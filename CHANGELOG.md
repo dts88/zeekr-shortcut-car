@@ -6,7 +6,7 @@
 
 ### 变更
 
-- 应用中文名定为「极氪极氪（车机版）」，成为默认的 launcher 名称；英文环境下仍显示 `Zeekr Shortcut`（新增 `values-en/strings.xml`）。
+- 应用中文名定为「极氪即刻（车机版）」，成为默认的 launcher 名称；英文环境下仍显示 `Zeekr Shortcut`（新增 `values-en/strings.xml`）。
 
 ### 移除（重要）
 
@@ -92,7 +92,7 @@
 
 ### 变更
 
-- 应用名改为 `Zeekr Shortcut`（中文名后改为「极氪极氪（车机版）」，见 Unreleased），包名改为 `io.github.dts88.zeekrshortcut`，
+- 应用名改为 `Zeekr Shortcut`（中文名后改为「极氪即刻（车机版）」，见 Unreleased），包名改为 `io.github.dts88.zeekrshortcut`，
   版本号从 `0.1.0-alpha` 重新起算（EVCam 基座版本为 1.6.6）。
 - 签名密钥可通过环境变量覆盖（`ZEEKR_KEYSTORE` 等），默认仍用仓库内的公开测试密钥。
 - 启用 `unitTests.isReturnDefaultValues`，使纯逻辑单元测试可在 JVM 上直接运行。

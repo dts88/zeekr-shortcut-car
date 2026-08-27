@@ -11,7 +11,7 @@
 set -euo pipefail
 
 REPO_NAME="${REPO_NAME:-zeekr-shortcut-car}"
-DESCRIPTION="极氪极氪（车机版）（Zeekr Shortcut (Car Version)）- 极氪车机环视记录仪。代码基座为 EVCam (GPL-3.0)，极氪合成流格式参考 openavm-recorder 的公开技术资料。"
+DESCRIPTION="极氪即刻（车机版）（Zeekr Shortcut (Car Version)）- 极氪车机环视记录仪。代码基座为 EVCam (GPL-3.0)，极氪合成流格式参考 openavm-recorder 的公开技术资料。"
 
 cd "$(dirname "$0")"
 

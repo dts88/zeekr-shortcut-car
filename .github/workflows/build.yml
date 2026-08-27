@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
-          VERSION=$(grep versionName app/build.gradle.kts | head -1 | cut -d'"' -f2)
+          VERSION=$(grep -E '^[[:space:]]*versionName[[:space:]]*=' app/build.gradle.kts | head -1 | cut -d'"' -f2)
           SHORT_SHA=$(git rev-parse --short HEAD)
           OUT="ZeekrShortcut-${VERSION}-${SHORT_SHA}.apk"
           cp "$SRC" "$OUT"
@@ -78,7 +78,7 @@ jobs:
           prerelease: true
           name: ${{ steps.apk.outputs.version }}
           body: |
-            ## 极氪极氪（车机版） ${{ steps.apk.outputs.version }}
+            ## 极氪即刻（车机版） ${{ steps.apk.outputs.version }}
 
             下载下面的 `.apk`，通过 App Lab 侧载安装。
 
