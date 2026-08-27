@@ -130,8 +130,10 @@ Camera2 ──写入──> 一个普通的 TextureView（唯一的相机消费�
 哪些原厂负载优先——全部未公开、未验证。
 
 【本项目】APK 体积是一个真实风险：本项目继承了 EVCam 的全部依赖
-（钉钉 SDK、gRPC、Glide、OkHttp 等），比上游那个精简应用大得多。
-若遇到装不上或起不来，第一优先级是裁依赖。
+（钉钉 SDK、gRPC、Glide、OkHttp、NanoHTTPD 等），**CI 实测 release APK 约 24 MB**，
+比上游那个精简 Compose 应用大不少。若遇到装不上或起不来，缓解顺序：
+① 开启 R8（`isMinifyEnabled = true`）+ 资源裁剪——注意 Gson/gRPC/钉钉 SDK 用反射，
+必须配 keep 规则并实机回归；② 砍掉用不到的远程查看模块。
 
 ### 3.3 内存
 
