@@ -1101,10 +1101,11 @@ public class SettingsFragment extends Fragment {
             
             // 异步检测 U盘
             new Thread(() -> {
-                boolean newHasSdCard = StorageHelper.hasExternalSdCard(context);
-                // 卷的数量可能变了（多插/拔掉一个盘）而 hasExternalSdCard 不变，所以一并取回
+                // 与初始化路径保持一致：hasExternalSdCard 统一由卷列表推导，
+                // 避免两处用不同方式判断而结论不一致
                 final java.util.List<StorageHelper.VolumeInfo> detected =
                         StorageHelper.listExternalVolumes(context);
+                boolean newHasSdCard = !detected.isEmpty();
 
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
@@ -1120,6 +1121,8 @@ public class SettingsFragment extends Fragment {
                             }
                             
                             rebuildStorageSpinner(currentLocation);
+                            // 重建过程中的回调可能影响中转写入行的可见性，复位一下
+                            updateRelayWriteVisibility();
                         }
                         
                         // 始终更新描述文字（可能U盘状态变化或空间变化）
@@ -1826,11 +1829,13 @@ public class SettingsFragment extends Fragment {
                     }
                 }
                 
-                updateStorageLocationDescriptionAsync(newLocation);
-                
+                // 初始化期间（换 adapter 会先回调一次 position 0）什么都不做，
+                // 描述文字由检测完成后的那次刷新负责
                 if (isInitializingStorageLocation) {
                     return;
                 }
+
+                updateStorageLocationDescriptionAsync(newLocation);
                 
                 // 注意：不能只比较 internal/external_sd —— 在两个外置卷之间切换时
                 // newLocation 是一样的，那样会被当成"没变化"直接 return。
@@ -1869,77 +1874,52 @@ public class SettingsFragment extends Fragment {
         }
         storageLocationSpinner.setSelection(selectedIndex);
 
-        // 异步枚举存储卷，回来后用真实列表重建选择器
-        if (getContext() != null) {
-            final Context volumeContext = getContext();
-            new Thread(() -> {
-                final java.util.List<StorageHelper.VolumeInfo> detected =
-                        StorageHelper.listExternalVolumes(volumeContext);
-                if (getActivity() == null) {
-                    return;
-                }
-                getActivity().runOnUiThread(() -> {
-                    if (getContext() == null) {
-                        return;
-                    }
-                    storageVolumes = buildVolumeSlots(detected);
-                    rebuildStorageSpinner(appConfig.getStorageLocation());
-                });
-            }).start();
-        }
         
         // 显示加载中状态
         if (storageLocationDescText != null) {
             storageLocationDescText.setText("正在检测存储设备...");
         }
         
-        // 异步检测 U盘并更新 UI
+        // 只做一次检测。
+        //
+        // 这里原本有两段异步检测在赛跑：旧的那段用写死的「内部存储 / U盘」两项重建
+        // spinner，新的那段用真实卷列表重建，谁后完成谁说了算 —— 于是首次进入常常
+        // 显示成「U盘（未检测到）」，退出再进才正常。更糟的是旧那段在 setAdapter 前
+        // 没有置 isInitializingStorageLocation，Spinner 换 adapter 时会先回调一次
+        // onItemSelected(0)，被当成用户选了「内部存储」写进配置，
+        // 于是下面的「中转写入」选项也跟着消失了。
+        //
+        // 现在合并成一次：枚举卷 -> 由卷列表推导 hasExternalSdCard -> 重建 spinner
+        // （带初始化标志）-> 更新描述与中转写入可见性。
         final String finalCurrentLocation = currentLocation;
-        final int finalSelectedIndex = selectedIndex;
+        final Context detectContext = getContext();
         new Thread(() -> {
-            // 在后台线程执行耗时的 I/O 操作
-            boolean detected = StorageHelper.hasExternalSdCard(getContext());
-            
-            // 回到主线程更新 UI
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (getContext() == null || storageLocationSpinner == null) {
-                        return;
-                    }
-                    
-                    hasExternalSdCard = detected;
-                    
-                    // 更新调试按钮可见性
-                    if (storageDebugButton != null) {
-                        storageDebugButton.setVisibility(hasExternalSdCard ? View.GONE : View.VISIBLE);
-                    }
-                    
-                    // 更新 Spinner 选项文字
-                    if (hasExternalSdCard) {
-                        storageLocationOptions = new String[] {"内部存储", "U盘"};
-                    } else {
-                        storageLocationOptions = new String[] {"内部存储", "U盘（未检测到）"};
-                    }
-                    
-                    ArrayAdapter<String> newAdapter = new ArrayAdapter<>(
-                            getContext(),
-                            R.layout.spinner_item,
-                            storageLocationOptions
-                    );
-                    newAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-                    storageLocationSpinner.setAdapter(newAdapter);
-                    
-                    // 恢复用户选择
-                    storageLocationSpinner.setSelection(finalSelectedIndex);
-                    
-                    // 异步更新描述文字
-                    updateStorageLocationDescriptionAsync(finalCurrentLocation);
-                    
-                    storageLocationSpinner.post(() -> {
-                        isInitializingStorageLocation = false;
-                    });
-                });
+            final java.util.List<StorageHelper.VolumeInfo> detected =
+                    StorageHelper.listExternalVolumes(detectContext);
+
+            if (getActivity() == null) {
+                return;
             }
+            getActivity().runOnUiThread(() -> {
+                if (getContext() == null || storageLocationSpinner == null) {
+                    return;
+                }
+
+                storageVolumes = buildVolumeSlots(detected);
+                hasExternalSdCard = !detected.isEmpty();
+
+                if (storageDebugButton != null) {
+                    storageDebugButton.setVisibility(hasExternalSdCard ? View.GONE : View.VISIBLE);
+                }
+
+                rebuildStorageSpinner(finalCurrentLocation);
+
+                // 检测完成后才更新描述，否则会用尚未确定的状态算出"未检测到U盘"
+                updateStorageLocationDescriptionAsync(finalCurrentLocation);
+                // 中转写入的可见性也要在这时候复位，
+                // 以防初始化过程中的回调把它藏起来了
+                updateRelayWriteVisibility();
+            });
         }).start();
         
         // 初始化中转写入开关

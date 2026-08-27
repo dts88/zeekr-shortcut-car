@@ -1464,7 +1464,9 @@ public class AppConfig {
      * @return true 表示中转写入已启用
      */
     public boolean isRelayWriteEnabled() {
-        return prefs.getBoolean(KEY_RELAY_WRITE_ENABLED, true);
+        // 默认关闭：中转写入会先写内部存储再搬到 U 盘，闪存写入量翻倍。
+        // 只有在 U 盘写入速度确实跟不上、录制出现卡顿时才值得开。
+        return prefs.getBoolean(KEY_RELAY_WRITE_ENABLED, false);
     }
     
     // ==================== 悬浮窗配置相关方法 ====================
