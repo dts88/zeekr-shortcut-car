@@ -60,6 +60,11 @@ public class SingleCamera {
     private Handler backgroundHandler;
 
     private Size previewSize;
+    /**
+     * 预览缓冲区尺寸。默认等于 {@link #previewSize}；开启「预览/录制分辨率解耦」后
+     * 会是一个更小的已声明尺寸，录制仍用 previewSize。
+     */
+    private Size previewBufferSize;
     private Surface recordSurface;  // 录制Surface
     private Surface mainFloatingSurface; // 主屏悬浮窗Surface
     private android.graphics.SurfaceTexture mainFloatingSurfaceTexture; // 主屏悬浮窗SurfaceTexture（用于设置buffer尺寸）
@@ -311,6 +316,64 @@ public class SingleCamera {
      */
     public Size getPreviewSize() {
         return previewSize;
+    }
+
+    /**
+     * 预览缓冲区实际使用的尺寸。录制尺寸请用 {@link #getPreviewSize()}。
+     */
+    public Size getPreviewBufferSize() {
+        return previewBufferSize != null ? previewBufferSize : previewSize;
+    }
+
+    /**
+     * 选择预览缓冲区尺寸。
+     *
+     * <p>未开启解耦时直接返回录制尺寸，行为与上游一致。开启后，从 HAL 已声明的
+     * 尺寸里挑一个最接近 640x480、且长宽都不超过 1280 的，用于预览缓冲区。
+     * 合成流被压扁进小缓冲区不影响四宫格拆分——拆分用的是归一化坐标。</p>
+     *
+     * <p>挑不到合适的小尺寸就退回录制尺寸，绝不臆造未声明的尺寸。</p>
+     */
+    private Size choosePreviewBufferSize(Size[] declaredSizes, Size recordSize) {
+        if (recordSize == null || declaredSizes == null) {
+            return recordSize;
+        }
+        AppConfig cfg = new AppConfig(context);
+        if (!cfg.isDecouplePreviewEnabled()) {
+            return recordSize;
+        }
+
+        final int targetW = 640;
+        final int targetH = 480;
+        final int maxEdge = 1280;
+
+        Size best = null;
+        int bestScore = Integer.MAX_VALUE;
+        for (Size size : declaredSizes) {
+            if (size == null || size.getWidth() <= 0 || size.getHeight() <= 0) {
+                continue;
+            }
+            if (size.getWidth() > maxEdge || size.getHeight() > maxEdge) {
+                continue;
+            }
+            long pixels = (long) size.getWidth() * size.getHeight();
+            if (pixels >= (long) recordSize.getWidth() * recordSize.getHeight()) {
+                continue;  // 不比录制尺寸小就没意义
+            }
+            int score = Math.abs(size.getWidth() - targetW) + Math.abs(size.getHeight() - targetH);
+            if (score < bestScore) {
+                bestScore = score;
+                best = size;
+            }
+        }
+
+        if (best == null) {
+            AppLog.w(TAG, "Camera " + cameraId + " 未找到合适的小尺寸预览缓冲区，沿用录制尺寸");
+            return recordSize;
+        }
+        AppLog.i(TAG, "Camera " + cameraId + " 预览/录制分辨率已解耦: 预览 " + best
+                + "，录制 " + recordSize);
+        return best;
     }
 
     public boolean isSecondaryDisplaySurfaceBound(Surface surface) {
@@ -902,7 +965,10 @@ public class SingleCamera {
 
                 // 选择合适的分辨率
                 previewSize = chooseOptimalSize(sizes);
-                AppLog.d(TAG, "Camera " + cameraId + " selected preview size: " + previewSize);
+                previewBufferSize = choosePreviewBufferSize(sizes, previewSize);
+                AppLog.d(TAG, "Camera " + cameraId + " selected preview size: " + previewSize
+                        + (previewBufferSize != null && !previewBufferSize.equals(previewSize)
+                           ? " (预览缓冲区: " + previewBufferSize + ")" : ""));
 
                 // 不在这里初始化ImageReader，改为拍照时按需创建
                 // 这样可以避免占用额外的缓冲区，防止超过系统限制(4个buffer)
@@ -1306,7 +1372,7 @@ public class SingleCamera {
             }
             if (surfaceTexture != null) {
                 if (previewSize != null) {
-                    surfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+                    surfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                     AppLog.d(TAG, "Camera " + cameraId + " buffer size set to: " + previewSize);
                 } else {
                     AppLog.e(TAG, "Camera " + cameraId + " Cannot set buffer size - previewSize: " + previewSize + ", SurfaceTexture: " + surfaceTexture);
@@ -1497,13 +1563,13 @@ public class SingleCamera {
                     // 避免悬浮窗/副屏 TextureView 使用物理布局尺寸导致 OutputConfiguration 尺寸不匹配
                     if (previewSize != null) {
                         if (mainFloatingSurfaceTexture != null) {
-                            mainFloatingSurfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+                            mainFloatingSurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                         }
                         if (secondaryDisplaySurfaceTexture != null) {
-                            secondaryDisplaySurfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+                            secondaryDisplaySurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                         }
                         if (fullscreenPreviewSurfaceTexture != null) {
-                            fullscreenPreviewSurfaceTexture.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+                            fullscreenPreviewSurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                         }
                     }
 
@@ -2538,7 +2604,7 @@ public class SingleCamera {
             if (st != null) {
                 android.util.Size previewSize = this.previewSize;
                 if (previewSize != null) {
-                    st.setDefaultBufferSize(previewSize.getWidth(), previewSize.getHeight());
+                    st.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                 }
                 textureView.setSurfaceTexture(st);
                 AppLog.d(TAG, "Camera " + cameraId + " restored main preview SurfaceTexture");

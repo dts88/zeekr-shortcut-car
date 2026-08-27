@@ -285,10 +285,19 @@ public class AppConfig {
     
     // 帧率配置相关键名
     private static final String KEY_FRAMERATE_LEVEL = "framerate_level";  // 帧率等级
+    private static final String KEY_RECORD_FPS = "record_fps";  // 显式录制帧率（auto/30/24/20/15/10）
+    private static final String KEY_DECOUPLE_PREVIEW = "decouple_preview_resolution";  // 预览与录制分辨率解耦
     
     // 帧率等级常量
     public static final String FRAMERATE_STANDARD = "standard";  // 标准帧率（默认）
     public static final String FRAMERATE_LOW = "low";            // 低帧率（标准值的一半）
+
+    // ---- 录制帧率：显式选择，优先级高于上面的帧率等级 ----
+    /** 跟随硬件/车型默认（即旧的帧率等级逻辑）。 */
+    public static final String RECORD_FPS_AUTO = "auto";
+    /** 可选的显式帧率，单位 fps。 */
+    public static final String[] RECORD_FPS_VALUES = {RECORD_FPS_AUTO, "30", "24", "20", "15", "10"};
+
     
     // 车型配置相关键名
     private static final String KEY_CAR_MODEL = "car_model";  // 车型（galaxy_e5 / custom）
@@ -773,16 +782,70 @@ public class AppConfig {
      * @return 实际使用的帧率
      */
     public int getActualFrameRate(int hardwareMaxFps) {
+        // 用户显式选了帧率就直接用，夹在 5..hardwareMaxFps 之间
+        String explicit = getRecordFps();
+        if (!RECORD_FPS_AUTO.equals(explicit)) {
+            try {
+                int fps = Integer.parseInt(explicit);
+                return Math.max(5, Math.min(hardwareMaxFps, fps));
+            } catch (NumberFormatException e) {
+                AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，回退到自动");
+            }
+        }
+
         int standardFps = getStandardFrameRate(hardwareMaxFps);
         String level = getFramerateLevel();
-        
+
         if (FRAMERATE_LOW.equals(level)) {
             // 低帧率：标准值除以2，最低10fps
             return Math.max(10, standardFps / 2);
         }
-        
+
         // 标准帧率
         return standardFps;
+    }
+
+    // ==================== 录制帧率（显式选择） ====================
+
+    /**
+     * 获取用户选择的录制帧率。
+     *
+     * @return {@link #RECORD_FPS_AUTO} 或具体的 fps 字符串
+     */
+    public String getRecordFps() {
+        return prefs.getString(KEY_RECORD_FPS, RECORD_FPS_AUTO);
+    }
+
+    /** 设置录制帧率；传入 {@link #RECORD_FPS_AUTO} 表示跟随硬件默认。 */
+    public void setRecordFps(String value) {
+        prefs.edit().putString(KEY_RECORD_FPS, value).apply();
+        AppLog.d(TAG, "录制帧率设置: " + value);
+    }
+
+    /** 录制帧率的显示名称。 */
+    public static String getRecordFpsDisplayName(String value) {
+        return RECORD_FPS_AUTO.equals(value) ? "原始帧率" : value + " fps";
+    }
+
+    // ==================== 预览/录制分辨率解耦 ====================
+
+    /**
+     * 是否让预览跑在较小的分辨率上，而录制仍用完整分辨率。
+     *
+     * <p>默认关闭，保持上游行为（两者共用一个尺寸）。开启后预览缓冲区会选一个
+     * 接近 640x480 的已声明尺寸，录制不受影响。对极氪的 1280x5140 合成流来说，
+     * 这能显著降低 GPU 与内存带宽——预览不必再搬运 655 万像素。</p>
+     *
+     * <p>是否可行取决于车机 HAL 是否支持这种「预览小、录制大」的组合，
+     * 因此做成开关，由用户在实车上验证。</p>
+     */
+    public boolean isDecouplePreviewEnabled() {
+        return prefs.getBoolean(KEY_DECOUPLE_PREVIEW, false);
+    }
+
+    public void setDecouplePreviewEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_DECOUPLE_PREVIEW, enabled).apply();
+        AppLog.d(TAG, "预览/录制分辨率解耦: " + enabled);
     }
     
     /**

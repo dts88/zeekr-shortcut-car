@@ -100,6 +100,14 @@ public class SettingsFragment extends Fragment {
     // 分段时长配置相关
     private Spinner segmentDurationSpinner;
     private static final String[] SEGMENT_DURATION_OPTIONS = {"1分钟", "3分钟", "5分钟"};
+
+    // 录制帧率配置相关
+    private Spinner recordFpsSpinner;
+    private static final String[] RECORD_FPS_OPTIONS = {"原始帧率", "30 fps", "24 fps", "20 fps", "15 fps", "10 fps"};
+    private boolean isInitializingRecordFps = false;
+
+    // 预览/录制分辨率解耦
+    private com.kooo.evcam.view.MacOSToggleButton decouplePreviewToggle;
     private boolean isInitializingSegmentDuration = false;
     private int lastAppliedSegmentDuration = -1;
     
@@ -192,6 +200,10 @@ public class SettingsFragment extends Fragment {
             
             // 初始化分段时长配置
             initSegmentDurationConfig(view);
+
+            initRecordFpsConfig(view);
+
+            initDecouplePreviewConfig(view);
             
             // 初始化录制摄像头选择配置
             initRecordingCameraSelectionConfig(view);
@@ -1354,6 +1366,95 @@ public class SettingsFragment extends Fragment {
         }
     }
     
+    /**
+     * 初始化录制帧率配置。
+     *
+     * <p>「原始帧率」保持上游行为（跟随车型/硬件默认），其余为显式帧率。
+     * 合成流分辨率很高，降低帧率是压编码负载最直接的手段。</p>
+     */
+    private void initRecordFpsConfig(View view) {
+        recordFpsSpinner = view.findViewById(R.id.spinner_record_fps);
+        if (recordFpsSpinner == null || getContext() == null || appConfig == null) {
+            return;
+        }
+
+        isInitializingRecordFps = true;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                getContext(), R.layout.spinner_item, RECORD_FPS_OPTIONS);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        recordFpsSpinner.setAdapter(adapter);
+
+        // 当前值 -> 下标
+        String current = appConfig.getRecordFps();
+        int selectedIndex = 0;
+        for (int i = 0; i < AppConfig.RECORD_FPS_VALUES.length; i++) {
+            if (AppConfig.RECORD_FPS_VALUES[i].equals(current)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+        recordFpsSpinner.setSelection(selectedIndex);
+
+        recordFpsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isInitializingRecordFps) {
+                    return;
+                }
+                if (position < 0 || position >= AppConfig.RECORD_FPS_VALUES.length) {
+                    return;
+                }
+                String value = AppConfig.RECORD_FPS_VALUES[position];
+                if (value.equals(appConfig.getRecordFps())) {
+                    return;
+                }
+                appConfig.setRecordFps(value);
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            "录制帧率已设为「" + AppConfig.getRecordFpsDisplayName(value)
+                                    + "」，下次开始录制时生效",
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        recordFpsSpinner.post(() -> isInitializingRecordFps = false);
+    }
+
+    /**
+     * 初始化「预览用低分辨率」开关。
+     *
+     * <p>默认关闭。开启后预览缓冲区会选一个接近 640x480 的已声明尺寸，
+     * 录制仍使用完整分辨率。能否生效取决于车机 HAL 是否支持这种组合，
+     * 因此提示用户开启后要实际确认预览与录制都正常。</p>
+     */
+    private void initDecouplePreviewConfig(View view) {
+        decouplePreviewToggle = view.findViewById(R.id.toggle_decouple_preview);
+        if (decouplePreviewToggle == null || appConfig == null) {
+            return;
+        }
+
+        decouplePreviewToggle.setChecked(appConfig.isDecouplePreviewEnabled());
+        decouplePreviewToggle.setOnCheckedChangeListener((button, isChecked) -> {
+            if (isChecked == appConfig.isDecouplePreviewEnabled()) {
+                return;
+            }
+            appConfig.setDecouplePreviewEnabled(isChecked);
+            if (getContext() != null) {
+                Toast.makeText(getContext(),
+                        isChecked
+                                ? "已开启：预览低分辨率、录制完整分辨率。重启应用后生效，请确认预览与录制都正常"
+                                : "已关闭：预览与录制共用同一分辨率。重启应用后生效",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
     /**
      * 初始化分段时长配置
      */
