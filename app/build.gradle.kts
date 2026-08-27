@@ -6,22 +6,34 @@ android {
     namespace = "com.kooo.evcam"
     compileSdk = 36
 
-    // 签名配置 (使用 AOSP 公共测试签名)
+    // 签名配置。
+    // 默认沿用仓库内的公开测试密钥（AOSP 测试签名，口令公开），方便任何人自行构建、
+    // 并保证不同版本之间可以覆盖安装。正式发布可用环境变量覆盖为自己的密钥：
+    //   ZEEKR_KEYSTORE / ZEEKR_KEYSTORE_PASSWORD / ZEEKR_KEY_ALIAS / ZEEKR_KEY_PASSWORD
     signingConfigs {
         create("release") {
-            storeFile = file("../keystore/release.jks")
-            storePassword = "android"
-            keyAlias = "apkeasytool"
-            keyPassword = "android"
+            val customStore = System.getenv("ZEEKR_KEYSTORE")
+            if (!customStore.isNullOrBlank() && file(customStore).exists()) {
+                storeFile = file(customStore)
+                storePassword = System.getenv("ZEEKR_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ZEEKR_KEY_ALIAS")
+                keyPassword = System.getenv("ZEEKR_KEY_PASSWORD")
+            } else {
+                storeFile = file("../keystore/release.jks")
+                storePassword = "android"
+                keyAlias = "apkeasytool"
+                keyPassword = "android"
+            }
         }
     }
 
     defaultConfig {
-        applicationId = "com.kooo.evcam"
+        applicationId = "io.github.dts88.zeekrshortcut"
         minSdk = 28
         targetSdk = 36
-        versionCode = 77
-        versionName = "1.6.6-test-06220930"
+        versionCode = 1
+        // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
+        versionName = "0.1.0-alpha"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -41,6 +53,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     sourceSets {

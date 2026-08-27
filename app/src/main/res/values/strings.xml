@@ -1,4 +1,17 @@
 <resources>
-    <string name="app_name">电车记录仪</string>
+    <string name="app_name">Zeekr Shortcut</string>
     <string name="accessibility_service_description">保活服务：用于提高应用后台运行稳定性，确保远程控制功能正常工作。\n\n本服务不会监控或操作任何用户界面，不会收集任何隐私信息，仅用于保持应用进程活跃。</string>
+
+    <!-- 极氪合成流模式 -->
+    <string name="zeekr_model_name">极氪7X（环视合成流）</string>
+    <string name="zeekr_lane_front">前</string>
+    <string name="zeekr_lane_back">后</string>
+    <string name="zeekr_lane_left">左</string>
+    <string name="zeekr_lane_right">右</string>
+    <string name="zeekr_mode_grid">四宫格</string>
+    <string name="zeekr_mode_single">单画面</string>
+    <string name="zeekr_composite_not_found">未检测到四联合成流，本机可能不支持极氪合成模式</string>
+
+    <!-- 关于页面 -->
+    <string name="about_title">关于与致谢</string>
 </resources>

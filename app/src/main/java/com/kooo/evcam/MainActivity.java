@@ -86,6 +86,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private AutoFitTextureView textureFront, textureBack, textureLeft, textureRight;
+    /** 极氪合成流视图；非该车型时为 null。 */
+    private com.kooo.evcam.zeekr.CompositeTextureView compositeTextureView;
+    private TextView tvCompositeInfo;
     private final java.util.Map<String, android.graphics.Matrix> previewBaseTransforms = new java.util.HashMap<>();
     private PreviewCorrectionFloatingWindow previewCorrectionFloatingWindow;
     private FisheyeCorrectionFloatingWindow fisheyeCorrectionFloatingWindow;
@@ -983,6 +986,13 @@ public class MainActivity extends AppCompatActivity {
             requiredTextureCount = 4;
             AppLog.d(TAG, "使用银河A7配置：横屏4摄像头布局（沿用E5）");
         }
+        // 极氪7X：一路四联合成流，界面上只有一个 CompositeTextureView 自己拆四宫格
+        else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
+            layoutId = R.layout.activity_main_zeekr_7x;
+            configuredCameraCount = 1;
+            requiredTextureCount = 1;
+            AppLog.d(TAG, "使用极氪7X配置：单路合成流 + GL 四宫格拆分");
+        }
         // 多视角布局：自定义布局 + 圆角UI + 车辆控制
         else if (appConfig.isMultiviewCarModel()) {
             layoutId = R.layout.activity_main_multiview;
@@ -1068,6 +1078,13 @@ public class MainActivity extends AppCompatActivity {
         textureBack = findViewById(R.id.texture_back);  // 1摄布局中为null
         textureLeft = findViewById(R.id.texture_left);  // 1摄和2摄布局中为null
         textureRight = findViewById(R.id.texture_right);  // 1摄和2摄布局中为null
+
+        // 极氪合成流：texture_front 实际是 CompositeTextureView
+        if (textureFront instanceof com.kooo.evcam.zeekr.CompositeTextureView) {
+            compositeTextureView = (com.kooo.evcam.zeekr.CompositeTextureView) textureFront;
+            tvCompositeInfo = findViewById(R.id.tv_composite_info);
+            setupCompositeControls();
+        }
         
         btnStartRecord = findViewById(R.id.btn_start_record);
         btnExit = findViewById(R.id.btn_exit);
@@ -1951,6 +1968,8 @@ public class MainActivity extends AppCompatActivity {
                 toggleSupervisionMode();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
+            } else if (itemId == R.id.nav_about) {
+                startActivity(new Intent(this, com.kooo.evcam.zeekr.AboutActivity.class));
             }
             // 设置当前项为选中
             navigationView.setCheckedItem(itemId);
@@ -2748,6 +2767,9 @@ public class MainActivity extends AppCompatActivity {
                 } else if (AppConfig.CAR_MODEL_GALAXY_A7.equals(carModel)) {
                     // 银河A7：沿用银河E5固定映射
                     initCamerasForGalaxyE5(cameraIds);
+                } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
+                    // 极氪7X：按能力查找提供合成流的那一路相机
+                    initCamerasForZeekrComposite(cm, cameraIds);
                 } else if (appConfig.needsCustomLayoutManager()) {
                     // 自定义车型/多视角：使用用户配置的摄像头映射
                     initCamerasForCustomModel(cameraIds);
@@ -2794,6 +2816,42 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     
+    /**
+     * 极氪7X：车机只提供一路四联合成流。
+     *
+     * <p>不写死摄像头下标，而是遍历所有相机、挑出真正声明了合成流尺寸的那一路。
+     * 找到后把分辨率写进配置，让 SingleCamera.chooseOptimalSize 精确命中它。</p>
+     */
+    private void initCamerasForZeekrComposite(CameraManager cm, String[] cameraIds) {
+        com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
+                com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
+        AppLog.i(TAG, "极氪合成流探测结果:
+" + located.diagnostics);
+
+        String cameraId;
+        if (located.found()) {
+            cameraId = located.cameraId;
+            // 让相机精确选中这个尺寸，而不是回退到最接近 1280x800 的那个
+            appConfig.setTargetResolution(
+                    located.size.getWidth() + "x" + located.size.getHeight());
+            if (compositeTextureView != null) {
+                compositeTextureView.setSourceSize(located.size);
+            }
+        } else {
+            // 没找到就退回第一个相机，界面上会显示原始画面并提示不支持
+            cameraId = cameraIds.length > 0 ? cameraIds[0] : null;
+            AppLog.w(TAG, "未找到合成流，退回相机 " + cameraId);
+            runOnUiThread(() -> Toast.makeText(this,
+                    R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show());
+        }
+
+        updateCompositeInfoOverlay(located.diagnostics);
+
+        if (cameraId != null) {
+            cameraManager.initCameras(cameraId, textureFront, null, null, null, null, null, null);
+        }
+    }
+
     /**
      * 银河E5车型：使用固定的摄像头映射
      */
@@ -3077,6 +3135,17 @@ public class MainActivity extends AppCompatActivity {
      */
     private void applyPreviewSizeTransform(String cameraKey, AutoFitTextureView textureView, android.util.Size previewSize) {
         String carModel = appConfig.getCarModel();
+
+        // 极氪合成流：比例与排版由 CompositeTextureView 自己用 GL 处理，
+        // 这里只把真实源尺寸告诉它，不要再套用单画面的宽高比/矩阵变换。
+        if (textureView instanceof com.kooo.evcam.zeekr.CompositeTextureView) {
+            com.kooo.evcam.zeekr.CompositeTextureView composite =
+                    (com.kooo.evcam.zeekr.CompositeTextureView) textureView;
+            composite.setSourceSize(previewSize);
+            AppLog.d(TAG, "合成流源尺寸已更新: " + previewSize + " -> " + composite.describePlan());
+            updateCompositeInfoOverlay(composite.describePlan());
+            return;
+        }
 
         if (appConfig.needsCustomLayoutManager()) {
             textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
@@ -5645,4 +5714,84 @@ public class MainActivity extends AppCompatActivity {
         // CameraPreviewFloatingService.stop(this);
         AppLog.d(TAG, "Camera preview floating stop - not implemented yet");
     }
+
+    // ==================== 极氪合成流 ====================
+
+    /**
+     * 合成流界面的交互：点击画面在四宫格 / 单画面之间切换，
+     * 单画面模式下再次点击换下一个画面。
+     */
+    private void setupCompositeControls() {
+        if (compositeTextureView == null) {
+            return;
+        }
+        Button btnMode = findViewById(R.id.btn_composite_mode);
+        if (btnMode != null) {
+            btnMode.setOnClickListener(v -> toggleCompositeMode(btnMode));
+        }
+        compositeTextureView.setOnClickListener(v -> {
+            if (compositeTextureView.getDisplayMode()
+                    == com.kooo.evcam.zeekr.CompositeTextureView.DisplayMode.SINGLE) {
+                int next = (compositeTextureView.getFocusedLane() + 1)
+                        % com.kooo.evcam.zeekr.CompositeStreamGeometry.LANE_COUNT;
+                compositeTextureView.focusLane(next);
+                updateCompositeLabels();
+            }
+        });
+        updateCompositeLabels();
+    }
+
+    private void toggleCompositeMode(Button btnMode) {
+        if (compositeTextureView == null) {
+            return;
+        }
+        boolean isGrid = compositeTextureView.getDisplayMode()
+                == com.kooo.evcam.zeekr.CompositeTextureView.DisplayMode.GRID;
+        if (isGrid) {
+            compositeTextureView.focusLane(0);
+            btnMode.setText(R.string.zeekr_mode_single);
+        } else {
+            compositeTextureView.showGrid();
+            btnMode.setText(R.string.zeekr_mode_grid);
+        }
+        updateCompositeLabels();
+    }
+
+    /** 单画面模式下只留一个角标，四宫格模式下四个都显示。 */
+    private void updateCompositeLabels() {
+        if (compositeTextureView == null) {
+            return;
+        }
+        boolean grid = compositeTextureView.getDisplayMode()
+                == com.kooo.evcam.zeekr.CompositeTextureView.DisplayMode.GRID;
+        TextView[] labels = {
+                findViewById(R.id.label_front),
+                findViewById(R.id.label_back),
+                findViewById(R.id.label_left),
+                findViewById(R.id.label_right),
+        };
+        int[] order = compositeTextureView.getLaneOrder();
+        int focused = compositeTextureView.getFocusedLane();
+        for (int cell = 0; cell < labels.length; cell++) {
+            if (labels[cell] == null) {
+                continue;
+            }
+            boolean visible = grid || order[cell] == focused;
+            labels[cell].setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /** 把合成流的识别结果显示在画面底部，方便用户和排查问题时确认。 */
+    private void updateCompositeInfoOverlay(String text) {
+        if (tvCompositeInfo == null || text == null) {
+            return;
+        }
+        String oneLine = text.trim().replace('
+', ' ');
+        runOnUiThread(() -> {
+            tvCompositeInfo.setText(oneLine);
+            tvCompositeInfo.setVisibility(oneLine.isEmpty() ? View.GONE : View.VISIBLE);
+        });
+    }
+
 }

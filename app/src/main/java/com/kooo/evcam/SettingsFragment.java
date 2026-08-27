@@ -86,7 +86,7 @@ public class SettingsFragment extends Fragment {
     // 车型配置相关
     private Spinner carModelSpinner;
     private Button customCameraConfigButton;
-    private static final String[] CAR_MODEL_OPTIONS = {"银河E5", "银河A7", "银河E5-多按钮", "银河L6/L7", "银河L7-多按钮", "26款星舰7", "手机", "自定义车型", "多视角布局"};
+    private static final String[] CAR_MODEL_OPTIONS = {"银河E5", "银河A7", "银河E5-多按钮", "银河L6/L7", "银河L7-多按钮", "26款星舰7", "手机", "自定义车型", "多视角布局", "极氪7X（环视合成流）"};
     private boolean isInitializingCarModel = false;
     private String lastAppliedCarModel = null;
     
@@ -1184,6 +1184,9 @@ public class SettingsFragment extends Fragment {
                 } else if (position == 8) {
                     newModel = AppConfig.CAR_MODEL_MULTIVIEW;
                     modelName = "多视角布局";
+                } else if (position == 9) {
+                    newModel = AppConfig.CAR_MODEL_ZEEKR_7X;
+                    modelName = "极氪7X（环视合成流）";
                 } else {
                     newModel = AppConfig.CAR_MODEL_CUSTOM;
                     modelName = "自定义车型";
@@ -1237,6 +1240,8 @@ public class SettingsFragment extends Fragment {
             selectedIndex = 7;
         } else if (AppConfig.CAR_MODEL_MULTIVIEW.equals(currentModel)) {
             selectedIndex = 8;
+        } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(currentModel)) {
+            selectedIndex = 9;
         }
         carModelSpinner.setSelection(selectedIndex);
         

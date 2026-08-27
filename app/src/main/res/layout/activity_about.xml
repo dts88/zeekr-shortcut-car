@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/menu_background">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/about_title"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/about_version"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="#AAFFFFFF"
+                android:textSize="14sp" />
+
+            <!-- 本应用是什么 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="本应用是什么"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/about_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="这是一个用于极氪车机的环视记录仪应用。它不是从零写出来的，功能来自两个已有的开源／公开项目，我们在此明确说明来源并向原开发者致谢。"
+                android:textColor="#DDFFFFFF"
+                android:textSize="15sp" />
+
+            <!-- 来源一：EVCam -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="来源一：EVCam（代码基座）"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="作者：suyunkai\n许可证：GNU GPL v3.0\n\n本应用直接以 EVCam 的源代码为基座构建，以下能力全部来自 EVCam，版权归其作者所有：\n\n• 多路视频流接入与 Camera2 管线\n• 视频压缩：H.264 / H.265 可选、码率档位、编码缩放\n• 帧率调节与自适应降帧\n• U盘等外置存储支持、存储自动清理\n• 分段录制、时间戳水印、回放与图片管理\n• 悬浮窗、开机自启、后台保活\n• 钉钉 / 飞书 / Telegram 远程查看\n\n按照 GPL v3.0 的要求，本应用同样以 GPL v3.0 发布，并公开全部源代码。"
+                android:textColor="#DDFFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/about_link_evcam"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:padding="10dp"
+                android:background="@drawable/camera_label_background"
+                android:text="github.com/suyunkai/EVCam"
+                android:textColor="#66CCFF"
+                android:textSize="15sp" />
+
+            <!-- 来源二：openavm-recorder -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="来源二：AVM Recorder（极氪合成流的公开技术资料）"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="作者：Dantenothing\n许可：Copyright © 2026 Dantenothing. All rights reserved.（保留所有权利，非开源许可）\n\n极氪 App Lab 只向第三方应用提供一路已经拼好的环视合成流，而不是四个独立摄像头。这一关键事实，以及合成流的具体尺寸与排布，由 openavm-recorder 项目率先公开记录：\n\n• 竖排 1280×5140：四个 1280×1280 方形画面竖向堆叠，另有 5 条 4px 分隔带\n• 横排 5120×1280：四个 1280×1280 画面横向排列\n• 整条合成流的推荐编码码率约 28 Mbps\n\n本应用对合成流的界面比例与拆分显示，正是基于以上公开记录的技术事实实现的。没有这份公开资料，本应用不可能适配极氪车机。在此向原作者致以诚挚感谢。"
+                android:textColor="#DDFFFFFF"
+                android:textSize="15sp" />
+
+            <!-- 边界说明 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:padding="12dp"
+                android:background="@drawable/camera_label_background"
+                android:lineSpacingMultiplier="1.3"
+                android:text="重要说明：本应用没有复制 openavm-recorder 的任何源代码。该项目保留所有权利，未授予开源许可，其代码不可被复制或再分发。本应用只使用了其公开 README 中记载的接口事实（分辨率、排布、比例），四宫格拆分与渲染均为独立编写实现。\n\n本应用与 openavm-recorder 项目及其作者没有隶属或合作关系，也未获其背书。AVM Recorder 的名称与图标未用于本应用的品牌标识。"
+                android:textColor="#FFD9A0"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/about_link_openavm"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:padding="10dp"
+                android:background="@drawable/camera_label_background"
+                android:text="github.com/Dantenothing/openavm-recorder"
+                android:textColor="#66CCFF"
+                android:textSize="15sp" />
+
+            <!-- 许可证 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="本应用的许可证"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="GNU General Public License v3.0（继承自 EVCam）。你可以自由使用、修改和分发本应用，但分发时必须同样以 GPL v3.0 发布并提供对应源代码。"
+                android:textColor="#DDFFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/about_link_gpl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:padding="10dp"
+                android:background="@drawable/camera_label_background"
+                android:text="gnu.org/licenses/gpl-3.0.html"
+                android:textColor="#66CCFF"
+                android:textSize="15sp" />
+
+            <!-- 安全免责 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="安全须知"
+                android:textColor="#FF8080"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="12dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="本应用为实验性非官方软件，与极氪（ZEEKR）无任何关联，未经其批准或认可，也未经过任何车辆功能安全认证。\n\n• 不可替代原厂行车记录仪、倒车影像、盲区监测或任何法定安全设备\n• 请勿在行驶中操作本应用，请勿依据本应用画面判断车距或障碍物\n• 画面存在延迟，可能卡顿、失真或中断\n• 与车机系统争夺资源可能影响原厂功能，一旦出现异常请立即停用并卸载\n• 长时间录制会持续写入闪存，请自行评估存储损耗\n• 录制内容可能包含人脸、车牌等个人信息，请遵守当地法律\n\n本软件以「现状」提供，不提供任何形式的担保。使用风险由使用者自行承担。"
+                android:textColor="#DDFFFFFF"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/about_close"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="24dp"
+                android:text="关闭"
+                android:textSize="16sp"
+                android:backgroundTint="@color/button_background"
+                android:textColor="@color/button_text" />
+
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

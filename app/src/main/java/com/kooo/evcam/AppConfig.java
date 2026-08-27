@@ -378,6 +378,7 @@ public class AppConfig {
     public static final String CAR_MODEL_CUSTOM = "custom";  // 自定义车型
     public static final String CAR_MODEL_XINGHAN_7 = "xinghan_7";  // 26款星舰7
     public static final String CAR_MODEL_MULTIVIEW = "multiview";  // 多视角布局
+    public static final String CAR_MODEL_ZEEKR_7X = "zeekr_7x";  // 极氪7X（一路四联合成环视流）
     
     private final SharedPreferences prefs;
     private final Context context;
@@ -828,6 +829,14 @@ public class AppConfig {
     }
     
     /**
+     * 是否为极氪合成流车型。
+     * 该模式下车机只提供一路四联合成流，预览与录制都走 CompositeTextureView。
+     */
+    public boolean isZeekrCompositeModel() {
+        return CAR_MODEL_ZEEKR_7X.equals(getCarModel());
+    }
+    
+    /**
      * 是否需要自定义布局管理器（自定义车型和多视角都需要）
      */
     public boolean needsCustomLayoutManager() {
@@ -861,6 +870,8 @@ public class AppConfig {
             case CAR_MODEL_L7_MULTI:
             case CAR_MODEL_XINGHAN_7:
                 return 4;  // 银河E5/L7/26款星舰7：4摄
+            case CAR_MODEL_ZEEKR_7X:
+                return 1;  // 极氪7X：车机只给一路合成流，四个画面在同一帧里
             case CAR_MODEL_MULTIVIEW:
             case CAR_MODEL_CUSTOM:
             default:

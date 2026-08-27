@@ -1,0 +1,86 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 纯 JVM 单元测试：合成流几何拆分与相机选择逻辑
+      - name: Run unit tests
+        run: ./gradlew testReleaseUnitTest --stacktrace
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Rename APK
+        id: apk
+        run: |
+          set -euo pipefail
+          SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          OUT="ZeekrShortcut-${VERSION}-${SHORT_SHA}.apk"
+          cp "$SRC" "$OUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          ls -lh "$OUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZeekrShortcut-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      # 打 tag 时自动发布 Release，车机/手机可直接下载安装
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          body: |
+            Zeekr Shortcut (Car Version) ${{ steps.apk.outputs.version }}
+
+            实验性非官方软件，与极氪（ZEEKR）无关联，未经其批准或认可。
+            请先阅读 README 的安全须知与来源说明。
+
+            本应用以 GPL-3.0 发布，代码基座为 [EVCam](https://github.com/suyunkai/EVCam)（GPL-3.0，作者 suyunkai）。
+            极氪合成流的尺寸与排布事实来自 [openavm-recorder](https://github.com/Dantenothing/openavm-recorder)
+            的公开 README（作者 Dantenothing，保留所有权利）——本项目未复制其任何源代码。

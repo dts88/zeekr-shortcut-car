@@ -62,7 +62,7 @@ public class CameraManagerHolder {
             }
 
             // 根据车型配置初始化摄像头（TextureView 全部传 null）
-            initCamerasByCarModel(appConfig, cameraIds);
+            initCamerasByCarModel(appConfig, cm, cameraIds);
 
             // 设置录制模式
             boolean useCodecRecording = appConfig.shouldUseCodecRecording();
@@ -108,6 +108,8 @@ public class CameraManagerHolder {
         String carModel = appConfig.getCarModel();
         if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
             return 2;
+        } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
+            return 1; // 极氪7X：一路合成流
         } else if (appConfig.isCustomCarModel()) {
             return appConfig.getCameraCount();
         }
@@ -117,7 +119,7 @@ public class CameraManagerHolder {
     /**
      * 根据车型配置初始化摄像头（与 MainActivity 中的逻辑一致，但 TextureView 全部传 null）
      */
-    private void initCamerasByCarModel(AppConfig appConfig, String[] cameraIds) {
+    private void initCamerasByCarModel(AppConfig appConfig, CameraManager cm, String[] cameraIds) {
         String carModel = appConfig.getCarModel();
 
         if (AppConfig.CAR_MODEL_L7.equals(carModel) || AppConfig.CAR_MODEL_L7_MULTI.equals(carModel)) {
@@ -129,12 +131,34 @@ public class CameraManagerHolder {
         } else if (AppConfig.CAR_MODEL_GALAXY_A7.equals(carModel)) {
             // 银河A7：沿用银河E5固定映射
             initCamerasForGalaxyE5(cameraIds);
+        } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
+            initCamerasForZeekrComposite(cm, cameraIds);
         } else if (appConfig.isCustomCarModel()) {
             initCamerasForCustomModel(appConfig, cameraIds);
         } else {
             // 银河E5（默认）
             initCamerasForGalaxyE5(cameraIds);
         }
+    }
+
+    /**
+     * 极氪7X 后台初始化：只开一路合成流。
+     *
+     * <p>与前台一样按能力查找提供合成流的相机，避免后台悬浮窗打开错误的那一路。
+     * 找不到时退回第一个相机，行为与前台保持一致。</p>
+     */
+    private void initCamerasForZeekrComposite(CameraManager cm, String[] cameraIds) {
+        if (cameraIds.length == 0) {
+            return;
+        }
+        com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
+                com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
+        String cameraId = located.found() ? located.cameraId : cameraIds[0];
+        AppLog.i(TAG, "后台合成流相机: " + cameraId
+                + (located.found() ? " (" + located.size + ")" : " (未找到合成流，已退回)"));
+        cameraManager.initCameras(
+                cameraId, null, null, null,
+                null, null, null, null);
     }
 
     private void initCamerasForGalaxyE5(String[] cameraIds) {
