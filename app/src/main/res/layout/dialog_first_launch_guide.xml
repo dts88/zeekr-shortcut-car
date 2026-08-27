@@ -153,26 +153,10 @@
             android:gravity="center"
             android:layout_marginBottom="12dp" />
 
-        <!-- 打赏支持 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="开发不易，如果这个项目对你有帮助，欢迎打赏支持！"
-            android:textSize="20sp"
-            android:textColor="@color/dialog_guide_accent"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:layout_marginBottom="12dp" />
-
-        <!-- 二维码图片（尺寸在代码中根据屏幕密度动态设置） -->
-        <ImageView
-            android:id="@+id/iv_qrcode"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:scaleType="fitCenter"
-            android:contentDescription="打赏二维码"
-            android:layout_marginBottom="20dp" />
+        <!-- 原上游 EVCam 的打赏二维码已移除。
+             那是 EVCam 作者的收款码，且是运行时从其服务器拉取的；
+             在改名后的分支里展示会让用户误以为是在支持本应用。
+             对上游的致谢与链接见「关于与致谢」页面。 -->
 
         <!-- 确认按钮 -->
         <TextView

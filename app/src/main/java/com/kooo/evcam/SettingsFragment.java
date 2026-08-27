@@ -333,102 +333,6 @@ public class SettingsFragment extends Fragment {
             }
         });
 
-        // 初始化预览画面矫正
-        previewCorrectionSwitch = view.findViewById(R.id.switch_preview_correction);
-        previewCorrectionButtonsLayout = view.findViewById(R.id.layout_preview_correction_buttons);
-        openPreviewCorrectionFloatingButton = view.findViewById(R.id.btn_open_preview_correction_floating);
-        resetPreviewCorrectionButton = view.findViewById(R.id.btn_reset_preview_correction);
-        if (getContext() != null && appConfig != null) {
-            boolean correctionEnabled = appConfig.isPreviewCorrectionEnabled();
-            previewCorrectionSwitch.setChecked(correctionEnabled);
-            previewCorrectionButtonsLayout.setVisibility(correctionEnabled ? View.VISIBLE : View.GONE);
-        }
-        previewCorrectionSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (getContext() != null && appConfig != null) {
-                appConfig.setPreviewCorrectionEnabled(isChecked);
-                previewCorrectionButtonsLayout.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-                // 刷新预览
-                MainActivity mainActivity = MainActivity.getInstance();
-                if (mainActivity != null) {
-                    mainActivity.refreshPreviewCorrection();
-                }
-                String message = isChecked ? "预览画面矫正已开启" : "预览画面矫正已关闭";
-                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-            }
-        });
-        openPreviewCorrectionFloatingButton.setOnClickListener(v -> {
-            if (getContext() == null) return;
-            if (!WakeUpHelper.hasOverlayPermission(requireContext())) {
-                Toast.makeText(requireContext(), "请先授予悬浮窗权限", Toast.LENGTH_SHORT).show();
-                WakeUpHelper.requestOverlayPermission(requireContext());
-                return;
-            }
-            // 先回到主界面再打开悬浮窗，方便实时预览
-            MainActivity mainActivity = MainActivity.getInstance();
-            if (mainActivity != null) {
-                mainActivity.goToRecordingInterface();
-                mainActivity.showPreviewCorrectionFloating();
-            }
-        });
-        resetPreviewCorrectionButton.setOnClickListener(v -> {
-            if (getContext() != null && appConfig != null) {
-                appConfig.resetAllPreviewCorrection();
-                Toast.makeText(getContext(), "所有预览矫正参数已恢复默认", Toast.LENGTH_SHORT).show();
-                MainActivity mainActivity = MainActivity.getInstance();
-                if (mainActivity != null) {
-                    mainActivity.refreshPreviewCorrection();
-                }
-            }
-        });
-
-        // 初始化鱼眼矫正
-        fisheyeCorrectionSwitch = view.findViewById(R.id.switch_fisheye_correction);
-        fisheyeCorrectionButtonsLayout = view.findViewById(R.id.layout_fisheye_correction_buttons);
-        openFisheyeCorrectionFloatingButton = view.findViewById(R.id.btn_open_fisheye_correction_floating);
-        resetFisheyeCorrectionButton = view.findViewById(R.id.btn_reset_fisheye_correction);
-        if (getContext() != null && appConfig != null) {
-            boolean fisheyeEnabled = appConfig.isFisheyeCorrectionEnabled();
-            fisheyeCorrectionSwitch.setChecked(fisheyeEnabled);
-            fisheyeCorrectionButtonsLayout.setVisibility(fisheyeEnabled ? View.VISIBLE : View.GONE);
-        }
-        fisheyeCorrectionSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (getContext() != null && appConfig != null) {
-                appConfig.setFisheyeCorrectionEnabled(isChecked);
-                fisheyeCorrectionButtonsLayout.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-                // 需要重建 session 来切换 Surface（直接 / GL 中间层）
-                MainActivity mainActivity = MainActivity.getInstance();
-                if (mainActivity != null) {
-                    mainActivity.refreshFisheyeCorrection();
-                }
-                String message = isChecked ? "鱼眼矫正已开启" : "鱼眼矫正已关闭";
-                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-            }
-        });
-        openFisheyeCorrectionFloatingButton.setOnClickListener(v -> {
-            if (getContext() == null) return;
-            if (!WakeUpHelper.hasOverlayPermission(requireContext())) {
-                Toast.makeText(requireContext(), "请先授予悬浮窗权限", Toast.LENGTH_SHORT).show();
-                WakeUpHelper.requestOverlayPermission(requireContext());
-                return;
-            }
-            // 先回到主界面再打开悬浮窗，方便实时预览
-            MainActivity mainActivity = MainActivity.getInstance();
-            if (mainActivity != null) {
-                mainActivity.goToRecordingInterface();
-                mainActivity.showFisheyeCorrectionFloating();
-            }
-        });
-        resetFisheyeCorrectionButton.setOnClickListener(v -> {
-            if (getContext() != null && appConfig != null) {
-                appConfig.resetAllFisheyeCorrection();
-                Toast.makeText(getContext(), "所有鱼眼矫正参数已恢复默认", Toast.LENGTH_SHORT).show();
-                MainActivity mainActivity = MainActivity.getInstance();
-                if (mainActivity != null) {
-                    mainActivity.refreshFisheyeCorrection();
-                }
-            }
-        });
-
         // 初始化开机自启动开关
         autoStartSwitch = view.findViewById(R.id.switch_auto_start);
         if (getContext() != null && appConfig != null) {
@@ -515,8 +419,6 @@ public class SettingsFragment extends Fragment {
         // 初始化录制悬浮按钮设置
         initRecordingFloatingSettings(view);
 
-        // 初始化定制键唤醒设置
-        initCustomKeyWakeupSettings(view);
         
         // 沉浸式状态栏兼容
         View toolbar = view.findViewById(R.id.toolbar);
@@ -557,85 +459,11 @@ public class SettingsFragment extends Fragment {
         }
 
         // 加载二维码图片
-        android.widget.ImageView ivQrcode = dialog.findViewById(R.id.iv_qrcode);
-        loadQrcodeImage(ivQrcode);
 
         // 设置确认按钮点击事件
         dialog.findViewById(R.id.btn_confirm).setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
-    }
-
-    /**
-     * 加载打赏二维码图片（URL经过混淆处理）
-     */
-    private void loadQrcodeImage(android.widget.ImageView imageView) {
-        if (getActivity() == null || getContext() == null) return;
-        
-        // 根据屏幕密度动态设置二维码尺寸
-        // 低DPI大屏设备使用更大尺寸，高DPI设备使用适中尺寸
-        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-        float density = dm.density;
-        int screenWidthPx = dm.widthPixels;
-        
-        // 计算二维码尺寸（像素）
-        // density: mdpi=1.0, hdpi=1.5, xhdpi=2.0, xxhdpi=3.0, xxxhdpi=4.0
-        int qrcodeSizePx;
-        if (density <= 1.0f) {
-            // mdpi 或更低密度（大屏低DPI设备）：使用屏幕宽度的25%
-            qrcodeSizePx = (int) (screenWidthPx * 0.25f);
-        } else if (density <= 1.5f) {
-            // hdpi：使用屏幕宽度的22%
-            qrcodeSizePx = (int) (screenWidthPx * 0.22f);
-        } else if (density <= 2.0f) {
-            // xhdpi：使用屏幕宽度的20%
-            qrcodeSizePx = (int) (screenWidthPx * 0.20f);
-        } else {
-            // xxhdpi 及以上（高密度设备）：使用屏幕宽度的18%
-            qrcodeSizePx = (int) (screenWidthPx * 0.18f);
-        }
-        
-        // 设置ImageView尺寸
-        android.view.ViewGroup.LayoutParams params = imageView.getLayoutParams();
-        params.width = qrcodeSizePx;
-        params.height = qrcodeSizePx;
-        imageView.setLayoutParams(params);
-        
-        // URL混淆存储，防止被轻易修改
-        // 原始URL经过Base64编码后分段存储
-        final String[] p = {
-            "aHR0cHM6Ly9ldmNhbS5jaGF0d2Vi", // 第一段
-            "LmNsb3VkLzE3Njk0NzcxOTc4NTUu", // 第二段  
-            "anBn"                           // 第三段
-        };
-        
-        new Thread(() -> {
-            try {
-                // 组合并解码URL
-                String encoded = p[0] + p[1] + p[2];
-                String url = new String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT));
-                
-                // 下载图片
-                java.net.URL imageUrl = new java.net.URL(url);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) imageUrl.openConnection();
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.setDoInput(true);
-                conn.connect();
-                
-                java.io.InputStream is = conn.getInputStream();
-                final android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeStream(is);
-                is.close();
-                conn.disconnect();
-                
-                // 在主线程更新UI
-                if (bitmap != null && getActivity() != null) {
-                    getActivity().runOnUiThread(() -> imageView.setImageBitmap(bitmap));
-                }
-            } catch (Exception e) {
-                AppLog.e("SettingsFragment", "加载二维码图片失败: " + e.getMessage());
-            }
-        }).start();
     }
 
     /**
@@ -706,83 +534,6 @@ public class SettingsFragment extends Fragment {
         initFloatingWindowAlphaSeekBar();
     }
 
-    /**
-     * 初始化定制键唤醒设置
-     */
-    private void initCustomKeyWakeupSettings(View view) {
-        customKeyWakeupSwitch = view.findViewById(R.id.switch_custom_key_wakeup);
-        customKeyWakeupDetailLayout = view.findViewById(R.id.layout_custom_key_wakeup_detail);
-        customKeySpeedThresholdEditText = view.findViewById(R.id.et_custom_key_speed_threshold);
-        customKeySpeedPropIdEditText = view.findViewById(R.id.et_custom_key_speed_prop_id);
-        customKeyButtonPropIdEditText = view.findViewById(R.id.et_custom_key_button_prop_id);
-
-        if (customKeyWakeupSwitch == null || getContext() == null || appConfig == null) return;
-
-        // 加载配置
-        boolean enabled = appConfig.isCustomKeyWakeupEnabled();
-        customKeyWakeupSwitch.setChecked(enabled);
-        customKeyWakeupDetailLayout.setVisibility(enabled ? View.VISIBLE : View.GONE);
-        customKeySpeedThresholdEditText.setText(String.valueOf(appConfig.getCustomKeySpeedThreshold()));
-        customKeySpeedPropIdEditText.setText(String.valueOf(appConfig.getCustomKeySpeedPropId()));
-        customKeyButtonPropIdEditText.setText(String.valueOf(appConfig.getCustomKeyButtonPropId()));
-
-        // 开关监听
-        customKeyWakeupSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (getContext() == null || appConfig == null) return;
-            appConfig.setCustomKeyWakeupEnabled(isChecked);
-            customKeyWakeupDetailLayout.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-            BlindSpotService.update(requireContext());
-        });
-
-        // 速度阈值监听
-        customKeySpeedThresholdEditText.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                try {
-                    float threshold = Float.parseFloat(s.toString());
-                    appConfig.setCustomKeySpeedThreshold(threshold);
-                } catch (NumberFormatException ignored) {}
-            }
-        });
-
-        // 速度属性ID监听
-        customKeySpeedPropIdEditText.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                try {
-                    int propId = Integer.parseInt(s.toString());
-                    appConfig.setCustomKeySpeedPropId(propId);
-                } catch (NumberFormatException ignored) {}
-            }
-        });
-
-        // 按钮属性ID监听
-        customKeyButtonPropIdEditText.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                try {
-                    int propId = Integer.parseInt(s.toString());
-                    appConfig.setCustomKeyButtonPropId(propId);
-                } catch (NumberFormatException ignored) {}
-            }
-        });
-    }
-    
-    /**
-     * 初始化悬浮窗大小选择器
-     */
     private void initFloatingWindowSizeSpinner() {
         if (floatingWindowSizeSpinner == null || getContext() == null) {
             return;
@@ -1151,9 +902,11 @@ public class SettingsFragment extends Fragment {
      */
     private void initCarModelConfig(View view) {
         carModelSpinner = view.findViewById(R.id.spinner_car_model);
-        customCameraConfigButton = view.findViewById(R.id.btn_custom_camera_config);
-        
-        if (carModelSpinner == null || customCameraConfigButton == null || getContext() == null) {
+        // 自定义摄像头映射入口已随自定义车型一起移除；这里不能再把它算进
+        // null 检查，否则整个车型配置会直接 return 掉
+        customCameraConfigButton = null;
+
+        if (carModelSpinner == null || getContext() == null) {
             return;
         }
 
@@ -1222,9 +975,6 @@ public class SettingsFragment extends Fragment {
             isInitializingCarModel = false;
         });
         
-        customCameraConfigButton.setOnClickListener(v -> {
-            openCustomCameraConfig();
-        });
     }
     
     /**
@@ -1394,6 +1144,23 @@ public class SettingsFragment extends Fragment {
     }
 
     /**
+     * 「录制模式」只在「原始长条」时有意义 —— 四宫格必须走 MediaCodec，
+     * 此时这个选项会被忽略，露出来只会让人以为可以改。
+     */
+    private void updateRecordingModeVisibility() {
+        if (recordingModeSpinner == null || appConfig == null) {
+            return;
+        }
+        // spinner 的直接父节点就是那一行（横向 LinearLayout）。
+        // 不能再往上走一层 —— 那是整个设置列表的容器，会把所有项都藏掉。
+        android.view.ViewParent parent = recordingModeSpinner.getParent();
+        if (parent instanceof View) {
+            ((View) parent).setVisibility(
+                    appConfig.isRecordGridLayout() ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /**
      * 初始化录制画面排列配置。
      *
      * <p>四宫格需要走 MediaCodec 路径（在编码前用 GL 重排），因此选中它时
@@ -1434,6 +1201,7 @@ public class SettingsFragment extends Fragment {
                     return;
                 }
                 appConfig.setRecordLayout(value);
+                updateRecordingModeVisibility();
                 if (getContext() != null) {
                     Toast.makeText(getContext(),
                             "录制画面排列已设为「" + RECORD_LAYOUT_OPTIONS[position]
@@ -1448,6 +1216,7 @@ public class SettingsFragment extends Fragment {
         });
 
         recordLayoutSpinner.post(() -> isInitializingRecordLayout = false);
+        updateRecordingModeVisibility();
     }
 
     /**
@@ -1641,8 +1410,9 @@ public class SettingsFragment extends Fragment {
         cbRecordCameraBack.setText(appConfig.getRecordingCameraDisplayName("back", 2));
         cbRecordCameraBack.setChecked(appConfig.isRecordingCameraEnabled("back"));
         
-        // 左摄像头（4摄才有）
-        cbRecordCameraLeft.setVisibility(cameraCount >= 4 ? View.VISIBLE : View.GONE);
+        // 第三路（3 摄及以上才有）——极氪「环视+座艡3路」配置正好是 3 摄，
+        // 原来写的是 >= 4，导致第三路永远没有复选框
+        cbRecordCameraLeft.setVisibility(cameraCount >= 3 ? View.VISIBLE : View.GONE);
         cbRecordCameraLeft.setText(appConfig.getRecordingCameraDisplayName("left", 3));
         cbRecordCameraLeft.setChecked(appConfig.isRecordingCameraEnabled("left"));
         
@@ -1709,8 +1479,9 @@ public class SettingsFragment extends Fragment {
         cbRecordCameraBack.setText(appConfig.getRecordingCameraDisplayName("back", 2));
         cbRecordCameraBack.setChecked(appConfig.isRecordingCameraEnabled("back"));
         
-        // 左摄像头（4摄才有）
-        cbRecordCameraLeft.setVisibility(cameraCount >= 4 ? View.VISIBLE : View.GONE);
+        // 第三路（3 摄及以上才有）——极氪「环视+座艡3路」配置正好是 3 摄，
+        // 原来写的是 >= 4，导致第三路永远没有复选框
+        cbRecordCameraLeft.setVisibility(cameraCount >= 3 ? View.VISIBLE : View.GONE);
         cbRecordCameraLeft.setText(appConfig.getRecordingCameraDisplayName("left", 3));
         cbRecordCameraLeft.setChecked(appConfig.isRecordingCameraEnabled("left"));
         

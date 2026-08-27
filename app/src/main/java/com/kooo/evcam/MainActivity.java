@@ -1429,83 +1429,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 加载二维码图片
-        android.widget.ImageView ivQrcode = dialog.findViewById(R.id.iv_qrcode);
-        loadQrcodeImage(ivQrcode);
 
         // 设置确认按钮点击事件
         dialog.findViewById(R.id.btn_confirm).setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
-    }
-
-    /**
-     * 加载打赏二维码图片（URL经过混淆处理）
-     */
-    private void loadQrcodeImage(android.widget.ImageView imageView) {
-        // 根据屏幕密度动态设置二维码尺寸
-        // 低DPI大屏设备使用更大尺寸，高DPI设备使用适中尺寸
-        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-        float density = dm.density;
-        int screenWidthPx = dm.widthPixels;
-        
-        // 计算二维码尺寸（像素）
-        // density: mdpi=1.0, hdpi=1.5, xhdpi=2.0, xxhdpi=3.0, xxxhdpi=4.0
-        int qrcodeSizePx;
-        if (density <= 1.0f) {
-            // mdpi 或更低密度（大屏低DPI设备）：使用屏幕宽度的25%
-            qrcodeSizePx = (int) (screenWidthPx * 0.25f);
-        } else if (density <= 1.5f) {
-            // hdpi：使用屏幕宽度的22%
-            qrcodeSizePx = (int) (screenWidthPx * 0.22f);
-        } else if (density <= 2.0f) {
-            // xhdpi：使用屏幕宽度的20%
-            qrcodeSizePx = (int) (screenWidthPx * 0.20f);
-        } else {
-            // xxhdpi 及以上（高密度设备）：使用屏幕宽度的18%
-            qrcodeSizePx = (int) (screenWidthPx * 0.18f);
-        }
-        
-        // 设置ImageView尺寸
-        android.view.ViewGroup.LayoutParams params = imageView.getLayoutParams();
-        params.width = qrcodeSizePx;
-        params.height = qrcodeSizePx;
-        imageView.setLayoutParams(params);
-        
-        // URL混淆存储，防止被轻易修改
-        // 原始URL经过Base64编码后分段存储
-        final String[] p = {
-            "aHR0cHM6Ly9ldmNhbS5jaGF0d2Vi", // 第一段
-            "LmNsb3VkLzE3Njk0NzcxOTc4NTUu", // 第二段  
-            "anBn"                           // 第三段
-        };
-        
-        new Thread(() -> {
-            try {
-                // 组合并解码URL
-                String encoded = p[0] + p[1] + p[2];
-                String url = new String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT));
-                
-                // 下载图片
-                java.net.URL imageUrl = new java.net.URL(url);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) imageUrl.openConnection();
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.setDoInput(true);
-                conn.connect();
-                
-                java.io.InputStream is = conn.getInputStream();
-                final android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeStream(is);
-                is.close();
-                conn.disconnect();
-                
-                // 在主线程更新UI
-                if (bitmap != null) {
-                    runOnUiThread(() -> imageView.setImageBitmap(bitmap));
-                }
-            } catch (Exception e) {
-                AppLog.e(TAG, "加载二维码图片失败: " + e.getMessage());
-            }
-        }).start();
     }
 
     /**

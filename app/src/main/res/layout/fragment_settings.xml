@@ -61,142 +61,17 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp">
-
-            <!-- 检查更新入口 -->
-            <LinearLayout
-                android:id="@+id/layout_check_update"
+            <!-- ===== 录制 ===== -->
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="检查更新"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tv_current_version"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="当前版本：v1.0.0"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/btn_check_update"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="检查 →"
-                    android:textSize="16sp"
-                    android:minHeight="48dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
-            </LinearLayout>
-
-            <!-- 使用提示入口 -->
-            <LinearLayout
-                android:id="@+id/layout_usage_guide"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="24dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="使用提示"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="首次使用必读，配置车型与权限"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/btn_usage_guide"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="查看 →"
-                    android:textSize="16sp"
-                    android:minHeight="48dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
-            </LinearLayout>
-
-            <!-- 权限设置入口 -->
-            <LinearLayout
-                android:id="@+id/layout_permission_settings"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="24dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="权限设置"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="首次安装使用请务必授予所有所需权限"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/btn_permission_settings"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="进入 →"
-                    android:textSize="16sp"
-                    android:minHeight="48dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
-            </LinearLayout>
+                android:text="录制"
+                android:textColor="@color/button_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
+                android:paddingStart="4dp" />
 
             <!-- 车型配置 -->
             <LinearLayout
@@ -218,7 +93,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="车型配置"
+                        android:text="视频流配置"
                         android:textColor="@color/text_primary"
                         android:textSize="20sp"
                         android:textStyle="bold" />
@@ -226,7 +101,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="选择车型以适配摄像头布局"
+                        android:text="选择使用哪几路视频流：仅环视合成流，或环视 + 后排 + 驾驶位"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:layout_marginTop="4dp" />
@@ -235,104 +110,6 @@
                 <Spinner
                     android:id="@+id/spinner_car_model"
                     android:layout_width="160dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:popupBackground="@color/card_background" />
-            </LinearLayout>
-
-            <!-- 自定义摄像头配置按钮（仅自定义车型显示） -->
-            <Button
-                android:id="@+id/btn_custom_camera_config"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="自定义界面配置"
-                android:textSize="20sp"
-                android:minHeight="56dp"
-                android:backgroundTint="@color/button_background"
-                android:textColor="@color/button_text"
-                android:layout_marginBottom="24dp"
-                android:visibility="gone" />
-
-            <!-- 录制模式配置 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="录制模式"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tv_recording_mode_desc"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="选择视频录制的编码方式"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <Spinner
-                    android:id="@+id/spinner_recording_mode"
-                    android:layout_width="180dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:popupBackground="@color/card_background" />
-            </LinearLayout>
-
-            <!-- 分段时长配置 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="分段时长"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="每段视频的最大录制时长"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <Spinner
-                    android:id="@+id/spinner_segment_duration"
-                    android:layout_width="120dp"
                     android:layout_height="48dp"
                     android:background="@drawable/spinner_background"
                     android:popupBackground="@color/card_background" />
@@ -422,7 +199,7 @@
                     android:popupBackground="@color/card_background" />
             </LinearLayout>
 
-            <!-- 预览/录制分辨率解耦（实验性） -->
+            <!-- 分段时长配置 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -442,7 +219,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="预览用低分辨率（实验性）"
+                        android:text="分段时长"
                         android:textColor="@color/text_primary"
                         android:textSize="20sp"
                         android:textStyle="bold" />
@@ -450,16 +227,18 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="预览跑小分辨率、录制仍用完整分辨率，可降低 GPU 与内存带宽。是否可行取决于车机，开启后请确认预览与录制都正常"
+                        android:text="每段视频的最大录制时长"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:layout_marginTop="4dp" />
                 </LinearLayout>
 
-                <com.kooo.evcam.view.MacOSToggleButton
-                    android:id="@+id/toggle_decouple_preview"
-                    android:layout_width="60dp"
-                    android:layout_height="32dp" />
+                <Spinner
+                    android:id="@+id/spinner_segment_duration"
+                    android:layout_width="120dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/spinner_background"
+                    android:popupBackground="@color/card_background" />
             </LinearLayout>
 
             <!-- 画质设置入口 -->
@@ -490,7 +269,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="设置视频分辨率和录制码率"
+                        android:text="设置录制码率。分辨率由视频流探测结果决定，无需手动设置"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:layout_marginTop="4dp" />
@@ -507,152 +286,45 @@
                     android:textColor="@color/button_text" />
             </LinearLayout>
 
-            <!-- 预览画面矫正 -->
+            <!-- 时间角标 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp"
                 android:background="@color/card_background"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="预览画面矫正"
-                            android:textColor="@color/text_primary"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="对主界面预览画面进行缩放/平移矫正"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="16sp"
-                            android:layout_marginTop="4dp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switch_preview_correction"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp" />
-                </LinearLayout>
+                        android:text="时间角标"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
 
-                <LinearLayout
-                    android:id="@+id/layout_preview_correction_buttons"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="12dp"
-                    android:visibility="gone">
-
-                    <Button
-                        android:id="@+id/btn_open_preview_correction_floating"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="打开矫正悬浮窗"
-                        android:backgroundTint="@color/button_accent"
-                        android:textColor="@color/white"
-                        android:layout_marginEnd="8dp" />
-
-                    <Button
-                        android:id="@+id/btn_reset_preview_correction"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="恢复默认参数"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- 鱼眼矫正 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="鱼眼矫正"
-                            android:textColor="@color/text_primary"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="对预览画面进行鱼眼畸变矫正，不影响录制"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="16sp"
-                            android:layout_marginTop="4dp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switch_fisheye_correction"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp" />
+                        android:text="在保存的视频/图片左上角添加时间水印，视频角标仅在MediaCodec模式下有效（略微影响性能）"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="16sp"
+                        android:layout_marginTop="4dp" />
+
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/layout_fisheye_correction_buttons"
-                    android:layout_width="match_parent"
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_timestamp_watermark"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="12dp"
-                    android:visibility="gone">
-
-                    <Button
-                        android:id="@+id/btn_open_fisheye_correction_floating"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="打开矫正悬浮窗"
-                        android:backgroundTint="@color/button_accent"
-                        android:textColor="@color/white"
-                        android:layout_marginEnd="8dp" />
-
-                    <Button
-                        android:id="@+id/btn_reset_fisheye_correction"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="恢复默认参数"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
-                </LinearLayout>
+                    android:layout_marginStart="16dp" />
             </LinearLayout>
 
             <!-- 录制摄像头选择 -->
@@ -684,7 +356,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="不影响拍照和钉钉指令"
+                        android:text="选择参与录制的视频流；不影响拍照"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:layout_marginTop="4dp" />
@@ -737,6 +409,18 @@
                         android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- ===== 存储 ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="存储"
+                android:textColor="@color/button_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
+                android:paddingStart="4dp" />
 
             <!-- 存储位置配置 -->
             <LinearLayout
@@ -964,127 +648,17 @@
                     android:layout_marginTop="12dp" />
             </LinearLayout>
 
-            <!-- 录制状态显示 -->
-            <LinearLayout
+            <!-- ===== 后台与保活 ===== -->
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="录制状态显示"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="在右上角显示录制时间和分段数（双击可切换）"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="16sp"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switch_recording_stats"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp" />
-            </LinearLayout>
-
-            <!-- 时间角标 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="时间角标"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="在保存的视频/图片左上角添加时间水印，视频角标仅在MediaCodec模式下有效（略微影响性能）"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="16sp"
-                        android:layout_marginTop="4dp" />
-
-                </LinearLayout>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switch_timestamp_watermark"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp" />
-            </LinearLayout>
-
-            <!-- 强制 H.264 编码 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:background="@color/card_background"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="强制 H.264 编码"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="开启后使用 H.264 兼容路径（仅 MediaCodec 模式生效），用于解决个别车机在 H.265 下的闪烁或录制失败；默认关闭，使用 H.265/HEVC 以获得更好压缩率"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="16sp"
-                        android:layout_marginTop="4dp" />
-
-                </LinearLayout>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switch_force_h264"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp" />
-            </LinearLayout>
+                android:text="后台与保活"
+                android:textColor="@color/button_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
+                android:paddingStart="4dp" />
 
             <!-- 开机自启动 -->
             <LinearLayout
@@ -1287,6 +861,18 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp" />
             </LinearLayout>
+
+            <!-- ===== 界面 ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="界面"
+                android:textColor="@color/button_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
+                android:paddingStart="4dp" />
 
             <!-- 悬浮窗开关 -->
             <LinearLayout
@@ -1562,158 +1148,180 @@
                     android:layout_marginTop="4dp" />
             </LinearLayout>
 
-            <!-- 定制键唤醒 -->
+            <!-- 录制状态显示 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp"
                 android:background="@color/card_background"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="定制键唤醒"
-                            android:textColor="@color/text_primary"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="车速超过阈值时按下定制键唤醒/退出EVCam预览（仅限龙鹰一号车型）"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="14sp"
-                            android:layout_marginTop="4dp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switch_custom_key_wakeup"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp" />
+                        android:text="录制状态显示"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="在右上角显示录制时间和分段数（双击可切换）"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="16sp"
+                        android:layout_marginTop="4dp" />
                 </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_recording_stats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
+            <!-- ===== 高级与诊断 ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="高级与诊断"
+                android:textColor="@color/button_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
+                android:paddingStart="4dp" />
+
+            <!-- 预览/录制分辨率解耦（实验性） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
 
                 <LinearLayout
-                    android:id="@+id/layout_custom_key_wakeup_detail"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginTop="12dp"
-                    android:visibility="gone">
+                    android:layout_weight="1"
+                    android:layout_marginEnd="16dp"
+                    android:orientation="vertical">
 
-                    <!-- 速度阈值 -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="8dp">
+                        android:text="预览用低分辨率（实验性）"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
 
-                        <TextView
-                            android:layout_width="100dp"
-                            android:layout_height="wrap_content"
-                            android:text="速度阈值"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
-
-                        <EditText
-                            android:id="@+id/et_custom_key_speed_threshold"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minHeight="40dp"
-                            android:gravity="center_vertical"
-                            android:background="@drawable/spinner_background"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:inputType="numberDecimal"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp"
-                            android:hint="8.34" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text=" m/s"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
-                    </LinearLayout>
-
-                    <!-- 速度属性ID -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="8dp">
-
-                        <TextView
-                            android:layout_width="100dp"
-                            android:layout_height="wrap_content"
-                            android:text="速度属性ID"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
-
-                        <EditText
-                            android:id="@+id/et_custom_key_speed_prop_id"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minHeight="40dp"
-                            android:gravity="center_vertical"
-                            android:background="@drawable/spinner_background"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:inputType="number"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp"
-                            android:hint="291504647" />
-                    </LinearLayout>
-
-                    <!-- 按钮属性ID -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <TextView
-                            android:layout_width="100dp"
-                            android:layout_height="wrap_content"
-                            android:text="按钮属性ID"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
-
-                        <EditText
-                            android:id="@+id/et_custom_key_button_prop_id"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:minHeight="40dp"
-                            android:gravity="center_vertical"
-                            android:background="@drawable/spinner_background"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:inputType="number"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp"
-                            android:hint="557872183" />
-                    </LinearLayout>
+                        android:text="预览跑小分辨率、录制仍用完整分辨率，可降低 GPU 与内存带宽。是否可行取决于车机，开启后请确认预览与录制都正常"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
                 </LinearLayout>
+
+                <com.kooo.evcam.view.MacOSToggleButton
+                    android:id="@+id/toggle_decouple_preview"
+                    android:layout_width="60dp"
+                    android:layout_height="32dp" />
+            </LinearLayout>
+
+            <!-- 强制 H.264 编码 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="强制 H.264 编码"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="开启后使用 H.264 兼容路径（仅 MediaCodec 模式生效），用于解决个别车机在 H.265 下的闪烁或录制失败；默认关闭，使用 H.265/HEVC 以获得更好压缩率"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="16sp"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_force_h264"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
+            <!-- 录制模式配置 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="16dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="录制模式"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_recording_mode_desc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="选择编码方式。四宫格排列必须使用 MediaCodec，此项仅在「原始长条」时生效"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <Spinner
+                    android:id="@+id/spinner_recording_mode"
+                    android:layout_width="180dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/spinner_background"
+                    android:popupBackground="@color/card_background" />
             </LinearLayout>
 
             <!-- Debug 模式 -->
@@ -1789,6 +1397,96 @@
                     android:textColor="@color/button_text"
                     android:layout_marginStart="8dp" />
 
+            </LinearLayout>
+
+            <!-- 权限设置入口 -->
+            <LinearLayout
+                android:id="@+id/layout_permission_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="权限设置"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="首次安装使用请务必授予所有所需权限"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_permission_settings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="进入 →"
+                    android:textSize="16sp"
+                    android:minHeight="48dp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+            </LinearLayout>
+
+            <!-- 使用提示入口 -->
+            <LinearLayout
+                android:id="@+id/layout_usage_guide"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="使用提示"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="首次使用必读，配置车型与权限"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_usage_guide"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="查看 →"
+                    android:textSize="16sp"
+                    android:minHeight="48dp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
             </LinearLayout>
 
             <!-- 使用说明 -->
