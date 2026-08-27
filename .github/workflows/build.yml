@@ -27,6 +27,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # 默认会装模拟器，我们只是编译 APK 用不到它；
+          # 而且它下载失败过一次（Error on ZipFile unknown archive），
+          # 白白多一个失败点。Gradle 会自行拉取真正需要的 SDK 组件。
+          packages: ''
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
