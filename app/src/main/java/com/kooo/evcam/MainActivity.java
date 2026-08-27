@@ -1622,6 +1622,15 @@ public class MainActivity extends AppCompatActivity {
             holder.setCameraManager(null);
             existingManager = null;
         }
+        // 后台那份可能是按别的车型建的（切换车型只提示重启，但前台服务让进程一直活着，
+        // 单例连同旧的摄像头映射就留下来了）。路数对不上就别复用，否则画面会全黑。
+        if (existingManager != null && existingManager.getCameraCount() != configuredCameraCount) {
+            AppLog.w(TAG, "后台摄像头映射为 " + existingManager.getCameraCount()
+                    + " 路，当前车型需要 " + configuredCameraCount + " 路，丢弃重建");
+            existingManager.release();
+            holder.setCameraManager(null);
+            existingManager = null;
+        }
         if (existingManager != null) {
             // 后台已初始化，复用实例并绑定 TextureView
             AppLog.d(TAG, "复用后台已初始化的摄像头管理器，绑定 TextureView");

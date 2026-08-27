@@ -16,6 +16,14 @@ public class CameraManagerHolder {
     private static final String TAG = "CameraManagerHolder";
     private static CameraManagerHolder instance;
     private MultiCameraManager cameraManager;
+    /**
+     * 这份实例是按哪个车型建的。
+     *
+     * <p>切换车型只提示「重启应用后生效」，但前台服务会让进程一直活着，
+     * 这个单例连同它的摄像头映射也就跟着留下来了。不记住车型的话，
+     * 换了配置仍然会复用旧映射 —— 表现就是画面全黑。</p>
+     */
+    private String initializedCarModel;
 
     private CameraManagerHolder() {}
 
@@ -31,6 +39,14 @@ public class CameraManagerHolder {
      * 可从 Service 或 Activity 调用。
      */
     public synchronized MultiCameraManager getOrInit(Context context) {
+        String currentModel = new AppConfig(context).getCarModel();
+        if (cameraManager != null && !cameraManager.isReleased()
+                && initializedCarModel != null && !initializedCarModel.equals(currentModel)) {
+            AppLog.w(TAG, "车型已从 " + initializedCarModel + " 改为 " + currentModel
+                    + "，丢弃旧的摄像头映射并重建");
+            cameraManager.release();
+            cameraManager = null;
+        }
         if (cameraManager != null && !cameraManager.isReleased()) {
             return cameraManager;
         }
@@ -72,7 +88,9 @@ public class CameraManagerHolder {
             // 部分设备/系统会禁止后台应用访问摄像头（CAMERA_DISABLED by policy）
             // 摄像头会在悬浮窗设置 Surface 并调用 recreateSession 时按需打开
 
-            AppLog.d(TAG, "后台摄像头对象初始化完成，共 " + cameraCount + " 个摄像头（未打开硬件）");
+            initializedCarModel = currentModel;
+            AppLog.d(TAG, "后台摄像头对象初始化完成，共 " + cameraCount
+                    + " 个摄像头（车型 " + currentModel + "，未打开硬件）");
         } catch (CameraAccessException e) {
             AppLog.e(TAG, "后台初始化摄像头失败: " + e.getMessage());
         }
@@ -102,6 +120,12 @@ public class CameraManagerHolder {
             cameraManager.release();
             cameraManager = null;
         }
+        initializedCarModel = null;
+    }
+
+    /** 这份实例是按哪个车型建的；未初始化时为 null。 */
+    public synchronized String getInitializedCarModel() {
+        return initializedCarModel;
     }
 
     private int getCameraCount(AppConfig appConfig) {

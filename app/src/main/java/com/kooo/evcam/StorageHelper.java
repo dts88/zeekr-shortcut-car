@@ -156,6 +156,28 @@ public class StorageHelper {
         if (context == null) {
             return volumes;
         }
+        java.util.Set<String> seenRoots = new java.util.HashSet<>();
+
+        // 先从 /proc/mounts 找。这一步不能省：本项目的极氪车机上，U 盘就是只能
+        // 通过 /proc/mounts 看到 —— getExternalFilesDirs() 里根本没有它，
+        // 但读写、回放都正常。之前只用 getExternalFilesDirs 才会出现
+        // 「显示未检测到、实际能选也能用」。
+        for (File root : listSdCardRootsFromMounts()) {
+            if (!seenRoots.add(root.getAbsolutePath())) {
+                continue;
+            }
+            long free = 0L;
+            long total = 0L;
+            try {
+                free = root.getUsableSpace();
+                total = root.getTotalSpace();
+            } catch (Exception ignored) {
+                // 容量取不到不影响使用
+            }
+            volumes.add(new VolumeInfo(root, root,
+                    "外置存储（" + root.getName() + "）", free, total));
+        }
+
         try {
             File[] externalDirs = context.getExternalFilesDirs(null);
             if (externalDirs == null) {
@@ -180,6 +202,10 @@ public class StorageHelper {
                     if (candidate.exists() && candidate.canRead()) {
                         root = candidate;
                     }
+                }
+
+                if (!seenRoots.add(root.getAbsolutePath())) {
+                    continue;  // /proc/mounts 已经收过同一个卷
                 }
 
                 String name = root.getName();
@@ -517,6 +543,46 @@ public class StorageHelper {
      * 这是最可靠的方法，能看到系统实际挂载的所有存储设备
      * 只接受 /storage/XXXX-XXXX 格式
      */
+    /**
+     * 从 /proc/mounts 列出<b>所有</b> /storage/XXXX-XXXX 挂载点。
+     *
+     * <p>{@link #getSdCardFromMounts()} 只返回第一个，用于「有没有U盘」的判断；
+     * 卷选择器需要全部。</p>
+     */
+    private static java.util.List<File> listSdCardRootsFromMounts() {
+        java.util.List<File> roots = new java.util.ArrayList<>();
+        java.io.BufferedReader reader = null;
+        try {
+            reader = new java.io.BufferedReader(new java.io.FileReader("/proc/mounts"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("\\s+");
+                if (parts.length < 2) {
+                    continue;
+                }
+                String mountPoint = parts[1];
+                if (!mountPoint.matches("/storage/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}")) {
+                    continue;
+                }
+                File dir = new File(mountPoint);
+                if (dir.exists() && dir.isDirectory() && dir.canRead()) {
+                    roots.add(dir);
+                }
+            }
+        } catch (Exception e) {
+            AppLog.d(TAG, "读取 /proc/mounts 失败: " + e.getMessage());
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (Exception ignored) {
+                    // 关闭失败无所谓
+                }
+            }
+        }
+        return roots;
+    }
+
     private static File getSdCardFromMounts() {
         try {
             java.io.BufferedReader reader = new java.io.BufferedReader(

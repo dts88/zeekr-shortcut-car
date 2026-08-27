@@ -283,6 +283,11 @@ public class MultiCameraManager {
      * @param position 位置（front/back/left/right）
      * @return SingleCamera实例，如果不存在则返回null
      */
+    /** 当前已初始化的摄像头路数。用于判断后台那份实例是否还匹配当前车型。 */
+    public int getCameraCount() {
+        return cameras.size();
+    }
+
     public SingleCamera getCamera(String position) {
         return cameras.get(position);
     }
