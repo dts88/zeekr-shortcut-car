@@ -70,6 +70,18 @@ jobs:
           if-no-files-found: error
 
       # 打 tag 时自动发布 Release，车机/手机可直接下载安装
+      # Release 正文由 CHANGELOG.md 里对应版本的小节自动生成，
+      # 这样每个版本的说明就是它自己的改动，而不是每次都一样的模板。
+      - name: Build release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/release_notes.py "${{ steps.apk.outputs.version }}" > RELEASE_NOTES.md
+          echo "----- release notes -----"
+          cat RELEASE_NOTES.md
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -77,40 +89,4 @@ jobs:
           files: ${{ steps.apk.outputs.path }}
           prerelease: true
           name: ${{ steps.apk.outputs.version }}
-          body: |
-            ## 极氪即刻（车机版） ${{ steps.apk.outputs.version }}
-
-            下载下面的 `.apk`，通过 App Lab 侧载安装。
-
-            > [!WARNING]
-            > **本版本尚未在实车上验证。** 自动化测试只覆盖纯逻辑部分（合成流几何拆分、
-            > 相机选择）。四宫格绘制、相机取流、录制链路都需要实车验证。
-            > **首次使用请在静止车辆上测试。**
-
-            ### 安全须知
-
-            实验性非官方软件，与极氪（ZEEKR）无任何关联，未经其批准或认可，
-            也未经过任何车辆功能安全认证。
-
-            - 不可替代原厂行车记录仪、倒车影像、盲区监测或任何法定安全设备
-            - 请勿在行驶中操作，请勿依据其画面判断车距或障碍物
-            - 与车机争夺资源**可能**影响原厂功能，出现异常请立即停用并卸载
-            - 录制内容可能包含人脸、车牌等个人信息，请遵守当地法律
-
-            完整说明见 [README](https://github.com/dts88/zeekr-shortcut-car#readme)。
-
-            ### 使用
-
-            安装后进入 **菜单 → 软件设置 → 车型**，选择 **「极氪7X（环视合成流）」**，
-            重启应用即可看到四宫格环视画面。
-
-            ### 来源与致谢
-
-            本应用以 **GPL-3.0** 发布，代码基座为 [EVCam](https://github.com/suyunkai/EVCam)
-            （GPL-3.0，作者 suyunkai）。
-
-            极氪合成流的尺寸、排布与平台行为等事实，来自
-            [openavm-recorder](https://github.com/Dantenothing/openavm-recorder)
-            公开记录的实测结论（作者 Dantenothing，保留所有权利）。
-            **本项目未复制其任何源代码**，也未使用其名称或图标，与其没有隶属关系。
-            详见 [NOTICE.md](https://github.com/dts88/zeekr-shortcut-car/blob/main/NOTICE.md)。
+          body_path: RELEASE_NOTES.md
