@@ -158,6 +158,13 @@
             android:screenOrientation="landscape"
             android:exported="false" />
 
+        <!-- 诊断信息：相机/屏幕/车辆信号/存储/日志，可导出 -->
+        <activity
+            android:name=".zeekr.DiagnosticsActivity"
+            android:label="诊断信息"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:exported="false" />
+
         <!-- 关于与致谢：说明本应用两个功能来源及其许可证 -->
         <activity
             android:name=".zeekr.AboutActivity"

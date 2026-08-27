@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/menu_background"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="诊断信息"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="10dp"
+        android:text="相机 / 屏幕 / 车辆信号 / 存储 / 日志。可保存为文件带走，或复制后发回分析。"
+        android:textColor="#AAFFFFFF"
+        android:textSize="13sp" />
+
+    <!-- 操作按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <Button
+            android:id="@+id/diagnostics_save"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="保存到存储"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
+            android:id="@+id/diagnostics_copy"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="复制"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
+            android:id="@+id/diagnostics_share"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="分享"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
+            android:id="@+id/diagnostics_refresh"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="重新采集"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
+            android:id="@+id/diagnostics_close"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="关闭"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+    </LinearLayout>
+
+    <!-- 报告正文：等宽字体，横竖都能滚 -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#20000000"
+        android:padding="8dp">
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/diagnostics_report"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textIsSelectable="true"
+                android:fontFamily="monospace"
+                android:textColor="#DDFFFFFF"
+                android:textSize="12sp" />
+        </HorizontalScrollView>
+    </ScrollView>
+
+</LinearLayout>

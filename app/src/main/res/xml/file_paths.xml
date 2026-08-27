@@ -28,4 +28,10 @@
     <files-path
         name="files"
         path="." />
+
+    <!-- 应用专属的外部目录（含 U 盘上的 Android/data/.../files）：
+         诊断报告可能落在这里，走 external-path 匹配不到 -->
+    <external-files-path
+        name="external_files"
+        path="." />
 </paths>
