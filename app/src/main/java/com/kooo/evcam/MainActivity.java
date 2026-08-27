@@ -682,11 +682,6 @@ public class MainActivity extends AppCompatActivity {
             btnPhotoPlayback.setOnClickListener(v -> showPhotoPlaybackInterface());
         }
         
-        View btnRemoteView = findViewById(R.id.btn_remote_view);
-        if (btnRemoteView != null) {
-            btnRemoteView.setOnClickListener(v -> showRemoteViewInterface());
-        }
-        
         View btnSettings = findViewById(R.id.btn_settings);
         if (btnSettings != null) {
             btnSettings.setOnClickListener(v -> showSettingsInterface());
@@ -1742,9 +1737,6 @@ public class MainActivity extends AppCompatActivity {
                     AppLog.d(TAG, "远程录制时间戳更新: " + remoteRecordingTimestamp + " -> " + newTimestamp);
                     remoteRecordingTimestamp = newTimestamp;
                 }
-                if (remoteCommandDispatcher != null) {
-                    remoteCommandDispatcher.onTimestampUpdated(newTimestamp);
-                }
             });
 
             // 录制状态回调（监听录制成功或失败）
@@ -1783,9 +1775,6 @@ public class MainActivity extends AppCompatActivity {
                             startRecordingTimer();
                             AppLog.d(TAG, "手动录制计时器已启动（首次写入后）");
                         }
-                    }
-                    if (remoteCommandDispatcher != null) {
-                        remoteCommandDispatcher.onFirstDataWritten();
                     }
                     if (isRemoteRecording && pendingRemoteDurationSeconds > 0) {
                         AppLog.d(TAG, "远程录制首次写入成功，启动 " + pendingRemoteDurationSeconds + " 秒定时器");
@@ -3730,11 +3719,6 @@ public class MainActivity extends AppCompatActivity {
         BlindSpotService.notifySelfBackground();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
         
-        // 暂停心跳推图（进入后台时）
-        if (heartbeatManager != null) {
-            heartbeatManager.pause();
-        }
-        
         // 通知悬浮窗服务：应用进入后台，显示悬浮窗
         if (appConfig.isFloatingWindowEnabled()) {
             FloatingWindowService.sendAppForegroundState(this, false);
@@ -3843,15 +3827,6 @@ public class MainActivity extends AppCompatActivity {
                     AppLog.d(TAG, "Recording in progress, cameras should still be connected");
                 }
                 
-                // 启动心跳推图（返回前台时，如果已启用）
-                if (heartbeatManager != null && heartbeatManager.getConfig().isEnabled()) {
-                    // 延迟启动，等待摄像头准备好
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        if (heartbeatManager != null && !isInBackground) {
-                            heartbeatManager.start();
-                        }
-                    }, 1500);
-                }
             };
             
             // 延迟100ms后执行（只有最后一次 onResume 会真正执行）
@@ -3894,17 +3869,6 @@ public class MainActivity extends AppCompatActivity {
         // 重置远程录制状态
         isRemoteRecording = false;
         wasManualRecordingBeforeRemote = false;
-        
-        // 清理远程命令分发器
-        if (remoteCommandDispatcher != null) {
-            remoteCommandDispatcher.cleanup();
-        }
-        
-        // 清理心跳推图管理器
-        if (heartbeatManager != null) {
-            heartbeatManager.destroy();
-            heartbeatManager = null;
-        }
         
         // 清理息屏录制相关资源
         if (screenStateReceiver != null) {
