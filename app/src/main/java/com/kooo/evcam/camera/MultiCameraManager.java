@@ -1228,15 +1228,44 @@ public class MultiCameraManager {
                         encodeWidth + "x" + encodeHeight + " (max: " + MAX_ENCODE_SIZE + ")");
             }
             
+            // 四宫格录制：把合成流重排成 2x2 再编码。
+            // 顺带解决一个实际问题——1280x5140 的高度超过编码器 4096 的上限，
+            // 原路径会把它整体缩小；2x2 输出（2560x2560）反而落在限制之内。
+            com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan = null;
+            int sourceWidth = previewSize.getWidth();
+            int sourceHeight = previewSize.getHeight();
+            if (appConfig.isRecordGridLayout()
+                    && com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
+                            sourceWidth, sourceHeight)) {
+                com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan =
+                        com.kooo.evcam.zeekr.CompositeStreamGeometry.analyse(sourceWidth, sourceHeight);
+                if (plan.isComposite()) {
+                    fourLanePlan = plan;
+                    // 2x2 输出：边长 = 2 倍单个画面边长，取偶数并夹在编码上限内
+                    int side = plan.laneSizePx * 2;
+                    side = Math.min(side, MAX_ENCODE_SIZE);
+                    side = (side / 2) * 2;
+                    encodeWidth = side;
+                    encodeHeight = side;
+                    AppLog.i(TAG, "Camera " + key + " 四宫格录制: 源 "
+                            + sourceWidth + "x" + sourceHeight
+                            + " -> 编码 " + encodeWidth + "x" + encodeHeight);
+                }
+            }
+
             // 计算码率（基于调整后的分辨率和帧率）
             int bitrate = appConfig.getActualBitrate(encodeWidth, encodeHeight, targetFrameRate);
 
             // 创建软编码录制器（使用调整后的分辨率）
             CodecVideoRecorder codecRecorder = new CodecVideoRecorder(
-                    camera.getCameraId(), 
-                    encodeWidth, 
+                    camera.getCameraId(),
+                    encodeWidth,
                     encodeHeight
             );
+
+            if (fourLanePlan != null) {
+                codecRecorder.setFourLaneSource(sourceWidth, sourceHeight, fourLanePlan, null);
+            }
 
             // 设置统一时间戳提供者（确保多路摄像头分段切换时使用相同时间戳）
             codecRecorder.setTimestampProvider(segmentTimestampProvider);

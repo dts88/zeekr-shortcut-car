@@ -287,6 +287,7 @@ public class AppConfig {
     private static final String KEY_FRAMERATE_LEVEL = "framerate_level";  // 帧率等级
     private static final String KEY_RECORD_FPS = "record_fps";  // 显式录制帧率（auto/30/24/20/15/10）
     private static final String KEY_DECOUPLE_PREVIEW = "decouple_preview_resolution";  // 预览与录制分辨率解耦
+    private static final String KEY_RECORD_LAYOUT = "record_layout";  // 录制画面排列（raw/grid2x2）
     
     // 帧率等级常量
     public static final String FRAMERATE_STANDARD = "standard";  // 标准帧率（默认）
@@ -561,6 +562,14 @@ public class AppConfig {
      */
     public boolean shouldUseCodecRecording() {
         String mode = getRecordingMode();
+        if (isRecordGridLayout()) {
+            // 四宫格要在编码前用 GL 重排画面，只有 MediaCodec 路径能做到；
+            // MediaRecorder 直接吃相机原始输出，没有插手的余地。
+            if (RECORDING_MODE_MEDIA_RECORDER.equals(mode)) {
+                AppLog.i(TAG, "已选四宫格录制，忽略 MediaRecorder 模式设置，改用 MediaCodec");
+            }
+            return true;
+        }
         if (RECORDING_MODE_CODEC.equals(mode)) {
             // 强制使用 Codec 模式
             return true;
@@ -846,6 +855,36 @@ public class AppConfig {
     public void setDecouplePreviewEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_DECOUPLE_PREVIEW, enabled).apply();
         AppLog.d(TAG, "预览/录制分辨率解耦: " + enabled);
+    }
+
+    // ==================== 录制画面排列 ====================
+
+    /** 录制原始合成流（四个画面竖向一字排开）。 */
+    public static final String RECORD_LAYOUT_RAW = "raw";
+    /** 录制为 2x2 四宫格。 */
+    public static final String RECORD_LAYOUT_GRID = "grid2x2";
+
+    /**
+     * 录制画面排列方式。
+     *
+     * <p>{@link #RECORD_LAYOUT_RAW} 直接录制车机给的合成流，四个画面竖向排列成一条长条，
+     * 编码开销最低但观看不便，且 1280x5140 超过编码器 4096 的上限、会被缩放。</p>
+     *
+     * <p>{@link #RECORD_LAYOUT_GRID} 在编码前用 GL 把四个画面重排成 2x2 正方形，
+     * 输出即所见。代价是必须走 MediaCodec（软编码）路径。</p>
+     */
+    public String getRecordLayout() {
+        return prefs.getString(KEY_RECORD_LAYOUT, RECORD_LAYOUT_GRID);
+    }
+
+    public void setRecordLayout(String layout) {
+        prefs.edit().putString(KEY_RECORD_LAYOUT, layout).apply();
+        AppLog.d(TAG, "录制画面排列: " + layout);
+    }
+
+    /** 是否录制为 2x2 四宫格。 */
+    public boolean isRecordGridLayout() {
+        return RECORD_LAYOUT_GRID.equals(getRecordLayout());
     }
     
     /**

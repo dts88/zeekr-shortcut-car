@@ -104,6 +104,13 @@ public class SettingsFragment extends Fragment {
     private Spinner segmentDurationSpinner;
     private static final String[] SEGMENT_DURATION_OPTIONS = {"1分钟", "3分钟", "5分钟"};
 
+    // 录制画面排列
+    private Spinner recordLayoutSpinner;
+    private static final String[] RECORD_LAYOUT_OPTIONS = {"四宫格", "原始长条"};
+    private static final String[] RECORD_LAYOUT_VALUES =
+            {AppConfig.RECORD_LAYOUT_GRID, AppConfig.RECORD_LAYOUT_RAW};
+    private boolean isInitializingRecordLayout = false;
+
     // 录制帧率配置相关
     private Spinner recordFpsSpinner;
     private static final String[] RECORD_FPS_OPTIONS = {"原始帧率", "30 fps", "24 fps", "20 fps", "15 fps", "10 fps"};
@@ -203,6 +210,8 @@ public class SettingsFragment extends Fragment {
             
             // 初始化分段时长配置
             initSegmentDurationConfig(view);
+
+            initRecordLayoutConfig(view);
 
             initRecordFpsConfig(view);
 
@@ -1328,6 +1337,63 @@ public class SettingsFragment extends Fragment {
         }
     }
     
+    /**
+     * 初始化录制画面排列配置。
+     *
+     * <p>四宫格需要走 MediaCodec 路径（在编码前用 GL 重排），因此选中它时
+     * {@link AppConfig#shouldUseCodecRecording()} 会强制返回 true。</p>
+     */
+    private void initRecordLayoutConfig(View view) {
+        recordLayoutSpinner = view.findViewById(R.id.spinner_record_layout);
+        if (recordLayoutSpinner == null || getContext() == null || appConfig == null) {
+            return;
+        }
+
+        isInitializingRecordLayout = true;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                getContext(), R.layout.spinner_item, RECORD_LAYOUT_OPTIONS);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        recordLayoutSpinner.setAdapter(adapter);
+
+        String current = appConfig.getRecordLayout();
+        int selectedIndex = 0;
+        for (int i = 0; i < RECORD_LAYOUT_VALUES.length; i++) {
+            if (RECORD_LAYOUT_VALUES[i].equals(current)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+        recordLayoutSpinner.setSelection(selectedIndex);
+
+        recordLayoutSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isInitializingRecordLayout
+                        || position < 0 || position >= RECORD_LAYOUT_VALUES.length) {
+                    return;
+                }
+                String value = RECORD_LAYOUT_VALUES[position];
+                if (value.equals(appConfig.getRecordLayout())) {
+                    return;
+                }
+                appConfig.setRecordLayout(value);
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            "录制画面排列已设为「" + RECORD_LAYOUT_OPTIONS[position]
+                                    + "」，重启应用后生效",
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        recordLayoutSpinner.post(() -> isInitializingRecordLayout = false);
+    }
+
     /**
      * 初始化录制帧率配置。
      *

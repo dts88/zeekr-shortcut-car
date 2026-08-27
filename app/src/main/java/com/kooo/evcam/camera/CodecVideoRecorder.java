@@ -159,10 +159,47 @@ public class CodecVideoRecorder {
 
     // 注意：帧同步变量已移除，帧处理现在直接在 onFrameAvailable 回调中完成
 
+    /**
+     * 相机输出缓冲区尺寸。默认等于编码尺寸；四宫格录制时这里是<b>合成流原始尺寸</b>
+     * （如 1280x5140），而编码输出是 2x2 的正方形。
+     */
+    private int sourceWidth;
+    private int sourceHeight;
+    /** 非 null 时按四宫格编码。 */
+    private com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan;
+    private int[] fourLaneOrder;
+
+    /**
+     * 启用四宫格录制。
+     *
+     * <p>相机仍按 {@code srcWidth x srcHeight} 出帧，编码器把它拆成四个画面渲染成
+     * 2x2 后再编码。构造函数里的 width/height 此时应当传 2x2 的输出尺寸。</p>
+     *
+     * @param srcWidth  合成流原始宽度
+     * @param srcHeight 合成流原始高度
+     * @param plan      拆分方案（按原始尺寸算出）
+     * @param order     画面排列，可为 null
+     */
+    public void setFourLaneSource(int srcWidth, int srcHeight,
+                                  com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan,
+                                  int[] order) {
+        if (srcWidth > 0 && srcHeight > 0) {
+            this.sourceWidth = srcWidth;
+            this.sourceHeight = srcHeight;
+        }
+        this.fourLanePlan = plan;
+        this.fourLaneOrder = order;
+        AppLog.i(TAG, "Camera " + cameraId + " 四宫格录制: 源 " + srcWidth + "x" + srcHeight
+                + " -> 编码 " + width + "x" + height);
+    }
+
     public CodecVideoRecorder(String cameraId, int width, int height) {
         this.cameraId = cameraId;
         this.width = width;
         this.height = height;
+        // 默认相机输出尺寸与编码尺寸一致；四宫格模式下由 setFourLaneSource 覆盖
+        this.sourceWidth = width;
+        this.sourceHeight = height;
         // 创建独立的后台线程用于分段处理和文件 I/O 操作
         segmentThread = new HandlerThread("CodecRecorder-Segment-" + cameraId) {
             @Override
@@ -381,7 +418,8 @@ public class CodecVideoRecorder {
 
                     // 创建 SurfaceTexture 供 Camera 输出（在编码线程上，绑定到 EGL context）
                     inputSurfaceTexture = new SurfaceTexture(textureId);
-                    inputSurfaceTexture.setDefaultBufferSize(width, height);
+                    // 相机按源尺寸出帧；四宫格模式下与编码尺寸不同
+                    inputSurfaceTexture.setDefaultBufferSize(sourceWidth, sourceHeight);
 
                     // 设置帧可用回调（在编码线程上）
                     // 直接在回调中处理帧，避免 Handler 死锁
@@ -463,6 +501,9 @@ public class CodecVideoRecorder {
 
                     // 设置 EGL 渲染器的输入
                     eglEncoder.setInputSurfaceTexture(inputSurfaceTexture);
+                    if (fourLanePlan != null) {
+                        eglEncoder.setFourLanePlan(fourLanePlan, fourLaneOrder);
+                    }
 
                     // 设置时间水印（如果启用）
                     if (watermarkEnabled) {

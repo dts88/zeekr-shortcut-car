@@ -88,6 +88,29 @@ public class EglSurfaceEncoder {
             "    }\n" +
             "}\n";
 
+    // 四宫格模式下的 2D 水印叠加着色器。
+    //
+    // 为什么不能复用 FRAGMENT_SHADER_WITH_WATERMARK：那个着色器是靠 vTextureCoord
+    // （纹理坐标）判断像素是否落在水印矩形内的。四宫格模式下每个画面只采样纹理的
+    // 一个子区间，这个判断会在错误的位置命中。所以水印改为独立一遍，直接在 NDC
+    // 里画一个小四边形，只采样水印位图并做 alpha 混合。
+    private static final String WATERMARK_OVERLAY_VERTEX_SHADER =
+            "attribute vec4 aPosition;\n" +
+            "attribute vec2 aTexCoord;\n" +
+            "varying vec2 vTexCoord;\n" +
+            "void main() {\n" +
+            "    gl_Position = aPosition;\n" +
+            "    vTexCoord = aTexCoord;\n" +
+            "}\n";
+
+    private static final String WATERMARK_OVERLAY_FRAGMENT_SHADER =
+            "precision mediump float;\n" +
+            "varying vec2 vTexCoord;\n" +
+            "uniform sampler2D sWatermark;\n" +
+            "void main() {\n" +
+            "    gl_FragColor = texture2D(sWatermark, vTexCoord);\n" +
+            "}\n";
+
     // 顶点坐标（全屏四边形）
     private static final float[] VERTICES = {
             -1.0f, -1.0f,  // 左下
@@ -107,6 +130,20 @@ public class EglSurfaceEncoder {
     private final String cameraId;
     private final int width;
     private final int height;
+
+    // ---- 四宫格录制 ----
+    /** 非 null 时启用四宫格录制：把合成流拆成 4 个画面渲染成 2x2。 */
+    private volatile com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan;
+    /** laneOrder[格子位置] = 合成流中的画面序号。 */
+    private volatile int[] fourLaneOrder = {0, 1, 2, 3};
+    private java.nio.FloatBuffer laneVertexBuffer;
+    private java.nio.FloatBuffer laneTexCoordBuffer;
+    private final float[] laneVertexScratch = new float[8];
+    private final float[] laneTexScratch = new float[8];
+    private int watermarkOverlayProgram;
+    private int overlayPositionHandle;
+    private int overlayTexCoordHandle;
+    private int overlayTextureHandle;
 
     // EGL 相关
     private EGLDisplay eglDisplay = EGL14.EGL_NO_DISPLAY;
@@ -327,8 +364,14 @@ public class EglSurfaceEncoder {
                 needsClear = false;
             }
 
-            // 根据是否启用水印选择不同的渲染路径
-            if (watermarkEnabled && watermarkProgram != 0) {
+            // 四宫格模式优先：拆成 2x2 渲染，水印另走一遍叠加
+            com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan = fourLanePlan;
+            if (plan != null) {
+                drawFourLanes(plan);
+                if (watermarkEnabled) {
+                    drawWatermarkOverlay();
+                }
+            } else if (watermarkEnabled && watermarkProgram != 0) {
                 drawFrameWithWatermark();
             } else {
                 drawFrameWithoutWatermark();
@@ -341,6 +384,150 @@ public class EglSurfaceEncoder {
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Error drawing frame", e);
         }
+    }
+
+    /**
+     * 启用四宫格录制。
+     *
+     * <p>传入的 plan 必须是按<b>合成流真实尺寸</b>算出来的（见 CompositeStreamGeometry），
+     * 因为它用的是归一化坐标，与编码输出尺寸无关。传 null 关闭，恢复整帧录制。</p>
+     *
+     * @param plan  四画面拆分方案；null 表示不拆分
+     * @param order 长度为 4 的排列，order[格子位置] = 画面序号；null 表示默认顺序
+     */
+    public void setFourLanePlan(com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan, int[] order) {
+        this.fourLanePlan = (plan != null && plan.isComposite()) ? plan : null;
+        if (order != null && order.length == 4) {
+            this.fourLaneOrder = order.clone();
+        }
+        AppLog.i(TAG, "Camera " + cameraId + " 四宫格录制: "
+                + (this.fourLanePlan != null ? "启用 (" + this.fourLanePlan + ")" : "关闭"));
+    }
+
+    public boolean isFourLaneEnabled() {
+        return fourLanePlan != null;
+    }
+
+    /**
+     * 四宫格渲染：把同一张 OES 纹理的四个子区域画进 2x2 的四个格子。
+     *
+     * <p>输出是正方形、每个画面也是正方形，所以不需要额外的比例修正。</p>
+     */
+    private void drawFourLanes(com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan) {
+        GLES20.glUseProgram(program);
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glUniformMatrix4fv(texMatrixHandle, 1, false, texMatrix, 0);
+        GLES20.glUniform1i(textureHandle, 0);
+
+        GLES20.glEnableVertexAttribArray(positionHandle);
+        GLES20.glEnableVertexAttribArray(texCoordHandle);
+
+        int[] order = fourLaneOrder;
+        for (int cell = 0; cell < 4; cell++) {
+            int laneIndex = order[cell];
+            if (laneIndex >= plan.laneCount()) {
+                continue;
+            }
+            com.kooo.evcam.zeekr.CompositeStreamGeometry.Lane lane = plan.lane(laneIndex);
+
+            // 目标格子（NDC）：格子 0 左上、1 右上、2 左下、3 右下
+            float left = -1.0f + (cell % 2);
+            float right = left + 1.0f;
+            float top = 1.0f - (cell / 2);
+            float bottom = top - 1.0f;
+
+            // 几何坐标以左上为原点，GL 纹理坐标以左下为原点，这里翻一次
+            float u0 = lane.u0;
+            float u1 = lane.u1;
+            float v0 = 1.0f - lane.v1;
+            float v1 = 1.0f - lane.v0;
+
+            // triangle strip: 左下 -> 右下 -> 左上 -> 右上
+            laneVertexScratch[0] = left;  laneVertexScratch[1] = bottom;
+            laneVertexScratch[2] = right; laneVertexScratch[3] = bottom;
+            laneVertexScratch[4] = left;  laneVertexScratch[5] = top;
+            laneVertexScratch[6] = right; laneVertexScratch[7] = top;
+
+            laneTexScratch[0] = u0; laneTexScratch[1] = v0;
+            laneTexScratch[2] = u1; laneTexScratch[3] = v0;
+            laneTexScratch[4] = u0; laneTexScratch[5] = v1;
+            laneTexScratch[6] = u1; laneTexScratch[7] = v1;
+
+            laneVertexBuffer.clear();
+            laneVertexBuffer.put(laneVertexScratch);
+            laneVertexBuffer.position(0);
+            laneTexCoordBuffer.clear();
+            laneTexCoordBuffer.put(laneTexScratch);
+            laneTexCoordBuffer.position(0);
+
+            GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, laneVertexBuffer);
+            GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, laneTexCoordBuffer);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+        }
+
+        GLES20.glDisableVertexAttribArray(positionHandle);
+        GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
+
+    /**
+     * 四宫格模式下的水印：单独一遍，画在输出画面的右上角。
+     */
+    private void drawWatermarkOverlay() {
+        if (watermarkOverlayProgram == 0 || watermarkTextureId == 0) {
+            return;
+        }
+        long currentTimeMs = System.currentTimeMillis();
+        if (currentTimeMs - lastWatermarkUpdateMs >= WATERMARK_UPDATE_INTERVAL_MS) {
+            updateWatermarkBitmap();
+            lastWatermarkUpdateMs = currentTimeMs;
+        }
+
+        float w = 2.0f * WATERMARK_WIDTH / width;    // NDC 宽度
+        float h = 2.0f * WATERMARK_HEIGHT / height;  // NDC 高度
+        float margin = 0.02f;
+        float right = 1.0f - margin;
+        float left = right - w;
+        float top = 1.0f - margin;
+        float bottom = top - h;
+
+        laneVertexScratch[0] = left;  laneVertexScratch[1] = bottom;
+        laneVertexScratch[2] = right; laneVertexScratch[3] = bottom;
+        laneVertexScratch[4] = left;  laneVertexScratch[5] = top;
+        laneVertexScratch[6] = right; laneVertexScratch[7] = top;
+
+        // 水印位图左上为原点，这里上下翻转贴图
+        laneTexScratch[0] = 0f; laneTexScratch[1] = 1f;
+        laneTexScratch[2] = 1f; laneTexScratch[3] = 1f;
+        laneTexScratch[4] = 0f; laneTexScratch[5] = 0f;
+        laneTexScratch[6] = 1f; laneTexScratch[7] = 0f;
+
+        laneVertexBuffer.clear();
+        laneVertexBuffer.put(laneVertexScratch);
+        laneVertexBuffer.position(0);
+        laneTexCoordBuffer.clear();
+        laneTexCoordBuffer.put(laneTexScratch);
+        laneTexCoordBuffer.position(0);
+
+        GLES20.glUseProgram(watermarkOverlayProgram);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, watermarkTextureId);
+        GLES20.glUniform1i(overlayTextureHandle, 0);
+
+        GLES20.glEnableVertexAttribArray(overlayPositionHandle);
+        GLES20.glVertexAttribPointer(overlayPositionHandle, 2, GLES20.GL_FLOAT, false, 0, laneVertexBuffer);
+        GLES20.glEnableVertexAttribArray(overlayTexCoordHandle);
+        GLES20.glVertexAttribPointer(overlayTexCoordHandle, 2, GLES20.GL_FLOAT, false, 0, laneTexCoordBuffer);
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+
+        GLES20.glDisableVertexAttribArray(overlayPositionHandle);
+        GLES20.glDisableVertexAttribArray(overlayTexCoordHandle);
+        GLES20.glDisable(GLES20.GL_BLEND);
     }
 
     /**
@@ -713,6 +900,21 @@ public class EglSurfaceEncoder {
         // 创建顶点缓冲
         vertexBuffer = createFloatBuffer(VERTICES);
         texCoordBuffer = createFloatBuffer(TEXTURE_COORDS);
+
+        // 四宫格模式每帧要改写顶点/纹理坐标，单独准备可写缓冲
+        laneVertexBuffer = createFloatBuffer(new float[8]);
+        laneTexCoordBuffer = createFloatBuffer(new float[8]);
+
+        // 四宫格下的水印叠加程序（失败不致命，只是没有水印）
+        watermarkOverlayProgram = createProgram(
+                WATERMARK_OVERLAY_VERTEX_SHADER, WATERMARK_OVERLAY_FRAGMENT_SHADER);
+        if (watermarkOverlayProgram != 0) {
+            overlayPositionHandle = GLES20.glGetAttribLocation(watermarkOverlayProgram, "aPosition");
+            overlayTexCoordHandle = GLES20.glGetAttribLocation(watermarkOverlayProgram, "aTexCoord");
+            overlayTextureHandle = GLES20.glGetUniformLocation(watermarkOverlayProgram, "sWatermark");
+        } else {
+            AppLog.w(TAG, "Camera " + cameraId + " 水印叠加着色器创建失败，四宫格模式将没有水印");
+        }
 
         AppLog.d(TAG, "Camera " + cameraId + " OpenGL setup complete, textureId=" + textureId);
     }
