@@ -1,91 +1,94 @@
 # 给 openavm-recorder 的 issue 草稿
 
-> 用途：向 openavm-recorder 作者 Dantenothing 说明本项目、致谢，并主动确认边界。
+> 用途：向 openavm-recorder 作者 Dantenothing 致谢，并主动确认边界。
 > 提交地址：https://github.com/Dantenothing/openavm-recorder/issues/new
 >
 > **未经你确认，不会替你提交。** 内容可随意增删。
+>
+> 范围：只谈 openavm-recorder 本身。不提任何其他项目，不介绍我在做什么应用、
+> 有什么功能——那些与本次致谢无关，也没必要占用对方的注意力。
 
 ---
 
 ## 标题
 
 ```
-Thanks + disclosure: a separate GPL-3.0 project that uses your documented facts (no code copied)
+Thank you for documenting the composite stream — and a note on how I used it
 ```
 
 ## 正文（英文，建议直接用这版）
 
 ```markdown
-Hi, and thank you for this project.
+Hi,
 
-I want to be upfront about something I've built, and give you the chance to
-object if any of it isn't OK with you.
+This isn't a bug report — I just wanted to say thank you, and to be transparent
+about how I've used what you published.
 
-### What I built
+### Thank you for the platform documentation
 
-I've published a Zeekr surround-view dashcam app:
-https://github.com/dts88/zeekr-shortcut-car
+You could have kept all of this to yourself. Instead you wrote down, in public
+and in detail, what the App Lab environment actually hands a third-party app:
 
-It's a fork of [EVCam](https://github.com/suyunkai/EVCam) (GPL-3.0, by suyunkai),
-which gave me the camera pipeline, encoding, storage and playback. I added
-support for the Zeekr composite surround-view stream on top of it.
+- one already-composited stream rather than four cameras
+- `1280x5140` vertical: four 1280x1280 views plus five 4px separator bands
+- the `5120x1280` horizontal variant
+- the ~28 Mbps / ~200 MB/min recording profile
+- the fact that the HAL may declare only a small squashed surface hint while
+  still delivering the same composite content
+- the principle of only ever using sizes the HAL actually declares, with no
+  invented fallbacks
+- that factory 360 / reverse / parking functions may reclaim the camera, and that
+  a third-party app must yield rather than compete
 
-### What I used from your project — and what I didn't
+I also appreciate that you documented the limits of what you'd established, and
+the open questions about shared resources, rather than overclaiming. That's rare.
 
-I read your README and your source code. I have **not copied any of your code**,
-and I'm not redistributing your APK. I understand your project is
-`All rights reserved` with no open-source licence, and that your name and logo
-are not licensed for derivative branding — I've respected all of that.
+### The one that saved me
 
-What I did use is the **factual information** you documented about the platform:
+The comment in `ProductHomeCameraPolicy.kt`:
 
-- App Lab exposes one already-composited stream, not four cameras
-- `1280x5140` vertical: four 1280x1280 views + five 4px separator bands
-- `5120x1280` horizontal variant
-- ~28 Mbps, ~200 MB/min write profile
-- the HAL may declare only a small squashed surface hint while still delivering
-  the same composite content
-- App Lab does not allow writing recordings to external USB storage
-- factory 360/reverse/parking functions may reclaim the camera and must be given way
-- **that replacing the working camera producer with a GL-owned SurfaceTexture
-  crashes, and that the working structure is one ordinary TextureView redrawn by
-  its parent into four cells**
+> "The old automatic preview crashed because it replaced the working producer
+> with a GL-owned SurfaceTexture. The current path has been verified on the car:
+> Camera2 feeds one ordinary TextureView and its parent redraws that same child
+> into four cells."
 
-That last one deserves a specific thank-you. I had already written the GL version
-— my own implementation, but architecturally the exact thing you documented as
-crashing. Your comment in `ProductHomeCameraPolicy.kt` saved me from shipping it
-to a real car and then having no idea why the preview died. I threw my
-implementation away and rewrote it as a container that redraws a plain
-TextureView, which is the structure you found to work.
+I had already built the GL version — my own code, but architecturally the exact
+thing you'd found to crash. I would have shipped it to a real vehicle and had no
+idea why the preview died. I deleted it and rewrote it around a plain TextureView
+redrawn by its parent, which is the structure you found to work.
 
-My implementations are written independently in Java (your project is Kotlin +
-Compose). If you look at them and feel anything crosses a line, tell me and I'll
-change or remove it immediately.
+That one comment was worth more than anything else I read. Thank you for leaving
+it in the source instead of just fixing it silently.
 
-### Attribution
+### How I used your work — and how I didn't
 
-You're credited in three places, all of which state your licence terms and
-explicitly say no code was copied and that we're not affiliated with or endorsed
-by you:
+I've written a separate application that targets the same composite stream.
+I want to be precise about the boundary:
 
-- the README
-- [NOTICE.md](https://github.com/dts88/zeekr-shortcut-car/blob/main/NOTICE.md)
-- an in-app "About & Credits" screen
-- plus [docs/zeekr-platform-notes.md](https://github.com/dts88/zeekr-shortcut-car/blob/main/docs/zeekr-platform-notes.md),
-  which records each platform fact with its source and marks what is measured vs
-  still unknown
+- I **read** your README and your source. I understand that's the stated purpose
+  of your source being publicly visible — inspection — and that visibility is not
+  a licence.
+- I have **not copied any of your code**. My implementations are written
+  independently in Java; yours is Kotlin + Compose.
+- I have **not** redistributed your APK, forked your repository, or used the
+  AVM Recorder name or logo in any way.
+- What I used is the **factual information** above: resolutions, layout, band
+  arithmetic, and the behavioural constraints you documented.
+- I credit you by name and link, state your `All rights reserved` terms, and say
+  explicitly that no code was copied and that I'm not affiliated with or endorsed
+  by you — in the project README, in a NOTICE file, and in an in-app credits
+  screen.
 
-### Two things I'd genuinely welcome
+### Two things I'd welcome
 
-1. **Tell me if I've overstepped.** I've tried to stay strictly on the
-   facts-not-expression side of the line, but you're the one whose work it is.
-2. **If you'd ever be willing to license your UI code** for reuse under GPL-3.0,
-   I'd much rather build on what you've already tuned on a real car than
-   re-derive it. Entirely your call, and a "no" is a perfectly fine answer —
-   nothing in my project depends on it.
+1. **If you think I've overstepped, tell me.** I've tried to stay strictly on the
+   facts-not-expression side of the line, but it's your work and your call. If
+   anything needs to change or come down, say so and I'll do it.
+2. **If you'd ever consider licensing your code for reuse**, I'd be glad to talk.
+   Entirely up to you, and "no" is a completely fine answer — nothing I've built
+   depends on it.
 
-Thanks again for documenting all of this publicly instead of keeping it to
-yourself. It's the reason a second app for this platform could exist at all.
+Either way: thanks for the work, and for publishing what you learned.
 ```
 
 ---
@@ -93,62 +96,62 @@ yourself. It's the reason a second app for this platform could exist at all.
 ## 中文版（如果你更想用中文发）
 
 ```markdown
-你好，首先感谢你这个项目。
+你好，
 
-我想主动说明一件事，也给你一个提出异议的机会。
+这不是一个 bug 报告——我只是想说声谢谢，并且主动把我使用你公开成果的方式讲清楚。
 
-### 我做了什么
+### 感谢你把平台细节记录下来
 
-我发布了一个极氪环视记录仪应用：https://github.com/dts88/zeekr-shortcut-car
+这些东西你完全可以自己留着。但你选择了公开、并且详细地写下 App Lab 环境到底
+给第三方应用什么：
 
-它 fork 自 [EVCam](https://github.com/suyunkai/EVCam)（GPL-3.0，作者 suyunkai），
-相机管线、编码、存储、回放都来自 EVCam。我在其之上增加了对极氪环视合成流的支持。
+- 一路已经合成好的视频流，而不是四个独立摄像头
+- 竖排 `1280×5140`：四个 1280×1280 画面 + 5 条 4px 分隔带
+- 横排 `5120×1280` 变体
+- 约 28 Mbps / 约 200 MB/min 的录制表现
+- HAL 可能只声明一个压扁的小尺寸提示，但送来的仍是同一份合成内容
+- 只使用 HAL 真正声明过的尺寸、绝不臆造回退值这一原则
+- 原厂 360°/倒车/泊车功能可能随时收回相机，第三方必须让路而不是去争
 
-### 我用了你项目的什么，没用什么
+我也很欣赏你同时写明了「哪些还没被确立」以及关于共享资源的开放问题，
+而不是把话说满。这很少见。
 
-我阅读了你的 README 和源码。我**没有复制你的任何代码**，也没有再分发你的 APK。
-我清楚你的项目是 All rights reserved、未授予开源许可，名称与图标也不授权用于衍生品牌
-—— 这些我都遵守了。
+### 真正帮到我的那一条
 
-我使用的是你公开记录的**事实信息**：
+`ProductHomeCameraPolicy.kt` 里的这段注释：
 
-- App Lab 只提供一路已合成的视频流，而不是四个摄像头
-- 竖排 `1280×5140`：四个 1280×1280 + 5 条 4px 分隔带
-- 横排 `5120×1280`
-- 约 28 Mbps、约 200 MB/min 的落盘表现
-- HAL 可能只声明一个压扁的小尺寸提示，但内容仍是同一份合成流
-- App Lab 不允许把录像直接写入外置 U 盘
-- 原厂 360°/倒车/泊车功能可能随时接管相机，必须让路
-- **用 GL 自建 SurfaceTexture 顶替相机生产者会崩溃，可行结构是一个普通 TextureView
-  由父容器重画进四个格子**
+> "The old automatic preview crashed because it replaced the working producer
+> with a GL-owned SurfaceTexture. The current path has been verified on the car:
+> Camera2 feeds one ordinary TextureView and its parent redraws that same child
+> into four cells."
 
-最后这一条要特别谢你。我当时已经把 GL 版本写完了——是我自己写的实现，
-但架构上正是你记录下来会崩的那种做法。你在 `ProductHomeCameraPolicy.kt` 里的那句注释，
-让我没有把它推上真车、然后完全搞不清预览为什么死掉。我把自己的实现整个删掉，
-按你验证可行的结构重写成了容器方案。
+我当时已经把 GL 版本写完了——是我自己写的代码，但架构上正是你发现会崩的那种做法。
+我本会把它装上真车，然后完全搞不清预览为什么死掉。我把它删了，
+改成由父容器重画一个普通 TextureView 的结构，也就是你验证可行的那套。
 
-我的实现是用 Java 独立编写的（你的项目是 Kotlin + Compose）。
-如果你看过之后觉得任何地方越界了，请告诉我，我会立刻修改或删除。
+这一条注释比我读到的其他任何内容都有价值。谢谢你把它留在源码里，
+而不是默默改掉就算了。
 
-### 署名
+### 我用了什么，没用什么
 
-你在三个地方被致谢，且都写明了你的许可条款、明确说明未复制代码、
-以及本项目与你没有隶属关系也未获你背书：
+我写了一个独立的应用，同样面向这路合成流。边界我想说清楚：
 
-- README
-- [NOTICE.md](https://github.com/dts88/zeekr-shortcut-car/blob/main/NOTICE.md)
-- 应用内的「关于与致谢」页面
-- 另有 [docs/zeekr-platform-notes.md](https://github.com/dts88/zeekr-shortcut-car/blob/main/docs/zeekr-platform-notes.md)，
-  逐条记录平台事实的来源，并标注哪些是实测、哪些仍未验证
+- 我**阅读**了你的 README 和源码。我理解源码公开可见的用途正是「供检查」，
+  而可见并不等于授权。
+- 我**没有复制你的任何代码**。我的实现是用 Java 独立编写的，你的是 Kotlin + Compose。
+- 我**没有**再分发你的 APK、没有 fork 你的仓库，也没有以任何方式使用
+  AVM Recorder 的名称或图标。
+- 我使用的是上面那些**事实信息**：分辨率、排布、分隔带算法，以及你记录的行为约束。
+- 我在项目 README、NOTICE 文件和应用内的致谢页面三处署你的名并附链接，
+  写明你的 All rights reserved 条款，并明确声明未复制代码、
+  与你没有隶属关系也未获你背书。
 
 ### 两件我很希望得到回应的事
 
-1. **如果我越界了，请直接告诉我。** 我尽量严格停在「事实而非表达」这一侧，
-   但这毕竟是你的作品。
-2. **如果你愿意授权你的界面代码以 GPL-3.0 复用**，我非常乐意直接用你已经在真车上
-   调好的那套，而不是自己重新摸索。完全由你决定，拒绝也完全没问题
-   —— 我的项目不依赖这件事。
+1. **如果你认为我越界了，请直接告诉我。** 我尽量严格停在「事实而非表达」这一侧，
+   但这是你的作品，由你判断。任何需要修改或撤下的地方，你说，我就做。
+2. **如果你愿意考虑授权你的代码被复用**，我很乐意聊聊。完全由你决定，
+   拒绝也完全没问题——我做的东西不依赖这件事。
 
-再次感谢你把这些都公开出来，而不是留着自己用。
-这是这个平台上能出现第二个应用的唯一原因。
+无论如何：感谢你的工作，也感谢你把学到的东西公开出来。
 ```

@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 
-import com.kooo.evcam.dingtalk.DingTalkConfig;
-import com.kooo.evcam.telegram.TelegramConfig;
 
 /**
  * 透明启动 Activity
@@ -45,7 +43,7 @@ public class TransparentBootActivity extends Activity {
         AppLog.d(TAG, "开始初始化后台服务...");
         
         // 1. 启动前台服务保持进程活跃
-        // 【重要】远程服务（钉钉/Telegram）现在在 CameraForegroundService.onCreate() 中启动
+        // 【重要】前台服务在 CameraForegroundService.onCreate() 中启动
         // 不再需要 MainActivity 来启动远程服务
         CameraForegroundService.start(this, 
             "开机自启动", 
@@ -60,22 +58,12 @@ public class TransparentBootActivity extends Activity {
         // 【优化后】只有以下情况需要启动 MainActivity：
         // - 用户启用了"启动自动录制"功能（需要摄像头，必须启动 Activity）
         // 【不再需要启动 MainActivity】：
-        // - 远程服务（钉钉/Telegram）已在 CameraForegroundService 中启动
         // - 悬浮窗已在 CameraForegroundService 中启动
         AppConfig appConfig = new AppConfig(this);
         
         boolean shouldAutoRecord = appConfig.isAutoStartRecording();
         boolean shouldShowFloatingWindow = appConfig.isFloatingWindowEnabled();
         
-        // 仅用于日志记录
-        DingTalkConfig dingTalkConfig = new DingTalkConfig(this);
-        TelegramConfig telegramConfig = new TelegramConfig(this);
-        boolean hasRemoteService = (dingTalkConfig.isConfigured() && dingTalkConfig.isAutoStart()) ||
-                                   (telegramConfig.isConfigured() && telegramConfig.isAutoStart());
-        
-        if (hasRemoteService) {
-            AppLog.d(TAG, "远程服务已在 CameraForegroundService 中启动，无需启动 MainActivity");
-        }
         if (shouldShowFloatingWindow) {
             AppLog.d(TAG, "悬浮窗已在 CameraForegroundService 中启动，无需启动 MainActivity");
         }

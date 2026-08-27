@@ -36,7 +36,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
-import com.kooo.evcam.transfer.QrTransferDialog;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -892,11 +891,8 @@ public class PlaybackFragmentNew extends Fragment {
         android.app.AlertDialog dialog = builder.create();
         
         // 设置按钮点击事件
-        btnQr.setOnClickListener(v -> {
-            Log.d(TAG, "用户选择扫码互传");
-            dialog.dismiss();
-            showQrTransferDialog(videoFiles);
-        });
+        // 扫码互传依赖已移除的 transfer 模块；U 盘可直接取文件，此入口隐藏
+        btnQr.setVisibility(android.view.View.GONE);
         
         btnShare.setOnClickListener(v -> {
             Log.d(TAG, "用户选择系统分享");
@@ -913,34 +909,6 @@ public class PlaybackFragmentNew extends Fragment {
         Log.d(TAG, "分享选项对话框已显示");
     }
 
-    /**
-     * 显示扫码互传对话框
-     */
-    private void showQrTransferDialog(List<File> videoFiles) {
-        // 使用 getActivity() 获取 Activity 上下文，避免 Fragment detached 问题
-        android.app.Activity activity = getActivity();
-        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
-            Log.e(TAG, "无法显示对话框: activity 不可用");
-            return;
-        }
-        
-        if (!isAdded()) {
-            Log.e(TAG, "无法显示对话框: Fragment 未 attached");
-            return;
-        }
-        
-        Log.d(TAG, "准备显示扫码互传对话框，文件数: " + (videoFiles != null ? videoFiles.size() : 0));
-        
-        try {
-            // 使用 Activity 上下文而不是 Fragment 上下文，确保对话框在 Activity 生命周期内
-            QrTransferDialog dialog = new QrTransferDialog(activity, videoFiles);
-            dialog.show();
-            Log.d(TAG, "扫码互传对话框已显示");
-        } catch (Exception e) {
-            Log.e(TAG, "显示扫码互传对话框失败", e);
-            Toast.makeText(activity, "无法显示分享对话框: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
 
     /**
      * 根据文件名获取位置名称

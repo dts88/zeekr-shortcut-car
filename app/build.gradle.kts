@@ -75,9 +75,6 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.cardview)
 
-    // 钉钉官方 Stream SDK
-    implementation("com.dingtalk.open:app-stream-client:1.3.12")
-
     // 飞书：使用轻量级 OkHttp WebSocket 实现，不再依赖官方 SDK
 
     // 网络请求和 WebSocket
@@ -86,12 +83,6 @@ dependencies {
 
     // JSON 解析
     implementation("com.google.code.gson:gson:2.10.1")
-
-    // ZXing 二维码生成
-    implementation("com.google.zxing:core:3.5.1")
-
-    // NanoHTTPD - 轻量级 HTTP 服务器
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
 
     // Glide 图片加载库（用于缓存和优化缩略图加载）
     implementation("com.github.bumptech.glide:glide:4.16.0")

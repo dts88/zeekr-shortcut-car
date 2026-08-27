@@ -579,13 +579,8 @@ public class BlindSpotSettingsFragment extends Fragment {
             transaction.commit();
         });
 
-        adjustMjpegStreamButton.setOnClickListener(v -> {
-            if (getActivity() == null) return;
-            androidx.fragment.app.FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
-            transaction.replace(R.id.fragment_container, new MjpegStreamAdjustFragment());
-            transaction.addToBackStack(null);
-            transaction.commit();
-        });
+        // MJPEG 推流模块已移除，隐藏该入口
+        adjustMjpegStreamButton.setVisibility(android.view.View.GONE);
 
         // 调整车门副屏悬浮窗位置按钮
         logcatDebugButton.setOnClickListener(v -> {

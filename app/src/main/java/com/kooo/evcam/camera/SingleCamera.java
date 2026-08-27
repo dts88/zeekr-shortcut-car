@@ -436,7 +436,7 @@ public class SingleCamera {
     /**
      * 设置 MJPEG 流编码器 Surface（独立 GL 管线读回）。
      * <p>
-     * 与副屏/主屏悬浮窗不同，这路 Surface 来自 {@link com.kooo.evcam.stream.StreamGlEncoder}，
+     * 与副屏/主屏悬浮窗不同，这路 Surface 来自独立的 GL 编码管线，
      * 它内部自带 EGL context + OES 纹理 + 鱼眼/cover/pan shader + PBO 异步读回，
      * 把 Camera2 输出读回为 RGBA 后编码成 JPEG 推 MJPEG HTTP 流。
      * <p>

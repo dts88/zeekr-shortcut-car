@@ -72,25 +72,21 @@ public class CameraForegroundService extends Service {
         // 获取 WakeLock 防止系统休眠（车机必须）
         acquireWakeLock();
         
-        // 启动远程服务（钉钉/Telegram）
-        // 这样远程服务不依赖 MainActivity，即使 Activity 被杀也能继续运行
+        // 启动悬浮窗与补盲服务（不依赖 MainActivity，Activity 被杀也能继续运行）
         startRemoteServicesIfNeeded();
 
         startCameraRepairLoop();
     }
     
     /**
-     * 启动远程服务（如果配置了自动启动）
-     * 这是轻量优化的核心：远程服务在 Service 中启动，不依赖 MainActivity
+     * 启动后台服务（如果配置了自动启动）
+     * 在 Service 中启动，不依赖 MainActivity
      */
     private void startRemoteServicesIfNeeded() {
         try {
             AppConfig appConfig = new AppConfig(this);
-            // 只有开启了开机自启动才启动远程服务和悬浮窗
+            // 只有开启了开机自启动才启动后台服务和悬浮窗
             if (appConfig.isAutoStartOnBoot()) {
-                AppLog.d(TAG, "开机自启动已开启，从 Service 启动远程服务...");
-                RemoteServiceManager.getInstance().startRemoteServicesFromService(this);
-                
                 // 启动悬浮窗（如果已启用）
                 if (appConfig.isFloatingWindowEnabled()) {
                     AppLog.d(TAG, "悬浮窗已启用，从 Service 启动悬浮窗...");
@@ -243,23 +239,12 @@ public class CameraForegroundService extends Service {
                 FloatingWindowService.start(this);
             }
             
-            // 检查并启动远程服务（如果未运行）
-            RemoteServiceManager serviceManager = RemoteServiceManager.getInstance();
-            if (!serviceManager.hasAnyServiceRunning()) {
-                AppLog.d(TAG, "远程服务未运行，重新启动...");
-                serviceManager.startRemoteServicesFromService(this);
-            }
-            
-            // 检查并启动 MainActivity（如果启用了自动录制且 Activity 未运行）
+// 检查并启动 MainActivity（如果启用了自动录制且 Activity 未运行）
             if (appConfig.isAutoStartRecording() && MainActivity.getInstance() == null) {
                 startMainActivityForAutoRecording();
             }
 
-            // 自恢复 MJPEG 流（若配置已开启但未运行）
-            if (appConfig.isMjpegStreamEnabled()) {
-                com.kooo.evcam.stream.MjpegStreamManager.ensureRunning(this);
-            }
-        } catch (Exception e) {
+} catch (Exception e) {
             AppLog.e(TAG, "确保服务启动失败: " + e.getMessage(), e);
         }
     }
