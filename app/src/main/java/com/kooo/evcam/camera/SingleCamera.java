@@ -2308,11 +2308,25 @@ public class SingleCamera {
         String position = (cameraPosition != null) ? cameraPosition : cameraId;
         File photoFile = new File(photoDir, timestamp + "_" + position + ".jpg");
 
-        // 检查是否需要添加时间角标
-        android.graphics.Bitmap finalBitmap = bitmap;
         AppConfig appConfig = new AppConfig(context);
+
+        // 四宫格：拍照拿到的是整张合成图（四个画面竖向一字排开），
+        // 与录制保持一致地重排成 2x2 再存盘。用的是同一套拆分几何。
+        android.graphics.Bitmap sourceBitmap = bitmap;
+        android.graphics.Bitmap gridBitmap = null;
+        if (appConfig.isRecordGridLayout()) {
+            gridBitmap = com.kooo.evcam.zeekr.CompositeBitmapComposer.toGrid(bitmap, null);
+            if (gridBitmap != bitmap) {
+                sourceBitmap = gridBitmap;
+            } else {
+                gridBitmap = null;  // 未发生重排，没有额外的 bitmap 需要回收
+            }
+        }
+
+        // 检查是否需要添加时间角标
+        android.graphics.Bitmap finalBitmap = sourceBitmap;
         if (appConfig.isTimestampWatermarkEnabled()) {
-            finalBitmap = addTimestampWatermark(bitmap, timestamp);
+            finalBitmap = addTimestampWatermark(sourceBitmap, timestamp);
         }
 
         FileOutputStream output = null;
@@ -2342,8 +2356,12 @@ public class SingleCamera {
                 }
             }
             // 如果创建了新的bitmap用于水印，需要回收
-            if (finalBitmap != bitmap && finalBitmap != null) {
+            if (finalBitmap != bitmap && finalBitmap != gridBitmap && finalBitmap != null) {
                 finalBitmap.recycle();
+            }
+            // 四宫格重排产生的中间 bitmap 也要回收（原始 bitmap 由调用方负责）
+            if (gridBitmap != null && !gridBitmap.isRecycled()) {
+                gridBitmap.recycle();
             }
         }
     }
