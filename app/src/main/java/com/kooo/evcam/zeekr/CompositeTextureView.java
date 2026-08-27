@@ -248,17 +248,15 @@ public class CompositeTextureView extends AutoFitTextureView {
     /**
      * 返回<b>生产者</b>纹理，而不是 TextureView 自己的显示纹理。
      * 相机、播放器都往这里写；显示由 GL 线程负责。
+     *
+     * <p>GL 初始化失败时退回显示纹理：画面会是未拆分的长条，但相机链路照常工作，
+     * 好过整个功能不可用。注意这里不重写 {@link #isAvailable()}——它必须继续如实反映
+     * 显示纹理的状态，否则 GL 失败时上游会因为「永远不可用」而根本不开相机。</p>
      */
     @Override
     public SurfaceTexture getSurfaceTexture() {
         SurfaceTexture producer = producerTexture;
         return producer != null ? producer : super.getSurfaceTexture();
-    }
-
-    /** 生产者纹理就绪才算可用，避免上游拿到 null。 */
-    @Override
-    public boolean isAvailable() {
-        return producerTexture != null && super.isAvailable();
     }
 
     /**

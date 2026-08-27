@@ -136,7 +136,8 @@ public final class ZeekrCameraLocator {
             addAll(merged, map.getOutputSizes(ImageFormat.PRIVATE));
             addAll(merged, map.getOutputSizes(SurfaceTexture.class));
             return merged.toArray(new Size[0]);
-        } catch (CameraAccessException | IllegalArgumentException | RuntimeException e) {
+        } catch (CameraAccessException | RuntimeException e) {
+            // RuntimeException 已覆盖 IllegalArgumentException（无效 cameraId）
             AppLog.w(TAG, "读取相机 " + cameraId + " 能力失败: " + e.getMessage());
             return null;
         }

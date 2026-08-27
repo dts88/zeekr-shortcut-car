@@ -2825,8 +2825,7 @@ public class MainActivity extends AppCompatActivity {
     private void initCamerasForZeekrComposite(CameraManager cm, String[] cameraIds) {
         com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
                 com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
-        AppLog.i(TAG, "极氪合成流探测结果:
-" + located.diagnostics);
+        AppLog.i(TAG, "极氪合成流探测结果:\n" + located.diagnostics);
 
         String cameraId;
         if (located.found()) {
@@ -5786,8 +5785,7 @@ public class MainActivity extends AppCompatActivity {
         if (tvCompositeInfo == null || text == null) {
             return;
         }
-        String oneLine = text.trim().replace('
-', ' ');
+        String oneLine = text.trim().replace('\n', ' ');
         runOnUiThread(() -> {
             tvCompositeInfo.setText(oneLine);
             tvCompositeInfo.setVisibility(oneLine.isEmpty() ? View.GONE : View.VISIBLE);
