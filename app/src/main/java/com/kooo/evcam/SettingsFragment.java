@@ -126,6 +126,8 @@ public class SettingsFragment extends Fragment {
     private TextView storageLocationDescText;
     private Button storageDebugButton;
     private String[] storageLocationOptions;
+    /** 与 spinner 选项一一对应；下标 0（内部存储）为 null。 */
+    private java.util.List<StorageHelper.VolumeInfo> storageVolumes = new java.util.ArrayList<>();
     private boolean isInitializingStorageLocation = false;
     private String lastAppliedStorageLocation = null;
     private boolean hasExternalSdCard = false;
@@ -1098,41 +1100,24 @@ public class SettingsFragment extends Fragment {
             // 异步检测 U盘
             new Thread(() -> {
                 boolean newHasSdCard = StorageHelper.hasExternalSdCard(context);
-                
+                // 卷的数量可能变了（多插/拔掉一个盘）而 hasExternalSdCard 不变，所以一并取回
+                final java.util.List<StorageHelper.VolumeInfo> detected =
+                        StorageHelper.listExternalVolumes(context);
+
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         if (getContext() == null) return;
-                        
-                        if (newHasSdCard != hasExternalSdCard) {
+
+                        boolean volumesChanged = detected.size() != storageVolumesCount();
+                        storageVolumes = buildVolumeSlots(detected);
+
+                        if (newHasSdCard != hasExternalSdCard || volumesChanged) {
                             hasExternalSdCard = newHasSdCard;
                             if (storageDebugButton != null) {
                                 storageDebugButton.setVisibility(hasExternalSdCard ? View.GONE : View.VISIBLE);
                             }
                             
-                            // 更新 Spinner 选项文字
-                            if (storageLocationSpinner != null) {
-                                if (hasExternalSdCard) {
-                                    storageLocationOptions = new String[] {"内部存储", "U盘"};
-                                } else {
-                                    storageLocationOptions = new String[] {"内部存储", "U盘（未检测到）"};
-                                }
-                                ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                                        getContext(),
-                                        R.layout.spinner_item,
-                                        storageLocationOptions
-                                );
-                                adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-                                
-                                isInitializingStorageLocation = true;
-                                storageLocationSpinner.setAdapter(adapter);
-                                
-                                // 恢复用户之前的选择
-                                int selectedIndex = AppConfig.STORAGE_EXTERNAL_SD.equals(currentLocation) ? 1 : 0;
-                                storageLocationSpinner.setSelection(selectedIndex);
-                                storageLocationSpinner.post(() -> isInitializingStorageLocation = false);
-                                // 注意：这里不弹 Toast，因为 onResume 不代表 U 盘刚插入
-                                // 只是界面切换后重新检测状态，避免每次打开设置都提示"检测到U盘"
-                            }
+                            rebuildStorageSpinner(currentLocation);
                         }
                         
                         // 始终更新描述文字（可能U盘状态变化或空间变化）
@@ -1337,6 +1322,72 @@ public class SettingsFragment extends Fragment {
         }
     }
     
+    /** spinner 里外置卷的数量（不含下标 0 的内部存储）。 */
+    private int storageVolumesCount() {
+        return Math.max(0, storageVolumes.size() - 1);
+    }
+
+    /**
+     * 把检测到的卷排成与 spinner 一一对应的列表：下标 0 是内部存储（null 占位）。
+     */
+    private java.util.List<StorageHelper.VolumeInfo> buildVolumeSlots(
+            java.util.List<StorageHelper.VolumeInfo> detected) {
+        java.util.List<StorageHelper.VolumeInfo> slots = new java.util.ArrayList<>();
+        slots.add(null);  // 内部存储
+        if (detected != null) {
+            slots.addAll(detected);
+        }
+        return slots;
+    }
+
+    /**
+     * 按当前检测到的卷重建存储位置选择器。
+     *
+     * <p>上游写死成「内部存储 / U盘」两项，插两个盘时第二个永远选不到。
+     * 这里每个卷都单独列一项，并显示剩余/总容量。</p>
+     */
+    private void rebuildStorageSpinner(String currentLocation) {
+        if (storageLocationSpinner == null || getContext() == null) {
+            return;
+        }
+
+        java.util.List<String> labels = new java.util.ArrayList<>();
+        labels.add("内部存储");
+        for (int i = 1; i < storageVolumes.size(); i++) {
+            StorageHelper.VolumeInfo v = storageVolumes.get(i);
+            labels.add(v != null ? v.describe() : "外置存储");
+        }
+        if (labels.size() == 1) {
+            labels.add("外置存储（未检测到）");
+        }
+        storageLocationOptions = labels.toArray(new String[0]);
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                getContext(), R.layout.spinner_item, storageLocationOptions);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+
+        isInitializingStorageLocation = true;
+        storageLocationSpinner.setAdapter(adapter);
+
+        // 恢复选择：优先按之前钉住的卷路径匹配，匹配不到就退回第一个外置卷
+        int selectedIndex = 0;
+        if (AppConfig.STORAGE_EXTERNAL_SD.equals(currentLocation)) {
+            selectedIndex = storageLocationOptions.length > 1 ? 1 : 0;
+            String pinned = appConfig != null ? appConfig.getCustomSdCardPath() : null;
+            if (pinned != null && !pinned.isEmpty()) {
+                for (int i = 1; i < storageVolumes.size(); i++) {
+                    StorageHelper.VolumeInfo v = storageVolumes.get(i);
+                    if (v != null && pinned.equals(v.root.getAbsolutePath())) {
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        storageLocationSpinner.setSelection(selectedIndex);
+        storageLocationSpinner.post(() -> isInitializingStorageLocation = false);
+    }
+
     /**
      * 初始化录制画面排列配置。
      *
@@ -1729,9 +1780,9 @@ public class SettingsFragment extends Fragment {
             storageDebugButton.setOnClickListener(v -> showStorageDebugInfo());
         }
         
-        // 初始化 Spinner（使用默认选项，后续异步更新）
-        storageLocationOptions = new String[] {"内部存储", "U盘（检测中...）"};
-        
+        // 初始化 Spinner（先给一个占位，检测完成后由 rebuildStorageSpinner 重建）
+        storageLocationOptions = new String[] {"内部存储", "外置存储（检测中...）"};
+
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 getContext(),
                 R.layout.spinner_item,
@@ -1745,16 +1796,31 @@ public class SettingsFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String newLocation;
                 String locationName;
-                
+
                 if (position == 0) {
                     newLocation = AppConfig.STORAGE_INTERNAL;
                     locationName = "内部存储";
+                    // 回到自动检测，清掉之前钉住的卷
+                    if (!isInitializingStorageLocation && appConfig != null) {
+                        appConfig.setCustomSdCardPath(null);
+                    }
                 } else {
                     newLocation = AppConfig.STORAGE_EXTERNAL_SD;
-                    locationName = "U盘";
-                    // 如果U盘不可用，显示警告但仍然允许用户选择
-                    if (!hasExternalSdCard && !isInitializingStorageLocation && getContext() != null) {
-                        Toast.makeText(getContext(), "当前未检测到U盘，录制将临时使用内部存储", Toast.LENGTH_LONG).show();
+                    // 选中的是哪个卷？把它的根目录钉到 customSdCardPath，
+                    // StorageHelper 的检测逻辑第一步就会优先用它，
+                    // 这样插多个盘时不会再永远落到第一个上。
+                    StorageHelper.VolumeInfo picked =
+                            (position < storageVolumes.size()) ? storageVolumes.get(position) : null;
+                    if (picked != null) {
+                        locationName = picked.label;
+                        if (!isInitializingStorageLocation && appConfig != null) {
+                            appConfig.setCustomSdCardPath(picked.root.getAbsolutePath());
+                        }
+                    } else {
+                        locationName = "外置存储";
+                        if (!hasExternalSdCard && !isInitializingStorageLocation && getContext() != null) {
+                            Toast.makeText(getContext(), "当前未检测到外置存储，录制将临时使用内部存储", Toast.LENGTH_LONG).show();
+                        }
                     }
                 }
                 
@@ -1764,10 +1830,14 @@ public class SettingsFragment extends Fragment {
                     return;
                 }
                 
-                if (newLocation.equals(lastAppliedStorageLocation)) {
+                // 注意：不能只比较 internal/external_sd —— 在两个外置卷之间切换时
+                // newLocation 是一样的，那样会被当成"没变化"直接 return。
+                boolean sameAsBefore = newLocation.equals(lastAppliedStorageLocation)
+                        && AppConfig.STORAGE_INTERNAL.equals(newLocation);
+                if (sameAsBefore) {
                     return;
                 }
-                
+
                 lastAppliedStorageLocation = newLocation;
                 appConfig.setStorageLocation(newLocation);
                 
@@ -1791,11 +1861,30 @@ public class SettingsFragment extends Fragment {
         
         String currentLocation = appConfig.getStorageLocation();
         int selectedIndex = 0;
-        // 保持用户选择的存储位置，即使U盘不可用也显示选中状态
+        // 保持用户选择的存储位置，即使外置存储不可用也显示选中状态
         if (AppConfig.STORAGE_EXTERNAL_SD.equals(currentLocation)) {
             selectedIndex = 1;
         }
         storageLocationSpinner.setSelection(selectedIndex);
+
+        // 异步枚举存储卷，回来后用真实列表重建选择器
+        if (getContext() != null) {
+            final Context volumeContext = getContext();
+            new Thread(() -> {
+                final java.util.List<StorageHelper.VolumeInfo> detected =
+                        StorageHelper.listExternalVolumes(volumeContext);
+                if (getActivity() == null) {
+                    return;
+                }
+                getActivity().runOnUiThread(() -> {
+                    if (getContext() == null) {
+                        return;
+                    }
+                    storageVolumes = buildVolumeSlots(detected);
+                    rebuildStorageSpinner(appConfig.getStorageLocation());
+                });
+            }).start();
+        }
         
         // 显示加载中状态
         if (storageLocationDescText != null) {

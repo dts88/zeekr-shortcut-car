@@ -112,6 +112,98 @@ public class StorageHelper {
     }
     
     /**
+     * 一个可用的存储卷。
+     */
+    public static class VolumeInfo {
+        /** 卷根目录，例如 /storage/XXXX-XXXX；取不到时为应用专属目录。 */
+        public final File root;
+        /** 该卷上的应用专属目录（一定可写）。 */
+        public final File appDir;
+        /** 显示名，例如 "U盘 1 (XXXX-XXXX)"。 */
+        public final String label;
+        public final long freeBytes;
+        public final long totalBytes;
+
+        VolumeInfo(File root, File appDir, String label, long freeBytes, long totalBytes) {
+            this.root = root;
+            this.appDir = appDir;
+            this.label = label;
+            this.freeBytes = freeBytes;
+            this.totalBytes = totalBytes;
+        }
+
+        /** 供设置页显示：名称 + 剩余/总容量。 */
+        public String describe() {
+            if (totalBytes <= 0) {
+                return label;
+            }
+            return label + "（剩余 " + formatSize(freeBytes) + " / " + formatSize(totalBytes) + "）";
+        }
+    }
+
+    /**
+     * 列出所有<b>外置</b>存储卷。
+     *
+     * <p>上游只支持「内部存储」和「U盘」两个选项，且实现上取的是
+     * {@code getExternalFilesDirs()} 里的第一个非内部卷 —— 插两个盘时第二个永远用不上。
+     * 这里把所有卷都列出来，交给用户选。</p>
+     *
+     * <p>用 {@code getExternalFilesDirs()} 而不是解析 /proc/mounts：前者返回的是
+     * 应用一定有权写入的目录，后者能看到更多挂载点但很多写不了。</p>
+     */
+    public static java.util.List<VolumeInfo> listExternalVolumes(Context context) {
+        java.util.List<VolumeInfo> volumes = new java.util.ArrayList<>();
+        if (context == null) {
+            return volumes;
+        }
+        try {
+            File[] externalDirs = context.getExternalFilesDirs(null);
+            if (externalDirs == null) {
+                return volumes;
+            }
+            // 下标 0 是内部存储的外部目录，从 1 开始才是真正的外置卷
+            for (int i = 1; i < externalDirs.length; i++) {
+                File appDir = externalDirs[i];
+                if (appDir == null) {
+                    continue;
+                }
+                if (!appDir.exists() && !appDir.mkdirs()) {
+                    AppLog.d(TAG, "存储卷 " + i + " 不可用: " + appDir);
+                    continue;
+                }
+
+                File root = appDir;
+                String path = appDir.getAbsolutePath();
+                int cut = path.indexOf("/Android/data/");
+                if (cut > 0) {
+                    File candidate = new File(path.substring(0, cut));
+                    if (candidate.exists() && candidate.canRead()) {
+                        root = candidate;
+                    }
+                }
+
+                String name = root.getName();
+                String label = "外置存储 " + i + (name.isEmpty() ? "" : "（" + name + "）");
+
+                long free = 0L;
+                long total = 0L;
+                try {
+                    free = appDir.getUsableSpace();
+                    total = appDir.getTotalSpace();
+                } catch (Exception ignored) {
+                    // 容量取不到不影响使用
+                }
+
+                volumes.add(new VolumeInfo(root, appDir, label, free, total));
+            }
+        } catch (Exception e) {
+            AppLog.e(TAG, "枚举存储卷失败", e);
+        }
+        AppLog.d(TAG, "检测到 " + volumes.size() + " 个外置存储卷");
+        return volumes;
+    }
+
+    /**
      * 获取U盘路径
      * @param context 上下文
      * @return U盘根目录，如果没有则返回 null
