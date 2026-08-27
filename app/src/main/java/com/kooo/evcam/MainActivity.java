@@ -545,7 +545,14 @@ public class MainActivity extends AppCompatActivity {
             layoutId = R.layout.activity_main_zeekr_7x;
             configuredCameraCount = 1;
             requiredTextureCount = 1;
-            AppLog.d(TAG, "使用极氪7X配置：单路合成流 + GL 四宫格拆分");
+            AppLog.d(TAG, "使用极氪7X配置：单路合成流 + 四宫格拆分");
+        }
+        // 极氪7X 多路：环视合成流 + 两路座舱摄像头
+        else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            layoutId = R.layout.activity_main_zeekr_7x_multi;
+            configuredCameraCount = 3;
+            requiredTextureCount = 3;
+            AppLog.d(TAG, "使用极氪7X多路配置：环视合成流 + 2 路座舱");
         }
         // 多视角布局：自定义布局 + 圆角UI + 车辆控制
         else if (appConfig.isMultiviewCarModel()) {
@@ -2076,6 +2083,9 @@ public class MainActivity extends AppCompatActivity {
                 } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
                     // 极氪7X：按能力查找提供合成流的那一路相机
                     initCamerasForZeekrComposite(cm, cameraIds);
+                } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+                    // 极氪7X 多路：合成流 + 其余两路座舱
+                    initCamerasForZeekrMulti(cm, cameraIds);
                 } else if (appConfig.needsCustomLayoutManager()) {
                     // 自定义车型/多视角：使用用户配置的摄像头映射
                     initCamerasForCustomModel(cameraIds);
@@ -2149,6 +2159,58 @@ public class MainActivity extends AppCompatActivity {
         if (cameraId != null) {
             cameraManager.initCameras(cameraId, textureFront, null, null, null, null, null, null);
         }
+    }
+
+    /**
+     * 极氪7X 多路：环视合成流 + 两路座舱摄像头。
+     *
+     * <p>合成流那一路仍然按能力查找；剩下的相机按 id 顺序补进「座舱 1 / 座舱 2」。
+     * 哪一路是后座、哪一路是主驾目前无法从 Camera2 的信息判断（朝向都可能报 EXTERNAL），
+     * 所以先按顺序排，实车看过画面后再决定要不要加一个交换选项。
+     * 诊断页会列出每路相机的完整能力，便于确认。</p>
+     */
+    private void initCamerasForZeekrMulti(CameraManager cm, String[] cameraIds) {
+        com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
+                com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
+        AppLog.i(TAG, "极氪多路探测结果:\n" + located.diagnostics);
+
+        String compositeId = located.found() ? located.cameraId : null;
+        if (located.found()) {
+            appConfig.setTargetResolution(
+                    located.size.getWidth() + "x" + located.size.getHeight());
+            if (compositeContainer != null) {
+                compositeContainer.setSourceSize(located.size);
+            }
+        } else {
+            AppLog.w(TAG, "未找到合成流，多路配置将只使用普通相机");
+            runOnUiThread(() -> Toast.makeText(this,
+                    R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show());
+        }
+        updateCompositeInfoOverlay(located.diagnostics);
+
+        // 其余相机按 id 顺序补进两个座舱槽位
+        java.util.List<String> others = new java.util.ArrayList<>();
+        for (String id : cameraIds) {
+            if (!id.equals(compositeId)) {
+                others.add(id);
+            }
+        }
+        if (compositeId == null && !others.isEmpty()) {
+            // 没有合成流时，第一路顶上主画面，避免整个界面空着
+            compositeId = others.remove(0);
+        }
+
+        String cabin1 = others.size() > 0 ? others.get(0) : null;
+        String cabin2 = others.size() > 1 ? others.get(1) : null;
+        AppLog.i(TAG, "极氪多路映射: 环视=" + compositeId
+                + ", 座舱1=" + cabin1 + ", 座舱2=" + cabin2
+                + "（共 " + cameraIds.length + " 路可用）");
+
+        cameraManager.initCameras(
+                compositeId, textureFront,
+                cabin1, textureBack,
+                cabin2, textureLeft,
+                null, null);
     }
 
     /**

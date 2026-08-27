@@ -389,6 +389,7 @@ public class AppConfig {
     public static final String CAR_MODEL_XINGHAN_7 = "xinghan_7";  // 26款星舰7
     public static final String CAR_MODEL_MULTIVIEW = "multiview";  // 多视角布局
     public static final String CAR_MODEL_ZEEKR_7X = "zeekr_7x";  // 极氪7X（一路四联合成环视流）
+    public static final String CAR_MODEL_ZEEKR_7X_MULTI = "zeekr_7x_multi";  // 极氪7X（环视合成流 + 两路座舱）
     
     private final SharedPreferences prefs;
     private final Context context;
@@ -936,7 +937,13 @@ public class AppConfig {
      * 该模式下车机只提供一路四联合成流，预览由 FourLaneContainer 拆成四宫格。
      */
     public boolean isZeekrCompositeModel() {
-        return CAR_MODEL_ZEEKR_7X.equals(getCarModel());
+        String model = getCarModel();
+        return CAR_MODEL_ZEEKR_7X.equals(model) || CAR_MODEL_ZEEKR_7X_MULTI.equals(model);
+    }
+
+    /** 是否为「环视 + 两路座舱」的多路极氪配置。 */
+    public boolean isZeekrMultiModel() {
+        return CAR_MODEL_ZEEKR_7X_MULTI.equals(getCarModel());
     }
     
     /**
@@ -975,6 +982,8 @@ public class AppConfig {
                 return 4;  // 银河E5/L7/26款星舰7：4摄
             case CAR_MODEL_ZEEKR_7X:
                 return 1;  // 极氪7X：车机只给一路合成流，四个画面在同一帧里
+            case CAR_MODEL_ZEEKR_7X_MULTI:
+                return 3;  // 极氪7X 多路：环视合成流 + 两路座舱摄像头
             case CAR_MODEL_MULTIVIEW:
             case CAR_MODEL_CUSTOM:
             default:

@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  极氪 7X 多路布局：环视合成流 + 两路座舱摄像头。
+
+  左侧是 FourLaneContainer（把一路合成流重画成 2x2 四宫格，结构与单路布局一致），
+  右侧上下叠放两路普通摄像头。右侧两路沿用 texture_back / texture_left 两个 id，
+  这样上游 MultiCameraManager 的四槽位映射不用改。
+-->
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/drawer_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:id="@+id/main"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:background="@color/menu_background">
+
+            <!-- 左：环视合成流四宫格 -->
+            <FrameLayout
+                android:id="@+id/composite_wrapper"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="22"
+                android:layout_margin="4dp">
+
+                <com.kooo.evcam.zeekr.FourLaneContainer
+                    android:id="@+id/composite_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <com.kooo.evcam.AutoFitTextureView
+                        android:id="@+id/texture_front"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+                </com.kooo.evcam.zeekr.FourLaneContainer>
+
+                <TextView
+                    android:id="@+id/label_front"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_gravity="top|start"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginTop="8dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:background="@drawable/camera_label_background"
+                    android:gravity="center"
+                    android:text="环视"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/tv_composite_info"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:layout_marginBottom="6dp"
+                    android:background="@drawable/camera_label_background"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- 中：两路座舱摄像头，上下叠放 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="12"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="4dp">
+
+                    <com.kooo.evcam.AutoFitTextureView
+                        android:id="@+id/texture_back"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="center" />
+
+                    <TextView
+                        android:id="@+id/label_back"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_gravity="top|start"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginTop="6dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:background="@drawable/camera_label_background"
+                        android:gravity="center"
+                        android:text="座舱 1"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+                </FrameLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="4dp">
+
+                    <com.kooo.evcam.AutoFitTextureView
+                        android:id="@+id/texture_left"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="center" />
+
+                    <TextView
+                        android:id="@+id/label_left"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_gravity="top|start"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginTop="6dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:background="@drawable/camera_label_background"
+                        android:gravity="center"
+                        android:text="座舱 2"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- 右：操作按钮 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="8"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center">
+
+                    <Button
+                        android:id="@+id/btn_menu"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
+                        android:layout_margin="8dp"
+                        android:text="☰"
+                        android:textSize="30sp"
+                        android:backgroundTint="@color/button_background"
+                        android:textColor="@color/button_text"
+                        android:elevation="4dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="12dp" />
+
+                    <Button
+                        android:id="@+id/btn_start_record"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
+                        android:layout_margin="8dp"
+                        android:text="○"
+                        android:textSize="40sp"
+                        android:backgroundTint="@color/button_background"
+                        android:textColor="#FF0000"
+                        android:elevation="4dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="12dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center">
+
+                    <Button
+                        android:id="@+id/btn_take_photo"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
+                        android:layout_margin="8dp"
+                        android:text="◉"
+                        android:textSize="36sp"
+                        android:backgroundTint="@color/button_background"
+                        android:textColor="@color/button_text"
+                        android:elevation="4dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="12dp" />
+
+                    <Button
+                        android:id="@+id/btn_exit"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
+                        android:layout_margin="8dp"
+                        android:text="✕"
+                        android:textSize="36sp"
+                        android:backgroundTint="@color/button_background"
+                        android:textColor="@color/button_text"
+                        android:elevation="4dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="12dp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_composite_mode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:text="@string/zeekr_mode_grid"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text"
+                    android:elevation="4dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    app:cornerRadius="12dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_recording_stats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="15dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/camera_label_background"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="00:00 / 1"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tv_debug_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_marginTop="15dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/camera_label_background"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text=""
+            android:textColor="#AAFFFFFF"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/fragment_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/nav_view"
+        android:layout_width="300dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:fitsSystemWindows="false"
+        android:background="@color/nav_background"
+        android:elevation="8dp"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/navigation_menu"
+        app:itemTextAppearance="@style/NavigationMenuTextAppearance"
+        app:subheaderTextAppearance="@style/NavigationSubheaderTextAppearance"
+        app:itemBackground="@drawable/nav_item_background"
+        app:itemIconTint="@color/nav_icon_color_selector"
+        app:itemTextColor="@color/nav_text_color_selector"
+        app:itemIconSize="24dp"
+        app:itemIconPadding="16dp"
+        app:itemHorizontalPadding="16dp"
+        app:itemVerticalPadding="16dp"
+        app:dividerInsetStart="16dp"
+        app:dividerInsetEnd="16dp"
+        app:subheaderInsetStart="16dp" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

@@ -88,8 +88,10 @@ public class SettingsFragment extends Fragment {
     private Button customCameraConfigButton;
     // 只保留极氪配置；银河/星舰/手机/自定义等上游车型与本项目无关，已隐藏。
     // 对应的代码仍在（AppConfig 的常量与 MainActivity 的分支），改回来只需恢复这个数组。
-    private static final String[] CAR_MODEL_OPTIONS = {"极氪7X（环视合成流）"};
-    private static final String[] CAR_MODEL_VALUES = {AppConfig.CAR_MODEL_ZEEKR_7X};
+    private static final String[] CAR_MODEL_OPTIONS =
+            {"极氪7X（环视合成流）", "极氪7X（环视+座舱3路）"};
+    private static final String[] CAR_MODEL_VALUES =
+            {AppConfig.CAR_MODEL_ZEEKR_7X, AppConfig.CAR_MODEL_ZEEKR_7X_MULTI};
     private boolean isInitializingCarModel = false;
     private String lastAppliedCarModel = null;
     

@@ -110,6 +110,8 @@ public class CameraManagerHolder {
             return 2;
         } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
             return 1; // 极氪7X：一路合成流
+        } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            return 3; // 极氪7X 多路：环视 + 两路座舱
         } else if (appConfig.isCustomCarModel()) {
             return appConfig.getCameraCount();
         }
@@ -133,6 +135,8 @@ public class CameraManagerHolder {
             initCamerasForGalaxyE5(cameraIds);
         } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
             initCamerasForZeekrComposite(cm, cameraIds);
+        } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            initCamerasForZeekrMulti(cm, cameraIds);
         } else if (appConfig.isCustomCarModel()) {
             initCamerasForCustomModel(appConfig, cameraIds);
         } else {
@@ -159,6 +163,35 @@ public class CameraManagerHolder {
         cameraManager.initCameras(
                 cameraId, null, null, null,
                 null, null, null, null);
+    }
+
+    /**
+     * 极氪7X 多路的后台初始化：合成流 + 其余两路，映射规则与前台一致。
+     */
+    private void initCamerasForZeekrMulti(CameraManager cm, String[] cameraIds) {
+        if (cameraIds.length == 0) {
+            return;
+        }
+        com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
+                com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
+        String compositeId = located.found() ? located.cameraId : null;
+
+        java.util.List<String> others = new java.util.ArrayList<>();
+        for (String id : cameraIds) {
+            if (!id.equals(compositeId)) {
+                others.add(id);
+            }
+        }
+        if (compositeId == null && !others.isEmpty()) {
+            compositeId = others.remove(0);
+        }
+
+        cameraManager.initCameras(
+                compositeId, null,
+                others.size() > 0 ? others.get(0) : null, null,
+                others.size() > 1 ? others.get(1) : null, null,
+                null, null);
+        AppLog.i(TAG, "后台极氪多路映射: 环视=" + compositeId + ", 其余 " + others.size() + " 路");
     }
 
     private void initCamerasForGalaxyE5(String[] cameraIds) {
