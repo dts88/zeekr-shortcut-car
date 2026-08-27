@@ -61,6 +61,13 @@ public class SingleCamera {
 
     private Size previewSize;
     /**
+     * 这台相机专属的目标尺寸。设了就用它，不再读全局的「画质设置」。
+     *
+     * <p>多路配置里必须这样：合成流那一路要 1280x5140，另外两路座舱相机根本不支持
+     * 这个尺寸。之前是把合成流尺寸写进全局配置，等于命令所有相机都去够这个尺寸。</p>
+     */
+    private Size preferredSize;
+    /**
      * 预览缓冲区尺寸。默认等于 {@link #previewSize}；开启「预览/录制分辨率解耦」后
      * 会是一个更小的已声明尺寸，录制仍用 previewSize。
      */
@@ -316,6 +323,15 @@ public class SingleCamera {
      */
     public Size getPreviewSize() {
         return previewSize;
+    }
+
+    /**
+     * 指定这台相机的目标分辨率，优先于全局「画质设置」。
+     * 传 null 表示恢复走全局配置。
+     */
+    public void setPreferredSize(Size size) {
+        this.preferredSize = size;
+        AppLog.d(TAG, "Camera " + cameraId + " 指定目标分辨率: " + size);
     }
 
     /**
@@ -666,6 +682,20 @@ public class SingleCamera {
      * - 指定分辨率：优先精确匹配，否则最接近的
      */
     private Size chooseOptimalSize(Size[] sizes) {
+        // 这台相机被单独指定了尺寸就直接用（前提是 HAL 确实声明过）
+        Size preferred = preferredSize;
+        if (preferred != null) {
+            for (Size size : sizes) {
+                if (size.getWidth() == preferred.getWidth()
+                        && size.getHeight() == preferred.getHeight()) {
+                    AppLog.d(TAG, "Camera " + cameraId + " 使用指定分辨率: " + preferred);
+                    return size;
+                }
+            }
+            AppLog.w(TAG, "Camera " + cameraId + " 指定分辨率 " + preferred
+                    + " 未被声明，回退到全局配置");
+        }
+
         // 从配置获取目标分辨率
         AppConfig appConfig = new AppConfig(context);
         String targetResolution = appConfig.getTargetResolution();

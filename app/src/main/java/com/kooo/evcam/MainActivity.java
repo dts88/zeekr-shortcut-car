@@ -2068,9 +2068,6 @@ public class MainActivity extends AppCompatActivity {
         String cameraId;
         if (located.found()) {
             cameraId = located.cameraId;
-            // 让相机精确选中这个尺寸，而不是回退到最接近 1280x800 的那个
-            appConfig.setTargetResolution(
-                    located.size.getWidth() + "x" + located.size.getHeight());
             if (compositeContainer != null) {
                 compositeContainer.setSourceSize(located.size);
             }
@@ -2086,6 +2083,13 @@ public class MainActivity extends AppCompatActivity {
 
         if (cameraId != null) {
             cameraManager.initCameras(cameraId, textureFront, null, null, null, null, null, null);
+            // 只对这一路指定合成流尺寸，不去改全局「画质设置」
+            if (located.found()) {
+                com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
+                if (cam != null) {
+                    cam.setPreferredSize(located.size);
+                }
+            }
         }
     }
 
@@ -2104,8 +2108,6 @@ public class MainActivity extends AppCompatActivity {
 
         String compositeId = located.found() ? located.cameraId : null;
         if (located.found()) {
-            appConfig.setTargetResolution(
-                    located.size.getWidth() + "x" + located.size.getHeight());
             if (compositeContainer != null) {
                 compositeContainer.setSourceSize(located.size);
             }
@@ -2139,7 +2141,15 @@ public class MainActivity extends AppCompatActivity {
                 cabin1, textureBack,
                 cabin2, textureLeft,
                 null, null);
-    }
+
+        // 只有合成流那一路需要 1280x5140；两路座舱相机根本不支持这个尺寸，
+        // 让它们各自按默认逻辑挑，否则会被逼着去够一个不存在的分辨率。
+        if (located.found()) {
+            com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
+            if (cam != null) {
+                cam.setPreferredSize(located.size);
+            }
+        }
 
     /**
      * 银河E5车型：使用固定的摄像头映射

@@ -58,6 +58,7 @@ public final class DiagnosticsCollector {
 
         appendDevice(sb);
         appendCameras(sb, context);
+        appendMultiMapping(sb, context);
         appendDisplays(sb, context);
         appendSignalSources(sb, context);
         appendStorage(sb, context);
@@ -200,6 +201,47 @@ public final class DiagnosticsCollector {
             default:
                 return "未知(" + level + ")";
         }
+    }
+
+    /**
+     * 多路配置会怎么分配这些相机 —— 3 路配置显示不出来时，先看这一节。
+     */
+    private static void appendMultiMapping(StringBuilder sb, Context context) {
+        sb.append("## 2.1 多路配置的相机分配").append('\n');
+        CameraManager cm = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+        if (cm == null) {
+            sb.append("!! 拿不到 CameraManager").append('\n').append('\n');
+            return;
+        }
+        try {
+            ZeekrCameraLocator.Result located = ZeekrCameraLocator.locate(cm);
+            String compositeId = located.found() ? located.cameraId : null;
+            sb.append("环视合成流: ")
+                    .append(compositeId == null ? "未找到" : ("相机 " + compositeId + "  " + located.size))
+                    .append('\n');
+
+            String[] ids = cm.getCameraIdList();
+            java.util.List<String> others = new java.util.ArrayList<>();
+            for (String id : ids) {
+                if (!id.equals(compositeId)) {
+                    others.add(id);
+                }
+            }
+            sb.append("其余相机: ").append(others).append('\n');
+            sb.append("座舱 1 -> ").append(others.size() > 0 ? ("相机 " + others.get(0)) : "无").append('\n');
+            sb.append("座舱 2 -> ").append(others.size() > 1 ? ("相机 " + others.get(1)) : "无").append('\n');
+            sb.append('\n');
+            sb.append("说明：座舱两路是按相机 id 顺序取的，不保证对应后排/驾驶位。").append('\n');
+            sb.append("若 3 路配置显示不出画面，需要确认的是：").append('\n');
+            sb.append("  a) 上面这两路 id 是不是真的对应后排/驾驶位摄像头；").append('\n');
+            sb.append("  b) 车机是否允许同时打开合成流 + 这两路"
+                    + "（合成流很大，HAL 可能不支持这种组合）。").append('\n');
+            sb.append("  对照：用其他车型配置能显示这两路时，说明相机本身可用，"
+                    + "问题就在分配或并发组合上。").append('\n');
+        } catch (Exception e) {
+            sb.append("!! 分配预览失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
     }
 
     /**

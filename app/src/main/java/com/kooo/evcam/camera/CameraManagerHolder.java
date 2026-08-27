@@ -163,6 +163,12 @@ public class CameraManagerHolder {
         cameraManager.initCameras(
                 cameraId, null, null, null,
                 null, null, null, null);
+        if (located.found()) {
+            SingleCamera cam = cameraManager.getCamera("front");
+            if (cam != null) {
+                cam.setPreferredSize(located.size);
+            }
+        }
     }
 
     /**
@@ -191,6 +197,12 @@ public class CameraManagerHolder {
                 others.size() > 0 ? others.get(0) : null, null,
                 others.size() > 1 ? others.get(1) : null, null,
                 null, null);
+        if (located.found()) {
+            SingleCamera cam = cameraManager.getCamera("front");
+            if (cam != null) {
+                cam.setPreferredSize(located.size);
+            }
+        }
         AppLog.i(TAG, "后台极氪多路映射: 环视=" + compositeId + ", 其余 " + others.size() + " 路");
     }
 
