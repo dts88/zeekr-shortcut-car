@@ -95,7 +95,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingMultiplier="1.3"
-                android:text="作者：Dantenothing\n许可：Copyright © 2026 Dantenothing. All rights reserved.（保留所有权利，非开源许可）\n\n极氪 App Lab 只向第三方应用提供一路已经拼好的环视合成流，而不是四个独立摄像头。这一关键事实，以及合成流的具体尺寸与排布，由 openavm-recorder 项目率先公开记录：\n\n• 竖排 1280×5140：四个 1280×1280 方形画面竖向堆叠，另有 5 条 4px 分隔带\n• 横排 5120×1280：四个 1280×1280 画面横向排列\n• 整条合成流的推荐编码码率约 28 Mbps\n\n本应用对合成流的界面比例与拆分显示，正是基于以上公开记录的技术事实实现的。没有这份公开资料，本应用不可能适配极氪车机。在此向原作者致以诚挚感谢。"
+                android:text="作者：Dantenothing\n许可：Copyright © 2026 Dantenothing. All rights reserved.（保留所有权利，非开源许可）\n\n极氪 App Lab 只向第三方应用提供一路已经拼好的环视合成流，而不是四个独立摄像头。这一关键事实，以及下列平台行为，由 openavm-recorder 项目率先公开记录：\n\n• 竖排 1280×5140：四个 1280×1280 方形画面竖向堆叠，另有 5 条 4px 分隔带\n• 横排 5120×1280：四个 1280×1280 画面横向排列\n• 推荐码率约 28 Mbps，落盘约 200 MB/min\n• HAL 可能只声明一个压扁的小尺寸提示，内容仍是同一份合成流\n• 用 GL 自建 SurfaceTexture 顶替相机生产者会导致预览崩溃；可行的做法是让一个普通 TextureView 做唯一消费者、由父容器重画进四个格子\n• App Lab 不允许直接写外置 U 盘；原厂 360°/倒车相机可能随时接管相机\n\n本应用的界面比例、四宫格拆分与渲染结构，正是基于以上公开记录的事实实现的。尤其是渲染结构那一条——本应用最初写的就是会崩的 GL 方案，读到该记录后整体重写。没有这份公开资料，本应用不可能适配极氪车机。在此向原作者致以诚挚感谢。"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -107,7 +107,7 @@
                 android:padding="12dp"
                 android:background="@drawable/camera_label_background"
                 android:lineSpacingMultiplier="1.3"
-                android:text="重要说明：本应用没有复制 openavm-recorder 的任何源代码。该项目保留所有权利，未授予开源许可，其代码不可被复制或再分发。本应用只使用了其公开 README 中记载的接口事实（分辨率、排布、比例），四宫格拆分与渲染均为独立编写实现。\n\n本应用与 openavm-recorder 项目及其作者没有隶属或合作关系，也未获其背书。AVM Recorder 的名称与图标未用于本应用的品牌标识。"
+                android:text="重要说明：本应用没有复制 openavm-recorder 的任何源代码。该项目保留所有权利，未授予开源许可，其代码不可被复制或再分发。本应用阅读了其公开源码与说明以了解车机行为（这正是其「源代码公开可见以供检查」的用途），使用的是从中提取的事实性结论（分辨率、排布、比例、平台限制），而不是代码本身；四宫格拆分与渲染均为独立编写实现。\n\n本应用与 openavm-recorder 项目及其作者没有隶属或合作关系，也未获其背书。AVM Recorder 的名称与图标未用于本应用的品牌标识。"
                 android:textColor="#FFD9A0"
                 android:textSize="14sp" />
 

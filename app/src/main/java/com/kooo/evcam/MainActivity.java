@@ -86,8 +86,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private AutoFitTextureView textureFront, textureBack, textureLeft, textureRight;
-    /** 极氪合成流视图；非该车型时为 null。 */
-    private com.kooo.evcam.zeekr.CompositeTextureView compositeTextureView;
+    /** 极氪合成流四宫格容器；非该车型时为 null。 */
+    private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
     private final java.util.Map<String, android.graphics.Matrix> previewBaseTransforms = new java.util.HashMap<>();
     private PreviewCorrectionFloatingWindow previewCorrectionFloatingWindow;
@@ -986,7 +986,7 @@ public class MainActivity extends AppCompatActivity {
             requiredTextureCount = 4;
             AppLog.d(TAG, "使用银河A7配置：横屏4摄像头布局（沿用E5）");
         }
-        // 极氪7X：一路四联合成流，界面上只有一个 CompositeTextureView 自己拆四宫格
+        // 极氪7X：一路四联合成流，由 FourLaneContainer 把单个 TextureView 重画成四宫格
         else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
             layoutId = R.layout.activity_main_zeekr_7x;
             configuredCameraCount = 1;
@@ -1079,9 +1079,10 @@ public class MainActivity extends AppCompatActivity {
         textureLeft = findViewById(R.id.texture_left);  // 1摄和2摄布局中为null
         textureRight = findViewById(R.id.texture_right);  // 1摄和2摄布局中为null
 
-        // 极氪合成流：texture_front 实际是 CompositeTextureView
-        if (textureFront instanceof com.kooo.evcam.zeekr.CompositeTextureView) {
-            compositeTextureView = (com.kooo.evcam.zeekr.CompositeTextureView) textureFront;
+        // 极氪合成流：texture_front 是容器里那个普通的 TextureView，
+        // 四宫格由父容器 FourLaneContainer 重画子视图实现
+        compositeContainer = findViewById(R.id.composite_container);
+        if (compositeContainer != null) {
             tvCompositeInfo = findViewById(R.id.tv_composite_info);
             setupCompositeControls();
         }
@@ -2833,8 +2834,8 @@ public class MainActivity extends AppCompatActivity {
             // 让相机精确选中这个尺寸，而不是回退到最接近 1280x800 的那个
             appConfig.setTargetResolution(
                     located.size.getWidth() + "x" + located.size.getHeight());
-            if (compositeTextureView != null) {
-                compositeTextureView.setSourceSize(located.size);
+            if (compositeContainer != null) {
+                compositeContainer.setSourceSize(located.size);
             }
         } else {
             // 没找到就退回第一个相机，界面上会显示原始画面并提示不支持
@@ -3135,14 +3136,16 @@ public class MainActivity extends AppCompatActivity {
     private void applyPreviewSizeTransform(String cameraKey, AutoFitTextureView textureView, android.util.Size previewSize) {
         String carModel = appConfig.getCarModel();
 
-        // 极氪合成流：比例与排版由 CompositeTextureView 自己用 GL 处理，
-        // 这里只把真实源尺寸告诉它，不要再套用单画面的宽高比/矩阵变换。
-        if (textureView instanceof com.kooo.evcam.zeekr.CompositeTextureView) {
-            com.kooo.evcam.zeekr.CompositeTextureView composite =
-                    (com.kooo.evcam.zeekr.CompositeTextureView) textureView;
-            composite.setSourceSize(previewSize);
-            AppLog.d(TAG, "合成流源尺寸已更新: " + previewSize + " -> " + composite.describePlan());
-            updateCompositeInfoOverlay(composite.describePlan());
+        // 极氪合成流：比例与排版由 FourLaneContainer 负责。
+        // 这里绝不能给 TextureView 设 1280:5140 这种长条宽高比或预览矩阵，
+        // 否则子视图会被测量成细长条，四宫格就错位了。
+        if (compositeContainer != null && textureView == textureFront) {
+            // 只有看起来像合成流的尺寸才更新几何；HAL 有时会给一个压扁的小尺寸提示，
+            // 那种尺寸会被容器忽略，已探测到的正确几何得以保留。
+            compositeContainer.setSourceSize(previewSize);
+            AppLog.d(TAG, "合成流预览尺寸: " + previewSize
+                    + " -> " + compositeContainer.describePlan());
+            updateCompositeInfoOverlay(compositeContainer.describePlan());
             return;
         }
 
@@ -5721,19 +5724,19 @@ public class MainActivity extends AppCompatActivity {
      * 单画面模式下再次点击换下一个画面。
      */
     private void setupCompositeControls() {
-        if (compositeTextureView == null) {
+        if (compositeContainer == null) {
             return;
         }
         Button btnMode = findViewById(R.id.btn_composite_mode);
         if (btnMode != null) {
             btnMode.setOnClickListener(v -> toggleCompositeMode(btnMode));
         }
-        compositeTextureView.setOnClickListener(v -> {
-            if (compositeTextureView.getDisplayMode()
-                    == com.kooo.evcam.zeekr.CompositeTextureView.DisplayMode.SINGLE) {
-                int next = (compositeTextureView.getFocusedLane() + 1)
+        compositeContainer.setOnClickListener(v -> {
+            if (compositeContainer.getDisplayMode()
+                    == com.kooo.evcam.zeekr.FourLaneContainer.DisplayMode.SINGLE) {
+                int next = (compositeContainer.getFocusedLane() + 1)
                         % com.kooo.evcam.zeekr.CompositeStreamGeometry.LANE_COUNT;
-                compositeTextureView.focusLane(next);
+                compositeContainer.focusLane(next);
                 updateCompositeLabels();
             }
         });
@@ -5741,16 +5744,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void toggleCompositeMode(Button btnMode) {
-        if (compositeTextureView == null) {
+        if (compositeContainer == null) {
             return;
         }
-        boolean isGrid = compositeTextureView.getDisplayMode()
-                == com.kooo.evcam.zeekr.CompositeTextureView.DisplayMode.GRID;
+        boolean isGrid = compositeContainer.getDisplayMode()
+                == com.kooo.evcam.zeekr.FourLaneContainer.DisplayMode.GRID;
         if (isGrid) {
-            compositeTextureView.focusLane(0);
+            compositeContainer.focusLane(0);
             btnMode.setText(R.string.zeekr_mode_single);
         } else {
-            compositeTextureView.showGrid();
+            compositeContainer.showGrid();
             btnMode.setText(R.string.zeekr_mode_grid);
         }
         updateCompositeLabels();
@@ -5758,19 +5761,19 @@ public class MainActivity extends AppCompatActivity {
 
     /** 单画面模式下只留一个角标，四宫格模式下四个都显示。 */
     private void updateCompositeLabels() {
-        if (compositeTextureView == null) {
+        if (compositeContainer == null) {
             return;
         }
-        boolean grid = compositeTextureView.getDisplayMode()
-                == com.kooo.evcam.zeekr.CompositeTextureView.DisplayMode.GRID;
+        boolean grid = compositeContainer.getDisplayMode()
+                == com.kooo.evcam.zeekr.FourLaneContainer.DisplayMode.GRID;
         TextView[] labels = {
                 findViewById(R.id.label_front),
                 findViewById(R.id.label_back),
                 findViewById(R.id.label_left),
                 findViewById(R.id.label_right),
         };
-        int[] order = compositeTextureView.getLaneOrder();
-        int focused = compositeTextureView.getFocusedLane();
+        int[] order = compositeContainer.getLaneOrder();
+        int focused = compositeContainer.getFocusedLane();
         for (int cell = 0; cell < labels.length; cell++) {
             if (labels[cell] == null) {
                 continue;

@@ -30,7 +30,7 @@
 | 改动 | 文件 |
 |------|------|
 | 新增极氪合成流几何拆分 | `app/src/main/java/com/kooo/evcam/zeekr/CompositeStreamGeometry.java`（新增） |
-| 新增合成流 GL 四宫格视图 | `app/src/main/java/com/kooo/evcam/zeekr/CompositeTextureView.java`（新增） |
+| 新增合成流四宫格容器 | `app/src/main/java/com/kooo/evcam/zeekr/FourLaneContainer.java`（新增） |
 | 新增合成流车型档案 | `app/src/main/java/com/kooo/evcam/zeekr/ZeekrCompositeProfile.java`（新增） |
 | 新增按能力查找相机 | `app/src/main/java/com/kooo/evcam/zeekr/ZeekrCameraLocator.java`（新增） |
 | 新增关于与致谢页 | `app/src/main/java/com/kooo/evcam/zeekr/AboutActivity.java`、`res/layout/activity_about.xml`（新增） |
@@ -44,6 +44,9 @@
 | 新增关于入口 | `res/menu/navigation_menu.xml`（修改） |
 | 新增 CI 构建 | `.github/workflows/build.yml`（新增） |
 | 上游文档移入 `docs/`，移除未被代码引用的大图 | `docs/`、`assets/`（移动/删除） |
+
+平台事实笔记见 [`docs/zeekr-platform-notes.md`](docs/zeekr-platform-notes.md)，
+其中逐条标注了来源与未验证项。
 
 上游原始文档保留在 [`docs/`](docs/) 目录：
 `upstream-EVCam-README.md`、`upstream-EVCam-CLAUDE.md`、`upstream-EVCam-AGENTS.md`、
@@ -85,13 +88,21 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 | 横排尺寸 | `5120×1280` = 四个 1280×1280 画面横向排列，无分隔带 |
 | 推荐码率 | 整条合成流约 28 Mbps |
 | 工程原则 | 只使用 HAL 实际声明的尺寸，不做臆造与近似替换 |
+| 小尺寸提示 | HAL 可能只声明约 640×480 的 Surface 提示，但内部仍送同一份合成内容 |
+| 渲染约束 | **用 GL 自建 SurfaceTexture 顶替相机生产者会导致预览崩溃**；可行结构是一个普通 TextureView 做唯一消费者、由父容器重画进四个格子 |
+| 落盘表现 | 约 200 MB/min、3–4 MB/s 持续写入 |
+| 存储限制 | 被测 App Lab 环境不允许直接写外置 USB 存储 |
+| 相机所有权 | 原厂 360°/倒车/泊车相机可能随时接管，第三方应用必须让路 |
+| 资源管理 | App Lab 提示体积过大的应用可能无法启动、高负载时可能被降速 |
 
 这些是对硬件/系统输出接口的事实性描述与数值，不构成受著作权保护的表达。
 
 ### 我们没有用什么
 
 - **没有复制该项目的任何源代码**（一行都没有）。该项目为 Kotlin + Jetpack Compose，
-  本项目对应实现为独立编写的 Java；
+  本项目对应实现为独立编写的 Java。我们**阅读**了其公开源码以了解车机行为
+  （这正是其「源代码公开可见以供检查」的用途），从中提取的是上表那些事实性结论，
+  而不是代码本身；
 - 没有使用其名称、图标或任何品牌标识；
 - 没有复制或再分发其 APK；
 - 没有暗示本项目与其存在任何关联。

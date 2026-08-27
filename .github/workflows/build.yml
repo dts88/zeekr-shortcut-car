@@ -36,7 +36,7 @@ jobs:
 
       # 纯 JVM 单元测试：合成流几何拆分与相机选择逻辑
       - name: Run unit tests
-        run: ./gradlew testReleaseUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
 
       - name: Upload test report
         if: always()

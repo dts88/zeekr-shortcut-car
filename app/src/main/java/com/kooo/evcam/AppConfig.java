@@ -830,7 +830,7 @@ public class AppConfig {
     
     /**
      * 是否为极氪合成流车型。
-     * 该模式下车机只提供一路四联合成流，预览与录制都走 CompositeTextureView。
+     * 该模式下车机只提供一路四联合成流，预览由 FourLaneContainer 拆成四宫格。
      */
     public boolean isZeekrCompositeModel() {
         return CAR_MODEL_ZEEKR_7X.equals(getCarModel());

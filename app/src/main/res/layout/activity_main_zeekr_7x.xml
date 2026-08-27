@@ -3,9 +3,9 @@
   极氪 7X 合成流布局。
 
   与其他车型最大的不同：车机只给一路四联合成流，所以这里只有一个
-  CompositeTextureView，四宫格是它自己用 OpenGL 拆出来的。
+  普通 TextureView，四宫格由父容器 FourLaneContainer 重画子视图实现。
   id 仍沿用 texture_front，这样上游相机管线不用改。
-  四个角标只是覆盖在上面的 TextView，与 GL 渲染无关。
+  四个角标是容器的兄弟节点，浮在上层，不参与容器的重画逻辑。
 -->
 <androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -28,16 +28,29 @@
 
             <!-- 左侧：合成流四宫格 -->
             <FrameLayout
-                android:id="@+id/composite_container"
+                android:id="@+id/composite_wrapper"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="32"
                 android:layout_margin="4dp">
 
-                <com.kooo.evcam.zeekr.CompositeTextureView
-                    android:id="@+id/texture_front"
+                <!--
+                  FourLaneContainer 里只放一个普通的 AutoFitTextureView，
+                  它是相机唯一的消费者、完全不被改造；容器只负责把这个子视图
+                  重复画进四个格子。这是 openavm-recorder 在真车上验证过的结构
+                  （用 GL 自建 SurfaceTexture 顶替生产者会崩溃）。
+                  角标与诊断信息是容器的兄弟节点，浮在上层。
+                -->
+                <com.kooo.evcam.zeekr.FourLaneContainer
+                    android:id="@+id/composite_container"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                    android:layout_height="match_parent">
+
+                    <com.kooo.evcam.AutoFitTextureView
+                        android:id="@+id/texture_front"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+                </com.kooo.evcam.zeekr.FourLaneContainer>
 
                 <!-- 四个象限角标：左上 / 右上 / 左下 / 右下 -->
                 <TextView
