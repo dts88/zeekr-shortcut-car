@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="400dp"
+    android:viewportWidth="200"
+    android:viewportHeight="400">
+
+    <!-- 车辆轮廓 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M50,20 L150,20 Q170,20 170,40 L170,360 Q170,380 150,380 L50,380 Q30,380 30,360 L30,40 Q30,20 50,20 Z" />
+
+    <!-- 前轮位置标记（左上） -->
+    <path
+        android:fillColor="#4A90E2"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M40,60 L70,60 L70,110 L40,110 Z" />
+
+    <!-- 后轮位置标记（右上） -->
+    <path
+        android:fillColor="#4A90E2"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M130,60 L160,60 L160,110 L130,110 Z" />
+
+    <!-- 前轮位置标记（左下） -->
+    <path
+        android:fillColor="#4A90E2"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M40,290 L70,290 L70,340 L40,340 Z" />
+
+    <!-- 后轮位置标记（右下） -->
+    <path
+        android:fillColor="#4A90E2"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M130,290 L160,290 L160,340 L130,340 Z" />
+
+    <!-- 中线 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#CCCCCC"
+        android:strokeWidth="1"
+        android:pathData="M100,20 L100,380" />
+
+</vector>
