@@ -387,9 +387,15 @@ public class RecordingFloatingService extends Service {
                             int newX = initialX + deltaX;
                             int newY = initialY + deltaY;
 
-                            // 边界限制（考虑时间显示展开后的宽度）
-                            int maxWidth = screenWidth - 200; // 预留足够空间
-                            newX = Math.max(0, Math.min(newX, screenWidth - maxWidth));
+                            // 边界限制：只把按钮夹在屏幕内，不再额外限制活动范围。
+                            //
+                            // 原实现是：
+                            //     int maxWidth = screenWidth - 200;
+                            //     newX = Math.max(0, Math.min(newX, screenWidth - maxWidth));
+                            // screenWidth - maxWidth 恒等于 200，等于把 X 锁死在 0..200 ——
+                            // 无论屏幕多宽，按钮都只能在左边一小条里移动。这是个笔误，
+                            // 本意应该是 Math.min(newX, maxWidth)。
+                            newX = Math.max(0, Math.min(newX, screenWidth - buttonSize));
                             newY = Math.max(0, Math.min(newY, screenHeight - buttonSize));
 
                             layoutParams.x = newX;

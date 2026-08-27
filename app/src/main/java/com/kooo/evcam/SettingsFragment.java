@@ -86,7 +86,10 @@ public class SettingsFragment extends Fragment {
     // 车型配置相关
     private Spinner carModelSpinner;
     private Button customCameraConfigButton;
-    private static final String[] CAR_MODEL_OPTIONS = {"银河E5", "银河A7", "银河E5-多按钮", "银河L6/L7", "银河L7-多按钮", "26款星舰7", "手机", "自定义车型", "多视角布局", "极氪7X（环视合成流）"};
+    // 只保留极氪配置；银河/星舰/手机/自定义等上游车型与本项目无关，已隐藏。
+    // 对应的代码仍在（AppConfig 的常量与 MainActivity 的分支），改回来只需恢复这个数组。
+    private static final String[] CAR_MODEL_OPTIONS = {"极氪7X（环视合成流）"};
+    private static final String[] CAR_MODEL_VALUES = {AppConfig.CAR_MODEL_ZEEKR_7X};
     private boolean isInitializingCarModel = false;
     private String lastAppliedCarModel = null;
     
@@ -1169,43 +1172,14 @@ public class SettingsFragment extends Fragment {
         carModelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String newModel;
-                String modelName;
-                
-                if (position == 0) {
-                    newModel = AppConfig.CAR_MODEL_GALAXY_E5;
-                    modelName = "银河E5";
-                } else if (position == 1) {
-                    newModel = AppConfig.CAR_MODEL_GALAXY_A7;
-                    modelName = "银河A7";
-                } else if (position == 2) {
-                    newModel = AppConfig.CAR_MODEL_E5_MULTI;
-                    modelName = "银河E5-多按钮";
-                } else if (position == 3) {
-                    newModel = AppConfig.CAR_MODEL_L7;
-                    modelName = "银河L6/L7";
-                } else if (position == 4) {
-                    newModel = AppConfig.CAR_MODEL_L7_MULTI;
-                    modelName = "银河L7-多按钮";
-                } else if (position == 5) {
-                    newModel = AppConfig.CAR_MODEL_XINGHAN_7;
-                    modelName = "26款星舰7";
-                } else if (position == 6) {
-                    newModel = AppConfig.CAR_MODEL_PHONE;
-                    modelName = "手机";
-                } else if (position == 8) {
-                    newModel = AppConfig.CAR_MODEL_MULTIVIEW;
-                    modelName = "多视角布局";
-                } else if (position == 9) {
-                    newModel = AppConfig.CAR_MODEL_ZEEKR_7X;
-                    modelName = "极氪7X（环视合成流）";
-                } else {
-                    newModel = AppConfig.CAR_MODEL_CUSTOM;
-                    modelName = "自定义车型";
+                if (position < 0 || position >= CAR_MODEL_VALUES.length) {
+                    return;
                 }
+                String newModel = CAR_MODEL_VALUES[position];
+                String modelName = CAR_MODEL_OPTIONS[position];
 
-                // 自定义车型和多视角布局显示配置按钮
-                updateCustomConfigButtonVisibility(position == 7 || position == 8);
+                // 极氪配置都不需要自定义摄像头映射
+                updateCustomConfigButtonVisibility(false);
 
                 if (isInitializingCarModel) {
                     return;
@@ -1234,26 +1208,14 @@ public class SettingsFragment extends Fragment {
             }
         });
         
+        // 从旧版本升级上来的用户可能停留在已隐藏的车型上，一律回落到第一项（极氪）
         String currentModel = appConfig.getCarModel();
         int selectedIndex = 0;
-        if (AppConfig.CAR_MODEL_GALAXY_A7.equals(currentModel)) {
-            selectedIndex = 1;
-        } else if (AppConfig.CAR_MODEL_E5_MULTI.equals(currentModel)) {
-            selectedIndex = 2;
-        } else if (AppConfig.CAR_MODEL_L7.equals(currentModel)) {
-            selectedIndex = 3;
-        } else if (AppConfig.CAR_MODEL_L7_MULTI.equals(currentModel)) {
-            selectedIndex = 4;
-        } else if (AppConfig.CAR_MODEL_XINGHAN_7.equals(currentModel)) {
-            selectedIndex = 5;
-        } else if (AppConfig.CAR_MODEL_PHONE.equals(currentModel)) {
-            selectedIndex = 6;
-        } else if (AppConfig.CAR_MODEL_CUSTOM.equals(currentModel)) {
-            selectedIndex = 7;
-        } else if (AppConfig.CAR_MODEL_MULTIVIEW.equals(currentModel)) {
-            selectedIndex = 8;
-        } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(currentModel)) {
-            selectedIndex = 9;
+        for (int i = 0; i < CAR_MODEL_VALUES.length; i++) {
+            if (CAR_MODEL_VALUES[i].equals(currentModel)) {
+                selectedIndex = i;
+                break;
+            }
         }
         carModelSpinner.setSelection(selectedIndex);
         

@@ -874,7 +874,8 @@ public class AppConfig {
      * @return 车型标识，默认为银河E5
      */
     public String getCarModel() {
-        return prefs.getString(KEY_CAR_MODEL, CAR_MODEL_GALAXY_E5);
+        // 默认极氪7X：本项目就是为极氪合成流做的，其余车型不再提供
+        return prefs.getString(KEY_CAR_MODEL, CAR_MODEL_ZEEKR_7X);
     }
     
     /**
