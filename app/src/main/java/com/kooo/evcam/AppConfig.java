@@ -1446,8 +1446,10 @@ public class AppConfig {
         if (!isUsingExternalSdCard()) {
             return false;
         }
-        // 检查用户是否启用了中转写入（默认启用）
-        return prefs.getBoolean(KEY_RELAY_WRITE_ENABLED, true);
+        // 走同一个入口，不要在这里另外写一个默认值——
+        // 之前这里写死为 true，而 isRelayWriteEnabled() 已改为默认 false，
+        // 结果开关显示关闭、实际却仍在走内部存储中转。
+        return isRelayWriteEnabled();
     }
     
     /**
