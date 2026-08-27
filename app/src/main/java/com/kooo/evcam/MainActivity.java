@@ -2150,6 +2150,7 @@ public class MainActivity extends AppCompatActivity {
                 cam.setPreferredSize(located.size);
             }
         }
+    }
 
     /**
      * 银河E5车型：使用固定的摄像头映射
