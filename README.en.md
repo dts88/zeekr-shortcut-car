@@ -2,6 +2,8 @@
 
 A surround-view dashcam application for Zeekr head units.
 
+The app is named 极氪极氪（车机版） on the device.
+
 [简体中文](README.md) · [Attribution](NOTICE.md) · [Changelog](CHANGELOG.md)
 
 > [!WARNING]

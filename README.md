@@ -1,6 +1,6 @@
-# Zeekr Shortcut (Car Version)
+# 极氪极氪（车机版）
 
-面向极氪车机的环视记录仪应用。
+*Zeekr Shortcut (Car Version)* — 面向极氪车机的环视记录仪应用。
 
 [English](README.en.md) · [来源与致谢](NOTICE.md) · [平台事实笔记](docs/zeekr-platform-notes.md) · [更新日志](CHANGELOG.md)
 

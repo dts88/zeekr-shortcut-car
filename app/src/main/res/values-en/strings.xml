@@ -1,0 +1,4 @@
+<resources>
+    <!-- 英文环境下的应用名；默认（中文）名见 values/strings.xml -->
+    <string name="app_name">Zeekr Shortcut</string>
+</resources>
