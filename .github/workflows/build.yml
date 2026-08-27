@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
-          VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          VERSION=$(grep versionName app/build.gradle.kts | head -1 | cut -d'"' -f2)
           SHORT_SHA=$(git rev-parse --short HEAD)
           OUT="ZeekrShortcut-${VERSION}-${SHORT_SHA}.apk"
           cp "$SRC" "$OUT"
