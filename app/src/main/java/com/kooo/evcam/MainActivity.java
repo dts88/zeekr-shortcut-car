@@ -2090,6 +2090,13 @@ public class MainActivity extends AppCompatActivity {
 
         updateCompositeInfoOverlay(located.diagnostics);
 
+        // 手动指定优先于自动探测
+        String overrideFront = appConfig.getCameraOverride("front");
+        if (overrideFront != null) {
+            AppLog.i(TAG, "环视使用手动指定的相机 " + overrideFront + "（自动探测结果为 " + cameraId + "）");
+            cameraId = overrideFront;
+        }
+
         if (cameraId != null) {
             cameraManager.initCameras(cameraId, textureFront, null, null, null, null, null, null);
             // 只对这一路指定合成流尺寸，不去改全局「画质设置」
@@ -2141,6 +2148,24 @@ public class MainActivity extends AppCompatActivity {
 
         String cabin1 = others.size() > 0 ? others.get(0) : null;
         String cabin2 = others.size() > 1 ? others.get(1) : null;
+
+        // 手动指定优先。Camera2 分不出后排/驾驶位，自动分配只是按 id 顺序猜，
+        // 所以允许直接指定 —— 这也是排查三路黑屏最直接的手段。
+        String ovFront = appConfig.getCameraOverride("front");
+        String ovBack = appConfig.getCameraOverride("back");
+        String ovLeft = appConfig.getCameraOverride("left");
+        if (ovFront != null) {
+            compositeId = ovFront;
+        }
+        if (ovBack != null) {
+            cabin1 = ovBack;
+        }
+        if (ovLeft != null) {
+            cabin2 = ovLeft;
+        }
+        if (ovFront != null || ovBack != null || ovLeft != null) {
+            AppLog.i(TAG, "使用手动指定的相机映射");
+        }
         AppLog.i(TAG, "极氪多路映射: 环视=" + compositeId
                 + ", 座舱1=" + cabin1 + ", 座舱2=" + cabin2
                 + "（共 " + cameraIds.length + " 路可用）");

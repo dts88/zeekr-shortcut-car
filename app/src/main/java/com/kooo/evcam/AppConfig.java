@@ -289,6 +289,7 @@ public class AppConfig {
     private static final String KEY_DECOUPLE_PREVIEW = "decouple_preview_resolution";  // 预览与录制分辨率解耦
     private static final String KEY_RECORD_LAYOUT = "record_layout";  // 录制画面排列（raw/grid2x2）
     private static final String KEY_PREVIEW_RESOLUTION = "preview_resolution";  // 低分辨率预览的目标尺寸
+    private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
     
     // 帧率等级常量
     public static final String FRAMERATE_STANDARD = "standard";  // 标准帧率（默认）
@@ -872,6 +873,50 @@ public class AppConfig {
     public void setPreviewResolution(String value) {
         prefs.edit().putString(KEY_PREVIEW_RESOLUTION, value).apply();
         AppLog.d(TAG, "预览分辨率设置: " + value);
+    }
+
+    // ==================== 手动指定相机映射 ====================
+
+    /**
+     * 覆盖某个槽位使用的相机 id。
+     *
+     * <p>自动分配是「合成流按能力找、其余按 id 顺序补」，这在多路配置里只是猜测 ——
+     * Camera2 无法告诉我们哪一路是后排、哪一路是驾驶位。这里允许直接指定。</p>
+     *
+     * @param slot     槽位：front / back / left
+     * @param cameraId 相机 id；传 null 或空表示恢复自动
+     */
+    public void setCameraOverride(String slot, String cameraId) {
+        String key = KEY_CAMERA_OVERRIDE_PREFIX + slot;
+        if (cameraId == null || cameraId.trim().isEmpty()) {
+            prefs.edit().remove(key).apply();
+        } else {
+            prefs.edit().putString(key, cameraId).apply();
+        }
+        AppLog.d(TAG, "相机映射覆盖 " + slot + " = " + cameraId);
+    }
+
+    /** 返回 null 表示该槽位走自动分配。 */
+    public String getCameraOverride(String slot) {
+        String value = prefs.getString(KEY_CAMERA_OVERRIDE_PREFIX + slot, null);
+        return (value == null || value.trim().isEmpty()) ? null : value;
+    }
+
+    /** 是否有任何槽位被手动指定过。 */
+    public boolean hasCameraOverride() {
+        return getCameraOverride("front") != null
+                || getCameraOverride("back") != null
+                || getCameraOverride("left") != null;
+    }
+
+    /** 清掉所有手动指定，全部恢复自动。 */
+    public void clearCameraOverrides() {
+        prefs.edit()
+                .remove(KEY_CAMERA_OVERRIDE_PREFIX + "front")
+                .remove(KEY_CAMERA_OVERRIDE_PREFIX + "back")
+                .remove(KEY_CAMERA_OVERRIDE_PREFIX + "left")
+                .apply();
+        AppLog.i(TAG, "相机映射已全部恢复自动");
     }
 
     /** 可选的预览分辨率，按从小到大排列。 */
@@ -3732,6 +3777,9 @@ public class AppConfig {
     private static final String KEY_RECORDING_FLOATING_ENABLED = "recording_floating_enabled";
     private static final String KEY_RECORDING_FLOATING_BUTTON_SIZE = "recording_floating_button_size";
     private static final String KEY_RECORDING_FLOATING_TIME_TEXT_SIZE = "recording_floating_time_text_size";
+    // 录制悬浮按钮的位置。上游没有存过位置，所以每次启动都回到默认点。
+    private static final String KEY_RECORDING_FLOATING_X = "recording_floating_x";
+    private static final String KEY_RECORDING_FLOATING_Y = "recording_floating_y";
     private static final boolean DEFAULT_RECORDING_FLOATING_ENABLED = true;  // 默认开启
     private static final int DEFAULT_BUTTON_SIZE_DP = 64;
     private static final int DEFAULT_TIME_TEXT_SIZE_SP = 14;
@@ -3776,6 +3824,53 @@ public class AppConfig {
     /**
      * 设置录制悬浮按钮时间文字大小（sp）
      */
+    /**
+     * 记住录制悬浮按钮被拖到哪里。
+     *
+     * <p>上游只在内存里改 layoutParams，从不落盘，所以每次重启都回到屏幕左侧中间。</p>
+     */
+    public void setRecordingFloatingPosition(int x, int y) {
+        prefs.edit()
+                .putInt(KEY_RECORDING_FLOATING_X, x)
+                .putInt(KEY_RECORDING_FLOATING_Y, y)
+                .apply();
+    }
+
+    /** 返回 -1 表示还没存过，调用方应使用默认位置。 */
+    public int getRecordingFloatingX() {
+        return prefs.getInt(KEY_RECORDING_FLOATING_X, -1);
+    }
+
+    public int getRecordingFloatingY() {
+        return prefs.getInt(KEY_RECORDING_FLOATING_Y, -1);
+    }
+
+    /**
+     * 把录制悬浮按钮恢复出厂：位置、按钮大小、时间字号。
+     */
+    public void resetRecordingFloatingLayout() {
+        prefs.edit()
+                .remove(KEY_RECORDING_FLOATING_X)
+                .remove(KEY_RECORDING_FLOATING_Y)
+                .remove(KEY_RECORDING_FLOATING_BUTTON_SIZE)
+                .remove(KEY_RECORDING_FLOATING_TIME_TEXT_SIZE)
+                .apply();
+        AppLog.i(TAG, "录制悬浮按钮布局已恢复默认");
+    }
+
+    /**
+     * 把主屏悬浮窗恢复出厂：位置、大小、透明度。
+     */
+    public void resetFloatingWindowLayout() {
+        prefs.edit()
+                .remove(KEY_FLOATING_WINDOW_X)
+                .remove(KEY_FLOATING_WINDOW_Y)
+                .remove(KEY_FLOATING_WINDOW_SIZE)
+                .remove(KEY_FLOATING_WINDOW_ALPHA)
+                .apply();
+        AppLog.i(TAG, "悬浮窗布局已恢复默认");
+    }
+
     public void setRecordingFloatingTimeTextSizeSp(int sizeSp) {
         prefs.edit().putInt(KEY_RECORDING_FLOATING_TIME_TEXT_SIZE, sizeSp).apply();
         AppLog.d(TAG, "录制悬浮按钮时间文字大小设置: " + sizeSp + "sp");

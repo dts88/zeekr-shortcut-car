@@ -115,6 +115,54 @@
                     android:popupBackground="@color/card_background" />
             </LinearLayout>
 
+            <!-- 手动指定相机映射（测试用） -->
+            <LinearLayout
+                android:id="@+id/layout_camera_mapping"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="16dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="相机映射"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_camera_mapping_desc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="自动分配。多路配置下若某一路不出画面，可在这里手动指定相机"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_camera_mapping"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:text="指定 →"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+            </LinearLayout>
+
             <!-- 录制画面排列 -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -873,6 +921,43 @@
                 android:layout_marginTop="4dp"
                 android:layout_marginBottom="10dp"
                 android:paddingStart="4dp" />
+
+            <!-- 悬浮窗布局：重置 / 保存 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="悬浮窗布局"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="10dp"
+                    android:text="拖动悬浮窗后位置会自动记住，下次启动沿用。重置可把位置、大小、透明度、字号一并恢复默认。"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/btn_reset_floating_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="重置为默认"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+            </LinearLayout>
+
 
             <!-- 悬浮窗开关 -->
             <LinearLayout

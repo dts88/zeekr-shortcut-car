@@ -120,6 +120,13 @@ public class SettingsFragment extends Fragment {
 
     // 预览/录制分辨率解耦
     private com.kooo.evcam.view.MacOSToggleButton decouplePreviewToggle;
+
+    // 悬浮窗布局重置/保存
+    private Button resetFloatingLayoutButton;
+
+    // 手动指定相机映射
+    private Button cameraMappingButton;
+    private TextView cameraMappingDescText;
     private boolean isInitializingSegmentDuration = false;
     private int lastAppliedSegmentDuration = -1;
     
@@ -211,6 +218,10 @@ public class SettingsFragment extends Fragment {
             
             // 初始化分段时长配置
             initSegmentDurationConfig(view);
+
+            initCameraMapping(view);
+
+            initFloatingLayoutButtons(view);
 
             initRecordLayoutConfig(view);
 
@@ -1152,6 +1163,190 @@ public class SettingsFragment extends Fragment {
         if (parent instanceof View) {
             ((View) parent).setVisibility(
                     appConfig.isRecordGridLayout() ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /**
+     * 手动指定各槽位使用哪个相机。
+     *
+     * <p>自动分配是「合成流按能力找、其余按 id 顺序补」，后者只是猜测 ——
+     * Camera2 分辨不出哪一路是后排、哪一路是驾驶位。多路配置下某一路不出画面时，
+     * 手动指定是最直接的排查手段。</p>
+     */
+    private void initCameraMapping(View view) {
+        cameraMappingButton = view.findViewById(R.id.btn_camera_mapping);
+        cameraMappingDescText = view.findViewById(R.id.tv_camera_mapping_desc);
+        if (cameraMappingButton == null || appConfig == null) {
+            return;
+        }
+        updateCameraMappingDesc();
+        cameraMappingButton.setOnClickListener(v -> showCameraMappingDialog());
+    }
+
+    private void updateCameraMappingDesc() {
+        if (cameraMappingDescText == null || appConfig == null) {
+            return;
+        }
+        if (!appConfig.hasCameraOverride()) {
+            cameraMappingDescText.setText("自动分配。多路配置下若某一路不出画面，可在这里手动指定相机");
+            return;
+        }
+        StringBuilder sb = new StringBuilder("已手动指定：");
+        appendMapping(sb, "环视", "front");
+        appendMapping(sb, "座舱1", "back");
+        appendMapping(sb, "座舱2", "left");
+        cameraMappingDescText.setText(sb.toString());
+    }
+
+    private void appendMapping(StringBuilder sb, String label, String slot) {
+        String id = appConfig.getCameraOverride(slot);
+        if (id != null) {
+            sb.append(' ').append(label).append('=').append(id);
+        }
+    }
+
+    /** 每个槽位一个下拉框，选项是车机实际报出来的相机 id。 */
+    private void showCameraMappingDialog() {
+        if (getContext() == null) {
+            return;
+        }
+        final String[] cameraIds = listCameraIds();
+        if (cameraIds.length == 0) {
+            Toast.makeText(getContext(), "读取不到相机列表", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 选项 = 自动 + 每个相机 id
+        final String[] options = new String[cameraIds.length + 1];
+        options[0] = "自动";
+        for (int i = 0; i < cameraIds.length; i++) {
+            options[i + 1] = "相机 " + cameraIds[i];
+        }
+
+        final String[] slots = {"front", "back", "left"};
+        final String[] slotLabels = {"环视（合成流）", "座舱 1", "座舱 2"};
+        final Spinner[] spinners = new Spinner[slots.length];
+
+        LinearLayout root = new LinearLayout(getContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        root.setPadding(pad, pad, pad, pad);
+
+        for (int i = 0; i < slots.length; i++) {
+            TextView label = new TextView(getContext());
+            label.setText(slotLabels[i]);
+            label.setTextSize(16f);
+            root.addView(label);
+
+            Spinner spinner = new Spinner(getContext());
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                    getContext(), android.R.layout.simple_spinner_item, options);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinner.setAdapter(adapter);
+
+            String current = appConfig.getCameraOverride(slots[i]);
+            int selected = 0;
+            if (current != null) {
+                for (int k = 0; k < cameraIds.length; k++) {
+                    if (cameraIds[k].equals(current)) {
+                        selected = k + 1;
+                        break;
+                    }
+                }
+            }
+            spinner.setSelection(selected);
+            root.addView(spinner);
+            spinners[i] = spinner;
+        }
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle("相机映射")
+                .setView(root)
+                .setPositiveButton("保存", (d, w) -> {
+                    for (int i = 0; i < slots.length; i++) {
+                        int pos = spinners[i].getSelectedItemPosition();
+                        appConfig.setCameraOverride(slots[i],
+                                pos <= 0 ? null : cameraIds[pos - 1]);
+                    }
+                    updateCameraMappingDesc();
+                    Toast.makeText(getContext(), "相机映射已保存，重启应用后生效",
+                            Toast.LENGTH_LONG).show();
+                })
+                .setNeutralButton("全部自动", (d, w) -> {
+                    appConfig.clearCameraOverrides();
+                    updateCameraMappingDesc();
+                    Toast.makeText(getContext(), "已恢复自动分配，重启应用后生效",
+                            Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private String[] listCameraIds() {
+        try {
+            android.hardware.camera2.CameraManager cm =
+                    (android.hardware.camera2.CameraManager)
+                            requireContext().getSystemService(android.content.Context.CAMERA_SERVICE);
+            if (cm != null) {
+                return cm.getCameraIdList();
+            }
+        } catch (Exception e) {
+            AppLog.w("SettingsFragment", "读取相机列表失败: " + e.getMessage());
+        }
+        return new String[0];
+    }
+
+    /**
+     * 悬浮窗布局的「重置」。
+     *
+     * <p>两个悬浮窗的位置现在都在拖动结束时自动落盘 —— 主屏悬浮窗上游本来就有，
+     * 录制悬浮按钮的持久化是这一版补上的（之前每次启动都回到屏幕左侧中间）。
+     * 既然位置自动记住，就不需要额外的「保存」按钮，只留「重置」：
+     * 悬浮窗被拖到别扭的位置或调得过大时能一键还原。</p>
+     */
+    private void initFloatingLayoutButtons(View view) {
+        resetFloatingLayoutButton = view.findViewById(R.id.btn_reset_floating_layout);
+        if (appConfig == null) {
+            return;
+        }
+
+        if (resetFloatingLayoutButton != null) {
+            resetFloatingLayoutButton.setOnClickListener(v -> {
+                appConfig.resetFloatingWindowLayout();
+                appConfig.resetRecordingFloatingLayout();
+                restartFloatingServices();
+                // 尺寸滑块/选择器要跟着回到默认值
+                initFloatingWindowSizeSpinner();
+                initFloatingWindowAlphaSeekBar();
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            "悬浮窗与录制按钮的位置、大小、透明度、字号已恢复默认",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+    }
+
+    /** 重置后让悬浮服务按新值重建。 */
+    private void restartFloatingServices() {
+        if (getContext() == null) {
+            return;
+        }
+        try {
+            android.content.Context ctx = getContext().getApplicationContext();
+            if (appConfig.isFloatingWindowEnabled()) {
+                ctx.stopService(new android.content.Intent(ctx, FloatingWindowService.class));
+                ctx.startService(new android.content.Intent(ctx, FloatingWindowService.class));
+            }
+            if (appConfig.isRecordingFloatingEnabled()) {
+                ctx.stopService(new android.content.Intent(
+                        ctx, com.kooo.evcam.service.RecordingFloatingService.class));
+                ctx.startService(new android.content.Intent(
+                        ctx, com.kooo.evcam.service.RecordingFloatingService.class));
+            }
+        } catch (Exception e) {
+            AppLog.w("SettingsFragment", "重启悬浮服务失败: " + e.getMessage());
         }
     }
 
