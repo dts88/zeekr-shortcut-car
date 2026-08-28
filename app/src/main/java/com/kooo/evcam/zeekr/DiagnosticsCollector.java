@@ -307,70 +307,13 @@ public final class DiagnosticsCollector {
     }
 
     /**
-     * 转向灯 / 车门信号的三种来源，逐个探测。
+     * 车辆信号探测。
+     *
+     * <p>之前这里按猜出来的类名找 CarSignalManager，全都没找到就下了结论 ——
+     * 那是错的。真正的读法见 {@link VehicleSignalProbe}。</p>
      */
     private static void appendSignalSources(StringBuilder sb, Context context) {
-        sb.append("## 4. 车辆信号来源").append('\n');
-
-        // 4.1 VHAL gRPC —— 本构建已换成空实现
-        sb.append("[VHAL gRPC] ");
-        try {
-            boolean reachable = com.kooo.evcam.VhalSignalObserver.testConnection();
-            sb.append(reachable ? "可达" : "不可达")
-                    .append("（注：本构建为空实现，恒为不可达；该服务是吉利专有）").append('\n');
-        } catch (Throwable t) {
-            sb.append("探测异常: ").append(t).append('\n');
-        }
-
-        // 4.2 CarSignalManager —— 吉利车机 API，靠反射看类在不在
-        sb.append("[CarSignalManager] ");
-        String[] candidates = {
-                "com.gwm.carsignal.CarSignalManager",
-                "android.car.CarSignalManager",
-                "com.geely.carsignal.CarSignalManager",
-                "com.ecarx.xsf.car.CarSignalManager",
-                "com.zeekr.car.CarSignalManager",
-        };
-        boolean foundAny = false;
-        for (String cls : candidates) {
-            try {
-                Class.forName(cls);
-                sb.append("找到 ").append(cls).append("  ");
-                foundAny = true;
-            } catch (Throwable ignored) {
-                // 不存在就继续试下一个
-            }
-        }
-        if (!foundAny) {
-            sb.append("未找到任何已知的 CarSignalManager 类");
-        }
-        sb.append('\n');
-
-        // 4.3 android.car —— 标准 Android Automotive API
-        sb.append("[android.car] ");
-        try {
-            Class.forName("android.car.Car");
-            sb.append("存在（车机支持 Android Automotive Car API，可作为信号来源的候选方向）");
-        } catch (Throwable t) {
-            sb.append("不存在");
-        }
-        sb.append('\n');
-
-        // 4.4 logcat 可读性
-        sb.append("[logcat] ");
-        try {
-            Process p = Runtime.getRuntime().exec("logcat -d -t 5");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            int lines = 0;
-            while (reader.readLine() != null && lines < 10) {
-                lines++;
-            }
-            reader.close();
-            sb.append(lines > 0 ? "可读（读到 " + lines + " 行）" : "可执行但读不到内容");
-        } catch (Exception e) {
-            sb.append("不可读: ").append(e);
-        }
-        sb.append('\n').append('\n');
+        VehicleSignalProbe.appendTo(sb, context);
     }
 
     private static void appendStorage(StringBuilder sb, Context context) {

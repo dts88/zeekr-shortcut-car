@@ -9,6 +9,66 @@
 
 （暂无）
 
+## [0.5.1-alpha] - 2026-08-28
+
+这一版只做一件事：**把车辆信号探测重写**。装上后进「诊断」导出报告即可，
+录制、回放等功能没有改动。
+
+### 修正
+
+- **之前的车辆信号探测结论是错的**。旧版按几个猜出来的类名去找
+  `CarSignalManager`（`com.gwm.*`、`com.geely.*`、`com.zeekr.*` 等），
+  一个都没找到，就报告「读不到车辆信号」。
+
+  但这根本不是 EVCam 读信号的方式。读了它的实现才发现真正的路径是走
+  binder 服务反射：
+
+  ```
+  ServiceManager.getService("ecarxcar_service")
+    → ecarx.car.IECarXCar$Stub.asInterface(binder)
+    → ecarx.car.ECarXCar.createCar(context, iECarXCar)
+    → car.getCarManager("car_signal", iECarXCar)
+    → getIndcrSts() / getDoorDrvrSts() / getDoorPassSts() / ...
+  ```
+
+  ECARX 正是做极氪车机的那家（EVCC 全称就是 Ecarx Vehicle Control
+  Console），所以同一条路在极氪上很可能是通的 —— 之前那个「读不到」的
+  结论下得太早了。
+
+### 新增
+
+诊断报告的第 4 节重写为六个小节，**每一项都独立 try/catch，一条路失败不会
+中断整份报告**：
+
+- **4.1 系统属性**。App Lab 的容器伪装了 `android.os.Build`（车机自称是
+  Pixel 3a），但通常没伪装 `SystemProperties`。直接读 `ro.product.*`、
+  `ro.board.platform`、`ro.ecarx.*`，看这台车机真正是谁家的平台 ——
+  这决定了该找哪家的车辆 SDK。
+- **4.2 系统服务清单**。`ServiceManager.listServices()` 列出全部 binder
+  服务，筛出含 car / ecarx / vehicle / signal / vhal / hvac 的那些。
+  **这是最有价值的一节**：与其继续猜名字，不如直接看车机注册了什么。
+- **4.3 ECARX ecarxcar_service**。完整走一遍上面那条调用链，每一步的成败
+  都写进报告，最后读转向灯与四个车门的状态；并把该 manager 上**所有无参
+  getter 连同返回值**都列出来 —— 可能有我们还不知道的信号。
+- **4.4 ECARX adaptapi CarSensor**。EVCam 里出现过的另一条路
+  （`com.ecarx.xui.adaptapi.car.sensor.CarSensor`），同样列出全部 getter。
+- **4.5 标准 android.car**。上一份报告已确认 `android.car` 存在，这次往里
+  走：连 `Car` → 拿 `CarPropertyManager` → **列出本应用实际能访问的属性**，
+  再逐个读转向灯 / 车门 / 车速 / 档位 / 手刹 / 点火状态，并附上五项车辆权限
+  的授予情况（读不到时能区分「没这个属性」和「没有权限」）。
+- **4.6 logcat 信号线索**。EVCam 匹配的是 `data1 = <数字>` 和
+  `front turn signal:`，这里放宽到 turn signal / indcr / door / gear /
+  speed，扫最近 3000 行。
+
+  > **采集建议**：这一节要有信号事件才会有内容。请先打几次转向灯、开关一次
+  > 车门，**然后立刻**导出报告。
+
+### 开发
+
+- 新增 `tools/check_java_syntax.py`：开发机上没有 JDK 与 Android SDK，
+  编译只能靠 CI，一个漏掉的花括号要浪费一整轮。这个脚本检查括号 / 引号 /
+  注释配平，推送前先跑一遍。过不了它就一定编译不了。
+
 ## [0.5.0-alpha] - 2026-08-28
 
 ### 新增

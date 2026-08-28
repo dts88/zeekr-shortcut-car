@@ -261,17 +261,73 @@ GPU / 内存带宽浪费。
 
 ### 待验证：极氪能否读取转向灯 / 车门信号
 
-EVCam 支持三种信号来源，**在极氪上都未验证**：
+#### 一个下早了的结论
 
-| 来源 | 现状 | 待测 |
-|------|------|------|
-| VHAL gRPC | **已换成空实现**（该服务是吉利专有，极氪上不存在，见 5.1） | 确认确实不存在；若存在则需恢复实现 |
-| CarSignalManager | 吉利车机 API，代码保留 | 极氪是否提供同名 API / 是否有权限访问 |
-| logcat 关键词 | 匹配吉利日志格式，代码保留 | 极氪日志里是否有可识别的转向灯/车门事件；应用是否有 READ_LOGS 权限 |
+第一份诊断报告显示「找不到 CarSignalManager」，据此报告了「读不到车辆信号」。
+**这个结论是错的**，因为探测方式本身就不对：当时是按几个猜出来的类名去
+`Class.forName`（`com.gwm.carsignal.CarSignalManager`、
+`com.geely.carsignal.CarSignalManager`、`com.zeekr.car.CarSignalManager` 等），
+一个都没命中就收工了。
 
-**任务**：在极氪车机上逐一测试三种来源，确认是否有任何一种能拿到转向灯与车门信号。
-若三种都不行，补盲的**联动**部分在极氪上就是死功能，只剩手动显示能力可用。
-测试入口：设置 → 补盲选项 → 触发模式，逐个切换并观察日志（应用内有 logcat 查看器）。
+而 EVCam 根本不是这样读信号的。读它的 `CarSignalManagerObserver` /
+`DoorSignalObserver` 才发现，真正的路径是走 binder 服务反射：
+
+```
+android.os.ServiceManager.getService("ecarxcar_service")
+  → ecarx.car.IECarXCar$Stub.asInterface(binder)
+  → ecarx.car.ECarXCar.createCar(context, iECarXCar)
+  → car.getCarManager("car_signal", iECarXCar)
+  → getIndcrSts()      // 转向灯
+    getDoorDrvrSts()   // 主驾门
+    getDoorPassSts()   // 副驾门
+    getDoorLeReSts()   // 左后门
+    getDoorRiReSts()   // 右后门
+```
+
+关键在于**这里没有任何一个类叫 CarSignalManager** —— 类名探测再怎么试都不会
+命中。名字里的 `ecarx` 才是重点：ECARX 正是做极氪与吉利车机的那家公司
+（EVCC 的全称就是 **Ecarx** Vehicle Control Console，见 4.7）。
+既然极氪是 ECARX 平台，这条路在极氪上很可能是通的。
+
+EVCam 里还出现过第二条 ECARX 路径：
+`com.ecarx.xui.adaptapi.car.sensor.CarSensor`（有静态 `create` 方法）。
+
+> 以上均为**阅读公开源码得到的事实**（服务名、类名、方法名），
+> 未复制其任何实现代码。
+
+#### 现有的四条候选路径
+
+| 来源 | 现状 |
+|------|------|
+| ECARX `ecarxcar_service` | **主要候选**。EVCam 实际使用的路径，见上 |
+| ECARX `adaptapi CarSensor` | 次要候选，同为 ECARX 平台 API |
+| 标准 `android.car` | 上一份报告已确认**该类存在**，但还没往里走过 |
+| logcat 关键词 | EVCam 匹配 `data1 = <数字>` 与 `front turn signal:` |
+| ~~VHAL gRPC~~ | 已换成空实现，吉利专有，极氪上不存在（见 5.1） |
+
+#### 探测实现
+
+诊断报告第 4 节（`zeekr/VehicleSignalProbe.java`）把上面每条路都走一遍，
+逐步记录成败。每一项独立 try/catch —— 一条路失败不能中断整份报告。
+
+设计上有一条贯穿始终的原则：**枚举，而不是猜**。
+
+- `ServiceManager.listServices()` 列出全部 binder 服务，而不是猜服务名；
+- 拿到 manager 后列出**它上面所有无参 getter 及返回值**，而不是猜方法名；
+- `CarPropertyManager.getPropertyList()` 列出实际能访问的属性，
+  而不是猜属性 ID。
+
+上一轮的教训就是猜错了名字还以为是「不存在」。
+
+另外读 `SystemProperties`（`ro.product.*`、`ro.board.platform`、`ro.ecarx.*`）：
+App Lab 容器伪装了 `android.os.Build`（车机自称 Pixel 3a），
+但通常不伪装 SystemProperties，能看出真实平台是谁家的。
+
+**采集方式**：先打几次转向灯、开关一次车门，**然后立刻**导出诊断报告 ——
+logcat 那一节要有信号事件发生才会有内容。
+
+若四条路都拿不到信号，补盲的**联动**部分在极氪上就是死功能，
+只剩手动显示能力可用。
 
 ### 待验证：主屏悬浮窗
 
