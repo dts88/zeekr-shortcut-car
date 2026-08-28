@@ -288,6 +288,7 @@ public class AppConfig {
     private static final String KEY_RECORD_FPS = "record_fps";  // 显式录制帧率（auto/30/24/20/15/10）
     private static final String KEY_DECOUPLE_PREVIEW = "decouple_preview_resolution";  // 预览与录制分辨率解耦
     private static final String KEY_RECORD_LAYOUT = "record_layout";  // 录制画面排列（raw/grid2x2）
+    private static final String KEY_PREVIEW_RESOLUTION = "preview_resolution";  // 低分辨率预览的目标尺寸
     
     // 帧率等级常量
     public static final String FRAMERATE_STANDARD = "standard";  // 标准帧率（默认）
@@ -857,6 +858,25 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_DECOUPLE_PREVIEW, enabled).apply();
         AppLog.d(TAG, "预览/录制分辨率解耦: " + enabled);
     }
+
+    /**
+     * 「预览用低分辨率」开启后，预览缓冲区的目标尺寸。
+     *
+     * <p>取值为 {@code 宽x高} 字符串。实际使用时会在 HAL <b>已声明</b>的尺寸里挑最接近的，
+     * 挑不到就退回录制尺寸 —— 绝不臆造未声明的分辨率。</p>
+     */
+    public String getPreviewResolution() {
+        return prefs.getString(KEY_PREVIEW_RESOLUTION, PREVIEW_RES_VALUES[1]);
+    }
+
+    public void setPreviewResolution(String value) {
+        prefs.edit().putString(KEY_PREVIEW_RESOLUTION, value).apply();
+        AppLog.d(TAG, "预览分辨率设置: " + value);
+    }
+
+    /** 可选的预览分辨率，按从小到大排列。 */
+    public static final String[] PREVIEW_RES_VALUES =
+            {"640x480", "1280x720", "1600x900", "1920x1080"};
 
     // ==================== 录制画面排列 ====================
 

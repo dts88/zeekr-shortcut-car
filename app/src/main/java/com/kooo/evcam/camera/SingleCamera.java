@@ -359,9 +359,16 @@ public class SingleCamera {
             return recordSize;
         }
 
-        final int targetW = 640;
-        final int targetH = 480;
-        final int maxEdge = 1280;
+        // 目标尺寸来自设置，而不是写死。之前固定 640x480 在车机大屏上太糊。
+        int targetW = 1280;
+        int targetH = 720;
+        int[] parsedTarget = AppConfig.parseResolution(cfg.getPreviewResolution());
+        if (parsedTarget != null) {
+            targetW = parsedTarget[0];
+            targetH = parsedTarget[1];
+        }
+        // 允许的最长边给一点余量，否则 1920x1080 这类选项会被自己滤掉
+        final int maxEdge = Math.max(targetW, targetH) * 2;
 
         Size best = null;
         int bestScore = Integer.MAX_VALUE;

@@ -231,6 +231,35 @@ public final class DiagnosticsCollector {
             sb.append("座舱 1 -> ").append(others.size() > 0 ? ("相机 " + others.get(0)) : "无").append('\n');
             sb.append("座舱 2 -> ").append(others.size() > 1 ? ("相机 " + others.get(1)) : "无").append('\n');
             sb.append('\n');
+            // 权威答案：系统直接告诉我们哪些相机组合可以同时打开
+            sb.append('\n');
+            sb.append("可并发打开的相机组合（系统 API）: ");
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                try {
+                    java.util.Set<java.util.Set<String>> sets = cm.getConcurrentCameraIds();
+                    if (sets == null || sets.isEmpty()) {
+                        sb.append("系统未声明任何并发组合").append('\n');
+                        sb.append("  >> 这通常意味着一次只保证打开一路相机。").append('\n');
+                    } else {
+                        sb.append(sets).append('\n');
+                        boolean tripleOk = false;
+                        for (java.util.Set<String> set : sets) {
+                            if (compositeId != null && set.contains(compositeId) && set.size() >= 3) {
+                                tripleOk = true;
+                                break;
+                            }
+                        }
+                        sb.append("  >> 含合成流的三路组合: ")
+                                .append(tripleOk ? "受支持" : "未在声明之列").append('\n');
+                    }
+                } catch (Throwable t) {
+                    sb.append("查询失败: ").append(t).append('\n');
+                }
+            } else {
+                sb.append("需要 Android 11 以上才有该 API").append('\n');
+            }
+            sb.append('\n');
+
             sb.append("说明：座舱两路是按相机 id 顺序取的，不保证对应后排/驾驶位。").append('\n');
             sb.append("若 3 路配置显示不出画面，需要确认的是：").append('\n');
             sb.append("  a) 上面这两路 id 是不是真的对应后排/驾驶位摄像头；").append('\n');

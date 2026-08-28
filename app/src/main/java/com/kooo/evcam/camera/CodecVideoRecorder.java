@@ -287,6 +287,24 @@ public class CodecVideoRecorder {
      * 只是码率分配提示。真正决定出帧节奏的是 GL 侧隔多久交换一次缓冲区，
      * 所以两处必须用同一个值，否则设置里选的帧率不会生效。</p>
      */
+    /**
+     * 写进文件的时间戳步长（微秒）。
+     *
+     * <p>原来这里写死成 40000us（25fps），完全不看实际帧率 —— 于是选 10fps 时，
+     * 一秒采到的 10 帧被标成只跨越 400ms，播放就快了 2.5 倍；
+     * 默认 30fps 时反过来偏慢 1.2 倍，只是不容易察觉。</p>
+     *
+     * <p>仍然沿用「按帧计数递推」而不是直接用采集时间戳：这样时间戳严格单调递增，
+     * 不会因为抖动或丢帧出现乱序 —— 这是上游选择计数法的原因，予以保留。</p>
+     */
+    private long ptsStepUs() {
+        int fps = blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate;
+        if (fps <= 0) {
+            fps = 25;  // 兜底，与历史行为一致
+        }
+        return 1_000_000L / fps;
+    }
+
     private void applyEncoderFrameRate() {
         EglSurfaceEncoder encoder = eglEncoder;
         if (encoder == null) {
@@ -1184,13 +1202,9 @@ public class CodecVideoRecorder {
                         if (!muxerStarted) {
                             AppLog.e(TAG, "Camera " + cameraId + " Muxer not started but got data");
                         } else {
-                            // 性能优化：使用基于帧数的 PTS 计算，减少 System.nanoTime() 调用
-                            // 假设目标帧率为 25fps，每帧间隔 40000 微秒
-                            // 优点：
-                            //   1. 大幅减少系统调用开销
-                            //   2. 时间戳单调递增，不会出现乱序
-                            //   3. 掉帧时时间轴仍然正确
-                            long calculatedPtsUs = encodedOutputFrameCount * 40000L;
+                            // 基于帧数递推 PTS：调用开销小、严格单调递增。
+                            // 步长必须跟随实际帧率，不能写死（见 ptsStepUs 的说明）。
+                            long calculatedPtsUs = encodedOutputFrameCount * ptsStepUs();
                             
                             // 调试日志（仅第一帧）
                             if (encodedOutputFrameCount == 0) {
@@ -1281,7 +1295,7 @@ public class CodecVideoRecorder {
                         if (muxerStarted) {
                             // 性能优化：使用基于帧数的 PTS 计算，减少 System.nanoTime() 调用开销
                             // 与 drainEncoder 中的计算方式保持一致
-                            long calculatedPtsUs = encodedOutputFrameCount * 40000L;
+                            long calculatedPtsUs = encodedOutputFrameCount * ptsStepUs();
                             bufferInfo.presentationTimeUs = calculatedPtsUs;
 
                             encodedData.position(bufferInfo.offset);
