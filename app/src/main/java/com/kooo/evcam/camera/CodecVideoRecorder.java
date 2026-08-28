@@ -110,6 +110,10 @@ public class CodecVideoRecorder {
     
     // 编码器输出帧计数（仅用于日志和统计，不再用于 PTS 计算）
     private long encodedOutputFrameCount = 0;
+    /** 上一次写入 muxer 的 PTS，用于保证严格单调递增；-1 表示还没写过帧。 */
+    private long lastWrittenPtsUs = -1L;
+    /** 本分段第一帧的编码器时间戳，用于把每段的 PTS 归零；-1 表示本段还没开始。 */
+    private long segmentBasePtsUs = -1L;
 
     // 分段录制相关
     private long segmentDurationMs = 60000;  // 分段时长，默认1分钟，可通过 setSegmentDuration 配置
@@ -281,21 +285,10 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 把当前生效的帧率下发给 GL 编码器。
+     * 标称帧率对应的时间戳步长（微秒）。
      *
-     * <p>只设 MediaFormat 的 KEY_FRAME_RATE 是不会降帧的 —— 那对 Surface 输入的编码器
-     * 只是码率分配提示。真正决定出帧节奏的是 GL 侧隔多久交换一次缓冲区，
-     * 所以两处必须用同一个值，否则设置里选的帧率不会生效。</p>
-     */
-    /**
-     * 写进文件的时间戳步长（微秒）。
-     *
-     * <p>原来这里写死成 40000us（25fps），完全不看实际帧率 —— 于是选 10fps 时，
-     * 一秒采到的 10 帧被标成只跨越 400ms，播放就快了 2.5 倍；
-     * 默认 30fps 时反过来偏慢 1.2 倍，只是不容易察觉。</p>
-     *
-     * <p>仍然沿用「按帧计数递推」而不是直接用采集时间戳：这样时间戳严格单调递增，
-     * 不会因为抖动或丢帧出现乱序 —— 这是上游选择计数法的原因，予以保留。</p>
+     * <p>只在 {@link #nextPtsUs(long)} 的兜底分支里用到 —— 正常情况下时间戳来自
+     * 编码器，不需要这个值。</p>
      */
     private long ptsStepUs() {
         int fps = blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate;
@@ -305,6 +298,51 @@ public class CodecVideoRecorder {
         return 1_000_000L / fps;
     }
 
+    /**
+     * 决定这一帧写进 muxer 的时间戳。
+     *
+     * <p>编码器输出的 {@code presentationTimeUs} 已经是真实的采集时间 ——
+     * 它来自 {@code surfaceTexture.getTimestamp()}，经
+     * {@code eglPresentationTimeANDROID} 一路传到这里。直接用它，
+     * 回放速度才等于实际录制速度。</p>
+     *
+     * <p>这里原来是按帧计数递推（帧号 × 标称步长）。<b>那个做法从根上就不成立</b>：
+     * 它假设编码器真的按标称帧率收到了帧。而 1280×5140 的合成流跑不满 30fps，
+     * 于是 N 帧被标成 N/30 秒、实际却花了 N/15 秒，回放就快了一倍。
+     * 「原始帧率」这一档最明显，因为它的标称值最高 —— 之前只把写死的 25fps
+     * 步长改成跟随设置，治的是症状，递推本身才是病根。</p>
+     *
+     * <p>当初保留递推是担心时间戳抖动或丢帧导致乱序被 muxer 拒绝。
+     * 那个顾虑用一个单调性兜底就够了，不需要牺牲真实时间。</p>
+     *
+     * @param encoderPtsUs 编码器给出的时间戳
+     * @return 严格大于上一帧的时间戳
+     */
+    private long nextPtsUs(long encoderPtsUs) {
+        // 每个分段都是一个新的 muxer，PTS 要从 0 开始。
+        // firstFrameTimestampNs 整场录制都不重置（EGL 需要单调递增的时间戳，
+        // 见 onFrameAvailable 处的说明），编码器给的时间戳会一路累加下去 ——
+        // 所以这里按本段第一帧再减一次基准。
+        if (segmentBasePtsUs < 0) {
+            segmentBasePtsUs = encoderPtsUs;
+        }
+        long pts = encoderPtsUs - segmentBasePtsUs;
+        if (pts <= lastWrittenPtsUs) {
+            // 时间戳没有前进（或编码器没给出有效值）时兜底：
+            // 用标称步长顶一格，保证 muxer 不会因为 PTS 不递增而拒绝这一帧
+            pts = lastWrittenPtsUs + ptsStepUs();
+        }
+        lastWrittenPtsUs = pts;
+        return pts;
+    }
+
+    /**
+     * 把当前生效的帧率下发给 GL 编码器。
+     *
+     * <p>只设 MediaFormat 的 KEY_FRAME_RATE 是不会降帧的 —— 那对 Surface 输入的编码器
+     * 只是码率分配提示。真正决定出帧节奏的是 GL 侧隔多久交换一次缓冲区，
+     * 所以两处必须用同一个值，否则设置里选的帧率不会生效。</p>
+     */
     private void applyEncoderFrameRate() {
         EglSurfaceEncoder encoder = eglEncoder;
         if (encoder == null) {
@@ -396,6 +434,8 @@ public class CodecVideoRecorder {
         this.recordedFrameCount = 0;
         this.firstFrameTimestampNs = -1;  // 重置时间戳基准
         this.encodedOutputFrameCount = 0;  // 重置编码输出帧计数
+        this.lastWrittenPtsUs = -1L;
+        this.segmentBasePtsUs = -1L;
 
         // 重置健康检查状态
         this.encoderHealthy = true;
@@ -646,6 +686,8 @@ public class CodecVideoRecorder {
         // 记录分段开始时间（用于 PTS 计算）
         segmentStartTimeNs = System.nanoTime();
         encodedOutputFrameCount = 0;
+        lastWrittenPtsUs = -1L;
+        segmentBasePtsUs = -1L;
         
         // 重置首次写入状态
         hasFirstWrite = false;
@@ -1202,16 +1244,24 @@ public class CodecVideoRecorder {
                         if (!muxerStarted) {
                             AppLog.e(TAG, "Camera " + cameraId + " Muxer not started but got data");
                         } else {
-                            // 基于帧数递推 PTS：调用开销小、严格单调递增。
-                            // 步长必须跟随实际帧率，不能写死（见 ptsStepUs 的说明）。
-                            long calculatedPtsUs = encodedOutputFrameCount * ptsStepUs();
+                            // 用编码器给出的真实时间戳，不要按帧数推算
+                            // （见 nextPtsUs：推算会让回放速度不等于录制速度）
+                            long calculatedPtsUs = nextPtsUs(bufferInfo.presentationTimeUs);
                             
                             // 调试日志（仅第一帧）
                             if (encodedOutputFrameCount == 0) {
                                 AppLog.d(TAG, "Camera " + cameraId + " First frame PTS: " + calculatedPtsUs + " us");
+                            } else if (encodedOutputFrameCount % 300 == 0 && calculatedPtsUs > 0) {
+                                // 实测帧率 = 已写帧数 / 时间戳跨度。
+                                // 这是验证「回放速度是否等于录制速度」的直接依据：
+                                // 若它明显低于设置里选的帧率，说明车机就是跑不满，
+                                // 而现在时间戳如实反映了这一点，回放不会再被加速。
+                                long measured = encodedOutputFrameCount * 1_000_000L / calculatedPtsUs;
+                                AppLog.d(TAG, "Camera " + cameraId + " 实测帧率 ~" + measured
+                                        + " fps（标称 " + frameRate + "），已写 "
+                                        + encodedOutputFrameCount + " 帧");
                             }
                             
-                            // 使用计算的时间戳
                             bufferInfo.presentationTimeUs = calculatedPtsUs;
                             
                             encodedData.position(bufferInfo.offset);
@@ -1293,10 +1343,8 @@ public class CodecVideoRecorder {
 
                     if (encodedData != null && bufferInfo.size != 0) {
                         if (muxerStarted) {
-                            // 性能优化：使用基于帧数的 PTS 计算，减少 System.nanoTime() 调用开销
-                            // 与 drainEncoder 中的计算方式保持一致
-                            long calculatedPtsUs = encodedOutputFrameCount * ptsStepUs();
-                            bufferInfo.presentationTimeUs = calculatedPtsUs;
+                            // 与 drainEncoder 中的处理保持一致：用编码器的真实时间戳
+                            bufferInfo.presentationTimeUs = nextPtsUs(bufferInfo.presentationTimeUs);
 
                             encodedData.position(bufferInfo.offset);
                             encodedData.limit(bufferInfo.offset + bufferInfo.size);
@@ -1394,6 +1442,8 @@ public class CodecVideoRecorder {
             // 重置分段开始时间和帧计数
             segmentStartTimeNs = System.nanoTime();
             encodedOutputFrameCount = 0;
+            lastWrittenPtsUs = -1L;
+            segmentBasePtsUs = -1L;
             // 不重置 firstFrameTimestampNs，保持 EGL 时间戳单调递增
 
             // 4. 创建新的 Muxer
@@ -1495,6 +1545,8 @@ public class CodecVideoRecorder {
             // 重置分段开始时间和帧计数
             segmentStartTimeNs = System.nanoTime();
             encodedOutputFrameCount = 0;
+            lastWrittenPtsUs = -1L;
+            segmentBasePtsUs = -1L;
             
             // 恢复录制
             isRecording.set(true);
@@ -1743,6 +1795,8 @@ public class CodecVideoRecorder {
             // 7. 重置状态
             segmentStartTimeNs = System.nanoTime();
             encodedOutputFrameCount = 0;
+            lastWrittenPtsUs = -1L;
+            segmentBasePtsUs = -1L;
             framesWithoutEncoderOutput = 0;
             encoderHealthy = true;
             lastEncoderOutputTime = System.currentTimeMillis();

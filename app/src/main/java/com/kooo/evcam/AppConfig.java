@@ -828,9 +828,18 @@ public class AppConfig {
         return prefs.getString(KEY_RECORD_FPS, RECORD_FPS_AUTO);
     }
 
-    /** 设置录制帧率；传入 {@link #RECORD_FPS_AUTO} 表示跟随硬件默认。 */
+    /**
+     * 设置录制帧率；传入 {@link #RECORD_FPS_AUTO} 表示跟随硬件默认。
+     *
+     * <p>顺手把旧的「标准/低」等级清回标准。合并前那是画质页里的第二个帧率控件，
+     * 只在这里选「原始帧率」时才生效 —— 不清掉的话，用户选了「原始帧率」
+     * 却仍然被旧等级悄悄降到一半，看起来就像设置没生效。</p>
+     */
     public void setRecordFps(String value) {
-        prefs.edit().putString(KEY_RECORD_FPS, value).apply();
+        prefs.edit()
+                .putString(KEY_RECORD_FPS, value)
+                .putString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD)
+                .apply();
         AppLog.d(TAG, "录制帧率设置: " + value);
     }
 

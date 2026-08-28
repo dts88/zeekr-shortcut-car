@@ -54,10 +54,7 @@ public class ResolutionSettingsFragment extends Fragment {
     private String selectedBitrateLevel;
     
     // 帧率相关
-    private Spinner framerateSpinner;
     private TextView framerateDescText;
-    private List<String> framerateOptions = new ArrayList<>();
-    private String selectedFramerateLevel;
     
     // 信息显示
     private TextView currentParamsText;
@@ -107,7 +104,6 @@ public class ResolutionSettingsFragment extends Fragment {
         initResolutionSpinner();
         
         // 初始化帧率选择器（必须在码率之前，因为码率计算依赖帧率）
-        initFramerateSpinner();
         
         // 初始化码率选择器
         initBitrateSpinner();
@@ -146,7 +142,6 @@ public class ResolutionSettingsFragment extends Fragment {
         resolutionDescText = view.findViewById(R.id.tv_resolution_desc);
         bitrateSpinner = view.findViewById(R.id.spinner_bitrate);
         bitrateDescText = view.findViewById(R.id.tv_bitrate_desc);
-        framerateSpinner = view.findViewById(R.id.spinner_framerate);
         framerateDescText = view.findViewById(R.id.tv_framerate_desc);
         currentParamsText = view.findViewById(R.id.tv_current_params);
         hardwareInfoText = view.findViewById(R.id.tv_hardware_info);
@@ -413,104 +408,50 @@ public class ResolutionSettingsFragment extends Fragment {
     }
 
     /**
-     * 初始化帧率选择器
+     * 显示当前生效的帧率。
+     *
+     * <p>这里原来是第二个「录制帧率」下拉框（标准/低）。它和设置页里的那个
+     * 从来就不是两个独立设置 —— {@link AppConfig#getActualFrameRate(int)} 会先看
+     * 设置页选的具体帧率，只有那里选「原始帧率」时才轮得到标准/低。
+     * 于是两个同名控件里有一个在悄悄压过另一个。现在只保留设置页那一个，
+     * 这里改成显示生效值，本页的码率估算仍然要用到它。</p>
      */
-    private void initFramerateSpinner() {
-        if (framerateSpinner == null || getContext() == null) {
+    private void updateFramerateDescription() {
+        if (framerateDescText == null || appConfig == null) {
             return;
         }
-
-        // 构建帧率选项
-        framerateOptions.clear();
-        framerateOptions.add("标准（推荐）");
-        framerateOptions.add("低（省空间）");
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                getContext(),
-                R.layout.spinner_item,
-                framerateOptions
-        );
-        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-        framerateSpinner.setAdapter(adapter);
-
-        // 设置当前选中项
-        String currentLevel = appConfig.getFramerateLevel();
-        selectedFramerateLevel = currentLevel;
-        int selectedIndex = 0;  // 默认标准
-        if (AppConfig.FRAMERATE_LOW.equals(currentLevel)) {
-            selectedIndex = 1;
-        }
-        framerateSpinner.setSelection(selectedIndex);
-
-        // 设置选择监听器
-        framerateSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            private boolean isFirstSelection = true;
-            
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String newLevel = (position == 1) ? AppConfig.FRAMERATE_LOW : AppConfig.FRAMERATE_STANDARD;
-                
-                // 只在值变化且非首次选择时保存
-                if (!isFirstSelection && !newLevel.equals(selectedFramerateLevel)) {
-                    selectedFramerateLevel = newLevel;
-                    saveFramerate();
-                } else {
-                    selectedFramerateLevel = newLevel;
-                }
-                isFirstSelection = false;
-                
-                updateFramerateDescription();
-                updateBitrateDescription();  // 帧率变化会影响码率计算
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-        
-        // 初始化描述
-        updateFramerateDescription();
+        String choice = AppConfig.getRecordFpsDisplayName(appConfig.getRecordFps());
+        framerateDescText.setText(String.format("当前：%s（实际约 %dfps）",
+                choice, getSelectedFrameRate()));
     }
 
     /**
-     * 更新帧率描述
+     * 硬件支持的最大帧率；读不到时按 30 估。
      */
-    private void updateFramerateDescription() {
-        if (framerateDescText == null) {
-            return;
+    private int getHardwareMaxFps() {
+        for (CameraInfo info : cameraInfoMap.values()) {
+            if (info.maxFps > 0) {
+                return info.maxFps;  // 假设所有摄像头帧率相同
+            }
         }
-
-        int standardFps = getStandardFrameRate();
-        int lowFps = Math.max(10, standardFps / 2);
-
-        String desc = String.format("标准: %dfps | 低: %dfps", standardFps, lowFps);
-        framerateDescText.setText(desc);
+        return 30;
     }
 
     /**
      * 获取标准帧率（接近30fps的硬件支持帧率）
      */
     private int getStandardFrameRate() {
-        int maxFps = 30;
-        for (CameraInfo info : cameraInfoMap.values()) {
-            if (info.maxFps > 0) {
-                maxFps = info.maxFps;
-                break;  // 假设所有摄像头帧率相同
-            }
-        }
-        return AppConfig.getStandardFrameRate(maxFps);
+        return AppConfig.getStandardFrameRate(getHardwareMaxFps());
     }
 
     /**
-     * 根据当前选择获取实际帧率
+     * 当前实际生效的帧率，用于码率估算。
      */
     private int getSelectedFrameRate() {
-        int standardFps = getStandardFrameRate();
-        // 防止初始化顺序导致的 null 问题
-        if (selectedFramerateLevel != null && AppConfig.FRAMERATE_LOW.equals(selectedFramerateLevel)) {
-            return Math.max(10, standardFps / 2);
+        if (appConfig == null) {
+            return getStandardFrameRate();
         }
-        return standardFps;
+        return appConfig.getActualFrameRate(getHardwareMaxFps());
     }
 
     /**
@@ -683,25 +624,6 @@ public class ResolutionSettingsFragment extends Fragment {
         displayCurrentParams();
     }
     
-    /**
-     * 保存帧率设置
-     */
-    private void saveFramerate() {
-        if (appConfig == null || getContext() == null) {
-            return;
-        }
-        
-        String oldFramerate = appConfig.getFramerateLevel();
-        appConfig.setFramerateLevel(selectedFramerateLevel);
-        
-        String framerateName = AppConfig.getFramerateLevelDisplayName(selectedFramerateLevel);
-        
-        Toast.makeText(getContext(), "帧率已设置为: " + framerateName + "\n重启应用后生效", Toast.LENGTH_SHORT).show();
-        AppLog.d(TAG, "帧率已保存: " + oldFramerate + " -> " + selectedFramerateLevel);
-        
-        // 更新当前参数显示
-        displayCurrentParams();
-    }
     
     // ==================== 亮度/降噪调节 ====================
     

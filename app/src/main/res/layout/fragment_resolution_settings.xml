@@ -161,29 +161,18 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="帧率越高画面越流畅，但文件体积越大"
+                    android:text="帧率越高画面越流畅，但文件体积越大。在「设置 → 录制帧率」中修改，此处显示当前生效值。"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
                     android:layout_marginTop="4dp"
                     android:layout_marginBottom="12dp" />
 
-                <Spinner
-                    android:id="@+id/spinner_framerate"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:popupBackground="@color/card_background"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp" />
-
                 <TextView
                     android:id="@+id/tv_framerate_desc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="标准: 30fps | 低: 15fps"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="8dp" />
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
             </LinearLayout>
 
             <!-- 亮度/降噪调节 -->

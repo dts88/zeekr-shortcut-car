@@ -120,6 +120,9 @@ public class SettingsFragment extends Fragment {
 
     // 预览/录制分辨率解耦
     private com.kooo.evcam.view.MacOSToggleButton decouplePreviewToggle;
+    private Spinner previewResolutionSpinner;
+    private TextView previewResolutionDescText;
+    private boolean isInitializingPreviewResolution = false;
 
     // 悬浮窗布局重置/保存
     private Button resetFloatingLayoutButton;
@@ -228,6 +231,7 @@ public class SettingsFragment extends Fragment {
             initRecordFpsConfig(view);
 
             initDecouplePreviewConfig(view);
+            initPreviewResolutionConfig(view);
             
             // 初始化录制摄像头选择配置
             initRecordingCameraSelectionConfig(view);
@@ -1470,6 +1474,81 @@ public class SettingsFragment extends Fragment {
     }
 
     /**
+     * 预览分辨率选择。
+     *
+     * <p>配置项与读取侧（{@code SingleCamera} 按此挑最接近的已声明尺寸）早就写好了，
+     * 但一直没做界面 —— 于是这个设置永远停在默认的 1280x720，看起来只有一个开关。</p>
+     *
+     * <p>只有开启「预览用低分辨率」时才可用，关闭时预览跟录制同分辨率，这里选什么都没意义。</p>
+     */
+    private void initPreviewResolutionConfig(View view) {
+        previewResolutionSpinner = view.findViewById(R.id.spinner_preview_resolution);
+        previewResolutionDescText = view.findViewById(R.id.text_preview_resolution_desc);
+        if (previewResolutionSpinner == null || getContext() == null || appConfig == null) {
+            return;
+        }
+
+        isInitializingPreviewResolution = true;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                getContext(), R.layout.spinner_item, AppConfig.PREVIEW_RES_VALUES);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        previewResolutionSpinner.setAdapter(adapter);
+
+        String current = appConfig.getPreviewResolution();
+        int selectedIndex = 0;
+        for (int i = 0; i < AppConfig.PREVIEW_RES_VALUES.length; i++) {
+            if (AppConfig.PREVIEW_RES_VALUES[i].equals(current)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+        previewResolutionSpinner.setSelection(selectedIndex);
+
+        previewResolutionSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (isInitializingPreviewResolution) {
+                    return;
+                }
+                if (position < 0 || position >= AppConfig.PREVIEW_RES_VALUES.length) {
+                    return;
+                }
+                String value = AppConfig.PREVIEW_RES_VALUES[position];
+                if (value.equals(appConfig.getPreviewResolution())) {
+                    return;
+                }
+                appConfig.setPreviewResolution(value);
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            "预览分辨率已设为 " + value + "，重启应用后生效",
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        isInitializingPreviewResolution = false;
+        updatePreviewResolutionEnabled(appConfig.isDecouplePreviewEnabled());
+    }
+
+    /** 「预览用低分辨率」关闭时，把分辨率选择灰掉——此时它不起作用。 */
+    private void updatePreviewResolutionEnabled(boolean enabled) {
+        if (previewResolutionSpinner != null) {
+            previewResolutionSpinner.setEnabled(enabled);
+            previewResolutionSpinner.setAlpha(enabled ? 1f : 0.4f);
+        }
+        if (previewResolutionDescText != null) {
+            previewResolutionDescText.setText(enabled
+                    ? "会在车机已声明的尺寸里挑最接近的，挑不到就退回录制尺寸"
+                    : "需先开启上面的「预览用低分辨率」");
+        }
+    }
+
+    /**
      * 初始化「预览用低分辨率」开关。
      *
      * <p>默认关闭。开启后预览缓冲区会选一个接近 640x480 的已声明尺寸，
@@ -1488,6 +1567,7 @@ public class SettingsFragment extends Fragment {
                 return;
             }
             appConfig.setDecouplePreviewEnabled(isChecked);
+            updatePreviewResolutionEnabled(isChecked);
             if (getContext() != null) {
                 Toast.makeText(getContext(),
                         isChecked
