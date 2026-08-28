@@ -158,6 +158,14 @@
             android:screenOrientation="landscape"
             android:exported="false" />
 
+        <!-- 连续时间轴回放（实验性）：把分段拼成一条时间轴，可跨文件拖动 -->
+        <activity
+            android:name=".zeekr.TimelinePlayerActivity"
+            android:label="连续回放"
+            android:theme="@style/Theme.Cam.Fullscreen"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
         <!-- 诊断信息：相机/屏幕/车辆信号/存储/日志，可导出 -->
         <activity
             android:name=".zeekr.DiagnosticsActivity"

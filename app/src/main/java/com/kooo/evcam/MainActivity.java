@@ -1347,6 +1347,8 @@ public class MainActivity extends AppCompatActivity {
                 toggleSupervisionMode();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
+            } else if (itemId == R.id.nav_timeline_playback) {
+                startActivity(new Intent(this, com.kooo.evcam.zeekr.TimelinePlayerActivity.class));
             } else if (itemId == R.id.nav_diagnostics) {
                 startActivity(new Intent(this, com.kooo.evcam.zeekr.DiagnosticsActivity.class));
             } else if (itemId == R.id.nav_about) {
