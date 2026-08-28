@@ -85,7 +85,7 @@ public class CodecVideoRecorder {
     private boolean muxerStarted = false;
 
     // EGL 渲染器
-    private EglSurfaceEncoder eglEncoder;
+    private volatile EglSurfaceEncoder eglEncoder;
     private SurfaceTexture inputSurfaceTexture;
     private int textureId;
 
@@ -276,7 +276,23 @@ public class CodecVideoRecorder {
      */
     public void setFrameRate(int fps) {
         this.frameRate = fps;
+        applyEncoderFrameRate();
         AppLog.d(TAG, "Camera " + cameraId + " frame rate set to " + fps + " fps");
+    }
+
+    /**
+     * 把当前生效的帧率下发给 GL 编码器。
+     *
+     * <p>只设 MediaFormat 的 KEY_FRAME_RATE 是不会降帧的 —— 那对 Surface 输入的编码器
+     * 只是码率分配提示。真正决定出帧节奏的是 GL 侧隔多久交换一次缓冲区，
+     * 所以两处必须用同一个值，否则设置里选的帧率不会生效。</p>
+     */
+    private void applyEncoderFrameRate() {
+        EglSurfaceEncoder encoder = eglEncoder;
+        if (encoder == null) {
+            return;  // 还没创建，创建时会再套用一次
+        }
+        encoder.setFrameRate(blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate);
     }
 
     /**
@@ -318,6 +334,7 @@ public class CodecVideoRecorder {
      */
     public void setBlindSpotOptimizeMode(boolean enabled) {
         this.blindSpotOptimizeMode = enabled;
+        applyEncoderFrameRate();
         if (enabled) {
             AppLog.i(TAG, "Camera " + cameraId + " 启用补盲优化模式，帧率降至 " + BLIND_SPOT_OPTIMIZED_FPS + "fps");
         } else {
@@ -413,6 +430,8 @@ public class CodecVideoRecorder {
                 try {
                     // 创建 EGL 渲染器（在编码线程上）
                     eglEncoder = new EglSurfaceEncoder(cameraId, width, height);
+                    // setFrameRate 通常在 prepareRecording 之前就调用了，这里补上
+                    applyEncoderFrameRate();
                     resultTextureId[0] = eglEncoder.initialize(encoderInputSurface);
                     textureId = resultTextureId[0];
 

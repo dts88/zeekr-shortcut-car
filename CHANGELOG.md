@@ -9,6 +9,24 @@
 
 （暂无）
 
+## [0.4.3-alpha] - 2026-08-28
+
+### 修复
+
+- **录制帧率选项不生效**（实车确认：选 10fps 录出来仍然很流畅）。
+  原因是设置只传到了 `MediaFormat.KEY_FRAME_RATE`，而这个键对 **Surface 输入的
+  编码器只是码率分配提示，不会丢帧** —— 实际出帧多少取决于 GL 侧隔多久
+  `eglSwapBuffers` 一次。而 `EglSurfaceEncoder` 把这个间隔**写死成 33ms（30fps）**，
+  且根本没有 `setFrameRate` 方法。
+  现在帧率会同时下发到 GL 侧的出帧节奏，两处用同一个值。
+
+### 说明
+
+- 上述修复覆盖 **MediaCodec** 路径，也就是默认的「四宫格」录制
+  （四宫格必须走 MediaCodec）。若切到「原始长条」且录制模式为 MediaRecorder，
+  帧率仍可能不生效 —— 那条路径的实际帧率由 Camera2 的
+  `CONTROL_AE_TARGET_FPS_RANGE` 决定，本项目尚未设置该参数。
+
 ## [0.4.2-alpha] - 2026-08-28
 
 ### 修复（涉及内置存储寿命，重要）

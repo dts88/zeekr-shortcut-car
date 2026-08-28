@@ -205,7 +205,17 @@ public class EglSurfaceEncoder {
     private volatile boolean hasPendingFrame = false; // 是否有待处理的帧
     private final Object frameLock = new Object(); // 帧处理锁
     private volatile long lastFrameTimeNs = 0; // 上一帧时间戳
-    private static final long MIN_FRAME_INTERVAL_NS = 33_000_000L; // 最小帧间隔约30fps（防止过度渲染）
+    /** 默认上限约 30fps，防止过度渲染；由 {@link #setFrameRate(int)} 按用户选择收紧。 */
+    private static final long DEFAULT_MIN_FRAME_INTERVAL_NS = 33_000_000L;
+    /**
+     * 渲染的最小帧间隔。
+     *
+     * <p>这里才是真正决定录制帧率的地方。MediaFormat 的 KEY_FRAME_RATE 对
+     * Surface 输入的编码器只是码率分配的提示，<b>不会丢帧</b> —— 编码器输出多少帧，
+     * 取决于我们隔多久 eglSwapBuffers 一次。之前这个值写死成 33ms，
+     * 所以设置里选 10fps 也照样按 30fps 出帧。</p>
+     */
+    private volatile long minFrameIntervalNs = DEFAULT_MIN_FRAME_INTERVAL_NS;
     
     // 性能优化：复用缓冲区，减少GC
     private final float[] tempMatrix = new float[16];
@@ -306,6 +316,23 @@ public class EglSurfaceEncoder {
      * 应该在 SurfaceTexture.onFrameAvailable 回调中调用
      * @param presentationTimeNs 帧的呈现时间（纳秒）
      */
+    /**
+     * 设置录制帧率。这会改变实际的出帧节奏，而不只是编码器的码率提示。
+     *
+     * @param fps 目标帧率；<= 0 表示恢复默认上限（约 30fps）
+     */
+    public void setFrameRate(int fps) {
+        if (fps <= 0) {
+            minFrameIntervalNs = DEFAULT_MIN_FRAME_INTERVAL_NS;
+            AppLog.d(TAG, "Camera " + cameraId + " 渲染帧率恢复默认上限");
+            return;
+        }
+        int clamped = Math.max(1, Math.min(60, fps));
+        minFrameIntervalNs = 1_000_000_000L / clamped;
+        AppLog.i(TAG, "Camera " + cameraId + " 渲染帧率上限设为 " + clamped
+                + " fps（间隔 " + (minFrameIntervalNs / 1_000_000L) + "ms）");
+    }
+
     public void drawFrame(long presentationTimeNs) {
         if (!isInitialized || isReleased) {
             return;
@@ -318,7 +345,7 @@ public class EglSurfaceEncoder {
 
         // 性能优化：帧率控制，防止过度渲染占用CPU
         long currentTimeNs = System.nanoTime();
-        if (currentTimeNs - lastFrameTimeNs < MIN_FRAME_INTERVAL_NS) {
+        if (currentTimeNs - lastFrameTimeNs < minFrameIntervalNs) {
             // 帧间隔太短，跳过渲染但消费帧
             try {
                 makeCurrent();
