@@ -46,6 +46,8 @@ public class DiagnosticsActivity extends Activity {
     private Button copyButton;
     private Button shareButton;
     private Button refreshButton;
+    private Button requestCarPermsButton;
+    private static final int REQUEST_CAR_PERMISSIONS = 4101;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile String report = "";
@@ -61,6 +63,7 @@ public class DiagnosticsActivity extends Activity {
         copyButton = findViewById(R.id.diagnostics_copy);
         shareButton = findViewById(R.id.diagnostics_share);
         refreshButton = findViewById(R.id.diagnostics_refresh);
+        requestCarPermsButton = findViewById(R.id.diagnostics_request_car_perms);
 
         View close = findViewById(R.id.diagnostics_close);
         if (close != null) {
@@ -78,7 +81,51 @@ public class DiagnosticsActivity extends Activity {
         if (shareButton != null) {
             shareButton.setOnClickListener(v -> shareReport());
         }
+        if (requestCarPermsButton != null) {
+            requestCarPermsButton.setOnClickListener(v -> requestCarPermissions());
+        }
 
+        runCollection();
+    }
+
+    /**
+     * 申请车辆权限。
+     *
+     * <p>只申请本机报告为 dangerous 级别的那些 —— 声明一个 dangerous 权限而不申请，
+     * 它依然是拒绝状态；而 signature|privileged 的申请系统会直接忽略，弹都不弹。
+     * 分清这两种情况正是这个按钮存在的意义：申请过之后再采一次报告，
+     * 「未授予」才真正说明是被拒绝，而不是没问过。</p>
+     */
+    private void requestCarPermissions() {
+        String[] pending = VehicleSignalProbe.runtimeGrantableCarPermissions(this);
+        if (pending.length == 0) {
+            Toast.makeText(this,
+                    "本机没有可运行时申请的车辆权限（都不是 dangerous 级别），"
+                            + "详见报告 4.5 节的保护级别",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, "正在申请 " + pending.length + " 项车辆权限",
+                Toast.LENGTH_SHORT).show();
+        requestPermissions(pending, REQUEST_CAR_PERMISSIONS);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_CAR_PERMISSIONS) {
+            return;
+        }
+        int granted = 0;
+        for (int result : grantResults) {
+            if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                granted++;
+            }
+        }
+        Toast.makeText(this,
+                "车辆权限：授予 " + granted + " / " + grantResults.length + "，正在重新采集",
+                Toast.LENGTH_LONG).show();
         runCollection();
     }
 
@@ -116,6 +163,9 @@ public class DiagnosticsActivity extends Activity {
         }
         if (shareButton != null) {
             shareButton.setEnabled(enabled);
+        }
+        if (requestCarPermsButton != null) {
+            requestCarPermsButton.setEnabled(enabled);
         }
         if (refreshButton != null) {
             refreshButton.setEnabled(enabled);

@@ -75,6 +75,17 @@
             android:textColor="@color/button_text" />
 
         <Button
+            android:id="@+id/diagnostics_request_car_perms"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="申请车辆权限"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
             android:id="@+id/diagnostics_close"
             android:layout_width="0dp"
             android:layout_height="wrap_content"

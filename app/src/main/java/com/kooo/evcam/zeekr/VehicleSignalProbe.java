@@ -50,6 +50,15 @@ public final class VehicleSignalProbe {
             "getDoorRiReSts",     // 右后门
     };
 
+    /** 读车辆属性需要的权限，按诊断报告里出现的顺序。 */
+    public static final String[] CAR_PERMISSIONS = {
+            "android.car.permission.CAR_POWERTRAIN",
+            "android.car.permission.CAR_SPEED",
+            "android.car.permission.CONTROL_CAR_DOORS",
+            "android.car.permission.CAR_EXTERIOR_LIGHTS",
+            "android.car.permission.CAR_ENERGY",
+    };
+
     /** 标准 Android Automotive 里几个我们关心的属性。 */
     private static final String[][] CAR_PROPERTIES = {
             {"TURN_SIGNAL_STATE", "转向灯"},
@@ -305,30 +314,39 @@ public final class VehicleSignalProbe {
             sb.append("     （读取本应用声明的权限失败: ").append(t).append("）").append('\n');
         }
 
-        sb.append("权限状态（声明 / 授予）:").append('\n');
-        for (String perm : new String[]{
-                "android.car.permission.CAR_POWERTRAIN",
-                "android.car.permission.CAR_SPEED",
-                "android.car.permission.CONTROL_CAR_DOORS",
-                "android.car.permission.CAR_EXTERIOR_LIGHTS",
-                "android.car.permission.CAR_ENERGY",
-        }) {
+        sb.append("权限状态（声明 / 授予 / 保护级别）:").append('\n');
+        boolean anyRuntimeGrantable = false;
+        for (String perm : CAR_PERMISSIONS) {
             boolean granted = false;
             try {
                 granted = context.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED;
             } catch (Throwable ignored) {
                 // 权限名在本平台可能不存在
             }
+            String protection = describeProtection(context, perm);
+            if (protection.startsWith("dangerous")) {
+                anyRuntimeGrantable = true;
+            }
             sb.append("     ")
                     .append(declared.contains(perm) ? "[已声明] " : "[未声明] ")
                     .append(granted ? "[已授予] " : "[未授予] ")
-                    .append(perm).append('\n');
+                    .append(perm)
+                    .append("  级别=").append(protection).append('\n');
         }
-        sb.append("     注：这些通常是 signature|privileged 级别，第三方应用拿不到。")
-                .append('\n');
-        sb.append("     若全部「已声明 + 未授予」，说明 API 可用而权限被系统挡住，")
-                .append('\n');
-        sb.append("     不是找错了 API。").append('\n');
+        sb.append('\n');
+        sb.append("     保护级别决定这件事有没有戏：").append('\n');
+        sb.append("       dangerous            —— 运行时可申请，值得弹窗试一次").append('\n');
+        sb.append("       signature/privileged —— 需与平台同签名或预置到 priv-app，").append('\n');
+        sb.append("                               App Lab 里的第三方应用拿不到").append('\n');
+        sb.append("       未定义               —— 本平台根本没有这个权限").append('\n');
+        if (anyRuntimeGrantable) {
+            sb.append("     >> 有 dangerous 级别的权限，用诊断页的「申请车辆权限」按钮试一次，")
+                    .append('\n');
+            sb.append("        然后重新采集本报告对比。").append('\n');
+        } else {
+            sb.append("     >> 没有任何一个是 dangerous 级别，运行时申请不会有帮助。")
+                    .append('\n');
+        }
 
         try {
             Class<?> carClass = Class.forName("android.car.Car");
@@ -485,6 +503,73 @@ public final class VehicleSignalProbe {
     // ------------------------------------------------------------------
     // 工具
     // ------------------------------------------------------------------
+
+    /**
+     * 读权限的保护级别。
+     *
+     * <p>这是「能不能拿到」的决定性依据，比凭印象背 AOSP 可靠 —— 各 Android 版本和
+     * 各家 OEM 的定义并不一致，只有这台车机自己的答案算数。</p>
+     */
+    private static String describeProtection(Context context, String permission) {
+        try {
+            android.content.pm.PermissionInfo info =
+                    context.getPackageManager().getPermissionInfo(permission, 0);
+            int base;
+            int flags;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                base = info.getProtection();
+                flags = info.getProtectionFlags();
+            } else {
+                base = info.protectionLevel & android.content.pm.PermissionInfo.PROTECTION_MASK_BASE;
+                flags = info.protectionLevel & ~android.content.pm.PermissionInfo.PROTECTION_MASK_BASE;
+            }
+            StringBuilder out = new StringBuilder();
+            switch (base) {
+                case android.content.pm.PermissionInfo.PROTECTION_NORMAL:
+                    out.append("normal");
+                    break;
+                case android.content.pm.PermissionInfo.PROTECTION_DANGEROUS:
+                    out.append("dangerous");
+                    break;
+                case android.content.pm.PermissionInfo.PROTECTION_SIGNATURE:
+                    out.append("signature");
+                    break;
+                default:
+                    out.append("其他(").append(base).append(")");
+                    break;
+            }
+            if ((flags & android.content.pm.PermissionInfo.PROTECTION_FLAG_PRIVILEGED) != 0) {
+                out.append("|privileged");
+            }
+            return out.toString();
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return "未定义";
+        } catch (Throwable t) {
+            return "读取失败";
+        }
+    }
+
+    /**
+     * 本平台上运行时可申请（dangerous 级别）的车辆权限。
+     *
+     * @return 可申请且尚未授予的权限；没有就返回空数组
+     */
+    public static String[] runtimeGrantableCarPermissions(Context context) {
+        List<String> pending = new ArrayList<>();
+        for (String perm : CAR_PERMISSIONS) {
+            if (!describeProtection(context, perm).startsWith("dangerous")) {
+                continue;
+            }
+            try {
+                if (context.checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
+                    pending.add(perm);
+                }
+            } catch (Throwable ignored) {
+                // 读不到就当作不可申请
+            }
+        }
+        return pending.toArray(new String[0]);
+    }
 
     private static boolean classExists(StringBuilder sb, String name) {
         try {
