@@ -191,6 +191,59 @@ public class RearViewGeometryTest {
         assertEquals(1f, badLane.laneScaleY, EPS);
     }
 
+    // ---------- 合成矩形：不做校正时用一个 2D 矩阵就够 ----------
+
+    @Test
+    public void combinedRectNestsTheCropInsideTheLane() {
+        CompositeStreamGeometry.Plan plan = zeekrPlan();
+        CompositeStreamGeometry.Lane lane = plan.lane(1);
+
+        // 蒙版取该路的下半部分中间一段
+        RearViewGeometry.Crop crop = new RearViewGeometry.Crop(0.25f, 0.5f, 0.5f, 0.5f);
+        float[] rect = RearViewGeometry.combinedSourceRect(plan, 1, crop);
+
+        float laneW = lane.u1 - lane.u0;
+        float laneH = lane.v1 - lane.v0;
+
+        assertEquals(lane.u0 + 0.25f * laneW, rect[0], EPS);
+        assertEquals(lane.v0 + 0.5f * laneH, rect[1], EPS);
+        assertEquals(0.5f * laneW, rect[2], EPS);
+        assertEquals(0.5f * laneH, rect[3], EPS);
+    }
+
+    @Test
+    public void combinedRectWithFullCropIsExactlyTheLane() {
+        CompositeStreamGeometry.Plan plan = zeekrPlan();
+        CompositeStreamGeometry.Lane lane = plan.lane(1);
+        float[] rect = RearViewGeometry.combinedSourceRect(
+                plan, 1, RearViewGeometry.Crop.full());
+
+        assertEquals(lane.u0, rect[0], EPS);
+        assertEquals(lane.v0, rect[1], EPS);
+        assertEquals(lane.u1 - lane.u0, rect[2], EPS);
+        assertEquals(lane.v1 - lane.v0, rect[3], EPS);
+    }
+
+    @Test
+    public void combinedRectAlwaysStaysInsideTheTexture() {
+        CompositeStreamGeometry.Plan plan = zeekrPlan();
+        for (int laneIndex = 0; laneIndex < 4; laneIndex++) {
+            for (RearViewGeometry.Crop crop : new RearViewGeometry.Crop[]{
+                    RearViewGeometry.Crop.full(),
+                    RearViewGeometry.Crop.defaultCrop(),
+                    new RearViewGeometry.Crop(0.9f, 0.9f, 0.5f, 0.5f),
+                    new RearViewGeometry.Crop(-1f, -1f, 0.2f, 0.2f)}) {
+                float[] r = RearViewGeometry.combinedSourceRect(plan, laneIndex, crop);
+                assertTrue("x 越界: " + r[0], r[0] >= -EPS);
+                assertTrue("y 越界: " + r[1], r[1] >= -EPS);
+                assertTrue("右边越界", r[0] + r[2] <= 1f + EPS);
+                assertTrue("下边越界", r[1] + r[3] <= 1f + EPS);
+                assertTrue("宽度必须为正", r[2] > 0f);
+                assertTrue("高度必须为正", r[3] > 0f);
+            }
+        }
+    }
+
     /** 默认蒙版要落在画面偏下 —— 后视镜关心的是路面。 */
     @Test
     public void defaultCropLooksAtTheRoadNotTheSky() {

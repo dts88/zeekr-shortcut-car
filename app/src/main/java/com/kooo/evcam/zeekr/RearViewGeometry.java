@@ -182,6 +182,30 @@ public final class RearViewGeometry {
     }
 
     /**
+     * 把「lane + 蒙版」压成一个矩形：最终要在合成流纹理里取哪一块。
+     *
+     * <p>这是不做鱼眼校正时的快捷路径。校正是非线性的，必须在着色器里分两步走；
+     * 但纯裁切是线性的，两层可以直接相乘，用一个 2D 矩阵就能实现 ——
+     * 也就不需要给悬浮窗接 GL 管线。</p>
+     *
+     * <p>{@link com.kooo.evcam.zeekr.CompositeStreamGeometry} 那条平台经验说过：
+     * 用普通 TextureView + 矩阵重画是这台车机上验证可行的做法，
+     * 而用 GL 自建 SurfaceTexture 顶替生产者会崩。所以能用矩阵解决的就不要上 GL。</p>
+     *
+     * @return {@code {x, y, width, height}}，归一化到合成流纹理
+     */
+    public static float[] combinedSourceRect(CompositeStreamGeometry.Plan plan,
+                                             int laneIndex, Crop crop) {
+        ShaderRects r = toShaderRects(plan, laneIndex, crop);
+        return new float[]{
+                r.laneOffsetX + r.cropOffsetX * r.laneScaleX,
+                r.laneOffsetY + r.cropOffsetY * r.laneScaleY,
+                r.cropScaleX * r.laneScaleX,
+                r.cropScaleY * r.laneScaleY,
+        };
+    }
+
+    /**
      * 后方那一路在合成流里的序号。
      *
      * <p>2x2 的格子编号是「左上、右上、左下、右下」，后方在右上（见 {@link #REAR_CELL}）。
