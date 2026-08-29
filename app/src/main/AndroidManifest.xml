@@ -148,6 +148,11 @@
             android:exported="false" />
 
         <!-- 摄像头录制服务 (D:\yuan重构新增) -->
+        <!-- 超级后视镜：环视合成流里后方那一路的悬浮窗 -->
+        <service
+            android:name=".zeekr.RearViewMirrorService"
+            android:exported="false" />
+
         <service
             android:name=".service.CameraRecordingService"
             android:enabled="true"

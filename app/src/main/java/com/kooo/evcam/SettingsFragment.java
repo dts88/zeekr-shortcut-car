@@ -58,6 +58,7 @@ public class SettingsFragment extends Fragment {
     private SwitchMaterial recordingStatsSwitch;
     private SwitchMaterial timestampWatermarkSwitch;
     private SwitchMaterial watermarkSpecSwitch;
+    private SwitchMaterial rearViewSwitch;
     private SwitchMaterial forceH264Switch;
     
     // 预览画面矫正相关
@@ -242,6 +243,7 @@ public class SettingsFragment extends Fragment {
             initRecordFpsConfig(view);
 
             initDecouplePreviewConfig(view);
+            initRearViewConfig(view);
             initPreviewResolutionConfig(view);
             
             // 初始化录制摄像头选择配置
@@ -1425,6 +1427,52 @@ public class SettingsFragment extends Fragment {
         });
 
         recordFpsSpinner.post(() -> isInitializingRecordFps = false);
+    }
+
+    /**
+     * 超级后视镜开关与重置。
+     *
+     * <p>它和主屏悬浮窗共用同一个相机附加输出槽位，所以两者不同时存在 ——
+     * 本来就是同一件事的两种形态。</p>
+     */
+    private void initRearViewConfig(View view) {
+        rearViewSwitch = view.findViewById(R.id.switch_rearview_mirror);
+        if (rearViewSwitch != null && appConfig != null) {
+            rearViewSwitch.setChecked(appConfig.isRearViewEnabled());
+            rearViewSwitch.setOnCheckedChangeListener((button, isChecked) -> {
+                if (isChecked == appConfig.isRearViewEnabled()) {
+                    return;
+                }
+                appConfig.setRearViewEnabled(isChecked);
+                if (getContext() == null) {
+                    return;
+                }
+                if (isChecked) {
+                    com.kooo.evcam.zeekr.RearViewMirrorService.start(getContext());
+                    Toast.makeText(getContext(),
+                            "超级后视镜已开启：左右三分之一拖动，中间上下滑调取景，双指缩放",
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    com.kooo.evcam.zeekr.RearViewMirrorService.stop(getContext());
+                }
+            });
+        }
+
+        View resetButton = view.findViewById(R.id.btn_reset_rearview);
+        if (resetButton != null) {
+            resetButton.setOnClickListener(v -> {
+                appConfig.resetRearViewLayout();
+                if (getContext() != null) {
+                    // 重开一次让新的默认值生效
+                    if (appConfig.isRearViewEnabled()) {
+                        com.kooo.evcam.zeekr.RearViewMirrorService.stop(getContext());
+                        com.kooo.evcam.zeekr.RearViewMirrorService.start(getContext());
+                    }
+                    Toast.makeText(getContext(), "后视镜取景与位置已恢复默认",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
 
     /**

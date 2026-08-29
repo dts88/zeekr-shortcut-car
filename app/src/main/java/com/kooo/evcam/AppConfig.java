@@ -92,6 +92,16 @@ public class AppConfig {
     private static final String KEY_MAIN_FLOATING_WIDTH = "main_floating_width";              // 主屏悬浮窗宽度
     private static final String KEY_MAIN_FLOATING_HEIGHT = "main_floating_height";            // 主屏悬浮窗高度
 
+    // 超级后视镜：把环视合成流里后方那一路单独放大显示
+    private static final String KEY_REARVIEW_ENABLED = "rearview_enabled";        // 总开关
+    private static final String KEY_REARVIEW_SIZE = "rearview_size";              // 窗口边长（px）
+    private static final String KEY_REARVIEW_CROP_X = "rearview_crop_x";          // 蒙版，归一化
+    private static final String KEY_REARVIEW_CROP_Y = "rearview_crop_y";
+    private static final String KEY_REARVIEW_CROP_W = "rearview_crop_w";
+    private static final String KEY_REARVIEW_CROP_H = "rearview_crop_h";
+    private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
+    private static final String KEY_REARVIEW_Y = "rearview_y";
+
 
     // 转向灯联动配置 (补盲选项新增)
     private static final String KEY_TURN_SIGNAL_LINKAGE_ENABLED = "turn_signal_linkage_enabled"; // 转向灯联动开关
@@ -1037,6 +1047,91 @@ public class AppConfig {
             return;
         }
         prefs.edit().putString(spec.key, value).apply();
+    }
+
+    // ==================== 超级后视镜 ====================
+
+    /** 后视镜窗口的默认边长（px），约屏幕宽度的六分之一。 */
+    public static final int REARVIEW_DEFAULT_SIZE = 520;
+    /** 允许的窗口边长范围。 */
+    public static final int REARVIEW_MIN_SIZE = 240;
+    public static final int REARVIEW_MAX_SIZE = 1400;
+
+    public boolean isRearViewEnabled() {
+        return prefs.getBoolean(KEY_REARVIEW_ENABLED, false);
+    }
+
+    public void setRearViewEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_REARVIEW_ENABLED, enabled).apply();
+        AppLog.d(TAG, "超级后视镜: " + (enabled ? "开" : "关"));
+    }
+
+    /** 窗口边长（px），已夹在允许范围内。 */
+    public int getRearViewSize() {
+        int size = prefs.getInt(KEY_REARVIEW_SIZE, REARVIEW_DEFAULT_SIZE);
+        return Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, size));
+    }
+
+    public void setRearViewSize(int sizePx) {
+        prefs.edit().putInt(KEY_REARVIEW_SIZE,
+                Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, sizePx))).apply();
+    }
+
+    /**
+     * 取景蒙版。
+     *
+     * <p>存四个浮点数而不是走 SettingsRegistry —— 那个注册表是给「取值有限、可枚举」的
+     * 设置用的，把一个矩形塞进去只会让它更难读。安全性由
+     * {@link com.kooo.evcam.zeekr.RearViewGeometry.Crop} 的构造函数保证：
+     * 它会夹住尺寸和位置，所以存坏了也读不出一个跑到画面外或者塌成零的取景框。</p>
+     */
+    public com.kooo.evcam.zeekr.RearViewGeometry.Crop getRearViewCrop() {
+        com.kooo.evcam.zeekr.RearViewGeometry.Crop fallback =
+                com.kooo.evcam.zeekr.RearViewGeometry.Crop.defaultCrop();
+        return new com.kooo.evcam.zeekr.RearViewGeometry.Crop(
+                prefs.getFloat(KEY_REARVIEW_CROP_X, fallback.x),
+                prefs.getFloat(KEY_REARVIEW_CROP_Y, fallback.y),
+                prefs.getFloat(KEY_REARVIEW_CROP_W, fallback.width),
+                prefs.getFloat(KEY_REARVIEW_CROP_H, fallback.height));
+    }
+
+    public void setRearViewCrop(com.kooo.evcam.zeekr.RearViewGeometry.Crop crop) {
+        if (crop == null) {
+            return;
+        }
+        prefs.edit()
+                .putFloat(KEY_REARVIEW_CROP_X, crop.x)
+                .putFloat(KEY_REARVIEW_CROP_Y, crop.y)
+                .putFloat(KEY_REARVIEW_CROP_W, crop.width)
+                .putFloat(KEY_REARVIEW_CROP_H, crop.height)
+                .apply();
+    }
+
+    /** 窗口位置；返回 -1 表示还没拖过，由调用方决定初始位置。 */
+    public int getRearViewX() {
+        return prefs.getInt(KEY_REARVIEW_X, -1);
+    }
+
+    public int getRearViewY() {
+        return prefs.getInt(KEY_REARVIEW_Y, -1);
+    }
+
+    public void setRearViewPosition(int x, int y) {
+        prefs.edit().putInt(KEY_REARVIEW_X, x).putInt(KEY_REARVIEW_Y, y).apply();
+    }
+
+    /** 恢复出厂：位置、大小、取景范围一并复位。 */
+    public void resetRearViewLayout() {
+        prefs.edit()
+                .remove(KEY_REARVIEW_X)
+                .remove(KEY_REARVIEW_Y)
+                .remove(KEY_REARVIEW_SIZE)
+                .remove(KEY_REARVIEW_CROP_X)
+                .remove(KEY_REARVIEW_CROP_Y)
+                .remove(KEY_REARVIEW_CROP_W)
+                .remove(KEY_REARVIEW_CROP_H)
+                .apply();
+        AppLog.i(TAG, "超级后视镜布局已恢复默认");
     }
 
     // ==================== 车型配置相关方法 ====================
