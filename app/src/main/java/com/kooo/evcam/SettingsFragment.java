@@ -23,6 +23,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.kooo.evcam.settings.SettingsRegistry;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -91,18 +93,21 @@ public class SettingsFragment extends Fragment {
     // 「自定义」是排查用的：它不做任何极氪专属处理（不探测合成流、不强制分辨率、
     // 不走四宫格容器），单纯按数量把相机铺开。三路模式黑屏时，用它可以确认
     // 「到底是相机开不起来，还是极氪那套处理有问题」——目前已知在它下面三路都能看到。
+    // 选项、顺序、显示名都来自 SettingsRegistry —— 这里不再各存一份
     private static final String[] CAR_MODEL_OPTIONS =
-            {"极氪7X（环视合成流）", "极氪7X（环视+座舱3路）", "自定义（排查用）"};
+            SettingsRegistry.CAR_MODEL.displayNames();
     private static final String[] CAR_MODEL_VALUES =
-            {AppConfig.CAR_MODEL_ZEEKR_7X, AppConfig.CAR_MODEL_ZEEKR_7X_MULTI,
-                    AppConfig.CAR_MODEL_CUSTOM};
+            SettingsRegistry.CAR_MODEL.values();
     private boolean isInitializingCarModel = false;
     private String lastAppliedCarModel = null;
     
     // 录制模式配置相关
     private Spinner recordingModeSpinner;
     private TextView recordingModeDescText;
-    private static final String[] RECORDING_MODE_OPTIONS = {"自动（推荐）", "MediaRecorder", "MediaCodec"};
+    private static final String[] RECORDING_MODE_OPTIONS =
+            SettingsRegistry.RECORDING_MODE.displayNames();
+    private static final String[] RECORDING_MODE_VALUES =
+            SettingsRegistry.RECORDING_MODE.values();
     private boolean isInitializingRecordingMode = false;
     private String lastAppliedRecordingMode = null;
     
@@ -112,14 +117,16 @@ public class SettingsFragment extends Fragment {
 
     // 录制画面排列
     private Spinner recordLayoutSpinner;
-    private static final String[] RECORD_LAYOUT_OPTIONS = {"四宫格", "原始长条"};
+    private static final String[] RECORD_LAYOUT_OPTIONS =
+            SettingsRegistry.RECORD_LAYOUT.displayNames();
     private static final String[] RECORD_LAYOUT_VALUES =
-            {AppConfig.RECORD_LAYOUT_GRID, AppConfig.RECORD_LAYOUT_RAW};
+            SettingsRegistry.RECORD_LAYOUT.values();
     private boolean isInitializingRecordLayout = false;
 
     // 录制帧率配置相关
     private Spinner recordFpsSpinner;
-    private static final String[] RECORD_FPS_OPTIONS = {"原始帧率", "30 fps", "24 fps", "20 fps", "15 fps", "10 fps"};
+    private static final String[] RECORD_FPS_OPTIONS =
+            SettingsRegistry.RECORD_FPS.displayNames();
     private boolean isInitializingRecordFps = false;
 
     // 预览/录制分辨率解耦
@@ -976,20 +983,20 @@ public class SettingsFragment extends Fragment {
                 String modeName;
                 String modeDesc;
                 
-                if (position == 0) {
-                    newMode = AppConfig.RECORDING_MODE_AUTO;
-                    modeName = "自动";
-                    // 显示当前实际使用的模式
+                // 取值和显示名都按下标从注册表取，不再假设「第 0 项就是自动」
+                if (position < 0 || position >= RECORDING_MODE_VALUES.length) {
+                    return;
+                }
+                newMode = RECORDING_MODE_VALUES[position];
+                modeName = RECORDING_MODE_OPTIONS[position];
+                if (AppConfig.RECORDING_MODE_MEDIA_RECORDER.equals(newMode)) {
+                    modeDesc = "使用系统硬件编码器，兼容性好";
+                } else if (AppConfig.RECORDING_MODE_CODEC.equals(newMode)) {
+                    modeDesc = "软编码方案，解决部分设备兼容问题";
+                } else {
+                    // 自动：把当前实际会用哪个也说出来
                     String actualMode = appConfig.shouldUseCodecRecording() ? "MediaCodec" : "MediaRecorder";
                     modeDesc = "MediaRecorder编码更稳定，MediaCodec兼容性更好，如果无法存储视频，尝试修改\n当前自动选择：" + actualMode;
-                } else if (position == 1) {
-                    newMode = AppConfig.RECORDING_MODE_MEDIA_RECORDER;
-                    modeName = "MediaRecorder";
-                    modeDesc = "使用系统硬件编码器，兼容性好";
-                } else {
-                    newMode = AppConfig.RECORDING_MODE_CODEC;
-                    modeName = "MediaCodec";
-                    modeDesc = "软编码方案，解决部分设备兼容问题";
                 }
                 
                 updateRecordingModeDescription(modeDesc);
@@ -1015,14 +1022,10 @@ public class SettingsFragment extends Fragment {
             }
         });
         
-        String currentMode = appConfig.getRecordingMode();
-        int selectedIndex = 0;
-        if (AppConfig.RECORDING_MODE_MEDIA_RECORDER.equals(currentMode)) {
-            selectedIndex = 1;
-        } else if (AppConfig.RECORDING_MODE_CODEC.equals(currentMode)) {
-            selectedIndex = 2;
-        }
-        recordingModeSpinner.setSelection(selectedIndex);
+        // getRecordingMode() 已经过 sanitize，取值必定合法，indexOf 不会是 -1；
+        // 仍然显式兜底 —— 悄悄落到第 0 项正是这轮改动要消灭的行为
+        int selectedIndex = SettingsRegistry.RECORDING_MODE.indexOf(appConfig.getRecordingMode());
+        recordingModeSpinner.setSelection(Math.max(0, selectedIndex));
         
         recordingModeSpinner.post(() -> {
             isInitializingRecordingMode = false;

@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 
 import com.kooo.evcam.config.BlindSpotConfig;
 import com.kooo.evcam.config.RecordingConfig;
+import com.kooo.evcam.settings.SettingSpec;
+import com.kooo.evcam.settings.SettingsRegistry;
 
 /**
  * 应用配置管理类
@@ -343,7 +345,8 @@ public class AppConfig {
     /** 跟随硬件/车型默认（即旧的帧率等级逻辑）。 */
     public static final String RECORD_FPS_AUTO = "auto";
     /** 可选的显式帧率，单位 fps。 */
-    public static final String[] RECORD_FPS_VALUES = {RECORD_FPS_AUTO, "30", "24", "20", "15", "10"};
+    /** 由注册表派生，避免和 SettingsRegistry 各存一份而走偏。 */
+    public static final String[] RECORD_FPS_VALUES = SettingsRegistry.RECORD_FPS.values();
 
     
     // 车型配置相关键名
@@ -592,7 +595,7 @@ public class AppConfig {
      * @param mode 录制模式（auto/media_recorder/codec）
      */
     public void setRecordingMode(String mode) {
-        prefs.edit().putString(KEY_RECORDING_MODE, mode).apply();
+        writeEnum(SettingsRegistry.RECORDING_MODE, mode);
         AppLog.d(TAG, "录制模式设置: " + mode);
     }
     
@@ -601,7 +604,7 @@ public class AppConfig {
      * @return 录制模式，默认为自动
      */
     public String getRecordingMode() {
-        return prefs.getString(KEY_RECORDING_MODE, RECORDING_MODE_AUTO);
+        return readEnum(SettingsRegistry.RECORDING_MODE);
     }
     
     /**
@@ -693,7 +696,7 @@ public class AppConfig {
      * @param level 码率等级（low/medium/high）
      */
     public void setBitrateLevel(String level) {
-        prefs.edit().putString(KEY_BITRATE_LEVEL, level).apply();
+        writeEnum(SettingsRegistry.BITRATE_LEVEL, level);
         AppLog.d(TAG, "码率等级设置: " + level);
     }
     
@@ -702,7 +705,7 @@ public class AppConfig {
      * @return 码率等级，默认为 medium
      */
     public String getBitrateLevel() {
-        return prefs.getString(KEY_BITRATE_LEVEL, BITRATE_MEDIUM);
+        return readEnum(SettingsRegistry.BITRATE_LEVEL);
     }
     
     /**
@@ -854,11 +857,36 @@ public class AppConfig {
         String level = prefs.getString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD);
         boolean stillAuto = RECORD_FPS_AUTO.equals(getRecordFps());
         if (stillAuto && FRAMERATE_LOW.equals(level)) {
-            int converted = Math.max(10, getStandardFrameRate(hardwareMaxFps) / 2);
-            prefs.edit().putString(KEY_RECORD_FPS, String.valueOf(converted)).apply();
-            AppLog.i(TAG, "旧的「低帧率」已折算为 " + converted + "fps");
+            int halved = Math.max(10, getStandardFrameRate(hardwareMaxFps) / 2);
+            // 折算结果未必正好是提供的档位之一（硬件标准 25fps 时算出来是 12），
+            // 就近吸附到一个真实存在的档位 —— 写一个列表里没有的值，
+            // 读的时候会被 sanitize 回 auto，等于这次迁移白做
+            String snapped = nearestOfferedFps(halved);
+            writeEnum(SettingsRegistry.RECORD_FPS, snapped);
+            AppLog.i(TAG, "旧的「低帧率」已折算为 " + snapped + "fps（计算值 " + halved + "）");
         }
         prefs.edit().remove(KEY_FRAMERATE_LEVEL).apply();
+    }
+
+    /** 把一个帧率数值吸附到最接近的、真实提供的档位。 */
+    private static String nearestOfferedFps(int fps) {
+        String best = SettingsRegistry.RECORD_FPS.defaultValue;
+        int bestDiff = Integer.MAX_VALUE;
+        for (String value : SettingsRegistry.RECORD_FPS.values()) {
+            if (RECORD_FPS_AUTO.equals(value)) {
+                continue;  // 「原始帧率」不是一个数，参与不了比较
+            }
+            try {
+                int diff = Math.abs(Integer.parseInt(value) - fps);
+                if (diff < bestDiff) {
+                    bestDiff = diff;
+                    best = value;
+                }
+            } catch (NumberFormatException ignored) {
+                // 不是数字就跳过
+            }
+        }
+        return best;
     }
 
     // ==================== 录制帧率（显式选择） ====================
@@ -869,7 +897,7 @@ public class AppConfig {
      * @return {@link #RECORD_FPS_AUTO} 或具体的 fps 字符串
      */
     public String getRecordFps() {
-        return prefs.getString(KEY_RECORD_FPS, RECORD_FPS_AUTO);
+        return readEnum(SettingsRegistry.RECORD_FPS);
     }
 
     /**
@@ -878,10 +906,8 @@ public class AppConfig {
      * <p>这是决定录制帧率的<b>唯一</b>设置。</p>
      */
     public void setRecordFps(String value) {
-        prefs.edit()
-                .putString(KEY_RECORD_FPS, value)
-                .remove(KEY_FRAMERATE_LEVEL)
-                .apply();
+        writeEnum(SettingsRegistry.RECORD_FPS, value);
+        prefs.edit().remove(KEY_FRAMERATE_LEVEL).apply();
         AppLog.d(TAG, "录制帧率设置: " + value);
     }
 
@@ -918,11 +944,11 @@ public class AppConfig {
      * 挑不到就退回录制尺寸 —— 绝不臆造未声明的分辨率。</p>
      */
     public String getPreviewResolution() {
-        return prefs.getString(KEY_PREVIEW_RESOLUTION, PREVIEW_RES_VALUES[1]);
+        return readEnum(SettingsRegistry.PREVIEW_RESOLUTION);
     }
 
     public void setPreviewResolution(String value) {
-        prefs.edit().putString(KEY_PREVIEW_RESOLUTION, value).apply();
+        writeEnum(SettingsRegistry.PREVIEW_RESOLUTION, value);
         AppLog.d(TAG, "预览分辨率设置: " + value);
     }
 
@@ -971,8 +997,9 @@ public class AppConfig {
     }
 
     /** 可选的预览分辨率，按从小到大排列。 */
+    /** 由注册表派生，避免和 SettingsRegistry 各存一份而走偏。 */
     public static final String[] PREVIEW_RES_VALUES =
-            {"640x480", "1280x720", "1600x900", "1920x1080"};
+            SettingsRegistry.PREVIEW_RESOLUTION.values();
 
     // ==================== 录制画面排列 ====================
 
@@ -991,11 +1018,11 @@ public class AppConfig {
      * 输出即所见。代价是必须走 MediaCodec（软编码）路径。</p>
      */
     public String getRecordLayout() {
-        return prefs.getString(KEY_RECORD_LAYOUT, RECORD_LAYOUT_GRID);
+        return readEnum(SettingsRegistry.RECORD_LAYOUT);
     }
 
     public void setRecordLayout(String layout) {
-        prefs.edit().putString(KEY_RECORD_LAYOUT, layout).apply();
+        writeEnum(SettingsRegistry.RECORD_LAYOUT, layout);
         AppLog.d(TAG, "录制画面排列: " + layout);
     }
 
@@ -1039,41 +1066,43 @@ public class AppConfig {
         }
         settingsRepaired = true;
 
-        repairEnum(KEY_RECORD_LAYOUT, RECORD_LAYOUT_GRID,
-                new String[]{RECORD_LAYOUT_RAW, RECORD_LAYOUT_GRID}, "录制画面排列");
-        repairEnum(KEY_RECORD_FPS, RECORD_FPS_AUTO, RECORD_FPS_VALUES, "录制帧率");
-        repairEnum(KEY_PREVIEW_RESOLUTION, PREVIEW_RES_VALUES[1], PREVIEW_RES_VALUES,
-                "预览分辨率");
-        repairEnum(KEY_RECORDING_MODE, RECORDING_MODE_AUTO,
-                new String[]{RECORDING_MODE_AUTO, RECORDING_MODE_MEDIA_RECORDER,
-                        RECORDING_MODE_CODEC}, "录制模式");
-        repairEnum(KEY_BITRATE_LEVEL, BITRATE_MEDIUM,
-                new String[]{BITRATE_LOW, BITRATE_MEDIUM, BITRATE_HIGH}, "码率等级");
+        // 遍历注册表，新增设置项自动纳入自检，不必记得回来加一行
+        for (SettingSpec spec : SettingsRegistry.ALL) {
+            repairEnum(spec);
+        }
+    }
+
+    /** 一个枚举项的自检：存的值不合法就修回默认值。 */
+    private void repairEnum(SettingSpec spec) {
+        if (!prefs.contains(spec.key)) {
+            return;  // 没存过就走默认，没什么可修的
+        }
+        String current = prefs.getString(spec.key, null);
+        if (spec.isValid(current)) {
+            return;
+        }
+        AppLog.w(TAG, spec.label + " 的存值「" + current + "」不在合法取值内，已修回默认「"
+                + spec.defaultValue + "」");
+        prefs.edit().putString(spec.key, spec.defaultValue).apply();
     }
 
     /**
-     * 一个枚举项的自检。
+     * 读一个枚举型设置。
      *
-     * @param key      SharedPreferences 键
-     * @param fallback 默认值
-     * @param allowed  合法取值
-     * @param label    日志里用的名字
+     * <p>一律过一遍 {@link SettingSpec#sanitize(String)} —— 不合法的值<b>根本不可能被
+     * 读出来</b>，启动自检只是顺手把坏值从存储里清掉，不是唯一的防线。</p>
      */
-    private void repairEnum(String key, String fallback, String[] allowed, String label) {
-        if (!prefs.contains(key)) {
-            return;  // 没存过就走默认，没什么可修的
+    private String readEnum(SettingSpec spec) {
+        return spec.sanitize(prefs.getString(spec.key, spec.defaultValue));
+    }
+
+    /** 写一个枚举型设置；不合法的值直接拒绝，避免把坏值写进存储。 */
+    private void writeEnum(SettingSpec spec, String value) {
+        if (!spec.isValid(value)) {
+            AppLog.w(TAG, "拒绝把不合法的值「" + value + "」写入 " + spec.label);
+            return;
         }
-        String current = prefs.getString(key, null);
-        if (current != null) {
-            for (String value : allowed) {
-                if (value.equals(current)) {
-                    return;
-                }
-            }
-        }
-        AppLog.w(TAG, label + " 的存值「" + current + "」不在合法取值内，已修回默认「"
-                + fallback + "」");
-        prefs.edit().putString(key, fallback).apply();
+        prefs.edit().putString(spec.key, value).apply();
     }
 
     // ==================== 车型配置相关方法 ====================
@@ -1083,7 +1112,7 @@ public class AppConfig {
      * @param carModel 车型标识（galaxy_e5 或 custom）
      */
     public void setCarModel(String carModel) {
-        prefs.edit().putString(KEY_CAR_MODEL, carModel).apply();
+        writeEnum(SettingsRegistry.CAR_MODEL, carModel);
         AppLog.d(TAG, "车型设置: " + carModel);
     }
     
@@ -1093,7 +1122,7 @@ public class AppConfig {
      */
     public String getCarModel() {
         // 默认极氪7X：本项目就是为极氪合成流做的，其余车型不再提供
-        return prefs.getString(KEY_CAR_MODEL, CAR_MODEL_ZEEKR_7X);
+        return readEnum(SettingsRegistry.CAR_MODEL);
     }
     
     /**
