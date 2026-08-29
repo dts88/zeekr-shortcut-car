@@ -12,6 +12,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
@@ -51,6 +54,9 @@ public class TimelinePlayerActivity extends Activity {
     private Button playPauseButton;
     private Button prevSessionButton;
     private Button nextSessionButton;
+    private RecyclerView sessionListView;
+    private TextView listSummaryText;
+    private TimelineSessionAdapter sessionAdapter;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private List<RecordingTimeline.Session> sessions = new ArrayList<>();
@@ -81,6 +87,14 @@ public class TimelinePlayerActivity extends Activity {
         playPauseButton = findViewById(R.id.timeline_play_pause);
         prevSessionButton = findViewById(R.id.timeline_prev_session);
         nextSessionButton = findViewById(R.id.timeline_next_session);
+        sessionListView = findViewById(R.id.timeline_session_list);
+        listSummaryText = findViewById(R.id.timeline_list_summary);
+
+        sessionAdapter = new TimelineSessionAdapter(this::switchSession);
+        if (sessionListView != null) {
+            sessionListView.setLayoutManager(new LinearLayoutManager(this));
+            sessionListView.setAdapter(sessionAdapter);
+        }
 
         View close = findViewById(R.id.timeline_close);
         if (close != null) {
@@ -136,6 +150,9 @@ public class TimelinePlayerActivity extends Activity {
     /** 扫描录像目录，按时间轴分组。可能有 I/O，放后台线程。 */
     private void loadTimelines() {
         infoText.setText("正在扫描录像...");
+        if (listSummaryText != null) {
+            listSummaryText.setText("正在扫描…");
+        }
         new Thread(() -> {
             List<RecordingTimeline.Source> sources = new ArrayList<>();
             try {
@@ -153,7 +170,7 @@ public class TimelinePlayerActivity extends Activity {
                         long duration = readDurationMs(f);
                         if (duration > 0) {
                             sources.add(new RecordingTimeline.Source(
-                                    f.getAbsolutePath(), start, duration));
+                                    f.getAbsolutePath(), start, duration, f.length()));
                         }
                     }
                 }
@@ -164,6 +181,8 @@ public class TimelinePlayerActivity extends Activity {
             final List<RecordingTimeline.Session> built = RecordingTimeline.build(sources);
             runOnUiThread(() -> {
                 sessions = built;
+                sessionAdapter.setSessions(sessions);
+                updateListSummary();
                 if (sessions.isEmpty()) {
                     infoText.setText("没有找到可用的录像");
                     Toast.makeText(this, "没有找到可用的录像", Toast.LENGTH_LONG).show();
@@ -210,6 +229,34 @@ public class TimelinePlayerActivity extends Activity {
 
         prevSessionButton.setEnabled(sessionIndex > 0);
         nextSessionButton.setEnabled(sessionIndex < sessions.size() - 1);
+
+        // 上一段/下一段按钮也会改变选中项，列表要跟着走
+        if (sessionAdapter != null) {
+            sessionAdapter.setSelectedIndex(sessionIndex);
+        }
+        if (sessionListView != null) {
+            sessionListView.scrollToPosition(sessionIndex);
+        }
+    }
+
+    /** 左栏顶部的一行汇总：共几条、合计多长多大。 */
+    private void updateListSummary() {
+        if (listSummaryText == null) {
+            return;
+        }
+        if (sessions.isEmpty()) {
+            listSummaryText.setText("没有找到可用的录像");
+            return;
+        }
+        long totalMs = 0L;
+        long totalBytes = 0L;
+        for (RecordingTimeline.Session session : sessions) {
+            totalMs += session.totalDurationMs;
+            totalBytes += session.totalSizeBytes;
+        }
+        listSummaryText.setText(sessions.size() + " 条　·　"
+                + TimelineFormat.duration(totalMs) + "　·　"
+                + TimelineFormat.size(totalBytes));
     }
 
     private void updateSessionInfo(RecordingTimeline.Session session) {
@@ -218,7 +265,7 @@ public class TimelinePlayerActivity extends Activity {
         infoText.setText(String.format(Locale.getDefault(),
                 "时间轴 %d/%d　起于 %s　共 %d 段　时长 %s",
                 sessionIndex + 1, sessions.size(), started,
-                session.segmentCount(), formatDuration(session.totalDurationMs)));
+                session.segmentCount(), TimelineFormat.duration(session.totalDurationMs)));
     }
 
     /**
@@ -294,8 +341,8 @@ public class TimelinePlayerActivity extends Activity {
             return;
         }
         RecordingTimeline.Session session = sessions.get(sessionIndex);
-        positionText.setText(formatDuration(positionMs) + " / "
-                + formatDuration(session.totalDurationMs));
+        positionText.setText(TimelineFormat.duration(positionMs) + " / "
+                + TimelineFormat.duration(session.totalDurationMs));
     }
 
     private void togglePlayPause() {
@@ -311,17 +358,6 @@ public class TimelinePlayerActivity extends Activity {
         if (playPauseButton != null) {
             playPauseButton.setText(videoView.isPlaying() ? "暂停" : "播放");
         }
-    }
-
-    private static String formatDuration(long ms) {
-        long totalSeconds = Math.max(0L, ms) / 1000L;
-        long hours = totalSeconds / 3600;
-        long minutes = (totalSeconds % 3600) / 60;
-        long seconds = totalSeconds % 60;
-        if (hours > 0) {
-            return String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds);
-        }
-        return String.format(Locale.US, "%02d:%02d", minutes, seconds);
     }
 
     @Override

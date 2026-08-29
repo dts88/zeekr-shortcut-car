@@ -922,35 +922,43 @@
                 android:layout_marginBottom="10dp"
                 android:paddingStart="4dp" />
 
-            <!-- 悬浮窗布局：重置 / 保存 -->
+            <!-- 悬浮窗布局：重置 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp"
                 android:background="@color/card_background"
                 android:layout_marginBottom="16dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="悬浮窗布局"
-                    android:textColor="@color/text_primary"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    android:layout_weight="1"
+                    android:layout_marginEnd="16dp"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="10dp"
-                    android:text="拖动悬浮窗后位置会自动记住，下次启动沿用。重置可把位置、大小、透明度、字号一并恢复默认。"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="悬浮窗布局"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="拖动悬浮窗后位置会自动记住，下次启动沿用。重置可把位置、大小、透明度、字号一并恢复默认。"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/btn_reset_floating_layout"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="重置为默认"
                     android:textSize="15sp"
@@ -1019,29 +1027,55 @@
                     android:textStyle="bold"
                     android:layout_marginBottom="16dp" />
 
-                <!-- 悬浮窗大小 -->
+                <!-- 悬浮窗大小：与录制悬浮按钮用同一种调节方式 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="按钮大小"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:layout_marginBottom="16dp">
+                    android:layout_marginTop="8dp">
 
                     <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="小"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
+
+                    <SeekBar
+                        android:id="@+id/seekbar_floating_window_size"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="按钮大小"
-                        android:textColor="@color/text_primary"
-                        android:textSize="16sp" />
+                        android:layout_marginHorizontal="8dp"
+                        android:max="160"
+                        android:progress="64" />
 
-                    <Spinner
-                        android:id="@+id/spinner_floating_window_size"
-                        android:layout_width="120dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="大"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/text_floating_window_size_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="64dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="16dp" />
 
                 <!-- 悬浮窗透明度 -->
                 <LinearLayout

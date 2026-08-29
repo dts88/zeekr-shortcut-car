@@ -40,12 +40,16 @@ public final class RecordingTimeline {
         public final long durationMs;
         /** 该段在所属时间轴上的起始偏移（毫秒）。 */
         public final long timelineOffsetMs;
+        /** 该段的文件大小（字节）；未知时为 0。 */
+        public final long sizeBytes;
 
-        Segment(String path, long startEpochMs, long durationMs, long timelineOffsetMs) {
+        Segment(String path, long startEpochMs, long durationMs, long timelineOffsetMs,
+                long sizeBytes) {
             this.path = path;
             this.startEpochMs = startEpochMs;
             this.durationMs = durationMs;
             this.timelineOffsetMs = timelineOffsetMs;
+            this.sizeBytes = sizeBytes;
         }
 
         /** 该段在时间轴上的结束偏移（不含）。 */
@@ -67,11 +71,18 @@ public final class RecordingTimeline {
         public final long totalDurationMs;
         /** 第一段的起始时刻，用于给会话命名。 */
         public final long startEpochMs;
+        /** 本条时间轴所有分段的文件大小之和（字节）。 */
+        public final long totalSizeBytes;
 
         Session(List<Segment> segments, long totalDurationMs, long startEpochMs) {
             this.segments = Collections.unmodifiableList(segments);
             this.totalDurationMs = totalDurationMs;
             this.startEpochMs = startEpochMs;
+            long bytes = 0L;
+            for (Segment segment : segments) {
+                bytes += segment.sizeBytes;
+            }
+            this.totalSizeBytes = bytes;
         }
 
         public int segmentCount() {
@@ -133,10 +144,18 @@ public final class RecordingTimeline {
         public final long startEpochMs;
         public final long durationMs;
 
+        /** 文件大小（字节）；未知时为 0。 */
+        public final long sizeBytes;
+
         public Source(String path, long startEpochMs, long durationMs) {
+            this(path, startEpochMs, durationMs, 0L);
+        }
+
+        public Source(String path, long startEpochMs, long durationMs, long sizeBytes) {
             this.path = path;
             this.startEpochMs = startEpochMs;
             this.durationMs = durationMs;
+            this.sizeBytes = sizeBytes;
         }
     }
 
@@ -186,7 +205,8 @@ public final class RecordingTimeline {
                 sessionStart = src.startEpochMs;
             }
 
-            current.add(new Segment(src.path, src.startEpochMs, src.durationMs, offset));
+            current.add(new Segment(src.path, src.startEpochMs, src.durationMs, offset,
+                    src.sizeBytes));
             offset += src.durationMs;
             previousEndEpoch = src.startEpochMs + src.durationMs;
         }

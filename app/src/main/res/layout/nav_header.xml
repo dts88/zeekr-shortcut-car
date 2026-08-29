@@ -76,28 +76,6 @@
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Base project credit: full attribution lives in the About page -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <View
-            android:layout_width="3dp"
-            android:layout_height="14dp"
-            android:background="@color/nav_header_text_secondary" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="基于 EVCam (GPL-3.0)　详见「关于与致谢」"
-            android:textColor="@color/nav_header_text_secondary"
-            android:textSize="12sp" />
-    </LinearLayout>
-
     <!-- Version info -->
     <LinearLayout
         android:layout_width="match_parent"

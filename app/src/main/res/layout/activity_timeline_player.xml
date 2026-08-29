@@ -1,108 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  连续回放。左栏列出识别出来的每一条连续时间轴，右侧是播放器。
+  版式与视频回看界面一致：列表在左，内容在右。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:background="#FF000000">
 
-    <!-- 画面 -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <VideoView
-            android:id="@+id/timeline_video"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center" />
-
-        <TextView
-            android:id="@+id/timeline_info"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|start"
-            android:layout_margin="12dp"
-            android:background="@drawable/camera_label_background"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
-            android:textColor="#DDFFFFFF"
-            android:textSize="13sp" />
-    </FrameLayout>
-
-    <!-- 进度条 -->
+    <!-- 左：连续录制列表 -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_width="280dp"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="12dp"
         android:background="@color/menu_background">
 
-        <SeekBar
-            android:id="@+id/timeline_seek"
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="6dp"
+            android:text="连续录制"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/timeline_position"
-            android:layout_width="wrap_content"
+            android:id="@+id/timeline_list_summary"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="2dp"
-            android:textColor="#FFFFFF"
-            android:textSize="15sp"
-            android:fontFamily="monospace" />
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:text="正在扫描…" />
 
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/timeline_session_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="8dp" />
+    </LinearLayout>
+
+    <!-- 右：播放器 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <VideoView
+                android:id="@+id/timeline_video"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center" />
+
+            <TextView
+                android:id="@+id/timeline_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="12dp"
+                android:background="@drawable/camera_label_background"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:textColor="#DDFFFFFF"
+                android:textSize="13sp" />
+        </FrameLayout>
+
+        <!-- 进度条 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+            android:orientation="vertical"
+            android:padding="12dp"
+            android:background="@color/menu_background">
 
-            <Button
-                android:id="@+id/timeline_prev_session"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="上一段录制"
-                android:textSize="15sp"
-                android:backgroundTint="@color/button_background"
-                android:textColor="@color/button_text" />
+            <SeekBar
+                android:id="@+id/timeline_seek"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
 
-            <Button
-                android:id="@+id/timeline_play_pause"
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/timeline_position"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="播放"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="2dp"
+                android:textColor="#FFFFFF"
                 android:textSize="15sp"
-                android:backgroundTint="@color/button_background"
-                android:textColor="@color/button_text" />
+                android:fontFamily="monospace" />
 
-            <Button
-                android:id="@+id/timeline_next_session"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="下一段录制"
-                android:textSize="15sp"
-                android:backgroundTint="@color/button_background"
-                android:textColor="@color/button_text" />
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
 
-            <Button
-                android:id="@+id/timeline_close"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="关闭"
-                android:textSize="15sp"
-                android:backgroundTint="@color/button_background"
-                android:textColor="@color/button_text" />
+                <Button
+                    android:id="@+id/timeline_prev_session"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="上一段录制"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+
+                <Button
+                    android:id="@+id/timeline_play_pause"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="播放"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+
+                <Button
+                    android:id="@+id/timeline_next_session"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="下一段录制"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+
+                <Button
+                    android:id="@+id/timeline_close"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="关闭"
+                    android:textSize="15sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

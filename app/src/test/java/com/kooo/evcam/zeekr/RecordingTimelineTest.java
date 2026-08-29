@@ -175,6 +175,52 @@ public class RecordingTimelineTest {
         assertTrue(past.offsetInSegmentMs < 3 * MIN);
     }
 
+    // ---------- 文件大小（连续回放左栏要显示） ----------
+
+    @Test
+    public void sumsFileSizesPerSession() {
+        long t0 = epoch(2026, 8, 28, 10, 0, 0);
+        long mb = 1024L * 1024L;
+        List<RecordingTimeline.Source> sources = Arrays.asList(
+                new RecordingTimeline.Source("a.mp4", t0, 3 * MIN, 100 * mb),
+                new RecordingTimeline.Source("b.mp4", t0 + 3 * MIN, 3 * MIN, 120 * mb),
+                // 断档：另起一条时间轴，大小不能算到上一条里
+                new RecordingTimeline.Source("c.mp4", t0 + 30 * MIN, 3 * MIN, 90 * mb));
+
+        List<RecordingTimeline.Session> sessions = RecordingTimeline.build(sources);
+
+        assertEquals(2, sessions.size());
+        assertEquals(220 * mb, sessions.get(0).totalSizeBytes);
+        assertEquals(90 * mb, sessions.get(1).totalSizeBytes);
+    }
+
+    @Test
+    public void sizeDefaultsToZeroWhenNotSupplied() {
+        long t0 = epoch(2026, 8, 28, 10, 0, 0);
+        // 三参构造保留给不关心大小的调用方，不该逼它们编一个数字出来
+        List<RecordingTimeline.Source> sources = Arrays.asList(
+                new RecordingTimeline.Source("a.mp4", t0, 3 * MIN));
+
+        RecordingTimeline.Session s = RecordingTimeline.build(sources).get(0);
+        assertEquals(0L, s.totalSizeBytes);
+        assertEquals("大小未知", TimelineFormat.size(s.totalSizeBytes));
+    }
+
+    @Test
+    public void formatsSizeAtEachScale() {
+        assertEquals("大小未知", TimelineFormat.size(0));
+        assertEquals("512 KB", TimelineFormat.size(512L * 1024L));
+        assertEquals("1.5 MB", TimelineFormat.size(3L * 512L * 1024L));
+        assertEquals("2.00 GB", TimelineFormat.size(2L * 1024 * 1024 * 1024));
+    }
+
+    @Test
+    public void formatsDurationWithHoursOnlyWhenNeeded() {
+        assertEquals("00:45", TimelineFormat.duration(45_000L));
+        assertEquals("27:04", TimelineFormat.duration(27 * MIN + 4_000L));
+        assertEquals("1:05:00", TimelineFormat.duration(65 * MIN));
+    }
+
     // ---------- 边界输入 ----------
 
     @Test

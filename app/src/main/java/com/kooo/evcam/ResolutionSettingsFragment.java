@@ -54,7 +54,6 @@ public class ResolutionSettingsFragment extends Fragment {
     private String selectedBitrateLevel;
     
     // 帧率相关
-    private TextView framerateDescText;
     
     // 信息显示
     private TextView currentParamsText;
@@ -142,7 +141,6 @@ public class ResolutionSettingsFragment extends Fragment {
         resolutionDescText = view.findViewById(R.id.tv_resolution_desc);
         bitrateSpinner = view.findViewById(R.id.spinner_bitrate);
         bitrateDescText = view.findViewById(R.id.tv_bitrate_desc);
-        framerateDescText = view.findViewById(R.id.tv_framerate_desc);
         currentParamsText = view.findViewById(R.id.tv_current_params);
         hardwareInfoText = view.findViewById(R.id.tv_hardware_info);
         
@@ -408,24 +406,6 @@ public class ResolutionSettingsFragment extends Fragment {
     }
 
     /**
-     * 显示当前生效的帧率。
-     *
-     * <p>这里原来是第二个「录制帧率」下拉框（标准/低）。它和设置页里的那个
-     * 从来就不是两个独立设置 —— {@link AppConfig#getActualFrameRate(int)} 会先看
-     * 设置页选的具体帧率，只有那里选「原始帧率」时才轮得到标准/低。
-     * 于是两个同名控件里有一个在悄悄压过另一个。现在只保留设置页那一个，
-     * 这里改成显示生效值，本页的码率估算仍然要用到它。</p>
-     */
-    private void updateFramerateDescription() {
-        if (framerateDescText == null || appConfig == null) {
-            return;
-        }
-        String choice = AppConfig.getRecordFpsDisplayName(appConfig.getRecordFps());
-        framerateDescText.setText(String.format("当前：%s（实际约 %dfps）",
-                choice, getSelectedFrameRate()));
-    }
-
-    /**
      * 硬件支持的最大帧率；读不到时按 30 估。
      */
     private int getHardwareMaxFps() {
@@ -532,14 +512,15 @@ public class ResolutionSettingsFragment extends Fragment {
         // 当前配置
         String targetRes = appConfig.getTargetResolution();
         String bitrateLevel = AppConfig.getBitrateLevelDisplayName(appConfig.getBitrateLevel());
-        String framerateLevel = AppConfig.getFramerateLevelDisplayName(appConfig.getFramerateLevel());
-        int standardFps = getStandardFrameRate();
-        int actualFps = appConfig.getActualFrameRate(standardFps);
+        // 帧率要显示用户真正选的那个。这里原来读的是旧的「标准/低」等级 ——
+        // 两个帧率控件合并之后它恒为「标准」，跟实际设置完全脱节。
+        String framerateChoice = AppConfig.getRecordFpsDisplayName(appConfig.getRecordFps());
+        int actualFps = appConfig.getActualFrameRate(getHardwareMaxFps());
         
         sb.append("【当前配置】\n");
         sb.append("目标分辨率: ").append(AppConfig.RESOLUTION_DEFAULT.equals(targetRes) ? "默认 (1280×800)" : targetRes).append("\n");
         sb.append("码率等级: ").append(bitrateLevel).append("\n");
-        sb.append("帧率等级: ").append(framerateLevel).append(" (").append(actualFps).append("fps)");
+        sb.append("录制帧率: ").append(framerateChoice).append(" (实际约 ").append(actualFps).append("fps)");
 
         currentParamsText.setText(sb.toString());
     }

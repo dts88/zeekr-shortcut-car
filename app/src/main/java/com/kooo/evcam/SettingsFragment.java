@@ -76,12 +76,10 @@ public class SettingsFragment extends Fragment {
     // 悬浮窗相关
     private SwitchMaterial floatingWindowSwitch;
     private LinearLayout floatingWindowSettingsLayout;
-    private Spinner floatingWindowSizeSpinner;
+    private SeekBar floatingWindowSizeSeekBar;
+    private TextView floatingWindowSizeValueText;
     private SeekBar floatingWindowAlphaSeekBar;
     private TextView floatingWindowAlphaText;
-    private static final String[] FLOATING_SIZE_OPTIONS = {"超小", "特小", "小", "中", "大", "超大", "特大", "特特大", "PLUS大", "MAX大"};
-    private boolean isInitializingFloatingSize = false;
-    private int lastAppliedFloatingSize = -1;  // 记录上次应用的大小，避免重复触发
     
     // 车型配置相关
     private Spinner carModelSpinner;
@@ -499,7 +497,8 @@ public class SettingsFragment extends Fragment {
     private void initFloatingWindowSettings(View view) {
         floatingWindowSwitch = view.findViewById(R.id.switch_floating_window);
         floatingWindowSettingsLayout = view.findViewById(R.id.layout_floating_window_settings);
-        floatingWindowSizeSpinner = view.findViewById(R.id.spinner_floating_window_size);
+        floatingWindowSizeSeekBar = view.findViewById(R.id.seekbar_floating_window_size);
+        floatingWindowSizeValueText = view.findViewById(R.id.text_floating_window_size_value);
         floatingWindowAlphaSeekBar = view.findViewById(R.id.seekbar_floating_window_alpha);
         floatingWindowAlphaText = view.findViewById(R.id.tv_floating_window_alpha_value);
         
@@ -543,133 +542,61 @@ public class SettingsFragment extends Fragment {
         });
         
         // 初始化悬浮窗大小选择器
-        initFloatingWindowSizeSpinner();
+        initFloatingWindowSizeSeekBar();
         
         // 初始化悬浮窗透明度滑块
         initFloatingWindowAlphaSeekBar();
     }
 
-    private void initFloatingWindowSizeSpinner() {
-        if (floatingWindowSizeSpinner == null || getContext() == null) {
+    /**
+     * 悬浮窗按钮大小。
+     *
+     * <p>原来是十档命名下拉框（超小/特小/小/中/大/超大/特大/特特大/PLUS大/MAX大）——
+     * 一个数字配十个名字，而名字并不比数字多说明什么。录制悬浮按钮那边早就是滑块 +
+     * dp 读数，这里改成同一种，顺便让设置页少一套词汇。</p>
+     */
+    private void initFloatingWindowSizeSeekBar() {
+        if (floatingWindowSizeSeekBar == null || getContext() == null || appConfig == null) {
             return;
         }
-        
-        isInitializingFloatingSize = true;
-        
-        // 记录当前保存的大小值
-        lastAppliedFloatingSize = appConfig.getFloatingWindowSize();
-        
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                getContext(),
-                R.layout.spinner_item,
-                FLOATING_SIZE_OPTIONS
-        );
-        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-        floatingWindowSizeSpinner.setAdapter(adapter);
-        
-        floatingWindowSizeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+
+        int currentSize = appConfig.getFloatingWindowSize();
+        floatingWindowSizeSeekBar.setProgress(currentSize);
+        if (floatingWindowSizeValueText != null) {
+            floatingWindowSizeValueText.setText(currentSize + "dp");
+        }
+
+        floatingWindowSizeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                int sizeDp;
-                String sizeName;
-                switch (position) {
-                    case 0:
-                        sizeDp = AppConfig.FLOATING_SIZE_TINY;
-                        sizeName = "超小";
-                        break;
-                    case 1:
-                        sizeDp = AppConfig.FLOATING_SIZE_EXTRA_SMALL;
-                        sizeName = "特小";
-                        break;
-                    case 2:
-                        sizeDp = AppConfig.FLOATING_SIZE_SMALL;
-                        sizeName = "小";
-                        break;
-                    case 3:
-                        sizeDp = AppConfig.FLOATING_SIZE_MEDIUM;
-                        sizeName = "中";
-                        break;
-                    case 4:
-                        sizeDp = AppConfig.FLOATING_SIZE_LARGE;
-                        sizeName = "大";
-                        break;
-                    case 5:
-                        sizeDp = AppConfig.FLOATING_SIZE_EXTRA_LARGE;
-                        sizeName = "超大";
-                        break;
-                    case 6:
-                        sizeDp = AppConfig.FLOATING_SIZE_HUGE;
-                        sizeName = "特大";
-                        break;
-                    case 7:
-                        sizeDp = AppConfig.FLOATING_SIZE_GIANT;
-                        sizeName = "特特大";
-                        break;
-                    case 8:
-                        sizeDp = AppConfig.FLOATING_SIZE_PLUS;
-                        sizeName = "PLUS大";
-                        break;
-                    default:
-                        sizeDp = AppConfig.FLOATING_SIZE_MAX;
-                        sizeName = "MAX大";
-                        break;
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int size = clampFloatingSize(progress);
+                if (floatingWindowSizeValueText != null) {
+                    floatingWindowSizeValueText.setText(size + "dp");
                 }
-                
-                // 初始化阶段不处理
-                if (isInitializingFloatingSize) {
-                    return;
-                }
-                
-                // 与上次应用的值相同，不重复处理
-                if (sizeDp == lastAppliedFloatingSize) {
-                    return;
-                }
-                
-                lastAppliedFloatingSize = sizeDp;
-                appConfig.setFloatingWindowSize(sizeDp);
-                
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                // 松手时才落盘，拖动过程中不反复写 SharedPreferences
+                int size = clampFloatingSize(seekBar.getProgress());
+                appConfig.setFloatingWindowSize(size);
                 if (getContext() != null && appConfig.isFloatingWindowEnabled()) {
                     FloatingWindowService.sendUpdateFloatingWindow(getContext());
-                    Toast.makeText(getContext(), "悬浮窗大小已设置为「" + sizeName + "」", Toast.LENGTH_SHORT).show();
                 }
             }
-            
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-        
-        // 根据当前保存的尺寸确定选中项
-        int currentSize = appConfig.getFloatingWindowSize();
-        int selectedIndex;
-        if (currentSize <= AppConfig.FLOATING_SIZE_TINY) {
-            selectedIndex = 0;  // 超小
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_EXTRA_SMALL) {
-            selectedIndex = 1;  // 特小
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_SMALL) {
-            selectedIndex = 2;  // 小
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_MEDIUM) {
-            selectedIndex = 3;  // 中
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_LARGE) {
-            selectedIndex = 4;  // 大
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_EXTRA_LARGE) {
-            selectedIndex = 5;  // 超大
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_HUGE) {
-            selectedIndex = 6;  // 特大
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_GIANT) {
-            selectedIndex = 7;  // 特特大
-        } else if (currentSize <= AppConfig.FLOATING_SIZE_PLUS) {
-            selectedIndex = 8;  // PLUS大
-        } else {
-            selectedIndex = 9;  // MAX大
-        }
-        floatingWindowSizeSpinner.setSelection(selectedIndex);
-        
-        floatingWindowSizeSpinner.post(() -> {
-            isInitializingFloatingSize = false;
         });
     }
-    
+
+    /** 悬浮窗按钮大小的取值范围，与原来十档命名的首尾一致。 */
+    private static int clampFloatingSize(int dp) {
+        return Math.max(AppConfig.FLOATING_SIZE_TINY,
+                Math.min(AppConfig.FLOATING_SIZE_MAX, dp));
+    }
+
     /**
      * 初始化悬浮窗透明度滑块
      */
@@ -1329,7 +1256,7 @@ public class SettingsFragment extends Fragment {
                 appConfig.resetRecordingFloatingLayout();
                 restartFloatingServices();
                 // 尺寸滑块/选择器要跟着回到默认值
-                initFloatingWindowSizeSpinner();
+                initFloatingWindowSizeSeekBar();
                 initFloatingWindowAlphaSeekBar();
                 if (getContext() != null) {
                     Toast.makeText(getContext(),
