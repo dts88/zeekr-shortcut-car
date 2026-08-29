@@ -2112,80 +2112,65 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 极氪7X 多路：环视合成流 + 两路座舱摄像头。
+     * 「环视 + 座舱 3 路」模式的相机初始化。
      *
-     * <p>合成流那一路仍然按能力查找；剩下的相机按 id 顺序补进「座舱 1 / 座舱 2」。
-     * 哪一路是后座、哪一路是主驾目前无法从 Camera2 的信息判断（朝向都可能报 EXTERNAL），
-     * 所以先按顺序排，实车看过画面后再决定要不要加一个交换选项。
-     * 诊断页会列出每路相机的完整能力，便于确认。</p>
+     * <p>槽位分配交给 {@link com.kooo.evcam.zeekr.ZeekrMultiPlan}（纯逻辑、有单元测试），
+     * 这里只负责套用与显示。</p>
+     *
+     * <p><b>这里不再强制环视走 1280×5140。</b>三路一起黑（连合成流都看不到）最可能
+     * 就是它造成的：单路模式下只有一路相机，6.6MP 随便用；三路同开时，这一路再加两路
+     * 座舱很可能超出 HAL 的并发流预算，而会话配置失败是整组一起失败 ——
+     * 表现就是三个画面全黑。用户在「自定义」配置下能看到这三路，两者的差别正好就是
+     * 有没有强制这个尺寸。</p>
+     *
+     * <p>不指定尺寸时 {@code chooseOptimalSize} 会去够 1280×800，负担轻得多。
+     * 至于还要不要拆成四宫格，交给实际协商到的尺寸决定：
+     * {@link com.kooo.evcam.zeekr.FourLaneContainer} 会忽略任何不像合成条带的尺寸，
+     * 于是直接显示原始画面，而不是把一张普通图切成四块错的。</p>
      */
     private void initCamerasForZeekrMulti(CameraManager cm, String[] cameraIds) {
         com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
                 com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
         AppLog.i(TAG, "极氪多路探测结果:\n" + located.diagnostics);
 
-        String compositeId = located.found() ? located.cameraId : null;
-        if (located.found()) {
-            if (compositeContainer != null) {
-                compositeContainer.setSourceSize(located.size);
-            }
-        } else {
-            AppLog.w(TAG, "未找到合成流，多路配置将只使用普通相机");
+        com.kooo.evcam.zeekr.ZeekrMultiPlan plan = com.kooo.evcam.zeekr.ZeekrMultiPlan.build(
+                cameraIds,
+                located.found() ? located.cameraId : null,
+                appConfig.getCameraOverride("front"),
+                appConfig.getCameraOverride("back"),
+                appConfig.getCameraOverride("left"));
+
+        AppLog.i(TAG, "极氪多路槽位分配:\n" + plan.explanation + "-> " + plan);
+
+        if (plan.assignedCount() == 0) {
+            AppLog.w(TAG, "没有任何可用相机，三路模式无法显示");
             runOnUiThread(() -> Toast.makeText(this,
                     R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show());
         }
-        updateCompositeInfoOverlay(located.diagnostics);
 
-        // 其余相机按 id 顺序补进两个座舱槽位
-        java.util.List<String> others = new java.util.ArrayList<>();
-        for (String id : cameraIds) {
-            if (!id.equals(compositeId)) {
-                others.add(id);
-            }
+        // 合成流的几何先按探测结果给上；若最终协商到的不是条带尺寸，
+        // onPreviewSizeChosen 那一路会保持原样显示（容器会忽略非条带尺寸）
+        if (plan.compositeIsReal && compositeContainer != null) {
+            compositeContainer.setSourceSize(located.size);
         }
-        if (compositeId == null && !others.isEmpty()) {
-            // 没有合成流时，第一路顶上主画面，避免整个界面空着
-            compositeId = others.remove(0);
-        }
-
-        String cabin1 = others.size() > 0 ? others.get(0) : null;
-        String cabin2 = others.size() > 1 ? others.get(1) : null;
-
-        // 手动指定优先。Camera2 分不出后排/驾驶位，自动分配只是按 id 顺序猜，
-        // 所以允许直接指定 —— 这也是排查三路黑屏最直接的手段。
-        String ovFront = appConfig.getCameraOverride("front");
-        String ovBack = appConfig.getCameraOverride("back");
-        String ovLeft = appConfig.getCameraOverride("left");
-        if (ovFront != null) {
-            compositeId = ovFront;
-        }
-        if (ovBack != null) {
-            cabin1 = ovBack;
-        }
-        if (ovLeft != null) {
-            cabin2 = ovLeft;
-        }
-        if (ovFront != null || ovBack != null || ovLeft != null) {
-            AppLog.i(TAG, "使用手动指定的相机映射");
-        }
-        AppLog.i(TAG, "极氪多路映射: 环视=" + compositeId
-                + ", 座舱1=" + cabin1 + ", 座舱2=" + cabin2
-                + "（共 " + cameraIds.length + " 路可用）");
 
         cameraManager.initCameras(
-                compositeId, textureFront,
-                cabin1, textureBack,
-                cabin2, textureLeft,
+                plan.compositeId, textureFront,
+                plan.cabin1Id, textureBack,
+                plan.cabin2Id, textureLeft,
                 null, null);
 
-        // 只有合成流那一路需要 1280x5140；两路座舱相机根本不支持这个尺寸，
-        // 让它们各自按默认逻辑挑，否则会被逼着去够一个不存在的分辨率。
-        if (located.found()) {
-            com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
-            if (cam != null) {
-                cam.setPreferredSize(located.size);
-            }
-        }
+        updateCompositeInfoOverlay(describeMultiSlots(plan));
+    }
+
+    /** 三路模式下把槽位分配显示在画面上——黑屏时这是最直接的线索。 */
+    private String describeMultiSlots(com.kooo.evcam.zeekr.ZeekrMultiPlan plan) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("环视=").append(plan.compositeId);
+        sb.append(plan.compositeIsReal ? "(合成流)" : "(普通相机)");
+        sb.append("  座舱1=").append(plan.cabin1Id);
+        sb.append("  座舱2=").append(plan.cabin2Id);
+        return sb.toString();
     }
 
     /**

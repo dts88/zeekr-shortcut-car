@@ -1,0 +1,34 @@
+<!--
+  极氪即刻的图标前景：四宫格 + 录制点。
+
+  取自这个应用实际在做的事 —— 把一路环视合成流拆成四宫格并录下来。
+  之前一直沿用 EVCam 的图标，那是别人的品牌标识；GPL 管的是代码，不含商标与图标。
+
+  108x108 是自适应图标的画布，安全区是以 (54,54) 为心、半径 36 的圆。
+  所有笔画都收在半径 34 以内，任何遮罩形状下都不会被切掉。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 四宫格：左上 / 右上 / 左下 / 右下 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,30 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M59,30 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,49 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M59,49 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
+
+    <!-- 录制点 -->
+    <path
+        android:fillColor="#FF3B30"
+        android:pathData="M48,76 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z" />
+</vector>

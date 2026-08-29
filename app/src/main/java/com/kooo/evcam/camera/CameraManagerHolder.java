@@ -160,7 +160,7 @@ public class CameraManagerHolder {
         } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
             initCamerasForZeekrComposite(cm, cameraIds);
         } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            initCamerasForZeekrMulti(cm, cameraIds);
+            initCamerasForZeekrMulti(appConfig, cm, cameraIds);
         } else if (appConfig.isCustomCarModel()) {
             initCamerasForCustomModel(appConfig, cameraIds);
         } else {
@@ -196,38 +196,34 @@ public class CameraManagerHolder {
     }
 
     /**
-     * 极氪7X 多路的后台初始化：合成流 + 其余两路，映射规则与前台一致。
+     * 极氪7X 多路的后台初始化。
+     *
+     * <p>与前台共用 {@link com.kooo.evcam.zeekr.ZeekrMultiPlan}。以前这里各写了一份，
+     * 规则还不一致 —— 后台这份根本不看手动指定的相机映射，于是同一台车前后台分配
+     * 出来的槽位可能不同。</p>
+     *
+     * <p>同样不强制环视的完整分辨率，原因见前台那份的说明。</p>
      */
-    private void initCamerasForZeekrMulti(CameraManager cm, String[] cameraIds) {
+    private void initCamerasForZeekrMulti(AppConfig cfg, CameraManager cm, String[] cameraIds) {
         if (cameraIds.length == 0) {
             return;
         }
         com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
                 com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
-        String compositeId = located.found() ? located.cameraId : null;
 
-        java.util.List<String> others = new java.util.ArrayList<>();
-        for (String id : cameraIds) {
-            if (!id.equals(compositeId)) {
-                others.add(id);
-            }
-        }
-        if (compositeId == null && !others.isEmpty()) {
-            compositeId = others.remove(0);
-        }
+        com.kooo.evcam.zeekr.ZeekrMultiPlan plan = com.kooo.evcam.zeekr.ZeekrMultiPlan.build(
+                cameraIds,
+                located.found() ? located.cameraId : null,
+                cfg.getCameraOverride("front"),
+                cfg.getCameraOverride("back"),
+                cfg.getCameraOverride("left"));
 
         cameraManager.initCameras(
-                compositeId, null,
-                others.size() > 0 ? others.get(0) : null, null,
-                others.size() > 1 ? others.get(1) : null, null,
+                plan.compositeId, null,
+                plan.cabin1Id, null,
+                plan.cabin2Id, null,
                 null, null);
-        if (located.found()) {
-            SingleCamera cam = cameraManager.getCamera("front");
-            if (cam != null) {
-                cam.setPreferredSize(located.size);
-            }
-        }
-        AppLog.i(TAG, "后台极氪多路映射: 环视=" + compositeId + ", 其余 " + others.size() + " 路");
+        AppLog.i(TAG, "后台极氪多路映射: " + plan);
     }
 
     private void initCamerasForGalaxyE5(String[] cameraIds) {

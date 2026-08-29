@@ -63,6 +63,7 @@ public final class DiagnosticsCollector {
         appendSignalSources(sb, context);
         appendStorage(sb, context);
         appendConfig(sb, context);
+        appendFloatingLayout(sb, context);
         appendLogcat(sb);
 
         sb.append('\n').append("===== 报告结束 =====").append('\n');
@@ -356,6 +357,85 @@ public final class DiagnosticsCollector {
                     cfg.getCustomSdCardPath() == null ? "(自动)" : cfg.getCustomSdCardPath()).append('\n');
         } catch (Exception e) {
             sb.append("!! 读取配置失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * 悬浮窗与悬浮按钮的位置、大小。
+     *
+     * <p>用途是「把手动调好的位置定为新的默认值」：先在车机上把各个悬浮元素拖到
+     * 合适的位置和大小，再导出这份报告，把本节的数字发回来，就能写进代码当默认值。</p>
+     *
+     * <p>所以这里同时给出<b>当前值</b>与<b>现行默认值</b> —— 只有能看出差别，
+     * 才知道哪些需要改。位置是像素，同时附上屏幕尺寸与密度，换算才有依据。</p>
+     */
+    private static void appendFloatingLayout(StringBuilder sb, Context context) {
+        sb.append("## 8. 悬浮窗位置与大小").append('\n');
+        sb.append("把悬浮元素拖到合适位置后导出本报告，把这一节发回即可设为默认值。").append('\n');
+        try {
+            AppConfig cfg = new AppConfig(context);
+
+            android.util.DisplayMetrics dm = context.getResources().getDisplayMetrics();
+            sb.append('\n').append("[屏幕]").append('\n');
+            sb.append("     尺寸: ").append(dm.widthPixels).append(" x ").append(dm.heightPixels)
+                    .append(" px").append('\n');
+            sb.append("     密度: ").append(dm.density).append("  (1dp = ")
+                    .append(dm.density).append("px, densityDpi=").append(dm.densityDpi)
+                    .append(")").append('\n');
+
+            sb.append('\n').append("[主屏悬浮窗]").append('\n');
+            sb.append("     开关: ").append(cfg.isMainFloatingEnabled() ? "开" : "关").append('\n');
+            sb.append("     摄像头: ").append(cfg.getMainFloatingCamera()).append('\n');
+            appendValueVsDefault(sb, "位置 X", cfg.getMainFloatingX(), 100);
+            appendValueVsDefault(sb, "位置 Y", cfg.getMainFloatingY(), 100);
+            appendValueVsDefault(sb, "宽度", cfg.getMainFloatingWidth(), 480);
+            appendValueVsDefault(sb, "高度", cfg.getMainFloatingHeight(), 320);
+
+            sb.append('\n').append("[录制悬浮按钮]").append('\n');
+            int rx = cfg.getRecordingFloatingX();
+            int ry = cfg.getRecordingFloatingY();
+            sb.append("     开关: ").append(cfg.isRecordingFloatingEnabled() ? "开" : "关").append('\n');
+            if (rx < 0 || ry < 0) {
+                sb.append("     位置: 尚未拖动过（使用内置默认位置）").append('\n');
+            } else {
+                sb.append("     位置 X = ").append(rx).append(" px").append('\n');
+                sb.append("     位置 Y = ").append(ry).append(" px").append('\n');
+            }
+            sb.append("     按钮大小 = ").append(cfg.getRecordingFloatingButtonSizeDp())
+                    .append(" dp").append('\n');
+            sb.append("     时间字号 = ").append(cfg.getRecordingFloatingTimeTextSizeSp())
+                    .append(" sp").append('\n');
+
+            sb.append('\n').append("[小窗（补盲/画中画）]").append('\n');
+            int fx = cfg.getFloatingWindowX();
+            int fy = cfg.getFloatingWindowY();
+            if (fx < 0 || fy < 0) {
+                sb.append("     位置: 尚未拖动过（使用内置默认位置）").append('\n');
+            } else {
+                sb.append("     位置 X = ").append(fx).append(" px").append('\n');
+                sb.append("     位置 Y = ").append(fy).append(" px").append('\n');
+            }
+            sb.append("     大小档位 = ").append(cfg.getFloatingWindowSize()).append('\n');
+            sb.append("     透明度 = ").append(cfg.getFloatingWindowAlpha()).append('\n');
+
+            sb.append('\n').append(">> 要把当前位置设为默认值，请把以上三组数字连同屏幕尺寸一起发回。")
+                    .append('\n');
+            sb.append(">> 注意：位置是像素值，只在同尺寸屏幕上通用；屏幕尺寸变了需要重新取。")
+                    .append('\n');
+        } catch (Throwable t) {
+            sb.append("!! 读取失败: ").append(t).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /** 当前值与默认值并排显示；相同就标出来，一眼能看出哪些是手动调过的。 */
+    private static void appendValueVsDefault(StringBuilder sb, String label, int value, int fallback) {
+        sb.append("     ").append(label).append(" = ").append(value);
+        if (value == fallback) {
+            sb.append("  (与当前默认值相同)");
+        } else {
+            sb.append("  (当前默认值 ").append(fallback).append(")");
         }
         sb.append('\n');
     }

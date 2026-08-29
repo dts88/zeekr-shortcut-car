@@ -1,0 +1,36 @@
+<!--
+  侧边菜单头部用的图标：与启动图标同一套记号，但自带背景，
+  因为它显示在渐变底色上，没有自适应图标的背景层可用。
+
+  这里画满整个画布（不受自适应图标安全区限制），所以四宫格比启动图标略大一些。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 圆角方形底 -->
+    <path
+        android:fillColor="#10151D"
+        android:pathData="M22,4 h64 a18,18 0 0 1 18,18 v64 a18,18 0 0 1 -18,18 h-64 a18,18 0 0 1 -18,-18 v-64 a18,18 0 0 1 18,-18 z" />
+
+    <!-- 四宫格 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,26 h21 a3,3 0 0 1 3,3 v13 a3,3 0 0 1 -3,3 h-21 a3,3 0 0 1 -3,-3 v-13 a3,3 0 0 1 3,-3 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M59,26 h21 a3,3 0 0 1 3,3 v13 a3,3 0 0 1 -3,3 h-21 a3,3 0 0 1 -3,-3 v-13 a3,3 0 0 1 3,-3 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,51 h21 a3,3 0 0 1 3,3 v13 a3,3 0 0 1 -3,3 h-21 a3,3 0 0 1 -3,-3 v-13 a3,3 0 0 1 3,-3 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M59,51 h21 a3,3 0 0 1 3,3 v13 a3,3 0 0 1 -3,3 h-21 a3,3 0 0 1 -3,-3 v-13 a3,3 0 0 1 3,-3 z" />
+
+    <!-- 录制点 -->
+    <path
+        android:fillColor="#FF3B30"
+        android:pathData="M46,84 a8,8 0 1 0 16,0 a8,8 0 1 0 -16,0 z" />
+</vector>

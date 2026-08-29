@@ -86,12 +86,17 @@ public class SettingsFragment extends Fragment {
     // 车型配置相关
     private Spinner carModelSpinner;
     private Button customCameraConfigButton;
-    // 只保留极氪配置；银河/星舰/手机/自定义等上游车型与本项目无关，已隐藏。
+    // 只保留极氪配置加「自定义」；银河/星舰/手机等上游车型与本项目无关，已隐藏。
     // 对应的代码仍在（AppConfig 的常量与 MainActivity 的分支），改回来只需恢复这个数组。
+    //
+    // 「自定义」是排查用的：它不做任何极氪专属处理（不探测合成流、不强制分辨率、
+    // 不走四宫格容器），单纯按数量把相机铺开。三路模式黑屏时，用它可以确认
+    // 「到底是相机开不起来，还是极氪那套处理有问题」——目前已知在它下面三路都能看到。
     private static final String[] CAR_MODEL_OPTIONS =
-            {"极氪7X（环视合成流）", "极氪7X（环视+座舱3路）"};
+            {"极氪7X（环视合成流）", "极氪7X（环视+座舱3路）", "自定义（排查用）"};
     private static final String[] CAR_MODEL_VALUES =
-            {AppConfig.CAR_MODEL_ZEEKR_7X, AppConfig.CAR_MODEL_ZEEKR_7X_MULTI};
+            {AppConfig.CAR_MODEL_ZEEKR_7X, AppConfig.CAR_MODEL_ZEEKR_7X_MULTI,
+                    AppConfig.CAR_MODEL_CUSTOM};
     private boolean isInitializingCarModel = false;
     private String lastAppliedCarModel = null;
     
@@ -940,8 +945,9 @@ public class SettingsFragment extends Fragment {
                 String newModel = CAR_MODEL_VALUES[position];
                 String modelName = CAR_MODEL_OPTIONS[position];
 
-                // 极氪配置都不需要自定义摄像头映射
-                updateCustomConfigButtonVisibility(false);
+                // 只有「自定义」需要摄像头数量/布局配置；极氪两档是固定映射
+                updateCustomConfigButtonVisibility(
+                        AppConfig.CAR_MODEL_CUSTOM.equals(newModel));
 
                 if (isInitializingCarModel) {
                     return;
@@ -980,6 +986,8 @@ public class SettingsFragment extends Fragment {
             }
         }
         carModelSpinner.setSelection(selectedIndex);
+        updateCustomConfigButtonVisibility(
+                AppConfig.CAR_MODEL_CUSTOM.equals(currentModel));
         
         carModelSpinner.post(() -> {
             isInitializingCarModel = false;
