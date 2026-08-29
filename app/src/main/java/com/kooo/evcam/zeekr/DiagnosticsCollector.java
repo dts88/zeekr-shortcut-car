@@ -240,7 +240,10 @@ public final class DiagnosticsCollector {
                     java.util.Set<java.util.Set<String>> sets = cm.getConcurrentCameraIds();
                     if (sets == null || sets.isEmpty()) {
                         sb.append("系统未声明任何并发组合").append('\n');
-                        sb.append("  >> 这通常意味着一次只保证打开一路相机。").append('\n');
+                        sb.append("  >> 注意：这只说明 HAL 没有「保证」任何组合，"
+                                + "不等于不允许并发。").append('\n');
+                        sb.append("  >> 实测：自定义配置下三路画面可以同时显示，"
+                                + "所以并发本身是可行的，只是没写进声明。").append('\n');
                     } else {
                         sb.append(sets).append('\n');
                         boolean tripleOk = false;
@@ -264,10 +267,10 @@ public final class DiagnosticsCollector {
             sb.append("说明：座舱两路是按相机 id 顺序取的，不保证对应后排/驾驶位。").append('\n');
             sb.append("若 3 路配置显示不出画面，需要确认的是：").append('\n');
             sb.append("  a) 上面这两路 id 是不是真的对应后排/驾驶位摄像头；").append('\n');
-            sb.append("  b) 车机是否允许同时打开合成流 + 这两路"
-                    + "（合成流很大，HAL 可能不支持这种组合）。").append('\n');
-            sb.append("  对照：用其他车型配置能显示这两路时，说明相机本身可用，"
-                    + "问题就在分配或并发组合上。").append('\n');
+            sb.append("  b) 三路同开时合成流会不会被降级或拒绝"
+                    + "（它比另外两路大得多）。").append('\n');
+            sb.append("  已知：自定义配置下三路可以同时出画面，"
+                    + "所以相机本身与并发都不是障碍。").append('\n');
         } catch (Exception e) {
             sb.append("!! 分配预览失败: ").append(e).append('\n');
         }
@@ -371,20 +374,31 @@ public final class DiagnosticsCollector {
      * 才知道哪些需要改。位置是像素，同时附上屏幕尺寸与密度，换算才有依据。</p>
      */
     private static void appendFloatingLayout(StringBuilder sb, Context context) {
-        sb.append("## 8. 悬浮窗位置与大小").append('\n');
+        sb.append("## 7. 悬浮窗位置与大小").append('\n');
         sb.append("把悬浮元素拖到合适位置后导出本报告，把这一节发回即可设为默认值。").append('\n');
         try {
             AppConfig cfg = new AppConfig(context);
 
             android.util.DisplayMetrics dm = context.getResources().getDisplayMetrics();
             sb.append('\n').append("[屏幕]").append('\n');
-            sb.append("     尺寸: ").append(dm.widthPixels).append(" x ").append(dm.heightPixels)
-                    .append(" px").append('\n');
+            sb.append("     应用可用区域: ").append(dm.widthPixels).append(" x ")
+                    .append(dm.heightPixels).append(" px（不含状态栏/导航栏）").append('\n');
+            // 悬浮窗用的是整屏坐标，只报可用区域会让人把位置算错一整条系统栏
+            try {
+                android.view.WindowManager wm = (android.view.WindowManager)
+                        context.getSystemService(Context.WINDOW_SERVICE);
+                android.util.DisplayMetrics real = new android.util.DisplayMetrics();
+                wm.getDefaultDisplay().getRealMetrics(real);
+                sb.append("     整屏: ").append(real.widthPixels).append(" x ")
+                        .append(real.heightPixels).append(" px（悬浮窗坐标用这个）").append('\n');
+            } catch (Throwable t) {
+                sb.append("     整屏尺寸读取失败: ").append(t).append('\n');
+            }
             sb.append("     密度: ").append(dm.density).append("  (1dp = ")
                     .append(dm.density).append("px, densityDpi=").append(dm.densityDpi)
                     .append(")").append('\n');
 
-            sb.append('\n').append("[主屏悬浮窗]").append('\n');
+            sb.append('\n').append("[主屏悬浮窗（摄像头画面窗口）]").append('\n');
             sb.append("     开关: ").append(cfg.isMainFloatingEnabled() ? "开" : "关").append('\n');
             sb.append("     摄像头: ").append(cfg.getMainFloatingCamera()).append('\n');
             appendValueVsDefault(sb, "位置 X", cfg.getMainFloatingX(), 100);
@@ -392,7 +406,7 @@ public final class DiagnosticsCollector {
             appendValueVsDefault(sb, "宽度", cfg.getMainFloatingWidth(), 480);
             appendValueVsDefault(sb, "高度", cfg.getMainFloatingHeight(), 320);
 
-            sb.append('\n').append("[录制悬浮按钮]").append('\n');
+            sb.append('\n').append("[录制悬浮按钮（开始/停止录制）]").append('\n');
             int rx = cfg.getRecordingFloatingX();
             int ry = cfg.getRecordingFloatingY();
             sb.append("     开关: ").append(cfg.isRecordingFloatingEnabled() ? "开" : "关").append('\n');
@@ -407,7 +421,10 @@ public final class DiagnosticsCollector {
             sb.append("     时间字号 = ").append(cfg.getRecordingFloatingTimeTextSizeSp())
                     .append(" sp").append('\n');
 
-            sb.append('\n').append("[小窗（补盲/画中画）]").append('\n');
+            // 这一组键（floating_window_*）驱动的是 FloatingWindowService，
+            // 它画的是 FloatingButtonView —— 一个点击打开应用、随录制状态变色的
+            // 悬浮按钮，不是画中画小窗。上一版这里的名字是错的。
+            sb.append('\n').append("[悬浮按钮（打开应用/状态指示）]").append('\n');
             int fx = cfg.getFloatingWindowX();
             int fy = cfg.getFloatingWindowY();
             if (fx < 0 || fy < 0) {
@@ -444,7 +461,7 @@ public final class DiagnosticsCollector {
      * 抓一段本应用的 logcat，便于排查启动/相机错误。
      */
     private static void appendLogcat(StringBuilder sb) {
-        sb.append("## 7. 最近日志（本应用相关）").append('\n');
+        sb.append("## 8. 最近日志（本应用相关）").append('\n');
         try {
             Process p = Runtime.getRuntime().exec(
                     new String[]{"logcat", "-d", "-v", "time", "-t", String.valueOf(LOGCAT_MAX_LINES)});

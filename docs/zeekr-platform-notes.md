@@ -259,75 +259,49 @@ GPU / 内存带宽浪费。
 有耦合，删除风险高于收益；且其显示能力（悬浮窗 / 副屏）本身在极氪上可能有用，
 即使转向灯联动用不了。
 
-### 待验证：极氪能否读取转向灯 / 车门信号
+### 已验证：转向灯 / 车门信号读不到，卡在权限而不是 API
 
-#### 一个下早了的结论
+2026-08-29 的实机诊断报告给出了明确结论。经过两轮猜错的探测，答案是：
+**接口就在那里，能连上，只是权限拿不到。**
 
-第一份诊断报告显示「找不到 CarSignalManager」，据此报告了「读不到车辆信号」。
-**这个结论是错的**，因为探测方式本身就不对：当时是按几个猜出来的类名去
-`Class.forName`（`com.gwm.carsignal.CarSignalManager`、
-`com.geely.carsignal.CarSignalManager`、`com.zeekr.car.CarSignalManager` 等），
-一个都没命中就收工了。
+#### 两个被推翻的猜测
 
-而 EVCam 根本不是这样读信号的。读它的 `CarSignalManagerObserver` /
-`DoorSignalObserver` 才发现，真正的路径是走 binder 服务反射：
-
-```
-android.os.ServiceManager.getService("ecarxcar_service")
-  → ecarx.car.IECarXCar$Stub.asInterface(binder)
-  → ecarx.car.ECarXCar.createCar(context, iECarXCar)
-  → car.getCarManager("car_signal", iECarXCar)
-  → getIndcrSts()      // 转向灯
-    getDoorDrvrSts()   // 主驾门
-    getDoorPassSts()   // 副驾门
-    getDoorLeReSts()   // 左后门
-    getDoorRiReSts()   // 右后门
-```
-
-关键在于**这里没有任何一个类叫 CarSignalManager** —— 类名探测再怎么试都不会
-命中。名字里的 `ecarx` 才是重点：ECARX 正是做极氪与吉利车机的那家公司
-（EVCC 的全称就是 **Ecarx** Vehicle Control Console，见 4.7）。
-既然极氪是 ECARX 平台，这条路在极氪上很可能是通的。
-
-EVCam 里还出现过第二条 ECARX 路径：
-`com.ecarx.xui.adaptapi.car.sensor.CarSensor`（有静态 `create` 方法）。
-
-> 以上均为**阅读公开源码得到的事实**（服务名、类名、方法名），
-> 未复制其任何实现代码。
-
-#### 现有的四条候选路径
-
-| 来源 | 现状 |
+| 猜测 | 实测 |
 |------|------|
-| ECARX `ecarxcar_service` | **主要候选**。EVCam 实际使用的路径，见上 |
-| ECARX `adaptapi CarSensor` | 次要候选，同为 ECARX 平台 API |
-| 标准 `android.car` | 上一份报告已确认**该类存在**，但还没往里走过 |
-| logcat 关键词 | EVCam 匹配 `data1 = <数字>` 与 `front turn signal:` |
-| ~~VHAL gRPC~~ | 已换成空实现，吉利专有，极氪上不存在（见 5.1） |
+| 按类名找 `CarSignalManager`（`com.gwm.*` / `com.geely.*` / `com.zeekr.*`） | 全部不存在 —— 而且这本来就不是 EVCam 的读法 |
+| ECARX 那条 binder 链（`ecarxcar_service` → `ecarx.car.ECarXCar`） | **服务和类都不存在**。极氪 7X 不走 ECARX 那套 |
 
-#### 探测实现
+`com.ecarx.xui.adaptapi.car.sensor.CarSensor` 同样不存在。
+EVCam 的三条路在这台车机上一条都不通。
 
-诊断报告第 4 节（`zeekr/VehicleSignalProbe.java`）把上面每条路都走一遍，
-逐步记录成败。每一项独立 try/catch —— 一条路失败不能中断整份报告。
+#### 实际可用的是标准 Android Automotive
 
-设计上有一条贯穿始终的原则：**枚举，而不是猜**。
+```
+android.car.Car                     存在
+Car.createCar(context)              成功
+car.getCarManager("property")       成功
+CarPropertyManager.getPropertyList()  返回 0 条
+读 TURN_SIGNAL_STATE / DOOR_POS / PERF_VEHICLE_SPEED / GEAR_SELECTION
+  → SecurityException: requires android.car.permission.XXX
+```
 
-- `ServiceManager.listServices()` 列出全部 binder 服务，而不是猜服务名；
-- 拿到 manager 后列出**它上面所有无参 getter 及返回值**，而不是猜方法名；
-- `CarPropertyManager.getPropertyList()` 列出实际能访问的属性，
-  而不是猜属性 ID。
+也就是说：**API 正常工作，每一步都成功，最后被权限挡住。**
+属性清单返回 0 条也是同一个原因 —— 没有权限的属性不会出现在清单里。
 
-上一轮的教训就是猜错了名字还以为是「不存在」。
+需要的权限：`CAR_EXTERIOR_LIGHTS`（转向灯）、`CONTROL_CAR_DOORS`（车门）、
+`CAR_SPEED`（车速）、`CAR_POWERTRAIN`（档位/手刹/点火）。
+这些在 AOSP 里是 `signature|privileged` 级别 —— 需要与平台同签名，
+或者被预置到 `/system/priv-app`。**App Lab 里的第三方应用两个条件都不满足。**
 
-另外读 `SystemProperties`（`ro.product.*`、`ro.board.platform`、`ro.ecarx.*`）：
-App Lab 容器伪装了 `android.os.Build`（车机自称 Pixel 3a），
-但通常不伪装 SystemProperties，能看出真实平台是谁家的。
+已在 manifest 里声明这些权限。不是指望被授予，而是为了让结论有意义：
+`checkSelfPermission` 对「没声明」和「声明了但被拒」都返回 DENIED，
+不声明就分不清是哪一种。下一份报告会分别显示「已声明 / 已授予」两栏。
 
-**采集方式**：先打几次转向灯、开关一次车门，**然后立刻**导出诊断报告 ——
-logcat 那一节要有信号事件发生才会有内容。
+#### 结论对补盲模块意味着什么
 
-若四条路都拿不到信号，补盲的**联动**部分在极氪上就是死功能，
-只剩手动显示能力可用。
+**联动触发在极氪 7X 上做不了**（除非将来能拿到系统签名或预置安装）。
+补盲模块只剩手动触发可用。logcat 那条路也扫过 4855 行、0 命中 ——
+车机日志里没有可识别的信号事件。
 
 ### 待验证：主屏悬浮窗
 
@@ -335,14 +309,24 @@ logcat 那一节要有信号事件发生才会有内容。
 车机是否授予、悬浮窗是否会被系统 UI 遮挡或强制关闭、以及退到后台后是否还在。
 这项即使转向灯信号读不到也有价值：可以当作常驻的小窗环视画面。
 
-### 待验证：推送到副屏
+### 已确认：车机向应用暴露了三块屏
 
-**任务**：确认能否把画面推到副屏（`BlindSpotService` 里的 secondary display 逻辑，
-上游走 EVCC dashcast）。需要先确认极氪车机是否向应用暴露第二块 Display
-（`DisplayManager.getDisplays()`），以及是否允许应用在其上创建窗口。
-若可行，副屏常驻环视画面会是很实用的形态。
+2026-08-29 的诊断报告里 `DisplayManager.getDisplays()` 返回三块：
 
----
+| id | 类型 | 分辨率 | 状态 |
+|----|------|--------|------|
+| 0 | 内置屏幕 | 3200×2000 | ON |
+| 2 | HDMI 屏幕 | 2560×536 | ON |
+| 3 | HDMI 屏幕 | 1440×480 | ON |
+
+两块副屏都是 ON，说明它们是真实在用的显示设备，不是占位。
+2560×536 这个细长比例（约 4.8:1）与主屏下方的横条屏形态吻合，
+1440×480（3:1）则是另一块。**具体对应车上哪块屏，需要实机推一帧上去看。**
+
+**任务**：在这两块屏上建 `Presentation` 试推画面，确认
+（a）应用是否被允许在其上创建窗口，（b）各自对应车上哪一块。
+若可行，副屏常驻环视画面会是很实用的形态 —— 2560×536 正好适合放一条横向拼接的
+环视带。
 
 ## 4.7 StartX BLE 旋钮（待办，尚未实现）
 
@@ -404,6 +388,33 @@ StartX 是 **BLE 低功耗蓝牙旋钮**，EVCC 把它接进了自己的自动�
 这条线（见 NOTICE.md）。
 
 来源：<https://evcc.coauto.cc/static/evcc_user_guide.md>
+
+## 4.8 真实平台身份（容器伪装之下）
+
+App Lab 把应用跑在 `com.puneetlj.box` / `com.vlite.sdk` 容器里，
+`android.os.Build` 被伪装成 Google Pixel 3a（`sargo`）。
+`ro.product.*` 系列同样被伪装。
+
+**但 `ro.build.display.id` 没有被改**：
+
+```
+ro.build.display.id = zeekr_dhu_sa8295_ovs-userdebug 12 SQ3A.220705.003.A1 ...
+ro.board.platform   = msmnile
+```
+
+由此可知真实平台是 **极氪 DHU，高通 SA8295，Android 12**，且是 userdebug 构建。
+识别车机时应该读这一项，而不是 `Build.MODEL`。
+
+系统服务里还有几个极氪自有的 binder，尚未探明用途：
+
+- `vendor.zeekr.carsecurity.ICarSecurity/default`
+- `vehicledcservice`
+- `car_service`（标准 Android Automotive 的那个）
+
+下一份诊断报告会打印每个服务的 AIDL 接口描述符 —— 接口名比服务名更有指向性，
+是继续往下找的线索。
+
+---
 
 ## 5. 权限与网络
 

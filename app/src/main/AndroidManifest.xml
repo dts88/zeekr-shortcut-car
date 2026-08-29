@@ -42,6 +42,20 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <!-- 蓝牙权限（用于监听蓝牙状态变化，车机启动会自动连蓝牙） -->
+    <!--
+      车辆信号权限。诊断报告已确认 android.car.Car 在极氪 7X 上可以连上，
+      getCarManager("property") 也成功，只是每个属性都因缺权限被拒。
+
+      这些几乎肯定是 signature|privileged 级别，第三方应用拿不到。声明它们不是
+      指望被授予，而是为了让诊断结论有意义：checkSelfPermission 对「没声明」和
+      「声明了但被拒」都返回 DENIED，不声明就分不清这两种情况。
+    -->
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
+    <uses-permission android:name="android.car.permission.CONTROL_CAR_DOORS" />
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_LIGHTS" />
+    <uses-permission android:name="android.car.permission.CAR_ENERGY" />
+
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 

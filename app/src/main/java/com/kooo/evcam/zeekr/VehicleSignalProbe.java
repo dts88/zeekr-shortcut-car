@@ -139,9 +139,26 @@ public final class VehicleSignalProbe {
             if (interesting.isEmpty()) {
                 sb.append(">> 没有匹配的服务").append('\n');
             } else {
-                sb.append(">> 相关服务 (").append(interesting.size()).append("):").append('\n');
+                sb.append(">> 相关服务 (").append(interesting.size())
+                        .append(")，附各自的 AIDL 接口名:").append('\n');
+                // 接口描述符能直接说出这个 binder 背后是哪个 AIDL —— 比服务名本身
+                // 更有指向性，是下一步该去找什么类的线索。
+                Method getService = sm.getMethod("getService", String.class);
                 for (String name : interesting) {
-                    sb.append("     ").append(name).append('\n');
+                    sb.append("     ").append(name);
+                    try {
+                        Object binder = getService.invoke(null, name);
+                        if (binder == null) {
+                            sb.append("  (取不到 binder)");
+                        } else {
+                            Method descriptor = binder.getClass()
+                                    .getMethod("getInterfaceDescriptor");
+                            sb.append("  -> ").append(descriptor.invoke(binder));
+                        }
+                    } catch (Throwable t) {
+                        sb.append("  (接口名读取失败)");
+                    }
+                    sb.append('\n');
                 }
             }
         } catch (Throwable t) {
@@ -275,7 +292,20 @@ public final class VehicleSignalProbe {
         }
 
         // 车辆相关权限的授予情况 —— 读属性需要这些
-        sb.append("权限状态:").append('\n');
+        // 分别报告「我们声明了没有」和「系统给了没有」——
+        // checkSelfPermission 对这两种情况都返回 DENIED，只看它分不清是哪种。
+        java.util.Set<String> declared = new java.util.HashSet<>();
+        try {
+            android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(
+                    context.getPackageName(), PackageManager.GET_PERMISSIONS);
+            if (info.requestedPermissions != null) {
+                java.util.Collections.addAll(declared, info.requestedPermissions);
+            }
+        } catch (Throwable t) {
+            sb.append("     （读取本应用声明的权限失败: ").append(t).append("）").append('\n');
+        }
+
+        sb.append("权限状态（声明 / 授予）:").append('\n');
         for (String perm : new String[]{
                 "android.car.permission.CAR_POWERTRAIN",
                 "android.car.permission.CAR_SPEED",
@@ -289,8 +319,16 @@ public final class VehicleSignalProbe {
             } catch (Throwable ignored) {
                 // 权限名在本平台可能不存在
             }
-            sb.append("     ").append(granted ? "[已授予] " : "[未授予] ").append(perm).append('\n');
+            sb.append("     ")
+                    .append(declared.contains(perm) ? "[已声明] " : "[未声明] ")
+                    .append(granted ? "[已授予] " : "[未授予] ")
+                    .append(perm).append('\n');
         }
+        sb.append("     注：这些通常是 signature|privileged 级别，第三方应用拿不到。")
+                .append('\n');
+        sb.append("     若全部「已声明 + 未授予」，说明 API 可用而权限被系统挡住，")
+                .append('\n');
+        sb.append("     不是找错了 API。").append('\n');
 
         try {
             Class<?> carClass = Class.forName("android.car.Car");
