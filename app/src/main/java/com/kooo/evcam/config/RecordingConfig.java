@@ -18,9 +18,6 @@ public class RecordingConfig {
     public static final String BITRATE_MEDIUM = "medium";
     public static final String BITRATE_LOW = "low";
 
-    // 帧率等级
-    public static final String FRAMERATE_STANDARD = "standard";
-    public static final String FRAMERATE_LOW = "low";
 
     // 录制模式
     public static final String RECORDING_MODE_AUTO = "auto";
@@ -65,7 +62,6 @@ public class RecordingConfig {
     // SharedPreferences 键名
     private static final String KEY_RECORDING_MODE = "recording_mode";
     private static final String KEY_BITRATE_LEVEL = "bitrate_level";
-    private static final String KEY_FRAMERATE_LEVEL = "framerate_level";
     private static final String KEY_ENCODE_SCALE_FACTOR = "encode_scale_factor";
     private static final String KEY_TARGET_RESOLUTION = "target_resolution";
     private static final String KEY_SEGMENT_DURATION_MINUTES = "segment_duration_minutes";
@@ -228,22 +224,14 @@ public class RecordingConfig {
 
     // ========== 帧率配置 ==========
 
-    public String getFramerateLevel() {
-        return prefs.getString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD);
-    }
-
-    public void setFramerateLevel(String level) {
-        prefs.edit().putString(KEY_FRAMERATE_LEVEL, level).apply();
-        AppLog.d(TAG, "帧率等级设置: " + level);
-    }
-
+    /**
+     * 帧率现在只由「录制帧率」一个设置决定，见 {@code SettingsRegistry.RECORD_FPS}。
+     *
+     * <p>旧的「标准/低」等级已整体删除：它的界面在 0.6.1 合并两个帧率控件时就撤掉了，
+     * 此后只是为了被迁移而存在。</p>
+     */
     public int getActualFrameRate(int originalFrameRate) {
-        int frameRate = getStandardFrameRate(originalFrameRate);
-        if (FRAMERATE_LOW.equals(getFramerateLevel())) {
-            frameRate = frameRate / 2;
-            frameRate = Math.max(10, frameRate);
-        }
-        return frameRate;
+        return getStandardFrameRate(originalFrameRate);
     }
 
     public static int getStandardFrameRate(int frameRate) {
@@ -252,9 +240,6 @@ public class RecordingConfig {
         return frameRate;
     }
 
-    public static String getFramerateLevelDisplayName(String level) {
-        return FRAMERATE_LOW.equals(level) ? "低" : "标准";
-    }
 
     // ========== 编码缩放 ==========
 

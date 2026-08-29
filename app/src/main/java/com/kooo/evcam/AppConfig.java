@@ -330,19 +330,15 @@ public class AppConfig {
     public static final String BITRATE_HIGH = "high";      // 高码率（计算值的150%）
     
     // 帧率配置相关键名
-    private static final String KEY_FRAMERATE_LEVEL = "framerate_level";  // 帧率等级
     private static final String KEY_RECORD_FPS = "record_fps";  // 显式录制帧率（auto/30/24/20/15/10）
     private static final String KEY_DECOUPLE_PREVIEW = "decouple_preview_resolution";  // 预览与录制分辨率解耦
     private static final String KEY_RECORD_LAYOUT = "record_layout";  // 录制画面排列（raw/grid2x2）
     private static final String KEY_PREVIEW_RESOLUTION = "preview_resolution";  // 低分辨率预览的目标尺寸
     private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
     
-    // 帧率等级常量
-    public static final String FRAMERATE_STANDARD = "standard";  // 标准帧率（默认）
-    public static final String FRAMERATE_LOW = "low";            // 低帧率（标准值的一半）
 
-    // ---- 录制帧率：显式选择，优先级高于上面的帧率等级 ----
-    /** 跟随硬件/车型默认（即旧的帧率等级逻辑）。 */
+    // ---- 录制帧率：决定录制帧率的唯一设置 ----
+    /** 跟随硬件/车型默认。 */
     public static final String RECORD_FPS_AUTO = "auto";
     /** 可选的显式帧率，单位 fps。 */
     /** 由注册表派生，避免和 SettingsRegistry 各存一份而走偏。 */
@@ -822,13 +818,16 @@ public class AppConfig {
     
     
     /**
-     * 根据配置的帧率等级获取实际帧率
+     * 实际使用的录制帧率。
+     *
+     * <p>只由「录制帧率」一个设置决定：选「原始帧率」就跟随硬件，否则用选中的数值。
+     * 旧的「标准/低」等级已整体删除 —— 它的界面在 0.6.1 合并两个帧率控件时就撤掉了，
+     * 此后只是为了被迁移而存在，留着只会让「我到底在用多少帧录」多一个变量。</p>
+     *
      * @param hardwareMaxFps 硬件支持的最大帧率
      * @return 实际使用的帧率
      */
     public int getActualFrameRate(int hardwareMaxFps) {
-        migrateLegacyFramerateLevel(hardwareMaxFps);
-
         String explicit = getRecordFps();
         if (RECORD_FPS_AUTO.equals(explicit)) {
             return getStandardFrameRate(hardwareMaxFps);
@@ -840,53 +839,6 @@ public class AppConfig {
             AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，按原始帧率处理");
             return getStandardFrameRate(hardwareMaxFps);
         }
-    }
-
-    /**
-     * 把旧的「标准/低」等级一次性折算成具体帧率，之后再也不看它。
-     *
-     * <p>帧率现在只由 {@link #getRecordFps()} 一个设置决定。以前是两个设置共同决定、
-     * 其中一个还会悄悄压过另一个，导致「我到底在用多少帧录」这个问题要靠推演两者的
-     * 关系才能回答。老版本升上来的用户如果停在「低」，这里替他折算一次，
-     * 免得升级后帧率无声地翻倍。</p>
-     */
-    private void migrateLegacyFramerateLevel(int hardwareMaxFps) {
-        if (!prefs.contains(KEY_FRAMERATE_LEVEL)) {
-            return;
-        }
-        String level = prefs.getString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD);
-        boolean stillAuto = RECORD_FPS_AUTO.equals(getRecordFps());
-        if (stillAuto && FRAMERATE_LOW.equals(level)) {
-            int halved = Math.max(10, getStandardFrameRate(hardwareMaxFps) / 2);
-            // 折算结果未必正好是提供的档位之一（硬件标准 25fps 时算出来是 12），
-            // 就近吸附到一个真实存在的档位 —— 写一个列表里没有的值，
-            // 读的时候会被 sanitize 回 auto，等于这次迁移白做
-            String snapped = nearestOfferedFps(halved);
-            writeEnum(SettingsRegistry.RECORD_FPS, snapped);
-            AppLog.i(TAG, "旧的「低帧率」已折算为 " + snapped + "fps（计算值 " + halved + "）");
-        }
-        prefs.edit().remove(KEY_FRAMERATE_LEVEL).apply();
-    }
-
-    /** 把一个帧率数值吸附到最接近的、真实提供的档位。 */
-    private static String nearestOfferedFps(int fps) {
-        String best = SettingsRegistry.RECORD_FPS.defaultValue;
-        int bestDiff = Integer.MAX_VALUE;
-        for (String value : SettingsRegistry.RECORD_FPS.values()) {
-            if (RECORD_FPS_AUTO.equals(value)) {
-                continue;  // 「原始帧率」不是一个数，参与不了比较
-            }
-            try {
-                int diff = Math.abs(Integer.parseInt(value) - fps);
-                if (diff < bestDiff) {
-                    bestDiff = diff;
-                    best = value;
-                }
-            } catch (NumberFormatException ignored) {
-                // 不是数字就跳过
-            }
-        }
-        return best;
     }
 
     // ==================== 录制帧率（显式选择） ====================
@@ -907,7 +859,6 @@ public class AppConfig {
      */
     public void setRecordFps(String value) {
         writeEnum(SettingsRegistry.RECORD_FPS, value);
-        prefs.edit().remove(KEY_FRAMERATE_LEVEL).apply();
         AppLog.d(TAG, "录制帧率设置: " + value);
     }
 

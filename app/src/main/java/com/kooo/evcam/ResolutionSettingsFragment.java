@@ -478,7 +478,7 @@ public class ResolutionSettingsFragment extends Fragment {
             }
         }
 
-        // 获取帧率（根据用户选择的帧率等级）
+        // 获取帧率（来自「录制帧率」设置）
         int frameRate = getSelectedFrameRate();
 
         // 计算各等级码率

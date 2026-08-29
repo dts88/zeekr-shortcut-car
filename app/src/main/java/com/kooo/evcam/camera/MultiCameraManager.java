@@ -885,7 +885,7 @@ public class MultiCameraManager {
             AppLog.d(TAG, "Segment duration: " + (segmentDurationMs / 1000) + " seconds (" + appConfig.getSegmentDurationMinutes() + " minutes)");
         }
         
-        // 获取帧率配置（根据帧率等级设置计算）
+        // 获取帧率配置（来自「录制帧率」设置）
         int targetFrameRate = appConfig.getActualFrameRate(25);  // 使用25fps降低CPU占用
         AppLog.d(TAG, "Target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
@@ -1189,7 +1189,7 @@ public class MultiCameraManager {
             AppLog.d(TAG, "Codec segment duration: " + (segmentDurationMs / 1000) + " seconds (" + appConfig.getSegmentDurationMinutes() + " minutes)");
         }
         
-        // 获取帧率配置（根据帧率等级设置计算）
+        // 获取帧率配置（来自「录制帧率」设置）
         int targetFrameRate = appConfig.getActualFrameRate(25);  // 使用25fps降低CPU占用
         AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
