@@ -91,22 +91,23 @@ public class DiagnosticsActivity extends Activity {
     /**
      * 申请车辆权限。
      *
-     * <p>只申请本机报告为 dangerous 级别的那些 —— 声明一个 dangerous 权限而不申请，
-     * 它依然是拒绝状态；而 signature|privileged 的申请系统会直接忽略，弹都不弹。
-     * 分清这两种情况正是这个按钮存在的意义：申请过之后再采一次报告，
-     * 「未授予」才真正说明是被拒绝，而不是没问过。</p>
+     * <p>申请<b>全部</b>尚未授予的车辆权限，而不是只挑 dangerous 的 ——
+     * 「车机会不会弹框」本身就是要在车上观察的实验，替系统先筛掉一部分就把实验做没了。
+     * dangerous 的会弹授权框；signature/privileged 的系统会当场静默拒绝、弹都不弹。
+     * 两种结果用户都能直接看到，再采一次报告对照即可：申请过之后仍是「未授予」，
+     * 才真正说明是被系统挡住，而不是没问过。</p>
      */
     private void requestCarPermissions() {
-        String[] pending = VehicleSignalProbe.runtimeGrantableCarPermissions(this);
+        String[] pending = VehicleSignalProbe.ungrantedCarPermissions(this);
         if (pending.length == 0) {
             Toast.makeText(this,
-                    "本机没有可运行时申请的车辆权限（都不是 dangerous 级别），"
-                            + "详见报告 4.5 节的保护级别",
+                    "车辆权限要么已全部授予，要么本平台未定义，详见报告 4.5 节",
                     Toast.LENGTH_LONG).show();
             return;
         }
-        Toast.makeText(this, "正在申请 " + pending.length + " 项车辆权限",
-                Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,
+                "正在申请 " + pending.length + " 项车辆权限，请留意车机是否弹出授权框",
+                Toast.LENGTH_LONG).show();
         requestPermissions(pending, REQUEST_CAR_PERMISSIONS);
     }
 

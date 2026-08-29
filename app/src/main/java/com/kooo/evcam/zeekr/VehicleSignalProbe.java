@@ -550,22 +550,23 @@ public final class VehicleSignalProbe {
     }
 
     /**
-     * 本平台上运行时可申请（dangerous 级别）的车辆权限。
+     * 全部尚未授予的车辆权限（不看保护级别）。
      *
-     * @return 可申请且尚未授予的权限；没有就返回空数组
+     * <p>「申请权限时车机弹不弹框」本身就是要观察的实验，所以别替系统先筛掉
+     * 一部分。dangerous 的会弹框，signature/privileged 的系统会当场静默拒绝 ——
+     * 两种结果都由用户在车上直接看到，比我们凭级别猜更可靠。</p>
+     *
+     * @return 尚未授予的车辆权限；全部已授予时返回空数组
      */
-    public static String[] runtimeGrantableCarPermissions(Context context) {
+    public static String[] ungrantedCarPermissions(Context context) {
         List<String> pending = new ArrayList<>();
         for (String perm : CAR_PERMISSIONS) {
-            if (!describeProtection(context, perm).startsWith("dangerous")) {
-                continue;
-            }
             try {
                 if (context.checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
                     pending.add(perm);
                 }
             } catch (Throwable ignored) {
-                // 读不到就当作不可申请
+                // 权限名在本平台可能不存在，跳过
             }
         }
         return pending.toArray(new String[0]);
