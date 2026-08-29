@@ -992,7 +992,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="把环视里后方那一路单独放大成悬浮窗。左右三分之一拖动窗口，中间三分之一上下滑调整取景范围，双指缩放大小，拖到边缘自动贴边"
+                        android:text="把环视里后方那一路单独放大成悬浮窗。左右三分之一拖动窗口，中间三分之一上下滑调整取景，双指缩放窗口，拖到边缘自动贴边。长按可进入取景调整模式：看到整路画面并拖动/缩放蒙版框，点一下确认"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp" />
                 </LinearLayout>
@@ -1001,6 +1001,82 @@
                     android:id="@+id/switch_rearview_mirror"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- 超级后视镜尺寸 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="后视镜窗口尺寸"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="宽高分开设置。后视镜天然是横向的，做成正方形要么留黑边、要么裁掉两侧"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="宽度"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <SeekBar
+                    android:id="@+id/seekbar_rearview_width"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:min="240"
+                    android:max="1600"
+                    android:progress="720" />
+
+                <TextView
+                    android:id="@+id/text_rearview_width"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:text="720 px" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="高度"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <SeekBar
+                    android:id="@+id/seekbar_rearview_height"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:min="240"
+                    android:max="1600"
+                    android:progress="320" />
+
+                <TextView
+                    android:id="@+id/text_rearview_height"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:text="320 px" />
             </LinearLayout>
 
             <!-- 超级后视镜：恢复默认取景与位置 -->

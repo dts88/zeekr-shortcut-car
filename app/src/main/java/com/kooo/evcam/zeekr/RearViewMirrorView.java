@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.os.Build;
@@ -56,6 +57,8 @@ public class RearViewMirrorView extends ViewGroup {
     private static final int DOCK_THRESHOLD_PX = PEEK_WIDTH_PX + 80;
     /** 超过这个位移才算拖动，避免点一下就漂移。 */
     private static final int DRAG_SLOP_PX = 12;
+    /** 按住多久算长按（进出取景调整模式）。 */
+    private static final long LONG_PRESS_MS = 600L;
 
     private final WindowManager windowManager;
     private final AppConfig appConfig;
@@ -77,13 +80,19 @@ public class RearViewMirrorView extends ViewGroup {
     private int windowStartY;
     private RearViewGeometry.Crop cropAtTouchStart;
     private boolean dragging;
+    /** 取景调整模式：显示整路画面 + 蒙版框，手势含义与平时不同。 */
+    private boolean framingMode;
+    private long touchDownAtMs;
     private boolean pinching;
     private float pinchStartSpan;
-    private int pinchStartSize;
+    private int pinchStartWidth;
+    private int pinchStartHeight;
 
     private final Matrix drawMatrix = new Matrix();
     private final RectF sourceRect = new RectF();
     private final RectF destRect = new RectF();
+    private final Paint framePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint dimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     public RearViewMirrorView(Context context, AppConfig appConfig) {
         super(context);
@@ -95,6 +104,11 @@ public class RearViewMirrorView extends ViewGroup {
 
         textureView = new AutoFitTextureView(context);
         addView(textureView);
+
+        framePaint.setStyle(Paint.Style.STROKE);
+        framePaint.setStrokeWidth(4f);
+        framePaint.setColor(0xFFFF3B30);
+        dimPaint.setColor(0x99000000);
     }
 
     /** 相机预览要写进的 TextureView。绑定方式与其它悬浮窗一致，不改相机会话。 */
@@ -133,9 +147,10 @@ public class RearViewMirrorView extends ViewGroup {
         if (attached) {
             return;
         }
-        int size = appConfig.getRearViewSize();
+        int width = appConfig.getRearViewWidth();
+        int height = appConfig.getRearViewHeight();
         params = new WindowManager.LayoutParams(
-                size, size,
+                width, height,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                         ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         : WindowManager.LayoutParams.TYPE_PHONE,
@@ -147,11 +162,11 @@ public class RearViewMirrorView extends ViewGroup {
         int savedY = appConfig.getRearViewY();
         if (savedX < 0 || savedY < 0) {
             // 默认落在右上角，和车内后视镜的位置感一致
-            savedX = screenWidth() - size - 40;
+            savedX = screenWidth() - width - 40;
             savedY = 40;
         }
-        params.x = RearViewTouchModel.clampX(savedX, size, screenWidth(), PEEK_WIDTH_PX);
-        params.y = RearViewTouchModel.clampY(savedY, size, screenHeight());
+        params.x = RearViewTouchModel.clampX(savedX, width, screenWidth(), PEEK_WIDTH_PX);
+        params.y = RearViewTouchModel.clampY(savedY, height, screenHeight());
 
         try {
             windowManager.addView(this, params);
@@ -171,6 +186,42 @@ public class RearViewMirrorView extends ViewGroup {
             AppLog.w(TAG, "后视镜窗口移除失败: " + e);
         }
         attached = false;
+    }
+
+    /**
+     * 进出取景调整模式。
+     *
+     * <p>进入时显示整路画面并画出蒙版框，退出时把框存下来。手势含义随之改变，
+     * 这正是把它做成「模式」而不是又一种手势的原因 —— 同一块小窗上再塞第四种手势，
+     * 用起来会互相打架。</p>
+     */
+    public void setFramingMode(boolean on) {
+        if (framingMode == on) {
+            return;
+        }
+        framingMode = on;
+        if (!on) {
+            appConfig.setRearViewCrop(crop);
+        }
+        AppLog.i(TAG, on ? "进入取景调整模式（拖动移动框、双指缩放框、点一下确认）"
+                : "退出取景调整模式，取景已保存");
+        invalidate();
+    }
+
+    public boolean isFramingMode() {
+        return framingMode;
+    }
+
+    /** 设置页改了尺寸后，直接套用到正在显示的窗口上。 */
+    public void applySizeFromConfig() {
+        if (params == null) {
+            return;
+        }
+        params.width = appConfig.getRearViewWidth();
+        params.height = appConfig.getRearViewHeight();
+        params.x = RearViewTouchModel.clampX(params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
+        params.y = RearViewTouchModel.clampY(params.y, params.height, screenHeight());
+        applyLayout();
     }
 
     public boolean isShowing() {
@@ -204,7 +255,12 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
 
-        float[] rect = RearViewGeometry.combinedSourceRect(plan, laneIndex, crop);
+        // 取景模式下显示整路画面，蒙版画在上面 —— 要框的东西必须看得见，
+        // 否则等于蒙着眼睛调整取景。
+        float[] rect = framingMode
+                ? RearViewGeometry.combinedSourceRect(plan, laneIndex,
+                        RearViewGeometry.Crop.full())
+                : RearViewGeometry.combinedSourceRect(plan, laneIndex, crop);
 
         // 源矩形在子视图坐标系里的位置。用归一化坐标是关键：
         // HAL 给的缓冲区可能被压扁，但比例关系不变。
@@ -219,6 +275,29 @@ public class RearViewMirrorView extends ViewGroup {
         canvas.concat(drawMatrix);
         drawChild(canvas, textureView, getDrawingTime());
         canvas.restoreToCount(save);
+
+        if (framingMode) {
+            drawFramingOverlay(canvas, width, height);
+        }
+    }
+
+    /**
+     * 画出蒙版框，框外压暗。
+     *
+     * <p>压暗的是「会被裁掉」的部分，所以框里就是最终会显示的内容 ——
+     * 不用想象，直接看到。</p>
+     */
+    private void drawFramingOverlay(Canvas canvas, int width, int height) {
+        float left = crop.x * width;
+        float top = crop.y * height;
+        float right = (crop.x + crop.width) * width;
+        float bottom = (crop.y + crop.height) * height;
+
+        canvas.drawRect(0, 0, width, top, dimPaint);
+        canvas.drawRect(0, bottom, width, height, dimPaint);
+        canvas.drawRect(0, top, left, bottom, dimPaint);
+        canvas.drawRect(right, top, width, bottom, dimPaint);
+        canvas.drawRect(left, top, right, bottom, framePaint);
     }
 
     // ------------------------------------------------------------------ 手势
@@ -262,6 +341,7 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     private void beginTouch(MotionEvent event) {
+        touchDownAtMs = android.os.SystemClock.elapsedRealtime();
         activeZone = RearViewTouchModel.zoneFor(event.getX(), getWidth());
         touchStartX = event.getRawX();
         touchStartY = event.getRawY();
@@ -276,7 +356,8 @@ public class RearViewMirrorView extends ViewGroup {
         pinching = true;
         dragging = false;
         pinchStartSpan = spanOf(event);
-        pinchStartSize = params != null ? params.width : appConfig.getRearViewSize();
+        pinchStartWidth = params != null ? params.width : appConfig.getRearViewWidth();
+        pinchStartHeight = params != null ? params.height : appConfig.getRearViewHeight();
     }
 
     private void updatePinch(MotionEvent event) {
@@ -287,16 +368,26 @@ public class RearViewMirrorView extends ViewGroup {
         if (span <= 0f) {
             return;
         }
-        int size = RearViewTouchModel.scaledSize(
-                pinchStartSize, span / pinchStartSpan,
-                AppConfig.REARVIEW_MIN_SIZE, AppConfig.REARVIEW_MAX_SIZE);
-        if (size == params.width) {
+
+        if (framingMode) {
+            // 取景模式：捏合改的是蒙版框的大小，不是窗口
+            crop = cropAtTouchStart.scaledAboutCenter(pinchStartSpan / span);
+            invalidate();
             return;
         }
-        params.width = size;
-        params.height = size;
-        params.x = RearViewTouchModel.clampX(params.x, size, screenWidth(), PEEK_WIDTH_PX);
-        params.y = RearViewTouchModel.clampY(params.y, size, screenHeight());
+        // 宽高一起缩，保持当前比例 —— 捏合是「放大缩小」，不该顺手改变形状
+        float factor = span / pinchStartSpan;
+        int width = RearViewTouchModel.scaledSize(pinchStartWidth, factor,
+                AppConfig.REARVIEW_MIN_SIZE, AppConfig.REARVIEW_MAX_SIZE);
+        int height = RearViewTouchModel.scaledSize(pinchStartHeight, factor,
+                AppConfig.REARVIEW_MIN_SIZE, AppConfig.REARVIEW_MAX_SIZE);
+        if (width == params.width && height == params.height) {
+            return;
+        }
+        params.width = width;
+        params.height = height;
+        params.x = RearViewTouchModel.clampX(params.x, width, screenWidth(), PEEK_WIDTH_PX);
+        params.y = RearViewTouchModel.clampY(params.y, height, screenHeight());
         applyLayout();
     }
 
@@ -307,6 +398,17 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
         dragging = true;
+
+        if (framingMode) {
+            // 取景模式：拖动整个蒙版框，横竖都动
+            float dxNorm = dx / Math.max(1, getWidth());
+            float dyNorm = dy / Math.max(1, getHeight());
+            crop = new RearViewGeometry.Crop(
+                    cropAtTouchStart.x + dxNorm, cropAtTouchStart.y + dyNorm,
+                    cropAtTouchStart.width, cropAtTouchStart.height);
+            invalidate();
+            return;
+        }
 
         if (activeZone == RearViewTouchModel.Zone.ADJUST_CROP) {
             // 中间三分之一：只调取景范围，窗口不动，左右方向也不变
@@ -328,6 +430,27 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     private void endTouch() {
+        long heldMs = android.os.SystemClock.elapsedRealtime() - touchDownAtMs;
+
+        if (!dragging && !pinching) {
+            if (heldMs >= LONG_PRESS_MS) {
+                // 长按进出取景模式
+                setFramingMode(!framingMode);
+            } else if (framingMode) {
+                // 取景模式里点一下 = 确认
+                setFramingMode(false);
+            }
+            return;
+        }
+
+        if (framingMode) {
+            appConfig.setRearViewCrop(crop);
+            invalidate();
+            dragging = false;
+            pinching = false;
+            return;
+        }
+
         if (activeZone == RearViewTouchModel.Zone.ADJUST_CROP && dragging) {
             appConfig.setRearViewCrop(crop);
         } else if (params != null && (dragging || pinching)) {
@@ -341,7 +464,7 @@ public class RearViewMirrorView extends ViewGroup {
                 AppLog.d(TAG, "后视镜已贴边: " + dock + "，露出 " + PEEK_WIDTH_PX + "px");
             }
             appConfig.setRearViewPosition(params.x, params.y);
-            appConfig.setRearViewSize(params.width);
+            appConfig.setRearViewSize(params.width, params.height);
         }
         dragging = false;
         pinching = false;

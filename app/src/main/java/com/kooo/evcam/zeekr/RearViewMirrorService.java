@@ -33,6 +33,9 @@ public class RearViewMirrorService extends Service {
 
     private static final String TAG = "RearViewMirrorSvc";
 
+    /** 设置页要能改到正在显示的那个窗口。 */
+    private static volatile RearViewMirrorService instance;
+
     /** 绑不上相机时的重试间隔与上限 —— 冷启动时相机可能还没就绪。 */
     private static final long RETRY_DELAY_MS = 500L;
     private static final int MAX_RETRY = 20;
@@ -55,10 +58,19 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
+    /** 设置页改了尺寸后通知正在显示的窗口。 */
+    public static void applySize(Context context) {
+        RearViewMirrorService svc = instance;
+        if (svc != null && svc.mirrorView != null) {
+            svc.mirrorView.applySizeFromConfig();
+        }
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
         appConfig = new AppConfig(this);
+        instance = this;
     }
 
     @Override
@@ -223,6 +235,7 @@ public class RearViewMirrorService extends Service {
 
     @Override
     public void onDestroy() {
+        instance = null;
         cancelRetry();
         cancelWatchdog();
         unbindCamera();

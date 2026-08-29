@@ -94,7 +94,8 @@ public class AppConfig {
 
     // 超级后视镜：把环视合成流里后方那一路单独放大显示
     private static final String KEY_REARVIEW_ENABLED = "rearview_enabled";        // 总开关
-    private static final String KEY_REARVIEW_SIZE = "rearview_size";              // 窗口边长（px）
+    private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
+    private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
     private static final String KEY_REARVIEW_CROP_X = "rearview_crop_x";          // 蒙版，归一化
     private static final String KEY_REARVIEW_CROP_Y = "rearview_crop_y";
     private static final String KEY_REARVIEW_CROP_W = "rearview_crop_w";
@@ -1051,11 +1052,17 @@ public class AppConfig {
 
     // ==================== 超级后视镜 ====================
 
-    /** 后视镜窗口的默认边长（px），约屏幕宽度的六分之一。 */
-    public static final int REARVIEW_DEFAULT_SIZE = 520;
-    /** 允许的窗口边长范围。 */
+    /**
+     * 后视镜窗口的默认尺寸（px）。
+     *
+     * <p>宽高分开，而不是正方形：后视镜天然是横向的，喂给它的取景也是该路画面里
+     * 一条横向的带 —— 硬做成正方形，要么上下留黑边，要么把两侧裁掉。</p>
+     */
+    public static final int REARVIEW_DEFAULT_WIDTH = 720;
+    public static final int REARVIEW_DEFAULT_HEIGHT = 320;
+    /** 允许的窗口尺寸范围。 */
     public static final int REARVIEW_MIN_SIZE = 240;
-    public static final int REARVIEW_MAX_SIZE = 1400;
+    public static final int REARVIEW_MAX_SIZE = 1600;
 
     public boolean isRearViewEnabled() {
         return prefs.getBoolean(KEY_REARVIEW_ENABLED, false);
@@ -1066,15 +1073,25 @@ public class AppConfig {
         AppLog.d(TAG, "超级后视镜: " + (enabled ? "开" : "关"));
     }
 
-    /** 窗口边长（px），已夹在允许范围内。 */
-    public int getRearViewSize() {
-        int size = prefs.getInt(KEY_REARVIEW_SIZE, REARVIEW_DEFAULT_SIZE);
-        return Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, size));
+    /** 窗口宽度（px），已夹在允许范围内。 */
+    public int getRearViewWidth() {
+        return clampRearViewSize(prefs.getInt(KEY_REARVIEW_WIDTH, REARVIEW_DEFAULT_WIDTH));
     }
 
-    public void setRearViewSize(int sizePx) {
-        prefs.edit().putInt(KEY_REARVIEW_SIZE,
-                Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, sizePx))).apply();
+    /** 窗口高度（px），已夹在允许范围内。 */
+    public int getRearViewHeight() {
+        return clampRearViewSize(prefs.getInt(KEY_REARVIEW_HEIGHT, REARVIEW_DEFAULT_HEIGHT));
+    }
+
+    public void setRearViewSize(int widthPx, int heightPx) {
+        prefs.edit()
+                .putInt(KEY_REARVIEW_WIDTH, clampRearViewSize(widthPx))
+                .putInt(KEY_REARVIEW_HEIGHT, clampRearViewSize(heightPx))
+                .apply();
+    }
+
+    public static int clampRearViewSize(int px) {
+        return Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, px));
     }
 
     /**
@@ -1125,7 +1142,8 @@ public class AppConfig {
         prefs.edit()
                 .remove(KEY_REARVIEW_X)
                 .remove(KEY_REARVIEW_Y)
-                .remove(KEY_REARVIEW_SIZE)
+                .remove(KEY_REARVIEW_WIDTH)
+                .remove(KEY_REARVIEW_HEIGHT)
                 .remove(KEY_REARVIEW_CROP_X)
                 .remove(KEY_REARVIEW_CROP_Y)
                 .remove(KEY_REARVIEW_CROP_W)

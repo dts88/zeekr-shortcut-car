@@ -1458,6 +1458,8 @@ public class SettingsFragment extends Fragment {
             });
         }
 
+        initRearViewSizeSliders(view);
+
         View resetButton = view.findViewById(R.id.btn_reset_rearview);
         if (resetButton != null) {
             resetButton.setOnClickListener(v -> {
@@ -1473,6 +1475,54 @@ public class SettingsFragment extends Fragment {
                 }
             });
         }
+    }
+
+    /** 后视镜窗口的宽高滑块。改动立刻套用到正在显示的窗口。 */
+    private void initRearViewSizeSliders(View view) {
+        SeekBar widthBar = view.findViewById(R.id.seekbar_rearview_width);
+        SeekBar heightBar = view.findViewById(R.id.seekbar_rearview_height);
+        TextView widthText = view.findViewById(R.id.text_rearview_width);
+        TextView heightText = view.findViewById(R.id.text_rearview_height);
+        if (widthBar == null || heightBar == null || appConfig == null) {
+            return;
+        }
+
+        widthBar.setProgress(appConfig.getRearViewWidth());
+        heightBar.setProgress(appConfig.getRearViewHeight());
+        if (widthText != null) {
+            widthText.setText(appConfig.getRearViewWidth() + " px");
+        }
+        if (heightText != null) {
+            heightText.setText(appConfig.getRearViewHeight() + " px");
+        }
+
+        SeekBar.OnSeekBarChangeListener listener = new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                int value = AppConfig.clampRearViewSize(progress);
+                TextView label = (bar == widthBar) ? widthText : heightText;
+                if (label != null) {
+                    label.setText(value + " px");
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                // 松手才落盘并套用，拖动过程中不反复写配置、不反复重排窗口
+                appConfig.setRearViewSize(
+                        AppConfig.clampRearViewSize(widthBar.getProgress()),
+                        AppConfig.clampRearViewSize(heightBar.getProgress()));
+                if (getContext() != null && appConfig.isRearViewEnabled()) {
+                    com.kooo.evcam.zeekr.RearViewMirrorService.applySize(getContext());
+                }
+            }
+        };
+        widthBar.setOnSeekBarChangeListener(listener);
+        heightBar.setOnSeekBarChangeListener(listener);
     }
 
     /**
