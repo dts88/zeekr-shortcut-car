@@ -79,10 +79,6 @@ public class SingleCamera {
     private android.graphics.SurfaceTexture secondaryDisplaySurfaceTexture; // 副屏SurfaceTexture（用于设置buffer尺寸）
     private Surface fullscreenPreviewSurface; // 全屏预览Surface
     private android.graphics.SurfaceTexture fullscreenPreviewSurfaceTexture; // 全屏预览SurfaceTexture（用于设置buffer尺寸）
-    // MJPEG 流编码器挂载点（独立 GL 管线读回）
-    private Surface streamSurface;
-    private Handler streamSurfaceHandler; // StreamGlEncoder 的渲染线程 Handler
-    private android.graphics.SurfaceTexture streamSurfaceTexture; // 暂未使用，预留
     private OutputConfiguration activePreviewConfig; // 共享预览配置，用于动态 Surface 增减
     private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
     private ImageReader imageReader;  // 用于拍照的ImageReader
@@ -517,64 +513,6 @@ public class SingleCamera {
     @Deprecated
     public void setSecondarySurface(Surface surface) {
         setSecondaryDisplaySurface(surface);
-    }
-
-    /**
-     * 设置 MJPEG 流编码器 Surface（独立 GL 管线读回）。
-     * <p>
-     * 与副屏/主屏悬浮窗不同，这路 Surface 来自独立的 GL 编码管线，
-     * 它内部自带 EGL context + OES 纹理 + 鱼眼/cover/pan shader + PBO 异步读回，
-     * 把 Camera2 输出读回为 RGBA 后编码成 JPEG 推 MJPEG HTTP 流。
-     * <p>
-     * 调用此方法会把 streamSurface 加入当前预览 session（或重建 session 时自动包含）。
-     * 传 null 解绑。
-     *
-     * @param surface  StreamGlEncoder 的 intermediate Surface，null 表示移除
-     * @param handler  StreamGlEncoder 的渲染线程 Handler（用于 SurfaceTexture 回调），
-     *                 可为 null（仅当 surface 为 null 时）
-     */
-    public void setStreamSurface(Surface surface, Handler handler) {
-        boolean changed = (streamSurface != null) != (surface != null)
-                || (streamSurface != null && !streamSurface.equals(surface));
-        this.streamSurface = surface;
-        this.streamSurfaceHandler = handler;
-        if (surface != null) {
-            AppLog.d(TAG, "Camera " + cameraId + " stream surface set: " + surface
-                    + ", isValid=" + surface.isValid());
-            // 动态加入 session（鱼眼模式不影响，streamSurface 自带 GL 管线，不走 FisheyeCorrector）
-            addStreamSurfaceToSession();
-        } else {
-            AppLog.d(TAG, "Camera " + cameraId + " stream surface cleared");
-            // 重建 session 时不会再包含 streamSurface（字段已清空）
-            if (streamSurfaceTexture != null) {
-                streamSurfaceTexture = null;
-            }
-        }
-    }
-
-    public boolean isStreamSurfaceBound() {
-        return streamSurface != null && streamSurface.isValid();
-    }
-
-    /**
-     * 动态把 streamSurface 加入当前预览 session。
-     * 复用 OutputConfiguration.addSurface + finalizeOutputConfigurations 机制；
-     * 失败时降级到 recreateSession。
-     */
-    private void addStreamSurfaceToSession() {
-        if (streamSurface == null || !streamSurface.isValid()) return;
-        if (backgroundHandler != null && captureSession != null && activePreviewConfig != null) {
-            backgroundHandler.removeCallbacks(recreateSessionRunnable);
-            backgroundHandler.post(() -> {
-                if (!tryDynamicSurfaceAdd(streamSurface, false)) {
-                    AppLog.d(TAG, "Camera " + cameraId + " stream surface dynamic add failed, rebuild session");
-                    createCameraPreviewSession();
-                }
-            });
-        } else {
-            // 没有现有 session（相机未打开），走正常创建路径
-            recreateSession(true);
-        }
     }
 
     /**
@@ -1499,8 +1437,7 @@ public class SingleCamera {
                     || (mainFloatingSurface != null && mainFloatingSurface.isValid())
                     || (secondaryDisplaySurface != null && secondaryDisplaySurface.isValid())
                     || (fullscreenPreviewSurface != null && fullscreenPreviewSurface.isValid())
-                    || (recordSurface != null && recordSurface.isValid())
-                    || (streamSurface != null && streamSurface.isValid());
+                    || (recordSurface != null && recordSurface.isValid());
             if (!hasAnySurface) {
                 AppLog.d(TAG, "Camera " + cameraId + " no available surfaces, skipping session creation (waiting for surface)");
                 // 关闭旧 session，防止继续推帧到已销毁的 Surface（queueBuffer abandoned）
@@ -1553,15 +1490,6 @@ public class SingleCamera {
 
                     if (surface != null && surface.isValid()) {
                         OutputConfiguration previewConfig = new OutputConfiguration(surface);
-                        // MJPEG 流 Surface（StreamGlEncoder 独立 GL 管线）需要直接接 Camera2 原始输出，
-                        // 与 FisheyeCorrector 的 intermediate Surface 共享同一 OutputConfiguration
-                        if (streamSurface != null && streamSurface.isValid() && streamSurface != surface) {
-                            previewConfig.enableSurfaceSharing();
-                            previewConfig.addSurface(streamSurface);
-                            surfaces.add(streamSurface);
-                            previewRequestBuilder.addTarget(streamSurface);
-                            AppLog.d(TAG, "Added stream surface to FISHEYE preview stream");
-                        }
                         activePreviewConfig = previewConfig;
                         surfaces.add(surface);
                         previewRequestBuilder.addTarget(surface);
@@ -1659,15 +1587,6 @@ public class SingleCamera {
                                     ", sameAsSecondary=" + (fullscreenPreviewSurface == secondaryDisplaySurface));
                         }
 
-                        // MJPEG 流 Surface（独立 GL 管线，加入共享预览流）
-                        if (streamSurface != null && streamSurface.isValid() &&
-                            streamSurface != surface && streamSurface != mainFloatingSurface &&
-                            streamSurface != secondaryDisplaySurface && streamSurface != fullscreenPreviewSurface) {
-                            previewSharedConfig.addSurface(streamSurface);
-                            surfaces.add(streamSurface);
-                            previewRequestBuilder.addTarget(streamSurface);
-                            AppLog.d(TAG, "Added stream surface to SHARED preview stream");
-                        }
 
                         outputConfigs.add(previewSharedConfig);
                     }
@@ -2561,12 +2480,6 @@ public class SingleCamera {
                 secondaryDisplaySurfaceTexture = null;
             }
             // 清理 MJPEG 流 Surface 引用（实际 release 由 StreamGlEncoder 负责）
-            if (streamSurface != null) {
-                AppLog.d(TAG, "Camera " + cameraId + " clearing stream surface reference");
-                streamSurface = null;
-                streamSurfaceHandler = null;
-                streamSurfaceTexture = null;
-            }
 
             // 释放ImageReader
             if (imageReader != null) {

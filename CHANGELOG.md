@@ -9,6 +9,36 @@
 
 （暂无）
 
+## [0.8.5-alpha] - 2026-08-29
+
+### 移除：已删功能的残骸
+
+留着没用的东西有实际代价，已经付过两次：**0.8.3 我还在给「旧帧率等级」的迁移逻辑
+打补丁**，而那个等级的界面 0.6.1 就撤了；**`getRecordingConfig()` 里的无限递归
+bug 能存活，正是因为没有任何调用者** —— 没人跑，就没人发现。
+
+这次清掉：
+
+| 残骸 | 依据 |
+|------|------|
+| **MJPEG 推流配置**：约 30 个方法 + 全部键 | 功能早已移除，补盲设置页自己写着「MJPEG 推流模块已移除，隐藏该入口」 |
+| `fragment_mjpeg_stream_adjust.xml` | 没有任何 Java 代码引用这个布局 |
+| 副屏设置里的 MJPEG 按钮 | `findViewById` 之后立刻 `setVisibility(GONE)` |
+| **`SingleCamera` 的 `streamSurface` 整套**（3 字段 + 3 方法 + 4 处分支） | `setStreamSurface()` 无调用者，字段恒为 null |
+| `AppConfig.getRecordingConfig()` | 无调用者；无限递归 bug 的所在 |
+
+`streamSurface` 那一组值得单独说：它的 `streamSurface != null` 分支**就长在
+`createCameraPreviewSession()` 里** —— 本机最容易出问题、我反复读过的那段代码。
+它们读起来像是「可能还挂着第三个消费者」，每次推理都要先排除一遍。
+
+`AppConfig` 从 4151 行降到 3947 行。
+
+### 规则
+
+已记入 `docs/zeekr-platform-notes.md` 4.12：**功能移除时，配置项、常量、挂载点一并删掉，
+不要只藏入口。**判断方法就是 grep 有没有外部调用者 —— 「以后可能会用」不是保留理由，
+git 历史里都在。
+
 ## [0.8.4-alpha] - 2026-08-29
 
 ### 移除

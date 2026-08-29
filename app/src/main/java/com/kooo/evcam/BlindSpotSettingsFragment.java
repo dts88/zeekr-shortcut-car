@@ -67,7 +67,6 @@ public class BlindSpotSettingsFragment extends Fragment {
     private android.widget.LinearLayout subFeaturesContainer;
     private SwitchMaterial secondaryBlindSpotSwitch;
     private Button adjustSecondaryBlindSpotWindowButton;
-    private Button adjustMjpegStreamButton;
     private SwitchMaterial mockFloatingSwitch;
     private SwitchMaterial floatingWindowAnimationSwitch;
     private RadioGroup statusBarStyleGroup;
@@ -123,7 +122,6 @@ public class BlindSpotSettingsFragment extends Fragment {
 
         secondaryBlindSpotSwitch = view.findViewById(R.id.switch_secondary_blind_spot_display);
         adjustSecondaryBlindSpotWindowButton = view.findViewById(R.id.btn_adjust_secondary_blind_spot_window);
-        adjustMjpegStreamButton = view.findViewById(R.id.btn_adjust_mjpeg_stream);
         
         // 车门联动UI初始化
         doorLinkageSectionLayout = view.findViewById(R.id.ll_door_linkage_section);
@@ -579,8 +577,6 @@ public class BlindSpotSettingsFragment extends Fragment {
             transaction.commit();
         });
 
-        // MJPEG 推流模块已移除，隐藏该入口
-        adjustMjpegStreamButton.setVisibility(android.view.View.GONE);
 
         // 调整车门副屏悬浮窗位置按钮
         logcatDebugButton.setOnClickListener(v -> {

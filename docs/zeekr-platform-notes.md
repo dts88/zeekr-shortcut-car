@@ -529,6 +529,33 @@ ro.board.platform   = msmnile
 
 ---
 
+## 4.12 已删除的功能不要留残骸
+
+**规则：功能移除时，把它的配置项、常量、挂载点一并删掉，不要只藏入口。**
+
+留下的残骸有实际代价，已经付过两次：
+
+- **给一个不存在的东西继续做维护**。0.8.3 我还在给「旧帧率等级」的迁移逻辑打补丁 ——
+  而那个等级的界面在 0.6.1 就撤了，它此后只是为了「被迁移」而存在。
+- **bug 藏在没人跑的代码里**。`AppConfig.getRecordingConfig()` 里有个匿名类的
+  `getCarModel()` 写成了调用自己，无限递归。它能存活是因为**没有任何调用者** ——
+  没人跑，就没人发现。
+
+2026-08-29 清掉的一批：
+
+| 残骸 | 状态 |
+|------|------|
+| MJPEG 推流：约 30 个配置方法 + 键 | 功能早已移除，设置页自己写着「模块已移除，隐藏该入口」 |
+| `fragment_mjpeg_stream_adjust.xml` | 没有任何 Java 引用 |
+| 副屏设置里的 MJPEG 按钮 | findViewById 之后立刻 setVisibility(GONE) |
+| `SingleCamera.streamSurface` 整套 | `setStreamSurface()` 无调用者，字段恒为 null —— 那些 `streamSurface != null` 分支就长在 `createCameraPreviewSession` 里，是本机最容易出问题的一段代码 |
+| `AppConfig.getRecordingConfig()` | 无调用者；无限递归 bug 的所在 |
+
+**判断方法**：`grep` 一下有没有外部调用者。没有就是没有 —— 「以后可能会用」不是保留理由，
+git 历史里都在，需要时取回来即可。
+
+---
+
 ## 5. 权限与网络
 
 【实测】上游应用只申请：相机、通知、前台服务、唤醒锁。
