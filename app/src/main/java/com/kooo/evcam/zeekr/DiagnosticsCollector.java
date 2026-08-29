@@ -64,6 +64,7 @@ public final class DiagnosticsCollector {
         appendStorage(sb, context);
         appendConfig(sb, context);
         appendFloatingLayout(sb, context);
+        PlaybackCapabilityProbe.appendTo(sb, context);
         appendLogcat(sb);
 
         sb.append('\n').append("===== 报告结束 =====").append('\n');
@@ -461,7 +462,7 @@ public final class DiagnosticsCollector {
      * 抓一段本应用的 logcat，便于排查启动/相机错误。
      */
     private static void appendLogcat(StringBuilder sb) {
-        sb.append("## 8. 最近日志（本应用相关）").append('\n');
+        sb.append("## 9. 最近日志（本应用相关）").append('\n');
         try {
             Process p = Runtime.getRuntime().exec(
                     new String[]{"logcat", "-d", "-v", "time", "-t", String.valueOf(LOGCAT_MAX_LINES)});

@@ -46,6 +46,8 @@ public class TimelinePlayerActivity extends Activity {
     private static final String TAG = "TimelinePlayer";
     /** 进度刷新间隔。 */
     private static final long TICK_MS = 500L;
+    /** 连续出错多少次就停止自动续播。 */
+    private static final int MAX_CONSECUTIVE_ERRORS = 3;
 
     private VideoView videoView;
     private SeekBar seekBar;
@@ -62,6 +64,22 @@ public class TimelinePlayerActivity extends Activity {
     private List<RecordingTimeline.Session> sessions = new ArrayList<>();
     private int sessionIndex = 0;
     private int currentSegmentIndex = -1;
+    /**
+     * 已经 prepare 完成、可以安全 seek/start 的段；-1 表示当前没有可用的播放器。
+     *
+     * <p>这个区分是必须的：{@code setVideoPath()} 只是发起异步 prepare，
+     * 在 onPrepared 之前对播放器 seek 会让解码器进入坏状态 ——
+     * 表现就是画面抽搐、卡死，严重时直接出乱码。</p>
+     */
+    private int preparedSegmentIndex = -1;
+    /** 正在 prepare 的段；-1 表示没有在途的打开操作。 */
+    private int preparingSegmentIndex = -1;
+    /** prepare 完成后要跳到的段内偏移。 */
+    private long pendingOffsetMs = 0L;
+    /** prepare 完成后是否自动开始播放（用户暂停过就不该被强制恢复）。 */
+    private boolean playWhenReady = true;
+    /** 连续出错次数，用来阻止「出错→跳下一段→又出错」无限翻下去。 */
+    private int consecutiveErrors = 0;
     /** 用户正在拖动进度条时不要被自动刷新打断。 */
     private boolean userSeeking = false;
 
@@ -112,10 +130,42 @@ public class TimelinePlayerActivity extends Activity {
 
         setupSeekBar();
 
+        // 三个监听器只在这里注册一次。以前 onPrepared 是每次切文件时重新注册的，
+        // 那样闭包捕获的是那一次的偏移量，切换密集时可能把旧偏移套到新文件上。
+        videoView.setOnPreparedListener(mp -> {
+            preparedSegmentIndex = preparingSegmentIndex;
+            preparingSegmentIndex = -1;
+            consecutiveErrors = 0;
+
+            // 明确清掉 seekComplete 回调。以前这里挂的是 m -> videoView.start()，
+            // 而它对这个播放器的每一次 seek 都会触发 —— 用户暂停了也会被强制播放。
+            try {
+                mp.setOnSeekCompleteListener(null);
+            } catch (Exception ignored) {
+                // 某些实现允许传 null，失败也不影响后续
+            }
+
+            videoView.seekTo((int) pendingOffsetMs);
+            if (playWhenReady) {
+                videoView.start();
+            }
+            updatePlayPauseLabel();
+        });
+
         // 播完一段自动接下一段
         videoView.setOnCompletionListener(mp -> advanceToNextSegment());
         videoView.setOnErrorListener((mp, what, extra) -> {
-            AppLog.w(TAG, "播放出错 what=" + what + " extra=" + extra);
+            AppLog.w(TAG, "播放出错 what=" + what + " extra=" + extra
+                    + " 段=" + currentSegmentIndex);
+            preparedSegmentIndex = -1;
+            preparingSegmentIndex = -1;
+            if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                // 连续出错就停下来，不要一路翻到底
+                AppLog.e(TAG, "连续 " + consecutiveErrors + " 次播放出错，停止自动续播");
+                Toast.makeText(this, "这段录像无法播放，已停止", Toast.LENGTH_LONG).show();
+                consecutiveErrors = 0;
+                return true;
+            }
             return advanceToNextSegment();
         });
 
@@ -221,6 +271,10 @@ public class TimelinePlayerActivity extends Activity {
         sessionIndex = Math.max(0, Math.min(index, sessions.size() - 1));
         RecordingTimeline.Session session = sessions.get(sessionIndex);
         currentSegmentIndex = -1;
+        preparedSegmentIndex = -1;
+        preparingSegmentIndex = -1;
+        consecutiveErrors = 0;
+        playWhenReady = true;
 
         seekBar.setMax((int) Math.max(1L, session.totalDurationMs));
         seekBar.setProgress(0);
@@ -274,6 +328,11 @@ public class TimelinePlayerActivity extends Activity {
 
     /**
      * 跳到时间轴上的某个位置：换算成「哪个文件 + 文件内偏移」，必要时切文件。
+     *
+     * <p>只有在播放器<b>确实 prepare 完成</b>时才直接 seek。以前这里只比较段号，
+     * 而段号在发起异步打开时就被改掉了 —— 于是在 prepare 完成之前再拖一次，
+     * 就会对一个还没准备好的播放器 seek。解码器由此进入坏状态：先是几帧几帧地抽搐，
+     * 然后卡住，再拖也不会恢复，最后出乱码。</p>
      */
     private void seekTimelineTo(long positionMs) {
         if (sessions.isEmpty()) {
@@ -285,22 +344,47 @@ public class TimelinePlayerActivity extends Activity {
             return;
         }
 
-        if (locator.segmentIndex != currentSegmentIndex) {
-            currentSegmentIndex = locator.segmentIndex;
-            videoView.setVideoPath(locator.segment.path);
-            final long offset = locator.offsetInSegmentMs;
-            videoView.setOnPreparedListener(mp -> {
-                mp.setOnSeekCompleteListener(m -> videoView.start());
-                videoView.seekTo((int) offset);
-                updatePlayPauseLabel();
-            });
-        } else {
+        boolean readyForDirectSeek = locator.segmentIndex == preparedSegmentIndex
+                && preparingSegmentIndex < 0;
+        if (readyForDirectSeek) {
             videoView.seekTo((int) locator.offsetInSegmentMs);
-            if (!videoView.isPlaying()) {
+            if (playWhenReady && !videoView.isPlaying()) {
                 videoView.start();
             }
+        } else {
+            openSegment(locator.segmentIndex, locator.offsetInSegmentMs);
         }
         showPosition(positionMs);
+    }
+
+    /**
+     * 打开某一段并在 prepare 完成后跳到指定偏移。
+     *
+     * <p>同一段已经在打开途中时，只更新目标偏移就返回 —— 连续拖动不该叠出多个
+     * 打开操作。</p>
+     */
+    private void openSegment(int segmentIndex, long offsetMs) {
+        if (sessions.isEmpty()) {
+            return;
+        }
+        RecordingTimeline.Session session = sessions.get(sessionIndex);
+        if (segmentIndex < 0 || segmentIndex >= session.segmentCount()) {
+            return;
+        }
+
+        pendingOffsetMs = Math.max(0L, offsetMs);
+        if (segmentIndex == preparingSegmentIndex) {
+            return;  // 已经在打开同一个文件，等它 prepare 完成即可
+        }
+
+        preparingSegmentIndex = segmentIndex;
+        preparedSegmentIndex = -1;
+        currentSegmentIndex = segmentIndex;
+
+        // 先显式停掉上一个再开下一个。setVideoPath 内部虽然也会释放，
+        // 但显式停一次能保证旧解码器不会和新的抢同一个 surface。
+        videoView.stopPlayback();
+        videoView.setVideoPath(session.segments.get(segmentIndex).path);
     }
 
     /** 一段播完后接下一段；已经是最后一段就停在末尾。 */
@@ -311,28 +395,32 @@ public class TimelinePlayerActivity extends Activity {
         RecordingTimeline.Session session = sessions.get(sessionIndex);
         int next = currentSegmentIndex + 1;
         if (next >= session.segmentCount()) {
+            preparedSegmentIndex = -1;
             updatePlayPauseLabel();
             return true;
         }
-        seekTimelineTo(session.segments.get(next).timelineOffsetMs);
+        // 直接打开下一段，不要绕回 seekTimelineTo —— 那会再做一次定位换算，
+        // 边界上可能又落回当前段，造成原地打转
+        openSegment(next, 0L);
         return true;
     }
 
     /** 当前时间轴位置 = 本段起始偏移 + 播放器内部进度。 */
     private long currentTimelinePosition() {
-        if (sessions.isEmpty() || currentSegmentIndex < 0) {
+        // 未 prepare 时 getCurrentPosition 返回的是无意义的值，别拿它去更新进度条
+        if (sessions.isEmpty() || preparedSegmentIndex < 0) {
             return 0L;
         }
         RecordingTimeline.Session session = sessions.get(sessionIndex);
-        if (currentSegmentIndex >= session.segmentCount()) {
+        if (preparedSegmentIndex >= session.segmentCount()) {
             return 0L;
         }
-        return session.segments.get(currentSegmentIndex).timelineOffsetMs
+        return session.segments.get(preparedSegmentIndex).timelineOffsetMs
                 + Math.max(0, videoView.getCurrentPosition());
     }
 
     private void updateProgress() {
-        if (sessions.isEmpty() || !videoView.isPlaying()) {
+        if (sessions.isEmpty() || preparedSegmentIndex < 0 || !videoView.isPlaying()) {
             return;
         }
         long position = currentTimelinePosition();
@@ -352,8 +440,13 @@ public class TimelinePlayerActivity extends Activity {
     private void togglePlayPause() {
         if (videoView.isPlaying()) {
             videoView.pause();
+            playWhenReady = false;
         } else {
-            videoView.start();
+            playWhenReady = true;
+            if (preparedSegmentIndex >= 0) {
+                videoView.start();
+            }
+            // 还没 prepare 完成的话，onPrepared 会按 playWhenReady 自动开始
         }
         updatePlayPauseLabel();
     }
