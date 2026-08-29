@@ -2507,6 +2507,20 @@ public class MainActivity extends AppCompatActivity {
             textureView.setFillContainer(false);
             applyPhoneScaleTransform(textureView, previewSize, cameraKey);
             AppLog.d(TAG, "设置 " + cameraKey + " 手机缩放变换, 预览尺寸: " + previewSize.getWidth() + "x" + previewSize.getHeight());
+        } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            // 三路配置的两路座舱相机：按原样显示，不旋转。
+            //
+            // 这一档以前没有自己的分支，会掉进下面的 E5 兜底 —— 那里的 "left"
+            // 指的是「装在车身左侧的摄像头」，要转 270 度才正。但在这个配置里
+            // texture_left 只是第三个槽位，装的是一路普通的座舱相机，本来就是正的。
+            //
+            // 这个旋转只作用于预览（TextureView 的矩阵），不影响拍照通道，
+            // 所以之前的表现是：预览里躺着，拍出来的照片却是正的。
+            textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+            textureView.setFillContainer(false);
+            applyPreviewCorrectionOnly(textureView, cameraKey);
+            AppLog.d(TAG, "设置 " + cameraKey + " 座舱相机宽高比(不旋转): "
+                    + previewSize.getWidth() + ":" + previewSize.getHeight());
         } else {
             // E5 等其他车型
             boolean needRotation = "left".equals(cameraKey) || "right".equals(cameraKey);

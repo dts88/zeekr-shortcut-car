@@ -80,7 +80,7 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="12"
+                android:layout_weight="14"
                 android:orientation="vertical">
 
                 <FrameLayout
@@ -140,11 +140,14 @@
                 </FrameLayout>
             </LinearLayout>
 
-            <!-- 右：操作按钮 -->
+            <!-- 右：操作按钮。
+                 按钮实际只需要约 312px（两列 88dp + 边距），原来分到 610px，
+                 而座舱那两路 16:10 的画面纵向被压掉 300 多像素 —— 把多余的宽度
+                 让给座舱列。 -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="8"
+                android:layout_weight="6"
                 android:orientation="vertical"
                 android:gravity="center">
 
