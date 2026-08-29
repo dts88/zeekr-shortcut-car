@@ -554,6 +554,40 @@ ro.board.platform   = msmnile
 **判断方法**：`grep` 一下有没有外部调用者。没有就是没有 —— 「以后可能会用」不是保留理由，
 git 历史里都在，需要时取回来即可。
 
+### MJPEG 推流：有意搁置，附恢复配方
+
+模块本体在 `ae701f0`（2026-08-27）随远程查看/钉钉/飞书一起删掉，那次把 APK 从
+24.4 MB 压到 16 MB。0.8.5 删的是它留下的空壳。**这是有意搁置，不是遗忘** ——
+用户 2026-08-29 确认暂不恢复，留在 git 历史里。
+
+将来要恢复的话，**用途已明确：手机浏览器远程看车内**（服务端模式）。
+那条路只需要一半的文件：
+
+| 需要 | 行数 | 作用 |
+|------|------|------|
+| `stream/StreamGlEncoder.java` | 631 | 独立 GL 管线，读回相机帧编 JPEG |
+| `stream/MjpegStreamManager.java` | 643 | 调度 |
+| `stream/MjpegStreamServer.java` | 214 | HTTP 服务端 |
+| `stream/MjpegFrameHolder.java` | 29 | 帧缓冲 |
+| `SingleCamera.setStreamSurface()` | — | 相机侧挂载点 |
+| AppConfig 的 MJPEG 配置项 | — | 端口/质量/尺寸/摄像头选择 |
+| `org.nanohttpd:nanohttpd:2.3.1` | — | 依赖 |
+
+**不需要**（那是 ESP32 客户端推流那条路）：`StreamClient`（380）、
+`Esp32Discovery`（88）、`UdpStreamServer`（169）、`RawTcpStreamServer`（128）、
+`FrameStreamServer`（18）。
+
+取回命令：
+
+```
+git show ae701f0^:app/src/main/java/com/kooo/evcam/stream/MjpegStreamServer.java
+git show 2e95ed9^:app/src/main/java/com/kooo/evcam/AppConfig.java      # 配置项
+git show 2e95ed9^:app/src/main/java/com/kooo/evcam/camera/SingleCamera.java  # 挂载点
+```
+
+界面 `MjpegStreamAdjustFragment`（511 行）和 `fragment_mjpeg_stream_adjust.xml`
+也在 `ae701f0^` / `2e95ed9^` 里。
+
 ---
 
 ## 5. 权限与网络
