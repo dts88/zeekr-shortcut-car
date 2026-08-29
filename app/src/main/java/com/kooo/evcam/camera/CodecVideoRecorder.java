@@ -610,6 +610,11 @@ public class CodecVideoRecorder {
                     // 设置时间水印（如果启用）
                     if (watermarkEnabled) {
                         eglEncoder.setWatermarkEnabled(true);
+                        // 规格行必须在这里再补一次。createEncoder() 里算好 encoderSpecLine
+                        // 之后也调过 applyWatermarkInfoLine()，但那时 eglEncoder 还是 null
+                        // —— 它是在本 runnable 里才 new 出来的 —— 所以那次是空转。
+                        // 不补的话第一段没有规格行，从第二段起才有：那时 eglEncoder 已经存在了。
+                        applyWatermarkInfoLine();
                     }
 
                     AppLog.d(TAG, "Camera " + cameraId + " EGL/SurfaceTexture initialized on encoder thread, textureId=" + textureId + ", watermark=" + watermarkEnabled);

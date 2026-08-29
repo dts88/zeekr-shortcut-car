@@ -9,6 +9,21 @@
 
 （暂无）
 
+## [0.7.7-alpha] - 2026-08-29
+
+### 修正
+
+- **角标的规格行第一段没有，从第二段才出现**。初始化顺序问题：
+
+  `createEncoder()` 里算好 `encoderSpecLine` 后会调 `applyWatermarkInfoLine()`，
+  但那一刻 `eglEncoder` 还是 `null` —— 它是在稍后 post 到编码线程的 runnable 里才
+  new 出来的，所以那次调用直接空转返回了。
+
+  而分段切换、录制恢复等路径再次调用 `createEncoder()` 时，`eglEncoder` 已经存在，
+  于是规格行正常写入 —— 这就是「第一段只有日期时间，第二段开始才有分辨率帧率」。
+
+  现在在 EGL 编码器创建完、`setWatermarkEnabled(true)` 之后再补一次，第一段就有了。
+
 ## [0.7.6-alpha] - 2026-08-29
 
 ### 修正
