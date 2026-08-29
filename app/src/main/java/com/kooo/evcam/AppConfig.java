@@ -443,6 +443,7 @@ public class AppConfig {
     public AppConfig(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        repairInvalidSettings();
     }
     
     // ==================== 首次启动相关方法 ====================
@@ -1004,6 +1005,77 @@ public class AppConfig {
     }
     
     
+    // ==================== 设置项自检 ====================
+
+    /** 每个进程只自检一次，AppConfig 到处都在 new，不必每次都查。 */
+    private static volatile boolean settingsRepaired = false;
+
+    /**
+     * 校验枚举型设置项，把不在合法取值内的值修回默认值。
+     *
+     * <p>起因是一个真实故障：设置页显示「四宫格」，录出来却是原始长条，
+     * 把选项切走再切回来就好了。这正是<b>存的值和显示的值对不上</b>的表现。</p>
+     *
+     * <p>设置页每个下拉框都是这么读的：</p>
+     *
+     * <pre>
+     *   int selectedIndex = 0;
+     *   for (...) if (VALUES[i].equals(current)) { selectedIndex = i; break; }
+     *   spinner.setSelection(selectedIndex);
+     * </pre>
+     *
+     * <p>存的字符串一个都没匹配上时，界面<b>默默</b>显示第 0 项，而配置里还是那个
+     * 对不上的值 —— 于是屏幕上写着一回事，程序按另一回事跑；切换选项之所以能「修好」，
+     * 只是因为那一下终于写进了一个两边一致的值。八个下拉框都是这个形状。</p>
+     *
+     * <p>与其在每个读取点各打一个补丁，不如让配置自己兜底：凡是取值不在合法集合里的
+     * 枚举项，一律修回文档写明的默认值并记日志。这样无论坏值是怎么来的 ——
+     * 写入被打断、版本之间合法取值变了、还是装了旧版本回去 —— 界面都不会再显示一个
+     * 程序不会遵守的设置。</p>
+     */
+    private void repairInvalidSettings() {
+        if (settingsRepaired) {
+            return;
+        }
+        settingsRepaired = true;
+
+        repairEnum(KEY_RECORD_LAYOUT, RECORD_LAYOUT_GRID,
+                new String[]{RECORD_LAYOUT_RAW, RECORD_LAYOUT_GRID}, "录制画面排列");
+        repairEnum(KEY_RECORD_FPS, RECORD_FPS_AUTO, RECORD_FPS_VALUES, "录制帧率");
+        repairEnum(KEY_PREVIEW_RESOLUTION, PREVIEW_RES_VALUES[1], PREVIEW_RES_VALUES,
+                "预览分辨率");
+        repairEnum(KEY_RECORDING_MODE, RECORDING_MODE_AUTO,
+                new String[]{RECORDING_MODE_AUTO, RECORDING_MODE_MEDIA_RECORDER,
+                        RECORDING_MODE_CODEC}, "录制模式");
+        repairEnum(KEY_BITRATE_LEVEL, BITRATE_MEDIUM,
+                new String[]{BITRATE_LOW, BITRATE_MEDIUM, BITRATE_HIGH}, "码率等级");
+    }
+
+    /**
+     * 一个枚举项的自检。
+     *
+     * @param key      SharedPreferences 键
+     * @param fallback 默认值
+     * @param allowed  合法取值
+     * @param label    日志里用的名字
+     */
+    private void repairEnum(String key, String fallback, String[] allowed, String label) {
+        if (!prefs.contains(key)) {
+            return;  // 没存过就走默认，没什么可修的
+        }
+        String current = prefs.getString(key, null);
+        if (current != null) {
+            for (String value : allowed) {
+                if (value.equals(current)) {
+                    return;
+                }
+            }
+        }
+        AppLog.w(TAG, label + " 的存值「" + current + "」不在合法取值内，已修回默认「"
+                + fallback + "」");
+        prefs.edit().putString(key, fallback).apply();
+    }
+
     // ==================== 车型配置相关方法 ====================
     
     /**

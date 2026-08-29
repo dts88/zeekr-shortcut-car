@@ -1239,9 +1239,19 @@ public class MultiCameraManager {
             com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan = null;
             int sourceWidth = previewSize.getWidth();
             int sourceHeight = previewSize.getHeight();
-            if (appConfig.isRecordGridLayout()
-                    && com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
-                            sourceWidth, sourceHeight)) {
+            boolean gridRequested = appConfig.isRecordGridLayout();
+            boolean sourceIsComposite =
+                    com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
+                            sourceWidth, sourceHeight);
+            // 设置写着四宫格却录出长条时，得能一眼看出是哪一步没成立
+            if (!gridRequested || !sourceIsComposite) {
+                AppLog.i(TAG, "Camera " + key + " 不做四宫格重排："
+                        + (gridRequested ? "" : "设置为原始长条；")
+                        + (sourceIsComposite ? "" : "源尺寸 " + sourceWidth + "x" + sourceHeight
+                                + " 不像合成条带；")
+                        + "将按原样编码");
+            }
+            if (gridRequested && sourceIsComposite) {
                 com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan =
                         com.kooo.evcam.zeekr.CompositeStreamGeometry.analyse(sourceWidth, sourceHeight);
                 if (plan.isComposite()) {
