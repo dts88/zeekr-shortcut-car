@@ -71,7 +71,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="选择视频预览和录制的目标分辨率"
+                    android:text="选择视频预览和录制的目标分辨率。环视合成流不受此项影响——它只在 1280×5140 下才是四联画面，始终按探测到的尺寸固定；此处的选择作用于座舱等普通摄像头"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
                     android:layout_marginTop="4dp"

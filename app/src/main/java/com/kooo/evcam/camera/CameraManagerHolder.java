@@ -202,7 +202,8 @@ public class CameraManagerHolder {
      * 规则还不一致 —— 后台这份根本不看手动指定的相机映射，于是同一台车前后台分配
      * 出来的槽位可能不同。</p>
      *
-     * <p>同样不强制环视的完整分辨率，原因见前台那份的说明。</p>
+     * <p>环视这一路同样钉住合成流尺寸，与前台一致 —— 否则前后台两条初始化路径会
+     * 协商出不同的分辨率，同一台车表现还不一样。</p>
      */
     private void initCamerasForZeekrMulti(AppConfig cfg, CameraManager cm, String[] cameraIds) {
         if (cameraIds.length == 0) {
@@ -223,6 +224,13 @@ public class CameraManagerHolder {
                 plan.cabin1Id, null,
                 plan.cabin2Id, null,
                 null, null);
+        // 只钉住环视，座舱两路仍按全局目标分辨率各自挑
+        if (plan.compositeIsReal && located.found()) {
+            SingleCamera cam = cameraManager.getCamera("front");
+            if (cam != null) {
+                cam.setPreferredSize(located.size);
+            }
+        }
         AppLog.i(TAG, "后台极氪多路映射: " + plan);
     }
 

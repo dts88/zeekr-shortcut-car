@@ -2129,16 +2129,20 @@ public class MainActivity extends AppCompatActivity {
      * <p>槽位分配交给 {@link com.kooo.evcam.zeekr.ZeekrMultiPlan}（纯逻辑、有单元测试），
      * 这里只负责套用与显示。</p>
      *
-     * <p><b>这里不再强制环视走 1280×5140。</b>三路一起黑（连合成流都看不到）最可能
-     * 就是它造成的：单路模式下只有一路相机，6.6MP 随便用；三路同开时，这一路再加两路
-     * 座舱很可能超出 HAL 的并发流预算，而会话配置失败是整组一起失败 ——
-     * 表现就是三个画面全黑。用户在「自定义」配置下能看到这三路，两者的差别正好就是
-     * 有没有强制这个尺寸。</p>
+     * <p><b>环视这一路固定用探测到的合成流尺寸</b>，与单路配置一致。</p>
      *
-     * <p>不指定尺寸时 {@code chooseOptimalSize} 会去够 1280×800，负担轻得多。
-     * 至于还要不要拆成四宫格，交给实际协商到的尺寸决定：
-     * {@link com.kooo.evcam.zeekr.FourLaneContainer} 会忽略任何不像合成条带的尺寸，
-     * 于是直接显示原始画面，而不是把一张普通图切成四块错的。</p>
+     * <p>0.6.0 曾以「强制 1280×5140 撑爆了 HAL 并发预算」为由去掉了这个固定，
+     * 那个判断是错的 —— 0.7.0 找到真正的原因（{@code configuredCameraCount >= 4}
+     * 那道判断让 initCamera 根本没被调用），固定与否都不影响三路能不能出画面。
+     * 而不固定会留下一个真实的坑：环视相机会退回去用全局「目标分辨率」，
+     * 可相机 2 压根没声明 1280×800，最近匹配会落到 1280×720 ——
+     * <b>四联合成的内容就此丢失，画面变成一张普通的小图</b>。
+     * 也就是说三路能正常工作，只是因为用户手动把画质里的目标分辨率设成了
+     * 1280×5140，这不该是它的依赖。</p>
+     *
+     * <p>合成流的尺寸是硬件事实、不是偏好：四联内容只在 1280×5140 下存在。
+     * 固定它之后，「目标分辨率」才回到它应有的含义 —— 那是给普通相机（座舱两路）
+     * 用的设置，在那里选择才是真的有意义。</p>
      */
     private void initCamerasForZeekrMulti(CameraManager cm, String[] cameraIds) {
         com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
@@ -2171,6 +2175,15 @@ public class MainActivity extends AppCompatActivity {
                 plan.cabin1Id, textureBack,
                 plan.cabin2Id, textureLeft,
                 null, null);
+
+        // 只钉住环视这一路的尺寸，不动全局「画质设置」——
+        // 座舱两路仍然按目标分辨率自己挑。
+        if (plan.compositeIsReal && located.found()) {
+            com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
+            if (cam != null) {
+                cam.setPreferredSize(located.size);
+            }
+        }
 
         updateCompositeInfoOverlay(describeMultiSlots(plan));
     }
