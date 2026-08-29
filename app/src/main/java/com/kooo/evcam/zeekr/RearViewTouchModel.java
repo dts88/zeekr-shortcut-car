@@ -124,8 +124,18 @@ public final class RearViewTouchModel {
         return Math.max(min, Math.min(max, scaled));
     }
 
-    /** 把窗口夹回屏幕内，允许贴边时露出一部分在外面。 */
+    /**
+     * 把窗口夹回屏幕内，允许贴边时露出一部分在外面。
+     *
+     * <p>窗口比屏幕还宽时（当前尺寸上限装不下，但公式不该因此失效）另算：
+     * 此时它必然覆盖整个屏幕，能做的只是左右平移去看两端，所以左边缘限制在
+     * {@code [screenW - width, 0]}。不这样分情况的话，通用公式会允许把一个
+     * 超宽窗口拖到几乎完全移出屏幕。</p>
+     */
     public static int clampX(int x, int width, int screenW, int peekWidth) {
+        if (width >= screenW) {
+            return Math.max(screenW - width, Math.min(0, x));
+        }
         int min = peekWidth - width;
         int max = screenW - peekWidth;
         if (max < min) {
