@@ -34,6 +34,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.kooo.evcam.zeekr.FisheyeProjection;
 
 import java.io.File;
 import java.util.List;
@@ -1459,6 +1460,7 @@ public class SettingsFragment extends Fragment {
         }
 
         initRearViewSizeSliders(view);
+        initRearViewFisheye(view);
 
         View resetButton = view.findViewById(R.id.btn_reset_rearview);
         if (resetButton != null) {
@@ -1474,6 +1476,63 @@ public class SettingsFragment extends Fragment {
                             Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+    }
+
+    /**
+     * 鱼眼校正开关与视野滑块。
+     *
+     * <p>视野用角度而不是畸变系数，是因为角度看得懂：「110°」能对着画面判断合不合适，
+     * 而 k1/k2 那种标定系数得拿棋盘格标定才有意义，没法凭手感调。</p>
+     */
+    private void initRearViewFisheye(View view) {
+        SwitchMaterial fisheyeSwitch = view.findViewById(R.id.switch_rearview_fisheye);
+        SeekBar fovBar = view.findViewById(R.id.seekbar_rearview_fov);
+        TextView fovText = view.findViewById(R.id.text_rearview_fov);
+        if (appConfig == null) {
+            return;
+        }
+
+        if (fisheyeSwitch != null) {
+            fisheyeSwitch.setChecked(appConfig.isRearViewFisheyeCorrection());
+            fisheyeSwitch.setOnCheckedChangeListener((button, isChecked) -> {
+                appConfig.setRearViewFisheyeCorrection(isChecked);
+                pushRearViewCorrection();
+            });
+        }
+
+        if (fovBar == null) {
+            return;
+        }
+        int fov = Math.round(appConfig.getRearViewFov());
+        fovBar.setProgress(fov);
+        if (fovText != null) {
+            fovText.setText(fov + "°");
+        }
+        fovBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fovText != null) {
+                    fovText.setText(Math.round(FisheyeProjection.clampFov(progress)) + "°");
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                appConfig.setRearViewFov(bar.getProgress());
+                pushRearViewCorrection();
+            }
+        });
+    }
+
+    /** 把校正设置推给正在显示的后视镜窗口。 */
+    private void pushRearViewCorrection() {
+        if (getContext() != null && appConfig.isRearViewEnabled()) {
+            com.kooo.evcam.zeekr.RearViewMirrorService.applyCorrection(getContext());
         }
     }
 

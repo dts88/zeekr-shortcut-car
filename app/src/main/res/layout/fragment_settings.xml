@@ -1003,6 +1003,84 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- 鱼眼校正 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="鱼眼校正"
+                            android:textColor="@color/text_primary"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="把鱼眼镜头的桶形畸变拉直，直线看起来才是直的。只改显示，录下来的原始画面不动"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_rearview_fisheye"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="视野角度"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="角度越大，画面收进来的范围越广，边缘拉伸也越明显"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <SeekBar
+                    android:id="@+id/seekbar_rearview_fov"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:min="90"
+                    android:max="140"
+                    android:progress="110" />
+
+                <TextView
+                    android:id="@+id/text_rearview_fov"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:text="110°" />
+            </LinearLayout>
+
             <!-- 超级后视镜尺寸 -->
             <LinearLayout
                 android:layout_width="match_parent"

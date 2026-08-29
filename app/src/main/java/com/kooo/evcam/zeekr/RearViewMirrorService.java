@@ -66,6 +66,14 @@ public class RearViewMirrorService extends Service {
         }
     }
 
+    /** 设置页改了鱼眼校正后通知正在显示的窗口。 */
+    public static void applyCorrection(Context context) {
+        RearViewMirrorService svc = instance;
+        if (svc != null && svc.mirrorView != null) {
+            svc.mirrorView.applyCorrectionFromConfig();
+        }
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();

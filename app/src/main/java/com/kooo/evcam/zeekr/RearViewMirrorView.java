@@ -79,6 +79,12 @@ public class RearViewMirrorView extends ViewGroup {
     private int windowStartX;
     private int windowStartY;
     private RearViewGeometry.Crop cropAtTouchStart;
+    /** 鱼眼校正开关与目标视野，进入时读一次，设置页改了再推过来。 */
+    private boolean fisheyeCorrection;
+    private float fovDegrees;
+    /** 分片绘制用的临时数组，避免每帧、每格都新建。 */
+    private final float[] meshSource = new float[8];
+    private final float[] meshDest = new float[8];
     private boolean dragging;
     /** 取景调整模式：显示整路画面 + 蒙版框，手势含义与平时不同。 */
     private boolean framingMode;
@@ -99,6 +105,8 @@ public class RearViewMirrorView extends ViewGroup {
         this.appConfig = appConfig;
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         this.crop = appConfig.getRearViewCrop();
+        this.fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
+        this.fovDegrees = appConfig.getRearViewFov();
 
         setBackgroundColor(0xFF000000);
 
@@ -262,19 +270,24 @@ public class RearViewMirrorView extends ViewGroup {
                         RearViewGeometry.Crop.full())
                 : RearViewGeometry.combinedSourceRect(plan, laneIndex, crop);
 
-        // 源矩形在子视图坐标系里的位置。用归一化坐标是关键：
-        // HAL 给的缓冲区可能被压扁，但比例关系不变。
-        sourceRect.set(rect[0] * width, rect[1] * height,
-                (rect[0] + rect[2]) * width, (rect[1] + rect[3]) * height);
-        destRect.set(0, 0, width, height);
+        if (fisheyeCorrection) {
+            drawCorrected(canvas, width, height,
+                    framingMode ? RearViewGeometry.Crop.full() : crop);
+        } else {
+            // 源矩形在子视图坐标系里的位置。用归一化坐标是关键：
+            // HAL 给的缓冲区可能被压扁，但比例关系不变。
+            sourceRect.set(rect[0] * width, rect[1] * height,
+                    (rect[0] + rect[2]) * width, (rect[1] + rect[3]) * height);
+            destRect.set(0, 0, width, height);
 
-        drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
+            drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
 
-        int save = canvas.save();
-        canvas.clipRect(destRect);
-        canvas.concat(drawMatrix);
-        drawChild(canvas, textureView, getDrawingTime());
-        canvas.restoreToCount(save);
+            int save = canvas.save();
+            canvas.clipRect(destRect);
+            canvas.concat(drawMatrix);
+            drawChild(canvas, textureView, getDrawingTime());
+            canvas.restoreToCount(save);
+        }
 
         if (framingMode) {
             drawFramingOverlay(canvas, width, height);
@@ -495,14 +508,80 @@ public class RearViewMirrorView extends ViewGroup {
         return getResources().getDisplayMetrics().heightPixels;
     }
 
-    // ------------------------------------------------------------------
-    // 鱼眼校正尚未接入。
-    //
-    // 每一路都是鱼眼镜头拍的，畸变很大，理应先校正再取景 —— 但校正是非线性的，
-    // 矩阵做不了，必须上着色器。而这台车机上「GL 顶替相机生产者」是已知会崩的做法，
-    // 现有的 FisheyeCorrector 走的正是那条路，且从来没有在这台车上跑过。
-    //
-    // 所以先把纯裁切这条安全路径做通、在车上验证，再单独处理校正，
-    // 而不是把两个不确定性绑在一起上车。
-    // ------------------------------------------------------------------
+    /**
+     * 带鱼眼校正的绘制：把输出切成小格，逐格反投影。
+     *
+     * <p>校正是非线性的，一个矩阵表达不了整幅画面 —— 但一小格之内，用四个角
+     * 定出的映射已经足够接近。于是每格用 {@code setPolyToPoly} 走一次线性映射，
+     * 格子够密，拼起来看不出接缝。</p>
+     *
+     * <p>关键在于这样做<b>不需要 OpenGL</b>：画的还是原来那个 TextureView，
+     * 相机的消费者始终只有它一个。这台车机上用 GL 自建 SurfaceTexture 顶替
+     * 相机生产者是已知会崩的（见 {@link CompositeStreamGeometry} 的平台记录），
+     * 而校正本身并不值得去冒那个险。</p>
+     *
+     * <p>代价是每帧 {@code N²} 次绘制。后视镜是一块小窗口，这个量级扛得住。</p>
+     */
+    private void drawCorrected(Canvas canvas, int width, int height,
+                               RearViewGeometry.Crop effectiveCrop) {
+        RearViewGeometry.ShaderRects r =
+                RearViewGeometry.toShaderRects(plan, laneIndex, effectiveCrop);
+        int divisions = FisheyeProjection.MESH_DIVISIONS;
+        long drawingTime = getDrawingTime();
+
+        for (int row = 0; row < divisions; row++) {
+            float v0 = (float) row / divisions;
+            float v1 = (float) (row + 1) / divisions;
+            for (int column = 0; column < divisions; column++) {
+                float u0 = (float) column / divisions;
+                float u1 = (float) (column + 1) / divisions;
+
+                // 目标：这一格在窗口里的四个角，顺序为左上、右上、右下、左下
+                meshDest[0] = u0 * width; meshDest[1] = v0 * height;
+                meshDest[2] = u1 * width; meshDest[3] = v0 * height;
+                meshDest[4] = u1 * width; meshDest[5] = v1 * height;
+                meshDest[6] = u0 * width; meshDest[7] = v1 * height;
+
+                // 源：同样四个角，逐个经「蒙版 -> 校正 -> 该路在合成流里的位置」换算
+                sourceCorner(r, u0, v0, width, height, 0);
+                sourceCorner(r, u1, v0, width, height, 2);
+                sourceCorner(r, u1, v1, width, height, 4);
+                sourceCorner(r, u0, v1, width, height, 6);
+
+                int save = canvas.save();
+                destRect.set(meshDest[0], meshDest[1], meshDest[4], meshDest[5]);
+                canvas.clipRect(destRect);
+                drawMatrix.reset();
+                if (drawMatrix.setPolyToPoly(meshSource, 0, meshDest, 0, 4)) {
+                    canvas.concat(drawMatrix);
+                    drawChild(canvas, textureView, drawingTime);
+                }
+                canvas.restoreToCount(save);
+            }
+        }
+    }
+
+    /**
+     * 窗口里的一个角 → 子视图坐标系里的采样点。
+     *
+     * <p>三步走，顺序不能换：先按蒙版落到「校正后画面」里，再反投影回原始鱼眼画面，
+     * 最后加上这一路在合成流里的偏移。蒙版之所以作用在校正之后，是因为用户是对着
+     * 校正后的成像取景的 —— 框住的就该是他看到的那一块。</p>
+     */
+    private void sourceCorner(RearViewGeometry.ShaderRects r, float u, float v,
+                              int width, int height, int offset) {
+        float correctedX = r.cropOffsetX + u * r.cropScaleX;
+        float correctedY = r.cropOffsetY + v * r.cropScaleY;
+        FisheyeProjection.sourcePoint(correctedX, correctedY, fovDegrees, meshSource, offset);
+        meshSource[offset] = (r.laneOffsetX + meshSource[offset] * r.laneScaleX) * width;
+        meshSource[offset + 1] = (r.laneOffsetY + meshSource[offset + 1] * r.laneScaleY) * height;
+    }
+
+    /** 设置页改了校正开关或视野后，推到正在显示的窗口。 */
+    public void applyCorrectionFromConfig() {
+        fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
+        fovDegrees = appConfig.getRearViewFov();
+        AppLog.i(TAG, "鱼眼校正 " + (fisheyeCorrection ? "开，视野 " + fovDegrees + "°" : "关"));
+        invalidate();
+    }
 }

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.kooo.evcam.config.BlindSpotConfig;
+import com.kooo.evcam.zeekr.FisheyeProjection;
 import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
 
@@ -94,6 +95,8 @@ public class AppConfig {
 
     // 超级后视镜：把环视合成流里后方那一路单独放大显示
     private static final String KEY_REARVIEW_ENABLED = "rearview_enabled";        // 总开关
+    private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
+    private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
     private static final String KEY_REARVIEW_CROP_X = "rearview_crop_x";          // 蒙版，归一化
@@ -1090,6 +1093,25 @@ public class AppConfig {
                 .apply();
     }
 
+    /** 是否对后视镜画面做鱼眼校正。只影响显示，录制的原始画面不动。 */
+    public boolean isRearViewFisheyeCorrection() {
+        return prefs.getBoolean(KEY_REARVIEW_FISHEYE, false);
+    }
+
+    public void setRearViewFisheyeCorrection(boolean on) {
+        prefs.edit().putBoolean(KEY_REARVIEW_FISHEYE, on).apply();
+    }
+
+    /** 校正的目标视野角度（度）。 */
+    public float getRearViewFov() {
+        return FisheyeProjection.clampFov(
+                prefs.getFloat(KEY_REARVIEW_FOV, FisheyeProjection.DEFAULT_FOV_DEGREES));
+    }
+
+    public void setRearViewFov(float degrees) {
+        prefs.edit().putFloat(KEY_REARVIEW_FOV, FisheyeProjection.clampFov(degrees)).apply();
+    }
+
     public static int clampRearViewSize(int px) {
         return Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, px));
     }
@@ -1142,6 +1164,8 @@ public class AppConfig {
         prefs.edit()
                 .remove(KEY_REARVIEW_X)
                 .remove(KEY_REARVIEW_Y)
+                .remove(KEY_REARVIEW_FISHEYE)
+                .remove(KEY_REARVIEW_FOV)
                 .remove(KEY_REARVIEW_WIDTH)
                 .remove(KEY_REARVIEW_HEIGHT)
                 .remove(KEY_REARVIEW_CROP_X)
