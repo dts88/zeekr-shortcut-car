@@ -269,6 +269,44 @@ public class AppConfig {
     public static final int FLOATING_SIZE_DEFAULT = 85;
     /** 悬浮窗按钮的默认不透明度（%）。 */
     public static final int FLOATING_ALPHA_DEFAULT = 75;
+
+    // ---- 悬浮元素的默认位置（2026-08-29 实车调好后测得，见诊断报告第 7 节）----
+    //
+    // 位置按下面这块参照屏幕记录，使用时再按实际屏幕等比换算。
+    // 直接存像素值的话，换一块尺寸不同的屏就会跑到画面外面去。
+
+    /** 记录这些默认位置时的屏幕尺寸（极氪 7X 内置屏，整屏）。 */
+    public static final int REFERENCE_SCREEN_WIDTH = 3200;
+    public static final int REFERENCE_SCREEN_HEIGHT = 2000;
+
+    /** 录制悬浮按钮的默认位置。 */
+    public static final int DEFAULT_RECORDING_FLOATING_X = 2943;
+    public static final int DEFAULT_RECORDING_FLOATING_Y = 205;
+
+    /** 悬浮按钮（打开应用/状态指示）的默认位置。 */
+    public static final int DEFAULT_FLOATING_WINDOW_X = 2890;
+    public static final int DEFAULT_FLOATING_WINDOW_Y = 33;
+
+    /**
+     * 把参照屏幕上的横坐标换算到当前屏幕。
+     *
+     * @param referenceX  参照屏幕上的 X
+     * @param screenWidth 当前屏幕宽度；&lt;= 0 时原样返回
+     */
+    public static int scaleDefaultX(int referenceX, int screenWidth) {
+        if (screenWidth <= 0) {
+            return referenceX;
+        }
+        return Math.round(referenceX * (float) screenWidth / REFERENCE_SCREEN_WIDTH);
+    }
+
+    /** @see #scaleDefaultX(int, int) */
+    public static int scaleDefaultY(int referenceY, int screenHeight) {
+        if (screenHeight <= 0) {
+            return referenceY;
+        }
+        return Math.round(referenceY * (float) screenHeight / REFERENCE_SCREEN_HEIGHT);
+    }
     
     // 录制模式常量
     public static final String RECORDING_MODE_AUTO = "auto";  // 自动（根据车型决定）
@@ -3800,7 +3838,7 @@ public class AppConfig {
     private static final String KEY_RECORDING_FLOATING_X = "recording_floating_x";
     private static final String KEY_RECORDING_FLOATING_Y = "recording_floating_y";
     private static final boolean DEFAULT_RECORDING_FLOATING_ENABLED = true;  // 默认开启
-    private static final int DEFAULT_BUTTON_SIZE_DP = 64;
+    private static final int DEFAULT_BUTTON_SIZE_DP = 65;  // 实车调好后测得
     private static final int DEFAULT_TIME_TEXT_SIZE_SP = 14;
 
     /**

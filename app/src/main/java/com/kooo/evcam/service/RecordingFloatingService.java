@@ -358,17 +358,16 @@ public class RecordingFloatingService extends Service {
 
         layoutParams.gravity = Gravity.TOP | Gravity.START;
 
-        // 默认位置：左侧中间
-        // 恢复上次拖到的位置；没存过就用默认的左侧居中
+        // 恢复上次拖到的位置；没存过就用实车调好的默认位置
+        // （2026-08-29 在 3200x2000 上测得，按当前屏幕等比换算，见 AppConfig）
         int savedX = appConfig.getRecordingFloatingX();
         int savedY = appConfig.getRecordingFloatingY();
-        if (savedX >= 0 && savedY >= 0) {
-            layoutParams.x = Math.min(savedX, Math.max(0, screenWidth - buttonSize));
-            layoutParams.y = Math.min(savedY, Math.max(0, screenHeight - buttonSize));
-        } else {
-            layoutParams.x = 20;
-            layoutParams.y = screenHeight / 2 - buttonSize / 2;
+        if (savedX < 0 || savedY < 0) {
+            savedX = AppConfig.scaleDefaultX(AppConfig.DEFAULT_RECORDING_FLOATING_X, screenWidth);
+            savedY = AppConfig.scaleDefaultY(AppConfig.DEFAULT_RECORDING_FLOATING_Y, screenHeight);
         }
+        layoutParams.x = Math.min(savedX, Math.max(0, screenWidth - buttonSize));
+        layoutParams.y = Math.min(savedY, Math.max(0, screenHeight - buttonSize));
 
         // 设置触摸事件
         floatingContainer.setOnTouchListener(new View.OnTouchListener() {

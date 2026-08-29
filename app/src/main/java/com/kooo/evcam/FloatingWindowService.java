@@ -194,16 +194,18 @@ public class FloatingWindowService extends Service {
         
         layoutParams.gravity = Gravity.TOP | Gravity.START;
         
-        // 恢复保存的位置或使用默认位置
-        if (savedX >= 0 && savedY >= 0) {
-            layoutParams.x = savedX;
-            layoutParams.y = savedY;
-        } else {
-            // 默认位置：右侧中间
-            DisplayMetrics metrics = getResources().getDisplayMetrics();
-            layoutParams.x = metrics.widthPixels - sizePx - 20;
-            layoutParams.y = metrics.heightPixels / 2 - sizePx / 2;
+        // 恢复保存的位置；没存过就用实车调好的默认位置
+        // （2026-08-29 在 3200x2000 上测得，按当前屏幕等比换算，见 AppConfig）
+        DisplayMetrics screenMetrics = getResources().getDisplayMetrics();
+        if (savedX < 0 || savedY < 0) {
+            savedX = AppConfig.scaleDefaultX(
+                    AppConfig.DEFAULT_FLOATING_WINDOW_X, screenMetrics.widthPixels);
+            savedY = AppConfig.scaleDefaultY(
+                    AppConfig.DEFAULT_FLOATING_WINDOW_Y, screenMetrics.heightPixels);
         }
+        // 夹在屏幕内，免得换屏之后跑到看不见的地方
+        layoutParams.x = Math.max(0, Math.min(savedX, screenMetrics.widthPixels - sizePx));
+        layoutParams.y = Math.max(0, Math.min(savedY, screenMetrics.heightPixels - sizePx));
         
         // 设置触摸事件
         floatingView.setOnTouchListener(new View.OnTouchListener() {
