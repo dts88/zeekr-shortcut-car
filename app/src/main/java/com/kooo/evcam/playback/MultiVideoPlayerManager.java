@@ -4,18 +4,14 @@ import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.TextureView;
 import android.view.View;
-import android.widget.VideoView;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 多路视频同步播放管理器
@@ -32,15 +28,14 @@ public class MultiVideoPlayerManager {
     /** 等「已渲染第一帧」最多等多久，超时就直接显示。 */
     private static final long SHOW_VIDEO_TIMEOUT_MS = 1500L;
 
-    /** 各位置的VideoView */
-    private VideoView videoFront;
-    private VideoView videoBack;
-    private VideoView videoLeft;
-    private VideoView videoRight;
-    private VideoView videoSingle;  // 单路模式用
+    /** 各位置的播放器 */
+    private ManagedVideoPlayer videoFront;
+    private ManagedVideoPlayer videoBack;
+    private ManagedVideoPlayer videoLeft;
+    private ManagedVideoPlayer videoRight;
+    private ManagedVideoPlayer videoSingle;  // 单路模式用
 
     /** 各位置的MediaPlayer引用（用于倍速控制） */
-    private final Map<String, MediaPlayer> mediaPlayers = new HashMap<>();
 
     /** 当前加载的视频组 */
     private VideoGroup currentGroup;
@@ -85,14 +80,22 @@ public class MultiVideoPlayerManager {
     }
 
     /**
-     * 设置VideoView引用
+     * 设置各路的显示视图
      */
-    public void setVideoViews(VideoView front, VideoView back, VideoView left, VideoView right, VideoView single) {
-        this.videoFront = front;
-        this.videoBack = back;
-        this.videoLeft = left;
-        this.videoRight = right;
-        this.videoSingle = single;
+    /**
+     * 传入五个 TextureView，本类为每一个建一个自己管的播放器。
+     *
+     * <p>以前这里收的是 VideoView。改掉的直接原因是透明：VideoView 内部是
+     * SurfaceView，会在窗口上挖洞 —— 网格里四个窗口就是四个洞，放大成一路才只剩
+     * 一个，所以「放大一路后就没有了」。TextureView 画在窗口里，没有这个行为。</p>
+     */
+    public void setVideoViews(TextureView front, TextureView back, TextureView left,
+                              TextureView right, TextureView single) {
+        this.videoFront = front != null ? new ManagedVideoPlayer(front) : null;
+        this.videoBack = back != null ? new ManagedVideoPlayer(back) : null;
+        this.videoLeft = left != null ? new ManagedVideoPlayer(left) : null;
+        this.videoRight = right != null ? new ManagedVideoPlayer(right) : null;
+        this.videoSingle = single != null ? new ManagedVideoPlayer(single) : null;
     }
 
     /**
@@ -114,7 +117,6 @@ public class MultiVideoPlayerManager {
         this.preparedCount = 0;
         this.totalVideos = 0;
         this.duration = 0;
-        this.mediaPlayers.clear();
 
         if (group == null) {
             return;
@@ -146,79 +148,55 @@ public class MultiVideoPlayerManager {
     }
 
     /**
-     * 加载单个视频到VideoView
+     * 加载单个视频到对应的播放器
      */
-    private void loadVideoIfExists(String position, File videoFile, VideoView videoView) {
-        if (videoFile == null || !videoFile.exists() || videoView == null) {
+    private void loadVideoIfExists(String position, File videoFile, ManagedVideoPlayer player) {
+        if (videoFile == null || !videoFile.exists() || player == null) {
             return;
         }
 
-        try {
-            Uri uri = Uri.fromFile(videoFile);
-
-            // 新视频渲染出第一帧之前先藏起来，避免显示上一个播放器留下的脏缓冲区
-            // （全绿是没写过的 YUV420 缓冲区，马赛克是上一个文件的残帧）。
-            // 文件本身没问题，解码器也够用，要挡的是「把脏缓冲显示出来」。
-            videoView.setVisibility(View.INVISIBLE);
-            // 兜底：MEDIA_INFO_VIDEO_RENDERING_START 并非所有实现都会发，
-            // 真不发的话没有这个超时画面就永远不显示了。
-            final Runnable showFallback = () -> videoView.setVisibility(View.VISIBLE);
-            handler.postDelayed(showFallback, SHOW_VIDEO_TIMEOUT_MS);
-            videoView.setOnInfoListener((mp, what, extra) -> {
-                if (what == android.media.MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                    handler.removeCallbacks(showFallback);
-                    videoView.setVisibility(View.VISIBLE);
+        player.setListener(new ManagedVideoPlayer.Listener() {
+            @Override
+            public void onPrepared(ManagedVideoPlayer p, int durationMs) {
+                Log.d(TAG, "Video prepared: " + position + ", duration=" + durationMs);
+                if (durationMs > duration) {
+                    duration = durationMs;
                 }
-                return false;
-            });
-
-            videoView.setVideoURI(uri);
-
-            videoView.setOnPreparedListener(mp -> {
-                Log.d(TAG, "Video prepared: " + position);
-                mediaPlayers.put(position, mp);
-
-                // 行车记录仪视频没有声音，设置静音
-                mp.setVolume(0f, 0f);
-
-                // 记录最长时长
-                int videoDuration = mp.getDuration();
-                Log.d(TAG, "Video duration: " + position + " = " + videoDuration + "ms");
-                if (videoDuration > duration) {
-                    duration = videoDuration;
-                    Log.d(TAG, "Updated max duration: " + duration + "ms");
-                }
-
-                // 设置倍速
-                setMediaPlayerSpeed(mp, currentSpeed);
-
+                p.setSpeed(currentSpeed);
                 preparedCount++;
-                Log.d(TAG, "Prepared count: " + preparedCount + "/" + totalVideos);
                 checkAllPrepared();
-            });
+            }
 
-            videoView.setOnCompletionListener(mp -> {
-                // 所有视频播放完成
+            @Override
+            public void onCompletion(ManagedVideoPlayer p) {
                 isPlaying = false;
                 if (playbackListener != null) {
                     playbackListener.onPlaybackStateChanged(false);
                     playbackListener.onCompletion();
                 }
-            });
+            }
 
-            videoView.setOnErrorListener((mp, what, extra) -> {
+            @Override
+            public void onError(ManagedVideoPlayer p, int what, int extra) {
                 if (!isStopping) {
                     Log.w(TAG, "Video error: " + position + ", what=" + what + ", extra=" + extra);
                     if (playbackListener != null) {
-                        playbackListener.onError("Video error: " + position + ", what=" + what + ", extra=" + extra);
+                        playbackListener.onError("Video error: " + position
+                                + ", what=" + what + ", extra=" + extra);
                     }
                 }
-                return true;
-            });
+            }
 
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load video: " + position, e);
-        }
+            @Override
+            public void onFirstFrame(ManagedVideoPlayer p) {
+                // 有画面了才显示，避免露出上一个文件的残帧
+                p.getView().setVisibility(View.VISIBLE);
+            }
+        });
+
+        // 新画面出来之前先藏着
+        player.getView().setVisibility(View.INVISIBLE);
+        player.open(videoFile.getAbsolutePath(), 0, false);
     }
 
     /**
@@ -253,21 +231,21 @@ public class MultiVideoPlayerManager {
         if (isSingleMode) {
             // 单路模式播放 videoSingle（用户看到的视频）
             if (videoSingle != null) {
-                videoSingle.start();
+                videoSingle.play();
             }
         } else {
             // 多路模式播放所有
             if (videoFront != null && currentGroup != null && currentGroup.hasVideo(VideoGroup.POSITION_FRONT)) {
-                videoFront.start();
+                videoFront.play();
             }
             if (videoBack != null && currentGroup != null && currentGroup.hasVideo(VideoGroup.POSITION_BACK)) {
-                videoBack.start();
+                videoBack.play();
             }
             if (videoLeft != null && currentGroup != null && currentGroup.hasVideo(VideoGroup.POSITION_LEFT)) {
-                videoLeft.start();
+                videoLeft.play();
             }
             if (videoRight != null && currentGroup != null && currentGroup.hasVideo(VideoGroup.POSITION_RIGHT)) {
-                videoRight.start();
+                videoRight.play();
             }
         }
 
@@ -326,28 +304,19 @@ public class MultiVideoPlayerManager {
             Log.e(TAG, "Error stopping playback", e);
         }
 
-        mediaPlayers.clear();
         isStopping = false;
     }
 
     /**
-     * 停掉一路并摘掉它的回调。
+     * 停掉一路。
      *
-     * <p>只 stopPlayback 是不够的：三个回调仍挂在 VideoView 上，而它们闭包引用着
-     * preparedCount / totalVideos / duration 这些计数。下一组加载时会把计数清零并
-     * 重新注册回调，此时上一组还在途中的 onPrepared 就会落到新状态上 ——
-     * preparedCount 被多加一次，checkAllPrepared() 提前判定完成，
-     * 于是对还没准备好的视图执行播放。</p>
+     * <p>回调的丢弃、解码器的释放都由 {@link ManagedVideoPlayer} 自己负责 ——
+     * 以前要在这里手动摘回调，是因为 VideoView 把播放器藏在内部，外面只能这么补。</p>
      */
-    private void detachAndStop(VideoView videoView) {
-        if (videoView == null) {
-            return;
+    private void detachAndStop(ManagedVideoPlayer player) {
+        if (player != null) {
+            player.stop();
         }
-        videoView.setOnPreparedListener(null);
-        videoView.setOnCompletionListener(null);
-        videoView.setOnErrorListener(null);
-        videoView.setOnInfoListener(null);
-        videoView.stopPlayback();
     }
 
     /**
@@ -393,7 +362,7 @@ public class MultiVideoPlayerManager {
                 // videoSingle 可能未准备好，尝试从四宫格获取
             }
             // 后备：从四宫格中对应位置的视频获取
-            VideoView sourceVideo = getSingleModeVideoView();
+            ManagedVideoPlayer sourceVideo = getSingleModeVideoView();
             if (sourceVideo != null) {
                 try {
                     return sourceVideo.getCurrentPosition();
@@ -449,9 +418,7 @@ public class MultiVideoPlayerManager {
         currentSpeed = SPEED_OPTIONS[currentSpeedIndex];
         
         // 应用新倍速到所有播放器
-        for (MediaPlayer mp : mediaPlayers.values()) {
-            setMediaPlayerSpeed(mp, currentSpeed);
-        }
+        applySpeedToAll();
         
         return currentSpeed;
     }
@@ -468,9 +435,7 @@ public class MultiVideoPlayerManager {
             }
         }
         
-        for (MediaPlayer mp : mediaPlayers.values()) {
-            setMediaPlayerSpeed(mp, currentSpeed);
-        }
+        applySpeedToAll();
     }
 
     /**
@@ -483,12 +448,12 @@ public class MultiVideoPlayerManager {
     /**
      * 设置MediaPlayer的播放速度
      */
-    private void setMediaPlayerSpeed(MediaPlayer mp, float speed) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                mp.setPlaybackParams(mp.getPlaybackParams().setSpeed(speed));
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to set playback speed", e);
+    /** 把当前倍速下发给所有已就绪的播放器。 */
+    private void applySpeedToAll() {
+        for (ManagedVideoPlayer p : new ManagedVideoPlayer[]{
+                videoFront, videoBack, videoLeft, videoRight, videoSingle}) {
+            if (p != null) {
+                p.setSpeed(currentSpeed);
             }
         }
     }
@@ -541,7 +506,7 @@ public class MultiVideoPlayerManager {
                 if (videoBack != null) videoBack.pause();
                 if (videoLeft != null) videoLeft.pause();
                 if (videoRight != null) videoRight.pause();
-                // 将源视频的内容显示到单路VideoView
+                // 将源视频的内容显示到单路播放器
                 loadSingleModeVideo(savedPosition, wasPlaying);
             } else {
                 // 切换回多路：暂停单路视频
@@ -574,53 +539,52 @@ public class MultiVideoPlayerManager {
         if (currentGroup == null || videoSingle == null) return;
 
         File videoFile = currentGroup.getVideoFile(singleModePosition);
-        if (videoFile != null && videoFile.exists()) {
-            try {
-                Uri uri = Uri.fromFile(videoFile);
-                videoSingle.setVideoURI(uri);
-                videoSingle.setOnPreparedListener(mp -> {
-                    mediaPlayers.put("single", mp);
-                    // 行车记录仪视频没有声音，设置静音
-                    mp.setVolume(0f, 0f);
-                    setMediaPlayerSpeed(mp, currentSpeed);
-                    // 放弃音频焦点
-                    abandonAudioFocus();
-                    // 视频准备好后再 seek 和播放
-                    mp.seekTo(seekPosition);
-                    
-                    // 通知 UI 单路视频已准备好（可以显示画面了）
-                    if (playbackListener != null) {
-                        playbackListener.onSingleVideoPrepared();
-                    }
-                    
-                    if (autoPlay) {
-                        mp.start();
-                        isPlaying = true;
-                        startProgressUpdate();
-                        // 通知 UI 更新按钮状态
-                        if (playbackListener != null) {
-                            playbackListener.onPlaybackStateChanged(true);
-                        }
-                    } else {
-                        // 确保视频暂停（某些设备 seek 后会自动播放）
-                        mp.pause();
-                        isPlaying = false;
-                        // 通知 UI 更新按钮状态
-                        if (playbackListener != null) {
-                            playbackListener.onPlaybackStateChanged(false);
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to load single mode video", e);
-            }
+        if (videoFile == null || !videoFile.exists()) {
+            return;
         }
+
+        final int startAt = seekPosition;
+        final boolean play = autoPlay;
+        videoSingle.setListener(new ManagedVideoPlayer.SimpleListener() {
+            @Override
+            public void onPrepared(ManagedVideoPlayer p, int durationMs) {
+                p.setSpeed(currentSpeed);
+                abandonAudioFocus();
+                isPlaying = play;
+                if (playbackListener != null) {
+                    playbackListener.onSingleVideoPrepared();
+                    playbackListener.onPlaybackStateChanged(play);
+                }
+                if (play) {
+                    startProgressUpdate();
+                }
+            }
+
+            @Override
+            public void onFirstFrame(ManagedVideoPlayer p) {
+                p.getView().setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onError(ManagedVideoPlayer p, int what, int extra) {
+                Log.w(TAG, "单路播放出错 what=" + what + " extra=" + extra);
+                if (playbackListener != null) {
+                    playbackListener.onError("单路播放出错: what=" + what);
+                }
+            }
+        });
+
+        // seek 与「是否自动播放」都交给播放器在 prepare 完成后处理 ——
+        // 以前这里要自己 seek 再 pause（「某些设备 seek 后会自动播放」），
+        // 那是因为 VideoView 的状态不在我们手里，只能事后纠正。
+        videoSingle.getView().setVisibility(View.INVISIBLE);
+        videoSingle.open(videoFile.getAbsolutePath(), startAt, play);
     }
 
     /**
-     * 获取单路模式对应的VideoView
+     * 获取单路模式对应的播放器
      */
-    private VideoView getSingleModeVideoView() {
+    private ManagedVideoPlayer getSingleModeVideoView() {
         switch (singleModePosition) {
             case VideoGroup.POSITION_FRONT:
                 return videoFront;
@@ -699,7 +663,6 @@ public class MultiVideoPlayerManager {
      */
     public void release() {
         stopAll();
-        mediaPlayers.clear();
         playbackListener = null;
     }
 

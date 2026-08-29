@@ -9,8 +9,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.view.TextureView;
 import android.widget.Toast;
-import android.widget.VideoView;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -19,6 +19,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
+import com.kooo.evcam.playback.ManagedVideoPlayer;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -37,9 +38,12 @@ import java.util.Locale;
  * <p>时间轴换算全部交给 {@link RecordingTimeline}（纯逻辑、有单元测试）。
  * 这里只负责：读时长、按定位切文件、跨段自动续播。</p>
  *
- * <p><b>已知限制</b>：用的是 VideoView/MediaPlayer，切文件时需要重新 prepare，
- * 因此段与段之间有零点几秒的停顿。要做到无缝需要换成 ExoPlayer 的
- * ConcatenatingMediaSource，但那会显著增大 APK —— 先看这个形态是否够用。</p>
+ * <p>播放交给 {@link com.kooo.evcam.playback.ManagedVideoPlayer}：由它保证
+ * 「没准备好不 seek」「旧回调丢弃」「打开串行化」，本类只管时间轴上该放哪一段。</p>
+ *
+ * <p><b>已知限制</b>：切文件仍要重新 prepare，段与段之间有短暂停顿。
+ * 要做到无缝需要在当前段播放时预加载下一段，播放器已经具备这个条件
+ * （可以先 prepare 不播），但还没接上。</p>
  */
 public class TimelinePlayerActivity extends Activity {
 
@@ -58,7 +62,7 @@ public class TimelinePlayerActivity extends Activity {
     /** 连续回放只播环视合成流那一路；座舱各路不参与时间轴。 */
     private static final String COMPOSITE_SLOT = "front";
 
-    private VideoView videoView;
+    private ManagedVideoPlayer player;
     private SeekBar seekBar;
     private TextView positionText;
     private TextView infoText;
@@ -120,7 +124,8 @@ public class TimelinePlayerActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timeline_player);
 
-        videoView = findViewById(R.id.timeline_video);
+        TextureView videoSurface = findViewById(R.id.timeline_video);
+        player = new ManagedVideoPlayer(videoSurface);
         seekBar = findViewById(R.id.timeline_seek);
         positionText = findViewById(R.id.timeline_position);
         infoText = findViewById(R.id.timeline_info);
@@ -153,16 +158,23 @@ public class TimelinePlayerActivity extends Activity {
 
         setupSeekBar();
 
-        // 新的一段真正渲染出第一帧之前，别把画面露出来。
-        //
-        // VideoView 的这块 SurfaceView 在多次 setVideoPath 之间是复用的，
-        // 上一个播放器被中途拆掉时，缓冲队列里可能还留着它分配了却没写过的缓冲区 ——
-        // 那块内存以 YUV420 解读就是全绿；也可能是上一个文件的残帧，看起来像马赛克。
-        // 文件本身没问题（拿到电脑上播是好的），解码器也支持这个尺寸，
-        // 所以要挡住的不是解码，而是「把脏缓冲区显示出来」这件事。
-        videoView.setOnInfoListener((mp, what, extra) -> {
-            if (what == android.media.MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                handler.removeCallbacks(showVideoFallback);
+        // 播放器自己保证「没准备好不 seek」「旧回调丢弃」「打开串行化」，
+        // 这里只关心时间轴上该放哪一段。
+        player.setListener(new ManagedVideoPlayer.SimpleListener() {
+            @Override
+            public void onPrepared(ManagedVideoPlayer p, int durationMs) {
+                preparedSegmentIndex = preparingSegmentIndex;
+                preparingSegmentIndex = -1;
+                consecutiveErrors = 0;
+                if (switchStartedAtMs > 0) {
+                    AppLog.d(TAG, "切换耗时 · 准备完成: "
+                            + (android.os.SystemClock.elapsedRealtime() - switchStartedAtMs) + "ms");
+                }
+                updatePlayPauseLabel();
+            }
+
+            @Override
+            public void onFirstFrame(ManagedVideoPlayer p) {
                 if (switchStartedAtMs > 0) {
                     AppLog.i(TAG, "切换耗时 · 出现第一帧: "
                             + (android.os.SystemClock.elapsedRealtime() - switchStartedAtMs) + "ms");
@@ -170,50 +182,26 @@ public class TimelinePlayerActivity extends Activity {
                 }
                 uncoverVideo();
             }
-            return false;
-        });
 
-        // 三个监听器只在这里注册一次。以前 onPrepared 是每次切文件时重新注册的，
-        // 那样闭包捕获的是那一次的偏移量，切换密集时可能把旧偏移套到新文件上。
-        videoView.setOnPreparedListener(mp -> {
-            preparedSegmentIndex = preparingSegmentIndex;
-            preparingSegmentIndex = -1;
-            consecutiveErrors = 0;
-            if (switchStartedAtMs > 0) {
-                AppLog.d(TAG, "切换耗时 · 准备完成: "
-                        + (android.os.SystemClock.elapsedRealtime() - switchStartedAtMs) + "ms");
+            @Override
+            public void onCompletion(ManagedVideoPlayer p) {
+                advanceToNextSegment();
             }
 
-            // 明确清掉 seekComplete 回调。以前这里挂的是 m -> videoView.start()，
-            // 而它对这个播放器的每一次 seek 都会触发 —— 用户暂停了也会被强制播放。
-            try {
-                mp.setOnSeekCompleteListener(null);
-            } catch (Exception ignored) {
-                // 某些实现允许传 null，失败也不影响后续
+            @Override
+            public void onError(ManagedVideoPlayer p, int what, int extra) {
+                preparedSegmentIndex = -1;
+                preparingSegmentIndex = -1;
+                uncoverVideo();
+                if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    AppLog.e(TAG, "连续 " + consecutiveErrors + " 次播放出错，停止自动续播");
+                    Toast.makeText(TimelinePlayerActivity.this,
+                            "这段录像无法播放，已停止", Toast.LENGTH_LONG).show();
+                    consecutiveErrors = 0;
+                    return;
+                }
+                advanceToNextSegment();
             }
-
-            videoView.seekTo((int) pendingOffsetMs);
-            if (playWhenReady) {
-                videoView.start();
-            }
-            updatePlayPauseLabel();
-        });
-
-        // 播完一段自动接下一段
-        videoView.setOnCompletionListener(mp -> advanceToNextSegment());
-        videoView.setOnErrorListener((mp, what, extra) -> {
-            AppLog.w(TAG, "播放出错 what=" + what + " extra=" + extra
-                    + " 段=" + currentSegmentIndex);
-            preparedSegmentIndex = -1;
-            preparingSegmentIndex = -1;
-            if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                // 连续出错就停下来，不要一路翻到底
-                AppLog.e(TAG, "连续 " + consecutiveErrors + " 次播放出错，停止自动续播");
-                Toast.makeText(this, "这段录像无法播放，已停止", Toast.LENGTH_LONG).show();
-                consecutiveErrors = 0;
-                return true;
-            }
-            return advanceToNextSegment();
         });
 
         loadTimelines();
@@ -401,9 +389,9 @@ public class TimelinePlayerActivity extends Activity {
         boolean readyForDirectSeek = locator.segmentIndex == preparedSegmentIndex
                 && preparingSegmentIndex < 0;
         if (readyForDirectSeek) {
-            videoView.seekTo((int) locator.offsetInSegmentMs);
-            if (playWhenReady && !videoView.isPlaying()) {
-                videoView.start();
+            player.seekTo(locator.offsetInSegmentMs);
+            if (playWhenReady) {
+                player.play();
             }
         } else {
             openSegment(locator.segmentIndex, locator.offsetInSegmentMs);
@@ -437,17 +425,13 @@ public class TimelinePlayerActivity extends Activity {
 
         switchStartedAtMs = android.os.SystemClock.elapsedRealtime();
 
-        // 切换期间盖住画面，等新的一段渲染出第一帧再揭开。
-        // 用遮罩而不是隐藏 VideoView：隐藏会连 surface 一起撤掉，
-        // 只剩窗口上那个洞，于是能看到应用背后的东西。
+        // 切换期间盖住画面，等新的一段渲染出第一帧再揭开
         coverVideo();
         handler.removeCallbacks(showVideoFallback);
         handler.postDelayed(showVideoFallback, SHOW_VIDEO_TIMEOUT_MS);
 
-        // 先显式停掉上一个再开下一个。setVideoPath 内部虽然也会释放，
-        // 但显式停一次能保证旧解码器不会和新的抢同一个 surface。
-        videoView.stopPlayback();
-        videoView.setVideoPath(session.segments.get(segmentIndex).path);
+        // 释放上一个、跳到偏移、要不要自动播，全部由播放器串行处理
+        player.open(session.segments.get(segmentIndex).path, pendingOffsetMs, playWhenReady);
     }
 
     /** 盖住画面。遮罩画在窗口里，不动 SurfaceView 的 surface。 */
@@ -493,11 +477,11 @@ public class TimelinePlayerActivity extends Activity {
             return 0L;
         }
         return session.segments.get(preparedSegmentIndex).timelineOffsetMs
-                + Math.max(0, videoView.getCurrentPosition());
+                + Math.max(0, player.getCurrentPosition());
     }
 
     private void updateProgress() {
-        if (sessions.isEmpty() || preparedSegmentIndex < 0 || !videoView.isPlaying()) {
+        if (sessions.isEmpty() || preparedSegmentIndex < 0 || !player.isPlaying()) {
             return;
         }
         long position = currentTimelinePosition();
@@ -515,22 +499,19 @@ public class TimelinePlayerActivity extends Activity {
     }
 
     private void togglePlayPause() {
-        if (videoView.isPlaying()) {
-            videoView.pause();
+        if (player.isPlaying()) {
+            player.pause();
             playWhenReady = false;
         } else {
             playWhenReady = true;
-            if (preparedSegmentIndex >= 0) {
-                videoView.start();
-            }
-            // 还没 prepare 完成的话，onPrepared 会按 playWhenReady 自动开始
+            player.play();   // 还没就绪的话，播放器会在 prepare 完成后自动开始
         }
         updatePlayPauseLabel();
     }
 
     private void updatePlayPauseLabel() {
         if (playPauseButton != null) {
-            playPauseButton.setText(videoView.isPlaying() ? "暂停" : "播放");
+            playPauseButton.setText(player.isPlaying() ? "暂停" : "播放");
         }
     }
 
@@ -538,8 +519,8 @@ public class TimelinePlayerActivity extends Activity {
     protected void onPause() {
         super.onPause();
         handler.removeCallbacks(ticker);
-        if (videoView != null && videoView.isPlaying()) {
-            videoView.pause();
+        if (player != null) {
+            player.pause();
         }
     }
 
@@ -554,8 +535,8 @@ public class TimelinePlayerActivity extends Activity {
         }
         preparedSegmentIndex = -1;
         preparingSegmentIndex = -1;
-        if (videoView != null) {
-            videoView.stopPlayback();
+        if (player != null) {
+            player.pause();
         }
     }
 
@@ -578,8 +559,8 @@ public class TimelinePlayerActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
-        if (videoView != null) {
-            videoView.stopPlayback();
+        if (player != null) {
+            player.release();
         }
         super.onDestroy();
     }

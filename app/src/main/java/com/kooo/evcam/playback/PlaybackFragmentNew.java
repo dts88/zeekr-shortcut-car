@@ -17,7 +17,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.VideoView;
+import android.view.TextureView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -70,7 +70,7 @@ public class PlaybackFragmentNew extends Fragment {
 
     // 预览区组件
     private View multiViewLayout, singleViewLayout;
-    private VideoView videoFront, videoBack, videoLeft, videoRight, videoSingle;
+    private TextureView videoFront, videoBack, videoLeft, videoRight, videoSingle;
     private FrameLayout frameFront, frameBack, frameLeft, frameRight;
     private TextView labelFront, labelBack, labelLeft, labelRight, labelSingle;
     private TextView placeholderFront, placeholderBack, placeholderLeft, placeholderRight;

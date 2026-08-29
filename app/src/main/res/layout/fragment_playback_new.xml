@@ -241,7 +241,7 @@
                             android:layout_marginBottom="6dp"
                             android:background="@color/preview_frame_background">
 
-                            <VideoView
+                            <TextureView
                                 android:id="@+id/video_front"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
@@ -284,7 +284,7 @@
                             android:layout_marginBottom="6dp"
                             android:background="@color/preview_frame_background">
 
-                            <VideoView
+                            <TextureView
                                 android:id="@+id/video_back"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
@@ -334,7 +334,7 @@
                             android:layout_marginBottom="0dp"
                             android:background="@color/preview_frame_background">
 
-                            <VideoView
+                            <TextureView
                                 android:id="@+id/video_left"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
@@ -376,7 +376,7 @@
                             android:layout_marginBottom="0dp"
                             android:background="@color/preview_frame_background">
 
-                            <VideoView
+                            <TextureView
                                 android:id="@+id/video_right"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
@@ -417,7 +417,7 @@
                     android:visibility="gone"
                     android:background="@color/preview_frame_background">
 
-                    <VideoView
+                    <TextureView
                         android:id="@+id/video_single"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"

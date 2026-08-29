@@ -60,7 +60,12 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <VideoView
+            <!--
+              TextureView 而不是 VideoView：VideoView 内部是 SurfaceView，
+              会在窗口上挖一个洞，画面在洞后面合成 —— 小窗发虚/透明就是这么来的。
+              TextureView 是普通视图，画在窗口里，没有这个问题。
+            -->
+            <TextureView
                 android:id="@+id/timeline_video"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
