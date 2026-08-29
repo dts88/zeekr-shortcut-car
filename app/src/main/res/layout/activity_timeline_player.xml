@@ -66,6 +66,19 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center" />
 
+            <!--
+              切换分段时用它盖住画面，而不是把 VideoView 隐藏。
+              SurfaceView 是在窗口上挖了个洞、自己的画面在洞后面合成 ——
+              一旦隐藏就只剩那个洞，于是能看到应用背后的东西（发虚/透明）。
+              这个不透明的 View 画在窗口里、盖在洞上方，遮住画面而不动 surface。
+            -->
+            <View
+                android:id="@+id/timeline_video_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#FF000000"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/timeline_info"
                 android:layout_width="wrap_content"

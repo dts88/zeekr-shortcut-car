@@ -65,6 +65,7 @@ public class TimelinePlayerActivity extends Activity {
     private Button playPauseButton;
     private Button prevSessionButton;
     private Button nextSessionButton;
+    private View videoCover;
     private RecyclerView sessionListView;
     private TextView listSummaryText;
     private TimelineSessionAdapter sessionAdapter;
@@ -89,6 +90,8 @@ public class TimelinePlayerActivity extends Activity {
     private boolean playWhenReady = true;
     /** 连续出错次数，用来阻止「出错→跳下一段→又出错」无限翻下去。 */
     private int consecutiveErrors = 0;
+    /** 本次切换的起点时刻，用于统计切换耗时；0 表示没有正在进行的切换。 */
+    private long switchStartedAtMs = 0L;
     /** onStop 释放播放器时记下的时间轴位置，回到前台后从这里恢复；-1 表示无需恢复。 */
     private long positionToRestoreMs = -1L;
     /** 用户正在拖动进度条时不要被自动刷新打断。 */
@@ -98,9 +101,7 @@ public class TimelinePlayerActivity extends Activity {
     private final Runnable showVideoFallback = new Runnable() {
         @Override
         public void run() {
-            if (videoView != null) {
-                videoView.setVisibility(View.VISIBLE);
-            }
+            uncoverVideo();
         }
     };
 
@@ -126,6 +127,7 @@ public class TimelinePlayerActivity extends Activity {
         playPauseButton = findViewById(R.id.timeline_play_pause);
         prevSessionButton = findViewById(R.id.timeline_prev_session);
         nextSessionButton = findViewById(R.id.timeline_next_session);
+        videoCover = findViewById(R.id.timeline_video_cover);
         sessionListView = findViewById(R.id.timeline_session_list);
         listSummaryText = findViewById(R.id.timeline_list_summary);
 
@@ -161,7 +163,12 @@ public class TimelinePlayerActivity extends Activity {
         videoView.setOnInfoListener((mp, what, extra) -> {
             if (what == android.media.MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
                 handler.removeCallbacks(showVideoFallback);
-                videoView.setVisibility(View.VISIBLE);
+                if (switchStartedAtMs > 0) {
+                    AppLog.i(TAG, "切换耗时 · 出现第一帧: "
+                            + (android.os.SystemClock.elapsedRealtime() - switchStartedAtMs) + "ms");
+                    switchStartedAtMs = 0L;
+                }
+                uncoverVideo();
             }
             return false;
         });
@@ -172,6 +179,10 @@ public class TimelinePlayerActivity extends Activity {
             preparedSegmentIndex = preparingSegmentIndex;
             preparingSegmentIndex = -1;
             consecutiveErrors = 0;
+            if (switchStartedAtMs > 0) {
+                AppLog.d(TAG, "切换耗时 · 准备完成: "
+                        + (android.os.SystemClock.elapsedRealtime() - switchStartedAtMs) + "ms");
+            }
 
             // 明确清掉 seekComplete 回调。以前这里挂的是 m -> videoView.start()，
             // 而它对这个播放器的每一次 seek 都会触发 —— 用户暂停了也会被强制播放。
@@ -424,9 +435,12 @@ public class TimelinePlayerActivity extends Activity {
         preparedSegmentIndex = -1;
         currentSegmentIndex = segmentIndex;
 
-        // 切换期间先把画面藏起来，等新的一段渲染出第一帧再显示
-        // （见 onCreate 里 setOnInfoListener 的说明）
-        videoView.setVisibility(View.INVISIBLE);
+        switchStartedAtMs = android.os.SystemClock.elapsedRealtime();
+
+        // 切换期间盖住画面，等新的一段渲染出第一帧再揭开。
+        // 用遮罩而不是隐藏 VideoView：隐藏会连 surface 一起撤掉，
+        // 只剩窗口上那个洞，于是能看到应用背后的东西。
+        coverVideo();
         handler.removeCallbacks(showVideoFallback);
         handler.postDelayed(showVideoFallback, SHOW_VIDEO_TIMEOUT_MS);
 
@@ -434,6 +448,20 @@ public class TimelinePlayerActivity extends Activity {
         // 但显式停一次能保证旧解码器不会和新的抢同一个 surface。
         videoView.stopPlayback();
         videoView.setVideoPath(session.segments.get(segmentIndex).path);
+    }
+
+    /** 盖住画面。遮罩画在窗口里，不动 SurfaceView 的 surface。 */
+    private void coverVideo() {
+        if (videoCover != null) {
+            videoCover.setVisibility(View.VISIBLE);
+        }
+    }
+
+    /** 揭开遮罩。 */
+    private void uncoverVideo() {
+        if (videoCover != null) {
+            videoCover.setVisibility(View.GONE);
+        }
     }
 
     /** 一段播完后接下一段；已经是最后一段就停在末尾。 */
