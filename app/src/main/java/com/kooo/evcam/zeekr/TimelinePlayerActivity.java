@@ -82,6 +82,8 @@ public class TimelinePlayerActivity extends Activity {
     private boolean playWhenReady = true;
     /** 连续出错次数，用来阻止「出错→跳下一段→又出错」无限翻下去。 */
     private int consecutiveErrors = 0;
+    /** onStop 释放播放器时记下的时间轴位置，回到前台后从这里恢复；-1 表示无需恢复。 */
+    private long positionToRestoreMs = -1L;
     /** 用户正在拖动进度条时不要被自动刷新打断。 */
     private boolean userSeeking = false;
 
@@ -476,8 +478,32 @@ public class TimelinePlayerActivity extends Activity {
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+        // 同样的道理：窗口不可见后 surface 会被销毁，只 pause 会让 MediaPlayer
+        // 继续持有它并不停超时（见 PlaybackFragmentNew.onStop 的说明）。
+        // 这里彻底释放，位置记下来，回前台时再开回去。
+        if (!sessions.isEmpty() && preparedSegmentIndex >= 0) {
+            positionToRestoreMs = currentTimelinePosition();
+        }
+        preparedSegmentIndex = -1;
+        preparingSegmentIndex = -1;
+        if (videoView != null) {
+            videoView.stopPlayback();
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        if (positionToRestoreMs >= 0 && !sessions.isEmpty()) {
+            long restore = positionToRestoreMs;
+            positionToRestoreMs = -1L;
+            // 回来时停在原处，不自动续播 —— 用户离开时未必想让它继续跑
+            playWhenReady = false;
+            seekTimelineTo(restore);
+            updatePlayPauseLabel();
+        }
         if (!sessions.isEmpty()) {
             handler.post(ticker);
         }

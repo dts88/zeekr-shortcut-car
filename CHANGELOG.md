@@ -9,6 +9,35 @@
 
 （暂无）
 
+## [0.7.9-alpha] - 2026-08-29
+
+### 修正
+
+- **界面不可见时播放器只 pause、不释放 surface**。日志里成片的
+
+  ```
+  E/BufferQueueProducer: SurfaceView[...MainActivity]#8 dequeueBuffer,TIMED_OUT state=DEQUEUED
+  ```
+
+  就是这么来的。
+
+  **先说清是哪个 surface**：`api:3` 是 `NATIVE_WINDOW_API_MEDIA`，producer 是
+  MediaPlayer；而摄像头预览**根本没用 SurfaceView**（全程是 `AutoFitTextureView`）。
+  所以这是**视频回看**那几个 `VideoView` —— 它作为 fragment 挂在 MainActivity 里，
+  surface 才以 MainActivity 命名。
+
+  `pause()` 不释放 surface。窗口退到后台后 SurfaceView 的 surface 会被销毁，
+  而 MediaPlayer 仍持有它，于是不停去 dequeue 一个再也不会被消费的缓冲区 ——
+  几十条 TIMED_OUT，解码器也被拖到坏状态。**这和「切几组之后画面变绿」是同一个根**：
+  从后台回来时解码器已经不干净了。
+
+  `onPause` 保持只 pause（弹个对话框不该把播放整个拆掉），
+  真正释放挪到 `onStop` —— surface 就是在那时消失的。回到前台时按
+  `currentGroup` 重新加载。
+
+  连续回放（`TimelinePlayerActivity`）是同一个问题，一并处理：`onStop` 释放并记下
+  时间轴位置，`onResume` 开回原处并保持暂停 —— 离开时未必想让它继续跑。
+
 ## [0.7.8-alpha] - 2026-08-29
 
 ### 变更

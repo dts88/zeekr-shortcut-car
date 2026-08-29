@@ -820,6 +820,32 @@ public class PlaybackFragmentNew extends Fragment {
     }
 
     @Override
+    public void onStop() {
+        super.onStop();
+        // 界面不可见时把播放器彻底停掉，而不是只 pause。
+        //
+        // pause() 并不释放 surface。窗口退到后台后 SurfaceView 的 surface 会被销毁，
+        // 而 MediaPlayer 仍然持有它 —— 于是它不停地去 dequeue 一个再也不会被消费的
+        // 缓冲区，日志里成片的 BufferQueueProducer TIMED_OUT 就是这么来的，
+        // 解码器也会被拖到坏状态（回来再切几组就出绿屏）。
+        //
+        // onPause 保持只 pause：弹个对话框不该把播放整个拆掉；
+        // 真正要释放的时机是 onStop，surface 就是在那时消失的。
+        if (playerManager != null) {
+            playerManager.stopAll();
+        }
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        // stopAll() 不会清掉 currentGroup，回到前台时按它重新加载即可
+        if (playerManager != null && playerManager.getCurrentGroup() != null) {
+            playerManager.loadVideoGroup(playerManager.getCurrentGroup());
+        }
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
         if (playerManager != null) {
