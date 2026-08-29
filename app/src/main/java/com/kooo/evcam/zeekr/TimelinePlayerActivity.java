@@ -235,7 +235,11 @@ public class TimelinePlayerActivity extends Activity {
             sessionAdapter.setSelectedIndex(sessionIndex);
         }
         if (sessionListView != null) {
-            sessionListView.scrollToPosition(sessionIndex);
+            // 列表里还夹着日期标题行，所以要按行号滚动，不能直接用会话下标
+            int row = sessionAdapter.rowOf(sessionIndex);
+            if (row >= 0) {
+                sessionListView.scrollToPosition(row);
+            }
         }
     }
 

@@ -55,6 +55,7 @@ public class SettingsFragment extends Fragment {
     // private SwitchMaterial preventSleepSwitch;
     private SwitchMaterial recordingStatsSwitch;
     private SwitchMaterial timestampWatermarkSwitch;
+    private SwitchMaterial watermarkSpecSwitch;
     private SwitchMaterial forceH264Switch;
     
     // 预览画面矫正相关
@@ -318,6 +319,7 @@ public class SettingsFragment extends Fragment {
 
         // 初始化时间角标开关
         timestampWatermarkSwitch = view.findViewById(R.id.switch_timestamp_watermark);
+        watermarkSpecSwitch = view.findViewById(R.id.switch_watermark_spec);
         if (getContext() != null && appConfig != null) {
             timestampWatermarkSwitch.setChecked(appConfig.isTimestampWatermarkEnabled());
         }
@@ -331,6 +333,20 @@ public class SettingsFragment extends Fragment {
                 AppLog.d("SettingsFragment", message);
             }
         });
+
+        if (watermarkSpecSwitch != null) {
+            watermarkSpecSwitch.setChecked(appConfig.isWatermarkSpecEnabled());
+            watermarkSpecSwitch.setEnabled(appConfig.isTimestampWatermarkEnabled());
+            watermarkSpecSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                appConfig.setWatermarkSpecEnabled(isChecked);
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            isChecked ? "角标将附带录制规格，下次开始录制时生效"
+                                      : "角标只显示时间，下次开始录制时生效",
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
 
         // 初始化强制 H.264 编码开关
         forceH264Switch = view.findViewById(R.id.switch_force_h264);

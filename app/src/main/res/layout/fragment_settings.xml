@@ -375,6 +375,47 @@
                     android:layout_marginStart="16dp" />
             </LinearLayout>
 
+            <!-- 角标附带录制规格 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="角标附带录制规格"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="在时间下方再加一行：分辨率、帧率、编码、码率。写的是编码器实际用的值，不是设置里的目标值。需要先开启「时间角标」"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="16sp"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_watermark_spec"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
             <!-- 录制摄像头选择 -->
             <LinearLayout
                 android:id="@+id/layout_recording_camera_selection"
@@ -1056,7 +1097,7 @@
                         android:layout_weight="1"
                         android:layout_marginHorizontal="8dp"
                         android:max="160"
-                        android:progress="64" />
+                        android:progress="85" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -1070,7 +1111,7 @@
                     android:id="@+id/text_floating_window_size_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="64dp"
+                    android:text="85dp"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
                     android:layout_gravity="center_horizontal"

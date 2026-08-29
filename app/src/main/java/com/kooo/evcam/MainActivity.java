@@ -716,10 +716,19 @@ public class MainActivity extends AppCompatActivity {
         if (textureFront != null) {
             textureFront.setSurfaceTextureListener(buildSurfaceListener("front"));
         }
+        // 每个槽位按自己的序号判断：第 2 路是 back，第 3 路是 left，第 4 路是 right。
+        //
+        // 这里原来 left 和 right 都要求 >= 4 —— 上游只有 1/2/4 路的布局，
+        // 左右天然成对出现，所以把它们当成一对来判断没出过问题。
+        // 但「环视+座舱3路」是第一个 3 路配置，它把 left 当作第三个槽位用，
+        // 于是 texture_left 拿不到监听器：textureReadyCount 最多到 2，
+        // 而 requiredTextureCount 是 3，启动相机的那道闸门
+        // （textureReadyCount >= requiredTextureCount）永远不成立，
+        // initCamera() 根本没被调用过 —— 三路全黑、连合成流都没有，就是这么来的。
         if (textureBack != null && configuredCameraCount >= 2) {
             textureBack.setSurfaceTextureListener(buildSurfaceListener("back"));
         }
-        if (textureLeft != null && configuredCameraCount >= 4) {
+        if (textureLeft != null && configuredCameraCount >= 3) {
             textureLeft.setSurfaceTextureListener(buildSurfaceListener("left"));
         }
         if (textureRight != null && configuredCameraCount >= 4) {
@@ -782,7 +791,7 @@ public class MainActivity extends AppCompatActivity {
         if (labelBack != null && configuredCameraCount >= 2) {
             updateCameraLabel(labelBack, appConfig.getCameraName("back"));
         }
-        if (labelLeft != null && configuredCameraCount >= 4) {
+        if (labelLeft != null && configuredCameraCount >= 3) {
             updateCameraLabel(labelLeft, appConfig.getCameraName("left"));
         }
         if (labelRight != null && configuredCameraCount >= 4) {
@@ -827,11 +836,14 @@ public class MainActivity extends AppCompatActivity {
             findViewById(R.id.container_buttons_left) : 
             findViewById(R.id.container_buttons_bottom);
 
-        // 根据摄像头数量隐藏不需要的容器
+        // 根据摄像头数量隐藏不需要的容器。
+        // 同样按槽位序号分开判断：3 路时 left 该留着，只藏 right。
         if (configuredCameraCount < 4) {
-            if (frameLeft != null) frameLeft.setVisibility(View.GONE);
             if (frameRight != null) frameRight.setVisibility(View.GONE);
             if (frameVehicleControl != null) frameVehicleControl.setVisibility(View.GONE);
+        }
+        if (configuredCameraCount < 3) {
+            if (frameLeft != null) frameLeft.setVisibility(View.GONE);
         }
         if (configuredCameraCount < 2) {
             if (frameBack != null) frameBack.setVisibility(View.GONE);

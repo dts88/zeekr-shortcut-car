@@ -183,6 +183,7 @@ public class AppConfig {
 
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
+    private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
 
     // 视频编码器配置
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 强制使用 H.264 编码器（关闭默认使用 H.265/HEVC）
@@ -263,6 +264,11 @@ public class AppConfig {
     public static final int FLOATING_SIZE_GIANT = 128;      // 特特大
     public static final int FLOATING_SIZE_PLUS = 144;       // PLUS大
     public static final int FLOATING_SIZE_MAX = 160;        // MAX大
+
+    /** 悬浮窗按钮的默认大小（dp）。 */
+    public static final int FLOATING_SIZE_DEFAULT = 85;
+    /** 悬浮窗按钮的默认不透明度（%）。 */
+    public static final int FLOATING_ALPHA_DEFAULT = 75;
     
     // 录制模式常量
     public static final String RECORDING_MODE_AUTO = "auto";  // 自动（根据车型决定）
@@ -771,22 +777,7 @@ public class AppConfig {
     
     // ==================== 帧率配置相关方法 ====================
     
-    /**
-     * 设置帧率等级
-     * @param level 帧率等级（standard/low）
-     */
-    public void setFramerateLevel(String level) {
-        prefs.edit().putString(KEY_FRAMERATE_LEVEL, level).apply();
-        AppLog.d(TAG, "帧率等级设置: " + level);
-    }
     
-    /**
-     * 获取帧率等级
-     * @return 帧率等级，默认为 standard
-     */
-    public String getFramerateLevel() {
-        return prefs.getString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD);
-    }
     
     /**
      * 根据配置的帧率等级获取实际帧率
@@ -794,27 +785,41 @@ public class AppConfig {
      * @return 实际使用的帧率
      */
     public int getActualFrameRate(int hardwareMaxFps) {
-        // 用户显式选了帧率就直接用，夹在 5..hardwareMaxFps 之间
+        migrateLegacyFramerateLevel(hardwareMaxFps);
+
         String explicit = getRecordFps();
-        if (!RECORD_FPS_AUTO.equals(explicit)) {
-            try {
-                int fps = Integer.parseInt(explicit);
-                return Math.max(5, Math.min(hardwareMaxFps, fps));
-            } catch (NumberFormatException e) {
-                AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，回退到自动");
-            }
+        if (RECORD_FPS_AUTO.equals(explicit)) {
+            return getStandardFrameRate(hardwareMaxFps);
         }
-
-        int standardFps = getStandardFrameRate(hardwareMaxFps);
-        String level = getFramerateLevel();
-
-        if (FRAMERATE_LOW.equals(level)) {
-            // 低帧率：标准值除以2，最低10fps
-            return Math.max(10, standardFps / 2);
+        try {
+            int fps = Integer.parseInt(explicit);
+            return Math.max(5, Math.min(hardwareMaxFps, fps));
+        } catch (NumberFormatException e) {
+            AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，按原始帧率处理");
+            return getStandardFrameRate(hardwareMaxFps);
         }
+    }
 
-        // 标准帧率
-        return standardFps;
+    /**
+     * 把旧的「标准/低」等级一次性折算成具体帧率，之后再也不看它。
+     *
+     * <p>帧率现在只由 {@link #getRecordFps()} 一个设置决定。以前是两个设置共同决定、
+     * 其中一个还会悄悄压过另一个，导致「我到底在用多少帧录」这个问题要靠推演两者的
+     * 关系才能回答。老版本升上来的用户如果停在「低」，这里替他折算一次，
+     * 免得升级后帧率无声地翻倍。</p>
+     */
+    private void migrateLegacyFramerateLevel(int hardwareMaxFps) {
+        if (!prefs.contains(KEY_FRAMERATE_LEVEL)) {
+            return;
+        }
+        String level = prefs.getString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD);
+        boolean stillAuto = RECORD_FPS_AUTO.equals(getRecordFps());
+        if (stillAuto && FRAMERATE_LOW.equals(level)) {
+            int converted = Math.max(10, getStandardFrameRate(hardwareMaxFps) / 2);
+            prefs.edit().putString(KEY_RECORD_FPS, String.valueOf(converted)).apply();
+            AppLog.i(TAG, "旧的「低帧率」已折算为 " + converted + "fps");
+        }
+        prefs.edit().remove(KEY_FRAMERATE_LEVEL).apply();
     }
 
     // ==================== 录制帧率（显式选择） ====================
@@ -831,14 +836,12 @@ public class AppConfig {
     /**
      * 设置录制帧率；传入 {@link #RECORD_FPS_AUTO} 表示跟随硬件默认。
      *
-     * <p>顺手把旧的「标准/低」等级清回标准。合并前那是画质页里的第二个帧率控件，
-     * 只在这里选「原始帧率」时才生效 —— 不清掉的话，用户选了「原始帧率」
-     * 却仍然被旧等级悄悄降到一半，看起来就像设置没生效。</p>
+     * <p>这是决定录制帧率的<b>唯一</b>设置。</p>
      */
     public void setRecordFps(String value) {
         prefs.edit()
                 .putString(KEY_RECORD_FPS, value)
-                .putString(KEY_FRAMERATE_LEVEL, FRAMERATE_STANDARD)
+                .remove(KEY_FRAMERATE_LEVEL)
                 .apply();
         AppLog.d(TAG, "录制帧率设置: " + value);
     }
@@ -962,15 +965,6 @@ public class AppConfig {
         return RECORD_LAYOUT_GRID.equals(getRecordLayout());
     }
     
-    /**
-     * 获取帧率等级的显示名称
-     */
-    public static String getFramerateLevelDisplayName(String level) {
-        if (FRAMERATE_LOW.equals(level)) {
-            return "低";
-        }
-        return "标准";
-    }
     
     // ==================== 车型配置相关方法 ====================
     
@@ -1578,7 +1572,7 @@ public class AppConfig {
      * @return 悬浮窗大小，默认为中等大小
      */
     public int getFloatingWindowSize() {
-        return prefs.getInt(KEY_FLOATING_WINDOW_SIZE, FLOATING_SIZE_MEDIUM);
+        return prefs.getInt(KEY_FLOATING_WINDOW_SIZE, FLOATING_SIZE_DEFAULT);
     }
     
     /**
@@ -1595,7 +1589,7 @@ public class AppConfig {
      * @return 透明度百分比，默认为100（完全不透明）
      */
     public int getFloatingWindowAlpha() {
-        return prefs.getInt(KEY_FLOATING_WINDOW_ALPHA, 100);
+        return prefs.getInt(KEY_FLOATING_WINDOW_ALPHA, FLOATING_ALPHA_DEFAULT);
     }
     
     /**
@@ -2716,6 +2710,21 @@ public class AppConfig {
         AppLog.d(TAG, "时间角标设置: " + (enabled ? "启用" : "禁用"));
     }
     
+    /**
+     * 角标是否附带录制规格（分辨率 / 帧率 / 编码 / 码率）。
+     *
+     * <p>默认开启：录像上带着自己的录制参数，事后回看时不必再去猜当时是什么设置。
+     * 需要角标尽量小的场合可以关掉。</p>
+     */
+    public boolean isWatermarkSpecEnabled() {
+        return prefs.getBoolean(KEY_WATERMARK_SPEC_ENABLED, true);
+    }
+
+    public void setWatermarkSpecEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_WATERMARK_SPEC_ENABLED, enabled).apply();
+        AppLog.d(TAG, "角标规格行: " + (enabled ? "显示" : "隐藏"));
+    }
+
     /**
      * 获取时间角标开关状态
      * @return true 表示启用时间角标

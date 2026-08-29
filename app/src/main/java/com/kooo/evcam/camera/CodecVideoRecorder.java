@@ -112,6 +112,10 @@ public class CodecVideoRecorder {
     private long encodedOutputFrameCount = 0;
     /** 上一次写入 muxer 的 PTS，用于保证严格单调递增；-1 表示还没写过帧。 */
     private long lastWrittenPtsUs = -1L;
+    /** 角标是否附带录制规格。 */
+    private boolean watermarkSpecEnabled = true;
+    /** 编码器实际使用的规格，用于角标第二行。 */
+    private String encoderSpecLine = "";
     /** 本分段第一帧的编码器时间戳，用于把每段的 PTS 归零；-1 表示本段还没开始。 */
     private long segmentBasePtsUs = -1L;
 
@@ -226,7 +230,28 @@ public class CodecVideoRecorder {
         if (eglEncoder != null) {
             eglEncoder.setWatermarkEnabled(enabled);
         }
+        applyWatermarkInfoLine();
         AppLog.d(TAG, "Camera " + cameraId + " Watermark " + (enabled ? "enabled" : "disabled"));
+    }
+
+    /** 角标是否附带录制规格那一行。 */
+    public void setWatermarkSpecEnabled(boolean enabled) {
+        this.watermarkSpecEnabled = enabled;
+        applyWatermarkInfoLine();
+    }
+
+    /**
+     * 把录制规格送到角标第二行。
+     *
+     * <p>用的是真正配置给编码器的值，不是设置里的目标值 —— 请求的尺寸可能被夹过，
+     * 编码可能回退到 H.264，帧率也可能被补盲模式改写。角标要如实反映录出来的东西。</p>
+     */
+    private void applyWatermarkInfoLine() {
+        if (eglEncoder == null) {
+            return;  // 编码器还没建，createEncoder 结束时会再调一次
+        }
+        eglEncoder.setWatermarkInfoLine(
+                watermarkEnabled && watermarkSpecEnabled ? encoderSpecLine : "");
     }
 
     /**
@@ -1017,6 +1042,15 @@ public class CodecVideoRecorder {
                 ", " + (effectiveBitrate / 1000) + " Kbps, " +
                 (mimeType.equals(MIME_TYPE_HEVC) ? "HEVC" : "H.264") +
                 (forceH264 ? " [兼容模式]" : ""));
+
+        // 同一批数字也送给角标第二行
+        encoderSpecLine = width + "x" + height
+                + "  " + effectiveFrameRate + "fps"
+                + "  " + (mimeType.equals(MIME_TYPE_HEVC) ? "H.265" : "H.264")
+                + "  " + (effectiveBitrate / 1000000.0f >= 1f
+                        ? String.format(java.util.Locale.US, "%.1fMbps", effectiveBitrate / 1000000.0f)
+                        : (effectiveBitrate / 1000) + "Kbps");
+        applyWatermarkInfoLine();
     }
 
     /**

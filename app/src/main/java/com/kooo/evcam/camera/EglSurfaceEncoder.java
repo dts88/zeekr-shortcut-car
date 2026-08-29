@@ -188,8 +188,11 @@ public class EglSurfaceEncoder {
     private int watermarkOesTextureHandle;
     private Bitmap watermarkBitmap;
     private String lastWatermarkTime = "";
-    private static final int WATERMARK_WIDTH = 400;   // 水印纹理宽度（需容纳19字符的时间戳）
-    private static final int WATERMARK_HEIGHT = 44;   // 水印纹理高度
+    /** 角标第二行：录制规格。为空表示只显示时间。 */
+    private volatile String watermarkInfoLine = "";
+    private static final int WATERMARK_WIDTH = 560;   // 需容纳规格行（比 19 字符的时间戳长）
+    private static final int WATERMARK_HEIGHT = 80;   // 两行
+    private static final int WATERMARK_LINE_HEIGHT = 34;
     private final SimpleDateFormat watermarkDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     
     // 性能优化：水印更新控制
@@ -277,6 +280,17 @@ public class EglSurfaceEncoder {
      * 设置是否启用时间水印
      * @param enabled true 表示启用水印
      */
+    /**
+     * 设置角标第二行（录制规格）。传空串则只画时间那一行。
+     *
+     * <p>规格在一次录制中是不变的，所以这里只是存下来；真正重绘由每秒一次的
+     * 时间更新顺带完成 —— 清空 {@code lastWatermarkTime} 是为了不必等到秒数变化。</p>
+     */
+    public void setWatermarkInfoLine(String line) {
+        this.watermarkInfoLine = line == null ? "" : line;
+        this.lastWatermarkTime = "";
+    }
+
     public void setWatermarkEnabled(boolean enabled) {
         this.watermarkEnabled = enabled;
         AppLog.d(TAG, "Camera " + cameraId + " Watermark " + (enabled ? "enabled" : "disabled"));
@@ -1025,10 +1039,19 @@ public class EglSurfaceEncoder {
         textPaint.setAntiAlias(true);
         textPaint.setTypeface(Typeface.MONOSPACE);
 
-        // 绘制阴影（偏移2像素）
+        // 第一行：时间
         canvas.drawText(currentTime, 8, 32, shadowPaint);
-        // 绘制主文字
         canvas.drawText(currentTime, 6, 30, textPaint);
+
+        // 第二行：录制规格。字号小一点 —— 它是参考信息，不该抢时间那一行的位置
+        String info = watermarkInfoLine;
+        if (info != null && !info.isEmpty()) {
+            shadowPaint.setTextSize(22);
+            textPaint.setTextSize(22);
+            float baseline = 30 + WATERMARK_LINE_HEIGHT;
+            canvas.drawText(info, 8, baseline + 2, shadowPaint);
+            canvas.drawText(info, 6, baseline, textPaint);
+        }
 
         // 上传纹理到 GPU
         if (watermarkTextureId != 0) {

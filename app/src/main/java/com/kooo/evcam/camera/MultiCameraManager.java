@@ -887,7 +887,7 @@ public class MultiCameraManager {
         
         // 获取帧率配置（根据帧率等级设置计算）
         int targetFrameRate = appConfig.getActualFrameRate(25);  // 使用25fps降低CPU占用
-        AppLog.d(TAG, "Target frame rate: " + targetFrameRate + " fps (level: " + appConfig.getFramerateLevel() + ")");
+        AppLog.d(TAG, "Target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
         // 第一步：准备所有 MediaRecorder（但不启动）
         // 使用每个摄像头的实际预览分辨率，而不是硬编码的值
@@ -1191,7 +1191,7 @@ public class MultiCameraManager {
         
         // 获取帧率配置（根据帧率等级设置计算）
         int targetFrameRate = appConfig.getActualFrameRate(25);  // 使用25fps降低CPU占用
-        AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps (level: " + appConfig.getFramerateLevel() + ")");
+        AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
         // 清理之前的软编码录制器
         for (CodecVideoRecorder recorder : codecRecorders.values()) {
@@ -1288,6 +1288,7 @@ public class MultiCameraManager {
 
             // 设置时间水印（从配置读取，使用方法开头已创建的 appConfig）
             codecRecorder.setWatermarkEnabled(appConfig.isTimestampWatermarkEnabled());
+            codecRecorder.setWatermarkSpecEnabled(appConfig.isWatermarkSpecEnabled());
 
             // 设置回调
             codecRecorder.setCallback(new RecordCallback() {
@@ -1619,6 +1620,7 @@ public class MultiCameraManager {
             codecRecorder.setQualityLevel(3);  // 设置最高画质
             codecRecorder.setForceH264(appConfig.isForceH264Encoding());
             codecRecorder.setWatermarkEnabled(appConfig.isTimestampWatermarkEnabled());
+            codecRecorder.setWatermarkSpecEnabled(appConfig.isWatermarkSpecEnabled());
 
             // 准备录制
             String path = new File(saveDir, timestamp + "_" + key + ".mp4").getAbsolutePath();
