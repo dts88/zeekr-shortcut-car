@@ -255,11 +255,28 @@ public class ResolutionSettingsFragment extends Fragment {
         resolutionOptions.clear();
         resolutionOptions.add("默认 (1280×800)");
 
-        // 收集所有摄像头支持的分辨率（去重）
+        // 只列出「每一路摄像头都声明过」的分辨率，即取交集而不是并集。
+        //
+        // 用并集的话，列表里会出现只有某一路才有的尺寸：选了之后，没有这个尺寸的那几路
+        // 会悄悄退回最接近的一个 —— 界面上写着一个值，实际用的是另一个。
+        // 合成条带（1280×5140 之类）也一并排除：环视那一路已经固定用探测到的尺寸，
+        // 这个设置本来就管不到它，把它列出来只会让人以为能选。
         Set<String> allResolutions = new LinkedHashSet<>();
+        boolean firstCamera = true;
         for (CameraInfo info : cameraInfoMap.values()) {
+            Set<String> ofThisCamera = new LinkedHashSet<>();
             for (Size size : info.supportedResolutions) {
-                allResolutions.add(size.getWidth() + "x" + size.getHeight());
+                if (com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
+                        size.getWidth(), size.getHeight())) {
+                    continue;
+                }
+                ofThisCamera.add(size.getWidth() + "x" + size.getHeight());
+            }
+            if (firstCamera) {
+                allResolutions.addAll(ofThisCamera);
+                firstCamera = false;
+            } else {
+                allResolutions.retainAll(ofThisCamera);
             }
         }
 
@@ -285,7 +302,6 @@ public class ResolutionSettingsFragment extends Fragment {
 
         // 设置当前选中项
         String currentResolution = (appConfig != null) ? appConfig.getTargetResolution() : AppConfig.RESOLUTION_DEFAULT;
-        selectedResolution = currentResolution;
         int selectedIndex = 0;
         if (!AppConfig.RESOLUTION_DEFAULT.equals(currentResolution)) {
             for (int i = 1; i < resolutionOptions.size(); i++) {
@@ -294,7 +310,16 @@ public class ResolutionSettingsFragment extends Fragment {
                     break;
                 }
             }
+            if (selectedIndex == 0 && appConfig != null) {
+                // 存着的值已经不在可选列表里了（比如从前选过的 1280×5140 —— 那是合成流
+                // 专有尺寸，现在环视自己固定，这里不再提供）。落回默认并写回配置，
+                // 否则界面显示「默认」而配置里是另一个值，两边对不上。
+                AppLog.i(TAG, "目标分辨率 " + currentResolution + " 已不在可选列表中，回落到默认");
+                currentResolution = AppConfig.RESOLUTION_DEFAULT;
+                appConfig.setTargetResolution(currentResolution);
+            }
         }
+        selectedResolution = currentResolution;
         resolutionSpinner.setSelection(selectedIndex);
 
         // 设置选择监听器

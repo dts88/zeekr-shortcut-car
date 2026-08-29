@@ -48,6 +48,13 @@ public class TimelinePlayerActivity extends Activity {
     private static final long TICK_MS = 500L;
     /** 连续出错多少次就停止自动续播。 */
     private static final int MAX_CONSECUTIVE_ERRORS = 3;
+    /**
+     * 等「已渲染第一帧」最多等多久，超时就直接显示。
+     *
+     * <p>MEDIA_INFO_VIDEO_RENDERING_START 并非所有实现都会发。真要不发，
+     * 没有这个兜底画面就永远不显示了 —— 那比它本来要避免的脏帧更糟。</p>
+     */
+    private static final long SHOW_VIDEO_TIMEOUT_MS = 1500L;
     /** 连续回放只播环视合成流那一路；座舱各路不参与时间轴。 */
     private static final String COMPOSITE_SLOT = "front";
 
@@ -86,6 +93,16 @@ public class TimelinePlayerActivity extends Activity {
     private long positionToRestoreMs = -1L;
     /** 用户正在拖动进度条时不要被自动刷新打断。 */
     private boolean userSeeking = false;
+
+    /** 超时兜底：没等到「已渲染」也把画面放出来。 */
+    private final Runnable showVideoFallback = new Runnable() {
+        @Override
+        public void run() {
+            if (videoView != null) {
+                videoView.setVisibility(View.VISIBLE);
+            }
+        }
+    };
 
     private final Runnable ticker = new Runnable() {
         @Override
@@ -133,6 +150,21 @@ public class TimelinePlayerActivity extends Activity {
         }
 
         setupSeekBar();
+
+        // 新的一段真正渲染出第一帧之前，别把画面露出来。
+        //
+        // VideoView 的这块 SurfaceView 在多次 setVideoPath 之间是复用的，
+        // 上一个播放器被中途拆掉时，缓冲队列里可能还留着它分配了却没写过的缓冲区 ——
+        // 那块内存以 YUV420 解读就是全绿；也可能是上一个文件的残帧，看起来像马赛克。
+        // 文件本身没问题（拿到电脑上播是好的），解码器也支持这个尺寸，
+        // 所以要挡住的不是解码，而是「把脏缓冲区显示出来」这件事。
+        videoView.setOnInfoListener((mp, what, extra) -> {
+            if (what == android.media.MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                handler.removeCallbacks(showVideoFallback);
+                videoView.setVisibility(View.VISIBLE);
+            }
+            return false;
+        });
 
         // 三个监听器只在这里注册一次。以前 onPrepared 是每次切文件时重新注册的，
         // 那样闭包捕获的是那一次的偏移量，切换密集时可能把旧偏移套到新文件上。
@@ -391,6 +423,12 @@ public class TimelinePlayerActivity extends Activity {
         preparingSegmentIndex = segmentIndex;
         preparedSegmentIndex = -1;
         currentSegmentIndex = segmentIndex;
+
+        // 切换期间先把画面藏起来，等新的一段渲染出第一帧再显示
+        // （见 onCreate 里 setOnInfoListener 的说明）
+        videoView.setVisibility(View.INVISIBLE);
+        handler.removeCallbacks(showVideoFallback);
+        handler.postDelayed(showVideoFallback, SHOW_VIDEO_TIMEOUT_MS);
 
         // 先显式停掉上一个再开下一个。setVideoPath 内部虽然也会释放，
         // 但显式停一次能保证旧解码器不会和新的抢同一个 surface。

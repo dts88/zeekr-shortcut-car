@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.View;
 import android.widget.VideoView;
 
 import java.io.File;
@@ -28,6 +29,8 @@ public class MultiVideoPlayerManager {
     
     private final Context context;
     private final Handler handler;
+    /** 等「已渲染第一帧」最多等多久，超时就直接显示。 */
+    private static final long SHOW_VIDEO_TIMEOUT_MS = 1500L;
 
     /** 各位置的VideoView */
     private VideoView videoFront;
@@ -152,6 +155,23 @@ public class MultiVideoPlayerManager {
 
         try {
             Uri uri = Uri.fromFile(videoFile);
+
+            // 新视频渲染出第一帧之前先藏起来，避免显示上一个播放器留下的脏缓冲区
+            // （全绿是没写过的 YUV420 缓冲区，马赛克是上一个文件的残帧）。
+            // 文件本身没问题，解码器也够用，要挡的是「把脏缓冲显示出来」。
+            videoView.setVisibility(View.INVISIBLE);
+            // 兜底：MEDIA_INFO_VIDEO_RENDERING_START 并非所有实现都会发，
+            // 真不发的话没有这个超时画面就永远不显示了。
+            final Runnable showFallback = () -> videoView.setVisibility(View.VISIBLE);
+            handler.postDelayed(showFallback, SHOW_VIDEO_TIMEOUT_MS);
+            videoView.setOnInfoListener((mp, what, extra) -> {
+                if (what == android.media.MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                    handler.removeCallbacks(showFallback);
+                    videoView.setVisibility(View.VISIBLE);
+                }
+                return false;
+            });
+
             videoView.setVideoURI(uri);
 
             videoView.setOnPreparedListener(mp -> {
@@ -326,6 +346,7 @@ public class MultiVideoPlayerManager {
         videoView.setOnPreparedListener(null);
         videoView.setOnCompletionListener(null);
         videoView.setOnErrorListener(null);
+        videoView.setOnInfoListener(null);
         videoView.stopPlayback();
     }
 
