@@ -2,6 +2,8 @@ package com.kooo.evcam.zeekr;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -45,6 +47,36 @@ public class RecordingTimelineTest {
         assertEquals(-1L, RecordingTimeline.parseStartEpochMs("2026ab28_221530_f.mp4"));
         assertEquals(-1L, RecordingTimeline.parseStartEpochMs("20261328_221530_f.mp4"));
         assertEquals(-1L, RecordingTimeline.parseStartEpochMs("20260828_251530_f.mp4"));
+    }
+
+    // ---------- 摄像头槽位（连续回放只看环视那一路） ----------
+
+    @Test
+    public void parsesCameraSlotFromFileName() {
+        assertEquals("front", RecordingTimeline.parseCameraSlot("20260829_100000_front.mp4"));
+        assertEquals("back", RecordingTimeline.parseCameraSlot("20260829_100000_back.mp4"));
+        assertEquals("left", RecordingTimeline.parseCameraSlot("20260829_100000_left.mp4"));
+    }
+
+    @Test
+    public void returnsNullForNamesWithoutASlot() {
+        assertNull(RecordingTimeline.parseCameraSlot(null));
+        assertNull(RecordingTimeline.parseCameraSlot("noextension"));
+        assertNull(RecordingTimeline.parseCameraSlot("20260829_100000_.mp4"));
+    }
+
+    @Test
+    public void keepsOnlyTheRequestedSlot() {
+        // 三路录制时同一分段写出三个文件，时间戳前缀完全相同 ——
+        // 不过滤的话它们会被当成时间上前后相接的三段接到同一条时间轴上
+        assertTrue(RecordingTimeline.isSlot("20260829_100000_front.mp4", "front"));
+        assertFalse(RecordingTimeline.isSlot("20260829_100000_back.mp4", "front"));
+        assertFalse(RecordingTimeline.isSlot("20260829_100000_left.mp4", "front"));
+    }
+
+    @Test
+    public void slotMatchIsCaseInsensitive() {
+        assertTrue(RecordingTimeline.isSlot("20260829_100000_FRONT.mp4", "front"));
     }
 
     // ---------- 连续分段合并 ----------

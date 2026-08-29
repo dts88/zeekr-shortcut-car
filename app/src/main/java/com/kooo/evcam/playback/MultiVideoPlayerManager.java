@@ -297,17 +297,36 @@ public class MultiVideoPlayerManager {
         isStopping = true;
 
         try {
-            if (videoFront != null) videoFront.stopPlayback();
-            if (videoBack != null) videoBack.stopPlayback();
-            if (videoLeft != null) videoLeft.stopPlayback();
-            if (videoRight != null) videoRight.stopPlayback();
-            if (videoSingle != null) videoSingle.stopPlayback();
+            detachAndStop(videoFront);
+            detachAndStop(videoBack);
+            detachAndStop(videoLeft);
+            detachAndStop(videoRight);
+            detachAndStop(videoSingle);
         } catch (Exception e) {
             Log.e(TAG, "Error stopping playback", e);
         }
 
         mediaPlayers.clear();
         isStopping = false;
+    }
+
+    /**
+     * 停掉一路并摘掉它的回调。
+     *
+     * <p>只 stopPlayback 是不够的：三个回调仍挂在 VideoView 上，而它们闭包引用着
+     * preparedCount / totalVideos / duration 这些计数。下一组加载时会把计数清零并
+     * 重新注册回调，此时上一组还在途中的 onPrepared 就会落到新状态上 ——
+     * preparedCount 被多加一次，checkAllPrepared() 提前判定完成，
+     * 于是对还没准备好的视图执行播放。</p>
+     */
+    private void detachAndStop(VideoView videoView) {
+        if (videoView == null) {
+            return;
+        }
+        videoView.setOnPreparedListener(null);
+        videoView.setOnCompletionListener(null);
+        videoView.setOnErrorListener(null);
+        videoView.stopPlayback();
     }
 
     /**

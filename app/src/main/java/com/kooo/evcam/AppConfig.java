@@ -2826,13 +2826,14 @@ public class AppConfig {
         if (cameraCount >= 2 && isRecordingCameraEnabled("back")) {
             enabled.add("back");
         }
-        if (cameraCount >= 4) {
-            if (isRecordingCameraEnabled("left")) {
-                enabled.add("left");
-            }
-            if (isRecordingCameraEnabled("right")) {
-                enabled.add("right");
-            }
+        // 按槽位序号分别判断：back 是第 2 路、left 第 3 路、right 第 4 路。
+        // 这里原来把 left/right 一起卡在 >= 4 —— 三路配置下 left 永远进不了集合，
+        // 于是后座画面预览正常、录制却没有这一路。
+        if (cameraCount >= 3 && isRecordingCameraEnabled("left")) {
+            enabled.add("left");
+        }
+        if (cameraCount >= 4 && isRecordingCameraEnabled("right")) {
+            enabled.add("right");
         }
         
         // 安全检查：如果结果为空，返回所有可用摄像头（防止无法录制）
@@ -2840,10 +2841,8 @@ public class AppConfig {
             AppLog.w(TAG, "没有启用的录制摄像头，自动启用所有可用摄像头");
             if (cameraCount >= 1) enabled.add("front");
             if (cameraCount >= 2) enabled.add("back");
-            if (cameraCount >= 4) {
-                enabled.add("left");
-                enabled.add("right");
-            }
+            if (cameraCount >= 3) enabled.add("left");
+            if (cameraCount >= 4) enabled.add("right");
             // 同时重置配置
             resetRecordingCameraSelection();
         }
@@ -3754,12 +3753,14 @@ public class AppConfig {
                 new RecordingConfig.CarModelProvider() {
                     @Override
                     public String getCarModel() {
-                        return getCarModel();
+                        // 必须带 AppConfig.this —— 不带的话调的是匿名类自己这个方法，
+                        // 无限递归直接 StackOverflowError
+                        return AppConfig.this.getCarModel();
                     }
 
                     @Override
                     public boolean isPanoramicMode() {
-                        return getCameraCount() >= 4;
+                        return AppConfig.this.getCameraCount() >= 4;
                     }
                 }
         );

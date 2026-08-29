@@ -223,6 +223,42 @@ public final class RecordingTimeline {
     }
 
     /**
+     * 录像文件名里的摄像头槽位。
+     *
+     * <p>文件名形如 {@code 20260829_100000_front.mp4}，最后一段下划线之后就是槽位名
+     * （front / back / left / right）。</p>
+     *
+     * @return 槽位名；解析不出来返回 null
+     */
+    public static String parseCameraSlot(String fileName) {
+        if (fileName == null) {
+            return null;
+        }
+        int dot = fileName.lastIndexOf('.');
+        if (dot <= 0) {
+            return null;
+        }
+        String stem = fileName.substring(0, dot);
+        int underscore = stem.lastIndexOf('_');
+        if (underscore < 0 || underscore == stem.length() - 1) {
+            return null;
+        }
+        return stem.substring(underscore + 1);
+    }
+
+    /**
+     * 这个文件是不是指定槽位的录像。
+     *
+     * <p>连续回放只看环视那一路。三路录制时同一分段会写出三个文件，
+     * 它们的时间戳前缀完全相同 —— 全都收进来的话，会被当成时间上前后相接的三段，
+     * 于是环视和座舱画面被接在同一条时间轴上。</p>
+     */
+    public static boolean isSlot(String fileName, String slot) {
+        String parsed = parseCameraSlot(fileName);
+        return parsed != null && parsed.equalsIgnoreCase(slot);
+    }
+
+    /**
      * 从 {@code yyyyMMdd_HHmmss} 开头的文件名里解析起始时刻。
      *
      * <p>录制文件名形如 {@code 20260828_221530_front.mp4}。</p>

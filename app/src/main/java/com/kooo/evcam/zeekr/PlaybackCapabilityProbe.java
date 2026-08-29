@@ -176,6 +176,21 @@ public final class PlaybackCapabilityProbe {
                     sb.append("     宽: ").append(caps.getSupportedWidths())
                             .append("   高: ").append(caps.getSupportedHeights()).append('\n');
 
+                    // 能同时开几个实例 —— 视频回看会把一组里的每一路同时解码，
+                    // 三路录制时就是 3 个解码器一起跑，其中一个还是 1280x5140。
+                    // 超过上限的表现正是「切换几次之后画面变绿」。
+                    try {
+                        int maxInstances = info.getCapabilitiesForType(type)
+                                .getMaxSupportedInstances();
+                        sb.append("     最大并发实例: ").append(maxInstances);
+                        if (maxInstances > 0 && maxInstances < 3) {
+                            sb.append("  >> 少于 3，视频回看同时播三路会超限 <<");
+                        }
+                        sb.append('\n');
+                    } catch (Throwable t) {
+                        sb.append("     最大并发实例: 读取失败").append('\n');
+                    }
+
                     // 直接问它支不支持我们录出来的尺寸 —— 这是最有用的一行
                     for (int[] size : recordedSizes) {
                         boolean ok = false;
@@ -201,6 +216,9 @@ public final class PlaybackCapabilityProbe {
             sb.append("   这不是播放器代码能修的，得改录制尺寸或分格保存。").append('\n');
             sb.append(">> 若全部「支持」，那回放问题就在播放器一侧，").append('\n');
             sb.append("   0.7.4 已重写拖动时的 prepare/seek 状态机。").append('\n');
+            sb.append(">> 「最大并发实例」少于 3 的话，视频回看界面同时播三路本身就超限，").append('\n');
+            sb.append("   表现就是切换几次之后画面变绿 —— 那需要改成按需解码，").append('\n');
+            sb.append("   而不是一次把整组都打开。").append('\n');
         } catch (Throwable t) {
             sb.append("!! 枚举解码器失败: ").append(t).append('\n');
         }

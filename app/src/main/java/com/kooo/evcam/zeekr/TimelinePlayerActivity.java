@@ -48,6 +48,8 @@ public class TimelinePlayerActivity extends Activity {
     private static final long TICK_MS = 500L;
     /** 连续出错多少次就停止自动续播。 */
     private static final int MAX_CONSECUTIVE_ERRORS = 3;
+    /** 连续回放只播环视合成流那一路；座舱各路不参与时间轴。 */
+    private static final String COMPOSITE_SLOT = "front";
 
     private VideoView videoView;
     private SeekBar seekBar;
@@ -213,6 +215,12 @@ public class TimelinePlayerActivity extends Activity {
                         if (!f.isFile() || !f.getName().toLowerCase(Locale.US).endsWith(".mp4")) {
                             continue;
                         }
+                        // 只要环视那一路。三路录制时同一分段会写出 front/back/left 三个
+                        // 文件，时间戳前缀一模一样 —— 全收进来就会被当成前后相接的三段，
+                        // 把环视和座舱画面接到同一条时间轴上。
+                        if (!RecordingTimeline.isSlot(f.getName(), COMPOSITE_SLOT)) {
+                            continue;
+                        }
                         long start = RecordingTimeline.parseStartEpochMs(f.getName());
                         if (start < 0) {
                             continue;
@@ -234,8 +242,9 @@ public class TimelinePlayerActivity extends Activity {
                 sessionAdapter.setSessions(sessions);
                 updateListSummary();
                 if (sessions.isEmpty()) {
-                    infoText.setText("没有找到可用的录像");
-                    Toast.makeText(this, "没有找到可用的录像", Toast.LENGTH_LONG).show();
+                    infoText.setText("没有找到环视录像");
+                    Toast.makeText(this, "没有找到环视录像（连续回放只播环视这一路）",
+                            Toast.LENGTH_LONG).show();
                     return;
                 }
                 // 默认打开最近的一条时间轴
