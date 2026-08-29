@@ -44,8 +44,16 @@ public class RearViewMirrorView extends ViewGroup {
 
     /** 贴边后仍然露出的宽度，用来把它再拖回来。 */
     private static final int PEEK_WIDTH_PX = 72;
-    /** 距离屏幕边缘多少像素以内算贴边。 */
-    private static final int DOCK_THRESHOLD_PX = 48;
+    /**
+     * 距离屏幕边缘多少像素以内算贴边。
+     *
+     * <p><b>必须大于 {@link #PEEK_WIDTH_PX}</b>，否则这个条件永远不成立：
+     * 拖动时 {@code clampX} 已经把 x 限制在最多 {@code screenW - PEEK}，
+     * 也就是右边缘最近只能到距屏幕边 PEEK 像素处。阈值比 PEEK 小的话，
+     * 窗口再怎么往边上拖也进不了判定范围 —— 第一版就是这么写的，
+     * 所以贴边隐藏一次都没触发过。</p>
+     */
+    private static final int DOCK_THRESHOLD_PX = PEEK_WIDTH_PX + 80;
     /** 超过这个位移才算拖动，避免点一下就漂移。 */
     private static final int DRAG_SLOP_PX = 12;
 
@@ -330,6 +338,7 @@ public class RearViewMirrorView extends ViewGroup {
                 params.x = RearViewTouchModel.dockedX(
                         dock, params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
                 applyLayout();
+                AppLog.d(TAG, "后视镜已贴边: " + dock + "，露出 " + PEEK_WIDTH_PX + "px");
             }
             appConfig.setRearViewPosition(params.x, params.y);
             appConfig.setRearViewSize(params.width);

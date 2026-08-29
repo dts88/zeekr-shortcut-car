@@ -3799,6 +3799,11 @@ public class MainActivity extends AppCompatActivity {
                 // 有悬浮窗（补盲/常驻/副屏）正在使用摄像头：保持连接
                 // 悬浮窗关闭时会自行释放摄像头（closeCamerasIfIdle）
                 AppLog.d(TAG, "Active camera windows exist, keeping cameras connected");
+            } else if (appConfig.isRearViewEnabled()) {
+                // 超级后视镜也在用这一路相机。不加这一条的话，退到后台时相机被关掉，
+                // 后视镜就冻在最后一帧上，切回前台也不会恢复 ——
+                // 前台只会为自己的预览重开相机，不认识这个它不知道的窗口。
+                AppLog.d(TAG, "超级后视镜正在显示，保持摄像头连接");
             } else {
                 // 未录制且无悬浮窗：主动断开摄像头，释放资源
                 AppLog.d(TAG, "Not recording, closing all cameras to release resources");

@@ -43,6 +43,9 @@ public class RearViewMirrorService extends Service {
     private SingleCamera boundCamera;
     private int retryCount;
     private Runnable retryRunnable;
+    private Runnable watchdog;
+    /** 相机看门狗间隔：够快到切回前台就恢复，又不至于空转太频繁。 */
+    private static final long WATCHDOG_INTERVAL_MS = 2000L;
 
     public static void start(Context context) {
         context.startService(new Intent(context, RearViewMirrorService.class));
@@ -100,6 +103,27 @@ public class RearViewMirrorService extends Service {
                     }
                 });
         mirrorView.show();
+        startWatchdog();
+    }
+
+    /** 每隔几秒确认相机还在，断了就接回来。 */
+    private void startWatchdog() {
+        cancelWatchdog();
+        watchdog = new Runnable() {
+            @Override
+            public void run() {
+                ensureStillBound();
+                handler.postDelayed(this, WATCHDOG_INTERVAL_MS);
+            }
+        };
+        handler.postDelayed(watchdog, WATCHDOG_INTERVAL_MS);
+    }
+
+    private void cancelWatchdog() {
+        if (watchdog != null) {
+            handler.removeCallbacks(watchdog);
+            watchdog = null;
+        }
     }
 
     /**
@@ -144,6 +168,28 @@ public class RearViewMirrorService extends Service {
         AppLog.i(TAG, "后视镜已接到相机，预览尺寸 " + previewSize);
     }
 
+    /**
+     * 相机被别处关掉后重新接上。
+     *
+     * <p>录制、息屏等路径都可能关掉相机；关掉之后这个窗口就冻在最后一帧上。
+     * 定期确认一下，断了就接回来，比等着某个通知可靠 ——
+     * 关相机的地方有好几处，不是每一处都会想到通知这里。</p>
+     */
+    private void ensureStillBound() {
+        if (mirrorView == null || !mirrorView.isShowing()) {
+            return;
+        }
+        if (boundCamera != null && boundCamera.isCameraOpened()) {
+            return;
+        }
+        TextureView tv = mirrorView.getTextureView();
+        if (tv.isAvailable()) {
+            AppLog.i(TAG, "相机已不在，后视镜重新绑定");
+            retryCount = 0;
+            bindCamera(tv.getSurfaceTexture());
+        }
+    }
+
     private void scheduleRetry(SurfaceTexture surfaceTexture) {
         if (retryCount >= MAX_RETRY) {
             AppLog.w(TAG, "相机始终不可用，后视镜放弃绑定");
@@ -178,6 +224,7 @@ public class RearViewMirrorService extends Service {
     @Override
     public void onDestroy() {
         cancelRetry();
+        cancelWatchdog();
         unbindCamera();
         if (mirrorView != null) {
             mirrorView.hide();
