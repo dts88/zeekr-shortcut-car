@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.LinkMovementMethod;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +48,8 @@ public class AboutActivity extends Activity {
         bindLink(R.id.about_link_openavm, OPENAVM_URL);
         bindLink(R.id.about_link_gpl, GPL_URL);
 
+        setUpDeveloperUnlock();
+
         View close = findViewById(R.id.about_close);
         if (close != null) {
             close.setOnClickListener(v -> finish());
@@ -81,4 +84,68 @@ public class AboutActivity extends Activity {
             Toast.makeText(this, url, Toast.LENGTH_LONG).show();
         }
     }
+
+    // ------------------------------------------------------------------ 开发者选项
+
+    private int safetyTaps;
+    private long lastTapAtMs;
+
+    /**
+     * 在「安全须知」上连点若干次，再输密码，打开开发者选项。
+     *
+     * <p>藏在这里而不是给个显眼的入口：后面那些要么没做完、要么是排查用的，
+     * 平时不该出现在设置里让人以为是正常功能。</p>
+     *
+     * <p>连点要够快 —— 隔太久就重新计数，免得平时零星点到几下慢慢攒够。</p>
+     */
+    private void setUpDeveloperUnlock() {
+        View heading = findViewById(R.id.about_safety_heading);
+        if (heading == null) {
+            return;
+        }
+        heading.setOnClickListener(v -> {
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (now - lastTapAtMs > TAP_RESET_MS) {
+                safetyTaps = 0;
+            }
+            lastTapAtMs = now;
+            safetyTaps++;
+
+            if (com.kooo.evcam.settings.DeveloperMode.isUnlocked()) {
+                return;
+            }
+            int remaining = com.kooo.evcam.settings.DeveloperMode.TAPS_REQUIRED - safetyTaps;
+            if (remaining <= 0) {
+                safetyTaps = 0;
+                promptForDeveloperPassword();
+            } else if (remaining <= 5) {
+                Toast.makeText(this, "还差 " + remaining + " 次", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void promptForDeveloperPassword() {
+        final EditText input = new EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setHint("密码");
+
+        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle("开发者选项")
+                .setMessage("这里面是没做完的和排查用的功能。重启应用后会自动关闭。")
+                .setView(input)
+                .setPositiveButton("确定", (dialog, which) -> {
+                    if (com.kooo.evcam.settings.DeveloperMode.unlock(input.getText().toString())) {
+                        Toast.makeText(this, "开发者选项已打开（重启后失效）",
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(this, "密码不对", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /** 连点的间隔上限，超过就重新数。 */
+    private static final long TAP_RESET_MS = 1500L;
 }

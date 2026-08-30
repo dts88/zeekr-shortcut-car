@@ -1445,6 +1445,21 @@ public class AppConfig {
      * @return 默认名称
      */
     public String getDefaultCameraName(String position) {
+        // 极氪这两档的第一路不是「前摄像头」，而是车机拼好的那条环视合成流。
+        // 叫它「前」会让人以为还有另外三路可选，实际整个 360° 都在这一路里。
+        String carModel = getCarModel();
+        if (CAR_MODEL_ZEEKR_7X.equals(carModel) || CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            switch (position) {
+                case "front":
+                    return "环视";
+                case "back":
+                    return "座舱1";
+                case "left":
+                    return "座舱2";
+                default:
+                    break;
+            }
+        }
         // 默认名称（适用于大多数预设车型）
         switch (position) {
             case "front":

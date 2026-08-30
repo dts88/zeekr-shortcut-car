@@ -1533,7 +1533,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 显示补盲选项设置界面
      */
-    private void showBlindSpotInterface() {
+    public void showBlindSpotInterface() {
         // 隐藏录制布局，显示Fragment容器
         recordingLayout.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
@@ -1549,7 +1549,7 @@ public class MainActivity extends AppCompatActivity {
      * 切换超视模式
      * 超视模式会同时显示左右两个补盲悬浮窗
      */
-    private void toggleSupervisionMode() {
+    public void toggleSupervisionMode() {
         AppConfig appConfig = new AppConfig(this);
         boolean currentEnabled = appConfig.isSupervisionModeEnabled();
         boolean newEnabled = !currentEnabled;

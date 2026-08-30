@@ -235,10 +235,6 @@
             android:title="防止休眠"
             android:summary="阻止系统深度休眠。会增加电瓶消耗，按需开启" />
 
-        <Preference
-            android:key="pref_permissions"
-            android:title="权限设置"
-            android:summary="管理应用所需的各项权限" />
     </PreferenceCategory>
 
     <!-- ==================== 高级 ==================== -->
@@ -282,9 +278,38 @@
             android:title="保存日志"
             android:summary="把运行日志写到存储里，方便拷走" />
 
+    </PreferenceCategory>
+
+    <!--
+      开发者选项。默认整块隐藏，在「关于本应用」里连点「安全须知」再输密码才出现，
+      而且重启应用就恢复隐藏 —— 里面要么是没做完的，要么是排查用的。
+    -->
+    <PreferenceCategory
+        android:key="cat_developer"
+        android:title="开发者选项">
+
+        <Preference
+            android:key="pref_permissions"
+            android:title="权限设置"
+            android:summary="管理应用所需的各项权限" />
+
         <Preference
             android:key="pref_upload_logs"
-            android:title="上传日志" />
+            android:title="上传日志"
+            android:summary="把运行日志发给作者" />
+
+        <Preference
+            android:key="pref_blind_spot"
+            android:title="补盲选项" />
+
+        <Preference
+            android:key="pref_supervision"
+            android:title="超视模式" />
+
+        <Preference
+            android:key="pref_developer_note"
+            android:selectable="false"
+            android:summary="「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。" />
     </PreferenceCategory>
 
     <!-- ==================== 关于 ==================== -->

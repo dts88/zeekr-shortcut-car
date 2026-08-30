@@ -15,6 +15,7 @@ import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
+import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
@@ -26,6 +27,7 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.PermissionSettingsFragment;
 import com.kooo.evcam.ResolutionSettingsFragment;
 import com.kooo.evcam.R;
+import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.AboutActivity;
@@ -60,6 +62,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private static final String TAG = "SettingsPreference";
 
     private AppConfig appConfig;
+    /** 外置卷的取值前缀，后面接它在探测结果里的下标。 */
+    private static final String EXTERNAL_PREFIX = "external:";
+    private List<StorageHelper.VolumeInfo> storageVolumes;
 
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
@@ -81,6 +86,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindFloating();
         bindSystem();
         bindAdvanced();
+        bindDeveloper();
         bindAbout();
     }
 
@@ -94,12 +100,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 录制
 
     private void bindRecording() {
-        bindEnum("pref_car_model", SettingsRegistry.CAR_MODEL,
-                appConfig.getCarModel(), value -> {
-                    appConfig.setCarModel(value);
-                    toast("视频流配置已改为「"
-                            + SettingsRegistry.CAR_MODEL.displayNameOf(value) + "」，重启应用后生效");
-                });
+        bindCarModel();
 
         bindEnum("pref_record_layout", SettingsRegistry.RECORD_LAYOUT,
                 appConfig.getRecordLayout(), value -> appConfig.setRecordLayout(value));
@@ -118,6 +119,51 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_watermark_spec", appConfig.isWatermarkSpecEnabled(),
                 value -> appConfig.setWatermarkSpecEnabled(value));
+    }
+
+    /**
+     * 视频流配置。
+     *
+     * <p>「环视+座舱3路」和「自定义」还没做完，平时不列出来 ——
+     * 半成品混在正常选项里，选中之后出问题会让人以为是应用坏了。
+     * 开发者选项打开时才出现。</p>
+     *
+     * <p>但<b>当前值一定保留</b>：万一已经停在某个隐藏选项上，把它从列表里抹掉
+     * 会让下拉框显示空白，那才是真的没法收拾。</p>
+     */
+    private void bindCarModel() {
+        ListPreference pref = findPreference("pref_car_model");
+        if (pref == null) {
+            return;
+        }
+        String current = SettingsRegistry.CAR_MODEL.sanitize(appConfig.getCarModel());
+        String[] allValues = SettingsRegistry.CAR_MODEL.values();
+        String[] allNames = SettingsRegistry.CAR_MODEL.displayNames();
+
+        List<String> values = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        for (int i = 0; i < allValues.length; i++) {
+            boolean unfinished = !AppConfig.CAR_MODEL_ZEEKR_7X.equals(allValues[i]);
+            if (!unfinished || DeveloperMode.isUnlocked() || allValues[i].equals(current)) {
+                values.add(allValues[i]);
+                names.add(allNames[i]);
+            }
+        }
+
+        pref.setPersistent(false);
+        pref.setEntries(names.toArray(new String[0]));
+        pref.setEntryValues(values.toArray(new String[0]));
+        pref.setValue(current);
+        pref.setSummary(pref.getEntry());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            String value = String.valueOf(newValue);
+            appConfig.setCarModel(value);
+            pref.setValue(value);
+            pref.setSummary(pref.getEntry());
+            toast("视频流配置已改为「"
+                    + SettingsRegistry.CAR_MODEL.displayNameOf(value) + "」，重启应用后生效");
+            return false;
+        });
     }
 
     /**
@@ -212,24 +258,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 存储
 
     private void bindStorage() {
-        ListPreference storage = findPreference("pref_storage_location");
-        if (storage != null) {
-            storage.setPersistent(false);
-            storage.setEntries(new String[]{"U 盘（推荐）", "内置存储"});
-            storage.setEntryValues(new String[]{
-                    AppConfig.STORAGE_EXTERNAL_SD, AppConfig.STORAGE_INTERNAL});
-            storage.setValue(appConfig.getStorageLocation());
-            storage.setSummary(storage.getEntry());
-            storage.setOnPreferenceChangeListener((preference, newValue) -> {
-                String value = String.valueOf(newValue);
-                if (AppConfig.STORAGE_INTERNAL.equals(value)) {
-                    confirmInternalStorage(storage);
-                } else {
-                    applyStorageLocation(storage, value);
-                }
-                return false;
-            });
-        }
+        bindStorageLocation();
 
         bindSwitch("pref_relay_write", appConfig.isRelayWriteEnabled(),
                 value -> appConfig.setRelayWriteEnabled(value));
@@ -252,7 +281,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (getContext() == null) {
             return;
         }
-        new android.app.AlertDialog.Builder(getContext())
+        // 必须带上 AlertDialogTheme：这个应用的主题下，不指定它的话
+        // 按钮文字和背景同色，看着就像「弹出来了但没有确认键」
+        new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
                 .setTitle("确定用内置存储？")
                 .setMessage("行车记录会持续不断地写入数据 —— 只要在录，就一直在写。\n\n"
                         + "闪存的写入寿命是有限的，长期把车机内置存储当作记录仪的落盘位置，"
@@ -264,8 +295,96 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 .show();
     }
 
+    /**
+     * 存储位置：把<b>实际存在的卷</b>逐个列出来。
+     *
+     * <p>以前只有「U盘 / 内置」两项，插两个盘时没法指定是哪一个。
+     * 这里按 {@link com.kooo.evcam.StorageHelper#listExternalVolumes} 的结果生成选项，
+     * 每一项带上卷名和剩余/总容量 —— 要选到正确的那个盘，得先看得出它们的区别。</p>
+     *
+     * <p>选中某个外置卷时会把它的根目录钉到 {@code customSdCardPath}，
+     * 否则检测逻辑永远落到第一个盘上。</p>
+     */
+    private void bindStorageLocation() {
+        ListPreference pref = findPreference("pref_storage_location");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setSummary("正在检测存储...");
+
+        final Context context = getContext().getApplicationContext();
+        new Thread(() -> {
+            final List<StorageHelper.VolumeInfo> volumes =
+                    StorageHelper.listExternalVolumes(context);
+            if (!isAdded()) {
+                return;
+            }
+            requireActivity().runOnUiThread(() -> populateStorageLocation(pref, volumes));
+        }, "storage-volumes").start();
+    }
+
+    private void populateStorageLocation(ListPreference pref,
+                                         List<StorageHelper.VolumeInfo> volumes) {
+        storageVolumes = volumes;
+
+        List<String> labels = new ArrayList<>();
+        List<String> values = new ArrayList<>();
+        for (int i = 0; i < volumes.size(); i++) {
+            labels.add(volumes.get(i).describe());
+            // 用下标当取值：同一台车上插拔顺序会变，但选中的那一刻下标是确定的，
+            // 真正被记住的是下面钉进 customSdCardPath 的根目录
+            values.add(EXTERNAL_PREFIX + i);
+        }
+        labels.add("内置存储");
+        values.add(AppConfig.STORAGE_INTERNAL);
+
+        pref.setEntries(labels.toArray(new String[0]));
+        pref.setEntryValues(values.toArray(new String[0]));
+        pref.setValue(currentStorageValue(volumes));
+        pref.setSummary(pref.getEntry() != null ? pref.getEntry() : "未选择");
+
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            String value = String.valueOf(newValue);
+            if (AppConfig.STORAGE_INTERNAL.equals(value)) {
+                confirmInternalStorage(pref);
+            } else {
+                applyStorageLocation(pref, value);
+            }
+            return false;
+        });
+        updateStorageUsage();
+    }
+
+    /** 当前生效的是哪一项。外置时要对上具体哪个卷，不能笼统算「外置」。 */
+    private String currentStorageValue(List<StorageHelper.VolumeInfo> volumes) {
+        if (!appConfig.isUsingExternalSdCard() || volumes.isEmpty()) {
+            return AppConfig.STORAGE_INTERNAL;
+        }
+        String pinned = appConfig.getCustomSdCardPath();
+        if (pinned != null && !pinned.isEmpty()) {
+            for (int i = 0; i < volumes.size(); i++) {
+                if (pinned.equals(volumes.get(i).root.getAbsolutePath())) {
+                    return EXTERNAL_PREFIX + i;
+                }
+            }
+        }
+        return EXTERNAL_PREFIX + "0";
+    }
+
     private void applyStorageLocation(ListPreference pref, String value) {
-        appConfig.setStorageLocation(value);
+        if (value.startsWith(EXTERNAL_PREFIX)) {
+            int index = Integer.parseInt(value.substring(EXTERNAL_PREFIX.length()));
+            if (storageVolumes != null && index < storageVolumes.size()) {
+                appConfig.setCustomSdCardPath(
+                        storageVolumes.get(index).root.getAbsolutePath());
+            }
+            appConfig.setStorageLocation(AppConfig.STORAGE_EXTERNAL_SD);
+        } else {
+            // 回到内置存储时清掉钉住的卷，否则下次选外置还会认着旧盘
+            appConfig.setCustomSdCardPath(null);
+            appConfig.setStorageLocation(AppConfig.STORAGE_INTERNAL);
+        }
         pref.setValue(value);
         pref.setSummary(pref.getEntry());
         toast("存储位置已切换为「" + pref.getEntry() + "」");
@@ -315,7 +434,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         new Thread(() -> {
             String desc;
             try {
-                desc = com.kooo.evcam.StorageHelper.getCurrentStoragePathDesc(context);
+                desc = StorageHelper.getCurrentStoragePathDesc(context);
             } catch (Throwable t) {
                 desc = "读取失败";
             }
@@ -594,6 +713,37 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             java.io.File file = AppLog.saveLogsToFile(getContext());
             toast(file != null ? "日志已保存到: " + file.getAbsolutePath() : "保存日志失败");
         });
+    }
+
+    private void updateCameraMappingSummary() {
+        Preference pref = findPreference("pref_camera_mapping");
+        if (pref == null) {
+            return;
+        }
+        pref.setSummary(appConfig.hasCameraOverride()
+                ? "已手动指定相机映射"
+                : "自动分配。多路配置下若某一路不出画面，可在这里手动指定");
+    }
+
+    // ------------------------------------------------------------------ 开发者选项
+
+    /**
+     * 开发者选项整块的显隐。
+     *
+     * <p>没解锁时把整个分类从界面上移除，而不是置灰 —— 置灰等于告诉别人
+     * 「这里有东西但你用不了」，而这些本来就不该出现在普通用户的设置里。</p>
+     */
+    private void bindDeveloper() {
+        PreferenceCategory category = findPreference("cat_developer");
+        if (category == null) {
+            return;
+        }
+        if (!DeveloperMode.isUnlocked()) {
+            getPreferenceScreen().removePreference(category);
+            return;
+        }
+
+        onClick("pref_permissions", pref -> openFragment(new PermissionSettingsFragment()));
 
         onClick("pref_upload_logs", pref -> {
             if (getContext() == null) {
@@ -607,16 +757,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 SettingsDialogs.showDeviceNicknameInputDialog(getContext(), appConfig);
             }
         });
-    }
 
-    private void updateCameraMappingSummary() {
-        Preference pref = findPreference("pref_camera_mapping");
-        if (pref == null) {
-            return;
-        }
-        pref.setSummary(appConfig.hasCameraOverride()
-                ? "已手动指定相机映射"
-                : "自动分配。多路配置下若某一路不出画面，可在这里手动指定");
+        onClick("pref_blind_spot", pref -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).showBlindSpotInterface();
+            }
+        });
+
+        onClick("pref_supervision", pref -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).toggleSupervisionMode();
+            }
+        });
     }
 
     // ------------------------------------------------------------------ 关于

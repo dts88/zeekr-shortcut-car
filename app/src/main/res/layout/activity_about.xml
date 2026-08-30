@@ -157,6 +157,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
+                android:id="@+id/about_safety_heading"
                 android:text="安全须知"
                 android:textColor="#FF8080"
                 android:textSize="18sp"
