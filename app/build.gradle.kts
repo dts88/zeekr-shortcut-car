@@ -33,9 +33,9 @@ android {
         targetSdk = 36
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
-        versionCode = 47
+        versionCode = 48
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "0.16.0-alpha"
+        versionName = "0.17.0-alpha"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -92,6 +92,9 @@ dependencies {
 
     // WorkManager 定时任务（用于保活）
     implementation("androidx.work:work-runtime:2.9.0")
+
+    // 设置界面（PreferenceScreen）
+    implementation("androidx.preference:preference:1.2.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

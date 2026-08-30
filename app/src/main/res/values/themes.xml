@@ -1,6 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.Cam" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- PreferenceFragmentCompat 必须能拿到 preferenceTheme，
+             否则构造时直接抛「Must specify preferenceTheme in theme」 -->
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
         <!-- 深灰色配色方案 -->
         <item name="colorPrimary">#424242</item>
         <item name="colorPrimaryVariant">#2A2A2A</item>

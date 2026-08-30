@@ -1525,7 +1525,8 @@ public class MainActivity extends AppCompatActivity {
         // 显示SettingsFragment
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, new SettingsFragment());
+        transaction.replace(R.id.fragment_container,
+                new com.kooo.evcam.settings.SettingsPreferenceFragment());
         transaction.commit();
     }
 

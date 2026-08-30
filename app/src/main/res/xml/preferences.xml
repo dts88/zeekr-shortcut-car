@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置界面的结构。
+
+  这里只声明「有哪些设置、怎么排、互相之间的启用关系」，不声明取值 ——
+  所有 Preference 都在代码里 setPersistent(false)，读写一律走 AppConfig。
+
+  这样做的理由：AppConfig 是这些设置唯一的真相来源，它的 getter/setter 里带着
+  夹取、默认值、迁移和联动。如果让 Preference 自己往 SharedPreferences 里写，
+  就等于开了第二条写入路径 —— key 一旦对不上，表现是「设置悄悄不生效」，
+  而这类问题在这个项目里已经反复出现过。所以这里的 key 只是标识符，不是存储键。
+
+  ListPreference 的选项也在代码里从 SettingsRegistry 填，同理：选项声明一遍就够。
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!--
+      车机上没有系统返回键可用，侧滑抽屉在行车时也不好按，
+      所以把「回到录制界面」明确放在最上面一条。
+    -->
+    <Preference
+        android:key="pref_back_to_recording"
+        android:title="← 返回录制界面" />
+
+    <!-- ==================== 录制 ==================== -->
+    <PreferenceCategory
+        android:key="cat_recording"
+        android:title="录制">
+
+        <ListPreference
+            android:key="pref_car_model"
+            android:title="视频流配置"
+            android:summary="%s"
+            app:useSimpleSummaryProvider="false" />
+
+        <ListPreference
+            android:key="pref_record_layout"
+            android:title="录制画面排列"
+            android:summary="%s" />
+
+        <ListPreference
+            android:key="pref_record_fps"
+            android:title="录制帧率"
+            android:summary="%s" />
+
+        <ListPreference
+            android:key="pref_segment_duration"
+            android:title="分段时长"
+            android:summary="%s" />
+
+        <MultiSelectListPreference
+            android:key="pref_recording_cameras"
+            android:title="录制摄像头"
+            android:dialogTitle="选择参与录制的视频流（不影响拍照）" />
+
+        <Preference
+            android:key="pref_resolution"
+            android:title="分辨率与码率"
+            android:summary="分辨率由视频流探测结果决定" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_watermark"
+            android:title="时间角标"
+            android:summaryOn="在保存的视频和图片上加时间水印"
+            android:summaryOff="不加水印。只影响存下来的文件，预览里本来就不显示" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_watermark_spec"
+            android:dependency="pref_watermark"
+            android:title="角标附带录制规格"
+            android:summary="水印里一并写上分辨率和帧率" />
+    </PreferenceCategory>
+
+    <!-- ==================== 存储 ==================== -->
+    <PreferenceCategory
+        android:key="cat_storage"
+        android:title="存储">
+
+        <ListPreference
+            android:key="pref_storage_location"
+            android:title="存储位置"
+            android:summary="%s" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_relay_write"
+            android:title="中转写入"
+            android:summary="先写内置存储，分段完成后再搬到 U 盘。U 盘速度不稳时可减少丢帧" />
+
+        <EditTextPreference
+            android:key="pref_video_limit"
+            android:title="视频存储上限"
+            android:dialogTitle="视频存储上限（GB）"
+            android:dialogMessage="超过上限时先删最早的。留空或填 0 表示不限制" />
+
+        <EditTextPreference
+            android:key="pref_photo_limit"
+            android:title="图片存储上限"
+            android:dialogTitle="图片存储上限（GB）"
+            android:dialogMessage="超过上限时先删最早的。留空或填 0 表示不限制" />
+
+        <Preference
+            android:key="pref_storage_usage"
+            android:title="当前落盘位置"
+            android:selectable="false" />
+    </PreferenceCategory>
+
+    <!-- ==================== 超级后视镜 ==================== -->
+    <PreferenceCategory
+        android:key="cat_rearview"
+        android:title="超级后视镜">
+
+        <SwitchPreferenceCompat
+            android:key="pref_rearview"
+            android:title="超级后视镜"
+            android:summary="把环视里的一路单独放大成悬浮窗。后视那一路左右镜像，和真正的后视镜一致" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_rearview_front_rear"
+            android:dependency="pref_rearview"
+            android:title="只显示前后视"
+            android:summary="左右划只在后视和前视之间来回，不经过两侧" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_rearview_fisheye"
+            android:dependency="pref_rearview"
+            android:title="鱼眼校正"
+            android:summary="把鱼眼镜头的桶形畸变拉直。只改显示，录下来的原始画面不动" />
+
+        <SeekBarPreference
+            android:key="pref_rearview_fov"
+            android:dependency="pref_rearview"
+            android:title="视野角度"
+            android:summary="角度越大左右收进来越广，边缘拉伸也越明显"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_rearview_width"
+            android:dependency="pref_rearview"
+            android:title="窗口宽度"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_rearview_height"
+            android:dependency="pref_rearview"
+            android:title="窗口高度"
+            android:summary="宽高各自可拉到整块屏幕。画面比例不会跟着变 —— 框的形状只决定看到多大一块"
+            app:showSeekBarValue="true" />
+
+        <Preference
+            android:key="pref_rearview_reset"
+            android:dependency="pref_rearview"
+            android:title="重置取景与位置"
+            android:summary="窗口挪丢了或取景调乱了，用这个回到默认" />
+    </PreferenceCategory>
+
+    <!-- ==================== 悬浮窗 ==================== -->
+    <PreferenceCategory
+        android:key="cat_floating"
+        android:title="悬浮窗">
+
+        <SwitchPreferenceCompat
+            android:key="pref_floating_window"
+            android:title="画面悬浮窗"
+            android:summary="在其他应用之上显示摄像头画面" />
+
+        <SeekBarPreference
+            android:key="pref_floating_size"
+            android:dependency="pref_floating_window"
+            android:title="悬浮窗大小"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_floating_alpha"
+            android:dependency="pref_floating_window"
+            android:title="悬浮窗透明度"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_recording_floating"
+            android:title="录制悬浮按钮"
+            android:summary="随时开始或停止录制" />
+
+        <SeekBarPreference
+            android:key="pref_button_size"
+            android:dependency="pref_recording_floating"
+            android:title="按钮大小"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_button_text_size"
+            android:dependency="pref_recording_floating"
+            android:title="按钮文字大小"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_recording_stats"
+            android:title="录制状态显示"
+            android:summary="录制时在画面角上显示时长和分段数" />
+
+        <Preference
+            android:key="pref_reset_floating"
+            android:title="重置悬浮窗布局"
+            android:summary="把各悬浮窗的位置和大小恢复默认" />
+    </PreferenceCategory>
+
+    <!-- ==================== 系统 ==================== -->
+    <PreferenceCategory
+        android:key="cat_system"
+        android:title="系统">
+
+        <SwitchPreferenceCompat
+            android:key="pref_auto_start"
+            android:title="开机自启动"
+            android:summary="系统启动后自动运行" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_auto_record"
+            android:title="启动自动录制"
+            android:summary="应用启动后自动开始录制，从后台回到前台时也会恢复" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_screen_off_recording"
+            android:dependency="pref_auto_record"
+            android:title="息屏录制"
+            android:summary="息屏（锁车黑屏）时继续录制" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_keep_alive"
+            android:title="定时保活"
+            android:summary="定期唤醒，避免被系统回收" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_prevent_sleep"
+            android:title="防止休眠"
+            android:summary="阻止系统深度休眠。会增加电瓶消耗，按需开启" />
+
+        <Preference
+            android:key="pref_permissions"
+            android:title="权限设置"
+            android:summary="管理应用所需的各项权限" />
+    </PreferenceCategory>
+
+    <!-- ==================== 高级 ==================== -->
+    <PreferenceCategory
+        android:key="cat_advanced"
+        android:title="高级">
+
+        <ListPreference
+            android:key="pref_recording_mode"
+            android:title="录制模式"
+            android:summary="%s" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_force_h264"
+            android:title="强制 H.264 编码"
+            android:summary="HEVC 出问题时改用兼容性更好的 H.264" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_decouple_preview"
+            android:title="预览用低分辨率"
+            android:summary="预览与录制分开取流，降低预览开销" />
+
+        <ListPreference
+            android:key="pref_preview_resolution"
+            android:dependency="pref_decouple_preview"
+            android:title="预览分辨率"
+            android:summary="%s" />
+
+        <Preference
+            android:key="pref_camera_mapping"
+            android:title="相机映射"
+            android:summary="手动指定各路视频流的对应关系（排查用）" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_debug"
+            android:title="Debug 模式"
+            android:summary="记录更详细的日志" />
+
+        <Preference
+            android:key="pref_save_logs"
+            android:title="保存日志"
+            android:summary="把运行日志写到存储里，方便拷走" />
+
+        <Preference
+            android:key="pref_upload_logs"
+            android:title="上传日志" />
+    </PreferenceCategory>
+
+    <!-- ==================== 关于 ==================== -->
+    <PreferenceCategory
+        android:key="cat_about"
+        android:title="关于">
+
+        <Preference
+            android:key="pref_usage_guide"
+            android:title="使用说明" />
+
+        <Preference
+            android:key="pref_diagnostics"
+            android:title="诊断信息"
+            android:summary="导出相机、屏幕、车辆信号与存储的实际情况" />
+
+        <Preference
+            android:key="pref_about"
+            android:title="关于本应用" />
+    </PreferenceCategory>
+</PreferenceScreen>
