@@ -992,7 +992,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="把环视里的一路单独放大成悬浮窗。后视那一路左右镜像，和真正的后视镜一致；前视、侧视不翻。左右三分之一拖动窗口，中间三分之一上下滑调取景高低、左右划换一路（顺时针 后左前右），双指缩放窗口，推出屏幕一半或朝边上甩一下即贴边隐藏"
+                        android:text="把环视里的一路单独放大成悬浮窗。后视那一路左右镜像，和真正的后视镜一致；前视、侧视不翻。左右三分之一拖动窗口，中间三分之一上下滑调取景高低、左右划换一路（右滑顺时针 后左前右，左滑反向），双指缩放窗口，推出屏幕一半或朝边上甩一下即贴边隐藏"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp" />
                 </LinearLayout>

@@ -48,6 +48,61 @@ public final class RearViewTouchModel {
         return (x >= third && x < third * 2f) ? Zone.ADJUST_CROP : Zone.MOVE_WINDOW;
     }
 
+    /** 双指缩放的结果：新的位置与尺寸。 */
+    public static final class PinchResult {
+        public final int x;
+        public final int y;
+        public final int width;
+        public final int height;
+
+        PinchResult(int x, int y, int width, int height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    /**
+     * 双指缩放，按系统相册那套来：<b>以两指中点为锚</b>，缩放的同时还能挪位置。
+     *
+     * <p>以前是固定左上角、只改宽高，于是窗口总往右下角长 —— 手指明明在中间捏，
+     * 画面却从角上撑开，很反直觉。</p>
+     *
+     * <p>这里的做法是：按下时记住「两指中点落在窗口的哪个相对位置」，
+     * 之后无论怎么缩放、两指怎么移动，都让<b>那个点始终待在两指中点底下</b>。
+     * 于是「以触点为中心缩放」和「两指拖着走」是同一个公式的两种表现 ——
+     * 不用分别处理，也就不会互相打架。</p>
+     *
+     * <p>倍数是夹在<b>倍数</b>上而不是分别夹宽和高的：分别夹的话，
+     * 宽先撞到屏幕边就会被压住而高还在长，比例就变了。</p>
+     *
+     * @param startX,startY,startWidth,startHeight 按下那一刻的窗口
+     * @param anchorRatioX,anchorRatioY            两指中点在窗口里的相对位置，0..1
+     * @param focusX,focusY                        当前两指中点（屏幕坐标）
+     * @param rawFactor                            当前跨距 / 起始跨距
+     */
+    public static PinchResult pinch(int startX, int startY, int startWidth, int startHeight,
+                                    float anchorRatioX, float anchorRatioY,
+                                    float focusX, float focusY, float rawFactor,
+                                    int minSize, int screenWidth, int screenHeight) {
+        if (startWidth <= 0 || startHeight <= 0) {
+            return new PinchResult(startX, startY, startWidth, startHeight);
+        }
+        float smallest = Math.max((float) minSize / startWidth, (float) minSize / startHeight);
+        float largest = Math.min((float) Math.max(screenWidth, minSize) / startWidth,
+                (float) Math.max(screenHeight, minSize) / startHeight);
+        // 下限优先：屏幕比最小尺寸还小这种荒唐情况下，也不能让窗口小到抓不住
+        largest = Math.max(largest, smallest);
+        float factor = Math.max(smallest, Math.min(largest, rawFactor));
+
+        int width = Math.round(startWidth * factor);
+        int height = Math.round(startHeight * factor);
+        int x = Math.round(focusX - anchorRatioX * width);
+        int y = Math.round(focusY - anchorRatioY * height);
+        return new PinchResult(x, y, width, height);
+    }
+
     /**
      * 中间三分之一的这一下，是「左右划着换一路」还是「上下挪取景」。
      *
@@ -192,19 +247,6 @@ public final class RearViewTouchModel {
         }
     }
 
-    /**
-     * 双指缩放后的窗口边长。
-     *
-     * <p>按比例缩放并夹在允许范围内。宽高一起缩，比例不变 ——
-     * 后视镜的取景比例由蒙版决定，不该被随手捏变形。</p>
-     */
-    public static int scaledSize(int current, float factor, int min, int max) {
-        if (factor <= 0f) {
-            return current;
-        }
-        int scaled = Math.round(current * factor);
-        return Math.max(min, Math.min(max, scaled));
-    }
 
     /**
      * 把窗口夹回屏幕内，允许贴边时露出一部分在外面。

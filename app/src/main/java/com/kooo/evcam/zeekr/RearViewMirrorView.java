@@ -105,6 +105,9 @@ public class RearViewMirrorView extends ViewGroup {
     private float pinchStartSpan;
     private int pinchStartWidth;
     private int pinchStartHeight;
+    /** 按下那一刻两指中点落在窗口的哪个相对位置，缩放时让这个点待在指下不动。 */
+    private float pinchAnchorRatioX;
+    private float pinchAnchorRatioY;
 
     private final Matrix drawMatrix = new Matrix();
     private final RectF sourceRect = new RectF();
@@ -391,6 +394,31 @@ public class RearViewMirrorView extends ViewGroup {
         pinchStartSpan = spanOf(event);
         pinchStartWidth = params != null ? params.width : appConfig.getRearViewWidth(screenWidth());
         pinchStartHeight = params != null ? params.height : appConfig.getRearViewHeight(screenHeight());
+
+        // 两指中点在窗口里的相对位置，之后一直用它当锚
+        float focusInViewX = (event.getX(0) + event.getX(1)) / 2f;
+        float focusInViewY = (event.getY(0) + event.getY(1)) / 2f;
+        pinchAnchorRatioX = clamp01(focusInViewX / Math.max(1, pinchStartWidth));
+        pinchAnchorRatioY = clamp01(focusInViewY / Math.max(1, pinchStartHeight));
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0f, Math.min(1f, value));
+    }
+
+    /**
+     * 两指中点的屏幕坐标。
+     *
+     * <p>{@code getRawX()} 只给得到第一根手指的屏幕坐标，而 {@code getRawX(int)}
+     * 要 API 29。好在两根手指的视图坐标之差与坐标系无关，
+     * 所以从第一根的屏幕坐标推出中点即可 —— 不用管窗口此刻在哪。</p>
+     */
+    private static float rawFocusX(MotionEvent event) {
+        return event.getRawX() + (event.getX(1) - event.getX(0)) / 2f;
+    }
+
+    private static float rawFocusY(MotionEvent event) {
+        return event.getRawY() + (event.getY(1) - event.getY(0)) / 2f;
     }
 
     private void updatePinch(MotionEvent event) {
@@ -402,19 +430,21 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
 
-        // 宽高一起缩，保持当前比例 —— 捏合是「放大缩小」，不该顺手改变形状
-        float factor = span / pinchStartSpan;
-        int width = RearViewTouchModel.scaledSize(pinchStartWidth, factor,
-                AppConfig.REARVIEW_MIN_SIZE, screenWidth());
-        int height = RearViewTouchModel.scaledSize(pinchStartHeight, factor,
-                AppConfig.REARVIEW_MIN_SIZE, screenHeight());
-        if (width == params.width && height == params.height) {
-            return;
-        }
-        params.width = width;
-        params.height = height;
-        params.x = RearViewTouchModel.clampX(params.x, width, screenWidth(), PEEK_WIDTH_PX);
-        params.y = RearViewTouchModel.clampY(params.y, height, screenHeight());
+        // 以两指中点为锚缩放，同时跟着中点走 —— 和系统相册一个手感。
+        // 不能在「尺寸没变」时提前返回：两指平移而不改变跨距是纯挪窗口，
+        // 那时候尺寸本来就不该变。
+        RearViewTouchModel.PinchResult result = RearViewTouchModel.pinch(
+                params.x, params.y, pinchStartWidth, pinchStartHeight,
+                pinchAnchorRatioX, pinchAnchorRatioY,
+                rawFocusX(event), rawFocusY(event), span / pinchStartSpan,
+                AppConfig.REARVIEW_MIN_SIZE, screenWidth(), screenHeight());
+
+        params.width = result.width;
+        params.height = result.height;
+        // 仍然夹一下，保证窗口不会被推到完全抓不回来的地方
+        params.x = RearViewTouchModel.clampX(
+                result.x, result.width, screenWidth(), PEEK_WIDTH_PX);
+        params.y = RearViewTouchModel.clampY(result.y, result.height, screenHeight());
         applyLayout();
     }
 
@@ -483,8 +513,8 @@ public class RearViewMirrorView extends ViewGroup {
             if (horizontalDrag != null && horizontalDrag) {
                 if (RearViewTouchModel.isDeliberateSwipe(
                         lastDx, velocityX, LANE_SWIPE_MIN_PX, minFlingVelocity)) {
-                    // 左滑走顺时针（后 左 前 右），右滑走逆时针
-                    switchLane(lastDx < 0f);
+                    // 右滑走顺时针（后 左 前 右），左滑走逆时针（后 右 前 左）
+                    switchLane(lastDx > 0f);
                 }
             } else {
                 appConfig.setRearViewPan(pan);

@@ -260,13 +260,92 @@ public class RearViewTouchModelTest {
 
     // ---------- 双指缩放窗口 ----------
 
+    private static final int SCREEN_W = 3200;
+    private static final int SCREEN_H = 1800;
+    private static final int MIN_SIZE = 120;
+
+    private RearViewTouchModel.PinchResult pinch(int x, int y, int w, int h,
+                                                 float rx, float ry,
+                                                 float focusX, float focusY, float factor) {
+        return RearViewTouchModel.pinch(x, y, w, h, rx, ry, focusX, focusY, factor,
+                MIN_SIZE, SCREEN_W, SCREEN_H);
+    }
+
+    /**
+     * 整套手感的根本：<b>手指底下那个点，缩放前后都待在手指底下</b>。
+     *
+     * <p>以前固定左上角，窗口总往右下角长 —— 手在中间捏，画面却从角上撑开。</p>
+     */
     @Test
-    public void pinchScalesWithinLimits() {
-        assertEquals(600, RearViewTouchModel.scaledSize(400, 1.5f, 200, 1200));
-        assertEquals(200, RearViewTouchModel.scaledSize(400, 0.1f, 200, 1200));
-        assertEquals(1200, RearViewTouchModel.scaledSize(400, 10f, 200, 1200));
-        assertEquals("非正的倍数应原样返回",
-                400, RearViewTouchModel.scaledSize(400, 0f, 200, 1200));
+    public void theGrabbedPointStaysUnderTheFingers() {
+        int x = 500, y = 300, w = 800, h = 400;
+        float rx = 0.5f, ry = 0.5f;                  // 从正中间捏
+        float focusX = x + rx * w, focusY = y + ry * h;
+
+        for (float factor : new float[]{0.5f, 1f, 1.5f, 2f}) {
+            RearViewTouchModel.PinchResult r = pinch(x, y, w, h, rx, ry, focusX, focusY, factor);
+            assertEquals("锚点横向应当不动", focusX, r.x + rx * r.width, 1f);
+            assertEquals("锚点纵向应当不动", focusY, r.y + ry * r.height, 1f);
+        }
+    }
+
+    /** 从角上捏也一样 —— 锚点不限于中心。 */
+    @Test
+    public void anOffCentreGrabIsAlsoHonoured() {
+        int x = 500, y = 300, w = 800, h = 400;
+        float rx = 0.2f, ry = 0.8f;
+        float focusX = x + rx * w, focusY = y + ry * h;
+
+        RearViewTouchModel.PinchResult r = pinch(x, y, w, h, rx, ry, focusX, focusY, 1.75f);
+        assertEquals(focusX, r.x + rx * r.width, 1f);
+        assertEquals(focusY, r.y + ry * r.height, 1f);
+    }
+
+    /** 两指不改变跨距、只是一起挪 —— 那就是纯粹的移动窗口。 */
+    @Test
+    public void movingBothFingersWithoutSpreadingJustMovesTheWindow() {
+        int x = 500, y = 300, w = 800, h = 400;
+        float rx = 0.5f, ry = 0.5f;
+        float startFocusX = x + rx * w, startFocusY = y + ry * h;
+
+        RearViewTouchModel.PinchResult r = pinch(
+                x, y, w, h, rx, ry, startFocusX + 120f, startFocusY - 60f, 1f);
+
+        assertEquals("尺寸不该变", w, r.width);
+        assertEquals(h, r.height);
+        assertEquals("应当跟着中点平移", x + 120, r.x, 1);
+        assertEquals(y - 60, r.y, 1);
+    }
+
+    /** 比例必须守住：夹的是倍数，不是分别夹宽和高。 */
+    @Test
+    public void theAspectRatioSurvivesEveryLimit() {
+        int w = 900, h = 300;
+        float aspect = (float) w / h;
+        for (float factor : new float[]{0.001f, 0.5f, 1f, 3f, 100f}) {
+            RearViewTouchModel.PinchResult r = pinch(0, 0, w, h, 0.5f, 0.5f, 0f, 0f, factor);
+            assertEquals("倍数 " + factor + " 时比例变了",
+                    aspect, (float) r.width / r.height, 0.02f);
+        }
+    }
+
+    @Test
+    public void sizeStaysWithinTheAllowedRange() {
+        for (float factor : new float[]{0.001f, 0.5f, 1f, 3f, 100f}) {
+            RearViewTouchModel.PinchResult r =
+                    pinch(0, 0, 900, 300, 0.5f, 0.5f, 0f, 0f, factor);
+            assertTrue("宽太小: " + r.width, r.width >= MIN_SIZE);
+            assertTrue("高太小: " + r.height, r.height >= MIN_SIZE);
+            assertTrue("宽超屏: " + r.width, r.width <= SCREEN_W);
+            assertTrue("高超屏: " + r.height, r.height <= SCREEN_H);
+        }
+    }
+
+    @Test
+    public void nonsenseStartSizesAreSurvivable() {
+        RearViewTouchModel.PinchResult r = pinch(10, 20, 0, 0, 0.5f, 0.5f, 100f, 100f, 2f);
+        assertEquals(10, r.x);
+        assertEquals(20, r.y);
     }
 
     // ---------- 夹回屏幕 ----------
