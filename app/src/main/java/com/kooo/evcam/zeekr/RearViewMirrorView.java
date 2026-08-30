@@ -57,6 +57,11 @@ public class RearViewMirrorView extends ViewGroup {
     // 判定条件本身见 RearViewTouchModel.deliberateDock：要么已经推出去一半，
     // 要么朝边上甩了一下。只要窗口还整个在屏幕里就绝不贴边。
 
+    /** 超过这个位移才算拖动，避免点一下就漂移。 */
+    private static final int DRAG_SLOP_PX = 12;
+    /** 按住多久算长按（进出取景调整模式）。 */
+    private static final long LONG_PRESS_MS = 600L;
+
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
