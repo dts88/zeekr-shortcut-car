@@ -8,8 +8,11 @@ import org.junit.Test;
 /**
  * {@link RearViewGeometry} 的单元测试。
  *
- * <p>取景框算错的表现是「画面偏了一点」——在车上盯着一块小窗口，肉眼几乎判断不出
- * 是偏了还是本来就该这样。所以这部分必须在这里钉死。</p>
+ * <p>取景算错的表现是「画面偏了一点」或者「有点变形」——在车上盯着一块小窗口，
+ * 肉眼几乎判断不出是偏了还是本来就该这样。所以这部分必须在这里钉死。</p>
+ *
+ * <p>其中<b>比例不变</b>是最要紧的一条：后视镜里的车被拉扁或压长，
+ * 会直接影响对距离的判断。</p>
  */
 public class RearViewGeometryTest {
 
@@ -20,92 +23,115 @@ public class RearViewGeometryTest {
         return CompositeStreamGeometry.analyse(1280, 5140);
     }
 
-    // ---------- 蒙版的自我约束 ----------
+    // ---------- 比例锁死 ----------
 
+    /**
+     * 整条规则的根本：源是正方形，取景块在<b>该路画面里</b>的宽高比
+     * 必须等于显示框的宽高比 —— 只有这样，填满显示框时画面才不变形。
+     */
     @Test
-    public void cropClampsIntoRange() {
-        RearViewGeometry.Crop c = new RearViewGeometry.Crop(-0.5f, -0.5f, 2f, 2f);
-        assertEquals(0f, c.x, EPS);
-        assertEquals(0f, c.y, EPS);
-        assertEquals(1f, c.width, EPS);
-        assertEquals(1f, c.height, EPS);
+    public void theViewportAlwaysMatchesTheWindowShape() {
+        int[][] windows = {
+                {900, 340}, {1600, 200}, {400, 400}, {300, 900}, {3200, 480}, {120, 2000},
+        };
+        for (int[] window : windows) {
+            RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(
+                    window[0], window[1], 0.5f);
+            float windowAspect = (float) window[0] / window[1];
+            float viewportAspect = v.width / v.height;
+            assertEquals("窗口 " + window[0] + "x" + window[1] + " 的取景比例应当与之一致",
+                    windowAspect, viewportAspect, 1e-3f);
+        }
+    }
+
+    /** 取景块永远落在画面之内，而且至少有一边是占满的（不留黑边）。 */
+    @Test
+    public void theViewportFillsTheWindowWithoutLeavingTheFrame() {
+        int[][] windows = {{900, 340}, {400, 400}, {300, 900}, {3200, 480}};
+        for (int[] window : windows) {
+            RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(
+                    window[0], window[1], 0.5f);
+            assertTrue("左边越界", v.x >= -EPS);
+            assertTrue("上边越界", v.y >= -EPS);
+            assertTrue("右边越界", v.x + v.width <= 1f + EPS);
+            assertTrue("下边越界", v.y + v.height <= 1f + EPS);
+            assertTrue("必须有一边占满，否则就是留了黑边",
+                    Math.abs(v.width - 1f) < EPS || Math.abs(v.height - 1f) < EPS);
+        }
+    }
+
+    /** 扁框看到的是一条横带；方框看到的是整幅。 */
+    @Test
+    public void aWideWindowSeesAHorizontalStrip() {
+        RearViewGeometry.Viewport wide = RearViewGeometry.Viewport.forWindow(1600, 400, 0.5f);
+        assertEquals("横向应当占满", 1f, wide.width, EPS);
+        assertEquals("纵向应当只有四分之一", 0.25f, wide.height, EPS);
+
+        RearViewGeometry.Viewport square = RearViewGeometry.Viewport.forWindow(500, 500, 0.5f);
+        assertEquals(1f, square.width, EPS);
+        assertEquals(1f, square.height, EPS);
     }
 
     @Test
-    public void cropNeverCollapsesToZero() {
-        RearViewGeometry.Crop c = new RearViewGeometry.Crop(0.5f, 0.5f, 0f, -1f);
-        assertEquals(RearViewGeometry.MIN_CROP_SIZE, c.width, EPS);
-        assertEquals(RearViewGeometry.MIN_CROP_SIZE, c.height, EPS);
+    public void aTallWindowSeesAVerticalStrip() {
+        RearViewGeometry.Viewport tall = RearViewGeometry.Viewport.forWindow(400, 1600, 0.5f);
+        assertEquals(1f, tall.height, EPS);
+        assertEquals(0.25f, tall.width, EPS);
+    }
+
+    // ---------- 上下平移 ----------
+
+    @Test
+    public void panMovesTheStripUpAndDown() {
+        RearViewGeometry.Viewport top = RearViewGeometry.Viewport.forWindow(1600, 400, 0f);
+        RearViewGeometry.Viewport middle = RearViewGeometry.Viewport.forWindow(1600, 400, 0.5f);
+        RearViewGeometry.Viewport bottom = RearViewGeometry.Viewport.forWindow(1600, 400, 1f);
+
+        assertEquals("pan=0 应当贴着顶部", 0f, top.y, EPS);
+        assertEquals("pan=1 应当贴着底部", 1f, bottom.y + bottom.height, EPS);
+        assertTrue(top.y < middle.y && middle.y < bottom.y);
+        assertEquals("平移不该改变看到多大一块", top.height, bottom.height, EPS);
+    }
+
+    /** 左右不跟着动 —— 看多宽由视野角度管，这里不重复给一个旋钮。 */
+    @Test
+    public void panNeverMovesHorizontally() {
+        RearViewGeometry.Viewport top = RearViewGeometry.Viewport.forWindow(1600, 400, 0f);
+        RearViewGeometry.Viewport bottom = RearViewGeometry.Viewport.forWindow(1600, 400, 1f);
+        assertEquals(top.x, bottom.x, EPS);
+        assertEquals(top.width, bottom.width, EPS);
     }
 
     @Test
-    public void cropStaysInsideWhenPushedPastTheEdge() {
-        // 尺寸先夹、位置后夹：一个过大的尺寸不能把位置挤成负数
-        RearViewGeometry.Crop c = new RearViewGeometry.Crop(0.9f, 0.9f, 0.4f, 0.4f);
-        assertEquals(0.6f, c.x, EPS);
-        assertEquals(0.6f, c.y, EPS);
-        assertTrue(c.x + c.width <= 1f + EPS);
-        assertTrue(c.y + c.height <= 1f + EPS);
+    public void panIsClampedIntoRange() {
+        assertEquals(0f, RearViewGeometry.clampPan(-5f), EPS);
+        assertEquals(1f, RearViewGeometry.clampPan(5f), EPS);
+        assertEquals(0.3f, RearViewGeometry.clampPan(0.3f), EPS);
+
+        RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(1600, 400, -3f);
+        assertEquals(0f, v.y, EPS);
     }
 
-    // ---------- 上下移动：中间三分之一的上下滑 ----------
-
+    /** 方框已经全看到了，没有可挪的余地——这不是限制，是没有别的可挪。 */
     @Test
-    public void verticalShiftMovesOnlyY() {
-        RearViewGeometry.Crop base = new RearViewGeometry.Crop(0.1f, 0.3f, 0.8f, 0.4f);
-        RearViewGeometry.Crop moved = base.shiftedVertically(0.1f);
+    public void aSquareWindowHasNothingLeftToPan() {
+        RearViewGeometry.Viewport square = RearViewGeometry.Viewport.forWindow(500, 500, 0.5f);
+        assertEquals(0f, square.verticalHeadroom(), EPS);
 
-        assertEquals("左右不该变", base.x, moved.x, EPS);
-        assertEquals("宽度不该变", base.width, moved.width, EPS);
-        assertEquals("高度不该变", base.height, moved.height, EPS);
-        assertEquals(0.4f, moved.y, EPS);
-    }
-
-    @Test
-    public void verticalShiftStopsAtTheEdges() {
-        RearViewGeometry.Crop base = new RearViewGeometry.Crop(0f, 0.3f, 1f, 0.4f);
-
-        // 往下推过头：贴住底边，而不是滑出画面
-        assertEquals(0.6f, base.shiftedVertically(10f).y, EPS);
-        // 往上推过头：贴住顶边
-        assertEquals(0f, base.shiftedVertically(-10f).y, EPS);
+        RearViewGeometry.Viewport wide = RearViewGeometry.Viewport.forWindow(1600, 400, 0.5f);
+        assertEquals(0.75f, wide.verticalHeadroom(), EPS);
+        assertTrue("越扁的框可挪的越多",
+                wide.verticalHeadroom() > square.verticalHeadroom());
     }
 
     @Test
-    public void headroomReportsHowFarItCanStillMove() {
-        RearViewGeometry.Crop c = new RearViewGeometry.Crop(0f, 0.3f, 1f, 0.4f);
-        assertEquals(0.3f, c.headroomAbove(), EPS);
-        assertEquals(0.3f, c.headroomBelow(), EPS);
-    }
-
-    // ---------- 双指缩放 ----------
-
-    @Test
-    public void scaleKeepsTheCentreStill() {
-        RearViewGeometry.Crop base = new RearViewGeometry.Crop(0.2f, 0.2f, 0.6f, 0.6f);
-        RearViewGeometry.Crop smaller = base.scaledAboutCenter(0.5f);
-
-        assertEquals("中心不该漂移",
-                base.x + base.width / 2f, smaller.x + smaller.width / 2f, EPS);
-        assertEquals(base.y + base.height / 2f, smaller.y + smaller.height / 2f, EPS);
-        assertEquals(0.3f, smaller.width, EPS);
-        assertEquals(0.3f, smaller.height, EPS);
-    }
-
-    @Test
-    public void scaleCannotExceedTheFrameOrVanish() {
-        RearViewGeometry.Crop base = new RearViewGeometry.Crop(0.2f, 0.2f, 0.6f, 0.6f);
-
-        RearViewGeometry.Crop huge = base.scaledAboutCenter(100f);
-        assertTrue(huge.width <= 1f + EPS);
-        assertTrue(huge.x >= -EPS);
-        assertTrue(huge.x + huge.width <= 1f + EPS);
-
-        RearViewGeometry.Crop tiny = base.scaledAboutCenter(0.0001f);
-        assertEquals(RearViewGeometry.MIN_CROP_SIZE, tiny.width, EPS);
-
-        assertEquals("非正的倍数应原样返回", base.width,
-                base.scaledAboutCenter(0f).width, EPS);
+    public void nonsenseWindowSizesFallBackToTheWholeFrame() {
+        for (int[] bad : new int[][]{{0, 100}, {100, 0}, {-5, -5}}) {
+            RearViewGeometry.Viewport v =
+                    RearViewGeometry.Viewport.forWindow(bad[0], bad[1], 0.5f);
+            assertEquals(1f, v.width, EPS);
+            assertEquals(1f, v.height, EPS);
+        }
     }
 
     // ---------- 后方是右上那一格 ----------
@@ -131,16 +157,15 @@ public class RearViewGeometryTest {
         assertEquals(1, RearViewGeometry.rearLaneIndex(new int[]{0, 99, 2, 3}));
     }
 
-    // ---------- 换算成着色器参数 ----------
+    // ---------- 换算成绘制参数 ----------
 
     @Test
     public void mapsTheRearLaneOfTheRealCompositeStream() {
         CompositeStreamGeometry.Plan plan = zeekrPlan();
         assertTrue("1280x5140 应当被识别为合成流", plan.isComposite());
 
-        RearViewGeometry.Crop crop = RearViewGeometry.Crop.full();
         RearViewGeometry.ShaderRects r =
-                RearViewGeometry.toShaderRects(plan, 1, crop);
+                RearViewGeometry.toShaderRects(plan, 1, RearViewGeometry.Viewport.full());
 
         CompositeStreamGeometry.Lane lane = plan.lane(1);
         assertEquals(lane.u0, r.laneOffsetX, EPS);
@@ -155,23 +180,22 @@ public class RearViewGeometryTest {
     }
 
     @Test
-    public void cropBecomesTheCropUniformsUntouched() {
-        RearViewGeometry.Crop crop = new RearViewGeometry.Crop(0.1f, 0.35f, 0.8f, 0.45f);
-        RearViewGeometry.ShaderRects r =
-                RearViewGeometry.toShaderRects(zeekrPlan(), 1, crop);
+    public void theViewportPassesThroughUntouched() {
+        RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(1600, 400, 0.25f);
+        RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(zeekrPlan(), 1, v);
 
-        assertEquals(0.1f, r.cropOffsetX, EPS);
-        assertEquals(0.35f, r.cropOffsetY, EPS);
-        assertEquals(0.8f, r.cropScaleX, EPS);
-        assertEquals(0.45f, r.cropScaleY, EPS);
+        assertEquals(v.x, r.viewOffsetX, EPS);
+        assertEquals(v.y, r.viewOffsetY, EPS);
+        assertEquals(v.width, r.viewScaleX, EPS);
+        assertEquals(v.height, r.viewScaleY, EPS);
     }
 
     /** 不是合成流时按整幅处理，后视镜至少还能出画面而不是全黑。 */
     @Test
     public void fallsBackToTheWholeFrameWhenNotComposite() {
         CompositeStreamGeometry.Plan ordinary = CompositeStreamGeometry.analyse(1280, 720);
-        RearViewGeometry.ShaderRects r =
-                RearViewGeometry.toShaderRects(ordinary, 1, RearViewGeometry.Crop.full());
+        RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
+                ordinary, 1, RearViewGeometry.Viewport.full());
 
         assertEquals(0f, r.laneOffsetX, EPS);
         assertEquals(0f, r.laneOffsetY, EPS);
@@ -184,39 +208,39 @@ public class RearViewGeometryTest {
         RearViewGeometry.ShaderRects nullPlan =
                 RearViewGeometry.toShaderRects(null, 1, null);
         assertEquals(1f, nullPlan.laneScaleX, EPS);
-        assertEquals(1f, nullPlan.cropScaleX, EPS);
+        assertEquals(1f, nullPlan.viewScaleX, EPS);
 
-        RearViewGeometry.ShaderRects badLane =
-                RearViewGeometry.toShaderRects(zeekrPlan(), 99, RearViewGeometry.Crop.full());
+        RearViewGeometry.ShaderRects badLane = RearViewGeometry.toShaderRects(
+                zeekrPlan(), 99, RearViewGeometry.Viewport.full());
         assertEquals(1f, badLane.laneScaleY, EPS);
     }
 
     // ---------- 合成矩形：不做校正时用一个 2D 矩阵就够 ----------
 
     @Test
-    public void combinedRectNestsTheCropInsideTheLane() {
+    public void combinedRectNestsTheViewportInsideTheLane() {
         CompositeStreamGeometry.Plan plan = zeekrPlan();
         CompositeStreamGeometry.Lane lane = plan.lane(1);
 
-        // 蒙版取该路的下半部分中间一段
-        RearViewGeometry.Crop crop = new RearViewGeometry.Crop(0.25f, 0.5f, 0.5f, 0.5f);
-        float[] rect = RearViewGeometry.combinedSourceRect(plan, 1, crop);
+        // 一条扁带，落在画面下半部
+        RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(1600, 800, 1f);
+        float[] rect = RearViewGeometry.combinedSourceRect(plan, 1, v);
 
         float laneW = lane.u1 - lane.u0;
         float laneH = lane.v1 - lane.v0;
 
-        assertEquals(lane.u0 + 0.25f * laneW, rect[0], EPS);
-        assertEquals(lane.v0 + 0.5f * laneH, rect[1], EPS);
-        assertEquals(0.5f * laneW, rect[2], EPS);
-        assertEquals(0.5f * laneH, rect[3], EPS);
+        assertEquals(lane.u0 + v.x * laneW, rect[0], EPS);
+        assertEquals(lane.v0 + v.y * laneH, rect[1], EPS);
+        assertEquals(v.width * laneW, rect[2], EPS);
+        assertEquals(v.height * laneH, rect[3], EPS);
     }
 
     @Test
-    public void combinedRectWithFullCropIsExactlyTheLane() {
+    public void combinedRectWithTheFullViewportIsExactlyTheLane() {
         CompositeStreamGeometry.Plan plan = zeekrPlan();
         CompositeStreamGeometry.Lane lane = plan.lane(1);
         float[] rect = RearViewGeometry.combinedSourceRect(
-                plan, 1, RearViewGeometry.Crop.full());
+                plan, 1, RearViewGeometry.Viewport.full());
 
         assertEquals(lane.u0, rect[0], EPS);
         assertEquals(lane.v0, rect[1], EPS);
@@ -224,31 +248,28 @@ public class RearViewGeometryTest {
         assertEquals(lane.v1 - lane.v0, rect[3], EPS);
     }
 
+    /**
+     * 采样绝不能越出本路 —— 合成流里四路上下紧挨着，
+     * 越界取到的是隔壁摄像头的画面，不是黑边。
+     */
     @Test
     public void combinedRectAlwaysStaysInsideTheTexture() {
         CompositeStreamGeometry.Plan plan = zeekrPlan();
+        int[][] windows = {{900, 340}, {400, 400}, {300, 900}, {3200, 480}, {120, 2000}};
         for (int laneIndex = 0; laneIndex < 4; laneIndex++) {
-            for (RearViewGeometry.Crop crop : new RearViewGeometry.Crop[]{
-                    RearViewGeometry.Crop.full(),
-                    RearViewGeometry.Crop.defaultCrop(),
-                    new RearViewGeometry.Crop(0.9f, 0.9f, 0.5f, 0.5f),
-                    new RearViewGeometry.Crop(-1f, -1f, 0.2f, 0.2f)}) {
-                float[] r = RearViewGeometry.combinedSourceRect(plan, laneIndex, crop);
-                assertTrue("x 越界: " + r[0], r[0] >= -EPS);
-                assertTrue("y 越界: " + r[1], r[1] >= -EPS);
-                assertTrue("右边越界", r[0] + r[2] <= 1f + EPS);
-                assertTrue("下边越界", r[1] + r[3] <= 1f + EPS);
-                assertTrue("宽度必须为正", r[2] > 0f);
-                assertTrue("高度必须为正", r[3] > 0f);
+            for (int[] window : windows) {
+                for (float pan : new float[]{0f, 0.5f, 1f, -3f, 7f}) {
+                    RearViewGeometry.Viewport v =
+                            RearViewGeometry.Viewport.forWindow(window[0], window[1], pan);
+                    float[] r = RearViewGeometry.combinedSourceRect(plan, laneIndex, v);
+                    assertTrue("x 越界: " + r[0], r[0] >= -EPS);
+                    assertTrue("y 越界: " + r[1], r[1] >= -EPS);
+                    assertTrue("右边越界", r[0] + r[2] <= 1f + EPS);
+                    assertTrue("下边越界", r[1] + r[3] <= 1f + EPS);
+                    assertTrue("宽度必须为正", r[2] > 0f);
+                    assertTrue("高度必须为正", r[3] > 0f);
+                }
             }
         }
-    }
-
-    /** 默认蒙版要落在画面偏下 —— 后视镜关心的是路面。 */
-    @Test
-    public void defaultCropLooksAtTheRoadNotTheSky() {
-        RearViewGeometry.Crop c = RearViewGeometry.Crop.defaultCrop();
-        assertTrue("应当偏向下半部", c.y + c.height / 2f > 0.5f);
-        assertTrue(c.y >= 0f && c.y + c.height <= 1f);
     }
 }

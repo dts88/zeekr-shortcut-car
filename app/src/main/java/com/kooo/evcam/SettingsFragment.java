@@ -1451,7 +1451,7 @@ public class SettingsFragment extends Fragment {
                 if (isChecked) {
                     com.kooo.evcam.zeekr.RearViewMirrorService.start(getContext());
                     Toast.makeText(getContext(),
-                            "超级后视镜已开启：左右三分之一拖动，中间上下滑调取景，双指缩放",
+                            "超级后视镜已开启：左右三分之一拖动，中间上下滑调取景高低，双指缩放",
                             Toast.LENGTH_LONG).show();
                 } else {
                     com.kooo.evcam.zeekr.RearViewMirrorService.stop(getContext());
@@ -1546,20 +1546,31 @@ public class SettingsFragment extends Fragment {
             return;
         }
 
-        widthBar.setProgress(appConfig.getRearViewWidth());
-        heightBar.setProgress(appConfig.getRearViewHeight());
+        // 上限就是这块屏幕本身 —— 想把后视镜拉到铺满整屏就该允许，
+        // 没有理由替用户设一个更小的天花板。
+        final int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        final int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        widthBar.setMin(AppConfig.REARVIEW_MIN_SIZE);
+        heightBar.setMin(AppConfig.REARVIEW_MIN_SIZE);
+        widthBar.setMax(screenWidth);
+        heightBar.setMax(screenHeight);
+
+        widthBar.setProgress(appConfig.getRearViewWidth(screenWidth));
+        heightBar.setProgress(appConfig.getRearViewHeight(screenHeight));
         if (widthText != null) {
-            widthText.setText(appConfig.getRearViewWidth() + " px");
+            widthText.setText(appConfig.getRearViewWidth(screenWidth) + " px");
         }
         if (heightText != null) {
-            heightText.setText(appConfig.getRearViewHeight() + " px");
+            heightText.setText(appConfig.getRearViewHeight(screenHeight) + " px");
         }
 
         SeekBar.OnSeekBarChangeListener listener = new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                int value = AppConfig.clampRearViewSize(progress);
-                TextView label = (bar == widthBar) ? widthText : heightText;
+                boolean isWidth = bar == widthBar;
+                int value = AppConfig.clampRearViewSize(
+                        progress, isWidth ? screenWidth : screenHeight);
+                TextView label = isWidth ? widthText : heightText;
                 if (label != null) {
                     label.setText(value + " px");
                 }
@@ -1573,8 +1584,8 @@ public class SettingsFragment extends Fragment {
             public void onStopTrackingTouch(SeekBar bar) {
                 // 松手才落盘并套用，拖动过程中不反复写配置、不反复重排窗口
                 appConfig.setRearViewSize(
-                        AppConfig.clampRearViewSize(widthBar.getProgress()),
-                        AppConfig.clampRearViewSize(heightBar.getProgress()));
+                        widthBar.getProgress(), heightBar.getProgress(),
+                        screenWidth, screenHeight);
                 if (getContext() != null && appConfig.isRearViewEnabled()) {
                     com.kooo.evcam.zeekr.RearViewMirrorService.applySize(getContext());
                 }

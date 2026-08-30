@@ -992,7 +992,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="把环视里后方那一路单独放大成悬浮窗。左右三分之一拖动窗口，中间三分之一上下滑调整取景，双指缩放窗口，拖到边缘自动贴边。长按可进入取景调整模式：看到整路画面并拖动/缩放蒙版框，点一下确认"
+                        android:text="把环视里后方那一路单独放大成悬浮窗，画面左右镜像，和真正的后视镜一致。左右三分之一拖动窗口，中间三分之一上下滑调整取景高低，双指缩放窗口，推出屏幕一半或朝边上甩一下即贴边隐藏"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp" />
                 </LinearLayout>
@@ -1058,7 +1058,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="角度越大，画面收进来的范围越广，边缘拉伸也越明显"
+                    android:text="角度越大，左右收进来的范围越广，边缘拉伸也越明显。这是控制「看多宽」的地方；画面比例不受它影响"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
 
@@ -1102,7 +1102,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="宽高分开设置。后视镜天然是横向的，做成正方形要么留黑边、要么裁掉两侧"
+                    android:text="宽高各自可拉到整块屏幕。画面比例不会跟着变——框的形状只决定看到多大一块，看多宽由下面的视野角度控制"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
 
@@ -1118,8 +1118,6 @@
                     android:id="@+id/seekbar_rearview_width"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:min="240"
-                    android:max="1600"
                     android:progress="720" />
 
                 <TextView
@@ -1129,7 +1127,7 @@
                     android:layout_gravity="center_horizontal"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
-                    android:text="720 px" />
+                    android:text="900 px" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -1143,8 +1141,6 @@
                     android:id="@+id/seekbar_rearview_height"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:min="240"
-                    android:max="1600"
                     android:progress="320" />
 
                 <TextView
@@ -1154,7 +1150,7 @@
                     android:layout_gravity="center_horizontal"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
-                    android:text="320 px" />
+                    android:text="340 px" />
             </LinearLayout>
 
             <!-- 超级后视镜：恢复默认取景与位置 -->

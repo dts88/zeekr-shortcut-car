@@ -99,10 +99,7 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
-    private static final String KEY_REARVIEW_CROP_X = "rearview_crop_x";          // 蒙版，归一化
-    private static final String KEY_REARVIEW_CROP_Y = "rearview_crop_y";
-    private static final String KEY_REARVIEW_CROP_W = "rearview_crop_w";
-    private static final String KEY_REARVIEW_CROP_H = "rearview_crop_h";
+    private static final String KEY_REARVIEW_PAN = "rearview_pan";                // 上下平移，0..1
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
@@ -1061,11 +1058,16 @@ public class AppConfig {
      * <p>宽高分开，而不是正方形：后视镜天然是横向的，喂给它的取景也是该路画面里
      * 一条横向的带 —— 硬做成正方形，要么上下留黑边，要么把两侧裁掉。</p>
      */
-    public static final int REARVIEW_DEFAULT_WIDTH = 720;
-    public static final int REARVIEW_DEFAULT_HEIGHT = 320;
+    public static final int REARVIEW_DEFAULT_WIDTH = 900;
+    public static final int REARVIEW_DEFAULT_HEIGHT = 340;
     /** 允许的窗口尺寸范围。 */
-    public static final int REARVIEW_MIN_SIZE = 240;
-    public static final int REARVIEW_MAX_SIZE = 1600;
+    /**
+     * 窗口尺寸下限。
+     *
+     * <p>不是 0：小到抓不住的话，就再也没法把它拖出来改大了 ——
+     * 一个不可恢复的状态不该让人一滑就滑进去。</p>
+     */
+    public static final int REARVIEW_MIN_SIZE = 120;
 
     public boolean isRearViewEnabled() {
         return prefs.getBoolean(KEY_REARVIEW_ENABLED, false);
@@ -1076,26 +1078,29 @@ public class AppConfig {
         AppLog.d(TAG, "超级后视镜: " + (enabled ? "开" : "关"));
     }
 
-    /** 窗口宽度（px），已夹在允许范围内。 */
-    public int getRearViewWidth() {
-        return clampRearViewSize(prefs.getInt(KEY_REARVIEW_WIDTH, REARVIEW_DEFAULT_WIDTH));
+    /** 窗口宽度（px），上限为屏幕宽。 */
+    public int getRearViewWidth(int screenWidth) {
+        return clampRearViewSize(
+                prefs.getInt(KEY_REARVIEW_WIDTH, REARVIEW_DEFAULT_WIDTH), screenWidth);
     }
 
-    /** 窗口高度（px），已夹在允许范围内。 */
-    public int getRearViewHeight() {
-        return clampRearViewSize(prefs.getInt(KEY_REARVIEW_HEIGHT, REARVIEW_DEFAULT_HEIGHT));
+    /** 窗口高度（px），上限为屏幕高。 */
+    public int getRearViewHeight(int screenHeight) {
+        return clampRearViewSize(
+                prefs.getInt(KEY_REARVIEW_HEIGHT, REARVIEW_DEFAULT_HEIGHT), screenHeight);
     }
 
-    public void setRearViewSize(int widthPx, int heightPx) {
+    public void setRearViewSize(int widthPx, int heightPx, int screenWidth, int screenHeight) {
         prefs.edit()
-                .putInt(KEY_REARVIEW_WIDTH, clampRearViewSize(widthPx))
-                .putInt(KEY_REARVIEW_HEIGHT, clampRearViewSize(heightPx))
+                .putInt(KEY_REARVIEW_WIDTH, clampRearViewSize(widthPx, screenWidth))
+                .putInt(KEY_REARVIEW_HEIGHT, clampRearViewSize(heightPx, screenHeight))
                 .apply();
     }
 
     /** 是否对后视镜画面做鱼眼校正。只影响显示，录制的原始画面不动。 */
     public boolean isRearViewFisheyeCorrection() {
-        return prefs.getBoolean(KEY_REARVIEW_FISHEYE, false);
+        // 默认开：这几路都是鱼眼镜头，不校正的画面本来就不该是「正常」状态
+        return prefs.getBoolean(KEY_REARVIEW_FISHEYE, true);
     }
 
     public void setRearViewFisheyeCorrection(boolean on) {
@@ -1112,38 +1117,31 @@ public class AppConfig {
         prefs.edit().putFloat(KEY_REARVIEW_FOV, FisheyeProjection.clampFov(degrees)).apply();
     }
 
-    public static int clampRearViewSize(int px) {
-        return Math.max(REARVIEW_MIN_SIZE, Math.min(REARVIEW_MAX_SIZE, px));
+    /**
+     * 夹住窗口尺寸。
+     *
+     * <p>上限就是屏幕本身 —— 想铺满整块屏就该允许，没有理由替用户设一个更小的天花板。</p>
+     */
+    public static int clampRearViewSize(int px, int screenLimit) {
+        int max = Math.max(REARVIEW_MIN_SIZE, screenLimit);
+        return Math.max(REARVIEW_MIN_SIZE, Math.min(max, px));
     }
 
     /**
-     * 取景蒙版。
+     * 上下平移量，0..1。
      *
-     * <p>存四个浮点数而不是走 SettingsRegistry —— 那个注册表是给「取值有限、可枚举」的
-     * 设置用的，把一个矩形塞进去只会让它更难读。安全性由
-     * {@link com.kooo.evcam.zeekr.RearViewGeometry.Crop} 的构造函数保证：
-     * 它会夹住尺寸和位置，所以存坏了也读不出一个跑到画面外或者塌成零的取景框。</p>
+     * <p>以前这里存的是一个四值蒙版矩形。现在画面比例锁死了，
+     * 看得到多宽由窗口形状和视野角度决定、看得到多高由比例决定 ——
+     * <b>可调的只剩「这一条落在画面的哪个高度」</b>，一个数就够了。</p>
      */
-    public com.kooo.evcam.zeekr.RearViewGeometry.Crop getRearViewCrop() {
-        com.kooo.evcam.zeekr.RearViewGeometry.Crop fallback =
-                com.kooo.evcam.zeekr.RearViewGeometry.Crop.defaultCrop();
-        return new com.kooo.evcam.zeekr.RearViewGeometry.Crop(
-                prefs.getFloat(KEY_REARVIEW_CROP_X, fallback.x),
-                prefs.getFloat(KEY_REARVIEW_CROP_Y, fallback.y),
-                prefs.getFloat(KEY_REARVIEW_CROP_W, fallback.width),
-                prefs.getFloat(KEY_REARVIEW_CROP_H, fallback.height));
+    public float getRearViewPan() {
+        return com.kooo.evcam.zeekr.RearViewGeometry.clampPan(
+                prefs.getFloat(KEY_REARVIEW_PAN, com.kooo.evcam.zeekr.RearViewGeometry.DEFAULT_PAN));
     }
 
-    public void setRearViewCrop(com.kooo.evcam.zeekr.RearViewGeometry.Crop crop) {
-        if (crop == null) {
-            return;
-        }
-        prefs.edit()
-                .putFloat(KEY_REARVIEW_CROP_X, crop.x)
-                .putFloat(KEY_REARVIEW_CROP_Y, crop.y)
-                .putFloat(KEY_REARVIEW_CROP_W, crop.width)
-                .putFloat(KEY_REARVIEW_CROP_H, crop.height)
-                .apply();
+    public void setRearViewPan(float pan) {
+        prefs.edit().putFloat(KEY_REARVIEW_PAN,
+                com.kooo.evcam.zeekr.RearViewGeometry.clampPan(pan)).apply();
     }
 
     /** 窗口位置；返回 -1 表示还没拖过，由调用方决定初始位置。 */
@@ -1168,10 +1166,7 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_FOV)
                 .remove(KEY_REARVIEW_WIDTH)
                 .remove(KEY_REARVIEW_HEIGHT)
-                .remove(KEY_REARVIEW_CROP_X)
-                .remove(KEY_REARVIEW_CROP_Y)
-                .remove(KEY_REARVIEW_CROP_W)
-                .remove(KEY_REARVIEW_CROP_H)
+                .remove(KEY_REARVIEW_PAN)
                 .apply();
         AppLog.i(TAG, "超级后视镜布局已恢复默认");
     }

@@ -49,24 +49,25 @@ public final class RearViewTouchModel {
     }
 
     /**
-     * 竖直拖动换算成取景框的位移。
+     * 中间三分之一上下拖动时，取景要平移多少。
      *
-     * <p>做成 1:1：手指在窗口里移动多少，画面就跟着移动多少。取景框只占该路画面的
-     * {@code cropHeight}，而它被拉伸到整个窗口高度，所以窗口里的一个像素对应
-     * 画面里的 {@code cropHeight / viewHeight}。</p>
+     * <p>方向是反的：手指往下拖，是想看画面<b>上方</b>的内容，取景要往上走。</p>
      *
-     * <p>方向是反的：手指往下拖，是想看画面<b>上方</b>的内容，取景框要往上走。</p>
+     * <p>换算成 0..1 的平移量而不是像素：可挪的总距离取决于窗口的形状
+     * （框越扁能挪的越多），用比例表示才能让手指划过整个窗口高度
+     * 正好等于把取景从最上挪到最下 —— 不管窗口是什么形状。</p>
      *
      * @param dy         手指竖直位移（像素，向下为正）
      * @param viewHeight 窗口高度
-     * @param cropHeight 当前取景框高度（归一化）
-     * @return 取景框的归一化位移，可直接喂给 {@link RearViewGeometry.Crop#shiftedVertically}
+     * @param headroom   还能挪的归一化距离，见 {@link RearViewGeometry.Viewport#verticalHeadroom}
+     * @return 平移量的增量，加到当前 pan 上；headroom 为 0 时返回 0
      */
-    public static float cropShiftForDrag(float dy, int viewHeight, float cropHeight) {
-        if (viewHeight <= 0) {
+    public static float panShiftForDrag(float dy, int viewHeight, float headroom) {
+        if (viewHeight <= 0 || headroom <= 0f) {
+            // 窗口是方的，整幅都看得见，没有可挪的余地
             return 0f;
         }
-        return -(dy / viewHeight) * cropHeight;
+        return -(dy / viewHeight);
     }
 
     /**

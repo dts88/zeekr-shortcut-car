@@ -45,44 +45,49 @@ public class RearViewTouchModelTest {
 
     // ---------- 上下滑调取景 ----------
 
+    /**
+     * 手指划过整个窗口高度 = 取景从最上挪到最下。
+     *
+     * <p>用 0..1 的比例而不是像素，正是为了让这条在<b>任何窗口形状下</b>都成立：
+     * 框越扁能挪的实际距离越大，但「划满一屏 = 挪到底」的手感不该跟着变。</p>
+     */
     @Test
     public void dragMovesTheViewOneToOneWithTheFinger() {
-        // 取景框占该路画面的一半，窗口高 400px。
-        // 手指移动 200px（窗口的一半）应当让取景框移动 0.5 * 0.5 = 0.25
-        float shift = RearViewTouchModel.cropShiftForDrag(200, 400, 0.5f);
-        assertEquals(-0.25f, shift, EPS);
+        assertEquals(-1f, RearViewTouchModel.panShiftForDrag(400, 400, 0.75f), EPS);
+        assertEquals(-0.5f, RearViewTouchModel.panShiftForDrag(200, 400, 0.75f), EPS);
     }
 
     @Test
     public void dragDownRevealsWhatIsAbove() {
-        // 手指往下拖 = 想看画面上方 = 取景框往上走（y 减小）
-        assertTrue("往下拖，取景框应当上移",
-                RearViewTouchModel.cropShiftForDrag(50, 400, 0.5f) < 0);
-        assertTrue("往上拖，取景框应当下移",
-                RearViewTouchModel.cropShiftForDrag(-50, 400, 0.5f) > 0);
+        // 手指往下拖 = 想看画面上方 = 取景往上走（pan 减小）
+        assertTrue("往下拖，取景应当上移",
+                RearViewTouchModel.panShiftForDrag(50, 400, 0.75f) < 0);
+        assertTrue("往上拖，取景应当下移",
+                RearViewTouchModel.panShiftForDrag(-50, 400, 0.75f) > 0);
     }
 
+    /** 方框已经全看到了，拖动不该有任何反应 —— 不是卡住，是没有别的可看。 */
     @Test
-    public void smallerCropMovesLessPerPixel() {
-        // 取景框越小，画面被放得越大，同样的手指位移对应的内容位移也该越小
-        float big = Math.abs(RearViewTouchModel.cropShiftForDrag(100, 400, 0.8f));
-        float small = Math.abs(RearViewTouchModel.cropShiftForDrag(100, 400, 0.2f));
-        assertTrue("取景框小的时候位移应当更小", small < big);
+    public void dragIsInertWhenThereIsNothingLeftToPan() {
+        assertEquals(0f, RearViewTouchModel.panShiftForDrag(300, 400, 0f), EPS);
+        assertEquals(0f, RearViewTouchModel.panShiftForDrag(-300, 400, 0f), EPS);
     }
 
     @Test
     public void dragIsInertWithoutAHeight() {
-        assertEquals(0f, RearViewTouchModel.cropShiftForDrag(100, 0, 0.5f), EPS);
+        assertEquals(0f, RearViewTouchModel.panShiftForDrag(100, 0, 0.75f), EPS);
     }
 
-    /** 拖动接上取景框之后仍然不能越界。 */
+    /** 拖到底也不能把取景推出画面。 */
     @Test
-    public void draggingCannotPushTheCropOutOfTheFrame() {
-        RearViewGeometry.Crop crop = new RearViewGeometry.Crop(0f, 0.3f, 1f, 0.4f);
+    public void draggingCannotPushTheViewportOutOfTheFrame() {
+        RearViewGeometry.Viewport base = RearViewGeometry.Viewport.forWindow(1600, 400, 0.5f);
         for (int dy = -2000; dy <= 2000; dy += 137) {
-            float shift = RearViewTouchModel.cropShiftForDrag(dy, 400, crop.height);
-            RearViewGeometry.Crop moved = crop.shiftedVertically(shift);
-            assertTrue("y 越界: " + moved, moved.y >= -EPS);
+            float shift = RearViewTouchModel.panShiftForDrag(dy, 400, base.verticalHeadroom());
+            float pan = RearViewGeometry.clampPan(0.5f + shift);
+            RearViewGeometry.Viewport moved =
+                    RearViewGeometry.Viewport.forWindow(1600, 400, pan);
+            assertTrue("上边越界: " + moved, moved.y >= -EPS);
             assertTrue("下边越界: " + moved, moved.y + moved.height <= 1f + EPS);
         }
     }
