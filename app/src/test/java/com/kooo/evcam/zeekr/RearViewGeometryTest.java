@@ -141,20 +141,6 @@ public class RearViewGeometryTest {
         // FourLaneContainer: left = (cell % 2), top = (cell / 2)
         // 所以格子 1 就是右上
         assertEquals(1, RearViewGeometry.REAR_CELL);
-        assertEquals(1, RearViewGeometry.rearLaneIndex(null));
-        assertEquals(1, RearViewGeometry.rearLaneIndex(new int[]{0, 1, 2, 3}));
-    }
-
-    @Test
-    public void rearFollowsACustomLaneOrder() {
-        // 用户把右上格换成了第 3 路，后视镜就该跟着取第 3 路
-        assertEquals(3, RearViewGeometry.rearLaneIndex(new int[]{0, 3, 2, 1}));
-    }
-
-    @Test
-    public void rearFallsBackWhenLaneOrderIsUnusable() {
-        assertEquals(1, RearViewGeometry.rearLaneIndex(new int[]{0}));
-        assertEquals(1, RearViewGeometry.rearLaneIndex(new int[]{0, 99, 2, 3}));
     }
 
     // ---------- 换算成绘制参数 ----------
@@ -210,6 +196,7 @@ public class RearViewGeometryTest {
         assertEquals(1f, nullPlan.laneScaleX, EPS);
         assertEquals(1f, nullPlan.viewScaleX, EPS);
 
+        // 序号越界时退回整幅，后视镜至少还能出画面而不是取到隔壁那一路
         RearViewGeometry.ShaderRects badLane = RearViewGeometry.toShaderRects(
                 zeekrPlan(), 99, RearViewGeometry.Viewport.full());
         assertEquals(1f, badLane.laneScaleY, EPS);
@@ -249,26 +236,30 @@ public class RearViewGeometryTest {
     }
 
     /**
-     * 采样绝不能越出本路 —— 合成流里四路上下紧挨着，
-     * 越界取到的是隔壁摄像头的画面，不是黑边。
+     * 采样绝不能越出后方那一路。
+     *
+     * <p>合成流里四路上下紧挨着排列，所以越界取到的是<b>隔壁摄像头的画面</b>，
+     * 不是黑边 —— 这类错误在车上看着像「后视镜偶尔闪一下别的画面」，
+     * 很难判断是怎么回事，必须在这里挡住。</p>
+     *
+     * <p>只扫后方这一路：显示哪一路不可配置，后视镜恒取右上那一格。</p>
      */
     @Test
-    public void combinedRectAlwaysStaysInsideTheTexture() {
+    public void combinedRectAlwaysStaysInsideTheLane() {
         CompositeStreamGeometry.Plan plan = zeekrPlan();
         int[][] windows = {{900, 340}, {400, 400}, {300, 900}, {3200, 480}, {120, 2000}};
-        for (int laneIndex = 0; laneIndex < 4; laneIndex++) {
-            for (int[] window : windows) {
-                for (float pan : new float[]{0f, 0.5f, 1f, -3f, 7f}) {
-                    RearViewGeometry.Viewport v =
-                            RearViewGeometry.Viewport.forWindow(window[0], window[1], pan);
-                    float[] r = RearViewGeometry.combinedSourceRect(plan, laneIndex, v);
-                    assertTrue("x 越界: " + r[0], r[0] >= -EPS);
-                    assertTrue("y 越界: " + r[1], r[1] >= -EPS);
-                    assertTrue("右边越界", r[0] + r[2] <= 1f + EPS);
-                    assertTrue("下边越界", r[1] + r[3] <= 1f + EPS);
-                    assertTrue("宽度必须为正", r[2] > 0f);
-                    assertTrue("高度必须为正", r[3] > 0f);
-                }
+        for (int[] window : windows) {
+            for (float pan : new float[]{0f, 0.5f, 1f, -3f, 7f}) {
+                RearViewGeometry.Viewport v =
+                        RearViewGeometry.Viewport.forWindow(window[0], window[1], pan);
+                float[] r = RearViewGeometry.combinedSourceRect(
+                        plan, RearViewGeometry.REAR_CELL, v);
+                assertTrue("x 越界: " + r[0], r[0] >= -EPS);
+                assertTrue("y 越界: " + r[1], r[1] >= -EPS);
+                assertTrue("右边越界", r[0] + r[2] <= 1f + EPS);
+                assertTrue("下边越界", r[1] + r[3] <= 1f + EPS);
+                assertTrue("宽度必须为正", r[2] > 0f);
+                assertTrue("高度必须为正", r[3] > 0f);
             }
         }
     }

@@ -71,7 +71,11 @@ public class RearViewMirrorView extends ViewGroup {
 
     /** 合成流的真实尺寸决定拆分几何，不能用缓冲区尺寸（HAL 可能给个压扁的提示值）。 */
     private CompositeStreamGeometry.Plan plan;
-    private int laneIndex = RearViewGeometry.REAR_CELL;
+    /**
+     * 取哪一路。恒为后方那一格 —— 四宫格排列目前没有任何地方能改，
+     * 所以这里不做成可配置的；等真接上排列功能了再说。
+     */
+    private final int laneIndex = RearViewGeometry.REAR_CELL;
     /** 取景在画面上的高低位置，0..1。宽高比锁死后，可调的就只剩这个。 */
     private float pan;
 
@@ -140,12 +144,6 @@ public class RearViewMirrorView extends ViewGroup {
         }
         plan = CompositeStreamGeometry.analyse(size.getWidth(), size.getHeight());
         AppLog.i(TAG, "后视镜取景: " + plan + " 第 " + laneIndex + " 路");
-        invalidate();
-    }
-
-    /** 四宫格排列可能被用户调过，后方是哪一路要跟着走。 */
-    public void setLaneOrder(int[] laneOrder) {
-        laneIndex = RearViewGeometry.rearLaneIndex(laneOrder);
         invalidate();
     }
 

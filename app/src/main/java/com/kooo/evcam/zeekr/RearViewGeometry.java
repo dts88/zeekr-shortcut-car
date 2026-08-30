@@ -218,21 +218,4 @@ public final class RearViewGeometry {
         };
     }
 
-    /**
-     * 后方那一路在合成流里的序号。
-     *
-     * <p>2x2 的格子编号是「左上、右上、左下、右下」，后方在右上（见 {@link #REAR_CELL}）。
-     * 格子到画面序号还要过一遍 laneOrder —— 用户可以调整四宫格的排列。</p>
-     *
-     * @param laneOrder laneOrder[格子] = 画面序号；传 null 用默认顺序
-     */
-    public static int rearLaneIndex(int[] laneOrder) {
-        if (laneOrder == null || REAR_CELL >= laneOrder.length) {
-            return REAR_CELL;
-        }
-        // laneOrder 是用户改过的配置，值不一定可信；越界就退回默认那一格，
-        // 否则会拿一个不存在的序号去取 lane
-        int lane = laneOrder[REAR_CELL];
-        return (lane >= 0 && lane < CompositeStreamGeometry.LANE_COUNT) ? lane : REAR_CELL;
-    }
 }
