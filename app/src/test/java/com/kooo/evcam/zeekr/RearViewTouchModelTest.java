@@ -89,17 +89,104 @@ public class RearViewTouchModelTest {
 
     // ---------- 贴边停靠 ----------
 
-    @Test
-    public void detectsWhichEdgeItWasDraggedTo() {
-        int screen = 3200;
-        int width = 480;
+    private static final int SCREEN = 3200;
+    private static final int WIDTH = 480;
+    private static final float MIN_FLING = 400f;
 
-        assertEquals(RearViewTouchModel.Dock.LEFT,
-                RearViewTouchModel.dockFor(10, width, screen, 40));
-        assertEquals(RearViewTouchModel.Dock.RIGHT,
-                RearViewTouchModel.dockFor(screen - width - 10, width, screen, 40));
+    private RearViewTouchModel.Dock dockAt(int x, float velocity) {
+        return RearViewTouchModel.deliberateDock(x, WIDTH, SCREEN, velocity, MIN_FLING);
+    }
+
+    /**
+     * 这条是整个规则的重点，也是上一版被抱怨的地方：
+     * 窗口整个还在屏幕里时，不管拖到多靠边、甩得多快，都不许贴边。
+     */
+    @Test
+    public void aFullyVisibleWindowNeverDocks() {
+        int[] positions = {0, 1, 40, 1000, SCREEN - WIDTH - 1, SCREEN - WIDTH};
+        for (int x : positions) {
+            assertEquals("x=" + x + " 时窗口仍完整可见，不该贴边",
+                    RearViewTouchModel.Dock.NONE, dockAt(x, 0f));
+            assertEquals("x=" + x + " 快速甩动也不该贴边",
+                    RearViewTouchModel.Dock.NONE, dockAt(x, -5000f));
+            assertEquals("x=" + x + " 快速甩动也不该贴边",
+                    RearViewTouchModel.Dock.NONE, dockAt(x, 5000f));
+        }
+    }
+
+    /** 推出去一半以上：不用甩，松手就该收起来。 */
+    @Test
+    public void pushingMostOfItOffScreenDocksWithoutAFling() {
+        assertEquals(RearViewTouchModel.Dock.LEFT, dockAt(-WIDTH / 2, 0f));
+        assertEquals(RearViewTouchModel.Dock.RIGHT, dockAt(SCREEN - WIDTH / 2, 0f));
+    }
+
+    /** 只推出去一点点、又没甩，应当留在原地 —— 这多半是手滑。 */
+    @Test
+    public void nudgingItSlightlyOffScreenIsNotEnough() {
+        assertEquals(RearViewTouchModel.Dock.NONE, dockAt(-10, 0f));
+        assertEquals(RearViewTouchModel.Dock.NONE, dockAt(SCREEN - WIDTH + 10, 0f));
+    }
+
+    /** 但推出去一点再朝那个方向甩一下，就算数了。 */
+    @Test
+    public void aFlingTowardsTheEdgeDocksOnceItHasStartedLeaving() {
+        assertEquals(RearViewTouchModel.Dock.LEFT, dockAt(-10, -MIN_FLING));
+        assertEquals(RearViewTouchModel.Dock.RIGHT, dockAt(SCREEN - WIDTH + 10, MIN_FLING));
+    }
+
+    /** 朝反方向甩不该贴边 —— 那是想把它拉回来。 */
+    @Test
+    public void aFlingAwayFromTheEdgeDoesNotDock() {
+        assertEquals(RearViewTouchModel.Dock.NONE, dockAt(-10, MIN_FLING * 4));
         assertEquals(RearViewTouchModel.Dock.NONE,
-                RearViewTouchModel.dockFor(1000, width, screen, 40));
+                dockAt(SCREEN - WIDTH + 10, -MIN_FLING * 4));
+    }
+
+    /** 慢慢挪出去一点点不算甩。 */
+    @Test
+    public void aSlowDragBelowTheFlingThresholdDoesNotDock() {
+        assertEquals(RearViewTouchModel.Dock.NONE, dockAt(-10, -MIN_FLING + 1));
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                dockAt(SCREEN - WIDTH + 10, MIN_FLING - 1));
+    }
+
+    /**
+     * 贴边条件必须是<b>拖得到</b>的。
+     *
+     * <p>拖动时 {@code clampX} 会保证至少留出 PEEK 宽度不被推出去，
+     * 所以最多只能推出 {@code width - PEEK}。要是这个上限还够不到
+     * 贴边所需的比例，条件就永远不成立 —— 这正是上一版贴边完全没反应的原因
+     * （当时阈值比 PEEK 还小），同一个坑不该踩第二次。</p>
+     */
+    @Test
+    public void theDockConditionIsActuallyReachableWhileDragging() {
+        int peek = 72;                 // RearViewMirrorView.PEEK_WIDTH_PX
+        int smallest = 240;            // AppConfig.REARVIEW_MIN_SIZE
+
+        for (int width : new int[]{smallest, 480, 720, 1600}) {
+            int furthestLeft = RearViewTouchModel.clampX(
+                    -100000, width, SCREEN, peek);
+            int furthestRight = RearViewTouchModel.clampX(
+                    100000, width, SCREEN, peek);
+
+            assertEquals("宽 " + width + " 时应当能一路推到左边贴住",
+                    RearViewTouchModel.Dock.LEFT,
+                    RearViewTouchModel.deliberateDock(
+                            furthestLeft, width, SCREEN, 0f, MIN_FLING));
+            assertEquals("宽 " + width + " 时应当能一路推到右边贴住",
+                    RearViewTouchModel.Dock.RIGHT,
+                    RearViewTouchModel.deliberateDock(
+                            furthestRight, width, SCREEN, 0f, MIN_FLING));
+        }
+    }
+
+    @Test
+    public void nonsenseGeometryIsSurvivable() {
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                RearViewTouchModel.deliberateDock(0, 0, SCREEN, 0f, MIN_FLING));
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                RearViewTouchModel.deliberateDock(0, WIDTH, 0, 0f, MIN_FLING));
     }
 
     @Test

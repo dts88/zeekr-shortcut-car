@@ -77,15 +77,61 @@ public final class RearViewTouchModel {
      * @param screenW   屏幕宽度
      * @param threshold 距离边缘多少像素以内算贴边
      */
-    public static Dock dockFor(int windowX, int width, int screenW, int threshold) {
+    /**
+     * 窗口被拖出屏幕多少比例才算「想把它收起来」。
+     *
+     * <p>一半 —— 拖到这个程度已经不像是手滑了。</p>
+     */
+    public static final float DOCK_OFFSCREEN_FRACTION = 0.5f;
+
+    /**
+     * 松手时该不该贴边。
+     *
+     * <p><b>窗口只要还整个在屏幕里，就一定不贴边。</b>这是这条规则的重点：
+     * 之前判断的是「离屏幕边缘多近」，于是窗口明明还完整可见就被吸走了 ——
+     * 「还没到边就隐藏了」说的就是这个。贴边应当是<b>做出来的动作</b>，
+     * 不是靠近某个位置的副作用。</p>
+     *
+     * <p>两种算「做出来了」：</p>
+     * <ul>
+     *   <li>已经推出去一半以上 —— 拖到这个程度不会是手滑；</li>
+     *   <li>朝着那条边甩了一下，而且窗口确实已经压到边上 ——
+     *       快速甩出去，不用一路拖到底。</li>
+     * </ul>
+     *
+     * @param velocityX        松手时的横向速度（px/s），右为正
+     * @param minFlingVelocity 系统认定的最小甩动速度，取自
+     *                         {@code ViewConfiguration.getScaledMinimumFlingVelocity()} ——
+     *                         用平台自己的阈值，手感和其他应用一致，也省得自己编一个数字
+     */
+    public static Dock deliberateDock(int windowX, int width, int screenW,
+                                      float velocityX, float minFlingVelocity) {
         if (screenW <= 0 || width <= 0) {
             return Dock.NONE;
         }
-        if (windowX <= threshold) {
+        int offLeft = Math.max(0, -windowX);
+        int offRight = Math.max(0, windowX + width - screenW);
+
+        // 还整个在屏幕里 —— 不管甩得多快都不贴边
+        if (offLeft == 0 && offRight == 0) {
+            return Dock.NONE;
+        }
+
+        float needed = width * DOCK_OFFSCREEN_FRACTION;
+        if (offLeft >= needed) {
             return Dock.LEFT;
         }
-        if (windowX + width >= screenW - threshold) {
+        if (offRight >= needed) {
             return Dock.RIGHT;
+        }
+
+        if (minFlingVelocity > 0) {
+            if (velocityX <= -minFlingVelocity && offLeft > 0) {
+                return Dock.LEFT;
+            }
+            if (velocityX >= minFlingVelocity && offRight > 0) {
+                return Dock.RIGHT;
+            }
         }
         return Dock.NONE;
     }

@@ -11,7 +11,9 @@ import android.os.Build;
 import android.util.Size;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 
@@ -37,7 +39,7 @@ import com.kooo.evcam.AutoFitTextureView;
  * <h3>手势</h3>
  *
  * <p>横向分三段，规则见 {@link RearViewTouchModel}：左右三分之一拖动窗口，
- * 中间三分之一上下滑调整取景范围（窗口不动）。双指缩放窗口大小，拖到边缘自动贴边。</p>
+ * 中间三分之一上下滑调整取景范围（窗口不动）。双指缩放窗口大小，推出屏幕一半或朝边上甩一下即贴边隐藏。</p>
  *
  * <p>画面做<b>左右镜像</b>，和真正的后视镜一致；预览、录制、回放都不受影响。</p>
  */
@@ -47,26 +49,13 @@ public class RearViewMirrorView extends ViewGroup {
 
     /** 贴边后仍然露出的宽度，用来把它再拖回来。 */
     private static final int PEEK_WIDTH_PX = 72;
-    /**
-     * 距离屏幕边缘多少像素以内算贴边。
-     *
-     * <p><b>必须大于 {@link #PEEK_WIDTH_PX}</b>，否则这个条件永远不成立：
-     * 拖动时 {@code clampX} 已经把 x 限制在最多 {@code screenW - PEEK}，
-     * 也就是右边缘最近只能到距屏幕边 PEEK 像素处。阈值比 PEEK 小的话，
-     * 窗口再怎么往边上拖也进不了判定范围 —— 第一版就是这么写的，
-     * 所以贴边隐藏一次都没触发过。</p>
-     */
-    private static final int DOCK_THRESHOLD_PX = PEEK_WIDTH_PX + 80;
 
-    // 贴边还有第二个前提，和上面这个阈值同样必要：窗口必须被允许探出屏幕。
+    // 贴边的前提是窗口能探出屏幕，靠的是 show() 里的 FLAG_LAYOUT_NO_LIMITS。
+    // 没有那个标志，WindowManager 会把悬浮窗按回显示区域内 ——
+    // 这边算得再准，x 一提交就被改回去，窗口根本出不去。
     //
-    // 没有 FLAG_LAYOUT_NO_LIMITS 的话，WindowManager 会把悬浮窗按回显示区域内 ——
-    // 这边算得再准，x 一提交就被改回去，窗口根本出不去，于是「拖到边缘」永远没反应。
-    // 之前只修了阈值，漏了这一条，所以贴边看起来还是坏的。
-    /** 超过这个位移才算拖动，避免点一下就漂移。 */
-    private static final int DRAG_SLOP_PX = 12;
-    /** 按住多久算长按（进出取景调整模式）。 */
-    private static final long LONG_PRESS_MS = 600L;
+    // 判定条件本身见 RearViewTouchModel.deliberateDock：要么已经推出去一半，
+    // 要么朝边上甩了一下。只要窗口还整个在屏幕里就绝不贴边。
 
     private final WindowManager windowManager;
     private final AppConfig appConfig;
@@ -94,6 +83,10 @@ public class RearViewMirrorView extends ViewGroup {
     private final float[] meshSource = new float[8];
     private final float[] meshDest = new float[8];
     private boolean dragging;
+    /** 松手时要知道甩得多快，用系统自带的这个就够，不必自己算。 */
+    private VelocityTracker velocityTracker;
+    /** 平台认定的最小甩动速度，手感与其他应用一致。 */
+    private final int minFlingVelocity;
     /** 取景调整模式：显示整路画面 + 蒙版框，手势含义与平时不同。 */
     private boolean framingMode;
     private long touchDownAtMs;
@@ -113,6 +106,8 @@ public class RearViewMirrorView extends ViewGroup {
         this.appConfig = appConfig;
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         this.crop = appConfig.getRearViewCrop();
+        this.minFlingVelocity =
+                ViewConfiguration.get(context).getScaledMinimumFlingVelocity();
         this.fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
         this.fovDegrees = appConfig.getRearViewFov();
 
@@ -341,6 +336,12 @@ public class RearViewMirrorView extends ViewGroup {
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                if (velocityTracker == null) {
+                    velocityTracker = VelocityTracker.obtain();
+                } else {
+                    velocityTracker.clear();
+                }
+                velocityTracker.addMovement(event);
                 beginTouch(event);
                 return true;
 
@@ -351,6 +352,9 @@ public class RearViewMirrorView extends ViewGroup {
                 return true;
 
             case MotionEvent.ACTION_MOVE:
+                if (velocityTracker != null) {
+                    velocityTracker.addMovement(event);
+                }
                 if (pinching && event.getPointerCount() >= 2) {
                     updatePinch(event);
                 } else if (!pinching) {
@@ -366,7 +370,7 @@ public class RearViewMirrorView extends ViewGroup {
 
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                endTouch();
+                endTouch(takeXVelocity(event));
                 return true;
 
             default:
@@ -463,7 +467,26 @@ public class RearViewMirrorView extends ViewGroup {
         applyLayout();
     }
 
-    private void endTouch() {
+    /** 取出松手瞬间的横向速度，顺手把 tracker 还回去。 */
+    private float takeXVelocity(MotionEvent event) {
+        if (velocityTracker == null) {
+            return 0f;
+        }
+        float velocity = 0f;
+        try {
+            velocityTracker.addMovement(event);
+            velocityTracker.computeCurrentVelocity(1000);   // px/s
+            velocity = velocityTracker.getXVelocity();
+        } catch (Exception e) {
+            AppLog.w(TAG, "取速度失败: " + e);
+        } finally {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
+        return velocity;
+    }
+
+    private void endTouch(float velocityX) {
         long heldMs = android.os.SystemClock.elapsedRealtime() - touchDownAtMs;
 
         if (!dragging && !pinching) {
@@ -488,9 +511,11 @@ public class RearViewMirrorView extends ViewGroup {
         if (activeZone == RearViewTouchModel.Zone.ADJUST_CROP && dragging) {
             appConfig.setRearViewCrop(crop);
         } else if (params != null && (dragging || pinching)) {
-            // 松手时如果贴到了边缘，就把它吸过去
-            RearViewTouchModel.Dock dock = RearViewTouchModel.dockFor(
-                    params.x, params.width, screenWidth(), DOCK_THRESHOLD_PX);
+            // 只有「明显是想收起来」才贴边：推出去一半，或者朝边上甩一下。
+            // 窗口还整个在屏幕里的话一定不贴边 —— 以前是按「离边多近」判断的，
+            // 于是画面明明还完整可见就被吸走了。
+            RearViewTouchModel.Dock dock = RearViewTouchModel.deliberateDock(
+                    params.x, params.width, screenWidth(), velocityX, minFlingVelocity);
             if (dock != RearViewTouchModel.Dock.NONE) {
                 params.x = RearViewTouchModel.dockedX(
                         dock, params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
