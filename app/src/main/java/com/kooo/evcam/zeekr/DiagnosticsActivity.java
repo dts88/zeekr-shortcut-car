@@ -25,6 +25,8 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -47,6 +49,12 @@ public class DiagnosticsActivity extends Activity {
     private Button shareButton;
     private Button refreshButton;
     private Button requestCarPermsButton;
+    private Button snapshotButton;
+    private Button compareButton;
+
+    /** 「拍快照」存下的那一份，等着和之后的状态对比。 */
+    private Map<String, String> baselineSnapshot;
+    private long baselineAtMs;
     private static final int REQUEST_CAR_PERMISSIONS = 4101;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -64,6 +72,15 @@ public class DiagnosticsActivity extends Activity {
         shareButton = findViewById(R.id.diagnostics_share);
         refreshButton = findViewById(R.id.diagnostics_refresh);
         requestCarPermsButton = findViewById(R.id.diagnostics_request_car_perms);
+
+        snapshotButton = findViewById(R.id.diagnostics_snapshot);
+        compareButton = findViewById(R.id.diagnostics_compare);
+        if (snapshotButton != null) {
+            snapshotButton.setOnClickListener(v -> takeBaselineSnapshot());
+        }
+        if (compareButton != null) {
+            compareButton.setOnClickListener(v -> compareWithBaseline());
+        }
 
         View close = findViewById(R.id.diagnostics_close);
         if (close != null) {
@@ -214,6 +231,88 @@ public class DiagnosticsActivity extends Activity {
             toast("保存失败: " + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 拍下当前状态，作为对比的基准。
+     *
+     * <p>用法：在车里先按「拍快照」，然后做一个动作（挂倒挡、开门、打转向灯），
+     * 再按「对比变化」—— 变了的属性就是这个动作的候选信号源。</p>
+     *
+     * <p>这个流程存在的理由是：**不必事先知道属性叫什么**。
+     * 之前找车辆信号一直卡在猜名字上，而猜不中并不能证明信号不存在。</p>
+     */
+    private void takeBaselineSnapshot() {
+        reportView.setText("正在记录当前状态...");
+        // getprop 要开一个进程、读上千行，别占着主线程 —— 车机上卡一下就能感觉到
+        new Thread(() -> {
+            Map<String, String> snapshot = VehicleSignalProbe.captureProperties();
+            mainHandler.post(() -> {
+                baselineSnapshot = snapshot;
+                baselineAtMs = System.currentTimeMillis();
+                reportView.setText("已记录 " + snapshot.size() + " 个属性。\n\n"
+                        + "现在去做一个动作（挂倒挡 / 开关车门 / 打转向灯 / 踩刹车），"
+                        + "做完回来按「② 对比变化」。");
+                toast("快照已记录");
+            });
+        }, "snapshot-baseline").start();
+    }
+
+    /** 和基准快照对比，把变了的属性列出来。 */
+    private void compareWithBaseline() {
+        if (baselineSnapshot == null) {
+            Toast.makeText(this, "请先按「① 拍快照」", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        reportView.setText("正在对比...");
+        new Thread(() -> {
+            Map<String, String> now = VehicleSignalProbe.captureProperties();
+            String result = describeChanges(now);
+            mainHandler.post(() -> {
+                reportView.setText(result);
+                report = result;
+            });
+        }, "snapshot-compare").start();
+    }
+
+    /** 把对比结果写成报告文本。 */
+    private String describeChanges(Map<String, String> now) {
+        List<SnapshotDiff.Change> all = SnapshotDiff.between(baselineSnapshot, now);
+        List<SnapshotDiff.Change> signal = SnapshotDiff.signalOnly(all);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# 状态变化对比\n\n");
+        sb.append("基准时间：")
+                .append(new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                        .format(new Date(baselineAtMs)))
+                .append("　间隔 ")
+                .append((System.currentTimeMillis() - baselineAtMs) / 1000)
+                .append(" 秒\n");
+        sb.append("属性总数：").append(now.size())
+                .append("　变化 ").append(all.size())
+                .append(" 项，滤除噪音后 ").append(signal.size()).append(" 项\n\n");
+
+        if (signal.isEmpty()) {
+            sb.append("## 没有发现变化\n\n");
+            sb.append("这说明刚才那个动作**没有反映到任何系统属性上**。\n");
+            sb.append("注意这不等于「车机读不到这个信号」——只说明它不走系统属性这条路。\n");
+            sb.append("还可以试：ECARX binder（见主报告 4.3）、logcat（4.6）、广播。\n");
+        } else {
+            sb.append("## 变化的属性\n\n");
+            for (SnapshotDiff.Change change : signal) {
+                sb.append("- ").append(change.toString()).append('\n');
+            }
+            sb.append("\n**接下来**：把上面这些名字对着刚才做的动作看一遍。\n");
+            sb.append("同一个动作重复做两次，两次都变的那一项才可靠 ——\n");
+            sb.append("只变一次的可能只是碰巧同时发生的别的事。\n");
+        }
+
+        if (all.size() > signal.size()) {
+            sb.append("\n<details>滤掉的噪音项（开机时长、内存计数之类）：")
+                    .append(all.size() - signal.size()).append(" 项</details>\n");
+        }
+
+        return sb.toString();
     }
 
     private void copyReport() {

@@ -86,6 +86,26 @@
             android:textColor="@color/button_text" />
 
         <Button
+            android:id="@+id/diagnostics_snapshot"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="① 拍快照"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
+            android:id="@+id/diagnostics_compare"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="② 对比变化"
+            android:textSize="15sp"
+            android:backgroundTint="@color/button_background"
+            android:textColor="@color/button_text" />
+
+        <Button
             android:id="@+id/diagnostics_close"
             android:layout_width="0dp"
             android:layout_height="wrap_content"

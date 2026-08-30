@@ -10,6 +10,8 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -70,6 +72,48 @@ public final class VehicleSignalProbe {
     };
 
     private VehicleSignalProbe() {
+    }
+
+    /**
+     * 把当前所有系统属性拍成一份快照。
+     *
+     * <p>配合 {@link SnapshotDiff} 用：变化前拍一张，变化后拍一张，对比出
+     * 「跟这个动作有关的属性」。这样就<b>不需要事先知道属性叫什么名字</b> ——
+     * 之前一直卡在猜名字上，猜不中还证明不了信号不存在。</p>
+     *
+     * <p>走 {@code getprop} 而不是逐个 {@code SystemProperties.get}：
+     * 后者必须先有名字，而这里要的正是「有哪些名字」。</p>
+     *
+     * @return 属性名 → 值；读不到时返回空表，不返回 null
+     */
+    public static Map<String, String> captureProperties() {
+        Map<String, String> snapshot = new HashMap<>();
+        Process process = null;
+        try {
+            process = new ProcessBuilder("getprop").redirectErrorStream(true).start();
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // getprop 的格式固定是 [名字]: [值]
+                int split = line.indexOf("]: [");
+                if (!line.startsWith("[") || split < 0 || !line.endsWith("]")) {
+                    continue;
+                }
+                String key = line.substring(1, split);
+                String value = line.substring(split + 4, line.length() - 1);
+                snapshot.put(key, value);
+            }
+            reader.close();
+        } catch (Exception e) {
+            AppLog.w(TAG, "拍快照失败: " + e);
+        } finally {
+            if (process != null) {
+                process.destroy();
+            }
+        }
+        AppLog.i(TAG, "快照：" + snapshot.size() + " 个属性");
+        return snapshot;
     }
 
     public static void appendTo(StringBuilder sb, Context context) {
