@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 
 import com.kooo.evcam.config.BlindSpotConfig;
 import com.kooo.evcam.zeekr.FisheyeProjection;
+import com.kooo.evcam.settings.FrameRatePolicy;
 import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
 
@@ -32,8 +33,8 @@ public class AppConfig {
     private static final String KEY_LAST_DETECTED_SD_PATH = "last_detected_sd_path";  // 上次自动检测到的U盘路径（缓存）
     
     // 存储位置常量
-    public static final String STORAGE_INTERNAL = "internal";  // 内部存储（默认）
-    public static final String STORAGE_EXTERNAL_SD = "external_sd";  // U盘
+    public static final String STORAGE_INTERNAL = "internal";  // 内部存储
+    public static final String STORAGE_EXTERNAL_SD = "external_sd";  // U盘（默认）
     
     // U盘回退提示标志（每次冷启动后重置）
     private static boolean sdFallbackShownThisSession = false;
@@ -504,7 +505,8 @@ public class AppConfig {
      */
     public boolean isAutoStartOnBoot() {
         // 默认启用开机自启动（车机系统场景）
-        return prefs.getBoolean(KEY_AUTO_START_ON_BOOT, true);
+        // 默认关：开机就自己起来是件挺重的事，该由用户明确开启
+        return prefs.getBoolean(KEY_AUTO_START_ON_BOOT, false);
     }
     
     /**
@@ -787,26 +789,7 @@ public class AppConfig {
      * @return 标准帧率
      */
     public static int getStandardFrameRate(int hardwareMaxFps) {
-        if (hardwareMaxFps <= 0) {
-            return 30;  // 默认30fps
-        }
-        
-        // 如果硬件帧率本身就是30或接近30，直接使用
-        if (hardwareMaxFps >= 25 && hardwareMaxFps <= 35) {
-            return hardwareMaxFps;
-        }
-        
-        // 如果超过30，降到30或以下的整数倍
-        if (hardwareMaxFps > 35) {
-            // 60fps -> 30fps, 120fps -> 30fps
-            int divisor = (hardwareMaxFps + 29) / 30;  // 向上取整
-            int result = hardwareMaxFps / divisor;
-            // 确保结果在合理范围内
-            return Math.max(15, Math.min(result, 30));
-        }
-        
-        // 如果低于25，直接使用硬件帧率
-        return hardwareMaxFps;
+        return FrameRatePolicy.standardFrameRate(hardwareMaxFps);
     }
     
     // ==================== 帧率配置相关方法 ====================
@@ -823,6 +806,9 @@ public class AppConfig {
      * @param hardwareMaxFps 硬件支持的最大帧率
      * @return 实际使用的帧率
      */
+    /** 录制链路当作「硬件最大帧率」用的值，见 {@link FrameRatePolicy}。 */
+    public static final int RECORDER_MAX_FPS = FrameRatePolicy.RECORDER_MAX_FPS;
+
     public int getActualFrameRate(int hardwareMaxFps) {
         String explicit = getRecordFps();
         if (RECORD_FPS_AUTO.equals(explicit)) {
@@ -860,7 +846,17 @@ public class AppConfig {
 
     /** 录制帧率的显示名称。 */
     public static String getRecordFpsDisplayName(String value) {
-        return RECORD_FPS_AUTO.equals(value) ? "原始帧率" : value + " fps";
+        return RECORD_FPS_AUTO.equals(value) ? autoFrameRateLabel() : value + " fps";
+    }
+
+    /**
+     * 「原始帧率」这一项要显示的文字，带上它实际会用的数值。
+     *
+     * <p>数值是算出来的而不是写死的字符串 —— 哪天录制链路改了，这里跟着变，
+     * 不会出现界面写一个数、实际录另一个数。</p>
+     */
+    public static String autoFrameRateLabel() {
+        return FrameRatePolicy.autoLabel();
     }
 
     // ==================== 预览/录制分辨率解耦 ====================
@@ -1654,7 +1650,8 @@ public class AppConfig {
      * @return 存储位置，默认为内部存储
      */
     public String getStorageLocation() {
-        return prefs.getString(KEY_STORAGE_LOCATION, STORAGE_INTERNAL);
+        // 默认 U 盘：行车记录是持续大量写入，默认写内置闪存会消耗它的寿命
+        return prefs.getString(KEY_STORAGE_LOCATION, STORAGE_EXTERNAL_SD);
     }
     
     /**

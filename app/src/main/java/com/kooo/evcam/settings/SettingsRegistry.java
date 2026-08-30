@@ -33,7 +33,7 @@ public final class SettingsRegistry {
     /** 录制帧率。 */
     public static final SettingSpec RECORD_FPS = SettingSpec.of(
             "record_fps", "录制帧率", "auto",
-            entry("auto", "原始帧率"),
+            entry("auto", FrameRatePolicy.autoLabel()),
             entry("30", "30 fps"),
             entry("24", "24 fps"),
             entry("20", "20 fps"),

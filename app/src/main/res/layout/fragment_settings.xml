@@ -99,20 +99,25 @@
                         android:textStyle="bold" />
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="选择使用哪几路视频流：仅环视合成流，或环视 + 后排 + 驾驶位"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp"
                         android:layout_marginTop="4dp" />
-                </LinearLayout>
 
-                <Spinner
-                    android:id="@+id/spinner_car_model"
-                    android:layout_width="160dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:popupBackground="@color/card_background" />
+                    <!--
+                      选项名比较长（「极氪7X（环视+座舱3路）」），和标题并排放
+                      再给个固定宽度必然截断。放到标题下面占满整行，多长都放得下。
+                    -->
+                    <Spinner
+                        android:id="@+id/spinner_car_model"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/spinner_background"
+                        android:popupBackground="@color/card_background" />
+                </LinearLayout>
             </LinearLayout>
 
             <!-- 手动指定相机映射（测试用） -->
@@ -462,7 +467,7 @@
                         android:id="@+id/cb_record_camera_front"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="前"
+                        android:text="环视"
                         android:textColor="@color/text_primary"
                         android:textSize="14sp"
                         android:checked="true" />
@@ -951,11 +956,11 @@
                     android:layout_marginStart="16dp" />
             </LinearLayout>
 
-            <!-- ===== 界面 ===== -->
+            <!-- ===== 超级后视镜 ===== -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="界面"
+                android:text="超级后视镜"
                 android:textColor="@color/button_accent"
                 android:textSize="16sp"
                 android:textStyle="bold"
@@ -1221,6 +1226,18 @@
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
             </LinearLayout>
+
+            <!-- ===== 悬浮窗 ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="悬浮窗"
+                android:textColor="@color/button_accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="10dp"
+                android:paddingStart="4dp" />
 
             <!-- 悬浮窗布局：重置 -->
             <LinearLayout
@@ -1964,7 +1981,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="• 权限设置：管理应用所需的各项权限\n\n• 车型配置：选择对应车型以适配摄像头布局\n\n• 录制模式：\n  - 自动：根据车型自动选择最佳方案\n  - MediaRecorder：使用系统硬件编码\n  - MediaCodec：软编码方案\n\n• 分段时长：设置每段视频的最大时长\n  - 1分钟：文件小巧，便于分享\n  - 3分钟：平衡文件大小和连续性\n  - 5分钟：减少文件数量\n\n• 存储位置：\n  - 内部存储：/DCIM/EVCam_Video/\n  - U盘：U盘/DCIM/（需权限）\n  - 选择U盘时自动启用中转写入\n    （先写入内部存储，分段后异步传输到U盘）\n\n• 存储自动清理：\n  - 分别设置视频和图片的存储限制\n  - 冷启动30秒后和每小时自动检测\n  - 超限时删除最早的文件（留空或0不限制）\n\n• 录制状态显示：\n  - 录制时在右上角显示时间和分段数\n  - 双击可快速切换显示/隐藏\n\n• 时间角标：\n  - 在保存的视频/图片左上角添加时间水印\n  - 仅影响存储文件，预览界面不显示\n  - 视频角标仅支持MediaCodec模式\n\n• 开机自启动：系统启动后自动运行\n\n• 启动自动录制：\n  - 应用启动后自动开始录制\n  - 从后台返回前台时自动恢复录制\n  - 配合前台服务保持录制不被中断\n\n• 息屏录制（锁车录制）：\n  - 仅在启动自动录制开启时可用\n  - 开启：息屏（锁车黑屏）时继续录制\n  - 关闭：息屏10秒后自动停止录制\n  - 亮屏10秒后自动恢复录制\n\n• 定时保活：每15分钟唤醒保持活跃\n\n• 防止休眠：阻止系统深度休眠\n  - 开启后熄火也能接收远程消息\n  - 会增加电瓶功耗，按需开启\n\n• 悬浮窗：显示悬浮录制按钮"
+                android:text="录制\n\n• 视频流配置：选择用哪几路视频流。「环视合成流」是车机拼好的一路 360° 画面（本应用的主功能）；「环视+座舱3路」再加上后排与驾驶位\n\n• 录制画面排列：\n  - 四宫格：录出来就是 2x2，所见即所得\n  - 原始长条：直接录车机的合成流，四个画面竖向排列。四宫格出问题时可退回这个\n\n• 录制帧率：选「原始帧率」跟随录制链路的默认值，其余为固定帧率\n\n• 分段时长：每段视频的最大长度。分段越短，单个文件越小，也越好分享\n\n• 录制码率：分辨率由视频流探测结果决定，不需要手动设置\n\n• 角标：在保存的视频/图片左上角加时间水印，可附带录制规格。只影响存下来的文件，预览里不显示\n\n存储\n\n• 存储位置：建议用 U 盘。行车记录是持续不断的写入，长期写内置存储会消耗闪存寿命，而车机存储通常换不了\n\n• 中转写入：先写内置存储，分段完成后再异步搬到 U 盘。U 盘速度不稳时可减少丢帧\n\n• 存储自动清理：视频和图片分别设上限，超了先删最早的。留空或填 0 表示不限制\n\n超级后视镜\n\n• 把环视里的一路单独放大成悬浮窗，后视那一路左右镜像，和真正的后视镜一致；前视、侧视不翻\n\n• 手势（把窗口横向分成三份）：\n  - 左右三分之一：拖动窗口\n  - 中间三分之一上下滑：调取景高低\n  - 中间三分之一左右划：换一路（右滑顺时针 后→左→前→右）\n  - 双指：以两指中点为锚缩放，同时可以挪位置\n  - 推出屏幕一半或朝边上甩一下：贴边隐藏\n  - 贴边后点一下、或往回拉一下：滑回来\n\n• 只显示前后视：左右划只在后视和前视之间来回\n\n• 窗口尺寸：宽高各自可拉到整块屏幕。画面比例不会跟着变 —— 框的形状只决定看到多大一块\n\n• 鱼眼校正：把鱼眼镜头的桶形畸变拉直。只改显示，录下来的原始画面不动\n\n悬浮窗\n\n• 悬浮窗：在其他应用之上显示画面\n\n• 录制悬浮按钮：随时开始/停止录制\n\n• 录制状态显示：录制时在画面角上显示时长和分段数\n\n系统\n\n• 开机自启动：系统启动后自动运行（默认关）\n\n• 启动自动录制：应用启动后自动开始录制，从后台回到前台时也会恢复\n\n• 息屏录制：需要先开启动自动录制。开启后息屏（锁车黑屏）仍继续录\n\n• 定时保活 / 防止休眠：让应用在后台不被系统回收。防止休眠会增加电瓶消耗，按需开启\n\n• 权限设置：管理应用所需的各项权限"
                 android:textColor="@color/text_secondary"
                 android:textSize="16sp"
                 android:lineSpacingExtra="4dp" />

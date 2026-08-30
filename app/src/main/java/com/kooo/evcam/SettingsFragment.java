@@ -2014,30 +2014,24 @@ public class SettingsFragment extends Fragment {
                     return;
                 }
 
-                updateStorageLocationDescriptionAsync(newLocation);
                 
                 // 注意：不能只比较 internal/external_sd —— 在两个外置卷之间切换时
                 // newLocation 是一样的，那样会被当成"没变化"直接 return。
                 boolean sameAsBefore = newLocation.equals(lastAppliedStorageLocation)
                         && AppConfig.STORAGE_INTERNAL.equals(newLocation);
                 if (sameAsBefore) {
+                    updateStorageLocationDescriptionAsync(newLocation);
                     return;
                 }
 
-                lastAppliedStorageLocation = newLocation;
-                appConfig.setStorageLocation(newLocation);
-                
-                // 更新中转写入开关的可见性
-                updateRelayWriteVisibility();
-                
-                if (getContext() != null) {
-                    Toast.makeText(getContext(), "存储位置已切换为「" + locationName + "」", Toast.LENGTH_SHORT).show();
-                    // 异步获取路径描述
-                    new Thread(() -> {
-                        String pathDesc = StorageHelper.getCurrentStoragePathDesc(getContext());
-                        AppLog.d("SettingsFragment", "存储位置已切换为: " + newLocation + "，路径: " + pathDesc);
-                    }).start();
+                // 改用内置存储要先问一声：行车记录是持续不断的大量写入，
+                // 而闪存的写入寿命有限。这不是顺手点错就该生效的选择。
+                if (AppConfig.STORAGE_INTERNAL.equals(newLocation) && getContext() != null) {
+                    confirmInternalStorage();
+                    return;
                 }
+
+                applyStorageLocation(newLocation, locationName);
             }
             
             @Override
@@ -2190,6 +2184,65 @@ public class SettingsFragment extends Fragment {
      * 异步更新存储位置描述文字
      * 避免在主线程执行文件系统 I/O 操作导致卡顿
      */
+    /**
+     * 落实存储位置的切换。
+     *
+     * <p>从监听器里抽出来，是因为确认弹窗要在用户点「继续」之后走同一条路 ——
+     * 两个入口共用一段代码，才不会出现「弹窗那条路少做了一步」。</p>
+     */
+    private void applyStorageLocation(String newLocation, String locationName) {
+        lastAppliedStorageLocation = newLocation;
+        appConfig.setStorageLocation(newLocation);
+        updateStorageLocationDescriptionAsync(newLocation);
+        updateRelayWriteVisibility();
+
+        if (getContext() != null) {
+            Toast.makeText(getContext(),
+                    "存储位置已切换为「" + locationName + "」", Toast.LENGTH_SHORT).show();
+            new Thread(() -> {
+                String pathDesc = StorageHelper.getCurrentStoragePathDesc(getContext());
+                AppLog.d("SettingsFragment", "存储位置已切换为: " + newLocation + "，路径: " + pathDesc);
+            }).start();
+        }
+    }
+
+    /**
+     * 换成内置存储之前先把代价说清楚。
+     *
+     * <p>行车记录仪是<b>一直在写</b>的：只要在录，数据就在往下落。
+     * 闪存的写入寿命有限，长期拿车机内置存储当记录仪的落盘位置会实打实地消耗它，
+     * 而车机存储通常换不了。所以做成必须明确点确认才生效，取消则把选择拨回去。</p>
+     */
+    private void confirmInternalStorage() {
+        new android.app.AlertDialog.Builder(getContext())
+                .setTitle("确定用内置存储？")
+                .setMessage("行车记录会持续不断地写入数据 —— 只要在录，就一直在写。\n\n"
+                        + "闪存的写入寿命是有限的，长期把车机内置存储当作记录仪的落盘位置，"
+                        + "会实打实地消耗它的寿命，而车机存储通常是不可更换的。\n\n"
+                        + "建议改用 U 盘：坏了随时能换，也方便直接拔下来拷走。")
+                .setPositiveButton("仍然使用内置存储", (dialog, which) ->
+                        applyStorageLocation(AppConfig.STORAGE_INTERNAL, "内部存储"))
+                .setNegativeButton("取消", (dialog, which) -> revertStorageSelection())
+                .setOnCancelListener(dialog -> revertStorageSelection())
+                .show();
+    }
+
+    /** 取消之后把下拉框拨回当前真正生效的那一项。 */
+    private void revertStorageSelection() {
+        if (storageLocationSpinner == null || appConfig == null) {
+            return;
+        }
+        int target = appConfig.isUsingExternalSdCard()
+                && storageLocationSpinner.getCount() > 1 ? 1 : 0;
+        // 这一拨会再次触发监听器，用初始化标志挡掉，免得弹窗套弹窗
+        isInitializingStorageLocation = true;
+        storageLocationSpinner.setSelection(target);
+        storageLocationSpinner.post(() -> isInitializingStorageLocation = false);
+        // 拨回去的那次回调被上面的标志挡掉了，描述文字得自己补一次
+        updateStorageLocationDescriptionAsync(appConfig.getStorageLocation());
+    }
+
+
     private void updateStorageLocationDescriptionAsync(String location) {
         if (storageLocationDescText == null || getContext() == null) {
             return;

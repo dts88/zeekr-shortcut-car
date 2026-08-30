@@ -886,7 +886,7 @@ public class MultiCameraManager {
         }
         
         // 获取帧率配置（来自「录制帧率」设置）
-        int targetFrameRate = appConfig.getActualFrameRate(25);  // 使用25fps降低CPU占用
+        int targetFrameRate = appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS);  // 压低 CPU 占用
         AppLog.d(TAG, "Target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
         // 第一步：准备所有 MediaRecorder（但不启动）
@@ -1190,7 +1190,7 @@ public class MultiCameraManager {
         }
         
         // 获取帧率配置（来自「录制帧率」设置）
-        int targetFrameRate = appConfig.getActualFrameRate(25);  // 使用25fps降低CPU占用
+        int targetFrameRate = appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS);  // 压低 CPU 占用
         AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
         // 清理之前的软编码录制器
@@ -1625,8 +1625,8 @@ public class MultiCameraManager {
             // 设置录制参数
             AppConfig appConfig = new AppConfig(context);
             codecRecorder.setSegmentDuration(appConfig.getSegmentDurationMs());
-            codecRecorder.setBitRate(appConfig.getActualBitrate(previewSize.getWidth(), previewSize.getHeight(), 25));  // 使用25fps降低CPU占用
-            codecRecorder.setFrameRate(appConfig.getActualFrameRate(25));  // 使用25fps降低CPU占用
+            codecRecorder.setBitRate(appConfig.getActualBitrate(previewSize.getWidth(), previewSize.getHeight(), 25));  // 压低 CPU 占用
+            codecRecorder.setFrameRate(appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS));  // 压低 CPU 占用
             codecRecorder.setQualityLevel(3);  // 设置最高画质
             codecRecorder.setForceH264(appConfig.isForceH264Encoding());
             codecRecorder.setWatermarkEnabled(appConfig.isTimestampWatermarkEnabled());
