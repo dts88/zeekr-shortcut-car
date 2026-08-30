@@ -462,6 +462,26 @@ public class StorageHelper {
      * @param context 上下文
      * @return U盘根目录，如果没有则返回 null
      */
+    /**
+     * 录像实际上会不会落在内置存储上。
+     *
+     * <p>两种情况都算：选的就是内置存储，或者选了 U 盘但盘不在
+     * （那时会回退到内置，见 {@code getStorageDir}）。</p>
+     *
+     * <p>后一种尤其值得提醒 —— 用户以为在写 U 盘，实际在写车机闪存，
+     * 而这是个不声不响就发生的降级。</p>
+     */
+    public static boolean willRecordToInternal(Context context) {
+        if (context == null) {
+            return false;
+        }
+        if (!new AppConfig(context).isUsingExternalSdCard()) {
+            return true;
+        }
+        // 选了 U 盘但盘不在，走的是 getStorageDir 里那条回退分支
+        return isSdCardFallback(context);
+    }
+
     public static File getExternalSdCardRoot(Context context) {
         if (context == null) {
             return null;

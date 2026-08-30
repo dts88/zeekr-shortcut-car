@@ -3349,6 +3349,33 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 切换录制状态（开始/停止）
      */
+    /**
+     * 录到内置存储之前先提醒一次。
+     *
+     * <p>只挡<b>手动开始</b>：自动录制（开机、回前台、远程唤醒）不弹，
+     * 那些场景没人在看屏幕，一个等着点确定的弹窗只会让记录仪根本不录 ——
+     * 那比写内置存储糟得多。自动路径改用一条 Toast 提示。</p>
+     */
+    private void confirmInternalStorageThen(Runnable onProceed) {
+        if (!StorageHelper.willRecordToInternal(this)) {
+            onProceed.run();
+            return;
+        }
+        boolean chosen = !new AppConfig(this).isUsingExternalSdCard();
+        String why = chosen
+                ? "当前设置的存储位置就是内置存储。"
+                : "选的是 U 盘，但现在没检测到，录像会落到内置存储。";
+        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle("将录制到内置存储")
+                .setMessage(why + "\n\n"
+                        + "行车记录会持续不断地写入数据，而闪存的写入寿命有限，"
+                        + "长期这样用会消耗车机存储的寿命，且车机存储通常不可更换。\n\n"
+                        + "建议插入 U 盘并在设置里选中它。")
+                .setPositiveButton("仍然录制", (dialog, which) -> onProceed.run())
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
     private void toggleRecording() {
         // 防双击保护
         long currentTime = System.currentTimeMillis();
@@ -3373,7 +3400,7 @@ public class MainActivity extends AppCompatActivity {
             // 这样后续如果录制异常停止，可以自动恢复
             isManuallyStoppedRecording = false;
             AppLog.d(TAG, "用户手动开始录制，自动录制检查已启用");
-            startRecording();
+            confirmInternalStorageThen(this::startRecording);
         }
     }
 

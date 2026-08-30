@@ -723,6 +723,27 @@ public class AppConfig {
      * @param frameRate 帧率
      * @return 实际码率（bps）
      */
+    /**
+     * 码率等级换算成编码器的画质档。
+     *
+     * <p>以前两处调用都写死 {@code setQualityLevel(3)}，而设置里的低/中/高
+     * 只在「强制 H.264」时才被读到 —— 也就是说正常的 HEVC 路径下，
+     * 那个下拉框<b>完全不起作用</b>，录出来永远是最高档。</p>
+     *
+     * <p>这正是这个项目反复出现的那类问题：界面上给了一个选择，实际不生效。</p>
+     */
+    public int getEncoderQualityLevel() {
+        switch (getBitrateLevel()) {
+            case BITRATE_LOW:
+                return 1;
+            case BITRATE_HIGH:
+                return 3;
+            case BITRATE_MEDIUM:
+            default:
+                return 2;
+        }
+    }
+
     public int getActualBitrate(int width, int height, int frameRate) {
         int baseBitrate = calculateBitrate(width, height, frameRate);
         String level = getBitrateLevel();

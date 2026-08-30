@@ -1290,7 +1290,8 @@ public class MultiCameraManager {
             codecRecorder.setSegmentDuration(segmentDurationMs);
             codecRecorder.setBitRate(bitrate);
             codecRecorder.setFrameRate(targetFrameRate);
-            codecRecorder.setQualityLevel(3);  // 设置最高画质
+            // 跟随设置里的码率等级。写死 3 的话那个下拉框就是个摆设
+            codecRecorder.setQualityLevel(new AppConfig(context).getEncoderQualityLevel());
             codecRecorder.setForceH264(appConfig.isForceH264Encoding());
 
             AppLog.d(TAG, "Codec recording params for " + key + ": " +
@@ -1629,7 +1630,8 @@ public class MultiCameraManager {
             codecRecorder.setSegmentDuration(appConfig.getSegmentDurationMs());
             codecRecorder.setBitRate(appConfig.getActualBitrate(previewSize.getWidth(), previewSize.getHeight(), 25));  // 压低 CPU 占用
             codecRecorder.setFrameRate(appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS));  // 压低 CPU 占用
-            codecRecorder.setQualityLevel(3);  // 设置最高画质
+            // 跟随设置里的码率等级。写死 3 的话那个下拉框就是个摆设
+            codecRecorder.setQualityLevel(new AppConfig(context).getEncoderQualityLevel());
             codecRecorder.setForceH264(appConfig.isForceH264Encoding());
             codecRecorder.setWatermarkEnabled(appConfig.isTimestampWatermarkEnabled());
             codecRecorder.setWatermarkSpecEnabled(appConfig.isWatermarkSpecEnabled());
