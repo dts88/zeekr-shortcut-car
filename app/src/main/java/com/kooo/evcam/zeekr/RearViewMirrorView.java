@@ -38,6 +38,8 @@ import com.kooo.evcam.AutoFitTextureView;
  *
  * <p>横向分三段，规则见 {@link RearViewTouchModel}：左右三分之一拖动窗口，
  * 中间三分之一上下滑调整取景范围（窗口不动）。双指缩放窗口大小，拖到边缘自动贴边。</p>
+ *
+ * <p>画面做<b>左右镜像</b>，和真正的后视镜一致；预览、录制、回放都不受影响。</p>
  */
 public class RearViewMirrorView extends ViewGroup {
 
@@ -55,6 +57,12 @@ public class RearViewMirrorView extends ViewGroup {
      * 所以贴边隐藏一次都没触发过。</p>
      */
     private static final int DOCK_THRESHOLD_PX = PEEK_WIDTH_PX + 80;
+
+    // 贴边还有第二个前提，和上面这个阈值同样必要：窗口必须被允许探出屏幕。
+    //
+    // 没有 FLAG_LAYOUT_NO_LIMITS 的话，WindowManager 会把悬浮窗按回显示区域内 ——
+    // 这边算得再准，x 一提交就被改回去，窗口根本出不去，于是「拖到边缘」永远没反应。
+    // 之前只修了阈值，漏了这一条，所以贴边看起来还是坏的。
     /** 超过这个位移才算拖动，避免点一下就漂移。 */
     private static final int DRAG_SLOP_PX = 12;
     /** 按住多久算长按（进出取景调整模式）。 */
@@ -162,7 +170,8 @@ public class RearViewMirrorView extends ViewGroup {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                         ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         : WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
 
@@ -270,6 +279,14 @@ public class RearViewMirrorView extends ViewGroup {
                         RearViewGeometry.Crop.full())
                 : RearViewGeometry.combinedSourceRect(plan, laneIndex, crop);
 
+        // 左右镜像。后视镜照出来的本来就是反的 —— 看到有车从画面右侧靠近，
+        // 手就该往左让，这个对应关系是开车时的肌肉记忆，不镜像会反过来。
+        //
+        // 只作用于这个悬浮窗：预览、录制、回放拿到的都还是原始画面，
+        // 镜像是「怎么看」的问题，不是「存什么」的问题。
+        int mirrorSave = canvas.save();
+        canvas.scale(-1f, 1f, width / 2f, height / 2f);
+
         if (fisheyeCorrection) {
             drawCorrected(canvas, width, height,
                     framingMode ? RearViewGeometry.Crop.full() : crop);
@@ -289,6 +306,10 @@ public class RearViewMirrorView extends ViewGroup {
             canvas.restoreToCount(save);
         }
 
+        canvas.restoreToCount(mirrorSave);
+
+        // 取景框画在镜像之外：框是用来操作的，跟手的方向必须和手指一致，
+        // 跟着画面一起翻会变成「往右拖、框往左走」。
         if (framingMode) {
             drawFramingOverlay(canvas, width, height);
         }

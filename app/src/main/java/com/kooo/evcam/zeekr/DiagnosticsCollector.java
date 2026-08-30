@@ -65,6 +65,7 @@ public final class DiagnosticsCollector {
         appendConfig(sb, context);
         appendFloatingLayout(sb, context);
         PlaybackCapabilityProbe.appendTo(sb, context);
+        VehicleEnumeration.appendTo(sb, context);
         appendLogcat(sb);
 
         sb.append('\n').append("===== 报告结束 =====").append('\n');
