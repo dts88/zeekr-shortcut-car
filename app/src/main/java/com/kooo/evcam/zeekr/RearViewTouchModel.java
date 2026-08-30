@@ -48,6 +48,95 @@ public final class RearViewTouchModel {
         return (x >= third && x < third * 2f) ? Zone.ADJUST_CROP : Zone.MOVE_WINDOW;
     }
 
+    /**
+     * 现在是不是贴着边、贴的哪一边。
+     *
+     * <p>不额外存状态，直接看位置 —— 有一部分在屏幕外就是贴边了。
+     * 存一个「已贴边」的布尔量迟早会和实际位置对不上。</p>
+     */
+    public static Dock dockedAt(int x, int width, int screenW) {
+        if (width <= 0 || screenW <= 0) {
+            return Dock.NONE;
+        }
+        if (x < 0) {
+            return Dock.LEFT;
+        }
+        if (x + width > screenW) {
+            return Dock.RIGHT;
+        }
+        return Dock.NONE;
+    }
+
+    /**
+     * 放回来之后该停在哪：<b>整个滑进屏幕，贴着刚才藏进去的那条边</b>。
+     *
+     * <p>不是回到贴边前的位置 —— 那个位置多半就在边上一点点，
+     * 放回来还是半吊子。贴着边是个明确、可预期的落点。</p>
+     */
+    public static int flushX(Dock dock, int width, int screenW) {
+        switch (dock) {
+            case LEFT:
+                return 0;
+            case RIGHT:
+                return screenW - width;
+            default:
+                return 0;
+        }
+    }
+
+    /**
+     * 贴边之后，这一下拖动算不算「要把它拉回来」。
+     *
+     * <p>门槛比贴边低得多，而且是<b>固定像素</b>而不是窗口宽度的比例。
+     * 贴边用比例是对的：推出去一半才算数，不容易误触发。
+     * 但反过来用比例就荒唐了 —— 窗口越大越难拉回来，
+     * 而一个大窗口恰恰是最想拉回来的那个。</p>
+     *
+     * <p>藏起来的东西要容易拿回来，代价只是偶尔多滑一次；
+     * 而藏错了却拿不回来，那是个死结。两边的代价不对称，门槛也就不该对称。</p>
+     *
+     * @param dx 总横向位移（像素，向右为正）
+     */
+    public static boolean shouldUndock(Dock dock, float dx, float velocityX,
+                                       int minDistancePx, float minFlingVelocity) {
+        if (dock == Dock.NONE) {
+            return false;
+        }
+        // 往屏幕里边拉才算：右边贴着的要往左拉，左边贴着的要往右拉
+        float inward = dock == Dock.RIGHT ? -dx : dx;
+        float inwardVelocity = dock == Dock.RIGHT ? -velocityX : velocityX;
+        if (inward >= minDistancePx) {
+            return true;
+        }
+        return minFlingVelocity > 0 && inwardVelocity >= minFlingVelocity;
+    }
+
+    /**
+     * 滑回去要用多久。
+     *
+     * <p>甩得越快回得越快 —— 手上使了多大劲，画面就该多快跟上，
+     * 不然会觉得「它没听我的」。没有甩动时按一个中庸的速度走。</p>
+     *
+     * @param distancePx      要走的距离
+     * @param velocityPxPerSec 松手时的速度绝对值；0 表示不是甩动
+     */
+    public static long glideDurationMs(int distancePx, float velocityPxPerSec,
+                                       long minMs, long maxMs) {
+        int distance = Math.abs(distancePx);
+        if (distance == 0) {
+            return minMs;
+        }
+        float speed = Math.abs(velocityPxPerSec);
+        if (speed < 1f) {
+            speed = DEFAULT_GLIDE_SPEED;
+        }
+        long duration = (long) (distance * 1000f / speed);
+        return Math.max(minMs, Math.min(maxMs, duration));
+    }
+
+    /** 没有甩动时的滑回速度（px/s）。 */
+    private static final float DEFAULT_GLIDE_SPEED = 2600f;
+
     /** 双指缩放的结果：新的位置与尺寸。 */
     public static final class PinchResult {
         public final int x;

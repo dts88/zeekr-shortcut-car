@@ -1,5 +1,8 @@
 package com.kooo.evcam.zeekr;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -12,6 +15,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -38,7 +42,7 @@ import com.kooo.evcam.AutoFitTextureView;
  * <h3>手势</h3>
  *
  * <p>横向分三段，规则见 {@link RearViewTouchModel}：左右三分之一拖动窗口，
- * 中间三分之一上下滑调整取景高低、左右划切换显示哪一路（窗口不动）。双指缩放窗口大小，推出屏幕一半或朝边上甩一下即贴边隐藏。</p>
+ * 中间三分之一上下滑调整取景高低、左右划切换显示哪一路（窗口不动）。双指缩放窗口大小，推出屏幕一半或朝边上甩一下即贴边隐藏；贴边后点一下、或往回拉一下就滑回来。</p>
  *
  * <p>显示框可以拉成任意宽高，但<b>画面比例永远不变</b>：框的形状决定看到多大一块，
  * 不决定画面被拉成什么样。</p>
@@ -64,6 +68,16 @@ public class RearViewMirrorView extends ViewGroup {
     private static final int DRAG_SLOP_PX = 12;
     /** 横向划多远算「明确要换一路」。 */
     private static final int LANE_SWIPE_MIN_PX = 90;
+    /**
+     * 贴边之后往回拉多少算「要拿回来」。
+     *
+     * <p>固定像素，不按窗口宽度取比例 —— 按比例的话窗口越大越难拉回来，
+     * 而大窗口恰恰是最想拿回来的那个。</p>
+     */
+    private static final int UNDOCK_MIN_PX = 60;
+    /** 滑回屏幕的时长范围。 */
+    private static final long GLIDE_MIN_MS = 120L;
+    private static final long GLIDE_MAX_MS = 380L;
 
     private final WindowManager windowManager;
     private final AppConfig appConfig;
@@ -90,6 +104,8 @@ public class RearViewMirrorView extends ViewGroup {
     private Boolean horizontalDrag;
     private float lastDx;
     private float lastDy;
+    /** 滑回屏幕的动画。新的手势一来就取消，免得和手指抢位置。 */
+    private ValueAnimator glide;
     /** 鱼眼校正开关与目标视野，进入时读一次，设置页改了再推过来。 */
     private boolean fisheyeCorrection;
     private float fovDegrees;
@@ -192,6 +208,7 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     public void hide() {
+        cancelGlide();
         if (!attached) {
             return;
         }
@@ -375,6 +392,7 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     private void beginTouch(MotionEvent event) {
+        cancelGlide();
         activeZone = RearViewTouchModel.zoneFor(event.getX(), getWidth());
         touchStartX = event.getRawX();
         touchStartY = event.getRawY();
@@ -506,6 +524,15 @@ public class RearViewMirrorView extends ViewGroup {
 
     private void endTouch(float velocityX) {
         if (!dragging && !pinching) {
+            // 贴着边的时候点一下就是「拿回来」—— 那时候屏幕上只剩一条窄边，
+            // 除了把它拉回来也没别的可做，不该还要求先拖一段
+            if (params != null) {
+                RearViewTouchModel.Dock docked = RearViewTouchModel.dockedAt(
+                        params.x, params.width, screenWidth());
+                if (docked != RearViewTouchModel.Dock.NONE) {
+                    glideTo(RearViewTouchModel.flushX(docked, params.width, screenWidth()), 0f);
+                }
+            }
             return;
         }
 
@@ -520,23 +547,104 @@ public class RearViewMirrorView extends ViewGroup {
                 appConfig.setRearViewPan(pan);
             }
         } else if (params != null && (dragging || pinching)) {
-            // 只有「明显是想收起来」才贴边：推出去一半，或者朝边上甩一下。
-            // 窗口还整个在屏幕里的话一定不贴边 —— 以前是按「离边多近」判断的，
-            // 于是画面明明还完整可见就被吸走了。
-            RearViewTouchModel.Dock dock = RearViewTouchModel.deliberateDock(
-                    params.x, params.width, screenWidth(), velocityX, minFlingVelocity);
-            if (dock != RearViewTouchModel.Dock.NONE) {
-                params.x = RearViewTouchModel.dockedX(
-                        dock, params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
-                applyLayout();
-                AppLog.d(TAG, "后视镜已贴边: " + dock + "，露出 " + PEEK_WIDTH_PX + "px");
-            }
-            appConfig.setRearViewPosition(params.x, params.y);
-            appConfig.setRearViewSize(params.width, params.height,
-                    screenWidth(), screenHeight());
+            settleAfterDrag(velocityX);
         }
         dragging = false;
         pinching = false;
+    }
+
+    /**
+     * 松手之后停在哪。
+     *
+     * <p>只有三种落点：<b>贴边</b>、<b>整个在屏幕里</b>、或者<b>原样贴回去</b>。
+     * 以前还有第四种 —— 半截露在外面停着，那是拖到哪算哪，看着就像没做完。</p>
+     *
+     * <p>贴边和取回来用的是<b>不对称</b>的门槛：推出去要够狠（一半宽度或甩一下），
+     * 拿回来只要 {@link #UNDOCK_MIN_PX} 像素或往回甩一下。
+     * 藏错了拿不回来是个死结，而多滑一次只是麻烦 —— 代价不对称，门槛就不该对称。</p>
+     */
+    private void settleAfterDrag(float velocityX) {
+        int screenW = screenWidth();
+        RearViewTouchModel.Dock wasDocked = RearViewTouchModel.dockedAt(
+                windowStartX, params.width, screenW);
+
+        if (wasDocked != RearViewTouchModel.Dock.NONE) {
+            if (RearViewTouchModel.shouldUndock(wasDocked, lastDx, velocityX,
+                    UNDOCK_MIN_PX, minFlingVelocity)) {
+                glideTo(RearViewTouchModel.flushX(wasDocked, params.width, screenW), velocityX);
+            } else {
+                // 没拉够就贴回去，而不是停在中间
+                glideTo(RearViewTouchModel.dockedX(
+                        wasDocked, params.x, params.width, screenW, PEEK_WIDTH_PX), velocityX);
+            }
+            savePosition();
+            return;
+        }
+
+        RearViewTouchModel.Dock dock = RearViewTouchModel.deliberateDock(
+                params.x, params.width, screenW, velocityX, minFlingVelocity);
+        if (dock != RearViewTouchModel.Dock.NONE) {
+            glideTo(RearViewTouchModel.dockedX(
+                    dock, params.x, params.width, screenW, PEEK_WIDTH_PX), velocityX);
+            AppLog.d(TAG, "后视镜贴边: " + dock + "，露出 " + PEEK_WIDTH_PX + "px");
+        } else {
+            // 没到贴边的程度就整个收回屏幕里，不留半截在外面
+            int onScreen = Math.max(0, Math.min(screenW - params.width, params.x));
+            if (onScreen != params.x) {
+                glideTo(onScreen, velocityX);
+            }
+        }
+        savePosition();
+    }
+
+    private void savePosition() {
+        appConfig.setRearViewPosition(params.x, params.y);
+        appConfig.setRearViewSize(params.width, params.height,
+                screenWidth(), screenHeight());
+    }
+
+    /**
+     * 横向滑到目标位置。
+     *
+     * <p>用动画而不是直接跳过去：跳过去看不出它从哪来、去了哪，
+     * 尤其贴边只露一条窄边时，会像是凭空冒出来的。</p>
+     *
+     * <p>时长跟着甩动速度走 —— 手上使了多大劲，画面就该多快跟上。</p>
+     */
+    private void glideTo(int targetX, float velocityX) {
+        if (params == null || targetX == params.x) {
+            return;
+        }
+        cancelGlide();
+        final int from = params.x;
+        long duration = RearViewTouchModel.glideDurationMs(
+                targetX - from, velocityX, GLIDE_MIN_MS, GLIDE_MAX_MS);
+
+        glide = ValueAnimator.ofInt(from, targetX);
+        glide.setDuration(duration);
+        glide.setInterpolator(new DecelerateInterpolator());
+        glide.addUpdateListener(animation -> {
+            if (params == null) {
+                return;
+            }
+            params.x = (Integer) animation.getAnimatedValue();
+            applyLayout();
+        });
+        glide.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                glide = null;
+                savePosition();
+            }
+        });
+        glide.start();
+    }
+
+    private void cancelGlide() {
+        if (glide != null) {
+            glide.cancel();
+            glide = null;
+        }
     }
 
     private static float spanOf(MotionEvent event) {

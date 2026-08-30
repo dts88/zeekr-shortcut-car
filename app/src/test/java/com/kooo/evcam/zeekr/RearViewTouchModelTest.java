@@ -258,6 +258,134 @@ public class RearViewTouchModelTest {
                 RearViewTouchModel.Dock.NONE, 1234, 480, 3200, 60));
     }
 
+    // ---------- 贴边之后怎么拿回来 ----------
+
+    @Test
+    public void aWindowHangingOffAnEdgeCountsAsDocked() {
+        assertEquals(RearViewTouchModel.Dock.RIGHT,
+                RearViewTouchModel.dockedAt(SCREEN - 72, WIDTH, SCREEN));
+        assertEquals(RearViewTouchModel.Dock.LEFT,
+                RearViewTouchModel.dockedAt(72 - WIDTH, WIDTH, SCREEN));
+    }
+
+    @Test
+    public void aFullyVisibleWindowIsNotDocked() {
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                RearViewTouchModel.dockedAt(0, WIDTH, SCREEN));
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                RearViewTouchModel.dockedAt(SCREEN - WIDTH, WIDTH, SCREEN));
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                RearViewTouchModel.dockedAt(1000, WIDTH, SCREEN));
+    }
+
+    /** 放回来就是整个进屏幕、贴着刚才藏进去的那条边。 */
+    @Test
+    public void restoringLandsFlushAgainstTheEdgeItHidBehind() {
+        assertEquals(0, RearViewTouchModel.flushX(
+                RearViewTouchModel.Dock.LEFT, WIDTH, SCREEN));
+        assertEquals(SCREEN - WIDTH, RearViewTouchModel.flushX(
+                RearViewTouchModel.Dock.RIGHT, WIDTH, SCREEN));
+
+        // 落点必须是完整可见的，否则等于没放回来
+        for (RearViewTouchModel.Dock dock : new RearViewTouchModel.Dock[]{
+                RearViewTouchModel.Dock.LEFT, RearViewTouchModel.Dock.RIGHT}) {
+            int x = RearViewTouchModel.flushX(dock, WIDTH, SCREEN);
+            assertEquals(RearViewTouchModel.Dock.NONE,
+                    RearViewTouchModel.dockedAt(x, WIDTH, SCREEN));
+        }
+    }
+
+    /**
+     * 关键的一条：拿回来的门槛远低于藏进去的门槛。
+     *
+     * <p>推出去要一半宽度（480px 的窗口是 240px），拉回来只要 60px ——
+     * 而且是固定像素，窗口再大也不会更难拉。</p>
+     */
+    @Test
+    public void pullingBackIsFarEasierThanPushingAway() {
+        assertTrue("往回拉 60px 就该放回来",
+                RearViewTouchModel.shouldUndock(
+                        RearViewTouchModel.Dock.RIGHT, -60, 0f, 60, MIN_FLING));
+        assertTrue(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.LEFT, 60, 0f, 60, MIN_FLING));
+
+        // 同样这点位移，远不足以把它推出去
+        assertEquals(RearViewTouchModel.Dock.NONE,
+                RearViewTouchModel.deliberateDock(60, WIDTH, SCREEN, 0f, MIN_FLING));
+    }
+
+    /** 窗口越大越难拉回来是不能接受的，所以门槛与宽度无关。 */
+    @Test
+    public void theUndockThresholdIsIndependentOfWindowSize() {
+        for (int width : new int[]{240, 900, 2000, 3000}) {
+            assertTrue("宽 " + width + " 时也该拉得回来",
+                    RearViewTouchModel.shouldUndock(
+                            RearViewTouchModel.Dock.RIGHT, -60, 0f, 60, MIN_FLING));
+        }
+    }
+
+    /** 往回甩一下也算，不必拉够距离。 */
+    @Test
+    public void anInwardFlickAlsoRestoresIt() {
+        assertTrue(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.RIGHT, -10, -MIN_FLING, 60, MIN_FLING));
+        assertTrue(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.LEFT, 10, MIN_FLING, 60, MIN_FLING));
+    }
+
+    /** 往外推、或者没动，不该放回来。 */
+    @Test
+    public void pushingFurtherOutDoesNotRestoreIt() {
+        assertFalse(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.RIGHT, 200, MIN_FLING * 3, 60, MIN_FLING));
+        assertFalse(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.LEFT, -200, -MIN_FLING * 3, 60, MIN_FLING));
+        assertFalse(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.RIGHT, -10, 0f, 60, MIN_FLING));
+    }
+
+    @Test
+    public void anUndockedWindowHasNothingToRestore() {
+        assertFalse(RearViewTouchModel.shouldUndock(
+                RearViewTouchModel.Dock.NONE, -500, -MIN_FLING * 5, 60, MIN_FLING));
+    }
+
+    // ---------- 滑回去用多久 ----------
+
+    /** 甩得越快回得越快 —— 手上使了多大劲，画面就该多快跟上。 */
+    @Test
+    public void aFasterFlickGlidesBackSooner() {
+        long slow = RearViewTouchModel.glideDurationMs(800, 1000f, 120, 380);
+        long fast = RearViewTouchModel.glideDurationMs(800, 6000f, 120, 380);
+        assertTrue("甩得快应当更快到位，slow=" + slow + " fast=" + fast, fast < slow);
+    }
+
+    /** 距离越远走得越久，但都夹在一个能看清的范围里。 */
+    @Test
+    public void glideDurationStaysWithinAUsableRange() {
+        for (int distance : new int[]{0, 1, 60, 500, 3000}) {
+            for (float velocity : new float[]{0f, 500f, 4000f, 40000f}) {
+                long duration = RearViewTouchModel.glideDurationMs(distance, velocity, 120, 380);
+                assertTrue("太短: " + duration, duration >= 120);
+                assertTrue("太长: " + duration, duration <= 380);
+            }
+        }
+    }
+
+    /** 没有甩动时也得有个合理的速度，不能因为 velocity=0 就算出无穷久。 */
+    @Test
+    public void aTapRestoreStillGlidesAtASensibleSpeed() {
+        long duration = RearViewTouchModel.glideDurationMs(600, 0f, 120, 380);
+        assertTrue(duration >= 120 && duration <= 380);
+    }
+
+    /** 方向不影响时长，只有距离和速度影响。 */
+    @Test
+    public void glideDurationIgnoresDirection() {
+        assertEquals(RearViewTouchModel.glideDurationMs(700, 3000f, 120, 380),
+                RearViewTouchModel.glideDurationMs(-700, -3000f, 120, 380));
+    }
+
     // ---------- 双指缩放窗口 ----------
 
     private static final int SCREEN_W = 3200;
