@@ -185,34 +185,6 @@ public final class SettingsDialogs {
                 .show();
     }
 
-    static void showUsageGuideDialog(Context context, AppConfig config) {
-        if (context == null) return;
-
-        // 创建自定义对话框
-        android.app.Dialog dialog = new android.app.Dialog(context);
-        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_first_launch_guide);
-        dialog.setCancelable(true);
-
-        // 设置对话框窗口属性
-        android.view.Window window = dialog.getWindow();
-        if (window != null) {
-            // 设置背景透明（让圆角生效）
-            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-            // 设置对话框宽度
-            android.view.WindowManager.LayoutParams params = window.getAttributes();
-            params.width = (int) (context.getResources().getDisplayMetrics().widthPixels * 0.85);
-            window.setAttributes(params);
-        }
-
-        // 加载二维码图片
-
-        // 设置确认按钮点击事件
-        dialog.findViewById(R.id.btn_confirm).setOnClickListener(v -> dialog.dismiss());
-
-        dialog.show();
-    }
-
     static void showDeviceNicknameInputDialog(Context context, AppConfig config) {
         if (context == null) return;
         

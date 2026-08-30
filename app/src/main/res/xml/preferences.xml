@@ -54,10 +54,20 @@
             android:title="录制摄像头"
             android:dialogTitle="选择参与录制的视频流（不影响拍照）" />
 
-        <Preference
+        <ListPreference
             android:key="pref_resolution"
-            android:title="分辨率与码率"
-            android:summary="分辨率由视频流探测结果决定" />
+            android:title="录制分辨率"
+            android:summary="%s" />
+
+        <ListPreference
+            android:key="pref_bitrate"
+            android:title="录制码率"
+            android:summary="%s" />
+
+        <Preference
+            android:key="pref_hardware_info"
+            android:title="视频流探测结果"
+            android:selectable="false" />
 
         <SwitchPreferenceCompat
             android:key="pref_watermark"
@@ -264,6 +274,15 @@
             android:summary="%s" />
 
         <Preference
+            android:key="pref_image_adjust"
+            android:title="亮度 / 降噪调节"
+            android:summary="打开调节窗口，实时改画面参数" />
+
+        <Preference
+            android:key="pref_image_adjust_reset"
+            android:title="恢复亮度 / 降噪默认值" />
+
+        <Preference
             android:key="pref_camera_mapping"
             android:title="相机映射"
             android:summary="手动指定各路视频流的对应关系（排查用）" />
@@ -316,10 +335,6 @@
     <PreferenceCategory
         android:key="cat_about"
         android:title="关于">
-
-        <Preference
-            android:key="pref_usage_guide"
-            android:title="使用说明" />
 
         <Preference
             android:key="pref_diagnostics"

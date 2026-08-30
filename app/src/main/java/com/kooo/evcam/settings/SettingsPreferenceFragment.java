@@ -2,6 +2,10 @@ package com.kooo.evcam.settings;
 
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.params.StreamConfigurationMap;
+import android.util.Size;
 import android.os.Bundle;
 import android.text.InputType;
 import android.widget.Toast;
@@ -25,7 +29,6 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.FloatingWindowService;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.PermissionSettingsFragment;
-import com.kooo.evcam.ResolutionSettingsFragment;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
@@ -112,7 +115,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindRecordingCameras();
 
-        onClick("pref_resolution", pref -> openFragment(new ResolutionSettingsFragment()));
+        bindResolution();
+
+        bindEnum("pref_bitrate", SettingsRegistry.BITRATE_LEVEL,
+                appConfig.getBitrateLevel(), value -> appConfig.setBitrateLevel(value));
 
         bindSwitch("pref_watermark", appConfig.isTimestampWatermarkEnabled(),
                 value -> appConfig.setTimestampWatermarkEnabled(value));
@@ -164,6 +170,115 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     + SettingsRegistry.CAR_MODEL.displayNameOf(value) + "」，重启应用后生效");
             return false;
         });
+    }
+
+    /**
+     * 录制分辨率。
+     *
+     * <p>选项要问过相机才知道，所以是异步填的；填好之前先显示当前值，
+     * 不留一个空白的下拉框。</p>
+     *
+     * <p>只列每一路都支持的尺寸，规则和理由见 {@link ResolutionOptions}。</p>
+     */
+    private void bindResolution() {
+        ListPreference pref = findPreference("pref_resolution");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setSummary(appConfig.getTargetResolution());
+
+        final Context context = getContext().getApplicationContext();
+        new Thread(() -> {
+            final List<List<int[]>> perCamera = probeSupportedSizes(context);
+            final String hardware = describeHardware(perCamera);
+            if (!isAdded()) {
+                return;
+            }
+            requireActivity().runOnUiThread(() -> {
+                populateResolution(pref, ResolutionOptions.common(perCamera));
+                Preference info = findPreference("pref_hardware_info");
+                if (info != null) {
+                    info.setSummary(hardware);
+                }
+            });
+        }, "resolution-probe").start();
+    }
+
+    private void populateResolution(ListPreference pref, List<String> options) {
+        List<String> values = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        values.add(AppConfig.RESOLUTION_DEFAULT);
+        labels.add("默认（跟随探测结果）");
+        for (String option : options) {
+            values.add(option);
+            labels.add(option);
+        }
+
+        String current = appConfig.getTargetResolution();
+        if (!values.contains(current)) {
+            // 当前值必须留着，否则下拉框会显示空白
+            values.add(current);
+            labels.add(current + "（当前）");
+        }
+
+        pref.setEntries(labels.toArray(new String[0]));
+        pref.setEntryValues(values.toArray(new String[0]));
+        pref.setValue(current);
+        pref.setSummary(pref.getEntry());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            String value = String.valueOf(newValue);
+            appConfig.setTargetResolution(value);
+            pref.setValue(value);
+            pref.setSummary(pref.getEntry());
+            toast("分辨率已改为「" + pref.getEntry() + "」，重新开始录制后生效");
+            return false;
+        });
+    }
+
+    /** 问每一路相机支持哪些尺寸。 */
+    private List<List<int[]>> probeSupportedSizes(Context context) {
+        List<List<int[]>> result = new ArrayList<>();
+        try {
+            CameraManager manager =
+                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return result;
+            }
+            for (String id : manager.getCameraIdList()) {
+                CameraCharacteristics characteristics = manager.getCameraCharacteristics(id);
+                StreamConfigurationMap map = characteristics.get(
+                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                if (map == null) {
+                    continue;
+                }
+                List<int[]> sizes = new ArrayList<>();
+                Size[] supported = map.getOutputSizes(android.graphics.ImageFormat.JPEG);
+                if (supported != null) {
+                    for (Size size : supported) {
+                        sizes.add(new int[]{size.getWidth(), size.getHeight()});
+                    }
+                }
+                result.add(sizes);
+            }
+        } catch (Throwable t) {
+            AppLog.w(TAG, "探测相机分辨率失败: " + t);
+        }
+        return result;
+    }
+
+    private String describeHardware(List<List<int[]>> perCamera) {
+        if (perCamera.isEmpty()) {
+            return "未检测到摄像头";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(perCamera.size()).append(" 路视频流");
+        List<String> common = ResolutionOptions.common(perCamera);
+        sb.append("，共同支持 ").append(common.size()).append(" 种分辨率");
+        if (!common.isEmpty()) {
+            sb.append("，最高 ").append(common.get(0));
+        }
+        return sb.toString();
     }
 
     /**
@@ -688,6 +803,25 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_preview_resolution", SettingsRegistry.PREVIEW_RESOLUTION,
                 appConfig.getPreviewResolution(), value -> appConfig.setPreviewResolution(value));
 
+        onClick("pref_image_adjust", pref -> {
+            if (getActivity() instanceof MainActivity) {
+                appConfig.setImageAdjustEnabled(true);
+                ((MainActivity) getActivity()).setImageAdjustEnabled(true);
+                toast("调节窗口已打开");
+            }
+        });
+
+        onClick("pref_image_adjust_reset", pref -> {
+            if (getActivity() instanceof MainActivity) {
+                com.kooo.evcam.camera.ImageAdjustManager manager =
+                        ((MainActivity) getActivity()).getImageAdjustManager();
+                if (manager != null) {
+                    manager.resetToDefault();
+                    toast("亮度/降噪参数已恢复默认");
+                }
+            }
+        });
+
         onClick("pref_camera_mapping", pref -> {
             if (getContext() != null) {
                 SettingsDialogs.showCameraMappingDialog(
@@ -774,11 +908,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 关于
 
     private void bindAbout() {
-        onClick("pref_usage_guide", pref -> {
-            if (getContext() != null) {
-                SettingsDialogs.showUsageGuideDialog(getContext(), appConfig);
-            }
-        });
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
         onClick("pref_about", pref ->

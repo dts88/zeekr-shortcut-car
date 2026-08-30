@@ -1445,21 +1445,6 @@ public class AppConfig {
      * @return 默认名称
      */
     public String getDefaultCameraName(String position) {
-        // 极氪这两档的第一路不是「前摄像头」，而是车机拼好的那条环视合成流。
-        // 叫它「前」会让人以为还有另外三路可选，实际整个 360° 都在这一路里。
-        String carModel = getCarModel();
-        if (CAR_MODEL_ZEEKR_7X.equals(carModel) || CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            switch (position) {
-                case "front":
-                    return "环视";
-                case "back":
-                    return "座舱1";
-                case "left":
-                    return "座舱2";
-                default:
-                    break;
-            }
-        }
         // 默认名称（适用于大多数预设车型）
         switch (position) {
             case "front":
@@ -3172,6 +3157,24 @@ public class AppConfig {
      * @return 显示名称
      */
     public String getRecordingCameraDisplayName(String position, int index) {
+        // 「录哪几路」和「四宫格里这一格叫什么」是两个问题，答案也不一样。
+        //
+        // 极氪这两档的第一路是车机拼好的整条环视流，选它就等于选下了整个 360°，
+        // 所以在「录制摄像头」里该叫「环视」。但录制界面上那四个标签指的是
+        // 这条流拆出来的四个 lane，那里的「前」确实就是前方，不能跟着改。
+        String carModel = getCarModel();
+        if (CAR_MODEL_ZEEKR_7X.equals(carModel) || CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            switch (position) {
+                case "front":
+                    return "环视";
+                case "back":
+                    return "座舱1";
+                case "left":
+                    return "座舱2";
+                default:
+                    break;
+            }
+        }
         String name = getCameraName(position);
         // 如果名称为空或仅为空白，使用位置名称
         if (name == null || name.trim().isEmpty()) {
