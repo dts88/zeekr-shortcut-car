@@ -28,6 +28,7 @@ public class AboutActivity extends Activity {
     public static final String EVCAM_URL = "https://github.com/suyunkai/EVCam";
     public static final String OPENAVM_URL = "https://github.com/Dantenothing/openavm-recorder";
     public static final String GPL_URL = "https://www.gnu.org/licenses/gpl-3.0.html";
+    public static final String PROJECT_URL = "https://github.com/dts88/zeekr-shortcut-car";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +45,7 @@ public class AboutActivity extends Activity {
             body.setMovementMethod(LinkMovementMethod.getInstance());
         }
 
+        bindLink(R.id.about_link_project, PROJECT_URL);
         bindLink(R.id.about_link_evcam, EVCAM_URL);
         bindLink(R.id.about_link_openavm, OPENAVM_URL);
         bindLink(R.id.about_link_gpl, GPL_URL);

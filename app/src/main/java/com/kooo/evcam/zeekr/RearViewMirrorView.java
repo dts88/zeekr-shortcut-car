@@ -339,7 +339,12 @@ public class RearViewMirrorView extends ViewGroup {
      * 所以这里没有第三个自由度可调。</p>
      */
     private RearViewGeometry.Viewport viewport() {
-        return RearViewGeometry.Viewport.forWindow(getWidth(), getHeight(), pan);
+        // 开了校正的话，视野角度已经在反投影里消化掉了，这里再收一次就重复了。
+        // 关掉校正时它没人消化，于是由取景来兑现 —— 两边都得让那根滑块管用。
+        float fraction = fisheyeCorrection
+                ? 1f
+                : RearViewGeometry.visibleFractionForFov(fovDegrees);
+        return RearViewGeometry.Viewport.forWindow(getWidth(), getHeight(), pan, fraction);
     }
 
     // ------------------------------------------------------------------ 手势
@@ -745,6 +750,7 @@ public class RearViewMirrorView extends ViewGroup {
     public void applyCorrectionFromConfig() {
         fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
         fovDegrees = appConfig.getRearViewFov();
+        // 两种模式下视野角度都会改变取景，所以无论开关如何都要重画
         AppLog.i(TAG, "鱼眼校正 " + (fisheyeCorrection ? "开，视野 " + fovDegrees + "°" : "关"));
         invalidate();
     }

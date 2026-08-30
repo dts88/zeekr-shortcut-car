@@ -1277,6 +1277,7 @@ public class MultiCameraManager {
                     encodeWidth,
                     encodeHeight
             );
+            codecRecorder.setBrandLine(buildBrandLine());
 
             if (fourLanePlan != null) {
                 codecRecorder.setFourLaneSource(sourceWidth, sourceHeight, fourLanePlan, null);
@@ -1621,6 +1622,7 @@ public class MultiCameraManager {
                     previewSize.getWidth(),
                     previewSize.getHeight()
             );
+            codecRecorder.setBrandLine(buildBrandLine());
 
             // 设置录制参数
             AppConfig appConfig = new AppConfig(context);
@@ -2399,5 +2401,18 @@ public class MultiCameraManager {
             }
         }
         return sb.toString();
+    }
+
+    /** 录像左上角要标的那行字：应用名 + 版本号。 */
+    private String buildBrandLine() {
+        String version = "";
+        try {
+            version = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            AppLog.w(TAG, "读取版本号失败: " + e);
+        }
+        String name = context.getString(com.kooo.evcam.R.string.app_name);
+        return version.isEmpty() ? name : name + " v" + version;
     }
 }

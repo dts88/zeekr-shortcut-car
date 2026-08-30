@@ -57,6 +57,20 @@ public final class RearViewGeometry {
     private RearViewGeometry() {
     }
 
+    /**
+     * 视野角度换算成「看这一路的多大一块」。
+     *
+     * <p>和校正那条路是同一套说法：输出边缘对应偏离光轴 fov/2 的射线，
+     * 而半径 1.0 记作 90°。所以 180° 就是整幅，110° 约六成，90° 一半。</p>
+     *
+     * <p>有了这个，<b>关掉鱼眼校正时那根滑块照样有用</b> —— 只是它不再是
+     * 「校正到多大视野」，而是「取这一路的多大一块」。两种模式下拖动的手感一致。</p>
+     */
+    public static float visibleFractionForFov(float fovDegrees) {
+        float fov = FisheyeProjection.clampFov(fovDegrees);
+        return Math.max(0.05f, Math.min(1f, fov / 180f));
+    }
+
     /** 把上下平移量夹进合法范围。0 = 贴着画面顶部，1 = 贴着底部。 */
     public static float clampPan(float pan) {
         return Math.max(0f, Math.min(1f, pan));
@@ -94,6 +108,15 @@ public final class RearViewGeometry {
          * @param pan          上下平移量，0..1；0 贴顶，1 贴底，0.5 居中
          */
         public static Viewport forWindow(int windowWidth, int windowHeight, float pan) {
+            return forWindow(windowWidth, windowHeight, pan, 1f);
+        }
+
+        /**
+         * @param visibleFraction 看这一路的多大一块，0..1。1 表示整幅；
+         *                        小于 1 就是往里收，等效于放大
+         */
+        public static Viewport forWindow(int windowWidth, int windowHeight,
+                                         float pan, float visibleFraction) {
             if (windowWidth <= 0 || windowHeight <= 0) {
                 return full();
             }
@@ -103,7 +126,13 @@ public final class RearViewGeometry {
             float width = aspect >= 1f ? 1f : aspect;
             float height = aspect >= 1f ? 1f / aspect : 1f;
 
-            // 左右居中，不提供横向平移 —— 看多宽由视野角度管，这里不重复给一个旋钮
+            // 视野角度：不做校正时也要管用，否则那根滑块拖了没反应。
+            // 宽高同比例收，形状不变 —— 比例是锁死的，这里不能破例。
+            float fraction = Math.max(0.05f, Math.min(1f, visibleFraction));
+            width *= fraction;
+            height *= fraction;
+
+            // 左右居中；上下由 pan 决定落在哪
             float x = (1f - width) / 2f;
             float y = clampPan(pan) * (1f - height);
             return new Viewport(x, y, width, height);

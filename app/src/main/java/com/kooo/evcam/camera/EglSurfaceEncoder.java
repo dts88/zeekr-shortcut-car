@@ -187,12 +187,17 @@ public class EglSurfaceEncoder {
     private int watermarkTexMatrixHandle;
     private int watermarkOesTextureHandle;
     private Bitmap watermarkBitmap;
+    /** 左上角那块：应用名 + 版本号。内容不变，画一次就够。 */
+    private int brandTextureId;
+    private String brandLine = "";
     private String lastWatermarkTime = "";
     /** 角标第二行：录制规格。为空表示只显示时间。 */
     private volatile String watermarkInfoLine = "";
     private static final int WATERMARK_WIDTH = 560;   // 需容纳规格行（比 19 字符的时间戳长）
     private static final int WATERMARK_HEIGHT = 80;   // 两行
     private static final int WATERMARK_LINE_HEIGHT = 34;
+    private static final int BRAND_WIDTH = 420;
+    private static final int BRAND_HEIGHT = 40;
     private final SimpleDateFormat watermarkDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     
     // 性能优化：水印更新控制
@@ -286,6 +291,11 @@ public class EglSurfaceEncoder {
      * <p>规格在一次录制中是不变的，所以这里只是存下来；真正重绘由每秒一次的
      * 时间更新顺带完成 —— 清空 {@code lastWatermarkTime} 是为了不必等到秒数变化。</p>
      */
+    /** 左上角显示的应用名与版本号。空字符串表示不显示。 */
+    public void setBrandLine(String line) {
+        this.brandLine = line == null ? "" : line;
+    }
+
     public void setWatermarkInfoLine(String line) {
         this.watermarkInfoLine = line == null ? "" : line;
         this.lastWatermarkTime = "";
@@ -525,49 +535,15 @@ public class EglSurfaceEncoder {
             lastWatermarkUpdateMs = currentTimeMs;
         }
 
-        float w = 2.0f * WATERMARK_WIDTH / width;    // NDC 宽度
-        float h = 2.0f * WATERMARK_HEIGHT / height;  // NDC 高度
-        float margin = 0.02f;
-        float right = 1.0f - margin;
-        float left = right - w;
-        float top = 1.0f - margin;
-        float bottom = top - h;
-
-        laneVertexScratch[0] = left;  laneVertexScratch[1] = bottom;
-        laneVertexScratch[2] = right; laneVertexScratch[3] = bottom;
-        laneVertexScratch[4] = left;  laneVertexScratch[5] = top;
-        laneVertexScratch[6] = right; laneVertexScratch[7] = top;
-
-        // 水印位图左上为原点，这里上下翻转贴图
-        laneTexScratch[0] = 0f; laneTexScratch[1] = 1f;
-        laneTexScratch[2] = 1f; laneTexScratch[3] = 1f;
-        laneTexScratch[4] = 0f; laneTexScratch[5] = 0f;
-        laneTexScratch[6] = 1f; laneTexScratch[7] = 0f;
-
-        laneVertexBuffer.clear();
-        laneVertexBuffer.put(laneVertexScratch);
-        laneVertexBuffer.position(0);
-        laneTexCoordBuffer.clear();
-        laneTexCoordBuffer.put(laneTexScratch);
-        laneTexCoordBuffer.position(0);
-
         GLES20.glUseProgram(watermarkOverlayProgram);
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
 
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, watermarkTextureId);
-        GLES20.glUniform1i(overlayTextureHandle, 0);
+        // 右上角：时间 + 规格 + 实时码率
+        drawOverlayQuad(watermarkTextureId, WATERMARK_WIDTH, WATERMARK_HEIGHT, true);
+        // 左上角：应用名 + 版本号，和右上角对称
+        drawOverlayQuad(brandTextureId, BRAND_WIDTH, BRAND_HEIGHT, false);
 
-        GLES20.glEnableVertexAttribArray(overlayPositionHandle);
-        GLES20.glVertexAttribPointer(overlayPositionHandle, 2, GLES20.GL_FLOAT, false, 0, laneVertexBuffer);
-        GLES20.glEnableVertexAttribArray(overlayTexCoordHandle);
-        GLES20.glVertexAttribPointer(overlayTexCoordHandle, 2, GLES20.GL_FLOAT, false, 0, laneTexCoordBuffer);
-
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
-
-        GLES20.glDisableVertexAttribArray(overlayPositionHandle);
-        GLES20.glDisableVertexAttribArray(overlayTexCoordHandle);
         GLES20.glDisable(GLES20.GL_BLEND);
     }
 
@@ -786,6 +762,10 @@ public class EglSurfaceEncoder {
                 watermarkTextureId = 0;
             }
 
+            if (brandTextureId != 0) {
+                GLES20.glDeleteTextures(1, new int[]{brandTextureId}, 0);
+                brandTextureId = 0;
+            }
             if (watermarkBitmap != null) {
                 watermarkBitmap.recycle();
                 watermarkBitmap = null;
@@ -1001,7 +981,105 @@ public class EglSurfaceEncoder {
         watermarkBitmap = Bitmap.createBitmap(WATERMARK_WIDTH, WATERMARK_HEIGHT, Bitmap.Config.ARGB_8888);
         updateWatermarkBitmap();
 
+        createBrandTexture();
+
         AppLog.d(TAG, "Camera " + cameraId + " Watermark OpenGL resources initialized, textureId=" + watermarkTextureId);
+    }
+
+    /**
+     * 生成左上角那块贴图。
+     *
+     * <p>只在初始化时画一次 —— 应用名和版本号在一次录制里不会变，
+     * 没有理由每帧甚至每秒重画。</p>
+     */
+    private void createBrandTexture() {
+        if (brandLine.isEmpty()) {
+            return;
+        }
+        int[] textures = new int[1];
+        GLES20.glGenTextures(1, textures, 0);
+        brandTextureId = textures[0];
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, brandTextureId);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
+        Bitmap bitmap = Bitmap.createBitmap(BRAND_WIDTH, BRAND_HEIGHT, Bitmap.Config.ARGB_8888);
+        bitmap.eraseColor(Color.TRANSPARENT);
+        Canvas canvas = new Canvas(bitmap);
+
+        Paint shadow = new Paint();
+        shadow.setColor(Color.BLACK);
+        shadow.setTextSize(26);
+        shadow.setAntiAlias(true);
+        shadow.setTypeface(Typeface.MONOSPACE);
+
+        Paint text = new Paint();
+        text.setColor(Color.WHITE);
+        text.setTextSize(26);
+        text.setAntiAlias(true);
+        text.setTypeface(Typeface.MONOSPACE);
+
+        canvas.drawText(brandLine, 8, 30, shadow);
+        canvas.drawText(brandLine, 6, 28, text);
+
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
+        bitmap.recycle();
+    }
+
+    /**
+     * 画一块角标。
+     *
+     * @param alignRight true 贴右上角，false 贴左上角
+     */
+    private void drawOverlayQuad(int textureId, int bitmapWidth, int bitmapHeight,
+                                 boolean alignRight) {
+        if (textureId == 0) {
+            return;
+        }
+        float w = 2.0f * bitmapWidth / width;
+        float h = 2.0f * bitmapHeight / height;
+        float margin = 0.02f;
+        float left = alignRight ? (1.0f - margin - w) : (-1.0f + margin);
+        float right = left + w;
+        float top = 1.0f - margin;
+        float bottom = top - h;
+
+        laneVertexScratch[0] = left;  laneVertexScratch[1] = bottom;
+        laneVertexScratch[2] = right; laneVertexScratch[3] = bottom;
+        laneVertexScratch[4] = left;  laneVertexScratch[5] = top;
+        laneVertexScratch[6] = right; laneVertexScratch[7] = top;
+
+        // 位图左上为原点，贴图要上下翻转
+        laneTexScratch[0] = 0f; laneTexScratch[1] = 1f;
+        laneTexScratch[2] = 1f; laneTexScratch[3] = 1f;
+        laneTexScratch[4] = 0f; laneTexScratch[5] = 0f;
+        laneTexScratch[6] = 1f; laneTexScratch[7] = 0f;
+
+        laneVertexBuffer.clear();
+        laneVertexBuffer.put(laneVertexScratch);
+        laneVertexBuffer.position(0);
+        laneTexCoordBuffer.clear();
+        laneTexCoordBuffer.put(laneTexScratch);
+        laneTexCoordBuffer.position(0);
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
+        GLES20.glUniform1i(overlayTextureHandle, 0);
+
+        GLES20.glEnableVertexAttribArray(overlayPositionHandle);
+        GLES20.glVertexAttribPointer(overlayPositionHandle, 2, GLES20.GL_FLOAT, false, 0,
+                laneVertexBuffer);
+        GLES20.glEnableVertexAttribArray(overlayTexCoordHandle);
+        GLES20.glVertexAttribPointer(overlayTexCoordHandle, 2, GLES20.GL_FLOAT, false, 0,
+                laneTexCoordBuffer);
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+
+        GLES20.glDisableVertexAttribArray(overlayPositionHandle);
+        GLES20.glDisableVertexAttribArray(overlayTexCoordHandle);
     }
 
     /**

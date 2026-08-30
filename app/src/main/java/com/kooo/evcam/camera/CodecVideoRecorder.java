@@ -246,12 +246,68 @@ public class CodecVideoRecorder {
      * <p>用的是真正配置给编码器的值，不是设置里的目标值 —— 请求的尺寸可能被夹过，
      * 编码可能回退到 H.264，帧率也可能被补盲模式改写。角标要如实反映录出来的东西。</p>
      */
+    /** 上一秒写进文件的字节数，用来算实时码率。 */
+    private long bytesThisSecond;
+    private long bitrateWindowStartMs;
+    private String liveBitrateText = "";
+
+    /**
+     * 记一笔刚写进文件的字节数，每满一秒折算成码率。
+     *
+     * <p>用的是<b>真正写进 muxer 的大小</b>，不是设置里的目标码率 ——
+     * 编码器给的是可变码率，画面越复杂写得越多，目标值只是个上限。</p>
+     *
+     * <p>这一步几乎不花钱：字节数本来就在手上，而水印位图本来就每秒重画一次
+     * （秒数变了才重画）。所以只是把一个已有的数字接到一行已有的文字上。</p>
+     */
+    private void noteEncodedBytes(int size) {
+        if (size <= 0) {
+            return;
+        }
+        bytesThisSecond += size;
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (bitrateWindowStartMs == 0) {
+            bitrateWindowStartMs = now;
+            return;
+        }
+        long elapsed = now - bitrateWindowStartMs;
+        if (elapsed < BITRATE_WINDOW_MS) {
+            return;
+        }
+        float mbps = bytesThisSecond * 8f / elapsed / 1000f;   // 字节/毫秒 -> Mbps
+        liveBitrateText = String.format(java.util.Locale.US, "%.1f Mbps", mbps);
+        bytesThisSecond = 0;
+        bitrateWindowStartMs = now;
+        applyWatermarkInfoLine();
+    }
+
+    /** 码率取样窗口。一秒够用了，再快也看不清。 */
+    private static final long BITRATE_WINDOW_MS = 1000L;
+
+    /**
+     * 录像左上角标的那行字：应用名 + 版本号。
+     *
+     * <p>由调用方给 —— 这个类拿不到 Context。录出来的文件常常是拿去当证据
+     * 或者发给别人的，落上是哪个应用、哪个版本录的，回头出问题才对得上。</p>
+     */
+    public void setBrandLine(String line) {
+        this.brandLine = line == null ? "" : line;
+    }
+
+    private String brandLine = "";
+
     private void applyWatermarkInfoLine() {
         if (eglEncoder == null) {
             return;  // 编码器还没建，createEncoder 结束时会再调一次
         }
-        eglEncoder.setWatermarkInfoLine(
-                watermarkEnabled && watermarkSpecEnabled ? encoderSpecLine : "");
+        String line = "";
+        if (watermarkEnabled && watermarkSpecEnabled) {
+            line = encoderSpecLine;
+            if (!liveBitrateText.isEmpty()) {
+                line = line + "  " + liveBitrateText;
+            }
+        }
+        eglEncoder.setWatermarkInfoLine(line);
     }
 
     /**
@@ -513,6 +569,9 @@ public class CodecVideoRecorder {
                 try {
                     // 创建 EGL 渲染器（在编码线程上）
                     eglEncoder = new EglSurfaceEncoder(cameraId, width, height);
+                    // 左上角的应用名与版本号。要在 initialize() 之前设好 ——
+                    // 那块贴图在初始化时画一次，之后不再重画
+                    eglEncoder.setBrandLine(brandLine);
                     // setFrameRate 通常在 prepareRecording 之前就调用了，这里补上
                     applyEncoderFrameRate();
                     resultTextureId[0] = eglEncoder.initialize(encoderInputSurface);
@@ -1306,6 +1365,7 @@ public class CodecVideoRecorder {
                             encodedData.position(bufferInfo.offset);
                             encodedData.limit(bufferInfo.offset + bufferInfo.size);
                             muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo);
+                            noteEncodedBytes(bufferInfo.size);
                             
                             encodedOutputFrameCount++;
                             lastEncoderOutputTime = System.currentTimeMillis();
@@ -1388,6 +1448,7 @@ public class CodecVideoRecorder {
                             encodedData.position(bufferInfo.offset);
                             encodedData.limit(bufferInfo.offset + bufferInfo.size);
                             muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo);
+                            noteEncodedBytes(bufferInfo.size);
 
                             encodedOutputFrameCount++;
                             lastEncoderOutputTime = System.currentTimeMillis();

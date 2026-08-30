@@ -79,6 +79,56 @@ public class RearViewGeometryTest {
         assertEquals(0.25f, tall.width, EPS);
     }
 
+    // ---------- 视野角度 ----------
+
+    /**
+     * 视野角度在<b>不做校正时也要管用</b>。
+     *
+     * <p>以前它只喂给反投影，关掉校正那根滑块就没反应了 ——
+     * 一个拖得动却不起作用的控件，比没有这个控件更糟。</p>
+     */
+    @Test
+    public void theFieldOfViewNarrowsTheViewportWhenCorrectionIsOff() {
+        RearViewGeometry.Viewport wide = RearViewGeometry.Viewport.forWindow(
+                1600, 400, 0.5f, RearViewGeometry.visibleFractionForFov(140));
+        RearViewGeometry.Viewport narrow = RearViewGeometry.Viewport.forWindow(
+                1600, 400, 0.5f, RearViewGeometry.visibleFractionForFov(90));
+        assertTrue("角度小应当看得更少（等于放大）", narrow.width < wide.width);
+        assertTrue(narrow.height < wide.height);
+    }
+
+    /** 收窄视野不能把画面拉变形 —— 比例是锁死的，这里也不能破例。 */
+    @Test
+    public void narrowingTheViewKeepsTheAspectRatio() {
+        for (float fov : new float[]{90f, 110f, 140f}) {
+            RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(
+                    1600, 400, 0.5f, RearViewGeometry.visibleFractionForFov(fov));
+            assertEquals("fov=" + fov + " 时比例变了", 4f, v.width / v.height, 0.01f);
+        }
+    }
+
+    /** 和校正那条路同一套说法：180° 整幅，90° 一半。 */
+    @Test
+    public void theFractionMatchesTheAngle() {
+        assertEquals(0.5f, RearViewGeometry.visibleFractionForFov(90), EPS);
+        assertEquals(140f / 180f, RearViewGeometry.visibleFractionForFov(140), EPS);
+        // 超出范围先被夹进 90..140
+        assertEquals(0.5f, RearViewGeometry.visibleFractionForFov(10), EPS);
+        assertEquals(140f / 180f, RearViewGeometry.visibleFractionForFov(999), EPS);
+    }
+
+    @Test
+    public void aNarrowedViewportStillFitsInsideTheLane() {
+        for (float fov : new float[]{90f, 110f, 140f}) {
+            for (float pan : new float[]{0f, 0.5f, 1f}) {
+                RearViewGeometry.Viewport v = RearViewGeometry.Viewport.forWindow(
+                        1600, 400, pan, RearViewGeometry.visibleFractionForFov(fov));
+                assertTrue(v.x >= -EPS && v.x + v.width <= 1f + EPS);
+                assertTrue(v.y >= -EPS && v.y + v.height <= 1f + EPS);
+            }
+        }
+    }
+
     // ---------- 上下平移 ----------
 
     @Test
