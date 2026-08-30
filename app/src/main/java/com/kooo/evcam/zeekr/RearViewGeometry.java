@@ -230,6 +230,9 @@ public final class RearViewGeometry {
         if (laneOrder == null || REAR_CELL >= laneOrder.length) {
             return REAR_CELL;
         }
-        return laneOrder[REAR_CELL];
+        // laneOrder 是用户改过的配置，值不一定可信；越界就退回默认那一格，
+        // 否则会拿一个不存在的序号去取 lane
+        int lane = laneOrder[REAR_CELL];
+        return (lane >= 0 && lane < CompositeStreamGeometry.LANE_COUNT) ? lane : REAR_CELL;
     }
 }
