@@ -34,10 +34,15 @@ import java.util.Locale;
  *
  * <p>导出提供三种方式，因为车机上能用哪种不一定：</p>
  * <ul>
- *   <li><b>保存到存储</b>——写成 .txt，U 盘拔下来就能拷走，最可靠；</li>
+ *   <li><b>保存到存储</b>——写成 .json，U 盘拔下来就能拷走，最可靠；</li>
  *   <li><b>复制到剪贴板</b>——车机上没有文件管理器时的退路；</li>
  *   <li><b>分享</b>——有微信/邮件之类应用时直接发出去。</li>
  * </ul>
+ *
+ * <p>导出的是 JSON 而不是纯文本：屏幕上那份为了能翻，每块有条数上限、长值会截断，
+ * 而这些上限对事后分析是有害的 —— <b>被截掉的那部分恰恰可能是要找的东西</b>。
+ * JSON 那份不设上限、不截断，人看的完整文本也一并放在 {@code text_report} 字段里，
+ * 一个文件两用。</p>
  */
 public class DiagnosticsActivity extends Activity {
 
@@ -90,7 +95,7 @@ public class DiagnosticsActivity extends Activity {
             refreshButton.setOnClickListener(v -> runCollection());
         }
         if (saveButton != null) {
-            saveButton.setOnClickListener(v -> saveReport());
+            saveButton.setOnClickListener(v -> saveInBackground(null));
         }
         if (copyButton != null) {
             copyButton.setOnClickListener(v -> copyReport());
@@ -193,6 +198,12 @@ public class DiagnosticsActivity extends Activity {
     /**
      * 写到日志目录（跟随当前存储位置设置，通常就是 U 盘），方便直接拷走。
      */
+    /**
+     * 写出诊断报告。
+     *
+     * <p>组装 JSON 要重新读一遍系统属性和三张 Settings 表，比写文件本身慢得多，
+     * 所以调用方必须在后台线程上调它 —— 主线程卡住在车机上立刻能感觉到。</p>
+     */
     private File saveReport() {
         if (report == null || report.isEmpty()) {
             toast("诊断信息尚未生成");
@@ -210,20 +221,23 @@ public class DiagnosticsActivity extends Activity {
             }
             String name = "zeekr_diagnostics_"
                     + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date())
-                    + ".txt";
+                    + ".json";
             File out = new File(dir, name);
+
+            String json = DiagnosticsJson.build(this, report);
 
             FileOutputStream fos = new FileOutputStream(out);
             OutputStreamWriter writer = new OutputStreamWriter(fos, Charset.forName("UTF-8"));
             try {
-                writer.write(report);
+                writer.write(json);
                 writer.flush();
             } finally {
                 writer.close();
             }
 
             lastSavedFile = out;
-            AppLog.i(TAG, "诊断报告已保存: " + out.getAbsolutePath());
+            AppLog.i(TAG, "诊断报告已保存: " + out.getAbsolutePath()
+                    + "（" + out.length() / 1024 + " KB）");
             toast("已保存到:\n" + out.getAbsolutePath());
             return out;
         } catch (Exception e) {
@@ -334,11 +348,34 @@ public class DiagnosticsActivity extends Activity {
         }
     }
 
+    /**
+     * 保存到后台线程上去做，完成后回到主线程。
+     *
+     * @param then 保存完要做的事（例如接着分享）；不需要就传 null
+     */
+    private void saveInBackground(java.util.function.Consumer<File> then) {
+        toast("正在导出...");
+        new Thread(() -> {
+            File out = saveReport();
+            mainHandler.post(() -> {
+                if (then != null && out != null) {
+                    then.accept(out);
+                }
+            });
+        }, "diagnostics-save").start();
+    }
+
     private void shareReport() {
         File file = lastSavedFile;
         if (file == null || !file.exists()) {
-            file = saveReport();
+            // 还没存过，先存再分享 —— 存要读一遍系统属性，不能占着主线程
+            saveInBackground(this::shareFile);
+            return;
         }
+        shareFile(file);
+    }
+
+    private void shareFile(File file) {
         if (file == null) {
             return;
         }
@@ -346,7 +383,7 @@ public class DiagnosticsActivity extends Activity {
             android.net.Uri uri = FileProvider.getUriForFile(
                     this, getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
-            intent.setType("text/plain");
+            intent.setType("application/json");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
             intent.putExtra(Intent.EXTRA_SUBJECT, "极氪即刻 诊断报告");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
