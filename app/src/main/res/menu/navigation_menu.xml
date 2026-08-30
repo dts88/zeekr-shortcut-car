@@ -12,10 +12,6 @@
             android:icon="@drawable/ic_nav_playback"
             android:title="视频回看" />
         <item
-            android:id="@+id/nav_timeline_playback"
-            android:icon="@drawable/ic_nav_playback"
-            android:title="连续回放（实验）" />
-        <item
             android:id="@+id/nav_photo_playback"
             android:icon="@drawable/ic_nav_photo"
             android:title="图片回看" />

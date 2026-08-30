@@ -38,6 +38,16 @@ public class TimelineSessionAdapter
         void onSessionClick(int sessionIndex);
     }
 
+    /**
+     * 长按一条时间轴。
+     *
+     * <p>单独一个接口，而不是给上面那个加方法：{@link OnSessionClickListener}
+     * 现在是用方法引用传进来的，加一个方法就用不了了。</p>
+     */
+    public interface OnSessionLongClickListener {
+        void onSessionLongClick(int sessionIndex);
+    }
+
     /** 一行：要么是日期标题，要么是一条时间轴。 */
     private static final class Row {
         final int type;
@@ -63,6 +73,7 @@ public class TimelineSessionAdapter
 
     private final List<Row> rows = new ArrayList<>();
     private final OnSessionClickListener listener;
+    private OnSessionLongClickListener longClickListener;
     private int selectedSessionIndex = -1;
 
     public TimelineSessionAdapter(OnSessionClickListener listener) {
@@ -94,6 +105,10 @@ public class TimelineSessionAdapter
     }
 
     /** 高亮当前正在播放的那一条（传 sessions 列表里的下标）。 */
+    public void setOnSessionLongClickListener(OnSessionLongClickListener listener) {
+        this.longClickListener = listener;
+    }
+
     public void setSelectedIndex(int sessionIndex) {
         int previousRow = rowOf(selectedSessionIndex);
         selectedSessionIndex = sessionIndex;
@@ -151,6 +166,14 @@ public class TimelineSessionAdapter
             if (listener != null && clicked != RecyclerView.NO_POSITION) {
                 listener.onSessionClick(rows.get(clicked).sessionIndex);
             }
+        });
+        sessionHolder.itemView.setOnLongClickListener(v -> {
+            int clicked = sessionHolder.getAdapterPosition();
+            if (longClickListener != null && clicked != RecyclerView.NO_POSITION) {
+                longClickListener.onSessionLongClick(rows.get(clicked).sessionIndex);
+                return true;
+            }
+            return false;
         });
     }
 

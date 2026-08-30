@@ -2,9 +2,15 @@ package com.kooo.evcam.zeekr;
 
 import android.app.Activity;
 import android.media.MediaMetadataRetriever;
+import android.graphics.Matrix;
+import android.graphics.RectF;
+import android.net.Uri;
+import android.content.Intent;
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
@@ -12,6 +18,8 @@ import android.widget.TextView;
 import android.view.TextureView;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+import com.kooo.evcam.playback.PlaybackViewport;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -67,6 +75,8 @@ public class TimelinePlayerActivity extends Activity {
     private TextView positionText;
     private TextView infoText;
     private Button playPauseButton;
+    private Button speedButton;
+    private TextureView videoSurface;
     private Button prevSessionButton;
     private Button nextSessionButton;
     private View videoCover;
@@ -101,6 +111,17 @@ public class TimelinePlayerActivity extends Activity {
     /** 用户正在拖动进度条时不要被自动刷新打断。 */
     private boolean userSeeking = false;
 
+    /** 当前放大的是哪一格；{@link PlaybackViewport#NO_CELL} 表示显示完整四宫格。 */
+    private int zoomedCell = PlaybackViewport.NO_CELL;
+
+    /** 倍速。每换一段都要重新下发 —— 换的是新的播放器状态，不会自己继承。 */
+    private static final float[] SPEED_OPTIONS = {0.5f, 1.0f, 1.5f, 2.0f};
+    private int speedIndex = 1;
+
+    /** 判定「点一下」而不是「拖了一下」的阈值。 */
+    private static final int TAP_SLOP_PX = 24;
+    private static final long TAP_MAX_MS = 400L;
+
     /** 超时兜底：没等到「已渲染」也把画面放出来。 */
     private final Runnable showVideoFallback = new Runnable() {
         @Override
@@ -124,7 +145,7 @@ public class TimelinePlayerActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timeline_player);
 
-        TextureView videoSurface = findViewById(R.id.timeline_video);
+        videoSurface = findViewById(R.id.timeline_video);
         player = new ManagedVideoPlayer(videoSurface);
         seekBar = findViewById(R.id.timeline_seek);
         positionText = findViewById(R.id.timeline_position);
@@ -137,6 +158,7 @@ public class TimelinePlayerActivity extends Activity {
         listSummaryText = findViewById(R.id.timeline_list_summary);
 
         sessionAdapter = new TimelineSessionAdapter(this::switchSession);
+        sessionAdapter.setOnSessionLongClickListener(this::showSessionActions);
         if (sessionListView != null) {
             sessionListView.setLayoutManager(new LinearLayoutManager(this));
             sessionListView.setAdapter(sessionAdapter);
@@ -155,6 +177,11 @@ public class TimelinePlayerActivity extends Activity {
         if (nextSessionButton != null) {
             nextSessionButton.setOnClickListener(v -> switchSession(sessionIndex + 1));
         }
+        speedButton = findViewById(R.id.timeline_speed);
+        if (speedButton != null) {
+            speedButton.setOnClickListener(v -> cycleSpeed());
+        }
+        setupZoomTaps();
 
         setupSeekBar();
 
@@ -166,6 +193,10 @@ public class TimelinePlayerActivity extends Activity {
                 preparedSegmentIndex = preparingSegmentIndex;
                 preparingSegmentIndex = -1;
                 consecutiveErrors = 0;
+                // 换段等于换了一次播放器状态，倍速和取景都要重新下发，
+                // 否则连续播放会在每个分段边界上悄悄变回 1.0x
+                p.setSpeed(SPEED_OPTIONS[speedIndex]);
+                applyViewport();
                 if (switchStartedAtMs > 0) {
                     AppLog.d(TAG, "切换耗时 · 准备完成: "
                             + (android.os.SystemClock.elapsedRealtime() - switchStartedAtMs) + "ms");
@@ -359,6 +390,179 @@ public class TimelinePlayerActivity extends Activity {
                 + TimelineFormat.size(totalBytes));
     }
 
+    /**
+     * 点画面放大其中一路，再点回到四宫格。
+     *
+     * <p>环视录像本身就是一个 2×2 网格文件，所以放大只是换个取景 ——
+     * 同一个解码器，不切文件、不新建播放器。旧的回看界面为此开到 5 个播放器，
+     * 绿屏和马赛克就出在那些播放器的来回创建上。</p>
+     */
+    private void setupZoomTaps() {
+        if (videoSurface == null) {
+            return;
+        }
+        videoSurface.setOnTouchListener(new View.OnTouchListener() {
+            private float downX;
+            private float downY;
+            private long downAtMs;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = event.getX();
+                        downY = event.getY();
+                        downAtMs = android.os.SystemClock.elapsedRealtime();
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        boolean moved = Math.abs(event.getX() - downX) > TAP_SLOP_PX
+                                || Math.abs(event.getY() - downY) > TAP_SLOP_PX;
+                        boolean quick = android.os.SystemClock.elapsedRealtime() - downAtMs
+                                < TAP_MAX_MS;
+                        if (!moved && quick) {
+                            v.performClick();
+                            toggleZoom(downX, downY);
+                        }
+                        return true;
+                    default:
+                        return true;
+                }
+            }
+        });
+    }
+
+    /** 已经放大了就还原，否则放大点到的那一格。 */
+    private void toggleZoom(float x, float y) {
+        if (zoomedCell != PlaybackViewport.NO_CELL) {
+            zoomedCell = PlaybackViewport.NO_CELL;
+        } else {
+            zoomedCell = PlaybackViewport.cellAt(x, y,
+                    videoSurface.getWidth(), videoSurface.getHeight());
+        }
+        applyViewport();
+        Toast.makeText(this, PlaybackViewport.labelOf(zoomedCell), Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 把取景下发到 TextureView。
+     *
+     * <p>顺带把画面按比例摆正：环视录像是 2560×2560 的方形，
+     * 而这块视图是宽的 —— 不做这一步就会被横向拉伸。</p>
+     */
+    private void applyViewport() {
+        if (videoSurface == null || player == null) {
+            return;
+        }
+        float[] r = PlaybackViewport.transformRects(zoomedCell,
+                player.getVideoWidth(), player.getVideoHeight(),
+                videoSurface.getWidth(), videoSurface.getHeight());
+        if (r == null) {
+            // 视频尺寸还不知道（没准备好），等 onPrepared 再来一次
+            return;
+        }
+        Matrix matrix = new Matrix();
+        matrix.setRectToRect(new RectF(r[0], r[1], r[2], r[3]),
+                new RectF(r[4], r[5], r[6], r[7]), Matrix.ScaleToFit.FILL);
+        videoSurface.setTransform(matrix);
+        videoSurface.invalidate();
+    }
+
+    private void cycleSpeed() {
+        speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
+        float speed = SPEED_OPTIONS[speedIndex];
+        player.setSpeed(speed);
+        if (speedButton != null) {
+            speedButton.setText(String.format(Locale.getDefault(), "%.1fx", speed));
+        }
+    }
+
+    /**
+     * 长按一条时间轴：删除或分享。
+     *
+     * <p>一条时间轴是一次连续录制，可能有很多个分段文件，
+     * 所以删除和分享都是对整组文件操作 —— 只删其中一段会在时间轴上留个洞。</p>
+     */
+    private void showSessionActions(int index) {
+        if (index < 0 || index >= sessions.size()) {
+            return;
+        }
+        RecordingTimeline.Session session = sessions.get(index);
+        String title = String.format(Locale.getDefault(), "%s　%d 段　%s",
+                new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+                        .format(new Date(session.startEpochMs)),
+                session.segmentCount(),
+                TimelineFormat.size(session.totalSizeBytes));
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setItems(new CharSequence[]{"分享这段录制", "删除这段录制"}, (dialog, which) -> {
+                    if (which == 0) {
+                        shareSession(session);
+                    } else {
+                        confirmDeleteSession(index, session);
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void shareSession(RecordingTimeline.Session session) {
+        ArrayList<Uri> uris = new ArrayList<>();
+        for (RecordingTimeline.Segment segment : session.segments) {
+            File file = new File(segment.path);
+            if (!file.exists()) {
+                continue;
+            }
+            try {
+                uris.add(FileProvider.getUriForFile(this,
+                        getPackageName() + ".fileprovider", file));
+            } catch (Exception e) {
+                AppLog.w(TAG, "无法分享 " + segment.path + ": " + e);
+            }
+        }
+        if (uris.isEmpty()) {
+            Toast.makeText(this, "没有可分享的文件", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(uris.size() > 1
+                ? Intent.ACTION_SEND_MULTIPLE : Intent.ACTION_SEND);
+        intent.setType("video/*");
+        if (uris.size() > 1) {
+            intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        } else {
+            intent.putExtra(Intent.EXTRA_STREAM, uris.get(0));
+        }
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, "分享录像"));
+    }
+
+    private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
+        new AlertDialog.Builder(this)
+                .setTitle("确认删除")
+                .setMessage(String.format(Locale.getDefault(),
+                        "将删除这段录制的全部 %d 个文件，共 %s。删除后无法恢复。",
+                        session.segmentCount(), TimelineFormat.size(session.totalSizeBytes)))
+                .setPositiveButton("删除", (dialog, which) -> deleteSession(index, session))
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void deleteSession(int index, RecordingTimeline.Session session) {
+        // 正在播这一段就先停下，否则删的是一个还开着的文件
+        if (index == sessionIndex) {
+            player.stop();
+        }
+        int deleted = 0;
+        for (RecordingTimeline.Segment segment : session.segments) {
+            File file = new File(segment.path);
+            if (file.exists() && file.delete()) {
+                deleted++;
+            }
+        }
+        AppLog.i(TAG, "删除时间轴 " + index + "：" + deleted + "/" + session.segmentCount() + " 个文件");
+        Toast.makeText(this, "已删除 " + deleted + " 个文件", Toast.LENGTH_SHORT).show();
+        loadTimelines();
+    }
+
     private void updateSessionInfo(RecordingTimeline.Session session) {
         String started = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
                 .format(new Date(session.startEpochMs));
@@ -528,7 +732,7 @@ public class TimelinePlayerActivity extends Activity {
     protected void onStop() {
         super.onStop();
         // 同样的道理：窗口不可见后 surface 会被销毁，只 pause 会让 MediaPlayer
-        // 继续持有它并不停超时（见 PlaybackFragmentNew.onStop 的说明）。
+        // 继续持有它并不停超时。
         // 这里彻底释放，位置记下来，回前台时再开回去。
         if (!sessions.isEmpty() && preparedSegmentIndex >= 0) {
             positionToRestoreMs = currentTimelinePosition();

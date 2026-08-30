@@ -10,7 +10,7 @@ import java.util.Locale;
 /**
  * 日期分组模型
  * 将同一天的视频/图片组聚合在一起
- * @param <T> VideoGroup 或 PhotoGroup
+ * @param <T> 分组类型，目前是 PhotoGroup
  */
 public class DateSection<T> {
     

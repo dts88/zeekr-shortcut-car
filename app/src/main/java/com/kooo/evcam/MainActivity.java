@@ -37,7 +37,6 @@ import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
-import com.kooo.evcam.playback.PlaybackFragmentNew;
 import com.kooo.evcam.playback.PhotoPlaybackFragmentNew;
 import com.kooo.evcam.view.MacOSToggleButton;
 
@@ -1359,8 +1358,6 @@ public class MainActivity extends AppCompatActivity {
                 toggleSupervisionMode();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
-            } else if (itemId == R.id.nav_timeline_playback) {
-                startActivity(new Intent(this, com.kooo.evcam.zeekr.TimelinePlayerActivity.class));
             } else if (itemId == R.id.nav_diagnostics) {
                 startActivity(new Intent(this, com.kooo.evcam.zeekr.DiagnosticsActivity.class));
             } else if (itemId == R.id.nav_about) {
@@ -1483,18 +1480,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 显示回看界面（新版四宫格界面）
+     * 显示回看界面。
+     *
+     * <p>以前这里是一个自己开到 5 个播放器的四宫格 Fragment。环视录像本身就是
+     * 一个 2×2 网格文件，四路都在同一个文件里 —— 放大其中一路只需要在同一个
+     * 解码器上换个取景，根本不需要第二个播放器。那些播放器的来回创建与切换，
+     * 正是绿屏、马赛克和卡顿的来源，所以整个界面换成了时间轴播放器。</p>
      */
     private void showPlaybackInterface() {
-        // 隐藏录制布局，显示Fragment容器
-        recordingLayout.setVisibility(View.GONE);
-        fragmentContainer.setVisibility(View.VISIBLE);
-
-        // 显示新版PlaybackFragment（支持四宫格预览）
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, new PlaybackFragmentNew());
-        transaction.commit();
+        startActivity(new Intent(this, com.kooo.evcam.zeekr.TimelinePlayerActivity.class));
     }
 
     /**

@@ -284,6 +284,20 @@ public class ManagedVideoPlayer {
         }
     }
 
+    /**
+     * 视频自身的宽高（像素）。未就绪时返回 0。
+     *
+     * <p>取景需要它：TextureView 默认把画面拉伸铺满自己的边框，
+     * 不知道原始比例就没法判断该留多少黑边。</p>
+     */
+    public int getVideoWidth() {
+        return isPrepared() ? player.getVideoWidth() : 0;
+    }
+
+    public int getVideoHeight() {
+        return isPrepared() ? player.getVideoHeight() : 0;
+    }
+
     public int getDuration() {
         try {
             return isPrepared() ? player.getDuration() : 0;

@@ -110,18 +110,6 @@
             </intent-filter>
         </activity>
 
-        <!-- 内置图片查看器 -->
-        <activity
-            android:name=".PhotoViewerActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Cam.Fullscreen" />
-
-        <!-- 内置视频播放器 -->
-        <activity
-            android:name=".VideoPlayerActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Cam.Fullscreen" />
-
         <!-- 透明启动 Activity：用于开机自启动，完全无感知 -->
         <activity
             android:name=".TransparentBootActivity"
