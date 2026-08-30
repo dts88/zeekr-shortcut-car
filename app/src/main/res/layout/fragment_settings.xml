@@ -992,13 +992,52 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="把环视里后方那一路单独放大成悬浮窗，画面左右镜像，和真正的后视镜一致。左右三分之一拖动窗口，中间三分之一上下滑调整取景高低，双指缩放窗口，推出屏幕一半或朝边上甩一下即贴边隐藏"
+                        android:text="把环视里的一路单独放大成悬浮窗。后视那一路左右镜像，和真正的后视镜一致；前视、侧视不翻。左右三分之一拖动窗口，中间三分之一上下滑调取景高低、左右划换一路（顺时针 后左前右），双指缩放窗口，推出屏幕一半或朝边上甩一下即贴边隐藏"
                         android:textColor="@color/text_secondary"
                         android:textSize="14sp" />
                 </LinearLayout>
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switch_rearview_mirror"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- 只看前后 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:background="@color/card_background"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="只显示前后视"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="打开后，左右划只在后视和前视之间来回，不经过两侧。开着时如果正停在侧视，会退回后视"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switch_rearview_front_rear"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
             </LinearLayout>

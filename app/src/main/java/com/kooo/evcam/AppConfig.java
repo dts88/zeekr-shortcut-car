@@ -100,6 +100,8 @@ public class AppConfig {
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
     private static final String KEY_REARVIEW_PAN = "rearview_pan";                // 上下平移，0..1
+    private static final String KEY_REARVIEW_LANE = "rearview_lane";              // 当前显示哪一路
+    private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
@@ -1139,6 +1141,33 @@ public class AppConfig {
                 prefs.getFloat(KEY_REARVIEW_PAN, com.kooo.evcam.zeekr.RearViewGeometry.DEFAULT_PAN));
     }
 
+    /**
+     * 后视镜当前显示哪一路。
+     *
+     * <p>记下来是因为它是用手势改的 —— 关掉再打开还停在原处，
+     * 比每次都跳回后视更符合预期。</p>
+     */
+    public int getRearViewLane() {
+        int lane = prefs.getInt(KEY_REARVIEW_LANE, com.kooo.evcam.zeekr.LaneCycle.REAR);
+        boolean frontRearOnly = isRearViewFrontRearOnly();
+        // 存的那一路可能已经不在当前模式的环上了（比如停在「左」时打开了只看前后）
+        return com.kooo.evcam.zeekr.LaneCycle.isOnRing(lane, frontRearOnly)
+                ? lane : com.kooo.evcam.zeekr.LaneCycle.REAR;
+    }
+
+    public void setRearViewLane(int lane) {
+        prefs.edit().putInt(KEY_REARVIEW_LANE, lane).apply();
+    }
+
+    /** 只在前后之间切换，不去侧视。 */
+    public boolean isRearViewFrontRearOnly() {
+        return prefs.getBoolean(KEY_REARVIEW_FRONT_REAR, false);
+    }
+
+    public void setRearViewFrontRearOnly(boolean on) {
+        prefs.edit().putBoolean(KEY_REARVIEW_FRONT_REAR, on).apply();
+    }
+
     public void setRearViewPan(float pan) {
         prefs.edit().putFloat(KEY_REARVIEW_PAN,
                 com.kooo.evcam.zeekr.RearViewGeometry.clampPan(pan)).apply();
@@ -1167,6 +1196,8 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_WIDTH)
                 .remove(KEY_REARVIEW_HEIGHT)
                 .remove(KEY_REARVIEW_PAN)
+                .remove(KEY_REARVIEW_LANE)
+                .remove(KEY_REARVIEW_FRONT_REAR)
                 .apply();
         AppLog.i(TAG, "超级后视镜布局已恢复默认");
     }

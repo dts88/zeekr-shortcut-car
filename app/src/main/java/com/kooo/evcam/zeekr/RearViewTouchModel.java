@@ -49,6 +49,41 @@ public final class RearViewTouchModel {
     }
 
     /**
+     * 中间三分之一的这一下，是「左右划着换一路」还是「上下挪取景」。
+     *
+     * <p>一开始就把方向锁死，而不是等松手再判断：不锁的话，横着划的过程中
+     * 那一点点竖直位移会让画面上下抖 —— 明明在换路，取景却动了。</p>
+     *
+     * @return true 表示这一下按横向处理
+     */
+    public static boolean isHorizontalIntent(float dx, float dy) {
+        return Math.abs(dx) > Math.abs(dy);
+    }
+
+    /**
+     * 横向的这一下够不够「明显」，够了才换路。
+     *
+     * <p>两条任选其一：划得够远，或者划得够快。慢慢挪一点点不算 ——
+     * 换路是个明确的动作，不该被手指的轻微横移触发。</p>
+     *
+     * @param dx               总横向位移（像素，向右为正）
+     * @param velocityX        松手时的横向速度（px/s）
+     * @param minDistancePx    够远的门槛
+     * @param minFlingVelocity 够快的门槛，取自 ViewConfiguration
+     */
+    public static boolean isDeliberateSwipe(float dx, float velocityX,
+                                            int minDistancePx, float minFlingVelocity) {
+        if (Math.abs(dx) >= minDistancePx) {
+            return true;
+        }
+        // 快速甩的方向必须和位移方向一致，否则是划出去又拉回来
+        return minFlingVelocity > 0
+                && Math.abs(velocityX) >= minFlingVelocity
+                && Math.signum(velocityX) == Math.signum(dx)
+                && dx != 0f;
+    }
+
+    /**
      * 中间三分之一上下拖动时，取景要平移多少。
      *
      * <p>方向是反的：手指往下拖，是想看画面<b>上方</b>的内容，取景要往上走。</p>

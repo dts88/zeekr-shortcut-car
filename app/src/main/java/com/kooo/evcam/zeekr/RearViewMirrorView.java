@@ -38,12 +38,13 @@ import com.kooo.evcam.AutoFitTextureView;
  * <h3>手势</h3>
  *
  * <p>横向分三段，规则见 {@link RearViewTouchModel}：左右三分之一拖动窗口，
- * 中间三分之一上下滑调整取景范围（窗口不动）。双指缩放窗口大小，推出屏幕一半或朝边上甩一下即贴边隐藏。</p>
+ * 中间三分之一上下滑调整取景高低、左右划切换显示哪一路（窗口不动）。双指缩放窗口大小，推出屏幕一半或朝边上甩一下即贴边隐藏。</p>
  *
  * <p>显示框可以拉成任意宽高，但<b>画面比例永远不变</b>：框的形状决定看到多大一块，
  * 不决定画面被拉成什么样。</p>
  *
- * <p>画面做<b>左右镜像</b>，和真正的后视镜一致；预览、录制、回放都不受影响。</p>
+ * <p>后视那一路做<b>左右镜像</b>，和真正的后视镜一致；前视、侧视不翻。
+ * 预览、录制、回放都不受影响。</p>
  */
 public class RearViewMirrorView extends ViewGroup {
 
@@ -61,6 +62,8 @@ public class RearViewMirrorView extends ViewGroup {
 
     /** 超过这个位移才算拖动，避免点一下就漂移。 */
     private static final int DRAG_SLOP_PX = 12;
+    /** 横向划多远算「明确要换一路」。 */
+    private static final int LANE_SWIPE_MIN_PX = 90;
 
     private final WindowManager windowManager;
     private final AppConfig appConfig;
@@ -71,11 +74,8 @@ public class RearViewMirrorView extends ViewGroup {
 
     /** 合成流的真实尺寸决定拆分几何，不能用缓冲区尺寸（HAL 可能给个压扁的提示值）。 */
     private CompositeStreamGeometry.Plan plan;
-    /**
-     * 取哪一路。恒为后方那一格 —— 四宫格排列目前没有任何地方能改，
-     * 所以这里不做成可配置的；等真接上排列功能了再说。
-     */
-    private final int laneIndex = RearViewGeometry.REAR_CELL;
+    /** 当前显示哪一路。中间三分之一左右划切换，见 {@link LaneCycle}。 */
+    private int laneIndex;
     /** 取景在画面上的高低位置，0..1。宽高比锁死后，可调的就只剩这个。 */
     private float pan;
 
@@ -86,6 +86,10 @@ public class RearViewMirrorView extends ViewGroup {
     private int windowStartX;
     private int windowStartY;
     private float panAtTouchStart;
+    /** 中间三分之一这一下锁定的方向；null 表示还没定。 */
+    private Boolean horizontalDrag;
+    private float lastDx;
+    private float lastDy;
     /** 鱼眼校正开关与目标视野，进入时读一次，设置页改了再推过来。 */
     private boolean fisheyeCorrection;
     private float fovDegrees;
@@ -111,6 +115,7 @@ public class RearViewMirrorView extends ViewGroup {
         this.appConfig = appConfig;
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         this.pan = appConfig.getRearViewPan();
+        this.laneIndex = appConfig.getRearViewLane();
         this.minFlingVelocity =
                 ViewConfiguration.get(context).getScaledMinimumFlingVelocity();
         this.fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
@@ -195,6 +200,39 @@ public class RearViewMirrorView extends ViewGroup {
         attached = false;
     }
 
+    /**
+     * 换到相邻的一路。
+     *
+     * <p>从车顶往下看，顺时针就是 <b>后 → 左 → 前 → 右</b>，逆时针反之。
+     * 环是首尾相接的 —— 后视镜是用来快速扫一圈的，转到头停住反而要多划几下回去。</p>
+     */
+    private void switchLane(boolean clockwise) {
+        int next = LaneCycle.next(laneIndex, clockwise, appConfig.isRearViewFrontRearOnly());
+        if (next == laneIndex) {
+            return;
+        }
+        laneIndex = next;
+        appConfig.setRearViewLane(laneIndex);
+        AppLog.i(TAG, "后视镜切到「" + LaneCycle.labelOf(laneIndex) + "」路"
+                + (LaneCycle.isMirrored(laneIndex) ? "（镜像）" : "（不镜像）"));
+        invalidate();
+    }
+
+    /**
+     * 设置页改了「只看前后」之后推过来。
+     *
+     * <p>如果当前停在侧视，而侧视已经不在环上了，就退回后视 ——
+     * 否则会停在一个划不动的画面上。</p>
+     */
+    public void applyLaneModeFromConfig() {
+        int lane = appConfig.getRearViewLane();
+        if (lane != laneIndex) {
+            laneIndex = lane;
+            AppLog.i(TAG, "后视镜回到「" + LaneCycle.labelOf(laneIndex) + "」路");
+            invalidate();
+        }
+    }
+
     /** 设置页改了尺寸后，直接套用到正在显示的窗口上。 */
     public void applySizeFromConfig() {
         if (params == null) {
@@ -241,13 +279,17 @@ public class RearViewMirrorView extends ViewGroup {
         RearViewGeometry.Viewport viewport = viewport();
         float[] rect = RearViewGeometry.combinedSourceRect(plan, laneIndex, viewport);
 
-        // 左右镜像。后视镜照出来的本来就是反的 —— 看到有车从画面右侧靠近，
-        // 手就该往左让，这个对应关系是开车时的肌肉记忆，不镜像会反过来。
+        // 左右镜像只给后视那一路。后视镜照出来的本来就是反的 —— 看到有车从画面
+        // 右侧靠近，手就该往左让，这个对应关系是开车时的肌肉记忆。
+        //
+        // 前视和侧视不翻：那是「朝那个方向看过去」的画面，翻了反而与实际相反。
         //
         // 只作用于这个悬浮窗：预览、录制、回放拿到的都还是原始画面，
         // 镜像是「怎么看」的问题，不是「存什么」的问题。
         int mirrorSave = canvas.save();
-        canvas.scale(-1f, 1f, width / 2f, height / 2f);
+        if (LaneCycle.isMirrored(laneIndex)) {
+            canvas.scale(-1f, 1f, width / 2f, height / 2f);
+        }
 
         if (fisheyeCorrection) {
             drawCorrected(canvas, width, height, viewport);
@@ -336,6 +378,9 @@ public class RearViewMirrorView extends ViewGroup {
         windowStartX = params != null ? params.x : 0;
         windowStartY = params != null ? params.y : 0;
         panAtTouchStart = pan;
+        horizontalDrag = null;
+        lastDx = 0f;
+        lastDy = 0f;
         dragging = false;
         pinching = false;
     }
@@ -380,9 +425,19 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
         dragging = true;
+        lastDx = dx;
+        lastDy = dy;
 
         if (activeZone == RearViewTouchModel.Zone.ADJUST_CROP) {
-            // 中间三分之一：只上下挪取景，窗口不动，左右也不变
+            // 一开始就锁定方向。不锁的话，横着划的过程中那点竖直位移会让取景上下抖 ——
+            // 明明在换路，画面却动了。
+            if (horizontalDrag == null) {
+                horizontalDrag = RearViewTouchModel.isHorizontalIntent(dx, dy);
+            }
+            if (horizontalDrag) {
+                // 换不换路等松手再定，划到一半不该跳来跳去
+                return;
+            }
             float shift = RearViewTouchModel.panShiftForDrag(
                     dy, getHeight(), viewport().verticalHeadroom());
             pan = RearViewGeometry.clampPan(panAtTouchStart + shift);
@@ -425,7 +480,15 @@ public class RearViewMirrorView extends ViewGroup {
         }
 
         if (activeZone == RearViewTouchModel.Zone.ADJUST_CROP && dragging) {
-            appConfig.setRearViewPan(pan);
+            if (horizontalDrag != null && horizontalDrag) {
+                if (RearViewTouchModel.isDeliberateSwipe(
+                        lastDx, velocityX, LANE_SWIPE_MIN_PX, minFlingVelocity)) {
+                    // 左滑走顺时针（后 左 前 右），右滑走逆时针
+                    switchLane(lastDx < 0f);
+                }
+            } else {
+                appConfig.setRearViewPan(pan);
+            }
         } else if (params != null && (dragging || pinching)) {
             // 只有「明显是想收起来」才贴边：推出去一半，或者朝边上甩一下。
             // 窗口还整个在屏幕里的话一定不贴边 —— 以前是按「离边多近」判断的，

@@ -1451,7 +1451,7 @@ public class SettingsFragment extends Fragment {
                 if (isChecked) {
                     com.kooo.evcam.zeekr.RearViewMirrorService.start(getContext());
                     Toast.makeText(getContext(),
-                            "超级后视镜已开启：左右三分之一拖动，中间上下滑调取景高低，双指缩放",
+                            "超级后视镜已开启：中间上下滑调取景、左右划换一路，两侧拖动窗口，双指缩放",
                             Toast.LENGTH_LONG).show();
                 } else {
                     com.kooo.evcam.zeekr.RearViewMirrorService.stop(getContext());
@@ -1461,6 +1461,7 @@ public class SettingsFragment extends Fragment {
 
         initRearViewSizeSliders(view);
         initRearViewFisheye(view);
+        initRearViewLaneMode(view);
 
         View resetButton = view.findViewById(R.id.btn_reset_rearview);
         if (resetButton != null) {
@@ -1477,6 +1478,21 @@ public class SettingsFragment extends Fragment {
                 }
             });
         }
+    }
+
+    /** 「只显示前后视」开关。 */
+    private void initRearViewLaneMode(View view) {
+        SwitchMaterial laneSwitch = view.findViewById(R.id.switch_rearview_front_rear);
+        if (laneSwitch == null || appConfig == null) {
+            return;
+        }
+        laneSwitch.setChecked(appConfig.isRearViewFrontRearOnly());
+        laneSwitch.setOnCheckedChangeListener((button, isChecked) -> {
+            appConfig.setRearViewFrontRearOnly(isChecked);
+            if (getContext() != null && appConfig.isRearViewEnabled()) {
+                com.kooo.evcam.zeekr.RearViewMirrorService.applyLaneMode(getContext());
+            }
+        });
     }
 
     /**

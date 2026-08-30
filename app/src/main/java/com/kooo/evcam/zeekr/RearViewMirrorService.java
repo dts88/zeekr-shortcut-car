@@ -74,6 +74,14 @@ public class RearViewMirrorService extends Service {
         }
     }
 
+    /** 设置页改了「只看前后」后通知正在显示的窗口。 */
+    public static void applyLaneMode(Context context) {
+        RearViewMirrorService svc = instance;
+        if (svc != null && svc.mirrorView != null) {
+            svc.mirrorView.applyLaneModeFromConfig();
+        }
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();

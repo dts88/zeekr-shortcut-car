@@ -1,6 +1,7 @@
 package com.kooo.evcam.zeekr;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -90,6 +91,46 @@ public class RearViewTouchModelTest {
             assertTrue("上边越界: " + moved, moved.y >= -EPS);
             assertTrue("下边越界: " + moved, moved.y + moved.height <= 1f + EPS);
         }
+    }
+
+    // ---------- 左右划换一路 ----------
+
+    @Test
+    public void theDominantAxisDecidesWhatTheDragMeans() {
+        assertTrue("横多于竖 -> 横向", RearViewTouchModel.isHorizontalIntent(50, 10));
+        assertFalse("竖多于横 -> 纵向", RearViewTouchModel.isHorizontalIntent(10, 50));
+        assertFalse("相等时按纵向处理，取景是更常用的那个",
+                RearViewTouchModel.isHorizontalIntent(30, 30));
+    }
+
+    /** 划得够远就算数，不必也划得快。 */
+    @Test
+    public void aLongEnoughSwipeCountsWithoutSpeed() {
+        assertTrue(RearViewTouchModel.isDeliberateSwipe(90, 0f, 90, MIN_FLING));
+        assertTrue(RearViewTouchModel.isDeliberateSwipe(-90, 0f, 90, MIN_FLING));
+        assertTrue(RearViewTouchModel.isDeliberateSwipe(500, 0f, 90, MIN_FLING));
+    }
+
+    /** 划得够快也算数，不必划到那么远。 */
+    @Test
+    public void aFastEnoughFlickCountsWithoutDistance() {
+        assertTrue(RearViewTouchModel.isDeliberateSwipe(30, MIN_FLING, 90, MIN_FLING));
+        assertTrue(RearViewTouchModel.isDeliberateSwipe(-30, -MIN_FLING, 90, MIN_FLING));
+    }
+
+    /** 又慢又短不算 —— 换路是明确的动作，不该被手指轻微横移触发。 */
+    @Test
+    public void aShortSlowNudgeDoesNotSwitchLanes() {
+        assertFalse(RearViewTouchModel.isDeliberateSwipe(30, 0f, 90, MIN_FLING));
+        assertFalse(RearViewTouchModel.isDeliberateSwipe(30, MIN_FLING - 1, 90, MIN_FLING));
+        assertFalse(RearViewTouchModel.isDeliberateSwipe(0, 0f, 90, MIN_FLING));
+    }
+
+    /** 划出去又拉回来：速度方向和位移方向相反，不该算数。 */
+    @Test
+    public void flickingBackTheOtherWayDoesNotCount() {
+        assertFalse(RearViewTouchModel.isDeliberateSwipe(30, -MIN_FLING * 3, 90, MIN_FLING));
+        assertFalse(RearViewTouchModel.isDeliberateSwipe(-30, MIN_FLING * 3, 90, MIN_FLING));
     }
 
     // ---------- 贴边停靠 ----------
