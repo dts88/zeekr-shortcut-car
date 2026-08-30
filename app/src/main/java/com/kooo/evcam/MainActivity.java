@@ -1336,6 +1336,14 @@ public class MainActivity extends AppCompatActivity {
      */
     private void setupNavigationDrawer() {
         // 设置导航菜单点击监听
+        drawerLayout.addDrawerListener(new androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            @Override
+            public void onDrawerOpened(View drawerView) {
+                syncDeveloperMenuVisibility();
+            }
+        });
+        syncDeveloperMenuVisibility();
+
         navigationView.setNavigationItemSelectedListener(item -> {
             int itemId = item.getItemId();
             // 先清除所有菜单项的选中状态（处理跨组选中）
@@ -4371,4 +4379,26 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
+    /**
+     * 补盲和超视只在开发者选项打开时出现在抽屉里。
+     *
+     * <p>每次拉开抽屉都对一次：开发者选项是不持久化的，重启就关，
+     * 菜单得跟着它走，不能只在启动时判断一次。</p>
+     */
+    private void syncDeveloperMenuVisibility() {
+        if (navigationView == null) {
+            return;
+        }
+        boolean unlocked = com.kooo.evcam.settings.DeveloperMode.isUnlocked();
+        android.view.Menu menu = navigationView.getMenu();
+        android.view.MenuItem blindSpot = menu.findItem(R.id.nav_secondary_display);
+        if (blindSpot != null) {
+            blindSpot.setVisible(unlocked);
+        }
+        android.view.MenuItem supervision = menu.findItem(R.id.nav_supervision_mode);
+        if (supervision != null) {
+            supervision.setVisible(unlocked);
+        }
+    }
 }

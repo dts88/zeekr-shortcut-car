@@ -10,3 +10,7 @@ local.properties
 *.log
 captures/
 .trae/
+
+# 只在本机保留的材料：待办、未验证项、路线图。
+# 仓库对外只呈现已经做完并验证过的东西，没做完的不对外讲。
+docs/local/
