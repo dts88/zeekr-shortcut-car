@@ -93,9 +93,10 @@ public class CameraForegroundService extends Service {
                     FloatingWindowService.start(this);
                 }
                 
-                // 启动补盲选项服务 (副屏/主屏悬浮窗/转向灯联动/模拟按钮)
-                if (appConfig.isSecondaryDisplayEnabled() || appConfig.isMainFloatingEnabled()
-                        || appConfig.isTurnSignalLinkageEnabled() || appConfig.isMockTurnSignalFloatingEnabled()) {
+                // 补盲那一套该不该起来，用和主界面同一条规则判断。
+                // 这里原先自己写了一遍，漏掉了全局开关、全景避让和定制键唤醒三项 ——
+                // 同一个问题两个答案，改了一处就会不一致。
+                if (com.kooo.evcam.overlay.OverlayCoordinator.blindSpotWanted(appConfig)) {
                     AppLog.d(TAG, "补盲选项已启用，从 Service 启动...");
                     BlindSpotService.update(this);
                 }

@@ -32,6 +32,7 @@ import com.kooo.evcam.PermissionSettingsFragment;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
+import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.AboutActivity;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
@@ -612,18 +613,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 超级后视镜
 
     private void bindRearView() {
-        bindSwitch("pref_rearview", appConfig.isRearViewEnabled(), value -> {
-            appConfig.setRearViewEnabled(value);
-            if (getContext() == null) {
-                return;
-            }
-            if (value) {
-                RearViewMirrorService.start(getContext());
-                toast("超级后视镜已开启：中间上下滑调取景、左右划换一路，两侧拖动窗口");
-            } else {
-                RearViewMirrorService.stop(getContext());
-            }
-        });
+        // 这个开关原先没查悬浮窗权限：没授权时它会拨上去、提示语还讲了手势怎么用，
+        // 而服务在 onStartCommand 里就 stopSelf() 走了，屏幕上什么都没有。
+        bindOverlaySwitch("pref_rearview", appConfig.isRearViewEnabled(),
+                OverlayCoordinator::setRearViewEnabled, on -> {
+                    if (on) {
+                        toast("超级后视镜已开启：中间上下滑调取景、左右划换一路，两侧拖动窗口");
+                    }
+                });
 
         bindSwitch("pref_rearview_front_rear", appConfig.isRearViewFrontRearOnly(), value -> {
             appConfig.setRearViewFrontRearOnly(value);
@@ -687,33 +684,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 悬浮窗
 
     private void bindFloating() {
-        SwitchPreferenceCompat floating = findPreference("pref_floating_window");
-        if (floating != null) {
-            floating.setPersistent(false);
-            floating.setChecked(appConfig.isFloatingWindowEnabled());
-            floating.setOnPreferenceChangeListener((preference, newValue) -> {
-                boolean on = Boolean.TRUE.equals(newValue);
-                if (getContext() == null) {
-                    return false;
-                }
-                // 没有悬浮窗权限就打不开，先去授权而不是把开关拨上去装作开了
-                if (on && !WakeUpHelper.hasOverlayPermission(getContext())) {
-                    toast("请先授权悬浮窗权限");
-                    WakeUpHelper.requestOverlayPermission(getContext());
-                    return false;
-                }
-                appConfig.setFloatingWindowEnabled(on);
-                if (on) {
-                    FloatingWindowService.start(getContext());
-                    if (getActivity() instanceof MainActivity) {
+        bindOverlaySwitch("pref_floating_window", appConfig.isFloatingWindowEnabled(),
+                OverlayCoordinator::setPreviewWindowEnabled, on -> {
+                    if (on && getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).broadcastCurrentRecordingState();
                     }
-                } else {
-                    FloatingWindowService.stop(getContext());
-                }
-                return true;
-            });
-        }
+                });
 
         // 范围取自 AppConfig 自己的常量，不另编一套 —— 让人选一个随后又被夹掉的值，
         // 就又变成「界面显示的和实际生效的不是一回事」
@@ -730,27 +706,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     pushFloatingWindow();
                 });
 
-        SwitchPreferenceCompat recordingFloating = findPreference("pref_recording_floating");
-        if (recordingFloating != null) {
-            recordingFloating.setPersistent(false);
-            recordingFloating.setChecked(appConfig.isRecordingFloatingEnabled());
-            recordingFloating.setOnPreferenceChangeListener((preference, newValue) -> {
-                boolean on = Boolean.TRUE.equals(newValue);
-                if (getContext() == null) {
-                    return false;
-                }
-                if (on && !WakeUpHelper.hasOverlayPermission(getContext())) {
-                    toast("请先授权悬浮窗权限");
-                    WakeUpHelper.requestOverlayPermission(getContext());
-                    return false;
-                }
-                appConfig.setRecordingFloatingEnabled(on);
-                sendToRecordingFloating(on
-                        ? RecordingFloatingService.ACTION_SHOW
-                        : RecordingFloatingService.ACTION_HIDE, null);
-                return true;
-            });
-        }
+        bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
+                OverlayCoordinator::setRecordButtonEnabled, null);
 
         bindSlider("pref_button_size", 32, 100,
                 appConfig.getRecordingFloatingButtonSizeDp(), " dp",
@@ -983,6 +940,46 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /** 开关：不自己持久化，读写都走 AppConfig。 */
+    /**
+     * 悬浮窗类开关。
+     *
+     * <p>没有悬浮窗权限时<b>不把开关拨上去</b>，而是去要权限 ——
+     * 拨上去而窗口不出现，就是「界面显示的和实际生效的不是一回事」。
+     * 三个开关原先各写各的，其中一个漏了这道检查。</p>
+     *
+     * @param toggle      真正去开 / 关的动作，返回 false 表示没开成
+     * @param afterChange 开成了之后额外要做的事，可以为 null
+     */
+    private void bindOverlaySwitch(String key, boolean current,
+                                   OverlayToggle toggle, BoolSetter afterChange) {
+        SwitchPreferenceCompat pref = findPreference(key);
+        if (pref == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setChecked(current);
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            if (getContext() == null) {
+                return false;
+            }
+            boolean on = Boolean.TRUE.equals(newValue);
+            if (!toggle.apply(getContext(), on)) {
+                toast("请先授权悬浮窗权限");
+                WakeUpHelper.requestOverlayPermission(getContext());
+                return false;
+            }
+            if (afterChange != null) {
+                afterChange.set(on);
+            }
+            return true;
+        });
+    }
+
+    /** 开 / 关一个悬浮窗；返回是否真的按要求生效。 */
+    private interface OverlayToggle {
+        boolean apply(Context context, boolean enabled);
+    }
+
     private void bindSwitch(String key, boolean current, BoolSetter setter) {
         SwitchPreferenceCompat pref = findPreference(key);
         if (pref == null) {

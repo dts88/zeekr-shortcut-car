@@ -34,6 +34,7 @@ import androidx.fragment.app.FragmentTransaction;
 import com.google.android.material.navigation.NavigationView;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
@@ -342,51 +343,9 @@ public class MainActivity extends AppCompatActivity {
             }, 1000);
         }
 
-// 启动悬浮窗服务（如果已启用）
-        if (appConfig.isFloatingWindowEnabled() && WakeUpHelper.hasOverlayPermission(this)) {
-            FloatingWindowService.start(this);
-            AppLog.d(TAG, "悬浮窗服务已启动");
-            
-            // 延迟发送当前状态（等待服务启动完成）
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                // 发送当前录制状态
-                broadcastCurrentRecordingState();
-                // 应用在前台，隐藏悬浮窗
-                FloatingWindowService.sendAppForegroundState(this, true);
-            }, 500);
-        }
-
-        // 启动超级后视镜（如果已启用）
-        //
-        // 以前这里没有这一段：开关存着「开」，但没人在启动时把服务拉起来，
-        // 于是每次重开应用都要去设置里关一次再开一次，它才真的出现。
-        // 其他悬浮窗都在这里恢复，唯独漏了它。
-        if (appConfig.isRearViewEnabled() && WakeUpHelper.hasOverlayPermission(this)) {
-            // 稍等一下再拉：后视镜要绑相机，相机这会儿还在开
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                com.kooo.evcam.zeekr.RearViewMirrorService.start(this);
-                AppLog.d(TAG, "超级后视镜已按设置自动开启");
-            }, 2000);
-        }
-
-        // 启动录制悬浮按钮服务（如果已启用，默认开启）
-        if (appConfig.isRecordingFloatingEnabled() && WakeUpHelper.hasOverlayPermission(this)) {
-            Intent intent = new Intent(this, com.kooo.evcam.service.RecordingFloatingService.class);
-            intent.setAction(com.kooo.evcam.service.RecordingFloatingService.ACTION_SHOW);
-            startService(intent);
-            AppLog.d(TAG, "录制悬浮按钮服务已启动");
-        }
-
-        // 启动补盲选项服务 (副屏/主屏悬浮窗/转向灯联动/模拟按钮/全景避让)
-        // 定制键唤醒独立于补盲全局开关，单独判断
-        if ((appConfig.isBlindSpotGlobalEnabled()
-                && (appConfig.isSecondaryDisplayEnabled() || appConfig.isMainFloatingEnabled()
-                    || appConfig.isTurnSignalLinkageEnabled() || appConfig.isMockTurnSignalFloatingEnabled()
-                    || appConfig.isAvmAvoidanceEnabled()))
-                || appConfig.isCustomKeyWakeupEnabled()) {
-            BlindSpotService.update(this);
-            AppLog.d(TAG, "补盲选项服务已启动");
-        }
+        // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级后视镜 /
+        // 录制悬浮按钮 / 补盲）。该不该开、能不能开都在协调器里判断。
+        OverlayCoordinator.restoreOnLaunch(this, this::broadcastCurrentRecordingState);
         
         // 初始化息屏录制检测
         initScreenStateReceiver();
@@ -2993,8 +2952,8 @@ public class MainActivity extends AppCompatActivity {
         CameraForegroundService.stop(this);
 
 
-        // 释放悬浮窗服务
-        FloatingWindowService.stop(this);
+        // 后视镜和录制按钮不停：它们本来就是脱离主界面用的
+        OverlayCoordinator.onActivityDestroyed(this);
         
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();
@@ -3293,13 +3252,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         isInBackground = true;
-        BlindSpotService.notifySelfBackground();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
         
-        // 通知悬浮窗服务：应用进入后台，显示悬浮窗
-        if (appConfig.isFloatingWindowEnabled()) {
-            FloatingWindowService.sendAppForegroundState(this, false);
-        }
+        // 通知悬浮窗：应用退到后台
+        OverlayCoordinator.onAppBackground(this);
         
         // 根据是否正在录制，决定如何处理摄像头
         if (cameraManager != null) {
@@ -3354,7 +3310,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         boolean wasInBackground = isInBackground;
         isInBackground = false;
-        BlindSpotService.notifySelfForeground();
         
         // 标记 Activity 已经完全恢复过一次（用于区分新创建和已存在的 Activity）
         // 这个标记在 onCreate 后第一次 onResume 时设为 true
@@ -3363,10 +3318,8 @@ public class MainActivity extends AppCompatActivity {
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording + ", firstResume=" + wasFirstResume);
         
-        // 通知悬浮窗服务：应用进入前台，隐藏悬浮窗
-        if (appConfig.isFloatingWindowEnabled()) {
-            FloatingWindowService.sendAppForegroundState(this, true);
-        }
+        // 通知悬浮窗：应用回到前台
+        OverlayCoordinator.onAppForeground(this);
         
         // 返回前台时，检查摄像头连接状态
         if (cameraManager != null && wasInBackground) {
