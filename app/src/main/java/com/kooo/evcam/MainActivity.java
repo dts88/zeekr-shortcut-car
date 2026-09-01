@@ -351,6 +351,19 @@ public class MainActivity extends AppCompatActivity {
             }, 500);
         }
 
+        // 启动超级后视镜（如果已启用）
+        //
+        // 以前这里没有这一段：开关存着「开」，但没人在启动时把服务拉起来，
+        // 于是每次重开应用都要去设置里关一次再开一次，它才真的出现。
+        // 其他悬浮窗都在这里恢复，唯独漏了它。
+        if (appConfig.isRearViewEnabled() && WakeUpHelper.hasOverlayPermission(this)) {
+            // 稍等一下再拉：后视镜要绑相机，相机这会儿还在开
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                com.kooo.evcam.zeekr.RearViewMirrorService.start(this);
+                AppLog.d(TAG, "超级后视镜已按设置自动开启");
+            }, 1500);
+        }
+
         // 启动录制悬浮按钮服务（如果已启用，默认开启）
         if (appConfig.isRecordingFloatingEnabled() && WakeUpHelper.hasOverlayPermission(this)) {
             Intent intent = new Intent(this, com.kooo.evcam.service.RecordingFloatingService.class);
