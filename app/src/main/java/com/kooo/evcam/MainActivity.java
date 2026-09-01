@@ -361,7 +361,7 @@ public class MainActivity extends AppCompatActivity {
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                 com.kooo.evcam.zeekr.RearViewMirrorService.start(this);
                 AppLog.d(TAG, "超级后视镜已按设置自动开启");
-            }, 1500);
+            }, 2000);
         }
 
         // 启动录制悬浮按钮服务（如果已启用，默认开启）
@@ -3372,6 +3372,17 @@ public class MainActivity extends AppCompatActivity {
     private void confirmInternalStorageThen(Runnable onProceed) {
         if (!StorageHelper.willRecordToInternal(this)) {
             onProceed.run();
+            return;
+        }
+        // 正常模式下根本不往内置存储录 —— 与其偷偷降级，不如说清楚并且不录
+        if (!StorageHelper.isInternalStorageAllowed()) {
+            new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                    .setTitle("未检测到外置存储")
+                    .setMessage("正常模式下只录到外置存储，以免持续写入损耗车机内置闪存。\n\n"
+                            + "请插入 U 盘后重试。已插入却识别不到的话，"
+                            + "可以换一个接口，或在设置里重新选择存储位置。")
+                    .setPositiveButton("知道了", null)
+                    .show();
             return;
         }
         boolean chosen = !new AppConfig(this).isUsingExternalSdCard();

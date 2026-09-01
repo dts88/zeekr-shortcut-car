@@ -375,8 +375,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindStorage() {
         bindStorageLocation();
 
-        bindSwitch("pref_relay_write", appConfig.isRelayWriteEnabled(),
-                value -> appConfig.setRelayWriteEnabled(value));
+        // 中转写入是「先写内置再搬走」，本质上就是往内置存储规律性地写，
+        // 所以和内置存储同一个门槛
+        SwitchPreferenceCompat relay = findPreference("pref_relay_write");
+        if (relay != null) {
+            relay.setPersistent(false);
+            relay.setChecked(appConfig.isRelayWriteEnabled());
+            if (!StorageHelper.isInternalStorageAllowed()) {
+                relay.setEnabled(false);
+                relay.setSummary("会先写内置存储再搬到 U 盘，因此仅限开发者模式");
+            }
+            relay.setOnPreferenceChangeListener((preference, newValue) -> {
+                appConfig.setRelayWriteEnabled(Boolean.TRUE.equals(newValue));
+                return true;
+            });
+        }
 
         bindGigabyteLimit("pref_video_limit", appConfig.getVideoStorageLimitGb(),
                 value -> appConfig.setVideoStorageLimitGb(value));
@@ -451,7 +464,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             // 真正被记住的是下面钉进 customSdCardPath 的根目录
             values.add(EXTERNAL_PREFIX + i);
         }
-        labels.add("内置存储");
+        // 内置存储照样列出来 —— 藏起来只会让人以为软件没这个能力。
+        // 但标明它要开发者选项，选中时也会被拦下。
+        labels.add(StorageHelper.isInternalStorageAllowed()
+                ? "内置存储" : "内置存储（仅限开发者模式）");
         values.add(AppConfig.STORAGE_INTERNAL);
 
         pref.setEntries(labels.toArray(new String[0]));
@@ -462,6 +478,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
             if (AppConfig.STORAGE_INTERNAL.equals(value)) {
+                if (!StorageHelper.isInternalStorageAllowed()) {
+                    explainInternalStorageIsGated();
+                    return false;
+                }
                 confirmInternalStorage(pref);
             } else {
                 applyStorageLocation(pref, value);
@@ -485,6 +505,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         }
         return EXTERNAL_PREFIX + "0";
+    }
+
+    /** 说清楚为什么内置存储点不动，而不是让它默默没反应。 */
+    private void explainInternalStorageIsGated() {
+        if (getContext() == null) {
+            return;
+        }
+        new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
+                .setTitle("内置存储需要开发者选项")
+                .setMessage("行车记录会持续不断地写入数据，而车机内置闪存的写入寿命有限，"
+                        + "坏了通常也换不了。所以正常模式下只录到外置存储。\n\n"
+                        + "如果确实需要，可在「关于本应用」里打开开发者选项后再选。")
+                .setPositiveButton("知道了", null)
+                .show();
     }
 
     private void applyStorageLocation(ListPreference pref, String value) {

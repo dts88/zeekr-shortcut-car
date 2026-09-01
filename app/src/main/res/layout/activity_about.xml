@@ -50,6 +50,34 @@
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
+            <!-- 存储建议 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="关于外置存储"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingMultiplier="1.25"
+                android:text="录像只写外置存储，不写车机内置闪存 —— 行车记录是持续写入，而车机存储写坏了换不了。\n\n• 随车附送的 U 盘足够满足基本录制。\n\n• 想要更高码率或更长的保存周期，又不想占用原车 U 盘，可以另插一块：用左侧的 Type-C 接口，车机会自动识别，随时可以拔下。\n\n• 已实测可用：128GB U 盘；NVMe 固态盘（读写快得多，基本解决写入瓶颈，但发热略大）。\n\n• 用傲腾（Optane）技术的 M10 系列性价比很高，缺点是容量太小，大约只能存最近 20 小时。"
+                android:textColor="#DDFFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.25"
+                android:text="⚠ 录像在 U 盘上是不加密的。盘随时可以拔下并在别的设备上读取，请自行注意隐私。"
+                android:textColor="#FFD08080"
+                android:textSize="15sp" />
+
             <!-- 项目地址 -->
             <TextView
                 android:layout_width="match_parent"

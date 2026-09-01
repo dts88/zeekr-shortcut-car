@@ -97,6 +97,7 @@
             android:title="中转写入"
             android:summary="先写内置存储，分段完成后再搬到 U 盘。U 盘速度不稳时可减少丢帧" />
 
+
         <EditTextPreference
             android:key="pref_video_limit"
             android:title="视频存储上限"

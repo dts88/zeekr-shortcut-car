@@ -463,6 +463,17 @@ public class StorageHelper {
      * @return U盘根目录，如果没有则返回 null
      */
     /**
+     * 内置存储现在允许当作落盘位置吗。
+     *
+     * <p>只有开发者选项打开时才允许。行车记录是持续写入，而车机闪存
+     * 写坏了换不了 —— 这个代价不该由「不熟悉软件、一路点确定」的人承担，
+     * 所以它不是一个弹窗能放行的选择，而是默认就不给。</p>
+     */
+    public static boolean isInternalStorageAllowed() {
+        return com.kooo.evcam.settings.DeveloperMode.isUnlocked();
+    }
+
+    /**
      * 录像实际上会不会落在内置存储上。
      *
      * <p>两种情况都算：选的就是内置存储，或者选了 U 盘但盘不在
