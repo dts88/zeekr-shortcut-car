@@ -1128,8 +1128,6 @@ public class MainActivity extends AppCompatActivity {
 
         navigationView.setNavigationItemSelectedListener(item -> {
             int itemId = item.getItemId();
-            // 先清除所有菜单项的选中状态（处理跨组选中）
-            clearAllNavigationChecks();
             
             if (itemId == R.id.nav_recording) {
                 // 显示录制界面
@@ -1153,8 +1151,7 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_about) {
                 startActivity(new Intent(this, com.kooo.evcam.zeekr.AboutActivity.class));
             }
-            // 设置当前项为选中
-            navigationView.setCheckedItem(itemId);
+            selectNavItem(itemId);
             drawerLayout.closeDrawer(GravityCompat.START);
             return true;
         });
@@ -1167,6 +1164,19 @@ public class MainActivity extends AppCompatActivity {
      * 清除所有导航菜单项的选中状态
      * 用于处理跨组选中时的状态同步
      */
+    /**
+     * 选中侧边栏里的某一项。
+     *
+     * <p>跨组选中要先把别的清掉，否则会同时亮着两项。</p>
+     */
+    private void selectNavItem(int itemId) {
+        if (navigationView == null) {
+            return;
+        }
+        clearAllNavigationChecks();
+        navigationView.setCheckedItem(itemId);
+    }
+
     private void clearAllNavigationChecks() {
         Menu menu = navigationView.getMenu();
         for (int i = 0; i < menu.size(); i++) {
@@ -1200,8 +1210,7 @@ public class MainActivity extends AppCompatActivity {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             // 进入设置界面
             showSettingsInterface();
-            clearAllNavigationChecks();
-            navigationView.setCheckedItem(R.id.nav_settings);
+            selectNavItem(R.id.nav_settings);
 
             // 显示引导弹窗
             showFirstLaunchGuideDialog();
@@ -1241,15 +1250,39 @@ public class MainActivity extends AppCompatActivity {
      * 显示录制界面
      */
     public void showRecordingInterface() {
-        // 清除所有Fragment
         FragmentManager fragmentManager = getSupportFragmentManager();
-        for (Fragment fragment : fragmentManager.getFragments()) {
-            fragmentManager.beginTransaction().remove(fragment).commit();
-        }
 
-        // 显示录制布局，隐藏Fragment容器
+        // 返回栈也要清掉。只把 Fragment 移走而把栈留着，下一次按返回键就会去
+        // 反演一个已经不在屏幕上的事务 —— 表现是「按了没反应，得再按一次」。
+        fragmentManager.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+
+        // 一个事务里移完，不是每个 Fragment 各提交一次
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        for (Fragment fragment : fragmentManager.getFragments()) {
+            transaction.remove(fragment);
+        }
+        transaction.commit();
+
         recordingLayout.setVisibility(View.VISIBLE);
         fragmentContainer.setVisibility(View.GONE);
+    }
+
+    /**
+     * 把一个界面放进内容区。
+     *
+     * <p>「藏录制布局、亮出容器、replace、commit」这四步原先在三处各写一遍。</p>
+     *
+     * <p>顺带把它标成<b>主导航 Fragment</b>。这是 Android 用来认「当前是哪一层」
+     * 的标准做法：标了之后它自己的子返回栈才算数 —— 设置页的二级界面
+     * （权限、相机映射）就在那个子返回栈里。</p>
+     */
+    private void showFragment(Fragment fragment) {
+        recordingLayout.setVisibility(View.GONE);
+        fragmentContainer.setVisibility(View.VISIBLE);
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .setPrimaryNavigationFragment(fragment)
+                .commit();
     }
 
     /**
@@ -1262,11 +1295,7 @@ public class MainActivity extends AppCompatActivity {
             drawerLayout.closeDrawer(GravityCompat.START);
         }
         showRecordingInterface();
-        // 更新导航菜单选中状态（先清除所有选中，再设置当前项）
-        if (navigationView != null) {
-            clearAllNavigationChecks();
-            navigationView.setCheckedItem(R.id.nav_recording);
-        }
+        selectNavItem(R.id.nav_recording);
     }
 
     /**
@@ -1285,15 +1314,7 @@ public class MainActivity extends AppCompatActivity {
      * 显示图片回看界面（新版四宫格界面）
      */
     private void showPhotoPlaybackInterface() {
-        // 隐藏录制布局，显示Fragment容器
-        recordingLayout.setVisibility(View.GONE);
-        fragmentContainer.setVisibility(View.VISIBLE);
-
-        // 显示新版PhotoPlaybackFragment（支持四宫格预览）
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, new PhotoPlaybackFragmentNew());
-        transaction.commit();
+        showFragment(new PhotoPlaybackFragmentNew());
     }
 
 
@@ -1308,31 +1329,14 @@ public class MainActivity extends AppCompatActivity {
      * 显示软件设置界面
      */
     private void showSettingsInterface() {
-        // 隐藏录制布局，显示Fragment容器
-        recordingLayout.setVisibility(View.GONE);
-        fragmentContainer.setVisibility(View.VISIBLE);
-
-        // 显示SettingsFragment
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container,
-                new com.kooo.evcam.settings.SettingsShellFragment());
-        transaction.commit();
+        showFragment(new com.kooo.evcam.settings.SettingsShellFragment());
     }
 
     /**
      * 显示补盲选项设置界面
      */
     public void showBlindSpotInterface() {
-        // 隐藏录制布局，显示Fragment容器
-        recordingLayout.setVisibility(View.GONE);
-        fragmentContainer.setVisibility(View.VISIBLE);
-
-        // 显示BlindSpotSettingsFragment
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.replace(R.id.fragment_container, new BlindSpotSettingsFragment());
-        transaction.commit();
+        showFragment(new BlindSpotSettingsFragment());
     }
 
     /**
@@ -3474,21 +3478,35 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START);
-        } else if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            // 如果 Fragment 返回栈不为空（在二级菜单中），则返回上一级
-            getSupportFragmentManager().popBackStack();
-            AppLog.d(TAG, "Popped fragment back stack, returning to previous screen");
+            return;
+        }
+
+        FragmentManager fragmentManager = getSupportFragmentManager();
+
+        // 先问当前这一层自己能不能退一步。设置页的二级界面（权限、相机映射）
+        // 进的是设置外壳自己的子返回栈，活动这一层的返回栈是空的 ——
+        // 不问它，从二级界面按返回会一路跳回录制界面，而不是回到刚才那个分区。
+        // isAdded() 一定要查：这个指针在 Fragment 被 replace 掉之后不一定跟着清空，
+        // 对着一个已经移走的 Fragment 取子 FragmentManager 会炸
+        Fragment current = fragmentManager.getPrimaryNavigationFragment();
+        if (current != null && current.isAdded()
+                && current.getChildFragmentManager().popBackStackImmediate()) {
+            AppLog.d(TAG, "返回键：退回上一级设置界面");
+            return;
+        }
+
+        if (fragmentManager.getBackStackEntryCount() > 0) {
+            fragmentManager.popBackStack();
+            AppLog.d(TAG, "返回键：弹出返回栈");
         } else if (fragmentContainer != null && fragmentContainer.getVisibility() == View.VISIBLE) {
-            // 如果当前在非录制界面（Fragment界面），先返回录制界面
             goToRecordingInterface();
-            AppLog.d(TAG, "Returned to recording interface via back button");
+            AppLog.d(TAG, "返回键：回到录制界面");
         } else {
-            // 在录制界面，按返回键将应用移到后台，而不是关闭Activity
-            // 这样下次打开应用时能快速恢复，无需重新创建Activity
+            // 录制界面按返回不关闭 Activity，退到后台 —— 下次打开能直接恢复
             moveTaskToBack(true);
-            AppLog.d(TAG, "Moved to background via back button");
+            AppLog.d(TAG, "返回键：退到后台");
         }
     }
     
