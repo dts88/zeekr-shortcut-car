@@ -3073,31 +3073,22 @@ public class AppConfig {
         java.util.Set<String> enabled = new java.util.HashSet<>();
         int cameraCount = getCameraCount();
         
-        // 根据摄像头数量判断哪些位置存在
-        if (cameraCount >= 1 && isRecordingCameraEnabled("front")) {
-            enabled.add("front");
+        // 哪一路存在按槽位号判断，规则在 PreviewSlots 里 —— 和挂预览监听用的是同一条
+        for (String key : com.kooo.evcam.camera.PreviewSlots.KEYS) {
+            if (com.kooo.evcam.camera.PreviewSlots.exists(cameraCount, key)
+                    && isRecordingCameraEnabled(key)) {
+                enabled.add(key);
+            }
         }
-        if (cameraCount >= 2 && isRecordingCameraEnabled("back")) {
-            enabled.add("back");
-        }
-        // 按槽位序号分别判断：back 是第 2 路、left 第 3 路、right 第 4 路。
-        // 这里原来把 left/right 一起卡在 >= 4 —— 三路配置下 left 永远进不了集合，
-        // 于是后座画面预览正常、录制却没有这一路。
-        if (cameraCount >= 3 && isRecordingCameraEnabled("left")) {
-            enabled.add("left");
-        }
-        if (cameraCount >= 4 && isRecordingCameraEnabled("right")) {
-            enabled.add("right");
-        }
-        
-        // 安全检查：如果结果为空，返回所有可用摄像头（防止无法录制）
+
+        // 一路都没选中时不能就这么去录一个空的，把存在的全打开
         if (enabled.isEmpty()) {
             AppLog.w(TAG, "没有启用的录制摄像头，自动启用所有可用摄像头");
-            if (cameraCount >= 1) enabled.add("front");
-            if (cameraCount >= 2) enabled.add("back");
-            if (cameraCount >= 3) enabled.add("left");
-            if (cameraCount >= 4) enabled.add("right");
-            // 同时重置配置
+            for (String key : com.kooo.evcam.camera.PreviewSlots.KEYS) {
+                if (com.kooo.evcam.camera.PreviewSlots.exists(cameraCount, key)) {
+                    enabled.add(key);
+                }
+            }
             resetRecordingCameraSelection();
         }
         

@@ -34,6 +34,7 @@ import androidx.fragment.app.FragmentTransaction;
 import com.google.android.material.navigation.NavigationView;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.camera.PreviewSlots;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.camera.SingleCamera;
@@ -112,7 +113,6 @@ public class MainActivity extends AppCompatActivity {
     private ImageAdjustManager imageAdjustManager;  // 亮度/降噪调节管理器
     private ImageAdjustFloatingWindow imageAdjustFloatingWindow;  // 亮度/降噪调节悬浮窗
     private int textureReadyCount = 0;  // 记录准备好的TextureView数量
-    private int requiredTextureCount = 4;  // 需要准备好的TextureView数量（根据摄像头数量）
     private boolean isRecording = false;  // 录制状态标志
     private boolean isInBackground = false;  // 是否在后台
   // 是否有待处理的远程命令
@@ -482,20 +482,17 @@ public class MainActivity extends AppCompatActivity {
             // 环视合成流 + 两路座舱
             layoutId = R.layout.activity_main_zeekr_7x_multi;
             configuredCameraCount = 3;
-            requiredTextureCount = 3;
             AppLog.d(TAG, "使用极氪7X多路配置：环视合成流 + 2 路座舱");
         } else if (appConfig.isCustomCarModel()) {
             // 自定义：路数由用户自己配
             layoutId = R.layout.activity_main_custom;
             configuredCameraCount = appConfig.getCameraCount();
-            requiredTextureCount = configuredCameraCount;
             AppLog.d(TAG, "使用自定义车型布局：" + configuredCameraCount + "摄像头");
         } else {
             // 极氪7X：一路四联合成流，由 FourLaneContainer 重画成四宫格。
             // 也是兜底 —— 这个项目就是为它做的
             layoutId = R.layout.activity_main_zeekr_7x;
             configuredCameraCount = 1;
-            requiredTextureCount = 1;
             AppLog.d(TAG, "使用极氪7X配置：单路合成流 + 四宫格拆分");
         }
 
@@ -616,22 +613,15 @@ public class MainActivity extends AppCompatActivity {
         if (textureFront != null) {
             textureFront.setSurfaceTextureListener(buildSurfaceListener("front"));
         }
-        // 每个槽位按自己的序号判断：第 2 路是 back，第 3 路是 left，第 4 路是 right。
-        //
-        // 这里原来 left 和 right 都要求 >= 4 —— 上游只有 1/2/4 路的布局，
-        // 左右天然成对出现，所以把它们当成一对来判断没出过问题。
-        // 但「环视+座舱3路」是第一个 3 路配置，它把 left 当作第三个槽位用，
-        // 于是 texture_left 拿不到监听器：textureReadyCount 最多到 2，
-        // 而 requiredTextureCount 是 3，启动相机的那道闸门
-        // （textureReadyCount >= requiredTextureCount）永远不成立，
-        // initCamera() 根本没被调用过 —— 三路全黑、连合成流都没有，就是这么来的。
-        if (textureBack != null && configuredCameraCount >= 2) {
+        // 哪一路存在按槽位号判断，规则在 PreviewSlots 里 ——
+        // 「left 是第三路还是和 right 成对」这处笔误已经咬过两次。
+        if (textureBack != null && PreviewSlots.exists(configuredCameraCount, "back")) {
             textureBack.setSurfaceTextureListener(buildSurfaceListener("back"));
         }
-        if (textureLeft != null && configuredCameraCount >= 3) {
+        if (textureLeft != null && PreviewSlots.exists(configuredCameraCount, "left")) {
             textureLeft.setSurfaceTextureListener(buildSurfaceListener("left"));
         }
-        if (textureRight != null && configuredCameraCount >= 4) {
+        if (textureRight != null && PreviewSlots.exists(configuredCameraCount, "right")) {
             textureRight.setSurfaceTextureListener(buildSurfaceListener("right"));
         }
     }
@@ -641,9 +631,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int width, int height) {
                 textureReadyCount++;
-                AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount + "/" + requiredTextureCount);
+                AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount
+                        + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
 
-                if (textureReadyCount >= requiredTextureCount && checkPermissions()) {
+                if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)
+                        && checkPermissions()) {
                     if (cameraManager == null) {
                         initCamera();
                     } else {
@@ -784,12 +776,7 @@ public class MainActivity extends AppCompatActivity {
         android.widget.FrameLayout frameLeft = findViewById(R.id.frame_left);
         android.widget.FrameLayout frameRight = findViewById(R.id.frame_right);
 
-        // 根据开关状态调整 requiredTextureCount
-        updateRequiredTextureCount();
-
         setupCameraFrameTouchListeners(frameFront, frameBack, frameLeft, frameRight);
-
-        AppLog.d(TAG, "摄像头开关初始化完成，requiredTextureCount=" + requiredTextureCount);
     }
 
     private FullscreenPreviewDialog currentFullscreenDialog;
@@ -826,50 +813,6 @@ public class MainActivity extends AppCompatActivity {
             currentFullscreenDialog = null;
         });
         currentFullscreenDialog.show();
-    }
-
-    /**
-     * 根据可见的画面数量更新 requiredTextureCount
-     */
-    private void updateRequiredTextureCount() {
-        int visibleCount = 0;
-        if (appConfig.isRecordingCameraEnabled("front")) visibleCount++;
-        if (appConfig.isRecordingCameraEnabled("back")) visibleCount++;
-        if (appConfig.isRecordingCameraEnabled("left")) visibleCount++;
-        if (appConfig.isRecordingCameraEnabled("right")) visibleCount++;
-        
-        // 至少需要一个可见的画面来初始化摄像头
-        requiredTextureCount = Math.max(1, visibleCount);
-        AppLog.d(TAG, "更新 requiredTextureCount: " + requiredTextureCount + " (可见画面: " + visibleCount + ")");
-    }
-
-    /**
-     * 设置摄像头画面的可见性（只隐藏画面内容，保留开关可见）
-     * @param frame 摄像头FrameLayout
-     * @param visible 是否可见
-     */
-    private void setCameraFrameVisible(android.widget.FrameLayout frame, boolean visible) {
-        if (frame == null) return;
-        // 只隐藏第一个子View（CardView，包含画面内容）
-        // 开关是第二个子View，保持可见
-        for (int i = 0; i < frame.getChildCount(); i++) {
-            View child = frame.getChildAt(i);
-            // 如果是CardView（画面内容），控制其可见性
-            if (child instanceof androidx.cardview.widget.CardView) {
-                child.setVisibility(visible ? View.VISIBLE : View.GONE);
-                break; // 只处理第一个CardView
-            }
-        }
-        
-        // 当画面变为可见时，检查是否需要更新摄像头预览
-        if (visible && cameraManager != null) {
-            // 延迟一点等待TextureView准备好
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                if (cameraManager != null) {
-                    cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, textureRight);
-                }
-            }, 100);
-        }
     }
 
     /**
@@ -1447,7 +1390,7 @@ public class MainActivity extends AppCompatActivity {
             if (checkPermissions()) {
                 // 权限已授予，但需要等待TextureView准备好
                 // 如果TextureView已经准备好，立即初始化摄像头
-                if (textureReadyCount >= requiredTextureCount) {
+                if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
                     initCamera();
                 }
             } else {
@@ -1459,8 +1402,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void initCamera() {
         // 确保所有需要的TextureView都准备好
-        if (textureReadyCount < requiredTextureCount) {
-            AppLog.w(TAG, "Not all TextureViews are ready yet: " + textureReadyCount + "/" + requiredTextureCount);
+        if (!PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
+            AppLog.w(TAG, "画面还没全部就绪: " + textureReadyCount
+                    + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
             return;
         }
         
