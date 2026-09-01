@@ -33,9 +33,9 @@ android {
         targetSdk = 36
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
-        versionCode = 54
+        versionCode = 55
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "0.20.0-alpha"
+        versionName = "0.21.0-alpha"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -95,6 +95,8 @@ dependencies {
 
     // 设置界面（PreferenceScreen）
     implementation("androidx.preference:preference:1.2.1")
+    // 两栏设置的左右分栏（androidx 自己的 PreferenceHeaderFragmentCompat 也用它）
+    implementation("androidx.slidingpanelayout:slidingpanelayout:1.2.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

@@ -69,19 +69,34 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private static final String EXTERNAL_PREFIX = "external:";
     private List<StorageHelper.VolumeInfo> storageVolumes;
 
+    private static final String ARG_SECTION = "section";
+
+    /**
+     * 只显示某一个分区。
+     *
+     * <p>分区在 {@code preferences.xml} 里是嵌套的 PreferenceScreen，
+     * {@code setPreferencesFromResource} 的 rootKey 参数就是按 key 取子树用的 ——
+     * 所以不需要把 XML 拆成八个文件。</p>
+     */
+    public static SettingsPreferenceFragment forSection(String screenKey) {
+        SettingsPreferenceFragment fragment = new SettingsPreferenceFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_SECTION, screenKey);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
-        setPreferencesFromResource(R.xml.preferences, rootKey);
+        String section = rootKey;
+        if (section == null && getArguments() != null) {
+            section = getArguments().getString(ARG_SECTION);
+        }
+        setPreferencesFromResource(R.xml.preferences, section);
         if (getContext() == null) {
             return;
         }
         appConfig = new AppConfig(getContext());
-
-        onClick("pref_back_to_recording", pref -> {
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).goToRecordingInterface();
-            }
-        });
 
         bindRecording();
         bindStorage();
@@ -818,8 +833,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setKeepAliveEnabled(value));
         bindSwitch("pref_prevent_sleep", appConfig.isPreventSleepEnabled(),
                 value -> appConfig.setPreventSleepEnabled(value));
-
-        onClick("pref_permissions", pref -> openFragment(new PermissionSettingsFragment()));
     }
 
     // ------------------------------------------------------------------ 高级
@@ -907,11 +920,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         if (!DeveloperMode.isUnlocked()) {
-            getPreferenceScreen().removePreference(category);
+            // 左栏已经把整块拿掉了；万一是直接跳进来的，这里也不接线
             return;
         }
 
-        onClick("pref_permissions", pref -> openFragment(new PermissionSettingsFragment()));
+        onClick("pref_permissions", pref -> openFragment(new PermissionsPreferenceFragment()));
 
         onClick("pref_upload_logs", pref -> {
             if (getContext() == null) {
@@ -925,6 +938,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 SettingsDialogs.showDeviceNicknameInputDialog(getContext(), appConfig);
             }
         });
+
+        onClick("pref_permission_tools",
+                pref -> openFragment(new PermissionSettingsFragment()));
 
         onClick("pref_blind_spot", pref -> {
             if (getActivity() instanceof MainActivity) {
@@ -1034,8 +1050,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
     }
 
-    /** 切到另一个 Fragment（分辨率、权限这些本来就有自己的界面）。 */
+    /**
+     * 打开一个自带界面的子项（权限设置这类）。
+     *
+     * <p>两栏布局下只换右栏，左栏的分区列表留着 —— 进了二级界面还看得见
+     * 自己在设置的哪一块。外壳不在时（理论上不会）退回整屏替换。</p>
+     */
     private void openFragment(androidx.fragment.app.Fragment fragment) {
+        if (getParentFragment() instanceof SettingsShellFragment) {
+            ((SettingsShellFragment) getParentFragment()).openDetail(fragment);
+            return;
+        }
         if (getActivity() == null) {
             return;
         }

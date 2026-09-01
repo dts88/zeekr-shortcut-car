@@ -156,7 +156,6 @@ public class CustomLayoutManager {
             setupRotateMirrorButtons(frameRight, "right", textureRight);
         }
         if (frameVehicleControl != null) {
-            setupVehicleControlButtons();
         }
         if (buttonContainer != null) {
             setupButtonContainer(buttonContainer);
@@ -440,108 +439,6 @@ public class CustomLayoutManager {
                 appConfig.setCameraCrop(cameraKey, "right", newValue);
                 applyCrop(textureView, cameraKey);
                 AppLog.d(TAG, cameraKey + " 右裁剪-: " + newValue + "px");
-            });
-        }
-    }
-    
-    /**
-     * 设置车辆控制按钮
-     * 前轮和后轮按键的选中/未选中状态切换（互斥选择）
-     */
-    private void setupVehicleControlButtons() {
-        if (frameVehicleControl == null) return;
-
-        Button btnFrontWheel = frameVehicleControl.findViewById(R.id.btn_front_wheel);
-        Button btnRearWheel = frameVehicleControl.findViewById(R.id.btn_rear_wheel);
-        ImageView ivVehicleOutline = frameVehicleControl.findViewById(R.id.iv_vehicle_outline);
-
-        if (btnFrontWheel != null) {
-            btnFrontWheel.setOnClickListener(v -> {
-                boolean isSelected = btnFrontWheel.getTag() != null && (Boolean) btnFrontWheel.getTag();
-
-                if (isSelected) {
-                    // 已选中，取消选中
-                    isSelected = false;
-                    btnFrontWheel.setTag(isSelected);
-                    setButtonUnselected(btnFrontWheel);
-                    // 切换到普通模式，恢复默认车辆轮廓
-                    if (ivVehicleOutline != null) {
-                        ivVehicleOutline.setImageResource(R.drawable.ic_vehicle_outline_normal);
-                    }
-                    applyNormalModeLayout();
-                } else {
-                    // 未选中，选中前轮并取消后轮选中
-                    isSelected = true;
-                    btnFrontWheel.setTag(isSelected);
-                    setButtonSelected(btnFrontWheel);
-
-                    // 取消后轮选中状态
-                    if (btnRearWheel != null) {
-                        btnRearWheel.setTag(false);
-                        setButtonUnselected(btnRearWheel);
-                    }
-
-                    // 更新车辆轮廓示意图，前轮显示绿色
-                    if (ivVehicleOutline != null) {
-                        ivVehicleOutline.setImageResource(R.drawable.ic_vehicle_outline_front);
-                    }
-
-                    // 切换到前轮模式
-                    applyFrontWheelModeLayout();
-                }
-
-                AppLog.d(TAG, "前轮按键状态: " + (isSelected ? "选中" : "未选中"));
-            });
-
-            // 长按事件：弹出前轮模式设置弹窗
-            btnFrontWheel.setOnLongClickListener(v -> {
-                showWheelSettingsDialog("front");
-                return true;
-            });
-        }
-
-        if (btnRearWheel != null) {
-            btnRearWheel.setOnClickListener(v -> {
-                boolean isSelected = btnRearWheel.getTag() != null && (Boolean) btnRearWheel.getTag();
-
-                if (isSelected) {
-                    // 已选中，取消选中
-                    isSelected = false;
-                    btnRearWheel.setTag(isSelected);
-                    setButtonUnselected(btnRearWheel);
-                    // 切换到普通模式，恢复默认车辆轮廓
-                    if (ivVehicleOutline != null) {
-                        ivVehicleOutline.setImageResource(R.drawable.ic_vehicle_outline_normal);
-                    }
-                    applyNormalModeLayout();
-                } else {
-                    // 未选中，选中后轮并取消前轮选中
-                    isSelected = true;
-                    btnRearWheel.setTag(isSelected);
-                    setButtonSelected(btnRearWheel);
-
-                    // 取消前轮选中状态
-                    if (btnFrontWheel != null) {
-                        btnFrontWheel.setTag(false);
-                        setButtonUnselected(btnFrontWheel);
-                    }
-
-                    // 更新车辆轮廓示意图，后轮显示绿色
-                    if (ivVehicleOutline != null) {
-                        ivVehicleOutline.setImageResource(R.drawable.ic_vehicle_outline_rear);
-                    }
-
-                    // 切换到后轮模式
-                    applyRearWheelModeLayout();
-                }
-
-                AppLog.d(TAG, "后轮按键状态: " + (isSelected ? "选中" : "未选中"));
-            });
-
-            // 长按事件：弹出后轮模式设置弹窗
-            btnRearWheel.setOnLongClickListener(v -> {
-                showWheelSettingsDialog("rear");
-                return true;
             });
         }
     }
@@ -869,21 +766,9 @@ public class CustomLayoutManager {
         // 弹窗关闭时恢复原始布局（如果未保存）
         dialog.setOnDismissListener(d -> {
             // 重新应用当前模式的保存值
-            if (mode.equals("front")) {
-                Button btnFrontWheel = frameVehicleControl.findViewById(R.id.btn_front_wheel);
-                if (btnFrontWheel != null && btnFrontWheel.getTag() != null && (Boolean) btnFrontWheel.getTag()) {
-                    applyFrontWheelModeLayout();
-                } else {
-                    applyNormalModeLayout();
-                }
-            } else {
-                Button btnRearWheel = frameVehicleControl.findViewById(R.id.btn_rear_wheel);
-                if (btnRearWheel != null && btnRearWheel.getTag() != null && (Boolean) btnRearWheel.getTag()) {
-                    applyRearWheelModeLayout();
-                } else {
-                    applyNormalModeLayout();
-                }
-            }
+            // 前轮/后轮模式的开关按钮只存在于已删除的多视角布局里，
+            // 现在没有任何途径进入那两个模式，恢复时一律回普通模式
+            applyNormalModeLayout();
         });
 
         dialog.show();
@@ -1069,24 +954,6 @@ public class CustomLayoutManager {
             appConfig.getNormalRightWidth(defRW),
             appConfig.getNormalRightHeight(defH)
         };
-    }
-
-    /**
-     * 设置按钮为选中状态
-     */
-    private void setButtonSelected(Button button) {
-        button.setTextColor(android.graphics.Color.parseColor("#FFFFFF"));
-        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                android.graphics.Color.parseColor("#007AFF")));
-    }
-
-    /**
-     * 设置按钮为未选中状态
-     */
-    private void setButtonUnselected(Button button) {
-        button.setTextColor(android.graphics.Color.parseColor("#808080"));
-        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                android.graphics.Color.parseColor("#00000000")));
     }
 
     /**
@@ -2050,16 +1917,11 @@ public class CustomLayoutManager {
      * 根据当前选中的模式（前轮/后轮/普通）保存到对应的参数
      */
     private void savePositionToCurrentMode(String viewId, int x, int y, int width, int height) {
-        // 判断当前模式
-        Button btnFrontWheel = null;
-        Button btnRearWheel = null;
-        if (frameVehicleControl != null) {
-            btnFrontWheel = frameVehicleControl.findViewById(R.id.btn_front_wheel);
-            btnRearWheel = frameVehicleControl.findViewById(R.id.btn_rear_wheel);
-        }
-
-        boolean isFrontWheelMode = btnFrontWheel != null && btnFrontWheel.getTag() != null && (Boolean) btnFrontWheel.getTag();
-        boolean isRearWheelMode = btnRearWheel != null && btnRearWheel.getTag() != null && (Boolean) btnRearWheel.getTag();
+        // 前轮/后轮模式的入口按钮随多视角布局一起删掉了，进不去那两个模式，
+        // 所以这里恒为普通模式。保留分支是因为对应的配置项还在，
+        // 万一以后把入口做回来，存取逻辑不用重写。
+        boolean isFrontWheelMode = false;
+        boolean isRearWheelMode = false;
 
         // 只保存左视图和右视图的位置
         if ("left".equals(viewId)) {

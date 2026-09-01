@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  两栏设置：左侧分区列表，右侧该分区的内容。
+
+  用 SlidingPaneLayout 而不是自己摆两个容器：它自带「宽屏并排、窄屏叠放并可滑动」
+  的行为，也是 androidx 的 PreferenceHeaderFragmentCompat 内部用的同一个组件。
+  车机内置屏 3200px 宽，永远走并排那一支；窄屏的处理是白拿的。
+
+  左栏固定 360dp：分区名都很短，再宽只是浪费；右栏 layout_weight=1 吃掉剩余宽度。
+-->
+<androidx.slidingpanelayout.widget.SlidingPaneLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_sliding_pane"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/page_background">
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/settings_headers"
+        android:layout_width="360dp"
+        android:layout_height="match_parent"
+        android:background="@color/menu_background" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/settings_detail"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="match_parent" />
+</androidx.slidingpanelayout.widget.SlidingPaneLayout>

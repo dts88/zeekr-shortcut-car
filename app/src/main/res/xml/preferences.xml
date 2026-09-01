@@ -10,7 +10,9 @@
   就等于开了第二条写入路径 —— key 一旦对不上，表现是「设置悄悄不生效」，
   而这类问题在这个项目里已经反复出现过。所以这里的 key 只是标识符，不是存储键。
 
-  ListPreference 的选项也在代码里从 SettingsRegistry 填，同理：选项声明一遍就够。
+  分区是<b>嵌套的 PreferenceScreen</b> 而不是 PreferenceCategory：
+  只有前者能被 setPreferencesFromResource(res, rootKey) 单独取出来，
+  两栏布局的右侧就是靠这个按 key 加载某一段的。
 -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
@@ -24,8 +26,8 @@
         android:title="← 返回录制界面" />
 
     <!-- ==================== 录制 ==================== -->
-    <PreferenceCategory
-        android:key="cat_recording"
+    <PreferenceScreen
+        android:key="screen_recording"
         android:title="录制">
 
         <ListPreference
@@ -80,11 +82,11 @@
             android:dependency="pref_watermark"
             android:title="角标附带录制规格"
             android:summary="水印里一并写上分辨率和帧率" />
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->
-    <PreferenceCategory
-        android:key="cat_storage"
+    <PreferenceScreen
+        android:key="screen_storage"
         android:title="存储">
 
         <ListPreference
@@ -114,11 +116,11 @@
             android:key="pref_storage_usage"
             android:title="当前落盘位置"
             android:selectable="false" />
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!-- ==================== 超级后视镜 ==================== -->
-    <PreferenceCategory
-        android:key="cat_rearview"
+    <PreferenceScreen
+        android:key="screen_rearview"
         android:title="超级后视镜">
 
         <SwitchPreferenceCompat
@@ -163,11 +165,11 @@
             android:dependency="pref_rearview"
             android:title="重置取景与位置"
             android:summary="窗口挪丢了或取景调乱了，用这个回到默认" />
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!-- ==================== 悬浮窗 ==================== -->
-    <PreferenceCategory
-        android:key="cat_floating"
+    <PreferenceScreen
+        android:key="screen_floating"
         android:title="悬浮窗">
 
         <SwitchPreferenceCompat
@@ -213,11 +215,11 @@
             android:key="pref_reset_floating"
             android:title="重置悬浮窗布局"
             android:summary="把各悬浮窗的位置和大小恢复默认" />
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!-- ==================== 系统 ==================== -->
-    <PreferenceCategory
-        android:key="cat_system"
+    <PreferenceScreen
+        android:key="screen_system"
         android:title="系统">
 
         <SwitchPreferenceCompat
@@ -246,11 +248,11 @@
             android:title="防止休眠"
             android:summary="阻止系统深度休眠。会增加电瓶消耗，按需开启" />
 
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!-- ==================== 高级 ==================== -->
-    <PreferenceCategory
-        android:key="cat_advanced"
+    <PreferenceScreen
+        android:key="screen_advanced"
         android:title="高级">
 
         <ListPreference
@@ -298,14 +300,14 @@
             android:title="保存日志"
             android:summary="把运行日志写到存储里，方便拷走" />
 
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!--
       开发者选项。默认整块隐藏，在「关于本应用」里连点「安全须知」再输密码才出现，
       而且重启应用就恢复隐藏 —— 里面要么是没做完的，要么是排查用的。
     -->
-    <PreferenceCategory
-        android:key="cat_developer"
+    <PreferenceScreen
+        android:key="screen_developer"
         android:title="开发者选项">
 
         <Preference
@@ -330,11 +332,11 @@
             android:key="pref_developer_note"
             android:selectable="false"
             android:summary="「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。" />
-    </PreferenceCategory>
+    </PreferenceScreen>
 
     <!-- ==================== 关于 ==================== -->
-    <PreferenceCategory
-        android:key="cat_about"
+    <PreferenceScreen
+        android:key="screen_about"
         android:title="关于">
 
         <Preference
@@ -345,5 +347,5 @@
         <Preference
             android:key="pref_about"
             android:title="关于本应用" />
-    </PreferenceCategory>
+    </PreferenceScreen>
 </PreferenceScreen>

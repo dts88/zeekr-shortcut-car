@@ -38,6 +38,7 @@ import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.playback.PhotoPlaybackFragmentNew;
+import com.kooo.evcam.settings.SettingsRegistry;
 import com.kooo.evcam.view.MacOSToggleButton;
 
 import java.io.BufferedReader;
@@ -502,87 +503,37 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 根据车型配置设置布局
      */
+    /**
+     * 按车型选布局。
+     *
+     * <p>只有三种可能：{@code getCarModel()} 走 {@link SettingsRegistry} 做净化，
+     * 取值只会是极氪的两档或自定义。以前这里还排着银河 E5 / L6 / L7 / 星舰 / 手机
+     * 等一长串分支，它们判断的取值早就选不出来了 —— 那些布局连同分支一起删掉了，
+     * 留着只会让人以为还支持那些车。</p>
+     */
     private void setupLayoutByCarModel() {
-        // 默认使用4摄像头布局（银河E5专用）
-        int layoutId = R.layout.activity_main;
-        configuredCameraCount = 4;
-        requiredTextureCount = 4;
-
         String carModel = appConfig.getCarModel();
-        
-        // 银河E5-多按钮：横屏布局，左侧按钮列表
-        if (AppConfig.CAR_MODEL_E5_MULTI.equals(carModel)) {
-            layoutId = R.layout.activity_main_e5_multi;
-            configuredCameraCount = 4;
-            requiredTextureCount = 4;
-            AppLog.d(TAG, "使用银河E5-多按钮配置：横屏左侧按钮列表布局");
-        }
-        // 银河L6/L7：竖屏四宫格布局
-        else if (AppConfig.CAR_MODEL_L7.equals(carModel)) {
-            layoutId = R.layout.activity_main_l7;
-            configuredCameraCount = 4;
-            requiredTextureCount = 4;
-            AppLog.d(TAG, "使用银河L6/L7配置：竖屏四宫格布局");
-        }
-        // 银河L7-多按钮：竖屏四宫格布局（顶部多功能按钮）
-        else if (AppConfig.CAR_MODEL_L7_MULTI.equals(carModel)) {
-            layoutId = R.layout.activity_main_l7_multi;
-            configuredCameraCount = 4;
-            requiredTextureCount = 4;
-            AppLog.d(TAG, "使用银河L7-多按钮配置：竖屏四宫格+顶部快捷按钮布局");
-        }
-        // 手机：自适应2摄像头布局
-        else if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
-            layoutId = R.layout.activity_main_phone;
-            configuredCameraCount = 2;
-            requiredTextureCount = 2;
-            AppLog.d(TAG, "使用手机配置：自适应2摄像头布局");
-        }
-        // 26款星舰7：横屏四摄像头布局（基于银河E5布局）
-        else if (AppConfig.CAR_MODEL_XINGHAN_7.equals(carModel)) {
-            layoutId = R.layout.activity_main;
-            configuredCameraCount = 4;
-            requiredTextureCount = 4;
-            AppLog.d(TAG, "使用26款星舰7配置：横屏4摄像头布局");
-        }
-        // 银河A7：横屏四摄像头布局（沿用银河E5）
-        else if (AppConfig.CAR_MODEL_GALAXY_A7.equals(carModel)) {
-            layoutId = R.layout.activity_main;
-            configuredCameraCount = 4;
-            requiredTextureCount = 4;
-            AppLog.d(TAG, "使用银河A7配置：横屏4摄像头布局（沿用E5）");
-        }
-        // 极氪7X：一路四联合成流，由 FourLaneContainer 把单个 TextureView 重画成四宫格
-        else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
-            layoutId = R.layout.activity_main_zeekr_7x;
-            configuredCameraCount = 1;
-            requiredTextureCount = 1;
-            AppLog.d(TAG, "使用极氪7X配置：单路合成流 + 四宫格拆分");
-        }
-        // 极氪7X 多路：环视合成流 + 两路座舱摄像头
-        else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+        int layoutId;
+
+        if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            // 环视合成流 + 两路座舱
             layoutId = R.layout.activity_main_zeekr_7x_multi;
             configuredCameraCount = 3;
             requiredTextureCount = 3;
             AppLog.d(TAG, "使用极氪7X多路配置：环视合成流 + 2 路座舱");
-        }
-        // 多视角布局：自定义布局 + 圆角UI + 车辆控制
-        else if (appConfig.isMultiviewCarModel()) {
-            layoutId = R.layout.activity_main_multiview;
-            configuredCameraCount = appConfig.getCameraCount();
-            requiredTextureCount = configuredCameraCount;
-            AppLog.d(TAG, "使用多视角布局：" + configuredCameraCount + "摄像头");
-        }
-        // 自定义车型：使用统一的自定义布局（支持自由操控）
-        else if (appConfig.isCustomCarModel()) {
+        } else if (appConfig.isCustomCarModel()) {
+            // 自定义：路数由用户自己配
             layoutId = R.layout.activity_main_custom;
             configuredCameraCount = appConfig.getCameraCount();
             requiredTextureCount = configuredCameraCount;
             AppLog.d(TAG, "使用自定义车型布局：" + configuredCameraCount + "摄像头");
-        }
-        // 银河E5：横屏四摄像头布局
-        else {
-            AppLog.d(TAG, "使用银河E5默认配置：4摄像头布局");
+        } else {
+            // 极氪7X：一路四联合成流，由 FourLaneContainer 重画成四宫格。
+            // 也是兜底 —— 这个项目就是为它做的
+            layoutId = R.layout.activity_main_zeekr_7x;
+            configuredCameraCount = 1;
+            requiredTextureCount = 1;
+            AppLog.d(TAG, "使用极氪7X配置：单路合成流 + 四宫格拆分");
         }
 
         setContentView(layoutId);
@@ -706,17 +657,6 @@ public class MainActivity extends AppCompatActivity {
             btnSettings.setOnClickListener(v -> showSettingsInterface());
         }
         
-        // E5-多按钮布局的快捷导航按钮
-        View btnPlayback = findViewById(R.id.btn_playback);
-        if (btnPlayback != null) {
-            btnPlayback.setOnClickListener(v -> showPlaybackInterface());
-        }
-        
-        View btnPhotos = findViewById(R.id.btn_photos);
-        if (btnPhotos != null) {
-            btnPhotos.setOnClickListener(v -> showPhotoPlaybackInterface());
-        }
-
         // 录制按钮：点击切换录制状态
         btnStartRecord.setOnClickListener(v -> toggleRecording());
 
@@ -837,7 +777,6 @@ public class MainActivity extends AppCompatActivity {
         android.widget.FrameLayout frameBack = findViewById(R.id.frame_back);
         android.widget.FrameLayout frameLeft = findViewById(R.id.frame_left);
         android.widget.FrameLayout frameRight = findViewById(R.id.frame_right);
-        android.widget.FrameLayout frameVehicleControl = findViewById(R.id.frame_vehicle_control);
         View editControls = findViewById(R.id.edit_controls);
         View containerCameras = findViewById(R.id.container_cameras);
         
@@ -852,7 +791,6 @@ public class MainActivity extends AppCompatActivity {
         // 同样按槽位序号分开判断：3 路时 left 该留着，只藏 right。
         if (configuredCameraCount < 4) {
             if (frameRight != null) frameRight.setVisibility(View.GONE);
-            if (frameVehicleControl != null) frameVehicleControl.setVisibility(View.GONE);
         }
         if (configuredCameraCount < 3) {
             if (frameLeft != null) frameLeft.setVisibility(View.GONE);
@@ -877,7 +815,7 @@ public class MainActivity extends AppCompatActivity {
             customLayoutManager.updateButtonContainer(newContainer);
         });
         customLayoutManager.setupFloatingViews(
-                frameFront, frameBack, frameLeft, frameRight, frameVehicleControl,
+                frameFront, frameBack, frameLeft, frameRight, null,
                 buttonContainer, editControls, containerCameras,
                 textureFront, textureBack, textureLeft, textureRight);
 
@@ -897,66 +835,6 @@ public class MainActivity extends AppCompatActivity {
         android.widget.FrameLayout frameBack = findViewById(R.id.frame_back);
         android.widget.FrameLayout frameLeft = findViewById(R.id.frame_left);
         android.widget.FrameLayout frameRight = findViewById(R.id.frame_right);
-
-        // 前摄像头开关 - 控制画面显示和录制
-        MacOSToggleButton toggleFront = findViewById(R.id.toggle_front);
-        if (toggleFront != null) {
-            boolean frontEnabled = appConfig.isRecordingCameraEnabled("front");
-            toggleFront.setChecked(frontEnabled);
-            // 初始化时设置画面可见性（只隐藏CardView，不隐藏整个frame）
-            setCameraFrameVisible(frameFront, frontEnabled);
-            toggleFront.setOnCheckedChangeListener((button, isChecked) -> {
-                appConfig.setRecordingCameraEnabled("front", isChecked);
-                setCameraFrameVisible(frameFront, isChecked);
-                updateRequiredTextureCount();
-                AppLog.d(TAG, "前摄像头开关: " + isChecked + ", 画面和录制: " + isChecked);
-            });
-        }
-
-        // 后摄像头开关 - 控制画面显示和录制
-        MacOSToggleButton toggleBack = findViewById(R.id.toggle_back);
-        if (toggleBack != null) {
-            boolean backEnabled = appConfig.isRecordingCameraEnabled("back");
-            toggleBack.setChecked(backEnabled);
-            // 初始化时设置画面可见性
-            setCameraFrameVisible(frameBack, backEnabled);
-            toggleBack.setOnCheckedChangeListener((button, isChecked) -> {
-                appConfig.setRecordingCameraEnabled("back", isChecked);
-                setCameraFrameVisible(frameBack, isChecked);
-                updateRequiredTextureCount();
-                AppLog.d(TAG, "后摄像头开关: " + isChecked + ", 画面和录制: " + isChecked);
-            });
-        }
-
-        // 左摄像头开关 - 控制画面显示和录制
-        MacOSToggleButton toggleLeft = findViewById(R.id.toggle_left);
-        if (toggleLeft != null) {
-            boolean leftEnabled = appConfig.isRecordingCameraEnabled("left");
-            toggleLeft.setChecked(leftEnabled);
-            // 初始化时设置画面可见性
-            setCameraFrameVisible(frameLeft, leftEnabled);
-            toggleLeft.setOnCheckedChangeListener((button, isChecked) -> {
-                appConfig.setRecordingCameraEnabled("left", isChecked);
-                setCameraFrameVisible(frameLeft, isChecked);
-                updateRequiredTextureCount();
-                AppLog.d(TAG, "左摄像头开关: " + isChecked + ", 画面和录制: " + isChecked);
-            });
-        }
-
-        // 右摄像头开关 - 控制画面显示和录制
-        MacOSToggleButton toggleRight = findViewById(R.id.toggle_right);
-        if (toggleRight != null) {
-            boolean rightEnabled = appConfig.isRecordingCameraEnabled("right");
-            toggleRight.setChecked(rightEnabled);
-            // 初始化时设置画面可见性
-            setCameraFrameVisible(frameRight, rightEnabled);
-            toggleRight.setOnCheckedChangeListener((button, isChecked) -> {
-                appConfig.setRecordingCameraEnabled("right", isChecked);
-                setCameraFrameVisible(frameRight, isChecked);
-                updateRequiredTextureCount();
-                AppLog.d(TAG, "右摄像头开关: " + isChecked + ", 画面和录制: " + isChecked);
-            });
-        }
 
         // 根据开关状态调整 requiredTextureCount
         updateRequiredTextureCount();
@@ -1547,7 +1425,7 @@ public class MainActivity extends AppCompatActivity {
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container,
-                new com.kooo.evcam.settings.SettingsPreferenceFragment());
+                new com.kooo.evcam.settings.SettingsShellFragment());
         transaction.commit();
     }
 
