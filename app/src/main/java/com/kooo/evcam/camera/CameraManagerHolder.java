@@ -130,42 +130,30 @@ public class CameraManagerHolder {
 
     private int getCameraCount(AppConfig appConfig) {
         String carModel = appConfig.getCarModel();
-        if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
-            return 2;
-        } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
-            return 1; // 极氪7X：一路合成流
-        } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            return 3; // 极氪7X 多路：环视 + 两路座舱
+        if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            return 3; // 环视 + 两路座舱
         } else if (appConfig.isCustomCarModel()) {
             return appConfig.getCameraCount();
         }
-        return 4; // E5, L7, Xinghan7 等默认4摄
+        return 1; // 极氪7X：一路合成流，也是兜底
     }
 
     /**
-     * 根据车型配置初始化摄像头（与 MainActivity 中的逻辑一致，但 TextureView 全部传 null）
+     * 按车型建立摄像头映射（与 MainActivity 同一套，但 TextureView 全部传 null）。
+     *
+     * <p>只剩三种：{@code getCarModel()} 读出来已经 sanitize 过，
+     * 设置里列的就那三项，别的值会被拨回 zeekr_7x。银河 E5/L7、星舰7、
+     * 手机模式那几个分支走不到，连同它们的映射方法一起删了。</p>
      */
     private void initCamerasByCarModel(AppConfig appConfig, CameraManager cm, String[] cameraIds) {
         String carModel = appConfig.getCarModel();
 
-        if (AppConfig.CAR_MODEL_L7.equals(carModel) || AppConfig.CAR_MODEL_L7_MULTI.equals(carModel)) {
-            initCamerasForL7(cameraIds);
-        } else if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
-            initCamerasForPhone(cameraIds);
-        } else if (AppConfig.CAR_MODEL_XINGHAN_7.equals(carModel)) {
-            initCamerasForXinghan7(cameraIds);
-        } else if (AppConfig.CAR_MODEL_GALAXY_A7.equals(carModel)) {
-            // 银河A7：沿用银河E5固定映射
-            initCamerasForGalaxyE5(cameraIds);
-        } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
-            initCamerasForZeekrComposite(cm, cameraIds);
-        } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+        if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
             initCamerasForZeekrMulti(appConfig, cm, cameraIds);
         } else if (appConfig.isCustomCarModel()) {
             initCamerasForCustomModel(appConfig, cameraIds);
         } else {
-            // 银河E5（默认）
-            initCamerasForGalaxyE5(cameraIds);
+            initCamerasForZeekrComposite(cm, cameraIds);
         }
     }
 
@@ -232,58 +220,6 @@ public class CameraManagerHolder {
             }
         }
         AppLog.i(TAG, "后台极氪多路映射: " + plan);
-    }
-
-    private void initCamerasForGalaxyE5(String[] cameraIds) {
-        if (cameraIds.length >= 4) {
-            cameraManager.initCameras(
-                    cameraIds[2], null, cameraIds[1], null,
-                    cameraIds[3], null, cameraIds[0], null);
-        } else if (cameraIds.length >= 2) {
-            cameraManager.initCameras(
-                    null, null, null, null,
-                    cameraIds[0], null, cameraIds[1], null);
-        } else if (cameraIds.length == 1) {
-            cameraManager.initCameras(
-                    cameraIds[0], null, cameraIds[0], null,
-                    cameraIds[0], null, cameraIds[0], null);
-        }
-    }
-
-    private void initCamerasForL7(String[] cameraIds) {
-        if (cameraIds.length >= 4) {
-            cameraManager.initCameras(
-                    cameraIds[2], null, cameraIds[3], null,
-                    cameraIds[0], null, cameraIds[1], null);
-        } else if (cameraIds.length >= 2) {
-            cameraManager.initCameras(
-                    cameraIds[0], null, cameraIds[1], null,
-                    cameraIds[0], null, cameraIds[1], null);
-        }
-    }
-
-    private void initCamerasForXinghan7(String[] cameraIds) {
-        if (cameraIds.length >= 5) {
-            cameraManager.initCameras(
-                    cameraIds[3], null, cameraIds[2], null,
-                    cameraIds[4], null, cameraIds[1], null);
-        } else if (cameraIds.length >= 4) {
-            cameraManager.initCameras(
-                    cameraIds[3], null, cameraIds[2], null,
-                    cameraIds[0], null, cameraIds[1], null);
-        }
-    }
-
-    private void initCamerasForPhone(String[] cameraIds) {
-        if (cameraIds.length >= 2) {
-            cameraManager.initCameras(
-                    cameraIds[1], null, cameraIds[0], null,
-                    null, null, null, null);
-        } else if (cameraIds.length == 1) {
-            cameraManager.initCameras(
-                    cameraIds[0], null, cameraIds[0], null,
-                    null, null, null, null);
-        }
     }
 
     private void initCamerasForCustomModel(AppConfig appConfig, String[] cameraIds) {

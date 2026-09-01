@@ -56,8 +56,6 @@ public class RecordingConfig {
     // 车型常量
     private static final String CAR_MODEL_LYNK_08_07 = "lynk_08_07";
     private static final String CAR_MODEL_LYNK_08_07_PLUS = "lynk_08_07_plus";
-    private static final String CAR_MODEL_L7 = "galaxy_l7";
-    private static final String CAR_MODEL_L7_MULTI = "galaxy_l7_multi";
 
     // SharedPreferences 键名
     private static final String KEY_RECORDING_MODE = "recording_mode";
@@ -128,11 +126,6 @@ public class RecordingConfig {
 
         if (carModelProvider.isPanoramicMode()) {
             AppLog.d(TAG, "全景模式已启用，自动切换到 Codec 模式");
-            return true;
-        }
-
-        String carModel = carModelProvider.getCarModel();
-        if (CAR_MODEL_L7.equals(carModel) || CAR_MODEL_L7_MULTI.equals(carModel)) {
             return true;
         }
 

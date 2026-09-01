@@ -562,21 +562,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        
-        // 仅针对手机布局添加沉浸式状态栏兼容
-        String carModel = appConfig.getCarModel();
-        if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
-            View mainLayout = findViewById(R.id.main);
-            if (mainLayout != null) {
-                final int originalPaddingTop = mainLayout.getPaddingTop();
-                androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(mainLayout, (v, insets) -> {
-                    int statusBarHeight = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top;
-                    v.setPadding(v.getPaddingLeft(), statusBarHeight + originalPaddingTop, v.getPaddingRight(), v.getPaddingBottom());
-                    return insets;
-                });
-                androidx.core.view.ViewCompat.requestApplyInsets(mainLayout);
-            }
-        }
     }
 
     private void initViews() {
@@ -1549,117 +1534,8 @@ public class MainActivity extends AppCompatActivity {
             cameraManager = existingManager;
             attachRecordingCoordinator();
 
-            // --- 补全后台初始化时缺失的回调 ---
-            // 后台（BlindSpotService）初始化的 MultiCameraManager 没有设置 MainActivity 的回调，
-            // 必须在此处设置，否则左右摄像头旋转变换、录制计时等功能不正常。
-
-            // 摄像头状态回调
-            cameraManager.setStatusCallback((cameraId, status) -> {
-                AppLog.d(TAG, "摄像头 " + cameraId + ": " + status);
-                if (status.contains("错误") || status.contains("断开")) {
-                    runOnUiThread(() -> {
-                        if (status.contains("ERROR_CAMERA_IN_USE") || status.contains("DISCONNECTED")) {
-                            Toast.makeText(MainActivity.this,
-                                "摄像头 " + cameraId + " 被占用，正在自动重连...",
-                                Toast.LENGTH_SHORT).show();
-                        } else if (status.contains("max reconnect attempts")) {
-                            Toast.makeText(MainActivity.this,
-                                "摄像头 " + cameraId + " 重连失败，请手动重启应用",
-                                Toast.LENGTH_LONG).show();
-                        }
-                    });
-                }
-            });
-
-            // 分段切换回调
-            cameraManager.setSegmentSwitchCallback(newSegmentIndex -> {
-                onSegmentSwitch(newSegmentIndex);
-            });
-
-            // 损坏文件删除回调
-            cameraManager.setCorruptedFilesCallback(deletedFiles -> {
-                showCorruptedFilesDeletedDialog(deletedFiles);
-            });
-
-            // Codec 回退通知回调
-            cameraManager.setCodecFallbackCallback(() -> {
-                runOnUiThread(() -> {
-                    Toast.makeText(this,
-                        "录制故障，已回退到MediaCodec模式，如果频繁故障请手动更改录制模式",
-                        Toast.LENGTH_LONG).show();
-                });
-            });
-
-            // 录制时间戳更新回调
-            cameraManager.setTimestampUpdateCallback(newTimestamp -> {
-                if (isRemoteRecording && remoteRecordingTimestamp != null) {
-                    AppLog.d(TAG, "远程录制时间戳更新: " + remoteRecordingTimestamp + " -> " + newTimestamp);
-                    remoteRecordingTimestamp = newTimestamp;
-                }
-            });
-
-            // 录制状态回调（监听录制成功或失败）
-            cameraManager.setRecordingStatusCallback((activeCameras, failedCameras) -> {
-                AppLog.d(TAG, "录制状态回调: 成功=" + activeCameras.size() + ", 失败=" + failedCameras.size());
-                if (activeCameras.isEmpty()) {
-                    // 所有摄像头都启动失败
-                    runOnUiThread(() -> {
-                        AppLog.e(TAG, "所有摄像头启动录制失败");
-                        isRecording = false;
-                        isAutoRecordingPending = false;
-                        isPreparingRecording = false;
-                        hidePreparingIndicator();
-                        Toast.makeText(this, "录制启动失败，请重试", Toast.LENGTH_SHORT).show();
-                    });
-                }
-            });
-
-            // 首次数据写入回调（录制计时器依赖此回调）
-            cameraManager.setFirstDataWrittenCallback(() -> {
-                AppLog.d(TAG, "收到首次数据写入回调，录制已真正开始");
-                runOnUiThread(() -> {
-                    if (isPreparingRecording) {
-                        isPreparingRecording = false;
-                        hidePreparingIndicator();
-                        AppLog.d(TAG, "准备状态结束，录制进入正常状态");
-                    }
-                    if (isRecording && !isRemoteRecording) {
-                        if (shouldResumeRecordingAfterRecreate && savedRecordingStartTime > 0) {
-                            startRecordingTimer(savedRecordingStartTime, savedSegmentCount);
-                            AppLog.d(TAG, "主题切换后恢复录制计时器（首次写入后）");
-                            shouldResumeRecordingAfterRecreate = false;
-                            savedRecordingStartTime = 0;
-                            savedSegmentCount = 1;
-                        } else {
-                            startRecordingTimer();
-                            AppLog.d(TAG, "手动录制计时器已启动（首次写入后）");
-                        }
-                    }
-                    if (isRemoteRecording && pendingRemoteDurationSeconds > 0) {
-                        AppLog.d(TAG, "远程录制首次写入成功，启动 " + pendingRemoteDurationSeconds + " 秒定时器");
-                        autoStopHandler.postDelayed(autoStopRunnable, pendingRemoteDurationSeconds * 1000L);
-                        pendingRemoteDurationSeconds = 0;
-                    }
-                });
-            });
-
-            // 预览尺寸回调（关键：负责左右摄像头旋转变换）
-            cameraManager.setPreviewSizeCallback((cameraKey, cameraId, previewSize) -> {
-                AppLog.d(TAG, "摄像头 " + cameraId + " 预览尺寸: " + previewSize.getWidth() + "x" + previewSize.getHeight());
-                runOnUiThread(() -> {
-                    final AutoFitTextureView textureView;
-                    switch (cameraKey) {
-                        case "front": textureView = textureFront; break;
-                        case "back":  textureView = textureBack;  break;
-                        case "left":  textureView = textureLeft;  break;
-                        case "right": textureView = textureRight; break;
-                        default:      textureView = null;         break;
-                    }
-                    if (textureView != null) {
-                        applyPreviewSizeTransform(cameraKey, textureView, previewSize);
-                    }
-                });
-            });
+            // 后台建的那份没有主界面的回调，在这里补上
+            wireCameraCallbacks();
 
             // 绑定 TextureView
             cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, textureRight);
@@ -1690,6 +1566,88 @@ public class MainActivity extends AppCompatActivity {
         // 初始化亮度/降噪调节管理器
         imageAdjustManager = new ImageAdjustManager(this);
 
+        wireCameraCallbacks();
+
+        // 等待TextureView准备好
+        textureFront.post(() -> {
+            try {
+                // 检测可用的摄像头
+                CameraManager cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+                String[] cameraIds = cm.getCameraIdList();
+
+                // 相机清单不在这里打了：诊断信息页采的是同样的东西而且不截断，
+                // 极氪这一路 ZeekrCameraLocator 还会把候选尺寸和选用结果完整打一遍。
+                // 这里每次初始化都遍历一遍 getCameraCharacteristics，只是白等。
+                AppLog.d(TAG, "可用相机 " + cameraIds.length + " 个");
+
+                initCamerasForConfiguredModel(cm, cameraIds);
+                
+                // 根据设置决定录制模式（支持用户手动选择）
+                boolean useCodecRecording = appConfig.shouldUseCodecRecording();
+                cameraManager.setCodecRecordingMode(useCodecRecording);
+                String recordingMode = appConfig.getRecordingMode();
+                String modeDesc = useCodecRecording ? "MediaCodec" : "MediaRecorder";
+                AppLog.d(TAG, "录制模式: " + modeDesc + " (设置: " + recordingMode + ")");
+
+                // 打开所有摄像头
+                cameraManager.openAllCameras();
+                
+                // 注册摄像头到亮度/降噪调节管理器
+                registerCamerasToImageAdjustManager();
+
+                AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras");
+                //Toast.makeText(this, "已打开 " + configuredCameraCount + " 个摄像头", Toast.LENGTH_SHORT).show();
+                
+                // 检查是否需要恢复录制（主题切换后），优先级高于自动录制
+                checkResumeRecordingAfterRecreate();
+                
+                // 检查并触发自动录制（延迟执行，确保摄像头准备就绪）
+                checkAutoStartRecording();
+                
+                // 启动自动录制定时检查（如果启用了自动录制）
+                startAutoRecordingCheck();
+
+            } catch (CameraAccessException e) {
+                AppLog.e(TAG, "Failed to access camera", e);
+                Toast.makeText(this, "摄像头访问失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /**
+     * 按当前车型建立摄像头映射。
+     *
+     * <p>只剩三种：{@code getCarModel()} 读出来就已经 sanitize 过，
+     * 存的值不在设置里列的三项之内会被拨回 zeekr_7x —— 所以银河 E5/L7、
+     * 星舰7、手机模式那几个分支是<b>永远走不到</b>的，连同它们各自的
+     * 映射方法一起删掉了。真要再支持别的车型，得先让它能被选出来。</p>
+     */
+    private void initCamerasForConfiguredModel(CameraManager cm, String[] cameraIds) {
+        String carModel = appConfig.getCarModel();
+        if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
+            // 极氪7X 多路：合成流 + 其余两路座舱
+            initCamerasForZeekrMulti(cm, cameraIds);
+        } else if (appConfig.needsCustomLayoutManager()) {
+            // 自定义：用户自己配的摄像头映射（排查用）
+            initCamerasForCustomModel(cameraIds);
+        } else {
+            // 极氪7X，也是兜底：本项目就是为这一路合成流做的
+            initCamerasForZeekrComposite(cm, cameraIds);
+        }
+    }
+
+    /**
+     * 把主界面要的那 8 个回调挂到 {@link #cameraManager} 上。
+     *
+     * <p>复用后台实例和新建实例两条路都要挂，而且挂的必须<b>一模一样</b> ——
+     * 原来是各抄了一份，两份已经开始漂了（一份多个注释、一份带着尾随空格）。
+     * 漂到功能上就是「同样的操作，冷启动和从后台回来表现不一致」，
+     * 这种问题查起来最费劲，因为两条路看着都对。</p>
+     *
+     * <p>后台（BlindSpotService）建的那份没有主界面的回调，
+     * 不补上的话左右摄像头的旋转变换、录制计时都不正常。</p>
+     */
+    private void wireCameraCallbacks() {
         // 设置摄像头状态回调
         cameraManager.setStatusCallback((cameraId, status) -> {
             AppLog.d(TAG, "摄像头 " + cameraId + ": " + status);
@@ -1810,173 +1768,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         });
-
-        // 等待TextureView准备好
-        textureFront.post(() -> {
-            try {
-                // 检测可用的摄像头
-                CameraManager cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-                String[] cameraIds = cm.getCameraIdList();
-
-                AppLog.d(TAG, "========== 摄像头诊断信息 ==========");
-                AppLog.d(TAG, "Available cameras: " + cameraIds.length);
-
-                for (String id : cameraIds) {
-                    AppLog.d(TAG, "---------- Camera ID: " + id + " ----------");
-
-                    try {
-                        android.hardware.camera2.CameraCharacteristics characteristics = cm.getCameraCharacteristics(id);
-
-                        // 打印摄像头方向
-                        Integer facing = characteristics.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING);
-                        String facingStr = "UNKNOWN";
-                        if (facing != null) {
-                            switch (facing) {
-                                case android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT:
-                                    facingStr = "FRONT";
-                                    break;
-                                case android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK:
-                                    facingStr = "BACK";
-                                    break;
-                                case android.hardware.camera2.CameraCharacteristics.LENS_FACING_EXTERNAL:
-                                    facingStr = "EXTERNAL";
-                                    break;
-                            }
-                        }
-                        AppLog.d(TAG, "  Facing: " + facingStr);
-
-                        // 打印支持的输出格式和分辨率
-                        android.hardware.camera2.params.StreamConfigurationMap map =
-                            characteristics.get(android.hardware.camera2.CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-
-                        if (map != null) {
-                            // 打印 ImageFormat.PRIVATE 的分辨率
-                            android.util.Size[] privateSizes = map.getOutputSizes(android.graphics.ImageFormat.PRIVATE);
-                            if (privateSizes != null && privateSizes.length > 0) {
-                                AppLog.d(TAG, "  PRIVATE formats (" + privateSizes.length + " sizes):");
-                                for (int i = 0; i < Math.min(privateSizes.length, 5); i++) {
-                                    AppLog.d(TAG, "    [" + i + "] " + privateSizes[i].getWidth() + "x" + privateSizes[i].getHeight());
-                                }
-                                if (privateSizes.length > 5) {
-                                    AppLog.d(TAG, "    ... and " + (privateSizes.length - 5) + " more");
-                                }
-                            }
-
-                            // 打印 ImageFormat.YUV_420_888 的分辨率
-                            android.util.Size[] yuvSizes = map.getOutputSizes(android.graphics.ImageFormat.YUV_420_888);
-                            if (yuvSizes != null && yuvSizes.length > 0) {
-                                AppLog.d(TAG, "  YUV_420_888 formats (" + yuvSizes.length + " sizes):");
-                                for (int i = 0; i < Math.min(yuvSizes.length, 5); i++) {
-                                    AppLog.d(TAG, "    [" + i + "] " + yuvSizes[i].getWidth() + "x" + yuvSizes[i].getHeight());
-                                }
-                                if (yuvSizes.length > 5) {
-                                    AppLog.d(TAG, "    ... and " + (yuvSizes.length - 5) + " more");
-                                }
-                            }
-
-                            // 打印 SurfaceTexture 的分辨率
-                            android.util.Size[] textureSizes = map.getOutputSizes(android.graphics.SurfaceTexture.class);
-                            if (textureSizes != null && textureSizes.length > 0) {
-                                AppLog.d(TAG, "  SurfaceTexture formats (" + textureSizes.length + " sizes):");
-                                for (int i = 0; i < Math.min(textureSizes.length, 5); i++) {
-                                    AppLog.d(TAG, "    [" + i + "] " + textureSizes[i].getWidth() + "x" + textureSizes[i].getHeight());
-                                }
-                                if (textureSizes.length > 5) {
-                                    AppLog.d(TAG, "    ... and " + (textureSizes.length - 5) + " more");
-                                }
-                            }
-                        } else {
-                            AppLog.w(TAG, "  StreamConfigurationMap is NULL!");
-                        }
-
-                        // 打印硬件级别
-                        Integer hwLevel = characteristics.get(android.hardware.camera2.CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-                        String hwLevelStr = "UNKNOWN";
-                        if (hwLevel != null) {
-                            switch (hwLevel) {
-                                case android.hardware.camera2.CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY:
-                                    hwLevelStr = "LEGACY";
-                                    break;
-                                case android.hardware.camera2.CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LIMITED:
-                                    hwLevelStr = "LIMITED";
-                                    break;
-                                case android.hardware.camera2.CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL:
-                                    hwLevelStr = "FULL";
-                                    break;
-                                case android.hardware.camera2.CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_3:
-                                    hwLevelStr = "LEVEL_3";
-                                    break;
-                            }
-                        }
-                        AppLog.d(TAG, "  Hardware Level: " + hwLevelStr);
-
-                    } catch (Exception e) {
-                        AppLog.e(TAG, "  Error getting characteristics for camera " + id + ": " + e.getMessage());
-                    }
-                }
-
-                AppLog.d(TAG, "========================================");
-
-                // 根据车型配置初始化摄像头
-                String carModel = appConfig.getCarModel();
-                if (AppConfig.CAR_MODEL_L7.equals(carModel) || AppConfig.CAR_MODEL_L7_MULTI.equals(carModel)) {
-                    // 银河L6/L7 / L7-多按钮：使用固定映射
-                    initCamerasForL7(cameraIds);
-                } else if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
-                    // 手机模式：2摄像头（前+后）
-                    initCamerasForPhone(cameraIds);
-                } else if (AppConfig.CAR_MODEL_XINGHAN_7.equals(carModel)) {
-                    // 26款星舰7：使用固定映射（前3后2左4右1）
-                    initCamerasForXinghan7(cameraIds);
-                } else if (AppConfig.CAR_MODEL_GALAXY_A7.equals(carModel)) {
-                    // 银河A7：沿用银河E5固定映射
-                    initCamerasForGalaxyE5(cameraIds);
-                } else if (AppConfig.CAR_MODEL_ZEEKR_7X.equals(carModel)) {
-                    // 极氪7X：按能力查找提供合成流的那一路相机
-                    initCamerasForZeekrComposite(cm, cameraIds);
-                } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-                    // 极氪7X 多路：合成流 + 其余两路座舱
-                    initCamerasForZeekrMulti(cm, cameraIds);
-                } else if (appConfig.needsCustomLayoutManager()) {
-                    // 自定义车型/多视角：使用用户配置的摄像头映射
-                    initCamerasForCustomModel(cameraIds);
-                } else {
-                    // 银河E5：使用固定映射
-                    initCamerasForGalaxyE5(cameraIds);
-                }
-                
-                // 根据设置决定录制模式（支持用户手动选择）
-                boolean useCodecRecording = appConfig.shouldUseCodecRecording();
-                cameraManager.setCodecRecordingMode(useCodecRecording);
-                String recordingMode = appConfig.getRecordingMode();
-                String modeDesc = useCodecRecording ? "MediaCodec" : "MediaRecorder";
-                AppLog.d(TAG, "录制模式: " + modeDesc + " (设置: " + recordingMode + ")");
-
-                // 打开所有摄像头
-                cameraManager.openAllCameras();
-                
-                // 注册摄像头到亮度/降噪调节管理器
-                registerCamerasToImageAdjustManager();
-
-                AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras");
-                //Toast.makeText(this, "已打开 " + configuredCameraCount + " 个摄像头", Toast.LENGTH_SHORT).show();
-                
-                // 检查是否需要恢复录制（主题切换后），优先级高于自动录制
-                checkResumeRecordingAfterRecreate();
-                
-                // 检查并触发自动录制（延迟执行，确保摄像头准备就绪）
-                checkAutoStartRecording();
-                
-                // 启动自动录制定时检查（如果启用了自动录制）
-                startAutoRecordingCheck();
-
-} catch (CameraAccessException e) {
-                AppLog.e(TAG, "Failed to access camera", e);
-                Toast.makeText(this, "摄像头访问失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
     }
-    
+
     /**
      * 极氪7X：车机只提供一路四联合成流。
      *
@@ -2099,146 +1892,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 银河E5车型：使用固定的摄像头映射
-     */
-    private void initCamerasForGalaxyE5(String[] cameraIds) {
-        if (cameraIds.length >= 4) {
-            // 有4个或更多摄像头
-            // 修正摄像头位置映射：前=cameraIds[2], 后=cameraIds[1], 左=cameraIds[3], 右=cameraIds[0]
-            cameraManager.initCameras(
-                    cameraIds[2], textureFront,  // 前摄像头使用 cameraIds[2]
-                    cameraIds[1], textureBack,   // 后摄像头使用 cameraIds[1]
-                    cameraIds[3], textureLeft,   // 左摄像头使用 cameraIds[3]
-                    cameraIds[0], textureRight   // 右摄像头使用 cameraIds[0]
-            );
-        } else if (cameraIds.length >= 2) {
-            // 只有2个摄像头，复用到四个位置
-            // 注意：参数顺序必须与 initCameras(frontId, frontView, backId, backView, leftId, leftView, rightId, rightView) 对应
-            cameraManager.initCameras(
-                    null, null,
-                    null, null,                    
-                    cameraIds[0], textureLeft,   // left位置使用 textureLeft
-                    cameraIds[1], textureRight   // right位置使用 textureRight
-            );
-        } else if (cameraIds.length == 1) {
-            // 只有1个摄像头，所有位置使用同一个
-            cameraManager.initCameras(
-                    cameraIds[0], textureFront,
-                    cameraIds[0], textureBack,
-                    cameraIds[0], textureLeft,
-                    cameraIds[0], textureRight
-            );
-        } else {
-            Toast.makeText(this, "没有可用的摄像头", Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    /**
-     * 银河L6/L7车型：使用固定的摄像头映射（竖屏四宫格）
-     * 前=2, 后=3, 左=0, 右=1
-     */
-    private void initCamerasForL7(String[] cameraIds) {
-        if (cameraIds.length >= 4) {
-            // 有4个或更多摄像头
-            cameraManager.initCameras(
-                    cameraIds[2], textureFront,  // 前摄像头使用 cameraIds[2]
-                    cameraIds[3], textureBack,   // 后摄像头使用 cameraIds[3]
-                    cameraIds[0], textureLeft,   // 左摄像头使用 cameraIds[0]
-                    cameraIds[1], textureRight   // 右摄像头使用 cameraIds[1]
-            );
-        } else if (cameraIds.length >= 2) {
-            // 只有2个摄像头，复用到四个位置
-            cameraManager.initCameras(
-                    cameraIds[0], textureFront,
-                    cameraIds[1], textureBack,
-                    cameraIds[0], textureLeft,
-                    cameraIds[1], textureRight
-            );
-        } else if (cameraIds.length == 1) {
-            // 只有1个摄像头，所有位置使用同一个
-            cameraManager.initCameras(
-                    cameraIds[0], textureFront,
-                    cameraIds[0], textureBack,
-                    cameraIds[0], textureLeft,
-                    cameraIds[0], textureRight
-            );
-        } else {
-            Toast.makeText(this, "没有可用的摄像头", Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    /**
-     * 26款星舰7车型：使用固定的摄像头映射
-     * 前=3, 后=2, 左=4, 右=1
-     */
-    private void initCamerasForXinghan7(String[] cameraIds) {
-        if (cameraIds.length >= 5) {
-            // 有5个或更多摄像头
-            cameraManager.initCameras(
-                    cameraIds[3], textureFront,  // 前摄像头使用 cameraIds[3]
-                    cameraIds[2], textureBack,   // 后摄像头使用 cameraIds[2]
-                    cameraIds[4], textureLeft,   // 左摄像头使用 cameraIds[4]
-                    cameraIds[1], textureRight   // 右摄像头使用 cameraIds[1]
-            );
-        } else if (cameraIds.length >= 4) {
-            // 只有4个摄像头，使用可用的ID
-            cameraManager.initCameras(
-                    cameraIds[3], textureFront,
-                    cameraIds[2], textureBack,
-                    cameraIds[0], textureLeft,
-                    cameraIds[1], textureRight
-            );
-        } else if (cameraIds.length >= 2) {
-            // 只有2个摄像头，复用到四个位置
-            cameraManager.initCameras(
-                    cameraIds[0], textureFront,
-                    cameraIds[1], textureBack,
-                    cameraIds[0], textureLeft,
-                    cameraIds[1], textureRight
-            );
-        } else if (cameraIds.length == 1) {
-            // 只有1个摄像头，所有位置使用同一个
-            cameraManager.initCameras(
-                    cameraIds[0], textureFront,
-                    cameraIds[0], textureBack,
-                    cameraIds[0], textureLeft,
-                    cameraIds[0], textureRight
-            );
-        } else {
-            Toast.makeText(this, "没有可用的摄像头", Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    /**
-     * 手机模式：使用前后2个摄像头
-     * 与银河E5不同，手机布局只有 textureFront 和 textureBack
-     */
-    private void initCamerasForPhone(String[] cameraIds) {
-        if (cameraIds.length >= 2) {
-            // 有2个或更多摄像头：使用前后两个摄像头
-            // 通常 cameraIds[0] 是后置摄像头，cameraIds[1] 是前置摄像头
-            cameraManager.initCameras(
-                    cameraIds[1], textureFront,  // 前置摄像头（通常 ID=1）
-                    cameraIds[0], textureBack,   // 后置摄像头（通常 ID=0）
-                    null, null,
-                    null, null
-            );
-            AppLog.d(TAG, "手机模式初始化：前置=" + cameraIds[1] + ", 后置=" + cameraIds[0]);
-        } else if (cameraIds.length == 1) {
-            // 只有1个摄像头，前后使用同一个
-            cameraManager.initCameras(
-                    cameraIds[0], textureFront,
-                    cameraIds[0], textureBack,
-                    null, null,
-                    null, null
-            );
-            AppLog.d(TAG, "手机模式初始化：单摄像头=" + cameraIds[0]);
-        } else {
-            Toast.makeText(this, "没有可用的摄像头", Toast.LENGTH_SHORT).show();
-        }
-    }
-    
-    /**
      * 自定义车型：使用用户配置的摄像头映射
      */
     private void initCamerasForCustomModel(String[] cameraIds) {
@@ -2326,56 +1979,6 @@ public class MainActivity extends AppCompatActivity {
      * @param cameraKey 摄像头标识
      */
     /**
-     * 应用手机缩放变换，保持摄像头预览的宽高比不被拉伸
-     */
-    private void applyPhoneScaleTransform(AutoFitTextureView textureView, android.util.Size previewSize, String cameraKey) {
-        textureView.post(() -> {
-            int viewWidth = textureView.getWidth();
-            int viewHeight = textureView.getHeight();
-
-            if (viewWidth == 0 || viewHeight == 0) {
-                AppLog.d(TAG, cameraKey + " TextureView 尺寸为0，延迟应用缩放");
-                textureView.postDelayed(() -> applyPhoneScaleTransform(textureView, previewSize, cameraKey), 100);
-                return;
-            }
-
-            int previewWidth = previewSize.getWidth();
-            int previewHeight = previewSize.getHeight();
-
-            android.graphics.Matrix matrix = new android.graphics.Matrix();
-
-            float centerX = viewWidth / 2f;
-            float centerY = viewHeight / 2f;
-
-            // 计算缩放比例，使用 FIT_CENTER 策略（保持比例，完整显示）
-            float scaleX = (float) viewWidth / previewWidth;
-            float scaleY = (float) viewHeight / previewHeight;
-            float scale = Math.min(scaleX, scaleY);  // 取较小值，确保完整显示
-
-            // 计算缩放后的尺寸
-            float scaledWidth = previewWidth * scale;
-            float scaledHeight = previewHeight * scale;
-
-            // 计算偏移量，使内容居中
-            float dx = (viewWidth - scaledWidth) / 2f;
-            float dy = (viewHeight - scaledHeight) / 2f;
-
-            // 设置变换矩阵：先缩放，再平移居中
-            matrix.setScale(scale, scale);
-            matrix.postTranslate(dx, dy);
-
-            // 保存基础变换，并叠加预览矫正
-            previewBaseTransforms.put(cameraKey, new android.graphics.Matrix(matrix));
-            PreviewCorrection.postApply(matrix, appConfig, cameraKey, viewWidth, viewHeight);
-
-            textureView.setTransform(matrix);
-            AppLog.d(TAG, cameraKey + " 应用手机缩放变换: view=" + viewWidth + "x" + viewHeight + 
-                    ", preview=" + previewWidth + "x" + previewHeight + 
-                    ", scale=" + scale);
-        });
-    }
-
-    /**
      * 根据车型和摄像头位置，对 TextureView 应用正确的宽高比和旋转变换。
      * 从 previewSizeCallback 提取，避免正常初始化和后台复用路径的代码重复。
      */
@@ -2403,23 +2006,6 @@ public class MainActivity extends AppCompatActivity {
                 customLayoutManager.updateCameraAspectRatio(cameraKey, previewSize.getWidth(), previewSize.getHeight(), 0);
             }
             applyPreviewCorrectionOnly(textureView, cameraKey);
-        } else if (AppConfig.CAR_MODEL_L7.equals(carModel) || AppConfig.CAR_MODEL_L7_MULTI.equals(carModel)) {
-            boolean needRotation = "left".equals(cameraKey) || "right".equals(cameraKey);
-            if (needRotation) {
-                textureView.setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
-                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比(旋转后): " + previewSize.getHeight() + ":" + previewSize.getWidth());
-                int rotation = "left".equals(cameraKey) ? 270 : 90;
-                applyRotationTransform(textureView, previewSize, rotation, cameraKey);
-            } else {
-                textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
-                textureView.setFillContainer(false);
-                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 适应模式");
-                applyPreviewCorrectionOnly(textureView, cameraKey);
-            }
-        } else if (AppConfig.CAR_MODEL_PHONE.equals(carModel)) {
-            textureView.setFillContainer(false);
-            applyPhoneScaleTransform(textureView, previewSize, cameraKey);
-            AppLog.d(TAG, "设置 " + cameraKey + " 手机缩放变换, 预览尺寸: " + previewSize.getWidth() + "x" + previewSize.getHeight());
         } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
             // 三路配置的两路座舱相机：按原样显示，不旋转。
             //
