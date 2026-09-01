@@ -22,8 +22,30 @@ import com.kooo.evcam.R;
  */
 public class SettingsHeadersFragment extends PreferenceFragmentCompat {
 
+    /** 上一次建这份列表时，开发者选项是不是解锁着的。 */
+    private boolean builtUnlocked;
+
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
+        build();
+    }
+
+    /**
+     * 解锁开发者模式是在「关于本应用」里做的 —— <b>那是另一个 Activity</b>。
+     *
+     * <p>从那儿回来时，这份列表还是解锁之前建的，「开发者选项」不会出现；
+     * 原先要退出设置再进来一次才看得见。这里发现状态变了就重建一次。</p>
+     */
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (builtUnlocked != DeveloperMode.isUnlocked()) {
+            build();
+        }
+    }
+
+    private void build() {
+        builtUnlocked = DeveloperMode.isUnlocked();
         setPreferencesFromResource(R.xml.preferences, null);
         PreferenceScreen root = getPreferenceScreen();
 
@@ -34,7 +56,7 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 continue;
             }
             PreferenceGroup group = (PreferenceGroup) child;
-            if ("screen_developer".equals(group.getKey()) && !DeveloperMode.isUnlocked()) {
+            if ("screen_developer".equals(group.getKey()) && !builtUnlocked) {
                 root.removePreference(group);
                 continue;
             }

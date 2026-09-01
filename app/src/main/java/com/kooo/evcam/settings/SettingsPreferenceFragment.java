@@ -19,7 +19,6 @@ import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
@@ -872,10 +871,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * 「这里有东西但你用不了」，而这些本来就不该出现在普通用户的设置里。</p>
      */
     private void bindDeveloper() {
-        PreferenceCategory category = findPreference("cat_developer");
-        if (category == null) {
-            return;
-        }
+        // 这里原来先找一个 key 为 cat_developer 的分类，找不到就整个返回 ——
+        // 而 0.21.0 把分区改成嵌套 PreferenceScreen 之后，这个 key 就不存在了。
+        // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
         if (!DeveloperMode.isUnlocked()) {
             // 左栏已经把整块拿掉了；万一是直接跳进来的，这里也不接线
             return;

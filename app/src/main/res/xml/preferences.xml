@@ -321,6 +321,11 @@
             android:summary="把运行日志发给作者" />
 
         <Preference
+            android:key="pref_permission_tools"
+            android:title="权限工具"
+            android:summary="ADB 一键授权、系统白名单（排查用）" />
+
+        <Preference
             android:key="pref_blind_spot"
             android:title="补盲选项" />
 
