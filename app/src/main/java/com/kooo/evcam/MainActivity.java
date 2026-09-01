@@ -34,6 +34,7 @@ import androidx.fragment.app.FragmentTransaction;
 import com.google.android.material.navigation.NavigationView;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
@@ -97,10 +98,13 @@ public class MainActivity extends AppCompatActivity {
 
     private Button btnStartRecord, btnExit, btnTakePhoto;
     private MultiCameraManager cameraManager;
+    /** 录不录、能不能录由它决定；这里只负责画面反馈。 */
+    private RecordingCoordinator recordingCoordinator;
 
     public MultiCameraManager getCameraManager() {
         if (cameraManager == null) {
             cameraManager = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+            attachRecordingCoordinator();
         }
         return cameraManager;
     }
@@ -1543,6 +1547,7 @@ public class MainActivity extends AppCompatActivity {
             // 后台已初始化，复用实例并绑定 TextureView
             AppLog.d(TAG, "复用后台已初始化的摄像头管理器，绑定 TextureView");
             cameraManager = existingManager;
+            attachRecordingCoordinator();
 
             // --- 补全后台初始化时缺失的回调 ---
             // 后台（BlindSpotService）初始化的 MultiCameraManager 没有设置 MainActivity 的回调，
@@ -1677,6 +1682,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         cameraManager = new MultiCameraManager(this);
+        attachRecordingCoordinator();
         cameraManager.setMaxOpenCameras(configuredCameraCount);
         // 注册到全局 Holder
         holder.setCameraManager(cameraManager);
@@ -3306,93 +3312,83 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void startRecording() {
-        if (cameraManager != null && !cameraManager.isRecording()) {
-            // 从配置读取启用的录制摄像头
-            AppConfig appConfig = new AppConfig(this);
-            java.util.Set<String> enabledCameras = appConfig.getEnabledRecordingCameras();
-            
-            if (enabledCameras.isEmpty()) {
-                Toast.makeText(this, "请至少选择一个录制摄像头", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            
-            // 检测U盘回退情况（用户选择了U盘但不可用）
-            boolean isFallback = StorageHelper.isSdCardFallback(this);
-            
-            // 生成统一时间戳
-            String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault())
-                    .format(new java.util.Date());
-            
-            // 使用指定的摄像头进行录制
-            boolean success = cameraManager.startRecording(timestamp, enabledCameras);
-            if (success) {
-                isRecording = true;
-                isPreparingRecording = true;  // 标记为准备中状态
-                isAutoRecordingPending = false;  // 录制成功，清除等待标记
+    /**
+     * 录制结果的画面反馈。
+     *
+     * <p>协调器只管录不录得起来；指示器、计时器、Toast 都在这里 ——
+     * 它们出错只是看着别扭，和「有没有录上」不是一回事，
+     * 混在一起会让后者也没法单独验证。</p>
+     */
+    private final RecordingCoordinator.Listener recordingListener =
+            new RecordingCoordinator.Listener() {
+        @Override
+        public void onRecordingStarted(java.util.Set<String> cameras, boolean sdFellBack) {
+            isRecording = true;
+            isPreparingRecording = true;
+            isAutoRecordingPending = false;
 
-                // 启动前台服务保护（防止后台录制被中断）
-                CameraForegroundService.start(this, "正在录制视频", "录制进行中，点击返回应用");
+            // 橙色旋转圈；首次写入回调里换成绿色闪烁。
+            // 计时器也在那时才启动 —— 从「真的录上了」开始计，而不是从「尝试录」开始
+            showPreparingIndicator();
 
-                // 显示准备中指示器（橙色旋转圈）
-                // 首次数据写入后会自动切换到绿色闪烁动画
-                showPreparingIndicator();
-                
-                // 注意：录制计时器延迟到首次写入回调中启动
-                // 这样计时从"有效录制"开始，而不是从"尝试录制"开始
-
-                // 发送录制状态广播（通知悬浮窗）
-                FloatingWindowService.sendRecordingStateChanged(this, true);
-
-                // L7-多按钮布局：更新录制按钮文字为"停止"
-                if (AppConfig.CAR_MODEL_L7_MULTI.equals(appConfig.getCarModel()) && btnStartRecord != null) {
-                    btnStartRecord.setText("停止");
-                }
-
-                // 显示提示：优先显示回退提示（每次冷启动只显示一次）
-                if (isFallback && !AppConfig.isSdFallbackShownThisSession()) {
-                    AppConfig.setSdFallbackShownThisSession(true);
-                    Toast.makeText(this, "未检测到U盘，已回退到内部存储", Toast.LENGTH_LONG).show();
-                    AppLog.w(TAG, "U盘回退：用户选择U盘但不可用，使用内部存储");
-                } else {
-                    // 显示录制的摄像头数量
-                    int cameraCount = enabledCameras.size();
-                    String cameraText = cameraCount == appConfig.getCameraCount() ? "全部" : cameraCount + "个";
-                    Toast.makeText(this, "开始录制" + cameraText + "摄像头", Toast.LENGTH_SHORT).show();
-                }
-                AppLog.d(TAG, "Recording started with " + enabledCameras.size() + " camera(s): " + enabledCameras);
+            if (sdFellBack && !AppConfig.isSdFallbackShownThisSession()) {
+                AppConfig.setSdFallbackShownThisSession(true);
+                Toast.makeText(MainActivity.this,
+                        "未检测到U盘，已回退到内部存储", Toast.LENGTH_LONG).show();
             } else {
-                Toast.makeText(this, "录制失败", Toast.LENGTH_SHORT).show();
+                int count = cameras.size();
+                String text = count == appConfig.getCameraCount() ? "全部" : count + "个";
+                Toast.makeText(MainActivity.this,
+                        "开始录制" + text + "摄像头", Toast.LENGTH_SHORT).show();
             }
         }
+
+        @Override
+        public void onRecordingStopped() {
+            isRecording = false;
+            isPreparingRecording = false;
+            stopBlinkAnimation();
+            stopRecordingTimer();
+            Toast.makeText(MainActivity.this, "录制已停止", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onRecordingRefused(String reason) {
+            Toast.makeText(MainActivity.this, reason, Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onRecordingFailed(String reason) {
+            Toast.makeText(MainActivity.this, reason, Toast.LENGTH_SHORT).show();
+        }
+    };
+
+    /**
+     * 开始录制。
+     *
+     * <p>要不要录、能不能录、怎么录，都在 {@link RecordingCoordinator} 里；
+     * 这里只剩把结果画到屏幕上。</p>
+     */
+    /**
+     * 把当前的相机管理器交给协调器。
+     *
+     * <p>每一处给 {@code cameraManager} 赋值之后都要调一次：它换了对象而协调器
+     * 还握着旧的，表现会是「按了录制，什么都没发生」—— 这种不报错的失败最难查。</p>
+     */
+    private void attachRecordingCoordinator() {
+        if (recordingCoordinator == null) {
+            recordingCoordinator = new RecordingCoordinator(this);
+            recordingCoordinator.setListener(recordingListener);
+        }
+        recordingCoordinator.setCameraManager(cameraManager);
+    }
+
+    private void startRecording() {
+        recordingCoordinator.start();
     }
 
     private void stopRecording() {
-        if (cameraManager != null) {
-            cameraManager.stopRecording();
-            isRecording = false;
-            isPreparingRecording = false;  // 重置准备中状态
-
-            // 停止前台服务
-            CameraForegroundService.stop(this);
-
-            // 停止闪烁动画，恢复红色
-            stopBlinkAnimation();
-            
-            // 停止录制计时器
-            stopRecordingTimer();
-
-            // 发送录制状态广播（通知悬浮窗）
-            FloatingWindowService.sendRecordingStateChanged(this, false);
-
-            // L7-多按钮布局：恢复录制按钮文字为"录像"
-            if (AppConfig.CAR_MODEL_L7_MULTI.equals(appConfig.getCarModel()) && btnStartRecord != null) {
-                btnStartRecord.setText("录像");
-            }
-
-            Toast.makeText(this, "录制已停止", Toast.LENGTH_SHORT).show();
-            AppLog.d(TAG, "Recording stopped, foreground service stopped");
-        }
+        recordingCoordinator.stop();
     }
 
     /**
