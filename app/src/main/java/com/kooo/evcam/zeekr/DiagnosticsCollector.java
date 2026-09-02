@@ -157,8 +157,7 @@ public final class DiagnosticsCollector {
         android.util.Range<Integer>[] ranges =
                 cc.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
         if (ranges == null || ranges.length == 0) {
-            sb.append("  帧率范围: 未声明").append('
-');
+            sb.append("  帧率范围: 未声明").append('\n');
             return;
         }
         StringBuilder line = new StringBuilder();
@@ -171,8 +170,7 @@ public final class DiagnosticsCollector {
             highest = Math.max(highest, range.getUpper());
         }
         sb.append("  帧率范围 (").append(ranges.length).append("): ")
-                .append(line).append("   最高 ").append(highest).append(" fps").append('
-');
+                .append(line).append("   最高 ").append(highest).append(" fps").append('\n');
     }
 
     private static void appendSizes(StringBuilder sb, String label, Size[] sizes) {
