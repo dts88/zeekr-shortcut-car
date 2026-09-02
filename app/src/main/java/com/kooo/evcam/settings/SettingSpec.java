@@ -24,11 +24,24 @@ public final class SettingSpec {
     /** 一个取值及其显示名。 */
     public static final class Entry {
         public final String value;
+        /** 中文显示名。取不到资源时的回落，也是日志里用的那个。 */
         public final String displayName;
+        /**
+         * 显示名的字符串资源 id，0 表示没有。
+         *
+         * <p>界面上优先用它 —— 英文界面就是靠这个。这里只存一个 int，
+         * 所以本类仍然不依赖任何 Android API，照旧能跑 JVM 单元测试。</p>
+         */
+        public final int nameRes;
 
         public Entry(String value, String displayName) {
+            this(value, displayName, 0);
+        }
+
+        public Entry(String value, String displayName, int nameRes) {
             this.value = value;
             this.displayName = displayName;
+            this.nameRes = nameRes;
         }
     }
 
@@ -51,6 +64,11 @@ public final class SettingSpec {
     /** 便捷构造：value 与显示名成对写在一起，避免两个数组错位。 */
     public static Entry entry(String value, String displayName) {
         return new Entry(value, displayName);
+    }
+
+    /** 同上，另外带一个字符串资源 id 供界面显示。 */
+    public static Entry entry(String value, String displayName, int nameRes) {
+        return new Entry(value, displayName, nameRes);
     }
 
     /**
@@ -100,6 +118,15 @@ public final class SettingSpec {
         String[] out = new String[entries.size()];
         for (int i = 0; i < entries.size(); i++) {
             out[i] = entries.get(i).displayName;
+        }
+        return out;
+    }
+
+    /** 全部显示名对应的字符串资源 id，与 {@link #values()} 一一对应；没有的位置是 0。 */
+    public int[] nameResIds() {
+        int[] out = new int[entries.size()];
+        for (int i = 0; i < entries.size(); i++) {
+            out[i] = entries.get(i).nameRes;
         }
         return out;
     }

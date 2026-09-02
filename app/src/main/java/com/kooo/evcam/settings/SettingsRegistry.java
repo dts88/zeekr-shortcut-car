@@ -2,6 +2,8 @@ package com.kooo.evcam.settings;
 
 import static com.kooo.evcam.settings.SettingSpec.entry;
 
+import com.kooo.evcam.R;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -27,13 +29,13 @@ public final class SettingsRegistry {
     /** 录制画面排列。 */
     public static final SettingSpec RECORD_LAYOUT = SettingSpec.of(
             "record_layout", "录制画面排列", "grid2x2",
-            entry("grid2x2", "四宫格"),
-            entry("raw", "原始长条"));
+            entry("grid2x2", "四宫格", R.string.opt_layout_grid),
+            entry("raw", "原始长条", R.string.opt_layout_raw));
 
     /** 录制帧率。 */
     public static final SettingSpec RECORD_FPS = SettingSpec.of(
             "record_fps", "录制帧率", "auto",
-            entry("auto", FrameRatePolicy.autoLabel()),
+            entry("auto", FrameRatePolicy.autoLabel(), R.string.opt_fps_auto),
             entry("30", "30 fps"),
             entry("24", "24 fps"),
             entry("20", "20 fps"),
@@ -51,16 +53,16 @@ public final class SettingsRegistry {
     /** 录制模式。 */
     public static final SettingSpec RECORDING_MODE = SettingSpec.of(
             "recording_mode", "录制模式", "auto",
-            entry("auto", "自动（推荐）"),
+            entry("auto", "自动（推荐）", R.string.opt_mode_auto),
             entry("media_recorder", "MediaRecorder"),
             entry("codec", "MediaCodec"));
 
     /** 码率等级。 */
     public static final SettingSpec BITRATE_LEVEL = SettingSpec.of(
             "bitrate_level", "码率等级", "medium",
-            entry("low", "低"),
-            entry("medium", "中"),
-            entry("high", "高"));
+            entry("low", "低", R.string.opt_bitrate_low),
+            entry("medium", "中", R.string.opt_bitrate_medium),
+            entry("high", "高", R.string.opt_bitrate_high));
 
     /**
      * 车型（视频流配置）。
@@ -70,9 +72,21 @@ public final class SettingsRegistry {
      */
     public static final SettingSpec CAR_MODEL = SettingSpec.of(
             "car_model", "车型", "zeekr_7x",
-            entry("zeekr_7x", "极氪7X（环视合成流）"),
-            entry("zeekr_7x_multi", "极氪7X（环视+座舱3路）"),
-            entry("custom", "自定义（排查用）"));
+            entry("zeekr_7x", "极氪7X（环视合成流）", R.string.opt_model_zeekr),
+            entry("zeekr_7x_multi", "极氪7X（环视+座舱3路）", R.string.opt_model_zeekr_multi),
+            entry("custom", "自定义（排查用）", R.string.opt_model_custom));
+
+    /**
+     * 界面语言。
+     *
+     * <p>默认<b>跟随系统</b> —— 车机本来是什么语言，这个应用就该是什么语言。
+     * 另外两档是明确指定，用于系统语言和使用者的偏好不一致的情况。</p>
+     */
+    public static final SettingSpec LANGUAGE = SettingSpec.of(
+            "language", "语言", "auto",
+            entry("auto", "跟随系统", R.string.lang_auto),
+            entry("zh", "中文", R.string.lang_zh),
+            entry("en", "English", R.string.lang_en));
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -81,5 +95,6 @@ public final class SettingsRegistry {
             PREVIEW_RESOLUTION,
             RECORDING_MODE,
             BITRATE_LEVEL,
-            CAR_MODEL));
+            CAR_MODEL,
+            LANGUAGE));
 }

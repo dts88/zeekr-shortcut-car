@@ -36,12 +36,14 @@ import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.PreviewSlots;
 import com.kooo.evcam.overlay.OverlayCoordinator;
+import com.kooo.evcam.settings.Languages;
+import com.kooo.evcam.settings.SettingSpec;
+import com.kooo.evcam.settings.SettingsRegistry;
 import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.playback.PhotoPlaybackFragmentNew;
-import com.kooo.evcam.settings.SettingsRegistry;
 import com.kooo.evcam.view.MacOSToggleButton;
 
 import java.io.BufferedReader;
@@ -1197,7 +1199,19 @@ public class MainActivity extends AppCompatActivity {
      * 首次启动时自动进入设置界面并显示引导弹窗
      */
     private void checkFirstLaunch() {
-        if (appConfig == null || !appConfig.isFirstLaunch()) {
+        if (appConfig == null) {
+            return;
+        }
+
+        // 语言先问。它和「首次启动」分开记：选完语言可能触发界面重建，
+        // 重建之后引导弹窗还得照常出现，共用一个标记就会把引导吞掉。
+        if (!appConfig.isLanguageChosen()) {
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(this::showLanguageChoiceDialog, 300);
+            return;
+        }
+
+        if (!appConfig.isFirstLaunch()) {
             return;
         }
 
@@ -1215,6 +1229,49 @@ public class MainActivity extends AppCompatActivity {
             // 显示引导弹窗
             showFirstLaunchGuideDialog();
         }, 300);
+    }
+
+    /**
+     * 首次启动时选界面语言。
+     *
+     * <p>默认「跟随系统」并且预先选中 —— 车机是什么语言，应用就该是什么语言，
+     * 这是不需要任何人做决定的默认。直接关掉弹窗也停在这一档。</p>
+     *
+     * <p>选完如果语言真的变了，系统会重建界面；那时 {@code isLanguageChosen()}
+     * 已经是 true，于是接着走引导弹窗，而引导已经是新语言的了。</p>
+     */
+    private void showLanguageChoiceDialog() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        SettingSpec spec = SettingsRegistry.LANGUAGE;
+        String[] values = spec.values();
+        String[] labels = new String[values.length];
+        int[] res = spec.nameResIds();
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = res[i] != 0 ? getString(res[i]) : spec.displayNames()[i];
+        }
+        final int[] picked = {Math.max(0, spec.indexOf(appConfig.getLanguageMode()))};
+
+        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle(R.string.dlg_language_title)
+                .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
+                .setPositiveButton(android.R.string.ok, (d, w) -> applyLanguageChoice(
+                        spec.valueAt(picked[0])))
+                .setOnCancelListener(d -> applyLanguageChoice(spec.valueAt(picked[0])))
+                // 注意：AlertDialog 一旦设了选项列表就不再显示 message，
+                // 所以「以后能在哪里改」这句放到选完之后提示
+                .setCancelable(true)
+                .show();
+    }
+
+    private void applyLanguageChoice(String mode) {
+        appConfig.setLanguageMode(mode);
+        appConfig.setLanguageChosen();
+        Languages.apply(mode);
+        Toast.makeText(this, R.string.msg_language_hint, Toast.LENGTH_LONG).show();
+        // 语言没变的话不会重建，这里接着往下走
+        checkFirstLaunch();
     }
 
     /**

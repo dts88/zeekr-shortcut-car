@@ -110,19 +110,23 @@ public final class SettingsDialogs {
         }
         final String[] cameraIds = listCameraIds(context);
         if (cameraIds.length == 0) {
-            Toast.makeText(context, "读取不到相机列表", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.msg_camera_list_failed,
+                    Toast.LENGTH_SHORT).show();
             return;
         }
 
         // 选项 = 自动 + 每个相机 id
         final String[] options = new String[cameraIds.length + 1];
-        options[0] = "自动";
+        options[0] = context.getString(R.string.opt_camera_auto);
         for (int i = 0; i < cameraIds.length; i++) {
-            options[i + 1] = "相机 " + cameraIds[i];
+            options[i + 1] = context.getString(R.string.opt_camera_id, cameraIds[i]);
         }
 
         final String[] slots = {"front", "back", "left"};
-        final String[] slotLabels = {"环视（合成流）", "座舱 1", "座舱 2"};
+        final String[] slotLabels = {
+                context.getString(R.string.slot_surround),
+                context.getString(R.string.slot_cabin_1),
+                context.getString(R.string.slot_cabin_2)};
         final Spinner[] spinners = new Spinner[slots.length];
 
         LinearLayout root = new LinearLayout(context);
@@ -159,9 +163,9 @@ public final class SettingsDialogs {
 
         new com.google.android.material.dialog.MaterialAlertDialogBuilder(
                 context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle("相机映射")
+                .setTitle(R.string.set_camera_mapping_title)
                 .setView(root)
-                .setPositiveButton("保存", (d, w) -> {
+                .setPositiveButton(R.string.action_save, (d, w) -> {
                     for (int i = 0; i < slots.length; i++) {
                         int pos = spinners[i].getSelectedItemPosition();
                         config.setCameraOverride(slots[i],
@@ -170,18 +174,18 @@ public final class SettingsDialogs {
                     if (onChanged != null) {
                         onChanged.run();
                     }
-                    Toast.makeText(context, "相机映射已保存，重启应用后生效",
+                    Toast.makeText(context, R.string.msg_mapping_saved,
                             Toast.LENGTH_LONG).show();
                 })
-                .setNeutralButton("全部自动", (d, w) -> {
+                .setNeutralButton(R.string.action_all_auto, (d, w) -> {
                     config.clearCameraOverrides();
                     if (onChanged != null) {
                         onChanged.run();
                     }
-                    Toast.makeText(context, "已恢复自动分配，重启应用后生效",
+                    Toast.makeText(context, R.string.msg_mapping_cleared,
                             Toast.LENGTH_LONG).show();
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.action_cancel, null)
                 .show();
     }
 

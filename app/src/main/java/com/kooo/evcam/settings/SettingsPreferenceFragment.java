@@ -160,7 +160,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         String current = SettingsRegistry.CAR_MODEL.sanitize(appConfig.getCarModel());
         String[] allValues = SettingsRegistry.CAR_MODEL.values();
-        String[] allNames = SettingsRegistry.CAR_MODEL.displayNames();
+        String[] allNames = localizedNames(SettingsRegistry.CAR_MODEL);
 
         List<String> values = new ArrayList<>();
         List<String> names = new ArrayList<>();
@@ -182,8 +182,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setCarModel(value);
             pref.setValue(value);
             pref.setSummary(pref.getEntry());
-            toast("视频流配置已改为「"
-                    + SettingsRegistry.CAR_MODEL.displayNameOf(value) + "」，重启应用后生效");
+            toast(getString(R.string.msg_stream_changed, pref.getEntry()));
             return false;
         });
     }
@@ -225,7 +224,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         List<String> values = new ArrayList<>();
         List<String> labels = new ArrayList<>();
         values.add(AppConfig.RESOLUTION_DEFAULT);
-        labels.add("默认（跟随探测结果）");
+        labels.add(getString(R.string.opt_resolution_default));
         for (String option : options) {
             values.add(option);
             labels.add(option);
@@ -235,7 +234,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (!values.contains(current)) {
             // 当前值必须留着，否则下拉框会显示空白
             values.add(current);
-            labels.add(current + "（当前）");
+            labels.add(getString(R.string.opt_resolution_current, current));
         }
 
         pref.setEntries(labels.toArray(new String[0]));
@@ -247,7 +246,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setTargetResolution(value);
             pref.setValue(value);
             pref.setSummary(pref.getEntry());
-            toast("分辨率已改为「" + pref.getEntry() + "」，重新开始录制后生效");
+            toast(getString(R.string.msg_resolution_changed, pref.getEntry()));
             return false;
         });
     }
@@ -285,16 +284,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private String describeHardware(List<List<int[]>> perCamera) {
         if (perCamera.isEmpty()) {
-            return "未检测到摄像头";
+            return getString(R.string.info_no_camera);
         }
-        StringBuilder sb = new StringBuilder();
-        sb.append(perCamera.size()).append(" 路视频流");
         List<String> common = ResolutionOptions.common(perCamera);
-        sb.append("，共同支持 ").append(common.size()).append(" 种分辨率");
-        if (!common.isEmpty()) {
-            sb.append("，最高 ").append(common.get(0));
+        if (common.isEmpty()) {
+            return getString(R.string.info_streams, perCamera.size(), 0);
         }
-        return sb.toString();
+        return getString(R.string.info_streams_with_max,
+                perCamera.size(), common.size(), common.get(0));
     }
 
     /**
@@ -326,7 +323,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         if (values.isEmpty()) {
             pref.setEnabled(false);
-            pref.setSummary("还没探测到视频流");
+            pref.setSummary(getString(R.string.info_no_stream_detected));
             return;
         }
 
@@ -339,7 +336,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             @SuppressWarnings("unchecked")
             Set<String> chosen = new HashSet<>((Set<String>) newValue);
             if (chosen.isEmpty()) {
-                toast("至少要保留一路；不想录的话请关掉录制");
+                toast(getString(R.string.msg_keep_one_camera));
                 return false;
             }
             for (String slot : values) {
@@ -361,7 +358,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 sb.append(labels.get(i));
             }
         }
-        return sb.length() > 0 ? sb.toString() : "未选择";
+        return sb.length() > 0 ? sb.toString() : getString(R.string.info_none_selected);
     }
 
     /** 分段时长存的是分钟数（int），不是枚举字符串，所以单独处理。 */
@@ -371,7 +368,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         String[] values = {"1", "3", "5", "10"};
-        String[] labels = {"1 分钟", "3 分钟", "5 分钟", "10 分钟"};
+        String[] labels = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            labels[i] = getString(R.string.opt_minutes, Integer.parseInt(values[i]));
+        }
         pref.setPersistent(false);
         pref.setEntries(labels);
         pref.setEntryValues(values);
@@ -399,7 +399,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             relay.setChecked(appConfig.isRelayWriteEnabled());
             if (!StorageHelper.isInternalStorageAllowed()) {
                 relay.setEnabled(false);
-                relay.setSummary("会先写内置存储再搬到 U 盘，因此仅限开发者模式");
+                relay.setSummary(getString(R.string.msg_relay_dev_only));
             }
             relay.setOnPreferenceChangeListener((preference, newValue) -> {
                 appConfig.setRelayWriteEnabled(Boolean.TRUE.equals(newValue));
@@ -428,14 +428,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 必须带上 AlertDialogTheme：这个应用的主题下，不指定它的话
         // 按钮文字和背景同色，看着就像「弹出来了但没有确认键」
         new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
-                .setTitle("确定用内置存储？")
-                .setMessage("行车记录会持续不断地写入数据 —— 只要在录，就一直在写。\n\n"
-                        + "闪存的写入寿命是有限的，长期把车机内置存储当作记录仪的落盘位置，"
-                        + "会实打实地消耗它的寿命，而车机存储通常是不可更换的。\n\n"
-                        + "建议改用 U 盘：坏了随时能换，也方便直接拔下来拷走。")
-                .setPositiveButton("仍然使用内置存储", (dialog, which) ->
+                .setTitle(R.string.dlg_internal_title)
+                .setMessage(R.string.dlg_internal_msg)
+                .setPositiveButton(R.string.dlg_internal_ok, (dialog, which) ->
                         applyStorageLocation(pref, AppConfig.STORAGE_INTERNAL))
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.action_cancel, null)
                 .show();
     }
 
@@ -455,7 +452,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         pref.setPersistent(false);
-        pref.setSummary("正在检测存储...");
+        pref.setSummary(getString(R.string.info_checking_storage));
 
         final Context context = getContext().getApplicationContext();
         new Thread(() -> {
@@ -482,14 +479,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         // 内置存储照样列出来 —— 藏起来只会让人以为软件没这个能力。
         // 但标明它要开发者选项，选中时也会被拦下。
-        labels.add(StorageHelper.isInternalStorageAllowed()
-                ? "内置存储" : "内置存储（仅限开发者模式）");
+        labels.add(getString(StorageHelper.isInternalStorageAllowed()
+                ? R.string.opt_internal_storage : R.string.opt_internal_storage_locked));
         values.add(AppConfig.STORAGE_INTERNAL);
 
         pref.setEntries(labels.toArray(new String[0]));
         pref.setEntryValues(values.toArray(new String[0]));
         pref.setValue(currentStorageValue(volumes));
-        pref.setSummary(pref.getEntry() != null ? pref.getEntry() : "未选择");
+        pref.setSummary(pref.getEntry() != null
+                ? pref.getEntry() : getString(R.string.info_none_selected));
 
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
@@ -529,11 +527,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
-                .setTitle("内置存储需要开发者选项")
-                .setMessage("行车记录会持续不断地写入数据，而车机内置闪存的写入寿命有限，"
-                        + "坏了通常也换不了。所以正常模式下只录到外置存储。\n\n"
-                        + "如果确实需要，可在「关于本应用」里打开开发者选项后再选。")
-                .setPositiveButton("知道了", null)
+                .setTitle(R.string.dlg_internal_locked_title)
+                .setMessage(R.string.dlg_internal_locked_msg)
+                .setPositiveButton(R.string.action_got_it, null)
                 .show();
     }
 
@@ -552,7 +548,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         pref.setValue(value);
         pref.setSummary(pref.getEntry());
-        toast("存储位置已切换为「" + pref.getEntry() + "」");
+        toast(getString(R.string.msg_storage_changed, pref.getEntry()));
         updateStorageUsage();
     }
 
@@ -574,7 +570,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 try {
                     parsed = Math.max(0, Integer.parseInt(text));
                 } catch (NumberFormatException e) {
-                    toast("请输入数字");
+                    toast(getString(R.string.msg_enter_number));
                     return false;
                 }
             }
@@ -586,7 +582,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     private String describeLimit(int gigabytes) {
-        return gigabytes > 0 ? gigabytes + " GB" : "不限制";
+        return gigabytes > 0 ? gigabytes + " GB" : getString(R.string.info_unlimited);
     }
 
     private void updateStorageUsage() {
@@ -594,14 +590,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (pref == null || getContext() == null) {
             return;
         }
-        pref.setSummary("正在读取...");
+        pref.setSummary(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
         new Thread(() -> {
             String desc;
             try {
                 desc = StorageHelper.getCurrentStoragePathDesc(context);
             } catch (Throwable t) {
-                desc = "读取失败";
+                desc = getString(R.string.info_read_failed);
             }
             final String result = desc;
             if (isAdded()) {
@@ -618,7 +614,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindOverlaySwitch("pref_rearview", appConfig.isRearViewEnabled(),
                 OverlayCoordinator::setRearViewEnabled, on -> {
                     if (on) {
-                        toast("超级后视镜已开启：中间上下滑调取景、左右划换一路，两侧拖动窗口");
+                        toast(getString(R.string.msg_rearview_on));
                     }
                 });
 
@@ -665,7 +661,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 RearViewMirrorService.stop(getContext());
                 RearViewMirrorService.start(getContext());
             }
-            toast("后视镜取景与位置已重置");
+            toast(getString(R.string.msg_rearview_reset));
         });
     }
 
@@ -773,13 +769,30 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindFloatingReset() {
         onClick("pref_reset_floating", pref -> {
             appConfig.resetFloatingWindowLayout();
-            toast("悬浮窗布局已重置");
+            toast(getString(R.string.msg_floating_reset));
         });
     }
 
     // ------------------------------------------------------------------ 系统
 
+    /**
+     * 界面语言。
+     *
+     * <p>选完立刻生效：{@link Languages#apply} 走的是系统的「按应用设定语言」，
+     * 由系统重新加载资源并重建界面 —— 不需要提示「重启后生效」，
+     * 那种提示本身就意味着界面上显示的和实际生效的暂时不是一回事。</p>
+     */
+    private void bindLanguage() {
+        bindEnum("pref_language", SettingsRegistry.LANGUAGE, appConfig.getLanguageMode(),
+                value -> {
+                    appConfig.setLanguageMode(value);
+                    Languages.apply(value);
+                });
+    }
+
     private void bindSystem() {
+        bindLanguage();
+
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));
         bindSwitch("pref_auto_record", appConfig.isAutoStartRecording(),
@@ -811,7 +824,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (getActivity() instanceof MainActivity) {
                 appConfig.setImageAdjustEnabled(true);
                 ((MainActivity) getActivity()).setImageAdjustEnabled(true);
-                toast("调节窗口已打开");
+                toast(getString(R.string.msg_adjust_opened));
             }
         });
 
@@ -821,7 +834,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         ((MainActivity) getActivity()).getImageAdjustManager();
                 if (manager != null) {
                     manager.resetToDefault();
-                    toast("亮度/降噪参数已恢复默认");
+                    toast(getString(R.string.msg_adjust_reset));
                 }
             }
         });
@@ -849,7 +862,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return;
             }
             java.io.File file = AppLog.saveLogsToFile(getContext());
-            toast(file != null ? "日志已保存到: " + file.getAbsolutePath() : "保存日志失败");
+            toast(file != null
+                    ? getString(R.string.msg_logs_saved, file.getAbsolutePath())
+                    : getString(R.string.msg_logs_failed));
         });
     }
 
@@ -858,9 +873,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (pref == null) {
             return;
         }
-        pref.setSummary(appConfig.hasCameraOverride()
-                ? "已手动指定相机映射"
-                : "自动分配。多路配置下若某一路不出画面，可在这里手动指定");
+        pref.setSummary(getString(appConfig.hasCameraOverride()
+                ? R.string.info_mapping_manual : R.string.info_mapping_auto));
     }
 
     // ------------------------------------------------------------------ 开发者选项
@@ -993,7 +1007,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             boolean on = Boolean.TRUE.equals(newValue);
             if (!toggle.apply(getContext(), on)) {
-                toast("请先授权悬浮窗权限");
+                toast(getString(R.string.msg_need_overlay));
                 WakeUpHelper.requestOverlayPermission(getContext());
                 return false;
             }
@@ -1029,7 +1043,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         pref.setPersistent(false);
-        pref.setEntries(spec.displayNames());
+        pref.setEntries(localizedNames(spec));
         pref.setEntryValues(spec.values());
         pref.setValue(spec.sanitize(current));
         pref.setSummary(pref.getEntry());
@@ -1063,6 +1077,33 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             setter.set((Integer) newValue);
             return true;
         });
+    }
+
+    /**
+     * 枚举选项的显示名。
+     *
+     * <p>有字符串资源的用资源 —— 英文界面就是靠这个；没有的回落到
+     * {@link SettingsRegistry} 里那份中文（分辨率、fps 这类本来也不需要翻译）。</p>
+     *
+     * <p>「原始帧率」那一项要带上实际会用的帧率，所以单独格式化。
+     * 这个数必须是<b>真正会录的</b>那个，不能是写死的文字。</p>
+     */
+    private String[] localizedNames(SettingSpec spec) {
+        String[] names = spec.displayNames();
+        int[] res = spec.nameResIds();
+        for (int i = 0; i < names.length; i++) {
+            if (res[i] != 0) {
+                names[i] = getString(res[i]);
+            }
+        }
+        if (spec == SettingsRegistry.RECORD_FPS) {
+            int auto = spec.indexOf("auto");
+            if (auto >= 0) {
+                names[auto] = getString(R.string.opt_fps_auto,
+                        FrameRatePolicy.standardFrameRate(FrameRatePolicy.RECORDER_MAX_FPS));
+            }
+        }
+        return names;
     }
 
     private void onClick(String key, Action action) {

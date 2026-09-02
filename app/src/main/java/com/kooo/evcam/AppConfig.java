@@ -19,6 +19,7 @@ public class AppConfig {
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
+    private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
@@ -1232,6 +1233,29 @@ public class AppConfig {
      * 获取车型
      * @return 车型标识，默认为银河E5
      */
+    /** 界面语言：auto / zh / en。 */
+    public String getLanguageMode() {
+        return readEnum(SettingsRegistry.LANGUAGE);
+    }
+
+    public void setLanguageMode(String mode) {
+        writeEnum(SettingsRegistry.LANGUAGE, mode);
+    }
+
+    /**
+     * 首次启动时的语言选择做过没有。
+     *
+     * <p>和「首次启动」分开记：语言一选中就可能触发界面重建，
+     * 重建之后引导弹窗还得照常出现，所以两件事各有各的标记。</p>
+     */
+    public boolean isLanguageChosen() {
+        return prefs.getBoolean(KEY_LANGUAGE_CHOSEN, false);
+    }
+
+    public void setLanguageChosen() {
+        prefs.edit().putBoolean(KEY_LANGUAGE_CHOSEN, true).apply();
+    }
+
     public String getCarModel() {
         // 默认极氪7X：本项目就是为极氪合成流做的，其余车型不再提供
         return readEnum(SettingsRegistry.CAR_MODEL);
