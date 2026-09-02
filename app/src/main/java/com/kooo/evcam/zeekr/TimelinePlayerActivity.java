@@ -177,6 +177,11 @@ public class TimelinePlayerActivity extends Activity {
         if (nextSessionButton != null) {
             nextSessionButton.setOnClickListener(v -> switchSession(sessionIndex + 1));
         }
+        View sendButton = findViewById(R.id.timeline_send);
+        if (sendButton != null) {
+            sendButton.setOnClickListener(v -> sendCurrentSegment());
+        }
+
         speedButton = findViewById(R.id.timeline_speed);
         if (speedButton != null) {
             speedButton.setOnClickListener(v -> cycleSpeed());
@@ -467,6 +472,26 @@ public class TimelinePlayerActivity extends Activity {
         videoSurface.invalidate();
     }
 
+    /**
+     * 把<b>当前正在播的那一段</b>发到手机上。
+     *
+     * <p>不是整条时间轴：一条时间轴是好几个分段文件接起来的，动辄几个 G，
+     * 而人想要的通常就是刚看到的那一段。所以按当前播放位置落在哪一段来取。</p>
+     */
+    private void sendCurrentSegment() {
+        if (sessionIndex < 0 || sessionIndex >= sessions.size()) {
+            Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        RecordingTimeline.Session session = sessions.get(sessionIndex);
+        if (currentSegmentIndex < 0 || currentSegmentIndex >= session.segmentCount()) {
+            Toast.makeText(this, R.string.share_phone_no_file, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        RecordingTimeline.Segment segment = session.segments.get(currentSegmentIndex);
+        com.kooo.evcam.share.PhoneShare.show(this, new java.io.File(segment.path));
+    }
+
     private void cycleSpeed() {
         speedIndex = (speedIndex + 1) % SPEED_OPTIONS.length;
         float speed = SPEED_OPTIONS[speedIndex];
@@ -492,7 +517,7 @@ public class TimelinePlayerActivity extends Activity {
                         .format(new Date(session.startEpochMs)),
                 session.segmentCount(),
                 TimelineFormat.size(session.totalSizeBytes));
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(title)
                 .setItems(new CharSequence[]{getString(R.string.action_share_clip),
                         getString(R.string.action_delete_clip)}, (dialog, which) -> {
@@ -537,7 +562,7 @@ public class TimelinePlayerActivity extends Activity {
     }
 
     private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle("确认删除")
                 .setMessage(String.format(Locale.getDefault(),
                         "将删除这段录制的全部 %d 个文件，共 %s。删除后无法恢复。",

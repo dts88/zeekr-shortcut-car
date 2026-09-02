@@ -321,4 +321,18 @@
     <string name="photo_no_image">No photo</string>
     <string name="photo_pick_hint">Pick a photo from the list</string>
     <string name="photo_double_tap_hint">Double-tap a lane to enlarge</string>
+
+    <!-- Send to phone -->
+    <string name="action_send_to_phone">Send to phone</string>
+    <string name="share_phone_title">Send to phone</string>
+    <string name="share_phone_steps">Scan with your phone → the file opens in the browser → long-press it and choose Save</string>
+    <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
+    <string name="share_phone_keep_open">Keep this window open until the file is saved — closing it ends the connection</string>
+    <string name="share_phone_switch_address">Try another address</string>
+    <string name="share_phone_no_file">Nothing to send</string>
+    <string name="share_phone_failed">Could not start: %1$s</string>
+    <string name="share_phone_need_hotspot_title">Connect the two devices first</string>
+    <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same local network: share a hotspot from the phone and join it from the car, or the other way round.\n\nTry again once they are connected.</string>
+    <string name="share_photo_pick_lane_first">Double-tap a lane to enlarge it first, then send</string>
+    <string name="share_video_current_segment">Send the current clip (%1$s)</string>
 </resources>

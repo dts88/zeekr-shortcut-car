@@ -462,6 +462,16 @@
                     android:textSize="16sp"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
+                <Button
+                    android:id="@+id/btn_send_to_phone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:minWidth="72dp"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/action_send_to_phone"
+                    android:textSize="16sp"
+                    android:backgroundTint="@color/button_background"
+                    android:textColor="@color/button_text" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

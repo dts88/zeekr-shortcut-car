@@ -230,6 +230,11 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
         // 摄像头切换按钮（循环切换）
         btnViewMode.setOnClickListener(v -> cycleViewMode());
+
+        View btnSendToPhone = view.findViewById(R.id.btn_send_to_phone);
+        if (btnSendToPhone != null) {
+            btnSendToPhone.setOnClickListener(v -> sendCurrentPhotoToPhone());
+        }
     }
 
     /**
@@ -280,6 +285,27 @@ public class PhotoPlaybackFragmentNew extends Fragment {
             detector.onTouchEvent(event);
             return true;
         });
+    }
+
+    /**
+     * 把当前这张照片发到手机上。
+     *
+     * <p>四宫格模式下不发：那时屏幕上是四张图，「这一张」没有定义。
+     * 与其挑一张替用户做主，不如让他先放大到想要的那一路。</p>
+     */
+    private void sendCurrentPhotoToPhone() {
+        if (!isSingleMode || currentSinglePosition == null) {
+            Toast.makeText(getContext(), R.string.share_photo_pick_lane_first,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (currentGroup == null) {
+            Toast.makeText(getContext(), R.string.share_phone_no_file,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.kooo.evcam.share.PhoneShare.show(getActivity(),
+                currentGroup.getPhotoFile(currentSinglePosition));
     }
 
     /**

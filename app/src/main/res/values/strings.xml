@@ -322,4 +322,18 @@
     <string name="photo_no_image">无图片</string>
     <string name="photo_pick_hint">请从左侧列表选择照片</string>
     <string name="photo_double_tap_hint">双击画面可放大切换</string>
+
+    <!-- 发送到手机 -->
+    <string name="action_send_to_phone">发送到手机</string>
+    <string name="share_phone_title">发送到手机</string>
+    <string name="share_phone_steps">用手机扫描二维码 → 浏览器会打开这个文件 → 长按图片或视频，选择「保存」</string>
+    <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
+    <string name="share_phone_keep_open">保存完成前请不要关闭本窗口 —— 关掉就断开了</string>
+    <string name="share_phone_switch_address">换一个地址</string>
+    <string name="share_phone_no_file">没有可发送的文件</string>
+    <string name="share_phone_failed">启动失败：%1$s</string>
+    <string name="share_phone_need_hotspot_title">需要先把两台设备连起来</string>
+    <string name="share_phone_need_hotspot_msg">手机和车机要在同一个局域网里：用手机开热点让车机连上，或者用车机开热点让手机连上。\n\n连好之后再试一次。</string>
+    <string name="share_photo_pick_lane_first">请先双击一路画面放大，再发送</string>
+    <string name="share_video_current_segment">发送当前这一段（%1$s）</string>
 </resources>
