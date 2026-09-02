@@ -666,6 +666,9 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onSurfaceTextureUpdated(@NonNull android.graphics.SurfaceTexture surface) {
+                // 这个回调每来一帧就响一次 —— 这就是「不录制时相机的出帧率」，
+                // 也就是这条视频流本身的上限。录制时的帧率再低，也不会比它高。
+                com.kooo.evcam.camera.PreviewFrameRates.onFrame(cameraKey);
             }
         };
     }

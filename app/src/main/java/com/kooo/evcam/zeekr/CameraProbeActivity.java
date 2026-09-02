@@ -63,6 +63,10 @@ public class CameraProbeActivity extends Activity {
         setContentView(scroll);
 
         content.addView(button("← 返回", v -> finish()));
+        content.addView(button("刷新", v -> {
+            content.removeViews(2, content.getChildCount() - 2);
+            render();
+        }));
         content.addView(head("相机能力清单"));
         content.addView(dim("只读。这些数字决定了「能选哪些分辨率、最高多少帧」——"
                 + "改设置之前先看这里，比试出来快。"));
@@ -71,6 +75,7 @@ public class CameraProbeActivity extends Activity {
     }
 
     private void render() {
+        appendLiveRates();
         CameraManager manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         if (manager == null) {
             content.addView(body("拿不到 CameraManager。"));
@@ -88,6 +93,24 @@ public class CameraProbeActivity extends Activity {
         }
         appendInUse();
         appendGlossary();
+    }
+
+    /**
+     * 相机<b>此刻</b>实际在出多少帧。
+     *
+     * <p>这是整屏最要紧的一个数：它不需要录制就能测出来，
+     * 因此它是<b>这条视频流本身的上限</b> —— 录制时只会更低，不会更高。
+     * 设置里那根帧率滑块是我们这边的天花板，压不高这个数。</p>
+     */
+    private void appendLiveRates() {
+        content.addView(head("实时出帧率（不录制也在测）"));
+        content.addView(mono(com.kooo.evcam.camera.PreviewFrameRates.describe()));
+        content.addView(dim("数在动说明相机正在出帧。"
+                + "如果它就是 15 左右，那么设置里把帧率调到 25 也没有意义 —— "
+                + "相机给不到，编码器就出不到。"
+                + "要区分「相机给不了」和「我们渲染跟不上」，录一段再看日志里"
+                + "「相机送来 X fps，实际渲染 Y fps」那一行。"));
+        content.addView(dim("这一屏不会自动刷新，点上面的「刷新」重新读一次。"));
     }
 
     // ------------------------------------------------------------------ 单个相机
@@ -122,7 +145,11 @@ public class CameraProbeActivity extends Activity {
         content.addView(sub("帧率范围"));
         Range<Integer>[] ranges = cc.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
         if (ranges == null || ranges.length == 0) {
-            content.addView(body("未声明 —— 相机不承诺任何帧率，跑多少是多少。"));
+            content.addView(body("未声明"));
+            content.addView(dim("这一路没有声明任何帧率区间 —— 相机不承诺帧率，"
+                    + "跑多少是多少。EXTERNAL 类型（车机送进来的视频流）常常是这样："
+                    + "它不是一颗受控的传感器，而是一路既成的视频。"
+                    + "这种情况下唯一可信的数就是上面那个实测出帧率。"));
         } else {
             StringBuilder sb = new StringBuilder();
             int highest = 0;
@@ -134,7 +161,7 @@ public class CameraProbeActivity extends Activity {
                 highest = Math.max(highest, range.getUpper());
             }
             content.addView(body(sb.toString()));
-            content.addView(dim("最高 " + highest + " fps。这是相机<b>声明</b>能给的上限，"
+            content.addView(dim("最高 " + highest + " fps。这是相机「声明」能给的上限，"
                     + "不等于实际能稳定跑到；而且本应用目前并没有向相机请求任何帧率区间。"));
         }
     }
@@ -211,17 +238,42 @@ public class CameraProbeActivity extends Activity {
     // ------------------------------------------------------------------ 名词解释
 
     private void appendGlossary() {
-        content.addView(head("这些数字分别决定什么"));
+        content.addView(head("名词解释"));
+
+        content.addView(sub("硬件级别"));
+        content.addView(body("LEGACY < LIMITED < FULL < LEVEL_3，越高能手动控制的东西越多。\n"
+                + "LIMITED 表示不支持逐帧手动曝光、手动对焦这类高级控制。\n"
+                + "对本应用没有影响 —— 我们只要一路画面，不做手动控制。"));
+
+        content.addView(sub("三种输出格式"));
         content.addView(body(
-                "• SurfaceTexture 尺寸 —— 预览与录制能选的档位。录制画面的清晰度由它决定。\n\n"
-                + "• JPEG 尺寸 —— 相机拍照能出的档位。注意：本应用目前的拍照是"
-                + "从预览画面上抓一帧，所以照片的清晰度受限于上面那个预览尺寸，"
-                + "而不是这一栏。要用上这一栏的分辨率，得改走相机的拍照通道。\n\n"
-                + "• 帧率范围 —— 相机声明能跑的区间。设置里选的帧率只是我们这边的"
-                + "上限：相机给不到那么多帧，编码器就出不到那么多帧，最终文件里的"
-                + "帧率是两者取小。\n\n"
-                + "• 宽高比 —— 挑分辨率时最实际的一条。环视合成流是 1280×5140 这种"
-                + "极端比例（四格竖排），普通相机则是 16:9 / 4:3 的常规档位。"));
+                "同一个相机，同一份画面，按用途分成三条清单：\n\n"
+                + "• PRIVATE —— 给系统内部消费的不透明格式（编码器、GPU）。\n"
+                + "  录制走的就是它，效率最高，但应用读不到里面的像素。\n\n"
+                + "• SurfaceTexture —— 给 TextureView 显示用的。\n"
+                + "  预览、四宫格、超级后视镜都走它。\n\n"
+                + "• JPEG —— 相机直接给一张压好的照片。\n"
+                + "  这是「拍照通道」，带完整的画质和拍摄信息。\n\n"
+                + "三条清单的尺寸经常一模一样，那说明这一路在三种用途下能力相同。"));
+
+        content.addView(sub("本应用的拍照现在没走 JPEG 那一条"));
+        content.addView(body("目前是从预览画面上抓一帧再压成 JPEG，所以：\n"
+                + "• 照片清晰度受限于「预览尺寸」，不是上面 JPEG 栏里的最大值；\n"
+                + "• 照片里没有任何拍摄信息（EXIF），因为它本来就不是相机拍的。\n"
+                + "要用上 JPEG 栏里的分辨率，得改走相机的拍照通道。"));
+
+        content.addView(sub("环视合成流的 5 条分隔带"));
+        content.addView(body(
+                "1280×5140 = 4×1280 + 20，多出来的 20 行是 5 条 4px 的分隔带。\n\n"
+                + "为什么是 5 条而不是 3 条：分隔带不只夹在画面之间，\n"
+                + "上边缘和下边缘各还有一条 ——\n"
+                + "  上边缘 1 + 画面之间 3 + 下边缘 1 = 5\n\n"
+                + "拆四宫格时必须把这 5 条都算进去，否则每一格都会带上几像素的黑边，\n"
+                + "而且越往下偏得越多。"));
+
+        content.addView(sub("宽高比"));
+        content.addView(body("挑分辨率时最实际的一条。环视合成流是 1280×5140 这种极端比例"
+                + "（四格竖排），普通相机则是 16:9 / 4:3 的常规档位。"));
     }
 
     // ------------------------------------------------------------------ 小工具
@@ -279,9 +331,7 @@ public class CameraProbeActivity extends Activity {
     }
 
     private TextView dim(String text) {
-        TextView view = make(android.text.Html.fromHtml(text,
-                android.text.Html.FROM_HTML_MODE_LEGACY).toString(), 13, 0xFF999999);
-        return view;
+        return make(text, 13, 0xFF999999);
     }
 
     private TextView mono(String text) {

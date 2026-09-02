@@ -58,6 +58,7 @@ public final class DiagnosticsCollector {
 
         appendDevice(sb);
         appendCameras(sb, context);
+        appendPreviewFrameRates(sb);
         appendMultiMapping(sb, context);
         appendDisplays(sb, context);
         appendSignalSources(sb, context);
@@ -153,6 +154,18 @@ public final class DiagnosticsCollector {
      * <p>「这几路最高能跑多少帧」以前报告里没有 —— 而设置里那个「原始帧率 25」
      * 是代码里写死的假设，不是从相机读来的。两者对不上时，录出来的文件会是第三个数。</p>
      */
+    /**
+     * 各路预览此刻的实测出帧率。
+     *
+     * <p>不需要录制就有数，所以它是这条视频流本身的上限 ——
+     * 录制时只会更低。设置里那个帧率是我们这边的天花板，压不高它。</p>
+     */
+    private static void appendPreviewFrameRates(StringBuilder sb) {
+        sb.append("## 2.2 各路实测出帧率（预览，不含录制）").append('\n');
+        sb.append(com.kooo.evcam.camera.PreviewFrameRates.describe()).append('\n');
+        sb.append("说明: 这是相机送出来的帧率，录制只会更低。").append('\n').append('\n');
+    }
+
     private static void appendFpsRanges(StringBuilder sb, CameraCharacteristics cc) {
         android.util.Range<Integer>[] ranges =
                 cc.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
