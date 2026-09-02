@@ -74,6 +74,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private TextView labelFront, labelBack, labelLeft, labelRight, labelSingle;
     private TextView placeholderFront, placeholderBack, placeholderLeft, placeholderRight;
     private Button btnViewMode;
+    private Button btnSendToPhone;
     private View controlsLayout;
 
     // 数据
@@ -150,6 +151,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
         // 摄像头切换按钮和控制栏
         btnViewMode = view.findViewById(R.id.btn_view_mode);
+        btnSendToPhone = view.findViewById(R.id.btn_send_to_phone);
         controlsLayout = view.findViewById(R.id.controls_layout);
 
         // 设置列表（竖屏2列，横屏1列，日期头部跨越所有列）
@@ -231,7 +233,6 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         // 摄像头切换按钮（循环切换）
         btnViewMode.setOnClickListener(v -> cycleViewMode());
 
-        View btnSendToPhone = view.findViewById(R.id.btn_send_to_phone);
         if (btnSendToPhone != null) {
             btnSendToPhone.setOnClickListener(v -> sendCurrentPhotoToPhone());
         }
