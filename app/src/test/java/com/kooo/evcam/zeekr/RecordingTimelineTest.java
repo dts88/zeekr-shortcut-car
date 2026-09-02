@@ -235,12 +235,14 @@ public class RecordingTimelineTest {
 
         RecordingTimeline.Session s = RecordingTimeline.build(sources).get(0);
         assertEquals(0L, s.totalSizeBytes);
-        assertEquals("大小未知", TimelineFormat.size(s.totalSizeBytes));
+        // 破折号而不是「大小未知」：这个类没有 Context 取不到资源，
+        // 而符号在中英文界面下都读得通
+        assertEquals("—", TimelineFormat.size(s.totalSizeBytes));
     }
 
     @Test
     public void formatsSizeAtEachScale() {
-        assertEquals("大小未知", TimelineFormat.size(0));
+        assertEquals("—", TimelineFormat.size(0));
         assertEquals("512 KB", TimelineFormat.size(512L * 1024L));
         assertEquals("1.5 MB", TimelineFormat.size(3L * 512L * 1024L));
         assertEquals("2.00 GB", TimelineFormat.size(2L * 1024 * 1024 * 1024));
