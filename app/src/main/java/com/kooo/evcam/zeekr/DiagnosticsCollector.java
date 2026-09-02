@@ -64,6 +64,7 @@ public final class DiagnosticsCollector {
         appendStorage(sb, context);
         appendConfig(sb, context);
         appendFloatingLayout(sb, context);
+        com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context);
         PlaybackCapabilityProbe.appendTo(sb, context);
         VehicleEnumeration.appendTo(sb, context);
         appendLogcat(sb);

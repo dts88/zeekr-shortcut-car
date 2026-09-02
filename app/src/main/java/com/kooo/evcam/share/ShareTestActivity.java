@@ -170,7 +170,17 @@ public class ShareTestActivity extends Activity {
             }
         }
         networkInfo.setText(sb.toString());
-        AppLog.i(TAG, "可用地址: " + endpoints);
+        // 界面上看到什么，日志里就有什么：截图截不全，而日志可以整份导出。
+        // 「诊断信息」里也有同一节（ShareDiagnostics），两边对得上才好判断
+        if (endpoints.isEmpty()) {
+            AppLog.i(TAG, "可用 IPv4 地址: 无 —— 两台设备还没连到同一个局域网里");
+        } else {
+            AppLog.i(TAG, "可用 IPv4 地址 " + endpoints.size() + " 个:");
+            for (LocalNetwork.Endpoint endpoint : endpoints) {
+                AppLog.i(TAG, "  " + (endpoint == chosen ? "* " : "  ") + endpoint.address
+                        + "  网卡=" + endpoint.interfaceName + "  判定=" + endpoint.kind);
+            }
+        }
         // 地址换了，之前那张二维码就不作数了
         showQr(null, null);
     }
@@ -183,6 +193,7 @@ public class ShareTestActivity extends Activity {
         }
         int index = endpoints.indexOf(chosen);
         chosen = endpoints.get((index + 1) % endpoints.size());
+        AppLog.i(TAG, "手动切换到 " + chosen);
         Toast.makeText(this, "改用 " + chosen, Toast.LENGTH_SHORT).show();
         refreshHighlight();
         if (server != null && server.sharedFile() != null) {
@@ -244,9 +255,13 @@ public class ShareTestActivity extends Activity {
         }
         urlText.setText(String.format(Locale.US, "%s\n%s  ·  %s",
                 url, shared.getName(), FileShareServer.readableSize(shared.length())));
+        AppLog.i(TAG, "二维码地址 " + url + "  文件=" + shared.getName()
+                + "  大小=" + FileShareServer.readableSize(shared.length())
+                + "  网卡=" + (chosen != null ? chosen.interfaceName : "?"));
         Bitmap qr = QrCode.encode(url, QR_SIZE_PX);
         qrImage.setImageBitmap(qr);
         if (qr == null) {
+            AppLog.e(TAG, "二维码生成失败: " + url);
             Toast.makeText(this, "二维码生成失败", Toast.LENGTH_SHORT).show();
         }
     }
