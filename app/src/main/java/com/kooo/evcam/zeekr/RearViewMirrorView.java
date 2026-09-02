@@ -118,6 +118,8 @@ public class RearViewMirrorView extends ViewGroup {
     /** 平台认定的最小甩动速度，手感与其他应用一致。 */
     private final int minFlingVelocity;
     private boolean pinching;
+    /** 这一次触摸里发生过缩放。抬起第二根手指时 pinching 就清了，松手时还要用。 */
+    private boolean pinchedThisGesture;
     private float pinchStartSpan;
     private int pinchStartWidth;
     private int pinchStartHeight;
@@ -381,8 +383,17 @@ public class RearViewMirrorView extends ViewGroup {
                 return true;
 
             case MotionEvent.ACTION_POINTER_UP:
-                if (event.getPointerCount() <= 2) {
+                // 双指里抬起一根，缩放就结束了 —— 尺寸必须在这里落盘。
+                //
+                // 原先只是把 pinching 置回 false 就返回，等 ACTION_UP 再统一处理；
+                // 可等到那时 pinching 已经是 false、dragging 也一直是 false，
+                // endTouch 里那道判断走不进去，savePosition() 根本不会被调用。
+                // 表现就是：窗口当场变了大小，配置里还是旧的 ——
+                // 设置页的「窗口宽度 / 高度」于是永远对不上眼前这个窗口。
+                if (event.getPointerCount() <= 2 && pinching) {
                     pinching = false;
+                    pinchedThisGesture = true;
+                    savePosition();
                 }
                 return true;
 
@@ -409,6 +420,7 @@ public class RearViewMirrorView extends ViewGroup {
         lastDy = 0f;
         dragging = false;
         pinching = false;
+        pinchedThisGesture = false;
     }
 
     private void beginPinch(MotionEvent event) {
@@ -551,11 +563,14 @@ public class RearViewMirrorView extends ViewGroup {
             } else {
                 appConfig.setRearViewPan(pan);
             }
-        } else if (params != null && (dragging || pinching)) {
+        } else if (params != null && (dragging || pinching || pinchedThisGesture)) {
+            // pinchedThisGesture 也要算：缩放在抬起第二根手指时就结束了，
+            // 到这里 pinching 已经是 false，但窗口该收回屏幕内还是得收
             settleAfterDrag(velocityX);
         }
         dragging = false;
         pinching = false;
+        pinchedThisGesture = false;
     }
 
     /**

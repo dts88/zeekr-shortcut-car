@@ -114,6 +114,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         super.onResume();
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateStorageUsage();
+        refreshRearViewSize();
     }
 
     // ------------------------------------------------------------------ 录制
@@ -663,6 +664,31 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             toast(getString(R.string.msg_rearview_reset));
         });
+    }
+
+    /**
+     * 把「窗口宽度 / 高度」两根滑块拨到窗口当前的实际尺寸。
+     *
+     * <p>后视镜是个悬浮窗，<b>可以在设置页开着的时候被捏大捏小</b> ——
+     * 滑块的值是在 {@code onCreatePreferences} 里读一次就定了的，
+     * 不重读的话，界面上显示的宽高和眼前那个窗口对不上。</p>
+     *
+     * <p>放在 {@code onResume}：从别处回到这个界面时必然经过它。</p>
+     */
+    private void refreshRearViewSize() {
+        if (getContext() == null) {
+            return;
+        }
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        SeekBarPreference width = findPreference("pref_rearview_width");
+        if (width != null) {
+            width.setValue(appConfig.getRearViewWidth(screenWidth));
+        }
+        SeekBarPreference height = findPreference("pref_rearview_height");
+        if (height != null) {
+            height.setValue(appConfig.getRearViewHeight(screenHeight));
+        }
     }
 
     private void pushCorrection() {
