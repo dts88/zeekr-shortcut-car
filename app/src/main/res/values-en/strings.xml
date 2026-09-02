@@ -119,7 +119,7 @@
     <string name="opt_minutes">%1$d min</string>
     <string name="msg_relay_dev_only">Writes to internal storage first, so it requires developer options</string>
     <string name="dlg_internal_title">Use internal storage?</string>
-    <string name="dlg_internal_msg">A dashcam writes continuously — as long as it is recording, it is writing.\n\nFlash memory has a limited write endurance. Using the head unit's internal storage as the dashcam's destination will measurably consume that endurance, and this storage usually cannot be replaced.\n\nA USB drive is recommended: it can be swapped when it wears out, and pulled out to copy files off.</string>
+    <string name="dlg_internal_msg">A dashcam writes continuously — as long as it is recording, it is writing.\n\nFlash memory has a limited write endurance. Using the head unit\'s internal storage as the dashcam\'s destination will measurably consume that endurance, and this storage usually cannot be replaced.\n\nA USB drive is recommended: it can be swapped when it wears out, and pulled out to copy files off.</string>
     <string name="dlg_internal_ok">Use internal storage anyway</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_got_it">Got it</string>
@@ -127,7 +127,7 @@
     <string name="opt_internal_storage">Internal storage</string>
     <string name="opt_internal_storage_locked">Internal storage (developer options only)</string>
     <string name="dlg_internal_locked_title">Internal storage requires developer options</string>
-    <string name="dlg_internal_locked_msg">A dashcam writes continuously, and the head unit's internal flash has a limited write endurance that usually cannot be replaced. So in normal mode recording goes to external storage only.\n\nIf you really need it, unlock developer options from \"About this app\" first.</string>
+    <string name="dlg_internal_locked_msg">A dashcam writes continuously, and the head unit\'s internal flash has a limited write endurance that usually cannot be replaced. So in normal mode recording goes to external storage only.\n\nIf you really need it, unlock developer options from \"About this app\" first.</string>
     <string name="msg_storage_changed">Storage location set to \"%1$s\"</string>
     <string name="msg_enter_number">Enter a number</string>
     <string name="info_unlimited">No limit</string>
