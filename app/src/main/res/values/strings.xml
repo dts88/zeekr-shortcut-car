@@ -175,11 +175,9 @@
     <!-- 首次启动引导 -->
     <string name="guide_title">开始之前</string>
     <string name="guide_1">这是实验性的非官方软件，未经任何车辆功能安全认证，不能替代原厂行车记录仪、倒车影像或盲区监测。请勿在行驶中操作。</string>
-    <string name="guide_2">请先授予相机、存储与悬浮窗权限。缺少悬浮窗权限时，超级后视镜和悬浮窗都无法显示。</string>
-    <string name="guide_3">建议插入 U 盘。默认录制到外置 U 盘；未检测到时会提示并回退到车机内置存储，而持续写入会消耗内置闪存的寿命。</string>
-    <string name="guide_4">超级后视镜默认关闭，可在「设置 → 超级后视镜」中开启。开启后，窗口中间三分之一上下滑调取景、左右滑换一路，两侧拖动窗口。</string>
-    <string name="guide_5">遇到异常先重启一次应用；仍不正常时，可在「设置 → 关于 → 诊断信息」导出实测信息。</string>
-    <string name="guide_footer">本应用以 EVCam（GPL-3.0）为代码基座，免费开源，不出售。来源与致谢见「关于本应用」。</string>
+    <string name="guide_2">录制前请插入 U 盘。未检测到 U 盘时不会开始录制 —— 行车记录是持续写入的，而车机内置闪存的写入寿命有限且通常不可更换。</string>
+    <string name="guide_3">超级后视镜默认关闭，可在「设置 → 超级后视镜」中开启。开启后，窗口中间三分之一上下滑调取景、左右滑换一路，两侧拖动窗口。</string>
+    <string name="guide_4">遇到异常先重启一次应用；仍不正常时，可在「设置 → 关于 → 诊断信息」导出实测信息。</string>
     <string name="action_got_it_guide">我知道了</string>
 
     <!-- 主界面 / 通知 / 回放 -->
@@ -287,4 +285,41 @@
     <string name="upd_cannot_open_apk">无法打开安装包：%1$s</string>
     <string name="upd_no_installer">这台车机上打不开安装界面：%1$s</string>
     <string name="upd_no_settings_page">这台车机上打不开该设置页</string>
+    <string name="msg_keep_one_camera_refuse">请至少选择一路录制摄像头</string>
+    <string name="msg_refuse_no_external">未检测到 U 盘，不会开始录制。为避免持续写入损耗车机内置闪存，正常模式下只录到外置存储。</string>
+
+    <!-- 关于页 -->
+    <string name="about_tagline">给极氪车机做的环视记录仪：把车机那条 360° 合成流录下来，并提供回放、超级后视镜等功能。</string>
+    <string name="about_storage_title">关于外置存储</string>
+    <string name="about_storage_body">录像只写外置存储，不写车机内置闪存 —— 行车记录是持续写入，而车机存储写坏了换不了。\n\n• 随车附送的 U 盘足够满足基本录制。\n\n• 想要更高码率或更长的保存周期，又不想占用原车 U 盘，可以另插一块：用左侧的 Type-C 接口，车机会自动识别，随时可以拔下。\n\n• 已实测可用：128GB U 盘；NVMe 固态盘（读写快得多，基本解决写入瓶颈，但发热略大）。\n\n• 用傲腾（Optane）技术的 M10 系列性价比很高，缺点是容量太小，大约只能存最近 20 小时。</string>
+    <string name="about_storage_privacy">⚠ 录像在 U 盘上是不加密的。盘随时可以拔下并在别的设备上读取，请自行注意隐私。</string>
+    <string name="about_project_title">项目地址</string>
+    <string name="about_coffee_title">请作者喝杯咖啡</string>
+    <string name="about_coffee_body">PayNow 到 9271 6786。完全自愿，不影响任何功能。</string>
+    <string name="about_credits_title">开源与来源</string>
+    <string name="about_credits_evcam">本应用以 GNU GPL v3.0 发布，继承自 EVCam（作者 suyunkai）—— 相机、录制、悬浮窗等基础部分来自它。</string>
+    <string name="about_credits_openavm">极氪车机只提供一条拼好的环视合成流（而不是四个独立摄像头），以及它的排布与渲染限制 —— 这些关键事实由 AVM Recorder（作者 Dantenothing）率先公开记录。该项目保留所有权利，本应用没有复制它的任何代码，只使用了从其公开资料中得到的事实性结论。谨此致谢。</string>
+    <string name="about_license_line">许可证全文：gnu.org/licenses/gpl-3.0.html</string>
+    <string name="about_safety_title">安全须知</string>
+    <string name="about_safety_body">实验性非官方软件，与极氪（ZEEKR）无任何关联。行车时请以实际路况为准，不要依赖本应用的画面判断路况；录像也不保证一定完整可用。使用风险自负。</string>
+    <string name="date_group_count">%1$d 组</string>
+
+    <!-- 图片回看 -->
+    <string name="photo_mode_multi">多路</string>
+    <string name="photo_mode_single">%1$s摄</string>
+    <string name="photo_share_count">已选择 %1$d 组图片，共 %2$d 个文件</string>
+    <string name="photo_share_total">共 %1$d 个图片文件</string>
+    <string name="msg_share_failed">分享失败：%1$s</string>
+    <string name="msg_share_path_unsupported">分享失败：文件路径不受支持</string>
+
+    <!-- 图片回看界面 -->
+    <string name="action_refresh">刷新</string>
+    <string name="action_multi_select">多选</string>
+    <string name="action_select_all">全选</string>
+    <string name="msg_selected_none">已选择 0 项</string>
+    <string name="action_share">分享</string>
+    <string name="photo_empty">暂无照片文件</string>
+    <string name="photo_no_image">无图片</string>
+    <string name="photo_pick_hint">请从左侧列表选择照片</string>
+    <string name="photo_double_tap_hint">双击画面可放大切换</string>
 </resources>

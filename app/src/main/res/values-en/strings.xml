@@ -174,11 +174,9 @@
     <!-- First-launch guide -->
     <string name="guide_title">Before you start</string>
     <string name="guide_1">Experimental, unofficial software with no automotive safety certification. It does not replace the factory dashcam, reversing camera or blind-spot monitor. Do not operate it while driving.</string>
-    <string name="guide_2">Grant the camera, storage and overlay permissions first. Without the overlay permission, the super mirror and floating windows cannot appear.</string>
-    <string name="guide_3">A USB drive is recommended. Recording goes to external USB storage by default; if none is found the app says so and falls back to internal storage, and continuous writing wears out the head unit\'s flash.</string>
-    <string name="guide_4">The super mirror is off by default — turn it on under Settings → Super mirror. In its middle third, swipe up/down to reframe and left/right to change lane; drag either side to move the window.</string>
-    <string name="guide_5">If something misbehaves, restart the app first. If it persists, export the details from Settings → About → Diagnostics.</string>
-    <string name="guide_footer">Built on EVCam (GPL-3.0). Free and open source, never sold. See \"About this app\" for credits.</string>
+    <string name="guide_2">Insert a USB drive before recording. Without one, recording will not start: a dashcam writes continuously, and the head unit\'s internal flash has a limited write endurance and usually cannot be replaced.</string>
+    <string name="guide_3">The super mirror is off by default — turn it on under Settings → Super mirror. In its middle third, swipe up/down to reframe and left/right to change lane; drag either side to move the window.</string>
+    <string name="guide_4">If something misbehaves, restart the app first. If it persists, export the details from Settings → About → Diagnostics.</string>
     <string name="action_got_it_guide">Got it</string>
 
     <!-- Main screen, notifications, playback -->
@@ -286,4 +284,41 @@
     <string name="upd_cannot_open_apk">Cannot open the installer: %1$s</string>
     <string name="upd_no_installer">This head unit cannot open the installer: %1$s</string>
     <string name="upd_no_settings_page">This head unit cannot open that settings page</string>
+    <string name="msg_keep_one_camera_refuse">Select at least one camera to record</string>
+    <string name="msg_refuse_no_external">No USB drive detected, so recording will not start. In normal mode recording goes to external storage only, so that continuous writing does not wear out the internal flash.</string>
+
+    <!-- About screen -->
+    <string name="about_tagline">A surround-view dashcam for Zeekr head units: it records the vehicle\'s 360° composite stream and adds playback, a super mirror and more.</string>
+    <string name="about_storage_title">About external storage</string>
+    <string name="about_storage_body">Recordings are written to external storage only, never to the head unit\'s internal flash — a dashcam writes continuously, and that storage cannot be replaced once worn out.\n\n• The USB drive supplied with the car is enough for basic recording.\n\n• For a higher bitrate or a longer retention window without occupying the original drive, add a second one through the left-hand Type-C port. The head unit picks it up automatically and it can be removed at any time.\n\n• Verified working: a 128 GB USB drive; an NVMe SSD (far faster, which largely removes the write bottleneck, though it runs warmer).\n\n• Optane-based M10 drives are good value, but their capacity is small — roughly the last 20 hours.</string>
+    <string name="about_storage_privacy">⚠ Recordings on the USB drive are not encrypted. The drive can be removed and read on any other device, so treat privacy accordingly.</string>
+    <string name="about_project_title">Project</string>
+    <string name="about_coffee_title">Buy the author a coffee</string>
+    <string name="about_coffee_body">PayNow to 9271 6786. Entirely optional; nothing in the app depends on it.</string>
+    <string name="about_credits_title">Open source and origins</string>
+    <string name="about_credits_evcam">This app is released under the GNU GPL v3.0, inherited from EVCam by suyunkai — the camera, recording and floating-window foundations come from it.</string>
+    <string name="about_credits_openavm">That Zeekr head units expose a single pre-composited surround stream (rather than four separate cameras), along with its layout and rendering constraints, was first documented publicly by AVM Recorder by Dantenothing. That project reserves all rights; no code from it has been copied here — only the factual conclusions drawn from its public material. With thanks.</string>
+    <string name="about_license_line">Full licence: gnu.org/licenses/gpl-3.0.html</string>
+    <string name="about_safety_title">Safety notice</string>
+    <string name="about_safety_body">Experimental, unofficial software with no affiliation to ZEEKR. While driving, rely on the road itself rather than this app\'s display, and do not assume a recording will always be complete or usable. Use at your own risk.</string>
+    <string name="date_group_count">%1$d group(s)</string>
+
+    <!-- Photo playback -->
+    <string name="photo_mode_multi">All lanes</string>
+    <string name="photo_mode_single">%1$s</string>
+    <string name="photo_share_count">%1$d group(s) selected, %2$d file(s)</string>
+    <string name="photo_share_total">%1$d photo file(s)</string>
+    <string name="msg_share_failed">Sharing failed: %1$s</string>
+    <string name="msg_share_path_unsupported">Sharing failed: this file path is not supported</string>
+
+    <!-- Photo playback screen -->
+    <string name="action_refresh">Refresh</string>
+    <string name="action_multi_select">Select</string>
+    <string name="action_select_all">Select all</string>
+    <string name="msg_selected_none">0 selected</string>
+    <string name="action_share">Share</string>
+    <string name="photo_empty">No photos yet</string>
+    <string name="photo_no_image">No photo</string>
+    <string name="photo_pick_hint">Pick a photo from the list</string>
+    <string name="photo_double_tap_hint">Double-tap a lane to enlarge</string>
 </resources>

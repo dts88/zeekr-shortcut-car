@@ -105,7 +105,7 @@ public class DateSection<T> {
      * 获取格式化的日期显示字符串
      * 今天显示"今天"，昨天显示"昨天"，其他显示日期
      */
-    public String getFormattedDateDisplay() {
+    public String getFormattedDateDisplay(android.content.Context context) {
         Calendar today = Calendar.getInstance();
         Calendar targetDate = Calendar.getInstance();
         targetDate.setTime(date);
@@ -124,43 +124,53 @@ public class DateSection<T> {
         long diffInDays = (today.getTimeInMillis() - targetDate.getTimeInMillis()) / (24 * 60 * 60 * 1000);
         
         if (diffInDays == 0) {
-            return "今天";
+            return context.getString(com.kooo.evcam.R.string.date_today);
         } else if (diffInDays == 1) {
-            return "昨天";
+            return context.getString(com.kooo.evcam.R.string.date_yesterday);
         } else if (diffInDays == 2) {
-            return "前天";
-        } else {
-            // 判断是否是同一年
-            if (today.get(Calendar.YEAR) == targetDate.get(Calendar.YEAR)) {
-                SimpleDateFormat sdf = new SimpleDateFormat("MM月dd日", Locale.CHINESE);
-                return sdf.format(date);
-            } else {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy年MM月dd日", Locale.CHINESE);
-                return sdf.format(date);
-            }
+            return context.getString(com.kooo.evcam.R.string.date_before_yesterday);
         }
+        // 日期本身不写死格式：让系统按当前语言拼一个 —— 中文得到「8月28日」，
+        // 英文得到「Aug 28」。原来写死 "MM月dd日" + Locale.CHINESE，
+        // 英文界面下会冒出一段中文日期。
+        Locale locale = Locale.getDefault();
+        String skeleton = today.get(Calendar.YEAR) == targetDate.get(Calendar.YEAR)
+                ? "MMMd" : "yMMMd";
+        String pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton);
+        return new SimpleDateFormat(pattern, locale).format(date);
     }
     
     /**
      * 获取星期几
      */
     public String getDayOfWeek() {
-        SimpleDateFormat sdf = new SimpleDateFormat("EEEE", Locale.CHINESE);
-        return sdf.format(date);
+        return new SimpleDateFormat("EEEE", Locale.getDefault()).format(date);
     }
     
     /**
      * 获取带星期的完整日期显示
      */
-    public String getFullDateDisplay() {
-        String dateDisplay = getFormattedDateDisplay();
-        String dayOfWeek = getDayOfWeek();
-        
-        // 今天、昨天、前天显示时带上星期
-        if ("今天".equals(dateDisplay) || "昨天".equals(dateDisplay) || "前天".equals(dateDisplay)) {
-            return dateDisplay + " · " + dayOfWeek;
+    public String getFullDateDisplay(android.content.Context context) {
+        // 「今天 · 星期四」和「8月28日 星期四」的分隔符不一样：前者是两个并列的说法，
+        // 后者是同一个日期的两部分。判据用相对天数，不去比对翻译过的文字 ——
+        // 比字符串的话，换一种语言就全都对不上了。
+        return getFormattedDateDisplay(context)
+                + (isWithinLastThreeDays() ? " · " : " ")
+                + getDayOfWeek();
+    }
+
+    /** 是不是今天 / 昨天 / 前天。 */
+    private boolean isWithinLastThreeDays() {
+        Calendar today = Calendar.getInstance();
+        Calendar target = Calendar.getInstance();
+        target.setTime(date);
+        for (Calendar c : new Calendar[]{today, target}) {
+            c.set(Calendar.HOUR_OF_DAY, 0);
+            c.set(Calendar.MINUTE, 0);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MILLISECOND, 0);
         }
-        
-        return dateDisplay + " " + dayOfWeek;
+        long days = (today.getTimeInMillis() - target.getTimeInMillis()) / (24 * 60 * 60 * 1000);
+        return days >= 0 && days <= 2;
     }
 }

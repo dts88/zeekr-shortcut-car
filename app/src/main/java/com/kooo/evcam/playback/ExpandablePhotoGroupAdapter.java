@@ -186,10 +186,11 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
 
     private void bindDateHeader(DateHeaderViewHolder holder, DateSection<PhotoGroup> section, int position) {
         // 设置日期文字
-        holder.dateText.setText(section.getFullDateDisplay());
+        holder.dateText.setText(section.getFullDateDisplay(context));
         
         // 设置组数量
-        holder.itemCount.setText(section.getItemCount() + "组");
+        holder.itemCount.setText(
+                context.getString(R.string.date_group_count, section.getItemCount()));
         
         // 设置展开/收起图标
         int iconRes = section.isExpanded() ? R.drawable.ic_expand_less : R.drawable.ic_expand_more;

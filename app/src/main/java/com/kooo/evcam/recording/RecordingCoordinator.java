@@ -6,6 +6,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CameraForegroundService;
 import com.kooo.evcam.FloatingWindowService;
+import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.camera.MultiCameraManager;
 
@@ -92,11 +93,23 @@ public class RecordingCoordinator {
 
         Set<String> cameras = appConfig.getEnabledRecordingCameras();
         if (cameras.isEmpty()) {
-            notifyRefused("请至少选择一个录制摄像头");
+            notifyRefused(context.getString(R.string.msg_keep_one_camera_refuse));
             return;
         }
 
-        // 用户选了 U 盘却没插的话，这次会落到内置存储，得让上层知道
+        // 正常模式下不往内置存储录：行车记录是一直在写的，而车机闪存换不了。
+        //
+        // 这条规则原先只拦住了「手动按录制」那一条路，另外八处（开机自动录、
+        // 悬浮按钮拉起、主题切换后恢复、定时自检、亮屏恢复）都是直接开录的 ——
+        // 也就是说，说好的「没有 U 盘就不录」，实际上只有按按钮时才成立。
+        // 判断放在这里，九条路才是同一个答案。
+        if (StorageHelper.willRecordToInternal(context)
+                && !StorageHelper.isInternalStorageAllowed()) {
+            notifyRefused(context.getString(R.string.msg_refuse_no_external));
+            return;
+        }
+
+        // 开发者模式下允许落到内置存储，但要让上层知道这次是回退
         boolean sdFellBack = StorageHelper.isSdCardFallback(context);
 
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())

@@ -102,6 +102,8 @@ public class MainActivity extends AppCompatActivity {
 
     private Button btnStartRecord, btnExit, btnTakePhoto;
     private MultiCameraManager cameraManager;
+    /** 上一条已提示过的拒绝理由，用来挡住定时重试造成的重复提示。 */
+    private String lastRefusalShown;
     /** 录不录、能不能录由它决定；这里只负责画面反馈。 */
     private RecordingCoordinator recordingCoordinator;
 
@@ -2870,6 +2872,7 @@ public class MainActivity extends AppCompatActivity {
             new RecordingCoordinator.Listener() {
         @Override
         public void onRecordingStarted(java.util.Set<String> cameras, boolean sdFellBack) {
+            lastRefusalShown = null;
             isRecording = true;
             isPreparingRecording = true;
             isAutoRecordingPending = false;
@@ -2894,6 +2897,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onRecordingStopped() {
+            lastRefusalShown = null;
             isRecording = false;
             isPreparingRecording = false;
             stopBlinkAnimation();
@@ -2903,7 +2907,13 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onRecordingRefused(String reason) {
-            Toast.makeText(MainActivity.this, reason, Toast.LENGTH_SHORT).show();
+            // 自动录制会定时重试，同一条理由不必每次都弹一遍 ——
+            // 那会变成一串关不掉的提示，反而盖住真正该看的东西
+            if (reason != null && reason.equals(lastRefusalShown)) {
+                return;
+            }
+            lastRefusalShown = reason;
+            Toast.makeText(MainActivity.this, reason, Toast.LENGTH_LONG).show();
         }
 
         @Override

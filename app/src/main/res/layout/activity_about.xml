@@ -46,7 +46,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:lineSpacingMultiplier="1.25"
-                android:text="给极氪车机做的环视记录仪：把车机那条 360° 合成流录下来，并提供回放、超级后视镜等功能。"
+                android:text="@string/about_tagline"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -55,7 +55,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="关于外置存储"
+                android:text="@string/about_storage_title"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -65,7 +65,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingMultiplier="1.25"
-                android:text="录像只写外置存储，不写车机内置闪存 —— 行车记录是持续写入，而车机存储写坏了换不了。\n\n• 随车附送的 U 盘足够满足基本录制。\n\n• 想要更高码率或更长的保存周期，又不想占用原车 U 盘，可以另插一块：用左侧的 Type-C 接口，车机会自动识别，随时可以拔下。\n\n• 已实测可用：128GB U 盘；NVMe 固态盘（读写快得多，基本解决写入瓶颈，但发热略大）。\n\n• 用傲腾（Optane）技术的 M10 系列性价比很高，缺点是容量太小，大约只能存最近 20 小时。"
+                android:text="@string/about_storage_body"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -74,7 +74,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:lineSpacingMultiplier="1.25"
-                android:text="⚠ 录像在 U 盘上是不加密的。盘随时可以拔下并在别的设备上读取，请自行注意隐私。"
+                android:text="@string/about_storage_privacy"
                 android:textColor="#FFD08080"
                 android:textSize="15sp" />
 
@@ -83,7 +83,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="项目地址"
+                android:text="@string/about_project_title"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -102,7 +102,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="请作者喝杯咖啡"
+                android:text="@string/about_coffee_title"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -111,7 +111,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="PayNow 到 9271 6786。完全自愿，不影响任何功能。"
+                android:text="@string/about_coffee_body"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -120,7 +120,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="开源与来源"
+                android:text="@string/about_credits_title"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -130,7 +130,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingMultiplier="1.25"
-                android:text="本应用以 GNU GPL v3.0 发布，继承自 EVCam（作者 suyunkai）—— 相机、录制、悬浮窗等基础部分来自它。"
+                android:text="@string/about_credits_evcam"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -148,7 +148,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:lineSpacingMultiplier="1.25"
-                android:text="极氪车机只提供一条拼好的环视合成流（而不是四个独立摄像头），以及它的排布与渲染限制 —— 这些关键事实由 AVM Recorder（作者 Dantenothing）率先公开记录。该项目保留所有权利，本应用没有复制它的任何代码，只使用了从其公开资料中得到的事实性结论。谨此致谢。"
+                android:text="@string/about_credits_openavm"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -166,7 +166,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="许可证全文：gnu.org/licenses/gpl-3.0.html"
+                android:text="@string/about_license_line"
                 android:textColor="#4FC3F7"
                 android:textSize="15sp" />
 
@@ -176,7 +176,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
-                android:text="安全须知"
+                android:text="@string/about_safety_title"
                 android:textColor="#FF8080"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -186,7 +186,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingMultiplier="1.25"
-                android:text="实验性非官方软件，与极氪（ZEEKR）无任何关联。行车时请以实际路况为准，不要依赖本应用的画面判断路况；录像也不保证一定完整可用。使用风险自负。"
+                android:text="@string/about_safety_body"
                 android:textColor="#DDFFFFFF"
                 android:textSize="15sp" />
 
@@ -197,7 +197,7 @@
                 android:layout_gravity="end"
                 android:layout_marginTop="24dp"
                 android:backgroundTint="@color/button_background"
-                android:text="关闭"
+                android:text="@string/action_close"
                 android:textColor="@color/button_text"
                 android:textSize="15sp" />
         </LinearLayout>
