@@ -21,9 +21,14 @@ import java.nio.charset.StandardCharsets;
  *
  * <h3>为什么不用 /releases/latest</h3>
  *
- * <p>那个接口<b>只认正式版</b>，会把预发布版全部跳过。本项目发的全是
- * {@code -alpha} 预发布，用它会永远返回 404 —— 表现就是「永远没有更新」。
- * 所以这里拉列表，自己挑版本号最大的那个非草稿版本。</p>
+ * <p>那个接口<b>只认正式版</b>，会把预发布版全部跳过。本项目目前发的是 beta
+ * 预发布，用它会永远返回 404 —— 表现就是「永远没有更新」。
+ * 所以这里拉列表，自己挑。</p>
+ *
+ * <h3>只推 beta 与正式版</h3>
+ *
+ * <p>alpha 是开发过程中随手发的，数量多、稳定性没有保证 ——
+ * 不该被推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。</p>
  *
  * <h3>这是本应用唯一一次主动出网</h3>
  *
@@ -77,9 +82,9 @@ public final class GithubReleases {
     }
 
     /**
-     * 取版本号最大的那个非草稿版本。
+     * 取版本号最大的那个非草稿、且属于 beta 或正式版的版本。
      *
-     * @return 没有任何带 APK 的版本时返回 null
+     * @return 没有符合条件、且带 APK 的版本时返回 null
      * @throws IOException 网络或解析出错
      */
     public static Release fetchLatest() throws IOException {
@@ -95,6 +100,10 @@ public final class GithubReleases {
                 }
                 Release candidate = toRelease(release);
                 if (candidate == null) {
+                    continue;
+                }
+                if (!VersionName.isBetaOrRelease(candidate.tagName)) {
+                    // alpha 不推：那是开发过程里随手发的，不该盖到一台在用的车机上
                     continue;
                 }
                 if (best == null || VersionName.compare(candidate.tagName, best.tagName) > 0) {

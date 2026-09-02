@@ -67,6 +67,42 @@ public class VersionNameTest {
         assertFalse(VersionName.isNewer("", "0.25.2-alpha"));
     }
 
+    /** 检查更新只推 beta 与正式版。 */
+    @Test
+    public void onlyBetaAndReleaseCountAsUpdatable() {
+        assertTrue(VersionName.isBetaOrRelease("v0.30.0-beta"));
+        assertTrue(VersionName.isBetaOrRelease("0.30.0-beta.2"));
+        assertTrue("正式版没有后缀", VersionName.isBetaOrRelease("1.0.0"));
+        assertFalse("alpha 不推给在用的车机", VersionName.isBetaOrRelease("0.29.2-alpha"));
+    }
+
+    /**
+     * rc 也不推。
+     *
+     * <p>这不是疏忽：真要发 rc，应当在代码里明确加上那一档，
+     * 而不是靠「看起来比 beta 新」这种默认放行。</p>
+     */
+    @Test
+    public void otherPrereleaseLabelsAreNotAssumedUpdatable() {
+        assertFalse(VersionName.isBetaOrRelease("1.0.0-rc1"));
+        assertFalse(VersionName.isBetaOrRelease("1.0.0-nightly"));
+    }
+
+    @Test
+    public void unparseableVersionsBelongToNoChannel() {
+        assertFalse(VersionName.isBetaOrRelease("nightly"));
+        assertFalse(VersionName.isBetaOrRelease(""));
+        assertFalse(VersionName.isBetaOrRelease(null));
+    }
+
+    /** 同号时 beta 比 alpha 新，正式版又比 beta 新。 */
+    @Test
+    public void channelOrderFollowsSemver() {
+        assertTrue(VersionName.isNewer("0.30.0-beta", "0.30.0-alpha"));
+        assertTrue(VersionName.isNewer("0.30.0", "0.30.0-beta"));
+        assertTrue(VersionName.isNewer("0.30.0-beta", "0.29.2-alpha"));
+    }
+
     @Test
     public void buildMetadataIsIgnored() {
         assertTrue(VersionName.compare("0.25.2+abc", "0.25.2") == 0);

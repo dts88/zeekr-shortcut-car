@@ -59,6 +59,27 @@ public final class VersionName {
         return compare(remote, local) > 0;
     }
 
+    /**
+     * 这个版本号属不属于「beta 或正式版」这一档。
+     *
+     * <p>检查更新只推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
+     * 拿它去覆盖一台正在用的车机不合适。</p>
+     *
+     * <p>后缀既不是空也不是 beta 的一律不算 —— 包括 rc。真要发 rc，
+     * 得在这里明确加上，而不是靠「看起来比 beta 新」这种默认。</p>
+     */
+    public static boolean isBetaOrRelease(String version) {
+        String[] parts = splitCore(version);
+        if (numbers(parts[0]).length == 0) {
+            // 版本号都认不出来，谈不上属于哪一档
+            return false;
+        }
+        if (parts[1].isEmpty()) {
+            return true;
+        }
+        return parts[1].toLowerCase(java.util.Locale.US).startsWith("beta");
+    }
+
     /** 拆成「数字部分」和「预发布后缀」两段，顺便吃掉前导的 v。 */
     private static String[] splitCore(String version) {
         String s = version == null ? "" : version.trim();
