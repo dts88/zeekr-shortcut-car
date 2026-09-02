@@ -25,6 +25,7 @@ import androidx.preference.SwitchPreferenceCompat;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.CustomCameraConfigFragment;
 import com.kooo.evcam.FloatingWindowService;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.PermissionSettingsFragment;
@@ -907,6 +908,36 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (getActivity() instanceof MainActivity) {
                 ((MainActivity) getActivity()).toggleSupervisionMode();
             }
+        });
+
+        // 「自定义」这档视频流配置是能选出来的，但配置它的界面一直没有入口 ——
+        // 选了之后没有任何地方能配摄像头路数和映射
+        onClick("pref_custom_config",
+                pref -> openFragment(new CustomCameraConfigFragment()));
+
+        bindSwitch("pref_preview_correction", appConfig.isPreviewCorrectionEnabled(), value -> {
+            appConfig.setPreviewCorrectionEnabled(value);
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).refreshPreviewCorrection();
+            }
+        });
+
+        onClick("pref_preview_correction_adjust", pref -> {
+            if (!appConfig.isPreviewCorrectionEnabled()) {
+                toast("请先打开「预览画面矫正」");
+                return;
+            }
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).showPreviewCorrectionFloating();
+            }
+        });
+
+        onClick("pref_preview_correction_reset", pref -> {
+            appConfig.resetAllPreviewCorrection();
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).refreshPreviewCorrection();
+            }
+            toast("预览矫正参数已重置");
         });
     }
 

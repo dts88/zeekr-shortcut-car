@@ -334,6 +334,25 @@
             android:title="超视模式" />
 
         <Preference
+            android:key="pref_custom_config"
+            android:title="自定义界面配置"
+            android:summary="「视频流配置」选「自定义」后，在这里配摄像头路数、映射、旋转与布局" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_preview_correction"
+            android:title="预览画面矫正"
+            android:summary="对预览画面做平移 / 缩放 / 旋转修正。只作用于走普通预览的那几路（三路配置的座舱相机、自定义），环视合成流由四宫格容器自己排版，不受影响" />
+
+        <Preference
+            android:key="pref_preview_correction_adjust"
+            android:title="预览矫正调参"
+            android:summary="打开悬浮窗逐路调整，需要先打开上面的开关" />
+
+        <Preference
+            android:key="pref_preview_correction_reset"
+            android:title="重置预览矫正参数" />
+
+        <Preference
             android:key="pref_developer_note"
             android:selectable="false"
             android:summary="「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。" />
