@@ -40,9 +40,9 @@
     <string name="set_rearview_front_rear_title">Front and rear only</string>
     <string name="set_rearview_front_rear_summary">Swiping cycles between rear and front only, skipping the sides</string>
     <string name="set_rearview_fisheye_title">Fisheye correction</string>
-    <string name="set_rearview_fisheye_summary">Straightens the lens barrel distortion. Display only — recorded footage is unchanged</string>
+    <string name="set_rearview_fisheye_summary">Straightens the lens barrel distortion. Display only — recorded footage is unchanged. Correction magnifies the centre, so it is slightly less sharp than the raw view</string>
     <string name="set_rearview_fov_title">Field of view</string>
-    <string name="set_rearview_fov_summary">A wider angle takes in more, at the cost of more stretching at the edges</string>
+    <string name="set_rearview_fov_summary">A wider angle takes in more and magnifies less (a sharper picture), at the cost of more stretching at the edges</string>
     <string name="set_rearview_width_title">Window width</string>
     <string name="set_rearview_height_title">Window height</string>
     <string name="set_rearview_height_summary">Width and height each go up to the full screen. The picture\'s aspect ratio never changes — the window shape only decides how much is visible</string>

@@ -118,6 +118,7 @@ public class RearViewMirrorService extends Service {
 
                     @Override
                     public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) {
+                        restoreBufferSize(st);
                     }
 
                     @Override
@@ -176,14 +177,13 @@ public class RearViewMirrorService extends Service {
 
         Size previewSize = camera.getPreviewSize();
         if (previewSize != null) {
-            surfaceTexture.setDefaultBufferSize(
-                    previewSize.getWidth(), previewSize.getHeight());
             // 几何按合成流的真实尺寸算，不是按缓冲区尺寸
             mirrorView.setSourceSize(previewSize);
         }
+        boundCamera = camera;
+        restoreBufferSize(surfaceTexture);
 
         Surface surface = new Surface(surfaceTexture);
-        boundCamera = camera;
         camera.setMainFloatingSurface(surface, surfaceTexture);
 
         if (camera.isCameraOpened()) {
@@ -193,7 +193,35 @@ public class RearViewMirrorService extends Service {
             CameraForegroundService.whenReady(this, cam::openCamera);
         }
         retryCount = 0;
-        AppLog.i(TAG, "后视镜已接到相机，预览尺寸 " + previewSize);
+        AppLog.i(TAG, "后视镜已接到相机，预览尺寸 " + previewSize
+                + "，缓冲区 " + camera.getPreviewBufferSize());
+    }
+
+    /**
+     * 把缓冲区尺寸拨回相机会话配置时用的那个。
+     *
+     * <p><b>窗口一改大小就必须做这件事。</b>TextureView 在尺寸变化时会把自己
+     * SurfaceTexture 的默认缓冲区尺寸设成<b>自己的布局尺寸</b>，
+     * 也就是这个悬浮窗的大小 —— 于是相机不再输出 1280×5140 的合成流，
+     * 而是输出一张窗口那么大的图；后视镜再从里面取四分之一放大回整个窗口。
+     * 表现就是「拖过尺寸之后画面变糊」，而且不会自己恢复。</p>
+     *
+     * <p>{@code SingleCamera} 在创建会话前也做同样的事（见那里的注释），
+     * 但会话只创建一次，之后的每一次缩放都得由这里兜住。</p>
+     *
+     * <p>用会话配置时那个尺寸而不是别的：改成第三个值会和
+     * {@code OutputConfiguration} 对不上，那是另一种坏法。</p>
+     */
+    private void restoreBufferSize(SurfaceTexture surfaceTexture) {
+        if (surfaceTexture == null || boundCamera == null) {
+            return;
+        }
+        Size buffer = boundCamera.getPreviewBufferSize();
+        if (buffer == null || buffer.getWidth() <= 0 || buffer.getHeight() <= 0) {
+            return;
+        }
+        surfaceTexture.setDefaultBufferSize(buffer.getWidth(), buffer.getHeight());
+        AppLog.d(TAG, "后视镜缓冲区尺寸已恢复为 " + buffer);
     }
 
     /**

@@ -53,9 +53,9 @@
     <string name="set_rearview_front_rear_title">只显示前后视</string>
     <string name="set_rearview_front_rear_summary">左右滑动仅在后视与前视之间切换，不经过两侧</string>
     <string name="set_rearview_fisheye_title">鱼眼校正</string>
-    <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变。仅影响显示，录制的原始画面不变</string>
+    <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变。仅影响显示，录制的原始画面不变。校正会放大画面中心，清晰度略低于不校正时</string>
     <string name="set_rearview_fov_title">视野角度</string>
-    <string name="set_rearview_fov_summary">角度越大视野越宽，边缘拉伸也越明显</string>
+    <string name="set_rearview_fov_summary">角度越大，视野越宽、放大倍数越小（画面更清晰），但边缘拉伸更明显</string>
     <string name="set_rearview_width_title">窗口宽度</string>
     <string name="set_rearview_height_title">窗口高度</string>
     <string name="set_rearview_height_summary">宽高可分别调至整块屏幕。画面比例保持不变，窗口形状只决定可见范围</string>
