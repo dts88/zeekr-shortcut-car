@@ -363,6 +363,11 @@
             android:title="重置预览矫正参数" />
 
         <Preference
+            android:key="pref_camera_probe"
+            android:title="相机能力清单"
+            android:summary="每个相机能给哪些分辨率、哪些帧率，以及这些数字分别决定什么" />
+
+        <Preference
             android:key="pref_share_test"
             android:title="发送到手机 · 连通性测试"
             android:summary="列出可用的局域网地址，起一个临时 HTTP 服务并生成二维码，用来验证手机能否扫码取到文件" />

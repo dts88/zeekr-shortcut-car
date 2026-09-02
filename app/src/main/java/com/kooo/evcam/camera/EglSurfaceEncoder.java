@@ -224,6 +224,59 @@ public class EglSurfaceEncoder {
      * 所以设置里选 10fps 也照样按 30fps 出帧。</p>
      */
     private volatile long minFrameIntervalNs = DEFAULT_MIN_FRAME_INTERVAL_NS;
+
+    /** 相机送来的帧数（drawFrame 被调用的次数）。 */
+    private long deliveredFrames;
+    /** 真正渲染出去、进了编码器的帧数。 */
+    private long renderedFrames;
+    private long rateWindowStartNs;
+
+    /** 帧率统计的窗口。5 秒足够平滑，又不至于要等很久才看到第一条。 */
+    private static final long RATE_WINDOW_NS = 5_000_000_000L;
+
+    /**
+     * 每隔几秒把两个帧率打进日志。
+     *
+     * <p><b>为什么要两个数：</b>「录出来只有 15fps」有两种完全不同的原因 ——
+     * 相机就只给了 15 帧，或者相机给了 25 帧而我们只渲染得出 15 帧。
+     * 前者是这条视频流本身的上限，改设置没有用；后者是我们的开销问题，
+     * 降分辨率或关水印可能就好了。只看最终文件分不出这两种。</p>
+     */
+    private void reportFrameRates(long nowNs) {
+        if (rateWindowStartNs == 0) {
+            rateWindowStartNs = nowNs;
+            return;
+        }
+        long elapsed = nowNs - rateWindowStartNs;
+        if (elapsed < RATE_WINDOW_NS) {
+            return;
+        }
+        float seconds = elapsed / 1_000_000_000f;
+        float delivered = deliveredFrames / seconds;
+        float rendered = renderedFrames / seconds;
+        AppLog.i(TAG, String.format(java.util.Locale.US,
+                "Camera %s 帧率：相机送来 %.1f fps，实际渲染 %.1f fps（节流上限 %.0f fps）%s",
+                cameraId, delivered, rendered, 1_000_000_000f / minFrameIntervalNs,
+                delivered - rendered > 1f ? "  << 渲染跟不上" : ""));
+        lastDeliveredFps = delivered;
+        lastRenderedFps = rendered;
+        deliveredFrames = 0;
+        renderedFrames = 0;
+        rateWindowStartNs = nowNs;
+    }
+
+    private volatile float lastDeliveredFps;
+    private volatile float lastRenderedFps;
+
+    /** 最近一次统计到的相机出帧率；0 表示还没统计出来。 */
+    public float getDeliveredFps() {
+        return lastDeliveredFps;
+    }
+
+    /** 最近一次统计到的实际渲染帧率。 */
+    public float getRenderedFps() {
+        return lastRenderedFps;
+    }
     
     // 性能优化：复用缓冲区，减少GC
     private final float[] tempMatrix = new float[16];
@@ -367,8 +420,12 @@ public class EglSurfaceEncoder {
             return;
         }
 
+        // 这个方法每来一帧就被调一次 —— 所以它的调用频率就是相机的出帧率
+        deliveredFrames++;
+
         // 性能优化：帧率控制，防止过度渲染占用CPU
         long currentTimeNs = System.nanoTime();
+        reportFrameRates(currentTimeNs);
         if (currentTimeNs - lastFrameTimeNs < minFrameIntervalNs) {
             // 帧间隔太短，跳过渲染但消费帧
             try {
@@ -404,6 +461,7 @@ public class EglSurfaceEncoder {
             inputSurfaceTexture.updateTexImage();
             inputSurfaceTexture.getTransformMatrix(texMatrix);
             lastFrameTimeNs = currentTimeNs;
+            renderedFrames++;   // 过了节流这一关，这一帧才真的进编码器
 
             // 设置视口
             GLES20.glViewport(0, 0, width, height);
