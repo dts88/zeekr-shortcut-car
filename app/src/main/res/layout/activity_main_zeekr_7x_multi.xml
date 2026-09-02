@@ -55,7 +55,7 @@
                     android:paddingEnd="10dp"
                     android:background="@drawable/camera_label_background"
                     android:gravity="center"
-                    android:text="环视"
+                    android:text="@string/lane_surround"
                     android:textColor="#FFFFFF"
                     android:textSize="15sp" />
 
@@ -106,7 +106,7 @@
                         android:paddingEnd="10dp"
                         android:background="@drawable/camera_label_background"
                         android:gravity="center"
-                        android:text="座舱 1"
+                        android:text="@string/slot_cabin_1"
                         android:textColor="#FFFFFF"
                         android:textSize="14sp" />
                 </FrameLayout>
@@ -134,7 +134,7 @@
                         android:paddingEnd="10dp"
                         android:background="@drawable/camera_label_background"
                         android:gravity="center"
-                        android:text="座舱 2"
+                        android:text="@string/slot_cabin_2"
                         android:textColor="#FFFFFF"
                         android:textSize="14sp" />
                 </FrameLayout>

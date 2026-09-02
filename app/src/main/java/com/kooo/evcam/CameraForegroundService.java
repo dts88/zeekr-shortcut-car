@@ -199,10 +199,10 @@ public class CameraForegroundService extends Service {
         String content = intent != null ? intent.getStringExtra("content") : null;
 
         if (title == null) {
-            title = "摄像头服务运行中";
+            title = getString(R.string.notif_running);
         }
         if (content == null) {
-            content = "正在处理远程拍照/录制请求";
+            content = getString(R.string.notif_running_desc);
         }
 
         // 创建通知
@@ -341,10 +341,10 @@ public class CameraForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "摄像头服务",
+                    getString(R.string.notif_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("用于后台拍照和录制");
+            channel.setDescription(getString(R.string.notif_channel_desc));
             channel.setShowBadge(false);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

@@ -465,7 +465,8 @@ public class RecordingFloatingService extends Service {
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 intent.putExtra("auto_start_recording", true);
                 startActivity(intent);
-                Toast.makeText(this, "正在启动录制，请稍候...", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.msg_starting_recording,
+                        Toast.LENGTH_SHORT).show();
                 return;
         }
     }
@@ -523,7 +524,8 @@ public class RecordingFloatingService extends Service {
         } else {
             // 重试次数耗尽，显示错误
             AppLog.e(TAG, "Failed to bind recording service after " + MAX_RETRIES + " retries");
-            Toast.makeText(this, "录制服务启动失败，请重试", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.msg_recording_service_failed,
+                    Toast.LENGTH_SHORT).show();
         }
     }
 

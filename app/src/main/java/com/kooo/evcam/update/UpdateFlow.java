@@ -49,7 +49,8 @@ public final class UpdateFlow {
         if (activity == null || activity.isFinishing()) {
             return;
         }
-        AlertDialog checking = message(activity, "正在检查更新…", false);
+        AlertDialog checking = message(activity,
+                activity.getString(R.string.upd_checking), false);
         new Thread(() -> {
             GithubReleases.Release release = null;
             String error = null;
@@ -64,9 +65,9 @@ public final class UpdateFlow {
             post(activity, () -> {
                 dismiss(checking);
                 if (failure != null) {
-                    toast(activity, "检查更新失败：" + failure);
+                    toast(activity, activity.getString(R.string.upd_check_failed, failure));
                 } else if (found == null) {
-                    toast(activity, "没有找到可安装的版本");
+                    toast(activity, activity.getString(R.string.upd_none));
                 } else {
                     compareAndOffer(activity, found);
                 }
@@ -77,20 +78,20 @@ public final class UpdateFlow {
     private static void compareAndOffer(Activity activity, GithubReleases.Release release) {
         String current = currentVersion(activity);
         if (!VersionName.isNewer(release.tagName, current)) {
-            toast(activity, "已是最新版本（" + current + "）");
+            toast(activity, activity.getString(R.string.upd_up_to_date, current));
             return;
         }
 
         String size = release.apkBytes > 0
-                ? String.format(Locale.US, "，约 %.1f MB", release.apkBytes / 1024f / 1024f)
+                ? activity.getString(R.string.upd_size_suffix,
+                        String.format(Locale.US, "%.1f", release.apkBytes / 1024f / 1024f))
                 : "";
         new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
-                .setTitle("发现新版本")
-                .setMessage(release.tagName + size + "\n\n当前版本 " + current
-                        + "\n\n下载完会直接进入系统的安装界面。安装包放在应用缓存里，"
-                        + "下次检查更新时自动清掉。")
-                .setPositiveButton("下载并安装", (d, w) -> download(activity, release))
-                .setNegativeButton("稍后", null)
+                .setTitle(R.string.upd_found_title)
+                .setMessage(activity.getString(R.string.upd_found_msg,
+                        release.tagName, size, current))
+                .setPositiveButton(R.string.upd_download, (d, w) -> download(activity, release))
+                .setNegativeButton(R.string.upd_later, null)
                 .show();
     }
 
@@ -104,7 +105,7 @@ public final class UpdateFlow {
         ProgressBar bar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
         bar.setMax(100);
         TextView label = new TextView(activity);
-        label.setText("正在下载…");
+        label.setText(R.string.upd_downloading);
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         LinearLayout box = new LinearLayout(activity);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -118,7 +119,7 @@ public final class UpdateFlow {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         AlertDialog dialog = new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
-                .setTitle("下载 " + release.tagName)
+                .setTitle(activity.getString(R.string.upd_download_title, release.tagName))
                 .setView(box)
                 .setCancelable(false)
                 .create();
@@ -134,8 +135,10 @@ public final class UpdateFlow {
                     int percent = (int) (done * 100 / total);
                     post(activity, () -> {
                         bar.setProgress(percent);
-                        label.setText(String.format(Locale.US, "正在下载… %d%%（%.1f / %.1f MB）",
-                                percent, done / 1024f / 1024f, total / 1024f / 1024f));
+                        label.setText(activity.getString(R.string.upd_downloading_pct,
+                                percent,
+                                String.format(Locale.US, "%.1f", done / 1024f / 1024f),
+                                String.format(Locale.US, "%.1f", total / 1024f / 1024f)));
                     });
                 });
             } catch (Exception e) {
@@ -146,7 +149,7 @@ public final class UpdateFlow {
             post(activity, () -> {
                 dismiss(dialog);
                 if (failure != null) {
-                    toast(activity, "下载失败：" + failure);
+                    toast(activity, activity.getString(R.string.upd_download_failed, failure));
                 } else {
                     install(activity, target);
                 }
@@ -158,18 +161,18 @@ public final class UpdateFlow {
 
     private static void install(Activity activity, File apk) {
         if (!apk.isFile() || apk.length() == 0) {
-            toast(activity, "安装包不见了，请重试");
+            toast(activity, activity.getString(R.string.upd_apk_missing));
             return;
         }
         // Android 8 起「安装未知来源应用」是一项单独授权，没有它 startActivity 会被静默挡掉
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
             new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
-                    .setTitle("需要允许安装应用")
-                    .setMessage("系统要求先允许本应用安装其他应用，才能进入安装界面。"
-                            + "\n\n授权后回到这里再点一次「检查更新」。")
-                    .setPositiveButton("去设置", (d, w) -> openInstallPermission(activity))
-                    .setNegativeButton("取消", null)
+                    .setTitle(R.string.upd_need_install_title)
+                    .setMessage(R.string.upd_need_install_msg)
+                    .setPositiveButton(R.string.upd_go_settings,
+                            (d, w) -> openInstallPermission(activity))
+                    .setNegativeButton(R.string.action_cancel, null)
                     .show();
             return;
         }
@@ -180,7 +183,7 @@ public final class UpdateFlow {
                     activity.getPackageName() + ".fileprovider", apk);
         } catch (IllegalArgumentException e) {
             AppLog.e(TAG, "FileProvider 拿不到 URI", e);
-            toast(activity, "无法打开安装包：" + e.getMessage());
+            toast(activity, activity.getString(R.string.upd_cannot_open_apk, e.getMessage()));
             return;
         }
 
@@ -191,7 +194,7 @@ public final class UpdateFlow {
             activity.startActivity(intent);
         } catch (Exception e) {
             AppLog.e(TAG, "打不开安装界面", e);
-            toast(activity, "这台车机上打不开安装界面：" + e.getMessage());
+            toast(activity, activity.getString(R.string.upd_no_installer, e.getMessage()));
         }
     }
 
@@ -204,7 +207,7 @@ public final class UpdateFlow {
                             Uri.parse("package:" + activity.getPackageName()));
             activity.startActivity(intent);
         } catch (Exception e) {
-            toast(activity, "这台车机上打不开该设置页");
+            toast(activity, activity.getString(R.string.upd_no_settings_page));
         }
     }
 

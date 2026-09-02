@@ -227,7 +227,7 @@ public class TimelinePlayerActivity extends Activity {
                 if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
                     AppLog.e(TAG, "连续 " + consecutiveErrors + " 次播放出错，停止自动续播");
                     Toast.makeText(TimelinePlayerActivity.this,
-                            "这段录像无法播放，已停止", Toast.LENGTH_LONG).show();
+                            R.string.msg_segment_unplayable, Toast.LENGTH_LONG).show();
                     consecutiveErrors = 0;
                     return;
                 }
@@ -265,9 +265,9 @@ public class TimelinePlayerActivity extends Activity {
 
     /** 扫描录像目录，按时间轴分组。可能有 I/O，放后台线程。 */
     private void loadTimelines() {
-        infoText.setText("正在扫描录像...");
+        infoText.setText(R.string.msg_scanning);
         if (listSummaryText != null) {
-            listSummaryText.setText("正在扫描…");
+            listSummaryText.setText(R.string.msg_scanning_short);
         }
         new Thread(() -> {
             List<RecordingTimeline.Source> sources = new ArrayList<>();
@@ -306,8 +306,8 @@ public class TimelinePlayerActivity extends Activity {
                 sessionAdapter.setSessions(sessions);
                 updateListSummary();
                 if (sessions.isEmpty()) {
-                    infoText.setText("没有找到环视录像");
-                    Toast.makeText(this, "没有找到环视录像（连续回放只播环视这一路）",
+                    infoText.setText(R.string.msg_no_surround_clips);
+                    Toast.makeText(this, R.string.msg_no_surround_clips_long,
                             Toast.LENGTH_LONG).show();
                     return;
                 }
@@ -376,7 +376,7 @@ public class TimelinePlayerActivity extends Activity {
             return;
         }
         if (sessions.isEmpty()) {
-            listSummaryText.setText("没有找到可用的录像");
+            listSummaryText.setText(R.string.msg_no_clips);
             return;
         }
         long totalMs = 0L;
@@ -385,9 +385,9 @@ public class TimelinePlayerActivity extends Activity {
             totalMs += session.totalDurationMs;
             totalBytes += session.totalSizeBytes;
         }
-        listSummaryText.setText(sessions.size() + " 条　·　"
-                + TimelineFormat.duration(totalMs) + "　·　"
-                + TimelineFormat.size(totalBytes));
+        listSummaryText.setText(getString(R.string.info_clip_count, sessions.size(),
+                TimelineFormat.duration(totalMs) + "　·　"
+                        + TimelineFormat.size(totalBytes)));
     }
 
     /**
@@ -494,14 +494,15 @@ public class TimelinePlayerActivity extends Activity {
                 TimelineFormat.size(session.totalSizeBytes));
         new AlertDialog.Builder(this)
                 .setTitle(title)
-                .setItems(new CharSequence[]{"分享这段录制", "删除这段录制"}, (dialog, which) -> {
+                .setItems(new CharSequence[]{getString(R.string.action_share_clip),
+                        getString(R.string.action_delete_clip)}, (dialog, which) -> {
                     if (which == 0) {
                         shareSession(session);
                     } else {
                         confirmDeleteSession(index, session);
                     }
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.action_cancel, null)
                 .show();
     }
 
@@ -520,7 +521,7 @@ public class TimelinePlayerActivity extends Activity {
             }
         }
         if (uris.isEmpty()) {
-            Toast.makeText(this, "没有可分享的文件", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.msg_nothing_to_share, Toast.LENGTH_SHORT).show();
             return;
         }
         Intent intent = new Intent(uris.size() > 1
@@ -542,7 +543,7 @@ public class TimelinePlayerActivity extends Activity {
                         "将删除这段录制的全部 %d 个文件，共 %s。删除后无法恢复。",
                         session.segmentCount(), TimelineFormat.size(session.totalSizeBytes)))
                 .setPositiveButton("删除", (dialog, which) -> deleteSession(index, session))
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.action_cancel, null)
                 .show();
     }
 
@@ -715,7 +716,8 @@ public class TimelinePlayerActivity extends Activity {
 
     private void updatePlayPauseLabel() {
         if (playPauseButton != null) {
-            playPauseButton.setText(player.isPlaying() ? "暂停" : "播放");
+            playPauseButton.setText(player.isPlaying()
+                    ? R.string.action_pause : R.string.action_play);
         }
     }
 

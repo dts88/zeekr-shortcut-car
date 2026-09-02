@@ -29,11 +29,13 @@ public final class TimelineFormat {
     /**
      * 文件大小。
      *
-     * <p>读不到大小时显示「大小未知」而不是 0 B —— 后者看起来像个真实的测量结果。</p>
+     * <p>读不到大小时显示一个破折号而不是 0 B —— 后者看起来像个真实的测量结果。
+     * 用符号而不是文字，是因为这个类是纯静态工具，没有 Context 可以取资源，
+     * 而破折号在中英文界面下都读得通。</p>
      */
     public static String size(long bytes) {
         if (bytes <= 0) {
-            return "大小未知";
+            return "—";
         }
         if (bytes < 1024L * 1024L) {
             return String.format(Locale.US, "%.0f KB", bytes / 1024.0);

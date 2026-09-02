@@ -23,7 +23,7 @@
             android:paddingEnd="16dp"
             android:paddingTop="14dp"
             android:paddingBottom="6dp"
-            android:text="连续录制"
+            android:text="@string/player_title"
             android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -37,7 +37,7 @@
             android:paddingBottom="8dp"
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
-            android:text="正在扫描…" />
+            android:text="@string/msg_scanning_short" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/timeline_session_list"
@@ -134,7 +134,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp"
-                    android:text="上一段录制"
+                    android:text="@string/player_prev"
                     android:textSize="15sp"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
@@ -145,7 +145,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp"
-                    android:text="播放"
+                    android:text="@string/action_play"
                     android:textSize="15sp"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
@@ -156,7 +156,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp"
-                    android:text="下一段录制"
+                    android:text="@string/player_next"
                     android:textSize="15sp"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
@@ -177,7 +177,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="关闭"
+                    android:text="@string/action_close"
                     android:textSize="15sp"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
