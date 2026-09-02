@@ -72,6 +72,11 @@
             android:selectable="false" />
 
         <SwitchPreferenceCompat
+            android:key="pref_watermark_brand"
+            android:title="@string/set_watermark_brand_title"
+            android:summary="@string/set_watermark_brand_summary" />
+
+        <SwitchPreferenceCompat
             android:key="pref_watermark"
             android:title="@string/set_watermark_title"
             android:summaryOn="@string/set_watermark_on"

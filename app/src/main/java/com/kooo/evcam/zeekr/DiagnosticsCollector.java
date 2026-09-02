@@ -121,6 +121,7 @@ public final class DiagnosticsCollector {
                     appendSizes(sb, "PRIVATE", map.getOutputSizes(ImageFormat.PRIVATE));
                     appendSizes(sb, "SurfaceTexture", map.getOutputSizes(SurfaceTexture.class));
                     appendSizes(sb, "JPEG", map.getOutputSizes(ImageFormat.JPEG));
+                    appendFpsRanges(sb, cc);
 
                     // 这一路是不是四联合成流？
                     List<Size> composite = ZeekrCompositeProfile.listCompositeCandidates(
@@ -144,6 +145,34 @@ public final class DiagnosticsCollector {
         } catch (Exception e) {
             sb.append("!! 枚举相机失败: ").append(e).append('\n').append('\n');
         }
+    }
+
+    /**
+     * 相机声明的目标帧率范围。
+     *
+     * <p>「这几路最高能跑多少帧」以前报告里没有 —— 而设置里那个「原始帧率 25」
+     * 是代码里写死的假设，不是从相机读来的。两者对不上时，录出来的文件会是第三个数。</p>
+     */
+    private static void appendFpsRanges(StringBuilder sb, CameraCharacteristics cc) {
+        android.util.Range<Integer>[] ranges =
+                cc.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+        if (ranges == null || ranges.length == 0) {
+            sb.append("  帧率范围: 未声明").append('
+');
+            return;
+        }
+        StringBuilder line = new StringBuilder();
+        int highest = 0;
+        for (android.util.Range<Integer> range : ranges) {
+            if (line.length() > 0) {
+                line.append(", ");
+            }
+            line.append(range.getLower()).append('-').append(range.getUpper());
+            highest = Math.max(highest, range.getUpper());
+        }
+        sb.append("  帧率范围 (").append(ranges.length).append("): ")
+                .append(line).append("   最高 ").append(highest).append(" fps").append('
+');
     }
 
     private static void appendSizes(StringBuilder sb, String label, Size[] sizes) {

@@ -68,6 +68,9 @@ public class ShareTestActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
         root.setBackgroundColor(0xFF1A1A1A);
 
+        // 这个界面原先没有任何退出方式 —— 车机上没有系统返回键，进来就出不去了。
+        // 「返回」放在最上面，和设置页那一条一样，是这台车机上唯一可靠的退路。
+        root.addView(button("← 返回", v -> finish()));
         root.addView(title("发送到手机 · 连通性测试"));
         root.addView(hint("前提：手机与车机之间已经建立直连 —— "
                 + "车机开热点手机连上来，或手机开热点车机连上去。"));

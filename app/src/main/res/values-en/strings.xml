@@ -335,4 +335,12 @@
     <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same local network: share a hotspot from the phone and join it from the car, or the other way round.\n\nTry again once they are connected.</string>
     <string name="share_photo_pick_lane_first">Double-tap a lane to enlarge it first, then send</string>
     <string name="share_video_current_segment">Send the current clip (%1$s)</string>
+
+    <!-- Share hints -->
+    <string name="share_phone_network_hint">The phone and the head unit must be on the same network. The easiest way: **turn on the phone hotspot and connect the car to that Wi-Fi**.</string>
+    <string name="share_video_segment_note">Recordings are stored in %1$s clips. Continuous playback stitches them together, but this sends **only the clip you are on**. To send another one, seek to it and tap again.</string>
+    <string name="share_minutes">%1$d minutes</string>
+    <string name="action_back">Back</string>
+    <string name="set_watermark_brand_title">App name and version overlay</string>
+    <string name="set_watermark_brand_summary">The app name and version are always stamped in the top-left corner and cannot be turned off — recordings are often kept as evidence or passed on, and knowing which app and version produced them is what makes them checkable later</string>
 </resources>

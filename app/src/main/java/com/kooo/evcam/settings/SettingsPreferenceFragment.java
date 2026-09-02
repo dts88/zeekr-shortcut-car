@@ -137,6 +137,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_bitrate", SettingsRegistry.BITRATE_LEVEL,
                 appConfig.getBitrateLevel(), value -> appConfig.setBitrateLevel(value));
 
+        // 应用名与版本是无条件盖上去的（见 MultiCameraManager.buildBrandLine），
+        // 这里只是把这件事摆在界面上：开着、灰着、点不动。
+        // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
+        SwitchPreferenceCompat brand = findPreference("pref_watermark_brand");
+        if (brand != null) {
+            brand.setPersistent(false);
+            brand.setChecked(true);
+            brand.setEnabled(false);
+        }
+
         bindSwitch("pref_watermark", appConfig.isTimestampWatermarkEnabled(),
                 value -> appConfig.setTimestampWatermarkEnabled(value));
 

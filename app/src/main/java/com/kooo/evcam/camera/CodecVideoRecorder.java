@@ -116,6 +116,32 @@ public class CodecVideoRecorder {
     private boolean watermarkSpecEnabled = true;
     /** 编码器实际使用的规格，用于角标第二行。 */
     private String encoderSpecLine = "";
+    private String specSizeText = "";
+    private String specCodecText = "";
+    private String specBitrateText = "";
+    /** 设置里选的那个帧率。它是<b>上限</b>，不是结果。 */
+    private int nominalFrameRate;
+    /** 实测帧率：已写帧数 / 时间戳跨度。0 表示还没测出来。 */
+    private int measuredFrameRate;
+
+    /**
+     * 拼角标第二行。
+     *
+     * <p>帧率优先写<b>实测值</b>。设置里那个数只是渲染节流的上限 ——
+     * 相机给不到那么多帧时，编码器就出不到那么多帧。角标写标称值等于
+     * 「界面显示的和实际录到的不是一回事」：分享到手机上，播放器读出来的
+     * 是 15 fps，而画面角上印着 25 fps，两个数对不上，而印在画面里的那个是错的。</p>
+     *
+     * <p>测出来之前先写标称值并加个「~」，否则录制刚开始那几秒角标是空的。</p>
+     */
+    private void rebuildSpecLine() {
+        String fps = measuredFrameRate > 0
+                ? measuredFrameRate + "fps"
+                : "~" + nominalFrameRate + "fps";
+        encoderSpecLine = specSizeText + "  " + fps
+                + "  " + specCodecText + "  " + specBitrateText;
+        applyWatermarkInfoLine();
+    }
     /** 本分段第一帧的编码器时间戳，用于把每段的 PTS 归零；-1 表示本段还没开始。 */
     private long segmentBasePtsUs = -1L;
 
@@ -1108,13 +1134,14 @@ public class CodecVideoRecorder {
                 (forceH264 ? " [兼容模式]" : ""));
 
         // 同一批数字也送给角标第二行
-        encoderSpecLine = width + "x" + height
-                + "  " + effectiveFrameRate + "fps"
-                + "  " + (mimeType.equals(MIME_TYPE_HEVC) ? "H.265" : "H.264")
-                + "  " + (effectiveBitrate / 1000000.0f >= 1f
-                        ? String.format(java.util.Locale.US, "%.1fMbps", effectiveBitrate / 1000000.0f)
-                        : (effectiveBitrate / 1000) + "Kbps");
-        applyWatermarkInfoLine();
+        specSizeText = width + "x" + height;
+        specCodecText = mimeType.equals(MIME_TYPE_HEVC) ? "H.265" : "H.264";
+        specBitrateText = effectiveBitrate / 1000000.0f >= 1f
+                ? String.format(java.util.Locale.US, "%.1fMbps", effectiveBitrate / 1000000.0f)
+                : (effectiveBitrate / 1000) + "Kbps";
+        nominalFrameRate = effectiveFrameRate;
+        measuredFrameRate = 0;
+        rebuildSpecLine();
     }
 
     /**
@@ -1358,6 +1385,11 @@ public class CodecVideoRecorder {
                                 AppLog.d(TAG, "Camera " + cameraId + " 实测帧率 ~" + measured
                                         + " fps（标称 " + frameRate + "），已写 "
                                         + encodedOutputFrameCount + " 帧");
+                                // 角标跟着改成这个数：印在画面里的必须是真录到的
+                                if (measured > 0 && measured != measuredFrameRate) {
+                                    measuredFrameRate = (int) measured;
+                                    rebuildSpecLine();
+                                }
                             }
                             
                             bufferInfo.presentationTimeUs = calculatedPtsUs;

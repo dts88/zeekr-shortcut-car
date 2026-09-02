@@ -45,6 +45,14 @@ public final class PhoneShare {
      * @param file 要发送的那一个文件；为 null 或不存在时只提示，不弹窗
      */
     public static void show(Activity activity, File file) {
+        show(activity, file, null);
+    }
+
+    /**
+     * @param extraNote 额外的一句说明，显示在操作步骤下面；不需要时传 null。
+     *                  视频用它讲清楚「只发当前这一段」。
+     */
+    public static void show(Activity activity, File file, String extraNote) {
         if (activity == null || activity.isFinishing()) {
             return;
         }
@@ -58,7 +66,8 @@ public final class PhoneShare {
             // 没有可用地址就不是「失败」，是前提没满足 —— 说清楚该做什么
             new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                     .setTitle(R.string.share_phone_need_hotspot_title)
-                    .setMessage(R.string.share_phone_need_hotspot_msg)
+                    .setMessage(activity.getString(R.string.share_phone_need_hotspot_msg)
+                            + "\n\n" + activity.getString(R.string.share_phone_network_hint))
                     .setPositiveButton(R.string.action_got_it, null)
                     .show();
             return;
@@ -74,7 +83,7 @@ public final class PhoneShare {
             return;
         }
         AppLog.i(TAG, "分享 " + file.getName() + "，端口 " + server.getListeningPort());
-        new Presenter(activity, server, endpoints, file).show();
+        new Presenter(activity, server, endpoints, file, extraNote).show();
     }
 
     private static void toast(Activity activity, String text) {
@@ -87,17 +96,19 @@ public final class PhoneShare {
         private final FileShareServer server;
         private final List<LocalNetwork.Endpoint> endpoints;
         private final File file;
+        private final String extraNote;
 
         private int index;
         private ImageView qrImage;
         private TextView addressText;
 
         Presenter(Activity activity, FileShareServer server,
-                  List<LocalNetwork.Endpoint> endpoints, File file) {
+                  List<LocalNetwork.Endpoint> endpoints, File file, String extraNote) {
             this.activity = activity;
             this.server = server;
             this.endpoints = endpoints;
             this.file = file;
+            this.extraNote = extraNote;
         }
 
         void show() {
@@ -115,10 +126,14 @@ public final class PhoneShare {
             root.addView(qrImage);
 
             root.addView(text(activity.getString(R.string.share_phone_steps), 15, false));
+            if (extraNote != null && !extraNote.isEmpty()) {
+                root.addView(text(extraNote, 14, false));
+            }
 
             addressText = text("", 13, true);
             root.addView(addressText);
 
+            root.addView(text(activity.getString(R.string.share_phone_network_hint), 13, true));
             root.addView(text(activity.getString(R.string.share_phone_keep_open), 13, true));
 
             AlertDialog.Builder builder = new AlertDialog.Builder(

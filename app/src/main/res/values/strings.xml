@@ -336,4 +336,12 @@
     <string name="share_phone_need_hotspot_msg">手机和车机要在同一个局域网里：用手机开热点让车机连上，或者用车机开热点让手机连上。\n\n连好之后再试一次。</string>
     <string name="share_photo_pick_lane_first">请先双击一路画面放大，再发送</string>
     <string name="share_video_current_segment">发送当前这一段（%1$s）</string>
+
+    <!-- 分享提示 -->
+    <string name="share_phone_network_hint">需要手机和车机在同一个网络里。最省事的做法：**用手机开热点，让车机连上这个 Wi-Fi**。</string>
+    <string name="share_video_segment_note">录像按每 %1$s 存一段。连续回放是把多段接起来放的，而这里只发**当前这一段**。要发别的时间段，把进度拖到那一段再点一次。</string>
+    <string name="share_minutes">%1$d 分钟</string>
+    <string name="action_back">返回</string>
+    <string name="set_watermark_brand_title">应用名与版本角标</string>
+    <string name="set_watermark_brand_summary">录像左上角始终标注应用名与版本号，不可关闭 —— 录出来的文件常被拿去当凭据或发给别人，落上是哪个应用哪个版本录的，回头才对得上</string>
 </resources>

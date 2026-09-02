@@ -489,7 +489,10 @@ public class TimelinePlayerActivity extends Activity {
             return;
         }
         RecordingTimeline.Segment segment = session.segments.get(currentSegmentIndex);
-        com.kooo.evcam.share.PhoneShare.show(this, new java.io.File(segment.path));
+        int minutes = new com.kooo.evcam.AppConfig(this).getSegmentDurationMinutes();
+        String note = getString(R.string.share_video_segment_note,
+                getString(R.string.share_minutes, minutes));
+        com.kooo.evcam.share.PhoneShare.show(this, new java.io.File(segment.path), note);
     }
 
     private void cycleSpeed() {
