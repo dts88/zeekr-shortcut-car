@@ -31,7 +31,6 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.PermissionSettingsFragment;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
-import com.kooo.evcam.update.UpdateFlow;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.service.RecordingFloatingService;
@@ -947,7 +946,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindAbout() {
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
-        onClick("pref_check_update", pref -> UpdateFlow.start(getActivity()));
         onClick("pref_about", pref ->
                 startActivity(new Intent(getContext(), AboutActivity.class)));
     }

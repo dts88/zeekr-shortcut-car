@@ -358,6 +358,14 @@
             android:summary="「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。" />
     </PreferenceScreen>
 
+    <!--
+      检查更新放在顶层：藏在「关于」里面没人找得到，而这是安装新版本的唯一途径。
+    -->
+    <Preference
+        android:key="pref_check_update"
+        android:title="检查更新"
+        android:summary="到 GitHub Releases 查有没有新版本；这是本应用唯一一次主动联网" />
+
     <!-- ==================== 关于 ==================== -->
     <PreferenceScreen
         android:key="screen_about"
@@ -367,11 +375,6 @@
             android:key="pref_diagnostics"
             android:title="诊断信息"
             android:summary="导出相机、屏幕、车辆信号与存储的实际情况" />
-
-        <Preference
-            android:key="pref_check_update"
-            android:title="检查更新"
-            android:summary="到 GitHub Releases 看有没有更新的版本；这是本应用唯一一次主动联网" />
 
         <Preference
             android:key="pref_about"
