@@ -358,6 +358,11 @@
             android:title="重置预览矫正参数" />
 
         <Preference
+            android:key="pref_share_test"
+            android:title="发送到手机 · 连通性测试"
+            android:summary="列出可用的局域网地址，起一个临时 HTTP 服务并生成二维码，用来验证手机能否扫码取到文件" />
+
+        <Preference
             android:key="pref_developer_note"
             android:selectable="false"
             android:summary="「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。" />

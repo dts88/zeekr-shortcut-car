@@ -93,6 +93,12 @@ dependencies {
     // WorkManager 定时任务（用于保活）
     implementation("androidx.work:work-runtime:2.9.0")
 
+    // 「发送到手机」：局域网内起一个 HTTP 服务 + 生成二维码。
+    // 两个都是上游 EVCam 用过的，许可证与 GPL-3.0 兼容：
+    // NanoHTTPD 是 BSD-3-Clause，ZXing 是 Apache-2.0。
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+    implementation("com.google.zxing:core:3.5.1")
+
     // 设置界面（PreferenceScreen）
     implementation("androidx.preference:preference:1.2.1")
     // 两栏设置的左右分栏（androidx 自己的 PreferenceHeaderFragmentCompat 也用它）

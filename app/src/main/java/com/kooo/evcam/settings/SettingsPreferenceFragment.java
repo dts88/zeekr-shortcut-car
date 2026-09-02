@@ -972,6 +972,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         });
 
+        onClick("pref_share_test", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.share.ShareTestActivity.class)));
+
         onClick("pref_preview_correction_reset", pref -> {
             appConfig.resetAllPreviewCorrection();
             if (getActivity() instanceof MainActivity) {

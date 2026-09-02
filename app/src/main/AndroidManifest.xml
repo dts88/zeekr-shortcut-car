@@ -104,6 +104,13 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 「发送到手机」的连通性测试界面，只从开发者选项进 -->
+        <activity
+            android:name=".share.ShareTestActivity"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:exported="false"
+            android:label="发送到手机 · 测试" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
