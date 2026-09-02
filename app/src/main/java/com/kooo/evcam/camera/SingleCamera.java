@@ -898,6 +898,9 @@ public class SingleCamera {
             CameraCharacteristics characteristics;
             try {
                 characteristics = cameraManager.getCameraCharacteristics(cameraId);
+                // 相机声明的帧率上限记下来 —— 设置界面拿不到相机对象，
+                // 而「原始帧率」那一项以前显示的是一个和相机无关的写死的数
+                CameraCapabilities.record(cameraId, characteristics);
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be virtual/invalid", e);
                 if (callback != null) {

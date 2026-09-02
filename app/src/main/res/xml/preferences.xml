@@ -368,6 +368,11 @@
             android:summary="每个相机能给哪些分辨率、哪些帧率，以及这些数字分别决定什么" />
 
         <Preference
+            android:key="pref_resolution_test"
+            android:title="分辨率实测"
+            android:summary="逐个真的开一次、真的出画面，确认声明支持的分辨率是不是真能用（会占用相机，录制中勿进）" />
+
+        <Preference
             android:key="pref_share_test"
             android:title="发送到手机 · 连通性测试"
             android:summary="列出可用的局域网地址，起一个临时 HTTP 服务并生成二维码，用来验证手机能否扫码取到文件" />

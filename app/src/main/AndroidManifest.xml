@@ -104,6 +104,13 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 分辨率实测，只从开发者选项进 -->
+        <activity
+            android:name=".zeekr.ResolutionTestActivity"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:exported="false"
+            android:label="分辨率实测" />
+
         <!-- 相机能力清单，只从开发者选项进 -->
         <activity
             android:name=".zeekr.CameraProbeActivity"

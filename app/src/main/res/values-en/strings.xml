@@ -343,4 +343,5 @@
     <string name="action_back">Back</string>
     <string name="set_watermark_brand_title">App name and version overlay</string>
     <string name="set_watermark_brand_summary">The app name and version are always stamped in the top-left corner and cannot be turned off — recordings are often kept as evidence or passed on, and knowing which app and version produced them is what makes them checkable later</string>
+    <string name="opt_fps_auto_unknown">Follow the camera (not detected yet)</string>
 </resources>

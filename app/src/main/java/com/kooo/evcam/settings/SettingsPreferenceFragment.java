@@ -985,6 +985,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_camera_probe", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.zeekr.CameraProbeActivity.class)));
 
+        onClick("pref_resolution_test", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.zeekr.ResolutionTestActivity.class)));
+
         onClick("pref_share_test", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.share.ShareTestActivity.class)));
 
@@ -1141,8 +1144,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (spec == SettingsRegistry.RECORD_FPS) {
             int auto = spec.indexOf("auto");
             if (auto >= 0) {
-                names[auto] = getString(R.string.opt_fps_auto,
-                        FrameRatePolicy.standardFrameRate(FrameRatePolicy.RECORDER_MAX_FPS));
+                // 这个数要么来自相机的声明，要么干脆不写 —— 以前写的是一个和相机
+                // 无关的常量 25，而相机声明 15-30、实际送出 29，两头都不沾。
+                int declared = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
+                names[auto] = declared > 0
+                        ? getString(R.string.opt_fps_auto,
+                                FrameRatePolicy.standardFrameRate(declared))
+                        : getString(R.string.opt_fps_auto_unknown);
             }
         }
         return names;

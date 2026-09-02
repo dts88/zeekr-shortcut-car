@@ -291,6 +291,7 @@ public class CodecVideoRecorder {
             return;
         }
         bytesThisSecond += size;
+        framesThisSecond++;
         long now = android.os.SystemClock.elapsedRealtime();
         if (bitrateWindowStartMs == 0) {
             bitrateWindowStartMs = now;
@@ -302,10 +303,29 @@ public class CodecVideoRecorder {
         }
         float mbps = bytesThisSecond * 8f / elapsed / 1000f;   // 字节/毫秒 -> Mbps
         liveBitrateText = String.format(java.util.Locale.US, "%.1f Mbps", mbps);
+
+        // 帧率和码率用同一个窗口。
+        //
+        // 之前是在写 muxer 的地方按「每 300 帧算一次」——而写 muxer 有两条路径，
+        // 那段判断只在其中一条里。帧数从另一条路走过去时计数照加、判断照跳，
+        // 于是 encodedOutputFrameCount % 300 == 0 那一刻可能永远撞不上，
+        // 实测帧率就一次都没算出来过 —— 角标始终停在「~标称值」。
+        //
+        // noteEncodedBytes 是两条路径都会调的那个点，挂在这里才数得全。
+        int measured = Math.round(framesThisSecond * 1000f / elapsed);
+        if (measured > 0 && measured != measuredFrameRate) {
+            measuredFrameRate = measured;
+            rebuildSpecLine();
+        }
+        framesThisSecond = 0;
+
         bytesThisSecond = 0;
         bitrateWindowStartMs = now;
         applyWatermarkInfoLine();
     }
+
+    /** 本窗口内写进文件的帧数，和字节数用同一个窗口结算。 */
+    private int framesThisSecond;
 
     /** 码率取样窗口。一秒够用了，再快也看不清。 */
     private static final long BITRATE_WINDOW_MS = 1000L;
@@ -1140,7 +1160,8 @@ public class CodecVideoRecorder {
                 ? String.format(java.util.Locale.US, "%.1fMbps", effectiveBitrate / 1000000.0f)
                 : (effectiveBitrate / 1000) + "Kbps";
         nominalFrameRate = effectiveFrameRate;
-        measuredFrameRate = 0;
+        // 实测值不清零：换分段会重建编码器，而相机的出帧率不会因此改变。
+        // 清零的话每段开头都要重新等一秒，角标先闪回「~标称值」再跳回来。
         rebuildSpecLine();
     }
 
@@ -1381,15 +1402,13 @@ public class CodecVideoRecorder {
                                 // 这是验证「回放速度是否等于录制速度」的直接依据：
                                 // 若它明显低于设置里选的帧率，说明车机就是跑不满，
                                 // 而现在时间戳如实反映了这一点，回放不会再被加速。
+                                // 这只是日志。角标的那个数由 noteEncodedBytes 负责 ——
+                                // 这里所在的是两条写入路径中的一条，数不全。
                                 long measured = encodedOutputFrameCount * 1_000_000L / calculatedPtsUs;
-                                AppLog.d(TAG, "Camera " + cameraId + " 实测帧率 ~" + measured
-                                        + " fps（标称 " + frameRate + "），已写 "
+                                AppLog.d(TAG, "Camera " + cameraId + " 按时间戳折算 ~" + measured
+                                        + " fps（标称 " + frameRate + "，角标用的实测值 "
+                                        + measuredFrameRate + "），已写 "
                                         + encodedOutputFrameCount + " 帧");
-                                // 角标跟着改成这个数：印在画面里的必须是真录到的
-                                if (measured > 0 && measured != measuredFrameRate) {
-                                    measuredFrameRate = (int) measured;
-                                    rebuildSpecLine();
-                                }
                             }
                             
                             bufferInfo.presentationTimeUs = calculatedPtsUs;
