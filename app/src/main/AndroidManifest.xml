@@ -20,6 +20,9 @@
         tools:ignore="ScopedStorage" />
     <!-- 网络权限（用于钉钉远程查看和扫码互传） -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 检查更新：下载回来的 APK 要交给系统安装器 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- 前台服务权限（Android 9+） -->

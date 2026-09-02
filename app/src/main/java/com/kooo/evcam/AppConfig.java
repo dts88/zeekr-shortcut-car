@@ -417,8 +417,6 @@ public class AppConfig {
     public static final String BUTTON_ORIENTATION_VERTICAL = "vertical";      // 竖版
     
     // 版本更新配置
-    private static final String KEY_UPDATE_SERVER_URL = "update_server_url";  // 更新服务器地址
-    private static final String DEFAULT_UPDATE_SERVER_URL = "https://evcam.suyunkai.top:9568/update/";  // 默认更新服务器
     
     // 车型常量
     public static final String CAR_MODEL_GALAXY_E5 = "galaxy_e5";  // 银河E5
@@ -3543,42 +3541,6 @@ public class AppConfig {
         return "横版";
     }
     
-    // ==================== 版本更新配置相关方法 ====================
-    
-    /**
-     * 设置更新服务器地址
-     * @param url 服务器地址（如 https://example.com/update/）
-     */
-    public void setUpdateServerUrl(String url) {
-        if (url == null || url.trim().isEmpty()) {
-            prefs.edit().remove(KEY_UPDATE_SERVER_URL).apply();
-            AppLog.d(TAG, "清除更新服务器地址");
-        } else {
-            prefs.edit().putString(KEY_UPDATE_SERVER_URL, url.trim()).apply();
-            AppLog.d(TAG, "更新服务器地址设置: " + url.trim());
-        }
-    }
-    
-    /**
-     * 获取更新服务器地址
-     * @return 服务器地址，默认为官方更新服务器
-     */
-    public String getUpdateServerUrl() {
-        String url = prefs.getString(KEY_UPDATE_SERVER_URL, DEFAULT_UPDATE_SERVER_URL);
-        if (url == null || url.trim().isEmpty()) {
-            return DEFAULT_UPDATE_SERVER_URL;
-        }
-        return url;
-    }
-    
-    /**
-     * 检查是否已配置更新服务器
-     * @return true 表示已配置
-     */
-    public boolean hasUpdateServerUrl() {
-        return getUpdateServerUrl() != null;
-    }
-
     // ==================== 全景影像避让配置相关方法 ====================
 
     /**

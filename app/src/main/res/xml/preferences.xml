@@ -369,6 +369,11 @@
             android:summary="导出相机、屏幕、车辆信号与存储的实际情况" />
 
         <Preference
+            android:key="pref_check_update"
+            android:title="检查更新"
+            android:summary="到 GitHub Releases 看有没有更新的版本；这是本应用唯一一次主动联网" />
+
+        <Preference
             android:key="pref_about"
             android:title="关于本应用" />
     </PreferenceScreen>
