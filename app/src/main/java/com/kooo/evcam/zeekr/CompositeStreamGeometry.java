@@ -149,6 +149,25 @@ public final class CompositeStreamGeometry {
     }
 
     /**
+     * 只看长宽比，<b>不理会声明</b>。
+     *
+     * <h3>为什么要有这个</h3>
+     *
+     * <p>「哪一路是环视」是靠条带比例认出来的：1280×5140 这种长条只有合成流才有。
+     * 如果这里也听声明的，那么声明 3840×2160 之后，座舱相机（它也声明支持
+     * 3840×2160）会跟着变成「合成流候选」，认错相机。</p>
+     *
+     * <p>所以分成两件事：<b>认哪一路</b>用比例，<b>怎么拆这一帧</b>用声明。</p>
+     */
+    public static boolean looksLikeCompositeByRatio(int frameWidth, int frameHeight) {
+        if (frameWidth <= 0 || frameHeight <= 0) {
+            return false;
+        }
+        return (float) frameWidth / frameHeight >= STRIP_RATIO_THRESHOLD
+                || (float) frameHeight / frameWidth >= STRIP_RATIO_THRESHOLD;
+    }
+
+    /**
      * 被明确声明为合成流的那一个尺寸；null 表示全部按长宽比判断。
      *
      * <h3>为什么需要这个</h3>

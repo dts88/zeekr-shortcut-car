@@ -22,6 +22,9 @@ import java.util.Set;
  * <p>1280×5140 这类条带尺寸也一并排除：环视那一路固定用探测到的尺寸，
  * 这个设置本来就管不到它，列出来只会让人以为能选。</p>
  *
+ * <p>这里按<b>长宽比</b>判断条带，不理会开发者选项里的声明 —— 否则声明
+ * 3840×2160 之后，这个尺寸会从座舱相机的可选列表里一起消失。</p>
+ *
  * <p>从设置界面里抽出来单独放，是因为这两条规则值得用测试钉住 ——
  * 选错的表现是「录出来的分辨率和设置里写的不一样」，肉眼很难发现。</p>
  */
@@ -48,7 +51,7 @@ public final class ResolutionOptions {
                         if (size == null || size.length < 2) {
                             continue;
                         }
-                        if (CompositeStreamGeometry.looksLikeComposite(size[0], size[1])) {
+                        if (CompositeStreamGeometry.looksLikeCompositeByRatio(size[0], size[1])) {
                             continue;
                         }
                         ofThisCamera.add(size[0] + "x" + size[1]);

@@ -14,6 +14,8 @@ Nothing yet.
 - Fixed: settings dialogs (plate number, dropdowns) had invisible OK and Cancel buttons.
 - Removed the "stream probe result" row from Settings; Developer options → Camera
   capabilities covers the same ground properly.
+- Camera detection still goes by aspect ratio alone, so a declared size cannot make a
+  cabin camera look like the composite one.
 
 ## [0.36.2-alpha] - 2026-09-03
 

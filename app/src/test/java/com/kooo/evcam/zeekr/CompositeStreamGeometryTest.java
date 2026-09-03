@@ -297,6 +297,28 @@ public class CompositeStreamGeometryTest {
         assertNull(CompositeStreamGeometry.declaredSize());
     }
 
+
+    /**
+     * 声明不得影响「哪一路是环视」的判断。
+     *
+     * <p>认相机靠的是条带比例——1280×5140 这种长条只有合成流才有。如果这一步也
+     * 听声明的，声明 3840×2160 之后，座舱相机（它同样声明支持 3840×2160）
+     * 会跟着变成合成流候选，把相机认错。</p>
+     */
+    @Test
+    public void theRatioOnlyCheckIgnoresDeclarations() {
+        CompositeStreamGeometry.declareComposite(3840, 2160,
+                CompositeStreamGeometry.Stacking.VERTICAL);
+
+        assertTrue("拆分要听声明", CompositeStreamGeometry.looksLikeComposite(3840, 2160));
+        assertFalse("认相机不能听声明",
+                CompositeStreamGeometry.looksLikeCompositeByRatio(3840, 2160));
+        // 真正的条带两边都认
+        assertTrue(CompositeStreamGeometry.looksLikeCompositeByRatio(1280, 5140));
+        assertTrue(CompositeStreamGeometry.looksLikeCompositeByRatio(5120, 1280));
+        assertFalse(CompositeStreamGeometry.looksLikeCompositeByRatio(0, 0));
+    }
+
     /** 声明是进程内全局的，每条测试跑完都要还原，否则会互相影响。 */
     @After
     public void clearDeclaration() {

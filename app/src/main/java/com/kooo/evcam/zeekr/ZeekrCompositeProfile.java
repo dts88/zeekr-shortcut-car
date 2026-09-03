@@ -90,7 +90,7 @@ public final class ZeekrCompositeProfile {
         long bestArea = -1L;
         for (int i = 0; i < declared.length; i++) {
             int[] size = declared[i];
-            if (size == null || !CompositeStreamGeometry.looksLikeComposite(size[0], size[1])) {
+            if (size == null || !CompositeStreamGeometry.looksLikeCompositeByRatio(size[0], size[1])) {
                 continue;
             }
             long area = (long) size[0] * size[1];
@@ -110,7 +110,7 @@ public final class ZeekrCompositeProfile {
         }
         for (Size declared : declaredSizes) {
             if (declared != null
-                    && CompositeStreamGeometry.looksLikeComposite(
+                    && CompositeStreamGeometry.looksLikeCompositeByRatio(
                             declared.getWidth(), declared.getHeight())) {
                 candidates.add(declared);
             }
