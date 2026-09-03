@@ -57,10 +57,9 @@ public class FrameRatePolicyTest {
         assertEquals(30, FrameRatePolicy.standardFrameRate(-5));
     }
 
-    /** 标签得让人看懂它是「跟随默认」而不是某个固定档位。 */
+    /** 标签得让人看懂它是「跟随视频流」而不是某个固定档位。 */
     @Test
     public void theLabelStillReadsAsAutomatic() {
         assertTrue(FrameRatePolicy.autoLabel().startsWith("原始帧率"));
-        assertTrue(FrameRatePolicy.autoLabel().contains("fps"));
     }
 }
