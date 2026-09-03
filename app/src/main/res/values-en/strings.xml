@@ -352,4 +352,6 @@
     <string name="upd_downloading_size">Downloading… %1$s MB</string>
     <string name="upd_download_failed_title">Download failed</string>
     <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone\'s browser instead</string>
+    <string name="opt_fps_stream_detected">stream %1$d fps</string>
+    <string name="set_resolution_pinned">This stream configuration records only the surround-view composite, whose size is fixed by the stream itself, so this setting has no effect. Change it under Developer options → Composite stream size.</string>
 </resources>

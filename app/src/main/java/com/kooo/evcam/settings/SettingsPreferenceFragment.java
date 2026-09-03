@@ -24,6 +24,7 @@ import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.camera.EncodeSize;
 import com.kooo.evcam.camera.TargetBitrate;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
@@ -129,6 +130,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindEnum("pref_record_fps", SettingsRegistry.RECORD_FPS,
                 appConfig.getRecordFps(), value -> appConfig.setRecordFps(value));
+        probeMainStreamFps();
 
         bindSegmentDuration();
 
@@ -137,11 +139,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindResolution();
 
         bindEnum("pref_bitrate", SettingsRegistry.BITRATE_LEVEL,
-                appConfig.getBitrateLevel(), value -> {
-                    appConfig.setBitrateLevel(value);
-                    showTargetBitrate();
-                });
-        showTargetBitrate();
+                appConfig.getBitrateLevel(), value -> appConfig.setBitrateLevel(value),
+                this::showTargetBitrate);
 
         // 应用名与版本是无条件盖上去的（见 MultiCameraManager.buildBrandLine），
         // 这里只是把这件事摆在界面上：开着、灰着、点不动。
@@ -218,6 +217,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         pref.setPersistent(false);
+
+        // 极氪 7X（单路合成流）下这一项是没有作用的：那一路的尺寸由合成流本身
+        // 决定，代码里用 setPreferredSize 钉死，全局目标分辨率根本不会被读到。
+        // 摆一个能选、选了又不生效的下拉框，比不给这个选项更糟。
+        // 「环视 + 两路座舱」不同 —— 那两路座舱仍然按这里选的尺寸挑。
+        if (appConfig.isZeekrCompositeModel() && !appConfig.isZeekrMultiModel()) {
+            pref.setEnabled(false);
+            pref.setSummary(getString(R.string.set_resolution_pinned));
+            return;
+        }
+
         pref.setSummary(appConfig.getTargetResolution());
 
         final Context context = getContext().getApplicationContext();
@@ -1141,25 +1151,147 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (pref == null || getContext() == null) {
             return;
         }
-        int[] size = AppConfig.parseResolution(appConfig.getTargetResolution());
-        int fps = appConfig.getNominalFrameRate(hardwareMaxFps());
         CharSequence level = pref.getEntry();
-        if (size == null) {
+        EncodeSize encode = liveEncodeSize();
+        if (encode == null || encode.width <= 0) {
+            // 相机还没开起来就没有「真正在录的尺寸」，那就只写等级名，不编一个数
             pref.setSummary(level);
             return;
         }
+        int fps = appConfig.getNominalFrameRate(hardwareMaxFps());
         // 编码器优先走 H.265，只有「强制 H.264」开着时才是 H.264
         boolean hevc = !appConfig.isForceH264Encoding();
         int bitrate = TargetBitrate.compute(appConfig.getEncoderQualityLevel(),
-                size[0], size[1], fps, hevc);
+                encode.width, encode.height, fps, hevc);
         pref.setSummary(getString(R.string.set_bitrate_summary_target,
                 level, TargetBitrate.format(bitrate),
-                size[0] + "x" + size[1], fps, hevc ? "H.265" : "H.264"));
+                encode.toString(), fps, hevc ? "H.265" : "H.264"));
+    }
+
+    /**
+     * 主视频流<b>真正编码</b>时的尺寸。
+     *
+     * <p>不能用「录制分辨率」那个设置：环视这一路根本不读它（尺寸由合成流决定），
+     * 而且四宫格重排会把 1280×5140 拼成 2560×2560 —— 拿设置里的数去算码率，
+     * 算出来的和实际配给编码器的不是一回事。</p>
+     *
+     * <p>所以直接问正在跑的那台相机，再套用录制链路同一个 {@link EncodeSize}。
+     * 相机没开时返回 null。</p>
+     */
+    private EncodeSize liveEncodeSize() {
+        if (!(getActivity() instanceof MainActivity)) {
+            return null;
+        }
+        com.kooo.evcam.camera.MultiCameraManager manager =
+                ((MainActivity) getActivity()).getCameraManager();
+        if (manager == null) {
+            return null;
+        }
+        com.kooo.evcam.camera.SingleCamera camera = manager.getCamera("front");
+        if (camera == null || camera.getPreviewSize() == null) {
+            return null;
+        }
+        Size source = camera.getPreviewSize();
+        return EncodeSize.forSource(source.getWidth(), source.getHeight(),
+                appConfig.isRecordGridLayout());
     }
 
     private static int hardwareMaxFps() {
         int declared = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
         return declared > 0 ? declared : AppConfig.RECORDER_MAX_FPS;
+    }
+
+    /**
+     * 把主视频流声明的帧率写到「原始帧率」右边。
+     *
+     * <p>主视频流就是这套配置真正在录的那一路 —— 极氪 7X 上是环视合成流。
+     * 「原始帧率」的含义是不限制、跟随视频流，那么这一路能给多少，
+     * 就是这一档实际会得到多少，写出来才有参照。</p>
+     *
+     * <p>读不到就不写 —— 与其编一个数，不如什么都不写。</p>
+     */
+    private void probeMainStreamFps() {
+        ListPreference pref = findPreference("pref_record_fps");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        final Context context = getContext().getApplicationContext();
+        new Thread(() -> {
+            final int[] range = mainStreamFpsRange(context);
+            if (!isAdded() || range == null) {
+                return;
+            }
+            requireActivity().runOnUiThread(() -> {
+                CharSequence[] entries = pref.getEntries();
+                String[] values = pref.getEntryValues() == null
+                        ? new String[0] : toStrings(pref.getEntryValues());
+                for (int i = 0; i < values.length && i < entries.length; i++) {
+                    if ("auto".equals(values[i])) {
+                        entries[i] = getString(R.string.opt_fps_auto) + "（"
+                                + getString(R.string.opt_fps_stream_detected, range[1]) + "）";
+                    }
+                }
+                pref.setEntries(entries);
+                pref.setSummary(pref.getEntry());
+            });
+        }, "main-stream-fps").start();
+    }
+
+    private static String[] toStrings(CharSequence[] values) {
+        String[] out = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            out[i] = String.valueOf(values[i]);
+        }
+        return out;
+    }
+
+    /**
+     * 主视频流声明的帧率区间 {@code {下限, 上限}}；读不到返回 null。
+     *
+     * <p>先找 EXTERNAL（环视合成流），找不到再退回第一台相机。</p>
+     */
+    private static int[] mainStreamFpsRange(Context context) {
+        try {
+            CameraManager manager =
+                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return null;
+            }
+            String[] ids = manager.getCameraIdList();
+            String target = null;
+            for (String id : ids) {
+                Integer facing = manager.getCameraCharacteristics(id)
+                        .get(CameraCharacteristics.LENS_FACING);
+                if (facing != null && facing == CameraCharacteristics.LENS_FACING_EXTERNAL) {
+                    target = id;
+                    break;
+                }
+            }
+            if (target == null && ids.length > 0) {
+                target = ids[0];
+            }
+            if (target == null) {
+                return null;
+            }
+            android.util.Range<Integer>[] ranges = manager.getCameraCharacteristics(target)
+                    .get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+            if (ranges == null || ranges.length == 0) {
+                return null;
+            }
+            int low = Integer.MAX_VALUE;
+            int high = 0;
+            for (android.util.Range<Integer> range : ranges) {
+                if (range == null || range.getLower() == null || range.getUpper() == null) {
+                    continue;
+                }
+                low = Math.min(low, range.getLower());
+                high = Math.max(high, range.getUpper());
+            }
+            return high > 0 ? new int[]{low, high} : null;
+        } catch (Exception e) {
+            AppLog.w("Settings", "读不到主视频流的帧率声明: " + e);
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ 关于
@@ -1245,6 +1377,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 枚举：选项与显示名都来自 {@link SettingsRegistry}，声明一遍就够。 */
     private void bindEnum(String key, SettingSpec spec, String current, StringSetter setter) {
+        bindEnum(key, spec, current, setter, null);
+    }
+
+    /**
+     * @param summary 自己接管摘要的写法；传 null 时摘要就是选中项的名字。
+     *                <b>必须在 {@code setValue} 之后调用</b> —— 之前调的话
+     *                {@code getEntry()} 拿到的还是上一个选项，而且紧接着会被
+     *                默认的 setSummary 覆盖掉。「切换之后摘要消失」就是这么来的。
+     */
+    private void bindEnum(String key, SettingSpec spec, String current, StringSetter setter,
+                          Runnable summary) {
         ListPreference pref = findPreference(key);
         if (pref == null) {
             return;
@@ -1253,12 +1396,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setEntries(localizedNames(spec));
         pref.setEntryValues(spec.values());
         pref.setValue(spec.sanitize(current));
-        pref.setSummary(pref.getEntry());
+        if (summary == null) {
+            pref.setSummary(pref.getEntry());
+        } else {
+            summary.run();
+        }
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
             setter.set(value);
             pref.setValue(value);
-            pref.setSummary(pref.getEntry());
+            if (summary == null) {
+                pref.setSummary(pref.getEntry());
+            } else {
+                summary.run();
+            }
             return false;
         });
     }

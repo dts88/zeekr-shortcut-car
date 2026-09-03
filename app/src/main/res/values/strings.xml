@@ -353,4 +353,6 @@
     <string name="upd_downloading_size">正在下载… %1$s MB</string>
     <string name="upd_download_failed_title">下载失败</string>
     <string name="share_phone_qr_failed">二维码没能生成，请直接在手机浏览器里输入下面这个地址</string>
+    <string name="opt_fps_stream_detected">视频流 %1$d fps</string>
+    <string name="set_resolution_pinned">当前视频流配置只录环视合成流，这一路的尺寸由合成流本身决定，此项不生效。要换尺寸请用开发者选项里的「环视流尺寸」。</string>
 </resources>

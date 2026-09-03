@@ -1217,57 +1217,39 @@ public class MultiCameraManager {
                 previewSize = new Size(1280, 800);
             }
             
-            // 最大编码分辨率限制（H.264 编码器硬件限制，固定值）
-            final int MAX_ENCODE_SIZE = 4096;
-            
-            // 计算调整后的编码分辨率（防止超大分辨率摄像头导致编码失败）
-            int encodeWidth = previewSize.getWidth();
-            int encodeHeight = previewSize.getHeight();
-            if (encodeWidth > MAX_ENCODE_SIZE || encodeHeight > MAX_ENCODE_SIZE) {
-                float widthRatio = (float) MAX_ENCODE_SIZE / encodeWidth;
-                float heightRatio = (float) MAX_ENCODE_SIZE / encodeHeight;
-                float scaleFactor = Math.min(widthRatio, heightRatio);
-                encodeWidth = ((int) (encodeWidth * scaleFactor) / 2) * 2;  // 确保是偶数
-                encodeHeight = ((int) (encodeHeight * scaleFactor) / 2) * 2;
-                if (encodeWidth < 2) encodeWidth = 2;
-                if (encodeHeight < 2) encodeHeight = 2;
-                AppLog.w(TAG, "Camera " + key + " codec resolution adjusted: " + 
-                        previewSize.getWidth() + "x" + previewSize.getHeight() + " -> " + 
-                        encodeWidth + "x" + encodeHeight + " (max: " + MAX_ENCODE_SIZE + ")");
-            }
-            
-            // 四宫格录制：把合成流重排成 2x2 再编码。
-            // 顺带解决一个实际问题——1280x5140 的高度超过编码器 4096 的上限，
-            // 原路径会把它整体缩小；2x2 输出（2560x2560）反而落在限制之内。
-            com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan = null;
+            // 尺寸怎么算的在 EncodeSize 里（有单元测试）——
+            // 设置界面显示目标码率时用的是同一个函数，两边不会走散。
+            boolean gridRequested = appConfig.isRecordGridLayout();
             int sourceWidth = previewSize.getWidth();
             int sourceHeight = previewSize.getHeight();
-            boolean gridRequested = appConfig.isRecordGridLayout();
-            boolean sourceIsComposite =
-                    com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
-                            sourceWidth, sourceHeight);
-            // 设置写着四宫格却录出长条时，得能一眼看出是哪一步没成立
-            if (!gridRequested || !sourceIsComposite) {
-                AppLog.i(TAG, "Camera " + key + " 不做四宫格重排："
-                        + (gridRequested ? "" : "设置为原始长条；")
-                        + (sourceIsComposite ? "" : "源尺寸 " + sourceWidth + "x" + sourceHeight
-                                + " 不像合成条带；")
-                        + "将按原样编码");
-            }
-            if (gridRequested && sourceIsComposite) {
-                com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan =
-                        com.kooo.evcam.zeekr.CompositeStreamGeometry.analyse(sourceWidth, sourceHeight);
-                if (plan.isComposite()) {
-                    fourLanePlan = plan;
-                    // 2x2 输出：边长 = 2 倍单个画面边长，取偶数并夹在编码上限内
-                    int side = plan.laneSizePx * 2;
-                    side = Math.min(side, MAX_ENCODE_SIZE);
-                    side = (side / 2) * 2;
-                    encodeWidth = side;
-                    encodeHeight = side;
-                    AppLog.i(TAG, "Camera " + key + " 四宫格录制: 源 "
-                            + sourceWidth + "x" + sourceHeight
-                            + " -> 编码 " + encodeWidth + "x" + encodeHeight);
+            EncodeSize encodeSize =
+                    EncodeSize.forSource(sourceWidth, sourceHeight, gridRequested);
+            int encodeWidth = encodeSize.width;
+            int encodeHeight = encodeSize.height;
+
+            com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan = null;
+            if (encodeSize.grid) {
+                fourLanePlan = com.kooo.evcam.zeekr.CompositeStreamGeometry.analyse(
+                        sourceWidth, sourceHeight);
+                AppLog.i(TAG, "Camera " + key + " 四宫格录制: 源 "
+                        + sourceWidth + "x" + sourceHeight
+                        + " -> 编码 " + encodeWidth + "x" + encodeHeight);
+            } else {
+                // 设置写着四宫格却录出长条时，得能一眼看出是哪一步没成立
+                boolean sourceIsComposite =
+                        com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
+                                sourceWidth, sourceHeight);
+                if (!gridRequested || !sourceIsComposite) {
+                    AppLog.i(TAG, "Camera " + key + " 不做四宫格重排："
+                            + (gridRequested ? "" : "设置为原始长条；")
+                            + (sourceIsComposite ? "" : "源尺寸 " + sourceWidth + "x" + sourceHeight
+                                    + " 不像合成条带；")
+                            + "将按原样编码");
+                }
+                if (encodeWidth != sourceWidth || encodeHeight != sourceHeight) {
+                    AppLog.i(TAG, "Camera " + key + " 超出编码器上限，缩到 "
+                            + encodeWidth + "x" + encodeHeight
+                            + "（上限 " + EncodeSize.MAX_SIDE + "）");
                 }
             }
 
