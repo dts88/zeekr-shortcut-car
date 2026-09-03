@@ -119,8 +119,8 @@ public final class CompositeSplitProfile {
         return out;
     }
 
-    /** 仅供测试还原状态。 */
-    static void reset() {
+    /** 回到「还没认出哪一路是合成流」的状态。测试用，跳车型时也用得上。 */
+    public static void reset() {
         compositeCameraId = null;
     }
 }
