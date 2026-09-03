@@ -22,7 +22,7 @@ public class RearViewGeometryTest {
     private static CompositeStreamGeometry.Plan zeekrPlan() {
         // 拆分要看是哪一路相机，先登记合成流那一路
         CompositeSplitProfile.setCompositeCameraId("2");
-        return CompositeStreamGeometry.analyse("2", 1280, 5140, 0);
+        return CompositeStreamGeometry.analyse("2", 1280, 5140);
     }
 
     // ---------- 比例锁死 ----------
@@ -232,7 +232,7 @@ public class RearViewGeometryTest {
     @Test
     public void fallsBackToTheWholeFrameWhenNotComposite() {
         CompositeStreamGeometry.Plan ordinary =
-                CompositeStreamGeometry.analyse("2", 1280, 720, 0);
+                CompositeStreamGeometry.analyse("2", 1280, 720);
         RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                 ordinary, 1, RearViewGeometry.Viewport.full());
 

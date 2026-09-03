@@ -168,7 +168,7 @@ public class RearViewMirrorView extends ViewGroup {
             AppLog.d(TAG, "忽略非合成流尺寸 " + size + "（多半是 HAL 的小尺寸提示）");
             return;
         }
-        plan = CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), size.getWidth(), size.getHeight(), 0);
+        plan = CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), size.getWidth(), size.getHeight());
         AppLog.i(TAG, "后视镜取景: " + plan + " 第 " + laneIndex + " 路");
         invalidate();
     }

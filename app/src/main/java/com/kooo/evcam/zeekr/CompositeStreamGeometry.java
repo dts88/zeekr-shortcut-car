@@ -178,10 +178,9 @@ public final class CompositeStreamGeometry {
                 || (float) frameHeight / frameWidth >= STRIP_RATIO_THRESHOLD;
     }
 
-    /** 按相机 + 尺寸拆分。{@link #analyse(int, int, int)} 的带相机版本。 */
-    public static Plan analyse(String cameraId, int frameWidth, int frameHeight,
-                               int cropInsetPx) {
-        return analyse(frameWidth, frameHeight, cropInsetPx,
+    /** 按「哪一路相机 + 什么分辨率」拆分。 */
+    public static Plan analyse(String cameraId, int frameWidth, int frameHeight) {
+        return analyse(frameWidth, frameHeight,
                 detectStacking(cameraId, frameWidth, frameHeight));
     }
 
@@ -202,46 +201,13 @@ public final class CompositeStreamGeometry {
         return detectStacking(null, frameWidth, frameHeight);
     }
 
-    /**
-     * 拆分一帧合成流。
-     *
-     * @param frameWidth  源帧宽度（像素），必须为正
-     * @param frameHeight 源帧高度（像素），必须为正
-     * @return 拆分结果；若不是合成流，返回只含一个整帧 Lane 的 Plan
-     */
-    public static Plan analyse(int frameWidth, int frameHeight) {
-        return analyse(frameWidth, frameHeight, 0);
-    }
-
-    /**
-     * 拆分一帧合成流，并对每个画面额外内缩若干像素。
-     *
-     * <p>内缩用于消除分隔带残留：不同固件版本的分隔带厚度可能与实测值差 1~2 像素，
-     * 内缩 1~4 像素可以把残留的边缘裁掉，代价是极小的视野损失。</p>
-     *
-     * @param cropInsetPx 每个画面四边各内缩的像素数，负值按 0 处理
-     */
-    public static Plan analyse(int frameWidth, int frameHeight, int cropInsetPx) {
+    private static Plan analyse(int frameWidth, int frameHeight, Stacking stacking) {
         if (frameWidth <= 0) {
             throw new IllegalArgumentException("frameWidth must be positive, got " + frameWidth);
         }
         if (frameHeight <= 0) {
             throw new IllegalArgumentException("frameHeight must be positive, got " + frameHeight);
         }
-        return analyse(frameWidth, frameHeight, cropInsetPx,
-                detectStacking(frameWidth, frameHeight));
-    }
-
-    private static Plan analyse(int frameWidth, int frameHeight, int cropInsetPx,
-                                Stacking stacking) {
-        if (frameWidth <= 0) {
-            throw new IllegalArgumentException("frameWidth must be positive, got " + frameWidth);
-        }
-        if (frameHeight <= 0) {
-            throw new IllegalArgumentException("frameHeight must be positive, got " + frameHeight);
-        }
-        int inset = Math.max(0, cropInsetPx);
-
         if (stacking == Stacking.NOT_COMPOSITE) {
             Lane[] single = {new Lane(0, 0, 0, frameWidth, frameHeight, frameWidth, frameHeight)};
             return new Plan(stacking, frameWidth, frameHeight, Math.min(frameWidth, frameHeight),
@@ -274,14 +240,6 @@ public final class CompositeStreamGeometry {
                 w = size;
                 h = frameHeight;
             }
-
-            // 应用内缩，并夹紧到源帧范围内，保证每边至少留 1 像素
-            int ix = Math.min(inset, Math.max(0, (w - 1) / 2));
-            int iy = Math.min(inset, Math.max(0, (h - 1) / 2));
-            x += ix;
-            y += iy;
-            w -= 2 * ix;
-            h -= 2 * iy;
 
             lanes[i] = new Lane(i, x, y, w, h, frameWidth, frameHeight);
         }

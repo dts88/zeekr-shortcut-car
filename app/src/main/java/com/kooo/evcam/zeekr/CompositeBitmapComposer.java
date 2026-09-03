@@ -43,7 +43,7 @@ public final class CompositeBitmapComposer {
             return source;
         }
 
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), srcWidth, srcHeight, 0);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), srcWidth, srcHeight);
         if (!plan.isComposite() || plan.laneCount() < CompositeStreamGeometry.LANE_COUNT) {
             return source;
         }

@@ -79,7 +79,6 @@ public class FourLaneContainer extends ViewGroup {
     /** 合成流的真实尺寸（不是缓冲区尺寸）。 */
     private int sourceWidth;
     private int sourceHeight;
-    private int cropInsetPx;
     private CompositeStreamGeometry.Plan plan;
 
     private ScaleMode scaleMode = ScaleMode.FIT;
@@ -151,15 +150,6 @@ public class FourLaneContainer extends ViewGroup {
         sourceWidth = width;
         sourceHeight = height;
         rebuildPlan();
-    }
-
-    /** 每个画面四边内缩的像素数，用于裁掉分隔带残留。 */
-    public void setCropInsetPx(int px) {
-        int clamped = Math.max(0, Math.min(64, px));
-        if (clamped != cropInsetPx) {
-            cropInsetPx = clamped;
-            rebuildPlan();
-        }
     }
 
     public void setScaleMode(ScaleMode mode) {
@@ -240,7 +230,8 @@ public class FourLaneContainer extends ViewGroup {
 
     private void rebuildPlan() {
         if (sourceWidth > 0 && sourceHeight > 0) {
-            plan = CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), sourceWidth, sourceHeight, cropInsetPx);
+            plan = CompositeStreamGeometry.analyse(
+                    CompositeSplitProfile.compositeCameraId(), sourceWidth, sourceHeight);
             AppLog.i(TAG, "合成流拆分方案: " + plan);
         } else {
             plan = null;

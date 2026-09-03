@@ -36,7 +36,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void verticalCompositeSplitsIntoFourSquareLanes() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140);
 
         assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
         assertTrue("应识别出分隔带", plan.bandsDetected);
@@ -62,7 +62,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void verticalLaneUvCoordinatesAreNormalised() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140);
         CompositeStreamGeometry.Lane first = plan.lane(0);
 
         assertEquals(0f, first.u0, EPS);
@@ -79,7 +79,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void ordinaryFrameIsNotTreatedAsComposite() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1920, 1080, 0);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1920, 1080);
 
         assertEquals(CompositeStreamGeometry.Stacking.NOT_COMPOSITE, plan.stacking);
         assertFalse(plan.isComposite());
@@ -118,40 +118,6 @@ public class CompositeStreamGeometryTest {
     // 现在表外的组合一律不拆，那三条针对的行为不存在了。等分与分隔带这两条分支
     // 由表里的两个真实尺寸各自覆盖：1280x5140 走分隔带，3840x2160 走等分。
 
-    // ---------- 内缩 ----------
-
-    @Test
-    public void cropInsetShrinksEveryLaneOnAllFourSides() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 2);
-
-        CompositeStreamGeometry.Lane first = plan.lane(0);
-        assertEquals(2, first.x);
-        assertEquals(4 + 2, first.y);
-        assertEquals(1280 - 4, first.width);
-        assertEquals(1280 - 4, first.height);
-        assertTrue(plan.note.contains("内缩"));
-    }
-
-    @Test
-    public void negativeInsetIsTreatedAsZero() {
-        CompositeStreamGeometry.Plan plain = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
-        CompositeStreamGeometry.Plan negative = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, -8);
-
-        assertEquals(plain.lane(0).x, negative.lane(0).x);
-        assertEquals(plain.lane(0).width, negative.lane(0).width);
-    }
-
-    @Test
-    public void absurdInsetStillLeavesAUsableLane() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 100_000);
-
-        for (int i = 0; i < plan.laneCount(); i++) {
-            CompositeStreamGeometry.Lane lane = plan.lane(i);
-            assertTrue("lane " + i + " 宽度必须为正", lane.width >= 1);
-            assertTrue("lane " + i + " 高度必须为正", lane.height >= 1);
-        }
-    }
-
     // ---------- 不变量 ----------
 
     @Test
@@ -163,7 +129,7 @@ public class CompositeStreamGeometryTest {
         };
         for (int[] size : sizes) {
             CompositeStreamGeometry.Plan plan =
-                    CompositeStreamGeometry.analyse(COMPOSITE, size[0], size[1], 1);
+                    CompositeStreamGeometry.analyse(COMPOSITE, size[0], size[1]);
             for (int i = 0; i < plan.laneCount(); i++) {
                 CompositeStreamGeometry.Lane lane = plan.lane(i);
                 String where = size[0] + "x" + size[1] + " lane " + i;
@@ -181,7 +147,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void lanesDoNotOverlapAlongTheStackingAxis() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140);
         for (int i = 1; i < plan.laneCount(); i++) {
             CompositeStreamGeometry.Lane previous = plan.lane(i - 1);
             CompositeStreamGeometry.Lane current = plan.lane(i);
@@ -196,7 +162,7 @@ public class CompositeStreamGeometryTest {
     public void rejectsNonPositiveDimensions() {
         for (int[] bad : new int[][]{{0, 100}, {100, 0}, {-1, 100}, {100, -1}}) {
             try {
-                CompositeStreamGeometry.analyse(COMPOSITE, bad[0], bad[1], 0);
+                CompositeStreamGeometry.analyse(COMPOSITE, bad[0], bad[1]);
                 fail("应拒绝 " + bad[0] + "x" + bad[1]);
             } catch (IllegalArgumentException expected) {
                 assertNotNull(expected.getMessage());
@@ -227,7 +193,7 @@ public class CompositeStreamGeometryTest {
         CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
 
         CompositeStreamGeometry.Plan plan =
-                CompositeStreamGeometry.analyse(COMPOSITE, 3840, 2160, 0);
+                CompositeStreamGeometry.analyse(COMPOSITE, 3840, 2160);
         assertTrue(plan.isComposite());
         assertEquals(CompositeStreamGeometry.LANE_COUNT, plan.lanes.length);
         assertEquals(3840, plan.lanes[0].width);

@@ -57,7 +57,7 @@ public final class EncodeSize {
         if (gridRequested
                 && CompositeStreamGeometry.looksLikeComposite(cameraId, sourceWidth, sourceHeight)) {
             CompositeStreamGeometry.Plan plan =
-                    CompositeStreamGeometry.analyse(cameraId, sourceWidth, sourceHeight, 0);
+                    CompositeStreamGeometry.analyse(cameraId, sourceWidth, sourceHeight);
             if (plan.isComposite()) {
                 // 2x2：宽高各取单格的两倍。不能拿 laneSizePx 当边长 ——
                 // 那个字段是「排布方向上的格长」，只在单格是正方形时等于宽和高。

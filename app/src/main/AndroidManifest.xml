@@ -105,20 +105,18 @@
         </provider>
 
         <!-- 分辨率实测，只从开发者选项进 -->
-        <activity
-            android:name=".zeekr.ResolutionTestActivity"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-            android:exported="false"
-            android:label="分辨率实测" />
 
         <!-- 相机能力清单，只从开发者选项进 -->
-        <activity
-            android:name=".zeekr.CameraProbeActivity"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-            android:exported="false"
-            android:label="相机能力清单" />
 
         <!-- 「发送到手机」的连通性测试界面，只从开发者选项进 -->
+        <!-- 拍照通道实测（开发者选项） -->
+        <activity
+            android:name=".zeekr.PhotoCaptureTestActivity"
+            android:label="拍照通道实测"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
         <activity
             android:name=".share.ShareTestActivity"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"

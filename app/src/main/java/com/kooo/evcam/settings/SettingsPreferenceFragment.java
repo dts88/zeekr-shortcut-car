@@ -1035,11 +1035,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindCompositeSize();
 
-        onClick("pref_camera_probe", pref -> startActivity(
-                new Intent(getContext(), com.kooo.evcam.zeekr.CameraProbeActivity.class)));
-
-        onClick("pref_resolution_test", pref -> startActivity(
-                new Intent(getContext(), com.kooo.evcam.zeekr.ResolutionTestActivity.class)));
+        onClick("pref_photo_test", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.zeekr.PhotoCaptureTestActivity.class)));
 
         onClick("pref_share_test", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.share.ShareTestActivity.class)));

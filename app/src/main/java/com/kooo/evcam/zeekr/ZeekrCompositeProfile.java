@@ -168,7 +168,7 @@ public final class ZeekrCompositeProfile {
             return "未检测到合成流";
         }
         CompositeStreamGeometry.Plan plan =
-                CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), size.getWidth(), size.getHeight(), 0);
+                CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), size.getWidth(), size.getHeight());
         String origin = isKnownSize(size) ? "已知实测尺寸" : "按长宽比推断";
         return size.getWidth() + "x" + size.getHeight() + "（" + origin + "）\n" + plan.note;
     }

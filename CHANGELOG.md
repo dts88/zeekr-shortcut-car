@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.36.8-alpha] - 2026-09-04
+
+- Developer options: added a photo capture test. It takes a real JPEG from every camera at
+  every declared size and reports what came back and which EXIF tags it carries.
+- Removed the camera capability list and the resolution test. Every declared size runs at
+  about 30 fps, so both tools have answered their question; the diagnostics report still
+  lists what each camera declares.
+- Removed the per-lane crop inset. It had a setter and nothing that ever called it.
+
 ## [0.36.7-alpha] - 2026-09-03
 
 - The split table now lists camera and size together, and only the two combinations
