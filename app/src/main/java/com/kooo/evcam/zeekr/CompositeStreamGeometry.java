@@ -166,7 +166,9 @@ public final class CompositeStreamGeometry {
      * 如果这里也听声明的，那么声明 3840×2160 之后，座舱相机（它也声明支持
      * 3840×2160）会跟着变成「合成流候选」，认错相机。</p>
      *
-     * <p>所以分成两件事：<b>认哪一路</b>用比例，<b>怎么拆这一帧</b>用声明。</p>
+     * <p>所以分成两件事：<b>认哪一路</b>用比例（只有这一处），
+     * <b>怎么拆这一帧</b>查 {@link CompositeSplitProfile} 那张表。
+     * 比例从不参与「怎么拆」的决定。</p>
      */
     public static boolean looksLikeCompositeByRatio(int frameWidth, int frameHeight) {
         if (frameWidth <= 0 || frameHeight <= 0) {

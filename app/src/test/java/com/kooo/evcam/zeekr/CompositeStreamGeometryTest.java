@@ -135,32 +135,11 @@ public class CompositeStreamGeometryTest {
                 CompositeStreamGeometry.looksLikeComposite(null, 1280, 5140));
     }
 
-    // ---------- 未知排布的回退 ----------
-
-    @Test
-    public void unknownGeometryFallsBackToEqualSplitWithoutLosingPixels() {
-        // 余量 880px 远超分隔带的合理范围，应退回等分。
-        // 表里没有这个尺寸，只有合成流那一路才按长条比例兜底
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 6000, 0);
-
-        assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
-        assertFalse("不应误判为分隔带", plan.bandsDetected);
-        assertEquals(1500, plan.laneSizePx);
-        assertEquals(0, plan.lane(0).y);
-        assertEquals(4500, plan.lane(3).y);
-        assertEquals("等分应覆盖整帧", 6000, plan.lane(3).y + plan.lane(3).height);
-    }
-
-    @Test
-    public void squashedLanesFallBackInsteadOfCroppingRealPixels() {
-        // 高度小于 4 个正方形画面，slack 为负 -> 回退等分
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 4800, 0);
-
-        assertFalse(plan.bandsDetected);
-        assertEquals(1200, plan.laneSizePx);
-    }
+    // ---------- 等分与分隔带 ----------
+    //
+    // 原来这里有三条针对「表外尺寸也拆」的测试（1280x6000、1280x4800、640x2570）。
+    // 现在表外的组合一律不拆，那三条针对的行为不存在了。等分与分隔带这两条分支
+    // 由表里的两个真实尺寸各自覆盖：1280x5140 走分隔带，3840x2160 走等分。
 
     // ---------- 内缩 ----------
 
@@ -234,22 +213,6 @@ public class CompositeStreamGeometryTest {
         }
     }
 
-    /**
-     * 车机 HAL 有时只声明一个较小的 Surface 提示尺寸，但送来的仍是同一份合成内容。
-     * 归一化坐标必须与全尺寸保持一致，缩放才不会走样。
-     */
-    @Test
-    public void normalisedWindowsAreScaleInvariant() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
-        CompositeStreamGeometry.Plan full = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
-        CompositeStreamGeometry.Plan half = CompositeStreamGeometry.analyse(COMPOSITE, 640, 2570, 0);
-
-        for (int i = 0; i < 4; i++) {
-            assertEquals("lane " + i + " v0", full.lane(i).v0, half.lane(i).v0, 1e-3f);
-            assertEquals("lane " + i + " v1", full.lane(i).v1, half.lane(i).v1, 1e-3f);
-        }
-    }
-
     // ---------- 参数校验 ----------
 
     @Test
@@ -299,20 +262,30 @@ public class CompositeStreamGeometryTest {
     }
 
     /**
-     * 表里没有的尺寸：普通比例一律不拆，长条只在合成流那一路兜底。
+     * 表里没有的组合一律不拆，长条也一样。
      *
-     * <p>兜底是给「固件换了一版、尺寸跟着变」留的。座舱那两路不适用：
-     * 它们本来就不是合成流，猜错的代价是把一幅好画面切成四块。</p>
+     * <p>猜的代价不对称：不拆看到的是一条挤在一起的长条，一眼就知道不对；
+     * 拆错看到的是四块被切开的画面，反而像是「功能正常」。</p>
      */
     @Test
-    public void unknownSizesSplitOnlyWhenTheyAreStripsOnTheCompositeCamera() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
-
+    public void combinationsOutsideTheTableAreNeverSplit() {
         assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1920, 1080));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 800));
-        // 长条：合成流那一路兜底拆，座舱不拆
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 6000));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(CABIN, 1280, 6000));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 720));
+        // 长条比例也不拆 —— 长宽比只用来认出哪一路是合成流，不用来决定怎么拆
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 6000));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 5120, 1280));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 5120));
+    }
+
+    /** 表里就是这台车实测确认过的两个尺寸，一个不多一个不少。 */
+    @Test
+    public void theTableHoldsExactlyTheConfirmedSizes() {
+        int[][] sizes = CompositeSplitProfile.compositeSizes();
+        assertEquals(2, sizes.length);
+        assertEquals(1280, sizes[0][0]);
+        assertEquals(5140, sizes[0][1]);
+        assertEquals(3840, sizes[1][0]);
+        assertEquals(2160, sizes[1][1]);
     }
 
     /** 登记是进程内全局的，每条测试跑完都要还原。 */

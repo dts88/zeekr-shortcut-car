@@ -36,6 +36,12 @@ package com.kooo.evcam.zeekr;
  *
  * <p>不写死 id。{@link ZeekrCameraLocator} 启动时靠 1280×5140 这种<b>只有合成流
  * 才会给</b>的长条认出它，然后登记在这里。换一台车、id 变了也照样能认出来。</p>
+ *
+ * <h3>表里没有的组合一律不拆</h3>
+ *
+ * <p>不按长宽比去猜。猜的代价不对称：不拆看到的是一条挤在一起的长条，一眼就知道
+ * 不对；拆错看到的是四块被切开的画面，反而像是「功能正常」。长宽比只用来
+ * <b>认出哪一路是合成流</b>，从不用来决定怎么拆。</p>
  */
 public final class CompositeSplitProfile {
 
@@ -73,22 +79,20 @@ public final class CompositeSplitProfile {
         }
         for (int[] size : COMPOSITE_SIZES) {
             if (size[0] == width && size[1] == height) {
-                return stackingOf(width, height);
+                // 长边在哪个方向，四格就往哪个方向排
+                return width > height ? CompositeStreamGeometry.Stacking.HORIZONTAL
+                        : CompositeStreamGeometry.Stacking.VERTICAL;
             }
         }
-        // 表里没有这个尺寸。合成流那一路给出长条时仍然拆 —— 固件换一版、尺寸跟着变，
-        // 或者 HAL 给了一个缩小的提示尺寸，总比把整条合成流当成一幅画面显示要好。
-        // 这一条只对合成流那一路成立，所以不会误伤座舱。
-        if (CompositeStreamGeometry.looksLikeCompositeByRatio(width, height)) {
-            return stackingOf(width, height);
-        }
+        // 表里没有这个组合就不拆，不按长宽比去猜。
+        //
+        // 猜的代价不对称：不拆看到的是一条挤在一起的长条，一眼就知道不对，
+        // 而且换个分辨率就能解决；拆错看到的是四块被切开的画面，反而像是
+        // 「功能正常」，等到有人对着录像找证据时才发现方位全是错的。
+        //
+        // 换固件、出现新的合成流尺寸时，往上面那张表里加一行 —— 加之前先在
+        // 「开发者选项 → 相机能力清单」里确认这一路真的声明了它。
         return CompositeStreamGeometry.Stacking.NOT_COMPOSITE;
-    }
-
-    /** 长边在哪个方向，四格就往哪个方向排。 */
-    private static CompositeStreamGeometry.Stacking stackingOf(int width, int height) {
-        return width > height ? CompositeStreamGeometry.Stacking.HORIZONTAL
-                : CompositeStreamGeometry.Stacking.VERTICAL;
     }
 
     /**

@@ -9,9 +9,11 @@ Nothing yet.
 
 ## [0.36.7-alpha] - 2026-09-03
 
-- The split table now lists camera and size together, and only combinations confirmed on
-  the vehicle: the composite camera at 1280×5140 and at 3840×2160. Two sizes that this
-  head unit never declares were removed.
+- The split table now lists camera and size together, and only the two combinations
+  confirmed on the vehicle: the composite camera at 1280×5140 and at 3840×2160.
+  Two sizes this head unit never declares were removed.
+- Combinations outside the table are never split. Aspect ratio is used only to identify
+  which camera is the composite one, never to decide how to split a frame.
 - No frame is split until the composite camera has been identified.
 
 ## [0.36.6-alpha] - 2026-09-03
