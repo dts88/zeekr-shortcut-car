@@ -46,6 +46,10 @@
             android:title="@string/set_record_fps_title"
             android:summary="%s" />
 
+        <Preference
+            android:key="pref_record_fps_note"
+            android:selectable="false" />
+
         <ListPreference
             android:key="pref_segment_duration"
             android:title="@string/set_segment_title"
@@ -361,6 +365,11 @@
         <Preference
             android:key="pref_preview_correction_reset"
             android:title="重置预览矫正参数" />
+
+        <ListPreference
+            android:key="pref_composite_size"
+            android:title="环视流尺寸"
+            android:summary="%s" />
 
         <Preference
             android:key="pref_camera_probe"

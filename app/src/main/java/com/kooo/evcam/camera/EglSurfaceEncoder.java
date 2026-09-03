@@ -258,8 +258,9 @@ public class EglSurfaceEncoder {
         float delivered = deliveredFrames / seconds;
         float rendered = renderedFrames / seconds;
         AppLog.i(TAG, String.format(java.util.Locale.US,
-                "Camera %s 帧率：相机送来 %.1f fps，实际渲染 %.1f fps（节流上限 %.0f fps）%s",
-                cameraId, delivered, rendered, 1_000_000_000f / minFrameIntervalNs,
+                "Camera %s 帧率：相机送来 %.1f fps，实际渲染 %.1f fps（上限 %.0f fps，0=不限制）%s",
+                cameraId, delivered, rendered,
+                minFrameIntervalNs > 0 ? 1_000_000_000f / minFrameIntervalNs : 0f,
                 delivered - rendered > 1f ? "  << 渲染跟不上" : ""));
         lastDeliveredFps = delivered;
         lastRenderedFps = rendered;
@@ -403,9 +404,12 @@ public class EglSurfaceEncoder {
      */
     public void setFrameRate(int fps) {
         if (fps <= 0) {
-            minFrameIntervalNs = DEFAULT_MIN_FRAME_INTERVAL_NS;
-            throttle.setMinIntervalNs(minFrameIntervalNs);
-            AppLog.d(TAG, "Camera " + cameraId + " 渲染帧率恢复默认上限");
+            // 不限制：视频流给多少就渲多少。
+            // 以前这里回落到一个 30fps 的默认上限 —— 那不是「不限制」，
+            // 而是「换了一个我们自己定的限制」。
+            minFrameIntervalNs = 0;
+            throttle.setMinIntervalNs(0);
+            AppLog.i(TAG, "Camera " + cameraId + " 渲染帧率不限制，跟随视频流");
             return;
         }
         int clamped = Math.max(1, Math.min(60, fps));

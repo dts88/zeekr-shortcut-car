@@ -19,6 +19,7 @@ public class AppConfig {
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
+    private static final String KEY_COMPOSITE_SIZE_OVERRIDE = "composite_size_override";  // 环视流强制尺寸
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
@@ -829,10 +830,23 @@ public class AppConfig {
     /** 录制链路当作「硬件最大帧率」用的值，见 {@link FrameRatePolicy}。 */
     public static final int RECORDER_MAX_FPS = FrameRatePolicy.RECORDER_MAX_FPS;
 
+    /**
+     * 「不限制帧率」。
+     *
+     * <p>0 而不是某个很大的数：下游拿到 0 就知道「不要设任何门槛」，
+     * 拿到 999 还得先判断这是不是一个真实的目标值。</p>
+     */
+    public static final int FRAME_RATE_UNLIMITED = 0;
+
     public int getActualFrameRate(int hardwareMaxFps) {
         String explicit = getRecordFps();
         if (RECORD_FPS_AUTO.equals(explicit)) {
-            return getStandardFrameRate(hardwareMaxFps);
+            // 「原始帧率」= 一帧都不丢，视频流给多少录多少。
+            //
+            // 以前它会算出一个具体的数（比如 25）再拿去节流，于是「原始」
+            // 反而成了一道限制 —— 而且当那个数和视频流的出帧节奏不成整数倍时，
+            // 节流还会把帧率砍一半。真想要「原始」，就不该有任何门槛。
+            return FRAME_RATE_UNLIMITED;
         }
         try {
             int fps = Integer.parseInt(explicit);
@@ -1233,6 +1247,23 @@ public class AppConfig {
      * 获取车型
      * @return 车型标识，默认为银河E5
      */
+    /**
+     * 环视合成流强制使用的尺寸，形如 {@code "3840x2160"}；空表示按探测结果走。
+     *
+     * <p>探测结果（1280×5140）是已知能出四格竖排的那一个。改成别的尺寸时，
+     * 相机<b>照样出画面</b>，但里面装的是什么排布只能看了才知道 ——
+     * 所以这一项在开发者选项里，而且默认为空。</p>
+     */
+    public String getCompositeSizeOverride() {
+        String value = prefs.getString(KEY_COMPOSITE_SIZE_OVERRIDE, "");
+        return value == null ? "" : value;
+    }
+
+    public void setCompositeSizeOverride(String value) {
+        prefs.edit().putString(KEY_COMPOSITE_SIZE_OVERRIDE, value == null ? "" : value).apply();
+        AppLog.i(TAG, "环视流尺寸覆盖: " + (value == null || value.isEmpty() ? "（跟随探测）" : value));
+    }
+
     /** 界面语言：auto / zh / en。 */
     public String getLanguageMode() {
         return readEnum(SettingsRegistry.LANGUAGE);

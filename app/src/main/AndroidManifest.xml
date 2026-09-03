@@ -192,10 +192,13 @@
             android:exported="false" />
 
         <!-- 连续时间轴回放（实验性）：把分段拼成一条时间轴，可跨文件拖动 -->
+        <!-- 视频回看。用 Theme.Cam 而不是全屏主题：全屏会把窗口铺到
+             状态栏底下，顶部的标题和列表被车机状态栏压住。
+             跟「软件设置」保持一致，由系统把状态栏那一条留出来。 -->
         <activity
             android:name=".zeekr.TimelinePlayerActivity"
             android:label="连续回放"
-            android:theme="@style/Theme.Cam.Fullscreen"
+            android:theme="@style/Theme.Cam"
             android:screenOrientation="landscape"
             android:exported="false" />
 

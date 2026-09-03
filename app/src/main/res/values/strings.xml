@@ -28,7 +28,7 @@
     <string name="set_section_about">关于</string>
     <string name="set_car_model_title">视频流配置</string>
     <string name="set_record_layout_title">录制画面排列</string>
-    <string name="set_record_fps_title">录制帧率</string>
+    <string name="set_record_fps_title">录制帧率上限</string>
     <string name="set_segment_title">分段时长</string>
     <string name="set_cameras_title">录制摄像头</string>
     <string name="set_cameras_dialog">选择参与录制的视频流（不影响拍照）</string>
@@ -109,7 +109,7 @@
     <!-- 设置里的枚举选项 -->
     <string name="opt_layout_grid">四宫格</string>
     <string name="opt_layout_raw">原始长条</string>
-    <string name="opt_fps_auto">原始帧率（%1$d fps）</string>
+    <string name="opt_fps_auto">原始帧率（不限制，视频流给多少录多少）</string>
     <string name="opt_mode_auto">自动（推荐）</string>
     <string name="opt_bitrate_low">低</string>
     <string name="opt_bitrate_medium">中</string>
@@ -344,5 +344,11 @@
     <string name="action_back">返回</string>
     <string name="set_watermark_brand_title">应用名与版本角标</string>
     <string name="set_watermark_brand_summary">录像左上角始终标注应用名与版本号，不可关闭 —— 录出来的文件常被拿去当凭据或发给别人，落上是哪个应用哪个版本录的，回头才对得上</string>
-    <string name="opt_fps_auto_unknown">跟随相机（尚未探测到）</string>
+    <string name="opt_fps_auto_unknown">原始帧率（不限制，视频流给多少录多少）</string>
+    <string name="set_record_fps_summary_note">「原始帧率」表示不做任何限制；其余各档是上限而不是强制值 —— 视频流本来就给不到那么多时，录出来只会更低。</string>
+    <string name="opt_fps_cap">最高 %1$s fps</string>
+    <string name="opt_composite_size_auto">跟随探测（1280×5140，已知可出四格）</string>
+    <string name="msg_composite_size_changed">环视流尺寸已更改，重启应用后生效。若画面不对，改回「跟随探测」。</string>
+    <string name="msg_composite_size_split">这个比例会被拆成四格显示。</string>
+    <string name="msg_composite_size_single">这个比例不满足条带判定（长边需达短边 3.2 倍），会当成一整幅画面显示 —— 用来看这一路里到底装了什么。</string>
 </resources>

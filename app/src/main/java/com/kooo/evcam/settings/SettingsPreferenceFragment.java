@@ -24,6 +24,7 @@ import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CustomCameraConfigFragment;
 import com.kooo.evcam.FloatingWindowService;
@@ -127,6 +128,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindEnum("pref_record_fps", SettingsRegistry.RECORD_FPS,
                 appConfig.getRecordFps(), value -> appConfig.setRecordFps(value));
+        Preference fpsNote = findPreference("pref_record_fps_note");
+        if (fpsNote != null) {
+            fpsNote.setSummary(R.string.set_record_fps_summary_note);
+        }
 
         bindSegmentDuration();
 
@@ -982,6 +987,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         });
 
+        bindCompositeSize();
+
         onClick("pref_camera_probe", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.zeekr.CameraProbeActivity.class)));
 
@@ -998,6 +1005,80 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             toast("预览矫正参数已重置");
         });
+    }
+
+    /**
+     * 环视流尺寸（开发者选项）。
+     *
+     * <p>默认「跟随探测」——探测出来的 1280×5140 是已知能出四格竖排的那一个。
+     * 换成别的尺寸相机照样出画面，但里面装的是什么排布只能看了才知道，
+     * 所以这一项不放进普通设置。</p>
+     */
+    private void bindCompositeSize() {
+        ListPreference pref = findPreference("pref_composite_size");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        // 探测相机要读 characteristics，放后台 —— 和「录制分辨率」那一项一样的做法
+        final Context context = getContext().getApplicationContext();
+        new Thread(() -> {
+            final List<String> options = ResolutionOptions.common(probeSupportedSizes(context));
+            if (!isAdded()) {
+                return;
+            }
+            requireActivity().runOnUiThread(() -> populateCompositeSize(pref, options));
+        }, "composite-size-probe").start();
+    }
+
+    private void populateCompositeSize(ListPreference pref, List<String> options) {
+        List<String> values = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        values.add("");
+        labels.add(getString(R.string.opt_composite_size_auto));
+        for (String option : options) {
+            values.add(option);
+            labels.add(option);
+        }
+        String current = appConfig.getCompositeSizeOverride();
+        if (!values.contains(current)) {
+            // 当前值一定要留着，否则下拉框会显示空白
+            values.add(current);
+            labels.add(current);
+        }
+        pref.setEntries(labels.toArray(new String[0]));
+        pref.setEntryValues(values.toArray(new String[0]));
+        pref.setValue(current);
+        showCompositeSize(pref);
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            String value = String.valueOf(newValue);
+            appConfig.setCompositeSizeOverride(value);
+            pref.setValue(value);
+            showCompositeSize(pref);
+            toast(getString(R.string.msg_composite_size_changed));
+            return false;
+        });
+    }
+
+    /**
+     * 摘要里同时写清「现在用的是哪个」和「这个尺寸会被怎么拆」。
+     *
+     * <p>拆分规则在 {@link CompositeStreamGeometry} 里：长边达到短边的 3.2 倍才算条带，
+     * 才会切成四格。3840×2160 是 16:9，达不到这个比例 —— 它会被当成一整幅画面显示。
+     * 这一句必须写出来，否则换完尺寸看到「只有一个画面」会以为是坏了。</p>
+     */
+    private void showCompositeSize(ListPreference pref) {
+        CharSequence entry = pref.getEntry();
+        int[] size = AppConfig.parseResolution(pref.getValue());
+        String note;
+        if (size == null) {
+            note = "";
+        } else if (CompositeStreamGeometry.looksLikeComposite(size[0], size[1])) {
+            note = "\n" + getString(R.string.msg_composite_size_split);
+        } else {
+            note = "\n" + getString(R.string.msg_composite_size_single);
+        }
+        pref.setSummary(entry + note);
     }
 
     // ------------------------------------------------------------------ 关于
@@ -1144,13 +1225,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (spec == SettingsRegistry.RECORD_FPS) {
             int auto = spec.indexOf("auto");
             if (auto >= 0) {
-                // 这个数要么来自相机的声明，要么干脆不写 —— 以前写的是一个和相机
-                // 无关的常量 25，而相机声明 15-30、实际送出 29，两头都不沾。
-                int declared = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
-                names[auto] = declared > 0
-                        ? getString(R.string.opt_fps_auto,
-                                FrameRatePolicy.standardFrameRate(declared))
-                        : getString(R.string.opt_fps_auto_unknown);
+                // 「原始帧率」不再显示任何数字：它现在的含义就是「不限制」，
+                // 印一个具体的数只会让人以为那是承诺。
+                names[auto] = getString(R.string.opt_fps_auto);
+            }
+            // 其余各档是上限而不是强制值 —— 标题里就该这么写，
+            // 免得看到「30 fps」以为选了它就一定录得到 30
+            String[] values = spec.values();
+            for (int i = 0; i < names.length; i++) {
+                if (!"auto".equals(values[i])) {
+                    names[i] = getString(R.string.opt_fps_cap, values[i]);
+                }
             }
         }
         return names;

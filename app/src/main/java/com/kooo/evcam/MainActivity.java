@@ -1781,10 +1781,28 @@ public class MainActivity extends AppCompatActivity {
             if (located.found()) {
                 com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
                 if (cam != null) {
-                    cam.setPreferredSize(located.size);
+                    // 开发者选项里可以强制换一个尺寸（比如试 3840×2160）。
+                    // 探测结果是已知能出四格竖排的那一个，所以它才是默认。
+                    android.util.Size forced = parseSizeSetting(
+                            appConfig.getCompositeSizeOverride());
+                    android.util.Size use = forced != null ? forced : located.size;
+                    if (forced != null) {
+                        AppLog.w(TAG, "环视流尺寸被强制为 " + forced
+                                + "（探测结果是 " + located.size + "）");
+                        if (compositeContainer != null) {
+                            compositeContainer.setSourceSize(forced);
+                        }
+                    }
+                    cam.setPreferredSize(use);
                 }
             }
         }
+    }
+
+    /** 把 {@code "3840x2160"} 这样的设置值解析成尺寸；空或不合法返回 null。 */
+    private static android.util.Size parseSizeSetting(String value) {
+        int[] parsed = AppConfig.parseResolution(value);
+        return parsed == null ? null : new android.util.Size(parsed[0], parsed[1]);
     }
 
     /**
