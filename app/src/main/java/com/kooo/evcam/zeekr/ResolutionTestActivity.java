@@ -376,8 +376,9 @@ public class ResolutionTestActivity extends Activity {
             return String.format(Locale.US, "%-12s 无画面  会话建起来了但一帧都没来（%d ms）",
                     size.getWidth() + "×" + size.getHeight(), elapsed);
         }
-        return String.format(Locale.US, "%-12s 正常  %.1f fps，%d 帧   请求 %s",
-                size.getWidth() + "×" + size.getHeight(), fps, frames,
+        return String.format(Locale.US, "%-12s 正常  %.1f fps（%d 秒内共收到 %d 帧）  请求 %s",
+                size.getWidth() + "×" + size.getHeight(), fps,
+                Math.round(PER_SIZE_MS / 1000f), frames,
                 requestedRange == null ? "不请求" : requestedRange.toString());
     }
 

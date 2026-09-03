@@ -225,6 +225,9 @@ public class EglSurfaceEncoder {
      */
     private volatile long minFrameIntervalNs = DEFAULT_MIN_FRAME_INTERVAL_NS;
 
+    /** 真正做「渲不渲这一帧」判断的地方。 */
+    private final FrameThrottle throttle = new FrameThrottle(DEFAULT_MIN_FRAME_INTERVAL_NS);
+
     /** 相机送来的帧数（drawFrame 被调用的次数）。 */
     private long deliveredFrames;
     /** 真正渲染出去、进了编码器的帧数。 */
@@ -401,13 +404,16 @@ public class EglSurfaceEncoder {
     public void setFrameRate(int fps) {
         if (fps <= 0) {
             minFrameIntervalNs = DEFAULT_MIN_FRAME_INTERVAL_NS;
+            throttle.setMinIntervalNs(minFrameIntervalNs);
             AppLog.d(TAG, "Camera " + cameraId + " 渲染帧率恢复默认上限");
             return;
         }
         int clamped = Math.max(1, Math.min(60, fps));
         minFrameIntervalNs = 1_000_000_000L / clamped;
-        AppLog.i(TAG, "Camera " + cameraId + " 渲染帧率上限设为 " + clamped
-                + " fps（间隔 " + (minFrameIntervalNs / 1_000_000L) + "ms）");
+        throttle.setMinIntervalNs(minFrameIntervalNs);
+        AppLog.i(TAG, "Camera " + cameraId + " 渲染帧率目标 " + clamped
+                + " fps（间隔 " + (minFrameIntervalNs / 1_000_000L) + "ms，"
+                + "允许提前 " + Math.round((1 - FrameThrottle.EARLY_TOLERANCE) * 100) + "%）");
     }
 
     public void drawFrame(long presentationTimeNs) {
@@ -423,10 +429,13 @@ public class EglSurfaceEncoder {
         // 这个方法每来一帧就被调一次 —— 所以它的调用频率就是相机的出帧率
         deliveredFrames++;
 
-        // 性能优化：帧率控制，防止过度渲染占用CPU
+        // 帧率控制。判断本身在 FrameThrottle 里（有单元测试）——
+        // 原来那句「距上一帧不足一个间隔就跳过」在源速率不是目标整数倍时
+        // 会直接把帧率砍一半：相机 29fps、目标 25fps，正好每两帧渲一帧，
+        // 得到 14.5fps。「选 25 录出 15」就是这么来的，和相机无关。
         long currentTimeNs = System.nanoTime();
         reportFrameRates(currentTimeNs);
-        if (currentTimeNs - lastFrameTimeNs < minFrameIntervalNs) {
+        if (!throttle.shouldRender(currentTimeNs)) {
             // 帧间隔太短，跳过渲染但消费帧
             try {
                 makeCurrent();
@@ -460,6 +469,7 @@ public class EglSurfaceEncoder {
             // 更新纹理（需要在正确的 EGL context 中）
             inputSurfaceTexture.updateTexImage();
             inputSurfaceTexture.getTransformMatrix(texMatrix);
+            // 节流由 throttle 记账，这个字段只留给日志/诊断看「上一帧什么时候画的」
             lastFrameTimeNs = currentTimeNs;
             renderedFrames++;   // 过了节流这一关，这一帧才真的进编码器
 
