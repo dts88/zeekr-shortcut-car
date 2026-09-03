@@ -2392,7 +2392,7 @@ public class MultiCameraManager {
         return sb.toString();
     }
 
-    /** 录像左上角要标的那行字：应用名 + 版本号。 */
+    /** 录像左上角要标的那行字：应用名 + 版本号，填了车牌号就跟在后面。 */
     private String buildBrandLine() {
         String version = "";
         try {
@@ -2401,8 +2401,10 @@ public class MultiCameraManager {
         } catch (Exception e) {
             AppLog.w(TAG, "读取版本号失败: " + e);
         }
-        String name = context.getString(com.kooo.evcam.R.string.app_name);
-        return version.isEmpty() ? name : name + " v" + version;
+        // 拼法在 WatermarkText 里，照片那一侧用的是同一个函数
+        return WatermarkText.brandLine(
+                context.getString(com.kooo.evcam.R.string.app_name),
+                version, new AppConfig(context).getLicensePlate());
     }
 
     /**

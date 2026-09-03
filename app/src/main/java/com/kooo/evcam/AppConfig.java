@@ -7,6 +7,7 @@ import com.kooo.evcam.config.BlindSpotConfig;
 import com.kooo.evcam.zeekr.FisheyeProjection;
 import com.kooo.evcam.settings.FrameRatePolicy;
 import com.kooo.evcam.settings.SettingSpec;
+import com.kooo.evcam.settings.LicensePlate;
 import com.kooo.evcam.settings.SettingsRegistry;
 
 /**
@@ -185,6 +186,8 @@ public class AppConfig {
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
     private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
+    private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
+    private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
 
     // 视频编码器配置
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 强制使用 H.264 编码器（关闭默认使用 H.265/HEVC）
@@ -3067,6 +3070,38 @@ public class AppConfig {
      * 获取时间角标开关状态
      * @return true 表示启用时间角标
      */
+    /**
+     * 要落进画面的车牌号；关掉开关或者没填时返回空串。
+     *
+     * <p>存进来的值一律先过 {@link LicensePlate#sanitize} —— 界面上显示的、
+     * 存下来的、录进画面的必须是同一个串。</p>
+     */
+    public String getLicensePlate() {
+        if (!prefs.getBoolean(KEY_LICENSE_PLATE_ENABLED, false)) {
+            return "";
+        }
+        return LicensePlate.sanitize(prefs.getString(KEY_LICENSE_PLATE, ""));
+    }
+
+    /** 设置界面要看的原始值（不受开关影响）。 */
+    public String getLicensePlateRaw() {
+        return LicensePlate.sanitize(prefs.getString(KEY_LICENSE_PLATE, ""));
+    }
+
+    public void setLicensePlate(String value) {
+        String clean = LicensePlate.sanitize(value);
+        prefs.edit().putString(KEY_LICENSE_PLATE, clean).apply();
+        AppLog.i(TAG, "车牌号设为 " + (clean.isEmpty() ? "（空）" : clean));
+    }
+
+    public boolean isLicensePlateEnabled() {
+        return prefs.getBoolean(KEY_LICENSE_PLATE_ENABLED, false);
+    }
+
+    public void setLicensePlateEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_LICENSE_PLATE_ENABLED, enabled).apply();
+    }
+
     public boolean isTimestampWatermarkEnabled() {
         // 默认关闭时间角标
         return prefs.getBoolean(KEY_TIMESTAMP_WATERMARK_ENABLED, false);

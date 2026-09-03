@@ -355,4 +355,10 @@
     <string name="share_phone_qr_failed">二维码没能生成，请直接在手机浏览器里输入下面这个地址</string>
     <string name="opt_fps_stream_detected">视频流 %1$d fps</string>
     <string name="set_resolution_pinned">当前视频流配置只录环视合成流，这一路的尺寸由合成流本身决定，此项不生效。要换尺寸请用开发者选项里的「环视流尺寸」。</string>
+    <string name="set_plate_switch_title">在画面中标注车牌号</string>
+    <string name="set_plate_switch_summary">录像和照片的左上角会跟着应用名一起标出车牌号</string>
+    <string name="set_plate_title">车牌号</string>
+    <string name="set_plate_hint">最长十位，只能是大写字母和数字</string>
+    <string name="set_plate_empty">未填写</string>
+    <string name="msg_plate_cleaned">已按规则整理为 %1$s</string>
 </resources>

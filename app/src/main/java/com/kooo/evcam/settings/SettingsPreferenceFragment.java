@@ -142,6 +142,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 appConfig.getBitrateLevel(), value -> appConfig.setBitrateLevel(value),
                 this::showTargetBitrate);
 
+        bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
+                enabled -> {
+                    appConfig.setLicensePlateEnabled(enabled);
+                    showLicensePlate();
+                });
+        bindLicensePlate();
+
         // 应用名与版本是无条件盖上去的（见 MultiCameraManager.buildBrandLine），
         // 这里只是把这件事摆在界面上：开着、灰着、点不动。
         // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
@@ -606,6 +613,52 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             pref.setSummary(describeLimit(parsed));
             return false;
         });
+    }
+
+    /**
+     * 车牌号输入框。
+     *
+     * <p>输入的东西一律先过 {@link LicensePlate#sanitize}：小写转大写，
+     * 空格连字符之类去掉，超过十位截断。清洗结果直接显示在下面 ——
+     * 录进画面的就是这一串，不能让人以为自己敲的原样进去了。</p>
+     */
+    private void bindLicensePlate() {
+        EditTextPreference pref = findPreference("pref_license_plate");
+        if (pref == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setText(appConfig.getLicensePlateRaw());
+        showLicensePlate();
+        pref.setOnBindEditTextListener(editText -> {
+            editText.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+            editText.setFilters(new android.text.InputFilter[]{
+                    new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
+        });
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            String raw = String.valueOf(newValue);
+            String clean = LicensePlate.sanitize(raw);
+            appConfig.setLicensePlate(clean);
+            pref.setText(clean);
+            showLicensePlate();
+            if (!clean.equals(raw.trim()) && !clean.isEmpty()) {
+                toast(getString(R.string.msg_plate_cleaned, clean));
+            }
+            return false;
+        });
+    }
+
+    /** 摘要写当前车牌号；没填就说没填，并把规则写在后面。 */
+    private void showLicensePlate() {
+        EditTextPreference pref = findPreference("pref_license_plate");
+        if (pref == null) {
+            return;
+        }
+        String plate = appConfig.getLicensePlateRaw();
+        pref.setSummary(plate.isEmpty()
+                ? getString(R.string.set_plate_empty) + " · " + getString(R.string.set_plate_hint)
+                : plate + " · " + getString(R.string.set_plate_hint));
     }
 
     private String describeLimit(int gigabytes) {

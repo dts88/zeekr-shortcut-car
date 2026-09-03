@@ -2363,63 +2363,103 @@ public class SingleCamera {
     }
 
     /**
-     * 在Bitmap上添加时间角标
-     * @param originalBitmap 原始图片
+     * 给照片盖角标。
+     *
+     * <h3>和录像盖的是同一套信息</h3>
+     *
+     * <p>以前照片只有一行时间，而录像有应用名、版本、车牌、尺寸 —— 同一台设备
+     * 记录的两种东西，角标写的内容却对不上。现在两边共用
+     * {@link WatermarkText} 拼字符串：</p>
+     *
+     * <pre>
+     *   极氪即刻 v0.36.2  京A12345     &lt;- 无条件；车牌号可选
+     *   2026-09-03 14:22:07
+     *   2560x2560                      &lt;- 这张图真实的尺寸
+     * </pre>
+     *
+     * <p>照片没有帧率、码率、编码，那几项就不写 —— 为了「看起来一致」
+     * 硬凑几个数，比不写更糟。</p>
+     *
      * @param timestamp 时间戳字符串（格式：yyyyMMdd_HHmmss）
-     * @return 带有时间角标的新Bitmap
      */
-    private android.graphics.Bitmap addTimestampWatermark(android.graphics.Bitmap originalBitmap, String timestamp) {
+    private android.graphics.Bitmap addTimestampWatermark(
+            android.graphics.Bitmap originalBitmap, String timestamp) {
         try {
-            // 创建可编辑的副本
-            android.graphics.Bitmap mutableBitmap = originalBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, true);
+            android.graphics.Bitmap mutableBitmap =
+                    originalBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, true);
             android.graphics.Canvas canvas = new android.graphics.Canvas(mutableBitmap);
 
-            // 将时间戳转换为可读格式：yyyyMMdd_HHmmss -> yyyy-MM-dd HH:mm:ss
-            String displayTime;
-            try {
-                java.text.SimpleDateFormat inputFormat = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
-                java.text.SimpleDateFormat outputFormat = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-                java.util.Date date = inputFormat.parse(timestamp);
-                displayTime = outputFormat.format(date);
-            } catch (Exception e) {
-                // 解析失败，使用当前时间
-                displayTime = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new java.util.Date());
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            lines.add(buildPhotoBrandLine());
+            lines.add(readableTime(timestamp));
+            String spec = WatermarkText.photoSpecLine(
+                    mutableBitmap.getWidth(), mutableBitmap.getHeight());
+            if (!spec.isEmpty()) {
+                lines.add(spec);
             }
 
-            // 根据图片宽度动态计算字体大小（约为图片宽度的3%）
+            // 字号跟着图片宽度走：四宫格 2560 和单路 1280 差一倍，
+            // 固定字号在其中一边一定不合适
             float textSize = mutableBitmap.getWidth() * 0.03f;
-            if (textSize < 16) textSize = 16;  // 最小16像素
-            if (textSize > 48) textSize = 48;  // 最大48像素
+            textSize = Math.max(16f, Math.min(48f, textSize));
 
-            // 设置画笔 - 阴影效果
             android.graphics.Paint shadowPaint = new android.graphics.Paint();
             shadowPaint.setColor(android.graphics.Color.BLACK);
             shadowPaint.setTextSize(textSize);
             shadowPaint.setAntiAlias(true);
             shadowPaint.setTypeface(android.graphics.Typeface.MONOSPACE);
 
-            // 设置画笔 - 主文字
             android.graphics.Paint textPaint = new android.graphics.Paint();
             textPaint.setColor(android.graphics.Color.WHITE);
             textPaint.setTextSize(textSize);
             textPaint.setAntiAlias(true);
             textPaint.setTypeface(android.graphics.Typeface.MONOSPACE);
 
-            // 计算位置（左上角，留一定边距）
             float x = textSize * 0.5f;
             float y = textSize * 1.2f;
+            for (String line : lines) {
+                if (line == null || line.isEmpty()) {
+                    continue;
+                }
+                canvas.drawText(line, x + 2, y + 2, shadowPaint);
+                canvas.drawText(line, x, y, textPaint);
+                y += textSize * 1.25f;
+            }
 
-            // 绘制阴影（偏移2像素）
-            canvas.drawText(displayTime, x + 2, y + 2, shadowPaint);
-            // 绘制主文字
-            canvas.drawText(displayTime, x, y, textPaint);
-
-            AppLog.d(TAG, "Camera " + cameraId + " added timestamp watermark: " + displayTime);
+            AppLog.d(TAG, "Camera " + cameraId + " 照片角标: " + lines);
             return mutableBitmap;
 
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " failed to add timestamp watermark", e);
             return originalBitmap;  // 失败时返回原图
+        }
+    }
+
+    /** 和录像左上角那一行完全一样的拼法。 */
+    private String buildPhotoBrandLine() {
+        String version = "";
+        try {
+            version = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            AppLog.w(TAG, "读取版本号失败: " + e);
+        }
+        return WatermarkText.brandLine(
+                context.getString(com.kooo.evcam.R.string.app_name),
+                version, new AppConfig(context).getLicensePlate());
+    }
+
+    /** yyyyMMdd_HHmmss -> yyyy-MM-dd HH:mm:ss；解析不了就用当前时间。 */
+    private static String readableTime(String timestamp) {
+        try {
+            java.text.SimpleDateFormat in =
+                    new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
+            java.text.SimpleDateFormat out =
+                    new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            return out.format(in.parse(timestamp));
+        } catch (Exception e) {
+            return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss",
+                    Locale.getDefault()).format(new java.util.Date());
         }
     }
 

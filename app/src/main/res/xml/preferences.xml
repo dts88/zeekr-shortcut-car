@@ -76,6 +76,16 @@
             android:summary="@string/set_watermark_brand_summary" />
 
         <SwitchPreferenceCompat
+            android:key="pref_license_plate_enabled"
+            android:title="@string/set_plate_switch_title"
+            android:summary="@string/set_plate_switch_summary" />
+
+        <EditTextPreference
+            android:key="pref_license_plate"
+            android:dependency="pref_license_plate_enabled"
+            android:title="@string/set_plate_title" />
+
+        <SwitchPreferenceCompat
             android:key="pref_watermark"
             android:title="@string/set_watermark_title"
             android:summaryOn="@string/set_watermark_on"
