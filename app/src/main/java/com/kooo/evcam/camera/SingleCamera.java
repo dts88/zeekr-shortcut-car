@@ -315,6 +315,40 @@ public class SingleCamera {
     }
 
     /**
+     * 向相机请求一个帧率区间。
+     *
+     * <p><b>这一项此前全项目一次都没设过。</b>不设的话，自动曝光会在 HAL 的默认区间里
+     * 自己决定跑多快；而这台车机声明的是 15–30，于是它完全有权在负载一上来时
+     * 滑到 15 —— 「设置里选 30、录出来 15」就是这么来的。相机不是给不到 30，
+     * 是没人要求过它保持 30。</p>
+     *
+     * <p>挑哪个区间见 {@link FpsRangePicker}：优先固定区间，其次下限最高的那个。
+     * 相机没声明区间时什么都不设 —— 硬塞一个没声明的值会让会话配置失败，
+     * 那是把「帧率不对」变成「根本没有画面」。</p>
+     */
+    private void applyTargetFpsRange(CaptureRequest.Builder builder) {
+        int target = new AppConfig(context).getActualFrameRate(
+                CameraCapabilities.declaredMaxFps() > 0
+                        ? CameraCapabilities.declaredMaxFps()
+                        : AppConfig.RECORDER_MAX_FPS);
+        FpsRangePicker.Choice choice =
+                FpsRangePicker.pick(CameraCapabilities.fpsRanges(cameraId), target);
+        if (choice == null) {
+            AppLog.i(TAG, "Camera " + cameraId + " 未声明帧率区间，不请求 —— 跑多少是多少");
+            return;
+        }
+        try {
+            builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                    new android.util.Range<>(choice.lower, choice.upper));
+            AppLog.i(TAG, "Camera " + cameraId + " 请求帧率区间 " + choice
+                    + "（目标 " + target + " fps）"
+                    + (choice.isFixed() ? "" : "  << 可变区间，自动曝光仍可能下滑到下限"));
+        } catch (Exception e) {
+            AppLog.w(TAG, "Camera " + cameraId + " 设置帧率区间失败: " + e);
+        }
+    }
+
+    /**
      * 获取预览分辨率
      */
     public Size getPreviewSize() {
@@ -1470,6 +1504,8 @@ public class SingleCamera {
             if (imageAdjustEnabled) {
                 applyImageAdjustParamsFromConfig(previewRequestBuilder);
             }
+
+            applyTargetFpsRange(previewRequestBuilder);
             
             // 准备所有输出Surface
             java.util.List<Surface> surfaces = new java.util.ArrayList<>();

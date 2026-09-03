@@ -73,6 +73,8 @@ public class ResolutionTestActivity extends Activity {
 
     private Spinner cameraSpinner;
     private Spinner sizeSpinner;
+    private Spinner fpsSpinner;
+    private final List<android.util.Range<Integer>> fpsChoices = new ArrayList<>();
     private TextView status;
     private TextView results;
     private TextureView preview;
@@ -85,6 +87,10 @@ public class ResolutionTestActivity extends Activity {
     private CameraCaptureSession session;
     private final FrameRateMeter meter = new FrameRateMeter(1000L);
     private volatile boolean runningBatch;
+    private android.media.ImageReader reader;
+    private Surface previewSurface;
+    /** 本次测试要请求的帧率区间；null 表示不请求，交给相机自己决定。 */
+    private android.util.Range<Integer> requestedRange;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,6 +133,10 @@ public class ResolutionTestActivity extends Activity {
         root.addView(labeled("相机", cameraSpinner));
         sizeSpinner = new Spinner(this);
         root.addView(labeled("尺寸", sizeSpinner));
+        // 分辨率和帧率是两个变量。「30 帧跑不到」可能是这个尺寸带不动，
+        // 也可能是根本没请求过这个帧率 —— 分开试才分得清。
+        fpsSpinner = new Spinner(this);
+        root.addView(labeled("帧率区间", fpsSpinner));
 
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -251,6 +261,40 @@ public class ResolutionTestActivity extends Activity {
         }
         sizeSpinner.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, labels));
+        loadFpsRanges(cameraId);
+    }
+
+    /**
+     * 帧率区间清单。
+     *
+     * <p>第一项是「不请求」—— 这正是本应用此前的行为，也是「选 30 录出 15」的成因：
+     * 不请求就等于把帧率交给自动曝光在默认区间里自己决定。
+     * 把它留在列表里，是为了能和明确请求的结果对照。</p>
+     */
+    private void loadFpsRanges(String cameraId) {
+        fpsChoices.clear();
+        List<String> labels = new ArrayList<>();
+        labels.add("不请求（相机自己决定）");
+        fpsChoices.add(null);
+        try {
+            CameraCharacteristics cc = cameraManager.getCameraCharacteristics(cameraId);
+            android.util.Range<Integer>[] ranges =
+                    cc.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+            if (ranges != null) {
+                for (android.util.Range<Integer> range : ranges) {
+                    if (range == null) {
+                        continue;
+                    }
+                    fpsChoices.add(range);
+                    labels.add(range.getLower() + "–" + range.getUpper()
+                            + (range.getLower().equals(range.getUpper()) ? "  (固定)" : "  (可变)"));
+                }
+            }
+        } catch (CameraAccessException | RuntimeException e) {
+            AppLog.w(TAG, "读帧率区间失败: " + e);
+        }
+        fpsSpinner.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, labels));
     }
 
     // ------------------------------------------------------------------ 测试
@@ -274,6 +318,11 @@ public class ResolutionTestActivity extends Activity {
         runInBackground(cameraIds.get(cameraPos), new ArrayList<>(sizes));
     }
 
+    private android.util.Range<Integer> selectedRange() {
+        int pos = fpsSpinner.getSelectedItemPosition();
+        return pos >= 0 && pos < fpsChoices.size() ? fpsChoices.get(pos) : null;
+    }
+
     private void runInBackground(String cameraId, List<Size> toTest) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -284,6 +333,7 @@ public class ResolutionTestActivity extends Activity {
         // 否则每一个尺寸都会以「相机被占用」失败，看起来像声明全是假的
         CameraManagerHolder.getInstance().release();
 
+        requestedRange = selectedRange();
         runningBatch = true;
         new Thread(() -> {
             for (Size size : toTest) {
@@ -326,14 +376,54 @@ public class ResolutionTestActivity extends Activity {
             return String.format(Locale.US, "%-12s 无画面  会话建起来了但一帧都没来（%d ms）",
                     size.getWidth() + "×" + size.getHeight(), elapsed);
         }
-        return String.format(Locale.US, "%-12s 正常  %.1f fps，%d 帧",
-                size.getWidth() + "×" + size.getHeight(), fps, frames);
+        return String.format(Locale.US, "%-12s 正常  %.1f fps，%d 帧   请求 %s",
+                size.getWidth() + "×" + size.getHeight(), fps, frames,
+                requestedRange == null ? "不请求" : requestedRange.toString());
     }
 
+    /**
+     * 开一次会话。
+     *
+     * <p><b>数帧用 ImageReader，不用 TextureView 的 SurfaceTexture。</b>
+     * 之前是给 TextureView 的 SurfaceTexture 装 {@code setOnFrameAvailableListener} ——
+     * 那会顶掉 TextureView 自己的那个回调，于是没有人再调 {@code updateTexImage()}；
+     * 缓冲区几帧就排满，生产者被卡住，回调随即停止。表现就是「连 1280×5140
+     * 这种一定出得来的流都数不到帧」。</p>
+     *
+     * <p>现在两个输出各司其职：ImageReader 负责计数（拿到就立刻关掉，不堆积），
+     * TextureView 负责显示，它自己的回调不被动。两个输出配不起来时退回只用
+     * ImageReader —— 能数到帧就说明这个尺寸是实的，只是这一轮看不到画面。</p>
+     */
     private void openAndPreview(String cameraId, Size size) throws Exception {
-        SurfaceTexture texture = waitForTexture();
-        texture.setDefaultBufferSize(size.getWidth(), size.getHeight());
-        Surface surface = new Surface(texture);
+        closeReader();
+        reader = android.media.ImageReader.newInstance(
+                size.getWidth(), size.getHeight(), android.graphics.ImageFormat.YUV_420_888, 2);
+        reader.setOnImageAvailableListener(r -> {
+            android.media.Image image = null;
+            try {
+                image = r.acquireLatestImage();
+            } catch (Exception ignored) {
+                // 取不到就算了，这一帧不计数
+            }
+            if (image != null) {
+                meter.onFrame(android.os.SystemClock.elapsedRealtime());
+                image.close();
+            }
+        }, cameraHandler);
+
+        java.util.List<Surface> targets = new java.util.ArrayList<>();
+        targets.add(reader.getSurface());
+
+        SurfaceTexture texture = preview.getSurfaceTexture();
+        if (texture != null) {
+            texture.setDefaultBufferSize(size.getWidth(), size.getHeight());
+            previewSurface = new Surface(texture);
+            targets.add(previewSurface);
+        }
+        openWith(cameraId, targets);
+    }
+
+    private void openWith(String cameraId, java.util.List<Surface> targets) throws Exception {
 
         final Object lock = new Object();
         final Exception[] failure = new Exception[1];
@@ -344,7 +434,7 @@ public class ResolutionTestActivity extends Activity {
             public void onOpened(CameraDevice camera) {
                 device = camera;
                 try {
-                    camera.createCaptureSession(Collections.singletonList(surface),
+                    camera.createCaptureSession(targets,
                             new CameraCaptureSession.StateCallback() {
                                 @Override
                                 public void onConfigured(CameraCaptureSession configured) {
@@ -352,7 +442,13 @@ public class ResolutionTestActivity extends Activity {
                                     try {
                                         CaptureRequest.Builder builder = camera.createCaptureRequest(
                                                 CameraDevice.TEMPLATE_PREVIEW);
-                                        builder.addTarget(surface);
+                                        for (Surface target : targets) {
+                                            builder.addTarget(target);
+                                        }
+                                        if (requestedRange != null) {
+                                            builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                                                    requestedRange);
+                                        }
                                         configured.setRepeatingRequest(
                                                 builder.build(), null, cameraHandler);
                                     } catch (Exception e) {
@@ -406,20 +502,6 @@ public class ResolutionTestActivity extends Activity {
         }
     }
 
-    /** TextureView 可能还没准备好；等它，等不到就没法测。 */
-    private SurfaceTexture waitForTexture() throws Exception {
-        for (int i = 0; i < 50; i++) {
-            SurfaceTexture texture = preview.getSurfaceTexture();
-            if (texture != null) {
-                texture.setOnFrameAvailableListener(t ->
-                        meter.onFrame(android.os.SystemClock.elapsedRealtime()), cameraHandler);
-                return texture;
-            }
-            sleep(100);
-        }
-        throw new IllegalStateException("预览视图没有就绪");
-    }
-
     private void closeCamera() {
         if (session != null) {
             try {
@@ -436,6 +518,22 @@ public class ResolutionTestActivity extends Activity {
                 // 同上
             }
             device = null;
+        }
+        closeReader();
+        if (previewSurface != null) {
+            previewSurface.release();
+            previewSurface = null;
+        }
+    }
+
+    private void closeReader() {
+        if (reader != null) {
+            try {
+                reader.close();
+            } catch (Exception ignored) {
+                // 关不掉也要继续
+            }
+            reader = null;
         }
     }
 

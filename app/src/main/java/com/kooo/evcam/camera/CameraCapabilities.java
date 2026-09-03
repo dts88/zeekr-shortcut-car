@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CameraCapabilities {
 
     private static final Map<String, Integer> MAX_FPS = new ConcurrentHashMap<>();
+    private static final Map<String, int[][]> FPS_RANGES = new ConcurrentHashMap<>();
 
     private CameraCapabilities() {
     }
@@ -45,6 +46,17 @@ public final class CameraCapabilities {
         if (highest > 0) {
             MAX_FPS.put(cameraId, highest);
         }
+        int[][] pairs = new int[ranges.length][2];
+        for (int i = 0; i < ranges.length; i++) {
+            pairs[i][0] = ranges[i] == null || ranges[i].getLower() == null ? 0 : ranges[i].getLower();
+            pairs[i][1] = ranges[i] == null || ranges[i].getUpper() == null ? 0 : ranges[i].getUpper();
+        }
+        FPS_RANGES.put(cameraId, pairs);
+    }
+
+    /** 某台相机声明的全部帧率区间；没记到时返回 null。 */
+    public static int[][] fpsRanges(String cameraId) {
+        return cameraId == null ? null : FPS_RANGES.get(cameraId);
     }
 
     /**
@@ -70,5 +82,6 @@ public final class CameraCapabilities {
 
     public static void reset() {
         MAX_FPS.clear();
+        FPS_RANGES.clear();
     }
 }
