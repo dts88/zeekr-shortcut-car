@@ -7,7 +7,7 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
-## [0.36.3-alpha] - 2026-09-03
+## [0.36.4-alpha] - 2026-09-03
 
 - A forced surround-view stream size is now split into the 2×2 grid like the native one.
   3840×2160 carries the same four lanes as 1280×5140, but 16:9 never passed the strip test.
