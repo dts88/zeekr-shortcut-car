@@ -239,18 +239,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         final Context context = getContext().getApplicationContext();
         new Thread(() -> {
-            final List<List<int[]>> perCamera = probeSupportedSizes(context);
-            final String hardware = describeHardware(perCamera);
+            final List<String> options = ResolutionOptions.common(probeSupportedSizes(context));
             if (!isAdded()) {
                 return;
             }
-            requireActivity().runOnUiThread(() -> {
-                populateResolution(pref, ResolutionOptions.common(perCamera));
-                Preference info = findPreference("pref_hardware_info");
-                if (info != null) {
-                    info.setSummary(hardware);
-                }
-            });
+            requireActivity().runOnUiThread(() -> populateResolution(pref, options));
         }, "resolution-probe").start();
     }
 
@@ -314,18 +307,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             AppLog.w(TAG, "探测相机分辨率失败: " + t);
         }
         return result;
-    }
-
-    private String describeHardware(List<List<int[]>> perCamera) {
-        if (perCamera.isEmpty()) {
-            return getString(R.string.info_no_camera);
-        }
-        List<String> common = ResolutionOptions.common(perCamera);
-        if (common.isEmpty()) {
-            return getString(R.string.info_streams, perCamera.size(), 0);
-        }
-        return getString(R.string.info_streams_with_max,
-                perCamera.size(), common.size(), common.get(0));
     }
 
     /**

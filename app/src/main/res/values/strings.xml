@@ -33,7 +33,6 @@
     <string name="set_cameras_dialog">选择参与录制的视频流（不影响拍照）</string>
     <string name="set_resolution_title">录制分辨率</string>
     <string name="set_bitrate_title">录制码率</string>
-    <string name="set_hardware_info_title">视频流探测结果</string>
     <string name="set_watermark_title">时间角标</string>
     <string name="set_watermark_on">在保存的视频与图片上添加时间水印</string>
     <string name="set_watermark_off">不添加水印。仅影响保存的文件，预览始终不显示</string>
@@ -122,9 +121,6 @@
     <string name="opt_resolution_default">默认（跟随探测结果）</string>
     <string name="opt_resolution_current">%1$s（当前）</string>
     <string name="msg_resolution_changed">分辨率已改为「%1$s」，重新开始录制后生效</string>
-    <string name="info_no_camera">未检测到摄像头</string>
-    <string name="info_streams">%1$d 路视频流，共同支持 %2$d 种分辨率</string>
-    <string name="info_streams_with_max">%1$d 路视频流，共同支持 %2$d 种分辨率，最高 %3$s</string>
     <string name="info_no_stream_detected">还没探测到视频流</string>
     <string name="msg_keep_one_camera">至少要保留一路；不想录的话请关掉录制</string>
     <string name="info_none_selected">未选择</string>

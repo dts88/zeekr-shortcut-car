@@ -228,6 +228,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 必须在任何一路取到画面之前：预览、录制、后视镜、照片拼合都按这条声明拆分
+        com.kooo.evcam.zeekr.CompositeDeclaration.applyFrom(this);
         instance = this;  // 设置静态实例引用
         AppLog.init(this);
 

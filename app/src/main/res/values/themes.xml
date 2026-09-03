@@ -4,6 +4,16 @@
         <!-- PreferenceFragmentCompat 必须能拿到 preferenceTheme，
              否则构造时直接抛「Must specify preferenceTheme in theme」 -->
         <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+        <!--
+          设置界面里的对话框（车牌号输入框、各种下拉框）是 androidx 自己弹的，
+          没法像代码里那样逐个传 R.style.AlertDialogTheme。不指定的话，深色底
+          配上默认的浅色文字，「确定 / 取消」两个按钮就是看不见的 ——
+          表现出来就是「这个输入框没有确认键」。三处都要写：AppCompat 读第一个，
+          框架读第二个，Material 组件读第三个。
+        -->
+        <item name="alertDialogTheme">@style/AlertDialogTheme</item>
+        <item name="android:alertDialogTheme">@style/AlertDialogTheme</item>
+        <item name="materialAlertDialogTheme">@style/Theme.Cam.MaterialAlertDialog</item>
         <!-- 深灰色配色方案 -->
         <item name="colorPrimary">#424242</item>
         <item name="colorPrimaryVariant">#2A2A2A</item>

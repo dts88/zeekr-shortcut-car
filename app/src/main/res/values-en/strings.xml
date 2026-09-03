@@ -20,7 +20,6 @@
     <string name="set_cameras_dialog">Choose which streams are recorded (photos are unaffected)</string>
     <string name="set_resolution_title">Resolution</string>
     <string name="set_bitrate_title">Bitrate</string>
-    <string name="set_hardware_info_title">Detected video streams</string>
     <string name="set_watermark_title">Timestamp overlay</string>
     <string name="set_watermark_on">Stamps the time onto saved videos and photos</string>
     <string name="set_watermark_off">No stamp. Only saved files are affected; the preview never shows it</string>
@@ -109,9 +108,6 @@
     <string name="opt_resolution_default">Default (follow detection)</string>
     <string name="opt_resolution_current">%1$s (current)</string>
     <string name="msg_resolution_changed">Resolution set to \"%1$s\". Takes effect on the next recording</string>
-    <string name="info_no_camera">No cameras detected</string>
-    <string name="info_streams">%1$d stream(s), %2$d resolutions in common</string>
-    <string name="info_streams_with_max">%1$d stream(s), %2$d resolutions in common, up to %3$s</string>
     <string name="info_no_stream_detected">No video stream detected yet</string>
     <string name="msg_keep_one_camera">Keep at least one stream. To stop recording entirely, turn recording off</string>
     <string name="info_none_selected">None selected</string>

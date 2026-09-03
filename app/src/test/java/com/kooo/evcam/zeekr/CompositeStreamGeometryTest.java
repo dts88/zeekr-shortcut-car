@@ -3,9 +3,11 @@ package com.kooo.evcam.zeekr;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.junit.After;
 import org.junit.Test;
 
 /**
@@ -109,6 +111,7 @@ public class CompositeStreamGeometryTest {
 
         assertFalse(CompositeStreamGeometry.looksLikeComposite(1920, 1080));
         assertFalse(CompositeStreamGeometry.looksLikeComposite(1280, 800));
+        // 3840x2160 是 16:9，光看比例判断不出来 —— 要靠声明，见下面那几条
         assertFalse(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
         assertFalse(CompositeStreamGeometry.looksLikeComposite(0, 0));
     }
@@ -235,4 +238,69 @@ public class CompositeStreamGeometryTest {
             }
         }
     }
+
+    /**
+     * 声明之后，16:9 也按四格竖排拆。
+     *
+     * <p>环视这一路除了 1280×5140 还声明支持 3840×2160，实测里面同样是四格竖排、
+     * 等分、顺序一致 —— 但比例判定永远过不了那道门槛，只能靠声明。</p>
+     */
+    @Test
+    public void aDeclaredSizeIsSplitRegardlessOfItsRatio() {
+        CompositeStreamGeometry.declareComposite(3840, 2160,
+                CompositeStreamGeometry.Stacking.VERTICAL);
+
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(3840, 2160);
+        assertTrue(plan.isComposite());
+        assertEquals(CompositeStreamGeometry.LANE_COUNT, plan.lanes.length);
+        // 等分：2160 / 4 = 540，每一格占满整个宽度
+        assertEquals(540, plan.lanes[0].height);
+        assertEquals(3840, plan.lanes[0].width);
+        assertEquals(0, plan.lanes[0].y);
+        assertEquals(540, plan.lanes[1].y);
+        assertEquals(1620, plan.lanes[3].y);
+    }
+
+    /**
+     * 声明只对声明的那一个尺寸生效。
+     *
+     * <p>全局打开的话，三路配置里 1920×1080 的座舱相机也会被切成四格。</p>
+     */
+    @Test
+    public void aDeclarationDoesNotLeakToOtherSizes() {
+        CompositeStreamGeometry.declareComposite(3840, 2160,
+                CompositeStreamGeometry.Stacking.VERTICAL);
+
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(1920, 1080));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(1280, 800));
+        // 原来就认得的那个尺寸不受影响
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(1280, 5140));
+    }
+
+    /** 撤销声明之后回到纯比例判断。 */
+    @Test
+    public void clearingTheDeclarationRestoresRatioOnlyBehaviour() {
+        CompositeStreamGeometry.declareComposite(3840, 2160,
+                CompositeStreamGeometry.Stacking.VERTICAL);
+        CompositeStreamGeometry.clearDeclaration();
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
+    }
+
+    /** 声明一个不合法的尺寸等于没声明，不能把状态搞坏。 */
+    @Test
+    public void anInvalidDeclarationIsIgnored() {
+        CompositeStreamGeometry.declareComposite(0, 0,
+                CompositeStreamGeometry.Stacking.VERTICAL);
+        assertNull(CompositeStreamGeometry.declaredSize());
+        CompositeStreamGeometry.declareComposite(3840, 2160, null);
+        assertNull(CompositeStreamGeometry.declaredSize());
+    }
+
+    /** 声明是进程内全局的，每条测试跑完都要还原，否则会互相影响。 */
+    @After
+    public void clearDeclaration() {
+        CompositeStreamGeometry.clearDeclaration();
+    }
+
 }

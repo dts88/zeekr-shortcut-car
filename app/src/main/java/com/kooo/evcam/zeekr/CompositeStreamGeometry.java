@@ -148,9 +148,56 @@ public final class CompositeStreamGeometry {
         return detectStacking(frameWidth, frameHeight) != Stacking.NOT_COMPOSITE;
     }
 
+    /**
+     * 被明确声明为合成流的那一个尺寸；null 表示全部按长宽比判断。
+     *
+     * <h3>为什么需要这个</h3>
+     *
+     * <p>长宽比判定是在<b>不知道这一路装的是什么</b>时的猜法。而环视这一路除了
+     * 1280×5140，还声明支持 3840×2160 —— 实测下来里面同样是四格竖排、等分、
+     * 顺序一致，但 16:9 的比例永远过不了那道门槛。</p>
+     *
+     * <p>所以这里留一个口子：开发者选项强制指定尺寸时，等于用户声明「这一路就是
+     * 合成流」，那就按声明来。<b>只对声明的那一个尺寸生效</b> ——
+     * 全局打开的话，三路配置里 1920×1080 的座舱相机也会被切成四格。</p>
+     */
+    private static volatile int[] declaredSize;
+    private static volatile Stacking declaredStacking;
+
+    /**
+     * 声明某个尺寸就是合成流，以及它的排布。
+     *
+     * <p>进程内全局，由启动时读一次设置来设定 —— 预览、录制、后视镜、照片拼合
+     * 必须<b>用同一套拆分</b>，任何一处不一致都会表现为「预览和录出来的不一样」。</p>
+     */
+    public static void declareComposite(int width, int height, Stacking stacking) {
+        if (width <= 0 || height <= 0 || stacking == null || stacking == Stacking.NOT_COMPOSITE) {
+            clearDeclaration();
+            return;
+        }
+        declaredSize = new int[]{width, height};
+        declaredStacking = stacking;
+    }
+
+    /** 回到「一切按长宽比判断」。 */
+    public static void clearDeclaration() {
+        declaredSize = null;
+        declaredStacking = null;
+    }
+
+    /** 当前声明，形如 {@code {宽, 高}}；没有声明时返回 null。 */
+    public static int[] declaredSize() {
+        int[] size = declaredSize;
+        return size == null ? null : new int[]{size[0], size[1]};
+    }
+
     static Stacking detectStacking(int frameWidth, int frameHeight) {
         if (frameWidth <= 0 || frameHeight <= 0) {
             return Stacking.NOT_COMPOSITE;
+        }
+        int[] declared = declaredSize;
+        if (declared != null && declared[0] == frameWidth && declared[1] == frameHeight) {
+            return declaredStacking;
         }
         if ((float) frameWidth / frameHeight >= STRIP_RATIO_THRESHOLD) {
             return Stacking.HORIZONTAL;
