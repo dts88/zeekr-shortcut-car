@@ -1,138 +1,92 @@
-# 极氪即刻（车机版）
+# Zeekr Shortcut (Car Version)
 
-*Zeekr Shortcut (Car Version)* — 面向极氪 7X 车机的环视记录仪。
+A surround-view dash cam for the ZEEKR 7X head unit.
 
-[English](README.en.md) · [来源与致谢](NOTICE.md) · [平台笔记](docs/zeekr-platform-notes.md) · [更新日志](CHANGELOG.md)
+[中文说明](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Credits](NOTICE.md) · [Platform notes](docs/zeekr-platform-notes.md)
 
 > [!WARNING]
-> 实验性非官方软件，与极氪（ZEEKR）没有任何关联，未经其批准或认可，也未经过任何车辆功能安全认证。
-> **不能替代**原厂行车记录仪、倒车影像、盲区监测或任何法定安全设备。请勿在行驶中操作。
-> 使用风险由使用者自行承担，详见文末「安全须知」。
+> Experimental, unofficial software. Not affiliated with, approved by, or endorsed by ZEEKR,
+> and not certified for any vehicle safety function. It does **not** replace the factory dash cam,
+> reversing camera, or blind-spot monitor. Do not operate it while driving.
+> Full safety notice: [安全须知](README.zh-CN.md#安全须知).
 
 ---
 
-## 这是什么
+## What it does
 
-极氪 App Lab 只向第三方应用开放**一路已经拼接好的合成流**——四个 1280×1280 的方形画面挤在同一帧里，
-直接预览是一根比例失真的竖条。
+ZEEKR's App Lab exposes the four surround-view cameras as **one pre-stitched stream** — four
+1280×1280 squares packed into a single frame, which previews as a distorted vertical strip.
+This app splits that stream back into a proper 2×2 grid, and builds three things on top of it.
 
-本应用把这一路正确拆成四宫格，并在此之上接了一套完整的记录仪功能。两部分都不是从零写的，
-分别建立在两个已有项目之上，见「来源与致谢」。
+### 1. Surround-view dash cam
 
----
+Records all four views at once. H.264 / H.265, 1–10 minute segments with the oldest files cleaned
+up automatically when the disk fills, adjustable frame rate, bitrate and layout (2×2 grid or the
+raw strip). Starts on boot, keeps recording with the screen off and after the car is locked.
 
-## 功能
+Recording goes to a **USB drive only**. Writing to the head unit's built-in flash sits behind
+developer options, because continuous writes wear out storage that cannot be replaced.
 
-**画面** — 合成流按真实几何拆成 2×2，方形比例不失真。点击画面在四宫格 / 单画面间切换，
-单画面下再点一次换到下一路。
+### 2. Electronic rear-view mirror
 
-**录制** — H.264 / H.265；落盘排列可选四宫格或原始长条；帧率（原始 25 fps，可降至 10 fps）、
-分辨率、码率（低 / 中 / 高，三档均实际生效）可调；1 / 3 / 5 / 10 分钟自动分段，
-超出容量上限自动清理最旧的文件。角标可开时间戳与录制规格，左上角固定标注应用名与版本号。
+A floating, dockable window showing any one camera enlarged. Pinch to zoom; swipe left or right to
+rotate through the cameras; swipe up or down in the middle third to raise or lower the framing.
+Fisheye correction and field of view are adjustable, and the window resizes to any shape without
+distorting the picture. Push it half off-screen and it hides at the edge — one tap brings it back.
+The rear view is mirrored horizontally, like a real mirror.
 
-**存储** — 默认且仅录到外置 U 盘；写内置存储需先解锁开发者选项，
-避免车机闪存被持续写入拖坏寿命。存储位置按实际探测到的卷逐个列出（卷名 + 剩余容量）。
+### 3. Send to your phone
 
-**超级后视镜** — 可停靠的悬浮窗，把任意一路单独放大：捏合缩放，左右划按顺 / 逆时针换一路，
-中间三分之一上下滑调取景高低；鱼眼校正与视野角度可调；窗口可拉成任意宽高而**画面比例不变**；
-推出屏幕一半或朝边上一甩即贴边隐藏，点一下或往回拉一下就滑回来。
-后视那一路做左右镜像，与真实后视镜一致——预览、录制、回放都不受影响。
+While viewing a photo or a video segment, tap **send to phone**: the app shows a QR code, your
+phone's browser opens that file, and you save it. Nothing to install on the phone.
 
-**回放** — 按时间轴连续播放，跨分段自动接续，0.5× / 1× / 1.5× / 2× 倍速，
-点任一格放大成单路；图片按日期分组回看。
-
-**悬浮窗** — 画面预览悬浮窗与悬浮录制按钮，大小、透明度可调。
-
-**保活** — 开机自启、前台服务、息屏录制，锁车后可继续录制。
-
-**设置** — 两栏式界面（左侧分区、右侧内容），分为 录制 / 存储 / 超级后视镜 / 悬浮窗 /
-系统 / 高级 / 关于。
+The file is served over your local network only while the dialog is open, from a random one-off
+address, and only that one file. Both devices need to be on the same network — the easiest way is
+to turn on the phone's hotspot and connect the car to it.
 
 ---
 
-## 合成流是怎么拆的
+## Install
 
-```
-Camera2（车机唯一的一路合成流，如 1280×5140）
-        │  一个普通的 TextureView 作为唯一相机消费者，完全不被改造
-        ▼
-父容器把同一个子视图重复画 4 次，每次裁剪到一格并映射对应源矩形
-        ▼
-2×2 四宫格
-```
+Download `ZeekrShortcut-*.apk` from [Releases](../../releases) and sideload it through App Lab.
 
-- **相机链路一点都不动**。用 OpenGL 顶替相机的生产者这个看似更优雅的方案在真车上会崩溃，
-  本项目为此整体推翻重写过一次。
-- **几何按合成流真实尺寸算，不按缓冲区尺寸算**：HAL 有时只声明一个压扁的提示尺寸，
-  内容仍是整幅合成流。
-- **绝不臆造分辨率**：只从 HAL 实际声明的尺寸中挑选，一个都没有就明确提示不支持。
-- **未知排布安全回退**：分隔带对不上时退回四等分。
+Then open **Settings → Recording → Stream configuration**, pick *ZEEKR 7X (surround-view
+composite)*, and restart the app when prompted. If it reports that no composite stream was found,
+this head unit or firmware version does not declare one and the app will not work on it.
 
-详见 [`docs/zeekr-platform-notes.md`](docs/zeekr-platform-notes.md)。
-
----
-
-## 安装
-
-从 [Releases](../../releases) 下载 `ZeekrShortcut-*.apk`，通过 App Lab 侧载安装。
-
-自行构建（需 JDK 17+ 与 Android SDK，compileSdk 36）：
+Building it yourself needs JDK 17+ and the Android SDK (compileSdk 36):
 
 ```bash
 git clone https://github.com/dts88/zeekr-shortcut-car.git
 cd zeekr-shortcut-car && ./gradlew assembleRelease
 ```
 
-产物位于 `app/build/outputs/apk/release/`。仓库内含一个公开的 AOSP 测试签名密钥（口令 `android`），
-正式发布请用自己的密钥覆盖：`ZEEKR_KEYSTORE`、`ZEEKR_KEYSTORE_PASSWORD`、`ZEEKR_KEY_ALIAS`、`ZEEKR_KEY_PASSWORD`。
-
-装好后进入 **设置 → 录制 → 视频流配置**，选择「极氪7X（环视合成流）」并按提示重启应用。
-若提示未检测到合成流，说明该车机 / 固件版本的 Camera2 没有声明合成流尺寸，可能不适用。
+The repo ships a public AOSP test signing key (password `android`). Override it with your own
+through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEKR_KEY_PASSWORD`.
 
 ---
 
-## 已知限制
+## Limitations
 
-- **只针对极氪 7X 的合成流格式设计**。其他车型或固件版本若排布不同，会走等分回退，画面可能偏移。
-- **原厂功能优先**：原厂 360° 环视、倒车影像、泊车相机可能随时收回相机资源，本应用应让路。
-- **落盘量大**：约 200 MB/min 持续写入，因此默认录到 U 盘，既减少车机闪存损耗也便于取出查看。
-- **实车验证仍在进行**：自动化测试只覆盖纯逻辑部分（几何拆分、相机选择、手势模型），
-  取流与录制链路需要实车验证，首次使用请在静止车辆上测试。
-
----
-
-## 来源与致谢
-
-本应用的能力来自两个项目，完整来源、许可证与边界说明见 [NOTICE.md](NOTICE.md)。
-
-- **[EVCam](https://github.com/suyunkai/EVCam)**（作者 suyunkai，GPL-3.0）——**代码基座**。
-  本仓库第一个 commit 就是 EVCam 的完整工作树，此后所有改动均以 diff 可见；
-  相机、编码、存储、回放、保活等能力均来自 EVCam，著作权归其作者所有。
-  按 GPL-3.0 要求，本应用同样以 GPL-3.0 发布并公开全部源代码。
-- **[openavm-recorder](https://github.com/Dantenothing/openavm-recorder)**（作者 Dantenothing，
-  保留所有权利，非开源许可）——**极氪合成流的公开技术资料来源**。
-  「极氪 App Lab 只给一路合成流」这一关键事实及其尺寸、排布，由该项目率先公开记录。
-  **本项目没有复制其任何源代码**，只使用了其公开记录的接口事实；四宫格拆分与容器渲染均为独立实现。
-  与该项目及其作者没有隶属或合作关系，也未获其背书。
+- Built for the ZEEKR 7X composite stream. Other models or firmware with a different layout fall
+  back to an even four-way split, and the picture may be offset.
+- Factory features come first: the built-in 360° view, reversing camera and parking cameras can
+  reclaim the camera at any time, and this app gets out of the way.
+- Roughly 200 MB per minute of continuous writing — which is why it records to USB.
+- On-vehicle validation is ongoing. Automated tests cover the pure logic only (geometry, camera
+  selection, gesture model); test in a stationary vehicle first.
 
 ---
 
-## 安全须知
+## Credits and license
 
-- 本应用为实验性非官方软件，未经任何车辆功能安全认证；
-- 不可替代原厂行车记录仪、倒车影像、盲区监测或任何法定安全设备；
-- **请勿在行驶中操作本应用**，请勿依据其画面判断车距、障碍物或进行变道 / 倒车；
-- 画面存在延迟，可能卡顿、撕裂、失真或中断；与车机系统争夺资源可能影响原厂功能，
-  一旦出现异常请立即停止使用并卸载；
-- 录制内容可能包含人脸、车牌、住址、行程等个人信息，请遵守所在地相关法律，
-  未经同意不要公开可识别的影像；
-- 本软件以「现状」（AS IS）提供，不提供任何形式的明示或默示担保，因使用或安装本软件
-  导致的任何人身伤害、财产损失或交通事故，开发者不承担法律责任。
+**GPL-3.0**, inherited from [EVCam](https://github.com/suyunkai/EVCam) by suyunkai — the code base
+this app is forked from. The first commit in this repository is EVCam's complete working tree, so
+every change since then is visible as a diff.
 
----
+That App Lab exposes only one composite stream, along with its dimensions and layout, was first
+documented publicly by [openavm-recorder](https://github.com/Dantenothing/openavm-recorder).
+**No code from that project was copied** — only its published interface facts were used; the grid
+splitting and rendering here are an independent implementation.
 
-## 许可证
-
-**GNU General Public License v3.0**——继承自 EVCam。你可以自由使用、修改和分发本项目，
-但对外分发时必须同样以 GPL-3.0 发布并提供对应源代码，保留版权与许可声明，且不得添加额外限制。
-完整条款见 [LICENSE](LICENSE)，第三方组件许可情况见 [NOTICE.md](NOTICE.md)。
+Full attribution, third-party licenses and boundaries: [NOTICE.md](NOTICE.md).
