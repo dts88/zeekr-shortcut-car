@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.36.5-alpha] - 2026-09-03
+
+- Unlocking developer options now asks for the password on the first tap instead of
+  after twenty.
+- Every remaining dialog passes an explicit theme, so none of them can end up with
+  invisible buttons — the settings dialogs were fixed in 0.36.4, this covers the rest.
+
 ## [0.36.4-alpha] - 2026-09-03
 
 - A forced surround-view stream size is now split into the 2×2 grid like the native one.

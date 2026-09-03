@@ -451,7 +451,9 @@ public class CustomLayoutManager {
         if (containerCameras == null) return;
 
         // 创建弹窗
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(context);
+  // 显式传主题：这个对话框可能拿的是服务/应用 Context，拿不到 Activity 主题里的 alertDialogTheme
+        android.app.AlertDialog.Builder builder =
+                new android.app.AlertDialog.Builder(context, R.style.AlertDialogTheme);
         View dialogView = android.view.LayoutInflater.from(context).inflate(R.layout.dialog_wheel_settings, null);
         builder.setView(dialogView);
 

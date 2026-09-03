@@ -46,9 +46,4 @@ public class DeveloperModeTest {
         DeveloperMode.lock();
         assertFalse(DeveloperMode.isUnlocked());
     }
-
-    @Test
-    public void twentyTapsAreRequired() {
-        assertTrue(DeveloperMode.TAPS_REQUIRED == 20);
-    }
 }

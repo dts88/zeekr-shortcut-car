@@ -16,9 +16,6 @@ package com.kooo.evcam.settings;
  */
 public final class DeveloperMode {
 
-    /** 解锁需要在「安全须知」上点这么多下。 */
-    public static final int TAPS_REQUIRED = 20;
-
     private static final String PASSWORD = "6651";
 
     /** 不做持久化，见类注释。 */

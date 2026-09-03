@@ -89,8 +89,6 @@ public class AboutActivity extends Activity {
 
     // ------------------------------------------------------------------ 开发者选项
 
-    private int safetyTaps;
-    private long lastTapAtMs;
 
     /**
      * 在「安全须知」上连点若干次，再输密码，打开开发者选项。
@@ -98,7 +96,9 @@ public class AboutActivity extends Activity {
      * <p>藏在这里而不是给个显眼的入口：后面那些要么没做完、要么是排查用的，
      * 平时不该出现在设置里让人以为是正常功能。</p>
      *
-     * <p>连点要够快 —— 隔太久就重新计数，免得平时零星点到几下慢慢攒够。</p>
+     * <p>点一下就弹密码框。连点二十次那套是从安卓「关于本机」抄来的，
+     * 但那是<b>没有密码</b>的场景才需要的门槛 —— 这里既然要输密码，
+     * 密码本身就是门槛，再让人数二十下只是折磨自己。</p>
      */
     private void setUpDeveloperUnlock() {
         View heading = findViewById(R.id.about_safety_heading);
@@ -106,23 +106,10 @@ public class AboutActivity extends Activity {
             return;
         }
         heading.setOnClickListener(v -> {
-            long now = android.os.SystemClock.elapsedRealtime();
-            if (now - lastTapAtMs > TAP_RESET_MS) {
-                safetyTaps = 0;
-            }
-            lastTapAtMs = now;
-            safetyTaps++;
-
             if (com.kooo.evcam.settings.DeveloperMode.isUnlocked()) {
                 return;
             }
-            int remaining = com.kooo.evcam.settings.DeveloperMode.TAPS_REQUIRED - safetyTaps;
-            if (remaining <= 0) {
-                safetyTaps = 0;
-                promptForDeveloperPassword();
-            } else if (remaining <= 5) {
-                Toast.makeText(this, "还差 " + remaining + " 次", Toast.LENGTH_SHORT).show();
-            }
+            promptForDeveloperPassword();
         });
     }
 
@@ -149,5 +136,4 @@ public class AboutActivity extends Activity {
     }
 
     /** 连点的间隔上限，超过就重新数。 */
-    private static final long TAP_RESET_MS = 1500L;
 }

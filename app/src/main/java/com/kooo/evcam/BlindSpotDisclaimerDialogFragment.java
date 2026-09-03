@@ -60,7 +60,8 @@ public class BlindSpotDisclaimerDialogFragment extends DialogFragment {
             dismissAllowingStateLoss();
         });
 
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+        AlertDialog dialog = new AlertDialog.Builder(
+                requireContext(), R.style.AlertDialogTheme)
                 .setView(view)
                 .create();
         dialog.setCanceledOnTouchOutside(false);

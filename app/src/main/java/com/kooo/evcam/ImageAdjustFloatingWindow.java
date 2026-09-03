@@ -608,7 +608,8 @@ public class ImageAdjustFloatingWindow {
             }
         }
         
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+  // 显式传主题：这个对话框可能拿的是服务/应用 Context，拿不到 Activity 主题里的 alertDialogTheme
+        AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.AlertDialogTheme);
         builder.setTitle(title);
         builder.setSingleChoiceItems(options.toArray(new String[0]), checkedItem, (dialog, which) -> {
             if (which < values.size()) {
