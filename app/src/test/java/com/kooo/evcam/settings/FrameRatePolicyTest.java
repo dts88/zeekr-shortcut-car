@@ -13,19 +13,19 @@ import org.junit.Test;
  */
 public class FrameRatePolicyTest {
 
-    /** 标签里的数字必须就是实际会用的帧率。 */
+    /**
+     * 「原始帧率」这一档不许印任何数字。
+     *
+     * <p>它的含义是「不限制」，视频流给多少录多少。印一个具体的数会让人
+     * 以为那是承诺 —— 而这一档恰恰不承诺任何数值。</p>
+     */
     @Test
-    public void theLabelStatesTheRateThatWillActuallyBeUsed() {
-        int actual = FrameRatePolicy.standardFrameRate(FrameRatePolicy.RECORDER_MAX_FPS);
-        assertTrue("标签里应当出现实际帧率 " + actual + "，实际标签: " + FrameRatePolicy.autoLabel(),
-                FrameRatePolicy.autoLabel().contains(String.valueOf(actual)));
-    }
-
-    /** 「原始帧率」在这台车机上就是 25 —— 因为录制链路把 25 当作硬件上限传进去。 */
-    @Test
-    public void autoResolvesTo25OnThisRecorder() {
-        assertEquals(25, FrameRatePolicy.RECORDER_MAX_FPS);
-        assertEquals(25, FrameRatePolicy.standardFrameRate(FrameRatePolicy.RECORDER_MAX_FPS));
+    public void autoLabelCarriesNoNumber() {
+        String label = FrameRatePolicy.autoLabel();
+        for (char c = '0'; c <= '9'; c++) {
+            assertTrue("「原始帧率」的标签里不该出现数字，实际: " + label,
+                    label.indexOf(c) < 0);
+        }
     }
 
     @Test

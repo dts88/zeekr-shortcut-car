@@ -33,9 +33,9 @@ android {
         targetSdk = 36
         // 每次发布 tag 前同步更新这两个值：versionCode 决定能否覆盖安装，
         // versionName 会成为 Release 名称与 APK 文件名
-        versionCode = 80
+        versionCode = 81
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "0.36.0-beta"
+        versionName = "0.36.1-beta"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

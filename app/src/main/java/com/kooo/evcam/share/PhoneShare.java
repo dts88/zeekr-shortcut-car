@@ -82,7 +82,8 @@ public final class PhoneShare {
             toast(activity, activity.getString(R.string.share_phone_failed, e.getMessage()));
             return;
         }
-        AppLog.i(TAG, "分享 " + file.getName() + "，端口 " + server.getListeningPort());
+        AppLog.i(TAG, "分享 " + file.getName() + "，端口 " + server.getListeningPort()
+                + "，可用地址 " + endpoints.size() + " 个：" + endpoints);
         new Presenter(activity, server, endpoints, file, extraNote).show();
     }
 
@@ -101,6 +102,7 @@ public final class PhoneShare {
         private int index;
         private ImageView qrImage;
         private TextView addressText;
+        private TextView qrFailed;
 
         Presenter(Activity activity, FileShareServer server,
                   List<LocalNetwork.Endpoint> endpoints, File file, String extraNote) {
@@ -124,6 +126,10 @@ public final class PhoneShare {
             qrParams.gravity = Gravity.CENTER_HORIZONTAL;
             qrImage.setLayoutParams(qrParams);
             root.addView(qrImage);
+
+            qrFailed = text(activity.getString(R.string.share_phone_qr_failed), 14, false);
+            qrFailed.setVisibility(android.view.View.GONE);
+            root.addView(qrFailed);
 
             root.addView(text(activity.getString(R.string.share_phone_steps), 15, false));
             if (extraNote != null && !extraNote.isEmpty()) {
@@ -168,10 +174,14 @@ public final class PhoneShare {
             String url = server.urlFor(endpoint.address);
             Bitmap qr = QrCode.encode(url, QR_SIZE_PX);
             qrImage.setImageBitmap(qr);
+            // 画不出来时那一格是白的，看上去和「界面坏了」没区别 —— 说出来
+            qrFailed.setVisibility(qr == null ? android.view.View.VISIBLE
+                    : android.view.View.GONE);
             addressText.setText(activity.getString(R.string.share_phone_address,
                     url == null ? "" : url, file.getName(),
                     FileShareServer.readableSize(file.length())));
-            AppLog.d(TAG, "二维码地址: " + url + "（网卡 " + endpoint.interfaceName + "）");
+            AppLog.i(TAG, "二维码地址: " + url + "（网卡 " + endpoint.interfaceName + "）"
+                    + (qr == null ? "  << 二维码没画出来" : ""));
         }
 
         private void stop() {

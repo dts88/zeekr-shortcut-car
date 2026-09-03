@@ -13,12 +13,8 @@ package com.kooo.evcam.settings;
  *
  * <h3>「原始帧率」到底是多少</h3>
  *
- * <p>是 {@link #RECORDER_MAX_FPS}，一个<b>写死的数</b>，不是从相机读出来的。
- * 当初定 25 是为了压低 CPU 占用。所以「原始」这个名字有点误导 ——
- * 它跟随的是录制链路的默认值，不是相机的原生帧率。</p>
- *
- * <p>界面上标的数由 {@link #autoLabel()} 算出来，和录制用的是同一段代码，
- * 不会出现界面写一个数、实际录另一个数。</p>
+ * <p>不是一个数——它表示<b>不限制</b>，视频流给多少录多少。
+ * {@link #RECORDER_MAX_FPS} 只在读不到相机声明时当作兜底上限用。</p>
  */
 public final class FrameRatePolicy {
 
@@ -55,8 +51,13 @@ public final class FrameRatePolicy {
         return hardwareMaxFps;
     }
 
-    /** 「原始帧率」这一项显示的文字，带上它实际会用的数值。 */
+    /**
+     * 「原始帧率」这一项显示的文字。
+     *
+     * <p>不带数字：这一档的含义是「不限制」，视频流给多少录多少。
+     * 印一个具体的数会让人以为那是承诺，而它并不是。</p>
+     */
     public static String autoLabel() {
-        return "原始帧率（" + standardFrameRate(RECORDER_MAX_FPS) + " fps）";
+        return "原始帧率";
     }
 }

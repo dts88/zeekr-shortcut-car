@@ -24,6 +24,7 @@ import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.camera.TargetBitrate;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CustomCameraConfigFragment;
@@ -128,10 +129,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindEnum("pref_record_fps", SettingsRegistry.RECORD_FPS,
                 appConfig.getRecordFps(), value -> appConfig.setRecordFps(value));
-        Preference fpsNote = findPreference("pref_record_fps_note");
-        if (fpsNote != null) {
-            fpsNote.setSummary(R.string.set_record_fps_summary_note);
-        }
 
         bindSegmentDuration();
 
@@ -140,7 +137,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindResolution();
 
         bindEnum("pref_bitrate", SettingsRegistry.BITRATE_LEVEL,
-                appConfig.getBitrateLevel(), value -> appConfig.setBitrateLevel(value));
+                appConfig.getBitrateLevel(), value -> {
+                    appConfig.setBitrateLevel(value);
+                    showTargetBitrate();
+                });
+        showTargetBitrate();
 
         // 应用名与版本是无条件盖上去的（见 MultiCameraManager.buildBrandLine），
         // 这里只是把这件事摆在界面上：开着、灰着、点不动。
@@ -1023,12 +1024,56 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 探测相机要读 characteristics，放后台 —— 和「录制分辨率」那一项一样的做法
         final Context context = getContext().getApplicationContext();
         new Thread(() -> {
-            final List<String> options = ResolutionOptions.common(probeSupportedSizes(context));
+            // 这里要的是环视那一路<b>自己</b>声明的尺寸，不是三路的交集：
+            // 交集会把 1280×5140 这种只有它有的条带尺寸筛掉，而那正是默认值。
+            final List<String> options = compositeCameraSizes(context);
             if (!isAdded()) {
                 return;
             }
             requireActivity().runOnUiThread(() -> populateCompositeSize(pref, options));
         }, "composite-size-probe").start();
+    }
+
+    /** 环视那一路声明的全部尺寸，从大到小。找不到那一路时返回空列表。 */
+    private List<String> compositeCameraSizes(Context context) {
+        List<String> out = new ArrayList<>();
+        try {
+            CameraManager manager =
+                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            if (manager == null) {
+                return out;
+            }
+            for (String id : manager.getCameraIdList()) {
+                CameraCharacteristics chars = manager.getCameraCharacteristics(id);
+                Integer facing = chars.get(CameraCharacteristics.LENS_FACING);
+                if (facing == null || facing != CameraCharacteristics.LENS_FACING_EXTERNAL) {
+                    continue;
+                }
+                StreamConfigurationMap map =
+                        chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                if (map == null) {
+                    continue;
+                }
+                List<Size> sizes = new ArrayList<>();
+                Size[] declared = map.getOutputSizes(android.graphics.SurfaceTexture.class);
+                if (declared != null) {
+                    java.util.Collections.addAll(sizes, declared);
+                }
+                java.util.Collections.sort(sizes, (x, y) -> Long.compare(
+                        (long) y.getWidth() * y.getHeight(),
+                        (long) x.getWidth() * x.getHeight()));
+                for (Size size : sizes) {
+                    String text = size.getWidth() + "x" + size.getHeight();
+                    if (!out.contains(text)) {
+                        out.add(text);
+                    }
+                }
+                break;
+            }
+        } catch (Exception e) {
+            AppLog.w("Settings", "读不到环视相机的尺寸列表: " + e);
+        }
+        return out;
     }
 
     private void populateCompositeSize(ListPreference pref, List<String> options) {
@@ -1079,6 +1124,42 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             note = "\n" + getString(R.string.msg_composite_size_single);
         }
         pref.setSummary(entry + note);
+    }
+
+    /**
+     * 在「码率」那一项下面写出目标码率。
+     *
+     * <p>这个数不是一个固定值，它跟着分辨率和帧率一起变，所以只写等级名没有用。
+     * 算它的是 {@link TargetBitrate}，和编码器用的是同一个函数 ——
+     * 界面上写的就是实际配给编码器的那个数。</p>
+     *
+     * <p>录出来的实际码率会低于它：目标码率是上限，画面静止时编码器用不满。
+     * 实际值印在录像角标上。</p>
+     */
+    private void showTargetBitrate() {
+        ListPreference pref = findPreference("pref_bitrate");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        int[] size = AppConfig.parseResolution(appConfig.getTargetResolution());
+        int fps = appConfig.getNominalFrameRate(hardwareMaxFps());
+        CharSequence level = pref.getEntry();
+        if (size == null) {
+            pref.setSummary(level);
+            return;
+        }
+        // 编码器优先走 H.265，只有「强制 H.264」开着时才是 H.264
+        boolean hevc = !appConfig.isForceH264Encoding();
+        int bitrate = TargetBitrate.compute(appConfig.getEncoderQualityLevel(),
+                size[0], size[1], fps, hevc);
+        pref.setSummary(getString(R.string.set_bitrate_summary_target,
+                level, TargetBitrate.format(bitrate),
+                size[0] + "x" + size[1], fps, hevc ? "H.265" : "H.264"));
+    }
+
+    private static int hardwareMaxFps() {
+        int declared = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
+        return declared > 0 ? declared : AppConfig.RECORDER_MAX_FPS;
     }
 
     // ------------------------------------------------------------------ 关于
@@ -1225,18 +1306,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (spec == SettingsRegistry.RECORD_FPS) {
             int auto = spec.indexOf("auto");
             if (auto >= 0) {
-                // 「原始帧率」不再显示任何数字：它现在的含义就是「不限制」，
-                // 印一个具体的数只会让人以为那是承诺。
                 names[auto] = getString(R.string.opt_fps_auto);
             }
             // 其余各档是上限而不是强制值 —— 标题里就该这么写，
             // 免得看到「30 fps」以为选了它就一定录得到 30
-            String[] values = spec.values();
-            for (int i = 0; i < names.length; i++) {
-                if (!"auto".equals(values[i])) {
-                    names[i] = getString(R.string.opt_fps_cap, values[i]);
-                }
-            }
         }
         return names;
     }

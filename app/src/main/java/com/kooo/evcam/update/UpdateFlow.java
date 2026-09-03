@@ -118,38 +118,55 @@ public final class UpdateFlow {
         box.addView(bar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        // 「连接中」和「已经在下但没进度」是两回事，界面上要能分清 ——
+        // 否则卡在哪一步都只能看到同一句「正在下载…」
+        label.setText(R.string.upd_connecting);
+        bar.setIndeterminate(true);
+
         AlertDialog dialog = new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                 .setTitle(activity.getString(R.string.upd_download_title, release.tagName))
                 .setView(box)
                 .setCancelable(false)
                 .create();
         dialog.show();
+        AppLog.i(TAG, "开始下载 " + release.apkName + "：" + release.apkUrl
+                + "，存到 " + target);
 
         new Thread(() -> {
             String error = null;
             try {
-                GithubReleases.download(release, target, (done, total) -> {
-                    if (total <= 0) {
-                        return;
-                    }
-                    int percent = (int) (done * 100 / total);
-                    post(activity, () -> {
+                GithubReleases.download(release, target, (done, total) -> post(activity, () -> {
+                    if (total > 0) {
+                        int percent = (int) (done * 100 / total);
+                        bar.setIndeterminate(false);
                         bar.setProgress(percent);
                         label.setText(activity.getString(R.string.upd_downloading_pct,
                                 percent,
                                 String.format(Locale.US, "%.1f", done / 1024f / 1024f),
                                 String.format(Locale.US, "%.1f", total / 1024f / 1024f)));
-                    });
-                });
+                    } else {
+                        // 对面没给长度：算不出百分比，但至少让人看见字节在涨
+                        label.setText(activity.getString(R.string.upd_downloading_size,
+                                String.format(Locale.US, "%.1f", done / 1024f / 1024f)));
+                    }
+                }));
             } catch (Exception e) {
                 AppLog.e(TAG, "下载失败", e);
-                error = e.getMessage();
+                error = e.getClass().getSimpleName()
+                        + (e.getMessage() == null ? "" : "：" + e.getMessage());
             }
             final String failure = error;
             post(activity, () -> {
                 dismiss(dialog);
                 if (failure != null) {
-                    toast(activity, activity.getString(R.string.upd_download_failed, failure));
+                    // 用对话框而不是 toast：下载失败是需要看清原因的，
+                    // 一闪而过的提示等于「点了没反应」
+                    new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+                            .setTitle(R.string.upd_download_failed_title)
+                            .setMessage(activity.getString(
+                                    R.string.upd_download_failed, failure))
+                            .setPositiveButton(R.string.action_got_it, null)
+                            .show();
                 } else {
                     install(activity, target);
                 }
@@ -187,6 +204,7 @@ public final class UpdateFlow {
             return;
         }
 
+        AppLog.i(TAG, "下载完成，打开安装界面：" + apk + "（" + apk.length() + " 字节）");
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setDataAndType(uri, "application/vnd.android.package-archive");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);

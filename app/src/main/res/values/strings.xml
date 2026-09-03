@@ -18,7 +18,6 @@
     <!-- 设置界面 -->
     <string name="set_back_to_recording">← 返回录制界面</string>
     <string name="set_check_update_title">检查更新</string>
-    <string name="set_check_update_summary">从 GitHub Releases 查询新版本。这是本应用唯一一次主动联网</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>
     <string name="set_section_rearview">超级后视镜</string>
@@ -28,7 +27,7 @@
     <string name="set_section_about">关于</string>
     <string name="set_car_model_title">视频流配置</string>
     <string name="set_record_layout_title">录制画面排列</string>
-    <string name="set_record_fps_title">录制帧率上限</string>
+    <string name="set_record_fps_title">录制帧率</string>
     <string name="set_segment_title">分段时长</string>
     <string name="set_cameras_title">录制摄像头</string>
     <string name="set_cameras_dialog">选择参与录制的视频流（不影响拍照）</string>
@@ -109,7 +108,7 @@
     <!-- 设置里的枚举选项 -->
     <string name="opt_layout_grid">四宫格</string>
     <string name="opt_layout_raw">原始长条</string>
-    <string name="opt_fps_auto">原始帧率（不限制，视频流给多少录多少）</string>
+    <string name="opt_fps_auto">原始帧率</string>
     <string name="opt_mode_auto">自动（推荐）</string>
     <string name="opt_bitrate_low">低</string>
     <string name="opt_bitrate_medium">中</string>
@@ -342,13 +341,16 @@
     <string name="share_video_segment_note">录像按每 %1$s 存一段。连续回放是把多段接起来放的，而这里只发**当前这一段**。要发别的时间段，把进度拖到那一段再点一次。</string>
     <string name="share_minutes">%1$d 分钟</string>
     <string name="action_back">返回</string>
-    <string name="set_watermark_brand_title">应用名与版本角标</string>
-    <string name="set_watermark_brand_summary">录像左上角始终标注应用名与版本号，不可关闭 —— 录出来的文件常被拿去当凭据或发给别人，落上是哪个应用哪个版本录的，回头才对得上</string>
-    <string name="opt_fps_auto_unknown">原始帧率（不限制，视频流给多少录多少）</string>
-    <string name="set_record_fps_summary_note">「原始帧率」表示不做任何限制；其余各档是上限而不是强制值 —— 视频流本来就给不到那么多时，录出来只会更低。</string>
-    <string name="opt_fps_cap">最高 %1$s fps</string>
+    <string name="set_watermark_brand_title">应用角标</string>
+    <string name="set_watermark_brand_summary">显示本应用的名称和版本号</string>
+    <string name="opt_fps_auto_unknown">原始帧率</string>
     <string name="opt_composite_size_auto">跟随探测（1280×5140，已知可出四格）</string>
     <string name="msg_composite_size_changed">环视流尺寸已更改，重启应用后生效。若画面不对，改回「跟随探测」。</string>
     <string name="msg_composite_size_split">这个比例会被拆成四格显示。</string>
     <string name="msg_composite_size_single">这个比例不满足条带判定（长边需达短边 3.2 倍），会当成一整幅画面显示 —— 用来看这一路里到底装了什么。</string>
+    <string name="set_bitrate_summary_target">%1$s · 目标 %2$s（%3$s @ %4$d fps，%5$s）</string>
+    <string name="upd_connecting">正在连接…</string>
+    <string name="upd_downloading_size">正在下载… %1$s MB</string>
+    <string name="upd_download_failed_title">下载失败</string>
+    <string name="share_phone_qr_failed">二维码没能生成，请直接在手机浏览器里输入下面这个地址</string>
 </resources>

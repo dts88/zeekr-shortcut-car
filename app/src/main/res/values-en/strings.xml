@@ -5,7 +5,6 @@
     <!-- Settings screen -->
     <string name="set_back_to_recording">← Back to recording</string>
     <string name="set_check_update_title">Check for updates</string>
-    <string name="set_check_update_summary">Queries GitHub Releases for a newer version. This is the app\'s only outbound connection</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
     <string name="set_section_rearview">Super mirror</string>
@@ -15,7 +14,7 @@
     <string name="set_section_about">About</string>
     <string name="set_car_model_title">Video stream profile</string>
     <string name="set_record_layout_title">Recorded frame layout</string>
-    <string name="set_record_fps_title">Frame rate cap</string>
+    <string name="set_record_fps_title">Frame rate</string>
     <string name="set_segment_title">Segment length</string>
     <string name="set_cameras_title">Cameras to record</string>
     <string name="set_cameras_dialog">Choose which streams are recorded (photos are unaffected)</string>
@@ -96,7 +95,7 @@
     <!-- Enumerated setting options -->
     <string name="opt_layout_grid">2×2 grid</string>
     <string name="opt_layout_raw">Raw strip</string>
-    <string name="opt_fps_auto">Native (no limit — record every frame the stream delivers)</string>
+    <string name="opt_fps_auto">Native</string>
     <string name="opt_mode_auto">Automatic (recommended)</string>
     <string name="opt_bitrate_low">Low</string>
     <string name="opt_bitrate_medium">Medium</string>
@@ -341,13 +340,16 @@
     <string name="share_video_segment_note">Recordings are stored in %1$s clips. Continuous playback stitches them together, but this sends **only the clip you are on**. To send another one, seek to it and tap again.</string>
     <string name="share_minutes">%1$d minutes</string>
     <string name="action_back">Back</string>
-    <string name="set_watermark_brand_title">App name and version overlay</string>
-    <string name="set_watermark_brand_summary">The app name and version are always stamped in the top-left corner and cannot be turned off — recordings are often kept as evidence or passed on, and knowing which app and version produced them is what makes them checkable later</string>
-    <string name="opt_fps_auto_unknown">Native (no limit — record every frame the stream delivers)</string>
-    <string name="set_record_fps_summary_note">\"Native\" applies no limit. The other options are a cap, not a target — if the stream delivers less, the recording is lower.</string>
-    <string name="opt_fps_cap">Up to %1$s fps</string>
+    <string name="set_watermark_brand_title">App badge</string>
+    <string name="set_watermark_brand_summary">Shows this app's name and version</string>
+    <string name="opt_fps_auto_unknown">Native</string>
     <string name="opt_composite_size_auto">Follow detection (1280×5140, known to produce the 4-up grid)</string>
     <string name="msg_composite_size_changed">Stream size changed; restart the app to apply. If the picture looks wrong, switch back to Follow detection.</string>
     <string name="msg_composite_size_split">This aspect ratio is split into the four-up grid.</string>
     <string name="msg_composite_size_single">Too square to be treated as a strip (the long side must be 3.2x the short one), so it is shown as one whole picture — useful for seeing what this stream actually contains.</string>
+    <string name="set_bitrate_summary_target">%1$s · target %2$s (%3$s @ %4$d fps, %5$s)</string>
+    <string name="upd_connecting">Connecting…</string>
+    <string name="upd_downloading_size">Downloading… %1$s MB</string>
+    <string name="upd_download_failed_title">Download failed</string>
+    <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone's browser instead</string>
 </resources>

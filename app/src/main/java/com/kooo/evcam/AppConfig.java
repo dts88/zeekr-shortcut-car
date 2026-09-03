@@ -838,7 +838,13 @@ public class AppConfig {
      */
     public static final int FRAME_RATE_UNLIMITED = 0;
 
-    public int getActualFrameRate(int hardwareMaxFps) {
+    /**
+     * 渲染节流的<b>上限</b>；{@link #FRAME_RATE_UNLIMITED} 表示不限制。
+     *
+     * <p>只有 GL 侧「这一帧渲不渲」的判断该用它。其他地方一律用
+     * {@link #getNominalFrameRate}——详见那个方法上的说明。</p>
+     */
+    public int getFrameRateCap(int hardwareMaxFps) {
         String explicit = getRecordFps();
         if (RECORD_FPS_AUTO.equals(explicit)) {
             // 「原始帧率」= 一帧都不丢，视频流给多少录多少。
@@ -848,12 +854,37 @@ public class AppConfig {
             // 节流还会把帧率砍一半。真想要「原始」，就不该有任何门槛。
             return FRAME_RATE_UNLIMITED;
         }
+        return explicitFrameRate(explicit, hardwareMaxFps);
+    }
+
+    /**
+     * 一个<b>一定是正数</b>的帧率，给所有需要「一个具体数字」的地方用：
+     * {@code MediaFormat.KEY_FRAME_RATE}、码率估算、相机的 AE 帧率区间。
+     *
+     * <h3>为什么要和上面那个分开</h3>
+     *
+     * <p>「不限制」对节流来说是 0，对其他人来说不是：编码器拿到帧率 0 会配置失败
+     * 或算出 0 码率，相机拿到 0 会去请求<b>最低</b>的那个帧率区间 ——
+     * 恰好和「不限制」相反。0.36.0-beta 里就是这么坏的。</p>
+     *
+     * <p>所以这里不提供一个「通用」的帧率方法：谁需要什么，自己选。</p>
+     */
+    public int getNominalFrameRate(int hardwareMaxFps) {
+        String explicit = getRecordFps();
+        if (RECORD_FPS_AUTO.equals(explicit)) {
+            // 不限制时，「预期能跑到多少」就是硬件能给到多少
+            return Math.max(5, hardwareMaxFps);
+        }
+        return explicitFrameRate(explicit, hardwareMaxFps);
+    }
+
+    private int explicitFrameRate(String explicit, int hardwareMaxFps) {
         try {
             int fps = Integer.parseInt(explicit);
             return Math.max(5, Math.min(hardwareMaxFps, fps));
         } catch (NumberFormatException e) {
-            AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，按原始帧率处理");
-            return getStandardFrameRate(hardwareMaxFps);
+            AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，按硬件上限处理");
+            return Math.max(5, hardwareMaxFps);
         }
     }
 

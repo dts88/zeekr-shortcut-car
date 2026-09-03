@@ -46,10 +46,6 @@
             android:title="@string/set_record_fps_title"
             android:summary="%s" />
 
-        <Preference
-            android:key="pref_record_fps_note"
-            android:selectable="false" />
-
         <ListPreference
             android:key="pref_segment_duration"
             android:title="@string/set_segment_title"
@@ -67,8 +63,7 @@
 
         <ListPreference
             android:key="pref_bitrate"
-            android:title="@string/set_bitrate_title"
-            android:summary="%s" />
+            android:title="@string/set_bitrate_title" />
 
         <Preference
             android:key="pref_hardware_info"
@@ -397,8 +392,7 @@
     -->
     <Preference
         android:key="pref_check_update"
-        android:title="@string/set_check_update_title"
-        android:summary="@string/set_check_update_summary" />
+        android:title="@string/set_check_update_title" />
 
     <!-- ==================== 关于 ==================== -->
     <PreferenceScreen

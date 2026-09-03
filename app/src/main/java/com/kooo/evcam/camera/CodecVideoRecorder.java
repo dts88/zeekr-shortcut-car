@@ -49,8 +49,6 @@ public class CodecVideoRecorder {
     private int bitRate = 0;          // 默认自动计算码率
     
     // 性能优化：码率上限（防止过高码率导致卡顿）
-    private static final int MAX_BITRATE = 12000000;  // 最大码率 12Mbps
-    private static final int MAX_HEVC_BITRATE = 8000000;  // HEVC 最大码率 8Mbps
     
     // 录制时补盲优化模式
     private boolean blindSpotOptimizeMode = false;  // 是否启用补盲优化模式（录制时降低负载）
@@ -61,6 +59,9 @@ public class CodecVideoRecorder {
     
     // 画质等级：0=低, 1=中, 2=高, 3=最高
     private int qualityLevel = 2;
+
+    /** 渲染节流上限；0 = 不限制。和 {@link #frameRate}（标称值）不是同一件事。 */
+    private int frameRateCap;
     
     // 自适应 drain 间隔控制（优化版 - 减少CPU占用）
     private volatile long currentDrainIntervalMs = 20;  // 当前 drain 间隔（毫秒）- 提高到20ms减少CPU占用
@@ -118,7 +119,6 @@ public class CodecVideoRecorder {
     private String encoderSpecLine = "";
     private String specSizeText = "";
     private String specCodecText = "";
-    private String specBitrateText = "";
     /** 设置里选的那个帧率。它是<b>上限</b>，不是结果。 */
     private int nominalFrameRate;
     /** 实测帧率：已写帧数 / 时间戳跨度。0 表示还没测出来。 */
@@ -138,8 +138,9 @@ public class CodecVideoRecorder {
         String fps = measuredFrameRate > 0
                 ? measuredFrameRate + "fps"
                 : "~" + nominalFrameRate + "fps";
-        encoderSpecLine = specSizeText + "  " + fps
-                + "  " + specCodecText + "  " + specBitrateText;
+        // 不写目标码率：那是设置里选出来的一个上限，印在画面里没有信息量。
+        // 角标上的码率只有一个 —— 每秒实测的那个（见 applyWatermarkInfoLine）。
+        encoderSpecLine = specSizeText + "  " + fps + "  " + specCodecText;
         applyWatermarkInfoLine();
     }
     /** 本分段第一帧的编码器时间戳，用于把每段的 PTS 归零；-1 表示本段还没开始。 */
@@ -406,9 +407,21 @@ public class CodecVideoRecorder {
      * @param fps 帧率（fps）
      */
     public void setFrameRate(int fps) {
-        this.frameRate = fps;
+        setFrameRate(fps, fps);
+    }
+
+    /**
+     * @param nominalFps 标称帧率，<b>必须是正数</b>。用于 {@code KEY_FRAME_RATE}
+     *                   与码率估算 —— 这两处拿到 0 会配置失败或算出 0 码率。
+     * @param capFps     渲染节流上限；0 表示不限制，视频流给多少录多少。
+     */
+    public void setFrameRate(int nominalFps, int capFps) {
+        this.frameRate = Math.max(1, nominalFps);
+        this.frameRateCap = Math.max(0, capFps);
         applyEncoderFrameRate();
-        AppLog.d(TAG, "Camera " + cameraId + " frame rate set to " + fps + " fps");
+        AppLog.d(TAG, "Camera " + cameraId + " 帧率：标称 " + this.frameRate
+                + " fps，节流上限 "
+                + (this.frameRateCap == 0 ? "不限制" : this.frameRateCap + " fps"));
     }
 
     /**
@@ -475,7 +488,8 @@ public class CodecVideoRecorder {
         if (encoder == null) {
             return;  // 还没创建，创建时会再套用一次
         }
-        encoder.setFrameRate(blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate);
+        // 节流用上限（可以是 0 = 不限制），不是标称值
+        encoder.setFrameRate(blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRateCap);
     }
 
     /**
@@ -1156,9 +1170,6 @@ public class CodecVideoRecorder {
         // 同一批数字也送给角标第二行
         specSizeText = width + "x" + height;
         specCodecText = mimeType.equals(MIME_TYPE_HEVC) ? "H.265" : "H.264";
-        specBitrateText = effectiveBitrate / 1000000.0f >= 1f
-                ? String.format(java.util.Locale.US, "%.1fMbps", effectiveBitrate / 1000000.0f)
-                : (effectiveBitrate / 1000) + "Kbps";
         nominalFrameRate = effectiveFrameRate;
         // 实测值不清零：换分段会重建编码器，而相机的出帧率不会因此改变。
         // 清零的话每段开头都要重新等一秒，角标先闪回「~标称值」再跳回来。
@@ -1246,66 +1257,10 @@ public class CodecVideoRecorder {
         return MediaCodec.createEncoderByType(mimeType);
     }
 
-    /**
-     * 计算最优码率
-     * 根据分辨率、帧率和画质等级计算
-     * HEVC 使用更低的码率（相同画质下约为 H.264 的 60%）
-     * 
-     * 优化策略：
-     * 1. 降低各画质等级的 bpp 值，减少编码压力
-     * 2. 根据分辨率动态调整，高分辨率适当降低 bpp
-     * 3. 严格限制最大码率，防止编码器过载
-     */
+    /** 公式在 {@link TargetBitrate} 里，设置界面显示的也是它算出来的同一个数。 */
     private int calculateOptimalBitrate() {
-        // 基础码率计算（每像素每帧的比特数）- 优化后的值，降低码率减少CPU占用
-        double bitsPerPixelPerFrame;
-
-        switch (qualityLevel) {
-            case 0: // 低画质 - 适合长时间录制
-                bitsPerPixelPerFrame = 0.03;
-                break;
-            case 1: // 中画质 - 平衡画质和性能
-                bitsPerPixelPerFrame = 0.05;
-                break;
-            case 2: // 高画质（推荐）- 优化后的值
-                bitsPerPixelPerFrame = 0.07;
-                break;
-            case 3: // 最高画质 - 适当降低 bpp 减少CPU
-                bitsPerPixelPerFrame = 0.10;
-                break;
-            default:
-                bitsPerPixelPerFrame = 0.07;
-        }
-
-        // 根据分辨率调整 bpp：分辨率越高，bpp 适当降低（编码效率提升）
-        long totalPixels = (long) width * height;
-        if (totalPixels > 2073600) { // 超过 1080p (1920x1080)
-            bitsPerPixelPerFrame *= 0.85; // 降低 15%
-        } else if (totalPixels > 921600) { // 超过 720p (1280x720)
-            bitsPerPixelPerFrame *= 0.90; // 降低 10%
-        }
-
-        // HEVC 效率更高，相同画质下使用 55% 的码率
-        boolean isHevc = mimeType.equals(MIME_TYPE_HEVC);
-        if (isHevc) {
-            bitsPerPixelPerFrame *= 0.55;
-        }
-
-        // 计算总码率
-        long bitrate = (long) (width * height * frameRate * bitsPerPixelPerFrame);
-
-        // 严格设置码率上限（防止过高导致编码器卡顿）
-        int maxAllowedBitrate = isHevc ? MAX_HEVC_BITRATE : MAX_BITRATE;
-        bitrate = Math.min(bitrate, maxAllowedBitrate);
-
-        // 设置码率下限（保证基本画质）
-        int minAllowedBitrate = isHevc ? 1000000 : 1500000; // HEVC 1Mbps, H.264 1.5Mbps
-        bitrate = Math.max(bitrate, minAllowedBitrate);
-
-        // 四舍五入到 100Kbps，便于日志阅读
-        bitrate = ((bitrate + 50000) / 100000) * 100000;
-
-        return (int) bitrate;
+        return TargetBitrate.compute(qualityLevel, width, height, frameRate,
+                mimeType.equals(MIME_TYPE_HEVC));
     }
 
     /**

@@ -885,8 +885,8 @@ public class MultiCameraManager {
             AppLog.d(TAG, "Segment duration: " + (segmentDurationMs / 1000) + " seconds (" + appConfig.getSegmentDurationMinutes() + " minutes)");
         }
         
-        // 获取帧率配置（来自「录制帧率」设置）
-        int targetFrameRate = appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS);  // 压低 CPU 占用
+        // MediaRecorder 只接受一个具体数字，没有「不限制」这个说法
+        int targetFrameRate = appConfig.getNominalFrameRate(hardwareMaxFps());
         AppLog.d(TAG, "Target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
 
         // 第一步：准备所有 MediaRecorder（但不启动）
@@ -1189,9 +1189,12 @@ public class MultiCameraManager {
             AppLog.d(TAG, "Codec segment duration: " + (segmentDurationMs / 1000) + " seconds (" + appConfig.getSegmentDurationMinutes() + " minutes)");
         }
         
-        // 获取帧率配置（来自「录制帧率」设置）
-        int targetFrameRate = appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS);  // 压低 CPU 占用
-        AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
+        // 两个值：标称值给编码器和码率估算，上限给渲染节流（可以是「不限制」）
+        int targetFrameRate = appConfig.getNominalFrameRate(hardwareMaxFps());
+        int frameRateCap = appConfig.getFrameRateCap(hardwareMaxFps());
+        AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps，节流上限 "
+                + (frameRateCap == 0 ? "不限制" : frameRateCap + " fps")
+                + " (设置: " + appConfig.getRecordFps() + ")");
 
         // 清理之前的软编码录制器
         for (CodecVideoRecorder recorder : codecRecorders.values()) {
@@ -1289,7 +1292,7 @@ public class MultiCameraManager {
             // 设置录制参数
             codecRecorder.setSegmentDuration(segmentDurationMs);
             codecRecorder.setBitRate(bitrate);
-            codecRecorder.setFrameRate(targetFrameRate);
+            codecRecorder.setFrameRate(targetFrameRate, frameRateCap);
             // 跟随设置里的码率等级。写死 3 的话那个下拉框就是个摆设
             codecRecorder.setQualityLevel(new AppConfig(context).getEncoderQualityLevel());
             codecRecorder.setForceH264(appConfig.isForceH264Encoding());
@@ -1629,7 +1632,9 @@ public class MultiCameraManager {
             AppConfig appConfig = new AppConfig(context);
             codecRecorder.setSegmentDuration(appConfig.getSegmentDurationMs());
             codecRecorder.setBitRate(appConfig.getActualBitrate(previewSize.getWidth(), previewSize.getHeight(), 25));  // 压低 CPU 占用
-            codecRecorder.setFrameRate(appConfig.getActualFrameRate(AppConfig.RECORDER_MAX_FPS));  // 压低 CPU 占用
+            codecRecorder.setFrameRate(
+                    appConfig.getNominalFrameRate(hardwareMaxFps()),
+                    appConfig.getFrameRateCap(hardwareMaxFps()));
             // 跟随设置里的码率等级。写死 3 的话那个下拉框就是个摆设
             codecRecorder.setQualityLevel(new AppConfig(context).getEncoderQualityLevel());
             codecRecorder.setForceH264(appConfig.isForceH264Encoding());
@@ -2417,4 +2422,17 @@ public class MultiCameraManager {
         String name = context.getString(com.kooo.evcam.R.string.app_name);
         return version.isEmpty() ? name : name + " v" + version;
     }
+
+    /**
+     * 「硬件最多能给多少帧」。
+     *
+     * <p>优先用相机自己声明的值。以前这里写死 25 —— 那是当初为了压低 CPU 定的假设，
+     * 不是从相机读来的。实测下来这一路稳在 29–30，写死 25 的后果是：选 30 被悄悄
+     * 夹到 25，而界面上还写着 30。</p>
+     */
+    private static int hardwareMaxFps() {
+        int declared = CameraCapabilities.declaredMaxFps();
+        return declared > 0 ? declared : AppConfig.RECORDER_MAX_FPS;
+    }
+
 }

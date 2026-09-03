@@ -57,6 +57,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
+
+    /** 环视流探测结果的那几行文字；相机开起来后可能被实际尺寸替掉。 */
+    private String compositeProbeInfo;
+
+    /** 探测出来的尺寸，用来和相机真正在用的那个对比。 */
+    private android.util.Size compositeProbeSize;
+
     private static final String TAG = "MainActivity";
     private static final int REQUEST_PERMISSIONS = 100;
     
@@ -1623,6 +1630,10 @@ public class MainActivity extends AppCompatActivity {
         cameraManager.setStatusCallback((cameraId, status) -> {
             AppLog.d(TAG, "摄像头 " + cameraId + ": " + status);
 
+            if (status.contains("预览已启动")) {
+                refreshCompositeSizeOverlay();
+            }
+
             // 如果摄像头断开或被占用，提示用户
             if (status.contains("错误") || status.contains("断开")) {
                 runOnUiThread(() -> {
@@ -1766,7 +1777,12 @@ public class MainActivity extends AppCompatActivity {
                     R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show());
         }
 
-        updateCompositeInfoOverlay(located.diagnostics);
+        // 角标先写探测结果；相机真正开起来之后会用实际尺寸再刷一次
+        // （见 refreshCompositeSizeOverlay）—— 强制换了尺寸而 HAL 不认时，
+        // 这里写探测值就成了「界面一个数、实际另一个数」。
+        compositeProbeInfo = located.diagnostics;
+        compositeProbeSize = located.size;
+        updateCompositeInfoOverlay(compositeProbeInfo);
 
         // 手动指定优先于自动探测
         String overrideFront = appConfig.getCameraOverride("front");
@@ -1797,6 +1813,44 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    /**
+     * 相机开起来之后，用它<b>实际</b>在用的尺寸刷新角标。
+     *
+     * <p>强制指定的尺寸如果 HAL 没声明，{@code SingleCamera} 会退回全局配置 ——
+     * 那时候界面上再写着强制值就是假的。</p>
+     */
+    private void refreshCompositeSizeOverlay() {
+        if (cameraManager == null || compositeProbeInfo == null) {
+            return;
+        }
+        com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
+        if (cam == null || cam.getPreviewSize() == null) {
+            return;
+        }
+        android.util.Size actual = cam.getPreviewSize();
+        String line;
+        if (actual.equals(compositeProbeSize)) {
+            line = compositeProbeInfo;
+        } else {
+            // 尺寸已经不是探测出来的那个了，探测那一行就不能再照抄 ——
+            // 它里面写的拆分方式（竖排四格）对新尺寸未必成立。
+            line = "实际 " + actual.getWidth() + "x" + actual.getHeight() + "  "
+                    + (com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
+                            actual.getWidth(), actual.getHeight())
+                            ? "条带，拆四格" : "非条带，整幅显示")
+                    + (compositeProbeSize == null ? ""
+                            : "（探测结果 " + compositeProbeSize.getWidth()
+                              + "x" + compositeProbeSize.getHeight() + "）");
+        }
+        runOnUiThread(() -> {
+            updateCompositeInfoOverlay(line);
+            if (compositeContainer != null) {
+                // 拆分几何按实际尺寸重排，否则四宫格会照着一个没在用的尺寸切
+                compositeContainer.setSourceSize(actual);
+            }
+        });
     }
 
     /** 把 {@code "3840x2160"} 这样的设置值解析成尺寸；空或不合法返回 null。 */

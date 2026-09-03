@@ -327,7 +327,8 @@ public class SingleCamera {
      * 那是把「帧率不对」变成「根本没有画面」。</p>
      */
     private void applyTargetFpsRange(CaptureRequest.Builder builder) {
-        int target = new AppConfig(context).getActualFrameRate(
+        // 相机要的是一个具体目标：给 0 它会去挑最低的那个区间，恰好和「不限制」相反
+        int target = new AppConfig(context).getNominalFrameRate(
                 CameraCapabilities.declaredMaxFps() > 0
                         ? CameraCapabilities.declaredMaxFps()
                         : AppConfig.RECORDER_MAX_FPS);
