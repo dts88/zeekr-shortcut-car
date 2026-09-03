@@ -73,34 +73,7 @@ public class CompositeStreamGeometryTest {
 
     // ---------- 横排 5120x1280 ----------
 
-    @Test
-    public void horizontalCompositeSplitsWithoutBands() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 5120, 1280, 0);
 
-        assertEquals(CompositeStreamGeometry.Stacking.HORIZONTAL, plan.stacking);
-        assertTrue(plan.bandsDetected);
-        assertEquals("5120 = 4*1280，没有多余像素", 0, plan.bandPx);
-        assertEquals(1280, plan.laneSizePx);
-
-        int[] expectedLeft = {0, 1280, 2560, 3840};
-        for (int i = 0; i < 4; i++) {
-            CompositeStreamGeometry.Lane lane = plan.lane(i);
-            assertEquals("lane " + i + " x", expectedLeft[i], lane.x);
-            assertEquals("lane " + i + " y", 0, lane.y);
-            assertEquals(1280, lane.width);
-            assertEquals(1280, lane.height);
-        }
-    }
-
-    @Test
-    public void verticalCompositeWithoutBandsIsAlsoSupported() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5120, 0);
-
-        assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
-        assertEquals(0, plan.bandPx);
-        assertEquals(0, plan.lane(0).y);
-        assertEquals(3840, plan.lane(3).y);
-    }
 
     // ---------- 非合成流 ----------
 
@@ -134,6 +107,10 @@ public class CompositeStreamGeometryTest {
         assertFalse("还没认出哪一路是合成流时，宁可不拆",
                 CompositeStreamGeometry.looksLikeComposite(null, 1280, 5140));
     }
+
+    // 5120x1280 和 1280x5120 那两条测试删掉了：诊断报告里这台车的三路相机
+    // 都没有声明过这两个尺寸，测试它们等于在钉一个不存在的行为。真出现别的
+    // 固件、别的尺寸，往 CompositeSplitProfile 的表里加一行，再补对应的测试。
 
     // ---------- 等分与分隔带 ----------
     //

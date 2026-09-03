@@ -14,10 +14,23 @@ import org.junit.Test;
  */
 public class EncodeSizeTest {
 
+    /** 合成流那一路。拆不拆要看相机 + 分辨率，所以测试里得先登记。 */
+    private static final String COMPOSITE = "2";
+
+    @org.junit.Before
+    public void registerCompositeCamera() {
+        com.kooo.evcam.zeekr.CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+    }
+
+    @org.junit.After
+    public void clearCompositeCamera() {
+        com.kooo.evcam.zeekr.CompositeSplitProfile.reset();
+    }
+
     /** 极氪的合成条带 + 四宫格：1280×5140 拼成 2560×2560。 */
     @Test
     public void compositeStripBecomesASquareGrid() {
-        EncodeSize size = EncodeSize.forSource(1280, 5140, true);
+        EncodeSize size = EncodeSize.forSource(COMPOSITE, 1280, 5140, true);
         assertTrue("应当走四宫格重排", size.grid);
         assertEquals(2560, size.width);
         assertEquals(2560, size.height);
@@ -31,7 +44,7 @@ public class EncodeSizeTest {
      */
     @Test
     public void rawStripIsScaledDownToTheEncoderCeiling() {
-        EncodeSize size = EncodeSize.forSource(1280, 5140, false);
+        EncodeSize size = EncodeSize.forSource(COMPOSITE, 1280, 5140, false);
         assertFalse(size.grid);
         assertTrue("高度不能超过编码器上限，实际 " + size.height, size.height <= EncodeSize.MAX_SIDE);
         assertEquals(0, size.width % 2);
@@ -41,16 +54,33 @@ public class EncodeSizeTest {
     /** 普通尺寸原样通过。 */
     @Test
     public void ordinarySizePassesThrough() {
-        EncodeSize size = EncodeSize.forSource(1920, 1080, true);
+        EncodeSize size = EncodeSize.forSource(COMPOSITE, 1920, 1080, true);
         assertFalse("16:9 不是条带，不该拼四宫格", size.grid);
         assertEquals(1920, size.width);
         assertEquals(1080, size.height);
     }
 
-    /** 3840×2160 在上限之内，原样通过。 */
+    /**
+     * 3840×2160 的四宫格：单格 3840×540，2×2 是 7680×1080，超宽要缩。
+     *
+     * <p>顺带说明一件事：这个尺寸<b>不比 1280×5140 清晰</b>。它的单格只有
+     * 540 行，而 1280×5140 的单格是 1280×1280 —— 分辨率数字更大，
+     * 每一路拿到的像素反而更少。</p>
+     */
     @Test
-    public void fourKFitsWithoutScaling() {
-        EncodeSize size = EncodeSize.forSource(3840, 2160, true);
+    public void theFourKGridIsWideAndGetsScaledDown() {
+        EncodeSize size = EncodeSize.forSource(COMPOSITE, 3840, 2160, true);
+        assertTrue("应当走四宫格重排", size.grid);
+        assertTrue("宽不能超过编码器上限，实际 " + size.width, size.width <= EncodeSize.MAX_SIDE);
+        assertEquals("2x2 的宽高比应等于单格宽高比 3840:540 = 7.11",
+                7.11f, size.width / (float) size.height, 0.1f);
+    }
+
+    /** 座舱那两路的 3840×2160 原样通过 —— 它们不是合成流，不拆。 */
+    @Test
+    public void fourKOnACabinCameraPassesThrough() {
+        EncodeSize size = EncodeSize.forSource("0", 3840, 2160, true);
+        assertFalse(size.grid);
         assertEquals(3840, size.width);
         assertEquals(2160, size.height);
     }

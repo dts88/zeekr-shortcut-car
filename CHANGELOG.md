@@ -15,6 +15,8 @@ Nothing yet.
 - Combinations outside the table are never split. Aspect ratio is used only to identify
   which camera is the composite one, never to decide how to split a frame.
 - No frame is split until the composite camera has been identified.
+- Fixed: the 2×2 grid size assumed square lanes. At 3840×2160 a lane is 3840×540,
+  so the grid is now sized from the lane's real width and height.
 
 ## [0.36.6-alpha] - 2026-09-03
 

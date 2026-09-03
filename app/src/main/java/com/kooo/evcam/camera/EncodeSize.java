@@ -59,16 +59,23 @@ public final class EncodeSize {
             CompositeStreamGeometry.Plan plan =
                     CompositeStreamGeometry.analyse(cameraId, sourceWidth, sourceHeight, 0);
             if (plan.isComposite()) {
-                int side = even(Math.min(plan.laneSizePx * 2, MAX_SIDE));
-                return new EncodeSize(side, side, true);
+                // 2x2：宽高各取单格的两倍。不能拿 laneSizePx 当边长 ——
+                // 那个字段是「排布方向上的格长」，只在单格是正方形时等于宽和高。
+                // 3840x2160 的单格是 3840x540，硬当正方形算会得出一个错的尺寸。
+                CompositeStreamGeometry.Lane lane = plan.lanes[0];
+                return clamp(lane.width * 2, lane.height * 2, true);
             }
         }
-        if (sourceWidth <= MAX_SIDE && sourceHeight <= MAX_SIDE) {
-            return new EncodeSize(sourceWidth, sourceHeight, false);
+        return clamp(sourceWidth, sourceHeight, false);
+    }
+
+    /** 夹进编码器上限，等比缩小，边长取偶数。 */
+    private static EncodeSize clamp(int width, int height, boolean grid) {
+        if (width <= MAX_SIDE && height <= MAX_SIDE) {
+            return new EncodeSize(even(width), even(height), grid);
         }
-        float scale = Math.min((float) MAX_SIDE / sourceWidth, (float) MAX_SIDE / sourceHeight);
-        return new EncodeSize(even((int) (sourceWidth * scale)),
-                even((int) (sourceHeight * scale)), false);
+        float scale = Math.min((float) MAX_SIDE / width, (float) MAX_SIDE / height);
+        return new EncodeSize(even((int) (width * scale)), even((int) (height * scale)), grid);
     }
 
     /** 编码器要求偶数边长。 */

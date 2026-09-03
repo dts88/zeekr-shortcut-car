@@ -45,10 +45,15 @@ package com.kooo.evcam.zeekr;
  */
 public final class CompositeSplitProfile {
 
-    /** 合成流那一路已确认的拆分尺寸。 */
-    private static final int[][] COMPOSITE_SIZES = {
-            {1280, 5140},
-            {3840, 2160},
+    /**
+     * 合成流那一路已确认的拆分尺寸，以及各自的排布。
+     *
+     * <p>排布<b>写在表里</b>，不从长宽比推 —— 3840×2160 的长边是宽，但四格
+     * 是竖排（每格 3840×540）。按长边推会得出横排，四个画面全串位。</p>
+     */
+    private static final Object[][] COMPOSITE_SIZES = {
+            {1280, 5140, CompositeStreamGeometry.Stacking.VERTICAL},
+            {3840, 2160, CompositeStreamGeometry.Stacking.VERTICAL},
     };
 
     /** 合成流那一路的相机 id；还没认出来时为 null。 */
@@ -77,11 +82,9 @@ public final class CompositeSplitProfile {
         if (width <= 0 || height <= 0 || !isCompositeCamera(cameraId)) {
             return CompositeStreamGeometry.Stacking.NOT_COMPOSITE;
         }
-        for (int[] size : COMPOSITE_SIZES) {
-            if (size[0] == width && size[1] == height) {
-                // 长边在哪个方向，四格就往哪个方向排
-                return width > height ? CompositeStreamGeometry.Stacking.HORIZONTAL
-                        : CompositeStreamGeometry.Stacking.VERTICAL;
+        for (Object[] entry : COMPOSITE_SIZES) {
+            if ((Integer) entry[0] == width && (Integer) entry[1] == height) {
+                return (CompositeStreamGeometry.Stacking) entry[2];
             }
         }
         // 表里没有这个组合就不拆，不按长宽比去猜。
@@ -110,8 +113,8 @@ public final class CompositeSplitProfile {
     public static int[][] compositeSizes() {
         int[][] out = new int[COMPOSITE_SIZES.length][2];
         for (int i = 0; i < COMPOSITE_SIZES.length; i++) {
-            out[i][0] = COMPOSITE_SIZES[i][0];
-            out[i][1] = COMPOSITE_SIZES[i][1];
+            out[i][0] = (Integer) COMPOSITE_SIZES[i][0];
+            out[i][1] = (Integer) COMPOSITE_SIZES[i][1];
         }
         return out;
     }
