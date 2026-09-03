@@ -1230,7 +1230,7 @@ public class MultiCameraManager {
             com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan = null;
             if (encodeSize.grid) {
                 fourLanePlan = com.kooo.evcam.zeekr.CompositeStreamGeometry.analyse(
-                        camera.getCameraId(), sourceWidth, sourceHeight, 0);
+                        camera.getCameraId(), sourceWidth, sourceHeight);
                 AppLog.i(TAG, "Camera " + key + " 四宫格录制: 源 "
                         + sourceWidth + "x" + sourceHeight
                         + " -> 编码 " + encodeWidth + "x" + encodeHeight);

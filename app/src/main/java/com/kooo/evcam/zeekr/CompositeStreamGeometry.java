@@ -249,10 +249,6 @@ public final class CompositeStreamGeometry {
                         BAND_COUNT, split.bandPx, split.laneSize)
                 : String.format(Locale.US, "未匹配分隔带排布（余量 %dpx），按 %d 等分回退",
                         along - across * LANE_COUNT, LANE_COUNT);
-        if (inset > 0) {
-            note = note + "，每边内缩 " + inset + "px";
-        }
-
         return new Plan(stacking, frameWidth, frameHeight, split.laneSize,
                 split.bandPx, split.bandsDetected, lanes, note);
     }
