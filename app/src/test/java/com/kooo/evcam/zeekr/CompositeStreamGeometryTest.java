@@ -292,13 +292,21 @@ public class CompositeStreamGeometryTest {
         assertTrue(CompositeStreamGeometry.looksLikeComposite(null, 5120, 1280));
     }
 
-    /** 表里没有的尺寸一律不拆 —— 不再靠长宽比去猜。 */
+    /**
+     * 表里没有的尺寸：普通比例一律不拆，长条只在合成流那一路兜底。
+     *
+     * <p>兜底是给「固件换了一版、尺寸跟着变」留的。座舱那两路不适用：
+     * 它们本来就不是合成流，猜错的代价是把一幅好画面切成四块。</p>
+     */
     @Test
-    public void unknownSizesAreNeverSplit() {
+    public void unknownSizesSplitOnlyWhenTheyAreStripsOnTheCompositeCamera() {
         CompositeSplitProfile.setCompositeCameraId("2");
+
         assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1920, 1080));
         assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1280, 800));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1280, 6000));
+        // 长条：合成流那一路兜底拆，座舱不拆
+        assertTrue(CompositeStreamGeometry.looksLikeComposite("2", 1280, 6000));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite("0", 1280, 6000));
     }
 
     /** 登记是进程内全局的，每条测试跑完都要还原。 */
