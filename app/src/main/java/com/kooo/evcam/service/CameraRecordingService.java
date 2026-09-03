@@ -87,8 +87,6 @@ public class CameraRecordingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        // 服务可能先于界面起来，声明同样要在取画面之前生效
-        com.kooo.evcam.zeekr.CompositeDeclaration.applyFrom(this);
         AppLog.d(TAG, "录制服务创建");
 
         appConfig = new AppConfig(this);

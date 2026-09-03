@@ -26,6 +26,7 @@ import androidx.preference.SwitchPreferenceCompat;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.camera.EncodeSize;
 import com.kooo.evcam.camera.TargetBitrate;
+import com.kooo.evcam.zeekr.CompositeSplitProfile;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CustomCameraConfigFragment;
@@ -1162,7 +1163,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         String note;
         if (size == null) {
             note = "";
-        } else if (CompositeStreamGeometry.looksLikeComposite(size[0], size[1])) {
+        } else if (CompositeSplitProfile.stackingFor(CompositeSplitProfile.compositeCameraId(),
+                size[0], size[1]) != CompositeStreamGeometry.Stacking.NOT_COMPOSITE) {
             note = "\n" + getString(R.string.msg_composite_size_split);
         } else {
             note = "\n" + getString(R.string.msg_composite_size_single);
@@ -1226,7 +1228,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return null;
         }
         Size source = camera.getPreviewSize();
-        return EncodeSize.forSource(source.getWidth(), source.getHeight(),
+        return EncodeSize.forSource(camera.getCameraId(), source.getWidth(), source.getHeight(),
                 appConfig.isRecordGridLayout());
     }
 

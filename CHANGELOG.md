@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.36.6-alpha] - 2026-09-03
+
+- Splitting the surround-view stream is now decided by one thing only: which camera the
+  frame came from and what size it is. 3840×2160 is split into four equal lanes on the
+  composite camera and left whole on the cabin cameras, which declare the same size.
+- The lane order is the same at every size: front, rear, left, right.
+
 ## [0.36.5-alpha] - 2026-09-03
 
 - Unlocking developer options now asks for the password on the first tap instead of

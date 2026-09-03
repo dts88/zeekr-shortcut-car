@@ -42,13 +42,22 @@ public final class EncodeSize {
      * @param gridRequested 设置里选的是不是「四宫格」排列
      */
     public static EncodeSize forSource(int sourceWidth, int sourceHeight, boolean gridRequested) {
+        return forSource(null, sourceWidth, sourceHeight, gridRequested);
+    }
+
+    /**
+     * @param cameraId 出这一帧的相机。3840×2160 这种尺寸座舱那两路也有，
+     *                 不带相机 id 就分不清该不该拆。
+     */
+    public static EncodeSize forSource(String cameraId, int sourceWidth, int sourceHeight,
+                                       boolean gridRequested) {
         if (sourceWidth <= 0 || sourceHeight <= 0) {
             return new EncodeSize(0, 0, false);
         }
         if (gridRequested
-                && CompositeStreamGeometry.looksLikeComposite(sourceWidth, sourceHeight)) {
+                && CompositeStreamGeometry.looksLikeComposite(cameraId, sourceWidth, sourceHeight)) {
             CompositeStreamGeometry.Plan plan =
-                    CompositeStreamGeometry.analyse(sourceWidth, sourceHeight);
+                    CompositeStreamGeometry.analyse(cameraId, sourceWidth, sourceHeight, 0);
             if (plan.isComposite()) {
                 int side = even(Math.min(plan.laneSizePx * 2, MAX_SIDE));
                 return new EncodeSize(side, side, true);

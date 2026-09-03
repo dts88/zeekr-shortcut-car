@@ -111,7 +111,7 @@ public class CompositeStreamGeometryTest {
 
         assertFalse(CompositeStreamGeometry.looksLikeComposite(1920, 1080));
         assertFalse(CompositeStreamGeometry.looksLikeComposite(1280, 800));
-        // 3840x2160 是 16:9，光看比例判断不出来 —— 要靠声明，见下面那几条
+        // 3840x2160 要看是哪一路相机，见下面那几条
         assertFalse(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
         assertFalse(CompositeStreamGeometry.looksLikeComposite(0, 0));
     }
@@ -120,8 +120,10 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void unknownGeometryFallsBackToEqualSplitWithoutLosingPixels() {
-        // 余量 880px 远超分隔带的合理范围，应退回等分
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 6000);
+        // 余量 880px 远超分隔带的合理范围，应退回等分。
+        // 表里没有这个尺寸，只有合成流那一路才按长条比例兜底
+        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse("2", 1280, 6000, 0);
 
         assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
         assertFalse("不应误判为分隔带", plan.bandsDetected);
@@ -134,7 +136,8 @@ public class CompositeStreamGeometryTest {
     @Test
     public void squashedLanesFallBackInsteadOfCroppingRealPixels() {
         // 高度小于 4 个正方形画面，slack 为负 -> 回退等分
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 4800);
+        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse("2", 1280, 4800, 0);
 
         assertFalse(plan.bandsDetected);
         assertEquals(1200, plan.laneSizePx);
@@ -178,12 +181,14 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void lanesNeverEscapeTheSourceFrame() {
+        CompositeSplitProfile.setCompositeCameraId("2");
         int[][] sizes = {
-                {1280, 5140}, {1280, 5120}, {5120, 1280},
+                {1280, 5140}, {1280, 5120}, {5120, 1280}, {3840, 2160},
                 {1280, 6000}, {1280, 4800}, {640, 2570}, {1920, 1080},
         };
         for (int[] size : sizes) {
-            CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(size[0], size[1], 1);
+            CompositeStreamGeometry.Plan plan =
+                    CompositeStreamGeometry.analyse("2", size[0], size[1], 1);
             for (int i = 0; i < plan.laneCount(); i++) {
                 CompositeStreamGeometry.Lane lane = plan.lane(i);
                 String where = size[0] + "x" + size[1] + " lane " + i;
@@ -216,8 +221,9 @@ public class CompositeStreamGeometryTest {
      */
     @Test
     public void normalisedWindowsAreScaleInvariant() {
-        CompositeStreamGeometry.Plan full = CompositeStreamGeometry.analyse(1280, 5140);
-        CompositeStreamGeometry.Plan half = CompositeStreamGeometry.analyse(640, 2570);
+        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeStreamGeometry.Plan full = CompositeStreamGeometry.analyse("2", 1280, 5140, 0);
+        CompositeStreamGeometry.Plan half = CompositeStreamGeometry.analyse("2", 640, 2570, 0);
 
         for (int i = 0; i < 4; i++) {
             assertEquals("lane " + i + " v0", full.lane(i).v0, half.lane(i).v0, 1e-3f);
@@ -240,89 +246,65 @@ public class CompositeStreamGeometryTest {
     }
 
     /**
-     * 声明之后，16:9 也按四格竖排拆。
+     * 3840×2160：合成流那一路要拆，座舱那两路不能拆。
      *
-     * <p>环视这一路除了 1280×5140 还声明支持 3840×2160，实测里面同样是四格竖排、
-     * 等分、顺序一致 —— 但比例判定永远过不了那道门槛，只能靠声明。</p>
+     * <p>这个尺寸座舱相机也声明支持，光看尺寸判断不了 —— 拆不拆只取决于
+     * 「哪一路相机 + 什么分辨率」。</p>
      */
     @Test
-    public void aDeclaredSizeIsSplitRegardlessOfItsRatio() {
-        CompositeStreamGeometry.declareComposite(3840, 2160,
-                CompositeStreamGeometry.Stacking.VERTICAL);
+    public void theSixteenByNineSizeSplitsOnlyOnTheCompositeCamera() {
+        CompositeSplitProfile.setCompositeCameraId("2");
 
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(3840, 2160);
+        assertTrue(CompositeStreamGeometry.looksLikeComposite("2", 3840, 2160));
+        assertFalse("座舱那两路不能被切成四块",
+                CompositeStreamGeometry.looksLikeComposite("0", 3840, 2160));
+        assertFalse("不知道是哪一路时不拆",
+                CompositeStreamGeometry.looksLikeComposite(null, 3840, 2160));
+    }
+
+    /** 3840×2160 等分成四条 3840×540。 */
+    @Test
+    public void theSixteenByNineSizeSplitsIntoFourEqualLanes() {
+        CompositeSplitProfile.setCompositeCameraId("2");
+
+        CompositeStreamGeometry.Plan plan =
+                CompositeStreamGeometry.analyse("2", 3840, 2160, 0);
         assertTrue(plan.isComposite());
         assertEquals(CompositeStreamGeometry.LANE_COUNT, plan.lanes.length);
-        // 等分：2160 / 4 = 540，每一格占满整个宽度
-        assertEquals(540, plan.lanes[0].height);
         assertEquals(3840, plan.lanes[0].width);
+        assertEquals(540, plan.lanes[0].height);
         assertEquals(0, plan.lanes[0].y);
         assertEquals(540, plan.lanes[1].y);
+        assertEquals(1080, plan.lanes[2].y);
         assertEquals(1620, plan.lanes[3].y);
     }
 
     /**
-     * 声明只对声明的那一个尺寸生效。
+     * 1280×5140 这类长条不需要相机身份。
      *
-     * <p>全局打开的话，三路配置里 1920×1080 的座舱相机也会被切成四格。</p>
+     * <p>这种比例只有合成流才会给，尺寸本身就说明了问题。</p>
      */
     @Test
-    public void aDeclarationDoesNotLeakToOtherSizes() {
-        CompositeStreamGeometry.declareComposite(3840, 2160,
-                CompositeStreamGeometry.Stacking.VERTICAL);
-
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(1920, 1080));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(1280, 800));
-        // 原来就认得的那个尺寸不受影响
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(1280, 5140));
+    public void stripSizesNeedNoCameraIdentity() {
+        CompositeSplitProfile.reset();
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(null, 1280, 5140));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite("0", 1280, 5120));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(null, 5120, 1280));
     }
 
-    /** 撤销声明之后回到纯比例判断。 */
+    /** 表里没有的尺寸一律不拆 —— 不再靠长宽比去猜。 */
     @Test
-    public void clearingTheDeclarationRestoresRatioOnlyBehaviour() {
-        CompositeStreamGeometry.declareComposite(3840, 2160,
-                CompositeStreamGeometry.Stacking.VERTICAL);
-        CompositeStreamGeometry.clearDeclaration();
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
+    public void unknownSizesAreNeverSplit() {
+        CompositeSplitProfile.setCompositeCameraId("2");
+        assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1920, 1080));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1280, 800));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1280, 6000));
     }
 
-    /** 声明一个不合法的尺寸等于没声明，不能把状态搞坏。 */
-    @Test
-    public void anInvalidDeclarationIsIgnored() {
-        CompositeStreamGeometry.declareComposite(0, 0,
-                CompositeStreamGeometry.Stacking.VERTICAL);
-        assertNull(CompositeStreamGeometry.declaredSize());
-        CompositeStreamGeometry.declareComposite(3840, 2160, null);
-        assertNull(CompositeStreamGeometry.declaredSize());
-    }
-
-
-    /**
-     * 声明不得影响「哪一路是环视」的判断。
-     *
-     * <p>认相机靠的是条带比例——1280×5140 这种长条只有合成流才有。如果这一步也
-     * 听声明的，声明 3840×2160 之后，座舱相机（它同样声明支持 3840×2160）
-     * 会跟着变成合成流候选，把相机认错。</p>
-     */
-    @Test
-    public void theRatioOnlyCheckIgnoresDeclarations() {
-        CompositeStreamGeometry.declareComposite(3840, 2160,
-                CompositeStreamGeometry.Stacking.VERTICAL);
-
-        assertTrue("拆分要听声明", CompositeStreamGeometry.looksLikeComposite(3840, 2160));
-        assertFalse("认相机不能听声明",
-                CompositeStreamGeometry.looksLikeCompositeByRatio(3840, 2160));
-        // 真正的条带两边都认
-        assertTrue(CompositeStreamGeometry.looksLikeCompositeByRatio(1280, 5140));
-        assertTrue(CompositeStreamGeometry.looksLikeCompositeByRatio(5120, 1280));
-        assertFalse(CompositeStreamGeometry.looksLikeCompositeByRatio(0, 0));
-    }
-
-    /** 声明是进程内全局的，每条测试跑完都要还原，否则会互相影响。 */
+    /** 登记是进程内全局的，每条测试跑完都要还原。 */
     @After
-    public void clearDeclaration() {
-        CompositeStreamGeometry.clearDeclaration();
+    public void clearCompositeCamera() {
+        CompositeSplitProfile.reset();
     }
 
 }

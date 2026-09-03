@@ -39,11 +39,11 @@ public final class CompositeBitmapComposer {
 
         int srcWidth = source.getWidth();
         int srcHeight = source.getHeight();
-        if (!CompositeStreamGeometry.looksLikeComposite(srcWidth, srcHeight)) {
+        if (!CompositeStreamGeometry.looksLikeComposite(CompositeSplitProfile.compositeCameraId(), srcWidth, srcHeight)) {
             return source;
         }
 
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(srcWidth, srcHeight);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(CompositeSplitProfile.compositeCameraId(), srcWidth, srcHeight, 0);
         if (!plan.isComposite() || plan.laneCount() < CompositeStreamGeometry.LANE_COUNT) {
             return source;
         }

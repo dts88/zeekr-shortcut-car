@@ -1222,15 +1222,15 @@ public class MultiCameraManager {
             boolean gridRequested = appConfig.isRecordGridLayout();
             int sourceWidth = previewSize.getWidth();
             int sourceHeight = previewSize.getHeight();
-            EncodeSize encodeSize =
-                    EncodeSize.forSource(sourceWidth, sourceHeight, gridRequested);
+            EncodeSize encodeSize = EncodeSize.forSource(
+                    camera.getCameraId(), sourceWidth, sourceHeight, gridRequested);
             int encodeWidth = encodeSize.width;
             int encodeHeight = encodeSize.height;
 
             com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan fourLanePlan = null;
             if (encodeSize.grid) {
                 fourLanePlan = com.kooo.evcam.zeekr.CompositeStreamGeometry.analyse(
-                        sourceWidth, sourceHeight);
+                        camera.getCameraId(), sourceWidth, sourceHeight, 0);
                 AppLog.i(TAG, "Camera " + key + " 四宫格录制: 源 "
                         + sourceWidth + "x" + sourceHeight
                         + " -> 编码 " + encodeWidth + "x" + encodeHeight);
@@ -1238,7 +1238,7 @@ public class MultiCameraManager {
                 // 设置写着四宫格却录出长条时，得能一眼看出是哪一步没成立
                 boolean sourceIsComposite =
                         com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
-                                sourceWidth, sourceHeight);
+                                camera.getCameraId(), sourceWidth, sourceHeight);
                 if (!gridRequested || !sourceIsComposite) {
                     AppLog.i(TAG, "Camera " + key + " 不做四宫格重排："
                             + (gridRequested ? "" : "设置为原始长条；")

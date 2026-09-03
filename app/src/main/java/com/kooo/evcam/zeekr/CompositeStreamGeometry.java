@@ -145,7 +145,16 @@ public final class CompositeStreamGeometry {
      * 判断给定尺寸是否像四联合成流。用于在候选分辨率里挑出合成流。
      */
     public static boolean looksLikeComposite(int frameWidth, int frameHeight) {
-        return detectStacking(frameWidth, frameHeight) != Stacking.NOT_COMPOSITE;
+        return looksLikeComposite(null, frameWidth, frameHeight);
+    }
+
+    /**
+     * 这一路相机在这个尺寸下要不要拆。
+     *
+     * <p>3840×2160 这种尺寸座舱相机也有，所以必须带上相机 id 才判断得了。</p>
+     */
+    public static boolean looksLikeComposite(String cameraId, int frameWidth, int frameHeight) {
+        return detectStacking(cameraId, frameWidth, frameHeight) != Stacking.NOT_COMPOSITE;
     }
 
     /**
@@ -167,64 +176,28 @@ public final class CompositeStreamGeometry {
                 || (float) frameHeight / frameWidth >= STRIP_RATIO_THRESHOLD;
     }
 
-    /**
-     * 被明确声明为合成流的那一个尺寸；null 表示全部按长宽比判断。
-     *
-     * <h3>为什么需要这个</h3>
-     *
-     * <p>长宽比判定是在<b>不知道这一路装的是什么</b>时的猜法。而环视这一路除了
-     * 1280×5140，还声明支持 3840×2160 —— 实测下来里面同样是四格竖排、等分、
-     * 顺序一致，但 16:9 的比例永远过不了那道门槛。</p>
-     *
-     * <p>所以这里留一个口子：开发者选项强制指定尺寸时，等于用户声明「这一路就是
-     * 合成流」，那就按声明来。<b>只对声明的那一个尺寸生效</b> ——
-     * 全局打开的话，三路配置里 1920×1080 的座舱相机也会被切成四格。</p>
-     */
-    private static volatile int[] declaredSize;
-    private static volatile Stacking declaredStacking;
-
-    /**
-     * 声明某个尺寸就是合成流，以及它的排布。
-     *
-     * <p>进程内全局，由启动时读一次设置来设定 —— 预览、录制、后视镜、照片拼合
-     * 必须<b>用同一套拆分</b>，任何一处不一致都会表现为「预览和录出来的不一样」。</p>
-     */
-    public static void declareComposite(int width, int height, Stacking stacking) {
-        if (width <= 0 || height <= 0 || stacking == null || stacking == Stacking.NOT_COMPOSITE) {
-            clearDeclaration();
-            return;
-        }
-        declaredSize = new int[]{width, height};
-        declaredStacking = stacking;
+    /** 按相机 + 尺寸拆分。{@link #analyse(int, int, int)} 的带相机版本。 */
+    public static Plan analyse(String cameraId, int frameWidth, int frameHeight,
+                               int cropInsetPx) {
+        return analyse(frameWidth, frameHeight, cropInsetPx,
+                detectStacking(cameraId, frameWidth, frameHeight));
     }
 
-    /** 回到「一切按长宽比判断」。 */
-    public static void clearDeclaration() {
-        declaredSize = null;
-        declaredStacking = null;
-    }
-
-    /** 当前声明，形如 {@code {宽, 高}}；没有声明时返回 null。 */
-    public static int[] declaredSize() {
-        int[] size = declaredSize;
-        return size == null ? null : new int[]{size[0], size[1]};
+    /**
+     * 这一帧要不要拆、怎么拆。
+     *
+     * <p>依据只有两个：<b>哪一路相机 + 什么分辨率</b>，规则全在
+     * {@link CompositeSplitProfile} 里。以前这里用长宽比去猜，是因为不知道
+     * 这一路装的是什么；现在知道了，就不该再猜。</p>
+     *
+     * @param cameraId 出这一帧的相机；不知道时传 null
+     */
+    public static Stacking detectStacking(String cameraId, int frameWidth, int frameHeight) {
+        return CompositeSplitProfile.stackingFor(cameraId, frameWidth, frameHeight);
     }
 
     static Stacking detectStacking(int frameWidth, int frameHeight) {
-        if (frameWidth <= 0 || frameHeight <= 0) {
-            return Stacking.NOT_COMPOSITE;
-        }
-        int[] declared = declaredSize;
-        if (declared != null && declared[0] == frameWidth && declared[1] == frameHeight) {
-            return declaredStacking;
-        }
-        if ((float) frameWidth / frameHeight >= STRIP_RATIO_THRESHOLD) {
-            return Stacking.HORIZONTAL;
-        }
-        if ((float) frameHeight / frameWidth >= STRIP_RATIO_THRESHOLD) {
-            return Stacking.VERTICAL;
-        }
-        return Stacking.NOT_COMPOSITE;
+        return detectStacking(null, frameWidth, frameHeight);
     }
 
     /**
@@ -253,13 +226,24 @@ public final class CompositeStreamGeometry {
         if (frameHeight <= 0) {
             throw new IllegalArgumentException("frameHeight must be positive, got " + frameHeight);
         }
+        return analyse(frameWidth, frameHeight, cropInsetPx,
+                detectStacking(frameWidth, frameHeight));
+    }
+
+    private static Plan analyse(int frameWidth, int frameHeight, int cropInsetPx,
+                                Stacking stacking) {
+        if (frameWidth <= 0) {
+            throw new IllegalArgumentException("frameWidth must be positive, got " + frameWidth);
+        }
+        if (frameHeight <= 0) {
+            throw new IllegalArgumentException("frameHeight must be positive, got " + frameHeight);
+        }
         int inset = Math.max(0, cropInsetPx);
 
-        Stacking stacking = detectStacking(frameWidth, frameHeight);
         if (stacking == Stacking.NOT_COMPOSITE) {
             Lane[] single = {new Lane(0, 0, 0, frameWidth, frameHeight, frameWidth, frameHeight)};
             return new Plan(stacking, frameWidth, frameHeight, Math.min(frameWidth, frameHeight),
-                    0, false, single, "长宽比不足 " + STRIP_RATIO_THRESHOLD + "，按单画面处理");
+                    0, false, single, frameWidth + "x" + frameHeight + " 不在已知的合成流尺寸里，按单画面处理");
         }
 
         boolean vertical = stacking == Stacking.VERTICAL;

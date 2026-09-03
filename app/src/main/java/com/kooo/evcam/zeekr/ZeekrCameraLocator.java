@@ -93,6 +93,9 @@ public final class ZeekrCameraLocator {
 
                 if (ZeekrCompositeProfile.isKnownSize(chosen)) {
                     log.append("命中已知实测尺寸，使用相机 ").append(id);
+                    // 登记「哪一路是合成流」：3840x2160 这种尺寸座舱也有，
+                    // 光看尺寸判断不了要不要拆，得知道是哪一路给的
+                    CompositeSplitProfile.setCompositeCameraId(id);
                     return new Result(id, chosen, candidates, log.toString());
                 }
                 if (fallbackId == null) {
@@ -109,6 +112,7 @@ public final class ZeekrCameraLocator {
 
         if (fallbackId != null) {
             log.append("未命中已知尺寸，改用推断结果：相机 ").append(fallbackId);
+            CompositeSplitProfile.setCompositeCameraId(fallbackId);
             return new Result(fallbackId, fallbackSize, fallbackCandidates, log.toString());
         }
 

@@ -228,8 +228,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 必须在任何一路取到画面之前：预览、录制、后视镜、照片拼合都按这条声明拆分
-        com.kooo.evcam.zeekr.CompositeDeclaration.applyFrom(this);
         instance = this;  // 设置静态实例引用
         AppLog.init(this);
 
@@ -1840,7 +1838,7 @@ public class MainActivity extends AppCompatActivity {
             // 它里面写的拆分方式（竖排四格）对新尺寸未必成立。
             line = "实际 " + actual.getWidth() + "x" + actual.getHeight() + "  "
                     + (com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
-                            actual.getWidth(), actual.getHeight())
+                            cam.getCameraId(), actual.getWidth(), actual.getHeight())
                             ? "条带，拆四格" : "非条带，整幅显示")
                     + (compositeProbeSize == null ? ""
                             : "（探测结果 " + compositeProbeSize.getWidth()
