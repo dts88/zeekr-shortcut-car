@@ -341,7 +341,7 @@
     <string name="share_minutes">%1$d minutes</string>
     <string name="action_back">Back</string>
     <string name="set_watermark_brand_title">App badge</string>
-    <string name="set_watermark_brand_summary">Shows this app's name and version</string>
+    <string name="set_watermark_brand_summary">Shows this app\'s name and version</string>
     <string name="opt_fps_auto_unknown">Native</string>
     <string name="opt_composite_size_auto">Follow detection (1280×5140, known to produce the 4-up grid)</string>
     <string name="msg_composite_size_changed">Stream size changed; restart the app to apply. If the picture looks wrong, switch back to Follow detection.</string>
@@ -351,5 +351,5 @@
     <string name="upd_connecting">Connecting…</string>
     <string name="upd_downloading_size">Downloading… %1$s MB</string>
     <string name="upd_download_failed_title">Download failed</string>
-    <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone's browser instead</string>
+    <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone\'s browser instead</string>
 </resources>

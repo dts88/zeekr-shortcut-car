@@ -98,4 +98,40 @@ public class StringResourceParityTest {
         }
         return null;
     }
+
+    /**
+     * 撇号必须转义。
+     *
+     * <p>{@code app's} 这样的写法会让 aapt 直接失败：
+     * 「Invalid unicode escape sequence in string」—— 报的位置和错的东西都对不上，
+     * 每次都要重新想一遍才认出来是撇号。这条测试替 CI 挡住它。</p>
+     */
+    @Test
+    public void apostrophesAreEscaped() throws IOException {
+        File module = findModuleRoot();
+        assumeTrue("定位不到模块根目录，跳过", module != null);
+
+        List<String> offenders = new ArrayList<>();
+        for (String dir : new String[]{"values", "values-en"}) {
+            File file = new File(module, "src/main/res/" + dir + "/strings.xml");
+            if (!file.isFile()) {
+                continue;
+            }
+            String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            Matcher matcher = STRING.matcher(text);
+            while (matcher.find()) {
+                String body = matcher.group(2);
+                for (int i = 0; i < body.length(); i++) {
+                    if (body.charAt(i) == '\''
+                            && (i == 0 || body.charAt(i - 1) != '\\')) {
+                        offenders.add(dir + "/" + matcher.group(1));
+                        break;
+                    }
+                }
+            }
+        }
+        assertTrue("这些字符串里的撇号没有转义，aapt 会直接编不过（写成 \\' 即可）: "
+                + offenders, offenders.isEmpty());
+    }
+
 }
