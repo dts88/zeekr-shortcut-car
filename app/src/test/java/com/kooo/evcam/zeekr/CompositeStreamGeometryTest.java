@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -18,13 +19,24 @@ import org.junit.Test;
  */
 public class CompositeStreamGeometryTest {
 
+    /** 合成流那一路。诊断报告里是相机 2（EXTERNAL），但代码不写死 id。 */
+    private static final String COMPOSITE = "2";
+
+    /** 座舱那两路之一。 */
+    private static final String CABIN = "0";
+
+    @Before
+    public void registerCompositeCamera() {
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+    }
+
     private static final float EPS = 1e-6f;
 
     // ---------- 竖排 1280x5140：实测排布 ----------
 
     @Test
     public void verticalCompositeSplitsIntoFourSquareLanes() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 5140);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
 
         assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
         assertTrue("应识别出分隔带", plan.bandsDetected);
@@ -50,7 +62,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void verticalLaneUvCoordinatesAreNormalised() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 5140);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
         CompositeStreamGeometry.Lane first = plan.lane(0);
 
         assertEquals(0f, first.u0, EPS);
@@ -63,7 +75,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void horizontalCompositeSplitsWithoutBands() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(5120, 1280);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 5120, 1280, 0);
 
         assertEquals(CompositeStreamGeometry.Stacking.HORIZONTAL, plan.stacking);
         assertTrue(plan.bandsDetected);
@@ -82,7 +94,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void verticalCompositeWithoutBandsIsAlsoSupported() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 5120);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5120, 0);
 
         assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
         assertEquals(0, plan.bandPx);
@@ -94,7 +106,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void ordinaryFrameIsNotTreatedAsComposite() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1920, 1080);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1920, 1080, 0);
 
         assertEquals(CompositeStreamGeometry.Stacking.NOT_COMPOSITE, plan.stacking);
         assertFalse(plan.isComposite());
@@ -105,15 +117,22 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void looksLikeCompositeMatchesKnownStreamSizes() {
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(1280, 5140));
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(1280, 5120));
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(5120, 1280));
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
 
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(1920, 1080));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(1280, 800));
-        // 3840x2160 要看是哪一路相机，见下面那几条
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(3840, 2160));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(0, 0));
+        // 合成流那一路实测声明的两个要拆的尺寸
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 5140));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 3840, 2160));
+
+        // 同一路的其他尺寸不拆
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1920, 1080));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 720));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 0, 0));
+
+        // 不是这一路的，什么尺寸都不拆
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(CABIN, 1280, 5140));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(CABIN, 3840, 2160));
+        assertFalse("还没认出哪一路是合成流时，宁可不拆",
+                CompositeStreamGeometry.looksLikeComposite(null, 1280, 5140));
     }
 
     // ---------- 未知排布的回退 ----------
@@ -122,8 +141,8 @@ public class CompositeStreamGeometryTest {
     public void unknownGeometryFallsBackToEqualSplitWithoutLosingPixels() {
         // 余量 880px 远超分隔带的合理范围，应退回等分。
         // 表里没有这个尺寸，只有合成流那一路才按长条比例兜底
-        CompositeSplitProfile.setCompositeCameraId("2");
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse("2", 1280, 6000, 0);
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 6000, 0);
 
         assertEquals(CompositeStreamGeometry.Stacking.VERTICAL, plan.stacking);
         assertFalse("不应误判为分隔带", plan.bandsDetected);
@@ -136,8 +155,8 @@ public class CompositeStreamGeometryTest {
     @Test
     public void squashedLanesFallBackInsteadOfCroppingRealPixels() {
         // 高度小于 4 个正方形画面，slack 为负 -> 回退等分
-        CompositeSplitProfile.setCompositeCameraId("2");
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse("2", 1280, 4800, 0);
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 4800, 0);
 
         assertFalse(plan.bandsDetected);
         assertEquals(1200, plan.laneSizePx);
@@ -147,7 +166,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void cropInsetShrinksEveryLaneOnAllFourSides() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 5140, 2);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 2);
 
         CompositeStreamGeometry.Lane first = plan.lane(0);
         assertEquals(2, first.x);
@@ -159,8 +178,8 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void negativeInsetIsTreatedAsZero() {
-        CompositeStreamGeometry.Plan plain = CompositeStreamGeometry.analyse(1280, 5140);
-        CompositeStreamGeometry.Plan negative = CompositeStreamGeometry.analyse(1280, 5140, -8);
+        CompositeStreamGeometry.Plan plain = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
+        CompositeStreamGeometry.Plan negative = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, -8);
 
         assertEquals(plain.lane(0).x, negative.lane(0).x);
         assertEquals(plain.lane(0).width, negative.lane(0).width);
@@ -168,7 +187,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void absurdInsetStillLeavesAUsableLane() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 5140, 100_000);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 100_000);
 
         for (int i = 0; i < plan.laneCount(); i++) {
             CompositeStreamGeometry.Lane lane = plan.lane(i);
@@ -181,14 +200,14 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void lanesNeverEscapeTheSourceFrame() {
-        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
         int[][] sizes = {
                 {1280, 5140}, {1280, 5120}, {5120, 1280}, {3840, 2160},
                 {1280, 6000}, {1280, 4800}, {640, 2570}, {1920, 1080},
         };
         for (int[] size : sizes) {
             CompositeStreamGeometry.Plan plan =
-                    CompositeStreamGeometry.analyse("2", size[0], size[1], 1);
+                    CompositeStreamGeometry.analyse(COMPOSITE, size[0], size[1], 1);
             for (int i = 0; i < plan.laneCount(); i++) {
                 CompositeStreamGeometry.Lane lane = plan.lane(i);
                 String where = size[0] + "x" + size[1] + " lane " + i;
@@ -206,7 +225,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void lanesDoNotOverlapAlongTheStackingAxis() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(1280, 5140);
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
         for (int i = 1; i < plan.laneCount(); i++) {
             CompositeStreamGeometry.Lane previous = plan.lane(i - 1);
             CompositeStreamGeometry.Lane current = plan.lane(i);
@@ -221,9 +240,9 @@ public class CompositeStreamGeometryTest {
      */
     @Test
     public void normalisedWindowsAreScaleInvariant() {
-        CompositeSplitProfile.setCompositeCameraId("2");
-        CompositeStreamGeometry.Plan full = CompositeStreamGeometry.analyse("2", 1280, 5140, 0);
-        CompositeStreamGeometry.Plan half = CompositeStreamGeometry.analyse("2", 640, 2570, 0);
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        CompositeStreamGeometry.Plan full = CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5140, 0);
+        CompositeStreamGeometry.Plan half = CompositeStreamGeometry.analyse(COMPOSITE, 640, 2570, 0);
 
         for (int i = 0; i < 4; i++) {
             assertEquals("lane " + i + " v0", full.lane(i).v0, half.lane(i).v0, 1e-3f);
@@ -237,7 +256,7 @@ public class CompositeStreamGeometryTest {
     public void rejectsNonPositiveDimensions() {
         for (int[] bad : new int[][]{{0, 100}, {100, 0}, {-1, 100}, {100, -1}}) {
             try {
-                CompositeStreamGeometry.analyse(bad[0], bad[1]);
+                CompositeStreamGeometry.analyse(COMPOSITE, bad[0], bad[1], 0);
                 fail("应拒绝 " + bad[0] + "x" + bad[1]);
             } catch (IllegalArgumentException expected) {
                 assertNotNull(expected.getMessage());
@@ -253,11 +272,11 @@ public class CompositeStreamGeometryTest {
      */
     @Test
     public void theSixteenByNineSizeSplitsOnlyOnTheCompositeCamera() {
-        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
 
-        assertTrue(CompositeStreamGeometry.looksLikeComposite("2", 3840, 2160));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 3840, 2160));
         assertFalse("座舱那两路不能被切成四块",
-                CompositeStreamGeometry.looksLikeComposite("0", 3840, 2160));
+                CompositeStreamGeometry.looksLikeComposite(CABIN, 3840, 2160));
         assertFalse("不知道是哪一路时不拆",
                 CompositeStreamGeometry.looksLikeComposite(null, 3840, 2160));
     }
@@ -265,10 +284,10 @@ public class CompositeStreamGeometryTest {
     /** 3840×2160 等分成四条 3840×540。 */
     @Test
     public void theSixteenByNineSizeSplitsIntoFourEqualLanes() {
-        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
 
         CompositeStreamGeometry.Plan plan =
-                CompositeStreamGeometry.analyse("2", 3840, 2160, 0);
+                CompositeStreamGeometry.analyse(COMPOSITE, 3840, 2160, 0);
         assertTrue(plan.isComposite());
         assertEquals(CompositeStreamGeometry.LANE_COUNT, plan.lanes.length);
         assertEquals(3840, plan.lanes[0].width);
@@ -280,19 +299,6 @@ public class CompositeStreamGeometryTest {
     }
 
     /**
-     * 1280×5140 这类长条不需要相机身份。
-     *
-     * <p>这种比例只有合成流才会给，尺寸本身就说明了问题。</p>
-     */
-    @Test
-    public void stripSizesNeedNoCameraIdentity() {
-        CompositeSplitProfile.reset();
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(null, 1280, 5140));
-        assertTrue(CompositeStreamGeometry.looksLikeComposite("0", 1280, 5120));
-        assertTrue(CompositeStreamGeometry.looksLikeComposite(null, 5120, 1280));
-    }
-
-    /**
      * 表里没有的尺寸：普通比例一律不拆，长条只在合成流那一路兜底。
      *
      * <p>兜底是给「固件换了一版、尺寸跟着变」留的。座舱那两路不适用：
@@ -300,13 +306,13 @@ public class CompositeStreamGeometryTest {
      */
     @Test
     public void unknownSizesSplitOnlyWhenTheyAreStripsOnTheCompositeCamera() {
-        CompositeSplitProfile.setCompositeCameraId("2");
+        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
 
-        assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1920, 1080));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite("2", 1280, 800));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1920, 1080));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 800));
         // 长条：合成流那一路兜底拆，座舱不拆
-        assertTrue(CompositeStreamGeometry.looksLikeComposite("2", 1280, 6000));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite("0", 1280, 6000));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 6000));
+        assertFalse(CompositeStreamGeometry.looksLikeComposite(CABIN, 1280, 6000));
     }
 
     /** 登记是进程内全局的，每条测试跑完都要还原。 */

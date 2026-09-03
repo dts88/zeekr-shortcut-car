@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.36.7-alpha] - 2026-09-03
+
+- The split table now lists camera and size together, and only combinations confirmed on
+  the vehicle: the composite camera at 1280×5140 and at 3840×2160. Two sizes that this
+  head unit never declares were removed.
+- No frame is split until the composite camera has been identified.
+
 ## [0.36.6-alpha] - 2026-09-03
 
 - Splitting the surround-view stream is now decided by one thing only: which camera the

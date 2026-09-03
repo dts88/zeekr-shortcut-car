@@ -1885,6 +1885,7 @@ public class MainActivity extends AppCompatActivity {
                 com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
         AppLog.i(TAG, "极氪多路探测结果:\n" + located.diagnostics);
 
+        // 三路模式下以计划为准：顶替上来的普通相机不是合成流，不能按四格拆
         com.kooo.evcam.zeekr.ZeekrMultiPlan plan = com.kooo.evcam.zeekr.ZeekrMultiPlan.build(
                 cameraIds,
                 located.found() ? located.cameraId : null,
@@ -1920,6 +1921,9 @@ public class MainActivity extends AppCompatActivity {
                 cam.setPreferredSize(located.size);
             }
         }
+
+        com.kooo.evcam.zeekr.CompositeSplitProfile.setCompositeCameraId(
+                plan.compositeIsReal ? plan.compositeId : null);
 
         updateCompositeInfoOverlay(describeMultiSlots(plan));
     }
