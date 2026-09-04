@@ -1035,11 +1035,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindCompositeSize();
 
+        bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
+                enabled -> {
+                    appConfig.setPhotoViaJpegEnabled(enabled);
+                    toast(getString(R.string.msg_restart_required));
+                });
+
         onClick("pref_photo_test", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.zeekr.PhotoCaptureTestActivity.class)));
 
-        onClick("pref_share_test", pref -> startActivity(
-                new Intent(getContext(), com.kooo.evcam.share.ShareTestActivity.class)));
 
         onClick("pref_preview_correction_reset", pref -> {
             appConfig.resetAllPreviewCorrection();
@@ -1325,6 +1329,95 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             AppLog.w("Settings", "读不到主视频流的帧率声明: " + e);
             return null;
         }
+    }
+
+    /**
+     * 带按钮的设置对话框自己弹。
+     *
+     * <h3>为什么不用 androidx 自带的</h3>
+     *
+     * <p>androidx 的偏好对话框自己 {@code new AlertDialog.Builder(context)}，主题靠
+     * {@code alertDialogTheme} 这个属性从 Activity 主题里解析。这个应用里那条路
+     * <b>解析不出想要的结果</b> —— 按钮画出来是看不见的，能点，但没有形状。
+     * 「车牌号输入框没有确认键」「存储上限没有保存键」都是这一件事。</p>
+     *
+     * <p>0.36.4 往主题里补 {@code alertDialogTheme} 是想从根上解决，结果只对
+     * 代码里自己建的对话框有效。所以这里改成不依赖属性解析：把主题
+     * <b>直接传进构造函数</b>，和这个应用里其他所有对话框一样 ——
+     * 那条路是反复验证过能显示出按钮的。</p>
+     *
+     * <p>下拉框（ListPreference）不在此列：它选中即关闭，本来就没有按钮。</p>
+     */
+    @Override
+    public void onDisplayPreferenceDialog(Preference preference) {
+        if (preference instanceof EditTextPreference) {
+            showTextDialog((EditTextPreference) preference);
+            return;
+        }
+        if (preference instanceof MultiSelectListPreference) {
+            showMultiSelectDialog((MultiSelectListPreference) preference);
+            return;
+        }
+        super.onDisplayPreferenceDialog(preference);
+    }
+
+    /** 单行文本输入：车牌号、视频 / 图片存储上限。 */
+    private void showTextDialog(EditTextPreference pref) {
+        final android.widget.EditText input = new android.widget.EditText(requireContext());
+        input.setText(pref.getText());
+        input.setSelectAllOnFocus(true);
+        if (pref.getOnBindEditTextListener() != null) {
+            pref.getOnBindEditTextListener().onBindEditText(input);
+        }
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.FrameLayout box = new android.widget.FrameLayout(requireContext());
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(input);
+
+        new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+                .setTitle(pref.getTitle())
+                .setView(box)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    String value = input.getText().toString();
+                    if (pref.callChangeListener(value)) {
+                        pref.setText(value);
+                    }
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    /** 多选：参与录制的摄像头。 */
+    private void showMultiSelectDialog(MultiSelectListPreference pref) {
+        CharSequence[] entries = pref.getEntries();
+        CharSequence[] values = pref.getEntryValues();
+        if (entries == null || values == null) {
+            super.onDisplayPreferenceDialog(pref);
+            return;
+        }
+        final boolean[] checked = new boolean[values.length];
+        Set<String> current = pref.getValues();
+        for (int i = 0; i < values.length; i++) {
+            checked[i] = current.contains(String.valueOf(values[i]));
+        }
+
+        new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+                .setTitle(pref.getTitle())
+                .setMultiChoiceItems(entries, checked,
+                        (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    Set<String> picked = new HashSet<>();
+                    for (int i = 0; i < values.length; i++) {
+                        if (checked[i]) {
+                            picked.add(String.valueOf(values[i]));
+                        }
+                    }
+                    if (pref.callChangeListener(picked)) {
+                        pref.setValues(picked);
+                    }
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
     }
 
     // ------------------------------------------------------------------ 关于

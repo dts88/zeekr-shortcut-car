@@ -356,4 +356,5 @@
     <string name="set_plate_hint">Up to 10 characters, uppercase letters and digits only</string>
     <string name="set_plate_empty">Not set</string>
     <string name="msg_plate_cleaned">Cleaned up to %1$s</string>
+    <string name="msg_restart_required">Takes effect after restarting the app</string>
 </resources>

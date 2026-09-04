@@ -371,15 +371,16 @@
             android:title="环视流尺寸"
             android:summary="%s" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_photo_via_jpeg"
+            android:title="拍照走图片通道"
+            android:summary="用相机自己的 JPEG 输出拍照，各路都用最大分辨率；关闭时抓预览画面（分辨率受预览缓冲区限制）。会在每一路会话里常驻一条输出流，改完需重启应用" />
+
         <Preference
             android:key="pref_photo_test"
             android:title="拍照通道实测"
             android:summary="每一路、每个声明的 JPEG 尺寸真的拍一张，看能不能出图、带了哪些标签（会占用相机，录制中勿进）" />
 
-        <Preference
-            android:key="pref_share_test"
-            android:title="发送到手机 · 连通性测试"
-            android:summary="列出可用的局域网地址，起一个临时 HTTP 服务并生成二维码，用来验证手机能否扫码取到文件" />
 
         <Preference
             android:key="pref_developer_note"

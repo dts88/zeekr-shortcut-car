@@ -92,7 +92,10 @@ public class PhotoCaptureTestActivity extends Activity {
         cameraThread.start();
         cameraHandler = new Handler(cameraThread.getLooper());
         cameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
-        sampleDir = new File(getExternalFilesDir(null), "photo-test");
+        // 和照片存一块儿（正常配置下就是 U 盘），不放应用私有目录 ——
+        // 那里卸载应用才会跟着删，而这些是随手拍来对比画质的，用完就该能自己删掉。
+        sampleDir = new File(
+                com.kooo.evcam.StorageHelper.getPhotoDir(this).getParentFile(), "photo-test");
         setContentView(buildLayout());
     }
 
@@ -120,11 +123,12 @@ public class PhotoCaptureTestActivity extends Activity {
         root.addView(title("拍照通道实测"));
         root.addView(hint("每一路相机、每一个声明的 JPEG 尺寸，真的拍一张，"
                 + "记下能不能出图、图有多大、带了哪些标签。\n"
-                + "会占用相机，录制中请先停止录制再测。"));
+                + "会占用相机，录制中请先停止录制再测。\n"
+                + "样片存到 " + sampleDir.getAbsolutePath()));
 
         runButton = button("开始测试（全部相机 × 全部尺寸）", v -> startTest());
         root.addView(runButton);
-        root.addView(button("打开样片目录路径", v -> toastPath()));
+        root.addView(button("清空样片", v -> clearSamples()));
 
         status = hint("");
         root.addView(status);
@@ -177,8 +181,24 @@ public class PhotoCaptureTestActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density);
     }
 
-    private void toastPath() {
-        append("样片目录：" + sampleDir.getAbsolutePath());
+    /** 样片是临时对比用的，随手能清掉。 */
+    private void clearSamples() {
+        if (running) {
+            append("测试进行中，先等它跑完");
+            return;
+        }
+        File[] files = sampleDir.listFiles();
+        int removed = 0;
+        if (files != null) {
+            for (File file : files) {
+                if (file.delete()) {
+                    removed++;
+                } else {
+                    AppLog.w(TAG, "删不掉: " + file);
+                }
+            }
+        }
+        append("已删除 " + removed + " 个样片：" + sampleDir.getAbsolutePath());
     }
 
     // ------------------------------------------------------------------ 测试

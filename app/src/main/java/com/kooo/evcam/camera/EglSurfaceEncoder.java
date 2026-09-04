@@ -196,8 +196,18 @@ public class EglSurfaceEncoder {
     private static final int WATERMARK_WIDTH = 560;   // 需容纳规格行（比 19 字符的时间戳长）
     private static final int WATERMARK_HEIGHT = 80;   // 两行
     private static final int WATERMARK_LINE_HEIGHT = 34;
-    private static final int BRAND_WIDTH = 420;
+    /**
+     * 角标贴图的高度。宽度<b>按文字实际宽度算</b>，不写死 ——
+     * 原来固定 420px，填了车牌号之后这一行变长，超出的部分被直接裁掉，
+     * 表现就是「开了车牌号但画面上看不到」。
+     */
     private static final int BRAND_HEIGHT = 40;
+
+    /** 角标文字大小；量文字宽度和真正画的时候必须用同一个值。 */
+    private static final float BRAND_TEXT_SIZE = 26f;
+
+    /** 实际生成的角标贴图尺寸，画四边形时要用它，不能用常量。 */
+    private int brandWidthPx;
     private final SimpleDateFormat watermarkDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     
     // 性能优化：水印更新控制
@@ -614,7 +624,7 @@ public class EglSurfaceEncoder {
         // 右上角：时间 + 规格 + 实时码率
         drawOverlayQuad(watermarkTextureId, WATERMARK_WIDTH, WATERMARK_HEIGHT, true);
         // 左上角：应用名 + 版本号，和右上角对称
-        drawOverlayQuad(brandTextureId, BRAND_WIDTH, BRAND_HEIGHT, false);
+        drawOverlayQuad(brandTextureId, brandWidthPx, BRAND_HEIGHT, false);
 
         GLES20.glDisable(GLES20.GL_BLEND);
     }
@@ -1068,6 +1078,11 @@ public class EglSurfaceEncoder {
         if (brandLine.isEmpty()) {
             return;
         }
+        if (brandTextureId != 0) {
+            // 车牌号改了会重建，旧纹理不删就漏了
+            GLES20.glDeleteTextures(1, new int[]{brandTextureId}, 0);
+            brandTextureId = 0;
+        }
         int[] textures = new int[1];
         GLES20.glGenTextures(1, textures, 0);
         brandTextureId = textures[0];
@@ -1078,21 +1093,24 @@ public class EglSurfaceEncoder {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
 
-        Bitmap bitmap = Bitmap.createBitmap(BRAND_WIDTH, BRAND_HEIGHT, Bitmap.Config.ARGB_8888);
-        bitmap.eraseColor(Color.TRANSPARENT);
-        Canvas canvas = new Canvas(bitmap);
-
         Paint shadow = new Paint();
         shadow.setColor(Color.BLACK);
-        shadow.setTextSize(26);
+        shadow.setTextSize(BRAND_TEXT_SIZE);
         shadow.setAntiAlias(true);
         shadow.setTypeface(Typeface.MONOSPACE);
 
         Paint text = new Paint();
         text.setColor(Color.WHITE);
-        text.setTextSize(26);
+        text.setTextSize(BRAND_TEXT_SIZE);
         text.setAntiAlias(true);
         text.setTypeface(Typeface.MONOSPACE);
+
+        // 量出来再建贴图：车牌号让这一行长短不定，写死宽度就会把尾巴裁掉。
+        // 左右各留出画阴影和描边的余量。
+        brandWidthPx = (int) Math.ceil(text.measureText(brandLine)) + 16;
+        Bitmap bitmap = Bitmap.createBitmap(brandWidthPx, BRAND_HEIGHT, Bitmap.Config.ARGB_8888);
+        bitmap.eraseColor(Color.TRANSPARENT);
+        Canvas canvas = new Canvas(bitmap);
 
         canvas.drawText(brandLine, 8, 30, shadow);
         canvas.drawText(brandLine, 6, 28, text);

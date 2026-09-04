@@ -186,6 +186,7 @@ public class AppConfig {
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
     private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
+    private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
 
@@ -3092,6 +3093,26 @@ public class AppConfig {
         String clean = LicensePlate.sanitize(value);
         prefs.edit().putString(KEY_LICENSE_PLATE, clean).apply();
         AppLog.i(TAG, "车牌号设为 " + (clean.isEmpty() ? "（空）" : clean));
+    }
+
+    /**
+     * 拍照走相机自己的 JPEG 输出通道，而不是抓预览画面。
+     *
+     * <h3>默认关着的理由</h3>
+     *
+     * <p>它要在每一路的相机会话里常驻一条 JPEG 输出流。撑爆平台的流数量上限时，
+     * 表现是<b>会话配置失败 = 没有画面</b> —— 比「照片糊一点」严重得多。
+     * 所以先放在开发者选项里，在车上确认三路都起得来之后再考虑设为默认。</p>
+     *
+     * <p>开着的好处：照片用这一路声明的最大分辨率，和预览缓冲区彻底脱钩。</p>
+     */
+    public boolean isPhotoViaJpegEnabled() {
+        return prefs.getBoolean(KEY_PHOTO_VIA_JPEG, false);
+    }
+
+    public void setPhotoViaJpegEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_PHOTO_VIA_JPEG, enabled).apply();
+        AppLog.i(TAG, "拍照通道: " + (enabled ? "相机 JPEG 输出" : "抓预览画面"));
     }
 
     public boolean isLicensePlateEnabled() {

@@ -7,6 +7,23 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.36.9-alpha] - 2026-09-04
+
+- Photos can now be taken through the camera's own JPEG channel at each camera's largest
+  size, instead of grabbing the preview. Off by default, under developer options, because
+  it keeps an extra output stream open per camera.
+- Fixed: the plate number was stamped but clipped off the badge, which is a fixed-width
+  strip. The badge is now sized from the text.
+- Fixed: settings dialogs with buttons (plate number, storage limits, recording cameras)
+  showed no visible Save button. They are now built the same way as every other dialog in
+  the app instead of relying on a theme attribute.
+- The night-mode theme was a full rewrite of the day theme and had drifted; it now carries
+  the same dialog and preference attributes.
+- Photo test samples go next to the photos on the USB drive, and can be cleared from the
+  test screen.
+- Removed the send-to-phone connectivity test. The feature works on the vehicle; the
+  diagnostics report still lists the local addresses.
+
 ## [0.36.8-alpha] - 2026-09-04
 
 - Developer options: added a photo capture test. It takes a real JPEG from every camera at

@@ -82,6 +82,29 @@ public class SingleCamera {
     private OutputConfiguration activePreviewConfig; // 共享预览配置，用于动态 Surface 增减
     private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
     private ImageReader imageReader;  // 用于拍照的ImageReader
+
+    /**
+     * 拍照用的 JPEG 输出，<b>常驻在会话里</b>。
+     *
+     * <p>方案 A：建会话时就把它挂上去，按下快门直接发一次静态拍照请求，
+     * 不用重建会话，预览和录制都不会顿。代价是每一路多一条输出流 ——
+     * 这也是它藏在开发者选项后面、默认关着的原因：真撑爆了表现是
+     * 「会话配置失败 = 没有画面」，得先在车上确认三路都起得来。</p>
+     */
+    private ImageReader jpegReader;
+
+    /** JPEG 通道用的尺寸：这一路声明的最大那个。 */
+    private Size jpegSize;
+
+    /** 一次拍照的回调；拿到图或失败之后就清掉。 */
+    private volatile JpegCallback pendingJpeg;
+
+    /** 拍到一张 JPEG 之后怎么处理。 */
+    interface JpegCallback {
+        void onJpeg(byte[] data);
+
+        void onFailed(String reason);
+    }
     private boolean singleOutputMode = false;  // 单一输出模式（用于不支持多路输出的车机平台）
     
     // 鱼眼矫正
@@ -983,9 +1006,9 @@ public class SingleCamera {
                         + (previewBufferSize != null && !previewBufferSize.equals(previewSize)
                            ? " (预览缓冲区: " + previewBufferSize + ")" : ""));
 
-                // 不在这里初始化ImageReader，改为拍照时按需创建
-                // 这样可以避免占用额外的缓冲区，防止超过系统限制(4个buffer)
-                AppLog.d(TAG, "Camera " + cameraId + " ImageReader will be created on demand when taking picture");
+                // 拍照通道：开着「拍照走图片通道」时，建一个常驻的 JPEG 输出。
+                // 关着时什么都不建，行为和以前完全一样（抓预览画面）。
+                prepareJpegReader(map);
 
                 // 通知回调预览尺寸已确定
                 if (callback != null && previewSize != null) {
@@ -1639,6 +1662,17 @@ public class SingleCamera {
                     previewRequestBuilder.addTarget(recordSurface);
                     AppLog.d(TAG, "Added record surface as SEPARATE stream");
                 }
+
+                // 拍照通道：只加进会话，<b>不加进预览请求</b> ——
+                // 每一帧都往 JPEG 编一遍是没有意义的开销，按下快门时才单发一次。
+                if (jpegReader != null) {
+                    Surface jpegSurface = jpegReader.getSurface();
+                    if (jpegSurface != null && jpegSurface.isValid()) {
+                        outputConfigs.add(new OutputConfiguration(jpegSurface));
+                        surfaces.add(jpegSurface);
+                        AppLog.d(TAG, "Camera " + cameraId + " 拍照通道已挂入会话: " + jpegSize);
+                    }
+                }
             }
 
             if (outputConfigs.isEmpty()) {
@@ -2223,6 +2257,97 @@ public class SingleCamera {
     }
 
     /**
+     * 建拍照用的 JPEG 输出。
+     *
+     * <p>尺寸取这一路声明的<b>最大</b>那个 —— 拍照是单张，没有帧率压力，
+     * 没有理由拍得比相机能给的小。诊断报告里三路的 JPEG 尺寸列表和预览完全一致，
+     * 实测每一路每个尺寸都能出图，耗时 120–200ms。</p>
+     */
+    private void prepareJpegReader(StreamConfigurationMap map) {
+        closeJpegReader();
+        if (!new AppConfig(context).isPhotoViaJpegEnabled()) {
+            AppLog.d(TAG, "Camera " + cameraId + " 拍照仍走预览抓图（图片通道未开启）");
+            return;
+        }
+        Size[] sizes = map.getOutputSizes(android.graphics.ImageFormat.JPEG);
+        if (sizes == null || sizes.length == 0) {
+            AppLog.w(TAG, "Camera " + cameraId + " 没有声明 JPEG 尺寸，拍照回退到预览抓图");
+            return;
+        }
+        Size largest = sizes[0];
+        for (Size size : sizes) {
+            if ((long) size.getWidth() * size.getHeight()
+                    > (long) largest.getWidth() * largest.getHeight()) {
+                largest = size;
+            }
+        }
+        jpegSize = largest;
+        // maxImages 2：一张在读、一张在路上就够了，多了只是占内存
+        jpegReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+                android.graphics.ImageFormat.JPEG, 2);
+        jpegReader.setOnImageAvailableListener(this::onJpegAvailable, backgroundHandler);
+        AppLog.i(TAG, "Camera " + cameraId + " 拍照通道就绪: " + largest);
+    }
+
+    private void onJpegAvailable(ImageReader reader) {
+        JpegCallback callback = pendingJpeg;
+        pendingJpeg = null;
+        byte[] data = null;
+        try (android.media.Image image = reader.acquireNextImage()) {
+            if (image != null) {
+                java.nio.ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                data = new byte[buffer.remaining()];
+                buffer.get(data);
+            }
+        } catch (Exception e) {
+            AppLog.w(TAG, "Camera " + cameraId + " 读取 JPEG 失败: " + e);
+        }
+        if (callback == null) {
+            return;   // 没人等这张图（超时之后才到），丢掉
+        }
+        if (data == null) {
+            callback.onFailed("没有拿到图像数据");
+        } else {
+            callback.onJpeg(data);
+        }
+    }
+
+    /**
+     * 发一次静态拍照请求。
+     *
+     * @return 发出去了返回 true；通道没开或会话不在时返回 false，调用方该回退
+     */
+    private boolean requestJpeg(JpegCallback callback) {
+        ImageReader reader = jpegReader;
+        CameraCaptureSession currentSession = captureSession;
+        if (reader == null || currentSession == null || cameraDevice == null) {
+            return false;
+        }
+        try {
+            CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(
+                    CameraDevice.TEMPLATE_STILL_CAPTURE);
+            builder.addTarget(reader.getSurface());
+            builder.set(CaptureRequest.JPEG_QUALITY, (byte) 95);
+            pendingJpeg = callback;
+            currentSession.capture(builder.build(), null, backgroundHandler);
+            return true;
+        } catch (Exception e) {
+            pendingJpeg = null;
+            AppLog.w(TAG, "Camera " + cameraId + " 拍照请求失败: " + e);
+            return false;
+        }
+    }
+
+    private void closeJpegReader() {
+        if (jpegReader != null) {
+            jpegReader.close();
+            jpegReader = null;
+        }
+        jpegSize = null;
+        pendingJpeg = null;
+    }
+
+    /**
      * 拍照（使用指定的时间戳和保存延迟）
      * @param timestamp 文件命名用的时间戳
      * @param saveDelayMs 保存文件前的延迟时间（毫秒）
@@ -2238,7 +2363,67 @@ public class SingleCamera {
             return;
         }
 
-        // 在后台线程中处理截图和保存
+        // 图片通道优先：那是相机自己的 JPEG 输出，分辨率是这一路的最大值，
+        // 和预览缓冲区无关。发不出去（通道没开、会话不在）就回退抓预览。
+        if (requestJpeg(new JpegCallback() {
+            @Override
+            public void onJpeg(byte[] data) {
+                saveJpeg(data, timestamp, saveDelayMs);
+            }
+
+            @Override
+            public void onFailed(String reason) {
+                AppLog.w(TAG, "Camera " + cameraId + " 图片通道没出图（" + reason + "），改抓预览");
+                grabPreview(timestamp, saveDelayMs);
+            }
+        })) {
+            return;
+        }
+        grabPreview(timestamp, saveDelayMs);
+    }
+
+    /**
+     * 把相机出的 JPEG 存下来。
+     *
+     * <p>要盖角标，所以得先解码成 Bitmap 再重新编码 —— 相机直出的那份字节
+     * 里没有我们的应用名、车牌和时间。EXIF 由 {@code saveBitmapAsJPEG} 之后
+     * 单独补写，重新编码会把相机写的标签丢掉。</p>
+     */
+    private void saveJpeg(byte[] data, String timestamp, int saveDelayMs) {
+        if (backgroundHandler == null) {
+            return;
+        }
+        backgroundHandler.post(() -> {
+            android.graphics.Bitmap bitmap = null;
+            try {
+                bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
+                if (bitmap == null) {
+                    AppLog.e(TAG, "Camera " + cameraId + " JPEG 解不开，改抓预览");
+                    grabPreview(timestamp, saveDelayMs);
+                    return;
+                }
+                AppLog.d(TAG, "Camera " + cameraId + " 图片通道拍到 "
+                        + bitmap.getWidth() + "x" + bitmap.getHeight());
+                if (saveDelayMs > 0) {
+                    try {
+                        Thread.sleep(saveDelayMs);
+                    } catch (InterruptedException e) {
+                        AppLog.w(TAG, "Save delay interrupted");
+                    }
+                }
+                saveBitmapAsJPEG(bitmap, timestamp);
+            } catch (Exception e) {
+                AppLog.e(TAG, "Camera " + cameraId + " 保存 JPEG 失败", e);
+            } finally {
+                if (bitmap != null) {
+                    bitmap.recycle();
+                }
+            }
+        });
+    }
+
+    /** 老路子：从 TextureView 抓一张预览画面。分辨率受预览缓冲区限制。 */
+    private void grabPreview(String timestamp, int saveDelayMs) {
         if (backgroundHandler != null) {
             backgroundHandler.post(() -> {
                 try {
@@ -2560,6 +2745,9 @@ public class SingleCamera {
                 secondaryDisplaySurfaceTexture = null;
             }
             // 清理 MJPEG 流 Surface 引用（实际 release 由 StreamGlEncoder 负责）
+
+            // 拍照通道也要放，否则下次建会话会多一条悬着的流
+            closeJpegReader();
 
             // 释放ImageReader
             if (imageReader != null) {

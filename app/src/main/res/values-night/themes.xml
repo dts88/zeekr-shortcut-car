@@ -1,6 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.Cam" parent="Theme.Material3.DayNight.NoActionBar">
+        <!--
+          这份夜间主题是整份重写的，不是继承 values/ 那份 —— 那边加的属性
+          这里不会自动有。preferenceTheme 缺了会让设置界面直接抛异常，
+          对话框主题缺了按钮就看不见。加什么都要两边一起加。
+        -->
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+        <item name="alertDialogTheme">@style/AlertDialogTheme</item>
+        <item name="android:alertDialogTheme">@style/AlertDialogTheme</item>
+        <item name="materialAlertDialogTheme">@style/Theme.Cam.MaterialAlertDialog</item>
         <!-- 深灰色配色方案 (夜间模式) -->
         <item name="colorPrimary">#424242</item>
         <item name="colorPrimaryVariant">#2A2A2A</item>

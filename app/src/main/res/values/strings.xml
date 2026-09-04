@@ -357,4 +357,5 @@
     <string name="set_plate_hint">最长十位，只能是大写字母和数字</string>
     <string name="set_plate_empty">未填写</string>
     <string name="msg_plate_cleaned">已按规则整理为 %1$s</string>
+    <string name="msg_restart_required">重启应用后生效</string>
 </resources>

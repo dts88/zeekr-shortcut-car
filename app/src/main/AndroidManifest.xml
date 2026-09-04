@@ -117,11 +117,6 @@
             android:screenOrientation="landscape"
             android:exported="false" />
 
-        <activity
-            android:name=".share.ShareTestActivity"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-            android:exported="false"
-            android:label="发送到手机 · 测试" />
 
         <activity
             android:name=".MainActivity"
