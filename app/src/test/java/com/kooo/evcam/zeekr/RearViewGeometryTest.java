@@ -21,7 +21,7 @@ public class RearViewGeometryTest {
     /** 极氪 7X 的真实合成流尺寸。 */
     private static CompositeStreamGeometry.Plan zeekrPlan() {
         // 拆分要看是哪一路相机，先登记合成流那一路
-        CompositeSplitProfile.setCompositeCameraId("2");
+        StreamLayoutTable.setCompositeCameraId("2");
         return CompositeStreamGeometry.analyse("2", 1280, 5140);
     }
 
@@ -318,7 +318,7 @@ public class RearViewGeometryTest {
     }
     @org.junit.After
     public void clearCompositeCamera() {
-        CompositeSplitProfile.reset();
+        StreamLayoutTable.reset();
     }
 
 }

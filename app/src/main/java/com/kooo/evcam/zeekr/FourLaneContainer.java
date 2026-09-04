@@ -140,7 +140,7 @@ public class FourLaneContainer extends ViewGroup {
         if (width <= 0 || height <= 0) {
             return;
         }
-        if (!CompositeStreamGeometry.looksLikeComposite(CompositeSplitProfile.compositeCameraId(), width, height)) {
+        if (!CompositeStreamGeometry.looksLikeComposite(StreamLayoutTable.compositeCameraId(), width, height)) {
             AppLog.d(TAG, "忽略非合成流尺寸 " + width + "x" + height + "（可能是 HAL 的小尺寸提示）");
             return;
         }
@@ -231,7 +231,7 @@ public class FourLaneContainer extends ViewGroup {
     private void rebuildPlan() {
         if (sourceWidth > 0 && sourceHeight > 0) {
             plan = CompositeStreamGeometry.analyse(
-                    CompositeSplitProfile.compositeCameraId(), sourceWidth, sourceHeight);
+                    StreamLayoutTable.compositeCameraId(), sourceWidth, sourceHeight);
             AppLog.i(TAG, "合成流拆分方案: " + plan);
         } else {
             plan = null;

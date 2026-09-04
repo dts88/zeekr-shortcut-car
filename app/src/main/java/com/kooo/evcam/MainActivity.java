@@ -1926,7 +1926,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        com.kooo.evcam.zeekr.CompositeSplitProfile.setCompositeCameraId(
+        com.kooo.evcam.zeekr.StreamLayoutTable.setCompositeCameraId(
                 plan.compositeIsReal ? plan.compositeId : null);
 
         updateCompositeInfoOverlay(describeMultiSlots(plan));

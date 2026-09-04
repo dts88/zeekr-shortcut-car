@@ -27,7 +27,7 @@ public class CompositeStreamGeometryTest {
 
     @Before
     public void registerCompositeCamera() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
     }
 
     private static final float EPS = 1e-6f;
@@ -90,7 +90,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void looksLikeCompositeMatchesKnownStreamSizes() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
 
         // 合成流那一路实测声明的两个要拆的尺寸
         assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 5140));
@@ -110,7 +110,7 @@ public class CompositeStreamGeometryTest {
 
     // 5120x1280 和 1280x5120 那两条测试删掉了：诊断报告里这台车的三路相机
     // 都没有声明过这两个尺寸，测试它们等于在钉一个不存在的行为。真出现别的
-    // 固件、别的尺寸，往 CompositeSplitProfile 的表里加一行，再补对应的测试。
+    // 固件、别的尺寸，往 StreamLayoutTable 的表里加一行，再补对应的测试。
 
     // ---------- 等分与分隔带 ----------
     //
@@ -122,7 +122,7 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void lanesNeverEscapeTheSourceFrame() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
         int[][] sizes = {
                 {1280, 5140}, {1280, 5120}, {5120, 1280}, {3840, 2160},
                 {1280, 6000}, {1280, 4800}, {640, 2570}, {1920, 1080},
@@ -178,7 +178,7 @@ public class CompositeStreamGeometryTest {
      */
     @Test
     public void theSixteenByNineSizeSplitsOnlyOnTheCompositeCamera() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
 
         assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 3840, 2160));
         assertFalse("座舱那两路不能被切成四块",
@@ -190,7 +190,7 @@ public class CompositeStreamGeometryTest {
     /** 3840×2160 等分成四条 3840×540。 */
     @Test
     public void theSixteenByNineSizeSplitsIntoFourEqualLanes() {
-        CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
 
         CompositeStreamGeometry.Plan plan =
                 CompositeStreamGeometry.analyse(COMPOSITE, 3840, 2160);
@@ -223,7 +223,7 @@ public class CompositeStreamGeometryTest {
     /** 表里就是这台车实测确认过的两个尺寸，一个不多一个不少。 */
     @Test
     public void theTableHoldsExactlyTheConfirmedSizes() {
-        int[][] sizes = CompositeSplitProfile.compositeSizes();
+        int[][] sizes = StreamLayoutTable.compositeSizes();
         assertEquals(2, sizes.length);
         assertEquals(1280, sizes[0][0]);
         assertEquals(5140, sizes[0][1]);
@@ -234,7 +234,7 @@ public class CompositeStreamGeometryTest {
     /** 登记是进程内全局的，每条测试跑完都要还原。 */
     @After
     public void clearCompositeCamera() {
-        CompositeSplitProfile.reset();
+        StreamLayoutTable.reset();
     }
 
 }

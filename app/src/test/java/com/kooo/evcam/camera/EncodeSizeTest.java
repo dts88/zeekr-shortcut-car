@@ -19,12 +19,12 @@ public class EncodeSizeTest {
 
     @org.junit.Before
     public void registerCompositeCamera() {
-        com.kooo.evcam.zeekr.CompositeSplitProfile.setCompositeCameraId(COMPOSITE);
+        com.kooo.evcam.zeekr.StreamLayoutTable.setCompositeCameraId(COMPOSITE);
     }
 
     @org.junit.After
     public void clearCompositeCamera() {
-        com.kooo.evcam.zeekr.CompositeSplitProfile.reset();
+        com.kooo.evcam.zeekr.StreamLayoutTable.reset();
     }
 
     /** 极氪的合成条带 + 四宫格：1280×5140 拼成 2560×2560。 */

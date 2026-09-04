@@ -28,6 +28,13 @@ package com.kooo.evcam.zeekr;
  *
  * <p>四格顺序在两个尺寸下一致：<b>前 后 左 右</b>，见 {@link LaneCycle}。</p>
  *
+ * <h3>为什么叫「表」而不是「配置」</h3>
+ *
+ * <p>这里面装的是<b>设备事实</b>：这一路相机在这个尺寸下送出来的像素是怎么排的。
+ * 用户改不了，因为那不是一个选择。跟它对立的是<b>配置</b>（用哪几路、
+ * 每条流什么参数、预览窗口怎么摆）—— 那些才是选择。两者必须分开，
+ * 这个类原来叫 {@code CompositeSplitProfile}，改名就是为了不和用户那个「配置」撞名。</p>
+ *
  * <p>其余组合一律不拆。特别是 <b>3840×2160 三路都有</b> —— 只看分辨率根本分不清，
  * 这正是这张表必须带上「哪一路」的原因：座舱拍到的一整幅画面被切成四块，
  * 比不拆糟糕得多。</p>
@@ -43,7 +50,7 @@ package com.kooo.evcam.zeekr;
  * 不对；拆错看到的是四块被切开的画面，反而像是「功能正常」。长宽比只用来
  * <b>认出哪一路是合成流</b>，从不用来决定怎么拆。</p>
  */
-public final class CompositeSplitProfile {
+public final class StreamLayoutTable {
 
     /**
      * 合成流那一路已确认的拆分尺寸，以及各自的排布。
@@ -59,7 +66,7 @@ public final class CompositeSplitProfile {
     /** 合成流那一路的相机 id；还没认出来时为 null。 */
     private static volatile String compositeCameraId;
 
-    private CompositeSplitProfile() {
+    private StreamLayoutTable() {
     }
 
     /** 启动时认出合成流之后登记一次。 */

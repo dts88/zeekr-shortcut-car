@@ -167,7 +167,7 @@ public final class CompositeStreamGeometry {
      * 3840×2160）会跟着变成「合成流候选」，认错相机。</p>
      *
      * <p>所以分成两件事：<b>认哪一路</b>用比例（只有这一处），
-     * <b>怎么拆这一帧</b>查 {@link CompositeSplitProfile} 那张表。
+     * <b>怎么拆这一帧</b>查 {@link StreamLayoutTable} 那张表。
      * 比例从不参与「怎么拆」的决定。</p>
      */
     public static boolean looksLikeCompositeByRatio(int frameWidth, int frameHeight) {
@@ -188,13 +188,13 @@ public final class CompositeStreamGeometry {
      * 这一帧要不要拆、怎么拆。
      *
      * <p>依据只有两个：<b>哪一路相机 + 什么分辨率</b>，规则全在
-     * {@link CompositeSplitProfile} 里。以前这里用长宽比去猜，是因为不知道
+     * {@link StreamLayoutTable} 里。以前这里用长宽比去猜，是因为不知道
      * 这一路装的是什么；现在知道了，就不该再猜。</p>
      *
      * @param cameraId 出这一帧的相机；不知道时传 null
      */
     public static Stacking detectStacking(String cameraId, int frameWidth, int frameHeight) {
-        return CompositeSplitProfile.stackingFor(cameraId, frameWidth, frameHeight);
+        return StreamLayoutTable.stackingFor(cameraId, frameWidth, frameHeight);
     }
 
     static Stacking detectStacking(int frameWidth, int frameHeight) {
