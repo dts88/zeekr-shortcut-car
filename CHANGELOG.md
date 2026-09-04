@@ -5,7 +5,8 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Removed an ImageReader field that was declared and closed but never given a surface
+  or attached to a session. Photos never went through it.
 
 ## [0.36.10-alpha] - 2026-09-04
 

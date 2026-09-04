@@ -81,7 +81,6 @@ public class SingleCamera {
     private android.graphics.SurfaceTexture fullscreenPreviewSurfaceTexture; // 全屏预览SurfaceTexture（用于设置buffer尺寸）
     private OutputConfiguration activePreviewConfig; // 共享预览配置，用于动态 Surface 增减
     private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
-    private ImageReader imageReader;  // 用于拍照的ImageReader
 
     /**
      * 拍照用的 JPEG 输出，<b>常驻在会话里</b>。
@@ -2748,17 +2747,6 @@ public class SingleCamera {
 
             // 拍照通道也要放，否则下次建会话会多一条悬着的流
             closeJpegReader();
-
-            // 释放ImageReader
-            if (imageReader != null) {
-                try {
-                    imageReader.close();
-                    AppLog.d(TAG, "Camera " + cameraId + " released image reader");
-                } catch (Exception e) {
-                    AppLog.d(TAG, "Camera " + cameraId + " ignored exception while closing image reader: " + e.getMessage());
-                }
-                imageReader = null;
-            }
 
             stopBackgroundThread();
 
