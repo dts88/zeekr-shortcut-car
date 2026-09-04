@@ -121,10 +121,16 @@ public final class ProfileMigration {
 
     public static Profile migrate(Snapshot snapshot) {
         boolean multi = "zeekr_7x_multi".equals(snapshot.carModel);
+        boolean custom = "custom".equals(snapshot.carModel);
 
         Profile profile = new Profile();
-        profile.id = multi ? Profile.PRESET_COMPOSITE_MULTI : Profile.PRESET_COMPOSITE;
-        profile.name = multi ? "环视 + 两路座舱" : "极氪7X（环视合成流）";
+        profile.id = multi ? Profile.PRESET_COMPOSITE_MULTI
+                : custom ? Profile.PRESET_CUSTOM : Profile.PRESET_COMPOSITE;
+        // 「自定义」的相机映射是另一套数据（CustomLayoutManager 那边），第 1 步没有翻译它。
+        // 名字必须说实话 —— 顶着「极氪7X」的名头给出一份不是它的配置，
+        // 比不给更糟：核对的人会以为翻译对了。
+        profile.name = multi ? "环视 + 两路座舱"
+                : custom ? "自定义（相机映射尚未翻译）" : "极氪7X（环视合成流）";
 
         // ---- 环视那一路 ----
         CameraProfile composite = new CameraProfile(CameraProfile.ROLE_COMPOSITE);

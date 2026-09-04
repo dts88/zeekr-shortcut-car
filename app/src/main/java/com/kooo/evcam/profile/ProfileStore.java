@@ -29,9 +29,6 @@ public final class ProfileStore {
     /** 当前选中的配置 id。 */
     private static final String KEY_CURRENT = "current";
 
-    /** 已经从旧设置翻译过一次，别再翻译第二次覆盖用户后来的改动。 */
-    private static final String KEY_MIGRATED = "migrated";
-
     private final Context context;
     private final SharedPreferences prefs;
 
@@ -41,29 +38,24 @@ public final class ProfileStore {
     }
 
     /**
-     * 取当前配置；第一次调用时从旧设置翻译一份出来并存好。
+     * 当前配置。
+     *
+     * <h3>第 1 步：每次都重新翻译</h3>
+     *
+     * <p>现在配置只是旧设置的一个<b>视图</b>：没有编辑器，没有任何人从它取值。
+     * 所以「存下来下次直接用」没有任何好处，只会造成一个真实的错误 ——
+     * 切换了车型之后，看到的还是上一次翻译的那份，而核对翻译对不对
+     * 正是这一步唯一的目的。</p>
+     *
+     * <p>第 2 步配置变成取值的源头之后，这里才改成「读存下来的那份」，
+     * 而「切换车型」也随之变成「切换配置」。</p>
      */
     public Profile current() {
-        String id = prefs.getString(KEY_CURRENT, null);
-        if (id != null) {
-            Profile stored = load(id);
-            if (!stored.cameras.isEmpty()) {
-                return stored;
-            }
-            AppLog.w(TAG, "配置 " + id + " 读出来是空的，重新从旧设置翻译");
-        }
         Profile migrated = ProfileMigration.migrate(snapshot(context));
         save(migrated);
-        prefs.edit()
-                .putString(KEY_CURRENT, migrated.id)
-                .putBoolean(KEY_MIGRATED, true)
-                .apply();
+        prefs.edit().putString(KEY_CURRENT, migrated.id).apply();
         AppLog.i(TAG, "已从旧设置翻译出配置:\n" + migrated);
         return migrated;
-    }
-
-    public boolean hasMigrated() {
-        return prefs.getBoolean(KEY_MIGRATED, false);
     }
 
     public void save(Profile profile) {

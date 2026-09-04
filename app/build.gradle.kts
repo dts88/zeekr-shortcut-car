@@ -38,9 +38,9 @@ android {
         // -beta，而且<b>不会延续到下一版</b>——上一版是 beta 不是下一版也是 beta
         // 的理由。检查更新只推 beta 和正式版，标错等于把一个没验证过的版本
         // 推给一台正在用的车机。
-        versionCode = 92
+        versionCode = 93
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
-        versionName = "0.37.0-alpha"
+        versionName = "0.37.1-alpha"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

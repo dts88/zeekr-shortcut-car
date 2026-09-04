@@ -156,6 +156,24 @@ public class ProfileMigrationTest {
         assertTrue(profile.camera(CameraProfile.ROLE_CABIN_2).lanes.get(0).mirrored);
     }
 
+    /**
+     * 「自定义」不能被当成极氪7X翻译。
+     *
+     * <p>顶着「极氪7X」的名头给出一份不是它的配置，比不给更糟 ——
+     * 核对的人会以为翻译对了。</p>
+     */
+    @Test
+    public void theCustomModelIsNotDisguisedAsTheZeekrPreset() {
+        ProfileMigration.Snapshot snapshot = snapshot();
+        snapshot.carModel = "custom";
+
+        Profile profile = ProfileMigration.migrate(snapshot);
+
+        assertEquals(Profile.PRESET_CUSTOM, profile.id);
+        assertTrue("名字要说明相机映射还没翻译，实际: " + profile.name,
+                profile.name.contains("尚未翻译"));
+    }
+
     // ---------- 意图，不是数字 ----------
 
     /** 旧的「原始帧率」存的是 auto，含义是不限制。 */

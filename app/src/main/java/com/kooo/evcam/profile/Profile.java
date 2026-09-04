@@ -29,6 +29,15 @@ public final class Profile {
     /** 内置预设：环视 + 两路座舱。 */
     public static final String PRESET_COMPOSITE_MULTI = "zeekr_7x_multi";
 
+    /**
+     * 自定义（排查用）。
+     *
+     * <p>它的相机映射存在另一套数据里，第 1 步没有翻译。第 4 步做布局编辑时
+     * 这个预设会被普通的「另存为」取代 —— 自定义本来就该是「一份改过的配置」，
+     * 而不是一种车型。</p>
+     */
+    public static final String PRESET_CUSTOM = "custom";
+
     /** 配置 id，也是存储时的命名空间。 */
     public String id = PRESET_COMPOSITE;
 
