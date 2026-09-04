@@ -35,6 +35,10 @@ import com.google.android.material.navigation.NavigationView;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.PreviewSlots;
+import com.kooo.evcam.profile.CameraProfile;
+import com.kooo.evcam.profile.Profile;
+import com.kooo.evcam.profile.ProfileResolution;
+import com.kooo.evcam.profile.ProfileStore;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.settings.Languages;
 import com.kooo.evcam.settings.SettingSpec;
@@ -1605,17 +1609,50 @@ public class MainActivity extends AppCompatActivity {
      * 映射方法一起删掉了。真要再支持别的车型，得先让它能被选出来。</p>
      */
     private void initCamerasForConfiguredModel(CameraManager cm, String[] cameraIds) {
-        String carModel = appConfig.getCarModel();
-        if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            // 极氪7X 多路：合成流 + 其余两路座舱
-            initCamerasForZeekrMulti(cm, cameraIds);
-        } else if (appConfig.needsCustomLayoutManager()) {
-            // 自定义：用户自己配的摄像头映射（排查用）
+        // 走哪条路由配置决定，不再看车型这个字符串。两个内置预设的区别就是
+        // 「配置里有几路相机」——这本来就是它们唯一的实质区别。
+        activeProfile = new ProfileStore(this).current();
+        AppLog.i(TAG, "本次相机初始化使用的配置:\n" + activeProfile);
+
+        if (Profile.PRESET_CUSTOM.equals(activeProfile.id)) {
+            // 自定义的相机映射还是另一套数据，第 4 步才收编
             initCamerasForCustomModel(cameraIds);
-        } else {
-            // 极氪7X，也是兜底：本项目就是为这一路合成流做的
-            initCamerasForZeekrComposite(cm, cameraIds);
+            return;
         }
+        if (activeProfile.camera(CameraProfile.ROLE_CABIN_1) != null) {
+            initCamerasForZeekrMulti(cm, cameraIds);
+            return;
+        }
+        initCamerasForZeekrComposite(cm, cameraIds);
+    }
+
+    /**
+     * 这次相机初始化用的那份配置。
+     *
+     * <p>取一次存着，别在初始化过程中反复去读 —— 中途换了值，前半截和后半截
+     * 按不同的配置接线，出来的东西不属于任何一份配置。</p>
+     */
+    private Profile activeProfile;
+
+    /**
+     * 某一路在配置里要用的预览尺寸。
+     *
+     * @param probed 这一路探测到的尺寸；没有传 null
+     * @return null 表示不指定，交给 {@code chooseOptimalSize} 按老规则挑
+     */
+    private android.util.Size profileSize(String role, android.util.Size probed) {
+        if (activeProfile == null) {
+            return probed;
+        }
+        CameraProfile camera = activeProfile.camera(role);
+        if (camera == null) {
+            return probed;
+        }
+        int[] probedPair = probed == null
+                ? null : new int[]{probed.getWidth(), probed.getHeight()};
+        ProfileResolution.Size size =
+                ProfileResolution.resolve(camera.preview.resolution, probedPair, null);
+        return size.specified() ? new android.util.Size(size.width, size.height) : null;
     }
 
     /**
@@ -1801,19 +1838,20 @@ public class MainActivity extends AppCompatActivity {
             if (located.found()) {
                 com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
                 if (cam != null) {
-                    // 开发者选项里可以强制换一个尺寸（比如试 3840×2160）。
-                    // 探测结果是已知能出四格竖排的那一个，所以它才是默认。
-                    android.util.Size forced = parseSizeSetting(
-                            appConfig.getCompositeSizeOverride());
-                    android.util.Size use = forced != null ? forced : located.size;
-                    if (forced != null) {
-                        AppLog.w(TAG, "环视流尺寸被强制为 " + forced
+                    // 尺寸来自配置。配置里是 auto 时就是探测结果，
+                    // 是具体值时（开发者选项改过的）就用那个值。
+                    android.util.Size use = profileSize(
+                            CameraProfile.ROLE_COMPOSITE, located.size);
+                    if (use != null && !use.equals(located.size)) {
+                        AppLog.w(TAG, "环视流尺寸按配置定为 " + use
                                 + "（探测结果是 " + located.size + "）");
                         if (compositeContainer != null) {
-                            compositeContainer.setSourceSize(forced);
+                            compositeContainer.setSourceSize(use);
                         }
                     }
-                    cam.setPreferredSize(use);
+                    if (use != null) {
+                        cam.setPreferredSize(use);
+                    }
                 }
             }
         }
@@ -1855,12 +1893,6 @@ public class MainActivity extends AppCompatActivity {
                 compositeContainer.setSourceSize(actual);
             }
         });
-    }
-
-    /** 把 {@code "3840x2160"} 这样的设置值解析成尺寸；空或不合法返回 null。 */
-    private static android.util.Size parseSizeSetting(String value) {
-        int[] parsed = AppConfig.parseResolution(value);
-        return parsed == null ? null : new android.util.Size(parsed[0], parsed[1]);
     }
 
     /**
@@ -1921,15 +1953,33 @@ public class MainActivity extends AppCompatActivity {
         // 座舱两路仍然按目标分辨率自己挑。
         if (plan.compositeIsReal && located.found()) {
             com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
-            if (cam != null) {
-                cam.setPreferredSize(located.size);
+            android.util.Size use = profileSize(CameraProfile.ROLE_COMPOSITE, located.size);
+            if (cam != null && use != null) {
+                cam.setPreferredSize(use);
             }
         }
+
+        // 座舱两路的尺寸也从配置来。配置里是 auto 时不指定，
+        // chooseOptimalSize 按它原来的规则挑 —— 和以前一模一样。
+        pinCabinSize(CameraProfile.ROLE_CABIN_1, "back");
+        pinCabinSize(CameraProfile.ROLE_CABIN_2, "left");
 
         com.kooo.evcam.zeekr.StreamLayoutTable.setCompositeCameraId(
                 plan.compositeIsReal ? plan.compositeId : null);
 
         updateCompositeInfoOverlay(describeMultiSlots(plan));
+    }
+
+    private void pinCabinSize(String role, String cameraKey) {
+        android.util.Size use = profileSize(role, null);
+        if (use == null) {
+            return;
+        }
+        com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera(cameraKey);
+        if (cam != null) {
+            cam.setPreferredSize(use);
+            AppLog.i(TAG, role + " 尺寸按配置定为 " + use);
+        }
     }
 
     /** 三路模式下把槽位分配显示在画面上——黑屏时这是最直接的线索。 */
