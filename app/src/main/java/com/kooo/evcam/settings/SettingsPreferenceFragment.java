@@ -577,8 +577,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setPersistent(false);
         pref.setText(current > 0 ? String.valueOf(current) : "");
         pref.setSummary(describeLimit(current));
-        pref.setOnBindEditTextListener(editText ->
-                editText.setInputType(InputType.TYPE_CLASS_NUMBER));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             int parsed = 0;
             String text = String.valueOf(newValue).trim();
@@ -612,12 +610,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setPersistent(false);
         pref.setText(appConfig.getLicensePlateRaw());
         showLicensePlate();
-        pref.setOnBindEditTextListener(editText -> {
-            editText.setInputType(InputType.TYPE_CLASS_TEXT
-                    | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-            editText.setFilters(new android.text.InputFilter[]{
-                    new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
-        });
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String raw = String.valueOf(newValue);
             String clean = LicensePlate.sanitize(raw);
@@ -1366,9 +1358,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         final android.widget.EditText input = new android.widget.EditText(requireContext());
         input.setText(pref.getText());
         input.setSelectAllOnFocus(true);
-        if (pref.getOnBindEditTextListener() != null) {
-            pref.getOnBindEditTextListener().onBindEditText(input);
-        }
+        configureInput(pref.getKey(), input);
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
         android.widget.FrameLayout box = new android.widget.FrameLayout(requireContext());
         box.setPadding(pad, pad / 2, pad, 0);
@@ -1385,6 +1375,25 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 })
                 .setNegativeButton(R.string.action_cancel, null)
                 .show();
+    }
+
+    /**
+     * 按 key 配键盘类型。
+     *
+     * <p>本来该问 preference 自己要那个 {@code OnBindEditTextListener}，
+     * 但那个 getter 不是公开的。要输入什么这里本来就知道，写在一处反而更好找。</p>
+     */
+    private void configureInput(String key, android.widget.EditText input) {
+        if ("pref_license_plate".equals(key)) {
+            input.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+            input.setFilters(new android.text.InputFilter[]{
+                    new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
+            return;
+        }
+        if ("pref_video_limit".equals(key) || "pref_photo_limit".equals(key)) {
+            input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        }
     }
 
     /** 多选：参与录制的摄像头。 */
