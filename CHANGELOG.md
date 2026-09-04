@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.36.10-alpha] - 2026-09-04
+
+- Developer options: added a preview resource sampler. It records per-camera frame counts
+  and how many cameras are open once a second, tagged with which screen was on top, and
+  reports it grouped by screen — so whether the preview stream keeps running in the
+  background can be measured rather than timed by hand.
+
 ## [0.36.9-alpha] - 2026-09-04
 
 - Photos can now be taken through the camera's own JPEG channel at each camera's largest

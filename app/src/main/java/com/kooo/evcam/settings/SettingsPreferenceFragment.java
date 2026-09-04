@@ -1033,6 +1033,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     toast(getString(R.string.msg_restart_required));
                 });
 
+        onClick("pref_preview_sampler", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.zeekr.PreviewSamplerActivity.class)));
+
         onClick("pref_photo_test", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.zeekr.PhotoCaptureTestActivity.class)));
 

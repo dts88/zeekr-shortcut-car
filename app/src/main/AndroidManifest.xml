@@ -109,6 +109,14 @@
         <!-- 相机能力清单，只从开发者选项进 -->
 
         <!-- 「发送到手机」的连通性测试界面，只从开发者选项进 -->
+        <!-- 预览资源占用实测（开发者选项） -->
+        <activity
+            android:name=".zeekr.PreviewSamplerActivity"
+            android:label="预览资源占用实测"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:screenOrientation="landscape"
+            android:exported="false" />
+
         <!-- 拍照通道实测（开发者选项） -->
         <activity
             android:name=".zeekr.PhotoCaptureTestActivity"
