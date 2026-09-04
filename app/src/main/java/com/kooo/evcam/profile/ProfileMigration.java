@@ -46,6 +46,23 @@ public final class ProfileMigration {
         public IntByKey rotation = key -> 0;
         /** 每一路是否镜像。 */
         public BoolByKey mirror = key -> false;
+        /** 预览矫正开关。关着时那几个值不生效，不能搬。 */
+        public boolean previewCorrectionEnabled;
+        /** 预览矫正：缩放与平移，按相机键取。 */
+        public FloatByKey scaleX = key -> 1f;
+        public FloatByKey scaleY = key -> 1f;
+        public FloatByKey translateX = key -> 0f;
+        public FloatByKey translateY = key -> 0f;
+        /** 四边裁切，旧值是像素。 */
+        public CropByKey crop = (key, side) -> 0;
+    }
+
+    public interface FloatByKey {
+        float get(String key);
+    }
+
+    public interface CropByKey {
+        int get(String key, String side);
     }
 
     public interface IntByKey {
@@ -78,7 +95,28 @@ public final class ProfileMigration {
         LaneLayout layout = LaneLayout.cell(-1, 0f, 0f, 1f, 1f);
         layout.rotation = snapshot.rotation.get(cameraKey);
         layout.mirrored = snapshot.mirror.get(cameraKey);
+        applyCorrection(layout, snapshot, cameraKey);
         camera.lanes.add(layout);
+    }
+
+    /**
+     * 把「预览矫正」和裁切搬到这一格上。
+     *
+     * <p>矫正开关关着时那几个值不生效 —— 搬过来就等于悄悄给用户开了一个
+     * 他从没开过的功能。所以只在开着时搬。</p>
+     *
+     * <p>裁切旧值是<b>像素</b>，而这里存的是比例。迁移时留 0：像素值换算成比例
+     * 需要知道当时的画面尺寸，而那个尺寸现在拿不到，硬换算出来的数是假的。
+     * 这一项在第 4 步做布局编辑时由用户重设，届时单位本来就变了。</p>
+     */
+    private static void applyCorrection(LaneLayout layout, Snapshot snapshot, String cameraKey) {
+        if (!snapshot.previewCorrectionEnabled) {
+            return;
+        }
+        layout.scaleX = snapshot.scaleX.get(cameraKey);
+        layout.scaleY = snapshot.scaleY.get(cameraKey);
+        layout.translateX = snapshot.translateX.get(cameraKey);
+        layout.translateY = snapshot.translateY.get(cameraKey);
     }
 
     public static Profile migrate(Snapshot snapshot) {

@@ -246,6 +246,71 @@ public class ProfileMigrationTest {
         }
     }
 
+    // ---------- 预览矫正 ----------
+
+    /** 矫正开着时，缩放和平移跟着搬过来。 */
+    @Test
+    public void previewCorrectionCarriesOverWhenEnabled() {
+        ProfileMigration.Snapshot snapshot = snapshot();
+        snapshot.carModel = "zeekr_7x_multi";
+        snapshot.previewCorrectionEnabled = true;
+        snapshot.scaleX = key -> "back".equals(key) ? 1.2f : 1f;
+        snapshot.translateY = key -> "back".equals(key) ? 0.05f : 0f;
+
+        LaneLayout lane = ProfileMigration.migrate(snapshot)
+                .camera(CameraProfile.ROLE_CABIN_1).lanes.get(0);
+
+        assertEquals(1.2f, lane.scaleX, 1e-4f);
+        assertEquals(0.05f, lane.translateY, 1e-4f);
+    }
+
+    /**
+     * 矫正开关关着时不能搬。
+     *
+     * <p>那几个值现在不生效，搬过来等于悄悄给用户开了一个他从没开过的功能。</p>
+     */
+    @Test
+    public void previewCorrectionIsNotCarriedOverWhenDisabled() {
+        ProfileMigration.Snapshot snapshot = snapshot();
+        snapshot.carModel = "zeekr_7x_multi";
+        snapshot.previewCorrectionEnabled = false;
+        snapshot.scaleX = key -> 1.2f;
+        snapshot.translateY = key -> 0.05f;
+
+        LaneLayout lane = ProfileMigration.migrate(snapshot)
+                .camera(CameraProfile.ROLE_CABIN_1).lanes.get(0);
+
+        assertEquals("关着的功能不能被迁移带开", 1f, lane.scaleX, 1e-4f);
+        assertEquals(0f, lane.translateY, 1e-4f);
+    }
+
+    /** 缩放平移也要经得起存取往返。 */
+    @Test
+    public void correctionSurvivesTheRoundTrip() {
+        LaneLayout before = LaneLayout.cell(2, 0f, 0.5f, 0.5f, 0.5f);
+        before.scaleX = 1.25f;
+        before.scaleY = 0.8f;
+        before.translateX = -0.1f;
+        before.cropTop = 0.02f;
+
+        LaneLayout after = LaneLayout.fromMap(before.toMap());
+
+        assertEquals(1.25f, after.scaleX, 1e-4f);
+        assertEquals(0.8f, after.scaleY, 1e-4f);
+        assertEquals(-0.1f, after.translateX, 1e-4f);
+        assertEquals(0.02f, after.cropTop, 1e-4f);
+    }
+
+    /** 没设过矫正时，缩放是 1、平移是 0 —— 不能是 0 缩放，那是一格黑。 */
+    @Test
+    public void anUntouchedLaneHasNeutralCorrection() {
+        LaneLayout lane = LaneLayout.fromMap(new java.util.LinkedHashMap<>());
+
+        assertEquals(1f, lane.scaleX, 1e-4f);
+        assertEquals(1f, lane.scaleY, 1e-4f);
+        assertEquals(0f, lane.translateX, 1e-4f);
+    }
+
     /** 空的存储读出来是一份空配置，不能抛。 */
     @Test
     public void anEmptyStoreYieldsAnEmptyProfile() {

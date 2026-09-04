@@ -106,6 +106,12 @@ public final class ProfileStore {
         snapshot.enabledRecordingCameras = config.getEnabledRecordingCameras();
         snapshot.rotation = config::getCameraRotation;
         snapshot.mirror = config::getCameraMirror;
+        snapshot.previewCorrectionEnabled = config.isPreviewCorrectionEnabled();
+        snapshot.scaleX = config::getPreviewCorrectionScaleX;
+        snapshot.scaleY = config::getPreviewCorrectionScaleY;
+        snapshot.translateX = config::getPreviewCorrectionTranslateX;
+        snapshot.translateY = config::getPreviewCorrectionTranslateY;
+        snapshot.crop = config::getCameraCrop;
         return snapshot;
     }
 }

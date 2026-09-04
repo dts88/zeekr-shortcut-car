@@ -43,6 +43,22 @@ public final class LaneLayout {
     public float cropLeft;
     public float cropRight;
 
+    /**
+     * 画面在这一格里的缩放与平移，就是原来那个「预览矫正」。
+     *
+     * <h3>和裁切的区别</h3>
+     *
+     * <p>两者都在动源矩形，但意图不同：<b>裁切</b>是「这几条边我不要」，
+     * 会改变画面的长宽比；<b>缩放平移</b>是「画面偏了 / 大小不对，挪一下」，
+     * 长宽比不变。修一个装歪了的摄像头用后者，切掉分隔带残留用前者。</p>
+     *
+     * <p>平移是相对这一格宽高的比例，正值向右 / 向下。</p>
+     */
+    public float scaleX = 1f;
+    public float scaleY = 1f;
+    public float translateX;
+    public float translateY;
+
     public static LaneLayout cell(int laneIndex, float x, float y, float width, float height) {
         LaneLayout layout = new LaneLayout();
         layout.laneIndex = laneIndex;
@@ -66,6 +82,10 @@ public final class LaneLayout {
         out.put("cropBottom", fraction(cropBottom));
         out.put("cropLeft", fraction(cropLeft));
         out.put("cropRight", fraction(cropRight));
+        out.put("scaleX", fraction(scaleX));
+        out.put("scaleY", fraction(scaleY));
+        out.put("translateX", fraction(translateX));
+        out.put("translateY", fraction(translateY));
         return out;
     }
 
@@ -85,6 +105,10 @@ public final class LaneLayout {
         layout.cropBottom = decimal(values, "cropBottom", 0f);
         layout.cropLeft = decimal(values, "cropLeft", 0f);
         layout.cropRight = decimal(values, "cropRight", 0f);
+        layout.scaleX = decimal(values, "scaleX", 1f);
+        layout.scaleY = decimal(values, "scaleY", 1f);
+        layout.translateX = decimal(values, "translateX", 0f);
+        layout.translateY = decimal(values, "translateY", 0f);
         return layout;
     }
 
@@ -116,6 +140,13 @@ public final class LaneLayout {
         return String.format(Locale.US, "lane%d (%.2f,%.2f) %.2fx%.2f%s%s",
                 laneIndex, x, y, width, height,
                 rotation != 0 ? " 旋转" + rotation : "",
-                mirrored ? " 镜像" : "");
+                mirrored ? " 镜像" : "")
+                + (scaleX != 1f || scaleY != 1f
+                        ? String.format(Locale.US, " 缩放%.2fx%.2f", scaleX, scaleY) : "")
+                + (translateX != 0f || translateY != 0f
+                        ? String.format(Locale.US, " 平移%.2f,%.2f", translateX, translateY) : "")
+                + (cropTop != 0f || cropBottom != 0f || cropLeft != 0f || cropRight != 0f
+                        ? String.format(Locale.US, " 裁切%.2f/%.2f/%.2f/%.2f",
+                                cropTop, cropBottom, cropLeft, cropRight) : "");
     }
 }
