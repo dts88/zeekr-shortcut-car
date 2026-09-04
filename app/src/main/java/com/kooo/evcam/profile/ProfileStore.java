@@ -40,22 +40,60 @@ public final class ProfileStore {
     /**
      * 当前配置。
      *
-     * <h3>第 1 步：每次都重新翻译</h3>
+     * <h3>配置现在是取值的源头</h3>
      *
-     * <p>现在配置只是旧设置的一个<b>视图</b>：没有编辑器，没有任何人从它取值。
-     * 所以「存下来下次直接用」没有任何好处，只会造成一个真实的错误 ——
-     * 切换了车型之后，看到的还是上一次翻译的那份，而核对翻译对不对
-     * 正是这一步唯一的目的。</p>
+     * <p>读存下来的那份。某份配置<b>第一次</b>被用到时，从旧设置翻译一份出来做初值 ——
+     * 之后用户在编辑器里改的东西就是它自己的了，不会再被翻译覆盖。</p>
      *
-     * <p>第 2 步配置变成取值的源头之后，这里才改成「读存下来的那份」，
-     * 而「切换车型」也随之变成「切换配置」。</p>
+     * <p>第 1 步里这里是每次重新翻译的，因为那时没有编辑器、没人从它取值，
+     * 「存下来」只会让人看到过期的内容。现在反过来：翻译只是初值。</p>
      */
     public Profile current() {
-        Profile migrated = ProfileMigration.migrate(snapshot(context));
-        save(migrated);
-        prefs.edit().putString(KEY_CURRENT, migrated.id).apply();
-        AppLog.i(TAG, "已从旧设置翻译出配置:\n" + migrated);
-        return migrated;
+        return byId(currentId());
+    }
+
+    /** 当前选中的配置 id；没选过时按旧设置里的车型推断。 */
+    public String currentId() {
+        String id = prefs.getString(KEY_CURRENT, null);
+        return id != null ? id : ProfileMigration.presetIdFor(new AppConfig(context).getCarModel());
+    }
+
+    /**
+     * 按 id 取配置，没有就从旧设置翻译一份做初值。
+     *
+     * <p>翻译出来的那份会被<b>改成这个 id</b>：用户切到「三路」时，要的是一份三路的
+     * 配置，而不是把当前车型翻译出来的那份贴上三路的标签。</p>
+     */
+    public Profile byId(String id) {
+        Profile stored = load(id);
+        if (!stored.cameras.isEmpty()) {
+            return stored;
+        }
+        ProfileMigration.Snapshot snapshot = snapshot(context);
+        snapshot.carModel = ProfileMigration.carModelFor(id);
+        Profile seeded = ProfileMigration.migrate(snapshot);
+        save(seeded);
+        AppLog.i(TAG, "配置 " + id + " 第一次使用，从旧设置翻译出初值:\n" + seeded);
+        return seeded;
+    }
+
+    /** 切换到另一份配置。 */
+    public void select(String id) {
+        prefs.edit().putString(KEY_CURRENT, id).apply();
+        AppLog.i(TAG, "当前配置切换为 " + id);
+    }
+
+    /** 把这份配置恢复成从旧设置翻译出来的初值。校验不通过时回滚用得上。 */
+    public Profile reset(String id) {
+        String prefix = id + ".";
+        SharedPreferences.Editor editor = prefs.edit();
+        for (String key : prefs.getAll().keySet()) {
+            if (key.startsWith(prefix)) {
+                editor.remove(key);
+            }
+        }
+        editor.apply();
+        return byId(id);
     }
 
     public void save(Profile profile) {

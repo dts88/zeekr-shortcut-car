@@ -8,6 +8,7 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.util.Size;
 import android.os.Bundle;
 import android.text.InputType;
+import com.kooo.evcam.profile.ProfileMigration;
 import com.kooo.evcam.profile.ProfileStore;
 import android.widget.TextView;
 import android.widget.ScrollView;
@@ -207,6 +208,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
             appConfig.setCarModel(value);
+            // 「切换视频流配置」现在的含义就是「切换到另一份配置」——
+            // 车型这个字段留着只是为了第一次翻译时有个输入。
+            new ProfileStore(requireContext())
+                    .select(ProfileMigration.presetIdFor(value));
             pref.setValue(value);
             pref.setSummary(pref.getEntry());
             toast(getString(R.string.msg_stream_changed, pref.getEntry()));
@@ -1035,6 +1040,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setPhotoViaJpegEnabled(enabled);
                     toast(getString(R.string.msg_restart_required));
                 });
+
+        onClick("pref_profile_editor", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.profile.ProfileEditorActivity.class)));
 
         onClick("pref_current_profile", pref -> showCurrentProfile());
 

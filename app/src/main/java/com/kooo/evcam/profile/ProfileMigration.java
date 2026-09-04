@@ -76,6 +76,28 @@ public final class ProfileMigration {
     private ProfileMigration() {
     }
 
+    /** 车型对应哪份内置预设。 */
+    public static String presetIdFor(String carModel) {
+        if ("zeekr_7x_multi".equals(carModel)) {
+            return Profile.PRESET_COMPOSITE_MULTI;
+        }
+        if ("custom".equals(carModel)) {
+            return Profile.PRESET_CUSTOM;
+        }
+        return Profile.PRESET_COMPOSITE;
+    }
+
+    /** 上一条的反向：这份预设对应哪个车型，用来给翻译喂对的输入。 */
+    public static String carModelFor(String profileId) {
+        if (Profile.PRESET_COMPOSITE_MULTI.equals(profileId)) {
+            return "zeekr_7x_multi";
+        }
+        if (Profile.PRESET_CUSTOM.equals(profileId)) {
+            return "custom";
+        }
+        return "zeekr_7x";
+    }
+
     /**
      * 合成流那一路在主界面上的四格摆位。
      *
