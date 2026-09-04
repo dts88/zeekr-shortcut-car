@@ -377,6 +377,11 @@
             android:summary="用相机自己的 JPEG 输出拍照，各路都用最大分辨率；关闭时抓预览画面（分辨率受预览缓冲区限制）。会在每一路会话里常驻一条输出流，改完需重启应用" />
 
         <Preference
+            android:key="pref_current_profile"
+            android:title="当前配置"
+            android:summary="从旧设置翻译出来的那份配置全文。第 1 步只翻译不启用，录制和预览仍走老路子——这里是用来逐行核对翻译对不对的" />
+
+        <Preference
             android:key="pref_preview_sampler"
             android:title="预览资源占用实测"
             android:summary="每秒记一次各路出帧数和相机开着几路，按界面自动分段——用来看切界面 / 退到后台之后预览这一路是不是还占着资源" />

@@ -8,6 +8,9 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.util.Size;
 import android.os.Bundle;
 import android.text.InputType;
+import com.kooo.evcam.profile.ProfileStore;
+import android.widget.TextView;
+import android.widget.ScrollView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -1033,6 +1036,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     toast(getString(R.string.msg_restart_required));
                 });
 
+        onClick("pref_current_profile", pref -> showCurrentProfile());
+
         onClick("pref_preview_sampler", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.zeekr.PreviewSamplerActivity.class)));
 
@@ -1429,6 +1434,39 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     }
                 })
                 .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    /**
+     * 把翻译出来的配置全文摆出来。
+     *
+     * <p>第 1 步只做翻译，不改取值路径。迷失一项的代价是某个设置悄悄回到
+     * 默认值，得等到开车时才发现 —— 所以先让它能被逐行核对。</p>
+     */
+    private void showCurrentProfile() {
+        if (getContext() == null) {
+            return;
+        }
+        String text;
+        try {
+            text = new ProfileStore(getContext()).current().toString();
+        } catch (Exception e) {
+            text = "读不出来：" + e;
+        }
+        TextView view = new TextView(getContext());
+        view.setText(text);
+        view.setTextIsSelectable(true);
+        view.setTypeface(android.graphics.Typeface.MONOSPACE);
+        view.setTextSize(13f);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        view.setPadding(pad, pad, pad, pad);
+        ScrollView scroll = new ScrollView(getContext());
+        scroll.addView(view);
+
+        new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+                .setTitle(R.string.set_current_profile_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.action_got_it, null)
                 .show();
     }
 

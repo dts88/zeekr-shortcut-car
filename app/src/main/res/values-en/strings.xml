@@ -357,4 +357,5 @@
     <string name="set_plate_empty">Not set</string>
     <string name="msg_plate_cleaned">Cleaned up to %1$s</string>
     <string name="msg_restart_required">Takes effect after restarting the app</string>
+    <string name="set_current_profile_title">Current profile</string>
 </resources>
