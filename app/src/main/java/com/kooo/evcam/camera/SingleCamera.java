@@ -92,6 +92,9 @@ public class SingleCamera {
      */
     private ImageReader jpegReader;
 
+    /** 这次开相机时，拍照通道是否因为会话配不上而被丢掉了。 */
+    private boolean jpegDropped;
+
     /** JPEG 通道用的尺寸：这一路声明的最大那个。 */
     private Size jpegSize;
 
@@ -931,6 +934,9 @@ public class SingleCamera {
 
                 // 拍照通道：开着「拍照走图片通道」时，建一个常驻的 JPEG 输出。
                 // 关着时什么都不建，行为和以前完全一样（抓预览画面）。
+                // 每次真正开相机都再试一次拍照通道：上一次是因为当时那套流
+                // 配不上才丢的，换了配置未必还配不上
+                jpegDropped = false;
                 prepareJpegReader(map);
 
                 // 通知回调预览尺寸已确定
@@ -1695,6 +1701,21 @@ public class SingleCamera {
                     }
                     
                     // 重试逻辑
+                    // 先丢拍照通道：它是这条会话里最可有可无的一条流，
+                    // 丢了照片退回抓预览，画面一帧不少；留着它却可能一帧都没有。
+                    if (jpegReader != null && !jpegDropped) {
+                        jpegDropped = true;
+                        closeJpegReader();
+                        AppLog.w(TAG, "Camera " + cameraId
+                                + " 会话配不上，先丢掉拍照通道再试（拍照将回退到抓预览）");
+                        if (backgroundHandler != null) {
+                            backgroundHandler.postDelayed(() -> {
+                                if (cameraDevice != null) createCameraPreviewSession();
+                            }, 200);
+                        }
+                        return;
+                    }
+
                     boolean fisheyeActive = (fisheyeCorrector != null && fisheyeCorrector.isInitialized());
                     if (recordSurface != null) {
                         // 录制中：丢弃可选 Surface 后重试
@@ -2171,6 +2192,11 @@ public class SingleCamera {
      */
     private void prepareJpegReader(StreamConfigurationMap map) {
         closeJpegReader();
+        if (jpegDropped) {
+            // 这一次会话已经因为它配不上了，别再往回加
+            AppLog.d(TAG, "Camera " + cameraId + " 拍照通道本次已被丢弃，不再重建");
+            return;
+        }
         if (!new AppConfig(context).isPhotoViaJpegEnabled()) {
             AppLog.d(TAG, "Camera " + cameraId + " 拍照仍走预览抓图（图片通道未开启）");
             return;

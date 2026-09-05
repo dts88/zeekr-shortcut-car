@@ -1666,8 +1666,10 @@ public class MainActivity extends AppCompatActivity {
         }
         int[] probedPair = probed == null
                 ? null : new int[]{probed.getWidth(), probed.getHeight()};
-        ProfileResolution.Size size =
-                ProfileResolution.resolve(camera.preview.resolution, probedPair, null);
+        // 「最大」也要能解出来：不给声明的最大尺寸的话，选了 max 等于没选 ——
+        // 解成「不指定」，相机就按老规则挑一个 1280x800 附近的
+        ProfileResolution.Size size = ProfileResolution.resolve(camera.preview.resolution,
+                probedPair, com.kooo.evcam.profile.ProfileSizes.declaredMax(this, role));
         return size.specified() ? new android.util.Size(size.width, size.height) : null;
     }
 

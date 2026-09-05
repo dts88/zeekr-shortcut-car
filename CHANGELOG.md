@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.37.11-alpha] - 2026-09-05
+
 - Camera and stream parameters now live in one place. Frame rate, bitrate, codec, segment
   length, which cameras record and the recording layout each had a setting of their own
   while the profile editor showed its own copy of the same thing. Recording now reads the
@@ -16,6 +20,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
   that switch could silently shrink it below what the editor showed.
 - A camera that is enabled in the profile is the camera that records. Choosing them
   separately allowed a camera that was open, and holding a stream, for nothing.
+- Fixed: "auto" for recording copied the preview size, so setting the preview to 640x480
+  recorded 1280x240. The surround-view stream's "auto" is now the size that keeps the most
+  detail per lane, whatever the preview is set to.
+- Fixed: photo resolution had no effect unless a developer option was on. Photos now go
+  through the camera's JPEG channel by default; if the session cannot take that extra
+  stream, it is the first thing dropped, so the picture is never lost for a photo.
+- Fixed: "max" as a preview resolution resolved to nothing and fell back to the old rule.
+- The profile editor prints what a size lands as: the per-lane size, and the size the file
+  will actually be after the four lanes are rearranged into the 2x2 grid.
 
 ## [0.37.10-alpha] - 2026-09-05
 

@@ -184,7 +184,8 @@ public class AppConfig {
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
     private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
-    private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";  // 拍照走相机 JPEG 通道
+    private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";
+    private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
 
@@ -2733,18 +2734,45 @@ public class AppConfig {
     }
 
     /**
+     * 强制所有相机用 H.264 编码。
+     *
+     * <h3>它和配置里的「编码」是什么关系</h3>
+     *
+     * <p>配置里每一路可以各自选 auto / h264 —— 这个开关<b>盖过</b>它们：
+     * 打开之后所有相机一律 H.264。它是一个排查用的总闸，
+     * 用在「怀疑 H.265 有问题、想一次性排除掉」的时候。</p>
+     *
+     * <p>关着时（默认）各路按自己配置里的编码走。</p>
+     */
+    public boolean isForceH264Encoding() {
+        return prefs.getBoolean(KEY_FORCE_H264_ENCODING, false);
+    }
+
+    public void setForceH264Encoding(boolean enabled) {
+        prefs.edit().putBoolean(KEY_FORCE_H264_ENCODING, enabled).apply();
+        AppLog.d(TAG, "强制 H.264 编码: " + (enabled ? "启用" : "禁用"));
+    }
+
+    /**
      * 拍照走相机自己的 JPEG 输出通道，而不是抓预览画面。
      *
-     * <h3>默认关着的理由</h3>
+     * <h3>为什么默认开着</h3>
+     *
+     * <p>关着时拍照是从预览画面上抓一张，尺寸只能是预览的尺寸 —— 配置里那个
+     * 「拍照分辨率」完全不参与，设成 1600×900 也照样出预览那一份。
+     * 一个设了不生效的选项比没有更糟。</p>
+     *
+     * <h3>它的风险，以及退路</h3>
      *
      * <p>它要在每一路的相机会话里常驻一条 JPEG 输出流。撑爆平台的流数量上限时，
-     * 表现是<b>会话配置失败 = 没有画面</b> —— 比「照片糊一点」严重得多。
-     * 所以先放在开发者选项里，在车上确认三路都起得来之后再考虑设为默认。</p>
+     * 表现是<b>会话配置失败 = 没有画面</b> —— 比「照片糊一点」严重得多。所以
+     * {@code SingleCamera} 在会话配不上时<b>第一个丢掉的就是它</b>：丢掉之后
+     * 画面照旧，拍照退回抓预览。画面优先于照片清晰度。</p>
      *
-     * <p>开着的好处：照片用这一路声明的最大分辨率，和预览缓冲区彻底脱钩。</p>
+     * <p>关掉它仍然可以（开发者选项），代价是拍照分辨率随之失效。</p>
      */
     public boolean isPhotoViaJpegEnabled() {
-        return prefs.getBoolean(KEY_PHOTO_VIA_JPEG, false);
+        return prefs.getBoolean(KEY_PHOTO_VIA_JPEG, true);
     }
 
     public void setPhotoViaJpegEnabled(boolean enabled) {

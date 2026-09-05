@@ -685,6 +685,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_recording_mode", SettingsRegistry.RECORDING_MODE,
                 appConfig.getRecordingMode(), value -> appConfig.setRecordingMode(value));
 
+        bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
+                value -> appConfig.setForceH264Encoding(value));
+
         onClick("pref_image_adjust", pref -> {
             if (getActivity() instanceof MainActivity) {
                 appConfig.setImageAdjustEnabled(true);

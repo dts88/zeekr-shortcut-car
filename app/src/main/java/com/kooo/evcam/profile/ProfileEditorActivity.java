@@ -19,6 +19,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.camera.EncodeSize;
 import com.kooo.evcam.R;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
@@ -177,6 +178,10 @@ public class ProfileEditorActivity extends Activity {
         }
         if (showsSplit) {
             sb.append('\n').append("        ").append(splitStatus(camera.role, spec));
+            String landing = describeLanding(camera, spec);
+            if (landing != null) {
+                sb.append('\n').append("        ").append(landing);
+            }
         }
         text.setText(sb.toString());
         text.setTextColor(0xFFCCCCCC);
@@ -315,9 +320,67 @@ public class ProfileEditorActivity extends Activity {
         if (StreamSpec.RESOLUTION_MAX.equals(spec.resolution)) {
             return max == null ? "读不到尺寸" : max[0] + "x" + max[1];
         }
-        // auto：环视跟探测结果，其他路交回给原来的挑选规则
-        return CameraProfile.ROLE_COMPOSITE.equals(role)
-                ? "跟随探测结果" : "由相机自己挑";
+        // auto：会拆的那一路取每格最清楚的那个尺寸，其他路跟随预览
+        if (!CameraProfile.ROLE_COMPOSITE.equals(role)) {
+            return "跟随预览";
+        }
+        return max == null ? "读不到尺寸" : max[0] + "x" + max[1] + "（每格最清楚的那个）";
+    }
+
+    /**
+     * 这个尺寸拆完之后每格多大、最后落盘多大。
+     *
+     * <h3>为什么必须写出来</h3>
+     *
+     * <p>配置里写的是<b>向相机要多大</b>，而拆四格会把它重排成 2×2 —— 两个数不一样。
+     * 不写出来就会出现「我明明选了 1920×1024，录出来却是 3840×512」：
+     * 那一路的每格是 1920×256，拼成 2×2 正好是 3840×512，一步都没错，
+     * 但界面上从来没说过这件事。</p>
+     *
+     * <p>顺带把每格尺寸也写出来 —— 每格被压成 1920×256 这种 7:1 的形状，
+     * 画面看起来就是扁的，只有看到这个数才知道为什么。</p>
+     */
+    private String describeLanding(CameraProfile camera, StreamSpec spec) {
+        int[] source = resolvedSource(camera.role, spec);
+        if (source == null) {
+            return null;
+        }
+        if (!splitsFor(camera.role, source[0], source[1])) {
+            return null;
+        }
+        int laneWidth = source[0];
+        int laneHeight = source[1] / 4;
+        StringBuilder sb = new StringBuilder();
+        sb.append("每格 ").append(laneWidth).append("×").append(laneHeight);
+        if (spec == camera.preview) {
+            return sb.toString();
+        }
+        // 录制和拍照都会按录制那一路的排列重排后落盘
+        boolean grid = camera.record != null && camera.record.grid;
+        EncodeSize landing = EncodeSize.forSource(
+                StreamLayoutTable.compositeCameraId(), source[0], source[1], grid);
+        sb.append("，落盘 ").append(landing.width).append("×").append(landing.height);
+        return sb.toString();
+    }
+
+    /**
+     * 这条流最后会向相机要多大。
+     *
+     * <p>{@code auto} 与 {@code max} 都要解成具体的数才能算落盘尺寸；解不出来
+     * （相机还没探测到）就返回 null，不编一个数。</p>
+     */
+    private int[] resolvedSource(String role, StreamSpec spec) {
+        int[] parsed = ProfileResolution.parse(spec.resolution);
+        if (parsed != null) {
+            return parsed;
+        }
+        int[] max = ProfileSizes.declaredMax(this, role);
+        if (StreamSpec.RESOLUTION_MAX.equals(spec.resolution)) {
+            return max;
+        }
+        // auto：会拆的那一路取每格最清楚的那个（和 ProfileSizes 同一条规则），
+        // 不拆的那一路交给相机自己挑，这里说不准
+        return CameraProfile.ROLE_COMPOSITE.equals(role) ? max : null;
     }
 
     /**
@@ -348,13 +411,24 @@ public class ProfileEditorActivity extends Activity {
         List<String> values = new ArrayList<>();
         List<String> labels = new ArrayList<>();
         values.add(StreamSpec.RESOLUTION_AUTO);
-        labels.add("自动（探测结果 / 沿用原规则）");
+        labels.add("自动（" + (CameraProfile.ROLE_COMPOSITE.equals(camera.role)
+                ? "每格最清楚的那个尺寸" : "跟随预览") + "）");
         values.add(StreamSpec.RESOLUTION_MAX);
         labels.add("最大（这一路声明的最大尺寸）");
+        boolean grid = camera.record != null && camera.record.grid;
         for (int[] size : declaredSizes(camera.role)) {
             String text = size[0] + "x" + size[1];
             values.add(text);
-            labels.add(text + (splitsFor(camera.role, size[0], size[1]) ? "   拆四格" : ""));
+            if (!splitsFor(camera.role, size[0], size[1])) {
+                labels.add(text);
+                continue;
+            }
+            // 选的是「向相机要多大」，而拆四格之后落盘是另一个数。
+            // 两个数都摆在这里，省得选完才发现录出来的是 3840×512。
+            EncodeSize landing = EncodeSize.forSource(
+                    StreamLayoutTable.compositeCameraId(), size[0], size[1], grid);
+            labels.add(text + "   拆四格 · 每格 " + size[0] + "×" + (size[1] / 4)
+                    + " · 落盘 " + landing.width + "×" + landing.height);
         }
 
         new AlertDialog.Builder(this, R.style.AlertDialogTheme)

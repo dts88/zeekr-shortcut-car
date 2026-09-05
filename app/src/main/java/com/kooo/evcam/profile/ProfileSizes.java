@@ -28,7 +28,7 @@ public final class ProfileSizes {
     private ProfileSizes() {
     }
 
-    /** 录制流要用的相机输出尺寸；返回 null 表示「跟着预览走」（配置里是 auto）。 */
+    /** 录制流要用的相机输出尺寸；返回 null 表示「跟着预览走」。 */
     public static Size record(Context context, String role, Size previewSize) {
         return forStream(context, role, spec -> spec.record, previewSize);
     }
@@ -36,6 +36,28 @@ public final class ProfileSizes {
     /** 拍照流要用的尺寸；返回 null 表示「用声明的最大值」。 */
     public static Size photo(Context context, String role, Size previewSize) {
         return forStream(context, role, spec -> spec.photo, previewSize);
+    }
+
+    /**
+     * {@code auto} 到底是多大。
+     *
+     * <h3>为什么不能是「跟随预览」</h3>
+     *
+     * <p>这三条流是<b>各自独立</b>的相机输出。auto 以前直接把预览尺寸拿来当自己的
+     * 尺寸用，于是预览调成 640×480，录制也跟着变成 640×480 —— 拆出来每格 640×120，
+     * 录像落盘 1280×240。预览是「屏幕上要显示多大」，录制是「要留下多清楚的证据」，
+     * 把后者绑在前者上，等于调一下显示就把记录毁了。</p>
+     *
+     * <p>所以会拆的那一路，auto 取<b>每格最清楚</b>的那个声明尺寸（这台车机上是
+     * 1280×5140，每格 1280×1285）。不拆的那一路画面就是整幅，预览多大录多大最省，
+     * auto 仍然跟随预览。</p>
+     */
+    private static Size autoSize(Context context, String role, Size previewSize) {
+        if (!CameraProfile.ROLE_COMPOSITE.equals(role)) {
+            return null;   // 交回给调用方：跟随预览
+        }
+        int[] best = declaredMax(context, role);
+        return best == null ? null : new Size(best[0], best[1]);
     }
 
     private interface Pick {
@@ -52,8 +74,11 @@ public final class ProfileSizes {
                 return null;
             }
             StreamSpec spec = pick.from(camera);
-            if (spec == null || StreamSpec.RESOLUTION_AUTO.equals(spec.resolution)) {
+            if (spec == null) {
                 return null;
+            }
+            if (StreamSpec.RESOLUTION_AUTO.equals(spec.resolution)) {
+                return autoSize(context, role, previewSize);
             }
             int[] probed = previewSize == null
                     ? null : new int[]{previewSize.getWidth(), previewSize.getHeight()};

@@ -244,6 +244,11 @@
             android:title="@string/set_recording_mode_title"
             android:summary="%s" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_force_h264"
+            android:title="@string/set_force_h264_title"
+            android:summary="@string/set_force_h264_summary" />
+
         <Preference
             android:key="pref_image_adjust"
             android:title="@string/set_image_adjust_title"

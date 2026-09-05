@@ -62,6 +62,8 @@
     <string name="set_prevent_sleep_title">Prevent deep sleep</string>
     <string name="set_prevent_sleep_summary">Blocks deep sleep. Increases power draw — enable only when needed</string>
     <string name="set_recording_mode_title">Recording pipeline</string>
+    <string name="set_force_h264_title">Force H.264</string>
+    <string name="set_force_h264_summary">Every camera encodes in H.264, overriding the codec chosen per camera in the profile</string>
     <string name="set_image_adjust_title">Brightness / noise reduction</string>
     <string name="set_image_adjust_summary">Opens a window for adjusting image parameters live</string>
     <string name="set_image_adjust_reset_title">Reset brightness / noise reduction</string>

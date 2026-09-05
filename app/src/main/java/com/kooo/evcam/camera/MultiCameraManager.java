@@ -1277,7 +1277,9 @@ public class MultiCameraManager {
             codecRecorder.setFrameRate(targetFrameRate, frameRateCap);
             // 跟随这一路配置里的码率等级。写死 3 的话那个选项就是个摆设
             codecRecorder.setQualityLevel(RecordSpecs.qualityLevel(spec.bitrate));
-            codecRecorder.setForceH264(RecordSpecs.forceH264(spec.codec));
+            // 设置里的「强制 H.264」是总闸，盖过这一路配置里的编码选择
+            codecRecorder.setForceH264(appConfig.isForceH264Encoding()
+                    || RecordSpecs.forceH264(spec.codec));
 
             AppLog.d(TAG, "Codec recording params for " + key + ": " +
                     encodeWidth + "x" + encodeHeight +
@@ -1621,7 +1623,8 @@ public class MultiCameraManager {
                     RecordSpecs.cap(spec.fps, hardwareMaxFps()));
             // 跟随这一路配置里的码率等级。写死 3 的话那个选项就是个摆设
             codecRecorder.setQualityLevel(RecordSpecs.qualityLevel(spec.bitrate));
-            codecRecorder.setForceH264(RecordSpecs.forceH264(spec.codec));
+            codecRecorder.setForceH264(appConfig.isForceH264Encoding()
+                    || RecordSpecs.forceH264(spec.codec));
             codecRecorder.setWatermarkEnabled(appConfig.isTimestampWatermarkEnabled());
             codecRecorder.setWatermarkSpecEnabled(appConfig.isWatermarkSpecEnabled());
 

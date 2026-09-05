@@ -79,6 +79,8 @@
     <string name="set_prevent_sleep_title">防止休眠</string>
     <string name="set_prevent_sleep_summary">阻止系统深度休眠。会增加电量消耗，请按需开启</string>
     <string name="set_recording_mode_title">录制模式</string>
+    <string name="set_force_h264_title">强制 H.264</string>
+    <string name="set_force_h264_summary">所有相机一律用 H.264，盖过配置编辑里各路的编码选择</string>
     <string name="set_image_adjust_title">亮度 / 降噪调节</string>
     <string name="set_image_adjust_summary">打开调节窗口，实时调整画面参数</string>
     <string name="set_image_adjust_reset_title">恢复亮度 / 降噪默认值</string>
