@@ -7,6 +7,16 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.37.8-alpha] - 2026-09-05
+
+- Photos now carry EXIF again: capture time, make and model, size, the app version, and
+  which camera took them. Stamping the badge means decoding and re-encoding the camera's
+  JPEG, which discards whatever the camera wrote, so it is written back.
+- The frame-rate options in the profile editor use the same wording as the setting: a plain
+  number, without "up to".
+- Clearing photo test samples also clears the folder used before 0.36.8, which the button
+  could not reach.
+
 ## [0.37.7-alpha] - 2026-09-05
 
 - Restored the changelog entries for 0.37.0 through 0.37.6. They were written

@@ -2521,6 +2521,9 @@ public class SingleCamera {
             output = new FileOutputStream(photoFile);
             finalBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output);
             output.flush();
+            output.close();
+            output = null;
+            writeExif(photoFile, timestamp, finalBitmap.getWidth(), finalBitmap.getHeight());
             AppLog.i(TAG, "Photo saved: " + photoFile.getAbsolutePath());
         } catch (IOException e) {
             if (e.getMessage() != null && e.getMessage().contains("ENOSPC")) {
@@ -2550,6 +2553,61 @@ public class SingleCamera {
             if (gridBitmap != null && !gridBitmap.isRecycled()) {
                 gridBitmap.recycle();
             }
+        }
+    }
+
+    /**
+     * 把拍摄时间和相机信息写进 EXIF。
+     *
+     * <h3>为什么要自己写</h3>
+     *
+     * <p>照片要盖角标，所以拿到相机直出的 JPEG 之后必须解码成 Bitmap 再重新编码 ——
+     * 这一来一回，相机原本写在文件里的 EXIF 全部丢掉了。抓预览那条路更彻底：
+     * 那是一张屏幕截图，本来就没有任何标签。</p>
+     *
+     * <p>所以时间、机型、尺寸、是哪一路拍的，都在这里补回去。写不进去只记一条日志 ——
+     * 照片本身已经存好了，不该因为标签失败就当成保存失败。</p>
+     */
+    private void writeExif(File file, String timestamp, int width, int height) {
+        try {
+            android.media.ExifInterface exif =
+                    new android.media.ExifInterface(file.getAbsolutePath());
+
+            // 文件名里的 yyyyMMdd_HHmmss 转成 EXIF 要的 yyyy:MM:dd HH:mm:ss
+            String when;
+            try {
+                java.util.Date date = new SimpleDateFormat("yyyyMMdd_HHmmss",
+                        Locale.getDefault()).parse(timestamp);
+                when = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(date);
+            } catch (Exception e) {
+                when = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
+                        .format(new java.util.Date());
+            }
+            exif.setAttribute(android.media.ExifInterface.TAG_DATETIME, when);
+            exif.setAttribute(android.media.ExifInterface.TAG_DATETIME_ORIGINAL, when);
+            exif.setAttribute(android.media.ExifInterface.TAG_DATETIME_DIGITIZED, when);
+
+            exif.setAttribute(android.media.ExifInterface.TAG_MAKE, android.os.Build.MANUFACTURER);
+            exif.setAttribute(android.media.ExifInterface.TAG_MODEL, android.os.Build.MODEL);
+            exif.setAttribute(android.media.ExifInterface.TAG_IMAGE_WIDTH, String.valueOf(width));
+            exif.setAttribute(android.media.ExifInterface.TAG_IMAGE_LENGTH, String.valueOf(height));
+
+            String version = "";
+            try {
+                version = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(), 0).versionName;
+            } catch (Exception ignored) {
+                // 版本号取不到就不写，不影响其他标签
+            }
+            exif.setAttribute(android.media.ExifInterface.TAG_SOFTWARE,
+                    context.getString(com.kooo.evcam.R.string.app_name)
+                            + (version.isEmpty() ? "" : " " + version));
+            // 哪一路拍的、相机 id 是多少 —— 回头对照日志时这两样最有用
+            exif.setAttribute(android.media.ExifInterface.TAG_USER_COMMENT,
+                    "camera=" + cameraId + " position=" + cameraPosition);
+            exif.saveAttributes();
+        } catch (Exception e) {
+            AppLog.w(TAG, "Camera " + cameraId + " 写 EXIF 失败（照片已保存）: " + e);
         }
     }
 

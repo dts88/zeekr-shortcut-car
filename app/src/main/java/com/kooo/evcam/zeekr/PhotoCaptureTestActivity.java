@@ -187,18 +187,27 @@ public class PhotoCaptureTestActivity extends Activity {
             append("测试进行中，先等它跑完");
             return;
         }
-        File[] files = sampleDir.listFiles();
+        int removed = clearDir(sampleDir);
+        // 0.36.8 之前样片存在应用私有目录里。那批文件从这个界面够不着，
+        // 只能等卸载应用才消失 —— 顺手一起清掉。
+        removed += clearDir(new File(getExternalFilesDir(null), "photo-test"));
+        append("已删除 " + removed + " 个样片：" + sampleDir.getAbsolutePath());
+    }
+
+    private int clearDir(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return 0;
+        }
         int removed = 0;
-        if (files != null) {
-            for (File file : files) {
-                if (file.delete()) {
-                    removed++;
-                } else {
-                    AppLog.w(TAG, "删不掉: " + file);
-                }
+        for (File file : files) {
+            if (file.delete()) {
+                removed++;
+            } else {
+                AppLog.w(TAG, "删不掉: " + file);
             }
         }
-        append("已删除 " + removed + " 个样片：" + sampleDir.getAbsolutePath());
+        return removed;
     }
 
     // ------------------------------------------------------------------ 测试

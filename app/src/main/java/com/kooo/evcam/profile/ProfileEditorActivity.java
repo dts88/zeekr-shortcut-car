@@ -244,8 +244,9 @@ public class ProfileEditorActivity extends Activity {
 
     private void pickFps(StreamSpec spec) {
         String[] values = {StreamSpec.FPS_UNLIMITED, "30", "24", "20", "15", "10"};
-        String[] labels = {"不限制（视频流给多少录多少）", "最高 30", "最高 24",
-                "最高 20", "最高 15", "最高 10"};
+        // 措辞和设置里那一项保持一致：只写数字，不加「最高」
+        String[] labels = {"原始帧率（不限制）", "30 fps", "24 fps",
+                "20 fps", "15 fps", "10 fps"};
         pickOne("录制帧率", labels, values, value -> {
             spec.fps = value;
             render();
