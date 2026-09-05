@@ -51,13 +51,27 @@ public class EncodeSizeTest {
         assertEquals(0, size.height % 2);
     }
 
-    /** 普通尺寸原样通过。 */
+    /** 座舱那一路的普通尺寸原样通过 —— 它不是合成流，不拆。 */
     @Test
     public void ordinarySizePassesThrough() {
-        EncodeSize size = EncodeSize.forSource(COMPOSITE, 1920, 1080, true);
-        assertFalse("16:9 不是条带，不该拼四宫格", size.grid);
+        EncodeSize size = EncodeSize.forSource("0", 1920, 1080, true);
+        assertFalse("座舱不该拼四宫格", size.grid);
         assertEquals(1920, size.width);
         assertEquals(1080, size.height);
+    }
+
+    /**
+     * 合成流那一路的同一个尺寸会拆。
+     *
+     * <p>这一路在任何分辨率下给的都是同一份四格内容，所以 1920×1080 也是四格 ——
+     * 每格 1920×270，2×2 拼出来 3840×540。</p>
+     */
+    @Test
+    public void theSameSizeSplitsOnTheCompositeCamera() {
+        EncodeSize size = EncodeSize.forSource(COMPOSITE, 1920, 1080, true);
+        assertTrue(size.grid);
+        assertEquals(3840, size.width);
+        assertEquals(540, size.height);
     }
 
     /**

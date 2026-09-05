@@ -79,7 +79,8 @@ public class CompositeStreamGeometryTest {
 
     @Test
     public void ordinaryFrameIsNotTreatedAsComposite() {
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(COMPOSITE, 1920, 1080);
+        // 座舱那一路：什么尺寸都不拆
+        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(CABIN, 1920, 1080);
 
         assertEquals(CompositeStreamGeometry.Stacking.NOT_COMPOSITE, plan.stacking);
         assertFalse(plan.isComposite());
@@ -92,13 +93,13 @@ public class CompositeStreamGeometryTest {
     public void looksLikeCompositeMatchesKnownStreamSizes() {
         StreamLayoutTable.setCompositeCameraId(COMPOSITE);
 
-        // 合成流那一路实测声明的两个要拆的尺寸
+        // 合成流那一路：任何尺寸都拆，因为它只有一种内容
         assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 5140));
         assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 3840, 2160));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1920, 1080));
+        assertTrue(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 720));
 
-        // 同一路的其他尺寸不拆
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1920, 1080));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 720));
+        // 尺寸不合法除外
         assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 0, 0));
 
         // 不是这一路的，什么尺寸都不拆
