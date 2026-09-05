@@ -58,18 +58,25 @@ public final class CompositeBitmapComposer {
             cellOrder = order;
         }
 
-        // 每个画面都是正方形，2x2 输出边长 = 2 倍画面边长
-        int lane = plan.laneSizePx;
-        if (lane <= 0) {
+        // 2x2 输出：宽高各取单格的两倍。
+        //
+        // 不能拿 laneSizePx 当边长 —— 那个字段是「排布方向上的格长」，
+        // 只在单格是正方形时才等于宽和高。3840x2160 的单格是 3840x540，
+        // 硬当正方形算会得出 1080x1080 —— 四个画面全被压扁，
+        // 而且无论怎么改分辨率都卡在这个尺寸上。
+        CompositeStreamGeometry.Lane first = plan.lane(0);
+        int outWidth = first.width * 2;
+        int outHeight = first.height * 2;
+        if (outWidth <= 0 || outHeight <= 0) {
             return source;
         }
-        int outSize = lane * 2;
 
         Bitmap grid;
         try {
-            grid = Bitmap.createBitmap(outSize, outSize, Bitmap.Config.ARGB_8888);
+            grid = Bitmap.createBitmap(outWidth, outHeight, Bitmap.Config.ARGB_8888);
         } catch (OutOfMemoryError e) {
-            AppLog.e(TAG, "内存不足，无法生成 " + outSize + "x" + outSize + " 四宫格图，保存原图");
+            AppLog.e(TAG, "内存不足，无法生成 " + outWidth + "x" + outHeight
+                    + " 四宫格图，保存原图");
             return source;
         }
 
@@ -87,15 +94,17 @@ public final class CompositeBitmapComposer {
             CompositeStreamGeometry.Lane l = plan.lane(laneIndex);
 
             srcRect.set(l.x, l.y, l.x + l.width, l.y + l.height);
-            int left = (cell % 2) * lane;
-            int top = (cell / 2) * lane;
-            dstRect.set(left, top, left + lane, top + lane);
+            int cellWidth = outWidth / 2;
+            int cellHeight = outHeight / 2;
+            int left = (cell % 2) * cellWidth;
+            int top = (cell / 2) * cellHeight;
+            dstRect.set(left, top, left + cellWidth, top + cellHeight);
 
             canvas.drawBitmap(source, srcRect, dstRect, paint);
         }
 
         AppLog.d(TAG, "照片已重排为四宫格: " + srcWidth + "x" + srcHeight
-                + " -> " + outSize + "x" + outSize);
+                + " -> " + outWidth + "x" + outHeight);
         return grid;
     }
 }
