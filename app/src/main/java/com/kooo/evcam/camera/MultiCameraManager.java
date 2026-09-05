@@ -3,6 +3,8 @@ package com.kooo.evcam.camera;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.profile.RecordSpecs;
+import com.kooo.evcam.profile.StreamSpec;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 import android.content.Context;
@@ -874,20 +876,8 @@ public class MultiCameraManager {
             return false;
         }
 
-        // 获取录制配置（使用上面已创建的 appConfig）
-        // 如果有临时覆盖值（远程录制），使用覆盖值；否则使用配置值
-        long segmentDurationMs = (overrideSegmentDurationMs > 0) 
-                ? overrideSegmentDurationMs 
-                : appConfig.getSegmentDurationMs();
-        if (overrideSegmentDurationMs > 0) {
-            AppLog.d(TAG, "Segment duration (override for remote recording): " + (segmentDurationMs / 1000) + " seconds");
-        } else {
-            AppLog.d(TAG, "Segment duration: " + (segmentDurationMs / 1000) + " seconds (" + appConfig.getSegmentDurationMinutes() + " minutes)");
-        }
-        
-        // MediaRecorder 只接受一个具体数字，没有「不限制」这个说法
-        int targetFrameRate = appConfig.getNominalFrameRate(hardwareMaxFps());
-        AppLog.d(TAG, "Target frame rate: " + targetFrameRate + " fps (设置: " + appConfig.getRecordFps() + ")");
+        // 帧率、码率、分段都写在每一路自己的配置里，所以在下面的循环里按路取。
+        // 远程录制那条路仍然可以临时覆盖分段时长。
 
         // 第一步：准备所有 MediaRecorder（但不启动）
         // 使用每个摄像头的实际预览分辨率，而不是硬编码的值
@@ -906,12 +896,19 @@ public class MultiCameraManager {
                 previewSize = new Size(1280, 720);  // 回退到常见分辨率
             }
             
-            // 计算码率（基于分辨率和帧率）
-            int bitrate = appConfig.getActualBitrate(
-                    previewSize.getWidth(), 
-                    previewSize.getHeight(), 
+            StreamSpec spec = RecordSpecs.forCameraKey(context, key);
+            // MediaRecorder 只接受一个具体数字，没有「不限制」这个说法
+            int targetFrameRate = RecordSpecs.nominal(spec.fps, hardwareMaxFps());
+            long segmentDurationMs = overrideSegmentDurationMs > 0
+                    ? overrideSegmentDurationMs
+                    : RecordSpecs.segmentMs(spec.segmentMinutes);
+            int bitrate = AppConfig.actualBitrate(spec.bitrate,
+                    previewSize.getWidth(),
+                    previewSize.getHeight(),
                     targetFrameRate);
-            
+            AppLog.d(TAG, "Camera " + key + " 录制配置: " + spec
+                    + "，分段 " + (segmentDurationMs / 1000) + " 秒");
+
             // 设置录制参数
             recorder.setSegmentDuration(segmentDurationMs);
             recorder.setVideoBitrate(bitrate);
@@ -1178,23 +1175,7 @@ public class MultiCameraManager {
             return false;
         }
 
-        // 获取录制配置（使用上面已创建的 appConfig）
-        // 如果有临时覆盖值（远程录制），使用覆盖值；否则使用配置值
-        long segmentDurationMs = (overrideSegmentDurationMs > 0) 
-                ? overrideSegmentDurationMs 
-                : appConfig.getSegmentDurationMs();
-        if (overrideSegmentDurationMs > 0) {
-            AppLog.d(TAG, "Codec segment duration (override for remote recording): " + (segmentDurationMs / 1000) + " seconds");
-        } else {
-            AppLog.d(TAG, "Codec segment duration: " + (segmentDurationMs / 1000) + " seconds (" + appConfig.getSegmentDurationMinutes() + " minutes)");
-        }
-        
-        // 两个值：标称值给编码器和码率估算，上限给渲染节流（可以是「不限制」）
-        int targetFrameRate = appConfig.getNominalFrameRate(hardwareMaxFps());
-        int frameRateCap = appConfig.getFrameRateCap(hardwareMaxFps());
-        AppLog.d(TAG, "Codec target frame rate: " + targetFrameRate + " fps，节流上限 "
-                + (frameRateCap == 0 ? "不限制" : frameRateCap + " fps")
-                + " (设置: " + appConfig.getRecordFps() + ")");
+        // 帧率、码率、分段都写在每一路自己的配置里，所以在下面的循环里按路取。
 
         // 清理之前的软编码录制器
         for (CodecVideoRecorder recorder : codecRecorders.values()) {
@@ -1217,9 +1198,18 @@ public class MultiCameraManager {
                 previewSize = new Size(1280, 800);
             }
             
-            // 尺寸怎么算的在 EncodeSize 里（有单元测试）——
-            // 设置界面显示目标码率时用的是同一个函数，两边不会走散。
-            boolean gridRequested = appConfig.isRecordGridLayout();
+            StreamSpec spec = RecordSpecs.forCameraKey(context, key);
+            // 两个值：标称值给编码器和码率估算，上限给渲染节流（可以是「不限制」）
+            int targetFrameRate = RecordSpecs.nominal(spec.fps, hardwareMaxFps());
+            int frameRateCap = RecordSpecs.cap(spec.fps, hardwareMaxFps());
+            long segmentDurationMs = overrideSegmentDurationMs > 0
+                    ? overrideSegmentDurationMs
+                    : RecordSpecs.segmentMs(spec.segmentMinutes);
+            AppLog.d(TAG, "Camera " + key + " 录制配置: " + spec + "，节流上限 "
+                    + (frameRateCap == 0 ? "不限制" : frameRateCap + " fps")
+                    + "，分段 " + (segmentDurationMs / 1000) + " 秒");
+
+            // 尺寸怎么算的在 EncodeSize 里（有单元测试）。
             // 录制是一条独立的相机输出流，尺寸可以和预览不同。
             // 以前直接拿预览尺寸，于是配置里改录制分辨率毫无反应，
             // 改预览却把录制一起带动了。
@@ -1234,7 +1224,7 @@ public class MultiCameraManager {
             int sourceWidth = source.getWidth();
             int sourceHeight = source.getHeight();
             EncodeSize encodeSize = EncodeSize.forSource(
-                    camera.getCameraId(), sourceWidth, sourceHeight, gridRequested);
+                    camera.getCameraId(), sourceWidth, sourceHeight, spec.grid);
             int encodeWidth = encodeSize.width;
             int encodeHeight = encodeSize.height;
 
@@ -1246,17 +1236,15 @@ public class MultiCameraManager {
                         + sourceWidth + "x" + sourceHeight
                         + " -> 编码 " + encodeWidth + "x" + encodeHeight);
             } else {
-                // 设置写着四宫格却录出长条时，得能一眼看出是哪一步没成立
+                // 配置写着四宫格却录出长条时，得能一眼看出是哪一步没成立
                 boolean sourceIsComposite =
                         com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
                                 camera.getCameraId(), sourceWidth, sourceHeight);
-                if (!gridRequested || !sourceIsComposite) {
-                    AppLog.i(TAG, "Camera " + key + " 不做四宫格重排："
-                            + (gridRequested ? "" : "设置为原始长条；")
-                            + (sourceIsComposite ? "" : "源尺寸 " + sourceWidth + "x" + sourceHeight
-                                    + " 不像合成条带；")
-                            + "将按原样编码");
-                }
+                AppLog.i(TAG, "Camera " + key + " 不做四宫格重排："
+                        + (spec.grid ? "" : "配置为原始长条；")
+                        + (sourceIsComposite ? "" : "源尺寸 " + sourceWidth + "x" + sourceHeight
+                                + " 不像合成条带；")
+                        + "将按原样编码");
                 if (encodeWidth != sourceWidth || encodeHeight != sourceHeight) {
                     AppLog.i(TAG, "Camera " + key + " 超出编码器上限，缩到 "
                             + encodeWidth + "x" + encodeHeight
@@ -1265,7 +1253,8 @@ public class MultiCameraManager {
             }
 
             // 计算码率（基于调整后的分辨率和帧率）
-            int bitrate = appConfig.getActualBitrate(encodeWidth, encodeHeight, targetFrameRate);
+            int bitrate = AppConfig.actualBitrate(spec.bitrate,
+                    encodeWidth, encodeHeight, targetFrameRate);
 
             // 创建软编码录制器（使用调整后的分辨率）
             CodecVideoRecorder codecRecorder = new CodecVideoRecorder(
@@ -1286,9 +1275,9 @@ public class MultiCameraManager {
             codecRecorder.setSegmentDuration(segmentDurationMs);
             codecRecorder.setBitRate(bitrate);
             codecRecorder.setFrameRate(targetFrameRate, frameRateCap);
-            // 跟随设置里的码率等级。写死 3 的话那个下拉框就是个摆设
-            codecRecorder.setQualityLevel(new AppConfig(context).getEncoderQualityLevel());
-            codecRecorder.setForceH264(appConfig.isForceH264Encoding());
+            // 跟随这一路配置里的码率等级。写死 3 的话那个选项就是个摆设
+            codecRecorder.setQualityLevel(RecordSpecs.qualityLevel(spec.bitrate));
+            codecRecorder.setForceH264(RecordSpecs.forceH264(spec.codec));
 
             AppLog.d(TAG, "Codec recording params for " + key + ": " +
                     encodeWidth + "x" + encodeHeight +
@@ -1623,14 +1612,16 @@ public class MultiCameraManager {
 
             // 设置录制参数
             AppConfig appConfig = new AppConfig(context);
-            codecRecorder.setSegmentDuration(appConfig.getSegmentDurationMs());
-            codecRecorder.setBitRate(appConfig.getActualBitrate(previewSize.getWidth(), previewSize.getHeight(), 25));  // 压低 CPU 占用
+            StreamSpec spec = RecordSpecs.forCameraKey(context, key);
+            codecRecorder.setSegmentDuration(RecordSpecs.segmentMs(spec.segmentMinutes));
+            codecRecorder.setBitRate(AppConfig.actualBitrate(spec.bitrate,
+                    previewSize.getWidth(), previewSize.getHeight(), 25));  // 压低 CPU 占用
             codecRecorder.setFrameRate(
-                    appConfig.getNominalFrameRate(hardwareMaxFps()),
-                    appConfig.getFrameRateCap(hardwareMaxFps()));
-            // 跟随设置里的码率等级。写死 3 的话那个下拉框就是个摆设
-            codecRecorder.setQualityLevel(new AppConfig(context).getEncoderQualityLevel());
-            codecRecorder.setForceH264(appConfig.isForceH264Encoding());
+                    RecordSpecs.nominal(spec.fps, hardwareMaxFps()),
+                    RecordSpecs.cap(spec.fps, hardwareMaxFps()));
+            // 跟随这一路配置里的码率等级。写死 3 的话那个选项就是个摆设
+            codecRecorder.setQualityLevel(RecordSpecs.qualityLevel(spec.bitrate));
+            codecRecorder.setForceH264(RecordSpecs.forceH264(spec.codec));
             codecRecorder.setWatermarkEnabled(appConfig.isTimestampWatermarkEnabled());
             codecRecorder.setWatermarkSpecEnabled(appConfig.isWatermarkSpecEnabled());
 

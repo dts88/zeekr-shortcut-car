@@ -68,7 +68,8 @@ def main():
     out.append("> Everything else - new features in particular - is **unverified on a vehicle**,")
     out.append("> and the automated tests cover the pure logic only.")
     out.append("> **Try anything new in a stationary vehicle first.**")
-    out.append("> If recording misbehaves, set the recording layout back to \"Raw strip\".")
+    out.append("> If recording misbehaves, set that camera's recording layout back")
+    out.append("> to \"Raw strip\" under Developer options -> Edit profile.")
     out.append("")
 
     out.append("## Getting started")

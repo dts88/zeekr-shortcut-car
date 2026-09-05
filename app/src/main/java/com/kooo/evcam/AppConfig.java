@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.config.BlindSpotConfig;
 import com.kooo.evcam.zeekr.FisheyeProjection;
-import com.kooo.evcam.settings.FrameRatePolicy;
 import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.LicensePlate;
 import com.kooo.evcam.settings.SettingsRegistry;
@@ -54,7 +53,6 @@ public class AppConfig {
     private static final String KEY_PHOTO_STORAGE_LIMIT_GB = "photo_storage_limit_gb";  // 图片存储限制（GB）
     
     // 分段录制配置
-    private static final String KEY_SEGMENT_DURATION_MINUTES = "segment_duration_minutes";  // 分段时长（分钟）
     
     // 录制状态显示配置
     private static final String KEY_RECORDING_STATS_ENABLED = "recording_stats_enabled";  // 录制状态显示开关
@@ -191,13 +189,8 @@ public class AppConfig {
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
 
     // 视频编码器配置
-    private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 强制使用 H.264 编码器（关闭默认使用 H.265/HEVC）
     
     // 录制摄像头选择配置
-    private static final String KEY_RECORDING_CAMERA_FRONT_ENABLED = "recording_camera_front_enabled";  // 前摄像头参与录制
-    private static final String KEY_RECORDING_CAMERA_BACK_ENABLED = "recording_camera_back_enabled";    // 后摄像头参与录制
-    private static final String KEY_RECORDING_CAMERA_LEFT_ENABLED = "recording_camera_left_enabled";    // 左摄像头参与录制
-    private static final String KEY_RECORDING_CAMERA_RIGHT_ENABLED = "recording_camera_right_enabled";  // 右摄像头参与录制
     
     // 摄像头画面显示配置（与录制开关分离）
     private static final String KEY_CAMERA_FRONT_VISIBLE = "camera_front_visible";  // 前摄像头画面显示
@@ -253,10 +246,6 @@ public class AppConfig {
     public static final int EFFECT_MODE_SEPIA = 4;  // 怀旧
     public static final int EFFECT_MODE_AQUA = 6;  // 水蓝
     
-    // 分段时长常量（分钟）
-    public static final int SEGMENT_DURATION_1_MIN = 1;
-    public static final int SEGMENT_DURATION_3_MIN = 3;
-    public static final int SEGMENT_DURATION_5_MIN = 5;
     
     // 悬浮窗大小常量
     public static final int FLOATING_SIZE_TINY = 32;        // 超小
@@ -318,34 +307,16 @@ public class AppConfig {
     public static final String RECORDING_MODE_MEDIA_RECORDER = "media_recorder";  // MediaRecorder（硬件编码）
     public static final String RECORDING_MODE_CODEC = "codec";  // MediaCodec（软编码）
     
-    // 分辨率配置相关键名
-    private static final String KEY_TARGET_RESOLUTION = "target_resolution";  // 目标分辨率
-    
-    // 分辨率常量
-    public static final String RESOLUTION_DEFAULT = "default";  // 默认（优先1280x800）
-    
     // 码率配置相关键名
-    private static final String KEY_BITRATE_LEVEL = "bitrate_level";  // 码率等级
     
     // 码率等级常量
     public static final String BITRATE_LOW = "low";        // 低码率（计算值的50%）
     public static final String BITRATE_MEDIUM = "medium";  // 中码率（计算值，默认）
     public static final String BITRATE_HIGH = "high";      // 高码率（计算值的150%）
     
-    // 帧率配置相关键名
-    private static final String KEY_RECORD_FPS = "record_fps";  // 显式录制帧率（auto/30/24/20/15/10）
-    private static final String KEY_DECOUPLE_PREVIEW = "decouple_preview_resolution";  // 预览与录制分辨率解耦
-    private static final String KEY_RECORD_LAYOUT = "record_layout";  // 录制画面排列（raw/grid2x2）
-    private static final String KEY_PREVIEW_RESOLUTION = "preview_resolution";  // 低分辨率预览的目标尺寸
     private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
     
 
-    // ---- 录制帧率：决定录制帧率的唯一设置 ----
-    /** 跟随硬件/车型默认。 */
-    public static final String RECORD_FPS_AUTO = "auto";
-    /** 可选的显式帧率，单位 fps。 */
-    /** 由注册表派生，避免和 SettingsRegistry 各存一份而走偏。 */
-    public static final String[] RECORD_FPS_VALUES = SettingsRegistry.RECORD_FPS.values();
 
     
     // 车型配置相关键名
@@ -611,7 +582,7 @@ public class AppConfig {
      */
     public boolean shouldUseCodecRecording() {
         String mode = getRecordingMode();
-        if (isRecordGridLayout()) {
+        if (com.kooo.evcam.profile.RecordSpecs.anyGridEnabled(context)) {
             // 四宫格要在编码前用 GL 重排画面，只有 MediaCodec 路径能做到；
             // MediaRecorder 直接吃相机原始输出，没有插手的余地。
             if (RECORDING_MODE_MEDIA_RECORDER.equals(mode)) {
@@ -641,70 +612,13 @@ public class AppConfig {
     
     // ==================== 分辨率配置相关方法 ====================
     
-    /**
-     * 设置目标分辨率
-     * @param resolution 分辨率字符串（如 "1280x720"）或 "default"
-     */
-    public void setTargetResolution(String resolution) {
-        prefs.edit().putString(KEY_TARGET_RESOLUTION, resolution).apply();
-        AppLog.d(TAG, "目标分辨率设置: " + resolution);
-    }
     
-    /**
-     * 获取目标分辨率
-     * @return 分辨率字符串，默认为 "default"
-     */
-    public String getTargetResolution() {
-        return prefs.getString(KEY_TARGET_RESOLUTION, RESOLUTION_DEFAULT);
-    }
     
-    /**
-     * 是否使用默认分辨率
-     */
-    public boolean isDefaultResolution() {
-        return RESOLUTION_DEFAULT.equals(getTargetResolution());
-    }
     
-    /**
-     * 解析分辨率字符串为宽高数组
-     * @param resolution 分辨率字符串（如 "1280x720"）
-     * @return [width, height]，解析失败返回 null
-     */
-    public static int[] parseResolution(String resolution) {
-        if (resolution == null || RESOLUTION_DEFAULT.equals(resolution)) {
-            return null;
-        }
-        try {
-            String[] parts = resolution.split("x");
-            if (parts.length == 2) {
-                int width = Integer.parseInt(parts[0].trim());
-                int height = Integer.parseInt(parts[1].trim());
-                return new int[]{width, height};
-            }
-        } catch (NumberFormatException e) {
-            AppLog.w(TAG, "无法解析分辨率: " + resolution);
-        }
-        return null;
-    }
     
     // ==================== 码率配置相关方法 ====================
     
-    /**
-     * 设置码率等级
-     * @param level 码率等级（low/medium/high）
-     */
-    public void setBitrateLevel(String level) {
-        writeEnum(SettingsRegistry.BITRATE_LEVEL, level);
-        AppLog.d(TAG, "码率等级设置: " + level);
-    }
     
-    /**
-     * 获取码率等级
-     * @return 码率等级，默认为 medium
-     */
-    public String getBitrateLevel() {
-        return readEnum(SettingsRegistry.BITRATE_LEVEL);
-    }
     
     /**
      * 根据分辨率和帧率计算码率（bps）
@@ -721,38 +635,14 @@ public class AppConfig {
     }
     
     /**
-     * 根据当前配置获取实际应用的码率（bps）
-     * @param width 宽度
-     * @param height 高度
-     * @param frameRate 帧率
-     * @return 实际码率（bps）
-     */
-    /**
-     * 码率等级换算成编码器的画质档。
+     * 同上，但码率等级由调用方给。
      *
-     * <p>以前两处调用都写死 {@code setQualityLevel(3)}，而设置里的低/中/高
-     * 只在「强制 H.264」时才被读到 —— 也就是说正常的 HEVC 路径下，
-     * 那个下拉框<b>完全不起作用</b>，录出来永远是最高档。</p>
-     *
-     * <p>这正是这个项目反复出现的那类问题：界面上给了一个选择，实际不生效。</p>
+     * <p>等级现在写在每一路自己的配置里，而不是一个全局键 —— 取值的地方变了，
+     * 这条公式没变。</p>
      */
-    public int getEncoderQualityLevel() {
-        switch (getBitrateLevel()) {
-            case BITRATE_LOW:
-                return 1;
-            case BITRATE_HIGH:
-                return 3;
-            case BITRATE_MEDIUM:
-            default:
-                return 2;
-        }
-    }
-
-    public int getActualBitrate(int width, int height, int frameRate) {
+    public static int actualBitrate(String level, int width, int height, int frameRate) {
         int baseBitrate = calculateBitrate(width, height, frameRate);
-        String level = getBitrateLevel();
-        
-        switch (level) {
+        switch (level == null ? "" : level) {
             case BITRATE_LOW:
                 // 50%，取整到 0.5Mbps
                 return roundToHalfMbps(baseBitrate / 2);
@@ -779,20 +669,6 @@ public class AppConfig {
         return Math.max(halfMbps, Math.min(rounded, 20000000));
     }
     
-    /**
-     * 获取码率等级的显示名称
-     */
-    public static String getBitrateLevelDisplayName(String level) {
-        switch (level) {
-            case BITRATE_LOW:
-                return "低";
-            case BITRATE_HIGH:
-                return "高";
-            case BITRATE_MEDIUM:
-            default:
-                return "标准";
-        }
-    }
     
     /**
      * 格式化码率为可读字符串
@@ -808,14 +684,6 @@ public class AppConfig {
         }
     }
     
-    /**
-     * 根据硬件最大帧率计算标准帧率（接近30fps的成倍降低值）
-     * @param hardwareMaxFps 硬件支持的最大帧率
-     * @return 标准帧率
-     */
-    public static int getStandardFrameRate(int hardwareMaxFps) {
-        return FrameRatePolicy.standardFrameRate(hardwareMaxFps);
-    }
     
     // ==================== 帧率配置相关方法 ====================
     
@@ -831,8 +699,13 @@ public class AppConfig {
      * @param hardwareMaxFps 硬件支持的最大帧率
      * @return 实际使用的帧率
      */
-    /** 录制链路当作「硬件最大帧率」用的值，见 {@link FrameRatePolicy}。 */
-    public static final int RECORDER_MAX_FPS = FrameRatePolicy.RECORDER_MAX_FPS;
+    /**
+     * 读不到相机声明时，录制链路当作「硬件最大帧率」用的兜底值。
+     *
+     * <p>只在 {@code CameraCapabilities.declaredMaxFps()} 拿不到数时才会用到 ——
+     * 相机说得出话就听相机的，这个数不参与决策。</p>
+     */
+    public static final int RECORDER_MAX_FPS = 25;
 
     /**
      * 「不限制帧率」。
@@ -840,129 +713,10 @@ public class AppConfig {
      * <p>0 而不是某个很大的数：下游拿到 0 就知道「不要设任何门槛」，
      * 拿到 999 还得先判断这是不是一个真实的目标值。</p>
      */
-    public static final int FRAME_RATE_UNLIMITED = 0;
-
-    /**
-     * 渲染节流的<b>上限</b>；{@link #FRAME_RATE_UNLIMITED} 表示不限制。
-     *
-     * <p>只有 GL 侧「这一帧渲不渲」的判断该用它。其他地方一律用
-     * {@link #getNominalFrameRate}——详见那个方法上的说明。</p>
-     */
-    public int getFrameRateCap(int hardwareMaxFps) {
-        String explicit = getRecordFps();
-        if (RECORD_FPS_AUTO.equals(explicit)) {
-            // 「原始帧率」= 一帧都不丢，视频流给多少录多少。
-            //
-            // 以前它会算出一个具体的数（比如 25）再拿去节流，于是「原始」
-            // 反而成了一道限制 —— 而且当那个数和视频流的出帧节奏不成整数倍时，
-            // 节流还会把帧率砍一半。真想要「原始」，就不该有任何门槛。
-            return FRAME_RATE_UNLIMITED;
-        }
-        return explicitFrameRate(explicit, hardwareMaxFps);
-    }
-
-    /**
-     * 一个<b>一定是正数</b>的帧率，给所有需要「一个具体数字」的地方用：
-     * {@code MediaFormat.KEY_FRAME_RATE}、码率估算、相机的 AE 帧率区间。
-     *
-     * <h3>为什么要和上面那个分开</h3>
-     *
-     * <p>「不限制」对节流来说是 0，对其他人来说不是：编码器拿到帧率 0 会配置失败
-     * 或算出 0 码率，相机拿到 0 会去请求<b>最低</b>的那个帧率区间 ——
-     * 恰好和「不限制」相反。0.36.0-beta 里就是这么坏的。</p>
-     *
-     * <p>所以这里不提供一个「通用」的帧率方法：谁需要什么，自己选。</p>
-     */
-    public int getNominalFrameRate(int hardwareMaxFps) {
-        String explicit = getRecordFps();
-        if (RECORD_FPS_AUTO.equals(explicit)) {
-            // 不限制时，「预期能跑到多少」就是硬件能给到多少
-            return Math.max(5, hardwareMaxFps);
-        }
-        return explicitFrameRate(explicit, hardwareMaxFps);
-    }
-
-    private int explicitFrameRate(String explicit, int hardwareMaxFps) {
-        try {
-            int fps = Integer.parseInt(explicit);
-            return Math.max(5, Math.min(hardwareMaxFps, fps));
-        } catch (NumberFormatException e) {
-            AppLog.w(TAG, "无法解析录制帧率 '" + explicit + "'，按硬件上限处理");
-            return Math.max(5, hardwareMaxFps);
-        }
-    }
 
     // ==================== 录制帧率（显式选择） ====================
 
-    /**
-     * 获取用户选择的录制帧率。
-     *
-     * @return {@link #RECORD_FPS_AUTO} 或具体的 fps 字符串
-     */
-    public String getRecordFps() {
-        return readEnum(SettingsRegistry.RECORD_FPS);
-    }
-
-    /**
-     * 设置录制帧率；传入 {@link #RECORD_FPS_AUTO} 表示跟随硬件默认。
-     *
-     * <p>这是决定录制帧率的<b>唯一</b>设置。</p>
-     */
-    public void setRecordFps(String value) {
-        writeEnum(SettingsRegistry.RECORD_FPS, value);
-        AppLog.d(TAG, "录制帧率设置: " + value);
-    }
-
-    /** 录制帧率的显示名称。 */
-    public static String getRecordFpsDisplayName(String value) {
-        return RECORD_FPS_AUTO.equals(value) ? autoFrameRateLabel() : value + " fps";
-    }
-
-    /**
-     * 「原始帧率」这一项要显示的文字，带上它实际会用的数值。
-     *
-     * <p>数值是算出来的而不是写死的字符串 —— 哪天录制链路改了，这里跟着变，
-     * 不会出现界面写一个数、实际录另一个数。</p>
-     */
-    public static String autoFrameRateLabel() {
-        return FrameRatePolicy.autoLabel();
-    }
-
     // ==================== 预览/录制分辨率解耦 ====================
-
-    /**
-     * 是否让预览跑在较小的分辨率上，而录制仍用完整分辨率。
-     *
-     * <p>默认关闭，保持上游行为（两者共用一个尺寸）。开启后预览缓冲区会选一个
-     * 接近 640x480 的已声明尺寸，录制不受影响。对极氪的 1280x5140 合成流来说，
-     * 这能显著降低 GPU 与内存带宽——预览不必再搬运 655 万像素。</p>
-     *
-     * <p>是否可行取决于车机 HAL 是否支持这种「预览小、录制大」的组合，
-     * 因此做成开关，由用户在实车上验证。</p>
-     */
-    public boolean isDecouplePreviewEnabled() {
-        return prefs.getBoolean(KEY_DECOUPLE_PREVIEW, false);
-    }
-
-    public void setDecouplePreviewEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_DECOUPLE_PREVIEW, enabled).apply();
-        AppLog.d(TAG, "预览/录制分辨率解耦: " + enabled);
-    }
-
-    /**
-     * 「预览用低分辨率」开启后，预览缓冲区的目标尺寸。
-     *
-     * <p>取值为 {@code 宽x高} 字符串。实际使用时会在 HAL <b>已声明</b>的尺寸里挑最接近的，
-     * 挑不到就退回录制尺寸 —— 绝不臆造未声明的分辨率。</p>
-     */
-    public String getPreviewResolution() {
-        return readEnum(SettingsRegistry.PREVIEW_RESOLUTION);
-    }
-
-    public void setPreviewResolution(String value) {
-        writeEnum(SettingsRegistry.PREVIEW_RESOLUTION, value);
-        AppLog.d(TAG, "预览分辨率设置: " + value);
-    }
 
     // ==================== 手动指定相机映射 ====================
 
@@ -1008,40 +762,7 @@ public class AppConfig {
         AppLog.i(TAG, "相机映射已全部恢复自动");
     }
 
-    /** 可选的预览分辨率，按从小到大排列。 */
-    /** 由注册表派生，避免和 SettingsRegistry 各存一份而走偏。 */
-    public static final String[] PREVIEW_RES_VALUES =
-            SettingsRegistry.PREVIEW_RESOLUTION.values();
 
-    // ==================== 录制画面排列 ====================
-
-    /** 录制原始合成流（四个画面竖向一字排开）。 */
-    public static final String RECORD_LAYOUT_RAW = "raw";
-    /** 录制为 2x2 四宫格。 */
-    public static final String RECORD_LAYOUT_GRID = "grid2x2";
-
-    /**
-     * 录制画面排列方式。
-     *
-     * <p>{@link #RECORD_LAYOUT_RAW} 直接录制车机给的合成流，四个画面竖向排列成一条长条，
-     * 编码开销最低但观看不便，且 1280x5140 超过编码器 4096 的上限、会被缩放。</p>
-     *
-     * <p>{@link #RECORD_LAYOUT_GRID} 在编码前用 GL 把四个画面重排成 2x2 正方形，
-     * 输出即所见。代价是必须走 MediaCodec（软编码）路径。</p>
-     */
-    public String getRecordLayout() {
-        return readEnum(SettingsRegistry.RECORD_LAYOUT);
-    }
-
-    public void setRecordLayout(String layout) {
-        writeEnum(SettingsRegistry.RECORD_LAYOUT, layout);
-        AppLog.d(TAG, "录制画面排列: " + layout);
-    }
-
-    /** 是否录制为 2x2 四宫格。 */
-    public boolean isRecordGridLayout() {
-        return RECORD_LAYOUT_GRID.equals(getRecordLayout());
-    }
     
     
     // ==================== 设置项自检 ====================
@@ -1946,30 +1667,8 @@ public class AppConfig {
     
     // ==================== 分段录制配置相关方法 ====================
     
-    /**
-     * 设置分段时长（分钟）
-     * @param minutes 分段时长，单位分钟（1/3/5）
-     */
-    public void setSegmentDurationMinutes(int minutes) {
-        prefs.edit().putInt(KEY_SEGMENT_DURATION_MINUTES, minutes).apply();
-        AppLog.d(TAG, "分段时长设置: " + minutes + " 分钟");
-    }
     
-    /**
-     * 获取分段时长（分钟）
-     * @return 分段时长，单位分钟，默认为1分钟
-     */
-    public int getSegmentDurationMinutes() {
-        return prefs.getInt(KEY_SEGMENT_DURATION_MINUTES, SEGMENT_DURATION_1_MIN);
-    }
     
-    /**
-     * 获取分段时长（毫秒）
-     * @return 分段时长，单位毫秒
-     */
-    public long getSegmentDurationMs() {
-        return getSegmentDurationMinutes() * 60 * 1000L;
-    }
     
     // ==================== 录制状态显示配置相关方法 ====================
     
@@ -3068,123 +2767,12 @@ public class AppConfig {
 
     // ==================== 视频编码器配置相关方法 ====================
 
-    /**
-     * 设置是否强制使用 H.264 编码器
-     * @param enabled true 表示强制 H.264（兼容性优先），false 表示优先使用 H.265/HEVC
-     */
-    public void setForceH264Encoding(boolean enabled) {
-        prefs.edit().putBoolean(KEY_FORCE_H264_ENCODING, enabled).apply();
-        AppLog.d(TAG, "强制 H.264 编码: " + (enabled ? "启用" : "禁用"));
-    }
-
-    /**
-     * 获取是否强制使用 H.264 编码器
-     * @return true 表示强制 H.264，false 表示优先使用 H.265/HEVC（默认）
-     */
-    public boolean isForceH264Encoding() {
-        return prefs.getBoolean(KEY_FORCE_H264_ENCODING, false);
-    }
 
     // ==================== 录制摄像头选择配置相关方法 ====================
     
-    /**
-     * 设置某个摄像头是否参与主界面录制
-     * @param position 位置（front/back/left/right）
-     * @param enabled true 表示参与录制
-     */
-    public void setRecordingCameraEnabled(String position, boolean enabled) {
-        String key;
-        switch (position) {
-            case "front":
-                key = KEY_RECORDING_CAMERA_FRONT_ENABLED;
-                break;
-            case "back":
-                key = KEY_RECORDING_CAMERA_BACK_ENABLED;
-                break;
-            case "left":
-                key = KEY_RECORDING_CAMERA_LEFT_ENABLED;
-                break;
-            case "right":
-                key = KEY_RECORDING_CAMERA_RIGHT_ENABLED;
-                break;
-            default:
-                AppLog.w(TAG, "未知的摄像头位置: " + position);
-                return;
-        }
-        prefs.edit().putBoolean(key, enabled).apply();
-        AppLog.d(TAG, "录制摄像头设置: " + position + " = " + (enabled ? "启用" : "禁用"));
-    }
     
-    /**
-     * 获取某个摄像头是否参与主界面录制
-     * @param position 位置（front/back/left/right）
-     * @return true 表示参与录制，默认为 true
-     */
-    public boolean isRecordingCameraEnabled(String position) {
-        String key;
-        switch (position) {
-            case "front":
-                key = KEY_RECORDING_CAMERA_FRONT_ENABLED;
-                break;
-            case "back":
-                key = KEY_RECORDING_CAMERA_BACK_ENABLED;
-                break;
-            case "left":
-                key = KEY_RECORDING_CAMERA_LEFT_ENABLED;
-                break;
-            case "right":
-                key = KEY_RECORDING_CAMERA_RIGHT_ENABLED;
-                break;
-            default:
-                return true;  // 未知位置默认启用
-        }
-        // 默认启用（全选）
-        return prefs.getBoolean(key, true);
-    }
     
-    /**
-     * 获取所有启用录制的摄像头位置集合
-     * 仅返回当前车型配置中存在的摄像头
-     * @return 启用的摄像头位置集合（如 ["front", "back"]）
-     */
-    public java.util.Set<String> getEnabledRecordingCameras() {
-        java.util.Set<String> enabled = new java.util.HashSet<>();
-        int cameraCount = getCameraCount();
-        
-        // 哪一路存在按槽位号判断，规则在 PreviewSlots 里 —— 和挂预览监听用的是同一条
-        for (String key : com.kooo.evcam.camera.PreviewSlots.KEYS) {
-            if (com.kooo.evcam.camera.PreviewSlots.exists(cameraCount, key)
-                    && isRecordingCameraEnabled(key)) {
-                enabled.add(key);
-            }
-        }
-
-        // 一路都没选中时不能就这么去录一个空的，把存在的全打开
-        if (enabled.isEmpty()) {
-            AppLog.w(TAG, "没有启用的录制摄像头，自动启用所有可用摄像头");
-            for (String key : com.kooo.evcam.camera.PreviewSlots.KEYS) {
-                if (com.kooo.evcam.camera.PreviewSlots.exists(cameraCount, key)) {
-                    enabled.add(key);
-                }
-            }
-            resetRecordingCameraSelection();
-        }
-        
-        return enabled;
-    }
     
-    /**
-     * 重置录制摄像头选择为全选
-     */
-    public void resetRecordingCameraSelection() {
-        prefs.edit()
-            .putBoolean(KEY_RECORDING_CAMERA_FRONT_ENABLED, true)
-            .putBoolean(KEY_RECORDING_CAMERA_BACK_ENABLED, true)
-            .putBoolean(KEY_RECORDING_CAMERA_LEFT_ENABLED, true)
-            .putBoolean(KEY_RECORDING_CAMERA_RIGHT_ENABLED, true)
-            .apply();
-        AppLog.d(TAG, "录制摄像头选择已重置为全选");
-    }
     
     /**
      * 获取某个摄像头画面是否显示（与录制开关分离）
@@ -3239,40 +2827,6 @@ public class AppConfig {
         prefs.edit().putBoolean(key, visible).apply();
     }
     
-    /**
-     * 获取用于显示的摄像头名称（用于录制摄像头选择等设置界面）
-     * 使用配置中的名称，如果为空则返回"位置N"
-     * @param uiContext 要显示这个名字的界面
-     * @param position 位置（front/back/left/right）
-     * @param index 位置索引（1-4）
-     * @return 显示名称
-     */
-    public String getRecordingCameraDisplayName(Context uiContext, String position, int index) {
-        // 「录哪几路」和「四宫格里这一格叫什么」是两个问题，答案也不一样。
-        //
-        // 极氪这两档的第一路是车机拼好的整条环视流，选它就等于选下了整个 360°，
-        // 所以在「录制摄像头」里该叫「环视」。但录制界面上那四个标签指的是
-        // 这条流拆出来的四个 lane，那里的「前」确实就是前方，不能跟着改。
-        String carModel = getCarModel();
-        if (CAR_MODEL_ZEEKR_7X.equals(carModel) || CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            switch (position) {
-                case "front":
-                    return uiContext.getString(R.string.slot_surround);
-                case "back":
-                    return uiContext.getString(R.string.slot_cabin_1);
-                case "left":
-                    return uiContext.getString(R.string.slot_cabin_2);
-                default:
-                    break;
-            }
-        }
-        String name = getCameraName(uiContext, position);
-        // 如果名称为空或仅为空白，使用位置名称
-        if (name == null || name.trim().isEmpty()) {
-            return uiContext.getString(R.string.camera_slot_n, index);
-        }
-        return name;
-    }
     
     // ==================== 亮度/降噪调节配置相关方法 ====================
     

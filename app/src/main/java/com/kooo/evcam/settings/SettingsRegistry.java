@@ -20,35 +20,14 @@ import java.util.List;
  *
  * <p><b>只收枚举型</b>：布尔开关、数值、路径这些没有「选项列表」，不存在这一类错位，
  * 保持原样即可。硬塞进来只会让这份声明变得难读。</p>
+ *
+ * <p>相机与视频流的参数（排列、帧率、码率、编码、分段、每一路的尺寸）不在这里 ——
+ * 它们按路存在配置里，入口是开发者选项 →「配置编辑」。</p>
  */
 public final class SettingsRegistry {
 
     private SettingsRegistry() {
     }
-
-    /** 录制画面排列。 */
-    public static final SettingSpec RECORD_LAYOUT = SettingSpec.of(
-            "record_layout", "录制画面排列", "grid2x2",
-            entry("grid2x2", "四宫格", R.string.opt_layout_grid),
-            entry("raw", "原始长条", R.string.opt_layout_raw));
-
-    /** 录制帧率。 */
-    public static final SettingSpec RECORD_FPS = SettingSpec.of(
-            "record_fps", "录制帧率", "auto",
-            entry("auto", FrameRatePolicy.autoLabel(), R.string.opt_fps_auto),
-            entry("30", "30 fps"),
-            entry("24", "24 fps"),
-            entry("20", "20 fps"),
-            entry("15", "15 fps"),
-            entry("10", "10 fps"));
-
-    /** 「预览用低分辨率」开启后，预览缓冲区的目标尺寸。 */
-    public static final SettingSpec PREVIEW_RESOLUTION = SettingSpec.of(
-            "preview_resolution", "预览分辨率", "1280x720",
-            entry("640x480", "640x480"),
-            entry("1280x720", "1280x720"),
-            entry("1600x900", "1600x900"),
-            entry("1920x1080", "1920x1080"));
 
     /** 录制模式。 */
     public static final SettingSpec RECORDING_MODE = SettingSpec.of(
@@ -56,13 +35,6 @@ public final class SettingsRegistry {
             entry("auto", "自动（推荐）", R.string.opt_mode_auto),
             entry("media_recorder", "MediaRecorder"),
             entry("codec", "MediaCodec"));
-
-    /** 码率等级。 */
-    public static final SettingSpec BITRATE_LEVEL = SettingSpec.of(
-            "bitrate_level", "码率等级", "medium",
-            entry("low", "低", R.string.opt_bitrate_low),
-            entry("medium", "中", R.string.opt_bitrate_medium),
-            entry("high", "高", R.string.opt_bitrate_high));
 
     /**
      * 车型（视频流配置）。
@@ -90,11 +62,7 @@ public final class SettingsRegistry {
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
-            RECORD_LAYOUT,
-            RECORD_FPS,
-            PREVIEW_RESOLUTION,
             RECORDING_MODE,
-            BITRATE_LEVEL,
             CAR_MODEL,
             LANGUAGE));
 }

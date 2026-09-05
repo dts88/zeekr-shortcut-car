@@ -5,7 +5,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Camera and stream parameters now live in one place. Frame rate, bitrate, codec, segment
+  length, which cameras record and the recording layout each had a setting of their own
+  while the profile editor showed its own copy of the same thing. Recording now reads the
+  profile, per camera, and those settings are gone from Settings.
+- Fixed: frame rate, bitrate, segment length and codec in the profile editor had no effect
+  at all. Recording still read the old global settings, so the editor showed one value and
+  the camera used another.
+- Removed "Low-resolution preview". Each camera's preview size is set in the profile, and
+  that switch could silently shrink it below what the editor showed.
+- A camera that is enabled in the profile is the camera that records. Choosing them
+  separately allowed a camera that was open, and holding a stream, for nothing.
 
 ## [0.37.10-alpha] - 2026-09-05
 

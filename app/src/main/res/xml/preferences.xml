@@ -36,35 +36,6 @@
             android:summary="%s"
             app:useSimpleSummaryProvider="false" />
 
-        <ListPreference
-            android:key="pref_record_layout"
-            android:title="@string/set_record_layout_title"
-            android:summary="%s" />
-
-        <ListPreference
-            android:key="pref_record_fps"
-            android:title="@string/set_record_fps_title"
-            android:summary="%s" />
-
-        <ListPreference
-            android:key="pref_segment_duration"
-            android:title="@string/set_segment_title"
-            android:summary="%s" />
-
-        <MultiSelectListPreference
-            android:key="pref_recording_cameras"
-            android:title="@string/set_cameras_title"
-            android:dialogTitle="@string/set_cameras_dialog" />
-
-        <ListPreference
-            android:key="pref_resolution"
-            android:title="@string/set_resolution_title"
-            android:summary="%s" />
-
-        <ListPreference
-            android:key="pref_bitrate"
-            android:title="@string/set_bitrate_title" />
-
         <SwitchPreferenceCompat
             android:key="pref_watermark_brand"
             android:title="@string/set_watermark_brand_title"
@@ -107,7 +78,6 @@
             android:key="pref_relay_write"
             android:title="@string/set_relay_title"
             android:summary="@string/set_relay_summary" />
-
 
         <EditTextPreference
             android:key="pref_video_limit"
@@ -274,22 +244,6 @@
             android:title="@string/set_recording_mode_title"
             android:summary="%s" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_force_h264"
-            android:title="@string/set_force_h264_title"
-            android:summary="@string/set_force_h264_summary" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_decouple_preview"
-            android:title="@string/set_decouple_preview_title"
-            android:summary="@string/set_decouple_preview_summary" />
-
-        <ListPreference
-            android:key="pref_preview_resolution"
-            android:dependency="pref_decouple_preview"
-            android:title="@string/set_preview_resolution_title"
-            android:summary="%s" />
-
         <Preference
             android:key="pref_image_adjust"
             android:title="@string/set_image_adjust_title"
@@ -366,7 +320,6 @@
             android:key="pref_preview_correction_reset"
             android:title="重置预览矫正参数" />
 
-
         <SwitchPreferenceCompat
             android:key="pref_photo_via_jpeg"
             android:title="拍照走图片通道"
@@ -391,7 +344,6 @@
             android:key="pref_photo_test"
             android:title="拍照通道实测"
             android:summary="每一路、每个声明的 JPEG 尺寸真的拍一张，看能不能出图、带了哪些标签（会占用相机，录制中勿进）" />
-
 
         <Preference
             android:key="pref_developer_note"

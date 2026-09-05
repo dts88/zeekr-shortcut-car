@@ -1,9 +1,7 @@
 package com.kooo.evcam.profile;
 
-import java.util.Set;
-
 /**
- * 把今天那一堆平铺的全局设置，翻译成一份配置。
+ * 建一份配置：按预设摆好相机，把还在设置里的那几项（车型、旋转、镜像、预览矫正）搬过来。
  *
  * <h3>为什么不直接读 AppConfig</h3>
  *
@@ -11,16 +9,14 @@ import java.util.Set;
  * 单独测：迁移<b>漏一项</b>的后果是某个设置悄悄回到默认值，用户下次开车才发现，
  * 而这类错误编译期一点痕迹都没有。要钉住它，就不能让它依赖 Context。</p>
  *
- * <h3>翻译时做的两件事</h3>
+ * <h3>录制那几项为什么是默认值而不是搬过来的</h3>
  *
- * <ol>
- *   <li><b>把全局值分发到每一路</b>。今天「录制分辨率」是一个全局键，但它其实
- *       只对座舱两路生效（环视那一路的尺寸被钉死）。翻译之后每一路各有一份，
- *       这个事实第一次变得看得见。</li>
- *   <li><b>把算出来的数还原成意图</b>。旧的「原始帧率」存的是 {@code auto}，
- *       含义是不限制，翻成 {@link StreamSpec#FPS_UNLIMITED}；拍照没有旧设置，
- *       直接给 {@link StreamSpec#RESOLUTION_MAX}。</li>
- * </ol>
+ * <p>帧率、码率、编码、分段、录哪几路原本都是设置里的全局键，这一版起<b>只存在于配置里</b>
+ * ——「配置编辑」是它们唯一的入口。既然设置里已经没有这些项，翻译也就无从搬起：
+ * 新建一份配置时给的是默认值，要改在配置编辑里改。</p>
+ *
+ * <p>存的仍然是意图而不是算出来的数：帧率默认 {@link StreamSpec#FPS_UNLIMITED}（不限制），
+ * 拍照默认 {@link StreamSpec#RESOLUTION_MAX}（这一路声明的最大）。</p>
  */
 public final class ProfileMigration {
 
@@ -28,18 +24,6 @@ public final class ProfileMigration {
     public static final class Snapshot {
         /** 车型 / 视频流配置：zeekr_7x / zeekr_7x_multi / 其他。 */
         public String carModel = "zeekr_7x";
-        /** 全局录制分辨率：default 或 "1920x1080"。 */
-        public String targetResolution = "default";
-        /** 录制帧率：auto 或数字字符串。 */
-        public String recordFps = "auto";
-        /** 码率等级：low / medium / high。 */
-        public String bitrateLevel = "medium";
-        /** 强制 H.264。 */
-        public boolean forceH264;
-        /** 分段时长（分钟）。 */
-        public int segmentMinutes = 3;
-        /** 参与录制的相机键（front / back / left / right）。 */
-        public Set<String> enabledRecordingCameras;
         /** 每一路的旋转角度，按相机键取。 */
         public IntByKey rotation = key -> 0;
         /** 每一路是否镜像。 */
@@ -159,8 +143,7 @@ public final class ProfileMigration {
         // 翻译之后这件事写在这一路自己身上；auto 就是「跟随探测」。
         String compositeSize = StreamSpec.RESOLUTION_AUTO;
         composite.preview = StreamSpec.preview(compositeSize);
-        composite.record = StreamSpec.record(compositeSize, fps(snapshot.recordFps),
-                snapshot.bitrateLevel, codec(snapshot.forceH264), snapshot.segmentMinutes);
+        composite.record = defaultRecord(compositeSize);
         composite.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
         addCompositeGrid(composite);
         profile.cameras.add(composite);
@@ -169,18 +152,16 @@ public final class ProfileMigration {
             return profile;
         }
 
-        // ---- 两路座舱。它们才是全局「录制分辨率」真正作用的地方 ----
-        String cabinSize = "default".equals(snapshot.targetResolution)
-                ? StreamSpec.RESOLUTION_AUTO : snapshot.targetResolution;
+        // ---- 两路座舱 ----
+        // 尺寸给 auto：具体多大由相机声明决定，要钉死就去配置编辑里钉
+        String cabinSize = StreamSpec.RESOLUTION_AUTO;
         String[] roles = {CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2};
         String[] keys = {"back", "left"};
         for (int i = 0; i < roles.length; i++) {
             CameraProfile cabin = new CameraProfile(roles[i]);
-            cabin.enabled = snapshot.enabledRecordingCameras == null
-                    || snapshot.enabledRecordingCameras.contains(keys[i]);
+            cabin.enabled = true;
             cabin.preview = StreamSpec.preview(cabinSize);
-            cabin.record = StreamSpec.record(cabinSize, fps(snapshot.recordFps),
-                    snapshot.bitrateLevel, codec(snapshot.forceH264), snapshot.segmentMinutes);
+            cabin.record = defaultRecord(cabinSize);
             cabin.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
             addFullFrame(cabin, snapshot, keys[i]);
             profile.cameras.add(cabin);
@@ -188,13 +169,16 @@ public final class ProfileMigration {
         return profile;
     }
 
-    /** 旧的 {@code auto} 就是「不限制」，翻成意图而不是当时算出来的那个数。 */
-    private static String fps(String recordFps) {
-        return recordFps == null || recordFps.isEmpty() || "auto".equals(recordFps)
-                ? StreamSpec.FPS_UNLIMITED : recordFps;
-    }
-
-    private static String codec(boolean forceH264) {
-        return forceH264 ? "h264" : "auto";
+    /**
+     * 新建配置时录制流的默认值。
+     *
+     * <p>不限帧率、中等码率、编码交给编码器挑、1 分钟一段 —— 和这些设置还在
+     * 设置界面里时的默认值一致，所以「什么都没改过」的行为没有变。</p>
+     */
+    private static StreamSpec defaultRecord(String resolution) {
+        StreamSpec spec = StreamSpec.record(resolution, StreamSpec.FPS_UNLIMITED, "medium",
+                "auto", RecordSpecs.DEFAULT_SEGMENT_MINUTES);
+        spec.grid = true;   // 和这一项还在设置里时的默认值一致
+        return spec;
     }
 }

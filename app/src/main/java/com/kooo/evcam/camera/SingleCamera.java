@@ -71,7 +71,7 @@ public class SingleCamera {
      * 预览缓冲区尺寸。默认等于 {@link #previewSize}；开启「预览/录制分辨率解耦」后
      * 会是一个更小的已声明尺寸，录制仍用 previewSize。
      */
-    private Size previewBufferSize;
+
     private Surface recordSurface;  // 录制Surface
     private Surface mainFloatingSurface; // 主屏悬浮窗Surface
     private android.graphics.SurfaceTexture mainFloatingSurfaceTexture; // 主屏悬浮窗SurfaceTexture（用于设置buffer尺寸）
@@ -349,8 +349,10 @@ public class SingleCamera {
      * 那是把「帧率不对」变成「根本没有画面」。</p>
      */
     private void applyTargetFpsRange(CaptureRequest.Builder builder) {
-        // 相机要的是一个具体目标：给 0 它会去挑最低的那个区间，恰好和「不限制」相反
-        int target = new AppConfig(context).getNominalFrameRate(
+        // 相机要的是一个具体目标：给 0 它会去挑最低的那个区间，恰好和「不限制」相反。
+        // 帧率写在这一路自己的配置里，所以按这一路取。
+        int target = com.kooo.evcam.profile.RecordSpecs.nominal(
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(context, cameraPosition).fps,
                 CameraCapabilities.declaredMaxFps() > 0
                         ? CameraCapabilities.declaredMaxFps()
                         : AppConfig.RECORDER_MAX_FPS);
@@ -388,68 +390,14 @@ public class SingleCamera {
     }
 
     /**
-     * 预览缓冲区实际使用的尺寸。录制尺寸请用 {@link #getPreviewSize()}。
+     * 预览缓冲区实际使用的尺寸。
+     *
+     * <p>就是这一路的预览尺寸 —— 它写在配置里，按路设置。以前这里还夹着一个
+     * 「预览用低分辨率」的全局开关，会在配置指定的尺寸之外再挑一个更小的缓冲区，
+     * 于是配置编辑里写着 1280×5140、实际跑的是 1280×720。</p>
      */
     public Size getPreviewBufferSize() {
-        return previewBufferSize != null ? previewBufferSize : previewSize;
-    }
-
-    /**
-     * 选择预览缓冲区尺寸。
-     *
-     * <p>未开启解耦时直接返回录制尺寸，行为与上游一致。开启后，从 HAL 已声明的
-     * 尺寸里挑一个最接近 640x480、且长宽都不超过 1280 的，用于预览缓冲区。
-     * 合成流被压扁进小缓冲区不影响四宫格拆分——拆分用的是归一化坐标。</p>
-     *
-     * <p>挑不到合适的小尺寸就退回录制尺寸，绝不臆造未声明的尺寸。</p>
-     */
-    private Size choosePreviewBufferSize(Size[] declaredSizes, Size recordSize) {
-        if (recordSize == null || declaredSizes == null) {
-            return recordSize;
-        }
-        AppConfig cfg = new AppConfig(context);
-        if (!cfg.isDecouplePreviewEnabled()) {
-            return recordSize;
-        }
-
-        // 目标尺寸来自设置，而不是写死。之前固定 640x480 在车机大屏上太糊。
-        int targetW = 1280;
-        int targetH = 720;
-        int[] parsedTarget = AppConfig.parseResolution(cfg.getPreviewResolution());
-        if (parsedTarget != null) {
-            targetW = parsedTarget[0];
-            targetH = parsedTarget[1];
-        }
-        // 允许的最长边给一点余量，否则 1920x1080 这类选项会被自己滤掉
-        final int maxEdge = Math.max(targetW, targetH) * 2;
-
-        Size best = null;
-        int bestScore = Integer.MAX_VALUE;
-        for (Size size : declaredSizes) {
-            if (size == null || size.getWidth() <= 0 || size.getHeight() <= 0) {
-                continue;
-            }
-            if (size.getWidth() > maxEdge || size.getHeight() > maxEdge) {
-                continue;
-            }
-            long pixels = (long) size.getWidth() * size.getHeight();
-            if (pixels >= (long) recordSize.getWidth() * recordSize.getHeight()) {
-                continue;  // 不比录制尺寸小就没意义
-            }
-            int score = Math.abs(size.getWidth() - targetW) + Math.abs(size.getHeight() - targetH);
-            if (score < bestScore) {
-                bestScore = score;
-                best = size;
-            }
-        }
-
-        if (best == null) {
-            AppLog.w(TAG, "Camera " + cameraId + " 未找到合适的小尺寸预览缓冲区，沿用录制尺寸");
-            return recordSize;
-        }
-        AppLog.i(TAG, "Camera " + cameraId + " 预览/录制分辨率已解耦: 预览 " + best
-                + "，录制 " + recordSize);
-        return best;
+        return previewSize;
     }
 
     public boolean isSecondaryDisplaySurfaceBound(Surface surface) {
@@ -698,32 +646,11 @@ public class SingleCamera {
                     + " 未被声明，回退到全局配置");
         }
 
-        // 从配置获取目标分辨率
-        AppConfig appConfig = new AppConfig(context);
-        String targetResolution = appConfig.getTargetResolution();
-        
-        int targetWidth;
-        int targetHeight;
-        
-        if (AppConfig.RESOLUTION_DEFAULT.equals(targetResolution)) {
-            // 默认：1280x800 (guardapp使用的分辨率)
-            targetWidth = 1280;
-            targetHeight = 800;
-            AppLog.d(TAG, "Camera " + cameraId + " using default target resolution: " + targetWidth + "x" + targetHeight);
-        } else {
-            // 用户指定的分辨率
-            int[] parsed = AppConfig.parseResolution(targetResolution);
-            if (parsed != null) {
-                targetWidth = parsed[0];
-                targetHeight = parsed[1];
-                AppLog.d(TAG, "Camera " + cameraId + " using user-specified target resolution: " + targetWidth + "x" + targetHeight);
-            } else {
-                // 解析失败，回退到默认
-                targetWidth = 1280;
-                targetHeight = 800;
-                AppLog.w(TAG, "Camera " + cameraId + " failed to parse resolution '" + targetResolution + "', using default 1280x800");
-            }
-        }
+        // 配置里这一路写的是 auto（不指定）时才走到这里：挑最接近 1280x800 的。
+        // 这个数是上游 guardapp 用的，留作没有任何指定时的落点。
+        // 要具体尺寸就在配置编辑里写具体尺寸 —— 那才是唯一说了算的地方。
+        int targetWidth = 1280;
+        int targetHeight = 800;
 
         // 首先尝试找到精确匹配
         for (Size size : sizes) {
@@ -1000,10 +927,7 @@ public class SingleCamera {
 
                 // 选择合适的分辨率
                 previewSize = chooseOptimalSize(sizes);
-                previewBufferSize = choosePreviewBufferSize(sizes, previewSize);
-                AppLog.d(TAG, "Camera " + cameraId + " selected preview size: " + previewSize
-                        + (previewBufferSize != null && !previewBufferSize.equals(previewSize)
-                           ? " (预览缓冲区: " + previewBufferSize + ")" : ""));
+                AppLog.d(TAG, "Camera " + cameraId + " selected preview size: " + previewSize);
 
                 // 拍照通道：开着「拍照走图片通道」时，建一个常驻的 JPEG 输出。
                 // 关着时什么都不建，行为和以前完全一样（抓预览画面）。
@@ -2461,7 +2385,8 @@ public class SingleCamera {
         // 与录制保持一致地重排成 2x2 再存盘。用的是同一套拆分几何。
         android.graphics.Bitmap sourceBitmap = bitmap;
         android.graphics.Bitmap gridBitmap = null;
-        if (appConfig.isRecordGridLayout()) {
+        // 照片跟着这一路录制的排列走：录像是 2×2，照片就该是 2×2
+        if (com.kooo.evcam.profile.RecordSpecs.forCameraKey(context, cameraPosition).grid) {
             gridBitmap = com.kooo.evcam.zeekr.CompositeBitmapComposer.toGrid(
                     cameraId, bitmap, null);
             if (gridBitmap != bitmap) {

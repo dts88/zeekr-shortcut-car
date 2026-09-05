@@ -2,10 +2,6 @@ package com.kooo.evcam.settings;
 
 import android.content.Context;
 import android.content.Intent;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.params.StreamConfigurationMap;
-import android.util.Size;
 import android.os.Bundle;
 import android.text.InputType;
 import com.kooo.evcam.profile.ProfileMigration;
@@ -15,21 +11,16 @@ import android.widget.ScrollView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import androidx.annotation.Nullable;
 import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
-import androidx.preference.MultiSelectListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 
 import com.kooo.evcam.AppConfig;
-import com.kooo.evcam.camera.EncodeSize;
-import com.kooo.evcam.camera.TargetBitrate;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
@@ -130,22 +121,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindRecording() {
         bindCarModel();
 
-        bindEnum("pref_record_layout", SettingsRegistry.RECORD_LAYOUT,
-                appConfig.getRecordLayout(), value -> appConfig.setRecordLayout(value));
-
-        bindEnum("pref_record_fps", SettingsRegistry.RECORD_FPS,
-                appConfig.getRecordFps(), value -> appConfig.setRecordFps(value));
-        probeMainStreamFps();
-
-        bindSegmentDuration();
-
-        bindRecordingCameras();
-
-        bindResolution();
-
-        bindEnum("pref_bitrate", SettingsRegistry.BITRATE_LEVEL,
-                appConfig.getBitrateLevel(), value -> appConfig.setBitrateLevel(value),
-                this::showTargetBitrate);
+        // 画面排列、帧率、分段、录哪几路、分辨率、码率都在
+        // 开发者选项 →「配置编辑」里，按路设置。同一件事只留一个入口：
+        // 两个入口意味着迟早会出现「这边写着 30、那边写着 15」。
 
         bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
                 enabled -> {
@@ -216,198 +194,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             pref.setSummary(pref.getEntry());
             toast(getString(R.string.msg_stream_changed, pref.getEntry()));
             return false;
-        });
-    }
-
-    /**
-     * 录制分辨率。
-     *
-     * <p>选项要问过相机才知道，所以是异步填的；填好之前先显示当前值，
-     * 不留一个空白的下拉框。</p>
-     *
-     * <p>只列每一路都支持的尺寸，规则和理由见 {@link ResolutionOptions}。</p>
-     */
-    private void bindResolution() {
-        ListPreference pref = findPreference("pref_resolution");
-        if (pref == null || getContext() == null) {
-            return;
-        }
-        pref.setPersistent(false);
-
-        // 极氪 7X（单路合成流）下这一项是没有作用的：那一路的尺寸由合成流本身
-        // 决定，代码里用 setPreferredSize 钉死，全局目标分辨率根本不会被读到。
-        // 摆一个能选、选了又不生效的下拉框，比不给这个选项更糟。
-        // 「环视 + 两路座舱」不同 —— 那两路座舱仍然按这里选的尺寸挑。
-        if (appConfig.isZeekrCompositeModel() && !appConfig.isZeekrMultiModel()) {
-            pref.setEnabled(false);
-            pref.setSummary(getString(R.string.set_resolution_pinned));
-            return;
-        }
-
-        pref.setSummary(appConfig.getTargetResolution());
-
-        final Context context = getContext().getApplicationContext();
-        new Thread(() -> {
-            final List<String> options = ResolutionOptions.common(probeSupportedSizes(context));
-            if (!isAdded()) {
-                return;
-            }
-            requireActivity().runOnUiThread(() -> populateResolution(pref, options));
-        }, "resolution-probe").start();
-    }
-
-    private void populateResolution(ListPreference pref, List<String> options) {
-        List<String> values = new ArrayList<>();
-        List<String> labels = new ArrayList<>();
-        values.add(AppConfig.RESOLUTION_DEFAULT);
-        labels.add(getString(R.string.opt_resolution_default));
-        for (String option : options) {
-            values.add(option);
-            labels.add(option);
-        }
-
-        String current = appConfig.getTargetResolution();
-        if (!values.contains(current)) {
-            // 当前值必须留着，否则下拉框会显示空白
-            values.add(current);
-            labels.add(getString(R.string.opt_resolution_current, current));
-        }
-
-        pref.setEntries(labels.toArray(new String[0]));
-        pref.setEntryValues(values.toArray(new String[0]));
-        pref.setValue(current);
-        pref.setSummary(pref.getEntry());
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            String value = String.valueOf(newValue);
-            appConfig.setTargetResolution(value);
-            pref.setValue(value);
-            pref.setSummary(pref.getEntry());
-            toast(getString(R.string.msg_resolution_changed, pref.getEntry()));
-            return false;
-        });
-    }
-
-    /** 问每一路相机支持哪些尺寸。 */
-    private List<List<int[]>> probeSupportedSizes(Context context) {
-        List<List<int[]>> result = new ArrayList<>();
-        try {
-            CameraManager manager =
-                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-            if (manager == null) {
-                return result;
-            }
-            for (String id : manager.getCameraIdList()) {
-                CameraCharacteristics characteristics = manager.getCameraCharacteristics(id);
-                StreamConfigurationMap map = characteristics.get(
-                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                if (map == null) {
-                    continue;
-                }
-                List<int[]> sizes = new ArrayList<>();
-                Size[] supported = map.getOutputSizes(android.graphics.ImageFormat.JPEG);
-                if (supported != null) {
-                    for (Size size : supported) {
-                        sizes.add(new int[]{size.getWidth(), size.getHeight()});
-                    }
-                }
-                result.add(sizes);
-            }
-        } catch (Throwable t) {
-            AppLog.w(TAG, "探测相机分辨率失败: " + t);
-        }
-        return result;
-    }
-
-    /**
-     * 参与录制的视频流。
-     *
-     * <p>选项是按<b>这台车实际有几路</b>生成的，不是写死四个 —— 车型不同路数不同，
-     * 列出不存在的那几路只会让人以为漏勾了什么。</p>
-     *
-     * <p>至少要留一路：全不勾等于关掉录制，而关录制有它自己的开关，
-     * 不该从这里绕出去。</p>
-     */
-    private void bindRecordingCameras() {
-        MultiSelectListPreference pref = findPreference("pref_recording_cameras");
-        if (pref == null) {
-            return;
-        }
-        int cameraCount = appConfig.getCameraCount();
-        String[] slots = {"front", "back", "left", "right"};
-
-        List<String> values = new ArrayList<>();
-        List<String> labels = new ArrayList<>();
-        Set<String> selected = new HashSet<>();
-        for (int i = 0; i < slots.length && i < cameraCount; i++) {
-            values.add(slots[i]);
-            labels.add(appConfig.getRecordingCameraDisplayName(
-                    requireContext(), slots[i], i + 1));
-            if (appConfig.isRecordingCameraEnabled(slots[i])) {
-                selected.add(slots[i]);
-            }
-        }
-        if (values.isEmpty()) {
-            pref.setEnabled(false);
-            pref.setSummary(getString(R.string.info_no_stream_detected));
-            return;
-        }
-
-        pref.setPersistent(false);
-        pref.setEntries(labels.toArray(new String[0]));
-        pref.setEntryValues(values.toArray(new String[0]));
-        pref.setValues(selected);
-        pref.setSummary(describeCameras(selected, values, labels));
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            @SuppressWarnings("unchecked")
-            Set<String> chosen = new HashSet<>((Set<String>) newValue);
-            if (chosen.isEmpty()) {
-                toast(getString(R.string.msg_keep_one_camera));
-                return false;
-            }
-            for (String slot : values) {
-                appConfig.setRecordingCameraEnabled(slot, chosen.contains(slot));
-            }
-            pref.setValues(chosen);
-            pref.setSummary(describeCameras(chosen, values, labels));
-            return false;
-        });
-    }
-
-    private String describeCameras(Set<String> chosen, List<String> values, List<String> labels) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < values.size(); i++) {
-            if (chosen.contains(values.get(i))) {
-                if (sb.length() > 0) {
-                    sb.append("、");
-                }
-                sb.append(labels.get(i));
-            }
-        }
-        return sb.length() > 0 ? sb.toString() : getString(R.string.info_none_selected);
-    }
-
-    /** 分段时长存的是分钟数（int），不是枚举字符串，所以单独处理。 */
-    private void bindSegmentDuration() {
-        ListPreference pref = findPreference("pref_segment_duration");
-        if (pref == null) {
-            return;
-        }
-        String[] values = {"1", "3", "5", "10"};
-        String[] labels = new String[values.length];
-        for (int i = 0; i < values.length; i++) {
-            labels[i] = getString(R.string.opt_minutes, Integer.parseInt(values[i]));
-        }
-        pref.setPersistent(false);
-        pref.setEntries(labels);
-        pref.setEntryValues(values);
-        pref.setValue(String.valueOf(appConfig.getSegmentDurationMinutes()));
-        pref.setSummary(pref.getEntry());
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            int minutes = Integer.parseInt(String.valueOf(newValue));
-            appConfig.setSegmentDurationMinutes(minutes);
-            pref.setValue(String.valueOf(minutes));
-            pref.setSummary(pref.getEntry());
-            return false;   // 值已经自己设好了，不让框架再写一遍
         });
     }
 
@@ -899,15 +685,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_recording_mode", SettingsRegistry.RECORDING_MODE,
                 appConfig.getRecordingMode(), value -> appConfig.setRecordingMode(value));
 
-        bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
-                value -> appConfig.setForceH264Encoding(value));
-
-        bindSwitch("pref_decouple_preview", appConfig.isDecouplePreviewEnabled(),
-                value -> appConfig.setDecouplePreviewEnabled(value));
-
-        bindEnum("pref_preview_resolution", SettingsRegistry.PREVIEW_RESOLUTION,
-                appConfig.getPreviewResolution(), value -> appConfig.setPreviewResolution(value));
-
         onClick("pref_image_adjust", pref -> {
             if (getActivity() instanceof MainActivity) {
                 appConfig.setImageAdjustEnabled(true);
@@ -1062,164 +839,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 在「码率」那一项下面写出目标码率。
-     *
-     * <p>这个数不是一个固定值，它跟着分辨率和帧率一起变，所以只写等级名没有用。
-     * 算它的是 {@link TargetBitrate}，和编码器用的是同一个函数 ——
-     * 界面上写的就是实际配给编码器的那个数。</p>
-     *
-     * <p>录出来的实际码率会低于它：目标码率是上限，画面静止时编码器用不满。
-     * 实际值印在录像角标上。</p>
-     */
-    private void showTargetBitrate() {
-        ListPreference pref = findPreference("pref_bitrate");
-        if (pref == null || getContext() == null) {
-            return;
-        }
-        CharSequence level = pref.getEntry();
-        EncodeSize encode = liveEncodeSize();
-        if (encode == null || encode.width <= 0) {
-            // 相机还没开起来就没有「真正在录的尺寸」，那就只写等级名，不编一个数
-            pref.setSummary(level);
-            return;
-        }
-        int fps = appConfig.getNominalFrameRate(hardwareMaxFps());
-        // 编码器优先走 H.265，只有「强制 H.264」开着时才是 H.264
-        boolean hevc = !appConfig.isForceH264Encoding();
-        int bitrate = TargetBitrate.compute(appConfig.getEncoderQualityLevel(),
-                encode.width, encode.height, fps, hevc);
-        pref.setSummary(getString(R.string.set_bitrate_summary_target,
-                level, TargetBitrate.format(bitrate),
-                encode.toString(), fps, hevc ? "H.265" : "H.264"));
-    }
-
-    /**
-     * 主视频流<b>真正编码</b>时的尺寸。
-     *
-     * <p>不能用「录制分辨率」那个设置：环视这一路根本不读它（尺寸由合成流决定），
-     * 而且四宫格重排会把 1280×5140 拼成 2560×2560 —— 拿设置里的数去算码率，
-     * 算出来的和实际配给编码器的不是一回事。</p>
-     *
-     * <p>所以直接问正在跑的那台相机，再套用录制链路同一个 {@link EncodeSize}。
-     * 相机没开时返回 null。</p>
-     */
-    private EncodeSize liveEncodeSize() {
-        if (!(getActivity() instanceof MainActivity)) {
-            return null;
-        }
-        com.kooo.evcam.camera.MultiCameraManager manager =
-                ((MainActivity) getActivity()).getCameraManager();
-        if (manager == null) {
-            return null;
-        }
-        com.kooo.evcam.camera.SingleCamera camera = manager.getCamera("front");
-        if (camera == null || camera.getPreviewSize() == null) {
-            return null;
-        }
-        Size source = camera.getPreviewSize();
-        return EncodeSize.forSource(camera.getCameraId(), source.getWidth(), source.getHeight(),
-                appConfig.isRecordGridLayout());
-    }
-
-    private static int hardwareMaxFps() {
-        int declared = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
-        return declared > 0 ? declared : AppConfig.RECORDER_MAX_FPS;
-    }
-
-    /**
-     * 把主视频流声明的帧率写到「原始帧率」右边。
-     *
-     * <p>主视频流就是这套配置真正在录的那一路 —— 极氪 7X 上是环视合成流。
-     * 「原始帧率」的含义是不限制、跟随视频流，那么这一路能给多少，
-     * 就是这一档实际会得到多少，写出来才有参照。</p>
-     *
-     * <p>读不到就不写 —— 与其编一个数，不如什么都不写。</p>
-     */
-    private void probeMainStreamFps() {
-        ListPreference pref = findPreference("pref_record_fps");
-        if (pref == null || getContext() == null) {
-            return;
-        }
-        final Context context = getContext().getApplicationContext();
-        new Thread(() -> {
-            final int[] range = mainStreamFpsRange(context);
-            if (!isAdded() || range == null) {
-                return;
-            }
-            requireActivity().runOnUiThread(() -> {
-                CharSequence[] entries = pref.getEntries();
-                String[] values = pref.getEntryValues() == null
-                        ? new String[0] : toStrings(pref.getEntryValues());
-                for (int i = 0; i < values.length && i < entries.length; i++) {
-                    if ("auto".equals(values[i])) {
-                        entries[i] = getString(R.string.opt_fps_auto) + "（"
-                                + getString(R.string.opt_fps_stream_detected, range[1]) + "）";
-                    }
-                }
-                pref.setEntries(entries);
-                pref.setSummary(pref.getEntry());
-            });
-        }, "main-stream-fps").start();
-    }
-
-    private static String[] toStrings(CharSequence[] values) {
-        String[] out = new String[values.length];
-        for (int i = 0; i < values.length; i++) {
-            out[i] = String.valueOf(values[i]);
-        }
-        return out;
-    }
-
-    /**
-     * 主视频流声明的帧率区间 {@code {下限, 上限}}；读不到返回 null。
-     *
-     * <p>先找 EXTERNAL（环视合成流），找不到再退回第一台相机。</p>
-     */
-    private static int[] mainStreamFpsRange(Context context) {
-        try {
-            CameraManager manager =
-                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-            if (manager == null) {
-                return null;
-            }
-            String[] ids = manager.getCameraIdList();
-            String target = null;
-            for (String id : ids) {
-                Integer facing = manager.getCameraCharacteristics(id)
-                        .get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_EXTERNAL) {
-                    target = id;
-                    break;
-                }
-            }
-            if (target == null && ids.length > 0) {
-                target = ids[0];
-            }
-            if (target == null) {
-                return null;
-            }
-            android.util.Range<Integer>[] ranges = manager.getCameraCharacteristics(target)
-                    .get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
-            if (ranges == null || ranges.length == 0) {
-                return null;
-            }
-            int low = Integer.MAX_VALUE;
-            int high = 0;
-            for (android.util.Range<Integer> range : ranges) {
-                if (range == null || range.getLower() == null || range.getUpper() == null) {
-                    continue;
-                }
-                low = Math.min(low, range.getLower());
-                high = Math.max(high, range.getUpper());
-            }
-            return high > 0 ? new int[]{low, high} : null;
-        } catch (Exception e) {
-            AppLog.w("Settings", "读不到主视频流的帧率声明: " + e);
-            return null;
-        }
-    }
-
-    /**
      * 带按钮的设置对话框自己弹。
      *
      * <h3>为什么不用 androidx 自带的</h3>
@@ -1240,10 +859,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     public void onDisplayPreferenceDialog(Preference preference) {
         if (preference instanceof EditTextPreference) {
             showTextDialog((EditTextPreference) preference);
-            return;
-        }
-        if (preference instanceof MultiSelectListPreference) {
-            showMultiSelectDialog((MultiSelectListPreference) preference);
             return;
         }
         super.onDisplayPreferenceDialog(preference);
@@ -1290,39 +905,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if ("pref_video_limit".equals(key) || "pref_photo_limit".equals(key)) {
             input.setInputType(InputType.TYPE_CLASS_NUMBER);
         }
-    }
-
-    /** 多选：参与录制的摄像头。 */
-    private void showMultiSelectDialog(MultiSelectListPreference pref) {
-        CharSequence[] entries = pref.getEntries();
-        CharSequence[] values = pref.getEntryValues();
-        if (entries == null || values == null) {
-            super.onDisplayPreferenceDialog(pref);
-            return;
-        }
-        final boolean[] checked = new boolean[values.length];
-        Set<String> current = pref.getValues();
-        for (int i = 0; i < values.length; i++) {
-            checked[i] = current.contains(String.valueOf(values[i]));
-        }
-
-        new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
-                .setTitle(pref.getTitle())
-                .setMultiChoiceItems(entries, checked,
-                        (dialog, which, isChecked) -> checked[which] = isChecked)
-                .setPositiveButton(R.string.action_save, (dialog, which) -> {
-                    Set<String> picked = new HashSet<>();
-                    for (int i = 0; i < values.length; i++) {
-                        if (checked[i]) {
-                            picked.add(String.valueOf(values[i]));
-                        }
-                    }
-                    if (pref.callChangeListener(picked)) {
-                        pref.setValues(picked);
-                    }
-                })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
     }
 
     /**
@@ -1507,8 +1089,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * <p>有字符串资源的用资源 —— 英文界面就是靠这个；没有的回落到
      * {@link SettingsRegistry} 里那份中文（分辨率、fps 这类本来也不需要翻译）。</p>
      *
-     * <p>「原始帧率」那一项要带上实际会用的帧率，所以单独格式化。
-     * 这个数必须是<b>真正会录的</b>那个，不能是写死的文字。</p>
      */
     private String[] localizedNames(SettingSpec spec) {
         String[] names = spec.displayNames();
@@ -1517,14 +1097,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (res[i] != 0) {
                 names[i] = getString(res[i]);
             }
-        }
-        if (spec == SettingsRegistry.RECORD_FPS) {
-            int auto = spec.indexOf("auto");
-            if (auto >= 0) {
-                names[auto] = getString(R.string.opt_fps_auto);
-            }
-            // 其余各档是上限而不是强制值 —— 标题里就该这么写，
-            // 免得看到「30 fps」以为选了它就一定录得到 30
         }
         return names;
     }

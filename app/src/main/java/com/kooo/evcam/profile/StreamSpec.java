@@ -54,6 +54,15 @@ public final class StreamSpec {
     /** 分段时长（分钟）。只有录制流用得上；0 表示不分段。 */
     public int segmentMinutes;
 
+    /**
+     * 拆出来的四格，落盘时拼成 2×2 还是保持原样的长条。只有会拆的那一路用得上。
+     *
+     * <p>默认拼成 2×2：长条那一版 1280×5140 超过编码器 4096 的上限，会被整体缩小，
+     * 而且回放放大是按 2×2 取景的。留着长条这一档是因为它走的是另一条录制路径
+     * （MediaRecorder 直接吃相机输出，不需要 GL），出问题时还有条退路。</p>
+     */
+    public boolean grid = true;
+
     /** JPEG 质量 1–100。只有拍照流用得上。 */
     public int jpegQuality = 95;
 
@@ -89,6 +98,7 @@ public final class StreamSpec {
         out.put("bitrate", bitrate);
         out.put("codec", codec);
         out.put("segmentMinutes", String.valueOf(segmentMinutes));
+        out.put("grid", String.valueOf(grid));
         out.put("jpegQuality", String.valueOf(jpegQuality));
         return out;
     }
@@ -103,6 +113,8 @@ public final class StreamSpec {
         spec.bitrate = text(values, "bitrate", BITRATE_AUTO);
         spec.codec = text(values, "codec", "auto");
         spec.segmentMinutes = number(values, "segmentMinutes", 0);
+        // 缺这个键时按 2×2 处理：这一项是后加的，早先存下的配置里没有它
+        spec.grid = !"false".equals(values.get("grid"));
         spec.jpegQuality = number(values, "jpegQuality", 95);
         return spec;
     }
@@ -124,6 +136,7 @@ public final class StreamSpec {
     @Override
     public String toString() {
         return "分辨率=" + resolution + " 帧率=" + fps + " 码率=" + bitrate
-                + " 编码=" + codec + " 分段=" + segmentMinutes + "分钟";
+                + " 编码=" + codec + " 分段=" + segmentMinutes + "分钟"
+                + " 排列=" + (grid ? "四宫格" : "原始长条");
     }
 }

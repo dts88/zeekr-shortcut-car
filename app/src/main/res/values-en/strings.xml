@@ -13,13 +13,6 @@
     <string name="set_section_advanced">Advanced</string>
     <string name="set_section_about">About</string>
     <string name="set_car_model_title">Video stream profile</string>
-    <string name="set_record_layout_title">Recorded frame layout</string>
-    <string name="set_record_fps_title">Frame rate</string>
-    <string name="set_segment_title">Segment length</string>
-    <string name="set_cameras_title">Cameras to record</string>
-    <string name="set_cameras_dialog">Choose which streams are recorded (photos are unaffected)</string>
-    <string name="set_resolution_title">Resolution</string>
-    <string name="set_bitrate_title">Bitrate</string>
     <string name="set_watermark_title">Timestamp overlay</string>
     <string name="set_watermark_on">Stamps the time onto saved videos and photos</string>
     <string name="set_watermark_off">No stamp. Only saved files are affected; the preview never shows it</string>
@@ -69,11 +62,6 @@
     <string name="set_prevent_sleep_title">Prevent deep sleep</string>
     <string name="set_prevent_sleep_summary">Blocks deep sleep. Increases power draw — enable only when needed</string>
     <string name="set_recording_mode_title">Recording pipeline</string>
-    <string name="set_force_h264_title">Force H.264</string>
-    <string name="set_force_h264_summary">Falls back to the more widely compatible H.264 when HEVC misbehaves</string>
-    <string name="set_decouple_preview_title">Low-resolution preview</string>
-    <string name="set_decouple_preview_summary">Runs preview on its own lower-resolution stream to cut overhead</string>
-    <string name="set_preview_resolution_title">Preview resolution</string>
     <string name="set_image_adjust_title">Brightness / noise reduction</string>
     <string name="set_image_adjust_summary">Opens a window for adjusting image parameters live</string>
     <string name="set_image_adjust_reset_title">Reset brightness / noise reduction</string>
@@ -92,26 +80,15 @@
     <string name="lang_en">English</string>
 
     <!-- Enumerated setting options -->
-    <string name="opt_layout_grid">2×2 grid</string>
-    <string name="opt_layout_raw">Raw strip</string>
-    <string name="opt_fps_auto">Native</string>
     <string name="opt_mode_auto">Automatic (recommended)</string>
-    <string name="opt_bitrate_low">Low</string>
-    <string name="opt_bitrate_medium">Medium</string>
-    <string name="opt_bitrate_high">High</string>
     <string name="opt_model_zeekr">Zeekr 7X (surround composite)</string>
     <string name="opt_model_zeekr_multi">Zeekr 7X (surround + 2 cabin)</string>
     <string name="opt_model_custom">Custom (troubleshooting)</string>
 
     <!-- Settings prompts and dialogs -->
     <string name="msg_stream_changed">Video stream profile set to \"%1$s\". Restart the app to apply</string>
-    <string name="opt_resolution_default">Default (follow detection)</string>
-    <string name="opt_resolution_current">%1$s (current)</string>
-    <string name="msg_resolution_changed">Resolution set to \"%1$s\". Takes effect on the next recording</string>
     <string name="info_no_stream_detected">No video stream detected yet</string>
-    <string name="msg_keep_one_camera">Keep at least one stream. To stop recording entirely, turn recording off</string>
     <string name="info_none_selected">None selected</string>
-    <string name="opt_minutes">%1$d min</string>
     <string name="msg_relay_dev_only">Writes to internal storage first, so it requires developer options</string>
     <string name="dlg_internal_title">Use internal storage?</string>
     <string name="dlg_internal_msg">A dashcam writes continuously — as long as it is recording, it is writing.\n\nFlash memory has a limited write endurance. Using the head unit\'s internal storage as the dashcam\'s destination will measurably consume that endurance, and this storage usually cannot be replaced.\n\nA USB drive is recommended: it can be swapped when it wears out, and pulled out to copy files off.</string>
@@ -162,7 +139,6 @@
     <string name="zeekr_lane_back">Rear</string>
     <string name="zeekr_lane_left">Left</string>
     <string name="zeekr_lane_right">Right</string>
-    <string name="camera_slot_n">Camera %1$d</string>
     <string name="cell_top_left">Top left</string>
     <string name="cell_top_right_rear">Top right (rear)</string>
     <string name="cell_bottom_left">Bottom left</string>
@@ -344,13 +320,10 @@
     <string name="set_watermark_brand_title">App badge</string>
     <string name="set_watermark_brand_summary">Shows this app\'s name and version</string>
     <string name="opt_fps_auto_unknown">Native</string>
-    <string name="set_bitrate_summary_target">%1$s · target %2$s (%3$s @ %4$d fps, %5$s)</string>
     <string name="upd_connecting">Connecting…</string>
     <string name="upd_downloading_size">Downloading… %1$s MB</string>
     <string name="upd_download_failed_title">Download failed</string>
     <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone\'s browser instead</string>
-    <string name="opt_fps_stream_detected">stream %1$d fps</string>
-    <string name="set_resolution_pinned">This stream configuration records only the surround-view composite, whose size is fixed by the stream itself, so this setting has no effect. Change it in the profile editor, under Developer options.</string>
     <string name="set_plate_switch_title">Stamp the plate number</string>
     <string name="set_plate_switch_summary">The plate number appears next to the app name in the top-left corner of recordings and photos</string>
     <string name="set_plate_title">Plate number</string>

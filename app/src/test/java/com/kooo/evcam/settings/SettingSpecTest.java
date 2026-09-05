@@ -140,23 +140,17 @@ public class SettingSpecTest {
      */
     @Test
     public void storageKeysAreStable() {
-        assertEquals("record_layout", SettingsRegistry.RECORD_LAYOUT.key);
-        assertEquals("record_fps", SettingsRegistry.RECORD_FPS.key);
-        assertEquals("preview_resolution", SettingsRegistry.PREVIEW_RESOLUTION.key);
         assertEquals("recording_mode", SettingsRegistry.RECORDING_MODE.key);
-        assertEquals("bitrate_level", SettingsRegistry.BITRATE_LEVEL.key);
         assertEquals("car_model", SettingsRegistry.CAR_MODEL.key);
+        assertEquals("language", SettingsRegistry.LANGUAGE.key);
     }
 
     /** 默认值同样钉住：它决定全新安装后的行为。 */
     @Test
     public void defaultsAreWhatWeIntend() {
-        assertEquals("grid2x2", SettingsRegistry.RECORD_LAYOUT.defaultValue);
-        assertEquals("auto", SettingsRegistry.RECORD_FPS.defaultValue);
-        assertEquals("1280x720", SettingsRegistry.PREVIEW_RESOLUTION.defaultValue);
         assertEquals("auto", SettingsRegistry.RECORDING_MODE.defaultValue);
-        assertEquals("medium", SettingsRegistry.BITRATE_LEVEL.defaultValue);
         assertEquals("zeekr_7x", SettingsRegistry.CAR_MODEL.defaultValue);
+        assertEquals("auto", SettingsRegistry.LANGUAGE.defaultValue);
     }
 
     /**

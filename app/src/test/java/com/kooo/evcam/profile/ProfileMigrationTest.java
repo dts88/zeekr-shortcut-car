@@ -8,26 +8,19 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-import java.util.HashSet;
 import java.util.Map;
 
 /**
  * 迁移的单元测试。
  *
- * <p>迁移漏一项的后果是<b>某个设置悄悄回到默认值</b> —— 用户下次开车才发现，
- * 而编译期一点痕迹都没有。所以每一项旧设置都在这里点名一次。</p>
+ * <p>漏一项的后果是<b>某个值悄悄变成别的</b> —— 用户下次开车才发现，
+ * 而编译期一点痕迹都没有。所以每一路、每一条流的初值都在这里点名一次。</p>
  */
 public class ProfileMigrationTest {
 
     private static ProfileMigration.Snapshot snapshot() {
         ProfileMigration.Snapshot snapshot = new ProfileMigration.Snapshot();
         snapshot.carModel = "zeekr_7x";
-        snapshot.targetResolution = "default";
-        snapshot.recordFps = "auto";
-        snapshot.bitrateLevel = "medium";
-        snapshot.forceH264 = false;
-        snapshot.segmentMinutes = 3;
-        snapshot.enabledRecordingCameras = new HashSet<>();
         return snapshot;
     }
 
@@ -67,14 +60,11 @@ public class ProfileMigrationTest {
         assertEquals(0.5f, composite.lanes.get(3).y, 1e-4f);
     }
 
-    /** 环视的尺寸不读全局「录制分辨率」——它一直由探测结果决定。 */
+    /** 环视的尺寸初值是「跟随探测」，不是某个写死的数。 */
     @Test
-    public void theCompositeIgnoresTheGlobalRecordingResolution() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.targetResolution = "1920x1080";
-
+    public void theCompositeSizeStartsAsAuto() {
         CameraProfile composite =
-                ProfileMigration.migrate(snapshot).camera(CameraProfile.ROLE_COMPOSITE);
+                ProfileMigration.migrate(snapshot()).camera(CameraProfile.ROLE_COMPOSITE);
 
         assertEquals(StreamSpec.RESOLUTION_AUTO, composite.record.resolution);
         assertEquals(StreamSpec.RESOLUTION_AUTO, composite.preview.resolution);
@@ -95,35 +85,31 @@ public class ProfileMigrationTest {
         assertNotNull(profile.camera(CameraProfile.ROLE_CABIN_2));
     }
 
-    /** 全局「录制分辨率」真正作用的地方是座舱两路。 */
+    /** 座舱两路的尺寸也是「跟随探测」，要钉死去配置编辑里钉。 */
     @Test
-    public void theGlobalResolutionLandsOnTheCabinCameras() {
+    public void theCabinSizesStartAsAuto() {
         ProfileMigration.Snapshot snapshot = snapshot();
         snapshot.carModel = "zeekr_7x_multi";
-        snapshot.targetResolution = "1920x1080";
 
         Profile profile = ProfileMigration.migrate(snapshot);
 
-        assertEquals("1920x1080",
+        assertEquals(StreamSpec.RESOLUTION_AUTO,
                 profile.camera(CameraProfile.ROLE_CABIN_1).record.resolution);
-        assertEquals("1920x1080",
+        assertEquals(StreamSpec.RESOLUTION_AUTO,
                 profile.camera(CameraProfile.ROLE_CABIN_2).preview.resolution);
     }
 
-    /** 没勾选录制的那一路，迁移后是「未启用」，不是消失。 */
+    /** 新建的三路配置里，三路都是启用的 —— 要关某一路在配置编辑里关。 */
     @Test
-    public void anUncheckedCameraBecomesDisabledNotMissing() {
+    public void everyCameraStartsEnabled() {
         ProfileMigration.Snapshot snapshot = snapshot();
         snapshot.carModel = "zeekr_7x_multi";
-        snapshot.enabledRecordingCameras = new HashSet<>();
-        snapshot.enabledRecordingCameras.add("back");   // 只勾了座舱1
 
         Profile profile = ProfileMigration.migrate(snapshot);
 
-        assertTrue(profile.camera(CameraProfile.ROLE_CABIN_1).enabled);
-        assertFalse(profile.camera(CameraProfile.ROLE_CABIN_2).enabled);
-        assertNotNull("未启用也要留在配置里，否则改回来时没有它的参数",
-                profile.camera(CameraProfile.ROLE_CABIN_2));
+        for (CameraProfile camera : profile.cameras) {
+            assertTrue(camera.role + " 应当是启用的", camera.enabled);
+        }
     }
 
     /** 每一路的旋转和镜像跟着搬过来。 */
@@ -162,25 +148,13 @@ public class ProfileMigrationTest {
 
     // ---------- 意图，不是数字 ----------
 
-    /** 旧的「原始帧率」存的是 auto，含义是不限制。 */
+    /** 帧率的初值是「不限制」这个意思，不是某个数。 */
     @Test
-    public void nativeFrameRateBecomesUnlimitedNotANumber() {
+    public void frameRateStartsUnlimitedNotANumber() {
         CameraProfile composite =
                 ProfileMigration.migrate(snapshot()).camera(CameraProfile.ROLE_COMPOSITE);
 
         assertEquals(StreamSpec.FPS_UNLIMITED, composite.record.fps);
-    }
-
-    /** 选了具体帧率就存那个数 —— 它本来就是一个用户给的值。 */
-    @Test
-    public void anExplicitFrameRateIsKept() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.recordFps = "30";
-
-        CameraProfile composite =
-                ProfileMigration.migrate(snapshot).camera(CameraProfile.ROLE_COMPOSITE);
-
-        assertEquals("30", composite.record.fps);
     }
 
     /** 拍照没有旧设置，直接给「最大」这个模式，不是某个具体尺寸。 */
@@ -192,19 +166,20 @@ public class ProfileMigrationTest {
         assertEquals(StreamSpec.RESOLUTION_MAX, composite.photo.resolution);
     }
 
+    /**
+     * 新建的配置必须是能直接拿去录的。
+     *
+     * <p>这几项以前是设置里的全局键，现在只存在于配置里。默认值得和当时一致，
+     * 否则「什么都没改过」的车升上来，录出来的东西就变了。</p>
+     */
     @Test
-    public void codecAndSegmentAndBitrateCarryOver() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.forceH264 = true;
-        snapshot.bitrateLevel = "high";
-        snapshot.segmentMinutes = 10;
-
+    public void theRecordDefaultsAreReadyToUse() {
         CameraProfile composite =
-                ProfileMigration.migrate(snapshot).camera(CameraProfile.ROLE_COMPOSITE);
+                ProfileMigration.migrate(snapshot()).camera(CameraProfile.ROLE_COMPOSITE);
 
-        assertEquals("h264", composite.record.codec);
-        assertEquals("high", composite.record.bitrate);
-        assertEquals(10, composite.record.segmentMinutes);
+        assertEquals("auto", composite.record.codec);
+        assertEquals("medium", composite.record.bitrate);
+        assertEquals(RecordSpecs.DEFAULT_SEGMENT_MINUTES, composite.record.segmentMinutes);
     }
 
     // ---------- 存取往返 ----------
@@ -214,11 +189,17 @@ public class ProfileMigrationTest {
     public void aProfileSurvivesTheRoundTrip() {
         ProfileMigration.Snapshot snapshot = snapshot();
         snapshot.carModel = "zeekr_7x_multi";
-        snapshot.targetResolution = "1920x1080";
-        snapshot.recordFps = "24";
         snapshot.rotation = key -> "back".equals(key) ? 90 : 0;
 
         Profile before = ProfileMigration.migrate(snapshot);
+        // 往返要拿真值试，全是默认值的话，丢了哪一项都看不出来
+        CameraProfile edited = before.camera(CameraProfile.ROLE_CABIN_1);
+        edited.enabled = false;
+        edited.record.resolution = "1920x1080";
+        edited.record.fps = "24";
+        edited.record.bitrate = "high";
+        edited.record.codec = "h264";
+        edited.record.segmentMinutes = 10;
         Map<String, String> flat = before.toMap();
         Profile after = Profile.fromMap(flat);
 

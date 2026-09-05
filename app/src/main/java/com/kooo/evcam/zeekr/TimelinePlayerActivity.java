@@ -489,7 +489,9 @@ public class TimelinePlayerActivity extends Activity {
             return;
         }
         RecordingTimeline.Segment segment = session.segments.get(currentSegmentIndex);
-        int minutes = new com.kooo.evcam.AppConfig(this).getSegmentDurationMinutes();
+        // 连续回放只播环视这一路，分段时长就取它的
+        int minutes = com.kooo.evcam.profile.RecordSpecs.forRole(this,
+                com.kooo.evcam.profile.CameraProfile.ROLE_COMPOSITE).segmentMinutes;
         String note = getString(R.string.share_video_segment_note,
                 getString(R.string.share_minutes, minutes));
         com.kooo.evcam.share.PhoneShare.show(this, new java.io.File(segment.path), note);

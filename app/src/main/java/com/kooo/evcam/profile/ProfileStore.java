@@ -122,17 +122,11 @@ public final class ProfileStore {
         return Profile.fromMap(values);
     }
 
-    /** 从旧设置取一份快照，交给翻译。取值的活儿在这里，翻译本身不认识 Context。 */
+    /** 取一份快照交给翻译。取值的活儿在这里，翻译本身不认识 Context。 */
     public static ProfileMigration.Snapshot snapshot(Context context) {
         AppConfig config = new AppConfig(context);
         ProfileMigration.Snapshot snapshot = new ProfileMigration.Snapshot();
         snapshot.carModel = config.getCarModel();
-        snapshot.targetResolution = config.getTargetResolution();
-        snapshot.recordFps = config.getRecordFps();
-        snapshot.bitrateLevel = config.getBitrateLevel();
-        snapshot.forceH264 = config.isForceH264Encoding();
-        snapshot.segmentMinutes = config.getSegmentDurationMinutes();
-        snapshot.enabledRecordingCameras = config.getEnabledRecordingCameras();
         snapshot.rotation = config::getCameraRotation;
         snapshot.mirror = config::getCameraMirror;
         snapshot.previewCorrectionEnabled = config.isPreviewCorrectionEnabled();

@@ -392,10 +392,8 @@ public final class DiagnosticsCollector {
             AppConfig cfg = new AppConfig(context);
             sb.append("车型: ").append(cfg.getCarModel()).append('\n');
             sb.append("摄像头数量: ").append(cfg.getCameraCount()).append('\n');
-            sb.append("录制画面排列: ").append(cfg.getRecordLayout()).append('\n');
-            sb.append("录制帧率: ").append(cfg.getRecordFps()).append('\n');
-            sb.append("预览低分辨率: ").append(cfg.isDecouplePreviewEnabled()).append('\n');
-            sb.append("目标分辨率: ").append(cfg.getTargetResolution()).append('\n');
+            // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准
+            sb.append(new com.kooo.evcam.profile.ProfileStore(context).current()).append('\n');
             sb.append("录制模式: ").append(cfg.getRecordingMode())
                     .append("  (实际用 Codec: ").append(cfg.shouldUseCodecRecording()).append(')').append('\n');
             sb.append("存储位置: ").append(cfg.getStorageLocation()).append('\n');

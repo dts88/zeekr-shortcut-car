@@ -8,7 +8,6 @@
     <string name="zeekr_lane_back">后</string>
     <string name="zeekr_lane_left">左</string>
     <string name="zeekr_lane_right">右</string>
-    <string name="camera_slot_n">位置%1$d</string>
     <string name="cell_top_left">左上</string>
     <string name="cell_top_right_rear">右上（后方）</string>
     <string name="cell_bottom_left">左下</string>
@@ -31,13 +30,6 @@
     <string name="set_section_advanced">高级</string>
     <string name="set_section_about">关于</string>
     <string name="set_car_model_title">视频流配置</string>
-    <string name="set_record_layout_title">录制画面排列</string>
-    <string name="set_record_fps_title">录制帧率</string>
-    <string name="set_segment_title">分段时长</string>
-    <string name="set_cameras_title">录制摄像头</string>
-    <string name="set_cameras_dialog">选择参与录制的视频流（不影响拍照）</string>
-    <string name="set_resolution_title">录制分辨率</string>
-    <string name="set_bitrate_title">录制码率</string>
     <string name="set_watermark_title">时间角标</string>
     <string name="set_watermark_on">在保存的视频与图片上添加时间水印</string>
     <string name="set_watermark_off">不添加水印。仅影响保存的文件，预览始终不显示</string>
@@ -87,11 +79,6 @@
     <string name="set_prevent_sleep_title">防止休眠</string>
     <string name="set_prevent_sleep_summary">阻止系统深度休眠。会增加电量消耗，请按需开启</string>
     <string name="set_recording_mode_title">录制模式</string>
-    <string name="set_force_h264_title">强制 H.264 编码</string>
-    <string name="set_force_h264_summary">HEVC 异常时改用兼容性更好的 H.264</string>
-    <string name="set_decouple_preview_title">预览用低分辨率</string>
-    <string name="set_decouple_preview_summary">预览与录制分开取流，降低预览开销</string>
-    <string name="set_preview_resolution_title">预览分辨率</string>
     <string name="set_image_adjust_title">亮度 / 降噪调节</string>
     <string name="set_image_adjust_summary">打开调节窗口，实时调整画面参数</string>
     <string name="set_image_adjust_reset_title">恢复亮度 / 降噪默认值</string>
@@ -110,26 +97,15 @@
     <string name="lang_en">English</string>
 
     <!-- 设置里的枚举选项 -->
-    <string name="opt_layout_grid">四宫格</string>
-    <string name="opt_layout_raw">原始长条</string>
-    <string name="opt_fps_auto">原始帧率</string>
     <string name="opt_mode_auto">自动（推荐）</string>
-    <string name="opt_bitrate_low">低</string>
-    <string name="opt_bitrate_medium">中</string>
-    <string name="opt_bitrate_high">高</string>
     <string name="opt_model_zeekr">极氪7X（环视合成流）</string>
     <string name="opt_model_zeekr_multi">极氪7X（环视+座舱3路）</string>
     <string name="opt_model_custom">自定义（排查用）</string>
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
-    <string name="opt_resolution_default">默认（跟随探测结果）</string>
-    <string name="opt_resolution_current">%1$s（当前）</string>
-    <string name="msg_resolution_changed">分辨率已改为「%1$s」，重新开始录制后生效</string>
     <string name="info_no_stream_detected">还没探测到视频流</string>
-    <string name="msg_keep_one_camera">至少要保留一路；不想录的话请关掉录制</string>
     <string name="info_none_selected">未选择</string>
-    <string name="opt_minutes">%1$d 分钟</string>
     <string name="msg_relay_dev_only">会先写内置存储再搬到 U 盘，因此仅限开发者模式</string>
     <string name="dlg_internal_title">确定使用内置存储？</string>
     <string name="dlg_internal_msg">行车记录会持续不断地写入数据 —— 只要在录，就一直在写。\n\n闪存的写入寿命有限，长期把车机内置存储作为记录仪的落盘位置会实打实地消耗它的寿命，而车机存储通常不可更换。\n\n建议改用 U 盘：损坏后可随时更换，也便于直接取下拷贝。</string>
@@ -345,13 +321,10 @@
     <string name="set_watermark_brand_title">应用角标</string>
     <string name="set_watermark_brand_summary">显示本应用的名称和版本号</string>
     <string name="opt_fps_auto_unknown">原始帧率</string>
-    <string name="set_bitrate_summary_target">%1$s · 目标 %2$s（%3$s @ %4$d fps，%5$s）</string>
     <string name="upd_connecting">正在连接…</string>
     <string name="upd_downloading_size">正在下载… %1$s MB</string>
     <string name="upd_download_failed_title">下载失败</string>
     <string name="share_phone_qr_failed">二维码没能生成，请直接在手机浏览器里输入下面这个地址</string>
-    <string name="opt_fps_stream_detected">视频流 %1$d fps</string>
-    <string name="set_resolution_pinned">当前视频流配置只录环视合成流，这一路的尺寸由合成流本身决定，此项不生效。要换尺寸请用开发者选项里的「配置编辑」。</string>
     <string name="set_plate_switch_title">在画面中标注车牌号</string>
     <string name="set_plate_switch_summary">录像和照片的左上角会跟着应用名一起标出车牌号</string>
     <string name="set_plate_title">车牌号</string>

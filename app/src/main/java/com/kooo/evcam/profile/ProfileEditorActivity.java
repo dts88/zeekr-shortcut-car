@@ -161,6 +161,10 @@ public class ProfileEditorActivity extends Activity {
             sb.append("   帧率 ").append(spec.fps)
                     .append("   码率 ").append(spec.bitrate)
                     .append("   分段 ").append(spec.segmentMinutes).append(" 分钟");
+            if (showsSplit) {
+                // 排列只对会拆的那一路有意义：不拆的画面本来就只有一格
+                sb.append("   排列 ").append(spec.grid ? "四宫格" : "原始长条");
+            }
         }
         if (spec == camera.photo) {
             sb.append("   质量 ").append(spec.jpegQuality);
@@ -186,6 +190,12 @@ public class ProfileEditorActivity extends Activity {
             buttons.addView(smallButton("帧率", v -> pickFps(spec)));
             buttons.addView(smallButton("码率", v -> pickBitrate(spec)));
             buttons.addView(smallButton("分段", v -> pickSegment(spec)));
+            if (showsSplit) {
+                buttons.addView(smallButton("排列", v -> {
+                    spec.grid = !spec.grid;
+                    render();
+                }));
+            }
         }
         if (spec == camera.preview && !camera.lanes.isEmpty()) {
             buttons.addView(smallButton("旋转", v -> cycleRotation(camera)));

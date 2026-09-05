@@ -91,7 +91,9 @@ public class RecordingCoordinator {
             return;
         }
 
-        Set<String> cameras = appConfig.getEnabledRecordingCameras();
+        // 录哪几路 = 配置里启用了哪几路。这两件事本来就是同一件：
+        // 关掉的相机不开、不录、不占流。
+        Set<String> cameras = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context);
         if (cameras.isEmpty()) {
             notifyRefused(context.getString(R.string.msg_keep_one_camera_refuse));
             return;

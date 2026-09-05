@@ -151,6 +151,20 @@ public final class ProfileSizes {
         return null;
     }
 
+    /** {@link #roleForCameraKey} 的反向：配置里的角色对应接线用的槽位名。 */
+    public static String cameraKeyForRole(String role) {
+        if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
+            return "front";
+        }
+        if (CameraProfile.ROLE_CABIN_1.equals(role)) {
+            return "back";
+        }
+        if (CameraProfile.ROLE_CABIN_2.equals(role)) {
+            return "left";
+        }
+        return null;
+    }
+
     private static String cameraIdFor(Context context, String role) {
         String composite = StreamLayoutTable.compositeCameraId();
         try {
