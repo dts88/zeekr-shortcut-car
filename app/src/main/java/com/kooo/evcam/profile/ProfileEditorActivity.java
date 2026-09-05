@@ -157,6 +157,12 @@ public class ProfileEditorActivity extends Activity {
         }
         if (spec == camera.photo) {
             sb.append("   质量 ").append(spec.jpegQuality);
+            // 图片通道关着时，拍照走的是抓预览画面那条路，
+            // 这一项根本不起作用 —— 不写出来就又是一个「显示值≠实际值」。
+            if (!new com.kooo.evcam.AppConfig(this).isPhotoViaJpegEnabled()) {
+                sb.append('\n').append("        开发者选项里的「拍照走图片通道」没开，"
+                        + "此项不生效（拍照跟随预览分辨率）");
+            }
         }
         if (showsSplit) {
             sb.append('\n').append("        ").append(splitStatus(camera.role, spec));

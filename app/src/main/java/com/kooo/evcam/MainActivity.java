@@ -490,25 +490,34 @@ public class MainActivity extends AppCompatActivity {
      * 留着只会让人以为还支持那些车。</p>
      */
     private void setupLayoutByCarModel() {
-        String carModel = appConfig.getCarModel();
         int layoutId;
 
-        if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            // 环视合成流 + 两路座舱
-            layoutId = R.layout.activity_main_zeekr_7x_multi;
-            configuredCameraCount = 3;
-            AppLog.d(TAG, "使用极氪7X多路配置：环视合成流 + 2 路座舱");
-        } else if (appConfig.isCustomCarModel()) {
-            // 自定义：路数由用户自己配
+        // 用几路、摆什么布局，跟着<b>配置</b>走，不看车型那个字符串。
+        //
+        // 以前这两件事看车型：于是在配置编辑里往「极氪7X」那份配置加两路座舱之后，
+        // 布局仍然是单路的（只有一个 TextureView），路数上限仍然是 1 ——
+        // 加进去的相机既没有地方显示，也不会被拍照和录制算进去。
+        Profile profile = new ProfileStore(this).current();
+        int enabled = 0;
+        for (CameraProfile camera : profile.cameras) {
+            if (camera.enabled) {
+                enabled++;
+            }
+        }
+
+        if (Profile.PRESET_CUSTOM.equals(profile.id)) {
             layoutId = R.layout.activity_main_custom;
             configuredCameraCount = appConfig.getCameraCount();
-            AppLog.d(TAG, "使用自定义车型布局：" + configuredCameraCount + "摄像头");
+            AppLog.d(TAG, "自定义布局：" + configuredCameraCount + " 路");
+        } else if (enabled > 1) {
+            layoutId = R.layout.activity_main_zeekr_7x_multi;
+            configuredCameraCount = Math.min(enabled, 3);
+            AppLog.d(TAG, "多路布局：配置里启用了 " + enabled + " 路");
         } else {
-            // 极氪7X：一路四联合成流，由 FourLaneContainer 重画成四宫格。
-            // 也是兜底 —— 这个项目就是为它做的
+            // 一路合成流，由 FourLaneContainer 重画成四宫格。也是兜底。
             layoutId = R.layout.activity_main_zeekr_7x;
             configuredCameraCount = 1;
-            AppLog.d(TAG, "使用极氪7X配置：单路合成流 + 四宫格拆分");
+            AppLog.d(TAG, "单路布局：环视合成流 + 四宫格拆分");
         }
 
         setContentView(layoutId);
@@ -1619,7 +1628,14 @@ public class MainActivity extends AppCompatActivity {
             initCamerasForCustomModel(cameraIds);
             return;
         }
-        if (activeProfile.camera(CameraProfile.ROLE_CABIN_1) != null) {
+        int enabled = 0;
+        for (CameraProfile camera : activeProfile.cameras) {
+            if (camera.enabled) {
+                enabled++;
+            }
+        }
+        // 和 setupLayout 用同一个判断：布局摆了几个窗口，就接几路
+        if (enabled > 1) {
             initCamerasForZeekrMulti(cm, cameraIds);
             return;
         }

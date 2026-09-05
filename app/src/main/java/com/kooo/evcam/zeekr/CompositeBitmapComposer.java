@@ -28,22 +28,27 @@ public final class CompositeBitmapComposer {
      *
      * <p>不修改也不回收 {@code source}，调用方仍然拥有它。</p>
      *
+     * @param cameraId 这张图是<b>哪一路</b>拍的。必须传 —— 拆不拆只取决于这个，
+     *                 而座舱那两路的照片是一整幅画面，切成四格就毁了。
      * @param source 原始合成图（如 1280x5140）
      * @param order  长度为 4 的排列，order[格子位置] = 画面序号；null 表示默认顺序
      * @return 2x2 四宫格图；若来源不是合成图或重排失败，返回 {@code source} 本身
      */
-    public static Bitmap toGrid(Bitmap source, int[] order) {
+    public static Bitmap toGrid(String cameraId, Bitmap source, int[] order) {
         if (source == null || source.isRecycled()) {
             return source;
         }
 
         int srcWidth = source.getWidth();
         int srcHeight = source.getHeight();
-        if (!CompositeStreamGeometry.looksLikeComposite(StreamLayoutTable.compositeCameraId(), srcWidth, srcHeight)) {
+        // 用这张图<b>实际来自</b>的相机来判断，不能拿「哪一路是合成流」冒充。
+        // 以前这里写死了合成流那一路的 id，于是座舱拍的照片也被当成合成图切开。
+        if (!CompositeStreamGeometry.looksLikeComposite(cameraId, srcWidth, srcHeight)) {
             return source;
         }
 
-        CompositeStreamGeometry.Plan plan = CompositeStreamGeometry.analyse(StreamLayoutTable.compositeCameraId(), srcWidth, srcHeight);
+        CompositeStreamGeometry.Plan plan =
+                CompositeStreamGeometry.analyse(cameraId, srcWidth, srcHeight);
         if (!plan.isComposite() || plan.laneCount() < CompositeStreamGeometry.LANE_COUNT) {
             return source;
         }

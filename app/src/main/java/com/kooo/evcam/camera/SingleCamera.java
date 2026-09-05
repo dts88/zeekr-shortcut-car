@@ -2501,7 +2501,8 @@ public class SingleCamera {
         android.graphics.Bitmap sourceBitmap = bitmap;
         android.graphics.Bitmap gridBitmap = null;
         if (appConfig.isRecordGridLayout()) {
-            gridBitmap = com.kooo.evcam.zeekr.CompositeBitmapComposer.toGrid(bitmap, null);
+            gridBitmap = com.kooo.evcam.zeekr.CompositeBitmapComposer.toGrid(
+                    cameraId, bitmap, null);
             if (gridBitmap != bitmap) {
                 sourceBitmap = gridBitmap;
             } else {
