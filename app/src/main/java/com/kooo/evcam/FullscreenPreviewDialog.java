@@ -24,6 +24,7 @@ import androidx.annotation.NonNull;
 import androidx.cardview.widget.CardView;
 
 import com.kooo.evcam.camera.CameraManagerHolder;
+import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
 
@@ -191,7 +192,7 @@ public class FullscreenPreviewDialog extends Dialog {
         btnSave = findViewById(R.id.btn_save);
         btnHideSettings = findViewById(R.id.btn_hide_settings);
 
-        String label = getCameraLabel(cameraPosition);
+        String label = CameraNames.of(context, cameraPosition);
         tvCameraLabel.setText(label);
         AppLog.d(TAG, "Camera label set to: " + label);
 
@@ -539,16 +540,6 @@ public class FullscreenPreviewDialog extends Dialog {
                         tvHint.setVisibility(View.VISIBLE);
                     })
                     .start();
-        }
-    }
-
-    private String getCameraLabel(String position) {
-        switch (position) {
-            case "front": return "前";
-            case "back": return "后";
-            case "left": return "左";
-            case "right": return "右";
-            default: return position;
         }
     }
 

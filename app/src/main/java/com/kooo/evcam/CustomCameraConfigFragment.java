@@ -22,6 +22,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.kooo.evcam.camera.CameraNames;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -466,10 +467,10 @@ public class CustomCameraConfigFragment extends Fragment {
         setSpinnerSelection(spinnerRightId, appConfig.getCameraId("right"));
 
         // 加载摄像头名称
-        editFrontName.setText(appConfig.getCameraName("front"));
-        editBackName.setText(appConfig.getCameraName("back"));
-        editLeftName.setText(appConfig.getCameraName("left"));
-        editRightName.setText(appConfig.getCameraName("right"));
+        editFrontName.setText(appConfig.getCameraName(requireContext(), "front"));
+        editBackName.setText(appConfig.getCameraName(requireContext(), "back"));
+        editLeftName.setText(appConfig.getCameraName(requireContext(), "left"));
+        editRightName.setText(appConfig.getCameraName(requireContext(), "right"));
 
         // 加载自由操控配置
         switchFreeControl.setChecked(appConfig.isCustomFreeControlEnabled());
@@ -589,10 +590,11 @@ public class CustomCameraConfigFragment extends Fragment {
         appConfig.setCameraId("back", "1");
         appConfig.setCameraId("left", "2");
         appConfig.setCameraId("right", "3");
-        appConfig.setCameraName("front", "前");
-        appConfig.setCameraName("back", "后");
-        appConfig.setCameraName("left", "左");
-        appConfig.setCameraName("right", "右");
+        // 名字清掉，让它回到跟着界面语言走的默认名。
+        // 在这里写死中文，等于把重置当时的语言冻进配置里。
+        for (String position : CameraNames.POSITIONS) {
+            appConfig.setCameraName(position, null);
+        }
         
         // 重置摄像头旋转和镜像
         appConfig.setCameraRotation("front", 0);

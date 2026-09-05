@@ -3,6 +3,7 @@ package com.kooo.evcam;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.config.BlindSpotConfig;
 import com.kooo.evcam.zeekr.FisheyeProjection;
 import com.kooo.evcam.settings.FrameRatePolicy;
@@ -1470,7 +1471,8 @@ public class AppConfig {
     /**
      * 设置摄像头名称
      * @param position 位置（front/back/left/right）
-     * @param name 摄像头名称
+     * @param name 摄像头名称；传 {@code null} 是清掉这一项，
+     *             之后取到的就是跟着界面语言走的默认名
      */
     public void setCameraName(String position, String name) {
         String key;
@@ -1498,18 +1500,23 @@ public class AppConfig {
     /**
      * 获取摄像头名称
      * 对于预设车型返回默认名称，对于自定义车型返回用户设置的名称
+     *
+     * <p>要传<b>界面</b>的 Context（Activity / Fragment）：默认名字是从资源表里取的，
+     * 理由见 {@link CameraNames}。</p>
+     *
+     * @param uiContext 要显示这个名字的界面
      * @param position 位置（front/back/left/right）
      * @return 摄像头名称
      */
-    public String getCameraName(String position) {
+    public String getCameraName(Context uiContext, String position) {
+        String defaultValue = CameraNames.of(uiContext, position);
         // 预设车型返回默认名称
         if (!isCustomCarModel()) {
-            return getDefaultCameraName(position);
+            return defaultValue;
         }
-        
+
         // 自定义车型返回用户设置的名称
         String key;
-        String defaultValue = getDefaultCameraName(position);
         switch (position) {
             case "front":
                 key = KEY_CAMERA_FRONT_NAME;
@@ -1524,31 +1531,9 @@ public class AppConfig {
                 key = KEY_CAMERA_RIGHT_NAME;
                 break;
             default:
-                return "未知";
+                return defaultValue;
         }
         return prefs.getString(key, defaultValue);
-    }
-    
-    /**
-     * 获取预设车型的默认摄像头名称
-     * 新增预设车型时，如果名称不同于默认值，在此添加
-     * @param position 位置（front/back/left/right）
-     * @return 默认名称
-     */
-    public String getDefaultCameraName(String position) {
-        // 默认名称（适用于大多数预设车型）
-        switch (position) {
-            case "front":
-                return "前";
-            case "back":
-                return "后";
-            case "left":
-                return "左";
-            case "right":
-                return "右";
-            default:
-                return "未知";
-        }
     }
 
     /**
@@ -1696,35 +1681,6 @@ public class AppConfig {
         setCameraCrop(position, "right", 0);
     }
 
-    /**
-     * 获取所有摄像头配置（用于自定义车型）
-     * 返回格式：position -> [cameraId, cameraName]
-     */
-    public String[][] getAllCameraConfig() {
-        int count = getCameraCount();
-        String[][] config;
-        
-        if (count == 4) {
-            config = new String[][] {
-                {"front", getCameraId("front"), getCameraName("front")},
-                {"back", getCameraId("back"), getCameraName("back")},
-                {"left", getCameraId("left"), getCameraName("left")},
-                {"right", getCameraId("right"), getCameraName("right")}
-            };
-        } else if (count == 2) {
-            config = new String[][] {
-                {"front", getCameraId("front"), getCameraName("front")},
-                {"back", getCameraId("back"), getCameraName("back")}
-            };
-        } else {
-            config = new String[][] {
-                {"front", getCameraId("front"), getCameraName("front")}
-            };
-        }
-        
-        return config;
-    }
-    
     // ==================== 存储位置配置相关方法 ====================
     
     /**
@@ -3286,11 +3242,12 @@ public class AppConfig {
     /**
      * 获取用于显示的摄像头名称（用于录制摄像头选择等设置界面）
      * 使用配置中的名称，如果为空则返回"位置N"
+     * @param uiContext 要显示这个名字的界面
      * @param position 位置（front/back/left/right）
      * @param index 位置索引（1-4）
      * @return 显示名称
      */
-    public String getRecordingCameraDisplayName(String position, int index) {
+    public String getRecordingCameraDisplayName(Context uiContext, String position, int index) {
         // 「录哪几路」和「四宫格里这一格叫什么」是两个问题，答案也不一样。
         //
         // 极氪这两档的第一路是车机拼好的整条环视流，选它就等于选下了整个 360°，
@@ -3300,19 +3257,19 @@ public class AppConfig {
         if (CAR_MODEL_ZEEKR_7X.equals(carModel) || CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
             switch (position) {
                 case "front":
-                    return "环视";
+                    return uiContext.getString(R.string.slot_surround);
                 case "back":
-                    return "座舱1";
+                    return uiContext.getString(R.string.slot_cabin_1);
                 case "left":
-                    return "座舱2";
+                    return uiContext.getString(R.string.slot_cabin_2);
                 default:
                     break;
             }
         }
-        String name = getCameraName(position);
+        String name = getCameraName(uiContext, position);
         // 如果名称为空或仅为空白，使用位置名称
         if (name == null || name.trim().isEmpty()) {
-            return "位置" + index;
+            return uiContext.getString(R.string.camera_slot_n, index);
         }
         return name;
     }

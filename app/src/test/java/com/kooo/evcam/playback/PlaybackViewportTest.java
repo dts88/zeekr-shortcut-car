@@ -1,8 +1,11 @@
 package com.kooo.evcam.playback;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+
+import com.kooo.evcam.R;
 
 import org.junit.Test;
 
@@ -118,13 +121,18 @@ public class PlaybackViewportTest {
         assertEquals(900f, r[7], TOLERANCE);
     }
 
-    /** 右上是后方 —— 这是实车确认过的唯一一格，名字里要带上。 */
+    /** 右上是后方 —— 这是实车确认过的唯一一格，只有它能指向那句文案。 */
     @Test
     public void onlyTheConfirmedDirectionIsNamed() {
-        assertTrue(PlaybackViewport.labelOf(1).contains("后"));
-        assertEquals("四宫格", PlaybackViewport.labelOf(PlaybackViewport.NO_CELL));
+        assertEquals(R.string.cell_top_right_rear, PlaybackViewport.labelRes(1));
         for (int cell = 0; cell < PlaybackViewport.CELL_COUNT; cell++) {
-            assertTrue("每一格都该有名字", PlaybackViewport.labelOf(cell).length() > 0);
+            assertNotEquals("每一格都该有名字", 0, PlaybackViewport.labelRes(cell));
+            if (cell != 1) {
+                assertNotEquals("只有右上确认过是后方",
+                        R.string.cell_top_right_rear, PlaybackViewport.labelRes(cell));
+            }
         }
+        assertEquals(R.string.zeekr_mode_grid,
+                PlaybackViewport.labelRes(PlaybackViewport.NO_CELL));
     }
 }

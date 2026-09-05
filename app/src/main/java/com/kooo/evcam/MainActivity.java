@@ -706,16 +706,16 @@ public class MainActivity extends AppCompatActivity {
         
         // 设置自定义名称，如果名称为空则隐藏标签
         if (labelFront != null) {
-            updateCameraLabel(labelFront, appConfig.getCameraName("front"));
+            updateCameraLabel(labelFront, appConfig.getCameraName(this, "front"));
         }
         if (labelBack != null && configuredCameraCount >= 2) {
-            updateCameraLabel(labelBack, appConfig.getCameraName("back"));
+            updateCameraLabel(labelBack, appConfig.getCameraName(this, "back"));
         }
         if (labelLeft != null && configuredCameraCount >= 3) {
-            updateCameraLabel(labelLeft, appConfig.getCameraName("left"));
+            updateCameraLabel(labelLeft, appConfig.getCameraName(this, "left"));
         }
         if (labelRight != null && configuredCameraCount >= 4) {
-            updateCameraLabel(labelRight, appConfig.getCameraName("right"));
+            updateCameraLabel(labelRight, appConfig.getCameraName(this, "right"));
         }
     }
     

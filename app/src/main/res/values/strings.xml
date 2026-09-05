@@ -8,6 +8,11 @@
     <string name="zeekr_lane_back">后</string>
     <string name="zeekr_lane_left">左</string>
     <string name="zeekr_lane_right">右</string>
+    <string name="camera_slot_n">位置%1$d</string>
+    <string name="cell_top_left">左上</string>
+    <string name="cell_top_right_rear">右上（后方）</string>
+    <string name="cell_bottom_left">左下</string>
+    <string name="cell_bottom_right">右下</string>
     <string name="zeekr_mode_grid">四宫格</string>
     <string name="zeekr_mode_single">单画面</string>
     <string name="zeekr_composite_not_found">未检测到四联合成流，本机可能不支持极氪合成模式</string>
@@ -346,7 +351,7 @@
     <string name="upd_download_failed_title">下载失败</string>
     <string name="share_phone_qr_failed">二维码没能生成，请直接在手机浏览器里输入下面这个地址</string>
     <string name="opt_fps_stream_detected">视频流 %1$d fps</string>
-    <string name="set_resolution_pinned">当前视频流配置只录环视合成流，这一路的尺寸由合成流本身决定，此项不生效。要换尺寸请用开发者选项里的「环视流尺寸」。</string>
+    <string name="set_resolution_pinned">当前视频流配置只录环视合成流，这一路的尺寸由合成流本身决定，此项不生效。要换尺寸请用开发者选项里的「配置编辑」。</string>
     <string name="set_plate_switch_title">在画面中标注车牌号</string>
     <string name="set_plate_switch_summary">录像和照片的左上角会跟着应用名一起标出车牌号</string>
     <string name="set_plate_title">车牌号</string>

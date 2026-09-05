@@ -162,6 +162,11 @@
     <string name="zeekr_lane_back">Rear</string>
     <string name="zeekr_lane_left">Left</string>
     <string name="zeekr_lane_right">Right</string>
+    <string name="camera_slot_n">Camera %1$d</string>
+    <string name="cell_top_left">Top left</string>
+    <string name="cell_top_right_rear">Top right (rear)</string>
+    <string name="cell_bottom_left">Bottom left</string>
+    <string name="cell_bottom_right">Bottom right</string>
     <string name="zeekr_mode_grid">2×2 grid</string>
     <string name="zeekr_mode_single">Single view</string>
     <string name="zeekr_model_name">Zeekr 7X (surround composite)</string>
@@ -345,7 +350,7 @@
     <string name="upd_download_failed_title">Download failed</string>
     <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone\'s browser instead</string>
     <string name="opt_fps_stream_detected">stream %1$d fps</string>
-    <string name="set_resolution_pinned">This stream configuration records only the surround-view composite, whose size is fixed by the stream itself, so this setting has no effect. Change it under Developer options → Composite stream size.</string>
+    <string name="set_resolution_pinned">This stream configuration records only the surround-view composite, whose size is fixed by the stream itself, so this setting has no effect. Change it in the profile editor, under Developer options.</string>
     <string name="set_plate_switch_title">Stamp the plate number</string>
     <string name="set_plate_switch_summary">The plate number appears next to the app name in the top-left corner of recordings and photos</string>
     <string name="set_plate_title">Plate number</string>

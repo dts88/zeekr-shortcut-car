@@ -20,6 +20,7 @@ import android.widget.TextView;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
+import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
 
 import java.util.ArrayList;
@@ -233,13 +234,10 @@ public class ProfileEditorActivity extends Activity {
 
     /** 拆成四格时得先问改哪一格。格子的名字就是方位。 */
     private void pickLane(CameraProfile camera, String title, LaneAction action) {
-        String[] names = {"前", "后", "左", "右"};
         String[] labels = new String[camera.lanes.size()];
         for (int i = 0; i < labels.length; i++) {
             LaneLayout lane = camera.lanes.get(i);
-            String name = lane.laneIndex >= 0 && lane.laneIndex < names.length
-                    ? names[lane.laneIndex] : String.valueOf(i);
-            labels[i] = name + "   " + lane;
+            labels[i] = CameraNames.ofLane(this, lane.laneIndex) + "   " + lane;
         }
         new AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(title)

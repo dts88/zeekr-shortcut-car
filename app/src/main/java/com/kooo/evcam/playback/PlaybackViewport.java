@@ -1,5 +1,7 @@
 package com.kooo.evcam.playback;
 
+import com.kooo.evcam.R;
+
 /**
  * 回放画面的取景：决定 TextureView 上那个变换矩阵的源矩形与目标矩形。
  *
@@ -21,7 +23,7 @@ package com.kooo.evcam.playback;
  * <b>这个已经拉伸过的结果</b>上再作用一次。所以源矩形用的是视图坐标，
  * 而不是视频像素坐标 —— 这一点弄反了画面就会跑偏。</p>
  *
- * <p>纯 Java，不碰 Android，方便直接跑单元测试。</p>
+ * <p>除了那张资源 id 表（一堆 int 常量）以外不碰 Android，方便直接跑单元测试。</p>
  */
 public final class PlaybackViewport {
 
@@ -109,18 +111,21 @@ public final class PlaybackViewport {
     }
 
     /**
-     * 格子的名字。
+     * 格子的名字，返回的是字符串资源 id。
      *
      * <p>只有右上是后方这一条在实车确认过（超级后视镜取的就是这一格）。
      * 其余三格对应车辆哪个方向尚未确认，所以按位置命名，不瞎标方向。</p>
+     *
+     * <p>返回 id 而不是文字：这个类不拿 Context，取字交给有界面的调用方 ——
+     * 顺带也就不会再有写死中文的那一版。</p>
      */
-    public static String labelOf(int cell) {
+    public static int labelRes(int cell) {
         switch (cell) {
-            case 0: return "左上";
-            case 1: return "右上（后方）";
-            case 2: return "左下";
-            case 3: return "右下";
-            default: return "四宫格";
+            case 0: return R.string.cell_top_left;
+            case 1: return R.string.cell_top_right_rear;
+            case 2: return R.string.cell_bottom_left;
+            case 3: return R.string.cell_bottom_right;
+            default: return R.string.zeekr_mode_grid;
         }
     }
 }

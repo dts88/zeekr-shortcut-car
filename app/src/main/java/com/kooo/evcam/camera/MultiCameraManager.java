@@ -2363,8 +2363,7 @@ public class MultiCameraManager {
      */
     public String getDebugStats() {
         StringBuilder sb = new StringBuilder();
-        String[] order = {"front", "back", "left", "right"};
-        String[] labels = {"前", "后", "左", "右"};
+        String[] order = CameraNames.POSITIONS;
         for (int i = 0; i < order.length; i++) {
             SingleCamera camera = cameras.get(order[i]);
             if (camera == null) continue;
@@ -2374,7 +2373,8 @@ public class MultiCameraManager {
                     ? previewSize.getWidth() + "×" + previewSize.getHeight()
                     : "-";
             float fps = camera.getCurrentFps();
-            sb.append(labels[i]).append("(").append(camera.getCameraId()).append(") ");
+            sb.append(CameraNames.of(context, order[i]))
+                    .append("(").append(camera.getCameraId()).append(") ");
             sb.append(String.format(java.util.Locale.US, "%.1f fps  ", fps));
             sb.append(res);
         }

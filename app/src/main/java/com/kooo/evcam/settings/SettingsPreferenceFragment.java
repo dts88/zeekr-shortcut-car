@@ -340,7 +340,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         Set<String> selected = new HashSet<>();
         for (int i = 0; i < slots.length && i < cameraCount; i++) {
             values.add(slots[i]);
-            labels.add(appConfig.getRecordingCameraDisplayName(slots[i], i + 1));
+            labels.add(appConfig.getRecordingCameraDisplayName(
+                    requireContext(), slots[i], i + 1));
             if (appConfig.isRecordingCameraEnabled(slots[i])) {
                 selected.add(slots[i]);
             }

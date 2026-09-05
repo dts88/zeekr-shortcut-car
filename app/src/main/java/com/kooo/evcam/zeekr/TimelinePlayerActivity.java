@@ -445,7 +445,7 @@ public class TimelinePlayerActivity extends Activity {
                     videoSurface.getWidth(), videoSurface.getHeight());
         }
         applyViewport();
-        Toast.makeText(this, PlaybackViewport.labelOf(zoomedCell), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, PlaybackViewport.labelRes(zoomedCell), Toast.LENGTH_SHORT).show();
     }
 
     /**
