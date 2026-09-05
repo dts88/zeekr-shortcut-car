@@ -109,14 +109,6 @@
         <!-- 相机能力清单，只从开发者选项进 -->
 
         <!-- 「发送到手机」的连通性测试界面，只从开发者选项进 -->
-        <!-- 配置编辑（开发者选项，第 3 步） -->
-        <activity
-            android:name=".profile.ProfileEditorActivity"
-            android:label="配置编辑"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-            android:screenOrientation="landscape"
-            android:exported="false" />
-
         <!-- 预览资源占用实测（开发者选项） -->
         <activity
             android:name=".zeekr.PreviewSamplerActivity"

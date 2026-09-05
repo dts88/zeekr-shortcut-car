@@ -30,6 +30,10 @@
     <string name="set_section_advanced">高级</string>
     <string name="set_section_about">关于</string>
     <string name="set_car_model_title">视频流配置</string>
+    <string name="set_profile_editor_title">视频流配置编辑</string>
+    <string name="set_profile_editor_summary">每一路相机的预览、录制、拍照三条流，以及拆出来的每一格怎么摆。保存前会按新配置开一次画面确认</string>
+    <string name="set_photo_jpeg_title">拍照走图片通道</string>
+    <string name="set_photo_jpeg_summary">用相机自己的 JPEG 输出拍照，「拍照分辨率」才有意义；关掉则是抓预览画面，分辨率跟着预览走。改完需重启应用</string>
     <string name="set_watermark_title">时间角标</string>
     <string name="set_watermark_on">在保存的视频与图片上添加时间水印</string>
     <string name="set_watermark_off">不添加水印。仅影响保存的文件，预览始终不显示</string>

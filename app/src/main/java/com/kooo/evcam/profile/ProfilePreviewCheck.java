@@ -73,6 +73,17 @@ public final class ProfilePreviewCheck {
      * @param split    这个尺寸会不会被拆成四格
      */
     public void run(String cameraId, Size size, boolean split, Runnable onConfirmed) {
+        run(cameraId, size, split, null, onConfirmed);
+    }
+
+    /**
+     * 同上，另外带上每一格的摆法。
+     *
+     * <p>确认画面要和保存之后看到的一样 —— 位置、旋转、镜像都改了，
+     * 而确认时给的还是 2×2 等分，那这一眼就白看了。</p>
+     */
+    public void run(String cameraId, Size size, boolean split,
+                    FourLaneContainer.Cell[] cells, Runnable onConfirmed) {
         cameraThread = new HandlerThread("profile-preview-check");
         cameraThread.start();
         cameraHandler = new Handler(cameraThread.getLooper());
@@ -95,6 +106,7 @@ public final class ProfilePreviewCheck {
             container.addView(texture, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             container.setSourceSize(size);
+            container.setCells(cells);
             holder = container;
         } else {
             FrameLayout frame = new FrameLayout(activity);

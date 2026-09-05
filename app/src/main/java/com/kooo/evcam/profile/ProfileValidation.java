@@ -14,7 +14,7 @@ import java.util.Locale;
  *
  * <p>真正的风险是<b>带宽</b>：会话配置成功不等于跑得动。三路各开三条流是系统级
  * 问题，没有任何声明能回答，只能真开一次、采几秒帧率。那一步在
- * {@code ProfileEditorActivity} 里做，因为它需要相机。</p>
+ * {@code ProfileEditorFragment} 里做，因为它需要相机。</p>
  */
 public final class ProfileValidation {
 

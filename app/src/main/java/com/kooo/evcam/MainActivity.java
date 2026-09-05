@@ -1621,6 +1621,7 @@ public class MainActivity extends AppCompatActivity {
         // 走哪条路由配置决定，不再看车型这个字符串。两个内置预设的区别就是
         // 「配置里有几路相机」——这本来就是它们唯一的实质区别。
         activeProfile = new ProfileStore(this).current();
+        applyProfileCells();
         AppLog.i(TAG, "本次相机初始化使用的配置:\n" + activeProfile);
 
         if (Profile.PRESET_CUSTOM.equals(activeProfile.id)) {
@@ -1649,6 +1650,53 @@ public class MainActivity extends AppCompatActivity {
      * 按不同的配置接线，出来的东西不属于任何一份配置。</p>
      */
     private Profile activeProfile;
+
+    /**
+     * 把配置里每一格的摆法交给四宫格容器。
+     *
+     * <h3>为什么要有这一步</h3>
+     *
+     * <p>位置、大小、旋转、镜像、裁切、缩放平移这些一直存在配置里，
+     * 但<b>没有任何人读过它们</b> —— 容器画的是写死的 2×2 等分。
+     * 于是编辑器里转 90°、开镜像，存下去了，画面纹丝不动。</p>
+     *
+     * <p>翻译放在这里而不是容器里：容器管「怎么画」，不该反过来认识配置的字段。</p>
+     */
+    private void applyProfileCells() {
+        if (compositeContainer == null || activeProfile == null) {
+            return;
+        }
+        CameraProfile composite = activeProfile.camera(CameraProfile.ROLE_COMPOSITE);
+        if (composite == null || composite.lanes.isEmpty()) {
+            compositeContainer.setCells(null);
+            return;
+        }
+        com.kooo.evcam.zeekr.FourLaneContainer.Cell[] cells =
+                new com.kooo.evcam.zeekr.FourLaneContainer.Cell[composite.lanes.size()];
+        for (int i = 0; i < cells.length; i++) {
+            com.kooo.evcam.profile.LaneLayout lane = composite.lanes.get(i);
+            com.kooo.evcam.zeekr.FourLaneContainer.Cell cell =
+                    new com.kooo.evcam.zeekr.FourLaneContainer.Cell();
+            cell.laneIndex = lane.laneIndex;
+            cell.x = lane.x;
+            cell.y = lane.y;
+            cell.width = lane.width;
+            cell.height = lane.height;
+            cell.rotation = lane.rotation;
+            cell.mirrored = lane.mirrored;
+            cell.cropTop = lane.cropTop;
+            cell.cropBottom = lane.cropBottom;
+            cell.cropLeft = lane.cropLeft;
+            cell.cropRight = lane.cropRight;
+            cell.scaleX = lane.scaleX;
+            cell.scaleY = lane.scaleY;
+            cell.translateX = lane.translateX;
+            cell.translateY = lane.translateY;
+            cells[i] = cell;
+        }
+        compositeContainer.setCells(cells);
+        AppLog.i(TAG, "四宫格摆位按配置生效，共 " + cells.length + " 格");
+    }
 
     /**
      * 某一路在配置里要用的预览尺寸。

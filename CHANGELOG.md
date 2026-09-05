@@ -5,7 +5,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- The stream profile editor has moved out of developer options into Settings -> Recording,
+  and is built like the rest of Settings. So has "Photos through the image channel", which
+  is what makes the photo resolution mean anything.
+- Fixed: rotation, mirroring, position, size, crop and pan were stored per lane and read by
+  nobody. The four-up view drew a hard-coded 2x2 and ignored all of it, so changing them in
+  the editor did nothing. They now draw what they say.
+- Each lane of a split stream is edited on its own - front, rear, left and right each have
+  their own placement, rotation, mirroring, crop and pan. They were one setting for the
+  whole camera, which cannot express "mirror the rear view only".
+- "auto" and "max" now print the size they resolve to, everywhere a resolution is shown or
+  chosen, next to what a split stream lands as on disk.
+- Removed the recording layout choice. A stream that splits is always stored as the 2x2
+  grid; the strip loses half the detail and playback zoom assumes the grid anyway.
 
 ## [0.37.11-alpha] - 2026-09-05
 

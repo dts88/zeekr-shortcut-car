@@ -13,6 +13,10 @@
     <string name="set_section_advanced">Advanced</string>
     <string name="set_section_about">About</string>
     <string name="set_car_model_title">Video stream profile</string>
+    <string name="set_profile_editor_title">Edit stream profile</string>
+    <string name="set_profile_editor_summary">The preview, recording and photo stream of each camera, and how each lane of a split stream is placed. Saving opens a live preview to confirm first</string>
+    <string name="set_photo_jpeg_title">Photos through the image channel</string>
+    <string name="set_photo_jpeg_summary">Takes photos through the camera\'s own JPEG output, which is what makes the photo resolution mean anything. With it off, a photo is grabbed from the preview at the preview\'s size. Restart the app after changing</string>
     <string name="set_watermark_title">Timestamp overlay</string>
     <string name="set_watermark_on">Stamps the time onto saved videos and photos</string>
     <string name="set_watermark_off">No stamp. Only saved files are affected; the preview never shows it</string>

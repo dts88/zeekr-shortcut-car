@@ -36,6 +36,16 @@
             android:summary="%s"
             app:useSimpleSummaryProvider="false" />
 
+        <Preference
+            android:key="pref_profile_editor"
+            android:title="@string/set_profile_editor_title"
+            android:summary="@string/set_profile_editor_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_photo_via_jpeg"
+            android:title="@string/set_photo_jpeg_title"
+            android:summary="@string/set_photo_jpeg_summary" />
+
         <SwitchPreferenceCompat
             android:key="pref_watermark_brand"
             android:title="@string/set_watermark_brand_title"
@@ -324,16 +334,6 @@
         <Preference
             android:key="pref_preview_correction_reset"
             android:title="重置预览矫正参数" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_photo_via_jpeg"
-            android:title="拍照走图片通道"
-            android:summary="用相机自己的 JPEG 输出拍照，各路都用最大分辨率；关闭时抓预览画面（分辨率受预览缓冲区限制）。会在每一路会话里常驻一条输出流，改完需重启应用" />
-
-        <Preference
-            android:key="pref_profile_editor"
-            android:title="配置编辑"
-            android:summary="按「相机 → 流」编辑当前配置，每条流显示自己的参数和拆分状态。保存前会做数据检查并采一次实测帧率，十秒内不确认就放弃" />
 
         <Preference
             android:key="pref_current_profile"

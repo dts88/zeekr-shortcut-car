@@ -121,9 +121,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindRecording() {
         bindCarModel();
 
-        // 画面排列、帧率、分段、录哪几路、分辨率、码率都在
-        // 开发者选项 →「配置编辑」里，按路设置。同一件事只留一个入口：
-        // 两个入口意味着迟早会出现「这边写着 30、那边写着 15」。
+        // 相机与视频流的参数（每一路的三条流、每一格的摆法）都在下面这个
+        // 「视频流配置编辑」里。同一件事只留一个入口：两个入口意味着
+        // 迟早会出现「这边写着 30、那边写着 15」。
+        onClick("pref_profile_editor", pref -> openFragment(new ProfileEditorFragment()));
+
+        bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
+                enabled -> {
+                    appConfig.setPhotoViaJpegEnabled(enabled);
+                    toast(getString(R.string.msg_restart_required));
+                });
+
 
         bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
                 enabled -> {
@@ -813,15 +821,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 ((MainActivity) getActivity()).showPreviewCorrectionFloating();
             }
         });
-
-        bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
-                enabled -> {
-                    appConfig.setPhotoViaJpegEnabled(enabled);
-                    toast(getString(R.string.msg_restart_required));
-                });
-
-        onClick("pref_profile_editor", pref -> startActivity(
-                new Intent(getContext(), com.kooo.evcam.profile.ProfileEditorActivity.class)));
 
         onClick("pref_current_profile", pref -> showCurrentProfile());
 

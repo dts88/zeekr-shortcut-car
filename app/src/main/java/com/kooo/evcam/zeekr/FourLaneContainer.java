@@ -70,6 +70,42 @@ public class FourLaneContainer extends ViewGroup {
         RAW
     }
 
+    /**
+     * 一格怎么摆、怎么显示。
+     *
+     * <h3>为什么这里再定义一遍</h3>
+     *
+     * <p>配置里那份是 {@code profile.LaneLayout}。这个容器属于「怎么画」，
+     * 不该反过来依赖「配置怎么存」—— 中间隔一层，配置的字段改名不会波及绘制。
+     * 调用方负责翻译，就一行的事。</p>
+     */
+    public static final class Cell {
+        /** 显示合成流里的哪一格。 */
+        public int laneIndex;
+        /** 在容器里的位置与大小，容器宽高的比例。 */
+        public float x;
+        public float y;
+        public float width = 1f;
+        public float height = 1f;
+        /** 顺时针旋转 0/90/180/270。 */
+        public int rotation;
+        /** 左右镜像。 */
+        public boolean mirrored;
+        /** 四边各裁掉多少，这一格画面宽高的比例。 */
+        public float cropTop;
+        public float cropBottom;
+        public float cropLeft;
+        public float cropRight;
+        /** 画面在格子里的缩放与平移。 */
+        public float scaleX = 1f;
+        public float scaleY = 1f;
+        public float translateX;
+        public float translateY;
+    }
+
+    /** 每一格的摆法；为空时退回 2×2 等分。 */
+    private Cell[] cells;
+
     private final Matrix drawMatrix = new Matrix();
     private final RectF sourceRect = new RectF();
     private final RectF destinationRect = new RectF();
@@ -218,6 +254,17 @@ public class FourLaneContainer extends ViewGroup {
         return laneOrder.clone();
     }
 
+    /**
+     * 每一格摆在哪、怎么显示。
+     *
+     * <p>传 null 或空数组就退回 2×2 等分 —— 这也是没有配置时的样子，
+     * 和这个功能存在之前完全一致。</p>
+     */
+    public void setCells(Cell[] value) {
+        cells = value == null || value.length == 0 ? null : value.clone();
+        invalidate();
+    }
+
     /** 当前是否真的按四联合成流在拆分显示。 */
     public boolean isCompositeActive() {
         return plan != null && plan.isComposite() && displayMode != DisplayMode.RAW;
@@ -290,10 +337,25 @@ public class FourLaneContainer extends ViewGroup {
 
         if (displayMode == DisplayMode.SINGLE) {
             int index = Math.min(focusedLane, current.laneCount() - 1);
-            drawLane(canvas, current.lane(index), 0f, 0f, width, height);
+            drawLane(canvas, current.lane(index), cellFor(index), 0f, 0f, width, height);
             return;
         }
 
+        Cell[] activeCells = cells;
+        if (activeCells != null) {
+            for (Cell cell : activeCells) {
+                if (cell == null || cell.laneIndex < 0
+                        || cell.laneIndex >= current.laneCount()) {
+                    continue;
+                }
+                drawLane(canvas, current.lane(cell.laneIndex), cell,
+                        cell.x * width, cell.y * height,
+                        cell.width * width, cell.height * height);
+            }
+            return;
+        }
+
+        // 没有配置时的样子：2×2 等分
         float cellWidth = width / 2f;
         float cellHeight = height / 2f;
         for (int cell = 0; cell < CompositeStreamGeometry.LANE_COUNT; cell++) {
@@ -303,8 +365,63 @@ public class FourLaneContainer extends ViewGroup {
             }
             float left = (cell % 2) * cellWidth;
             float top = (cell / 2) * cellHeight;
-            drawLane(canvas, current.lane(laneIndex), left, top, cellWidth, cellHeight);
+            drawLane(canvas, current.lane(laneIndex), null, left, top, cellWidth, cellHeight);
         }
+    }
+
+    /**
+     * 裁切与缩放平移都作用在<b>源矩形</b>上，返回裁切之后这一格的真实长宽比。
+     *
+     * <h3>为什么动源矩形而不是目标矩形</h3>
+     *
+     * <p>目标矩形是「这一格在屏幕上占多大」，那是布局说了算的。要表达「这幅画面
+     * 少看一点边、或者放大一点」，动的是<b>取画面的哪一块</b> —— 也就是源矩形。
+     * 放大 2 倍就是只取中间一半，向右平移就是把取景窗往左挪。</p>
+     */
+    private float applyCropAndPan(Cell cell, float laneAspectPx) {
+        float keepX = 1f - clampFraction(cell.cropLeft) - clampFraction(cell.cropRight);
+        float keepY = 1f - clampFraction(cell.cropTop) - clampFraction(cell.cropBottom);
+        if (keepX <= 0.01f || keepY <= 0.01f) {
+            return laneAspectPx;   // 全裁光了，当作没裁
+        }
+        float width = sourceRect.width();
+        float height = sourceRect.height();
+        float left = sourceRect.left + width * clampFraction(cell.cropLeft);
+        float top = sourceRect.top + height * clampFraction(cell.cropTop);
+        sourceRect.set(left, top, left + width * keepX, top + height * keepY);
+
+        float scaleX = cell.scaleX > 0.05f ? cell.scaleX : 1f;
+        float scaleY = cell.scaleY > 0.05f ? cell.scaleY : 1f;
+        if (scaleX != 1f || scaleY != 1f) {
+            float cx = sourceRect.centerX();
+            float cy = sourceRect.centerY();
+            float halfW = sourceRect.width() / 2f / scaleX;
+            float halfH = sourceRect.height() / 2f / scaleY;
+            sourceRect.set(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
+        }
+        if (cell.translateX != 0f || cell.translateY != 0f) {
+            // 画面往右挪 = 取景窗往左挪
+            sourceRect.offset(-cell.translateX * sourceRect.width(),
+                    -cell.translateY * sourceRect.height());
+        }
+        return laneAspectPx * (keepX / keepY);
+    }
+
+    private static float clampFraction(float value) {
+        return value < 0f ? 0f : (value > 0.9f ? 0.9f : value);
+    }
+
+    /** 这一格的摆法；没有配置就返回 null（走默认）。 */
+    private Cell cellFor(int laneIndex) {
+        if (cells == null) {
+            return null;
+        }
+        for (Cell cell : cells) {
+            if (cell != null && cell.laneIndex == laneIndex) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     /**
@@ -313,8 +430,11 @@ public class FourLaneContainer extends ViewGroup {
      * <p>做法是裁剪到目标格子，再用一个矩阵把该画面在子视图中的源矩形映射过去，
      * 然后把<b>同一个</b>子视图重新画一遍。子视图本身不知道自己被画了几次。</p>
      */
-    private void drawLane(Canvas canvas, CompositeStreamGeometry.Lane lane,
+    private void drawLane(Canvas canvas, CompositeStreamGeometry.Lane lane, Cell cell,
                           float cellLeft, float cellTop, float cellWidth, float cellHeight) {
+        if (cellWidth <= 0f || cellHeight <= 0f) {
+            return;
+        }
         // 画面在子视图坐标系中的位置：归一化窗口 x 子视图尺寸。
         // 用归一化坐标是关键——HAL 给的缓冲区可能被压扁，但比例关系不变。
         float childWidth = getWidth();
@@ -328,13 +448,23 @@ public class FourLaneContainer extends ViewGroup {
             return;
         }
 
+        // 这一格的真实长宽比。裁切会改变它（切掉的是画面的一部分），
+        // 缩放平移不会（那只是把同一幅画面挪一挪、放大一点）。
+        float laneAspectPx = lane.aspect();
+        if (cell != null) {
+            laneAspectPx = applyCropAndPan(cell, laneAspectPx);
+        }
+        int rotation = cell == null ? 0 : ((cell.rotation % 360) + 360) % 360;
+        boolean quarterTurn = rotation == 90 || rotation == 270;
+
         float destLeft = cellLeft;
         float destTop = cellTop;
         float destWidth = cellWidth;
         float destHeight = cellHeight;
 
-        // 画面的真实比例来自源像素（合成流里是正方形），不是被压扁的缓冲区比例
-        float laneAspect = lane.aspect();
+        // 画面的真实比例来自源像素（合成流里是正方形），不是被压扁的缓冲区比例。
+        // 转了 90°/270° 的话，占地的长宽也跟着对调。
+        float laneAspect = quarterTurn && laneAspectPx > 0f ? 1f / laneAspectPx : laneAspectPx;
         float cellAspect = cellWidth / cellHeight;
         if (scaleMode == ScaleMode.FIT && laneAspect > 0f && cellAspect > 0f) {
             if (laneAspect < cellAspect) {
@@ -362,7 +492,27 @@ public class FourLaneContainer extends ViewGroup {
         }
 
         destinationRect.set(destLeft, destTop, destLeft + destWidth, destTop + destHeight);
+        if (quarterTurn) {
+            // 转四分之一圈时，先按「转之前」的形状去映射：
+            // 目标框的长宽在旋转后才互换，所以这里要用互换回来的那个框
+            float cx = destinationRect.centerX();
+            float cy = destinationRect.centerY();
+            float halfW = destinationRect.height() / 2f;
+            float halfH = destinationRect.width() / 2f;
+            destinationRect.set(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
+        }
         drawMatrix.setRectToRect(sourceRect, destinationRect, Matrix.ScaleToFit.FILL);
+        if (cell != null) {
+            float cx = destinationRect.centerX();
+            float cy = destinationRect.centerY();
+            if (rotation != 0) {
+                drawMatrix.postRotate(rotation, cx, cy);
+            }
+            if (cell.mirrored) {
+                // 左右镜像：后视看到的本来就是反的
+                drawMatrix.postScale(-1f, 1f, cx, cy);
+            }
+        }
 
         int save = canvas.save();
         // 先裁到格子，避免子视图的其他部分溢出到相邻格子
