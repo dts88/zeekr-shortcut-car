@@ -128,6 +128,19 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
     }
 
     /**
+     * 把单选高亮挪到这一组上。
+     *
+     * <p>重新扫描会把 PhotoGroup 全部重建，而高亮记的是<b>扁平列表里的下标</b> ——
+     * 不挪的话，多出一组照片就会把高亮顶到别人身上。</p>
+     *
+     * <p>要在 {@link #buildFlattenedList()} 之后调用；那一组所在的日期收起来了
+     * 就没有下标，此时不高亮任何一行。</p>
+     */
+    public void setSelectedGroup(PhotoGroup group) {
+        selectedPosition = group == null ? -1 : flattenedItems.indexOf(group);
+    }
+
+    /**
      * 全选所有图片组
      */
     public void selectAll() {

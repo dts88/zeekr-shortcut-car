@@ -9,6 +9,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
   They were written into the code instead of the string table, as were the names in the
   recording-camera setting, the fullscreen preview, the profile editor and the playback zoom.
 - The recording resolution setting still pointed at a developer option removed in 0.37.9.
+- Fixed: with three cameras, a photo group showed only two of them until you refreshed and
+  then switched to another photo and back. A refresh rebuilt the list, but the preview still
+  held the photo group from the previous scan.
+- Photos now reach the drive as soon as they are taken. Each camera slept its own camera
+  thread for up to two seconds after decoding the picture, so the third photo landed 2.6
+  seconds after the shutter - late enough for the photo screen to miss it, and long enough
+  to hold up that camera's session callbacks.
 
 ## [0.37.9-alpha] - 2026-09-05
 

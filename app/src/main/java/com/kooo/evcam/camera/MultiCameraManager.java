@@ -2230,17 +2230,22 @@ public class MultiCameraManager {
 
         AppLog.d(TAG, "Taking picture with " + keys.size() + " camera(s) using timestamp: " + timestamp);
 
-        // 快速拍照，每个摄像头间隔300ms触发拍照，但保存文件时按顺序延迟1秒
+        // 每一路错开 300ms 触发，避免三路同时解码 + 编码。
+        //
+        // 这里以前还给「保存」另外排了 1 秒一档的延迟，说是分散磁盘 I/O。
+        // 那个延迟加在解码之后：位图已经在内存里了，睡的是这一路相机的
+        // 后台线程 —— 相机的会话回调、健康检查、重连都排在同一个线程上。
+        // 结果是内存占得更久、文件晚两秒多才落盘（拍完立刻去看图片回看，
+        // 第三张还不在），而 I/O 本来就已经被触发延迟错开了。
         for (int i = 0; i < keys.size(); i++) {
             final String key = keys.get(i);
-            final int captureDelay = i * 300;      // 拍照触发延迟：300ms（快速抓拍画面）
-            final int saveDelay = i * 1000;        // 文件保存延迟：1秒（分散磁盘I/O）
+            final int captureDelay = i * 300;
 
             mainHandler.postDelayed(() -> {
                 SingleCamera camera = cameras.get(key);
                 if (camera != null && camera.isConnected()) {
                     AppLog.d(TAG, "Taking picture with camera " + key);
-                    camera.takePicture(timestamp, saveDelay);  // 传递统一时间戳和保存延迟
+                    camera.takePicture(timestamp);  // 统一时间戳，分到同一组
                 } else {
                     AppLog.w(TAG, "Camera " + key + " not available for taking picture");
                 }

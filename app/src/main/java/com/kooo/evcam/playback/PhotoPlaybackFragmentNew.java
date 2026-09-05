@@ -483,11 +483,15 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      * 更新图片列表（按日期分组，然后按时间戳分组）
      */
     private void updatePhotoList() {
+        // 屏幕上现在放的是哪一组。扫描之后 PhotoGroup 全是新对象，
+        // 得靠时间戳把它认回来。
+        String shown = currentGroup != null ? currentGroup.getTimestampPrefix() : null;
         dateSections.clear();
 
         File saveDir = StorageHelper.getPhotoDir(getContext());
         if (!saveDir.exists() || !saveDir.isDirectory()) {
             showEmptyState();
+            showNoSelection();
             return;
         }
 
@@ -498,6 +502,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
         if (files == null || files.length == 0) {
             showEmptyState();
+            showNoSelection();
             return;
         }
 
@@ -544,6 +549,48 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
         adapter.buildFlattenedList();
         adapter.notifyDataSetChanged();
+        reloadShownGroup(shown);
+    }
+
+    /**
+     * 扫描之后，把预览区换成新扫出来的那一组。
+     *
+     * <h3>为什么必须换</h3>
+     *
+     * <p>扫描把每一组都重建了，{@code currentGroup} 指着的还是上一次扫出来的旧对象。
+     * 不换的话「刷新」只刷新了列表，预览区还停在旧的那一份 —— 拍完三路马上进来，
+     * 最后一张还没落盘，刷新看着毫无反应，切到别的照片再切回来才出得来。</p>
+     *
+     * <p>那一组已经不在了（被删了）就退回没选中的状态，不留一张指向空文件的旧图。</p>
+     */
+    private void reloadShownGroup(String timestampPrefix) {
+        if (timestampPrefix == null) {
+            return;
+        }
+        for (DateSection<PhotoGroup> section : dateSections) {
+            for (PhotoGroup group : section.getItems()) {
+                if (timestampPrefix.equals(group.getTimestampPrefix())) {
+                    adapter.setSelectedGroup(group);
+                    adapter.notifyDataSetChanged();
+                    loadPhotoGroup(group);
+                    return;
+                }
+            }
+        }
+        showNoSelection();
+    }
+
+    /** 回到「还没选照片」的样子。 */
+    private void showNoSelection() {
+        currentGroup = null;
+        adapter.setSelectedGroup(null);
+        adapter.notifyDataSetChanged();
+        isSingleMode = false;
+        multiViewLayout.setVisibility(View.GONE);
+        singleViewLayout.setVisibility(View.GONE);
+        controlsLayout.setVisibility(View.GONE);
+        noSelectionHint.setVisibility(View.VISIBLE);
+        currentDatetime.setText("");
     }
 
     private void showEmptyState() {
@@ -596,16 +643,19 @@ public class PhotoPlaybackFragmentNew extends Fragment {
                 .setTitle(R.string.dlg_delete_photos_title)
                 .setMessage(getString(R.string.dlg_delete_photos_msg, selectedGroups.size()))
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> {
+                    // selectedGroups 就是 adapter 手里那个集合，下面会被清空，
+                    // 先留一份 —— 删完还要拿它对一下预览区放的是不是其中之一
+                    Set<PhotoGroup> deleted = new HashSet<>(selectedGroups);
                     int deletedCount = 0;
                     
                     // 删除选中的图片组
-                    for (PhotoGroup group : selectedGroups) {
+                    for (PhotoGroup group : deleted) {
                         deletedCount += group.deleteAll();
                     }
                     
                     // 从日期分组中移除已删除的组
                     for (DateSection<PhotoGroup> section : dateSections) {
-                        section.getItems().removeAll(selectedGroups);
+                        section.getItems().removeAll(deleted);
                     }
                     
                     // 移除空的日期分组
@@ -613,6 +663,12 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
                     adapter.clearSelection();
                     adapter.buildFlattenedList();
+                    // 预览区放的那一组也在这一批里的话，别再挂着已经删掉的照片
+                    if (currentGroup != null && deleted.contains(currentGroup)) {
+                        showNoSelection();
+                    } else {
+                        adapter.setSelectedGroup(currentGroup);
+                    }
                     adapter.notifyDataSetChanged();
                     updateSelectedCount();
 

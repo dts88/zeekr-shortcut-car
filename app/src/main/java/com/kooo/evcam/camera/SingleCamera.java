@@ -2239,23 +2239,6 @@ public class SingleCamera {
     }
 
     /**
-     * 拍照（自动生成时间戳）
-     */
-    public void takePicture() {
-        // 生成时间戳
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        takePicture(timestamp);
-    }
-
-    /**
-     * 拍照（使用指定的时间戳）
-     * @param timestamp 文件命名用的时间戳
-     */
-    public void takePicture(String timestamp) {
-        takePicture(timestamp, 0);  // 默认无延迟
-    }
-
-    /**
      * 建拍照用的 JPEG 输出。
      *
      * <p>尺寸取这一路声明的<b>最大</b>那个 —— 拍照是单张，没有帧率压力，
@@ -2353,11 +2336,16 @@ public class SingleCamera {
     }
 
     /**
-     * 拍照（使用指定的时间戳和保存延迟）
-     * @param timestamp 文件命名用的时间戳
-     * @param saveDelayMs 保存文件前的延迟时间（毫秒）
+     * 拍照。
+     *
+     * <h3>为什么时间戳由调用方给</h3>
+     *
+     * <p>多路拍的是同一个瞬间，回看是按文件名里的时间戳分组的 —— 各自取各自的
+     * 时间，跨过一秒就会被拆成两组。</p>
+     *
+     * @param timestamp 文件命名用的时间戳，由调用方统一生成
      */
-    public void takePicture(String timestamp, int saveDelayMs) {
+    public void takePicture(String timestamp) {
         if (textureView == null || !textureView.isAvailable()) {
             AppLog.e(TAG, "Camera " + cameraId + " TextureView not available");
             return;
@@ -2373,18 +2361,18 @@ public class SingleCamera {
         if (requestJpeg(new JpegCallback() {
             @Override
             public void onJpeg(byte[] data) {
-                saveJpeg(data, timestamp, saveDelayMs);
+                saveJpeg(data, timestamp);
             }
 
             @Override
             public void onFailed(String reason) {
                 AppLog.w(TAG, "Camera " + cameraId + " 图片通道没出图（" + reason + "），改抓预览");
-                grabPreview(timestamp, saveDelayMs);
+                grabPreview(timestamp);
             }
         })) {
             return;
         }
-        grabPreview(timestamp, saveDelayMs);
+        grabPreview(timestamp);
     }
 
     /**
@@ -2394,7 +2382,7 @@ public class SingleCamera {
      * 里没有我们的应用名、车牌和时间。EXIF 由 {@code saveBitmapAsJPEG} 之后
      * 单独补写，重新编码会把相机写的标签丢掉。</p>
      */
-    private void saveJpeg(byte[] data, String timestamp, int saveDelayMs) {
+    private void saveJpeg(byte[] data, String timestamp) {
         if (backgroundHandler == null) {
             return;
         }
@@ -2404,18 +2392,11 @@ public class SingleCamera {
                 bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
                 if (bitmap == null) {
                     AppLog.e(TAG, "Camera " + cameraId + " JPEG 解不开，改抓预览");
-                    grabPreview(timestamp, saveDelayMs);
+                    grabPreview(timestamp);
                     return;
                 }
                 AppLog.d(TAG, "Camera " + cameraId + " 图片通道拍到 "
                         + bitmap.getWidth() + "x" + bitmap.getHeight());
-                if (saveDelayMs > 0) {
-                    try {
-                        Thread.sleep(saveDelayMs);
-                    } catch (InterruptedException e) {
-                        AppLog.w(TAG, "Save delay interrupted");
-                    }
-                }
                 saveBitmapAsJPEG(bitmap, timestamp);
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " 保存 JPEG 失败", e);
@@ -2428,50 +2409,30 @@ public class SingleCamera {
     }
 
     /** 老路子：从 TextureView 抓一张预览画面。分辨率受预览缓冲区限制。 */
-    private void grabPreview(String timestamp, int saveDelayMs) {
-        if (backgroundHandler != null) {
-            backgroundHandler.post(() -> {
-                try {
-                    // 1. 立即从TextureView获取Bitmap（快速抓拍）
-                    android.graphics.Bitmap bitmap = textureView.getBitmap(
-                            previewSize.getWidth(),
-                            previewSize.getHeight()
-                    );
-                    
-                    if (bitmap != null) {
-                        AppLog.d(TAG, "Camera " + cameraId + " picture captured (" +
-                              bitmap.getWidth() + "x" + bitmap.getHeight() + "), will save in " + saveDelayMs + "ms");
-                        
-                        // 2. 延迟后再保存到磁盘（分散I/O压力）
-                        if (saveDelayMs > 0) {
-                            try {
-                                Thread.sleep(saveDelayMs);
-                            } catch (InterruptedException e) {
-                                AppLog.w(TAG, "Save delay interrupted");
-                            }
-                        }
-                        
-                        // 3. 保存文件
-                        saveBitmapAsJPEG(bitmap, timestamp);
-                        bitmap.recycle();
-                        AppLog.d(TAG, "Camera " + cameraId + " picture saved");
-                    } else {
-                        AppLog.e(TAG, "Camera " + cameraId + " failed to get bitmap from TextureView");
-                    }
-                } catch (Exception e) {
-                    AppLog.e(TAG, "Camera " + cameraId + " error capturing picture", e);
-                }
-            });
+    private void grabPreview(String timestamp) {
+        if (backgroundHandler == null) {
+            return;
         }
-    }
-
-    /**
-     * 将Bitmap保存为JPEG文件
-     */
-    private void saveBitmapAsJPEG(android.graphics.Bitmap bitmap) {
-        // 生成时间戳
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        saveBitmapAsJPEG(bitmap, timestamp);
+        backgroundHandler.post(() -> {
+            try {
+                // 立即从 TextureView 抓一张（快速抓拍）
+                android.graphics.Bitmap bitmap = textureView.getBitmap(
+                        previewSize.getWidth(),
+                        previewSize.getHeight()
+                );
+                if (bitmap == null) {
+                    AppLog.e(TAG, "Camera " + cameraId + " failed to get bitmap from TextureView");
+                    return;
+                }
+                AppLog.d(TAG, "Camera " + cameraId + " picture captured ("
+                        + bitmap.getWidth() + "x" + bitmap.getHeight() + ")");
+                saveBitmapAsJPEG(bitmap, timestamp);
+                bitmap.recycle();
+                AppLog.d(TAG, "Camera " + cameraId + " picture saved");
+            } catch (Exception e) {
+                AppLog.e(TAG, "Camera " + cameraId + " error capturing picture", e);
+            }
+        });
     }
 
     /**
