@@ -13,7 +13,7 @@ import os
 import re
 import sys
 
-APP_NAME = "极氪即刻（车机版）"
+APP_NAME = "Zeekr Shortcut (Car Version)"
 REPO = "https://github.com/dts88/zeekr-shortcut-car"
 
 
@@ -49,12 +49,12 @@ def main():
     out = []
     out.append("## " + APP_NAME + " " + version)
     out.append("")
-    out.append("下载下面的 `.apk`，通过 App Lab 侧载安装。")
+    out.append("Download the `.apk` below and sideload it through App Lab.")
     out.append("")
 
     section = changelog_section(version)
     if section:
-        out.append("## 本版本更新")
+        out.append("## What changed")
         out.append("")
         out.append(section)
         out.append("")

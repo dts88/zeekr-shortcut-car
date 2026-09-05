@@ -5,7 +5,8 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Release descriptions are generated in English. The heading and the install line
+  were still Chinese while everything around them had been translated.
 
 ## [0.37.8-alpha] - 2026-09-05
 
