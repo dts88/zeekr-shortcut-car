@@ -205,30 +205,73 @@ public class CompositeStreamGeometryTest {
     }
 
     /**
-     * 表里没有的组合一律不拆，长条也一样。
+     * 不是合成流那一路，什么分辨率都不拆。
      *
-     * <p>猜的代价不对称：不拆看到的是一条挤在一起的长条，一眼就知道不对；
-     * 拆错看到的是四块被切开的画面，反而像是「功能正常」。</p>
+     * <p>3840×2160 三路都声明，光看分辨率分不清 —— 判断依据必须是相机。</p>
      */
     @Test
-    public void combinationsOutsideTheTableAreNeverSplit() {
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1920, 1080));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 720));
-        // 长条比例也不拆 —— 长宽比只用来认出哪一路是合成流，不用来决定怎么拆
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 6000));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 5120, 1280));
-        assertFalse(CompositeStreamGeometry.looksLikeComposite(COMPOSITE, 1280, 5120));
+    public void otherCamerasAreNeverSplit() {
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
+
+        for (int[] size : new int[][]{{1280, 5140}, {3840, 2160}, {1600, 900}}) {
+            assertFalse(size[0] + "x" + size[1] + " 在座舱上不该拆",
+                    CompositeStreamGeometry.looksLikeComposite(CABIN, size[0], size[1]));
+        }
+        assertFalse("还没认出哪一路是合成流时，宁可不拆",
+                CompositeStreamGeometry.looksLikeComposite(null, 1280, 5140));
     }
 
-    /** 表里就是这台车实测确认过的两个尺寸，一个不多一个不少。 */
+    /**
+     * 合成流那一路：任何分辨率都拆。
+     *
+     * <p>这一路在任何分辨率下给的都是同一份四格合成内容，分辨率只改变清晰度。
+     * 所以判断依据里没有分辨率这一维。</p>
+     */
     @Test
-    public void theTableHoldsExactlyTheConfirmedSizes() {
-        int[][] sizes = StreamLayoutTable.compositeSizes();
-        assertEquals(2, sizes.length);
-        assertEquals(1280, sizes[0][0]);
-        assertEquals(5140, sizes[0][1]);
-        assertEquals(3840, sizes[1][0]);
-        assertEquals(2160, sizes[1][1]);
+    public void theCompositeCameraSplitsAtEverySize() {
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
+
+        for (int[] size : new int[][]{{1280, 5140}, {3840, 2160}, {1600, 900},
+                {1920, 1080}, {1280, 720}, {640, 480}}) {
+            assertTrue(size[0] + "x" + size[1] + " 应当拆",
+                    CompositeStreamGeometry.looksLikeComposite(COMPOSITE, size[0], size[1]));
+        }
+    }
+
+    /** 1600×900 拆成四条 1600×225 —— 等分，归一化坐标和条带那份一致。 */
+    @Test
+    public void aScaledCompositeSplitsIntoFourEqualLanes() {
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
+
+        CompositeStreamGeometry.Plan plan =
+                CompositeStreamGeometry.analyse(COMPOSITE, 1600, 900);
+
+        assertEquals(4, plan.lanes.length);
+        assertEquals(1600, plan.lanes[0].width);
+        assertEquals(225, plan.lanes[0].height);
+        assertEquals(675, plan.lanes[3].y);
+    }
+
+    /**
+     * 缩放过的合成流，归一化坐标必须和原始条带一致。
+     *
+     * <p>这正是 1600×900 能被正确拆分的原因：坐标是比例，不是像素。</p>
+     */
+    @Test
+    public void normalisedWindowsMatchAcrossScales() {
+        StreamLayoutTable.setCompositeCameraId(COMPOSITE);
+
+        CompositeStreamGeometry.Plan strip =
+                CompositeStreamGeometry.analyse(COMPOSITE, 1280, 5120);
+        CompositeStreamGeometry.Plan scaled =
+                CompositeStreamGeometry.analyse(COMPOSITE, 1600, 900);
+
+        for (int i = 0; i < 4; i++) {
+            assertEquals("lane " + i + " v0",
+                    strip.lane(i).v0, scaled.lane(i).v0, 1e-3f);
+            assertEquals("lane " + i + " v1",
+                    strip.lane(i).v1, scaled.lane(i).v1, 1e-3f);
+        }
     }
 
     /** 登记是进程内全局的，每条测试跑完都要还原。 */
