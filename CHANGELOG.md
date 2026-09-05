@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.37.10-alpha] - 2026-09-05
+
 - Fixed: the four camera labels on the main screen stayed Chinese in an English interface.
   They were written into the code instead of the string table, as were the names in the
   recording-camera setting, the fullscreen preview, the profile editor and the playback zoom.

@@ -59,47 +59,53 @@ def main():
         out.append(section)
         out.append("")
 
-    out.append("## 验证状态")
+    out.append("## Verified on the vehicle")
     out.append("")
-    out.append("已在极氪 7X 实车验证：**环视合成流拆分为四画面**、**录制**、**存储到 U 盘**。")
+    out.append("Confirmed on a ZEEKR 7X: **the composite stream split into four views**, "
+               "**recording**, and **saving to a USB drive**.")
     out.append("")
     out.append("> [!WARNING]")
-    out.append("> 其余功能（尤其是每个版本的新增项）**未经实车验证**，")
-    out.append("> 自动化测试只覆盖纯逻辑部分。**首次使用新功能请在静止车辆上测试。**")
-    out.append("> 若录制异常，可在设置里把「录制画面排列」切回「原始长条」。")
+    out.append("> Everything else - new features in particular - is **unverified on a vehicle**,")
+    out.append("> and the automated tests cover the pure logic only.")
+    out.append("> **Try anything new in a stationary vehicle first.**")
+    out.append("> If recording misbehaves, set the recording layout back to \"Raw strip\".")
     out.append("")
 
-    out.append("## 使用")
+    out.append("## Getting started")
     out.append("")
-    out.append("安装后进入 **菜单 → 软件设置 → 车型**，选择 **「极氪7X（环视合成流）」**，")
-    out.append("重启应用即可看到四宫格环视画面。")
+    out.append("Open **Settings -> Recording -> Stream configuration**, pick "
+               "*ZEEKR 7X (surround-view composite)*, and restart the app.")
     out.append("")
-    out.append("遇到问题请打开 **菜单 → 诊断信息**，导出报告后附在 issue 里。")
-    out.append("")
-
-    out.append("## 安全须知")
-    out.append("")
-    out.append("实验性非官方软件，与极氪（ZEEKR）无任何关联，未经其批准或认可，")
-    out.append("也未经过任何车辆功能安全认证。")
-    out.append("")
-    out.append("- 不可替代原厂行车记录仪、倒车影像、盲区监测或任何法定安全设备")
-    out.append("- 请勿在行驶中操作，请勿依据其画面判断车距或障碍物")
-    out.append("- 与车机争夺资源**可能**影响原厂功能，出现异常请立即停用并卸载")
-    out.append("- 录制内容可能包含人脸、车牌等个人信息，请遵守当地法律")
-    out.append("")
-    out.append("完整说明见 [README](" + REPO + "#readme)。")
+    out.append("Something wrong? Export **Menu -> Diagnostics** and attach the report to an issue.")
     out.append("")
 
-    out.append("## 来源与致谢")
+    out.append("## Safety")
     out.append("")
-    out.append("本应用以 **GPL-3.0** 发布，代码基座为 "
-               "[EVCam](https://github.com/suyunkai/EVCam)（GPL-3.0，作者 suyunkai）。")
+    out.append("Experimental, unofficial software. Not affiliated with, approved by, or endorsed "
+               "by ZEEKR, and not certified for any vehicle safety function.")
     out.append("")
-    out.append("极氪合成流的尺寸、排布与平台行为等事实，来自 "
+    out.append("- It does not replace the factory dash cam, reversing camera, blind-spot monitor, "
+               "or any other required safety equipment")
+    out.append("- Do not operate it while driving, and do not judge distances or obstacles from "
+               "its picture")
+    out.append("- It competes with the head unit for resources and **may** affect factory "
+               "features; stop using it and uninstall if anything behaves oddly")
+    out.append("- Recordings can contain faces and plate numbers - follow your local law")
+    out.append("")
+    out.append("Full notice: [README](" + REPO + "#readme).")
+    out.append("")
+
+    out.append("## Credits")
+    out.append("")
+    out.append("Released under **GPL-3.0**, with "
+               "[EVCam](https://github.com/suyunkai/EVCam) (GPL-3.0, by suyunkai) as its code base.")
+    out.append("")
+    out.append("The dimensions, layout and platform behaviour of the ZEEKR composite stream were "
+               "first documented publicly by "
                "[openavm-recorder](https://github.com/Dantenothing/openavm-recorder) "
-               "公开记录的实测结论（作者 Dantenothing，保留所有权利）。")
-    out.append("**本项目未复制其任何源代码**，也未使用其名称或图标，与其没有隶属关系。")
-    out.append("详见 [NOTICE.md](" + REPO + "/blob/main/NOTICE.md)。")
+               "(by Dantenothing, all rights reserved). "
+               "**No code from that project was copied**, nor its name or icon, and there is no "
+               "affiliation. See [NOTICE.md](" + REPO + "/blob/main/NOTICE.md).")
 
     sys.stdout.write("\n".join(out) + "\n")
 
