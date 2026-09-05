@@ -579,6 +579,9 @@ public class MainActivity extends AppCompatActivity {
         if (compositeContainer != null) {
             tvCompositeInfo = findViewById(R.id.tv_composite_info);
             setupCompositeControls();
+            // 容器是刚建出来的，摆位得立刻给它一份 —— 相机初始化不一定
+            // 跟着布局重建走（横竖屏切换、主题切换都会重建布局）
+            applyProfileCells();
         }
         
         btnStartRecord = findViewById(R.id.btn_start_record);
@@ -1663,8 +1666,12 @@ public class MainActivity extends AppCompatActivity {
      * <p>翻译放在这里而不是容器里：容器管「怎么画」，不该反过来认识配置的字段。</p>
      */
     private void applyProfileCells() {
-        if (compositeContainer == null || activeProfile == null) {
+        if (compositeContainer == null) {
             return;
+        }
+        if (activeProfile == null) {
+            // 布局先于相机初始化建好，这时还没取过配置
+            activeProfile = new ProfileStore(this).current();
         }
         CameraProfile composite = activeProfile.camera(CameraProfile.ROLE_COMPOSITE);
         if (composite == null || composite.lanes.isEmpty()) {

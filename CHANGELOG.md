@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.37.12-alpha] - 2026-09-05
+
 - The stream profile editor has moved out of developer options into Settings -> Recording,
   and is built like the rest of Settings. So has "Photos through the image channel", which
   is what makes the photo resolution mean anything.

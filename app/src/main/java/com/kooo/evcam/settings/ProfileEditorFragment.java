@@ -177,6 +177,17 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
         PreferenceCategory group = category(screen, context,
                 roleName(camera.role) + " · " + name);
 
+        if (!splits) {
+            // 座舱那两路的画面还是各自的 TextureView，旋转镜像走的是旧的相机矫正，
+            // 不读这里。说出来 —— 一个改了不生效的选项比没有更糟。
+            Preference note = new Preference(context);
+            note.setSelectable(false);
+            note.setTitle("这一路的下列调整暂不生效");
+            note.setSummary("它的画面还走旧的相机矫正那条路，配置里的值没有人读。"
+                    + "环视那一路（拆四格的）是生效的");
+            group.addPreference(note);
+        }
+
         if (splits) {
             click(group, context, "位置与大小",
                     String.format(Locale.US, "左上 %.2f, %.2f    大小 %.2f × %.2f",
@@ -246,6 +257,11 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
      */
     private String describeStream(CameraProfile camera, StreamSpec spec) {
         StringBuilder sb = new StringBuilder(resolutionLabel(camera.role, spec));
+        if (spec == camera.photo
+                && !new com.kooo.evcam.AppConfig(requireContext()).isPhotoViaJpegEnabled()) {
+            // 关着「拍照走图片通道」时拍照是抓预览画面，这一项根本不参与
+            return sb + "（「拍照走图片通道」关着，此项不生效，拍照跟随预览）";
+        }
         int[] source = resolvedSource(camera.role, spec);
         if (source == null) {
             return sb.toString();
