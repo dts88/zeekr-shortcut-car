@@ -5,8 +5,72 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-- Removed an ImageReader field that was declared and closed but never given a surface
-  or attached to a session. Photos never went through it.
+Nothing yet.
+
+## [0.37.7-alpha] - 2026-09-05
+
+- Restored the changelog entries for 0.37.0 through 0.37.6. They were written
+  against an anchor that had stopped matching, so seven releases went out with an
+  empty description.
+
+## [0.37.6-alpha] - 2026-09-05
+
+- Fixed: cabin photos were rearranged into the four-up grid. The composer assumed every
+  picture came from the surround-view camera; it is now told which camera took it.
+- Fixed: cameras added to a profile had nowhere to appear. The screen layout and the camera
+  limit were still chosen from the stored car model rather than the profile.
+- Fixed: surround-view photos came out 1080x1080 whatever the settings said. The composer
+  assumed the four lanes were square, which they are only at 1280x5140.
+- The photo row in the editor says when the image channel is off, because the photo
+  resolution has no effect in that case.
+
+## [0.37.5-alpha] - 2026-09-05
+
+- Splitting is now decided by the camera alone. The surround-view stream carries the same
+  four-lane content at every resolution - confirmed at 1280x5140, 3840x2160 and 1600x900 -
+  so resolution only changes sharpness, never the arrangement.
+- Fixed: the profile editor reported "not split" for any size outside the old table while
+  the preview split it anyway.
+
+## [0.37.4-alpha] - 2026-09-05
+
+- Fixed: recording and photo resolution had no effect, and changing the preview resolution
+  moved all three. Only the preview stream was wired to the profile.
+- The save check no longer opens a dialog just to say the check passed.
+- Replaced the measured frame rate, which was always zero because the main screen is paused
+  while the editor is open, with a real preview of the new configuration.
+- The editor can add and remove cameras, and set frame rate, bitrate, segment length,
+  rotation and mirroring.
+
+## [0.37.3-alpha] - 2026-09-05
+
+- Developer options -> Edit profile: cameras and their three streams, each stream showing
+  its own parameters and whether it will be split into the four-up grid.
+- Saving is checked first, then confirmed against a live preview with a countdown that
+  expires. A configuration that leaves you without a picture cannot be cancelled by hand,
+  so the default is to discard.
+- Switching the stream configuration now switches profile.
+
+## [0.37.2-alpha] - 2026-09-05
+
+- Which camera setup runs is decided by the profile, not by the stored car model.
+- Each camera's preview size comes from its profile entry.
+
+## [0.37.1-alpha] - 2026-09-05
+
+- Fixed: Current profile kept showing the first translation, so switching the stream
+  configuration appeared to do nothing.
+- The custom stream configuration is no longer labelled as the ZEEKR 7X preset.
+
+## [0.37.0-alpha] - 2026-09-05
+
+Groundwork for making camera and stream settings a profile you can edit and save.
+
+- Camera and stream parameters now have a data model: which cameras are used, what each of
+  the three streams (preview, recording, photo) is set to, and where each pane sits.
+- Existing settings are translated into a default profile, viewable under developer options.
+- Removed an ImageReader field that was declared and closed but never given a surface or
+  attached to a session. Photos never went through it.
 
 ## [0.36.10-alpha] - 2026-09-04
 
