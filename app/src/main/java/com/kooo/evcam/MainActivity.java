@@ -1702,7 +1702,56 @@ public class MainActivity extends AppCompatActivity {
             cells[i] = cell;
         }
         compositeContainer.setCells(cells);
+        positionLaneLabels(cells);
         AppLog.i(TAG, "四宫格摆位按配置生效，共 " + cells.length + " 格");
+    }
+
+    /**
+     * 四个角标跟着各自那一格走。
+     *
+     * <h3>为什么不能留在布局里</h3>
+     *
+     * <p>布局里这四个角标是用 {@code layout_gravity} 钉在容器四角的 —— 那是「一定是
+     * 2×2 等分」时才成立的假设。格子现在可以挪、可以改大小，钉死的角标就会
+     * 落在别人的画面上，或者干脆落在没有画面的地方。</p>
+     *
+     * <p>规则统一成<b>各自那一格的左上角</b>：换成任何摆法都说得通，
+     * 而「哪个角离容器的哪个角近」在格子能任意摆之后根本没有答案。</p>
+     */
+    private void positionLaneLabels(com.kooo.evcam.zeekr.FourLaneContainer.Cell[] cells) {
+        TextView[] labels = {
+                findViewById(R.id.label_front),
+                findViewById(R.id.label_back),
+                findViewById(R.id.label_left),
+                findViewById(R.id.label_right),
+        };
+        // 容器的尺寸要等布局量完才知道
+        compositeContainer.post(() -> {
+            int width = compositeContainer.getWidth();
+            int height = compositeContainer.getHeight();
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            int inset = (int) (8 * getResources().getDisplayMetrics().density);
+            for (com.kooo.evcam.zeekr.FourLaneContainer.Cell cell : cells) {
+                if (cell == null || cell.laneIndex < 0 || cell.laneIndex >= labels.length) {
+                    continue;
+                }
+                TextView label = labels[cell.laneIndex];
+                if (label == null || !(label.getLayoutParams()
+                        instanceof android.widget.FrameLayout.LayoutParams)) {
+                    continue;
+                }
+                android.widget.FrameLayout.LayoutParams params =
+                        (android.widget.FrameLayout.LayoutParams) label.getLayoutParams();
+                params.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+                params.setMarginStart((int) (cell.x * width) + inset);
+                params.topMargin = (int) (cell.y * height) + inset;
+                params.setMarginEnd(0);
+                params.bottomMargin = 0;
+                label.setLayoutParams(params);
+            }
+        });
     }
 
     /**

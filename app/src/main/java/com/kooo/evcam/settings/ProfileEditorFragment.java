@@ -263,14 +263,13 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
             return sb + "（「拍照走图片通道」关着，此项不生效，拍照跟随预览）";
         }
         int[] source = resolvedSource(camera.role, spec);
-        if (source == null) {
-            return sb.toString();
-        }
-        if (!splitsFor(camera.role, source[0], source[1])) {
+        if (source == null || !splitsFor(camera.role)) {
             return sb.toString();
         }
         sb.append("    每格 ").append(source[0]).append("×").append(source[1] / 4);
-        if (spec != camera.preview) {
+        // 落盘尺寸要走拆分几何，而几何认的是相机 id：相机还没起来时算不出来，
+        // 那就不写 —— 编一个数比不写更糟
+        if (spec != camera.preview && StreamLayoutTable.compositeCameraId() != null) {
             EncodeSize landing = EncodeSize.forSource(
                     StreamLayoutTable.compositeCameraId(), source[0], source[1],
                     camera.record != null && camera.record.grid);
@@ -344,16 +343,19 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
         labels.add("最大 → " + resolvedText(camera.role, StreamSpec.RESOLUTION_MAX));
 
         boolean grid = camera.record != null && camera.record.grid;
+        String compositeId = StreamLayoutTable.compositeCameraId();
         for (int[] size : declaredSizes(camera.role)) {
             values.add(size[0] + "x" + size[1]);
-            if (!splitsFor(camera.role, size[0], size[1])) {
+            if (!splitsFor(camera.role)) {
                 labels.add(size[0] + "x" + size[1]);
                 continue;
             }
-            EncodeSize landing = EncodeSize.forSource(
-                    StreamLayoutTable.compositeCameraId(), size[0], size[1], grid);
-            labels.add(size[0] + "x" + size[1] + "   每格 " + size[0] + "×" + (size[1] / 4)
-                    + " · 落盘 " + landing.width + "×" + landing.height);
+            String text = size[0] + "x" + size[1] + "   每格 " + size[0] + "×" + (size[1] / 4);
+            if (compositeId != null) {
+                EncodeSize landing = EncodeSize.forSource(compositeId, size[0], size[1], grid);
+                text += " · 落盘 " + landing.width + "×" + landing.height;
+            }
+            labels.add(text);
         }
         pickOne(roleName(camera.role) + " · 分辨率",
                 labels.toArray(new String[0]), values.toArray(new String[0]),
@@ -619,10 +621,15 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
 
     // ------------------------------------------------------------------ 相机信息
 
+    /**
+     * 这一路拆不拆。
+     *
+     * <p>环视那一路在 {@link StreamLayoutTable} 里，也就是<b>一定</b>拆 —— 和分辨率无关，
+     * 也和「这次相机开没开起来」无关。以前这里还要求表里已经登记了相机 id，
+     * 于是相机还没起来时进设置，编辑器会把环视说成不拆的，连每一格都不给编。</p>
+     */
     private boolean splitsFor(String role) {
-        // 这一路在表里就一定拆 —— 和分辨率无关，规则在 StreamLayoutTable
-        return CameraProfile.ROLE_COMPOSITE.equals(role)
-                && StreamLayoutTable.compositeCameraId() != null;
+        return CameraProfile.ROLE_COMPOSITE.equals(role);
     }
 
     private boolean splitsFor(String role, int width, int height) {

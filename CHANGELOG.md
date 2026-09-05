@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.37.13-alpha] - 2026-09-05
+
+- Fixed: the four lane labels stayed pinned to the corners of the screen when a lane was
+  moved or resized, so a label could sit on someone else's picture. Each label now follows
+  its own lane.
+- Fixed: opening the editor before the cameras had started described the surround-view
+  stream as not split, which hid the per-lane controls. Whether a stream splits is a
+  property of the camera, not of whether it happens to be open.
+
 ## [0.37.12-alpha] - 2026-09-05
 
 - The stream profile editor has moved out of developer options into Settings -> Recording,
