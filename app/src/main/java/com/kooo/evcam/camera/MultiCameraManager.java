@@ -1220,8 +1220,19 @@ public class MultiCameraManager {
             // 尺寸怎么算的在 EncodeSize 里（有单元测试）——
             // 设置界面显示目标码率时用的是同一个函数，两边不会走散。
             boolean gridRequested = appConfig.isRecordGridLayout();
-            int sourceWidth = previewSize.getWidth();
-            int sourceHeight = previewSize.getHeight();
+            // 录制是一条独立的相机输出流，尺寸可以和预览不同。
+            // 以前直接拿预览尺寸，于是配置里改录制分辨率毫无反应，
+            // 改预览却把录制一起带动了。
+            String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(key);
+            Size recordSource = role == null ? null
+                    : com.kooo.evcam.profile.ProfileSizes.record(context, role, previewSize);
+            if (recordSource != null && !recordSource.equals(previewSize)) {
+                AppLog.i(TAG, "Camera " + key + " 录制流按配置用 " + recordSource
+                        + "（预览是 " + previewSize + "）");
+            }
+            Size source = recordSource != null ? recordSource : previewSize;
+            int sourceWidth = source.getWidth();
+            int sourceHeight = source.getHeight();
             EncodeSize encodeSize = EncodeSize.forSource(
                     camera.getCameraId(), sourceWidth, sourceHeight, gridRequested);
             int encodeWidth = encodeSize.width;

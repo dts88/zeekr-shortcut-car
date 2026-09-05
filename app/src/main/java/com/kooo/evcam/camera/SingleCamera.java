@@ -2280,12 +2280,18 @@ public class SingleCamera {
                 largest = size;
             }
         }
-        jpegSize = largest;
+        // 配置里指定了拍照尺寸就用它；auto / max 时才是这一路的最大值。
+        // 不读配置的话，配置编辑里那个「拍照分辨率」是个摆设。
+        String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(cameraPosition);
+        Size configured = role == null ? null
+                : com.kooo.evcam.profile.ProfileSizes.photo(context, role, previewSize);
+        jpegSize = configured != null ? configured : largest;
         // maxImages 2：一张在读、一张在路上就够了，多了只是占内存
-        jpegReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+        jpegReader = ImageReader.newInstance(jpegSize.getWidth(), jpegSize.getHeight(),
                 android.graphics.ImageFormat.JPEG, 2);
         jpegReader.setOnImageAvailableListener(this::onJpegAvailable, backgroundHandler);
-        AppLog.i(TAG, "Camera " + cameraId + " 拍照通道就绪: " + largest);
+        AppLog.i(TAG, "Camera " + cameraId + " 拍照通道就绪: " + jpegSize
+                + (configured != null ? "（配置指定）" : "（这一路的最大值）"));
     }
 
     private void onJpegAvailable(ImageReader reader) {

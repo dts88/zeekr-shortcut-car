@@ -20,12 +20,10 @@ import android.widget.TextView;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
-import com.kooo.evcam.camera.PreviewFrameRates;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 配置编辑：按「相机 → 流」摆开，每条流显示自己的参数和拆分状态。
@@ -46,19 +44,17 @@ import java.util.Locale;
  * <ol>
  *   <li><b>数据检查</b>（{@link ProfileValidation}）：一路都没启用、选了没声明的尺寸，
  *       这些不用开相机就知道错。</li>
- *   <li><b>实测</b>：真开一次会话、采几秒帧率。会话配得起来不等于跑得动 ——
- *       三路各开三条流是系统级问题，没有任何声明能回答。</li>
+ *   <li><b>看画面</b>：按新配置真开一次相机。会话配得起来不等于跑得动，
+ *       而拆分对不对、位置对不对，只有看一眼才知道。</li>
  * </ol>
  *
- * <p>实测结果连同倒计时一起摆出来：十秒内不确认就回滚。配错了最坏的情况是没有画面，
- * 那时候人是点不动屏幕的，所以不能指望用户来点「取消」。</p>
+ * <p>看画面那一步在 {@link ProfilePreviewCheck}：按新配置真的开一次相机，
+ * 拆四格的尺寸就用真正的四宫格容器显示，看到的排布和主界面一致。
+ * 倒计时结束不保存 —— 配错了最坏是黑屏，那时候人是点不动屏幕的。</p>
  */
 public class ProfileEditorActivity extends Activity {
 
     private static final String TAG = "ProfileEditor";
-
-    /** 确认倒计时。够看清帧率，又不至于让人干等。 */
-    private static final int CONFIRM_SECONDS = 10;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -100,6 +96,7 @@ public class ProfileEditorActivity extends Activity {
         root.addView(scroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
+        root.addView(button("加一路相机", v -> addCamera()));
         root.addView(button("校验并保存", v -> validateAndSave()));
         root.addView(button("恢复为初值", v -> confirmReset()));
         return root;
@@ -139,6 +136,7 @@ public class ProfileEditorActivity extends Activity {
             render();
         });
         row.addView(toggle);
+        row.addView(smallButton("移除", v -> removeCamera(camera)));
         return row;
     }
 
@@ -168,12 +166,123 @@ public class ProfileEditorActivity extends Activity {
         text.setTextSize(14f);
         row.addView(text);
 
-        Button edit = new Button(this);
-        edit.setText("改分辨率");
-        edit.setAllCaps(false);
-        edit.setOnClickListener(v -> pickResolution(camera, spec));
-        row.addView(edit);
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.addView(smallButton("分辨率", v -> pickResolution(camera, spec)));
+        if (spec == camera.record) {
+            buttons.addView(smallButton("帧率", v -> pickFps(spec)));
+            buttons.addView(smallButton("码率", v -> pickBitrate(spec)));
+            buttons.addView(smallButton("分段", v -> pickSegment(spec)));
+        }
+        if (spec == camera.preview && !camera.lanes.isEmpty()) {
+            buttons.addView(smallButton("旋转", v -> cycleRotation(camera)));
+            buttons.addView(smallButton("镜像", v -> toggleMirror(camera)));
+        }
+        row.addView(buttons);
         return row;
+    }
+
+    /**
+     * 旋转和镜像作用在<b>每一格</b>上，不是整路相机。
+     *
+     * <p>合成流拆出来的四格各自可以有自己的方向 —— 后视那一格默认镜像，
+     * 和真实后视镜一致，其余三格不镜像。所以这里改的是所有格子还是某一格，
+     * 取决于这一路拆没拆：没拆就只有一格，改它就是改这一路。</p>
+     */
+    private void cycleRotation(CameraProfile camera) {
+        if (camera.lanes.size() == 1) {
+            LaneLayout lane = camera.lanes.get(0);
+            lane.rotation = (lane.rotation + 90) % 360;
+            render();
+            return;
+        }
+        pickLane(camera, "旋转哪一格", lane -> {
+            lane.rotation = (lane.rotation + 90) % 360;
+            render();
+        });
+    }
+
+    private void toggleMirror(CameraProfile camera) {
+        if (camera.lanes.size() == 1) {
+            LaneLayout lane = camera.lanes.get(0);
+            lane.mirrored = !lane.mirrored;
+            render();
+            return;
+        }
+        pickLane(camera, "镜像哪一格", lane -> {
+            lane.mirrored = !lane.mirrored;
+            render();
+        });
+    }
+
+    private interface LaneAction {
+        void apply(LaneLayout lane);
+    }
+
+    /** 拆成四格时得先问改哪一格。格子的名字就是方位。 */
+    private void pickLane(CameraProfile camera, String title, LaneAction action) {
+        String[] names = {"前", "后", "左", "右"};
+        String[] labels = new String[camera.lanes.size()];
+        for (int i = 0; i < labels.length; i++) {
+            LaneLayout lane = camera.lanes.get(i);
+            String name = lane.laneIndex >= 0 && lane.laneIndex < names.length
+                    ? names[lane.laneIndex] : String.valueOf(i);
+            labels[i] = name + "   " + lane;
+        }
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle(title)
+                .setItems(labels, (d, which) -> action.apply(camera.lanes.get(which)))
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private void pickFps(StreamSpec spec) {
+        String[] values = {StreamSpec.FPS_UNLIMITED, "30", "24", "20", "15", "10"};
+        String[] labels = {"不限制（视频流给多少录多少）", "最高 30", "最高 24",
+                "最高 20", "最高 15", "最高 10"};
+        pickOne("录制帧率", labels, values, value -> {
+            spec.fps = value;
+            render();
+        });
+    }
+
+    private void pickBitrate(StreamSpec spec) {
+        String[] values = {"low", "medium", "high"};
+        String[] labels = {"低", "中", "高"};
+        pickOne("录制码率", labels, values, value -> {
+            spec.bitrate = value;
+            render();
+        });
+    }
+
+    private void pickSegment(StreamSpec spec) {
+        String[] values = {"1", "3", "5", "10"};
+        String[] labels = {"1 分钟", "3 分钟", "5 分钟", "10 分钟"};
+        pickOne("分段时长", labels, values, value -> {
+            spec.segmentMinutes = Integer.parseInt(value);
+            render();
+        });
+    }
+
+    private interface Chosen {
+        void set(String value);
+    }
+
+    private void pickOne(String title, String[] labels, String[] values, Chosen chosen) {
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle(title)
+                .setItems(labels, (d, which) -> chosen.set(values[which]))
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private Button smallButton(String text, View.OnClickListener listener) {
+        Button view = new Button(this);
+        view.setText(text);
+        view.setAllCaps(false);
+        view.setTextSize(13f);
+        view.setOnClickListener(listener);
+        return view;
     }
 
     /**
@@ -223,6 +332,69 @@ public class ProfileEditorActivity extends Activity {
                 .show();
     }
 
+    /**
+     * 往这份配置里加一路相机。
+     *
+     * <p>「用哪几路」本来就该是配置的一部分。之前只能改分辨率，是因为编辑器
+     * 只做了一半 —— 单路那份配置里锁着一路环视，加不进座舱。</p>
+     */
+    private void addCamera() {
+        List<String> roles = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        for (String role : new String[]{CameraProfile.ROLE_COMPOSITE,
+                CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2}) {
+            if (profile.camera(role) == null) {
+                roles.add(role);
+                labels.add(roleName(role) + "   " + cameraSummary(role));
+            }
+        }
+        if (roles.isEmpty()) {
+            toast("三路都已经在这份配置里了");
+            return;
+        }
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle("加一路相机")
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    profile.cameras.add(newCamera(roles.get(which)));
+                    render();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private CameraProfile newCamera(String role) {
+        CameraProfile camera = new CameraProfile(role);
+        camera.preview = StreamSpec.preview(StreamSpec.RESOLUTION_AUTO);
+        camera.record = StreamSpec.record(StreamSpec.RESOLUTION_AUTO,
+                StreamSpec.FPS_UNLIMITED, "medium", "auto", 3);
+        camera.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
+        if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
+            for (int lane = 0; lane < 4; lane++) {
+                camera.lanes.add(LaneLayout.cell(lane,
+                        (lane % 2) * 0.5f, (lane / 2) * 0.5f, 0.5f, 0.5f));
+            }
+        } else {
+            camera.lanes.add(LaneLayout.cell(-1, 0f, 0f, 1f, 1f));
+        }
+        return camera;
+    }
+
+    private void removeCamera(CameraProfile camera) {
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle("移除 " + roleName(camera.role))
+                .setMessage("从这份配置里去掉这一路。它的参数会一起丢掉。")
+                .setPositiveButton("移除", (d, w) -> {
+                    profile.cameras.remove(camera);
+                    render();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private void toast(String text) {
+        android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
     // ------------------------------------------------------------------ 校验
 
     private void validateAndSave() {
@@ -241,106 +413,74 @@ public class ProfileEditorActivity extends Activity {
                 });
 
         if (ProfileValidation.hasBlocking(issues)) {
-            showIssues("这份配置存不了", issues, null);
+            showIssues("这份配置存不了", issues);
             return;
         }
-        showIssues("检查通过，接下来实测", issues, this::measureThenConfirm);
+        // 检查通过就直接往下走。原来这里还弹一个「检查通过，接下来实测」——
+        // 那个框不承载任何信息，只是让人多点一次。
+        previewThenSave(issues);
     }
 
-    private void showIssues(String title, List<ProfileValidation.Issue> issues,
-                            Runnable onContinue) {
+    private void showIssues(String title, List<ProfileValidation.Issue> issues) {
         StringBuilder sb = new StringBuilder();
         for (ProfileValidation.Issue issue : issues) {
             sb.append(issue).append('\n');
         }
-        if (sb.length() == 0) {
-            sb.append("没有发现问题。");
-        }
-        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(title)
-                .setMessage(sb.toString());
-        if (onContinue != null) {
-            builder.setPositiveButton("继续", (d, w) -> onContinue.run())
-                    .setNegativeButton(R.string.action_cancel, null);
-        } else {
-            builder.setPositiveButton(R.string.action_got_it, null);
-        }
-        builder.show();
+                .setMessage(sb.toString())
+                .setPositiveButton(R.string.action_got_it, null)
+                .show();
     }
 
     /**
-     * 采几秒实际帧率，再连同倒计时一起让人确认。
+     * 按新配置真的开一次画面，看清楚再决定保不保存。
      *
-     * <p>采的是<b>当前正在跑的那套</b>的帧率 —— 新配置要生效得重启应用，
-     * 所以这个数是「现在这样能跑到多少」，不是「按新配置能跑到多少」。
-     * 它的价值在于给出一个基线：真按新配置重启之后跑成什么样，
-     * 回到这里再采一次就知道了。这一点必须写在界面上，否则就是在骗人。</p>
+     * <p>原来这里采一段帧率再把数字摆出来 —— 那个数字<b>永远是 0</b>：编辑界面是
+     * 另一个 Activity，主界面已经退到后台、相机已经被关掉了，根本没有帧在走。</p>
+     *
+     * <p>而且就算数字是真的，它也回答不了真正要问的问题：画面出得来吗、拆分对吗、
+     * 位置对吗。这三件事只有看一眼才知道。</p>
      */
-    private void measureThenConfirm() {
-        long[] before = frameCounts();
-        status.setText("正在采样……");
-        ui.postDelayed(() -> {
-            long[] after = frameCounts();
-            StringBuilder sb = new StringBuilder();
-            String[] keys = {"front", "back", "left", "right"};
-            for (int i = 0; i < keys.length; i++) {
-                if (after[i] <= 0) {
-                    continue;
-                }
-                sb.append(String.format(Locale.US, "%-6s %.1f fps%n",
-                        keys[i], (after[i] - before[i]) / 3f));
-            }
-            if (sb.length() == 0) {
-                sb.append("这三秒里一路都没有出帧（相机可能没在跑）。\n");
-            }
-            status.setText("");
-            confirmWithCountdown(sb.toString());
-        }, 3000L);
-    }
-
-    private long[] frameCounts() {
-        String[] keys = {"front", "back", "left", "right"};
-        long[] out = new long[keys.length];
-        for (int i = 0; i < keys.length; i++) {
-            out[i] = PreviewFrameRates.totalFrames(keys[i]);
+    private void previewThenSave(List<ProfileValidation.Issue> warnings) {
+        CameraProfile first = firstEnabled();
+        if (first == null) {
+            showIssues("没有启用任何相机", warnings);
+            return;
         }
-        return out;
+        String cameraId = cameraIdFor(first.role);
+        if (cameraId == null) {
+            showIssues("找不到 " + roleName(first.role) + " 对应的相机", warnings);
+            return;
+        }
+
+        int[] probed = null;
+        int[] parsed = ProfileResolution.parse(first.preview.resolution);
+        if (parsed != null) {
+            probed = parsed;
+        }
+        ProfileResolution.Size resolved = ProfileResolution.resolve(
+                first.preview.resolution, probed,
+                ProfileSizes.declaredMax(this, first.role));
+        Size size = resolved.specified()
+                ? new Size(resolved.width, resolved.height) : null;
+        boolean split = size != null
+                && splitsFor(first.role, size.getWidth(), size.getHeight());
+
+        new ProfilePreviewCheck(this).run(cameraId, size, split, () -> {
+            store.save(profile);
+            AppLog.i(TAG, "配置已保存:\n" + profile);
+            status.setText("已保存，重启应用后生效");
+        });
     }
 
-    private void confirmWithCountdown(String measured) {
-        final AlertDialog dialog = new AlertDialog.Builder(this, R.style.AlertDialogTheme)
-                .setTitle("保存这份配置？")
-                .setMessage(measured
-                        + "\n以上是【当前这套】的实测帧率，作为基线。"
-                        + "新配置要重启应用才生效。\n\n"
-                        + CONFIRM_SECONDS + " 秒内不确认就放弃保存。")
-                .setPositiveButton("保存", (d, w) -> {
-                    store.save(profile);
-                    AppLog.i(TAG, "配置已保存:\n" + profile);
-                    status.setText("已保存，重启应用后生效");
-                })
-                .setNegativeButton(R.string.action_cancel, null)
-                .setCancelable(false)
-                .create();
-        dialog.show();
-
-        final int[] left = {CONFIRM_SECONDS};
-        final Runnable[] tick = new Runnable[1];
-        tick[0] = () -> {
-            left[0]--;
-            if (!dialog.isShowing()) {
-                return;
+    private CameraProfile firstEnabled() {
+        for (CameraProfile camera : profile.cameras) {
+            if (camera.enabled) {
+                return camera;
             }
-            if (left[0] <= 0) {
-                dialog.dismiss();
-                status.setText("超时未确认，没有保存");
-                return;
-            }
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                    .setText("保存（" + left[0] + "）");
-            ui.postDelayed(tick[0], 1000L);
-        };
-        ui.postDelayed(tick[0], 1000L);
+        }
+        return null;
     }
 
     private void confirmReset() {
