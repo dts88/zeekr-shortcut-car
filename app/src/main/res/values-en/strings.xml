@@ -339,10 +339,6 @@
     <string name="set_watermark_brand_title">App badge</string>
     <string name="set_watermark_brand_summary">Shows this app\'s name and version</string>
     <string name="opt_fps_auto_unknown">Native</string>
-    <string name="opt_composite_size_auto">Follow detection (1280×5140, known to produce the 4-up grid)</string>
-    <string name="msg_composite_size_changed">Stream size changed; restart the app to apply. If the picture looks wrong, switch back to Follow detection.</string>
-    <string name="msg_composite_size_split">This aspect ratio is split into the four-up grid.</string>
-    <string name="msg_composite_size_single">Too square to be treated as a strip (the long side must be 3.2x the short one), so it is shown as one whole picture — useful for seeing what this stream actually contains.</string>
     <string name="set_bitrate_summary_target">%1$s · target %2$s (%3$s @ %4$d fps, %5$s)</string>
     <string name="upd_connecting">Connecting…</string>
     <string name="upd_downloading_size">Downloading… %1$s MB</string>

@@ -1033,8 +1033,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         });
 
-        bindCompositeSize();
-
         bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
                 enabled -> {
                     appConfig.setPhotoViaJpegEnabled(enabled);
@@ -1060,125 +1058,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             toast("预览矫正参数已重置");
         });
-    }
-
-    /**
-     * 环视流尺寸（开发者选项）。
-     *
-     * <p>默认「跟随探测」——探测出来的 1280×5140 是已知能出四格竖排的那一个。
-     * 换成别的尺寸相机照样出画面，但里面装的是什么排布只能看了才知道，
-     * 所以这一项不放进普通设置。</p>
-     */
-    private void bindCompositeSize() {
-        ListPreference pref = findPreference("pref_composite_size");
-        if (pref == null || getContext() == null) {
-            return;
-        }
-        pref.setPersistent(false);
-        // 探测相机要读 characteristics，放后台 —— 和「录制分辨率」那一项一样的做法
-        final Context context = getContext().getApplicationContext();
-        new Thread(() -> {
-            // 这里要的是环视那一路<b>自己</b>声明的尺寸，不是三路的交集：
-            // 交集会把 1280×5140 这种只有它有的条带尺寸筛掉，而那正是默认值。
-            final List<String> options = compositeCameraSizes(context);
-            if (!isAdded()) {
-                return;
-            }
-            requireActivity().runOnUiThread(() -> populateCompositeSize(pref, options));
-        }, "composite-size-probe").start();
-    }
-
-    /** 环视那一路声明的全部尺寸，从大到小。找不到那一路时返回空列表。 */
-    private List<String> compositeCameraSizes(Context context) {
-        List<String> out = new ArrayList<>();
-        try {
-            CameraManager manager =
-                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-            if (manager == null) {
-                return out;
-            }
-            for (String id : manager.getCameraIdList()) {
-                CameraCharacteristics chars = manager.getCameraCharacteristics(id);
-                Integer facing = chars.get(CameraCharacteristics.LENS_FACING);
-                if (facing == null || facing != CameraCharacteristics.LENS_FACING_EXTERNAL) {
-                    continue;
-                }
-                StreamConfigurationMap map =
-                        chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-                if (map == null) {
-                    continue;
-                }
-                List<Size> sizes = new ArrayList<>();
-                Size[] declared = map.getOutputSizes(android.graphics.SurfaceTexture.class);
-                if (declared != null) {
-                    java.util.Collections.addAll(sizes, declared);
-                }
-                java.util.Collections.sort(sizes, (x, y) -> Long.compare(
-                        (long) y.getWidth() * y.getHeight(),
-                        (long) x.getWidth() * x.getHeight()));
-                for (Size size : sizes) {
-                    String text = size.getWidth() + "x" + size.getHeight();
-                    if (!out.contains(text)) {
-                        out.add(text);
-                    }
-                }
-                break;
-            }
-        } catch (Exception e) {
-            AppLog.w("Settings", "读不到环视相机的尺寸列表: " + e);
-        }
-        return out;
-    }
-
-    private void populateCompositeSize(ListPreference pref, List<String> options) {
-        List<String> values = new ArrayList<>();
-        List<String> labels = new ArrayList<>();
-        values.add("");
-        labels.add(getString(R.string.opt_composite_size_auto));
-        for (String option : options) {
-            values.add(option);
-            labels.add(option);
-        }
-        String current = appConfig.getCompositeSizeOverride();
-        if (!values.contains(current)) {
-            // 当前值一定要留着，否则下拉框会显示空白
-            values.add(current);
-            labels.add(current);
-        }
-        pref.setEntries(labels.toArray(new String[0]));
-        pref.setEntryValues(values.toArray(new String[0]));
-        pref.setValue(current);
-        showCompositeSize(pref);
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            String value = String.valueOf(newValue);
-            appConfig.setCompositeSizeOverride(value);
-            pref.setValue(value);
-            showCompositeSize(pref);
-            toast(getString(R.string.msg_composite_size_changed));
-            return false;
-        });
-    }
-
-    /**
-     * 摘要里同时写清「现在用的是哪个」和「这个尺寸会被怎么拆」。
-     *
-     * <p>拆分规则在 {@link CompositeStreamGeometry} 里：长边达到短边的 3.2 倍才算条带，
-     * 才会切成四格。3840×2160 是 16:9，达不到这个比例 —— 它会被当成一整幅画面显示。
-     * 这一句必须写出来，否则换完尺寸看到「只有一个画面」会以为是坏了。</p>
-     */
-    private void showCompositeSize(ListPreference pref) {
-        CharSequence entry = pref.getEntry();
-        int[] size = AppConfig.parseResolution(pref.getValue());
-        String note;
-        if (size == null) {
-            note = "";
-        } else if (StreamLayoutTable.stackingFor(StreamLayoutTable.compositeCameraId(),
-                size[0], size[1]) != CompositeStreamGeometry.Stacking.NOT_COMPOSITE) {
-            note = "\n" + getString(R.string.msg_composite_size_split);
-        } else {
-            note = "\n" + getString(R.string.msg_composite_size_single);
-        }
-        pref.setSummary(entry + note);
     }
 
     /**

@@ -150,6 +150,12 @@ public class ProfileEditorActivity extends Activity {
         TextView text = new TextView(this);
         StringBuilder sb = new StringBuilder();
         sb.append(label).append("   分辨率 ").append(spec.resolution);
+        // auto / max 是意图，不是数。不写出它到底解成多少，
+        // 用户只能猜 —— 而环视那一路的 max 并不是像素最多的那个。
+        String resolved = describeResolved(camera.role, spec);
+        if (resolved != null) {
+            sb.append("  → ").append(resolved);
+        }
         if (spec == camera.record) {
             sb.append("   帧率 ").append(spec.fps)
                     .append("   码率 ").append(spec.bitrate)
@@ -290,6 +296,20 @@ public class ProfileEditorActivity extends Activity {
         view.setTextSize(13f);
         view.setOnClickListener(listener);
         return view;
+    }
+
+    /** auto / max 实际解成多少；已经是具体值时返回 null（不用重复）。 */
+    private String describeResolved(String role, StreamSpec spec) {
+        if (ProfileResolution.parse(spec.resolution) != null) {
+            return null;
+        }
+        int[] max = ProfileSizes.declaredMax(this, role);
+        if (StreamSpec.RESOLUTION_MAX.equals(spec.resolution)) {
+            return max == null ? "读不到尺寸" : max[0] + "x" + max[1];
+        }
+        // auto：环视跟探测结果，其他路交回给原来的挑选规则
+        return CameraProfile.ROLE_COMPOSITE.equals(role)
+                ? "跟随探测结果" : "由相机自己挑";
     }
 
     /**

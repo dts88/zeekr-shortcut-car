@@ -23,7 +23,6 @@ public class ProfileMigrationTest {
         ProfileMigration.Snapshot snapshot = new ProfileMigration.Snapshot();
         snapshot.carModel = "zeekr_7x";
         snapshot.targetResolution = "default";
-        snapshot.compositeSizeOverride = "";
         snapshot.recordFps = "auto";
         snapshot.bitrateLevel = "medium";
         snapshot.forceH264 = false;
@@ -79,19 +78,6 @@ public class ProfileMigrationTest {
 
         assertEquals(StreamSpec.RESOLUTION_AUTO, composite.record.resolution);
         assertEquals(StreamSpec.RESOLUTION_AUTO, composite.preview.resolution);
-    }
-
-    /** 开发者选项里覆盖过尺寸时，覆盖值跟着走。 */
-    @Test
-    public void theCompositeSizeOverrideCarriesOver() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.compositeSizeOverride = "3840x2160";
-
-        CameraProfile composite =
-                ProfileMigration.migrate(snapshot).camera(CameraProfile.ROLE_COMPOSITE);
-
-        assertEquals("3840x2160", composite.record.resolution);
-        assertEquals("3840x2160", composite.preview.resolution);
     }
 
     // ---------- 三路 ----------

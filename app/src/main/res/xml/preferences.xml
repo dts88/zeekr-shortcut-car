@@ -366,10 +366,6 @@
             android:key="pref_preview_correction_reset"
             android:title="重置预览矫正参数" />
 
-        <ListPreference
-            android:key="pref_composite_size"
-            android:title="环视流尺寸"
-            android:summary="%s" />
 
         <SwitchPreferenceCompat
             android:key="pref_photo_via_jpeg"

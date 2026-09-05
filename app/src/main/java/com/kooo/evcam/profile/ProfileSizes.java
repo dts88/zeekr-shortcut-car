@@ -67,7 +67,25 @@ public final class ProfileSizes {
         }
     }
 
-    /** 这一路声明的最大 JPEG 尺寸。拍照的 max 就是它。 */
+    /**
+     * 这一路的「最大」尺寸 —— 拍照的 {@code max} 就是它。
+     *
+     * <h3>合成流那一路不能按像素总数比</h3>
+     *
+     * <p>它的每个尺寸装的都是同一份四格内容，只是被压成不同形状：</p>
+     *
+     * <pre>
+     *   1280×5140   每格 1280×1285   像素 1.64M   短边 1280
+     *   3840×2160   每格 3840×540    像素 2.07M   短边 540
+     * </pre>
+     *
+     * <p>按像素总数比，3840×2160 赢 —— 但那一格是一个<b>方形画面被压成 7:1</b>，
+     * 真正的细节被短边卡死在 540 行，比 1280×5140 差一半还多。拍出来是一张
+     * 7680×1080 的超宽图，四个画面全是扁的。</p>
+     *
+     * <p>所以这一路按<b>每格短边</b>挑。座舱那两路不拆，一格就是整幅画面，
+     * 按像素总数挑没有问题。</p>
+     */
     public static int[] declaredMax(Context context, String role) {
         String cameraId = cameraIdFor(context, role);
         if (cameraId == null) {
@@ -85,18 +103,34 @@ public final class ProfileSizes {
             if (sizes == null || sizes.length == 0) {
                 return null;
             }
-            Size largest = sizes[0];
+            boolean splits = CameraProfile.ROLE_COMPOSITE.equals(role);
+            Size best = sizes[0];
+            long bestScore = -1;
             for (Size size : sizes) {
-                if ((long) size.getWidth() * size.getHeight()
-                        > (long) largest.getWidth() * largest.getHeight()) {
-                    largest = size;
+                long score = score(size, splits);
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = size;
                 }
             }
-            return new int[]{largest.getWidth(), largest.getHeight()};
+            return new int[]{best.getWidth(), best.getHeight()};
         } catch (Exception e) {
             AppLog.w(TAG, "读不到 " + role + " 的最大尺寸: " + e);
             return null;
         }
+    }
+
+    /**
+     * 拆分的那一路按每格短边打分，不拆的按像素总数。
+     *
+     * <p>四格竖排时每格是 {@code 宽 × 高/4}，短边就是这一格能表达的真实细节。</p>
+     */
+    private static long score(Size size, boolean splits) {
+        if (!splits) {
+            return (long) size.getWidth() * size.getHeight();
+        }
+        int laneHeight = size.getHeight() / 4;
+        return Math.min(size.getWidth(), laneHeight);
     }
 
     /**

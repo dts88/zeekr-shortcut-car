@@ -128,7 +128,6 @@ public final class ProfileStore {
         ProfileMigration.Snapshot snapshot = new ProfileMigration.Snapshot();
         snapshot.carModel = config.getCarModel();
         snapshot.targetResolution = config.getTargetResolution();
-        snapshot.compositeSizeOverride = config.getCompositeSizeOverride();
         snapshot.recordFps = config.getRecordFps();
         snapshot.bitrateLevel = config.getBitrateLevel();
         snapshot.forceH264 = config.isForceH264Encoding();

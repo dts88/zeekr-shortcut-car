@@ -340,10 +340,6 @@
     <string name="set_watermark_brand_title">应用角标</string>
     <string name="set_watermark_brand_summary">显示本应用的名称和版本号</string>
     <string name="opt_fps_auto_unknown">原始帧率</string>
-    <string name="opt_composite_size_auto">跟随探测（1280×5140，已知可出四格）</string>
-    <string name="msg_composite_size_changed">环视流尺寸已更改，重启应用后生效。若画面不对，改回「跟随探测」。</string>
-    <string name="msg_composite_size_split">这个比例会被拆成四格显示。</string>
-    <string name="msg_composite_size_single">这个比例不满足条带判定（长边需达短边 3.2 倍），会当成一整幅画面显示 —— 用来看这一路里到底装了什么。</string>
     <string name="set_bitrate_summary_target">%1$s · 目标 %2$s（%3$s @ %4$d fps，%5$s）</string>
     <string name="upd_connecting">正在连接…</string>
     <string name="upd_downloading_size">正在下载… %1$s MB</string>

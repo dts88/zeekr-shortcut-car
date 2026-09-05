@@ -30,8 +30,6 @@ public final class ProfileMigration {
         public String carModel = "zeekr_7x";
         /** 全局录制分辨率：default 或 "1920x1080"。 */
         public String targetResolution = "default";
-        /** 环视流尺寸覆盖，空表示跟随探测。 */
-        public String compositeSizeOverride = "";
         /** 录制帧率：auto 或数字字符串。 */
         public String recordFps = "auto";
         /** 码率等级：low / medium / high。 */
@@ -157,11 +155,9 @@ public final class ProfileMigration {
         // ---- 环视那一路 ----
         CameraProfile composite = new CameraProfile(CameraProfile.ROLE_COMPOSITE);
         composite.enabled = true;
-        // 环视的尺寸从来不读全局「录制分辨率」：它由探测结果决定，
-        // 开发者选项里的覆盖值优先。翻译之后这件事写在这一路自己身上。
-        String compositeSize = snapshot.compositeSizeOverride == null
-                || snapshot.compositeSizeOverride.isEmpty()
-                ? StreamSpec.RESOLUTION_AUTO : snapshot.compositeSizeOverride;
+        // 环视的尺寸从来不读全局「录制分辨率」——它由探测结果决定。
+        // 翻译之后这件事写在这一路自己身上；auto 就是「跟随探测」。
+        String compositeSize = StreamSpec.RESOLUTION_AUTO;
         composite.preview = StreamSpec.preview(compositeSize);
         composite.record = StreamSpec.record(compositeSize, fps(snapshot.recordFps),
                 snapshot.bitrateLevel, codec(snapshot.forceH264), snapshot.segmentMinutes);

@@ -20,7 +20,6 @@ public class AppConfig {
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
-    private static final String KEY_COMPOSITE_SIZE_OVERRIDE = "composite_size_override";  // 环视流强制尺寸
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
@@ -1282,23 +1281,6 @@ public class AppConfig {
      * 获取车型
      * @return 车型标识，默认为银河E5
      */
-    /**
-     * 环视合成流强制使用的尺寸，形如 {@code "3840x2160"}；空表示按探测结果走。
-     *
-     * <p>探测结果（1280×5140）是已知能出四格竖排的那一个。改成别的尺寸时，
-     * 相机<b>照样出画面</b>，但里面装的是什么排布只能看了才知道 ——
-     * 所以这一项在开发者选项里，而且默认为空。</p>
-     */
-    public String getCompositeSizeOverride() {
-        String value = prefs.getString(KEY_COMPOSITE_SIZE_OVERRIDE, "");
-        return value == null ? "" : value;
-    }
-
-    public void setCompositeSizeOverride(String value) {
-        prefs.edit().putString(KEY_COMPOSITE_SIZE_OVERRIDE, value == null ? "" : value).apply();
-        AppLog.i(TAG, "环视流尺寸覆盖: " + (value == null || value.isEmpty() ? "（跟随探测）" : value));
-    }
-
     /** 界面语言：auto / zh / en。 */
     public String getLanguageMode() {
         return readEnum(SettingsRegistry.LANGUAGE);

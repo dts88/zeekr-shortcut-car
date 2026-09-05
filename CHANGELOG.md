@@ -5,8 +5,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-- Release descriptions are generated in English. The heading and the install line
-  were still Chinese while everything around them had been translated.
+Nothing yet.
+
+## [0.37.9-alpha] - 2026-09-05
+
+- Removed the developer-only surround-view stream size. Every resolution now lives in the
+  profile editor, and having a second place to set the same thing could only disagree.
+- Fixed: a surround-view photo on "max" came out 7680x1080. Max picked the size with the
+  most pixels, but on this camera every size holds the same four views, so 3840x2160 stores
+  each square view squashed to 3840x540. Max now picks by how much detail a lane actually
+  keeps, which is 1280x5140.
+- The editor shows what "auto" and "max" resolve to, instead of leaving it to be guessed.
+- Release descriptions are generated in English. The heading and the install line were
+  still Chinese while everything around them had been translated.
 
 ## [0.37.8-alpha] - 2026-09-05
 
