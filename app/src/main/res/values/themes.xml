@@ -102,7 +102,7 @@
 
     <!-- 导航菜单项文字样式 -->
     <style name="NavigationMenuTextAppearance" parent="TextAppearance.AppCompat.Body1">
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">17sp</item>
         <item name="android:textColor">@color/nav_text_primary</item>
         <item name="fontFamily">sans-serif-medium</item>
     </style>

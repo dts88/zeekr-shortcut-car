@@ -372,4 +372,5 @@
     <string name="status_bitrate_high">High bitrate</string>
     <string name="status_storage_free">USB %1$s free</string>
     <string name="status_storage_none">No USB drive</string>
+    <string name="nav_group_switches">Switches</string>
 </resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  抽屉里行尾的开关，和设置里的开关同一个样子（车机系统式：圆角矩形轨道 + 白色方块滑块）。
+  它自己不接点击：点整行就拨（MainActivity.toggleRearViewFromDrawer），
+  这样手指落在行上任何地方都算数。
+-->
+<androidx.appcompat.widget.SwitchCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_switch"
+    style="@style/Widget.AppCompat.CompoundButton.Switch"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@null"
+    android:clickable="false"
+    android:focusable="false"
+    android:thumb="@drawable/pref_switch_thumb"
+    app:switchMinWidth="56dp"
+    app:track="@drawable/pref_switch_track" />

@@ -1280,12 +1280,21 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onDrawerOpened(View drawerView) {
                 syncDeveloperMenuVisibility();
+                // 后视镜也可能在设置里、或者悬浮窗自己关掉过
+                syncRearViewSwitch();
             }
         });
         syncDeveloperMenuVisibility();
+        syncRearViewSwitch();
 
         navigationView.setNavigationItemSelectedListener(item -> {
             int itemId = item.getItemId();
+
+            // 开关行：点一下就拨，不跳界面、不收抽屉 —— 拨完还看得见它变了没有
+            if (itemId == R.id.nav_rearview) {
+                toggleRearViewFromDrawer();
+                return false;
+            }
             
             if (itemId == R.id.nav_recording) {
                 // 显示录制界面
@@ -4254,6 +4263,37 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
+    /**
+     * 抽屉里的「超级后视镜」开关。
+     *
+     * <p>和设置里那个开关走同一条路（{@code OverlayCoordinator.setRearViewEnabled}）：
+     * 悬浮窗权限不够时它会返回 false，这时去申请权限，开关停在原位 ——
+     * 开关显示的必须是后视镜真实的状态，不是「刚才按了一下」。</p>
+     */
+    private void toggleRearViewFromDrawer() {
+        boolean on = !appConfig.isRearViewEnabled();
+        if (!OverlayCoordinator.setRearViewEnabled(this, on)) {
+            Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
+            WakeUpHelper.requestOverlayPermission(this);
+        } else if (on) {
+            Toast.makeText(this, R.string.msg_rearview_on, Toast.LENGTH_SHORT).show();
+        }
+        syncRearViewSwitch();
+    }
+
+    /** 行尾开关照后视镜的真实状态摆。 */
+    private void syncRearViewSwitch() {
+        if (navigationView == null || appConfig == null) {
+            return;
+        }
+        android.view.MenuItem item = navigationView.getMenu().findItem(R.id.nav_rearview);
+        View action = item != null ? item.getActionView() : null;
+        View toggle = action != null ? action.findViewById(R.id.nav_switch) : null;
+        if (toggle instanceof android.widget.CompoundButton) {
+            ((android.widget.CompoundButton) toggle).setChecked(appConfig.isRearViewEnabled());
+        }
+    }
 
     /**
      * 补盲和超视只在开发者选项打开时出现在抽屉里。

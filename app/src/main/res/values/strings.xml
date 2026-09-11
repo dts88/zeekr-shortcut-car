@@ -373,4 +373,5 @@
     <string name="status_bitrate_high">高码率</string>
     <string name="status_storage_free">U 盘 %1$s 可用</string>
     <string name="status_storage_none">未检测到 U 盘</string>
+    <string name="nav_group_switches">开关</string>
 </resources>

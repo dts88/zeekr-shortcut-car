@@ -1,49 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<!--
+  抽屉菜单。三组：看（界面之间跳）、开关（直接在这里拨）、系统。
 
-    <!-- 主要功能区 -->
+  「超级后视镜」是一个开关而不是一个界面：以前要进设置 → 超级后视镜 → 拨开关，
+  三步才能做一件「开 / 关」的事。现在行尾就是开关，点这一行就拨，抽屉不收起 ——
+  拨完还看得见它变了没有。
+
+  图标全部是统一图标集里的矢量图（24dp 网格、线宽 1.7），随抽屉的着色走。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/nav_recording"
-            android:icon="@drawable/ic_nav_recording"
+            android:icon="@drawable/ic_record"
             android:title="@string/nav_recording" />
         <item
             android:id="@+id/nav_playback"
-            android:icon="@drawable/ic_nav_playback"
+            android:icon="@drawable/ic_video"
             android:title="@string/nav_video_playback" />
         <item
             android:id="@+id/nav_photo_playback"
-            android:icon="@drawable/ic_nav_photo"
+            android:icon="@drawable/ic_photo"
             android:title="@string/nav_photo_playback" />
     </group>
 
-    <!-- 设置区 -->
+    <item android:title="@string/nav_group_switches">
+        <menu>
+            <item
+                android:id="@+id/nav_rearview"
+                android:checkable="false"
+                android:icon="@drawable/ic_rearview"
+                android:title="@string/set_section_rearview"
+                app:actionLayout="@layout/nav_switch" />
+        </menu>
+    </item>
+
     <item android:title="@string/nav_group_system">
         <menu>
             <item
                 android:id="@+id/nav_secondary_display"
-                android:icon="@drawable/ic_nav_remote"
                 android:checkable="true"
+                android:icon="@drawable/ic_floating"
                 android:title="@string/nav_blind_spot" />
             <item
                 android:id="@+id/nav_supervision_mode"
-                android:icon="@drawable/ic_nav_remote"
                 android:checkable="true"
+                android:icon="@drawable/ic_grid"
                 android:title="@string/nav_supervision" />
             <item
                 android:id="@+id/nav_settings"
-                android:icon="@drawable/ic_nav_settings"
                 android:checkable="true"
+                android:icon="@drawable/ic_settings"
                 android:title="@string/nav_settings" />
             <item
                 android:id="@+id/nav_diagnostics"
-                android:icon="@drawable/ic_nav_settings"
                 android:checkable="true"
+                android:icon="@drawable/ic_diagnostics"
                 android:title="@string/nav_diagnostics" />
             <item
                 android:id="@+id/nav_about"
-                android:icon="@drawable/ic_nav_app_logo"
                 android:checkable="true"
+                android:icon="@drawable/ic_info"
                 android:title="@string/about_title" />
         </menu>
     </item>
