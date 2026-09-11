@@ -474,6 +474,16 @@ public class StorageHelper {
     }
 
     /**
+     * 现在能不能开始录：有 U 盘，或者开发者选项放行了内置存储。
+     *
+     * <p>拒录（{@code RecordingCoordinator}）和录制键的「不可用」状态问的是同一件事，
+     * 所以只有这一处判断 —— 两处各写一遍，迟早出现「按钮说能录、按下去说不能」。</p>
+     */
+    public static boolean isRecordingStorageAvailable(Context context) {
+        return !willRecordToInternal(context) || isInternalStorageAllowed();
+    }
+
+    /**
      * 录像实际上会不会落在内置存储上。
      *
      * <p>两种情况都算：选的就是内置存储，或者选了 U 盘但盘不在

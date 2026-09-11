@@ -356,4 +356,21 @@
     <string name="set_rail_side_title">操作按钮位置</string>
     <string name="opt_rail_right">右侧</string>
     <string name="opt_rail_left">左侧</string>
+
+    <!-- 界面分区 · 首次启动问舵位 · 录制键不可用 · 状态条 -->
+    <string name="set_section_interface">界面</string>
+    <string name="set_reduce_motion_title">录制时减少动效</string>
+    <string name="set_reduce_motion_summary">录制时界面之间直接切换、不做过渡；录制键和进度环照常动。编码器正在用 GPU，界面不跟它抢</string>
+    <string name="dlg_rail_side_title">方向盘在哪一边？</string>
+    <string name="dlg_rail_side_lhd">左边（左舵车）· 操作按钮放左侧</string>
+    <string name="dlg_rail_side_rhd">右边（右舵车）· 操作按钮放右侧</string>
+    <string name="msg_rail_side_hint">操作按钮放在离驾驶位近的一侧。以后可以在 设置 → 界面 里改</string>
+    <string name="record_unavailable">插入 U 盘后可录制</string>
+    <string name="record_unavailable_detail">未检测到 U 盘</string>
+    <string name="status_fps">≤%1$s fps</string>
+    <string name="status_bitrate_low">低码率</string>
+    <string name="status_bitrate_medium">中码率</string>
+    <string name="status_bitrate_high">高码率</string>
+    <string name="status_storage_free">U 盘 %1$s 可用</string>
+    <string name="status_storage_none">未检测到 U 盘</string>
 </resources>

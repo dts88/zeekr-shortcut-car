@@ -105,8 +105,7 @@ public class RecordingCoordinator {
         // 悬浮按钮拉起、主题切换后恢复、定时自检、亮屏恢复）都是直接开录的 ——
         // 也就是说，说好的「没有 U 盘就不录」，实际上只有按按钮时才成立。
         // 判断放在这里，九条路才是同一个答案。
-        if (StorageHelper.willRecordToInternal(context)
-                && !StorageHelper.isInternalStorageAllowed()) {
+        if (!StorageHelper.isRecordingStorageAvailable(context)) {
             notifyRefused(context.getString(R.string.msg_refuse_no_external));
             return;
         }

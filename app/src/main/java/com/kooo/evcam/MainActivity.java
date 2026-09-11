@@ -168,6 +168,7 @@ public class MainActivity extends AppCompatActivity {
     private android.content.BroadcastReceiver screenStateReceiver;  // 屏幕状态广播接收器
     private android.content.BroadcastReceiver backgroundCommandReceiver;  // 后台切换广播接收器
     private android.content.BroadcastReceiver toggleRecordingReceiver;  // 录制切换广播接收器（来自悬浮窗）
+    private android.content.BroadcastReceiver storageReceiver;  // U 盘插拔：录制键可不可录、状态条余量
     private android.os.Handler screenStateHandler;  // 息屏/亮屏延迟处理
     private Runnable screenOffStopRunnable;  // 息屏停止录制的延迟任务
     private Runnable screenOnStartRunnable;  // 亮屏恢复录制的延迟任务
@@ -633,6 +634,7 @@ public class MainActivity extends AppCompatActivity {
         
         bindRecordButtonUi();
         applyActionRailSide();
+        updateStatusLine();
 
         // 录制按钮：点击切换录制状态
         btnStartRecord.setOnClickListener(v -> toggleRecording());
@@ -1044,6 +1046,7 @@ public class MainActivity extends AppCompatActivity {
         // 分段按时长切：恢复时第 N 段的起点就是开始时间往后数 N-1 段
         segmentStartTime = recordingStartTime + (currentSegmentCount - 1) * segmentLengthMs;
         setSegmentProgressVisible(true);
+        updateStatusLine();
 
         if (tvRecordingStats != null) {
             // 始终设为 VISIBLE，通过 alpha 控制可见性
@@ -1114,8 +1117,14 @@ public class MainActivity extends AppCompatActivity {
         segmentStartTime = System.currentTimeMillis();
         AppLog.d(TAG, "分段切换: 第 " + currentSegmentCount + " 段");
         
-        // 立即更新显示
-        runOnUiThread(this::updateRecordingStatsDisplay);
+        // 立即更新显示；换段的那一下录制键淡一下，状态条的余量也顺手刷新
+        runOnUiThread(() -> {
+            updateRecordingStatsDisplay();
+            if (recordButtonUi != null) {
+                recordButtonUi.flashSegment();
+            }
+            updateStatusLine();
+        });
     }
     
     /**
@@ -1168,6 +1177,55 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 待机时录制键该是「开始录制」还是「插入 U 盘后可录制」。
+     *
+     * <p>判断和拒录是同一个（{@code StorageHelper.isRecordingStorageAvailable}）——
+     * 按钮不会显示能录、按下去却被拒。录制中不动它：盘拔了由录制链路自己处理。</p>
+     */
+    private void refreshRecordAvailability() {
+        if (recordButtonUi == null || isRecording) {
+            return;
+        }
+        recordButtonUi.setState(StorageHelper.isRecordingStorageAvailable(this)
+                ? com.kooo.evcam.ui.RecordButtonUi.State.IDLE
+                : com.kooo.evcam.ui.RecordButtonUi.State.UNAVAILABLE);
+    }
+
+    /**
+     * 状态条左侧：这次按什么录、U 盘还剩多少。
+     *
+     * <p>取的是录制链路真正读的那一份（{@code RecordSpecs}），不是另存的显示值。
+     * 帧率在配置里的含义是上限（硬件给不到就按硬件的），所以写成「≤」；
+     * 码率「自动」在录制链路里就是中档（{@code RecordSpecs.qualityLevel}），也照实写中档。</p>
+     */
+    private void updateStatusLine() {
+        TextView stream = findViewById(R.id.tv_status_stream);
+        if (stream != null) {
+            com.kooo.evcam.profile.StreamSpec spec =
+                    com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front");
+            String fps = spec.fps == null || spec.fps.isEmpty()
+                    || com.kooo.evcam.profile.StreamSpec.FPS_UNLIMITED.equals(spec.fps)
+                    ? getString(R.string.opt_fps_auto_unknown)
+                    : getString(R.string.status_fps, spec.fps);
+            int level = com.kooo.evcam.profile.RecordSpecs.qualityLevel(spec.bitrate);
+            int bitrate = level == 1 ? R.string.status_bitrate_low
+                    : level == 3 ? R.string.status_bitrate_high
+                    : R.string.status_bitrate_medium;
+            stream.setText(fps + " · " + getString(bitrate));
+            stream.setVisibility(View.VISIBLE);
+        }
+        TextView storage = findViewById(R.id.tv_status_storage);
+        if (storage != null) {
+            java.io.File root = StorageHelper.getExternalSdCardRoot(this);
+            long free = root != null ? StorageHelper.getAvailableSpace(root) : -1;
+            storage.setText(free >= 0
+                    ? getString(R.string.status_storage_free, StorageHelper.formatSize(free))
+                    : getString(R.string.status_storage_none));
+            storage.setVisibility(View.VISIBLE);
+        }
+    }
+
     /** 录制键换了实例（布局重建、自定义车型换按钮布局）就重新接一次。 */
     private void bindRecordButtonUi() {
         recordButtonUi = btnStartRecord != null ? new com.kooo.evcam.ui.RecordButtonUi(btnStartRecord) : null;
@@ -1178,6 +1236,8 @@ public class MainActivity extends AppCompatActivity {
                 com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
         if (isRecording) {
             recordButtonUi.setState(isPreparingRecording ? com.kooo.evcam.ui.RecordButtonUi.State.PREPARING : com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
+        } else {
+            refreshRecordAvailability();
         }
     }
 
@@ -1307,6 +1367,13 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // 再问方向盘在哪边：它决定操作按钮放哪一侧。老用户升级上来也问这一次
+        if (!appConfig.isRailSideChosen()) {
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(this::showRailSideChoiceDialog, 300);
+            return;
+        }
+
         if (!appConfig.isFirstLaunch()) {
             return;
         }
@@ -1367,6 +1434,41 @@ public class MainActivity extends AppCompatActivity {
         Languages.apply(mode);
         Toast.makeText(this, R.string.msg_language_hint, Toast.LENGTH_LONG).show();
         // 语言没变的话不会重建，这里接着往下走
+        checkFirstLaunch();
+    }
+
+    /**
+     * 首次启动问方向盘在哪边，决定操作按钮放哪一侧。
+     *
+     * <p>规则是<b>离驾驶位近的那一侧</b>：左舵车人坐在左边，中控屏在右手边，
+     * 屏幕离人最近的是它的左边缘；右舵车反过来。选项上把这条规则直接写出来，
+     * 不合心意选另一个就是。预先选中的是现在的设置，直接关掉弹窗也停在这一档。</p>
+     */
+    private void showRailSideChoiceDialog() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        String[] sides = {"left", "right"};
+        String[] labels = {
+                getString(R.string.dlg_rail_side_lhd),
+                getString(R.string.dlg_rail_side_rhd),
+        };
+        final int[] picked = {"left".equals(appConfig.getActionRailSide()) ? 0 : 1};
+        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+                .setTitle(R.string.dlg_rail_side_title)
+                .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
+                .setPositiveButton(android.R.string.ok,
+                        (d, w) -> applyRailSideChoice(sides[picked[0]]))
+                .setOnCancelListener(d -> applyRailSideChoice(sides[picked[0]]))
+                .setCancelable(true)
+                .show();
+    }
+
+    private void applyRailSideChoice(String side) {
+        appConfig.setActionRailSide(side);
+        appConfig.setRailSideChosen();
+        applyActionRailSide();
+        Toast.makeText(this, R.string.msg_rail_side_hint, Toast.LENGTH_LONG).show();
         checkFirstLaunch();
     }
 
@@ -1438,9 +1540,12 @@ public class MainActivity extends AppCompatActivity {
                 com.kooo.evcam.camera.AppScreenState.OTHER_SCREEN);
         recordingLayout.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
-        // 进一层：沿 Z 轴放大淡入，和设置里进二级界面是同一个动作
-        fragment.setEnterTransition(new com.google.android.material.transition.MaterialSharedAxis(
-                com.google.android.material.transition.MaterialSharedAxis.Z, true));
+        // 进一层：沿 Z 轴放大淡入，和设置里进二级界面是同一个动作。
+        // 录制中（且开着「录制时减少动效」）或系统关了动画时直接切
+        if (com.kooo.evcam.ui.MotionPolicy.decorative(this)) {
+            fragment.setEnterTransition(new com.google.android.material.transition.MaterialSharedAxis(
+                    com.google.android.material.transition.MaterialSharedAxis.Z, true));
+        }
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .setPrimaryNavigationFragment(fragment)
@@ -1463,6 +1568,10 @@ public class MainActivity extends AppCompatActivity {
         boolean left = "left".equals(appConfig.getActionRailSide());
         int target = left ? 0 : row.getChildCount() - 1;
         if (row.indexOfChild(rail) != target) {
+            if (row.isLaidOut() && com.kooo.evcam.ui.MotionPolicy.decorative(this)) {
+                android.transition.TransitionManager.beginDelayedTransition(row,
+                        new android.transition.ChangeBounds().setDuration(250));
+            }
             row.removeView(rail);
             row.addView(rail, left ? 0 : row.getChildCount());
         }
@@ -2845,6 +2954,7 @@ public class MainActivity extends AppCompatActivity {
         
         // 初始化后台切换广播接收器
         initBackgroundCommandReceiver();
+        initStorageReceiver();
         
         // 初始化录制切换广播接收器（来自悬浮窗）
         initToggleRecordingReceiver();
@@ -2899,6 +3009,28 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(backgroundCommandReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
         
         AppLog.d(TAG, "后台切换广播接收器已注册");
+    }
+
+    /** U 盘插拔：录制键的「可不可录」和状态条的余量跟着变。 */
+    private void initStorageReceiver() {
+        storageReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(android.content.Context context, android.content.Intent intent) {
+                // 存储探测结果有缓存，插拔之后得先作废
+                StorageHelper.clearCache();
+                refreshRecordAvailability();
+                updateStatusLine();
+            }
+        };
+        android.content.IntentFilter filter = new android.content.IntentFilter();
+        filter.addAction(android.content.Intent.ACTION_MEDIA_MOUNTED);
+        filter.addAction(android.content.Intent.ACTION_MEDIA_UNMOUNTED);
+        filter.addAction(android.content.Intent.ACTION_MEDIA_REMOVED);
+        filter.addAction(android.content.Intent.ACTION_MEDIA_BAD_REMOVAL);
+        filter.addAction(android.content.Intent.ACTION_MEDIA_EJECT);
+        // 这几条系统广播带的是卷的路径，不加 file 这个 scheme 收不到
+        filter.addDataScheme("file");
+        registerReceiver(storageReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
     }
     
     /**
@@ -3347,8 +3479,15 @@ public class MainActivity extends AppCompatActivity {
 
     /** 录制键切到某个状态。回调可能来自相机线程，统一丢回主线程。 */
     private void setRecordState(com.kooo.evcam.ui.RecordButtonUi.State state) {
+        com.kooo.evcam.ui.MotionPolicy.setRecording(state == com.kooo.evcam.ui.RecordButtonUi.State.PREPARING
+                || state == com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
         runOnUiThread(() -> {
-            if (recordButtonUi != null) {
+            if (recordButtonUi == null) {
+                return;
+            }
+            if (state == com.kooo.evcam.ui.RecordButtonUi.State.IDLE) {
+                refreshRecordAvailability();
+            } else {
                 recordButtonUi.setState(state);
             }
         });
@@ -3558,6 +3697,10 @@ public class MainActivity extends AppCompatActivity {
         
         // 通知悬浮窗：应用回到前台
         OverlayCoordinator.onAppForeground(this);
+
+        // U 盘可能在后台时插拔过
+        refreshRecordAvailability();
+        updateStatusLine();
         
         // 返回前台时，检查摄像头连接状态
         if (cameraManager != null && wasInBackground) {
@@ -3663,6 +3806,15 @@ public class MainActivity extends AppCompatActivity {
             backgroundCommandReceiver = null;
         }
         
+        if (storageReceiver != null) {
+            try {
+                unregisterReceiver(storageReceiver);
+            } catch (Exception e) {
+                AppLog.w(TAG, "注销 U 盘插拔广播接收器时出错: " + e.getMessage());
+            }
+            storageReceiver = null;
+        }
+
         // 清理录制切换广播接收器
         if (toggleRecordingReceiver != null) {
             try {
@@ -4052,11 +4204,20 @@ public class MainActivity extends AppCompatActivity {
         if (isGrid) {
             compositeContainer.focusLane(0);
             btnMode.setText(R.string.zeekr_mode_single);
+            setModeIcon(btnMode, R.drawable.ic_single);
         } else {
             compositeContainer.showGrid();
             btnMode.setText(R.string.zeekr_mode_grid);
+            setModeIcon(btnMode, R.drawable.ic_grid);
         }
         updateCompositeLabels();
+    }
+
+    /** 按钮上的字说的是现在的模式，图标也跟着说同一件事。 */
+    private static void setModeIcon(Button button, int icon) {
+        if (button instanceof com.google.android.material.button.MaterialButton) {
+            ((com.google.android.material.button.MaterialButton) button).setIconResource(icon);
+        }
     }
 
     /** 单画面模式下只留一个角标，四宫格模式下四个都显示。 */
@@ -4093,7 +4254,7 @@ public class MainActivity extends AppCompatActivity {
         String oneLine = text.trim().replace('\n', ' ');
         runOnUiThread(() -> {
             tvCompositeInfo.setText(oneLine);
-            tvCompositeInfo.setVisibility(oneLine.isEmpty() ? View.GONE : View.VISIBLE);
+            tvCompositeInfo.setVisibility(oneLine.isEmpty() ? View.INVISIBLE : View.VISIBLE);
         });
     }
 

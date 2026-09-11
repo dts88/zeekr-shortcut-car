@@ -227,21 +227,42 @@
                     android:paddingStart="18dp"
                     android:paddingEnd="18dp">
 
+                    <!-- 这次按什么录：帧率上限 · 码率档（取自录制链路真正读的那一份） -->
                     <TextView
-                        android:id="@+id/tv_composite_info"
+                        android:id="@+id/tv_status_stream"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp"
                         android:visibility="gone" />
 
-                    <Space
+                    <TextView
+                        android:id="@+id/tv_status_storage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="26dp"
+                        android:fontFeatureSettings="tnum"
+                        android:maxLines="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <!-- 合成流识别结果（尺寸、分隔带、拆分方式）：吃掉剩余宽度，放不下就截断 -->
+                    <TextView
+                        android:id="@+id/tv_composite_info"
                         android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="26dp"
+                        android:layout_marginEnd="20dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:fontFeatureSettings="tnum"
+                        android:maxLines="1"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="13sp"
+                        android:visibility="invisible" />
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
                         android:id="@+id/segment_progress"

@@ -12,6 +12,7 @@ import androidx.slidingpanelayout.widget.SlidingPaneLayout;
 
 import com.google.android.material.transition.MaterialSharedAxis;
 import com.kooo.evcam.R;
+import com.kooo.evcam.ui.MotionPolicy;
 
 /**
  * 设置界面的外壳：左侧分区列表，右侧该分区的内容。
@@ -98,7 +99,7 @@ public class SettingsShellFragment extends Fragment {
         }
         Fragment next = SettingsPreferenceFragment.forSection(screenKey);
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
-        if (shown != null) {
+        if (shown != null && MotionPolicy.decorative(requireContext())) {
             // 换分区沿纵轴走：左栏是竖着排的，点下面一行内容就从下面上来，
             // 点上面一行就从上面下来 —— 动作的方向和手指在列表里移动的方向一致。
             // 平级切换不用横向（那读起来像「进了下一级」），也不用 Z 轴（那是进二级界面）
@@ -122,12 +123,15 @@ public class SettingsShellFragment extends Fragment {
         // 进二级界面沿 Z 轴：新的一层从稍小放大到位，旧的一层稍放大并淡出；
         // 返回时两者各自倒放 —— 深了一层还是退回一层，看动作就知道
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        boolean animate = MotionPolicy.decorative(requireContext());
         if (shown != null) {
-            shown.setExitTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
-            shown.setReenterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
+            shown.setExitTransition(animate ? new MaterialSharedAxis(MaterialSharedAxis.Z, true) : null);
+            shown.setReenterTransition(animate ? new MaterialSharedAxis(MaterialSharedAxis.Z, false) : null);
         }
-        fragment.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
-        fragment.setReturnTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
+        if (animate) {
+            fragment.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
+            fragment.setReturnTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
+        }
         getChildFragmentManager().beginTransaction()
                 .setReorderingAllowed(true)
                 .replace(R.id.settings_detail, fragment)

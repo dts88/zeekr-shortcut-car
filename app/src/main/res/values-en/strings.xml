@@ -355,4 +355,21 @@
     <string name="set_rail_side_title">Button side</string>
     <string name="opt_rail_right">Right</string>
     <string name="opt_rail_left">Left</string>
+
+    <!-- Interface section · first-launch side question · record unavailable · status bar -->
+    <string name="set_section_interface">Interface</string>
+    <string name="set_reduce_motion_title">Less motion while recording</string>
+    <string name="set_reduce_motion_summary">While recording, screens switch without transitions; the record button and clip ring still move. The encoder is using the GPU</string>
+    <string name="dlg_rail_side_title">Which side is the steering wheel on?</string>
+    <string name="dlg_rail_side_lhd">Left (left-hand drive) · buttons on the left</string>
+    <string name="dlg_rail_side_rhd">Right (right-hand drive) · buttons on the right</string>
+    <string name="msg_rail_side_hint">Buttons go on the side nearest the driver. Change it any time in Settings → Interface</string>
+    <string name="record_unavailable">Insert a USB drive to record</string>
+    <string name="record_unavailable_detail">No USB drive</string>
+    <string name="status_fps">≤%1$s fps</string>
+    <string name="status_bitrate_low">Low bitrate</string>
+    <string name="status_bitrate_medium">Medium bitrate</string>
+    <string name="status_bitrate_high">High bitrate</string>
+    <string name="status_storage_free">USB %1$s free</string>
+    <string name="status_storage_none">No USB drive</string>
 </resources>

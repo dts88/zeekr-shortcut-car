@@ -21,6 +21,8 @@ public class AppConfig {
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
+    private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
+    private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
@@ -1020,6 +1022,24 @@ public class AppConfig {
 
     public void setActionRailSide(String side) {
         writeEnum(SettingsRegistry.ACTION_RAIL_SIDE, side);
+    }
+
+    /** 「方向盘在哪边」问过没有。和语言一样单独记：老用户升级上来也问这一次。 */
+    public boolean isRailSideChosen() {
+        return prefs.getBoolean(KEY_RAIL_SIDE_CHOSEN, false);
+    }
+
+    public void setRailSideChosen() {
+        prefs.edit().putBoolean(KEY_RAIL_SIDE_CHOSEN, true).apply();
+    }
+
+    /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */
+    public boolean isReduceMotionWhileRecording() {
+        return prefs.getBoolean(KEY_REDUCE_MOTION_RECORDING, true);
+    }
+
+    public void setReduceMotionWhileRecording(boolean on) {
+        prefs.edit().putBoolean(KEY_REDUCE_MOTION_RECORDING, on).apply();
     }
 
     /**

@@ -24,28 +24,33 @@ import java.util.Locale;
  * <p>红色的面积大，标的就成了「这个按钮」；红色只留在点和环上，标的才是
  * 「正在录」这件事。按钮本身的分量靠尺寸（它比旁边的方块大一档）撑着。</p>
  *
- * <h3>三个状态，一个动作讲清楚</h3>
+ * <h3>四个状态，一个动作讲清楚</h3>
  *
  * <ul>
  *   <li><b>待机</b>：红色圆点，环只剩轨道，「开始录制」。</li>
+ *   <li><b>不可用</b>：灰色圆点 —— 没插 U 盘，按下去也不会录。和拒录用的是同一个判断
+ *       （{@code StorageHelper.isRecordingStorageAvailable}），按钮不会说一套、做一套。</li>
  *   <li><b>准备中</b>：点已经收成方块、一明一暗地呼吸，环在转 —— 录制器还没起来。</li>
- *   <li><b>录制中</b>：方块，环按本段已录的比例走，走满一圈换下一段。</li>
+ *   <li><b>录制中</b>：方块，环按本段已录的比例走，走满一圈换下一段；
+ *       换段的那一下，点淡一下再回来。</li>
  * </ul>
  *
  * <h3>动效只用属性动画</h3>
  *
  * <p>圆 ⇄ 方是同一个 {@link GradientDrawable} 的圆角半径和视图缩放一起插值 ——
  * 缩放不触发重新布局，圆角半径只重画这一块。底色切换是颜色插值。都是平台自带的
- * {@link ValueAnimator}，跟随系统的「动画时长缩放」设置，关了动画就直接跳到终态。</p>
+ * {@link ValueAnimator}，跟随系统的「动画时长缩放」设置，关了动画就直接跳到终态。
+ * 这些都是状态本身，不算装饰，录制时也照常动（见 {@link MotionPolicy}）。</p>
  *
  * <p>自定义车型那几份布局里录制键还是一个普通按钮（没有点和环），这时退化成只改颜色。</p>
  */
 public final class RecordButtonUi {
 
-    public enum State { IDLE, PREPARING, RECORDING }
+    public enum State { IDLE, UNAVAILABLE, PREPARING, RECORDING }
 
     private static final long MORPH_MS = 220;
     private static final long PULSE_MS = 600;
+    private static final long FLASH_MS = 300;
 
     private final View root;
     private final Context context;
@@ -65,6 +70,7 @@ public final class RecordButtonUi {
     private ValueAnimator morphAnimator;
     private ValueAnimator pulseAnimator;
     private ValueAnimator backgroundAnimator;
+    private ValueAnimator flashAnimator;
 
     public RecordButtonUi(View root) {
         this.root = root;
@@ -124,15 +130,37 @@ public final class RecordButtonUi {
         }
     }
 
+    /** 换段的一瞬：点淡下去再回来，环从零开始。 */
+    public void flashSegment() {
+        if (state != State.RECORDING || dot == null) {
+            return;
+        }
+        if (ring != null && !ring.isIndeterminate()) {
+            ring.setProgressCompat(0, false);
+        }
+        if (flashAnimator != null) {
+            flashAnimator.cancel();
+        }
+        flashAnimator = ValueAnimator.ofFloat(1f, 0.45f, 1f);
+        flashAnimator.setDuration(FLASH_MS);
+        flashAnimator.addUpdateListener(a -> dot.setAlpha((float) a.getAnimatedValue()));
+        flashAnimator.start();
+    }
+
     // ------------------------------------------------------------------ 状态
 
     private void render(State next, boolean animate) {
         state = next;
-        root.setContentDescription(context.getString(
-                next == State.IDLE ? R.string.record_start : R.string.record_stop));
+        int description = next == State.IDLE ? R.string.record_start
+                : next == State.UNAVAILABLE ? R.string.record_unavailable
+                : R.string.record_stop;
+        root.setContentDescription(context.getString(description));
         if (card == null) {
             renderPlainButton(next);
             return;
+        }
+        if (dotShape != null) {
+            dotShape.setColor(color(next == State.UNAVAILABLE ? R.color.text_tertiary : R.color.recording));
         }
         switch (next) {
             case PREPARING:
@@ -141,9 +169,7 @@ public final class RecordButtonUi {
                 startPulse();
                 backgroundTo(R.color.recording_quiet, animate);
                 setTitle(R.string.record_preparing);
-                if (detail != null) {
-                    detail.setText("");
-                }
+                setDetail("");
                 break;
             case RECORDING:
                 stopPulse();
@@ -154,10 +180,18 @@ public final class RecordButtonUi {
                 morphTo(1f, animate);
                 backgroundTo(R.color.recording_quiet, animate);
                 setTitle(R.string.record_stop);
-                if (detail != null) {
-                    detail.setText(context.getString(R.string.record_segment_detail,
-                            mmss(0), segmentMinutes));
+                setDetail(context.getString(R.string.record_segment_detail, mmss(0), segmentMinutes));
+                break;
+            case UNAVAILABLE:
+                stopPulse();
+                setIndeterminate(false);
+                if (ring != null) {
+                    ring.setProgressCompat(0, animate);
                 }
+                morphTo(0f, animate);
+                backgroundTo(R.color.sunken, animate);
+                setTitle(R.string.record_unavailable);
+                setDetail(context.getString(R.string.record_unavailable_detail));
                 break;
             case IDLE:
             default:
@@ -182,20 +216,34 @@ public final class RecordButtonUi {
         if (!(root instanceof TextView)) {
             return;
         }
-        int res = next == State.IDLE ? R.color.recording
-                : next == State.PREPARING ? R.color.text_tertiary : R.color.energy;
+        int res;
+        switch (next) {
+            case IDLE:
+                res = R.color.recording;
+                break;
+            case RECORDING:
+                res = R.color.energy;
+                break;
+            default:
+                res = R.color.text_tertiary;
+                break;
+        }
         ((TextView) root).setTextColor(color(res));
     }
 
     private void showIdleDetail() {
-        if (detail != null) {
-            detail.setText(context.getString(R.string.record_idle_detail, segmentMinutes));
-        }
+        setDetail(context.getString(R.string.record_idle_detail, segmentMinutes));
     }
 
     private void setTitle(int res) {
         if (title != null) {
             title.setText(res);
+        }
+    }
+
+    private void setDetail(CharSequence text) {
+        if (detail != null) {
+            detail.setText(text);
         }
     }
 

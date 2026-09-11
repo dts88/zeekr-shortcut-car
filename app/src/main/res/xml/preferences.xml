@@ -206,6 +206,23 @@
             android:summary="@string/set_reset_floating_summary" />
     </PreferenceScreen>
 
+    <!-- ==================== 界面 ==================== -->
+    <PreferenceScreen
+        android:key="screen_interface"
+        android:title="@string/set_section_interface">
+
+        <ListPreference
+            android:key="pref_rail_side"
+            android:title="@string/set_rail_side_title"
+            android:summary="%s" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_reduce_motion"
+            android:title="@string/set_reduce_motion_title"
+            android:summary="@string/set_reduce_motion_summary" />
+
+    </PreferenceScreen>
+
     <!-- ==================== 系统 ==================== -->
     <PreferenceScreen
         android:key="screen_system"
@@ -235,11 +252,6 @@
         <ListPreference
             android:key="pref_language"
             android:title="@string/set_language_title"
-            android:summary="%s" />
-
-        <ListPreference
-            android:key="pref_rail_side"
-            android:title="@string/set_rail_side_title"
             android:summary="%s" />
 
         <SwitchPreferenceCompat
