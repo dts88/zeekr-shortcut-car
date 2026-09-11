@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ic_advanced：高级（两根调节滑杆）。统一图标集。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M4,7.5h9 M17,7.5h3 M15,5.5v4 M4,16.5h3 M11,16.5h9 M9,14.5v4"
+        android:strokeWidth="1.7"
+        android:strokeColor="@color/text_primary"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

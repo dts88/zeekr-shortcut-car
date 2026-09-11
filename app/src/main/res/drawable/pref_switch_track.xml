@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 车机系统式开关的轨道：圆角矩形而不是胶囊，颜色随开关状态变（color/pref_switch_track） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="9dp" />
+    <size
+        android:width="56dp"
+        android:height="30dp" />
+    <solid android:color="@color/pref_switch_track" />
+</shape>

@@ -110,7 +110,17 @@ public class SettingsShellFragment extends Fragment {
                 .setReorderingAllowed(true)
                 .replace(R.id.settings_detail, next)
                 .commit();
+        // 左栏跟着把选中块挪过去（第一次进来时它还没建好，建的时候会来问 currentSection）
+        Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+        if (headers instanceof SettingsHeadersFragment) {
+            ((SettingsHeadersFragment) headers).markSelected(screenKey);
+        }
         openDetail();
+    }
+
+    /** 右栏正在显示的分区。左栏建列表时用它决定哪一项是选中的。 */
+    String currentSection() {
+        return currentSection;
     }
 
     /**

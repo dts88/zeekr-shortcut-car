@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 不可点的行（说明、拖动条）：同一块卡片，没有涟漪 —— 按下去不该有反应的地方就不给反应 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="@dimen/corner_radius" />
+    <solid android:color="@color/sunken" />
+</shape>

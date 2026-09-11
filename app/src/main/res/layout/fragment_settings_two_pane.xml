@@ -20,7 +20,7 @@
         android:id="@+id/settings_headers"
         android:layout_width="@dimen/list_width"
         android:layout_height="match_parent"
-        android:background="@color/menu_background" />
+        android:background="@color/page_background" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/settings_detail"

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 左栏的一项：选中是一块中性灰（不用橙色 —— 橙色留给开关和「正在发生」的东西） -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/nav_ripple_color">
+    <item android:id="@android:id/mask">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/corner_radius" />
+            <solid android:color="@color/white" />
+        </shape>
+    </item>
+    <item>
+        <selector>
+            <item android:state_activated="true">
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/corner_radius" />
+                    <solid android:color="@color/sunken" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/corner_radius" />
+                    <solid android:color="@android:color/transparent" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>

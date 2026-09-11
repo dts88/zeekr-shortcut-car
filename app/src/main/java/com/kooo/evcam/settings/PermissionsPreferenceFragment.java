@@ -46,6 +46,7 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(context);
         setPreferenceScreen(screen);
         build(screen, context);
+        PreferenceRows.apply(screen);
     }
 
     @Override

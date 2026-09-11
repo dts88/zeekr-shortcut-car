@@ -107,6 +107,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindAdvanced();
         bindDeveloper();
         bindAbout();
+
+        // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
+        PreferenceRows.apply(getPreferenceScreen());
+    }
+
+    @Override
+    public void onViewCreated(@androidx.annotation.NonNull android.view.View view,
+                              @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        PreferenceRows.styleList(this, 28, 16);
     }
 
     @Override

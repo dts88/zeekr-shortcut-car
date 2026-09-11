@@ -1,12 +1,16 @@
 package com.kooo.evcam.settings;
 
+import android.content.Context;
 import android.os.Bundle;
+import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceScreen;
+import androidx.preference.PreferenceViewHolder;
 
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
@@ -15,9 +19,13 @@ import com.kooo.evcam.update.UpdateFlow;
 /**
  * 左栏：设置的分区列表。
  *
- * <p>直接加载完整的 {@code preferences.xml}，然后<b>把每个分区里的内容全部移除</b>，
- * 只留分区自己作为一行。这样分区名和顺序仍然只在那个 XML 里声明一次 ——
+ * <p>先整份载入 {@code preferences.xml}，读出顶层每一项的 key 和名字，再换成左栏自己的行
+ * （{@link HeaderRow}）。这样分区名和顺序仍然只在那个 XML 里声明一次 ——
  * 另写一份导航列表的话，加了新分区却忘了同步，左栏就会少一项。</p>
+ *
+ * <p>换成自己的行，是为了两件默认的行做不到的事：每一项一个图标，
+ * 以及<b>当前在哪个分区</b>看得出来（选中那一项垫一块灰）。
+ * 以前点完左栏，左栏本身没有任何变化，只能靠右栏的内容去猜。</p>
  *
  * <p>开发者选项没解锁时整块拿掉，和右栏的判断保持一致。</p>
  */
@@ -25,10 +33,21 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
 
     /** 上一次建这份列表时，开发者选项是不是解锁着的。 */
     private boolean builtUnlocked;
+    /** 右栏正在显示的分区。 */
+    private String selectedKey;
 
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
+        if (getParentFragment() instanceof SettingsShellFragment) {
+            selectedKey = ((SettingsShellFragment) getParentFragment()).currentSection();
+        }
         build();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        PreferenceRows.styleList(this, 0, 12);
     }
 
     /**
@@ -45,64 +64,136 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         }
     }
 
-    private void build() {
-        builtUnlocked = DeveloperMode.isUnlocked();
-        setPreferencesFromResource(R.xml.preferences, null);
-        PreferenceScreen root = getPreferenceScreen();
-
-        for (int i = root.getPreferenceCount() - 1; i >= 0; i--) {
-            Preference child = root.getPreference(i);
-            if (!(child instanceof PreferenceGroup)) {
-                // 「返回录制界面」这类不属于任何分区的条目，留在最上面
-                continue;
-            }
-            PreferenceGroup group = (PreferenceGroup) child;
-            if ("screen_developer".equals(group.getKey()) && !builtUnlocked) {
-                root.removePreference(group);
-                continue;
-            }
-            // 只留标题这一行，内容交给右栏
-            group.removeAll();
-            group.setSummary(null);
+    /** 右栏换了分区：左栏跟着把选中块挪过去。 */
+    void markSelected(String key) {
+        selectedKey = key;
+        PreferenceScreen screen = getPreferenceScreen();
+        if (screen == null) {
+            return;
         }
-
-        wireClicks(root);
+        for (int i = 0; i < screen.getPreferenceCount(); i++) {
+            Preference preference = screen.getPreference(i);
+            if (preference instanceof HeaderRow) {
+                ((HeaderRow) preference).setSelectedRow(key != null && key.equals(preference.getKey()));
+            }
+        }
     }
 
-    private void wireClicks(PreferenceScreen root) {
-        Preference back = findPreference("pref_back_to_recording");
-        if (back != null) {
-            back.setOnPreferenceClickListener(preference -> {
-                if (getActivity() instanceof MainActivity) {
-                    ((MainActivity) getActivity()).goToRecordingInterface();
-                }
-                return true;
-            });
-        }
+    private void build() {
+        builtUnlocked = DeveloperMode.isUnlocked();
+        Context context = requireContext();
 
-        // 顶层的动作条目：它不属于任何分区，右栏按 key 取子树时取不到它，
-        // 只能在这一栏接线
-        Preference update = findPreference("pref_check_update");
-        if (update != null) {
-            update.setOnPreferenceClickListener(preference -> {
-                UpdateFlow.start(getActivity());
-                return true;
-            });
-        }
+        // 分区的名字和顺序只从这里来
+        setPreferencesFromResource(R.xml.preferences, null);
+        PreferenceScreen source = getPreferenceScreen();
 
-        for (int i = 0; i < root.getPreferenceCount(); i++) {
-            Preference child = root.getPreference(i);
-            if (!(child instanceof PreferenceGroup) || child.getKey() == null) {
+        PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(context);
+        int order = 0;
+        for (int i = 0; i < source.getPreferenceCount(); i++) {
+            Preference child = source.getPreference(i);
+            String key = child.getKey();
+            if (key == null) {
                 continue;
             }
-            final String key = child.getKey();
-            final int order = i;
-            child.setOnPreferenceClickListener(preference -> {
-                if (getParentFragment() instanceof SettingsShellFragment) {
-                    ((SettingsShellFragment) getParentFragment()).showSection(key, order);
+            boolean section = child instanceof PreferenceGroup;
+            if (section && "screen_developer".equals(key) && !builtUnlocked) {
+                continue;
+            }
+            HeaderRow row = new HeaderRow(context, section, order++);
+            row.setKey(key);
+            row.setTitle(child.getTitle());
+            row.setPersistent(false);
+            row.setIconSpaceReserved(true);
+            int icon = iconFor(key);
+            if (icon != 0) {
+                row.setIcon(icon);
+            }
+            row.setSelectedRow(key.equals(selectedKey));
+            screen.addPreference(row);
+        }
+        setPreferenceScreen(screen);
+        wireClicks(screen);
+    }
+
+    private void wireClicks(PreferenceScreen screen) {
+        for (int i = 0; i < screen.getPreferenceCount(); i++) {
+            Preference preference = screen.getPreference(i);
+            if (!(preference instanceof HeaderRow)) {
+                continue;
+            }
+            HeaderRow row = (HeaderRow) preference;
+            final String key = row.getKey();
+            row.setOnPreferenceClickListener(p -> {
+                if ("pref_back_to_recording".equals(key)) {
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).goToRecordingInterface();
+                    }
+                } else if ("pref_check_update".equals(key)) {
+                    // 顶层的动作条目：它不属于任何分区，右栏按 key 取子树时取不到它
+                    UpdateFlow.start(getActivity());
+                } else if (row.section && getParentFragment() instanceof SettingsShellFragment) {
+                    ((SettingsShellFragment) getParentFragment()).showSection(key, row.order);
                 }
                 return true;
             });
+        }
+    }
+
+    private static int iconFor(String key) {
+        switch (key) {
+            case "pref_back_to_recording":
+                return R.drawable.ic_back;
+            case "screen_recording":
+                return R.drawable.ic_video;
+            case "screen_storage":
+                return R.drawable.ic_storage;
+            case "screen_rearview":
+                return R.drawable.ic_rearview;
+            case "screen_floating":
+                return R.drawable.ic_floating;
+            case "screen_interface":
+                return R.drawable.ic_interface;
+            case "screen_system":
+                return R.drawable.ic_settings;
+            case "screen_advanced":
+                return R.drawable.ic_advanced;
+            case "screen_developer":
+                return R.drawable.ic_developer;
+            case "pref_check_update":
+                return R.drawable.ic_update;
+            case "screen_about":
+                return R.drawable.ic_info;
+            default:
+                return 0;
+        }
+    }
+
+    /** 左栏的一行：记得自己是不是分区、排第几、现在是不是选中的那一项。 */
+    static final class HeaderRow extends Preference {
+
+        final boolean section;
+        final int order;
+        private boolean selected;
+
+        HeaderRow(Context context, boolean section, int order) {
+            super(context);
+            this.section = section;
+            this.order = order;
+            setLayoutResource(R.layout.pref_header_row);
+        }
+
+        void setSelectedRow(boolean value) {
+            if (value != selected) {
+                selected = value;
+                notifyChanged();
+            }
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull PreferenceViewHolder holder) {
+            super.onBindViewHolder(holder);
+            // 激活态会传给所有子控件：底色、图标、字一起变
+            holder.itemView.setActivated(selected);
         }
     }
 }

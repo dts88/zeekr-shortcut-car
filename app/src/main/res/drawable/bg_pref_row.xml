@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置行：每一行是一块独立的灰底卡片（车机系统设置的做法），按下有涟漪 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/nav_ripple_color">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/corner_radius" />
+            <solid android:color="@color/sunken" />
+        </shape>
+    </item>
+</ripple>

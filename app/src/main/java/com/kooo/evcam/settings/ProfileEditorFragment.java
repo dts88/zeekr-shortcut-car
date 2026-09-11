@@ -80,9 +80,22 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
         render();
     }
 
+    @Override
+    public void onViewCreated(@androidx.annotation.NonNull android.view.View view,
+                              @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        PreferenceRows.styleList(this, 28, 16);
+    }
+
     // ------------------------------------------------------------------ 界面
 
     private void render() {
+        renderRows();
+        // 刚加进来的行还没交给列表（同步是下一帧），这时套样式正好
+        PreferenceRows.apply(getPreferenceScreen());
+    }
+
+    private void renderRows() {
         PreferenceScreen screen = getPreferenceScreen();
         if (screen == null || getContext() == null) {
             return;

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 开关滑块：白色圆角方块，四周留 4dp 让它落在轨道里面 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:bottom="4dp"
+        android:left="4dp"
+        android:right="4dp"
+        android:top="4dp">
+        <shape android:shape="rectangle">
+            <size
+                android:width="22dp"
+                android:height="22dp" />
+            <corners android:radius="6dp" />
+            <solid android:color="@color/on_energy" />
+        </shape>
+    </item>
+</layer-list>

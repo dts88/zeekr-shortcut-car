@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行：有一个当前值（下拉选择、文字输入）。
+
+  值放在行尾、名字放在行首，中间空出来 —— 车机系统设置里「Activation duration   Always on ›」
+  就是这个排法：一眼扫下来左边是问题、右边是答案。值用的是 summary 这个 id，
+  所以 ListPreference 的「%s」、代码里 setSummary 的值都照常落在这里。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingStart="20dp"
+    android:paddingEnd="14dp">
+
+    <TextView
+        android:id="@android:id/title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp"
+        android:textColor="@color/pref_title"
+        android:textSize="17sp" />
+
+    <TextView
+        android:id="@android:id/summary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxWidth="360dp"
+        android:maxLines="2"
+        android:textColor="@color/pref_summary"
+        android:textSize="15sp" />
+
+    <LinearLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical" />
+
+    <ImageView
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="@color/text_tertiary" />
+</LinearLayout>

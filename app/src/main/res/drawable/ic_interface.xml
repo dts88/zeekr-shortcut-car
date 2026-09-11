@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ic_interface：界面（分区的版面）。统一图标集。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M6,4.5h12a1.5,1.5 0,0 1,1.5,1.5v12a1.5,1.5 0,0 1,-1.5,1.5h-12a1.5,1.5 0,0 1,-1.5,-1.5v-12a1.5,1.5 0,0 1,1.5,-1.5z M4.5,9.5h15 M10,9.5v10"
+        android:strokeWidth="1.7"
+        android:strokeColor="@color/text_primary"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
