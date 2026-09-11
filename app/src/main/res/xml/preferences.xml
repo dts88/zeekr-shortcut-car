@@ -237,6 +237,11 @@
             android:title="@string/set_language_title"
             android:summary="%s" />
 
+        <ListPreference
+            android:key="pref_rail_side"
+            android:title="@string/set_rail_side_title"
+            android:summary="%s" />
+
         <SwitchPreferenceCompat
             android:key="pref_prevent_sleep"
             android:title="@string/set_prevent_sleep_title"

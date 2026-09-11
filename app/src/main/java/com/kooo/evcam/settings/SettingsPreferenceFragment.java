@@ -675,6 +675,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindSystem() {
         bindLanguage();
 
+        // 回到主界面时生效（MainActivity.showRecordingInterface 会按它重新摆一次）
+        bindEnum("pref_rail_side", SettingsRegistry.ACTION_RAIL_SIDE,
+                appConfig.getActionRailSide(), value -> appConfig.setActionRailSide(value));
+
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));
         bindSwitch("pref_auto_record", appConfig.isAutoStartRecording(),

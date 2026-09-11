@@ -1,32 +1,46 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!--
+      只有这一份主题，日间夜间共用：颜色全部引用 @color/ 下的语义色，
+      由 values / values-night 两份 colors.xml 各自给值，主题跟随系统昼夜。
+
+      以前夜间是整份重写的主题，加一个属性要记得两边都加 —— 忘了就是
+      「设置界面直接崩」或「对话框按钮看不见」。现在没有第二份可以忘。
+
+      取值对齐极氪车机系统（Zeekr OS 2.1）：中性暖灰、平铺无阴影、橙色强调。
+    -->
     <style name="Base.Theme.Cam" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- PreferenceFragmentCompat 必须能拿到 preferenceTheme，
              否则构造时直接抛「Must specify preferenceTheme in theme」 -->
         <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
         <!--
           设置界面里的对话框（车牌号输入框、各种下拉框）是 androidx 自己弹的，
-          没法像代码里那样逐个传 R.style.AlertDialogTheme。不指定的话，深色底
-          配上默认的浅色文字，「确定 / 取消」两个按钮就是看不见的 ——
-          表现出来就是「这个输入框没有确认键」。三处都要写：AppCompat 读第一个，
-          框架读第二个，Material 组件读第三个。
+          没法像代码里那样逐个传 R.style.AlertDialogTheme。三处都要写：
+          AppCompat 读第一个，框架读第二个，Material 组件读第三个。
         -->
         <item name="alertDialogTheme">@style/AlertDialogTheme</item>
         <item name="android:alertDialogTheme">@style/AlertDialogTheme</item>
         <item name="materialAlertDialogTheme">@style/Theme.Cam.MaterialAlertDialog</item>
-        <!-- 深灰色配色方案 -->
-        <item name="colorPrimary">#424242</item>
-        <item name="colorPrimaryVariant">#2A2A2A</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">#616161</item>
-        <item name="colorSecondaryVariant">#424242</item>
-        <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="android:colorBackground">#1A1A1A</item>
-        <item name="colorSurface">#2A2A2A</item>
-        <item name="colorOnSurface">#FFFFFF</item>
-        <item name="android:statusBarColor">#2A2A2A</item>
-        <item name="android:navigationBarColor">#000000</item>
-        <!-- 启动画面背景颜色（偏蓝色） -->
+
+        <!-- 能量色 = 极氪橙：开关、选中、主色按钮 -->
+        <item name="colorPrimary">@color/energy</item>
+        <item name="colorOnPrimary">@color/on_energy</item>
+        <item name="colorPrimaryContainer">@color/energy_quiet</item>
+        <item name="colorOnPrimaryContainer">@color/energy_text</item>
+        <!-- 次级按钮是中性灰块，和车机系统的选中项一样 -->
+        <item name="colorSecondary">@color/text_secondary</item>
+        <item name="colorOnSecondary">@color/surface</item>
+        <item name="colorSecondaryContainer">@color/sunken</item>
+        <item name="colorOnSecondaryContainer">@color/text_primary</item>
+        <item name="colorError">@color/recording</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/sunken</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/line</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
         <item name="android:windowBackground">@color/page_background</item>
         <!-- Android 12+ 启动画面背景 -->
         <item name="android:windowSplashScreenBackground">@color/page_background</item>
@@ -45,6 +59,45 @@
         <item name="android:backgroundDimEnabled">false</item>
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowDisablePreview">true</item>
+    </style>
+
+    <!-- ================= 动作栏控件（原生 MaterialButton，只定样式） ================= -->
+
+    <!-- 次级方块：图标在上、字在下，中性灰底，无阴影 -->
+    <style name="Widget.Cam.RailTile" parent="Widget.Material3.Button.TonalButton">
+        <item name="backgroundTint">@color/sunken</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="iconTint">@color/text_primary</item>
+        <!-- textTop：图标和字作为一组在方块里上下居中（top 会把图标贴在顶边） -->
+        <item name="iconGravity">textTop</item>
+        <item name="iconSize">26dp</item>
+        <item name="iconPadding">8dp</item>
+        <item name="cornerRadius">@dimen/corner_radius</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingLeft">8dp</item>
+        <item name="android:paddingRight">8dp</item>
+        <item name="rippleColor">@color/nav_ripple_color</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <!-- 横条：图标在字左边 -->
+    <style name="Widget.Cam.RailSmall" parent="Widget.Cam.RailTile">
+        <item name="iconGravity">textStart</item>
+        <item name="iconSize">22dp</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <!-- 只有图标：菜单、退出 -->
+    <style name="Widget.Cam.IconButton" parent="Widget.Cam.RailTile">
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconSize">22dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:paddingLeft">0dp</item>
+        <item name="android:paddingRight">0dp</item>
     </style>
 
     <!-- 导航菜单项文字样式 -->
@@ -75,33 +128,37 @@
         <item name="android:letterSpacing">0.03</item>
     </style>
 
-    <!-- 日间模式对话框主题 -->
+    <!--
+      对话框：每一个颜色都显式给到语义色，日夜各自解析。
+      按钮不可见那个老问题，根子就是「靠主题属性推出按钮颜色」—— 这里不给它推的机会。
+    -->
     <style name="Theme.Cam.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
-        <!-- 对话框背景 -->
-        <item name="colorSurface">#FFFFFF</item>
-        <!-- 标题和内容文字颜色 -->
-        <item name="colorOnSurface">#1A1A1A</item>
-        <!-- 按钮颜色 -->
-        <item name="colorPrimary">#1976D2</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorPrimary">@color/energy_text</item>
         <!-- 增大字号适配车机屏幕 -->
         <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.Cam.Title</item>
         <item name="materialAlertDialogBodyTextStyle">@style/MaterialAlertDialog.Cam.Body</item>
     </style>
 
-    <!-- 原生 AlertDialog 样式（确保文字可见） -->
-    <style name="AlertDialogTheme" parent="Theme.Material3.Light.Dialog.Alert">
-        <item name="android:windowBackground">#FFFFFF</item>
-        <item name="android:textColorPrimary">#1A1A1A</item>
-        <item name="android:textColorSecondary">#666666</item>
-        <item name="colorPrimary">#1976D2</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
+    <!-- 原生 AlertDialog：DayNight 父主题 + 全部颜色显式给定 -->
+    <style name="AlertDialogTheme" parent="Theme.Material3.DayNight.Dialog.Alert">
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorAlertDialogListItem">@color/text_primary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorPrimary">@color/energy_text</item>
+        <item name="colorOnPrimary">@color/on_energy</item>
         <item name="buttonBarPositiveButtonStyle">@style/AlertDialogButton</item>
         <item name="buttonBarNegativeButtonStyle">@style/AlertDialogButton</item>
         <item name="buttonBarNeutralButtonStyle">@style/AlertDialogButton</item>
     </style>
 
     <style name="AlertDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
-        <item name="android:textColor">#1976D2</item>
+        <item name="android:textColor">@color/energy_text</item>
         <item name="android:textSize">16sp</item>
     </style>
 

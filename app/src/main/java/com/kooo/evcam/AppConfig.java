@@ -1013,6 +1013,15 @@ public class AppConfig {
         writeEnum(SettingsRegistry.LANGUAGE, mode);
     }
 
+    /** 动作栏在屏幕哪一侧：right / left。 */
+    public String getActionRailSide() {
+        return readEnum(SettingsRegistry.ACTION_RAIL_SIDE);
+    }
+
+    public void setActionRailSide(String side) {
+        writeEnum(SettingsRegistry.ACTION_RAIL_SIDE, side);
+    }
+
     /**
      * 首次启动时的语言选择做过没有。
      *

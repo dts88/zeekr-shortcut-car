@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ic_settings：统一图标集的一员（24dp 网格、线宽 1.7、圆头）。着色由使用方的 iconTint 决定。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M15.2,12a3.2,3.2 0 1,1 -6.4,0a3.2,3.2 0 1,1 6.4,0z M12,3.5v2.2M12,18.3v2.2M20.5,12h-2.2M5.7,12H3.5M18,6l-1.6,1.6M7.6,16.4L6,18M18,18l-1.6,-1.6M7.6,7.6L6,6" />
+</vector>

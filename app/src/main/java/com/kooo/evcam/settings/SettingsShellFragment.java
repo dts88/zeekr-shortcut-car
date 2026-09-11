@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.slidingpanelayout.widget.SlidingPaneLayout;
 
+import com.google.android.material.transition.MaterialSharedAxis;
 import com.kooo.evcam.R;
 
 /**
@@ -40,6 +41,8 @@ public class SettingsShellFragment extends Fragment {
 
     private SlidingPaneLayout slidingPane;
     private String currentSection = DEFAULT_SECTION;
+    /** 当前分区在左栏的行号，决定下一次切换往上还是往下走。 */
+    private int currentOrder = -1;
 
     @Nullable
     @Override
@@ -81,12 +84,30 @@ public class SettingsShellFragment extends Fragment {
      * 不该让返回键一段一段倒回去。分区里再往下的子界面才进返回栈。</p>
      */
     void showSection(String screenKey) {
+        showSection(screenKey, -1);
+    }
+
+    /**
+     * @param order 这个分区在左栏里是第几行；不知道就传 -1（按「往下」处理）
+     */
+    void showSection(String screenKey, int order) {
+        boolean down = order < 0 || order >= currentOrder;
         currentSection = screenKey;
+        if (order >= 0) {
+            currentOrder = order;
+        }
+        Fragment next = SettingsPreferenceFragment.forSection(screenKey);
+        Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        if (shown != null) {
+            // 换分区沿纵轴走：左栏是竖着排的，点下面一行内容就从下面上来，
+            // 点上面一行就从上面下来 —— 动作的方向和手指在列表里移动的方向一致。
+            // 平级切换不用横向（那读起来像「进了下一级」），也不用 Z 轴（那是进二级界面）
+            shown.setExitTransition(new MaterialSharedAxis(MaterialSharedAxis.Y, down));
+            next.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Y, down));
+        }
         getChildFragmentManager().beginTransaction()
-                // 换分区用淡入淡出：横向滑动会读成「进入下一级」，
-                // 而切分区是平级的，动作的方向应当说明层级关系
-                .setTransition(androidx.fragment.app.FragmentTransaction.TRANSIT_FRAGMENT_FADE)
-                .replace(R.id.settings_detail, SettingsPreferenceFragment.forSection(screenKey))
+                .setReorderingAllowed(true)
+                .replace(R.id.settings_detail, next)
                 .commit();
         openDetail();
     }
@@ -98,10 +119,17 @@ public class SettingsShellFragment extends Fragment {
      * 进了二级界面还看得见自己在设置的哪一块。进返回栈，返回键回到分区。</p>
      */
     void openDetail(Fragment fragment) {
+        // 进二级界面沿 Z 轴：新的一层从稍小放大到位，旧的一层稍放大并淡出；
+        // 返回时两者各自倒放 —— 深了一层还是退回一层，看动作就知道
+        Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        if (shown != null) {
+            shown.setExitTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
+            shown.setReenterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
+        }
+        fragment.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
+        fragment.setReturnTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
         getChildFragmentManager().beginTransaction()
-                // 进二级界面用系统的「打开」过渡：这个方向感说明的是深了一层，
-                // 返回时框架会自动播放它的反向动画
-                .setTransition(androidx.fragment.app.FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
+                .setReorderingAllowed(true)
                 .replace(R.id.settings_detail, fragment)
                 .addToBackStack(null)
                 .commit();

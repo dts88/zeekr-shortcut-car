@@ -6,7 +6,8 @@
   的行为，也是 androidx 的 PreferenceHeaderFragmentCompat 内部用的同一个组件。
   车机内置屏 3200px 宽，永远走并排那一支；窄屏的处理是白拿的。
 
-  左栏固定 360dp：分区名都很短，再宽只是浪费；右栏 layout_weight=1 吃掉剩余宽度。
+  左栏固定宽度（list_width，和车机系统设置的左栏同一比例）：分区名都很短，
+  再宽只是浪费；右栏 layout_weight=1 吃掉剩余宽度。
 -->
 <androidx.slidingpanelayout.widget.SlidingPaneLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -17,7 +18,7 @@
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/settings_headers"
-        android:layout_width="360dp"
+        android:layout_width="@dimen/list_width"
         android:layout_height="match_parent"
         android:background="@color/menu_background" />
 

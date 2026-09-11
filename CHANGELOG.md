@@ -7,6 +7,18 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.38.0-alpha] - 2026-09-11
+
+- New look aligned with Zeekr OS: warm greys, Zeekr orange accent, flat cards. Day and night follow the system.
+- Main screen rebuilt on one skeleton: title bar (menu top-left), preview, action rail, status bar.
+- Record button: red only on the dot and the clip ring. The dot morphs circle to square; the ring fills per clip.
+- Status bar shows clip progress; the recording chip shows elapsed time and clip number.
+- Vector icons replace the text glyphs.
+- Settings -> System -> Button side: action rail on the left or right.
+- Transitions: settings sections move along the list, sub-pages and full screens zoom in.
+- Fixed: in the surround + cabin layout, single view hid the cabin labels and lane placement could move them.
+- One theme for day and night (the night copy had drifted); a test keeps the two colour sets in step.
+
 ## [0.37.13-alpha] - 2026-09-05
 
 - Fixed: the four lane labels stayed pinned to the corners of the screen when a lane was

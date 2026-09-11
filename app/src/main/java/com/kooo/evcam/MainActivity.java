@@ -111,7 +111,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int DEBUG_TAP_COUNT = 5;
     private static final long DEBUG_TAP_INTERVAL_MS = 800;  // 连续点击的最大间隔
 
-    private Button btnStartRecord, btnExit, btnTakePhoto;
+    /** 极氪布局里是一张卡片（点 + 环 + 两行字），自定义车型里还是普通按钮 —— 所以只当 View 用。 */
+    private View btnStartRecord;
+    private Button btnExit, btnTakePhoto;
+    /** 录制键的三个状态和本段进度都由它画。 */
+    private com.kooo.evcam.ui.RecordButtonUi recordButtonUi;
     private MultiCameraManager cameraManager;
     /** 上一条已提示过的拒绝理由，用来挡住定时重试造成的重复提示。 */
     private String lastRefusalShown;
@@ -180,11 +184,6 @@ public class MainActivity extends AppCompatActivity {
     private int configuredCameraCount = 4;  // 配置的摄像头数量
     private CustomLayoutManager customLayoutManager;  // 自定义车型布局管理器
 
-    // 录制按钮闪烁动画相关
-    private android.os.Handler blinkHandler;
-    private Runnable blinkRunnable;
-    private boolean isBlinking = false;
-
     // 录制状态显示相关
     private TextView tvRecordingStats;
     private android.os.Handler recordingTimerHandler;
@@ -192,6 +191,8 @@ public class MainActivity extends AppCompatActivity {
     private Runnable recordingTimerRunnable;
     private long recordingStartTime = 0;  // 录制开始时间
     private int currentSegmentCount = 1;  // 当前分段数
+    private long segmentStartTime = 0;  // 本段开始时间（分段进度环用）
+    private long segmentLengthMs = com.kooo.evcam.profile.RecordSpecs.segmentMs(com.kooo.evcam.profile.RecordSpecs.DEFAULT_SEGMENT_MINUTES);
     private boolean isRecordingStatsEnabled = true;  // 录制状态显示开关
     private long lastStatsClickTime = 0;  // 上次点击录制状态显示的时间
     private static final long DOUBLE_CLICK_INTERVAL = 500;  // 双击判定间隔（毫秒）
@@ -525,8 +526,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupStatusBar() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            // 设置状态栏颜色为菜单栏背景色
-            getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.menu_background));
+            // 状态栏和页面底色连成一片
+            getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.bg));
 
             // 根据当前主题模式设置状态栏图标颜色
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -630,6 +631,9 @@ public class MainActivity extends AppCompatActivity {
             btnSettings.setOnClickListener(v -> showSettingsInterface());
         }
         
+        bindRecordButtonUi();
+        applyActionRailSide();
+
         // 录制按钮：点击切换录制状态
         btnStartRecord.setOnClickListener(v -> toggleRecording());
 
@@ -913,6 +917,7 @@ public class MainActivity extends AppCompatActivity {
         btnStartRecord = targetContainer.findViewById(R.id.btn_start_record);
         btnExit = targetContainer.findViewById(R.id.btn_exit);
         btnTakePhoto = targetContainer.findViewById(R.id.btn_take_photo);
+        bindRecordButtonUi();
 
         // 设置按钮点击事件
         if (btnStartRecord != null) {
@@ -1034,6 +1039,12 @@ public class MainActivity extends AppCompatActivity {
             currentSegmentCount = 1;
         }
         
+        segmentLengthMs = com.kooo.evcam.profile.RecordSpecs.segmentMs(
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
+        // 分段按时长切：恢复时第 N 段的起点就是开始时间往后数 N-1 段
+        segmentStartTime = recordingStartTime + (currentSegmentCount - 1) * segmentLengthMs;
+        setSegmentProgressVisible(true);
+
         if (tvRecordingStats != null) {
             // 始终设为 VISIBLE，通过 alpha 控制可见性
             tvRecordingStats.setVisibility(View.VISIBLE);
@@ -1070,12 +1081,15 @@ public class MainActivity extends AppCompatActivity {
         
         recordingStartTime = 0;
         currentSegmentCount = 1;
+        segmentStartTime = 0;
+        setSegmentProgressVisible(false);
     }
     
     /**
      * 更新录制状态显示
      */
     private void updateRecordingStatsDisplay() {
+        updateSegmentProgress();
         if (tvRecordingStats == null) {
             return;
         }
@@ -1086,9 +1100,10 @@ public class MainActivity extends AppCompatActivity {
         long minutes = totalSeconds / 60;
         long seconds = totalSeconds % 60;
         
-        // 格式化时间：MM:SS / 分段数（即使隐藏也更新文本，便于双击显示时立即看到正确时间）
-        String timeStr = String.format(java.util.Locale.getDefault(), "%02d:%02d / %d", minutes, seconds, currentSegmentCount);
-        tvRecordingStats.setText(timeStr);
+        // 即使隐藏也更新文本，便于双击显示时立即看到正确时间
+        String elapsed = String.format(java.util.Locale.US, "%02d:%02d:%02d",
+                minutes / 60, minutes % 60, seconds);
+        tvRecordingStats.setText(getString(R.string.recording_chip, elapsed, currentSegmentCount));
     }
     
     /**
@@ -1096,6 +1111,7 @@ public class MainActivity extends AppCompatActivity {
      */
     public void onSegmentSwitch(int newSegmentIndex) {
         currentSegmentCount = newSegmentIndex + 1;  // 分段索引从0开始，显示从1开始
+        segmentStartTime = System.currentTimeMillis();
         AppLog.d(TAG, "分段切换: 第 " + currentSegmentCount + " 段");
         
         // 立即更新显示
@@ -1111,6 +1127,57 @@ public class MainActivity extends AppCompatActivity {
         // 如果正在录制，根据新设置显示或隐藏（通过 alpha 控制，保持可点击）
         if (isRecording && tvRecordingStats != null) {
             tvRecordingStats.setAlpha(isRecordingStatsEnabled ? 1.0f : 0.0f);
+        }
+    }
+
+    /**
+     * 本段进度：录制键外圈和状态条上那一条是同一个数。
+     *
+     * <p>按时长算，不按文件大小 —— 分段本来就是按时长切的。</p>
+     */
+    private void updateSegmentProgress() {
+        if (!isRecording || segmentStartTime <= 0 || segmentLengthMs <= 0) {
+            return;
+        }
+        long elapsed = System.currentTimeMillis() - segmentStartTime;
+        if (recordButtonUi != null) {
+            recordButtonUi.setSegmentProgress(elapsed, segmentLengthMs);
+        }
+        int percent = (int) Math.max(0, Math.min(100, elapsed * 100 / segmentLengthMs));
+        com.google.android.material.progressindicator.LinearProgressIndicator bar =
+                findViewById(R.id.segment_progress);
+        if (bar != null) {
+            bar.setProgressCompat(percent, true);
+        }
+        TextView label = findViewById(R.id.tv_segment_percent);
+        if (label != null) {
+            label.setText(getString(R.string.segment_percent, percent));
+        }
+    }
+
+    /** 状态条上的本段进度只在录制时出现；不录时留空，不显示一条不动的空轨道。 */
+    private void setSegmentProgressVisible(boolean visible) {
+        int visibility = visible ? View.VISIBLE : View.INVISIBLE;
+        View bar = findViewById(R.id.segment_progress);
+        if (bar != null) {
+            bar.setVisibility(visibility);
+        }
+        View label = findViewById(R.id.tv_segment_percent);
+        if (label != null) {
+            label.setVisibility(visibility);
+        }
+    }
+
+    /** 录制键换了实例（布局重建、自定义车型换按钮布局）就重新接一次。 */
+    private void bindRecordButtonUi() {
+        recordButtonUi = btnStartRecord != null ? new com.kooo.evcam.ui.RecordButtonUi(btnStartRecord) : null;
+        if (recordButtonUi == null) {
+            return;
+        }
+        recordButtonUi.setSegmentMinutes(
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
+        if (isRecording) {
+            recordButtonUi.setState(isPreparingRecording ? com.kooo.evcam.ui.RecordButtonUi.State.PREPARING : com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
         }
     }
 
@@ -1351,6 +1418,8 @@ public class MainActivity extends AppCompatActivity {
         }
         transaction.commit();
 
+        // 可能刚在设置里换了边
+        applyActionRailSide();
         recordingLayout.setVisibility(View.VISIBLE);
         fragmentContainer.setVisibility(View.GONE);
     }
@@ -1369,10 +1438,40 @@ public class MainActivity extends AppCompatActivity {
                 com.kooo.evcam.camera.AppScreenState.OTHER_SCREEN);
         recordingLayout.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
+        // 进一层：沿 Z 轴放大淡入，和设置里进二级界面是同一个动作
+        fragment.setEnterTransition(new com.google.android.material.transition.MaterialSharedAxis(
+                com.google.android.material.transition.MaterialSharedAxis.Z, true));
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .setPrimaryNavigationFragment(fragment)
                 .commit();
+    }
+
+    /**
+     * 动作栏放到设置里选的那一侧（左舵 / 右舵）。
+     *
+     * <p>只挪这一列：从行里摘下来插到另一头，外边距跟着对调。预览画面不动，
+     * 它的 Surface 也就不会被销毁重建。自定义车型的布局没有这一列，直接跳过。</p>
+     */
+    private void applyActionRailSide() {
+        View rail = findViewById(R.id.action_rail);
+        if (rail == null || !(rail.getParent() instanceof android.widget.LinearLayout)
+                || !(rail.getLayoutParams() instanceof android.widget.LinearLayout.LayoutParams)) {
+            return;
+        }
+        android.widget.LinearLayout row = (android.widget.LinearLayout) rail.getParent();
+        boolean left = "left".equals(appConfig.getActionRailSide());
+        int target = left ? 0 : row.getChildCount() - 1;
+        if (row.indexOfChild(rail) != target) {
+            row.removeView(rail);
+            row.addView(rail, left ? 0 : row.getChildCount());
+        }
+        android.widget.LinearLayout.LayoutParams params =
+                (android.widget.LinearLayout.LayoutParams) rail.getLayoutParams();
+        int gutter = getResources().getDimensionPixelSize(R.dimen.gutter);
+        params.setMarginStart(left ? 0 : gutter);
+        params.setMarginEnd(left ? gutter : 0);
+        rail.setLayoutParams(params);
     }
 
     /**
@@ -1738,7 +1837,10 @@ public class MainActivity extends AppCompatActivity {
                     continue;
                 }
                 TextView label = labels[cell.laneIndex];
-                if (label == null || !(label.getLayoutParams()
+                // 多路布局里 label_back / label_left 是座舱那两路的角标，
+                // 不在四宫格上，不能跟着格子挪
+                if (label == null || label.getParent() != compositeContainer.getParent()
+                        || !(label.getLayoutParams()
                         instanceof android.widget.FrameLayout.LayoutParams)) {
                     continue;
                 }
@@ -3155,7 +3257,7 @@ public class MainActivity extends AppCompatActivity {
             lastRefusalShown = null;
             isRecording = false;
             isPreparingRecording = false;
-            stopBlinkAnimation();
+            setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
             Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
         }
@@ -3243,70 +3345,30 @@ public class MainActivity extends AppCompatActivity {
         System.exit(0);
     }
 
-    private void startBlinkAnimation() {
-        if (blinkHandler == null) {
-            blinkHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        }
-
-        isBlinking = true;
-        blinkRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (isBlinking) {
-                    // 切换颜色：绿色和深绿色交替
-                    int currentColor = btnStartRecord.getTextColors().getDefaultColor();
-                    if (currentColor == 0xFF00FF00) {  // 亮绿色
-                        btnStartRecord.setTextColor(0xFF006400);  // 深绿色
-                    } else {
-                        btnStartRecord.setTextColor(0xFF00FF00);  // 亮绿色
-                    }
-                    blinkHandler.postDelayed(this, 1000);  // 每500ms闪烁一次
-                }
+    /** 录制键切到某个状态。回调可能来自相机线程，统一丢回主线程。 */
+    private void setRecordState(com.kooo.evcam.ui.RecordButtonUi.State state) {
+        runOnUiThread(() -> {
+            if (recordButtonUi != null) {
+                recordButtonUi.setState(state);
             }
-        };
-
-        // 初始设置为绿色
-        btnStartRecord.setTextColor(0xFF00FF00);
-        blinkHandler.post(blinkRunnable);
+        });
     }
 
-    private void stopBlinkAnimation() {
-        isBlinking = false;
-        if (blinkHandler != null && blinkRunnable != null) {
-            blinkHandler.removeCallbacks(blinkRunnable);
-        }
-        // 恢复红色（确保在主线程执行，且按钮不为空）
-        if (btnStartRecord != null) {
-            runOnUiThread(() -> {
-                if (btnStartRecord != null) {
-                    btnStartRecord.setTextColor(0xFFFF0000);
-                }
-            });
-        }
-    }
-
-    /**
-     * 显示准备中状态
-     * 按钮变为暗绿色（不闪烁），表示录制正在初始化
-     */
+    /** 准备中：点已收成方块、一明一暗，外圈在转 —— 录制器还没起来。 */
     private void showPreparingIndicator() {
-        if (btnStartRecord != null) {
-            // 设置按钮为暗绿色（不闪烁），表示准备中
-            btnStartRecord.setTextColor(0xFF006400);  // 暗绿色
-            AppLog.d(TAG, "进入准备中状态：暗绿色（不闪烁）");
-        }
+        setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.PREPARING);
+        AppLog.d(TAG, "进入准备中状态");
     }
 
     /**
-     * 结束准备中状态
-     * 录制真正开始后调用，开始绿色闪烁动画
+     * 结束准备中：真的录上了就进录制中，没录上就回待机。
+     *
+     * <p>以前没录上时这里什么都不做，按钮就停在「准备中」的颜色上。</p>
      */
     private void hidePreparingIndicator() {
-        // 开始绿色闪烁动画（如果正在录制）
-        if (isRecording || isRemoteRecording) {
-            startBlinkAnimation();
-            AppLog.d(TAG, "准备完成，开始绿色闪烁");
-        }
+        setRecordState(isRecording || isRemoteRecording
+                ? com.kooo.evcam.ui.RecordButtonUi.State.RECORDING
+                : com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
     }
 
     private void takePicture() {
@@ -3466,7 +3528,7 @@ public class MainActivity extends AppCompatActivity {
                 cameraManager.stopRecording();
                 isRecording = false;
                 // 停止录制相关的 UI 更新（Activity 即将销毁，不显示 Toast）
-                stopBlinkAnimation();
+                setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
                 stopRecordingTimer();
                 // 停止前台服务
                 CameraForegroundService.stop(this);
@@ -4013,7 +4075,9 @@ public class MainActivity extends AppCompatActivity {
         int[] order = compositeContainer.getLaneOrder();
         int focused = compositeContainer.getFocusedLane();
         for (int cell = 0; cell < labels.length; cell++) {
-            if (labels[cell] == null) {
+            // 同上：座舱那两路的角标不归单画面 / 四宫格管
+            if (labels[cell] == null
+                    || labels[cell].getParent() != compositeContainer.getParent()) {
                 continue;
             }
             boolean visible = grid || order[cell] == focused;

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
+
+  按钮 id 一个没改（btn_start_record / btn_take_photo / btn_exit / btn_composite_mode /
+  btn_video_playback / btn_photo_playback / btn_settings），MainActivity 里原有的
+  findViewById 与点击绑定原样生效。
+
+  主操作只有录制一个：它大一档（132dp），状态由左侧的点（圆 ⇄ 方）和外圈分段进度环表示，
+  红色只出现在那一小块上 —— 红标的是「正在录」这件事，不是这个按钮。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/action_rail"
+    android:layout_width="@dimen/rail_width"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/btn_start_record"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/record_button_height"
+        android:clickable="true"
+        android:contentDescription="@string/record_start"
+        android:focusable="true"
+        app:cardBackgroundColor="@color/sunken"
+        app:cardCornerRadius="@dimen/corner_radius"
+        app:cardElevation="0dp"
+        app:rippleColor="@color/nav_ripple_color"
+        app:strokeWidth="0dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="22dp"
+            android:paddingEnd="16dp">
+
+            <FrameLayout
+                android:layout_width="@dimen/record_ring_size"
+                android:layout_height="@dimen/record_ring_size">
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:id="@+id/record_ring"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:max="1000"
+                    android:progress="0"
+                    app:indicatorColor="@color/recording"
+                    app:indicatorSize="@dimen/record_ring_size"
+                    app:trackColor="@color/recording_track"
+                    app:trackCornerRadius="2dp"
+                    app:trackThickness="4dp" />
+
+                <!-- 形状在代码里画：圆角半径和缩放一起动，就是圆 ⇄ 方 -->
+                <View
+                    android:id="@+id/record_dot"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/record_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="@string/record_start"
+                    android:textColor="@color/text_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/record_detail"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFeatureSettings="tnum"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/gutter"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_take_photo"
+            style="@style/Widget.Cam.RailTile"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/rail_tile_height"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="@string/rail_photo"
+            app:icon="@drawable/ic_camera" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_composite_mode"
+            style="@style/Widget.Cam.RailTile"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/rail_tile_height"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:text="@string/zeekr_mode_grid"
+            app:icon="@drawable/ic_grid" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/gutter"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_video_playback"
+            style="@style/Widget.Cam.RailTile"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/rail_tile_height"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:text="@string/nav_video_playback"
+            app:icon="@drawable/ic_video" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_photo_playback"
+            style="@style/Widget.Cam.RailTile"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/rail_tile_height"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:text="@string/nav_photo_playback"
+            app:icon="@drawable/ic_photo" />
+    </LinearLayout>
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_settings"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/rail_small_height"
+            android:layout_marginEnd="@dimen/gutter"
+            android:layout_weight="1"
+            android:text="@string/rail_settings"
+            app:icon="@drawable/ic_settings" />
+
+        <!-- 退出降一级：72dp、次要色 —— 不再和录制平起平坐 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_exit"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/rail_small_height"
+            android:layout_height="@dimen/rail_small_height"
+            android:contentDescription="@string/cd_exit"
+            app:icon="@drawable/ic_exit"
+            app:iconTint="@color/text_secondary" />
+    </LinearLayout>
+</LinearLayout>

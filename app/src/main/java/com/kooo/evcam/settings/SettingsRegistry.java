@@ -22,7 +22,7 @@ import java.util.List;
  * 保持原样即可。硬塞进来只会让这份声明变得难读。</p>
  *
  * <p>相机与视频流的参数（排列、帧率、码率、编码、分段、每一路的尺寸）不在这里 ——
- * 它们按路存在配置里，入口是开发者选项 →「配置编辑」。</p>
+ * 它们按路存在配置里，入口是设置 → 录制 →「配置编辑」。</p>
  */
 public final class SettingsRegistry {
 
@@ -60,9 +60,21 @@ public final class SettingsRegistry {
             entry("zh", "中文", R.string.lang_zh),
             entry("en", "English", R.string.lang_en));
 
+    /**
+     * 动作栏（录制、拍照那一列）放在屏幕哪一侧。
+     *
+     * <p>左舵车和右舵车伸手够屏幕的方向正好相反。只挪这一列，别的区不动 ——
+     * 标题、内容、状态条的位置不因舵位而变，换一台车也不用重新认界面。</p>
+     */
+    public static final SettingSpec ACTION_RAIL_SIDE = SettingSpec.of(
+            "action_rail_side", "操作按钮位置", "right",
+            entry("right", "右侧", R.string.opt_rail_right),
+            entry("left", "左侧", R.string.opt_rail_left));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
             CAR_MODEL,
-            LANGUAGE));
+            LANGUAGE,
+            ACTION_RAIL_SIDE));
 }

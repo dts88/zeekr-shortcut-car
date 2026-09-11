@@ -96,9 +96,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 continue;
             }
             final String key = child.getKey();
+            final int order = i;
             child.setOnPreferenceClickListener(preference -> {
                 if (getParentFragment() instanceof SettingsShellFragment) {
-                    ((SettingsShellFragment) getParentFragment()).showSection(key);
+                    ((SettingsShellFragment) getParentFragment()).showSection(key, order);
                 }
                 return true;
             });

@@ -1,68 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  日间配色。由脚本同时生成日间与夜间两份，名字与数量必须一致
+  （ColorResourceParityTest 钉着）。界面里只该认上面那组语义色；
+  下面的旧名字全部指向语义色，是为了不动几十个布局就把整套换掉。
+-->
 <resources>
+    <!-- 语义色 -->
+    <color name="bg">#FFF2F2F3</color>  <!-- 整屏底色：不带蓝，近白 / 近黑 -->
+    <color name="surface">#FFFAFAFB</color>  <!-- 承载内容的面（夜间是中灰卡片，和系统一致） -->
+    <color name="sunken">#FFE6E6E8</color>  <!-- 次级按钮、选中项的中性灰块 -->
+    <color name="line">#FFDDDDE0</color>  <!-- 1px 分隔线 -->
+    <color name="text_primary">#FF2A2B2E</color>  <!-- 正文：不用纯黑 / 纯白 -->
+    <color name="text_secondary">#FF76787D</color>  <!-- 说明、状态 -->
+    <color name="text_tertiary">#FF9EA0A5</color>  <!-- 最弱一级 -->
+    <color name="energy">#FFF0622D</color>  <!-- 能量色 = 极氪橙：开关、指示、选中下划线 -->
+    <color name="energy_text">#FFC9491A</color>  <!-- 要写成橙色文字、或当主色按钮时用它 -->
+    <color name="energy_quiet">#FFFDEDE6</color>  <!-- 橙色的淡底 -->
+    <color name="on_energy">#FFFFFFFF</color>  <!-- 能量色上面的字 -->
+    <color name="recording">#FFE0393E</color>  <!-- 只标「正在录」与不可逆操作；比极氪橙更偏红，两者不混 -->
+    <color name="recording_quiet">#FFFCEBEB</color>  <!-- 录制中那一块的底 -->
+    <color name="recording_track">#FFF3D3D4</color>  <!-- 分段进度环的轨道 -->
+    <color name="recording_text">#FFB32A2F</color>  <!-- 录制状态文字 -->
+
+    <!-- 昼夜各自取值的 -->
+    <color name="preview_frame_background">#FFE2E2E4</color>
+    <color name="nav_ripple_color">#1F2A2B2E</color>
+    <color name="dialog_guide_button_ripple">#30000000</color>
+
+    <!-- 旧名字 → 语义色 -->
+    <color name="colorPrimary">@color/energy</color>
+    <color name="menu_background">@color/bg</color>
+    <color name="page_background">@color/bg</color>
+    <color name="button_background">@color/sunken</color>
+    <color name="button_accent">@color/energy</color>
+    <color name="button_text">@color/text_primary</color>
+    <color name="card_background">@color/surface</color>
+    <color name="text_hint">@color/text_tertiary</color>
+    <color name="input_background">@color/sunken</color>
+    <color name="nav_header_background">@color/surface</color>
+    <color name="nav_background">@color/surface</color>
+    <color name="nav_header_gradient_start">@color/surface</color>
+    <color name="nav_header_gradient_center">@color/surface</color>
+    <color name="nav_header_gradient_end">@color/surface</color>
+    <color name="nav_header_text">@color/text_primary</color>
+    <color name="nav_header_text_secondary">@color/text_secondary</color>
+    <color name="nav_item_selected_background">@color/energy_quiet</color>
+    <color name="nav_item_pressed_background">@color/sunken</color>
+    <color name="nav_divider_color">@color/line</color>
+    <color name="nav_icon_background">@color/sunken</color>
+    <color name="nav_icon_tint">@color/text_secondary</color>
+    <color name="nav_icon_tint_selected">@color/energy_text</color>
+    <color name="nav_text_primary">@color/text_primary</color>
+    <color name="nav_text_secondary">@color/text_secondary</color>
+    <color name="nav_logo_background">@color/text_primary</color>
+    <color name="nav_logo_foreground">@color/surface</color>
+    <color name="nav_logo_accent">@color/energy</color>
+    <color name="nav_section_title">@color/text_tertiary</color>
+    <color name="nav_version_text">@color/text_tertiary</color>
+    <color name="item_selected_background">@color/energy_quiet</color>
+    <color name="preview_background">@color/bg</color>
+    <color name="preview_grid_divider">@color/bg</color>
+    <color name="preview_placeholder_text">@color/text_secondary</color>
+    <color name="preview_controls_background">@color/bg</color>
+    <color name="dialog_guide_background">@color/surface</color>
+    <color name="dialog_guide_title">@color/text_primary</color>
+    <color name="dialog_guide_content">@color/text_primary</color>
+    <color name="dialog_guide_accent">@color/energy_text</color>
+    <color name="dialog_guide_secondary">@color/text_secondary</color>
+    <color name="dialog_guide_divider">@color/line</color>
+    <color name="dialog_guide_button_bg">@color/energy_text</color>
+    <color name="dialog_guide_button_text">@color/on_energy</color>
+
+    <!-- 常量 -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="colorPrimary">#FF4A90D9</color>
-
-    <!-- 深灰色配色方案 -->
-    <color name="dark_gray_primary">#424242</color>
-    <color name="dark_gray_secondary">#616161</color>
-    <color name="dark_gray_background">#1A1A1A</color>
-    <color name="dark_gray_surface">#2A2A2A</color>
-
-    <!-- 日间模式配色 -->
-    <color name="menu_background">#FFD4DBE6</color>
-    <color name="button_background">#FFF9FAFB</color>
-    <color name="button_accent">#FF4A90D9</color>
-    <color name="button_text">#FF1A1A1A</color>
-    <color name="page_background">#FFD4DBE6</color>
-    <color name="card_background">#FFF9FAFB</color>
-    <color name="text_primary">#FF1A1A1A</color>
-    <color name="text_secondary">#FF666666</color>
-    <color name="text_hint">#FF999999</color>
-    <color name="input_background">#FFEAEEF3</color>
-    <color name="nav_header_background">#FFD4DBE6</color>
-
-    <!-- 导航菜单配色 - 日间模式（与主界面一致） -->
-    <color name="nav_background">#FFF9FAFB</color>
-    <color name="nav_header_gradient_start">#FFB8C4D4</color>
-    <color name="nav_header_gradient_center">#FFC4CFE0</color>
-    <color name="nav_header_gradient_end">#FFD4DBE6</color>
-    <color name="nav_header_text">#FF1A1A1A</color>
-    <color name="nav_header_text_secondary">#FF424242</color>
-    <color name="nav_item_selected_background">#20000000</color>
-    <color name="nav_item_pressed_background">#10000000</color>
-    <color name="nav_ripple_color">#30000000</color>
-    <color name="nav_divider_color">#1A1A1A1A</color>
-    <color name="nav_icon_background">#15000000</color>
-    <color name="nav_icon_tint">#FF424242</color>
-    <color name="nav_icon_tint_selected">#FF1A1A1A</color>
-    <color name="nav_text_primary">#FF1A1A1A</color>
-    <color name="nav_text_secondary">#FF666666</color>
-    <color name="nav_logo_background">#FF424242</color>
-    <color name="nav_logo_foreground">#FFFFFFFF</color>
-    <color name="nav_logo_accent">#FF424242</color>
-    <color name="nav_section_title">#FF888888</color>
-    <color name="nav_version_text">#FF999999</color>
-
-    <!-- 多选模式选中背景 - 日间模式 -->
-    <color name="item_selected_background">#E3F2FD</color>  <!-- 改为浅蓝色背景 -->
-
-    <!-- 视频预览区配色 - 日间模式（使用页面底色） -->
-    <color name="preview_background">@color/page_background</color>
-    <color name="preview_frame_background">#FFC0C8D0</color>
-    <color name="preview_grid_divider">@color/page_background</color>
-    <color name="preview_placeholder_text">#FF666666</color>
-    <color name="preview_controls_background">@color/page_background</color>
-
-    <!-- 使用提示对话框配色 - 日间模式 -->
-    <color name="dialog_guide_background">#FFFFFF</color>
-    <color name="dialog_guide_title">#1A1A1A</color>
-    <color name="dialog_guide_content">#333333</color>
-    <color name="dialog_guide_accent">#1976D2</color>
-    <color name="dialog_guide_secondary">#666666</color>
-    <color name="dialog_guide_divider">#E0E0E0</color>
-    <color name="dialog_guide_button_bg">#1976D2</color>
-    <color name="dialog_guide_button_text">#FFFFFF</color>
-    <color name="dialog_guide_button_ripple">#30000000</color>
 </resources>

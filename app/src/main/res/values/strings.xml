@@ -339,4 +339,21 @@
     <string name="msg_plate_cleaned">已按规则整理为 %1$s</string>
     <string name="msg_restart_required">重启应用后生效</string>
     <string name="set_current_profile_title">当前配置</string>
+
+    <!-- 主界面（统一骨架） -->
+    <string name="main_title">极氪即刻</string>
+    <string name="record_start">开始录制</string>
+    <string name="record_stop">停止录制</string>
+    <string name="record_preparing">正在准备…</string>
+    <string name="record_idle_detail">每段 %1$d 分钟</string>
+    <string name="record_segment_detail">本段 %1$s / %2$d 分钟</string>
+    <string name="recording_chip">录制中 %1$s · 第 %2$d 段</string>
+    <string name="segment_percent">本段 %1$d%%</string>
+    <string name="rail_photo">拍照</string>
+    <string name="rail_settings">设置</string>
+    <string name="cd_menu">菜单</string>
+    <string name="cd_exit">退出</string>
+    <string name="set_rail_side_title">操作按钮位置</string>
+    <string name="opt_rail_right">右侧</string>
+    <string name="opt_rail_left">左侧</string>
 </resources>

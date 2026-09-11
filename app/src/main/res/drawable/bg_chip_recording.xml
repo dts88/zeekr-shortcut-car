@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 标题区里「录制中」那枚标签 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/recording_quiet" />
+    <corners android:radius="20dp" />
+</shape>

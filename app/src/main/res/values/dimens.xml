@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  统一骨架的尺寸。四个区（标题区、列表栏、内容区、动作栏）加一条状态条，
+  所有界面都按这几个数排。
+
+  list_width / corner_radius 已按极氪车机系统（Zeekr OS 2.1）的设置界面取值：
+  左侧导航约占屏宽 16%，卡片圆角约 10dp。
+-->
+<resources>
+    <dimen name="title_bar_height">64dp</dimen>
+    <dimen name="status_bar_height">48dp</dimen>
+    <dimen name="list_width">280dp</dimen>
+    <dimen name="rail_width">380dp</dimen>
+    <!-- 三路那一版中间还要摆座舱列，动作栏收窄一些 -->
+    <dimen name="rail_width_compact">300dp</dimen>
+    <dimen name="corner_radius">10dp</dimen>
+    <dimen name="gutter">12dp</dimen>
+
+    <dimen name="record_button_height">132dp</dimen>
+    <dimen name="record_ring_size">68dp</dimen>
+    <dimen name="rail_tile_height">104dp</dimen>
+    <dimen name="rail_small_height">72dp</dimen>
+    <dimen name="icon_button_size">44dp</dimen>
+</resources>
