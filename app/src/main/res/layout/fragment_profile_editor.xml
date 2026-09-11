@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  视频流配置编辑：两栏。
+  左：选哪一路相机 + 这一路的三条流 + 整份配置的操作。
+  右：这一路的格子图 + 正在改的那一格。
+  「选一个 → 改它」：一次只摆出正在改的那一路、那一格，不再是二十多行一路竖排下去。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/page_background"
+    android:baselineAligned="false"
+    android:orientation="horizontal">
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/editor_streams"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1" />
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="@color/line" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/editor_lanes"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1" />
+</LinearLayout>

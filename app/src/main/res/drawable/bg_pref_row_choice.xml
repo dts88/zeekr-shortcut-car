@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 可选中的行（配置编辑里的相机）：和普通行同一块卡片，选中那一行加一圈能量色描边 -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/nav_ripple_color">
+    <item>
+        <selector>
+            <item android:state_activated="true">
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/corner_radius" />
+                    <solid android:color="@color/sunken" />
+                    <stroke
+                        android:width="2dp"
+                        android:color="@color/energy" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="@dimen/corner_radius" />
+                    <solid android:color="@color/sunken" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>

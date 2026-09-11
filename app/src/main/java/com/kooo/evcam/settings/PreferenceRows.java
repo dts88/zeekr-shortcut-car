@@ -39,7 +39,28 @@ import com.kooo.evcam.R;
  */
 final class PreferenceRows {
 
+    /** 自己带布局的行（选择行、配置编辑里的格子图）：不替它换。 */
+    interface OwnLayout {
+    }
+
+    private static final String EXTRA_ROW = "cam_row";
+    private static final String ROW_VALUE = "value";
+    private static final String ROW_PRIMARY = "primary";
+
     private PreferenceRows() {
+    }
+
+    /**
+     * 这一行的 summary 是一个当前值（「30 fps」「中」「90°」）：值放行尾。
+     * 普通 Preference 看不出自己是不是「有值」，所以由建行的地方说一声。
+     */
+    static void markValue(Preference preference) {
+        preference.getExtras().putString(EXTRA_ROW, ROW_VALUE);
+    }
+
+    /** 这一屏的主操作（比如「保存」）：实心能量色的一行。一屏最多一处。 */
+    static void markPrimary(Preference preference) {
+        preference.getExtras().putString(EXTRA_ROW, ROW_PRIMARY);
     }
 
     /** 给一组设置套上行样式，子分组一起。 */
@@ -50,7 +71,16 @@ final class PreferenceRows {
         for (int i = 0; i < group.getPreferenceCount(); i++) {
             Preference preference = group.getPreference(i);
             preference.setIconSpaceReserved(false);
-            if (preference instanceof PreferenceCategory) {
+            if (preference instanceof OwnLayout) {
+                continue;
+            }
+            String row = preference.peekExtras() != null
+                    ? preference.peekExtras().getString(EXTRA_ROW) : null;
+            if (ROW_PRIMARY.equals(row)) {
+                preference.setLayoutResource(R.layout.pref_row_primary);
+            } else if (ROW_VALUE.equals(row)) {
+                preference.setLayoutResource(R.layout.pref_row_value);
+            } else if (preference instanceof PreferenceCategory) {
                 preference.setLayoutResource(R.layout.pref_category);
                 apply((PreferenceGroup) preference);
             } else if (preference instanceof PreferenceGroup) {
