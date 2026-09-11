@@ -1,6 +1,7 @@
 package com.kooo.evcam.update;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.R;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -36,6 +37,26 @@ import java.nio.charset.StandardCharsets;
  * GitHub 的下载域名，不带任何设备信息，也不上传任何东西。</p>
  */
 public final class GithubReleases {
+
+    /**
+     * 能说清原因的失败。界面按当前语言显示 {@link #messageRes}，日志里是英文原文。
+     * 说不清的（网络层自己抛的）仍是普通的 IOException。
+     */
+    public static final class Failure extends IOException {
+        public final int messageRes;
+        public final Object[] args;
+
+        Failure(String english, int messageRes, Object... args) {
+            super(english);
+            this.messageRes = messageRes;
+            this.args = args;
+        }
+
+        Failure because(Throwable cause) {
+            initCause(cause);
+            return this;
+        }
+    }
 
     private static final String TAG = "GithubReleases";
 
@@ -111,7 +132,8 @@ public final class GithubReleases {
                 }
             }
         } catch (org.json.JSONException e) {
-            throw new IOException("看不懂 GitHub 的响应: " + e.getMessage(), e);
+            throw new Failure("Unreadable GitHub response: " + e.getMessage(),
+                    R.string.upd_err_bad_response).because(e);
         }
         return best;
     }
@@ -153,16 +175,17 @@ public final class GithubReleases {
         try {
             int code = connection.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
-                throw new IOException("下载失败，HTTP " + code);
+                throw new Failure("Download failed: HTTP " + code, R.string.upd_err_http, code);
             }
             long total = connection.getContentLengthLong();
             if (total > MAX_APK_BYTES) {
-                throw new IOException("文件过大（" + total + " 字节），已中止");
+                throw new Failure("File too large (" + total + " bytes), aborted",
+                        R.string.upd_err_too_large, total / (1024 * 1024));
             }
 
             File parent = target.getParentFile();
             if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                throw new IOException("建不了下载目录: " + parent);
+                throw new Failure("Cannot create download folder: " + parent, R.string.upd_err_no_dir);
             }
 
             byte[] buffer = new byte[64 * 1024];
@@ -174,7 +197,8 @@ public final class GithubReleases {
                     out.write(buffer, 0, n);
                     done += n;
                     if (done > MAX_APK_BYTES) {
-                        throw new IOException("下载内容超出上限，已中止");
+                        throw new Failure("Download exceeded the size limit, aborted",
+                                R.string.upd_err_over_limit);
                     }
                     if (listener != null) {
                         listener.onProgress(done, total);
@@ -182,7 +206,8 @@ public final class GithubReleases {
                 }
             }
             if (total > 0 && done != total) {
-                throw new IOException("只收到 " + done + "/" + total + " 字节");
+                throw new Failure("Only received " + done + "/" + total + " bytes",
+                        R.string.upd_err_truncated, done, total);
             }
             AppLog.d(TAG, "已下载 " + release.apkName + "（" + done + " 字节）");
         } catch (IOException e) {
@@ -201,7 +226,7 @@ public final class GithubReleases {
         try {
             int code = connection.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
-                throw new IOException("GitHub 返回 HTTP " + code);
+                throw new Failure("GitHub returned HTTP " + code, R.string.upd_err_http, code);
             }
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[16 * 1024];
@@ -210,7 +235,8 @@ public final class GithubReleases {
                 while ((n = in.read(chunk)) != -1) {
                     buffer.write(chunk, 0, n);
                     if (buffer.size() > MAX_JSON_BYTES) {
-                        throw new IOException("响应过大，已中止");
+                        throw new Failure("Response exceeded the size limit, aborted",
+                                R.string.upd_err_over_limit);
                     }
                 }
             }

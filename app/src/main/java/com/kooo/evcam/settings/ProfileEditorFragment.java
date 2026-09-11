@@ -583,12 +583,47 @@ public class ProfileEditorFragment extends Fragment {
     private void showIssues(String title, List<ProfileValidation.Issue> issues) {
         StringBuilder sb = new StringBuilder();
         for (ProfileValidation.Issue issue : issues) {
-            sb.append(issue).append('\n');
+            sb.append(describe(issue)).append('\n');
         }
         CamDialogs.show(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle(title)
                 .setMessage(sb.length() == 0 ? getString(R.string.editor_no_more_info) : sb.toString())
                 .setPositiveButton(android.R.string.ok, null));
+    }
+
+    /** 一条问题按当前语言说出来。 */
+    private String describe(ProfileValidation.Issue issue) {
+        String text;
+        switch (issue.kind) {
+            case NO_CAMERAS:
+                text = getString(R.string.editor_issue_no_cameras);
+                break;
+            case NONE_ENABLED:
+                text = getString(R.string.editor_issue_none_enabled);
+                break;
+            case UNDECLARED_SIZE:
+                text = getString(R.string.editor_issue_undeclared_size, roleName(issue.role),
+                        streamName(issue.stream), issue.width, issue.height);
+                break;
+            case PREVIEW_SPLIT_ONLY:
+                text = getString(R.string.editor_issue_preview_split_only, roleName(issue.role));
+                break;
+            default:
+                text = getString(R.string.editor_issue_record_split_only, roleName(issue.role));
+                break;
+        }
+        return (issue.blocking ? "✗ " : "⚠ ") + text;
+    }
+
+    private String streamName(ProfileValidation.Issue.Stream stream) {
+        switch (stream) {
+            case RECORD:
+                return getString(R.string.editor_stream_record);
+            case PHOTO:
+                return getString(R.string.editor_stream_photo);
+            default:
+                return getString(R.string.editor_stream_preview);
+        }
     }
 
     private ProfileValidation.Capabilities capabilities() {

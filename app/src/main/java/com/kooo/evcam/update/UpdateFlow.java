@@ -58,7 +58,7 @@ public final class UpdateFlow {
                 release = GithubReleases.fetchLatest();
             } catch (Exception e) {
                 AppLog.w(TAG, "检查更新失败: " + e);
-                error = e.getMessage();
+                error = reason(activity, e);
             }
             final GithubReleases.Release found = release;
             final String failure = error;
@@ -151,8 +151,7 @@ public final class UpdateFlow {
                 }));
             } catch (Exception e) {
                 AppLog.e(TAG, "下载失败", e);
-                error = e.getClass().getSimpleName()
-                        + (e.getMessage() == null ? "" : "：" + e.getMessage());
+                error = reason(activity, e);
             }
             final String failure = error;
             post(activity, () -> {
@@ -239,6 +238,16 @@ public final class UpdateFlow {
                 AppLog.w(TAG, "旧的安装包删不掉: " + file);
             }
         }
+    }
+
+    /** 失败原因按当前语言说；说不清的（网络层抛的）照原样给出类名和原文。 */
+    private static String reason(Context context, Exception e) {
+        if (e instanceof GithubReleases.Failure) {
+            GithubReleases.Failure failure = (GithubReleases.Failure) e;
+            return context.getString(failure.messageRes, failure.args);
+        }
+        return e.getClass().getSimpleName()
+                + (e.getMessage() == null ? "" : ": " + e.getMessage());
     }
 
     private static String currentVersion(Context context) {

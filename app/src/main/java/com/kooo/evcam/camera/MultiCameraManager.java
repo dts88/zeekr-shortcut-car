@@ -77,6 +77,17 @@ public class MultiCameraManager {
     private final Map<String, Boolean> cameraRecordingActive = new LinkedHashMap<>();
     private RecordingStatusCallback recordingStatusCallback;
 
+    /**
+     * 状态回调里的取值。这是模块之间的约定，不上界面，所以用固定的英文标记 ——
+     * 以前是「预览已启动」「错误: …」这样的中文，接收方靠 contains 去猜。
+     */
+    public static final String STATUS_OPENED = "opened";
+    public static final String STATUS_PREVIEW_STARTED = "preview_started";
+    public static final String STATUS_CLOSED = "closed";
+    /** 后面跟错误码，例如 {@code error:-4}。 */
+    public static final String STATUS_ERROR_PREFIX = "error:";
+    public static final String STATUS_RECORDING_FAILED = "recording_failed";
+
     public interface StatusCallback {
         void onCameraStatusUpdate(String cameraId, String status);
     }
@@ -407,7 +418,7 @@ public class MultiCameraManager {
             public void onCameraOpened(String cameraId) {
                 AppLog.d(TAG, "Callback: Camera " + cameraId + " opened");
                 if (statusCallback != null) {
-                    statusCallback.onCameraStatusUpdate(cameraId, "已打开");
+                    statusCallback.onCameraStatusUpdate(cameraId, STATUS_OPENED);
                 }
             }
 
@@ -415,7 +426,7 @@ public class MultiCameraManager {
             public void onCameraConfigured(String cameraId) {
                 AppLog.d(TAG, "Callback: Camera " + cameraId + " configured");
                 if (statusCallback != null) {
-                    statusCallback.onCameraStatusUpdate(cameraId, "预览已启动");
+                    statusCallback.onCameraStatusUpdate(cameraId, STATUS_PREVIEW_STARTED);
                 }
 
                 // 检查是否有录制器正在等待会话重新配置（分段切换）
@@ -482,7 +493,7 @@ public class MultiCameraManager {
             public void onCameraClosed(String cameraId) {
                 AppLog.d(TAG, "Callback: Camera " + cameraId + " closed");
                 if (statusCallback != null) {
-                    statusCallback.onCameraStatusUpdate(cameraId, "已关闭");
+                    statusCallback.onCameraStatusUpdate(cameraId, STATUS_CLOSED);
                 }
             }
 
@@ -491,7 +502,7 @@ public class MultiCameraManager {
                 String errorMsg = getErrorMessage(errorCode);
                 AppLog.e(TAG, "Callback: Camera " + cameraId + " error: " + errorCode + " - " + errorMsg);
                 if (statusCallback != null) {
-                    statusCallback.onCameraStatusUpdate(cameraId, "错误: " + errorMsg);
+                    statusCallback.onCameraStatusUpdate(cameraId, STATUS_ERROR_PREFIX + errorCode);
                 }
 
                 // 如果在等待会话配置期间发生错误，减少期望计数（线程安全处理）
@@ -1077,7 +1088,7 @@ public class MultiCameraManager {
             }
             // 通知上层完全失败
             if (statusCallback != null) {
-                statusCallback.onCameraStatusUpdate("all", "recording_failed");
+                statusCallback.onCameraStatusUpdate("all", STATUS_RECORDING_FAILED);
             }
             // 同时通知 recordingStatusCallback（如果有设置）
             if (recordingStatusCallback != null) {

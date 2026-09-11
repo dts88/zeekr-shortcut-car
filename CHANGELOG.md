@@ -14,7 +14,7 @@ Notable changes only, newest first. Each version's section becomes the body of i
 - Dialogs share one style; destructive buttons are red.
 - About, Diagnostics and Timeline use the shared title bar. Fixed white-on-light text in day mode.
 - Four-up: the tapped lane grows out of its cell.
-- English UI: playback, notifications, diagnostics, image adjustment and the developer section no longer show Chinese. A test blocks new hardcoded text.
+- English UI: playback, notifications, diagnostics, image adjustment, the profile editor's save checks, update errors and the developer section no longer show Chinese. A test blocks new hardcoded text.
 - Removed unused layouts and code.
 
 ## [0.38.0-alpha] - 2026-09-11

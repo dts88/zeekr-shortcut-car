@@ -38,8 +38,8 @@ import java.util.stream.Stream;
  *
  * <h3>白名单</h3>
  *
- * <p>下面列出的文件暂时允许有中文，每一组写明原因。其中「待迁移」那一组
- * <b>确实会出现在界面上</b>，只是还没搬 —— 列出来是为了不假装它们没问题。
+ * <p>下面列出的文件暂时允许有中文，每一组写明原因。确实会出现在界面上、
+ * 只是还没来得及搬的，要单列一组标「待迁移」，不能混进别的理由里。
  * 另有一条检查保证名单只减不增：名单里的文件已经清干净、或者已经不在了，测试就失败，
  * 提醒把它从名单里拿掉。</p>
  */
@@ -96,12 +96,13 @@ public class HardcodedTextTest {
                 "录制错误描述只写进日志（RecordingController.onError 不转给任何界面）");
         JAVA_ALLOWED.put("profile/ProfileMigration.java",
                 "预设配置里存的名字；编辑器按配置 id 显示本地化名字，不读它");
-        // ---- 待迁移：会出现在界面上，还没搬 ----
-        JAVA_ALLOWED.put("profile/ProfileValidation.java", "待迁移：保存配置被拦下时列出的问题");
-        JAVA_ALLOWED.put("update/GithubReleases.java", "待迁移：下载更新失败时显示的原因");
-        JAVA_ALLOWED.put("share/FileShareServer.java", "待迁移：手机浏览器里那一页的说明");
-        JAVA_ALLOWED.put("camera/MultiCameraManager.java", "待迁移：相机状态和打不开时的错误描述（另有调试统计）");
-        JAVA_ALLOWED.put("camera/SingleCamera.java", "待迁移：拍照失败的原因");
+        JAVA_ALLOWED.put("camera/SingleCamera.java",
+                "拍照失败原因只写进日志（onFailed 唯一的实现改抓预览并记日志）");
+        JAVA_ALLOWED.put("camera/MultiCameraManager.java",
+                "相机错误码的日志说明和调试统计；状态回调用的是英文标记");
+        // ---- 故意中英并列 ----
+        JAVA_ALLOWED.put("share/FileShareServer.java",
+                "手机浏览器里那一页：不知道手机是什么语言，中英并列");
 
         String xmlDeveloper = "开发者工具 / 自定义车型（排查用）的布局";
         for (String f : new String[]{
@@ -116,10 +117,11 @@ public class HardcodedTextTest {
                 "layout/view_blind_spot_floating.xml", "layout/view_blind_spot_floating_multiview.xml",
                 "layout/view_fisheye_correction_floating.xml",
                 "layout/view_mock_turn_signal_floating.xml",
-                "layout/view_preview_correction_floating.xml"}) {
+                "layout/view_preview_correction_floating.xml",
+                // 自定义车型的画面点一下打开的鱼眼调整；自定义只在开发者选项里能选
+                "layout/dialog_fullscreen_preview.xml"}) {
             XML_ALLOWED.put(f, xmlDeveloper);
         }
-        XML_ALLOWED.put("layout/dialog_fullscreen_preview.xml", "待迁移：全屏预览对话框");
     }
 
     private static final Pattern COMPARISON =

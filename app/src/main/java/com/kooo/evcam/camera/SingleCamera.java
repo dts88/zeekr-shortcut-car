@@ -147,7 +147,6 @@ public class SingleCamera {
 
     private boolean shouldReconnect = false;  // 是否应该重连
     private int reconnectAttempts = 0;  // 重连尝试次数
-    private static final int MAX_RECONNECT_ATTEMPTS = 90;  // 最大重连次数（90次 × 2秒 = 3分钟）
     private static final long RECONNECT_DELAY_MS = 2000;  // 重连延迟（毫秒）
     private long reconnectDelayFloorMs = 0;
     private Runnable reconnectRunnable;  // 重连任务

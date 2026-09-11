@@ -154,7 +154,7 @@ public class FileShareServer extends NanoHTTPD {
                 + "<div class=\"name\">" + escape(shared.getName()) + "</div>"
                 + "<div class=\"size\">" + readableSize(shared.length()) + "</div>"
                 + "<div class=\"tip\">" + howTo
-                + "<br><br>存不下来时，点这里直接下载：<br>"
+                + "<br><br>存不下来时，点这里直接下载<br>If saving fails, download it here:<br>"
                 + "<a href=\"/f/" + tokenValue + "\" download>" + escape(shared.getName()) + "</a>"
                 + "</div></body></html>";
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html);

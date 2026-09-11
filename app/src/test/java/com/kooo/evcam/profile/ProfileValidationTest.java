@@ -95,7 +95,7 @@ public class ProfileValidationTest {
         assertFalse("这是合法组合，不该拦", ProfileValidation.hasBlocking(issues));
         boolean warned = false;
         for (ProfileValidation.Issue issue : issues) {
-            if (!issue.blocking && issue.message.contains("后视镜")) {
+            if (!issue.blocking && issue.kind == ProfileValidation.Issue.Kind.RECORD_SPLIT_ONLY) {
                 warned = true;
             }
         }

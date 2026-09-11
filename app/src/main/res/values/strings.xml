@@ -166,8 +166,6 @@
     <string name="msg_camera_not_ready">摄像头未准备好，请重试</string>
     <string name="msg_need_camera_storage">需要相机和存储权限</string>
     <string name="msg_camera_access_failed">摄像头访问失败：%1$s</string>
-    <string name="msg_camera_in_use">摄像头 %1$s 被占用，正在自动重连…</string>
-    <string name="msg_camera_reconnect_failed">摄像头 %1$s 重连失败，请手动重启应用</string>
     <string name="msg_codec_fallback">录制故障，已回退到 MediaCodec 模式；若频繁发生请在设置里更改录制模式</string>
     <string name="msg_record_start_failed">录制启动失败，请重试</string>
     <string name="msg_record_error">录制发生异常</string>
@@ -261,6 +259,12 @@
     <string name="upd_download_title">下载 %1$s</string>
     <string name="upd_download_failed">下载失败：%1$s</string>
     <string name="upd_apk_missing">安装包不见了，请重试</string>
+    <string name="upd_err_bad_response">看不懂 GitHub 的响应</string>
+    <string name="upd_err_http">服务器返回 HTTP %1$d</string>
+    <string name="upd_err_too_large">文件过大（%1$d MB），已中止</string>
+    <string name="upd_err_no_dir">建不了下载目录</string>
+    <string name="upd_err_over_limit">内容超出上限，已中止</string>
+    <string name="upd_err_truncated">只收到 %1$d / %2$d 字节</string>
     <string name="upd_need_install_title">需要允许安装应用</string>
     <string name="upd_need_install_msg">系统要求先允许本应用安装其他应用，才能进入安装界面。\n\n授权后回到这里再点一次「检查更新」。</string>
     <string name="upd_go_settings">去设置</string>
@@ -455,6 +459,14 @@
     <string name="editor_no_camera_for">找不到 %1$s 对应的相机</string>
     <string name="editor_saved">已保存，重启应用后生效</string>
     <string name="editor_no_more_info">（没有更多信息）</string>
+    <string name="editor_issue_no_cameras">这份配置里一路相机都没有</string>
+    <string name="editor_issue_none_enabled">一路相机都没启用，什么都不会显示也不会录</string>
+    <string name="editor_issue_undeclared_size">%1$s 的%2$s尺寸 %3$dx%4$d 这一路没有声明过</string>
+    <string name="editor_issue_preview_split_only">%1$s：预览拆四格但录制不拆，录出来的是一整幅画面</string>
+    <string name="editor_issue_record_split_only">%1$s：录制拆四格但预览不拆，超级后视镜取不到单独那一路</string>
+    <string name="editor_stream_preview">预览</string>
+    <string name="editor_stream_record">录制</string>
+    <string name="editor_stream_photo">拍照</string>
     <string name="editor_camera_missing">（找不到对应的相机）</string>
     <string name="editor_camera_summary">相机 %1$s · 最大 %2$s</string>
     <string name="editor_size_unknown">尺寸未知</string>

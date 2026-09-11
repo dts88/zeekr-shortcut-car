@@ -2012,24 +2012,13 @@ public class MainActivity extends AppCompatActivity {
         cameraManager.setStatusCallback((cameraId, status) -> {
             AppLog.d(TAG, "摄像头 " + cameraId + ": " + status);
 
-            if (status.contains("预览已启动")) {
+            if (MultiCameraManager.STATUS_PREVIEW_STARTED.equals(status)) {
                 refreshCompositeSizeOverlay();
             }
-
-            // 如果摄像头断开或被占用，提示用户
-            if (status.contains("错误") || status.contains("断开")) {
-                runOnUiThread(() -> {
-                    if (status.contains("ERROR_CAMERA_IN_USE") || status.contains("DISCONNECTED")) {
-                        Toast.makeText(MainActivity.this,
-                            getString(R.string.msg_camera_in_use, cameraId),
-                            Toast.LENGTH_SHORT).show();
-                    } else if (status.contains("max reconnect attempts")) {
-                        Toast.makeText(MainActivity.this,
-                            getString(R.string.msg_camera_reconnect_failed, cameraId),
-                            Toast.LENGTH_LONG).show();
-                    }
-                });
-            }
+            // 以前这里还按状态文字弹「被占用」「重连失败」两个提示。状态早就是中文了，
+            // 它找的 ERROR_CAMERA_IN_USE / DISCONNECTED / max reconnect attempts
+            // 一次都没匹配上过。断开和被占用本来就会自动重连，而重连从不放弃，
+            // 没有「失败」可报 —— 真接上反而是每次短暂断开都弹一次。两个提示一起删了。
         });
 
         // 设置分段切换回调

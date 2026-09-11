@@ -2,7 +2,6 @@ package com.kooo.evcam.profile;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 保存一份配置之前，先看看它说不说得通。
@@ -18,19 +17,45 @@ import java.util.Locale;
  */
 public final class ProfileValidation {
 
-    /** 一条问题。{@code blocking} 为 true 时不让保存。 */
+    /**
+     * 一条问题。{@code blocking} 为 true 时不让保存。
+     *
+     * <p>这里只给事实，不给句子：句子由界面按当前语言拼，
+     * 那一路叫什么（「环视」还是「Surround」）也是界面的事。</p>
+     */
     public static final class Issue {
-        public final boolean blocking;
-        public final String message;
+        public enum Kind { NO_CAMERAS, NONE_ENABLED, UNDECLARED_SIZE, PREVIEW_SPLIT_ONLY, RECORD_SPLIT_ONLY }
 
-        Issue(boolean blocking, String message) {
+        public enum Stream { PREVIEW, RECORD, PHOTO }
+
+        public final boolean blocking;
+        public final Kind kind;
+        /** 出问题的那一路；整份配置的问题为 null。 */
+        public final String role;
+        /** 尺寸问题落在哪条流上；其余为 null。 */
+        public final Stream stream;
+        public final int width;
+        public final int height;
+
+        Issue(boolean blocking, Kind kind, String role, Stream stream, int width, int height) {
             this.blocking = blocking;
-            this.message = message;
+            this.kind = kind;
+            this.role = role;
+            this.stream = stream;
+            this.width = width;
+            this.height = height;
         }
 
+        static Issue of(boolean blocking, Kind kind, String role) {
+            return new Issue(blocking, kind, role, null, 0, 0);
+        }
+
+        /** 给日志看的。 */
         @Override
         public String toString() {
-            return (blocking ? "✗ " : "⚠ ") + message;
+            return (blocking ? "✗ " : "⚠ ") + kind
+                    + (role == null ? "" : " " + role)
+                    + (stream == null ? "" : " " + stream + " " + width + "x" + height);
         }
     }
 
@@ -49,7 +74,7 @@ public final class ProfileValidation {
     public static List<Issue> check(Profile profile, Capabilities capabilities) {
         List<Issue> issues = new ArrayList<>();
         if (profile == null || profile.cameras.isEmpty()) {
-            issues.add(new Issue(true, "这份配置里一路相机都没有"));
+            issues.add(Issue.of(true, Issue.Kind.NO_CAMERAS, null));
             return issues;
         }
 
@@ -60,23 +85,23 @@ public final class ProfileValidation {
             }
         }
         if (enabled == 0) {
-            issues.add(new Issue(true, "一路相机都没启用，什么都不会显示也不会录"));
+            issues.add(Issue.of(true, Issue.Kind.NONE_ENABLED, null));
         }
 
         for (CameraProfile camera : profile.cameras) {
             if (!camera.enabled) {
                 continue;
             }
-            checkStream(issues, capabilities, camera.role, "预览", camera.preview);
-            checkStream(issues, capabilities, camera.role, "录制", camera.record);
-            checkStream(issues, capabilities, camera.role, "拍照", camera.photo);
+            checkStream(issues, capabilities, camera.role, Issue.Stream.PREVIEW, camera.preview);
+            checkStream(issues, capabilities, camera.role, Issue.Stream.RECORD, camera.record);
+            checkStream(issues, capabilities, camera.role, Issue.Stream.PHOTO, camera.photo);
             checkSplitConsistency(issues, capabilities, camera);
         }
         return issues;
     }
 
     private static void checkStream(List<Issue> issues, Capabilities capabilities,
-                                    String role, String label, StreamSpec spec) {
+                                    String role, Issue.Stream stream, StreamSpec spec) {
         int[] size = ProfileResolution.parse(spec.resolution);
         if (size == null) {
             return;   // auto / max 都由下游解析，这里没什么可查的
@@ -90,8 +115,7 @@ public final class ProfileValidation {
                 return;
             }
         }
-        issues.add(new Issue(true, String.format(Locale.US,
-                "%s 的%s尺寸 %dx%d 这一路没有声明过", role, label, size[0], size[1])));
+        issues.add(new Issue(true, Issue.Kind.UNDECLARED_SIZE, role, stream, size[0], size[1]));
     }
 
     /**
@@ -108,12 +132,10 @@ public final class ProfileValidation {
             return;
         }
         if (previewSplits && !recordSplits) {
-            issues.add(new Issue(false, camera.role + "：预览拆四格但录制不拆，"
-                    + "录出来的是一整幅画面"));
+            issues.add(Issue.of(false, Issue.Kind.PREVIEW_SPLIT_ONLY, camera.role));
         }
         if (!previewSplits && recordSplits) {
-            issues.add(new Issue(false, camera.role + "：录制拆四格但预览不拆，"
-                    + "超级后视镜取不到单独那一路"));
+            issues.add(Issue.of(false, Issue.Kind.RECORD_SPLIT_ONLY, camera.role));
         }
     }
 

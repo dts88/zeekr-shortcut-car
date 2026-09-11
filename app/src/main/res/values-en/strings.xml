@@ -165,8 +165,6 @@
     <string name="msg_camera_not_ready">Camera not ready — try again</string>
     <string name="msg_need_camera_storage">Camera and storage permissions are required</string>
     <string name="msg_camera_access_failed">Camera access failed: %1$s</string>
-    <string name="msg_camera_in_use">Camera %1$s is in use; reconnecting</string>
-    <string name="msg_camera_reconnect_failed">Camera %1$s could not reconnect. Please restart the app</string>
     <string name="msg_codec_fallback">Recording fault — fell back to MediaCodec. If this keeps happening, change the recording pipeline in Settings</string>
     <string name="msg_record_start_failed">Could not start recording — try again</string>
     <string name="msg_record_error">Recording error</string>
@@ -260,6 +258,12 @@
     <string name="upd_download_title">Downloading %1$s</string>
     <string name="upd_download_failed">Download failed: %1$s</string>
     <string name="upd_apk_missing">The installer file is gone — try again</string>
+    <string name="upd_err_bad_response">Unreadable response from GitHub</string>
+    <string name="upd_err_http">Server returned HTTP %1$d</string>
+    <string name="upd_err_too_large">File too large (%1$d MB), aborted</string>
+    <string name="upd_err_no_dir">Cannot create the download folder</string>
+    <string name="upd_err_over_limit">Too much data, aborted</string>
+    <string name="upd_err_truncated">Only received %1$d of %2$d bytes</string>
     <string name="upd_need_install_title">Permission to install apps is required</string>
     <string name="upd_need_install_msg">Android requires this app to be allowed to install other apps before the installer can open.\n\nGrant it, come back, and tap Check for updates again.</string>
     <string name="upd_go_settings">Open settings</string>
@@ -454,6 +458,14 @@
     <string name="editor_no_camera_for">No camera found for %1$s</string>
     <string name="editor_saved">Saved. Takes effect after restarting the app</string>
     <string name="editor_no_more_info">(no further details)</string>
+    <string name="editor_issue_no_cameras">This profile has no cameras</string>
+    <string name="editor_issue_none_enabled">No camera is enabled, so nothing will show or record</string>
+    <string name="editor_issue_undeclared_size">%1$s: the %2$s size %3$dx%4$d is not declared by this camera</string>
+    <string name="editor_issue_preview_split_only">%1$s: preview is split into four but recording is not, so the recording is one whole frame</string>
+    <string name="editor_issue_record_split_only">%1$s: recording is split into four but preview is not, so the rear-view mirror cannot get its lane</string>
+    <string name="editor_stream_preview">preview</string>
+    <string name="editor_stream_record">recording</string>
+    <string name="editor_stream_photo">photo</string>
     <string name="editor_camera_missing">(camera not found)</string>
     <string name="editor_camera_summary">Camera %1$s · max %2$s</string>
     <string name="editor_size_unknown">size unknown</string>
