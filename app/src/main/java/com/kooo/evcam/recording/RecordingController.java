@@ -35,7 +35,6 @@ public class RecordingController {
 
     // 回调监听器列表
     private final List<RecordingStateListener> stateListeners = new ArrayList<>();
-    private final List<RecordingErrorListener> errorListeners = new ArrayList<>();
     private final List<RecordingProgressListener> progressListeners = new ArrayList<>();
 
     // 录制统计信息
@@ -45,10 +44,6 @@ public class RecordingController {
 
     public interface RecordingStateListener {
         void onStateChanged(RecordingState newState, RecordingState oldState);
-    }
-
-    public interface RecordingErrorListener {
-        void onError(int errorCode, String errorMessage);
     }
 
     public interface RecordingProgressListener {
@@ -128,10 +123,10 @@ public class RecordingController {
         AppLog.d(TAG, "分段录制完成: " + segmentIndex);
     }
 
+    /** 只记日志、置错误状态。以前还会转给错误监听器，但从来没有谁注册过，已删。 */
     public void onError(int errorCode, String errorMessage) {
         AppLog.e(TAG, "录制错误 [" + errorCode + "]: " + errorMessage);
         setState(RecordingState.ERROR);
-        notifyError(errorCode, errorMessage);
     }
 
     // ========== 监听器管理 ==========
@@ -144,16 +139,6 @@ public class RecordingController {
 
     public void removeStateListener(RecordingStateListener listener) {
         stateListeners.remove(listener);
-    }
-
-    public void addErrorListener(RecordingErrorListener listener) {
-        if (!errorListeners.contains(listener)) {
-            errorListeners.add(listener);
-        }
-    }
-
-    public void removeErrorListener(RecordingErrorListener listener) {
-        errorListeners.remove(listener);
     }
 
     public void addProgressListener(RecordingProgressListener listener) {
@@ -175,18 +160,6 @@ public class RecordingController {
                     listener.onStateChanged(newState, oldState);
                 } catch (Exception e) {
                     AppLog.e(TAG, "状态监听器回调异常", e);
-                }
-            }
-        });
-    }
-
-    private void notifyError(int errorCode, String errorMessage) {
-        mainHandler.post(() -> {
-            for (RecordingErrorListener listener : errorListeners) {
-                try {
-                    listener.onError(errorCode, errorMessage);
-                } catch (Exception e) {
-                    AppLog.e(TAG, "错误监听器回调异常", e);
                 }
             }
         });

@@ -572,4 +572,84 @@
     <string name="diag_share_subject">%1$s 诊断报告</string>
     <string name="diag_share_chooser">分享诊断报告</string>
     <string name="diag_share_failed">无法分享，文件已保存在：\n%1$s</string>
+
+    <!-- 画面调节悬浮窗 -->
+    <string name="adj_title">亮度/降噪调节</string>
+    <string name="adj_unsupported">当前设备不支持亮度/降噪调节</string>
+    <string name="adj_exposure">曝光补偿</string>
+    <string name="adj_exposure_value">当前：%1$s（调暗 ← → 调亮）</string>
+    <string name="adj_awb">白平衡</string>
+    <string name="adj_tonemap">色调映射</string>
+    <string name="adj_edge">边缘增强/锐化</string>
+    <string name="adj_noise">降噪</string>
+    <string name="adj_effect">特效</string>
+    <string name="adj_default">默认</string>
+    <string name="adj_reset">恢复默认</string>
+    <string name="adj_save_close">保存并关闭</string>
+    <string name="awb_auto">自动</string>
+    <string name="awb_incandescent">白炽灯</string>
+    <string name="awb_fluorescent">荧光灯</string>
+    <string name="awb_warm_fluorescent">暖荧光灯</string>
+    <string name="awb_daylight">日光</string>
+    <string name="awb_cloudy">阴天</string>
+    <string name="awb_twilight">黄昏</string>
+    <string name="awb_shade">阴影</string>
+    <string name="mode_off">关闭</string>
+    <string name="mode_fast">快速</string>
+    <string name="mode_high_quality">高质量</string>
+    <string name="tonemap_contrast_curve">对比度曲线</string>
+    <string name="effect_mono">黑白</string>
+    <string name="effect_negative">负片</string>
+    <string name="effect_solarize">曝光过度</string>
+    <string name="effect_sepia">怀旧</string>
+    <string name="effect_aqua">水蓝</string>
+
+    <!-- 开发者选项分区 -->
+    <string name="set_section_developer">开发者选项</string>
+    <string name="dev_permissions_title">权限设置</string>
+    <string name="dev_permissions_summary">管理应用所需的各项权限</string>
+    <string name="dev_upload_logs_title">上传日志</string>
+    <string name="dev_upload_logs_summary">把运行日志发给作者</string>
+    <string name="dev_permission_tools_title">权限工具</string>
+    <string name="dev_permission_tools_summary">ADB 一键授权、系统白名单（排查用）</string>
+    <string name="dev_blind_spot_title">补盲选项</string>
+    <string name="dev_supervision_title">超视模式</string>
+    <string name="dev_custom_config_title">自定义界面配置</string>
+    <string name="dev_custom_config_summary">「视频流配置」选「自定义」后，在这里配摄像头路数、映射、旋转与布局</string>
+    <string name="dev_preview_correction_title">预览画面矫正</string>
+    <string name="dev_preview_correction_summary">对预览画面做平移 / 缩放 / 旋转修正。只作用于走普通预览的那几路（三路配置的座舱相机、自定义），环视合成流由四宫格容器自己排版，不受影响</string>
+    <string name="dev_preview_correction_adjust_title">预览矫正调参</string>
+    <string name="dev_preview_correction_adjust_summary">打开悬浮窗逐路调整，需要先打开上面的开关</string>
+    <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
+    <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
+    <string name="dev_preview_sampler_title">预览资源占用实测</string>
+    <string name="dev_preview_sampler_summary">每秒记一次各路出帧数和相机开着几路，按界面自动分段——用来看切界面 / 退到后台之后预览这一路是不是还占着资源</string>
+    <string name="dev_photo_test_title">拍照通道实测</string>
+    <string name="dev_photo_test_summary">每一路、每个声明的 JPEG 尺寸真的拍一张，看能不能出图、带了哪些标签（会占用相机，录制中勿进）</string>
+    <string name="dev_note">「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。</string>
+
+    <!-- 上传日志 · 设备识别名称（开发者） -->
+    <string name="nick_confirm_title">确认设备名称</string>
+    <string name="nick_confirm_msg">您输入的设备名称是：\n\n「%1$s」\n\n确认使用此名称吗？</string>
+    <string name="nick_confirm_ok">确认</string>
+    <string name="nick_reenter">重新输入</string>
+    <string name="nick_title">设置设备识别名称</string>
+    <string name="nick_msg">请输入一个便于识别的名称，用于区分不同用户的日志：</string>
+    <string name="nick_hint">例如：张三的 7X</string>
+    <string name="nick_empty">名称不能为空</string>
+    <string name="upload_type_current">本次运行</string>
+    <string name="upload_type_previous">上次运行</string>
+    <string name="upload_uploading">正在上传%1$s日志…</string>
+    <string name="upload_done">作者已收到%1$s日志</string>
+    <string name="upload_failed">上传失败：%1$s</string>
+    <string name="upload_identity">上传身份：「%1$s」</string>
+    <string name="upload_choose_log">选择日志：</string>
+    <string name="upload_current_log">本次运行日志</string>
+    <string name="upload_previous_log">上次运行日志</string>
+    <string name="upload_previous_none">上次运行日志（无可用日志）</string>
+    <string name="upload_desc_label">问题描述：</string>
+    <string name="upload_desc_hint">请描述遇到的问题…</string>
+    <string name="upload_desc_empty">（用户未填写问题描述）</string>
+    <string name="upload_ok">上传</string>
+    <string name="upload_change_name">修改名称</string>
 </resources>

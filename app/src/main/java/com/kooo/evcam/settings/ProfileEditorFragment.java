@@ -129,7 +129,22 @@ public class ProfileEditorFragment extends Fragment {
         }
     }
 
+    /**
+     * 编辑器顶上显示的配置名。
+     *
+     * <p>预设的那三份按 id 显示本地化的名字：存进配置里的名字是迁移时写的中文，
+     * 英文界面下照抄它就是一行中文。自己起过名的配置照原样显示。</p>
+     */
     String profileName() {
+        if (Profile.PRESET_COMPOSITE.equals(profile.id)) {
+            return getString(R.string.opt_model_zeekr);
+        }
+        if (Profile.PRESET_COMPOSITE_MULTI.equals(profile.id)) {
+            return getString(R.string.opt_model_zeekr_multi);
+        }
+        if (Profile.PRESET_CUSTOM.equals(profile.id)) {
+            return getString(R.string.opt_model_custom);
+        }
         return profile.name.isEmpty() ? profile.id : profile.name;
     }
 

@@ -6,6 +6,7 @@
   下面一行是时长、总大小和段数。一项不是一个文件，而是一整段连续录制。
 -->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/session_card"
     android:layout_width="match_parent"
@@ -57,7 +58,7 @@
                 android:layout_marginTop="3dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp"
-                android:text="27:04　·　1.2 GB　·　9 段" />
+                tools:text="27:04 · 1.2 GB · 9 clips" />
         </LinearLayout>
     </LinearLayout>
 

@@ -204,17 +204,6 @@ public class RecordingConfig {
         }
     }
 
-    public static String getBitrateLevelDisplayName(String level) {
-        switch (level) {
-            case BITRATE_HIGH:
-                return "高";
-            case BITRATE_LOW:
-                return "低";
-            default:
-                return "标准";
-        }
-    }
-
     // ========== 帧率配置 ==========
 
     /**
@@ -244,14 +233,6 @@ public class RecordingConfig {
         scale = Math.max(ENCODE_SCALE_25, Math.min(ENCODE_SCALE_100, scale));
         prefs.edit().putFloat(KEY_ENCODE_SCALE_FACTOR, scale).apply();
         AppLog.d(TAG, "编码缩放因子设置: " + scale);
-    }
-
-    public static String getEncodeScaleDisplayName(float scale) {
-        if (scale >= 0.99f) return "原画（高码率）";
-        if (scale >= 0.74f && scale <= 0.76f) return "高画质（推荐）";
-        if (scale >= 0.49f && scale <= 0.51f) return "中画质";
-        if (scale >= 0.24f && scale <= 0.26f) return "低画质";
-        return String.format(Locale.getDefault(), "%.0f%%", scale * 100);
     }
 
     /**

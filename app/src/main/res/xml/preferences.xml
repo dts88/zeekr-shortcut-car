@@ -308,69 +308,69 @@
     -->
     <PreferenceScreen
         android:key="screen_developer"
-        android:title="开发者选项">
+        android:title="@string/set_section_developer">
 
         <Preference
             android:key="pref_permissions"
-            android:title="权限设置"
-            android:summary="管理应用所需的各项权限" />
+            android:title="@string/dev_permissions_title"
+            android:summary="@string/dev_permissions_summary" />
 
         <Preference
             android:key="pref_upload_logs"
-            android:title="上传日志"
-            android:summary="把运行日志发给作者" />
+            android:title="@string/dev_upload_logs_title"
+            android:summary="@string/dev_upload_logs_summary" />
 
         <Preference
             android:key="pref_permission_tools"
-            android:title="权限工具"
-            android:summary="ADB 一键授权、系统白名单（排查用）" />
+            android:title="@string/dev_permission_tools_title"
+            android:summary="@string/dev_permission_tools_summary" />
 
         <Preference
             android:key="pref_blind_spot"
-            android:title="补盲选项" />
+            android:title="@string/dev_blind_spot_title" />
 
         <Preference
             android:key="pref_supervision"
-            android:title="超视模式" />
+            android:title="@string/dev_supervision_title" />
 
         <Preference
             android:key="pref_custom_config"
-            android:title="自定义界面配置"
-            android:summary="「视频流配置」选「自定义」后，在这里配摄像头路数、映射、旋转与布局" />
+            android:title="@string/dev_custom_config_title"
+            android:summary="@string/dev_custom_config_summary" />
 
         <SwitchPreferenceCompat
             android:key="pref_preview_correction"
-            android:title="预览画面矫正"
-            android:summary="对预览画面做平移 / 缩放 / 旋转修正。只作用于走普通预览的那几路（三路配置的座舱相机、自定义），环视合成流由四宫格容器自己排版，不受影响" />
+            android:title="@string/dev_preview_correction_title"
+            android:summary="@string/dev_preview_correction_summary" />
 
         <Preference
             android:key="pref_preview_correction_adjust"
-            android:title="预览矫正调参"
-            android:summary="打开悬浮窗逐路调整，需要先打开上面的开关" />
+            android:title="@string/dev_preview_correction_adjust_title"
+            android:summary="@string/dev_preview_correction_adjust_summary" />
 
         <Preference
             android:key="pref_preview_correction_reset"
-            android:title="重置预览矫正参数" />
+            android:title="@string/dev_preview_correction_reset_title" />
 
         <Preference
             android:key="pref_current_profile"
-            android:title="当前配置"
-            android:summary="从旧设置翻译出来的那份配置全文。第 1 步只翻译不启用，录制和预览仍走老路子——这里是用来逐行核对翻译对不对的" />
+            android:title="@string/set_current_profile_title"
+            android:summary="@string/dev_current_profile_summary" />
 
         <Preference
             android:key="pref_preview_sampler"
-            android:title="预览资源占用实测"
-            android:summary="每秒记一次各路出帧数和相机开着几路，按界面自动分段——用来看切界面 / 退到后台之后预览这一路是不是还占着资源" />
+            android:title="@string/dev_preview_sampler_title"
+            android:summary="@string/dev_preview_sampler_summary" />
 
         <Preference
             android:key="pref_photo_test"
-            android:title="拍照通道实测"
-            android:summary="每一路、每个声明的 JPEG 尺寸真的拍一张，看能不能出图、带了哪些标签（会占用相机，录制中勿进）" />
+            android:title="@string/dev_photo_test_title"
+            android:summary="@string/dev_photo_test_summary" />
 
         <Preference
             android:key="pref_developer_note"
             android:selectable="false"
-            android:summary="「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。" />
+            android:summary="@string/dev_note" />
     </PreferenceScreen>
 
     <!--

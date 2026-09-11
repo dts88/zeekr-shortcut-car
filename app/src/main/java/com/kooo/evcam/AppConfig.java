@@ -3042,73 +3042,73 @@ public class AppConfig {
     /**
      * 获取白平衡模式的显示名称
      */
-    public static String getAwbModeDisplayName(int mode) {
+    public static String getAwbModeDisplayName(Context context, int mode) {
         switch (mode) {
-            case AWB_MODE_DEFAULT: return "默认";
-            case AWB_MODE_AUTO: return "自动";
-            case AWB_MODE_INCANDESCENT: return "白炽灯";
-            case AWB_MODE_FLUORESCENT: return "荧光灯";
-            case AWB_MODE_WARM_FLUORESCENT: return "暖荧光灯";
-            case AWB_MODE_DAYLIGHT: return "日光";
-            case AWB_MODE_CLOUDY_DAYLIGHT: return "阴天";
-            case AWB_MODE_TWILIGHT: return "黄昏";
-            case AWB_MODE_SHADE: return "阴影";
-            default: return "未知";
+            case AWB_MODE_DEFAULT: return context.getString(R.string.adj_default);
+            case AWB_MODE_AUTO: return context.getString(R.string.awb_auto);
+            case AWB_MODE_INCANDESCENT: return context.getString(R.string.awb_incandescent);
+            case AWB_MODE_FLUORESCENT: return context.getString(R.string.awb_fluorescent);
+            case AWB_MODE_WARM_FLUORESCENT: return context.getString(R.string.awb_warm_fluorescent);
+            case AWB_MODE_DAYLIGHT: return context.getString(R.string.awb_daylight);
+            case AWB_MODE_CLOUDY_DAYLIGHT: return context.getString(R.string.awb_cloudy);
+            case AWB_MODE_TWILIGHT: return context.getString(R.string.awb_twilight);
+            case AWB_MODE_SHADE: return context.getString(R.string.awb_shade);
+            default: return "—";
         }
     }
     
     /**
      * 获取色调映射模式的显示名称
      */
-    public static String getTonemapModeDisplayName(int mode) {
+    public static String getTonemapModeDisplayName(Context context, int mode) {
         switch (mode) {
-            case TONEMAP_MODE_DEFAULT: return "默认";
-            case TONEMAP_MODE_CONTRAST_CURVE: return "对比度曲线";
-            case TONEMAP_MODE_FAST: return "快速";
-            case TONEMAP_MODE_HIGH_QUALITY: return "高质量";
-            default: return "未知";
+            case TONEMAP_MODE_DEFAULT: return context.getString(R.string.adj_default);
+            case TONEMAP_MODE_CONTRAST_CURVE: return context.getString(R.string.tonemap_contrast_curve);
+            case TONEMAP_MODE_FAST: return context.getString(R.string.mode_fast);
+            case TONEMAP_MODE_HIGH_QUALITY: return context.getString(R.string.mode_high_quality);
+            default: return "—";
         }
     }
     
     /**
      * 获取边缘增强模式的显示名称
      */
-    public static String getEdgeModeDisplayName(int mode) {
+    public static String getEdgeModeDisplayName(Context context, int mode) {
         switch (mode) {
-            case EDGE_MODE_DEFAULT: return "默认";
-            case EDGE_MODE_OFF: return "关闭";
-            case EDGE_MODE_FAST: return "快速";
-            case EDGE_MODE_HIGH_QUALITY: return "高质量";
-            default: return "未知";
+            case EDGE_MODE_DEFAULT: return context.getString(R.string.adj_default);
+            case EDGE_MODE_OFF: return context.getString(R.string.mode_off);
+            case EDGE_MODE_FAST: return context.getString(R.string.mode_fast);
+            case EDGE_MODE_HIGH_QUALITY: return context.getString(R.string.mode_high_quality);
+            default: return "—";
         }
     }
     
     /**
      * 获取降噪模式的显示名称
      */
-    public static String getNoiseReductionModeDisplayName(int mode) {
+    public static String getNoiseReductionModeDisplayName(Context context, int mode) {
         switch (mode) {
-            case NOISE_REDUCTION_DEFAULT: return "默认";
-            case NOISE_REDUCTION_OFF: return "关闭";
-            case NOISE_REDUCTION_FAST: return "快速";
-            case NOISE_REDUCTION_HIGH_QUALITY: return "高质量";
-            default: return "未知";
+            case NOISE_REDUCTION_DEFAULT: return context.getString(R.string.adj_default);
+            case NOISE_REDUCTION_OFF: return context.getString(R.string.mode_off);
+            case NOISE_REDUCTION_FAST: return context.getString(R.string.mode_fast);
+            case NOISE_REDUCTION_HIGH_QUALITY: return context.getString(R.string.mode_high_quality);
+            default: return "—";
         }
     }
     
     /**
      * 获取特效模式的显示名称
      */
-    public static String getEffectModeDisplayName(int mode) {
+    public static String getEffectModeDisplayName(Context context, int mode) {
         switch (mode) {
-            case EFFECT_MODE_DEFAULT: return "默认";
-            case EFFECT_MODE_OFF: return "关闭";
-            case EFFECT_MODE_MONO: return "黑白";
-            case EFFECT_MODE_NEGATIVE: return "负片";
-            case EFFECT_MODE_SOLARIZE: return "曝光过度";
-            case EFFECT_MODE_SEPIA: return "怀旧";
-            case EFFECT_MODE_AQUA: return "水蓝";
-            default: return "未知";
+            case EFFECT_MODE_DEFAULT: return context.getString(R.string.adj_default);
+            case EFFECT_MODE_OFF: return context.getString(R.string.mode_off);
+            case EFFECT_MODE_MONO: return context.getString(R.string.effect_mono);
+            case EFFECT_MODE_NEGATIVE: return context.getString(R.string.effect_negative);
+            case EFFECT_MODE_SOLARIZE: return context.getString(R.string.effect_solarize);
+            case EFFECT_MODE_SEPIA: return context.getString(R.string.effect_sepia);
+            case EFFECT_MODE_AQUA: return context.getString(R.string.effect_aqua);
+            default: return "—";
         }
     }
     
@@ -3211,26 +3211,6 @@ public class AppConfig {
             return new int[]{height, width};
         }
         return new int[]{width, height};
-    }
-    
-    /**
-     * 获取按钮样式的显示名称
-     */
-    public static String getButtonStyleDisplayName(String style) {
-        if (BUTTON_STYLE_MULTI.equals(style)) {
-            return "多按钮";
-        }
-        return "标准";
-    }
-    
-    /**
-     * 获取按钮方向的显示名称
-     */
-    public static String getButtonOrientationDisplayName(String orientation) {
-        if (BUTTON_ORIENTATION_VERTICAL.equals(orientation)) {
-            return "竖版";
-        }
-        return "横版";
     }
     
     // ==================== 全景影像避让配置相关方法 ====================

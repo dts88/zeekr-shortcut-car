@@ -194,7 +194,7 @@ public class BlindSpotOverlayService extends Service {
     private void showOverlay(String side) {
         if (!WakeUpHelper.hasOverlayPermission(this)) {
             AppLog.e(TAG, "没有悬浮窗权限");
-            Toast.makeText(this, "请授予悬浮窗权限", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
             stopSelf();
             return;
         }

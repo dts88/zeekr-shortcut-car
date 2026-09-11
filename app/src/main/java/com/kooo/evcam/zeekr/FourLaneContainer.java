@@ -343,9 +343,9 @@ public class FourLaneContainer extends ViewGroup {
         return plan != null && plan.isComposite() && displayMode != DisplayMode.RAW;
     }
 
-    /** 当前拆分结果的可读描述，用于界面上的诊断信息。 */
+    /** 当前拆分结果的可读描述。只进日志和诊断报告；状态条上的那一行由主界面按当前语言拼。 */
     public String describePlan() {
-        return plan == null ? "尚未获得合成流尺寸" : plan.toString();
+        return plan == null ? "no composite size yet" : plan.toString();
     }
 
     private void rebuildPlan() {

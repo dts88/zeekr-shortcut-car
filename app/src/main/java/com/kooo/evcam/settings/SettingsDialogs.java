@@ -41,16 +41,16 @@ public final class SettingsDialogs {
         if (context == null) return;
         
         com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle("确认设备名称")
-                .setMessage("您输入的设备名称是：\n\n「" + nickname + "」\n\n确认使用此名称吗？")
-                .setPositiveButton("确认", (dialog, which) -> {
+                .setTitle(R.string.nick_confirm_title)
+                .setMessage(context.getString(R.string.nick_confirm_msg, nickname))
+                .setPositiveButton(R.string.nick_confirm_ok, (dialog, which) -> {
                     // 保存名称，然后显示上传确认框
                     if (config != null) {
                         config.setDeviceNickname(nickname);
                     }
                     showUploadConfirmDialog(context, config, nickname);
                 })
-                .setNegativeButton("重新输入", (dialog, which) -> {
+                .setNegativeButton(R.string.nick_reenter, (dialog, which) -> {
                     // 重新显示输入框
                     showDeviceNicknameInputDialog(context, config);
                 }));
@@ -83,21 +83,22 @@ public final class SettingsDialogs {
                                          boolean uploadPreviousSession) {
         final Context app = context.getApplicationContext();
         final Handler main = new Handler(Looper.getMainLooper());
-        final String logType = uploadPreviousSession ? "上次运行" : "本次运行";
-        Toast.makeText(app, "正在上传" + logType + "日志...", Toast.LENGTH_SHORT).show();
+        final String logType = context.getString(uploadPreviousSession
+                ? R.string.upload_type_previous : R.string.upload_type_current);
+        Toast.makeText(app, app.getString(R.string.upload_uploading, logType), Toast.LENGTH_SHORT).show();
 
         AppLog.uploadLogsToServer(app, deviceNickname, problemDescription,
                 uploadPreviousSession, new AppLog.UploadCallback() {
                     @Override
                     public void onSuccess() {
                         main.post(() -> Toast.makeText(
-                                app, "作者已收到" + logType + "日志", Toast.LENGTH_LONG).show());
+                                app, app.getString(R.string.upload_done, logType), Toast.LENGTH_LONG).show());
                     }
 
                     @Override
                     public void onError(String error) {
                         main.post(() -> Toast.makeText(
-                                app, "上传失败: " + error, Toast.LENGTH_SHORT).show());
+                                app, app.getString(R.string.upload_failed, error), Toast.LENGTH_SHORT).show());
                     }
                 });
     }
@@ -192,7 +193,7 @@ public final class SettingsDialogs {
         
         EditText inputEditText = new EditText(context);
         inputEditText.setInputType(InputType.TYPE_CLASS_TEXT);
-        inputEditText.setHint("例如：张三的银河E5");
+        inputEditText.setHint(R.string.nick_hint);
         inputEditText.setPadding(48, 32, 48, 32);
         // 适配夜间模式
         inputEditText.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
@@ -200,19 +201,19 @@ public final class SettingsDialogs {
         inputEditText.setBackgroundResource(R.drawable.edit_text_background);
         
         com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle("设置设备识别名称")
-                .setMessage("请输入一个便于识别的名称，用于区分不同用户的日志：")
+                .setTitle(R.string.nick_title)
+                .setMessage(R.string.nick_msg)
                 .setView(inputEditText)
-                .setPositiveButton("确认", (dialog, which) -> {
+                .setPositiveButton(R.string.nick_confirm_ok, (dialog, which) -> {
                     String nickname = inputEditText.getText().toString().trim();
                     if (nickname.isEmpty()) {
-                        Toast.makeText(context, "名称不能为空", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, R.string.nick_empty, Toast.LENGTH_SHORT).show();
                         return;
                     }
                     // 显示二次确认
                     showNicknameConfirmDialog(context, config, nickname);
                 })
-                .setNegativeButton("取消", null));
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     static void showUploadConfirmDialog(Context context, AppConfig config, String nickname) {
@@ -225,7 +226,7 @@ public final class SettingsDialogs {
         
         // 名称显示 - 适配夜间模式
         TextView nicknameLabel = new TextView(context);
-        nicknameLabel.setText("上传身份：「" + nickname + "」");
+        nicknameLabel.setText(context.getString(R.string.upload_identity, nickname));
         nicknameLabel.setTextSize(16);
         nicknameLabel.setPadding(0, 0, 0, 24);
         nicknameLabel.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
@@ -233,7 +234,7 @@ public final class SettingsDialogs {
         
         // 日志选择标签
         TextView logTypeLabel = new TextView(context);
-        logTypeLabel.setText("选择日志：");
+        logTypeLabel.setText(R.string.upload_choose_log);
         logTypeLabel.setTextSize(14);
         logTypeLabel.setPadding(0, 0, 0, 8);
         logTypeLabel.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
@@ -247,7 +248,7 @@ public final class SettingsDialogs {
         // 本次运行日志选项
         RadioButton currentLogRadio = new RadioButton(context);
         currentLogRadio.setId(View.generateViewId());
-        currentLogRadio.setText("本次运行日志");
+        currentLogRadio.setText(R.string.upload_current_log);
         currentLogRadio.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
         currentLogRadio.setChecked(true);
         logTypeGroup.addView(currentLogRadio);
@@ -258,10 +259,10 @@ public final class SettingsDialogs {
         boolean hasPrevious = AppLog.hasPreviousSessionLogs(context);
         if (hasPrevious) {
             String prevInfo = AppLog.getPreviousSessionLogInfo(context);
-            previousLogRadio.setText("上次运行日志" + (prevInfo != null ? "\n  " + prevInfo : ""));
+            previousLogRadio.setText(context.getString(R.string.upload_previous_log) + (prevInfo != null ? "\n  " + prevInfo : ""));
             previousLogRadio.setEnabled(true);
         } else {
-            previousLogRadio.setText("上次运行日志（无可用日志）");
+            previousLogRadio.setText(R.string.upload_previous_none);
             previousLogRadio.setEnabled(false);
         }
         previousLogRadio.setTextColor(ContextCompat.getColor(context, 
@@ -272,7 +273,7 @@ public final class SettingsDialogs {
         
         // 问题描述标签 - 适配夜间模式
         TextView descLabel = new TextView(context);
-        descLabel.setText("问题描述：");
+        descLabel.setText(R.string.upload_desc_label);
         descLabel.setTextSize(14);
         descLabel.setPadding(0, 0, 0, 8);
         descLabel.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
@@ -283,27 +284,27 @@ public final class SettingsDialogs {
         inputEditText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         inputEditText.setMinLines(3);
         inputEditText.setMaxLines(6);
-        inputEditText.setHint("请描述遇到的问题...");
+        inputEditText.setHint(R.string.upload_desc_hint);
         inputEditText.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
         inputEditText.setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary));
         inputEditText.setBackgroundResource(R.drawable.edit_text_background);
         layout.addView(inputEditText);
         
         com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle("上传日志")
+                .setTitle(R.string.dev_upload_logs_title)
                 .setView(layout)
-                .setPositiveButton("上传", (dialog, which) -> {
+                .setPositiveButton(R.string.upload_ok, (dialog, which) -> {
                     String problemDesc = inputEditText.getText().toString().trim();
                     if (problemDesc.isEmpty()) {
-                        problemDesc = "（用户未填写问题描述）";
+                        problemDesc = context.getString(R.string.upload_desc_empty);
                     }
                     // 判断选择了哪个日志
                     boolean uploadPreviousSession = previousLogRadio.isChecked();
                     performLogUpload(context, nickname, problemDesc, uploadPreviousSession);
                 })
-                .setNeutralButton("修改名称", (dialog, which) -> {
+                .setNeutralButton(R.string.upload_change_name, (dialog, which) -> {
                     showDeviceNicknameInputDialog(context, config);
                 })
-                .setNegativeButton("取消", null));
+                .setNegativeButton(R.string.action_cancel, null));
     }
 }

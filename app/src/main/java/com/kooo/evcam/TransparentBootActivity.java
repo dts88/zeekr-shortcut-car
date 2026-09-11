@@ -45,9 +45,9 @@ public class TransparentBootActivity extends Activity {
         // 1. 启动前台服务保持进程活跃
         // 【重要】前台服务在 CameraForegroundService.onCreate() 中启动
         // 不再需要 MainActivity 来启动远程服务
-        CameraForegroundService.start(this, 
-            "开机自启动", 
-            "应用已在后台运行");
+        CameraForegroundService.start(this,
+            getString(R.string.notif_background_title),
+            getString(R.string.notif_tap_to_return));
         AppLog.d(TAG, "前台服务已启动（远程服务将在其中启动）");
         
         // 2. 启动 WorkManager 保活任务（车机必需，始终开启）

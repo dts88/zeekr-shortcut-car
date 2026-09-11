@@ -5,7 +5,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- First launch asks which side the driver sits on and puts the action rail on that side. Existing installs are asked once.
+- Settings -> Interface: button side, and "Reduce motion while recording" (on by default).
+- Record button is disabled when there is nowhere to record (no USB drive). The status bar shows the fps cap, bitrate tier and free space.
+- Settings rows redesigned: section icons, values on the right, switches, chevrons.
+- Stream profile editor in two panes (streams / lanes) with a lane map.
+- Drawer regrouped; the rear-view switch toggles in place.
+- Dialogs share one style; destructive buttons are red.
+- About, Diagnostics and Timeline use the shared title bar. Fixed white-on-light text in day mode.
+- Four-up: the tapped lane grows out of its cell.
+- English UI: playback, notifications, diagnostics, image adjustment and the developer section no longer show Chinese. A test blocks new hardcoded text.
+- Removed unused layouts and code.
 
 ## [0.38.0-alpha] - 2026-09-11
 

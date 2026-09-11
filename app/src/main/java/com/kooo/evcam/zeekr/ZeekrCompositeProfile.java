@@ -162,7 +162,7 @@ public final class ZeekrCompositeProfile {
         return false;
     }
 
-    /** 供设置页显示的一行摘要。 */
+    /** 诊断报告里的一行摘要。只有诊断报告调用，不上界面。 */
     public static String describe(Size size) {
         if (size == null) {
             return "未检测到合成流";

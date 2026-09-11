@@ -223,7 +223,7 @@ public class ImageAdjustFloatingWindow {
         // 如果没有可调节的参数
         if (contentLayout.getChildCount() == 0) {
             TextView noParamsText = new TextView(context);
-            noParamsText.setText("当前设备不支持亮度/降噪调节");
+            noParamsText.setText(R.string.adj_unsupported);
             noParamsText.setTextColor(Color.GRAY);
             noParamsText.setTextSize(14);
             noParamsText.setPadding(0, dp2px(20), 0, dp2px(20));
@@ -251,7 +251,7 @@ public class ImageAdjustFloatingWindow {
         
         // 标题
         TextView titleText = new TextView(context);
-        titleText.setText("亮度/降噪调节");
+        titleText.setText(R.string.adj_title);
         titleText.setTextColor(Color.WHITE);
         titleText.setTextSize(16);
         titleText.setLayoutParams(new LinearLayout.LayoutParams(
@@ -302,7 +302,7 @@ public class ImageAdjustFloatingWindow {
      * 创建曝光补偿区域
      */
     private LinearLayout createExposureSection() {
-        LinearLayout section = createSection("曝光补偿");
+        LinearLayout section = createSection(context.getString(R.string.adj_exposure));
         
         Range<Integer> range = adjustManager.getExposureRange();
         if (range == null) {
@@ -370,7 +370,7 @@ public class ImageAdjustFloatingWindow {
         if (exposureValueText != null) {
             int value = adjustManager.getExposureCompensation();
             String text = (value >= 0 ? "+" : "") + value;
-            exposureValueText.setText("当前: " + text + " (调暗 ← → 调亮)");
+            exposureValueText.setText(context.getString(R.string.adj_exposure_value, text));
         }
     }
     
@@ -378,26 +378,26 @@ public class ImageAdjustFloatingWindow {
      * 创建白平衡区域
      */
     private LinearLayout createAwbSection() {
-        LinearLayout section = createSection("白平衡");
+        LinearLayout section = createSection(context.getString(R.string.adj_awb));
         
         awbOptions.clear();
         awbModeValues.clear();
         
         // 添加默认选项
-        awbOptions.add("默认");
+        awbOptions.add(context.getString(R.string.adj_default));
         awbModeValues.add(AppConfig.AWB_MODE_DEFAULT);
         
         int[] supportedModes = adjustManager.getSupportedAwbModes();
         if (supportedModes != null) {
             for (int mode : supportedModes) {
-                awbOptions.add(AppConfig.getAwbModeDisplayName(mode));
+                awbOptions.add(AppConfig.getAwbModeDisplayName(context, mode));
                 awbModeValues.add(mode);
             }
         }
         
         awbSelectText = createSelectTextView(
                 getDisplayName(awbOptions, awbModeValues, adjustManager.getAwbMode()),
-                v -> showSelectionDialog("白平衡", awbOptions, awbModeValues, adjustManager.getAwbMode(), 
+                v -> showSelectionDialog(context.getString(R.string.adj_awb), awbOptions, awbModeValues, adjustManager.getAwbMode(), 
                         value -> {
                             adjustManager.setAwbMode(value);
                             adjustManager.updateAllCameras();
@@ -413,25 +413,25 @@ public class ImageAdjustFloatingWindow {
      * 创建色调映射区域
      */
     private LinearLayout createTonemapSection() {
-        LinearLayout section = createSection("色调映射");
+        LinearLayout section = createSection(context.getString(R.string.adj_tonemap));
         
         tonemapOptions.clear();
         tonemapModeValues.clear();
         
-        tonemapOptions.add("默认");
+        tonemapOptions.add(context.getString(R.string.adj_default));
         tonemapModeValues.add(AppConfig.TONEMAP_MODE_DEFAULT);
         
         int[] supportedModes = adjustManager.getSupportedTonemapModes();
         if (supportedModes != null) {
             for (int mode : supportedModes) {
-                tonemapOptions.add(AppConfig.getTonemapModeDisplayName(mode));
+                tonemapOptions.add(AppConfig.getTonemapModeDisplayName(context, mode));
                 tonemapModeValues.add(mode);
             }
         }
         
         tonemapSelectText = createSelectTextView(
                 getDisplayName(tonemapOptions, tonemapModeValues, adjustManager.getTonemapMode()),
-                v -> showSelectionDialog("色调映射", tonemapOptions, tonemapModeValues, adjustManager.getTonemapMode(),
+                v -> showSelectionDialog(context.getString(R.string.adj_tonemap), tonemapOptions, tonemapModeValues, adjustManager.getTonemapMode(),
                         value -> {
                             adjustManager.setTonemapMode(value);
                             adjustManager.updateAllCameras();
@@ -447,25 +447,25 @@ public class ImageAdjustFloatingWindow {
      * 创建边缘增强区域
      */
     private LinearLayout createEdgeSection() {
-        LinearLayout section = createSection("边缘增强/锐化");
+        LinearLayout section = createSection(context.getString(R.string.adj_edge));
         
         edgeOptions.clear();
         edgeModeValues.clear();
         
-        edgeOptions.add("默认");
+        edgeOptions.add(context.getString(R.string.adj_default));
         edgeModeValues.add(AppConfig.EDGE_MODE_DEFAULT);
         
         int[] supportedModes = adjustManager.getSupportedEdgeModes();
         if (supportedModes != null) {
             for (int mode : supportedModes) {
-                edgeOptions.add(AppConfig.getEdgeModeDisplayName(mode));
+                edgeOptions.add(AppConfig.getEdgeModeDisplayName(context, mode));
                 edgeModeValues.add(mode);
             }
         }
         
         edgeSelectText = createSelectTextView(
                 getDisplayName(edgeOptions, edgeModeValues, adjustManager.getEdgeMode()),
-                v -> showSelectionDialog("边缘增强/锐化", edgeOptions, edgeModeValues, adjustManager.getEdgeMode(),
+                v -> showSelectionDialog(context.getString(R.string.adj_edge), edgeOptions, edgeModeValues, adjustManager.getEdgeMode(),
                         value -> {
                             adjustManager.setEdgeMode(value);
                             adjustManager.updateAllCameras();
@@ -481,25 +481,25 @@ public class ImageAdjustFloatingWindow {
      * 创建降噪区域
      */
     private LinearLayout createNoiseReductionSection() {
-        LinearLayout section = createSection("降噪");
+        LinearLayout section = createSection(context.getString(R.string.adj_noise));
         
         noiseReductionOptions.clear();
         noiseReductionModeValues.clear();
         
-        noiseReductionOptions.add("默认");
+        noiseReductionOptions.add(context.getString(R.string.adj_default));
         noiseReductionModeValues.add(AppConfig.NOISE_REDUCTION_DEFAULT);
         
         int[] supportedModes = adjustManager.getSupportedNoiseReductionModes();
         if (supportedModes != null) {
             for (int mode : supportedModes) {
-                noiseReductionOptions.add(AppConfig.getNoiseReductionModeDisplayName(mode));
+                noiseReductionOptions.add(AppConfig.getNoiseReductionModeDisplayName(context, mode));
                 noiseReductionModeValues.add(mode);
             }
         }
         
         noiseReductionSelectText = createSelectTextView(
                 getDisplayName(noiseReductionOptions, noiseReductionModeValues, adjustManager.getNoiseReductionMode()),
-                v -> showSelectionDialog("降噪", noiseReductionOptions, noiseReductionModeValues, adjustManager.getNoiseReductionMode(),
+                v -> showSelectionDialog(context.getString(R.string.adj_noise), noiseReductionOptions, noiseReductionModeValues, adjustManager.getNoiseReductionMode(),
                         value -> {
                             adjustManager.setNoiseReductionMode(value);
                             adjustManager.updateAllCameras();
@@ -515,25 +515,25 @@ public class ImageAdjustFloatingWindow {
      * 创建特效区域
      */
     private LinearLayout createEffectSection() {
-        LinearLayout section = createSection("特效");
+        LinearLayout section = createSection(context.getString(R.string.adj_effect));
         
         effectOptions.clear();
         effectModeValues.clear();
         
-        effectOptions.add("默认");
+        effectOptions.add(context.getString(R.string.adj_default));
         effectModeValues.add(AppConfig.EFFECT_MODE_DEFAULT);
         
         int[] supportedModes = adjustManager.getSupportedEffectModes();
         if (supportedModes != null) {
             for (int mode : supportedModes) {
-                effectOptions.add(AppConfig.getEffectModeDisplayName(mode));
+                effectOptions.add(AppConfig.getEffectModeDisplayName(context, mode));
                 effectModeValues.add(mode);
             }
         }
         
         effectSelectText = createSelectTextView(
                 getDisplayName(effectOptions, effectModeValues, adjustManager.getEffectMode()),
-                v -> showSelectionDialog("特效", effectOptions, effectModeValues, adjustManager.getEffectMode(),
+                v -> showSelectionDialog(context.getString(R.string.adj_effect), effectOptions, effectModeValues, adjustManager.getEffectMode(),
                         value -> {
                             adjustManager.setEffectMode(value);
                             adjustManager.updateAllCameras();
@@ -617,7 +617,7 @@ public class ImageAdjustFloatingWindow {
             }
             dialog.dismiss();
         });
-        builder.setNegativeButton("取消", null);
+        builder.setNegativeButton(R.string.action_cancel, null);
         
         AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(builder.create());
         
@@ -643,7 +643,7 @@ public class ImageAdjustFloatingWindow {
                 return options.get(i);
             }
         }
-        return options.isEmpty() ? "未知" : options.get(0);
+        return options.isEmpty() ? "—" : options.get(0);
     }
     
     /**
@@ -664,7 +664,7 @@ public class ImageAdjustFloatingWindow {
         
         // 重置按钮
         Button resetButton = new Button(context);
-        resetButton.setText("恢复默认");
+        resetButton.setText(R.string.adj_reset);
         resetButton.setTextSize(12);
         resetButton.setOnClickListener(v -> {
             adjustManager.resetToDefault();
@@ -679,7 +679,7 @@ public class ImageAdjustFloatingWindow {
         
         // 保存并关闭按钮
         Button saveButton = new Button(context);
-        saveButton.setText("保存并关闭");
+        saveButton.setText(R.string.adj_save_close);
         saveButton.setTextSize(12);
         saveButton.setOnClickListener(v -> dismiss());
         bottomBar.addView(saveButton);

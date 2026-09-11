@@ -571,4 +571,84 @@
     <string name="diag_share_subject">%1$s diagnostics report</string>
     <string name="diag_share_chooser">Share diagnostics report</string>
     <string name="diag_share_failed">Could not share; the file is saved at:\n%1$s</string>
+
+    <!-- Image adjustment floating window -->
+    <string name="adj_title">Brightness &amp; noise</string>
+    <string name="adj_unsupported">This device does not support brightness or noise adjustments</string>
+    <string name="adj_exposure">Exposure compensation</string>
+    <string name="adj_exposure_value">Now: %1$s (darker ← → brighter)</string>
+    <string name="adj_awb">White balance</string>
+    <string name="adj_tonemap">Tone mapping</string>
+    <string name="adj_edge">Edge enhancement / sharpening</string>
+    <string name="adj_noise">Noise reduction</string>
+    <string name="adj_effect">Effect</string>
+    <string name="adj_default">Default</string>
+    <string name="adj_reset">Reset</string>
+    <string name="adj_save_close">Save and close</string>
+    <string name="awb_auto">Auto</string>
+    <string name="awb_incandescent">Incandescent</string>
+    <string name="awb_fluorescent">Fluorescent</string>
+    <string name="awb_warm_fluorescent">Warm fluorescent</string>
+    <string name="awb_daylight">Daylight</string>
+    <string name="awb_cloudy">Cloudy</string>
+    <string name="awb_twilight">Twilight</string>
+    <string name="awb_shade">Shade</string>
+    <string name="mode_off">Off</string>
+    <string name="mode_fast">Fast</string>
+    <string name="mode_high_quality">High quality</string>
+    <string name="tonemap_contrast_curve">Contrast curve</string>
+    <string name="effect_mono">Mono</string>
+    <string name="effect_negative">Negative</string>
+    <string name="effect_solarize">Solarize</string>
+    <string name="effect_sepia">Sepia</string>
+    <string name="effect_aqua">Aqua</string>
+
+    <!-- Developer options section -->
+    <string name="set_section_developer">Developer options</string>
+    <string name="dev_permissions_title">Permissions</string>
+    <string name="dev_permissions_summary">Manage the permissions the app needs</string>
+    <string name="dev_upload_logs_title">Upload logs</string>
+    <string name="dev_upload_logs_summary">Send the run logs to the author</string>
+    <string name="dev_permission_tools_title">Permission tools</string>
+    <string name="dev_permission_tools_summary">ADB one-tap grant, system whitelist (troubleshooting)</string>
+    <string name="dev_blind_spot_title">Blind-spot options</string>
+    <string name="dev_supervision_title">Super view</string>
+    <string name="dev_custom_config_title">Custom layout</string>
+    <string name="dev_custom_config_summary">After choosing “Custom” under Stream configuration, set up the cameras, mapping, rotation and layout here</string>
+    <string name="dev_preview_correction_title">Preview correction</string>
+    <string name="dev_preview_correction_summary">Pan / zoom / rotate the preview. Only affects cameras on the plain preview path (cabin cameras in the three-camera setup, custom); the surround composite is laid out by the four-up view and is not affected</string>
+    <string name="dev_preview_correction_adjust_title">Adjust preview correction</string>
+    <string name="dev_preview_correction_adjust_summary">Opens a floating window to adjust each camera; turn on the switch above first</string>
+    <string name="dev_preview_correction_reset_title">Reset preview correction</string>
+    <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
+    <string name="dev_preview_sampler_title">Preview resource sampler</string>
+    <string name="dev_preview_sampler_summary">Logs frames per camera and how many cameras are open every second, split by screen, to see whether the preview still holds resources after switching screens or going to the background</string>
+    <string name="dev_photo_test_title">Photo channel test</string>
+    <string name="dev_photo_test_summary">Takes one photo per camera at every declared JPEG size to see which work and what tags they carry (uses the cameras; do not open while recording)</string>
+    <string name="dev_note">“Surround + cabin (3 cameras)” and “Custom” under Stream configuration are only available here as well. This section hides again after the app restarts.</string>
+
+    <!-- Log upload · device name (developer) -->
+    <string name="nick_confirm_title">Confirm device name</string>
+    <string name="nick_confirm_msg">The device name you entered is:\n\n“%1$s”\n\nUse this name?</string>
+    <string name="nick_confirm_ok">Confirm</string>
+    <string name="nick_reenter">Re-enter</string>
+    <string name="nick_title">Set a device name</string>
+    <string name="nick_msg">Enter a name that identifies you, so that logs from different users can be told apart:</string>
+    <string name="nick_hint">e.g. Alex’s 7X</string>
+    <string name="nick_empty">The name cannot be empty</string>
+    <string name="upload_type_current">this run</string>
+    <string name="upload_type_previous">previous run</string>
+    <string name="upload_uploading">Uploading the %1$s log…</string>
+    <string name="upload_done">The author received the %1$s log</string>
+    <string name="upload_failed">Upload failed: %1$s</string>
+    <string name="upload_identity">Uploading as: “%1$s”</string>
+    <string name="upload_choose_log">Choose a log:</string>
+    <string name="upload_current_log">This run’s log</string>
+    <string name="upload_previous_log">Previous run’s log</string>
+    <string name="upload_previous_none">Previous run’s log (none available)</string>
+    <string name="upload_desc_label">Describe the problem:</string>
+    <string name="upload_desc_hint">Describe what went wrong…</string>
+    <string name="upload_desc_empty">(no description given)</string>
+    <string name="upload_ok">Upload</string>
+    <string name="upload_change_name">Change name</string>
 </resources>

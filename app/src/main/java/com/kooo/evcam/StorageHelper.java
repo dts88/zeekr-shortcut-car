@@ -6,8 +6,6 @@ import android.os.Environment;
 import android.os.StatFs;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 存储帮助类
@@ -696,96 +694,6 @@ public class StorageHelper {
     }
     
     
-    
-    /**
-     * 获取所有检测到的存储设备信息（用于调试）
-     * @param context 上下文
-     * @return 存储设备信息列表
-     */
-    public static List<String> getStorageDebugInfo(Context context) {
-        List<String> info = new ArrayList<>();
-        
-        // 0. 显示内部存储路径（用于对比）
-        info.add("=== 内部存储 ===");
-        String internalPath = Environment.getExternalStorageDirectory().getAbsolutePath();
-        info.add("路径: " + internalPath);
-        info.add("");
-        
-        // 1. /proc/mounts 内容（最可靠的挂载信息）
-        info.add("=== /proc/mounts ===");
-        try {
-            java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.FileReader("/proc/mounts"));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("\\s+");
-                if (parts.length >= 2) {
-                    String mountPoint = parts[1];
-                    // 只显示 /storage/ 相关的挂载点
-                    if (mountPoint.startsWith("/storage/")) {
-                        String marker = "";
-                        if (mountPoint.contains("emulated")) {
-                            marker = " [内部]";
-                        } else if (mountPoint.matches("/storage/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}")) {
-                            marker = " [U盘]";
-                        }
-                        info.add(mountPoint + marker);
-                    }
-                }
-            }
-            reader.close();
-        } catch (Exception e) {
-            info.add("读取失败: " + e.getMessage());
-        }
-        
-        // 2. getExternalFilesDirs 信息
-        info.add("");
-        info.add("=== getExternalFilesDirs ===");
-        try {
-            File[] externalDirs = context.getExternalFilesDirs(null);
-            if (externalDirs != null) {
-                for (int i = 0; i < externalDirs.length; i++) {
-                    File dir = externalDirs[i];
-                    if (dir != null) {
-                        String label = (i == 0) ? "[0] 内部" : "[" + i + "] 外部";
-                        info.add(label + ": " + dir.getAbsolutePath());
-                    } else {
-                        info.add("[" + i + "] null");
-                    }
-                }
-            } else {
-                info.add("返回 null");
-            }
-        } catch (Exception e) {
-            info.add("错误: " + e.getMessage());
-        }
-        
-        // 3. 自定义路径
-        info.add("");
-        info.add("=== 自定义路径 ===");
-        AppConfig config = new AppConfig(context);
-        String customPath = config.getCustomSdCardPath();
-        if (customPath != null && !customPath.isEmpty()) {
-            File customDir = new File(customPath);
-            info.add("路径: " + customPath);
-            info.add("存在: " + customDir.exists() + ", 可读: " + customDir.canRead() + ", 可写: " + customDir.canWrite());
-        } else {
-            info.add("未设置");
-        }
-        
-        // 4. 检测结果
-        info.add("");
-        info.add("=== 检测结果 ===");
-        File sdCard = getExternalSdCardRoot(context);
-        if (sdCard != null) {
-            info.add("检测到U盘: " + sdCard.getAbsolutePath());
-            info.add("可写入: " + sdCard.canWrite());
-        } else {
-            info.add("未检测到U盘");
-        }
-        
-        return info;
-    }
     
     /**
      * 获取存储空间信息
