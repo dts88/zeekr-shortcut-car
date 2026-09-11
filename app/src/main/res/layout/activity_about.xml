@@ -8,16 +8,56 @@
   但两处不能删：GPL-3.0 的继承关系是许可证要求，
   而 openavm-recorder 是「保留所有权利」的项目，本应用借鉴了它公开记录的平台事实，
   「没有复制代码」这句话必须留着。两者都压到一行讲清楚。
+
+  统一骨架：① 标题区（返回在左上，和主界面的菜单同一个位置）+ ③ 内容区。
+  颜色全部走语义色 —— 以前字是写死的白色，换成浅色日间配色后白字压在浅底上就看不见了。
 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/menu_background">
+    android:background="@color/page_background"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/about_close"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/action_back"
+            app:icon="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:text="@string/about_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="24dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingStart="28dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="28dp"
+        android:paddingBottom="28dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -25,19 +65,10 @@
             android:orientation="vertical">
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/about_title"
-                android:textColor="#FFFFFF"
-                android:textSize="26sp"
-                android:textStyle="bold" />
-
-            <TextView
                 android:id="@+id/about_version"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:textColor="#AAFFFFFF"
+                android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
             <TextView
@@ -47,7 +78,7 @@
                 android:layout_marginTop="16dp"
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_tagline"
-                android:textColor="#DDFFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
             <!-- 存储建议 -->
@@ -56,7 +87,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:text="@string/about_storage_title"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -66,16 +97,17 @@
                 android:layout_marginTop="6dp"
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_storage_body"
-                android:textColor="#DDFFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
+            <!-- 隐私提醒：U 盘里的录像没有加密。用录制红标出来 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_storage_privacy"
-                android:textColor="#FFD08080"
+                android:textColor="@color/recording_text"
                 android:textSize="15sp" />
 
             <!-- 项目地址 -->
@@ -84,7 +116,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:text="@string/about_project_title"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -94,7 +126,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="github.com/dts88/zeekr-shortcut-car"
-                android:textColor="#4FC3F7"
+                android:textColor="@color/energy_text"
                 android:textSize="15sp" />
 
             <!-- 请作者喝杯咖啡 -->
@@ -103,7 +135,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:text="@string/about_coffee_title"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -112,7 +144,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="@string/about_coffee_body"
-                android:textColor="#DDFFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
             <!-- 开源与来源 -->
@@ -121,7 +153,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:text="@string/about_credits_title"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -131,7 +163,7 @@
                 android:layout_marginTop="6dp"
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_credits_evcam"
-                android:textColor="#DDFFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
             <TextView
@@ -140,7 +172,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="github.com/suyunkai/EVCam"
-                android:textColor="#4FC3F7"
+                android:textColor="@color/energy_text"
                 android:textSize="15sp" />
 
             <TextView
@@ -149,7 +181,7 @@
                 android:layout_marginTop="12dp"
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_credits_openavm"
-                android:textColor="#DDFFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp" />
 
             <TextView
@@ -158,7 +190,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="github.com/Dantenothing/openavm-recorder"
-                android:textColor="#4FC3F7"
+                android:textColor="@color/energy_text"
                 android:textSize="15sp" />
 
             <TextView
@@ -167,7 +199,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:text="@string/about_license_line"
-                android:textColor="#4FC3F7"
+                android:textColor="@color/energy_text"
                 android:textSize="15sp" />
 
             <!-- 安全免责 -->
@@ -177,7 +209,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:text="@string/about_safety_title"
-                android:textColor="#FF8080"
+                android:textColor="@color/recording_text"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -187,19 +219,8 @@
                 android:layout_marginTop="6dp"
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_safety_body"
-                android:textColor="#DDFFFFFF"
-                android:textSize="15sp" />
-
-            <Button
-                android:id="@+id/about_close"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginTop="24dp"
-                android:backgroundTint="@color/button_background"
-                android:text="@string/action_close"
-                android:textColor="@color/button_text"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp" />
         </LinearLayout>
     </ScrollView>
-</FrameLayout>
+</LinearLayout>

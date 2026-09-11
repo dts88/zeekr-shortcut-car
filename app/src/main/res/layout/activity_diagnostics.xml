@@ -1,128 +1,145 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  诊断信息。统一骨架：① 标题区（返回在左上）+ 一排操作 + ③ 报告正文。
+
+  返回键接用了原来行末那个「关闭」的 id（diagnostics_close），点击逻辑不用改；
+  那个「关闭」本身就不再需要了 —— 同一件事有两个入口，只会让人找哪个才是。
+  颜色走语义色：以前是写死的白字，日间浅底上看不见。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/menu_background"
-    android:padding="16dp">
+    android:background="@color/page_background"
+    android:orientation="vertical">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="诊断信息"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:textStyle="bold" />
-
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="10dp"
-        android:text="相机 / 屏幕 / 车辆信号 / 存储 / 日志。可保存为文件带走，或复制后发回分析。"
-        android:textColor="#AAFFFFFF"
-        android:textSize="13sp" />
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/diagnostics_close"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/action_back"
+            app:icon="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:text="@string/set_diagnostics_title"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="相机 / 屏幕 / 车辆信号 / 存储 / 日志。可保存为文件带走，或复制后发回分析。"
+            android:textColor="@color/text_tertiary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
 
     <!-- 操作按钮 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="10dp">
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_save"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="保存到存储"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:text="保存到存储" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_copy"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="复制"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:text="复制" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_share"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="分享"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:text="分享" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_refresh"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="重新采集"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:text="重新采集" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_request_car_perms"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="申请车辆权限"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:text="申请车辆权限" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_snapshot"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="52dp"
             android:layout_marginEnd="8dp"
-            android:text="① 拍快照"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="① 拍快照" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_compare"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:text="② 对比变化"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
-
-        <Button
-            android:id="@+id/diagnostics_close"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="关闭"
-            android:textSize="15sp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:layout_height="52dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="② 对比变化" />
     </LinearLayout>
 
-    <!-- 报告正文：等宽字体，横竖都能滚 -->
+    <!-- 报告正文：等宽字体，横竖都能滚，垫在一块卡片上 -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
         android:layout_weight="1"
-        android:background="#20000000"
-        android:padding="8dp">
+        android:background="@drawable/bg_pref_row_static"
+        android:padding="12dp">
 
         <HorizontalScrollView
             android:layout_width="match_parent"
@@ -132,9 +149,9 @@
                 android:id="@+id/diagnostics_report"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textIsSelectable="true"
                 android:fontFamily="monospace"
-                android:textColor="#DDFFFFFF"
+                android:textColor="@color/text_primary"
+                android:textIsSelectable="true"
                 android:textSize="12sp" />
         </HorizontalScrollView>
     </ScrollView>

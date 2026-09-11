@@ -1,197 +1,207 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  连续回放。左栏列出识别出来的每一条连续时间轴，右侧是播放器。
-  版式与视频回看界面一致：列表在左，内容在右。
+  连续回放。统一骨架：① 标题区（返回在左上）+ 左栏连续录制列表 + 右侧播放器。
+
+  返回键接用了原来控制条末尾那个「关闭」的 id（timeline_close），点击逻辑不用改。
+  只有画面那一块是黑底（视频本来就该衬黑），其余跟应用配色走 ——
+  以前整页是黑的，控制条上的时间写死白色，换成浅色日间配色后就看不见了。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:background="#FF000000">
+    android:background="@color/page_background"
+    android:orientation="vertical">
 
-    <!-- 左：连续录制列表 -->
     <LinearLayout
-        android:layout_width="280dp"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:background="@color/menu_background">
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_close"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/action_back"
+            app:icon="@drawable/ic_back" />
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="14dp"
-            android:paddingBottom="6dp"
+            android:layout_marginStart="14dp"
             android:text="@string/player_title"
             android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/timeline_list_summary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="8dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:text="@string/msg_scanning_short" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/timeline_session_list"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingBottom="8dp" />
     </LinearLayout>
 
-    <!-- 右：播放器 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="horizontal">
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <!--
-              TextureView 而不是 VideoView：VideoView 内部是 SurfaceView，
-              会在窗口上挖一个洞，画面在洞后面合成 —— 小窗发虚/透明就是这么来的。
-              TextureView 是普通视图，画在窗口里，没有这个问题。
-            -->
-            <TextureView
-                android:id="@+id/timeline_video"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center" />
-
-            <!--
-              切换分段时用它盖住画面，而不是把 VideoView 隐藏。
-              SurfaceView 是在窗口上挖了个洞、自己的画面在洞后面合成 ——
-              一旦隐藏就只剩那个洞，于是能看到应用背后的东西（发虚/透明）。
-              这个不透明的 View 画在窗口里、盖在洞上方，遮住画面而不动 surface。
-            -->
-            <View
-                android:id="@+id/timeline_video_cover"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#FF000000"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/timeline_info"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|start"
-                android:layout_margin="12dp"
-                android:background="@drawable/camera_label_background"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:textColor="#DDFFFFFF"
-                android:textSize="13sp" />
-        </FrameLayout>
-
-        <!-- 进度条 -->
+        <!-- 左：连续录制列表 -->
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp"
-            android:background="@color/menu_background">
-
-            <SeekBar
-                android:id="@+id/timeline_seek"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+            android:layout_width="@dimen/list_width"
+            android:layout_height="match_parent"
+            android:background="@color/menu_background"
+            android:orientation="vertical">
 
             <TextView
-                android:id="@+id/timeline_position"
-                android:layout_width="wrap_content"
+                android:id="@+id/timeline_list_summary"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="2dp"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:fontFamily="monospace" />
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="8dp"
+                android:text="@string/msg_scanning_short"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
 
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/timeline_session_list"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp" />
+        </LinearLayout>
+
+        <!-- 右：播放器 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="@color/black">
+
+                <!--
+                  TextureView 而不是 VideoView：VideoView 内部是 SurfaceView，
+                  会在窗口上挖一个洞，画面在洞后面合成 —— 小窗发虚/透明就是这么来的。
+                  TextureView 是普通视图，画在窗口里，没有这个问题。
+                -->
+                <TextureView
+                    android:id="@+id/timeline_video"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="center" />
+
+                <!--
+                  切换分段时用它盖住画面，而不是把画面藏起来：
+                  一个不透明的 View 画在窗口里、盖在画面上方，遮住画面而不动 surface。
+                -->
+                <View
+                    android:id="@+id/timeline_video_cover"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@color/black"
+                    android:visibility="gone" />
+
+                <!-- 画面上的角标：压在视频上，所以用深色半透明底 + 白字，不跟日夜变 -->
+                <TextView
+                    android:id="@+id/timeline_info"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/camera_label_background"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+            </FrameLayout>
+
+            <!-- 进度条与控制 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                android:background="@color/menu_background"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-                <Button
-                    android:id="@+id/timeline_prev_session"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/player_prev"
-                    android:textSize="15sp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                <SeekBar
+                    android:id="@+id/timeline_seek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
 
-                <Button
-                    android:id="@+id/timeline_play_pause"
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/timeline_position"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/action_play"
-                    android:textSize="15sp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
 
-                <Button
-                    android:id="@+id/timeline_next_session"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/player_next"
-                    android:textSize="15sp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
 
-                <Button
-                    android:id="@+id/timeline_speed"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="1.0x"
-                    android:textSize="15sp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_prev_session"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/player_prev" />
 
-                <Button
-                    android:id="@+id/timeline_send"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/action_send_to_phone"
-                    android:textSize="15sp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_play_pause"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/action_play" />
 
-                <Button
-                    android:id="@+id/timeline_close"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/action_close"
-                    android:textSize="15sp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_next_session"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/player_next" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_speed"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="1.0x" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_send"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:text="@string/action_send_to_phone" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

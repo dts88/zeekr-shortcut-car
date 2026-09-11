@@ -7,38 +7,36 @@
     android:orientation="vertical"
     android:background="@color/page_background">
 
-    <!-- 顶部工具栏 -->
+    <!--
+      ① 标题区：和主界面同一套 —— 64dp 高，菜单在左上，界面名紧跟着，
+      本界面的动作靠右。按钮都是矢量图标或灰底块，不再用 ☰ ⌂ 这类字符。
+    -->
     <LinearLayout
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/title_bar_height"
         android:orientation="horizontal"
-        android:paddingTop="15dp"
-        android:paddingBottom="8dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp"
         android:gravity="center_vertical"
         android:background="@color/menu_background">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_menu"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="☰"
-            android:textSize="20sp"
-            android:minWidth="48dp"
-            android:minHeight="48dp"
-            android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/cd_menu"
+            app:icon="@drawable/ic_menu" />
 
         <TextView
             android:id="@+id/toolbar_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
             android:text="@string/nav_photo_playback"
             android:textColor="@color/text_primary"
-            android:textSize="24sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <TextView
@@ -46,69 +44,61 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="16dp"
+            android:layout_marginStart="14dp"
             android:text=""
             android:textColor="@color/text_secondary"
-            android:textSize="16sp"
+            android:textSize="14sp"
             android:gravity="start|center_vertical" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_refresh"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/action_refresh"
-            android:textSize="20sp"
-            android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_refresh" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_multi_select"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/action_multi_select"
-            android:textSize="20sp"
-            android:minHeight="48dp"
+            android:layout_height="@dimen/icon_button_size"
             android:layout_marginStart="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_multi_select" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_home"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="⌂"
-            android:textSize="20sp"
-            android:minWidth="48dp"
-            android:minHeight="48dp"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
             android:layout_marginStart="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:contentDescription="@string/set_back_to_recording"
+            app:icon="@drawable/ic_home" />
     </LinearLayout>
 
-    <!-- 多选工具栏（隐藏） -->
+    <!-- 多选工具栏（隐藏）：同样的高度和按钮；分享用能量橙，删除用录制红 -->
     <LinearLayout
         android:id="@+id/multi_select_toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/title_bar_height"
         android:orientation="horizontal"
-        android:paddingTop="15dp"
-        android:paddingBottom="8dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp"
         android:gravity="center_vertical"
         android:background="@color/menu_background"
         android:visibility="gone">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_select_all"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/action_select_all"
-            android:textSize="20sp"
-            android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_select_all" />
 
         <TextView
             android:id="@+id/selected_count"
@@ -117,40 +107,41 @@
             android:layout_weight="1"
             android:text="@string/msg_selected_none"
             android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textSize="16sp"
             android:gravity="center" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_share_selected"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/action_share"
-            android:textSize="20sp"
-            android:minHeight="48dp"
+            android:layout_height="@dimen/icon_button_size"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_accent"
-            android:textColor="@android:color/white" />
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_share"
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/energy" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_delete_selected"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
             android:text="@string/action_delete"
-            android:textSize="20sp"
-            android:minHeight="48dp"
-            android:backgroundTint="@android:color/holo_red_dark"
-            android:textColor="@android:color/white" />
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/recording" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_cancel_select"
+            style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/action_cancel"
-            android:textSize="20sp"
-            android:minHeight="48dp"
+            android:layout_height="@dimen/icon_button_size"
             android:layout_marginStart="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_cancel" />
     </LinearLayout>
 
     <!-- 主内容区：左右分栏 -->
