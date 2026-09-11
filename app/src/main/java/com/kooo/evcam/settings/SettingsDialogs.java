@@ -40,7 +40,7 @@ public final class SettingsDialogs {
     static void showNicknameConfirmDialog(Context context, AppConfig config, String nickname) {
         if (context == null) return;
         
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle("确认设备名称")
                 .setMessage("您输入的设备名称是：\n\n「" + nickname + "」\n\n确认使用此名称吗？")
                 .setPositiveButton("确认", (dialog, which) -> {
@@ -53,8 +53,7 @@ public final class SettingsDialogs {
                 .setNegativeButton("重新输入", (dialog, which) -> {
                     // 重新显示输入框
                     showDeviceNicknameInputDialog(context, config);
-                })
-                .show();
+                }));
     }
 
     /** 这台车上到底有哪些相机 id —— 手动指定映射时要从真实存在的里面挑。 */
@@ -161,7 +160,7 @@ public final class SettingsDialogs {
             spinners[i] = spinner;
         }
 
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(
+        com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(
                 context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.set_camera_mapping_title)
                 .setView(root)
@@ -185,8 +184,7 @@ public final class SettingsDialogs {
                     Toast.makeText(context, R.string.msg_mapping_cleared,
                             Toast.LENGTH_LONG).show();
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     static void showDeviceNicknameInputDialog(Context context, AppConfig config) {
@@ -201,7 +199,7 @@ public final class SettingsDialogs {
         inputEditText.setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary));
         inputEditText.setBackgroundResource(R.drawable.edit_text_background);
         
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle("设置设备识别名称")
                 .setMessage("请输入一个便于识别的名称，用于区分不同用户的日志：")
                 .setView(inputEditText)
@@ -214,8 +212,7 @@ public final class SettingsDialogs {
                     // 显示二次确认
                     showNicknameConfirmDialog(context, config, nickname);
                 })
-                .setNegativeButton("取消", null)
-                .show();
+                .setNegativeButton("取消", null));
     }
 
     static void showUploadConfirmDialog(Context context, AppConfig config, String nickname) {
@@ -292,7 +289,7 @@ public final class SettingsDialogs {
         inputEditText.setBackgroundResource(R.drawable.edit_text_background);
         layout.addView(inputEditText);
         
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle("上传日志")
                 .setView(layout)
                 .setPositiveButton("上传", (dialog, which) -> {
@@ -307,7 +304,6 @@ public final class SettingsDialogs {
                 .setNeutralButton("修改名称", (dialog, which) -> {
                     showDeviceNicknameInputDialog(context, config);
                 })
-                .setNegativeButton("取消", null)
-                .show();
+                .setNegativeButton("取消", null));
     }
 }

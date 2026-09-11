@@ -522,7 +522,7 @@ public class TimelinePlayerActivity extends Activity {
                         .format(new Date(session.startEpochMs)),
                 session.segmentCount(),
                 TimelineFormat.size(session.totalSizeBytes));
-        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(title)
                 .setItems(new CharSequence[]{getString(R.string.action_share_clip),
                         getString(R.string.action_delete_clip)}, (dialog, which) -> {
@@ -532,8 +532,7 @@ public class TimelinePlayerActivity extends Activity {
                         confirmDeleteSession(index, session);
                     }
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private void shareSession(RecordingTimeline.Session session) {
@@ -567,14 +566,13 @@ public class TimelinePlayerActivity extends Activity {
     }
 
     private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
-        new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle("确认删除")
                 .setMessage(String.format(Locale.getDefault(),
                         "将删除这段录制的全部 %d 个文件，共 %s。删除后无法恢复。",
                         session.segmentCount(), TimelineFormat.size(session.totalSizeBytes)))
                 .setPositiveButton("删除", (dialog, which) -> deleteSession(index, session))
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private void deleteSession(int index, RecordingTimeline.Session session) {

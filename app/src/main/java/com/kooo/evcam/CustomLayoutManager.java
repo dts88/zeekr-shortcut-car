@@ -761,6 +761,7 @@ public class CustomLayoutManager {
 
         // 设置弹窗背景透明度为15%
         dialog.setOnShowListener(d -> {
+            com.kooo.evcam.ui.CamDialogs.paintNow(dialog);
             View rootView = dialog.getWindow().getDecorView();
             rootView.setBackgroundColor(android.graphics.Color.parseColor("#26000000"));
         });

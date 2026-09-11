@@ -118,7 +118,7 @@ public final class ProfilePreviewCheck {
         box.addView(holder, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, height));
 
-        dialog = new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                 .setTitle("看一眼再保存")
                 .setView(box)
                 .setPositiveButton("保存", (d, w) -> {
@@ -127,7 +127,7 @@ public final class ProfilePreviewCheck {
                 })
                 .setNegativeButton(R.string.action_cancel, (d, w) -> stop())
                 .setCancelable(false)
-                .create();
+                .create());
         dialog.setOnDismissListener(d -> stop());
         dialog.show();
 

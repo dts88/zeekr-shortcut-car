@@ -645,7 +645,7 @@ public class PermissionSettingsFragment extends Fragment {
     private void showWhitelistRiskDialog() {
         if (getContext() == null) return;
 
-        new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle("风险提醒")
                 .setMessage("此操作将修改车机系统分区的配置文件，请仔细阅读：\n\n"
                         + "1. 仅适用于银河E5（E245）车机\n"
@@ -657,8 +657,7 @@ public class PermissionSettingsFragment extends Fragment {
                         + "7. 如果设备不是 E245，脚本会自动检测并中止。\n\n"
                         + "确认要继续执行吗？")
                 .setPositiveButton("确认执行", (dialog, which) -> startWhitelistSetup())
-                .setNegativeButton("取消", null)
-                .show();
+                .setNegativeButton("取消", null));
     }
 
     /**
@@ -716,7 +715,7 @@ public class PermissionSettingsFragment extends Fragment {
     private void showRestoreConfirmDialog() {
         if (getContext() == null) return;
 
-        new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle("恢复确认")
                 .setMessage("此操作将从备份恢复车机系统白名单配置：\n\n"
                         + "1. 恢复后 EVCam 的白名单配置将被移除\n"
@@ -725,8 +724,7 @@ public class PermissionSettingsFragment extends Fragment {
                         + "4. 如果之前「一键配置」导致全景影像等功能异常，恢复后应恢复正常\n\n"
                         + "确认要恢复吗？")
                 .setPositiveButton("确认恢复", (dialog, which) -> startWhitelistRestore())
-                .setNegativeButton("取消", null)
-                .show();
+                .setNegativeButton("取消", null));
     }
 
     /**

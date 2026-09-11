@@ -1416,7 +1416,7 @@ public class MainActivity extends AppCompatActivity {
         }
         final int[] picked = {Math.max(0, spec.indexOf(appConfig.getLanguageMode()))};
 
-        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(R.string.dlg_language_title)
                 .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
                 .setPositiveButton(android.R.string.ok, (d, w) -> applyLanguageChoice(
@@ -1424,8 +1424,7 @@ public class MainActivity extends AppCompatActivity {
                 .setOnCancelListener(d -> applyLanguageChoice(spec.valueAt(picked[0])))
                 // 注意：AlertDialog 一旦设了选项列表就不再显示 message，
                 // 所以「以后能在哪里改」这句放到选完之后提示
-                .setCancelable(true)
-                .show();
+                .setCancelable(true));
     }
 
     private void applyLanguageChoice(String mode) {
@@ -1454,14 +1453,13 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.dlg_rail_side_rhd),
         };
         final int[] picked = {"left".equals(appConfig.getActionRailSide()) ? 0 : 1};
-        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(R.string.dlg_rail_side_title)
                 .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
                 .setPositiveButton(android.R.string.ok,
                         (d, w) -> applyRailSideChoice(sides[picked[0]]))
                 .setOnCancelListener(d -> applyRailSideChoice(sides[picked[0]]))
-                .setCancelable(true)
-                .show();
+                .setCancelable(true));
     }
 
     private void applyRailSideChoice(String side) {
@@ -3303,23 +3301,21 @@ public class MainActivity extends AppCompatActivity {
         }
         // 正常模式下根本不往内置存储录 —— 与其偷偷降级，不如说清楚并且不录
         if (!StorageHelper.isInternalStorageAllowed()) {
-            new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+            com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
                     .setTitle(R.string.dlg_no_external_title)
                     .setMessage(R.string.dlg_no_external_msg)
-                    .setPositiveButton(R.string.action_got_it, null)
-                    .show();
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
         boolean chosen = !new AppConfig(this).isUsingExternalSdCard();
         String why = getString(chosen
                 ? R.string.dlg_internal_reason_chosen
                 : R.string.dlg_internal_reason_fallback);
-        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle(R.string.dlg_will_use_internal_title)
                 .setMessage(getString(R.string.dlg_internal_warn, why))
                 .setPositiveButton(R.string.action_record_anyway, (dialog, which) -> onProceed.run())
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private void toggleRecording() {

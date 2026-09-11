@@ -60,10 +60,10 @@ public class BlindSpotDisclaimerDialogFragment extends DialogFragment {
             dismissAllowingStateLoss();
         });
 
-        AlertDialog dialog = new AlertDialog.Builder(
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(
                 requireContext(), R.style.AlertDialogTheme)
                 .setView(view)
-                .create();
+                .create());
         dialog.setCanceledOnTouchOutside(false);
         setCancelable(false);
         return dialog;

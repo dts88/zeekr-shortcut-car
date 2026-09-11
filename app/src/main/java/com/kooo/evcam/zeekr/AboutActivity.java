@@ -119,7 +119,7 @@ public class AboutActivity extends Activity {
                 | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         input.setHint("密码");
 
-        new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
                 .setTitle("开发者选项")
                 .setMessage("这里面是没做完的和排查用的功能。重启应用后会自动关闭。")
                 .setView(input)
@@ -131,8 +131,7 @@ public class AboutActivity extends Activity {
                         Toast.makeText(this, "密码不对", Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton("取消", null)
-                .show();
+                .setNegativeButton("取消", null));
     }
 
     /** 连点的间隔上限，超过就重新数。 */

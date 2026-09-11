@@ -86,13 +86,12 @@ public final class UpdateFlow {
                 ? activity.getString(R.string.upd_size_suffix,
                         String.format(Locale.US, "%.1f", release.apkBytes / 1024f / 1024f))
                 : "";
-        new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                 .setTitle(R.string.upd_found_title)
                 .setMessage(activity.getString(R.string.upd_found_msg,
                         release.tagName, size, current))
                 .setPositiveButton(R.string.upd_download, (d, w) -> download(activity, release))
-                .setNegativeButton(R.string.upd_later, null)
-                .show();
+                .setNegativeButton(R.string.upd_later, null));
     }
 
     // ------------------------------------------------------------------ 下载
@@ -123,11 +122,11 @@ public final class UpdateFlow {
         label.setText(R.string.upd_connecting);
         bar.setIndeterminate(true);
 
-        AlertDialog dialog = new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                 .setTitle(activity.getString(R.string.upd_download_title, release.tagName))
                 .setView(box)
                 .setCancelable(false)
-                .create();
+                .create());
         dialog.show();
         AppLog.i(TAG, "开始下载 " + release.apkName + "：" + release.apkUrl
                 + "，存到 " + target);
@@ -161,12 +160,11 @@ public final class UpdateFlow {
                 if (failure != null) {
                     // 用对话框而不是 toast：下载失败是需要看清原因的，
                     // 一闪而过的提示等于「点了没反应」
-                    new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+                    com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                             .setTitle(R.string.upd_download_failed_title)
                             .setMessage(activity.getString(
                                     R.string.upd_download_failed, failure))
-                            .setPositiveButton(R.string.action_got_it, null)
-                            .show();
+                            .setPositiveButton(R.string.action_got_it, null));
                 } else {
                     install(activity, target);
                 }
@@ -184,13 +182,12 @@ public final class UpdateFlow {
         // Android 8 起「安装未知来源应用」是一项单独授权，没有它 startActivity 会被静默挡掉
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
-            new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+            com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                     .setTitle(R.string.upd_need_install_title)
                     .setMessage(R.string.upd_need_install_msg)
                     .setPositiveButton(R.string.upd_go_settings,
                             (d, w) -> openInstallPermission(activity))
-                    .setNegativeButton(R.string.action_cancel, null)
-                    .show();
+                    .setNegativeButton(R.string.action_cancel, null));
             return;
         }
 
@@ -254,10 +251,10 @@ public final class UpdateFlow {
     }
 
     private static AlertDialog message(Activity activity, String text, boolean cancelable) {
-        AlertDialog dialog = new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                 .setMessage(text)
                 .setCancelable(cancelable)
-                .create();
+                .create());
         dialog.show();
         return dialog;
     }

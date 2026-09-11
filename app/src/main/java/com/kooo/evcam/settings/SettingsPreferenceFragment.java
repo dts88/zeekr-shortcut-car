@@ -247,13 +247,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         // 必须带上 AlertDialogTheme：这个应用的主题下，不指定它的话
         // 按钮文字和背景同色，看着就像「弹出来了但没有确认键」
-        new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
                 .setTitle(R.string.dlg_internal_title)
                 .setMessage(R.string.dlg_internal_msg)
                 .setPositiveButton(R.string.dlg_internal_ok, (dialog, which) ->
                         applyStorageLocation(pref, AppConfig.STORAGE_INTERNAL))
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     /**
@@ -346,11 +345,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (getContext() == null) {
             return;
         }
-        new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
                 .setTitle(R.string.dlg_internal_locked_title)
                 .setMessage(R.string.dlg_internal_locked_msg)
-                .setPositiveButton(R.string.action_got_it, null)
-                .show();
+                .setPositiveButton(R.string.action_got_it, null));
     }
 
     private void applyStorageLocation(ListPreference pref, String value) {
@@ -892,7 +890,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(input);
 
-        new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle(pref.getTitle())
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (dialog, which) -> {
@@ -901,8 +899,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         pref.setText(value);
                     }
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     /**
@@ -950,11 +947,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         ScrollView scroll = new ScrollView(getContext());
         scroll.addView(view);
 
-        new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle(R.string.set_current_profile_title)
                 .setView(scroll)
-                .setPositiveButton(R.string.action_got_it, null)
-                .show();
+                .setPositiveButton(R.string.action_got_it, null));
     }
 
     // ------------------------------------------------------------------ 关于

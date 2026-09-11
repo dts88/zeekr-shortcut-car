@@ -385,14 +385,13 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
     }
 
     private void pickOne(String title, String[] labels, String[] values, Chosen chosen) {
-        new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle(title)
                 .setItems(labels, (d, which) -> {
                     chosen.set(values[which]);
                     render();
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private interface Numbers {
@@ -428,7 +427,7 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
             inputs[i] = input;
         }
 
-        new AlertDialog.Builder(context, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(context, R.style.AlertDialogTheme)
                 .setTitle(title)
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (d, w) -> {
@@ -439,8 +438,7 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
                     onOk.set(values);
                     render();
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private static float parseFloat(String text, float fallback) {
@@ -489,19 +487,18 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
     }
 
     private void confirmRemove(CameraProfile camera) {
-        new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle("移除 " + roleName(camera.role))
                 .setMessage("从这份配置里去掉这一路。它的参数会一起丢掉。")
                 .setPositiveButton(R.string.action_delete, (d, w) -> {
                     profile.cameras.remove(camera);
                     render();
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private void confirmReset() {
-        new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle("恢复为初值")
                 .setMessage("把这份配置改回新建时的样子，你在这里改的会丢掉。")
                 .setPositiveButton("恢复", (d, w) -> {
@@ -509,8 +506,7 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
                     render();
                     toast("已恢复为初值");
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     /**
@@ -597,11 +593,10 @@ public class ProfileEditorFragment extends PreferenceFragmentCompat {
         for (ProfileValidation.Issue issue : issues) {
             sb.append(issue).append('\n');
         }
-        new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
                 .setTitle(title)
                 .setMessage(sb.length() == 0 ? "（没有更多信息）" : sb.toString())
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
+                .setPositiveButton(android.R.string.ok, null));
     }
 
     private ProfileValidation.Capabilities capabilities() {

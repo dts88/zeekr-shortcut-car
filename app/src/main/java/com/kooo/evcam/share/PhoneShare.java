@@ -64,12 +64,11 @@ public final class PhoneShare {
         List<LocalNetwork.Endpoint> endpoints = LocalNetwork.enumerate();
         if (endpoints.isEmpty()) {
             // 没有可用地址就不是「失败」，是前提没满足 —— 说清楚该做什么
-            new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+            com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
                     .setTitle(R.string.share_phone_need_hotspot_title)
                     .setMessage(activity.getString(R.string.share_phone_need_hotspot_msg)
                             + "\n\n" + activity.getString(R.string.share_phone_network_hint))
-                    .setPositiveButton(R.string.action_got_it, null)
-                    .show();
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
 
@@ -157,6 +156,7 @@ public final class PhoneShare {
 
             AlertDialog dialog = builder.create();
             dialog.setOnShowListener(d -> {
+                com.kooo.evcam.ui.CamDialogs.paintNow(dialog);
                 if (endpoints.size() > 1) {
                     // 直接拿按钮改点击：默认行为会关掉对话框，而换地址不该关
                     dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {

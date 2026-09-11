@@ -639,7 +639,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
             return;
         }
 
-        new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_delete_photos_title)
                 .setMessage(getString(R.string.dlg_delete_photos_msg, selectedGroups.size()))
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> {
@@ -683,8 +683,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
                         showEmptyState();
                     }
                 })
-                .setNegativeButton(R.string.action_cancel, null)
-                .show();
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private void applyStatusBarInsets(View view) {
@@ -787,7 +786,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         builder.setView(dialogView);
         builder.setCancelable(true);
 
-        android.app.AlertDialog dialog = builder.create();
+        android.app.AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(builder.create());
 
         // 设置按钮点击事件
         // 扫码互传依赖已移除的 transfer 模块；U 盘可直接取文件，此入口隐藏

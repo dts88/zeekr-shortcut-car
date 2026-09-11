@@ -583,7 +583,7 @@ public class BlindSpotSettingsFragment extends Fragment {
             String keyword = logFilterEditText.getText().toString().trim();
             if (keyword.isEmpty()) {
                 // 没有输入关键词时弹窗提示
-                new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                     .setTitle("提示")
                     .setMessage("未输入过滤关键字，日志量可能很大，可能导致界面卡顿。\n\n建议输入关键字进行过滤，是否继续？")
                     .setPositiveButton("继续打开", (dialog, which) -> {
@@ -591,8 +591,7 @@ public class BlindSpotSettingsFragment extends Fragment {
                         intent.putExtra("filter_keyword", "");
                         startActivity(intent);
                     })
-                    .setNegativeButton("返回输入", null)
-                    .show();
+                    .setNegativeButton("返回输入", null));
             } else {
                 android.content.Intent intent = new android.content.Intent(requireContext(), LogcatViewerActivity.class);
                 intent.putExtra("filter_keyword", keyword);
@@ -746,7 +745,7 @@ public class BlindSpotSettingsFragment extends Fragment {
         picker.setPadding(pad, pad, pad, pad);
         picker.setColor(appConfig.getBlindSpotStatusBarColor());
 
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle("选择动效颜色")
                 .setView(picker)
                 .setPositiveButton("确定", (dialog, which) -> {
@@ -761,8 +760,7 @@ public class BlindSpotSettingsFragment extends Fragment {
                     appConfig.setBlindSpotStatusBarColor(defaultColor);
                     updateColorPreview(defaultColor);
                     BlindSpotService.update(requireContext());
-                })
-                .show();
+                }));
     }
     
     /**

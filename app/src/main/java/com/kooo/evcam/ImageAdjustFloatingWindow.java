@@ -619,7 +619,7 @@ public class ImageAdjustFloatingWindow {
         });
         builder.setNegativeButton("取消", null);
         
-        AlertDialog dialog = builder.create();
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(builder.create());
         
         // 设置对话框窗口类型，使其显示在悬浮窗上方
         Window window = dialog.getWindow();
