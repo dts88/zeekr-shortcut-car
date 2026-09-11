@@ -837,7 +837,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         onClick("pref_preview_correction_adjust", pref -> {
             if (!appConfig.isPreviewCorrectionEnabled()) {
-                toast("请先打开「预览画面矫正」");
+                toast(getString(R.string.msg_correction_needs_switch));
                 return;
             }
             if (getActivity() instanceof MainActivity) {
@@ -859,7 +859,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (getActivity() instanceof MainActivity) {
                 ((MainActivity) getActivity()).refreshPreviewCorrection();
             }
-            toast("预览矫正参数已重置");
+            toast(getString(R.string.msg_correction_reset));
         });
     }
 
@@ -945,7 +945,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         try {
             text = new ProfileStore(getContext()).current().toString();
         } catch (Exception e) {
-            text = "读不出来：" + e;
+            text = getString(R.string.profile_unreadable, String.valueOf(e));
         }
         TextView view = new TextView(getContext());
         view.setText(text);

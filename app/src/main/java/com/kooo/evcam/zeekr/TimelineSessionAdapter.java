@@ -87,7 +87,10 @@ public class TimelineSessionAdapter
         rows.clear();
         if (sessions != null) {
             SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
-            SimpleDateFormat dayLabel = new SimpleDateFormat("M月d日 EEEE", Locale.getDefault());
+            // 「9月11日 星期四」/「Thursday, September 11」：按当前语言由系统给最合适的写法
+            SimpleDateFormat dayLabel = new SimpleDateFormat(
+                    android.text.format.DateFormat.getBestDateTimePattern(
+                            Locale.getDefault(), "MMMMdEEEE"), Locale.getDefault());
             String currentDay = null;
             // 倒着遍历：最新的排在最上面
             for (int i = sessions.size() - 1; i >= 0; i--) {
@@ -216,8 +219,9 @@ public class TimelineSessionAdapter
             timeText.setText(clock.format(start) + " – " + clock.format(end));
 
             metaText.setText(TimelineFormat.duration(session.totalDurationMs)
-                    + "　·　" + TimelineFormat.size(session.totalSizeBytes)
-                    + "　·　" + session.segmentCount() + " 段");
+                    + " · " + TimelineFormat.size(session.totalSizeBytes)
+                    + " · " + itemView.getContext().getString(
+                            R.string.player_clip_count, session.segmentCount()));
 
             selectedBar.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
         }

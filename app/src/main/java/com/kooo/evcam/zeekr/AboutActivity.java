@@ -117,21 +117,21 @@ public class AboutActivity extends Activity {
         final EditText input = new EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
                 | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        input.setHint("密码");
+        input.setHint(R.string.dev_unlock_hint);
 
         com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
-                .setTitle("开发者选项")
-                .setMessage("这里面是没做完的和排查用的功能。重启应用后会自动关闭。")
+                .setTitle(R.string.dev_unlock_title)
+                .setMessage(R.string.dev_unlock_msg)
                 .setView(input)
-                .setPositiveButton("确定", (dialog, which) -> {
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
                     if (com.kooo.evcam.settings.DeveloperMode.unlock(input.getText().toString())) {
-                        Toast.makeText(this, "开发者选项已打开（重启后失效）",
+                        Toast.makeText(this, R.string.dev_unlocked,
                                 Toast.LENGTH_LONG).show();
                     } else {
-                        Toast.makeText(this, "密码不对", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, R.string.dev_wrong_password, Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton("取消", null));
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     /** 连点的间隔上限，超过就重新数。 */

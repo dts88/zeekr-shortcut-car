@@ -229,7 +229,7 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
 
         // 图片数量标签
         int count = group.getPhotoCount();
-        holder.videoCountBadge.setText(count + "张");
+        holder.videoCountBadge.setText(context.getString(R.string.photo_count_badge, count));
 
         // 加载四个位置的缩略图
         loadThumbnail(group.getFrontPhoto(), holder.thumbFront);

@@ -459,4 +459,117 @@
     <string name="editor_camera_summary">相机 %1$s · 最大 %2$s</string>
     <string name="editor_size_unknown">尺寸未知</string>
     <string name="editor_splits">拆四格</string>
+
+    <!-- 连续回放 -->
+    <string name="player_session_title">%1$s · %2$d 段 · %3$s</string>
+    <string name="player_share_chooser">分享录像</string>
+    <string name="player_delete_title">删除这段录制？</string>
+    <string name="player_delete_msg">将删除这段录制的全部 %1$d 个文件，共 %2$s。删除后无法恢复。</string>
+    <string name="player_deleted">已删除 %1$d 个文件</string>
+    <string name="player_info">时间轴 %1$d/%2$d · 起于 %3$s · 共 %4$d 段 · 时长 %5$s</string>
+    <string name="player_clip_count">%1$d 段</string>
+
+    <!-- 保存配置前看一眼 -->
+    <string name="check_opening">正在打开相机……</string>
+    <string name="check_title">看一眼再保存</string>
+    <string name="check_save_countdown">保存（%1$d）</string>
+    <string name="check_ok">画面出来了。看清楚再决定 —— 拆分对不对、位置对不对、有没有卡。</string>
+    <string name="check_no_frames">开了会话但出不了画面：%1$s</string>
+    <string name="check_config_failed">会话配置失败 —— 这套组合这台车机跑不了。保存了会没有画面。</string>
+    <string name="check_session_failed">建会话失败：%1$s</string>
+    <string name="check_disconnected">相机被断开 —— 可能正在录制，或者被别的应用占着。停掉录制再试。</string>
+    <string name="check_error">打不开相机，错误 %1$d</string>
+    <string name="check_open_failed">打不开相机：%1$s</string>
+
+    <!-- 开发者选项解锁 -->
+    <string name="dev_unlock_hint">密码</string>
+    <string name="dev_unlock_title">开发者选项</string>
+    <string name="dev_unlock_msg">这里面是没做完的和排查用的功能。重启应用后会自动关闭。</string>
+    <string name="dev_unlocked">开发者选项已打开（重启后失效）</string>
+    <string name="dev_wrong_password">密码不对</string>
+
+    <!-- 通知 -->
+    <string name="notif_recording_title">正在录制</string>
+    <string name="notif_recording_text">正在录制行车视频</string>
+    <string name="notif_recording_tap">录制进行中，点这里回到应用</string>
+    <string name="notif_channel_recording">录制服务</string>
+    <string name="notif_channel_recording_desc">保持录制服务在后台运行</string>
+    <string name="notif_background_title">在后台运行</string>
+    <string name="notif_tap_to_return">点这里回到应用</string>
+    <string name="notif_channel_keepalive">保活服务</string>
+    <string name="notif_channel_keepalive_desc">维持应用后台运行</string>
+    <string name="notif_keepalive_text">保活服务运行中</string>
+
+    <!-- 存储卷 -->
+    <string name="storage_volume_desc">%1$s（剩余 %2$s / 共 %3$s）</string>
+    <string name="storage_external_named">外置存储（%1$s）</string>
+    <string name="storage_external_n">外置存储 %1$d</string>
+    <string name="storage_external_n_named">外置存储 %1$d（%2$s）</string>
+
+    <!-- 图片回看 -->
+    <string name="photo_count_badge">%1$d 张</string>
+    <string name="cd_expand">展开或收起</string>
+    <string name="cd_selected">已选中</string>
+
+    <!-- 开发者：预览矫正 · 当前配置 -->
+    <string name="msg_correction_needs_switch">请先打开「预览画面矫正」</string>
+    <string name="msg_correction_reset">预览矫正参数已重置</string>
+    <string name="profile_unreadable">读不出来：%1$s</string>
+
+    <!-- 主界面：状态条上的环视流摘要 · 超视 · 调试覆盖层 -->
+    <string name="composite_summary">环视流 %1$d×%2$d · %3$s</string>
+    <string name="composite_split">拆四格</string>
+    <string name="composite_whole">整幅显示</string>
+    <string name="composite_probed">探测结果 %1$d×%2$d</string>
+    <string name="composite_kind_real">合成流</string>
+    <string name="composite_kind_plain">普通相机</string>
+    <string name="msg_supervision_on">超视模式已开启</string>
+    <string name="msg_supervision_off">超视模式已关闭</string>
+    <string name="debug_on">调试信息已开启</string>
+    <string name="debug_off">调试信息已关闭</string>
+    <string name="debug_recording">录制：%1$s</string>
+    <string name="debug_rec">● 录制中</string>
+    <string name="debug_stopped">○ 停止</string>
+    <string name="debug_mode">模式：%1$s</string>
+    <string name="debug_memory">内存：%1$d/%2$d MB</string>
+    <string name="debug_model">车型：%1$s · 摄像头数：%2$d</string>
+    <string name="debug_version">版本：%1$s</string>
+
+    <!-- 诊断信息 -->
+    <string name="diag_subtitle">相机 / 屏幕 / 车辆信号 / 存储 / 日志。可保存为文件带走，或复制后发回分析。</string>
+    <string name="diag_btn_save">保存到存储</string>
+    <string name="diag_btn_copy">复制</string>
+    <string name="diag_btn_refresh">重新采集</string>
+    <string name="diag_btn_car_perms">申请车辆权限</string>
+    <string name="diag_btn_snapshot">① 拍快照</string>
+    <string name="diag_btn_compare">② 对比变化</string>
+    <string name="diag_perms_none">车辆权限要么已全部授予，要么本平台未定义，详见报告 4.5 节</string>
+    <string name="diag_perms_requesting">正在申请 %1$d 项车辆权限，请留意车机是否弹出授权框</string>
+    <string name="diag_perms_result">车辆权限：授予 %1$d / %2$d，正在重新采集</string>
+    <string name="diag_collecting">正在采集诊断信息…</string>
+    <string name="diag_collect_failed">采集失败：%1$s</string>
+    <string name="diag_not_ready">诊断信息尚未生成</string>
+    <string name="diag_mkdir_failed">无法创建目录：%1$s</string>
+    <string name="diag_saved">已保存到：\n%1$s</string>
+    <string name="diag_save_failed">保存失败：%1$s</string>
+    <string name="diag_snapshotting">正在记录当前状态…</string>
+    <string name="diag_snapshot_done">已记录 %1$d 个属性。\n\n现在去做一个动作（挂倒挡 / 开关车门 / 打转向灯 / 踩刹车），做完回来按「② 对比变化」。</string>
+    <string name="diag_snapshot_toast">快照已记录</string>
+    <string name="diag_snapshot_first">请先按「① 拍快照」</string>
+    <string name="diag_comparing">正在对比…</string>
+    <string name="diag_cmp_title"># 状态变化对比</string>
+    <string name="diag_cmp_baseline">基准时间：%1$s · 间隔 %2$d 秒</string>
+    <string name="diag_cmp_counts">属性总数：%1$d · 变化 %2$d 项，滤除噪音后 %3$d 项</string>
+    <string name="diag_cmp_none">## 没有发现变化\n\n这说明刚才那个动作**没有反映到任何系统属性上**。\n注意这不等于「车机读不到这个信号」——只说明它不走系统属性这条路。\n还可以试：ECARX binder（见主报告 4.3）、logcat（4.6）、广播。</string>
+    <string name="diag_cmp_changed_title">## 变化的属性</string>
+    <string name="diag_cmp_next">**接下来**：把上面这些名字对着刚才做的动作看一遍。\n同一个动作重复做两次，两次都变的那一项才可靠 ——\n只变一次的可能只是碰巧同时发生的别的事。</string>
+    <string name="diag_cmp_noise">&lt;details&gt;滤掉的噪音项（开机时长、内存计数之类）：%1$d 项&lt;/details&gt;</string>
+    <string name="diag_clipboard_unavailable">剪贴板不可用</string>
+    <string name="diag_clip_label">诊断报告</string>
+    <string name="diag_copied">已复制到剪贴板</string>
+    <string name="diag_copy_failed">复制失败：%1$s</string>
+    <string name="diag_exporting">正在导出…</string>
+    <string name="diag_share_subject">%1$s 诊断报告</string>
+    <string name="diag_share_chooser">分享诊断报告</string>
+    <string name="diag_share_failed">无法分享，文件已保存在：\n%1$s</string>
 </resources>

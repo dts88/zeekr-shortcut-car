@@ -446,8 +446,8 @@ public class CameraRecordingService extends Service {
                 this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("EVCam 录制中")
-                .setContentText("正在录制行车视频")
+                .setContentTitle(getString(R.string.notif_recording_title))
+                .setContentText(getString(R.string.notif_recording_text))
                 .setSmallIcon(R.drawable.ic_nav_recording)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -458,9 +458,9 @@ public class CameraRecordingService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "录制服务",
+                    getString(R.string.notif_channel_recording),
                     NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("保持录制服务在后台运行");
+            channel.setDescription(getString(R.string.notif_channel_recording_desc));
 
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {

@@ -1657,7 +1657,8 @@ public class MainActivity extends AppCompatActivity {
         appConfig.setSupervisionModeEnabled(newEnabled);
         
         // 显示提示
-        String message = newEnabled ? "超视模式已开启" : "超视模式已关闭";
+        String message = getString(newEnabled
+                ? R.string.msg_supervision_on : R.string.msg_supervision_off);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         
         // 发送广播通知BlindSpotService
@@ -2163,7 +2164,7 @@ public class MainActivity extends AppCompatActivity {
         // 这里写探测值就成了「界面一个数、实际另一个数」。
         compositeProbeInfo = located.diagnostics;
         compositeProbeSize = located.size;
-        updateCompositeInfoOverlay(compositeProbeInfo);
+        updateCompositeInfoOverlay(compositeSummary(located.cameraId, located.size));
 
         // 手动指定优先于自动探测
         String overrideFront = appConfig.getCameraOverride("front");
@@ -2212,20 +2213,14 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         android.util.Size actual = cam.getPreviewSize();
-        String line;
-        if (actual.equals(compositeProbeSize)) {
-            line = compositeProbeInfo;
-        } else {
-            // 尺寸已经不是探测出来的那个了，探测那一行就不能再照抄 ——
-            // 它里面写的拆分方式（竖排四格）对新尺寸未必成立。
-            line = "实际 " + actual.getWidth() + "x" + actual.getHeight() + "  "
-                    + (com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
-                            cam.getCameraId(), actual.getWidth(), actual.getHeight())
-                            ? "条带，拆四格" : "非条带，整幅显示")
-                    + (compositeProbeSize == null ? ""
-                            : "（探测结果 " + compositeProbeSize.getWidth()
-                              + "x" + compositeProbeSize.getHeight() + "）");
+        // 尺寸已经不是探测出来的那个了（按配置改过），就把探测值也写上 ——
+        // 排查时一眼看得出「尺寸是配置定的」
+        String summary = compositeSummary(cam.getCameraId(), actual);
+        if (compositeProbeSize != null && !actual.equals(compositeProbeSize)) {
+            summary += " · " + getString(R.string.composite_probed,
+                    compositeProbeSize.getWidth(), compositeProbeSize.getHeight());
         }
+        final String line = summary;
         runOnUiThread(() -> {
             updateCompositeInfoOverlay(line);
             if (compositeContainer != null) {
@@ -2324,12 +2319,27 @@ public class MainActivity extends AppCompatActivity {
 
     /** 三路模式下把槽位分配显示在画面上——黑屏时这是最直接的线索。 */
     private String describeMultiSlots(com.kooo.evcam.zeekr.ZeekrMultiPlan plan) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("环视=").append(plan.compositeId);
-        sb.append(plan.compositeIsReal ? "(合成流)" : "(普通相机)");
-        sb.append("  座舱1=").append(plan.cabin1Id);
-        sb.append("  座舱2=").append(plan.cabin2Id);
-        return sb.toString();
+        return getString(R.string.slot_surround) + " " + plan.compositeId
+                + " (" + getString(plan.compositeIsReal
+                        ? R.string.composite_kind_real : R.string.composite_kind_plain) + ")"
+                + " · " + getString(R.string.slot_cabin_1) + " " + plan.cabin1Id
+                + " · " + getString(R.string.slot_cabin_2) + " " + plan.cabin2Id;
+    }
+
+    /**
+     * 状态条上那一行：环视流多大、拆不拆。
+     *
+     * <p>以前这里直接摆探测器的诊断文字（中文、带内部术语），英文界面下就是一行中文，
+     * 中文界面下也只有排查的人读得懂。细节照样进日志和诊断报告，这里只说人看得懂的两件事。</p>
+     */
+    private String compositeSummary(String cameraId, android.util.Size size) {
+        if (size == null) {
+            return "";
+        }
+        boolean split = com.kooo.evcam.zeekr.CompositeStreamGeometry.looksLikeComposite(
+                cameraId, size.getWidth(), size.getHeight());
+        return getString(R.string.composite_summary, size.getWidth(), size.getHeight(),
+                getString(split ? R.string.composite_split : R.string.composite_whole));
     }
 
     /**
@@ -2435,7 +2445,8 @@ public class MainActivity extends AppCompatActivity {
             compositeContainer.setSourceSize(previewSize);
             AppLog.d(TAG, "合成流预览尺寸: " + previewSize
                     + " -> " + compositeContainer.describePlan());
-            updateCompositeInfoOverlay(compositeContainer.describePlan());
+            updateCompositeInfoOverlay(compositeSummary(
+                    com.kooo.evcam.zeekr.StreamLayoutTable.compositeCameraId(), previewSize));
             return;
         }
 
@@ -2683,11 +2694,11 @@ public class MainActivity extends AppCompatActivity {
         if (debugOverlayVisible) {
             tvDebugOverlay.setVisibility(View.VISIBLE);
             startDebugUpdates();
-            android.widget.Toast.makeText(this, "调试信息已开启", android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(this, R.string.debug_on, android.widget.Toast.LENGTH_SHORT).show();
         } else {
             tvDebugOverlay.setVisibility(View.GONE);
             stopDebugUpdates();
-            android.widget.Toast.makeText(this, "调试信息已关闭", android.widget.Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(this, R.string.debug_off, android.widget.Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -2715,7 +2726,7 @@ public class MainActivity extends AppCompatActivity {
         if (tvDebugOverlay == null) return;
 
         StringBuilder sb = new StringBuilder();
-        sb.append("── EVCam Debug ──\n");
+        sb.append("── Debug ──\n");
 
         // 摄像头 FPS 和分辨率
         if (cameraManager != null) {
@@ -2726,28 +2737,26 @@ public class MainActivity extends AppCompatActivity {
 
         // 录制状态
         sb.append("\n\n");
-        sb.append("录制: ").append(isRecording ? "● REC" : "○ 停止");
+        sb.append(getString(R.string.debug_recording,
+                getString(isRecording ? R.string.debug_rec : R.string.debug_stopped)));
         if (isRecording) {
-            sb.append("  模式: ").append(appConfig.getRecordingMode());
+            sb.append("  ").append(getString(R.string.debug_mode, appConfig.getRecordingMode()));
         }
 
         // 内存使用
         Runtime rt = Runtime.getRuntime();
         long usedMB = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
         long totalMB = rt.maxMemory() / (1024 * 1024);
-        sb.append("\n");
-        sb.append("内存: ").append(usedMB).append("/").append(totalMB).append(" MB");
+        sb.append("\n").append(getString(R.string.debug_memory, usedMB, totalMB));
 
         // 车型
-        sb.append("\n");
-        sb.append("车型: ").append(appConfig.getCarModel());
-        sb.append("  摄像头数: ").append(appConfig.getCameraCount());
+        sb.append("\n").append(getString(R.string.debug_model,
+                appConfig.getCarModel(), appConfig.getCameraCount()));
 
         // 版本
         try {
             String versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            sb.append("\n");
-            sb.append("版本: ").append(versionName);
+            sb.append("\n").append(getString(R.string.debug_version, versionName));
         } catch (Exception ignored) {}
 
         tvDebugOverlay.setText(sb.toString());
@@ -4144,35 +4153,6 @@ public class MainActivity extends AppCompatActivity {
         return instance;
     }
     
-    /**
-     * 显示摄像头预览悬浮窗
-     * 
-     * @param cameraPosition 要显示的摄像头位置（front/back/left/right）
-     */
-    public void showCameraPreviewFloating(String cameraPosition) {
-        // 检查悬浮窗权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "需要悬浮窗权限才能显示预览", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    android.net.Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
-            return;
-        }
-        
-        // TODO: CameraPreviewFloatingService 尚未实现
-        // CameraPreviewFloatingService.start(this, cameraPosition);
-        AppLog.d(TAG, "Camera preview floating not implemented yet for: " + cameraPosition);
-        Toast.makeText(this, "摄像头预览悬浮窗功能尚未实现", Toast.LENGTH_SHORT).show();
-    }
-    
-    /**
-     * 关闭摄像头预览悬浮窗
-     */
-    public void dismissCameraPreviewFloating() {
-        // TODO: CameraPreviewFloatingService 尚未实现
-        // CameraPreviewFloatingService.stop(this);
-        AppLog.d(TAG, "Camera preview floating stop - not implemented yet");
-    }
 
     // ==================== 极氪合成流 ====================
 

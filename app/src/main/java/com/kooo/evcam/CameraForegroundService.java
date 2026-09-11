@@ -315,7 +315,8 @@ public class CameraForegroundService extends Service {
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 try {
                     AppLog.d(TAG, "执行延迟重启...");
-                    start(getApplicationContext(), "EVCam", "服务自动重启");
+                    start(getApplicationContext(), getString(R.string.notif_background_title),
+                            getString(R.string.notif_tap_to_return));
                 } catch (Exception e) {
                     AppLog.e(TAG, "延迟重启失败: " + e.getMessage(), e);
                 }

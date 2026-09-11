@@ -122,13 +122,11 @@ public class DiagnosticsActivity extends Activity {
     private void requestCarPermissions() {
         String[] pending = VehicleSignalProbe.ungrantedCarPermissions(this);
         if (pending.length == 0) {
-            Toast.makeText(this,
-                    "车辆权限要么已全部授予，要么本平台未定义，详见报告 4.5 节",
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(this, R.string.diag_perms_none, Toast.LENGTH_LONG).show();
             return;
         }
         Toast.makeText(this,
-                "正在申请 " + pending.length + " 项车辆权限，请留意车机是否弹出授权框",
+                getString(R.string.diag_perms_requesting, pending.length),
                 Toast.LENGTH_LONG).show();
         requestPermissions(pending, REQUEST_CAR_PERMISSIONS);
     }
@@ -147,7 +145,7 @@ public class DiagnosticsActivity extends Activity {
             }
         }
         Toast.makeText(this,
-                "车辆权限：授予 " + granted + " / " + grantResults.length + "，正在重新采集",
+                getString(R.string.diag_perms_result, granted, grantResults.length),
                 Toast.LENGTH_LONG).show();
         runCollection();
     }
@@ -156,7 +154,7 @@ public class DiagnosticsActivity extends Activity {
     private void runCollection() {
         setButtonsEnabled(false);
         if (reportView != null) {
-            reportView.setText("正在采集诊断信息...");
+            reportView.setText(R.string.diag_collecting);
         }
         new Thread(() -> {
             String result;
@@ -164,7 +162,7 @@ public class DiagnosticsActivity extends Activity {
                 result = DiagnosticsCollector.collect(getApplicationContext());
             } catch (Throwable t) {
                 AppLog.e(TAG, "采集诊断信息失败", t);
-                result = "采集失败: " + t;
+                result = getString(R.string.diag_collect_failed, String.valueOf(t));
             }
             final String finalResult = result;
             mainHandler.post(() -> {
@@ -206,7 +204,7 @@ public class DiagnosticsActivity extends Activity {
      */
     private File saveReport() {
         if (report == null || report.isEmpty()) {
-            toast("诊断信息尚未生成");
+            toast(getString(R.string.diag_not_ready));
             return null;
         }
         try {
@@ -216,7 +214,7 @@ public class DiagnosticsActivity extends Activity {
                 dir = getExternalFilesDir(null);
             }
             if (dir != null && !dir.exists() && !dir.mkdirs()) {
-                toast("无法创建目录: " + dir.getAbsolutePath());
+                toast(getString(R.string.diag_mkdir_failed, dir.getAbsolutePath()));
                 return null;
             }
             String name = "zeekr_diagnostics_"
@@ -238,11 +236,11 @@ public class DiagnosticsActivity extends Activity {
             lastSavedFile = out;
             AppLog.i(TAG, "诊断报告已保存: " + out.getAbsolutePath()
                     + "（" + out.length() / 1024 + " KB）");
-            toast("已保存到:\n" + out.getAbsolutePath());
+            toast(getString(R.string.diag_saved, out.getAbsolutePath()));
             return out;
         } catch (Exception e) {
             AppLog.e(TAG, "保存诊断报告失败", e);
-            toast("保存失败: " + e.getMessage());
+            toast(getString(R.string.diag_save_failed, String.valueOf(e.getMessage())));
             return null;
         }
     }
@@ -257,17 +255,15 @@ public class DiagnosticsActivity extends Activity {
      * 之前找车辆信号一直卡在猜名字上，而猜不中并不能证明信号不存在。</p>
      */
     private void takeBaselineSnapshot() {
-        reportView.setText("正在记录当前状态...");
+        reportView.setText(R.string.diag_snapshotting);
         // getprop 要开一个进程、读上千行，别占着主线程 —— 车机上卡一下就能感觉到
         new Thread(() -> {
             Map<String, String> snapshot = VehicleSignalProbe.captureProperties();
             mainHandler.post(() -> {
                 baselineSnapshot = snapshot;
                 baselineAtMs = System.currentTimeMillis();
-                reportView.setText("已记录 " + snapshot.size() + " 个属性。\n\n"
-                        + "现在去做一个动作（挂倒挡 / 开关车门 / 打转向灯 / 踩刹车），"
-                        + "做完回来按「② 对比变化」。");
-                toast("快照已记录");
+                reportView.setText(getString(R.string.diag_snapshot_done, snapshot.size()));
+                toast(getString(R.string.diag_snapshot_toast));
             });
         }, "snapshot-baseline").start();
     }
@@ -275,10 +271,10 @@ public class DiagnosticsActivity extends Activity {
     /** 和基准快照对比，把变了的属性列出来。 */
     private void compareWithBaseline() {
         if (baselineSnapshot == null) {
-            Toast.makeText(this, "请先按「① 拍快照」", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.diag_snapshot_first, Toast.LENGTH_SHORT).show();
             return;
         }
-        reportView.setText("正在对比...");
+        reportView.setText(R.string.diag_comparing);
         new Thread(() -> {
             Map<String, String> now = VehicleSignalProbe.captureProperties();
             String result = describeChanges(now);
@@ -295,35 +291,26 @@ public class DiagnosticsActivity extends Activity {
         List<SnapshotDiff.Change> signal = SnapshotDiff.signalOnly(all);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("# 状态变化对比\n\n");
-        sb.append("基准时间：")
-                .append(new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                        .format(new Date(baselineAtMs)))
-                .append("　间隔 ")
-                .append((System.currentTimeMillis() - baselineAtMs) / 1000)
-                .append(" 秒\n");
-        sb.append("属性总数：").append(now.size())
-                .append("　变化 ").append(all.size())
-                .append(" 项，滤除噪音后 ").append(signal.size()).append(" 项\n\n");
+        sb.append(getString(R.string.diag_cmp_title)).append("\n\n");
+        sb.append(getString(R.string.diag_cmp_baseline,
+                new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date(baselineAtMs)),
+                (System.currentTimeMillis() - baselineAtMs) / 1000)).append('\n');
+        sb.append(getString(R.string.diag_cmp_counts, now.size(), all.size(), signal.size()))
+                .append("\n\n");
 
         if (signal.isEmpty()) {
-            sb.append("## 没有发现变化\n\n");
-            sb.append("这说明刚才那个动作**没有反映到任何系统属性上**。\n");
-            sb.append("注意这不等于「车机读不到这个信号」——只说明它不走系统属性这条路。\n");
-            sb.append("还可以试：ECARX binder（见主报告 4.3）、logcat（4.6）、广播。\n");
+            sb.append(getString(R.string.diag_cmp_none)).append('\n');
         } else {
-            sb.append("## 变化的属性\n\n");
+            sb.append(getString(R.string.diag_cmp_changed_title)).append("\n\n");
             for (SnapshotDiff.Change change : signal) {
                 sb.append("- ").append(change.toString()).append('\n');
             }
-            sb.append("\n**接下来**：把上面这些名字对着刚才做的动作看一遍。\n");
-            sb.append("同一个动作重复做两次，两次都变的那一项才可靠 ——\n");
-            sb.append("只变一次的可能只是碰巧同时发生的别的事。\n");
+            sb.append('\n').append(getString(R.string.diag_cmp_next)).append('\n');
         }
 
         if (all.size() > signal.size()) {
-            sb.append("\n<details>滤掉的噪音项（开机时长、内存计数之类）：")
-                    .append(all.size() - signal.size()).append(" 项</details>\n");
+            sb.append('\n').append(getString(R.string.diag_cmp_noise, all.size() - signal.size()))
+                    .append('\n');
         }
 
         return sb.toString();
@@ -331,20 +318,20 @@ public class DiagnosticsActivity extends Activity {
 
     private void copyReport() {
         if (report == null || report.isEmpty()) {
-            toast("诊断信息尚未生成");
+            toast(getString(R.string.diag_not_ready));
             return;
         }
         try {
             ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
             if (cm == null) {
-                toast("剪贴板不可用");
+                toast(getString(R.string.diag_clipboard_unavailable));
                 return;
             }
-            cm.setPrimaryClip(ClipData.newPlainText("Zeekr 诊断报告", report));
-            toast("已复制到剪贴板");
+            cm.setPrimaryClip(ClipData.newPlainText(getString(R.string.diag_clip_label), report));
+            toast(getString(R.string.diag_copied));
         } catch (Exception e) {
             AppLog.e(TAG, "复制失败", e);
-            toast("复制失败: " + e.getMessage());
+            toast(getString(R.string.diag_copy_failed, String.valueOf(e.getMessage())));
         }
     }
 
@@ -354,7 +341,7 @@ public class DiagnosticsActivity extends Activity {
      * @param then 保存完要做的事（例如接着分享）；不需要就传 null
      */
     private void saveInBackground(java.util.function.Consumer<File> then) {
-        toast("正在导出...");
+        toast(getString(R.string.diag_exporting));
         new Thread(() -> {
             File out = saveReport();
             mainHandler.post(() -> {
@@ -385,13 +372,14 @@ public class DiagnosticsActivity extends Activity {
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("application/json");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
-            intent.putExtra(Intent.EXTRA_SUBJECT, "极氪即刻 诊断报告");
+            intent.putExtra(Intent.EXTRA_SUBJECT,
+                    getString(R.string.diag_share_subject, getString(R.string.app_name)));
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(intent, "分享诊断报告"));
+            startActivity(Intent.createChooser(intent, getString(R.string.diag_share_chooser)));
         } catch (Exception e) {
             // 车机上常常没有可分享的应用，退回提示文件路径
             AppLog.w(TAG, "分享失败", e);
-            toast("无法分享，文件已保存在:\n" + file.getAbsolutePath());
+            toast(getString(R.string.diag_share_failed, file.getAbsolutePath()));
         }
     }
 

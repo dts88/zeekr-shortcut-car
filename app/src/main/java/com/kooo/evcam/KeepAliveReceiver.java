@@ -273,7 +273,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
     /**
      * 确保所有保活服务正在运行（带触发原因）
      * @param context 上下文
-     * @param reason 触发原因（用于通知显示）
+     * @param reason 触发原因：只写进日志。通知栏上给人看的是「在后台运行」，「屏幕亮起」「电量正常」这类原因是排查用的
      */
     private void ensureServicesRunning(Context context, String reason) {
         // 防止短时间内重复触发
@@ -285,7 +285,9 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         
         try {
             // 启动前台服务
-            CameraForegroundService.start(context, "EVCam 后台运行中", "触发: " + reason);
+            CameraForegroundService.start(context,
+                    context.getString(R.string.notif_background_title),
+                    context.getString(R.string.notif_tap_to_return));
             AppLog.d(TAG, "已请求启动前台服务 (触发: " + reason + ")");
         } catch (Exception e) {
             AppLog.e(TAG, "启动服务失败: " + e.getMessage(), e);
@@ -306,7 +308,9 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         
         try {
             // 启动前台服务
-            CameraForegroundService.start(context, "EVCam 后台运行中", "点击返回应用");
+            CameraForegroundService.start(context,
+                    context.getString(R.string.notif_background_title),
+                    context.getString(R.string.notif_tap_to_return));
         } catch (Exception e) {
             // 静默失败，不输出日志
         }

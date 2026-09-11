@@ -458,4 +458,117 @@
     <string name="editor_camera_summary">Camera %1$s · max %2$s</string>
     <string name="editor_size_unknown">size unknown</string>
     <string name="editor_splits">split in four</string>
+
+    <!-- Continuous playback -->
+    <string name="player_session_title">%1$s · %2$d clips · %3$s</string>
+    <string name="player_share_chooser">Share recording</string>
+    <string name="player_delete_title">Delete this recording?</string>
+    <string name="player_delete_msg">All %1$d files of this recording (%2$s) will be deleted. This cannot be undone.</string>
+    <string name="player_deleted">Deleted %1$d files</string>
+    <string name="player_info">Timeline %1$d/%2$d · from %3$s · %4$d clips · %5$s</string>
+    <string name="player_clip_count">%1$d clips</string>
+
+    <!-- Look before saving a profile -->
+    <string name="check_opening">Opening the camera…</string>
+    <string name="check_title">Look before saving</string>
+    <string name="check_save_countdown">Save (%1$d)</string>
+    <string name="check_ok">The picture is up. Look before you decide: is the split right, are the cells in place, does it stutter?</string>
+    <string name="check_no_frames">The session opened but there is no picture: %1$s</string>
+    <string name="check_config_failed">Session configuration failed: this head unit cannot run this combination. Saving it would leave you without a picture.</string>
+    <string name="check_session_failed">Could not create the session: %1$s</string>
+    <string name="check_disconnected">The camera was disconnected. It may be recording or in use by another app. Stop recording and try again.</string>
+    <string name="check_error">Could not open the camera (error %1$d)</string>
+    <string name="check_open_failed">Could not open the camera: %1$s</string>
+
+    <!-- Developer options unlock -->
+    <string name="dev_unlock_hint">Password</string>
+    <string name="dev_unlock_title">Developer options</string>
+    <string name="dev_unlock_msg">Unfinished and troubleshooting features. They close again when the app restarts.</string>
+    <string name="dev_unlocked">Developer options on (until the app restarts)</string>
+    <string name="dev_wrong_password">Wrong password</string>
+
+    <!-- Notifications -->
+    <string name="notif_recording_title">Recording</string>
+    <string name="notif_recording_text">Recording driving video</string>
+    <string name="notif_recording_tap">Recording. Tap to return to the app</string>
+    <string name="notif_channel_recording">Recording service</string>
+    <string name="notif_channel_recording_desc">Keeps recording running in the background</string>
+    <string name="notif_background_title">Running in the background</string>
+    <string name="notif_tap_to_return">Tap to return to the app</string>
+    <string name="notif_channel_keepalive">Keep-alive service</string>
+    <string name="notif_channel_keepalive_desc">Keeps the app running in the background</string>
+    <string name="notif_keepalive_text">Keep-alive running</string>
+
+    <!-- Storage volumes -->
+    <string name="storage_volume_desc">%1$s (%2$s free of %3$s)</string>
+    <string name="storage_external_named">External storage (%1$s)</string>
+    <string name="storage_external_n">External storage %1$d</string>
+    <string name="storage_external_n_named">External storage %1$d (%2$s)</string>
+
+    <!-- Photo playback -->
+    <string name="photo_count_badge">%1$d photos</string>
+    <string name="cd_expand">Expand or collapse</string>
+    <string name="cd_selected">Selected</string>
+
+    <!-- Developer: preview correction · current profile -->
+    <string name="msg_correction_needs_switch">Turn on Preview correction first</string>
+    <string name="msg_correction_reset">Preview correction reset</string>
+    <string name="profile_unreadable">Could not read it: %1$s</string>
+
+    <!-- Main screen: surround stream summary in the status bar · super view · debug overlay -->
+    <string name="composite_summary">Surround stream %1$d×%2$d · %3$s</string>
+    <string name="composite_split">split in four</string>
+    <string name="composite_whole">shown whole</string>
+    <string name="composite_probed">probed %1$d×%2$d</string>
+    <string name="composite_kind_real">composite</string>
+    <string name="composite_kind_plain">plain camera</string>
+    <string name="msg_supervision_on">Super view on</string>
+    <string name="msg_supervision_off">Super view off</string>
+    <string name="debug_on">Debug info on</string>
+    <string name="debug_off">Debug info off</string>
+    <string name="debug_recording">Recording: %1$s</string>
+    <string name="debug_rec">● REC</string>
+    <string name="debug_stopped">○ stopped</string>
+    <string name="debug_mode">mode: %1$s</string>
+    <string name="debug_memory">Memory: %1$d/%2$d MB</string>
+    <string name="debug_model">Model: %1$s · cameras: %2$d</string>
+    <string name="debug_version">Version: %1$s</string>
+
+    <!-- Diagnostics -->
+    <string name="diag_subtitle">Cameras / screen / vehicle signals / storage / logs. Save it as a file, or copy it and send it back for analysis.</string>
+    <string name="diag_btn_save">Save</string>
+    <string name="diag_btn_copy">Copy</string>
+    <string name="diag_btn_refresh">Collect again</string>
+    <string name="diag_btn_car_perms">Request vehicle permissions</string>
+    <string name="diag_btn_snapshot">① Snapshot</string>
+    <string name="diag_btn_compare">② Compare</string>
+    <string name="diag_perms_none">Vehicle permissions are either all granted or not defined on this platform; see section 4.5 of the report</string>
+    <string name="diag_perms_requesting">Requesting %1$d vehicle permissions. Watch for a permission prompt on the head unit</string>
+    <string name="diag_perms_result">Vehicle permissions: %1$d of %2$d granted, collecting again</string>
+    <string name="diag_collecting">Collecting diagnostics…</string>
+    <string name="diag_collect_failed">Collection failed: %1$s</string>
+    <string name="diag_not_ready">The report is not ready yet</string>
+    <string name="diag_mkdir_failed">Could not create the folder: %1$s</string>
+    <string name="diag_saved">Saved to:\n%1$s</string>
+    <string name="diag_save_failed">Save failed: %1$s</string>
+    <string name="diag_snapshotting">Recording the current state…</string>
+    <string name="diag_snapshot_done">Recorded %1$d properties.\n\nNow do one thing (shift to reverse / open or close a door / use the indicator / press the brake), then come back and tap “② Compare”.</string>
+    <string name="diag_snapshot_toast">Snapshot recorded</string>
+    <string name="diag_snapshot_first">Tap “① Snapshot” first</string>
+    <string name="diag_comparing">Comparing…</string>
+    <string name="diag_cmp_title"># State changes</string>
+    <string name="diag_cmp_baseline">Baseline: %1$s · %2$d s ago</string>
+    <string name="diag_cmp_counts">Properties: %1$d · changed %2$d, %3$d after filtering noise</string>
+    <string name="diag_cmp_none">## No change found\n\nThe action did **not show up in any system property**.\nThat does not mean the head unit cannot read the signal, only that it does not travel through system properties.\nAlso try: ECARX binder (report 4.3), logcat (4.6), broadcasts.</string>
+    <string name="diag_cmp_changed_title">## Changed properties</string>
+    <string name="diag_cmp_next">**Next**: read these names against the action you just did.\nDo the same action twice; only what changes both times is reliable —\nsomething that changed once may be unrelated.</string>
+    <string name="diag_cmp_noise">&lt;details&gt;Filtered noise (uptime, memory counters and the like): %1$d&lt;/details&gt;</string>
+    <string name="diag_clipboard_unavailable">Clipboard unavailable</string>
+    <string name="diag_clip_label">Diagnostics report</string>
+    <string name="diag_copied">Copied to the clipboard</string>
+    <string name="diag_copy_failed">Copy failed: %1$s</string>
+    <string name="diag_exporting">Exporting…</string>
+    <string name="diag_share_subject">%1$s diagnostics report</string>
+    <string name="diag_share_chooser">Share diagnostics report</string>
+    <string name="diag_share_failed">Could not share; the file is saved at:\n%1$s</string>
 </resources>

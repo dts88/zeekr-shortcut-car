@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 图片回看列表的日期分组头。文字由适配器按当前语言填，这里只放预览用的 tools:text。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
+    android:background="?attr/selectableItemBackground"
     android:gravity="center_vertical"
+    android:orientation="horizontal"
     android:paddingHorizontal="12dp"
-    android:paddingVertical="12dp"
-    android:background="?attr/selectableItemBackground">
+    android:paddingVertical="12dp">
 
     <!-- 展开/收起图标 -->
     <ImageView
         android:id="@+id/expand_icon"
         android:layout_width="20dp"
         android:layout_height="20dp"
+        android:contentDescription="@string/cd_expand"
         android:src="@drawable/ic_expand_more"
-        android:contentDescription="展开/收起"
         app:tint="@color/text_secondary" />
 
     <!-- 日期文字 -->
@@ -23,12 +25,12 @@
         android:id="@+id/date_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:layout_marginStart="8dp"
+        android:layout_weight="1"
         android:textColor="@color/text_primary"
         android:textSize="17sp"
         android:textStyle="bold"
-        android:text="今天 · 星期日" />
+        tools:text="今天 · 星期日" />
 
     <!-- 组数量标签 -->
     <TextView
@@ -37,6 +39,6 @@
         android:layout_height="wrap_content"
         android:textColor="@color/text_secondary"
         android:textSize="14sp"
-        android:text="5组" />
+        tools:text="5组" />
 
 </LinearLayout>

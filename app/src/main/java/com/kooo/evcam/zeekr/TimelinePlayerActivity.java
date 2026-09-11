@@ -517,7 +517,7 @@ public class TimelinePlayerActivity extends Activity {
             return;
         }
         RecordingTimeline.Session session = sessions.get(index);
-        String title = String.format(Locale.getDefault(), "%s　%d 段　%s",
+        String title = getString(R.string.player_session_title,
                 new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
                         .format(new Date(session.startEpochMs)),
                 session.segmentCount(),
@@ -562,16 +562,15 @@ public class TimelinePlayerActivity extends Activity {
             intent.putExtra(Intent.EXTRA_STREAM, uris.get(0));
         }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "分享录像"));
+        startActivity(Intent.createChooser(intent, getString(R.string.player_share_chooser)));
     }
 
     private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
         com.kooo.evcam.ui.CamDialogs.showDestructive(new AlertDialog.Builder(this, R.style.AlertDialogTheme)
-                .setTitle("确认删除")
-                .setMessage(String.format(Locale.getDefault(),
-                        "将删除这段录制的全部 %d 个文件，共 %s。删除后无法恢复。",
+                .setTitle(R.string.player_delete_title)
+                .setMessage(getString(R.string.player_delete_msg,
                         session.segmentCount(), TimelineFormat.size(session.totalSizeBytes)))
-                .setPositiveButton("删除", (dialog, which) -> deleteSession(index, session))
+                .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteSession(index, session))
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
@@ -588,15 +587,14 @@ public class TimelinePlayerActivity extends Activity {
             }
         }
         AppLog.i(TAG, "删除时间轴 " + index + "：" + deleted + "/" + session.segmentCount() + " 个文件");
-        Toast.makeText(this, "已删除 " + deleted + " 个文件", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.player_deleted, deleted), Toast.LENGTH_SHORT).show();
         loadTimelines();
     }
 
     private void updateSessionInfo(RecordingTimeline.Session session) {
         String started = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
                 .format(new Date(session.startEpochMs));
-        infoText.setText(String.format(Locale.getDefault(),
-                "时间轴 %d/%d　起于 %s　共 %d 段　时长 %s",
+        infoText.setText(getString(R.string.player_info,
                 sessionIndex + 1, sessions.size(), started,
                 session.segmentCount(), TimelineFormat.duration(session.totalDurationMs)));
     }

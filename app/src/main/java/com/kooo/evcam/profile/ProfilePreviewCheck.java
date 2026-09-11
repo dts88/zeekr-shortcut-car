@@ -48,9 +48,6 @@ public final class ProfilePreviewCheck {
     /** 看画面 + 决定的时间。 */
     private static final int CONFIRM_SECONDS = 15;
 
-    /** 开相机、配会话的等待上限。 */
-    private static final long OPEN_TIMEOUT_MS = 5000L;
-
     private final Activity activity;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private HandlerThread cameraThread;
@@ -95,7 +92,7 @@ public final class ProfilePreviewCheck {
         note.setTextSize(14f);
         int pad = (int) (12 * activity.getResources().getDisplayMetrics().density);
         note.setPadding(pad, pad, pad, pad);
-        note.setText("正在打开相机……");
+        note.setText(R.string.check_opening);
         box.addView(note);
 
         TextureView texture = new TextureView(activity);
@@ -119,9 +116,9 @@ public final class ProfilePreviewCheck {
                 ViewGroup.LayoutParams.MATCH_PARENT, height));
 
         dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
-                .setTitle("看一眼再保存")
+                .setTitle(R.string.check_title)
                 .setView(box)
-                .setPositiveButton("保存", (d, w) -> {
+                .setPositiveButton(R.string.editor_save, (d, w) -> {
                     stop();
                     onConfirmed.run();
                 })
@@ -175,7 +172,7 @@ public final class ProfilePreviewCheck {
                     return;
                 }
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                        .setText("保存（" + left[0] + "）");
+                        .setText(activity.getString(R.string.check_save_countdown, left[0]));
                 ui.postDelayed(this, 1000L);
             }
         };
@@ -205,38 +202,37 @@ public final class ProfilePreviewCheck {
                                             builder.addTarget(surface);
                                             configured.setRepeatingRequest(
                                                     builder.build(), null, cameraHandler);
-                                            say(note, "画面出来了。看清楚再决定 ——"
-                                                    + "拆分对不对、位置对不对、有没有卡。");
+                                            say(note, activity.getString(R.string.check_ok));
                                         } catch (Exception e) {
-                                            say(note, "开了会话但出不了画面：" + e);
+                                            say(note, activity.getString(
+                                                    R.string.check_no_frames, String.valueOf(e)));
                                         }
                                     }
 
                                     @Override
                                     public void onConfigureFailed(
                                             CameraCaptureSession configured) {
-                                        say(note, "会话配置失败 —— 这套组合这台车机跑不了。"
-                                                + "保存了会没有画面。");
+                                        say(note, activity.getString(R.string.check_config_failed));
                                     }
                                 }, cameraHandler);
                     } catch (Exception e) {
-                        say(note, "建会话失败：" + e);
+                        say(note, activity.getString(
+                                R.string.check_session_failed, String.valueOf(e)));
                     }
                 }
 
                 @Override
                 public void onDisconnected(CameraDevice camera) {
-                    say(note, "相机被断开 —— 可能正在录制，或者被别的应用占着。"
-                            + "停掉录制再试。");
+                    say(note, activity.getString(R.string.check_disconnected));
                 }
 
                 @Override
                 public void onError(CameraDevice camera, int error) {
-                    say(note, "打不开相机，错误 " + error);
+                    say(note, activity.getString(R.string.check_error, error));
                 }
             }, cameraHandler);
         } catch (Exception e) {
-            say(note, "打不开相机：" + e);
+            say(note, activity.getString(R.string.check_open_failed, String.valueOf(e)));
         }
     }
 

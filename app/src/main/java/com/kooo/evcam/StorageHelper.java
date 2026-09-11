@@ -124,20 +124,24 @@ public class StorageHelper {
         public final long freeBytes;
         public final long totalBytes;
 
-        VolumeInfo(File root, File appDir, String label, long freeBytes, long totalBytes) {
+        /** 设置页和诊断报告里的那一行。建的时候就按当前语言排好，用的地方不必再要 Context。 */
+        private final String description;
+
+        VolumeInfo(Context context, File root, File appDir, String label,
+                   long freeBytes, long totalBytes) {
             this.root = root;
             this.appDir = appDir;
             this.label = label;
             this.freeBytes = freeBytes;
             this.totalBytes = totalBytes;
+            this.description = totalBytes <= 0 ? label
+                    : context.getString(R.string.storage_volume_desc, label,
+                            formatSize(freeBytes), formatSize(totalBytes));
         }
 
-        /** 供设置页显示：名称 + 剩余/总容量。 */
+        /** 名称 + 剩余/总容量。 */
         public String describe() {
-            if (totalBytes <= 0) {
-                return label;
-            }
-            return label + "（剩余 " + formatSize(freeBytes) + " / " + formatSize(totalBytes) + "）";
+            return description;
         }
     }
 
@@ -174,8 +178,9 @@ public class StorageHelper {
             } catch (Exception ignored) {
                 // 容量取不到不影响使用
             }
-            volumes.add(new VolumeInfo(root, root,
-                    "外置存储（" + root.getName() + "）", free, total));
+            volumes.add(new VolumeInfo(context, root, root,
+                    context.getString(R.string.storage_external_named, root.getName()),
+                    free, total));
         }
 
         try {
@@ -209,7 +214,9 @@ public class StorageHelper {
                 }
 
                 String name = root.getName();
-                String label = "外置存储 " + i + (name.isEmpty() ? "" : "（" + name + "）");
+                String label = name.isEmpty()
+                        ? context.getString(R.string.storage_external_n, i)
+                        : context.getString(R.string.storage_external_n_named, i, name);
 
                 long free = 0L;
                 long total = 0L;
@@ -220,7 +227,7 @@ public class StorageHelper {
                     // 容量取不到不影响使用
                 }
 
-                volumes.add(new VolumeInfo(root, appDir, label, free, total));
+                volumes.add(new VolumeInfo(context, root, appDir, label, free, total));
             }
         } catch (Exception e) {
             AppLog.e(TAG, "枚举存储卷失败", e);
@@ -825,7 +832,7 @@ public class StorageHelper {
      */
     public static String formatSize(long bytes) {
         if (bytes < 0) {
-            return "未知";
+            return "—";
         }
         
         final long KB = 1024;
@@ -841,40 +848,6 @@ public class StorageHelper {
         } else {
             return bytes + " B";
         }
-    }
-    
-    /**
-     * 获取存储信息描述
-     * @param context 上下文
-     * @param useExternalSd 是否使用U盘
-     * @return 存储信息描述字符串
-     */
-    public static String getStorageInfoDesc(Context context, boolean useExternalSd) {
-        File storageDir;
-        String storageName;
-        
-        if (useExternalSd) {
-            storageDir = getExternalSdCardRoot(context);
-            storageName = "U盘";
-            if (storageDir == null) {
-                return "U盘不可用";
-            }
-        } else {
-            storageDir = Environment.getExternalStorageDirectory();
-            storageName = "内部存储";
-        }
-        
-        long available = getAvailableSpace(storageDir);
-        long total = getTotalSpace(storageDir);
-        
-        if (available < 0 || total < 0) {
-            return storageName;
-        }
-        
-        return String.format("%s（可用 %s / 共 %s）", 
-                storageName, 
-                formatSize(available), 
-                formatSize(total));
     }
     
     /**

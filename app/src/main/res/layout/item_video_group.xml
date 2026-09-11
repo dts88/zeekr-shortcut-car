@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  图片回看列表里的一组照片：左边四宫格缩略图，右边时间和大小。
+  文字由适配器按当前语言填，这里只放预览用的 tools:text；
+  缩略图框的深色底是垫在照片下面的，不跟日夜变。
+-->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="8dp"
@@ -12,9 +18,9 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="8dp"
-        android:gravity="center_vertical">
+        android:padding="8dp">
 
         <!-- 缩略图（四宫格预览） -->
         <FrameLayout
@@ -39,9 +45,9 @@
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
                         android:background="#1A1A1A"
-                        android:contentDescription="前置" />
+                        android:contentDescription="@string/zeekr_lane_front"
+                        android:scaleType="centerCrop" />
 
                     <View
                         android:layout_width="1dp"
@@ -53,9 +59,9 @@
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
                         android:background="#1A1A1A"
-                        android:contentDescription="后置" />
+                        android:contentDescription="@string/zeekr_lane_back"
+                        android:scaleType="centerCrop" />
                 </LinearLayout>
 
                 <View
@@ -74,9 +80,9 @@
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
                         android:background="#1A1A1A"
-                        android:contentDescription="左侧" />
+                        android:contentDescription="@string/zeekr_lane_left"
+                        android:scaleType="centerCrop" />
 
                     <View
                         android:layout_width="1dp"
@@ -88,13 +94,13 @@
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:scaleType="centerCrop"
                         android:background="#1A1A1A"
-                        android:contentDescription="右侧" />
+                        android:contentDescription="@string/zeekr_lane_right"
+                        android:scaleType="centerCrop" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- 视频路数标签 -->
+            <!-- 张数标签（压在缩略图上） -->
             <TextView
                 android:id="@+id/video_count_badge"
                 android:layout_width="wrap_content"
@@ -105,18 +111,17 @@
                 android:paddingVertical="1dp"
                 android:textColor="#FFFFFF"
                 android:textSize="10sp"
-                android:text="4路" />
+                tools:text="4张" />
         </FrameLayout>
 
-        <!-- 视频信息 -->
+        <!-- 信息 -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:layout_marginStart="12dp"
+            android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- 日期 -->
             <TextView
                 android:id="@+id/video_date"
                 android:layout_width="wrap_content"
@@ -124,28 +129,26 @@
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:text="2026-01-31" />
+                tools:text="2026-01-31" />
 
-            <!-- 时间 -->
             <TextView
                 android:id="@+id/video_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:layout_marginTop="2dp"
-                android:text="12:54" />
+                tools:text="12:54" />
 
-            <!-- 文件大小 -->
             <TextView
                 android:id="@+id/video_size"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp"
-                android:layout_marginTop="2dp"
-                android:text="69.94 MB" />
+                tools:text="69.94 MB" />
         </LinearLayout>
 
         <!-- 选中指示器（多选模式用） -->
@@ -153,11 +156,11 @@
             android:id="@+id/check_indicator"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:clickable="false"
-            android:focusable="false"
             android:checked="true"
-            android:visibility="gone"
-            android:contentDescription="选中" />
+            android:clickable="false"
+            android:contentDescription="@string/cd_selected"
+            android:focusable="false"
+            android:visibility="gone" />
     </LinearLayout>
 
 </androidx.cardview.widget.CardView>

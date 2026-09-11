@@ -117,12 +117,14 @@ public class RecordingCoordinator {
                 .format(new Date());
 
         if (!cameraManager.startRecording(timestamp, cameras)) {
-            notifyFailed("录制失败");
+            notifyFailed(context.getString(R.string.msg_record_start_failed));
             return;
         }
 
         // 前台服务：没有它，系统会在应用退到后台后把录制掐掉
-        CameraForegroundService.start(context, "正在录制视频", "录制进行中，点击返回应用");
+        CameraForegroundService.start(context,
+                context.getString(R.string.notif_recording_title),
+                context.getString(R.string.notif_recording_tap));
         FloatingWindowService.sendRecordingStateChanged(context, true);
 
         AppLog.d(TAG, "开始录制 " + cameras.size() + " 路: " + cameras);

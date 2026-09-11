@@ -4,7 +4,7 @@
 
   返回键接用了原来行末那个「关闭」的 id（diagnostics_close），点击逻辑不用改；
   那个「关闭」本身就不再需要了 —— 同一件事有两个入口，只会让人找哪个才是。
-  颜色走语义色：以前是写死的白字，日间浅底上看不见。
+  颜色走语义色、文字走 strings：以前是写死的白字和中文，日间看不见、英文界面读不懂。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -45,7 +45,7 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="相机 / 屏幕 / 车辆信号 / 存储 / 日志。可保存为文件带走，或复制后发回分析。"
+            android:text="@string/diag_subtitle"
             android:textColor="@color/text_tertiary"
             android:textSize="13sp" />
     </LinearLayout>
@@ -72,7 +72,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="保存到存储" />
+            android:text="@string/diag_btn_save" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_copy"
@@ -81,7 +81,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="复制" />
+            android:text="@string/diag_btn_copy" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_share"
@@ -90,7 +90,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="分享" />
+            android:text="@string/action_share" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_refresh"
@@ -99,7 +99,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="重新采集" />
+            android:text="@string/diag_btn_refresh" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_request_car_perms"
@@ -108,7 +108,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="申请车辆权限" />
+            android:text="@string/diag_btn_car_perms" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_snapshot"
@@ -118,7 +118,7 @@
             android:layout_marginEnd="8dp"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="① 拍快照" />
+            android:text="@string/diag_btn_snapshot" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_compare"
@@ -127,7 +127,7 @@
             android:layout_height="52dp"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:text="② 对比变化" />
+            android:text="@string/diag_btn_compare" />
     </LinearLayout>
 
     <!-- 报告正文：等宽字体，横竖都能滚，垫在一块卡片上 -->
