@@ -764,46 +764,25 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     }
 
     /**
-     * 显示图片分享选项对话框（使用与视频相同的布局）
+     * 图片分享：说明有几张，主操作「分享」，次操作「关闭」。
+     *
+     * <p>以前这里是一块自绘的白底布局，写死了三个选项。其中「二维码」依赖的传输模块
+     * 早已移除、一直是隐藏的，剩下的两个就是一个标准的确认框 —— 于是换成统一的对话框，
+     * 按钮样式、日夜配色和其他对话框一致，也不再有一块夜里刺眼的白板。</p>
      */
     private void showPhotoShareOptionsDialog(String title, String message, List<File> photoFiles) {
         if (getContext() == null) return;
 
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(
-                getContext(), R.style.AlertDialogTheme);
-
-        // 加载自定义布局
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_share_options, null);
-        TextView titleView = dialogView.findViewById(R.id.dialog_title);
-        TextView messageView = dialogView.findViewById(R.id.dialog_message);
-        View btnQr = dialogView.findViewById(R.id.btn_qr);
-        View btnShare = dialogView.findViewById(R.id.btn_share);
-        View btnClose = dialogView.findViewById(R.id.btn_close);
-
-        titleView.setText(title);
-        messageView.setText(message);
-
-        builder.setView(dialogView);
-        builder.setCancelable(true);
-
-        android.app.AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(builder.create());
-
-        // 设置按钮点击事件
-        // 扫码互传依赖已移除的 transfer 模块；U 盘可直接取文件，此入口隐藏
-        btnQr.setVisibility(android.view.View.GONE);
-
-        btnShare.setOnClickListener(v -> {
-            Log.d(TAG, "用户选择系统分享图片");
-            dialog.dismiss();
-            sharePhotos(photoFiles);
-        });
-
-        btnClose.setOnClickListener(v -> {
-            Log.d(TAG, "用户取消图片分享");
-            dialog.dismiss();
-        });
-
-        dialog.show();
+        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(
+                getContext(), R.style.AlertDialogTheme)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(R.string.action_share, (dialog, which) -> {
+                    Log.d(TAG, "用户选择系统分享图片");
+                    sharePhotos(photoFiles);
+                })
+                .setNegativeButton(R.string.action_close, null)
+                .setCancelable(true));
         Log.d(TAG, "图片分享选项对话框已显示");
     }
 
