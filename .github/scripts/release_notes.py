@@ -68,14 +68,12 @@ def main():
     out.append("> Everything else - new features in particular - is **unverified on a vehicle**,")
     out.append("> and the automated tests cover the pure logic only.")
     out.append("> **Try anything new in a stationary vehicle first.**")
-    out.append("> If recording misbehaves, set that camera's recording layout back")
-    out.append("> to \"Raw strip\" under Developer options -> Edit profile.")
     out.append("")
 
     out.append("## Getting started")
     out.append("")
-    out.append("Open **Settings -> Recording -> Stream configuration**, pick "
-               "*ZEEKR 7X (surround-view composite)*, and restart the app.")
+    out.append("Open **Settings -> Recording -> Video stream profile**, pick "
+               "*Zeekr 7X (surround composite)*, and restart the app.")
     out.append("")
     out.append("Something wrong? Export **Menu -> Diagnostics** and attach the report to an issue.")
     out.append("")

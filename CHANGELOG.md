@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.39.0-alpha] - 2026-09-12
+
 - First launch asks which side the driver sits on and puts the action rail on that side. Existing installs are asked once.
 - Settings -> Interface: button side, and "Reduce motion while recording" (on by default).
 - Record button is disabled when there is nowhere to record (no USB drive). The status bar shows the fps cap, bitrate tier and free space.
