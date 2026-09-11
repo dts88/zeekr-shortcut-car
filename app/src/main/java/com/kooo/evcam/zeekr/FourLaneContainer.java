@@ -1,16 +1,25 @@
 package com.kooo.evcam.zeekr;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.util.Size;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.PathInterpolator;
+
+import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.AutoFitTextureView;
+import com.kooo.evcam.R;
+import com.kooo.evcam.ui.MotionPolicy;
 
 /**
  * 把一路四联合成流显示成 2x2 四宫格的容器。
@@ -123,6 +132,23 @@ public class FourLaneContainer extends ViewGroup {
     /** laneOrder[格子位置] = 合成流中的画面序号。 */
     private int[] laneOrder = {0, 1, 2, 3};
 
+    /**
+     * 四宫格 ⇄ 单画面的过渡。
+     *
+     * <p>点开一格时，那一格从自己的位置<b>长</b>到铺满，而不是一下切过去；收回时反过来。
+     * 相机没有重新取流 —— 动的只是同一个子视图被画进去的那个矩形，不额外占资源。
+     * 模式本身（{@link #getDisplayMode}）立刻就是新的，过渡只管画。</p>
+     */
+    private static final long GROW_MS = 280;
+    private ValueAnimator growAnimator;
+    private boolean transitioning;
+    private int transitionLane;
+    /** 0 = 在自己的格子里，1 = 铺满。 */
+    private float growProgress = 1f;
+    private final RectF gridRect = new RectF();
+    /** 长大中的那一格先垫一块底，免得留边的地方透出后面的格子。 */
+    private final Paint backdrop = new Paint();
+
     public FourLaneContainer(Context context) {
         this(context, null);
     }
@@ -132,6 +158,7 @@ public class FourLaneContainer extends ViewGroup {
         // ViewGroup 默认不调用 onDraw，但我们要自己控制子视图的绘制
         setWillNotDraw(false);
         setClipChildren(true);
+        backdrop.setColor(ContextCompat.getColor(context, R.color.preview_frame_background));
     }
 
     @Override
@@ -207,26 +234,72 @@ public class FourLaneContainer extends ViewGroup {
         return focusedLane;
     }
 
-    /** 切到只看某一个画面。 */
+    /** 切到只看某一个画面。从四宫格点开时，那一格长到铺满。 */
     public void focusLane(int index) {
         if (index < 0 || index >= CompositeStreamGeometry.LANE_COUNT) {
             return;
         }
+        boolean fromGrid = displayMode == DisplayMode.GRID;
         focusedLane = index;
         displayMode = DisplayMode.SINGLE;
-        invalidate();
+        if (fromGrid) {
+            animateGrow(0f, 1f);
+        } else {
+            // 单画面里点一下换下一路：同一个位置换内容，不需要过渡
+            invalidate();
+        }
     }
 
-    /** 回到 2x2 四宫格。 */
+    /** 回到 2x2 四宫格。从单画面收回时，那一格缩回自己的格子。 */
     public void showGrid() {
+        boolean fromSingle = displayMode == DisplayMode.SINGLE;
         displayMode = DisplayMode.GRID;
-        invalidate();
+        if (fromSingle) {
+            animateGrow(1f, 0f);
+        } else {
+            invalidate();
+        }
     }
 
     /** 不拆分，原样显示整条合成流（排查用）。 */
     public void showRaw() {
+        stopGrow();
         displayMode = DisplayMode.RAW;
         invalidate();
+    }
+
+    private void animateGrow(float from, float to) {
+        stopGrow();
+        if (getWidth() <= 0 || getHeight() <= 0 || !MotionPolicy.decorative(getContext())) {
+            invalidate();
+            return;
+        }
+        transitionLane = focusedLane;
+        growProgress = from;
+        transitioning = true;
+        growAnimator = ValueAnimator.ofFloat(from, to);
+        growAnimator.setDuration(GROW_MS);
+        growAnimator.setInterpolator(new PathInterpolator(0.4f, 0f, 0.2f, 1f));
+        growAnimator.addUpdateListener(animation -> {
+            growProgress = (float) animation.getAnimatedValue();
+            invalidate();
+        });
+        growAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                transitioning = false;
+                invalidate();
+            }
+        });
+        growAnimator.start();
+    }
+
+    private void stopGrow() {
+        if (growAnimator != null) {
+            growAnimator.cancel();
+            growAnimator = null;
+        }
+        transitioning = false;
     }
 
     /**
@@ -335,17 +408,41 @@ public class FourLaneContainer extends ViewGroup {
             return;
         }
 
+        if (transitioning) {
+            // 过渡中：先照常画四宫格（主角那一格除外），再把主角从它自己的格子
+            // 插值到铺满。它盖在别的格子上面「长」出来，收回时反过来缩回去
+            int index = Math.min(transitionLane, current.laneCount() - 1);
+            drawGrid(canvas, current, width, height, index);
+            gridRectFor(index, width, height, gridRect);
+            float t = growProgress;
+            float left = gridRect.left * (1f - t);
+            float top = gridRect.top * (1f - t);
+            float right = gridRect.right + (width - gridRect.right) * t;
+            float bottom = gridRect.bottom + (height - gridRect.bottom) * t;
+            canvas.drawRect(left, top, right, bottom, backdrop);
+            drawLane(canvas, current.lane(index), cellFor(index),
+                    left, top, right - left, bottom - top);
+            return;
+        }
+
         if (displayMode == DisplayMode.SINGLE) {
             int index = Math.min(focusedLane, current.laneCount() - 1);
             drawLane(canvas, current.lane(index), cellFor(index), 0f, 0f, width, height);
             return;
         }
 
+        drawGrid(canvas, current, width, height, -1);
+    }
+
+    /** 四宫格。{@code skipLane} 那一格不画（过渡时它由上面单独画）；-1 表示都画。 */
+    private void drawGrid(Canvas canvas, CompositeStreamGeometry.Plan current,
+                          int width, int height, int skipLane) {
         Cell[] activeCells = cells;
         if (activeCells != null) {
             for (Cell cell : activeCells) {
                 if (cell == null || cell.laneIndex < 0
-                        || cell.laneIndex >= current.laneCount()) {
+                        || cell.laneIndex >= current.laneCount()
+                        || cell.laneIndex == skipLane) {
                     continue;
                 }
                 drawLane(canvas, current.lane(cell.laneIndex), cell,
@@ -360,13 +457,38 @@ public class FourLaneContainer extends ViewGroup {
         float cellHeight = height / 2f;
         for (int cell = 0; cell < CompositeStreamGeometry.LANE_COUNT; cell++) {
             int laneIndex = laneOrder[cell];
-            if (laneIndex >= current.laneCount()) {
+            if (laneIndex >= current.laneCount() || laneIndex == skipLane) {
                 continue;
             }
             float left = (cell % 2) * cellWidth;
             float top = (cell / 2) * cellHeight;
             drawLane(canvas, current.lane(laneIndex), null, left, top, cellWidth, cellHeight);
         }
+    }
+
+    /** 某一路在四宫格里占的那块矩形 —— 过渡的起点（或终点）。 */
+    private void gridRectFor(int laneIndex, int width, int height, RectF out) {
+        if (cells != null) {
+            Cell cell = cellFor(laneIndex);
+            if (cell != null) {
+                out.set(cell.x * width, cell.y * height,
+                        (cell.x + cell.width) * width, (cell.y + cell.height) * height);
+            } else {
+                out.set(0f, 0f, width, height);
+            }
+            return;
+        }
+        float cellWidth = width / 2f;
+        float cellHeight = height / 2f;
+        for (int position = 0; position < CompositeStreamGeometry.LANE_COUNT; position++) {
+            if (laneOrder[position] == laneIndex) {
+                float left = (position % 2) * cellWidth;
+                float top = (position / 2) * cellHeight;
+                out.set(left, top, left + cellWidth, top + cellHeight);
+                return;
+            }
+        }
+        out.set(0f, 0f, width, height);
     }
 
     /**
