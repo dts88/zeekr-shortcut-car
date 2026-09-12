@@ -90,7 +90,8 @@ public final class ProfilePreviewCheck {
         box.setOrientation(LinearLayout.VERTICAL);
 
         final TextView note = new TextView(activity);
-        note.setTextSize(14f);
+        note.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                activity.getResources().getDimension(R.dimen.text_caption));
         int pad = (int) (12 * activity.getResources().getDisplayMetrics().density);
         note.setPadding(pad, pad, pad, pad);
         note.setText(R.string.check_opening);

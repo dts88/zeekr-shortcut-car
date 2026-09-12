@@ -106,7 +106,8 @@ public final class UpdateFlow {
         bar.setMax(100);
         TextView label = new TextView(activity);
         label.setText(R.string.upd_downloading);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                activity.getResources().getDimension(R.dimen.text_body));
         LinearLayout box = new LinearLayout(activity);
         box.setOrientation(LinearLayout.VERTICAL);
         int pad = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24,

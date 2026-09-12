@@ -127,20 +127,20 @@ public final class PhoneShare {
             qrImage.setLayoutParams(qrParams);
             root.addView(qrImage);
 
-            qrFailed = text(activity.getString(R.string.share_phone_qr_failed), 14, false);
+            qrFailed = text(activity.getString(R.string.share_phone_qr_failed), R.dimen.text_caption, false);
             qrFailed.setVisibility(android.view.View.GONE);
             root.addView(qrFailed);
 
-            root.addView(text(activity.getString(R.string.share_phone_steps), 15, false));
+            root.addView(text(activity.getString(R.string.share_phone_steps), R.dimen.text_body, false));
             if (extraNote != null && !extraNote.isEmpty()) {
-                root.addView(text(extraNote, 14, false));
+                root.addView(text(extraNote, R.dimen.text_caption, false));
             }
 
-            addressText = text("", 13, true);
+            addressText = text("", R.dimen.text_caption, true);
             root.addView(addressText);
 
-            root.addView(text(activity.getString(R.string.share_phone_network_hint), 13, true));
-            root.addView(text(activity.getString(R.string.share_phone_keep_open), 13, true));
+            root.addView(text(activity.getString(R.string.share_phone_network_hint), R.dimen.text_caption, true));
+            root.addView(text(activity.getString(R.string.share_phone_keep_open), R.dimen.text_caption, true));
 
             MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(
                     activity, R.style.Theme_Cam_MaterialAlertDialog)
@@ -194,10 +194,12 @@ public final class PhoneShare {
             }
         }
 
-        private TextView text(String content, int sizeSp, boolean secondary) {
+    /** @param sizeDimen 字号体系里的一档（{@code R.dimen.text_*}），不要传字面 sp */
+    private TextView text(String content, int sizeDimen, boolean secondary) {
             TextView view = new TextView(activity);
             view.setText(content);
-            view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp);
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                    activity.getResources().getDimension(sizeDimen));
             view.setGravity(Gravity.CENTER_HORIZONTAL);
             view.setPadding(0, dp(10), 0, 0);
             if (secondary) {
