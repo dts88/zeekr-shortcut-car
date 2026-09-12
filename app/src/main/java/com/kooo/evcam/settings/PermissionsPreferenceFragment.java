@@ -50,6 +50,14 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     @Override
+    public void onViewCreated(@androidx.annotation.NonNull android.view.View view,
+                              @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        // 这一页以前漏了：分隔线和默认边距还在，和其他设置页不是一套
+        PreferenceRows.styleList(this, 28, 16);
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         // 授权是在系统设置里点的，回来时要重新查
