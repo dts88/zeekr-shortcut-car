@@ -1,30 +1,85 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  两栏设置：左侧分区列表，右侧该分区的内容。
+  设置：统一骨架的 ① 标题区 · ② 列表栏 · ③ 内容区 · ⑤ 状态条（见 docs/ui-spec.md）。
 
-  用 SlidingPaneLayout 而不是自己摆两个容器：它自带「宽屏并排、窄屏叠放并可滑动」
-  的行为，也是 androidx 的 PreferenceHeaderFragmentCompat 内部用的同一个组件。
-  车机内置屏 3200px 宽，永远走并排那一支；窄屏的处理是白拿的。
+  ① 横跨两栏，因为「设置」是一屏，不是两屏。它的左键跟着深度变：
+  停在分区层是菜单（拉开抽屉），进了二级界面是返回（退一层）——
+  位置永远是这一个，规范第一条原则。
 
-  左栏固定宽度（list_width，和车机系统设置的左栏同一比例）：分区名都很短，
-  再宽只是浪费；右栏 layout_weight=1 吃掉剩余宽度。
+  ② 左栏固定宽度（list_width，和车机系统设置的左栏同一比例）：分区名都很短，
+  给它一个稳定的宽度，右栏才不会因为换分区而变宽变窄。
 -->
-<androidx.slidingpanelayout.widget.SlidingPaneLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/settings_sliding_pane"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg">
+    android:background="@color/bg"
+    android:orientation="vertical">
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/settings_headers"
-        android:layout_width="@dimen/list_width"
-        android:layout_height="match_parent"
-        android:background="@color/bg" />
+    <!-- ① 标题区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp">
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/settings_detail"
-        android:layout_width="0dp"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/settings_nav"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/cd_menu"
+            app:icon="@drawable/ic_menu" />
+
+        <TextView
+            android:id="@+id/settings_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/nav_settings"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
+    <androidx.slidingpanelayout.widget.SlidingPaneLayout
+        android:id="@+id/settings_sliding_pane"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_height="match_parent" />
-</androidx.slidingpanelayout.widget.SlidingPaneLayout>
+        android:background="@color/bg">
+
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/settings_headers"
+            android:layout_width="@dimen/list_width"
+            android:layout_height="match_parent"
+            android:background="@color/bg" />
+
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/settings_detail"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent" />
+    </androidx.slidingpanelayout.widget.SlidingPaneLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
+    <!-- ⑤ 状态条：和主界面同一条 -->
+    <include
+        layout="@layout/layout_status_bar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/status_bar_height" />
+</LinearLayout>

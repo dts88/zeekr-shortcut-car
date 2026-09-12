@@ -137,7 +137,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 相机与视频流的参数（每一路的三条流、每一格的摆法）都在下面这个
         // 「视频流配置编辑」里。同一件事只留一个入口：两个入口意味着
         // 迟早会出现「这边写着 30、那边写着 15」。
-        onClick("pref_profile_editor", pref -> openFragment(new ProfileEditorFragment()));
+        onClick("pref_profile_editor",
+                pref -> openFragment(new ProfileEditorFragment(), R.string.set_profile_editor_title));
 
         bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
                 enabled -> {
@@ -794,7 +795,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
 
-        onClick("pref_permissions", pref -> openFragment(new PermissionsPreferenceFragment()));
+        onClick("pref_permissions",
+                pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
         onClick("pref_upload_logs", pref -> {
             if (getContext() == null) {
@@ -810,7 +812,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
 
         onClick("pref_permission_tools",
-                pref -> openFragment(new PermissionSettingsFragment()));
+                pref -> openFragment(new PermissionSettingsFragment(),
+                        R.string.dev_permission_tools_title));
 
         onClick("pref_blind_spot", pref -> {
             if (getActivity() instanceof MainActivity) {
@@ -827,7 +830,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 「自定义」这档视频流配置是能选出来的，但配置它的界面一直没有入口 ——
         // 选了之后没有任何地方能配摄像头路数和映射
         onClick("pref_custom_config",
-                pref -> openFragment(new CustomCameraConfigFragment()));
+                pref -> openFragment(new CustomCameraConfigFragment(),
+                        R.string.dev_custom_config_title));
 
         bindSwitch("pref_preview_correction", appConfig.isPreviewCorrectionEnabled(), value -> {
             appConfig.setPreviewCorrectionEnabled(value);
@@ -1188,9 +1192,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * <p>两栏布局下只换右栏，左栏的分区列表留着 —— 进了二级界面还看得见
      * 自己在设置的哪一块。外壳不在时（理论上不会）退回整屏替换。</p>
      */
-    private void openFragment(androidx.fragment.app.Fragment fragment) {
+    /** @param titleRes 这个二级界面叫什么；标题区显示它，返回时自动退回上一层的名字 */
+    private void openFragment(androidx.fragment.app.Fragment fragment, int titleRes) {
         if (getParentFragment() instanceof SettingsShellFragment) {
-            ((SettingsShellFragment) getParentFragment()).openDetail(fragment);
+            ((SettingsShellFragment) getParentFragment())
+                    .openDetail(fragment, getString(titleRes));
             return;
         }
         if (getActivity() == null) {

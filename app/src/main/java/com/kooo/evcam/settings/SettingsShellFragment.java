@@ -41,6 +41,8 @@ public class SettingsShellFragment extends Fragment {
     static final String DEFAULT_SECTION = "screen_recording";
 
     private SlidingPaneLayout slidingPane;
+    private com.google.android.material.button.MaterialButton navButton;
+    private android.widget.TextView titleText;
     private String currentSection = DEFAULT_SECTION;
     /** 当前分区在左栏的行号，决定下一次切换往上还是往下走。 */
     private int currentOrder = -1;
@@ -56,6 +58,14 @@ public class SettingsShellFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         slidingPane = view.findViewById(R.id.settings_sliding_pane);
+        navButton = view.findViewById(R.id.settings_nav);
+        titleText = view.findViewById(R.id.settings_title);
+        if (navButton != null) {
+            navButton.setOnClickListener(v -> onNavClick());
+        }
+        // 进出二级界面时标题区要跟着变
+        getChildFragmentManager().addOnBackStackChangedListener(this::refreshTitle);
+        com.kooo.evcam.ui.StatusLine.fill(view);
 
         if (savedInstanceState != null) {
             String saved = savedInstanceState.getString(STATE_SECTION);
@@ -70,6 +80,7 @@ public class SettingsShellFragment extends Fragment {
                     .commit();
             showSection(currentSection);
         }
+        refreshTitle();
     }
 
     @Override
@@ -116,6 +127,7 @@ public class SettingsShellFragment extends Fragment {
             ((SettingsHeadersFragment) headers).markSelected(screenKey);
         }
         openDetail();
+        refreshTitle();
     }
 
     /** 右栏正在显示的分区。左栏建列表时用它决定哪一项是选中的。 */
@@ -124,12 +136,50 @@ public class SettingsShellFragment extends Fragment {
     }
 
     /**
+     * 标题区左键：分区层是菜单（拉开抽屉），二级界面是返回（退一层）。
+     *
+     * <p>位置不变、图标变 —— 手记住的是位置。抽屉长在主界面上，所以这里要问它。</p>
+     */
+    private void onNavClick() {
+        if (getChildFragmentManager().getBackStackEntryCount() > 0) {
+            getChildFragmentManager().popBackStack();
+            return;
+        }
+        if (getActivity() instanceof com.kooo.evcam.MainActivity) {
+            ((com.kooo.evcam.MainActivity) getActivity()).openDrawer();
+        }
+    }
+
+    /** 标题区按当前深度重画。左栏建好、换分区、进出二级界面都要叫一次。 */
+    void refreshTitle() {
+        if (titleText == null || navButton == null) {
+            return;
+        }
+        int depth = getChildFragmentManager().getBackStackEntryCount();
+        if (depth > 0) {
+            String name = getChildFragmentManager().getBackStackEntryAt(depth - 1).getName();
+            titleText.setText(name != null ? name : getString(R.string.nav_settings));
+            navButton.setIconResource(R.drawable.ic_back);
+            navButton.setContentDescription(getString(R.string.action_back));
+            return;
+        }
+        CharSequence section = null;
+        Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+        if (headers instanceof SettingsHeadersFragment) {
+            section = ((SettingsHeadersFragment) headers).titleOf(currentSection);
+        }
+        titleText.setText(section != null ? section : getString(R.string.nav_settings));
+        navButton.setIconResource(R.drawable.ic_menu);
+        navButton.setContentDescription(getString(R.string.cd_menu));
+    }
+
+    /**
      * 分区内部再往下走（权限、相机映射这些自带界面的）。
      *
      * <p>只换右栏，左栏不动 —— 这正是两栏布局的意义：
      * 进了二级界面还看得见自己在设置的哪一块。进返回栈，返回键回到分区。</p>
      */
-    void openDetail(Fragment fragment) {
+    void openDetail(Fragment fragment, CharSequence title) {
         // 进二级界面沿 Z 轴：新的一层从稍小放大到位，旧的一层稍放大并淡出；
         // 返回时两者各自倒放 —— 深了一层还是退回一层，看动作就知道
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
@@ -145,7 +195,7 @@ public class SettingsShellFragment extends Fragment {
         getChildFragmentManager().beginTransaction()
                 .setReorderingAllowed(true)
                 .replace(R.id.settings_detail, fragment)
-                .addToBackStack(null)
+                .addToBackStack(title == null ? null : title.toString())
                 .commit();
         openDetail();
     }

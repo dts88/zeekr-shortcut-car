@@ -79,6 +79,21 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         }
     }
 
+    /** 某个分区叫什么。标题区要用它，分区名只在 preferences.xml 里声明一次。 */
+    CharSequence titleOf(String key) {
+        PreferenceScreen screen = getPreferenceScreen();
+        if (screen == null || key == null) {
+            return null;
+        }
+        for (int i = 0; i < screen.getPreferenceCount(); i++) {
+            Preference preference = screen.getPreference(i);
+            if (key.equals(preference.getKey())) {
+                return preference.getTitle();
+            }
+        }
+        return null;
+    }
+
     private void build() {
         builtUnlocked = DeveloperMode.isUnlocked();
         Context context = requireContext();
@@ -113,6 +128,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         }
         setPreferenceScreen(screen);
         wireClicks(screen);
+        // 行建好了，标题区才问得到分区名
+        if (getParentFragment() instanceof SettingsShellFragment) {
+            ((SettingsShellFragment) getParentFragment()).refreshTitle();
+        }
     }
 
     private void wireClicks(PreferenceScreen screen) {
