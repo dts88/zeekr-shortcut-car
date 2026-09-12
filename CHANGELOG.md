@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.43.0-alpha] - 2026-09-12
+
+- Settings has a title bar again: the menu key sits where every other screen keeps it, and turns into back inside a sub-screen, whose name it shows. The status bar from the main screen runs along the bottom.
+- Photo and video review moved their actions -- refresh, multi-select, home -- into an action rail on the right, and the selection actions with them. Both screens include the same rail, so they cannot drift apart. Transport controls stay under the video, where the picture they act on is.
+- Video review shows the status bar too, so recording state and free space are visible while watching.
+- The status bar itself is now one layout instead of a copy per main layout.
+- The UI spec lives in the repo (docs/ui-spec.md): the five zones, which screens use which, every token value, and a table saying plainly what does not follow it yet.
+
 ## [0.42.1-alpha] - 2026-09-12
 
 - Fixed: photo review's list was a sliver. The layout that survived yesterday's cleanup sized that list for a phone (200dp fixed); it now uses the same width as the settings and video-review lists.
