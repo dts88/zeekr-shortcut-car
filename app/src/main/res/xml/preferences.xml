@@ -359,16 +359,6 @@
             android:summary="@string/dev_current_profile_summary" />
 
         <Preference
-            android:key="pref_preview_sampler"
-            android:title="@string/dev_preview_sampler_title"
-            android:summary="@string/dev_preview_sampler_summary" />
-
-        <Preference
-            android:key="pref_photo_test"
-            android:title="@string/dev_photo_test_title"
-            android:summary="@string/dev_photo_test_summary" />
-
-        <Preference
             android:key="pref_developer_note"
             android:selectable="false"
             android:summary="@string/dev_note" />

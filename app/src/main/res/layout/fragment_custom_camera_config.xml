@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <!-- Toolbar -->
     <LinearLayout
@@ -16,7 +16,7 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <Button
             android:id="@+id/btn_back"
@@ -27,8 +27,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:layout_width="0dp"
@@ -103,7 +103,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -165,7 +165,7 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background"
+                        android:popupBackground="@color/surface"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp" />
                 </LinearLayout>
@@ -177,7 +177,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -202,7 +202,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:background="@drawable/spinner_background"
-                    android:popupBackground="@color/card_background"
+                    android:popupBackground="@color/surface"
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp" />
             </LinearLayout>
@@ -213,7 +213,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -311,7 +311,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <TextView
@@ -370,7 +370,7 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background"
+                        android:popupBackground="@color/surface"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp" />
                 </LinearLayout>
@@ -383,7 +383,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <TextView
@@ -442,7 +442,7 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background"
+                        android:popupBackground="@color/surface"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp" />
                 </LinearLayout>
@@ -455,7 +455,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <TextView
@@ -514,7 +514,7 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background"
+                        android:popupBackground="@color/surface"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp" />
                 </LinearLayout>
@@ -527,7 +527,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -586,7 +586,7 @@
                         android:layout_height="48dp"
                         android:layout_weight="1"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background"
+                        android:popupBackground="@color/surface"
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp" />
                 </LinearLayout>
@@ -598,7 +598,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background">
+                android:background="@color/surface">
 
                 <TextView
                     android:layout_width="match_parent"
@@ -624,7 +624,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginTop="16dp">
 
                 <TextView

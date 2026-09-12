@@ -634,10 +634,6 @@
     <string name="dev_preview_correction_adjust_summary">Opens a floating window to adjust each camera; turn on the switch above first</string>
     <string name="dev_preview_correction_reset_title">Reset preview correction</string>
     <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
-    <string name="dev_preview_sampler_title">Preview resource sampler</string>
-    <string name="dev_preview_sampler_summary">Logs frames per camera and how many cameras are open every second, split by screen, to see whether the preview still holds resources after switching screens or going to the background</string>
-    <string name="dev_photo_test_title">Photo channel test</string>
-    <string name="dev_photo_test_summary">Takes one photo per camera at every declared JPEG size to see which work and what tags they carry (uses the cameras; do not open while recording)</string>
     <string name="dev_note">“Surround + cabin (3 cameras)” and “Custom” under Stream configuration are only available here as well. This section hides again after the app restarts.</string>
 
     <!-- Log upload · device name (developer) -->

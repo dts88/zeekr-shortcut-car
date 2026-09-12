@@ -268,12 +268,12 @@ public class BlindSpotCorrectionFragment extends Fragment {
         for (int i = 0; i < buttons.length; i++) {
             if (positions[i].equals(currentCameraPos)) {
                 buttons[i].setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                        getResources().getColor(R.color.button_accent, null)));
+                        getResources().getColor(R.color.energy, null)));
                 buttons[i].setTextColor(getResources().getColor(R.color.white, null));
             } else {
                 buttons[i].setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                        getResources().getColor(R.color.button_background, null)));
-                buttons[i].setTextColor(getResources().getColor(R.color.button_text, null));
+                        getResources().getColor(R.color.sunken, null)));
+                buttons[i].setTextColor(getResources().getColor(R.color.text_primary, null));
             }
         }
     }
@@ -282,10 +282,10 @@ public class BlindSpotCorrectionFragment extends Fragment {
         boolean mirrorH = appConfig.getBlindSpotCorrectionMirrorH(currentCameraPos);
         boolean mirrorV = appConfig.getBlindSpotCorrectionMirrorV(currentCameraPos);
 
-        int accentColor = getResources().getColor(R.color.button_accent, null);
-        int normalColor = getResources().getColor(R.color.button_background, null);
+        int accentColor = getResources().getColor(R.color.energy, null);
+        int normalColor = getResources().getColor(R.color.sunken, null);
         int whiteText = getResources().getColor(R.color.white, null);
-        int normalText = getResources().getColor(R.color.button_text, null);
+        int normalText = getResources().getColor(R.color.text_primary, null);
 
         btnMirrorH.setBackgroundTintList(ColorStateList.valueOf(mirrorH ? accentColor : normalColor));
         btnMirrorH.setTextColor(mirrorH ? whiteText : normalText);

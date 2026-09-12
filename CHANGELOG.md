@@ -5,7 +5,7 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Developer options: the photo-channel test and the preview resource sampler are gone. Each was built to answer one question about a feature that has since shipped, and both questions are answered.
 
 ## [0.40.0-alpha] - 2026-09-12
 

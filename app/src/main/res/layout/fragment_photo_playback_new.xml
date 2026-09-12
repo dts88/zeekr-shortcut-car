@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <!--
       ① 标题区：和主界面同一套 —— 64dp 高，菜单在左上，界面名紧跟着，
@@ -19,7 +19,7 @@
         android:paddingStart="10dp"
         android:paddingEnd="16dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_menu"
@@ -88,7 +88,7 @@
         android:paddingStart="10dp"
         android:paddingEnd="16dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background"
+        android:background="@color/bg"
         android:visibility="gone">
 
         <com.google.android.material.button.MaterialButton
@@ -157,7 +157,7 @@
             android:id="@+id/list_container"
             android:layout_width="200dp"
             android:layout_height="match_parent"
-            android:background="@color/page_background">
+            android:background="@color/bg">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/photo_list"
@@ -464,8 +464,8 @@ android:layout_marginStart="0dp"
                     android:minWidth="72dp"
                     android:text="@string/photo_mode_multi"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
                 <Button
                     android:id="@+id/btn_send_to_phone"
                     android:layout_width="wrap_content"
@@ -474,8 +474,8 @@ android:layout_marginStart="0dp"
                     android:layout_marginStart="8dp"
                     android:text="@string/action_send_to_phone"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

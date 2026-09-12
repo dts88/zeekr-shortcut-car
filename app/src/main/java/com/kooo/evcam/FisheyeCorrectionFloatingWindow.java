@@ -273,10 +273,10 @@ public class FisheyeCorrectionFloatingWindow {
     }
 
     private void updateCameraButtonStyles() {
-        ColorStateList accentTint = ContextCompat.getColorStateList(context, R.color.button_accent);
-        ColorStateList normalTint = ContextCompat.getColorStateList(context, R.color.button_background);
+        ColorStateList accentTint = ContextCompat.getColorStateList(context, R.color.energy);
+        ColorStateList normalTint = ContextCompat.getColorStateList(context, R.color.sunken);
         int whiteColor = ContextCompat.getColor(context, R.color.white);
-        int normalTextColor = ContextCompat.getColor(context, R.color.button_text);
+        int normalTextColor = ContextCompat.getColor(context, R.color.text_primary);
 
         btnCamFront.setBackgroundTintList("front".equals(currentCameraPos) ? accentTint : normalTint);
         btnCamFront.setTextColor("front".equals(currentCameraPos) ? whiteColor : normalTextColor);

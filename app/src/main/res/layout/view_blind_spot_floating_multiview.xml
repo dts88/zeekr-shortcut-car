@@ -36,7 +36,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="旋转"
-            android:backgroundTint="@color/button_accent"
+            android:backgroundTint="@color/energy"
             android:textColor="@color/white"
             android:layout_marginEnd="8dp" />
 
@@ -45,7 +45,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="保存并关闭"
-            android:backgroundTint="@color/button_accent"
+            android:backgroundTint="@color/energy"
             android:textColor="@color/white" />
     </LinearLayout>
 

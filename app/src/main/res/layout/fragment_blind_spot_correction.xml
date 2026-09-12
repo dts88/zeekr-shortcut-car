@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,7 +15,7 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <Button
             android:id="@+id/btn_back"
@@ -26,8 +26,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:layout_width="0dp"
@@ -46,8 +46,8 @@
             android:textSize="20sp"
             android:minWidth="48dp"
             android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 
     <ScrollView
@@ -65,7 +65,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -89,7 +89,7 @@
                         android:layout_weight="1"
                         android:text="前"
                         android:textSize="16sp"
-                        android:backgroundTint="@color/button_accent"
+                        android:backgroundTint="@color/energy"
                         android:textColor="@color/white" />
 
                     <Button
@@ -100,8 +100,8 @@
                         android:layout_marginStart="8dp"
                         android:text="后"
                         android:textSize="16sp"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
+                        android:backgroundTint="@color/sunken"
+                        android:textColor="@color/text_primary" />
 
                     <Button
                         android:id="@+id/btn_camera_left"
@@ -111,8 +111,8 @@
                         android:layout_marginStart="8dp"
                         android:text="左"
                         android:textSize="16sp"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
+                        android:backgroundTint="@color/sunken"
+                        android:textColor="@color/text_primary" />
 
                     <Button
                         android:id="@+id/btn_camera_right"
@@ -122,8 +122,8 @@
                         android:layout_marginStart="8dp"
                         android:text="右"
                         android:textSize="16sp"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
+                        android:backgroundTint="@color/sunken"
+                        android:textColor="@color/text_primary" />
                 </LinearLayout>
 
                 <TextView
@@ -141,7 +141,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -218,7 +218,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -295,7 +295,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -343,7 +343,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -368,8 +368,8 @@
                         android:layout_weight="1"
                         android:text="水平镜像"
                         android:textSize="15sp"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
+                        android:backgroundTint="@color/sunken"
+                        android:textColor="@color/text_primary" />
 
                     <Button
                         android:id="@+id/btn_mirror_v"
@@ -379,8 +379,8 @@
                         android:layout_marginStart="12dp"
                         android:text="垂直镜像"
                         android:textSize="15sp"
-                        android:backgroundTint="@color/button_background"
-                        android:textColor="@color/button_text" />
+                        android:backgroundTint="@color/sunken"
+                        android:textColor="@color/text_primary" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -397,8 +397,8 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="恢复默认"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
 
                 <Button
                     android:id="@+id/btn_save_apply"
@@ -407,7 +407,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="12dp"
                     android:text="保存并应用"
-                    android:backgroundTint="@color/button_accent"
+                    android:backgroundTint="@color/energy"
                     android:textColor="@color/white" />
             </LinearLayout>
         </LinearLayout>

@@ -41,9 +41,9 @@
         <item name="colorOutline">@color/line</item>
         <item name="android:statusBarColor">@color/bg</item>
         <item name="android:navigationBarColor">@color/bg</item>
-        <item name="android:windowBackground">@color/page_background</item>
+        <item name="android:windowBackground">@color/bg</item>
         <!-- Android 12+ 启动画面背景 -->
-        <item name="android:windowSplashScreenBackground">@color/page_background</item>
+        <item name="android:windowSplashScreenBackground">@color/bg</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 

@@ -6,4 +6,4 @@
     android:padding="16dp"
     android:textColor="@color/text_primary"
     android:textAppearance="@style/TextAppearance.Cam.Body"
-    android:background="@color/card_background" />
+    android:background="@color/surface" />

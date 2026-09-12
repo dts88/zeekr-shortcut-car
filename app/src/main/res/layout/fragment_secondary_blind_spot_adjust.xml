@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,7 +15,7 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <Button
             android:id="@+id/btn_back"
@@ -26,8 +26,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:layout_width="0dp"
@@ -46,8 +46,8 @@
             android:textSize="20sp"
             android:minWidth="48dp"
             android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 
     <ScrollView
@@ -65,7 +65,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
@@ -88,7 +88,7 @@
                         android:layout_width="150dp"
                         android:layout_height="48dp"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background" />
+                        android:popupBackground="@color/surface" />
                 </LinearLayout>
 
                 <TextView
@@ -106,7 +106,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -260,7 +260,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -292,7 +292,7 @@
                         android:layout_width="120dp"
                         android:layout_height="48dp"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background" />
+                        android:popupBackground="@color/surface" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -315,7 +315,7 @@
                         android:layout_width="150dp"
                         android:layout_height="48dp"
                         android:background="@drawable/spinner_background"
-                        android:popupBackground="@color/card_background" />
+                        android:popupBackground="@color/surface" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -378,8 +378,8 @@
                 android:text="保存配置并应用"
                 android:textSize="20sp"
                 android:minHeight="56dp"
-                android:backgroundTint="@color/button_background"
-                android:textColor="@color/button_text"
+                android:backgroundTint="@color/sunken"
+                android:textColor="@color/text_primary"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="24dp" />
         </LinearLayout>

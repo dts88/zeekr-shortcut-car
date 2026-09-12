@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <!-- 顶部工具栏 -->
     <LinearLayout
@@ -19,7 +19,7 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <Button
             android:id="@+id/btn_menu"
@@ -30,8 +30,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:id="@+id/toolbar_title"
@@ -60,8 +60,8 @@
             android:text="@string/action_refresh"
             android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <Button
             android:id="@+id/btn_multi_select"
@@ -71,8 +71,8 @@
             android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:layout_marginStart="4dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <Button
             android:id="@+id/btn_home"
@@ -83,8 +83,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginStart="4dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 
     <!-- 多选工具栏（隐藏） -->
@@ -98,7 +98,7 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background"
+        android:background="@color/bg"
         android:visibility="gone">
 
         <Button
@@ -108,8 +108,8 @@
             android:text="@string/action_select_all"
             android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:id="@+id/selected_count"
@@ -129,7 +129,7 @@
             android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:layout_marginEnd="4dp"
-            android:backgroundTint="@color/button_accent"
+            android:backgroundTint="@color/energy"
             android:textColor="@android:color/white" />
 
         <Button
@@ -150,8 +150,8 @@
             android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:layout_marginStart="4dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 
     <!-- 主内容区：上下分栏（竖屏） -->
@@ -439,8 +439,8 @@
                     android:minWidth="60dp"
                     android:text="@string/photo_mode_multi"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
                 <Button
                     android:id="@+id/btn_send_to_phone"
                     android:layout_width="wrap_content"
@@ -449,8 +449,8 @@
                     android:layout_marginStart="8dp"
                     android:text="@string/action_send_to_phone"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
         </LinearLayout>
 
@@ -460,7 +460,7 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:background="@color/page_background">
+            android:background="@color/bg">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/photo_list"

@@ -58,7 +58,6 @@ public class HardcodedTextTest {
                 "zeekr/ZeekrCompositeProfile.java", "zeekr/CompositeStreamGeometry.java",
                 "share/ShareDiagnostics.java",
                 "camera/PreviewFrameRates.java", "camera/FrameRateMeter.java",
-                "camera/PreviewSampler.java", "camera/AppScreenState.java",
                 "profile/Profile.java", "profile/CameraProfile.java", "profile/StreamSpec.java",
                 "profile/LaneLayout.java", "profile/ProfileResolution.java"}) {
             JAVA_ALLOWED.put(f, report);
@@ -69,8 +68,7 @@ public class HardcodedTextTest {
                 "AdbPermissionHelper.java", "PermissionSettingsFragment.java",
                 "settings/PermissionsPreferenceFragment.java", "SystemWhitelistHelper.java",
                 "CustomCameraConfigFragment.java", "CustomLayoutManager.java",
-                "LogcatViewerActivity.java",
-                "zeekr/PhotoCaptureTestActivity.java", "zeekr/PreviewSamplerActivity.java"}) {
+                "LogcatViewerActivity.java"}) {
             JAVA_ALLOWED.put(f, developer);
         }
         String blindSpot = "补盲 / 超视：设置页和抽屉入口都只在开发者模式解锁后出现";

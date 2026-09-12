@@ -29,12 +29,6 @@
 
     <!-- 旧名字 → 语义色 -->
     <color name="colorPrimary">@color/energy</color>
-    <color name="menu_background">@color/bg</color>
-    <color name="page_background">@color/bg</color>
-    <color name="button_background">@color/sunken</color>
-    <color name="button_accent">@color/energy</color>
-    <color name="button_text">@color/text_primary</color>
-    <color name="card_background">@color/surface</color>
     <color name="text_hint">@color/text_tertiary</color>
     <color name="input_background">@color/sunken</color>
     <color name="nav_header_background">@color/surface</color>
@@ -54,7 +48,6 @@
     <color name="nav_logo_accent">@color/energy</color>
     <color name="nav_section_title">@color/text_tertiary</color>
     <color name="nav_version_text">@color/text_tertiary</color>
-    <color name="item_selected_background">@color/energy_quiet</color>
     <color name="preview_background">@color/bg</color>
     <color name="preview_grid_divider">@color/bg</color>
     <color name="preview_placeholder_text">@color/text_secondary</color>

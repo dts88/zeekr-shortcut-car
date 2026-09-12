@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="18dp"
-    android:background="@color/card_background">
+    android:background="@color/surface">
 
     <TextView
         android:id="@+id/tv_title"
@@ -68,8 +68,8 @@
         android:minHeight="52dp"
         android:layout_marginTop="10dp"
         android:enabled="false"
-        android:backgroundTint="@color/button_background"
-        android:textColor="@color/button_text" />
+        android:backgroundTint="@color/sunken"
+        android:textColor="@color/text_primary" />
 
 </LinearLayout>
 

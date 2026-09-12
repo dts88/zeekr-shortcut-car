@@ -14,13 +14,13 @@
     android:id="@+id/settings_sliding_pane"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/settings_headers"
         android:layout_width="@dimen/list_width"
         android:layout_height="match_parent"
-        android:background="@color/page_background" />
+        android:background="@color/bg" />
 
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/settings_detail"

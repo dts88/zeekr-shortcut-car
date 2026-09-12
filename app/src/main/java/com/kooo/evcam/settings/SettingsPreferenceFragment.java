@@ -848,12 +848,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         onClick("pref_current_profile", pref -> showCurrentProfile());
 
-        onClick("pref_preview_sampler", pref -> startActivity(
-                new Intent(getContext(), com.kooo.evcam.zeekr.PreviewSamplerActivity.class)));
-
-        onClick("pref_photo_test", pref -> startActivity(
-                new Intent(getContext(), com.kooo.evcam.zeekr.PhotoCaptureTestActivity.class)));
-
 
         onClick("pref_preview_correction_reset", pref -> {
             appConfig.resetAllPreviewCorrection();

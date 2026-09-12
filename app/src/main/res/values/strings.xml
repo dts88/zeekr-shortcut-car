@@ -635,10 +635,6 @@
     <string name="dev_preview_correction_adjust_summary">打开悬浮窗逐路调整，需要先打开上面的开关</string>
     <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
     <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
-    <string name="dev_preview_sampler_title">预览资源占用实测</string>
-    <string name="dev_preview_sampler_summary">每秒记一次各路出帧数和相机开着几路，按界面自动分段——用来看切界面 / 退到后台之后预览这一路是不是还占着资源</string>
-    <string name="dev_photo_test_title">拍照通道实测</string>
-    <string name="dev_photo_test_summary">每一路、每个声明的 JPEG 尺寸真的拍一张，看能不能出图、带了哪些标签（会占用相机，录制中勿进）</string>
     <string name="dev_note">「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。</string>
 
     <!-- 上传日志 · 设备识别名称（开发者） -->

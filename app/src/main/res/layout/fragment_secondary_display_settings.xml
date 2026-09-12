@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <!-- Toolbar -->
     <LinearLayout
@@ -17,7 +17,7 @@
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <Button
             android:id="@+id/btn_menu"
@@ -28,8 +28,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:layout_width="0dp"
@@ -48,8 +48,8 @@
             android:textSize="20sp"
             android:minWidth="48dp"
             android:minHeight="48dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 
     <ScrollView
@@ -68,7 +68,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp"
                 android:gravity="center_vertical">
 
@@ -116,7 +116,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <TextView
@@ -141,7 +141,7 @@
                     android:layout_height="wrap_content"
                     android:text="进入实验室"
                     android:layout_marginTop="12dp"
-                    android:backgroundTint="@color/button_accent"
+                    android:backgroundTint="@color/energy"
                     android:textColor="@color/white" />
             </LinearLayout>
 
@@ -151,7 +151,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
@@ -196,7 +196,7 @@
                     android:layout_height="wrap_content"
                     android:text="调整矫正参数 (四路独立)"
                     android:layout_marginTop="12dp"
-                    android:backgroundTint="@color/button_accent"
+                    android:backgroundTint="@color/energy"
                     android:textColor="@color/white" />
             </LinearLayout>
 
@@ -206,7 +206,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
@@ -288,7 +288,7 @@
                     android:layout_height="wrap_content"
                     android:text="重置主屏悬浮窗 (恢复默认位置和大小)"
                     android:layout_marginTop="12dp"
-                    android:backgroundTint="@color/button_accent"
+                    android:backgroundTint="@color/energy"
                     android:textColor="@color/white" />
             </LinearLayout>
 
@@ -298,7 +298,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
@@ -383,8 +383,8 @@
                     android:text="调整位置和大小"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text"
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary"
                     android:layout_marginTop="8dp"
                     android:visibility="gone" />
 
@@ -537,7 +537,7 @@
                             android:layout_height="36dp"
                             android:text="选择颜色"
                             android:textSize="13sp"
-                            android:backgroundTint="@color/button_accent"
+                            android:backgroundTint="@color/energy"
                             android:textColor="@color/white"
                             android:minWidth="0dp"
                             android:paddingStart="16dp"
@@ -836,7 +836,7 @@
                     android:layout_height="wrap_content"
                     android:text="调整副屏悬浮窗位置"
                     android:layout_marginTop="12dp"
-                    android:backgroundTint="@color/button_accent"
+                    android:backgroundTint="@color/energy"
                     android:textColor="@color/white" />
 
             </LinearLayout>
@@ -848,7 +848,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp"
                 android:visibility="gone">
 
@@ -896,7 +896,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
@@ -984,7 +984,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="32dp">
 
                 <TextView
@@ -1013,8 +1013,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="打开 Logcat 实时调试"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 版权说明 -->

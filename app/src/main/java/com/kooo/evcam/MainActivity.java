@@ -1514,8 +1514,6 @@ public class MainActivity extends AppCompatActivity {
      * 显示录制界面
      */
     public void showRecordingInterface() {
-        com.kooo.evcam.camera.AppScreenState.set(
-                com.kooo.evcam.camera.AppScreenState.PREVIEW);
         FragmentManager fragmentManager = getSupportFragmentManager();
 
         // 返回栈也要清掉。只把 Fragment 移走而把栈留着，下一次按返回键就会去
@@ -1545,8 +1543,6 @@ public class MainActivity extends AppCompatActivity {
      * （权限、相机映射）就在那个子返回栈里。</p>
      */
     private void showFragment(Fragment fragment) {
-        com.kooo.evcam.camera.AppScreenState.set(
-                com.kooo.evcam.camera.AppScreenState.OTHER_SCREEN);
         recordingLayout.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
         // 进一层：沿 Z 轴放大淡入，和设置里进二级界面是同一个动作。
@@ -3627,8 +3623,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         isInBackground = true;
-        com.kooo.evcam.camera.AppScreenState.set(
-                com.kooo.evcam.camera.AppScreenState.BACKGROUND);
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
         
         // 通知悬浮窗：应用退到后台
@@ -3685,11 +3679,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // 回到前台。具体是不是预览界面由 showFragment / showRecordingInterface 再改一次
-        com.kooo.evcam.camera.AppScreenState.set(
-                fragmentContainer != null && fragmentContainer.getVisibility() == View.VISIBLE
-                        ? com.kooo.evcam.camera.AppScreenState.OTHER_SCREEN
-                        : com.kooo.evcam.camera.AppScreenState.PREVIEW);
         boolean wasInBackground = isInBackground;
         isInBackground = false;
         

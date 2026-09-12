@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/page_background">
+    android:background="@color/bg">
 
     <!-- Toolbar -->
     <LinearLayout
@@ -17,7 +17,7 @@
         android:paddingEnd="8dp"
         android:gravity="center_vertical"
         android:baselineAligned="false"
-        android:background="@color/menu_background">
+        android:background="@color/bg">
 
         <Button
             android:id="@+id/btn_back"
@@ -29,8 +29,8 @@
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/button_background"
-            android:textColor="@color/button_text" />
+            android:backgroundTint="@color/sunken"
+            android:textColor="@color/text_primary" />
 
         <TextView
             android:layout_width="0dp"
@@ -68,7 +68,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:padding="16dp"
                 android:layout_marginBottom="16dp">
 
@@ -103,7 +103,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="240dp"
                     android:layout_marginTop="12dp"
-                    android:background="@color/page_background"
+                    android:background="@color/bg"
                     android:padding="10dp"
                     android:visibility="gone"
                     android:fillViewport="false">
@@ -136,7 +136,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <LinearLayout
@@ -170,8 +170,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 麦克风权限 -->
@@ -181,7 +181,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <LinearLayout
@@ -215,8 +215,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 存储权限 -->
@@ -226,7 +226,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <LinearLayout
@@ -260,8 +260,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 通知权限（Android 13+） -->
@@ -272,7 +272,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp"
                 android:visibility="gone">
 
@@ -307,8 +307,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- ========== 高级权限 ========== -->
@@ -329,7 +329,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp"
                 android:visibility="gone">
 
@@ -364,8 +364,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 悬浮窗权限 -->
@@ -375,7 +375,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <LinearLayout
@@ -409,8 +409,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 无障碍服务 -->
@@ -420,7 +420,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <LinearLayout
@@ -454,8 +454,8 @@
                     android:text="去启用"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 使用情况访问权限（全景影像避让） -->
@@ -466,7 +466,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="8dp">
 
                 <LinearLayout
@@ -500,8 +500,8 @@
                     android:text="去授权"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- 电池优化 -->
@@ -512,7 +512,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="16dp"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:layout_marginBottom="16dp">
 
                 <LinearLayout
@@ -546,8 +546,8 @@
                     android:text="去设置"
                     android:textSize="14sp"
                     android:minHeight="40dp"
-                    android:backgroundTint="@color/button_background"
-                    android:textColor="@color/button_text" />
+                    android:backgroundTint="@color/sunken"
+                    android:textColor="@color/text_primary" />
             </LinearLayout>
 
             <!-- ========== 系统级保活（E245） ========== -->
@@ -564,7 +564,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:background="@color/card_background"
+                android:background="@color/surface"
                 android:padding="16dp"
                 android:layout_marginBottom="16dp">
 
@@ -600,7 +600,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="280dp"
                     android:layout_marginTop="12dp"
-                    android:background="@color/page_background"
+                    android:background="@color/bg"
                     android:padding="10dp"
                     android:visibility="gone"
                     android:fillViewport="false">
@@ -631,7 +631,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="280dp"
                     android:layout_marginTop="12dp"
-                    android:background="@color/page_background"
+                    android:background="@color/bg"
                     android:padding="10dp"
                     android:visibility="gone"
                     android:fillViewport="false">

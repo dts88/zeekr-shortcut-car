@@ -295,7 +295,7 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
 
     private void updateSelectionStyle(PhotoGroupViewHolder holder, boolean isSelected) {
         if (isSelected) {
-            holder.itemView.setBackgroundColor(context.getResources().getColor(R.color.item_selected_background));
+            holder.itemView.setBackgroundColor(context.getResources().getColor(R.color.energy_quiet));
         } else {
             holder.itemView.setBackgroundColor(context.getResources().getColor(android.R.color.transparent));
         }
