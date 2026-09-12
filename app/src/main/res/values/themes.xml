@@ -38,7 +38,7 @@
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorSurfaceVariant">@color/sunken</item>
         <item name="elevationOverlayEnabled">false</item>
-        <item name="colorSurfaceTint">@color/surface</item>
+        <item name="elevationOverlayColor">@color/surface</item>
         <item name="colorSurfaceContainer">@color/surface</item>
         <item name="colorSurfaceContainerHigh">@color/sunken</item>
         <item name="colorSurfaceContainerHighest">@color/sunken</item>
@@ -162,7 +162,7 @@
           中性灰白不是一套。这里把上色关掉，并把几档表面色都钉回自己的语义色。
         -->
         <item name="elevationOverlayEnabled">false</item>
-        <item name="colorSurfaceTint">@color/surface</item>
+        <item name="elevationOverlayColor">@color/surface</item>
         <item name="colorSurfaceContainer">@color/surface</item>
         <item name="colorSurfaceContainerHigh">@color/surface</item>
         <item name="colorSurfaceContainerHighest">@color/surface</item>
