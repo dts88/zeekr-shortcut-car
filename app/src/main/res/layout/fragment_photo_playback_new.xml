@@ -152,10 +152,10 @@
         android:layout_weight="1"
         android:orientation="horizontal">
 
-        <!-- 左侧：图片列表（手机使用固定宽度） -->
+        <!-- 左侧：图片列表。宽度和设置页、视频回看的左栏用同一个值 -->
         <FrameLayout
             android:id="@+id/list_container"
-            android:layout_width="200dp"
+            android:layout_width="@dimen/list_width"
             android:layout_height="match_parent"
             android:background="@color/bg">
 
@@ -246,7 +246,7 @@ android:layout_marginStart="0dp"
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_front"
                             android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                         <TextView
                             android:id="@+id/placeholder_front"
@@ -255,7 +255,7 @@ android:layout_marginStart="0dp"
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textAppearance="@style/TextAppearance.Cam.Body"
+                            android:textAppearance="@style/TextAppearance.Cam.Caption"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
 
@@ -287,7 +287,7 @@ android:layout_marginStart="0dp"
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_back"
                             android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                         <TextView
                             android:id="@+id/placeholder_back"
@@ -296,7 +296,7 @@ android:layout_marginStart="0dp"
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textAppearance="@style/TextAppearance.Cam.Body"
+                            android:textAppearance="@style/TextAppearance.Cam.Caption"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
                 </LinearLayout>
@@ -336,7 +336,7 @@ android:layout_marginStart="0dp"
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_left"
                             android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                         <TextView
                             android:id="@+id/placeholder_left"
@@ -345,7 +345,7 @@ android:layout_marginStart="0dp"
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textAppearance="@style/TextAppearance.Cam.Body"
+                            android:textAppearance="@style/TextAppearance.Cam.Caption"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
 
@@ -377,7 +377,7 @@ android:layout_marginStart="0dp"
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_right"
                             android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                         <TextView
                             android:id="@+id/placeholder_right"
@@ -386,7 +386,7 @@ android:layout_marginStart="0dp"
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textAppearance="@style/TextAppearance.Cam.Body"
+                            android:textAppearance="@style/TextAppearance.Cam.Caption"
                             android:visibility="gone" />
                             </com.kooo.evcam.AspectRatioFrameLayout>
                         </LinearLayout>
@@ -418,7 +418,7 @@ android:layout_marginStart="0dp"
                         android:paddingVertical="6dp"
                         android:text="@string/zeekr_lane_front"
                         android:textColor="#FFFFFF"
-                        android:textAppearance="@style/TextAppearance.Cam.Body" />
+                        android:textAppearance="@style/TextAppearance.Cam.Caption" />
                 </FrameLayout>
 
                 <!-- 无选中状态提示 -->
@@ -434,7 +434,7 @@ android:layout_marginStart="0dp"
                         android:layout_height="wrap_content"
                         android:text="@string/photo_pick_hint"
                         android:textColor="@color/text_secondary"
-                        android:textAppearance="@style/TextAppearance.Cam.Display" />
+                        android:textAppearance="@style/TextAppearance.Cam.Row" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -442,7 +442,7 @@ android:layout_marginStart="0dp"
                         android:layout_marginTop="12dp"
                         android:text="@string/photo_double_tap_hint"
                         android:textColor="@color/text_hint"
-                        android:textAppearance="@style/TextAppearance.Cam.Row" />
+                        android:textAppearance="@style/TextAppearance.Cam.Body" />
                 </LinearLayout>
             </FrameLayout>
 

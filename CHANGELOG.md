@@ -7,6 +7,11 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.42.1-alpha] - 2026-09-12
+
+- Fixed: photo review's list was a sliver. The layout that survived yesterday's cleanup sized that list for a phone (200dp fixed); it now uses the same width as the settings and video-review lists.
+- Photo review's text steps line up with the rest: lane badges match the ones on the main screen, and the empty-state hint is no longer larger than a page title with its own subtitle bigger still.
+
 ## [0.42.0-alpha] - 2026-09-12
 
 - Fixed: photo review was still showing its pre-redesign toolbar on the vehicle. The head unit picks the large-screen copy of that layout, and only the base copy had been redesigned — so the vector icons and rounded tiles landed in 0.38.0 for everyone except the car. Those stale copies are gone; there is one layout now.
