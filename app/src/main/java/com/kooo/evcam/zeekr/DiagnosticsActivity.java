@@ -1,6 +1,5 @@
 package com.kooo.evcam.zeekr;
 
-import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -44,7 +43,9 @@ import java.util.Locale;
  * JSON 那份不设上限、不截断，人看的完整文本也一并放在 {@code text_report} 字段里，
  * 一个文件两用。</p>
  */
-public class DiagnosticsActivity extends Activity {
+import androidx.appcompat.app.AppCompatActivity;
+
+public class DiagnosticsActivity extends AppCompatActivity {
 
     private static final String TAG = "DiagnosticsActivity";
 

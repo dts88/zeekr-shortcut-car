@@ -188,14 +188,14 @@
         <activity
             android:name=".zeekr.DiagnosticsActivity"
             android:label="诊断信息"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:theme="@style/Theme.Cam"
             android:exported="false" />
 
         <!-- 关于与致谢：说明本应用两个功能来源及其许可证 -->
         <activity
             android:name=".zeekr.AboutActivity"
             android:label="@string/about_title"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:theme="@style/Theme.Cam"
             android:exported="false" />
 
         <!-- 无障碍服务：用于保活 -->

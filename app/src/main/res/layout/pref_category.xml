@@ -15,7 +15,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@color/text_secondary"
-        android:textAppearance="@style/TextAppearance.Cam.Body" />
+        android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
     <TextView
         android:id="@android:id/summary"

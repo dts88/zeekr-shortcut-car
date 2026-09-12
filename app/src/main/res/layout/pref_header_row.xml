@@ -40,7 +40,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="@color/pref_title"
-        android:textAppearance="@style/TextAppearance.Cam.Row" />
+        android:textAppearance="@style/TextAppearance.Cam.Body" />
 
     <TextView
         android:id="@android:id/summary"

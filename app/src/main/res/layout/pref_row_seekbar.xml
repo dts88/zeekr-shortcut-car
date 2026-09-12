@@ -26,7 +26,7 @@
         android:labelFor="@+id/seekbar"
         android:maxLines="2"
         android:textColor="@color/pref_title"
-        android:textAppearance="@style/TextAppearance.Cam.Row" />
+        android:textAppearance="@style/TextAppearance.Cam.Body" />
 
     <TextView
         android:id="@android:id/summary"
@@ -35,7 +35,7 @@
         android:layout_marginTop="3dp"
         android:maxLines="4"
         android:textColor="@color/pref_summary"
-        android:textAppearance="@style/TextAppearance.Cam.Caption" />
+        android:textAppearance="@style/TextAppearance.Cam.Micro" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -65,7 +65,7 @@
             android:paddingStart="8dp"
             android:singleLine="true"
             android:textColor="@color/pref_summary"
-            android:textAppearance="@style/TextAppearance.Cam.Body" />
+            android:textAppearance="@style/TextAppearance.Cam.Caption" />
     </LinearLayout>
 
     <LinearLayout

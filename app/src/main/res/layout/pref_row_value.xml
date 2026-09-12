@@ -28,7 +28,7 @@
         android:paddingTop="14dp"
         android:paddingBottom="14dp"
         android:textColor="@color/pref_title"
-        android:textAppearance="@style/TextAppearance.Cam.Row" />
+        android:textAppearance="@style/TextAppearance.Cam.Body" />
 
     <TextView
         android:id="@android:id/summary"
@@ -40,7 +40,7 @@
         android:maxWidth="360dp"
         android:maxLines="2"
         android:textColor="@color/pref_summary"
-        android:textAppearance="@style/TextAppearance.Cam.Body" />
+        android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
     <LinearLayout
         android:id="@android:id/widget_frame"

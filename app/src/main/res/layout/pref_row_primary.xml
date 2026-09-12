@@ -18,7 +18,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@color/on_energy"
-        android:textAppearance="@style/TextAppearance.Cam.Row"
+        android:textAppearance="@style/TextAppearance.Cam.Body"
         android:textStyle="bold" />
 
     <TextView
@@ -28,7 +28,7 @@
         android:layout_marginTop="3dp"
         android:alpha="0.85"
         android:textColor="@color/on_energy"
-        android:textAppearance="@style/TextAppearance.Cam.Caption" />
+        android:textAppearance="@style/TextAppearance.Cam.Micro" />
 
     <LinearLayout
         android:id="@android:id/widget_frame"

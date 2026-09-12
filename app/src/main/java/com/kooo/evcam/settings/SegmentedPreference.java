@@ -80,7 +80,8 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
         TextView view = new TextView(context);
         view.setText(label);
         view.setGravity(Gravity.CENTER);
-        view.setTextAppearance(R.style.TextAppearance_Cam_Body);
+        // 设置页整体比别处低一档，段上的字跟着行标题往下走一级
+        view.setTextAppearance(R.style.TextAppearance_Cam_Caption);
         view.setTextColor(ContextCompat.getColor(context,
                 chosen ? R.color.on_energy : R.color.text_secondary));
         view.setBackgroundResource(R.drawable.bg_segment);

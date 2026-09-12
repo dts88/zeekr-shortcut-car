@@ -1,6 +1,5 @@
 package com.kooo.evcam.zeekr;
 
-import android.app.Activity;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.net.Uri;
@@ -17,6 +16,7 @@ import android.view.TextureView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import com.kooo.evcam.playback.PlaybackViewport;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -53,7 +53,7 @@ import java.util.Locale;
  * 要做到无缝需要在当前段播放时预加载下一段，播放器已经具备这个条件
  * （可以先 prepare 不播），但还没接上。</p>
  */
-public class TimelinePlayerActivity extends Activity {
+public class TimelinePlayerActivity extends AppCompatActivity {
 
     private static final String TAG = "TimelinePlayer";
     /** 进度刷新间隔。 */

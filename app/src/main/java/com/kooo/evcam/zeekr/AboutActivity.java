@@ -1,6 +1,5 @@
 package com.kooo.evcam.zeekr;
 
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
@@ -22,7 +21,9 @@ import com.kooo.evcam.R;
  * <p>这一页存在的意义就是把来源讲清楚：本应用的两个能力来源分别是哪个开源项目、
  * 各自是什么许可证、我们用了什么、没用什么。信息全部硬编码在这里，不联网。</p>
  */
-public class AboutActivity extends Activity {
+import androidx.appcompat.app.AppCompatActivity;
+
+public class AboutActivity extends AppCompatActivity {
 
     private static final String TAG = "AboutActivity";
 
