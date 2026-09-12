@@ -7,6 +7,11 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.43.2-alpha] - 2026-09-13
+
+- The last four places that set a text size in code now read the scale: the profile preview check's note, the update dialog's progress line, the lane map's labels and the phone-share page. Sizes still set in code are either burned into a frame or chosen by the user.
+- Removed an unused layout left over from upstream, and added a test that fails on a plain Button or an android:backgroundTint in a core screen -- the shape of what sat unnoticed in the large-screen layout for four months.
+
 ## [0.43.1-alpha] - 2026-09-12
 
 - Photo and video review keep their actions in the title bar after all. The action rail 0.43.0 moved them to costs 380dp on a screen whose content is the picture, and the title bar had the room. Both screens still share one layout for them.
