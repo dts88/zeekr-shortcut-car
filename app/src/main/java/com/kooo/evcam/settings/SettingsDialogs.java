@@ -191,14 +191,9 @@ public final class SettingsDialogs {
     static void showDeviceNicknameInputDialog(Context context, AppConfig config) {
         if (context == null) return;
         
-        EditText inputEditText = new EditText(context);
+        EditText inputEditText = com.kooo.evcam.ui.CamDialogs.input(context);
         inputEditText.setInputType(InputType.TYPE_CLASS_TEXT);
         inputEditText.setHint(R.string.nick_hint);
-        inputEditText.setPadding(48, 32, 48, 32);
-        // 适配夜间模式
-        inputEditText.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
-        inputEditText.setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary));
-        inputEditText.setBackgroundResource(R.drawable.edit_text_background);
         
         com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.nick_title)
@@ -285,9 +280,6 @@ public final class SettingsDialogs {
         inputEditText.setMinLines(3);
         inputEditText.setMaxLines(6);
         inputEditText.setHint(R.string.upload_desc_hint);
-        inputEditText.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
-        inputEditText.setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary));
-        inputEditText.setBackgroundResource(R.drawable.edit_text_background);
         layout.addView(inputEditText);
         
         com.kooo.evcam.ui.CamDialogs.show(new com.google.android.material.dialog.MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)

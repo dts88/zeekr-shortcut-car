@@ -923,7 +923,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 单行文本输入：车牌号、视频 / 图片存储上限。 */
     private void showTextDialog(EditTextPreference pref) {
-        final android.widget.EditText input = new android.widget.EditText(requireContext());
+        final android.widget.EditText input =
+                com.kooo.evcam.ui.CamDialogs.input(requireContext());
         input.setText(pref.getText());
         input.setSelectAllOnFocus(true);
         configureInput(pref.getKey(), input);

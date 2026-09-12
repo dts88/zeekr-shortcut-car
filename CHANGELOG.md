@@ -8,6 +8,7 @@ Notable changes only, newest first. Each version's section becomes the body of i
 - Fixed: settings dialogs had no confirm button (video and photo limits, licence plate, button side, and the first-launch driver-side question). They were framework dialogs, whose button bar this head unit does not draw. Every dialog is now a Material dialog - what the dialogs that always worked (camera mapping, device name) were already using. A test keeps it that way.
 - Dropdown settings (video stream profile, storage location, button side) now ask for confirmation. They used to apply the moment you touched an entry, with no way back.
 - Fixed: dialog buttons were clipped along the top, so only their bottom corners looked rounded.
+- Text inputs in dialogs share one style (licence plate, storage limits, device name, problem description). They were two different-looking boxes. Filled buttons all use the same orange.
 
 ## [0.39.0-alpha] - 2026-09-12
 

@@ -10,6 +10,7 @@ import android.graphics.drawable.RippleDrawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 
 import androidx.core.content.ContextCompat;
 
@@ -52,9 +53,32 @@ public final class CamDialogs {
     private static final int BUTTON_PADDING_DP = 24;
     private static final int BUTTON_GAP_DP = 12;
     private static final int BUTTON_BAR_PADDING_DP = 12;
+    private static final int INPUT_HEIGHT_DP = 56;
+    private static final int INPUT_PADDING_H_DP = 16;
+    private static final int INPUT_PADDING_V_DP = 14;
     private static final int CORNER_DP = 10;
 
     private CamDialogs() {
+    }
+
+    /**
+     * 对话框里的输入框。
+     *
+     * <p>以前几处各写各的：车牌号和存储上限是裸的 EditText，设备名和问题描述是
+     * 像素内边距加一圈描边 —— 同一个应用里两种长相。这里给一份。</p>
+     */
+    public static EditText input(Context context) {
+        EditText input = new EditText(context);
+        float density = context.getResources().getDisplayMetrics().density;
+        input.setBackgroundResource(R.drawable.bg_dialog_input);
+        input.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
+        input.setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary));
+        input.setTextSize(18f);
+        int horizontal = Math.round(INPUT_PADDING_H_DP * density);
+        int vertical = Math.round(INPUT_PADDING_V_DP * density);
+        input.setPadding(horizontal, vertical, horizontal, vertical);
+        input.setMinHeight(Math.round(INPUT_HEIGHT_DP * density));
+        return input;
     }
 
     // ------------------------------------------------------------------ 弹

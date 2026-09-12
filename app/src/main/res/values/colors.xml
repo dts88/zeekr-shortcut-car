@@ -14,7 +14,7 @@
     <color name="text_secondary">#FF76787D</color>  <!-- 说明、状态 -->
     <color name="text_tertiary">#FF9EA0A5</color>  <!-- 最弱一级 -->
     <color name="energy">#FFF0622D</color>  <!-- 能量色 = 极氪橙：开关、指示、选中下划线 -->
-    <color name="energy_text">#FFC9491A</color>  <!-- 要写成橙色文字、或当主色按钮时用它 -->
+    <color name="energy_text">#FFC9491A</color>  <!-- 橙色文字用它；实心按钮一律用 energy -->
     <color name="energy_quiet">#FFFDEDE6</color>  <!-- 橙色的淡底 -->
     <color name="on_energy">#FFFFFFFF</color>  <!-- 能量色上面的字 -->
     <color name="recording">#FFE0393E</color>  <!-- 只标「正在录」与不可逆操作；比极氪橙更偏红，两者不混 -->
@@ -65,7 +65,7 @@
     <color name="dialog_guide_accent">@color/energy_text</color>
     <color name="dialog_guide_secondary">@color/text_secondary</color>
     <color name="dialog_guide_divider">@color/line</color>
-    <color name="dialog_guide_button_bg">@color/energy_text</color>
+    <color name="dialog_guide_button_bg">@color/energy</color>
     <color name="dialog_guide_button_text">@color/on_energy</color>
 
     <!-- 常量 -->
