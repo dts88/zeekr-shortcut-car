@@ -156,7 +156,7 @@
     <!-- First-launch guide -->
     <string name="guide_title">Before you start</string>
     <string name="guide_1">Experimental, unofficial software, certified for no vehicle safety function. It does not replace the factory dash cam, reversing camera or blind-spot monitor; do not operate it while driving, and do not judge the road from its picture.</string>
-    <string name="guide_2">Recordings go to the USB drive only. With no drive present, recording will not start — a dashcam writes continuously, and the head unit's built-in flash cannot be replaced once worn. Recordings on the drive are not encrypted: the drive can be pulled out and read on any other device.</string>
+    <string name="guide_2">Recordings go to the USB drive only. With no drive present, recording will not start — a dashcam writes continuously, and the head unit\'s built-in flash cannot be replaced once worn. Recordings on the drive are not encrypted: the drive can be pulled out and read on any other device.</string>
     <string name="guide_3">The menu key is always at the top left. The action buttons can sit on the left or the right (Settings → Interface → Button side) — pick the side the driver sits on. The super mirror is off by default; turn it on under Settings → Super mirror. Once on, it can be dragged and resized: swipe up or down to change the framing, left or right to change which camera it shows.</string>
     <string name="guide_4">If something goes wrong, restart the app first. If it persists, export the report from Menu → Diagnostics — attaching it to an issue saves the most time.</string>
     <string name="action_got_it_guide">Got it</string>
