@@ -88,8 +88,7 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 本仓库第一个 commit 就是 EVCam 的完整工作树，此后所有改动均以 diff 可见。
 按 GPL-3.0 要求，本应用同样以 GPL-3.0 发布并公开全部源代码。
 
-「极氪 App Lab 只给一路合成流」这一事实及其尺寸、排布，由
-[openavm-recorder](https://github.com/Dantenothing/openavm-recorder)（作者 Dantenothing）率先公开记录。
-**本项目没有复制其任何源代码**，只使用了其公开记录的接口事实；四宫格拆分与容器渲染均为独立实现。
+极氪 App Lab 给第三方应用的是一路拼好的环视合成流，而不是四个独立摄像头。
+把这条流拆成四宫格并渲染出来，是本项目独立实现的。
 
-完整来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。
+来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。

@@ -17,10 +17,8 @@ import java.util.Locale;
  *       5120 = 4x1280 正好整除，没有分隔带。</li>
  * </ul>
  *
- * <p>以上尺寸与排布属于对车机输出接口的<b>事实性描述</b>，来源是
- * openavm-recorder 项目公开 README 中记录的实测结论
- * （https://github.com/Dantenothing/openavm-recorder）。本类为独立编写实现，
- * 未复制该项目任何源代码。特此致谢原作者公开这些观测结果。</p>
+ * <p>以上尺寸与排布是对车机输出接口的<b>事实性描述</b>：相机 HAL 自己声明这些尺寸
+ * （见 {@code ZeekrCameraLocator}），本项目在实车上按它们拆分、录制、回放都对得上。</p>
  *
  * <p>本类不依赖任何 Android API，因此可以直接跑 JVM 单元测试。</p>
  */

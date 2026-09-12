@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: #1B7F92; } a:hover { color: #135f6d; }
+  </style>
+</helmet>
+<div style="width: 1240px; height: 900px; box-sizing: border-box; background: #F3F6F8; padding: 32px 34px; display: flex; flex-direction: column; gap: 20px;">
+
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <div style="font-size: 26px; font-weight: 700; color: #2E343B;">对话框动作条</div>
+    <div style="font-size: 14px; color: #6C757E; line-height: 1.6; max-width: 1000px; text-wrap: pretty;">
+      按钮不可见修了五次，因为每次修的是「让主题属性解析到正确的颜色」。
+      只要按钮的颜色还依赖属性解析，下一个没传主题的调用点就会再犯一次。
+      这一版把动作条画进对话框自己的布局：颜色写死在布局里，不问主题要。
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 20px;">
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 22px; height: 22px; border-radius: 11px; background: #D9553F; color: #FFFFFF; font-size: 14px; display: flex; align-items: center; justify-content: center;">✕</div>
+        <div style="font-size: 16px; font-weight: 600; color: #2E343B;">现在（深色主题解析失败时）</div>
+      </div>
+      <div style="border-radius: 12px; background: #2A2A2A; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="font-size: 18px; font-weight: 600; color: #FFFFFF;">车牌号</div>
+        <div style="height: 48px; border-radius: 8px; background: #2E343B; display: flex; align-items: center; padding: 0 14px; font-size: 15px; color: #FFFFFF; font-family: ui-monospace, monospace;">沪A12345</div>
+        <div style="height: 44px; display: flex; justify-content: flex-end; align-items: center; gap: 26px; padding-right: 6px;">
+          <div style="font-size: 15px; color: #2E2E2E;">取消</div>
+          <div style="font-size: 15px; color: #2E2E2E;">保存</div>
+        </div>
+      </div>
+      <div style="font-size: 13px; color: #D9553F; line-height: 1.6;">
+        两个按钮就在那里，能点，但颜色和背景几乎一样 —— 用户看到的是「这个框没有确认键」。
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 22px; height: 22px; border-radius: 11px; background: #3F8F6B; color: #FFFFFF; font-size: 13px; display: flex; align-items: center; justify-content: center;">✓</div>
+        <div style="font-size: 16px; font-weight: 600; color: #2E343B;">提案：动作条自己画</div>
+      </div>
+      <div style="border-radius: 12px; background: #FFFFFF; border: 1px solid #DCE3E9; overflow: hidden;">
+        <div style="padding: 24px 24px 20px; display: flex; flex-direction: column; gap: 16px;">
+          <div style="font-size: 18px; font-weight: 600; color: #2E343B;">车牌号</div>
+          <div style="font-size: 13px; color: #6C757E;">最多 10 位，大写字母和数字</div>
+          <div style="height: 48px; border-radius: 8px; background: #EAEFF3; border: 1px solid #DCE3E9; display: flex; align-items: center; padding: 0 14px; font-size: 16px; color: #2E343B; font-family: ui-monospace, monospace;">沪A12345</div>
+        </div>
+        <div style="border-top: 1px solid #EAEFF3; background: #EAEFF3; padding: 14px 16px; display: flex; gap: 12px; justify-content: flex-end;">
+          <div style="height: 52px; min-width: 120px; padding: 0 24px; border-radius: 10px; background: #DCE3E9; color: #2E343B; font-size: 16px; display: flex; align-items: center; justify-content: center;">取消</div>
+          <div style="height: 52px; min-width: 120px; padding: 0 24px; border-radius: 10px; background: #1B7F92; color: #FFFFFF; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;">保存</div>
+        </div>
+      </div>
+      <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">
+        动作条是对话框布局的一部分：底色、文字色、按钮块都写在自己身上，
+        没有任何一处向主题要颜色，也就没有解析失败这回事。
+      </div>
+    </div>
+
+  </div>
+
+  <div style="background: #FBFCFD; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="font-size: 16px; font-weight: 600; color: #2E343B;">三条规则</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 14px; font-weight: 600; color: #2E343B;">动作条永远可见</div>
+        <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">它是布局里的一块，不是框架按钮栏。滚动内容在它上方滚，它不跟着滚。</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 14px; font-weight: 600; color: #2E343B;">主操作实心，次操作浅底</div>
+        <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">哪个是"确定"不靠位置记忆，靠颜色一眼分辨。两者都是 52dp 高的实块，不是纯文字。</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 14px; font-weight: 600; color: #2E343B;">破坏性动作用红色</div>
+        <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">删除、恢复初值这类不可逆的，主操作换成 #D9553F，且默认焦点停在"取消"。</div>
+      </div>
+    </div>
+    <div style="margin-top: 4px; font-size: 13px; color: #9AA3AC; line-height: 1.6;">
+      落地方式：一个 <span style="font-family: ui-monospace, monospace; font-size: 12px; background: #EAEFF3; padding: 1px 5px; border-radius: 4px;">dialog_action_bar.xml</span> + 一个建对话框的工具方法，所有调用点走它。
+      这样"传没传主题"不再是每个调用点各自要记住的事。
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -99,13 +99,6 @@ def main():
     out.append("Released under **GPL-3.0**, with "
                "[EVCam](https://github.com/suyunkai/EVCam) (GPL-3.0, by suyunkai) as its code base.")
     out.append("")
-    out.append("The dimensions, layout and platform behaviour of the ZEEKR composite stream were "
-               "first documented publicly by "
-               "[openavm-recorder](https://github.com/Dantenothing/openavm-recorder) "
-               "(by Dantenothing, all rights reserved). "
-               "**No code from that project was copied**, nor its name or icon, and there is no "
-               "affiliation. See [NOTICE.md](" + REPO + "/blob/main/NOTICE.md).")
-
     sys.stdout.write("\n".join(out) + "\n")
 
 

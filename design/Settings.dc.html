@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: #1B7F92; } a:hover { color: #135f6d; }
+  </style>
+</helmet>
+<div style="width: 1600px; height: 1000px; box-sizing: border-box; background: #F3F6F8; display: flex; flex-direction: column;">
+
+  <div style="padding: 14px 20px 10px; display: flex; align-items: baseline; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 600; color: #2E343B;">设置 · 提案：右栏两列卡片</div>
+    <div style="font-size: 13px; color: #6C757E;">左栏分区不动（已经是对的）；右栏从一条长列表改成按主题分组的两列</div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; gap: 4px; padding: 0 4px 4px;">
+
+    <div style="width: 360px; flex-shrink: 0; background: #F3F6F8; padding: 12px 0; box-sizing: border-box; display: flex; flex-direction: column;">
+      <div style="padding: 10px 22px 14px; display: flex; align-items: center; gap: 14px;">
+        <div style="width: 44px; height: 44px; border-radius: 10px; background: #EAEFF3; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #2E343B;">☰</div>
+        <div style="font-size: 19px; font-weight: 600; color: #2E343B;">软件设置</div>
+      </div>
+      <div style="padding: 16px 22px; background: #FBFCFD; border-radius: 12px; margin: 0 12px 8px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 17px; font-weight: 600; color: #2E343B;">录制</div>
+        <div style="font-size: 12px; color: #6C757E;">视频流配置 · 水印 · 车牌</div>
+      </div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">存储</div><div style="font-size: 12px; color: #6C757E;">U 盘 · 容量上限</div></div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">超级后视镜</div><div style="font-size: 12px; color: #6C757E;">窗口 · 鱼眼 · 视场</div></div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">悬浮窗</div><div style="font-size: 12px; color: #6C757E;">按钮 · 透明度</div></div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">系统</div><div style="font-size: 12px; color: #6C757E;">自启 · 保活 · 语言</div></div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">高级</div><div style="font-size: 12px; color: #6C757E;">编码 · 相机映射</div></div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #9AA3AC;">开发者选项</div><div style="font-size: 12px; color: #9AA3AC;">需要密码</div></div>
+    </div>
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 12px; padding: 24px 26px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <div style="font-size: 22px; font-weight: 600; color: #2E343B;">录制</div>
+        <div style="font-size: 13px; color: #6C757E;">这一屏放得下整个分区，不用滚</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+
+        <div style="border: 1px solid #DCE3E9; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="font-size: 12px; letter-spacing: 2px; color: #9AA3AC;">视频流</div>
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="font-size: 16px; color: #2E343B;">视频流配置</div>
+            <div style="font-size: 13px; color: #6C757E;">极氪7X（环视合成流）</div>
+          </div>
+          <div style="height: 1px; background: #EAEFF3;"></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-size: 16px; color: #2E343B;">视频流配置编辑</div>
+              <div style="font-size: 13px; color: #6C757E;">三条流 · 每一格的摆法</div>
+            </div>
+            <div style="font-size: 18px; color: #9AA3AC;">›</div>
+          </div>
+          <div style="height: 1px; background: #EAEFF3;"></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-size: 16px; color: #2E343B;">拍照走图片通道</div>
+              <div style="font-size: 13px; color: #6C757E;">关掉则拍照分辨率不生效</div>
+            </div>
+            <div style="width: 52px; height: 30px; border-radius: 15px; background: #2FA8BE; position: relative; flex-shrink: 0;">
+              <div style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #FFFFFF;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #DCE3E9; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="font-size: 12px; letter-spacing: 2px; color: #9AA3AC;">画面上的标注</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-size: 16px; color: #2E343B;">应用角标</div>
+              <div style="font-size: 13px; color: #6C757E;">显示本应用的名称和版本号</div>
+            </div>
+            <div style="width: 52px; height: 30px; border-radius: 15px; background: #2FA8BE; position: relative; flex-shrink: 0;">
+              <div style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #FFFFFF;"></div>
+            </div>
+          </div>
+          <div style="height: 1px; background: #EAEFF3;"></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-size: 16px; color: #2E343B;">在画面中标注车牌号</div>
+              <div style="font-size: 13px; color: #6C757E;">沪 A·12345</div>
+            </div>
+            <div style="width: 52px; height: 30px; border-radius: 15px; background: #2FA8BE; position: relative; flex-shrink: 0;">
+              <div style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #FFFFFF;"></div>
+            </div>
+          </div>
+          <div style="height: 1px; background: #EAEFF3;"></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-size: 16px; color: #2E343B;">时间水印</div>
+              <div style="font-size: 13px; color: #6C757E;">日期 时间 尺寸 码率</div>
+            </div>
+            <div style="width: 52px; height: 30px; border-radius: 15px; background: #2FA8BE; position: relative; flex-shrink: 0;">
+              <div style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #FFFFFF;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="border: 1px solid #DCE3E9; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 12px; letter-spacing: 2px; color: #9AA3AC;">这份配置现在是什么样（只读摘要）</div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+          <div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; color: #6C757E;">环视 · 录制</div><div style="font-size: 15px; color: #2E343B;">1280×5140 → 2560×2570</div></div>
+          <div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; color: #6C757E;">帧率</div><div style="font-size: 15px; color: #2E343B;">原始帧率（不限制）</div></div>
+          <div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; color: #6C757E;">码率 · 编码</div><div style="font-size: 15px; color: #2E343B;">中 · H.265</div></div>
+          <div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; color: #6C757E;">分段</div><div style="font-size: 15px; color: #2E343B;">1 分钟</div></div>
+        </div>
+      </div>
+
+      <div style="margin-top: auto; font-size: 13px; color: #6C757E; line-height: 1.6;">
+        规则：<b style="color: #2E343B;">一个分区一屏放得下</b>。放不下就说明这个分区该拆，而不是让用户滚。
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

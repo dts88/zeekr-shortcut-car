@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: #1976D2; } a:hover { color: #12508f; }
+  </style>
+</helmet>
+<div style="width: 1600px; height: 1000px; box-sizing: border-box; background: #D4DBE6; display: flex; flex-direction: column;">
+
+  <div style="padding: 14px 20px 10px; display: flex; align-items: baseline; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 600; color: #1A1A1A;">主界面 · 现状</div>
+    <div style="font-size: 13px; color: #666666;">极氪 7X 合成流布局　1600 × 1000 dp（车机 3200 × 2000 px）</div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; gap: 4px; padding: 0 4px 4px;">
+
+    <div style="flex-grow: 1; position: relative; background: #C0C8D0; border-radius: 4px; overflow: hidden;">
+      <div style="position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 2px;">
+        <div style="background: #97A3B4; display: flex; align-items: center; justify-content: center; color: #EDF1F6; font-size: 15px;">前</div>
+        <div style="background: #8E9AAB; display: flex; align-items: center; justify-content: center; color: #EDF1F6; font-size: 15px;">后</div>
+        <div style="background: #8E9AAB; display: flex; align-items: center; justify-content: center; color: #EDF1F6; font-size: 15px;">左</div>
+        <div style="background: #97A3B4; display: flex; align-items: center; justify-content: center; color: #EDF1F6; font-size: 15px;">右</div>
+      </div>
+      <div style="position: absolute; left: 12px; top: 8px; width: 40px; height: 40px; border-radius: 6px; background: rgba(26,26,26,0.55); color: #FFFFFF; font-size: 16px; display: flex; align-items: center; justify-content: center;">前</div>
+      <div style="position: absolute; right: 12px; top: 8px; width: 40px; height: 40px; border-radius: 6px; background: rgba(26,26,26,0.55); color: #FFFFFF; font-size: 16px; display: flex; align-items: center; justify-content: center;">后</div>
+      <div style="position: absolute; left: 12px; bottom: 8px; width: 40px; height: 40px; border-radius: 6px; background: rgba(26,26,26,0.55); color: #FFFFFF; font-size: 16px; display: flex; align-items: center; justify-content: center;">左</div>
+      <div style="position: absolute; right: 12px; bottom: 8px; width: 40px; height: 40px; border-radius: 6px; background: rgba(26,26,26,0.55); color: #FFFFFF; font-size: 16px; display: flex; align-items: center; justify-content: center;">右</div>
+      <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 12px; background: rgba(26,26,26,0.45); color: #E6EBF2; font-size: 12px; font-family: ui-monospace, monospace;">1280x5140 VERTICAL · 每格 1280×1285 · 30 fps</div>
+    </div>
+
+    <div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+        <div style="position: relative; width: 100px; height: 100px; border-radius: 12px; background: #F9FAFB; box-shadow: 0 2px 5px rgba(26,26,26,0.18); display: flex; align-items: center; justify-content: center; font-size: 36px; color: #1A1A1A;">
+          ☰
+          <div style="position: absolute; inset: -6px; border: 2px dashed #C0392B; border-radius: 16px;"></div>
+        </div>
+        <div style="width: 100px; height: 100px; border-radius: 12px; background: #F9FAFB; box-shadow: 0 2px 5px rgba(26,26,26,0.18); display: flex; align-items: center; justify-content: center; font-size: 38px; color: #FF0000;">○</div>
+        <div style="width: 100px; height: 100px; border-radius: 12px; background: #F9FAFB; box-shadow: 0 2px 5px rgba(26,26,26,0.18); display: flex; align-items: center; justify-content: center; font-size: 36px; color: #1A1A1A;">⊙</div>
+        <div style="width: 100px; height: 100px; border-radius: 12px; background: #F9FAFB; box-shadow: 0 2px 5px rgba(26,26,26,0.18); display: flex; align-items: center; justify-content: center; font-size: 36px; color: #1A1A1A;">✕</div>
+      </div>
+      <div style="margin-top: 24px; width: 224px; height: 56px; border-radius: 12px; background: #F9FAFB; box-shadow: 0 2px 5px rgba(26,26,26,0.18); display: flex; align-items: center; justify-content: center; font-size: 16px; color: #1A1A1A;">四宫格 / 单画面</div>
+      <div style="margin-top: 20px; width: 300px; font-size: 13px; color: #C0392B; line-height: 1.6; text-align: center;">
+        ☰ 在这里。换成自定义布局它在底部横排，<br>进了图片回看它在左上角。
+      </div>
+    </div>
+
+  </div>
+
+  <div style="padding: 10px 20px 14px; display: flex; gap: 28px; align-items: center;">
+    <div style="font-size: 13px; color: #666666;">四个按钮同样大、同样重 —— 录制和退出看上去一样重要</div>
+    <div style="font-size: 13px; color: #666666;">回看 / 设置 在这一屏没有入口，只能先开菜单</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

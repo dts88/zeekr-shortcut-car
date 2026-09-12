@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, "Noto Sans SC", "PingFang SC", sans-serif; }
+    a { color: #1B7F92; } a:hover { color: #135f6d; }
+  </style>
+</helmet>
+<div style="width: 1400px; height: 900px; box-sizing: border-box; background: #F3F6F8; padding: 40px 44px; display: flex; flex-direction: column; gap: 22px;">
+
+  <div style="display: flex; flex-direction: column; gap: 7px;">
+    <div style="font-size: 12px; letter-spacing: 4px; color: #9AA3AC;">左舵 / 右舵</div>
+    <div style="font-size: 30px; font-weight: 600; color: #2E343B;">只镜像动作栏，不镜像阅读方向</div>
+    <div style="font-size: 14px; color: #6C757E; line-height: 1.7; max-width: 1060px; text-wrap: pretty;">
+      手要够得着，所以动作栏跟着驾驶位走；但文字从左往右读、列表在左内容在右，这是阅读习惯，不跟着方向盘变。
+      一个设置项管这一件事，四个界面同时生效。
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 20px;">
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 16px; font-weight: 600; color: #2E343B;">操作栏靠右</div>
+        <div style="font-size: 13px; color: #9AA3AC;">左舵（默认）· 驾驶位在左，手往右伸</div>
+      </div>
+      <div style="height: 300px; border-radius: 12px; background: #EAEFF3; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 34px; border-radius: 8px; background: #FBFCFD; display: flex; align-items: center; padding: 0 12px; gap: 10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          <div style="font-size: 12px; color: #6C757E;">标题区 · 菜单在左上</div>
+        </div>
+        <div style="flex-grow: 1; display: flex; gap: 8px;">
+          <div style="flex-grow: 1; border-radius: 8px; background: #C6D0D7; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FBFCFD;">画面</div>
+          <div style="width: 96px; border-radius: 8px; background: #2FA8BE; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #FFFFFF; text-align: center; line-height: 1.5;">动作栏</div>
+        </div>
+        <div style="height: 24px; border-radius: 8px; background: #FBFCFD;"></div>
+      </div>
+      <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">主操作离右手最近；菜单和返回仍在左上，和车机系统其它应用一致。</div>
+    </div>
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 16px; font-weight: 600; color: #2E343B;">操作栏靠左</div>
+        <div style="font-size: 13px; color: #9AA3AC;">右舵 · 驾驶位在右，手往左伸</div>
+      </div>
+      <div style="height: 300px; border-radius: 12px; background: #EAEFF3; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 34px; border-radius: 8px; background: #FBFCFD; display: flex; align-items: center; padding: 0 12px; gap: 10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          <div style="font-size: 12px; color: #6C757E;">标题区 · 菜单仍在左上</div>
+        </div>
+        <div style="flex-grow: 1; display: flex; gap: 8px;">
+          <div style="width: 96px; border-radius: 8px; background: #2FA8BE; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #FFFFFF; text-align: center; line-height: 1.5;">动作栏</div>
+          <div style="flex-grow: 1; border-radius: 8px; background: #C6D0D7; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #FBFCFD;">画面</div>
+        </div>
+        <div style="height: 24px; border-radius: 8px; background: #FBFCFD;"></div>
+      </div>
+      <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">只有第 ④ 区换边。标题区、状态条、以及设置里"左选右改"的分栏都不动。</div>
+    </div>
+
+  </div>
+
+  <div style="display: flex; gap: 20px;">
+
+    <div style="width: 620px; flex-shrink: 0; background: #FBFCFD; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-size: 16px; font-weight: 600; color: #2E343B;">设置里长这样</div>
+      <div style="border: 1px solid #EAEFF3; border-radius: 12px; overflow: hidden;">
+        <div style="padding: 16px 18px; display: flex; flex-direction: column; gap: 3px; border-bottom: 1px solid #EAEFF3;">
+          <div style="font-size: 15px; color: #2E343B;">界面</div>
+          <div style="font-size: 12px; color: #9AA3AC;">设置 → 界面</div>
+        </div>
+        <div style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <div style="font-size: 15px; color: #2E343B;">操作栏位置</div>
+            <div style="font-size: 12px; color: #9AA3AC;">按驾驶位选一边，手不用横跨整块屏</div>
+          </div>
+          <div style="display: flex; gap: 0; border-radius: 10px; overflow: hidden; border: 1px solid #DCE3E9;">
+            <div style="flex-grow: 1; padding: 12px 0; text-align: center; font-size: 14px; color: #FFFFFF; background: #2FA8BE;">靠右（左舵）</div>
+            <div style="flex-grow: 1; padding: 12px 0; text-align: center; font-size: 14px; color: #2E343B; background: #FBFCFD;">靠左（右舵）</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">
+        原生 <span style="font-family: ui-monospace, monospace; font-size: 12px; color: #2E343B;">MaterialButtonToggleGroup</span> 单选段控件。切换时动作栏用一次 250ms 的位移过渡滑到另一边，不是闪现。
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; background: #E6F4F7; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="font-size: 16px; font-weight: 600; color: #17434D;">实现上几乎不花钱</div>
+      <div style="font-size: 13px; color: #2C5A64; line-height: 1.75;">
+        动作栏是 <span style="font-family: ui-monospace, monospace; font-size: 12px;">&lt;include&gt;</span> 进来的同一个布局，靠边只是父容器里换一个方向 ——
+        不需要第二套布局文件，也不需要 RTL 那一整套镜像（RTL 会把文字方向一起翻，那不是我们要的）。<br><br>
+        代价：一个布尔设置 + 一处 <span style="font-family: ui-monospace, monospace; font-size: 12px;">setLayoutDirection</span> 之外的顺序调整。<br><br>
+        顺带把"四套按钮布局"合并成一套之后，这件事才做得成 —— 否则要改四个文件。
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

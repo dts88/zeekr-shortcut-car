@@ -1,0 +1,29 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "方向与体系" },
+    { "id": "page-2", "name": "各界面" }
+  ],
+  "artboards": [
+    { "file": "Tokens.dc.html", "x": 0, "y": 0, "w": 1400, "h": 1560, "page": "page-1", "title": "配色 · 日/夜" },
+    { "file": "Main.dc.html", "x": 1520, "y": 0, "w": 1600, "h": 1060, "page": "page-1", "title": "主界面 · 日间" },
+    { "file": "MainNight.dc.html", "x": 3240, "y": 0, "w": 1600, "h": 1060, "page": "page-1", "title": "主界面 · 夜间" },
+    { "file": "Skeleton.dc.html", "x": 1520, "y": 1300, "w": 1600, "h": 1100, "page": "page-1", "title": "统一骨架" },
+    { "file": "Motion.dc.html", "x": 3240, "y": 1300, "w": 1400, "h": 1180, "page": "page-1", "title": "动效" },
+    { "file": "Icons.dc.html", "x": 0, "y": 1780, "w": 1400, "h": 1060, "page": "page-1", "title": "图标" },
+    { "file": "Handedness.dc.html", "x": 1520, "y": 2600, "w": 1400, "h": 900, "page": "page-1", "title": "左舵 / 右舵" },
+    { "file": "Plan.dc.html", "x": 3120, "y": 2600, "w": 1240, "h": 1440, "page": "page-1", "title": "落地顺序" },
+
+    { "file": "Audit.dc.html", "x": 0, "y": 0, "w": 1200, "h": 1560, "page": "page-2", "title": "现状审查" },
+    { "file": "MainNow.dc.html", "x": 1320, "y": 0, "w": 1600, "h": 1000, "page": "page-2", "title": "主界面 · 现状" },
+    { "file": "Menu.dc.html", "x": 3040, "y": 0, "w": 1600, "h": 1000, "page": "page-2", "title": "菜单" },
+    { "file": "Settings.dc.html", "x": 1320, "y": 1720, "w": 1600, "h": 1000, "page": "page-2", "title": "设置" },
+    { "file": "Editor.dc.html", "x": 3040, "y": 1720, "w": 1600, "h": 1000, "page": "page-2", "title": "配置编辑" },
+    { "file": "Dialog.dc.html", "x": 0, "y": 1720, "w": 1240, "h": 900, "page": "page-2", "title": "对话框动作条" }
+  ],
+  "annotations": [
+    { "id": "direction", "x": 0, "y": -190, "w": 1400, "page": "page-1", "text": "新方向：原生控件、淡雅配色、日夜跟随系统、动效克制但处处有回应。\n先看配色，再看主界面日/夜两版，然后是骨架、动效、图标、左右舵。" },
+    { "id": "zeekr-hook", "x": 3240, "y": 2560, "w": 1240, "page": "page-1", "text": "等你给 Zeekr OS 的截图，要对齐的只有三个数和一个色相 —— 前三步都按变量写，就是为了这一步只改几行。" },
+    { "id": "second-page", "x": 0, "y": -190, "w": 1200, "page": "page-2", "text": "这一页是现状与各界面的具体排布。主界面·现状那一块保留旧配色（它画的就是现在的样子），其余已换新色板。" }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

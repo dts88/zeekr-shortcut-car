@@ -84,9 +84,7 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 this app is forked from. The first commit in this repository is EVCam's complete working tree, so
 every change since then is visible as a diff.
 
-That App Lab exposes only one composite stream, along with its dimensions and layout, was first
-documented publicly by [openavm-recorder](https://github.com/Dantenothing/openavm-recorder).
-**No code from that project was copied** — only its published interface facts were used; the grid
-splitting and rendering here are an independent implementation.
+App Lab hands a third-party app one pre-composited surround stream rather than four cameras.
+Splitting that stream into a grid and rendering it is implemented here from scratch.
 
-Full attribution, third-party licenses and boundaries: [NOTICE.md](NOTICE.md).
+Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).

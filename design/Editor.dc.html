@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: #1B7F92; } a:hover { color: #135f6d; }
+  </style>
+</helmet>
+<div style="width: 1600px; height: 1000px; box-sizing: border-box; background: #F3F6F8; display: flex; flex-direction: column;">
+
+  <div style="padding: 14px 20px 10px; display: flex; align-items: baseline; gap: 12px;">
+    <div style="font-size: 15px; font-weight: 600; color: #2E343B;">视频流配置编辑 · 提案：先选格子，再改它</div>
+    <div style="font-size: 13px; color: #6C757E;">现在是 20 多行竖排；改成「左边点一格 → 右边改这一格」，改的是哪一格看得见</div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; gap: 4px; padding: 0 4px 4px;">
+
+    <div style="width: 360px; flex-shrink: 0; background: #F3F6F8; padding: 12px 0; box-sizing: border-box; display: flex; flex-direction: column;">
+      <div style="padding: 10px 22px 14px; display: flex; align-items: center; gap: 14px;">
+        <div style="width: 44px; height: 44px; border-radius: 10px; background: #EAEFF3; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #2E343B;">‹</div>
+        <div style="font-size: 19px; font-weight: 600; color: #2E343B;">配置编辑</div>
+      </div>
+      <div style="padding: 16px 22px; background: #FBFCFD; border-radius: 12px; margin: 0 12px 8px; display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 17px; font-weight: 600; color: #2E343B;">环视（合成流）</div>
+        <div style="font-size: 12px; color: #6C757E;">相机 2 · 拆四格 · 已启用</div>
+      </div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">座舱 1</div><div style="font-size: 12px; color: #6C757E;">相机 0 · 未启用</div></div>
+      <div style="padding: 16px 22px; margin: 0 12px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 17px; color: #2E343B;">座舱 2</div><div style="font-size: 12px; color: #6C757E;">相机 1 · 未启用</div></div>
+      <div style="margin: 8px 12px 0; padding: 14px 22px; border: 1px dashed #B9C6CE; border-radius: 12px; font-size: 15px; color: #6C757E;">＋ 加一路相机</div>
+      <div style="margin-top: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="height: 56px; border-radius: 12px; background: #1B7F92; color: #FFFFFF; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center;">保存并看一眼画面</div>
+        <div style="height: 48px; border-radius: 12px; background: #EAEFF3; color: #6C757E; font-size: 15px; display: flex; align-items: center; justify-content: center;">恢复为初值</div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 12px; padding: 22px 24px; box-sizing: border-box; display: flex; gap: 22px;">
+
+      <div style="width: 460px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 12px; letter-spacing: 2px; color: #9AA3AC;">四个格子 · 点一格来改它</div>
+        <div style="width: 460px; height: 288px; border-radius: 10px; background: #C0C8D0; padding: 4px; box-sizing: border-box; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 4px;">
+          <div style="border-radius: 6px; background: #97A3B4; display: flex; align-items: center; justify-content: center; color: #F2F5F9; font-size: 15px;">前</div>
+          <div style="position: relative; border-radius: 6px; background: #6E7E93; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; outline: 3px solid #1B7F92; outline-offset: 1px;">
+            <div style="color: #FFFFFF; font-size: 16px; font-weight: 600;">后</div>
+            <div style="color: #DCE6F2; font-size: 12px;">镜像 · 旋转 0°</div>
+          </div>
+          <div style="border-radius: 6px; background: #8E9AAB; display: flex; align-items: center; justify-content: center; color: #F2F5F9; font-size: 15px;">左</div>
+          <div style="border-radius: 6px; background: #97A3B4; display: flex; align-items: center; justify-content: center; color: #F2F5F9; font-size: 15px;">右</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 12px; letter-spacing: 2px; color: #9AA3AC;">这一路的三条流</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-size: 15px; color: #2E343B;">预览</div>
+              <div style="font-size: 13px; color: #6C757E;">自动 → 1280×5140　每格 1280×1285</div>
+            </div>
+            <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-size: 15px; color: #2E343B;">录制</div>
+              <div style="font-size: 13px; color: #6C757E;">自动 → 落盘 2560×2570 · 原始帧率</div>
+            </div>
+            <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-size: 15px; color: #2E343B;">拍照</div>
+              <div style="font-size: 13px; color: #6C757E;">最大 → 1280×5140 · 质量 95</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <div style="font-size: 20px; font-weight: 600; color: #2E343B;">后</div>
+          <div style="font-size: 13px; color: #6C757E;">右上那一格 · 改动只作用于它</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+          <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 13px; color: #9AA3AC;">旋转</div>
+            <div style="display: flex; gap: 8px;">
+              <div style="flex-grow: 1; height: 44px; border-radius: 8px; background: #1B7F92; color: #FFFFFF; font-size: 15px; display: flex; align-items: center; justify-content: center;">0°</div>
+              <div style="flex-grow: 1; height: 44px; border-radius: 8px; background: #EAEFF3; color: #6C757E; font-size: 15px; display: flex; align-items: center; justify-content: center;">90°</div>
+              <div style="flex-grow: 1; height: 44px; border-radius: 8px; background: #EAEFF3; color: #6C757E; font-size: 15px; display: flex; align-items: center; justify-content: center;">180°</div>
+              <div style="flex-grow: 1; height: 44px; border-radius: 8px; background: #EAEFF3; color: #6C757E; font-size: 15px; display: flex; align-items: center; justify-content: center;">270°</div>
+            </div>
+          </div>
+          <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <div style="font-size: 15px; color: #2E343B;">镜像</div>
+              <div style="font-size: 12px; color: #6C757E;">和真实后视镜一致</div>
+            </div>
+            <div style="width: 52px; height: 30px; border-radius: 15px; background: #2FA8BE; position: relative;">
+              <div style="position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: #FFFFFF;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="font-size: 13px; color: #9AA3AC;">位置与大小　<span style="color: #6C757E;">拖动上面那一格也能改</span></div>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; color: #9AA3AC;">左 x</div><div style="height: 44px; border-radius: 8px; background: #EAEFF3; display: flex; align-items: center; padding: 0 12px; font-size: 15px; color: #2E343B; font-family: ui-monospace, monospace;">0.50</div></div>
+            <div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; color: #9AA3AC;">上 y</div><div style="height: 44px; border-radius: 8px; background: #EAEFF3; display: flex; align-items: center; padding: 0 12px; font-size: 15px; color: #2E343B; font-family: ui-monospace, monospace;">0.00</div></div>
+            <div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; color: #9AA3AC;">宽</div><div style="height: 44px; border-radius: 8px; background: #EAEFF3; display: flex; align-items: center; padding: 0 12px; font-size: 15px; color: #2E343B; font-family: ui-monospace, monospace;">0.50</div></div>
+            <div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; color: #9AA3AC;">高</div><div style="height: 44px; border-radius: 8px; background: #EAEFF3; display: flex; align-items: center; padding: 0 12px; font-size: 15px; color: #2E343B; font-family: ui-monospace, monospace;">0.50</div></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+          <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 15px; color: #2E343B;">裁切</div>
+            <div style="font-size: 13px; color: #6C757E; font-family: ui-monospace, monospace;">0 / 0 / 0 / 0　›</div>
+          </div>
+          <div style="border: 1px solid #DCE3E9; border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 15px; color: #2E343B;">缩放与平移</div>
+            <div style="font-size: 13px; color: #6C757E; font-family: ui-monospace, monospace;">1.00× · 0,0　›</div>
+          </div>
+        </div>
+
+        <div style="margin-top: auto; background: #E6F4F7; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #17434D; line-height: 1.6;">
+          座舱两路的这些值目前不生效（画面还走旧的相机矫正）。这一条要在界面上说出来，
+          否则又是一个「改了没反应」。
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

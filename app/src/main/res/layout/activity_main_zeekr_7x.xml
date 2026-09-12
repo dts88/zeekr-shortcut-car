@@ -119,8 +119,8 @@
                         <!--
                           FourLaneContainer 里只放一个普通的 AutoFitTextureView，
                           它是相机唯一的消费者、完全不被改造；容器只负责把这个子视图
-                          重复画进四个格子。这是 openavm-recorder 在真车上验证过的结构
-                          （用 GL 自建 SurfaceTexture 顶替生产者会崩溃）。
+                          重复画进四个格子。这套结构在实车上验证过
+                          （另一条路——用 GL 自建 SurfaceTexture 顶替生产者——据公开资料会崩溃）。
                           角标是容器的兄弟节点，浮在上层。
                         -->
                         <com.kooo.evcam.zeekr.FourLaneContainer

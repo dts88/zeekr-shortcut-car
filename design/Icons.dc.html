@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, "Noto Sans SC", "PingFang SC", sans-serif; }
+    a { color: #1B7F92; } a:hover { color: #135f6d; }
+  </style>
+</helmet>
+<div style="width: 1400px; height: 1060px; box-sizing: border-box; background: #F3F6F8; padding: 40px 44px; display: flex; flex-direction: column; gap: 22px;">
+
+  <div style="display: flex; flex-direction: column; gap: 7px;">
+    <div style="font-size: 12px; letter-spacing: 4px; color: #9AA3AC;">图标</div>
+    <div style="font-size: 30px; font-weight: 600; color: #2E343B;">字符换矢量，不是为了好看</div>
+    <div style="font-size: 14px; color: #6C757E; line-height: 1.7; max-width: 1060px; text-wrap: pretty;">
+      现在的 ☰ ○ ⊙ ✕ 是 <span style="font-family: ui-monospace, monospace; font-size: 13px; background: #EAEFF3; padding: 2px 6px; border-radius: 4px;">android:text</span> 里的文字。三个后果，第三个是硬伤。
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 18px;">
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 15px; font-weight: 600; color: #2E343B;">① 字形不归你管</div>
+      <div style="font-size: 13px; color: #6C757E; line-height: 1.65;">画成什么样由系统字体决定。换固件、换语言、缺字形就变成方块 □。同一个 ○ 在不同字体里粗细和大小都不同。</div>
+    </div>
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 15px; font-weight: 600; color: #2E343B;">② 会被字体大小拽变形</div>
+      <div style="font-size: 13px; color: #6C757E; line-height: 1.65;">字号用 sp，用户把车机字体调大，按钮是 dp 固定的，里面的图形就顶出去了。而且各字符基线不同，四个按钮看着不齐。</div>
+    </div>
+    <div style="flex-grow: 1; background: #FBEEEB; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="font-size: 15px; font-weight: 600; color: #8C2F1F;">③ 动不了</div>
+      <div style="font-size: 13px; color: #A33A28; line-height: 1.65;">你要的"录制圆点变方块 + 进度环"这类动效，字符做不到 —— 它就是一个字。这一条决定了必须换。</div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; gap: 18px;">
+
+    <div style="width: 520px; flex-shrink: 0; background: #FBFCFD; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 18px;">
+      <div style="font-size: 16px; font-weight: 600; color: #2E343B;">录制键的四个状态</div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+          <div style="width: 108px; height: 108px; border-radius: 16px; background: #EAEFF3; display: flex; align-items: center; justify-content: center;">
+            <svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none" stroke="#C6D0D7" stroke-width="3"/><circle cx="26" cy="26" r="15" fill="#D9553F"/></svg>
+          </div>
+          <div style="font-size: 13px; color: #6C757E;">待机</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+          <div style="width: 108px; height: 108px; border-radius: 16px; background: #EAEFF3; display: flex; align-items: center; justify-content: center;">
+            <svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none" stroke="#C6D0D7" stroke-width="3"/><path d="M26 2a24 24 0 0 1 20.8 36" fill="none" stroke="#D9553F" stroke-width="3" stroke-linecap="round"/><rect x="15" y="15" width="22" height="22" rx="5" fill="#D9553F"/></svg>
+          </div>
+          <div style="font-size: 13px; color: #6C757E;">录制中 · 环走一圈是一段</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+          <div style="width: 108px; height: 108px; border-radius: 16px; background: #EAEFF3; display: flex; align-items: center; justify-content: center;">
+            <svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none" stroke="#C6D0D7" stroke-width="3"/><rect x="15" y="15" width="22" height="22" rx="5" fill="#D9553F" opacity="0.45"/></svg>
+          </div>
+          <div style="font-size: 13px; color: #6C757E;">切段的一瞬（淡一下）</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+          <div style="width: 108px; height: 108px; border-radius: 16px; background: #EAEFF3; display: flex; align-items: center; justify-content: center;">
+            <svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none" stroke="#DCE3E9" stroke-width="3"/><circle cx="26" cy="26" r="15" fill="#C6D0D7"/><path d="M14 38L38 14" stroke="#9AA3AC" stroke-width="3" stroke-linecap="round"/></svg>
+          </div>
+          <div style="font-size: 13px; color: #6C757E;">不可用（没插 U 盘）</div>
+        </div>
+
+      </div>
+      <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid #EAEFF3; font-size: 13px; color: #9AA3AC; line-height: 1.6;">
+        一个 <span style="font-family: ui-monospace, monospace; font-size: 12px;">AnimatedVectorDrawable</span> 承担全部四态，切换时自动补间。图形本身 1KB 出头，没有位图。
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; background: #FBFCFD; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 18px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <div style="font-size: 16px; font-weight: 600; color: #2E343B;">图标集</div>
+        <div style="font-size: 13px; color: #9AA3AC;">24dp 网格 · 线宽 1.7 · 圆头圆角 —— 一套画完，风格才统一</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><div style="font-size: 12px; color: #6C757E;">菜单</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5l-7 7 7 7"/></svg><div style="font-size: 12px; color: #6C757E;">返回</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linejoin="round"><circle cx="12" cy="13" r="4"/><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.3-2h7l1.3 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/></svg><div style="font-size: 12px; color: #6C757E;">拍照</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15M3.5 12h17"/></svg><div style="font-size: 12px; color: #6C757E;">四宫格</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10.5 9.5l4.5 2.5-4.5 2.5z"/></svg><div style="font-size: 12px; color: #6C757E;">视频回看</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 15.5l4.5-4 3.5 3 3.5-3.5L21 15"/><circle cx="8.5" cy="9.5" r="1.3"/></svg><div style="font-size: 12px; color: #6C757E;">图片回看</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2M12 18.3v2.2M20.5 12h-2.2M5.7 12H3.5M18 6l-1.6 1.6M7.6 16.4L6 18M18 18l-1.6-1.6M7.6 7.6L6 6"/></svg><div style="font-size: 12px; color: #6C757E;">设置</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg><div style="font-size: 12px; color: #6C757E;">退出</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linejoin="round"><path d="M4 17V7a1 1 0 0 1 1-1h6l2 2h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/></svg><div style="font-size: 12px; color: #6C757E;">存储</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linecap="round"><path d="M12 3.5l7.5 4v5c0 4.2-3 7.4-7.5 8.5-4.5-1.1-7.5-4.3-7.5-8.5v-5z" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01"/></svg><div style="font-size: 12px; color: #6C757E;">诊断</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linejoin="round"><path d="M3.5 12s3.2-5.5 8.5-5.5S20.5 12 20.5 12s-3.2 5.5-8.5 5.5S3.5 12 3.5 12z"/><circle cx="12" cy="12" r="2.4"/></svg><div style="font-size: 12px; color: #6C757E;">后视镜</div></div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2E343B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9M8.5 7.5L12 4l3.5 3.5"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg><div style="font-size: 12px; color: #6C757E;">发送到手机</div></div>
+      </div>
+      <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid #EAEFF3; display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 13px; color: #6C757E; line-height: 1.6;">
+          全部是 <span style="font-family: ui-monospace, monospace; font-size: 12px; color: #2E343B;">VectorDrawable</span>，用 <span style="font-family: ui-monospace, monospace; font-size: 12px; color: #2E343B;">?attr/colorOnSurface</span> 着色 —— 日夜切换不用换资源，也不用两套 PNG。
+        </div>
+        <div style="font-size: 13px; color: #9AA3AC; line-height: 1.6;">
+          十二个图标，一个下午能画完；之后新增功能沿用同一套线宽和网格，风格自然是统一的。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
