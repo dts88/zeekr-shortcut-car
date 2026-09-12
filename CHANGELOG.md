@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.44.0-alpha] - 2026-09-13
+
 - Bitrate has four tiers instead of three, and the whole table moved up: very low 2.7,
   low 5.4, medium 10, high 20 Mbps on the surround grid. Medium is the default and is
   double what it was. The old ceiling was 8 Mbps for a 6.6-megapixel frame -- 0.033 bits
