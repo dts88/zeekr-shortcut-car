@@ -7,6 +7,11 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.41.1-alpha] - 2026-09-12
+
+- Settings text is back to its previous size. The section is a dense list read while parked, so it sits one step below the rest of the scale; every other screen keeps 0.41.0's sizes.
+- Fixed: video review, About and Diagnostics ignored the language setting and stayed in the system language. The app's language reaches AppCompat activities only, and those three were plain ones. About and Diagnostics also still carried the system theme, so their colours now match as well.
+
 ## [0.41.0-alpha] - 2026-09-12
 
 - Text and icons are a size up: the scale moves 12/13/15/18/22/24 -> 14/16/18/21/26/28 and icons follow, after comparing against the head unit's own settings screens.
