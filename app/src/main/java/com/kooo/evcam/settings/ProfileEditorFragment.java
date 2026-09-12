@@ -269,13 +269,16 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     String bitrateLabel(String bitrate) {
-        if ("low".equals(bitrate)) {
+        if (StreamSpec.BITRATE_VERY_LOW.equals(bitrate)) {
+            return getString(R.string.editor_very_low);
+        }
+        if (StreamSpec.BITRATE_LOW.equals(bitrate)) {
             return getString(R.string.editor_low);
         }
-        if ("high".equals(bitrate)) {
+        if (StreamSpec.BITRATE_HIGH.equals(bitrate)) {
             return getString(R.string.editor_high);
         }
-        if ("medium".equals(bitrate)) {
+        if (StreamSpec.BITRATE_MEDIUM.equals(bitrate)) {
             return getString(R.string.editor_medium);
         }
         return getString(R.string.editor_bitrate_auto);
@@ -336,9 +339,12 @@ public class ProfileEditorFragment extends Fragment {
 
     void pickBitrate(StreamSpec spec) {
         pickOne(getString(R.string.editor_record_bitrate),
-                new String[]{getString(R.string.editor_bitrate_auto), getString(R.string.editor_low),
+                new String[]{getString(R.string.editor_bitrate_auto),
+                        getString(R.string.editor_very_low), getString(R.string.editor_low),
                         getString(R.string.editor_medium), getString(R.string.editor_high)},
-                new String[]{StreamSpec.BITRATE_AUTO, "low", "medium", "high"},
+                new String[]{StreamSpec.BITRATE_AUTO, StreamSpec.BITRATE_VERY_LOW,
+                        StreamSpec.BITRATE_LOW, StreamSpec.BITRATE_MEDIUM,
+                        StreamSpec.BITRATE_HIGH},
                 value -> spec.bitrate = value);
     }
 

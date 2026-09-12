@@ -8,7 +8,7 @@ import org.junit.Test;
 /**
  * {@link TargetBitrate} 的单元测试。
  *
- * <p>这段公式现在有两个使用方：编码器拿它配置码率，设置界面拿它显示「目标 X Mbps」。
+ * <p>这段公式现在有两个使用方：编码器拿它配置码率，配置编辑拿它显示「目标 X Mbps」。
  * 钉住它，是为了「界面写的数」和「实际配下去的数」永远是同一个。</p>
  */
 public class TargetBitrateTest {
@@ -38,13 +38,42 @@ public class TargetBitrateTest {
         assertTrue("HEVC 应当低于 H.264，实际 " + hevc + " / " + h264, hevc < h264);
     }
 
-    /** 再大的画面也不会超过编码器扛得住的上限。 */
+    /** 再大的画面也不会超过编码器扛得住的上限，两种编码同一条。 */
     @Test
     public void neverExceedsTheCeiling() {
-        assertEquals(TargetBitrate.MAX_H264,
+        assertEquals(TargetBitrate.MAX,
                 TargetBitrate.compute(3, 3840, 2160, 30, false));
-        assertEquals(TargetBitrate.MAX_HEVC,
-                TargetBitrate.compute(3, 3840, 2160, 30, true));
+        assertEquals(TargetBitrate.MAX,
+                TargetBitrate.compute(3, 7680, 4320, 30, true));
+    }
+
+    /**
+     * 环视四宫格上四档落在哪。
+     *
+     * <p>这四个数就是界面上要写给用户看的数，也是这次调整的全部目的：
+     * 每档翻一倍，「中」比 0.43 的「中」高一倍。写进测试，下次谁改公式都得
+     * 先面对这张表。</p>
+     */
+    @Test
+    public void theFourTiersLandOnTheirTargets() {
+        int width = 2560;
+        int height = 2570;
+        assertEquals(2_700_000, TargetBitrate.compute(0, width, height, 25, true));
+        assertEquals(5_400_000, TargetBitrate.compute(1, width, height, 25, true));
+        assertEquals(10_000_000, TargetBitrate.compute(2, width, height, 25, true));
+        assertEquals(20_000_000, TargetBitrate.compute(3, width, height, 25, true));
+    }
+
+    /** 每一档都比上一档高，四档都不重合。 */
+    @Test
+    public void everyTierIsAStepUp() {
+        int previous = 0;
+        for (int level = 0; level <= 3; level++) {
+            int bitrate = TargetBitrate.compute(level, 2560, 2570, 25, true);
+            assertTrue("第 " + level + " 档 " + bitrate + " 没有高于上一档 " + previous,
+                    bitrate > previous);
+            previous = bitrate;
+        }
     }
 
     /** 结果取整到 100Kbps，界面和日志才好读。 */

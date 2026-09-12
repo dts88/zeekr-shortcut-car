@@ -152,16 +152,23 @@ public final class RecordSpecs {
     }
 
     /**
-     * 码率等级 → 画质档 0–3。
+     * 码率等级 → 画质档 0–3。四档的实际码率见 {@link
+     * com.kooo.evcam.camera.TargetBitrate}。
      *
      * <p>{@code auto} 与 {@code medium} 同档：配置里的「跟随」指的是跟随画质等级
      * 自动算码率，而中等就是那条基准线。</p>
+     *
+     * <p>0.44.0 之前第 0 档没有任何键能取到 —— 那一档的码率写在表里，却没有
+     * 入口。现在它是「极低」。</p>
      */
     public static int qualityLevel(String bitrate) {
-        if ("low".equals(bitrate)) {
+        if (StreamSpec.BITRATE_VERY_LOW.equals(bitrate)) {
+            return 0;
+        }
+        if (StreamSpec.BITRATE_LOW.equals(bitrate)) {
             return 1;
         }
-        if ("high".equals(bitrate)) {
+        if (StreamSpec.BITRATE_HIGH.equals(bitrate)) {
             return 3;
         }
         return 2;

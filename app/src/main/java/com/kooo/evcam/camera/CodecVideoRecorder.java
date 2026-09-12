@@ -46,9 +46,6 @@ public class CodecVideoRecorder {
     
     // 编码参数（可配置）
     private int frameRate = 20;       // 默认 20fps - 降低帧率减少CPU占用，同时保持流畅
-    private int bitRate = 0;          // 默认自动计算码率
-    
-    // 性能优化：码率上限（防止过高码率导致卡顿）
     
     // 录制时补盲优化模式
     private boolean blindSpotOptimizeMode = false;  // 是否启用补盲优化模式（录制时降低负载）
@@ -57,7 +54,7 @@ public class CodecVideoRecorder {
     // 编码器选择：是否强制使用 H.264（默认 false，优先使用 HEVC）
     private boolean forceH264 = false;
     
-    // 画质等级：0=低, 1=中, 2=高, 3=最高
+    // 画质等级：0=极低, 1=低, 2=中, 3=高（见 TargetBitrate）
     private int qualityLevel = 2;
 
     /** 渲染节流上限；0 = 不限制。和 {@link #frameRate}（标称值）不是同一件事。 */
@@ -394,15 +391,6 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 设置录制码率
-     * @param bitrate 码率（bps）
-     */
-    public void setBitRate(int bitrate) {
-        this.bitRate = bitrate;
-        AppLog.d(TAG, "Camera " + cameraId + " bitrate set to " + (bitrate / 1000) + " Kbps");
-    }
-
-    /**
      * 设置录制帧率
      * @param fps 帧率（fps）
      */
@@ -508,13 +496,6 @@ public class CodecVideoRecorder {
     public void setForceH264(boolean force) {
         this.forceH264 = force;
         AppLog.d(TAG, "Camera " + cameraId + " forceH264 = " + force);
-    }
-
-    /**
-     * 获取当前配置的码率
-     */
-    public int getBitRate() {
-        return bitRate;
     }
 
     /**
@@ -1128,8 +1109,10 @@ public class CodecVideoRecorder {
         // 如果启用了补盲优化模式，使用降低的帧率
         int effectiveFrameRate = blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate;
 
-        // 码率：HEVC 模式使用优化后码率；H.264 兼容模式使用显式配置值
-        int effectiveBitrate = forceH264 ? bitRate : calculateOptimalBitrate();
+        // 码率只有一条公式（TargetBitrate），两种编码都走它 —— 它自己知道 H.264
+        // 要的比 HEVC 多。以前兼容模式走另一条公式，于是「强制 H.264」这个为了
+        // 兼容而存在的开关，反而成了码率最高、画质最好的那条路。
+        int effectiveBitrate = calculateOptimalBitrate();
 
         MediaFormat format = MediaFormat.createVideoFormat(mimeType, width, height);
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
@@ -1141,7 +1124,10 @@ public class CodecVideoRecorder {
             // HEVC/H.264 优化路径：附加 Profile/Level 以获得更好效率
             if (mimeType.equals(MIME_TYPE_HEVC)) {
                 format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.HEVCProfileMain);
-                format.setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.HEVCHighTierLevel4);
+                // KEY_LEVEL 故意不设。原来写死 HEVC Level 4，而 Level 4 的最大画面是
+                // 2,228,224 个亮度采样（≈1920×1080），环视四宫格是 6,579,200 个 ——
+                // 超了三倍。声明一个装不下这幅画的 Level，有的编码器会照着那个 Level
+                // 的限制去夹自己的码率控制。不声明，编码器按实际尺寸和码率自己定。
             } else {
                 format.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileHigh);
             }

@@ -39,13 +39,19 @@ public final class StreamSpec {
     /** 跟随画质等级算出来的码率。 */
     public static final String BITRATE_AUTO = "auto";
 
+    /** 四个码率等级。实际码率见 {@link com.kooo.evcam.camera.TargetBitrate}。 */
+    public static final String BITRATE_VERY_LOW = "verylow";
+    public static final String BITRATE_LOW = "low";
+    public static final String BITRATE_MEDIUM = "medium";
+    public static final String BITRATE_HIGH = "high";
+
     /** {@link #RESOLUTION_MAX} / {@link #RESOLUTION_AUTO} / {@code "1280x5140"}。 */
     public String resolution = RESOLUTION_AUTO;
 
     /** {@link #FPS_UNLIMITED} 或具体数字的字符串。只有录制流用得上。 */
     public String fps = FPS_UNLIMITED;
 
-    /** {@link #BITRATE_AUTO} 或码率等级（low / medium / high）。只有录制流用得上。 */
+    /** {@link #BITRATE_AUTO} 或四个码率等级之一。只有录制流用得上。 */
     public String bitrate = BITRATE_AUTO;
 
     /** auto / h264 / hevc。只有录制流用得上。 */

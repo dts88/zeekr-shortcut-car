@@ -39,7 +39,8 @@ public final class StatusLine {
                     ? context.getString(R.string.opt_fps_auto_unknown)
                     : context.getString(R.string.status_fps, spec.fps);
             int level = RecordSpecs.qualityLevel(spec.bitrate);
-            int bitrate = level == 1 ? R.string.status_bitrate_low
+            int bitrate = level == 0 ? R.string.status_bitrate_very_low
+                    : level == 1 ? R.string.status_bitrate_low
                     : level == 3 ? R.string.status_bitrate_high
                     : R.string.status_bitrate_medium;
             NumberRoll.set(stream, fps + " · " + context.getString(bitrate));

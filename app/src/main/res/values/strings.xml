@@ -376,6 +376,7 @@
     <string name="record_unavailable">插入 U 盘后可录制</string>
     <string name="record_unavailable_detail">未检测到 U 盘</string>
     <string name="status_fps">≤%1$s fps</string>
+    <string name="status_bitrate_very_low">极低码率</string>
     <string name="status_bitrate_low">低码率</string>
     <string name="status_bitrate_medium">中码率</string>
     <string name="status_bitrate_high">高码率</string>
@@ -452,6 +453,7 @@
     <string name="editor_fps_unlimited">原始帧率（不限制）</string>
     <string name="editor_fps_cap">%1$s fps（上限）</string>
     <string name="editor_bitrate_auto">跟随画质等级（中）</string>
+    <string name="editor_very_low">极低</string>
     <string name="editor_low">低</string>
     <string name="editor_medium">中</string>
     <string name="editor_high">高</string>

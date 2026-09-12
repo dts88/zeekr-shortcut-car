@@ -375,6 +375,7 @@
     <string name="record_unavailable">Insert a USB drive to record</string>
     <string name="record_unavailable_detail">No USB drive</string>
     <string name="status_fps">≤%1$s fps</string>
+    <string name="status_bitrate_very_low">Very low bitrate</string>
     <string name="status_bitrate_low">Low bitrate</string>
     <string name="status_bitrate_medium">Medium bitrate</string>
     <string name="status_bitrate_high">High bitrate</string>
@@ -451,6 +452,7 @@
     <string name="editor_fps_unlimited">Native (no limit)</string>
     <string name="editor_fps_cap">%1$s fps (cap)</string>
     <string name="editor_bitrate_auto">Follow quality level (medium)</string>
+    <string name="editor_very_low">Very low</string>
     <string name="editor_low">Low</string>
     <string name="editor_medium">Medium</string>
     <string name="editor_high">High</string>

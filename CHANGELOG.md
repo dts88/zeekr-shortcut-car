@@ -5,7 +5,22 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Bitrate has four tiers instead of three, and the whole table moved up: very low 2.7,
+  low 5.4, medium 10, high 20 Mbps on the surround grid. Medium is the default and is
+  double what it was. The old ceiling was 8 Mbps for a 6.6-megapixel frame -- 0.033 bits
+  per pixel, about a seventh of what an ordinary dashcam spends on 1080p. The detail was
+  being recorded and then compressed away, which is why the picture looked soft rather
+  than small.
+- One bitrate formula. There were two: the encoder's, and one computed next to it whose
+  result was thrown away unless "force H.264" was on -- so that compatibility switch was
+  quietly the sharpest setting in the app.
+- Recording no longer declares HEVC Level 4, which tops out at 1920x1080. The surround
+  grid is three times that, and an encoder that believes the declaration may hold its own
+  rate control down to match.
+- Fixed: re-preparing after a forced camera reopen built the recorder from the preview
+  size with no four-up rearrangement and the frame rate hard-coded to 25. One reopen and
+  the rest of the session recorded a preview-sized strip, with nothing in the log to say
+  so. Both paths build the recorder the same way now.
 
 ## [0.43.2-alpha] - 2026-09-13
 

@@ -53,12 +53,13 @@ public class RecordSpecsTest {
         assertEquals(HARDWARE_MAX, RecordSpecs.cap("每秒很多帧", HARDWARE_MAX));
     }
 
-    /** 码率等级对应的画质档，和旧的 getEncoderQualityLevel 一致。 */
+    /** 四个码率等级各占一档，第 0 档不再是个取不到的空位。 */
     @Test
     public void bitrateLevelsKeepTheirQualityStep() {
-        assertEquals(1, RecordSpecs.qualityLevel("low"));
-        assertEquals(2, RecordSpecs.qualityLevel("medium"));
-        assertEquals(3, RecordSpecs.qualityLevel("high"));
+        assertEquals(0, RecordSpecs.qualityLevel(StreamSpec.BITRATE_VERY_LOW));
+        assertEquals(1, RecordSpecs.qualityLevel(StreamSpec.BITRATE_LOW));
+        assertEquals(2, RecordSpecs.qualityLevel(StreamSpec.BITRATE_MEDIUM));
+        assertEquals(3, RecordSpecs.qualityLevel(StreamSpec.BITRATE_HIGH));
         assertEquals("auto 与 medium 同档", 2, RecordSpecs.qualityLevel(StreamSpec.BITRATE_AUTO));
         assertEquals("认不出来的值也得给一档", 2, RecordSpecs.qualityLevel("moderate"));
     }
