@@ -83,8 +83,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private RecyclerView sessionListView;
     private TextView listSummaryText;
     private TimelineSessionAdapter sessionAdapter;
-    private View railNormal;
-    private View railSelection;
+    private View actionGroup;
+    private View selectionGroup;
     private TextView selectedCountText;
     /** 界面重建（切黑白模式这类）之前看的是哪一条；-1 表示没有，开最新的那条。 */
     private int pendingSessionIndex = -1;
@@ -164,7 +164,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         videoCover = findViewById(R.id.timeline_video_cover);
         sessionListView = findViewById(R.id.timeline_session_list);
         listSummaryText = findViewById(R.id.timeline_list_summary);
-        railNormal = findViewById(R.id.rail_normal);
+        actionGroup = findViewById(R.id.pb_actions);
 
         sessionAdapter = new TimelineSessionAdapter(this::switchSession);
         sessionAdapter.setOnSessionLongClickListener(this::showSessionActions);
@@ -173,41 +173,41 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             sessionListView.setAdapter(sessionAdapter);
         }
 
-        railSelection = findViewById(R.id.rail_selection);
+        selectionGroup = findViewById(R.id.pb_selection);
         // 视频是按分段发送的，没有整批分享
-        View share = findViewById(R.id.rail_share);
+        View share = findViewById(R.id.pb_share);
         if (share != null) {
             share.setVisibility(View.GONE);
         }
         com.kooo.evcam.ui.StatusLine.fill(findViewById(android.R.id.content));
-        selectedCountText = findViewById(R.id.rail_selected_count);
+        selectedCountText = findViewById(R.id.pb_selected_count);
         sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);
 
         View menu = findViewById(R.id.timeline_menu);
         if (menu != null) {
             menu.setOnClickListener(v -> openDrawerOnMain());
         }
-        View home = findViewById(R.id.rail_home);
+        View home = findViewById(R.id.pb_home);
         if (home != null) {
             home.setOnClickListener(v -> finish());
         }
-        View refresh = findViewById(R.id.rail_refresh);
+        View refresh = findViewById(R.id.pb_refresh);
         if (refresh != null) {
             refresh.setOnClickListener(v -> loadTimelines());
         }
-        View multiSelect = findViewById(R.id.rail_multi_select);
+        View multiSelect = findViewById(R.id.pb_multi_select);
         if (multiSelect != null) {
             multiSelect.setOnClickListener(v -> setSelecting(true));
         }
-        View selectAll = findViewById(R.id.rail_select_all);
+        View selectAll = findViewById(R.id.pb_select_all);
         if (selectAll != null) {
             selectAll.setOnClickListener(v -> sessionAdapter.chooseAll());
         }
-        View deleteSelected = findViewById(R.id.rail_delete);
+        View deleteSelected = findViewById(R.id.pb_delete);
         if (deleteSelected != null) {
             deleteSelected.setOnClickListener(v -> confirmDeleteChosen());
         }
-        View cancelSelect = findViewById(R.id.rail_cancel);
+        View cancelSelect = findViewById(R.id.pb_cancel);
         if (cancelSelect != null) {
             cancelSelect.setOnClickListener(v -> setSelecting(false));
         }
@@ -610,11 +610,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private void setSelecting(boolean on) {
         sessionAdapter.setSelectionMode(on);
         // 标题区不动，换的是动作栏里的两组
-        if (railNormal != null) {
-            railNormal.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (actionGroup != null) {
+            actionGroup.setVisibility(on ? View.GONE : View.VISIBLE);
         }
-        if (railSelection != null) {
-            railSelection.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (selectionGroup != null) {
+            selectionGroup.setVisibility(on ? View.VISIBLE : View.GONE);
         }
         updateSelectedCount();
     }

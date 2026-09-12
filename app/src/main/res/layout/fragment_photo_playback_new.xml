@@ -50,10 +50,15 @@
             android:textAppearance="@style/TextAppearance.Cam.Body"
             android:gravity="start|center_vertical" />
 
+        <include
+            layout="@layout/layout_playback_actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
     </LinearLayout>
 
 
-    <!-- 主内容区：② 列表栏 · ③ 内容区 · ④ 动作栏 -->
+    <!-- 主内容区：② 列表栏 · ③ 内容区 -->
     <LinearLayout
         android:id="@+id/content_layout"
         android:layout_width="match_parent"
@@ -385,12 +390,6 @@ android:layout_marginStart="0dp"
                     style="@style/Widget.Cam.RailSmall" />
             </LinearLayout>
         </LinearLayout>
-
-        <!-- ④ 动作栏 -->
-        <include
-            layout="@layout/layout_playback_rail"
-            android:layout_width="@dimen/rail_width"
-            android:layout_height="match_parent" />
     </LinearLayout>
 
 </LinearLayout>

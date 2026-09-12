@@ -65,7 +65,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private Button btnSelectAll, btnDeleteSelected, btnCancelSelect, btnShareSelected;
     private TextView selectedCount;
     private static final String TAG = "PhotoPlaybackFragmentNew";
-    private View toolbar, railNormal, railSelection;
+    private View toolbar, actionGroup, selectionGroup;
 
     // 预览区组件
     private View multiViewLayout, singleViewLayout;
@@ -104,20 +104,20 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private void initViews(View view) {
         // 工具栏
         toolbar = view.findViewById(R.id.toolbar);
-        railNormal = view.findViewById(R.id.rail_normal);
-        railSelection = view.findViewById(R.id.rail_selection);
+        actionGroup = view.findViewById(R.id.pb_actions);
+        selectionGroup = view.findViewById(R.id.pb_selection);
         btnMenu = view.findViewById(R.id.btn_menu);
-        btnRefresh = view.findViewById(R.id.rail_refresh);
-        btnMultiSelect = view.findViewById(R.id.rail_multi_select);
-        btnHome = view.findViewById(R.id.rail_home);
+        btnRefresh = view.findViewById(R.id.pb_refresh);
+        btnMultiSelect = view.findViewById(R.id.pb_multi_select);
+        btnHome = view.findViewById(R.id.pb_home);
         currentDatetime = view.findViewById(R.id.current_datetime);
 
         // 多选工具栏
-        btnSelectAll = view.findViewById(R.id.rail_select_all);
-        btnDeleteSelected = view.findViewById(R.id.rail_delete);
-        btnCancelSelect = view.findViewById(R.id.rail_cancel);
-        btnShareSelected = view.findViewById(R.id.rail_share);
-        selectedCount = view.findViewById(R.id.rail_selected_count);
+        btnSelectAll = view.findViewById(R.id.pb_select_all);
+        btnDeleteSelected = view.findViewById(R.id.pb_delete);
+        btnCancelSelect = view.findViewById(R.id.pb_cancel);
+        btnShareSelected = view.findViewById(R.id.pb_share);
+        selectedCount = view.findViewById(R.id.pb_selected_count);
 
         // 列表
         photoList = view.findViewById(R.id.photo_list);
@@ -607,12 +607,12 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
         // 标题区不动（菜单和界面名一直在），换的是动作栏里的两组
         if (isMultiSelectMode) {
-            railNormal.setVisibility(View.GONE);
-            railSelection.setVisibility(View.VISIBLE);
+            actionGroup.setVisibility(View.GONE);
+            selectionGroup.setVisibility(View.VISIBLE);
             updateSelectedCount();
         } else {
-            railNormal.setVisibility(View.VISIBLE);
-            railSelection.setVisibility(View.GONE);
+            actionGroup.setVisibility(View.VISIBLE);
+            selectionGroup.setVisibility(View.GONE);
         }
     }
 
@@ -621,8 +621,8 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         adapter.clearSelection();
         adapter.setMultiSelectMode(false);
         adapter.notifyDataSetChanged();
-        railNormal.setVisibility(View.VISIBLE);
-        railSelection.setVisibility(View.GONE);
+        actionGroup.setVisibility(View.VISIBLE);
+        selectionGroup.setVisibility(View.GONE);
     }
 
     private void selectAll() {

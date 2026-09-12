@@ -23,7 +23,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:text="@string/guide_title"
-            android:textAppearance="@style/TextAppearance.Cam.Display"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textColor="@color/dialog_guide_title"
             android:textStyle="bold"
             android:layout_marginTop="8dp"
@@ -46,7 +46,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="①"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textColor="@color/dialog_guide_accent"
                 android:textStyle="bold"
                 android:layout_marginEnd="8dp" />
@@ -55,9 +55,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/guide_1"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Body"
                 android:textColor="@color/dialog_guide_content"
-                android:lineSpacingExtra="4dp" />
+                android:lineSpacingMultiplier="1.35" />
         </LinearLayout>
 
         <LinearLayout
@@ -70,7 +70,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="②"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textColor="@color/dialog_guide_accent"
                 android:textStyle="bold"
                 android:layout_marginEnd="8dp" />
@@ -79,9 +79,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/guide_2"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Body"
                 android:textColor="@color/dialog_guide_content"
-                android:lineSpacingExtra="4dp" />
+                android:lineSpacingMultiplier="1.35" />
         </LinearLayout>
 
         <LinearLayout
@@ -94,7 +94,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="③"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textColor="@color/dialog_guide_accent"
                 android:textStyle="bold"
                 android:layout_marginEnd="8dp" />
@@ -103,9 +103,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/guide_3"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Body"
                 android:textColor="@color/dialog_guide_content"
-                android:lineSpacingExtra="4dp" />
+                android:lineSpacingMultiplier="1.35" />
         </LinearLayout>
 
         <LinearLayout
@@ -118,7 +118,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="④"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textColor="@color/dialog_guide_accent"
                 android:textStyle="bold"
                 android:layout_marginEnd="8dp" />
@@ -127,9 +127,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/guide_4"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textAppearance="@style/TextAppearance.Cam.Body"
                 android:textColor="@color/dialog_guide_content"
-                android:lineSpacingExtra="4dp" />
+                android:lineSpacingMultiplier="1.35" />
         </LinearLayout>
 
 

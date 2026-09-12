@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  回看界面的动作组，放在 ① 标题区右侧。
+
+  <b>为什么不用 ④ 动作栏</b>：0.43.0 试过把这几个动作放进右侧动作栏，实车上判定
+  不合适 —— 回看界面的内容就是画面本身，侧栏要吃掉 380dp；而标题区右侧本来空着。
+  规范里 ④ 那一条对回看界面作废，理由记在 docs/ui-spec.md。
+
+  两个回看界面 <include> 同一份，id 相同。不支持的那一项自己 setVisibility(GONE)
+  （视频是按分段发送的，没有整批分享）。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/pb_action_group"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- 平时 -->
+    <LinearLayout
+        android:id="@+id/pb_actions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_refresh"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_refresh" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_multi_select"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_multi_select" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_home"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:contentDescription="@string/set_back_to_recording"
+            app:icon="@drawable/ic_home" />
+    </LinearLayout>
+
+    <!-- 多选中：占同一个位置，标题和菜单键都不动 -->
+    <LinearLayout
+        android:id="@+id/pb_selection"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/pb_selected_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="12dp"
+            android:text="@string/msg_selected_none"
+            android:textAppearance="@style/TextAppearance.Cam.Body"
+            android:textColor="@color/text_primary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_select_all"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_select_all" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_share"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_share"
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/energy" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_delete"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_delete"
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/recording" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/pb_cancel"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_cancel" />
+    </LinearLayout>
+</FrameLayout>

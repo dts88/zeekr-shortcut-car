@@ -41,6 +41,15 @@
             android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
 
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <include
+            layout="@layout/layout_playback_actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <View
@@ -208,12 +217,6 @@
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
-
-        <!-- ④ 动作栏 -->
-        <include
-            layout="@layout/layout_playback_rail"
-            android:layout_width="@dimen/rail_width"
-            android:layout_height="match_parent" />
     </LinearLayout>
 
 
