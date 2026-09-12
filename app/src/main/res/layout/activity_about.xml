@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  关于页面。
+  关于与致谢。
 
-  这一页是「关于这个软件」，不是致谢长文 —— 之前来源说明和免责占了整整两屏，
-  把它本该回答的问题（这是什么、谁做的、去哪看）挤没了。
+  顺序是有意的：先谢人，再说这软件是什么、跟谁借的、怎么对待你的数据、
+  出了事算谁的。致谢排在最前面，因为这个项目是别人给的信息攒起来的。
 
-  但两处不能删：GPL-3.0 的继承关系是许可证要求，
-  而 openavm-recorder 是「保留所有权利」的项目，本应用借鉴了它公开记录的平台事实，
-  「没有复制代码」这句话必须留着。两者都压到一行讲清楚。
+  一处不能删：GPL-3.0 的继承关系是许可证要求，必须留在用户看得见的地方。
+
+  「安全须知」那行标题是开发者选项的入口（点一下弹密码框），换 id 会把它弄丢。
 
   统一骨架：① 标题区（返回在左上，和主界面的菜单同一个位置）+ ③ 内容区。
-  颜色全部走语义色 —— 以前字是写死的白色，换成浅色日间配色后白字压在浅底上就看不见了。
+  颜色全部走语义色 —— 以前字是写死的白色，换成浅色日间配色后就看不见了。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -81,77 +81,28 @@
                 android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-            <!-- 存储建议 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="@string/about_storage_title"
+                android:layout_marginTop="28dp"
+                android:text="@string/about_thanks_title"
                 android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:lineSpacingMultiplier="1.25"
-                android:text="@string/about_storage_body"
-                android:textColor="@color/text_primary"
-                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-            <!-- 隐私提醒：U 盘里的录像没有加密。用录制红标出来 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.25"
-                android:text="@string/about_storage_privacy"
-                android:textColor="@color/recording_text"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/about_thanks_body"
+                android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-            <!-- 项目地址 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="@string/about_project_title"
-                android:textColor="@color/text_primary"
-                android:textAppearance="@style/TextAppearance.Cam.Row"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/about_link_project"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="github.com/dts88/zeekr-shortcut-car"
-                android:textColor="@color/energy_text"
-                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-            <!-- 请作者喝杯咖啡 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="@string/about_coffee_title"
-                android:textColor="@color/text_primary"
-                android:textAppearance="@style/TextAppearance.Cam.Row"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/about_coffee_body"
-                android:textColor="@color/text_primary"
-                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-            <!-- 开源与来源 -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="28dp"
                 android:text="@string/about_credits_title"
                 android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Row"
@@ -160,36 +111,19 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:lineSpacingMultiplier="1.25"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_credits_evcam"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:id="@+id/about_link_evcam"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="8dp"
+                android:padding="4dp"
                 android:text="github.com/suyunkai/EVCam"
-                android:textColor="@color/energy_text"
-                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:lineSpacingMultiplier="1.25"
-                android:text="@string/about_credits_openavm"
-                android:textColor="@color/text_primary"
-                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-            <TextView
-                android:id="@+id/about_link_openavm"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="github.com/Dantenothing/openavm-recorder"
                 android:textColor="@color/energy_text"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
@@ -197,29 +131,111 @@
                 android:id="@+id/about_link_gpl"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="@string/about_license_line"
+                android:layout_marginTop="4dp"
+                android:padding="4dp"
+                android:text="gnu.org/licenses/gpl-3.0.html"
                 android:textColor="@color/energy_text"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-            <!-- 安全免责 -->
             <TextView
-                android:id="@+id/about_safety_heading"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="@string/about_safety_title"
-                android:textColor="@color/recording_text"
+                android:layout_marginTop="28dp"
+                android:text="@string/about_project_title"
+                android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:lineSpacingMultiplier="1.25"
-                android:text="@string/about_safety_body"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/about_project_body"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+            <TextView
+                android:id="@+id/about_link_project"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:padding="4dp"
+                android:text="github.com/dts88/zeekr-shortcut-car"
+                android:textColor="@color/energy_text"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/about_privacy_title"
                 android:textColor="@color/text_primary"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/about_privacy_body"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/about_storage_title"
+                android:textColor="@color/text_primary"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/about_storage_body"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+            <TextView
+                android:id="@+id/about_safety_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/about_safety_title"
+                android:textColor="@color/text_primary"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/about_safety_body"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/about_coffee_title"
+                android:textColor="@color/text_primary"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingMultiplier="1.3"
+                android:text="@string/about_coffee_body"
+                android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
         </LinearLayout>
     </ScrollView>
