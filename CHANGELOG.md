@@ -7,6 +7,11 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.43.1-alpha] - 2026-09-12
+
+- Photo and video review keep their actions in the title bar after all. The action rail 0.43.0 moved them to costs 380dp on a screen whose content is the picture, and the title bar had the room. Both screens still share one layout for them.
+- The first-launch guide was set in the page-title size, which read oversized and cramped; it is body text with proportional line spacing now. Its content is current too: the diagnostics report comes from the drawer, and the button side and the mirror's gestures each get a line.
+
 ## [0.43.0-alpha] - 2026-09-12
 
 - Settings has a title bar again: the menu key sits where every other screen keeps it, and turns into back inside a sub-screen, whose name it shows. The status bar from the main screen runs along the bottom.
