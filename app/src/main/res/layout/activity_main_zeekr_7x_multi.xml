@@ -217,74 +217,10 @@
                     android:layout_height="1dp"
                     android:background="@color/line" />
 
-                <!-- ⑤ 状态条 -->
-                <LinearLayout
-                    android:id="@+id/status_bar"
+                <include
+                    layout="@layout/layout_status_bar"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/status_bar_height"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp">
-
-                    <!-- 这次按什么录：帧率上限 · 码率档（取自录制链路真正读的那一份） -->
-                    <TextView
-                        android:id="@+id/tv_status_stream"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFeatureSettings="tnum"
-                        android:maxLines="1"
-                        android:textColor="@color/text_secondary"
-                        android:textAppearance="@style/TextAppearance.Cam.Caption"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tv_status_storage"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="26dp"
-                        android:fontFeatureSettings="tnum"
-                        android:maxLines="1"
-                        android:textColor="@color/text_secondary"
-                        android:textAppearance="@style/TextAppearance.Cam.Caption"
-                        android:visibility="gone" />
-
-                    <!-- 合成流识别结果（尺寸、分隔带、拆分方式）：吃掉剩余宽度，放不下就截断 -->
-                    <TextView
-                        android:id="@+id/tv_composite_info"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="26dp"
-                        android:layout_marginEnd="20dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:fontFeatureSettings="tnum"
-                        android:maxLines="1"
-                        android:textColor="@color/text_tertiary"
-                        android:textAppearance="@style/TextAppearance.Cam.Caption"
-                        android:visibility="invisible" />
-
-                    <com.google.android.material.progressindicator.LinearProgressIndicator
-                        android:id="@+id/segment_progress"
-                        android:layout_width="200dp"
-                        android:layout_height="wrap_content"
-                        android:max="100"
-                        android:visibility="invisible"
-                        app:indicatorColor="@color/recording"
-                        app:trackColor="@color/recording_track"
-                        app:trackCornerRadius="2dp"
-                        app:trackThickness="4dp" />
-
-                    <TextView
-                        android:id="@+id/tv_segment_percent"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:fontFeatureSettings="tnum"
-                        android:textColor="@color/text_tertiary"
-                        android:textAppearance="@style/TextAppearance.Cam.Micro"
-                        android:visibility="invisible" />
-                </LinearLayout>
+                    android:layout_height="@dimen/status_bar_height" />
             </LinearLayout>
         </LinearLayout>
 

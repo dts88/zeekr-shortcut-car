@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ⑤ 状态条（统一骨架的第五个区，见 docs/ui-spec.md）。
+
+  始终在，不随界面变 —— 开车的人只要扫一眼这一条：这次按什么录、还剩多少空间、
+  合成流认出来没有、本段录到哪儿了。
+
+  各界面 <include> 进去，id 一个不改；填内容的是 ui/StatusLine，
+  它在自己那一棵树里找这些 id，所以同一个界面里出现两份也不会互相填错。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/status_bar"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="18dp"
+    android:paddingEnd="18dp">
+
+    <!-- 这次按什么录：帧率上限 · 码率档（取自录制链路真正读的那一份） -->
+    <TextView
+        android:id="@+id/tv_status_stream"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="1"
+        android:textColor="@color/text_secondary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_status_storage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="26dp"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="1"
+        android:textColor="@color/text_secondary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+
+    <!-- 合成流识别结果（尺寸、分隔带、拆分方式）：吃掉剩余宽度，放不下就截断 -->
+    <TextView
+        android:id="@+id/tv_composite_info"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="26dp"
+        android:layout_marginEnd="20dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="1"
+        android:textColor="@color/text_tertiary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="invisible" />
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/segment_progress"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:visibility="invisible"
+        app:indicatorColor="@color/recording"
+        app:trackColor="@color/recording_track"
+        app:trackCornerRadius="2dp"
+        app:trackThickness="4dp" />
+
+    <TextView
+        android:id="@+id/tv_segment_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:fontFeatureSettings="tnum"
+        android:textColor="@color/text_tertiary"
+        android:textAppearance="@style/TextAppearance.Cam.Micro"
+        android:visibility="invisible" />
+</LinearLayout>

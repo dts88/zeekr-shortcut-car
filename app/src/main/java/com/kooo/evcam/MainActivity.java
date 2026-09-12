@@ -596,7 +596,7 @@ public class MainActivity extends AppCompatActivity {
         // 四宫格由父容器 FourLaneContainer 重画子视图实现
         compositeContainer = findViewById(R.id.composite_container);
         if (compositeContainer != null) {
-            tvCompositeInfo = findViewById(R.id.tv_composite_info);
+            tvCompositeInfo = recordingLayout.findViewById(R.id.tv_composite_info);
             setupCompositeControls();
             // 容器是刚建出来的，摆位得立刻给它一份 —— 相机初始化不一定
             // 跟着布局重建走（横竖屏切换、主题切换都会重建布局）
@@ -686,6 +686,13 @@ public class MainActivity extends AppCompatActivity {
         if (drawerLayout != null) {
             drawerLayout.post(() ->
                     drawerLayout.openDrawer(androidx.core.view.GravityCompat.START));
+        }
+    }
+
+    /** 别的界面上的菜单键用它：那些界面没有抽屉，抽屉长在这里。 */
+    public void openDrawer() {
+        if (drawerLayout != null) {
+            drawerLayout.openDrawer(androidx.core.view.GravityCompat.START);
         }
     }
 
@@ -1183,7 +1190,7 @@ public class MainActivity extends AppCompatActivity {
         }
         int percent = (int) Math.max(0, Math.min(100, elapsed * 100 / segmentLengthMs));
         com.google.android.material.progressindicator.LinearProgressIndicator bar =
-                findViewById(R.id.segment_progress);
+                recordingLayout.findViewById(R.id.segment_progress);
         if (bar != null) {
             bar.setProgressCompat(percent, true);
         }
@@ -1196,7 +1203,7 @@ public class MainActivity extends AppCompatActivity {
     /** 状态条上的本段进度只在录制时出现；不录时留空，不显示一条不动的空轨道。 */
     private void setSegmentProgressVisible(boolean visible) {
         int visibility = visible ? View.VISIBLE : View.INVISIBLE;
-        View bar = findViewById(R.id.segment_progress);
+        View bar = recordingLayout.findViewById(R.id.segment_progress);
         if (bar != null) {
             bar.setVisibility(visibility);
         }
@@ -1228,31 +1235,14 @@ public class MainActivity extends AppCompatActivity {
      * 帧率在配置里的含义是上限（硬件给不到就按硬件的），所以写成「≤」；
      * 码率「自动」在录制链路里就是中档（{@code RecordSpecs.qualityLevel}），也照实写中档。</p>
      */
+    /**
+     * 状态条上「按什么录」和「剩多少空间」两格。
+     *
+     * <p>限定在 {@code recordingLayout} 这棵树里找：设置界面也有一条状态条，
+     * 从 Activity 上找会撞到看不见的那一份。</p>
+     */
     private void updateStatusLine() {
-        TextView stream = findViewById(R.id.tv_status_stream);
-        if (stream != null) {
-            com.kooo.evcam.profile.StreamSpec spec =
-                    com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front");
-            String fps = spec.fps == null || spec.fps.isEmpty()
-                    || com.kooo.evcam.profile.StreamSpec.FPS_UNLIMITED.equals(spec.fps)
-                    ? getString(R.string.opt_fps_auto_unknown)
-                    : getString(R.string.status_fps, spec.fps);
-            int level = com.kooo.evcam.profile.RecordSpecs.qualityLevel(spec.bitrate);
-            int bitrate = level == 1 ? R.string.status_bitrate_low
-                    : level == 3 ? R.string.status_bitrate_high
-                    : R.string.status_bitrate_medium;
-            com.kooo.evcam.ui.NumberRoll.set(stream, fps + " · " + getString(bitrate));
-            stream.setVisibility(View.VISIBLE);
-        }
-        TextView storage = findViewById(R.id.tv_status_storage);
-        if (storage != null) {
-            java.io.File root = StorageHelper.getExternalSdCardRoot(this);
-            long free = root != null ? StorageHelper.getAvailableSpace(root) : -1;
-            com.kooo.evcam.ui.NumberRoll.set(storage, free >= 0
-                    ? getString(R.string.status_storage_free, StorageHelper.formatSize(free))
-                    : getString(R.string.status_storage_none));
-            storage.setVisibility(View.VISIBLE);
-        }
+        com.kooo.evcam.ui.StatusLine.fill(recordingLayout);
     }
 
     /** 录制键换了实例（布局重建、自定义车型换按钮布局）就重新接一次。 */
