@@ -5,7 +5,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.AttributeSet;
-import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -114,4 +113,40 @@ public class LaneMapView extends View {
         }
     }
 
+    /** 一格在这张图里的矩形；格子之间留 3dp 缝。 */
+    private void laneRect(LaneLayout lane, RectF out) {
+        float gap = 3f * density;
+        float left = area.left + lane.x * area.width();
+        float top = area.top + lane.y * area.height();
+        out.set(left + gap, top + gap,
+                left + lane.width * area.width() - gap,
+                top + lane.height * area.height() - gap);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            return true;
+        }
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            // 从后往前找：后画的盖在上面，点到的是看得见的那一格
+            for (int i = lanes.size() - 1; i >= 0; i--) {
+                laneRect(lanes.get(i), rect);
+                if (rect.contains(event.getX(), event.getY())) {
+                    if (listener != null && i != selected) {
+                        listener.onTap(i);
+                    }
+                    performClick();
+                    return true;
+                }
+            }
+            return true;
+        }
+        return super.onTouchEvent(event);
+    }
+
+    @Override
+    public boolean performClick() {
+        return super.performClick();
+    }
 }
