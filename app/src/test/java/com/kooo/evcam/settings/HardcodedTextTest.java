@@ -155,7 +155,9 @@ public class HardcodedTextTest {
         List<String> offenders = new ArrayList<>();
         for (Path path : files(root, ".xml")) {
             String rel = relative(root, path);
-            if (!(rel.startsWith("layout/") || rel.startsWith("menu/") || rel.startsWith("xml/"))
+            // layout-sw600dp、layout-port 这些变体目录也要扫：车机走的正是 sw600dp 那一份，
+            // 以前只扫 layout/，于是变体里写死的中文躲了过去（真出过这事）
+            if (!(rel.startsWith("layout") || rel.startsWith("menu") || rel.startsWith("xml/"))
                     || XML_ALLOWED.containsKey(rel)) {
                 continue;
             }
