@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.41.0-alpha] - 2026-09-12
+
 - Text and icons are a size up: the scale moves 12/13/15/18/22/24 -> 14/16/18/21/26/28 and icons follow, after comparing against the head unit's own settings screens.
 - Switches: white thumb, orange track when on. Material's own switch tints the thumb and washes the track, which is where the pale orange came from.
 - Fixed: dialogs looked reddish. Material 3 tints elevated surfaces with the primary colour, and ours is Zeekr orange.
