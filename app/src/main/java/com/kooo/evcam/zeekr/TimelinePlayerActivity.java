@@ -1,7 +1,6 @@
 package com.kooo.evcam.zeekr;
 
 import android.app.Activity;
-import android.media.MediaMetadataRetriever;
 import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.net.Uri;
@@ -83,6 +82,9 @@ public class TimelinePlayerActivity extends Activity {
     private RecyclerView sessionListView;
     private TextView listSummaryText;
     private TimelineSessionAdapter sessionAdapter;
+    private View toolbar;
+    private View selectToolbar;
+    private TextView selectedCountText;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private List<RecordingTimeline.Session> sessions = new ArrayList<>();
@@ -156,6 +158,7 @@ public class TimelinePlayerActivity extends Activity {
         videoCover = findViewById(R.id.timeline_video_cover);
         sessionListView = findViewById(R.id.timeline_session_list);
         listSummaryText = findViewById(R.id.timeline_list_summary);
+        toolbar = findViewById(R.id.timeline_toolbar);
 
         sessionAdapter = new TimelineSessionAdapter(this::switchSession);
         sessionAdapter.setOnSessionLongClickListener(this::showSessionActions);
@@ -164,9 +167,37 @@ public class TimelinePlayerActivity extends Activity {
             sessionListView.setAdapter(sessionAdapter);
         }
 
-        View close = findViewById(R.id.timeline_close);
-        if (close != null) {
-            close.setOnClickListener(v -> finish());
+        selectToolbar = findViewById(R.id.timeline_select_toolbar);
+        selectedCountText = findViewById(R.id.timeline_selected_count);
+        sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);
+
+        View menu = findViewById(R.id.timeline_menu);
+        if (menu != null) {
+            menu.setOnClickListener(v -> openDrawerOnMain());
+        }
+        View home = findViewById(R.id.timeline_home);
+        if (home != null) {
+            home.setOnClickListener(v -> finish());
+        }
+        View refresh = findViewById(R.id.timeline_refresh);
+        if (refresh != null) {
+            refresh.setOnClickListener(v -> loadTimelines());
+        }
+        View multiSelect = findViewById(R.id.timeline_multi_select);
+        if (multiSelect != null) {
+            multiSelect.setOnClickListener(v -> setSelecting(true));
+        }
+        View selectAll = findViewById(R.id.timeline_select_all);
+        if (selectAll != null) {
+            selectAll.setOnClickListener(v -> sessionAdapter.chooseAll());
+        }
+        View deleteSelected = findViewById(R.id.timeline_delete_selected);
+        if (deleteSelected != null) {
+            deleteSelected.setOnClickListener(v -> confirmDeleteChosen());
+        }
+        View cancelSelect = findViewById(R.id.timeline_cancel_select);
+        if (cancelSelect != null) {
+            cancelSelect.setOnClickListener(v -> setSelecting(false));
         }
         if (playPauseButton != null) {
             playPauseButton.setOnClickListener(v -> togglePlayPause());
@@ -294,7 +325,7 @@ public class TimelinePlayerActivity extends Activity {
                         if (start < 0) {
                             continue;
                         }
-                        long duration = readDurationMs(f);
+                        long duration = ClipDurations.of(f);
                         if (duration > 0) {
                             sources.add(new RecordingTimeline.Source(
                                     f.getAbsolutePath(), start, duration, f.length()));
@@ -321,25 +352,6 @@ public class TimelinePlayerActivity extends Activity {
                 handler.post(ticker);
             });
         }).start();
-    }
-
-    /** 读单个文件的时长；读不出来返回 -1，调用方会跳过该文件。 */
-    private long readDurationMs(File file) {
-        MediaMetadataRetriever retriever = new MediaMetadataRetriever();
-        try {
-            retriever.setDataSource(file.getAbsolutePath());
-            String value = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-            return value != null ? Long.parseLong(value) : -1L;
-        } catch (Exception e) {
-            AppLog.w(TAG, "读取时长失败: " + file.getName());
-            return -1L;
-        } finally {
-            try {
-                retriever.release();
-            } catch (Exception ignored) {
-                // 释放失败无所谓
-            }
-        }
     }
 
     private void switchSession(int index) {
@@ -565,6 +577,84 @@ public class TimelinePlayerActivity extends Activity {
         startActivity(Intent.createChooser(intent, getString(R.string.player_share_chooser)));
     }
 
+    /**
+     * 菜单键回主界面并把抽屉拉开。
+     *
+     * <p>抽屉长在主界面上，这里是另一个界面 —— 所以不是「打开抽屉」，
+     * 而是「回到有抽屉的那一屏，并让它开着」。看起来和主界面点菜单是一回事。</p>
+     */
+    private void openDrawerOnMain() {
+        Intent intent = new Intent(this, com.kooo.evcam.MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.putExtra(com.kooo.evcam.MainActivity.EXTRA_OPEN_DRAWER, true);
+        startActivity(intent);
+        finish();
+    }
+
+    /** 进出多选：两条工具条互换，列表自己换成勾选的点法。 */
+    private void setSelecting(boolean on) {
+        sessionAdapter.setSelectionMode(on);
+        if (toolbar != null) {
+            toolbar.setVisibility(on ? View.GONE : View.VISIBLE);
+        }
+        if (selectToolbar != null) {
+            selectToolbar.setVisibility(on ? View.VISIBLE : View.GONE);
+        }
+        updateSelectedCount();
+    }
+
+    private void updateSelectedCount() {
+        if (selectedCountText != null) {
+            selectedCountText.setText(getString(R.string.msg_selected_n, sessionAdapter.chosenCount()));
+        }
+    }
+
+    private void confirmDeleteChosen() {
+        List<Integer> indexes = sessionAdapter.chosenIndexes();
+        if (indexes.isEmpty()) {
+            Toast.makeText(this, R.string.msg_selected_none, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int segments = 0;
+        long bytes = 0;
+        for (int index : indexes) {
+            if (index >= 0 && index < sessions.size()) {
+                RecordingTimeline.Session session = sessions.get(index);
+                segments += session.segmentCount();
+                bytes += session.totalSizeBytes;
+            }
+        }
+        final int totalSegments = segments;
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.player_delete_title)
+                .setMessage(getString(R.string.player_delete_msg, totalSegments, TimelineFormat.size(bytes)))
+                .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteChosen(indexes))
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    private void deleteChosen(List<Integer> indexes) {
+        // 正在播的那一段可能也在里面，先停下，否则删的是一个还开着的文件
+        player.stop();
+        int deleted = 0;
+        int total = 0;
+        for (int index : indexes) {
+            if (index < 0 || index >= sessions.size()) {
+                continue;
+            }
+            for (RecordingTimeline.Segment segment : sessions.get(index).segments) {
+                total++;
+                File file = new File(segment.path);
+                if (file.exists() && file.delete()) {
+                    deleted++;
+                }
+            }
+        }
+        AppLog.i(TAG, "多选删除：" + deleted + "/" + total + " 个文件");
+        Toast.makeText(this, getString(R.string.player_deleted, deleted), Toast.LENGTH_SHORT).show();
+        setSelecting(false);
+        loadTimelines();
+    }
+
     private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
@@ -589,6 +679,16 @@ public class TimelinePlayerActivity extends Activity {
         AppLog.i(TAG, "删除时间轴 " + index + "：" + deleted + "/" + session.segmentCount() + " 个文件");
         Toast.makeText(this, getString(R.string.player_deleted, deleted), Toast.LENGTH_SHORT).show();
         loadTimelines();
+    }
+
+    @Override
+    public void onBackPressed() {
+        // 多选里按返回：先退出多选。直接离开会让人以为选择被「提交」了
+        if (sessionAdapter != null && sessionAdapter.isSelectionMode()) {
+            setSelecting(false);
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void updateSessionInfo(RecordingTimeline.Session session) {

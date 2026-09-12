@@ -38,7 +38,7 @@
             android:layout_height="wrap_content"
             android:text="@string/nav_photo_playback"
             android:textColor="@color/text_primary"
-            android:textAppearance="@style/TextAppearance.Cam.Display"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
 
         <TextView

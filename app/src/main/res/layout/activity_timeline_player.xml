@@ -2,7 +2,8 @@
 <!--
   连续回放。统一骨架：① 标题区（返回在左上）+ 左栏连续录制列表 + 右侧播放器。
 
-  返回键接用了原来控制条末尾那个「关闭」的 id（timeline_close），点击逻辑不用改。
+  左上角是菜单键，和主界面同一个位置、同一个图标；右边是刷新、多选、主页，
+  和图片回看那一排对齐 —— 两个回看界面从此是一套操作。
   只有画面那一块是黑底（视频本来就该衬黑），其余跟应用配色走 ——
   以前整页是黑的，控制条上的时间写死白色，换成浅色日间配色后就看不见了。
 -->
@@ -14,6 +15,7 @@
     android:orientation="vertical">
 
     <LinearLayout
+        android:id="@+id/timeline_toolbar"
         android:layout_width="match_parent"
         android:layout_height="@dimen/title_bar_height"
         android:gravity="center_vertical"
@@ -21,13 +23,14 @@
         android:paddingStart="10dp"
         android:paddingEnd="16dp">
 
+        <!-- 菜单键和主界面同一个位置、同一个图标：点开抽屉，不是「返回上一层」 -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_close"
+            android:id="@+id/timeline_menu"
             style="@style/Widget.Cam.IconButton"
             android:layout_width="@dimen/icon_button_size"
             android:layout_height="@dimen/icon_button_size"
-            android:contentDescription="@string/action_back"
-            app:icon="@drawable/ic_back" />
+            android:contentDescription="@string/cd_menu"
+            app:icon="@drawable/ic_menu" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -37,6 +40,91 @@
             android:textColor="@color/text_primary"
             android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_refresh"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_refresh" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_multi_select"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_multi_select" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_home"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:contentDescription="@string/set_back_to_recording"
+            app:icon="@drawable/ic_home" />
+    </LinearLayout>
+
+    <!-- 多选中：和图片回看同一条操作条（删除用录制红） -->
+    <LinearLayout
+        android:id="@+id/timeline_select_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_select_all"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_select_all" />
+
+        <TextView
+            android:id="@+id/timeline_selected_count"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/msg_selected_none"
+            android:textColor="@color/text_primary"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_delete_selected"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_delete"
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/recording" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/timeline_cancel_select"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_button_size"
+            android:layout_marginStart="8dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:text="@string/action_cancel" />
     </LinearLayout>
 
     <View

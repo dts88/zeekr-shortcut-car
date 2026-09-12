@@ -5,6 +5,11 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+- Text and icons are a size up: the scale moves 12/13/15/18/22/24 -> 14/16/18/21/26/28 and icons follow, after comparing against the head unit's own settings screens.
+- Switches: white thumb, orange track when on. Material's own switch tints the thumb and washes the track, which is where the pale orange came from.
+- Fixed: dialogs looked reddish. Material 3 tints elevated surfaces with the primary colour, and ours is Zeekr orange.
+- Fixed: switching day/night dropped you back to the main screen and made the playback screens rescan. The screen you had open comes back, and clip durations are remembered, so there is nothing to rescan.
+- Video review has the same controls as photo review: the menu button where the main screen keeps it, plus refresh, multi-select and home. Multi-select deletes several recordings at once.
 - Developer options: the photo-channel test and the preview resource sampler are gone. Each was built to answer one question about a feature that has since shipped, and both questions are answered.
 
 ## [0.40.0-alpha] - 2026-09-12

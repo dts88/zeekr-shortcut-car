@@ -4,6 +4,8 @@
 
   日期由上方的分组标题给出，所以这里不再重复 —— 突出的是这次录制的时间跨度，
   下面一行是时长、总大小和段数。一项不是一个文件，而是一整段连续录制。
+
+  多选时行尾出现一个勾；不在多选里它不占位（gone），行的排布不变。
 -->
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -25,13 +27,13 @@
         android:padding="10dp"
         android:gravity="center_vertical">
 
-        <!-- 选中条：当前正在播放的那一条 -->
+        <!-- 正在播的那一条：红色只标「正在播」这件事，和录制键同一个规矩 -->
         <View
             android:id="@+id/session_selected_bar"
             android:layout_width="4dp"
             android:layout_height="42dp"
             android:layout_marginEnd="10dp"
-            android:background="#FF3B30"
+            android:background="@color/recording"
             android:visibility="invisible" />
 
         <LinearLayout
@@ -40,7 +42,6 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- 时间跨度 -->
             <TextView
                 android:id="@+id/session_time"
                 android:layout_width="wrap_content"
@@ -48,9 +49,8 @@
                 android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold"
-                android:text="12:54 – 13:21" />
+                tools:text="12:54 – 13:21" />
 
-            <!-- 时长 · 大小 · 段数 -->
             <TextView
                 android:id="@+id/session_meta"
                 android:layout_width="wrap_content"
@@ -60,6 +60,15 @@
                 android:textAppearance="@style/TextAppearance.Cam.Caption"
                 tools:text="27:04 · 1.2 GB · 9 clips" />
         </LinearLayout>
+
+        <ImageView
+            android:id="@+id/session_check"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="10dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_check"
+            android:visibility="gone" />
     </LinearLayout>
 
 </androidx.cardview.widget.CardView>

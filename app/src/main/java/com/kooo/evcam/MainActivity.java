@@ -64,6 +64,9 @@ import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
+    /** 别的界面上的菜单键：回到这里，并且把抽屉拉开。 */
+    public static final String EXTRA_OPEN_DRAWER = "open_drawer";
+
     /** 环视流探测结果的那几行文字；相机开起来后可能被实际尺寸替掉。 */
     private String compositeProbeInfo;
 
@@ -553,6 +556,17 @@ public class MainActivity extends AppCompatActivity {
         navigationView = findViewById(R.id.nav_view);
         recordingLayout = findViewById(R.id.main);
         fragmentContainer = findViewById(R.id.fragment_container);
+
+        // 切黑白模式（以及旋转、语言这些）会让系统把这个界面整个重建一遍。
+        // 重建时系统会把原来打开着的那个 Fragment 还回来，但布局的初始状态是
+        // 「主界面可见、容器隐藏」—— 于是看起来像是自己退回了主界面，
+        // 其实那一层还在，只是被盖住了。按实际在场的 Fragment 摆一次可见性。
+        if (getSupportFragmentManager().findFragmentById(R.id.fragment_container) != null) {
+            recordingLayout.setVisibility(View.GONE);
+            fragmentContainer.setVisibility(View.VISIBLE);
+        }
+
+        openDrawerIfAsked(getIntent());
         
         // 设置导航头部版本号
         if (navigationView != null) {
@@ -659,6 +673,25 @@ public class MainActivity extends AppCompatActivity {
         }
         if (textureRight != null && PreviewSlots.exists(configuredCameraCount, "right")) {
             textureRight.setSurfaceTextureListener(buildSurfaceListener("right"));
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        openDrawerIfAsked(intent);
+    }
+
+    /** 从别的界面按菜单键回来：抽屉要开着，否则那一下点击看起来没反应。 */
+    private void openDrawerIfAsked(Intent intent) {
+        if (intent == null || !intent.getBooleanExtra(EXTRA_OPEN_DRAWER, false)) {
+            return;
+        }
+        intent.removeExtra(EXTRA_OPEN_DRAWER);
+        if (drawerLayout != null) {
+            drawerLayout.post(() ->
+                    drawerLayout.openDrawer(androidx.core.view.GravityCompat.START));
         }
     }
 

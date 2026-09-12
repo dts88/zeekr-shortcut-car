@@ -12,9 +12,11 @@ import com.kooo.evcam.R;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * 连续回放左栏的列表：日期分组标题 + 每条连续时间轴。
@@ -76,6 +78,16 @@ public class TimelineSessionAdapter
     private OnSessionLongClickListener longClickListener;
     private int selectedSessionIndex = -1;
 
+    /**
+     * 多选模式：点一下是勾选，不是播放。
+     *
+     * <p>选中的是 sessions 列表里的下标，不是行号 —— 行号会随着日期标题的增减而变，
+     * 而删除之后整张列表都会重建。</p>
+     */
+    private boolean selectionMode;
+    private final Set<Integer> chosen = new LinkedHashSet<>();
+    private Runnable onSelectionChanged;
+
     public TimelineSessionAdapter(OnSessionClickListener listener) {
         this.listener = listener;
     }
@@ -124,6 +136,59 @@ public class TimelineSessionAdapter
         }
     }
 
+    /** 进出多选。进出都把已选清空：留着上一次的选择只会让人误删。 */
+    public void setSelectionMode(boolean on) {
+        if (selectionMode == on) {
+            return;
+        }
+        selectionMode = on;
+        chosen.clear();
+        notifyDataSetChanged();
+    }
+
+    public boolean isSelectionMode() {
+        return selectionMode;
+    }
+
+    /** 选中变化时通知一声，让工具条上的计数跟着走。 */
+    public void setOnSelectionChangedListener(Runnable listener) {
+        this.onSelectionChanged = listener;
+    }
+
+    public void chooseAll() {
+        chosen.clear();
+        for (Row row : rows) {
+            if (row.type == TYPE_SESSION) {
+                chosen.add(row.sessionIndex);
+            }
+        }
+        notifyDataSetChanged();
+        if (onSelectionChanged != null) {
+            onSelectionChanged.run();
+        }
+    }
+
+    public List<Integer> chosenIndexes() {
+        return new ArrayList<>(chosen);
+    }
+
+    public int chosenCount() {
+        return chosen.size();
+    }
+
+    private void toggle(int sessionIndex) {
+        if (!chosen.remove(sessionIndex)) {
+            chosen.add(sessionIndex);
+        }
+        int row = rowOf(sessionIndex);
+        if (row >= 0) {
+            notifyItemChanged(row);
+        }
+        if (onSelectionChanged != null) {
+            onSelectionChanged.run();
+        }
+    }
+
     /** 会话下标 -> 行号；用于滚动定位。找不到返回 -1。 */
     public int rowOf(int sessionIndex) {
         if (sessionIndex < 0) {
@@ -162,12 +227,19 @@ public class TimelineSessionAdapter
             return;
         }
         SessionViewHolder sessionHolder = (SessionViewHolder) holder;
-        sessionHolder.bind(row.session, row.sessionIndex == selectedSessionIndex);
+        sessionHolder.bind(row.session, row.sessionIndex == selectedSessionIndex,
+                selectionMode, chosen.contains(row.sessionIndex));
         sessionHolder.itemView.setOnClickListener(v -> {
             int clicked = sessionHolder.getAdapterPosition();
             // 列表刚刷新时 getAdapterPosition 会是 NO_POSITION，别把 -1 传出去
-            if (listener != null && clicked != RecyclerView.NO_POSITION) {
-                listener.onSessionClick(rows.get(clicked).sessionIndex);
+            if (clicked == RecyclerView.NO_POSITION) {
+                return;
+            }
+            int index = rows.get(clicked).sessionIndex;
+            if (selectionMode) {
+                toggle(index);
+            } else if (listener != null) {
+                listener.onSessionClick(index);
             }
         });
         sessionHolder.itemView.setOnLongClickListener(v -> {
@@ -202,15 +274,18 @@ public class TimelineSessionAdapter
         private final TextView timeText;
         private final TextView metaText;
         private final View selectedBar;
+        private final View check;
 
         SessionViewHolder(@NonNull View itemView) {
             super(itemView);
             timeText = itemView.findViewById(R.id.session_time);
             metaText = itemView.findViewById(R.id.session_meta);
             selectedBar = itemView.findViewById(R.id.session_selected_bar);
+            check = itemView.findViewById(R.id.session_check);
         }
 
-        void bind(RecordingTimeline.Session session, boolean selected) {
+        void bind(RecordingTimeline.Session session, boolean selected,
+                  boolean selecting, boolean chosen) {
             Date start = new Date(session.startEpochMs);
             Date end = new Date(session.startEpochMs + session.totalDurationMs);
 
@@ -223,7 +298,10 @@ public class TimelineSessionAdapter
                     + " · " + itemView.getContext().getString(
                             R.string.player_clip_count, session.segmentCount()));
 
+            // 正在播的那条留着红条；多选时右边多一个勾
             selectedBar.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+            check.setVisibility(selecting && chosen ? View.VISIBLE : View.GONE);
+            itemView.setAlpha(selecting && !chosen ? 0.55f : 1f);
         }
     }
 }
