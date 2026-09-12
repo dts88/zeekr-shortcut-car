@@ -50,101 +50,10 @@
             android:textAppearance="@style/TextAppearance.Cam.Body"
             android:gravity="start|center_vertical" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_refresh"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_refresh" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_multi_select"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginStart="8dp"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_multi_select" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_home"
-            style="@style/Widget.Cam.IconButton"
-            android:layout_width="@dimen/icon_button_size"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginStart="8dp"
-            android:contentDescription="@string/set_back_to_recording"
-            app:icon="@drawable/ic_home" />
     </LinearLayout>
 
-    <!-- 多选工具栏（隐藏）：同样的高度和按钮；分享用能量橙，删除用录制红 -->
-    <LinearLayout
-        android:id="@+id/multi_select_toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/title_bar_height"
-        android:orientation="horizontal"
-        android:paddingStart="10dp"
-        android:paddingEnd="16dp"
-        android:gravity="center_vertical"
-        android:background="@color/bg"
-        android:visibility="gone">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_select_all"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_select_all" />
-
-        <TextView
-            android:id="@+id/selected_count"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/msg_selected_none"
-            android:textColor="@color/text_primary"
-            android:textAppearance="@style/TextAppearance.Cam.Body"
-            android:gravity="center" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_share_selected"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginEnd="8dp"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_share"
-            android:textColor="@color/on_energy"
-            app:backgroundTint="@color/energy" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_delete_selected"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_delete"
-            android:textColor="@color/on_energy"
-            app:backgroundTint="@color/recording" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_cancel_select"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginStart="8dp"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_cancel" />
-    </LinearLayout>
-
-    <!-- 主内容区：左右分栏 -->
+    <!-- 主内容区：② 列表栏 · ③ 内容区 · ④ 动作栏 -->
     <LinearLayout
         android:id="@+id/content_layout"
         android:layout_width="match_parent"
@@ -457,16 +366,15 @@ android:layout_marginStart="0dp"
                 android:background="@color/preview_controls_background"
                 android:visibility="gone">
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_view_mode"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
                     android:minWidth="72dp"
                     android:text="@string/photo_mode_multi"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:backgroundTint="@color/sunken"
-                    android:textColor="@color/text_primary" />
-                <Button
+                    style="@style/Widget.Cam.RailSmall" />
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_send_to_phone"
                     android:layout_width="wrap_content"
                     android:layout_height="48dp"
@@ -474,10 +382,15 @@ android:layout_marginStart="0dp"
                     android:layout_marginStart="8dp"
                     android:text="@string/action_send_to_phone"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:backgroundTint="@color/sunken"
-                    android:textColor="@color/text_primary" />
+                    style="@style/Widget.Cam.RailSmall" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- ④ 动作栏 -->
+        <include
+            layout="@layout/layout_playback_rail"
+            android:layout_width="@dimen/rail_width"
+            android:layout_height="match_parent" />
     </LinearLayout>
 
 </LinearLayout>

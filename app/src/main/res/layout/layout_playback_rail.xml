@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ④ 动作栏：回看界面用的那一版（统一骨架见 docs/ui-spec.md）。
+
+  它承载的是<b>这个界面能做的事</b> —— 刷新、多选、主页，多选时换成整选 / 分享 /
+  删除 / 取消。播放控制（上一段、播放、倍速）不在这里：它们控制的是播放头，
+  跟画面绑在一起才讲得通，挪到右侧反而把一件事切成两处。
+
+  两个回看界面 <include> 同一份，id 相同 —— 谁也别再抄一份各自漂移。
+  不支持的那一项自己 setVisibility(GONE)（视频是按分段发送的，没有整批分享）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/playback_rail"
+    android:background="@color/bg"
+    android:orientation="vertical"
+    android:paddingStart="@dimen/gutter"
+    android:paddingTop="@dimen/gutter"
+    android:paddingEnd="@dimen/gutter"
+    android:paddingBottom="@dimen/gutter">
+
+    <!-- 平时 -->
+    <LinearLayout
+        android:id="@+id/rail_normal"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_refresh"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:text="@string/action_refresh" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_multi_select"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:layout_marginTop="@dimen/gutter"
+            android:text="@string/action_multi_select" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- 回主界面放在最下面：手往下摸就是退出这一屏 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_home"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:text="@string/set_back_to_recording"
+            app:icon="@drawable/ic_home" />
+    </LinearLayout>
+
+    <!-- 多选中 -->
+    <LinearLayout
+        android:id="@+id/rail_selection"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/rail_selected_count"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/gutter"
+            android:gravity="center"
+            android:text="@string/msg_selected_none"
+            android:textAppearance="@style/TextAppearance.Cam.Body"
+            android:textColor="@color/text_primary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_select_all"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:text="@string/action_select_all" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_share"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:layout_marginTop="@dimen/gutter"
+            android:text="@string/action_share"
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/energy" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_delete"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:layout_marginTop="@dimen/gutter"
+            android:text="@string/action_delete"
+            android:textColor="@color/on_energy"
+            app:backgroundTint="@color/recording" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/rail_cancel"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/rail_small_height"
+            android:text="@string/action_cancel" />
+    </LinearLayout>
+</LinearLayout>

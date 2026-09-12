@@ -41,90 +41,6 @@
             android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_refresh"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_refresh" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_multi_select"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginStart="8dp"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_multi_select" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_home"
-            style="@style/Widget.Cam.IconButton"
-            android:layout_width="@dimen/icon_button_size"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginStart="8dp"
-            android:contentDescription="@string/set_back_to_recording"
-            app:icon="@drawable/ic_home" />
-    </LinearLayout>
-
-    <!-- 多选中：和图片回看同一条操作条（删除用录制红） -->
-    <LinearLayout
-        android:id="@+id/timeline_select_toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/title_bar_height"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="10dp"
-        android:paddingEnd="16dp"
-        android:visibility="gone">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_select_all"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_select_all" />
-
-        <TextView
-            android:id="@+id/timeline_selected_count"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="@string/msg_selected_none"
-            android:textColor="@color/text_primary"
-            android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_delete_selected"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_delete"
-            android:textColor="@color/on_energy"
-            app:backgroundTint="@color/recording" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_cancel_select"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/icon_button_size"
-            android:layout_marginStart="8dp"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:text="@string/action_cancel" />
     </LinearLayout>
 
     <View
@@ -292,6 +208,24 @@
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
+
+        <!-- ④ 动作栏 -->
+        <include
+            layout="@layout/layout_playback_rail"
+            android:layout_width="@dimen/rail_width"
+            android:layout_height="match_parent" />
     </LinearLayout>
+
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
+    <!-- ⑤ 状态条：和主界面同一条 -->
+    <include
+        layout="@layout/layout_status_bar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/status_bar_height" />
 
 </LinearLayout>

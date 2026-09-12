@@ -83,8 +83,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private RecyclerView sessionListView;
     private TextView listSummaryText;
     private TimelineSessionAdapter sessionAdapter;
-    private View toolbar;
-    private View selectToolbar;
+    private View railNormal;
+    private View railSelection;
     private TextView selectedCountText;
     /** 界面重建（切黑白模式这类）之前看的是哪一条；-1 表示没有，开最新的那条。 */
     private int pendingSessionIndex = -1;
@@ -164,7 +164,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         videoCover = findViewById(R.id.timeline_video_cover);
         sessionListView = findViewById(R.id.timeline_session_list);
         listSummaryText = findViewById(R.id.timeline_list_summary);
-        toolbar = findViewById(R.id.timeline_toolbar);
+        railNormal = findViewById(R.id.rail_normal);
 
         sessionAdapter = new TimelineSessionAdapter(this::switchSession);
         sessionAdapter.setOnSessionLongClickListener(this::showSessionActions);
@@ -173,35 +173,41 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             sessionListView.setAdapter(sessionAdapter);
         }
 
-        selectToolbar = findViewById(R.id.timeline_select_toolbar);
-        selectedCountText = findViewById(R.id.timeline_selected_count);
+        railSelection = findViewById(R.id.rail_selection);
+        // 视频是按分段发送的，没有整批分享
+        View share = findViewById(R.id.rail_share);
+        if (share != null) {
+            share.setVisibility(View.GONE);
+        }
+        com.kooo.evcam.ui.StatusLine.fill(findViewById(android.R.id.content));
+        selectedCountText = findViewById(R.id.rail_selected_count);
         sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);
 
         View menu = findViewById(R.id.timeline_menu);
         if (menu != null) {
             menu.setOnClickListener(v -> openDrawerOnMain());
         }
-        View home = findViewById(R.id.timeline_home);
+        View home = findViewById(R.id.rail_home);
         if (home != null) {
             home.setOnClickListener(v -> finish());
         }
-        View refresh = findViewById(R.id.timeline_refresh);
+        View refresh = findViewById(R.id.rail_refresh);
         if (refresh != null) {
             refresh.setOnClickListener(v -> loadTimelines());
         }
-        View multiSelect = findViewById(R.id.timeline_multi_select);
+        View multiSelect = findViewById(R.id.rail_multi_select);
         if (multiSelect != null) {
             multiSelect.setOnClickListener(v -> setSelecting(true));
         }
-        View selectAll = findViewById(R.id.timeline_select_all);
+        View selectAll = findViewById(R.id.rail_select_all);
         if (selectAll != null) {
             selectAll.setOnClickListener(v -> sessionAdapter.chooseAll());
         }
-        View deleteSelected = findViewById(R.id.timeline_delete_selected);
+        View deleteSelected = findViewById(R.id.rail_delete);
         if (deleteSelected != null) {
             deleteSelected.setOnClickListener(v -> confirmDeleteChosen());
         }
-        View cancelSelect = findViewById(R.id.timeline_cancel_select);
+        View cancelSelect = findViewById(R.id.rail_cancel);
         if (cancelSelect != null) {
             cancelSelect.setOnClickListener(v -> setSelecting(false));
         }
@@ -603,11 +609,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     /** 进出多选：两条工具条互换，列表自己换成勾选的点法。 */
     private void setSelecting(boolean on) {
         sessionAdapter.setSelectionMode(on);
-        if (toolbar != null) {
-            toolbar.setVisibility(on ? View.GONE : View.VISIBLE);
+        // 标题区不动，换的是动作栏里的两组
+        if (railNormal != null) {
+            railNormal.setVisibility(on ? View.GONE : View.VISIBLE);
         }
-        if (selectToolbar != null) {
-            selectToolbar.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (railSelection != null) {
+            railSelection.setVisibility(on ? View.VISIBLE : View.GONE);
         }
         updateSelectedCount();
     }
