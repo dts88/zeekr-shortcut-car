@@ -8,8 +8,12 @@
   这里收成六档，每一档对应一个角色。取值尽量沿用原来用得最多的那个，
   所以绝大多数地方看起来和以前一样；变的是它们从此有名字，改一次就全改。
 
-  车机屏幕（3200×2000）比手机远，比手机大，所以最小一档也有 12sp：
+  车机屏幕（3200×2000）比手机远，比手机大，所以最小一档也有 14sp：
   再小的字在驾驶位上是读不了的，也就不该存在。
+
+  0.41.0 整体上调一档（12/13/15/18/22/24 → 14/16/18/21/26/28）：
+  实车上比对，原来的字比车机系统设置界面的略小。图标按同样的比例跟着放大，
+  它们都是矢量，放大不会有锯齿。
 
   用法：布局里写 android:textAppearance，不要再写 android:textSize。
   TypeScaleTest 会拦下新的硬编码字号（开发者工具和自定义车型的布局不在此列）。
@@ -17,12 +21,12 @@
 <resources>
 
     <!-- 六档的取值。样式和代码都引用这里，改一个数就全改 -->
-    <dimen name="text_micro">12sp</dimen>
-    <dimen name="text_caption">13sp</dimen>
-    <dimen name="text_body">15sp</dimen>
-    <dimen name="text_row">18sp</dimen>
-    <dimen name="text_title">22sp</dimen>
-    <dimen name="text_display">24sp</dimen>
+    <dimen name="text_micro">14sp</dimen>
+    <dimen name="text_caption">16sp</dimen>
+    <dimen name="text_body">18sp</dimen>
+    <dimen name="text_row">21sp</dimen>
+    <dimen name="text_title">26sp</dimen>
+    <dimen name="text_display">28sp</dimen>
 
     <!--
       字重和字距和主题里保持一致：父样式（Material3）自带的那份会盖掉主题设的，

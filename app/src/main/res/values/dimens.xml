@@ -20,5 +20,5 @@
     <dimen name="record_ring_size">68dp</dimen>
     <dimen name="rail_tile_height">104dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
-    <dimen name="icon_button_size">44dp</dimen>
+    <dimen name="icon_button_size">48dp</dimen>
 </resources>

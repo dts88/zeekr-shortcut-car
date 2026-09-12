@@ -26,8 +26,8 @@
 
         <ImageView
             android:id="@android:id/icon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:importantForAccessibility="no"
             android:tint="@color/pref_icon" />
     </LinearLayout>

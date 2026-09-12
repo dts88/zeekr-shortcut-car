@@ -37,6 +37,13 @@
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorSurfaceVariant">@color/sunken</item>
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="colorSurfaceTint">@color/surface</item>
+        <item name="colorSurfaceContainer">@color/surface</item>
+        <item name="colorSurfaceContainerHigh">@color/sunken</item>
+        <item name="colorSurfaceContainerHighest">@color/sunken</item>
+        <!-- 开关统一走我们自己的轨道和滑块，见 Widget.Cam.Switch -->
+        <item name="switchStyle">@style/Widget.Cam.Switch</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
         <item name="colorOutline">@color/line</item>
         <item name="android:statusBarColor">@color/bg</item>
@@ -70,10 +77,10 @@
         <item name="iconTint">@color/text_primary</item>
         <!-- textTop：图标和字作为一组在方块里上下居中（top 会把图标贴在顶边） -->
         <item name="iconGravity">textTop</item>
-        <item name="iconSize">26dp</item>
+        <item name="iconSize">30dp</item>
         <item name="iconPadding">8dp</item>
         <item name="cornerRadius">@dimen/corner_radius</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textSize">@dimen/text_caption</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
         <item name="android:paddingLeft">8dp</item>
@@ -85,15 +92,15 @@
     <!-- 横条：图标在字左边 -->
     <style name="Widget.Cam.RailSmall" parent="Widget.Cam.RailTile">
         <item name="iconGravity">textStart</item>
-        <item name="iconSize">22dp</item>
-        <item name="android:textSize">15sp</item>
+        <item name="iconSize">26dp</item>
+        <item name="android:textSize">@dimen/text_body</item>
     </style>
 
     <!-- 只有图标：菜单、退出 -->
     <style name="Widget.Cam.IconButton" parent="Widget.Cam.RailTile">
         <item name="iconGravity">textStart</item>
         <item name="iconPadding">0dp</item>
-        <item name="iconSize">22dp</item>
+        <item name="iconSize">26dp</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:minHeight">0dp</item>
         <item name="android:paddingLeft">0dp</item>
@@ -102,7 +109,7 @@
 
     <!-- 导航菜单项文字样式 -->
     <style name="NavigationMenuTextAppearance" parent="TextAppearance.AppCompat.Body1">
-        <item name="android:textSize">17sp</item>
+        <item name="android:textSize">@dimen/text_row</item>
         <item name="android:textColor">@color/nav_text_primary</item>
         <item name="fontFamily">sans-serif-medium</item>
     </style>
@@ -119,9 +126,21 @@
         <item name="android:paddingEnd">8dp</item>
     </style>
 
+    <!--
+      开关：滑块永远是白的，开着时轨道是能量橙 —— 车机系统就是这个规则，
+      没有「浅橙轨道」那一档。Material 自带的开关正好相反（滑块跟着变橙、
+      轨道是橙色的半透明），所以这里把默认样式换掉，凡是开关都走同一套。
+    -->
+    <style name="Widget.Cam.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="android:thumb">@drawable/pref_switch_thumb</item>
+        <item name="track">@drawable/pref_switch_track</item>
+        <item name="switchMinWidth">56dp</item>
+        <item name="android:background">@null</item>
+    </style>
+
     <!-- 导航分组标题样式 -->
     <style name="NavigationSubheaderTextAppearance" parent="TextAppearance.AppCompat.Body2">
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">@dimen/text_micro</item>
         <item name="android:textColor">@color/nav_section_title</item>
         <item name="android:textAllCaps">false</item>
         <item name="fontFamily">sans-serif-medium</item>
@@ -137,6 +156,16 @@
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
         <item name="colorPrimary">@color/energy_text</item>
+        <!--
+          对话框底色不许带橙。Material 3 会按「浮起的高度」给表面上一层主色调的色
+          （surface tint），而主色是极氪橙 —— 于是对话框底色看起来偏红，和别处的
+          中性灰白不是一套。这里把上色关掉，并把几档表面色都钉回自己的语义色。
+        -->
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="colorSurfaceTint">@color/surface</item>
+        <item name="colorSurfaceContainer">@color/surface</item>
+        <item name="colorSurfaceContainerHigh">@color/surface</item>
+        <item name="colorSurfaceContainerHighest">@color/surface</item>
         <!-- 增大字号适配车机屏幕 -->
         <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.Cam.Title</item>
         <item name="materialAlertDialogBodyTextStyle">@style/MaterialAlertDialog.Cam.Body</item>
@@ -159,7 +188,7 @@
 
     <style name="AlertDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
         <item name="android:textColor">@color/energy_text</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:textSize">@dimen/text_row</item>
     </style>
 
     <!-- 对话框标题：字号体系里的「标题」那一档，见 values/type.xml -->
