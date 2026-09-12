@@ -29,6 +29,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import androidx.core.content.ContextCompat;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
@@ -323,9 +324,9 @@ public class RecordingFloatingService extends Service {
 
         // 创建时间显示
         timeTextView = new TextView(this);
-        timeTextView.setTextColor(Color.WHITE);
+        timeTextView.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
         timeTextView.setTextSize(timeTextSizeSp);
-        timeTextView.setBackgroundColor(Color.parseColor("#80000000")); // 半透明黑色背景
+        timeTextView.setBackgroundColor(ContextCompat.getColor(this, R.color.surface));
         // 根据按钮大小调整padding
         int padding = Math.max(8, buttonSize / 8);
         timeTextView.setPadding(padding, padding / 2, padding, padding / 2);
@@ -650,10 +651,10 @@ public class RecordingFloatingService extends Service {
             backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             backgroundPaint.setStyle(Paint.Style.FILL);
 
-            // 图标画笔 - 白色
+            // 中间那个点 / 方块是录制状态本身，所以它是红的；底色不是
             iconPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             iconPaint.setStyle(Paint.Style.FILL);
-            iconPaint.setColor(Color.WHITE);
+            iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
 
             // 阴影画笔 - iOS 风格轻微阴影
             shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -685,14 +686,9 @@ public class RecordingFloatingService extends Service {
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
 
-            // iOS 扁平化配色
-            if (isRecording) {
-                // 录制中 - iOS 红色
-                backgroundPaint.setColor(Color.parseColor("#FF3B30"));
-            } else {
-                // 未录制 - iOS 绿色
-                backgroundPaint.setColor(Color.parseColor("#34C759"));
-            }
+            // 底色始终中性。整块变红等于把「这个按钮」和「正在录」混为一谈 ——
+            // 主界面的录制键就是这么定的：红色只出现在中间那个点上。
+            backgroundPaint.setColor(ContextCompat.getColor(getContext(), R.color.surface));
 
             // 绘制阴影（iOS 风格）
             float shadowOffset = radius * 0.08f;

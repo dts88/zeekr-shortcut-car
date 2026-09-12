@@ -5,7 +5,8 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Text sizes come from one named scale of six steps. Core screens had eight sizes, three pairs of them one sp apart. Page titles are now larger than the section headings inside the page; they used to be the same size.
+- The floating record button and the preview window's button follow the palette: neutral ground, red only on the dot that marks recording. They were iOS red/green and blinking green, neither of which is in the palette, and both of which said "red means button" instead of "red means recording".
 
 ## [0.39.1-alpha] - 2026-09-12
 

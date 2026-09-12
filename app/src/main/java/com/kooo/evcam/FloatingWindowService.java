@@ -18,6 +18,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 
+import androidx.core.content.ContextCompat;
 import androidx.annotation.Nullable;
 
 /**
@@ -469,11 +470,6 @@ public class FloatingWindowService extends Service {
         private int size;
         private float cornerRadius;
         
-        // 日间模式颜色
-        private static final int COLOR_BG_DAY = 0xFFF9FAFB;      // 浅灰白色背景
-        // 夜间模式颜色
-        private static final int COLOR_BG_NIGHT = 0xFF060809;    // 深黑色背景
-        
         public FloatingButtonView(Context context, int size) {
             super(context);
             this.size = size;
@@ -490,21 +486,12 @@ public class FloatingWindowService extends Service {
             fillPaint.setStyle(Paint.Style.FILL);
         }
         
-        /**
-         * 判断当前是否为夜间模式
-         */
-        private boolean isNightMode() {
-            int nightModeFlags = getContext().getResources().getConfiguration().uiMode 
-                    & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
-            return nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        }
-        
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             
             // 绘制方形圆角背景
-            int bgColor = isNightMode() ? COLOR_BG_NIGHT : COLOR_BG_DAY;
+            int bgColor = ContextCompat.getColor(getContext(), R.color.surface);
             backgroundPaint.setColor(bgColor);
             android.graphics.RectF bgRect = new android.graphics.RectF(0, 0, size, size);
             canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, backgroundPaint);
@@ -515,8 +502,10 @@ public class FloatingWindowService extends Service {
             float innerRadius = size * 0.09f;  // 内圆半径（缩小）
             
             if (isRecording) {
-                // 录制中：绿色，闪烁
-                int color = isBlinkOn ? 0xFF00FF00 : 0xFF006400;  // 亮绿/深绿
+                // 录制中：录制红，靠透明度闪，不换颜色 ——
+                // 换成另一种绿只是「变了一下」，看不出是同一件事在继续
+                int red = ContextCompat.getColor(getContext(), R.color.recording);
+                int color = isBlinkOn ? red : (red & 0x00FFFFFF) | 0x60000000;
                 circlePaint.setColor(color);
                 fillPaint.setColor(color);
                 
@@ -527,7 +516,7 @@ public class FloatingWindowService extends Service {
                 canvas.drawCircle(centerX, centerY, innerRadius, fillPaint);
             } else {
                 // 未录制：根据主题显示黑色或白色空心圆
-                int circleColor = isNightMode() ? 0xFFFFFFFF : 0xFF000000;  // 夜间白色，日间黑色
+                int circleColor = ContextCompat.getColor(getContext(), R.color.text_primary);
                 circlePaint.setColor(circleColor);
                 
                 // 绘制外圈

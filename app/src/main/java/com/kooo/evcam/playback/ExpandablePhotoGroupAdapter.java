@@ -14,6 +14,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.signature.ObjectKey;
+import androidx.core.content.ContextCompat;
 import com.kooo.evcam.R;
 
 import java.io.File;
@@ -303,7 +304,8 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
     private void loadThumbnail(File photoFile, ImageView imageView) {
         if (photoFile == null || !photoFile.exists()) {
             imageView.setImageDrawable(null);
-            imageView.setBackgroundColor(0xFF1A1A1A);
+            imageView.setBackgroundColor(
+                    ContextCompat.getColor(imageView.getContext(), R.color.sunken));
             return;
         }
 
