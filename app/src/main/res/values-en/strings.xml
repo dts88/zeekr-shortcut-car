@@ -416,8 +416,8 @@
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">Tap a cell to edit it</string>
     <string name="editor_no_camera">This profile has no camera yet</string>
-    <string name="editor_cabin_note_title">These adjustments do not apply to this camera yet</string>
-    <string name="editor_cabin_note_summary">Its picture still goes through the old camera correction and nothing reads these values. They do apply to the surround-view camera (the one split into four)</string>
+    <string name="editor_cabin_note_title">This camera cannot be moved or resized yet</string>
+    <string name="editor_cabin_note_summary">Rotation, mirroring, crop, zoom and pan all apply. Position and size wait for the main screen layout to come from the profile; for now this camera keeps its own fixed pane</string>
     <string name="editor_position">Position and size</string>
     <string name="editor_position_value">Top-left %1$s, %2$s · size %3$s × %4$s</string>
     <string name="editor_position_dialog">Position and size (fraction of the view, 0–1)</string>

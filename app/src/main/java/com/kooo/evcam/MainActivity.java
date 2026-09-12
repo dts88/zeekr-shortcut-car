@@ -2463,18 +2463,16 @@ public class MainActivity extends AppCompatActivity {
             }
             applyPreviewCorrectionOnly(textureView, cameraKey);
         } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            // 三路配置的两路座舱相机：按原样显示，不旋转。
+            // 三路配置的两路座舱相机：默认按原样显示，转不转由配置里那一格说。
             //
             // 这一档以前没有自己的分支，会掉进下面的 E5 兜底 —— 那里的 "left"
             // 指的是「装在车身左侧的摄像头」，要转 270 度才正。但在这个配置里
             // texture_left 只是第三个槽位，装的是一路普通的座舱相机，本来就是正的。
-            //
-            // 这个旋转只作用于预览（TextureView 的矩阵），不影响拍照通道，
-            // 所以之前的表现是：预览里躺着，拍出来的照片却是正的。
+            // 所以这里不能按槽位名硬转，只能按配置转。
             textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
             textureView.setFillContainer(false);
-            applyPreviewCorrectionOnly(textureView, cameraKey);
-            AppLog.d(TAG, "设置 " + cameraKey + " 座舱相机宽高比(不旋转): "
+            applyLaneTransform(textureView, cameraKey);
+            AppLog.d(TAG, "设置 " + cameraKey + " 座舱相机宽高比: "
                     + previewSize.getWidth() + ":" + previewSize.getHeight());
         } else {
             // E5 等其他车型
@@ -2552,6 +2550,56 @@ public class MainActivity extends AppCompatActivity {
             textureView.setTransform(matrix);
             AppLog.d(TAG, cameraKey + " 应用修正旋转: " + rotation + "度");
         });
+    }
+
+    /**
+     * 座舱那一路的旋转、镜像、裁剪、缩放平移：从配置里那一格取，压成 surface 矩阵。
+     *
+     * <h3>为什么以前无效</h3>
+     *
+     * <p>这两路的画面各是一个 {@code TextureView}，变换一直来自旧的「预览矫正」
+     * 那套按相机位置存的键，配置里那一格的值没有人读 —— 也就是说，编辑器里转了、
+     * 存了、显示着 90°，画面一动不动。和环视那一路在 0.38 修过的，是同一个缺陷。</p>
+     *
+     * <p>开发者选项里的「预览矫正」仍然叠在这之上：配置是存下来的摆法，
+     * 那个悬浮窗是在它上面临时推一把。</p>
+     */
+    private void applyLaneTransform(AutoFitTextureView textureView, String cameraKey) {
+        textureView.post(() -> {
+            int viewWidth = textureView.getWidth();
+            int viewHeight = textureView.getHeight();
+            if (viewWidth <= 0 || viewHeight <= 0) {
+                textureView.postDelayed(() -> applyLaneTransform(textureView, cameraKey), 100);
+                return;
+            }
+            android.graphics.Matrix matrix = new android.graphics.Matrix();
+            com.kooo.evcam.profile.LaneLayout lane = laneFor(cameraKey);
+            if (lane != null && com.kooo.evcam.camera.LaneSurfaceMatrix.build(matrix,
+                    viewWidth, viewHeight, lane.rotation, lane.mirrored,
+                    lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
+                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY)) {
+                AppLog.i(TAG, "座舱 " + cameraKey + " 按配置变换: " + lane);
+            }
+            previewBaseTransforms.put(cameraKey, new android.graphics.Matrix(matrix));
+            PreviewCorrection.postApply(matrix, appConfig, cameraKey, viewWidth, viewHeight);
+            textureView.setTransform(matrix);
+        });
+    }
+
+    /** 这一路在当前配置里的那一格；不拆分的那几路只有一格。取不到返回 null。 */
+    private com.kooo.evcam.profile.LaneLayout laneFor(String cameraKey) {
+        String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(cameraKey);
+        if (role == null) {
+            return null;
+        }
+        if (activeProfile == null) {
+            activeProfile = new ProfileStore(this).current();
+        }
+        CameraProfile camera = activeProfile.camera(role);
+        if (camera == null || camera.lanes.isEmpty()) {
+            return null;
+        }
+        return camera.lanes.get(0);
     }
 
     /**

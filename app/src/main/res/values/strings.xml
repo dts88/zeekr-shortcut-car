@@ -417,8 +417,8 @@
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">点一格来改它</string>
     <string name="editor_no_camera">这份配置里还没有相机</string>
-    <string name="editor_cabin_note_title">这一路的下列调整暂不生效</string>
-    <string name="editor_cabin_note_summary">它的画面还走旧的相机矫正那条路，配置里的值没有人读。环视那一路（拆四格的）是生效的</string>
+    <string name="editor_cabin_note_title">这一路还不能挪位置、改大小</string>
+    <string name="editor_cabin_note_summary">旋转、镜像、裁剪、缩放平移都已生效。位置和大小要等主界面的版面由配置决定，现在它固定占一块</string>
     <string name="editor_position">位置与大小</string>
     <string name="editor_position_value">左上 %1$s, %2$s · 大小 %3$s × %4$s</string>
     <string name="editor_position_dialog">位置与大小（容器宽高的比例，0–1）</string>

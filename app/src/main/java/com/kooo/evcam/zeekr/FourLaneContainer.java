@@ -17,6 +17,7 @@ import android.view.animation.PathInterpolator;
 import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.camera.LaneOrientation;
 import com.kooo.evcam.AutoFitTextureView;
 import com.kooo.evcam.R;
 import com.kooo.evcam.ui.MotionPolicy;
@@ -496,21 +497,30 @@ public class FourLaneContainer extends ViewGroup {
      * <p>目标矩形是「这一格在屏幕上占多大」，那是布局说了算的。要表达「这幅画面
      * 少看一点边、或者放大一点」，动的是<b>取画面的哪一块</b> —— 也就是源矩形。
      * 放大 2 倍就是只取中间一半，向右平移就是把取景窗往左挪。</p>
+     *
+     * <h3>为什么先过一次 LaneOrientation</h3>
+     *
+     * <p>源矩形在<b>转之前</b>，而用户填那几个数时看的是<b>转之后</b>的画面。
+     * 不换算的话，一格转 90° 之后「上边裁 20%」裁掉的是屏幕上的左边 ——
+     * 在车上看，这和「裁剪根本没生效」长得一模一样。</p>
      */
-    private float applyCropAndPan(Cell cell, float laneAspectPx) {
-        float keepX = 1f - clampFraction(cell.cropLeft) - clampFraction(cell.cropRight);
-        float keepY = 1f - clampFraction(cell.cropTop) - clampFraction(cell.cropBottom);
+    private float applyCropAndPan(Cell cell, int rotation, float laneAspectPx) {
+        LaneOrientation o = LaneOrientation.sourceSpace(rotation,
+                cell.cropTop, cell.cropBottom, cell.cropLeft, cell.cropRight,
+                cell.scaleX, cell.scaleY, cell.translateX, cell.translateY);
+        float keepX = 1f - clampFraction(o.cropLeft) - clampFraction(o.cropRight);
+        float keepY = 1f - clampFraction(o.cropTop) - clampFraction(o.cropBottom);
         if (keepX <= 0.01f || keepY <= 0.01f) {
             return laneAspectPx;   // 全裁光了，当作没裁
         }
         float width = sourceRect.width();
         float height = sourceRect.height();
-        float left = sourceRect.left + width * clampFraction(cell.cropLeft);
-        float top = sourceRect.top + height * clampFraction(cell.cropTop);
+        float left = sourceRect.left + width * clampFraction(o.cropLeft);
+        float top = sourceRect.top + height * clampFraction(o.cropTop);
         sourceRect.set(left, top, left + width * keepX, top + height * keepY);
 
-        float scaleX = cell.scaleX > 0.05f ? cell.scaleX : 1f;
-        float scaleY = cell.scaleY > 0.05f ? cell.scaleY : 1f;
+        float scaleX = o.scaleX > 0.05f ? o.scaleX : 1f;
+        float scaleY = o.scaleY > 0.05f ? o.scaleY : 1f;
         if (scaleX != 1f || scaleY != 1f) {
             float cx = sourceRect.centerX();
             float cy = sourceRect.centerY();
@@ -518,10 +528,10 @@ public class FourLaneContainer extends ViewGroup {
             float halfH = sourceRect.height() / 2f / scaleY;
             sourceRect.set(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
         }
-        if (cell.translateX != 0f || cell.translateY != 0f) {
+        if (o.translateX != 0f || o.translateY != 0f) {
             // 画面往右挪 = 取景窗往左挪
-            sourceRect.offset(-cell.translateX * sourceRect.width(),
-                    -cell.translateY * sourceRect.height());
+            sourceRect.offset(-o.translateX * sourceRect.width(),
+                    -o.translateY * sourceRect.height());
         }
         return laneAspectPx * (keepX / keepY);
     }
@@ -569,12 +579,12 @@ public class FourLaneContainer extends ViewGroup {
 
         // 这一格的真实长宽比。裁切会改变它（切掉的是画面的一部分），
         // 缩放平移不会（那只是把同一幅画面挪一挪、放大一点）。
+        int rotation = cell == null ? 0 : LaneOrientation.normalise(cell.rotation);
+        boolean quarterTurn = LaneOrientation.quarterTurn(rotation);
         float laneAspectPx = lane.aspect();
         if (cell != null) {
-            laneAspectPx = applyCropAndPan(cell, laneAspectPx);
+            laneAspectPx = applyCropAndPan(cell, rotation, laneAspectPx);
         }
-        int rotation = cell == null ? 0 : ((cell.rotation % 360) + 360) % 360;
-        boolean quarterTurn = rotation == 90 || rotation == 270;
 
         float destLeft = cellLeft;
         float destTop = cellTop;

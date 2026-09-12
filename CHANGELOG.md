@@ -21,6 +21,18 @@ Notable changes only, newest first. Each version's section becomes the body of i
   size with no four-up rearrangement and the frame rate hard-coded to 25. One reopen and
   the rest of the session recorded a preview-sized strip, with nothing in the log to say
   so. Both paths build the recorder the same way now.
+- Fixed: crop cut the wrong edge on a rotated lane. Crop, zoom and pan were read in the
+  source picture's axes while the user sets them looking at the rotated one, so after a
+  quarter turn "crop 20% off the top" took it off the left -- which on the vehicle is
+  indistinguishable from crop not working at all. The mapping is its own tested function
+  now, shared by both drawing paths.
+- Fixed: rotation and mirroring had no effect on the two cabin cameras. Their transform
+  came from the old per-camera preview correction and nothing read their lane in the
+  profile, so the editor showed 90 degrees while the picture never moved. Rotation,
+  mirroring, crop, zoom and pan now all apply; position and size still wait for the main
+  screen layout to come from the profile, and the editor says so.
+- The confirm-before-save preview applies the same transform, so what it shows is what the
+  main screen will show.
 
 ## [0.43.2-alpha] - 2026-09-13
 

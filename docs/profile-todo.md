@@ -12,21 +12,26 @@ configuration rework.
 - The editor lives in Settings → Recording and is built like the rest of Settings.
 - Photos go through the camera's JPEG channel by default, so the photo resolution applies.
 
-## Step 4 — the cabin cameras still use the old display path
+## Step 4 — the cabin panes still cannot be moved or resized
 
-The composite camera's lanes are drawn from the profile. The two cabin cameras are separate
-`TextureView`s, and their rotation, mirroring, crop and correction still come from
-`CustomLayoutManager` and `PreviewCorrection`, reading the old per-camera settings.
+A cabin camera's rotation, mirroring, crop, zoom and pan now come from its lane in the
+profile (`LaneSurfaceMatrix`, applied as the `TextureView`'s base transform). What is
+still fixed is the *pane*: each cabin camera occupies a slot in a per-camera-count XML
+layout, so a lane's x/y/width/height are read only for the composite camera.
 
-So a cabin camera's lane in the profile carries values that nothing reads — the same defect
-that was just fixed for the composite lanes, one layer down. Merging them means the main
-screen layout has to be driven by the profile rather than by a fixed XML per camera count.
+Merging that means the main screen layout has to be driven by the profile rather than by
+a fixed XML per camera count.
 
 Until that happens:
 
-- editing a cabin lane's rotation or mirroring in the editor has no effect
-- panes cannot be moved or resized (only the composite lanes can)
+- a cabin lane's position and size have no effect (rotation, mirroring and crop do)
 - the three camera-wiring paths cannot merge into one
+
+The geometry is also written twice: `FourLaneContainer.drawLane` places a lane inside a
+grid cell, `LaneSurfaceMatrix` places a whole frame inside a `TextureView`. They share the
+axis mapping (`LaneOrientation`) but not the fit-and-rotate arithmetic. The drag-and-resize
+editor is the moment to merge them — doing it earlier means touching the container's
+drawing for no visible gain.
 
 ## Custom camera mapping
 

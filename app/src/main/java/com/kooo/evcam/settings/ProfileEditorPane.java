@@ -184,8 +184,9 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
                 getString(R.string.editor_lane_group, editor.roleName(camera.role), laneName));
 
         if (!splits) {
-            // 座舱那两路的画面还是各自的 TextureView，旋转镜像走的是旧的相机矫正，
-            // 不读这里。说出来 —— 一个改了不生效的选项比没有更糟。
+            // 旋转、镜像、裁剪、缩放平移这一路现在生效了（0.44.0）；位置和大小还不行
+            // —— 那两项要等主界面的版面由配置驱动。说出来，一个改了不生效的选项
+            // 比没有更糟。
             info(group, context, getString(R.string.editor_cabin_note_title),
                     getString(R.string.editor_cabin_note_summary));
         }

@@ -1,6 +1,7 @@
 package com.kooo.evcam.profile;
 
 import android.app.Activity;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
@@ -21,6 +22,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
+import com.kooo.evcam.camera.LaneSurfaceMatrix;
 import com.kooo.evcam.zeekr.FourLaneContainer;
 
 import java.util.ArrayList;
@@ -61,6 +63,38 @@ public final class ProfilePreviewCheck {
 
     public ProfilePreviewCheck(Activity activity) {
         this.activity = activity;
+    }
+
+    /**
+     * 整幅画面那一路的摆法。
+     *
+     * <p>确认画面和主界面必须是同一个算法，否则这一眼看到的和保存之后看到的是两回事
+     * —— 那这一眼就白看了。位置和大小不在这里：不拆分的那一路占的是布局里固定的
+     * 一块，那两个值现在还没有人读（见 docs/profile-todo.md）。</p>
+     */
+    private static void applyWholeFrameTransform(TextureView texture,
+                                                 FourLaneContainer.Cell[] cells) {
+        if (cells == null || cells.length == 0 || cells[0] == null) {
+            return;
+        }
+        FourLaneContainer.Cell cell = cells[0];
+        texture.post(new Runnable() {
+            @Override
+            public void run() {
+                int width = texture.getWidth();
+                int height = texture.getHeight();
+                if (width <= 0 || height <= 0) {
+                    texture.postDelayed(this, 100);
+                    return;
+                }
+                Matrix matrix = new Matrix();
+                if (LaneSurfaceMatrix.build(matrix, width, height, cell.rotation, cell.mirrored,
+                        cell.cropTop, cell.cropBottom, cell.cropLeft, cell.cropRight,
+                        cell.scaleX, cell.scaleY, cell.translateX, cell.translateY)) {
+                    texture.setTransform(matrix);
+                }
+            }
+        });
     }
 
     /**
@@ -111,6 +145,8 @@ public final class ProfilePreviewCheck {
             FrameLayout frame = new FrameLayout(activity);
             frame.addView(texture, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            // 不拆分的那一路：旋转镜像裁剪走 surface 矩阵，和主界面同一个算法
+            applyWholeFrameTransform(texture, cells);
             holder = frame;
         }
         int height = (int) (280 * activity.getResources().getDisplayMetrics().density);
