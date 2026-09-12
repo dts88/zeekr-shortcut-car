@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  整屏列表进场：每一行比上一行晚一点点，从上往下。
+
+  delay 取 8%（约 13ms 一行）：够看出先后，又不会让最后一行明显落在后面。
+-->
+<layoutAnimation xmlns:android="http://schemas.android.com/apk/res/android"
+    android:animation="@anim/list_item_enter"
+    android:animationOrder="normal"
+    android:delay="8%" />

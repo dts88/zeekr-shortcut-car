@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  列表项进场：淡入 + 从下方 12dp 推上来。
+
+  160ms，比一次眨眼还短 —— 目的是让人看出「这一屏是新排出来的」，
+  不是让人等它排完。再长就成了阻碍。
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/decelerate_quint">
+
+    <alpha
+        android:duration="160"
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0" />
+
+    <translate
+        android:duration="160"
+        android:fromYDelta="12%"
+        android:toYDelta="0" />
+</set>

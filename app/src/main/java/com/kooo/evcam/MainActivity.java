@@ -1214,14 +1214,14 @@ public class MainActivity extends AppCompatActivity {
             int bitrate = level == 1 ? R.string.status_bitrate_low
                     : level == 3 ? R.string.status_bitrate_high
                     : R.string.status_bitrate_medium;
-            stream.setText(fps + " · " + getString(bitrate));
+            com.kooo.evcam.ui.NumberRoll.set(stream, fps + " · " + getString(bitrate));
             stream.setVisibility(View.VISIBLE);
         }
         TextView storage = findViewById(R.id.tv_status_storage);
         if (storage != null) {
             java.io.File root = StorageHelper.getExternalSdCardRoot(this);
             long free = root != null ? StorageHelper.getAvailableSpace(root) : -1;
-            storage.setText(free >= 0
+            com.kooo.evcam.ui.NumberRoll.set(storage, free >= 0
                     ? getString(R.string.status_storage_free, StorageHelper.formatSize(free))
                     : getString(R.string.status_storage_none));
             storage.setVisibility(View.VISIBLE);

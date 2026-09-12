@@ -115,5 +115,12 @@ final class PreferenceRows {
         int vertical = Math.round(verticalDp * density);
         list.setPadding(horizontal, vertical, horizontal, vertical);
         list.setClipToPadding(false);
+
+        // 进这一屏时，行一条条排出来。装饰性的，录制中和关了动画时不放
+        if (fragment.getContext() != null
+                && com.kooo.evcam.ui.MotionPolicy.decorative(fragment.getContext())) {
+            list.setLayoutAnimation(android.view.animation.AnimationUtils
+                    .loadLayoutAnimation(fragment.getContext(), R.anim.layout_list_enter));
+        }
     }
 }

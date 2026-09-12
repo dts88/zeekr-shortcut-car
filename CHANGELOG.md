@@ -7,6 +7,7 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 - Text sizes come from one named scale of six steps. Core screens had eight sizes, three pairs of them one sp apart. Page titles are now larger than the section headings inside the page; they used to be the same size.
 - Settings -> Interface -> Button side is a row with both choices on it: one tap to switch, and you can see what the other option is without opening anything.
+- Settings lists deal their rows in when a section opens, and the status bar rolls a number over instead of swapping it. Both are decorative, so both stop while recording and when the system has animations turned off.
 - The floating record button and the preview window's button follow the palette: neutral ground, red only on the dot that marks recording. They were iOS red/green and blinking green, neither of which is in the palette, and both of which said "red means button" instead of "red means recording".
 
 ## [0.39.1-alpha] - 2026-09-12
