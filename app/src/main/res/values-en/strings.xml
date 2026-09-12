@@ -357,6 +357,7 @@
     <string name="cd_menu">Menu</string>
     <string name="cd_exit">Exit</string>
     <string name="set_rail_side_title">Button side</string>
+    <string name="set_rail_side_summary">Keep it on the driver side</string>
     <string name="opt_rail_right">Right</string>
     <string name="opt_rail_left">Left</string>
 

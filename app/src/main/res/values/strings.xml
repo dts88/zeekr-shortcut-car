@@ -358,6 +358,7 @@
     <string name="cd_menu">菜单</string>
     <string name="cd_exit">退出</string>
     <string name="set_rail_side_title">操作按钮位置</string>
+    <string name="set_rail_side_summary">放在离驾驶座近的那一侧</string>
     <string name="opt_rail_right">右侧</string>
     <string name="opt_rail_left">左侧</string>
 

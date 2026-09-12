@@ -211,10 +211,11 @@
         android:key="screen_interface"
         android:title="@string/set_section_interface">
 
-        <ListPreference
+        <!-- 两个选项：摆在行里点一次，不弹框 -->
+        <com.kooo.evcam.settings.SegmentedPreference
             android:key="pref_rail_side"
             android:title="@string/set_rail_side_title"
-            android:summary="%s" />
+            android:summary="@string/set_rail_side_summary" />
 
         <SwitchPreferenceCompat
             android:key="pref_reduce_motion"

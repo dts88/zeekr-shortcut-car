@@ -687,7 +687,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindInterface() {
         // 回到主界面时生效（MainActivity.showRecordingInterface 会按它重新摆一次）。
         // 在这里选过，首次启动就不必再问
-        bindEnum("pref_rail_side", SettingsRegistry.ACTION_RAIL_SIDE,
+        bindSegmented("pref_rail_side", SettingsRegistry.ACTION_RAIL_SIDE,
                 appConfig.getActionRailSide(), value -> {
                     appConfig.setActionRailSide(value);
                     appConfig.setRailSideChosen();
@@ -1078,6 +1078,26 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /** 枚举：选项与显示名都来自 {@link SettingsRegistry}，声明一遍就够。 */
+    /**
+     * 选项只有两三个的设置：摆在行里点一次。
+     *
+     * <p>和 {@link #bindEnum} 的区别只在长相；取值、校验、写回都还是走
+     * {@link SettingSpec}，所以两者可以随时互换。</p>
+     */
+    private void bindSegmented(String key, SettingSpec spec, String current,
+                               StringSetter setter) {
+        SegmentedPreference pref = findPreference(key);
+        if (pref == null) {
+            return;
+        }
+        pref.setOptions(localizedNames(spec), spec.values());
+        pref.setValue(spec.sanitize(current));
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            setter.set(String.valueOf(newValue));
+            return true;
+        });
+    }
+
     private void bindEnum(String key, SettingSpec spec, String current, StringSetter setter) {
         bindEnum(key, spec, current, setter, null);
     }

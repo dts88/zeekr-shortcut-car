@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行：两三个选项直接摆在行里。
+
+  下拉框要点两次（开框、选中），而这种行一次就够。选项少的时候，
+  还能同时看见「另一个是什么」—— 下拉框收起来之后是看不见的。
+
+  没有 ›：这一行不通往任何地方，点哪一段就是哪一段。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row_static"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingStart="20dp"
+    android:paddingEnd="14dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
+            android:textColor="@color/pref_title" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="3"
+            android:textAppearance="@style/TextAppearance.Cam.Caption"
+            android:textColor="@color/pref_summary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/segments"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/bg_segment_track"
+        android:orientation="horizontal"
+        android:padding="3dp" />
+</LinearLayout>
