@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.40.0-alpha] - 2026-09-12
+
 - Text sizes come from one named scale of six steps. Core screens had eight sizes, three pairs of them one sp apart. Page titles are now larger than the section headings inside the page; they used to be the same size.
 - Settings -> Interface -> Button side is a row with both choices on it: one tap to switch, and you can see what the other option is without opening anything.
 - Settings lists deal their rows in when a section opens, and the status bar rolls a number over instead of swapping it. Both are decorative, so both stop while recording and when the system has animations turned off.
