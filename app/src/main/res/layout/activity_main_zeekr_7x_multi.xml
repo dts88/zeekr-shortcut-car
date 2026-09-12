@@ -56,7 +56,7 @@
                         android:layout_marginStart="14dp"
                         android:text="@string/main_title"
                         android:textColor="@color/text_primary"
-                        android:textSize="18sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Title"
                         android:textStyle="bold" />
 
                     <TextView
@@ -65,7 +65,7 @@
                         android:layout_marginStart="12dp"
                         android:text="@string/opt_model_zeekr_multi"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="13sp" />
+                        android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                     <Space
                         android:layout_width="0dp"
@@ -86,7 +86,7 @@
                         android:paddingEnd="14dp"
                         android:paddingBottom="7dp"
                         android:textColor="@color/recording_text"
-                        android:textSize="14sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Body"
                         android:visibility="gone" />
                 </LinearLayout>
 
@@ -136,7 +136,7 @@
                             android:paddingEnd="12dp"
                             android:text="@string/lane_surround"
                             android:textColor="#FFFFFF"
-                            android:textSize="15sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
                     </FrameLayout>
 
                     <!-- 两路座舱，上下叠放 -->
@@ -172,7 +172,7 @@
                                 android:paddingEnd="10dp"
                                 android:text="@string/slot_cabin_1"
                                 android:textColor="#FFFFFF"
-                                android:textSize="14sp" />
+                                android:textAppearance="@style/TextAppearance.Cam.Body" />
                         </FrameLayout>
 
                         <FrameLayout
@@ -201,7 +201,7 @@
                                 android:paddingEnd="10dp"
                                 android:text="@string/slot_cabin_2"
                                 android:textColor="#FFFFFF"
-                                android:textSize="14sp" />
+                                android:textAppearance="@style/TextAppearance.Cam.Body" />
                         </FrameLayout>
                     </LinearLayout>
 
@@ -235,7 +235,7 @@
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
                         android:visibility="gone" />
 
                     <TextView
@@ -246,7 +246,7 @@
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
                         android:visibility="gone" />
 
                     <!-- 合成流识别结果（尺寸、分隔带、拆分方式）：吃掉剩余宽度，放不下就截断 -->
@@ -261,7 +261,7 @@
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
                         android:visibility="invisible" />
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -282,7 +282,7 @@
                         android:layout_marginStart="10dp"
                         android:fontFeatureSettings="tnum"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="12sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Micro"
                         android:visibility="invisible" />
                 </LinearLayout>
             </LinearLayout>
@@ -304,7 +304,7 @@
             android:paddingBottom="6dp"
             android:text=""
             android:textColor="#AAFFFFFF"
-            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Cam.Micro"
             android:visibility="gone" />
 
         <FrameLayout

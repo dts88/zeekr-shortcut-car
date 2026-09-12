@@ -35,7 +35,7 @@
             android:layout_marginStart="14dp"
             android:text="@string/player_title"
             android:textColor="@color/text_primary"
-            android:textSize="18sp"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -67,7 +67,7 @@
                 android:paddingBottom="8dp"
                 android:text="@string/msg_scanning_short"
                 android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/timeline_session_list"
@@ -126,7 +126,7 @@
                     android:paddingEnd="12dp"
                     android:paddingBottom="6dp"
                     android:textColor="@color/white"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.Cam.Caption" />
             </FrameLayout>
 
             <!-- 进度条与控制 -->
@@ -150,7 +150,7 @@
                     android:layout_marginTop="2dp"
                     android:fontFamily="monospace"
                     android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
+                    android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                 <LinearLayout
                     android:layout_width="match_parent"

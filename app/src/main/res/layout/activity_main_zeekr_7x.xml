@@ -60,7 +60,7 @@
                         android:layout_marginStart="14dp"
                         android:text="@string/main_title"
                         android:textColor="@color/text_primary"
-                        android:textSize="18sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Title"
                         android:textStyle="bold" />
 
                     <TextView
@@ -69,7 +69,7 @@
                         android:layout_marginStart="12dp"
                         android:text="@string/zeekr_model_name"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="13sp" />
+                        android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                     <Space
                         android:layout_width="0dp"
@@ -91,7 +91,7 @@
                         android:paddingEnd="14dp"
                         android:paddingBottom="7dp"
                         android:textColor="@color/recording_text"
-                        android:textSize="14sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Body"
                         android:visibility="gone" />
                 </LinearLayout>
 
@@ -148,7 +148,7 @@
                             android:paddingEnd="12dp"
                             android:text="@string/zeekr_lane_front"
                             android:textColor="#FFFFFF"
-                            android:textSize="15sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/label_back"
@@ -163,7 +163,7 @@
                             android:paddingEnd="12dp"
                             android:text="@string/zeekr_lane_back"
                             android:textColor="#FFFFFF"
-                            android:textSize="15sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/label_left"
@@ -178,7 +178,7 @@
                             android:paddingEnd="12dp"
                             android:text="@string/zeekr_lane_left"
                             android:textColor="#FFFFFF"
-                            android:textSize="15sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/label_right"
@@ -193,7 +193,7 @@
                             android:paddingEnd="12dp"
                             android:text="@string/zeekr_lane_right"
                             android:textColor="#FFFFFF"
-                            android:textSize="15sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
                     </FrameLayout>
 
                     <include
@@ -226,7 +226,7 @@
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
                         android:visibility="gone" />
 
                     <TextView
@@ -237,7 +237,7 @@
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
                         android:visibility="gone" />
 
                     <!-- 合成流识别结果（尺寸、分隔带、拆分方式）：吃掉剩余宽度，放不下就截断 -->
@@ -252,7 +252,7 @@
                         android:fontFeatureSettings="tnum"
                         android:maxLines="1"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
                         android:visibility="invisible" />
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -273,7 +273,7 @@
                         android:layout_marginStart="10dp"
                         android:fontFeatureSettings="tnum"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="12sp"
+                        android:textAppearance="@style/TextAppearance.Cam.Micro"
                         android:visibility="invisible" />
                 </LinearLayout>
             </LinearLayout>
@@ -295,7 +295,7 @@
             android:paddingBottom="6dp"
             android:text=""
             android:textColor="#AAFFFFFF"
-            android:textSize="12sp"
+            android:textAppearance="@style/TextAppearance.Cam.Micro"
             android:visibility="gone" />
 
         <FrameLayout

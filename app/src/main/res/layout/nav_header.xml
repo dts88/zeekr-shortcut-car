@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
                 android:textColor="@color/nav_header_text"
-                android:textSize="19sp"
+                android:textAppearance="@style/TextAppearance.Cam.Title"
                 android:textStyle="bold" />
 
             <TextView
@@ -50,7 +50,7 @@
                 android:layout_marginTop="2dp"
                 android:text="@string/nav_header_subtitle"
                 android:textColor="@color/nav_header_text_secondary"
-                android:textSize="13sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Caption" />
         </LinearLayout>
     </LinearLayout>
 
@@ -60,7 +60,7 @@
         android:layout_marginTop="16dp"
         android:text="@string/nav_header_author"
         android:textColor="@color/nav_header_text_secondary"
-        android:textSize="12sp" />
+        android:textAppearance="@style/TextAppearance.Cam.Micro" />
 
     <TextView
         android:id="@+id/nav_header_version"
@@ -69,7 +69,7 @@
         android:layout_marginTop="2dp"
         android:fontFeatureSettings="tnum"
         android:textColor="@color/nav_header_text_secondary"
-        android:textSize="12sp"
+        android:textAppearance="@style/TextAppearance.Cam.Micro"
         tools:text="Version 0.38.0" />
 
 </LinearLayout>

@@ -25,7 +25,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="☰"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
@@ -38,7 +38,7 @@
             android:layout_height="wrap_content"
             android:text="@string/nav_photo_playback"
             android:textColor="@color/text_primary"
-            android:textSize="24sp"
+            android:textAppearance="@style/TextAppearance.Cam.Display"
             android:textStyle="bold" />
 
         <TextView
@@ -49,7 +49,7 @@
             android:layout_marginStart="16dp"
             android:text=""
             android:textColor="@color/text_secondary"
-            android:textSize="16sp"
+            android:textAppearance="@style/TextAppearance.Cam.Body"
             android:gravity="start|center_vertical" />
 
         <Button
@@ -57,7 +57,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/action_refresh"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:backgroundTint="@color/button_background"
             android:textColor="@color/button_text" />
@@ -67,7 +67,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/action_multi_select"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:layout_marginStart="8dp"
             android:backgroundTint="@color/button_background"
@@ -78,7 +78,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="⌂"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minWidth="48dp"
             android:minHeight="48dp"
             android:layout_marginStart="8dp"
@@ -105,7 +105,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/action_select_all"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:backgroundTint="@color/button_background"
             android:textColor="@color/button_text" />
@@ -117,7 +117,7 @@
             android:layout_weight="1"
             android:text="@string/msg_selected_none"
             android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:gravity="center" />
 
         <Button
@@ -125,7 +125,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/action_share"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:layout_marginEnd="8dp"
             android:backgroundTint="@color/button_accent"
@@ -136,7 +136,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/action_delete"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:backgroundTint="@android:color/holo_red_dark"
             android:textColor="@android:color/white" />
@@ -146,7 +146,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/action_cancel"
-            android:textSize="20sp"
+            android:textAppearance="@style/TextAppearance.Cam.Row"
             android:minHeight="48dp"
             android:layout_marginStart="8dp"
             android:backgroundTint="@color/button_background"
@@ -183,7 +183,7 @@
                 android:gravity="center"
                 android:text="@string/photo_empty"
                 android:textColor="@color/text_secondary"
-                android:textSize="16sp"
+                android:textAppearance="@style/TextAppearance.Cam.Body"
                 android:visibility="gone" />
         </FrameLayout>
 
@@ -250,7 +250,7 @@
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_front"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/placeholder_front"
@@ -259,7 +259,7 @@
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textSize="14sp"
+                            android:textAppearance="@style/TextAppearance.Cam.Body"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
 
@@ -288,7 +288,7 @@
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_back"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/placeholder_back"
@@ -297,7 +297,7 @@
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textSize="14sp"
+                            android:textAppearance="@style/TextAppearance.Cam.Body"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
                 </LinearLayout>
@@ -336,7 +336,7 @@
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_left"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/placeholder_left"
@@ -345,7 +345,7 @@
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textSize="14sp"
+                            android:textAppearance="@style/TextAppearance.Cam.Body"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
 
@@ -374,7 +374,7 @@
                             android:paddingVertical="4dp"
                             android:text="@string/zeekr_lane_right"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp" />
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
 
                         <TextView
                             android:id="@+id/placeholder_right"
@@ -383,7 +383,7 @@
                             android:gravity="center"
                             android:text="@string/photo_no_image"
                             android:textColor="@color/preview_placeholder_text"
-                            android:textSize="14sp"
+                            android:textAppearance="@style/TextAppearance.Cam.Body"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
                     </LinearLayout>
@@ -414,7 +414,7 @@
                         android:paddingVertical="6dp"
                         android:text="@string/zeekr_lane_front"
                         android:textColor="#FFFFFF"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.Cam.Body" />
                 </FrameLayout>
 
                 <!-- 无选中状态提示 -->
@@ -430,7 +430,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/photo_pick_hint"
                         android:textColor="@color/text_secondary"
-                        android:textSize="24sp" />
+                        android:textAppearance="@style/TextAppearance.Cam.Display" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -438,7 +438,7 @@
                         android:layout_marginTop="12dp"
                         android:text="@string/photo_double_tap_hint"
                         android:textColor="@color/text_hint"
-                        android:textSize="18sp" />
+                        android:textAppearance="@style/TextAppearance.Cam.Row" />
                 </LinearLayout>
             </FrameLayout>
 
@@ -459,7 +459,7 @@
                     android:layout_height="48dp"
                     android:minWidth="72dp"
                     android:text="@string/photo_mode_multi"
-                    android:textSize="16sp"
+                    android:textAppearance="@style/TextAppearance.Cam.Body"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
                 <Button
@@ -469,7 +469,7 @@
                     android:minWidth="72dp"
                     android:layout_marginStart="8dp"
                     android:text="@string/action_send_to_phone"
-                    android:textSize="16sp"
+                    android:textAppearance="@style/TextAppearance.Cam.Body"
                     android:backgroundTint="@color/button_background"
                     android:textColor="@color/button_text" />
             </LinearLayout>

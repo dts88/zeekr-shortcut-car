@@ -9,5 +9,5 @@
     android:paddingTop="14dp"
     android:paddingBottom="6dp"
     android:textColor="@color/text_secondary"
-    android:textSize="14sp"
+    android:textAppearance="@style/TextAppearance.Cam.Body"
     android:textStyle="bold" />

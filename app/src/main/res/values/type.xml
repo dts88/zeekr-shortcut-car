@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  字号体系。
+
+  以前每个布局各写各的 sp：核心界面里同时存在 12 / 13 / 14 / 15 / 17 / 18 / 20 / 24 八档，
+  其中 13 与 14、14 与 15、17 与 18 差一个 sp —— 那不是设计意图，是没人管。
+
+  这里收成六档，每一档对应一个角色。取值尽量沿用原来用得最多的那个，
+  所以绝大多数地方看起来和以前一样；变的是它们从此有名字，改一次就全改。
+
+  车机屏幕（3200×2000）比手机远，比手机大，所以最小一档也有 12sp：
+  再小的字在驾驶位上是读不了的，也就不该存在。
+
+  用法：布局里写 android:textAppearance，不要再写 android:textSize。
+  TypeScaleTest 会拦下新的硬编码字号（开发者工具和自定义车型的布局不在此列）。
+-->
+<resources>
+
+    <!-- 六档的取值。样式和代码都引用这里，改一个数就全改 -->
+    <dimen name="text_micro">12sp</dimen>
+    <dimen name="text_caption">13sp</dimen>
+    <dimen name="text_body">15sp</dimen>
+    <dimen name="text_row">18sp</dimen>
+    <dimen name="text_title">22sp</dimen>
+    <dimen name="text_display">24sp</dimen>
+
+    <style name="TextAppearance.Cam" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <!-- 角标、计数：贴在画面或缩略图上的那种 -->
+    <style name="TextAppearance.Cam.Micro">
+        <item name="android:textSize">@dimen/text_micro</item>
+    </style>
+
+    <!-- 说明、状态条、副标题：解释上一行是什么 -->
+    <style name="TextAppearance.Cam.Caption">
+        <item name="android:textSize">@dimen/text_caption</item>
+    </style>
+
+    <!-- 正文：段落、画面角标、列表次要行 -->
+    <style name="TextAppearance.Cam.Body">
+        <item name="android:textSize">@dimen/text_body</item>
+    </style>
+
+    <!-- 行标题、分区标题、对话框正文：一眼扫过去先看见的那一行 -->
+    <style name="TextAppearance.Cam.Row">
+        <item name="android:textSize">@dimen/text_row</item>
+    </style>
+
+    <!-- 页面标题、对话框标题、录制键上的那一行 -->
+    <style name="TextAppearance.Cam.Title">
+        <item name="android:textSize">@dimen/text_title</item>
+    </style>
+
+    <!-- 大数字：计时、张数这类需要隔着一米看清的 -->
+    <style name="TextAppearance.Cam.Display">
+        <item name="android:textSize">@dimen/text_display</item>
+    </style>
+
+</resources>

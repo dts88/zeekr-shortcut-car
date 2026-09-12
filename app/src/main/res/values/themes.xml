@@ -162,13 +162,13 @@
         <item name="android:textSize">16sp</item>
     </style>
 
-    <!-- 对话框标题字号 -->
+    <!-- 对话框标题：字号体系里的「标题」那一档，见 values/type.xml -->
     <style name="MaterialAlertDialog.Cam.Title" parent="MaterialAlertDialog.Material3.Title.Text">
-        <item name="android:textSize">22sp</item>
+        <item name="android:textSize">@dimen/text_title</item>
     </style>
 
-    <!-- 对话框正文字号 -->
+    <!-- 对话框正文：和列表行标题同一档 -->
     <style name="MaterialAlertDialog.Cam.Body" parent="MaterialAlertDialog.Material3.Body.Text">
-        <item name="android:textSize">18sp</item>
+        <item name="android:textSize">@dimen/text_row</item>
     </style>
 </resources>

@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
+import android.util.TypedValue;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.View;
@@ -73,7 +74,8 @@ public final class CamDialogs {
         input.setBackgroundResource(R.drawable.bg_dialog_input);
         input.setTextColor(ContextCompat.getColor(context, R.color.text_primary));
         input.setHintTextColor(ContextCompat.getColor(context, R.color.text_secondary));
-        input.setTextSize(18f);
+        input.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                context.getResources().getDimension(R.dimen.text_row));
         int horizontal = Math.round(INPUT_PADDING_H_DP * density);
         int vertical = Math.round(INPUT_PADDING_V_DP * density);
         input.setPadding(horizontal, vertical, horizontal, vertical);
@@ -184,7 +186,8 @@ public final class CamDialogs {
 
         button.setTextColor(ContextCompat.getColor(context, textRes));
         button.setAllCaps(false);
-        button.setTextSize(16f);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                context.getResources().getDimension(R.dimen.text_row));
         button.setTypeface(Typeface.create(button.getTypeface(),
                 primary ? Typeface.BOLD : Typeface.NORMAL));
 

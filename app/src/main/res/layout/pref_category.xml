@@ -15,7 +15,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@color/text_secondary"
-        android:textSize="14sp" />
+        android:textAppearance="@style/TextAppearance.Cam.Body" />
 
     <TextView
         android:id="@android:id/summary"
@@ -23,5 +23,5 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:textColor="@color/text_tertiary"
-        android:textSize="12sp" />
+        android:textAppearance="@style/TextAppearance.Cam.Micro" />
 </LinearLayout>

@@ -46,7 +46,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold"
                 android:text="12:54 – 13:21" />
 
@@ -57,7 +57,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:textColor="@color/text_secondary"
-                android:textSize="13sp"
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
                 tools:text="27:04 · 1.2 GB · 9 clips" />
         </LinearLayout>
     </LinearLayout>

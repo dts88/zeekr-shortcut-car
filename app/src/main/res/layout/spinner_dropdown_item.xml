@@ -5,5 +5,5 @@
     android:layout_height="wrap_content"
     android:padding="16dp"
     android:textColor="@color/text_primary"
-    android:textSize="16sp"
+    android:textAppearance="@style/TextAppearance.Cam.Body"
     android:background="@color/card_background" />

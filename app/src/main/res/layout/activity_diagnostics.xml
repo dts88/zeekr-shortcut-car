@@ -35,7 +35,7 @@
             android:layout_marginStart="14dp"
             android:text="@string/set_diagnostics_title"
             android:textColor="@color/text_primary"
-            android:textSize="18sp"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
 
         <TextView
@@ -47,7 +47,7 @@
             android:maxLines="1"
             android:text="@string/diag_subtitle"
             android:textColor="@color/text_tertiary"
-            android:textSize="13sp" />
+            android:textAppearance="@style/TextAppearance.Cam.Caption" />
     </LinearLayout>
 
     <View
@@ -152,7 +152,7 @@
                 android:fontFamily="monospace"
                 android:textColor="@color/text_primary"
                 android:textIsSelectable="true"
-                android:textSize="12sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Micro" />
         </HorizontalScrollView>
     </ScrollView>
 

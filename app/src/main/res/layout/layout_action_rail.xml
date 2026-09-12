@@ -76,7 +76,7 @@
                     android:maxLines="1"
                     android:text="@string/record_start"
                     android:textColor="@color/text_primary"
-                    android:textSize="22sp"
+                    android:textAppearance="@style/TextAppearance.Cam.Title"
                     android:textStyle="bold" />
 
                 <TextView
@@ -87,7 +87,7 @@
                     android:fontFeatureSettings="tnum"
                     android:maxLines="1"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textAppearance="@style/TextAppearance.Cam.Caption" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

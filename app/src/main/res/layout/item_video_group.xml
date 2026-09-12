@@ -110,7 +110,7 @@
                 android:paddingHorizontal="4dp"
                 android:paddingVertical="1dp"
                 android:textColor="#FFFFFF"
-                android:textSize="10sp"
+                android:textAppearance="@style/TextAppearance.Cam.Micro"
                 tools:text="4张" />
         </FrameLayout>
 
@@ -127,7 +127,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp"
+                android:textAppearance="@style/TextAppearance.Cam.Body"
                 android:textStyle="bold"
                 tools:text="2026-01-31" />
 
@@ -137,7 +137,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:textColor="@color/text_primary"
-                android:textSize="20sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold"
                 tools:text="12:54" />
 
@@ -147,7 +147,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:textColor="@color/text_secondary"
-                android:textSize="13sp"
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
                 tools:text="69.94 MB" />
         </LinearLayout>
 

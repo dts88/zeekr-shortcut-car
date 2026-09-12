@@ -41,7 +41,7 @@
             android:layout_marginStart="14dp"
             android:text="@string/about_title"
             android:textColor="@color/text_primary"
-            android:textSize="18sp"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -69,7 +69,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:id="@+id/about_body"
@@ -79,7 +79,7 @@
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_tagline"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <!-- 存储建议 -->
             <TextView
@@ -88,7 +88,7 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/about_storage_title"
                 android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
             <TextView
@@ -98,7 +98,7 @@
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_storage_body"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <!-- 隐私提醒：U 盘里的录像没有加密。用录制红标出来 -->
             <TextView
@@ -108,7 +108,7 @@
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_storage_privacy"
                 android:textColor="@color/recording_text"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <!-- 项目地址 -->
             <TextView
@@ -117,7 +117,7 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/about_project_title"
                 android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
             <TextView
@@ -127,7 +127,7 @@
                 android:layout_marginTop="6dp"
                 android:text="github.com/dts88/zeekr-shortcut-car"
                 android:textColor="@color/energy_text"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <!-- 请作者喝杯咖啡 -->
             <TextView
@@ -136,7 +136,7 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/about_coffee_title"
                 android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
             <TextView
@@ -145,7 +145,7 @@
                 android:layout_marginTop="6dp"
                 android:text="@string/about_coffee_body"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <!-- 开源与来源 -->
             <TextView
@@ -154,7 +154,7 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/about_credits_title"
                 android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
             <TextView
@@ -164,7 +164,7 @@
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_credits_evcam"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:id="@+id/about_link_evcam"
@@ -173,7 +173,7 @@
                 android:layout_marginTop="4dp"
                 android:text="github.com/suyunkai/EVCam"
                 android:textColor="@color/energy_text"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -182,7 +182,7 @@
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_credits_openavm"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:id="@+id/about_link_openavm"
@@ -191,7 +191,7 @@
                 android:layout_marginTop="4dp"
                 android:text="github.com/Dantenothing/openavm-recorder"
                 android:textColor="@color/energy_text"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:id="@+id/about_link_gpl"
@@ -200,7 +200,7 @@
                 android:layout_marginTop="12dp"
                 android:text="@string/about_license_line"
                 android:textColor="@color/energy_text"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <!-- 安全免责 -->
             <TextView
@@ -210,7 +210,7 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/about_safety_title"
                 android:textColor="@color/recording_text"
-                android:textSize="18sp"
+                android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
 
             <TextView
@@ -220,7 +220,7 @@
                 android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_safety_body"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

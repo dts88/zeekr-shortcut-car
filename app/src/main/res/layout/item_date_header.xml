@@ -28,7 +28,7 @@
         android:layout_marginStart="8dp"
         android:layout_weight="1"
         android:textColor="@color/text_primary"
-        android:textSize="17sp"
+        android:textAppearance="@style/TextAppearance.Cam.Row"
         android:textStyle="bold"
         tools:text="今天 · 星期日" />
 
@@ -38,7 +38,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@color/text_secondary"
-        android:textSize="14sp"
+        android:textAppearance="@style/TextAppearance.Cam.Body"
         tools:text="5组" />
 
 </LinearLayout>
