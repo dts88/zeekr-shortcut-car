@@ -26,8 +26,14 @@ import com.kooo.evcam.R;
  * 按钮在那里、能点，只是颜色和底色一样。</p>
  *
  * <p>这里不再问主题要颜色：对话框显示出来的那一刻，把三个按钮的底色、字色、
- * 尺寸直接画上去，颜色取自语义色（日夜各一份）。于是「这个对话框用的是哪个主题、
- * 是框架的还是 AppCompat 的、是不是 androidx 自己 new 的」都不再影响按钮看不看得见。</p>
+ * 尺寸直接画上去，颜色取自语义色（日夜各一份）。</p>
+ *
+ * <p>只画颜色还不够。0.39.0 之前，应用里大部分对话框是框架的
+ * {@code android.app.AlertDialog}，它那一栏按钮长什么样由车机 ROM 说了算 ——
+ * 在实车上整栏不显示，于是「确认键看不见」修一次复发一次；而同期用 Material
+ * 对话框的那几个（相机映射、设备名）一直是好的。所以现在只剩一条路：
+ * {@code MaterialAlertDialogBuilder} + {@code Theme.Cam.MaterialAlertDialog}，
+ * 由 {@code DialogStyleTest} 钉住。</p>
  *
  * <h3>三条规则</h3>
  *
@@ -45,6 +51,7 @@ public final class CamDialogs {
     private static final int BUTTON_MIN_WIDTH_DP = 120;
     private static final int BUTTON_PADDING_DP = 24;
     private static final int BUTTON_GAP_DP = 12;
+    private static final int BUTTON_BAR_PADDING_DP = 12;
     private static final int CORNER_DP = 10;
 
     private CamDialogs() {
@@ -52,20 +59,12 @@ public final class CamDialogs {
 
     // ------------------------------------------------------------------ 弹
 
-    public static android.app.AlertDialog show(android.app.AlertDialog.Builder builder) {
-        return showNow(style(builder.create(), false));
-    }
-
     public static androidx.appcompat.app.AlertDialog show(
             androidx.appcompat.app.AlertDialog.Builder builder) {
         return showNow(style(builder.create(), false));
     }
 
     /** 主操作不可逆（删除、恢复初值、改系统文件）：主按钮用红色。 */
-    public static android.app.AlertDialog showDestructive(android.app.AlertDialog.Builder builder) {
-        return showNow(style(builder.create(), true));
-    }
-
     public static androidx.appcompat.app.AlertDialog showDestructive(
             androidx.appcompat.app.AlertDialog.Builder builder) {
         return showNow(style(builder.create(), true));
@@ -112,12 +111,38 @@ public final class CamDialogs {
                 R.color.sunken, R.color.text_primary, false);
         paint(button(dialog, DialogInterface.BUTTON_NEUTRAL),
                 R.color.sunken, R.color.text_primary, false);
+        makeRoomForButtons(dialog);
+    }
+
+    /**
+     * 按钮栏是按「一行字」的高度排的，而这里的按钮是 52dp 的块：
+     * 不给它留出位置，块的上半就被裁掉，看起来像只有下沿有圆角。
+     */
+    private static void makeRoomForButtons(Dialog dialog) {
+        Button any = button(dialog, DialogInterface.BUTTON_POSITIVE);
+        if (any == null) {
+            any = button(dialog, DialogInterface.BUTTON_NEGATIVE);
+        }
+        if (any == null || !(any.getParent() instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup bar = (ViewGroup) any.getParent();
+        float density = bar.getResources().getDisplayMetrics().density;
+        int vertical = Math.round(BUTTON_BAR_PADDING_DP * density);
+        bar.setClipChildren(false);
+        bar.setClipToPadding(false);
+        bar.setPadding(bar.getPaddingLeft(), vertical, bar.getPaddingRight(), vertical);
+        bar.setMinimumHeight(Math.round(
+                (BUTTON_HEIGHT_DP + 2 * BUTTON_BAR_PADDING_DP) * density));
+        ViewGroup.LayoutParams params = bar.getLayoutParams();
+        if (params != null && params.height >= 0) {
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            bar.setLayoutParams(params);
+        }
+        bar.requestLayout();
     }
 
     private static Button button(Dialog dialog, int which) {
-        if (dialog instanceof android.app.AlertDialog) {
-            return ((android.app.AlertDialog) dialog).getButton(which);
-        }
         if (dialog instanceof androidx.appcompat.app.AlertDialog) {
             return ((androidx.appcompat.app.AlertDialog) dialog).getButton(which);
         }

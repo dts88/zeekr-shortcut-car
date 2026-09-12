@@ -25,6 +25,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
@@ -32,7 +33,6 @@ import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.signature.ObjectKey;
 import android.widget.PopupMenu;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
@@ -773,8 +773,8 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private void showPhotoShareOptionsDialog(String title, String message, List<File> photoFiles) {
         if (getContext() == null) return;
 
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(
-                getContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(
+                getContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setMessage(message)
                 .setPositiveButton(R.string.action_share, (dialog, which) -> {

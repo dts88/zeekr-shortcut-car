@@ -1,7 +1,6 @@
 package com.kooo.evcam.profile;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
@@ -17,6 +16,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
@@ -115,7 +116,7 @@ public final class ProfilePreviewCheck {
         box.addView(holder, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, height));
 
-        dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.check_title)
                 .setView(box)
                 .setPositiveButton(R.string.editor_save, (d, w) -> {

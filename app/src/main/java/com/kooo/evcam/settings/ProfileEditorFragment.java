@@ -1,6 +1,5 @@
 package com.kooo.evcam.settings;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraCharacteristics;
@@ -20,6 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
@@ -373,7 +373,7 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     private void pickOne(String title, String[] labels, String[] values, Chosen chosen) {
-        CamDialogs.show(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setItems(labels, (d, which) -> {
                     chosen.set(values[which]);
@@ -415,7 +415,7 @@ public class ProfileEditorFragment extends Fragment {
             inputs[i] = input;
         }
 
-        CamDialogs.show(new AlertDialog.Builder(context, R.style.AlertDialogTheme)
+        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (d, w) -> {
@@ -481,7 +481,7 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     void confirmRemove(CameraProfile camera) {
-        CamDialogs.showDestructive(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        CamDialogs.showDestructive(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(getString(R.string.editor_remove_title, roleName(camera.role)))
                 .setMessage(R.string.editor_remove_msg)
                 .setPositiveButton(R.string.action_delete, (d, w) -> {
@@ -492,7 +492,7 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     void confirmReset() {
-        CamDialogs.showDestructive(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        CamDialogs.showDestructive(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.editor_reset)
                 .setMessage(R.string.editor_reset_msg)
                 .setPositiveButton(R.string.editor_reset_ok, (d, w) -> {
@@ -585,7 +585,7 @@ public class ProfileEditorFragment extends Fragment {
         for (ProfileValidation.Issue issue : issues) {
             sb.append(describe(issue)).append('\n');
         }
-        CamDialogs.show(new AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setMessage(sb.length() == 0 ? getString(R.string.editor_no_more_info) : sb.toString())
                 .setPositiveButton(android.R.string.ok, null));

@@ -6,7 +6,6 @@ import android.graphics.Matrix;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.content.Intent;
-import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,6 +21,7 @@ import androidx.core.content.FileProvider;
 import com.kooo.evcam.playback.PlaybackViewport;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
@@ -522,7 +522,7 @@ public class TimelinePlayerActivity extends Activity {
                         .format(new Date(session.startEpochMs)),
                 session.segmentCount(),
                 TimelineFormat.size(session.totalSizeBytes));
-        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setItems(new CharSequence[]{getString(R.string.action_share_clip),
                         getString(R.string.action_delete_clip)}, (dialog, which) -> {
@@ -566,7 +566,7 @@ public class TimelinePlayerActivity extends Activity {
     }
 
     private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
-        com.kooo.evcam.ui.CamDialogs.showDestructive(new AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
                 .setMessage(getString(R.string.player_delete_msg,
                         session.segmentCount(), TimelineFormat.size(session.totalSizeBytes)))

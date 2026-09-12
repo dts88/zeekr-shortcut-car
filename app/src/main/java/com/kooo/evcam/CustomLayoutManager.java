@@ -11,6 +11,8 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -451,9 +453,10 @@ public class CustomLayoutManager {
         if (containerCameras == null) return;
 
         // 创建弹窗
-  // 显式传主题：这个对话框可能拿的是服务/应用 Context，拿不到 Activity 主题里的 alertDialogTheme
-        android.app.AlertDialog.Builder builder =
-                new android.app.AlertDialog.Builder(context, R.style.AlertDialogTheme);
+        // 主题显式传：这个对话框拿的可能是服务 / 应用 Context，
+        // 而且只有 Material 对话框在实车上显示得出按钮栏
+        MaterialAlertDialogBuilder builder =
+                new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog);
         View dialogView = android.view.LayoutInflater.from(context).inflate(R.layout.dialog_wheel_settings, null);
         builder.setView(dialogView);
 
@@ -593,7 +596,7 @@ public class CustomLayoutManager {
         final int defaultRightHeight = fp[7];
 
         // 创建弹窗
-        android.app.AlertDialog dialog = builder.create();
+        AlertDialog dialog = builder.create();
 
         // 实时预览更新的Runnable
         final Runnable previewUpdateRunnable = new Runnable() {

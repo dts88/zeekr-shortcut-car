@@ -1,7 +1,6 @@
 package com.kooo.evcam.update;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -17,6 +16,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
@@ -86,7 +87,7 @@ public final class UpdateFlow {
                 ? activity.getString(R.string.upd_size_suffix,
                         String.format(Locale.US, "%.1f", release.apkBytes / 1024f / 1024f))
                 : "";
-        com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.upd_found_title)
                 .setMessage(activity.getString(R.string.upd_found_msg,
                         release.tagName, size, current))
@@ -122,7 +123,7 @@ public final class UpdateFlow {
         label.setText(R.string.upd_connecting);
         bar.setIndeterminate(true);
 
-        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(activity.getString(R.string.upd_download_title, release.tagName))
                 .setView(box)
                 .setCancelable(false)
@@ -159,7 +160,7 @@ public final class UpdateFlow {
                 if (failure != null) {
                     // 用对话框而不是 toast：下载失败是需要看清原因的，
                     // 一闪而过的提示等于「点了没反应」
-                    com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+                    com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                             .setTitle(R.string.upd_download_failed_title)
                             .setMessage(activity.getString(
                                     R.string.upd_download_failed, failure))
@@ -181,7 +182,7 @@ public final class UpdateFlow {
         // Android 8 起「安装未知来源应用」是一项单独授权，没有它 startActivity 会被静默挡掉
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !activity.getPackageManager().canRequestPackageInstalls()) {
-            com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+            com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                     .setTitle(R.string.upd_need_install_title)
                     .setMessage(R.string.upd_need_install_msg)
                     .setPositiveButton(R.string.upd_go_settings,
@@ -260,7 +261,7 @@ public final class UpdateFlow {
     }
 
     private static AlertDialog message(Activity activity, String text, boolean cancelable) {
-        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                 .setMessage(text)
                 .setCancelable(cancelable)
                 .create());

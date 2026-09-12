@@ -1,6 +1,5 @@
 package com.kooo.evcam;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -18,6 +17,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.camera.ImageAdjustManager;
 
@@ -608,8 +609,9 @@ public class ImageAdjustFloatingWindow {
             }
         }
         
-  // 显式传主题：这个对话框可能拿的是服务/应用 Context，拿不到 Activity 主题里的 alertDialogTheme
-        AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.AlertDialogTheme);
+        // 主题显式传：这个对话框拿的可能是服务 / 应用 Context，
+        // 而且只有 Material 对话框在实车上显示得出按钮栏
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog);
         builder.setTitle(title);
         builder.setSingleChoiceItems(options.toArray(new String[0]), checkedItem, (dialog, which) -> {
             if (which < values.size()) {

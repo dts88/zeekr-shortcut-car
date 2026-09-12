@@ -1,7 +1,6 @@
 package com.kooo.evcam.share;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.Bitmap;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -10,6 +9,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
@@ -64,7 +65,7 @@ public final class PhoneShare {
         List<LocalNetwork.Endpoint> endpoints = LocalNetwork.enumerate();
         if (endpoints.isEmpty()) {
             // 没有可用地址就不是「失败」，是前提没满足 —— 说清楚该做什么
-            com.kooo.evcam.ui.CamDialogs.show(new AlertDialog.Builder(activity, R.style.AlertDialogTheme)
+            com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                     .setTitle(R.string.share_phone_need_hotspot_title)
                     .setMessage(activity.getString(R.string.share_phone_need_hotspot_msg)
                             + "\n\n" + activity.getString(R.string.share_phone_network_hint))
@@ -141,8 +142,8 @@ public final class PhoneShare {
             root.addView(text(activity.getString(R.string.share_phone_network_hint), 13, true));
             root.addView(text(activity.getString(R.string.share_phone_keep_open), 13, true));
 
-            AlertDialog.Builder builder = new AlertDialog.Builder(
-                    activity, R.style.AlertDialogTheme)
+            MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(
+                    activity, R.style.Theme_Cam_MaterialAlertDialog)
                     .setTitle(R.string.share_phone_title)
                     .setView(root)
                     .setPositiveButton(R.string.action_close, null)

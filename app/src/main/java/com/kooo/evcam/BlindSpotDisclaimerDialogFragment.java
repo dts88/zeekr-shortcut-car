@@ -24,8 +24,9 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -60,8 +61,8 @@ public class BlindSpotDisclaimerDialogFragment extends DialogFragment {
             dismissAllowingStateLoss();
         });
 
-        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new AlertDialog.Builder(
-                requireContext(), R.style.AlertDialogTheme)
+        AlertDialog dialog = com.kooo.evcam.ui.CamDialogs.style(new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setView(view)
                 .create());
         dialog.setCanceledOnTouchOutside(false);

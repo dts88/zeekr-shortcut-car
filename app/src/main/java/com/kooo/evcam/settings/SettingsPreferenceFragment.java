@@ -19,6 +19,8 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
+import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
@@ -255,9 +257,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (getContext() == null) {
             return;
         }
-        // 必须带上 AlertDialogTheme：这个应用的主题下，不指定它的话
-        // 按钮文字和背景同色，看着就像「弹出来了但没有确认键」
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
+        // 主题显式传：Material 对话框 + 这个主题，是实车上唯一显示得出按钮的组合
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_internal_title)
                 .setMessage(R.string.dlg_internal_msg)
                 .setPositiveButton(R.string.dlg_internal_ok, (dialog, which) ->
@@ -355,7 +356,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (getContext() == null) {
             return;
         }
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(getContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_internal_locked_title)
                 .setMessage(R.string.dlg_internal_locked_msg)
                 .setPositiveButton(R.string.action_got_it, null));
@@ -868,17 +869,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      *
      * <h3>为什么不用 androidx 自带的</h3>
      *
-     * <p>androidx 的偏好对话框自己 {@code new AlertDialog.Builder(context)}，主题靠
-     * {@code alertDialogTheme} 这个属性从 Activity 主题里解析。这个应用里那条路
-     * <b>解析不出想要的结果</b> —— 按钮画出来是看不见的，能点，但没有形状。
-     * 「车牌号输入框没有确认键」「存储上限没有保存键」都是这一件事。</p>
+     * <p>androidx 的偏好对话框自己建一个<b>框架</b> AlertDialog，主题靠
+     * {@code alertDialogTheme} 从 Activity 主题里解析。「车牌号没有确认键」
+     * 「存储上限没有保存键」说的都是这一件事。</p>
      *
-     * <p>0.36.4 往主题里补 {@code alertDialogTheme} 是想从根上解决，结果只对
-     * 代码里自己建的对话框有效。所以这里改成不依赖属性解析：把主题
-     * <b>直接传进构造函数</b>，和这个应用里其他所有对话框一样 ——
-     * 那条路是反复验证过能显示出按钮的。</p>
+     * <p>0.36.4 往主题里补属性、0.38.0 把主题直接传进构造函数，都只是换个方式继续用
+     * 框架对话框，所以在实车上都没修好 —— 那一栏按钮长什么样由车机 ROM 说了算。
+     * 真正的差别是<b>哪一种对话框</b>：同期用 Material 对话框的那几个（相机映射、
+     * 设备名）一直是好的。这里也统一到那条路。</p>
      *
-     * <p>下拉框（ListPreference）不在此列：它选中即关闭，本来就没有按钮。</p>
+     * <p>下拉框（ListPreference）也在此列。androidx 那个选中即关闭、没有确认键，
+     * 点错一项就直接生效，没有反悔的机会。</p>
      */
     @Override
     public void onDisplayPreferenceDialog(Preference preference) {
@@ -886,7 +887,38 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             showTextDialog((EditTextPreference) preference);
             return;
         }
+        if (preference instanceof ListPreference) {
+            showChoiceDialog((ListPreference) preference);
+            return;
+        }
         super.onDisplayPreferenceDialog(preference);
+    }
+
+    /** 单选：视频流配置、存储位置、操作按钮位置。选中之后还要按确定才算数。 */
+    private void showChoiceDialog(ListPreference pref) {
+        CharSequence[] entries = pref.getEntries();
+        CharSequence[] values = pref.getEntryValues();
+        if (entries == null || values == null || entries.length != values.length) {
+            super.onDisplayPreferenceDialog(pref);
+            return;
+        }
+        final int[] picked = {pref.findIndexOfValue(pref.getValue())};
+        CharSequence title = pref.getDialogTitle() != null
+                ? pref.getDialogTitle() : pref.getTitle();
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(title)
+                .setSingleChoiceItems(entries, picked[0], (d, which) -> picked[0] = which)
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    if (picked[0] < 0 || picked[0] >= values.length) {
+                        return;
+                    }
+                    String value = values[picked[0]].toString();
+                    if (pref.callChangeListener(value)) {
+                        pref.setValue(value);
+                    }
+                })
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     /** 单行文本输入：车牌号、视频 / 图片存储上限。 */
@@ -900,7 +932,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(input);
 
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(pref.getTitle())
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (dialog, which) -> {
@@ -957,7 +989,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         ScrollView scroll = new ScrollView(getContext());
         scroll.addView(view);
 
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(requireContext(), R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.set_current_profile_title)
                 .setView(scroll)
                 .setPositiveButton(R.string.action_got_it, null));

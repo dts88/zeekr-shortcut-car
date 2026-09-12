@@ -30,8 +30,10 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.PreviewSlots;
@@ -1425,7 +1427,7 @@ public class MainActivity extends AppCompatActivity {
         }
         final int[] picked = {Math.max(0, spec.indexOf(appConfig.getLanguageMode()))};
 
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_language_title)
                 .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
                 .setPositiveButton(android.R.string.ok, (d, w) -> applyLanguageChoice(
@@ -1462,7 +1464,7 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.dlg_rail_side_rhd),
         };
         final int[] picked = {"left".equals(appConfig.getActionRailSide()) ? 0 : 1};
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_rail_side_title)
                 .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
                 .setPositiveButton(android.R.string.ok,
@@ -3308,7 +3310,7 @@ public class MainActivity extends AppCompatActivity {
         }
         // 正常模式下根本不往内置存储录 —— 与其偷偷降级，不如说清楚并且不录
         if (!StorageHelper.isInternalStorageAllowed()) {
-            com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+            com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                     .setTitle(R.string.dlg_no_external_title)
                     .setMessage(R.string.dlg_no_external_msg)
                     .setPositiveButton(R.string.action_got_it, null));
@@ -3318,7 +3320,7 @@ public class MainActivity extends AppCompatActivity {
         String why = getString(chosen
                 ? R.string.dlg_internal_reason_chosen
                 : R.string.dlg_internal_reason_fallback);
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_will_use_internal_title)
                 .setMessage(getString(R.string.dlg_internal_warn, why))
                 .setPositiveButton(R.string.action_record_anyway, (dialog, which) -> onProceed.run())

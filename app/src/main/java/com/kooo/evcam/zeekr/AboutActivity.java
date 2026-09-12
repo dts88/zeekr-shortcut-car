@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 
 import com.kooo.evcam.AppLog;
@@ -119,7 +120,7 @@ public class AboutActivity extends Activity {
                 | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         input.setHint(R.string.dev_unlock_hint);
 
-        com.kooo.evcam.ui.CamDialogs.show(new android.app.AlertDialog.Builder(this, R.style.AlertDialogTheme)
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dev_unlock_title)
                 .setMessage(R.string.dev_unlock_msg)
                 .setView(input)
