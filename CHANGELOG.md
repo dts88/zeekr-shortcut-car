@@ -7,6 +7,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.42.0-alpha] - 2026-09-12
+
+- Fixed: photo review was still showing its pre-redesign toolbar on the vehicle. The head unit picks the large-screen copy of that layout, and only the base copy had been redesigned — so the vector icons and rounded tiles landed in 0.38.0 for everyone except the car. Those stale copies are gone; there is one layout now.
+- Fixed: the stale copy also carried hardcoded Chinese, which the test missed because it only scanned the base layout folder. It scans every variant now.
+- About rewritten: thanks first, then what the app is built on, where the source is, what happens to your recordings and the three times the app goes online, storage advice, and the safety notice.
+
 ## [0.41.1-alpha] - 2026-09-12
 
 - Settings text is back to its previous size. The section is a dense list read while parked, so it sits one step below the rest of the scale; every other screen keeps 0.41.0's sizes.
