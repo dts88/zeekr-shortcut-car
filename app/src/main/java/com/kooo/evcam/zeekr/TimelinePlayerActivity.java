@@ -16,6 +16,7 @@ import android.widget.TextView;
 import android.view.TextureView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
 import com.kooo.evcam.playback.PlaybackViewport;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -85,6 +86,8 @@ public class TimelinePlayerActivity extends Activity {
     private View toolbar;
     private View selectToolbar;
     private TextView selectedCountText;
+    /** 界面重建（切黑白模式这类）之前看的是哪一条；-1 表示没有，开最新的那条。 */
+    private int pendingSessionIndex = -1;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private List<RecordingTimeline.Session> sessions = new ArrayList<>();
@@ -146,6 +149,9 @@ public class TimelinePlayerActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timeline_player);
+        if (savedInstanceState != null) {
+            pendingSessionIndex = savedInstanceState.getInt(STATE_SESSION_INDEX, -1);
+        }
 
         videoSurface = findViewById(R.id.timeline_video);
         player = new ManagedVideoPlayer(videoSurface);
@@ -347,8 +353,11 @@ public class TimelinePlayerActivity extends Activity {
                             Toast.LENGTH_LONG).show();
                     return;
                 }
-                // 默认打开最近的一条时间轴
-                switchSession(sessions.size() - 1);
+                // 默认打开最近的一条；界面刚重建过就回到原来那一条
+                int target = pendingSessionIndex >= 0 && pendingSessionIndex < sessions.size()
+                        ? pendingSessionIndex : sessions.size() - 1;
+                pendingSessionIndex = -1;
+                switchSession(target);
                 handler.post(ticker);
             });
         }).start();
@@ -679,6 +688,14 @@ public class TimelinePlayerActivity extends Activity {
         AppLog.i(TAG, "删除时间轴 " + index + "：" + deleted + "/" + session.segmentCount() + " 个文件");
         Toast.makeText(this, getString(R.string.player_deleted, deleted), Toast.LENGTH_SHORT).show();
         loadTimelines();
+    }
+
+    private static final String STATE_SESSION_INDEX = "sessionIndex";
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_SESSION_INDEX, sessionIndex);
     }
 
     @Override

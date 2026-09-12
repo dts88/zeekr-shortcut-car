@@ -378,6 +378,7 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         AppLog.d(TAG, "onNewIntent called");
+        openDrawerIfAsked(intent);
 
 // 处理从录制悬浮按钮启动（需要自动开始录制）
         boolean autoStartRecording = intent.getBooleanExtra("auto_start_recording", false);
@@ -674,13 +675,6 @@ public class MainActivity extends AppCompatActivity {
         if (textureRight != null && PreviewSlots.exists(configuredCameraCount, "right")) {
             textureRight.setSurfaceTextureListener(buildSurfaceListener("right"));
         }
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        openDrawerIfAsked(intent);
     }
 
     /** 从别的界面按菜单键回来：抽屉要开着，否则那一下点击看起来没反应。 */
