@@ -1974,6 +1974,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    /** 某一格要不要出现在版面里。GONE 而不是 INVISIBLE：要把地方让出来。 */
+    private void showPane(int id, boolean show) {
+        View pane = findViewById(id);
+        if (pane != null) {
+            pane.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+    }
+
     /** 配置里存的是三个词，容器认的是枚举。 */
     private static com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode scaleModeOf(String fit) {
         if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
@@ -2332,14 +2340,23 @@ public class MainActivity extends AppCompatActivity {
         // ZeekrMultiPlan 只认相机 id 的顺序：除去合成流之后，第一个填座舱 1、
         // 第二个填座舱 2。于是在配置里只加了「后座舱」的人，画面会出现在前座舱
         // 那一格里 —— 报上来的现象是「无论加哪一路，先出来的总是前座」。
+        // 角色和相机是<b>固定</b>对应的：除去合成流之后，第一路是前座舱、第二路是
+        // 后座舱（和 ProfileSizes.cameraIdFor 同一条规则）。只加了后座舱时，
+        // 前座舱那一路就空着 —— 不能拿它去填后座舱的位置。
+        //
+        // 上一版这里写的是「只加了后座舱就把第一路顶上，别让槽位空着」。结果是
+        // 格子对、名字对、画面是前座舱的 —— 比空着更难发现。
         boolean wantsFront = laneFor("back") != null;
         boolean wantsRear = laneFor("left") != null;
         String cabinFrontId = wantsFront ? plan.cabin1Id : null;
-        String cabinRearId = wantsRear
-                ? (wantsFront ? plan.cabin2Id : plan.cabin1Id)
-                : null;
+        String cabinRearId = wantsRear ? plan.cabin2Id : null;
         AppLog.i(TAG, "座舱槽位按配置分: 前座舱=" + cabinFrontId + "，后座舱=" + cabinRearId
                 + "（配置里 前=" + wantsFront + " 后=" + wantsRear + "）");
+
+        // 配置里没有的那一路，整格藏起来 —— 一块黑方块下面写着「前座舱」，
+        // 比空着更像出了故障。藏起来之后剩下那一格自己占满这一列
+        showPane(R.id.pane_cabin_front, cabinFrontId != null);
+        showPane(R.id.pane_cabin_rear, cabinRearId != null);
 
         cameraManager.initCameras(
                 plan.compositeId, textureFront,
