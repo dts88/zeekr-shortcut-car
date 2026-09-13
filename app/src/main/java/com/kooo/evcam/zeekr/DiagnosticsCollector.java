@@ -1,6 +1,9 @@
 package com.kooo.evcam.zeekr;
 
 import android.content.Context;
+import android.media.MediaFormat;
+import android.media.MediaCodecList;
+import android.media.MediaCodecInfo;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraCharacteristics;
@@ -65,6 +68,7 @@ public final class DiagnosticsCollector {
         appendStorage(sb, context);
         appendConfig(sb, context);
         appendFloatingLayout(sb, context);
+        appendEncoders(sb, context);
         com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context);
         PlaybackCapabilityProbe.appendTo(sb, context);
         VehicleEnumeration.appendTo(sb, context);
@@ -501,6 +505,109 @@ public final class DiagnosticsCollector {
     /**
      * 抓一段本应用的 logcat，便于排查启动/相机错误。
      */
+    /**
+     * 硬件编码器到底允许什么。
+     *
+     * <h3>为什么要把这些数抄出来</h3>
+     *
+     * <p>码率上限一直是代码里写死的一个数（上游给小得多的画面定的 8 Mbps），
+     * 从来没有对照过这台车机自己声明的范围。同理，录制曾经写死 HEVC Level 4 ——
+     * 而 Level 4 的最大画面是 1920×1080，环视四宫格是它的三倍。这两件事在车上
+     * 都看不出来：编码器不会报错，只会安静地把画质压下去。</p>
+     *
+     * <p>所以这一节只做一件事：把编码器<b>自己声明</b>的尺寸范围、码率范围和
+     * Profile/Level 抄出来。有了这几行，「20 Mbps 会不会被夹」就不再是猜的。</p>
+     */
+    private static void appendEncoders(StringBuilder sb, Context context) {
+        sb.append("## 8. 硬件编码器能力").append('\n');
+        int[] target = encodeTarget(context);
+        if (target != null) {
+            sb.append("环视这一路要编的尺寸: ").append(target[0]).append('x').append(target[1])
+                    .append("  (").append((long) target[0] * target[1] / 10000).append(" 万像素)")
+                    .append('\n');
+        }
+        appendEncoder(sb, MediaFormat.MIMETYPE_VIDEO_HEVC, "H.265 / HEVC", target);
+        appendEncoder(sb, MediaFormat.MIMETYPE_VIDEO_AVC, "H.264 / AVC", target);
+        sb.append('\n');
+    }
+
+    /** 环视那一路最终送进编码器的尺寸；算不出来返回 null。 */
+    private static int[] encodeTarget(Context context) {
+        try {
+            int[] max = com.kooo.evcam.profile.ProfileSizes.declaredMax(
+                    context, com.kooo.evcam.profile.CameraProfile.ROLE_COMPOSITE);
+            if (max == null) {
+                return null;
+            }
+            com.kooo.evcam.camera.EncodeSize size = com.kooo.evcam.camera.EncodeSize.forSource(
+                    com.kooo.evcam.zeekr.StreamLayoutTable.compositeCameraId(), max[0], max[1], true);
+            return size.width > 0 ? new int[]{size.width, size.height} : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void appendEncoder(StringBuilder sb, String mime, String label, int[] target) {
+        sb.append("### ").append(label).append('\n');
+        boolean found = false;
+        try {
+            MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+            for (MediaCodecInfo info : list.getCodecInfos()) {
+                if (!info.isEncoder()) {
+                    continue;
+                }
+                boolean matches = false;
+                for (String type : info.getSupportedTypes()) {
+                    if (type.equalsIgnoreCase(mime)) {
+                        matches = true;
+                        break;
+                    }
+                }
+                if (!matches) {
+                    continue;
+                }
+                found = true;
+                String name = info.getName();
+                boolean software = name.contains("c2.android") || name.contains("OMX.google");
+                sb.append(name).append(software ? "  (软编码)" : "  (硬编码)").append('\n');
+                MediaCodecInfo.CodecCapabilities caps = info.getCapabilitiesForType(mime);
+                MediaCodecInfo.VideoCapabilities video = caps.getVideoCapabilities();
+                if (video != null) {
+                    sb.append("  尺寸: ").append(video.getSupportedWidths()).append(" x ")
+                            .append(video.getSupportedHeights()).append('\n');
+                    sb.append("  码率: ").append(video.getBitrateRange()).append(" bps")
+                            .append('\n');
+                    if (target != null) {
+                        boolean ok = false;
+                        try {
+                            ok = video.isSizeSupported(target[0], target[1]);
+                        } catch (Exception ignored) {
+                            // 有的实现对超范围的尺寸直接抛，那就是「不支持」
+                        }
+                        sb.append("  能编 ").append(target[0]).append('x').append(target[1])
+                                .append(": ").append(ok ? "能" : "不能").append('\n');
+                    }
+                }
+                MediaCodecInfo.CodecProfileLevel[] levels = caps.profileLevels;
+                if (levels != null && levels.length > 0) {
+                    sb.append("  声明的 Profile/Level: ");
+                    for (int i = 0; i < levels.length; i++) {
+                        if (i > 0) {
+                            sb.append(", ");
+                        }
+                        sb.append(levels[i].profile).append('/').append(levels[i].level);
+                    }
+                    sb.append('\n');
+                }
+            }
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        if (!found) {
+            sb.append("(这台设备没有这种编码器)").append('\n');
+        }
+    }
+
     private static void appendLogcat(StringBuilder sb) {
         sb.append("## 9. 最近日志（本应用相关）").append('\n');
         try {

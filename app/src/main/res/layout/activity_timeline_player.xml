@@ -140,6 +140,16 @@
                     android:paddingBottom="6dp"
                     android:textColor="@color/white"
                     android:textAppearance="@style/TextAppearance.Cam.Caption" />
+
+                <!--
+                  ⑤ 状态条：和主界面同一条，也和主界面一样压在画面底边上，
+                  不去挤下面那排播放控制。
+                -->
+                <include
+                    layout="@layout/layout_status_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/status_bar_height"
+                    android:layout_gravity="bottom" />
             </FrameLayout>
 
             <!-- 进度条与控制 -->
@@ -219,16 +229,5 @@
         </LinearLayout>
     </LinearLayout>
 
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/line" />
-
-    <!-- ⑤ 状态条：和主界面同一条 -->
-    <include
-        layout="@layout/layout_status_bar"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/status_bar_height" />
 
 </LinearLayout>

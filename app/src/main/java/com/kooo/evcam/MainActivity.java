@@ -1244,6 +1244,7 @@ public class MainActivity extends AppCompatActivity {
      * 从 Activity 上找会撞到看不见的那一份。</p>
      */
     private void updateStatusLine() {
+        com.kooo.evcam.ui.StatusLine.overlay(recordingLayout);
         com.kooo.evcam.ui.StatusLine.fill(recordingLayout);
     }
 

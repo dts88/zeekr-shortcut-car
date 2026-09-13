@@ -64,4 +64,11 @@
     <!-- 常量 -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!--
+      压在摄像头画面上的字。日夜同色 —— 它下面永远是画面，不是界面底色，
+      跟着日夜翻会在白天变成深色字压在深色蒙版上。
+    -->
+    <color name="status_overlay_text">#F2FFFFFF</color>
+    <color name="status_overlay_text_dim">#B3FFFFFF</color>
 </resources>

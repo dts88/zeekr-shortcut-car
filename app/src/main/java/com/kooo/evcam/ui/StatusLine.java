@@ -4,6 +4,8 @@ import android.content.Context;
 import android.view.View;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
+
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.profile.RecordSpecs;
@@ -23,6 +25,43 @@ import java.io.File;
 public final class StatusLine {
 
     private StatusLine() {
+    }
+
+    /**
+     * 把这一条摆成压在画面上的那一条：半透明渐变底、固定浅色字。
+     *
+     * <h3>为什么不写在布局里</h3>
+     *
+     * <p>同一份 {@code layout_status_bar} 也用在设置界面，那里它贴在页面底部、
+     * 下面是界面底色 —— 给它蒙一层深色渐变就成了一条莫名其妙的黑边。压在画面上
+     * 和贴在页面底部是两种处境，字色也就不能是同一套：画面上必须固定浅色，
+     * 页面上必须跟日夜走。</p>
+     *
+     * <p>只需要在界面建好时调一次，之后 {@link #fill} 只换文字。</p>
+     */
+    public static void overlay(View root) {
+        if (root == null) {
+            return;
+        }
+        View bar = root.findViewById(R.id.status_bar);
+        if (bar == null) {
+            return;
+        }
+        bar.setBackgroundResource(R.drawable.bg_status_scrim);
+        Context context = bar.getContext();
+        int bright = ContextCompat.getColor(context, R.color.status_overlay_text);
+        int dim = ContextCompat.getColor(context, R.color.status_overlay_text_dim);
+        tint(root, R.id.tv_status_stream, bright);
+        tint(root, R.id.tv_status_storage, bright);
+        tint(root, R.id.tv_composite_info, dim);
+        tint(root, R.id.tv_segment_percent, dim);
+    }
+
+    private static void tint(View root, int id, int colour) {
+        TextView view = root.findViewById(id);
+        if (view != null) {
+            view.setTextColor(colour);
+        }
     }
 
     /** 把「这次按什么录」和「还剩多少空间」两格填好；其余两格是录制状态，由主界面自己管。 */

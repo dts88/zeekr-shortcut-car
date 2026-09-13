@@ -179,6 +179,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         if (share != null) {
             share.setVisibility(View.GONE);
         }
+        com.kooo.evcam.ui.StatusLine.overlay(findViewById(android.R.id.content));
         com.kooo.evcam.ui.StatusLine.fill(findViewById(android.R.id.content));
         selectedCountText = findViewById(R.id.pb_selected_count);
         sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);

@@ -24,6 +24,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
   cabin camera. That rule now applies only where the profile does not drive the lane. The
   transform is also recomputed when the view is re-laid out, which it is right after the
   aspect ratio is set.
+- The status bar sits on the picture again, along its bottom edge, on a soft dark gradient
+  -- on the main screen and in video review, the two screens whose content is the picture.
+  As its own row it cost them 48dp of height, and in video review it had pushed the
+  transport controls down. Settings keeps it as a row: there it sits below text, not on a
+  picture.
+- Diagnostics reports what the encoders actually allow: the sizes and bitrate range each
+  one declares, whether it will take the surround grid's size, and the profile/levels it
+  advertises. The ceiling in the code was inherited, never checked against the hardware,
+  and an encoder that disagrees does not complain -- it quietly lowers the quality.
 
 ## [0.44.0-alpha] - 2026-09-13
 

@@ -194,6 +194,16 @@
                             android:text="@string/zeekr_lane_right"
                             android:textColor="#FFFFFF"
                             android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                        <!--
+                          ⑤ 状态条压在画面底边上（见 docs/ui-spec.md）。占一行的话
+                          预览就矮 48dp —— 这块屏幕上，内容就是画面本身。
+                        -->
+                        <include
+                            layout="@layout/layout_status_bar"
+                            android:layout_width="match_parent"
+                            android:layout_height="@dimen/status_bar_height"
+                            android:layout_gravity="bottom" />
                     </FrameLayout>
 
                     <include
@@ -202,16 +212,6 @@
                         android:layout_height="match_parent"
                         android:layout_marginStart="@dimen/gutter" />
                 </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/line" />
-
-                <include
-                    layout="@layout/layout_status_bar"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/status_bar_height" />
             </LinearLayout>
         </LinearLayout>
 
