@@ -87,8 +87,10 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         LaneLayout lane = camera.lanes.get(index);
 
         if (splits) {
+            // 拖只开给环视的四格：座舱那两路的位置和大小目前还不由配置决定，
+            // 拖了也不会变 —— 那就别给那个手势
             screen.addPreference(new LanePickerPreference(context, camera.lanes, index,
-                    editor::selectLane));
+                    editor::selectLane, moved -> editor.refresh()));
         }
 
         String laneName = splits && lane.laneIndex >= 0

@@ -422,6 +422,7 @@
     <string name="editor_whole_frame">Whole frame</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">Tap a cell to edit it</string>
+    <string name="editor_stage">Drag a cell to move it, drag a corner to resize</string>
     <string name="editor_no_camera">This profile has no camera yet</string>
     <string name="editor_cabin_note_title">This camera cannot be moved or resized yet</string>
     <string name="editor_cabin_note_summary">Rotation, mirroring, crop, zoom and pan all apply. Position and size wait for the main screen layout to come from the profile; for now this camera keeps its own fixed pane</string>

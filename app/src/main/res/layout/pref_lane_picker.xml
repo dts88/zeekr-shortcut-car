@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  配置编辑右栏最上面的格子图：每一格按它真实的位置和大小画出来，点一格就改那一格，
-  正在改的那一格高亮。改的是哪一格，看得见。
+  摆位舞台：每一格按它真实的位置和大小画出来，点一格选它，拖一格换位置，
+  拖四个角改大小。改的是哪一格、改成了什么样，都在这张图上。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

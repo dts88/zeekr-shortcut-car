@@ -423,6 +423,7 @@
     <string name="editor_whole_frame">整幅画面</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">点一格来改它</string>
+    <string name="editor_stage">拖格子换位置，拖四个角改大小</string>
     <string name="editor_no_camera">这份配置里还没有相机</string>
     <string name="editor_cabin_note_title">这一路还不能挪位置、改大小</string>
     <string name="editor_cabin_note_summary">旋转、镜像、裁剪、缩放平移都已生效。位置和大小要等主界面的版面由配置决定，现在它固定占一块</string>
