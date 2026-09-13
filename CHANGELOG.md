@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.51.0-alpha] - 2026-09-13
+
+- Photos always use the camera's largest size. They no longer follow the resolution chosen
+  above it -- a photo is one still frame, it costs no continuous bandwidth, so there is no
+  reason to step it down. The surround camera stays at 1280x5140, as before. The detail box
+  shows the size it works out to.
+- Save space is 10 fps (was 15); balanced is 20 fps (was unlimited). A newly created profile
+  starts on balanced, so it reads as one of the three steps instead of none.
+- The storage line now reads "recording 3, 26.6 Mbps in total, about 12.0 GB an hour" and
+  says plainly when no camera is on. The total bit rate makes it obvious that the line
+  follows what you change; one decimal place of GB alone could look like nothing happened.
+- The three quality notes describe frame rate and bit rate instead of what you can make out
+  in the picture.
+
 ## [0.50.1-alpha] - 2026-09-13
 
 - Fixed: the cabin cameras showed a landing size of 2560x400. Whether a stream is split
