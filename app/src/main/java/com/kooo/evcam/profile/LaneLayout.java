@@ -67,8 +67,10 @@ public final class LaneLayout {
      * <ul>
      *   <li>{@link #FIT 适应}：整幅都看得见，比例不变，对不上的那两边留黑。默认。</li>
      *   <li>{@link #FILL 填充}：铺满这一格，比例不变，多出来的那一边居中裁掉。</li>
-     *   <li>{@link #STRETCH 拉伸}：铺满这一格，画面按格子的形状拉变形。</li>
      * </ul>
+     *
+     * <p>试过第三档「拉伸」（铺满且不保比例），去掉了 —— 一幅被拉变形的行车
+     * 记录画面，既不好看也不能作证。</p>
      *
      * <p>转 90° 之后画面的长宽对调，和格子对不上是常态 —— 座舱那两路转过来
      * 会缩成一小条，就是「适应」的结果。想让它顶满，选「填充」。</p>
@@ -77,11 +79,10 @@ public final class LaneLayout {
 
     public static final String FIT = "fit";
     public static final String FILL = "fill";
-    public static final String STRETCH = "stretch";
 
     /** 认不出来的值一律当「适应」—— 配置是可以被手改的。 */
     public static String normaliseFit(String value) {
-        return FILL.equals(value) || STRETCH.equals(value) ? value : FIT;
+        return FILL.equals(value) ? FILL : FIT;
     }
 
     public static LaneLayout cell(int laneIndex, float x, float y, float width, float height) {

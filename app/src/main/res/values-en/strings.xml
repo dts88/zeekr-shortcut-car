@@ -440,7 +440,6 @@
     <string name="editor_fit">Fit to pane</string>
     <string name="editor_fit_fit">Fit · whole picture, bars at the sides</string>
     <string name="editor_fit_fill">Fill · covers the pane, excess cropped</string>
-    <string name="editor_fit_stretch">Stretch · covers the pane, picture distorted</string>
     <string name="editor_crop_off">Unavailable: cropping goes wrong on the vehicle and the cause is not understood yet</string>
     <string name="editor_crop_dialog">Crop (how much to cut from each side, fraction of the picture)</string>
     <string name="editor_top">Top</string>

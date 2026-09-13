@@ -69,9 +69,7 @@ public class FourLaneContainer extends ViewGroup {
         /** 保持画面原始比例，格子内留黑边。合成流画面是正方形，默认用这个。 */
         FIT,
         /** 填满格子，比例不变，超出的那一边居中裁切。 */
-        FILL,
-        /** 填满格子，画面按格子的形状拉变形。 */
-        STRETCH
+        FILL
     }
 
     /** 显示模式。 */
@@ -614,10 +612,6 @@ public class FourLaneContainer extends ViewGroup {
         float cellAspect = cellWidth / cellHeight;
         // 这一格自己说了算，没说才跟容器走
         ScaleMode mode = cell != null && cell.fit != null ? cell.fit : scaleMode;
-        if (mode == ScaleMode.STRETCH) {
-            // 拉伸：目标框就是整格，源矩形不动 —— 画面按格子的形状变形
-            laneAspect = 0f;
-        }
         if (mode == ScaleMode.FIT && laneAspect > 0f && cellAspect > 0f) {
             if (laneAspect < cellAspect) {
                 destWidth = cellHeight * laneAspect;

@@ -5,7 +5,26 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Fixed: rotation and mirroring on the cabin cameras (fourth attempt). Every attempt keyed
+  the decision off the car model, which defaults to the single-stream Zeekr and only
+  changes if someone picks the three-stream option by hand -- so the main screen took a
+  different branch and wrote an identity matrix over the one built from the profile. The
+  question is now "does the profile have a lane for this camera", and if it does, nothing
+  but the camera writes its transform.
+- Fixed: panes were labelled by direction, not by what they show. "front/back/left" name a
+  lane of the surround strip in one place and a camera slot in another; the badges wanted
+  the second and used the first, so the surround pane read "front", the front cabin read
+  "back" and the rear cabin read "left". Photo review had the same labels hardcoded. Both
+  now ask the same place, which answers with the camera's role.
+- Fixed: whichever cabin camera you added, the picture appeared in the first cabin pane.
+  The slot plan only knew the order of camera ids; it now follows the profile.
+- Cabin 1 and Cabin 2 are the front cabin and the rear cabin. Cameras the app recognises
+  carry those names; anything else -- the custom model's four, or a camera found later --
+  is still yours to name.
+- Each lane chooses how it fills its pane: fit (whole picture, bars at the sides) or fill
+  (covers the pane, the excess cropped). A quarter-turned cabin camera shrinks to a strip
+  under "fit", which is what it was doing with no way to say otherwise.
+- Diagnostics reports each camera's lane and what the last attempt to apply it did.
 
 ## [0.46.2-alpha] - 2026-09-13
 

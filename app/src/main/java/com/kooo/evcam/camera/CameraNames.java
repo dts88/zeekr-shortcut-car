@@ -55,17 +55,31 @@ public final class CameraNames {
      * （自定义车型那种四面各一个相机的接法），才回到方向名。</p>
      */
     public static String ofSlot(Context context, String position) {
+        Integer res = roleResFor(context, position);
+        return res == null ? of(context, position) : context.getString(res);
+    }
+
+    /**
+     * 这一路在配置里是不是一个<b>认出来的</b>角色。
+     *
+     * <p>是 —— 环视、前座舱、后座舱 —— 就有定名，不让改：改了之后
+     * 「配置编辑里叫后座舱、主界面角标叫别的」，对不上。</p>
+     *
+     * <p>不是（自定义车型那种四面各一个相机的接法，或者以后新认出来的路），
+     * 返回 null，由调用方决定叫什么 —— 那种情况下名字归用户。</p>
+     */
+    public static Integer roleResFor(Context context, String position) {
         try {
             String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(position);
             if (role != null
                     && new com.kooo.evcam.profile.ProfileStore(context)
                             .current().camera(role) != null) {
-                return context.getString(roleRes(role));
+                return roleRes(role);
             }
         } catch (Exception ignored) {
-            // 配置读不出来就按方向名，总比没有名字强
+            // 配置读不出来就当没认出来，名字归用户
         }
-        return of(context, position);
+        return null;
     }
 
     private static int roleRes(String role) {

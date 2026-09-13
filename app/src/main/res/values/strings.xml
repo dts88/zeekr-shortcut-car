@@ -441,7 +441,6 @@
     <string name="editor_fit">画面填充</string>
     <string name="editor_fit_fit">适应 · 整幅可见，两边留黑</string>
     <string name="editor_fit_fill">填充 · 铺满，多出来的裁掉</string>
-    <string name="editor_fit_stretch">拉伸 · 铺满，画面变形</string>
     <string name="editor_crop_off">暂不可用：车上一裁就出问题，原因还没查清，先停用</string>
     <string name="editor_crop_dialog">裁切（各边切掉多少，画面的比例）</string>
     <string name="editor_top">上</string>

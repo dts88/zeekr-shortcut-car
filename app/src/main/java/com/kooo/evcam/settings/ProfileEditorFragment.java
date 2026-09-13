@@ -583,9 +583,6 @@ public class ProfileEditorFragment extends Fragment {
         if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
             return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.FILL;
         }
-        if (com.kooo.evcam.profile.LaneLayout.STRETCH.equals(fit)) {
-            return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.STRETCH;
-        }
         return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.FIT;
     }
 

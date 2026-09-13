@@ -55,8 +55,7 @@ public final class LaneSurfaceMatrix {
                 || o.cropLeft != 0f || o.cropRight != 0f;
         boolean zoomed = o.scaleX != 1f || o.scaleY != 1f;
         boolean panned = o.translateX != 0f || o.translateY != 0f;
-        boolean fills = com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)
-                || com.kooo.evcam.profile.LaneLayout.STRETCH.equals(fit);
+        boolean fills = com.kooo.evcam.profile.LaneLayout.FILL.equals(fit);
         if (turn == 0 && !mirrored && !cropped && !zoomed && !panned && !fills) {
             return false;
         }
@@ -91,10 +90,9 @@ public final class LaneSurfaceMatrix {
             return false;
         }
 
-        // 放到视图的哪一块，三档：
+        // 放到视图的哪一块，两档：
         //   适应 —— 整幅可见，比例不变，对不上的两边留黑
         //   填充 —— 铺满视图，比例不变，多出来的那一边居中裁掉
-        //   拉伸 —— 铺满视图，画面按视图的形状变形
         float pictureAspect = window.width() / window.height();
         float shownAspect = quarterTurn ? 1f / pictureAspect : pictureAspect;
         float viewAspect = (float) viewWidth / viewHeight;
@@ -125,7 +123,7 @@ public final class LaneSurfaceMatrix {
                     window.bottom = centre + half;
                 }
             }
-        } else if (!com.kooo.evcam.profile.LaneLayout.STRETCH.equals(fit)) {
+        } else {
             if (shownAspect < viewAspect) {
                 destWidth = viewHeight * shownAspect;
             } else if (shownAspect > viewAspect) {

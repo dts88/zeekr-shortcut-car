@@ -297,25 +297,18 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
      *
      * @param value summary 是一个短的当前值（「30 fps」「90°」）时为 true：值放行尾
      */
-    /** 「适应 / 填充 / 拉伸」轮着来。 */
+    /** 「适应」和「填充」来回换。 */
     private static String nextFit(String fit) {
-        if (com.kooo.evcam.profile.LaneLayout.FIT.equals(
-                com.kooo.evcam.profile.LaneLayout.normaliseFit(fit))) {
-            return com.kooo.evcam.profile.LaneLayout.FILL;
-        }
-        if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
-            return com.kooo.evcam.profile.LaneLayout.STRETCH;
-        }
-        return com.kooo.evcam.profile.LaneLayout.FIT;
+        return com.kooo.evcam.profile.LaneLayout.FILL.equals(
+                com.kooo.evcam.profile.LaneLayout.normaliseFit(fit))
+                ? com.kooo.evcam.profile.LaneLayout.FIT
+                : com.kooo.evcam.profile.LaneLayout.FILL;
     }
 
     private static String fitName(Context context, String fit) {
         String value = com.kooo.evcam.profile.LaneLayout.normaliseFit(fit);
         if (com.kooo.evcam.profile.LaneLayout.FILL.equals(value)) {
             return context.getString(R.string.editor_fit_fill);
-        }
-        if (com.kooo.evcam.profile.LaneLayout.STRETCH.equals(value)) {
-            return context.getString(R.string.editor_fit_stretch);
         }
         return context.getString(R.string.editor_fit_fit);
     }

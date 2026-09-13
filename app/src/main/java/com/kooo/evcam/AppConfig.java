@@ -1259,13 +1259,15 @@ public class AppConfig {
      * @return 摄像头名称
      */
     public String getCameraName(Context uiContext, String position) {
-        String defaultValue = CameraNames.ofSlot(uiContext, position);
-        // 预设车型返回默认名称
-        if (!isCustomCarModel()) {
-            return defaultValue;
+        // 认出来的那几路有定名，不让改 —— 否则「配置编辑里叫后座舱、主界面角标
+        // 叫别的」，两处对不上。没认出来的（自定义车型的四路、以后新发现的路）
+        // 名字归用户，填过就用填的
+        Integer fixed = CameraNames.roleResFor(uiContext, position);
+        if (fixed != null) {
+            return uiContext.getString(fixed);
         }
+        String defaultValue = CameraNames.of(uiContext, position);
 
-        // 自定义车型返回用户设置的名称
         String key;
         switch (position) {
             case "front":
