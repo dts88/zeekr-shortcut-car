@@ -2543,11 +2543,26 @@ public class MainActivity extends AppCompatActivity {
         // （applyPreviewCorrectionOnly 写的是单位阵）。而车型这个键默认是 zeekr_7x，
         // 于是三路配置的座舱相机掉进了「E5 兜底」那一条，把按配置算好的摆位盖掉 ——
         // 座舱旋转连修三次都没生效，就是栽在这。判断不看车型，只看配置里有没有那一格。
-        if (laneFor(cameraKey) != null) {
-            textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+        com.kooo.evcam.profile.LaneLayout ownLane = laneFor(cameraKey);
+        if (ownLane != null) {
+            // 视图的形状也归这一格管：
+            //   适应 —— 视图取画面的形状，在格子里居中，四周留黑（原来的样子）
+            //   填充 —— 视图<b>让出整格</b>，形状交给矩阵去补
+            //
+            // 只改矩阵是不够的：「适应」模式下 AutoFitTextureView 会先把视图缩成
+            // 画面的形状，转 90° 之后画面再怎么铺也只能铺满那个已经缩过的视图 ——
+            // 报上来的「选了填充还是顶不满」就是卡在这一层。
+            boolean fill = com.kooo.evcam.profile.LaneLayout.FILL.equals(
+                    com.kooo.evcam.profile.LaneLayout.normaliseFit(ownLane.fit));
+            if (fill) {
+                textureView.setAspectRatio(0, 0);
+            } else {
+                textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+            }
             textureView.setFillContainer(false);
-            AppLog.d(TAG, "设置 " + cameraKey + " 宽高比 " + previewSize.getWidth() + ":"
-                    + previewSize.getHeight() + "，摆位交给配置（SingleCamera）");
+            AppLog.d(TAG, "设置 " + cameraKey + (fill ? " 铺满整格" : " 宽高比 "
+                    + previewSize.getWidth() + ":" + previewSize.getHeight())
+                    + "，摆位交给配置（SingleCamera）");
             return;
         }
 

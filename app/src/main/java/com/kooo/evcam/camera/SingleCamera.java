@@ -301,7 +301,10 @@ public class SingleCamera {
                 return;
             }
             android.graphics.Matrix matrix = new android.graphics.Matrix();
+            android.util.Size buffer = previewSize;
             boolean shaped = LaneSurfaceMatrix.build(matrix, width, height,
+                    buffer == null ? 0 : buffer.getWidth(),
+                    buffer == null ? 0 : buffer.getHeight(),
                     lane.rotation, lane.mirrored,
                     lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
                     lane.scaleX, lane.scaleY, lane.translateX, lane.translateY, lane.fit);

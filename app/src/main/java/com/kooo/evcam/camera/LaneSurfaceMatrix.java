@@ -26,14 +26,25 @@ public final class LaneSurfaceMatrix {
     }
 
     /**
-     * 算出矩阵。{@code viewWidth × viewHeight} 是纹理铺满的那块区域 ——
-     * {@code AutoFitTextureView} 已经把视图做成了缓冲区的比例，所以在视图坐标系里
-     * 画面是不变形的。
+     * 算出矩阵。
      *
+     * <h3>为什么要知道缓冲区的形状</h3>
+     *
+     * <p>纹理是<b>铺满</b>视图的：视图什么形状，画面就被拉成什么形状。以前这里
+     * 假设「视图已经被做成了缓冲区的比例」，所以在视图坐标系里画面不变形 ——
+     * 那个假设在「适应」下成立，在「填充」下不成立：填充时视图占的是整格，
+     * 而整格和画面本来就不同形。</p>
+     *
+     * <p>所以这里自己算一个<b>压扁系数</b> k =（缓冲区比例）×（视图高/视图宽）。
+     * 视图正好是缓冲区的形状时 k = 1，下面所有算式都退回原来那一套 ——
+     * 这也是这次改动不会动到「适应」的原因。</p>
+     *
+     * @param bufferWidth  相机给的那块缓冲区，0 表示不知道（按 k = 1 处理）
      * @param rotation 顺时针旋转的度数
      * @return 是否真的有变换要应用；false 时 {@code out} 是单位矩阵
      */
     public static boolean build(Matrix out, int viewWidth, int viewHeight,
+                                int bufferWidth, int bufferHeight,
                                 int rotation, boolean mirrored,
                                 float cropTop, float cropBottom, float cropLeft, float cropRight,
                                 float scaleX, float scaleY,
@@ -41,6 +52,12 @@ public final class LaneSurfaceMatrix {
         out.reset();
         if (viewWidth <= 0 || viewHeight <= 0) {
             return false;
+        }
+        // 视图把缓冲区拉成了自己的形状，差的这一下要补回来
+        float squash = 1f;
+        if (bufferWidth > 0 && bufferHeight > 0) {
+            squash = ((float) bufferWidth / bufferHeight)
+                    * ((float) viewHeight / viewWidth);
         }
         int turn = LaneOrientation.normalise(rotation);
         boolean quarterTurn = LaneOrientation.quarterTurn(turn);
@@ -93,7 +110,7 @@ public final class LaneSurfaceMatrix {
         // 放到视图的哪一块，两档：
         //   适应 —— 整幅可见，比例不变，对不上的两边留黑
         //   填充 —— 铺满视图，比例不变，多出来的那一边居中裁掉
-        float pictureAspect = window.width() / window.height();
+        float pictureAspect = window.width() / window.height() * squash;
         float shownAspect = quarterTurn ? 1f / pictureAspect : pictureAspect;
         float viewAspect = (float) viewWidth / viewHeight;
         float destWidth = viewWidth;

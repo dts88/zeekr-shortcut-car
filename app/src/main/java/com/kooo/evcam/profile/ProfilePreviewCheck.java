@@ -88,7 +88,8 @@ public final class ProfilePreviewCheck {
                     return;
                 }
                 Matrix matrix = new Matrix();
-                if (LaneSurfaceMatrix.build(matrix, width, height, cell.rotation, cell.mirrored,
+                if (LaneSurfaceMatrix.build(matrix, width, height, 0, 0,
+                        cell.rotation, cell.mirrored,
                         cell.cropTop, cell.cropBottom, cell.cropLeft, cell.cropRight,
                         cell.scaleX, cell.scaleY, cell.translateX, cell.translateY,
                         cell.fit == null ? null : cell.fit.name().toLowerCase(java.util.Locale.US))) {

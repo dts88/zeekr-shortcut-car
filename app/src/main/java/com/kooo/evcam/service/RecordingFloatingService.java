@@ -945,9 +945,15 @@ public class RecordingFloatingService extends Service {
                         iconCornerRadius,
                         iconPaint
                 );
+            } else {
+                // 待机：中间那个点留着，但和外圈一样是灰的。
+                //
+                // 试过中间不画东西，只剩一个空圈 —— 太素，一眼认不出这是个按钮。
+                // 红色仍然只在录制时出现：说明「正在录」的是颜色，不是有没有点。
+                iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.text_tertiary));
+                canvas.drawCircle(centerX, centerY, radius * 0.32f, iconPaint);
+                iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
             }
-            // 待机时中间什么都不画：一个灰色空心圈就是「空闲」，
-            // 中间再摆一个红点，说的就成了「这是录制键」——它默认不是。
         }
     }
 }
