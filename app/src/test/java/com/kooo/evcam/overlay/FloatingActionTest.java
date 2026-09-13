@@ -40,13 +40,11 @@ public class FloatingActionTest {
     }
 
     @Test
-    public void keysAreUniqueAndInOrder() {
-        String[] keys = FloatingAction.keys();
-        assertEquals(FloatingAction.values().length, keys.length);
+    public void keysAreUnique() {
         Set<String> seen = new HashSet<>();
-        for (int i = 0; i < keys.length; i++) {
-            assertEquals(FloatingAction.values()[i].key, keys[i]);
-            assertNotEquals("重复的 key: " + keys[i], false, seen.add(keys[i]));
+        for (FloatingAction action : FloatingAction.values()) {
+            assertNotEquals("重复的 key: " + action.key, false, seen.add(action.key));
         }
+        assertEquals(FloatingAction.values().length, seen.size());
     }
 }

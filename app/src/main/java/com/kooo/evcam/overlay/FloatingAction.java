@@ -40,14 +40,4 @@ public enum FloatingAction {
         }
         return OPEN_APP;
     }
-
-    /** 存进配置里的那几个字符串，顺序与 {@link #values()} 一致。 */
-    public static String[] keys() {
-        FloatingAction[] all = values();
-        String[] out = new String[all.length];
-        for (int i = 0; i < all.length; i++) {
-            out[i] = all[i].key;
-        }
-        return out;
-    }
 }

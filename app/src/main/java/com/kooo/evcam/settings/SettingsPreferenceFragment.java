@@ -629,14 +629,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         ListPreference list = (ListPreference) pref;
-        String[] values = FloatingAction.keys();
-        String[] labels = {
-                getString(R.string.floating_action_open_app),
-                getString(R.string.floating_action_toggle_recording),
-                getString(R.string.floating_action_take_photo),
-                getString(R.string.floating_action_toggle_mirror)};
-        if (labels.length != values.length) {
-            throw new IllegalStateException("动作数量和选项文字对不上");
+        FloatingAction[] actions = FloatingAction.values();
+        String[] values = new String[actions.length];
+        String[] labels = new String[actions.length];
+        for (int i = 0; i < actions.length; i++) {
+            values[i] = actions[i].key;
+            labels[i] = getString(labelOf(actions[i]));
         }
         list.setEntries(labels);
         list.setEntryValues(values);
@@ -646,6 +644,27 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             onPick.set(String.valueOf(value));
             return true;
         });
+    }
+
+    /**
+     * 每个动作在界面上叫什么。
+     *
+     * <p>两个数组从 {@link FloatingAction#values()} 一起长出来，所以数量不会对不上；
+     * 新增一个动作时，忘了在这里加分支的后果是它显示成「打开主界面」——
+     * 不会崩，但会说谎，所以新增时两处一起改。</p>
+     */
+    private static int labelOf(FloatingAction action) {
+        switch (action) {
+            case TOGGLE_RECORDING:
+                return R.string.floating_action_toggle_recording;
+            case TAKE_PHOTO:
+                return R.string.floating_action_take_photo;
+            case TOGGLE_MIRROR:
+                return R.string.floating_action_toggle_mirror;
+            case OPEN_APP:
+            default:
+                return R.string.floating_action_open_app;
+        }
     }
 
     /** 透明度、时长开关这类改完要重建视图的项：关掉再开一次。 */
