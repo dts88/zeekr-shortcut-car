@@ -85,7 +85,6 @@ public class HardcodedTextTest {
         JAVA_ALLOWED.put("StorageCleanupManager.java", "清理通知只在录到内部存储时才发，而内部存储只有开发者能选");
         // ---- 不上界面的文字 ----
         JAVA_ALLOWED.put("camera/EglSurfaceEncoder.java", "GLSL 着色器源码里的注释");
-        JAVA_ALLOWED.put("camera/FisheyeCorrector.java", "GLSL 着色器源码里的注释");
         JAVA_ALLOWED.put("settings/SettingSpec.java", "设置定义写错时抛给开发者的异常");
         JAVA_ALLOWED.put("settings/SegmentedPreference.java", "设置定义写错时抛给开发者的异常");
         JAVA_ALLOWED.put("settings/SettingsRegistry.java", "日志用的设置名；界面上的名字走 strings");
@@ -115,10 +114,9 @@ public class HardcodedTextTest {
                 "layout/layout_custom_buttons_multi.xml",
                 "layout/layout_custom_buttons_multi_vertical.xml",
                 "layout/view_blind_spot_floating.xml", "layout/view_blind_spot_floating_multiview.xml",
-                "layout/view_fisheye_correction_floating.xml",
                 "layout/view_mock_turn_signal_floating.xml",
                 "layout/view_preview_correction_floating.xml",
-                // 自定义车型的画面点一下打开的鱼眼调整；自定义只在开发者选项里能选
+                // 自定义车型的画面长按打开的窗口调整；自定义只在开发者选项里能选
                 "layout/dialog_fullscreen_preview.xml"}) {
             XML_ALLOWED.put(f, xmlDeveloper);
         }
