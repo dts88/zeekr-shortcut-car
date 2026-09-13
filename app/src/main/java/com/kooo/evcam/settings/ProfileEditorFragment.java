@@ -461,8 +461,7 @@ public class ProfileEditorFragment extends Fragment {
         StringBuilder sb = new StringBuilder();
         for (ProfileValidation.Issue issue : ProfileValidation.check(profile, capabilities())) {
             if (sb.length() > 0) {
-                sb.append('
-');
+                sb.append('\n');
             }
             sb.append(describe(issue));
         }
