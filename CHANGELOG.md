@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.44.1-alpha] - 2026-09-13
+
 - Fixed: rotating a lane made the neighbouring lanes appear beside it. A lane keeps its
   own shape inside its cell, so there is empty space at the sides -- and that space holds
   the pixels of the lanes above and below it on the same strip. Upright, the strip runs
