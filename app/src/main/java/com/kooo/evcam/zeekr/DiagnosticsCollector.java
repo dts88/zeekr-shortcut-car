@@ -69,6 +69,7 @@ public final class DiagnosticsCollector {
         appendConfig(sb, context);
         appendFloatingLayout(sb, context);
         appendEncoders(sb, context);
+        appendLaneTransforms(sb, context);
         com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context);
         PlaybackCapabilityProbe.appendTo(sb, context);
         VehicleEnumeration.appendTo(sb, context);
@@ -518,6 +519,52 @@ public final class DiagnosticsCollector {
      * <p>所以这一节只做一件事：把编码器<b>自己声明</b>的尺寸范围、码率范围和
      * Profile/Level 抄出来。有了这几行，「20 Mbps 会不会被夹」就不再是猜的。</p>
      */
+    /**
+     * 每一路的摆位现在是什么状态。
+     *
+     * <h3>为什么要把这个印出来</h3>
+     *
+     * <p>座舱旋转连修三次都「没反应」，而三次的原因各不相同：第一次被别处的矩阵
+     * 盖掉，第二次代码没跑到，第三次判断条件是车型而车型不是想的那个值。
+     * 每一次都要再发一版才知道猜错没有。</p>
+     *
+     * <p>这几行让它当场可见：配置里有没有这一格、那一格写着什么、最近一次摆位
+     * 做成了什么。下次再「没反应」，报告里就有答案。</p>
+     */
+    private static void appendLaneTransforms(StringBuilder sb, Context context) {
+        sb.append("## 8.1 每一路的摆位").append('\n');
+        try {
+            com.kooo.evcam.profile.Profile profile =
+                    new com.kooo.evcam.profile.ProfileStore(context).current();
+            for (String key : new String[]{"front", "back", "left", "right"}) {
+                String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(key);
+                if (role == null) {
+                    continue;
+                }
+                com.kooo.evcam.profile.CameraProfile camera = profile.camera(role);
+                sb.append(key).append(" (").append(role).append("): ");
+                if (camera == null || camera.lanes.isEmpty()) {
+                    sb.append("配置里没有这一路").append('\n');
+                    continue;
+                }
+                for (com.kooo.evcam.profile.LaneLayout lane : camera.lanes) {
+                    sb.append('\n').append("    ").append(lane);
+                }
+                sb.append('\n');
+                com.kooo.evcam.camera.MultiCameraManager manager = com.kooo.evcam.camera
+                        .CameraManagerHolder.getInstance().getCameraManager();
+                com.kooo.evcam.camera.SingleCamera single =
+                        manager == null ? null : manager.getCamera(key);
+                sb.append("    最近一次摆位: ")
+                        .append(single == null ? "相机没起来" : single.getLaneTransformNote())
+                        .append('\n');
+            }
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
     private static void appendEncoders(StringBuilder sb, Context context) {
         sb.append("## 8. 硬件编码器能力").append('\n');
         int[] target = encodeTarget(context);

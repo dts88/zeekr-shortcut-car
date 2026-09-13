@@ -5,7 +5,16 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Fixed, fourth attempt: rotation and mirroring on the cabin cameras. Every attempt so far
+  keyed the decision off the car model, and that setting defaults to the single-stream
+  Zeekr and only changes if someone picks the three-stream option by hand -- so the main
+  screen took a different branch, and that branch wrote an identity matrix over the one
+  built from the profile. The question is no longer "which car model is this" but "does
+  the profile have a lane for this camera"; if it does, the camera owns its transform and
+  nothing else writes one.
+- Diagnostics reports each camera's lane and what the last attempt to apply it did. Three
+  fixes in a row came back as "no effect" for three different reasons, each costing a
+  release to find out. Now the report says which link is broken.
 
 ## [0.46.1-alpha] - 2026-09-13
 

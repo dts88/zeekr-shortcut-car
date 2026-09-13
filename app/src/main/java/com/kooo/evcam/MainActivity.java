@@ -2472,8 +2472,43 @@ public class MainActivity extends AppCompatActivity {
      * 根据车型和摄像头位置，对 TextureView 应用正确的宽高比和旋转变换。
      * 从 previewSizeCallback 提取，避免正常初始化和后台复用路径的代码重复。
      */
+    /**
+     * 这一路在当前配置里的那一格；不拆分的那几路只有一格。取不到返回 null。
+     *
+     * <p>「取得到」= 这一路的摆位由配置说了算，本界面不要再往它的 TextureView
+     * 上写矩阵。判断只看配置，不看车型 —— 看车型是前三次修座舱旋转都栽的那个坑。</p>
+     */
+    private com.kooo.evcam.profile.LaneLayout laneFor(String cameraKey) {
+        String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(cameraKey);
+        if (role == null) {
+            return null;
+        }
+        if (activeProfile == null) {
+            activeProfile = new ProfileStore(this).current();
+        }
+        CameraProfile camera = activeProfile.camera(role);
+        if (camera == null || camera.lanes.isEmpty()) {
+            return null;
+        }
+        return camera.lanes.get(0);
+    }
+
     private void applyPreviewSizeTransform(String cameraKey, AutoFitTextureView textureView, android.util.Size previewSize) {
         String carModel = appConfig.getCarModel();
+
+        // 配置里有这一路的那一格时，矩阵由 SingleCamera 一家说了算。
+        //
+        // 这里原来按车型分了好几个分支，每一条最后都会往 TextureView 上写一次矩阵
+        // （applyPreviewCorrectionOnly 写的是单位阵）。而车型这个键默认是 zeekr_7x，
+        // 于是三路配置的座舱相机掉进了「E5 兜底」那一条，把按配置算好的摆位盖掉 ——
+        // 座舱旋转连修三次都没生效，就是栽在这。判断不看车型，只看配置里有没有那一格。
+        if (laneFor(cameraKey) != null) {
+            textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+            textureView.setFillContainer(false);
+            AppLog.d(TAG, "设置 " + cameraKey + " 宽高比 " + previewSize.getWidth() + ":"
+                    + previewSize.getHeight() + "，摆位交给配置（SingleCamera）");
+            return;
+        }
 
         // 极氪合成流：比例与排版由 FourLaneContainer 负责。
         // 这里绝不能给 TextureView 设 1280:5140 这种长条宽高比或预览矩阵，
@@ -2497,19 +2532,6 @@ public class MainActivity extends AppCompatActivity {
                 customLayoutManager.updateCameraAspectRatio(cameraKey, previewSize.getWidth(), previewSize.getHeight(), 0);
             }
             applyPreviewCorrectionOnly(textureView, cameraKey);
-        } else if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
-            // 三路配置的两路座舱相机：默认按原样显示，转不转由配置里那一格说。
-            //
-            // 这一档以前没有自己的分支，会掉进下面的 E5 兜底 —— 那里的 "left"
-            // 指的是「装在车身左侧的摄像头」，要转 270 度才正。但在这个配置里
-            // texture_left 只是第三个槽位，装的是一路普通的座舱相机，本来就是正的。
-            // 所以这里不能按槽位名硬转，只能按配置转。
-            textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
-            textureView.setFillContainer(false);
-            // 变换由 SingleCamera 按配置那一格来做 —— 这里再设一次只会互相覆盖，
-            // 而它那几个调用点才是确定会跑的（见 SingleCamera.applyLaneTransform）
-            AppLog.d(TAG, "设置 " + cameraKey + " 座舱相机宽高比: "
-                    + previewSize.getWidth() + ":" + previewSize.getHeight());
         } else {
             // E5 等其他车型
             boolean needRotation = "left".equals(cameraKey) || "right".equals(cameraKey);

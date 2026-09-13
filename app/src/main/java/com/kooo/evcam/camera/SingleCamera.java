@@ -52,8 +52,8 @@ public class SingleCamera {
     private CameraCallback callback;
     private String cameraPosition;  // 摄像头位置（front/back/left/right）
     private int customRotation = 0;  // 自定义旋转角度（仅用于自定义车型）
-    /** 这一路的摆法由配置里那一格说了算，本类不要再往 TextureView 上写矩阵。 */
-    private boolean laneDriven = false;
+    /** 最近一次按配置摆位的结果，只给诊断报告看。 */
+    private volatile String laneTransformNote = "还没试过";
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -184,28 +184,24 @@ public class SingleCamera {
         if (autoMirrorBack() && textureView != null) {
             applyMirrorTransform();
         }
-        if (laneDriven && textureView != null) {
+        if (textureView != null) {
             applyLaneTransform();
         }
     }
 
     /**
-     * 这一路的旋转镜像由配置里那一格决定，本类不要插手。
+     * 「back 一律加左右镜像」这条祖传规则还该不该生效。
      *
-     * <h3>为什么需要这个开关</h3>
+     * <p>它是给自定义 / E5 车型写的 —— 那里的 back 是倒车影像，本来就该反着看。
+     * 但在「环视 + 两路座舱」里，back 这个槽位装的是<b>座舱第一路</b>：它被无条件
+     * 镜像，而且是直接 {@code setTransform}，把配置算出来的矩阵整个盖掉。</p>
      *
-     * <p>下面那条「{@code back} 一律加左右镜像」是给自定义/E5 车型写的 ——
-     * 那里的 back 是倒车影像，本来就该反着看。但在「环视 + 两路座舱」这个配置里，
-     * back 这个槽位装的是<b>座舱第一路</b>：它被无条件镜像，而且是直接
-     * {@code setTransform}，把配置算出来的矩阵整个盖掉。表现就是编辑器里转了、
-     * 存了、显示着 90°，画面一动不动。</p>
+     * <p>判断只看<b>配置里有没有这一路的那一格</b>。原来看的是车型，而车型这个键
+     * 默认是 {@code zeekr_7x}，没人手动改过就一直是它 —— 座舱旋转前三次没修好，
+     * 每次都绕回这个坑。</p>
      */
-    public void setLaneDriven(boolean value) {
-        this.laneDriven = value;
-    }
-
     private boolean autoMirrorBack() {
-        return !laneDriven && "back".equals(cameraPosition);
+        return "back".equals(cameraPosition) && laneForThisCamera() == null;
     }
 
     public void setTextureView(TextureView textureView) {
@@ -214,11 +210,11 @@ public class SingleCamera {
         if (autoMirrorBack() && this.textureView != null) {
             applyMirrorTransform();
         }
-        if (!laneDriven && customRotation != 0
+        if (customRotation != 0 && laneForThisCamera() == null
                 && this.textureView != null && this.textureView.isAvailable()) {
             applyCustomRotation();
         }
-        if (laneDriven && this.textureView != null) {
+        if (this.textureView != null) {
             applyLaneTransform();
         }
     }
@@ -287,6 +283,12 @@ public class SingleCamera {
     private void applyLaneTransform() {
         final TextureView view = textureView;
         if (view == null) {
+            laneTransformNote = "没有 TextureView";
+            return;
+        }
+        final com.kooo.evcam.profile.LaneLayout lane = laneForThisCamera();
+        if (lane == null) {
+            laneTransformNote = "配置里没有这一路";
             return;
         }
         view.post(() -> {
@@ -294,21 +296,28 @@ public class SingleCamera {
             int height = view.getHeight();
             if (width <= 0 || height <= 0) {
                 // 还没量出来，等下一帧
+                laneTransformNote = "视图还没有尺寸，等下一帧";
                 view.postDelayed(this::applyLaneTransform, 100);
                 return;
             }
             android.graphics.Matrix matrix = new android.graphics.Matrix();
-            com.kooo.evcam.profile.LaneLayout lane = laneForThisCamera();
-            boolean shaped = lane != null && LaneSurfaceMatrix.build(matrix, width, height,
+            boolean shaped = LaneSurfaceMatrix.build(matrix, width, height,
                     lane.rotation, lane.mirrored,
                     lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
                     lane.scaleX, lane.scaleY, lane.translateX, lane.translateY);
             com.kooo.evcam.PreviewCorrection.postApply(
                     matrix, new AppConfig(context), cameraPosition, width, height);
             view.setTransform(matrix);
+            laneTransformNote = (shaped ? "已应用 " + lane : "这一格没有任何变换")
+                    + "，视图 " + width + "x" + height;
             AppLog.i(TAG, "Camera " + cameraId + " (" + cameraPosition + ") 按配置摆位: "
-                    + (shaped ? String.valueOf(lane) : "无变换") + "，视图 " + width + "x" + height);
+                    + laneTransformNote);
         });
+    }
+
+    /** 最近一次按配置摆位的结果，给诊断报告用。 */
+    public String getLaneTransformNote() {
+        return laneTransformNote;
     }
 
     /** 配置里这一路的那一格；不拆分的那几路只有一格。取不到返回 null。 */
@@ -1414,13 +1423,11 @@ public class SingleCamera {
                     applyMirrorTransform();
                 }
 
-                if (!laneDriven && customRotation != 0) {
+                if (customRotation != 0 && laneForThisCamera() == null) {
                     applyCustomRotation();
                 }
 
-                if (laneDriven) {
-                    applyLaneTransform();
-                }
+                applyLaneTransform();
 
                 if (previewSurface == null || !previewSurface.isValid()) {
                     if (previewSurface != null) {
