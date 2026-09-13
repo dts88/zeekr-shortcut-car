@@ -93,8 +93,9 @@
                                     android:textAppearance="@style/TextAppearance.Cam.Body" />
                             </FrameLayout>
 
-                            <!-- 两路座舱，上下叠放 -->
+                            <!-- 两路座舱，上下叠放。放大环视的一格时整列让出来 -->
                             <LinearLayout
+                                android:id="@+id/cabin_column"
                                 android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_marginStart="@dimen/gutter"

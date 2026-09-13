@@ -123,7 +123,16 @@ public class MainActivity extends AppCompatActivity {
 
     /** 极氪布局里是一张卡片（点 + 环 + 两行字），自定义车型里还是普通按钮 —— 所以只当 View 用。 */
     private View btnStartRecord;
-    private Button btnExit, btnTakePhoto;
+    private Button btnExit, btnMinimize, btnTakePhoto;
+
+    /** 点开放大了哪一块：环视那一块，或者座舱的某一格；null 表示没放大。 */
+    private View expandedPreview;
+    /** 放大的是座舱哪一路（back / left）；放大的是环视时为 null。 */
+    private String expandedCameraKey;
+    /** 放大时让出来的那几块，还原时原样放回去。 */
+    private final java.util.List<View> hiddenForExpand = new java.util.ArrayList<>();
+    /** 后座舱那一格上边有一道间隙，放大时先拿掉，还原时放回。 */
+    private int expandedTopMargin = -1;
     /** 录制键的三个状态和本段进度都由它画。 */
     private com.kooo.evcam.ui.RecordButtonUi recordButtonUi;
     private MultiCameraManager cameraManager;
@@ -620,7 +629,7 @@ public class MainActivity extends AppCompatActivity {
         }
         
         btnStartRecord = findViewById(R.id.btn_start_record);
-        btnExit = findViewById(R.id.btn_exit);
+        btnMinimize = findViewById(R.id.btn_minimize);
         btnTakePhoto = findViewById(R.id.btn_take_photo);
         
         // 初始化录制状态显示
@@ -672,8 +681,11 @@ public class MainActivity extends AppCompatActivity {
         // 录制按钮：点击切换录制状态
         btnStartRecord.setOnClickListener(v -> toggleRecording());
 
-        // 退出按钮：完全退出应用
-        btnExit.setOnClickListener(v -> exitApp());
+        // 隐藏到后台：录制和悬浮按钮照旧，只把界面收起来。
+        // 真正的退出在抽屉和设置左栏的最底下（自定义布局的按钮在下面另接，那里仍是退出）
+        if (btnMinimize != null) {
+            btnMinimize.setOnClickListener(v -> moveTaskToBack(true));
+        }
 
         btnTakePhoto.setOnClickListener(v -> takePicture());
 
@@ -1329,6 +1341,11 @@ public class MainActivity extends AppCompatActivity {
             if (itemId == R.id.nav_floating_button) {
                 toggleFloatingButtonFromDrawer();
                 return false;
+            }
+
+            if (itemId == R.id.nav_exit) {
+                exitApp();
+                return true;
             }
             
             if (itemId == R.id.nav_recording) {
@@ -2533,7 +2550,9 @@ public class MainActivity extends AppCompatActivity {
             // 只改矩阵是不够的：「适应」模式下 AutoFitTextureView 会先把视图缩成
             // 画面的形状，转 90° 之后画面再怎么铺也只能铺满那个已经缩过的视图 ——
             // 报上来的「选了填充还是顶不满」就是卡在这一层。
-            boolean fill = com.kooo.evcam.profile.LaneLayout.FILL.equals(
+            // 主界面点开放大的那一路一律铺满（见 setupCompositeControls）
+            boolean fill = cameraKey.equals(expandedCameraKey)
+                    || com.kooo.evcam.profile.LaneLayout.FILL.equals(
                     com.kooo.evcam.profile.LaneLayout.normaliseFit(ownLane.fit));
             if (fill) {
                 textureView.setAspectRatio(0, 0);
@@ -3523,8 +3542,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 完全退出应用（包括后台进程）
      * 这是用户主动退出，需要停止所有服务
+     *
+     * <p>入口在抽屉和设置左栏的最底下。主界面右下角那个键现在是「隐藏到后台」——
+     * 原来那个 × 两件事都像，按下去之前猜不到是收起来还是全关掉。</p>
      */
-    private void exitApp() {
+    public void exitApp() {
         AppLog.d(TAG, "用户请求退出应用，停止所有服务...");
         
         // 停止录制（如果正在录制）
@@ -4217,51 +4239,147 @@ public class MainActivity extends AppCompatActivity {
     // ==================== 极氪合成流 ====================
 
     /**
-     * 合成流界面的交互：点击画面在四宫格 / 单画面之间切换，
-     * 单画面模式下再次点击换下一个画面。
+     * 点画面放大，再点还原。
+     *
+     * <h3>为什么撤掉四宫格键</h3>
+     *
+     * <p>那个键只做一件事：四宫格和单画面来回切。可切到单画面时它总是先给前视，
+     * 想看左视还得再点画面轮一圈 —— 想看哪一格，却要先按键、再数着点。
+     * 直接点那一格才是这件事本来的手势。拍照键因此独占一行。</p>
+     *
+     * <h3>放大到哪、怎么铺</h3>
+     *
+     * <p>整块预览区。三路布局里点环视的一格，座舱那一列先让出来，再放大那一格；
+     * 点座舱的一路，环视和另一路让出来。放大后一律<b>填充</b>（铺满、裁边），
+     * 不按那一格原来的「适应」—— 放大就是为了看清，留两条黑边等于没放大。
+     * 这些都不写配置：放大是看一眼的事。</p>
      */
     private void setupCompositeControls() {
         if (compositeContainer == null) {
             return;
         }
-        Button btnMode = findViewById(R.id.btn_composite_mode);
-        if (btnMode != null) {
-            btnMode.setOnClickListener(v -> toggleCompositeMode(btnMode));
+        // 布局可能是重建出来的：上一份布局里的放大状态作废，
+        // 但相机对象还是那几个，座舱那一路的「填充」得撤掉
+        hiddenForExpand.clear();
+        if (expandedCameraKey != null && cameraManager != null) {
+            com.kooo.evcam.camera.SingleCamera camera = cameraManager.getCamera(expandedCameraKey);
+            if (camera != null) {
+                camera.setFitOverride(null);
+            }
         }
+        expandedPreview = null;
+        expandedCameraKey = null;
+        expandedTopMargin = -1;
+
         compositeContainer.setOnClickListener(v -> {
-            if (compositeContainer.getDisplayMode()
-                    == com.kooo.evcam.zeekr.FourLaneContainer.DisplayMode.SINGLE) {
-                int next = (compositeContainer.getFocusedLane() + 1)
-                        % com.kooo.evcam.zeekr.CompositeStreamGeometry.LANE_COUNT;
-                compositeContainer.focusLane(next);
-                updateCompositeLabels();
+            if (expandedPreview != null) {
+                collapsePreview();
+                return;
+            }
+            int lane = compositeContainer.laneAtLastTouch();
+            if (lane >= 0) {
+                expandCompositeLane(lane);
             }
         });
+        View cabinFront = findViewById(R.id.pane_cabin_front);
+        if (cabinFront != null) {
+            cabinFront.setOnClickListener(v -> toggleCabinExpanded(v, "back"));
+        }
+        View cabinRear = findViewById(R.id.pane_cabin_rear);
+        if (cabinRear != null) {
+            cabinRear.setOnClickListener(v -> toggleCabinExpanded(v, "left"));
+        }
         updateCompositeLabels();
     }
 
-    private void toggleCompositeMode(Button btnMode) {
-        if (compositeContainer == null) {
+    /** 环视的某一格放大到整块预览区。 */
+    private void expandCompositeLane(int lane) {
+        hideForExpand(findViewById(R.id.cabin_column));
+        View wrapper = findViewById(R.id.composite_wrapper);
+        expandedPreview = wrapper != null ? wrapper : compositeContainer;
+        expandedCameraKey = null;
+        compositeContainer.focusLane(lane);
+        updateCompositeLabels();
+    }
+
+    /** 座舱的某一路放大到整块预览区；已经放大了就还原。 */
+    private void toggleCabinExpanded(View pane, String cameraKey) {
+        if (expandedPreview != null) {
+            collapsePreview();
             return;
         }
-        boolean isGrid = compositeContainer.getDisplayMode()
-                == com.kooo.evcam.zeekr.FourLaneContainer.DisplayMode.GRID;
-        if (isGrid) {
-            compositeContainer.focusLane(0);
-            btnMode.setText(R.string.zeekr_mode_single);
-            setModeIcon(btnMode, R.drawable.ic_single);
-        } else {
-            compositeContainer.showGrid();
-            btnMode.setText(R.string.zeekr_mode_grid);
-            setModeIcon(btnMode, R.drawable.ic_grid);
+        hideForExpand(findViewById(R.id.composite_wrapper));
+        hideForExpand(findViewById(pane.getId() == R.id.pane_cabin_front
+                ? R.id.pane_cabin_rear : R.id.pane_cabin_front));
+        if (pane.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+            android.view.ViewGroup.MarginLayoutParams params =
+                    (android.view.ViewGroup.MarginLayoutParams) pane.getLayoutParams();
+            expandedTopMargin = params.topMargin;
+            params.topMargin = 0;
+            pane.setLayoutParams(params);
         }
-        updateCompositeLabels();
+        expandedPreview = pane;
+        expandedCameraKey = cameraKey;
+        setCabinFill(cameraKey, true);
     }
 
-    /** 按钮上的字说的是现在的模式，图标也跟着说同一件事。 */
-    private static void setModeIcon(Button button, int icon) {
-        if (button instanceof com.google.android.material.button.MaterialButton) {
-            ((com.google.android.material.button.MaterialButton) button).setIconResource(icon);
+    /** 只收起本来看得见的：本来就藏着的（这一路没配）还原时也不该冒出来。 */
+    private void hideForExpand(View view) {
+        if (view != null && view.getVisibility() == View.VISIBLE) {
+            view.setVisibility(View.GONE);
+            hiddenForExpand.add(view);
+        }
+    }
+
+    /** 放回原样。 */
+    private void collapsePreview() {
+        View expanded = expandedPreview;
+        String cameraKey = expandedCameraKey;
+        // 先清状态再恢复形状：applyPreviewSizeTransform 会看 expandedCameraKey，
+        // 不先清的话它还会按「放大中」把视图摆成铺满
+        expandedPreview = null;
+        expandedCameraKey = null;
+        for (View view : hiddenForExpand) {
+            view.setVisibility(View.VISIBLE);
+        }
+        hiddenForExpand.clear();
+        if (cameraKey != null) {
+            if (expandedTopMargin >= 0 && expanded != null && expanded.getLayoutParams()
+                    instanceof android.view.ViewGroup.MarginLayoutParams) {
+                android.view.ViewGroup.MarginLayoutParams params =
+                        (android.view.ViewGroup.MarginLayoutParams) expanded.getLayoutParams();
+                params.topMargin = expandedTopMargin;
+                expanded.setLayoutParams(params);
+            }
+            setCabinFill(cameraKey, false);
+        } else if (compositeContainer != null) {
+            compositeContainer.showGrid();
+            updateCompositeLabels();
+        }
+        expandedTopMargin = -1;
+    }
+
+    /**
+     * 座舱那一路放大时铺满，还原时回到配置里的摆法。
+     *
+     * <p>要动两层：视图的形状（AutoFitTextureView 会先把自己缩成画面的形状）和
+     * 矩阵（SingleCamera 按「适应 / 填充」算）。只改矩阵是顶不满的 ——
+     * 0.47.x 那两次「填充不顶满」就是卡在视图那一层。</p>
+     */
+    private void setCabinFill(String cameraKey, boolean fill) {
+        com.kooo.evcam.camera.SingleCamera camera =
+                cameraManager == null ? null : cameraManager.getCamera(cameraKey);
+        if (camera != null) {
+            camera.setFitOverride(fill ? com.kooo.evcam.profile.LaneLayout.FILL : null);
+        }
+        AutoFitTextureView view = "back".equals(cameraKey) ? textureBack : textureLeft;
+        if (view == null) {
+            return;
+        }
+        if (fill) {
+            view.setAspectRatio(0, 0);
+        } else if (camera != null && camera.getPreviewSize() != null) {
+            applyPreviewSizeTransform(cameraKey, view, camera.getPreviewSize());
         }
     }
 

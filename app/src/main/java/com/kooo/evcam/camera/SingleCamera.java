@@ -56,6 +56,8 @@ public class SingleCamera {
     private volatile String laneTransformNote = "还没试过";
     /** 挂在预览视图上的重算监听，挂一次就够。 */
     private android.view.View.OnLayoutChangeListener laneLayoutWatch;
+    /** 主界面点开放大时临时改成「填充」；null 表示按配置里那一格走。 */
+    private volatile String fitOverride;
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -319,7 +321,8 @@ public class SingleCamera {
                     buffer == null ? 0 : buffer.getHeight(),
                     lane.rotation, lane.mirrored,
                     lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
-                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY, lane.fit);
+                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY,
+                    fitOverride != null ? fitOverride : lane.fit);
             com.kooo.evcam.PreviewCorrection.postApply(
                     matrix, new AppConfig(context), cameraPosition, width, height);
             view.setTransform(matrix);
@@ -328,6 +331,16 @@ public class SingleCamera {
             AppLog.i(TAG, "Camera " + cameraId + " (" + cameraPosition + ") 按配置摆位: "
                     + laneTransformNote);
         });
+    }
+
+    /**
+     * 临时换一种铺法：主界面点开放大时用「填充」，传 null 回到配置里那一格的铺法。
+     *
+     * <p>不写配置 —— 放大是看一眼的事，不该改掉存下来的摆法。</p>
+     */
+    public void setFitOverride(String fit) {
+        fitOverride = fit;
+        applyLaneTransform();
     }
 
     /** 最近一次按配置摆位的结果，给诊断报告用。 */

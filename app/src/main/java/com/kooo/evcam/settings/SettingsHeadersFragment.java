@@ -150,6 +150,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 } else if ("pref_check_update".equals(key)) {
                     // 顶层的动作条目：它不属于任何分区，右栏按 key 取子树时取不到它
                     UpdateFlow.start(getActivity());
+                } else if ("pref_exit".equals(key)) {
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).exitApp();
+                    }
                 } else if (row.section && getParentFragment() instanceof SettingsShellFragment) {
                     ((SettingsShellFragment) getParentFragment()).showSection(key, row.order);
                 }
@@ -182,6 +186,8 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return R.drawable.ic_update;
             case "screen_about":
                 return R.drawable.ic_info;
+            case "pref_exit":
+                return R.drawable.ic_power;
             default:
                 return 0;
         }

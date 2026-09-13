@@ -2,9 +2,10 @@
 <!--
   ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
 
-  按钮 id 一个没改（btn_start_record / btn_take_photo / btn_exit / btn_composite_mode /
-  btn_video_playback / btn_photo_playback / btn_settings），MainActivity 里原有的
-  findViewById 与点击绑定原样生效。
+  按钮：btn_start_record / btn_take_photo / btn_video_playback / btn_photo_playback /
+  btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，再点还原
+  （MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
+  「隐藏到后台」；真正的退出在抽屉和设置左栏的最底下。
 
   主操作只有录制一个：它大一档（132dp），状态由左侧的点（圆 ⇄ 方）和外圈分段进度环表示，
   红色只出现在那一小块上 —— 红标的是「正在录」这件事，不是这个按钮。
@@ -107,32 +108,15 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <LinearLayout
+    <!-- 拍照独占一行：四宫格键撤了，放大一格改成直接点画面 -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_take_photo"
+        style="@style/Widget.Cam.RailTile"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/rail_tile_height"
         android:layout_marginTop="@dimen/gutter"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_take_photo"
-            style="@style/Widget.Cam.RailTile"
-            android:layout_width="0dp"
-            android:layout_height="@dimen/rail_tile_height"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
-            android:text="@string/rail_photo"
-            app:icon="@drawable/ic_camera" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_composite_mode"
-            style="@style/Widget.Cam.RailTile"
-            android:layout_width="0dp"
-            android:layout_height="@dimen/rail_tile_height"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:text="@string/zeekr_mode_grid"
-            app:icon="@drawable/ic_grid" />
-    </LinearLayout>
+        android:text="@string/rail_photo"
+        app:icon="@drawable/ic_camera" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -181,14 +165,18 @@
             android:text="@string/rail_settings"
             app:icon="@drawable/ic_settings" />
 
-        <!-- 退出降一级：72dp、次要色 —— 不再和录制平起平坐 -->
+        <!--
+          隐藏到后台：录制、悬浮按钮照旧，只把界面收起来。
+          原来这里是「×退出」，× 既像「关掉这一页」又像「全部退出」，按之前猜不到是哪个。
+          真正的退出挪到抽屉和设置左栏的最底下 —— 往下找得到，手滑点不到。
+        -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_exit"
+            android:id="@+id/btn_minimize"
             style="@style/Widget.Cam.IconButton"
             android:layout_width="@dimen/rail_small_height"
             android:layout_height="@dimen/rail_small_height"
-            android:contentDescription="@string/cd_exit"
-            app:icon="@drawable/ic_exit"
+            android:contentDescription="@string/cd_minimize"
+            app:icon="@drawable/ic_minimize"
             app:iconTint="@color/text_secondary" />
     </LinearLayout>
 </LinearLayout>

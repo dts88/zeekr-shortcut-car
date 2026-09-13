@@ -13,7 +13,6 @@
     <string name="cell_bottom_left">左下</string>
     <string name="cell_bottom_right">右下</string>
     <string name="zeekr_mode_grid">四宫格</string>
-    <string name="zeekr_mode_single">单画面</string>
     <string name="zeekr_composite_not_found">未检测到四联合成流，本机可能不支持极氪合成模式</string>
 
     <!-- 关于页面 -->
@@ -365,7 +364,9 @@
     <string name="rail_photo">拍照</string>
     <string name="rail_settings">设置</string>
     <string name="cd_menu">菜单</string>
-    <string name="cd_exit">退出</string>
+    <string name="cd_minimize">隐藏到后台</string>
+    <string name="nav_exit">退出应用</string>
+    <string name="set_screen_off_locked">锁定中：打开开发者选项后才能开启</string>
     <string name="set_rail_side_title">操作按钮位置</string>
     <string name="set_rail_side_summary">放在离驾驶座近的那一侧</string>
     <string name="opt_rail_right">右侧</string>

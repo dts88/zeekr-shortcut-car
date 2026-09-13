@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ic_minimize：统一图标集的一员（24dp 网格、线宽 1.7、圆头）。着色由使用方的 iconTint 决定。
+
+  「隐藏到后台」：一支往下的箭头落到一条底线上 —— 收下去，但还在。
+  原来这个位置是一个 ×，× 同时像「关掉这一页」和「退出整个应用」，
+  点的人分不清按下去会发生哪一件。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12,4.5V15M7.5,10.5L12,15L16.5,10.5M5,19.5H19" />
+</vector>

@@ -62,6 +62,8 @@ public class RecordingFloatingService extends Service {
 
     /** 大小、字号、透明度、时长显示改了，就地重贴一遍。 */
     public static final String ACTION_UPDATE_STYLE = "com.kooo.evcam.action.UPDATE_FLOATING_STYLE";
+    /** 「重置悬浮窗布局」：大小和位置回默认，当场挪过去。 */
+    public static final String ACTION_RESET_POSITION = "com.kooo.evcam.action.RESET_FLOATING_POSITION";
 
     /**
      * 录制状态变了，告诉按钮换颜色。
@@ -308,6 +310,11 @@ public class RecordingFloatingService extends Service {
                 if (floatingContainer != null) {
                     mainHandler.post(this::applyStyle);
                 }
+            } else if (ACTION_RESET_POSITION.equals(action)) {
+                // 同上：没显示就不管，下次显示时自然落在默认位置
+                if (floatingContainer != null) {
+                    mainHandler.post(this::resetPosition);
+                }
             } else {
                 showFloatingWindow();
             }
@@ -374,6 +381,39 @@ public class RecordingFloatingService extends Service {
         stopTimeUpdate();
     }
 
+    /**
+     * 放到上次拖到的位置；没存过（或刚被重置）就放到默认位置。
+     *
+     * <p>默认位置是原来那个「打开应用」按钮调好的位置（3200x2000 上测得，
+     * 按当前屏幕等比换算，见 AppConfig）。</p>
+     */
+    private void placeAtSavedOrDefault(int buttonSizePx) {
+        int x = appConfig.getRecordingFloatingX();
+        int y = appConfig.getRecordingFloatingY();
+        if (x < 0 || y < 0) {
+            x = AppConfig.scaleDefaultX(AppConfig.DEFAULT_FLOATING_WINDOW_X, screenWidth);
+            y = AppConfig.scaleDefaultY(AppConfig.DEFAULT_FLOATING_WINDOW_Y, screenHeight);
+        }
+        layoutParams.x = Math.min(x, Math.max(0, screenWidth - buttonSizePx));
+        layoutParams.y = Math.min(y, Math.max(0, screenHeight - buttonSizePx));
+    }
+
+    /**
+     * 重置之后当场挪过去。
+     *
+     * <p>以前重置只清配置，按钮留在原地，要等下次重新显示才回去 —— 点了提示
+     * 「已重置」、按钮纹丝不动，看起来就是没生效。</p>
+     */
+    private void resetPosition() {
+        if (floatingContainer == null || recordingButton == null) {
+            return;
+        }
+        applyStyle();
+        placeAtSavedOrDefault(recordingButton.getLayoutParams().width);
+        windowManager.updateViewLayout(floatingContainer, layoutParams);
+        AppLog.i(TAG, "悬浮按钮已回到默认位置: " + layoutParams.x + "," + layoutParams.y);
+    }
+
     private void createFloatingWindow() {
         // 获取配置的大小
         int buttonSizeDp = appConfig.getRecordingFloatingButtonSizeDp();
@@ -433,16 +473,8 @@ public class RecordingFloatingService extends Service {
 
         layoutParams.gravity = Gravity.TOP | Gravity.START;
 
-        // 恢复上次拖到的位置；没存过就用实车调好的默认位置
-        // （2026-08-29 在 3200x2000 上测得，按当前屏幕等比换算，见 AppConfig）
-        int savedX = appConfig.getRecordingFloatingX();
-        int savedY = appConfig.getRecordingFloatingY();
-        if (savedX < 0 || savedY < 0) {
-            savedX = AppConfig.scaleDefaultX(AppConfig.DEFAULT_RECORDING_FLOATING_X, screenWidth);
-            savedY = AppConfig.scaleDefaultY(AppConfig.DEFAULT_RECORDING_FLOATING_Y, screenHeight);
-        }
-        layoutParams.x = Math.min(savedX, Math.max(0, screenWidth - buttonSize));
-        layoutParams.y = Math.min(savedY, Math.max(0, screenHeight - buttonSize));
+        // 恢复上次拖到的位置；没存过就用默认位置
+        placeAtSavedOrDefault(buttonSize);
 
         // 设置触摸事件
         floatingContainer.setOnTouchListener(new View.OnTouchListener() {

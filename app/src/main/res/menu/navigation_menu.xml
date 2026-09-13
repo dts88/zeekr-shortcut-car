@@ -65,6 +65,12 @@
                 android:checkable="true"
                 android:icon="@drawable/ic_info"
                 android:title="@string/about_title" />
+            <!-- 最底下：和主界面那个「隐藏到后台」分开，真要退出往下找得到 -->
+            <item
+                android:id="@+id/nav_exit"
+                android:checkable="false"
+                android:icon="@drawable/ic_power"
+                android:title="@string/nav_exit" />
         </menu>
     </item>
 

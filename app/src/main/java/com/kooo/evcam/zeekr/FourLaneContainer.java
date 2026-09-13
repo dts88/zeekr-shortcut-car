@@ -137,6 +137,10 @@ public class FourLaneContainer extends ViewGroup {
     /** laneOrder[格子位置] = 合成流中的画面序号。 */
     private int[] laneOrder = {0, 1, 2, 3};
 
+    /** 最近一次按下的位置：点画面放大时，靠它知道点的是哪一格。 */
+    private float lastTouchX = -1f;
+    private float lastTouchY = -1f;
+
     /**
      * 四宫格 ⇄ 单画面的过渡。
      *
@@ -237,6 +241,52 @@ public class FourLaneContainer extends ViewGroup {
 
     public int getFocusedLane() {
         return focusedLane;
+    }
+
+    @Override
+    public boolean onTouchEvent(android.view.MotionEvent event) {
+        if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+            lastTouchX = event.getX();
+            lastTouchY = event.getY();
+        }
+        return super.onTouchEvent(event);
+    }
+
+    /** 最近一次按下的地方是哪一路；不在四宫格、或者按在空处，返回 -1。 */
+    public int laneAtLastTouch() {
+        return laneAt(lastTouchX, lastTouchY);
+    }
+
+    /**
+     * 这个点落在哪一路上（合成流里的画面序号）。只在四宫格时有意义。
+     *
+     * <p>有配置时按每一格的位置和大小找，后画的盖在上面，所以从后往前找 ——
+     * 点到的是看得见的那一格。没有配置时就是 2×2 等分。</p>
+     */
+    public int laneAt(float x, float y) {
+        int width = getWidth();
+        int height = getHeight();
+        if (displayMode != DisplayMode.GRID || width <= 0 || height <= 0 || x < 0f || y < 0f) {
+            return -1;
+        }
+        Cell[] activeCells = cells;
+        if (activeCells != null) {
+            for (int i = activeCells.length - 1; i >= 0; i--) {
+                Cell cell = activeCells[i];
+                if (cell == null || cell.laneIndex < 0
+                        || cell.laneIndex >= CompositeStreamGeometry.LANE_COUNT) {
+                    continue;
+                }
+                if (x >= cell.x * width && x < (cell.x + cell.width) * width
+                        && y >= cell.y * height && y < (cell.y + cell.height) * height) {
+                    return cell.laneIndex;
+                }
+            }
+            return -1;
+        }
+        int column = x < width / 2f ? 0 : 1;
+        int row = y < height / 2f ? 0 : 1;
+        return laneOrder[row * 2 + column];
     }
 
     /** 切到只看某一个画面。从四宫格点开时，那一格长到铺满。 */
@@ -426,13 +476,14 @@ public class FourLaneContainer extends ViewGroup {
             float bottom = gridRect.bottom + (height - gridRect.bottom) * t;
             canvas.drawRect(left, top, right, bottom, backdrop);
             drawLane(canvas, current.lane(index), cellFor(index),
-                    left, top, right - left, bottom - top);
+                    left, top, right - left, bottom - top, ScaleMode.FILL);
             return;
         }
 
         if (displayMode == DisplayMode.SINGLE) {
             int index = Math.min(focusedLane, current.laneCount() - 1);
-            drawLane(canvas, current.lane(index), cellFor(index), 0f, 0f, width, height);
+            drawLane(canvas, current.lane(index), cellFor(index), 0f, 0f, width, height,
+                    ScaleMode.FILL);
             return;
         }
 
@@ -452,7 +503,7 @@ public class FourLaneContainer extends ViewGroup {
                 }
                 drawLane(canvas, current.lane(cell.laneIndex), cell,
                         cell.x * width, cell.y * height,
-                        cell.width * width, cell.height * height);
+                        cell.width * width, cell.height * height, null);
             }
             return;
         }
@@ -467,7 +518,7 @@ public class FourLaneContainer extends ViewGroup {
             }
             float left = (cell % 2) * cellWidth;
             float top = (cell / 2) * cellHeight;
-            drawLane(canvas, current.lane(laneIndex), null, left, top, cellWidth, cellHeight);
+            drawLane(canvas, current.lane(laneIndex), null, left, top, cellWidth, cellHeight, null);
         }
     }
 
@@ -570,7 +621,8 @@ public class FourLaneContainer extends ViewGroup {
      * 然后把<b>同一个</b>子视图重新画一遍。子视图本身不知道自己被画了几次。</p>
      */
     private void drawLane(Canvas canvas, CompositeStreamGeometry.Lane lane, Cell cell,
-                          float cellLeft, float cellTop, float cellWidth, float cellHeight) {
+                          float cellLeft, float cellTop, float cellWidth, float cellHeight,
+                          ScaleMode forced) {
         if (cellWidth <= 0f || cellHeight <= 0f) {
             return;
         }
@@ -611,7 +663,9 @@ public class FourLaneContainer extends ViewGroup {
         float laneAspect = quarterTurn && laneAspectPx > 0f ? 1f / laneAspectPx : laneAspectPx;
         float cellAspect = cellWidth / cellHeight;
         // 这一格自己说了算，没说才跟容器走
-        ScaleMode mode = cell != null && cell.fit != null ? cell.fit : scaleMode;
+        // 放大时由调用方指定（一律填充）；否则这一格自己说了算，没说才跟容器走
+        ScaleMode mode = forced != null ? forced
+                : cell != null && cell.fit != null ? cell.fit : scaleMode;
         if (mode == ScaleMode.FIT && laneAspect > 0f && cellAspect > 0f) {
             if (laneAspect < cellAspect) {
                 destWidth = cellHeight * laneAspect;

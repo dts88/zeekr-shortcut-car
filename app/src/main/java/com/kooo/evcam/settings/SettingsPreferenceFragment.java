@@ -711,7 +711,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void bindFloatingReset() {
         onClick("pref_reset_floating", pref -> {
-            appConfig.resetFloatingWindowLayout();
+            // 以前清的是旧「主屏悬浮窗」那几个键，合并后的按钮根本不读它们 ——
+            // 点了提示「已重置」，按钮纹丝不动。现在清按钮自己的位置、大小、字号，
+            // 并让它当场挪回默认位置（原来那个「打开应用」按钮的位置）
+            appConfig.resetRecordingFloatingLayout();
+            sendToRecordingFloating(RecordingFloatingService.ACTION_RESET_POSITION, null);
+            // 两个滑块跟着回去，否则界面上还写着重置之前的数
+            SeekBarPreference size = findPreference("pref_button_size");
+            if (size != null) {
+                size.setValue(appConfig.getRecordingFloatingButtonSizeDp());
+            }
+            SeekBarPreference textSize = findPreference("pref_button_text_size");
+            if (textSize != null) {
+                textSize.setValue(appConfig.getRecordingFloatingTimeTextSizeSp());
+            }
             toast(getString(R.string.msg_floating_reset));
         });
     }
@@ -751,6 +764,25 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setReduceMotionWhileRecording(value));
     }
 
+    /**
+     * 息屏录制：没开开发者选项时锁住 —— 灰掉、关着、写明为什么。
+     *
+     * <p>用「锁」不用「藏」：这是一个普通人会来找的选项，藏起来的话找的人不知道它存在，
+     * 也不知道去哪打开。值那边 AppConfig 同样锁着，界面写着关，实际就是关。</p>
+     */
+    private void lockScreenOffRecording() {
+        if (DeveloperMode.isUnlocked()) {
+            return;
+        }
+        SwitchPreferenceCompat pref = findPreference("pref_screen_off_recording");
+        if (pref == null) {
+            return;
+        }
+        pref.setChecked(false);
+        pref.setEnabled(false);
+        pref.setSummary(R.string.set_screen_off_locked);
+    }
+
     private void bindSystem() {
         bindLanguage();
 
@@ -760,6 +792,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setAutoStartRecording(value));
         bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
                 value -> appConfig.setScreenOffRecordingEnabled(value));
+        lockScreenOffRecording();
         bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> appConfig.setKeepAliveEnabled(value));
         bindSwitch("pref_prevent_sleep", appConfig.isPreventSleepEnabled(),

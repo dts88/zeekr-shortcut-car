@@ -157,7 +157,6 @@
     <string name="cell_bottom_left">Bottom left</string>
     <string name="cell_bottom_right">Bottom right</string>
     <string name="zeekr_mode_grid">2×2 grid</string>
-    <string name="zeekr_mode_single">Single view</string>
     <string name="zeekr_model_name">Zeekr 7X (surround composite)</string>
 
     <!-- First-launch guide -->
@@ -364,7 +363,9 @@
     <string name="rail_photo">Photo</string>
     <string name="rail_settings">Settings</string>
     <string name="cd_menu">Menu</string>
-    <string name="cd_exit">Exit</string>
+    <string name="cd_minimize">Hide to background</string>
+    <string name="nav_exit">Quit app</string>
+    <string name="set_screen_off_locked">Locked: turn on developer options to enable this</string>
     <string name="set_rail_side_title">Button side</string>
     <string name="set_rail_side_summary">Keep it on the driver side</string>
     <string name="opt_rail_right">Right</string>

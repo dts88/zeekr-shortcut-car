@@ -264,7 +264,7 @@ public class AppConfig {
     /** 悬浮窗按钮的默认大小（dp）。 */
     public static final int FLOATING_SIZE_DEFAULT = 85;
     /** 悬浮窗按钮的默认不透明度（%）。 */
-    public static final int FLOATING_ALPHA_DEFAULT = 75;
+    public static final int FLOATING_ALPHA_DEFAULT = 95;
 
     // ---- 悬浮元素的默认位置（2026-08-29 实车调好后测得，见诊断报告第 7 节）----
     //
@@ -275,11 +275,13 @@ public class AppConfig {
     public static final int REFERENCE_SCREEN_WIDTH = 3200;
     public static final int REFERENCE_SCREEN_HEIGHT = 2000;
 
-    /** 录制悬浮按钮的默认位置。 */
-    public static final int DEFAULT_RECORDING_FLOATING_X = 2943;
-    public static final int DEFAULT_RECORDING_FLOATING_Y = 205;
-
-    /** 悬浮按钮（打开应用/状态指示）的默认位置。 */
+    /**
+     * 悬浮按钮的默认位置 —— 原来那个「打开应用」按钮调好的位置。
+     *
+     * <p>两个按钮合并之后，默认位置沿用的一直是录制按钮那一个（2943, 205）。
+     * 项目拥有者定：合并后的按钮默认回到「打开应用」那个按钮的位置，
+     * 「重置悬浮窗布局」也回到这里。录制按钮那一组坐标随之删掉。</p>
+     */
     public static final int DEFAULT_FLOATING_WINDOW_X = 2890;
     public static final int DEFAULT_FLOATING_WINDOW_Y = 33;
 
@@ -519,7 +521,11 @@ public class AppConfig {
      */
     public boolean isScreenOffRecordingEnabled() {
         // 默认禁用息屏录制
-        return prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
+        // 锁在开发者选项后面：没解锁时一律当关着，存着的值不动。
+        // 设置里那个开关没解锁时是灰的、关着的 —— 这里必须和它说同一句话，
+        // 否则界面写着关、实际还在息屏录
+        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
+                && prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
     }
     
     /**
@@ -554,11 +560,10 @@ public class AppConfig {
      * @return true 表示启用防止休眠
      */
     public boolean isPreventSleepEnabled() {
-        // 车机应用默认启用防止休眠
-        // 原因：1. 车机使用车辆供电，不影响电池
-        //       2. 摄像头应用需要在息屏时继续录制
-        //       3. 远程控制需要后台运行
-        return prefs.getBoolean(KEY_PREVENT_SLEEP_ENABLED, true);
+        // 默认关（项目拥有者 2026-09 定）。原来默认开，理由之一是息屏也要录 ——
+        // 而息屏录制现在默认关、并且锁在开发者选项后面，默认不让车机休眠
+        // 就只剩代价、没有收益
+        return prefs.getBoolean(KEY_PREVENT_SLEEP_ENABLED, false);
     }
     
     /**
@@ -890,7 +895,7 @@ public class AppConfig {
     /** 是否对后视镜画面做鱼眼校正。只影响显示，录制的原始画面不动。 */
     public boolean isRearViewFisheyeCorrection() {
         // 默认开：这几路都是鱼眼镜头，不校正的画面本来就不该是「正常」状态
-        return prefs.getBoolean(KEY_REARVIEW_FISHEYE, true);
+        return prefs.getBoolean(KEY_REARVIEW_FISHEYE, false);
     }
 
     public void setRearViewFisheyeCorrection(boolean on) {
@@ -3686,7 +3691,7 @@ public class AppConfig {
 
     /** 录制时在按钮旁显示已录时长。 */
     public boolean isFloatingDurationVisible() {
-        return prefs.getBoolean(KEY_FLOATING_DURATION_VISIBLE, true);
+        return prefs.getBoolean(KEY_FLOATING_DURATION_VISIBLE, false);
     }
 
     public void setFloatingDurationVisible(boolean visible) {
@@ -3724,7 +3729,7 @@ public class AppConfig {
     private static final boolean DEFAULT_RECORDING_FLOATING_ENABLED = true;  // 默认开启
     // 0.45.2 起整档上移 50%：65dp 在车上偏小，最小档也够不着。原值是实车测的，
     // 新值就是它乘 1.5，不另起炉灶
-    private static final int DEFAULT_BUTTON_SIZE_DP = 98;
+    private static final int DEFAULT_BUTTON_SIZE_DP = 90;
     private static final int DEFAULT_TIME_TEXT_SIZE_SP = 14;
 
     /**
@@ -3799,19 +3804,6 @@ public class AppConfig {
                 .remove(KEY_RECORDING_FLOATING_TIME_TEXT_SIZE)
                 .apply();
         AppLog.i(TAG, "录制悬浮按钮布局已恢复默认");
-    }
-
-    /**
-     * 把主屏悬浮窗恢复出厂：位置、大小、透明度。
-     */
-    public void resetFloatingWindowLayout() {
-        prefs.edit()
-                .remove(KEY_FLOATING_WINDOW_X)
-                .remove(KEY_FLOATING_WINDOW_Y)
-                .remove(KEY_FLOATING_WINDOW_SIZE)
-                .remove(KEY_FLOATING_WINDOW_ALPHA)
-                .apply();
-        AppLog.i(TAG, "悬浮窗布局已恢复默认");
     }
 
     public void setRecordingFloatingTimeTextSizeSp(int sizeSp) {

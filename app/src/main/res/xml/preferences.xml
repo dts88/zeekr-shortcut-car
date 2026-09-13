@@ -396,4 +396,9 @@
             android:key="pref_about"
             android:title="@string/set_about_title" />
     </PreferenceScreen>
+
+    <!-- 退出放在最底下：和主界面那个「隐藏到后台」分开，往下找得到，手滑点不到 -->
+    <Preference
+        android:key="pref_exit"
+        android:title="@string/nav_exit" />
 </PreferenceScreen>
