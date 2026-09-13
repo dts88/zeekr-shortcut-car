@@ -189,6 +189,12 @@
             app:showSeekBarValue="true" />
 
         <SwitchPreferenceCompat
+            android:key="pref_floating_lock"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_lock_title"
+            android:summary="@string/set_floating_lock_summary" />
+
+        <SwitchPreferenceCompat
             android:key="pref_floating_duration"
             android:dependency="pref_recording_floating"
             android:title="@string/set_floating_duration_title"

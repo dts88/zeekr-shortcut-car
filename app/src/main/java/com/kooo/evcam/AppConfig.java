@@ -3643,6 +3643,21 @@ public class AppConfig {
     private static final String KEY_FLOATING_LONG_PRESS_ACTION = "floating_long_press_action";
     private static final String KEY_FLOATING_DURATION_VISIBLE = "floating_duration_visible";
     private static final String KEY_FLOATING_MERGED = "floating_buttons_merged";
+    private static final String KEY_FLOATING_LOCKED = "floating_position_locked";
+
+    /**
+     * 位置锁上之后就拖不动了。
+     *
+     * <p>摆好之后再碰它，多半是误触 —— 而这个按钮就摆在画面上，开车时手
+     * 蹭一下它就跑了。锁只锁拖拽，单击和长按照旧。</p>
+     */
+    public boolean isFloatingPositionLocked() {
+        return prefs.getBoolean(KEY_FLOATING_LOCKED, false);
+    }
+
+    public void setFloatingPositionLocked(boolean locked) {
+        prefs.edit().putBoolean(KEY_FLOATING_LOCKED, locked).apply();
+    }
 
     /**
      * 单击做什么。默认「打开主界面」—— 手指擦到按钮就停了录像，

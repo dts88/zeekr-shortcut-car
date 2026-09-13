@@ -50,6 +50,8 @@
     <string name="set_button_text_size_title">Button text size</string>
     <string name="set_floating_tap_title">Tap</string>
     <string name="set_floating_long_press_title">Long press</string>
+    <string name="set_floating_lock_title">Lock its position</string>
+    <string name="set_floating_lock_summary">Locked, it cannot be dragged. Tap and long press still work</string>
     <string name="set_floating_duration_title">Show recording time</string>
     <string name="set_floating_duration_summary">While recording, show how long next to the button</string>
     <string name="floating_action_open_app">Open the app</string>

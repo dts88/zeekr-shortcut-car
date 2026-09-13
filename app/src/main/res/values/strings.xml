@@ -67,6 +67,8 @@
     <string name="set_button_text_size_title">按钮文字大小</string>
     <string name="set_floating_tap_title">单击</string>
     <string name="set_floating_long_press_title">长按</string>
+    <string name="set_floating_lock_title">锁定位置</string>
+    <string name="set_floating_lock_summary">锁上之后拖不动它。单击和长按照旧</string>
     <string name="set_floating_duration_title">显示录制时长</string>
     <string name="set_floating_duration_summary">录制时在按钮旁显示已录了多久</string>
     <string name="floating_action_open_app">打开主界面</string>

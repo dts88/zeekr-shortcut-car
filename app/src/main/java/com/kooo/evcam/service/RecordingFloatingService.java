@@ -92,6 +92,8 @@ public class RecordingFloatingService extends Service {
 
     // 长按：计时器要在 appConfig 之后声明，它读的是 appConfig
     private boolean longPressFired = false;
+    /** 位置锁着时手指滑了一段：这一下既不是点击也不是长按。 */
+    private boolean slidWhileLocked = false;
     private final Runnable longPressRunnable = () -> {
         longPressFired = true;
         perform(FloatingAction.fromKey(appConfig.getFloatingLongPressAction()));
@@ -462,9 +464,13 @@ public class RecordingFloatingService extends Service {
                         int deltaY = (int) (event.getRawY() - initialTouchY);
 
                         if (Math.abs(deltaX) > CLICK_THRESHOLD || Math.abs(deltaY) > CLICK_THRESHOLD) {
-                            isDragging = true;
-                            // 挪起来了就不是长按了
+                            // 位置锁上时手指照样能滑，只是按钮不跟着走 ——
+                            // 但这一下已经不算「点一下」了，也不该触发长按
+                            isDragging = !appConfig.isFloatingPositionLocked();
                             mainHandler.removeCallbacks(longPressRunnable);
+                            if (!isDragging) {
+                                slidWhileLocked = true;
+                            }
                         }
 
                         if (isDragging) {
@@ -490,6 +496,10 @@ public class RecordingFloatingService extends Service {
 
                     case MotionEvent.ACTION_UP:
                         mainHandler.removeCallbacks(longPressRunnable);
+                        if (slidWhileLocked) {
+                            slidWhileLocked = false;
+                            return true;
+                        }
                         if (!isDragging && !longPressFired) {
                             perform(FloatingAction.fromKey(appConfig.getFloatingTapAction()));
                         } else if (!isDragging) {
@@ -720,6 +730,10 @@ public class RecordingFloatingService extends Service {
             }
         } else {
             stopTimeUpdate();
+            if (recordingButton != null) {
+                // 环归零：下次开录从十二点开始，而不是接着上次那一段
+                recordingButton.setProgress(0f);
+            }
             if (timeTextView != null) {
                 timeTextView.setVisibility(View.GONE);
                 timeTextView.setText("00:00");
@@ -739,6 +753,7 @@ public class RecordingFloatingService extends Service {
                     long duration = System.currentTimeMillis() - recordingStartTime;
                     String timeStr = formatDuration(duration);
                     timeTextView.setText(timeStr);
+                    updateRingProgress(duration);
                     mainHandler.postDelayed(this, 1000);
                 }
             }
@@ -752,6 +767,25 @@ public class RecordingFloatingService extends Service {
             mainHandler.removeCallbacks(timeUpdateRunnable);
             timeUpdateRunnable = null;
         }
+    }
+
+    /**
+     * 环走到哪儿了。
+     *
+     * <p>服务这边只知道整场录制是什么时候开始的，不知道当前这一段是什么时候切的
+     * —— 但分段是等长的，所以「已录时长对分段时长取余」就是本段的进度。
+     * 差别只会出现在中途改过分段长度的那一次。</p>
+     */
+    private void updateRingProgress(long elapsedMs) {
+        if (recordingButton == null) {
+            return;
+        }
+        long segment = com.kooo.evcam.profile.RecordSpecs.segmentMs(
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
+        if (segment <= 0) {
+            return;
+        }
+        recordingButton.setProgress((elapsedMs % segment) / (float) segment);
     }
 
     private String formatDuration(long durationMs) {
@@ -775,7 +809,14 @@ public class RecordingFloatingService extends Service {
         private Paint backgroundPaint;
         private Paint iconPaint;
         private Paint shadowPaint;
+        /** 外面那一圈：待机是灰的空心圈，录制中是浅红的轨道。 */
+        private Paint ringPaint;
+        /** 录制中沿着轨道走的那一段，和主界面录制键的分段进度环同一个意思。 */
+        private Paint progressPaint;
+        private final android.graphics.RectF ringRect = new android.graphics.RectF();
         private boolean isRecording = false;
+        /** 本段录到哪儿了，0–1。 */
+        private float progress = 0f;
         private float centerX, centerY;
         private float radius;
         private int buttonSize;
@@ -801,6 +842,24 @@ public class RecordingFloatingService extends Service {
             shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             shadowPaint.setStyle(Paint.Style.FILL);
             shadowPaint.setColor(Color.parseColor("#20000000")); // 半透明黑色阴影
+
+            ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            ringPaint.setStyle(Paint.Style.STROKE);
+            ringPaint.setStrokeCap(Paint.Cap.ROUND);
+
+            progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            progressPaint.setStyle(Paint.Style.STROKE);
+            progressPaint.setStrokeCap(Paint.Cap.ROUND);
+            progressPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
+        }
+
+        /** 本段录到哪儿了，0–1。只在录制中画。 */
+        public void setProgress(float value) {
+            float clamped = value < 0f ? 0f : (value > 1f ? 1f : value);
+            if (Math.abs(clamped - progress) > 0.002f) {
+                progress = clamped;
+                invalidate();
+            }
         }
 
         public void setRecording(boolean recording) {
@@ -856,11 +915,27 @@ public class RecordingFloatingService extends Service {
                     backgroundPaint
             );
 
-            // 绘制内部图标（iOS 风格简洁图标）
+            // 外面那一圈，和主界面录制键的分段进度环一个意思。
+            //
+            // 待机时是<b>灰的空心圈</b> —— 合并之前那个「打开主界面」的悬浮按钮
+            // 就长这样，而这个按钮默认干的也正是那件事。红色留给「正在录」。
+            float stroke = radius * 0.14f;
+            float ringRadius = radius * 0.72f;
+            ringPaint.setStrokeWidth(stroke);
+            progressPaint.setStrokeWidth(stroke);
+            ringPaint.setColor(ContextCompat.getColor(getContext(),
+                    isRecording ? R.color.recording_track : R.color.text_tertiary));
+            canvas.drawCircle(centerX, centerY, ringRadius, ringPaint);
+
             if (isRecording) {
-                // 绘制停止方块（iOS 风格圆角方形）
-                float rectSize = radius * 0.45f;
-                float iconCornerRadius = rectSize * 0.15f;
+                // 轨道上走过的那一段：从十二点开始顺时针
+                ringRect.set(centerX - ringRadius, centerY - ringRadius,
+                        centerX + ringRadius, centerY + ringRadius);
+                canvas.drawArc(ringRect, -90f, 360f * progress, false, progressPaint);
+
+                // 停止方块
+                float rectSize = radius * 0.42f;
+                float iconCornerRadius = rectSize * 0.2f;
                 canvas.drawRoundRect(
                         centerX - rectSize / 2,
                         centerY - rectSize / 2,
@@ -870,10 +945,9 @@ public class RecordingFloatingService extends Service {
                         iconCornerRadius,
                         iconPaint
                 );
-            } else {
-                // 绘制录制圆点（实心圆）
-                canvas.drawCircle(centerX, centerY, radius * 0.35f, iconPaint);
             }
+            // 待机时中间什么都不画：一个灰色空心圈就是「空闲」，
+            // 中间再摆一个红点，说的就成了「这是录制键」——它默认不是。
         }
     }
 }

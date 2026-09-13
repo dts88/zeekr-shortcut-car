@@ -600,6 +600,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindFloatingAction("pref_floating_long_press", appConfig.getFloatingLongPressAction(),
                 value -> appConfig.setFloatingLongPressAction(value));
 
+        bindSwitch("pref_floating_lock", appConfig.isFloatingPositionLocked(),
+                value -> appConfig.setFloatingPositionLocked(value));
+
         bindSwitch("pref_floating_duration", appConfig.isFloatingDurationVisible(), value -> {
             appConfig.setFloatingDurationVisible(value);
             pushFloatingStyle();
