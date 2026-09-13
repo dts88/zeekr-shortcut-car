@@ -21,26 +21,18 @@ import com.kooo.evcam.profile.LaneLayout;
 import java.util.ArrayList;
 
 /**
- * 配置编辑的一栏。同一个类，两种：
+ * 摆位：这一路的格子图，和正在改的那一格（位置、旋转、镜像、画面填充）。
  *
- * <ul>
- *   <li><b>左栏</b>（{@link #streams()}）：选哪一路相机、这一路的三条流、整份配置的操作；</li>
- *   <li><b>右栏</b>（{@link #lanes()}）：这一路的格子图，和正在改的那一格。</li>
- * </ul>
+ * <p>从配置编辑里那个「摆位」进来。流参数不在这里 —— 那一页问的是「录成什么样」，
+ * 这一页问的是「摆在哪」，两件事分开问，各自都短。</p>
  *
  * <p>数据和所有「怎么取值、怎么选、怎么存」都在 {@link ProfileEditorFragment} 里，
- * 这里只按当前选中的相机和格子搭行。任何一处改动之后两栏一起重搭，
- * 所以左边改了分辨率、右边的格子图不会停在旧样子上。</p>
+ * 这里只按当前选中的相机和格子搭行。</p>
  */
 public class ProfileEditorPane extends PreferenceFragmentCompat {
 
     private static final String ARG_PANE = "pane";
-    private static final String PANE_STREAMS = "streams";
     private static final String PANE_LANES = "lanes";
-
-    static ProfileEditorPane streams() {
-        return of(PANE_STREAMS);
-    }
 
     static ProfileEditorPane lanes() {
         return of(PANE_LANES);
@@ -75,90 +67,12 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         }
         ProfileEditorFragment editor = (ProfileEditorFragment) getParentFragment();
         screen.removeAll();
-        if (PANE_LANES.equals(getArguments() == null ? null : getArguments().getString(ARG_PANE))) {
-            renderLanes(screen, editor);
-        } else {
-            renderStreams(screen, editor);
-        }
+        renderLanes(screen, editor);
         // 刚加进来的行还没交给列表（同步是下一帧），这时套样式正好
         PreferenceRows.apply(screen);
     }
 
     // ------------------------------------------------------------------ 左栏
-
-    private void renderStreams(PreferenceScreen screen, ProfileEditorFragment editor) {
-        Context context = requireContext();
-        info(screen, context, editor.profileName(), getString(R.string.editor_hint));
-
-        PreferenceCategory cameras = category(screen, context, getString(R.string.editor_group_cameras));
-        CameraProfile selected = editor.selectedCamera();
-        for (CameraProfile camera : new ArrayList<>(editor.profile.cameras)) {
-            ChoiceRow row = new ChoiceRow(context, camera == selected);
-            row.setTitle(editor.roleName(camera.role));
-            row.setSummary(editor.cameraSummary(camera.role)
-                    + (camera.enabled ? "" : " · " + getString(R.string.editor_off)));
-            row.setOnPreferenceClickListener(p -> {
-                editor.selectCamera(camera.role);
-                return true;
-            });
-            cameras.addPreference(row);
-        }
-
-        if (selected != null) {
-            PreferenceCategory streams = category(screen, context, getString(
-                    R.string.editor_lane_group, editor.roleName(selected.role),
-                    getString(R.string.editor_group_streams)));
-
-            SwitchPreferenceCompat enabled = new SwitchPreferenceCompat(context);
-            enabled.setPersistent(false);
-            enabled.setTitle(R.string.editor_enable);
-            enabled.setSummary(R.string.editor_enable_summary);
-            enabled.setChecked(selected.enabled);
-            enabled.setOnPreferenceChangeListener((p, value) -> {
-                selected.enabled = Boolean.TRUE.equals(value);
-                editor.refresh();
-                return false;
-            });
-            streams.addPreference(enabled);
-
-            row(streams, context, R.string.editor_preview_res,
-                    editor.describeStream(selected, selected.preview), false,
-                    () -> editor.pickResolution(selected, selected.preview));
-            row(streams, context, R.string.editor_record_res,
-                    editor.describeStream(selected, selected.record), false,
-                    () -> editor.pickResolution(selected, selected.record));
-            row(streams, context, R.string.editor_record_fps,
-                    editor.fpsLabel(selected.record.fps), true,
-                    () -> editor.pickFps(selected.record));
-            row(streams, context, R.string.editor_record_bitrate,
-                    editor.bitrateLabel(selected.record.bitrate), true,
-                    () -> editor.pickBitrate(selected.record));
-            row(streams, context, R.string.editor_record_codec,
-                    editor.codecLabel(selected.record.codec), true,
-                    () -> editor.pickCodec(selected.record));
-            row(streams, context, R.string.editor_record_segment,
-                    getString(R.string.share_minutes, selected.record.segmentMinutes), true,
-                    () -> editor.pickSegment(selected.record));
-            row(streams, context, R.string.editor_photo_res,
-                    editor.describeStream(selected, selected.photo), false,
-                    () -> editor.pickResolution(selected, selected.photo));
-            row(streams, context, R.string.editor_photo_quality,
-                    String.valueOf(selected.photo.jpegQuality), true,
-                    () -> editor.pickQuality(selected.photo));
-            row(streams, context, R.string.editor_remove,
-                    getString(R.string.editor_remove_summary), false,
-                    () -> editor.confirmRemove(selected));
-        }
-
-        PreferenceCategory actions = category(screen, context, getString(R.string.editor_group_profile));
-        row(actions, context, R.string.editor_add_camera, null, false, editor::addCamera);
-        Preference save = row(actions, context, R.string.editor_save,
-                getString(R.string.editor_save_summary), false, editor::saveWithPreview);
-        PreferenceRows.markPrimary(save);
-        row(actions, context, R.string.editor_reset,
-                getString(R.string.editor_reset_summary), false, editor::confirmReset);
-    }
-
     // ------------------------------------------------------------------ 右栏
 
     private void renderLanes(PreferenceScreen screen, ProfileEditorFragment editor) {

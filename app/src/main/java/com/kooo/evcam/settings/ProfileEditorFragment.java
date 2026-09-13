@@ -25,6 +25,8 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.camera.EncodeSize;
+import com.kooo.evcam.camera.StorageBudget;
+import com.kooo.evcam.camera.TargetBitrate;
 import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.LaneLayout;
 import com.kooo.evcam.profile.Profile;
@@ -33,8 +35,10 @@ import com.kooo.evcam.profile.ProfileResolution;
 import com.kooo.evcam.profile.ProfileSizes;
 import com.kooo.evcam.profile.ProfileStore;
 import com.kooo.evcam.profile.ProfileValidation;
+import com.kooo.evcam.profile.QualityPreset;
 import com.kooo.evcam.profile.StreamSpec;
 import com.kooo.evcam.ui.CamDialogs;
+import com.kooo.evcam.ui.SegmentedBar;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.zeekr.FourLaneContainer;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
@@ -77,6 +81,11 @@ public class ProfileEditorFragment extends Fragment {
     private ProfileStore store;
     Profile profile;
     private CameraManager cameraManager;
+    private LinearLayout presetRow;
+    private LinearLayout cameraRow;
+    private LinearLayout detailBox;
+    private TextView budgetLine;
+    private TextView camerasTitle;
     private String selectedRole;
     private int selectedLane;
 
@@ -103,11 +112,23 @@ public class ProfileEditorFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        if (getChildFragmentManager().findFragmentById(R.id.editor_streams) == null) {
-            getChildFragmentManager().beginTransaction()
-                    .replace(R.id.editor_streams, ProfileEditorPane.streams())
-                    .replace(R.id.editor_lanes, ProfileEditorPane.lanes())
-                    .commit();
+        presetRow = view.findViewById(R.id.editor_presets);
+        cameraRow = view.findViewById(R.id.editor_cameras);
+        detailBox = view.findViewById(R.id.editor_detail);
+        budgetLine = view.findViewById(R.id.editor_budget);
+        camerasTitle = view.findViewById(R.id.editor_cameras_title);
+        view.findViewById(R.id.editor_open_lanes).setOnClickListener(v -> openLanes());
+        view.findViewById(R.id.editor_add_camera).setOnClickListener(v -> addCamera());
+        view.findViewById(R.id.editor_reset).setOnClickListener(v -> confirmReset());
+        view.findViewById(R.id.editor_save).setOnClickListener(v -> saveWithPreview());
+        refresh();
+    }
+
+    /** 摆位是另一件事，走另一个界面：这里管「录成什么样」，那里管「摆在哪」。 */
+    private void openLanes() {
+        if (getParentFragment() instanceof SettingsShellFragment) {
+            ((SettingsShellFragment) getParentFragment())
+                    .openDetail(ProfileEditorPane.lanes(), getString(R.string.editor_open_lanes));
         }
     }
 
@@ -120,13 +141,294 @@ public class ProfileEditorFragment extends Fragment {
 
     // ------------------------------------------------------------------ 选中
 
-    /** 两栏按当前状态一起重搭。 */
+    /** 按当前状态整页重搭。 */
     void refresh() {
+        if (presetRow == null || getContext() == null) {
+            return;
+        }
+        renderPresets();
+        renderCameras();
+        renderDetail();
+        renderBudget();
         for (Fragment child : getChildFragmentManager().getFragments()) {
             if (child instanceof ProfileEditorPane) {
                 ((ProfileEditorPane) child).render();
             }
         }
+    }
+
+    // ------------------------------------------------------------------ 三档
+
+    private void renderPresets() {
+        Context context = requireContext();
+        LayoutInflater inflater = LayoutInflater.from(context);
+        QualityPreset current = QualityPreset.of(profile);
+        long free = freeBytes();
+        presetRow.removeAllViews();
+        for (QualityPreset preset : QualityPreset.values()) {
+            View card = inflater.inflate(R.layout.item_quality_preset, presetRow, false);
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (presetRow.getChildCount() > 0) {
+                params.setMarginStart(dp(12));
+            }
+            card.setLayoutParams(params);
+            card.setBackgroundResource(preset == current
+                    ? R.drawable.bg_editor_card_on : R.drawable.bg_editor_card);
+            ((TextView) card.findViewById(R.id.preset_name)).setText(presetName(preset));
+            ((TextView) card.findViewById(R.id.preset_note)).setText(presetNote(preset));
+            card.findViewById(R.id.preset_current)
+                    .setVisibility(preset == current ? View.VISIBLE : View.GONE);
+
+            long perHour = bytesPerHourFor(preset);
+            ((TextView) card.findViewById(R.id.preset_gb)).setText(String.format(Locale.US,
+                    "%.1f", StorageBudget.gigabytesPerHour(perHour)));
+            TextView hours = card.findViewById(R.id.preset_hours);
+            TextView hoursUnit = card.findViewById(R.id.preset_hours_unit);
+            float canRecord = StorageBudget.hours(free, perHour);
+            if (canRecord > 0f) {
+                hours.setText(String.format(Locale.US, "%.0f", canRecord));
+                hoursUnit.setText(R.string.editor_quality_hours_unit);
+                hours.setVisibility(View.VISIBLE);
+                hoursUnit.setVisibility(View.VISIBLE);
+            } else {
+                // 没插 U 盘就不编一个数：这几行字的全部意义是让人敢照着它做决定
+                hours.setVisibility(View.GONE);
+                hoursUnit.setVisibility(View.GONE);
+            }
+            card.setOnClickListener(v -> {
+                preset.applyTo(profile);
+                refresh();
+            });
+            presetRow.addView(card);
+        }
+    }
+
+    private String presetName(QualityPreset preset) {
+        switch (preset) {
+            case SAVE_SPACE: return getString(R.string.editor_quality_space);
+            case SHARPEST: return getString(R.string.editor_quality_sharp);
+            default: return getString(R.string.editor_quality_balanced);
+        }
+    }
+
+    private String presetNote(QualityPreset preset) {
+        switch (preset) {
+            case SAVE_SPACE: return getString(R.string.editor_quality_space_note);
+            case SHARPEST: return getString(R.string.editor_quality_sharp_note);
+            default: return getString(R.string.editor_quality_balanced_note);
+        }
+    }
+
+    // ------------------------------------------------------------------ 相机
+
+    private void renderCameras() {
+        Context context = requireContext();
+        LayoutInflater inflater = LayoutInflater.from(context);
+        QualityPreset current = QualityPreset.of(profile);
+        camerasTitle.setText(getString(R.string.editor_cameras_title, profile.cameras.size()));
+        cameraRow.removeAllViews();
+        CameraProfile selected = selectedCamera();
+        for (CameraProfile camera : new ArrayList<>(profile.cameras)) {
+            View card = inflater.inflate(R.layout.item_camera_card, cameraRow, false);
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (cameraRow.getChildCount() > 0) {
+                params.setMarginStart(dp(12));
+            }
+            card.setLayoutParams(params);
+            card.setBackgroundResource(camera == selected
+                    ? R.drawable.bg_editor_card_on : R.drawable.bg_editor_card);
+            ((TextView) card.findViewById(R.id.camera_name)).setText(roleName(camera.role));
+            ((TextView) card.findViewById(R.id.camera_summary)).setText(recordSummary(camera));
+            // 「我选了均衡，但后座舱不是」—— 这件事必须看得见
+            boolean tuned = current != null && !current.matches(camera.record);
+            card.findViewById(R.id.camera_tuned)
+                    .setVisibility(tuned ? View.VISIBLE : View.GONE);
+            android.widget.CompoundButton toggle = card.findViewById(R.id.camera_enabled);
+            toggle.setChecked(camera.enabled);
+            toggle.setOnClickListener(v -> {
+                camera.enabled = toggle.isChecked();
+                refresh();
+            });
+            card.setOnClickListener(v -> selectCamera(camera.role));
+            cameraRow.addView(card);
+        }
+    }
+
+    /** 这一路录成什么样，一行写完。 */
+    private String recordSummary(CameraProfile camera) {
+        int bitrate = estimatedBitrate(camera, camera.record.fps, camera.record.bitrate);
+        int[] size = resolvedSource(camera.role, camera.record);
+        String landing = size == null ? getString(R.string.editor_resolved_by_camera)
+                : landingSize(camera, size);
+        return landing + " · " + fpsLabel(camera.record.fps)
+                + " · " + TargetBitrate.format(bitrate);
+    }
+
+    private String landingSize(CameraProfile camera, int[] source) {
+        String compositeId = StreamLayoutTable.compositeCameraId();
+        boolean grid = camera.record != null && camera.record.grid;
+        EncodeSize landing = EncodeSize.forSource(compositeId, source[0], source[1], grid);
+        return landing.width + "×" + landing.height;
+    }
+
+    // ------------------------------------------------------------------ 细调
+
+    private void renderDetail() {
+        Context context = requireContext();
+        detailBox.removeAllViews();
+        CameraProfile camera = selectedCamera();
+        if (camera == null) {
+            detailBox.setVisibility(View.GONE);
+            return;
+        }
+        detailBox.setVisibility(View.VISIBLE);
+        StreamSpec record = camera.record;
+
+        LinearLayout header = new LinearLayout(context);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(context);
+        title.setText(getString(R.string.editor_detail_title, roleName(camera.role)));
+        title.setTextAppearance(R.style.TextAppearance_Cam_Row);
+        title.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.energy_text));
+        header.addView(title);
+        TextView which = new TextView(context);
+        which.setText("  " + cameraSummary(camera.role));
+        which.setTextAppearance(R.style.TextAppearance_Cam_Caption);
+        which.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
+        LinearLayout.LayoutParams grow =
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        which.setLayoutParams(grow);
+        header.addView(which);
+        detailBox.addView(header);
+
+        knob(context, R.string.editor_knob_fps,
+                new String[]{getString(R.string.editor_fps_unlimited), "30", "24", "20", "15", "10"},
+                new String[]{StreamSpec.FPS_UNLIMITED, "30", "24", "20", "15", "10"},
+                record.fps, value -> { record.fps = value; refresh(); });
+
+        knob(context, R.string.editor_knob_bitrate,
+                new String[]{getString(R.string.editor_very_low), getString(R.string.editor_low),
+                        getString(R.string.editor_medium), getString(R.string.editor_high)},
+                new String[]{StreamSpec.BITRATE_VERY_LOW, StreamSpec.BITRATE_LOW,
+                        StreamSpec.BITRATE_MEDIUM, StreamSpec.BITRATE_HIGH},
+                record.bitrate, value -> { record.bitrate = value; refresh(); });
+
+        knob(context, R.string.editor_knob_segment,
+                new String[]{"1", "3", "5", "10"}, new String[]{"1", "3", "5", "10"},
+                String.valueOf(record.segmentMinutes),
+                value -> { record.segmentMinutes = Integer.parseInt(value); refresh(); });
+
+        knob(context, R.string.editor_knob_codec,
+                new String[]{getString(R.string.editor_codec_auto), "H.264"},
+                new String[]{"auto", "h264"},
+                record.codec, value -> { record.codec = value; refresh(); });
+
+        // 分辨率和拍照参数不常改，收在一行里，点开还是原来那套选择框
+        TextView more = new TextView(context);
+        more.setText(getString(R.string.editor_detail_more,
+                describeStream(camera, camera.preview), String.valueOf(camera.photo.jpegQuality)));
+        more.setTextAppearance(R.style.TextAppearance_Cam_Caption);
+        more.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
+        LinearLayout.LayoutParams moreParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        moreParams.topMargin = dp(14);
+        more.setLayoutParams(moreParams);
+        more.setOnClickListener(v -> pickResolution(camera, camera.record));
+        detailBox.addView(more);
+
+        TextView remove = new TextView(context);
+        remove.setText(R.string.editor_remove);
+        remove.setTextAppearance(R.style.TextAppearance_Cam_Caption);
+        remove.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_tertiary));
+        LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        removeParams.topMargin = dp(10);
+        remove.setLayoutParams(removeParams);
+        remove.setOnClickListener(v -> confirmRemove(camera));
+        detailBox.addView(remove);
+    }
+
+    private void knob(Context context, int labelRes, String[] labels, String[] values,
+                      String current, SegmentedBar.OnPick onPick) {
+        View row = LayoutInflater.from(context).inflate(R.layout.item_knob_row, detailBox, false);
+        ((TextView) row.findViewById(R.id.knob_label)).setText(labelRes);
+        ((SegmentedBar) row.findViewById(R.id.knob_bar)).bind(labels, values, current, onPick);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(14);
+        row.setLayoutParams(params);
+        detailBox.addView(row);
+    }
+
+    // ------------------------------------------------------------------ 代价
+
+    private void renderBudget() {
+        long perHour = bytesPerHourFor(null);
+        long free = freeBytes();
+        float hours = StorageBudget.hours(free, perHour);
+        String size = String.format(Locale.US, "%.1f", StorageBudget.gigabytesPerHour(perHour));
+        budgetLine.setText(hours > 0f
+                ? getString(R.string.editor_budget_with_space, size,
+                        String.format(Locale.US, "%.0f", hours))
+                : getString(R.string.editor_budget, size));
+    }
+
+    /**
+     * 这份配置一小时落盘多少字节。
+     *
+     * @param preset 不为 null 时按这一档算（三张卡上那两个数），null 表示按现在的设置算
+     */
+    private long bytesPerHourFor(QualityPreset preset) {
+        List<Integer> rates = new ArrayList<>();
+        for (CameraProfile camera : profile.cameras) {
+            if (!camera.enabled) {
+                continue;
+            }
+            String fps = preset == null ? camera.record.fps : preset.fps;
+            String bitrate = preset == null ? camera.record.bitrate : preset.bitrate;
+            rates.add(estimatedBitrate(camera, fps, bitrate));
+        }
+        int[] bits = new int[rates.size()];
+        for (int i = 0; i < bits.length; i++) {
+            bits[i] = rates.get(i);
+        }
+        return StorageBudget.bytesPerHour(bits);
+    }
+
+    /**
+     * 这一路按这组参数会配多少码率。
+     *
+     * <p>走的是录制那边同一个 {@link TargetBitrate} —— 界面写的数和实际配下去的
+     * 必须是同一个，不能在这里另算一遍。</p>
+     */
+    private int estimatedBitrate(CameraProfile camera, String fps, String bitrate) {
+        int[] source = resolvedSource(camera.role, camera.record);
+        if (source == null) {
+            return 0;
+        }
+        EncodeSize size = EncodeSize.forSource(StreamLayoutTable.compositeCameraId(),
+                source[0], source[1], camera.record.grid);
+        int max = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
+        int nominal = com.kooo.evcam.profile.RecordSpecs.nominal(fps,
+                max > 0 ? max : AppConfig.RECORDER_MAX_FPS);
+        boolean h264 = com.kooo.evcam.profile.RecordSpecs.forceH264(camera.record.codec)
+                || new AppConfig(requireContext()).isForceH264Encoding();
+        return TargetBitrate.compute(
+                com.kooo.evcam.profile.RecordSpecs.qualityLevel(bitrate),
+                size.width, size.height, nominal, !h264);
+    }
+
+    private long freeBytes() {
+        java.io.File sdCard =
+                com.kooo.evcam.StorageHelper.getExternalSdCardRoot(requireContext());
+        return sdCard == null ? 0 : com.kooo.evcam.StorageHelper.getAvailableSpace(sdCard);
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density);
     }
 
     /**

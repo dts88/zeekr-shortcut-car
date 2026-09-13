@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 细调里的一行：左边一个名字，右边整排档位。没有弹框 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@+id/knob_label"
+        android:layout_width="96dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Cam.Body"
+        android:textColor="@color/text_secondary" />
+
+    <com.kooo.evcam.ui.SegmentedBar
+        android:id="@+id/knob_bar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1" />
+</LinearLayout>

@@ -1,33 +1,165 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  视频流配置编辑：两栏。
-  左：选哪一路相机 + 这一路的三条流 + 整份配置的操作。
-  右：这一路的格子图 + 正在改的那一格。
-  「选一个 → 改它」：一次只摆出正在改的那一路、那一格，不再是二十多行一路竖排下去。
+  视频流配置编辑。
+
+  意图在前，参数在后：先问「录成什么样」（省空间 / 均衡 / 最清晰），一次定下三路的
+  帧率和码率，每一档下面写出代价 —— 每小时多少 GB、这张盘能录多久。三路各占一张卡，
+  和那一档不一样的标「已细调」。点开某一路才出现细调，全部是就地分段控件，没有弹框。
+
+  原来摆的是参数本身：每一路九行，三路二十七行形状一样的东西，每一个值藏在一个弹框
+  后面。但决定这些数的人心里想的不是「码率要中还是高」，而是「够不够清楚」和
+  「能录多久」—— 参数是答案，不是问题。
+
+  摆位（每一格的位置、旋转、镜像、填充）走另一个界面，从「摆位」进去。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
-    android:baselineAligned="false"
-    android:orientation="horizontal">
+    android:orientation="vertical">
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/editor_streams"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1" />
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="16dp">
+
+            <!-- ① 录成什么样 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/editor_quality_title"
+                android:textAppearance="@style/TextAppearance.Cam.Row" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/editor_quality_summary"
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                android:textColor="@color/text_secondary" />
+
+            <LinearLayout
+                android:id="@+id/editor_presets"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal" />
+
+            <!-- ② 相机 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:baselineAligned="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/editor_cameras_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Cam.Row" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="@string/editor_cameras_summary"
+                    android:textAppearance="@style/TextAppearance.Cam.Caption"
+                    android:textColor="@color/text_secondary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/editor_open_lanes"
+                    style="@style/Widget.Cam.RailSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="56dp"
+                    android:text="@string/editor_open_lanes" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/editor_cameras"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal" />
+
+            <!-- ③ 展开的那一路 -->
+            <LinearLayout
+                android:id="@+id/editor_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_editor_card_on"
+                android:orientation="vertical"
+                android:padding="18dp" />
+
+            <!-- ④ 这一档要花多少 -->
+            <TextView
+                android:id="@+id/editor_budget"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                android:textColor="@color/text_secondary" />
+        </LinearLayout>
+    </ScrollView>
 
     <View
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
         android:background="@color/line" />
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/editor_lanes"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="12dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editor_add_camera"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:text="@string/editor_add_camera" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editor_reset"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_marginStart="10dp"
+            android:text="@string/editor_reset" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editor_save"
+            style="@style/Widget.Cam.RailTile"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:text="@string/editor_save" />
+    </LinearLayout>
 </LinearLayout>

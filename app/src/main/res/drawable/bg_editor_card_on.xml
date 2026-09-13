@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选中的那张卡：淡橙底 + 能量色描边。红色不在这里出现，它只标录制状态 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/energy_quiet" />
+    <stroke android:width="2dp" android:color="@color/energy" />
+    <corners android:radius="@dimen/corner_radius" />
+</shape>
