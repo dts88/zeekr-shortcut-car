@@ -7,6 +7,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.50.1-alpha] - 2026-09-13
+
+- Fixed: the cabin cameras showed a landing size of 2560x400. Whether a stream is split
+  depends only on the camera id, and the editor passed the surround camera's id whatever
+  row it was drawing, so 1280x800 was cut into four lanes and reassembled 2x2. Their bit
+  rate was computed from that wrong size too.
+- Resolution is one setting now, applied to preview, recording and photos together. The
+  profile still stores three, but choosing three times per camera only made it easy to end
+  up with a profile that disagreed with itself. The list offers the sizes declared for both
+  preview and photos -- a size declared for only one of them quietly falls back on the
+  other side.
+- Photo quality is fixed at 95 and the control is gone.
+
 ## [0.50.0-alpha] - 2026-09-13
 
 - Adding a camera is gone. This car has three, so "add" was never a real event -- on and
