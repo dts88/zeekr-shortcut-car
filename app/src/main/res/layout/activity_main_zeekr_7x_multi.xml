@@ -32,69 +32,6 @@
                 android:background="@drawable/bg_surface_card"
                 android:orientation="vertical">
 
-                <!-- ① 标题区 -->
-                <LinearLayout
-                    android:id="@+id/title_bar"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/title_bar_height"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="16dp">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_menu"
-                        style="@style/Widget.Cam.IconButton"
-                        android:layout_width="@dimen/icon_button_size"
-                        android:layout_height="@dimen/icon_button_size"
-                        android:contentDescription="@string/cd_menu"
-                        app:icon="@drawable/ic_menu" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:text="@string/main_title"
-                        android:textColor="@color/text_primary"
-                        android:textAppearance="@style/TextAppearance.Cam.Title"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="@string/opt_model_zeekr_multi"
-                        android:textColor="@color/text_tertiary"
-                        android:textAppearance="@style/TextAppearance.Cam.Caption" />
-
-                    <Space
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
-
-                    <TextView
-                        android:id="@+id/tv_recording_stats"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_chip_recording"
-                        android:drawableStart="@drawable/chip_dot_recording"
-                        android:drawablePadding="8dp"
-                        android:fontFeatureSettings="tnum"
-                        android:gravity="center_vertical"
-                        android:paddingStart="14dp"
-                        android:paddingTop="7dp"
-                        android:paddingEnd="14dp"
-                        android:paddingBottom="7dp"
-                        android:textColor="@color/recording_text"
-                        android:textAppearance="@style/TextAppearance.Cam.Body"
-                        android:visibility="gone" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/line" />
-
                 <!-- ③ 内容区 + ④ 动作栏 -->
                 <LinearLayout
                     android:id="@+id/main_row"
@@ -103,44 +40,160 @@
                     android:layout_weight="1"
                     android:orientation="horizontal"
                     android:padding="@dimen/gutter">
+                    <!--
+                      ③ 内容区。整块是一个 FrameLayout：画面铺满，菜单键、录制角标和
+                      ⑤ 状态条都浮在它上面。
 
-                    <!-- 环视合成流四宫格 -->
+                      标题栏没有了 —— 那一条 64dp 里只有一个菜单键、一个应用名和一个
+                      配置名，三样东西各自都有更该待的地方，而这块屏幕上真正稀缺的是
+                      画面的高度。
+                    -->
                     <FrameLayout
-                        android:id="@+id/composite_wrapper"
+                        android:id="@+id/preview_stage"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="22"
-                        android:background="@drawable/bg_preview_frame">
+                        android:layout_weight="1">
 
-                        <com.kooo.evcam.zeekr.FourLaneContainer
-                            android:id="@+id/composite_container"
+                        <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent">
+                            android:layout_height="match_parent"
+                            android:orientation="horizontal">
+                            <!-- 环视合成流四宫格 -->
+                            <FrameLayout
+                                android:id="@+id/composite_wrapper"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="22"
+                                android:background="@drawable/bg_preview_frame">
 
-                            <com.kooo.evcam.AutoFitTextureView
-                                android:id="@+id/texture_front"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent" />
-                        </com.kooo.evcam.zeekr.FourLaneContainer>
+                                <com.kooo.evcam.zeekr.FourLaneContainer
+                                    android:id="@+id/composite_container"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent">
 
-                        <TextView
-                            android:id="@+id/label_front"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
+                                    <com.kooo.evcam.AutoFitTextureView
+                                        android:id="@+id/texture_front"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="match_parent" />
+                                </com.kooo.evcam.zeekr.FourLaneContainer>
+
+                                <TextView
+                                    android:id="@+id/label_front"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="36dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="12dp"
+                                    android:layout_marginTop="8dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="12dp"
+                                    android:paddingEnd="12dp"
+                                    android:text="@string/lane_surround"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            </FrameLayout>
+
+                            <!-- 两路座舱，上下叠放 -->
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginStart="@dimen/gutter"
+                                android:layout_weight="14"
+                                android:orientation="vertical">
+
+                                <FrameLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="0dp"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_preview_frame">
+
+                                    <com.kooo.evcam.AutoFitTextureView
+                                        android:id="@+id/texture_back"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="match_parent"
+                                        android:layout_gravity="center" />
+
+                                    <TextView
+                                        android:id="@+id/label_back"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="34dp"
+                                        android:layout_gravity="top|start"
+                                        android:layout_marginStart="10dp"
+                                        android:layout_marginTop="6dp"
+                                        android:background="@drawable/camera_label_background"
+                                        android:gravity="center"
+                                        android:paddingStart="10dp"
+                                        android:paddingEnd="10dp"
+                                        android:text="@string/slot_cabin_1"
+                                        android:textColor="#FFFFFF"
+                                        android:textAppearance="@style/TextAppearance.Cam.Body" />
+                                </FrameLayout>
+
+                                <FrameLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="0dp"
+                                    android:layout_marginTop="@dimen/gutter"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_preview_frame">
+
+                                    <com.kooo.evcam.AutoFitTextureView
+                                        android:id="@+id/texture_left"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="match_parent"
+                                        android:layout_gravity="center" />
+
+                                    <TextView
+                                        android:id="@+id/label_left"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="34dp"
+                                        android:layout_gravity="top|start"
+                                        android:layout_marginStart="10dp"
+                                        android:layout_marginTop="6dp"
+                                        android:background="@drawable/camera_label_background"
+                                        android:gravity="center"
+                                        android:paddingStart="10dp"
+                                        android:paddingEnd="10dp"
+                                        android:text="@string/slot_cabin_2"
+                                        android:textColor="#FFFFFF"
+                                        android:textAppearance="@style/TextAppearance.Cam.Body" />
+                                </FrameLayout>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- 菜单键：浮在画面左上角，位置和原来标题栏里那个一致 -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_menu"
+                            style="@style/Widget.Cam.IconButton"
+                            android:layout_width="@dimen/icon_button_size"
+                            android:layout_height="@dimen/icon_button_size"
                             android:layout_gravity="top|start"
-                            android:layout_marginStart="12dp"
-                            android:layout_marginTop="8dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:text="@string/lane_surround"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:layout_margin="@dimen/gutter"
+                            android:contentDescription="@string/cd_menu"
+                            app:icon="@drawable/ic_menu" />
+
+                        <!-- 录制角标：原来在标题栏右侧，现在在画面右上角 -->
+                        <TextView
+                            android:id="@+id/tv_recording_stats"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="top|end"
+                            android:layout_margin="@dimen/gutter"
+                            android:background="@drawable/bg_chip_recording"
+                            android:drawableStart="@drawable/chip_dot_recording"
+                            android:drawablePadding="8dp"
+                            android:fontFeatureSettings="tnum"
+                            android:gravity="center_vertical"
+                            android:paddingStart="14dp"
+                            android:paddingTop="7dp"
+                            android:paddingEnd="14dp"
+                            android:paddingBottom="7dp"
+                            android:textColor="@color/recording_text"
+                            android:textAppearance="@style/TextAppearance.Cam.Body"
+                            android:visibility="gone" />
 
                         <!--
-                          ⑤ 状态条压在画面底边上（见 docs/ui-spec.md）。占一行的话
-                          预览就矮 48dp —— 这块屏幕上，内容就是画面本身。
+                          ⑤ 状态条压在画面底边上（见 docs/ui-spec.md）。它在这一层，
+                          所以横跨整个画面区，而不是只盖住环视那一格。
                         -->
                         <include
                             layout="@layout/layout_status_bar"
@@ -148,73 +201,6 @@
                             android:layout_height="@dimen/status_bar_height"
                             android:layout_gravity="bottom" />
                     </FrameLayout>
-
-                    <!-- 两路座舱，上下叠放 -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="@dimen/gutter"
-                        android:layout_weight="14"
-                        android:orientation="vertical">
-
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame">
-
-                            <com.kooo.evcam.AutoFitTextureView
-                                android:id="@+id/texture_back"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:layout_gravity="center" />
-
-                            <TextView
-                                android:id="@+id/label_back"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:text="@string/slot_cabin_1"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-                        </FrameLayout>
-
-                        <FrameLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_marginTop="@dimen/gutter"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame">
-
-                            <com.kooo.evcam.AutoFitTextureView
-                                android:id="@+id/texture_left"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:layout_gravity="center" />
-
-                            <TextView
-                                android:id="@+id/label_left"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:text="@string/slot_cabin_2"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-                        </FrameLayout>
-                    </LinearLayout>
-
                     <include
                         layout="@layout/layout_action_rail"
                         android:layout_width="@dimen/rail_width_compact"

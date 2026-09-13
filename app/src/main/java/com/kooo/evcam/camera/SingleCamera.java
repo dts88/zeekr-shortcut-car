@@ -184,6 +184,9 @@ public class SingleCamera {
         if (autoMirrorBack() && textureView != null) {
             applyMirrorTransform();
         }
+        if (laneDriven && textureView != null) {
+            applyLaneTransform();
+        }
     }
 
     /**
@@ -214,6 +217,9 @@ public class SingleCamera {
         if (!laneDriven && customRotation != 0
                 && this.textureView != null && this.textureView.isAvailable()) {
             applyCustomRotation();
+        }
+        if (laneDriven && this.textureView != null) {
+            applyLaneTransform();
         }
     }
 
@@ -261,6 +267,67 @@ public class SingleCamera {
      */
     public boolean isPrimaryInstance() {
         return isPrimaryInstance;
+    }
+
+    /**
+     * 这一路的摆法：旋转、镜像、裁剪、缩放平移，全部来自配置里那一格。
+     *
+     * <h3>为什么写在这里，而不是主界面</h3>
+     *
+     * <p>试过两次写在 {@code MainActivity.applyPreviewSizeTransform} 里，两次都无效。
+     * 第一次是被本类那条「back 一律加镜像」盖掉了；第二次盖不掉了，还是没生效 ——
+     * 说明主界面那条路径要么没跑到，要么跑在 TextureView 有尺寸之前。</p>
+     *
+     * <p>而本类这几个调用点是<b>确定会执行</b>的：正是它们盖掉了第一次的修复。
+     * 所以摆法搬到这里来 —— 谁盖谁，就由谁来负责。</p>
+     *
+     * <p>开发者选项里的「预览矫正」仍然叠在这之上：配置是存下来的摆法，
+     * 那个悬浮窗是在它上面临时推一把。</p>
+     */
+    private void applyLaneTransform() {
+        final TextureView view = textureView;
+        if (view == null) {
+            return;
+        }
+        view.post(() -> {
+            int width = view.getWidth();
+            int height = view.getHeight();
+            if (width <= 0 || height <= 0) {
+                // 还没量出来，等下一帧
+                view.postDelayed(this::applyLaneTransform, 100);
+                return;
+            }
+            android.graphics.Matrix matrix = new android.graphics.Matrix();
+            com.kooo.evcam.profile.LaneLayout lane = laneForThisCamera();
+            boolean shaped = lane != null && LaneSurfaceMatrix.build(matrix, width, height,
+                    lane.rotation, lane.mirrored,
+                    lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
+                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY);
+            com.kooo.evcam.PreviewCorrection.postApply(
+                    matrix, new AppConfig(context), cameraPosition, width, height);
+            view.setTransform(matrix);
+            AppLog.i(TAG, "Camera " + cameraId + " (" + cameraPosition + ") 按配置摆位: "
+                    + (shaped ? String.valueOf(lane) : "无变换") + "，视图 " + width + "x" + height);
+        });
+    }
+
+    /** 配置里这一路的那一格；不拆分的那几路只有一格。取不到返回 null。 */
+    private com.kooo.evcam.profile.LaneLayout laneForThisCamera() {
+        try {
+            String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(cameraPosition);
+            if (role == null) {
+                return null;
+            }
+            com.kooo.evcam.profile.CameraProfile camera =
+                    new com.kooo.evcam.profile.ProfileStore(context).current().camera(role);
+            if (camera == null || camera.lanes.isEmpty()) {
+                return null;
+            }
+            return camera.lanes.get(0);
+        } catch (Exception e) {
+            AppLog.w(TAG, "Camera " + cameraId + " 取配置那一格失败: " + e);
+            return null;
+        }
     }
 
     /**
@@ -1349,6 +1416,10 @@ public class SingleCamera {
 
                 if (!laneDriven && customRotation != 0) {
                     applyCustomRotation();
+                }
+
+                if (laneDriven) {
+                    applyLaneTransform();
                 }
 
                 if (previewSurface == null || !previewSurface.isValid()) {

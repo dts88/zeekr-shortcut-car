@@ -60,6 +60,9 @@ public class RecordingFloatingService extends Service {
     public static final String ACTION_HIDE = "com.kooo.evcam.action.HIDE_RECORDING_FLOATING";
     public static final String ACTION_UPDATE_SIZE = "com.kooo.evcam.action.UPDATE_RECORDING_FLOATING_SIZE";
 
+    /** 大小、字号、透明度、时长显示改了，就地重贴一遍。 */
+    public static final String ACTION_UPDATE_STYLE = "com.kooo.evcam.action.UPDATE_FLOATING_STYLE";
+
     /**
      * 录制状态变了，告诉按钮换颜色。
      *
@@ -265,12 +268,44 @@ public class RecordingFloatingService extends Service {
         AppLog.d(TAG, "悬浮按钮大小已更新");
     }
 
+    /**
+     * 大小、字号、透明度、显示不显示时长：<b>就地</b>改，不重建视图。
+     *
+     * <h3>为什么不是关掉再开</h3>
+     *
+     * <p>0.45 里透明度和时长开关走的是「先发 HIDE 再发 SHOW」，两条指令各自
+     * 起一个线程 —— 顺序没有保证。SHOW 先跑完、HIDE 后到，按钮就没了。
+     * 「有时能调、有时按钮消失」和「关掉时长把整个按钮关掉」是同一个竞态。</p>
+     *
+     * <p>这里不碰生命周期，只把当前配置重新读一遍贴上去。</p>
+     */
+    private void applyStyle() {
+        if (floatingContainer == null || recordingButton == null || timeTextView == null) {
+            return;
+        }
+        updateFloatingSize(appConfig.getRecordingFloatingButtonSizeDp(),
+                appConfig.getRecordingFloatingTimeTextSizeSp());
+        floatingContainer.setAlpha(appConfig.getFloatingWindowAlpha() / 100f);
+        timeTextView.setVisibility(isRecording && appConfig.isFloatingDurationVisible()
+                ? View.VISIBLE : View.GONE);
+        AppLog.d(TAG, "悬浮按钮外观已更新: 大小 "
+                + appConfig.getRecordingFloatingButtonSizeDp() + "dp, 透明度 "
+                + appConfig.getFloatingWindowAlpha() + "%, 时长 "
+                + (appConfig.isFloatingDurationVisible() ? "显示" : "隐藏"));
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
             String action = intent.getAction();
             if (ACTION_HIDE.equals(action)) {
                 hideFloatingWindow();
+            } else if (ACTION_UPDATE_STYLE.equals(action) || ACTION_UPDATE_SIZE.equals(action)) {
+                // 只在已经显示时才有意义；没显示就什么都不做，
+                // 尤其不能顺手 showFloatingWindow —— 那会把关掉的按钮又拉出来
+                if (floatingContainer != null) {
+                    mainHandler.post(this::applyStyle);
+                }
             } else {
                 showFloatingWindow();
             }
@@ -473,6 +508,7 @@ public class RecordingFloatingService extends Service {
         // 添加到窗口
         try {
             windowManager.addView(floatingContainer, layoutParams);
+            applyStyle();
             AppLog.d(TAG, "录制悬浮窗创建成功");
         } catch (Exception e) {
             AppLog.e(TAG, "添加悬浮窗失败", e);
@@ -791,9 +827,11 @@ public class RecordingFloatingService extends Service {
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
 
-            // 底色始终中性。整块变红等于把「这个按钮」和「正在录」混为一谈 ——
-            // 主界面的录制键就是这么定的：红色只出现在中间那个点上。
-            backgroundPaint.setColor(ContextCompat.getColor(getContext(), R.color.surface));
+            // 和主界面那个录制键一样：底色只在两档之间走（待机 sunken、
+            // 录制中 recording_quiet），红色始终只出现在中间那个点上。
+            // 整块变红等于把「这个按钮」和「正在录」混为一谈。
+            backgroundPaint.setColor(ContextCompat.getColor(getContext(),
+                    isRecording ? R.color.recording_quiet : R.color.sunken));
 
             // 绘制阴影（iOS 风格）
             float shadowOffset = radius * 0.08f;

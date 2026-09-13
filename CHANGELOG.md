@@ -5,7 +5,29 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Reverted 0.45's crop placement. Keeping the frame still while the crop filled it turned a
+  lane into static on the vehicle; the cause is not understood yet, so the old behaviour is
+  back -- the picture resizes and shifts as you crop, which is wrong but is a picture. The
+  mask fix and the rotated-axis mapping stay.
+- Fixed: rotation and mirroring still did nothing to the cabin cameras. Twice the transform
+  was written from the main screen and twice it lost -- first overwritten, then apparently
+  never reached the view. It is built inside SingleCamera now, at the same three points
+  that used to overwrite it, which are the ones known to run.
+- The main screen has no title bar. Its 64dp held a menu key, the app name and the profile
+  name; the menu key now floats on the picture where it already was, the name sits at the
+  top of the action rail, and the profile name joined the status bar, where "what is
+  running right now" already lives. The picture is 64dp taller.
+- The status bar spans the whole picture area instead of just the surround pane.
+- Fixed: the floating button's size and text-size sliders did nothing. Settings started the
+  service with an action the service only listened for as a broadcast.
+- Fixed: changing opacity sometimes made the floating button vanish, and turning the
+  recording time off closed the button entirely. Both were the same race -- two commands,
+  hide and show, each on its own thread. Style changes are applied in place now.
+- The floating button's background follows the main screen's record button: neutral when
+  idle, a quiet red while recording, with red only ever on the dot.
+- The drawer has a floating-button switch under the mirror, and no longer has a diagnostics
+  entry. "Recording status readout" moved to Interface, where it belongs -- it is the chip
+  on the picture, not part of the floating button.
 
 ## [0.45.0-alpha] - 2026-09-13
 

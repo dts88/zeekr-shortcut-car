@@ -16,6 +16,21 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!--
+      应用名。原来在标题栏左侧，标题栏拆掉之后它归到这一列的顶上 ——
+      这一列本来就是「这个界面能做的事」，名字挂在最上面不占画面。
+    -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/gutter"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/main_title"
+        android:textColor="@color/text_primary"
+        android:textAppearance="@style/TextAppearance.Cam.Title"
+        android:textStyle="bold" />
+
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/btn_start_record"
         android:layout_width="match_parent"

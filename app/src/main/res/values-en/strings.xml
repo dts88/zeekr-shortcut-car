@@ -8,7 +8,7 @@
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
     <string name="set_section_rearview">Super mirror</string>
-    <string name="set_section_floating">Floating windows</string>
+    <string name="set_section_floating">Floating button</string>
     <string name="set_section_system">System</string>
     <string name="set_section_advanced">Advanced</string>
     <string name="set_section_about">About</string>

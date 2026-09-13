@@ -64,6 +64,16 @@ public final class StatusLine {
         }
     }
 
+    /** 现在生效的那份配置叫什么；读不出来就空着，不编一个名字。 */
+    private static String profileName(Context context) {
+        try {
+            String name = new com.kooo.evcam.profile.ProfileStore(context).current().name;
+            return name == null ? "" : name.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /** 把「这次按什么录」和「还剩多少空间」两格填好；其余两格是录制状态，由主界面自己管。 */
     public static void fill(View root) {
         if (root == null) {
@@ -82,7 +92,11 @@ public final class StatusLine {
                     : level == 1 ? R.string.status_bitrate_low
                     : level == 3 ? R.string.status_bitrate_high
                     : R.string.status_bitrate_medium;
-            NumberRoll.set(stream, fps + " · " + context.getString(bitrate));
+            // 配置名原来在标题栏里（「环视 + 两路座舱」那一行）。标题栏拆了之后
+            // 它归到这里 —— 它本来就是一条「现在按什么在跑」的状态，和帧率码率同类
+            String profile = profileName(context);
+            NumberRoll.set(stream, (profile.isEmpty() ? "" : profile + " · ")
+                    + fps + " · " + context.getString(bitrate));
             stream.setVisibility(View.VISIBLE);
         }
         TextView storage = root.findViewById(R.id.tv_status_storage);

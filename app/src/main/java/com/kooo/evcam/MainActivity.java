@@ -109,8 +109,6 @@ public class MainActivity extends AppCompatActivity {
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
     private final java.util.Map<String, android.graphics.Matrix> previewBaseTransforms = new java.util.HashMap<>();
-    /** 已经挂上重算监听的那几路，别挂第二遍。 */
-    private final java.util.Set<String> laneTransformBound = new java.util.HashSet<>();
     private PreviewCorrectionFloatingWindow previewCorrectionFloatingWindow;
 
     // 调试信息覆盖层（连点5下空白处显示）
@@ -1348,6 +1346,11 @@ public class MainActivity extends AppCompatActivity {
                 toggleRearViewFromDrawer();
                 return false;
             }
+
+            if (itemId == R.id.nav_floating_button) {
+                toggleFloatingButtonFromDrawer();
+                return false;
+            }
             
             if (itemId == R.id.nav_recording) {
                 // 显示录制界面
@@ -1366,8 +1369,6 @@ public class MainActivity extends AppCompatActivity {
                 toggleSupervisionMode();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
-            } else if (itemId == R.id.nav_diagnostics) {
-                startActivity(new Intent(this, com.kooo.evcam.zeekr.DiagnosticsActivity.class));
             } else if (itemId == R.id.nav_about) {
                 startActivity(new Intent(this, com.kooo.evcam.zeekr.AboutActivity.class));
             }
@@ -2505,7 +2506,8 @@ public class MainActivity extends AppCompatActivity {
             // 所以这里不能按槽位名硬转，只能按配置转。
             textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
             textureView.setFillContainer(false);
-            applyLaneTransform(textureView, cameraKey);
+            // 变换由 SingleCamera 按配置那一格来做 —— 这里再设一次只会互相覆盖，
+            // 而它那几个调用点才是确定会跑的（见 SingleCamera.applyLaneTransform）
             AppLog.d(TAG, "设置 " + cameraKey + " 座舱相机宽高比: "
                     + previewSize.getWidth() + ":" + previewSize.getHeight());
         } else {
@@ -2584,67 +2586,6 @@ public class MainActivity extends AppCompatActivity {
             textureView.setTransform(matrix);
             AppLog.d(TAG, cameraKey + " 应用修正旋转: " + rotation + "度");
         });
-    }
-
-    /**
-     * 座舱那一路的旋转、镜像、裁剪、缩放平移：从配置里那一格取，压成 surface 矩阵。
-     *
-     * <h3>为什么以前无效</h3>
-     *
-     * <p>这两路的画面各是一个 {@code TextureView}，变换一直来自旧的「预览矫正」
-     * 那套按相机位置存的键，配置里那一格的值没有人读 —— 也就是说，编辑器里转了、
-     * 存了、显示着 90°，画面一动不动。和环视那一路在 0.38 修过的，是同一个缺陷。</p>
-     *
-     * <p>开发者选项里的「预览矫正」仍然叠在这之上：配置是存下来的摆法，
-     * 那个悬浮窗是在它上面临时推一把。</p>
-     */
-    private void applyLaneTransform(AutoFitTextureView textureView, String cameraKey) {
-        // 尺寸一变，矩阵就得重算。setAspectRatio 会触发一次重新布局，而它和这里
-        // 谁先谁后没有保证 —— 只算一次的话，算的可能是上一次的尺寸
-        if (laneTransformBound.add(cameraKey)) {
-            textureView.addOnLayoutChangeListener(
-                    (v, left, top, right, bottom, wasLeft, wasTop, wasRight, wasBottom) -> {
-                        if (right - left != wasRight - wasLeft
-                                || bottom - top != wasBottom - wasTop) {
-                            applyLaneTransform(textureView, cameraKey);
-                        }
-                    });
-        }
-        textureView.post(() -> {
-            int viewWidth = textureView.getWidth();
-            int viewHeight = textureView.getHeight();
-            if (viewWidth <= 0 || viewHeight <= 0) {
-                textureView.postDelayed(() -> applyLaneTransform(textureView, cameraKey), 100);
-                return;
-            }
-            android.graphics.Matrix matrix = new android.graphics.Matrix();
-            com.kooo.evcam.profile.LaneLayout lane = laneFor(cameraKey);
-            if (lane != null && com.kooo.evcam.camera.LaneSurfaceMatrix.build(matrix,
-                    viewWidth, viewHeight, lane.rotation, lane.mirrored,
-                    lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
-                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY)) {
-                AppLog.i(TAG, "座舱 " + cameraKey + " 按配置变换: " + lane);
-            }
-            previewBaseTransforms.put(cameraKey, new android.graphics.Matrix(matrix));
-            PreviewCorrection.postApply(matrix, appConfig, cameraKey, viewWidth, viewHeight);
-            textureView.setTransform(matrix);
-        });
-    }
-
-    /** 这一路在当前配置里的那一格；不拆分的那几路只有一格。取不到返回 null。 */
-    private com.kooo.evcam.profile.LaneLayout laneFor(String cameraKey) {
-        String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(cameraKey);
-        if (role == null) {
-            return null;
-        }
-        if (activeProfile == null) {
-            activeProfile = new ProfileStore(this).current();
-        }
-        CameraProfile camera = activeProfile.camera(role);
-        if (camera == null || camera.lanes.isEmpty()) {
-            return null;
-        }
-        return camera.lanes.get(0);
     }
 
     /**
@@ -4317,16 +4258,33 @@ public class MainActivity extends AppCompatActivity {
         syncRearViewSwitch();
     }
 
-    /** 行尾开关照后视镜的真实状态摆。 */
+    /** 抽屉里的悬浮按钮开关，和后视镜那一行表现一致。 */
+    private void toggleFloatingButtonFromDrawer() {
+        boolean on = !appConfig.isRecordingFloatingEnabled();
+        if (!OverlayCoordinator.setRecordButtonEnabled(this, on)) {
+            Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
+            WakeUpHelper.requestOverlayPermission(this);
+        } else if (on) {
+            broadcastCurrentRecordingState();
+        }
+        syncRearViewSwitch();
+    }
+
+    /** 行尾那两个开关照各自的真实状态摆。 */
     private void syncRearViewSwitch() {
         if (navigationView == null || appConfig == null) {
             return;
         }
-        android.view.MenuItem item = navigationView.getMenu().findItem(R.id.nav_rearview);
+        syncNavSwitch(R.id.nav_rearview, appConfig.isRearViewEnabled());
+        syncNavSwitch(R.id.nav_floating_button, appConfig.isRecordingFloatingEnabled());
+    }
+
+    private void syncNavSwitch(int itemId, boolean on) {
+        android.view.MenuItem item = navigationView.getMenu().findItem(itemId);
         View action = item != null ? item.getActionView() : null;
         View toggle = action != null ? action.findViewById(R.id.nav_switch) : null;
         if (toggle instanceof android.widget.CompoundButton) {
-            ((android.widget.CompoundButton) toggle).setChecked(appConfig.isRearViewEnabled());
+            ((android.widget.CompoundButton) toggle).setChecked(on);
         }
     }
 

@@ -34,6 +34,12 @@
                 android:icon="@drawable/ic_rearview"
                 android:title="@string/set_section_rearview"
                 app:actionLayout="@layout/nav_switch" />
+            <item
+                android:id="@+id/nav_floating_button"
+                android:checkable="false"
+                android:icon="@drawable/ic_floating"
+                android:title="@string/set_section_floating"
+                app:actionLayout="@layout/nav_switch" />
         </menu>
     </item>
 
@@ -54,11 +60,6 @@
                 android:checkable="true"
                 android:icon="@drawable/ic_settings"
                 android:title="@string/nav_settings" />
-            <item
-                android:id="@+id/nav_diagnostics"
-                android:checkable="true"
-                android:icon="@drawable/ic_diagnostics"
-                android:title="@string/nav_diagnostics" />
             <item
                 android:id="@+id/nav_about"
                 android:checkable="true"

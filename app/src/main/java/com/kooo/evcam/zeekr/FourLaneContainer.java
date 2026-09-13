@@ -17,7 +17,6 @@ import android.view.animation.PathInterpolator;
 import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.camera.LaneFit;
 import com.kooo.evcam.camera.LaneOrientation;
 import com.kooo.evcam.AutoFitTextureView;
 import com.kooo.evcam.R;
@@ -115,8 +114,6 @@ public class FourLaneContainer extends ViewGroup {
     private Cell[] cells;
 
     private final Matrix drawMatrix = new Matrix();
-    private final float[] fitScratch = new float[4];
-    private final float[] coverScratch = new float[2];
     private final RectF sourceRect = new RectF();
     private final RectF destinationRect = new RectF();
 
@@ -583,41 +580,52 @@ public class FourLaneContainer extends ViewGroup {
         int rotation = cell == null ? 0 : LaneOrientation.normalise(cell.rotation);
         boolean quarterTurn = LaneOrientation.quarterTurn(rotation);
 
-        // 目标框按<b>没裁之前</b>的画面比例定。裁剪不该让这一格里的画面跳位置、
-        // 改大小 —— 那看起来像是裁剪坏了，而不像裁掉了车头。
+        // 这一格的真实长宽比。裁切会改变它（切掉的是画面的一部分），
+        // 缩放平移不会（那只是把同一幅画面挪一挪、放大一点）。
+        //
+        // 0.45 试过「框按没裁之前的比例定、裁完的部分填满同一个框」，想让裁剪
+        // 不带着画面跳位置。车上试出来是一格雪花 —— 原因还没查清，所以先退回
+        // 这一版：画面会跟着裁剪改大小和位置，但它是画面。
         float laneAspectPx = lane.aspect();
-        float laneAspect = quarterTurn && laneAspectPx > 0f ? 1f / laneAspectPx : laneAspectPx;
-        if (scaleMode == ScaleMode.FILL) {
-            laneAspect = cellWidth / cellHeight;
-        }
-        LaneFit.fitCentred(cellWidth, cellHeight, laneAspect, fitScratch);
-        destinationRect.set(cellLeft + fitScratch[0], cellTop + fitScratch[1],
-                cellLeft + fitScratch[0] + fitScratch[2],
-                cellTop + fitScratch[1] + fitScratch[3]);
-
-        // 取源画面的哪一块。裁剪、缩放、平移都动这个窗口，不动上面那个框。
-        float contentAspect = laneAspectPx;
         if (cell != null) {
-            contentAspect = applyCropAndPan(cell, rotation, laneAspectPx);
+            laneAspectPx = applyCropAndPan(cell, rotation, laneAspectPx);
         }
 
-        // 裁完的部分填满同一个框：多出来的那一边居中裁掉，不拉伸。
-        // 框在转之后才互换长宽，所以这里比的是转之前的比例。
-        float targetAspect = quarterTurn && laneAspect > 0f ? 1f / laneAspect : laneAspect;
-        LaneFit.cover(contentAspect, targetAspect, coverScratch);
-        if (coverScratch[0] < 1f) {
-            float centre = sourceRect.centerX();
-            float half = sourceRect.width() / 2f * coverScratch[0];
-            sourceRect.left = centre - half;
-            sourceRect.right = centre + half;
-        }
-        if (coverScratch[1] < 1f) {
-            float centre = sourceRect.centerY();
-            float half = sourceRect.height() / 2f * coverScratch[1];
-            sourceRect.top = centre - half;
-            sourceRect.bottom = centre + half;
+        float destLeft = cellLeft;
+        float destTop = cellTop;
+        float destWidth = cellWidth;
+        float destHeight = cellHeight;
+
+        // 画面的真实比例来自源像素（合成流里是正方形），不是被压扁的缓冲区比例。
+        // 转了 90°/270° 的话，占地的长宽也跟着对调。
+        float laneAspect = quarterTurn && laneAspectPx > 0f ? 1f / laneAspectPx : laneAspectPx;
+        float cellAspect = cellWidth / cellHeight;
+        if (scaleMode == ScaleMode.FIT && laneAspect > 0f && cellAspect > 0f) {
+            if (laneAspect < cellAspect) {
+                destWidth = cellHeight * laneAspect;
+                destLeft = cellLeft + (cellWidth - destWidth) / 2f;
+            } else if (laneAspect > cellAspect) {
+                destHeight = cellWidth / laneAspect;
+                destTop = cellTop + (cellHeight - destHeight) / 2f;
+            }
+        } else if (scaleMode == ScaleMode.FILL && laneAspect > 0f && cellAspect > 0f) {
+            // 填满：反过来收窄源矩形，居中裁切
+            if (laneAspect < cellAspect) {
+                float keep = laneAspect / cellAspect;
+                float centre = sourceRect.centerY();
+                float half = sourceRect.height() / 2f * keep;
+                sourceRect.top = centre - half;
+                sourceRect.bottom = centre + half;
+            } else if (laneAspect > cellAspect) {
+                float keep = cellAspect / laneAspect;
+                float centre = sourceRect.centerX();
+                float half = sourceRect.width() / 2f * keep;
+                sourceRect.left = centre - half;
+                sourceRect.right = centre + half;
+            }
         }
 
+        destinationRect.set(destLeft, destTop, destLeft + destWidth, destTop + destHeight);
         if (quarterTurn) {
             // 转四分之一圈时，先按「转之前」的形状去映射：
             // 目标框的长宽在旋转后才互换，所以这里要用互换回来的那个框
@@ -626,6 +634,12 @@ public class FourLaneContainer extends ViewGroup {
             float halfW = destinationRect.height() / 2f;
             float halfH = destinationRect.width() / 2f;
             destinationRect.set(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
+        }
+        if (sourceRect.width() <= 0f || sourceRect.height() <= 0f
+                || destinationRect.width() <= 0f || destinationRect.height() <= 0f) {
+            // 空矩形喂给 setRectToRect 会得到一个单位阵 —— 那一格就会画成整条
+            // 合成流，而不是什么都不画。宁可这一格空着
+            return;
         }
         drawMatrix.setRectToRect(sourceRect, destinationRect, Matrix.ScaleToFit.FILL);
         if (cell != null) {

@@ -36,70 +36,6 @@
                 android:background="@drawable/bg_surface_card"
                 android:orientation="vertical">
 
-                <!-- ① 标题区：菜单永远在左上 -->
-                <LinearLayout
-                    android:id="@+id/title_bar"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/title_bar_height"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="16dp">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_menu"
-                        style="@style/Widget.Cam.IconButton"
-                        android:layout_width="@dimen/icon_button_size"
-                        android:layout_height="@dimen/icon_button_size"
-                        android:contentDescription="@string/cd_menu"
-                        app:icon="@drawable/ic_menu" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:text="@string/main_title"
-                        android:textColor="@color/text_primary"
-                        android:textAppearance="@style/TextAppearance.Cam.Title"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="@string/zeekr_model_name"
-                        android:textColor="@color/text_tertiary"
-                        android:textAppearance="@style/TextAppearance.Cam.Caption" />
-
-                    <Space
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
-
-                    <!-- 录制中 00:14:22 · 第 N 段。双击可隐藏（沿用原来的逻辑） -->
-                    <TextView
-                        android:id="@+id/tv_recording_stats"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_chip_recording"
-                        android:drawableStart="@drawable/chip_dot_recording"
-                        android:drawablePadding="8dp"
-                        android:fontFeatureSettings="tnum"
-                        android:gravity="center_vertical"
-                        android:paddingStart="14dp"
-                        android:paddingTop="7dp"
-                        android:paddingEnd="14dp"
-                        android:paddingBottom="7dp"
-                        android:textColor="@color/recording_text"
-                        android:textAppearance="@style/TextAppearance.Cam.Body"
-                        android:visibility="gone" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/line" />
-
                 <!-- ③ 内容区 + ④ 动作栏 -->
                 <LinearLayout
                     android:id="@+id/main_row"
@@ -108,96 +44,146 @@
                     android:layout_weight="1"
                     android:orientation="horizontal"
                     android:padding="@dimen/gutter">
+                    <!--
+                      ③ 内容区。整块是一个 FrameLayout：画面铺满，菜单键、录制角标和
+                      ⑤ 状态条都浮在它上面。
 
+                      标题栏没有了 —— 那一条 64dp 里只有一个菜单键、一个应用名和一个
+                      配置名，三样东西各自都有更该待的地方，而这块屏幕上真正稀缺的是
+                      画面的高度。
+                    -->
                     <FrameLayout
-                        android:id="@+id/composite_wrapper"
+                        android:id="@+id/preview_stage"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_preview_frame">
+                        android:layout_weight="1">
 
-                        <!--
-                          FourLaneContainer 里只放一个普通的 AutoFitTextureView，
-                          它是相机唯一的消费者、完全不被改造；容器只负责把这个子视图
-                          重复画进四个格子。这套结构在实车上验证过
-                          （另一条路——用 GL 自建 SurfaceTexture 顶替生产者——据公开资料会崩溃）。
-                          角标是容器的兄弟节点，浮在上层。
-                        -->
-                        <com.kooo.evcam.zeekr.FourLaneContainer
-                            android:id="@+id/composite_container"
+                        <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent">
+                            android:layout_height="match_parent"
+                            android:orientation="horizontal">
+                            <FrameLayout
+                                android:id="@+id/composite_wrapper"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame">
 
-                            <com.kooo.evcam.AutoFitTextureView
-                                android:id="@+id/texture_front"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent" />
-                        </com.kooo.evcam.zeekr.FourLaneContainer>
+                                <!--
+                                  FourLaneContainer 里只放一个普通的 AutoFitTextureView，
+                                  它是相机唯一的消费者、完全不被改造；容器只负责把这个子视图
+                                  重复画进四个格子。这套结构在实车上验证过
+                                  （另一条路——用 GL 自建 SurfaceTexture 顶替生产者——据公开资料会崩溃）。
+                                  角标是容器的兄弟节点，浮在上层。
+                                -->
+                                <com.kooo.evcam.zeekr.FourLaneContainer
+                                    android:id="@+id/composite_container"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent">
 
-                        <!-- 四个角标：跟着各自那一格走（MainActivity.positionLaneLabels） -->
-                        <TextView
-                            android:id="@+id/label_front"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
+                                    <com.kooo.evcam.AutoFitTextureView
+                                        android:id="@+id/texture_front"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="match_parent" />
+                                </com.kooo.evcam.zeekr.FourLaneContainer>
+
+                                <!-- 四个角标：跟着各自那一格走（MainActivity.positionLaneLabels） -->
+                                <TextView
+                                    android:id="@+id/label_front"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="36dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="12dp"
+                                    android:layout_marginTop="8dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="12dp"
+                                    android:paddingEnd="12dp"
+                                    android:text="@string/zeekr_lane_front"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                                <TextView
+                                    android:id="@+id/label_back"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="36dp"
+                                    android:layout_gravity="top|end"
+                                    android:layout_marginTop="8dp"
+                                    android:layout_marginEnd="12dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="12dp"
+                                    android:paddingEnd="12dp"
+                                    android:text="@string/zeekr_lane_back"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                                <TextView
+                                    android:id="@+id/label_left"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="36dp"
+                                    android:layout_gravity="bottom|start"
+                                    android:layout_marginStart="12dp"
+                                    android:layout_marginBottom="8dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="12dp"
+                                    android:paddingEnd="12dp"
+                                    android:text="@string/zeekr_lane_left"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                                <TextView
+                                    android:id="@+id/label_right"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="36dp"
+                                    android:layout_gravity="bottom|end"
+                                    android:layout_marginEnd="12dp"
+                                    android:layout_marginBottom="8dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="12dp"
+                                    android:paddingEnd="12dp"
+                                    android:text="@string/zeekr_lane_right"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            </FrameLayout>
+                        </LinearLayout>
+
+                        <!-- 菜单键：浮在画面左上角，位置和原来标题栏里那个一致 -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_menu"
+                            style="@style/Widget.Cam.IconButton"
+                            android:layout_width="@dimen/icon_button_size"
+                            android:layout_height="@dimen/icon_button_size"
                             android:layout_gravity="top|start"
-                            android:layout_marginStart="12dp"
-                            android:layout_marginTop="8dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:text="@string/zeekr_lane_front"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:layout_margin="@dimen/gutter"
+                            android:contentDescription="@string/cd_menu"
+                            app:icon="@drawable/ic_menu" />
 
+                        <!-- 录制角标：原来在标题栏右侧，现在在画面右上角 -->
                         <TextView
-                            android:id="@+id/label_back"
+                            android:id="@+id/tv_recording_stats"
                             android:layout_width="wrap_content"
-                            android:layout_height="36dp"
+                            android:layout_height="wrap_content"
                             android:layout_gravity="top|end"
-                            android:layout_marginTop="8dp"
-                            android:layout_marginEnd="12dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:text="@string/zeekr_lane_back"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-                        <TextView
-                            android:id="@+id/label_left"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_gravity="bottom|start"
-                            android:layout_marginStart="12dp"
-                            android:layout_marginBottom="8dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:text="@string/zeekr_lane_left"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-                        <TextView
-                            android:id="@+id/label_right"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="12dp"
-                            android:layout_marginBottom="8dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp"
-                            android:text="@string/zeekr_lane_right"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            android:layout_margin="@dimen/gutter"
+                            android:background="@drawable/bg_chip_recording"
+                            android:drawableStart="@drawable/chip_dot_recording"
+                            android:drawablePadding="8dp"
+                            android:fontFeatureSettings="tnum"
+                            android:gravity="center_vertical"
+                            android:paddingStart="14dp"
+                            android:paddingTop="7dp"
+                            android:paddingEnd="14dp"
+                            android:paddingBottom="7dp"
+                            android:textColor="@color/recording_text"
+                            android:textAppearance="@style/TextAppearance.Cam.Body"
+                            android:visibility="gone" />
 
                         <!--
-                          ⑤ 状态条压在画面底边上（见 docs/ui-spec.md）。占一行的话
-                          预览就矮 48dp —— 这块屏幕上，内容就是画面本身。
+                          ⑤ 状态条压在画面底边上（见 docs/ui-spec.md）。它在这一层，
+                          所以横跨整个画面区，而不是只盖住环视那一格。
                         -->
                         <include
                             layout="@layout/layout_status_bar"
@@ -205,7 +191,6 @@
                             android:layout_height="@dimen/status_bar_height"
                             android:layout_gravity="bottom" />
                     </FrameLayout>
-
                     <include
                         layout="@layout/layout_action_rail"
                         android:layout_width="@dimen/rail_width"

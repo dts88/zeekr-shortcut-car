@@ -586,12 +586,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 appConfig.getRecordingFloatingButtonSizeDp(), " dp",
                 value -> {
                     appConfig.setRecordingFloatingButtonSizeDp(value);
-                    pushRecordingButtonSize();
+                    pushFloatingStyle();
                 });
         bindSlider("pref_floating_alpha", 20, 100, appConfig.getFloatingWindowAlpha(), "%",
                 value -> {
                     appConfig.setFloatingWindowAlpha(value);
-                    restartFloatingButton();
+                    pushFloatingStyle();
                 });
 
         bindFloatingAction("pref_floating_tap", appConfig.getFloatingTapAction(),
@@ -601,17 +601,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_floating_duration", appConfig.isFloatingDurationVisible(), value -> {
             appConfig.setFloatingDurationVisible(value);
-            restartFloatingButton();
+            pushFloatingStyle();
         });
         bindSlider("pref_button_text_size", 8, 24,
                 appConfig.getRecordingFloatingTimeTextSizeSp(), " sp",
                 value -> {
                     appConfig.setRecordingFloatingTimeTextSizeSp(value);
-                    pushRecordingButtonSize();
+                    pushFloatingStyle();
                 });
-
-        bindSwitch("pref_recording_stats", appConfig.isRecordingStatsEnabled(),
-                value -> appConfig.setRecordingStatsEnabled(value));
 
         bindFloatingReset();
 
@@ -667,22 +664,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    /** 透明度、时长开关这类改完要重建视图的项：关掉再开一次。 */
-    private void restartFloatingButton() {
-        if (getContext() == null || !appConfig.isRecordingFloatingEnabled()) {
-            return;
-        }
-        sendToRecordingFloating(RecordingFloatingService.ACTION_HIDE, null);
-        sendToRecordingFloating(RecordingFloatingService.ACTION_SHOW, null);
-    }
 
-    private void pushRecordingButtonSize() {
-        Intent intent = new Intent();
-        intent.putExtra(RecordingFloatingService.EXTRA_BUTTON_SIZE,
-                appConfig.getRecordingFloatingButtonSizeDp());
-        intent.putExtra(RecordingFloatingService.EXTRA_TEXT_SIZE,
-                appConfig.getRecordingFloatingTimeTextSizeSp());
-        sendToRecordingFloating(RecordingFloatingService.ACTION_UPDATE_SIZE, intent);
+    /**
+     * 外观改了，让按钮就地重读一遍配置。
+     *
+     * <p>以前这里发的是 {@code ACTION_UPDATE_SIZE} 加两个 extra，而服务那边
+     * 是用<b>广播</b>接收器在等这个 action —— 这边却是 {@code startService}。
+     * 两条路对不上，所以两个滑块一直没有任何反应。现在服务在 onStartCommand
+     * 里认这条指令，参数它自己读，不用带。</p>
+     */
+    private void pushFloatingStyle() {
+        sendToRecordingFloating(RecordingFloatingService.ACTION_UPDATE_STYLE, null);
     }
 
     /**
@@ -744,6 +736,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setActionRailSide(value);
                     appConfig.setRailSideChosen();
                 });
+        // 录制状态显示是主界面画面角落那块，不是悬浮按钮的事
+        bindSwitch("pref_recording_stats", appConfig.isRecordingStatsEnabled(),
+                value -> appConfig.setRecordingStatsEnabled(value));
+
         bindSwitch("pref_reduce_motion", appConfig.isReduceMotionWhileRecording(),
                 value -> appConfig.setReduceMotionWhileRecording(value));
     }

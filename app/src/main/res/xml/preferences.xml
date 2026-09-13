@@ -200,11 +200,6 @@
             android:title="@string/set_button_text_size_title"
             app:showSeekBarValue="true" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_recording_stats"
-            android:title="@string/set_recording_stats_title"
-            android:summary="@string/set_recording_stats_summary" />
-
         <Preference
             android:key="pref_reset_floating"
             android:title="@string/set_reset_floating_title"
@@ -221,6 +216,11 @@
             android:key="pref_rail_side"
             android:title="@string/set_rail_side_title"
             android:summary="@string/set_rail_side_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_recording_stats"
+            android:title="@string/set_recording_stats_title"
+            android:summary="@string/set_recording_stats_summary" />
 
         <SwitchPreferenceCompat
             android:key="pref_reduce_motion"
