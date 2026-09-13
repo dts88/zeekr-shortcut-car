@@ -7,6 +7,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.51.1-alpha] - 2026-09-14
+
+- Removed the segment progress bar and "clip xx%" from the status bar on the main screen.
+  While recording it jumped between the real value and 100%, and the record button's ring
+  already shows the same progress.
+
 ## [0.51.0-alpha] - 2026-09-13
 
 - Photos always use the camera's largest size. They no longer follow the resolution chosen
