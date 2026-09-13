@@ -83,14 +83,16 @@ public class RecordingFloatingService extends Service {
     private static final long LONG_PRESS_MS = 600;
 
     private final IBinder binder = new LocalBinder();
+    private Handler mainHandler;
+    private AppConfig appConfig;
+    private WindowManager windowManager;
+
+    // 长按：计时器要在 appConfig 之后声明，它读的是 appConfig
     private boolean longPressFired = false;
     private final Runnable longPressRunnable = () -> {
         longPressFired = true;
         perform(FloatingAction.fromKey(appConfig.getFloatingLongPressAction()));
     };
-    private Handler mainHandler;
-    private AppConfig appConfig;
-    private WindowManager windowManager;
 
     // 视图组件
     private FrameLayout floatingContainer;

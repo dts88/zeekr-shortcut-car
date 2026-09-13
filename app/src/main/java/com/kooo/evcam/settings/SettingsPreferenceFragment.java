@@ -623,7 +623,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * <p>选项文字在 strings.xml，存下去的是 {@link FloatingAction} 里那几个 key，
      * 两边靠同一个数组下标对上 —— 所以这里必须一起写，不能一边加一边忘。</p>
      */
-    private void bindFloatingAction(String key, String current, java.util.function.Consumer<String> onPick) {
+    private void bindFloatingAction(String key, String current, StringSetter onPick) {
         Preference pref = findPreference(key);
         if (!(pref instanceof ListPreference)) {
             return;
@@ -643,7 +643,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         list.setValue(FloatingAction.fromKey(current).key);
         list.setSummaryProvider(p -> ((ListPreference) p).getEntry());
         list.setOnPreferenceChangeListener((p, value) -> {
-            onPick.accept(String.valueOf(value));
+            onPick.set(String.valueOf(value));
             return true;
         });
     }
