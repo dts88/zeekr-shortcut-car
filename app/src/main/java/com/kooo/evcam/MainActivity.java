@@ -106,7 +106,6 @@ public class MainActivity extends AppCompatActivity {
     /** 已经挂上重算监听的那几路，别挂第二遍。 */
     private final java.util.Set<String> laneTransformBound = new java.util.HashSet<>();
     private PreviewCorrectionFloatingWindow previewCorrectionFloatingWindow;
-    private FisheyeCorrectionFloatingWindow fisheyeCorrectionFloatingWindow;
 
     // 调试信息覆盖层（连点5下空白处显示）
     private TextView tvDebugOverlay;
@@ -881,9 +880,6 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "显示全屏预览: " + cameraPosition);
 
         currentFullscreenDialog = new FullscreenPreviewDialog(this, cameraPosition);
-        currentFullscreenDialog.setOnParamsSavedListener((pos, k1, k2, zoom, cx, cy, rotation) -> {
-            AppLog.d(TAG, "鱼眼参数已保存: " + pos + " k1=" + k1 + " k2=" + k2 + " zoom=" + zoom + " rotation=" + rotation);
-        });
         currentFullscreenDialog.setOnDismissListener(dialog -> {
             currentFullscreenDialog = null;
         });
@@ -2685,45 +2681,6 @@ public class MainActivity extends AppCompatActivity {
         if (previewCorrectionFloatingWindow != null) {
             previewCorrectionFloatingWindow.dismiss();
             previewCorrectionFloatingWindow = null;
-        }
-    }
-
-    // ==================== 鱼眼矫正 ====================
-
-    /**
-     * 鱼眼矫正开关切换后刷新所有摄像头预览
-     * 需要重建 Camera session（切换直接 Surface / GL 中间层）
-     */
-    public void refreshFisheyeCorrection() {
-        MultiCameraManager cm = cameraManager;
-        if (cm == null) return;
-        String[] positions = {"front", "back", "left", "right"};
-        for (String pos : positions) {
-            com.kooo.evcam.camera.SingleCamera camera = cm.getCamera(pos);
-            if (camera != null) {
-                camera.recreateForFisheyeToggle();
-            }
-        }
-    }
-
-    /**
-     * 显示鱼眼矫正悬浮窗
-     */
-    public void showFisheyeCorrectionFloating() {
-        if (fisheyeCorrectionFloatingWindow != null && fisheyeCorrectionFloatingWindow.isShowing()) {
-            return;
-        }
-        fisheyeCorrectionFloatingWindow = new FisheyeCorrectionFloatingWindow(this);
-        fisheyeCorrectionFloatingWindow.show();
-    }
-
-    /**
-     * 关闭鱼眼矫正悬浮窗
-     */
-    public void dismissFisheyeCorrectionFloating() {
-        if (fisheyeCorrectionFloatingWindow != null) {
-            fisheyeCorrectionFloatingWindow.dismiss();
-            fisheyeCorrectionFloatingWindow = null;
         }
     }
 

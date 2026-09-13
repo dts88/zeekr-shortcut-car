@@ -82,7 +82,7 @@
     </FrameLayout>
 
     <ScrollView
-        android:id="@+id/panel_fisheye_settings"
+        android:id="@+id/panel_preview_settings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
@@ -397,70 +397,6 @@
                 android:layout_marginTop="12dp"
                 android:layout_marginBottom="12dp"
                 android:background="#40FFFFFF" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="60dp"
-                    android:layout_height="wrap_content"
-                    android:text="K1 强度"
-                    android:textColor="#CCCCCC"
-                    android:textSize="13sp" />
-
-                <SeekBar
-                    android:id="@+id/seek_k1"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp" />
-
-                <TextView
-                    android:id="@+id/tv_k1"
-                    android:layout_width="50dp"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:text="0.00"
-                    android:textColor="#CCCCCC"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="60dp"
-                    android:layout_height="wrap_content"
-                    android:text="K2 细调"
-                    android:textColor="#CCCCCC"
-                    android:textSize="13sp" />
-
-                <SeekBar
-                    android:id="@+id/seek_k2"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp" />
-
-                <TextView
-                    android:id="@+id/tv_k2"
-                    android:layout_width="50dp"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:text="0.00"
-                    android:textColor="#CCCCCC"
-                    android:textSize="13sp" />
-            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

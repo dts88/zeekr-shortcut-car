@@ -33,6 +33,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
   one declares, whether it will take the surround grid's size, and the profile/levels it
   advertises. The ceiling in the code was inherited, never checked against the hardware,
   and an encoder that disagrees does not complain -- it quietly lowers the quality.
+- Removed the inherited fisheye correction: a second camera pipeline, about 1800 lines,
+  behind a flag that nothing could ever set. It rendered the camera into an intermediate
+  GL surface, which is the very thing that crashes on this head unit -- which is why the
+  rear-view mirror's own correction was written the way it was, as a mesh over the existing
+  view. That one stays and is the basis for anything we do with distortion later. The
+  fullscreen preview keeps its zoom, centre and rotation sliders, which work; the two that
+  fed the deleted shader are gone.
 
 ## [0.44.0-alpha] - 2026-09-13
 

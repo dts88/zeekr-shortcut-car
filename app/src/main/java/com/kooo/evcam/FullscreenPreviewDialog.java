@@ -33,14 +33,6 @@ import java.util.Locale;
 public class FullscreenPreviewDialog extends Dialog {
     private static final String TAG = "FullscreenPreviewDialog";
 
-    private static final float K1_MIN = -2.00f;
-    private static final float K1_MAX = 2.00f;
-    private static final float K1_STEP = 0.01f;
-
-    private static final float K2_MIN = -2.00f;
-    private static final float K2_MAX = 2.00f;
-    private static final float K2_STEP = 0.01f;
-
     private static final float ZOOM_MIN = 0.50f;
     private static final float ZOOM_MAX = 3.00f;
     private static final float ZOOM_STEP = 0.01f;
@@ -58,11 +50,11 @@ public class FullscreenPreviewDialog extends Dialog {
     private AutoFitTextureView textureView;
     private TextView tvCameraLabel;
     private TextView tvHint;
-    private ScrollView panelFisheyeSettings;
+    private ScrollView panelSettings;
     private SeekBar seekPosX, seekPosY, seekWidth, seekHeight;
-    private SeekBar seekK1, seekK2, seekZoom, seekCenterX, seekCenterY, seekRotation;
+    private SeekBar seekZoom, seekCenterX, seekCenterY, seekRotation;
     private TextView tvPosX, tvPosY, tvWidth, tvHeight;
-    private TextView tvK1, tvK2, tvZoom, tvCenterX, tvCenterY, tvRotation;
+    private TextView tvZoom, tvCenterX, tvCenterY, tvRotation;
     private Button btnReset, btnSave;
     private ImageButton btnClose, btnHideSettings;
     private CardView cardVideo;
@@ -70,9 +62,9 @@ public class FullscreenPreviewDialog extends Dialog {
 
     private int currentPosX, currentPosY, currentWidth, currentHeight;
     private int savedPosX, savedPosY, savedWidth, savedHeight;
-    private float currentK1, currentK2, currentZoom, currentCenterX, currentCenterY;
+    private float currentZoom, currentCenterX, currentCenterY;
     private int currentRotation;
-    private float savedK1, savedK2, savedZoom, savedCenterX, savedCenterY;
+    private float savedZoom, savedCenterX, savedCenterY;
     private int savedRotation;
 
     private boolean isSettingsPanelVisible = false;
@@ -87,27 +79,17 @@ public class FullscreenPreviewDialog extends Dialog {
     private final Runnable longPressRunnable = () -> {
         if (!isLongPressTriggered) {
             isLongPressTriggered = true;
-            showFisheyeSettingsPanel();
+            showSettingsPanel();
         }
     };
 
     private OnDismissListener onDismissListener;
-
-    public interface OnParamsSavedListener {
-        void onParamsSaved(String cameraPosition, float k1, float k2, float zoom, float centerX, float centerY, int rotation);
-    }
-
-    private OnParamsSavedListener onParamsSavedListener;
 
     public FullscreenPreviewDialog(@NonNull Context context, String cameraPosition) {
         super(context, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         this.context = context;
         this.cameraPosition = cameraPosition;
         this.appConfig = new AppConfig(context);
-    }
-
-    public void setOnParamsSavedListener(OnParamsSavedListener listener) {
-        this.onParamsSavedListener = listener;
     }
 
     @Override
@@ -159,10 +141,10 @@ public class FullscreenPreviewDialog extends Dialog {
         textureView = findViewById(R.id.texture_fullscreen);
         tvCameraLabel = findViewById(R.id.tv_camera_label);
         tvHint = findViewById(R.id.tv_hint);
-        panelFisheyeSettings = findViewById(R.id.panel_fisheye_settings);
+        panelSettings = findViewById(R.id.panel_preview_settings);
         videoContainer = findViewById(R.id.video_container);
 
-        AppLog.d(TAG, "initViews: tvCameraLabel=" + tvCameraLabel + ", tvHint=" + tvHint + ", panelFisheyeSettings=" + panelFisheyeSettings);
+        AppLog.d(TAG, "initViews: tvCameraLabel=" + tvCameraLabel + ", tvHint=" + tvHint + ", panelSettings=" + panelSettings);
 
         seekPosX = findViewById(R.id.seek_pos_x);
         seekPosY = findViewById(R.id.seek_pos_y);
@@ -173,15 +155,11 @@ public class FullscreenPreviewDialog extends Dialog {
         tvWidth = findViewById(R.id.tv_width);
         tvHeight = findViewById(R.id.tv_height);
 
-        seekK1 = findViewById(R.id.seek_k1);
-        seekK2 = findViewById(R.id.seek_k2);
         seekZoom = findViewById(R.id.seek_zoom);
         seekCenterX = findViewById(R.id.seek_center_x);
         seekCenterY = findViewById(R.id.seek_center_y);
         seekRotation = findViewById(R.id.seek_rotation);
 
-        tvK1 = findViewById(R.id.tv_k1);
-        tvK2 = findViewById(R.id.tv_k2);
         tvZoom = findViewById(R.id.tv_zoom);
         tvCenterX = findViewById(R.id.tv_center_x);
         tvCenterY = findViewById(R.id.tv_center_y);
@@ -208,8 +186,6 @@ public class FullscreenPreviewDialog extends Dialog {
         seekWidth.setMax(screenWidth);
         seekHeight.setMax(screenHeight);
 
-        seekK1.setMax(Math.round((K1_MAX - K1_MIN) / K1_STEP));
-        seekK2.setMax(Math.round((K2_MAX - K2_MIN) / K2_STEP));
         seekZoom.setMax(Math.round((ZOOM_MAX - ZOOM_MIN) / ZOOM_STEP));
         seekCenterX.setMax(Math.round((CENTER_MAX - CENTER_MIN) / CENTER_STEP));
         seekCenterY.setMax(Math.round((CENTER_MAX - CENTER_MIN) / CENTER_STEP));
@@ -228,8 +204,6 @@ public class FullscreenPreviewDialog extends Dialog {
         if (savedWidth <= 0) savedWidth = screenWidth * 2 / 3;
         if (savedHeight <= 0) savedHeight = screenHeight * 2 / 3;
 
-        savedK1 = appConfig.getFisheyeCorrectionK1(cameraPosition);
-        savedK2 = appConfig.getFisheyeCorrectionK2(cameraPosition);
         savedZoom = appConfig.getFisheyeCorrectionZoom(cameraPosition);
         savedCenterX = appConfig.getFisheyeCorrectionCenterX(cameraPosition);
         savedCenterY = appConfig.getFisheyeCorrectionCenterY(cameraPosition);
@@ -239,8 +213,6 @@ public class FullscreenPreviewDialog extends Dialog {
         currentPosY = savedPosY > 0 ? savedPosY : 0;
         currentWidth = savedWidth;
         currentHeight = savedHeight;
-        currentK1 = savedK1;
-        currentK2 = savedK2;
         currentZoom = savedZoom;
         currentCenterX = savedCenterX;
         currentCenterY = savedCenterY;
@@ -256,8 +228,6 @@ public class FullscreenPreviewDialog extends Dialog {
         seekPosY.setProgress(currentPosY);
         seekWidth.setProgress(currentWidth);
         seekHeight.setProgress(currentHeight);
-        seekK1.setProgress(k1ToProgress(currentK1));
-        seekK2.setProgress(k2ToProgress(currentK2));
         seekZoom.setProgress(zoomToProgress(currentZoom));
         seekCenterX.setProgress(centerToProgress(currentCenterX));
         seekCenterY.setProgress(centerToProgress(currentCenterY));
@@ -269,8 +239,6 @@ public class FullscreenPreviewDialog extends Dialog {
         tvPosY.setText(String.valueOf(currentPosY));
         tvWidth.setText(String.valueOf(currentWidth));
         tvHeight.setText(String.valueOf(currentHeight));
-        tvK1.setText(format2(currentK1));
-        tvK2.setText(format2(currentK2));
         tvZoom.setText(format2(currentZoom));
         tvCenterX.setText(format2(currentCenterX));
         tvCenterY.setText(format2(currentCenterY));
@@ -295,15 +263,13 @@ public class FullscreenPreviewDialog extends Dialog {
     private void setupListeners() {
         btnClose.setOnClickListener(v -> dismiss());
 
-        btnHideSettings.setOnClickListener(v -> hideFisheyeSettingsPanel());
+        btnHideSettings.setOnClickListener(v -> hideSettingsPanel());
 
         btnReset.setOnClickListener(v -> {
             currentPosX = 0;
             currentPosY = 0;
             currentWidth = 0;
             currentHeight = 0;
-            currentK1 = 0.0f;
-            currentK2 = 0.0f;
             currentZoom = 1.0f;
             currentCenterX = 0.5f;
             currentCenterY = 0.5f;
@@ -319,8 +285,6 @@ public class FullscreenPreviewDialog extends Dialog {
             savedPosY = currentPosY;
             savedWidth = currentWidth;
             savedHeight = currentHeight;
-            savedK1 = currentK1;
-            savedK2 = currentK2;
             savedZoom = currentZoom;
             savedCenterX = currentCenterX;
             savedCenterY = currentCenterY;
@@ -330,18 +294,12 @@ public class FullscreenPreviewDialog extends Dialog {
             appConfig.setFullscreenWindowY(cameraPosition, savedPosY);
             appConfig.setFullscreenWindowWidth(cameraPosition, savedWidth);
             appConfig.setFullscreenWindowHeight(cameraPosition, savedHeight);
-            appConfig.setFisheyeCorrectionK1(cameraPosition, savedK1);
-            appConfig.setFisheyeCorrectionK2(cameraPosition, savedK2);
             appConfig.setFisheyeCorrectionZoom(cameraPosition, savedZoom);
             appConfig.setFisheyeCorrectionCenterX(cameraPosition, savedCenterX);
             appConfig.setFisheyeCorrectionCenterY(cameraPosition, savedCenterY);
             appConfig.setFisheyeCorrectionRotation(cameraPosition, savedRotation);
 
-            if (onParamsSavedListener != null) {
-                onParamsSavedListener.onParamsSaved(cameraPosition, savedK1, savedK2, savedZoom, savedCenterX, savedCenterY, savedRotation);
-            }
-
-            hideFisheyeSettingsPanel();
+            hideSettingsPanel();
         });
 
         SeekBar.OnSeekBarChangeListener seekListener = new SeekBar.OnSeekBarChangeListener() {
@@ -365,14 +323,6 @@ public class FullscreenPreviewDialog extends Dialog {
                     currentHeight = progress;
                     tvHeight.setText(String.valueOf(progress));
                     updateWindowFromParams();
-                } else if (seekBar == seekK1) {
-                    currentK1 = progressToK1(progress);
-                    tvK1.setText(format2(currentK1));
-                    applyTransform();
-                } else if (seekBar == seekK2) {
-                    currentK2 = progressToK2(progress);
-                    tvK2.setText(format2(currentK2));
-                    applyTransform();
                 } else if (seekBar == seekZoom) {
                     currentZoom = progressToZoom(progress);
                     tvZoom.setText(format2(currentZoom));
@@ -403,8 +353,6 @@ public class FullscreenPreviewDialog extends Dialog {
         seekPosY.setOnSeekBarChangeListener(seekListener);
         seekWidth.setOnSeekBarChangeListener(seekListener);
         seekHeight.setOnSeekBarChangeListener(seekListener);
-        seekK1.setOnSeekBarChangeListener(seekListener);
-        seekK2.setOnSeekBarChangeListener(seekListener);
         seekZoom.setOnSeekBarChangeListener(seekListener);
         seekCenterX.setOnSeekBarChangeListener(seekListener);
         seekCenterY.setOnSeekBarChangeListener(seekListener);
@@ -434,7 +382,7 @@ public class FullscreenPreviewDialog extends Dialog {
                         long touchDuration = System.currentTimeMillis() - touchDownTime;
                         if (touchDuration < LONG_PRESS_TIMEOUT) {
                             if (isSettingsPanelVisible) {
-                                hideFisheyeSettingsPanel();
+                                hideSettingsPanel();
                             } else {
                                 dismiss();
                             }
@@ -516,12 +464,12 @@ public class FullscreenPreviewDialog extends Dialog {
         textureView.setTransform(transformMatrix);
     }
 
-    private void showFisheyeSettingsPanel() {
+    private void showSettingsPanel() {
         if (!isSettingsPanelVisible) {
             isSettingsPanelVisible = true;
-            panelFisheyeSettings.setVisibility(View.VISIBLE);
-            panelFisheyeSettings.setAlpha(0f);
-            panelFisheyeSettings.animate()
+            panelSettings.setVisibility(View.VISIBLE);
+            panelSettings.setAlpha(0f);
+            panelSettings.animate()
                     .alpha(1f)
                     .setDuration(200)
                     .start();
@@ -529,36 +477,18 @@ public class FullscreenPreviewDialog extends Dialog {
         }
     }
 
-    private void hideFisheyeSettingsPanel() {
+    private void hideSettingsPanel() {
         if (isSettingsPanelVisible) {
             isSettingsPanelVisible = false;
-            panelFisheyeSettings.animate()
+            panelSettings.animate()
                     .alpha(0f)
                     .setDuration(200)
                     .withEndAction(() -> {
-                        panelFisheyeSettings.setVisibility(View.GONE);
+                        panelSettings.setVisibility(View.GONE);
                         tvHint.setVisibility(View.VISIBLE);
                     })
                     .start();
         }
-    }
-
-    private int k1ToProgress(float k1) {
-        float clamped = Math.max(K1_MIN, Math.min(K1_MAX, k1));
-        return Math.round((clamped - K1_MIN) / K1_STEP);
-    }
-
-    private float progressToK1(int progress) {
-        return K1_MIN + progress * K1_STEP;
-    }
-
-    private int k2ToProgress(float k2) {
-        float clamped = Math.max(K2_MIN, Math.min(K2_MAX, k2));
-        return Math.round((clamped - K2_MIN) / K2_STEP);
-    }
-
-    private float progressToK2(int progress) {
-        return K2_MIN + progress * K2_STEP;
     }
 
     private int zoomToProgress(float zoom) {
