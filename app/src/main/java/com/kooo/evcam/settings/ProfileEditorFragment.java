@@ -116,11 +116,14 @@ public class ProfileEditorFragment extends Fragment {
      * 开和关才是。老配置里缺的那几路在这里补齐，默认关着 ——
      * 关着的一路不开相机、不占空间，和它不在没有区别。</p>
      *
-     * <h3>一个分辨率、一个拍照质量</h3>
+     * <h3>分辨率一个，拍照固定</h3>
      *
-     * <p>这两项前台不再分开给了。配置里还是三个分辨率字段（后台照旧各问各的），
-     * 但既然前台改不到，就不能把旧数据里的差异留在那 —— 一个既看不见、
-     * 又改不了、还在悷悷生效的值，比一个错的值更难查。</p>
+     * <p>前台只给一个分辨率，写进预览和录制；拍照永远用这一路的最大尺寸，
+     * 质量固定 95。拍照是一张存下来就不再动的图，它不占持续带宽，没有降一档的理由。</p>
+     *
+     * <p>配置里还是三个独立的分辨率字段（后台照旧各问各的），但既然前台改不到，
+     * 就不能把旧数据里的差异留在那 —— 一个既看不见、又改不了、还在悷悷生效的值，
+     * 比一个错的值更难查。</p>
      */
     private void normaliseProfile() {
         for (String role : ROLES) {
@@ -132,8 +135,8 @@ public class ProfileEditorFragment extends Fragment {
         }
         for (CameraProfile camera : profile.cameras) {
             camera.photo.jpegQuality = PHOTO_QUALITY;
+            camera.photo.resolution = StreamSpec.RESOLUTION_MAX;
             camera.preview.resolution = camera.record.resolution;
-            camera.photo.resolution = camera.record.resolution;
         }
     }
 
@@ -213,8 +216,8 @@ public class ProfileEditorFragment extends Fragment {
         }
         renderPresets();
         renderCameras();
-        renderDetail();
         renderBudget();
+        renderDetail();
         // 摆位那一页不在这里重搭：它把这一页换下去了，两者不会同时在屏上。
         // 它改完自己重搭，退回来时这一页的 onViewCreated 会再叫一次 refresh。
     }
@@ -437,16 +440,31 @@ public class ProfileEditorFragment extends Fragment {
         // 档位有十几个，排不成一排，这一行点开是选择框
         pick(context, R.string.editor_knob_resolution, R.string.editor_knob_resolution_note,
                 describeStream(camera), () -> pickResolution(camera));
+        pick(context, R.string.editor_knob_photo_size, R.string.editor_knob_photo_size_note,
+                photoSize(camera), null);
     }
 
-    /** 一行“名字 + 当前值”，点值弹选择框。 */
-    private void pick(Context context, int labelRes, int noteRes, String value, Runnable onPick) {
+    /**
+     * 一行“名字 + 当前值”。
+     *
+     * @param onPick 为 null 就是一行只读的值（比如拍照尺寸，它没得选）
+     */
+    private void pick(Context context, int labelRes, int noteRes, String value,
+                      @Nullable Runnable onPick) {
         View row = LayoutInflater.from(context).inflate(R.layout.item_pick_row, detailBox, false);
         ((TextView) row.findViewById(R.id.pick_label)).setText(labelRes);
         ((TextView) row.findViewById(R.id.pick_note)).setText(noteRes);
         TextView current = row.findViewById(R.id.pick_value);
         current.setText(value);
-        current.setOnClickListener(v -> onPick.run());
+        if (onPick == null) {
+            // 没得选就别装得像能点：去掉箭头和底，字也压一级
+            current.setCompoundDrawables(null, null, null, null);
+            current.setBackground(null);
+            current.setTextColor(androidx.core.content.ContextCompat.getColor(
+                    context, R.color.text_secondary));
+            current.setPadding(0, dp(13), 0, dp(13));
+        }
+        current.setOnClickListener(onPick == null ? null : v -> onPick.run());
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.topMargin = dp(14);
@@ -469,14 +487,28 @@ public class ProfileEditorFragment extends Fragment {
     // ------------------------------------------------------------------ 代价
 
     private void renderBudget() {
-        long perHour = bytesPerHourFor(null);
+        int[] rates = enabledRates(null);
+        if (rates.length == 0) {
+            budgetLine.setText(R.string.editor_budget_none);
+            renderIssues();
+            return;
+        }
+        int total = 0;
+        for (int rate : rates) {
+            total += rate;
+        }
+        long perHour = StorageBudget.bytesPerHour(rates);
         long free = freeBytes();
         float hours = StorageBudget.hours(free, perHour);
+        String lanes = String.valueOf(rates.length);
+        String sum = TargetBitrate.format(total);
         String size = String.format(Locale.US, "%.1f", StorageBudget.gigabytesPerHour(perHour));
+        // 合计码率也写出来：每改一下这一行都该动，
+        // 写了它，「动没动」不用盯着一位小数去比
         budgetLine.setText(hours > 0f
-                ? getString(R.string.editor_budget_with_space, size,
+                ? getString(R.string.editor_budget_with_space, lanes, sum, size,
                         String.format(Locale.US, "%.0f", hours))
-                : getString(R.string.editor_budget, size));
+                : getString(R.string.editor_budget, lanes, sum, size));
         renderIssues();
     }
 
@@ -499,11 +531,11 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     /**
-     * 这份配置一小时落盘多少字节。
+     * 现在开着的这几路各配多少码率（bps）。
      *
      * @param preset 不为 null 时按这一档算（三张卡上那两个数），null 表示按现在的设置算
      */
-    private long bytesPerHourFor(QualityPreset preset) {
+    private int[] enabledRates(@Nullable QualityPreset preset) {
         List<Integer> rates = new ArrayList<>();
         for (CameraProfile camera : profile.cameras) {
             if (!camera.enabled) {
@@ -517,7 +549,12 @@ public class ProfileEditorFragment extends Fragment {
         for (int i = 0; i < bits.length; i++) {
             bits[i] = rates.get(i);
         }
-        return StorageBudget.bytesPerHour(bits);
+        return bits;
+    }
+
+    /** 这份配置一小时落盘多少字节。 */
+    private long bytesPerHourFor(@Nullable QualityPreset preset) {
+        return StorageBudget.bytesPerHour(enabledRates(preset));
     }
 
     /**
@@ -639,6 +676,13 @@ public class ProfileEditorFragment extends Fragment {
                     landing.width + "×" + landing.height));
         }
         return sb.toString();
+    }
+
+    /** 拍照用的尺寸 —— 固定是这一路的最大值，不跟上面那个选择走。 */
+    private String photoSize(CameraProfile camera) {
+        int[] size = resolvedSource(camera.role, camera.photo);
+        return size == null ? getString(R.string.editor_resolved_by_camera)
+                : size[0] + "×" + size[1];
     }
 
     /** 「自动 → 1280x5140」这种写法：意图在前，解出来的数在后。 */
@@ -829,9 +873,9 @@ public class ProfileEditorFragment extends Fragment {
                         getString(R.string.editor_resolution)),
                 labels.toArray(new String[0]), values.toArray(new String[0]),
                 value -> {
+                    // 拍照不跟：它永远用这一路的最大尺寸
                     camera.preview.resolution = value;
                     camera.record.resolution = value;
-                    camera.photo.resolution = value;
                 });
     }
 
@@ -885,7 +929,7 @@ public class ProfileEditorFragment extends Fragment {
         CameraProfile camera = new CameraProfile(role);
         camera.preview = StreamSpec.preview(StreamSpec.RESOLUTION_AUTO);
         camera.record = StreamSpec.record(StreamSpec.RESOLUTION_AUTO,
-                StreamSpec.FPS_UNLIMITED, "medium", "auto", 1);
+                QualityPreset.BALANCED.fps, QualityPreset.BALANCED.bitrate, "auto", 1);
         camera.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
         if (splitsFor(role)) {
             for (int lane = 0; lane < 4; lane++) {

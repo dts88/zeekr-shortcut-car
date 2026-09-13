@@ -50,19 +50,28 @@ public class QualityPresetTest {
         assertFalse(QualityPreset.SAVE_SPACE.bitrate.equals(QualityPreset.BALANCED.bitrate));
         assertFalse(QualityPreset.BALANCED.bitrate.equals(QualityPreset.SHARPEST.bitrate));
         assertFalse(QualityPreset.SAVE_SPACE.fps.equals(QualityPreset.BALANCED.fps));
+        assertFalse(QualityPreset.BALANCED.fps.equals(QualityPreset.SHARPEST.fps));
+    }
+
+    /** 三档的帧率是项目拥有者定的，写死在测试里。 */
+    @Test
+    public void theFrameRatesAreFixed() {
+        assertEquals("10", QualityPreset.SAVE_SPACE.fps);
+        assertEquals("20", QualityPreset.BALANCED.fps);
+        assertEquals(StreamSpec.FPS_UNLIMITED, QualityPreset.SHARPEST.fps);
     }
 
     /** 每一路都对得上才算这一档。 */
     @Test
     public void aProfileMatchesOnlyWhenEveryCameraDoes() {
         Profile balanced = profileWith(
-                StreamSpec.FPS_UNLIMITED, StreamSpec.BITRATE_MEDIUM,
-                StreamSpec.FPS_UNLIMITED, StreamSpec.BITRATE_MEDIUM);
+                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM,
+                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM);
         assertEquals(QualityPreset.BALANCED, QualityPreset.of(balanced));
 
         Profile mixed = profileWith(
-                StreamSpec.FPS_UNLIMITED, StreamSpec.BITRATE_MEDIUM,
-                "15", StreamSpec.BITRATE_LOW);
+                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM,
+                QualityPreset.SAVE_SPACE.fps, StreamSpec.BITRATE_LOW);
         assertNull("一路细调过就不该算整体是哪一档", QualityPreset.of(mixed));
     }
 
@@ -94,7 +103,7 @@ public class QualityPresetTest {
     @Test
     public void oneCameraKnowsWhetherItMatches() {
         StreamSpec record = StreamSpec.record(StreamSpec.RESOLUTION_AUTO,
-                StreamSpec.FPS_UNLIMITED, StreamSpec.BITRATE_MEDIUM, "auto", 1);
+                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM, "auto", 1);
         assertTrue(QualityPreset.BALANCED.matches(record));
         assertFalse(QualityPreset.SHARPEST.matches(record));
         assertFalse(QualityPreset.BALANCED.matches(null));

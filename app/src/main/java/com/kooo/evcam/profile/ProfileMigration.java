@@ -15,7 +15,7 @@ package com.kooo.evcam.profile;
  * ——「配置编辑」是它们唯一的入口。既然设置里已经没有这些项，翻译也就无从搬起：
  * 新建一份配置时给的是默认值，要改在配置编辑里改。</p>
  *
- * <p>存的仍然是意图而不是算出来的数：帧率默认 {@link StreamSpec#FPS_UNLIMITED}（不限制），
+ * <p>存的仍然是意图而不是算出来的数：分辨率存 auto / max，
  * 拍照默认 {@link StreamSpec#RESOLUTION_MAX}（这一路声明的最大）。</p>
  */
 public final class ProfileMigration {
@@ -173,12 +173,13 @@ public final class ProfileMigration {
     /**
      * 新建配置时录制流的默认值。
      *
-     * <p>不限帧率、中等码率、编码交给编码器挑、1 分钟一段 —— 和这些设置还在
-     * 设置界面里时的默认值一致，所以「什么都没改过」的行为没有变。</p>
+     * <p>帧率和码率跟着「均衡」那一档走（{@link QualityPreset#BALANCED}），
+     * 编码交给编码器挑，1 分钟一段。初值必须正好是某一档 ——
+     * 否则刚建的配置一打开，三张卡一张都没选中，每一路还都标着「已细调」。</p>
      */
     private static StreamSpec defaultRecord(String resolution) {
-        StreamSpec spec = StreamSpec.record(resolution, StreamSpec.FPS_UNLIMITED, "medium",
-                "auto", RecordSpecs.DEFAULT_SEGMENT_MINUTES);
+        StreamSpec spec = StreamSpec.record(resolution, QualityPreset.BALANCED.fps,
+                QualityPreset.BALANCED.bitrate, "auto", RecordSpecs.DEFAULT_SEGMENT_MINUTES);
         spec.grid = true;   // 和这一项还在设置里时的默认值一致
         return spec;
     }

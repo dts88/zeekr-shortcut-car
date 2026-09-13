@@ -156,13 +156,17 @@ public class ProfileMigrationTest {
 
     // ---------- 意图，不是数字 ----------
 
-    /** 帧率的初值是「不限制」这个意思，不是某个数。 */
+    /**
+     * 新建的配置正好是「均衡」那一档。
+     *
+     * <p>初值必须落在某一档上 —— 否则刚建的配置一打开，三张卡一张都没选中，
+     * 每一路还都标着「已细调」。</p>
+     */
     @Test
-    public void frameRateStartsUnlimitedNotANumber() {
-        CameraProfile composite =
-                ProfileMigration.migrate(snapshot()).camera(CameraProfile.ROLE_COMPOSITE);
+    public void aNewProfileIsExactlyTheBalancedStep() {
+        Profile profile = ProfileMigration.migrate(snapshot());
 
-        assertEquals(StreamSpec.FPS_UNLIMITED, composite.record.fps);
+        assertEquals(QualityPreset.BALANCED, QualityPreset.of(profile));
     }
 
     /** 拍照没有旧设置，直接给「最大」这个模式，不是某个具体尺寸。 */

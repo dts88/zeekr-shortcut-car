@@ -13,6 +13,11 @@ package com.kooo.evcam.profile;
  * 细调过的那一路会被标出来（{@link #matches}），因为「我选了均衡，但后座舱不是」
  * 这件事必须看得见。</p>
  *
+ * <h3>帧率</h3>
+ *
+ * <p>10 / 20 / 不限。帧率和码率同方向走：帧数少了，同样的码率落在每一帧上就多，
+ * 所以省空间那一档降帧率并不意味着每一帧更糊 —— 它省下的是总量。</p>
+ *
  * <h3>为什么不动分辨率</h3>
  *
  * <p>三档只改帧率和码率。分辨率在这台车机上没有可省的余地：环视那一路的
@@ -24,13 +29,13 @@ package com.kooo.evcam.profile;
  */
 public enum QualityPreset {
 
-    /** 省空间：看得清发生了什么，看不清对面车牌。 */
-    SAVE_SPACE("space", "15", StreamSpec.BITRATE_LOW),
+    /** 省空间：10 fps + 低码率，继续记录全过程，细节有所压缩。 */
+    SAVE_SPACE("space", "10", StreamSpec.BITRATE_LOW),
 
-    /** 均衡：日常行车够用，出事时看得清。默认。 */
-    BALANCED("balanced", StreamSpec.FPS_UNLIMITED, StreamSpec.BITRATE_MEDIUM),
+    /** 均衡：20 fps + 中码率。默认。 */
+    BALANCED("balanced", "20", StreamSpec.BITRATE_MEDIUM),
 
-    /** 最清晰：看得清对面车牌，编码器接近满负荷。 */
+    /** 最清晰：不限帧率 + 高码率，编码器接近满负荷。 */
     SHARPEST("sharp", StreamSpec.FPS_UNLIMITED, StreamSpec.BITRATE_HIGH);
 
     /** 存进配置里的那个词。存词不存序号：序号会随枚举顺序变。 */
