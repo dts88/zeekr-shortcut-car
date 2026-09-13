@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.45.1-alpha] - 2026-09-13
+
 - Reverted 0.45's crop placement. Keeping the frame still while the crop filled it turned a
   lane into static on the vehicle; the cause is not understood yet, so the old behaviour is
   back -- the picture resizes and shifts as you crop, which is wrong but is a picture. The
