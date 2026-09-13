@@ -5,7 +5,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- One floating button instead of two. It shows whether recording is running -- red while
+  it records, a hollow ring when idle -- and what a tap and a long press do is yours to
+  set: open the app, start/stop recording, take a photo, or toggle the mirror. Both
+  default to opening the app, because brushing a button should never stop a dashcam
+  recording. Drag, size, opacity and the recording time beside it all stay; the time is a
+  switch now. Anyone who had only the old open-the-app button keeps a button.
 
 ## [0.44.1-alpha] - 2026-09-13
 

@@ -27,13 +27,13 @@ import com.kooo.evcam.zeekr.StreamLayoutTable;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CustomCameraConfigFragment;
-import com.kooo.evcam.FloatingWindowService;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.PermissionSettingsFragment;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.overlay.OverlayCoordinator;
+import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.AboutActivity;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
@@ -573,30 +573,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 悬浮窗
 
     private void bindFloating() {
-        bindOverlaySwitch("pref_floating_window", appConfig.isFloatingWindowEnabled(),
-                OverlayCoordinator::setPreviewWindowEnabled, on -> {
+        appConfig.mergeFloatingButtonsOnce();
+
+        bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
+                OverlayCoordinator::setRecordButtonEnabled, on -> {
                     if (on && getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).broadcastCurrentRecordingState();
                     }
                 });
-
-        // 范围取自 AppConfig 自己的常量，不另编一套 —— 让人选一个随后又被夹掉的值，
-        // 就又变成「界面显示的和实际生效的不是一回事」
-        bindSlider("pref_floating_size",
-                AppConfig.FLOATING_SIZE_TINY, AppConfig.FLOATING_SIZE_MAX,
-                appConfig.getFloatingWindowSize(), " dp",
-                value -> {
-                    appConfig.setFloatingWindowSize(value);
-                    pushFloatingWindow();
-                });
-        bindSlider("pref_floating_alpha", 20, 100, appConfig.getFloatingWindowAlpha(), "%",
-                value -> {
-                    appConfig.setFloatingWindowAlpha(value);
-                    pushFloatingWindow();
-                });
-
-        bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
-                OverlayCoordinator::setRecordButtonEnabled, null);
 
         bindSlider("pref_button_size", 32, 100,
                 appConfig.getRecordingFloatingButtonSizeDp(), " dp",
@@ -604,6 +588,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setRecordingFloatingButtonSizeDp(value);
                     pushRecordingButtonSize();
                 });
+        bindSlider("pref_floating_alpha", 20, 100, appConfig.getFloatingWindowAlpha(), "%",
+                value -> {
+                    appConfig.setFloatingWindowAlpha(value);
+                    restartFloatingButton();
+                });
+
+        bindFloatingAction("pref_floating_tap", appConfig.getFloatingTapAction(),
+                value -> appConfig.setFloatingTapAction(value));
+        bindFloatingAction("pref_floating_long_press", appConfig.getFloatingLongPressAction(),
+                value -> appConfig.setFloatingLongPressAction(value));
+
+        bindSwitch("pref_floating_duration", appConfig.isFloatingDurationVisible(), value -> {
+            appConfig.setFloatingDurationVisible(value);
+            restartFloatingButton();
+        });
         bindSlider("pref_button_text_size", 8, 24,
                 appConfig.getRecordingFloatingTimeTextSizeSp(), " sp",
                 value -> {
@@ -618,11 +617,44 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     }
 
-    /** 大小或透明度改了，正在显示的悬浮窗要跟着变，否则得关掉再开才看得到。 */
-    private void pushFloatingWindow() {
-        if (getContext() != null && appConfig.isFloatingWindowEnabled()) {
-            FloatingWindowService.sendUpdateFloatingWindow(getContext());
+    /**
+     * 单击 / 长按能选哪几件事。
+     *
+     * <p>选项文字在 strings.xml，存下去的是 {@link FloatingAction} 里那几个 key，
+     * 两边靠同一个数组下标对上 —— 所以这里必须一起写，不能一边加一边忘。</p>
+     */
+    private void bindFloatingAction(String key, String current, java.util.function.Consumer<String> onPick) {
+        Preference pref = findPreference(key);
+        if (!(pref instanceof ListPreference)) {
+            return;
         }
+        ListPreference list = (ListPreference) pref;
+        String[] values = FloatingAction.keys();
+        String[] labels = {
+                getString(R.string.floating_action_open_app),
+                getString(R.string.floating_action_toggle_recording),
+                getString(R.string.floating_action_take_photo),
+                getString(R.string.floating_action_toggle_mirror)};
+        if (labels.length != values.length) {
+            throw new IllegalStateException("动作数量和选项文字对不上");
+        }
+        list.setEntries(labels);
+        list.setEntryValues(values);
+        list.setValue(FloatingAction.fromKey(current).key);
+        list.setSummaryProvider(p -> ((ListPreference) p).getEntry());
+        list.setOnPreferenceChangeListener((p, value) -> {
+            onPick.accept(String.valueOf(value));
+            return true;
+        });
+    }
+
+    /** 透明度、时长开关这类改完要重建视图的项：关掉再开一次。 */
+    private void restartFloatingButton() {
+        if (getContext() == null || !appConfig.isRecordingFloatingEnabled()) {
+            return;
+        }
+        sendToRecordingFloating(RecordingFloatingService.ACTION_HIDE, null);
+        sendToRecordingFloating(RecordingFloatingService.ACTION_SHOW, null);
     }
 
     private void pushRecordingButtonSize() {

@@ -67,6 +67,12 @@ public class MainActivity extends AppCompatActivity {
     /** 别的界面上的菜单键：回到这里，并且把抽屉拉开。 */
     public static final String EXTRA_OPEN_DRAWER = "open_drawer";
 
+    /** 悬浮按钮在应用没运行时按了「拍照」：拉起来，等相机就绪再拍。 */
+    public static final String EXTRA_AUTO_TAKE_PHOTO = "auto_take_photo";
+
+    /** 悬浮按钮在应用还活着时按了「拍照」。 */
+    public static final String ACTION_TAKE_PHOTO = "com.kooo.evcam.action.TAKE_PHOTO";
+
     /** 环视流探测结果的那几行文字；相机开起来后可能被实际尺寸替掉。 */
     private String compositeProbeInfo;
 
@@ -330,6 +336,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 检查是否是从录制悬浮按钮启动（需要自动开始录制）
+        // 悬浮按钮在应用没运行时按了「拍照」：相机得先起来，晚一点再拍
+        if (getIntent().getBooleanExtra(EXTRA_AUTO_TAKE_PHOTO, false)) {
+            getIntent().removeExtra(EXTRA_AUTO_TAKE_PHOTO);
+            scheduleAutoPhoto();
+        }
+
         boolean autoStartRecording = getIntent().getBooleanExtra("auto_start_recording", false);
         if (autoStartRecording) {
             getIntent().removeExtra("auto_start_recording");
@@ -382,6 +394,11 @@ public class MainActivity extends AppCompatActivity {
         openDrawerIfAsked(intent);
 
 // 处理从录制悬浮按钮启动（需要自动开始录制）
+        if (intent.getBooleanExtra(EXTRA_AUTO_TAKE_PHOTO, false)) {
+            intent.removeExtra(EXTRA_AUTO_TAKE_PHOTO);
+            scheduleAutoPhoto();
+        }
+
         boolean autoStartRecording = intent.getBooleanExtra("auto_start_recording", false);
         if (autoStartRecording) {
             intent.removeExtra("auto_start_recording");
@@ -874,6 +891,24 @@ public class MainActivity extends AppCompatActivity {
             }
             showFullscreenPreview(cameraPosition);
         });
+    }
+
+    /**
+     * 等相机就绪再拍一张。
+     *
+     * <p>悬浮按钮在应用没运行时按了拍照，只能先把界面拉起来 —— 而这会儿相机
+     * 还没连上。和自动开始录制走同一个思路：等一会儿，等到了就拍，等不到就算了，
+     * 不弹错误 —— 用户按的是一个快捷键，不是在等一个回执。</p>
+     */
+    private void scheduleAutoPhoto() {
+        AppLog.d(TAG, "从悬浮按钮拍照，等相机就绪");
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (cameraManager != null && cameraManager.hasConnectedCameras()) {
+                takePicture();
+            } else {
+                AppLog.w(TAG, "相机还没就绪，这次拍照放弃");
+            }
+        }, 3000);
     }
 
     private void showFullscreenPreview(String cameraPosition) {
@@ -3009,17 +3044,21 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(android.content.Context context, android.content.Intent intent) {
                 String action = intent.getAction();
                 if ("com.kooo.evcam.action.TOGGLE_RECORDING".equals(action)) {
-                    AppLog.d(TAG, "收到录制切换广播（来自悬浮窗）");
+                    AppLog.d(TAG, "收到录制切换广播（来自悬浮按钮）");
                     // 在主线程执行录制切换
                     runOnUiThread(() -> {
                         toggleRecording();
                     });
+                } else if (ACTION_TAKE_PHOTO.equals(action)) {
+                    AppLog.d(TAG, "收到拍照广播（来自悬浮按钮）");
+                    runOnUiThread(MainActivity.this::takePicture);
                 }
             }
         };
         
         android.content.IntentFilter filter = new android.content.IntentFilter();
         filter.addAction("com.kooo.evcam.action.TOGGLE_RECORDING");
+        filter.addAction(ACTION_TAKE_PHOTO);
         registerReceiver(toggleRecordingReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
         
         AppLog.d(TAG, "录制切换广播接收器已注册");
@@ -3622,7 +3661,7 @@ public class MainActivity extends AppCompatActivity {
      * 发送当前录制状态广播（供悬浮窗服务查询）
      */
     public void broadcastCurrentRecordingState() {
-        FloatingWindowService.sendRecordingStateChanged(this, isRecording);
+        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, isRecording);
     }
     
     /**

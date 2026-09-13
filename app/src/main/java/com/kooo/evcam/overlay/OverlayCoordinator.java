@@ -8,7 +8,6 @@ import android.os.Looper;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.BlindSpotService;
-import com.kooo.evcam.FloatingWindowService;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
@@ -99,18 +98,6 @@ public final class OverlayCoordinator {
         AppConfig config = new AppConfig(context);
         boolean allowed = canShowOverlay(context);
 
-        if (config.isFloatingWindowEnabled() && allowed) {
-            FloatingWindowService.start(context);
-            AppLog.d(TAG, "画面悬浮窗已启动");
-            main().postDelayed(() -> {
-                if (afterPreviewWindowStarted != null) {
-                    afterPreviewWindowStarted.run();
-                }
-                // 应用这会儿在前台，悬浮窗该藏着
-                FloatingWindowService.sendAppForegroundState(context, true);
-            }, STATE_PUSH_DELAY_MS);
-        }
-
         if (config.isRearViewEnabled() && allowed) {
             // 这一段以前没有：开关存着「开」，但没人在启动时把服务拉起来，
             // 于是每次重开应用都要去设置里关一次再开一次它才出现。
@@ -122,7 +109,12 @@ public final class OverlayCoordinator {
 
         if (config.isRecordingFloatingEnabled() && allowed) {
             sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
-            AppLog.d(TAG, "录制悬浮按钮已启动");
+            AppLog.d(TAG, "悬浮按钮已启动");
+            main().postDelayed(() -> {
+                if (afterPreviewWindowStarted != null) {
+                    afterPreviewWindowStarted.run();
+                }
+            }, STATE_PUSH_DELAY_MS);
         }
 
         if (blindSpotWanted(config)) {
@@ -134,25 +126,14 @@ public final class OverlayCoordinator {
     // ------------------------------------------------------------------ 开关
 
     /**
-     * 开 / 关画面悬浮窗。
+     * 开 / 关悬浮按钮。
+     *
+     * <p>0.45 起只有这一个按钮：原来那个只管「打开应用」的已经并进来，
+     * 成了它默认的单击动作。</p>
      *
      * @return 是否真的按要求生效；没有悬浮窗权限时返回 {@code false}，
      *         调用方应当把开关保持在原位而不是拨上去
      */
-    public static boolean setPreviewWindowEnabled(Context context, boolean enabled) {
-        if (enabled && !canShowOverlay(context)) {
-            return false;
-        }
-        new AppConfig(context).setFloatingWindowEnabled(enabled);
-        if (enabled) {
-            FloatingWindowService.start(context);
-        } else {
-            FloatingWindowService.stop(context);
-        }
-        return true;
-    }
-
-    /** 开 / 关录制悬浮按钮。返回值含义同 {@link #setPreviewWindowEnabled}。 */
     public static boolean setRecordButtonEnabled(Context context, boolean enabled) {
         if (enabled && !canShowOverlay(context)) {
             return false;
@@ -165,7 +146,7 @@ public final class OverlayCoordinator {
     }
 
     /**
-     * 开 / 关超级后视镜。返回值含义同 {@link #setPreviewWindowEnabled}。
+     * 开 / 关超级后视镜。返回值含义同 {@link #setRecordButtonEnabled}。
      *
      * <p>这里的权限检查是补上的 —— 原来没有，没授权时开关会拨上去而窗口不出现。</p>
      */
@@ -184,30 +165,29 @@ public final class OverlayCoordinator {
 
     // ------------------------------------------------------------------ 前后台
 
-    /** 应用退到后台：画面悬浮窗该露出来了。 */
+    /**
+     * 应用退到后台 / 回到前台。
+     *
+     * <p>0.45 之前这里还要让「打开应用」那个按钮在前台时藏起来 —— 它在主界面上
+     * 没有意义。合并之后不再藏：留下的这个按钮管的是录制、拍照这些事，
+     * 在哪儿都用得上，而且一个会自己消失的按钮比一个一直在的更难解释。</p>
+     */
     public static void onAppBackground(Context context) {
         BlindSpotService.notifySelfBackground();
-        if (new AppConfig(context).isFloatingWindowEnabled()) {
-            FloatingWindowService.sendAppForegroundState(context, false);
-        }
     }
 
-    /** 应用回到前台：主界面自己就是画面，悬浮窗该藏起来。 */
     public static void onAppForeground(Context context) {
         BlindSpotService.notifySelfForeground();
-        if (new AppConfig(context).isFloatingWindowEnabled()) {
-            FloatingWindowService.sendAppForegroundState(context, true);
-        }
     }
 
     /**
      * 主界面销毁时的清理。
      *
-     * <p>只停画面悬浮窗。后视镜和录制按钮是<b>脱离主界面用的</b>，
+     * <p>什么都不用停：后视镜和悬浮按钮是<b>脱离主界面用的</b>，
      * 主界面没了它们还该在 —— 那本来就是它们存在的理由。</p>
      */
     public static void onActivityDestroyed(Context context) {
-        FloatingWindowService.stop(context);
+        // 有意留空
     }
 
     // ------------------------------------------------------------------

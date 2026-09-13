@@ -134,9 +134,6 @@
             android:exported="false" />
 
         <!-- 悬浮窗服务：显示悬浮录制按钮 -->
-        <service
-            android:name=".FloatingWindowService"
-            android:exported="false" />
 
         <!-- 补盲选项服务 (副屏显示+主屏悬浮窗) -->
         <service

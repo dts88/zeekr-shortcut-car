@@ -3637,6 +3637,65 @@ public class AppConfig {
         AppLog.d(TAG, "新录制架构设置: " + (enabled ? "启用" : "禁用"));
     }
 
+    // ==================== 悬浮按钮的动作 ====================
+
+    private static final String KEY_FLOATING_TAP_ACTION = "floating_tap_action";
+    private static final String KEY_FLOATING_LONG_PRESS_ACTION = "floating_long_press_action";
+    private static final String KEY_FLOATING_DURATION_VISIBLE = "floating_duration_visible";
+    private static final String KEY_FLOATING_MERGED = "floating_buttons_merged";
+
+    /**
+     * 单击做什么。默认「打开主界面」—— 手指擦到按钮就停了录像，
+     * 是行车记录仪最不该发生的事。
+     */
+    public String getFloatingTapAction() {
+        return prefs.getString(KEY_FLOATING_TAP_ACTION,
+                com.kooo.evcam.overlay.FloatingAction.OPEN_APP.key);
+    }
+
+    public void setFloatingTapAction(String key) {
+        prefs.edit().putString(KEY_FLOATING_TAP_ACTION, key).apply();
+    }
+
+    /** 长按做什么。默认同上。 */
+    public String getFloatingLongPressAction() {
+        return prefs.getString(KEY_FLOATING_LONG_PRESS_ACTION,
+                com.kooo.evcam.overlay.FloatingAction.OPEN_APP.key);
+    }
+
+    public void setFloatingLongPressAction(String key) {
+        prefs.edit().putString(KEY_FLOATING_LONG_PRESS_ACTION, key).apply();
+    }
+
+    /** 录制时在按钮旁显示已录时长。 */
+    public boolean isFloatingDurationVisible() {
+        return prefs.getBoolean(KEY_FLOATING_DURATION_VISIBLE, true);
+    }
+
+    public void setFloatingDurationVisible(boolean visible) {
+        prefs.edit().putBoolean(KEY_FLOATING_DURATION_VISIBLE, visible).apply();
+    }
+
+    /**
+     * 两个悬浮按钮合成一个：只跑一次。
+     *
+     * <p>合并前有两个开关。录制那个默认就是开的，所以绝大多数人不受影响；
+     * 唯一会丢东西的是「关了录制按钮、只留打开应用那个」的人 —— 不迁移的话，
+     * 他升级之后屏幕上什么都没有，还不知道是为什么。</p>
+     */
+    public void mergeFloatingButtonsOnce() {
+        if (prefs.getBoolean(KEY_FLOATING_MERGED, false)) {
+            return;
+        }
+        if (prefs.getBoolean(KEY_FLOATING_WINDOW_ENABLED, false)
+                && !prefs.getBoolean(KEY_RECORDING_FLOATING_ENABLED,
+                        DEFAULT_RECORDING_FLOATING_ENABLED)) {
+            prefs.edit().putBoolean(KEY_RECORDING_FLOATING_ENABLED, true).apply();
+            AppLog.i(TAG, "悬浮按钮合并：原来只开了「打开应用」那一个，合并后保留按钮");
+        }
+        prefs.edit().putBoolean(KEY_FLOATING_MERGED, true).apply();
+    }
+
     // ==================== 录制悬浮按钮配置 ====================
 
     private static final String KEY_RECORDING_FLOATING_ENABLED = "recording_floating_enabled";

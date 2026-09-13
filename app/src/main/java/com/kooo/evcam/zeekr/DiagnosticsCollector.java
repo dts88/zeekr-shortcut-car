@@ -466,7 +466,7 @@ public final class DiagnosticsCollector {
             sb.append("     时间字号 = ").append(cfg.getRecordingFloatingTimeTextSizeSp())
                     .append(" sp").append('\n');
 
-            // 这一组键（floating_window_*）驱动的是 FloatingWindowService，
+            // 这一组键（floating_window_*）里现在只剩透明度还在用，
             // 它画的是 FloatingButtonView —— 一个点击打开应用、随录制状态变色的
             // 悬浮按钮，不是画中画小窗。上一版这里的名字是错的。
             sb.append('\n').append("[悬浮按钮（打开应用/状态指示）]").append('\n');

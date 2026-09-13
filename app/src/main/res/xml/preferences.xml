@@ -162,26 +162,19 @@
         android:title="@string/set_section_floating">
 
         <SwitchPreferenceCompat
-            android:key="pref_floating_window"
-            android:title="@string/set_floating_window_title"
-            android:summary="@string/set_floating_window_summary" />
-
-        <SeekBarPreference
-            android:key="pref_floating_size"
-            android:dependency="pref_floating_window"
-            android:title="@string/set_floating_size_title"
-            app:showSeekBarValue="true" />
-
-        <SeekBarPreference
-            android:key="pref_floating_alpha"
-            android:dependency="pref_floating_window"
-            android:title="@string/set_floating_alpha_title"
-            app:showSeekBarValue="true" />
-
-        <SwitchPreferenceCompat
             android:key="pref_recording_floating"
             android:title="@string/set_recording_floating_title"
             android:summary="@string/set_recording_floating_summary" />
+
+        <ListPreference
+            android:key="pref_floating_tap"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_tap_title" />
+
+        <ListPreference
+            android:key="pref_floating_long_press"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_long_press_title" />
 
         <SeekBarPreference
             android:key="pref_button_size"
@@ -190,8 +183,20 @@
             app:showSeekBarValue="true" />
 
         <SeekBarPreference
-            android:key="pref_button_text_size"
+            android:key="pref_floating_alpha"
             android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_alpha_title"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_floating_duration"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_duration_title"
+            android:summary="@string/set_floating_duration_summary" />
+
+        <SeekBarPreference
+            android:key="pref_button_text_size"
+            android:dependency="pref_floating_duration"
             android:title="@string/set_button_text_size_title"
             app:showSeekBarValue="true" />
 

@@ -87,12 +87,7 @@ public class CameraForegroundService extends Service {
             AppConfig appConfig = new AppConfig(this);
             // 只有开启了开机自启动才启动后台服务和悬浮窗
             if (appConfig.isAutoStartOnBoot()) {
-                // 启动悬浮窗（如果已启用）
-                if (appConfig.isFloatingWindowEnabled()) {
-                    AppLog.d(TAG, "悬浮窗已启用，从 Service 启动悬浮窗...");
-                    FloatingWindowService.start(this);
-                }
-                
+                // 悬浮按钮由 OverlayCoordinator 按同一条规则拉起，这里不再自己判断一遍
                 // 补盲那一套该不该起来，用和主界面同一条规则判断。
                 // 这里原先自己写了一遍，漏掉了全局开关、全景避让和定制键唤醒三项 ——
                 // 同一个问题两个答案，改了一处就会不一致。
@@ -232,12 +227,6 @@ public class CameraForegroundService extends Service {
             AppConfig appConfig = new AppConfig(this);
             if (!appConfig.isAutoStartOnBoot()) {
                 return;  // 未开启开机自启动，跳过
-            }
-            
-            // 检查并启动悬浮窗
-            if (appConfig.isFloatingWindowEnabled() && !FloatingWindowService.isRunning()) {
-                AppLog.d(TAG, "悬浮窗未运行，重新启动...");
-                FloatingWindowService.start(this);
             }
             
 // 检查并启动 MainActivity（如果启用了自动录制且 Activity 未运行）

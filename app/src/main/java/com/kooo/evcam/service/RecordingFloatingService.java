@@ -37,11 +37,20 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.recording.RecordingController;
 
 /**
- * 录制悬浮按钮服务
- * 在后台显示录制按钮，点击开始/停止录制，并显示录制时间
+ * 悬浮按钮服务：整个应用只有这一个悬浮按钮。
+ *
+ * <h3>为什么类名还叫 Recording</h3>
+ *
+ * <p>0.45 之前有两个按钮：这一个管录制、另一个管打开应用。合并时留下了这一个
+ * —— 录制那套「应用在前台 / 在后台 / 没运行」的分支是真正难的部分，另一个只是
+ * 一句 startActivity。类名没跟着改：改名和合并放进同一个提交，diff 就没法看了。</p>
+ *
+ * <p>按钮的颜色说明现在是不是在录（录制红 + 呼吸，空闲是个空心圈）。单击和长按
+ * 各做什么由设置决定，默认都是打开主界面（见 {@link FloatingAction}）。</p>
  */
 public class RecordingFloatingService extends Service {
     private static final String TAG = "RecordingFloatingService";
@@ -51,10 +60,34 @@ public class RecordingFloatingService extends Service {
     public static final String ACTION_HIDE = "com.kooo.evcam.action.HIDE_RECORDING_FLOATING";
     public static final String ACTION_UPDATE_SIZE = "com.kooo.evcam.action.UPDATE_RECORDING_FLOATING_SIZE";
 
+    /**
+     * 录制状态变了，告诉按钮换颜色。
+     *
+     * <p>这个广播原来由已删掉的那个按钮的类发，本服务一直同时听着这两个 action
+     * ——所以搬过来只是换个发信人，收信的规则一个字没动。</p>
+     */
+    public static final String ACTION_RECORDING_STATE_CHANGED = "com.kooo.evcam.RECORDING_STATE_CHANGED";
+    public static final String EXTRA_IS_RECORDING = "is_recording";
+
+    public static void sendRecordingStateChanged(Context context, boolean isRecording) {
+        Intent intent = new Intent(ACTION_RECORDING_STATE_CHANGED);
+        intent.setPackage(context.getPackageName());
+        intent.putExtra(EXTRA_IS_RECORDING, isRecording);
+        context.sendBroadcast(intent);
+    }
+
     public static final String EXTRA_BUTTON_SIZE = "button_size";
     public static final String EXTRA_TEXT_SIZE = "text_size";
 
+    /** 按住多久算长按。比系统默认的 500ms 略长一点：这个按钮是在车上按的。 */
+    private static final long LONG_PRESS_MS = 600;
+
     private final IBinder binder = new LocalBinder();
+    private boolean longPressFired = false;
+    private final Runnable longPressRunnable = () -> {
+        longPressFired = true;
+        perform(FloatingAction.fromKey(appConfig.getFloatingLongPressAction()));
+    };
     private Handler mainHandler;
     private AppConfig appConfig;
     private WindowManager windowManager;
@@ -311,6 +344,8 @@ public class RecordingFloatingService extends Service {
 
         // 创建容器
         floatingContainer = new FrameLayout(this);
+        // 透明度沿用原来那个按钮的设置项，合并之后它管这一个
+        floatingContainer.setAlpha(appConfig.getFloatingWindowAlpha() / 100f);
 
         // 创建水平布局容器
         LinearLayout horizontalContainer = new LinearLayout(this);
@@ -381,6 +416,8 @@ public class RecordingFloatingService extends Service {
                         initialTouchX = event.getRawX();
                         initialTouchY = event.getRawY();
                         isDragging = false;
+                        longPressFired = false;
+                        mainHandler.postDelayed(longPressRunnable, LONG_PRESS_MS);
                         return true;
 
                     case MotionEvent.ACTION_MOVE:
@@ -389,6 +426,8 @@ public class RecordingFloatingService extends Service {
 
                         if (Math.abs(deltaX) > CLICK_THRESHOLD || Math.abs(deltaY) > CLICK_THRESHOLD) {
                             isDragging = true;
+                            // 挪起来了就不是长按了
+                            mainHandler.removeCallbacks(longPressRunnable);
                         }
 
                         if (isDragging) {
@@ -413,9 +452,12 @@ public class RecordingFloatingService extends Service {
                         return true;
 
                     case MotionEvent.ACTION_UP:
-                        if (!isDragging) {
-                            // 点击事件：切换录制状态
-                            toggleRecording();
+                        mainHandler.removeCallbacks(longPressRunnable);
+                        if (!isDragging && !longPressFired) {
+                            perform(FloatingAction.fromKey(appConfig.getFloatingTapAction()));
+                        } else if (!isDragging) {
+                            // 长按已经在计时器里做过了，抬手不再做第二件事
+                            AppLog.d(TAG, "长按已处理，忽略这次抬手");
                         } else {
                             // 拖动结束才落盘，避免拖动过程中反复写 SharedPreferences
                             appConfig.setRecordingFloatingPosition(layoutParams.x, layoutParams.y);
@@ -433,6 +475,65 @@ public class RecordingFloatingService extends Service {
         } catch (Exception e) {
             AppLog.e(TAG, "添加悬浮窗失败", e);
             stopSelf();
+        }
+    }
+
+    // ========== 按钮动作 ==========
+
+    /**
+     * 单击 / 长按各做什么，见 {@link FloatingAction}。
+     *
+     * <p>录制那一条走原来那套（按应用在不在前台分三种情况），其余三条都是
+     * 一句话的事。</p>
+     */
+    private void perform(FloatingAction action) {
+        switch (action) {
+            case TOGGLE_RECORDING:
+                toggleRecording();
+                return;
+            case TAKE_PHOTO:
+                takePhoto();
+                return;
+            case TOGGLE_MIRROR:
+                toggleMirror();
+                return;
+            case OPEN_APP:
+            default:
+                openApp();
+        }
+    }
+
+    private void openApp() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        startActivity(intent);
+    }
+
+    /**
+     * 拍一张。
+     *
+     * <p>应用还活着就发广播，让它用现成的相机拍 —— 服务这边没有相机。
+     * 没活着就把它拉起来并带上一个标记，等相机就绪再拍。</p>
+     */
+    private void takePhoto() {
+        if (getAppState() == AppState.NOT_RUNNING) {
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            intent.putExtra(MainActivity.EXTRA_AUTO_TAKE_PHOTO, true);
+            startActivity(intent);
+            return;
+        }
+        Intent intent = new Intent(MainActivity.ACTION_TAKE_PHOTO);
+        intent.setPackage(getPackageName());
+        sendBroadcast(intent);
+    }
+
+    private void toggleMirror() {
+        boolean on = appConfig.isRearViewEnabled();
+        if (!com.kooo.evcam.overlay.OverlayCoordinator.setRearViewEnabled(this, !on)) {
+            Toast.makeText(this, R.string.msg_need_overlay,
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -575,7 +676,9 @@ public class RecordingFloatingService extends Service {
             recordingStartTime = System.currentTimeMillis();
             startTimeUpdate();
             if (timeTextView != null) {
-                timeTextView.setVisibility(View.VISIBLE);
+                // 时长是个开关：有人只要一个按钮，不要旁边那串数字
+                timeTextView.setVisibility(appConfig.isFloatingDurationVisible()
+                        ? View.VISIBLE : View.GONE);
             }
         } else {
             stopTimeUpdate();

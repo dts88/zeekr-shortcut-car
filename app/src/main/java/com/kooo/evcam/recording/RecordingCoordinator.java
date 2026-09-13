@@ -5,7 +5,7 @@ import android.content.Context;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CameraForegroundService;
-import com.kooo.evcam.FloatingWindowService;
+import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.camera.MultiCameraManager;
@@ -125,7 +125,7 @@ public class RecordingCoordinator {
         CameraForegroundService.start(context,
                 context.getString(R.string.notif_recording_title),
                 context.getString(R.string.notif_recording_tap));
-        FloatingWindowService.sendRecordingStateChanged(context, true);
+        RecordingFloatingService.sendRecordingStateChanged(context, true);
 
         AppLog.d(TAG, "开始录制 " + cameras.size() + " 路: " + cameras);
         if (listener != null) {
@@ -139,7 +139,7 @@ public class RecordingCoordinator {
         }
         cameraManager.stopRecording();
         CameraForegroundService.stop(context);
-        FloatingWindowService.sendRecordingStateChanged(context, false);
+        RecordingFloatingService.sendRecordingStateChanged(context, false);
 
         AppLog.d(TAG, "录制已停止，前台服务已关闭");
         if (listener != null) {
