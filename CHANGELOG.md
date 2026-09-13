@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.46.1-alpha] - 2026-09-13
+
 - Reverted 0.45.2's clip change. Moving the lane's clip ahead of the transform was meant to
   cure the static that crop produced; it broke rotation instead -- every cell showed the
   whole strip. The clip is back where rotation is known to work.
