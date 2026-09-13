@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.48.0-alpha] - 2026-09-13
+
+- The surround-plus-two-cabin stream profile is available to everyone. It was behind
+  developer options as unfinished; rotation, mirroring and pane fill now work on the cabin
+  cameras and have been checked on the vehicle. "Custom" stays a developer option -- it
+  asks you to wire each camera by hand and exists for troubleshooting.
+
 ## [0.47.2-alpha] - 2026-09-13
 
 - Fixed: "fit" left two sets of bars, so the long edge never reached the pane. The view was
