@@ -148,18 +148,19 @@ public final class ProfileMigration {
         addCompositeGrid(composite);
         profile.cameras.add(composite);
 
-        if (!multi) {
-            return profile;
-        }
-
         // ---- 两路座舱 ----
+        //
+        // 两路一直都在配置里，只是「环视流」那一份默认关着。以前不在，
+        // 于是编辑器里多了一个「加一路相机」的步骤 —— 而这台车就那三路，
+        // “加”不是一件真实发生的事，开和关才是。
+        //
         // 尺寸给 auto：具体多大由相机声明决定，要钉死就去配置编辑里钉
         String cabinSize = StreamSpec.RESOLUTION_AUTO;
         String[] roles = {CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2};
         String[] keys = {"back", "left"};
         for (int i = 0; i < roles.length; i++) {
             CameraProfile cabin = new CameraProfile(roles[i]);
-            cabin.enabled = true;
+            cabin.enabled = multi;
             cabin.preview = StreamSpec.preview(cabinSize);
             cabin.record = defaultRecord(cabinSize);
             cabin.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);

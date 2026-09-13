@@ -2528,7 +2528,9 @@ public class MainActivity extends AppCompatActivity {
             activeProfile = new ProfileStore(this).current();
         }
         CameraProfile camera = activeProfile.camera(role);
-        if (camera == null || camera.lanes.isEmpty()) {
+        // 关着的那一路不算数。三路现在永远都在配置里（开关才是开关），
+        // 只问「有没有这一路」的话，一份只开环视的配置也会把座舱那两路开起来
+        if (camera == null || !camera.enabled || camera.lanes.isEmpty()) {
             return null;
         }
         return camera.lanes.get(0);

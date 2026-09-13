@@ -396,11 +396,7 @@
     <string name="editor_group_cameras">相机</string>
     <string name="editor_group_streams">三条流</string>
     <string name="editor_group_profile">这份配置</string>
-    <string name="editor_add_camera">加一路相机</string>
-    <string name="editor_save">保存</string>
-    <string name="editor_save_summary">先看一眼新配置下的实际画面，确认了才写进去</string>
-    <string name="editor_reset">恢复为初值</string>
-    <string name="editor_reset_summary">丢掉这里改过的，回到新建时的样子</string>
+    <string name="editor_reset">重置</string>
     <string name="editor_enable">启用这一路</string>
     <string name="editor_enable_summary">关掉之后这一路不开、不录、不占流</string>
     <string name="editor_off">已关闭</string>
@@ -411,15 +407,10 @@
     <string name="editor_record_codec">录制 · 编码</string>
     <string name="editor_record_segment">录制 · 分段时长</string>
     <string name="editor_photo_res">拍照 · 分辨率</string>
-    <string name="editor_photo_quality">拍照 · 质量</string>
     <string name="editor_resolution">分辨率</string>
-    <string name="editor_remove">移除这一路</string>
-    <string name="editor_remove_summary">它的参数会一起丢掉</string>
-    <string name="editor_remove_title">移除 %1$s</string>
-    <string name="editor_remove_msg">从这份配置里去掉这一路。它的参数会一起丢掉。</string>
     <string name="editor_reset_msg">把这份配置改回新建时的样子，你在这里改的会丢掉。</string>
     <string name="editor_reset_ok">恢复</string>
-    <string name="editor_reset_done">已恢复为初值</string>
+    <string name="editor_reset_done">已重置</string>
     <string name="editor_whole_frame">整幅画面</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">点一格来改它</string>
@@ -443,7 +434,7 @@
     <string name="editor_fit">画面填充</string>
     <string name="editor_fit_fit">适应 · 整幅可见，两边留黑</string>
     <string name="editor_fit_fill">填充 · 铺满，多出来的裁掉</string>
-    <string name="editor_quality_title">录成什么样</string>
+    <string name="editor_quality_title">录制画质</string>
     <string name="editor_quality_summary">一次定下每一路的帧率和码率。想单独改某一路，下面细调</string>
     <string name="editor_quality_current">当前</string>
     <string name="editor_quality_gb_unit">GB / 小时</string>
@@ -454,15 +445,16 @@
     <string name="editor_quality_balanced_note">日常行车够用，出事时看得清</string>
     <string name="editor_quality_sharp">最清晰</string>
     <string name="editor_quality_sharp_note">看得清对面车牌，编码器接近满负荷</string>
-    <string name="editor_cameras_title">%1$d 路相机</string>
-    <string name="editor_cameras_summary">点一路展开细调；和上面那一档不一样的地方会标出来</string>
+    <string name="editor_cameras_title">在录 %1$d 路</string>
+    <string name="editor_cameras_summary">关掉的那一路不开相机、也不占空间；点一路展开细调</string>
     <string name="editor_camera_tuned">已细调</string>
     <string name="editor_open_lanes">摆位</string>
     <string name="editor_detail_title">%1$s · 细调</string>
-    <string name="editor_detail_more">分辨率与拍照：%1$s · 拍照质量 %2$s</string>
+    <string name="editor_detail_more">录制分辨率：%1$s</string>
     <string name="editor_knob_fps">帧率</string>
     <string name="editor_knob_bitrate">码率</string>
     <string name="editor_knob_segment">分段（分钟）</string>
+    <string name="editor_knob_photo">拍照质量</string>
     <string name="editor_knob_codec">编码</string>
     <string name="editor_budget">这份配置一小时落盘约 %1$s GB</string>
     <string name="editor_budget_with_space">这份配置一小时落盘约 %1$s GB，剩余空间还能录约 %2$s 小时</string>
@@ -495,12 +487,6 @@
     <string name="editor_high">高</string>
     <string name="editor_codec_auto">自动（优先 H.265）</string>
     <string name="editor_quality_default">95（默认）</string>
-    <string name="editor_all_added">三路都已经在这份配置里了</string>
-    <string name="editor_cannot_save">这份配置还不能保存</string>
-    <string name="editor_none_enabled">没有启用任何相机</string>
-    <string name="editor_no_camera_for">找不到 %1$s 对应的相机</string>
-    <string name="editor_saved">已保存，重启应用后生效</string>
-    <string name="editor_no_more_info">（没有更多信息）</string>
     <string name="editor_issue_no_cameras">这份配置里一路相机都没有</string>
     <string name="editor_issue_none_enabled">一路相机都没启用，什么都不会显示也不会录</string>
     <string name="editor_issue_undeclared_size">%1$s 的%2$s尺寸 %3$dx%4$d 这一路没有声明过</string>
@@ -524,16 +510,6 @@
     <string name="player_clip_count">%1$d 段</string>
 
     <!-- 保存配置前看一眼 -->
-    <string name="check_opening">正在打开相机……</string>
-    <string name="check_title">看一眼再保存</string>
-    <string name="check_save_countdown">保存（%1$d）</string>
-    <string name="check_ok">画面出来了。看清楚再决定 —— 拆分对不对、位置对不对、有没有卡。</string>
-    <string name="check_no_frames">开了会话但出不了画面：%1$s</string>
-    <string name="check_config_failed">会话配置失败 —— 这套组合这台车机跑不了。保存了会没有画面。</string>
-    <string name="check_session_failed">建会话失败：%1$s</string>
-    <string name="check_disconnected">相机被断开 —— 可能正在录制，或者被别的应用占着。停掉录制再试。</string>
-    <string name="check_error">打不开相机，错误 %1$d</string>
-    <string name="check_open_failed">打不开相机：%1$s</string>
 
     <!-- 开发者选项解锁 -->
     <string name="dev_unlock_hint">密码</string>

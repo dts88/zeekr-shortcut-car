@@ -28,7 +28,6 @@ import com.kooo.evcam.camera.TargetBitrate;
 import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.LaneLayout;
 import com.kooo.evcam.profile.Profile;
-import com.kooo.evcam.profile.ProfilePreviewCheck;
 import com.kooo.evcam.profile.ProfileResolution;
 import com.kooo.evcam.profile.ProfileSizes;
 import com.kooo.evcam.profile.ProfileStore;
@@ -38,7 +37,6 @@ import com.kooo.evcam.profile.StreamSpec;
 import com.kooo.evcam.ui.CamDialogs;
 import com.kooo.evcam.ui.SegmentedBar;
 import com.kooo.evcam.zeekr.CompositeStreamGeometry;
-import com.kooo.evcam.zeekr.FourLaneContainer;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
 
 import java.util.ArrayList;
@@ -76,6 +74,10 @@ public class ProfileEditorFragment extends Fragment {
     private static final String STATE_ROLE = "role";
     private static final String STATE_LANE = "lane";
 
+    /** 这台车就这三路，顺序也固定。 */
+    private static final String[] ROLES = {CameraProfile.ROLE_COMPOSITE,
+            CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2};
+
     private ProfileStore store;
     Profile profile;
     private CameraManager cameraManager;
@@ -83,6 +85,7 @@ public class ProfileEditorFragment extends Fragment {
     private LinearLayout cameraRow;
     private LinearLayout detailBox;
     private TextView budgetLine;
+    private TextView issueLine;
     private TextView camerasTitle;
     private String selectedRole;
     private int selectedLane;
@@ -93,10 +96,28 @@ public class ProfileEditorFragment extends Fragment {
         Context context = requireContext();
         store = new ProfileStore(context);
         profile = store.current();
+        ensureAllRoles();
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         if (savedInstanceState != null) {
             selectedRole = savedInstanceState.getString(STATE_ROLE);
             selectedLane = savedInstanceState.getInt(STATE_LANE);
+        }
+    }
+
+    /**
+     * 三路永远都在配置里。
+     *
+     * <p>「加一路相机」这个概念没了：“加”不是一件真实发生的事，
+     * 开和关才是。老配置里缺的那几路在这里补齐，默认关着 ——
+     * 关着的一路不开相机、不占空间，和它不在没有区别。</p>
+     */
+    private void ensureAllRoles() {
+        for (String role : ROLES) {
+            if (profile.camera(role) == null) {
+                CameraProfile camera = newCamera(role);
+                camera.enabled = false;
+                profile.cameras.add(camera);
+            }
         }
     }
 
@@ -114,11 +135,10 @@ public class ProfileEditorFragment extends Fragment {
         cameraRow = view.findViewById(R.id.editor_cameras);
         detailBox = view.findViewById(R.id.editor_detail);
         budgetLine = view.findViewById(R.id.editor_budget);
+        issueLine = view.findViewById(R.id.editor_issues);
         camerasTitle = view.findViewById(R.id.editor_cameras_title);
         view.findViewById(R.id.editor_open_lanes).setOnClickListener(v -> openLanes());
-        view.findViewById(R.id.editor_add_camera).setOnClickListener(v -> addCamera());
         view.findViewById(R.id.editor_reset).setOnClickListener(v -> confirmReset());
-        view.findViewById(R.id.editor_save).setOnClickListener(v -> saveWithPreview());
         refresh();
     }
 
@@ -154,6 +174,22 @@ public class ProfileEditorFragment extends Fragment {
 
     // ------------------------------------------------------------------ 选中
 
+    /**
+     * 改了就存，然后重搭。
+     *
+     * <h3>为什么没有保存键</h3>
+     *
+     * <p>一个只有按了「保存」才生效的界面，等于让人全程在
+     * 「看到的」和「生效的」之间猜。改坏了还有「重置」。</p>
+     *
+     * <p>不能写在 {@link #refresh()} 里：摆位那一页把这一页换下去了，
+     * 那时 refresh 没有 view 可搭会直接返回 —— 而摆位同样要存。</p>
+     */
+    void commit() {
+        store.save(profile);
+        refresh();
+    }
+
     /** 按当前状态整页重搭。 */
     void refresh() {
         if (presetRow == null || getContext() == null) {
@@ -176,6 +212,7 @@ public class ProfileEditorFragment extends Fragment {
         cameraRow = null;
         detailBox = null;
         budgetLine = null;
+        issueLine = null;
         camerasTitle = null;
     }
 
@@ -220,7 +257,7 @@ public class ProfileEditorFragment extends Fragment {
             }
             card.setOnClickListener(v -> {
                 preset.applyTo(profile);
-                refresh();
+                commit();
             });
             presetRow.addView(card);
         }
@@ -248,10 +285,20 @@ public class ProfileEditorFragment extends Fragment {
         Context context = requireContext();
         LayoutInflater inflater = LayoutInflater.from(context);
         QualityPreset current = QualityPreset.of(profile);
-        camerasTitle.setText(getString(R.string.editor_cameras_title, profile.cameras.size()));
+        int on = 0;
+        for (CameraProfile camera : profile.cameras) {
+            if (camera.enabled) {
+                on++;
+            }
+        }
+        camerasTitle.setText(getString(R.string.editor_cameras_title, on));
         cameraRow.removeAllViews();
         CameraProfile selected = selectedCamera();
-        for (CameraProfile camera : new ArrayList<>(profile.cameras)) {
+        for (String role : ROLES) {
+            CameraProfile camera = profile.camera(role);
+            if (camera == null) {
+                continue;   // ensureAllRoles 之后不会发生，保险起见
+            }
             View card = inflater.inflate(R.layout.item_camera_card, cameraRow, false);
             LinearLayout.LayoutParams params =
                     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -263,6 +310,11 @@ public class ProfileEditorFragment extends Fragment {
                     ? R.drawable.bg_editor_card_on : R.drawable.bg_editor_card);
             ((TextView) card.findViewById(R.id.camera_name)).setText(roleName(camera.role));
             ((TextView) card.findViewById(R.id.camera_summary)).setText(recordSummary(camera));
+            // 关着的那张把字压暗：三张卡永远都在，开没开得一眼看得出来。
+            // 压的只是字，不是整张卡 —— 开关本身得看着是能按的
+            float dim = camera.enabled ? 1f : 0.45f;
+            card.findViewById(R.id.camera_name).setAlpha(dim);
+            card.findViewById(R.id.camera_summary).setAlpha(dim);
             // 「我选了均衡，但后座舱不是」—— 这件事必须看得见
             boolean tuned = current != null && !current.matches(camera.record);
             card.findViewById(R.id.camera_tuned)
@@ -271,7 +323,12 @@ public class ProfileEditorFragment extends Fragment {
             toggle.setChecked(camera.enabled);
             toggle.setOnClickListener(v -> {
                 camera.enabled = toggle.isChecked();
-                refresh();
+                // 开一路就是要改它：顺手选中，细调框直接就是它的
+                if (camera.enabled) {
+                    selectedRole = camera.role;
+                    selectedLane = 0;
+                }
+                commit();
             });
             card.setOnClickListener(v -> selectCamera(camera.role));
             cameraRow.addView(card);
@@ -329,29 +386,35 @@ public class ProfileEditorFragment extends Fragment {
         knob(context, R.string.editor_knob_fps,
                 new String[]{getString(R.string.editor_fps_unlimited), "30", "24", "20", "15", "10"},
                 new String[]{StreamSpec.FPS_UNLIMITED, "30", "24", "20", "15", "10"},
-                record.fps, value -> { record.fps = value; refresh(); });
+                record.fps, value -> { record.fps = value; commit(); });
 
         knob(context, R.string.editor_knob_bitrate,
                 new String[]{getString(R.string.editor_very_low), getString(R.string.editor_low),
                         getString(R.string.editor_medium), getString(R.string.editor_high)},
                 new String[]{StreamSpec.BITRATE_VERY_LOW, StreamSpec.BITRATE_LOW,
                         StreamSpec.BITRATE_MEDIUM, StreamSpec.BITRATE_HIGH},
-                record.bitrate, value -> { record.bitrate = value; refresh(); });
+                record.bitrate, value -> { record.bitrate = value; commit(); });
 
         knob(context, R.string.editor_knob_segment,
                 new String[]{"1", "3", "5", "10"}, new String[]{"1", "3", "5", "10"},
                 String.valueOf(record.segmentMinutes),
-                value -> { record.segmentMinutes = Integer.parseInt(value); refresh(); });
+                value -> { record.segmentMinutes = Integer.parseInt(value); commit(); });
+
+        knob(context, R.string.editor_knob_photo,
+                new String[]{getString(R.string.editor_quality_default), "90", "80", "70"},
+                new String[]{"95", "90", "80", "70"},
+                String.valueOf(camera.photo.jpegQuality),
+                value -> { camera.photo.jpegQuality = Integer.parseInt(value); commit(); });
 
         knob(context, R.string.editor_knob_codec,
                 new String[]{getString(R.string.editor_codec_auto), "H.264"},
                 new String[]{"auto", "h264"},
-                record.codec, value -> { record.codec = value; refresh(); });
+                record.codec, value -> { record.codec = value; commit(); });
 
         // 分辨率和拍照参数不常改，收在一行里，点开还是原来那套选择框
         TextView more = new TextView(context);
         more.setText(getString(R.string.editor_detail_more,
-                describeStream(camera, camera.preview), String.valueOf(camera.photo.jpegQuality)));
+                describeStream(camera, camera.record)));
         more.setTextAppearance(R.style.TextAppearance_Cam_Caption);
         more.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
         LinearLayout.LayoutParams moreParams = new LinearLayout.LayoutParams(
@@ -360,17 +423,6 @@ public class ProfileEditorFragment extends Fragment {
         more.setLayoutParams(moreParams);
         more.setOnClickListener(v -> pickResolution(camera, camera.record));
         detailBox.addView(more);
-
-        TextView remove = new TextView(context);
-        remove.setText(R.string.editor_remove);
-        remove.setTextAppearance(R.style.TextAppearance_Cam_Caption);
-        remove.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_tertiary));
-        LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        removeParams.topMargin = dp(10);
-        remove.setLayoutParams(removeParams);
-        remove.setOnClickListener(v -> confirmRemove(camera));
-        detailBox.addView(remove);
     }
 
     private void knob(Context context, int labelRes, String[] labels, String[] values,
@@ -396,6 +448,26 @@ public class ProfileEditorFragment extends Fragment {
                 ? getString(R.string.editor_budget_with_space, size,
                         String.format(Locale.US, "%.0f", hours))
                 : getString(R.string.editor_budget, size));
+        renderIssues();
+    }
+
+    /**
+     * 这份配置现在有什么毛病。
+     *
+     * <p>以前这些是按下保存时弹出来的。没了保存键就没了那一刻，
+     * 所以改成一直摆在这里 —— 有问题的时候看得见，没问题的时候不占地方。</p>
+     */
+    private void renderIssues() {
+        StringBuilder sb = new StringBuilder();
+        for (ProfileValidation.Issue issue : ProfileValidation.check(profile, capabilities())) {
+            if (sb.length() > 0) {
+                sb.append('
+');
+            }
+            sb.append(describe(issue));
+        }
+        issueLine.setText(sb);
+        issueLine.setVisibility(sb.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
     /**
@@ -502,7 +574,7 @@ public class ProfileEditorFragment extends Fragment {
         if (!role.equals(selectedRole)) {
             selectedRole = role;
             selectedLane = 0;
-            refresh();
+            refresh();   // 只是选中变了，没改配置
         }
     }
 
@@ -583,7 +655,75 @@ public class ProfileEditorFragment extends Fragment {
         if (StreamSpec.RESOLUTION_MAX.equals(spec.resolution)) {
             return max;
         }
-        return CameraProfile.ROLE_COMPOSITE.equals(role) ? max : null;
+        if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
+            return max;
+        }
+        // 座舱那两路的 auto：拍照用声明的最大值，预览按「最接近 1280×800」
+        // 挑，录制跟着预览走。这三条以前在这里一律返回 null，于是卡上的码率
+        // 写成 0 kbps，「还能录多久」也完全不受这两路开关的影响 ——
+        // 而这个数是算得出来的，算得出来就不能写 0。
+        CameraProfile camera = profile.camera(role);
+        if (camera == null) {
+            return previewDefaultSize(role);
+        }
+        if (spec == camera.photo) {
+            return max;
+        }
+        if (spec != camera.preview && camera.preview != null) {
+            return resolvedSource(role, camera.preview);
+        }
+        return previewDefaultSize(role);
+    }
+
+    /**
+     * 配置里写 auto 时，预览会挑中的那个尺寸。
+     *
+     * <p>和 {@code SingleCamera.chooseOptimalSize} 同一条规则：先找 1280×800，
+     * 找不到就找最接近的。两边必须一致 —— 界面上写的数就是实际配下去的数。</p>
+     */
+    private int[] previewDefaultSize(String role) {
+        int[] best = null;
+        int bestDiff = Integer.MAX_VALUE;
+        for (int[] size : declaredPreviewSizes(role)) {
+            if (size[0] == 1280 && size[1] == 800) {
+                return size;
+            }
+            int diff = Math.abs(1280 - size[0]) + Math.abs(800 - size[1]);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = size;
+            }
+        }
+        return best;
+    }
+
+    /** 预览走的是 PRIVATE / SurfaceTexture 那一份声明，不是 JPEG 那一份。 */
+    private List<int[]> declaredPreviewSizes(String role) {
+        List<int[]> out = new ArrayList<>();
+        String cameraId = cameraIdFor(role);
+        if (cameraId == null || cameraManager == null) {
+            return out;
+        }
+        try {
+            StreamConfigurationMap map = cameraManager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (map == null) {
+                return out;
+            }
+            Size[] sizes = map.getOutputSizes(ImageFormat.PRIVATE);
+            if (sizes == null || sizes.length == 0) {
+                sizes = map.getOutputSizes(android.graphics.SurfaceTexture.class);
+            }
+            if (sizes == null) {
+                return out;
+            }
+            for (Size size : sizes) {
+                out.add(new int[]{size.getWidth(), size.getHeight()});
+            }
+        } catch (Exception e) {
+            AppLog.w(TAG, "读不到 " + role + " 的预览尺寸列表: " + e);
+        }
+        return out;
     }
 
     String fpsLabel(String fps) {
@@ -653,24 +793,7 @@ public class ProfileEditorFragment extends Fragment {
                 value -> spec.resolution = value);
     }
 
-    void pickFps(StreamSpec spec) {
-        pickOne(getString(R.string.editor_record_fps),
-                new String[]{getString(R.string.editor_fps_unlimited),
-                        "30 fps", "24 fps", "20 fps", "15 fps", "10 fps"},
-                new String[]{StreamSpec.FPS_UNLIMITED, "30", "24", "20", "15", "10"},
-                value -> spec.fps = value);
-    }
 
-    void pickBitrate(StreamSpec spec) {
-        pickOne(getString(R.string.editor_record_bitrate),
-                new String[]{getString(R.string.editor_bitrate_auto),
-                        getString(R.string.editor_very_low), getString(R.string.editor_low),
-                        getString(R.string.editor_medium), getString(R.string.editor_high)},
-                new String[]{StreamSpec.BITRATE_AUTO, StreamSpec.BITRATE_VERY_LOW,
-                        StreamSpec.BITRATE_LOW, StreamSpec.BITRATE_MEDIUM,
-                        StreamSpec.BITRATE_HIGH},
-                value -> spec.bitrate = value);
-    }
 
     void pickCodec(StreamSpec spec) {
         pickOne(getString(R.string.editor_record_codec),
@@ -679,24 +802,7 @@ public class ProfileEditorFragment extends Fragment {
                 value -> spec.codec = value);
     }
 
-    void pickSegment(StreamSpec spec) {
-        int[] minutes = {1, 3, 5, 10};
-        String[] labels = new String[minutes.length];
-        String[] values = new String[minutes.length];
-        for (int i = 0; i < minutes.length; i++) {
-            labels[i] = getString(R.string.share_minutes, minutes[i]);
-            values[i] = String.valueOf(minutes[i]);
-        }
-        pickOne(getString(R.string.editor_record_segment), labels, values,
-                value -> spec.segmentMinutes = Integer.parseInt(value));
-    }
 
-    void pickQuality(StreamSpec spec) {
-        pickOne(getString(R.string.editor_photo_quality),
-                new String[]{getString(R.string.editor_quality_default), "90", "80", "70"},
-                new String[]{"95", "90", "80", "70"},
-                value -> spec.jpegQuality = Integer.parseInt(value));
-    }
 
     private interface Chosen {
         void set(String value);
@@ -707,36 +813,12 @@ public class ProfileEditorFragment extends Fragment {
                 .setTitle(title)
                 .setItems(labels, (d, which) -> {
                     chosen.set(values[which]);
-                    refresh();
+                    commit();
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
     // ------------------------------------------------------------------ 加 / 删 / 存
-
-    void addCamera() {
-        List<String> roles = new ArrayList<>();
-        List<String> labels = new ArrayList<>();
-        for (String role : new String[]{CameraProfile.ROLE_COMPOSITE,
-                CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2}) {
-            if (profile.camera(role) == null) {
-                roles.add(role);
-                labels.add(roleName(role) + "   " + cameraSummary(role));
-            }
-        }
-        if (roles.isEmpty()) {
-            toast(getString(R.string.editor_all_added));
-            return;
-        }
-        pickOne(getString(R.string.editor_add_camera),
-                labels.toArray(new String[0]), roles.toArray(new String[0]),
-                role -> {
-                    profile.cameras.add(newCamera(role));
-                    // 加进来的那一路直接选中：加它就是为了改它
-                    selectedRole = role;
-                    selectedLane = 0;
-                });
-    }
 
     private CameraProfile newCamera(String role) {
         CameraProfile camera = new CameraProfile(role);
@@ -755,124 +837,17 @@ public class ProfileEditorFragment extends Fragment {
         return camera;
     }
 
-    void confirmRemove(CameraProfile camera) {
-        CamDialogs.showDestructive(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(getString(R.string.editor_remove_title, roleName(camera.role)))
-                .setMessage(R.string.editor_remove_msg)
-                .setPositiveButton(R.string.action_delete, (d, w) -> {
-                    profile.cameras.remove(camera);
-                    refresh();
-                })
-                .setNegativeButton(R.string.action_cancel, null));
-    }
-
     void confirmReset() {
         CamDialogs.showDestructive(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.editor_reset)
                 .setMessage(R.string.editor_reset_msg)
                 .setPositiveButton(R.string.editor_reset_ok, (d, w) -> {
                     profile = store.reset(profile.id);
-                    refresh();
+                    ensureAllRoles();
+                    commit();
                     toast(getString(R.string.editor_reset_done));
                 })
                 .setNegativeButton(R.string.action_cancel, null));
-    }
-
-    /**
-     * 先查数据，再按新配置开一次画面，看清楚了才保存。
-     *
-     * <p>一份让人没有画面的配置，是没法用「取消」退出来的 —— 所以确认框默认丢弃，
-     * 十秒不点就当没改过。</p>
-     */
-    void saveWithPreview() {
-        List<ProfileValidation.Issue> issues = ProfileValidation.check(profile, capabilities());
-        List<ProfileValidation.Issue> warnings = new ArrayList<>();
-        for (ProfileValidation.Issue issue : issues) {
-            if (issue.blocking) {
-                showIssues(getString(R.string.editor_cannot_save), issues);
-                return;
-            }
-            warnings.add(issue);
-        }
-
-        CameraProfile first = firstEnabled();
-        if (first == null) {
-            showIssues(getString(R.string.editor_none_enabled), warnings);
-            return;
-        }
-        String cameraId = cameraIdFor(first.role);
-        if (cameraId == null) {
-            showIssues(getString(R.string.editor_no_camera_for, roleName(first.role)), warnings);
-            return;
-        }
-        int[] resolved = resolvedSource(first.role, first.preview);
-        Size size = resolved == null ? null : new Size(resolved[0], resolved[1]);
-        boolean split = size != null
-                && splitsFor(first.role, size.getWidth(), size.getHeight());
-
-        new ProfilePreviewCheck(requireActivity()).run(cameraId, size, split, cellsOf(first), () -> {
-            store.save(profile);
-            AppLog.i(TAG, "配置已保存:\n" + profile);
-            toast(getString(R.string.editor_saved));
-        });
-    }
-
-    /** 把这一路的格子翻译成容器认识的那份，确认画面才和保存之后一致。 */
-    private FourLaneContainer.Cell[] cellsOf(CameraProfile camera) {
-        if (camera == null || camera.lanes.isEmpty()) {
-            return null;
-        }
-        FourLaneContainer.Cell[] cells = new FourLaneContainer.Cell[camera.lanes.size()];
-        for (int i = 0; i < cells.length; i++) {
-            LaneLayout lane = camera.lanes.get(i);
-            FourLaneContainer.Cell cell = new FourLaneContainer.Cell();
-            cell.laneIndex = lane.laneIndex;
-            cell.x = lane.x;
-            cell.y = lane.y;
-            cell.width = lane.width;
-            cell.height = lane.height;
-            cell.rotation = lane.rotation;
-            cell.mirrored = lane.mirrored;
-            cell.cropTop = lane.cropTop;
-            cell.cropBottom = lane.cropBottom;
-            cell.cropLeft = lane.cropLeft;
-            cell.cropRight = lane.cropRight;
-            cell.scaleX = lane.scaleX;
-            cell.scaleY = lane.scaleY;
-            cell.translateX = lane.translateX;
-            cell.translateY = lane.translateY;
-            cell.fit = scaleModeOf(lane.fit);
-            cells[i] = cell;
-        }
-        return cells;
-    }
-
-    /** 配置里存的是三个词，容器认的是枚举。 */
-    private static com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode scaleModeOf(String fit) {
-        if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
-            return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.FILL;
-        }
-        return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.FIT;
-    }
-
-    private CameraProfile firstEnabled() {
-        for (CameraProfile camera : profile.cameras) {
-            if (camera.enabled) {
-                return camera;
-            }
-        }
-        return null;
-    }
-
-    private void showIssues(String title, List<ProfileValidation.Issue> issues) {
-        StringBuilder sb = new StringBuilder();
-        for (ProfileValidation.Issue issue : issues) {
-            sb.append(describe(issue)).append('\n');
-        }
-        CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(title)
-                .setMessage(sb.length() == 0 ? getString(R.string.editor_no_more_info) : sb.toString())
-                .setPositiveButton(android.R.string.ok, null));
     }
 
     /** 一条问题按当前语言说出来。 */

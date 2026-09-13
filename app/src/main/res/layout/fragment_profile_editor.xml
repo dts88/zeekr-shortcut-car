@@ -11,6 +11,9 @@
   「能录多久」—— 参数是答案，不是问题。
 
   摆位（每一格的位置、旋转、镜像、填充）走另一个界面，从「摆位」进去。
+
+  没有保存键：改一下存一下。一个只有「保存」才生效的界面，等于让人随时在
+  「看到的」和「生效的」之间猜。改坏了就按右上那个「重置」。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -33,20 +36,44 @@
             android:paddingEnd="20dp"
             android:paddingBottom="16dp">
 
-            <!-- ① 录成什么样 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/editor_quality_title"
-                android:textAppearance="@style/TextAppearance.Cam.Row" />
-
-            <TextView
+            <!-- ① 录制画质 -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="@string/editor_quality_summary"
-                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                android:textColor="@color/text_secondary" />
+                android:baselineAligned="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/editor_quality_title"
+                        android:textAppearance="@style/TextAppearance.Cam.Row" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/editor_quality_summary"
+                        android:textAppearance="@style/TextAppearance.Cam.Caption"
+                        android:textColor="@color/text_secondary" />
+                </LinearLayout>
+
+                <!-- 没有保存键，所以重置是唯一的后悔路 —— 放在改得最多的那一排边上 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/editor_reset"
+                    style="@style/Widget.Cam.RailSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/editor_reset" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/editor_presets"
@@ -114,52 +141,17 @@
                 android:layout_marginTop="14dp"
                 android:textAppearance="@style/TextAppearance.Cam.Caption"
                 android:textColor="@color/text_secondary" />
+
+            <!-- ⑤ 毛病。以前在保存时弹框，没了保存键就改成一直摆在这 -->
+            <TextView
+                android:id="@+id/editor_issues"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                android:textColor="@color/recording_text"
+                android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/line" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/surface"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="20dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="12dp">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/editor_add_camera"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="56dp"
-            android:text="@string/editor_add_camera" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/editor_reset"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="56dp"
-            android:layout_marginStart="10dp"
-            android:text="@string/editor_reset" />
-
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/editor_save"
-            style="@style/Widget.Cam.RailTile"
-            android:layout_width="wrap_content"
-            android:layout_height="56dp"
-            android:paddingStart="28dp"
-            android:paddingEnd="28dp"
-            android:text="@string/editor_save" />
-    </LinearLayout>
 </LinearLayout>

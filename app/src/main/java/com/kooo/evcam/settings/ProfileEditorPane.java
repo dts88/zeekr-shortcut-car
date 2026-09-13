@@ -310,12 +310,19 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
     }
 
     /**
-     * 改完了：这一栏立刻重搭。
+     * 改完了：存盘，这一栏重搭。
+     *
+     * <p>没有保存键，所以摆位这边也得自己存 —— 拖完不存的话，
+     * 这一页改的东西全是白改。</p>
      *
      * <p>配置编辑那一页不用管 —— 它的 view 已经被摧了，退回去的时候
      * {@code onViewCreated} 会再搭一次。改的都是同一份 Profile，不会对不上。</p>
      */
     private void changed() {
+        ProfileEditorFragment editor = editor();
+        if (editor != null) {
+            editor.commit();
+        }
         render();
     }
 

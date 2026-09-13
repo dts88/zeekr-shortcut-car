@@ -26,14 +26,22 @@ public class ProfileMigrationTest {
 
     // ---------- 单路合成流 ----------
 
+    /**
+     * 三路都在，只有环视开着。
+     *
+     * <p>以前这份配置里只有一路，于是编辑器要多一个「加一路相机」的步骤。
+     * 这台车就那三路，“加”不是一件真实发生的事，开和关才是。</p>
+     */
     @Test
-    public void theCompositePresetHasExactlyOneCamera() {
+    public void theCompositePresetCarriesAllThreeWithOnlySurroundOn() {
         Profile profile = ProfileMigration.migrate(snapshot());
 
         assertEquals(Profile.PRESET_COMPOSITE, profile.id);
-        assertEquals(1, profile.cameras.size());
-        assertNotNull(profile.camera(CameraProfile.ROLE_COMPOSITE));
-        assertNull("单路配置里不该有座舱", profile.camera(CameraProfile.ROLE_CABIN_1));
+        assertEquals(3, profile.cameras.size());
+        assertTrue(profile.camera(CameraProfile.ROLE_COMPOSITE).enabled);
+        assertFalse("单路配置里座舱默认关着",
+                profile.camera(CameraProfile.ROLE_CABIN_1).enabled);
+        assertFalse(profile.camera(CameraProfile.ROLE_CABIN_2).enabled);
     }
 
     /** 环视四格的摆位从 FourLaneContainer 提取出来：2×2 等分。 */

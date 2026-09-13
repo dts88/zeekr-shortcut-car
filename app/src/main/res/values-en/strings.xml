@@ -395,11 +395,7 @@
     <string name="editor_group_cameras">Cameras</string>
     <string name="editor_group_streams">Streams</string>
     <string name="editor_group_profile">This profile</string>
-    <string name="editor_add_camera">Add a camera</string>
-    <string name="editor_save">Save</string>
-    <string name="editor_save_summary">Look at the picture with the new setup first; it is written only after you confirm</string>
-    <string name="editor_reset">Reset to defaults</string>
-    <string name="editor_reset_summary">Discard what was changed here and go back to the original</string>
+    <string name="editor_reset">Reset</string>
     <string name="editor_enable">Use this camera</string>
     <string name="editor_enable_summary">When off, it is not opened, not recorded and takes no stream</string>
     <string name="editor_off">off</string>
@@ -410,15 +406,10 @@
     <string name="editor_record_codec">Recording · codec</string>
     <string name="editor_record_segment">Recording · clip length</string>
     <string name="editor_photo_res">Photo · resolution</string>
-    <string name="editor_photo_quality">Photo · quality</string>
     <string name="editor_resolution">Resolution</string>
-    <string name="editor_remove">Remove this camera</string>
-    <string name="editor_remove_summary">Its settings are discarded too</string>
-    <string name="editor_remove_title">Remove %1$s</string>
-    <string name="editor_remove_msg">Remove this camera from the profile. Its settings are discarded too.</string>
     <string name="editor_reset_msg">Put this profile back the way it was created. What was changed here is discarded.</string>
     <string name="editor_reset_ok">Reset</string>
-    <string name="editor_reset_done">Reset to defaults</string>
+    <string name="editor_reset_done">Reset</string>
     <string name="editor_whole_frame">Whole frame</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">Tap a cell to edit it</string>
@@ -442,8 +433,8 @@
     <string name="editor_fit">Fit to pane</string>
     <string name="editor_fit_fit">Fit · whole picture, bars at the sides</string>
     <string name="editor_fit_fill">Fill · covers the pane, excess cropped</string>
-    <string name="editor_quality_title">How it should record</string>
-    <string name="editor_quality_summary">Sets the frame rate and bitrate of every camera at once. Tune one of them below</string>
+    <string name="editor_quality_title">Recording quality</string>
+    <string name="editor_quality_summary">Sets frame rate and bit rate on every camera at once. Tune one below.</string>
     <string name="editor_quality_current">current</string>
     <string name="editor_quality_gb_unit">GB / hour</string>
     <string name="editor_quality_hours_unit">hours · on free space</string>
@@ -453,15 +444,16 @@
     <string name="editor_quality_balanced_note">Enough for daily driving, clear when it matters</string>
     <string name="editor_quality_sharp">Sharpest</string>
     <string name="editor_quality_sharp_note">Plates are readable, the encoder runs near its limit</string>
-    <string name="editor_cameras_title">%1$d cameras</string>
-    <string name="editor_cameras_summary">Tap one to tune it; anything off the chosen step is marked</string>
+    <string name="editor_cameras_title">Recording %1$d</string>
+    <string name="editor_cameras_summary">A camera that is off is not opened and costs nothing; tap one to tune it</string>
     <string name="editor_camera_tuned">tuned</string>
     <string name="editor_open_lanes">Placement</string>
     <string name="editor_detail_title">%1$s · tuning</string>
-    <string name="editor_detail_more">Resolution and photos: %1$s · photo quality %2$s</string>
+    <string name="editor_detail_more">Recording resolution: %1$s</string>
     <string name="editor_knob_fps">Frame rate</string>
     <string name="editor_knob_bitrate">Bitrate</string>
     <string name="editor_knob_segment">Segment (min)</string>
+    <string name="editor_knob_photo">Photo quality</string>
     <string name="editor_knob_codec">Codec</string>
     <string name="editor_budget">About %1$s GB an hour</string>
     <string name="editor_budget_with_space">About %1$s GB an hour; the free space holds about %2$s hours</string>
@@ -494,12 +486,6 @@
     <string name="editor_high">High</string>
     <string name="editor_codec_auto">Auto (H.265 first)</string>
     <string name="editor_quality_default">95 (default)</string>
-    <string name="editor_all_added">All three cameras are already in this profile</string>
-    <string name="editor_cannot_save">This profile cannot be saved yet</string>
-    <string name="editor_none_enabled">No camera is enabled</string>
-    <string name="editor_no_camera_for">No camera found for %1$s</string>
-    <string name="editor_saved">Saved. Takes effect after restarting the app</string>
-    <string name="editor_no_more_info">(no further details)</string>
     <string name="editor_issue_no_cameras">This profile has no cameras</string>
     <string name="editor_issue_none_enabled">No camera is enabled, so nothing will show or record</string>
     <string name="editor_issue_undeclared_size">%1$s: the %2$s size %3$dx%4$d is not declared by this camera</string>
@@ -523,16 +509,6 @@
     <string name="player_clip_count">%1$d clips</string>
 
     <!-- Look before saving a profile -->
-    <string name="check_opening">Opening the camera…</string>
-    <string name="check_title">Look before saving</string>
-    <string name="check_save_countdown">Save (%1$d)</string>
-    <string name="check_ok">The picture is up. Look before you decide: is the split right, are the cells in place, does it stutter?</string>
-    <string name="check_no_frames">The session opened but there is no picture: %1$s</string>
-    <string name="check_config_failed">Session configuration failed: this head unit cannot run this combination. Saving it would leave you without a picture.</string>
-    <string name="check_session_failed">Could not create the session: %1$s</string>
-    <string name="check_disconnected">The camera was disconnected. It may be recording or in use by another app. Stop recording and try again.</string>
-    <string name="check_error">Could not open the camera (error %1$d)</string>
-    <string name="check_open_failed">Could not open the camera: %1$s</string>
 
     <!-- Developer options unlock -->
     <string name="dev_unlock_hint">Password</string>
