@@ -1259,7 +1259,7 @@ public class AppConfig {
      * @return 摄像头名称
      */
     public String getCameraName(Context uiContext, String position) {
-        String defaultValue = CameraNames.of(uiContext, position);
+        String defaultValue = CameraNames.ofSlot(uiContext, position);
         // 预设车型返回默认名称
         if (!isCustomCarModel()) {
             return defaultValue;

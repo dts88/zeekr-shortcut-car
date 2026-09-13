@@ -136,8 +136,8 @@
     <string name="opt_camera_auto">Automatic</string>
     <string name="opt_camera_id">Camera %1$s</string>
     <string name="slot_surround">Surround (composite)</string>
-    <string name="slot_cabin_1">Cabin 1</string>
-    <string name="slot_cabin_2">Cabin 2</string>
+    <string name="slot_cabin_front">Front cabin</string>
+    <string name="slot_cabin_rear">Rear cabin</string>
     <string name="action_save">Save</string>
     <string name="action_all_auto">All automatic</string>
     <string name="msg_mapping_saved">Camera mapping saved. Restart the app to apply</string>

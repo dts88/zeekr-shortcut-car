@@ -736,9 +736,9 @@ public class ProfileEditorFragment extends Fragment {
             return getString(R.string.slot_surround);
         }
         if (CameraProfile.ROLE_CABIN_1.equals(role)) {
-            return getString(R.string.slot_cabin_1);
+            return getString(R.string.slot_cabin_front);
         }
-        return getString(R.string.slot_cabin_2);
+        return getString(R.string.slot_cabin_rear);
     }
 
     // ------------------------------------------------------------------ 小工具

@@ -125,8 +125,8 @@ public final class SettingsDialogs {
         final String[] slots = {"front", "back", "left"};
         final String[] slotLabels = {
                 context.getString(R.string.slot_surround),
-                context.getString(R.string.slot_cabin_1),
-                context.getString(R.string.slot_cabin_2)};
+                context.getString(R.string.slot_cabin_front),
+                context.getString(R.string.slot_cabin_rear)};
         final Spinner[] spinners = new Spinner[slots.length];
 
         LinearLayout root = new LinearLayout(context);

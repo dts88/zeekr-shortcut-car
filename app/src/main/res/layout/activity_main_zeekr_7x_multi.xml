@@ -124,7 +124,7 @@
                                         android:gravity="center"
                                         android:paddingStart="10dp"
                                         android:paddingEnd="10dp"
-                                        android:text="@string/slot_cabin_1"
+                                        android:text="@string/slot_cabin_front"
                                         android:textColor="#FFFFFF"
                                         android:textAppearance="@style/TextAppearance.Cam.Body" />
                                 </FrameLayout>
@@ -153,7 +153,7 @@
                                         android:gravity="center"
                                         android:paddingStart="10dp"
                                         android:paddingEnd="10dp"
-                                        android:text="@string/slot_cabin_2"
+                                        android:text="@string/slot_cabin_rear"
                                         android:textColor="#FFFFFF"
                                         android:textAppearance="@style/TextAppearance.Cam.Body" />
                                 </FrameLayout>

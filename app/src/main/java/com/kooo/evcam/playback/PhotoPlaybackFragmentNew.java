@@ -145,6 +145,13 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         labelRight = view.findViewById(R.id.label_right);
         labelSingle = view.findViewById(R.id.label_single);
 
+        // 角标叫什么和主界面同一个来源：布局里那四个「前后左右」说的是合成流的
+        // 四个方向，而这里每一格是一路相机 —— 三路配置下就成了环视写着「前」
+        nameLane(labelFront, "front");
+        nameLane(labelBack, "back");
+        nameLane(labelLeft, "left");
+        nameLane(labelRight, "right");
+
         placeholderFront = view.findViewById(R.id.placeholder_front);
         placeholderBack = view.findViewById(R.id.placeholder_back);
         placeholderLeft = view.findViewById(R.id.placeholder_left);
@@ -313,6 +320,15 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     /**
      * 切换到单路模式
      */
+/** 这一格装的是哪一路相机，名字和主界面同一个来源。 */
+    private void nameLane(TextView label, String position) {
+        if (label == null || getContext() == null) {
+            return;
+        }
+        label.setText(new com.kooo.evcam.AppConfig(getContext())
+                .getCameraName(getContext(), position));
+    }
+
     private void switchToSingleMode(String position, String label) {
         isSingleMode = true;
         currentSinglePosition = position;

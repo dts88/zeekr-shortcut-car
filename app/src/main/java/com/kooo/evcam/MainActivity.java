@@ -2317,10 +2317,24 @@ public class MainActivity extends AppCompatActivity {
             compositeContainer.setSourceSize(located.size);
         }
 
+        // 座舱那两路按<b>配置里有哪一路</b>分槽位，不按相机 id 的先后。
+        //
+        // ZeekrMultiPlan 只认相机 id 的顺序：除去合成流之后，第一个填座舱 1、
+        // 第二个填座舱 2。于是在配置里只加了「后座舱」的人，画面会出现在前座舱
+        // 那一格里 —— 报上来的现象是「无论加哪一路，先出来的总是前座」。
+        boolean wantsFront = laneFor("back") != null;
+        boolean wantsRear = laneFor("left") != null;
+        String cabinFrontId = wantsFront ? plan.cabin1Id : null;
+        String cabinRearId = wantsRear
+                ? (wantsFront ? plan.cabin2Id : plan.cabin1Id)
+                : null;
+        AppLog.i(TAG, "座舱槽位按配置分: 前座舱=" + cabinFrontId + "，后座舱=" + cabinRearId
+                + "（配置里 前=" + wantsFront + " 后=" + wantsRear + "）");
+
         cameraManager.initCameras(
                 plan.compositeId, textureFront,
-                plan.cabin1Id, textureBack,
-                plan.cabin2Id, textureLeft,
+                cabinFrontId, textureBack,
+                cabinRearId, textureLeft,
                 null, null);
 
         // 只钉住环视这一路的尺寸，不动全局「画质设置」——
@@ -2361,8 +2375,8 @@ public class MainActivity extends AppCompatActivity {
         return getString(R.string.slot_surround) + " " + plan.compositeId
                 + " (" + getString(plan.compositeIsReal
                         ? R.string.composite_kind_real : R.string.composite_kind_plain) + ")"
-                + " · " + getString(R.string.slot_cabin_1) + " " + plan.cabin1Id
-                + " · " + getString(R.string.slot_cabin_2) + " " + plan.cabin2Id;
+                + " · " + getString(R.string.slot_cabin_front) + " " + plan.cabin1Id
+                + " · " + getString(R.string.slot_cabin_rear) + " " + plan.cabin2Id;
     }
 
     /**

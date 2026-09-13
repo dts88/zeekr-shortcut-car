@@ -153,8 +153,8 @@
     <string name="opt_camera_auto">自动</string>
     <string name="opt_camera_id">相机 %1$s</string>
     <string name="slot_surround">环视（合成流）</string>
-    <string name="slot_cabin_1">座舱 1</string>
-    <string name="slot_cabin_2">座舱 2</string>
+    <string name="slot_cabin_front">前座舱</string>
+    <string name="slot_cabin_rear">后座舱</string>
     <string name="action_save">保存</string>
     <string name="action_all_auto">全部自动</string>
     <string name="msg_mapping_saved">相机映射已保存，重启应用后生效</string>
