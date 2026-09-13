@@ -7,6 +7,22 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.49.0-alpha] - 2026-09-13
+
+- The stream profile editor asks what you want before it asks for numbers. Pick one of
+  three -- save space, balanced, sharpest -- and it sets frame rate and bit rate on every
+  camera at once, with the cost written under each: gigabytes per hour, and how long the
+  stick you have in the car will last. Each camera is a card; one that differs from the
+  preset is marked. Open a card and its knobs appear in place as rows of segments. No
+  dialogs.
+- Lane placement is a stage you drag. Drag a cell to move it, drag a corner to resize it.
+  It snaps to the edges, halves and quarters of the frame and to the other cells' edges,
+  and draws the line it snapped to. Surround lanes only -- the cabin panes' position and
+  size are not driven by the profile yet, and a control that changes nothing is worse than
+  no control.
+- Cropping a surround lane is still switched off; it rendered as snow and the cause is not
+  found yet. The row says so instead of hiding.
+
 ## [0.48.0-alpha] - 2026-09-13
 
 - The surround-plus-two-cabin stream profile is available to everyone. It was behind
