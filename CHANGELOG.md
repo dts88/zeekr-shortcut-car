@@ -5,7 +5,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- The floating button has the record button's ring: a track around the edge with the
+  segment's progress running along it while recording. Idle it is a plain grey outline --
+  the look of the open-the-app button it replaced, which is also what it does by default.
+  Red is reserved for recording.
+- The floating button's position can be locked. Parked where you want it, the next touch
+  is usually an accident, and it sits on the picture. The lock only stops dragging; tap
+  and long press still work.
 
 ## [0.45.2-alpha] - 2026-09-13
 
