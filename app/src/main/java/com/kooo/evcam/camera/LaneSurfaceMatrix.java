@@ -44,8 +44,12 @@ public final class LaneSurfaceMatrix {
         }
         int turn = LaneOrientation.normalise(rotation);
         boolean quarterTurn = LaneOrientation.quarterTurn(turn);
-        LaneOrientation o = LaneOrientation.sourceSpace(turn, cropTop, cropBottom,
-                cropLeft, cropRight, scaleX, scaleY, translateX, translateY);
+        // 裁剪停用期间一律当 0，和环视那一路保持一致
+        boolean crop = LaneOrientation.CROP_SUPPORTED;
+        LaneOrientation o = LaneOrientation.sourceSpace(turn,
+                crop ? cropTop : 0f, crop ? cropBottom : 0f,
+                crop ? cropLeft : 0f, crop ? cropRight : 0f,
+                scaleX, scaleY, translateX, translateY);
 
         boolean cropped = o.cropTop != 0f || o.cropBottom != 0f
                 || o.cropLeft != 0f || o.cropRight != 0f;

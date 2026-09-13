@@ -224,11 +224,15 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         });
         group.addPreference(mirror);
 
-        row(group, context, R.string.editor_crop,
-                getString(R.string.editor_crop_value, ProfileEditorFragment.num(lane.cropTop),
+        // 裁剪停用中：一个改了不生效的选项比没有更糟，所以这一行明说
+        boolean cropOn = com.kooo.evcam.camera.LaneOrientation.CROP_SUPPORTED;
+        Preference cropRow = row(group, context, R.string.editor_crop,
+                cropOn ? getString(R.string.editor_crop_value,
+                        ProfileEditorFragment.num(lane.cropTop),
                         ProfileEditorFragment.num(lane.cropBottom),
                         ProfileEditorFragment.num(lane.cropLeft),
-                        ProfileEditorFragment.num(lane.cropRight)), false,
+                        ProfileEditorFragment.num(lane.cropRight))
+                        : getString(R.string.editor_crop_off), cropOn,
                 () -> editor.editNumbers(getString(R.string.editor_crop_dialog),
                         new String[]{getString(R.string.editor_top), getString(R.string.editor_bottom),
                                 getString(R.string.editor_left), getString(R.string.editor_right)},
@@ -239,6 +243,9 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
                             lane.cropLeft = values[2];
                             lane.cropRight = values[3];
                         }));
+        // 灰掉而不是藏起来：藏起来的话，看到的人不知道这个功能存在过，
+        // 也不知道它为什么不在
+        cropRow.setEnabled(cropOn);
         row(group, context, R.string.editor_scale,
                 getString(R.string.editor_scale_value, ProfileEditorFragment.num(lane.scaleX),
                         ProfileEditorFragment.num(lane.scaleY),

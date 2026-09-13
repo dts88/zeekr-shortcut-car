@@ -116,8 +116,6 @@ public class FourLaneContainer extends ViewGroup {
     private final Matrix drawMatrix = new Matrix();
     private final RectF sourceRect = new RectF();
     private final RectF destinationRect = new RectF();
-    /** 这一格的画面在屏幕上占的那块（已含旋转后的落点）。 */
-    private final RectF visibleRect = new RectF();
 
     private AutoFitTextureView textureView;
 
@@ -507,8 +505,11 @@ public class FourLaneContainer extends ViewGroup {
      * 在车上看，这和「裁剪根本没生效」长得一模一样。</p>
      */
     private float applyCropAndPan(Cell cell, int rotation, float laneAspectPx) {
+        // 裁剪停用期间一律当 0：存着的值不动，只是不生效
+        boolean crop = LaneOrientation.CROP_SUPPORTED;
         LaneOrientation o = LaneOrientation.sourceSpace(rotation,
-                cell.cropTop, cell.cropBottom, cell.cropLeft, cell.cropRight,
+                crop ? cell.cropTop : 0f, crop ? cell.cropBottom : 0f,
+                crop ? cell.cropLeft : 0f, crop ? cell.cropRight : 0f,
                 cell.scaleX, cell.scaleY, cell.translateX, cell.translateY);
         float keepX = 1f - clampFraction(o.cropLeft) - clampFraction(o.cropRight);
         float keepY = 1f - clampFraction(o.cropTop) - clampFraction(o.cropBottom);
@@ -627,10 +628,6 @@ public class FourLaneContainer extends ViewGroup {
             }
         }
 
-        // 这一格的画面最后落在屏幕上的哪一块。转四分之一圈时下面那次长宽互换
-        // 是为了「转之前」的映射，转完又转回来 —— 所以占地就是这里这一块。
-        visibleRect.set(destLeft, destTop, destLeft + destWidth, destTop + destHeight);
-
         destinationRect.set(destLeft, destTop, destLeft + destWidth, destTop + destHeight);
         if (quarterTurn) {
             // 转四分之一圈时，先按「转之前」的形状去映射：
@@ -666,18 +663,18 @@ public class FourLaneContainer extends ViewGroup {
         // 画面比例和格子形状对不上时，格子里会有留白。留白得是黑的 ——
         // 不画的话那里留着上一帧
         canvas.drawRect(cellLeft, cellTop, cellLeft + cellWidth, cellTop + cellHeight, backdrop);
-        // 再裁到这一格画面真正占的那一块。
+        canvas.concat(drawMatrix);
+        // 再裁到这一格自己的取景窗。
         //
         // 留白装的是<b>同一张条带上相邻画面</b>的像素：条带竖着跑的时候，留白在
         // 左右两侧，那两侧正好没有内容，所以一直看不出来；一转 90°，条带横过来，
         // 留白里就长出别人的画面。裁到格子挡不住它 —— 它本来就在格子里。
         //
-        // 0.44.1 是在 concat <b>之后</b>裁源矩形。那样也对，但那是在一个被缩放过
-        // 的坐标系里裁，渲染器要另走一条路；裁剪一开就出雪花，只在这条路上出现。
-        // 这里改成在 concat <b>之前</b>裁屏幕上的那一块 —— 两次裁剪都在同一个
-        // 未变换的坐标系里，都是轴对齐的矩形，遮的东西一模一样。
-        canvas.clipRect(visibleRect);
-        canvas.concat(drawMatrix);
+        // 0.45.2 试过把这次裁剪挪到 concat <b>之前</b>（改裁屏幕上的那一块），
+        // 想绕开裁剪时出的雪花。结果是旋转也跟着坏了：四格全变成整条竖长条。
+        // 两次改动、两次坏在不同的地方 —— 所以退回这一版，它的旋转是在车上
+        // 验证过的。裁剪则整个停用，见 LaneOrientation.CROP_SUPPORTED。
+        canvas.clipRect(sourceRect);
         drawChild(canvas, textureView, getDrawingTime());
         canvas.restoreToCount(save);
     }

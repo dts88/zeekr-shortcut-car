@@ -21,6 +21,25 @@ package com.kooo.evcam.camera;
  */
 public final class LaneOrientation {
 
+    /**
+     * 裁剪暂时停用。
+     *
+     * <h3>为什么是关掉而不是修好</h3>
+     *
+     * <p>0.44.1 起，只要给环视的某一格设了裁剪，主界面就出问题：先是那一格变雪花，
+     * 换了一种裁法之后变成画面互相盖、左右两格不见了。旋转、镜像、缩放平移都正常，
+     * 只有裁剪会这样。</p>
+     *
+     * <p>连着两版靠推理去改这段绘制，两次都改坏了别的东西 —— 说明这条路上有一件
+     * 我在代码里看不出来的事（多半和 TextureView 在被变换过的画布上如何被裁有关），
+     * 而它只有在车上才看得见。在能看见它之前继续改，是在拿主界面赌。</p>
+     *
+     * <p>所以：裁剪的值照旧存着（不动用户已经填的数），但绘制时一律当 0。
+     * 配置编辑里那一行也标成暂不可用。查清之后把这个常量改回 true 就行。
+     * 详见 {@code docs/profile-todo.md}。</p>
+     */
+    public static final boolean CROP_SUPPORTED = false;
+
     /** 换算到源画面坐标系之后的裁剪比例。 */
     public final float cropTop;
     public final float cropBottom;

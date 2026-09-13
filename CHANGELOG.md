@@ -5,7 +5,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Reverted 0.45.2's clip change. Moving the lane's clip ahead of the transform was meant to
+  cure the static that crop produced; it broke rotation instead -- every cell showed the
+  whole strip. The clip is back where rotation is known to work.
+- Crop is switched off. Three attempts to fix it by reading the code each broke something
+  else, and the arithmetic checks out, so whatever is wrong is in how the renderer clips a
+  TextureView inside a transformed canvas -- not visible in the source and only visible on
+  the vehicle. Saved crop values are untouched; the drawing paths treat them as zero, and
+  the editor says the row is unavailable and why. What is known, and the cheap experiments
+  to try next, are written down in docs/profile-todo.md.
 
 ## [0.46.0-alpha] - 2026-09-13
 

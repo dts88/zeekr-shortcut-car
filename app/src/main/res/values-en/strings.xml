@@ -437,6 +437,7 @@
     <string name="editor_mirror_summary">Flip left to right, like a real mirror</string>
     <string name="editor_crop">Crop</string>
     <string name="editor_crop_value">Top %1$s · bottom %2$s · left %3$s · right %4$s</string>
+    <string name="editor_crop_off">Unavailable: cropping goes wrong on the vehicle and the cause is not understood yet</string>
     <string name="editor_crop_dialog">Crop (how much to cut from each side, fraction of the picture)</string>
     <string name="editor_top">Top</string>
     <string name="editor_bottom">Bottom</string>
