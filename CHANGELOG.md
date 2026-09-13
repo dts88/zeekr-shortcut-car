@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.45.2-alpha] - 2026-09-13
+
 - Fixed: cropping a surround lane turned that pane into static. The mask added in 0.44.1
   clipped the lane inside the transformed coordinate space, which is a different path
   through the renderer; it only showed up once a crop made that clip stop coinciding with
