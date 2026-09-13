@@ -449,11 +449,11 @@
     <string name="editor_camera_tuned">tuned</string>
     <string name="editor_open_lanes">Placement</string>
     <string name="editor_detail_title">%1$s · tuning</string>
-    <string name="editor_detail_more">Recording resolution: %1$s</string>
     <string name="editor_knob_fps">Frame rate</string>
     <string name="editor_knob_bitrate">Bitrate</string>
     <string name="editor_knob_segment">Segment (min)</string>
-    <string name="editor_knob_photo">Photo quality</string>
+    <string name="editor_knob_resolution">Resolution</string>
+    <string name="editor_knob_resolution_note">Preview / record / photo</string>
     <string name="editor_knob_codec">Codec</string>
     <string name="editor_budget">About %1$s GB an hour</string>
     <string name="editor_budget_with_space">About %1$s GB an hour; the free space holds about %2$s hours</string>
@@ -476,7 +476,6 @@
     <string name="editor_resolved_by_camera">picked by the camera, closest to 1280x800</string>
     <string name="editor_per_cell">per cell %1$s</string>
     <string name="editor_landing">on disk %1$s</string>
-    <string name="editor_photo_off">(Photos through the image channel is off, so this has no effect; photos follow the preview)</string>
     <string name="editor_fps_unlimited">Native (no limit)</string>
     <string name="editor_fps_cap">%1$s fps (cap)</string>
     <string name="editor_bitrate_auto">Follow quality level (medium)</string>
@@ -485,7 +484,6 @@
     <string name="editor_medium">Medium</string>
     <string name="editor_high">High</string>
     <string name="editor_codec_auto">Auto (H.265 first)</string>
-    <string name="editor_quality_default">95 (default)</string>
     <string name="editor_issue_no_cameras">This profile has no cameras</string>
     <string name="editor_issue_none_enabled">No camera is enabled, so nothing will show or record</string>
     <string name="editor_issue_undeclared_size">%1$s: the %2$s size %3$dx%4$d is not declared by this camera</string>

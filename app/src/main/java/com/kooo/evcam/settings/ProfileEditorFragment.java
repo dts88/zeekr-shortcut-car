@@ -78,6 +78,9 @@ public class ProfileEditorFragment extends Fragment {
     private static final String[] ROLES = {CameraProfile.ROLE_COMPOSITE,
             CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2};
 
+    /** 拍照质量不再是一个选项。 */
+    private static final int PHOTO_QUALITY = 95;
+
     private ProfileStore store;
     Profile profile;
     private CameraManager cameraManager;
@@ -96,7 +99,7 @@ public class ProfileEditorFragment extends Fragment {
         Context context = requireContext();
         store = new ProfileStore(context);
         profile = store.current();
-        ensureAllRoles();
+        normaliseProfile();
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         if (savedInstanceState != null) {
             selectedRole = savedInstanceState.getString(STATE_ROLE);
@@ -105,19 +108,32 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     /**
-     * 三路永远都在配置里。
+     * 把这份配置调成前台真能表达的样子。
+     *
+     * <h3>三路永远都在</h3>
      *
      * <p>「加一路相机」这个概念没了：“加”不是一件真实发生的事，
      * 开和关才是。老配置里缺的那几路在这里补齐，默认关着 ——
      * 关着的一路不开相机、不占空间，和它不在没有区别。</p>
+     *
+     * <h3>一个分辨率、一个拍照质量</h3>
+     *
+     * <p>这两项前台不再分开给了。配置里还是三个分辨率字段（后台照旧各问各的），
+     * 但既然前台改不到，就不能把旧数据里的差异留在那 —— 一个既看不见、
+     * 又改不了、还在悷悷生效的值，比一个错的值更难查。</p>
      */
-    private void ensureAllRoles() {
+    private void normaliseProfile() {
         for (String role : ROLES) {
             if (profile.camera(role) == null) {
                 CameraProfile camera = newCamera(role);
                 camera.enabled = false;
                 profile.cameras.add(camera);
             }
+        }
+        for (CameraProfile camera : profile.cameras) {
+            camera.photo.jpegQuality = PHOTO_QUALITY;
+            camera.preview.resolution = camera.record.resolution;
+            camera.photo.resolution = camera.record.resolution;
         }
     }
 
@@ -297,7 +313,7 @@ public class ProfileEditorFragment extends Fragment {
         for (String role : ROLES) {
             CameraProfile camera = profile.camera(role);
             if (camera == null) {
-                continue;   // ensureAllRoles 之后不会发生，保险起见
+                continue;   // normaliseProfile 之后不会发生，保险起见
             }
             View card = inflater.inflate(R.layout.item_camera_card, cameraRow, false);
             LinearLayout.LayoutParams params =
@@ -346,10 +362,23 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     private String landingSize(CameraProfile camera, int[] source) {
-        String compositeId = StreamLayoutTable.compositeCameraId();
-        boolean grid = camera.record != null && camera.record.grid;
-        EncodeSize landing = EncodeSize.forSource(compositeId, source[0], source[1], grid);
+        EncodeSize landing = landingFor(camera, source);
         return landing.width + "×" + landing.height;
+    }
+
+    /**
+     * 这一路的这个尺寸，真正会编码成多大。
+     *
+     * <h3>相机 id 必须是这一路自己的</h3>
+     *
+     * <p>拆不拆只看相机 id（{@code StreamLayoutTable.stackingFor}）。
+     * 以前这里不管哪一路都传环视的 id，于是座舱的 1280×800
+     * 被当成四格竖条拆了：每格 1280×200，2×2 拼回去就是那个
+     * 凭空出现的 2560×400（1280×720 则是 2560×360）。</p>
+     */
+    private EncodeSize landingFor(CameraProfile camera, int[] source) {
+        boolean grid = splitsFor(camera.role) && camera.record != null && camera.record.grid;
+        return EncodeSize.forSource(cameraIdFor(camera.role), source[0], source[1], grid);
     }
 
     // ------------------------------------------------------------------ 细调
@@ -400,29 +429,29 @@ public class ProfileEditorFragment extends Fragment {
                 String.valueOf(record.segmentMinutes),
                 value -> { record.segmentMinutes = Integer.parseInt(value); commit(); });
 
-        knob(context, R.string.editor_knob_photo,
-                new String[]{getString(R.string.editor_quality_default), "90", "80", "70"},
-                new String[]{"95", "90", "80", "70"},
-                String.valueOf(camera.photo.jpegQuality),
-                value -> { camera.photo.jpegQuality = Integer.parseInt(value); commit(); });
-
         knob(context, R.string.editor_knob_codec,
                 new String[]{getString(R.string.editor_codec_auto), "H.264"},
                 new String[]{"auto", "h264"},
                 record.codec, value -> { record.codec = value; commit(); });
 
-        // 分辨率和拍照参数不常改，收在一行里，点开还是原来那套选择框
-        TextView more = new TextView(context);
-        more.setText(getString(R.string.editor_detail_more,
-                describeStream(camera, camera.record)));
-        more.setTextAppearance(R.style.TextAppearance_Cam_Caption);
-        more.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
-        LinearLayout.LayoutParams moreParams = new LinearLayout.LayoutParams(
+        // 档位有十几个，排不成一排，这一行点开是选择框
+        pick(context, R.string.editor_knob_resolution, R.string.editor_knob_resolution_note,
+                describeStream(camera), () -> pickResolution(camera));
+    }
+
+    /** 一行“名字 + 当前值”，点值弹选择框。 */
+    private void pick(Context context, int labelRes, int noteRes, String value, Runnable onPick) {
+        View row = LayoutInflater.from(context).inflate(R.layout.item_pick_row, detailBox, false);
+        ((TextView) row.findViewById(R.id.pick_label)).setText(labelRes);
+        ((TextView) row.findViewById(R.id.pick_note)).setText(noteRes);
+        TextView current = row.findViewById(R.id.pick_value);
+        current.setText(value);
+        current.setOnClickListener(v -> onPick.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        moreParams.topMargin = dp(14);
-        more.setLayoutParams(moreParams);
-        more.setOnClickListener(v -> pickResolution(camera, camera.record));
-        detailBox.addView(more);
+        params.topMargin = dp(14);
+        row.setLayoutParams(params);
+        detailBox.addView(row);
     }
 
     private void knob(Context context, int labelRes, String[] labels, String[] values,
@@ -502,8 +531,7 @@ public class ProfileEditorFragment extends Fragment {
         if (source == null) {
             return 0;
         }
-        EncodeSize size = EncodeSize.forSource(StreamLayoutTable.compositeCameraId(),
-                source[0], source[1], camera.record.grid);
+        EncodeSize size = landingFor(camera, source);
         int max = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
         int nominal = com.kooo.evcam.profile.RecordSpecs.nominal(fps,
                 max > 0 ? max : AppConfig.RECORDER_MAX_FPS);
@@ -587,19 +615,16 @@ public class ProfileEditorFragment extends Fragment {
     // ------------------------------------------------------------------ 尺寸的说明
 
     /**
-     * 一条流的分辨率现在是多少、解出来是多少、落盘是多少。
+     * 这一路的分辨率现在是多少、解出来是多少、落盘是多少。
      *
      * <h3>为什么 auto / max 也要写出数字</h3>
      *
      * <p>它们是<b>意图</b>，配置里存的就是这两个词。但看的人要的是那个数 ——
      * 不写出来，「自动」到底是 1280×5140 还是 1280×800 只能靠猜。</p>
      */
-    String describeStream(CameraProfile camera, StreamSpec spec) {
+    String describeStream(CameraProfile camera) {
+        StreamSpec spec = camera.record;
         StringBuilder sb = new StringBuilder(resolutionLabel(camera.role, spec));
-        if (spec == camera.photo && !new AppConfig(requireContext()).isPhotoViaJpegEnabled()) {
-            // 关着「拍照走图片通道」时拍照是抓预览画面，这一项根本不参与
-            return sb + getString(R.string.editor_photo_off);
-        }
         int[] source = resolvedSource(camera.role, spec);
         if (source == null || !splitsFor(camera.role)) {
             return sb.toString();
@@ -608,10 +633,8 @@ public class ProfileEditorFragment extends Fragment {
                 source[0] + "×" + (source[1] / 4)));
         // 落盘尺寸要走拆分几何，而几何认的是相机 id：相机还没起来时算不出来，
         // 那就不写 —— 编一个数比不写更糟
-        if (spec != camera.preview && StreamLayoutTable.compositeCameraId() != null) {
-            EncodeSize landing = EncodeSize.forSource(
-                    StreamLayoutTable.compositeCameraId(), source[0], source[1],
-                    camera.record != null && camera.record.grid);
+        if (StreamLayoutTable.compositeCameraId() != null) {
+            EncodeSize landing = landingFor(camera, source);
             sb.append(" · ").append(getString(R.string.editor_landing,
                     landing.width + "×" + landing.height));
         }
@@ -758,7 +781,23 @@ public class ProfileEditorFragment extends Fragment {
 
     // ------------------------------------------------------------------ 选择
 
-    void pickResolution(CameraProfile camera, StreamSpec spec) {
+    /**
+     * 改分辨率。<b>三条流一起改</b>。
+     *
+     * <h3>为什么前台只给一个</h3>
+     *
+     * <p>预览、录制、拍照在配置里仍然是三个独立的值，后台照旧各问各的。
+     * 但前台摆三个，意味着每一路都要做三次选择，而它们之间的区别
+     * 大多数时候无意义 —— 一个改了另两个没改，只会得到一份自己矛盾的配置。</p>
+     *
+     * <h3>为什么只列两边都声明过的尺寸</h3>
+     *
+     * <p>预览走 PRIVATE / SurfaceTexture 那份声明，拍照走 JPEG 那份，两份不一定一样。
+     * 一个只在一边声明过的尺寸，选了之后另一边会静静地回退到别的值 ——
+     * 那就又是「界面写一个数、实际用另一个」。交集空的话（读不到声明等）
+     * 退回 JPEG 那份，宁可多列也不能一个都不给。</p>
+     */
+    void pickResolution(CameraProfile camera) {
         List<String> values = new ArrayList<>();
         List<String> labels = new ArrayList<>();
 
@@ -771,7 +810,7 @@ public class ProfileEditorFragment extends Fragment {
 
         boolean grid = camera.record != null && camera.record.grid;
         String compositeId = StreamLayoutTable.compositeCameraId();
-        for (int[] size : declaredSizes(camera.role)) {
+        for (int[] size : offeredSizes(camera.role)) {
             values.add(size[0] + "x" + size[1]);
             if (!splitsFor(camera.role)) {
                 labels.add(size[0] + "x" + size[1]);
@@ -789,7 +828,30 @@ public class ProfileEditorFragment extends Fragment {
         pickOne(getString(R.string.editor_lane_group, roleName(camera.role),
                         getString(R.string.editor_resolution)),
                 labels.toArray(new String[0]), values.toArray(new String[0]),
-                value -> spec.resolution = value);
+                value -> {
+                    camera.preview.resolution = value;
+                    camera.record.resolution = value;
+                    camera.photo.resolution = value;
+                });
+    }
+
+    /** 两边都声明过的尺寸；交集空就用 JPEG 那份。 */
+    private List<int[]> offeredSizes(String role) {
+        List<int[]> jpeg = declaredSizes(role);
+        List<int[]> both = new ArrayList<>();
+        for (int[] size : jpeg) {
+            for (int[] other : declaredPreviewSizes(role)) {
+                if (other[0] == size[0] && other[1] == size[1]) {
+                    both.add(size);
+                    break;
+                }
+            }
+        }
+        if (both.isEmpty()) {
+            AppLog.w(TAG, role + " 的预览和拍照尺寸没有交集，列表退回 JPEG 那份");
+            return jpeg;
+        }
+        return both;
     }
 
 
@@ -842,7 +904,7 @@ public class ProfileEditorFragment extends Fragment {
                 .setMessage(R.string.editor_reset_msg)
                 .setPositiveButton(R.string.editor_reset_ok, (d, w) -> {
                     profile = store.reset(profile.id);
-                    ensureAllRoles();
+                    normaliseProfile();
                     commit();
                     toast(getString(R.string.editor_reset_done));
                 })

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  细调里的一行：左边一个名字，右边当前值，点值弹选择框。
+
+  和它旁边那几行（item_knob_row）长得一样，只是档位多到摆不下 —— 分辨率有十几个，
+  排成一整排既挤又难点。名字的宽度和那几行对齐，读下来是一列。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <LinearLayout
+        android:layout_width="96dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/pick_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.Cam.Body"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/pick_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textAppearance="@style/TextAppearance.Cam.Micro"
+            android:textColor="@color/text_tertiary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pick_value"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_segment_track"
+        android:drawableEnd="@drawable/ic_chevron_right"
+        android:drawableTint="@color/text_tertiary"
+        android:fontFeatureSettings="tnum"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="13dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="13dp"
+        android:textAppearance="@style/TextAppearance.Cam.Body"
+        android:textColor="@color/text_primary" />
+</LinearLayout>

@@ -450,11 +450,11 @@
     <string name="editor_camera_tuned">已细调</string>
     <string name="editor_open_lanes">摆位</string>
     <string name="editor_detail_title">%1$s · 细调</string>
-    <string name="editor_detail_more">录制分辨率：%1$s</string>
     <string name="editor_knob_fps">帧率</string>
     <string name="editor_knob_bitrate">码率</string>
     <string name="editor_knob_segment">分段（分钟）</string>
-    <string name="editor_knob_photo">拍照质量</string>
+    <string name="editor_knob_resolution">分辨率</string>
+    <string name="editor_knob_resolution_note">预览 / 录制 / 拍照都用它</string>
     <string name="editor_knob_codec">编码</string>
     <string name="editor_budget">这份配置一小时落盘约 %1$s GB</string>
     <string name="editor_budget_with_space">这份配置一小时落盘约 %1$s GB，剩余空间还能录约 %2$s 小时</string>
@@ -477,7 +477,6 @@
     <string name="editor_resolved_by_camera">由相机按最接近 1280x800 挑</string>
     <string name="editor_per_cell">每格 %1$s</string>
     <string name="editor_landing">落盘 %1$s</string>
-    <string name="editor_photo_off">（「拍照走图片通道」关着，此项不生效，拍照跟随预览）</string>
     <string name="editor_fps_unlimited">原始帧率（不限制）</string>
     <string name="editor_fps_cap">%1$s fps（上限）</string>
     <string name="editor_bitrate_auto">跟随画质等级（中）</string>
@@ -486,7 +485,6 @@
     <string name="editor_medium">中</string>
     <string name="editor_high">高</string>
     <string name="editor_codec_auto">自动（优先 H.265）</string>
-    <string name="editor_quality_default">95（默认）</string>
     <string name="editor_issue_no_cameras">这份配置里一路相机都没有</string>
     <string name="editor_issue_none_enabled">一路相机都没启用，什么都不会显示也不会录</string>
     <string name="editor_issue_undeclared_size">%1$s 的%2$s尺寸 %3$dx%4$d 这一路没有声明过</string>
