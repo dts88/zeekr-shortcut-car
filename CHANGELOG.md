@@ -7,6 +7,22 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.52.0-alpha] - 2026-09-14
+
+- The bottom-right button on the main screen hides the app instead of quitting it, with a
+  new icon: the old cross looked like both "close this page" and "quit". Quit moved to the
+  bottom of the drawer and the bottom of the settings list.
+- The grid button is gone and Photo takes the whole row. Tap a surround lane to fill the
+  preview area with it, tap again to go back; the cabin cameras work the same way. An
+  expanded view always fills, cropping the edges.
+- Fixed: "Reset floating button layout" did nothing. It cleared the settings of the old
+  main-screen floating window, which the merged button never reads. It now resets the
+  button's own position and size and moves it straight away, to where the original "open
+  app" button used to sit.
+- New defaults (only for settings you have never changed): floating button size 90,
+  opacity 95, recording duration hidden; rear-view fisheye correction off; prevent sleep
+  off. Record with screen off is locked unless developer options are on.
+
 ## [0.51.1-alpha] - 2026-09-14
 
 - Removed the segment progress bar and "clip xx%" from the status bar on the main screen.
