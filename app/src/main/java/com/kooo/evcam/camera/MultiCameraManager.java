@@ -363,10 +363,15 @@ public class MultiCameraManager {
 
         // 清空之前的摄像头实例
         cameras.clear();
+
+        // 极氪那两个配置的摆法全部来自配置文件，SingleCamera 里那几条按槽位名
+        // 写死的旋转镜像不能再插手 —— 它们是给自定义/E5 车型写的
+        boolean laneDriven = new AppConfig(context).isZeekrCompositeModel();
         
         // 根据参数创建摄像头实例（支持 null TextureView 用于后台初始化）
         if (frontId != null) {
             SingleCamera frontCamera = new SingleCamera(context, frontId, frontView);
+            frontCamera.setLaneDriven(laneDriven);
             frontCamera.setCameraPosition("front");
             cameras.put("front", frontCamera);
             AppLog.d(TAG, "初始化前摄像头: ID=" + frontId);
@@ -374,6 +379,7 @@ public class MultiCameraManager {
 
         if (backId != null) {
             SingleCamera backCamera = new SingleCamera(context, backId, backView);
+            backCamera.setLaneDriven(laneDriven);
             backCamera.setCameraPosition("back");
             cameras.put("back", backCamera);
             AppLog.d(TAG, "初始化后摄像头: ID=" + backId);
@@ -381,6 +387,7 @@ public class MultiCameraManager {
 
         if (leftId != null) {
             SingleCamera leftCamera = new SingleCamera(context, leftId, leftView);
+            leftCamera.setLaneDriven(laneDriven);
             leftCamera.setCameraPosition("left");
             cameras.put("left", leftCamera);
             AppLog.d(TAG, "初始化左摄像头: ID=" + leftId);
@@ -388,6 +395,7 @@ public class MultiCameraManager {
 
         if (rightId != null) {
             SingleCamera rightCamera = new SingleCamera(context, rightId, rightView);
+            rightCamera.setLaneDriven(laneDriven);
             rightCamera.setCameraPosition("right");
             cameras.put("right", rightCamera);
             AppLog.d(TAG, "初始化右摄像头: ID=" + rightId);

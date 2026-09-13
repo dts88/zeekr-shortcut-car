@@ -5,7 +5,25 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Fixed: rotating a lane made the neighbouring lanes appear beside it. A lane keeps its
+  own shape inside its cell, so there is empty space at the sides -- and that space holds
+  the pixels of the lanes above and below it on the same strip. Upright, the strip runs
+  vertically and the side margins happen to be empty; rotate it a quarter turn and the
+  strip runs across, filling them. Clipping to the cell never helped: the leak was already
+  inside the cell. Each lane is now clipped to its own window in the strip, which no
+  rotation can widen, and the margin is painted.
+- Crop no longer moves the picture. The cell used to be re-fitted to whatever was left
+  after cropping, so trimming the top made the whole lane shrink and shift -- which reads
+  as crop being broken rather than as a trimmed bumper. The frame now stays where it was
+  and the remainder fills it, the excess centre-cropped rather than stretched, the way the
+  rear-view mirror fills its window. Trimming top and bottom therefore also trims a little
+  from the sides.
+- Fixed: rotation still did nothing to the cabin cameras. An inherited rule mirrors the
+  "back" slot unconditionally and writes the matrix straight onto the view, which erased
+  the one built from the profile -- and in the three-stream profile that slot is the first
+  cabin camera. That rule now applies only where the profile does not drive the lane. The
+  transform is also recomputed when the view is re-laid out, which it is right after the
+  aspect ratio is set.
 
 ## [0.44.0-alpha] - 2026-09-13
 

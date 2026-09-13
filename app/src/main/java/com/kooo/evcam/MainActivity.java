@@ -103,6 +103,8 @@ public class MainActivity extends AppCompatActivity {
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
     private final java.util.Map<String, android.graphics.Matrix> previewBaseTransforms = new java.util.HashMap<>();
+    /** 已经挂上重算监听的那几路，别挂第二遍。 */
+    private final java.util.Set<String> laneTransformBound = new java.util.HashSet<>();
     private PreviewCorrectionFloatingWindow previewCorrectionFloatingWindow;
     private FisheyeCorrectionFloatingWindow fisheyeCorrectionFloatingWindow;
 
@@ -2565,6 +2567,17 @@ public class MainActivity extends AppCompatActivity {
      * 那个悬浮窗是在它上面临时推一把。</p>
      */
     private void applyLaneTransform(AutoFitTextureView textureView, String cameraKey) {
+        // 尺寸一变，矩阵就得重算。setAspectRatio 会触发一次重新布局，而它和这里
+        // 谁先谁后没有保证 —— 只算一次的话，算的可能是上一次的尺寸
+        if (laneTransformBound.add(cameraKey)) {
+            textureView.addOnLayoutChangeListener(
+                    (v, left, top, right, bottom, wasLeft, wasTop, wasRight, wasBottom) -> {
+                        if (right - left != wasRight - wasLeft
+                                || bottom - top != wasBottom - wasTop) {
+                            applyLaneTransform(textureView, cameraKey);
+                        }
+                    });
+        }
         textureView.post(() -> {
             int viewWidth = textureView.getWidth();
             int viewHeight = textureView.getHeight();

@@ -52,6 +52,8 @@ public class SingleCamera {
     private CameraCallback callback;
     private String cameraPosition;  // 摄像头位置（front/back/left/right）
     private int customRotation = 0;  // 自定义旋转角度（仅用于自定义车型）
+    /** 这一路的摆法由配置里那一格说了算，本类不要再往 TextureView 上写矩阵。 */
+    private boolean laneDriven = false;
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -181,18 +183,38 @@ public class SingleCamera {
         this.cameraPosition = position;
 
         // 如果是后摄像头，应用左右镜像变换
-        if ("back".equals(position) && textureView != null) {
+        if (autoMirrorBack() && textureView != null) {
             applyMirrorTransform();
         }
+    }
+
+    /**
+     * 这一路的旋转镜像由配置里那一格决定，本类不要插手。
+     *
+     * <h3>为什么需要这个开关</h3>
+     *
+     * <p>下面那条「{@code back} 一律加左右镜像」是给自定义/E5 车型写的 ——
+     * 那里的 back 是倒车影像，本来就该反着看。但在「环视 + 两路座舱」这个配置里，
+     * back 这个槽位装的是<b>座舱第一路</b>：它被无条件镜像，而且是直接
+     * {@code setTransform}，把配置算出来的矩阵整个盖掉。表现就是编辑器里转了、
+     * 存了、显示着 90°，画面一动不动。</p>
+     */
+    public void setLaneDriven(boolean value) {
+        this.laneDriven = value;
+    }
+
+    private boolean autoMirrorBack() {
+        return !laneDriven && "back".equals(cameraPosition);
     }
 
     public void setTextureView(TextureView textureView) {
         this.textureView = textureView;
         clearPreviewSurface();
-        if ("back".equals(cameraPosition) && this.textureView != null) {
+        if (autoMirrorBack() && this.textureView != null) {
             applyMirrorTransform();
         }
-        if (customRotation != 0 && this.textureView != null && this.textureView.isAvailable()) {
+        if (!laneDriven && customRotation != 0
+                && this.textureView != null && this.textureView.isAvailable()) {
             applyCustomRotation();
         }
     }
@@ -1342,11 +1364,11 @@ public class SingleCamera {
                     AppLog.e(TAG, "Camera " + cameraId + " Cannot set buffer size - previewSize: " + previewSize + ", SurfaceTexture: " + surfaceTexture);
                 }
 
-                if ("back".equals(cameraPosition)) {
+                if (autoMirrorBack()) {
                     applyMirrorTransform();
                 }
 
-                if (customRotation != 0) {
+                if (!laneDriven && customRotation != 0) {
                     applyCustomRotation();
                 }
 
