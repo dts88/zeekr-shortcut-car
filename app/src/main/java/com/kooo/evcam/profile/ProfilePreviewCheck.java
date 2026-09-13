@@ -72,7 +72,7 @@ public final class ProfilePreviewCheck {
      * —— 那这一眼就白看了。位置和大小不在这里：不拆分的那一路占的是布局里固定的
      * 一块，那两个值现在还没有人读（见 docs/profile-todo.md）。</p>
      */
-    private static void applyWholeFrameTransform(TextureView texture,
+    private static void applyWholeFrameTransform(TextureView texture, Size source,
                                                  FourLaneContainer.Cell[] cells) {
         if (cells == null || cells.length == 0 || cells[0] == null) {
             return;
@@ -88,7 +88,9 @@ public final class ProfilePreviewCheck {
                     return;
                 }
                 Matrix matrix = new Matrix();
-                if (LaneSurfaceMatrix.build(matrix, width, height, 0, 0,
+                if (LaneSurfaceMatrix.build(matrix, width, height,
+                        source == null ? 0 : source.getWidth(),
+                        source == null ? 0 : source.getHeight(),
                         cell.rotation, cell.mirrored,
                         cell.cropTop, cell.cropBottom, cell.cropLeft, cell.cropRight,
                         cell.scaleX, cell.scaleY, cell.translateX, cell.translateY,
@@ -148,7 +150,7 @@ public final class ProfilePreviewCheck {
             frame.addView(texture, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             // 不拆分的那一路：旋转镜像裁剪走 surface 矩阵，和主界面同一个算法
-            applyWholeFrameTransform(texture, cells);
+            applyWholeFrameTransform(texture, size, cells);
             holder = frame;
         }
         int height = (int) (280 * activity.getResources().getDisplayMetrics().density);

@@ -2557,7 +2557,12 @@ public class MainActivity extends AppCompatActivity {
             if (fill) {
                 textureView.setAspectRatio(0, 0);
             } else {
-                textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
+                // 适应：视图取<b>转过之后</b>的形状。取转之前的话会留两层黑边 ——
+                // 视图先在格子里缩一次（缩成画面的形状），矩阵再在视图里缩一次
+                // （因为转过之后长宽对调了），长边就怎么都顶不到格子的边。
+                textureView.setAspectRatioWithRotation(
+                        previewSize.getWidth(), previewSize.getHeight(),
+                        com.kooo.evcam.camera.LaneOrientation.normalise(ownLane.rotation));
             }
             textureView.setFillContainer(false);
             AppLog.d(TAG, "设置 " + cameraKey + (fill ? " 铺满整格" : " 宽高比 "

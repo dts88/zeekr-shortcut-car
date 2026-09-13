@@ -54,6 +54,8 @@ public class SingleCamera {
     private int customRotation = 0;  // 自定义旋转角度（仅用于自定义车型）
     /** 最近一次按配置摆位的结果，只给诊断报告看。 */
     private volatile String laneTransformNote = "还没试过";
+    /** 挂在预览视图上的重算监听，挂一次就够。 */
+    private android.view.View.OnLayoutChangeListener laneLayoutWatch;
 
     private CameraManager cameraManager;
     private CameraDevice cameraDevice;
@@ -290,6 +292,16 @@ public class SingleCamera {
         if (lane == null) {
             laneTransformNote = "配置里没有这一路";
             return;
+        }
+        if (laneLayoutWatch == null) {
+            // 视图尺寸一变就重算：设宽高比会触发重新布局，而它和这里谁先谁后
+            // 没有保证 —— 只算一次的话，算的可能是上一次的尺寸
+            laneLayoutWatch = (v, l, t, r, b, ol, ot, or2, ob) -> {
+                if (r - l != or2 - ol || b - t != ob - ot) {
+                    applyLaneTransform();
+                }
+            };
+            view.addOnLayoutChangeListener(laneLayoutWatch);
         }
         view.post(() -> {
             int width = view.getWidth();
