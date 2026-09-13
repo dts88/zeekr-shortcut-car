@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.46.0-alpha] - 2026-09-13
+
 - The floating button has the record button's ring: a track around the edge with the
   segment's progress running along it while recording. Idle it is a plain grey outline --
   the look of the open-the-app button it replaced, which is also what it does by default.
