@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.47.1-alpha] - 2026-09-13
+
+- Fixed: adding only the rear cabin showed the front cabin's picture in it. Each cabin role
+  is pinned to its own camera; the previous release filled the gap with the first spare
+  camera instead, which is worse than leaving it empty because the pane and the label were
+  both right. A cabin pane with no camera configured is hidden now, and the other one takes
+  the column.
+- Fixed: "fill" did not fill. The view itself is shrunk to the picture's shape before the
+  matrix ever runs, so a quarter-turned picture could only ever fill that already-shrunk
+  view. The pane's shape now follows the lane's choice, and the matrix is told the buffer's
+  real shape so it can account for the stretch.
+- The floating button keeps a dot in the middle when idle, in grey. An empty ring alone did
+  not read as a button. Red still appears only while recording.
+
 ## [0.47.0-alpha] - 2026-09-13
 
 - Fixed: rotation and mirroring on the cabin cameras (fourth attempt). Every attempt keyed
