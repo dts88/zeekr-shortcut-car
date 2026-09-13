@@ -160,14 +160,19 @@
                             </LinearLayout>
                         </LinearLayout>
 
-                        <!-- 菜单键：浮在画面左上角，位置和原来标题栏里那个一致 -->
+                        <!--
+                          菜单键。其他界面的 ① 里它是「左 10dp、在 64dp 里垂直居中」
+                          （即上 8dp），这里照抄同一组数，只是量的起点从卡片边变成
+                          画面边 —— 卡片的左上角在左舵时是动作栏，不能放它。
+                        -->
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btn_menu"
                             style="@style/Widget.Cam.IconButton"
                             android:layout_width="@dimen/icon_button_size"
                             android:layout_height="@dimen/icon_button_size"
                             android:layout_gravity="top|start"
-                            android:layout_margin="@dimen/gutter"
+                            android:layout_marginStart="10dp"
+                            android:layout_marginTop="8dp"
                             android:contentDescription="@string/cd_menu"
                             app:icon="@drawable/ic_menu" />
 
@@ -177,7 +182,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="top|end"
-                            android:layout_margin="@dimen/gutter"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginEnd="16dp"
                             android:background="@drawable/bg_chip_recording"
                             android:drawableStart="@drawable/chip_dot_recording"
                             android:drawablePadding="8dp"

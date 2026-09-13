@@ -3705,7 +3705,9 @@ public class AppConfig {
     private static final String KEY_RECORDING_FLOATING_X = "recording_floating_x";
     private static final String KEY_RECORDING_FLOATING_Y = "recording_floating_y";
     private static final boolean DEFAULT_RECORDING_FLOATING_ENABLED = true;  // 默认开启
-    private static final int DEFAULT_BUTTON_SIZE_DP = 65;  // 实车调好后测得
+    // 0.45.2 起整档上移 50%：65dp 在车上偏小，最小档也够不着。原值是实车测的，
+    // 新值就是它乘 1.5，不另起炉灶
+    private static final int DEFAULT_BUTTON_SIZE_DP = 98;
     private static final int DEFAULT_TIME_TEXT_SIZE_SP = 14;
 
     /**

@@ -20,7 +20,7 @@
     <string name="about_title">关于与致谢</string>
 
     <!-- 设置界面 -->
-    <string name="set_back_to_recording">← 返回录制界面</string>
+    <string name="set_back_to_recording">返回录制界面</string>
     <string name="set_check_update_title">检查更新</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>

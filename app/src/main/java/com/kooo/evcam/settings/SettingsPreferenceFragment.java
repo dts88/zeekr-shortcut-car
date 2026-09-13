@@ -582,7 +582,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     }
                 });
 
-        bindSlider("pref_button_size", 32, 100,
+        // 整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半
+        bindSlider("pref_button_size", 48, 150,
                 appConfig.getRecordingFloatingButtonSizeDp(), " dp",
                 value -> {
                     appConfig.setRecordingFloatingButtonSizeDp(value);

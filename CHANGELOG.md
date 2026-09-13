@@ -5,7 +5,18 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- Fixed: cropping a surround lane turned that pane into static. The mask added in 0.44.1
+  clipped the lane inside the transformed coordinate space, which is a different path
+  through the renderer; it only showed up once a crop made that clip stop coinciding with
+  the cell. The clip now happens before the transform, on the rectangle the lane occupies
+  on screen -- same masking, one coordinate space, plain axis-aligned rectangles.
+- The floating button's size range moved up by half: 48-150dp instead of 32-100, and the
+  default with it. It was too small on the vehicle even at the top of the old range.
+- The main screen's menu key uses the same numbers as the one in every other title bar --
+  48dp, 10dp in, 8dp down. It is measured from the picture's edge rather than the card's,
+  because the card's top-left corner is where the action rail sits on left-hand drive.
+- "Back to recording" in Settings no longer carries its own arrow; there is already one in
+  the title bar above it.
 
 ## [0.45.1-alpha] - 2026-09-13
 

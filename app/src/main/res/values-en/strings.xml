@@ -3,7 +3,7 @@
     <string name="app_name">Zeekr Shortcut</string>
 
     <!-- Settings screen -->
-    <string name="set_back_to_recording">← Back to recording</string>
+    <string name="set_back_to_recording">Back to recording</string>
     <string name="set_check_update_title">Check for updates</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
