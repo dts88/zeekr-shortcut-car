@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.45.0-alpha] - 2026-09-13
+
 - One floating button instead of two. It shows whether recording is running -- red while
   it records, a hollow ring when idle -- and what a tap and a long press do is yours to
   set: open the app, start/stop recording, take a photo, or toggle the mirror. Both
