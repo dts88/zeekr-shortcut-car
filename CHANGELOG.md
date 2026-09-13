@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.47.2-alpha] - 2026-09-13
+
+- Fixed: "fit" left two sets of bars, so the long edge never reached the pane. The view was
+  shrunk to the picture's shape before rotation, and the matrix then fitted the rotated
+  picture inside that. The view now takes the shape the picture will have after rotating,
+  which leaves one set of bars and puts the long edge against the pane.
+- The transform is recomputed when the preview view is re-laid out, which it is right after
+  its aspect ratio changes.
+
 ## [0.47.1-alpha] - 2026-09-13
 
 - Fixed: adding only the rear cabin showed the front cabin's picture in it. Each cabin role
