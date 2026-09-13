@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.46.2-alpha] - 2026-09-13
+
 - Fixed, fourth attempt: rotation and mirroring on the cabin cameras. Every attempt so far
   keyed the decision off the car model, and that setting defaults to the single-stream
   Zeekr and only changes if someone picks the three-stream option by hand -- so the main
