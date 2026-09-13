@@ -112,7 +112,7 @@
     <!-- 设置里的枚举选项 -->
     <string name="opt_mode_auto">自动（推荐）</string>
     <string name="opt_model_zeekr">极氪7X（环视合成流）</string>
-    <string name="opt_model_zeekr_multi">极氪7X（环视+座舱3路）</string>
+    <string name="opt_model_zeekr_multi">极氪7X（环视 + 前后座舱）</string>
     <string name="opt_model_custom">自定义（排查用）</string>
 
     <!-- 设置界面里的提示与对话框 -->

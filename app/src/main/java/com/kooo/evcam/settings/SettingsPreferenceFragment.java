@@ -174,11 +174,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /**
      * 视频流配置。
      *
-     * <p>「环视+座舱3路」和「自定义」还没做完，平时不列出来 ——
-     * 半成品混在正常选项里，选中之后出问题会让人以为是应用坏了。
-     * 开发者选项打开时才出现。</p>
+     * <p>「环视 + 两路座舱」0.48 起对所有人开放：座舱那两路的旋转、镜像、
+     * 画面填充都做完并在车上验证过了，它不再是半成品。</p>
      *
-     * <p>但<b>当前值一定保留</b>：万一已经停在某个隐藏选项上，把它从列表里抹掉
+     * <p>「自定义」仍然只在开发者选项里 —— 那一档要手动指定每一路接哪个相机，
+     * 用途是排查，不是日常使用。半成品混在正常选项里，选中之后出问题会让人
+     * 以为是应用坏了。</p>
+     *
+     * <p><b>当前值一定保留</b>：万一已经停在某个隐藏选项上，把它从列表里抹掉
      * 会让下拉框显示空白，那才是真的没法收拾。</p>
      */
     private void bindCarModel() {
@@ -193,8 +196,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         List<String> values = new ArrayList<>();
         List<String> names = new ArrayList<>();
         for (int i = 0; i < allValues.length; i++) {
-            boolean unfinished = !AppConfig.CAR_MODEL_ZEEKR_7X.equals(allValues[i]);
-            if (!unfinished || DeveloperMode.isUnlocked() || allValues[i].equals(current)) {
+            boolean devOnly = AppConfig.CAR_MODEL_CUSTOM.equals(allValues[i]);
+            if (!devOnly || DeveloperMode.isUnlocked() || allValues[i].equals(current)) {
                 values.add(allValues[i]);
                 names.add(allNames[i]);
             }

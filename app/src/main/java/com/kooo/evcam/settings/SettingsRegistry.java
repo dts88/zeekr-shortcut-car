@@ -45,7 +45,7 @@ public final class SettingsRegistry {
     public static final SettingSpec CAR_MODEL = SettingSpec.of(
             "car_model", "车型", "zeekr_7x",
             entry("zeekr_7x", "极氪7X（环视合成流）", R.string.opt_model_zeekr),
-            entry("zeekr_7x_multi", "极氪7X（环视+座舱3路）", R.string.opt_model_zeekr_multi),
+            entry("zeekr_7x_multi", "极氪7X（环视 + 前后座舱）", R.string.opt_model_zeekr_multi),
             entry("custom", "自定义（排查用）", R.string.opt_model_custom));
 
     /**

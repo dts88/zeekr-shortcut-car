@@ -95,7 +95,7 @@
     <!-- Enumerated setting options -->
     <string name="opt_mode_auto">Automatic (recommended)</string>
     <string name="opt_model_zeekr">Zeekr 7X (surround composite)</string>
-    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + 2 cabin)</string>
+    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + front and rear cabin)</string>
     <string name="opt_model_custom">Custom (troubleshooting)</string>
 
     <!-- Settings prompts and dialogs -->
