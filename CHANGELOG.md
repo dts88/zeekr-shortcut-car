@@ -7,6 +7,24 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.50.0-alpha] - 2026-09-13
+
+- Adding a camera is gone. This car has three, so "add" was never a real event -- on and
+  off is. All three cards are always there, dimmed when off. The surround-only profile
+  starts with just the surround stream on; surround-plus-two starts with all three.
+- Fixed: the two cabin cameras always read 0 kbps whatever the bit rate was set to, and the
+  hours-left estimate did not change when they were switched on or off. Their "auto"
+  resolution does have an answer -- photos take the largest declared size, the preview
+  takes the declared size closest to 1280x800, and recording follows the preview -- so it
+  is worked out rather than left blank.
+- No Save button: a change takes effect when you make it. Reset, next to the quality
+  heading, is the way back. The checks that used to appear when saving now sit under the
+  storage estimate.
+- The quality section is named "Recording quality", and photo quality became a row of
+  choices -- it was printed but could not be changed.
+- Fixed: the placement page opened blank. It is pushed over the editor, so it is not the
+  editor's child and could not find the profile being edited.
+
 ## [0.49.0-alpha] - 2026-09-13
 
 - The stream profile editor asks what you want before it asks for numbers. Pick one of
