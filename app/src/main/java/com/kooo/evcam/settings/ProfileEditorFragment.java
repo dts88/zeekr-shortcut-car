@@ -6,12 +6,10 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Bundle;
-import android.text.InputType;
 import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -124,12 +122,27 @@ public class ProfileEditorFragment extends Fragment {
         refresh();
     }
 
-    /** 摆位是另一件事，走另一个界面：这里管「录成什么样」，那里管「摆在哪」。 */
+    /**
+     * 摆位是另一件事，走另一个界面：这里管「录成什么样」，那里管「摆在哪」。
+     *
+     * <p>那一页会把这一页换下去，但这个实例还在返回栈里活着，
+     * 手里那份没存盘的配置也还在 —— 摆位改的就是它（按类名 tag 找回来）。</p>
+     */
     private void openLanes() {
+        ProfileEditorPane lanes = ProfileEditorPane.lanes();
+        String title = getString(R.string.editor_open_lanes);
         if (getParentFragment() instanceof SettingsShellFragment) {
-            ((SettingsShellFragment) getParentFragment())
-                    .openDetail(ProfileEditorPane.lanes(), getString(R.string.editor_open_lanes));
+            ((SettingsShellFragment) getParentFragment()).openDetail(lanes, title);
+            return;
         }
+        if (getActivity() == null) {
+            return;
+        }
+        getActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, lanes, lanes.getClass().getName())
+                .addToBackStack(title)
+                .commit();
     }
 
     @Override
@@ -150,11 +163,20 @@ public class ProfileEditorFragment extends Fragment {
         renderCameras();
         renderDetail();
         renderBudget();
-        for (Fragment child : getChildFragmentManager().getFragments()) {
-            if (child instanceof ProfileEditorPane) {
-                ((ProfileEditorPane) child).render();
-            }
-        }
+        // 摆位那一页不在这里重搭：它把这一页换下去了，两者不会同时在屏上。
+        // 它改完自己重搭，退回来时这一页的 onViewCreated 会再叫一次 refresh。
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // 进摆位时这一页被换下去，view 摧了人还在。不放手的话，
+        // 持的就是一棵已经死了的控件树，而且 refresh() 会往里面白写
+        presetRow = null;
+        cameraRow = null;
+        detailBox = null;
+        budgetLine = null;
+        camerasTitle = null;
     }
 
     // ------------------------------------------------------------------ 三档
@@ -688,61 +710,6 @@ public class ProfileEditorFragment extends Fragment {
                     refresh();
                 })
                 .setNegativeButton(R.string.action_cancel, null));
-    }
-
-    interface Numbers {
-        void set(float[] values);
-    }
-
-    /**
-     * 几个小数一起改。
-     *
-     * <p>位置、裁切、缩放这些都是<b>一组</b>数，一个一个弹窗改会让人对不上 ——
-     * 改完宽还要再点一次改高，中间那一下界面已经动过了。</p>
-     */
-    void editNumbers(String title, String[] labels, float[] current, Numbers onOk) {
-        Context context = requireContext();
-        LinearLayout box = new LinearLayout(context);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (16 * context.getResources().getDisplayMetrics().density);
-        box.setPadding(pad, pad, pad, 0);
-
-        EditText[] inputs = new EditText[labels.length];
-        for (int i = 0; i < labels.length; i++) {
-            TextView label = new TextView(context);
-            label.setText(labels[i]);
-            box.addView(label);
-
-            EditText input = new EditText(context);
-            input.setInputType(InputType.TYPE_CLASS_NUMBER
-                    | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
-            input.setText(String.format(Locale.US, "%.4f", current[i]));
-            input.setLayoutParams(new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            box.addView(input);
-            inputs[i] = input;
-        }
-
-        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(title)
-                .setView(box)
-                .setPositiveButton(R.string.action_save, (d, w) -> {
-                    float[] values = new float[inputs.length];
-                    for (int i = 0; i < inputs.length; i++) {
-                        values[i] = parseFloat(inputs[i].getText().toString(), current[i]);
-                    }
-                    onOk.set(values);
-                    refresh();
-                })
-                .setNegativeButton(R.string.action_cancel, null));
-    }
-
-    private static float parseFloat(String text, float fallback) {
-        try {
-            return Float.parseFloat(text.trim());
-        } catch (NumberFormatException e) {
-            return fallback;   // 输错了就保持原值，不要把它变成 0
-        }
     }
 
     // ------------------------------------------------------------------ 加 / 删 / 存

@@ -2,10 +2,16 @@ package com.kooo.evcam.settings;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceFragmentCompat;
@@ -13,21 +19,35 @@ import androidx.preference.PreferenceScreen;
 import androidx.preference.PreferenceViewHolder;
 import androidx.preference.SwitchPreferenceCompat;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import com.kooo.evcam.R;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.LaneLayout;
+import com.kooo.evcam.ui.CamDialogs;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 /**
- * 摆位：这一路的格子图，和正在改的那一格（位置、旋转、镜像、画面填充）。
+ * 摆位：这一路的舞台，和正在改的那一格（位置、旋转、镜像、画面填充）。
  *
  * <p>从配置编辑里那个「摆位」进来。流参数不在这里 —— 那一页问的是「录成什么样」，
  * 这一页问的是「摆在哪」，两件事分开问，各自都短。</p>
  *
  * <p>数据和所有「怎么取值、怎么选、怎么存」都在 {@link ProfileEditorFragment} 里，
  * 这里只按当前选中的相机和格子搭行。</p>
+ *
+ * <h3>配置编辑在哪</h3>
+ *
+ * <p>这一页是被「替换」进壳的右栏的，所以它的 parent 是<b>壳</b>，
+ * 不是配置编辑 —— 配置编辑被换到返回栈里去了，还活着，但不再是任何人的父子。
+ * 所以这里按 tag 去 FragmentManager 里把它找回来（{@link #editor()}）。
+ * 上一版先问 parent 是不是它，永远不是，于是这一页是空白的。</p>
+ *
+ * <p>为什么一定要找那个实例：要改的是它手里<b>还没存盘的那份配置</b>。
+ * 自己新开一份就是另一份，改完回去一保存，摆位全丢。</p>
  */
 public class ProfileEditorPane extends PreferenceFragmentCompat {
 
@@ -61,19 +81,35 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
     /** 按当前的选中重搭这一栏。 */
     void render() {
         PreferenceScreen screen = getPreferenceScreen();
-        if (screen == null || getContext() == null
-                || !(getParentFragment() instanceof ProfileEditorFragment)) {
+        if (screen == null || getContext() == null) {
             return;
         }
-        ProfileEditorFragment editor = (ProfileEditorFragment) getParentFragment();
+        ProfileEditorFragment editor = editor();
         screen.removeAll();
-        renderLanes(screen, editor);
+        if (editor == null) {
+            info(screen, requireContext(), getString(R.string.editor_lanes_lost), null);
+        } else {
+            renderLanes(screen, editor);
+        }
         // 刚加进来的行还没交给列表（同步是下一帧），这时套样式正好
         PreferenceRows.apply(screen);
     }
 
-    // ------------------------------------------------------------------ 左栏
-    // ------------------------------------------------------------------ 右栏
+    /**
+     * 拿着那份配置的配置编辑。
+     *
+     * <p>两种摆法都认：当子 fragment 用时它就是 parent；
+     * 当二级界面用时它在返回栈里，按 tag 找。</p>
+     */
+    @Nullable
+    private ProfileEditorFragment editor() {
+        if (getParentFragment() instanceof ProfileEditorFragment) {
+            return (ProfileEditorFragment) getParentFragment();
+        }
+        Fragment found = getParentFragmentManager()
+                .findFragmentByTag(ProfileEditorFragment.class.getName());
+        return found instanceof ProfileEditorFragment ? (ProfileEditorFragment) found : null;
+    }
 
     private void renderLanes(PreferenceScreen screen, ProfileEditorFragment editor) {
         Context context = requireContext();
@@ -86,11 +122,29 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         boolean splits = editor.splitsFor(camera.role);
         LaneLayout lane = camera.lanes.get(index);
 
+        // 进来之前选的是哪一路，进来之后还得看得见，也得能换一路 ——
+        // 否则摆完一路要退出去点另一张卡再进来
+        if (editor.profile.cameras.size() > 1) {
+            for (CameraProfile option : editor.profile.cameras) {
+                ChoiceRow pick = new ChoiceRow(context, option.role.equals(camera.role));
+                pick.setTitle(editor.roleName(option.role));
+                pick.setSummary(editor.splitsFor(option.role)
+                        ? getString(R.string.editor_splits)
+                        : getString(R.string.editor_whole_frame));
+                pick.setOnPreferenceClickListener(p -> {
+                    editor.selectCamera(option.role);
+                    render();
+                    return true;
+                });
+                screen.addPreference(pick);
+            }
+        }
+
         if (splits) {
             // 拖只开给环视的四格：座舱那两路的位置和大小目前还不由配置决定，
             // 拖了也不会变 —— 那就别给那个手势
             screen.addPreference(new LanePickerPreference(context, camera.lanes, index,
-                    editor::selectLane, moved -> editor.refresh()));
+                    this::pickLane, moved -> changed()));
         }
 
         String laneName = splits && lane.laneIndex >= 0
@@ -112,7 +166,7 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
                     getString(R.string.editor_position_value, ProfileEditorFragment.num(lane.x),
                             ProfileEditorFragment.num(lane.y), ProfileEditorFragment.num(lane.width),
                             ProfileEditorFragment.num(lane.height)), false,
-                    () -> editor.editNumbers(getString(R.string.editor_position_dialog),
+                    () -> editNumbers(getString(R.string.editor_position_dialog),
                             new String[]{getString(R.string.editor_x), getString(R.string.editor_y),
                                     getString(R.string.editor_w), getString(R.string.editor_h)},
                             new float[]{lane.x, lane.y, lane.width, lane.height},
@@ -125,7 +179,7 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         }
         row(group, context, R.string.editor_rotation, lane.rotation + "°", true, () -> {
             lane.rotation = (lane.rotation + 90) % 360;
-            editor.refresh();
+            changed();
         });
 
         SwitchPreferenceCompat mirror = new SwitchPreferenceCompat(context);
@@ -135,7 +189,7 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         mirror.setChecked(lane.mirrored);
         mirror.setOnPreferenceChangeListener((p, value) -> {
             lane.mirrored = Boolean.TRUE.equals(value);
-            editor.refresh();
+            changed();
             return false;
         });
         group.addPreference(mirror);
@@ -143,7 +197,7 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         row(group, context, R.string.editor_fit, fitName(context, lane.fit), true, () -> {
             // 三档轮着换：点一下换一个，不弹框。和旋转那一行一个手感
             lane.fit = nextFit(lane.fit);
-            editor.refresh();
+            changed();
         });
 
         // 裁剪停用中：一个改了不生效的选项比没有更糟，所以这一行明说
@@ -155,7 +209,7 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
                         ProfileEditorFragment.num(lane.cropLeft),
                         ProfileEditorFragment.num(lane.cropRight))
                         : getString(R.string.editor_crop_off), cropOn,
-                () -> editor.editNumbers(getString(R.string.editor_crop_dialog),
+                () -> editNumbers(getString(R.string.editor_crop_dialog),
                         new String[]{getString(R.string.editor_top), getString(R.string.editor_bottom),
                                 getString(R.string.editor_left), getString(R.string.editor_right)},
                         new float[]{lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight},
@@ -173,7 +227,7 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
                         ProfileEditorFragment.num(lane.scaleY),
                         ProfileEditorFragment.num(lane.translateX),
                         ProfileEditorFragment.num(lane.translateY)), false,
-                () -> editor.editNumbers(getString(R.string.editor_scale_dialog),
+                () -> editNumbers(getString(R.string.editor_scale_dialog),
                         new String[]{getString(R.string.editor_scale_x),
                                 getString(R.string.editor_scale_y),
                                 getString(R.string.editor_pan_x), getString(R.string.editor_pan_y)},
@@ -184,6 +238,85 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
                             lane.translateX = values[2];
                             lane.translateY = values[3];
                         }));
+    }
+
+    // ------------------------------------------------------------------ 改几个数
+
+    private interface Numbers {
+        void set(float[] values);
+    }
+
+    /**
+     * 几个小数一起改。
+     *
+     * <p>位置、裁切、缩放这些都是<b>一组</b>数，一个一个弹窗改会让人对不上 ——
+     * 改完宽还要再点一次改高，中间那一下界面已经动过了。</p>
+     *
+     * <p>用的是<b>这一页的</b> context。原来这段在配置编辑里，
+     * 而那一页现在在返回栈上、没有 context，一点就炋。</p>
+     */
+    private void editNumbers(String title, String[] labels, float[] current, Numbers onOk) {
+        Context context = requireContext();
+        LinearLayout box = new LinearLayout(context);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (16 * context.getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, 0);
+
+        EditText[] inputs = new EditText[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            TextView label = new TextView(context);
+            label.setText(labels[i]);
+            box.addView(label);
+
+            EditText input = new EditText(context);
+            input.setInputType(InputType.TYPE_CLASS_NUMBER
+                    | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
+            input.setText(String.format(Locale.US, "%.4f", current[i]));
+            input.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            box.addView(input);
+            inputs[i] = input;
+        }
+
+        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(title)
+                .setView(box)
+                .setPositiveButton(R.string.action_save, (d, w) -> {
+                    float[] values = new float[inputs.length];
+                    for (int i = 0; i < inputs.length; i++) {
+                        values[i] = parseFloat(inputs[i].getText().toString(), current[i]);
+                    }
+                    onOk.set(values);
+                    changed();
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    private static float parseFloat(String text, float fallback) {
+        try {
+            return Float.parseFloat(text.trim());
+        } catch (NumberFormatException e) {
+            return fallback;   // 输错了就保持原值，不要把它变成 0
+        }
+    }
+
+    /** 点了另一格：告诉配置编辑，然后自己重搭。 */
+    private void pickLane(int index) {
+        ProfileEditorFragment editor = editor();
+        if (editor != null) {
+            editor.selectLane(index);
+        }
+        render();
+    }
+
+    /**
+     * 改完了：这一栏立刻重搭。
+     *
+     * <p>配置编辑那一页不用管 —— 它的 view 已经被摧了，退回去的时候
+     * {@code onViewCreated} 会再搭一次。改的都是同一份 Profile，不会对不上。</p>
+     */
+    private void changed() {
+        render();
     }
 
     // ------------------------------------------------------------------ 小工具

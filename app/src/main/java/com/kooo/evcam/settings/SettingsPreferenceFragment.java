@@ -1258,7 +1258,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         getActivity().getSupportFragmentManager()
                 .beginTransaction()
-                .replace(R.id.fragment_container, fragment)
+                .replace(R.id.fragment_container, fragment, fragment.getClass().getName())
                 .addToBackStack(null)
                 .commit();
     }

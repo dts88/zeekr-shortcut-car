@@ -192,9 +192,12 @@ public class SettingsShellFragment extends Fragment {
             fragment.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
             fragment.setReturnTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
         }
+        // 打上类名当 tag：被换下去的那一层还在返回栈里活着，
+        // 有 tag 才找得回来。摆位那一页要改的正是被它换下去的配置编辑里
+        // 那份没存的配置 —— 找不回来就只能重读磁盘，改了一半的东西会没
         getChildFragmentManager().beginTransaction()
                 .setReorderingAllowed(true)
-                .replace(R.id.settings_detail, fragment)
+                .replace(R.id.settings_detail, fragment, fragment.getClass().getName())
                 .addToBackStack(title == null ? null : title.toString())
                 .commit();
         openDetail();
