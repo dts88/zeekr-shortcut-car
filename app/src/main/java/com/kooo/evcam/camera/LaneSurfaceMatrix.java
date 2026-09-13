@@ -37,7 +37,7 @@ public final class LaneSurfaceMatrix {
                                 int rotation, boolean mirrored,
                                 float cropTop, float cropBottom, float cropLeft, float cropRight,
                                 float scaleX, float scaleY,
-                                float translateX, float translateY) {
+                                float translateX, float translateY, String fit) {
         out.reset();
         if (viewWidth <= 0 || viewHeight <= 0) {
             return false;
@@ -55,7 +55,9 @@ public final class LaneSurfaceMatrix {
                 || o.cropLeft != 0f || o.cropRight != 0f;
         boolean zoomed = o.scaleX != 1f || o.scaleY != 1f;
         boolean panned = o.translateX != 0f || o.translateY != 0f;
-        if (turn == 0 && !mirrored && !cropped && !zoomed && !panned) {
+        boolean fills = com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)
+                || com.kooo.evcam.profile.LaneLayout.STRETCH.equals(fit);
+        if (turn == 0 && !mirrored && !cropped && !zoomed && !panned && !fills) {
             return false;
         }
 
@@ -89,16 +91,46 @@ public final class LaneSurfaceMatrix {
             return false;
         }
 
-        // 放到视图的哪一块：保持画面比例，转过之后仍然整幅可见（留黑边，不裁）
+        // 放到视图的哪一块，三档：
+        //   适应 —— 整幅可见，比例不变，对不上的两边留黑
+        //   填充 —— 铺满视图，比例不变，多出来的那一边居中裁掉
+        //   拉伸 —— 铺满视图，画面按视图的形状变形
         float pictureAspect = window.width() / window.height();
         float shownAspect = quarterTurn ? 1f / pictureAspect : pictureAspect;
         float viewAspect = (float) viewWidth / viewHeight;
         float destWidth = viewWidth;
         float destHeight = viewHeight;
-        if (shownAspect < viewAspect) {
-            destWidth = viewHeight * shownAspect;
-        } else if (shownAspect > viewAspect) {
-            destHeight = viewWidth / shownAspect;
+        if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
+            // 反过来收窄取景窗：多出来的那一边不要
+            if (shownAspect > viewAspect) {
+                float keep = viewAspect / shownAspect;
+                float centre = quarterTurn ? window.centerY() : window.centerX();
+                float half = (quarterTurn ? window.height() : window.width()) / 2f * keep;
+                if (quarterTurn) {
+                    window.top = centre - half;
+                    window.bottom = centre + half;
+                } else {
+                    window.left = centre - half;
+                    window.right = centre + half;
+                }
+            } else if (shownAspect < viewAspect) {
+                float keep = shownAspect / viewAspect;
+                float centre = quarterTurn ? window.centerX() : window.centerY();
+                float half = (quarterTurn ? window.width() : window.height()) / 2f * keep;
+                if (quarterTurn) {
+                    window.left = centre - half;
+                    window.right = centre + half;
+                } else {
+                    window.top = centre - half;
+                    window.bottom = centre + half;
+                }
+            }
+        } else if (!com.kooo.evcam.profile.LaneLayout.STRETCH.equals(fit)) {
+            if (shownAspect < viewAspect) {
+                destWidth = viewHeight * shownAspect;
+            } else if (shownAspect > viewAspect) {
+                destHeight = viewWidth / shownAspect;
+            }
         }
         float cx = viewWidth / 2f;
         float cy = viewHeight / 2f;

@@ -572,9 +572,21 @@ public class ProfileEditorFragment extends Fragment {
             cell.scaleY = lane.scaleY;
             cell.translateX = lane.translateX;
             cell.translateY = lane.translateY;
+            cell.fit = scaleModeOf(lane.fit);
             cells[i] = cell;
         }
         return cells;
+    }
+
+    /** 配置里存的是三个词，容器认的是枚举。 */
+    private static com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode scaleModeOf(String fit) {
+        if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
+            return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.FILL;
+        }
+        if (com.kooo.evcam.profile.LaneLayout.STRETCH.equals(fit)) {
+            return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.STRETCH;
+        }
+        return com.kooo.evcam.zeekr.FourLaneContainer.ScaleMode.FIT;
     }
 
     private CameraProfile firstEnabled() {

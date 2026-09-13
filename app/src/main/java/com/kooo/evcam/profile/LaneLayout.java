@@ -59,6 +59,31 @@ public final class LaneLayout {
     public float translateX;
     public float translateY;
 
+    /**
+     * 画面和这一格形状对不上时怎么办。
+     *
+     * <h3>三档分别是什么</h3>
+     *
+     * <ul>
+     *   <li>{@link #FIT 适应}：整幅都看得见，比例不变，对不上的那两边留黑。默认。</li>
+     *   <li>{@link #FILL 填充}：铺满这一格，比例不变，多出来的那一边居中裁掉。</li>
+     *   <li>{@link #STRETCH 拉伸}：铺满这一格，画面按格子的形状拉变形。</li>
+     * </ul>
+     *
+     * <p>转 90° 之后画面的长宽对调，和格子对不上是常态 —— 座舱那两路转过来
+     * 会缩成一小条，就是「适应」的结果。想让它顶满，选「填充」。</p>
+     */
+    public String fit = FIT;
+
+    public static final String FIT = "fit";
+    public static final String FILL = "fill";
+    public static final String STRETCH = "stretch";
+
+    /** 认不出来的值一律当「适应」—— 配置是可以被手改的。 */
+    public static String normaliseFit(String value) {
+        return FILL.equals(value) || STRETCH.equals(value) ? value : FIT;
+    }
+
     public static LaneLayout cell(int laneIndex, float x, float y, float width, float height) {
         LaneLayout layout = new LaneLayout();
         layout.laneIndex = laneIndex;
@@ -86,6 +111,7 @@ public final class LaneLayout {
         out.put("scaleY", fraction(scaleY));
         out.put("translateX", fraction(translateX));
         out.put("translateY", fraction(translateY));
+        out.put("fit", fit);
         return out;
     }
 
@@ -109,6 +135,7 @@ public final class LaneLayout {
         layout.scaleY = decimal(values, "scaleY", 1f);
         layout.translateX = decimal(values, "translateX", 0f);
         layout.translateY = decimal(values, "translateY", 0f);
+        layout.fit = normaliseFit(values.get("fit"));
         return layout;
     }
 

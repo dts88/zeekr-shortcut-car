@@ -59,12 +59,19 @@ public class FourLaneContainer extends ViewGroup {
 
     private static final String TAG = "FourLaneContainer";
 
-    /** 每个画面在格子里的缩放方式。 */
+    /**
+     * 每个画面在格子里的缩放方式。
+     *
+     * <p>这是容器级的默认值；每一格可以在 {@link Cell#fit} 里单独说，
+     * 说了就以那一格的为准。</p>
+     */
     public enum ScaleMode {
         /** 保持画面原始比例，格子内留黑边。合成流画面是正方形，默认用这个。 */
         FIT,
-        /** 填满格子，超出部分居中裁切。 */
-        FILL
+        /** 填满格子，比例不变，超出的那一边居中裁切。 */
+        FILL,
+        /** 填满格子，画面按格子的形状拉变形。 */
+        STRETCH
     }
 
     /** 显示模式。 */
@@ -89,6 +96,8 @@ public class FourLaneContainer extends ViewGroup {
     public static final class Cell {
         /** 显示合成流里的哪一格。 */
         public int laneIndex;
+        /** 这一格自己的缩放方式；null 表示跟容器走。 */
+        public ScaleMode fit;
         /** 在容器里的位置与大小，容器宽高的比例。 */
         public float x;
         public float y;
@@ -603,7 +612,13 @@ public class FourLaneContainer extends ViewGroup {
         // 转了 90°/270° 的话，占地的长宽也跟着对调。
         float laneAspect = quarterTurn && laneAspectPx > 0f ? 1f / laneAspectPx : laneAspectPx;
         float cellAspect = cellWidth / cellHeight;
-        if (scaleMode == ScaleMode.FIT && laneAspect > 0f && cellAspect > 0f) {
+        // 这一格自己说了算，没说才跟容器走
+        ScaleMode mode = cell != null && cell.fit != null ? cell.fit : scaleMode;
+        if (mode == ScaleMode.STRETCH) {
+            // 拉伸：目标框就是整格，源矩形不动 —— 画面按格子的形状变形
+            laneAspect = 0f;
+        }
+        if (mode == ScaleMode.FIT && laneAspect > 0f && cellAspect > 0f) {
             if (laneAspect < cellAspect) {
                 destWidth = cellHeight * laneAspect;
                 destLeft = cellLeft + (cellWidth - destWidth) / 2f;
@@ -611,7 +626,7 @@ public class FourLaneContainer extends ViewGroup {
                 destHeight = cellWidth / laneAspect;
                 destTop = cellTop + (cellHeight - destHeight) / 2f;
             }
-        } else if (scaleMode == ScaleMode.FILL && laneAspect > 0f && cellAspect > 0f) {
+        } else if (mode == ScaleMode.FILL && laneAspect > 0f && cellAspect > 0f) {
             // 填满：反过来收窄源矩形，居中裁切
             if (laneAspect < cellAspect) {
                 float keep = laneAspect / cellAspect;

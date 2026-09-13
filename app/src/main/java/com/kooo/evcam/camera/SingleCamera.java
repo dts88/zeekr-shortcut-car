@@ -304,7 +304,7 @@ public class SingleCamera {
             boolean shaped = LaneSurfaceMatrix.build(matrix, width, height,
                     lane.rotation, lane.mirrored,
                     lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
-                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY);
+                    lane.scaleX, lane.scaleY, lane.translateX, lane.translateY, lane.fit);
             com.kooo.evcam.PreviewCorrection.postApply(
                     matrix, new AppConfig(context), cameraPosition, width, height);
             view.setTransform(matrix);

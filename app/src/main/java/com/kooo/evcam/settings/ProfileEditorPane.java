@@ -224,6 +224,12 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         });
         group.addPreference(mirror);
 
+        row(group, context, R.string.editor_fit, fitName(context, lane.fit), true, () -> {
+            // 三档轮着换：点一下换一个，不弹框。和旋转那一行一个手感
+            lane.fit = nextFit(lane.fit);
+            editor.refresh();
+        });
+
         // 裁剪停用中：一个改了不生效的选项比没有更糟，所以这一行明说
         boolean cropOn = com.kooo.evcam.camera.LaneOrientation.CROP_SUPPORTED;
         Preference cropRow = row(group, context, R.string.editor_crop,
@@ -291,6 +297,29 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
      *
      * @param value summary 是一个短的当前值（「30 fps」「90°」）时为 true：值放行尾
      */
+    /** 「适应 / 填充 / 拉伸」轮着来。 */
+    private static String nextFit(String fit) {
+        if (com.kooo.evcam.profile.LaneLayout.FIT.equals(
+                com.kooo.evcam.profile.LaneLayout.normaliseFit(fit))) {
+            return com.kooo.evcam.profile.LaneLayout.FILL;
+        }
+        if (com.kooo.evcam.profile.LaneLayout.FILL.equals(fit)) {
+            return com.kooo.evcam.profile.LaneLayout.STRETCH;
+        }
+        return com.kooo.evcam.profile.LaneLayout.FIT;
+    }
+
+    private static String fitName(Context context, String fit) {
+        String value = com.kooo.evcam.profile.LaneLayout.normaliseFit(fit);
+        if (com.kooo.evcam.profile.LaneLayout.FILL.equals(value)) {
+            return context.getString(R.string.editor_fit_fill);
+        }
+        if (com.kooo.evcam.profile.LaneLayout.STRETCH.equals(value)) {
+            return context.getString(R.string.editor_fit_stretch);
+        }
+        return context.getString(R.string.editor_fit_fit);
+    }
+
     private static Preference row(PreferenceCategory parent, Context context, int title,
                                   @Nullable String summary, boolean value, Runnable action) {
         Preference preference = new Preference(context);
