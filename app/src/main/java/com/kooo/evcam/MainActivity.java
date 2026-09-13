@@ -1112,7 +1112,6 @@ public class MainActivity extends AppCompatActivity {
                 com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
         // 分段按时长切：恢复时第 N 段的起点就是开始时间往后数 N-1 段
         segmentStartTime = recordingStartTime + (currentSegmentCount - 1) * segmentLengthMs;
-        setSegmentProgressVisible(true);
         updateStatusLine();
 
         if (tvRecordingStats != null) {
@@ -1152,7 +1151,6 @@ public class MainActivity extends AppCompatActivity {
         recordingStartTime = 0;
         currentSegmentCount = 1;
         segmentStartTime = 0;
-        setSegmentProgressVisible(false);
     }
     
     /**
@@ -1207,9 +1205,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 本段进度：录制键外圈和状态条上那一条是同一个数。
+     * 本段进度，画在录制键外圈上。
      *
      * <p>按时长算，不按文件大小 —— 分段本来就是按时长切的。</p>
+     *
+     * <p>状态条上原来还有一条进度和「本段 xx%」，和这个环是同一个数。
+     * 录制时它在实际值和 100% 之间来回跳，而同一件事录制键上已经有了，
+     * 所以删掉（项目拥有者 2026-09 定）。</p>
      */
     private void updateSegmentProgress() {
         if (!isRecording || segmentStartTime <= 0 || segmentLengthMs <= 0) {
@@ -1218,29 +1220,6 @@ public class MainActivity extends AppCompatActivity {
         long elapsed = System.currentTimeMillis() - segmentStartTime;
         if (recordButtonUi != null) {
             recordButtonUi.setSegmentProgress(elapsed, segmentLengthMs);
-        }
-        int percent = (int) Math.max(0, Math.min(100, elapsed * 100 / segmentLengthMs));
-        com.google.android.material.progressindicator.LinearProgressIndicator bar =
-                recordingLayout.findViewById(R.id.segment_progress);
-        if (bar != null) {
-            bar.setProgressCompat(percent, true);
-        }
-        TextView label = findViewById(R.id.tv_segment_percent);
-        if (label != null) {
-            label.setText(getString(R.string.segment_percent, percent));
-        }
-    }
-
-    /** 状态条上的本段进度只在录制时出现；不录时留空，不显示一条不动的空轨道。 */
-    private void setSegmentProgressVisible(boolean visible) {
-        int visibility = visible ? View.VISIBLE : View.INVISIBLE;
-        View bar = recordingLayout.findViewById(R.id.segment_progress);
-        if (bar != null) {
-            bar.setVisibility(visibility);
-        }
-        View label = findViewById(R.id.tv_segment_percent);
-        if (label != null) {
-            label.setVisibility(visibility);
         }
     }
 

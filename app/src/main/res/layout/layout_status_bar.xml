@@ -3,13 +3,12 @@
   ⑤ 状态条（统一骨架的第五个区，见 docs/ui-spec.md）。
 
   始终在，不随界面变 —— 开车的人只要扫一眼这一条：这次按什么录、还剩多少空间、
-  合成流认出来没有、本段录到哪儿了。
+  合成流认出来没有。本段录到哪儿在录制键的外圈上，这里不再重复。
 
   各界面 <include> 进去，id 一个不改；填内容的是 ui/StatusLine，
   它在自己那一棵树里找这些 id，所以同一个界面里出现两份也不会互相填错。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/status_bar"
     android:gravity="center_vertical"
     android:orientation="horizontal"
@@ -44,33 +43,11 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="26dp"
-        android:layout_marginEnd="20dp"
         android:layout_weight="1"
         android:ellipsize="end"
         android:fontFeatureSettings="tnum"
         android:maxLines="1"
         android:textColor="@color/text_tertiary"
         android:textAppearance="@style/TextAppearance.Cam.Caption"
-        android:visibility="invisible" />
-
-    <com.google.android.material.progressindicator.LinearProgressIndicator
-        android:id="@+id/segment_progress"
-        android:layout_width="200dp"
-        android:layout_height="wrap_content"
-        android:max="100"
-        android:visibility="invisible"
-        app:indicatorColor="@color/recording"
-        app:trackColor="@color/recording_track"
-        app:trackCornerRadius="2dp"
-        app:trackThickness="4dp" />
-
-    <TextView
-        android:id="@+id/tv_segment_percent"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:fontFeatureSettings="tnum"
-        android:textColor="@color/text_tertiary"
-        android:textAppearance="@style/TextAppearance.Cam.Micro"
         android:visibility="invisible" />
 </LinearLayout>

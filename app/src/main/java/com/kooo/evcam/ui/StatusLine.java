@@ -54,7 +54,6 @@ public final class StatusLine {
         tint(root, R.id.tv_status_stream, bright);
         tint(root, R.id.tv_status_storage, bright);
         tint(root, R.id.tv_composite_info, dim);
-        tint(root, R.id.tv_segment_percent, dim);
     }
 
     private static void tint(View root, int id, int colour) {
