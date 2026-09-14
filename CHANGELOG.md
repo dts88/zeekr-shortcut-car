@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.54.0-alpha] - 2026-09-14
+
+- Update checks have an "Include beta releases" switch, on by default. On, they offer beta
+  and stable releases, as before; off, stable releases only. Alpha builds are never offered.
+  Check for updates in Settings is its own section now, showing the installed version.
+- Removed the OkHttp library. Nothing used it, but it was still built into the APK.
+
 ## [0.53.0-alpha] - 2026-09-14
 
 - The super mirror has a picture guide: five pages covering the three gesture zones, changing
