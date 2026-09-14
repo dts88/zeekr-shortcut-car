@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.55.0-alpha] - 2026-09-14
+
+- Stall watch. If the super mirror shows no new frame for 1.5 s, or a recording gets no
+  camera frame for 3 s, the app saves a report: camera and session state, frame counts,
+  lost buffers, encoder and file-write timings, segment-switch time, thread stacks and the
+  recent log. Save logs and the diagnostics report include these reports. It only records;
+  nothing is restarted or repaired.
+
 ## [0.54.0-alpha] - 2026-09-14
 
 - Update checks have an "Include beta releases" switch, on by default. On, they offer beta

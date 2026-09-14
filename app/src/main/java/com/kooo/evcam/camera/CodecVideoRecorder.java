@@ -69,6 +69,8 @@ public class CodecVideoRecorder {
     private int framesSinceLastDrain = 0;  // 上次 drain 以来的帧数
 
     private final String cameraId;
+    /** 编码线程收到帧的心跳和各步用时，给卡顿监测用（见 StallWatch）。 */
+    private Heartbeat encoderBeat;
     private final int width;
     private final int height;
 
@@ -227,6 +229,7 @@ public class CodecVideoRecorder {
 
     public CodecVideoRecorder(String cameraId, int width, int height) {
         this.cameraId = cameraId;
+        this.encoderBeat = StallWatch.encoder(cameraId);
         this.width = width;
         this.height = height;
         // 默认相机输出尺寸与编码尺寸一致；四宫格模式下由 setFourLaneSource 覆盖
@@ -629,6 +632,8 @@ public class CodecVideoRecorder {
                         if (isReleased) {
                             return;
                         }
+                        // 编码线程接到了一帧（录不录都算）：卡顿监测靠它判断录制这一路有没有断流
+                        encoderBeat.beat(StallWatch.now());
 
                         try {
                             // 关键修复：即使不在录制状态，也必须调用 updateTexImage() 消费帧
@@ -665,7 +670,9 @@ public class CodecVideoRecorder {
 
                             // 直接渲染帧到编码器（使用相对时间戳）
                             if (eglEncoder != null && eglEncoder.isInitialized()) {
+                                long drawStart = StallWatch.now();
                                 eglEncoder.drawFrame(relativeTimestampNs);
+                                StallWatch.noteOp(encoderBeat, cameraId, "draw", drawStart);
                                 recordedFrameCount++;
                                 framesSinceLastDrain++;
 
@@ -681,7 +688,9 @@ public class CodecVideoRecorder {
                             // 优化：增加帧数阈值到 10 帧，进一步减少 drain 次数
                             if (currentTimeMs - lastDrainTimeMs >= currentDrainIntervalMs || framesSinceLastDrain >= 10) {
                                 // 从编码器获取输出数据并写入 muxer
+                                long drainStart = StallWatch.now();
                                 boolean hadOutput = drainEncoderWithResult(false);
+                                StallWatch.noteOp(encoderBeat, cameraId, "drain", drainStart);
                                 lastDrainTimeMs = currentTimeMs;
                                 framesSinceLastDrain = 0;
                                 
@@ -824,6 +833,8 @@ public class CodecVideoRecorder {
         lastFileSize = 0;
         
         isRecording.set(true);
+        // 从现在起盯着这一路；录制 Surface 要等会话重建后才出帧，宽限期够它建好
+        encoderBeat.arm(StallWatch.now(), StallRules.ARM_GRACE_MS);
 
         // 注意：不再使用单独的编码循环
         // 帧的处理直接在 onFrameAvailable 回调中完成（该回调在 encoderHandler 上执行）
@@ -865,6 +876,7 @@ public class CodecVideoRecorder {
 
         // 立即标记停止状态，防止新帧处理
         isRecording.set(false);
+        encoderBeat.disarm();
 
         // 取消所有定时器和任务
         if (segmentRunnable != null) {
@@ -971,6 +983,7 @@ public class CodecVideoRecorder {
         AppLog.d(TAG, "Camera " + cameraId + " Releasing CodecVideoRecorder");
 
         isReleased = true;
+        encoderBeat.disarm();
 
         if (isRecording.get()) {
             stopRecording();
@@ -1356,7 +1369,9 @@ public class CodecVideoRecorder {
                             
                             encodedData.position(bufferInfo.offset);
                             encodedData.limit(bufferInfo.offset + bufferInfo.size);
+                            long writeStart = StallWatch.now();
                             muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo);
+                            StallWatch.noteOp(encoderBeat, cameraId, "write", writeStart);
                             noteEncodedBytes(bufferInfo.size);
                             
                             encodedOutputFrameCount++;
@@ -1439,7 +1454,9 @@ public class CodecVideoRecorder {
 
                             encodedData.position(bufferInfo.offset);
                             encodedData.limit(bufferInfo.offset + bufferInfo.size);
+                            long writeStart = StallWatch.now();
                             muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo);
+                            StallWatch.noteOp(encoderBeat, cameraId, "write", writeStart);
                             noteEncodedBytes(bufferInfo.size);
 
                             encodedOutputFrameCount++;
@@ -1485,7 +1502,7 @@ public class CodecVideoRecorder {
             if (isRecording.get() && encoderHandler != null) {
                 AppLog.d(TAG, "Camera " + cameraId + " Scheduling segment switch on encoder thread");
                 // 在编码线程上执行切换，避免线程冲突
-                encoderHandler.post(() -> switchToNextSegment());
+                encoderHandler.post(() -> StallWatch.runTask(encoderBeat, cameraId, "segment-switch", this::switchToNextSegment));
             }
         };
 
@@ -1603,7 +1620,7 @@ public class CodecVideoRecorder {
             if (!isReleased && encoderHandler != null) {
                 AppLog.d(TAG, "Camera " + cameraId + " Recovery retry triggered");
                 // 在编码线程上执行恢复
-                encoderHandler.post(() -> attemptRecovery());
+                encoderHandler.post(() -> StallWatch.runTask(encoderBeat, cameraId, "recovery", this::attemptRecovery));
             }
         };
         
@@ -1805,7 +1822,7 @@ public class CodecVideoRecorder {
 
                 // 在编码线程上执行重建
                 if (encoderHandler != null) {
-                    encoderHandler.post(() -> rebuildEncoder());
+                    encoderHandler.post(() -> StallWatch.runTask(encoderBeat, cameraId, "rebuild-encoder", this::rebuildEncoder));
                 }
             } else {
                 // 编码器健康，继续调度下一次检查

@@ -62,6 +62,7 @@ public final class DiagnosticsCollector {
         appendDevice(sb);
         appendCameras(sb, context);
         appendPreviewFrameRates(sb);
+        appendStallWatch(sb, context);
         appendMultiMapping(sb, context);
         appendDisplays(sb, context);
         appendSignalSources(sb, context);
@@ -169,6 +170,17 @@ public final class DiagnosticsCollector {
         sb.append("## 2.2 各路实测出帧率（预览，不含录制）").append('\n');
         sb.append(com.kooo.evcam.camera.PreviewFrameRates.describe()).append('\n');
         sb.append("说明: 这是相机送出来的帧率，录制只会更低。").append('\n').append('\n');
+    }
+
+    private static void appendStallWatch(StringBuilder sb, Context context) {
+        sb.append("## 2.3 卡顿监测（后视镜 / 录制卡住时自动留下的现场）").append('\n');
+        try {
+            // 页面放不下太长的文字，报告只带最新的一段；完整的在「保存日志」里
+            sb.append(com.kooo.evcam.camera.StallWatch.exportText(context, 64 * 1024)).append('\n');
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
     }
 
     private static void appendFpsRanges(StringBuilder sb, CameraCharacteristics cc) {

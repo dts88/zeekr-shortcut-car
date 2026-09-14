@@ -3725,6 +3725,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         isInBackground = true;
+        com.kooo.evcam.camera.StallWatch.setForeground(false);
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
         
         // 通知悬浮窗：应用退到后台
@@ -3783,6 +3784,7 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         boolean wasInBackground = isInBackground;
         isInBackground = false;
+        com.kooo.evcam.camera.StallWatch.setForeground(true);
         
         // 标记 Activity 已经完全恢复过一次（用于区分新创建和已存在的 Activity）
         // 这个标记在 onCreate 后第一次 onResume 时设为 true

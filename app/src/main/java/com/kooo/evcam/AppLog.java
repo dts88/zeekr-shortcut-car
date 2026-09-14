@@ -294,6 +294,14 @@ public final class AppLog {
         }
     }
 
+    /** 缓冲区里最后 n 行。卡顿报告拿它当卡住前后的上下文。 */
+    public static List<String> tail(int n) {
+        synchronized (LOCK) {
+            int from = Math.max(0, BUFFER.size() - Math.max(0, n));
+            return new ArrayList<>(BUFFER.subList(from, BUFFER.size()));
+        }
+    }
+
     public static File saveLogsToFile(Context context) {
         if (context == null) {
             return null;
@@ -308,7 +316,17 @@ public final class AppLog {
         // 保存到 Download/EVCam_Log/ 目录
         File logDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "EVCam_Log");
         File logFile = new File(logDir, fileName);
-        return writeLogToFile(logFile, snapshot) ? logFile : null;
+        // 卡顿监测的现场和自动留下的报告放在最前面：查「后视镜卡住」先看的就是它
+        List<String> lines = new ArrayList<>();
+        try {
+            java.util.Collections.addAll(lines, com.kooo.evcam.camera.StallWatch
+                    .exportText(context, Integer.MAX_VALUE).split("\n", -1));
+        } catch (Exception e) {
+            lines.add("(stall watch export failed: " + e + ")");
+        }
+        lines.add("===== app log =====");
+        lines.addAll(snapshot);
+        return writeLogToFile(logFile, lines) ? logFile : null;
     }
     
     /**

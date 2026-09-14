@@ -17,6 +17,7 @@ import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
+import com.kooo.evcam.camera.StallWatch;
 import com.kooo.evcam.CameraForegroundService;
 
 /**
@@ -82,6 +83,41 @@ public class RearViewMirrorService extends Service {
         }
     }
 
+    /**
+     * 卡顿监测用：窗口此刻是否真的在屏幕上画。
+     *
+     * <p>窗口被系统藏起来（例如系统弹窗盖住悬浮窗）时 TextureView 不画，
+     * 没有新画面是正常的，不能算卡。从监测线程读，是近似值。</p>
+     */
+    public static boolean isWindowVisibleForStall() {
+        RearViewMirrorService svc = instance;
+        RearViewMirrorView view = svc != null ? svc.mirrorView : null;
+        return view != null && view.isShowing()
+                && view.getWindowVisibility() == android.view.View.VISIBLE;
+    }
+
+    /** 卡顿报告里的一行：窗口和相机绑定的状态。 */
+    public static String describeForStall() {
+        RearViewMirrorService svc = instance;
+        if (svc == null) {
+            return "mirror: service not running";
+        }
+        RearViewMirrorView view = svc.mirrorView;
+        if (view == null) {
+            return "mirror: service running, no window";
+        }
+        SingleCamera camera = svc.boundCamera;
+        TextureView tv = view.getTextureView();
+        return "mirror: showing=" + view.isShowing()
+                + " windowVisibility=" + view.getWindowVisibility()
+                + " shown=" + view.isShown()
+                + " size=" + view.getWidth() + "x" + view.getHeight()
+                + " textureAvailable=" + tv.isAvailable()
+                + " boundCamera=" + (camera != null ? camera.getCameraId() : "none")
+                + " cameraOpened=" + (camera != null && camera.isCameraOpened())
+                + " bindRetries=" + svc.retryCount;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -129,6 +165,8 @@ public class RearViewMirrorService extends Service {
 
                     @Override
                     public void onSurfaceTextureUpdated(SurfaceTexture st) {
+                        // 每显示一帧新画面响一次。卡顿监测靠它判断后视镜是不是卡住了
+                        StallWatch.mirrorFrame();
                     }
                 });
         mirrorView.show();
@@ -193,6 +231,7 @@ public class RearViewMirrorService extends Service {
             CameraForegroundService.whenReady(this, cam::openCamera);
         }
         retryCount = 0;
+        StallWatch.armMirror(true);
         AppLog.i(TAG, "后视镜已接到相机，预览尺寸 " + previewSize
                 + "，缓冲区 " + camera.getPreviewBufferSize());
     }
@@ -266,6 +305,7 @@ public class RearViewMirrorService extends Service {
 
     private void unbindCamera() {
         cancelRetry();
+        StallWatch.armMirror(false);
         if (boundCamera != null) {
             try {
                 boundCamera.setMainFloatingSurface(null, null);

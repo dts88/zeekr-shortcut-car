@@ -48,6 +48,8 @@ public class SingleCamera {
 
     private final Context context;
     private final String cameraId;
+    /** 出帧结果的心跳，给卡顿监测用（见 StallWatch）。 */
+    private Heartbeat captureBeat;
     private TextureView textureView;
     private CameraCallback callback;
     private String cameraPosition;  // 摄像头位置（front/back/left/right）
@@ -173,6 +175,8 @@ public class SingleCamera {
     public SingleCamera(Context context, String cameraId, TextureView textureView) {
         this.context = context;
         this.cameraId = cameraId;
+        this.captureBeat = StallWatch.capture(cameraId);
+        StallWatch.registerCamera(this);
         this.textureView = textureView;
         this.cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
     }
@@ -802,6 +806,8 @@ public class SingleCamera {
         backgroundThread = new HandlerThread("Camera-" + cameraId);
         backgroundThread.start();
         backgroundHandler = new Handler(backgroundThread.getLooper());
+        // 卡顿报告里要看得出相机线程是不是被堵住了
+        StallWatch.watchLooper("Camera-" + cameraId, backgroundHandler);
     }
 
     /**
@@ -814,6 +820,7 @@ public class SingleCamera {
         if (backgroundThread == null) {
             return;
         }
+        StallWatch.unwatchLooper("Camera-" + cameraId);
         
         backgroundThread.quitSafely();
         
@@ -906,6 +913,69 @@ public class SingleCamera {
         }
         healthCheckRunnable = null;
         stallRecoveryLevel = 0;
+    }
+
+    /**
+     * 卡顿报告里这一路相机的状态，一行。
+     *
+     * <p>不加锁：从监测线程读，拿到的是那一瞬间的近似值，够判断就行 ——
+     * 为了一份诊断去抢相机线程的锁，反而可能把相机线程卡住。</p>
+     */
+    public String describeForStall() {
+        long last = lastFrameTimestampMs;
+        return "camera " + cameraId + " (" + cameraPosition + ", "
+                + (isPrimaryInstance ? "primary" : "secondary") + " @"
+                + Integer.toHexString(System.identityHashCode(this)) + ")"
+                + " device=" + (cameraDevice != null)
+                + " session=" + (captureSession != null)
+                + " opening=" + isOpening
+                + " configuring=" + isConfiguring
+                + " closing=" + isSessionClosing
+                + " pendingRebuild=" + isPendingReconfiguration
+                + " reconnecting=" + isReconnecting
+                + " pausedByLifecycle=" + isPausedByLifecycle
+                + " outputs[main-preview=" + surfaceState(previewSurface)
+                + " mirror=" + surfaceState(mainFloatingSurface)
+                + " record=" + surfaceState(recordSurface)
+                + " secondary=" + surfaceState(secondaryDisplaySurface)
+                + " fullscreen=" + surfaceState(fullscreenPreviewSurface)
+                + " jpeg=" + (jpegReader != null) + "]"
+                + " fps=" + String.format(java.util.Locale.US, "%.1f", currentFps)
+                + " lastResult=" + (last > 0 ? (System.currentTimeMillis() - last) + "ms ago" : "never")
+                + " stallRecoveryLevel=" + stallRecoveryLevel;
+    }
+
+    private static String surfaceState(Surface surface) {
+        if (surface == null) {
+            return "none";
+        }
+        return surface.isValid() ? "ok" : "INVALID";
+    }
+
+    /** 丢帧回调里的 Surface 是哪一路输出。 */
+    private String describeTarget(Surface target) {
+        if (target == null) {
+            return "null";
+        }
+        if (target == previewSurface) {
+            return "main-preview";
+        }
+        if (target == mainFloatingSurface) {
+            return "mirror";
+        }
+        if (target == recordSurface) {
+            return "record";
+        }
+        if (target == secondaryDisplaySurface) {
+            return "secondary";
+        }
+        if (target == fullscreenPreviewSurface) {
+            return "fullscreen";
+        }
+        if (jpegReader != null && target == jpegReader.getSurface()) {
+            return "jpeg";
+        }
+        return "other";
     }
 
     public long getLastFrameTimestampMs() {
@@ -1896,6 +1966,7 @@ public class SingleCamera {
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                       @NonNull CaptureRequest request,
                                       @NonNull TotalCaptureResult result) {
+            captureBeat.beat(StallWatch.now());
             frameCount++;
             long now = System.currentTimeMillis();
             lastFrameTimestampMs = now;
@@ -1918,6 +1989,22 @@ public class SingleCamera {
                 frameCount = 0;
                 lastFrameLogTime = now;
             }
+        }
+
+        // 下面两个只为卡顿监测记账：一次请求失败、某一路输出没拿到这一帧。
+        // 出问题时每帧都可能来一次，所以这里只计数，日志由 StallWatch 限流
+        @Override
+        public void onCaptureFailed(@NonNull CameraCaptureSession session,
+                                    @NonNull CaptureRequest request,
+                                    @NonNull android.hardware.camera2.CaptureFailure failure) {
+            StallWatch.captureFailed(cameraId, failure.getReason());
+        }
+
+        @Override
+        public void onCaptureBufferLost(@NonNull CameraCaptureSession session,
+                                        @NonNull CaptureRequest request,
+                                        @NonNull Surface target, long frameNumber) {
+            StallWatch.bufferLost(cameraId, describeTarget(target));
         }
     };
 
