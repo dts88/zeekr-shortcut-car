@@ -3,7 +3,6 @@
     <string name="accessibility_service_description">保活服务：用于提高应用后台运行稳定性，确保远程控制功能正常工作。\n\n本服务不会监控或操作任何用户界面，不会收集任何隐私信息，仅用于保持应用进程活跃。</string>
 
     <!-- 极氪合成流模式 -->
-    <string name="zeekr_model_name">极氪7X（环视合成流）</string>
     <string name="zeekr_lane_front">前</string>
     <string name="zeekr_lane_back">后</string>
     <string name="zeekr_lane_left">左</string>
@@ -34,7 +33,7 @@
     <string name="set_section_about">关于</string>
     <string name="set_car_model_title">视频流配置</string>
     <string name="set_profile_editor_title">视频流配置编辑</string>
-    <string name="set_profile_editor_summary">每一路相机的预览、录制、拍照三条流，以及拆出来的每一格怎么摆。保存前会按新配置开一次画面确认</string>
+    <string name="set_profile_editor_summary">录制画质、每一路相机的细调和画面摆位</string>
     <string name="set_photo_jpeg_title">拍照走图片通道</string>
     <string name="set_photo_jpeg_summary">用相机自己的 JPEG 输出拍照，「拍照分辨率」才有意义；关掉则是抓预览画面，分辨率跟着预览走。改完需重启应用</string>
     <string name="set_watermark_title">时间角标</string>
@@ -124,7 +123,6 @@
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
-    <string name="info_no_stream_detected">还没探测到视频流</string>
     <string name="info_none_selected">未选择</string>
     <string name="msg_relay_dev_only">会先写内置存储再搬到 U 盘，因此仅限开发者模式</string>
     <string name="dlg_internal_title">确定使用内置存储？</string>
@@ -153,7 +151,6 @@
     <string name="info_mapping_auto">自动分配。多路配置下若某一路没有画面，可在这里手动指定</string>
     <string name="msg_need_overlay">请先授权悬浮窗权限</string>
     <string name="dlg_language_title">选择界面语言</string>
-    <string name="dlg_language_msg">随时可以在「设置 → 系统 → 语言」里更改。</string>
 
     <!-- 相机映射与语言提示 -->
     <string name="msg_camera_list_failed">读取不到相机列表</string>
@@ -173,7 +170,7 @@
     <string name="guide_1">实验性的非官方软件，未经任何车辆功能安全认证。它不替代原厂行车记录仪、倒车影像或盲区监测，行驶中请不要操作它，也不要靠它的画面判断路况。</string>
     <string name="guide_2">录制只写 U 盘。没插 U 盘不会开始录制 —— 行车记录是持续写入，而车机内置闪存写坏了换不了。U 盘上的录像不加密，盘拔下来在别的设备上就能读。</string>
     <string name="guide_3">菜单键永远在左上角。操作按钮可以整列放到左边或右边（设置 → 界面 → 操作按钮位置），按驾驶座在哪一侧选。超级后视镜默认关着，在设置 → 超级后视镜里开；开了之后可以拖动、缩放，上下划换取景、左右划换一路。</string>
-    <string name="guide_4">出了问题先重启一次应用。还不正常的话，从菜单 → 诊断信息导出报告 —— 带着它提 issue 最省事。</string>
+    <string name="guide_4">出了问题先重启一次应用。还不正常的话，从 设置 → 关于 → 诊断信息 导出报告 —— 带着它提 issue 最省事。</string>
     <string name="action_got_it_guide">我知道了</string>
 
     <!-- 主界面 / 通知 / 回放 -->
@@ -248,7 +245,6 @@
     <string name="nav_blind_spot">补盲选项</string>
     <string name="nav_supervision">超视模式</string>
     <string name="nav_settings">软件设置</string>
-    <string name="nav_diagnostics">诊断信息</string>
     <string name="nav_header_subtitle">车机版环视记录仪</string>
     <string name="nav_header_author">作者：dts88</string>
     <string name="lane_surround">环视</string>
@@ -302,7 +298,6 @@
     <string name="about_privacy_body">录像和照片只写在你自己的 U 盘上，应用不会把它们传到任何地方。\n\n⚠ U 盘上的录像不加密。盘随时能拔下来、在别的设备上直接读，请自行注意隐私。\n\n除了下面三件事，应用不主动联网，而且每一件都要你先动手：\n\n• 点「检查更新」时，向 GitHub 问一次有没有新版本 —— 不带设备信息，也不上传任何东西。\n\n• 用「发送到手机」时，在本地网络里临时开一个网页，手机连上来取那一个文件；关掉就没了。\n\n• 开发者选项里的「上传日志」，你点了才会上传。</string>
     <string name="about_project_body">源码、问题反馈和新版本都在这里。碰到问题，带上「诊断」里导出的报告最省事。</string>
     <string name="about_credits_evcam">本应用以 GNU GPL v3.0 发布，继承自 EVCam（作者 suyunkai）—— 相机、录制、悬浮窗这些基础部分来自它。按 GPL 的要求，本应用的源码同样公开。</string>
-    <string name="about_license_line">许可证全文：gnu.org/licenses/gpl-3.0.html</string>
     <string name="about_safety_title">安全须知</string>
     <string name="about_safety_body">实验性非官方软件，与极氪（ZEEKR）无任何关联。行车时请以实际路况为准，不要依赖本应用的画面判断路况；录像也不保证一定完整可用。使用风险自负。</string>
     <string name="date_group_count">%1$d 组</string>
@@ -338,7 +333,6 @@
     <string name="share_phone_need_hotspot_title">需要先把两台设备连起来</string>
     <string name="share_phone_need_hotspot_msg">手机和车机要在同一个局域网里：用手机开热点让车机连上，或者用车机开热点让手机连上。\n\n连好之后再试一次。</string>
     <string name="share_photo_pick_lane_first">请先双击一路画面放大，再发送</string>
-    <string name="share_video_current_segment">发送当前这一段（%1$s）</string>
 
     <!-- 分享提示 -->
     <string name="share_phone_network_hint">需要手机和车机在同一个网络里。最省事的做法：**用手机开热点，让车机连上这个 Wi-Fi**。</string>
@@ -400,21 +394,8 @@
     <string name="nav_group_switches">开关</string>
 
     <!-- 视频流配置编辑 -->
-    <string name="editor_hint">改动要按「保存」才写进去，保存前会先按新配置开一次画面</string>
-    <string name="editor_group_cameras">相机</string>
-    <string name="editor_group_streams">三条流</string>
-    <string name="editor_group_profile">这份配置</string>
     <string name="editor_reset">重置</string>
-    <string name="editor_enable">启用这一路</string>
-    <string name="editor_enable_summary">关掉之后这一路不开、不录、不占流</string>
-    <string name="editor_off">已关闭</string>
-    <string name="editor_preview_res">预览 · 分辨率</string>
-    <string name="editor_record_res">录制 · 分辨率</string>
-    <string name="editor_record_fps">录制 · 帧率</string>
-    <string name="editor_record_bitrate">录制 · 码率</string>
     <string name="editor_record_codec">录制 · 编码</string>
-    <string name="editor_record_segment">录制 · 分段时长</string>
-    <string name="editor_photo_res">拍照 · 分辨率</string>
     <string name="editor_resolution">分辨率</string>
     <string name="editor_reset_msg">把这份配置改回新建时的样子，你在这里改的会丢掉。</string>
     <string name="editor_reset_ok">恢复</string>
@@ -426,7 +407,7 @@
     <string name="editor_lanes_lost">打不开。请退回去重新进一次视频流配置编辑</string>
     <string name="editor_no_camera">这份配置里还没有相机</string>
     <string name="editor_cabin_note_title">这一路还不能挪位置、改大小</string>
-    <string name="editor_cabin_note_summary">旋转、镜像、裁剪、缩放平移都已生效。位置和大小要等主界面的版面由配置决定，现在它固定占一块</string>
+    <string name="editor_cabin_note_summary">旋转、镜像、画面填充、缩放平移已生效；位置和大小暂时固定</string>
     <string name="editor_position">位置与大小</string>
     <string name="editor_position_value">左上 %1$s, %2$s · 大小 %3$s × %4$s</string>
     <string name="editor_position_dialog">位置与大小（容器宽高的比例，0–1）</string>

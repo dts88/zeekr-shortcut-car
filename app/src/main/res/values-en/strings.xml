@@ -7,7 +7,7 @@
     <string name="set_check_update_title">Check for updates</string>
     <string name="set_check_update_summary">Current version %1$s</string>
     <string name="set_update_beta_title">Include beta releases</string>
-    <string name="set_update_beta_summary">When off, only stable releases are checked</string>
+    <string name="set_update_beta_summary">Off: stable releases only</string>
     <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
@@ -16,84 +16,84 @@
     <string name="set_section_system">System</string>
     <string name="set_section_advanced">Advanced</string>
     <string name="set_section_about">About</string>
-    <string name="set_car_model_title">Video stream profile</string>
+    <string name="set_car_model_title">Stream profile</string>
     <string name="set_profile_editor_title">Edit stream profile</string>
-    <string name="set_profile_editor_summary">The preview, recording and photo stream of each camera, and how each lane of a split stream is placed. Saving opens a live preview to confirm first</string>
+    <string name="set_profile_editor_summary">Recording quality, per-camera tuning and placement</string>
     <string name="set_photo_jpeg_title">Photos through the image channel</string>
-    <string name="set_photo_jpeg_summary">Takes photos through the camera\'s own JPEG output, which is what makes the photo resolution mean anything. With it off, a photo is grabbed from the preview at the preview\'s size. Restart the app after changing</string>
+    <string name="set_photo_jpeg_summary">Uses the camera\'s JPEG output, so the photo resolution applies. Off: photos are taken from the preview. Restart the app after changing</string>
     <string name="set_watermark_title">Timestamp overlay</string>
-    <string name="set_watermark_on">Stamps the time onto saved videos and photos</string>
-    <string name="set_watermark_off">No stamp. Only saved files are affected; the preview never shows it</string>
+    <string name="set_watermark_on">Adds the time to saved videos and photos</string>
+    <string name="set_watermark_off">No stamp on saved files</string>
     <string name="set_watermark_spec_title">Include recording specs</string>
     <string name="set_watermark_spec_summary">Adds resolution and frame rate to the stamp</string>
     <string name="set_storage_location_title">Storage location</string>
     <string name="set_relay_title">Relay write</string>
-    <string name="set_relay_summary">Writes to internal storage first, then moves each finished segment to the USB drive. Reduces dropped frames when the drive is slow</string>
+    <string name="set_relay_summary">Writes to internal storage first, then moves each finished clip to the USB drive. Fewer dropped frames on a slow drive</string>
     <string name="set_video_limit_title">Video storage cap</string>
     <string name="set_video_limit_dialog">Video storage cap (GB)</string>
     <string name="set_photo_limit_title">Photo storage cap</string>
     <string name="set_photo_limit_dialog">Photo storage cap (GB)</string>
-    <string name="set_limit_message">Oldest files are removed first once the cap is reached. Leave blank or enter 0 for no limit</string>
+    <string name="set_limit_message">The oldest files are deleted first. Leave blank or enter 0 for no limit</string>
     <string name="set_storage_usage_title">Current write location</string>
-    <string name="set_rearview_summary">Enlarges any one surround-view lane into a floating window. The rear lane is mirrored horizontally, like a real mirror</string>
+    <string name="set_rearview_summary">Shows one surround camera in a floating window. The rear view is mirrored, like a real mirror</string>
     <string name="set_rearview_front_rear_title">Front and rear only</string>
-    <string name="set_rearview_front_rear_summary">Swiping cycles between rear and front only, skipping the sides</string>
+    <string name="set_rearview_front_rear_summary">Swiping switches between rear and front only</string>
     <string name="set_rearview_fisheye_title">Fisheye correction</string>
-    <string name="set_rearview_fisheye_summary">Straightens the lens barrel distortion. Display only — recorded footage is unchanged. Correction magnifies the centre, so it is slightly less sharp than the raw view</string>
+    <string name="set_rearview_fisheye_summary">Corrects barrel distortion on screen; recordings are unchanged. The picture is slightly softer</string>
     <string name="set_rearview_fov_title">Field of view</string>
-    <string name="set_rearview_fov_summary">A wider angle takes in more and magnifies less (a sharper picture), at the cost of more stretching at the edges</string>
+    <string name="set_rearview_fov_summary">Wider shows more and looks sharper, with more stretch at the edges</string>
     <string name="set_rearview_width_title">Window width</string>
     <string name="set_rearview_height_title">Window height</string>
-    <string name="set_rearview_height_summary">Width and height each go up to the full screen. The picture\'s aspect ratio never changes — the window shape only decides how much is visible</string>
+    <string name="set_rearview_height_summary">Up to the full screen. The picture keeps its proportions; the window shape sets how much is visible</string>
     <string name="set_rearview_reset_title">Reset framing and position</string>
-    <string name="set_rearview_reset_summary">Use this if the window has been moved out of reach or the framing is off</string>
+    <string name="set_rearview_reset_summary">Use if the window is out of reach or the framing is off</string>
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, changing camera, framing, docking and zoom</string>
     <string name="rearview_guide_hint">Swipe to turn pages · Tap outside to close</string>
     <string name="rearview_guide_page">Guide page %1$d of %2$d</string>
-    <string name="set_floating_alpha_title">Window opacity</string>
+    <string name="set_floating_alpha_title">Opacity</string>
     <string name="set_recording_floating_title">Floating record button</string>
     <string name="set_recording_floating_summary">Start or stop recording from anywhere</string>
     <string name="set_button_size_title">Button size</string>
     <string name="set_button_text_size_title">Button text size</string>
     <string name="set_floating_tap_title">Tap</string>
     <string name="set_floating_long_press_title">Long press</string>
-    <string name="set_floating_lock_title">Lock its position</string>
-    <string name="set_floating_lock_summary">Locked, it cannot be dragged. Tap and long press still work</string>
+    <string name="set_floating_lock_title">Lock position</string>
+    <string name="set_floating_lock_summary">It cannot be dragged. Tap and long press still work</string>
     <string name="set_floating_duration_title">Show recording time</string>
-    <string name="set_floating_duration_summary">While recording, show how long next to the button</string>
+    <string name="set_floating_duration_summary">Shows elapsed time next to the button while recording</string>
     <string name="floating_action_open_app">Open the app</string>
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>
-    <string name="floating_action_toggle_mirror">Toggle the mirror</string>
+    <string name="floating_action_toggle_mirror">Super mirror on / off</string>
     <string name="set_recording_stats_title">Recording status readout</string>
-    <string name="set_recording_stats_summary">Shows elapsed time and segment count in the corner while recording</string>
-    <string name="set_reset_floating_title">Reset floating layout</string>
-    <string name="set_reset_floating_summary">Restores every floating window\'s position and size</string>
+    <string name="set_recording_stats_summary">Shows elapsed time and clip count in a corner while recording</string>
+    <string name="set_reset_floating_title">Reset floating button</string>
+    <string name="set_reset_floating_summary">Restores its default position and size</string>
     <string name="set_auto_start_title">Start on boot</string>
     <string name="set_auto_start_summary">Launches automatically after the system starts</string>
     <string name="set_auto_record_title">Record on launch</string>
-    <string name="set_auto_record_summary">Starts recording as soon as the app launches, and resumes when it returns to the foreground</string>
+    <string name="set_auto_record_summary">Starts recording when the app opens or returns to the foreground</string>
     <string name="set_screen_off_title">Record with screen off</string>
-    <string name="set_screen_off_summary">Keeps recording after the screen goes dark (car locked)</string>
+    <string name="set_screen_off_summary">Keeps recording after the screen turns off</string>
     <string name="set_keep_alive_title">Periodic keep-alive</string>
-    <string name="set_keep_alive_summary">Wakes the process periodically so the system does not reclaim it</string>
+    <string name="set_keep_alive_summary">Wakes the app periodically so the system does not close it</string>
     <string name="set_prevent_sleep_title">Prevent deep sleep</string>
-    <string name="set_prevent_sleep_summary">Blocks deep sleep. Increases power draw — enable only when needed</string>
+    <string name="set_prevent_sleep_summary">Blocks deep sleep. Uses more power; turn on only if needed</string>
     <string name="set_recording_mode_title">Recording pipeline</string>
     <string name="set_force_h264_title">Force H.264</string>
-    <string name="set_force_h264_summary">Every camera encodes in H.264, overriding the codec chosen per camera in the profile</string>
+    <string name="set_force_h264_summary">Overrides the codec set for each camera</string>
     <string name="set_image_adjust_title">Brightness / noise reduction</string>
-    <string name="set_image_adjust_summary">Opens a window for adjusting image parameters live</string>
+    <string name="set_image_adjust_summary">Adjust the picture live in a floating window</string>
     <string name="set_image_adjust_reset_title">Reset brightness / noise reduction</string>
     <string name="set_camera_mapping_title">Camera mapping</string>
-    <string name="set_camera_mapping_summary">Assign each stream to a slot by hand (troubleshooting)</string>
+    <string name="set_camera_mapping_summary">Assign cameras manually (troubleshooting)</string>
     <string name="set_debug_title">Debug mode</string>
-    <string name="set_debug_summary">Records more detailed logs</string>
+    <string name="set_debug_summary">Logs more detail</string>
     <string name="set_save_logs_title">Save logs</string>
-    <string name="set_save_logs_summary">Writes the runtime log to storage so it can be copied off</string>
+    <string name="set_save_logs_summary">Saves the log to storage</string>
     <string name="set_diagnostics_title">Diagnostics</string>
-    <string name="set_diagnostics_summary">Exports what was actually measured from the cameras, display, vehicle signals and storage</string>
+    <string name="set_diagnostics_summary">Camera, display, vehicle signal and storage details, for export</string>
     <string name="set_about_title">About this app</string>
     <string name="set_language_title">Language</string>
     <string name="lang_auto">Follow system</string>
@@ -107,12 +107,11 @@
     <string name="opt_model_custom">Custom (troubleshooting)</string>
 
     <!-- Settings prompts and dialogs -->
-    <string name="msg_stream_changed">Video stream profile set to \"%1$s\". Restart the app to apply</string>
-    <string name="info_no_stream_detected">No video stream detected yet</string>
+    <string name="msg_stream_changed">Stream profile set to “%1$s”. Restart the app to apply</string>
     <string name="info_none_selected">None selected</string>
-    <string name="msg_relay_dev_only">Writes to internal storage first, so it requires developer options</string>
+    <string name="msg_relay_dev_only">Relay write uses internal storage, so it needs developer options</string>
     <string name="dlg_internal_title">Use internal storage?</string>
-    <string name="dlg_internal_msg">A dashcam writes continuously — as long as it is recording, it is writing.\n\nFlash memory has a limited write endurance. Using the head unit\'s internal storage as the dashcam\'s destination will measurably consume that endurance, and this storage usually cannot be replaced.\n\nA USB drive is recommended: it can be swapped when it wears out, and pulled out to copy files off.</string>
+    <string name="dlg_internal_msg">A dashcam writes continuously. Internal flash wears out and usually cannot be replaced.\n\nA USB drive is recommended: it can be replaced, and removed to copy files.</string>
     <string name="dlg_internal_ok">Use internal storage anyway</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_got_it">Got it</string>
@@ -120,24 +119,23 @@
     <string name="opt_internal_storage">Internal storage</string>
     <string name="opt_internal_storage_locked">Internal storage (developer options only)</string>
     <string name="dlg_internal_locked_title">Internal storage requires developer options</string>
-    <string name="dlg_internal_locked_msg">A dashcam writes continuously, and the head unit\'s internal flash has a limited write endurance that usually cannot be replaced. So in normal mode recording goes to external storage only.\n\nIf you really need it, unlock developer options from \"About this app\" first.</string>
-    <string name="msg_storage_changed">Storage location set to \"%1$s\"</string>
+    <string name="dlg_internal_locked_msg">Continuous recording wears out internal flash, which usually cannot be replaced, so recordings go to external storage only.\n\nTo choose it anyway, turn on developer options in About this app first.</string>
+    <string name="msg_storage_changed">Storage location set to “%1$s”</string>
     <string name="msg_enter_number">Enter a number</string>
     <string name="info_unlimited">No limit</string>
     <string name="info_reading">Reading…</string>
     <string name="info_read_failed">Could not read</string>
-    <string name="msg_rearview_on">Super mirror on. Middle third: swipe up/down to reframe, left/right to change lane. Either side: drag to move the window</string>
-    <string name="msg_rearview_reset">Mirror framing and position reset</string>
-    <string name="msg_floating_reset">Floating window layout reset</string>
+    <string name="msg_rearview_on">Super mirror on. Middle: swipe up or down to reframe, left or right to change camera. Sides: drag to move</string>
+    <string name="msg_rearview_reset">Super mirror framing and position reset</string>
+    <string name="msg_floating_reset">Floating button reset</string>
     <string name="msg_adjust_opened">Adjustment window opened</string>
     <string name="msg_adjust_reset">Brightness / noise reduction restored to defaults</string>
     <string name="msg_logs_saved">Log saved to %1$s</string>
     <string name="msg_logs_failed">Could not save the log</string>
     <string name="info_mapping_manual">Camera mapping set manually</string>
-    <string name="info_mapping_auto">Assigned automatically. If a stream shows nothing in a multi-stream profile, set it here</string>
+    <string name="info_mapping_auto">Automatic. If a camera shows nothing, assign it here</string>
     <string name="msg_need_overlay">Grant the overlay permission first</string>
     <string name="dlg_language_title">Choose a language</string>
-    <string name="dlg_language_msg">You can change this later in Settings → System → Language.</string>
 
     <!-- Camera mapping and language hint -->
     <string name="msg_camera_list_failed">Camera list unavailable</string>
@@ -154,8 +152,8 @@
 
     <!-- Main interface -->
     <string name="about_title">About &amp; credits</string>
-    <string name="accessibility_service_description">Keep-alive service: improves background stability so recording is not interrupted.\n\nThis service never monitors or operates any user interface and collects no personal data. It only keeps the app process alive.</string>
-    <string name="zeekr_composite_not_found">No four-in-one composite stream detected; this head unit may not support Zeekr composite mode</string>
+    <string name="accessibility_service_description">Keeps the app running in the background so recording is not interrupted.\n\nIt does not read or control the screen and collects no personal data.</string>
+    <string name="zeekr_composite_not_found">No surround composite stream found. This head unit may not be supported</string>
     <string name="zeekr_lane_front">Front</string>
     <string name="zeekr_lane_back">Rear</string>
     <string name="zeekr_lane_left">Left</string>
@@ -165,28 +163,27 @@
     <string name="cell_bottom_left">Bottom left</string>
     <string name="cell_bottom_right">Bottom right</string>
     <string name="zeekr_mode_grid">2×2 grid</string>
-    <string name="zeekr_model_name">Zeekr 7X (surround composite)</string>
 
     <!-- First-launch guide -->
     <string name="guide_title">Before you start</string>
-    <string name="guide_1">Experimental, unofficial software, certified for no vehicle safety function. It does not replace the factory dash cam, reversing camera or blind-spot monitor; do not operate it while driving, and do not judge the road from its picture.</string>
-    <string name="guide_2">Recordings go to the USB drive only. With no drive present, recording will not start — a dashcam writes continuously, and the head unit\'s built-in flash cannot be replaced once worn. Recordings on the drive are not encrypted: the drive can be pulled out and read on any other device.</string>
-    <string name="guide_3">The menu key is always at the top left. The action buttons can sit on the left or the right (Settings → Interface → Button side) — pick the side the driver sits on. The super mirror is off by default; turn it on under Settings → Super mirror. Once on, it can be dragged and resized: swipe up or down to change the framing, left or right to change which camera it shows.</string>
-    <string name="guide_4">If something goes wrong, restart the app first. If it persists, export the report from Menu → Diagnostics — attaching it to an issue saves the most time.</string>
+    <string name="guide_1">Experimental, unofficial software with no vehicle safety certification. It does not replace the factory dashcam, reversing camera or blind-spot monitor. Do not use it while driving, and do not rely on its picture to judge the road.</string>
+    <string name="guide_2">Recordings go to the USB drive only; without a drive, recording does not start. Recordings are not encrypted: anyone with the drive can read them.</string>
+    <string name="guide_3">The menu is at the top left. Put the action buttons on the driver\'s side in Settings → Interface → Button side. The super mirror is off by default; turn it on in Settings → Super mirror.</string>
+    <string name="guide_4">If something goes wrong, restart the app. If it continues, export a report from Settings → About → Diagnostics and attach it to an issue.</string>
     <string name="action_got_it_guide">Got it</string>
 
     <!-- Main screen, notifications, playback -->
     <string name="msg_camera_not_ready">Camera not ready — try again</string>
     <string name="msg_need_camera_storage">Camera and storage permissions are required</string>
     <string name="msg_camera_access_failed">Camera access failed: %1$s</string>
-    <string name="msg_codec_fallback">Recording fault — fell back to MediaCodec. If this keeps happening, change the recording pipeline in Settings</string>
+    <string name="msg_codec_fallback">Recording failed and switched to MediaCodec. If this keeps happening, change the recording pipeline in Settings</string>
     <string name="msg_record_start_failed">Could not start recording — try again</string>
     <string name="msg_record_error">Recording error</string>
     <string name="msg_photo_taken">Photo saved</string>
     <string name="msg_recording_stopped">Recording stopped</string>
     <string name="msg_recording_started_all">Recording all cameras</string>
     <string name="msg_recording_started_n">Recording %1$d camera(s)</string>
-    <string name="msg_sd_fallback">No USB drive found — falling back to internal storage</string>
+    <string name="msg_sd_fallback">No USB drive found; using internal storage</string>
     <string name="msg_recording_resumed">Recording resumed automatically</string>
     <string name="msg_recording_auto_started">Recording started automatically</string>
     <string name="msg_resume_failed">Camera not ready — could not resume recording</string>
@@ -200,11 +197,11 @@
     <string name="msg_camera_not_ready_adjust">Camera not ready — cannot open the adjustment window</string>
     <string name="msg_overlay_denied">Overlay permission not granted</string>
     <string name="dlg_no_external_title">No external storage found</string>
-    <string name="dlg_no_external_msg">In normal mode recording goes to external storage only, so that continuous writing does not wear out the head unit\'s internal flash.\n\nInsert a USB drive and try again. If one is inserted but not detected, try another port, or pick the storage location again in Settings.</string>
+    <string name="dlg_no_external_msg">Recordings go to external storage only, to spare the internal flash.\n\nInsert a USB drive and try again. If it is not detected, try another port or choose the storage location again in Settings.</string>
     <string name="dlg_will_use_internal_title">Recording to internal storage</string>
     <string name="dlg_internal_reason_chosen">Internal storage is the location currently selected.</string>
     <string name="dlg_internal_reason_fallback">A USB drive is selected but none is detected, so recordings will go to internal storage.</string>
-    <string name="dlg_internal_warn">%1$s\n\nA dashcam writes continuously, and flash memory has a limited write endurance. Sustained use will consume the head unit\'s storage life, and that storage usually cannot be replaced.\n\nInsert a USB drive and select it in Settings.</string>
+    <string name="dlg_internal_warn">%1$s\n\nContinuous recording wears out internal storage, which usually cannot be replaced.\n\nInsert a USB drive and select it in Settings.</string>
     <string name="action_record_anyway">Record anyway</string>
     <string name="notif_channel_name">Camera service</string>
     <string name="notif_channel_desc">Used for background capture and recording</string>
@@ -215,15 +212,15 @@
     <string name="msg_segment_unplayable">This clip cannot be played; playback stopped</string>
     <string name="msg_scanning">Scanning recordings…</string>
     <string name="msg_scanning_short">Scanning…</string>
-    <string name="msg_no_surround_clips">No surround-view recordings found</string>
-    <string name="msg_no_surround_clips_long">No surround-view recordings found (continuous playback covers the surround lane only)</string>
+    <string name="msg_no_surround_clips">No surround recordings found</string>
+    <string name="msg_no_surround_clips_long">No surround recordings found (continuous playback plays the surround camera only)</string>
     <string name="msg_no_clips">No recordings available</string>
     <string name="msg_nothing_to_share">Nothing to share</string>
     <string name="action_share_clip">Share this recording</string>
     <string name="action_delete_clip">Delete this recording</string>
     <string name="action_pause">Pause</string>
     <string name="action_play">Play</string>
-    <string name="info_clip_count">%1$d clips　·　%2$s</string>
+    <string name="info_clip_count">%1$d clip(s) · %2$s</string>
     <string name="date_today">Today</string>
     <string name="date_yesterday">Yesterday</string>
     <string name="date_before_yesterday">2 days ago</string>
@@ -245,9 +242,8 @@
     <string name="nav_photo_playback">Photos</string>
     <string name="nav_group_system">System</string>
     <string name="nav_blind_spot">Blind-spot options</string>
-    <string name="nav_supervision">Super-view mode</string>
+    <string name="nav_supervision">Super view</string>
     <string name="nav_settings">Settings</string>
-    <string name="nav_diagnostics">Diagnostics</string>
     <string name="nav_header_subtitle">Surround-view dashcam</string>
     <string name="nav_header_author">By dts88</string>
     <string name="lane_surround">Surround</string>
@@ -264,14 +260,14 @@
     <string name="upd_up_to_date">Already up to date (%1$s)</string>
     <string name="upd_found_title">Update available</string>
     <string name="upd_size_suffix">, about %1$s MB</string>
-    <string name="upd_found_msg">%1$s%2$s\n\nCurrent version %3$s\n\nWhen the download finishes, the system installer opens directly. The package is kept in the app cache and cleared on the next update check.</string>
+    <string name="upd_found_msg">%1$s%2$s\n\nCurrent version %3$s\n\nThe installer opens when the download finishes.</string>
     <string name="upd_download">Download and install</string>
     <string name="upd_later">Later</string>
     <string name="upd_downloading">Downloading…</string>
     <string name="upd_downloading_pct">Downloading… %1$d%% (%2$s / %3$s MB)</string>
     <string name="upd_download_title">Downloading %1$s</string>
     <string name="upd_download_failed">Download failed: %1$s</string>
-    <string name="upd_apk_missing">The installer file is gone — try again</string>
+    <string name="upd_apk_missing">Installer file missing. Try again</string>
     <string name="upd_err_bad_response">Unreadable response from GitHub</string>
     <string name="upd_err_http">Server returned HTTP %1$d</string>
     <string name="upd_err_too_large">File too large (%1$d MB), aborted</string>
@@ -279,35 +275,34 @@
     <string name="upd_err_over_limit">Too much data, aborted</string>
     <string name="upd_err_truncated">Only received %1$d of %2$d bytes</string>
     <string name="upd_need_install_title">Permission to install apps is required</string>
-    <string name="upd_need_install_msg">Android requires this app to be allowed to install other apps before the installer can open.\n\nGrant it, come back, and tap Check for updates again.</string>
+    <string name="upd_need_install_msg">Allow this app to install apps, then come back and tap Check for updates again.</string>
     <string name="upd_go_settings">Open settings</string>
     <string name="upd_cannot_open_apk">Cannot open the installer: %1$s</string>
     <string name="upd_no_installer">This head unit cannot open the installer: %1$s</string>
     <string name="upd_no_settings_page">This head unit cannot open that settings page</string>
     <string name="msg_keep_one_camera_refuse">Select at least one camera to record</string>
-    <string name="msg_refuse_no_external">No USB drive detected, so recording will not start. In normal mode recording goes to external storage only, so that continuous writing does not wear out the internal flash.</string>
+    <string name="msg_refuse_no_external">No USB drive detected. Recordings go to external storage only.</string>
 
     <!-- About screen -->
-    <string name="about_tagline">A surround-view dashcam for Zeekr head units: it records the vehicle\'s 360° composite stream and adds playback, a super mirror and more.</string>
+    <string name="about_tagline">A surround-view dashcam for Zeekr head units: it records the 360° composite stream, with playback and a super mirror.</string>
     <string name="about_storage_title">About external storage</string>
-    <string name="about_storage_body">Recordings are written to external storage only, never to the head unit\'s internal flash — a dashcam writes continuously, and that storage cannot be replaced once worn out.\n\n• The USB drive supplied with the car is enough for basic recording.\n\n• For a higher bitrate or a longer retention window without occupying the original drive, add a second one through the left-hand Type-C port. The head unit picks it up automatically and it can be removed at any time.\n\n• Verified working: a 128 GB USB drive; an NVMe SSD (far faster, which largely removes the write bottleneck, though it runs warmer).\n\n• Optane-based M10 drives are good value, but their capacity is small — roughly the last 20 hours.</string>
+    <string name="about_storage_body">Recordings go to external storage only, never to the head unit\'s internal flash, which cannot be replaced once worn out.\n\n• The USB drive supplied with the car is enough for basic recording.\n\n• For higher bitrates or longer retention, add a drive to the left Type-C port. It is detected automatically and can be removed at any time.\n\n• Tested: a 128 GB USB drive, and an NVMe SSD (much faster, runs slightly warmer).\n\n• Optane M10 drives are good value but small: about the last 20 hours.</string>
     <string name="about_project_title">Project</string>
     <string name="about_coffee_title">Buy the author a coffee</string>
-    <string name="about_coffee_body">PayNow to 9271 6786. Entirely optional; nothing in the app depends on it.</string>
+    <string name="about_coffee_body">PayNow to 9271 6786. Optional; every feature works without it.</string>
     <string name="about_credits_title">Open source and origins</string>
     <string name="about_thanks_title">Thanks</string>
-    <string name="about_thanks_body">This project grew out of an owners\' club group chat. These people gave it its start:\n\n• Jon (Zeekr 7X Singapore owners\' club) — walked me through getting an app onto the head unit. Nothing else could have happened without that first step.\n\n• SW (same club) — pointed me at the AVM Recorder project, which showed the road had been walked before.\n\n• Patrick (same club) — supplied the few facts the project needed to get off the ground.\n\n• The Zeekr 7X Singapore owners\' club — a capable moderating team, and members who are warm and good company. A place where people share freely is rarer than it sounds.\n\n• Myself, a little — for keeping an appetite for life, and the habit of poking at things.\n\n• Everyone using this app — I hope it makes the car a little easier to live with.\n\n• ZEEKR and Geely, last — for bringing us together, and for building a car this good with a team to match.</string>
+    <string name="about_thanks_body">This project grew out of an owners\' club group chat. These people gave it its start:\n\n• Jon (Zeekr 7X Singapore owners\' club) — explained how to install apps on the head unit. Nothing else would have happened without that.\n\n• SW (same club) — shared the AVM Recorder project, which showed it could be done.\n\n• Patrick (same club) — provided the key information to get started.\n\n• The Zeekr 7X Singapore owners\' club — a capable admin team and friendly members. A place where people share freely is rare.\n\n• Myself — for enthusiasm and curiosity.\n\n• Everyone using this app — I hope it makes driving a little easier.\n\n• ZEEKR and Geely — for bringing us together, and for a great car and team.</string>
     <string name="about_privacy_title">Privacy and network use</string>
-    <string name="about_privacy_body">Recordings and photos are written to your own USB drive. The app does not send them anywhere.\n\n⚠ Recordings on the drive are not encrypted. The drive can be pulled out and read on any other device, so treat privacy accordingly.\n\nApart from these three, the app does not go online — and each one happens only because you started it:\n\n• Checking for updates asks GitHub whether there is a newer version. No device information is sent, and nothing is uploaded.\n\n• “Send to phone” opens a temporary page on your local network so the phone can fetch that one file. It is gone when you close it.\n\n• “Upload logs”, under developer options, uploads only when you tap it.</string>
-    <string name="about_project_body">Source, issues and new releases all live here. When reporting a problem, the report exported from Diagnostics saves the most time.</string>
-    <string name="about_credits_evcam">This app is released under the GNU GPL v3.0, inherited from EVCam by suyunkai — the camera, recording and floating-window foundations come from it. As the GPL requires, this app\'s source is published too.</string>
-    <string name="about_license_line">Full licence: gnu.org/licenses/gpl-3.0.html</string>
+    <string name="about_privacy_body">Recordings and photos stay on your USB drive. The app does not send them anywhere.\n\n⚠ Recordings on the drive are not encrypted. Anyone with the drive can read them.\n\nThe app goes online only when you start one of these:\n\n• Check for updates: asks GitHub for the latest version. No device data is sent.\n\n• Send to phone: serves one file on your local network until you close it.\n\n• Upload logs (developer options): uploads only when you tap it.</string>
+    <string name="about_project_body">Source code, issues and releases. When reporting a problem, attach a report from Diagnostics.</string>
+    <string name="about_credits_evcam">Released under the GNU GPL v3.0 and based on EVCam by suyunkai, which provides the camera, recording and floating window foundations. As the GPL requires, the source code is public.</string>
     <string name="about_safety_title">Safety notice</string>
-    <string name="about_safety_body">Experimental, unofficial software with no affiliation to ZEEKR. While driving, rely on the road itself rather than this app\'s display, and do not assume a recording will always be complete or usable. Use at your own risk.</string>
+    <string name="about_safety_body">Experimental, unofficial software, not affiliated with ZEEKR. While driving, watch the road, not this app. Recordings are not guaranteed to be complete. Use at your own risk.</string>
     <string name="date_group_count">%1$d group(s)</string>
 
     <!-- Photo playback -->
-    <string name="photo_mode_multi">All lanes</string>
+    <string name="photo_mode_multi">All cameras</string>
     <string name="photo_mode_single">%1$s</string>
     <string name="photo_share_count">%1$d group(s) selected, %2$d file(s)</string>
     <string name="photo_share_total">%1$d photo file(s)</string>
@@ -323,26 +318,25 @@
     <string name="photo_empty">No photos yet</string>
     <string name="photo_no_image">No photo</string>
     <string name="photo_pick_hint">Pick a photo from the list</string>
-    <string name="photo_double_tap_hint">Double-tap a lane to enlarge</string>
+    <string name="photo_double_tap_hint">Double-tap a view to enlarge it</string>
 
     <!-- Send to phone -->
     <string name="action_send_to_phone">Send to phone</string>
     <string name="share_phone_title">Send to phone</string>
     <string name="share_phone_steps">Scan with your phone → the file opens in the browser → long-press it and choose Save</string>
     <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
-    <string name="share_phone_keep_open">Keep this window open until the file is saved — closing it ends the connection</string>
+    <string name="share_phone_keep_open">Keep this open until the file is saved</string>
     <string name="share_phone_switch_address">Try another address</string>
     <string name="share_phone_no_file">Nothing to send</string>
     <string name="share_phone_failed">Could not start: %1$s</string>
     <string name="share_phone_need_hotspot_title">Connect the two devices first</string>
-    <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same local network: share a hotspot from the phone and join it from the car, or the other way round.\n\nTry again once they are connected.</string>
-    <string name="share_photo_pick_lane_first">Double-tap a lane to enlarge it first, then send</string>
-    <string name="share_video_current_segment">Send the current clip (%1$s)</string>
+    <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same network: connect one to the other\'s hotspot.\n\nThen try again.</string>
+    <string name="share_photo_pick_lane_first">Double-tap a view to enlarge it, then send</string>
 
     <!-- Share hints -->
-    <string name="share_phone_network_hint">The phone and the head unit must be on the same network. The easiest way: **turn on the phone hotspot and connect the car to that Wi-Fi**.</string>
-    <string name="share_video_segment_note">Recordings are stored in %1$s clips. Continuous playback stitches them together, but this sends **only the clip you are on**. To send another one, seek to it and tap again.</string>
-    <string name="share_minutes">%1$d minutes</string>
+    <string name="share_phone_network_hint">The phone and the head unit must be on the same network. Easiest: **turn on the phone\'s hotspot and connect the car to it**.</string>
+    <string name="share_video_segment_note">Recordings are saved in %1$s clips. This sends **only the current clip**; to send another, seek to it and tap again.</string>
+    <string name="share_minutes">%1$d min</string>
     <string name="action_back">Back</string>
     <string name="set_watermark_brand_title">App badge</string>
     <string name="set_watermark_brand_summary">Shows this app\'s name and version</string>
@@ -350,13 +344,13 @@
     <string name="upd_connecting">Connecting…</string>
     <string name="upd_downloading_size">Downloading… %1$s MB</string>
     <string name="upd_download_failed_title">Download failed</string>
-    <string name="share_phone_qr_failed">The QR code could not be generated — type the address below into the phone\'s browser instead</string>
+    <string name="share_phone_qr_failed">Could not create the QR code. Enter this address in the phone\'s browser instead</string>
     <string name="set_plate_switch_title">Stamp the plate number</string>
-    <string name="set_plate_switch_summary">The plate number appears next to the app name in the top-left corner of recordings and photos</string>
+    <string name="set_plate_switch_summary">Adds the plate number next to the app name on recordings and photos</string>
     <string name="set_plate_title">Plate number</string>
     <string name="set_plate_hint">Up to 10 characters, uppercase letters and digits only</string>
     <string name="set_plate_empty">Not set</string>
-    <string name="msg_plate_cleaned">Cleaned up to %1$s</string>
+    <string name="msg_plate_cleaned">Saved as %1$s</string>
     <string name="msg_restart_required">Takes effect after restarting the app</string>
     <string name="set_current_profile_title">Current profile</string>
 
@@ -373,20 +367,20 @@
     <string name="cd_menu">Menu</string>
     <string name="cd_minimize">Hide to background</string>
     <string name="nav_exit">Quit app</string>
-    <string name="set_screen_off_locked">Locked: turn on developer options to enable this</string>
+    <string name="set_screen_off_locked">Locked: requires developer options</string>
     <string name="set_rail_side_title">Button side</string>
-    <string name="set_rail_side_summary">Keep it on the driver side</string>
+    <string name="set_rail_side_summary">Put them on the driver\'s side</string>
     <string name="opt_rail_right">Right</string>
     <string name="opt_rail_left">Left</string>
 
     <!-- Interface section · first-launch side question · record unavailable · status bar -->
     <string name="set_section_interface">Interface</string>
     <string name="set_reduce_motion_title">Less motion while recording</string>
-    <string name="set_reduce_motion_summary">While recording, screens switch without transitions; the record button and clip ring still move. The encoder is using the GPU</string>
+    <string name="set_reduce_motion_summary">No screen transitions while recording, leaving the GPU to the encoder</string>
     <string name="dlg_rail_side_title">Which side is the steering wheel on?</string>
     <string name="dlg_rail_side_lhd">Left (left-hand drive) · buttons on the left</string>
     <string name="dlg_rail_side_rhd">Right (right-hand drive) · buttons on the right</string>
-    <string name="msg_rail_side_hint">Buttons go on the side nearest the driver. Change it any time in Settings → Interface</string>
+    <string name="msg_rail_side_hint">Buttons go on the driver\'s side. Change this in Settings → Interface</string>
     <string name="record_unavailable">Insert a USB drive to record</string>
     <string name="record_unavailable_detail">No USB drive</string>
     <string name="status_fps">≤%1$s fps</string>
@@ -399,33 +393,20 @@
     <string name="nav_group_switches">Switches</string>
 
     <!-- Stream profile editor -->
-    <string name="editor_hint">Changes are written only when you tap Save; the new setup is shown once before saving</string>
-    <string name="editor_group_cameras">Cameras</string>
-    <string name="editor_group_streams">Streams</string>
-    <string name="editor_group_profile">This profile</string>
     <string name="editor_reset">Reset</string>
-    <string name="editor_enable">Use this camera</string>
-    <string name="editor_enable_summary">When off, it is not opened, not recorded and takes no stream</string>
-    <string name="editor_off">off</string>
-    <string name="editor_preview_res">Preview · resolution</string>
-    <string name="editor_record_res">Recording · resolution</string>
-    <string name="editor_record_fps">Recording · frame rate</string>
-    <string name="editor_record_bitrate">Recording · bitrate</string>
     <string name="editor_record_codec">Recording · codec</string>
-    <string name="editor_record_segment">Recording · clip length</string>
-    <string name="editor_photo_res">Photo · resolution</string>
     <string name="editor_resolution">Resolution</string>
-    <string name="editor_reset_msg">Put this profile back the way it was created. What was changed here is discarded.</string>
+    <string name="editor_reset_msg">Restore this profile to its defaults? Changes made here will be lost.</string>
     <string name="editor_reset_ok">Reset</string>
-    <string name="editor_reset_done">Reset</string>
+    <string name="editor_reset_done">Profile reset</string>
     <string name="editor_whole_frame">Whole frame</string>
     <string name="editor_lane_group">%1$s · %2$s</string>
     <string name="editor_pick_lane">Tap a cell to edit it</string>
     <string name="editor_stage">Drag a cell to move it, drag a corner to resize</string>
-    <string name="editor_lanes_lost">Could not open. Go back and enter the stream profile editor again</string>
+    <string name="editor_lanes_lost">Could not open. Go back and open Edit stream profile again</string>
     <string name="editor_no_camera">This profile has no camera yet</string>
-    <string name="editor_cabin_note_title">This camera cannot be moved or resized yet</string>
-    <string name="editor_cabin_note_summary">Rotation, mirroring, crop, zoom and pan all apply. Position and size wait for the main screen layout to come from the profile; for now this camera keeps its own fixed pane</string>
+    <string name="editor_cabin_note_title">Position and size are fixed for this camera</string>
+    <string name="editor_cabin_note_summary">Rotation, mirror, fit and zoom apply</string>
     <string name="editor_position">Position and size</string>
     <string name="editor_position_value">Top-left %1$s, %2$s · size %3$s × %4$s</string>
     <string name="editor_position_dialog">Position and size (fraction of the view, 0–1)</string>
@@ -442,33 +423,33 @@
     <string name="editor_fit_fit">Fit · whole picture, bars at the sides</string>
     <string name="editor_fit_fill">Fill · covers the pane, excess cropped</string>
     <string name="editor_quality_title">Recording quality</string>
-    <string name="editor_quality_summary">Sets frame rate and bit rate on every camera at once. Tune one below.</string>
+    <string name="editor_quality_summary">Frame rate and bitrate for all cameras. Tune a camera below.</string>
     <string name="editor_quality_current">current</string>
     <string name="editor_quality_gb_unit">GB / hour</string>
-    <string name="editor_quality_hours_unit">hours · on free space</string>
+    <string name="editor_quality_hours_unit">hours on free space</string>
     <string name="editor_quality_space">Save space</string>
-    <string name="editor_quality_space_note">10 fps, low bit rate; complete record, more compression</string>
+    <string name="editor_quality_space_note">10 fps, low bitrate. Most compression</string>
     <string name="editor_quality_balanced">Balanced</string>
-    <string name="editor_quality_balanced_note">20 fps, medium bit rate; detail against storage</string>
+    <string name="editor_quality_balanced_note">20 fps, medium bitrate. Balances detail and storage</string>
     <string name="editor_quality_sharp">Sharpest</string>
-    <string name="editor_quality_sharp_note">Unlimited frame rate, high bit rate; most detail retained</string>
-    <string name="editor_cameras_title">Recording %1$d</string>
-    <string name="editor_cameras_summary">A camera that is off is not opened and costs nothing; tap one to tune it</string>
+    <string name="editor_quality_sharp_note">No frame rate cap, high bitrate. Most detail</string>
+    <string name="editor_cameras_title">Cameras recording: %1$d</string>
+    <string name="editor_cameras_summary">Cameras that are off are not opened and use no space. Tap one to tune it</string>
     <string name="editor_camera_tuned">tuned</string>
     <string name="editor_open_lanes">Placement</string>
     <string name="editor_detail_title">%1$s · tuning</string>
     <string name="editor_knob_fps">Frame rate</string>
     <string name="editor_knob_bitrate">Bitrate</string>
-    <string name="editor_knob_segment">Segment (min)</string>
+    <string name="editor_knob_segment">Clip length (min)</string>
     <string name="editor_knob_resolution">Resolution</string>
     <string name="editor_knob_resolution_note">Preview and recording</string>
     <string name="editor_knob_photo_size">Photos</string>
     <string name="editor_knob_photo_size_note">Always the largest size</string>
     <string name="editor_knob_codec">Codec</string>
     <string name="editor_budget_none">No camera is on; nothing will be recorded</string>
-    <string name="editor_budget">Recording %1$s, %2$s in total, about %3$s GB an hour</string>
-    <string name="editor_budget_with_space">Recording %1$s, %2$s in total, about %3$s GB an hour; the free space holds about %4$s hours</string>
-    <string name="editor_crop_off">Unavailable: cropping goes wrong on the vehicle and the cause is not understood yet</string>
+    <string name="editor_budget">Cameras: %1$s · %2$s total · about %3$s GB/hour</string>
+    <string name="editor_budget_with_space">Cameras: %1$s · %2$s total · about %3$s GB/hour · about %4$s hours of free space</string>
+    <string name="editor_crop_off">Unavailable for now</string>
     <string name="editor_crop_dialog">Crop (how much to cut from each side, fraction of the picture)</string>
     <string name="editor_top">Top</string>
     <string name="editor_bottom">Bottom</string>
@@ -499,7 +480,7 @@
     <string name="editor_issue_none_enabled">No camera is enabled, so nothing will show or record</string>
     <string name="editor_issue_undeclared_size">%1$s: the %2$s size %3$dx%4$d is not declared by this camera</string>
     <string name="editor_issue_preview_split_only">%1$s: preview is split into four but recording is not, so the recording is one whole frame</string>
-    <string name="editor_issue_record_split_only">%1$s: recording is split into four but preview is not, so the rear-view mirror cannot get its lane</string>
+    <string name="editor_issue_record_split_only">%1$s: recording is split into four but preview is not, so the super mirror cannot show a single view</string>
     <string name="editor_stream_preview">preview</string>
     <string name="editor_stream_record">recording</string>
     <string name="editor_stream_photo">photo</string>
@@ -509,13 +490,13 @@
     <string name="editor_splits">split in four</string>
 
     <!-- Continuous playback -->
-    <string name="player_session_title">%1$s · %2$d clips · %3$s</string>
+    <string name="player_session_title">%1$s · %2$d clip(s) · %3$s</string>
     <string name="player_share_chooser">Share recording</string>
     <string name="player_delete_title">Delete this recording?</string>
-    <string name="player_delete_msg">All %1$d files of this recording (%2$s) will be deleted. This cannot be undone.</string>
-    <string name="player_deleted">Deleted %1$d files</string>
-    <string name="player_info">Timeline %1$d/%2$d · from %3$s · %4$d clips · %5$s</string>
-    <string name="player_clip_count">%1$d clips</string>
+    <string name="player_delete_msg">All %1$d file(s) of this recording (%2$s) will be deleted. This cannot be undone.</string>
+    <string name="player_deleted">Deleted %1$d file(s)</string>
+    <string name="player_info">Timeline %1$d/%2$d · from %3$s · %4$d clip(s) · %5$s</string>
+    <string name="player_clip_count">%1$d clip(s)</string>
 
     <!-- Look before saving a profile -->
 
@@ -545,7 +526,7 @@
     <string name="storage_external_n_named">External storage %1$d (%2$s)</string>
 
     <!-- Photo playback -->
-    <string name="photo_count_badge">%1$d photos</string>
+    <string name="photo_count_badge">%1$d photo(s)</string>
     <string name="cd_expand">Expand or collapse</string>
     <string name="cd_selected">Selected</string>
 
@@ -574,7 +555,7 @@
     <string name="debug_version">Version: %1$s</string>
 
     <!-- Diagnostics -->
-    <string name="diag_subtitle">Cameras / screen / vehicle signals / storage / logs. Save it as a file, or copy it and send it back for analysis.</string>
+    <string name="diag_subtitle">Cameras, display, vehicle signals, storage and logs. Save or copy the report to send it.</string>
     <string name="diag_btn_save">Save</string>
     <string name="diag_btn_copy">Copy</string>
     <string name="diag_btn_refresh">Collect again</string>
@@ -653,14 +634,14 @@
     <string name="dev_blind_spot_title">Blind-spot options</string>
     <string name="dev_supervision_title">Super view</string>
     <string name="dev_custom_config_title">Custom layout</string>
-    <string name="dev_custom_config_summary">After choosing “Custom” under Stream configuration, set up the cameras, mapping, rotation and layout here</string>
+    <string name="dev_custom_config_summary">After choosing “Custom” in Stream profile, set up cameras, mapping, rotation and layout here</string>
     <string name="dev_preview_correction_title">Preview correction</string>
-    <string name="dev_preview_correction_summary">Pan / zoom / rotate the preview. Only affects cameras on the plain preview path (cabin cameras in the three-camera setup, custom); the surround composite is laid out by the four-up view and is not affected</string>
+    <string name="dev_preview_correction_summary">Pan, zoom or rotate the preview of plain cameras (cabin cameras, custom). The surround view is not affected</string>
     <string name="dev_preview_correction_adjust_title">Adjust preview correction</string>
     <string name="dev_preview_correction_adjust_summary">Opens a floating window to adjust each camera; turn on the switch above first</string>
     <string name="dev_preview_correction_reset_title">Reset preview correction</string>
     <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
-    <string name="dev_note">“Custom” under Video stream profile is only available here as well. This section hides again after the app restarts.</string>
+    <string name="dev_note">“Custom” in Stream profile is only available here. This section hides after the app restarts.</string>
 
     <!-- Log upload · device name (developer) -->
     <string name="nick_confirm_title">Confirm device name</string>
@@ -668,7 +649,7 @@
     <string name="nick_confirm_ok">Confirm</string>
     <string name="nick_reenter">Re-enter</string>
     <string name="nick_title">Set a device name</string>
-    <string name="nick_msg">Enter a name that identifies you, so that logs from different users can be told apart:</string>
+    <string name="nick_msg">Enter a name so your logs can be identified:</string>
     <string name="nick_hint">e.g. Alex’s 7X</string>
     <string name="nick_empty">The name cannot be empty</string>
     <string name="upload_type_current">this run</string>
