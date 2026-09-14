@@ -29,7 +29,8 @@ import java.nio.charset.StandardCharsets;
  * <h3>只推 beta 与正式版</h3>
  *
  * <p>alpha 是开发过程中随手发的，数量多、稳定性没有保证 ——
- * 不该被推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。</p>
+ * 不该被推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。
+ * 设置里关掉「接收 Beta 版」时只推正式版（{@link VersionName#isRelease}）。</p>
  *
  * <h3>这是本应用唯一一次主动出网</h3>
  *
@@ -103,12 +104,13 @@ public final class GithubReleases {
     }
 
     /**
-     * 取版本号最大的那个非草稿、且属于 beta 或正式版的版本。
+     * 取版本号最大的那个非草稿版本。
      *
+     * @param includeBeta true：beta 和正式版都算；false：只算正式版。alpha 永远不算
      * @return 没有符合条件、且带 APK 的版本时返回 null
      * @throws IOException 网络或解析出错
      */
-    public static Release fetchLatest() throws IOException {
+    public static Release fetchLatest(boolean includeBeta) throws IOException {
         String body = getText(LIST_URL);
         Release best = null;
         try {
@@ -123,8 +125,12 @@ public final class GithubReleases {
                 if (candidate == null) {
                     continue;
                 }
-                if (!VersionName.isBetaOrRelease(candidate.tagName)) {
-                    // alpha 不推：那是开发过程里随手发的，不该盖到一台在用的车机上
+                boolean eligible = includeBeta
+                        ? VersionName.isBetaOrRelease(candidate.tagName)
+                        : VersionName.isRelease(candidate.tagName);
+                if (!eligible) {
+                    // alpha 永远不推：那是开发过程里随手发的，不该盖到一台在用的车机上。
+                    // 关了「接收 Beta 版」时 beta 也不推
                     continue;
                 }
                 if (best == null || VersionName.compare(candidate.tagName, best.tagName) > 0) {

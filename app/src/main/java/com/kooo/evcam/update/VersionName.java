@@ -80,6 +80,16 @@ public final class VersionName {
         return parts[1].toLowerCase(java.util.Locale.US).startsWith("beta");
     }
 
+    /**
+     * 是不是正式版：认得出版本号，而且没有预发布后缀。
+     *
+     * <p>设置里关掉「接收 Beta 版」之后，检查更新只认这一档。</p>
+     */
+    public static boolean isRelease(String version) {
+        String[] parts = splitCore(version);
+        return numbers(parts[0]).length > 0 && parts[1].isEmpty();
+    }
+
     /** 拆成「数字部分」和「预发布后缀」两段，顺便吃掉前导的 v。 */
     private static String[] splitCore(String version) {
         String s = version == null ? "" : version.trim();

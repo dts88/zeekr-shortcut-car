@@ -107,4 +107,15 @@ public class VersionNameTest {
     public void buildMetadataIsIgnored() {
         assertTrue(VersionName.compare("0.25.2+abc", "0.25.2") == 0);
     }
+
+    /** 关了「接收 Beta 版」：只有正式版算，beta 和 alpha 都不算。 */
+    @Test
+    public void onlyReleasesCountWhenBetaIsOff() {
+        assertTrue(VersionName.isRelease("1.0.0"));
+        assertTrue(VersionName.isRelease("v0.60.1"));
+        assertFalse(VersionName.isRelease("0.60.0-beta"));
+        assertFalse(VersionName.isRelease("0.60.0-alpha"));
+        assertFalse(VersionName.isRelease("nightly"));
+        assertFalse(VersionName.isRelease(null));
+    }
 }

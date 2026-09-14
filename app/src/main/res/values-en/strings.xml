@@ -5,6 +5,10 @@
     <!-- Settings screen -->
     <string name="set_back_to_recording">Back to recording</string>
     <string name="set_check_update_title">Check for updates</string>
+    <string name="set_check_update_summary">Current version %1$s</string>
+    <string name="set_update_beta_title">Include beta releases</string>
+    <string name="set_update_beta_summary">When off, only stable releases are checked</string>
+    <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
     <string name="set_section_rearview">Super mirror</string>

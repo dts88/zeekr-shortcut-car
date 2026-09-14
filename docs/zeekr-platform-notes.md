@@ -407,8 +407,9 @@ git show 2e95ed9^:app/src/main/java/com/kooo/evcam/camera/SingleCamera.java  # �
 **明确不申请 `INTERNET` 权限。**
 
 【本项目】EVCam 基座的钉钉/飞书/Telegram 远程查看、MJPEG 推流、心跳推图
-**已全部移除**（见 3.2）。应用仍保留网络权限（Glide/OkHttp 等基础库需要），
-但已不再有任何主动外发数据的功能。
+**已全部移除**（见 3.2）。应用仍保留网络权限，只用在两处：用户点「检查更新」时访问
+GitHub（不带任何设备信息），和「发送到手机」时在局域网里临时提供一个文件。
+除此之外没有任何主动外发数据的功能。
 
 ---
 

@@ -52,11 +52,12 @@ public final class UpdateFlow {
         }
         AlertDialog checking = message(activity,
                 activity.getString(R.string.upd_checking), false);
+        final boolean includeBeta = new com.kooo.evcam.AppConfig(activity).isUpdateBetaEnabled();
         new Thread(() -> {
             GithubReleases.Release release = null;
             String error = null;
             try {
-                release = GithubReleases.fetchLatest();
+                release = GithubReleases.fetchLatest(includeBeta);
             } catch (Exception e) {
                 AppLog.w(TAG, "检查更新失败: " + e);
                 error = reason(activity, e);
@@ -68,7 +69,9 @@ public final class UpdateFlow {
                 if (failure != null) {
                     toast(activity, activity.getString(R.string.upd_check_failed, failure));
                 } else if (found == null) {
-                    toast(activity, activity.getString(R.string.upd_none));
+                    // 只查正式版时说清楚：不是「没有新版本」，是「没有正式版」
+                    toast(activity, activity.getString(includeBeta
+                            ? R.string.upd_none : R.string.upd_none_release));
                 } else {
                     compareAndOffer(activity, found);
                 }
@@ -252,7 +255,8 @@ public final class UpdateFlow {
                 + (e.getMessage() == null ? "" : ": " + e.getMessage());
     }
 
-    private static String currentVersion(Context context) {
+    /** 本机装的是哪个版本；设置里「检查更新」那一行也显示它。 */
+    public static String currentVersion(Context context) {
         try {
             return context.getPackageManager()
                     .getPackageInfo(context.getPackageName(), 0).versionName;

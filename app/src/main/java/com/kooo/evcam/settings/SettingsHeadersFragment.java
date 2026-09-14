@@ -14,7 +14,6 @@ import androidx.preference.PreferenceViewHolder;
 
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
-import com.kooo.evcam.update.UpdateFlow;
 
 /**
  * 左栏：设置的分区列表。
@@ -147,9 +146,6 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                     if (getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).goToRecordingInterface();
                     }
-                } else if ("pref_check_update".equals(key)) {
-                    // 顶层的动作条目：它不属于任何分区，右栏按 key 取子树时取不到它
-                    UpdateFlow.start(getActivity());
                 } else if ("pref_exit".equals(key)) {
                     if (getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).exitApp();
@@ -182,7 +178,7 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return R.drawable.ic_advanced;
             case "screen_developer":
                 return R.drawable.ic_developer;
-            case "pref_check_update":
+            case "screen_update":
                 return R.drawable.ic_update;
             case "screen_about":
                 return R.drawable.ic_info;

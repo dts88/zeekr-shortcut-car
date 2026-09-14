@@ -108,6 +108,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSystem();
         bindAdvanced();
         bindDeveloper();
+        bindUpdate();
         bindAbout();
 
         // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
@@ -1087,6 +1088,26 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     // ------------------------------------------------------------------ 关于
+
+    // ------------------------------------------------------------------ 检查更新
+
+    /**
+     * 检查更新：点那一行就查；另有一个「接收 Beta 版」开关。
+     *
+     * <p>当前版本写在那一行的说明里 —— 点之前就知道本机装的是哪个，
+     * 查完提示「已是最新」时也对得上。</p>
+     */
+    private void bindUpdate() {
+        androidx.preference.Preference check = findPreference("pref_check_update");
+        if (check != null && getContext() != null) {
+            check.setSummary(getString(R.string.set_check_update_summary,
+                    com.kooo.evcam.update.UpdateFlow.currentVersion(getContext())));
+        }
+        onClick("pref_check_update",
+                pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
+        bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
+                value -> appConfig.setUpdateBetaEnabled(value));
+    }
 
     private void bindAbout() {
         onClick("pref_diagnostics", pref ->

@@ -383,10 +383,22 @@
 
     <!--
       检查更新放在顶层：藏在「关于」里面没人找得到，而这是安装新版本的唯一途径。
+      原来是左栏里一个点了就查的动作行；加了「接收 Beta 版」之后改成一个分区 ——
+      左边选、右边改，和其他分区一个样子。
     -->
-    <Preference
-        android:key="pref_check_update"
-        android:title="@string/set_check_update_title" />
+    <PreferenceScreen
+        android:key="screen_update"
+        android:title="@string/set_check_update_title">
+
+        <Preference
+            android:key="pref_check_update"
+            android:title="@string/set_check_update_title" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_update_beta"
+            android:title="@string/set_update_beta_title"
+            android:summary="@string/set_update_beta_summary" />
+    </PreferenceScreen>
 
     <!-- ==================== 关于 ==================== -->
     <PreferenceScreen

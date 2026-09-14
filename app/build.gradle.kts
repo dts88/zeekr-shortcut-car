@@ -82,12 +82,6 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.cardview)
 
-    // 飞书：使用轻量级 OkHttp WebSocket 实现，不再依赖官方 SDK
-
-    // 网络请求和 WebSocket
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
     // JSON 解析
     implementation("com.google.code.gson:gson:2.10.1")
 

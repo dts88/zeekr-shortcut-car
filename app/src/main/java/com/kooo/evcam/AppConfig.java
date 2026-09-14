@@ -107,6 +107,7 @@ public class AppConfig {
     private static final String KEY_REARVIEW_LANE = "rearview_lane";              // 当前显示哪一路
     private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
+    private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
@@ -1049,6 +1050,18 @@ public class AppConfig {
 
     public void setRearViewGuideSeen() {
         prefs.edit().putBoolean(KEY_REARVIEW_GUIDE_SEEN, true).apply();
+    }
+
+    /**
+     * 检查更新时接不接收 Beta 版。默认接收：现在发出去的除了 alpha 就是 beta，
+     * 默认关掉等于「永远没有更新」。关掉之后只推正式版。alpha 无论如何都不推。
+     */
+    public boolean isUpdateBetaEnabled() {
+        return prefs.getBoolean(KEY_UPDATE_BETA, true);
+    }
+
+    public void setUpdateBetaEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_UPDATE_BETA, enabled).apply();
     }
 
     /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */

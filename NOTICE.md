@@ -57,7 +57,6 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 |------|--------|
 | AndroidX（AppCompat、Activity、ConstraintLayout、RecyclerView、CardView、Preference、SlidingPaneLayout、WorkManager） | Apache License 2.0 |
 | Material Components | Apache License 2.0 |
-| OkHttp（含 logging-interceptor） | Apache License 2.0 |
 | Gson | Apache License 2.0 |
 | Glide | BSD / MIT / Apache 2.0（见其仓库 LICENSE） |
 | NanoHTTPD | BSD 3-Clause |
