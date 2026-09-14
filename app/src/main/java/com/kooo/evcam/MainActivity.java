@@ -682,9 +682,19 @@ public class MainActivity extends AppCompatActivity {
         btnStartRecord.setOnClickListener(v -> toggleRecording());
 
         // 隐藏到后台：录制和悬浮按钮照旧，只把界面收起来。
-        // 真正的退出在抽屉和设置左栏的最底下（自定义布局的按钮在下面另接，那里仍是退出）
+        // 长按是退出，和抽屉、设置左栏最底下的「退出应用」是同一件事。退出会停掉录制，
+        // 放在长按上，碰一下不会误触（自定义布局的按钮在下面另接，那里仍是退出）
         if (btnMinimize != null) {
             btnMinimize.setOnClickListener(v -> moveTaskToBack(true));
+            btnMinimize.setOnLongClickListener(v -> {
+                exitApp();
+                return true;
+            });
+            // 读屏念出来的长按动作是「退出应用」，而不是笼统的「长按」
+            androidx.core.view.ViewCompat.replaceAccessibilityAction(btnMinimize,
+                    androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+                            .AccessibilityActionCompat.ACTION_LONG_CLICK,
+                    getString(R.string.nav_exit), null);
         }
 
         btnTakePhoto.setOnClickListener(v -> takePicture());
@@ -3544,7 +3554,7 @@ public class MainActivity extends AppCompatActivity {
      * 这是用户主动退出，需要停止所有服务
      *
      * <p>入口在抽屉和设置左栏的最底下。主界面右下角那个键现在是「隐藏到后台」——
-     * 原来那个 × 两件事都像，按下去之前猜不到是收起来还是全关掉。</p>
+     * 原来那个 × 两件事都像，按下去之前猜不到是收起来还是全关掉。长按那个键才走到这里。</p>
      */
     public void exitApp() {
         AppLog.d(TAG, "用户请求退出应用，停止所有服务...");

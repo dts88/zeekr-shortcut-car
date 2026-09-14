@@ -937,7 +937,10 @@ public class ProfileEditorFragment extends Fragment {
                         (lane % 2) * 0.5f, (lane / 2) * 0.5f, 0.5f, 0.5f));
             }
         } else {
-            camera.lanes.add(LaneLayout.cell(-1, 0f, 0f, 1f, 1f));
+            // 座舱：整幅一格，默认镜像，和新建配置时一致
+            LaneLayout lane = LaneLayout.cell(-1, 0f, 0f, 1f, 1f);
+            lane.mirrored = CameraProfile.CABIN_MIRRORED_BY_DEFAULT;
+            camera.lanes.add(lane);
         }
         return camera;
     }

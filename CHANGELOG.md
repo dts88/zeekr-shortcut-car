@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.56.0-alpha] - 2026-09-14
+
+- Long-press the hide button on the main screen to quit the app.
+- The front and rear cabin cameras start mirrored in both built-in stream setups, including
+  when a cabin camera is switched on later in the surround-only setup. Setups already saved
+  keep their settings; Reset applies the new default. Mirroring flips the on-screen preview
+  only, not recordings or photos.
+
 ## [0.55.0-alpha] - 2026-09-14
 
 - Stall watch. If the super mirror shows no new frame for 1.5 s, or a recording gets no

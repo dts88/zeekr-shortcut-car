@@ -169,6 +169,7 @@
           隐藏到后台：录制、悬浮按钮照旧，只把界面收起来。
           原来这里是「×退出」，× 既像「关掉这一页」又像「全部退出」，按之前猜不到是哪个。
           真正的退出挪到抽屉和设置左栏的最底下 —— 往下找得到，手滑点不到。
+          长按这个键也是退出：长按不会是手滑碰出来的。
         -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_minimize"

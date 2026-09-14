@@ -21,6 +21,14 @@ public final class CameraProfile {
     public static final String ROLE_CABIN_1 = "cabin1";
     public static final String ROLE_CABIN_2 = "cabin2";
 
+    /**
+     * 座舱两路默认镜像（项目拥有者 2026-09 定）。
+     *
+     * <p>新建配置、重置、配置编辑补上缺的那几路时都用它。关着的那两路也带上 ——
+     * 之后在配置编辑里打开时就是镜像的。只翻屏幕上的预览，录像和照片照原样。</p>
+     */
+    public static final boolean CABIN_MIRRORED_BY_DEFAULT = true;
+
     public String role = ROLE_COMPOSITE;
 
     /** 这一路参不参与。关掉的相机不开、不录、不占流。 */

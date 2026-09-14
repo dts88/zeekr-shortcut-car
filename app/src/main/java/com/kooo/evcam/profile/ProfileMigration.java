@@ -26,7 +26,7 @@ public final class ProfileMigration {
         public String carModel = "zeekr_7x";
         /** 每一路的旋转角度，按相机键取。 */
         public IntByKey rotation = key -> 0;
-        /** 每一路是否镜像。 */
+        /** 每一路是否镜像。只有自定义车型搬它：极氪两份预设里座舱默认镜像。 */
         public BoolByKey mirror = key -> false;
         /** 预览矫正开关。关着时那几个值不生效，不能搬。 */
         public boolean previewCorrectionEnabled;
@@ -165,6 +165,11 @@ public final class ProfileMigration {
             cabin.record = defaultRecord(cabinSize);
             cabin.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
             addFullFrame(cabin, snapshot, keys[i]);
+            if (!custom) {
+                // 旧设置里的镜像键不算数：那几个键只有自定义车型的相机映射改得到，
+                // 在极氪预设里它们只是没人动过的 false
+                cabin.lanes.get(0).mirrored = CameraProfile.CABIN_MIRRORED_BY_DEFAULT;
+            }
             profile.cameras.add(cabin);
         }
         return profile;
