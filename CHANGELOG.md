@@ -7,6 +7,16 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.53.0-alpha] - 2026-09-14
+
+- The super mirror has a picture guide: five pages covering the three gesture zones, changing
+  camera, framing, docking to the edge and zooming. Swipe to turn pages; tap outside the
+  picture or press back to close at any time. It opens once, the first time the mirror is
+  turned on from the drawer or Settings, and again from Settings -> Super mirror -> How to use,
+  which works even while the mirror is off. It does not open when the mirror is turned on
+  from the floating button, since the app is usually not in front then.
+- Chinese and English builds each have their own set of pictures.
+
 ## [0.52.0-alpha] - 2026-09-14
 
 - The bottom-right button on the main screen hides the app instead of quitting it, with a
