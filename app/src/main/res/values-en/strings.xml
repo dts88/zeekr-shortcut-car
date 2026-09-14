@@ -652,7 +652,7 @@
     <string name="dev_preview_correction_adjust_summary">Opens a floating window to adjust each camera; turn on the switch above first</string>
     <string name="dev_preview_correction_reset_title">Reset preview correction</string>
     <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
-    <string name="dev_note">“Surround + cabin (3 cameras)” and “Custom” under Stream configuration are only available here as well. This section hides again after the app restarts.</string>
+    <string name="dev_note">“Custom” under Video stream profile is only available here as well. This section hides again after the app restarts.</string>
 
     <!-- Log upload · device name (developer) -->
     <string name="nick_confirm_title">Confirm device name</string>

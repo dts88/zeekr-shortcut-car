@@ -11,6 +11,9 @@ configuration rework.
   come from the profile, per camera.
 - The editor lives in Settings → Recording and is built like the rest of Settings.
 - Photos go through the camera's JPEG channel by default, so the photo resolution applies.
+- Surround lanes are placed on a drag-and-resize stage (0.49.0).
+- The editor asks for a recording quality preset first, then per-camera tuning; the three
+  cameras are always listed and switched on or off (0.49.0–0.51.0).
 
 ## Crop is switched off
 
@@ -62,8 +65,9 @@ Until that happens:
 The geometry is also written twice: `FourLaneContainer.drawLane` places a lane inside a
 grid cell, `LaneSurfaceMatrix` places a whole frame inside a `TextureView`. They share the
 axis mapping (`LaneOrientation`) but not the fit-and-rotate arithmetic. The drag-and-resize
-editor is the moment to merge them — doing it earlier means touching the container's
-drawing for no visible gain.
+stage (0.49.0) was built without merging them, because it only edits surround lanes. The
+merge belongs with the step above: once a cabin pane can be placed, both paths place a
+picture in a rectangle and should share one implementation.
 
 ## Custom camera mapping
 

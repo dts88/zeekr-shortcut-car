@@ -14,28 +14,32 @@ A surround-view dash cam for the ZEEKR 7X head unit.
 
 ## What it does
 
-ZEEKR's App Lab exposes the four surround-view cameras as **one pre-stitched stream** — four
-1280×1280 squares packed into a single frame, which previews as a distorted vertical strip.
-This app splits that stream back into a proper 2×2 grid, and builds three things on top of it.
+App Lab gives a third-party app the four surround cameras as **one pre-stitched stream**: four
+square views packed into a single frame, which previews as a distorted vertical strip. This app
+splits it back into a 2×2 grid and builds on that.
 
-### 1. Surround-view dash cam
+### Dash cam
 
-Records all four views at once. H.264 / H.265, 1–10 minute segments with the oldest files cleaned
-up automatically when the disk fills, adjustable frame rate, bitrate and layout (2×2 grid or the
-raw strip). Starts on boot, keeps recording with the screen off and after the car is locked.
+- Records the surround view as a 2×2 grid, plus the front and rear cabin cameras if you turn them on.
+- Three recording presets — save space (10 fps), balanced (20 fps), sharpest — each showing how
+  many GB an hour it needs and how long your USB drive will last. Frame rate, bitrate, segment
+  length and codec can also be tuned per camera.
+- 1–10 minute segments; the oldest files are cleaned up when the drive fills.
+- Photos use each camera's largest size.
+- Records to a **USB drive only**. Writing to the head unit's built-in flash sits behind developer
+  options, because that storage cannot be replaced once worn out.
 
-Recording goes to a **USB drive only**. Writing to the head unit's built-in flash sits behind
-developer options, because continuous writes wear out storage that cannot be replaced.
+On the main screen, tap any view to fill the preview with it and tap again to go back. A floating
+button shows whether recording is running and opens the app from anywhere.
 
-### 2. Electronic rear-view mirror
+### Electronic rear-view mirror
 
 A floating, dockable window showing any one camera enlarged. Pinch to zoom; swipe left or right to
-rotate through the cameras; swipe up or down in the middle third to raise or lower the framing.
-Fisheye correction and field of view are adjustable, and the window resizes to any shape without
-distorting the picture. Push it half off-screen and it hides at the edge — one tap brings it back.
-The rear view is mirrored horizontally, like a real mirror.
+change camera; swipe up or down in the middle third to raise or lower the framing. Push it half
+off-screen to hide it at the edge, and tap to bring it back. The rear camera is mirrored, like a
+real mirror. Fisheye correction with an adjustable field of view is optional.
 
-### 3. Send to your phone
+### Send to your phone
 
 While viewing a photo or a video segment, tap **send to phone**: the app shows a QR code, your
 phone's browser opens that file, and you save it. Nothing to install on the phone.
@@ -49,10 +53,13 @@ to turn on the phone's hotspot and connect the car to it.
 ## Install
 
 Download `ZeekrShortcut-*.apk` from [Releases](../../releases) and sideload it through App Lab.
+Builds tagged `-alpha` are test builds; the in-app update check only offers beta and stable
+releases.
 
-Then open **Settings → Recording → Stream configuration**, pick *ZEEKR 7X (surround-view
-composite)*, and restart the app when prompted. If it reports that no composite stream was found,
-this head unit or firmware version does not declare one and the app will not work on it.
+Then open **Settings → Recording → Video stream profile** and choose *Zeekr 7X (surround
+composite)*, or *surround + front and rear cabin* to add the cabin cameras. Restart the app to
+apply. If it reports that no composite stream was detected, this head unit or firmware does not
+provide one and the app will not work on it.
 
 Building it yourself needs JDK 17+ and the Android SDK (compileSdk 36):
 
@@ -68,13 +75,15 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 
 ## Limitations
 
-- Built for the ZEEKR 7X composite stream. Other models or firmware with a different layout fall
-  back to an even four-way split, and the picture may be offset.
+- Built for the ZEEKR 7X. Only the camera recognised as the composite stream is split; a head unit
+  that does not provide one gets nothing split.
 - Factory features come first: the built-in 360° view, reversing camera and parking cameras can
-  reclaim the camera at any time, and this app gets out of the way.
-- Roughly 200 MB per minute of continuous writing — which is why it records to USB.
-- On-vehicle validation is ongoing. Automated tests cover the pure logic only (geometry, camera
-  selection, gesture model); test in a stationary vehicle first.
+  reclaim a camera at any time.
+- Starting on boot, recording on launch and preventing sleep are off by default. Recording with
+  the screen off is only available with developer options on.
+- Cropping a surround view is switched off for now.
+- On-vehicle validation is ongoing. Automated tests cover the pure logic only; test in a stationary
+  vehicle first.
 
 ---
 
@@ -84,7 +93,6 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 this app is forked from. The first commit in this repository is EVCam's complete working tree, so
 every change since then is visible as a diff.
 
-App Lab hands a third-party app one pre-composited surround stream rather than four cameras.
-Splitting that stream into a grid and rendering it is implemented here from scratch.
+Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).

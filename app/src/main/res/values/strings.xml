@@ -653,7 +653,7 @@
     <string name="dev_preview_correction_adjust_summary">打开悬浮窗逐路调整，需要先打开上面的开关</string>
     <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
     <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
-    <string name="dev_note">「视频流配置」里的「环视+座舱3路」和「自定义」也只在这里可选。重启应用后本区隐藏。</string>
+    <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。重启应用后本区隐藏。</string>
 
     <!-- 上传日志 · 设备识别名称（开发者） -->
     <string name="nick_confirm_title">确认设备名称</string>
