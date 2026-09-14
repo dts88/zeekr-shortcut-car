@@ -106,6 +106,7 @@ public class AppConfig {
     private static final String KEY_REARVIEW_PAN = "rearview_pan";                // 上下平移，0..1
     private static final String KEY_REARVIEW_LANE = "rearview_lane";              // 当前显示哪一路
     private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
+    private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
@@ -1035,6 +1036,19 @@ public class AppConfig {
 
     public void setRailSideChosen() {
         prefs.edit().putBoolean(KEY_RAIL_SIDE_CHOSEN, true).apply();
+    }
+
+    /**
+     * 超级后视镜的使用指南弹过没有。只在第一次打开后视镜时弹，之后从设置里看。
+     *
+     * <p>「恢复默认布局」不清它：那是把窗口挪回来，不是重新学一遍怎么用。</p>
+     */
+    public boolean isRearViewGuideSeen() {
+        return prefs.getBoolean(KEY_REARVIEW_GUIDE_SEEN, false);
+    }
+
+    public void setRearViewGuideSeen() {
+        prefs.edit().putBoolean(KEY_REARVIEW_GUIDE_SEEN, true).apply();
     }
 
     /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */

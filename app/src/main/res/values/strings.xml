@@ -59,6 +59,10 @@
     <string name="set_rearview_height_summary">宽高可分别调至整块屏幕。画面比例保持不变，窗口形状只决定可见范围</string>
     <string name="set_rearview_reset_title">重置取景与位置</string>
     <string name="set_rearview_reset_summary">窗口移出视野或取景调乱时，用此项恢复默认</string>
+    <string name="set_rearview_guide_title">使用指南</string>
+    <string name="set_rearview_guide_summary">三个手势区域、换一路、调取景、贴边隐藏、缩放</string>
+    <string name="rearview_guide_hint">左右划翻页 · 点击图片外关闭</string>
+    <string name="rearview_guide_page">使用指南第 %1$d 张，共 %2$d 张</string>
     <string name="set_floating_alpha_title">悬浮窗透明度</string>
     <string name="set_recording_floating_title">录制悬浮按钮</string>
     <string name="set_recording_floating_summary">随时开始或停止录制</string>
@@ -134,7 +138,7 @@
     <string name="info_unlimited">不限制</string>
     <string name="info_reading">正在读取…</string>
     <string name="info_read_failed">读取失败</string>
-    <string name="msg_rearview_on">超级后视镜已开启：中间三分之一上下滑调取景、左右滑换一路，两侧拖动窗口</string>
+    <string name="msg_rearview_on">超级后视镜已开启：中间三分之一上下划调取景、左右划换一路，两侧拖动窗口</string>
     <string name="msg_rearview_reset">后视镜取景与位置已重置</string>
     <string name="msg_floating_reset">悬浮窗布局已重置</string>
     <string name="msg_adjust_opened">调节窗口已打开</string>
@@ -164,7 +168,7 @@
     <string name="guide_title">开始之前</string>
     <string name="guide_1">实验性的非官方软件，未经任何车辆功能安全认证。它不替代原厂行车记录仪、倒车影像或盲区监测，行驶中请不要操作它，也不要靠它的画面判断路况。</string>
     <string name="guide_2">录制只写 U 盘。没插 U 盘不会开始录制 —— 行车记录是持续写入，而车机内置闪存写坏了换不了。U 盘上的录像不加密，盘拔下来在别的设备上就能读。</string>
-    <string name="guide_3">菜单键永远在左上角。操作按钮可以整列放到左边或右边（设置 → 界面 → 操作按钮位置），按驾驶座在哪一侧选。超级后视镜默认关着，在设置 → 超级后视镜里开；开了之后可以拖动、缩放，上下滑换取景、左右滑换一路。</string>
+    <string name="guide_3">菜单键永远在左上角。操作按钮可以整列放到左边或右边（设置 → 界面 → 操作按钮位置），按驾驶座在哪一侧选。超级后视镜默认关着，在设置 → 超级后视镜里开；开了之后可以拖动、缩放，上下划换取景、左右划换一路。</string>
     <string name="guide_4">出了问题先重启一次应用。还不正常的话，从菜单 → 诊断信息导出报告 —— 带着它提 issue 最省事。</string>
     <string name="action_got_it_guide">我知道了</string>
 

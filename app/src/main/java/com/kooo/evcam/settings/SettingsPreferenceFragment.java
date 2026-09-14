@@ -486,8 +486,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 OverlayCoordinator::setRearViewEnabled, on -> {
                     if (on) {
                         toast(getString(R.string.msg_rearview_on));
+                        com.kooo.evcam.ui.RearViewGuide.showOnce(getActivity());
                     }
                 });
+
+        // 不跟着开关走：还没打开后视镜之前，也该能先看看它怎么用
+        onClick("pref_rearview_guide",
+                pref -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
 
         bindSwitch("pref_rearview_front_rear", appConfig.isRearViewFrontRearOnly(), value -> {
             appConfig.setRearViewFrontRearOnly(value);

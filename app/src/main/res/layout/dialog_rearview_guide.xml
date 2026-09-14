@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  超级后视镜使用指南（ui/RearViewGuide）：五张说明图，左右划翻页。
+
+  外层铺满整个窗口、可点：点图片外面任何地方就关。图片那一块是列表，触摸被它自己吃掉
+  用来翻页，不会误关。最后一张把底下那行提示换成「知道了」，两者占同一个位置，
+  翻到最后一张时版面不跳。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/guide_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/guide_pages"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:overScrollMode="never" />
+
+        <LinearLayout
+            android:id="@+id/guide_dots"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="horizontal" />
+
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:layout_marginTop="12dp">
+
+            <TextView
+                android:id="@+id/guide_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="@string/rearview_guide_hint"
+                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                android:textColor="@color/status_overlay_text_dim" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/guide_done"
+                style="@style/Widget.Cam.RailTile"
+                android:layout_width="wrap_content"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:paddingStart="40dp"
+                android:paddingEnd="40dp"
+                android:text="@string/action_got_it"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

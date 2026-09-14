@@ -154,6 +154,12 @@
             android:dependency="pref_rearview"
             android:title="@string/set_rearview_reset_title"
             android:summary="@string/set_rearview_reset_summary" />
+
+        <!-- 不依赖开关：没打开后视镜之前，也该能先看看它怎么用 -->
+        <Preference
+            android:key="pref_rearview_guide"
+            android:title="@string/set_rearview_guide_title"
+            android:summary="@string/set_rearview_guide_summary" />
     </PreferenceScreen>
 
     <!-- ==================== 悬浮窗 ==================== -->

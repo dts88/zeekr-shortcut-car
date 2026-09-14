@@ -4436,6 +4436,7 @@ public class MainActivity extends AppCompatActivity {
             WakeUpHelper.requestOverlayPermission(this);
         } else if (on) {
             Toast.makeText(this, R.string.msg_rearview_on, Toast.LENGTH_SHORT).show();
+            com.kooo.evcam.ui.RearViewGuide.showOnce(this);
         }
         syncRearViewSwitch();
     }
