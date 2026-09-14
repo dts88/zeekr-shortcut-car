@@ -59,28 +59,68 @@ public final class DiagnosticsCollector {
         sb.append(" 生成时间: ").append(now).append('\n');
         sb.append("========================================").append('\n').append('\n');
 
-        appendDevice(sb);
-        appendCameras(sb, context);
-        appendPreviewFrameRates(sb);
-        appendStallWatch(sb, context);
-        appendMultiMapping(sb, context);
-        appendDisplays(sb, context);
-        appendSignalSources(sb, context);
-        appendStorage(sb, context);
-        appendConfig(sb, context);
-        appendFloatingLayout(sb, context);
-        appendEncoders(sb, context);
-        appendLaneTransforms(sb, context);
-        com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context);
-        PlaybackCapabilityProbe.appendTo(sb, context);
-        VehicleEnumeration.appendTo(sb, context);
-        appendLogcat(sb);
+        // 每一节计时：生成报告时界面会卡一下，先弄清是哪一节慢
+        Timings timings = new Timings();
+        timings.run("device", () -> appendDevice(sb));
+        timings.run("cameras", () -> appendCameras(sb, context));
+        timings.run("frame rates", () -> appendPreviewFrameRates(sb));
+        timings.run("stall watch", () -> appendStallWatch(sb, context));
+        timings.run("multi mapping", () -> appendMultiMapping(sb, context));
+        timings.run("displays", () -> appendDisplays(sb, context));
+        timings.run("vehicle signals", () -> appendSignalSources(sb, context));
+        timings.run("storage", () -> appendStorage(sb, context));
+        timings.run("config", () -> appendConfig(sb, context));
+        timings.run("floating layout", () -> appendFloatingLayout(sb, context));
+        timings.run("encoders", () -> appendEncoders(sb, context));
+        timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
+        timings.run("share", () -> com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context));
+        timings.run("playback", () -> PlaybackCapabilityProbe.appendTo(sb, context));
+        timings.run("vehicle enumeration", () -> VehicleEnumeration.appendTo(sb, context));
+        timings.run("logcat", () -> appendLogcat(sb));
+
+        String took = timings.describe();
+        sb.append('\n').append("## 生成耗时（从长到短）").append('\n').append(took).append('\n');
+        AppLog.i(TAG, "report sections: " + took.replace('\n', ' '));
 
         sb.append('\n').append("===== 报告结束 =====").append('\n');
         return sb.toString();
     }
 
     // ------------------------------------------------------------------
+
+    /** 每一节用了多久。 */
+    private static final class Timings {
+        private final List<String> names = new ArrayList<>();
+        private final List<Long> millis = new ArrayList<>();
+        private long total;
+
+        void run(String name, Runnable section) {
+            long start = android.os.SystemClock.uptimeMillis();
+            try {
+                section.run();
+            } finally {
+                long took = android.os.SystemClock.uptimeMillis() - start;
+                names.add(name);
+                millis.add(took);
+                total += took;
+            }
+        }
+
+        /** 按用时从长到短。 */
+        String describe() {
+            Integer[] order = new Integer[names.size()];
+            for (int i = 0; i < order.length; i++) {
+                order[i] = i;
+            }
+            Arrays.sort(order, (a, b) -> Long.compare(millis.get(b), millis.get(a)));
+            StringBuilder out = new StringBuilder("total " + total + "ms");
+            for (int i : order) {
+                out.append('\n').append("  ").append(names.get(i)).append(' ')
+                        .append(millis.get(i)).append("ms");
+            }
+            return out.toString();
+        }
+    }
 
     private static void appendDevice(StringBuilder sb) {
         sb.append("## 1. 设备").append('\n');

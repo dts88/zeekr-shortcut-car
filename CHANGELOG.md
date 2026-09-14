@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.57.0-alpha] - 2026-09-14
+
+- Diagnostics only, no behaviour change. The main screen logs what the surround preview
+  draws (four views or one whole frame) and why, its lifecycle, and every change to which
+  camera is the composite stream. The diagnostics report times each section and logs how
+  long the screen froze while it was generated.
+- Stall reports now include the main, camera and encoder thread stacks. On the car the
+  system thread list left them out.
+
 ## [0.56.0-alpha] - 2026-09-14
 
 - Long-press the hide button on the main screen to quit the app.

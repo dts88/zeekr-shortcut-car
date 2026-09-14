@@ -157,6 +157,8 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (reportView != null) {
             reportView.setText(R.string.diag_collecting);
         }
+        final FrameGapWatch gaps = new FrameGapWatch();
+        gaps.start();
         new Thread(() -> {
             String result;
             try {
@@ -169,11 +171,58 @@ public class DiagnosticsActivity extends AppCompatActivity {
             mainHandler.post(() -> {
                 report = finalResult;
                 if (reportView != null) {
+                    long setStart = android.os.SystemClock.uptimeMillis();
                     reportView.setText(finalResult);
+                    AppLog.i(TAG, "report text set in "
+                            + (android.os.SystemClock.uptimeMillis() - setStart)
+                            + "ms (" + finalResult.length() + " chars)");
                 }
                 setButtonsEnabled(true);
+                // 贴上去之后还要排版、画第一帧，再多看两秒
+                gaps.stopAfter(2000L);
             });
         }).start();
+    }
+
+    /**
+     * 生成报告时「卡一下」卡在哪：记下这段时间里界面两帧之间最长隔了多久。
+     *
+     * <p>从开始采集看到结果贴上去之后两秒，然后自己停，把结果写进日志。
+     * 主线程被堵住时下一帧就来得晚，隔多久就是卡了多久。</p>
+     */
+    private final class FrameGapWatch implements android.view.Choreographer.FrameCallback {
+        private final long startMs = android.os.SystemClock.uptimeMillis();
+        private long stopAtMs = Long.MAX_VALUE;
+        private long lastFrameNanos;
+        private long longestGapMs;
+        private int gapsOver100Ms;
+
+        void start() {
+            android.view.Choreographer.getInstance().postFrameCallback(this);
+        }
+
+        void stopAfter(long delayMs) {
+            stopAtMs = android.os.SystemClock.uptimeMillis() + delayMs;
+        }
+
+        @Override
+        public void doFrame(long frameTimeNanos) {
+            if (lastFrameNanos != 0L) {
+                long gapMs = (frameTimeNanos - lastFrameNanos) / 1_000_000L;
+                longestGapMs = Math.max(longestGapMs, gapMs);
+                if (gapMs > 100L) {
+                    gapsOver100Ms++;
+                }
+            }
+            lastFrameNanos = frameTimeNanos;
+            if (android.os.SystemClock.uptimeMillis() < stopAtMs && !isDestroyed()) {
+                android.view.Choreographer.getInstance().postFrameCallback(this);
+            } else {
+                AppLog.i(TAG, "UI while generating the report: longest gap between frames "
+                        + longestGapMs + "ms, " + gapsOver100Ms + " gaps over 100ms, watched "
+                        + (android.os.SystemClock.uptimeMillis() - startMs) + "ms");
+            }
+        }
     }
 
     private void setButtonsEnabled(boolean enabled) {

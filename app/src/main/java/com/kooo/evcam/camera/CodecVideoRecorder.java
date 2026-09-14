@@ -596,6 +596,7 @@ public class CodecVideoRecorder {
             };
             encoderThread.start();
             encoderHandler = new Handler(encoderThread.getLooper());
+            StallWatch.watchLooper("Encoder-" + cameraId, encoderHandler);
 
             // 创建 MediaCodec 编码器
             createEncoder();
@@ -1039,6 +1040,7 @@ public class CodecVideoRecorder {
 
         // 停止编码线程
         if (encoderThread != null) {
+            StallWatch.unwatchLooper("Encoder-" + cameraId);
             encoderThread.quitSafely();
             try {
                 encoderThread.join(1000);

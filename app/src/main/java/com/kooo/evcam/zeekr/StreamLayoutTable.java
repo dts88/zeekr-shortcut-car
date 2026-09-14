@@ -50,7 +50,28 @@ public final class StreamLayoutTable {
 
     /** 启动时认出合成流之后登记一次。 */
     public static void setCompositeCameraId(String cameraId) {
+        String old = compositeCameraId;
         compositeCameraId = cameraId;
+        if (old == null ? cameraId != null : !old.equals(cameraId)) {
+            // 变了才记，带上是谁改的：四宫格拆不拆全看它，改错了画面就是一整条
+            com.kooo.evcam.AppLog.i("StreamLayoutTable", "composite camera " + old + " -> "
+                    + cameraId + ", set by" + callers());
+        }
+    }
+
+    /** 调用 setCompositeCameraId 的那两层。 */
+    private static String callers() {
+        StringBuilder out = new StringBuilder();
+        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+        for (int i = 0; i < stack.length; i++) {
+            if ("setCompositeCameraId".equals(stack[i].getMethodName())) {
+                for (int j = i + 1; j < Math.min(stack.length, i + 3); j++) {
+                    out.append(' ').append(stack[j]);
+                }
+                break;
+            }
+        }
+        return out.toString();
     }
 
     public static String compositeCameraId() {

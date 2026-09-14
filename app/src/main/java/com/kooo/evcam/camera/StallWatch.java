@@ -430,6 +430,8 @@ public final class StallWatch {
         sb.append(safe(RearViewMirrorService::describeForStall)).append('\n');
         sb.append("signals: ").append(describeBeats(now)).append('\n');
         sb.append("threads: ").append(describeLoopers(now)).append('\n');
+        sb.append("main screen surround preview: ")
+                .append(safe(com.kooo.evcam.zeekr.FourLaneContainer::describeAttached)).append('\n');
         appendCameras(sb);
         sb.append("main window preview: ").append(safe(PreviewFrameRates::describe)).append('\n');
         appendMemory(sb, ctx);
@@ -541,8 +543,23 @@ public final class StallWatch {
         sb.append('\n');
     }
 
+    /**
+     * 关键线程的栈。
+     *
+     * <p>不能只靠 {@code Thread.getAllStackTraces()}：车上的虚拟化容器里它只列出几条无关的线程，
+     * 主线程和相机线程都不在里面 —— 2026-09-14 的诊断报告里一条关键线程的栈都没有。
+     * 所以登记过的线程（主线程、相机线程、编码线程）直接从各自的 Looper 取，
+     * 再和系统列出来的合在一起。</p>
+     */
     private static void appendThreads(StringBuilder sb) {
-        Map<Thread, StackTraceElement[]> all = Thread.getAllStackTraces();
+        Map<Thread, StackTraceElement[]> all = new HashMap<>(Thread.getAllStackTraces());
+        int listedBySystem = all.size();
+        for (LooperProbe probe : LOOPERS.values()) {
+            Thread thread = probe.handler.getLooper().getThread();
+            if (!all.containsKey(thread)) {
+                all.put(thread, thread.getStackTrace());
+            }
+        }
         List<Thread> threads = new ArrayList<>(all.keySet());
         Collections.sort(threads, (a, b) -> a.getName().compareTo(b.getName()));
         int skipped = 0;
@@ -553,7 +570,8 @@ public final class StallWatch {
                 skipped++;
             }
         }
-        sb.append('(').append(skipped).append(" other threads not shown)\n");
+        sb.append('(').append(skipped).append(" other threads not shown; the system listed ")
+                .append(listedBySystem).append(")\n");
     }
 
     private static boolean isInteresting(Thread thread) {

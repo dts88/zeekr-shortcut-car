@@ -255,6 +255,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         instance = this;  // 设置静态实例引用
         AppLog.init(this);
+        // 回到主界面时是不是换了一个新实例、Holder 里还有没有旧的相机管理器 ——
+        // 「从诊断页回来四宫格变一整幅」要靠这几行对上
+        AppLog.i(TAG, "onCreate " + instanceTag() + " restored=" + (savedInstanceState != null)
+                + " cameraManagerInHolder="
+                + (com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager() != null));
 
         // 设置字体缩放比例（1.3倍）
         adjustFontScale(1.2f);
@@ -3767,9 +3772,31 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        AppLog.i(TAG, "onStart " + instanceTag() + " surround: " + describeComposite());
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        AppLog.i(TAG, "onRestart " + instanceTag());
+    }
+
+    private String instanceTag() {
+        return "MainActivity@" + Integer.toHexString(System.identityHashCode(this));
+    }
+
+    private String describeComposite() {
+        return compositeContainer == null ? "no surround container in this layout"
+                : compositeContainer.describeState();
+    }
+
+    @Override
     protected void onStop() {
         super.onStop();
         AppLog.d(TAG, "onStop called, isRecording=" + isRecording);
+        AppLog.i(TAG, "onStop " + instanceTag() + " surround: " + describeComposite());
         
         // 如果正在录制但 Activity 即将被销毁，提前停止录制
         // 这给予了比 onDestroy 更充裕的时间来完成清理
@@ -3795,6 +3822,7 @@ public class MainActivity extends AppCompatActivity {
         boolean wasInBackground = isInBackground;
         isInBackground = false;
         com.kooo.evcam.camera.StallWatch.setForeground(true);
+        AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         
         // 标记 Activity 已经完全恢复过一次（用于区分新创建和已存在的 Activity）
         // 这个标记在 onCreate 后第一次 onResume 时设为 true
@@ -3861,6 +3889,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
+                + " changingConfigurations=" + isChangingConfigurations());
 
         // 无论是 recreate 还是 finishing，都清掉 Holder 中的旧引用。
         // isFinishing()=true 时（如从最近任务划掉），release() 会清空 cameras map，

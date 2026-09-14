@@ -158,6 +158,17 @@ public class FourLaneContainer extends ViewGroup {
     /** 长大中的那一格先垫一块底，免得留边的地方透出后面的格子。 */
     private final Paint backdrop = new Paint();
 
+    /**
+     * 最近一个挂上窗口的实例。
+     *
+     * <p>「从诊断页回来，四宫格变成了一整幅」这种事，事后问不出是哪个实例、为什么。
+     * 卡顿报告和诊断报告靠它说出主界面上的四宫格此刻在画什么。</p>
+     */
+    private static volatile java.lang.ref.WeakReference<FourLaneContainer> lastAttached;
+
+    /** 上一帧走的是哪条绘制路径。变了才记日志 —— 每帧都记会把日志冲掉。 */
+    private String drawPath = "";
+
     public FourLaneContainer(Context context) {
         this(context, null);
     }
@@ -213,7 +224,8 @@ public class FourLaneContainer extends ViewGroup {
             return;
         }
         if (!CompositeStreamGeometry.looksLikeComposite(StreamLayoutTable.compositeCameraId(), width, height)) {
-            AppLog.d(TAG, "忽略非合成流尺寸 " + width + "x" + height + "（可能是 HAL 的小尺寸提示）");
+            AppLog.d(TAG, "忽略非合成流尺寸 " + width + "x" + height + "（可能是 HAL 的小尺寸提示）"
+                    + " compositeCamera=" + StreamLayoutTable.compositeCameraId() + " " + instanceTag());
             return;
         }
         if (width == sourceWidth && height == sourceHeight) {
@@ -403,6 +415,55 @@ public class FourLaneContainer extends ViewGroup {
         return plan == null ? "no composite size yet" : plan.toString();
     }
 
+    /** 这个实例此刻的状态，一行。 */
+    public String describeState() {
+        CompositeStreamGeometry.Plan current = plan;
+        Cell[] activeCells = cells;
+        return instanceTag()
+                + " attached=" + isAttachedToWindow()
+                + " shown=" + isShown()
+                + " size=" + getWidth() + "x" + getHeight()
+                + " source=" + sourceWidth + "x" + sourceHeight
+                + " compositeCamera=" + StreamLayoutTable.compositeCameraId()
+                + " plan=" + (current == null ? "none"
+                        : current.isComposite() ? "split into " + current.laneCount() : "not split")
+                + " mode=" + displayMode
+                + " cells=" + (activeCells == null ? "default 2x2" : String.valueOf(activeCells.length))
+                + " drawing=" + (drawPath.isEmpty() ? "not drawn yet" : drawPath);
+    }
+
+    /** 主界面上那个四宫格此刻的状态。 */
+    public static String describeAttached() {
+        java.lang.ref.WeakReference<FourLaneContainer> ref = lastAttached;
+        FourLaneContainer container = ref == null ? null : ref.get();
+        return container == null ? "no container attached" : container.describeState();
+    }
+
+    private String instanceTag() {
+        return "container@" + Integer.toHexString(System.identityHashCode(this));
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        lastAttached = new java.lang.ref.WeakReference<>(this);
+        AppLog.i(TAG, "attached: " + describeState());
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        AppLog.i(TAG, "detached: " + describeState());
+        super.onDetachedFromWindow();
+    }
+
+    /** 绘制路径变了就记一笔。传进来的都是常量字符串，每帧比较不分配。 */
+    private void noteDrawPath(String path) {
+        if (!path.equals(drawPath)) {
+            drawPath = path;
+            AppLog.i(TAG, "now drawing " + path + ": " + describeState());
+        }
+    }
+
     private void rebuildPlan() {
         if (sourceWidth > 0 && sourceHeight > 0) {
             plan = CompositeStreamGeometry.analyse(
@@ -453,6 +514,10 @@ public class FourLaneContainer extends ViewGroup {
         if (textureView == null || current == null || !current.isComposite()
                 || displayMode == DisplayMode.RAW) {
             // 尺寸未知、不是合成流，或用户选了原样显示：走默认绘制
+            noteDrawPath(textureView == null ? "whole frame (no texture view)"
+                    : current == null ? "whole frame (no source size set on this container)"
+                    : !current.isComposite() ? "whole frame (plan says not composite)"
+                    : "whole frame (raw mode)");
             super.dispatchDraw(canvas);
             return;
         }
@@ -462,6 +527,8 @@ public class FourLaneContainer extends ViewGroup {
         if (width <= 0 || height <= 0) {
             return;
         }
+        noteDrawPath(transitioning ? "grow transition"
+                : displayMode == DisplayMode.SINGLE ? "single lane" : "grid");
 
         if (transitioning) {
             // 过渡中：先照常画四宫格（主角那一格除外），再把主角从它自己的格子
