@@ -183,16 +183,13 @@ public final class UpdateFlow {
             toast(activity, activity.getString(R.string.upd_apk_missing));
             return;
         }
-        // Android 8 起「安装未知来源应用」是一项单独授权，没有它 startActivity 会被静默挡掉
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                && !activity.getPackageManager().canRequestPackageInstalls()) {
-            com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
-                    .setTitle(R.string.upd_need_install_title)
-                    .setMessage(R.string.upd_need_install_msg)
-                    .setPositiveButton(R.string.upd_go_settings,
-                            (d, w) -> openInstallPermission(activity))
-                    .setNegativeButton(R.string.action_cancel, null));
-            return;
+        // 不先问 canRequestPackageInstalls()。车上的虚拟化容器（App Lab）里它回 false，
+        // 可系统安装界面其实打得开 —— 浏览器下载的 APK 就是这样装上的。以前先问这一句，
+        // 于是永远弹「需要允许安装应用」，而「去设置」那一页车机上又打不开，应用内更新就卡死了。
+        // 直接交给系统安装器：真缺授权时，安装器会自己提示并带去设置的入口。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AppLog.i(TAG, "canRequestPackageInstalls="
+                    + activity.getPackageManager().canRequestPackageInstalls());
         }
 
         Uri uri;
@@ -211,10 +208,23 @@ public final class UpdateFlow {
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             activity.startActivity(intent);
+        } catch (SecurityException e) {
+            // 系统明确拒绝时才去要授权
+            AppLog.e(TAG, "安装界面被拒绝打开", e);
+            askForInstallPermission(activity);
         } catch (Exception e) {
             AppLog.e(TAG, "打不开安装界面", e);
             toast(activity, activity.getString(R.string.upd_no_installer, e.getMessage()));
         }
+    }
+
+    private static void askForInstallPermission(Activity activity) {
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.upd_need_install_title)
+                .setMessage(R.string.upd_need_install_msg)
+                .setPositiveButton(R.string.upd_go_settings,
+                        (d, w) -> openInstallPermission(activity))
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     private static void openInstallPermission(Activity activity) {

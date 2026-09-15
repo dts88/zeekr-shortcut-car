@@ -77,13 +77,14 @@
                                         android:layout_height="match_parent" />
                                 </com.kooo.evcam.zeekr.FourLaneContainer>
 
+                                <!-- 「环视」在这一块的右上角：左上角是菜单键 -->
                                 <TextView
                                     android:id="@+id/label_front"
                                     android:layout_width="wrap_content"
                                     android:layout_height="36dp"
-                                    android:layout_gravity="top|start"
-                                    android:layout_marginStart="12dp"
+                                    android:layout_gravity="top|end"
                                     android:layout_marginTop="8dp"
+                                    android:layout_marginEnd="12dp"
                                     android:background="@drawable/camera_label_background"
                                     android:gravity="center"
                                     android:paddingStart="12dp"

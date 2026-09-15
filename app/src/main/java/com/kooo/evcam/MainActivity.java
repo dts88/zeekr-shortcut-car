@@ -2012,6 +2012,9 @@ public class MainActivity extends AppCompatActivity {
      *
      * <p>规则统一成<b>各自那一格的左上角</b>：换成任何摆法都说得通，
      * 而「哪个角离容器的哪个角近」在格子能任意摆之后根本没有答案。</p>
+     *
+     * <p>例外有两个，都因为菜单键浮在画面左上角：三路布局里「环视」是整块的角标，
+     * 固定在这一块的右上角，不跟着格子走；四宫格里落在菜单键底下的那一格角标往右让开。</p>
      */
     private void positionLaneLabels(com.kooo.evcam.zeekr.FourLaneContainer.Cell[] cells) {
         TextView[] labels = {
@@ -2028,6 +2031,18 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             int inset = (int) (8 * getResources().getDisplayMetrics().density);
+            boolean paneLabel = findViewById(R.id.cabin_column) != null;
+            int menuRight = 0;
+            int menuBottom = 0;
+            View menu = findViewById(R.id.btn_menu);
+            if (menu != null && menu.getVisibility() == View.VISIBLE) {
+                int[] menuAt = new int[2];
+                int[] containerAt = new int[2];
+                menu.getLocationOnScreen(menuAt);
+                compositeContainer.getLocationOnScreen(containerAt);
+                menuRight = menuAt[0] - containerAt[0] + menu.getWidth();
+                menuBottom = menuAt[1] - containerAt[1] + menu.getHeight();
+            }
             for (com.kooo.evcam.zeekr.FourLaneContainer.Cell cell : cells) {
                 if (cell == null || cell.laneIndex < 0 || cell.laneIndex >= labels.length) {
                     continue;
@@ -2040,11 +2055,20 @@ public class MainActivity extends AppCompatActivity {
                         instanceof android.widget.FrameLayout.LayoutParams)) {
                     continue;
                 }
+                // 三路布局里的「环视」：位置在布局里定好了（这一块的右上角）
+                if (paneLabel && cell.laneIndex == 0) {
+                    continue;
+                }
+                int start = (int) (cell.x * width) + inset;
+                int top = (int) (cell.y * height) + inset;
+                if (top < menuBottom && start < menuRight + inset) {
+                    start = menuRight + inset;
+                }
                 android.widget.FrameLayout.LayoutParams params =
                         (android.widget.FrameLayout.LayoutParams) label.getLayoutParams();
                 params.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
-                params.setMarginStart((int) (cell.x * width) + inset);
-                params.topMargin = (int) (cell.y * height) + inset;
+                params.setMarginStart(start);
+                params.topMargin = top;
                 params.setMarginEnd(0);
                 params.bottomMargin = 0;
                 label.setLayoutParams(params);
@@ -4446,7 +4470,10 @@ public class MainActivity extends AppCompatActivity {
                     || labels[cell].getParent() != compositeContainer.getParent()) {
                 continue;
             }
-            boolean visible = grid || order[cell] == focused;
+            // 三路布局里的「环视」在放大某一格时收起：那时这一块占满画面，
+            // 它的右上角正好是录制角标的位置
+            boolean visible = grid
+                    || (order[cell] == focused && findViewById(R.id.cabin_column) == null);
             labels[cell].setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }

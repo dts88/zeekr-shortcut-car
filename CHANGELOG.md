@@ -7,6 +7,37 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.58.1-beta] - 2026-09-15
+
+Changes since 0.36.1-beta:
+
+- Fixed: updating from inside the app stopped at "Permission to install apps is required".
+  The app asked Android first, and on the car the answer is no even though the installer
+  opens. The download now goes straight to the system installer. Updating from 0.58.0 or
+  earlier still needs this version installed by hand once.
+- The "Surround" label on the main screen is at the top right of its pane; the menu key
+  covered it. In the surround-only layout, a view label under the menu key moves aside.
+- New look aligned with Zeekr OS: main screen, settings, playback and dialogs redesigned,
+  larger text, action buttons on the driver's side.
+- Stream profile editor in Settings -> Recording: choose a recording quality (save space,
+  balanced, sharpest), tune each camera, and drag the surround views into place. Changes
+  apply immediately.
+- The surround + front and rear cabin profile is available to everyone. Cabin cameras
+  support rotation, mirroring and fit, and start mirrored.
+- Higher bitrates (medium is 10 Mbps on the surround grid). Photos use each camera's
+  largest size.
+- Main screen: tap a view to fill the preview, tap again to go back. The bottom-right button
+  hides the app; long-press it to quit.
+- One floating button, with its tap and long-press actions set by you and a position lock.
+- The super mirror has a picture guide, shown the first time it is turned on.
+- Update checks can include or skip beta releases.
+- Stall watch: a report is saved when the super mirror or a recording stops receiving frames.
+- English interface reviewed: outdated text corrected, terms made consistent, explanations
+  shortened.
+- Known issues: cropping a surround view is disabled. After switching the interface language
+  or opening Diagnostics, the surround preview may show the whole unsplit strip until the
+  app is restarted.
+
 ## [0.58.0-beta] - 2026-09-14
 
 First beta since 0.36.1. Highlights since then:
