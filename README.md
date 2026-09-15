@@ -12,6 +12,25 @@ A surround-view dash cam for the ZEEKR 7X head unit.
 
 ---
 
+## Tips
+
+### If the USB drive can't keep up
+
+If recording stops working properly on the USB drive because the files have grown too large:
+
+1. **Lower the frame rate to 10 fps first.** In **Settings → Recording → Edit stream profile**, tap
+   each camera under *Cameras recording* and set **Frame rate** to *10 fps (cap)*.
+2. **Still not working? Then lower the bitrate** for those cameras.
+
+Changes apply from the next recording.
+
+A dash cam's main job is a clear picture. At 10 fps motion looks choppy, but each frame stays sharp.
+
+For anything else, [open an issue](../../issues) and attach a report from **Settings → About →
+Diagnostics**.
+
+---
+
 ## What it does
 
 App Lab gives a third-party app the four surround cameras as **one pre-stitched stream**: four
@@ -57,7 +76,7 @@ Download `ZeekrShortcut-*.apk` from [Releases](../../releases) and sideload it t
 Builds tagged `-alpha` are test builds; the in-app update check only offers beta and stable
 releases.
 
-Then open **Settings → Recording → Video stream profile** and choose *Zeekr 7X (surround
+Then open **Settings → Recording → Stream profile** and choose *Zeekr 7X (surround
 composite)*, or *surround + front and rear cabin* to add the cabin cameras. Restart the app to
 apply. If it reports that no composite stream was detected, this head unit or firmware does not
 provide one and the app will not work on it.
