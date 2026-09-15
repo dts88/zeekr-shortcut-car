@@ -11,8 +11,6 @@
     <dimen name="status_bar_height">48dp</dimen>
     <dimen name="list_width">280dp</dimen>
     <dimen name="rail_width">380dp</dimen>
-    <!-- 三路那一版中间还要摆座舱列，动作栏收窄一些 -->
-    <dimen name="rail_width_compact">300dp</dimen>
     <dimen name="corner_radius">10dp</dimen>
     <dimen name="gutter">12dp</dimen>
 

@@ -16,7 +16,7 @@
 | ① 标题区 | `title_bar_height` = 64dp | 左起：**菜单或返回**（永远在这个位置）· 界面名 · 右侧本界面的一两个动作 |
 | ② 列表栏 | `list_width` = 280dp | 设置的分区、配置编辑的相机、回看的日期。**左侧选、右侧改** |
 | ③ 内容区 | 剩余宽度 | 各界面自己做主。规则只有一条：**一屏之内看完一件事**，放不下就该拆 |
-| ④ 动作栏 | `rail_width` = 380dp（三路布局用 `rail_width_compact` = 300dp） | 这个界面能做的事，按重要性从上往下。**主操作只有一个**。左右舵镜像到另一侧，其余四个区不动 |
+| ④ 动作栏 | `rail_width` = 380dp（三路布局也用这一档：收窄到 300dp 时英文放不下） | 这个界面能做的事，按重要性从上往下。**主操作只有一个**。左右舵镜像到另一侧，其余四个区不动 |
 | ⑤ 状态条 | `status_bar_height` = 48dp | 录制状态 · 存储余量 · 当前流尺寸。始终在，不随界面变。**内容是画面的界面上，它压在画面底边**（见下） |
 
 ### 每个界面用哪几个区
@@ -102,7 +102,7 @@
 ### 尺寸（`dimens.xml`）
 
 `title_bar_height` 64dp · `status_bar_height` 48dp · `list_width` 280dp ·
-`rail_width` 380dp · `rail_width_compact` 300dp · `corner_radius` 10dp ·
+`rail_width` 380dp · `corner_radius` 10dp ·
 `gutter` 12dp · `icon_button_size` 48dp
 
 > 设计稿上写的是 `list_width` 360dp、圆角 16dp。那是拿到实车截图之前的草案，

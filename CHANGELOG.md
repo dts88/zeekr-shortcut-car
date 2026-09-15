@@ -7,6 +7,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.62.0-alpha] - 2026-09-15
+
+- The action column on the main screen is as wide in the surround + cabin layout as in the
+  surround-only one (380dp, was 300dp). In English the record button and the two playback
+  buttons did not fit. The surround and cabin views give up that width.
+
 ## [0.61.0-alpha] - 2026-09-15
 
 - Fixed: saving a diagnostics report crashed the app, and it restarted a few seconds later.

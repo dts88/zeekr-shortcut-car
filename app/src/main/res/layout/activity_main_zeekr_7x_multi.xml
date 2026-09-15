@@ -3,8 +3,8 @@
   极氪 7X「环视 + 两路座舱」布局。统一骨架：① 标题区 · ③ 内容区 · ④ 动作栏 · ⑤ 状态条。
 
   内容区三列：环视合成流四宫格 · 两路座舱上下叠放 · 动作栏。
-  动作栏用收窄的那一档（rail_width_compact），把宽度让给座舱列 ——
-  座舱是 16:10 的画面，列一窄纵向就被压掉一大截。
+  动作栏和只有环视的布局一样宽（rail_width）。原来收窄到 300dp，把宽度让给座舱列，
+  但英文界面里录制键和两块回看键的字放不下（0.61 实车），宽度还给动作栏。
 -->
 <androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -213,7 +213,7 @@
                     </FrameLayout>
                     <include
                         layout="@layout/layout_action_rail"
-                        android:layout_width="@dimen/rail_width_compact"
+                        android:layout_width="@dimen/rail_width"
                         android:layout_height="match_parent"
                         android:layout_marginStart="@dimen/gutter" />
                 </LinearLayout>
