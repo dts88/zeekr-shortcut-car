@@ -92,6 +92,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.apk.outputs.path }}
-          prerelease: true
+          # 带后缀的（-alpha / -beta）是测试版；1.0.0 这种不带后缀的是正式版，显示为 Latest
+          prerelease: ${{ contains(steps.apk.outputs.version, '-') }}
           name: ${{ steps.apk.outputs.version }}
           body_path: RELEASE_NOTES.md

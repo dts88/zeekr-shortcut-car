@@ -6,6 +6,11 @@ Takes the matching section out of CHANGELOG.md so each release shows its own
 changes instead of the same boilerplate every time, then appends the standing
 safety / attribution text.
 
+A stable version (no suffix) is introduced by its changelog section as a whole: that
+section carries its own headings, written as ### in CHANGELOG.md and promoted to ## here.
+Test builds (-alpha, -beta) list the section under "What changed" and keep the warning
+that most of what is new has not been checked on a vehicle.
+
 Usage:  python3 .github/scripts/release_notes.py 0.3.0-alpha > RELEASE_NOTES.md
 """
 import io
@@ -43,39 +48,54 @@ def changelog_section(version):
     return body if body else None
 
 
+def promote_headings(section):
+    """### in CHANGELOG.md (so the section parser keeps them) become ## in the release."""
+    return "\n".join("## " + line[4:] if line.startswith("### ") else line
+                     for line in section.split("\n"))
+
+
 def main():
     version = sys.argv[1] if len(sys.argv) > 1 else "unknown"
+    stable = "-" not in version
 
     out = []
     out.append("## " + APP_NAME + " " + version)
     out.append("")
-    out.append("Download the `.apk` below and sideload it through App Lab.")
-    out.append("")
 
     section = changelog_section(version)
-    if section:
-        out.append("## What changed")
+    if stable:
+        if section:
+            out.append(promote_headings(section))
+            out.append("")
+    else:
+        out.append("Download the `.apk` below and sideload it through App Lab.")
         out.append("")
-        out.append(section)
-        out.append("")
+        if section:
+            out.append("## What changed")
+            out.append("")
+            out.append(section)
+            out.append("")
 
-    out.append("## Verified on the vehicle")
-    out.append("")
-    out.append("Confirmed on a ZEEKR 7X: **the composite stream split into four views**, "
-               "**recording**, and **saving to a USB drive**.")
-    out.append("")
-    out.append("> [!WARNING]")
-    out.append("> Everything else - new features in particular - is **unverified on a vehicle**,")
-    out.append("> and the automated tests cover the pure logic only.")
-    out.append("> **Try anything new in a stationary vehicle first.**")
-    out.append("")
+        out.append("## Verified on the vehicle")
+        out.append("")
+        out.append("Confirmed on a ZEEKR 7X: **the composite stream split into four views**, "
+                   "**recording**, and **saving to a USB drive**.")
+        out.append("")
+        out.append("> [!WARNING]")
+        out.append("> Everything else - new features in particular - is **unverified on a vehicle**,")
+        out.append("> and the automated tests cover the pure logic only.")
+        out.append("> **Try anything new in a stationary vehicle first.**")
+        out.append("")
 
     out.append("## Getting started")
     out.append("")
-    out.append("Open **Settings -> Recording -> Video stream profile**, pick "
-               "*Zeekr 7X (surround composite)*, and restart the app.")
+    out.append("1. Plug in a USB drive.")
+    out.append("2. Open **Settings \u2192 Recording \u2192 Stream profile**, pick "
+               "*Zeekr 7X (surround composite)* or *Zeekr 7X (surround + front and rear cabin)*, "
+               "and restart the app.")
     out.append("")
-    out.append("Something wrong? Export **Menu -> Diagnostics** and attach the report to an issue.")
+    out.append("Something wrong? Export a report from **Settings \u2192 About \u2192 Diagnostics** "
+               "and attach it to an issue.")
     out.append("")
 
     out.append("## Safety")
@@ -83,21 +103,20 @@ def main():
     out.append("Experimental, unofficial software. Not affiliated with, approved by, or endorsed "
                "by ZEEKR, and not certified for any vehicle safety function.")
     out.append("")
-    out.append("- It does not replace the factory dash cam, reversing camera, blind-spot monitor, "
-               "or any other required safety equipment")
+    out.append("- It does not replace the factory dash cam, reversing camera or blind-spot monitor.")
     out.append("- Do not operate it while driving, and do not judge distances or obstacles from "
-               "its picture")
-    out.append("- It competes with the head unit for resources and **may** affect factory "
-               "features; stop using it and uninstall if anything behaves oddly")
-    out.append("- Recordings can contain faces and plate numbers - follow your local law")
-    out.append("")
-    out.append("Full notice: [README](" + REPO + "#readme).")
+               "its picture.")
+    if not stable:
+        out.append("- It competes with the head unit for resources and **may** affect factory "
+                   "features; stop using it and uninstall if anything behaves oddly.")
+    out.append("- Recordings on the USB drive are not encrypted and can contain faces and plate "
+               "numbers. Follow your local law.")
     out.append("")
 
     out.append("## Credits")
     out.append("")
-    out.append("Released under **GPL-3.0**, with "
-               "[EVCam](https://github.com/suyunkai/EVCam) (GPL-3.0, by suyunkai) as its code base.")
+    out.append("Released under **GPL-3.0**, based on "
+               "[EVCam](https://github.com/suyunkai/EVCam) by suyunkai.")
     out.append("")
     sys.stdout.write("\n".join(out) + "\n")
 

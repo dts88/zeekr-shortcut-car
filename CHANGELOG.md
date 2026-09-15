@@ -7,6 +7,23 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.0.0] - 2026-09-15
+
+First stable release. Download the `.apk` below and sideload it through App Lab.
+
+A surround-view dash cam for the ZEEKR 7X head unit. App Lab gives third-party apps the four surround cameras as one stitched strip; this app splits it back into four views and records them.
+
+### Main features
+
+- **Dash cam**: records the surround view as a 2×2 grid, plus the front and rear cabin cameras if you turn them on. Recordings go to a USB drive in 1–10 minute clips.
+- **Recording quality**: three presets (save space, balanced, sharpest), each showing GB per hour and how long your drive will last. Frame rate, bitrate, clip length and codec can be tuned per camera.
+- **Main screen**: tap any view to fill the preview, tap again to go back. Photos use each camera's full resolution.
+- **Super mirror**: a floating window showing one camera enlarged. Drag it, pinch to resize, swipe to change camera or framing, and dock it at the screen edge.
+- **Playback**: continuous playback across clips, photo review, and sending a clip or photo to your phone by QR code over the local network.
+- **Floating button**: shows recording state and opens the app from anywhere; tap and long-press actions are configurable.
+- **Updates**: check for new versions in Settings, with or without beta releases.
+- Chinese and English interface; action buttons on the driver's side.
+
 ## [0.62.0-alpha] - 2026-09-15
 
 - The action column on the main screen is as wide in the surround + cabin layout as in the
