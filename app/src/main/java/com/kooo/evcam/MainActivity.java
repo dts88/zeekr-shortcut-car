@@ -133,6 +133,12 @@ public class MainActivity extends AppCompatActivity {
     private final java.util.List<View> hiddenForExpand = new java.util.ArrayList<>();
     /** 后座舱那一格上边有一道间隙，放大时先拿掉，还原时放回。 */
     private int expandedTopMargin = -1;
+    /** 放大前那一块在屏幕上的矩形 {left, top, width, height}：收回时缩回这里。 */
+    private float[] expandedFrom;
+    /** 收回的过渡正在跑：这时再点一下就直接收完，不再起一次过渡。 */
+    private boolean collapsing;
+    private final com.kooo.evcam.ui.PreviewExpandAnimator expandAnimator =
+            new com.kooo.evcam.ui.PreviewExpandAnimator();
     /** 录制键的三个状态和本段进度都由它画。 */
     private com.kooo.evcam.ui.RecordButtonUi recordButtonUi;
     private MultiCameraManager cameraManager;
@@ -4326,6 +4332,9 @@ public class MainActivity extends AppCompatActivity {
         }
         // 布局可能是重建出来的：上一份布局里的放大状态作废，
         // 但相机对象还是那几个，座舱那一路的「填充」得撤掉
+        expandAnimator.finishNow();
+        collapsing = false;
+        expandedFrom = null;
         hiddenForExpand.clear();
         if (expandedCameraKey != null && cameraManager != null) {
             com.kooo.evcam.camera.SingleCamera camera = cameraManager.getCamera(expandedCameraKey);
@@ -4358,22 +4367,48 @@ public class MainActivity extends AppCompatActivity {
         updateCompositeLabels();
     }
 
-    /** 环视的某一格放大到整块预览区。 */
+    /**
+     * 环视的某一格放大到整块预览区。
+     *
+     * <p>三路布局里长大的是整块环视（座舱那一列让出来），起点是<b>这一格此刻在屏幕上的
+     * 位置</b>，过渡由 {@link #expandAnimator} 做。只有环视的布局里环视本来就占满，
+     * 由容器自己让那一格从格子里长出来。</p>
+     */
     private void expandCompositeLane(int lane) {
-        hideForExpand(findViewById(R.id.cabin_column));
+        View cabinColumn = findViewById(R.id.cabin_column);
         View wrapper = findViewById(R.id.composite_wrapper);
-        expandedPreview = wrapper != null ? wrapper : compositeContainer;
+        View target = wrapper != null ? wrapper : compositeContainer;
+        boolean paneGrows = cabinColumn != null && cabinColumn.getVisibility() == View.VISIBLE;
+        float[] from = paneGrows ? laneRectOnScreen(lane) : null;
+        hideForExpand(cabinColumn);
+        expandedPreview = target;
         expandedCameraKey = null;
-        compositeContainer.focusLane(lane);
+        expandedFrom = from;
+        compositeContainer.focusLane(lane, !paneGrows);
+        if (paneGrows) {
+            expandAnimator.grow(target, from);
+        }
         updateCompositeLabels();
     }
 
-    /** 座舱的某一路放大到整块预览区；已经放大了就还原。 */
+    /** 环视的某一格此刻在屏幕上的矩形 {left, top, width, height}；量不出来时为 null。 */
+    private float[] laneRectOnScreen(int lane) {
+        android.graphics.RectF bounds = new android.graphics.RectF();
+        if (!compositeContainer.laneBounds(lane, bounds)) {
+            return null;
+        }
+        float[] container = com.kooo.evcam.ui.PreviewExpandAnimator.screenRect(compositeContainer);
+        return new float[]{container[0] + bounds.left, container[1] + bounds.top,
+                bounds.width(), bounds.height()};
+    }
+
+    /** 座舱的某一路放大到整块预览区；已经放大了就还原。过渡从这一格此刻的位置长出来。 */
     private void toggleCabinExpanded(View pane, String cameraKey) {
         if (expandedPreview != null) {
             collapsePreview();
             return;
         }
+        float[] from = com.kooo.evcam.ui.PreviewExpandAnimator.screenRect(pane);
         hideForExpand(findViewById(R.id.composite_wrapper));
         hideForExpand(findViewById(pane.getId() == R.id.pane_cabin_front
                 ? R.id.pane_cabin_rear : R.id.pane_cabin_front));
@@ -4386,7 +4421,9 @@ public class MainActivity extends AppCompatActivity {
         }
         expandedPreview = pane;
         expandedCameraKey = cameraKey;
+        expandedFrom = from;
         setCabinFill(cameraKey, true);
+        expandAnimator.grow(pane, from);
     }
 
     /** 只收起本来看得见的：本来就藏着的（这一路没配）还原时也不该冒出来。 */
@@ -4397,14 +4434,45 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** 放回原样。 */
+    /** 放回原样：先缩回放大前的位置，再把布局还原。 */
     private void collapsePreview() {
         View expanded = expandedPreview;
+        if (expanded == null) {
+            return;
+        }
+        if (collapsing) {
+            // 收回的过渡还在跑时又点了一下：直接收完
+            expandAnimator.finishNow();
+            return;
+        }
+        // 只有环视的布局里，放大的是容器里的一格、布局没动过，由容器自己缩回格子
+        boolean paneShrinks = expandedCameraKey != null || !hiddenForExpand.isEmpty();
+        float[] to = expandedFrom;
+        if (!paneShrinks || to == null) {
+            finishCollapse(!paneShrinks);
+            return;
+        }
+        collapsing = true;
+        expandAnimator.shrink(expanded, to, () -> finishCollapse(false));
+    }
+
+    /**
+     * 还原布局。
+     *
+     * @param gridAnimates 只有环视的布局里为 true：由容器让那一格缩回格子
+     */
+    private void finishCollapse(boolean gridAnimates) {
+        View expanded = expandedPreview;
         String cameraKey = expandedCameraKey;
+        collapsing = false;
+        if (expanded == null) {
+            return;
+        }
         // 先清状态再恢复形状：applyPreviewSizeTransform 会看 expandedCameraKey，
         // 不先清的话它还会按「放大中」把视图摆成铺满
         expandedPreview = null;
         expandedCameraKey = null;
+        expandedFrom = null;
         for (View view : hiddenForExpand) {
             view.setVisibility(View.VISIBLE);
         }
@@ -4419,7 +4487,7 @@ public class MainActivity extends AppCompatActivity {
             }
             setCabinFill(cameraKey, false);
         } else if (compositeContainer != null) {
-            compositeContainer.showGrid();
+            compositeContainer.showGrid(gridAnimates);
             updateCompositeLabels();
         }
         expandedTopMargin = -1;

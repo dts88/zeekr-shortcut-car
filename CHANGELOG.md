@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.60.0-alpha] - 2026-09-15
+
+- Tap-to-enlarge in the surround + cabin layout grows each view from where it actually is on
+  screen: a surround view from its own cell, a cabin camera from its pane, and back the same
+  way. The surround view used to grow from its position in the surround-only layout, and the
+  cabin cameras had no transition. Start and end points are measured, so the transition
+  keeps working when view placement changes.
+
 ## [0.59.0-alpha] - 2026-09-15
 
 - New app icon: a car seen from above inside four arcs, one for each camera view. It has a

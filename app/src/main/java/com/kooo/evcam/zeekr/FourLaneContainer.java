@@ -303,27 +303,42 @@ public class FourLaneContainer extends ViewGroup {
 
     /** 切到只看某一个画面。从四宫格点开时，那一格长到铺满。 */
     public void focusLane(int index) {
+        focusLane(index, true);
+    }
+
+    /**
+     * @param animate false 时不在容器里做「从格子长出来」的过渡。三路布局里放大时长大的是
+     *                整块环视，过渡由主界面按实际位置做；容器里再长一次就是两层动画叠在一起
+     */
+    public void focusLane(int index, boolean animate) {
         if (index < 0 || index >= CompositeStreamGeometry.LANE_COUNT) {
             return;
         }
         boolean fromGrid = displayMode == DisplayMode.GRID;
         focusedLane = index;
         displayMode = DisplayMode.SINGLE;
-        if (fromGrid) {
+        if (fromGrid && animate) {
             animateGrow(0f, 1f);
         } else {
             // 单画面里点一下换下一路：同一个位置换内容，不需要过渡
+            stopGrow();
             invalidate();
         }
     }
 
     /** 回到 2x2 四宫格。从单画面收回时，那一格缩回自己的格子。 */
     public void showGrid() {
+        showGrid(true);
+    }
+
+    /** @param animate false 时直接回到四宫格，理由同 {@link #focusLane(int, boolean)} */
+    public void showGrid(boolean animate) {
         boolean fromSingle = displayMode == DisplayMode.SINGLE;
         displayMode = DisplayMode.GRID;
-        if (fromSingle) {
+        if (fromSingle && animate) {
             animateGrow(1f, 0f);
         } else {
+            stopGrow();
             invalidate();
         }
     }
@@ -587,6 +602,20 @@ public class FourLaneContainer extends ViewGroup {
             float top = (cell / 2) * cellHeight;
             drawLane(canvas, current.lane(laneIndex), null, left, top, cellWidth, cellHeight, null);
         }
+    }
+
+    /**
+     * 某一路此刻在容器里占的矩形（容器坐标）；还没量出尺寸时返回 false。
+     * 放大过渡拿它当起点：按配置里的摆位算，不假设 2×2。
+     */
+    public boolean laneBounds(int laneIndex, RectF out) {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        gridRectFor(laneIndex, width, height, out);
+        return true;
     }
 
     /** 某一路在四宫格里占的那块矩形 —— 过渡的起点（或终点）。 */
