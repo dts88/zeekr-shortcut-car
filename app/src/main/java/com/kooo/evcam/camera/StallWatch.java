@@ -1,7 +1,9 @@
 package com.kooo.evcam.camera;
 
 import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
 import android.content.Context;
+import android.os.Build;
 import android.os.Debug;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -262,6 +264,10 @@ public final class StallWatch {
         } else {
             sb.append(saved);
         }
+        sb.append("===== previous process exits, newest first =====\n");
+        appendExitReasons(sb, ctx);
+        sb.append("===== crash in the previous run =====\n");
+        appendPreviousCrash(sb, ctx);
         return sb.toString();
     }
 
@@ -615,6 +621,103 @@ public final class StallWatch {
             if (process != null) {
                 process.destroy();
             }
+        }
+    }
+
+    // ------------------------------------------------------------------ 进程退出
+
+    /**
+     * 最近几次进程为什么退出（Android 11 起系统记着）。
+     *
+     * <p>应用被悄悄重启过的话，这里能看出是崩溃、被系统杀掉还是自己退出的。
+     * 2026-09-15 那几份诊断报告进程号各不相同，当时没有这一节，只能从代码里倒推。</p>
+     */
+    private static void appendExitReasons(StringBuilder sb, Context ctx) {
+        if (ctx == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            sb.append("(not available on this Android version)\n");
+            return;
+        }
+        try {
+            ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+            List<ApplicationExitInfo> exits = am == null ? null
+                    : am.getHistoricalProcessExitReasons(ctx.getPackageName(), 0, 8);
+            if (exits == null || exits.isEmpty()) {
+                sb.append("(none recorded)\n");
+                return;
+            }
+            for (ApplicationExitInfo exit : exits) {
+                sb.append(wallClock(exit.getTimestamp()))
+                        .append(" pid=").append(exit.getPid())
+                        .append(' ').append(exitReasonName(exit.getReason()))
+                        .append(" status=").append(exit.getStatus())
+                        .append(" importance=").append(exit.getImportance())
+                        .append(" pss=").append(exit.getPss() / 1024).append("MB");
+                if (exit.getDescription() != null) {
+                    sb.append(" (").append(exit.getDescription()).append(')');
+                }
+                sb.append('\n');
+            }
+        } catch (Exception e) {
+            sb.append("(unavailable: ").append(e).append(")\n");
+        }
+    }
+
+    private static String exitReasonName(int reason) {
+        switch (reason) {
+            case ApplicationExitInfo.REASON_EXIT_SELF:
+                return "EXIT_SELF";
+            case ApplicationExitInfo.REASON_SIGNALED:
+                return "SIGNALED";
+            case ApplicationExitInfo.REASON_LOW_MEMORY:
+                return "LOW_MEMORY";
+            case ApplicationExitInfo.REASON_CRASH:
+                return "CRASH";
+            case ApplicationExitInfo.REASON_CRASH_NATIVE:
+                return "CRASH_NATIVE";
+            case ApplicationExitInfo.REASON_ANR:
+                return "ANR";
+            case ApplicationExitInfo.REASON_INITIALIZATION_FAILURE:
+                return "INITIALIZATION_FAILURE";
+            case ApplicationExitInfo.REASON_PERMISSION_CHANGE:
+                return "PERMISSION_CHANGE";
+            case ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE:
+                return "EXCESSIVE_RESOURCE_USAGE";
+            case ApplicationExitInfo.REASON_USER_REQUESTED:
+                return "USER_REQUESTED";
+            case ApplicationExitInfo.REASON_USER_STOPPED:
+                return "USER_STOPPED";
+            case ApplicationExitInfo.REASON_DEPENDENCY_DIED:
+                return "DEPENDENCY_DIED";
+            case ApplicationExitInfo.REASON_OTHER:
+                return "OTHER";
+            default:
+                return "UNKNOWN(" + reason + ")";
+        }
+    }
+
+    /**
+     * 上一次运行里 AppLog 记下的崩溃：崩溃时整段日志存进当前会话文件，
+     * 下次主界面启动时轮换成「上一次」。系统的退出记录只说崩了，不说崩在哪一行。
+     */
+    private static void appendPreviousCrash(StringBuilder sb, Context ctx) {
+        if (ctx == null) {
+            sb.append("(no context)\n");
+            return;
+        }
+        List<String> lines = AppLog.getPreviousSessionLogs(ctx);
+        int at = -1;
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            if (lines.get(i).contains("APPLICATION CRASH")) {
+                at = i;
+                break;
+            }
+        }
+        if (at < 0) {
+            sb.append("(none)\n");
+            return;
+        }
+        for (int i = at; i < Math.min(lines.size(), at + 40); i++) {
+            sb.append(lines.get(i)).append('\n');
         }
     }
 

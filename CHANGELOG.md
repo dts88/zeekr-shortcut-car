@@ -7,6 +7,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.61.0-alpha] - 2026-09-15
+
+- Fixed: saving a diagnostics report crashed the app, and it restarted a few seconds later.
+  The "saved" message was shown from a background thread, which Android does not allow.
+- Fixed: after the app restarted or the interface language changed, the surround preview
+  could show the whole strip, unsplit and stretched. When the main screen reused cameras
+  the super mirror had already opened, the step that passes the stream size to the surround
+  view sat behind a check the surround camera also passes, so it never ran.
+- Diagnostics and saved logs list the last few reasons the app process exited (crash,
+  killed, low memory and so on) and the crash from the previous run, if any.
+
 ## [0.60.0-alpha] - 2026-09-15
 
 - Tap-to-enlarge in the surround + cabin layout grows each view from where it actually is on

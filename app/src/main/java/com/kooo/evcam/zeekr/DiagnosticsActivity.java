@@ -433,7 +433,13 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * saveReport 在后台线程上跑，也会走到这里。没有 Looper 的线程上 Toast.makeText 直接抛异常，
+     * 而后台线程的异常会让整个进程崩掉 —— 诊断报告每存一次，应用就被重启一次
+     * （2026-09-15 那几份报告的进程号各不相同，就是这个）。一律抛回主线程。
+     */
     private void toast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Context app = getApplicationContext();
+        mainHandler.post(() -> Toast.makeText(app, message, Toast.LENGTH_LONG).show());
     }
 }

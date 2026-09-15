@@ -2580,6 +2580,26 @@ public class MainActivity extends AppCompatActivity {
     private void applyPreviewSizeTransform(String cameraKey, AutoFitTextureView textureView, android.util.Size previewSize) {
         String carModel = appConfig.getCarModel();
 
+        // 极氪合成流：比例与排版由 FourLaneContainer 负责。
+        //
+        // 这一段必须排在下面「配置里有这一格」前面：环视在配置里也有格子（四格），
+        // 排在后面就永远走不到这里。冷启动时 initCamerasForZeekrMulti 会另外把尺寸交给容器，
+        // 所以一直没露馅；应用被重启、主界面复用后视镜在后台建好的相机时只剩这一条路，
+        // 容器拿不到尺寸，环视就成了一整条被拉伸的画面（2026-09-15 的诊断报告）。
+        //
+        // 这里绝不能给 TextureView 设 1280:5140 这种长条宽高比或预览矩阵，
+        // 否则子视图会被测量成细长条，四宫格就错位了。
+        if (compositeContainer != null && textureView == textureFront) {
+            // 只有看起来像合成流的尺寸才更新几何；HAL 有时会给一个压扁的小尺寸提示，
+            // 那种尺寸会被容器忽略，已探测到的正确几何得以保留。
+            compositeContainer.setSourceSize(previewSize);
+            AppLog.d(TAG, "合成流预览尺寸: " + previewSize
+                    + " -> " + compositeContainer.describePlan());
+            updateCompositeInfoOverlay(compositeSummary(
+                    com.kooo.evcam.zeekr.StreamLayoutTable.compositeCameraId(), previewSize));
+            return;
+        }
+
         // 配置里有这一路的那一格时，矩阵由 SingleCamera 一家说了算。
         //
         // 这里原来按车型分了好几个分支，每一条最后都会往 TextureView 上写一次矩阵
@@ -2613,20 +2633,6 @@ public class MainActivity extends AppCompatActivity {
             AppLog.d(TAG, "设置 " + cameraKey + (fill ? " 铺满整格" : " 宽高比 "
                     + previewSize.getWidth() + ":" + previewSize.getHeight())
                     + "，摆位交给配置（SingleCamera）");
-            return;
-        }
-
-        // 极氪合成流：比例与排版由 FourLaneContainer 负责。
-        // 这里绝不能给 TextureView 设 1280:5140 这种长条宽高比或预览矩阵，
-        // 否则子视图会被测量成细长条，四宫格就错位了。
-        if (compositeContainer != null && textureView == textureFront) {
-            // 只有看起来像合成流的尺寸才更新几何；HAL 有时会给一个压扁的小尺寸提示，
-            // 那种尺寸会被容器忽略，已探测到的正确几何得以保留。
-            compositeContainer.setSourceSize(previewSize);
-            AppLog.d(TAG, "合成流预览尺寸: " + previewSize
-                    + " -> " + compositeContainer.describePlan());
-            updateCompositeInfoOverlay(compositeSummary(
-                    com.kooo.evcam.zeekr.StreamLayoutTable.compositeCameraId(), previewSize));
             return;
         }
 
