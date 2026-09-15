@@ -32,12 +32,13 @@ splits it back into a 2×2 grid and builds on that.
 On the main screen, tap any view to fill the preview with it and tap again to go back. A floating
 button shows whether recording is running and opens the app from anywhere.
 
-### Electronic rear-view mirror
+### Super mirror
 
-A floating, dockable window showing any one camera enlarged. Pinch to zoom; swipe left or right to
-change camera; swipe up or down in the middle third to raise or lower the framing. Push it half
-off-screen to hide it at the edge, and tap to bring it back. The rear camera is mirrored, like a
-real mirror. Fisheye correction with an adjustable field of view is optional.
+An electronic rear-view mirror: a floating, dockable window showing any one camera enlarged. Pinch
+to zoom; swipe left or right to change camera; swipe up or down in the middle third to raise or
+lower the framing. Push it half off-screen to hide it at the edge, and tap to bring it back. The
+rear camera is mirrored, like a real mirror. Fisheye correction with an adjustable field of view is
+optional.
 
 ### Send to your phone
 
