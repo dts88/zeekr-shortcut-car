@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [0.59.0-alpha] - 2026-09-15
+
+- New app icon: a car seen from above inside four arcs, one for each camera view. It has a
+  monochrome layer for themed icons on Android 13 and later, and the camera service
+  notification uses the same mark instead of the Android robot.
+- Removed icon files nothing used: per-density launcher bitmaps (the adaptive icon always
+  applies from Android 8, and the app needs 9), the template robot and an EVCam wordmark.
+
 ## [0.58.1-beta] - 2026-09-15
 
 Changes since 0.36.1-beta:

@@ -43,9 +43,6 @@
     <color name="nav_icon_tint_selected">@color/text_primary</color>
     <color name="nav_text_primary">@color/text_primary</color>
     <color name="nav_text_secondary">@color/text_secondary</color>
-    <color name="nav_logo_background">@color/text_primary</color>
-    <color name="nav_logo_foreground">@color/surface</color>
-    <color name="nav_logo_accent">@color/energy</color>
     <color name="nav_section_title">@color/text_tertiary</color>
     <color name="nav_version_text">@color/text_tertiary</color>
     <color name="preview_background">@color/bg</color>

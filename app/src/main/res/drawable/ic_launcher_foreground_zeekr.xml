@@ -1,11 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
-  极氪即刻的图标前景：四宫格 + 录制点。
+  极氪即刻的图标前景：从车顶往下看的车身，外面四段弧是前、后、左、右四路画面，车头朝上。
 
-  取自这个应用实际在做的事 —— 把一路环视合成流拆成四宫格并录下来。
-  之前一直沿用 EVCam 的图标，那是别人的品牌标识；GPL 管的是代码，不含商标与图标。
-
-  108x108 是自适应图标的画布，安全区是以 (54,54) 为心、半径 36 的圆。
-  所有笔画都收在半径 34 以内，任何遮罩形状下都不会被切掉。
+  108x108 是自适应图标的画布，桌面只露出中间 72x72；安全区是以 (54,54) 为心、直径 66 的圆。
+  弧线外沿在半径 25.3，车身在半径 15 以内，任何遮罩形状下都切不到。
+  改几何时 ic_launcher_monochrome（主题图标）和 ic_stat_app（通知栏）要一起改。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -13,22 +12,20 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 四宫格：左上 / 右上 / 左下 / 右下 -->
+    <!-- 四段弧：前 / 右 / 后 / 左 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,30 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M59,30 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,49 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M59,49 h17 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-17 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" />
+        android:pathData="M42.5,34.08 A23,23 0 0 1 65.5,34.08 M73.92,42.5 A23,23 0 0 1 73.92,65.5 M65.5,73.92 A23,23 0 0 1 42.5,73.92 M34.08,65.5 A23,23 0 0 1 34.08,42.5"
+        android:strokeColor="#F0622D"
+        android:strokeWidth="4.6"
+        android:strokeLineCap="round" />
 
-    <!-- 录制点 -->
+    <!-- 车身 -->
     <path
-        android:fillColor="#FF3B30"
-        android:pathData="M48,76 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z" />
+        android:fillColor="#2A2B2E"
+        android:pathData="M46.75,45.5 A6.5,6.5 0 0 1 53.25,39 H54.75 A6.5,6.5 0 0 1 61.25,45.5 V62.5 A6.5,6.5 0 0 1 54.75,69 H53.25 A6.5,6.5 0 0 1 46.75,62.5 Z" />
+
+    <!-- 前挡与后窗 -->
+    <path
+        android:fillColor="#9EA0A5"
+        android:pathData="M48.78,47.21 Q54,44.94 59.22,47.21 L58.35,51.86 Q54,50.86 49.65,51.86 Z M49.65,60.79 Q54,61.71 58.35,60.79 L59.08,64 Q54,65.57 48.93,64 Z" />
 </vector>
