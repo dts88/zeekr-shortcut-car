@@ -12,25 +12,6 @@ A surround-view dash cam for the ZEEKR 7X head unit.
 
 ---
 
-## Tips
-
-### If the USB drive can't keep up
-
-If recording stops working properly on the USB drive because the files have grown too large:
-
-1. **Lower the frame rate to 10 fps first.** In **Settings → Recording → Edit stream profile**, tap
-   each camera under *Cameras recording* and set **Frame rate** to *10 fps (cap)*.
-2. **Still not working? Then lower the bitrate** for those cameras.
-
-Changes apply from the next recording.
-
-A dash cam's main job is a clear picture. At 10 fps motion looks choppy, but each frame stays sharp.
-
-For anything else, [open an issue](../../issues) and attach a report from **Settings → About →
-Diagnostics**.
-
----
-
 ## What it does
 
 App Lab gives a third-party app the four surround cameras as **one pre-stitched stream**: four
@@ -90,6 +71,25 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 The repo ships a public AOSP test signing key (password `android`). Override it with your own
 through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEKR_KEY_PASSWORD`.
+
+---
+
+## Tips
+
+### If the USB drive can't keep up
+
+If recording stops working properly on the USB drive because the files have grown too large:
+
+1. **Lower the frame rate to 10 fps first.** In **Settings → Recording → Edit stream profile**, tap
+   each camera under *Cameras recording* and set **Frame rate** to *10 fps (cap)*.
+2. **Still not working? Then lower the bitrate** for those cameras.
+
+Changes apply from the next recording.
+
+A dash cam's main job is a clear picture. At 10 fps motion looks choppy, but each frame stays sharp.
+
+For anything else, [open an issue](../../issues) and attach a report from **Settings → About →
+Diagnostics**.
 
 ---
 
