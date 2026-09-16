@@ -53,10 +53,13 @@ to turn on the phone's hotspot and connect the car to it.
 
 ## Install
 
-- **Stable — [1.0.0](../../releases/tag/v1.0.0)**, or whatever is newest at
-  [Releases · latest](../../releases/latest). Start here.
-- **Everything, including test builds — [Releases](../../releases).** Builds tagged `-alpha` are
-  unverified; the in-app update check never offers them, only beta and stable releases.
+- **Recommended — the [latest stable release](../../releases/latest).** The first stable release
+  was [1.0.0](../../releases/tag/v1.0.0).
+- **Happy to try things early — the newest `-beta` on the [Releases](../../releases) page.** Or
+  turn on *Include beta releases* under Settings → Check for updates and let the app fetch it.
+- Builds tagged `-alpha` are **not recommended**: they are test builds, often unverified on a
+  vehicle. The in-app update check never offers them. They are on the same
+  [Releases](../../releases) page if you want one anyway.
 
 Download the `ZeekrShortcut-*.apk` asset from the release page and sideload it through App Lab.
 

@@ -46,10 +46,12 @@
 
 ## 安装
 
-- **正式版 —— [1.0.0](../../releases/tag/v1.0.0)**，或者
-  [Releases · latest](../../releases/latest) 上最新的那个。从这里开始。
-- **全部版本（含测试版）—— [Releases](../../releases)。** 带 `-alpha` 的是未经验证的测试版；
-  应用内的检查更新不会推送它们，只推 beta 和正式版。
+- **推荐 —— [最新正式版](../../releases/latest)。** 第一个正式版是
+  [1.0.0](../../releases/tag/v1.0.0)。
+- **想尝鲜 —— [Releases](../../releases) 页面上最新的 `-beta`。** 也可以在
+  设置 → 检查更新 里打开「接收 Beta 版」，让应用自己取。
+- 带 `-alpha` 的**不建议使用**：那是测试版，多数没有在车上验证过。应用内的检查更新不会推送它们；
+  真要装的话，它们也在同一个 [Releases](../../releases) 页面上。
 
 在发布页下载 `ZeekrShortcut-*.apk`，通过 App Lab 侧载安装。
 
