@@ -6,7 +6,7 @@ import androidx.core.os.LocaleListCompat;
 import com.kooo.evcam.AppLog;
 
 /**
- * 界面语言：跟随系统 / 中文 / English。
+ * 界面语言：跟随系统 / 中文 / English / Bahasa Melayu。
  *
  * <h3>用系统自己的「按应用设定语言」</h3>
  *
@@ -19,7 +19,7 @@ import com.kooo.evcam.AppLog;
  * <h3>为什么默认跟随系统</h3>
  *
  * <p>车机本来是什么语言，这个应用就该是什么语言 —— 这是不需要任何人做决定的默认。
- * 另外两档留给「系统语言和使用者的偏好不一致」的情况。</p>
+ * 其余几档留给「系统语言和使用者的偏好不一致」的情况。</p>
  */
 public final class Languages {
 
@@ -31,6 +31,8 @@ public final class Languages {
     public static final String CHINESE = "zh";
     /** 英文。 */
     public static final String ENGLISH = "en";
+    /** 马来语。 */
+    public static final String MALAY = "ms";
 
     private Languages() {
     }
@@ -49,6 +51,9 @@ public final class Languages {
         }
         if (ENGLISH.equals(mode)) {
             return "en";
+        }
+        if (MALAY.equals(mode)) {
+            return "ms";
         }
         // 包括 auto 和任何不认识的值：不指定，交回给系统
         return "";

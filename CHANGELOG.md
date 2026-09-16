@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.1.0-alpha] - 2026-09-16
+
+- **Malay interface.** Every screen is translated: Settings, the stream profile editor,
+  playback, the super mirror, diagnostics, dialogs and notifications. Pick it in
+  Settings -> System -> Language, or let it follow the head unit when that is set to
+  Malay. Text sizes are the same as in English.
+
 ## [1.0.0] - 2026-09-15
 
 First stable release. Download the `.apk` below and sideload it through App Lab.

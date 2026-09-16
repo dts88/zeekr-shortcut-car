@@ -22,6 +22,7 @@ public class LanguagesTest {
     public void explicitChoicesMapToLanguageTags() {
         assertEquals("zh-CN", Languages.tagsFor(Languages.CHINESE));
         assertEquals("en", Languages.tagsFor(Languages.ENGLISH));
+        assertEquals("ms", Languages.tagsFor(Languages.MALAY));
     }
 
     /** 存坏了的值不该锁到某个语言上，回到跟随系统才是安全的落点。 */
@@ -32,14 +33,15 @@ public class LanguagesTest {
         assertTrue(Languages.tagsFor(null).isEmpty());
     }
 
-    /** 这三个值就是设置项里的三档，两边必须对得上。 */
+    /** 这几个值就是设置项里的那几档，两边必须对得上。 */
     @Test
-    public void theThreeModesAreExactlyTheOnesInTheSetting() {
+    public void theModesAreExactlyTheOnesInTheSetting() {
         String[] values = SettingsRegistry.LANGUAGE.values();
-        assertEquals(3, values.length);
+        assertEquals(4, values.length);
         assertEquals(Languages.AUTO, values[0]);
         assertEquals(Languages.CHINESE, values[1]);
         assertEquals(Languages.ENGLISH, values[2]);
+        assertEquals(Languages.MALAY, values[3]);
         assertEquals(Languages.AUTO, SettingsRegistry.LANGUAGE.defaultValue);
     }
 }

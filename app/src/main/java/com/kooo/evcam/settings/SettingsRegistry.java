@@ -52,13 +52,14 @@ public final class SettingsRegistry {
      * 界面语言。
      *
      * <p>默认<b>跟随系统</b> —— 车机本来是什么语言，这个应用就该是什么语言。
-     * 另外两档是明确指定，用于系统语言和使用者的偏好不一致的情况。</p>
+     * 其余几档是明确指定，用于系统语言和使用者的偏好不一致的情况。</p>
      */
     public static final SettingSpec LANGUAGE = SettingSpec.of(
             "language", "语言", "auto",
             entry("auto", "跟随系统", R.string.lang_auto),
             entry("zh", "中文", R.string.lang_zh),
-            entry("en", "English", R.string.lang_en));
+            entry("en", "English", R.string.lang_en),
+            entry("ms", "Bahasa Melayu", R.string.lang_ms));
 
     /**
      * 动作栏（录制、拍照那一列）放在屏幕哪一侧。

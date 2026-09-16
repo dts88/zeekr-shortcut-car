@@ -18,12 +18,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 中英两份 strings.xml 必须对得上。
+ * 每一份翻译的 strings.xml 都要和中文那份对得上。
  *
  * <h3>为什么值得测</h3>
  *
- * <p>少一条英文，界面上就会在一片英文里冒出一句中文 —— 不报错，只是难看，
- * 而且往往要等到有人截图才被发现。</p>
+ * <p>少一条翻译，界面上就会在一片外文里冒出一句中文 —— 不报错，只是难看，
+ * 而且往往要等到有人截图才被发现。语言是一份一份加的，所以这里按目录列表遍历：
+ * 新增一种语言时只改这一处。</p>
  *
  * <p>更严重的是<b>占位符对不上</b>：中文写 {@code %1$s} 而英文漏了，
  * {@code getString(id, arg)} 在运行期直接抛异常，界面当场崩。
@@ -35,31 +36,42 @@ public class StringResourceParityTest {
             "<string\\s+name=\"([^\"]+)\"[^>]*>(.*?)</string>", Pattern.DOTALL);
     private static final Pattern PLACEHOLDER = Pattern.compile("%\\d\\$[sd]");
 
+    /** 翻译目录。新增一种语言时，这里和 xml/locales_config.xml 一起改。 */
+    private static final String[] TRANSLATIONS = {"values-en", "values-ms"};
+
     @Test
-    public void everyChineseStringHasAnEnglishOneWithMatchingPlaceholders() throws IOException {
+    public void everyChineseStringHasATranslationWithMatchingPlaceholders() throws IOException {
         File module = findModuleRoot();
         assumeTrue("定位不到模块根目录，跳过", module != null);
 
         Map<String, String> zh = parse(new File(module, "src/main/res/values/strings.xml"));
-        Map<String, String> en = parse(new File(module, "src/main/res/values-en/strings.xml"));
-        assumeTrue("读不到 strings.xml，跳过", !zh.isEmpty() && !en.isEmpty());
+        assumeTrue("读不到中文 strings.xml，跳过", !zh.isEmpty());
 
-        TreeSet<String> missing = new TreeSet<>(zh.keySet());
-        missing.removeAll(en.keySet());
-        assertTrue("这些条目没有英文，英文界面上会露出中文: " + missing, missing.isEmpty());
+        for (String dir : TRANSLATIONS) {
+            Map<String, String> other = parse(
+                    new File(module, "src/main/res/" + dir + "/strings.xml"));
+            assertTrue("读不到 " + dir + "/strings.xml", !other.isEmpty());
 
-        TreeSet<String> stray = new TreeSet<>(en.keySet());
-        stray.removeAll(zh.keySet());
-        assertTrue("这些英文条目在中文里没有对应，多半是改名后忘了删: " + stray, stray.isEmpty());
+            TreeSet<String> missing = new TreeSet<>(zh.keySet());
+            missing.removeAll(other.keySet());
+            assertTrue("这些条目没有 " + dir + " 翻译，那个界面上会露出中文: " + missing,
+                    missing.isEmpty());
 
-        List<String> mismatched = new ArrayList<>();
-        for (Map.Entry<String, String> entry : zh.entrySet()) {
-            if (!placeholders(entry.getValue()).equals(placeholders(en.get(entry.getKey())))) {
-                mismatched.add(entry.getKey());
+            TreeSet<String> stray = new TreeSet<>(other.keySet());
+            stray.removeAll(zh.keySet());
+            assertTrue("这些 " + dir + " 条目在中文里没有对应，多半是改名后忘了删: " + stray,
+                    stray.isEmpty());
+
+            List<String> mismatched = new ArrayList<>();
+            for (Map.Entry<String, String> entry : zh.entrySet()) {
+                if (!placeholders(entry.getValue())
+                        .equals(placeholders(other.get(entry.getKey())))) {
+                    mismatched.add(entry.getKey());
+                }
             }
+            assertTrue("这些条目和 " + dir + " 的占位符不一致，运行期格式化会抛异常: "
+                    + mismatched, mismatched.isEmpty());
         }
-        assertTrue("这些条目中英占位符不一致，运行期格式化会抛异常: " + mismatched,
-                mismatched.isEmpty());
     }
 
     private static TreeSet<String> placeholders(String text) {
@@ -112,7 +124,7 @@ public class StringResourceParityTest {
         assumeTrue("定位不到模块根目录，跳过", module != null);
 
         List<String> offenders = new ArrayList<>();
-        for (String dir : new String[]{"values", "values-en"}) {
+        for (String dir : new String[]{"values", "values-en", "values-ms"}) {
             File file = new File(module, "src/main/res/" + dir + "/strings.xml");
             if (!file.isFile()) {
                 continue;
