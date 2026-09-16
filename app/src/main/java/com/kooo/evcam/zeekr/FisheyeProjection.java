@@ -31,6 +31,20 @@ public final class FisheyeProjection {
     public static final float MIN_FOV_DEGREES = 90f;
     public static final float MAX_FOV_DEGREES = 140f;
 
+    /** 直线投影：直线掰得笔直，代价是视野之外一律裁掉，而且越靠边放得越大。 */
+    public static final String PROJECTION_RECTILINEAR = "rectilinear";
+
+    /** 柱面投影：竖着的东西保持直，横线略弯，换来的是左右能多留住一大片。 */
+    public static final String PROJECTION_CYLINDRICAL = "cylindrical";
+
+    /**
+     * 柱面投影的视野上限。
+     *
+     * <p>直线投影到 90° 就发散，所以卡在 140°；柱面没有这个问题 —— 横向位置正比于方位角，
+     * 180°（每边 90°）仍然老老实实落在画面里。</p>
+     */
+    public static final float MAX_CYLINDRICAL_FOV_DEGREES = 180f;
+
     /**
      * 图片回看用的视野角度。
      *
@@ -59,6 +73,69 @@ public final class FisheyeProjection {
 
     public static float clampFov(float degrees) {
         return Math.max(MIN_FOV_DEGREES, Math.min(MAX_FOV_DEGREES, degrees));
+    }
+
+    /** 这种投影能给到多大的视野。 */
+    public static float maxFovFor(String projection) {
+        return PROJECTION_CYLINDRICAL.equals(projection)
+                ? MAX_CYLINDRICAL_FOV_DEGREES : MAX_FOV_DEGREES;
+    }
+
+    /** 按投影方式夹住视野角度 —— 上限两种投影不一样。 */
+    public static float clampFov(float degrees, String projection) {
+        return Math.max(MIN_FOV_DEGREES, Math.min(maxFovFor(projection), degrees));
+    }
+
+    /**
+     * 按指定投影做反向映射。
+     *
+     * @param projection {@link #PROJECTION_RECTILINEAR} 或 {@link #PROJECTION_CYLINDRICAL}；
+     *                   认不出来的值走直线投影
+     */
+    public static void sourcePoint(float x, float y, float fovDegrees, String projection,
+                                   float[] out, int offset) {
+        if (PROJECTION_CYLINDRICAL.equals(projection)) {
+            cylindricalSourcePoint(x, y, fovDegrees, out, offset);
+            return;
+        }
+        sourcePoint(x, y, fovDegrees, out, offset);
+    }
+
+    /**
+     * 柱面投影的反向映射：校正后画面里的一点 → 原始鱼眼画面里的采样点。
+     *
+     * <h3>和直线投影差在哪</h3>
+     *
+     * <p>直线投影把画面摊在一块<b>平板</b>上，横向位置正比于 tan(方位角) —— 所以世界里的直线
+     * 全都是直的，但角度一大，平板就得无限宽，只能裁。柱面投影把画面卷在一个<b>圆柱</b>上，
+     * 横向位置<b>正比于方位角本身</b>：圆柱可以一直卷下去，180° 也装得下。</p>
+     *
+     * <p>代价是横向的直线会弯 —— 只有竖直方向仍按平板算，所以车柱、路灯、门框这类竖线保持直，
+     * 而地平线、路沿会有一点弧度。对行车记录仪来说这笔买卖大多是划算的：
+     * 左右能看到的范围才是这类画面的价值所在。</p>
+     *
+     * <p>纵向那个系数取半视野（弧度），是为了让<b>画面正中不被拉扁</b>：
+     * 中心处横向每单位对应 halfFov 弧度，纵向也得是 halfFov，两边才一样。</p>
+     */
+    public static void cylindricalSourcePoint(float x, float y, float fovDegrees,
+                                              float[] out, int offset) {
+        double halfFov = Math.toRadians(clampFov(fovDegrees, PROJECTION_CYLINDRICAL) / 2.0);
+        double azimuth = (x * 2.0 - 1.0) * halfFov;
+        double height = (y * 2.0 - 1.0) * halfFov;
+
+        double sinAzimuth = Math.sin(azimuth);
+        double cosAzimuth = Math.cos(azimuth);
+        // 射线是 (sinφ, h, cosφ)；它偏离光轴多少，决定在原图上离中心多远
+        double norm = Math.sqrt(1.0 + height * height);
+        double cosAngle = Math.max(-1.0, Math.min(1.0, cosAzimuth / norm));
+        float sourceRadius = (float) (Math.acos(cosAngle) / (Math.PI / 2.0));
+
+        double planar = Math.sqrt(sinAzimuth * sinAzimuth + height * height);
+        double directionX = planar > EPSILON ? sinAzimuth / planar : 0.0;
+        double directionY = planar > EPSILON ? height / planar : 0.0;
+
+        out[offset] = clamp01((float) (DEFAULT_CENTER_X + directionX * sourceRadius * 0.5));
+        out[offset + 1] = clamp01((float) (DEFAULT_CENTER_Y + directionY * sourceRadius * 0.5));
     }
 
     /**

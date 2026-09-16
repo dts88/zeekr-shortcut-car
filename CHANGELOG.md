@@ -7,6 +7,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.4.0-alpha] - 2026-09-16
+
+- Settings -> Interface -> Fisheye correction: pick how the picture is straightened.
+  "Straight lines" is the projection used so far: every straight line in the world comes
+  out straight, and whatever falls outside the chosen field is cut. "Wide" wraps the
+  picture on a cylinder instead: upright things stay upright and the horizon curves a
+  little, which buys a much wider view to the left and right.
+- Settings -> Interface -> Corrected field of view: 90 to 140 degrees for straight lines,
+  90 to 180 for wide. The slider follows the projection, so what it shows is what is in
+  effect.
+- Both settings apply to photo playback only for now. Turning the correction on and off
+  stays where it was, in the top right of photo playback.
+
 ## [1.3.0-alpha] - 2026-09-16
 
 - Developer options: "Also save the raw frame". With it on, taking a photo also writes the

@@ -379,6 +379,12 @@
     <string name="set_section_interface">Interface</string>
     <string name="set_reduce_motion_title">Less motion while recording</string>
     <string name="set_reduce_motion_summary">No screen transitions while recording, leaving the GPU to the encoder</string>
+    <string name="set_fisheye_projection_title">Fisheye correction</string>
+    <string name="set_fisheye_projection_summary">%1$s · photo playback only for now</string>
+    <string name="opt_projection_rectilinear">Straight lines</string>
+    <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
+    <string name="set_fisheye_fov_title">Corrected field of view</string>
+    <string name="set_fisheye_fov_summary">A wider angle keeps more of the picture. Up to 140° for straight lines, 180° for wide</string>
     <string name="dlg_rail_side_title">Which side is the steering wheel on?</string>
     <string name="dlg_rail_side_lhd">Left (left-hand drive) · buttons on the left</string>
     <string name="dlg_rail_side_rhd">Right (right-hand drive) · buttons on the right</string>

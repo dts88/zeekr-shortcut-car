@@ -102,6 +102,7 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
+    private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
@@ -931,6 +932,32 @@ public class AppConfig {
 
     public void setRawFrameDumpEnabled(boolean on) {
         prefs.edit().putBoolean(KEY_RAW_FRAME_DUMP, on).apply();
+    }
+
+    /** 鱼眼校正用哪种投影（直线 / 柱面）。目前只作用于图片回看。 */
+    public String getFisheyeProjection() {
+        return readEnum(SettingsRegistry.FISHEYE_PROJECTION);
+    }
+
+    public void setFisheyeProjection(String projection) {
+        writeEnum(SettingsRegistry.FISHEYE_PROJECTION, projection);
+    }
+
+    /**
+     * 图片回看的校正视野。
+     *
+     * <p>读的时候按<b>当前投影</b>夹一次：两种投影的上限不一样（直线 140°、柱面 180°），
+     * 从柱面切回直线时存着的 170° 不该还当 170° 用 —— 界面显示多少，生效的就得是多少。</p>
+     */
+    public float getPhotoFisheyeFov() {
+        return FisheyeProjection.clampFov(
+                prefs.getFloat(KEY_PHOTO_FISHEYE_FOV, FisheyeProjection.PHOTO_FOV_DEGREES),
+                getFisheyeProjection());
+    }
+
+    public void setPhotoFisheyeFov(float degrees) {
+        prefs.edit().putFloat(KEY_PHOTO_FISHEYE_FOV,
+                FisheyeProjection.clampFov(degrees, getFisheyeProjection())).apply();
     }
 
     /** 校正的目标视野角度（度）。 */

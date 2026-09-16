@@ -519,7 +519,9 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         // 校正只对环视那一路：座舱是普通相机，一张图就是一个画面，不该动它
         int lanes = fisheyeOn ? gridColumns(position) : 1;
         if (lanes > 1) {
-            options = options.transform(new FisheyeTransformation(lanes, lanes));
+            AppConfig config = new AppConfig(getContext());
+            options = options.transform(new FisheyeTransformation(lanes, lanes,
+                    config.getPhotoFisheyeFov(), config.getFisheyeProjection()));
         }
         options = options.placeholder(keepShowing(imageView));
 

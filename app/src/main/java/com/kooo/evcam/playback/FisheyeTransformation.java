@@ -27,32 +27,38 @@ import java.security.MessageDigest;
 public class FisheyeTransformation extends BitmapTransformation {
 
     /** 改了校正的算法就改这个版本号，否则磁盘上的旧图会被当成新的用。 */
-    private static final String ID = "com.kooo.evcam.playback.FisheyeTransformation.3";
+    private static final String ID = "com.kooo.evcam.playback.FisheyeTransformation.4";
     private static final byte[] ID_BYTES = ID.getBytes(Key.CHARSET);
 
     private final int columns;
     private final int rows;
     private final float fovDegrees;
+    private final String projection;
 
     /**
      * @param columns 这张图横向排了几路（环视合成图是 2）
      * @param rows    纵向几路（环视合成图是 2）
      */
     public FisheyeTransformation(int columns, int rows) {
-        this(columns, rows, FisheyeProjection.PHOTO_FOV_DEGREES);
+        this(columns, rows, FisheyeProjection.PHOTO_FOV_DEGREES,
+                FisheyeProjection.PROJECTION_RECTILINEAR);
     }
 
-    /** 想换校正量时用这个 —— 视野角度的含义和后视镜那一项完全一样。 */
-    public FisheyeTransformation(int columns, int rows, float fovDegrees) {
+    /** 视野角度的含义和后视镜那一项完全一样；投影方式决定直线掰得多直、画面留下多少。 */
+    public FisheyeTransformation(int columns, int rows, float fovDegrees, String projection) {
         this.columns = columns;
         this.rows = rows;
-        this.fovDegrees = FisheyeProjection.clampFov(fovDegrees);
+        this.projection = FisheyeProjection.PROJECTION_CYLINDRICAL.equals(projection)
+                ? FisheyeProjection.PROJECTION_CYLINDRICAL
+                : FisheyeProjection.PROJECTION_RECTILINEAR;
+        this.fovDegrees = FisheyeProjection.clampFov(fovDegrees, this.projection);
     }
 
     @Override
     protected Bitmap transform(@NonNull BitmapPool pool, @NonNull Bitmap toTransform,
                                int outWidth, int outHeight) {
-        return FisheyeCorrector.correctGrid(toTransform, columns, rows, fovDegrees);
+        return FisheyeCorrector.correctGrid(toTransform, columns, rows, fovDegrees,
+                projection);
     }
 
     @Override
@@ -60,6 +66,7 @@ public class FisheyeTransformation extends BitmapTransformation {
         messageDigest.update(ID_BYTES);
         messageDigest.update(ByteBuffer.allocate(12)
                 .putInt(columns).putInt(rows).putFloat(fovDegrees).array());
+        messageDigest.update(projection.getBytes(Key.CHARSET));
     }
 
     @Override
@@ -69,12 +76,13 @@ public class FisheyeTransformation extends BitmapTransformation {
         }
         FisheyeTransformation that = (FisheyeTransformation) other;
         return columns == that.columns && rows == that.rows
-                && Float.compare(fovDegrees, that.fovDegrees) == 0;
+                && Float.compare(fovDegrees, that.fovDegrees) == 0
+                && projection.equals(that.projection);
     }
 
     @Override
     public int hashCode() {
-        return ((ID.hashCode() * 31 + columns) * 31 + rows) * 31
-                + Float.floatToIntBits(fovDegrees);
+        return (((ID.hashCode() * 31 + columns) * 31 + rows) * 31
+                + Float.floatToIntBits(fovDegrees)) * 31 + projection.hashCode();
     }
 }

@@ -44,9 +44,11 @@ public final class FisheyeCorrector {
      * 校正一张按 {@code columns × rows} 排列的合成图。
      *
      * @param fovDegrees 校正后画面的视野角度，和后视镜那一项是同一个含义
+     * @param projection 投影方式，见 {@link FisheyeProjection#PROJECTION_RECTILINEAR}
      * @return 新的位图；参数不合法或中途出错时原样返回入参，宁可不校正也不能没有图
      */
-    public static Bitmap correctGrid(Bitmap source, int columns, int rows, float fovDegrees) {
+    public static Bitmap correctGrid(Bitmap source, int columns, int rows,
+                                     float fovDegrees, String projection) {
         if (source == null || source.isRecycled() || columns < 1 || rows < 1) {
             return source;
         }
@@ -70,13 +72,12 @@ public final class FisheyeCorrector {
             return source;
         }
 
-        float halfFovTangent = FisheyeProjection.halfFovTangent(fovDegrees);
         for (int row = 0; row < rows; row++) {
             for (int column = 0; column < columns; column++) {
                 try {
                     source.getPixels(cell, 0, cellWidth,
                             column * cellWidth, row * cellHeight, cellWidth, cellHeight);
-                    remapCell(cell, remapped, cellWidth, cellHeight, halfFovTangent);
+                    remapCell(cell, remapped, cellWidth, cellHeight, fovDegrees, projection);
                     corrected.setPixels(remapped, 0, cellWidth,
                             column * cellWidth, row * cellHeight, cellWidth, cellHeight);
                 } catch (Exception e) {
@@ -94,7 +95,13 @@ public final class FisheyeCorrector {
      * 合成图里四路紧挨着，越界取到的就是隔壁那个摄像头的画面。</p>
      */
     private static void remapCell(int[] cell, int[] out, int width, int height,
-                                  float halfFovTangent) {
+                                  float fovDegrees, String projection) {
+        if (FisheyeProjection.PROJECTION_CYLINDRICAL.equals(projection)) {
+            remapCylindrical(cell, out, width, height, fovDegrees);
+            return;
+        }
+        // 直线投影：tan(fov/2) 只跟视野有关，一格算一次就够
+        float halfFovTangent = FisheyeProjection.halfFovTangent(fovDegrees);
         int index = 0;
         for (int y = 0; y < height; y++) {
             // 用像素中心，否则整幅画面会偏半个像素
@@ -111,6 +118,22 @@ public final class FisheyeCorrector {
                 float sourceX = (0.5f + planeX * scale) * width - 0.5f;
                 float sourceY = (0.5f + planeY * scale) * height - 0.5f;
                 out[index] = sample(cell, width, height, sourceX, sourceY);
+            }
+        }
+    }
+
+    /** 柱面投影那一支。数学都在 {@link FisheyeProjection#cylindricalSourcePoint} 里。 */
+    private static void remapCylindrical(int[] cell, int[] out, int width, int height,
+                                         float fovDegrees) {
+        float[] point = new float[2];
+        int index = 0;
+        for (int y = 0; y < height; y++) {
+            float v = (y + 0.5f) / height;
+            for (int x = 0; x < width; x++, index++) {
+                float u = (x + 0.5f) / width;
+                FisheyeProjection.cylindricalSourcePoint(u, v, fovDegrees, point, 0);
+                out[index] = sample(cell, width, height,
+                        point[0] * width - 0.5f, point[1] * height - 0.5f);
             }
         }
     }

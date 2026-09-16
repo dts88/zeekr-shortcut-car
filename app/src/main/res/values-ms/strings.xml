@@ -379,6 +379,12 @@
     <string name="set_section_interface">Antara muka</string>
     <string name="set_reduce_motion_title">Kurangkan animasi semasa merakam</string>
     <string name="set_reduce_motion_summary">Tiada peralihan skrin semasa merakam, GPU dibiarkan untuk pengekod</string>
+    <string name="set_fisheye_projection_title">Pembetulan mata ikan</string>
+    <string name="set_fisheye_projection_summary">%1$s · buat masa ini untuk lihat foto sahaja</string>
+    <string name="opt_projection_rectilinear">Garisan lurus</string>
+    <string name="opt_projection_cylindrical">Luas (ufuk melengkung)</string>
+    <string name="set_fisheye_fov_title">Medan pandangan dibetulkan</string>
+    <string name="set_fisheye_fov_summary">Sudut lebih luas mengekalkan lebih banyak gambar. Sehingga 140° untuk garisan lurus, 180° untuk luas</string>
     <string name="dlg_rail_side_title">Stereng di sebelah mana?</string>
     <string name="dlg_rail_side_lhd">Kiri (pandu kiri) · butang di kiri</string>
     <string name="dlg_rail_side_rhd">Kanan (pandu kanan) · butang di kanan</string>

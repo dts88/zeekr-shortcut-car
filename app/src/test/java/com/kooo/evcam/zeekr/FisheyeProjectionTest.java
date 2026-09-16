@@ -156,4 +156,110 @@ public class FisheyeProjectionTest {
         assertEquals(0.5f, FisheyeProjection.sourceRadius(1f), TOLERANCE);
         assertTrue(FisheyeProjection.sourceRadius(1000f) < 1f);
     }
+
+    // ---------------------------------------------------------------- 柱面投影
+
+    private float[] cylindrical(float x, float y, float fov) {
+        float[] out = new float[2];
+        FisheyeProjection.cylindricalSourcePoint(x, y, fov, out, 0);
+        return out;
+    }
+
+    @Test
+    public void theCylindricalCentreStaysAtTheCentre() {
+        float[] p = cylindrical(0.5f, 0.5f, 140f);
+        assertEquals(0.5f, p[0], TOLERANCE);
+        assertEquals(0.5f, p[1], TOLERANCE);
+    }
+
+    /**
+     * 两种投影在<b>画面边上</b>看到的角度必须一样 —— 否则「视野 140°」在两个模式下
+     * 指的就不是同一件事，用户切一下投影会觉得视野莫名其妙变了。
+     */
+    @Test
+    public void bothProjectionsReachTheSameAngleAtTheEdge() {
+        for (float fov : new float[]{90f, 110f, 140f}) {
+            assertEquals("fov=" + fov,
+                    at(1f, 0.5f, fov)[0], cylindrical(1f, 0.5f, fov)[0], 0.002f);
+        }
+    }
+
+    /**
+     * 中途才见分晓：柱面的横向位置正比于<b>角度</b>，直线的正比于 tan(角度)。
+     * 所以同一个输出位置，柱面取到的点离中心更近 —— 边缘那一带于是被摊开，不像直线投影那样挤成一条。
+     */
+    @Test
+    public void theCylindricalMappingIsLinearInAngleNotInTangent() {
+        for (float fov : new float[]{110f, 140f}) {
+            assertTrue("fov=" + fov,
+                    cylindrical(0.75f, 0.5f, fov)[0] < at(0.75f, 0.5f, fov)[0]);
+        }
+    }
+
+    /** 180°：每边正好 90°，画面边缘刚好落在鱼眼圆上。直线投影到这里早就发散了。 */
+    @Test
+    public void theCylindricalProjectionReachesTheWholeCircleAtOneEighty() {
+        assertEquals(1f, cylindrical(1f, 0.5f, 180f)[0], 0.002f);
+        assertEquals(0f, cylindrical(0f, 0.5f, 180f)[0], 0.002f);
+    }
+
+    @Test
+    public void theCylindricalMappingIsMonotonicAndSymmetric() {
+        float previous = -1f;
+        for (float x = 0f; x <= 1.0001f; x += 0.1f) {
+            float current = cylindrical(x, 0.5f, 140f)[0];
+            assertTrue("应当单调递增，x=" + x, current > previous);
+            previous = current;
+        }
+        for (float offset = 0.1f; offset <= 0.5f; offset += 0.1f) {
+            float left = cylindrical(0.5f - offset, 0.5f, 140f)[0];
+            float right = cylindrical(0.5f + offset, 0.5f, 140f)[0];
+            assertEquals(0.5f - left, right - 0.5f, TOLERANCE);
+        }
+    }
+
+    /** 和直线投影一样：采样不能越过本路，否则取到的是隔壁摄像头的画面。 */
+    @Test
+    public void theCylindricalSamplingNeverLeavesThisLane() {
+        for (float fov = FisheyeProjection.MIN_FOV_DEGREES;
+                fov <= FisheyeProjection.MAX_CYLINDRICAL_FOV_DEGREES; fov += 10f) {
+            for (float x = -0.5f; x <= 1.5f; x += 0.25f) {
+                for (float y = -0.5f; y <= 1.5f; y += 0.25f) {
+                    float[] p = cylindrical(x, y, fov);
+                    assertTrue("x 越界 fov=" + fov, p[0] >= 0f && p[0] <= 1f);
+                    assertTrue("y 越界 fov=" + fov, p[1] >= 0f && p[1] <= 1f);
+                }
+            }
+        }
+    }
+
+    /** 上限按投影分开：直线到 140° 就发散得没法看，柱面能到 180°。 */
+    @Test
+    public void eachProjectionHasItsOwnCeiling() {
+        assertEquals(140f, FisheyeProjection.clampFov(
+                175f, FisheyeProjection.PROJECTION_RECTILINEAR), TOLERANCE);
+        assertEquals(175f, FisheyeProjection.clampFov(
+                175f, FisheyeProjection.PROJECTION_CYLINDRICAL), TOLERANCE);
+        assertEquals(90f, FisheyeProjection.clampFov(
+                10f, FisheyeProjection.PROJECTION_CYLINDRICAL), TOLERANCE);
+    }
+
+    /** 认不出来的投影名走直线投影，不能让一个坏值把画面变成别的样子。 */
+    @Test
+    public void anUnknownProjectionFallsBackToStraightLines() {
+        float[] fallback = new float[2];
+        FisheyeProjection.sourcePoint(0.75f, 0.5f, 140f, "hyperbolic", fallback, 0);
+        assertEquals(at(0.75f, 0.5f, 140f)[0], fallback[0], TOLERANCE);
+    }
+
+    /** 设置项里存的字符串就是算法认的那两个 —— 中间只隔着这一个值，写错了界面会静默回到直线。 */
+    @Test
+    public void theSettingValuesAreExactlyTheProjectionNames() {
+        String[] values = com.kooo.evcam.settings.SettingsRegistry.FISHEYE_PROJECTION.values();
+        assertEquals(2, values.length);
+        assertEquals(FisheyeProjection.PROJECTION_RECTILINEAR, values[0]);
+        assertEquals(FisheyeProjection.PROJECTION_CYLINDRICAL, values[1]);
+        assertEquals(FisheyeProjection.PROJECTION_RECTILINEAR,
+                com.kooo.evcam.settings.SettingsRegistry.FISHEYE_PROJECTION.defaultValue);
+    }
 }

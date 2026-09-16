@@ -380,6 +380,12 @@
     <string name="set_section_interface">界面</string>
     <string name="set_reduce_motion_title">录制时减少动效</string>
     <string name="set_reduce_motion_summary">录制时界面之间直接切换、不做过渡；录制键和进度环照常动。编码器正在用 GPU，界面不跟它抢</string>
+    <string name="set_fisheye_projection_title">鱼眼校正方式</string>
+    <string name="set_fisheye_projection_summary">%1$s · 目前只作用于图片回看</string>
+    <string name="opt_projection_rectilinear">直线投影</string>
+    <string name="opt_projection_cylindrical">柱面投影</string>
+    <string name="set_fisheye_fov_title">校正视野</string>
+    <string name="set_fisheye_fov_summary">角度越大留下的画面越多。直线投影最大 140°，柱面最大 180°</string>
     <string name="dlg_rail_side_title">方向盘在哪一边？</string>
     <string name="dlg_rail_side_lhd">左边（左舵车）· 操作按钮放左侧</string>
     <string name="dlg_rail_side_rhd">右边（右舵车）· 操作按钮放右侧</string>

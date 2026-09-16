@@ -62,6 +62,20 @@ public final class SettingsRegistry {
             entry("ms", "Bahasa Melayu", R.string.lang_ms));
 
     /**
+     * 鱼眼校正用哪种投影。
+     *
+     * <p>取值必须和 {@code FisheyeProjection.PROJECTION_*} 对得上 —— 那边是算法，
+     * 这边是界面，中间只隔着这一个字符串。{@code FisheyeProjectionTest} 钉着这一条。</p>
+     *
+     * <p>默认直线投影：它把直线掰得笔直，是大多数人说「矫正」时想要的那个样子。
+     * 目前只作用于图片回看。</p>
+     */
+    public static final SettingSpec FISHEYE_PROJECTION = SettingSpec.of(
+            "fisheye_projection", "鱼眼校正方式", "rectilinear",
+            entry("rectilinear", "直线投影", R.string.opt_projection_rectilinear),
+            entry("cylindrical", "柱面投影", R.string.opt_projection_cylindrical));
+
+    /**
      * 动作栏（录制、拍照那一列）放在屏幕哪一侧。
      *
      * <p>左舵车和右舵车伸手够屏幕的方向正好相反。只挪这一列，别的区不动 ——
@@ -77,5 +91,6 @@ public final class SettingsRegistry {
             RECORDING_MODE,
             CAR_MODEL,
             LANGUAGE,
+            FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE));
 }
