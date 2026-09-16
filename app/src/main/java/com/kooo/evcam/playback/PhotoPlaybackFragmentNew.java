@@ -1,6 +1,7 @@
 package com.kooo.evcam.playback;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -25,6 +27,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.bumptech.glide.Glide;
@@ -33,9 +36,11 @@ import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.signature.ObjectKey;
 import android.widget.PopupMenu;
 
+import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
+import com.kooo.evcam.profile.RecordSpecs;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -62,6 +67,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private TextView currentDatetime;
     private View noSelectionHint;
     private Button btnMenu, btnRefresh, btnMultiSelect, btnHome;
+    private MaterialButton btnFisheye;
     private Button btnSelectAll, btnDeleteSelected, btnCancelSelect, btnShareSelected;
     private TextView selectedCount;
     private static final String TAG = "PhotoPlaybackFragmentNew";
@@ -86,6 +92,8 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private boolean isMultiSelectMode = false;
     private boolean isSingleMode = false;
     private String currentSinglePosition = PhotoGroup.POSITION_FRONT;
+    /** 鱼眼校正：只改屏幕上的样子，原图不动。开关记在设置里，下次进来还是这个状态。 */
+    private boolean fisheyeOn;
 
     @Nullable
     @Override
@@ -110,6 +118,9 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         btnRefresh = view.findViewById(R.id.pb_refresh);
         btnMultiSelect = view.findViewById(R.id.pb_multi_select);
         btnHome = view.findViewById(R.id.pb_home);
+        btnFisheye = view.findViewById(R.id.pb_fisheye);
+        fisheyeOn = new AppConfig(view.getContext()).isPhotoFisheyeCorrection();
+        updateFisheyeButton();
         currentDatetime = view.findViewById(R.id.current_datetime);
 
         // 多选工具栏
@@ -187,6 +198,16 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     }
 
     private void setupListeners() {
+        // 鱼眼校正开关。改的是「怎么画」，所以只要把当前这一组重新贴一遍
+        btnFisheye.setOnClickListener(v -> {
+            fisheyeOn = !fisheyeOn;
+            new AppConfig(v.getContext()).setPhotoFisheyeCorrection(fisheyeOn);
+            updateFisheyeButton();
+            if (currentGroup != null) {
+                loadPhotoGroup(currentGroup);
+            }
+        });
+
         // 菜单按钮
         btnMenu.setOnClickListener(v -> {
             if (getActivity() != null) {
@@ -341,7 +362,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         // 加载大图
         if (currentGroup != null) {
             File photoFile = currentGroup.getPhotoFile(position);
-            loadImage(photoFile, imageSingle);
+            loadImage(photoFile, imageSingle, position);
         }
     }
 
@@ -430,7 +451,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
             singleViewLayout.setVisibility(View.VISIBLE);
             // 重新加载单路大图
             File photoFile = group.getPhotoFile(currentSinglePosition);
-            loadImage(photoFile, imageSingle);
+            loadImage(photoFile, imageSingle, currentSinglePosition);
         } else {
             multiViewLayout.setVisibility(View.VISIBLE);
             singleViewLayout.setVisibility(View.GONE);
@@ -458,28 +479,31 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         // 前置
         imageFront.setVisibility(hasFront ? View.VISIBLE : View.GONE);
         placeholderFront.setVisibility(hasFront ? View.GONE : View.VISIBLE);
-        if (hasFront) loadImage(group.getFrontPhoto(), imageFront);
+        if (hasFront) loadImage(group.getFrontPhoto(), imageFront, PhotoGroup.POSITION_FRONT);
 
         // 后置
         imageBack.setVisibility(hasBack ? View.VISIBLE : View.GONE);
         placeholderBack.setVisibility(hasBack ? View.GONE : View.VISIBLE);
-        if (hasBack) loadImage(group.getBackPhoto(), imageBack);
+        if (hasBack) loadImage(group.getBackPhoto(), imageBack, PhotoGroup.POSITION_BACK);
 
         // 左侧
         imageLeft.setVisibility(hasLeft ? View.VISIBLE : View.GONE);
         placeholderLeft.setVisibility(hasLeft ? View.GONE : View.VISIBLE);
-        if (hasLeft) loadImage(group.getLeftPhoto(), imageLeft);
+        if (hasLeft) loadImage(group.getLeftPhoto(), imageLeft, PhotoGroup.POSITION_LEFT);
 
         // 右侧
         imageRight.setVisibility(hasRight ? View.VISIBLE : View.GONE);
         placeholderRight.setVisibility(hasRight ? View.GONE : View.VISIBLE);
-        if (hasRight) loadImage(group.getRightPhoto(), imageRight);
+        if (hasRight) loadImage(group.getRightPhoto(), imageRight, PhotoGroup.POSITION_RIGHT);
     }
 
     /**
-     * 加载图片
+     * 加载图片。
+     *
+     * <p>{@code position} 是这张图来自哪一路 —— 鱼眼校正要按它去查这一路是不是
+     * 拼成四宫格存的：环视那一路一张图里装着四个画面，得一格一格校正。</p>
      */
-    private void loadImage(File photoFile, ImageView imageView) {
+    private void loadImage(File photoFile, ImageView imageView, String position) {
         if (photoFile == null || !photoFile.exists() || getContext() == null) {
             return;
         }
@@ -489,11 +513,42 @@ public class PhotoPlaybackFragmentNew extends Fragment {
                 .signature(new ObjectKey(photoFile.lastModified()))
                 .placeholder(android.R.color.black)
                 .error(android.R.color.black);
+        if (fisheyeOn) {
+            int lanes = gridColumns(position);
+            options = options.transform(new FisheyeTransformation(lanes, lanes));
+        }
 
         Glide.with(getContext())
                 .load(photoFile)
                 .apply(options)
                 .into(imageView);
+    }
+
+    /**
+     * 这一路的照片横竖各排了几路。
+     *
+     * <p>照片跟着这一路录制的排列走（见 {@code SingleCamera.saveBitmapAsJPEG}）：
+     * 环视合成流拆四宫格，所以是 2；座舱那种普通相机是一整张，1。</p>
+     */
+    private int gridColumns(String position) {
+        try {
+            return RecordSpecs.forCameraKey(getContext(), position).grid ? 2 : 1;
+        } catch (Exception e) {
+            Log.w(TAG, "读不到 " + position + " 的排列，按不拆处理: " + e);
+            return 1;
+        }
+    }
+
+    /** 开着的时候按主色点亮，一眼能看出现在看到的画面动过手脚。 */
+    private void updateFisheyeButton() {
+        if (btnFisheye == null || getContext() == null) {
+            return;
+        }
+        int background = fisheyeOn ? R.color.energy : R.color.sunken;
+        int foreground = fisheyeOn ? R.color.on_energy : R.color.text_primary;
+        btnFisheye.setBackgroundTintList(
+                ColorStateList.valueOf(ContextCompat.getColor(getContext(), background)));
+        btnFisheye.setTextColor(ContextCompat.getColor(getContext(), foreground));
     }
 
     /**

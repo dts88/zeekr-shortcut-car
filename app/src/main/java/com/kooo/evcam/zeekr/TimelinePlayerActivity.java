@@ -184,6 +184,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         selectedCountText = findViewById(R.id.pb_selected_count);
         sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);
 
+        // 鱼眼校正目前只做在图片回看上：视频那边要逐帧算，性能还没量过
+        View fisheye = findViewById(R.id.pb_fisheye);
+        if (fisheye != null) {
+            fisheye.setVisibility(View.GONE);
+        }
+
         View menu = findViewById(R.id.timeline_menu);
         if (menu != null) {
             menu.setOnClickListener(v -> openDrawerOnMain());

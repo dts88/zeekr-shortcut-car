@@ -100,6 +100,7 @@ public class AppConfig {
     // 超级后视镜：把环视合成流里后方那一路单独放大显示
     private static final String KEY_REARVIEW_ENABLED = "rearview_enabled";        // 总开关
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
+    private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
@@ -902,6 +903,20 @@ public class AppConfig {
 
     public void setRearViewFisheyeCorrection(boolean on) {
         prefs.edit().putBoolean(KEY_REARVIEW_FISHEYE, on).apply();
+    }
+
+    /**
+     * 图片回看里是否对画面做鱼眼校正。
+     *
+     * <p>和后视镜那一档各管各的：这一档只改屏幕上看到的样子，U 盘里的原图不动。
+     * 默认关 —— 回看首先要能看到「拍下来的就是这样」。</p>
+     */
+    public boolean isPhotoFisheyeCorrection() {
+        return prefs.getBoolean(KEY_PHOTO_FISHEYE, false);
+    }
+
+    public void setPhotoFisheyeCorrection(boolean on) {
+        prefs.edit().putBoolean(KEY_PHOTO_FISHEYE, on).apply();
     }
 
     /** 校正的目标视野角度（度）。 */

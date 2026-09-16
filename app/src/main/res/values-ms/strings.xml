@@ -320,6 +320,7 @@
     <string name="photo_no_image">Tiada foto</string>
     <string name="photo_pick_hint">Pilih foto daripada senarai</string>
     <string name="photo_double_tap_hint">Ketik dua kali pada satu paparan untuk membesarkannya</string>
+    <string name="photo_fisheye">Mata ikan</string>
 
     <!-- Hantar ke telefon -->
     <string name="action_send_to_phone">Hantar ke telefon</string>

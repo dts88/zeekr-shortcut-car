@@ -118,4 +118,76 @@ public class FisheyeProjectionTest {
     public void meshDivisionsArePositive() {
         assertTrue(FisheyeProjection.MESH_DIVISIONS > 0);
     }
+
+    // ---------------------------------------------------------------- 正向映射（图片回看）
+
+    private float[] forward(float x, float y) {
+        float[] out = new float[2];
+        FisheyeProjection.correctedPoint(x, y, out, 0);
+        return out;
+    }
+
+    @Test
+    public void theForwardMappingKeepsTheCentreWhereItIs() {
+        float[] p = forward(0.5f, 0.5f);
+        assertEquals(0.5f, p[0], TOLERANCE);
+        assertEquals(0.5f, p[1], TOLERANCE);
+    }
+
+    /**
+     * 整个鱼眼圆（半宽 1.0，也就是 180° 全视场）正好落在画面边上。
+     * 这条成立，「校正之后画面没被裁掉」才是真的。
+     */
+    @Test
+    public void theWholeFisheyeCircleLandsExactlyOnTheEdge() {
+        assertEquals(1f, forward(1f, 0.5f)[0], TOLERANCE);
+        assertEquals(0f, forward(0f, 0.5f)[0], TOLERANCE);
+        assertEquals(1f, forward(0.5f, 1f)[1], TOLERANCE);
+        assertEquals(0f, forward(0.5f, 0f)[1], TOLERANCE);
+    }
+
+    /** 四个角在圆之外，会落到框外 —— 所以绘制时必须按本路裁剪，不能画到隔壁那一路上。 */
+    @Test
+    public void theCornersFallOutsideTheFrameAndMustBeClipped() {
+        float[] corner = forward(1f, 1f);
+        assertTrue("右下角应当落在框外: " + corner[0], corner[0] > 1f);
+        assertTrue("右下角应当落在框外: " + corner[1], corner[1] > 1f);
+    }
+
+    /**
+     * 校正就是把中间压一点、把边缘拉开：中途的点相对地往里走，边缘不动。
+     * 反过来（中间被拉开）说明投影写反了，画面会更鼓。
+     */
+    @Test
+    public void theMiddleIsSqueezedSoTheEdgeCanStretch() {
+        assertTrue(forward(0.75f, 0.5f)[0] < 0.75f);
+        assertTrue(forward(0.9f, 0.5f)[0] < 0.9f);
+        assertEquals(1f, forward(1f, 0.5f)[0], TOLERANCE);
+    }
+
+    /** 单调递增，否则画面会在某处翻折。 */
+    @Test
+    public void theForwardMappingIsMonotonic() {
+        float previous = -1f;
+        for (float x = 0.5f; x <= 1.0001f; x += 0.05f) {
+            float current = forward(x, 0.5f)[0];
+            assertTrue("应当单调递增，x=" + x, current > previous);
+            previous = current;
+        }
+    }
+
+    @Test
+    public void theForwardMappingIsSymmetricAboutTheCentre() {
+        for (float offset = 0.1f; offset <= 0.5f; offset += 0.1f) {
+            float left = forward(0.5f - offset, 0.5f)[0];
+            float right = forward(0.5f + offset, 0.5f)[0];
+            assertEquals(0.5f - left, right - 0.5f, TOLERANCE);
+        }
+    }
+
+    /** 照片只算一次，网格该比预览密 —— 密度就是这条曲线被逼近得有多准。 */
+    @Test
+    public void thePhotoMeshIsDenserThanThePreviewMesh() {
+        assertTrue(FisheyeProjection.PHOTO_MESH_DIVISIONS > FisheyeProjection.MESH_DIVISIONS);
+    }
 }

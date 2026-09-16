@@ -320,6 +320,7 @@
     <string name="photo_no_image">No photo</string>
     <string name="photo_pick_hint">Pick a photo from the list</string>
     <string name="photo_double_tap_hint">Double-tap a view to enlarge it</string>
+    <string name="photo_fisheye">Fisheye</string>
 
     <!-- Send to phone -->
     <string name="action_send_to_phone">Send to phone</string>

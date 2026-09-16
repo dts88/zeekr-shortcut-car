@@ -7,6 +7,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.2.0-alpha] - 2026-09-16
+
+- **Fisheye correction in photo playback.** A button in the top right turns it on and off.
+  It only changes what is on screen: the files on the USB drive are untouched.
+- A surround photo holds all four views in one 2x2 image, so each quarter is corrected on
+  its own. Correcting the whole frame at once would treat four lenses as one and pull the
+  views towards the middle of the picture.
+- The correction keeps as much of the picture as possible: the whole fisheye circle stays,
+  and only the four corners outside that circle are cut. It uses a different projection
+  from the super mirror, whose straight-line correction cannot fit the whole circle at all.
+
 ## [1.1.0-alpha] - 2026-09-16
 
 - **Malay interface.** Every screen is translated: Settings, the stream profile editor,
