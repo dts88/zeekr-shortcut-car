@@ -7,6 +7,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.2.2-alpha] - 2026-09-16
+
+- Photo playback: straight lines stay straight under fisheye correction. The picture is
+  now remapped pixel by pixel instead of through a mesh of small patches. Each patch was
+  linear inside and the slope jumped at its border, which turned a straight line into a
+  chain of short segments that reads as a wave. A photo is corrected once, so it can
+  afford the exact arithmetic; the super mirror keeps the patches because it has to keep
+  up with thirty frames a second.
+- Sampling is bilinear, so the correction softens the picture slightly rather than
+  showing stair steps.
+
 ## [1.2.1-alpha] - 2026-09-16
 
 - Photo playback: the fisheye correction now straightens as much as the super mirror does.

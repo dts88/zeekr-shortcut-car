@@ -27,7 +27,7 @@ import java.security.MessageDigest;
 public class FisheyeTransformation extends BitmapTransformation {
 
     /** 改了校正的算法就改这个版本号，否则磁盘上的旧图会被当成新的用。 */
-    private static final String ID = "com.kooo.evcam.playback.FisheyeTransformation.2";
+    private static final String ID = "com.kooo.evcam.playback.FisheyeTransformation.3";
     private static final byte[] ID_BYTES = ID.getBytes(Key.CHARSET);
 
     private final int columns;

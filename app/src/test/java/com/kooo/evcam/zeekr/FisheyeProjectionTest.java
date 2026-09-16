@@ -119,93 +119,41 @@ public class FisheyeProjectionTest {
         assertTrue(FisheyeProjection.MESH_DIVISIONS > 0);
     }
 
-    // ---------------------------------------------------------------- 正向映射（图片回看）
-
-    private float[] forward(float x, float y, float fov) {
-        float[] out = new float[2];
-        FisheyeProjection.correctedPoint(x, y, fov, out, 0);
-        return out;
-    }
-
-    @Test
-    public void theForwardMappingKeepsTheCentreWhereItIs() {
-        float[] p = forward(0.5f, 0.5f, 110f);
-        assertEquals(0.5f, p[0], TOLERANCE);
-        assertEquals(0.5f, p[1], TOLERANCE);
-    }
+    // ---------------------------------------------------------------- 逐像素重映射用的两个函数
 
     /**
-     * 正反两个方向必须是同一条曲线 —— 这条成立，照片的校正量才和后视镜一模一样。
-     * 一个说「输出点去源图哪里取色」，另一个说「源图这点画到哪里去」，绕一圈得回到原处。
+     * 拆出来的两个函数必须和 {@link FisheyeProjection#sourcePoint} 算的是同一件事 ——
+     * 照片走的是它们，后视镜走的是 sourcePoint，两边对不上就是「同一个视野角度、
+     * 两个界面却不一样」。
      */
     @Test
-    public void theTwoDirectionsAreInverseOfEachOther() {
+    public void thePerPixelHelpersAgreeWithSourcePoint() {
         for (float fov : new float[]{90f, 110f, 140f}) {
-            for (float x = 0.05f; x <= 0.95f; x += 0.1f) {
-                float[] corrected = forward(x, 0.5f, fov);
-                float[] back = at(corrected[0], corrected[1], fov);
-                assertEquals("fov=" + fov + " x=" + x, x, back[0], 0.002f);
-                assertEquals("fov=" + fov + " x=" + x, 0.5f, back[1], 0.002f);
+            float halfFovTangent = FisheyeProjection.halfFovTangent(fov);
+            for (float x = 0f; x <= 1.0001f; x += 0.125f) {
+                float planeX = (x * 2f - 1f) * halfFovTangent;
+                float planeRadius = Math.abs(planeX);
+                float radius = FisheyeProjection.sourceRadius(planeRadius);
+                float expected = at(x, 0.5f, fov)[0];
+                float actual = 0.5f + Math.signum(planeX) * radius * 0.5f;
+                assertEquals("fov=" + fov + " x=" + x, expected, actual, TOLERANCE);
             }
         }
     }
 
-    /** 偏离光轴正好 fov/2 的那一圈落在画面边上 —— 视野角度在这边也是字面意义。 */
+    /** 视野角度越大，像平面越宽 —— 同一个输出位置就采得更靠外。 */
     @Test
-    public void theStatedFieldOfViewLandsOnTheEdge() {
-        for (float fov : new float[]{90f, 110f, 140f}) {
-            float atHalfFov = 0.5f + (fov / 2f / 90f) * 0.5f;
-            assertEquals("fov=" + fov, 1f, forward(atHalfFov, 0.5f, fov)[0], 0.002f);
-        }
+    public void aWiderFieldOfViewMeansAWiderImagePlane() {
+        assertTrue(FisheyeProjection.halfFovTangent(140f) > FisheyeProjection.halfFovTangent(110f));
+        assertTrue(FisheyeProjection.halfFovTangent(110f) > FisheyeProjection.halfFovTangent(90f));
+        assertEquals(1f, FisheyeProjection.halfFovTangent(90f), TOLERANCE);
     }
 
-    /** 视野之外的那一圈落到框外，绘制时必须裁掉，不能画到隔壁那一路上。 */
+    /** 半宽 1.0 就是 90°：这条定死了「视野」这个词在整个项目里的含义。 */
     @Test
-    public void whatLiesBeyondTheFieldOfViewFallsOutsideTheFrame() {
-        assertTrue(forward(1f, 0.5f, 110f)[0] > 1f);
-        float[] corner = forward(1f, 1f, 110f);
-        assertTrue(corner[0] > 1f);
-        assertTrue(corner[1] > 1f);
-    }
-
-    /** 校正就是把边缘拉开：越靠外推得越远，中间几乎不动。 */
-    @Test
-    public void theEdgeIsStretchedMoreThanTheMiddle() {
-        float middle = forward(0.6f, 0.5f, 110f)[0] - 0.6f;
-        float edge = forward(0.9f, 0.5f, 110f)[0] - 0.9f;
-        assertTrue("边缘应当被推得更远: " + middle + " vs " + edge, edge > middle);
-    }
-
-    /** 视野越小，同一点被推得越远（看到的范围越窄、放得越大）。 */
-    @Test
-    public void aNarrowerFieldOfViewPushesFurther() {
-        assertTrue(forward(0.7f, 0.5f, 90f)[0] > forward(0.7f, 0.5f, 110f)[0]);
-        assertTrue(forward(0.7f, 0.5f, 110f)[0] > forward(0.7f, 0.5f, 140f)[0]);
-    }
-
-    /** 单调递增，否则画面会在某处翻折。 */
-    @Test
-    public void theForwardMappingIsMonotonic() {
-        float previous = -1f;
-        for (float x = 0.5f; x <= 1.0001f; x += 0.05f) {
-            float current = forward(x, 0.5f, 110f)[0];
-            assertTrue("应当单调递增，x=" + x, current > previous);
-            previous = current;
-        }
-    }
-
-    @Test
-    public void theForwardMappingIsSymmetricAboutTheCentre() {
-        for (float offset = 0.1f; offset <= 0.5f; offset += 0.1f) {
-            float left = forward(0.5f - offset, 0.5f, 110f)[0];
-            float right = forward(0.5f + offset, 0.5f, 110f)[0];
-            assertEquals(0.5f - left, right - 0.5f, TOLERANCE);
-        }
-    }
-
-    /** 照片只算一次，网格该比预览密 —— 密度就是这条曲线被逼近得有多准。 */
-    @Test
-    public void thePhotoMeshIsDenserThanThePreviewMesh() {
-        assertTrue(FisheyeProjection.PHOTO_MESH_DIVISIONS > FisheyeProjection.MESH_DIVISIONS);
+    public void theImagePlaneEdgeIsNinetyDegrees() {
+        assertEquals(0f, FisheyeProjection.sourceRadius(0f), TOLERANCE);
+        assertEquals(0.5f, FisheyeProjection.sourceRadius(1f), TOLERANCE);
+        assertTrue(FisheyeProjection.sourceRadius(1000f) < 1f);
     }
 }
