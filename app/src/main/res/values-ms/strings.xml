@@ -240,7 +240,7 @@
     <!-- Laci navigasi dan pemain -->
     <string name="nav_recording">Rakaman</string>
     <string name="nav_video_playback">Main balik video</string>
-    <string name="nav_photo_playback">Foto</string>
+    <string name="nav_photo_playback">Lihat foto</string>
     <string name="nav_group_system">Sistem</string>
     <string name="nav_blind_spot">Pilihan titik buta</string>
     <string name="nav_supervision">Pandangan super</string>
@@ -364,7 +364,7 @@
     <string name="record_idle_detail">Klip %1$d min</string>
     <string name="record_segment_detail">Klip ini %1$s / %2$d min</string>
     <string name="recording_chip">Merakam %1$s · klip %2$d</string>
-    <string name="rail_photo">Foto</string>
+    <string name="rail_photo">Ambil foto</string>
     <string name="rail_settings">Tetapan</string>
     <string name="cd_menu">Menu</string>
     <string name="cd_minimize">Sembunyi ke latar belakang</string>

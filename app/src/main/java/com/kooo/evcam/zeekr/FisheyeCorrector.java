@@ -32,9 +32,10 @@ public final class FisheyeCorrector {
     /**
      * 校正一张按 {@code columns × rows} 排列的合成图。
      *
+     * @param fovDegrees 校正后画面的视野角度，和后视镜那一项是同一个含义
      * @return 新的位图；参数不合法或中途出错时原样返回入参，宁可不校正也不能没有图
      */
-    public static Bitmap correctGrid(Bitmap source, int columns, int rows) {
+    public static Bitmap correctGrid(Bitmap source, int columns, int rows, float fovDegrees) {
         if (source == null || source.isRecycled() || columns < 1 || rows < 1) {
             return source;
         }
@@ -70,14 +71,13 @@ public final class FisheyeCorrector {
                     int i = 0;
                     for (int y = 0; y <= divisions; y++) {
                         for (int x = 0; x <= divisions; x++) {
-                            FisheyeProjection.correctedPoint(
-                                    (float) x / divisions, (float) y / divisions, point, 0);
+                            FisheyeProjection.correctedPoint((float) x / divisions,
+                                    (float) y / divisions, fovDegrees, point, 0);
                             vertices[i++] = column * cellWidth + point[0] * cellWidth;
                             vertices[i++] = row * cellHeight + point[1] * cellHeight;
                         }
                     }
-                    // 四个角落在本格之外（见 FisheyeProjection#keepCircleScale），
-                    // 不裁的话它们会画到隔壁那一路上去
+                    // 超出视野的那一圈落在本格之外，不裁的话会画到隔壁那一路上去
                     int save = canvas.save();
                     canvas.clipRect(column * cellWidth, row * cellHeight,
                             (column + 1) * cellWidth, (row + 1) * cellHeight);

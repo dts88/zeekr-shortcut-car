@@ -2,7 +2,10 @@ package com.kooo.evcam.playback;
 
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
 import android.content.res.Configuration;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -511,17 +514,46 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         RequestOptions options = new RequestOptions()
                 .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
                 .signature(new ObjectKey(photoFile.lastModified()))
-                .placeholder(android.R.color.black)
                 .error(android.R.color.black);
-        if (fisheyeOn) {
-            int lanes = gridColumns(position);
+
+        // 校正只对环视那一路：座舱是普通相机，一张图就是一个画面，不该动它
+        int lanes = fisheyeOn ? gridColumns(position) : 1;
+        if (lanes > 1) {
             options = options.transform(new FisheyeTransformation(lanes, lanes));
         }
+        options = options.placeholder(keepShowing(imageView));
 
         Glide.with(getContext())
                 .load(photoFile)
                 .apply(options)
                 .into(imageView);
+    }
+
+    /**
+     * 换图期间先接着显示现在这一帧。
+     *
+     * <p>拨校正开关等于重新贴一次图，而 Glide 一开始加载就会把 ImageView 清掉 ——
+     * 占位图是黑的，看到的就是「画面黑一下再回来」。把当前这一帧拷一份当占位图，
+     * 屏幕上就一直有画面。拷贝是必要的：原来那张属于 Glide 的池子，它随时会回收。</p>
+     *
+     * @return 占位图；现在还没有画面时返回 null，由 Glide 用空白顶着
+     */
+    private Drawable keepShowing(ImageView imageView) {
+        Drawable current = imageView.getDrawable();
+        if (!(current instanceof BitmapDrawable)) {
+            return null;
+        }
+        Bitmap shown = ((BitmapDrawable) current).getBitmap();
+        if (shown == null || shown.isRecycled()) {
+            return null;
+        }
+        try {
+            Bitmap copy = shown.copy(Bitmap.Config.ARGB_8888, false);
+            return copy == null ? null : new BitmapDrawable(getResources(), copy);
+        } catch (Exception | OutOfMemoryError e) {
+            Log.w(TAG, "占位图拷贝不出来，换图时会闪一下: " + e);
+            return null;
+        }
     }
 
     /**

@@ -101,63 +101,40 @@ public final class FisheyeProjection {
      */
     public static final int PHOTO_MESH_DIVISIONS = 24;
 
-    /** 一路画面的四个角：到中心的距离是半宽的 √2 倍，也就是这张图里最远的点。 */
-    public static final float CORNER_RADIUS = (float) Math.sqrt(2.0);
-
     /**
-     * 半径上的正向映射：原图半径 → 校正后的半径。两边都以<b>半宽为 1</b> 计。
+     * 直线投影能表达到的最大偏角。
      *
-     * <h3>为什么这里不是 {@link #sourcePoint} 那套直线投影</h3>
-     *
-     * <p>直线投影（虚拟针孔相机）把偏离光轴 θ 的射线放到 tan θ 上，θ 越接近 90°
-     * 拉得越远，到 90° 就是无穷 —— 而等距鱼眼里半宽 1.0 正是 90°，四个角更是到了 127°。
-     * 也就是说<b>直线投影根本装不下整幅鱼眼画面</b>，只能选一个视野角度，其余的裁掉。
-     * 后视镜就是这么做的：那是个小窗口，本来就只看中间一块。</p>
-     *
-     * <p>回看要的是另一件事 —— 先尽量把画面都留下，再由人决定裁多少。所以这里用
-     * <b>立体投影</b>（r = tan(θ/2)）：θ 到 180° 才发散，整幅鱼眼都落在有限的范围内，
-     * 弯的东西也大致被掰直了，只是不像直线投影那样把直线掰得一根不剩。</p>
+     * <p>90° 对应无穷远，留一点余量 —— 这一圈早就在画面之外，夹住只是不让顶点坐标跑飞。</p>
      */
-    public static float correctedRadius(float sourceRadius) {
-        double angle = Math.max(0f, sourceRadius) * (Math.PI / 2.0);
-        // 夹在最远的那个角上：再远的输入只会是调用方算错了，不该让它跑到无穷去
-        angle = Math.min(angle, CORNER_RADIUS * (Math.PI / 2.0));
-        return (float) Math.tan(angle / 2.0);
-    }
-
-    /**
-     * 缩放：让<b>整个鱼眼圆</b>（半宽 1.0，也就是 180° 全视场）正好落在画面边上。
-     *
-     * <p>四个角在圆之外，会被画到框外去，由调用方裁掉 —— 那一圈要么是暗角，
-     * 要么是拉到看不出东西的极边缘。要连角也留住就把这个值改小，
-     * 代价是画面整体缩到一半，中间反而看不清。</p>
-     */
-    public static float keepCircleScale() {
-        return 1f / correctedRadius(1f);
-    }
+    private static final double MAX_ANGLE_RADIANS = Math.toRadians(88.0);
 
     /**
      * 正向映射：原始鱼眼画面里的一点 → 校正后画面里的位置。
      * 两边都是本路画面内的归一化坐标，光心按画面正中算。
      *
-     * <p>和 {@link #sourcePoint} 方向相反：那边是「输出点该去源图哪里取色」，
-     * 这边是「源图这一点该画到哪里去」。{@code drawBitmapMesh} 要的正是后者。</p>
+     * <p>这是 {@link #sourcePoint} 的<b>逆函数</b>，同一个视野角度下两者的校正量完全一致 ——
+     * 后视镜看到的是什么样，照片就是什么样。方向相反是因为用途不同：那边问「输出点该去
+     * 源图哪里取色」，这边问「源图这一点该画到哪里去」，而 {@code drawBitmapMesh} 要的是后者。</p>
      *
-     * <p>结果<b>可能落在 [0,1] 之外</b>（四个角），调用方必须按本路的范围裁剪，
-     * 否则会画到隔壁那一路上。</p>
+     * <p>结果<b>可能落在 [0,1] 之外</b>：超出视野的那一圈就该被裁掉，
+     * 调用方必须按本路的范围裁剪，否则会画到隔壁那一路上。</p>
      */
-    public static void correctedPoint(float x, float y, float[] out, int offset) {
+    public static void correctedPoint(float x, float y, float fovDegrees,
+                                      float[] out, int offset) {
         float dx = (x - DEFAULT_CENTER_X) * 2f;
         float dy = (y - DEFAULT_CENTER_Y) * 2f;
-        float radius = (float) Math.hypot(dx, dy);
-        if (radius < EPSILON) {
+        float sourceRadius = (float) Math.hypot(dx, dy);
+        if (sourceRadius < EPSILON) {
             out[offset] = DEFAULT_CENTER_X;
             out[offset + 1] = DEFAULT_CENTER_Y;
             return;
         }
-        float mapped = correctedRadius(radius) * keepCircleScale();
-        out[offset] = DEFAULT_CENTER_X + (dx / radius) * mapped * 0.5f;
-        out[offset + 1] = DEFAULT_CENTER_Y + (dy / radius) * mapped * 0.5f;
+        // 等距鱼眼：半径正比于偏角，半宽 1.0 就是 90°
+        double angle = Math.min(sourceRadius * (Math.PI / 2.0), MAX_ANGLE_RADIANS);
+        double halfFovTangent = Math.tan(Math.toRadians(clampFov(fovDegrees)) / 2.0);
+        float mapped = (float) (Math.tan(angle) / halfFovTangent);
+        out[offset] = DEFAULT_CENTER_X + (dx / sourceRadius) * mapped * 0.5f;
+        out[offset + 1] = DEFAULT_CENTER_Y + (dy / sourceRadius) * mapped * 0.5f;
     }
 
     private static float clamp01(float value) {

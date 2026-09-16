@@ -7,6 +7,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.2.1-alpha] - 2026-09-16
+
+- Photo playback: the fisheye correction now straightens as much as the super mirror does.
+  It is the same straight-line projection at the same 110 degree field of view, so the two
+  look alike; what falls outside that field is cut.
+- Photo playback: only the surround photo is corrected. The cabin cameras are left alone.
+- Photo playback: turning the correction on or off no longer blanks the picture while the
+  new one is prepared.
+- Malay: the photo button on the main screen reads "Ambil foto" and the drawer entry reads
+  "Lihat foto". Both said "Foto" before, which did not say which was which.
+
 ## [1.2.0-alpha] - 2026-09-16
 
 - **Fisheye correction in photo playback.** A button in the top right turns it on and off.

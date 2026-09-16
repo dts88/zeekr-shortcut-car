@@ -8,6 +8,7 @@ import com.bumptech.glide.load.Key;
 import com.bumptech.glide.load.engine.bitmap_recycle.BitmapPool;
 import com.bumptech.glide.load.resource.bitmap.BitmapTransformation;
 import com.kooo.evcam.zeekr.FisheyeCorrector;
+import com.kooo.evcam.zeekr.FisheyeProjection;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -26,31 +27,39 @@ import java.security.MessageDigest;
 public class FisheyeTransformation extends BitmapTransformation {
 
     /** 改了校正的算法就改这个版本号，否则磁盘上的旧图会被当成新的用。 */
-    private static final String ID = "com.kooo.evcam.playback.FisheyeTransformation.1";
+    private static final String ID = "com.kooo.evcam.playback.FisheyeTransformation.2";
     private static final byte[] ID_BYTES = ID.getBytes(Key.CHARSET);
 
     private final int columns;
     private final int rows;
+    private final float fovDegrees;
 
     /**
      * @param columns 这张图横向排了几路（环视合成图是 2）
      * @param rows    纵向几路（环视合成图是 2）
      */
     public FisheyeTransformation(int columns, int rows) {
+        this(columns, rows, FisheyeProjection.DEFAULT_FOV_DEGREES);
+    }
+
+    /** 想换校正量时用这个 —— 视野角度的含义和后视镜那一项完全一样。 */
+    public FisheyeTransformation(int columns, int rows, float fovDegrees) {
         this.columns = columns;
         this.rows = rows;
+        this.fovDegrees = FisheyeProjection.clampFov(fovDegrees);
     }
 
     @Override
     protected Bitmap transform(@NonNull BitmapPool pool, @NonNull Bitmap toTransform,
                                int outWidth, int outHeight) {
-        return FisheyeCorrector.correctGrid(toTransform, columns, rows);
+        return FisheyeCorrector.correctGrid(toTransform, columns, rows, fovDegrees);
     }
 
     @Override
     public void updateDiskCacheKey(@NonNull MessageDigest messageDigest) {
         messageDigest.update(ID_BYTES);
-        messageDigest.update(ByteBuffer.allocate(8).putInt(columns).putInt(rows).array());
+        messageDigest.update(ByteBuffer.allocate(12)
+                .putInt(columns).putInt(rows).putFloat(fovDegrees).array());
     }
 
     @Override
@@ -59,11 +68,13 @@ public class FisheyeTransformation extends BitmapTransformation {
             return false;
         }
         FisheyeTransformation that = (FisheyeTransformation) other;
-        return columns == that.columns && rows == that.rows;
+        return columns == that.columns && rows == that.rows
+                && Float.compare(fovDegrees, that.fovDegrees) == 0;
     }
 
     @Override
     public int hashCode() {
-        return ID.hashCode() * 31 * 31 + columns * 31 + rows;
+        return ((ID.hashCode() * 31 + columns) * 31 + rows) * 31
+                + Float.floatToIntBits(fovDegrees);
     }
 }

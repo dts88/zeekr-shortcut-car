@@ -121,48 +121,66 @@ public class FisheyeProjectionTest {
 
     // ---------------------------------------------------------------- 正向映射（图片回看）
 
-    private float[] forward(float x, float y) {
+    private float[] forward(float x, float y, float fov) {
         float[] out = new float[2];
-        FisheyeProjection.correctedPoint(x, y, out, 0);
+        FisheyeProjection.correctedPoint(x, y, fov, out, 0);
         return out;
     }
 
     @Test
     public void theForwardMappingKeepsTheCentreWhereItIs() {
-        float[] p = forward(0.5f, 0.5f);
+        float[] p = forward(0.5f, 0.5f, 110f);
         assertEquals(0.5f, p[0], TOLERANCE);
         assertEquals(0.5f, p[1], TOLERANCE);
     }
 
     /**
-     * 整个鱼眼圆（半宽 1.0，也就是 180° 全视场）正好落在画面边上。
-     * 这条成立，「校正之后画面没被裁掉」才是真的。
+     * 正反两个方向必须是同一条曲线 —— 这条成立，照片的校正量才和后视镜一模一样。
+     * 一个说「输出点去源图哪里取色」，另一个说「源图这点画到哪里去」，绕一圈得回到原处。
      */
     @Test
-    public void theWholeFisheyeCircleLandsExactlyOnTheEdge() {
-        assertEquals(1f, forward(1f, 0.5f)[0], TOLERANCE);
-        assertEquals(0f, forward(0f, 0.5f)[0], TOLERANCE);
-        assertEquals(1f, forward(0.5f, 1f)[1], TOLERANCE);
-        assertEquals(0f, forward(0.5f, 0f)[1], TOLERANCE);
+    public void theTwoDirectionsAreInverseOfEachOther() {
+        for (float fov : new float[]{90f, 110f, 140f}) {
+            for (float x = 0.05f; x <= 0.95f; x += 0.1f) {
+                float[] corrected = forward(x, 0.5f, fov);
+                float[] back = at(corrected[0], corrected[1], fov);
+                assertEquals("fov=" + fov + " x=" + x, x, back[0], 0.002f);
+                assertEquals("fov=" + fov + " x=" + x, 0.5f, back[1], 0.002f);
+            }
+        }
     }
 
-    /** 四个角在圆之外，会落到框外 —— 所以绘制时必须按本路裁剪，不能画到隔壁那一路上。 */
+    /** 偏离光轴正好 fov/2 的那一圈落在画面边上 —— 视野角度在这边也是字面意义。 */
     @Test
-    public void theCornersFallOutsideTheFrameAndMustBeClipped() {
-        float[] corner = forward(1f, 1f);
-        assertTrue("右下角应当落在框外: " + corner[0], corner[0] > 1f);
-        assertTrue("右下角应当落在框外: " + corner[1], corner[1] > 1f);
+    public void theStatedFieldOfViewLandsOnTheEdge() {
+        for (float fov : new float[]{90f, 110f, 140f}) {
+            float atHalfFov = 0.5f + (fov / 2f / 90f) * 0.5f;
+            assertEquals("fov=" + fov, 1f, forward(atHalfFov, 0.5f, fov)[0], 0.002f);
+        }
     }
 
-    /**
-     * 校正就是把中间压一点、把边缘拉开：中途的点相对地往里走，边缘不动。
-     * 反过来（中间被拉开）说明投影写反了，画面会更鼓。
-     */
+    /** 视野之外的那一圈落到框外，绘制时必须裁掉，不能画到隔壁那一路上。 */
     @Test
-    public void theMiddleIsSqueezedSoTheEdgeCanStretch() {
-        assertTrue(forward(0.75f, 0.5f)[0] < 0.75f);
-        assertTrue(forward(0.9f, 0.5f)[0] < 0.9f);
-        assertEquals(1f, forward(1f, 0.5f)[0], TOLERANCE);
+    public void whatLiesBeyondTheFieldOfViewFallsOutsideTheFrame() {
+        assertTrue(forward(1f, 0.5f, 110f)[0] > 1f);
+        float[] corner = forward(1f, 1f, 110f);
+        assertTrue(corner[0] > 1f);
+        assertTrue(corner[1] > 1f);
+    }
+
+    /** 校正就是把边缘拉开：越靠外推得越远，中间几乎不动。 */
+    @Test
+    public void theEdgeIsStretchedMoreThanTheMiddle() {
+        float middle = forward(0.6f, 0.5f, 110f)[0] - 0.6f;
+        float edge = forward(0.9f, 0.5f, 110f)[0] - 0.9f;
+        assertTrue("边缘应当被推得更远: " + middle + " vs " + edge, edge > middle);
+    }
+
+    /** 视野越小，同一点被推得越远（看到的范围越窄、放得越大）。 */
+    @Test
+    public void aNarrowerFieldOfViewPushesFurther() {
+        assertTrue(forward(0.7f, 0.5f, 90f)[0] > forward(0.7f, 0.5f, 110f)[0]);
+        assertTrue(forward(0.7f, 0.5f, 110f)[0] > forward(0.7f, 0.5f, 140f)[0]);
     }
 
     /** 单调递增，否则画面会在某处翻折。 */
@@ -170,7 +188,7 @@ public class FisheyeProjectionTest {
     public void theForwardMappingIsMonotonic() {
         float previous = -1f;
         for (float x = 0.5f; x <= 1.0001f; x += 0.05f) {
-            float current = forward(x, 0.5f)[0];
+            float current = forward(x, 0.5f, 110f)[0];
             assertTrue("应当单调递增，x=" + x, current > previous);
             previous = current;
         }
@@ -179,8 +197,8 @@ public class FisheyeProjectionTest {
     @Test
     public void theForwardMappingIsSymmetricAboutTheCentre() {
         for (float offset = 0.1f; offset <= 0.5f; offset += 0.1f) {
-            float left = forward(0.5f - offset, 0.5f)[0];
-            float right = forward(0.5f + offset, 0.5f)[0];
+            float left = forward(0.5f - offset, 0.5f, 110f)[0];
+            float right = forward(0.5f + offset, 0.5f, 110f)[0];
             assertEquals(0.5f - left, right - 0.5f, TOLERANCE);
         }
     }
