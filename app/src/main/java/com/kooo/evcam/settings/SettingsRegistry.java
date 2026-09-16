@@ -73,7 +73,8 @@ public final class SettingsRegistry {
     public static final SettingSpec FISHEYE_PROJECTION = SettingSpec.of(
             "fisheye_projection", "鱼眼校正方式", "rectilinear",
             entry("rectilinear", "直线投影", R.string.opt_projection_rectilinear),
-            entry("cylindrical", "柱面投影", R.string.opt_projection_cylindrical));
+            entry("cylindrical", "柱面投影", R.string.opt_projection_cylindrical),
+            entry("stereographic", "立体投影", R.string.opt_projection_stereographic));
 
     /**
      * 动作栏（录制、拍照那一列）放在屏幕哪一侧。

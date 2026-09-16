@@ -38,6 +38,14 @@ public final class FisheyeProjection {
     public static final String PROJECTION_CYLINDRICAL = "cylindrical";
 
     /**
+     * 立体投影：整幅鱼眼都装得下，直线掰得没那么彻底。
+     *
+     * <p>把射线放在 tan(θ/2) 上而不是 tan(θ)。后者到 90° 就发散，所以直线投影必须裁；
+     * 前者到 180° 才发散，于是整个圆都能留在画面里，代价是直线只掰直了一部分。</p>
+     */
+    public static final String PROJECTION_STEREOGRAPHIC = "stereographic";
+
+    /**
      * 柱面投影的视野上限。
      *
      * <p>直线投影到 90° 就发散，所以卡在 140°；柱面没有这个问题 —— 横向位置正比于方位角，
@@ -75,10 +83,15 @@ public final class FisheyeProjection {
         return Math.max(MIN_FOV_DEGREES, Math.min(MAX_FOV_DEGREES, degrees));
     }
 
-    /** 这种投影能给到多大的视野。 */
+    /**
+     * 这种投影能给到多大的视野。
+     *
+     * <p>直线投影卡在 140°：它把射线放在 tan(θ) 上，θ 到 90° 就是无穷，再宽边缘就没法看了。
+     * 另外两种没有这个问题。</p>
+     */
     public static float maxFovFor(String projection) {
-        return PROJECTION_CYLINDRICAL.equals(projection)
-                ? MAX_CYLINDRICAL_FOV_DEGREES : MAX_FOV_DEGREES;
+        return PROJECTION_RECTILINEAR.equals(projection) || projection == null
+                ? MAX_FOV_DEGREES : MAX_CYLINDRICAL_FOV_DEGREES;
     }
 
     /** 按投影方式夹住视野角度 —— 上限两种投影不一样。 */
@@ -98,7 +111,53 @@ public final class FisheyeProjection {
             cylindricalSourcePoint(x, y, fovDegrees, out, offset);
             return;
         }
+        if (PROJECTION_STEREOGRAPHIC.equals(projection)) {
+            stereographicSourcePoint(x, y, fovDegrees, out, offset);
+            return;
+        }
         sourcePoint(x, y, fovDegrees, out, offset);
+    }
+
+    /**
+     * 带强度的反向映射：{@code strength} 从 0 到 1，在「原图不动」和「完全校正」之间插值。
+     *
+     * <p>0 就是原样：输出点直接取源图同一个位置。1 就是那一种投影本来的样子。
+     * 中间是线性插值 —— 它不对应任何一种真实的成像模型，但这里要的是一个能用手感调的旋钮：
+     * 校正过头和校正不足都能看出来，中间那一档往往才是顺眼的。</p>
+     */
+    public static void sourcePoint(float x, float y, float fovDegrees, String projection,
+                                   float strength, float[] out, int offset) {
+        sourcePoint(x, y, fovDegrees, projection, out, offset);
+        if (strength >= 1f) {
+            return;
+        }
+        float amount = Math.max(0f, strength);
+        out[offset] = x + (out[offset] - x) * amount;
+        out[offset + 1] = y + (out[offset + 1] - y) * amount;
+    }
+
+    /**
+     * 立体投影的反向映射：校正后画面里的一点 → 原始鱼眼画面里的采样点。
+     *
+     * <p>和直线投影同一个约定：画面边缘对应偏离光轴 fov/2 的那条射线。差别只在中间怎么分配 ——
+     * 半径放在 tan(θ/2) 上，中心压得比直线投影轻，边缘也不会被拉到没法看。</p>
+     */
+    public static void stereographicSourcePoint(float x, float y, float fovDegrees,
+                                                float[] out, int offset) {
+        double halfFov = Math.toRadians(clampFov(fovDegrees, PROJECTION_STEREOGRAPHIC) / 2.0);
+        double edge = Math.tan(halfFov / 2.0);
+        double dx = (x * 2.0 - 1.0) * edge;
+        double dy = (y * 2.0 - 1.0) * edge;
+        double planeRadius = Math.hypot(dx, dy);
+        if (planeRadius < EPSILON) {
+            out[offset] = DEFAULT_CENTER_X;
+            out[offset + 1] = DEFAULT_CENTER_Y;
+            return;
+        }
+        double angle = 2.0 * Math.atan(planeRadius);
+        float sourceRadius = (float) (angle / (Math.PI / 2.0));
+        out[offset] = clamp01((float) (DEFAULT_CENTER_X + dx / planeRadius * sourceRadius * 0.5));
+        out[offset + 1] = clamp01((float) (DEFAULT_CENTER_Y + dy / planeRadius * sourceRadius * 0.5));
     }
 
     /**

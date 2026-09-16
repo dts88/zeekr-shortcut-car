@@ -385,6 +385,9 @@
     <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
     <string name="set_fisheye_fov_title">Corrected field of view</string>
     <string name="set_fisheye_fov_summary">A wider angle keeps more of the picture. Up to 140° for straight lines, 180° for wide</string>
+    <string name="opt_projection_stereographic">Whole circle</string>
+    <string name="set_fisheye_strength_title">Correction strength</string>
+    <string name="set_fisheye_strength_summary">100 is the full effect of the chosen projection; lower leans back towards the original picture</string>
     <string name="dlg_rail_side_title">Which side is the steering wheel on?</string>
     <string name="dlg_rail_side_lhd">Left (left-hand drive) · buttons on the left</string>
     <string name="dlg_rail_side_rhd">Right (right-hand drive) · buttons on the right</string>

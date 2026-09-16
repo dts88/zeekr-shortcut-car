@@ -103,6 +103,7 @@ public class AppConfig {
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
     private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
+    private static final String KEY_FISHEYE_STRENGTH = "fisheye_strength";        // 校正强度（百分比）
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
@@ -958,6 +959,19 @@ public class AppConfig {
     public void setPhotoFisheyeFov(float degrees) {
         prefs.edit().putFloat(KEY_PHOTO_FISHEYE_FOV,
                 FisheyeProjection.clampFov(degrees, getFisheyeProjection())).apply();
+    }
+
+    /**
+     * 校正强度，百分比。100 就是这种投影本来的样子，小于 100 是往原图那边插值。
+     *
+     * <p>下限 10 而不是 0：0 等于没校正，那是开关该管的事，不该在滑块上再来一个关。</p>
+     */
+    public int getFisheyeStrength() {
+        return Math.max(10, Math.min(100, prefs.getInt(KEY_FISHEYE_STRENGTH, 100)));
+    }
+
+    public void setFisheyeStrength(int percent) {
+        prefs.edit().putInt(KEY_FISHEYE_STRENGTH, Math.max(10, Math.min(100, percent))).apply();
     }
 
     /** 校正的目标视野角度（度）。 */

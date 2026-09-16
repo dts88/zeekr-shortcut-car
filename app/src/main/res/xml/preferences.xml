@@ -253,6 +253,12 @@
             android:summary="@string/set_fisheye_fov_summary"
             app:showSeekBarValue="true" />
 
+        <SeekBarPreference
+            android:key="pref_fisheye_strength"
+            android:title="@string/set_fisheye_strength_title"
+            android:summary="@string/set_fisheye_strength_summary"
+            app:showSeekBarValue="true" />
+
     </PreferenceScreen>
 
     <!-- ==================== 系统 ==================== -->

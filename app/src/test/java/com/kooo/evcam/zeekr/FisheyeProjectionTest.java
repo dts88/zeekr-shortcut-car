@@ -252,14 +252,83 @@ public class FisheyeProjectionTest {
         assertEquals(at(0.75f, 0.5f, 140f)[0], fallback[0], TOLERANCE);
     }
 
-    /** 设置项里存的字符串就是算法认的那两个 —— 中间只隔着这一个值，写错了界面会静默回到直线。 */
+    /** 设置项里存的字符串就是算法认的那几个 —— 中间只隔着这一个值，写错了界面会静默回到直线。 */
     @Test
     public void theSettingValuesAreExactlyTheProjectionNames() {
         String[] values = com.kooo.evcam.settings.SettingsRegistry.FISHEYE_PROJECTION.values();
-        assertEquals(2, values.length);
+        assertEquals(3, values.length);
         assertEquals(FisheyeProjection.PROJECTION_RECTILINEAR, values[0]);
         assertEquals(FisheyeProjection.PROJECTION_CYLINDRICAL, values[1]);
+        assertEquals(FisheyeProjection.PROJECTION_STEREOGRAPHIC, values[2]);
         assertEquals(FisheyeProjection.PROJECTION_RECTILINEAR,
                 com.kooo.evcam.settings.SettingsRegistry.FISHEYE_PROJECTION.defaultValue);
+    }
+
+    // ---------------------------------------------------------------- 立体投影与强度
+
+    private float[] stereographic(float x, float y, float fov) {
+        float[] out = new float[2];
+        FisheyeProjection.stereographicSourcePoint(x, y, fov, out, 0);
+        return out;
+    }
+
+    @Test
+    public void theStereographicCentreStaysAtTheCentre() {
+        float[] p = stereographic(0.5f, 0.5f, 140f);
+        assertEquals(0.5f, p[0], TOLERANCE);
+        assertEquals(0.5f, p[1], TOLERANCE);
+    }
+
+    /** 三种投影在画面边上看到的角度都一样，差别全在中间怎么分配。 */
+    @Test
+    public void allThreeProjectionsAgreeAtTheEdge() {
+        for (float fov : new float[]{90f, 110f, 140f}) {
+            float edge = at(1f, 0.5f, fov)[0];
+            assertEquals("fov=" + fov, edge, cylindrical(1f, 0.5f, fov)[0], 0.002f);
+            assertEquals("fov=" + fov, edge, stereographic(1f, 0.5f, fov)[0], 0.002f);
+        }
+    }
+
+    /** 中途：立体投影落在直线和柱面之间 —— 比直线温和，比柱面保守。 */
+    @Test
+    public void theStereographicMappingSitsBetweenTheOtherTwo() {
+        for (float fov : new float[]{110f, 140f}) {
+            float rectilinear = at(0.75f, 0.5f, fov)[0];
+            float middle = stereographic(0.75f, 0.5f, fov)[0];
+            float wide = cylindrical(0.75f, 0.5f, fov)[0];
+            assertTrue("fov=" + fov, wide < middle);
+            assertTrue("fov=" + fov, middle < rectilinear);
+        }
+    }
+
+    /** 立体投影也能开到 180°，直线投影不行。 */
+    @Test
+    public void theStereographicProjectionAlsoReachesOneEighty() {
+        assertEquals(180f, FisheyeProjection.maxFovFor(
+                FisheyeProjection.PROJECTION_STEREOGRAPHIC), TOLERANCE);
+        assertEquals(140f, FisheyeProjection.maxFovFor(
+                FisheyeProjection.PROJECTION_RECTILINEAR), TOLERANCE);
+        assertEquals(1f, stereographic(1f, 0.5f, 180f)[0], 0.002f);
+    }
+
+    /** 强度 0 就是原图不动；1 就是这种投影本来的样子；中间是插值。 */
+    @Test
+    public void strengthInterpolatesTowardsTheUntouchedPicture() {
+        float[] out = new float[2];
+        FisheyeProjection.sourcePoint(0.8f, 0.3f, 120f,
+                FisheyeProjection.PROJECTION_RECTILINEAR, 0f, out, 0);
+        assertEquals(0.8f, out[0], TOLERANCE);
+        assertEquals(0.3f, out[1], TOLERANCE);
+
+        float[] full = new float[2];
+        FisheyeProjection.sourcePoint(0.8f, 0.3f, 120f,
+                FisheyeProjection.PROJECTION_RECTILINEAR, 1f, full, 0);
+        assertEquals(at(0.8f, 0.3f, 120f)[0], full[0], TOLERANCE);
+
+        float[] half = new float[2];
+        FisheyeProjection.sourcePoint(0.8f, 0.3f, 120f,
+                FisheyeProjection.PROJECTION_RECTILINEAR, 0.5f, half, 0);
+        assertEquals((0.8f + full[0]) / 2f, half[0], TOLERANCE);
+        assertEquals((0.3f + full[1]) / 2f, half[1], TOLERANCE);
     }
 }

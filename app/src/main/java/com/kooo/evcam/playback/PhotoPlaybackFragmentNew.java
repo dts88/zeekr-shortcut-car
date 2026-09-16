@@ -521,7 +521,8 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         if (lanes > 1) {
             AppConfig config = new AppConfig(getContext());
             options = options.transform(new FisheyeTransformation(lanes, lanes,
-                    config.getPhotoFisheyeFov(), config.getFisheyeProjection()));
+                    config.getPhotoFisheyeFov(), config.getFisheyeProjection(),
+                    config.getFisheyeStrength() / 100f));
         }
         options = options.placeholder(keepShowing(imageView));
 

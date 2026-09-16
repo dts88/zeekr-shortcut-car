@@ -385,6 +385,9 @@
     <string name="opt_projection_cylindrical">Luas (ufuk melengkung)</string>
     <string name="set_fisheye_fov_title">Medan pandangan dibetulkan</string>
     <string name="set_fisheye_fov_summary">Sudut lebih luas mengekalkan lebih banyak gambar. Sehingga 140° untuk garisan lurus, 180° untuk luas</string>
+    <string name="opt_projection_stereographic">Seluruh bulatan</string>
+    <string name="set_fisheye_strength_title">Kekuatan pembetulan</string>
+    <string name="set_fisheye_strength_summary">100 ialah kesan penuh unjuran yang dipilih; lebih rendah condong kembali kepada gambar asal</string>
     <string name="dlg_rail_side_title">Stereng di sebelah mana?</string>
     <string name="dlg_rail_side_lhd">Kiri (pandu kiri) · butang di kiri</string>
     <string name="dlg_rail_side_rhd">Kanan (pandu kanan) · butang di kanan</string>

@@ -7,6 +7,24 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.5.0-alpha] - 2026-09-16
+
+- **Fixed: cabin photos were being corrected as if they were four views in one frame.**
+  The correction asked the profile whether a camera records a 2x2 grid, and that flag is
+  on for every camera by default -- including the cabin ones, which never produce a grid.
+  A cabin photo was therefore cut in four and each quarter warped separately. It now looks
+  at the picture instead: only a frame whose cells are square is treated as a grid.
+  Present since 1.2.0, and in the quartered form since 1.2.1.
+- Settings -> Interface -> Fisheye correction: a third projection, "Whole circle". It puts
+  a ray at tan(angle/2) instead of tan(angle), so the entire fisheye circle fits in the
+  frame; straight lines come out less straight than with "Straight lines" but nothing is
+  cut. Up to 180 degrees, like the wide one.
+- Settings -> Interface -> Correction strength: 10 to 100. Below 100 the picture is
+  interpolated back towards the untouched original, which is the knob to reach for when a
+  projection straightens too much or too little.
+- All three projections put the same angle at the frame edge, so switching between them
+  changes how the middle is laid out, not how much you see.
+
 ## [1.4.0-alpha] - 2026-09-16
 
 - Settings -> Interface -> Fisheye correction: pick how the picture is straightened.
