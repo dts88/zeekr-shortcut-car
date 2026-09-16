@@ -90,6 +90,8 @@ public class HardcodedTextTest {
         JAVA_ALLOWED.put("settings/SettingsRegistry.java", "日志用的设置名；界面上的名字走 strings");
         JAVA_ALLOWED.put("KeepAliveReceiver.java", "触发原因只写进日志");
         JAVA_ALLOWED.put("zeekr/LaneCycle.java", "日志里的方位名");
+        JAVA_ALLOWED.put("zeekr/RawFrameDump.java",
+                "工程模式导出的那份说明文件的正文，写进 txt，不上界面");
         JAVA_ALLOWED.put("config/RecordingConfig.java", "水印颜色 / 风格名只写进日志");
         JAVA_ALLOWED.put("service/CameraRecordingService.java",
                 "录制错误描述只写进日志（RecordingController.onError 不转给任何界面）");
