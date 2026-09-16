@@ -31,6 +31,15 @@ public final class FisheyeProjection {
     public static final float MIN_FOV_DEGREES = 90f;
     public static final float MAX_FOV_DEGREES = 140f;
 
+    /**
+     * 图片回看用的视野角度。
+     *
+     * <p>比后视镜的默认值宽：后视镜是边开车边扫一眼，窄一点、大一点反而好认；
+     * 照片是事后翻看，留下的范围越大越有用，四角裁掉的也少一些。
+     * 校正的<b>算法</b>两边完全一样，差的只是这一个数。</p>
+     */
+    public static final float PHOTO_FOV_DEGREES = 140f;
+
     /** 光心在原始画面里的位置。多数情况下就是正中间。 */
     public static final float DEFAULT_CENTER_X = 0.5f;
     public static final float DEFAULT_CENTER_Y = 0.5f;

@@ -7,6 +7,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.2.3-alpha] - 2026-09-16
+
+- Photo playback: the fisheye correction now keeps a 140 degree field instead of 110, so
+  less of the picture is cut away at the edges. The correction itself is unchanged; the
+  super mirror keeps its own setting.
+
 ## [1.2.2-alpha] - 2026-09-16
 
 - Photo playback: straight lines stay straight under fisheye correction. The picture is

@@ -39,7 +39,7 @@ public class FisheyeTransformation extends BitmapTransformation {
      * @param rows    纵向几路（环视合成图是 2）
      */
     public FisheyeTransformation(int columns, int rows) {
-        this(columns, rows, FisheyeProjection.DEFAULT_FOV_DEGREES);
+        this(columns, rows, FisheyeProjection.PHOTO_FOV_DEGREES);
     }
 
     /** 想换校正量时用这个 —— 视野角度的含义和后视镜那一项完全一样。 */
