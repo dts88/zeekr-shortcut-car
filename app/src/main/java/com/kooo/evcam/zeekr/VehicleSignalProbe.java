@@ -61,14 +61,19 @@ public final class VehicleSignalProbe {
             "android.car.permission.CAR_ENERGY",
     };
 
-    /** 标准 Android Automotive 里几个我们关心的属性。 */
+    /**
+     * 标准 Android Automotive 里几个我们关心的属性：常量名、显示名、读它需要的权限。
+     *
+     * <p>权限写在这里，是为了让报告能把「检查说有没有」和「实际读没读到」摆在一行里对比 ——
+     * 这两件事在这台车机上未必一致，而不一致正是我们要找的东西。</p>
+     */
     private static final String[][] CAR_PROPERTIES = {
-            {"TURN_SIGNAL_STATE", "转向灯"},
-            {"DOOR_POS", "车门位置"},
-            {"PERF_VEHICLE_SPEED", "车速"},
-            {"GEAR_SELECTION", "档位"},
-            {"PARKING_BRAKE_ON", "手刹"},
-            {"IGNITION_STATE", "点火状态"},
+            {"TURN_SIGNAL_STATE", "转向灯", "android.car.permission.CAR_EXTERIOR_LIGHTS"},
+            {"DOOR_POS", "车门位置", "android.car.permission.CONTROL_CAR_DOORS"},
+            {"PERF_VEHICLE_SPEED", "车速", "android.car.permission.CAR_SPEED"},
+            {"GEAR_SELECTION", "档位", "android.car.permission.CAR_POWERTRAIN"},
+            {"PARKING_BRAKE_ON", "手刹", "android.car.permission.CAR_POWERTRAIN"},
+            {"IGNITION_STATE", "点火状态", "android.car.permission.CAR_POWERTRAIN"},
     };
 
     private VehicleSignalProbe() {
@@ -441,11 +446,20 @@ public final class VehicleSignalProbe {
                 sb.append("   属性清单读取失败: ").append(t).append('\n');
             }
 
-            // 尝试直接读我们关心的几个
-            sb.append(">> 关心的属性读取结果:").append('\n');
+            // 挨个试：不看权限检查怎么说，直接调，看回来的是值还是异常
+            sb.append(">> 关心的属性：挨个试过之后的结果").append('\n');
+            List<String> verdicts = new ArrayList<>();
             for (String[] entry : CAR_PROPERTIES) {
-                readCarProperty(sb, propertyManager, entry[0], entry[1]);
+                verdicts.add(readCarProperty(sb, context, propertyManager,
+                        entry[0], entry[1], entry[2]));
             }
+            sb.append('\n').append(">> 一句话小结（权限检查 vs 实际读到的东西）:").append('\n');
+            for (String verdict : verdicts) {
+                sb.append("     ").append(verdict).append('\n');
+            }
+            sb.append("     说明：「权限说没有、却读到了」是有价值的发现 —— 和安装应用那次一样，")
+                    .append('\n');
+            sb.append("     检查接口在这台车机上会说谎，真去调用反而成。").append('\n');
 
         } catch (Throwable t) {
             sb.append("!! 调用失败: ").append(t).append('\n');
@@ -454,24 +468,51 @@ public final class VehicleSignalProbe {
     }
 
     /**
-     * 读一个车辆属性。
+     * 读一个车辆属性 —— <b>把能走的路都走一遍</b>，不管权限检查怎么说。
      *
-     * <p>优先用不带类型的 {@code getProperty(int, int)} —— 它返回
-     * {@code CarPropertyValue}，对什么类型的属性都适用。带类型的三参重载要求传对
-     * 具体类（车速是 Float、手刹是 Boolean、转向灯是 Integer），传错会以一个与
-     * 「能不能读到」无关的理由失败，反而掩盖真正的答案。</p>
+     * <h3>为什么不先看权限</h3>
+     *
+     * <p>「检查接口说不行、实际调用却成了」在这台车机上已经出现过一次：应用内更新原本卡在
+     * {@code canRequestPackageInstalls()} 返回 false 上，而直接把安装器拉起来是好的。
+     * 权限检查在 App Lab 这层虚拟化里未必反映真实情况，所以这里一律先试，再看结果。</p>
+     *
+     * <h3>为什么要走好几条路</h3>
+     *
+     * <ul>
+     *   <li>{@code getProperty(int,int)} 不带类型，对什么属性都适用，是首选；</li>
+     *   <li>车门这类<b>分区属性</b>用 areaId=0 读不到，得按配置里列出的区域号逐个试 ——
+     *       上一版只试了 0，所以「车门读不到」这个结论本身就可能是错的；</li>
+     *   <li>带类型的 getter 有时能绕过不同的检查，值得再试一次；</li>
+     *   <li>一次性读失败不代表订阅也失败：换挡、转向灯这类信号本来就该用回调拿。</li>
+     * </ul>
+     *
+     * @return 一行小结，供报告末尾汇总
      */
-    private static void readCarProperty(StringBuilder sb, Object propertyManager,
-                                        String propName, String label) {
-        sb.append("     ").append(label).append(" (").append(propName).append("): ");
+    private static String readCarProperty(StringBuilder sb, Context context,
+                                          Object propertyManager, String propName,
+                                          String label, String permission) {
+        sb.append("     ").append(label).append(" (").append(propName).append(')').append('\n');
+
+        boolean granted = false;
+        try {
+            granted = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable ignored) {
+            // 权限名在本平台可能不存在
+        }
+        sb.append("        权限检查: ").append(granted ? "已授予" : "未授予")
+                .append("  (").append(permission).append(')').append('\n');
+
         int propId;
         try {
             Class<?> ids = Class.forName("android.car.VehiclePropertyIds");
             propId = ids.getField(propName).getInt(null);
         } catch (Throwable t) {
-            sb.append("本平台无此属性常量").append('\n');
-            return;
+            sb.append("        本平台无此属性常量").append('\n');
+            return label + ": 本平台没有这个属性";
         }
+
+        // 配置里有区域号：分区属性必须按区域读
+        int[] areaIds = areaIdsOf(sb, propertyManager, propId);
 
         Method untyped = null;
         for (Method m : propertyManager.getClass().getMethods()) {
@@ -482,20 +523,110 @@ public final class VehicleSignalProbe {
                 break;
             }
         }
-        if (untyped == null) {
-            sb.append("无 getProperty(int,int) 方法").append('\n');
-            return;
+
+        String success = null;
+        String lastFailure = null;
+        if (untyped != null) {
+            for (int areaId : areaIds) {
+                try {
+                    Object value = untyped.invoke(propertyManager, propId, areaId);
+                    sb.append("        getProperty(area=").append(areaId).append("): ")
+                            .append(abbreviate(value)).append('\n');
+                    if (value != null && success == null) {
+                        success = "getProperty area=" + areaId;
+                    }
+                } catch (Throwable t) {
+                    lastFailure = describeCause(t);
+                    sb.append("        getProperty(area=").append(areaId).append("): 失败 ")
+                            .append(lastFailure).append('\n');
+                }
+            }
+        } else {
+            sb.append("        无 getProperty(int,int) 方法").append('\n');
         }
 
-        // areaId 0 是全局属性的区域号；车门这类分区属性用 0 读不到，
-        // 那种情况下要看上面的属性清单里列出的 areaIds。
-        try {
-            Object value = untyped.invoke(propertyManager, propId, 0);
-            sb.append(value).append('\n');
-        } catch (Throwable t) {
-            String reason = t.getCause() != null ? String.valueOf(t.getCause()) : String.valueOf(t);
-            sb.append("读取失败 ").append(reason).append('\n');
+        // 带类型的 getter 再试一遍：它们走的检查未必和上面那条一样
+        for (String typed : new String[]{"getIntProperty", "getFloatProperty",
+                "getBooleanProperty"}) {
+            String outcome = tryTypedGetter(propertyManager, typed, propId, areaIds[0]);
+            if (outcome == null) {
+                continue;
+            }
+            sb.append("        ").append(typed).append("(area=").append(areaIds[0])
+                    .append("): ").append(outcome).append('\n');
+            if (success == null && !outcome.startsWith("失败")) {
+                success = typed;
+            }
         }
+
+        String verdict;
+        if (success != null) {
+            verdict = label + ": 读到了（" + success + "）"
+                    + (granted ? "" : "  << 权限说没有，实际可以");
+        } else {
+            verdict = label + ": 读不到"
+                    + (lastFailure != null ? "（" + lastFailure + "）" : "")
+                    + (granted ? "  << 权限说有，却读不到" : "");
+        }
+        AppLog.i(TAG, "车辆属性实测 " + verdict);
+        return verdict;
+    }
+
+    /**
+     * 这个属性有哪些区域号。
+     *
+     * <p>全局属性只有 0；车门、车窗这类每个位置一个号。读不到配置就只试 0 ——
+     * 那是全局属性的区域号，至少不会一条路都没走。</p>
+     */
+    private static int[] areaIdsOf(StringBuilder sb, Object propertyManager, int propId) {
+        try {
+            Method getConfig = null;
+            for (Method m : propertyManager.getClass().getMethods()) {
+                if ("getCarPropertyConfig".equals(m.getName())
+                        && m.getParameterTypes().length == 1) {
+                    getConfig = m;
+                    break;
+                }
+            }
+            if (getConfig == null) {
+                return new int[]{0};
+            }
+            Object config = getConfig.invoke(propertyManager, propId);
+            if (config == null) {
+                sb.append("        配置: 读不到（属性可能不存在或没有权限看）").append('\n');
+                return new int[]{0};
+            }
+            Object ids = config.getClass().getMethod("getAreaIds").invoke(config);
+            if (ids instanceof int[] && ((int[]) ids).length > 0) {
+                int[] areaIds = (int[]) ids;
+                sb.append("        配置: 区域号 ").append(Arrays.toString(areaIds)).append('\n');
+                return areaIds.length > 6 ? Arrays.copyOf(areaIds, 6) : areaIds;
+            }
+        } catch (Throwable t) {
+            sb.append("        配置: 取不到 ").append(describeCause(t)).append('\n');
+        }
+        return new int[]{0};
+    }
+
+    /** 带类型的 getter 试一次；本平台没有这个方法就返回 null，不写进报告。 */
+    private static String tryTypedGetter(Object propertyManager, String methodName,
+                                         int propId, int areaId) {
+        try {
+            Method m = propertyManager.getClass().getMethod(methodName, int.class, int.class);
+            return String.valueOf(m.invoke(propertyManager, propId, areaId));
+        } catch (NoSuchMethodException e) {
+            return null;
+        } catch (Throwable t) {
+            return "失败 " + describeCause(t);
+        }
+    }
+
+    /** 反射调用失败时，真正有信息的是 cause（SecurityException 还是别的）。 */
+    private static String describeCause(Throwable t) {
+        Throwable cause = t.getCause() != null ? t.getCause() : t;
+        String text = cause.getClass().getSimpleName()
+                + (cause.getMessage() != null ? ": " + cause.getMessage() : "");
+        return text.length() > 120 ? text.substring(0, 120) + "…" : text;
     }
 
     // ------------------------------------------------------------------

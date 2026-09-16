@@ -7,6 +7,18 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.5.1-alpha] - 2026-09-17
+
+- Diagnostics: the vehicle-signal probe now tries every way in and reports what came back,
+  rather than trusting the permission check. It reads each property through the untyped
+  getter, through the typed ones, and -- this is new -- at every area id the property
+  declares, so a zoned property like the doors is no longer written off after a single
+  read at area 0. Each line says what the permission check claimed next to what the call
+  actually returned, and the section ends with a one-line verdict per signal.
+- The reason for the change is the in-app update: it was blocked by a permission check that
+  said no, while handing the APK to the installer worked. A check that says no is a
+  question, not an answer.
+
 ## [1.5.0-alpha] - 2026-09-16
 
 - **Fixed: cabin photos were being corrected as if they were four views in one frame.**
