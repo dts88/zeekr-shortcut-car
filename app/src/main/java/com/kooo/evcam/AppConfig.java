@@ -101,6 +101,7 @@ public class AppConfig {
     private static final String KEY_REARVIEW_ENABLED = "rearview_enabled";        // 总开关
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
+    private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
@@ -917,6 +918,19 @@ public class AppConfig {
 
     public void setPhotoFisheyeCorrection(boolean on) {
         prefs.edit().putBoolean(KEY_PHOTO_FISHEYE, on).apply();
+    }
+
+    /**
+     * 拍照时是否另存一份没动过的整帧（见 {@code RawFrameDump}）。
+     *
+     * <p>工程模式用：拿去量画面几何和鱼眼参数。平时没有理由开着 —— 每拍一张多占一份空间。</p>
+     */
+    public boolean isRawFrameDumpEnabled() {
+        return prefs.getBoolean(KEY_RAW_FRAME_DUMP, false);
+    }
+
+    public void setRawFrameDumpEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_RAW_FRAME_DUMP, on).apply();
     }
 
     /** 校正的目标视野角度（度）。 */

@@ -640,6 +640,8 @@
     <string name="dev_preview_correction_adjust_title">Laraskan pembetulan pratonton</string>
     <string name="dev_preview_correction_adjust_summary">Membuka tetingkap terapung untuk melaraskan setiap kamera; buka suis di atas dahulu</string>
     <string name="dev_preview_correction_reset_title">Set semula pembetulan pratonton</string>
+    <string name="dev_raw_frame_title">Simpan juga bingkai asal</string>
+    <string name="dev_raw_frame_summary">Tanpa dipecah atau ditera, bersama nota geometri bingkai, dalam photos/raw. Untuk mengkaji susunan lorong dan parameter kanta</string>
     <string name="dev_current_profile_summary">Teks penuh profil yang berkuat kuasa, untuk semakan baris demi baris</string>
     <string name="dev_note">“Tersuai” dalam Profil strim hanya tersedia di sini. Bahagian ini tersembunyi selepas apl dimulakan semula.</string>
 

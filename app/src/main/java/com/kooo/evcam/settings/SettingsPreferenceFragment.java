@@ -926,6 +926,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 pref -> openFragment(new CustomCameraConfigFragment(),
                         R.string.dev_custom_config_title));
 
+        bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
+                appConfig::setRawFrameDumpEnabled);
+
         bindSwitch("pref_preview_correction", appConfig.isPreviewCorrectionEnabled(), value -> {
             appConfig.setPreviewCorrectionEnabled(value);
             if (getActivity() instanceof MainActivity) {

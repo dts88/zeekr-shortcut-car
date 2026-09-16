@@ -370,6 +370,11 @@
             android:key="pref_preview_correction_reset"
             android:title="@string/dev_preview_correction_reset_title" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_raw_frame_dump"
+            android:title="@string/dev_raw_frame_title"
+            android:summary="@string/dev_raw_frame_summary" />
+
         <Preference
             android:key="pref_current_profile"
             android:title="@string/set_current_profile_title"

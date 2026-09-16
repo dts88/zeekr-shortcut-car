@@ -643,6 +643,8 @@
     <string name="dev_preview_correction_adjust_title">预览矫正调参</string>
     <string name="dev_preview_correction_adjust_summary">打开悬浮窗逐路调整，需要先打开上面的开关</string>
     <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
+    <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
+    <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
     <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
     <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。重启应用后本区隐藏。</string>
 

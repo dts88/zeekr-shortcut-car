@@ -2479,6 +2479,12 @@ public class SingleCamera {
 
         AppConfig appConfig = new AppConfig(context);
 
+        // 工程模式：先把没动过的这一张留一份，重排和角标都在这之后
+        if (appConfig.isRawFrameDumpEnabled()) {
+            com.kooo.evcam.zeekr.RawFrameDump.save(
+                    context, bitmap, photoDir, timestamp, cameraId, position);
+        }
+
         // 四宫格：拍照拿到的是整张合成图（四个画面竖向一字排开），
         // 与录制保持一致地重排成 2x2 再存盘。用的是同一套拆分几何。
         android.graphics.Bitmap sourceBitmap = bitmap;

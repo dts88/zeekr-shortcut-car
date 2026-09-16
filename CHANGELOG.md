@@ -7,6 +7,16 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.3.0-alpha] - 2026-09-16
+
+- Developer options: "Also save the raw frame". With it on, taking a photo also writes the
+  frame exactly as the camera handed it over -- four views in one strip, not cut apart, no
+  stamp -- to photos/raw, next to a text file recording what the app made of it: the frame
+  size, whether it was taken for a composite stream, the rectangle of each lane, and the
+  recording settings in force. It is off by default and costs one extra file per photo.
+- The raw folder is outside what photo playback scans, so these files do not show up as
+  duplicates of the photo you just took.
+
 ## [1.2.3-alpha] - 2026-09-16
 
 - Photo playback: the fisheye correction now keeps a 140 degree field instead of 110, so
