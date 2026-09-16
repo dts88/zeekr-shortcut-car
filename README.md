@@ -53,9 +53,12 @@ to turn on the phone's hotspot and connect the car to it.
 
 ## Install
 
-Download `ZeekrShortcut-*.apk` from [Releases](../../releases) and sideload it through App Lab.
-Builds tagged `-alpha` are test builds; the in-app update check only offers beta and stable
-releases.
+- **Stable — [1.0.0](../../releases/tag/v1.0.0)**, or whatever is newest at
+  [Releases · latest](../../releases/latest). Start here.
+- **Everything, including test builds — [Releases](../../releases).** Builds tagged `-alpha` are
+  unverified; the in-app update check never offers them, only beta and stable releases.
+
+Download the `ZeekrShortcut-*.apk` asset from the release page and sideload it through App Lab.
 
 Then open **Settings → Recording → Stream profile** and choose *Zeekr 7X (surround
 composite)*, or *surround + front and rear cabin* to add the cabin cameras. Restart the app to

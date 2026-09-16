@@ -46,8 +46,12 @@
 
 ## 安装
 
-从 [Releases](../../releases) 下载 `ZeekrShortcut-*.apk`，通过 App Lab 侧载安装。
-带 `-alpha` 的是测试版；应用内的检查更新只推送 beta 和正式版。
+- **正式版 —— [1.0.0](../../releases/tag/v1.0.0)**，或者
+  [Releases · latest](../../releases/latest) 上最新的那个。从这里开始。
+- **全部版本（含测试版）—— [Releases](../../releases)。** 带 `-alpha` 的是未经验证的测试版；
+  应用内的检查更新不会推送它们，只推 beta 和正式版。
+
+在发布页下载 `ZeekrShortcut-*.apk`，通过 App Lab 侧载安装。
 
 装好后进入 **设置 → 录制 → 视频流配置**，选择「极氪7X（环视合成流）」，要加座舱画面就选
 「极氪7X（环视 + 前后座舱）」，重启应用后生效。若提示未检测到合成流，说明该车机 / 固件版本
