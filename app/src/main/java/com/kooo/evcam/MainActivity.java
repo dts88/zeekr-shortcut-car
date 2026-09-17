@@ -1839,6 +1839,12 @@ public class MainActivity extends AppCompatActivity {
             // 绑定 TextureView
             cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, textureRight);
 
+            // 布局是新建的，座舱两格默认都显示。管线里只有真正分到了相机的那一路才有实例，
+            // 所以问它就等于新建路径当时的结论 —— 以前这一步只在新建路径里做，
+            // 界面一重建，没开的「前座舱」就成了一块空格子
+            showCabinPanes(cameraManager.getCamera("back") != null,
+                    cameraManager.getCamera("left") != null);
+
             // 打开所有摄像头（后台初始化时仅创建了对象，可能只打开了补盲所需的单个摄像头）
             // 主界面需要所有摄像头画面，已打开的摄像头会被 openCamera 内部的防重复检查跳过
             cameraManager.openAllCameras();
@@ -2012,6 +2018,19 @@ public class MainActivity extends AppCompatActivity {
         AppLog.i(TAG, "四宫格摆位按配置生效，共 " + cells.length + " 格");
     }
 
+
+    /**
+     * 座舱那两格显不显示。
+     *
+     * <p>配置里没有的那一路，整格藏起来 —— 一块黑方块下面写着「前座舱」，比空着更像出了故障。
+     * 藏起来之后剩下那一格自己占满这一列。只开环视的布局里没有这两格，调了也不会有事。</p>
+     *
+     * <p>新建管线和复用管线两条路都要走这里：布局每次重建，两格都会回到默认的显示状态。</p>
+     */
+    private void showCabinPanes(boolean front, boolean rear) {
+        showPane(R.id.pane_cabin_front, front);
+        showPane(R.id.pane_cabin_rear, rear);
+    }
 
     /** 某一格要不要出现在版面里。GONE 而不是 INVISIBLE：要把地方让出来。 */
     private void showPane(int id, boolean show) {
@@ -2431,10 +2450,7 @@ public class MainActivity extends AppCompatActivity {
         AppLog.i(TAG, "座舱槽位按配置分: 前座舱=" + cabinFrontId + "，后座舱=" + cabinRearId
                 + "（配置里 前=" + wantsFront + " 后=" + wantsRear + "）");
 
-        // 配置里没有的那一路，整格藏起来 —— 一块黑方块下面写着「前座舱」，
-        // 比空着更像出了故障。藏起来之后剩下那一格自己占满这一列
-        showPane(R.id.pane_cabin_front, cabinFrontId != null);
-        showPane(R.id.pane_cabin_rear, cabinRearId != null);
+        showCabinPanes(cabinFrontId != null, cabinRearId != null);
 
         cameraManager.initCameras(
                 plan.compositeId, textureFront,

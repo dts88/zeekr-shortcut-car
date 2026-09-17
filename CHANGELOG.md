@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.8.1-alpha] - 2026-09-17
+
+- Fixed: with the surround + cabin profile and only one cabin camera turned on, rebuilding
+  the main screen (night mode, language) brought back an empty pane for the camera that is
+  off. Hiding it was only done when the cameras were first set up, not when a rebuilt screen
+  picked up the ones already running. The surround-only layout has no cabin panes and was
+  not affected.
+
 ## [1.8.0-alpha] - 2026-09-17
 
 - **Recording no longer stops when the main screen is rebuilt or closed.** Switching to night
