@@ -179,6 +179,9 @@
     <string name="msg_camera_access_failed">Camera access failed: %1$s</string>
     <string name="msg_codec_fallback">Recording failed and switched to MediaCodec. If this keeps happening, change the recording pipeline in Settings</string>
     <string name="msg_record_start_failed">Could not start recording — try again</string>
+    <string name="msg_record_start_retrying">Recording did not start — retrying…</string>
+    <string name="msg_record_start_gave_up">Recording still did not start. Tap Start recording</string>
+    <string name="msg_recording_lost_in_background">Recording stopped while the app was in the background</string>
     <string name="msg_record_error">Recording error</string>
     <string name="msg_photo_taken">Photo saved</string>
     <string name="msg_recording_stopped">Recording stopped</string>

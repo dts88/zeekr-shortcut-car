@@ -7,6 +7,23 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.6.1-alpha] - 2026-09-17
+
+- **Fixed: the record button could stay on "Starting…" for good after returning to the app,
+  while nothing was being recorded.** Recording is only counted as started once the first
+  data is written, and that wait had no time limit: if the data never came, the button
+  waited forever. The usual way in is leaving the app while recording and coming back after
+  the screen has been rebuilt (the head unit switching to night mode, for one), when the
+  new screen tries to resume recording and the attempt does not take. Tapping the button
+  then showed "Recording error" -- that was the empty clip being cleaned up -- and a second
+  tap started recording properly.
+- Now, if no data arrives within 10 seconds, the app stops the attempt quietly and tries
+  once more by itself. If that also fails it says so and waits for you, rather than retrying
+  forever.
+- Returning to the app also checks that the recorder is really recording when the screen
+  says it is. If not, the button goes back to Start recording and a message says recording
+  stopped while the app was in the background.
+
 ## [1.6.0-alpha] - 2026-09-17
 
 - Check for updates: when a newer version is found, the dialog shows what changed, taken

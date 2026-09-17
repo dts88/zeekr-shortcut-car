@@ -180,6 +180,9 @@
     <string name="msg_camera_access_failed">摄像头访问失败：%1$s</string>
     <string name="msg_codec_fallback">录制故障，已回退到 MediaCodec 模式；若频繁发生请在设置里更改录制模式</string>
     <string name="msg_record_start_failed">录制启动失败，请重试</string>
+    <string name="msg_record_start_retrying">录制没能启动，正在自动重试…</string>
+    <string name="msg_record_start_gave_up">录制还是没能启动，请点一下「开始录制」</string>
+    <string name="msg_recording_lost_in_background">录制已在后台停止</string>
     <string name="msg_record_error">录制发生异常</string>
     <string name="msg_photo_taken">拍照完成</string>
     <string name="msg_recording_stopped">录制已停止</string>

@@ -179,6 +179,9 @@
     <string name="msg_camera_access_failed">Capaian kamera gagal: %1$s</string>
     <string name="msg_codec_fallback">Rakaman gagal dan bertukar kepada MediaCodec. Jika ini berterusan, tukar saluran rakaman dalam Tetapan</string>
     <string name="msg_record_start_failed">Tidak dapat memulakan rakaman — cuba lagi</string>
+    <string name="msg_record_start_retrying">Rakaman tidak bermula — mencuba semula…</string>
+    <string name="msg_record_start_gave_up">Rakaman masih tidak bermula. Ketik Mula rakam</string>
+    <string name="msg_recording_lost_in_background">Rakaman berhenti semasa apl di latar belakang</string>
     <string name="msg_record_error">Ralat rakaman</string>
     <string name="msg_photo_taken">Foto disimpan</string>
     <string name="msg_recording_stopped">Rakaman dihentikan</string>

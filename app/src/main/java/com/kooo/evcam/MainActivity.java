@@ -239,6 +239,25 @@ public class MainActivity extends AppCompatActivity {
     private int pendingRemoteDurationSeconds = 0;  // 待启动的远程录制时长（等待首次写入后启动定时器）
     private boolean isPreparingRecording = false;  // 是否正在准备录制（等待首次写入）
 
+    /**
+     * 「准备中」最多等多久。
+     *
+     * <p>开始录制之后，要等录制器写出第一笔数据才算真的录上。以前这一步<b>没有超时</b>：
+     * 第一笔数据一直不来，按钮就永远停在「正在准备」，而录制器其实早就没在录了 ——
+     * 典型场景是录制中退到后台、Activity 被重建（比如车机切夜间模式），
+     * 新实例「恢复录制」没接上。用户得先点一下（弹出「录制异常」，那是在清理空的分段文件），
+     * 再点一下才恢复。这里让应用自己做这两下。</p>
+     */
+    private static final long PREPARING_TIMEOUT_MS = 10_000L;
+    private final android.os.Handler preparingHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable preparingWatchdog = this::onPreparingTimedOut;
+    /** 连续几次准备超时。超时后自动重试一次；重试也超时就停下来交给用户。 */
+    private int preparingTimeouts = 0;
+    /** 看门狗自己停掉录制器时，不弹「录制已停止」「录制异常」—— 那是它在收拾，不是出了新问题。 */
+    private boolean quietStop = false;
+    private long suppressRecordErrorToastUntil = 0;
+
 
 
 
@@ -2165,6 +2184,7 @@ public class MainActivity extends AppCompatActivity {
                 // 所有摄像头都启动失败
                 runOnUiThread(() -> {
                     AppLog.e(TAG, "所有摄像头启动录制失败");
+                    preparingHandler.removeCallbacks(preparingWatchdog);
                     isRecording = false;
                     isAutoRecordingPending = false;
                     isPreparingRecording = false;
@@ -2180,6 +2200,8 @@ public class MainActivity extends AppCompatActivity {
             AppLog.d(TAG, "收到首次数据写入回调，录制已真正开始");
             runOnUiThread(() -> {
                 // 结束"准备中"状态
+                preparingHandler.removeCallbacks(preparingWatchdog);
+                preparingTimeouts = 0;
                 if (isPreparingRecording) {
                     isPreparingRecording = false;
                     hidePreparingIndicator();
@@ -3538,11 +3560,14 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onRecordingStopped() {
             lastRefusalShown = null;
+            preparingHandler.removeCallbacks(preparingWatchdog);
             isRecording = false;
             isPreparingRecording = false;
             setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
-            Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
+            if (!quietStop) {
+                Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
+            }
         }
 
         @Override
@@ -3650,7 +3675,84 @@ public class MainActivity extends AppCompatActivity {
     /** 准备中：点已收成方块、一明一暗，外圈在转 —— 录制器还没起来。 */
     private void showPreparingIndicator() {
         setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.PREPARING);
-        AppLog.d(TAG, "进入准备中状态");
+        preparingHandler.removeCallbacks(preparingWatchdog);
+        preparingHandler.postDelayed(preparingWatchdog, PREPARING_TIMEOUT_MS);
+        AppLog.d(TAG, "进入准备中状态，" + PREPARING_TIMEOUT_MS + "ms 内等第一笔数据");
+    }
+
+    /**
+     * 准备中超时：第一笔数据迟迟不来。
+     *
+     * <p>先把这一次当作没录上 —— 停掉录制器（它会清掉那个一个字节都没写进去的分段文件），
+     * 状态回到待机；然后自动再开一次。用户手动做这两下是能恢复的，说明第二次通常能成，
+     * 那就不该让用户来做。重试也超时就停下来，明确告诉用户，不再无限重试。</p>
+     */
+    private void onPreparingTimedOut() {
+        if (!isPreparingRecording) {
+            return;
+        }
+        boolean managerRecording = cameraManager != null && cameraManager.isRecording();
+        boolean connected = cameraManager != null && cameraManager.hasConnectedCameras();
+        AppLog.w(TAG, "准备中超时：" + PREPARING_TIMEOUT_MS + "ms 没收到第一笔数据 " + instanceTag()
+                + " 第" + (preparingTimeouts + 1) + "次 managerRecording=" + managerRecording
+                + " camerasConnected=" + connected
+                + " resumeAfterRecreate=" + shouldResumeRecordingAfterRecreate
+                + " inBackground=" + isInBackground);
+
+        quietStop = true;
+        suppressRecordErrorToastUntil = System.currentTimeMillis() + 5_000L;
+        try {
+            stopRecording();
+        } catch (Exception e) {
+            AppLog.w(TAG, "准备中超时后停止录制器失败: " + e);
+        } finally {
+            quietStop = false;
+        }
+        // 协调器的停止回调可能不来（录制器本来就没起来）—— 这里自己把状态摆正
+        isRecording = false;
+        isPreparingRecording = false;
+        stopRecordingTimer();
+        setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
+
+        preparingTimeouts++;
+        if (preparingTimeouts <= 1) {
+            Toast.makeText(this, R.string.msg_record_start_retrying, Toast.LENGTH_SHORT).show();
+            preparingHandler.postDelayed(() -> {
+                if (!isRecording && !isFinishing() && !isDestroyed()) {
+                    AppLog.i(TAG, "准备中超时后自动重试录制");
+                    startRecording();
+                }
+            }, 1_500L);
+        } else {
+            AppLog.w(TAG, "准备中连续超时 " + preparingTimeouts + " 次，不再自动重试");
+            preparingTimeouts = 0;
+            Toast.makeText(this, R.string.msg_record_start_gave_up, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * 回到前台时，对一下「界面以为在录」和「录制器真的在录」是不是一回事。
+     *
+     * <p>以前这里只写了一句「录制中，相机应该还连着」就什么都不查。录制器若在后台停了，
+     * 界面会一直停在准备中或录制中，要等用户去点才暴露。录制器在请求开始的那一刻就会
+     * 把自己标成在录（不等第一笔数据），所以正常的准备中不会被误判。</p>
+     */
+    private void reconcileRecordingState() {
+        if (!isRecording || isRemoteRecording || cameraManager == null) {
+            return;
+        }
+        if (cameraManager.isRecording()) {
+            return;
+        }
+        AppLog.w(TAG, "回到前台：界面以为在录，录制器其实没在录 " + instanceTag()
+                + " preparing=" + isPreparingRecording);
+        preparingHandler.removeCallbacks(preparingWatchdog);
+        preparingTimeouts = 0;
+        isRecording = false;
+        isPreparingRecording = false;
+        stopRecordingTimer();
+        setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
+        Toast.makeText(this, R.string.msg_recording_lost_in_background, Toast.LENGTH_LONG).show();
     }
 
     /**
@@ -3870,6 +3972,9 @@ public class MainActivity extends AppCompatActivity {
         // 通知悬浮窗：应用回到前台
         OverlayCoordinator.onAppForeground(this);
 
+        // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
+        reconcileRecordingState();
+
         // U 盘可能在后台时插拔过
         refreshRecordAvailability();
         updateStatusLine();
@@ -3947,6 +4052,8 @@ public class MainActivity extends AppCompatActivity {
         // 保存当前运行日志到持久化文件（用于下次启动时可上传"上次运行日志"）
         // 放在 onDestroy 开头，确保在清理其他资源前保存完整日志
         AppLog.saveToPersistentLog(this);
+
+        preparingHandler.removeCallbacksAndMessages(null);
 
         // 取消自动停止录制的任务
         if (autoStopHandler != null && autoStopRunnable != null) {
@@ -4078,6 +4185,12 @@ public class MainActivity extends AppCompatActivity {
 
         // 记录日志（始终记录）
         AppLog.w(TAG, "Recording error, deleted " + deletedFiles.size() + " corrupted files: " + deletedFiles);
+
+        // 准备中超时后看门狗停掉录制器，清掉的正是那个空分段 —— 这是在收拾，不是新的异常
+        if (System.currentTimeMillis() < suppressRecordErrorToastUntil) {
+            AppLog.d(TAG, "准备中超时的清理，不弹录制异常");
+            return;
+        }
 
         // 检查是否可以显示 Toast（20秒内只显示一次）
         long currentTime = System.currentTimeMillis();
