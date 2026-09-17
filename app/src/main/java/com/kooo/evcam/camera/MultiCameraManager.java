@@ -233,6 +233,16 @@ public class MultiCameraManager {
     private TimestampUpdateCallback timestampUpdateCallback;
     private boolean hasNotifiedFirstDataWritten = false;  // 是否已通知首次写入（每次录制只通知一次）
 
+    /**
+     * 这次录制有没有写出过第一笔数据、什么时候写出的。
+     *
+     * <p>和 {@code hasNotifiedFirstDataWritten} 分开记：那个管的是「通知过没有」，只在有人听时才有意义。
+     * 主界面重建的那段时间里没人听，第一笔数据恰好在这时写出，新界面就等不到这次通知 ——
+     * 按钮会一直停在「正在准备」。所以新界面接上时直接来问这两个值。</p>
+     */
+    private volatile boolean firstDataWritten = false;
+    private volatile long firstDataWrittenAtMs = 0;
+
     public void setStatusCallback(StatusCallback callback) {
         this.statusCallback = callback;
     }
@@ -255,6 +265,46 @@ public class MultiCameraManager {
 
     public void setStorageFullCallback(StorageFullCallback callback) {
         this.storageFullCallback = callback;
+    }
+
+    /** 这次录制写出过第一笔数据没有。见 {@link #firstDataWritten}。 */
+    public boolean hasWrittenFirstData() {
+        return firstDataWritten;
+    }
+
+    /** 第一笔数据写出的时间（墙钟毫秒）；还没写出时是 0。新界面拿它接着计时。 */
+    public long getFirstDataWrittenAtMs() {
+        return firstDataWrittenAtMs;
+    }
+
+    /** 当前是第几个分段，从 0 数。 */
+    public int getCurrentSegmentIndex() {
+        return Math.max(0, lastNotifiedSegmentIndex);
+    }
+
+    /**
+     * 主界面要走了、录制管线留下：把它设的回调换成什么都不做的实现。
+     *
+     * <h3>为什么不直接置空</h3>
+     *
+     * <p>这些回调大多在相机线程上「先判空、再调用」。主界面在主线程上把字段置空，
+     * 正好落在两步之间，相机线程就空指针崩溃 —— 而且是在录制中。换成空实现就没有这个窗口，
+     * 也不再握着那个已经销毁的界面。</p>
+     *
+     * <p>唯一置空的是「U 盘满」：没人接时相机层自己停录（见 {@link #checkStorage}），
+     * 而且它只在主线程上读，不存在上面那种竞争。</p>
+     */
+    public void detachUiCallbacks() {
+        statusCallback = (cameraId, status) -> { };
+        previewSizeCallback = (cameraKey, cameraId, previewSize) -> { };
+        corruptedFilesCallback = deletedFiles -> { };
+        recordingStatusCallback = (activeCameras, failedCameras) -> { };
+        segmentSwitchCallback = newSegmentIndex -> { };
+        codecFallbackCallback = () -> { };
+        firstDataWrittenCallback = () -> { };
+        timestampUpdateCallback = newTimestamp -> { };
+        storageFullCallback = null;
+        AppLog.i(TAG, "主界面已离开，回调换成空实现，录制管线继续 recording=" + isRecording);
     }
 
     /**
@@ -713,6 +763,10 @@ public class MultiCameraManager {
             public void onFirstDataWritten(String cameraId) {
                 AppLog.d(TAG, "First data written for camera " + cameraId);
                 // 只在第一个摄像头首次写入时通知外部（每次录制只通知一次）
+                if (!firstDataWritten) {
+                    firstDataWritten = true;
+                    firstDataWrittenAtMs = System.currentTimeMillis();
+                }
                 if (!hasNotifiedFirstDataWritten && firstDataWrittenCallback != null) {
                     hasNotifiedFirstDataWritten = true;
                     AppLog.d(TAG, "Notifying external: first data written, recording truly started");
@@ -896,6 +950,8 @@ public class MultiCameraManager {
 
         // 重置首次写入通知标志（每次录制只通知一次）
         hasNotifiedFirstDataWritten = false;
+        firstDataWritten = false;
+        firstDataWrittenAtMs = 0;
 
         // 记录当前录制参数（用于 Watchdog 重建）
         currentRecordingTimestamp = timestamp;
@@ -1308,6 +1364,8 @@ public class MultiCameraManager {
 
         // 重置首次写入通知标志（每次录制只通知一次）
         hasNotifiedFirstDataWritten = false;
+        firstDataWritten = false;
+        firstDataWrittenAtMs = 0;
 
         // 检查是否使用中转写入模式
         AppConfig appConfig = new AppConfig(context);
@@ -1443,6 +1501,10 @@ public class MultiCameraManager {
                 public void onFirstDataWritten(String cameraId) {
                     AppLog.d(TAG, "Codec first data written for camera " + cameraId);
                     // 只在第一个摄像头首次写入时通知外部（每次录制只通知一次）
+                    if (!firstDataWritten) {
+                        firstDataWritten = true;
+                        firstDataWrittenAtMs = System.currentTimeMillis();
+                    }
                     if (!hasNotifiedFirstDataWritten && firstDataWrittenCallback != null) {
                         hasNotifiedFirstDataWritten = true;
                         AppLog.d(TAG, "Notifying external: first data written, recording truly started");

@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.8.0-alpha] - 2026-09-17
+
+- **Recording no longer stops when the main screen is rebuilt or closed.** Switching to night
+  mode, changing the language, or the system reclaiming the screen while the app is in the
+  background all rebuild the main screen, and that used to take the recording down with it:
+  the new screen then tried to resume recording, which is how the button could hang on
+  "Starting…". The cameras and recorders now stay up through it, and the new screen simply
+  shows what they are doing -- recording, with the timer carrying on from when it began.
+- Closing the main screen (back out of it, or swipe it away from recent apps) keeps
+  recording too; the notification and the floating button show that it is still running.
+  Recording stops only when you tap Stop or long-press to quit the app.
+- While the preview is being handed from the old screen to the new one, the camera session
+  is reconfigured, which may leave a gap of a fraction of a second in the recording.
+
 ## [1.7.0-alpha] - 2026-09-17
 
 - **Storage is checked every time a clip is finished, not once an hour.** Between hourly

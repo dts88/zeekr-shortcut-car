@@ -1850,6 +1850,9 @@ public class MainActivity extends AppCompatActivity {
             imageAdjustManager = new ImageAdjustManager(this);
             registerCamerasToImageAdjustManager();
             AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras (reused from background)");
+            // 必须在下面几个检查之前：管线还在录的话，界面的标记要先对上，
+            // 否则「重建后恢复录制」会以为没在录，又去开一次
+            syncRecordingStateFromManager();
             checkResumeRecordingAfterRecreate();
             checkAutoStartRecording();
             startAutoRecordingCheck();
@@ -3743,6 +3746,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * 接上一条还在进行的录制：状态以录制管线为准，而不是去「恢复」它。
+     *
+     * <p>主界面被重建或者重新打开时，录制管线一直在跑（见 onDestroy 的 keepPipeline）。
+     * 新界面要做的只是把按钮、计时器画成管线现在的样子：写出过第一笔数据就是录制中，
+     * 计时从那一刻接着走；还没写出就是准备中，看门狗照常盯着。</p>
+     */
+    private void syncRecordingStateFromManager() {
+        if (cameraManager == null || !cameraManager.isRecording()) {
+            return;
+        }
+        isRecording = true;
+        // 录制根本没断，不存在「恢复」—— 那条路会以为要重开一次
+        shouldResumeRecordingAfterRecreate = false;
+        savedRecordingStartTime = 0;
+        if (cameraManager.hasWrittenFirstData()) {
+            isPreparingRecording = false;
+            startRecordingTimer(cameraManager.getFirstDataWrittenAtMs(),
+                    cameraManager.getCurrentSegmentIndex() + 1);
+            setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
+        } else {
+            isPreparingRecording = true;
+            showPreparingIndicator();
+        }
+        AppLog.i(TAG, "接上了还在进行的录制 " + instanceTag()
+                + " firstData=" + cameraManager.hasWrittenFirstData()
+                + " segment=" + (cameraManager.getCurrentSegmentIndex() + 1));
+    }
+
+    /**
      * 回到前台时，对一下「界面以为在录」和「录制器真的在录」是不是一回事。
      *
      * <p>以前这里只写了一句「录制中，相机应该还连着」就什么都不查。录制器若在后台停了，
@@ -3948,21 +3980,11 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "onStop called, isRecording=" + isRecording);
         AppLog.i(TAG, "onStop " + instanceTag() + " surround: " + describeComposite());
         
-        // 如果正在录制但 Activity 即将被销毁，提前停止录制
-        // 这给予了比 onDestroy 更充裕的时间来完成清理
-        if (isRecording && cameraManager != null && isFinishing()) {
-            AppLog.d(TAG, "Activity is finishing, stopping recording in onStop for safer cleanup");
-            try {
-                cameraManager.stopRecording();
-                isRecording = false;
-                // 停止录制相关的 UI 更新（Activity 即将销毁，不显示 Toast）
-                setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
-                stopRecordingTimer();
-                // 停止前台服务
-                CameraForegroundService.stop(this);
-            } catch (Exception e) {
-                AppLog.e(TAG, "Error stopping recording in onStop", e);
-            }
+        // 主界面被关掉（返回键退出、从最近任务划掉）时录制不停：录制管线不属于界面，
+        // 它由前台服务保着，界面再打开时接回去（见 syncRecordingStateFromManager）。
+        // 真正停录只有两条路：点停止，或者长按退出应用（exitApp 自己停，不经过这里）
+        if (isRecording && isFinishing()) {
+            AppLog.i(TAG, "主界面关闭，录制继续在后台进行 " + instanceTag());
         }
     }
 
@@ -4045,10 +4067,18 @@ public class MainActivity extends AppCompatActivity {
         AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
 
-        // 无论是 recreate 还是 finishing，都清掉 Holder 中的旧引用。
-        // isFinishing()=true 时（如从最近任务划掉），release() 会清空 cameras map，
-        // 但进程可能因 Service 存活而不退出，导致 Holder 持有已清空的实例被复用。
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().setCameraManager(null);
+        // 录制管线留不留：还在录，或者只是重建（夜间模式、语言切换）—— 留着，界面再起来时接回去。
+        // 以前这里一律释放，录制就断在重建上；新界面再去「恢复录制」，恢复没接上就卡在准备中
+        final boolean keepPipeline = cameraManager != null && !cameraManager.isReleased()
+                && (cameraManager.isRecording() || isChangingConfigurations());
+        AppLog.i(TAG, "onDestroy 录制管线" + (keepPipeline ? "保留" : "释放") + " "
+                + instanceTag() + " recording=" + (cameraManager != null && cameraManager.isRecording())
+                + " changingConfigurations=" + isChangingConfigurations());
+        if (!keepPipeline) {
+            // 不留就清掉 Holder：release() 会清空 cameras map，进程若因 Service 存活而不退出，
+            // Holder 会握着一个已清空的实例被下次复用
+            com.kooo.evcam.camera.CameraManagerHolder.getInstance().setCameraManager(null);
+        }
 
         // 关闭预览矫正悬浮窗
         dismissPreviewCorrectionFloating();
@@ -4129,19 +4159,26 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // 停止前台服务（确保清理）
-        CameraForegroundService.stop(this);
+        // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉
+        if (!keepPipeline) {
+            CameraForegroundService.stop(this);
+        }
 
-// 停止存储清理任务
+        // 停止存储清理任务
         if (storageCleanupManager != null) {
             storageCleanupManager.stop();
         }
         
-        // 停止文件传输服务
-        FileTransferManager.getInstance(this).stop();
+        // 文件传输（U 盘中转写入）：录制还在继续，分段还要往 U 盘搬，不能停
+        if (!keepPipeline) {
+            FileTransferManager.getInstance(this).stop();
+        }
 
-        // 带超时保护的摄像头资源释放
-        if (cameraManager != null) {
+        if (keepPipeline) {
+            // 留着管线：只摘掉这个界面设的回调
+            cameraManager.detachUiCallbacks();
+        } else if (cameraManager != null) {
+            // 带超时保护的摄像头资源释放
             releaseCameraManagerWithTimeout(3000);  // 3秒超时
         }
         
