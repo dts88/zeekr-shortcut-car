@@ -16,6 +16,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 去 GitHub Releases 问一句「有没有更新」，有就把 APK 拉回来。
@@ -88,13 +91,27 @@ public final class GithubReleases {
         public final String apkUrl;
         public final long apkBytes;
         public final String pageUrl;
+        /** 发布页上的说明原文（Markdown）。 */
+        public final String body;
+        /**
+         * 给对话框看的更新内容：从手上这版到这一版之间每个会被推送的版本的改动，
+         * 已整理成纯文本（见 {@link ReleaseNotes}）。没有时是空字符串。
+         */
+        public final String notes;
 
-        Release(String tagName, String apkName, String apkUrl, long apkBytes, String pageUrl) {
+        Release(String tagName, String apkName, String apkUrl, long apkBytes, String pageUrl,
+                String body, String notes) {
             this.tagName = tagName;
             this.apkName = apkName;
             this.apkUrl = apkUrl;
             this.apkBytes = apkBytes;
             this.pageUrl = pageUrl;
+            this.body = body;
+            this.notes = notes;
+        }
+
+        Release withNotes(String notes) {
+            return new Release(tagName, apkName, apkUrl, apkBytes, pageUrl, body, notes);
         }
     }
 
@@ -104,15 +121,22 @@ public final class GithubReleases {
     }
 
     /**
-     * 取版本号最大的那个非草稿版本。
+     * 取版本号最大的那个非草稿版本，并带上从手上这版到它之间的更新内容。
      *
-     * @param includeBeta true：beta 和正式版都算；false：只算正式版。alpha 永远不算
+     * <p>更新内容不只取最新那一版：跳过了几个版本的人，想知道的是「装上之后和现在比多了什么」，
+     * 所以把中间每个会被推送的版本都列出来（alpha 不推，也就不列）。
+     * 发布列表本来就是一次请求拿全的，不多花一次网络。</p>
+     *
+     * @param includeBeta    true：beta 和正式版都算；false：只算正式版。alpha 永远不算
+     * @param currentVersion 手上这一版的版本名，用来挑出「比它新」的那几个
      * @return 没有符合条件、且带 APK 的版本时返回 null
      * @throws IOException 网络或解析出错
      */
-    public static Release fetchLatest(boolean includeBeta) throws IOException {
+    public static Release fetchLatest(boolean includeBeta, String currentVersion)
+            throws IOException {
         String body = getText(LIST_URL);
         Release best = null;
+        List<Release> newer = new ArrayList<>();
         try {
             JSONArray releases = new JSONArray(body);
             for (int i = 0; i < releases.length(); i++) {
@@ -136,12 +160,25 @@ public final class GithubReleases {
                 if (best == null || VersionName.compare(candidate.tagName, best.tagName) > 0) {
                     best = candidate;
                 }
+                if (currentVersion == null
+                        || VersionName.isNewer(candidate.tagName, currentVersion)) {
+                    newer.add(candidate);
+                }
             }
         } catch (org.json.JSONException e) {
             throw new Failure("Unreadable GitHub response: " + e.getMessage(),
                     R.string.upd_err_bad_response).because(e);
         }
-        return best;
+        if (best == null) {
+            return null;
+        }
+        // 新的在前：对话框里最先看到的应该是马上要装上的那一版
+        Collections.sort(newer, (a, b) -> VersionName.compare(b.tagName, a.tagName));
+        List<ReleaseNotes.Entry> entries = new ArrayList<>();
+        for (Release release : newer) {
+            entries.add(new ReleaseNotes.Entry(release.tagName, release.body));
+        }
+        return best.withNotes(ReleaseNotes.combine(entries));
     }
 
     /** 挑出这个版本里的 APK 附件；没有就返回 null。 */
@@ -163,7 +200,9 @@ public final class GithubReleases {
                         name,
                         url,
                         asset.optLong("size", 0),
-                        release.optString("html_url", ""));
+                        release.optString("html_url", ""),
+                        release.optString("body", ""),
+                        "");
             }
         }
         return null;

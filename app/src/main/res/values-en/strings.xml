@@ -262,6 +262,7 @@
     <string name="upd_found_title">Update available</string>
     <string name="upd_size_suffix">, about %1$s MB</string>
     <string name="upd_found_msg">%1$s%2$s\n\nCurrent version %3$s\n\nThe installer opens when the download finishes.</string>
+    <string name="upd_found_msg_notes">%1$s%2$s\n\nCurrent version %3$s\n\nWhat\'s new (from the GitHub release page):\n\n%4$s\n\nThe installer opens when the download finishes.</string>
     <string name="upd_download">Download and install</string>
     <string name="upd_later">Later</string>
     <string name="upd_downloading">Downloading…</string>
@@ -293,7 +294,7 @@
     <string name="about_coffee_body">PayNow to 9271 6786. Optional; every feature works without it.</string>
     <string name="about_credits_title">Open source and origins</string>
     <string name="about_thanks_title">Thanks</string>
-    <string name="about_thanks_body">This project grew out of an owners\' club group chat. These people gave it its start:\n\n• Jon (Zeekr 7X Singapore owners\' club) — explained how to install apps on the head unit. Nothing else would have happened without that.\n\n• SW (same club) — shared the AVM Recorder project, which showed it could be done.\n\n• Patrick (same club) — provided the key information to get started.\n\n• The Zeekr 7X Singapore owners\' club — a capable admin team and friendly members. A place where people share freely is rare.\n\n• Myself — for enthusiasm and curiosity.\n\n• Everyone using this app — I hope it makes driving a little easier.\n\n• ZEEKR and Geely — for bringing us together, and for a great car and team.</string>
+    <string name="about_thanks_body">This project grew out of an owners\' club group chat. These people gave it its start:\n\n• Jon (Zeekr 7X Singapore owners\' club) — explained how to install apps on the head unit. Nothing else would have happened without that.\n\n• SW (same club) — shared the AVM Recorder project, which showed it could be done.\n\n• Patrick (same club) — provided the key information to get started.\n\n• Gabriel (same club) — tested the app and sent feedback.\n\n• The Zeekr 7X Singapore owners\' club — a capable admin team and friendly members. A place where people share freely is rare.\n\n• Myself — for enthusiasm and curiosity.\n\n• Everyone using this app — I hope it makes driving a little easier.\n\n• ZEEKR and Geely — for bringing us together, and for a great car and team.</string>
     <string name="about_privacy_title">Privacy and network use</string>
     <string name="about_privacy_body">Recordings and photos stay on your USB drive. The app does not send them anywhere.\n\n⚠ Recordings on the drive are not encrypted. Anyone with the drive can read them.\n\nThe app goes online only when you start one of these:\n\n• Check for updates: asks GitHub for the latest version. No device data is sent.\n\n• Send to phone: serves one file on your local network until you close it.\n\n• Upload logs (developer options): uploads only when you tap it.</string>
     <string name="about_project_body">Source code, issues and releases. When reporting a problem, attach a report from Diagnostics.</string>

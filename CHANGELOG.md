@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.6.0-alpha] - 2026-09-17
+
+- Check for updates: when a newer version is found, the dialog shows what changed, taken
+  from the GitHub release page. If you skipped versions, each one in between is listed,
+  newest first (up to five). The parts every release repeats -- getting started, safety,
+  credits -- are left out, and so is the markup, so what remains is the changes.
+- About: thanks to Gabriel, from the same owners' club, for testing the app and sending
+  feedback.
+
 ## [1.5.1-alpha] - 2026-09-17
 
 - Diagnostics: the vehicle-signal probe now tries every way in and reports what came back,

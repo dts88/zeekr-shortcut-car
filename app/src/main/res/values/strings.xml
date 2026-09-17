@@ -263,6 +263,7 @@
     <string name="upd_found_title">发现新版本</string>
     <string name="upd_size_suffix">，约 %1$s MB</string>
     <string name="upd_found_msg">%1$s%2$s\n\n当前版本 %3$s\n\n下载完成后会直接进入系统的安装界面。安装包存放在应用缓存中，下次检查更新时自动清除。</string>
+    <string name="upd_found_msg_notes">%1$s%2$s\n\n当前版本 %3$s\n\n更新内容（来自 GitHub 发布页）：\n\n%4$s\n\n下载完成后会直接进入系统的安装界面。</string>
     <string name="upd_download">下载并安装</string>
     <string name="upd_later">稍后</string>
     <string name="upd_downloading">正在下载…</string>
@@ -294,7 +295,7 @@
     <string name="about_coffee_body">PayNow 到 9271 6786。完全自愿，不影响任何功能。</string>
     <string name="about_credits_title">开源与来源</string>
     <string name="about_thanks_title">致谢</string>
-    <string name="about_thanks_body">这个项目是从车友会的聊天记录里长出来的。下面这些人给了它起点：\n\n• Jon（极氪7X 新加坡车友会）—— 讲清了怎么把应用装进车机。没有这一步，后面什么都不会发生。\n\n• SW（同一个车友会）—— 分享了 AVM Recorder 这个项目的信息，让我知道这条路有人走通过。\n\n• Patrick（同一个车友会）—— 给出了项目起步最要紧的那几条信息。\n\n• 极氪7X 新加坡车友会 —— 专业的管理团队，热情有趣的成员。一个大家愿意分享的地方，本身就很难得。\n\n• 也谢谢我自己 —— 对生活的热情，和一直没丢的好奇心。\n\n• 谢谢每一位用它的人 —— 希望它让你用车省点事。\n\n• 最后谢谢极氪和吉利 —— 是你们把我们聚到一起，也是你们造出了这么好的车和这么好的团队。</string>
+    <string name="about_thanks_body">这个项目是从车友会的聊天记录里长出来的。下面这些人给了它起点：\n\n• Jon（极氪7X 新加坡车友会）—— 讲清了怎么把应用装进车机。没有这一步，后面什么都不会发生。\n\n• SW（同一个车友会）—— 分享了 AVM Recorder 这个项目的信息，让我知道这条路有人走通过。\n\n• Patrick（同一个车友会）—— 给出了项目起步最要紧的那几条信息。\n\n• Gabriel（同一个车友会）—— 帮忙测试软件，给了很多反馈。\n\n• 极氪7X 新加坡车友会 —— 专业的管理团队，热情有趣的成员。一个大家愿意分享的地方，本身就很难得。\n\n• 也谢谢我自己 —— 对生活的热情，和一直没丢的好奇心。\n\n• 谢谢每一位用它的人 —— 希望它让你用车省点事。\n\n• 最后谢谢极氪和吉利 —— 是你们把我们聚到一起，也是你们造出了这么好的车和这么好的团队。</string>
     <string name="about_privacy_title">隐私与联网</string>
     <string name="about_privacy_body">录像和照片只写在你自己的 U 盘上，应用不会把它们传到任何地方。\n\n⚠ U 盘上的录像不加密。盘随时能拔下来、在别的设备上直接读，请自行注意隐私。\n\n除了下面三件事，应用不主动联网，而且每一件都要你先动手：\n\n• 点「检查更新」时，向 GitHub 问一次有没有新版本 —— 不带设备信息，也不上传任何东西。\n\n• 用「发送到手机」时，在本地网络里临时开一个网页，手机连上来取那一个文件；关掉就没了。\n\n• 开发者选项里的「上传日志」，你点了才会上传。</string>
     <string name="about_project_body">源码、问题反馈和新版本都在这里。碰到问题，带上「诊断」里导出的报告最省事。</string>

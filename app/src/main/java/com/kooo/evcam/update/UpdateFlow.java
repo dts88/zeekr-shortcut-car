@@ -57,7 +57,7 @@ public final class UpdateFlow {
             GithubReleases.Release release = null;
             String error = null;
             try {
-                release = GithubReleases.fetchLatest(includeBeta);
+                release = GithubReleases.fetchLatest(includeBeta, currentVersion(activity));
             } catch (Exception e) {
                 AppLog.w(TAG, "检查更新失败: " + e);
                 error = reason(activity, e);
@@ -90,10 +90,15 @@ public final class UpdateFlow {
                 ? activity.getString(R.string.upd_size_suffix,
                         String.format(Locale.US, "%.1f", release.apkBytes / 1024f / 1024f))
                 : "";
+        // 有更新内容就顺带显示出来：用户是在决定「要不要装」，改了什么正是要看的东西。
+        // 说明来自 GitHub 发布页，按仓库的规矩是英文。
+        String message = release.notes.isEmpty()
+                ? activity.getString(R.string.upd_found_msg, release.tagName, size, current)
+                : activity.getString(R.string.upd_found_msg_notes,
+                        release.tagName, size, current, release.notes);
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.upd_found_title)
-                .setMessage(activity.getString(R.string.upd_found_msg,
-                        release.tagName, size, current))
+                .setMessage(message)
                 .setPositiveButton(R.string.upd_download, (d, w) -> download(activity, release))
                 .setNegativeButton(R.string.upd_later, null));
     }
