@@ -2154,6 +2154,18 @@ public class MainActivity extends AppCompatActivity {
             onSegmentSwitch(newSegmentIndex);
         });
 
+        // U 盘满了录不下去：由界面来停，按钮、计时器、前台服务一起回到待机
+        cameraManager.setStorageFullCallback(capless -> runOnUiThread(() -> {
+            quietStop = true;
+            try {
+                stopRecording();
+            } finally {
+                quietStop = false;
+            }
+            Toast.makeText(this, capless ? R.string.msg_storage_full_stopped
+                    : R.string.msg_storage_cannot_free, Toast.LENGTH_LONG).show();
+        }));
+
         // 设置损坏文件删除回调
         cameraManager.setCorruptedFilesCallback(deletedFiles -> {
             showCorruptedFilesDeletedDialog(deletedFiles);

@@ -24,7 +24,8 @@ splits it back into a 2×2 grid and builds on that.
 - Three recording presets — save space (10 fps), balanced (20 fps), sharpest — each showing how
   many GB an hour it needs and how long your USB drive will last. Frame rate, bitrate, segment
   length and codec can also be tuned per camera.
-- 1–10 minute segments; the oldest files are cleaned up when the drive fills.
+- 1–10 minute segments. With a video storage cap set, the oldest clips are deleted to stay under
+  it; with no cap, nothing is deleted and recording stops when the drive is full.
 - Photos use each camera's largest size.
 - Records to a **USB drive only**. Writing to the head unit's built-in flash sits behind developer
   options, because that storage cannot be replaced once worn out.

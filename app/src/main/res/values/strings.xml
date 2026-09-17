@@ -48,7 +48,7 @@
     <string name="set_video_limit_dialog">视频存储上限（GB）</string>
     <string name="set_photo_limit_title">图片存储上限</string>
     <string name="set_photo_limit_dialog">图片存储上限（GB）</string>
-    <string name="set_limit_message">超出上限时优先删除最早的文件。留空或填 0 表示不限制</string>
+    <string name="set_limit_message">超出上限时从最旧的录像删起，删的只有本应用录的文件。留空或填 0 表示不限制：不删任何录像，U 盘写满就停止录制</string>
     <string name="set_storage_usage_title">当前落盘位置</string>
     <string name="set_rearview_summary">将环视中的任一路单独放大为悬浮窗。后视一路做左右镜像，与实际后视镜一致</string>
     <string name="set_rearview_front_rear_title">只显示前后视</string>
@@ -180,6 +180,10 @@
     <string name="msg_camera_access_failed">摄像头访问失败：%1$s</string>
     <string name="msg_codec_fallback">录制故障，已回退到 MediaCodec 模式；若频繁发生请在设置里更改录制模式</string>
     <string name="msg_record_start_failed">录制启动失败，请重试</string>
+    <string name="msg_storage_full_stopped">U 盘已满，录制已停止。没有设置视频存储上限，所以不会自动删除旧录像</string>
+    <string name="msg_storage_full_refuse">U 盘空间不足，无法开始录制。没有设置视频存储上限，不会自动删除旧录像</string>
+    <string name="msg_storage_cleaning">空间不够，正在删除最旧的录像，完成后开始录制…</string>
+    <string name="msg_storage_cannot_free">U 盘空间不足：删掉本应用的旧录像也腾不出足够空间，录制已停止</string>
     <string name="msg_record_start_retrying">录制没能启动，正在自动重试…</string>
     <string name="msg_record_start_gave_up">录制还是没能启动，请点一下「开始录制」</string>
     <string name="msg_recording_lost_in_background">录制已在后台停止</string>

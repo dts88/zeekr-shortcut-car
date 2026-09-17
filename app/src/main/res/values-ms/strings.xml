@@ -33,7 +33,7 @@
     <string name="set_video_limit_dialog">Had storan video (GB)</string>
     <string name="set_photo_limit_title">Had storan foto</string>
     <string name="set_photo_limit_dialog">Had storan foto (GB)</string>
-    <string name="set_limit_message">Fail terlama dipadam dahulu. Biarkan kosong atau isi 0 untuk tiada had</string>
+    <string name="set_limit_message">Apabila melebihi had, rakaman paling lama dipadam dahulu, dan hanya fail yang dirakam oleh apl ini. Biarkan kosong atau isi 0 untuk tiada had: tiada apa dipadam dan rakaman berhenti apabila pemacu penuh</string>
     <string name="set_storage_usage_title">Lokasi tulis semasa</string>
     <string name="set_rearview_summary">Menunjukkan satu kamera keliling dalam tetingkap terapung. Pandangan belakang dicerminkan, seperti cermin sebenar</string>
     <string name="set_rearview_front_rear_title">Depan dan belakang sahaja</string>
@@ -179,6 +179,10 @@
     <string name="msg_camera_access_failed">Capaian kamera gagal: %1$s</string>
     <string name="msg_codec_fallback">Rakaman gagal dan bertukar kepada MediaCodec. Jika ini berterusan, tukar saluran rakaman dalam Tetapan</string>
     <string name="msg_record_start_failed">Tidak dapat memulakan rakaman — cuba lagi</string>
+    <string name="msg_storage_full_stopped">Pemacu USB penuh — rakaman dihentikan. Tiada had storan video ditetapkan, jadi rakaman lama tidak dipadam</string>
+    <string name="msg_storage_full_refuse">Ruang pemacu USB tidak cukup untuk mula merakam. Tiada had storan video ditetapkan, jadi rakaman lama tidak dipadam</string>
+    <string name="msg_storage_cleaning">Ruang tidak cukup — memadam rakaman paling lama, kemudian rakaman akan bermula…</string>
+    <string name="msg_storage_cannot_free">Pemacu USB penuh: memadam rakaman lama apl ini pun tidak cukup untuk mengosongkan ruang. Rakaman dihentikan</string>
     <string name="msg_record_start_retrying">Rakaman tidak bermula — mencuba semula…</string>
     <string name="msg_record_start_gave_up">Rakaman masih tidak bermula. Ketik Mula rakam</string>
     <string name="msg_recording_lost_in_background">Rakaman berhenti semasa apl di latar belakang</string>

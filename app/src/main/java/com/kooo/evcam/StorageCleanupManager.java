@@ -108,16 +108,10 @@ public class StorageCleanupManager {
         int videoLimitGb = appConfig.getVideoStorageLimitGb();
         int photoLimitGb = appConfig.getPhotoStorageLimitGb();
         
-        // 检测并清理视频
+        // 视频：和录制中分段切换时同一套规则（StoragePlan），只是这里在没在录都会跑一次。
+        // 两套规则各删各的，是最容易「删多了」的写法
         if (videoLimitGb > 0) {
-            CleanupResult videoResult = cleanupDirectory(
-                StorageHelper.getVideoDir(context),
-                videoLimitGb * GB_TO_BYTES,
-                "视频"
-            );
-            if (videoResult.deletedCount > 0) {
-                showCleanupNotification(videoResult, "视频");
-            }
+            com.kooo.evcam.camera.StorageGuard.enforce(context, StorageHelper.getVideoDir(context));
         }
         
         // 检测并清理图片
@@ -190,7 +184,10 @@ public class StorageCleanupManager {
             return result;
         }
         
-        File[] files = directory.listFiles(File::isFile);
+        // 只认本应用写出来的文件：U 盘上可能有用户自己的东西，以前这里有什么删什么
+        File[] files = directory.listFiles(file -> file.isFile()
+                && (com.kooo.evcam.camera.StoragePlan.isOwnClip(file.getName())
+                || com.kooo.evcam.camera.StoragePlan.isOwnPhoto(file.getName())));
         if (files == null || files.length == 0) {
             return result;
         }
@@ -271,7 +268,10 @@ public class StorageCleanupManager {
         }
         
         // 获取目录中所有文件（不筛选格式）
-        File[] files = directory.listFiles(File::isFile);
+        // 只认本应用写出来的文件：U 盘上可能有用户自己的东西，以前这里有什么删什么
+        File[] files = directory.listFiles(file -> file.isFile()
+                && (com.kooo.evcam.camera.StoragePlan.isOwnClip(file.getName())
+                || com.kooo.evcam.camera.StoragePlan.isOwnPhoto(file.getName())));
         
         if (files == null || files.length == 0) {
             AppLog.d(TAG, typeName + "目录为空");
@@ -380,7 +380,10 @@ public class StorageCleanupManager {
             return 0;
         }
         
-        File[] files = directory.listFiles(File::isFile);
+        // 只认本应用写出来的文件：U 盘上可能有用户自己的东西，以前这里有什么删什么
+        File[] files = directory.listFiles(file -> file.isFile()
+                && (com.kooo.evcam.camera.StoragePlan.isOwnClip(file.getName())
+                || com.kooo.evcam.camera.StoragePlan.isOwnPhoto(file.getName())));
         
         if (files == null) {
             return 0;

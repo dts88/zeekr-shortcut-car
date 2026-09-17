@@ -33,7 +33,7 @@
     <string name="set_video_limit_dialog">Video storage cap (GB)</string>
     <string name="set_photo_limit_title">Photo storage cap</string>
     <string name="set_photo_limit_dialog">Photo storage cap (GB)</string>
-    <string name="set_limit_message">The oldest files are deleted first. Leave blank or enter 0 for no limit</string>
+    <string name="set_limit_message">Over the cap, the oldest recordings are deleted first, and only files this app recorded. Leave blank or enter 0 for no limit: nothing is deleted and recording stops when the drive is full</string>
     <string name="set_storage_usage_title">Current write location</string>
     <string name="set_rearview_summary">Shows one surround camera in a floating window. The rear view is mirrored, like a real mirror</string>
     <string name="set_rearview_front_rear_title">Front and rear only</string>
@@ -179,6 +179,10 @@
     <string name="msg_camera_access_failed">Camera access failed: %1$s</string>
     <string name="msg_codec_fallback">Recording failed and switched to MediaCodec. If this keeps happening, change the recording pipeline in Settings</string>
     <string name="msg_record_start_failed">Could not start recording — try again</string>
+    <string name="msg_storage_full_stopped">USB drive full — recording stopped. No video storage cap is set, so old recordings are not deleted</string>
+    <string name="msg_storage_full_refuse">Not enough space on the USB drive to start recording. No video storage cap is set, so old recordings are not deleted</string>
+    <string name="msg_storage_cleaning">Not enough space — deleting the oldest recordings, then recording will start…</string>
+    <string name="msg_storage_cannot_free">USB drive full: deleting this app\'s old recordings would not free enough space. Recording stopped</string>
     <string name="msg_record_start_retrying">Recording did not start — retrying…</string>
     <string name="msg_record_start_gave_up">Recording still did not start. Tap Start recording</string>
     <string name="msg_recording_lost_in_background">Recording stopped while the app was in the background</string>

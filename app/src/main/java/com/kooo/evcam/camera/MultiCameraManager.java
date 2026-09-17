@@ -101,6 +101,17 @@ public class MultiCameraManager {
     }
 
     /**
+     * 录不下去了（U 盘满）。
+     *
+     * <p>界面在的时候交给界面去停 —— 它要同步按钮、计时器、提示。界面不在的时候
+     * 相机层自己停，见 {@link #checkStorage}。</p>
+     */
+    public interface StorageFullCallback {
+        /** @param capless true：没设上限（不删录像）；false：设了上限但删光旧录像也腾不出空间 */
+        void onStorageFull(boolean capless);
+    }
+
+    /**
      * 损坏文件删除回调
      */
     public interface CorruptedFilesCallback {
@@ -193,6 +204,29 @@ public class MultiCameraManager {
     }
     
     private SegmentSwitchCallback segmentSwitchCallback;
+    private StorageFullCallback storageFullCallback;
+    /** 几路相机各自触发一次分段切换，合并成一次检查。 */
+    private long lastStorageCheckMs = 0;
+    private static final long STORAGE_CHECK_DEBOUNCE_MS = 20_000L;
+    private static final long STORAGE_TICK_MS = 30_000L;
+
+    /**
+     * 录制中每 30 秒看一眼剩余空间。只是一次 statfs；低于余量才做完整检查。
+     * 分段切换时的检查管的是「按上限删旧的」，这一条管的是分段写到一半盘就满了。
+     */
+    private final Runnable storageTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!isRecording) {
+                return;
+            }
+            long free = StorageGuard.freeBytes(com.kooo.evcam.StorageHelper.getVideoDir(context));
+            if (free >= 0 && free < StorageGuard.lastMarginBytes()) {
+                checkStorage("剩余空间低于余量");
+            }
+            mainHandler.postDelayed(this, STORAGE_TICK_MS);
+        }
+    };
     private CorruptedFilesCallback corruptedFilesCallback;
     private CodecFallbackCallback codecFallbackCallback;
     private FirstDataWrittenCallback firstDataWrittenCallback;
@@ -217,6 +251,10 @@ public class MultiCameraManager {
     
     public void setSegmentSwitchCallback(SegmentSwitchCallback callback) {
         this.segmentSwitchCallback = callback;
+    }
+
+    public void setStorageFullCallback(StorageFullCallback callback) {
+        this.storageFullCallback = callback;
     }
 
     /**
@@ -645,6 +683,7 @@ public class MultiCameraManager {
                             lastNotifiedSegmentIndex = newSegmentIndex;
                             segmentSwitchCallback.onSegmentSwitch(newSegmentIndex);
                         }
+                        checkStorage("分段切换");
                         break;
                     }
                 }
@@ -801,11 +840,50 @@ public class MultiCameraManager {
         clearCachedSegmentTimestamp();
 
         // 根据模式选择录制方式
-        if (useCodecRecording) {
-            return startCodecRecording(timestamp, enabledCameras);
-        } else {
-            return startMediaRecorderRecording(timestamp, enabledCameras);
+        boolean started = useCodecRecording
+                ? startCodecRecording(timestamp, enabledCameras)
+                : startMediaRecorderRecording(timestamp, enabledCameras);
+        if (started) {
+            lastStorageCheckMs = 0;
+            mainHandler.removeCallbacks(storageTick);
+            mainHandler.postDelayed(storageTick, STORAGE_TICK_MS);
         }
+        return started;
+    }
+
+    /**
+     * 管一次录像空间：设了上限就按上限删最旧的，录不下去了就停。
+     *
+     * <p>放在相机层而不是界面里：分段切换的回调以前要经过 MainActivity 才有人处理，
+     * 界面被关掉或重建的那段时间里就没人管空间了。录制在，检查就在。</p>
+     */
+    private void checkStorage(String why) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - lastStorageCheckMs < STORAGE_CHECK_DEBOUNCE_MS) {
+            return;
+        }
+        lastStorageCheckMs = now;
+        StorageGuard.enforceAsync(context, com.kooo.evcam.StorageHelper.getVideoDir(context),
+                decision -> {
+                    if (decision.verdict != StoragePlan.Verdict.FULL || !isRecording) {
+                        return;
+                    }
+                    AppLog.w(TAG, "存储检查（" + why + "）：录不下去了，停止录制 capless="
+                            + decision.capless);
+                    if (storageFullCallback != null) {
+                        storageFullCallback.onStorageFull(decision.capless);
+                        return;
+                    }
+                    // 界面不在：自己停，自己提示
+                    stopRecording();
+                    com.kooo.evcam.CameraForegroundService.stop(context);
+                    com.kooo.evcam.service.RecordingFloatingService
+                            .sendRecordingStateChanged(context, false);
+                    android.widget.Toast.makeText(context.getApplicationContext(),
+                            decision.capless ? com.kooo.evcam.R.string.msg_storage_full_stopped
+                                    : com.kooo.evcam.R.string.msg_storage_cannot_free,
+                            android.widget.Toast.LENGTH_LONG).show();
+                });
     }
 
     /**
@@ -1337,6 +1415,7 @@ public class MultiCameraManager {
                         lastNotifiedSegmentIndex = newSegmentIndex;
                         segmentSwitchCallback.onSegmentSwitch(newSegmentIndex);
                     }
+                    checkStorage("分段切换");
                 }
 
                 @Override
@@ -1687,6 +1766,7 @@ public class MultiCameraManager {
         // 立即标记停止状态，防止新的录制请求
         final boolean wasRecording = isRecording;
         isRecording = false;
+        mainHandler.removeCallbacks(storageTick);
 
         // 在后台线程执行停止操作，避免阻塞主线程
         new Thread(() -> {

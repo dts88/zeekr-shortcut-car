@@ -7,6 +7,27 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.7.0-alpha] - 2026-09-17
+
+- **Storage is checked every time a clip is finished, not once an hour.** Between hourly
+  checks the recordings could outgrow the cap by a whole hour of video. With a cap set, the
+  oldest clips are now deleted so that the next clip still fits under it, and a margin of
+  two clips is always kept free on the drive.
+- **No cap now means what it says: nothing is deleted.** When the drive runs out of room,
+  recording stops and says why. Previously the drive simply filled up and recording failed
+  without a word -- one way the record button could hang on "Starting…".
+- Before recording starts, the app makes sure at least one clip will fit. With a cap it
+  clears the oldest clips first; without one it refuses and explains.
+- While recording, free space is also checked every 30 seconds, for a drive that fills up
+  in the middle of a clip.
+- **Only this app's own recordings are ever deleted** -- files named like
+  `20260917_101500_front.mp4`. The old cleanup deleted anything it found in the folder.
+  Clips are deleted a whole minute at a time, oldest first, never the one being written.
+- If a drive is full of other things, so that deleting every old recording still would not
+  free enough, nothing is deleted and recording stops.
+- The README claimed the oldest files were cleaned up when the drive fills. Without a cap
+  that was never true; it now describes both cases.
+
 ## [1.6.1-alpha] - 2026-09-17
 
 - **Fixed: the record button could stay on "Starting…" for good after returning to the app,

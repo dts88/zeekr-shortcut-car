@@ -87,6 +87,14 @@ public class RecordingCoordinator {
      * 一路都没选时不是「录了个空的」，而是根本不该开始 —— 不想录有它自己的开关。</p>
      */
     public void start() {
+        start(true);
+    }
+
+    /**
+     * @param checkStorage false：刚为这次开录清理过空间，不再检查一遍 ——
+     *                     否则估算的余量稍有变化就会清完又清，一直开不起来
+     */
+    private void start(boolean checkStorage) {
         if (cameraManager == null || cameraManager.isRecording()) {
             return;
         }
@@ -107,6 +115,12 @@ public class RecordingCoordinator {
         // 判断放在这里，九条路才是同一个答案。
         if (!StorageHelper.isRecordingStorageAvailable(context)) {
             notifyRefused(context.getString(R.string.msg_refuse_no_external));
+            return;
+        }
+
+        // 开录前先确认写得下：以前不查，盘满时照常开录，第一笔数据写不进去，
+        // 按钮就卡在「正在准备」。只看一次剩余空间，很快；不够时才去列目录、删文件
+        if (checkStorage && !ensureRoomToStart()) {
             return;
         }
 
@@ -145,6 +159,32 @@ public class RecordingCoordinator {
         if (listener != null) {
             listener.onRecordingStopped();
         }
+    }
+
+    /**
+     * 空间够就返回 true。不够时：没设上限直接拒绝（不删录像）；设了上限就在后台清理，
+     * 清完再开一次，这次返回 false。
+     */
+    private boolean ensureRoomToStart() {
+        java.io.File dir = StorageHelper.getVideoDir(context);
+        long free = com.kooo.evcam.camera.StorageGuard.freeBytes(dir);
+        if (free < 0 || free >= com.kooo.evcam.camera.StorageGuard.lastMarginBytes()) {
+            return true;
+        }
+        if (new AppConfig(context).getVideoStorageLimitGb() <= 0) {
+            notifyRefused(context.getString(R.string.msg_storage_full_refuse));
+            return false;
+        }
+        AppLog.i(TAG, "开录前空间不够，先清理最旧的录像");
+        notifyRefused(context.getString(R.string.msg_storage_cleaning));
+        com.kooo.evcam.camera.StorageGuard.enforceAsync(context, dir, decision -> {
+            if (decision.verdict == com.kooo.evcam.camera.StoragePlan.Verdict.FULL) {
+                notifyRefused(context.getString(R.string.msg_storage_cannot_free));
+            } else {
+                start(false);
+            }
+        });
+        return false;
     }
 
     private void notifyRefused(String reason) {
