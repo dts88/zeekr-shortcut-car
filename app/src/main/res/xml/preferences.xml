@@ -223,6 +223,11 @@
         android:key="screen_interface"
         android:title="@string/set_section_interface">
 
+        <ListPreference
+            android:key="pref_language"
+            android:title="@string/set_language_title"
+            android:summary="%s" />
+
         <!-- 两个选项：摆在行里点一次，不弹框 -->
         <com.kooo.evcam.settings.SegmentedPreference
             android:key="pref_rail_side"
@@ -287,23 +292,28 @@
             android:title="@string/set_keep_alive_title"
             android:summary="@string/set_keep_alive_summary" />
 
-        <ListPreference
-            android:key="pref_language"
-            android:title="@string/set_language_title"
-            android:summary="%s" />
-
         <SwitchPreferenceCompat
             android:key="pref_prevent_sleep"
             android:title="@string/set_prevent_sleep_title"
             android:summary="@string/set_prevent_sleep_summary" />
 
+        <Preference
+            android:key="pref_diagnostics"
+            android:title="@string/set_diagnostics_title"
+            android:summary="@string/set_diagnostics_summary" />
+
     </PreferenceScreen>
 
-    <!-- ==================== 高级 ==================== -->
+    <!--
+      开发者选项。默认整块隐藏，在「关于本应用」里连点「安全须知」再输密码才出现，
+      而且重启应用就恢复隐藏 —— 里面要么是没做完的，要么是排查用的。
+    -->
     <PreferenceScreen
-        android:key="screen_advanced"
-        android:title="@string/set_section_advanced">
+        android:key="screen_developer"
+        android:title="@string/set_section_developer">
 
+        <!-- 原来「高级」里的那几项：录制管线、编码、画面调节、相机映射、调试日志 ——
+             都是排查问题时才动的东西，和开发者工具放在一起 -->
         <ListPreference
             android:key="pref_recording_mode"
             android:title="@string/set_recording_mode_title"
@@ -337,16 +347,6 @@
             android:key="pref_save_logs"
             android:title="@string/set_save_logs_title"
             android:summary="@string/set_save_logs_summary" />
-
-    </PreferenceScreen>
-
-    <!--
-      开发者选项。默认整块隐藏，在「关于本应用」里连点「安全须知」再输密码才出现，
-      而且重启应用就恢复隐藏 —— 里面要么是没做完的，要么是排查用的。
-    -->
-    <PreferenceScreen
-        android:key="screen_developer"
-        android:title="@string/set_section_developer">
 
         <Preference
             android:key="pref_permissions"
@@ -425,20 +425,13 @@
             android:summary="@string/set_update_beta_summary" />
     </PreferenceScreen>
 
-    <!-- ==================== 关于 ==================== -->
-    <PreferenceScreen
-        android:key="screen_about"
-        android:title="@string/set_section_about">
-
-        <Preference
-            android:key="pref_diagnostics"
-            android:title="@string/set_diagnostics_title"
-            android:summary="@string/set_diagnostics_summary" />
-
-        <Preference
-            android:key="pref_about"
-            android:title="@string/set_about_title" />
-    </PreferenceScreen>
+    <!--
+      关于：顶层一行，点了直接打开关于页。以前是一个分区，里面只有「关于本应用」和「诊断信息」两行，
+      多点一层才到。诊断信息搬去了「系统」—— 它是给所有人导出报告用的，不该跟着「关于」藏一层。
+    -->
+    <Preference
+        android:key="pref_about"
+        android:title="@string/set_section_about" />
 
     <!-- 退出放在最底下：和主界面那个「隐藏到后台」分开，往下找得到，手滑点不到 -->
     <Preference

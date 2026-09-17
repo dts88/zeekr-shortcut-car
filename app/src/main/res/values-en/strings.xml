@@ -14,7 +14,6 @@
     <string name="set_section_rearview">Super mirror</string>
     <string name="set_section_floating">Floating button</string>
     <string name="set_section_system">System</string>
-    <string name="set_section_advanced">Advanced</string>
     <string name="set_section_about">About</string>
     <string name="set_car_model_title">Stream profile</string>
     <string name="set_profile_editor_title">Edit stream profile</string>
@@ -94,7 +93,6 @@
     <string name="set_save_logs_summary">Saves the log to storage</string>
     <string name="set_diagnostics_title">Diagnostics</string>
     <string name="set_diagnostics_summary">Camera, display, vehicle signal and storage details, for export</string>
-    <string name="set_about_title">About this app</string>
     <string name="set_language_title">Language</string>
     <string name="lang_auto">Follow system</string>
     <string name="lang_zh">中文</string>
@@ -149,7 +147,7 @@
     <string name="action_all_auto">All automatic</string>
     <string name="msg_mapping_saved">Camera mapping saved. Restart the app to apply</string>
     <string name="msg_mapping_cleared">Back to automatic assignment. Restart the app to apply</string>
-    <string name="msg_language_hint">You can change this later in Settings → System → Language</string>
+    <string name="msg_language_hint">You can change this later in Settings → Interface → Language</string>
 
     <!-- Main interface -->
     <string name="about_title">About &amp; credits</string>
@@ -170,7 +168,7 @@
     <string name="guide_1">Experimental, unofficial software with no vehicle safety certification. It does not replace the factory dashcam, reversing camera or blind-spot monitor. Do not use it while driving, and do not rely on its picture to judge the road.</string>
     <string name="guide_2">Recordings go to the USB drive only; without a drive, recording does not start. Recordings are not encrypted: anyone with the drive can read them.</string>
     <string name="guide_3">The menu is at the top left. Put the action buttons on the driver\'s side in Settings → Interface → Button side. The super mirror is off by default; turn it on in Settings → Super mirror.</string>
-    <string name="guide_4">If something goes wrong, restart the app. If it continues, export a report from Settings → About → Diagnostics and attach it to an issue.</string>
+    <string name="guide_4">If something goes wrong, restart the app. If it continues, export a report from Settings → System → Diagnostics and attach it to an issue.</string>
     <string name="action_got_it_guide">Got it</string>
 
     <!-- Main screen, notifications, playback -->

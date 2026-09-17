@@ -146,6 +146,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                     if (getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).goToRecordingInterface();
                     }
+                } else if ("pref_about".equals(key)) {
+                    // 关于不是分区：点了直接打开关于页，不在右栏里再垫一层
+                    startActivity(new android.content.Intent(requireContext(),
+                            com.kooo.evcam.zeekr.AboutActivity.class));
                 } else if ("pref_exit".equals(key)) {
                     if (getActivity() instanceof MainActivity) {
                         ((MainActivity) getActivity()).exitApp();
@@ -174,13 +178,11 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return R.drawable.ic_interface;
             case "screen_system":
                 return R.drawable.ic_settings;
-            case "screen_advanced":
-                return R.drawable.ic_advanced;
             case "screen_developer":
                 return R.drawable.ic_developer;
             case "screen_update":
                 return R.drawable.ic_update;
-            case "screen_about":
+            case "pref_about":
                 return R.drawable.ic_info;
             case "pref_exit":
                 return R.drawable.ic_power;

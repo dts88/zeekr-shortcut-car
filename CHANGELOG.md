@@ -7,6 +7,25 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.9.0-beta] - 2026-09-17
+
+Changes since 1.0.0:
+
+- **Steadier recording and interface.**
+  - Recording keeps going when the main screen is rebuilt (night mode, a language change) or
+    closed. It stops only when you tap Stop or quit the app.
+  - The record button no longer hangs on "Starting…". If recording does not start, the app
+    retries once by itself.
+  - Storage is checked every time a clip finishes. With a video storage cap set, the oldest
+    recordings are deleted to stay under it; with no cap, nothing is deleted and recording
+    stops when the drive is full. Only files this app recorded are ever deleted.
+  - Settings: Language is under Interface, Diagnostics under System, and the former Advanced
+    options are in Developer options. About opens directly.
+- **Fisheye correction test options** for photo playback: a switch in the top right, and the
+  projection, field of view and strength under Settings -> Interface. Only the surround view
+  is corrected, and only on screen; recordings and photos on the drive are not changed.
+- **Malay interface.** Native Malay speakers: if anything reads wrong, please report it.
+
 ## [1.8.1-alpha] - 2026-09-17
 
 - Fixed: with the surround + cabin profile and only one cabin camera turned on, rebuilding

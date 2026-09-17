@@ -35,7 +35,6 @@ import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
-import com.kooo.evcam.zeekr.AboutActivity;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 
@@ -109,7 +108,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindAdvanced();
         bindDeveloper();
         bindUpdate();
-        bindAbout();
 
         // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
         PreferenceRows.apply(getPreferenceScreen());
@@ -755,6 +753,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 界面
 
     private void bindInterface() {
+        bindLanguage();
         // 回到主界面时生效（MainActivity.showRecordingInterface 会按它重新摆一次）。
         // 在这里选过，首次启动就不必再问
         bindSegmented("pref_rail_side", SettingsRegistry.ACTION_RAIL_SIDE,
@@ -819,7 +818,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     private void bindSystem() {
-        bindLanguage();
+        // 诊断信息放在系统里：它是给所有人导出报告用的
+        onClick("pref_diagnostics", pref ->
+                startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
 
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> appConfig.setAutoStartOnBoot(value));
@@ -834,7 +835,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setPreventSleepEnabled(value));
     }
 
-    // ------------------------------------------------------------------ 高级
+    // ------------------------------------------------------------------ 原「高级」，现在在开发者选项里
 
     private void bindAdvanced() {
         bindEnum("pref_recording_mode", SettingsRegistry.RECORDING_MODE,
@@ -1139,13 +1140,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
         bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
                 value -> appConfig.setUpdateBetaEnabled(value));
-    }
-
-    private void bindAbout() {
-        onClick("pref_diagnostics", pref ->
-                startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
-        onClick("pref_about", pref ->
-                startActivity(new Intent(getContext(), AboutActivity.class)));
     }
 
     // ------------------------------------------------------------------ 小工具

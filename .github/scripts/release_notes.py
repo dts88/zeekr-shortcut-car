@@ -94,7 +94,7 @@ def main():
                "*Zeekr 7X (surround composite)* or *Zeekr 7X (surround + front and rear cabin)*, "
                "and restart the app.")
     out.append("")
-    out.append("Something wrong? Export a report from **Settings \u2192 About \u2192 Diagnostics** "
+    out.append("Something wrong? Export a report from **Settings \u2192 System \u2192 Diagnostics** "
                "and attach it to an issue.")
     out.append("")
 

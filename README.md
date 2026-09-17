@@ -95,7 +95,7 @@ Changes apply from the next recording.
 
 A dash cam's main job is a clear picture. At 10 fps motion looks choppy, but each frame stays sharp.
 
-For anything else, [open an issue](../../issues) and attach a report from **Settings → About →
+For anything else, [open an issue](../../issues) and attach a report from **Settings → System →
 Diagnostics**.
 
 ---

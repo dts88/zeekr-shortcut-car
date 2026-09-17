@@ -29,7 +29,6 @@
     <string name="set_section_rearview">超级后视镜</string>
     <string name="set_section_floating">悬浮按钮</string>
     <string name="set_section_system">系统</string>
-    <string name="set_section_advanced">高级</string>
     <string name="set_section_about">关于</string>
     <string name="set_car_model_title">视频流配置</string>
     <string name="set_profile_editor_title">视频流配置编辑</string>
@@ -109,7 +108,6 @@
     <string name="set_save_logs_summary">将运行日志写入存储，便于导出</string>
     <string name="set_diagnostics_title">诊断信息</string>
     <string name="set_diagnostics_summary">导出相机、屏幕、车辆信号与存储的实测信息</string>
-    <string name="set_about_title">关于本应用</string>
     <string name="set_language_title">语言 / Language</string>
     <string name="lang_auto">跟随系统</string>
     <string name="lang_zh">中文</string>
@@ -164,14 +162,14 @@
     <string name="action_all_auto">全部自动</string>
     <string name="msg_mapping_saved">相机映射已保存，重启应用后生效</string>
     <string name="msg_mapping_cleared">已恢复自动分配，重启应用后生效</string>
-    <string name="msg_language_hint">以后可以在「设置 → 系统 → 语言」里更改</string>
+    <string name="msg_language_hint">以后可以在「设置 → 界面 → 语言」里更改</string>
 
     <!-- 首次启动引导 -->
     <string name="guide_title">开始之前</string>
     <string name="guide_1">实验性的非官方软件，未经任何车辆功能安全认证。它不替代原厂行车记录仪、倒车影像或盲区监测，行驶中请不要操作它，也不要靠它的画面判断路况。</string>
     <string name="guide_2">录制只写 U 盘。没插 U 盘不会开始录制 —— 行车记录是持续写入，而车机内置闪存写坏了换不了。U 盘上的录像不加密，盘拔下来在别的设备上就能读。</string>
     <string name="guide_3">菜单键永远在左上角。操作按钮可以整列放到左边或右边（设置 → 界面 → 操作按钮位置），按驾驶座在哪一侧选。超级后视镜默认关着，在设置 → 超级后视镜里开；开了之后可以拖动、缩放，上下划换取景、左右划换一路。</string>
-    <string name="guide_4">出了问题先重启一次应用。还不正常的话，从 设置 → 关于 → 诊断信息 导出报告 —— 带着它提 issue 最省事。</string>
+    <string name="guide_4">出了问题先重启一次应用。还不正常的话，从 设置 → 系统 → 诊断信息 导出报告 —— 带着它提 issue 最省事。</string>
     <string name="action_got_it_guide">我知道了</string>
 
     <!-- 主界面 / 通知 / 回放 -->

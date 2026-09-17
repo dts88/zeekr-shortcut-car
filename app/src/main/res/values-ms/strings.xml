@@ -14,7 +14,6 @@
     <string name="set_section_rearview">Cermin super</string>
     <string name="set_section_floating">Butang terapung</string>
     <string name="set_section_system">Sistem</string>
-    <string name="set_section_advanced">Lanjutan</string>
     <string name="set_section_about">Perihal</string>
     <string name="set_car_model_title">Profil strim</string>
     <string name="set_profile_editor_title">Edit profil strim</string>
@@ -94,7 +93,6 @@
     <string name="set_save_logs_summary">Menyimpan log ke storan</string>
     <string name="set_diagnostics_title">Maklumat diagnostik</string>
     <string name="set_diagnostics_summary">Butiran kamera, paparan, isyarat kenderaan dan storan, untuk dieksport</string>
-    <string name="set_about_title">Perihal apl ini</string>
     <string name="set_language_title">Bahasa</string>
     <string name="lang_auto">Ikut sistem</string>
     <string name="lang_zh">中文</string>
@@ -149,7 +147,7 @@
     <string name="action_all_auto">Semua automatik</string>
     <string name="msg_mapping_saved">Pemetaan kamera disimpan. Mulakan semula apl untuk terpakai</string>
     <string name="msg_mapping_cleared">Kembali kepada tetapan automatik. Mulakan semula apl untuk terpakai</string>
-    <string name="msg_language_hint">Anda boleh menukarnya kemudian di Tetapan → Sistem → Bahasa</string>
+    <string name="msg_language_hint">Anda boleh menukarnya kemudian di Tetapan → Antara muka → Bahasa</string>
 
     <!-- Antara muka utama -->
     <string name="about_title">Perihal &amp; penghargaan</string>
@@ -170,7 +168,7 @@
     <string name="guide_1">Perisian eksperimen tidak rasmi tanpa pensijilan keselamatan kenderaan. Ia tidak menggantikan kamera pemandu asal, kamera undur atau pemantau titik buta. Jangan gunakannya semasa memandu, dan jangan bergantung pada gambarnya untuk menilai jalan.</string>
     <string name="guide_2">Rakaman disimpan ke pemacu USB sahaja; tanpa pemacu, rakaman tidak bermula. Rakaman tidak disulitkan: sesiapa yang memegang pemacu boleh membacanya.</string>
     <string name="guide_3">Menu berada di kiri atas. Letakkan butang tindakan di sebelah pemandu melalui Tetapan → Antara muka → Sebelah butang. Cermin super ditutup secara lalai; bukanya di Tetapan → Cermin super.</string>
-    <string name="guide_4">Jika ada yang tidak kena, mulakan semula apl. Jika berterusan, eksport laporan dari Tetapan → Perihal → Maklumat diagnostik dan lampirkannya pada isu.</string>
+    <string name="guide_4">Jika ada yang tidak kena, mulakan semula apl. Jika berterusan, eksport laporan dari Tetapan → Sistem → Maklumat diagnostik dan lampirkannya pada isu.</string>
     <string name="action_got_it_guide">Faham</string>
 
     <!-- Skrin utama, pemberitahuan, main balik -->
