@@ -665,6 +665,8 @@
     <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
     <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
     <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
+    <string name="dev_repair_mp4_title">修复未封口的视频</string>
+    <string name="dev_repair_mp4_summary">断电时正在录的那一段没有索引，播放器打不开。按同一路相机完好片段的参数补一个索引回去，文件名不变</string>
     <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
     <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。重启应用后本区隐藏。</string>
 

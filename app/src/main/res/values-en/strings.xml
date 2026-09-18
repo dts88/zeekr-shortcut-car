@@ -661,6 +661,8 @@
     <string name="dev_preview_correction_reset_title">Reset preview correction</string>
     <string name="dev_raw_frame_title">Also save the raw frame</string>
     <string name="dev_raw_frame_summary">Uncut and unstamped, with a note on the frame geometry, in photos/raw. For working out the lane layout and the lens parameters</string>
+    <string name="dev_repair_mp4_title">Repair unfinalised videos</string>
+    <string name="dev_repair_mp4_summary">A clip cut short by a power loss has no index, so nothing will open it. Rebuilds one using a healthy clip from the same camera, keeping the file name</string>
     <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
     <string name="dev_note">“Custom” in Stream profile is only available here. This section hides after the app restarts.</string>
 

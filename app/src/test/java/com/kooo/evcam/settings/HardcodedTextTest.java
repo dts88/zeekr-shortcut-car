@@ -69,7 +69,7 @@ public class HardcodedTextTest {
                 "AdbPermissionHelper.java", "PermissionSettingsFragment.java",
                 "settings/PermissionsPreferenceFragment.java", "SystemWhitelistHelper.java",
                 "CustomCameraConfigFragment.java", "CustomLayoutManager.java",
-                "LogcatViewerActivity.java"}) {
+                "LogcatViewerActivity.java", "repair/Mp4RepairFlow.java"}) {
             JAVA_ALLOWED.put(f, developer);
         }
         String blindSpot = "补盲 / 超视：设置页和抽屉入口都只在开发者模式解锁后出现";
@@ -90,6 +90,8 @@ public class HardcodedTextTest {
         JAVA_ALLOWED.put("settings/SettingsRegistry.java", "日志用的设置名；界面上的名字走 strings");
         JAVA_ALLOWED.put("KeepAliveReceiver.java", "触发原因只写进日志");
         JAVA_ALLOWED.put("zeekr/LaneCycle.java", "日志里的方位名");
+        JAVA_ALLOWED.put("repair/Mp4Repair.java",
+                "修不了时抛出的原因，只出现在开发者选项那份修复报告里");
         JAVA_ALLOWED.put("zeekr/RawFrameDump.java",
                 "工程模式导出的那份说明文件的正文，写进 txt，不上界面");
         JAVA_ALLOWED.put("config/RecordingConfig.java", "水印颜色 / 风格名只写进日志");

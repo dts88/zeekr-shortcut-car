@@ -976,6 +976,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         });
 
+        onClick("pref_repair_mp4", pref -> {
+            if (getActivity() == null) {
+                return;
+            }
+            // 录制中不能修：正在录的那一段也没有索引，和断电留下的半截文件长得一样
+            boolean recording = getActivity() instanceof MainActivity
+                    && ((MainActivity) getActivity()).isCurrentlyRecording();
+            com.kooo.evcam.repair.Mp4RepairFlow.start(getActivity(), recording);
+        });
+
         onClick("pref_current_profile", pref -> showCurrentProfile());
 
 

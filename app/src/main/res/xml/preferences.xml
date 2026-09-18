@@ -396,6 +396,11 @@
             android:summary="@string/dev_raw_frame_summary" />
 
         <Preference
+            android:key="pref_repair_mp4"
+            android:title="@string/dev_repair_mp4_title"
+            android:summary="@string/dev_repair_mp4_summary" />
+
+        <Preference
             android:key="pref_current_profile"
             android:title="@string/set_current_profile_title"
             android:summary="@string/dev_current_profile_summary" />
