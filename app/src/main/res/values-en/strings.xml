@@ -251,7 +251,7 @@
     <string name="nav_supervision">Super view</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_header_subtitle">Surround-view dashcam</string>
-    <string name="nav_header_author">By dts88</string>
+    <string name="nav_header_alt_name">极氪即刻</string>
     <string name="lane_surround">Surround</string>
     <string name="player_title">Continuous playback</string>
     <string name="player_prev">Previous</string>

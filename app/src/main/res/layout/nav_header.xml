@@ -2,6 +2,9 @@
 <!--
   抽屉头：平铺，不用渐变 —— 车机系统的面板都是平的，层次靠明度和留白。
   三个 id（nav_header_title / subtitle / version）MainActivity 会去填，保留。
+
+  名字下面那行小字是<b>另一种语言的应用名</b>：中文界面下写 Zeekr Shortcut，
+  其它语言下写极氪即刻 —— 两个名字都在用，两个都摆出来，谁提起哪个都能对上号。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -14,59 +17,37 @@
     android:paddingEnd="24dp"
     android:paddingBottom="20dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/nav_header_title"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:contentDescription="@string/app_name"
-            android:scaleType="fitCenter"
-            android:src="@drawable/ic_app_logo" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/nav_header_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/app_name"
-                android:textColor="@color/nav_header_text"
-                android:textAppearance="@style/TextAppearance.Cam.Title"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/nav_header_subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/nav_header_subtitle"
-                android:textColor="@color/nav_header_text_secondary"
-                android:textAppearance="@style/TextAppearance.Cam.Caption" />
-        </LinearLayout>
-    </LinearLayout>
+        android:text="@string/app_name"
+        android:textColor="@color/nav_header_text"
+        android:textAppearance="@style/TextAppearance.Cam.Title"
+        android:textStyle="bold" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/nav_header_author"
+        android:layout_marginTop="2dp"
+        android:text="@string/nav_header_alt_name"
         android:textColor="@color/nav_header_text_secondary"
         android:textAppearance="@style/TextAppearance.Cam.Micro" />
+
+    <TextView
+        android:id="@+id/nav_header_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/nav_header_subtitle"
+        android:textColor="@color/nav_header_text_secondary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
     <TextView
         android:id="@+id/nav_header_version"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="10dp"
         android:fontFeatureSettings="tnum"
         android:textColor="@color/nav_header_text_secondary"
         android:textAppearance="@style/TextAppearance.Cam.Micro"

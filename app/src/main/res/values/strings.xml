@@ -252,7 +252,7 @@
     <string name="nav_supervision">超视模式</string>
     <string name="nav_settings">软件设置</string>
     <string name="nav_header_subtitle">车机版环视记录仪</string>
-    <string name="nav_header_author">作者：dts88</string>
+    <string name="nav_header_alt_name">Zeekr Shortcut</string>
     <string name="lane_surround">环视</string>
     <string name="player_title">连续录制</string>
     <string name="player_prev">上一段录制</string>
