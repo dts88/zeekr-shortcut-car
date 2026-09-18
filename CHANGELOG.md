@@ -7,6 +7,22 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.10.0-alpha] - 2026-09-18
+
+- **Repair clips that lost power mid-recording**, under Developer options. A segment cut
+  short by a power loss keeps every frame it recorded; what it lacks is the index, which is
+  only written when recording stops normally, so no player will open it. The index is
+  rebuilt from the frames themselves and appended in place, with the decoder parameters and
+  the frame rate taken from a healthy clip of the same camera. The repaired file is read
+  back before it is accepted, and rolled back byte for byte if it does not. It refuses to
+  run while recording, and never touches files this app did not record.
+- The main screen tiles read **Take photo**, **Videos** and **Photos** -- in English the
+  capture and playback tiles used to be "Photo" and "Photos", side by side.
+- The app name is now just **Zeekr Shortcut** on the device: the drawer, the launcher and
+  the notifications. About and the documentation still carry the car-version name.
+- The drawer header drops the logo and the byline, and shows the app's other-language name
+  in small text under it.
+
 ## [1.9.0-beta] - 2026-09-17
 
 Changes since 1.0.0:
