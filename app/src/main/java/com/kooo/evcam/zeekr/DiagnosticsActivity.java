@@ -423,7 +423,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
             intent.setType("application/json");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
             intent.putExtra(Intent.EXTRA_SUBJECT,
-                    getString(R.string.diag_share_subject, getString(R.string.app_name)));
+                    getString(R.string.diag_share_subject, getString(R.string.app_name_full)));
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(intent, getString(R.string.diag_share_chooser)));
         } catch (Exception e) {

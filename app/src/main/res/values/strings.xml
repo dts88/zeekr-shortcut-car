@@ -1,5 +1,10 @@
 <resources>
-    <string name="app_name">极氪即刻（车机版）</string>
+    <!--
+      应用名：装在车机上的这一份，本身就是车机版，桌面图标、抽屉标题、通知里不用再重复一遍。
+      app_name_full 才带「（车机版）」—— 关于页、诊断报告这种要跟以后的 iOS 版区分开的地方用它。
+    -->
+    <string name="app_name">极氪即刻</string>
+    <string name="app_name_full">极氪即刻（车机版）</string>
     <string name="accessibility_service_description">保活服务：用于提高应用后台运行稳定性，确保远程控制功能正常工作。\n\n本服务不会监控或操作任何用户界面，不会收集任何隐私信息，仅用于保持应用进程活跃。</string>
 
     <!-- 极氪合成流模式 -->

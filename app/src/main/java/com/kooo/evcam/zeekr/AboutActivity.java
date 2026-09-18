@@ -61,9 +61,9 @@ public class AboutActivity extends AppCompatActivity {
     private String buildVersionLine() {
         try {
             String name = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            return getString(R.string.app_name) + "  v" + name;
+            return getString(R.string.app_name_full) + "  v" + name;
         } catch (Exception e) {
-            return getString(R.string.app_name);
+            return getString(R.string.app_name_full);
         }
     }
 

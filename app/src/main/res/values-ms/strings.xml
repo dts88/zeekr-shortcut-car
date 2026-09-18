@@ -1,6 +1,8 @@
 <resources>
     <!-- 马来语界面。键名与顺序跟 values-en 一致，字号不单独定义，和英文共用 values/dimens.xml -->
     <string name="app_name">Zeekr Shortcut</string>
+    <!-- 完整名只有中文才带「（车机版）」，这边两条一样 -->
+    <string name="app_name_full">Zeekr Shortcut</string>
 
     <!-- Tetapan -->
     <string name="set_back_to_recording">Kembali ke rakaman</string>
@@ -244,8 +246,8 @@
 
     <!-- Laci navigasi dan pemain -->
     <string name="nav_recording">Rakaman</string>
-    <string name="nav_video_playback">Main balik video</string>
-    <string name="nav_photo_playback">Lihat foto</string>
+    <string name="nav_video_playback">Video</string>
+    <string name="nav_photo_playback">Foto</string>
     <string name="nav_group_system">Sistem</string>
     <string name="nav_blind_spot">Pilihan titik buta</string>
     <string name="nav_supervision">Pandangan super</string>
