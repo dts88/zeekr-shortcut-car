@@ -228,6 +228,13 @@
             android:enabled="true"
             android:exported="true">
             <intent-filter android:priority="1000">
+                <!-- ========== 关机族：熄火时车机到底通不通知应用，靠这几条探 ========== -->
+                <!-- 收到就说明「断电前干净地停一次录制」这条路走得通，见 ShutdownProbe -->
+                <action android:name="android.intent.action.ACTION_SHUTDOWN" />
+                <action android:name="android.intent.action.REBOOT" />
+                <action android:name="android.intent.action.QUICKBOOT_POWEROFF" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWEROFF" />
+
                 <!-- ========== 屏幕相关（车机点火必亮屏） ========== -->
                 <!-- 屏幕亮起：点火必亮屏，这是车机上最稳的触发信号 -->
                 <action android:name="android.intent.action.SCREEN_ON" />

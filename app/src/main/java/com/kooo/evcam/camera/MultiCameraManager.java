@@ -282,6 +282,8 @@ public class MultiCameraManager {
             if (!isRecording) {
                 return;
             }
+            // 顺路留一个「还活着」的时刻：断电之后靠它判断最后活到几点
+            com.kooo.evcam.zeekr.ShutdownProbe.heartbeat(context, true);
             long free = StorageGuard.freeBytes(com.kooo.evcam.StorageHelper.getVideoDir(context));
             if (free >= 0 && free < StorageGuard.lastMarginBytes()) {
                 checkStorage("剩余空间低于余量");

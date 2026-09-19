@@ -52,6 +52,7 @@
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan zum</string>
     <string name="rearview_guide_hint">Leret untuk tukar halaman · Ketik di luar untuk tutup</string>
     <string name="mirror_paused_tap">Dijeda · ketik untuk sambung</string>
+    <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Halaman panduan %1$d daripada %2$d</string>
     <string name="set_floating_alpha_title">Kelegapan</string>
     <string name="set_recording_floating_title">Butang rakam terapung</string>

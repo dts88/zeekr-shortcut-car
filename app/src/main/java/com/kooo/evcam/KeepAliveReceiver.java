@@ -64,7 +64,21 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         }
         
         String action = intent.getAction();
-        
+
+        // 关机族的广播要抢时间：系统随时会把进程带走，所以同步落盘。
+        // 电源、熄屏这些顺便记一笔当上下文 —— 要弄清「熄火」在这台车机上长什么样。
+        // 只记不动作，为什么见 ShutdownProbe
+        boolean shuttingDown = Intent.ACTION_SHUTDOWN.equals(action)
+                || Intent.ACTION_REBOOT.equals(action)
+                || action.endsWith("QUICKBOOT_POWEROFF");
+        if (shuttingDown
+                || Intent.ACTION_POWER_DISCONNECTED.equals(action)
+                || Intent.ACTION_POWER_CONNECTED.equals(action)
+                || Intent.ACTION_SCREEN_OFF.equals(action)
+                || Intent.ACTION_SCREEN_ON.equals(action)) {
+            com.kooo.evcam.zeekr.ShutdownProbe.note(context, action, shuttingDown);
+        }
+
         // 保活功能已改为始终开启（车机必需）
         
         switch (action) {
@@ -332,6 +346,11 @@ public class KeepAliveReceiver extends BroadcastReceiver {
             timeTickReceiver = new KeepAliveReceiver();
             IntentFilter filter = new IntentFilter();
             filter.addAction(Intent.ACTION_TIME_TICK);
+            // 关机族再动态注册一份：有些 ROM 的 ACTION_SHUTDOWN 只发给动态注册的接收器，
+            // 清单里那份收不到。两边都挂上，哪边先到都算数（ShutdownProbe 只是多记一条）
+            filter.addAction(Intent.ACTION_SHUTDOWN);
+            filter.addAction(Intent.ACTION_REBOOT);
+            filter.addAction("android.intent.action.QUICKBOOT_POWEROFF");
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.getApplicationContext().registerReceiver(

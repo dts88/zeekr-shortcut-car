@@ -7,6 +7,25 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.12.0-alpha] - 2026-09-19
+
+- **Recording no longer starts by itself.** Opening video playback and coming back to the
+  main screen started a recording, because returning to the foreground was treated as a
+  reason to record whenever "Start recording automatically" was on -- it checked neither
+  whether you had stopped recording yourself nor whether anything had been recording in the
+  first place. Three more paths did the same thing: rebuilding the main screen (night mode,
+  a language change, closing and reopening it) re-armed the one-shot auto start, forgot that
+  you had pressed stop, and the 30-second safety check would start a recording that had
+  never been running. The setting now means what it says: start once when the app starts,
+  and afterwards only pick up a recording that stopped on its own. A recording you stopped
+  stays stopped until you start it again.
+- **Shutdown probe** (Diagnostics, section 2.4). Records whether the head unit tells the app
+  anything before it powers down -- if it does, the clip being recorded can be closed
+  properly instead of being left without an index. It only records; it does not act on the
+  signal yet.
+- The docked mirror strip now reads "Super mirror" in every language, in the app's own
+  colours, a little larger.
+
 ## [1.11.0-alpha] - 2026-09-19
 
 - **A camera that quietly stops producing frames is now reopened.** The app already had

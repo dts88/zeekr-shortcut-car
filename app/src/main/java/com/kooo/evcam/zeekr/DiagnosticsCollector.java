@@ -68,6 +68,7 @@ public final class DiagnosticsCollector {
         timings.run("multi mapping", () -> appendMultiMapping(sb, context));
         timings.run("displays", () -> appendDisplays(sb, context));
         timings.run("vehicle signals", () -> appendSignalSources(sb, context));
+        timings.run("shutdown probe", () -> appendShutdownProbe(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("floating layout", () -> appendFloatingLayout(sb, context));
@@ -217,6 +218,22 @@ public final class DiagnosticsCollector {
         try {
             // 页面放不下太长的文字，报告只带最新的一段；完整的在「保存日志」里
             sb.append(com.kooo.evcam.camera.StallWatch.exportText(context, 64 * 1024)).append('\n');
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * 熄火时车机有没有通知过我们。
+     *
+     * <p>这一节是为了回答一个很具体的问题：断电前能不能先把正在录的那一段正常关掉。
+     * 能收到关机广播就能，收不到就只能靠事后修索引。</p>
+     */
+    private static void appendShutdownProbe(StringBuilder sb, Context context) {
+        sb.append("## 2.4 关机信号探测（熄火时车机有没有通知应用）").append('\n');
+        try {
+            sb.append(ShutdownProbe.describe(context));
         } catch (Exception e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }

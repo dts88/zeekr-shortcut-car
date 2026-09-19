@@ -55,7 +55,7 @@ public class HardcodedTextTest {
         for (String f : new String[]{
                 "zeekr/DiagnosticsCollector.java", "zeekr/VehicleSignalProbe.java",
                 "zeekr/VehicleEnumeration.java", "zeekr/PlaybackCapabilityProbe.java",
-                "zeekr/SnapshotDiff.java", "zeekr/ZeekrCameraLocator.java", "zeekr/ZeekrMultiPlan.java",
+                "zeekr/SnapshotDiff.java", "zeekr/ShutdownProbe.java", "zeekr/ZeekrCameraLocator.java", "zeekr/ZeekrMultiPlan.java",
                 "zeekr/ZeekrCompositeProfile.java", "zeekr/CompositeStreamGeometry.java",
                 "share/ShareDiagnostics.java",
                 "camera/PreviewFrameRates.java", "camera/FrameRateMeter.java",

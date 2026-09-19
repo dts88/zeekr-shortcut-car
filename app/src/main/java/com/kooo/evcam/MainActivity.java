@@ -171,11 +171,9 @@ public class MainActivity extends AppCompatActivity {
     private long lastRecordingErrorToastTime = 0;  // 上次显示录制异常提示的时间
     private static final long RECORDING_ERROR_TOAST_INTERVAL = 20000;  // 最小显示间隔（20秒）
     private boolean shouldMoveToBackgroundOnReady = false;  // 开机自启动后，窗口准备好时移到后台
-    private boolean autoStartRecordingTriggered = false;  // 标记自动录制是否已触发（避免重复触发）
     private boolean isAutoRecordingPending = false;  // 标记自动录制已计划但尚未开始（防止 onPause 关闭摄像头）
     
     // 自动录制定时检查相关
-    private boolean isManuallyStoppedRecording = false;  // 用户是否手动停止了录制（手动停止后不自动恢复）
     private android.os.Handler autoRecordingCheckHandler;  // 定时检查 Handler
     private Runnable autoRecordingCheckRunnable;  // 定时检查 Runnable
     private static final long AUTO_RECORDING_CHECK_INTERVAL_MS = 30000;  // 检查间隔（30秒）
@@ -2997,20 +2995,17 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         
-        // 避免重复触发
-        if (autoStartRecordingTriggered) {
-            AppLog.d(TAG, "自动录制已触发过，跳过");
+        // 这一趟开过没有、用户停过没有，都记在进程级的 RecordingIntent 上 ——
+        // 以前记在界面的字段里，界面一重建（切日夜模式、换语言、关掉再打开）就忘了，
+        // 于是用户明明按过停止，重建之后又自己录上了
+        com.kooo.evcam.recording.RecordingIntent intent =
+                com.kooo.evcam.recording.RecordingIntent.current();
+        if (!intent.shouldAutoStart(appConfig.isAutoStartRecording())) {
+            AppLog.d(TAG, "不自动开始录制（" + intent.describe() + "，开关="
+                    + appConfig.isAutoStartRecording() + "）");
             return;
         }
-        
-        // 检查是否启用了自动录制
-        if (!appConfig.isAutoStartRecording()) {
-            AppLog.d(TAG, "未启用启动自动录制");
-            return;
-        }
-        
-        // 标记已触发
-        autoStartRecordingTriggered = true;
+        intent.noteAutoStarted();
         isAutoRecordingPending = true;  // 标记自动录制正在等待中（防止 onPause 关闭摄像头）
         AppLog.d(TAG, "检测到启用了启动自动录制，将在2秒后自动开始录制...");
         
@@ -3092,14 +3087,12 @@ public class MainActivity extends AppCompatActivity {
      * 条件：启用了自动录制 + 不是手动停止 + 当前没在录制 + 摄像头已连接
      */
     private void checkAndRestoreAutoRecording() {
-        // 检查是否启用了自动录制
-        if (!appConfig.isAutoStartRecording()) {
-            return;
-        }
-        
-        // 如果用户手动停止了录制，不自动恢复
-        if (isManuallyStoppedRecording) {
-            // 每5分钟打印一次日志（避免日志刷屏）
+        // 开着功能、这一趟真的录起来过、而且不是用户自己停的 —— 三条缺一不可。
+        // 中间那条是新加的：以前「从来没录起来过」也会被这里开起来，
+        // 于是看完回放切回主界面、开机没插 U 盘，都会莫名其妙开始录制
+        com.kooo.evcam.recording.RecordingIntent intent =
+                com.kooo.evcam.recording.RecordingIntent.current();
+        if (!intent.shouldRestore(appConfig.isAutoStartRecording())) {
             return;
         }
         
@@ -3120,7 +3113,9 @@ public class MainActivity extends AppCompatActivity {
         }
         
         // 满足所有条件，自动恢复录制
-        AppLog.d(TAG, "自动录制检查：检测到未在录制，自动恢复录制...");
+        intent.noteRestoreAttempt();
+        AppLog.d(TAG, "自动录制检查：录制意外停了，接回去（第 "
+                + intent.restoreAttempts() + " 次）");
         startRecording();
         Toast.makeText(this, R.string.msg_recording_resumed, Toast.LENGTH_SHORT).show();
     }
@@ -3538,8 +3533,8 @@ public class MainActivity extends AppCompatActivity {
         if (isRecording) {
             // 用户手动停止录制，设置手动停止标记
             // 这样自动录制检查不会自动恢复录制
-            isManuallyStoppedRecording = true;
-            AppLog.d(TAG, "用户手动停止录制，自动录制检查将不再自动恢复");
+            com.kooo.evcam.recording.RecordingIntent.current().noteUserStopped();
+            AppLog.d(TAG, "用户手动停止录制，这一趟不再自动开始");
             
             // 用户手动停止录制，重置息屏录制标记
             // 这样亮屏后不会错误地恢复录制
@@ -3548,8 +3543,8 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // 用户手动开始录制，重置手动停止标记
             // 这样后续如果录制异常停止，可以自动恢复
-            isManuallyStoppedRecording = false;
-            AppLog.d(TAG, "用户手动开始录制，自动录制检查已启用");
+            com.kooo.evcam.recording.RecordingIntent.current().noteUserStarted();
+            AppLog.d(TAG, "用户手动开始录制，自动恢复重新生效");
             confirmInternalStorageThen(this::startRecording);
         }
     }
@@ -3569,6 +3564,7 @@ public class MainActivity extends AppCompatActivity {
             isRecording = true;
             isPreparingRecording = true;
             isAutoRecordingPending = false;
+            com.kooo.evcam.recording.RecordingIntent.current().noteRecordingStarted();
 
             // 橙色旋转圈；首次写入回调里换成绿色闪烁。
             // 计时器也在那时才启动 —— 从「真的录上了」开始计，而不是从「尝试录」开始
@@ -3655,7 +3651,10 @@ public class MainActivity extends AppCompatActivity {
      */
     public void exitApp() {
         AppLog.d(TAG, "用户请求退出应用，停止所有服务...");
-        
+
+        // 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
+        com.kooo.evcam.recording.RecordingIntent.current().reset();
+
         // 停止录制（如果正在录制）
         if (isRecording) {
             stopRecording();
@@ -4049,17 +4048,12 @@ public class MainActivity extends AppCompatActivity {
                     AppLog.d(TAG, "Reopening cameras after returning from background");
                     cameraManager.openAllCameras();
 
-                    // 如果启用了自动录制，从后台返回时自动恢复录制
-                    if (appConfig.isAutoStartRecording()) {
-                        AppLog.d(TAG, "启用了自动录制，从后台返回后将自动恢复录制");
-                        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                            if (!isRecording && cameraManager != null && cameraManager.hasConnectedCameras()) {
-                                AppLog.d(TAG, "自动恢复录制...");
-                                startRecording();
-                                Toast.makeText(this, R.string.msg_recording_resumed, Toast.LENGTH_SHORT).show();
-                            }
-                        }, 1500);  // 等待摄像头准备好
-                    }
+                    // 这里原本还有一段：只要开着「启动自动录制」，回到前台就开始录。
+                    // 它不看用户停没停过，也不看这一趟有没有录起来过 ——
+                    // 于是「打开视频回放再切回主界面」就会自己录上。
+                    // 回到前台不是开始录制的理由：启动时开一次由 checkAutoStartRecording 管，
+                    // 录着录着意外停了由 checkAndRestoreAutoRecording 接，两条都在
+                    // RecordingIntent 里统一判断。
                     
                     // 重新启动超视模式窗口的摄像头预览
                     new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
@@ -4197,9 +4191,6 @@ public class MainActivity extends AppCompatActivity {
             // 带超时保护的摄像头资源释放
             releaseCameraManagerWithTimeout(3000);  // 3秒超时
         }
-        
-        // 重置自动录制触发标志（下次启动时可以再次触发）
-        autoStartRecordingTriggered = false;
     }
     
     /**

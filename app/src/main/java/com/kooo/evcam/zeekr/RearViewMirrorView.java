@@ -825,11 +825,14 @@ public class RearViewMirrorView extends ViewGroup {
 
     // ------------------------------------------------------------------ 没有画面时画什么
 
-    /** 贴边那条窄边的底色。比纯黑浅一点，在深色桌面上也分得出这里有个东西。 */
-    private static final int DOCKED_BACKGROUND = 0xE6101214;
-    /** 画面停住时盖上去的一层。压暗而不是盖死 —— 让人看得出底下是张画面，只是不再更新了。 */
+    /**
+     * 画面停住时盖上去的一层。压暗而不是盖死 —— 让人看得出底下是张画面，只是不再更新了。
+     *
+     * <p>这一层盖的是摄像头画面，不是应用自己的界面，所以不跟日夜模式走：
+     * 底下永远是视频，压暗 + 浅色字在两种模式下都读得清。</p>
+     */
     private static final int FROZEN_SCRIM = 0xCC000000;
-    private static final int LABEL_COLOR = 0xFFE8EAED;
+    private static final int FROZEN_TEXT = 0xFFF2F2F3;
 
     /**
      * 贴边收起时那条窄边上画什么。
@@ -838,8 +841,11 @@ public class RearViewMirrorView extends ViewGroup {
      * 推流本身在贴边时就停掉了（见 {@link #syncDockState()}），这里画的是替代品：
      * 写上名字，这条边才说得清自己是谁，否则屏幕边上就是一条没来由的深色条。</p>
      *
-     * <p>中文这种没有空格的短名竖着<b>逐字排</b>，其余（Super mirror / Cermin super）
-     * 整体转 90 度 —— 把拉丁字母拆开竖排既难读也难看。</p>
+     * <p>字是<b>那一串英文</b>，三个语言都一样：72px 宽的一条上放的是应用在车上的
+     * 「标记」，不是一句要读的话，换成别的语言反而认不出来。整体转 90 度而不是逐字竖排。</p>
+
+     * <p>底色和字色取的是应用自己那套颜色资源（{@code surface} / {@code text_secondary}），
+     * 所以它跟着日夜模式走，和抽屉、设置页是同一个底。</p>
      */
     private void drawDockedLabel(Canvas canvas, int width, int height) {
         float left = 0f;
@@ -849,37 +855,28 @@ public class RearViewMirrorView extends ViewGroup {
             left = Math.max(0f, width - PEEK_WIDTH_PX);
         }
         float right = Math.min(width, left + PEEK_WIDTH_PX);
-        scrimPaint.setColor(DOCKED_BACKGROUND);
+        // 配色走应用自己的那套：这条边是应用的界面，不是摄像头画面，
+        // 该跟着日夜模式一起变，也该和抽屉、设置页是同一个底
+        scrimPaint.setColor(androidx.core.content.ContextCompat.getColor(
+                getContext(), R.color.surface));
         canvas.drawRect(left, 0, right, height, scrimPaint);
 
-        // 名字用设置页那一条，功能名只留一处
-        String label = getContext().getString(R.string.set_section_rearview);
+        String label = getContext().getString(R.string.mirror_dock_label);
         if (label.isEmpty() || height <= 0) {
             return;
         }
         float centerX = (left + right) / 2f;
-        labelPaint.setColor(LABEL_COLOR);
+        labelPaint.setColor(androidx.core.content.ContextCompat.getColor(
+                getContext(), R.color.text_secondary));
         labelPaint.setTextAlign(Paint.Align.CENTER);
-
-        if (label.length() <= 6 && label.indexOf(' ') < 0) {
-            labelPaint.setTextSize(Math.max(1f,
-                    Math.min(PEEK_WIDTH_PX * 0.42f, height / (label.length() + 1f))));
-            Paint.FontMetrics fm = labelPaint.getFontMetrics();
-            float lineHeight = (fm.descent - fm.ascent) * 1.05f;
-            float top = (height - lineHeight * label.length()) / 2f;
-            for (int i = 0; i < label.length(); i++) {
-                canvas.drawText(label, i, i + 1, centerX,
-                        top + i * lineHeight - fm.ascent, labelPaint);
-            }
-        } else {
-            labelPaint.setTextSize(Math.max(1f,
-                    Math.min(PEEK_WIDTH_PX * 0.38f, height / (label.length() * 0.75f))));
-            int save = canvas.save();
-            canvas.rotate(90f, centerX, height / 2f);
-            Paint.FontMetrics fm = labelPaint.getFontMetrics();
-            canvas.drawText(label, centerX, height / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
-            canvas.restoreToCount(save);
-        }
+        // 整体转 90 度，不逐字竖排 —— 这一条永远是那串英文，拆开竖排既难读也难看
+        labelPaint.setTextSize(Math.max(1f,
+                Math.min(PEEK_WIDTH_PX * 0.50f, height * 1.6f / label.length())));
+        int save = canvas.save();
+        canvas.rotate(90f, centerX, height / 2f);
+        Paint.FontMetrics fm = labelPaint.getFontMetrics();
+        canvas.drawText(label, centerX, height / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
+        canvas.restoreToCount(save);
     }
 
     /**
@@ -896,10 +893,10 @@ public class RearViewMirrorView extends ViewGroup {
         if (hint.isEmpty()) {
             return;
         }
-        labelPaint.setColor(LABEL_COLOR);
+        labelPaint.setColor(FROZEN_TEXT);
         labelPaint.setTextAlign(Paint.Align.CENTER);
         labelPaint.setTextSize(Math.max(1f,
-                Math.min(height * 0.15f, width / (hint.length() * 0.62f))));
+                Math.min(height * 0.17f, width / (hint.length() * 0.56f))));
         Paint.FontMetrics fm = labelPaint.getFontMetrics();
         canvas.drawText(hint, width / 2f, height / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
     }
