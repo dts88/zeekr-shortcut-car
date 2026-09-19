@@ -7,6 +7,14 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.12.1-alpha] - 2026-09-19
+
+- The docked mirror strip is readable against any wallpaper: a fixed dark fill with the
+  Zeekr orange down the edge that faces the desktop. It had been using the app's own surface
+  colour, which is near-white by day and disappeared into light wallpapers -- matching the
+  settings screen says nothing about standing out from whatever the strip happens to float
+  over, so it no longer follows the day/night theme at all.
+
 ## [1.12.0-alpha] - 2026-09-19
 
 - **Recording no longer starts by itself.** Opening video playback and coming back to the

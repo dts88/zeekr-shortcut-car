@@ -835,6 +835,18 @@ public class RearViewMirrorView extends ViewGroup {
     private static final int FROZEN_TEXT = 0xFFF2F2F3;
 
     /**
+     * 贴边那条窄边的底色与字色。<b>固定深色，不跟日夜模式走。</b>
+     *
+     * <p>它浮在车机桌面上，背后是什么完全不可控 —— 跟着日夜模式走只保证和自己的设置页
+     * 一致，不保证和背后的东西分得开。先前用的 {@code surface} 在日间是近白色，
+     * 落在浅色壁纸上就糊成一片。</p>
+     */
+    private static final int DOCK_BACKGROUND = 0xFF1A1C1F;
+    private static final int DOCK_TEXT = 0xFFF0F1F2;
+    /** 朝向桌面那一侧的极氪橙亮边，单位 dp。 */
+    private static final float DOCK_EDGE_DP = 3f;
+
+    /**
      * 贴边收起时那条窄边上画什么。
      *
      * <p><b>不画画面。</b>72px 宽的一条里既看不出什么，还要相机一直多推一路流 ——
@@ -844,8 +856,9 @@ public class RearViewMirrorView extends ViewGroup {
      * <p>字是<b>那一串英文</b>，三个语言都一样：72px 宽的一条上放的是应用在车上的
      * 「标记」，不是一句要读的话，换成别的语言反而认不出来。整体转 90 度而不是逐字竖排。</p>
 
-     * <p>底色和字色取的是应用自己那套颜色资源（{@code surface} / {@code text_secondary}），
-     * 所以它跟着日夜模式走，和抽屉、设置页是同一个底。</p>
+     * <p>配色是<b>固定的深色底 + 近白色字 + 朝向桌面那一侧的一条极氪橙</b>，不跟日夜模式走：
+     * 这条边浮在车机桌面上，背后是什么不可控，和自己的设置页一致并不能保证和背后分得开。
+     * 深色底对付亮壁纸，橙边对付深色壁纸。</p>
      */
     private void drawDockedLabel(Canvas canvas, int width, int height) {
         float left = 0f;
@@ -855,23 +868,34 @@ public class RearViewMirrorView extends ViewGroup {
             left = Math.max(0f, width - PEEK_WIDTH_PX);
         }
         float right = Math.min(width, left + PEEK_WIDTH_PX);
-        // 配色走应用自己的那套：这条边是应用的界面，不是摄像头画面，
-        // 该跟着日夜模式一起变，也该和抽屉、设置页是同一个底
-        scrimPaint.setColor(androidx.core.content.ContextCompat.getColor(
-                getContext(), R.color.surface));
+        scrimPaint.setColor(DOCK_BACKGROUND);
         canvas.drawRect(left, 0, right, height, scrimPaint);
+
+        // 亮边画在朝向桌面的那一侧，不是贴屏幕外沿那一侧 ——
+        // 外沿紧挨着屏幕边框，画了也看不见；要划清界限的是它和桌面相接的这条边。
+        // 深色底对付亮壁纸，这条橙边对付深色壁纸，两头都不会糊
+        float edge = DOCK_EDGE_DP * getResources().getDisplayMetrics().density;
+        scrimPaint.setColor(androidx.core.content.ContextCompat.getColor(
+                getContext(), R.color.energy));
+        if (left > 0) {
+            // 往左藏：露出的是窗口右边那条，朝向桌面的是它的右沿
+            canvas.drawRect(right - edge, 0, right, height, scrimPaint);
+        } else {
+            canvas.drawRect(left, 0, left + edge, height, scrimPaint);
+        }
 
         String label = getContext().getString(R.string.mirror_dock_label);
         if (label.isEmpty() || height <= 0) {
             return;
         }
         float centerX = (left + right) / 2f;
-        labelPaint.setColor(androidx.core.content.ContextCompat.getColor(
-                getContext(), R.color.text_secondary));
+        labelPaint.setColor(DOCK_TEXT);
         labelPaint.setTextAlign(Paint.Align.CENTER);
         // 整体转 90 度，不逐字竖排 —— 这一条永远是那串英文，拆开竖排既难读也难看
+        // 字号先由窄边的宽度定（0.62 的高度加上上下留白，正好把 72px 用满），
+        // 窗口很矮时再由高度收 —— 转了 90 度之后，整串字的长度是沿着窗口高度排的
         labelPaint.setTextSize(Math.max(1f,
-                Math.min(PEEK_WIDTH_PX * 0.50f, height * 1.6f / label.length())));
+                Math.min(PEEK_WIDTH_PX * 0.62f, height * 1.7f / label.length())));
         int save = canvas.save();
         canvas.rotate(90f, centerX, height / 2f);
         Paint.FontMetrics fm = labelPaint.getFontMetrics();
