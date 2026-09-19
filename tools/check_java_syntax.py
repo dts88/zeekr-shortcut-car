@@ -16,9 +16,32 @@ from __future__ import print_function
 
 import io
 import os
+import re
 import sys
 
 PAIRS = {')': '(', ']': '[', '}': '{'}
+
+# 资源引用。子包里用 R.string.xxx 必须自己 import com.kooo.evcam.R ——
+# 括号配对、语法也挑不出毛病，只有编译器会说 "package R does not exist"，
+# 而这台机器上没有 JDK，于是这种错只能等 CI 红了才发现。
+R_REFERENCE = re.compile(
+    r'(?<![\w.])R\.(string|color|dimen|style|drawable|layout|id|array|xml|raw|plurals)\.')
+R_IMPORT = 'import com.kooo.evcam.R;'
+PACKAGE = re.compile(r'package\s+([\w.]+);')
+STRING_LITERAL = re.compile(r'"(?:[^"\\\n]|\\.)*"')
+
+
+def check_r_import(path, src):
+    """子包里用了 R 却没 import 的，返回一条问题；同包（com.kooo.evcam）不需要。"""
+    if 'src/test' in path.replace(os.sep, '/'):
+        return []          # 测试不碰资源
+    package = PACKAGE.search(src)
+    if not package or package.group(1) == 'com.kooo.evcam':
+        return []
+    # 去掉字符串字面量再找：把 "R.style.xxx" 当文本比对的那种不算数
+    if not R_REFERENCE.search(STRING_LITERAL.sub('""', src)) or R_IMPORT in src:
+        return []
+    return ['用了 R.xxx 但没有 %s（编译会报 package R does not exist）' % R_IMPORT]
 OPENERS = set('([{')
 
 
@@ -27,7 +50,7 @@ def check(path):
     with io.open(path, encoding='utf-8') as handle:
         src = handle.read()
 
-    problems = []
+    problems = check_r_import(path, src)
     stack = []          # (字符, 行号)
     line = 1
     i = 0

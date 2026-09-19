@@ -13,6 +13,7 @@ import android.view.TextureView;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.MultiCameraManager;
