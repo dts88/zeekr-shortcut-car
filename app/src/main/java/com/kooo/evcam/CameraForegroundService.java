@@ -72,6 +72,10 @@ public class CameraForegroundService extends Service {
         // 获取 WakeLock 防止系统休眠（车机必须）
         acquireWakeLock();
         
+        // 挂上车辆信号监听。放在前台服务里而不是界面里：要盯的是熄火那一刻，
+        // 那时候界面多半已经不在了，而这个服务还在。只读，失败也不影响别的
+        com.kooo.evcam.zeekr.VehicleSignalWatch.start(this);
+
         // 启动悬浮窗与补盲服务（不依赖 MainActivity，Activity 被杀也能继续运行）
         startRemoteServicesIfNeeded();
 

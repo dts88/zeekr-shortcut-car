@@ -69,6 +69,7 @@ public final class DiagnosticsCollector {
         timings.run("displays", () -> appendDisplays(sb, context));
         timings.run("vehicle signals", () -> appendSignalSources(sb, context));
         timings.run("shutdown probe", () -> appendShutdownProbe(sb, context));
+        timings.run("vehicle watch", () -> appendVehicleWatch(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("floating layout", () -> appendFloatingLayout(sb, context));
@@ -234,6 +235,22 @@ public final class DiagnosticsCollector {
         sb.append("## 2.4 关机信号探测（熄火时车机有没有通知应用）").append('\n');
         try {
             sb.append(ShutdownProbe.describe(context));
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * 点火状态这一类信号的监听结果。
+     *
+     * <p>和 2.4 的关机广播是同一个问题的两条路：知道「快断电了」，才能在断电前
+     * 把正在录的那一段关干净。</p>
+     */
+    private static void appendVehicleWatch(StringBuilder sb, Context context) {
+        sb.append("## 2.5 车辆信号监听（点火 / 档位 / 手刹）").append('\n');
+        try {
+            sb.append(VehicleSignalWatch.describe());
         } catch (Exception e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }

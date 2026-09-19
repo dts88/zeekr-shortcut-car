@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.14.0-alpha] - 2026-09-20
+
+- **Watches the vehicle's ignition state**, as a second route to the question the shutdown
+  probe is asking: knowing that power is about to go lets the clip being recorded be closed
+  properly instead of being left without an index. Turn signals and doors are out of reach on
+  this head unit (`signature|privileged`), but ignition, gear and the parking brake sit under
+  `CAR_POWERTRAIN`, which is a `normal` permission -- so the app now asks for it at startup,
+  silently, since normal permissions do not prompt. It then registers for change callbacks
+  and reads the current values, without checking first whether it is allowed: what the
+  permission check claims and what the car actually returns have not always agreed here, and
+  the disagreement is the interesting part. Everything it learns, including every refusal,
+  goes to Diagnostics section 2.5, and ignition changes are written into the same timeline as
+  the shutdown broadcasts in 2.4.
+
 ## [1.13.2-alpha] - 2026-09-19
 
 Both changes come from one incident on the car: no camera would open -- mirror frozen,
