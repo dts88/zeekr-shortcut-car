@@ -798,25 +798,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    /**
-     * 息屏录制：没开开发者选项时锁住 —— 灰掉、关着、写明为什么。
-     *
-     * <p>用「锁」不用「藏」：这是一个普通人会来找的选项，藏起来的话找的人不知道它存在，
-     * 也不知道去哪打开。值那边 AppConfig 同样锁着，界面写着关，实际就是关。</p>
-     */
-    private void lockScreenOffRecording() {
-        if (DeveloperMode.isUnlocked()) {
-            return;
-        }
-        SwitchPreferenceCompat pref = findPreference("pref_screen_off_recording");
-        if (pref == null) {
-            return;
-        }
-        pref.setChecked(false);
-        pref.setEnabled(false);
-        pref.setSummary(R.string.set_screen_off_locked);
-    }
-
     private void bindSystem() {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
@@ -828,7 +809,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setAutoStartRecording(value));
         bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
                 value -> appConfig.setScreenOffRecordingEnabled(value));
-        lockScreenOffRecording();
         bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> appConfig.setKeepAliveEnabled(value));
         bindSwitch("pref_prevent_sleep", appConfig.isPreventSleepEnabled(),

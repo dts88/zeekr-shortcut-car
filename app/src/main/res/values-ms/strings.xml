@@ -78,7 +78,7 @@
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka atau kembali ke depan</string>
     <string name="set_screen_off_title">Rakam dengan skrin mati</string>
-    <string name="set_screen_off_summary">Terus merakam selepas skrin dimatikan</string>
+    <string name="set_screen_off_summary">Terus merakam selepas skrin dimatikan. Ia tidak berhenti apabila anda meletak kereta dan pergi -- hanya kuasa terputus atau pemacu penuh menghentikannya</string>
     <string name="set_keep_alive_title">Kekal hidup berkala</string>
     <string name="set_keep_alive_summary">Mengejutkan apl secara berkala supaya sistem tidak menutupnya</string>
     <string name="set_prevent_sleep_title">Halang tidur dalam</string>
@@ -379,7 +379,6 @@
     <string name="cd_menu">Menu</string>
     <string name="cd_minimize">Sembunyi ke latar belakang</string>
     <string name="nav_exit">Keluar apl</string>
-    <string name="set_screen_off_locked">Dikunci: memerlukan pilihan pembangun</string>
     <string name="set_rail_side_title">Sebelah butang</string>
     <string name="set_rail_side_summary">Letak di sebelah pemandu</string>
     <string name="opt_rail_right">Kanan</string>

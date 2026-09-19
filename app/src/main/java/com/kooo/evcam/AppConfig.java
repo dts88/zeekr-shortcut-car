@@ -547,13 +547,15 @@ public class AppConfig {
         return prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false);
     }
 
+    /**
+     * 息屏之后继续录制。默认关。
+     *
+     * <p>1.13.0 之前这一条锁在开发者选项后面（没解锁一律当关着）。解锁是因为
+     * 「停车之后还录不录」本来就该由车主自己定 —— 想要停车监控的人打开它，
+     * 不想为此耗电、写满 U 盘的人就别开。默认仍然是关。</p>
+     */
     public boolean isScreenOffRecordingEnabled() {
-        // 默认禁用息屏录制
-        // 锁在开发者选项后面：没解锁时一律当关着，存着的值不动。
-        // 设置里那个开关没解锁时是灰的、关着的 —— 这里必须和它说同一句话，
-        // 否则界面写着关、实际还在息屏录
-        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                && prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
+        return prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
     }
     
     /**

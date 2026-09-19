@@ -7,6 +7,24 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.13.0-alpha] - 2026-09-19
+
+- **The app comes back when the screen does.** Fifteen seconds after the screen goes off it
+  closes the cameras and sends itself to the background, which was always deliberate; what
+  was missing is the other half. Getting into the car meant finding the head unit's home
+  screen and tapping the icon again. It now returns by itself -- and if the screen was
+  reclaimed while the car was parked, it is started again, the process still being held up
+  by the foreground service. Only a screen that left *because of* the screen going off comes
+  back: turning the display on is not by itself a reason for this app to take over the car's
+  screen.
+- **"Keep recording after the screen goes off" is no longer locked behind Developer options.**
+  Whether recording continues after you park is the owner's call, not something to hide.
+  Default is still off; with it off, recording stops ten seconds after the screen does, as
+  before. With it on, recording continues until the power is cut or the drive fills up --
+  which is the point, and also the cost.
+- The super mirror's usage guide is the first row of its settings page, above the switches
+  it explains.
+
 ## [1.12.1-alpha] - 2026-09-19
 
 - The docked mirror strip is readable against any wallpaper: a fixed dark fill with the

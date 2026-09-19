@@ -78,7 +78,7 @@
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens or returns to the foreground</string>
     <string name="set_screen_off_title">Record with screen off</string>
-    <string name="set_screen_off_summary">Keeps recording after the screen turns off</string>
+    <string name="set_screen_off_summary">Keep recording after the screen goes off. It does not stop when you park and walk away -- only a power cut or a full drive stops it</string>
     <string name="set_keep_alive_title">Periodic keep-alive</string>
     <string name="set_keep_alive_summary">Wakes the app periodically so the system does not close it</string>
     <string name="set_prevent_sleep_title">Prevent deep sleep</string>
@@ -379,7 +379,6 @@
     <string name="cd_menu">Menu</string>
     <string name="cd_minimize">Hide to background</string>
     <string name="nav_exit">Quit app</string>
-    <string name="set_screen_off_locked">Locked: requires developer options</string>
     <string name="set_rail_side_title">Button side</string>
     <string name="set_rail_side_summary">Put them on the driver\'s side</string>
     <string name="opt_rail_right">Right</string>
