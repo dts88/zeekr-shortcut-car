@@ -100,7 +100,7 @@
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动后自动开始录制；从后台返回前台时同样恢复</string>
     <string name="set_screen_off_title">息屏录制</string>
-    <string name="set_screen_off_summary">息屏（锁车黑屏）后继续录制。停车离开也不停，直到断电或写满</string>
+    <string name="set_screen_off_summary">息屏（锁车黑屏）后继续录制</string>
     <string name="set_keep_alive_title">定时保活</string>
     <string name="set_keep_alive_summary">定期唤醒进程，避免被系统回收</string>
     <string name="set_prevent_sleep_title">防止休眠</string>
@@ -387,6 +387,7 @@
     <string name="cd_menu">菜单</string>
     <string name="cd_minimize">隐藏到后台</string>
     <string name="nav_exit">退出应用</string>
+    <string name="set_screen_off_locked">锁定中：打开开发者选项后才能开启</string>
     <string name="set_rail_side_title">操作按钮位置</string>
     <string name="set_rail_side_summary">放在离驾驶座近的那一侧</string>
     <string name="opt_rail_right">右侧</string>

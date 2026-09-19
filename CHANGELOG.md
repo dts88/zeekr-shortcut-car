@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.13.1-alpha] - 2026-09-19
+
+- Reverted: "Keep recording after the screen goes off" is behind Developer options again, as
+  it was before 1.13.0. Stopping ten seconds after the screen goes off is the behaviour the
+  owner wants by default, and a switch that can quietly keep the cameras running all night
+  is not one to leave where it can be flipped by accident.
+
 ## [1.13.0-alpha] - 2026-09-19
 
 - **The app comes back when the screen does.** Fifteen seconds after the screen goes off it
