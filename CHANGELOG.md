@@ -7,6 +7,24 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.11.0-alpha] - 2026-09-19
+
+- **A camera that quietly stops producing frames is now reopened.** The app already had
+  self-healing for this, but every path into it is driven by a camera callback, and it only
+  arms itself when a session finishes configuring -- so when the callbacks stop coming, which
+  is what a stalled camera on this head unit looks like, the recovery is deaf. That is the
+  "came back to the car, mirror frozen, preview blank, recording will not start, only a
+  restart helps" case. A watchdog outside that state machine now looks only at whether frames
+  are arriving, and reopens the camera after eight seconds without one, three tries before it
+  backs off for a minute.
+- **The super mirror no longer shows a stale picture as if it were live.** A TextureView keeps
+  the last frame forever, so a dead camera looks exactly like a quiet road. After 2.5 seconds
+  without a new frame the window dims and reads "Paused - tap to resume"; a tap reconnects.
+- **A docked mirror stops streaming.** Pushed to the edge, the 72px sliver shows the name
+  "Super mirror" down its length instead of a picture, and that camera output is dropped --
+  if nothing else needs the camera, it closes entirely. Bringing it back costs the few tenths
+  of a second it takes to rebuild the session.
+
 ## [1.10.0-alpha] - 2026-09-18
 
 - **Repair clips that lost power mid-recording**, under Developer options. A segment cut

@@ -7,9 +7,13 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Size;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -23,6 +27,7 @@ import android.view.WindowManager;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.AutoFitTextureView;
+import com.kooo.evcam.R;
 
 /**
  * 超级后视镜：把环视合成流里<b>后方那一路</b>单独放大成一个悬浮窗。
@@ -112,6 +117,30 @@ public class RearViewMirrorView extends ViewGroup {
     /** 分片绘制用的临时数组，避免每帧、每格都新建。 */
     private final float[] meshSource = new float[8];
     private final float[] meshDest = new float[8];
+    /**
+     * 多久没有新画面就不再拿它当实时画面看。
+     *
+     * <p>最省的档位也有 10fps，2.5 秒是二十多帧没来 —— 到这个地步已经不是卡顿，
+     * 是这条流停了。</p>
+     */
+    private static final long FROZEN_AFTER_MS = 2500L;
+    /** 没有画面时靠它定期重画 —— 画面停了就没有帧来驱动重画了。 */
+    private static final long IDLE_TICK_MS = 1000L;
+
+    private final Handler idleHandler = new Handler(Looper.getMainLooper());
+    private final Paint scrimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** 最后一帧新画面的时刻，单调时钟。 */
+    private long lastFrameUptimeMs;
+    /** 画面停了：盖住那张过时的画面，改成一句「点击恢复」。 */
+    private boolean frozen;
+    /** 贴边收起：那一条窄边上不画画面，只写名字。 */
+    private boolean docked;
+    /** 点一下要做的恢复动作，由服务给。 */
+    private Runnable resumeAction;
+    /** 贴边状态变了通知服务，好把相机那一路的推流停掉 / 接回来。 */
+    private DockListener dockListener;
+
     private boolean dragging;
     /** 松手时要知道甩得多快，用系统自带的这个就够，不必自己算。 */
     private VelocityTracker velocityTracker;
@@ -204,12 +233,101 @@ public class RearViewMirrorView extends ViewGroup {
         try {
             windowManager.addView(this, params);
             attached = true;
+            lastFrameUptimeMs = SystemClock.uptimeMillis();
+            docked = RearViewTouchModel.dockedAt(params.x, params.width, screenWidth())
+                    != RearViewTouchModel.Dock.NONE;
+            idleHandler.postDelayed(idleTick, IDLE_TICK_MS);
         } catch (Exception e) {
             AppLog.e(TAG, "后视镜窗口添加失败", e);
         }
     }
 
+    /** 服务每收到一帧新画面调一次。 */
+    public void noteFrame() {
+        lastFrameUptimeMs = SystemClock.uptimeMillis();
+        if (frozen) {
+            frozen = false;
+            invalidate();
+        }
+    }
+
+    /** 画面停了、点了那句提示时要做的事。 */
+    public void setResumeAction(Runnable action) {
+        this.resumeAction = action;
+    }
+
+    public void setDockListener(DockListener listener) {
+        this.dockListener = listener;
+    }
+
+    public boolean isDocked() {
+        return docked;
+    }
+
+    /** 贴边收起 / 放回来。 */
+    public interface DockListener {
+        void onDockChanged(boolean docked);
+    }
+
+    /**
+     * 没有帧的时候也要有人推着重画。
+     *
+     * <p>平时每一帧新画面都会触发重画，可画面一停就没人推了 —— 而「画面停了」
+     * 恰恰是这时候唯一需要画出来的东西。</p>
+     */
+    private final Runnable idleTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!attached) {
+                return;
+            }
+            boolean nowFrozen = !docked
+                    && SystemClock.uptimeMillis() - lastFrameUptimeMs > FROZEN_AFTER_MS;
+            if (nowFrozen != frozen) {
+                frozen = nowFrozen;
+                AppLog.i(TAG, frozen ? "后视镜画面停了，改显示「点击恢复」" : "后视镜画面回来了");
+                invalidate();
+            }
+            syncDockState();
+            idleHandler.postDelayed(this, IDLE_TICK_MS);
+        }
+    };
+
+    /**
+     * 贴边状态变了就通知一次。
+     *
+     * <p>贴边之后那条窄边只有 72px，画面在里面既看不清也没有意义，
+     * 却要相机一直多推一路流。所以贴边即停流，放回来再接上。</p>
+     */
+    private void syncDockState() {
+        if (params == null) {
+            return;
+        }
+        if (dragging || pinching || glide != null) {
+            // 手指还在上面、或者还在滑回去的路上：这中间窗口会短暂地探出屏幕，
+            // 那不是「收起来了」。只认落定之后的位置，否则拖一下就会停一次流
+            return;
+        }
+        boolean nowDocked = RearViewTouchModel.dockedAt(
+                params.x, params.width, screenWidth()) != RearViewTouchModel.Dock.NONE;
+        if (nowDocked == docked) {
+            return;
+        }
+        docked = nowDocked;
+        if (docked) {
+            frozen = false;   // 收起来不算「画面停了」，是我们自己停的
+        } else {
+            lastFrameUptimeMs = SystemClock.uptimeMillis();   // 给重新接上留出时间
+        }
+        AppLog.i(TAG, docked ? "后视镜贴边收起，停止推流" : "后视镜放回来，恢复推流");
+        invalidate();
+        if (dockListener != null) {
+            dockListener.onDockChanged(docked);
+        }
+    }
+
     public void hide() {
+        idleHandler.removeCallbacks(idleTick);
         cancelGlide();
         if (!attached) {
             return;
@@ -292,9 +410,17 @@ public class RearViewMirrorView extends ViewGroup {
         if (width <= 0 || height <= 0) {
             return;
         }
+        if (docked) {
+            // 贴边收起：那条窄边上不画画面，见 drawDockedLabel
+            drawDockedLabel(canvas, width, height);
+            return;
+        }
         if (plan == null || !plan.isComposite()) {
             // 还不知道几何，先原样显示，总比全黑好
             super.dispatchDraw(canvas);
+            if (frozen) {
+                drawFrozenHint(canvas, width, height);
+            }
             return;
         }
 
@@ -332,6 +458,11 @@ public class RearViewMirrorView extends ViewGroup {
         }
 
         canvas.restoreToCount(mirrorSave);
+
+        // 盖在最上面，而且在镜像之外 —— 提示文字不该跟着画面一起左右翻
+        if (frozen) {
+            drawFrozenHint(canvas, width, height);
+        }
     }
 
     /**
@@ -544,10 +675,14 @@ public class RearViewMirrorView extends ViewGroup {
             // 贴着边的时候点一下就是「拿回来」—— 那时候屏幕上只剩一条窄边，
             // 除了把它拉回来也没别的可做，不该还要求先拖一段
             if (params != null) {
-                RearViewTouchModel.Dock docked = RearViewTouchModel.dockedAt(
+                RearViewTouchModel.Dock dock = RearViewTouchModel.dockedAt(
                         params.x, params.width, screenWidth());
-                if (docked != RearViewTouchModel.Dock.NONE) {
-                    glideTo(RearViewTouchModel.flushX(docked, params.width, screenWidth()), 0f);
+                if (dock != RearViewTouchModel.Dock.NONE) {
+                    glideTo(RearViewTouchModel.flushX(dock, params.width, screenWidth()), 0f);
+                } else if (frozen && resumeAction != null) {
+                    // 画面停住时点一下就是「把它接回来」—— 那时候除了这个也没别的可做
+                    AppLog.i(TAG, "点了停住的后视镜，重新接相机");
+                    resumeAction.run();
                 }
             }
             return;
@@ -571,6 +706,7 @@ public class RearViewMirrorView extends ViewGroup {
         dragging = false;
         pinching = false;
         pinchedThisGesture = false;
+        syncDockState();
     }
 
     /**
@@ -655,6 +791,8 @@ public class RearViewMirrorView extends ViewGroup {
             public void onAnimationEnd(Animator animation) {
                 glide = null;
                 savePosition();
+                // 落定了才算数：贴边收起 / 放回来都在这一刻定下来
+                syncDockState();
             }
         });
         glide.start();
@@ -682,6 +820,88 @@ public class RearViewMirrorView extends ViewGroup {
         } catch (Exception e) {
             AppLog.w(TAG, "后视镜窗口更新失败: " + e);
         }
+        syncDockState();
+    }
+
+    // ------------------------------------------------------------------ 没有画面时画什么
+
+    /** 贴边那条窄边的底色。比纯黑浅一点，在深色桌面上也分得出这里有个东西。 */
+    private static final int DOCKED_BACKGROUND = 0xE6101214;
+    /** 画面停住时盖上去的一层。压暗而不是盖死 —— 让人看得出底下是张画面，只是不再更新了。 */
+    private static final int FROZEN_SCRIM = 0xCC000000;
+    private static final int LABEL_COLOR = 0xFFE8EAED;
+
+    /**
+     * 贴边收起时那条窄边上画什么。
+     *
+     * <p><b>不画画面。</b>72px 宽的一条里既看不出什么，还要相机一直多推一路流 ——
+     * 推流本身在贴边时就停掉了（见 {@link #syncDockState()}），这里画的是替代品：
+     * 写上名字，这条边才说得清自己是谁，否则屏幕边上就是一条没来由的深色条。</p>
+     *
+     * <p>中文这种没有空格的短名竖着<b>逐字排</b>，其余（Super mirror / Cermin super）
+     * 整体转 90 度 —— 把拉丁字母拆开竖排既难读也难看。</p>
+     */
+    private void drawDockedLabel(Canvas canvas, int width, int height) {
+        float left = 0f;
+        if (params != null && RearViewTouchModel.dockedAt(params.x, params.width, screenWidth())
+                == RearViewTouchModel.Dock.LEFT) {
+            // 往左藏，露出来的是窗口的右边那一条
+            left = Math.max(0f, width - PEEK_WIDTH_PX);
+        }
+        float right = Math.min(width, left + PEEK_WIDTH_PX);
+        scrimPaint.setColor(DOCKED_BACKGROUND);
+        canvas.drawRect(left, 0, right, height, scrimPaint);
+
+        // 名字用设置页那一条，功能名只留一处
+        String label = getContext().getString(R.string.set_section_rearview);
+        if (label.isEmpty() || height <= 0) {
+            return;
+        }
+        float centerX = (left + right) / 2f;
+        labelPaint.setColor(LABEL_COLOR);
+        labelPaint.setTextAlign(Paint.Align.CENTER);
+
+        if (label.length() <= 6 && label.indexOf(' ') < 0) {
+            labelPaint.setTextSize(Math.max(1f,
+                    Math.min(PEEK_WIDTH_PX * 0.42f, height / (label.length() + 1f))));
+            Paint.FontMetrics fm = labelPaint.getFontMetrics();
+            float lineHeight = (fm.descent - fm.ascent) * 1.05f;
+            float top = (height - lineHeight * label.length()) / 2f;
+            for (int i = 0; i < label.length(); i++) {
+                canvas.drawText(label, i, i + 1, centerX,
+                        top + i * lineHeight - fm.ascent, labelPaint);
+            }
+        } else {
+            labelPaint.setTextSize(Math.max(1f,
+                    Math.min(PEEK_WIDTH_PX * 0.38f, height / (label.length() * 0.75f))));
+            int save = canvas.save();
+            canvas.rotate(90f, centerX, height / 2f);
+            Paint.FontMetrics fm = labelPaint.getFontMetrics();
+            canvas.drawText(label, centerX, height / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
+            canvas.restoreToCount(save);
+        }
+    }
+
+    /**
+     * 画面停了就把它盖住，换成一句「点击恢复」。
+     *
+     * <p>这不是省事，是安全：TextureView 会一直留着最后一帧，于是相机断了之后
+     * 窗口里仍然是一幅<b>看起来像实时</b>的路面。盯着一张过时的后视镜画面变道，
+     * 比看见一块黑屏危险得多 —— 黑屏至少能看出它坏了。</p>
+     */
+    private void drawFrozenHint(Canvas canvas, int width, int height) {
+        scrimPaint.setColor(FROZEN_SCRIM);
+        canvas.drawRect(0, 0, width, height, scrimPaint);
+        String hint = getContext().getString(R.string.mirror_paused_tap);
+        if (hint.isEmpty()) {
+            return;
+        }
+        labelPaint.setColor(LABEL_COLOR);
+        labelPaint.setTextAlign(Paint.Align.CENTER);
+        labelPaint.setTextSize(Math.max(1f,
+                Math.min(height * 0.15f, width / (hint.length() * 0.62f))));
+        Paint.FontMetrics fm = labelPaint.getFontMetrics();
+        canvas.drawText(hint, width / 2f, height / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
     }
 
     private int screenWidth() {

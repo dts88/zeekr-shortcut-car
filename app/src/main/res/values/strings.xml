@@ -69,6 +69,7 @@
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">三个手势区域、换一路、调取景、贴边隐藏、缩放</string>
     <string name="rearview_guide_hint">左右划翻页 · 点击图片外关闭</string>
+    <string name="mirror_paused_tap">画面已停止 · 点击恢复</string>
     <string name="rearview_guide_page">使用指南第 %1$d 张，共 %2$d 张</string>
     <string name="set_floating_alpha_title">悬浮窗透明度</string>
     <string name="set_recording_floating_title">录制悬浮按钮</string>

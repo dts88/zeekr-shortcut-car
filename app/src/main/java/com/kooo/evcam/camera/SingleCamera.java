@@ -20,6 +20,7 @@ import android.util.Range;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.util.Size;
@@ -144,6 +145,14 @@ public class SingleCamera {
     private long fpsWindowStartTime = 0;
 
     private long lastFrameTimestampMs = 0;
+    /**
+     * 最后一次「有动静」的单调时刻：出了一帧、相机开了、会话建好了，都算。
+     *
+     * <p>和上面那个的区别有两处，都要紧：一是用不含深度睡眠的时钟 ——
+     * 车停一夜醒来不该算「卡了一整夜」；二是<b>开相机、建会话也刷新它</b>，
+     * 于是「一帧都没出过」和「出过帧然后停了」可以用同一个年龄来判断。</p>
+     */
+    private volatile long lastProgressUptimeMs = 0;
     private long lastStallRecoveryMs = 0;
     private int stallRecoveryLevel = 0;
     private Runnable healthCheckRunnable;
@@ -983,6 +992,33 @@ public class SingleCamera {
     }
 
     /**
+     * 距上一次「有动静」多久。给 {@link CameraLiveness} 那层兜底看门狗用。
+     *
+     * <p>从没开过相机的返回 0（不是无穷大）—— 没开过就不该被判成卡住。</p>
+     */
+    public long progressAgeMs() {
+        long last = lastProgressUptimeMs;
+        return last == 0 ? 0 : Math.max(0, SystemClock.uptimeMillis() - last);
+    }
+
+    /**
+     * 此刻该不该有帧：是主实例、没有被生命周期主动暂停、而且至少有一路输出在等画面。
+     *
+     * <p>注意这里<b>不看</b>相机开没开、会话建没建 —— 兜底看门狗要救的恰恰是
+     * 那些状态标志卡住的情形，拿卡住的标志当前提就等于不救。</p>
+     */
+    public boolean wantsFrames() {
+        return isPrimaryInstance && !isPausedByLifecycle
+                && (previewSurface != null || mainFloatingSurface != null
+                || recordSurface != null || secondaryDisplaySurface != null
+                || fullscreenPreviewSurface != null);
+    }
+
+    public boolean isPausedByLifecycle() {
+        return isPausedByLifecycle;
+    }
+
+    /**
      * 获取当前实时 FPS（1秒滚动窗口）
      */
     public float getCurrentFps() {
@@ -1011,7 +1047,8 @@ public class SingleCamera {
             return;
         }
         isOpening = true;
-        
+        lastProgressUptimeMs = SystemClock.uptimeMillis();
+
         synchronized (reconnectLock) {
             // 安全措施：清理可能残留的录制 Surface 引用（防止 Surface abandoned 错误）
             // 放在同步块内，避免与 setRecordSurface() 的竞态条件
@@ -1761,6 +1798,7 @@ public class SingleCamera {
                         captureSession.setRepeatingRequest(previewRequestBuilder.build(), activeCaptureCallback, backgroundHandler);
                         AppLog.d(TAG, "Camera " + cameraId + " preview started!");
                         lastFrameTimestampMs = System.currentTimeMillis();
+                        lastProgressUptimeMs = SystemClock.uptimeMillis();
                         stallRecoveryLevel = 0;
                         lastStallRecoveryMs = 0;
                         startHealthMonitor();
@@ -1967,6 +2005,7 @@ public class SingleCamera {
                                       @NonNull CaptureRequest request,
                                       @NonNull TotalCaptureResult result) {
             captureBeat.beat(StallWatch.now());
+            lastProgressUptimeMs = SystemClock.uptimeMillis();
             frameCount++;
             long now = System.currentTimeMillis();
             lastFrameTimestampMs = now;
@@ -3026,10 +3065,20 @@ public class SingleCamera {
                 reconnectRunnable = null;
             }
             
-            // 重置状态
+            // 重置状态。isOpening / isConfiguring / isSessionClosing 这三个也要清 ——
+            // 它们只在相机回调里复位，而回调不来正是这条路被走到的原因。
+            // 不清的话：isOpening 会挡掉之后每一次 openCamera，
+            // isConfiguring 会让自愈的每次检查都直接跳过。设备和会话下面就关掉了，
+            // 在途的那一次配置已经作废，清掉不会和谁打架。
             reconnectAttempts = 0;
             shouldReconnect = true;
             isReconnecting = false;
+            isOpening = false;
+            synchronized (sessionLock) {
+                isConfiguring = false;
+                isSessionClosing = false;
+                isPendingReconfiguration = false;
+            }
             
             // 关闭现有连接
             if (cameraDevice != null) {

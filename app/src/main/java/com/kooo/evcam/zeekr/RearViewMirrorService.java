@@ -165,10 +165,17 @@ public class RearViewMirrorService extends Service {
 
                     @Override
                     public void onSurfaceTextureUpdated(SurfaceTexture st) {
-                        // 每显示一帧新画面响一次。卡顿监测靠它判断后视镜是不是卡住了
+                        // 每显示一帧新画面响一次。卡顿监测靠它判断后视镜是不是卡住了，
+                        // 窗口自己靠它判断要不要把那张过时的画面盖起来
                         StallWatch.mirrorFrame();
+                        RearViewMirrorView view = mirrorView;
+                        if (view != null) {
+                            view.noteFrame();
+                        }
                     }
                 });
+        mirrorView.setResumeAction(this::rebindNow);
+        mirrorView.setDockListener(this::onDockChanged);
         mirrorView.show();
         startWatchdog();
     }
@@ -201,6 +208,11 @@ public class RearViewMirrorService extends Service {
      */
     private void bindCamera(SurfaceTexture surfaceTexture) {
         if (mirrorView == null || surfaceTexture == null) {
+            return;
+        }
+        if (mirrorView.isDocked()) {
+            // 上次就是贴边收起来的：那条窄边上只写名字，不该为它开一路推流
+            AppLog.i(TAG, "后视镜处于贴边状态，暂不接相机");
             return;
         }
         MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
@@ -274,6 +286,10 @@ public class RearViewMirrorService extends Service {
         if (mirrorView == null || !mirrorView.isShowing()) {
             return;
         }
+        if (mirrorView.isDocked()) {
+            // 贴边收起时本来就是故意不接相机的，别把它又接回去
+            return;
+        }
         if (boundCamera != null && boundCamera.isCameraOpened()) {
             return;
         }
@@ -301,6 +317,37 @@ public class RearViewMirrorService extends Service {
             handler.removeCallbacks(retryRunnable);
             retryRunnable = null;
         }
+    }
+
+    /**
+     * 贴边收起就停掉这一路推流，放回来再接上。
+     *
+     * <p>收起后屏幕上只剩 72px 宽的一条，里面什么也看不出来，却要相机一直多推一路
+     * 输出、窗口每帧重画一遍整张纹理。这一路停掉之后，如果没有别人在用这台相机
+     * （没在录、主界面也不在前台），相机会跟着整个关掉。</p>
+     *
+     * <p>代价是放回来要重建一次会话，画面会比窗口晚到零点几秒。</p>
+     */
+    private void onDockChanged(boolean docked) {
+        if (docked) {
+            unbindCamera();
+            return;
+        }
+        rebindNow();
+    }
+
+    /** 重新接上相机：放回来时、以及画面停住时点了那句提示。 */
+    private void rebindNow() {
+        if (mirrorView == null || !mirrorView.isShowing()) {
+            return;
+        }
+        TextureView tv = mirrorView.getTextureView();
+        if (!tv.isAvailable()) {
+            AppLog.w(TAG, "后视镜画布还没准备好，暂不接相机");
+            return;
+        }
+        retryCount = 0;
+        bindCamera(tv.getSurfaceTexture());
     }
 
     private void unbindCamera() {

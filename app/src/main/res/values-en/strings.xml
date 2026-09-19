@@ -51,6 +51,7 @@
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, changing camera, framing, docking and zoom</string>
     <string name="rearview_guide_hint">Swipe to turn pages · Tap outside to close</string>
+    <string name="mirror_paused_tap">Paused · tap to resume</string>
     <string name="rearview_guide_page">Guide page %1$d of %2$d</string>
     <string name="set_floating_alpha_title">Opacity</string>
     <string name="set_recording_floating_title">Floating record button</string>

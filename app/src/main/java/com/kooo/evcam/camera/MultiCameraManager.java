@@ -17,6 +17,7 @@ import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -162,6 +163,67 @@ public class MultiCameraManager {
 
     public MultiCameraManager(Context context) {
         this.context = context;
+        livenessRunning = true;
+        mainHandler.postDelayed(livenessTick, LIVENESS_TICK_MS);
+    }
+
+    // ------------------------------------------------------------------ 相机兜底看门狗
+
+    /** 兜底看门狗多久看一眼。空转时只是几次字段读取，放密一点不心疼。 */
+    private static final long LIVENESS_TICK_MS = 2000L;
+
+    private final Map<String, CameraLiveness.State> livenessStates = new HashMap<>();
+    private boolean livenessRunning;
+
+    private final Runnable livenessTick = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                checkLiveness();
+            } catch (Exception e) {
+                AppLog.w(TAG, "相机看门狗检查失败: " + e);
+            }
+            if (livenessRunning) {
+                mainHandler.postDelayed(this, LIVENESS_TICK_MS);
+            }
+        }
+    };
+
+    /**
+     * 该出帧而长时间没帧的那一路，直接重开。
+     *
+     * <p>为什么 {@link SingleCamera} 自己已经有一套自愈还要这一层，见 {@link CameraLiveness}
+     * 的类说明：那一套全靠相机回调驱动，而回调不来正是车机相机挂住时的样子。
+     * 这一层只看有没有帧，不看任何状态标志。</p>
+     */
+    private void checkLiveness() {
+        if (cameras.isEmpty()) {
+            return;
+        }
+        long now = android.os.SystemClock.uptimeMillis();
+        for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
+            SingleCamera camera = entry.getValue();
+            if (camera == null) {
+                continue;
+            }
+            CameraLiveness.State state = livenessStates.get(entry.getKey());
+            if (state == null) {
+                state = new CameraLiveness.State();
+                livenessStates.put(entry.getKey(), state);
+            }
+            long age = camera.progressAgeMs();
+            CameraLiveness.Action action =
+                    CameraLiveness.step(state, camera.wantsFrames(), age, now);
+            if (action == CameraLiveness.Action.RESET) {
+                AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
+                        + age + "ms 没有画面，重开（第 " + state.attempts() + " 次）");
+                camera.forceReopen();
+            } else if (action == CameraLiveness.Action.GIVE_UP) {
+                AppLog.e(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 连着重开 "
+                        + CameraLiveness.MAX_ATTEMPTS + " 次都没救回来，先停手 "
+                        + (CameraLiveness.COOL_OFF_MS / 1000) + " 秒");
+            }
+        }
     }
 
     /**
@@ -2243,6 +2305,7 @@ public class MultiCameraManager {
      */
     public void release() {
         AppLog.d(TAG, "Releasing MultiCameraManager resources");
+        livenessRunning = false;
         
         try {
             // 1. 首先清理所有待执行的 Handler 任务（防止内存泄漏）
