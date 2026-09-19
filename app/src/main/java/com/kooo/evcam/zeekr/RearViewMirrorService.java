@@ -174,7 +174,7 @@ public class RearViewMirrorService extends Service {
                         }
                     }
                 });
-        mirrorView.setResumeAction(this::rebindNow);
+        mirrorView.setResumeAction(() -> rebindNow(true));
         mirrorView.setDockListener(this::onDockChanged);
         mirrorView.show();
         startWatchdog();
@@ -336,8 +336,17 @@ public class RearViewMirrorService extends Service {
         rebindNow();
     }
 
-    /** 重新接上相机：放回来时、以及画面停住时点了那句提示。 */
     private void rebindNow() {
+        rebindNow(false);
+    }
+
+    /**
+     * 重新接上相机：放回来时、以及画面停住时点了那句提示。
+     *
+     * @param explainIfItFails 用户主动点的那一次传 true —— 点了没反应是最难受的，
+     *                         接不上就得说出为什么（相机被占着、还是别的）
+     */
+    private void rebindNow(boolean explainIfItFails) {
         if (mirrorView == null || !mirrorView.isShowing()) {
             return;
         }
@@ -348,6 +357,34 @@ public class RearViewMirrorService extends Service {
         }
         retryCount = 0;
         bindCamera(tv.getSurfaceTexture());
+        if (explainIfItFails) {
+            // 开相机是异步的，当场问「开了没」一定是没开。等两秒半再看
+            handler.postDelayed(this::explainIfStillDark, 2500);
+        }
+    }
+
+    /**
+     * 点了「点击恢复」之后画面还是没回来，说一句为什么。
+     *
+     * <p>这一条是给「点了没有任何作用」那种情形写的：相机被别的程序占着时，
+     * 我们这边怎么点都没用，而屏幕上什么都不说 —— 人只能猜是应用坏了，
+     * 于是去重启应用、清缓存、重装，全都不会有效果，因为占用记录在相机服务那边。</p>
+     */
+    private void explainIfStillDark() {
+        SingleCamera camera = boundCamera;
+        if (camera != null && camera.isCameraOpened()) {
+            return;
+        }
+        String error = camera == null ? null : camera.lastErrorName();
+        String message = error != null && error.contains("IN_USE")
+                ? getString(R.string.mirror_resume_busy)
+                : getString(R.string.mirror_resume_failed, error == null ? "?" : error);
+        AppLog.w(TAG, "点击恢复之后相机仍然没打开: " + error);
+        try {
+            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            AppLog.w(TAG, "提示弹不出来: " + e);
+        }
     }
 
     private void unbindCamera() {

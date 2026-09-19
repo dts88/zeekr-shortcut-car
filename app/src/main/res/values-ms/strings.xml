@@ -52,6 +52,8 @@
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan zum</string>
     <string name="rearview_guide_hint">Leret untuk tukar halaman · Ketik di luar untuk tutup</string>
     <string name="mirror_paused_tap">Dijeda · ketik untuk sambung</string>
+    <string name="mirror_resume_busy">Sesuatu yang lain sedang memegang kamera. Mulakan semula unit kepala untuk memulihkannya</string>
+    <string name="mirror_resume_failed">Kamera tidak dapat dibuka: %1$s</string>
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Halaman panduan %1$d daripada %2$d</string>
     <string name="set_floating_alpha_title">Kelegapan</string>

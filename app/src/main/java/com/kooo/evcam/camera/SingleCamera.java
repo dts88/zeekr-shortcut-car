@@ -153,6 +153,16 @@ public class SingleCamera {
      * 于是「一帧都没出过」和「出过帧然后停了」可以用同一个年龄来判断。</p>
      */
     private volatile long lastProgressUptimeMs = 0;
+    /**
+     * 这一趟有没有<b>成功打开过</b>。
+     *
+     * <p>兜底看门狗只管「开起来之后又不出帧」，不管「压根打不开」——
+     * 后者是开相机那条路自己的事（它有退避重连），看门狗再去强制重开只会
+     * 一起捶已经卡住的相机服务。</p>
+     */
+    private volatile boolean everOpened;
+    /** 最后一次相机报错的短名，给界面说明「为什么点了没反应」。 */
+    private volatile String lastErrorName;
     private long lastStallRecoveryMs = 0;
     private int stallRecoveryLevel = 0;
     private Runnable healthCheckRunnable;
@@ -1018,6 +1028,16 @@ public class SingleCamera {
         return isPausedByLifecycle;
     }
 
+    /** 这一趟成功打开过没有。见 {@link #everOpened}。 */
+    public boolean hasEverOpened() {
+        return everOpened;
+    }
+
+    /** 最后一次报错的短名，没有就返回 null。 */
+    public String lastErrorName() {
+        return lastErrorName;
+    }
+
     /**
      * 获取当前实时 FPS（1秒滚动窗口）
      */
@@ -1353,6 +1373,8 @@ public class SingleCamera {
             isOpening = false;
             synchronized (reconnectLock) {
                 cameraDevice = camera;
+                everOpened = true;
+                lastErrorName = null;
                 reconnectAttempts = 0;  // 重置重连计数
                 isReconnecting = false;  // 重连成功，清除重连标志
                 reconnectDelayFloorMs = 0;
@@ -1454,6 +1476,7 @@ public class SingleCamera {
                 }
 
                 AppLog.e(TAG, "Camera " + cameraId + " error: " + errorMsg);
+                lastErrorName = errorMsg;
                 if (callback != null) {
                     callback.onCameraError(cameraId, error);
                 }

@@ -70,6 +70,8 @@
     <string name="set_rearview_guide_summary">三个手势区域、换一路、调取景、贴边隐藏、缩放</string>
     <string name="rearview_guide_hint">左右划翻页 · 点击图片外关闭</string>
     <string name="mirror_paused_tap">画面已停止 · 点击恢复</string>
+    <string name="mirror_resume_busy">相机被别的程序占着，打不开。重启车机可以恢复</string>
+    <string name="mirror_resume_failed">相机打不开：%1$s</string>
     <!--
       贴边收起后那条窄边上的字。三个语言都是同一串英文：那里只有 72px 宽，
       放的是应用在车上的「标记」而不是一句话，换成别的语言反而认不出来了。

@@ -100,6 +100,48 @@ public class CameraLivenessTest {
         assertEquals(1, state.attempts());
     }
 
+    /**
+     * 几轮都没用就彻底停手，不再每分钟去捶一次。
+     *
+     * <p>相机服务里留了僵死的占用记录时（实车遇到过：车机自己的 360 还能用，
+     * 我们这边怎么都打不开，重启车机才好），重开是救不回来的。
+     * 没有这一条的话，一夜下来会去捶几百次。</p>
+     */
+    @Test
+    public void stopsForGoodAfterAFewRounds() {
+        long now = 10_000;
+        for (int cycle = 1; cycle <= CameraLiveness.MAX_CYCLES; cycle++) {
+            for (int i = 0; i < CameraLiveness.MAX_ATTEMPTS; i++) {
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now);
+                now += CameraLiveness.RETRY_GAP_MS;
+            }
+            CameraLiveness.Action action =
+                    CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now);
+            if (cycle < CameraLiveness.MAX_CYCLES) {
+                assertEquals("第 " + cycle + " 轮该只是歇一会儿",
+                        CameraLiveness.Action.GIVE_UP, action);
+                now += CameraLiveness.COOL_OFF_MS;
+            } else {
+                assertEquals("最后一轮该彻底停手", CameraLiveness.Action.STOP, action);
+            }
+        }
+        assertTrue(state.stopped());
+
+        // 停手之后就是彻底安静，等多久都不再试
+        assertEquals(CameraLiveness.Action.NONE,
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
+                        now + 10 * CameraLiveness.COOL_OFF_MS));
+
+        // 但相机真活过来了就重新算 —— 重启车机之后不该还记着仇
+        assertEquals(CameraLiveness.Action.NONE,
+                CameraLiveness.step(state, true, 0, now + 11 * CameraLiveness.COOL_OFF_MS));
+        assertFalse(state.stopped());
+        assertEquals(0, state.cycles());
+        assertEquals(CameraLiveness.Action.RESET,
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
+                        now + 12 * CameraLiveness.COOL_OFF_MS));
+    }
+
     /** 兜底的门槛必须明显宽于 SingleCamera 自己那套，否则两层会抢着动手。 */
     @Test
     public void thresholdStaysWellAboveTheInnerRecovery() {

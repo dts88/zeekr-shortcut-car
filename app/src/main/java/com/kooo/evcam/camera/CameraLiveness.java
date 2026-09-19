@@ -50,6 +50,18 @@ public final class CameraLiveness {
     /** 停手之后过这么久允许再来一轮。 */
     public static final long COOL_OFF_MS = 60000L;
 
+    /**
+     * 这么多轮都没救回来就<b>彻底停手</b>，不再周期性地试。
+     *
+     * <p>没有这一条的话「歇一分钟再来一轮」是无限的：相机服务真卡死时，
+     * 我们每分钟去捶一次，一夜下来几百次，既救不回来，又让已经卡住的
+     * 相机服务更难缓过来，日志也被刷满。</p>
+     *
+     * <p>彻底停手之后只有两件事能让它重新开始：真的出了一帧，
+     * 或者这一路不再需要画面（收起后视镜、停止录制）之后重新需要。</p>
+     */
+    public static final int MAX_CYCLES = 3;
+
     private CameraLiveness() {
     }
 
@@ -58,8 +70,10 @@ public final class CameraLiveness {
         NONE,
         /** 重开这一路相机。 */
         RESET,
-        /** 救不动了，这一轮到此为止（只记一次日志）。 */
-        GIVE_UP
+        /** 这一轮救不动了，歇一会儿再来（只记一次日志）。 */
+        GIVE_UP,
+        /** 几轮都没用，彻底停手，不再周期性地试（只记一次日志）。 */
+        STOP
     }
 
     /** 一路相机的救援状态，只在监测线程上读写。 */
@@ -68,6 +82,8 @@ public final class CameraLiveness {
         private long lastResetMs;
         private boolean gaveUp;
         private long gaveUpAtMs;
+        private int cycles;
+        private boolean stopped;
 
         public int attempts() {
             return attempts;
@@ -77,18 +93,30 @@ public final class CameraLiveness {
             return gaveUp;
         }
 
+        public boolean stopped() {
+            return stopped;
+        }
+
+        public int cycles() {
+            return cycles;
+        }
+
+        /** 帧回来了、或者这一路不再需要画面 —— 一切归零，包括彻底停手的状态。 */
         private void clear() {
             attempts = 0;
             lastResetMs = 0;
             gaveUp = false;
             gaveUpAtMs = 0;
+            cycles = 0;
+            stopped = false;
         }
     }
 
     /**
      * 往前走一步。
      *
-     * @param wantsFrames 这一路此刻该不该出帧（有人在用它的画面，且不是被主动暂停的）
+     * @param wantsFrames 这一路此刻该不该出帧：有人在用它的画面、不是被主动暂停的，
+     *                    <b>而且这一趟成功打开过</b> —— 压根没打开过的不归这里管
      * @param frameAgeMs  距上一次「有动静」多久 —— 出了一帧、开了相机、建好会话，都算动静
      * @param now         单调时钟，不含深度睡眠（车停着睡一夜，醒来不该算卡了一整夜）
      */
@@ -98,11 +126,17 @@ public final class CameraLiveness {
             state.clear();
             return Action.NONE;
         }
+        if (state.stopped) {
+            return Action.NONE;
+        }
         if (state.gaveUp) {
             if (now - state.gaveUpAtMs < COOL_OFF_MS) {
                 return Action.NONE;
             }
+            // 歇够了，再来一轮 —— 但轮数要留着，不能跟着一起清零
+            int cycles = state.cycles;
             state.clear();
+            state.cycles = cycles;
         }
         if (state.lastResetMs != 0 && now - state.lastResetMs < RETRY_GAP_MS) {
             return Action.NONE;
@@ -110,6 +144,11 @@ public final class CameraLiveness {
         if (state.attempts >= MAX_ATTEMPTS) {
             state.gaveUp = true;
             state.gaveUpAtMs = now;
+            state.cycles++;
+            if (state.cycles >= MAX_CYCLES) {
+                state.stopped = true;
+                return Action.STOP;
+            }
             return Action.GIVE_UP;
         }
         state.attempts++;

@@ -7,6 +7,24 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.13.2-alpha] - 2026-09-19
+
+Both changes come from one incident on the car: no camera would open -- mirror frozen,
+preview blank, recording refusing to start -- while the car's own 360 view kept working.
+Restarting the app, clearing its data and reinstalling all did nothing; restarting the head
+unit fixed it instantly. So the stuck thing was a stale claim inside the camera service,
+not anything this app stores.
+
+- **The watchdog no longer hammers a camera that cannot be opened at all.** It was meant for
+  a camera that opens and then goes quiet; a camera that never opened is the business of the
+  open path, which has its own backoff. It also stops for good after three rounds instead of
+  retrying every minute forever -- against a wedged camera service that only makes recovery
+  harder, and fills the log.
+- **"Tap to resume" says why when it cannot.** Tapping and getting nothing is what sends
+  people to reinstall the app, which cannot help when the claim is held elsewhere. It now
+  reports the camera's own error, and for a camera held by something else it says plainly
+  that restarting the head unit clears it.
+
 ## [1.13.1-alpha] - 2026-09-19
 
 - Reverted: "Keep recording after the screen goes off" is behind Developer options again, as

@@ -212,8 +212,10 @@ public class MultiCameraManager {
                 livenessStates.put(entry.getKey(), state);
             }
             long age = camera.progressAgeMs();
-            CameraLiveness.Action action =
-                    CameraLiveness.step(state, camera.wantsFrames(), age, now);
+            // 压根没打开过的不归这里管：那是开相机那条路自己的事，它有自己的退避重连。
+            // 看门狗再去强制重开，只会和它一起捶一个已经卡住的相机服务
+            boolean watch = camera.wantsFrames() && camera.hasEverOpened();
+            CameraLiveness.Action action = CameraLiveness.step(state, watch, age, now);
             if (action == CameraLiveness.Action.RESET) {
                 AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
                         + age + "ms 没有画面，重开（第 " + state.attempts() + " 次）");
@@ -222,6 +224,11 @@ public class MultiCameraManager {
                 AppLog.e(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 连着重开 "
                         + CameraLiveness.MAX_ATTEMPTS + " 次都没救回来，先停手 "
                         + (CameraLiveness.COOL_OFF_MS / 1000) + " 秒");
+            } else if (action == CameraLiveness.Action.STOP) {
+                AppLog.e(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 试了 "
+                        + CameraLiveness.MAX_CYCLES + " 轮都没用，彻底停手 —— "
+                        + "再捶下去只会让相机服务更难缓过来。"
+                        + "最后一次报错: " + camera.lastErrorName());
             }
         }
     }
