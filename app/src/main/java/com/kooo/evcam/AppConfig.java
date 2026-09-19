@@ -27,6 +27,7 @@ public class AppConfig {
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
+    private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
     private static final String KEY_KEEP_ALIVE_ENABLED = "keep_alive_enabled";  // 保活服务
     private static final String KEY_PREVENT_SLEEP_ENABLED = "prevent_sleep_enabled";  // 防止休眠（持续WakeLock）
     private static final String KEY_RECORDING_MODE = "recording_mode";  // 录制模式
@@ -525,6 +526,27 @@ public class AppConfig {
      * 获取息屏录制设置
      * @return true 表示息屏时继续录制
      */
+    /**
+     * 主界面是不是<b>因为熄屏</b>才退到后台的。
+     *
+     * <p>熄屏 15 秒后应用会把自己退到后台、关掉相机（见 MainActivity 的
+     * {@code scheduleBackgroundTask}）。既然是我们自己退下去的，亮屏时就该自己回来 ——
+     * 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。</p>
+     *
+     * <p>存在配置里而不是内存字段里：退到后台之后这个界面很可能撑不到亮屏那一刻，
+     * 被系统收走之后只有存下来的记号还在。</p>
+     *
+     * <p>只有这个记号在时才会把界面拉回前台。用户自己切走的、从来没进过前台的，
+     * 一律不动 —— 不能因为有人点亮了屏幕就抢到最前面。</p>
+     */
+    public void setUiLeftForScreenOff(boolean value) {
+        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).apply();
+    }
+
+    public boolean didUiLeaveForScreenOff() {
+        return prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false);
+    }
+
     public boolean isScreenOffRecordingEnabled() {
         // 默认禁用息屏录制
         // 锁在开发者选项后面：没解锁时一律当关着，存着的值不动。

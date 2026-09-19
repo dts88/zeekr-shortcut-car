@@ -86,6 +86,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
             case Intent.ACTION_SCREEN_ON:
                 AppLog.d(TAG, "【屏幕】屏幕亮起（点火信号）");
                 ensureServicesRunning(context, "屏幕亮起");
+                restoreMainScreenIfItLeftForScreenOff(context);
                 break;
                 
             case Intent.ACTION_SCREEN_OFF:
@@ -263,6 +264,35 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         }
     }
     
+    /**
+     * 熄屏时自己退下去、之后又被系统收走的主界面，亮屏时拉回来。
+     *
+     * <p>界面还活着的时候它自己会回来（{@code MainActivity.onScreenOn}）；
+     * 这里管的是它已经不在了的那种 —— 停了一夜，进程还在（前台服务保着），
+     * 界面早被系统回收了。</p>
+     *
+     * <p>只认「是它自己因为熄屏退下去的」这个记号。用户自己切走的、从来没进过前台的，
+     * 一律不动：不能因为有人点亮了屏幕就抢到最前面。</p>
+     */
+    private void restoreMainScreenIfItLeftForScreenOff(Context context) {
+        try {
+            if (MainActivity.getInstance() != null) {
+                return;
+            }
+            AppConfig config = new AppConfig(context);
+            if (!config.didUiLeaveForScreenOff()) {
+                return;
+            }
+            config.setUiLeftForScreenOff(false);
+            Intent intent = new Intent(context, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            context.startActivity(intent);
+            AppLog.i(TAG, "亮屏，主界面已不在，按熄屏前的状态把它拉回来");
+        } catch (Exception e) {
+            AppLog.w(TAG, "恢复主界面失败: " + e);
+        }
+    }
+
     /**
      * TIME_TICK 处理（每分钟调用）
      * 使用轻量级检查，避免频繁操作

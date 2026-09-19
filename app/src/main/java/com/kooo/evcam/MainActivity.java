@@ -3347,6 +3347,10 @@ public class MainActivity extends AppCompatActivity {
             }
             
             AppLog.d(TAG, "息屏已持续15秒，退到后台释放相机资源");
+
+            // 留个记号：是我们自己因为熄屏退下去的。亮屏时据此把界面接回来 ——
+            // 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标
+            appConfig.setUiLeftForScreenOff(true);
             
             // 关闭摄像头释放资源
             if (cameraManager != null) {
@@ -3388,6 +3392,21 @@ public class MainActivity extends AppCompatActivity {
             screenStateHandler.removeCallbacks(screenOffBackgroundRunnable);
             screenOffBackgroundRunnable = null;
             AppLog.d(TAG, "亮屏，取消退后台任务");
+        }
+
+        // 因为熄屏自己退下去的，亮屏就自己回来。界面已经被系统收走的那种情况
+        // 由 KeepAliveReceiver 接手（那时候这里根本不会被调用）
+        if (appConfig.didUiLeaveForScreenOff()) {
+            appConfig.setUiLeftForScreenOff(false);
+            AppLog.i(TAG, "亮屏，把因熄屏退下去的主界面接回前台");
+            try {
+                Intent back = new Intent(this, MainActivity.class);
+                back.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                startActivity(back);
+            } catch (Exception e) {
+                AppLog.w(TAG, "接回前台失败: " + e);
+            }
         }
         
         // 检查是否启用了自动录制功能
@@ -3654,6 +3673,8 @@ public class MainActivity extends AppCompatActivity {
 
         // 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
         com.kooo.evcam.recording.RecordingIntent.current().reset();
+        // 主动退出之后不该再被亮屏拉回来
+        appConfig.setUiLeftForScreenOff(false);
 
         // 停止录制（如果正在录制）
         if (isRecording) {
@@ -4020,6 +4041,10 @@ public class MainActivity extends AppCompatActivity {
         
         // 通知悬浮窗：应用回到前台
         OverlayCoordinator.onAppForeground(this);
+
+        // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
+        // 还是用户自己点回来的
+        appConfig.setUiLeftForScreenOff(false);
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
