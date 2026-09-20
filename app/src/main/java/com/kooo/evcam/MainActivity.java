@@ -49,7 +49,6 @@ import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
-import com.kooo.evcam.playback.PhotoPlaybackFragmentNew;
 import com.kooo.evcam.view.MacOSToggleButton;
 
 import java.io.BufferedReader;
@@ -1713,7 +1712,7 @@ public class MainActivity extends AppCompatActivity {
      * 显示图片回看界面（新版四宫格界面）
      */
     private void showPhotoPlaybackInterface() {
-        showFragment(new PhotoPlaybackFragmentNew());
+        startActivity(new Intent(this, com.kooo.evcam.playback.PhotoPlaybackActivity.class));
     }
 
 

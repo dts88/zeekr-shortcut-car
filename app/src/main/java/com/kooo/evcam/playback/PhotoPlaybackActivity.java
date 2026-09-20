@@ -10,7 +10,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.GestureDetector;
-import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,9 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.fragment.app.Fragment;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -59,10 +56,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 图片回看Fragment（新版）
- * 支持左右分栏、四宫格预览、单路/多路切换
+ * 图片回看：左右分栏、四宫格预览、单路 / 多路切换。
+ *
+ * <h3>为什么是独立 Activity</h3>
+ *
+ * <p>以前它是嵌在主界面里的一个 Fragment，主界面只是把录制那一层
+ * {@code setVisibility(GONE)} —— 于是<b>主界面从头到尾没有 pause 过</b>，
+ * 相机全程在采集、在出帧，只是被这一层盖住了，白白发热耗电。</p>
+ *
+ * <p>改成独立 Activity 之后，打开它就等于主界面退到后台：没在录制、没有悬浮窗
+ * 用相机的话，相机按既有逻辑关掉。连续回放（{@code TimelinePlayerActivity}）
+ * 一直就是这么做的，两个回看界面现在是同一套结构。</p>
  */
-public class PhotoPlaybackFragmentNew extends Fragment {
+public class PhotoPlaybackActivity extends AppCompatActivity {
 
     // UI 组件
     private RecyclerView photoList;
@@ -73,7 +79,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private MaterialButton btnFisheye;
     private Button btnSelectAll, btnDeleteSelected, btnCancelSelect, btnShareSelected;
     private TextView selectedCount;
-    private static final String TAG = "PhotoPlaybackFragmentNew";
+    private static final String TAG = "PhotoPlaybackActivity";
     private View toolbar, actionGroup, selectionGroup;
 
     // 预览区组件
@@ -98,66 +104,64 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     /** 鱼眼校正：只改屏幕上的样子，原图不动。开关记在设置里，下次进来还是这个状态。 */
     private boolean fisheyeOn;
 
-    @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_photo_playback_new, container, false);
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_photo_playback);
 
-        initViews(view);
+        initViews();
         setupListeners();
         setupDoubleTapListeners();
         updatePhotoList();
-        applyStatusBarInsets(view);
-
-        return view;
+        applyStatusBarInsets();
     }
 
-    private void initViews(View view) {
+    private void initViews() {
         // 工具栏
-        toolbar = view.findViewById(R.id.toolbar);
-        actionGroup = view.findViewById(R.id.pb_actions);
-        selectionGroup = view.findViewById(R.id.pb_selection);
-        btnMenu = view.findViewById(R.id.btn_menu);
-        btnRefresh = view.findViewById(R.id.pb_refresh);
-        btnMultiSelect = view.findViewById(R.id.pb_multi_select);
-        btnHome = view.findViewById(R.id.pb_home);
-        btnFisheye = view.findViewById(R.id.pb_fisheye);
-        fisheyeOn = new AppConfig(view.getContext()).isPhotoFisheyeCorrection();
+        toolbar = findViewById(R.id.toolbar);
+        actionGroup = findViewById(R.id.pb_actions);
+        selectionGroup = findViewById(R.id.pb_selection);
+        btnMenu = findViewById(R.id.btn_menu);
+        btnRefresh = findViewById(R.id.pb_refresh);
+        btnMultiSelect = findViewById(R.id.pb_multi_select);
+        btnHome = findViewById(R.id.pb_home);
+        btnFisheye = findViewById(R.id.pb_fisheye);
+        fisheyeOn = new AppConfig(PhotoPlaybackActivity.this).isPhotoFisheyeCorrection();
         updateFisheyeButton();
-        currentDatetime = view.findViewById(R.id.current_datetime);
+        currentDatetime = findViewById(R.id.current_datetime);
 
         // 多选工具栏
-        btnSelectAll = view.findViewById(R.id.pb_select_all);
-        btnDeleteSelected = view.findViewById(R.id.pb_delete);
-        btnCancelSelect = view.findViewById(R.id.pb_cancel);
-        btnShareSelected = view.findViewById(R.id.pb_share);
-        selectedCount = view.findViewById(R.id.pb_selected_count);
+        btnSelectAll = findViewById(R.id.pb_select_all);
+        btnDeleteSelected = findViewById(R.id.pb_delete);
+        btnCancelSelect = findViewById(R.id.pb_cancel);
+        btnShareSelected = findViewById(R.id.pb_share);
+        selectedCount = findViewById(R.id.pb_selected_count);
 
         // 列表
-        photoList = view.findViewById(R.id.photo_list);
-        emptyText = view.findViewById(R.id.empty_text);
-        noSelectionHint = view.findViewById(R.id.no_selection_hint);
+        photoList = findViewById(R.id.photo_list);
+        emptyText = findViewById(R.id.empty_text);
+        noSelectionHint = findViewById(R.id.no_selection_hint);
 
         // 四宫格预览
-        multiViewLayout = view.findViewById(R.id.multi_view_layout);
-        singleViewLayout = view.findViewById(R.id.single_view_layout);
+        multiViewLayout = findViewById(R.id.multi_view_layout);
+        singleViewLayout = findViewById(R.id.single_view_layout);
 
-        imageFront = view.findViewById(R.id.image_front);
-        imageBack = view.findViewById(R.id.image_back);
-        imageLeft = view.findViewById(R.id.image_left);
-        imageRight = view.findViewById(R.id.image_right);
-        imageSingle = view.findViewById(R.id.image_single);
+        imageFront = findViewById(R.id.image_front);
+        imageBack = findViewById(R.id.image_back);
+        imageLeft = findViewById(R.id.image_left);
+        imageRight = findViewById(R.id.image_right);
+        imageSingle = findViewById(R.id.image_single);
 
-        frameFront = view.findViewById(R.id.frame_front);
-        frameBack = view.findViewById(R.id.frame_back);
-        frameLeft = view.findViewById(R.id.frame_left);
-        frameRight = view.findViewById(R.id.frame_right);
+        frameFront = findViewById(R.id.frame_front);
+        frameBack = findViewById(R.id.frame_back);
+        frameLeft = findViewById(R.id.frame_left);
+        frameRight = findViewById(R.id.frame_right);
 
-        labelFront = view.findViewById(R.id.label_front);
-        labelBack = view.findViewById(R.id.label_back);
-        labelLeft = view.findViewById(R.id.label_left);
-        labelRight = view.findViewById(R.id.label_right);
-        labelSingle = view.findViewById(R.id.label_single);
+        labelFront = findViewById(R.id.label_front);
+        labelBack = findViewById(R.id.label_back);
+        labelLeft = findViewById(R.id.label_left);
+        labelRight = findViewById(R.id.label_right);
+        labelSingle = findViewById(R.id.label_single);
 
         // 角标叫什么和主界面同一个来源：布局里那四个「前后左右」说的是合成流的
         // 四个方向，而这里每一格是一路相机 —— 三路配置下就成了环视写着「前」
@@ -166,21 +170,21 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         nameLane(labelLeft, "left");
         nameLane(labelRight, "right");
 
-        placeholderFront = view.findViewById(R.id.placeholder_front);
-        placeholderBack = view.findViewById(R.id.placeholder_back);
-        placeholderLeft = view.findViewById(R.id.placeholder_left);
-        placeholderRight = view.findViewById(R.id.placeholder_right);
+        placeholderFront = findViewById(R.id.placeholder_front);
+        placeholderBack = findViewById(R.id.placeholder_back);
+        placeholderLeft = findViewById(R.id.placeholder_left);
+        placeholderRight = findViewById(R.id.placeholder_right);
 
         // 摄像头切换按钮和控制栏
-        btnViewMode = view.findViewById(R.id.btn_view_mode);
-        btnSendToPhone = view.findViewById(R.id.btn_send_to_phone);
-        controlsLayout = view.findViewById(R.id.controls_layout);
+        btnViewMode = findViewById(R.id.btn_view_mode);
+        btnSendToPhone = findViewById(R.id.btn_send_to_phone);
+        controlsLayout = findViewById(R.id.controls_layout);
 
         // 设置列表（竖屏2列，横屏1列，日期头部跨越所有列）
-        adapter = new ExpandablePhotoGroupAdapter(getContext(), dateSections);
+        adapter = new ExpandablePhotoGroupAdapter(PhotoPlaybackActivity.this, dateSections);
         int orientation = getResources().getConfiguration().orientation;
         if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-            GridLayoutManager gridLayoutManager = new GridLayoutManager(getContext(), 2);
+            GridLayoutManager gridLayoutManager = new GridLayoutManager(PhotoPlaybackActivity.this, 2);
             gridLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
                 @Override
                 public int getSpanSize(int position) {
@@ -190,7 +194,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
             });
             photoList.setLayoutManager(gridLayoutManager);
         } else {
-            photoList.setLayoutManager(new LinearLayoutManager(getContext()));
+            photoList.setLayoutManager(new LinearLayoutManager(PhotoPlaybackActivity.this));
         }
         photoList.setAdapter(adapter);
 
@@ -204,33 +208,18 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         // 鱼眼校正开关。改的是「怎么画」，所以只要把当前这一组重新贴一遍
         btnFisheye.setOnClickListener(v -> {
             fisheyeOn = !fisheyeOn;
-            new AppConfig(v.getContext()).setPhotoFisheyeCorrection(fisheyeOn);
+            new AppConfig(v.PhotoPlaybackActivity.this).setPhotoFisheyeCorrection(fisheyeOn);
             updateFisheyeButton();
             if (currentGroup != null) {
                 loadPhotoGroup(currentGroup);
             }
         });
 
-        // 菜单按钮
-        btnMenu.setOnClickListener(v -> {
-            if (getActivity() != null) {
-                DrawerLayout drawerLayout = getActivity().findViewById(R.id.drawer_layout);
-                if (drawerLayout != null) {
-                    if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                        drawerLayout.closeDrawer(GravityCompat.START);
-                    } else {
-                        drawerLayout.openDrawer(GravityCompat.START);
-                    }
-                }
-            }
-        });
+        // 菜单：抽屉在主界面上，回去顺便把它打开 —— 和连续回放同一个做法
+        btnMenu.setOnClickListener(v -> openDrawerOnMain());
 
-        // 返回主界面
-        btnHome.setOnClickListener(v -> {
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).goToRecordingInterface();
-            }
-        });
+        // 返回主界面：独立 Activity，关掉自己就回去了
+        btnHome.setOnClickListener(v -> finish());
 
         // 刷新
         btnRefresh.setOnClickListener(v -> updatePhotoList());
@@ -285,7 +274,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
         // 单路模式双击返回多路
         if (singleViewLayout != null) {
-            GestureDetector detector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+            GestureDetector detector = new GestureDetector(PhotoPlaybackActivity.this, new GestureDetector.SimpleOnGestureListener() {
                 @Override
                 public boolean onDoubleTap(MotionEvent e) {
                     if (isSingleMode) {
@@ -304,7 +293,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private void setupDoubleTap(View view, String position, String label) {
         if (view == null) return;
 
-        GestureDetector detector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+        GestureDetector detector = new GestureDetector(PhotoPlaybackActivity.this, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDoubleTap(MotionEvent e) {
                 if (!isSingleMode && currentGroup != null && currentGroup.hasPhoto(position)) {
@@ -328,16 +317,16 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      */
     private void sendCurrentPhotoToPhone() {
         if (!isSingleMode || currentSinglePosition == null) {
-            Toast.makeText(getContext(), R.string.share_photo_pick_lane_first,
+            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_photo_pick_lane_first,
                     Toast.LENGTH_LONG).show();
             return;
         }
         if (currentGroup == null) {
-            Toast.makeText(getContext(), R.string.share_phone_no_file,
+            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        com.kooo.evcam.share.PhoneShare.show(getActivity(),
+        com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this,
                 currentGroup.getPhotoFile(currentSinglePosition));
     }
 
@@ -346,11 +335,11 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      */
 /** 这一格装的是哪一路相机，名字和主界面同一个来源。 */
     private void nameLane(TextView label, String position) {
-        if (label == null || getContext() == null) {
+        if (label == null) {
             return;
         }
-        label.setText(new com.kooo.evcam.AppConfig(getContext())
-                .getCameraName(getContext(), position));
+        label.setText(new com.kooo.evcam.AppConfig(PhotoPlaybackActivity.this)
+                .getCameraName(PhotoPlaybackActivity.this, position));
     }
 
     private void switchToSingleMode(String position, String label) {
@@ -507,7 +496,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      * 拼成四宫格存的：环视那一路一张图里装着四个画面，得一格一格校正。</p>
      */
     private void loadImage(File photoFile, ImageView imageView, String position) {
-        if (photoFile == null || !photoFile.exists() || getContext() == null) {
+        if (photoFile == null || !photoFile.exists()) {
             return;
         }
 
@@ -519,14 +508,14 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         // 校正只对环视那一路：座舱是普通相机，一张图就是一个画面，不该动它
         int lanes = fisheyeOn ? gridColumns(position) : 1;
         if (lanes > 1) {
-            AppConfig config = new AppConfig(getContext());
+            AppConfig config = new AppConfig(PhotoPlaybackActivity.this);
             options = options.transform(new FisheyeTransformation(lanes, lanes,
                     config.getPhotoFisheyeFov(), config.getFisheyeProjection(),
                     config.getFisheyeStrength() / 100f));
         }
         options = options.placeholder(keepShowing(imageView));
 
-        Glide.with(getContext())
+        Glide.with(PhotoPlaybackActivity.this)
                 .load(photoFile)
                 .apply(options)
                 .into(imageView);
@@ -567,7 +556,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      */
     private int gridColumns(String position) {
         try {
-            return RecordSpecs.forCameraKey(getContext(), position).grid ? 2 : 1;
+            return RecordSpecs.forCameraKey(PhotoPlaybackActivity.this, position).grid ? 2 : 1;
         } catch (Exception e) {
             Log.w(TAG, "读不到 " + position + " 的排列，按不拆处理: " + e);
             return 1;
@@ -576,14 +565,14 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
     /** 开着的时候按主色点亮，一眼能看出现在看到的画面动过手脚。 */
     private void updateFisheyeButton() {
-        if (btnFisheye == null || getContext() == null) {
+        if (btnFisheye == null) {
             return;
         }
         int background = fisheyeOn ? R.color.energy : R.color.sunken;
         int foreground = fisheyeOn ? R.color.on_energy : R.color.text_primary;
         btnFisheye.setBackgroundTintList(
-                ColorStateList.valueOf(ContextCompat.getColor(getContext(), background)));
-        btnFisheye.setTextColor(ContextCompat.getColor(getContext(), foreground));
+                ColorStateList.valueOf(ContextCompat.getColor(PhotoPlaybackActivity.this, background)));
+        btnFisheye.setTextColor(ContextCompat.getColor(PhotoPlaybackActivity.this, foreground));
     }
 
     /**
@@ -595,7 +584,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         String shown = currentGroup != null ? currentGroup.getTimestampPrefix() : null;
         dateSections.clear();
 
-        File saveDir = StorageHelper.getPhotoDir(getContext());
+        File saveDir = StorageHelper.getPhotoDir(PhotoPlaybackActivity.this);
         if (!saveDir.exists() || !saveDir.isDirectory()) {
             showEmptyState();
             showNoSelection();
@@ -747,7 +736,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
             return;
         }
 
-        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_delete_photos_title)
                 .setMessage(getString(R.string.dlg_delete_photos_msg, selectedGroups.size()))
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> {
@@ -780,11 +769,9 @@ public class PhotoPlaybackFragmentNew extends Fragment {
                     adapter.notifyDataSetChanged();
                     updateSelectedCount();
 
-                    if (getContext() != null) {
-                        android.widget.Toast.makeText(getContext(),
-                                getString(R.string.msg_photos_deleted, deletedCount),
-                                android.widget.Toast.LENGTH_SHORT).show();
-                    }
+                    android.widget.Toast.makeText(PhotoPlaybackActivity.this,
+                            getString(R.string.msg_photos_deleted, deletedCount),
+                            android.widget.Toast.LENGTH_SHORT).show();
 
                     if (dateSections.isEmpty()) {
                         exitMultiSelectMode();
@@ -794,8 +781,42 @@ public class PhotoPlaybackFragmentNew extends Fragment {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    private void applyStatusBarInsets(View view) {
-        View toolbarView = view.findViewById(R.id.toolbar);
+    /**
+     * 返回键：先退出当前这一层，最后才是离开这个界面。
+     *
+     * <p>做 Fragment 的时候没有这一层 —— 主界面的返回键一路回到录制界面，
+     * 多选里按返回会直接走掉，看着像「选择被提交了」。连续回放早就是这么处理的，
+     * 这里补齐，顺便把单路视图也算一层。</p>
+     */
+    @Override
+    public void onBackPressed() {
+        if (isMultiSelectMode) {
+            exitMultiSelectMode();
+            return;
+        }
+        if (isSingleMode) {
+            switchToMultiMode();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    /**
+     * 回主界面，并让它把抽屉打开。
+     *
+     * <p>抽屉挂在主界面上，这里是另一个 Activity，够不着它 ——
+     * 所以带一个标志回去，由主界面自己打开。连续回放也是这么做的。</p>
+     */
+    private void openDrawerOnMain() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.putExtra(MainActivity.EXTRA_OPEN_DRAWER, true);
+        startActivity(intent);
+        finish();
+    }
+
+    private void applyStatusBarInsets() {
+        View toolbarView = findViewById(R.id.toolbar);
         if (toolbarView != null) {
             final int originalPaddingTop = toolbarView.getPaddingTop();
             androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(toolbarView, (v, insets) -> {
@@ -813,7 +834,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
     private void shareSelected() {
         Set<PhotoGroup> selectedGroups = adapter.getSelectedGroups();
         if (selectedGroups.isEmpty()) {
-            Toast.makeText(getContext(), getString(R.string.msg_select_photos_first), Toast.LENGTH_SHORT).show();
+            Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_select_photos_first), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -832,7 +853,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         }
 
         if (allPhotoFiles.isEmpty()) {
-            Toast.makeText(getContext(), getString(R.string.msg_no_photos_to_share), Toast.LENGTH_SHORT).show();
+            Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_no_photos_to_share), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -847,8 +868,6 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      * 显示单组图片分享对话框
      */
     private void showPhotoShareDialog(PhotoGroup group) {
-        if (getContext() == null) return;
-
         // 获取所有可用的图片文件
         List<File> photoFiles = new ArrayList<>();
         String[] positions = {PhotoGroup.POSITION_FRONT, PhotoGroup.POSITION_BACK,
@@ -862,7 +881,7 @@ public class PhotoPlaybackFragmentNew extends Fragment {
         }
 
         if (photoFiles.isEmpty()) {
-            Toast.makeText(getContext(), getString(R.string.msg_no_photos_to_share), Toast.LENGTH_SHORT).show();
+            Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_no_photos_to_share), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -879,10 +898,8 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      * 按钮样式、日夜配色和其他对话框一致，也不再有一块夜里刺眼的白板。</p>
      */
     private void showPhotoShareOptionsDialog(String title, String message, List<File> photoFiles) {
-        if (getContext() == null) return;
-
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(
-                getContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setMessage(message)
                 .setPositiveButton(R.string.action_share, (dialog, which) -> {
@@ -899,10 +916,12 @@ public class PhotoPlaybackFragmentNew extends Fragment {
      * 分享图片文件
      */
     private void sharePhotos(List<File> photoFiles) {
-        if (getContext() == null || photoFiles.isEmpty()) return;
+        if (photoFiles.isEmpty()) {
+            return;
+        }
 
         try {
-            String authority = getContext().getPackageName() + ".fileprovider";
+            String authority = getPackageName() + ".fileprovider";
 
             if (photoFiles.size() == 1) {
                 // 分享单个图片
@@ -910,11 +929,11 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
                 // 检查文件是否存在且可读
                 if (!photoFile.exists() || !photoFile.canRead()) {
-                    Toast.makeText(getContext(), getString(R.string.msg_file_unreadable), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_file_unreadable), Toast.LENGTH_SHORT).show();
                     return;
                 }
 
-                Uri photoUri = FileProvider.getUriForFile(getContext(), authority, photoFile);
+                Uri photoUri = FileProvider.getUriForFile(PhotoPlaybackActivity.this, authority, photoFile);
 
                 Intent shareIntent = new Intent(Intent.ACTION_SEND);
                 shareIntent.setType("image/jpeg");
@@ -927,10 +946,10 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
                 // 创建选择器
                 Intent chooser = Intent.createChooser(shareIntent, getString(R.string.action_share_photos));
-                if (chooser.resolveActivity(getContext().getPackageManager()) != null) {
+                if (chooser.resolveActivity(PhotoPlaybackActivity.this.getPackageManager()) != null) {
                     startActivity(chooser);
                 } else {
-                    Toast.makeText(getContext(), getString(R.string.msg_no_share_target), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_no_share_target), Toast.LENGTH_SHORT).show();
                 }
             } else {
                 // 分享多个图片
@@ -940,12 +959,12 @@ public class PhotoPlaybackFragmentNew extends Fragment {
                     if (!photoFile.exists() || !photoFile.canRead()) {
                         continue;
                     }
-                    Uri photoUri = FileProvider.getUriForFile(getContext(), authority, photoFile);
+                    Uri photoUri = FileProvider.getUriForFile(PhotoPlaybackActivity.this, authority, photoFile);
                     photoUris.add(photoUri);
                 }
 
                 if (photoUris.isEmpty()) {
-                    Toast.makeText(getContext(), getString(R.string.msg_nothing_to_share), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_nothing_to_share), Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -960,19 +979,19 @@ public class PhotoPlaybackFragmentNew extends Fragment {
 
                 // 创建选择器
                 Intent chooser = Intent.createChooser(shareIntent, getString(R.string.action_share_photos));
-                if (chooser.resolveActivity(getContext().getPackageManager()) != null) {
+                if (chooser.resolveActivity(PhotoPlaybackActivity.this.getPackageManager()) != null) {
                     startActivity(chooser);
                 } else {
-                    Toast.makeText(getContext(), getString(R.string.msg_no_share_target), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_no_share_target), Toast.LENGTH_SHORT).show();
                 }
             }
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "分享图片失败: FileProvider 无法处理该文件路径", e);
-            Toast.makeText(getContext(), R.string.msg_share_path_unsupported,
+            Toast.makeText(PhotoPlaybackActivity.this, R.string.msg_share_path_unsupported,
                     Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Log.e(TAG, "分享图片失败", e);
-            Toast.makeText(getContext(), getString(R.string.msg_share_failed, e.getMessage()),
+            Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_share_failed, e.getMessage()),
                     Toast.LENGTH_SHORT).show();
         }
     }

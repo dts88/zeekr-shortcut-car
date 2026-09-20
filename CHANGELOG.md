@@ -7,6 +7,17 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.16.0-alpha] - 2026-09-20
+
+- **Photo playback is its own screen now**, the way continuous playback already was. It used
+  to be a panel inside the main screen, which only hid the recording layer -- so the main
+  screen never paused and the cameras kept capturing at full rate behind a picture nobody
+  could see. Opening it now sends the main screen to the background, and unless something
+  else wants the cameras, they close.
+- Back now steps out one layer at a time there: out of multi-select, then out of the
+  single-lane view, then out of the screen. Before, back left the screen outright from
+  anywhere, which made a multi-selection look like it had been committed.
+
 ## [1.15.0-alpha] - 2026-09-20
 
 - **Records what actually happens to the app, in Diagnostics section 2.6.** Startup,
