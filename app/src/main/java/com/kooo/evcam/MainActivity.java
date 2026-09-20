@@ -278,6 +278,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.kooo.evcam.blackbox.BlackBox.attach(this, "Activity:MainActivity");
+        com.kooo.evcam.blackbox.BlackBox.note("主界面 onCreate savedState=" + (savedInstanceState != null));
         instance = this;  // 设置静态实例引用
         AppLog.init(this);
         // 回到主界面时是不是换了一个新实例、Holder 里还有没有旧的相机管理器 ——
@@ -718,7 +720,10 @@ public class MainActivity extends AppCompatActivity {
         // 长按是退出，和抽屉、设置左栏最底下的「退出应用」是同一件事。退出会停掉录制，
         // 放在长按上，碰一下不会误触（自定义布局的按钮在下面另接，那里仍是退出）
         if (btnMinimize != null) {
-            btnMinimize.setOnClickListener(v -> moveTaskToBack(true));
+            btnMinimize.setOnClickListener(v -> {
+                com.kooo.evcam.blackbox.BlackBox.note("用户点了最小化");
+                moveTaskToBack(true);
+            });
             btnMinimize.setOnLongClickListener(v -> {
                 exitApp();
                 return true;
@@ -3703,6 +3708,8 @@ public class MainActivity extends AppCompatActivity {
      */
     public void exitApp() {
         AppLog.d(TAG, "用户请求退出应用，停止所有服务...");
+        // 退出这条路到底走到哪一步、之后还有谁把我们拉起来 —— 靠这一行和后面的进程启动行对照
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("==== 用户退出应用 ====");
 
         // 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
         com.kooo.evcam.recording.RecordingIntent.current().reset();
@@ -4046,6 +4053,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+        // 界面是怎么离开的：关掉？只是切走？还是在重建？三种后果完全不同
+        com.kooo.evcam.blackbox.BlackBox.note("主界面 onStop finishing=" + isFinishing()
+                + " changingConfigurations=" + isChangingConfigurations()
+                + " recording=" + isRecording);
         AppLog.d(TAG, "onStop called, isRecording=" + isRecording);
         AppLog.i(TAG, "onStop " + instanceTag() + " surround: " + describeComposite());
         
@@ -4132,6 +4143,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面 onDestroy finishing=" + isFinishing()
+                + " changingConfigurations=" + isChangingConfigurations());
         AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
 

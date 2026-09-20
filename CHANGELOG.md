@@ -7,6 +7,18 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.15.0-alpha] - 2026-09-20
+
+- **Records what actually happens to the app, in Diagnostics section 2.6.** Startup,
+  keep-alive and exit have been rebuilt in layers, and whether any of it works cannot be read
+  off the code: the app can only ask -- start a service, hold a wake lock, register for a
+  broadcast -- and whether this head unit obeys, quietly ignores or refuses is something only
+  the car can say. So every request and its outcome are now written side by side, with three
+  clocks on each line: awake time, accumulated deep sleep, and the process id. A night parked
+  answers several questions at once -- how long the unit really slept, whether the process
+  survived, what restarted it if not, and which of the thirty keep-alive broadcasts ever
+  arrive. Nothing acts on any of it; it only records.
+
 ## [1.14.0-alpha] - 2026-09-20
 
 - **Watches the vehicle's ignition state**, as a second route to the question the shutdown

@@ -31,6 +31,9 @@ public class BootReceiver extends BroadcastReceiver {
 
         String action = intent.getAction();
         AppLog.d(TAG, "收到广播: " + action);
+        // 开机广播到底投不投递给 App Lab 里的应用 —— 这一行就是答案
+        com.kooo.evcam.blackbox.BlackBox.attach(context, "BootReceiver:" + action);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开机广播: " + action);
 
         // 监听开机完成广播
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) || 

@@ -122,12 +122,19 @@ public class RearViewMirrorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:RearViewMirrorService");
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("后台服务 RearViewMirrorService onCreate");
         appConfig = new AppConfig(this);
         instance = this;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
+        // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("RearViewMirrorService onStartCommand flags=" + flags
+                + (intent == null ? " intent=null(sticky重启)" : "")
+                + " startId=" + startId);
         if (!appConfig.isRearViewEnabled()) {
             stopSelf();
             return START_NOT_STICKY;
@@ -404,6 +411,7 @@ public class RearViewMirrorService extends Service {
 
     @Override
     public void onDestroy() {
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("RearViewMirrorService onDestroy");
         instance = null;
         cancelRetry();
         cancelWatchdog();

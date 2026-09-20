@@ -99,6 +99,7 @@ public class WakeUpHelper {
      */
     public static void acquirePersistentWakeLock(Context context) {
         AppLog.d(TAG, "Acquiring persistent wake lock (prevent sleep)...");
+        com.kooo.evcam.blackbox.BlackBox.note("请求持续唤醒锁");
 
         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         if (pm == null) {
@@ -131,6 +132,7 @@ public class WakeUpHelper {
         if (persistentWakeLock != null && persistentWakeLock.isHeld()) {
             try {
                 persistentWakeLock.release();
+                com.kooo.evcam.blackbox.BlackBox.note("释放持续唤醒锁");
                 AppLog.d(TAG, "Persistent WakeLock released - system can sleep now");
             } catch (Exception e) {
                 AppLog.e(TAG, "Failed to release persistent WakeLock", e);

@@ -63,6 +63,8 @@ public class CameraForegroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:CameraForegroundService");
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务 CameraForegroundService onCreate");
         AppLog.d(TAG, "Service created");
         createNotificationChannel();
         
@@ -72,6 +74,10 @@ public class CameraForegroundService extends Service {
         // 获取 WakeLock 防止系统休眠（车机必须）
         acquireWakeLock();
         
+        // 黑匣子心跳：每分钟一行。停车那一夜有没有真的睡过去、睡了多久，
+        // 全在这些行的 slept= 里；中间断掉的那一段就是「我们不在」
+        startBlackBoxHeartbeat();
+
         // 挂上车辆信号监听。放在前台服务里而不是界面里：要盯的是熄火那一刻，
         // 那时候界面多半已经不在了，而这个服务还在。只读，失败也不影响别的
         com.kooo.evcam.zeekr.VehicleSignalWatch.start(this);
@@ -180,6 +186,11 @@ public class CameraForegroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
+        // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("CameraForegroundService onStartCommand flags=" + flags
+                + (intent == null ? " intent=null(sticky重启)" : "")
+                + " startId=" + startId);
         AppLog.d(TAG, "Service started");
         
         // 每次启动时检查并注册 TIME_TICK
@@ -222,6 +233,46 @@ public class CameraForegroundService extends Service {
         return START_STICKY;
     }
     
+    /** 黑匣子心跳间隔。一分钟一行，一夜六十行，不多。 */
+    private static final long BLACK_BOX_TICK_MS = 60_000L;
+
+    private final android.os.Handler blackBoxHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable blackBoxTick = new Runnable() {
+        @Override
+        public void run() {
+            com.kooo.evcam.blackbox.BlackBox.note("心跳 recording=" + isRecordingNow()
+                    + " screenOn=" + isScreenOnNow());
+            com.kooo.evcam.blackbox.BlackBox.flushCountsIfDue();
+            blackBoxHandler.postDelayed(this, BLACK_BOX_TICK_MS);
+        }
+    };
+
+    private void startBlackBoxHeartbeat() {
+        blackBoxHandler.removeCallbacks(blackBoxTick);
+        blackBoxHandler.postDelayed(blackBoxTick, BLACK_BOX_TICK_MS);
+    }
+
+    private boolean isRecordingNow() {
+        try {
+            com.kooo.evcam.camera.MultiCameraManager manager =
+                    com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+            return manager != null && manager.isRecording();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private boolean isScreenOnNow() {
+        try {
+            android.os.PowerManager pm =
+                    (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            return pm == null || pm.isInteractive();
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
     /**
      * 确保远程服务和悬浮窗已启动
      * 用于处理 START_STICKY 自动重启的情况（此时 onCreate 不会被调用）
@@ -245,6 +296,8 @@ public class CameraForegroundService extends Service {
 
     @Override
     public void onDestroy() {
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("CameraForegroundService onDestroy");
+        blackBoxHandler.removeCallbacks(blackBoxTick);
         AppLog.d(TAG, "Service destroyed - 尝试重启...");
         isForegroundReady = false;
         stopCameraRepairLoop();
@@ -398,7 +451,11 @@ public class CameraForegroundService extends Service {
             try {
                 context.startForegroundService(intent);
                 AppLog.d(TAG, "Starting foreground service: " + title);
+                com.kooo.evcam.blackbox.BlackBox.note("startForegroundService 调用成功");
             } catch (Exception e) {
+                // Android 12 起，后台启前台服务会被拦 —— 拦不拦、什么条件下拦，看这一行
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("startForegroundService 被拒: " + e.getClass().getSimpleName()
+                        + " " + e.getMessage());
                 AppLog.e(TAG, "启动前台服务失败: " + e.getMessage(), e);
                 // 如果失败，尝试普通启动
                 try {

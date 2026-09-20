@@ -171,6 +171,8 @@ public class RecordingFloatingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:RecordingFloatingService");
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("后台服务 RecordingFloatingService onCreate");
         AppLog.d(TAG, "录制悬浮服务创建");
 
         mainHandler = new Handler(Looper.getMainLooper());
@@ -300,6 +302,11 @@ public class RecordingFloatingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
+        // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onStartCommand flags=" + flags
+                + (intent == null ? " intent=null(sticky重启)" : "")
+                + " startId=" + startId);
         if (intent != null) {
             String action = intent.getAction();
             if (ACTION_HIDE.equals(action)) {
@@ -330,6 +337,7 @@ public class RecordingFloatingService extends Service {
 
     @Override
     public void onDestroy() {
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onDestroy");
         super.onDestroy();
         hideFloatingWindow();
 

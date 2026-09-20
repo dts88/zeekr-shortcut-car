@@ -70,6 +70,7 @@ public final class DiagnosticsCollector {
         timings.run("vehicle signals", () -> appendSignalSources(sb, context));
         timings.run("shutdown probe", () -> appendShutdownProbe(sb, context));
         timings.run("vehicle watch", () -> appendVehicleWatch(sb, context));
+        timings.run("black box", () -> appendBlackBox(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("floating layout", () -> appendFloatingLayout(sb, context));
@@ -251,6 +252,22 @@ public final class DiagnosticsCollector {
         sb.append("## 2.5 车辆信号监听（点火 / 档位 / 手刹）").append('\n');
         try {
             sb.append(VehicleSignalWatch.describe());
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * 黑匣子：启动、保活、退出这一块到底发生了什么。
+     *
+     * <p>应用只能发出请求，至于这台车机是照做还是悄悄忽略，代码上看不出来 ——
+     * 这一节记的就是「请求」和「实际」成对的那份时间线。</p>
+     */
+    private static void appendBlackBox(StringBuilder sb, Context context) {
+        sb.append("## 2.6 黑匣子（进程 / 服务 / 界面的生死时间线）").append('\n');
+        try {
+            sb.append(com.kooo.evcam.blackbox.BlackBox.export(context, 48 * 1024));
         } catch (Exception e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }

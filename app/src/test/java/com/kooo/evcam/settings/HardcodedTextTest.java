@@ -56,7 +56,7 @@ public class HardcodedTextTest {
                 "zeekr/DiagnosticsCollector.java", "zeekr/VehicleSignalProbe.java",
                 "zeekr/VehicleEnumeration.java", "zeekr/PlaybackCapabilityProbe.java",
                 "zeekr/SnapshotDiff.java", "zeekr/ShutdownProbe.java",
-                "zeekr/VehicleSignalWatch.java", "zeekr/ZeekrCameraLocator.java", "zeekr/ZeekrMultiPlan.java",
+                "zeekr/VehicleSignalWatch.java", "blackbox/BlackBox.java", "zeekr/ZeekrCameraLocator.java", "zeekr/ZeekrMultiPlan.java",
                 "zeekr/ZeekrCompositeProfile.java", "zeekr/CompositeStreamGeometry.java",
                 "share/ShareDiagnostics.java",
                 "camera/PreviewFrameRates.java", "camera/FrameRateMeter.java",
