@@ -1771,6 +1771,21 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "超视模式切换: " + newEnabled);
     }
 
+    /**
+     * 录制这一项的登记跟着状态走。
+     *
+     * <p>「正要开始录」也算 —— 开机自启动那条路上，相机得先开着等录制起来，
+     * 这中间要是被判成「没人要」关掉了，录制就永远起不来。</p>
+     */
+    private void syncRecordingClaim() {
+        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+        if (isRecording || isRemoteRecording || isAutoRecordingPending) {
+            needs.claim(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
+        } else {
+            needs.release(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
+        }
+    }
+
     private boolean checkPermissions() {
         for (String permission : getRequiredPermissions()) {
             if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
@@ -3383,6 +3398,16 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             
+            // 以前这里直接关相机，不看后视镜也不看悬浮窗 —— 于是开着后视镜时
+            // 关掉两秒后又被它的看门狗打开，每次熄屏白做一遍。现在问同一张登记表
+            com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+            if (needs.heldByAnyoneExcept(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW)) {
+                AppLog.d(TAG, "息屏 15 秒，但相机还有人要: " + needs.describe() + "，不关");
+                appConfig.setUiLeftForScreenOff(true);
+                moveTaskToBack(true);
+                return;
+            }
+
             AppLog.d(TAG, "息屏已持续15秒，退到后台释放相机资源");
 
             // 留个记号：是我们自己因为熄屏退下去的。亮屏时据此把界面接回来 ——
@@ -3621,6 +3646,7 @@ public class MainActivity extends AppCompatActivity {
             isPreparingRecording = true;
             isAutoRecordingPending = false;
             com.kooo.evcam.recording.RecordingIntent.current().noteRecordingStarted();
+            syncRecordingClaim();
 
             // 橙色旋转圈；首次写入回调里换成绿色闪烁。
             // 计时器也在那时才启动 —— 从「真的录上了」开始计，而不是从「尝试录」开始
@@ -3646,6 +3672,7 @@ public class MainActivity extends AppCompatActivity {
             preparingHandler.removeCallbacks(preparingWatchdog);
             isRecording = false;
             isPreparingRecording = false;
+            syncRecordingClaim();
             setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
             if (!quietStop) {
@@ -4003,26 +4030,15 @@ public class MainActivity extends AppCompatActivity {
         // 通知悬浮窗：应用退到后台
         OverlayCoordinator.onAppBackground(this);
         
-        // 根据是否正在录制，决定如何处理摄像头
+        // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表
+        syncRecordingClaim();
+        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+        needs.release(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
         if (cameraManager != null) {
-            if (isRecording || isRemoteRecording) {
-                // 正在录制（手动或远程）：保持摄像头连接（有前台服务保护）
-                AppLog.d(TAG, "Recording in progress (manual=" + isRecording + ", remote=" + isRemoteRecording + "), keeping cameras connected");
-            } else if (isAutoRecordingPending) {
-                // 自动录制正在等待中：保持摄像头连接（开机自启动场景）
-                AppLog.d(TAG, "Auto recording pending, keeping cameras connected for startup recording");
-            } else if (BlindSpotService.hasActiveCameraWindows()) {
-                // 有悬浮窗（补盲/常驻/副屏）正在使用摄像头：保持连接
-                // 悬浮窗关闭时会自行释放摄像头（closeCamerasIfIdle）
-                AppLog.d(TAG, "Active camera windows exist, keeping cameras connected");
-            } else if (appConfig.isRearViewEnabled()) {
-                // 超级后视镜也在用这一路相机。不加这一条的话，退到后台时相机被关掉，
-                // 后视镜就冻在最后一帧上，切回前台也不会恢复 ——
-                // 前台只会为自己的预览重开相机，不认识这个它不知道的窗口。
-                AppLog.d(TAG, "超级后视镜正在显示，保持摄像头连接");
+            if (needs.heldByAnyone()) {
+                AppLog.d(TAG, "退到后台，相机留着 —— 还有人要: " + needs.describe());
             } else {
-                // 未录制且无悬浮窗：主动断开摄像头，释放资源
-                AppLog.d(TAG, "Not recording, closing all cameras to release resources");
+                AppLog.d(TAG, "退到后台，没人要相机，关掉");
                 cameraManager.closeAllCameras();
             }
         }
@@ -4088,6 +4104,10 @@ public class MainActivity extends AppCompatActivity {
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
         // 还是用户自己点回来的
         appConfig.setUiLeftForScreenOff(false);
+
+        // 预览又要用相机了
+        com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        syncRecordingClaim();
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();

@@ -184,7 +184,7 @@
 
         <activity
             android:name=".zeekr.TimelinePlayerActivity"
-            android:label="连续回放"
+            android:label="@string/nav_video_playback"
             android:theme="@style/Theme.Cam"
             android:screenOrientation="landscape"
             android:exported="false" />

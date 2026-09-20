@@ -7,6 +7,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.17.0-alpha] - 2026-09-20
+
+- **One register decides whether the cameras stay open.** Four places used to answer that
+  question with their own conditions, and two of them disagreed: with the super mirror on,
+  the screen-off routine closed the cameras after fifteen seconds and the mirror's watchdog
+  reopened them two seconds later, every time the screen went off, all night. Preview,
+  recording and the mirror now register while they need the cameras, the overlay windows are
+  asked directly since their own service already tracks them, and the cameras close only
+  when nobody holds a claim. Behaviour is otherwise unchanged -- what ends is the closing and
+  reopening.
+- The continuous playback screen's name comes from the string resources now, like every
+  other screen's.
+
 ## [1.16.0-alpha] - 2026-09-20
 
 - **Photo playback is its own screen now**, the way continuous playback already was. It used

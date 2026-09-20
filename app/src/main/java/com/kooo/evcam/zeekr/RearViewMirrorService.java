@@ -251,6 +251,8 @@ public class RearViewMirrorService extends Service {
             CameraForegroundService.whenReady(this, cam::openCamera);
         }
         retryCount = 0;
+        // 登记：这一路相机后视镜要用。没人登记时别处才会关它
+        com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.MIRROR);
         StallWatch.armMirror(true);
         AppLog.i(TAG, "后视镜已接到相机，预览尺寸 " + previewSize
                 + "，缓冲区 " + camera.getPreviewBufferSize());
@@ -397,6 +399,7 @@ public class RearViewMirrorService extends Service {
 
     private void unbindCamera() {
         cancelRetry();
+        com.kooo.evcam.camera.CameraNeeds.current().release(com.kooo.evcam.camera.CameraNeeds.Holder.MIRROR);
         StallWatch.armMirror(false);
         if (boundCamera != null) {
             try {
