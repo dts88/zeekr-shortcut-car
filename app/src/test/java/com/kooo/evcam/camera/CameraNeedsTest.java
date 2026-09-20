@@ -19,7 +19,7 @@ public class CameraNeedsTest {
     @Test
     public void nobodyWantsItToBeginWith() {
         assertFalse(needs.heldByAnyone());
-        assertEquals("没人要", needs.describe());
+        assertEquals("(none)", needs.describe());
     }
 
     @Test
