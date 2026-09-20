@@ -46,6 +46,12 @@ import java.util.stream.Stream;
  */
 public class HardcodedTextTest {
 
+    /**
+     * 例外：{@code AppLog.*} 和 {@code BlackBox.*} 里的中文不算。
+     *
+     * <p>两者都是只写进日志 / 诊断报告、永远不上界面的文字。把它们算进来的话，
+     * 每加一个埋点就得往下面的白名单里塞一个文件，而白名单一旦变长就不再说明任何事。</p>
+     */
     private static final Map<String, String> JAVA_ALLOWED = new LinkedHashMap<>();
     private static final Map<String, String> XML_ALLOWED = new LinkedHashMap<>();
 
@@ -216,7 +222,12 @@ public class HardcodedTextTest {
             if (line.startsWith("//") || line.startsWith("*")) {
                 continue;
             }
-            if (line.contains("AppLog.") || line.startsWith("Log.") || line.contains(" Log.")) {
+            // BlackBox 记的是进程、服务、界面的生死时间线，和日志一样<b>永远不上界面</b>，
+            // 只出现在诊断报告里 —— 所以和 AppLog 同等对待，不然每加一个埋点
+            // 就要往白名单里塞一个文件，白名单很快就会变得没有意义
+            if (line.contains("AppLog.") || line.startsWith("Log.") || line.contains(" Log.")
+                    || line.contains("BlackBox.note") || line.contains("BlackBox.noteImportant")
+                    || line.contains("BlackBox.attach") || line.contains("BlackBox.count")) {
                 inLog = !line.endsWith(";");
                 continue;
             }
