@@ -16,10 +16,16 @@ import java.util.Map;
 public class PhotoGroup {
 
     /** 摄像头位置常量 */
-    public static final String POSITION_FRONT = "front";
-    public static final String POSITION_BACK = "back";
-    public static final String POSITION_LEFT = "left";
-    public static final String POSITION_RIGHT = "right";
+    /**
+     * 这四个是<b>对外的槽位名</b>，见 {@link com.kooo.evcam.camera.CameraSlots}。
+     *
+     * <p>改名之前的文件写的是 front / back / left，解析时会被归一到这里，
+     * 所以新旧文件落进同一组，不会把一次拍摄拆成两份。</p>
+     */
+    public static final String POSITION_FRONT = com.kooo.evcam.camera.CameraSlots.SURROUND;
+    public static final String POSITION_BACK = com.kooo.evcam.camera.CameraSlots.CABIN_FRONT;
+    public static final String POSITION_LEFT = com.kooo.evcam.camera.CameraSlots.CABIN_REAR;
+    public static final String POSITION_RIGHT = com.kooo.evcam.camera.CameraSlots.KEY_FOURTH;
 
     /** 时间戳前缀，如 "20260131_1254" */
     private final String timestampPrefix;
@@ -69,7 +75,11 @@ public class PhotoGroup {
     }
 
     /**
-     * 从文件名提取摄像头位置
+     * 从文件名提取摄像头位置，并<b>归一到对外的槽位名</b>。
+     *
+     * <p>改名之前的文件写的是 front / back / left，这里把它们归一成
+     * surround / cabinfront / cabinrear —— 新旧文件因此落进同一组，
+     * 同一次拍摄不会被拆成两份。见 {@link com.kooo.evcam.camera.CameraSlots}。</p>
      */
     public static String extractPosition(String fileName) {
         String nameWithoutExt = fileName;
@@ -80,7 +90,8 @@ public class PhotoGroup {
 
         int lastUnderscore = nameWithoutExt.lastIndexOf('_');
         if (lastUnderscore > 0 && lastUnderscore < nameWithoutExt.length() - 1) {
-            return nameWithoutExt.substring(lastUnderscore + 1).toLowerCase();
+            return com.kooo.evcam.camera.CameraSlots.canonical(
+                    nameWithoutExt.substring(lastUnderscore + 1).toLowerCase(Locale.US));
         }
         return null;
     }

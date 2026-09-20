@@ -314,7 +314,13 @@ public final class Mp4RepairFlow {
         }
         int underscore = name.lastIndexOf('_');
         int dot = name.lastIndexOf('.');
-        return underscore >= 0 && dot > underscore ? name.substring(underscore + 1, dot) : "";
+        if (underscore < 0 || dot <= underscore) {
+            return "";
+        }
+        // 归一到对外的槽位名：改名那一版前后的文件是同一路相机，
+        // 不归一的话，新的坏文件会找不到旧的完好片段当参考
+        return com.kooo.evcam.camera.CameraSlots.canonical(
+                name.substring(underscore + 1, dot));
     }
 
     private static String size(long bytes) {

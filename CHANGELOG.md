@@ -7,6 +7,18 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.18.0-alpha] - 2026-09-20
+
+- **Recordings and photos are named after the camera they came from**: `surround`,
+  `cabinfront`, `cabinrear`. The old names were `front`, `back` and `left`, which read like
+  directions and are not: `front` is the whole surround composite -- a 2x2 picture that has
+  its own front, back, left and right inside it -- while `back` is the front cabin and `left`
+  is the rear one. Files written from now on carry the new names; **files already on the
+  drive keep working**, since both spellings resolve to the same camera and land in the same
+  group.
+- The boxes in photo playback are labelled with the camera's name rather than a direction,
+  for the same reason.
+
 ## [1.17.0-alpha] - 2026-09-20
 
 - **One register decides whether the cameras stay open.** Four places used to answer that

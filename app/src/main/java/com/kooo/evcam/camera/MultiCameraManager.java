@@ -1136,7 +1136,8 @@ public class MultiCameraManager {
                     " @ " + targetFrameRate + "fps, " + AppConfig.formatBitrate(bitrate));
             
             // 所有摄像头使用统一的时间戳：日期_时间_摄像头位置.mp4
-            String path = new File(saveDir, timestamp + "_" + key + ".mp4").getAbsolutePath();
+            String path = new File(saveDir, timestamp + "_"
+                    + CameraSlots.suffixFor(key) + ".mp4").getAbsolutePath();
             // 只准备 MediaRecorder，获取 Surface，使用预览的实际分辨率
             AppLog.d(TAG, "Preparing recording for " + key + " with size: " + previewSize.getWidth() + "x" + previewSize.getHeight());
             if (!recorder.prepareRecording(path, previewSize.getWidth(), previewSize.getHeight())) {
@@ -1585,7 +1586,8 @@ public class MultiCameraManager {
             });
 
             // 准备录制
-            String path = new File(saveDir, timestamp + "_" + key + ".mp4").getAbsolutePath();
+            String path = new File(saveDir, timestamp + "_"
+                    + CameraSlots.suffixFor(key) + ".mp4").getAbsolutePath();
             AppLog.d(TAG, "Preparing codec recording for " + key);
 
             android.graphics.SurfaceTexture surfaceTexture = codecRecorder.prepareRecording(path);
@@ -1824,7 +1826,8 @@ public class MultiCameraManager {
             CodecVideoRecorder codecRecorder = newCodecRecorder(key, camera, spec, appConfig);
 
             // 准备录制
-            String path = new File(saveDir, timestamp + "_" + key + ".mp4").getAbsolutePath();
+            String path = new File(saveDir, timestamp + "_"
+                    + CameraSlots.suffixFor(key) + ".mp4").getAbsolutePath();
             android.graphics.SurfaceTexture surfaceTexture = codecRecorder.prepareRecording(path);
             if (surfaceTexture == null) {
                 AppLog.e(TAG, "Failed to prepare codec recording for " + key);

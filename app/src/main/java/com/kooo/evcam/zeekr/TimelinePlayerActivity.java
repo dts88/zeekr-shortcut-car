@@ -68,7 +68,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      */
     private static final long SHOW_VIDEO_TIMEOUT_MS = 1500L;
     /** 连续回放只播环视合成流那一路；座舱各路不参与时间轴。 */
-    private static final String COMPOSITE_SLOT = "front";
+    private static final String COMPOSITE_SLOT =
+            com.kooo.evcam.camera.CameraSlots.SURROUND;
 
     private ManagedVideoPlayer player;
     private SeekBar seekBar;

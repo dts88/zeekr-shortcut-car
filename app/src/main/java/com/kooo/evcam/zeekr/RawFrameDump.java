@@ -60,7 +60,8 @@ public final class RawFrameDump {
             return;
         }
 
-        String name = timestamp + "_" + position + "_raw";
+        String name = timestamp + "_"
+                + com.kooo.evcam.camera.CameraSlots.suffixFor(position) + "_raw";
         File image = new File(dir, name + ".jpg");
         // 95 而不是平时的 90：这张图是拿去量几何的，压缩痕迹越少越好
         try (FileOutputStream output = new FileOutputStream(image)) {

@@ -339,7 +339,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             return;
         }
         label.setText(new com.kooo.evcam.AppConfig(PhotoPlaybackActivity.this)
-                .getCameraName(PhotoPlaybackActivity.this, position));
+                .getCameraName(PhotoPlaybackActivity.this,
+                        com.kooo.evcam.camera.CameraSlots.keyForSuffix(position)));
     }
 
     private void switchToSingleMode(String position, String label) {
@@ -405,13 +406,11 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      * 获取位置对应的标签
      */
     private String getPositionLabel(String position) {
-        switch (position) {
-            case PhotoGroup.POSITION_FRONT: return getString(R.string.zeekr_lane_front);
-            case PhotoGroup.POSITION_BACK: return getString(R.string.zeekr_lane_back);
-            case PhotoGroup.POSITION_LEFT: return getString(R.string.zeekr_lane_left);
-            case PhotoGroup.POSITION_RIGHT: return getString(R.string.zeekr_lane_right);
-            default: return "";
-        }
+        // 这里要的是<b>相机的名字</b>（环视 / 前座舱 / 后座舱），不是格子的方位。
+        // 以前用的是 zeekr_lane_* —— 那是环视那张 2×2 里四个格子的名字，
+        // 和「这是哪一路相机」是两回事，摆在框上会让人以为四个框就是前后左右
+        return new AppConfig(this).getCameraName(this,
+                com.kooo.evcam.camera.CameraSlots.keyForSuffix(position));
     }
 
     /**
@@ -556,7 +555,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      */
     private int gridColumns(String position) {
         try {
-            return RecordSpecs.forCameraKey(PhotoPlaybackActivity.this, position).grid ? 2 : 1;
+            // 配置那边按内部 key 存，这里拿到的是对外的名字，翻一下
+            return RecordSpecs.forCameraKey(PhotoPlaybackActivity.this,
+                    com.kooo.evcam.camera.CameraSlots.keyForSuffix(position)).grid ? 2 : 1;
         } catch (Exception e) {
             Log.w(TAG, "读不到 " + position + " 的排列，按不拆处理: " + e);
             return 1;

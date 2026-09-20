@@ -2537,7 +2537,8 @@ public class SingleCamera {
 
         // 使用传入的时间戳命名：yyyyMMdd_HHmmss_摄像头位置.jpg
         String position = (cameraPosition != null) ? cameraPosition : cameraId;
-        File photoFile = new File(photoDir, timestamp + "_" + position + ".jpg");
+        File photoFile = new File(photoDir,
+                timestamp + "_" + CameraSlots.suffixFor(position) + ".jpg");
 
         AppConfig appConfig = new AppConfig(context);
 

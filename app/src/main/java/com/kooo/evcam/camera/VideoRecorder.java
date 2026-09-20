@@ -465,7 +465,7 @@ public class VideoRecorder {
             timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
             AppLog.d(TAG, "Camera " + cameraId + " using local timestamp: " + timestamp);
         }
-        String fileName = timestamp + "_" + cameraPosition + ".mp4";
+        String fileName = timestamp + "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
         return new File(saveDirectory, fileName).getAbsolutePath();
     }
 

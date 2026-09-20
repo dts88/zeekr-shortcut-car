@@ -255,7 +255,12 @@ public final class RecordingTimeline {
      */
     public static boolean isSlot(String fileName, String slot) {
         String parsed = parseCameraSlot(fileName);
-        return parsed != null && parsed.equalsIgnoreCase(slot);
+        if (parsed == null || slot == null) {
+            return false;
+        }
+        // 两边都归一：改名之前录的 _front 和现在的 _surround 是同一路
+        return com.kooo.evcam.camera.CameraSlots.canonical(parsed.toLowerCase(Locale.US))
+                .equals(com.kooo.evcam.camera.CameraSlots.canonical(slot.toLowerCase(Locale.US)));
     }
 
     /**
