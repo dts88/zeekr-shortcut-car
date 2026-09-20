@@ -30,6 +30,25 @@ R_IMPORT = 'import com.kooo.evcam.R;'
 PACKAGE = re.compile(r'package\s+([\w.]+);')
 STRING_LITERAL = re.compile(r'"(?:[^"\\\n]|\\.)*"')
 
+# 带限定的 this（{@code Outer.this}）前面不能再挂东西：{@code v.Outer.this} 不是
+# 任何合法写法。批量把 getContext() 换成 Outer.this 时很容易漏掉「前面还有个变量」
+# 的那一处，而括号是配对的、语法也挑不出毛病，只有编译器会说 "package v does not exist"。
+BAD_QUALIFIED_THIS = re.compile(r'\b[A-Za-z_]\w*\.[A-Z]\w*\.this\b')
+
+
+def check_qualified_this(src):
+    """{@code x.Outer.this} 这种残骸，返回问题列表。"""
+    problems = []
+    for number, raw_line in enumerate(src.split('\n'), start=1):
+        line = raw_line.strip()
+        if line.startswith('//') or line.startswith('*'):
+            continue
+        hit = BAD_QUALIFIED_THIS.search(STRING_LITERAL.sub('""', raw_line))
+        if hit:
+            problems.append('第 %d 行：%s 前面不该有东西（Outer.this 不能再加前缀）'
+                            % (number, hit.group(0)))
+    return problems
+
 
 def check_r_import(path, src):
     """子包里用了 R 却没 import 的，返回一条问题；同包（com.kooo.evcam）不需要。"""
@@ -51,6 +70,7 @@ def check(path):
         src = handle.read()
 
     problems = check_r_import(path, src)
+    problems.extend(check_qualified_this(src))
     stack = []          # (字符, 行号)
     line = 1
     i = 0

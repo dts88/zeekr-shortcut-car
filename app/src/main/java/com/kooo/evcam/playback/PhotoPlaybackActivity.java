@@ -208,7 +208,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         // 鱼眼校正开关。改的是「怎么画」，所以只要把当前这一组重新贴一遍
         btnFisheye.setOnClickListener(v -> {
             fisheyeOn = !fisheyeOn;
-            new AppConfig(v.PhotoPlaybackActivity.this).setPhotoFisheyeCorrection(fisheyeOn);
+            new AppConfig(PhotoPlaybackActivity.this).setPhotoFisheyeCorrection(fisheyeOn);
             updateFisheyeButton();
             if (currentGroup != null) {
                 loadPhotoGroup(currentGroup);
