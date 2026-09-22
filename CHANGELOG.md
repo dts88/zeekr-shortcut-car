@@ -7,6 +7,38 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.19.0-beta] - 2026-09-22
+
+Everything from the alphas since 1.9.0-beta, gathered into one beta.
+
+- **Clips that lost power mid-recording can be repaired.** A segment cut short is not
+  damaged -- every frame is on the disk -- but the index is only written when recording stops
+  normally, so no player will open it. Developer options can rebuild that index in place,
+  using a healthy clip of the same camera, and rolls the file back untouched if the result
+  does not read.
+- **A camera that goes quiet is reopened.** The existing recovery was driven by camera
+  callbacks and went deaf exactly when the camera stopped reporting -- the case where the
+  mirror froze, the preview went blank and recording would not start until the app was
+  restarted. A watchdog outside that path now watches only whether frames arrive. When the
+  camera cannot be opened at all, it says so instead of retrying forever, and tells you when
+  restarting the head unit is what clears it.
+- **The super mirror no longer shows a stale picture as if it were live**: after a few
+  seconds without a new frame it dims and offers a tap to reconnect. Pushed to the edge it
+  stops streaming altogether and shows its name down the strip.
+- **Recording no longer starts on its own.** Opening playback and coming back, rebuilding the
+  screen, or half a minute passing could each start a recording you had stopped. "Start
+  recording automatically" now means what it says: once at startup, and afterwards only
+  picking up a recording that stopped by itself.
+- **Photo playback is its own screen**, so opening it lets the cameras close instead of
+  leaving them capturing behind a picture. Back steps out one layer at a time.
+- **Recordings and photos are named after their camera** -- `surround`, `cabinfront`,
+  `cabinrear` -- rather than `front`, `back` and `left`, which read like directions and are
+  not. Files already on the drive keep working.
+- The app comes back to the front when the screen does, the cameras' open state is decided
+  in one place rather than four, and diagnostics now records what the head unit actually
+  does with the app's lifecycle requests -- useful if you are reporting a problem.
+- Malay joins the interface languages, and the app name drops "car version" on the device.
+
 ## [1.18.0-alpha] - 2026-09-20
 
 - **Recordings and photos are named after the camera they came from**: `surround`,
