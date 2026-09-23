@@ -160,13 +160,13 @@ public class CameraForegroundService extends Service {
     private void acquireWakeLock() {
         try {
             AppConfig appConfig = new AppConfig(this);
-            if (appConfig.isAutoStartOnBoot()) {
+            if (appConfig.isPersistentWakeLockEnabled()) {
                 WakeUpHelper.acquirePersistentWakeLock(this);
-                AppLog.d(TAG, "WakeLock acquired (开机自启动已开启)");
+                AppLog.d(TAG, "WakeLock acquired (常驻唤醒锁已开启)");
             } else {
-                // 如果开机自启动关闭，释放可能存在的 WakeLock
+                // 关着就把可能还持有的那一把放掉 —— 拿着它车机永远不深睡
                 WakeUpHelper.releasePersistentWakeLock();
-                AppLog.d(TAG, "WakeLock not acquired (开机自启动未开启)");
+                AppLog.d(TAG, "WakeLock not acquired (常驻唤醒锁未开启)");
             }
         } catch (Exception e) {
             AppLog.e(TAG, "Failed to handle WakeLock: " + e.getMessage(), e);

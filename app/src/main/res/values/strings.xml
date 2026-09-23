@@ -106,6 +106,8 @@
     <string name="set_recording_mode_title">录制模式</string>
     <string name="set_force_h264_title">强制 H.264</string>
     <string name="set_force_h264_summary">所有相机一律用 H.264，盖过配置编辑里各路的编码选择</string>
+    <string name="set_persistent_wake_lock_title">常驻唤醒锁</string>
+    <string name="set_persistent_wake_lock_summary">拿着它车机就不会深睡。实测停着的时候车机本来有八成时间在深睡，开了就一直醒着耗电瓶</string>
     <string name="set_image_adjust_title">亮度 / 降噪调节</string>
     <string name="set_image_adjust_summary">打开调节窗口，实时调整画面参数</string>
     <string name="set_image_adjust_reset_title">恢复亮度 / 降噪默认值</string>

@@ -352,14 +352,16 @@ public class MainActivity extends AppCompatActivity {
         KeepAliveManager.startKeepAliveWork(this);
         AppLog.d(TAG, "定时保活任务已启动");
         
-        // 防止休眠（仅当开启"开机自启动"时）
-        // WakeLock 主要在 CameraForegroundService 中维护
-        // 这里作为备份，确保 Activity 存在时也有 WakeLock
-        if (appConfig.isAutoStartOnBoot()) {
+        // 常驻唤醒锁：开发者选项里那一项，默认关。主要在 CameraForegroundService
+        // 里维护，这里是备份，保证界面在时也有一把。
+        //
+        // 它原来挂在「开机自启动」上：那个开关只说开机要不要自己起来，
+        // 却顺带让车机永不深睡（实测 26 小时里本该睡 20.8 小时）。两件事拆开了
+        if (appConfig.isPersistentWakeLockEnabled()) {
             WakeUpHelper.acquirePersistentWakeLock(this);
-            AppLog.d(TAG, "WakeLock 已获取（开机自启动已开启）");
+            AppLog.d(TAG, "WakeLock 已获取（常驻唤醒锁已开启）");
         } else {
-            AppLog.d(TAG, "WakeLock 未获取（开机自启动未开启）");
+            AppLog.d(TAG, "WakeLock 未获取（常驻唤醒锁未开启）");
         }
         
         // 启动存储清理任务（如果用户设置了限制）

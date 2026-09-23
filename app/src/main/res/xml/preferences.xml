@@ -325,6 +325,11 @@
             android:title="@string/set_force_h264_title"
             android:summary="@string/set_force_h264_summary" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_persistent_wake_lock"
+            android:title="@string/set_persistent_wake_lock_title"
+            android:summary="@string/set_persistent_wake_lock_summary" />
+
         <Preference
             android:key="pref_image_adjust"
             android:title="@string/set_image_adjust_title"

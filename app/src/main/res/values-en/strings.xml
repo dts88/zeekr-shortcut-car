@@ -88,6 +88,8 @@
     <string name="set_recording_mode_title">Recording pipeline</string>
     <string name="set_force_h264_title">Force H.264</string>
     <string name="set_force_h264_summary">Overrides the codec set for each camera</string>
+    <string name="set_persistent_wake_lock_title">Persistent wake lock</string>
+    <string name="set_persistent_wake_lock_summary">Keeps the head unit from deep sleep. Parked, it sleeps about four fifths of the time; with this on it stays awake on the battery</string>
     <string name="set_image_adjust_title">Brightness / noise reduction</string>
     <string name="set_image_adjust_summary">Adjust the picture live in a floating window</string>
     <string name="set_image_adjust_reset_title">Reset brightness / noise reduction</string>

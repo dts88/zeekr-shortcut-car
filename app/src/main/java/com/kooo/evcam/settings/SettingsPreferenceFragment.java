@@ -846,6 +846,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_recording_mode", SettingsRegistry.RECORDING_MODE,
                 appConfig.getRecordingMode(), value -> appConfig.setRecordingMode(value));
 
+        bindSwitch("pref_persistent_wake_lock", appConfig.isPersistentWakeLockEnabled(),
+                value -> appConfig.setPersistentWakeLockEnabled(value));
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
 

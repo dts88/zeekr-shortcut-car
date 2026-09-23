@@ -88,6 +88,8 @@
     <string name="set_recording_mode_title">Saluran rakaman</string>
     <string name="set_force_h264_title">Paksa H.264</string>
     <string name="set_force_h264_summary">Mengatasi kodek yang ditetapkan bagi setiap kamera</string>
+    <string name="set_persistent_wake_lock_title">Kunci jaga berterusan</string>
+    <string name="set_persistent_wake_lock_summary">Menghalang unit kepala daripada tidur dalam. Semasa diletakkan ia tidur kira-kira empat perlima masa; dengan ini dibuka ia terus berjaga menggunakan bateri</string>
     <string name="set_image_adjust_title">Kecerahan / pengurangan hingar</string>
     <string name="set_image_adjust_summary">Laraskan gambar secara langsung dalam tetingkap terapung</string>
     <string name="set_image_adjust_reset_title">Set semula kecerahan / pengurangan hingar</string>

@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.26.0-alpha] - 2026-09-23
+
+- **Boot autostart no longer means "the head unit never sleeps".** The persistent wake lock
+  was held whenever that switch was on, which is a second thing the switch never said it
+  did -- and the expensive one: parked, the head unit spends about four fifths of its time
+  in deep sleep, and the lock replaces all of it with time awake on the 12V battery. The
+  lock is now its own switch under Developer options, off by default, and boot autostart
+  means only what its name says.
+- Waking from sleep is written down as a usable trigger in the platform notes. Nothing runs
+  during deep sleep, but the moment the head unit wakes, the gap between elapsed real time
+  and uptime says exactly how long it slept -- enough to rebuild a camera session that
+  predates the sleep on purpose, instead of waiting for a watchdog to notice the frames
+  stopped.
+
 ## [1.25.0-alpha] - 2026-09-23
 
 - **"Prevent deep sleep" is gone from Settings.** What it would have prevented, measured

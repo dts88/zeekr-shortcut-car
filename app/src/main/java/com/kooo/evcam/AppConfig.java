@@ -24,6 +24,7 @@ public class AppConfig {
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
+    private static final String KEY_PERSISTENT_WAKE_LOCK = "persistent_wake_lock";  // 常驻唤醒锁（开发者选项）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
@@ -488,6 +489,26 @@ public class AppConfig {
      * 获取开机自启动设置
      * @return true 表示启用开机自启动
      */
+    /**
+     * 常驻唤醒锁：拿着它车机就不会深睡。<b>开发者选项，默认关。</b>
+     *
+     * <p>它原来挂在「开机自启动」上 —— 那个开关的名字只说开机要不要自己起来，
+     * 没说「车机从此不再深睡」。实测车机 26 小时里有 20.8 小时在深睡，全是停着的时候；
+     * 锁一拿，那 20.8 小时就变成醒着，停在那儿耗 12V 电瓶。两件事捆在一个开关上，
+     * 打开的人不会知道自己同时买了哪一件。</p>
+     *
+     * <p>拆开之后「开机自启动」只管开机自启动。这一项单独放在开发者选项里，
+     * 等真需要时再说。数据见 {@code docs/zeekr-platform-notes.md} §3.6。</p>
+     */
+    public boolean isPersistentWakeLockEnabled() {
+        return prefs.getBoolean(KEY_PERSISTENT_WAKE_LOCK, false);
+    }
+
+    public void setPersistentWakeLockEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_PERSISTENT_WAKE_LOCK, enabled).apply();
+        AppLog.d(TAG, "常驻唤醒锁: " + (enabled ? "开" : "关"));
+    }
+
     public boolean isAutoStartOnBoot() {
         // 默认启用开机自启动（车机系统场景）
         // 默认关：开机就自己起来是件挺重的事，该由用户明确开启
