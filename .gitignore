@@ -17,3 +17,9 @@ docs/local/
 
 # 设计稿只留在本地，不入库
 design/
+
+# 设计画布同样只在本地，不入库
+design-canvas/
+
+# 本地跑过 tools/ 里的脚本留下的
+__pycache__/

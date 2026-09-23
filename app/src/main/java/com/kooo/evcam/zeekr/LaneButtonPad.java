@@ -34,18 +34,32 @@ public final class LaneButtonPad {
     /** 四个按钮。编号和 {@link LaneCycle} 一致：0 前、1 后、2 左、3 右。 */
     public static final int COUNT = 4;
 
-    /** 单个按钮的宽。 */
-    private static final float BUTTON_WIDTH_DP = 52f;
-    /** 单个按钮的高。48dp 是安卓建议的最小触摸目标，不低于它。 */
-    private static final float BUTTON_HEIGHT_DP = 48f;
+    /**
+     * 单个按钮的宽。
+     *
+     * <p>实车上按着偏小，整体放大到原来的一倍半（52 → 78）。开车时按键按的是
+     * 余光加肌肉记忆，48dp 那个下限是照着「手机、看着按」定的，在车里不够用。</p>
+     */
+    private static final float BUTTON_WIDTH_DP = 78f;
+    /** 单个按钮的高。同样一倍半（48 → 72），远在安卓建议的 48dp 下限之上。 */
+    private static final float BUTTON_HEIGHT_DP = 72f;
     /** 按钮之间的间隙 —— 挨着放会误触到隔壁。 */
     private static final float GAP_DP = 8f;
     /** 这一组到窗口左右边的最小留白。 */
     private static final float SIDE_MARGIN_DP = 10f;
     /** 这一组的上沿落在窗口高度的哪个位置：居中偏上。 */
     private static final float TOP_FRACTION = 0.18f;
-    /** 圆角。 */
-    private static final float CORNER_DP = 8f;
+    /**
+     * 在那个锚点之上再提多少个按钮的高度。
+     *
+     * <p>按钮放大之后这一组整体长高了，还按原来的锚点摆，下面那一排就压到画面正中 ——
+     * 而正中间恰恰是最该看清的地方。提一个按钮的高度，位置回到画面上部。</p>
+     */
+    private static final float RAISE_BY_BUTTONS = 1f;
+    /** 提到顶也要留的一道边，免得按钮贴着窗口上沿。 */
+    private static final float TOP_MARGIN_DP = 12f;
+    /** 圆角。按钮大了，圆角跟着走，不然看着像方板。 */
+    private static final float CORNER_DP = 12f;
 
     private LaneButtonPad() {
     }
@@ -84,6 +98,18 @@ public final class LaneButtonPad {
     }
 
     /**
+     * 这一组的上沿在哪。
+     *
+     * <p>{@link #TOP_FRACTION} 是锚点，再往上提 {@link #RAISE_BY_BUTTONS} 个按钮的高度。
+     * 窗口矮的时候会提到框外去，所以留一道 {@link #TOP_MARGIN_DP} 把它按住 ——
+     * 「看得见但点不着」和「画在框外」是同一类毛病，只有缩到极限时才露面。</p>
+     */
+    public static float padTop(int viewHeight, float density) {
+        float raised = viewHeight * TOP_FRACTION - RAISE_BY_BUTTONS * buttonHeight(density);
+        return Math.max(TOP_MARGIN_DP * density, raised);
+    }
+
+    /**
      * 第 {@code index} 个按钮在窗口里的位置。
      *
      * @return {@code {left, top, right, bottom}}，窗口自己的坐标系
@@ -93,7 +119,7 @@ public final class LaneButtonPad {
         float buttonH = buttonHeight(density);
         float gap = GAP_DP * density;
         float padLeft = (viewWidth - padWidth(density)) / 2f;
-        float padTop = viewHeight * TOP_FRACTION;
+        float padTopPx = padTop(viewHeight, density);
         float column = buttonW + gap;
 
         float left;
@@ -101,19 +127,19 @@ public final class LaneButtonPad {
         switch (index) {
             case LaneCycle.REAR:                    // 中间一列，下面那格
                 left = padLeft + column;
-                top = padTop + buttonH + gap;
+                top = padTopPx + buttonH + gap;
                 break;
             case LaneCycle.LEFT:                    // 左边一列，竖直居中
                 left = padLeft;
-                top = padTop + (buttonH + gap) / 2f;
+                top = padTopPx + (buttonH + gap) / 2f;
                 break;
             case LaneCycle.RIGHT:                   // 右边一列，竖直居中
                 left = padLeft + 2 * column;
-                top = padTop + (buttonH + gap) / 2f;
+                top = padTopPx + (buttonH + gap) / 2f;
                 break;
             default:                                // 前：中间一列，上面那格
                 left = padLeft + column;
-                top = padTop;
+                top = padTopPx;
                 break;
         }
         return new float[]{left, top, left + buttonW, top + buttonH};

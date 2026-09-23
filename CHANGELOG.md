@@ -7,6 +7,25 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.22.0-alpha] - 2026-09-23
+
+- **The super mirror's buttons are half again as large** and the group sits one button
+  higher. A button you press while driving is pressed from the corner of your eye, and the
+  48dp minimum is a phone number, not a car one. The window's minimum size in this mode
+  grows with them.
+- **Fixed: the boxes in photo playback were in the wrong places.** Three nested layouts
+  were each forcing a 16:10 shape on the same content, so no box ended up the size or the
+  position it was given. Shape is the picture's business now; the boxes only do layout, and
+  they match the preview frame for frame.
+- **Fixed: a camera with no picture for that moment still took up a box.** This was claimed
+  in 1.20.0 but only the layout comment said so -- the code kept the box and wrote "no
+  picture" in it. Now the box goes, and with both cabin boxes gone the surround view takes
+  the whole area.
+- **Fixed: tapping a lane of a surround photo did not enlarge it.** The picture only moved.
+  The viewport was handing an ImageView matrix source coordinates measured in the view,
+  while that matrix maps the picture's own pixels -- the two are now separate calls, and
+  mixing them again trips a test.
+
 ## [1.21.0-alpha] - 2026-09-23
 
 - **Button mode for the super mirror**, off by default, under Settings -> Super mirror. It

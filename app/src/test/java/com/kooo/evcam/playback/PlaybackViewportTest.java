@@ -43,6 +43,63 @@ public class PlaybackViewportTest {
         assertEquals(PlaybackViewport.NO_CELL, PlaybackViewport.cellAt(10, 10, 0, 0));
         assertNull(PlaybackViewport.transformRects(PlaybackViewport.NO_CELL, 0, 0, VIEW_W, VIEW_H));
         assertNull(PlaybackViewport.transformRects(PlaybackViewport.NO_CELL, VIDEO, VIDEO, 0, 0));
+        assertNull(PlaybackViewport.imageRects(PlaybackViewport.NO_CELL, 0, 0, VIEW_W, VIEW_H));
+        assertNull(PlaybackViewport.imageRects(PlaybackViewport.NO_CELL, VIDEO, VIDEO, 0, 0));
+    }
+
+    /**
+     * 照片这边的源矩形用<b>图片像素</b>，不是视图坐标。
+     *
+     * <p>这一条就是那个 bug 的形状：把视图坐标当图片坐标喂给 ImageView 的矩阵，
+     * 画面只是挪了挪位置，该放大的一点没大。</p>
+     */
+    @Test
+    public void imageRectsSourceTheImagesOwnPixels() {
+        float[] r = PlaybackViewport.imageRects(3, VIDEO, VIDEO, VIEW_W, VIEW_H);
+        assertEquals("右下那一格从图片正中间开始", VIDEO / 2f, r[0], TOLERANCE);
+        assertEquals(VIDEO / 2f, r[1], TOLERANCE);
+        assertEquals("一直到图片的右下角", VIDEO, r[2], TOLERANCE);
+        assertEquals(VIDEO, r[3], TOLERANCE);
+    }
+
+    /** 放大一格，画面得真的大一倍 —— 2×2 里的一格占的边长正好是整张的一半。 */
+    @Test
+    public void zoomingAnImageCellActuallyEnlargesIt() {
+        float[] whole = PlaybackViewport.imageRects(
+                PlaybackViewport.NO_CELL, VIDEO, VIDEO, VIEW_W, VIEW_H);
+        float wholeScale = (whole[6] - whole[4]) / (whole[2] - whole[0]);
+        for (int cell = 0; cell < PlaybackViewport.CELL_COUNT; cell++) {
+            float[] zoomed = PlaybackViewport.imageRects(cell, VIDEO, VIDEO, VIEW_W, VIEW_H);
+            float scale = (zoomed[6] - zoomed[4]) / (zoomed[2] - zoomed[0]);
+            assertEquals("第 " + cell + " 格应当正好放大一倍", wholeScale * 2f, scale, TOLERANCE);
+        }
+    }
+
+    /** 放大前后占的那块屏幕是同一块，画面不会跳到别处去。 */
+    @Test
+    public void zoomingAnImageKeepsTheSameDestination() {
+        float[] whole = PlaybackViewport.imageRects(
+                PlaybackViewport.NO_CELL, VIDEO, VIDEO, VIEW_W, VIEW_H);
+        for (int cell = 0; cell < PlaybackViewport.CELL_COUNT; cell++) {
+            float[] zoomed = PlaybackViewport.imageRects(cell, VIDEO, VIDEO, VIEW_W, VIEW_H);
+            for (int i = 4; i < 8; i++) {
+                assertEquals("目标矩形不该动", whole[i], zoomed[i], TOLERANCE);
+            }
+        }
+    }
+
+    /**
+     * 两套取景的源在不同的坐标系里，不能互相替用。
+     *
+     * <p>写成测试是因为它们长得太像：同样的参数、同样的返回，
+     * 只有源的单位不一样 —— 混用了编译器不会说话，屏幕上也只是「有点不对」。</p>
+     */
+    @Test
+    public void theTwoViewportsDoNotShareACoordinateSpace() {
+        float[] forTexture = PlaybackViewport.transformRects(3, VIDEO, VIDEO, VIEW_W, VIEW_H);
+        float[] forImage = PlaybackViewport.imageRects(3, VIDEO, VIDEO, VIEW_W, VIEW_H);
+        assertNotEquals("TextureView 那套的源是视图坐标", forImage[0], forTexture[0], TOLERANCE);
+        assertEquals("视图坐标里右下格从视图中线起", VIEW_W / 2f, forTexture[0], TOLERANCE);
     }
 
     /** 方形视频放进宽视图，应当留左右黑边而不是横向拉伸。 */

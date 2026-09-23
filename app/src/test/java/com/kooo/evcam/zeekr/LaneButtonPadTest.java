@@ -71,6 +71,40 @@ public class LaneButtonPadTest {
         assertTrue("中间和右要有缝", right[0] > front[2]);
     }
 
+    /**
+     * 按钮得够大。
+     *
+     * <p>下限写成 70/64 而不是钉死 78/72：这是「在车里按得着」的门槛，
+     * 往上调不该惊动测试，往下掉回原来那个尺寸才该。</p>
+     */
+    @Test
+    public void theButtonsAreBigEnoughToHitInACar() {
+        assertTrue("宽不该小于 70dp", LaneButtonPad.buttonWidth(1f) >= 70f);
+        assertTrue("高不该小于 64dp", LaneButtonPad.buttonHeight(1f) >= 64f);
+    }
+
+    /** 整组比锚点再高一个按钮 —— 放大之后压到画面正中，挡的正是最该看的地方。 */
+    @Test
+    public void thePadIsRaisedByOneButton() {
+        int tall = 1600;
+        float[] front = LaneButtonPad.rectFor(LaneCycle.FRONT, WIDTH, tall, DENSITY);
+        assertEquals("上沿就是 padTop 算出来的那个数", LaneButtonPad.padTop(tall, DENSITY),
+                front[1], TOLERANCE);
+        assertEquals("正好比 0.18 那个锚点高出一个按钮",
+                tall * 0.18f - LaneButtonPad.buttonHeight(DENSITY), front[1], TOLERANCE);
+    }
+
+    /** 窗口矮的时候提到顶就停住：宁可离锚点近一点，也不能把按钮推出框外。 */
+    @Test
+    public void raisingStopsAtTheTopEdge() {
+        int shortWindow = 200;
+        float top = LaneButtonPad.padTop(shortWindow, DENSITY);
+        assertTrue("不能提成负的", top > 0f);
+        assertEquals(top,
+                LaneButtonPad.rectFor(LaneCycle.FRONT, WIDTH, shortWindow, DENSITY)[1],
+                TOLERANCE);
+    }
+
     /** 居中偏上，不是正中间 —— 正中间会挡住最该看的那部分画面。 */
     @Test
     public void thePadSitsAboveTheMiddle() {

@@ -556,7 +556,7 @@ public class RearViewMirrorView extends ViewGroup {
         float corner = LaneButtonPad.corner(density);
         int active = LaneButtonPad.indexForLane(laneIndex);
         labelPaint.setTextAlign(Paint.Align.CENTER);
-        labelPaint.setTextSize(LaneButtonPad.buttonHeight(density) * 0.42f);
+        labelPaint.setTextSize(buttonTextSize(density));
         Paint.FontMetrics fm = labelPaint.getFontMetrics();
 
         for (int i = 0; i < LaneButtonPad.COUNT; i++) {
@@ -574,6 +574,25 @@ public class RearViewMirrorView extends ViewGroup {
                     (r[0] + r[2]) / 2f,
                     (r[1] + r[3]) / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
         }
+    }
+
+    /**
+     * 四个按钮上的字用多大。
+     *
+     * <p>先按按钮高度取一个字号，再拿<b>最长的那一个</b>去比按钮的宽：
+     * 中文是一个字，英文是「Front」五个字母，同一个字号下宽度差着三倍。
+     * 收就四个一起收 —— 一个键的字比旁边小一号，比四个都小一号更显眼。</p>
+     */
+    private float buttonTextSize(float density) {
+        float size = LaneButtonPad.buttonHeight(density) * 0.42f;
+        float room = LaneButtonPad.buttonWidth(density) * 0.82f;
+        labelPaint.setTextSize(size);
+        float widest = 0f;
+        for (int i = 0; i < LaneButtonPad.COUNT; i++) {
+            widest = Math.max(widest,
+                    labelPaint.measureText(getContext().getString(laneLabelRes(i))));
+        }
+        return widest > room ? size * room / widest : size;
     }
 
     private static int laneLabelRes(int index) {

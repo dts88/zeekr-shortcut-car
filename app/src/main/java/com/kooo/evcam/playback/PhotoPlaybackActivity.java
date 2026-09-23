@@ -86,6 +86,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private View multiViewLayout, singleViewLayout;
     private ImageView imageFront, imageBack, imageLeft, imageRight, imageSingle;
     private FrameLayout frameFront, frameBack, frameLeft, frameRight;
+    /** 两路座舱那一列。两格都没有文件时整列让开，环视独占整块。 */
+    private View cabinColumn;
     private TextView labelFront, labelBack, labelLeft, labelRight, labelSingle;
     private TextView placeholderFront, placeholderBack, placeholderLeft, placeholderRight;
     private Button btnViewMode;
@@ -162,6 +164,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         frameBack = findViewById(R.id.frame_back);
         frameLeft = findViewById(R.id.frame_left);
         frameRight = findViewById(R.id.frame_right);
+        cabinColumn = findViewById(R.id.cabin_column);
 
         labelFront = findViewById(R.id.label_front);
         labelBack = findViewById(R.id.label_back);
@@ -478,7 +481,14 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     /**
-     * 更新图片显示
+     * 按这一组有哪些文件，决定每一格显示什么。
+     *
+     * <p><b>没有文件的那一格整个收起来</b>，不留空框：这一组是按时间戳凑出来的，
+     * 只拍到环视的那一次，座舱两格不该占着版面说一句「无图片」——
+     * 那是在为不存在的文件留位置。两格都没有时整列让开，环视独占整块。</p>
+     *
+     * <p>环视那一格例外，一直留着：它是这个界面的主画面，
+     * 真要是连它都没有，总得有个地方把这件事说出来。</p>
      */
     private void updatePhotoDisplay(PhotoGroup group) {
         boolean hasFront = group.hasPhoto(PhotoGroup.POSITION_FRONT);
@@ -486,25 +496,41 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         boolean hasLeft = group.hasPhoto(PhotoGroup.POSITION_LEFT);
         boolean hasRight = group.hasPhoto(PhotoGroup.POSITION_RIGHT);
 
-        // 前置
         imageFront.setVisibility(hasFront ? View.VISIBLE : View.GONE);
         placeholderFront.setVisibility(hasFront ? View.GONE : View.VISIBLE);
-        if (hasFront) loadImage(group.getFrontPhoto(), imageFront, PhotoGroup.POSITION_FRONT);
+        if (hasFront) {
+            loadImage(group.getFrontPhoto(), imageFront, PhotoGroup.POSITION_FRONT);
+        }
 
-        // 后置
-        imageBack.setVisibility(hasBack ? View.VISIBLE : View.GONE);
-        placeholderBack.setVisibility(hasBack ? View.GONE : View.VISIBLE);
-        if (hasBack) loadImage(group.getBackPhoto(), imageBack, PhotoGroup.POSITION_BACK);
+        showLane(frameBack, imageBack, placeholderBack, hasBack,
+                group.getBackPhoto(), PhotoGroup.POSITION_BACK);
+        showLane(frameLeft, imageLeft, placeholderLeft, hasLeft,
+                group.getLeftPhoto(), PhotoGroup.POSITION_LEFT);
+        showLane(frameRight, imageRight, placeholderRight, hasRight,
+                group.getRightPhoto(), PhotoGroup.POSITION_RIGHT);
 
-        // 左侧
-        imageLeft.setVisibility(hasLeft ? View.VISIBLE : View.GONE);
-        placeholderLeft.setVisibility(hasLeft ? View.GONE : View.VISIBLE);
-        if (hasLeft) loadImage(group.getLeftPhoto(), imageLeft, PhotoGroup.POSITION_LEFT);
+        if (cabinColumn != null) {
+            cabinColumn.setVisibility(hasBack || hasLeft || hasRight
+                    ? View.VISIBLE : View.GONE);
+        }
+    }
 
-        // 右侧
-        imageRight.setVisibility(hasRight ? View.VISIBLE : View.GONE);
-        placeholderRight.setVisibility(hasRight ? View.GONE : View.VISIBLE);
-        if (hasRight) loadImage(group.getRightPhoto(), imageRight, PhotoGroup.POSITION_RIGHT);
+    /** 座舱那几格：有文件才有这一格，没有就连框一起收走。 */
+    private void showLane(FrameLayout frame, ImageView image, TextView placeholder,
+                          boolean has, File photoFile, String position) {
+        if (frame != null) {
+            frame.setVisibility(has ? View.VISIBLE : View.GONE);
+        }
+        if (placeholder != null) {
+            // 框都不在了，「无图片」没有人看 —— 留着它只会在框回来时闪一下
+            placeholder.setVisibility(View.GONE);
+        }
+        if (image != null) {
+            image.setVisibility(has ? View.VISIBLE : View.GONE);
+        }
+        if (has) {
+            loadImage(photoFile, image, position);
+        }
     }
 
     /**
@@ -601,14 +627,18 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             imageSingle.setImageMatrix(new android.graphics.Matrix());
             return;
         }
-        float[] r = PlaybackViewport.transformRects(zoomedCell,
+        // 源要用图片自己的像素坐标：ImageView 的矩阵映的是 drawable，不是视图
+        float[] r = PlaybackViewport.imageRects(zoomedCell,
                 drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(),
                 imageSingle.getWidth(), imageSingle.getHeight());
+        if (r == null) {
+            return;
+        }
         android.graphics.Matrix matrix = new android.graphics.Matrix();
         matrix.setRectToRect(
                 new android.graphics.RectF(r[0], r[1], r[2], r[3]),
                 new android.graphics.RectF(r[4], r[5], r[6], r[7]),
-                android.graphics.Matrix.ScaleToFit.CENTER);
+                android.graphics.Matrix.ScaleToFit.FILL);
         imageSingle.setScaleType(ImageView.ScaleType.MATRIX);
         imageSingle.setImageMatrix(matrix);
     }

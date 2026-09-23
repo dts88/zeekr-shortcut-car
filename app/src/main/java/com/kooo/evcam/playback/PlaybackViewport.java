@@ -90,7 +90,61 @@ public final class PlaybackViewport {
             sourceAspect = ((float) videoWidth / 2f) / ((float) videoHeight / 2f);
         }
 
-        // 目标：按源比例塞进视图，居中，留黑边
+        float[] dest = destRect(sourceAspect, viewWidth, viewHeight);
+        return new float[]{
+                srcLeft, srcTop, srcRight, srcBottom,
+                dest[0], dest[1], dest[2], dest[3],
+        };
+    }
+
+    /**
+     * ImageView 用的取景：源矩形在<b>图片像素</b>坐标里。
+     *
+     * <p>和 {@link #transformRects} 是同一件事，差的只是源用哪个坐标系 ——
+     * 而这一点差错会让人完全看不出是坐标系的问题。TextureView 先把画面拉满自己的
+     * 边框，矩阵作用在那个结果上，所以源写视图坐标；ImageView 的矩阵是直接把
+     * <b>图片像素</b>映到视图上的。拿视图坐标去当图片坐标，画面就只是挪了挪位置，
+     * 该放大的没放大 —— 之前这里正是这个样子。</p>
+     *
+     * @param cell        要放大的格子；{@link #NO_CELL} 表示整张
+     * @param imageWidth  图片宽（像素，即 drawable 的固有宽）
+     * @param imageHeight 图片高（像素）
+     * @return {@code {srcL, srcT, srcR, srcB, dstL, dstT, dstR, dstB}}，
+     *         源在<b>图片像素</b>坐标、目标在视图坐标；尺寸未知时返回 null
+     */
+    public static float[] imageRects(int cell, int imageWidth, int imageHeight,
+                                     int viewWidth, int viewHeight) {
+        if (imageWidth <= 0 || imageHeight <= 0 || viewWidth <= 0 || viewHeight <= 0) {
+            return null;
+        }
+        float srcLeft = 0f;
+        float srcTop = 0f;
+        float srcRight = imageWidth;
+        float srcBottom = imageHeight;
+        if (cell >= 0 && cell < CELL_COUNT) {
+            int column = cell % 2;
+            int row = cell / 2;
+            float halfWidth = imageWidth / 2f;
+            float halfHeight = imageHeight / 2f;
+            srcLeft = column * halfWidth;
+            srcTop = row * halfHeight;
+            srcRight = srcLeft + halfWidth;
+            srcBottom = srcTop + halfHeight;
+        }
+        float[] dest = destRect((srcRight - srcLeft) / (srcBottom - srcTop),
+                viewWidth, viewHeight);
+        return new float[]{
+                srcLeft, srcTop, srcRight, srcBottom,
+                dest[0], dest[1], dest[2], dest[3],
+        };
+    }
+
+    /**
+     * 按源的宽高比把目标矩形塞进视图，居中，留黑边。
+     *
+     * <p>宁可留黑边也不拉变形 —— 环视是方的，这块视图是宽的。</p>
+     */
+    private static float[] destRect(float sourceAspect, int viewWidth, int viewHeight) {
         float viewAspect = (float) viewWidth / viewHeight;
         float destWidth;
         float destHeight;
@@ -103,11 +157,7 @@ public final class PlaybackViewport {
         }
         float destLeft = (viewWidth - destWidth) / 2f;
         float destTop = (viewHeight - destHeight) / 2f;
-
-        return new float[]{
-                srcLeft, srcTop, srcRight, srcBottom,
-                destLeft, destTop, destLeft + destWidth, destTop + destHeight,
-        };
+        return new float[]{destLeft, destTop, destLeft + destWidth, destTop + destHeight};
     }
 
     /**
