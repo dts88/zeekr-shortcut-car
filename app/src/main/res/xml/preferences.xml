@@ -124,6 +124,12 @@
             android:summary="@string/set_rearview_summary" />
 
         <SwitchPreferenceCompat
+            android:key="pref_rearview_button_mode"
+            android:dependency="pref_rearview"
+            android:title="@string/set_rearview_button_mode_title"
+            android:summary="@string/set_rearview_button_mode_summary" />
+
+        <SwitchPreferenceCompat
             android:key="pref_rearview_front_rear"
             android:dependency="pref_rearview"
             android:title="@string/set_rearview_front_rear_title"

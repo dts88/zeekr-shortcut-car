@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.21.0-alpha] - 2026-09-23
+
+- **Button mode for the super mirror**, off by default, under Settings -> Super mirror. It
+  replaces swiping the middle third with four buttons laid out the way the car is: front on
+  top, rear below it, left and right to the sides. Position is the answer, so there is
+  nothing to read. The current view is the Zeekr orange one. The buttons appear when you
+  touch the window and go five seconds later, they stay the same size however the window is
+  resized, and in this mode the window will not shrink below them.
+
 ## [1.20.0-alpha] - 2026-09-23
 
 - **Photo playback is laid out like the preview**: the surround view on the left, the cabin

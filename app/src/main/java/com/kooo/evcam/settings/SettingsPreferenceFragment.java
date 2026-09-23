@@ -493,6 +493,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_rearview_guide",
                 pref -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
 
+        bindSwitch("pref_rearview_button_mode", appConfig.isRearViewButtonMode(), value -> {
+            appConfig.setRearViewButtonMode(value);
+            if (getContext() != null && appConfig.isRearViewEnabled()) {
+                RearViewMirrorService.applyButtonMode(getContext());
+            }
+        });
+
         bindSwitch("pref_rearview_front_rear", appConfig.isRearViewFrontRearOnly(), value -> {
             appConfig.setRearViewFrontRearOnly(value);
             if (getContext() != null && appConfig.isRearViewEnabled()) {

@@ -51,6 +51,8 @@
     <string name="set_limit_message">超出上限时从最旧的录像删起，删的只有本应用录的文件。留空或填 0 表示不限制：不删任何录像，U 盘写满就停止录制</string>
     <string name="set_storage_usage_title">当前落盘位置</string>
     <string name="set_rearview_summary">将环视中的任一路单独放大为悬浮窗。后视一路做左右镜像，与实际后视镜一致</string>
+    <string name="set_rearview_button_mode_title">按键模式</string>
+    <string name="set_rearview_button_mode_summary">中间三分之一不再左右划换路，改成四个按钮，按方位摆成菱形（上前、下后、左左、右右）。碰一下窗口才出现，5 秒后消失。窗口不能再缩得比这一组按钮小</string>
     <string name="set_rearview_front_rear_title">只显示前后视</string>
     <string name="set_rearview_front_rear_summary">左右滑动仅在后视与前视之间切换，不经过两侧</string>
     <string name="set_rearview_fisheye_title">鱼眼校正</string>

@@ -37,6 +37,8 @@
     <string name="set_limit_message">Over the cap, the oldest recordings are deleted first, and only files this app recorded. Leave blank or enter 0 for no limit: nothing is deleted and recording stops when the drive is full</string>
     <string name="set_storage_usage_title">Current write location</string>
     <string name="set_rearview_summary">Shows one surround camera in a floating window. The rear view is mirrored, like a real mirror</string>
+    <string name="set_rearview_button_mode_title">Button mode</string>
+    <string name="set_rearview_button_mode_summary">Four buttons in place of swiping the middle third to change view, arranged the way the car is: front on top, rear below, left and right to the sides. They appear when you touch the window and go after five seconds. The window cannot be made smaller than the buttons</string>
     <string name="set_rearview_front_rear_title">Front and rear only</string>
     <string name="set_rearview_front_rear_summary">Swiping switches between rear and front only</string>
     <string name="set_rearview_fisheye_title">Fisheye correction</string>

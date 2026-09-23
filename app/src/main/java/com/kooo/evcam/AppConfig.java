@@ -891,6 +891,7 @@ public class AppConfig {
      * 一个不可恢复的状态不该让人一滑就滑进去。</p>
      */
     public static final int REARVIEW_MIN_SIZE = 120;
+    private static final String KEY_REARVIEW_BUTTON_MODE = "rearview_button_mode";
 
     public boolean isRearViewEnabled() {
         return prefs.getBoolean(KEY_REARVIEW_ENABLED, false);
@@ -1044,6 +1045,20 @@ public class AppConfig {
 
     public void setRearViewLane(int lane) {
         prefs.edit().putInt(KEY_REARVIEW_LANE, lane).apply();
+    }
+
+    /**
+     * 按键模式：中间三分之一不再左右划换路，改成四个按钮。默认关。
+     *
+     * <p>划动是个好手势，但要先知道它存在。按钮是看得见的 ——
+     * 代价是占掉一块画面，而且窗口不能再缩得比那一排按钮还小。</p>
+     */
+    public boolean isRearViewButtonMode() {
+        return prefs.getBoolean(KEY_REARVIEW_BUTTON_MODE, false);
+    }
+
+    public void setRearViewButtonMode(boolean on) {
+        prefs.edit().putBoolean(KEY_REARVIEW_BUTTON_MODE, on).apply();
     }
 
     /** 只在前后之间切换，不去侧视。 */

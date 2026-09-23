@@ -37,6 +37,8 @@
     <string name="set_limit_message">Apabila melebihi had, rakaman paling lama dipadam dahulu, dan hanya fail yang dirakam oleh apl ini. Biarkan kosong atau isi 0 untuk tiada had: tiada apa dipadam dan rakaman berhenti apabila pemacu penuh</string>
     <string name="set_storage_usage_title">Lokasi tulis semasa</string>
     <string name="set_rearview_summary">Menunjukkan satu kamera keliling dalam tetingkap terapung. Pandangan belakang dicerminkan, seperti cermin sebenar</string>
+    <string name="set_rearview_button_mode_title">Mod butang</string>
+    <string name="set_rearview_button_mode_summary">Empat butang menggantikan leretan di bahagian tengah untuk menukar pandangan, disusun mengikut arah sebenar: depan di atas, belakang di bawah, kiri dan kanan di tepi. Ia muncul apabila anda menyentuh tetingkap dan hilang selepas lima saat. Tetingkap tidak boleh dikecilkan melebihi butang itu</string>
     <string name="set_rearview_front_rear_title">Depan dan belakang sahaja</string>
     <string name="set_rearview_front_rear_summary">Leret hanya bertukar antara belakang dan depan</string>
     <string name="set_rearview_fisheye_title">Pembetulan mata ikan</string>
