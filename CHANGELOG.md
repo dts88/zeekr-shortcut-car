@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.25.0-alpha] - 2026-09-23
+
+- **"Prevent deep sleep" is gone from Settings.** What it would have prevented, measured
+  over the last 26 hours of head unit uptime, is 20.8 hours of deep sleep -- all of it
+  while parked, and all of it spent on the 12V battery instead. The same black box shows
+  the process coming out of two deep sleeps with the same process id it went in with, so
+  it does not need the switch to survive. It had never been read by anything except the
+  settings screen drawing it, so removing it changes no behaviour; it only takes away a
+  switch that could only do harm. The evidence is written down in the platform notes so
+  nobody has to work it out again.
+- Note for whoever reads the notes next: the same wake lock is still held when **boot
+  autostart** is on, which means that switch also means "the head unit never deep-sleeps".
+  That is not what its name says, and it is left alone pending a decision.
+
 ## [1.24.0-alpha] - 2026-09-23
 
 Read from the car: the head unit deep-sleeps whenever it is parked -- 20.8 hours out of the

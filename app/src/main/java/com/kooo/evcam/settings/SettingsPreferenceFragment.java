@@ -838,8 +838,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         lockScreenOffRecording();
         bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> appConfig.setKeepAliveEnabled(value));
-        bindSwitch("pref_prevent_sleep", appConfig.isPreventSleepEnabled(),
-                value -> appConfig.setPreventSleepEnabled(value));
     }
 
     // ------------------------------------------------------------------ 原「高级」，现在在开发者选项里

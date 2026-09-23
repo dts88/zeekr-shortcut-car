@@ -29,7 +29,6 @@ public class AppConfig {
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
     private static final String KEY_KEEP_ALIVE_ENABLED = "keep_alive_enabled";  // 保活服务
-    private static final String KEY_PREVENT_SLEEP_ENABLED = "prevent_sleep_enabled";  // 防止休眠（持续WakeLock）
     private static final String KEY_RECORDING_MODE = "recording_mode";  // 录制模式
     
     // 存储位置配置
@@ -574,25 +573,6 @@ public class AppConfig {
         return prefs.getBoolean(KEY_KEEP_ALIVE_ENABLED, true);
     }
     
-    /**
-     * 设置防止休眠（持续WakeLock）
-     * @param enabled true 表示启用防止休眠
-     */
-    public void setPreventSleepEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_PREVENT_SLEEP_ENABLED, enabled).apply();
-        AppLog.d(TAG, "防止休眠设置: " + (enabled ? "启用" : "禁用"));
-    }
-    
-    /**
-     * 获取防止休眠设置
-     * @return true 表示启用防止休眠
-     */
-    public boolean isPreventSleepEnabled() {
-        // 默认关（项目拥有者 2026-09 定）。原来默认开，理由之一是息屏也要录 ——
-        // 而息屏录制现在默认关、并且锁在开发者选项后面，默认不让车机休眠
-        // 就只剩代价、没有收益
-        return prefs.getBoolean(KEY_PREVENT_SLEEP_ENABLED, false);
-    }
     
     /**
      * 设置录制模式

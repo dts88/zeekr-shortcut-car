@@ -85,8 +85,6 @@
     <string name="set_screen_off_summary">Terus merakam selepas skrin dimatikan</string>
     <string name="set_keep_alive_title">Kekal hidup berkala</string>
     <string name="set_keep_alive_summary">Mengejutkan apl secara berkala supaya sistem tidak menutupnya</string>
-    <string name="set_prevent_sleep_title">Halang tidur dalam</string>
-    <string name="set_prevent_sleep_summary">Menghalang tidur dalam. Menggunakan lebih kuasa; buka hanya jika perlu</string>
     <string name="set_recording_mode_title">Saluran rakaman</string>
     <string name="set_force_h264_title">Paksa H.264</string>
     <string name="set_force_h264_summary">Mengatasi kodek yang ditetapkan bagi setiap kamera</string>

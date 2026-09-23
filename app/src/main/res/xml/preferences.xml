@@ -298,11 +298,6 @@
             android:title="@string/set_keep_alive_title"
             android:summary="@string/set_keep_alive_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_prevent_sleep"
-            android:title="@string/set_prevent_sleep_title"
-            android:summary="@string/set_prevent_sleep_summary" />
-
         <Preference
             android:key="pref_diagnostics"
             android:title="@string/set_diagnostics_title"

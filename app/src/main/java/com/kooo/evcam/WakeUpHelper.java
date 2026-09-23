@@ -93,9 +93,20 @@ public class WakeUpHelper {
     }
     
     /**
-     * 获取持续唤醒锁（防止系统休眠）
-     * 用于需要长期保持CPU运行的场景，如车机熄火后仍需接收远程消息
-     * 注意：会增加功耗，需要用户明确开启
+     * 拿一个不超时的唤醒锁，车机就不会深睡。
+     *
+     * <h3>这是有代价的，而且代价是实测过的</h3>
+     *
+     * <p>2026-09-23 那份黑匣子：车机开机 26 小时，其中 <b>20.8 小时在深睡</b>
+     * —— 全是停着的时候。这个锁拿着，那 20.8 小时就变成醒着，停在那里耗 12V 电瓶。</p>
+     *
+     * <p>同一份日志里还有一条：两段深睡前后进程 pid 一模一样，
+     * <b>进程不需要这个锁也能活下来</b>。所以名叫「防止休眠」的那个开关 1.25.0 删掉了。</p>
+     *
+     * <p><b>但这个方法还活着</b>：它现在由<b>开机自启动</b>决定
+     * （{@code CameraForegroundService} 和 {@code MainActivity} 各一处）——
+     * 也就是说开着「开机自启动」等于车机永不深睡。这和开关的名字对不上，
+     * 改动需要项目所有者拍板。完整数据见 {@code docs/zeekr-platform-notes.md} §3.6。</p>
      */
     public static void acquirePersistentWakeLock(Context context) {
         AppLog.d(TAG, "Acquiring persistent wake lock (prevent sleep)...");
@@ -117,7 +128,7 @@ public class WakeUpHelper {
         // PARTIAL_WAKE_LOCK: 只保持CPU运行，不亮屏
         persistentWakeLock = pm.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
-                "EVCam:PreventSleep"
+                "EVCam:AutoStartAwake"
         );
 
         // 持有唤醒锁，不设置超时（直到手动释放）

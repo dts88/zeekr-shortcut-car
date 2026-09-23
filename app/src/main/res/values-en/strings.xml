@@ -85,8 +85,6 @@
     <string name="set_screen_off_summary">Keeps recording after the screen turns off</string>
     <string name="set_keep_alive_title">Periodic keep-alive</string>
     <string name="set_keep_alive_summary">Wakes the app periodically so the system does not close it</string>
-    <string name="set_prevent_sleep_title">Prevent deep sleep</string>
-    <string name="set_prevent_sleep_summary">Blocks deep sleep. Uses more power; turn on only if needed</string>
     <string name="set_recording_mode_title">Recording pipeline</string>
     <string name="set_force_h264_title">Force H.264</string>
     <string name="set_force_h264_summary">Overrides the codec set for each camera</string>
