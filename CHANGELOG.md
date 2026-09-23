@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.23.0-alpha] - 2026-09-23
+
+- **One tap gets you there in photo playback**, the way the preview already worked. Tap a
+  lane of the surround photo and it fills the area with that lane enlarged -- no more
+  double-tapping to enlarge and then tapping again to pick the lane. Tap a cabin photo and
+  it fills the area. Tap the picture again to go back to the whole photo, tap beside it, or
+  press back, to return to the grid.
+- **Faster, because it no longer waits to see whether you tap twice.** Keeping a
+  double-tap gesture means every single tap must sit through the ~300ms double-tap window
+  first. That wait was the whole difference in feel between the preview and photo playback.
+- The second view is gone: enlarging now hides the other boxes instead of loading the same
+  file into a separate full-screen ImageView, so a picture is decoded once rather than once
+  per enlarge.
+
 ## [1.22.0-alpha] - 2026-09-23
 
 - **The super mirror's buttons are half again as large** and the group sits one button

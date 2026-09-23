@@ -51,6 +51,36 @@ public final class PlaybackViewport {
     }
 
     /**
+     * 点在照片的哪一路上。
+     *
+     * <p>和 {@link #cellAt} 的差别是<b>黑边</b>：那一个按视图的正中划四等分，
+     * 用在视频上没问题 —— 画面是居中摆的，中线和视图中线重合。而照片这边，点还要
+     * 落在画面<b>之内</b>才算数：网格里那一格是横的、照片是方的，两侧留出来的黑边
+     * 可以很宽，点在那里算成某一路，就成了「我明明点的是旁边」。</p>
+     *
+     * <p>这也给了「退出去」一个落脚点：黑边上没有画面，点它就是收回网格。</p>
+     *
+     * @return 0..3；点在画面外或者尺寸未知时返回 {@link #NO_CELL}
+     */
+    public static int cellAtInPicture(float x, float y, int imageWidth, int imageHeight,
+                                      int viewWidth, int viewHeight) {
+        float[] r = imageRects(NO_CELL, imageWidth, imageHeight, viewWidth, viewHeight);
+        if (r == null) {
+            return NO_CELL;
+        }
+        float left = r[4];
+        float top = r[5];
+        float right = r[6];
+        float bottom = r[7];
+        if (x < left || x > right || y < top || y > bottom) {
+            return NO_CELL;
+        }
+        int column = x < (left + right) / 2f ? 0 : 1;
+        int row = y < (top + bottom) / 2f ? 0 : 1;
+        return row * 2 + column;
+    }
+
+    /**
      * 算出变换矩阵要的两个矩形。
      *
      * <p>目标矩形按源画面的宽高比居中摆放 —— 环视录像是正方形的，

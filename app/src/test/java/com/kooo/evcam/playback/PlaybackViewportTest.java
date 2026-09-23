@@ -48,6 +48,45 @@ public class PlaybackViewportTest {
     }
 
     /**
+     * 照片上点哪一路：黑边不算。
+     *
+     * <p>网格里环视那一格是横的、照片是方的，两边的黑边可以很宽。按视图中线分四块
+     * 的话，点在左边那条黑边上会被算成「左侧那一路」—— 而那里根本没有画面。</p>
+     */
+    @Test
+    public void tapsOutsideThePictureBelongToNoCell() {
+        // 1600x900 的视图里，方形照片占中间 900 宽，左右各 350 的黑边
+        assertEquals("左黑边不算", PlaybackViewport.NO_CELL,
+                PlaybackViewport.cellAtInPicture(10, 450, VIDEO, VIDEO, VIEW_W, VIEW_H));
+        assertEquals("右黑边不算", PlaybackViewport.NO_CELL,
+                PlaybackViewport.cellAtInPicture(VIEW_W - 10, 450, VIDEO, VIDEO, VIEW_W, VIEW_H));
+        assertEquals("尺寸不知道时不算", PlaybackViewport.NO_CELL,
+                PlaybackViewport.cellAtInPicture(800, 450, 0, 0, VIEW_W, VIEW_H));
+    }
+
+    /** 画面之内还是按四等分，四个角各归各的。 */
+    @Test
+    public void tapsInsideThePictureMapToTheirLane() {
+        assertEquals(0, PlaybackViewport.cellAtInPicture(360, 10, VIDEO, VIDEO, VIEW_W, VIEW_H));
+        assertEquals(1, PlaybackViewport.cellAtInPicture(1240, 10, VIDEO, VIDEO, VIEW_W, VIEW_H));
+        assertEquals(2, PlaybackViewport.cellAtInPicture(360, 890, VIDEO, VIDEO, VIEW_W, VIEW_H));
+        assertEquals(3, PlaybackViewport.cellAtInPicture(1240, 890, VIDEO, VIDEO, VIEW_W, VIEW_H));
+    }
+
+    /**
+     * 竖着的视图里，黑边在上下 —— 边在哪一侧要跟着视图走，不能只认左右。
+     */
+    @Test
+    public void theBandsFollowTheViewsShape() {
+        int wide = 600;
+        int tall = 1000;
+        assertEquals("上黑边不算", PlaybackViewport.NO_CELL,
+                PlaybackViewport.cellAtInPicture(300, 10, VIDEO, VIDEO, wide, tall));
+        assertEquals("正中偏上一点点算左上", 0,
+                PlaybackViewport.cellAtInPicture(299, 299, VIDEO, VIDEO, wide, tall));
+    }
+
+    /**
      * 照片这边的源矩形用<b>图片像素</b>，不是视图坐标。
      *
      * <p>这一条就是那个 bug 的形状：把视图坐标当图片坐标喂给 ImageView 的矩阵，

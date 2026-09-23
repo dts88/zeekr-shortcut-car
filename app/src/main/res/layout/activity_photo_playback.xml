@@ -204,15 +204,6 @@
                                 android:textColor="#FFFFFF"
                                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-                            <TextView
-                                android:id="@+id/placeholder_back"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:text="@string/photo_no_image"
-                                android:textColor="@color/preview_placeholder_text"
-                                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                                android:visibility="gone" />
                         </FrameLayout>
 
                         <FrameLayout
@@ -244,15 +235,6 @@
                                 android:textColor="#FFFFFF"
                                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-                            <TextView
-                                android:id="@+id/placeholder_left"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:text="@string/photo_no_image"
-                                android:textColor="@color/preview_placeholder_text"
-                                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                                android:visibility="gone" />
                         </FrameLayout>
 
                         <FrameLayout
@@ -285,48 +267,9 @@
                                 android:textColor="#FFFFFF"
                                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-                            <TextView
-                                android:id="@+id/placeholder_right"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:text="@string/photo_no_image"
-                                android:textColor="@color/preview_placeholder_text"
-                                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                                android:visibility="gone" />
                         </FrameLayout>
                     </LinearLayout>
                 </LinearLayout>
-
-                <!-- 单路模式：整块都给这一路。底和角标和上面那几格是同一套 -->
-                <FrameLayout
-                    android:id="@+id/single_view_layout"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/bg_preview_frame"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:id="@+id/image_single"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:scaleType="fitCenter" />
-
-                    <TextView
-                        android:id="@+id/label_single"
-                        android:layout_width="wrap_content"
-                        android:layout_height="34dp"
-                        android:layout_gravity="top|start"
-                        android:layout_marginStart="10dp"
-                        android:layout_marginTop="6dp"
-                        android:background="@drawable/camera_label_background"
-                        android:gravity="center"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
-                        android:text="@string/zeekr_lane_front"
-                        android:textColor="#FFFFFF"
-                        android:textAppearance="@style/TextAppearance.Cam.Body" />
-                </FrameLayout>
 
                 <!-- 无选中状态提示 -->
                 <LinearLayout

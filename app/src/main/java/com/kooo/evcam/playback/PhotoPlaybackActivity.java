@@ -9,10 +9,8 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -34,7 +32,6 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.signature.ObjectKey;
-import android.widget.PopupMenu;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.MainActivity;
@@ -56,7 +53,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 图片回看：左右分栏、四宫格预览、单路 / 多路切换。
+ * 图片回看：左边一列照片，右边按主界面预览的排版摆开。
+ *
+ * <h3>只有一套视图</h3>
+ *
+ * <p>点一格就让那一格占满整块，做的只是<b>把别的几格收起来</b> —— 没有第二套布局、
+ * 没有第二个 ImageView，同一张图从头到尾只解一次码。主界面预览就是这么做的。</p>
+ *
+ * <p>点一下就到位：网格里点环视的某一路，直接展开并放大那一路，不必先展开再点。
+ * 手势全走 {@code setOnClickListener} —— 只要还留着双击，单击就得等
+ * 300ms 的双击判定，那正是「预览比回看弹得快」的来源。</p>
  *
  * <h3>为什么是独立 Activity</h3>
  *
@@ -83,13 +89,14 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private View toolbar, actionGroup, selectionGroup;
 
     // 预览区组件
-    private View multiViewLayout, singleViewLayout;
-    private ImageView imageFront, imageBack, imageLeft, imageRight, imageSingle;
+    private View multiViewLayout;
+    private ImageView imageFront, imageBack, imageLeft, imageRight;
     private FrameLayout frameFront, frameBack, frameLeft, frameRight;
     /** 两路座舱那一列。两格都没有文件时整列让开，环视独占整块。 */
     private View cabinColumn;
-    private TextView labelFront, labelBack, labelLeft, labelRight, labelSingle;
-    private TextView placeholderFront, placeholderBack, placeholderLeft, placeholderRight;
+    private TextView labelFront, labelBack, labelLeft, labelRight;
+    /** 只有环视那一格有：别的几格没有文件时整个收起来，没有地方需要说「无图片」。 */
+    private TextView placeholderFront;
     private Button btnViewMode;
     private Button btnSendToPhone;
     private View controlsLayout;
@@ -101,14 +108,26 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
     // 状态
     private boolean isMultiSelectMode = false;
-    private boolean isSingleMode = false;
     /**
-     * 单路视图里放大到哪一格；{@link PlaybackViewport#NO_CELL} 表示整张。
+     * 现在是哪一路占满整块；{@code null} 表示摆成网格。
+     *
+     * <p>原来这里是 {@code isSingleMode} 加 {@code currentSinglePosition} 两个字段，
+     * 而它们只有三种合法组合 —— 两个字段表达一件事，迟早会对不上。</p>
+     */
+    private String expandedPosition;
+    /**
+     * 放大到环视的哪一格；{@link PlaybackViewport#NO_CELL} 表示整张。
      *
      * <p>只有环视有格子可放 —— 它本身就是一张 2×2。座舱是一整幅画面，点了不动。</p>
      */
     private int zoomedCell = PlaybackViewport.NO_CELL;
-    private String currentSinglePosition = PhotoGroup.POSITION_FRONT;
+    /** 最近一次按在哪 —— 点击回调不带坐标，而「点的是哪一路」全看这个。 */
+    private float lastTouchX, lastTouchY;
+    /** 四路的顺序。分享、循环切换都按这个走，省得各写一份。 */
+    private static final String[] POSITIONS = {
+            PhotoGroup.POSITION_FRONT, PhotoGroup.POSITION_BACK,
+            PhotoGroup.POSITION_LEFT, PhotoGroup.POSITION_RIGHT,
+    };
     /** 鱼眼校正：只改屏幕上的样子，原图不动。开关记在设置里，下次进来还是这个状态。 */
     private boolean fisheyeOn;
 
@@ -119,7 +138,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         initViews();
         setupListeners();
-        setupDoubleTapListeners();
+        setupTapToExpand();
         updatePhotoList();
         applyStatusBarInsets();
     }
@@ -152,13 +171,19 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         // 四宫格预览
         multiViewLayout = findViewById(R.id.multi_view_layout);
-        singleViewLayout = findViewById(R.id.single_view_layout);
 
         imageFront = findViewById(R.id.image_front);
         imageBack = findViewById(R.id.image_back);
         imageLeft = findViewById(R.id.image_left);
         imageRight = findViewById(R.id.image_right);
-        imageSingle = findViewById(R.id.image_single);
+
+        // 展开、收起都会改变这一格的大小，而放大用的矩阵是按当时的尺寸算出来的：
+        // 布局一变就得重算，否则画面会停在按旧尺寸算的位置上
+        imageFront.addOnLayoutChangeListener((v, l, top, r, b, ol, ot, orr, ob) -> {
+            if (l != ol || top != ot || r != orr || b != ob) {
+                applyCellZoom();
+            }
+        });
 
         frameFront = findViewById(R.id.frame_front);
         frameBack = findViewById(R.id.frame_back);
@@ -170,7 +195,6 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         labelBack = findViewById(R.id.label_back);
         labelLeft = findViewById(R.id.label_left);
         labelRight = findViewById(R.id.label_right);
-        labelSingle = findViewById(R.id.label_single);
 
         // 角标叫什么和主界面同一个来源：布局里那四个「前后左右」说的是合成流的
         // 四个方向，而这里每一格是一路相机 —— 三路配置下就成了环视写着「前」
@@ -180,9 +204,6 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         nameLane(labelRight, "right");
 
         placeholderFront = findViewById(R.id.placeholder_front);
-        placeholderBack = findViewById(R.id.placeholder_back);
-        placeholderLeft = findViewById(R.id.placeholder_left);
-        placeholderRight = findViewById(R.id.placeholder_right);
 
         // 摄像头切换按钮和控制栏
         btnViewMode = findViewById(R.id.btn_view_mode);
@@ -209,7 +230,6 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         // 初始状态：隐藏四宫格，显示提示
         multiViewLayout.setVisibility(View.GONE);
-        singleViewLayout.setVisibility(View.GONE);
         noSelectionHint.setVisibility(View.VISIBLE);
     }
 
@@ -269,62 +289,80 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     /**
-     * 设置四宫格双击监听（双击放大到单路）
+     * 点一下就到位 —— 和主界面预览同一套。
+     *
+     * <p>原来要双击才放大，环视还得先双击放大、再单击那一路，两步。而且第一步
+     * 走的是 {@code onSingleTapConfirmed}：那个回调要等双击判定的 300ms 过去才发，
+     * <b>「预览弹得比回看快」就是这 300ms</b>，不是解码，也不是别的。</p>
+     *
+     * <p>这里用的是最朴素的 {@code setOnClickListener}：按下就算数，没有等待。
+     * 坐标由按下时记一笔，点击回调本身不带坐标。</p>
      */
-    private void setupDoubleTapListeners() {
-        setupDoubleTap(frameFront, PhotoGroup.POSITION_FRONT,
-                getString(R.string.zeekr_lane_front));
-        setupDoubleTap(frameBack, PhotoGroup.POSITION_BACK,
-                getString(R.string.zeekr_lane_back));
-        setupDoubleTap(frameLeft, PhotoGroup.POSITION_LEFT,
-                getString(R.string.zeekr_lane_left));
-        setupDoubleTap(frameRight, PhotoGroup.POSITION_RIGHT,
-                getString(R.string.zeekr_lane_right));
-
-        // 单路模式双击返回多路
-        if (singleViewLayout != null) {
-            GestureDetector detector = new GestureDetector(PhotoPlaybackActivity.this, new GestureDetector.SimpleOnGestureListener() {
-                @Override
-                public boolean onDoubleTap(MotionEvent e) {
-                    if (isSingleMode) {
-                        switchToMultiMode();
-                    }
-                    return true;
-                }
-
-                /** 单击放大点到的那一格，再点还原 —— 和连续回放同一个手势。 */
-                @Override
-                public boolean onSingleTapConfirmed(MotionEvent e) {
-                    if (isSingleMode) {
-                        toggleCellZoom(e.getX(), e.getY());
-                    }
-                    return true;
-                }
-            });
-            singleViewLayout.setOnTouchListener((v, event) -> {
-                detector.onTouchEvent(event);
-                return true;
-            });
-        }
+    private void setupTapToExpand() {
+        tapExpands(frameFront, PhotoGroup.POSITION_FRONT);
+        tapExpands(frameBack, PhotoGroup.POSITION_BACK);
+        tapExpands(frameLeft, PhotoGroup.POSITION_LEFT);
+        tapExpands(frameRight, PhotoGroup.POSITION_RIGHT);
     }
 
-    private void setupDoubleTap(View view, String position, String label) {
-        if (view == null) return;
-
-        GestureDetector detector = new GestureDetector(PhotoPlaybackActivity.this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onDoubleTap(MotionEvent e) {
-                if (!isSingleMode && currentGroup != null && currentGroup.hasPhoto(position)) {
-                    switchToSingleMode(position, label);
-                }
-                return true;
+    private void tapExpands(View frame, String position) {
+        if (frame == null) {
+            return;
+        }
+        frame.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                lastTouchX = event.getX();
+                lastTouchY = event.getY();
             }
+            return false;   // 不拦，点击照常走 —— 按压反馈和无障碍都在那条路上
         });
+        frame.setOnClickListener(v -> tapped(position));
+    }
 
-        view.setOnTouchListener((v, event) -> {
-            detector.onTouchEvent(event);
-            return true;
-        });
+    /**
+     * 点了某一格之后。
+     *
+     * <ul>
+     *   <li>网格里点一格 → 这一格占满整块。环视还顺带把<b>点到的那一路</b>放大：
+     *       想看哪一路，一下到位。</li>
+     *   <li>占满的环视上再点 → 放大那一路；已经放大了就还原成整张；
+     *       点在画面外的黑边上 → 收回网格。</li>
+     *   <li>占满的座舱上再点 → 一整幅画面，没有格子可分，直接收回网格。</li>
+     * </ul>
+     */
+    private void tapped(String position) {
+        if (currentGroup == null || !currentGroup.hasPhoto(position)) {
+            return;
+        }
+        if (expandedPosition == null) {
+            expandedPosition = position;
+            zoomedCell = gridColumns(position) >= 2 ? cellUnderTouch() : PlaybackViewport.NO_CELL;
+            applyViewMode();
+            return;
+        }
+        if (gridColumns(position) < 2) {
+            collapse();
+            return;
+        }
+        int cell = cellUnderTouch();
+        if (cell == PlaybackViewport.NO_CELL) {
+            collapse();
+            return;
+        }
+        // 已经放大了的话，屏幕上就只剩那一路，点哪儿都只能是「还原」
+        zoomedCell = zoomedCell != PlaybackViewport.NO_CELL ? PlaybackViewport.NO_CELL : cell;
+        applyCellZoom();
+    }
+
+    /** 手指落在环视照片的哪一路上；落在 fitCenter 留出的黑边上返回 NO_CELL。 */
+    private int cellUnderTouch() {
+        Drawable drawable = imageFront == null ? null : imageFront.getDrawable();
+        if (drawable == null) {
+            return PlaybackViewport.NO_CELL;
+        }
+        return PlaybackViewport.cellAtInPicture(lastTouchX, lastTouchY,
+                drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(),
+                imageFront.getWidth(), imageFront.getHeight());
     }
 
     /**
@@ -334,7 +372,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      * 与其挑一张替用户做主，不如让他先放大到想要的那一路。</p>
      */
     private void sendCurrentPhotoToPhone() {
-        if (!isSingleMode || currentSinglePosition == null) {
+        if (expandedPosition == null) {
             Toast.makeText(PhotoPlaybackActivity.this, R.string.share_photo_pick_lane_first,
                     Toast.LENGTH_LONG).show();
             return;
@@ -345,13 +383,10 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             return;
         }
         com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this,
-                currentGroup.getPhotoFile(currentSinglePosition));
+                currentGroup.getPhotoFile(expandedPosition));
     }
 
-    /**
-     * 切换到单路模式
-     */
-/** 这一格装的是哪一路相机，名字和主界面同一个来源。 */
+    /** 这一格装的是哪一路相机，名字和主界面同一个来源。 */
     private void nameLane(TextView label, String position) {
         if (label == null) {
             return;
@@ -361,67 +396,75 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
                         com.kooo.evcam.camera.CameraSlots.keyForSuffix(position)));
     }
 
-    private void switchToSingleMode(String position, String label) {
-        isSingleMode = true;
-        resetCellZoom();
-        currentSinglePosition = position;
-
-        multiViewLayout.setVisibility(View.GONE);
-        singleViewLayout.setVisibility(View.VISIBLE);
-        labelSingle.setText(label);
-        btnViewMode.setText(getString(R.string.photo_mode_single, label));
-
-        // 加载大图
-        if (currentGroup != null) {
-            File photoFile = currentGroup.getPhotoFile(position);
-            loadImage(photoFile, imageSingle, position);
-        }
-    }
-
     /**
-     * 切换到多路模式
+     * 现在该看什么：摆成网格，还是某一路占满整块。
+     *
+     * <p>让一路占满，做的只是<b>把别的几格收起来</b> —— 图还是那张图，位置还是那个
+     * 位置，没有换布局、没有再解一次码。主界面预览就是这么做的，所以它是即时的。</p>
+     *
+     * <p>原来这里是另起一套 {@code single_view_layout} 加一个 ImageView：同一个文件
+     * 要为它再解一次码，进出一次就是两次解码，而屏幕上从头到尾只有那一张图。</p>
      */
-    private void switchToMultiMode() {
-        resetCellZoom();
-        isSingleMode = false;
-
-        multiViewLayout.setVisibility(View.VISIBLE);
-        singleViewLayout.setVisibility(View.GONE);
-        btnViewMode.setText(getString(R.string.photo_mode_multi));
+    private void applyViewMode() {
+        boolean grid = expandedPosition == null;
+        frameFront.setVisibility(grid || PhotoGroup.POSITION_FRONT.equals(expandedPosition)
+                ? View.VISIBLE : View.GONE);
+        boolean back = laneVisible(frameBack, PhotoGroup.POSITION_BACK);
+        boolean left = laneVisible(frameLeft, PhotoGroup.POSITION_LEFT);
+        boolean right = laneVisible(frameRight, PhotoGroup.POSITION_RIGHT);
+        if (cabinColumn != null) {
+            cabinColumn.setVisibility(back || left || right ? View.VISIBLE : View.GONE);
+        }
+        applyCellZoom();
+        btnViewMode.setText(grid
+                ? getString(R.string.photo_mode_multi)
+                : getString(R.string.photo_mode_single, getPositionLabel(expandedPosition)));
     }
 
     /**
-     * 循环切换视图模式：多路 → 前摄 → 后摄 → 左摄 → 右摄 → 多路...
-     * 只切换到有图片的摄像头
+     * 座舱那几格该不该出现：有文件，而且没有别的一路正占着整块。
+     *
+     * @return 这一格现在是不是看得见
+     */
+    private boolean laneVisible(View frame, String position) {
+        boolean show = currentGroup != null && currentGroup.hasPhoto(position)
+                && (expandedPosition == null || position.equals(expandedPosition));
+        if (frame != null) {
+            frame.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        return show;
+    }
+
+    /** 收回网格。 */
+    private void collapse() {
+        expandedPosition = null;
+        zoomedCell = PlaybackViewport.NO_CELL;
+        applyViewMode();
+    }
+
+    /**
+     * 底部那个按钮：网格 → 有图的每一路 → 回到网格。
+     *
+     * <p>点画面已经能到任何一路了，这个按钮留着是因为它同时是<b>现在在看哪一路</b>
+     * 的标签 —— 而且从放大的画面退回网格，不必非得知道「点黑边」这条规矩。</p>
      */
     private void cycleViewMode() {
-        if (currentGroup == null) return;
-        
-        // 构建可用位置列表
-        java.util.List<String> availablePositions = new java.util.ArrayList<>();
-        availablePositions.add("multi"); // 多路始终可用
-        if (currentGroup.hasPhoto(PhotoGroup.POSITION_FRONT)) availablePositions.add(PhotoGroup.POSITION_FRONT);
-        if (currentGroup.hasPhoto(PhotoGroup.POSITION_BACK)) availablePositions.add(PhotoGroup.POSITION_BACK);
-        if (currentGroup.hasPhoto(PhotoGroup.POSITION_LEFT)) availablePositions.add(PhotoGroup.POSITION_LEFT);
-        if (currentGroup.hasPhoto(PhotoGroup.POSITION_RIGHT)) availablePositions.add(PhotoGroup.POSITION_RIGHT);
-        
-        // 找到当前位置的索引
-        String currentPos = isSingleMode ? currentSinglePosition : "multi";
-        int currentIndex = availablePositions.indexOf(currentPos);
-        if (currentIndex < 0) currentIndex = 0;
-        
-        // 切换到下一个位置
-        int nextIndex = (currentIndex + 1) % availablePositions.size();
-        String nextPos = availablePositions.get(nextIndex);
-        
-        if ("multi".equals(nextPos)) {
-            switchToMultiMode();
-        } else {
-            String label = getPositionLabel(nextPos);
-            switchToSingleMode(nextPos, label);
+        if (currentGroup == null) {
+            return;
         }
+        List<String> order = new ArrayList<>();
+        order.add(null);            // 网格
+        for (String position : POSITIONS) {
+            if (currentGroup.hasPhoto(position)) {
+                order.add(position);
+            }
+        }
+        int at = order.indexOf(expandedPosition);
+        expandedPosition = order.get((Math.max(at, 0) + 1) % order.size());
+        zoomedCell = PlaybackViewport.NO_CELL;
+        applyViewMode();
     }
-    
+
     /**
      * 获取位置对应的标签
      */
@@ -434,102 +477,63 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     /**
-     * 切换单路/多路模式（保留用于双击）
-     */
-    private void toggleViewMode() {
-        cycleViewMode();
-    }
-
-    /**
      * 加载图片组进行显示
      */
     private void loadPhotoGroup(PhotoGroup group) {
         this.currentGroup = group;
         noSelectionHint.setVisibility(View.GONE);
-
-        // 如果在单路模式下，检查当前选择的摄像头是否有图片
-        if (isSingleMode) {
-            if (!group.hasPhoto(currentSinglePosition)) {
-                // 当前摄像头在新图片组中没有图片，切回多路模式
-                isSingleMode = false;
-                btnViewMode.setText(getString(R.string.photo_mode_multi));
-            }
-        }
-
-        // 显示四宫格（根据当前模式）
-        if (isSingleMode) {
-            multiViewLayout.setVisibility(View.GONE);
-            singleViewLayout.setVisibility(View.VISIBLE);
-            // 重新加载单路大图。换了图，取景要回到整张 ——
-            // 留着上一张的放大矩形，会把新图按别人的格子切
-            resetCellZoom();
-            File photoFile = group.getPhotoFile(currentSinglePosition);
-            loadImage(photoFile, imageSingle, currentSinglePosition);
-        } else {
-            multiViewLayout.setVisibility(View.VISIBLE);
-            singleViewLayout.setVisibility(View.GONE);
-        }
-
-        // 显示控制栏
+        multiViewLayout.setVisibility(View.VISIBLE);
         controlsLayout.setVisibility(View.VISIBLE);
 
-        // 更新标题栏日期时间
-        currentDatetime.setText(group.getFormattedDateTime());
+        // 正占着整块的那一路，这一组里没有的话就收回网格
+        if (expandedPosition != null && !group.hasPhoto(expandedPosition)) {
+            expandedPosition = null;
+        }
+        // 换了图，取景回到整张 —— 留着上一张的放大矩形，会把新图按别人的格子切
+        zoomedCell = PlaybackViewport.NO_CELL;
 
-        // 更新四宫格的占位符和图片
+        currentDatetime.setText(group.getFormattedDateTime());
         updatePhotoDisplay(group);
     }
 
     /**
-     * 按这一组有哪些文件，决定每一格显示什么。
+     * 把这一组的图贴上去。
      *
-     * <p><b>没有文件的那一格整个收起来</b>，不留空框：这一组是按时间戳凑出来的，
-     * 只拍到环视的那一次，座舱两格不该占着版面说一句「无图片」——
-     * 那是在为不存在的文件留位置。两格都没有时整列让开，环视独占整块。</p>
+     * <p>这里只管<b>贴哪几张</b>；谁显示、谁占多大归 {@link #applyViewMode()}。</p>
      *
-     * <p>环视那一格例外，一直留着：它是这个界面的主画面，
-     * 真要是连它都没有，总得有个地方把这件事说出来。</p>
+     * <p>没有文件的那一路要把图清掉：那一格反正会收起来，但留着上一组的图，
+     * 下次它重新出现时会先闪一下别人的照片。</p>
      */
     private void updatePhotoDisplay(PhotoGroup group) {
-        boolean hasFront = group.hasPhoto(PhotoGroup.POSITION_FRONT);
-        boolean hasBack = group.hasPhoto(PhotoGroup.POSITION_BACK);
-        boolean hasLeft = group.hasPhoto(PhotoGroup.POSITION_LEFT);
-        boolean hasRight = group.hasPhoto(PhotoGroup.POSITION_RIGHT);
-
-        imageFront.setVisibility(hasFront ? View.VISIBLE : View.GONE);
-        placeholderFront.setVisibility(hasFront ? View.GONE : View.VISIBLE);
-        if (hasFront) {
-            loadImage(group.getFrontPhoto(), imageFront, PhotoGroup.POSITION_FRONT);
+        for (String position : POSITIONS) {
+            loadLane(imageFor(position), group, position);
         }
+        // 环视那一格一直留着：它是这个界面的主画面，连它都没有，总得有地方说一声
+        placeholderFront.setVisibility(
+                group.hasPhoto(PhotoGroup.POSITION_FRONT) ? View.GONE : View.VISIBLE);
+        applyViewMode();
+    }
 
-        showLane(frameBack, imageBack, placeholderBack, hasBack,
-                group.getBackPhoto(), PhotoGroup.POSITION_BACK);
-        showLane(frameLeft, imageLeft, placeholderLeft, hasLeft,
-                group.getLeftPhoto(), PhotoGroup.POSITION_LEFT);
-        showLane(frameRight, imageRight, placeholderRight, hasRight,
-                group.getRightPhoto(), PhotoGroup.POSITION_RIGHT);
-
-        if (cabinColumn != null) {
-            cabinColumn.setVisibility(hasBack || hasLeft || hasRight
-                    ? View.VISIBLE : View.GONE);
+    private void loadLane(ImageView image, PhotoGroup group, String position) {
+        if (image == null) {
+            return;
+        }
+        if (group.hasPhoto(position)) {
+            loadImage(group.getPhotoFile(position), image, position);
+        } else {
+            // clear 而不是只置空：上一组的加载可能还在路上，不取消的话它回来时
+            // 会把图贴进一个「这一组没有这一路」的格子里
+            Glide.with(PhotoPlaybackActivity.this).clear(image);
+            image.setImageDrawable(null);
         }
     }
 
-    /** 座舱那几格：有文件才有这一格，没有就连框一起收走。 */
-    private void showLane(FrameLayout frame, ImageView image, TextView placeholder,
-                          boolean has, File photoFile, String position) {
-        if (frame != null) {
-            frame.setVisibility(has ? View.VISIBLE : View.GONE);
-        }
-        if (placeholder != null) {
-            // 框都不在了，「无图片」没有人看 —— 留着它只会在框回来时闪一下
-            placeholder.setVisibility(View.GONE);
-        }
-        if (image != null) {
-            image.setVisibility(has ? View.VISIBLE : View.GONE);
-        }
-        if (has) {
-            loadImage(photoFile, image, position);
+    private ImageView imageFor(String position) {
+        switch (position) {
+            case PhotoGroup.POSITION_BACK: return imageBack;
+            case PhotoGroup.POSITION_LEFT: return imageLeft;
+            case PhotoGroup.POSITION_RIGHT: return imageRight;
+            default: return imageFront;
         }
     }
 
@@ -593,45 +597,23 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     /**
-     * 点一下：放大点到的那一格，或者还原。
+     * 把当前的取景贴到环视那一格上。
      *
-     * <p>只对环视有效。座舱是一整幅画面，没有格子可分 —— 点了什么都不做，
-     * 而不是装模作样地放大一个不存在的格子。</p>
-     */
-    private void toggleCellZoom(float x, float y) {
-        if (imageSingle == null || gridColumns(currentSinglePosition) < 2) {
-            return;
-        }
-        zoomedCell = zoomedCell != PlaybackViewport.NO_CELL
-                ? PlaybackViewport.NO_CELL
-                : PlaybackViewport.cellAt(x, y, imageSingle.getWidth(), imageSingle.getHeight());
-        applyCellZoom();
-        Toast.makeText(this, PlaybackViewport.labelRes(zoomedCell), Toast.LENGTH_SHORT).show();
-    }
-
-    /**
-     * 把当前的取景贴到图上。
-     *
-     * <p>放大不是缩放整张图，是<b>换一个取景矩形</b>：把那一格映射到整个视图。
+     * <p>放大不是缩放整张图，是<b>换一个取景矩形</b>：把那一路映射到整格。
      * 连续回放对视频做的是同一件事，这里换成 ImageView 的矩阵而已。</p>
      */
     private void applyCellZoom() {
-        if (imageSingle == null) {
+        if (imageFront == null) {
             return;
         }
-        android.graphics.drawable.Drawable drawable = imageSingle.getDrawable();
-        if (zoomedCell == PlaybackViewport.NO_CELL || drawable == null
-                || drawable.getIntrinsicWidth() <= 0 || drawable.getIntrinsicHeight() <= 0
-                || imageSingle.getWidth() <= 0 || imageSingle.getHeight() <= 0) {
-            imageSingle.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            imageSingle.setImageMatrix(new android.graphics.Matrix());
-            return;
-        }
-        // 源要用图片自己的像素坐标：ImageView 的矩阵映的是 drawable，不是视图
-        float[] r = PlaybackViewport.imageRects(zoomedCell,
-                drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(),
-                imageSingle.getWidth(), imageSingle.getHeight());
+        Drawable drawable = imageFront.getDrawable();
+        float[] r = zoomedCell == PlaybackViewport.NO_CELL || drawable == null ? null
+                : PlaybackViewport.imageRects(zoomedCell,
+                        drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(),
+                        imageFront.getWidth(), imageFront.getHeight());
         if (r == null) {
+            imageFront.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            imageFront.setImageMatrix(new android.graphics.Matrix());
             return;
         }
         android.graphics.Matrix matrix = new android.graphics.Matrix();
@@ -639,14 +621,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
                 new android.graphics.RectF(r[0], r[1], r[2], r[3]),
                 new android.graphics.RectF(r[4], r[5], r[6], r[7]),
                 android.graphics.Matrix.ScaleToFit.FILL);
-        imageSingle.setScaleType(ImageView.ScaleType.MATRIX);
-        imageSingle.setImageMatrix(matrix);
-    }
-
-    /** 换了图、进出单路视图，取景都要回到整张。 */
-    private void resetCellZoom() {
-        zoomedCell = PlaybackViewport.NO_CELL;
-        applyCellZoom();
+        imageFront.setScaleType(ImageView.ScaleType.MATRIX);
+        imageFront.setImageMatrix(matrix);
     }
 
     /**
@@ -784,9 +760,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         currentGroup = null;
         adapter.setSelectedGroup(null);
         adapter.notifyDataSetChanged();
-        isSingleMode = false;
+        expandedPosition = null;
+        zoomedCell = PlaybackViewport.NO_CELL;
         multiViewLayout.setVisibility(View.GONE);
-        singleViewLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.GONE);
         noSelectionHint.setVisibility(View.VISIBLE);
         currentDatetime.setText("");
@@ -898,11 +874,12 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             return;
         }
         if (zoomedCell != PlaybackViewport.NO_CELL) {
-            resetCellZoom();
+            zoomedCell = PlaybackViewport.NO_CELL;
+            applyCellZoom();
             return;
         }
-        if (isSingleMode) {
-            switchToMultiMode();
+        if (expandedPosition != null) {
+            collapse();
             return;
         }
         super.onBackPressed();
@@ -947,11 +924,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         // 收集所有选中的图片文件
         List<File> allPhotoFiles = new ArrayList<>();
-        String[] positions = {PhotoGroup.POSITION_FRONT, PhotoGroup.POSITION_BACK,
-                              PhotoGroup.POSITION_LEFT, PhotoGroup.POSITION_RIGHT};
-
         for (PhotoGroup group : selectedGroups) {
-            for (String position : positions) {
+            for (String position : POSITIONS) {
                 File photoFile = group.getPhotoFile(position);
                 if (photoFile != null && photoFile.exists() && photoFile.length() > 0) {
                     allPhotoFiles.add(photoFile);
@@ -977,10 +951,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private void showPhotoShareDialog(PhotoGroup group) {
         // 获取所有可用的图片文件
         List<File> photoFiles = new ArrayList<>();
-        String[] positions = {PhotoGroup.POSITION_FRONT, PhotoGroup.POSITION_BACK,
-                              PhotoGroup.POSITION_LEFT, PhotoGroup.POSITION_RIGHT};
-
-        for (String position : positions) {
+        for (String position : POSITIONS) {
             File photoFile = group.getPhotoFile(position);
             if (photoFile != null && photoFile.exists() && photoFile.length() > 0) {
                 photoFiles.add(photoFile);
