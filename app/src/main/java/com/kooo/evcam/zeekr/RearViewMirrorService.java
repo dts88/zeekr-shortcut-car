@@ -127,6 +127,42 @@ public class RearViewMirrorService extends Service {
                 + " bindRetries=" + svc.retryCount;
     }
 
+    /**
+     * 屏幕是不是黑着。黑着就不占相机 —— 这一条是<b>实测拿到的</b>：
+     *
+     * <p>熄屏两秒后这个窗口就已经在显示「点击恢复」，因为屏幕黑了本来就没有帧可看；
+     * 但它对相机的那一份登记还在，于是主界面那个「熄屏 15 秒关相机」的任务只能报告
+     * 「相机还有人要: MIRROR，不关」。相机就这样开着进了深睡。等十几分钟后车机醒来，
+     * 会话已经是上一世的：关它的那次调用卡在 binder 里一秒多，紧接着
+     * DISCONNECTED、error -4（资源耗尽），最后靠看门狗重开，花了 9.4 秒。
+     * 运气差的那次，是连重开都失败，只能重启车机。</p>
+     *
+     * <p>所以现在熄屏就放手：看不见的画面不值得占着相机睡过去。亮屏再接回来。</p>
+     */
+    private boolean screenOff;
+
+    /** 熄屏之后等多久再确认没人要相机。车机熄屏六秒就深睡，这一步不能慢。 */
+    private static final long CLOSE_AFTER_SCREEN_OFF_MS = 1500;
+
+    private final android.content.BroadcastReceiver screenWatch =
+            new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(android.content.Context context, Intent intent) {
+                    String action = intent == null ? null : intent.getAction();
+                    if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                        screenOff = true;
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：后视镜放开相机");
+                        unbindCamera();
+                        handler.postDelayed(RearViewMirrorService.this::closeCamerasIfNobodyWants,
+                                CLOSE_AFTER_SCREEN_OFF_MS);
+                    } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
+                        screenOff = false;
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏：后视镜重新接相机");
+                        rebindNow();
+                    }
+                }
+            };
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -134,6 +170,14 @@ public class RearViewMirrorService extends Service {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("后台服务 RearViewMirrorService onCreate");
         appConfig = new AppConfig(this);
         instance = this;
+        android.os.PowerManager power =
+                (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
+        screenOff = power != null && !power.isInteractive();
+        android.content.IntentFilter filter = new android.content.IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        // 和主界面那个屏幕监听用同一种注册方式（系统广播，不对外）
+        registerReceiver(screenWatch, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
@@ -223,6 +267,12 @@ public class RearViewMirrorService extends Service {
      * 而不是一次不成就放弃 —— 那样后视镜会永远黑着。</p>
      */
     private void bindCamera(SurfaceTexture surfaceTexture) {
+        if (screenOff) {
+            // 画布准备好、看门狗到点、贴边放回来 —— 通往这里的路不止一条，
+            // 所以这一条守在入口，而不是守在每一个调用方
+            AppLog.d(TAG, "屏幕黑着，后视镜先不接相机");
+            return;
+        }
         if (mirrorView == null || surfaceTexture == null) {
             return;
         }
@@ -304,8 +354,8 @@ public class RearViewMirrorService extends Service {
         if (mirrorView == null || !mirrorView.isShowing()) {
             return;
         }
-        if (mirrorView.isDocked()) {
-            // 贴边收起时本来就是故意不接相机的，别把它又接回去
+        if (mirrorView.isDocked() || screenOff) {
+            // 贴边收起、或者屏幕黑着，本来就是故意不接相机的，别把它又接回去
             return;
         }
         if (boundCamera != null && boundCamera.isCameraOpened()) {
@@ -405,6 +455,30 @@ public class RearViewMirrorService extends Service {
         }
     }
 
+    /**
+     * 熄屏之后确认一遍：没人要相机就整个关掉。
+     *
+     * <p>主界面那边也有同样一步，但它<b>可能根本不在</b> —— 退出应用之后只剩这几个
+     * 服务，那时候没人会去关相机，于是又变成开着相机睡过去。所以这里也管一次；
+     * 两边都关是无害的，漏了才有害。</p>
+     */
+    private void closeCamerasIfNobodyWants() {
+        if (!screenOff) {
+            return;
+        }
+        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+        if (needs.heldByAnyone()) {
+            AppLog.d(TAG, "熄屏，但相机还有人要: " + needs.describe());
+            return;
+        }
+        MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
+        if (manager != null) {
+            manager.closeAllCameras();
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：相机已放开（后视镜这边）");
+            AppLog.i(TAG, "熄屏且没人要相机，关掉");
+        }
+    }
+
     private void unbindCamera() {
         cancelRetry();
         com.kooo.evcam.camera.CameraNeeds.current().release(com.kooo.evcam.camera.CameraNeeds.Holder.MIRROR);
@@ -424,6 +498,11 @@ public class RearViewMirrorService extends Service {
     public void onDestroy() {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RearViewMirrorService onDestroy");
         instance = null;
+        try {
+            unregisterReceiver(screenWatch);
+        } catch (Exception e) {
+            AppLog.w(TAG, "屏幕监听取消失败: " + e);
+        }
         cancelRetry();
         cancelWatchdog();
         unbindCamera();

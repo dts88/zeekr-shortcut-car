@@ -197,11 +197,24 @@ public class MainActivity extends AppCompatActivity {
     private Runnable screenOffStopRunnable;  // 息屏停止录制的延迟任务
     private Runnable screenOnStartRunnable;  // 亮屏恢复录制的延迟任务
     private Runnable screenOffBackgroundRunnable;  // 息屏退后台的延迟任务
+    private Runnable screenOffCameraRunnable;  // 息屏尽快关相机的延迟任务
     private boolean isScreenOff = false;  // 当前是否息屏
     private boolean wasRecordingBeforeScreenOff = false;  // 息屏前是否正在录制
     private static final long SCREEN_OFF_DELAY_MS = 10000;  // 息屏后等待10秒（停止录制）
     private static final long SCREEN_ON_DELAY_MS = 10000;   // 亮屏后等待10秒（恢复录制）
     private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
+    /**
+     * 息屏后多久放开相机。
+     *
+     * <p>退后台那一步可以慢慢来，<b>放开相机不能</b>：实测车机熄屏六秒后就深睡了，
+     * 而 15 秒的延迟任务用的是 uptime 时钟，深睡期间根本不走 —— 那一次它是在
+     * 十九分钟后、车机醒来时才执行的，相机就这么开着睡了过去。醒来时会话已经作废，
+     * 关它卡在 binder 里，接着 error -4（资源耗尽），靠看门狗重开花了 9.4 秒。</p>
+     *
+     * <p>1.5 秒既躲得开深睡，也还留着一点余地：屏幕闪一下就亮回来的话，
+     * 相机还没来得及关。</p>
+     */
+    private static final long SCREEN_OFF_CAMERA_DELAY_MS = 1500;
     
     
     // 车型配置相关
@@ -3429,6 +3442,27 @@ public class MainActivity extends AppCompatActivity {
         };
         
         screenStateHandler.postDelayed(screenOffBackgroundRunnable, SCREEN_OFF_BACKGROUND_DELAY_MS);
+
+        // 相机不等那 15 秒：车机熄屏没几秒就深睡，晚一步就是开着相机睡过去
+        screenOffCameraRunnable = () -> {
+            if (!isScreenOff || isRecording) {
+                return;
+            }
+            if (appConfig.isAutoStartRecording() && appConfig.isScreenOffRecordingEnabled()) {
+                return;
+            }
+            com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+            if (needs.heldByAnyone()) {
+                AppLog.d(TAG, "熄屏，但相机还有人要: " + needs.describe() + "，等退后台那一步再说");
+                return;
+            }
+            if (cameraManager != null) {
+                cameraManager.closeAllCameras();
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：相机已放开（深睡前）");
+                AppLog.i(TAG, "熄屏，没人要相机，先关掉 —— 别开着相机睡过去");
+            }
+        };
+        screenStateHandler.postDelayed(screenOffCameraRunnable, SCREEN_OFF_CAMERA_DELAY_MS);
     }
     
     /**
@@ -3454,6 +3488,10 @@ public class MainActivity extends AppCompatActivity {
             screenStateHandler.removeCallbacks(screenOffBackgroundRunnable);
             screenOffBackgroundRunnable = null;
             AppLog.d(TAG, "亮屏，取消退后台任务");
+        }
+        if (screenOffCameraRunnable != null) {
+            screenStateHandler.removeCallbacks(screenOffCameraRunnable);
+            screenOffCameraRunnable = null;
         }
 
         // 因为熄屏自己退下去的，亮屏就自己回来。界面已经被系统收走的那种情况

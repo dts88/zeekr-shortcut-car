@@ -7,6 +7,32 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.24.0-alpha] - 2026-09-23
+
+Read from the car: the head unit deep-sleeps whenever it is parked -- 20.8 hours out of the
+last 26 -- and the app survives it, same process id either side. What did not survive was
+the camera.
+
+- **The super mirror lets go of the camera when the screen goes dark, and takes it back
+  when the screen comes on.** Two seconds after the screen went off it was already showing
+  "tap to resume", because a dark screen has no frames to show -- but it still held its
+  claim on the camera, so the step that releases cameras fifteen seconds after screen-off
+  reported "someone still wants it" and left the camera open. It then went into deep sleep
+  that way. On waking, the session belonged to a previous life: closing it blocked inside
+  binder, then DISCONNECTED, then error -4 (out of resources), and the watchdog needed 9.4
+  seconds to get a picture back. The unlucky version of that is the one that needed the
+  head unit restarted.
+- **Cameras are released 1.5 seconds after the screen goes dark, not 15.** The 15-second
+  task runs on a clock that stops during deep sleep, and the head unit was asleep six
+  seconds after screen-off -- so that task actually ran nineteen minutes later, on waking.
+  The mirror does the same check itself, because after you exit the app there is no main
+  screen left to do it.
+- **The black box now covers the night.** Two thirds of it was the once-a-minute keep-alive
+  routine, which meant a 48KB export held about three hours -- and the hours worth reading
+  are the ones you were asleep for. Those lines are counted now instead of listed, a
+  heartbeat is written when something changes rather than every minute, and the export
+  holds 128KB.
+
 ## [1.23.2-alpha] - 2026-09-23
 
 - **Tapping an enlarged lane goes straight back to the grid**, instead of stopping at the

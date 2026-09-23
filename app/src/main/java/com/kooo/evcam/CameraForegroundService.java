@@ -187,10 +187,18 @@ public class CameraForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
-        // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("CameraForegroundService onStartCommand flags=" + flags
-                + (intent == null ? " intent=null(sticky重启)" : "")
-                + " startId=" + startId);
+        // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它。
+        //
+        // 只有那种才值一行：每分钟那一次例行叫醒只计数。原来一律记，结果 48KB 的
+        // 导出只装得下三个小时 —— 而要看的那一夜正好在三个小时之外
+        if (flags != 0 || intent == null) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                    "CameraForegroundService onStartCommand flags=" + flags
+                            + (intent == null ? " intent=null(sticky重启)" : "")
+                            + " startId=" + startId);
+        } else {
+            com.kooo.evcam.blackbox.BlackBox.count("前台服务例行叫醒");
+        }
         AppLog.d(TAG, "Service started");
         
         // 每次启动时检查并注册 TIME_TICK
@@ -233,16 +241,38 @@ public class CameraForegroundService extends Service {
         return START_STICKY;
     }
     
-    /** 黑匣子心跳间隔。一分钟一行，一夜六十行，不多。 */
+    /** 黑匣子心跳间隔：一分钟看一次。 */
     private static final long BLACK_BOX_TICK_MS = 60_000L;
+    /** 状态没变的话，多久才值得再写一行。 */
+    private static final long BLACK_BOX_QUIET_MS = 10 * 60_000L;
+
+    /** 上一行心跳写的是什么状态，以及什么时候写的（开机起算，含深睡）。 */
+    private boolean lastBeatRecording;
+    private boolean lastBeatScreenOn;
+    private long lastBeatAtMs;
 
     private final android.os.Handler blackBoxHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable blackBoxTick = new Runnable() {
         @Override
         public void run() {
-            com.kooo.evcam.blackbox.BlackBox.note("心跳 recording=" + isRecordingNow()
-                    + " screenOn=" + isScreenOnNow());
+            // 每分钟看一次，但只有「变了」或者「安静太久了」才写下来。
+            //
+            // 一分钟一行看着不多，一夜也就六十行 —— 可它一分钟并不止一行，
+            // 连带前台服务那两行，三分之二的黑匣子都是这种什么也没发生的行。
+            // 真正要看的是变化：什么时候开始录、什么时候熄的屏，以及
+            // <b>两行之间 slept= 涨了多少</b>，那一段就是车机睡过去的时间。
+            boolean recording = isRecordingNow();
+            boolean screenOn = isScreenOnNow();
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (lastBeatAtMs == 0 || recording != lastBeatRecording || screenOn != lastBeatScreenOn
+                    || now - lastBeatAtMs >= BLACK_BOX_QUIET_MS) {
+                com.kooo.evcam.blackbox.BlackBox.note(
+                        "心跳 recording=" + recording + " screenOn=" + screenOn);
+                lastBeatRecording = recording;
+                lastBeatScreenOn = screenOn;
+                lastBeatAtMs = now;
+            }
             com.kooo.evcam.blackbox.BlackBox.flushCountsIfDue();
             blackBoxHandler.postDelayed(this, BLACK_BOX_TICK_MS);
         }
@@ -451,7 +481,7 @@ public class CameraForegroundService extends Service {
             try {
                 context.startForegroundService(intent);
                 AppLog.d(TAG, "Starting foreground service: " + title);
-                com.kooo.evcam.blackbox.BlackBox.note("startForegroundService 调用成功");
+                com.kooo.evcam.blackbox.BlackBox.count("startForegroundService 成功");
             } catch (Exception e) {
                 // Android 12 起，后台启前台服务会被拦 —— 拦不拦、什么条件下拦，看这一行
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("startForegroundService 被拒: " + e.getClass().getSimpleName()

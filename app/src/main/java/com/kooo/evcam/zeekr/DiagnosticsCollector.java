@@ -267,7 +267,7 @@ public final class DiagnosticsCollector {
     private static void appendBlackBox(StringBuilder sb, Context context) {
         sb.append("## 2.6 黑匣子（进程 / 服务 / 界面的生死时间线）").append('\n');
         try {
-            sb.append(com.kooo.evcam.blackbox.BlackBox.export(context, 48 * 1024));
+            sb.append(com.kooo.evcam.blackbox.BlackBox.export(context, 128 * 1024));
         } catch (Exception e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
