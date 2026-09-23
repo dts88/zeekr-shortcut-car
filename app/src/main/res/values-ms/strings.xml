@@ -329,7 +329,7 @@
     <string name="photo_empty">Belum ada foto</string>
     <string name="photo_no_image">Tiada foto</string>
     <string name="photo_pick_hint">Pilih foto daripada senarai</string>
-    <string name="photo_double_tap_hint">Ketik dua kali pada satu paparan untuk membesarkannya</string>
+    <string name="photo_tap_hint">Ketik satu paparan untuk membesarkannya</string>
     <string name="photo_fisheye">Mata ikan</string>
 
     <!-- Hantar ke telefon -->
@@ -343,7 +343,7 @@
     <string name="share_phone_failed">Tidak dapat bermula: %1$s</string>
     <string name="share_phone_need_hotspot_title">Sambungkan kedua-dua peranti dahulu</string>
     <string name="share_phone_need_hotspot_msg">Telefon dan unit kepala mesti berada pada rangkaian yang sama: sambungkan satu ke hotspot yang satu lagi.\n\nKemudian cuba lagi.</string>
-    <string name="share_photo_pick_lane_first">Ketik dua kali pada satu paparan untuk membesarkannya, kemudian hantar</string>
+    <string name="share_photo_pick_lane_first">Ketik satu paparan untuk membesarkannya, kemudian hantar</string>
 
     <!-- Gesaan perkongsian -->
     <string name="share_phone_network_hint">Telefon dan unit kepala mesti berada pada rangkaian yang sama. Paling mudah: **buka hotspot telefon dan sambungkan kereta kepadanya**.</string>

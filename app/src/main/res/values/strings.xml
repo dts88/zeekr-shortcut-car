@@ -337,7 +337,7 @@
     <string name="photo_empty">暂无照片文件</string>
     <string name="photo_no_image">无图片</string>
     <string name="photo_pick_hint">请从左侧列表选择照片</string>
-    <string name="photo_double_tap_hint">双击画面可放大切换</string>
+    <string name="photo_tap_hint">点画面放大那一路</string>
     <string name="photo_fisheye">鱼眼校正</string>
 
     <!-- 发送到手机 -->
@@ -351,7 +351,7 @@
     <string name="share_phone_failed">启动失败：%1$s</string>
     <string name="share_phone_need_hotspot_title">需要先把两台设备连起来</string>
     <string name="share_phone_need_hotspot_msg">手机和车机要在同一个局域网里：用手机开热点让车机连上，或者用车机开热点让手机连上。\n\n连好之后再试一次。</string>
-    <string name="share_photo_pick_lane_first">请先双击一路画面放大，再发送</string>
+    <string name="share_photo_pick_lane_first">请先点一路画面放大，再发送</string>
 
     <!-- 分享提示 -->
     <string name="share_phone_network_hint">需要手机和车机在同一个网络里。最省事的做法：**用手机开热点，让车机连上这个 Wi-Fi**。</string>

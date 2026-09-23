@@ -290,7 +290,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="@string/photo_double_tap_hint"
+                        android:text="@string/photo_tap_hint"
                         android:textColor="@color/text_hint"
                         android:textAppearance="@style/TextAppearance.Cam.Body" />
                 </LinearLayout>

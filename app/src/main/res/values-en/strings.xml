@@ -329,7 +329,7 @@
     <string name="photo_empty">No photos yet</string>
     <string name="photo_no_image">No photo</string>
     <string name="photo_pick_hint">Pick a photo from the list</string>
-    <string name="photo_double_tap_hint">Double-tap a view to enlarge it</string>
+    <string name="photo_tap_hint">Tap a view to enlarge it</string>
     <string name="photo_fisheye">Fisheye</string>
 
     <!-- Send to phone -->
@@ -343,7 +343,7 @@
     <string name="share_phone_failed">Could not start: %1$s</string>
     <string name="share_phone_need_hotspot_title">Connect the two devices first</string>
     <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same network: connect one to the other\'s hotspot.\n\nThen try again.</string>
-    <string name="share_photo_pick_lane_first">Double-tap a view to enlarge it, then send</string>
+    <string name="share_photo_pick_lane_first">Tap a view to enlarge it, then send</string>
 
     <!-- Share hints -->
     <string name="share_phone_network_hint">The phone and the head unit must be on the same network. Easiest: **turn on the phone\'s hotspot and connect the car to it**.</string>

@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.23.1-alpha] - 2026-09-23
+
+- Fixed: two hints still told you to double-tap -- the one under the photo list and the one
+  that asks you to pick a lane before sending a photo to a phone. Nothing double-taps any
+  more; the string is named after what it says now, not after the gesture it used to
+  describe.
+
 ## [1.23.0-alpha] - 2026-09-23
 
 - **One tap gets you there in photo playback**, the way the preview already worked. Tap a
