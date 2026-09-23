@@ -60,7 +60,8 @@ import java.util.Set;
  * <p>点一格就让那一格占满整块，做的只是<b>把别的几格收起来</b> —— 没有第二套布局、
  * 没有第二个 ImageView，同一张图从头到尾只解一次码。主界面预览就是这么做的。</p>
  *
- * <p>点一下就到位：网格里点环视的某一路，直接展开并放大那一路，不必先展开再点。
+ * <p>点一下就到位：网格里点环视的某一路，直接展开并放大那一路，不必先展开再点；
+ * 再点一下回到网格，中间不停在「整张环视」那一层。
  * 手势全走 {@code setOnClickListener} —— 只要还留着双击，单击就得等
  * 300ms 的双击判定，那正是「预览比回看弹得快」的来源。</p>
  *
@@ -325,8 +326,10 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      * <ul>
      *   <li>网格里点一格 → 这一格占满整块。环视还顺带把<b>点到的那一路</b>放大：
      *       想看哪一路，一下到位。</li>
-     *   <li>占满的环视上再点 → 放大那一路；已经放大了就还原成整张；
-     *       点在画面外的黑边上 → 收回网格。</li>
+     *   <li>占满的环视上再点 → 放大那一路。</li>
+     *   <li><b>已经放大了的话，点哪儿都是收回网格。</b>「整张环视、座舱还藏着」那一层
+     *       不是一个要停留的画面：看完一路要回到全貌，没有理由多点一下。
+     *       只有环视的那一组本来就看不出差别 —— 网格里也只有它一格。</li>
      *   <li>占满的座舱上再点 → 一整幅画面，没有格子可分，直接收回网格。</li>
      * </ul>
      */
@@ -345,12 +348,11 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             return;
         }
         int cell = cellUnderTouch();
-        if (cell == PlaybackViewport.NO_CELL) {
-            collapse();
+        if (zoomedCell != PlaybackViewport.NO_CELL || cell == PlaybackViewport.NO_CELL) {
+            collapse();   // 放大着的时候点哪儿都是退回去；黑边上也没有画面可点
             return;
         }
-        // 已经放大了的话，屏幕上就只剩那一路，点哪儿都只能是「还原」
-        zoomedCell = zoomedCell != PlaybackViewport.NO_CELL ? PlaybackViewport.NO_CELL : cell;
+        zoomedCell = cell;
         applyCellZoom();
     }
 
@@ -873,12 +875,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             exitMultiSelectMode();
             return;
         }
-        if (zoomedCell != PlaybackViewport.NO_CELL) {
-            zoomedCell = PlaybackViewport.NO_CELL;
-            applyCellZoom();
-            return;
-        }
-        if (expandedPosition != null) {
+        if (zoomedCell != PlaybackViewport.NO_CELL || expandedPosition != null) {
+            // 和点画面一样，一下退回网格：中间那一层不值得让返回键多按一次
             collapse();
             return;
         }

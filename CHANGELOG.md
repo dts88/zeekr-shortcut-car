@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.23.2-alpha] - 2026-09-23
+
+- **Tapping an enlarged lane goes straight back to the grid**, instead of stopping at the
+  whole surround photo with the cabin views still hidden. That state is somewhere to pass
+  through, not somewhere to be: having looked at one lane, you want the whole picture back,
+  and there was no reason to spend a second tap on it. Back does the same in one press. For
+  a group with only a surround photo nothing changes -- the grid holds that one photo
+  anyway, so the two looked identical to begin with.
+
 ## [1.23.1-alpha] - 2026-09-23
 
 - Fixed: two hints still told you to double-tap -- the one under the photo list and the one
