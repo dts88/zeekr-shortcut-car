@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.20.0-alpha] - 2026-09-23
+
+- **Photo playback is laid out like the preview**: the surround view on the left, the cabin
+  cameras stacked on the right, in the same proportions. A camera with no picture for that
+  moment leaves no empty box.
+- **Tap a cell of a surround photo to enlarge it, tap again to go back** -- the gesture
+  continuous playback already had. Cabin pictures are a single view with nothing to divide,
+  so a tap there does nothing rather than pretending to zoom.
+- The four cells are named by direction now -- front, rear, left, right -- instead of "top
+  left", "bottom left", "bottom right". Which cell faces which way was confirmed on the car
+  long ago and the super mirror is built on it; only these labels had not caught up. Naming
+  them by position was also its own trap, since "top left" and the surround view's own
+  "left" are two different things.
+
 ## [1.19.0-beta] - 2026-09-22
 
 Everything from the alphas since 1.9.0-beta, gathered into one beta.

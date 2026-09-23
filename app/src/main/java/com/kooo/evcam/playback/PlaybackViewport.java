@@ -113,18 +113,23 @@ public final class PlaybackViewport {
     /**
      * 格子的名字，返回的是字符串资源 id。
      *
-     * <p>只有右上是后方这一条在实车确认过（超级后视镜取的就是这一格）。
-     * 其余三格对应车辆哪个方向尚未确认，所以按位置命名，不瞎标方向。</p>
+     * <p>四格对应哪个方向<b>早就实车确认过</b>：左上 前、右上 后、左下 左、右下 右。
+     * 超级后视镜就建立在这个映射上 —— 它按「后 → 左 → 前 → 右」顺时针遍历，
+     * 而且只给「后」做左右镜像；映射要是错的，那个窗口第一天就穿帮了。</p>
+     *
+     * <p>这里原先只敢说右上是后方、其余三格按位置叫「左上 / 左下 / 右下」——
+     * 那是确认之前留下的措辞，一直没跟上。按位置叫的问题不只是含糊：
+     * 「左上」和环视里真正的「左」<b>指的是两个东西</b>，摆在一起只会让人对不上。</p>
      *
      * <p>返回 id 而不是文字：这个类不拿 Context，取字交给有界面的调用方 ——
      * 顺带也就不会再有写死中文的那一版。</p>
      */
     public static int labelRes(int cell) {
         switch (cell) {
-            case 0: return R.string.cell_top_left;
-            case 1: return R.string.cell_top_right_rear;
-            case 2: return R.string.cell_bottom_left;
-            case 3: return R.string.cell_bottom_right;
+            case 0: return R.string.zeekr_lane_front;
+            case 1: return R.string.zeekr_lane_back;
+            case 2: return R.string.zeekr_lane_left;
+            case 3: return R.string.zeekr_lane_right;
             default: return R.string.zeekr_mode_grid;
         }
     }

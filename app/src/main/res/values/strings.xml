@@ -12,10 +12,6 @@
     <string name="zeekr_lane_back">后</string>
     <string name="zeekr_lane_left">左</string>
     <string name="zeekr_lane_right">右</string>
-    <string name="cell_top_left">左上</string>
-    <string name="cell_top_right_rear">右上（后方）</string>
-    <string name="cell_bottom_left">左下</string>
-    <string name="cell_bottom_right">右下</string>
     <string name="zeekr_mode_grid">四宫格</string>
     <string name="zeekr_composite_not_found">未检测到四联合成流，本机可能不支持极氪合成模式</string>
 

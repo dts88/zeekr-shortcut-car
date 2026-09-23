@@ -163,10 +163,6 @@
     <string name="zeekr_lane_back">Rear</string>
     <string name="zeekr_lane_left">Left</string>
     <string name="zeekr_lane_right">Right</string>
-    <string name="cell_top_left">Top left</string>
-    <string name="cell_top_right_rear">Top right (rear)</string>
-    <string name="cell_bottom_left">Bottom left</string>
-    <string name="cell_bottom_right">Bottom right</string>
     <string name="zeekr_mode_grid">2×2 grid</string>
 
     <!-- First-launch guide -->

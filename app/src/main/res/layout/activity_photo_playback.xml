@@ -121,27 +121,25 @@
                         android:id="@+id/multi_view_layout"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:orientation="vertical"
+                        android:orientation="horizontal"
                         android:gravity="center"
                         android:background="@color/preview_grid_divider">
 
-                        <!-- 上排：前、后 -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center">
+                        <!--
+                          排版和主界面预览一致：环视在左（大），座舱竖排在右。
+                          权重 22 : 14 也取自预览，两边看着才是同一个应用。
 
-                            <com.kooo.evcam.AspectRatioFrameLayout
+                          有文件才显示 —— 没有的那一格整个收起来，不留空框。
+                          第四路（right）在极氪 7X 上不存在，于是永远不显示；
+                          留着它是为了自定义车型那种四面各一个相机的接法。
+                        -->
+                        <com.kooo.evcam.AspectRatioFrameLayout
                                 android:id="@+id/frame_front"
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                        android:layout_weight="1"
-android:layout_marginStart="0dp"
-                            android:layout_marginEnd="6dp"
-                            android:layout_marginTop="0dp"
-                            android:layout_marginBottom="6dp"
-                        android:background="@color/preview_frame_background">
+                                android:layout_height="match_parent"
+                                android:layout_weight="22"
+                                android:layout_margin="3dp"
+                                android:background="@color/preview_frame_background">
 
                         <ImageView
                             android:id="@+id/image_front"
@@ -173,15 +171,19 @@ android:layout_marginStart="0dp"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
 
+                        <LinearLayout
+                            android:id="@+id/cabin_column"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="14"
+                            android:orientation="vertical">
+
                             <com.kooo.evcam.AspectRatioFrameLayout
                                 android:id="@+id/frame_back"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
                                 android:layout_weight="1"
-                                android:layout_marginStart="6dp"
-                                android:layout_marginEnd="0dp"
-                                android:layout_marginTop="0dp"
-                                android:layout_marginBottom="6dp"
+                                android:layout_margin="3dp"
                                 android:background="@color/preview_frame_background">
 
                         <ImageView
@@ -213,24 +215,13 @@ android:layout_marginStart="0dp"
                             android:textAppearance="@style/TextAppearance.Cam.Caption"
                             android:visibility="gone" />
                     </com.kooo.evcam.AspectRatioFrameLayout>
-                </LinearLayout>
-
-                        <!-- 下排：左、右 -->
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center">
 
                             <com.kooo.evcam.AspectRatioFrameLayout
                                 android:id="@+id/frame_left"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
                                 android:layout_weight="1"
-                                android:layout_marginStart="0dp"
-                                android:layout_marginEnd="6dp"
-                                android:layout_marginTop="6dp"
-                                android:layout_marginBottom="0dp"
+                                android:layout_margin="3dp"
                                 android:background="@color/preview_frame_background">
 
                         <ImageView
@@ -265,13 +256,11 @@ android:layout_marginStart="0dp"
 
                             <com.kooo.evcam.AspectRatioFrameLayout
                                 android:id="@+id/frame_right"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
                                 android:layout_weight="1"
-                                android:layout_marginStart="6dp"
-                                android:layout_marginEnd="0dp"
-                                android:layout_marginTop="6dp"
-                                android:layout_marginBottom="0dp"
+                                android:layout_margin="3dp"
+                                android:visibility="gone"
                                 android:background="@color/preview_frame_background">
 
                         <ImageView

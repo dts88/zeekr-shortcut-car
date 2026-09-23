@@ -100,6 +100,12 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     // 状态
     private boolean isMultiSelectMode = false;
     private boolean isSingleMode = false;
+    /**
+     * 单路视图里放大到哪一格；{@link PlaybackViewport#NO_CELL} 表示整张。
+     *
+     * <p>只有环视有格子可放 —— 它本身就是一张 2×2。座舱是一整幅画面，点了不动。</p>
+     */
+    private int zoomedCell = PlaybackViewport.NO_CELL;
     private String currentSinglePosition = PhotoGroup.POSITION_FRONT;
     /** 鱼眼校正：只改屏幕上的样子，原图不动。开关记在设置里，下次进来还是这个状态。 */
     private boolean fisheyeOn;
@@ -282,6 +288,15 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
                     }
                     return true;
                 }
+
+                /** 单击放大点到的那一格，再点还原 —— 和连续回放同一个手势。 */
+                @Override
+                public boolean onSingleTapConfirmed(MotionEvent e) {
+                    if (isSingleMode) {
+                        toggleCellZoom(e.getX(), e.getY());
+                    }
+                    return true;
+                }
             });
             singleViewLayout.setOnTouchListener((v, event) -> {
                 detector.onTouchEvent(event);
@@ -345,6 +360,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
     private void switchToSingleMode(String position, String label) {
         isSingleMode = true;
+        resetCellZoom();
         currentSinglePosition = position;
 
         multiViewLayout.setVisibility(View.GONE);
@@ -363,6 +379,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      * 切换到多路模式
      */
     private void switchToMultiMode() {
+        resetCellZoom();
         isSingleMode = false;
 
         multiViewLayout.setVisibility(View.VISIBLE);
@@ -440,7 +457,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         if (isSingleMode) {
             multiViewLayout.setVisibility(View.GONE);
             singleViewLayout.setVisibility(View.VISIBLE);
-            // 重新加载单路大图
+            // 重新加载单路大图。换了图，取景要回到整张 ——
+            // 留着上一张的放大矩形，会把新图按别人的格子切
+            resetCellZoom();
             File photoFile = group.getPhotoFile(currentSinglePosition);
             loadImage(photoFile, imageSingle, currentSinglePosition);
         } else {
@@ -545,6 +564,59 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             Log.w(TAG, "占位图拷贝不出来，换图时会闪一下: " + e);
             return null;
         }
+    }
+
+    /**
+     * 点一下：放大点到的那一格，或者还原。
+     *
+     * <p>只对环视有效。座舱是一整幅画面，没有格子可分 —— 点了什么都不做，
+     * 而不是装模作样地放大一个不存在的格子。</p>
+     */
+    private void toggleCellZoom(float x, float y) {
+        if (imageSingle == null || gridColumns(currentSinglePosition) < 2) {
+            return;
+        }
+        zoomedCell = zoomedCell != PlaybackViewport.NO_CELL
+                ? PlaybackViewport.NO_CELL
+                : PlaybackViewport.cellAt(x, y, imageSingle.getWidth(), imageSingle.getHeight());
+        applyCellZoom();
+        Toast.makeText(this, PlaybackViewport.labelRes(zoomedCell), Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 把当前的取景贴到图上。
+     *
+     * <p>放大不是缩放整张图，是<b>换一个取景矩形</b>：把那一格映射到整个视图。
+     * 连续回放对视频做的是同一件事，这里换成 ImageView 的矩阵而已。</p>
+     */
+    private void applyCellZoom() {
+        if (imageSingle == null) {
+            return;
+        }
+        android.graphics.drawable.Drawable drawable = imageSingle.getDrawable();
+        if (zoomedCell == PlaybackViewport.NO_CELL || drawable == null
+                || drawable.getIntrinsicWidth() <= 0 || drawable.getIntrinsicHeight() <= 0
+                || imageSingle.getWidth() <= 0 || imageSingle.getHeight() <= 0) {
+            imageSingle.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            imageSingle.setImageMatrix(new android.graphics.Matrix());
+            return;
+        }
+        float[] r = PlaybackViewport.transformRects(zoomedCell,
+                drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(),
+                imageSingle.getWidth(), imageSingle.getHeight());
+        android.graphics.Matrix matrix = new android.graphics.Matrix();
+        matrix.setRectToRect(
+                new android.graphics.RectF(r[0], r[1], r[2], r[3]),
+                new android.graphics.RectF(r[4], r[5], r[6], r[7]),
+                android.graphics.Matrix.ScaleToFit.CENTER);
+        imageSingle.setScaleType(ImageView.ScaleType.MATRIX);
+        imageSingle.setImageMatrix(matrix);
+    }
+
+    /** 换了图、进出单路视图，取景都要回到整张。 */
+    private void resetCellZoom() {
+        zoomedCell = PlaybackViewport.NO_CELL;
+        applyCellZoom();
     }
 
     /**
@@ -793,6 +865,10 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (isMultiSelectMode) {
             exitMultiSelectMode();
+            return;
+        }
+        if (zoomedCell != PlaybackViewport.NO_CELL) {
+            resetCellZoom();
             return;
         }
         if (isSingleMode) {
