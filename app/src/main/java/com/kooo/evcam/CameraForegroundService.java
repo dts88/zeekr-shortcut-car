@@ -82,6 +82,10 @@ public class CameraForegroundService extends Service {
         // 那时候界面多半已经不在了，而这个服务还在。只读，失败也不影响别的
         com.kooo.evcam.zeekr.VehicleSignalWatch.start(this);
 
+        // 相机服务眼里每一路空不空。环视卡死、只能重启车机的那种状态，
+        // 要靠它说出「是谁占着」—— 注册时系统会把当前状态报一遍
+        com.kooo.evcam.camera.CameraAvailabilityWatch.start(this);
+
         // 启动悬浮窗与补盲服务（不依赖 MainActivity，Activity 被杀也能继续运行）
         startRemoteServicesIfNeeded();
 

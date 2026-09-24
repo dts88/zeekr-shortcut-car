@@ -876,7 +876,7 @@ public class MultiCameraManager {
             case -3:
                 return "会话配置失败";
             case -4:
-                return "摄像头断开连接(资源耗尽)";
+                return "被相机服务断开(onDisconnected)";
             default:
                 return "未知错误(" + errorCode + ")";
         }

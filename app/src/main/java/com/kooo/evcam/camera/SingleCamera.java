@@ -450,6 +450,38 @@ public class SingleCamera {
     /**
      * 摄像头硬件是否已打开
      */
+    /** 开着，或者正在开 —— 相机服务报「被占用」时，用来判断是不是我们自己。 */
+    public boolean holdsOrIsOpening() {
+        return cameraDevice != null || isOpening;
+    }
+
+    /**
+     * 关相机，并量一下它在相机服务里卡了多久。
+     *
+     * <p>{@code CameraDevice.close()} 是一次进相机服务的 binder 调用。醒来之后它卡过一秒多
+     * （2026-09-23，Camera-2 线程停在 {@code ICameraDeviceUser.disconnect()}）；
+     * 而这几处调用都拿着 {@link #reconnectLock}，主线程上的 {@link #closeCamera()} 也要这把锁 ——
+     * 一边卡在 binder 里，另一边就在锁上等。超过半秒的都记进黑匣子，带上线程名：
+     * 是不是卡在主线程上，看这一行就知道。</p>
+     */
+    private void closeDeviceTimed(CameraDevice device, String why) {
+        if (device == null) {
+            return;
+        }
+        long start = SystemClock.elapsedRealtime();
+        try {
+            device.close();
+        } catch (Exception e) {
+            AppLog.d(TAG, "Camera " + cameraId + " ignored exception while closing (" + why + "): "
+                    + e.getMessage());
+        }
+        long ms = SystemClock.elapsedRealtime() - start;
+        if (ms >= 500) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 关闭卡了 " + ms + "ms（"
+                    + why + "，线程 " + Thread.currentThread().getName() + "）");
+        }
+    }
+
     public boolean isCameraOpened() {
         return cameraDevice != null;
     }
@@ -1273,6 +1305,8 @@ public class SingleCamera {
 
             reconnectAttempts++;
             isReconnecting = true;
+            // 只计数不逐条记：一路相机被反复重连时，这个数会在汇总里冒出来
+            com.kooo.evcam.blackbox.BlackBox.count("相机 " + cameraId + " 自动重连");
             long delayMs = Math.max(getReconnectDelayMs(reconnectAttempts), reconnectDelayFloorMs);
             AppLog.d(TAG, "Camera " + cameraId + " scheduling reconnect attempt " + reconnectAttempts + " in " + delayMs + "ms");
 
@@ -1403,13 +1437,11 @@ public class SingleCamera {
         @Override
         public void onDisconnected(@NonNull CameraDevice camera) {
             isOpening = false;
+            // 这是相机服务把我们踢掉：被别的程序（多半是原厂功能）拿走，或者设备自己没了。
+            // 基座把它记成自定义的 -4，标签写的「资源耗尽」是错的
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 被相机服务断开（onDisconnected）");
             synchronized (reconnectLock) {
-                try {
-                    camera.close();
-                } catch (Exception e) {
-                    // 忽略关闭异常
-                    AppLog.d(TAG, "Camera " + cameraId + " ignored exception while closing on disconnect: " + e.getMessage());
-                }
+                closeDeviceTimed(camera, "onDisconnected");
                 cameraDevice = null;
                 AppLog.w(TAG, "Camera " + cameraId + " DISCONNECTED - will attempt to reconnect...");
                 if (callback != null) {
@@ -1433,13 +1465,9 @@ public class SingleCamera {
         @Override
         public void onError(@NonNull CameraDevice camera, int error) {
             isOpening = false;
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 出错 error=" + error);
             synchronized (reconnectLock) {
-                try {
-                    camera.close();
-                } catch (Exception e) {
-                    // 忽略关闭异常
-                    AppLog.d(TAG, "Camera " + cameraId + " ignored exception while closing on error: " + e.getMessage());
-                }
+                closeDeviceTimed(camera, "onError");
                 cameraDevice = null;
                 String errorMsg = "UNKNOWN";
                 boolean shouldRetry = false;
@@ -2818,14 +2846,9 @@ public class SingleCamera {
                 captureSession = null;
             }
 
-            // 关闭设备（捕获异常）
+            // 关闭设备（捕获异常），并量一下卡了多久
             if (cameraDevice != null) {
-                try {
-                    cameraDevice.close();
-                } catch (Exception e) {
-                    // 忽略关闭异常
-                    AppLog.d(TAG, "Camera " + cameraId + " ignored exception while closing device: " + e.getMessage());
-                }
+                closeDeviceTimed(cameraDevice, "closeCamera");
                 cameraDevice = null;
             }
 

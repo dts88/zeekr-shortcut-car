@@ -824,6 +824,23 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setSummary(R.string.set_screen_off_locked);
     }
 
+    /**
+     * 醒来自动接回相机：和息屏录制同一个锁法 —— 没开开发者选项时灰掉、关着、写明为什么。
+     * {@link com.kooo.evcam.AppConfig#isAutoReconnectOnWake()} 那边同样锁着，界面写着关，实际就是关。
+     */
+    private void lockAutoReconnect() {
+        if (DeveloperMode.isUnlocked()) {
+            return;
+        }
+        SwitchPreferenceCompat pref = findPreference("pref_auto_reconnect");
+        if (pref == null) {
+            return;
+        }
+        pref.setChecked(false);
+        pref.setEnabled(false);
+        pref.setSummary(R.string.set_screen_off_locked);
+    }
+
     private void bindSystem() {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
@@ -836,6 +853,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
                 value -> appConfig.setScreenOffRecordingEnabled(value));
         lockScreenOffRecording();
+        bindSwitch("pref_auto_reconnect", appConfig.isAutoReconnectOnWake(),
+                value -> appConfig.setAutoReconnectOnWake(value));
+        lockAutoReconnect();
         bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> appConfig.setKeepAliveEnabled(value));
     }

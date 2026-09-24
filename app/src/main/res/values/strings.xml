@@ -101,6 +101,8 @@
     <string name="set_auto_record_summary">应用启动后自动开始录制；从后台返回前台时同样恢复</string>
     <string name="set_screen_off_title">息屏录制</string>
     <string name="set_screen_off_summary">息屏（锁车黑屏）后继续录制</string>
+    <string name="set_auto_reconnect_title">亮屏后自动接回相机</string>
+    <string name="set_auto_reconnect_summary">车机深睡醒来、停车后自己亮屏，两种都分不出是不是人回来了。关着时点一下后视镜才接回相机</string>
     <string name="set_keep_alive_title">定时保活</string>
     <string name="set_keep_alive_summary">定期唤醒进程，避免被系统回收</string>
     <string name="set_recording_mode_title">录制模式</string>

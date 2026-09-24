@@ -215,6 +215,31 @@ public final class DiagnosticsCollector {
         sb.append("说明: 这是相机送出来的帧率，录制只会更低。").append('\n').append('\n');
     }
 
+    /**
+     * 相机服务眼里每一路空不空。
+     *
+     * <p>要找的是这一种：<b>被占用，但不是我们</b>。环视卡死、重启应用和重装都没用、
+     * 只有重启车机才好 —— 如果那时这里写着「2 被占用（不是我们）」，
+     * 占着它的就在相机服务那一侧，应用这边怎么重试都没用。</p>
+     */
+    private static void appendCameraAvailability(StringBuilder sb) {
+        sb.append("## 2.3.1 相机可用性（相机服务视角）").append('\n');
+        if (!com.kooo.evcam.camera.CameraAvailabilityWatch.heardAnything()) {
+            sb.append("没收到过可用性回调（前台服务没起来，或者容器没转这条接口）").append('\n').append('\n');
+            return;
+        }
+        for (java.util.Map.Entry<String, long[]> e
+                : com.kooo.evcam.camera.CameraAvailabilityWatch.snapshot().entrySet()) {
+            long[] v = e.getValue();
+            sb.append("  相机 ").append(e.getKey()).append(": ")
+                    .append(v[0] == 1 ? "空闲" : "被占用")
+                    .append(v[0] == 1 ? "" : (v[2] == 1 ? "（我们开着）" : "（不是我们）"))
+                    .append(v[1] >= 0 ? "，已持续 " + (v[1] / 1000) + " 秒" : "")
+                    .append('\n');
+        }
+        sb.append('\n');
+    }
+
     private static void appendStallWatch(StringBuilder sb, Context context) {
         sb.append("## 2.3 卡顿监测（后视镜 / 录制卡住时自动留下的现场）").append('\n');
         try {
@@ -224,6 +249,7 @@ public final class DiagnosticsCollector {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
         sb.append('\n');
+        appendCameraAvailability(sb);
     }
 
     /**

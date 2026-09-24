@@ -208,17 +208,35 @@ public class MainActivity extends AppCompatActivity {
      * 相机不重开、界面不接回来；十五秒那个退后台的任务按 uptime 算，醒来十几秒后照样执行，
      * 读到的还是「熄屏中」。</p>
      *
-     * <p>所以凡是要看「现在是不是熄屏」的地方，先调这一步：屏幕其实亮着就补跑一次
-     * {@link #onScreenOn()}，然后再回答。</p>
+     * <p>所以凡是要看「现在是不是熄屏」的地方，先调这一步。屏幕其实亮着的话：
+     * 人在界面上（{@code userPresent}），或者开发者选项里开了「亮屏后自动接回相机」，
+     * 就补跑一次 {@link #onScreenOn()}；否则只把标记对齐 —— 车机停车后会自己醒来亮屏两分钟，
+     * 那一次不该开相机、拉界面。</p>
      *
      * @return 屏幕此刻是不是真的黑着
      */
-    private boolean reconcileScreenState(String where) {
+    private boolean reconcileScreenState(String where, boolean userPresent) {
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(POWER_SERVICE);
         boolean dark = power != null ? !power.isInteractive() : isScreenOff;
         if (isScreenOff && !dark) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播，补跑亮屏逻辑（" + where + "）");
-            onScreenOn();
+            if (userPresent || appConfig.isAutoReconnectOnWake()) {
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播，补跑亮屏逻辑（" + where + "）");
+                onScreenOn();
+            } else {
+                // 可能是车机停车后自己醒的那一次：不开相机、不拉界面、不恢复录制，
+                // 只把标记对齐、把熄屏那几个还在排队的任务撤掉 —— 否则退后台那一步会把人踢出去
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播：按设置不自动接回（" + where + "）");
+                isScreenOff = false;
+                for (Runnable pending : new Runnable[]{screenOffStopRunnable,
+                        screenOffBackgroundRunnable, screenOffCameraRunnable}) {
+                    if (pending != null) {
+                        screenStateHandler.removeCallbacks(pending);
+                    }
+                }
+                screenOffStopRunnable = null;
+                screenOffBackgroundRunnable = null;
+                screenOffCameraRunnable = null;
+            }
         }
         return dark;
     }
@@ -232,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
      * <p>退后台那一步可以慢慢来，<b>放开相机不能</b>：实测车机熄屏六秒后就深睡了，
      * 而 15 秒的延迟任务用的是 uptime 时钟，深睡期间根本不走 —— 那一次它是在
      * 十九分钟后、车机醒来时才执行的，相机就这么开着睡了过去。醒来时会话已经作废，
-     * 关它卡在 binder 里，接着 error -4（资源耗尽），靠看门狗重开花了 9.4 秒。</p>
+     * 关它卡在 binder 里，接着被相机服务断开（日志里的 error -4，基座自定义码），靠看门狗重开花了 9.4 秒。</p>
      *
      * <p>1.5 秒既躲得开深睡，也还留着一点余地：屏幕闪一下就亮回来的话，
      * 相机还没来得及关。</p>
@@ -3419,7 +3437,7 @@ public class MainActivity extends AppCompatActivity {
         
         screenOffBackgroundRunnable = () -> {
             // 再次检查是否仍然息屏 —— 问实际状态：深睡醒来后亮屏广播不来，标记是旧的
-            if (!reconcileScreenState("15s-background") || !isScreenOff) {
+            if (!reconcileScreenState("15s-background", false) || !isScreenOff) {
                 AppLog.d(TAG, "屏幕已亮起，取消退后台");
                 return;
             }
@@ -3470,7 +3488,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 相机不等那 15 秒：车机熄屏没几秒就深睡，晚一步就是开着相机睡过去
         screenOffCameraRunnable = () -> {
-            if (!reconcileScreenState("1.5s-camera") || !isScreenOff || isRecording) {
+            if (!reconcileScreenState("1.5s-camera", false) || !isScreenOff || isRecording) {
                 return;
             }
             if (appConfig.isAutoStartRecording() && appConfig.isScreenOffRecordingEnabled()) {
@@ -4165,7 +4183,7 @@ public class MainActivity extends AppCompatActivity {
         OverlayCoordinator.onAppForeground(this);
 
         // 人已经在界面上了，屏幕一定亮着。熄屏标记还挂着就说明亮屏广播没来，补跑一次
-        reconcileScreenState("onResume");
+        reconcileScreenState("onResume", true);
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
         // 还是用户自己点回来的

@@ -294,6 +294,11 @@
             android:summary="@string/set_screen_off_summary" />
 
         <SwitchPreferenceCompat
+            android:key="pref_auto_reconnect"
+            android:title="@string/set_auto_reconnect_title"
+            android:summary="@string/set_auto_reconnect_summary" />
+
+        <SwitchPreferenceCompat
             android:key="pref_keep_alive"
             android:title="@string/set_keep_alive_title"
             android:summary="@string/set_keep_alive_summary" />

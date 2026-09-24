@@ -7,6 +7,26 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.28.0-alpha] - 2026-09-25
+
+- **After the car wakes, the cameras wait for you by default.** Waking from deep sleep and
+  the car lighting its own screen while parked -- it does this about two hours after it
+  first falls asleep, for about two minutes -- look identical to the app: the screen is on
+  and no screen-on broadcast arrives. So the super mirror now stays on "tap to resume"
+  until you tap it, and the main screen opens its preview when you open it, as usual. A
+  new switch under Settings -> System, "Reconnect cameras on wake", brings back 1.27.0's
+  automatic reconnect; like screen-off recording, it is locked off unless Developer
+  options are unlocked.
+- **The black box now records what the camera service thinks.** For each camera: when it
+  becomes busy or free, and whether that was us. The state the surround view gets stuck in
+  -- only a head unit restart clears it, while the cabin cameras keep working -- has never
+  been caught in a log; if it happens again, an export before restarting will say whether
+  something other than the app is holding it. Also recorded: disconnects and errors, how
+  long closing a camera took when it took over half a second and on which thread, and how
+  often a camera was reconnected automatically.
+- The error logged as "-4 (out of resources)" was never about resources: -4 is the base
+  code's own number for the camera service disconnecting the app. Label corrected.
+
 ## [1.27.0-alpha] - 2026-09-24
 
 - **Fixed: after the car had been parked, the super mirror stayed on "tap to resume" and
