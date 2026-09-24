@@ -7,6 +7,31 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.27.0-alpha] - 2026-09-24
+
+- **Fixed: after the car had been parked, the super mirror stayed on "tap to resume" and
+  tapping it did nothing.** This was introduced in 1.24.0. The mirror remembered "the
+  screen is dark" when the screen went off and waited for the screen-on broadcast to clear
+  it -- but after deep sleep that broadcast never arrives. The black box shows the release
+  four times out of four and the screen-on broadcast zero times out of four, while the
+  heartbeat reports the screen on within thirty seconds of each wake. With the flag stuck,
+  every path to the camera was refused, including your tap. It now asks the system whether
+  the screen is on instead of trusting a flag, so it comes back within two seconds of the
+  screen lighting up, broadcast or not.
+- **The main screen had the same blind spot** (this one predates the fork): its screen-on
+  handling never ran after deep sleep, so cameras were not reopened and the fifteen-second
+  "move to background" step still fired after waking, thinking the screen was off. It now
+  checks the real screen state first, and runs the screen-on handling it missed.
+- **The black box now keeps the scene of an ANR.** Today's session ended with the app not
+  responding -- the dialog you saw was Android's "app isn't responding" -- and nothing said
+  where the main thread was stuck. The next time the app starts after an ANR, the main
+  thread's stack from that moment is copied into the black box.
+- **Diagnostics now show every setting.** A new section lists the switches that decide
+  when the camera is used, whether Developer options are unlocked, and the raw value of
+  every setting. The black box records the same switches each time the process starts and
+  a line whenever one is changed, so any stretch of the timeline can be matched to the
+  settings it ran under.
+
 ## [1.26.0-alpha] - 2026-09-23
 
 - **Boot autostart no longer means "the head unit never sleeps".** The persistent wake lock

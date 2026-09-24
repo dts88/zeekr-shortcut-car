@@ -198,7 +198,30 @@ public class MainActivity extends AppCompatActivity {
     private Runnable screenOnStartRunnable;  // 亮屏恢复录制的延迟任务
     private Runnable screenOffBackgroundRunnable;  // 息屏退后台的延迟任务
     private Runnable screenOffCameraRunnable;  // 息屏尽快关相机的延迟任务
-    private boolean isScreenOff = false;  // 当前是否息屏
+    private boolean isScreenOff = false;  // 收到过熄屏、还没收到亮屏。亮屏广播深睡醒来后不来，见 reconcileScreenState
+
+    /**
+     * 把「记下来的熄屏」和「屏幕实际亮着」对一下。
+     *
+     * <p>实测（2026-09-24）：熄屏广播四次四次都到，深睡醒来后的亮屏广播一次都没到。
+     * 于是 {@link #isScreenOff} 一旦置上就再也没人清 —— {@link #onScreenOn()} 不跑，
+     * 相机不重开、界面不接回来；十五秒那个退后台的任务按 uptime 算，醒来十几秒后照样执行，
+     * 读到的还是「熄屏中」。</p>
+     *
+     * <p>所以凡是要看「现在是不是熄屏」的地方，先调这一步：屏幕其实亮着就补跑一次
+     * {@link #onScreenOn()}，然后再回答。</p>
+     *
+     * @return 屏幕此刻是不是真的黑着
+     */
+    private boolean reconcileScreenState(String where) {
+        android.os.PowerManager power = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        boolean dark = power != null ? !power.isInteractive() : isScreenOff;
+        if (isScreenOff && !dark) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播，补跑亮屏逻辑（" + where + "）");
+            onScreenOn();
+        }
+        return dark;
+    }
     private boolean wasRecordingBeforeScreenOff = false;  // 息屏前是否正在录制
     private static final long SCREEN_OFF_DELAY_MS = 10000;  // 息屏后等待10秒（停止录制）
     private static final long SCREEN_ON_DELAY_MS = 10000;   // 亮屏后等待10秒（恢复录制）
@@ -3395,8 +3418,8 @@ public class MainActivity extends AppCompatActivity {
         }
         
         screenOffBackgroundRunnable = () -> {
-            // 再次检查是否仍然息屏
-            if (!isScreenOff) {
+            // 再次检查是否仍然息屏 —— 问实际状态：深睡醒来后亮屏广播不来，标记是旧的
+            if (!reconcileScreenState("15s-background") || !isScreenOff) {
                 AppLog.d(TAG, "屏幕已亮起，取消退后台");
                 return;
             }
@@ -3447,7 +3470,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 相机不等那 15 秒：车机熄屏没几秒就深睡，晚一步就是开着相机睡过去
         screenOffCameraRunnable = () -> {
-            if (!isScreenOff || isRecording) {
+            if (!reconcileScreenState("1.5s-camera") || !isScreenOff || isRecording) {
                 return;
             }
             if (appConfig.isAutoStartRecording() && appConfig.isScreenOffRecordingEnabled()) {
@@ -4140,6 +4163,9 @@ public class MainActivity extends AppCompatActivity {
         
         // 通知悬浮窗：应用回到前台
         OverlayCoordinator.onAppForeground(this);
+
+        // 人已经在界面上了，屏幕一定亮着。熄屏标记还挂着就说明亮屏广播没来，补跑一次
+        reconcileScreenState("onResume");
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
         // 还是用户自己点回来的

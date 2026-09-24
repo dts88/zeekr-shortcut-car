@@ -3,15 +3,19 @@ package com.kooo.evcam.blackbox;
 import android.app.ActivityManager;
 import android.app.ApplicationExitInfo;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Process;
 import android.os.SystemClock;
 
 import com.kooo.evcam.AppLog;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
@@ -114,7 +118,39 @@ public final class BlackBox {
             return;
         }
         noteImportant("==== 进程启动，起因: " + starter + " ====");
+        // 这一次进程起来时开关是什么样的 —— 事后看一段时间线，才知道当时在什么设置下
+        noteImportant("开关: " + describeSwitches(appContext));
         appendPreviousExits();
+    }
+
+    /**
+     * 几个和启动、保活、相机去留相关的开关，一行。
+     *
+     * <p>进程每次启动记一遍，诊断报告导出时再列一遍，设置页里改动时另记一笔 ——
+     * 于是任何一段时间线都能对上当时的开关。只列会影响「谁在什么时候用相机」的那几个；
+     * 全部设置的原始值在诊断报告 6.1 里。</p>
+     */
+    public static String describeSwitches(Context context) {
+        if (context == null) {
+            return "(没有 context)";
+        }
+        try {
+            com.kooo.evcam.AppConfig c = new com.kooo.evcam.AppConfig(context);
+            return "开机自启动=" + onOff(c.isAutoStartOnBoot())
+                    + " 自动录制=" + onOff(c.isAutoStartRecording())
+                    + " 熄屏录制=" + onOff(c.isScreenOffRecordingEnabled())
+                    + " 定时保活=" + onOff(c.isKeepAliveEnabled()) + "(开关未接线)"
+                    + " 常驻唤醒锁=" + onOff(c.isPersistentWakeLockEnabled())
+                    + " 超级后视镜=" + onOff(c.isRearViewEnabled())
+                    + " 按键模式=" + onOff(c.isRearViewButtonMode())
+                    + " 录制悬浮按钮=" + onOff(c.isRecordingFloatingEnabled());
+        } catch (Throwable t) {
+            return "(读开关失败: " + t + ")";
+        }
+    }
+
+    private static String onOff(boolean on) {
+        return on ? "开" : "关";
     }
 
     /** 已经接上了没有。没接上时事件先攒在内存里。 */
@@ -275,6 +311,7 @@ public final class BlackBox {
                 note("（系统没有记录过上一次进程退出）");
                 return;
             }
+            noteNewestAnrTrace(context, exits);
             for (ApplicationExitInfo exit : exits) {
                 note("上次退出: " + wallClock(exit.getTimestamp())
                         + " pid=" + exit.getPid()
@@ -286,6 +323,78 @@ public final class BlackBox {
         } catch (Throwable t) {
             AppLog.w(TAG, "读进程退出原因失败: " + t);
         }
+    }
+
+    /** 抄过的最后一次 ANR 的时间戳存在这里，同一次 ANR 只抄一遍。 */
+    private static final String SEEN_PREFS = "blackbox_seen";
+    private static final String KEY_LAST_ANR = "last_anr_ts";
+    /** 主线程抄多少帧。够看出卡在哪一个调用里就行。 */
+    private static final int ANR_FRAMES = 25;
+
+    /**
+     * ANR 的那一次，把主线程卡在哪抄进来。
+     *
+     * <p>2026-09-24 那次进程是以 ANR 结束的（弹出「应用无响应」，用户点了关闭），
+     * 可当时没有任何东西说明主线程卡在哪 —— 只能从旁证猜。系统其实替 ANR 留了一份
+     * 线程快照（{@code getTraceInputStream}），只是要等进程重新起来才读得到，所以放在这里。</p>
+     *
+     * <p>只抄 {@code "main"} 那一段：ANR 问的就是它。同一次 ANR 以后每次启动都会出现在
+     * 「上次退出」里，所以记下时间戳，只抄一遍。每一帧单独一行，保持「一行一件事」。</p>
+     */
+    private static void noteNewestAnrTrace(Context context, List<ApplicationExitInfo> exits) {
+        ApplicationExitInfo anr = null;
+        for (ApplicationExitInfo exit : exits) {
+            if (exit.getReason() == ApplicationExitInfo.REASON_ANR) {
+                anr = exit;   // 系统按新到旧给，第一个就是最近的
+                break;
+            }
+        }
+        if (anr == null) {
+            return;
+        }
+        SharedPreferences seen = context.getSharedPreferences(SEEN_PREFS, Context.MODE_PRIVATE);
+        if (seen.getLong(KEY_LAST_ANR, 0L) >= anr.getTimestamp()) {
+            return;
+        }
+        seen.edit().putLong(KEY_LAST_ANR, anr.getTimestamp()).apply();
+
+        List<String> frames = mainThreadOf(anr);
+        noteImportant("ANR 现场：" + wallClock(anr.getTimestamp()) + " pid=" + anr.getPid()
+                + (frames.isEmpty() ? "，系统没留主线程快照" : "，主线程如下"));
+        for (String frame : frames) {
+            note("ANR 主线程 | " + frame);
+        }
+    }
+
+    private static List<String> mainThreadOf(ApplicationExitInfo anr) {
+        List<String> out = new ArrayList<>();
+        try (InputStream in = anr.getTraceInputStream()) {
+            if (in == null) {
+                return out;
+            }
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+            boolean inMain = false;
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!inMain) {
+                    if (line.startsWith("\"main\"")) {
+                        inMain = true;
+                        out.add(line.trim());
+                    }
+                    continue;
+                }
+                if (line.trim().isEmpty()) {
+                    break;   // 线程和线程之间隔一个空行
+                }
+                out.add(line.trim());
+                if (out.size() >= ANR_FRAMES) {
+                    break;
+                }
+            }
+        } catch (Throwable t) {
+            AppLog.w(TAG, "读 ANR 快照失败: " + t);
+        }
+        return out;
     }
 
     private static String reasonName(int reason) {

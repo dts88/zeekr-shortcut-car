@@ -138,8 +138,38 @@ public class RearViewMirrorService extends Service {
      * 运气差的那次，是连重开都失败，只能重启车机。</p>
      *
      * <p>所以现在熄屏就放手：看不见的画面不值得占着相机睡过去。亮屏再接回来。</p>
+     *
+     * <h3>但「亮屏」这个广播靠不住（1.27.0 修的回归）</h3>
+     *
+     * <p>2026-09-24 那份黑匣子：四次熄屏都有「熄屏：后视镜放开相机」，四次醒来
+     * <b>一次「亮屏：后视镜重新接相机」都没有</b> —— 而每次醒来三十秒内心跳就写着
+     * {@code screenOn=true}。也就是说车机深睡醒来后，{@code ACTION_SCREEN_ON}
+     * 根本不送到这里。</p>
+     *
+     * <p>1.24.0 把「屏幕黑着」记成一个标记、只等这个广播来清掉，于是标记永远清不掉：
+     * {@link #bindCamera} 一律拒绝，连用户点「点击恢复」也被拒 —— 那就是「点了没反应」。
+     * 同一个点击在新进程里（标记重新从 PowerManager 读）一点就好，证实了是这个标记。</p>
+     *
+     * <p>所以这个字段现在只表示「收到过熄屏、放开过相机」；<b>该不该接相机，一律问
+     * {@link #screenIsDark()} 读实时状态</b>。看门狗两秒一次，屏幕一亮就接回来，
+     * 不管广播来不来。</p>
      */
     private boolean screenOff;
+
+    /**
+     * 屏幕此刻是不是黑的 —— 问系统，不信记下来的标记。
+     *
+     * <p>熄屏广播是可靠的（实测四次四次都到），亮屏广播在深睡醒来之后一次都没到。
+     * 所以「黑」可以由广播告诉我们，「亮」只能自己去看。</p>
+     */
+    private boolean screenIsDark() {
+        android.os.PowerManager power =
+                (android.os.PowerManager) getSystemService(android.content.Context.POWER_SERVICE);
+        if (power == null) {
+            return screenOff;
+        }
+        return !power.isInteractive();
+    }
 
     /** 熄屏之后等多久再确认没人要相机。车机熄屏六秒就深睡，这一步不能慢。 */
     private static final long CLOSE_AFTER_SCREEN_OFF_MS = 1500;
@@ -267,7 +297,7 @@ public class RearViewMirrorService extends Service {
      * 而不是一次不成就放弃 —— 那样后视镜会永远黑着。</p>
      */
     private void bindCamera(SurfaceTexture surfaceTexture) {
-        if (screenOff) {
+        if (screenIsDark()) {
             // 画布准备好、看门狗到点、贴边放回来 —— 通往这里的路不止一条，
             // 所以这一条守在入口，而不是守在每一个调用方
             AppLog.d(TAG, "屏幕黑着，后视镜先不接相机");
@@ -354,9 +384,14 @@ public class RearViewMirrorService extends Service {
         if (mirrorView == null || !mirrorView.isShowing()) {
             return;
         }
-        if (mirrorView.isDocked() || screenOff) {
+        if (mirrorView.isDocked() || screenIsDark()) {
             // 贴边收起、或者屏幕黑着，本来就是故意不接相机的，别把它又接回去
             return;
+        }
+        if (screenOff) {
+            // 屏幕已经亮了，亮屏广播却没来 —— 深睡醒来就是这样。自己接回去，并记一笔
+            screenOff = false;
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播：后视镜自己接回相机");
         }
         if (boundCamera != null && boundCamera.isCameraOpened()) {
             return;
@@ -463,7 +498,7 @@ public class RearViewMirrorService extends Service {
      * 两边都关是无害的，漏了才有害。</p>
      */
     private void closeCamerasIfNobodyWants() {
-        if (!screenOff) {
+        if (!screenIsDark()) {
             return;
         }
         com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();

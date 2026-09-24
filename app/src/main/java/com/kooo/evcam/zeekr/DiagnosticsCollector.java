@@ -511,6 +511,42 @@ public final class DiagnosticsCollector {
             sb.append("!! 读取配置失败: ").append(e).append('\n');
         }
         sb.append('\n');
+        appendSwitches(sb, context);
+    }
+
+    /**
+     * 开关状态：导出这一刻的，以及设置里全部项的原始值。
+     *
+     * <p>以前报告里只有视频流配置，没有开关 —— 看一份日志时说不出当时「开机自启动」
+     * 开没开，只能从别的行去猜（比如「WakeLock not acquired (开机自启动未开启)」）。
+     * 这里前半段是人看的那几个，后半段把 {@code app_config} 整份列出来：
+     * 以后加了新开关，这里不用改也会出现。</p>
+     *
+     * <p>要看<b>过去某一刻</b>的开关，去黑匣子里找：每次进程启动都有一行「开关: …」，
+     * 在设置里改动时有「开关变更: …」。</p>
+     */
+    private static void appendSwitches(StringBuilder sb, Context context) {
+        sb.append("## 6.1 开关状态（导出这一刻）").append('\n');
+        for (String item : com.kooo.evcam.blackbox.BlackBox.describeSwitches(context).split(" ")) {
+            sb.append("  ").append(item).append('\n');
+        }
+        sb.append("  开发者选项=").append(com.kooo.evcam.settings.DeveloperMode.isUnlocked()
+                ? "已解锁" : "未解锁").append('\n');
+        sb.append('\n').append("全部设置的原始值（app_config）:").append('\n');
+        try {
+            java.util.Map<String, ?> all = context
+                    .getSharedPreferences("app_config", Context.MODE_PRIVATE).getAll();
+            for (java.util.Map.Entry<String, ?> e : new java.util.TreeMap<>(all).entrySet()) {
+                String value = String.valueOf(e.getValue());
+                if (value.length() > 80) {
+                    value = value.substring(0, 80) + "…（" + value.length() + " 字）";
+                }
+                sb.append("  ").append(e.getKey()).append(" = ").append(value).append('\n');
+            }
+        } catch (Exception e) {
+            sb.append("  !! 读不出来: ").append(e).append('\n');
+        }
+        sb.append('\n');
     }
 
     /**

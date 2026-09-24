@@ -1226,7 +1226,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setPersistent(false);
         pref.setChecked(current);
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            setter.set(Boolean.TRUE.equals(newValue));
+            boolean on = Boolean.TRUE.equals(newValue);
+            setter.set(on);
+            // 开关什么时候被改过，黑匣子里要看得到 —— 否则一段时间线对不上当时的设置
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: " + key + " → " + (on ? "开" : "关"));
             return true;
         });
     }
