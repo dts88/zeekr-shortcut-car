@@ -197,6 +197,11 @@
     <string name="msg_recording_started_n">Recording %1$d camera(s)</string>
     <string name="msg_sd_fallback">No USB drive found; using internal storage</string>
     <string name="msg_recording_resumed">Recording resumed automatically</string>
+    <string name="msg_recording_interrupted">Recording interrupted: %1$s</string>
+    <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. It will resume once the surround view is back</string>
+    <string name="msg_recording_resume_gave_up">Recording failed to resume %1$d times in a row; no longer retrying</string>
+    <string name="rec_reason_no_data">no picture arrived after recording started</string>
+    <string name="rec_reason_unknown">the recorder stopped on its own</string>
     <string name="msg_recording_auto_started">Recording started automatically</string>
     <string name="msg_resume_failed">Camera not ready — could not resume recording</string>
     <string name="msg_auto_record_failed">Camera not ready — automatic recording did not start</string>

@@ -197,6 +197,11 @@
     <string name="msg_recording_started_n">Merakam %1$d kamera</string>
     <string name="msg_sd_fallback">Tiada pemacu USB ditemui; menggunakan storan dalaman</string>
     <string name="msg_recording_resumed">Rakaman disambung semula secara automatik</string>
+    <string name="msg_recording_interrupted">Rakaman terganggu: %1$s</string>
+    <string name="msg_recording_interrupted_resuming">Rakaman terganggu: %1$s. Ia akan disambung semula apabila paparan sekeliling kembali</string>
+    <string name="msg_recording_resume_gave_up">Rakaman gagal disambung semula %1$d kali berturut-turut; tidak mencuba lagi</string>
+    <string name="rec_reason_no_data">tiada gambar diterima selepas rakaman bermula</string>
+    <string name="rec_reason_unknown">perakam berhenti sendiri</string>
     <string name="msg_recording_auto_started">Rakaman bermula secara automatik</string>
     <string name="msg_resume_failed">Kamera belum sedia — rakaman tidak dapat disambung semula</string>
     <string name="msg_auto_record_failed">Kamera belum sedia — rakaman automatik tidak bermula</string>

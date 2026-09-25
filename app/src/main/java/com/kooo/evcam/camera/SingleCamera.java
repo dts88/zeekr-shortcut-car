@@ -153,6 +153,8 @@ public class SingleCamera {
      * 于是「一帧都没出过」和「出过帧然后停了」可以用同一个年龄来判断。</p>
      */
     private volatile long lastProgressUptimeMs = 0;
+    /** 最近一次真的收到画面（capture 完成）—— 开相机、建会话不算。 */
+    private volatile long lastCaptureUptimeMs = 0;
     /**
      * 这一趟有没有<b>成功打开过</b>。
      *
@@ -1038,6 +1040,17 @@ public class SingleCamera {
      *
      * <p>从没开过相机的返回 0（不是无穷大）—— 没开过就不该被判成卡住。</p>
      */
+    /**
+     * 最近 {@code ms} 毫秒里有没有真的出过画面。
+     *
+     * <p>和 {@link #progressAgeMs()} 不同：那个开相机、建会话也算「有动静」；
+     * 这里只认画面。「环视恢复了没有」要问的是这个。</p>
+     */
+    public boolean hasFramesWithin(long ms) {
+        long last = lastCaptureUptimeMs;
+        return last != 0 && SystemClock.uptimeMillis() - last < ms;
+    }
+
     public long progressAgeMs() {
         long last = lastProgressUptimeMs;
         return last == 0 ? 0 : Math.max(0, SystemClock.uptimeMillis() - last);
@@ -2062,6 +2075,7 @@ public class SingleCamera {
                                       @NonNull TotalCaptureResult result) {
             captureBeat.beat(StallWatch.now());
             lastProgressUptimeMs = SystemClock.uptimeMillis();
+            lastCaptureUptimeMs = lastProgressUptimeMs;
             frameCount++;
             long now = System.currentTimeMillis();
             lastFrameTimestampMs = now;

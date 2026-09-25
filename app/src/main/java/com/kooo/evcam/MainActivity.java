@@ -311,6 +311,23 @@ public class MainActivity extends AppCompatActivity {
     private boolean quietStop = false;
     private long suppressRecordErrorToastUntil = 0;
 
+    /** 下一次 onRecordingStopped 是因为什么停的。没人填，就是录制器自己停的（UNKNOWN）。 */
+    private com.kooo.evcam.recording.RecordingStops.Reason nextStopReason;
+    /** 这一段录像从什么时候开始（开机起算）。恢复额度看它录了多久，见 RecordingStops.ResumeBudget。 */
+    private long recordingStartedAtMs;
+    /** 什么时候被打断的，恢复时算一下断了多久。 */
+    private long interruptedAtMs;
+    private final com.kooo.evcam.recording.RecordingStops.ResumeBudget resumeBudget =
+            new com.kooo.evcam.recording.RecordingStops.ResumeBudget();
+    /** 等环视恢复的那个检查；null 表示没在等。 */
+    private Runnable surroundResumeCheck;
+    private final android.os.Handler surroundResumeHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    /** 多久看一次环视回来了没有。 */
+    private static final long SURROUND_RESUME_POLL_MS = 2000;
+    /** 最近这么久里出过画面，才算环视正常。 */
+    private static final long SURROUND_FRESH_MS = 2000;
+
 
 
 
@@ -586,6 +603,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         
+        nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.USER;   // 远程让停的，也算人停的
         stopRecording();
         AppLog.d(TAG, "Recording stopped");
         
@@ -2286,6 +2304,8 @@ public class MainActivity extends AppCompatActivity {
 
         // U 盘满了录不下去：由界面来停，按钮、计时器、前台服务一起回到待机
         cameraManager.setStorageFullCallback(capless -> runOnUiThread(() -> {
+            nextStopReason = capless ? com.kooo.evcam.recording.RecordingStops.Reason.STORAGE_FULL
+                    : com.kooo.evcam.recording.RecordingStops.Reason.STORAGE_CANNOT_FREE;
             quietStop = true;
             try {
                 stopRecording();
@@ -3193,6 +3213,91 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
+     * 录像被非人为原因打断了（规格 §2.3）。
+     *
+     * <p>记进黑匣子、告诉用户被什么打断的；开着自动录制、额度还在的话，
+     * 开始等环视恢复 —— 不等主界面显示，环视一出画面就接回去。</p>
+     */
+    private void onRecordingInterrupted(com.kooo.evcam.recording.RecordingStops.Reason reason) {
+        String why = getString(reason == com.kooo.evcam.recording.RecordingStops.Reason.NO_DATA
+                ? R.string.rec_reason_no_data : R.string.rec_reason_unknown);
+        interruptedAtMs = android.os.SystemClock.elapsedRealtime();
+        com.kooo.evcam.recording.RecordingIntent intent =
+                com.kooo.evcam.recording.RecordingIntent.current();
+        boolean willResume = intent.shouldRestore(appConfig.isAutoStartRecording())
+                && resumeBudget.allows();
+        if (willResume) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason
+                    + "），等环视恢复后自动接回（已试 " + resumeBudget.attempts() + " 次）");
+            Toast.makeText(this, getString(R.string.msg_recording_interrupted_resuming, why),
+                    Toast.LENGTH_LONG).show();
+            armSurroundResume();
+        } else if (!resumeBudget.allows()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason
+                    + "），自动恢复已连续失败 " + resumeBudget.attempts() + " 次，不再尝试");
+            Toast.makeText(this, getString(R.string.msg_recording_resume_gave_up,
+                    resumeBudget.attempts()), Toast.LENGTH_LONG).show();
+        } else {
+            // 没开自动录制（手动录的），只告诉用户，不自己接
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason + "），自动录制没开，不自动接回");
+            Toast.makeText(this, getString(R.string.msg_recording_interrupted, why),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 环视此刻是不是在正常出画面 —— 「能获得视频流」以环视为准（规格 §2.2）。 */
+    private boolean surroundHealthy() {
+        if (cameraManager == null) {
+            return false;
+        }
+        com.kooo.evcam.camera.SingleCamera surround =
+                cameraManager.getCamera(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND);
+        return surround != null && surround.isCameraOpened()
+                && surround.hasFramesWithin(SURROUND_FRESH_MS);
+    }
+
+    private void armSurroundResume() {
+        disarmSurroundResume();
+        surroundResumeCheck = new Runnable() {
+            @Override
+            public void run() {
+                if (surroundResumeCheck != this) {
+                    return;
+                }
+                com.kooo.evcam.recording.RecordingIntent intent =
+                        com.kooo.evcam.recording.RecordingIntent.current();
+                if (isRecording || isPreparingRecording || isAutoRecordingPending
+                        || !intent.shouldRestore(appConfig.isAutoStartRecording())) {
+                    // 已经有人把它开起来了，或者人停了 / 关了自动录制：不用等了
+                    surroundResumeCheck = null;
+                    return;
+                }
+                if (surroundHealthy()) {
+                    surroundResumeCheck = null;
+                    long gone = (android.os.SystemClock.elapsedRealtime() - interruptedAtMs) / 1000;
+                    resumeBudget.noteAttempt();
+                    intent.noteRestoreAttempt();
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("环视正常了，自动接回录像（断了 "
+                            + gone + " 秒，第 " + resumeBudget.attempts() + " 次）");
+                    startRecording();
+                    Toast.makeText(MainActivity.this, R.string.msg_recording_resumed,
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                surroundResumeHandler.postDelayed(this, SURROUND_RESUME_POLL_MS);
+            }
+        };
+        surroundResumeHandler.postDelayed(surroundResumeCheck, SURROUND_RESUME_POLL_MS);
+    }
+
+    private void disarmSurroundResume() {
+        if (surroundResumeCheck != null) {
+            surroundResumeHandler.removeCallbacks(surroundResumeCheck);
+            surroundResumeCheck = null;
+        }
+    }
+
+    /**
      * 检查并恢复自动录制
      * 条件：启用了自动录制 + 不是手动停止 + 当前没在录制 + 摄像头已连接
      */
@@ -3217,12 +3322,20 @@ public class MainActivity extends AppCompatActivity {
         }
         
         // 检查摄像头是否就绪
-        if (cameraManager == null || !cameraManager.hasConnectedCameras()) {
-            AppLog.w(TAG, "自动录制检查：摄像头未就绪，跳过恢复");
+        // 以环视为准（规格 §2.2）：以前是「任意一路相机连着」就接
+        if (!surroundHealthy()) {
+            AppLog.w(TAG, "自动录制检查：环视没在出画面，跳过恢复");
+            return;
+        }
+        // 正在等环视的那个检查会处理；额度用完了也不再试
+        if (surroundResumeCheck != null || !resumeBudget.allows()) {
             return;
         }
         
         // 满足所有条件，自动恢复录制
+        resumeBudget.noteAttempt();
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("30 秒检查：自动接回录像（第 "
+                + resumeBudget.attempts() + " 次）");
         intent.noteRestoreAttempt();
         AppLog.d(TAG, "自动录制检查：录制意外停了，接回去（第 "
                 + intent.restoreAttempts() + " 次）");
@@ -3410,6 +3523,7 @@ public class MainActivity extends AppCompatActivity {
                 
                 AppLog.d(TAG, "息屏已持续10秒，自动停止录制");
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止：熄屏已 10 秒（自动录制开、熄屏录制没生效）");
+                nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.SCREEN_OFF;
                 stopRecording();
                 runOnUiThread(() -> {
                     Toast.makeText(MainActivity.this, R.string.msg_screen_off_stopped, Toast.LENGTH_SHORT).show();
@@ -3709,11 +3823,15 @@ public class MainActivity extends AppCompatActivity {
             // 用户手动停止录制，重置息屏录制标记
             // 这样亮屏后不会错误地恢复录制
             wasRecordingBeforeScreenOff = false;
+            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.USER;
+            resumeBudget.reset();
+            disarmSurroundResume();
             stopRecording();
         } else {
             // 用户手动开始录制，重置手动停止标记
             // 这样后续如果录制异常停止，可以自动恢复
             com.kooo.evcam.recording.RecordingIntent.current().noteUserStarted();
+            resumeBudget.reset();
             AppLog.d(TAG, "用户手动开始录制，自动恢复重新生效");
             confirmInternalStorageThen(this::startRecording);
         }
@@ -3732,6 +3850,8 @@ public class MainActivity extends AppCompatActivity {
         public void onRecordingStarted(java.util.Set<String> cameras, boolean sdFellBack) {
             // 录像的起止以前不进黑匣子 —— 「哨兵模式下录像停了」这种问题，没有它就说不出是谁停的
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录像开始: " + cameras);
+            recordingStartedAtMs = android.os.SystemClock.elapsedRealtime();
+            disarmSurroundResume();
             lastRefusalShown = null;
             isRecording = true;
             isPreparingRecording = true;
@@ -3767,7 +3887,27 @@ public class MainActivity extends AppCompatActivity {
             syncRecordingClaim();
             setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
-            if (!quietStop) {
+
+            // 为什么停的：停之前有人写下原因的就用它；没人写，就是录制器自己停的
+            com.kooo.evcam.recording.RecordingStops.Reason reason = nextStopReason != null ? nextStopReason
+                    : com.kooo.evcam.recording.RecordingIntent.current().stoppedByUser()
+                    ? com.kooo.evcam.recording.RecordingStops.Reason.USER : com.kooo.evcam.recording.RecordingStops.Reason.UNKNOWN;
+            nextStopReason = null;
+            long lasted = recordingStartedAtMs > 0
+                    ? android.os.SystemClock.elapsedRealtime() - recordingStartedAtMs : 0;
+            recordingStartedAtMs = 0;
+            resumeBudget.noteRecordingLasted(lasted);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止原因: " + reason
+                    + "，这一段录了 " + (lasted / 1000) + " 秒");
+
+            if (reason == com.kooo.evcam.recording.RecordingStops.Reason.USER) {
+                if (!quietStop) {
+                    Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
+                }
+            } else if (com.kooo.evcam.recording.RecordingStops.resumesOnSurround(reason)) {
+                onRecordingInterrupted(reason);
+            } else if (!quietStop) {
+                // 存储、熄屏那几条各自已经提示过了（它们都是 quietStop）；走到这里的不会重复
                 Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
             }
         }
@@ -3837,7 +3977,9 @@ public class MainActivity extends AppCompatActivity {
         appConfig.setUiLeftForScreenOff(false);
 
         // 停止录制（如果正在录制）
+        disarmSurroundResume();
         if (isRecording) {
+            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.USER;
             stopRecording();
         }
 
@@ -3913,6 +4055,7 @@ public class MainActivity extends AppCompatActivity {
                 + " resumeAfterRecreate=" + shouldResumeRecordingAfterRecreate
                 + " inBackground=" + isInBackground);
 
+        nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.NO_DATA;
         quietStop = true;
         suppressRecordErrorToastUntil = System.currentTimeMillis() + 5_000L;
         try {
@@ -4314,6 +4457,7 @@ public class MainActivity extends AppCompatActivity {
         
         // 停止自动录制定时检查
         stopAutoRecordingCheck();
+        disarmSurroundResume();
         
         // 重置远程录制状态
         isRemoteRecording = false;

@@ -7,6 +7,21 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.33.0-alpha] - 2026-09-26
+
+- **When recording is interrupted, the app says why, and picks it back up as soon as the
+  surround view is back.** Until now it said nothing, checked every thirty seconds, and
+  resumed as soon as any camera was connected. Now, with auto-record on, an interruption
+  shows the reason -- no picture after recording started, or the recorder stopping on its
+  own -- and that it will resume; the app then watches the surround camera every two
+  seconds and restarts recording the moment it is delivering pictures again, whether or not
+  the main screen is showing. A full storage device and the screen-off rule keep their own
+  messages and are not resumed this way.
+- **Resuming now gives up after three failures in a row, and says so.** The old counter was
+  reset whenever recording started, so recording that started but never received a picture
+  could be restarted forever, rebuilding the surround camera's session every time. A resume
+  now only counts as successful once a minute has been recorded.
+
 ## [1.32.0-alpha] - 2026-09-26
 
 - **Cameras are released only when nothing is using them -- now everywhere.** The register
