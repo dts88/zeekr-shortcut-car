@@ -35,6 +35,11 @@ public class KeepAliveProvider extends ContentProvider {
         // 这里是整个进程最早能执行的地方，「这条命是被谁开的」从这儿记
         com.kooo.evcam.blackbox.BlackBox.attach(context, "ContentProvider");
 
+        if (UserExit.blocks(context, "KeepAliveProvider")) {
+            // 进程是被别的东西拉起来的（多半是系统），用户已经退出：不启动前台服务、不注册 TIME_TICK
+            return true;
+        }
+
         try {
             AppLog.d(TAG, "KeepAliveProvider onCreate - 应用启动最早阶段");
             

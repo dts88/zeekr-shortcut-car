@@ -65,6 +65,12 @@ public class CameraForegroundService extends Service {
         super.onCreate();
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:CameraForegroundService");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务 CameraForegroundService onCreate");
+        if (UserExit.blocks(this, "CameraForegroundService.onCreate")) {
+            // 系统按 START_STICKY 重启了我们，但用户已经退出：什么都别起（尤其别去拉主界面），
+            // 在 onStartCommand 里把自己停掉
+            exitedIdle = true;
+            return;
+        }
         AppLog.d(TAG, "Service created");
         createNotificationChannel();
         
@@ -189,7 +195,14 @@ public class CameraForegroundService extends Service {
     }
 
     @Override
+    /** 用户已退出、这一次是被系统重启的：onCreate 什么都没起，onStartCommand 里停掉自己。 */
+    private boolean exitedIdle;
+
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (exitedIdle || UserExit.isExited(this)) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
         // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它。
         //
@@ -336,8 +349,10 @@ public class CameraForegroundService extends Service {
         isForegroundReady = false;
         stopCameraRepairLoop();
 
-        // 服务被杀时，发送延迟重启广播
-        scheduleServiceRestart();
+        // 服务被杀时，发送延迟重启广播 —— 用户主动退出时不发：这正是以前「退不掉」的一条路
+        if (!UserExit.isExited(this)) {
+            scheduleServiceRestart();
+        }
 
         super.onDestroy();
     }
@@ -475,6 +490,10 @@ public class CameraForegroundService extends Service {
      * @param content 通知内容
      */
     public static void start(Context context, String title, String content) {
+        // 保活广播、ContentProvider、无障碍服务都从这里启动前台服务 —— 用户退出后一律不启动
+        if (UserExit.blocks(context, "CameraForegroundService.start")) {
+            return;
+        }
         Intent intent = new Intent(context, CameraForegroundService.class);
         intent.putExtra("title", title);
         intent.putExtra("content", content);

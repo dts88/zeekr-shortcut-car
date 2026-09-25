@@ -333,6 +333,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Activity:MainActivity");
         com.kooo.evcam.blackbox.BlackBox.note("主界面 onCreate savedState=" + (savedInstanceState != null));
+        // 用户退出之后，所有会自己拉起主界面的路都被拦住了 —— 这时主界面被创建，只能是人点开的
+        UserExit.clear(this, "manual open");
         instance = this;  // 设置静态实例引用
         AppLog.init(this);
         // 回到主界面时是不是换了一个新实例、Holder 里还有没有旧的相机管理器 ——
@@ -3826,6 +3828,8 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "用户请求退出应用，停止所有服务...");
         // 退出这条路到底走到哪一步、之后还有谁把我们拉起来 —— 靠这一行和后面的进程启动行对照
         com.kooo.evcam.blackbox.BlackBox.noteImportant("==== 用户退出应用 ====");
+        // 必须在停服务之前：前台服务的 onDestroy 会发保活广播，保活接收器收到就去重启它
+        UserExit.markExited(this);
 
         // 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
         com.kooo.evcam.recording.RecordingIntent.current().reset();
@@ -3841,8 +3845,11 @@ public class MainActivity extends AppCompatActivity {
         CameraForegroundService.stop(this);
 
 
-        // 后视镜和录制按钮不停：它们本来就是脱离主界面用的
+        // 退出就是退出：后视镜、录制按钮、补盲一起停。以前这里写着「不停，它们本来就是
+        // 脱离主界面用的」—— 但紧接着 System.exit，它们反正活不下去，留着只是让系统
+        // 以 START_STICKY 的名义再去重启它们
         OverlayCoordinator.onActivityDestroyed(this);
+        com.kooo.evcam.zeekr.RearViewMirrorService.stop(this);
         
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();

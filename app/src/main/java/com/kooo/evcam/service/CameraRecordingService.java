@@ -130,6 +130,11 @@ public class CameraRecordingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (com.kooo.evcam.UserExit.blocks(this, "CameraRecordingService")) {
+            // 用户已经退出：被系统重启也不起来
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         if (intent == null) {
             return START_STICKY;
         }

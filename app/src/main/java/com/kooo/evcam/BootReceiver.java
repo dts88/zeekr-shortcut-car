@@ -40,6 +40,8 @@ public class BootReceiver extends BroadcastReceiver {
             "android.intent.action.QUICKBOOT_POWERON".equals(action)) {
             
             AppLog.d(TAG, "系统开机完成！");
+            // 真正开机：用户上一次的「退出」到此为止
+            UserExit.clear(context, "boot");
             
             // 立即启动前台服务（最重要！参考应用0的做法）
             startForegroundServiceImmediately(context);

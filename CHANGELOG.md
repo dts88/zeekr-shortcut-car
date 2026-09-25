@@ -7,6 +7,21 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.31.0-alpha] - 2026-09-26
+
+- **Exit now means exit.** Until now the app came back by itself within fifteen minutes
+  of pressing exit: the fifteen-minute keep-alive job was never cancelled, the foreground
+  service broadcast a request to restart itself every time it was stopped (including on
+  exit), and the system restarts services marked sticky. Exiting now records that you did,
+  cancels the job, and every path that could bring the app back -- the service's start
+  point, the keep-alive broadcasts, the earliest-starting provider, the job itself, and
+  each service when the system restarts it -- checks first and does nothing. It lasts until
+  you open the app yourself or the head unit genuinely boots. The super mirror, the
+  recording button and blind spot now stop on exit as well.
+- The lifecycle is now written down as a spec -- what boot autostart and auto-record are
+  defined to do, and a table of where the app still differs -- in
+  `docs/lifecycle-spec.md`.
+
 ## [1.30.0-alpha] - 2026-09-26
 
 - **Recording in progress when the screen goes dark no longer has the super mirror pulled

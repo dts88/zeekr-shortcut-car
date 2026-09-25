@@ -223,6 +223,11 @@ public class RearViewMirrorService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (com.kooo.evcam.UserExit.blocks(this, "RearViewMirrorService")) {
+            // 用户已经退出：被系统重启也不起来
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
         // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RearViewMirrorService onStartCommand flags=" + flags

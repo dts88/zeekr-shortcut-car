@@ -558,6 +558,8 @@ public final class DiagnosticsCollector {
         }
         sb.append("  开发者选项=").append(com.kooo.evcam.settings.DeveloperMode.isUnlocked()
                 ? "已解锁" : "未解锁").append('\n');
+        sb.append("  用户退出后暂停自启动=").append(com.kooo.evcam.UserExit.isExited(context)
+                ? "是（等手动打开或真正开机）" : "否").append('\n');
         sb.append('\n').append("全部设置的原始值（app_config）:").append('\n');
         try {
             java.util.Map<String, ?> all = context

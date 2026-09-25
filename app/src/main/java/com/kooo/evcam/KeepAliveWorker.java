@@ -23,6 +23,11 @@ public class KeepAliveWorker extends Worker {
         // WorkManager 在停车之后还跑不跑，只能靠这一行的时间戳看
         com.kooo.evcam.blackbox.BlackBox.attach(getApplicationContext(), "WorkManager");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("保活任务执行");
+        if (UserExit.blocks(getApplicationContext(), "KeepAliveWorker")) {
+            // 退出时已经取消过；还能跑到这里说明取消没赶上，再取消一次
+            KeepAliveManager.stopKeepAliveWork(getApplicationContext());
+            return Result.success();
+        }
 
         try {
             // 检查远程查看服务状态

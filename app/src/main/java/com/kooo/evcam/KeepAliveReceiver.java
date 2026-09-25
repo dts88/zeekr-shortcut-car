@@ -69,6 +69,9 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         // 高频的（电量变化之类）只数不记，见 BlackBox.count
         com.kooo.evcam.blackbox.BlackBox.attach(context, "Receiver:" + action);
         com.kooo.evcam.blackbox.BlackBox.count(action);
+        if (UserExit.blocks(context, "KeepAliveReceiver")) {
+            return;
+        }
 
         // 关机族的广播要抢时间：系统随时会把进程带走，所以同步落盘。
         // 电源、熄屏这些顺便记一笔当上下文 —— 要弄清「熄火」在这台车机上长什么样。
