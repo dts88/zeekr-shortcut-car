@@ -7,6 +7,21 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.29.0-alpha] - 2026-09-26
+
+- **The black box now says why recording stopped.** Recording starts and stops were never
+  recorded, so "recording stopped in sentry mode" could not be traced to a cause. Now:
+  every start and stop, and at screen-off which rule applied -- manual recording left
+  alone, screen-off recording in effect, or auto-record with screen-off recording not in
+  effect and a stop due in ten seconds.
+- **Screen-off recording that is stored on but not in effect is now called out.** It only
+  works in the process where Developer options were unlocked, and unlocking is deliberately
+  not saved, so every update quietly takes it out of effect. The black box's switch line at
+  each process start now says so when that is the case.
+- Fixed: with auto-record and screen-off recording in effect, the super mirror's
+  screen-off step (added in 1.24.0) closed the cameras that the main screen deliberately
+  keeps active so recording can start at once when the screen comes back.
+
 ## [1.28.0-alpha] - 2026-09-25
 
 - **After the car wakes, the cameras wait for you by default.** Waking from deep sleep and

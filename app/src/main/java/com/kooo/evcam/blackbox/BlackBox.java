@@ -139,6 +139,8 @@ public final class BlackBox {
             return "开机自启动=" + onOff(c.isAutoStartOnBoot())
                     + " 自动录制=" + onOff(c.isAutoStartRecording())
                     + " 熄屏录制=" + onOff(c.isScreenOffRecordingEnabled())
+                    + (c.isScreenOffRecordingStoredOn() && !c.isScreenOffRecordingEnabled()
+                            ? "(存着是开，开发者选项没解锁，没生效)" : "")
                     + " 定时保活=" + onOff(c.isKeepAliveEnabled()) + "(开关未接线)"
                     + " 常驻唤醒锁=" + onOff(c.isPersistentWakeLockEnabled())
                     + " 超级后视镜=" + onOff(c.isRearViewEnabled())

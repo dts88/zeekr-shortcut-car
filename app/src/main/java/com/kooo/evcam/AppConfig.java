@@ -589,6 +589,16 @@ public class AppConfig {
         return prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false);
     }
 
+    /**
+     * 息屏录制<b>存着</b>的值，不管开发者选项解没解锁。
+     *
+     * <p>只给黑匣子和诊断报告用：开发者选项的解锁不保存，装一次新版本、进程重启一次就锁回去，
+     * 于是「存着是开的、实际没生效」会悄悄发生。两个值摆在一起，才看得出是这种情况。</p>
+     */
+    public boolean isScreenOffRecordingStoredOn() {
+        return prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
+    }
+
     public boolean isScreenOffRecordingEnabled() {
         // 默认禁用息屏录制
         // 锁在开发者选项后面：没解锁时一律当关着，存着的值不动。

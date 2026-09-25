@@ -3363,17 +3363,22 @@ public class MainActivity extends AppCompatActivity {
             // 如果开启了自动录制+息屏录制，继续录制
             if (keepCameraActive) {
                 AppLog.d(TAG, "息屏录制已启用，继续录制");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：熄屏录制生效，继续录");
                 return;
             }
             
             // 如果未开启自动录制功能，不干预手动录制，也不退后台
             if (!appConfig.isAutoStartRecording()) {
                 AppLog.d(TAG, "手动录制中，不受息屏影响，保持前台");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：手动录制，不干预");
                 return;
             }
             
             // 开启了自动录制但未开启息屏录制，10秒后停止录制，15秒后退后台
             AppLog.d(TAG, "息屏录制未启用，将在10秒后停止录制，15秒后退后台...");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：自动录制开、熄屏录制没生效"
+                    + (appConfig.isScreenOffRecordingStoredOn() ? "（存着是开，开发者选项没解锁）" : "")
+                    + "，10 秒后停录");
             wasRecordingBeforeScreenOff = true;
             
             screenOffStopRunnable = () -> {
@@ -3402,6 +3407,7 @@ public class MainActivity extends AppCompatActivity {
                 }
                 
                 AppLog.d(TAG, "息屏已持续10秒，自动停止录制");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止：熄屏已 10 秒（自动录制开、熄屏录制没生效）");
                 stopRecording();
                 runOnUiThread(() -> {
                     Toast.makeText(MainActivity.this, R.string.msg_screen_off_stopped, Toast.LENGTH_SHORT).show();
@@ -3722,6 +3728,8 @@ public class MainActivity extends AppCompatActivity {
             new RecordingCoordinator.Listener() {
         @Override
         public void onRecordingStarted(java.util.Set<String> cameras, boolean sdFellBack) {
+            // 录像的起止以前不进黑匣子 —— 「哨兵模式下录像停了」这种问题，没有它就说不出是谁停的
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像开始: " + cameras);
             lastRefusalShown = null;
             isRecording = true;
             isPreparingRecording = true;
@@ -3749,6 +3757,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onRecordingStopped() {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止");
             lastRefusalShown = null;
             preparingHandler.removeCallbacks(preparingWatchdog);
             isRecording = false;
