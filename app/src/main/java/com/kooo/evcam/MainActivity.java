@@ -4269,8 +4269,18 @@ public class MainActivity extends AppCompatActivity {
 
         // 录制管线留不留：还在录，或者只是重建（夜间模式、语言切换）—— 留着，界面再起来时接回去。
         // 以前这里一律释放，录制就断在重建上；新界面再去「恢复录制」，恢复没接上就卡在准备中
+        // 还有别人在用相机（超级后视镜、悬浮窗、补盲）也要留着 —— 以前只看录制，
+        // 主界面一被销毁就把整个相机管理器拆掉，后视镜当场黑掉，两秒后它的看门狗又去重开：
+        // 环视就这样被关了又开。登记表的规矩是「都不用了才释放」，这里是最后绕过它的一处
+        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+        final boolean othersNeedCamera = needs.heldByAnyoneExcept(
+                com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
         final boolean keepPipeline = cameraManager != null && !cameraManager.isReleased()
-                && (cameraManager.isRecording() || isChangingConfigurations());
+                && (cameraManager.isRecording() || isChangingConfigurations() || othersNeedCamera);
+        if (othersNeedCamera && cameraManager != null && !cameraManager.isReleased()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面销毁，但相机还有人要（"
+                    + needs.describe() + "），不释放");
+        }
         AppLog.i(TAG, "onDestroy 录制管线" + (keepPipeline ? "保留" : "释放") + " "
                 + instanceTag() + " recording=" + (cameraManager != null && cameraManager.isRecording())
                 + " changingConfigurations=" + isChangingConfigurations());

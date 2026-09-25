@@ -7,6 +7,21 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.32.0-alpha] - 2026-09-26
+
+- **Cameras are released only when nothing is using them -- now everywhere.** The register
+  of who is using the cameras (preview, recording, super mirror, floating windows, blind
+  spot) has existed since 1.17.0, but two places closed the cameras without asking it.
+  When the main screen was destroyed while not recording, the whole camera manager was
+  torn down even with the super mirror showing the surround view; the mirror went dark and
+  its watchdog reopened the camera two seconds later. When blind spot finished, it checked
+  itself and recording but not the mirror. Both now ask the register first.
+- **Every head unit reboot is now recorded.** Parking is normally deep sleep and the app
+  survives it. A real reboot is rare, and whether the app can come back after one on its
+  own has been seen only once. At each start the black box now notes which boot it is in,
+  and when that has changed, how many minutes after boot the app first ran and what
+  started it.
+
 ## [1.31.0-alpha] - 2026-09-26
 
 - **Exit now means exit.** Until now the app came back by itself within fifteen minutes

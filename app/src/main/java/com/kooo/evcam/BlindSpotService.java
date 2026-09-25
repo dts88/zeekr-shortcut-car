@@ -1416,7 +1416,14 @@ public class BlindSpotService extends Service {
                 AppLog.d(TAG, "补盲结束但正在录制中，保持相机连接");
                 return;
             }
+            // 上面几条只看了补盲自己和录制，没看超级后视镜 —— 问登记表，都不用了才关
+            com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
+            if (needs.heldByAnyone()) {
+                AppLog.d(TAG, "补盲结束，但相机还有人要: " + needs.describe());
+                return;
+            }
             AppLog.d(TAG, "补盲结束且无持久 Surface，释放相机资源");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("补盲结束：相机没人要了，关掉");
             cameraManager.closeAllCameras();
         }
     }
