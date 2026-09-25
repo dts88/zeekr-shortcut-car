@@ -50,6 +50,35 @@ def check_qualified_this(src):
     return problems
 
 
+def check_override_target(src):
+    """@Override 后面跟的必须是方法签名。
+
+    1.31.0 往 @Override 和 onStartCommand 中间插了一个字段，注解落到了字段上 ——
+    括号配对、语法都挑不出毛病，只有编译器会说 "annotation type not applicable"。
+    """
+    problems = []
+    lines = src.split('\n')
+    for number, raw_line in enumerate(lines, start=1):
+        if raw_line.strip() != '@Override':
+            continue
+        in_javadoc = False
+        for follow in lines[number:]:
+            line = follow.strip()
+            if in_javadoc:
+                if '*/' in line:
+                    in_javadoc = False
+                continue
+            if line.startswith('/*'):
+                in_javadoc = '*/' not in line
+                continue
+            if not line or line.startswith('//') or line.startswith('@'):
+                continue
+            if '(' not in line:
+                problems.append('第 %d 行：@Override 后面不是方法签名（"%s"）' % (number, line[:50]))
+            break
+    return problems
+
+
 def check_r_import(path, src):
     """子包里用了 R 却没 import 的，返回一条问题；同包（com.kooo.evcam）不需要。"""
     if 'src/test' in path.replace(os.sep, '/'):
@@ -71,6 +100,7 @@ def check(path):
 
     problems = check_r_import(path, src)
     problems.extend(check_qualified_this(src))
+    problems.extend(check_override_target(src))
     stack = []          # (字符, 行号)
     line = 1
     i = 0

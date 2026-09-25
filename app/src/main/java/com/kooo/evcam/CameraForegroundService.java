@@ -194,10 +194,10 @@ public class CameraForegroundService extends Service {
         }
     }
 
-    @Override
     /** 用户已退出、这一次是被系统重启的：onCreate 什么都没起，onStartCommand 里停掉自己。 */
     private boolean exitedIdle;
 
+    @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (exitedIdle || UserExit.isExited(this)) {
             stopSelf();
