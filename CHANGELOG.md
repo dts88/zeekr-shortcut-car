@@ -7,6 +7,24 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.34.0-alpha] - 2026-09-26
+
+- **One principle for the whole app: it keeps running in the state you set.** Parking,
+  errors and a full drive are exceptions where it adjusts by its own rules, and once the
+  exception is over it goes back to your state. Written down as section 0 of the lifecycle
+  spec.
+- **So after the car wakes, the super mirror reconnects by itself again**, and the screen-on
+  handling the car never announces is replayed: the main screen comes back if it left for
+  screen-off, and recording stopped at screen-off resumes. This includes the car's own
+  wake two hours after parking. The Developer option "Reconnect cameras on wake" (1.28.0)
+  is gone -- there is nothing left for it to decide.
+- **Recording you started by hand is resumed after an interruption too**, not only
+  auto-record, once the surround view is back. Only recording you stopped yourself is left
+  stopped.
+- Settings -> Super mirror: "Button mode" now sits just above "Reset view and position".
+- Settings -> Floating button: the default button size is now 92 dp (was 90). A size you
+  have already set is kept; "Reset floating windows" applies the new default.
+
 ## [1.33.0-alpha] - 2026-09-26
 
 - **When recording is interrupted, the app says why, and picks it back up as soon as the

@@ -83,8 +83,6 @@
     <string name="set_auto_record_summary">Starts recording when the app opens or returns to the foreground</string>
     <string name="set_screen_off_title">Record with screen off</string>
     <string name="set_screen_off_summary">Keeps recording after the screen turns off</string>
-    <string name="set_auto_reconnect_title">Reconnect cameras on wake</string>
-    <string name="set_auto_reconnect_summary">Waking from deep sleep looks the same as the car lighting its own screen while parked. When off, tap the mirror to reconnect</string>
     <string name="set_keep_alive_title">Periodic keep-alive</string>
     <string name="set_keep_alive_summary">Wakes the app periodically so the system does not close it</string>
     <string name="set_recording_mode_title">Recording pipeline</string>

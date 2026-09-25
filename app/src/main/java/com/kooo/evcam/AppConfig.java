@@ -24,7 +24,6 @@ public class AppConfig {
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
-    private static final String KEY_AUTO_RECONNECT_ON_WAKE = "auto_reconnect_on_wake";  // 醒来自动接回相机（开发者选项才能开）
     private static final String KEY_PERSISTENT_WAKE_LOCK = "persistent_wake_lock";  // 常驻唤醒锁（开发者选项）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
@@ -501,27 +500,6 @@ public class AppConfig {
      * <p>拆开之后「开机自启动」只管开机自启动。这一项单独放在开发者选项里，
      * 等真需要时再说。数据见 {@code docs/zeekr-platform-notes.md} §3.6。</p>
      */
-    /**
-     * 亮屏了但没收到亮屏广播时，要不要自己把相机接回来。<b>默认不接，锁在开发者选项后面。</b>
-     *
-     * <p>车机深睡醒来时不发亮屏广播，而且停车后约两小时会<b>自己</b>醒一次、亮屏两分钟
-     * （2026-09-24 两次，间隔精确到秒相同）。这两种亮屏在我们看来一模一样，
-     * 分不出是人回来了还是车机自己醒了。默认的做法是等人：点一下后视镜才接回，
-     * 打开主界面时预览照常开。</p>
-     *
-     * <p>和息屏录制一样：没解锁时一律当关着，存着的值不动 —— 设置里那个开关灰着、关着，
-     * 这里必须说同一句话。</p>
-     */
-    public boolean isAutoReconnectOnWake() {
-        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                && prefs.getBoolean(KEY_AUTO_RECONNECT_ON_WAKE, false);
-    }
-
-    public void setAutoReconnectOnWake(boolean enabled) {
-        prefs.edit().putBoolean(KEY_AUTO_RECONNECT_ON_WAKE, enabled).apply();
-        AppLog.d(TAG, "auto reconnect on wake: " + enabled);
-    }
-
     public boolean isPersistentWakeLockEnabled() {
         return prefs.getBoolean(KEY_PERSISTENT_WAKE_LOCK, false);
     }
@@ -3896,7 +3874,7 @@ public class AppConfig {
     private static final boolean DEFAULT_RECORDING_FLOATING_ENABLED = true;  // 默认开启
     // 0.45.2 起整档上移 50%：65dp 在车上偏小，最小档也够不着。原值是实车测的，
     // 新值就是它乘 1.5，不另起炉灶
-    private static final int DEFAULT_BUTTON_SIZE_DP = 90;
+    private static final int DEFAULT_BUTTON_SIZE_DP = 92;
     private static final int DEFAULT_TIME_TEXT_SIZE_SP = 14;
 
     /**

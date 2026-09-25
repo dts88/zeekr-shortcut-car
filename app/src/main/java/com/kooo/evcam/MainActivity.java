@@ -208,35 +208,20 @@ public class MainActivity extends AppCompatActivity {
      * 相机不重开、界面不接回来；十五秒那个退后台的任务按 uptime 算，醒来十几秒后照样执行，
      * 读到的还是「熄屏中」。</p>
      *
-     * <p>所以凡是要看「现在是不是熄屏」的地方，先调这一步。屏幕其实亮着的话：
-     * 人在界面上（{@code userPresent}），或者开发者选项里开了「亮屏后自动接回相机」，
-     * 就补跑一次 {@link #onScreenOn()}；否则只把标记对齐 —— 车机停车后会自己醒来亮屏两分钟，
-     * 那一次不该开相机、拉界面。</p>
+     * <p>所以凡是要看「现在是不是熄屏」的地方，先调这一步：屏幕其实亮着，
+     * 就补跑一次 {@link #onScreenOn()}，回到用户设定的状态（规格 §0）。
+     * 车机停车后自己醒来亮屏的那两分钟也一样（规格 §1.3 选 a）。</p>
      *
      * @return 屏幕此刻是不是真的黑着
      */
-    private boolean reconcileScreenState(String where, boolean userPresent) {
+    private boolean reconcileScreenState(String where) {
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(POWER_SERVICE);
         boolean dark = power != null ? !power.isInteractive() : isScreenOff;
         if (isScreenOff && !dark) {
-            if (userPresent || appConfig.isAutoReconnectOnWake()) {
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播，补跑亮屏逻辑（" + where + "）");
-                onScreenOn();
-            } else {
-                // 可能是车机停车后自己醒的那一次：不开相机、不拉界面、不恢复录制，
-                // 只把标记对齐、把熄屏那几个还在排队的任务撤掉 —— 否则退后台那一步会把人踢出去
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播：按设置不自动接回（" + where + "）");
-                isScreenOff = false;
-                for (Runnable pending : new Runnable[]{screenOffStopRunnable,
-                        screenOffBackgroundRunnable, screenOffCameraRunnable}) {
-                    if (pending != null) {
-                        screenStateHandler.removeCallbacks(pending);
-                    }
-                }
-                screenOffStopRunnable = null;
-                screenOffBackgroundRunnable = null;
-                screenOffCameraRunnable = null;
-            }
+            // 总原则（规格 §0）：停车熄屏是特殊情况；屏幕亮了，特殊情况就结束了，
+            // 回到用户设定的状态 —— 把漏掉的亮屏逻辑补跑一次（接回界面、接回录像）
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播，补跑亮屏逻辑（" + where + "）");
+            onScreenOn();
         }
         return dark;
     }
@@ -3224,22 +3209,23 @@ public class MainActivity extends AppCompatActivity {
         interruptedAtMs = android.os.SystemClock.elapsedRealtime();
         com.kooo.evcam.recording.RecordingIntent intent =
                 com.kooo.evcam.recording.RecordingIntent.current();
-        boolean willResume = intent.shouldRestore(appConfig.isAutoStartRecording())
-                && resumeBudget.allows();
-        if (willResume) {
+        // 总原则（规格 §0）：用户开着录像，App 就该一直录着 —— 不管是手动开的还是自动录制开的。
+        // shouldRestore(true) 只剩三条：这一趟录起来过、不是人停的、没连着失败太多次
+        boolean wanted = intent.shouldRestore(true);
+        if (wanted && resumeBudget.allows()) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason
                     + "），等环视恢复后自动接回（已试 " + resumeBudget.attempts() + " 次）");
             Toast.makeText(this, getString(R.string.msg_recording_interrupted_resuming, why),
                     Toast.LENGTH_LONG).show();
             armSurroundResume();
-        } else if (!resumeBudget.allows()) {
+        } else if (wanted) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason
                     + "），自动恢复已连续失败 " + resumeBudget.attempts() + " 次，不再尝试");
             Toast.makeText(this, getString(R.string.msg_recording_resume_gave_up,
                     resumeBudget.attempts()), Toast.LENGTH_LONG).show();
         } else {
-            // 没开自动录制（手动录的），只告诉用户，不自己接
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason + "），自动录制没开，不自动接回");
+            // 人停过，或者这一趟从没录起来过：只告诉用户，不自己接
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像被打断（" + reason + "），不自动接回");
             Toast.makeText(this, getString(R.string.msg_recording_interrupted, why),
                     Toast.LENGTH_LONG).show();
         }
@@ -3267,8 +3253,8 @@ public class MainActivity extends AppCompatActivity {
                 com.kooo.evcam.recording.RecordingIntent intent =
                         com.kooo.evcam.recording.RecordingIntent.current();
                 if (isRecording || isPreparingRecording || isAutoRecordingPending
-                        || !intent.shouldRestore(appConfig.isAutoStartRecording())) {
-                    // 已经有人把它开起来了，或者人停了 / 关了自动录制：不用等了
+                        || !intent.shouldRestore(true)) {
+                    // 已经有人把它开起来了，或者人停了：不用等了
                     surroundResumeCheck = null;
                     return;
                 }
@@ -3559,7 +3545,7 @@ public class MainActivity extends AppCompatActivity {
         
         screenOffBackgroundRunnable = () -> {
             // 再次检查是否仍然息屏 —— 问实际状态：深睡醒来后亮屏广播不来，标记是旧的
-            if (!reconcileScreenState("15s-background", false) || !isScreenOff) {
+            if (!reconcileScreenState("15s-background") || !isScreenOff) {
                 AppLog.d(TAG, "屏幕已亮起，取消退后台");
                 return;
             }
@@ -3610,7 +3596,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 相机不等那 15 秒：车机熄屏没几秒就深睡，晚一步就是开着相机睡过去
         screenOffCameraRunnable = () -> {
-            if (!reconcileScreenState("1.5s-camera", false) || !isScreenOff || isRecording) {
+            if (!reconcileScreenState("1.5s-camera") || !isScreenOff || isRecording) {
                 return;
             }
             if (appConfig.isAutoStartRecording() && appConfig.isScreenOffRecordingEnabled()) {
@@ -4342,7 +4328,7 @@ public class MainActivity extends AppCompatActivity {
         OverlayCoordinator.onAppForeground(this);
 
         // 人已经在界面上了，屏幕一定亮着。熄屏标记还挂着就说明亮屏广播没来，补跑一次
-        reconcileScreenState("onResume", true);
+        reconcileScreenState("onResume");
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
         // 还是用户自己点回来的

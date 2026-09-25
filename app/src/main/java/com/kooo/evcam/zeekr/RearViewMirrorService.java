@@ -171,8 +171,6 @@ public class RearViewMirrorService extends Service {
         return !power.isInteractive();
     }
 
-    /** 这一次「亮了却没收到广播、在等人点」已经记过黑匣子了，别每两秒记一遍。 */
-    private boolean waitingForTapNoted;
 
     /** 熄屏之后等多久再确认没人要相机。车机熄屏六秒就深睡，这一步不能慢。 */
     private static final long CLOSE_AFTER_SCREEN_OFF_MS = 1500;
@@ -184,7 +182,6 @@ public class RearViewMirrorService extends Service {
                     String action = intent == null ? null : intent.getAction();
                     if (Intent.ACTION_SCREEN_OFF.equals(action)) {
                         screenOff = true;
-                        waitingForTapNoted = false;
                         if (recordingHoldsCamera()) {
                             // 正在录像：相机反正不会关，摘掉后视镜什么也省不下，
                             // 只会多一次会话重建 —— 见 recordingHoldsCamera 的说明。录完再摘
@@ -197,7 +194,6 @@ public class RearViewMirrorService extends Service {
                                 CLOSE_AFTER_SCREEN_OFF_MS);
                     } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
                         screenOff = false;
-                        waitingForTapNoted = false;
                         com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏：后视镜重新接相机");
                         rebindNow();
                     }
@@ -313,11 +309,6 @@ public class RearViewMirrorService extends Service {
      * 而不是一次不成就放弃 —— 那样后视镜会永远黑着。</p>
      */
     private void bindCamera(SurfaceTexture surfaceTexture) {
-        if (!screenIsDark() && screenOff && !appConfig.isAutoReconnectOnWake()) {
-            // 亮了，但是没收到亮屏广播 —— 可能是车机自己醒的。按设置等人点
-            AppLog.d(TAG, "亮屏但没收到广播，按设置等人点了再接相机");
-            return;
-        }
         if (screenIsDark()) {
             // 画布准备好、看门狗到点、贴边放回来 —— 通往这里的路不止一条，
             // 所以这一条守在入口，而不是守在每一个调用方
@@ -438,16 +429,11 @@ public class RearViewMirrorService extends Service {
         }
         if (screenOff) {
             // 屏幕已经亮了，亮屏广播却没来 —— 深睡醒来就是这样，车机停车后自己醒那一次也是。
-            // 两种分不出来，所以默认等人点；开发者选项里打开「亮屏后自动接回相机」才自己接
-            if (!appConfig.isAutoReconnectOnWake()) {
-                if (!waitingForTapNoted) {
-                    waitingForTapNoted = true;
-                    com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播：后视镜等人点了再接");
-                }
-                return;
-            }
+            // 总原则（规格 §0）：用户开着后视镜，后视镜就该开着；停车时放开相机是特殊情况，
+            // 醒来特殊情况就结束了，回到用户设定的状态。车机自己醒的那一次同样接（§1.3 选 a）。
+            // 1.28.0 曾在开发者选项里放过一个「亮屏后自动接回相机」、默认等人点，1.34.0 删掉
             screenOff = false;
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播：后视镜自己接回相机（设置里开了自动接回）");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏但没收到广播：后视镜自己接回相机");
         }
         if (boundCamera != null && boundCamera.isCameraOpened()) {
             return;
@@ -495,7 +481,6 @@ public class RearViewMirrorService extends Service {
         if (screenOff && !screenIsDark()) {
             // 把贴边的窗口拉回来，也是人的动作
             screenOff = false;
-            waitingForTapNoted = false;
         }
         rebindNow();
     }
@@ -514,7 +499,6 @@ public class RearViewMirrorService extends Service {
         if (explainIfItFails && screenOff && !screenIsDark()) {
             // 人点了，那就是人回来了
             screenOff = false;
-            waitingForTapNoted = false;
             com.kooo.evcam.blackbox.BlackBox.noteImportant("点了后视镜：接回相机");
         }
         if (mirrorView == null || !mirrorView.isShowing()) {
