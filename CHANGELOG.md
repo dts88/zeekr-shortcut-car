@@ -7,6 +7,21 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.30.0-alpha] - 2026-09-26
+
+- **Recording in progress when the screen goes dark no longer has the super mirror pulled
+  off the surround camera.** Since 1.24.0 the mirror detached itself at screen-off, which
+  rebuilds that camera's session. If a rebuild during recording fails to configure, the
+  camera drops optional outputs and retries -- the second screen, then the mirror, and when
+  neither is left, the recording output. The preview carries on and nothing on screen
+  says the recording stopped. On 1.19 the mirror was still attached at screen-off and would
+  have been the one dropped. This is the only change since 1.19 that touches a recording
+  already running at screen-off, and a likely cause of manual recording stopping in
+  sentry mode, though not yet caught in a log. While recording, the camera is never closed
+  anyway, so the mirror now waits and detaches once recording ends.
+- Dropping the mirror or the recording output after a failed session is now written to
+  the black box.
+
 ## [1.29.0-alpha] - 2026-09-26
 
 - **The black box now says why recording stopped.** Recording starts and stops were never

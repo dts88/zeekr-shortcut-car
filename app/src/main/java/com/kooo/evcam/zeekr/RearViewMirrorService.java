@@ -185,6 +185,12 @@ public class RearViewMirrorService extends Service {
                     if (Intent.ACTION_SCREEN_OFF.equals(action)) {
                         screenOff = true;
                         waitingForTapNoted = false;
+                        if (recordingHoldsCamera()) {
+                            // 正在录像：相机反正不会关，摘掉后视镜什么也省不下，
+                            // 只会多一次会话重建 —— 见 recordingHoldsCamera 的说明。录完再摘
+                            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：正在录像，后视镜先不放开，录完再放");
+                            return;
+                        }
                         com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：后视镜放开相机");
                         unbindCamera();
                         handler.postDelayed(RearViewMirrorService.this::closeCamerasIfNobodyWants,
@@ -390,8 +396,35 @@ public class RearViewMirrorService extends Service {
      * 定期确认一下，断了就接回来，比等着某个通知可靠 ——
      * 关相机的地方有好几处，不是每一处都会想到通知这里。</p>
      */
+    /**
+     * 录像是不是正拿着相机。
+     *
+     * <h3>为什么录像中熄屏，后视镜不摘</h3>
+     *
+     * <p>摘掉后视镜会让那一路重建一次会话。录像中重建万一配置失败，
+     * {@code SingleCamera} 会按顺序丢掉「可选」的输出再重试：先丢副屏、再丢后视镜，
+     * <b>都没得丢了就丢掉录像输出</b> —— 那一路照样有预览，只是不再往录像里送帧。
+     * 1.24.0 之前熄屏时后视镜还挂着，失败了被牺牲的是它；1.24.0 起它先走了，
+     * 剩下能丢的就只有录像。「1.19 哨兵模式下手动录像能一直录，1.28 熄屏后停了」
+     * 是在这一处对上的（2026-09-26，还没被日志抓到）。</p>
+     *
+     * <p>而录像中相机本来就不会被关（登记表里有录像这一项），摘掉后视镜省不下任何东西。
+     * 所以录像中不摘，录完了由看门狗补摘 —— 那时再放开相机，照样赶在深睡之前。</p>
+     */
+    private boolean recordingHoldsCamera() {
+        return com.kooo.evcam.camera.CameraNeeds.current()
+                .isHeld(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
+    }
+
     private void ensureStillBound() {
         if (mirrorView == null || !mirrorView.isShowing()) {
+            return;
+        }
+        if (screenIsDark() && boundCamera != null && !recordingHoldsCamera()) {
+            // 熄屏那一刻在录像，所以没摘；现在录完了，补上
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏中录像结束：后视镜放开相机");
+            unbindCamera();
+            handler.postDelayed(this::closeCamerasIfNobodyWants, CLOSE_AFTER_SCREEN_OFF_MS);
             return;
         }
         if (mirrorView.isDocked() || screenIsDark()) {

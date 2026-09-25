@@ -1909,9 +1909,14 @@ public class SingleCamera {
                             mainFloatingSurface = null;
                             droppedOptionalSurface = true;
                             AppLog.w(TAG, "Retrying without main floating surface...");
+                            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
+                                    + " 录像中会话配置失败：丢掉后视镜输出重试");
                         }
                         if (!droppedOptionalSurface) {
                             AppLog.w(TAG, "Retrying without recording surface...");
+                            // 这一路从这里起不再往录像里送帧，而界面上什么都看不出来
+                            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
+                                    + " 录像中会话配置失败：丢掉了录像输出，这一路从此不再录");
                             recordSurface = null;
                         }
                         if (backgroundHandler != null) {

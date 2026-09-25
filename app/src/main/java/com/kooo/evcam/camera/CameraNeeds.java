@@ -79,6 +79,11 @@ public final class CameraNeeds {
     }
 
     /** 还有人要吗。没人要才该关相机。 */
+    /** 这一项此刻有没有登记着。 */
+    public synchronized boolean isHeld(Holder holder) {
+        return holders.contains(holder);
+    }
+
     public synchronized boolean heldByAnyone() {
         return !holders.isEmpty() || overlayActive();
     }
