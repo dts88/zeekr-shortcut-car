@@ -118,6 +118,7 @@ public final class BlackBox {
             return;
         }
         noteImportant("==== 进程启动，起因: " + starter + " ====");
+        noteBootIfNew(appContext, starter);
         // 这一次进程起来时开关是什么样的 —— 事后看一段时间线，才知道当时在什么设置下
         noteImportant("开关: " + describeSwitches(appContext));
         appendPreviousExits();
@@ -324,6 +325,46 @@ public final class BlackBox {
             }
         } catch (Throwable t) {
             AppLog.w(TAG, "读进程退出原因失败: " + t);
+        }
+    }
+
+    /** 上一次见到的「车机开机时刻」（墙钟）与当时的开机时长。 */
+    private static final String KEY_BOOT_WALL = "boot_wall_ms";
+    private static final String KEY_BOOT_ELAPSED = "boot_elapsed_ms";
+    /** 墙钟开机后常被校时拨动，差这么多以内当作同一次开机。 */
+    private static final long SAME_BOOT_SLACK_MS = 5 * 60 * 1000L;
+
+    /**
+     * 车机是不是换了一次开机。
+     *
+     * <p>平时停车是深睡，进程不死；真正重启很少见，却决定了「开机后 App 能不能自己回来」。
+     * 2026-09-22 那一次重启之后，我们的代码直到用户手动打开才运行 —— 但只有这一个样本。
+     * 所以每次进程启动都记下这一次开机的时刻：和上次见到的不一样，就是重启过，
+     * 顺便写下开机多久之后我们才第一次运行、是被什么拉起来的。攒几次，结论就有了。</p>
+     *
+     * <p>判据两条，满足一条就算：开机时长比上次记的还短（计时从头来过了）；
+     * 或者按墙钟倒推的开机时刻差了五分钟以上。</p>
+     */
+    private static void noteBootIfNew(Context context, String starter) {
+        try {
+            long elapsed = SystemClock.elapsedRealtime();
+            long bootWall = System.currentTimeMillis() - elapsed;
+            SharedPreferences seen = context.getSharedPreferences(SEEN_PREFS, Context.MODE_PRIVATE);
+            long lastWall = seen.getLong(KEY_BOOT_WALL, 0L);
+            long lastElapsed = seen.getLong(KEY_BOOT_ELAPSED, 0L);
+            boolean first = lastWall == 0L;
+            boolean rebooted = !first && (elapsed < lastElapsed
+                    || Math.abs(bootWall - lastWall) > SAME_BOOT_SLACK_MS);
+            seen.edit().putLong(KEY_BOOT_WALL, bootWall).putLong(KEY_BOOT_ELAPSED, elapsed).apply();
+            if (first) {
+                noteImportant("车机本次开机于 " + wallClock(bootWall) + "（第一次记录）");
+            } else if (rebooted) {
+                noteImportant("车机重启过：本次开机于 " + wallClock(bootWall)
+                        + "（上次记录的开机 " + wallClock(lastWall) + "），开机 "
+                        + (elapsed / 60000) + " 分钟后我们才第一次运行，起因 " + starter);
+            }
+        } catch (Throwable t) {
+            AppLog.w(TAG, "noteBootIfNew: " + t);
         }
     }
 
