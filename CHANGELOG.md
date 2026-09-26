@@ -7,6 +7,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.45.0-alpha] - 2026-09-26
+
+- **No more "recording" when nothing is being recorded.** If the screen and the floating button
+  say recording but no data has reached the file for 15 seconds, recording stops as interrupted
+  ("nothing was being written to the file"), and resumes on its own once the surround view is
+  fine, like the other interruptions. In sentry mode the encoder failed and the app showed
+  "recording" for two hours without writing a file.
+- Every recorder error, encoder rebuild and recovery attempt goes to the black box with the
+  reason the system gives. Warnings and errors are also kept in a file that survives restarts;
+  the diagnostics report shows the last 150 of them.
+- Developer options: the screen-off recording switch is now called "Screen-off recording
+  (developer)", so it is not confused with "Keep recording when the screen goes off".
+
 ## [1.44.0-alpha] - 2026-09-26
 
 - **Removed the EVCam code this app never used, about 18,000 lines.** The blind-spot,
