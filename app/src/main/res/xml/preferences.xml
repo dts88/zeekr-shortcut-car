@@ -407,6 +407,16 @@
             android:title="@string/dev_raw_frame_title"
             android:summary="@string/dev_raw_frame_summary" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_gpu_fisheye_preview"
+            android:title="@string/dev_gpu_fisheye_preview_title"
+            android:summary="@string/dev_gpu_fisheye_preview_summary" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_gpu_fisheye_video"
+            android:title="@string/dev_gpu_fisheye_video_title"
+            android:summary="@string/dev_gpu_fisheye_video_summary" />
+
         <Preference
             android:key="pref_repair_mp4"
             android:title="@string/dev_repair_mp4_title"

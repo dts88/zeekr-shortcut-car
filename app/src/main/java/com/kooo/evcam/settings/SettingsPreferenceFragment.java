@@ -966,6 +966,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
 
+        // 鱼眼校正换成 GPU 逐像素算。只换算法，开不开还是看屏幕上那个鱼眼按钮
+        bindSwitch("pref_gpu_fisheye_preview", appConfig.isGpuFisheyePreview(),
+                appConfig::setGpuFisheyePreview);
+        bindSwitch("pref_gpu_fisheye_video", appConfig.isGpuFisheyeVideo(),
+                appConfig::setGpuFisheyeVideo);
+
         bindSwitch("pref_preview_correction", appConfig.isPreviewCorrectionEnabled(), value -> {
             appConfig.setPreviewCorrectionEnabled(value);
             if (getActivity() instanceof MainActivity) {

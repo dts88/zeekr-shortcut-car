@@ -248,6 +248,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         };
         surround = lanes[0];
         surroundFrame = findViewById(R.id.video_surround_frame);
+        if (surroundFrame != null) {
+            // 开发者选项「视频回看：GPU 逐像素鱼眼校正」开着时，解码器先画进外框的管线。
+            // 必须在 TextureView 的画布好之前交给播放器 —— onCreate 里正是时候
+            surround.player.setSurfaceRoute(surroundFrame.gpuRoute());
+        }
         for (Lane lane : lanes) {
             wire(lane);
         }

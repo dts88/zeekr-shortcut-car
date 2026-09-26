@@ -654,6 +654,10 @@
     <string name="dev_preview_correction_reset_title">Set semula pembetulan pratonton</string>
     <string name="dev_raw_frame_title">Simpan juga bingkai asal</string>
     <string name="dev_raw_frame_summary">Tanpa dipecah atau ditera, bersama nota geometri bingkai, dalam photos/raw. Untuk mengkaji susunan lorong dan parameter kanta</string>
+    <string name="dev_gpu_fisheye_preview_title">Pratonton: pembetulan mata ikan per piksel dengan GPU</string>
+    <string name="dev_gpu_fisheye_preview_summary">Pratonton langsung sekeliling dibetulkan piksel demi piksel dengan GPU, selurus dalam lihat foto, bukan secara tampalan. Gambar kamera melalui GL apl sendiri sebelum dipaparkan. Ini memilih kaedah sahaja; butang Mata ikan masih menghidupkan dan mematikan pembetulan. Berkuat kuasa selepas apl dimulakan semula</string>
+    <string name="dev_gpu_fisheye_video_title">Main semula video: pembetulan mata ikan per piksel dengan GPU</string>
+    <string name="dev_gpu_fisheye_video_summary">Paparan sekeliling dalam main semula video dibetulkan piksel demi piksel dengan GPU. Ini memilih kaedah sahaja; butang Mata ikan masih menghidupkan dan mematikan pembetulan. Berkuat kuasa apabila main semula video dibuka lagi</string>
     <string name="dev_repair_mp4_title">Baiki video tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus kerana bekalan kuasa hilang tiada indeks, jadi tiada apa boleh membukanya. Indeks dibina semula daripada klip sihat kamera yang sama, nama fail kekal</string>
     <string name="dev_current_profile_summary">Teks penuh profil yang berkuat kuasa, untuk semakan baris demi baris</string>

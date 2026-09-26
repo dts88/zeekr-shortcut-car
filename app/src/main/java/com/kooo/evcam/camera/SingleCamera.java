@@ -1640,7 +1640,10 @@ public class SingleCamera {
                         previewSurface = null;
                     }
 
-                    previewSurface = new Surface(surfaceTexture);
+                    // 平时就是 new Surface(surfaceTexture)；开发者选项开着时，环视这一路改写进
+                    // GPU 逐像素鱼眼校正的管线，由它再画到这个 TextureView 上（见 PreviewDewarp）
+                    previewSurface = com.kooo.evcam.zeekr.PreviewDewarp.surfaceFor(
+                            cameraId, textureView, surfaceTexture, getPreviewBufferSize());
                     AppLog.d(TAG, "Camera " + cameraId + " Created NEW preview surface: " + previewSurface);
                 }
             } else {

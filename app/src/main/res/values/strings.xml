@@ -664,6 +664,10 @@
     <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
     <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
     <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
+    <string name="dev_gpu_fisheye_preview_title">预览：GPU 逐像素鱼眼校正</string>
+    <string name="dev_gpu_fisheye_preview_summary">主界面环视预览的鱼眼校正改用 GPU 逐像素计算，直线和图片回看一样直，不再分格近似。相机画面会先经过应用自己的 GL 再显示。只换算法，开不开还看鱼眼校正按钮。重启应用后生效</string>
+    <string name="dev_gpu_fisheye_video_title">视频回看：GPU 逐像素鱼眼校正</string>
+    <string name="dev_gpu_fisheye_video_summary">视频回看里环视那一格的鱼眼校正改用 GPU 逐像素计算。只换算法，开不开还看鱼眼校正按钮。下次打开视频回看时生效</string>
     <string name="dev_repair_mp4_title">修复未封口的视频</string>
     <string name="dev_repair_mp4_summary">断电时正在录的那一段没有索引，播放器打不开。按同一路相机完好片段的参数补一个索引回去，文件名不变</string>
     <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>

@@ -656,6 +656,10 @@
     <string name="dev_preview_correction_reset_title">Reset preview correction</string>
     <string name="dev_raw_frame_title">Also save the raw frame</string>
     <string name="dev_raw_frame_summary">Uncut and unstamped, with a note on the frame geometry, in photos/raw. For working out the lane layout and the lens parameters</string>
+    <string name="dev_gpu_fisheye_preview_title">Preview: per-pixel fisheye correction on the GPU</string>
+    <string name="dev_gpu_fisheye_preview_summary">The live surround view is corrected pixel by pixel on the GPU, as straight as in photo playback, instead of in patches. The camera picture goes through the app\'s own GL before it is shown. This picks the method only; the Fisheye button still turns correction on and off. Takes effect after restarting the app</string>
+    <string name="dev_gpu_fisheye_video_title">Video playback: per-pixel fisheye correction on the GPU</string>
+    <string name="dev_gpu_fisheye_video_summary">The surround view in video playback is corrected pixel by pixel on the GPU. This picks the method only; the Fisheye button still turns correction on and off. Takes effect the next time video playback opens</string>
     <string name="dev_repair_mp4_title">Repair unfinalised videos</string>
     <string name="dev_repair_mp4_summary">A clip cut short by a power loss has no index, so nothing will open it. Rebuilds one using a healthy clip from the same camera, keeping the file name</string>
     <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>

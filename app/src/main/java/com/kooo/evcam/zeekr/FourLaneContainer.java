@@ -63,6 +63,9 @@ import com.kooo.evcam.ui.MotionPolicy;
  * 画的仍然是同一个子视图，相机链路照样没动。开关和图片回看、视频回看是同一个
  * （{@link AppConfig#isFisheyeCorrection}），投影、视野、强度也用同一套设置。
  * 容器自己听开关：拨开关的是动作栏上那个按钮自己，MainActivity 不用接线。</p>
+ *
+ * <p>开发者选项里还有一种算法：GPU 逐像素（{@link PreviewDewarp}）。那时子视图里的画面
+ * 在进来之前就已经校正好了，这里照常按矩阵画，不再分格。</p>
  */
 public class FourLaneContainer extends ViewGroup {
 
@@ -177,9 +180,20 @@ public class FourLaneContainer extends ViewGroup {
 
     /** 上一帧走的是哪条绘制路径。变了才记日志 —— 每帧都记会把日志冲掉。 */
     private String drawPath = "";
+    /** [四宫格 / 单画面 / 过渡][不校正 / 分格校正 / GPU 校正]。都是常量，每帧比较不分配。 */
+    private static final String[][] DRAW_PATHS = {
+            {"grid", "grid, fisheye corrected", "grid, fisheye on GPU"},
+            {"single lane", "single lane, fisheye corrected", "single lane, fisheye on GPU"},
+            {"grow transition", "grow transition, fisheye corrected", "grow transition, fisheye on GPU"},
+    };
 
     /** 屏幕上的鱼眼校正开没开。挂上窗口时读，之后开关或设置一变就重读。 */
     private boolean fisheye;
+    /**
+     * 这一帧要不要分格。GPU 逐像素校正的管线接着的时候（{@link PreviewDewarp}），
+     * 子视图里的画面已经是校正过的，再分格就校正了两遍。每次 dispatchDraw 开头定一次。
+     */
+    private boolean meshThisFrame;
     private final FisheyeMesh mesh = new FisheyeMesh();
     private final FisheyeMesh.Painter paintTexture =
             canvas -> drawChild(canvas, textureView, getDrawingTime());
@@ -463,7 +477,8 @@ public class FourLaneContainer extends ViewGroup {
                         : current.isComposite() ? "split into " + current.laneCount() : "not split")
                 + " mode=" + displayMode
                 + " cells=" + (activeCells == null ? "default 2x2" : String.valueOf(activeCells.length))
-                + " fisheye=" + (fisheye ? "on" : "off")
+                + " fisheye=" + (!fisheye ? "off"
+                        : PreviewDewarp.isActive(textureView) ? "gpu" : "mesh")
                 + " drawing=" + (drawPath.isEmpty() ? "not drawn yet" : drawPath);
     }
 
@@ -579,10 +594,10 @@ public class FourLaneContainer extends ViewGroup {
         if (width <= 0 || height <= 0) {
             return;
         }
-        noteDrawPath(transitioning ? (fisheye ? "grow transition, fisheye corrected" : "grow transition")
-                : displayMode == DisplayMode.SINGLE
-                        ? (fisheye ? "single lane, fisheye corrected" : "single lane")
-                        : (fisheye ? "grid, fisheye corrected" : "grid"));
+        boolean gpu = PreviewDewarp.isActive(textureView);
+        meshThisFrame = fisheye && !gpu;
+        noteDrawPath(DRAW_PATHS[transitioning ? 2 : displayMode == DisplayMode.SINGLE ? 1 : 0]
+                [!fisheye ? 0 : gpu ? 2 : 1]);
 
         if (transitioning) {
             // 过渡中：先照常画四宫格（主角那一格除外），再把主角从它自己的格子
@@ -842,7 +857,7 @@ public class FourLaneContainer extends ViewGroup {
             // 合成流，而不是什么都不画。宁可这一格空着
             return;
         }
-        if (fisheye) {
+        if (meshThisFrame) {
             drawLaneCorrected(canvas, lane, cell, rotation, childWidth, childHeight,
                     cellLeft, cellTop, cellWidth, cellHeight);
             return;

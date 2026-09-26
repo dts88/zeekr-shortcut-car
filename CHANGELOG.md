@@ -5,7 +5,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- **Developer options: per-pixel fisheye correction on the GPU**, one switch for the live
+  preview and one for video playback. With them on, the surround view is straightened pixel
+  by pixel, as in photo playback, instead of in patches that bend straight lines slightly.
+  The Fisheye button still turns correction on and off; these only pick the method. For the
+  preview the camera picture goes through the app's own GL before it is shown, which has not
+  been tried on the car yet; it takes effect after restarting the app. Recordings are
+  untouched either way.
 
 ## [1.43.0-alpha] - 2026-09-26
 

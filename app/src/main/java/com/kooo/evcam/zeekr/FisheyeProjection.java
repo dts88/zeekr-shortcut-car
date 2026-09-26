@@ -255,6 +255,41 @@ public final class FisheyeProjection {
         return (float) (Math.atan(planeRadius) / (Math.PI / 2.0));
     }
 
+    /**
+     * 着色器里用哪一支：0 直线、1 柱面、2 立体。认不出来的值走直线，和 {@link #sourcePoint} 一样。
+     *
+     * <p>GPU 逐像素校正（{@link FisheyeGlPipe}）把 {@link #sourcePoint} 那三种投影照搬进了着色器，
+     * 这里和 {@link #shaderParameter} 是两边之间唯一的接口。</p>
+     */
+    public static int shaderProjectionCode(String projection) {
+        if (PROJECTION_CYLINDRICAL.equals(projection)) {
+            return 1;
+        }
+        if (PROJECTION_STEREOGRAPHIC.equals(projection)) {
+            return 2;
+        }
+        return 0;
+    }
+
+    /**
+     * 着色器要的那一个数，只和视野、投影有关，每帧不必重算：
+     * 直线是 tan(视野/2)，柱面是 视野/2（弧度），立体是 tan(视野/4)。
+     * 视野先按投影夹一次，和 {@link #sourcePoint} 一致。
+     */
+    public static float shaderParameter(float fovDegrees, String projection) {
+        int code = shaderProjectionCode(projection);
+        String effective = code == 1 ? PROJECTION_CYLINDRICAL
+                : code == 2 ? PROJECTION_STEREOGRAPHIC : PROJECTION_RECTILINEAR;
+        double halfFov = Math.toRadians(clampFov(fovDegrees, effective) / 2.0);
+        if (code == 1) {
+            return (float) halfFov;
+        }
+        if (code == 2) {
+            return (float) Math.tan(halfFov / 2.0);
+        }
+        return (float) Math.tan(halfFov);
+    }
+
     private static float clamp01(float value) {
         return Math.max(0f, Math.min(1f, value));
     }

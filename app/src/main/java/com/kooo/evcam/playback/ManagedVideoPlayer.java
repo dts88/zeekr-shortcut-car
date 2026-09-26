@@ -59,6 +59,22 @@ public class ManagedVideoPlayer {
         void onFirstFrame(ManagedVideoPlayer player);
     }
 
+    /**
+     * 解码器往哪画。平时直接画到 TextureView 上；给了它，就先画进它给的 Surface，
+     * 由它再画到 TextureView 上（视频回看的 GPU 逐像素鱼眼校正就是这么接进来的）。
+     */
+    public interface SurfaceRoute {
+        /**
+         * TextureView 的画布好了。
+         *
+         * @return 给解码器的 Surface；返回 null 表示不转，直接画到 {@code display} 上
+         */
+        Surface open(SurfaceTexture display, int width, int height);
+
+        /** TextureView 的画布没了，或者播放器报废了：转接那一头也该收了。 */
+        void close();
+    }
+
     /** 空实现，省得每个调用方都写一堆空方法。 */
     public static class SimpleListener implements Listener {
         @Override public void onPrepared(ManagedVideoPlayer player, int durationMs) { }
@@ -72,6 +88,8 @@ public class ManagedVideoPlayer {
 
     private MediaPlayer player;
     private Surface surface;
+    /** 转接；null 表示直接画到 TextureView 上。 */
+    private SurfaceRoute route;
     private Listener listener = new SimpleListener();
 
     private boolean surfaceReady;
@@ -93,7 +111,10 @@ public class ManagedVideoPlayer {
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture st, int w, int h) {
-                surface = new Surface(st);
+                surface = route != null ? route.open(st, w, h) : null;
+                if (surface == null) {
+                    surface = new Surface(st);
+                }
                 surfaceReady = true;
                 if (player != null) {
                     player.setSurface(surface);
@@ -119,6 +140,9 @@ public class ManagedVideoPlayer {
                     surface.release();
                     surface = null;
                 }
+                if (route != null) {
+                    route.close();
+                }
                 return true;
             }
 
@@ -126,6 +150,14 @@ public class ManagedVideoPlayer {
             public void onSurfaceTextureUpdated(SurfaceTexture st) {
             }
         });
+    }
+
+    /**
+     * 解码器改画进转接那一头。要在 TextureView 的画布好之前设（界面 onCreate 里），
+     * 之后设的要等下一次画布重建才生效。
+     */
+    public void setSurfaceRoute(SurfaceRoute route) {
+        this.route = route;
     }
 
     public void setListener(Listener listener) {
@@ -375,6 +407,9 @@ public class ManagedVideoPlayer {
         if (surface != null) {
             surface.release();
             surface = null;
+        }
+        if (route != null) {
+            route.close();
         }
     }
 

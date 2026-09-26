@@ -100,6 +100,8 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
+    private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
+    private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
     private static final String KEY_FISHEYE_STRENGTH = "fisheye_strength";        // 校正强度（百分比）
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
@@ -985,6 +987,36 @@ public class AppConfig {
 
     public void setRawFrameDumpEnabled(boolean on) {
         prefs.edit().putBoolean(KEY_RAW_FRAME_DUMP, on).apply();
+    }
+
+    /**
+     * 主界面环视预览的鱼眼校正走 GPU 逐像素（{@code PreviewDewarp}），而不是分格近似。
+     *
+     * <p>开发者选项：相机画面要先进应用自己的 GL 再显示，还没在车上验证过。锁在开发者模式后面，
+     * 没解锁时一律当关着 —— 关掉开发者模式就回到验证过的那条路。改了要重启应用才生效。</p>
+     *
+     * <p>只决定算法。校正开不开还是看 {@link #isFisheyeCorrection}。</p>
+     */
+    public boolean isGpuFisheyePreview() {
+        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
+                && prefs.getBoolean(KEY_GPU_FISHEYE_PREVIEW, false);
+    }
+
+    public void setGpuFisheyePreview(boolean on) {
+        prefs.edit().putBoolean(KEY_GPU_FISHEYE_PREVIEW, on).apply();
+    }
+
+    /**
+     * 视频回看里环视那一格的鱼眼校正走 GPU 逐像素（{@code FisheyeVideoFrame}）。
+     * 开发者选项，同上锁在开发者模式后面；下次打开视频回看时生效。
+     */
+    public boolean isGpuFisheyeVideo() {
+        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
+                && prefs.getBoolean(KEY_GPU_FISHEYE_VIDEO, false);
+    }
+
+    public void setGpuFisheyeVideo(boolean on) {
+        prefs.edit().putBoolean(KEY_GPU_FISHEYE_VIDEO, on).apply();
     }
 
     /** 鱼眼校正用哪种投影（直线 / 柱面 / 立体）。主界面预览、图片回看、视频回看共用；后视镜不用它。 */

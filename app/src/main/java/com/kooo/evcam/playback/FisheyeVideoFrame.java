@@ -5,13 +5,16 @@ import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.RectF;
+import android.graphics.SurfaceTexture;
 import android.util.AttributeSet;
+import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.FrameLayout;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.zeekr.FisheyeGlPipe;
 import com.kooo.evcam.zeekr.FisheyeMesh;
 
 /**
@@ -29,6 +32,12 @@ import com.kooo.evcam.zeekr.FisheyeMesh;
  *
  * <p>只校正按 2×2 存、每格是正方形的录像 —— 那才是四路鱼眼。座舱录像是一整幅普通画面，
  * 这里对它只做取景，和以前一样。录像文件本身一个字节都不动。</p>
+ *
+ * <h3>GPU 逐像素（开发者选项）</h3>
+ *
+ * <p>开着时解码器不直接画到 TextureView 上，而是画进一条 {@link FisheyeGlPipe}（{@link #gpuRoute}），
+ * 由它逐像素校正四格之后再画上去 —— 和图片回看一样直。这时画面进来就是校正过的，
+ * 这里只做取景，不再分格。</p>
  */
 public class FisheyeVideoFrame extends FrameLayout {
 
@@ -51,8 +60,10 @@ public class FisheyeVideoFrame extends FrameLayout {
     private int cell = PlaybackViewport.NO_CELL;
     private int videoWidth;
     private int videoHeight;
-    /** 此刻是不是在校正着画：开关开着，而且这段录像真是四路鱼眼。 */
+    /** 此刻是不是在分格校正着画：开关开着、这段录像真是四路鱼眼、而且没走 GPU。 */
     private boolean correcting;
+    /** GPU 逐像素校正的管线；没开那个开发者选项、或者管线没起来时为 null。 */
+    private FisheyeGlPipe pipe;
 
     public FisheyeVideoFrame(Context context) {
         this(context, null);
@@ -114,22 +125,71 @@ public class FisheyeVideoFrame extends FrameLayout {
         apply();
     }
 
+    /**
+     * 开发者选项「视频回看：GPU 逐像素鱼眼校正」开着时，给播放器的转接；没开返回 null。
+     * 要在 TextureView 的画布好之前交给播放器（{@link ManagedVideoPlayer#setSurfaceRoute}）。
+     */
+    public ManagedVideoPlayer.SurfaceRoute gpuRoute() {
+        if (!new AppConfig(getContext()).isGpuFisheyeVideo()) {
+            return null;
+        }
+        return new ManagedVideoPlayer.SurfaceRoute() {
+            @Override
+            public Surface open(SurfaceTexture display, int width, int height) {
+                closePipe();
+                pipe = FisheyeGlPipe.start("video", display, width, height,
+                        FisheyeGlPipe.GRID_2X2);
+                Surface surface = pipe != null ? pipe.newInputSurface() : null;
+                if (surface == null) {
+                    closePipe();
+                    AppLog.w(TAG, "GPU 逐像素校正起不来，这一回照旧分格");
+                } else {
+                    AppLog.i(TAG, "视频改走 GPU 逐像素校正");
+                }
+                apply();
+                return surface;
+            }
+
+            @Override
+            public void close() {
+                closePipe();
+                apply();
+            }
+        };
+    }
+
+    private void closePipe() {
+        if (pipe != null) {
+            pipe.release();
+            pipe = null;
+        }
+    }
+
     private void apply() {
         if (video == null) {
             return;
+        }
+        boolean fisheyeVideo = switchedOn && grid
+                && PlaybackViewport.hasSquareCells(videoWidth, videoHeight);
+        if (pipe != null) {
+            // 走 GPU：开没开交给管线，这里只做取景。输出按视频原尺寸，放大一格时才不糊
+            pipe.setCorrection(fisheyeVideo, mesh.fovDegrees(), mesh.projection(), mesh.strength());
+            if (videoWidth > 0 && videoHeight > 0) {
+                pipe.setOutputSize(videoWidth, videoHeight);
+            }
         }
         float[] r = PlaybackViewport.transformRects(cell, videoWidth, videoHeight,
                 video.getWidth(), video.getHeight());
         if (r == null) {
             return;
         }
-        boolean now = switchedOn && grid
-                && PlaybackViewport.hasSquareCells(videoWidth, videoHeight);
+        boolean now = fisheyeVideo && pipe == null;
         if (now != correcting) {
             AppLog.i(TAG, now
-                    ? "鱼眼校正开：" + mesh.projection() + " " + mesh.fovDegrees() + "° 强度 "
+                    ? "分格校正开：" + mesh.projection() + " " + mesh.fovDegrees() + "° 强度 "
                             + Math.round(mesh.strength() * 100f) + "%"
-                    : "鱼眼校正关" + (switchedOn ? "（这段录像不是四路鱼眼："
+                    : "分格校正关" + (pipe != null ? "（走 GPU 逐像素）"
+                            : switchedOn ? "（这段录像不是四路鱼眼："
                             + videoWidth + "x" + videoHeight + " grid=" + grid + "）" : ""));
         }
         correcting = now;
