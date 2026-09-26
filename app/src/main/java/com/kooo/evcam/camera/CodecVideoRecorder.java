@@ -13,6 +13,7 @@ import android.os.Process;
 import android.view.Surface;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.StorageHelper;
 
 import java.io.File;
 import java.io.IOException;
