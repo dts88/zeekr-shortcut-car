@@ -7,6 +7,26 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.35.0-alpha] - 2026-09-26
+
+- **Video playback shows every camera, laid out like photo playback**: surround on the
+  left, cabin cameras stacked on the right. A camera with no files in that recording is
+  hidden. All of them play together, kept in step by time, with the surround view setting
+  the pace.
+- Taps work as in photo playback: tap a view to enlarge it (on the surround view, the lane
+  you tapped), tap again to go back. A new button under the player steps through the views;
+  Back returns to the grid.
+- The recording info moved from the corner of the picture to the title bar.
+- "Send to phone" sends the current clip of the enlarged camera (surround in the grid).
+- Deleting or sharing a recording includes its cabin files, and the sizes in the list count
+  them. Before, only the surround files were deleted and the cabin files stayed on the drive.
+- Play after a recording has finished starts it again from the beginning.
+- Floating button: the default position is the spot set in the car (top right), stored as a
+  distance from the top-right corner so it stays there on other screen sizes. Applies to new
+  installs and "Reset floating windows"; a position you dragged to is kept.
+- Removed what was left of the old "open app" floating button (merged into this one in
+  0.45.0).
+
 ## [1.34.0-alpha] - 2026-09-26
 
 - **One principle for the whole app: it keeps running in the state you set.** Parking,

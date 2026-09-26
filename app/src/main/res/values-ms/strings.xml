@@ -225,10 +225,12 @@
     <string name="msg_starting_recording">Memulakan rakaman…</string>
     <string name="msg_recording_service_failed">Perkhidmatan rakaman gagal bermula — cuba lagi</string>
     <string name="msg_segment_unplayable">Klip ini tidak boleh dimainkan; main balik dihentikan</string>
+    <string name="player_lane_no_footage">Tiada rakaman daripada kamera ini pada saat ini</string>
+    <string name="player_lane_unplayable">Klip ini tidak boleh dimainkan</string>
     <string name="msg_scanning">Mengimbas rakaman…</string>
     <string name="msg_scanning_short">Mengimbas…</string>
     <string name="msg_no_surround_clips">Tiada rakaman keliling ditemui</string>
-    <string name="msg_no_surround_clips_long">Tiada rakaman keliling ditemui (main balik berterusan hanya memainkan kamera keliling)</string>
+    <string name="msg_no_surround_clips_long">Tiada rakaman keliling ditemui (main balik berterusan menyusun garis masa mengikut kamera keliling)</string>
     <string name="msg_no_clips">Tiada rakaman tersedia</string>
     <string name="msg_nothing_to_share">Tiada apa-apa untuk dikongsi</string>
     <string name="action_share_clip">Kongsi rakaman ini</string>

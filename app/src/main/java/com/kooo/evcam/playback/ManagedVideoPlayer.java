@@ -83,6 +83,7 @@ public class ManagedVideoPlayer {
     /** surface 还没好时先存着，好了再执行。 */
     private String pendingPath;
     private long pendingOffsetMs;
+    private boolean pendingExact;
 
     private String currentPath;
     private Runnable firstFrameFallback;
@@ -100,7 +101,7 @@ public class ManagedVideoPlayer {
                     String path = pendingPath;
                     long offset = pendingOffsetMs;
                     pendingPath = null;
-                    open(path, offset, playWhenReady);
+                    open(path, offset, playWhenReady, pendingExact);
                 }
             }
 
@@ -152,6 +153,15 @@ public class ManagedVideoPlayer {
      * @param autoPlay  就绪后是否自动播放
      */
     public void open(String path, long offsetMs, boolean autoPlay) {
+        open(path, offsetMs, autoPlay, false);
+    }
+
+    /**
+     * 打开一个文件。
+     *
+     * @param exact 就绪后按 {@link #seekToExact} 跳，而不是只跳到关键帧
+     */
+    public void open(String path, long offsetMs, boolean autoPlay, boolean exact) {
         if (released || path == null) {
             return;
         }
@@ -161,6 +171,7 @@ public class ManagedVideoPlayer {
             // surface 还没好，记下来等它
             pendingPath = path;
             pendingOffsetMs = offsetMs;
+            pendingExact = exact;
             return;
         }
 
@@ -184,7 +195,11 @@ public class ManagedVideoPlayer {
                 }
                 prepared = true;
                 if (offsetMs > 0) {
-                    seekTo(offsetMs);
+                    if (exact) {
+                        seekToExact(offsetMs);
+                    } else {
+                        seekTo(offsetMs);
+                    }
                 }
                 if (playWhenReady) {
                     p.start();
@@ -241,6 +256,23 @@ public class ManagedVideoPlayer {
         }
         try {
             player.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST_SYNC);
+        } catch (Exception e) {
+            AppLog.w(TAG, "seek 失败: " + e);
+        }
+    }
+
+    /**
+     * 精确跳转（{@code SEEK_CLOSEST}）：从前一个关键帧一路解到目标位置。
+     *
+     * <p>座舱那几路跟着环视走时用。关键帧最多隔 3 秒，只跳到关键帧的话，
+     * 几路画面之间能差出好几秒；座舱画面小，解那几秒的帧不贵。</p>
+     */
+    public void seekToExact(long positionMs) {
+        if (!isPrepared()) {
+            return;
+        }
+        try {
+            player.seekTo(positionMs, MediaPlayer.SEEK_CLOSEST);
         } catch (Exception e) {
             AppLog.w(TAG, "seek 失败: " + e);
         }

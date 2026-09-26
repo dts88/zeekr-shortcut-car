@@ -93,9 +93,26 @@ public class TimelineSessionAdapter
     }
 
     /**
+     * 每一条录制的大小（字节），按会话下标。
+     *
+     * <p>会话本身只认环视那一路；同一次录制里座舱的文件也在回放里一起放、一起删，
+     * 所以大小由界面算好了给过来。没给的按会话自己的算。</p>
+     */
+    private long[] sessionBytes = new long[0];
+
+    /**
+     * @param sessions 正序（最早在前）的会话列表，与 {@link RecordingTimeline#build} 的输出一致
+     * @param bytes    每一条的大小（字节），和 sessions 一一对应
+     */
+    public void setSessions(List<RecordingTimeline.Session> sessions, long[] bytes) {
+        sessionBytes = bytes != null ? bytes : new long[0];
+        setSessions(sessions);
+    }
+
+    /**
      * @param sessions 正序（最早在前）的会话列表，与 {@link RecordingTimeline#build} 的输出一致
      */
-    public void setSessions(List<RecordingTimeline.Session> sessions) {
+    private void setSessions(List<RecordingTimeline.Session> sessions) {
         rows.clear();
         if (sessions != null) {
             SimpleDateFormat dayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
@@ -227,7 +244,9 @@ public class TimelineSessionAdapter
             return;
         }
         SessionViewHolder sessionHolder = (SessionViewHolder) holder;
-        sessionHolder.bind(row.session, row.sessionIndex == selectedSessionIndex,
+        long bytes = row.sessionIndex < sessionBytes.length
+                ? sessionBytes[row.sessionIndex] : row.session.totalSizeBytes;
+        sessionHolder.bind(row.session, bytes, row.sessionIndex == selectedSessionIndex,
                 selectionMode, chosen.contains(row.sessionIndex));
         sessionHolder.itemView.setOnClickListener(v -> {
             int clicked = sessionHolder.getAdapterPosition();
@@ -284,7 +303,7 @@ public class TimelineSessionAdapter
             check = itemView.findViewById(R.id.session_check);
         }
 
-        void bind(RecordingTimeline.Session session, boolean selected,
+        void bind(RecordingTimeline.Session session, long bytes, boolean selected,
                   boolean selecting, boolean chosen) {
             Date start = new Date(session.startEpochMs);
             Date end = new Date(session.startEpochMs + session.totalDurationMs);
@@ -294,7 +313,7 @@ public class TimelineSessionAdapter
             timeText.setText(clock.format(start) + " – " + clock.format(end));
 
             metaText.setText(TimelineFormat.duration(session.totalDurationMs)
-                    + " · " + TimelineFormat.size(session.totalSizeBytes)
+                    + " · " + TimelineFormat.size(bytes)
                     + " · " + itemView.getContext().getString(
                             R.string.player_clip_count, session.segmentCount()));
 

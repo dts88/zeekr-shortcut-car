@@ -233,10 +233,12 @@
     <string name="msg_starting_recording">正在启动录制，请稍候…</string>
     <string name="msg_recording_service_failed">录制服务启动失败，请重试</string>
     <string name="msg_segment_unplayable">这段录像无法播放，已停止</string>
+    <string name="player_lane_no_footage">这一刻没有这一路的录像</string>
+    <string name="player_lane_unplayable">这一段放不出来</string>
     <string name="msg_scanning">正在扫描录像…</string>
     <string name="msg_scanning_short">正在扫描…</string>
     <string name="msg_no_surround_clips">没有找到环视录像</string>
-    <string name="msg_no_surround_clips_long">没有找到环视录像（连续回放只播环视这一路）</string>
+    <string name="msg_no_surround_clips_long">没有找到环视录像（连续回放按环视那一路排时间轴）</string>
     <string name="msg_no_clips">没有找到可用的录像</string>
     <string name="msg_nothing_to_share">没有可分享的文件</string>
     <string name="action_share_clip">分享这段录制</string>

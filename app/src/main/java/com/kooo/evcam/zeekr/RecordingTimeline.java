@@ -89,6 +89,46 @@ public final class RecordingTimeline {
             return segments.size();
         }
 
+        /** 最后一段结束的真实时刻。 */
+        public long endEpochMs() {
+            if (segments.isEmpty()) {
+                return startEpochMs;
+            }
+            Segment last = segments.get(segments.size() - 1);
+            return last.startEpochMs + last.durationMs;
+        }
+
+        /**
+         * 时间轴上的位置 → 真实时刻。
+         *
+         * <p>座舱各路按真实时刻去对（见 {@link LaneTrack}），所以先换算过去。
+         * 时间轴把段与段之间那零点几秒的空隙挤掉了，两者不是简单地差一个起点。</p>
+         */
+        public long epochAt(long positionMs) {
+            Locator locator = locate(positionMs);
+            if (locator == null) {
+                return startEpochMs;
+            }
+            return locator.segment.startEpochMs + locator.offsetInSegmentMs;
+        }
+
+        /**
+         * 真实时刻 → 时间轴上的位置，{@link #epochAt} 反过来。
+         *
+         * <p>落在两段之间的空隙里，算下一段的开头；早于第一段算 0，晚于最后一段算末尾。</p>
+         */
+        public long positionAt(long epochMs) {
+            for (Segment seg : segments) {
+                if (epochMs < seg.startEpochMs) {
+                    return seg.timelineOffsetMs;
+                }
+                if (epochMs < seg.startEpochMs + seg.durationMs) {
+                    return seg.timelineOffsetMs + (epochMs - seg.startEpochMs);
+                }
+            }
+            return totalDurationMs;
+        }
+
         /**
          * 把时间轴上的位置换算成「哪个文件 + 文件内偏移」。
          *

@@ -225,10 +225,12 @@
     <string name="msg_starting_recording">Starting recording…</string>
     <string name="msg_recording_service_failed">Recording service failed to start — try again</string>
     <string name="msg_segment_unplayable">This clip cannot be played; playback stopped</string>
+    <string name="player_lane_no_footage">No recording from this camera at this moment</string>
+    <string name="player_lane_unplayable">This clip cannot be played</string>
     <string name="msg_scanning">Scanning recordings…</string>
     <string name="msg_scanning_short">Scanning…</string>
     <string name="msg_no_surround_clips">No surround recordings found</string>
-    <string name="msg_no_surround_clips_long">No surround recordings found (continuous playback plays the surround camera only)</string>
+    <string name="msg_no_surround_clips_long">No surround recordings found (continuous playback builds its timeline from the surround camera)</string>
     <string name="msg_no_clips">No recordings available</string>
     <string name="msg_nothing_to_share">Nothing to share</string>
     <string name="action_share_clip">Share this recording</string>
