@@ -631,8 +631,6 @@
     <string name="set_section_developer">Developer options</string>
     <string name="dev_permissions_title">Permissions</string>
     <string name="dev_permissions_summary">Manage the permissions the app needs</string>
-    <string name="dev_permission_tools_title">Permission tools</string>
-    <string name="dev_permission_tools_summary">ADB one-tap grant, system whitelist (troubleshooting)</string>
     <string name="dev_blind_spot_title">Blind-spot options</string>
     <string name="dev_supervision_title">Super view</string>
     <string name="dev_custom_config_title">Custom layout</string>

@@ -24,7 +24,6 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CustomCameraConfigFragment;
 import com.kooo.evcam.MainActivity;
-import com.kooo.evcam.PermissionSettingsFragment;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
@@ -904,10 +903,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
-
-        onClick("pref_permission_tools",
-                pref -> openFragment(new PermissionSettingsFragment(),
-                        R.string.dev_permission_tools_title));
 
         onClick("pref_blind_spot", pref -> {
             if (getActivity() instanceof MainActivity) {

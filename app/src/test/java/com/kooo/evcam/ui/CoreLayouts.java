@@ -30,7 +30,7 @@ final class CoreLayouts {
             "dialog_blind_spot_disclaimer.xml", "dialog_fullscreen_preview.xml",
             "dialog_wheel_settings.xml", "fragment_blind_spot_correction.xml",
             "fragment_blind_spot_lab.xml", "fragment_custom_camera_config.xml",
-            "fragment_permission_settings.xml", "fragment_secondary_blind_spot_adjust.xml",
+            "fragment_secondary_blind_spot_adjust.xml",
             "fragment_secondary_display_settings.xml", "layout_custom_buttons_multi.xml",
             "layout_custom_buttons_multi_vertical.xml", "layout_custom_buttons_standard.xml",
             "layout_custom_buttons_standard_vertical.xml", "presentation_secondary_display.xml",

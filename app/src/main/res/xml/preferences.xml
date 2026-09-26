@@ -356,11 +356,6 @@
             android:summary="@string/dev_permissions_summary" />
 
         <Preference
-            android:key="pref_permission_tools"
-            android:title="@string/dev_permission_tools_title"
-            android:summary="@string/dev_permission_tools_summary" />
-
-        <Preference
             android:key="pref_blind_spot"
             android:title="@string/dev_blind_spot_title" />
 

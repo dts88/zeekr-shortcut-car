@@ -629,8 +629,6 @@
     <string name="set_section_developer">Pilihan pembangun</string>
     <string name="dev_permissions_title">Kebenaran</string>
     <string name="dev_permissions_summary">Urus kebenaran yang diperlukan apl</string>
-    <string name="dev_permission_tools_title">Alat kebenaran</string>
-    <string name="dev_permission_tools_summary">Pemberian sekali ketik ADB, senarai putih sistem (penyelesaian masalah)</string>
     <string name="dev_blind_spot_title">Pilihan titik buta</string>
     <string name="dev_supervision_title">Pandangan super</string>
     <string name="dev_custom_config_title">Susun atur tersuai</string>

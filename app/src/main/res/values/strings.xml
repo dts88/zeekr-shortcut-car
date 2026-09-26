@@ -639,8 +639,6 @@
     <string name="set_section_developer">开发者选项</string>
     <string name="dev_permissions_title">权限设置</string>
     <string name="dev_permissions_summary">管理应用所需的各项权限</string>
-    <string name="dev_permission_tools_title">权限工具</string>
-    <string name="dev_permission_tools_summary">ADB 一键授权、系统白名单（排查用）</string>
     <string name="dev_blind_spot_title">补盲选项</string>
     <string name="dev_supervision_title">超视模式</string>
     <string name="dev_custom_config_title">自定义界面配置</string>

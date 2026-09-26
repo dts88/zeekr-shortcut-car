@@ -71,9 +71,7 @@ public class HardcodedTextTest {
         // ---- 纯开发者工具：入口都在开发者选项里（抽屉里的补盲 / 超视也只在解锁后显示） ----
         String developer = "开发者工具，只在开发者选项里出现";
         for (String f : new String[]{
-                "AdbPermissionHelper.java", "PermissionSettingsFragment.java",
-                "settings/PermissionsPreferenceFragment.java", "SystemWhitelistHelper.java",
-                "CustomCameraConfigFragment.java", "CustomLayoutManager.java",
+                "settings/PermissionsPreferenceFragment.java", "CustomCameraConfigFragment.java", "CustomLayoutManager.java",
                 "LogcatViewerActivity.java", "repair/Mp4RepairFlow.java"}) {
             JAVA_ALLOWED.put(f, developer);
         }
@@ -114,8 +112,7 @@ public class HardcodedTextTest {
                 "layout/activity_logcat_viewer.xml", "layout/activity_main_custom.xml",
                 "layout/dialog_blind_spot_disclaimer.xml", "layout/dialog_wheel_settings.xml",
                 "layout/fragment_blind_spot_correction.xml", "layout/fragment_blind_spot_lab.xml",
-                "layout/fragment_custom_camera_config.xml", "layout/fragment_permission_settings.xml",
-                "layout/fragment_secondary_blind_spot_adjust.xml",
+                "layout/fragment_custom_camera_config.xml", "layout/fragment_secondary_blind_spot_adjust.xml",
                 "layout/fragment_secondary_display_settings.xml",
                 "layout/layout_custom_buttons_multi.xml",
                 "layout/layout_custom_buttons_multi_vertical.xml",
