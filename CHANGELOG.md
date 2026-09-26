@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.47.0-alpha] - 2026-09-27
+
 - **Recording moves to another drive the moment its drive stops taking data, without losing
   the last 15 seconds.** The recorder keeps the most recent 15 seconds of encoded video in
   memory (longer while the drive has not confirmed the data on disk, up to one minute), fsyncs
