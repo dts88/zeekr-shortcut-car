@@ -5,6 +5,10 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.40.0-alpha] - 2026-09-26
+
 - **Fisheye correction on the live surround view and in video playback** (experimental).
   A "Fisheye" button in the action rail on the main screen; video playback gets the same
   button, which was hidden until now. It is one switch with the button in photo playback,
