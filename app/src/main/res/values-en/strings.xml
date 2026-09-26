@@ -641,8 +641,6 @@
     <string name="set_section_developer">Developer options</string>
     <string name="dev_permissions_title">Permissions</string>
     <string name="dev_permissions_summary">Manage the permissions the app needs</string>
-    <string name="dev_upload_logs_title">Upload logs</string>
-    <string name="dev_upload_logs_summary">Send the run logs to the author</string>
     <string name="dev_permission_tools_title">Permission tools</string>
     <string name="dev_permission_tools_summary">ADB one-tap grant, system whitelist (troubleshooting)</string>
     <string name="dev_blind_spot_title">Blind-spot options</string>
@@ -662,27 +660,4 @@
     <string name="dev_note">“Custom” in Stream profile is only available here. Tap “Safety notice” in About to turn developer options off; this section then hides.</string>
 
     <!-- Log upload · device name (developer) -->
-    <string name="nick_confirm_title">Confirm device name</string>
-    <string name="nick_confirm_msg">The device name you entered is:\n\n“%1$s”\n\nUse this name?</string>
-    <string name="nick_confirm_ok">Confirm</string>
-    <string name="nick_reenter">Re-enter</string>
-    <string name="nick_title">Set a device name</string>
-    <string name="nick_msg">Enter a name so your logs can be identified:</string>
-    <string name="nick_hint">e.g. Alex’s 7X</string>
-    <string name="nick_empty">The name cannot be empty</string>
-    <string name="upload_type_current">this run</string>
-    <string name="upload_type_previous">previous run</string>
-    <string name="upload_uploading">Uploading the %1$s log…</string>
-    <string name="upload_done">The author received the %1$s log</string>
-    <string name="upload_failed">Upload failed: %1$s</string>
-    <string name="upload_identity">Uploading as: “%1$s”</string>
-    <string name="upload_choose_log">Choose a log:</string>
-    <string name="upload_current_log">This run’s log</string>
-    <string name="upload_previous_log">Previous run’s log</string>
-    <string name="upload_previous_none">Previous run’s log (none available)</string>
-    <string name="upload_desc_label">Describe the problem:</string>
-    <string name="upload_desc_hint">Describe what went wrong…</string>
-    <string name="upload_desc_empty">(no description given)</string>
-    <string name="upload_ok">Upload</string>
-    <string name="upload_change_name">Change name</string>
 </resources>

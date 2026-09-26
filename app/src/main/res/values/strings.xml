@@ -649,8 +649,6 @@
     <string name="set_section_developer">开发者选项</string>
     <string name="dev_permissions_title">权限设置</string>
     <string name="dev_permissions_summary">管理应用所需的各项权限</string>
-    <string name="dev_upload_logs_title">上传日志</string>
-    <string name="dev_upload_logs_summary">把运行日志发给作者</string>
     <string name="dev_permission_tools_title">权限工具</string>
     <string name="dev_permission_tools_summary">ADB 一键授权、系统白名单（排查用）</string>
     <string name="dev_blind_spot_title">补盲选项</string>
@@ -670,27 +668,4 @@
     <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。在「关于」里点「安全须知」可以关掉开发者选项，关掉后本区隐藏。</string>
 
     <!-- 上传日志 · 设备识别名称（开发者） -->
-    <string name="nick_confirm_title">确认设备名称</string>
-    <string name="nick_confirm_msg">您输入的设备名称是：\n\n「%1$s」\n\n确认使用此名称吗？</string>
-    <string name="nick_confirm_ok">确认</string>
-    <string name="nick_reenter">重新输入</string>
-    <string name="nick_title">设置设备识别名称</string>
-    <string name="nick_msg">请输入一个便于识别的名称，用于区分不同用户的日志：</string>
-    <string name="nick_hint">例如：张三的 7X</string>
-    <string name="nick_empty">名称不能为空</string>
-    <string name="upload_type_current">本次运行</string>
-    <string name="upload_type_previous">上次运行</string>
-    <string name="upload_uploading">正在上传%1$s日志…</string>
-    <string name="upload_done">作者已收到%1$s日志</string>
-    <string name="upload_failed">上传失败：%1$s</string>
-    <string name="upload_identity">上传身份：「%1$s」</string>
-    <string name="upload_choose_log">选择日志：</string>
-    <string name="upload_current_log">本次运行日志</string>
-    <string name="upload_previous_log">上次运行日志</string>
-    <string name="upload_previous_none">上次运行日志（无可用日志）</string>
-    <string name="upload_desc_label">问题描述：</string>
-    <string name="upload_desc_hint">请描述遇到的问题…</string>
-    <string name="upload_desc_empty">（用户未填写问题描述）</string>
-    <string name="upload_ok">上传</string>
-    <string name="upload_change_name">修改名称</string>
 </resources>

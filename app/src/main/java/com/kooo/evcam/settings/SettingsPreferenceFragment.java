@@ -928,19 +928,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
-        onClick("pref_upload_logs", pref -> {
-            if (getContext() == null) {
-                return;
-            }
-            // 没设过设备名就先问一次，否则上传上去分不清是哪台车
-            if (appConfig.hasDeviceNickname()) {
-                SettingsDialogs.showUploadConfirmDialog(
-                        getContext(), appConfig, appConfig.getDeviceNickname());
-            } else {
-                SettingsDialogs.showDeviceNicknameInputDialog(getContext(), appConfig);
-            }
-        });
-
         onClick("pref_permission_tools",
                 pref -> openFragment(new PermissionSettingsFragment(),
                         R.string.dev_permission_tools_title));

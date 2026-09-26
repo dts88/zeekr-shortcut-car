@@ -22,9 +22,7 @@ public class AppConfig {
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
-    private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
-    private static final String KEY_DEVICE_NICKNAME = "device_nickname";  // 设备识别名称（用于日志上传）
-    private static final String KEY_PERSISTENT_WAKE_LOCK = "persistent_wake_lock";  // 常驻唤醒锁（开发者选项）
+    private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";    private static final String KEY_PERSISTENT_WAKE_LOCK = "persistent_wake_lock";  // 常驻唤醒锁（开发者选项）
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
@@ -392,35 +390,8 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply();
         AppLog.d(TAG, "首次启动标记已设置为完成");
     }
-    
-    // ==================== 设备识别名称相关方法 ====================
-    
-    /**
-     * 获取设备识别名称（用于日志上传）
-     * @return 设备名称，如果未设置返回 null
-     */
-    public String getDeviceNickname() {
-        return prefs.getString(KEY_DEVICE_NICKNAME, null);
-    }
-    
-    /**
-     * 设置设备识别名称
-     * @param nickname 设备名称
-     */
-    public void setDeviceNickname(String nickname) {
-        prefs.edit().putString(KEY_DEVICE_NICKNAME, nickname).apply();
-        AppLog.d(TAG, "设备识别名称已设置: " + nickname);
-    }
-    
-    /**
-     * 检查是否已设置设备识别名称
-     * @return true 表示已设置
-     */
-    public boolean hasDeviceNickname() {
-        String nickname = getDeviceNickname();
-        return nickname != null && !nickname.trim().isEmpty();
-    }
-    
+
+
     // ==================== 开机自启动相关方法 ====================
     
     /**

@@ -639,8 +639,6 @@
     <string name="set_section_developer">Pilihan pembangun</string>
     <string name="dev_permissions_title">Kebenaran</string>
     <string name="dev_permissions_summary">Urus kebenaran yang diperlukan apl</string>
-    <string name="dev_upload_logs_title">Muat naik log</string>
-    <string name="dev_upload_logs_summary">Hantar log larian kepada penulis</string>
     <string name="dev_permission_tools_title">Alat kebenaran</string>
     <string name="dev_permission_tools_summary">Pemberian sekali ketik ADB, senarai putih sistem (penyelesaian masalah)</string>
     <string name="dev_blind_spot_title">Pilihan titik buta</string>
@@ -660,27 +658,4 @@
     <string name="dev_note">“Tersuai” dalam Profil strim hanya tersedia di sini. Ketik “Notis keselamatan” dalam Perihal untuk mematikan pilihan pembangun; bahagian ini kemudian tersembunyi.</string>
 
     <!-- Muat naik log · nama peranti (pembangun) -->
-    <string name="nick_confirm_title">Sahkan nama peranti</string>
-    <string name="nick_confirm_msg">Nama peranti yang anda masukkan ialah:\n\n“%1$s”\n\nGuna nama ini?</string>
-    <string name="nick_confirm_ok">Sahkan</string>
-    <string name="nick_reenter">Masukkan semula</string>
-    <string name="nick_title">Tetapkan nama peranti</string>
-    <string name="nick_msg">Masukkan nama supaya log anda boleh dikenal pasti:</string>
-    <string name="nick_hint">cth. 7X Ali</string>
-    <string name="nick_empty">Nama tidak boleh kosong</string>
-    <string name="upload_type_current">larian ini</string>
-    <string name="upload_type_previous">larian sebelumnya</string>
-    <string name="upload_uploading">Memuat naik log %1$s…</string>
-    <string name="upload_done">Penulis menerima log %1$s</string>
-    <string name="upload_failed">Muat naik gagal: %1$s</string>
-    <string name="upload_identity">Memuat naik sebagai: “%1$s”</string>
-    <string name="upload_choose_log">Pilih log:</string>
-    <string name="upload_current_log">Log larian ini</string>
-    <string name="upload_previous_log">Log larian sebelumnya</string>
-    <string name="upload_previous_none">Log larian sebelumnya (tiada tersedia)</string>
-    <string name="upload_desc_label">Terangkan masalah:</string>
-    <string name="upload_desc_hint">Terangkan apa yang tidak kena…</string>
-    <string name="upload_desc_empty">(tiada penerangan diberikan)</string>
-    <string name="upload_ok">Muat naik</string>
-    <string name="upload_change_name">Tukar nama</string>
 </resources>

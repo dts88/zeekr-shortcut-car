@@ -86,7 +86,6 @@ public class HardcodedTextTest {
                 "DoorSignalObserver.java"}) {
             JAVA_ALLOWED.put(f, blindSpot);
         }
-        JAVA_ALLOWED.put("AppLog.java", "日志上传（开发者选项）的提示和上传报告正文");
         JAVA_ALLOWED.put("StorageCleanupManager.java", "清理通知只在录到内部存储时才发，而内部存储只有开发者能选");
         // ---- 不上界面的文字 ----
         JAVA_ALLOWED.put("camera/EglSurfaceEncoder.java", "GLSL 着色器源码里的注释");

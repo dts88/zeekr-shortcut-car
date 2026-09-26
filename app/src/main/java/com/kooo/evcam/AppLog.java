@@ -2,24 +2,16 @@ package com.kooo.evcam;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Environment;
 import android.util.Log;
 
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-
-import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -44,18 +36,7 @@ public final class AppLog {
     
     // 原始的 UncaughtExceptionHandler
     private static Thread.UncaughtExceptionHandler sDefaultHandler = null;
-    
-    // Gotify 服务器配置
-    private static final String GOTIFY_SERVER_URL = "http://suyunkai.top:40266";
-    private static final String GOTIFY_APP_TOKEN = "AXK51-43QvveMDM";
-    
-    /**
-     * 日志上传回调接口
-     */
-    public interface UploadCallback {
-        void onSuccess();
-        void onError(String error);
-    }
+
 
     private AppLog() {
     }
@@ -185,75 +166,8 @@ public final class AppLog {
             Log.w("AppLog", "Failed to save current session log: " + e.getMessage());
         }
     }
-    
-    /**
-     * 检查是否有上次运行的日志
-     */
-    public static boolean hasPreviousSessionLogs(Context context) {
-        if (context == null) return false;
-        
-        File logDir = getLogDirectory(context);
-        File previousLog = new File(logDir, PREVIOUS_SESSION_LOG);
-        return previousLog.exists() && previousLog.length() > 0;
-    }
-    
-    /**
-     * 获取上次运行日志的信息（行数和时间）
-     */
-    public static String getPreviousSessionLogInfo(Context context) {
-        if (context == null) return null;
-        
-        File logDir = getLogDirectory(context);
-        File previousLog = new File(logDir, PREVIOUS_SESSION_LOG);
-        
-        if (!previousLog.exists() || previousLog.length() == 0) {
-            return null;
-        }
-        
-        // 读取文件获取行数和首行时间
-        int lineCount = 0;
-        String firstLine = null;
-        String lastLine = null;
-        
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new java.io.FileInputStream(previousLog), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (lineCount == 0) {
-                    firstLine = line;
-                }
-                lastLine = line;
-                lineCount++;
-            }
-        } catch (IOException e) {
-            return null;
-        }
-        
-        // 提取时间信息
-        String startTime = extractTimeFromLogLine(firstLine);
-        String endTime = extractTimeFromLogLine(lastLine);
-        
-        if (startTime != null && endTime != null) {
-            return lineCount + " 条日志 (" + startTime + " ~ " + endTime + ")";
-        } else {
-            return lineCount + " 条日志";
-        }
-    }
-    
-    /**
-     * 从日志行中提取时间部分
-     */
-    private static String extractTimeFromLogLine(String line) {
-        if (line == null || line.length() < 19) return null;
-        // 日志格式: "2025-01-31 12:34:56.789 ..."
-        // 只取时间部分 "12:34:56"
-        try {
-            return line.substring(11, 19);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-    
+
+
     /**
      * 获取上次运行的日志内容
      */
@@ -328,145 +242,7 @@ public final class AppLog {
         lines.addAll(snapshot);
         return writeLogToFile(logFile, lines) ? logFile : null;
     }
-    
-    /**
-     * 一键上传日志到 Gotify 服务器（上传当前运行日志）
-     * @param context 上下文
-     * @param deviceNickname 设备识别名称
-     * @param problemDescription 问题描述
-     * @param callback 上传结果回调
-     */
-    public static void uploadLogsToServer(Context context, String deviceNickname, String problemDescription, UploadCallback callback) {
-        uploadLogsToServer(context, deviceNickname, problemDescription, false, callback);
-    }
-    
-    /**
-     * 一键上传日志到 Gotify 服务器
-     * @param context 上下文
-     * @param deviceNickname 设备识别名称
-     * @param problemDescription 问题描述
-     * @param uploadPreviousSession 是否上传上次运行的日志
-     * @param callback 上传结果回调
-     */
-    public static void uploadLogsToServer(Context context, String deviceNickname, String problemDescription, 
-                                          boolean uploadPreviousSession, UploadCallback callback) {
-        if (context == null || callback == null) {
-            if (callback != null) {
-                callback.onError("Context is null");
-            }
-            return;
-        }
-        
-        // 在后台线程执行网络请求
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            try {
-                // 获取日志内容
-                List<String> snapshot;
-                if (uploadPreviousSession) {
-                    // 获取上次运行日志
-                    snapshot = getPreviousSessionLogs(context);
-                } else {
-                    // 获取当前运行日志
-                    synchronized (LOCK) {
-                        snapshot = new ArrayList<>(BUFFER);
-                    }
-                }
-                
-                if (snapshot.isEmpty()) {
-                    callback.onError(uploadPreviousSession ? "上次运行日志为空" : "日志为空");
-                    return;
-                }
-                
-                // 获取应用版本信息
-                String versionName = "unknown";
-                int versionCode = 0;
-                try {
-                    PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-                    versionName = packageInfo.versionName;
-                    versionCode = (int) packageInfo.getLongVersionCode();
-                } catch (PackageManager.NameNotFoundException e) {
-                    // 忽略
-                }
-                
-                // 构建日志内容
-                String logType = uploadPreviousSession ? "上次运行日志" : "本次运行日志";
-                StringBuilder logContent = new StringBuilder();
-                logContent.append("=== EVCam 日志上传 (").append(logType).append(") ===\n");
-                logContent.append("用户标识: ").append(deviceNickname != null ? deviceNickname : "未知").append("\n");
-                logContent.append("设备型号: ").append(Build.MODEL).append("\n");
-                logContent.append("系统版本: Android ").append(Build.VERSION.RELEASE)
-                         .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
-                logContent.append("应用版本: ").append(versionName)
-                         .append(" (").append(versionCode).append(")\n");
-                logContent.append("上传时间: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA).format(new Date())).append("\n");
-                logContent.append("日志类型: ").append(logType).append("\n");
-                logContent.append("日志条数: ").append(snapshot.size()).append("\n");
-                logContent.append("========================\n\n");
-                
-                // 添加问题描述
-                logContent.append("【问题描述】\n");
-                logContent.append(problemDescription != null ? problemDescription : "（无）").append("\n\n");
-                logContent.append("========================\n\n");
-                
-                for (String line : snapshot) {
-                    logContent.append(line).append("\n");
-                }
-                
-                // 构建请求 URL
-                URL url = new URL(GOTIFY_SERVER_URL + "/message?token=" + GOTIFY_APP_TOKEN);
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                connection.setDoOutput(true);
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(15000);
-                
-                // 构建 JSON 请求体 - 标题包含用户标识和日志类型便于识别
-                JSONObject jsonBody = new JSONObject();
-                String logTypeShort = uploadPreviousSession ? "[Previous]" : "[Current]";
-                String title = deviceNickname != null ? 
-                        "EVCam " + logTypeShort + " - " + deviceNickname : 
-                        "EVCam " + logTypeShort + " - " + Build.MODEL;
-                jsonBody.put("title", title);
-                jsonBody.put("message", logContent.toString());
-                jsonBody.put("priority", 5);
-                
-                // 发送请求
-                try (OutputStream os = connection.getOutputStream()) {
-                    byte[] input = jsonBody.toString().getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
-                }
-                
-                // 获取响应
-                int responseCode = connection.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
-                    callback.onSuccess();
-                } else {
-                    // 读取错误信息
-                    StringBuilder errorResponse = new StringBuilder();
-                    try (BufferedReader br = new BufferedReader(
-                            new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            errorResponse.append(line);
-                        }
-                    } catch (Exception e) {
-                        // 忽略读取错误流的异常
-                    }
-                    callback.onError("HTTP " + responseCode + ": " + errorResponse);
-                }
-                
-            } catch (Exception e) {
-                Log.e("AppLog", "Upload failed", e);
-                callback.onError(e.getMessage());
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
-            }
-        }).start();
-    }
+
 
     private static boolean writeLogToFile(File logFile, List<String> lines) {
         if (!logFile.getParentFile().exists() && !logFile.getParentFile().mkdirs()) {
