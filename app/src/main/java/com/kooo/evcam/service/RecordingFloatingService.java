@@ -11,7 +11,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
@@ -35,10 +34,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
-import com.kooo.evcam.camera.CameraManagerHolder;
-import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.overlay.FloatingAction;
-import com.kooo.evcam.recording.RecordingController;
 
 /**
  * 悬浮按钮服务：整个应用只有这一个悬浮按钮。
@@ -143,21 +139,7 @@ public class RecordingFloatingService extends Service {
             recordingService = binder.getService();
             isServiceBound = true;
 
-            // 监听录制状态
-            recordingService.getRecordingController().addStateListener(
-                    new RecordingController.RecordingStateListener() {
-                        @Override
-                        public void onStateChanged(RecordingController.RecordingState newState,
-                                                   RecordingController.RecordingState oldState) {
-                            mainHandler.post(() -> {
-                                boolean recording = (newState == RecordingController.RecordingState.RECORDING);
-                                updateRecordingState(recording);
-                            });
-                        }
-                    }
-            );
-
-            // 同步当前状态
+            // 之后的变化服务会发 ACTION_RECORDING_STATE_CHANGED 广播，本服务一直听着；这里只对一次当前状态
             updateRecordingState(recordingService.isRecording());
         }
 

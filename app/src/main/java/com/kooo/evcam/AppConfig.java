@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.kooo.evcam.camera.CameraNames;
-import com.kooo.evcam.config.BlindSpotConfig;
 import com.kooo.evcam.zeekr.FisheyeProjection;
 import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.LicensePlate;
