@@ -28,10 +28,38 @@ public final class RecentRecordings {
     private RecentRecordings() {
     }
 
+    /**
+     * 先列最近一次录像实际写进的目录，再列设定的目录（两者不同时）。
+     *
+     * <p>以前只看设定的那个盘。2026-09-26 21:55 设定的盘掉线、自动接回写到了另一个盘，
+     * 报告里就一个新文件都看不到，像是什么都没录上。</p>
+     */
     public static void appendTo(StringBuilder sb, Context context) {
         sb.append("## 8. 最近的录像文件实际规格").append('\n');
+        File chosen = null;
         try {
-            File dir = StorageHelper.getVideoDir(context);
+            chosen = StorageHelper.getVideoDir(context);
+        } catch (Throwable t) {
+            sb.append("!! 读取设定目录失败: ").append(t).append('\n');
+        }
+        File last = StorageHelper.lastRecordingDir();
+        if (last != null && (chosen == null || !last.getAbsolutePath().equals(chosen.getAbsolutePath()))) {
+            sb.append("最近一次录像写在（不是设定的目录）: ").append(last.getAbsolutePath()).append('\n');
+            appendDir(sb, last);
+            if (chosen != null) {
+                sb.append("设定的目录: ").append(chosen.getAbsolutePath()).append('\n');
+            }
+        } else if (chosen != null) {
+            sb.append("目录: ").append(chosen.getAbsolutePath()).append('\n');
+        }
+        if (chosen != null) {
+            appendDir(sb, chosen);
+        }
+        sb.append('\n');
+    }
+
+    private static void appendDir(StringBuilder sb, File dir) {
+        try {
             File[] files = dir != null ? dir.listFiles() : null;
             List<File> videos = new ArrayList<>();
             if (files != null) {
@@ -42,7 +70,7 @@ public final class RecentRecordings {
                 }
             }
             if (videos.isEmpty()) {
-                sb.append("没有找到 mp4 文件").append('\n').append('\n');
+                sb.append("  没有找到 mp4 文件").append('\n');
                 return;
             }
             // 最新的几个即可：读每个文件都要开一次 extractor，不必全扫
@@ -56,7 +84,6 @@ public final class RecentRecordings {
         } catch (Throwable t) {
             sb.append("!! 读取失败: ").append(t).append('\n');
         }
-        sb.append('\n');
     }
 
     /** 用 MediaExtractor 读视频轨的真实格式。 */

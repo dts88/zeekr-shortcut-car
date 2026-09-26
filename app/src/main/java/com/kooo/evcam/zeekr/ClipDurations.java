@@ -57,7 +57,9 @@ final class ClipDurations {
             String value = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
             return value != null ? Long.parseLong(value) : -1L;
         } catch (Exception e) {
-            AppLog.w(TAG, "读取时长失败: " + file.getName());
+            // 断电、掉盘留下的半截文件读不出时长很常见，不算警告：
+            // 算警告的话一打开回放就是几十条，把警告文件里真正要看的冲掉
+            AppLog.d(TAG, "读取时长失败: " + file.getName());
             return -1L;
         } finally {
             try {

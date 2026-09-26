@@ -339,7 +339,8 @@ public class MultiCameraManager {
                     CodecVideoRecorder stuck = codecRecorders.get(worstKey);
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("录像写不进文件：" + worstKey + " 已 "
                             + (worst / 1000) + " 秒没有新数据（"
-                            + (stuck == null ? "" : stuck.describeWriteState()) + "）");
+                            + (stuck == null ? "" : stuck.describeWriteState())
+                            + "）；此刻挂着的盘：" + StorageHelper.describeMounts());
                     onWriteStalled(worst);
                     return;
                 }
@@ -354,6 +355,27 @@ public class MultiCameraManager {
      * <p>界面在的时候交给界面：它按「录像被打断」处理，按钮、悬浮按钮回到未录，等能录了再接。
      * 界面不在的时候相机层自己停，至少别再显示在录。</p>
      */
+    /**
+     * 这次录像实际写到哪个盘，进黑匣子。
+     *
+     * <p>设定的盘不在时，路径选择会悄悄改用别的盘（2026-09-26 21:55 那次，1D8C 掉线后自动接回，
+     * 就写到了 B905 上）—— 不记下来的话，事后连「录像在哪」都要猜。</p>
+     */
+    private void noteRecordingDir() {
+        try {
+            File dir = StorageHelper.getRecordingDir(context);
+            StorageHelper.noteRecordingDir(dir);
+            String custom = new AppConfig(context).getCustomSdCardPath();
+            boolean offTarget = custom != null && !custom.isEmpty()
+                    && !dir.getAbsolutePath().startsWith(custom);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像写到 " + dir.getAbsolutePath()
+                    + (offTarget ? "（设定的是 " + custom + "，那个盘此刻不可用）" : "")
+                    + "；此刻挂着的盘：" + StorageHelper.describeMounts());
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "noteRecordingDir failed: " + e);
+        }
+    }
+
     public interface WriteStallCallback {
         void onWriteStalled(long stalledMs);
     }
@@ -1060,6 +1082,7 @@ public class MultiCameraManager {
             writeStallReported = false;
             mainHandler.removeCallbacks(writeWatch);
             mainHandler.postDelayed(writeWatch, WRITE_WATCH_MS);
+            noteRecordingDir();
         }
         return started;
     }

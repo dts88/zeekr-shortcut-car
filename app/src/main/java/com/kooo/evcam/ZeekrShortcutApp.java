@@ -30,6 +30,8 @@ public class ZeekrShortcutApp extends Application {
         lastConfig = new Configuration(getResources().getConfiguration());
         // 黑匣子尽早接上。ContentProvider 比这里还早，那边也会接一次，谁先谁算
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
+        // U 盘挂上、卸下、异常掉线进黑匣子（2026-09-26 录像盘掉线，系统那边发生了什么一行都没记下）
+        com.kooo.evcam.blackbox.VolumeEvents.register(this);
         Languages.apply(new AppConfig(this).getLanguageMode());
         StallWatch.start(this);
     }

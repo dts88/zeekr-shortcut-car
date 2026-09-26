@@ -31,6 +31,38 @@ public class StorageHelper {
     // 用于同步的锁对象
     private static final Object cacheLock = new Object();
     
+    /** 最近一次录像实际写进的目录。诊断报告按它列文件：设定的盘不在时会改写到别的盘。 */
+    private static volatile File lastRecordingDir;
+
+    public static void noteRecordingDir(File dir) {
+        lastRecordingDir = dir;
+    }
+
+    /** 最近一次录像实际写进的目录；这个进程里还没录过时为 null。 */
+    public static File lastRecordingDir() {
+        return lastRecordingDir;
+    }
+
+    /**
+     * 此刻系统里挂着哪些 U 盘（读 /proc/mounts），黑匣子用：「XXXX-XXXX, YYYY-YYYY」，一个都没有时「none」。
+     *
+     * <p>写不进文件、U 盘事件、开始录像时各记一次 —— 要回答的是「那一刻盘还在不在」。</p>
+     */
+    public static String describeMounts() {
+        java.util.List<File> roots = listSdCardRootsFromMounts();
+        if (roots.isEmpty()) {
+            return "none";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (File root : roots) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(root.getName());
+        }
+        return sb.toString();
+    }
+
     /**
      * 清除内存缓存（U盘插拔时调用）
      */
