@@ -36,7 +36,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- 通知权限（Android 13+，用于显示前台服务通知） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 使用情况访问权限（用于全景影像避让检测前台Activity） -->
+    <!-- 使用情况访问权限：只剩开发者选项的权限页显示它的状态 -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <!-- 蓝牙权限（用于监听蓝牙状态变化，车机启动会自动连蓝牙） -->
@@ -47,12 +47,6 @@
     <!-- 声明使用摄像头功能 -->
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-
-    <!-- targetSdk 30+ 包可见性：访问 EVCC 仪表投屏 ContentProvider 需要显式声明。
-         没有这条，副屏选了"EVCC 仪表投屏"时 ContentResolver.query 会拿不到数据。 -->
-    <queries>
-        <provider android:authorities="com.kooo.evcc.displays" />
-    </queries>
 
     <application
         android:name=".ZeekrShortcutApp"
@@ -117,11 +111,6 @@
 
         <!-- 悬浮窗服务：显示悬浮录制按钮 -->
 
-        <!-- 补盲选项服务 (副屏显示+主屏悬浮窗) -->
-        <service
-            android:name=".BlindSpotService"
-            android:exported="false" />
-
         <!-- 摄像头录制服务 (D:\yuan重构新增) -->
         <!-- 超级后视镜：环视合成流里后方那一路的悬浮窗 -->
         <service
@@ -139,12 +128,6 @@
         <service
             android:name=".service.RecordingFloatingService"
             android:enabled="true"
-            android:exported="false" />
-
-        <activity
-            android:name=".LogcatViewerActivity"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
-            android:screenOrientation="landscape"
             android:exported="false" />
 
         <!-- 连续时间轴回放（实验性）：把分段拼成一条时间轴，可跨文件拖动 -->

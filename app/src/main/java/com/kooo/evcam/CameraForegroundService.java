@@ -104,14 +104,6 @@ public class CameraForegroundService extends Service {
             // 只有开启了开机自启动才启动后台服务和悬浮窗
             if (appConfig.isAutoStartOnBoot()) {
                 // 悬浮按钮由 OverlayCoordinator 按同一条规则拉起，这里不再自己判断一遍
-                // 补盲那一套该不该起来，用和主界面同一条规则判断。
-                // 这里原先自己写了一遍，漏掉了全局开关、全景避让和定制键唤醒三项 ——
-                // 同一个问题两个答案，改了一处就会不一致。
-                if (com.kooo.evcam.overlay.OverlayCoordinator.blindSpotWanted(appConfig)) {
-                    AppLog.d(TAG, "补盲选项已启用，从 Service 启动...");
-                    BlindSpotService.update(this);
-                }
-                
                 // 如果启用了自动录制，启动 MainActivity
                 // 这确保杀后台重启后也能自动录制（与开机启动行为一致）
                 if (appConfig.isAutoStartRecording()) {

@@ -253,8 +253,6 @@
     <string name="nav_video_playback">Videos</string>
     <string name="nav_photo_playback">Photos</string>
     <string name="nav_group_system">System</string>
-    <string name="nav_blind_spot">Blind-spot options</string>
-    <string name="nav_supervision">Super view</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_header_subtitle">Surround-view dashcam</string>
     <string name="nav_header_alt_name">极氪即刻</string>
@@ -565,8 +563,6 @@
     <string name="composite_probed">probed %1$d×%2$d</string>
     <string name="composite_kind_real">composite</string>
     <string name="composite_kind_plain">plain camera</string>
-    <string name="msg_supervision_on">Super view on</string>
-    <string name="msg_supervision_off">Super view off</string>
     <string name="debug_on">Debug info on</string>
     <string name="debug_off">Debug info off</string>
     <string name="debug_recording">Recording: %1$s</string>
@@ -630,8 +626,6 @@
     <string name="set_section_developer">Developer options</string>
     <string name="dev_permissions_title">Permissions</string>
     <string name="dev_permissions_summary">Manage the permissions the app needs</string>
-    <string name="dev_blind_spot_title">Blind-spot options</string>
-    <string name="dev_supervision_title">Super view</string>
     <string name="dev_raw_frame_title">Also save the raw frame</string>
     <string name="dev_raw_frame_summary">Uncut and unstamped, with a note on the frame geometry, in photos/raw. For working out the lane layout and the lens parameters</string>
     <string name="dev_repair_mp4_title">Repair unfinalised videos</string>

@@ -68,20 +68,11 @@ public class HardcodedTextTest {
                 "profile/LaneLayout.java", "profile/ProfileResolution.java"}) {
             JAVA_ALLOWED.put(f, report);
         }
-        // ---- 纯开发者工具：入口都在开发者选项里（抽屉里的补盲 / 超视也只在解锁后显示） ----
+        // ---- 纯开发者工具：入口都在开发者选项里 ----
         String developer = "开发者工具，只在开发者选项里出现";
         for (String f : new String[]{
-                "settings/PermissionsPreferenceFragment.java", "LogcatViewerActivity.java", "repair/Mp4RepairFlow.java"}) {
+                "settings/PermissionsPreferenceFragment.java", "repair/Mp4RepairFlow.java"}) {
             JAVA_ALLOWED.put(f, developer);
-        }
-        String blindSpot = "补盲 / 超视：设置页和抽屉入口都只在开发者模式解锁后出现";
-        for (String f : new String[]{
-                "BlindSpotCorrectionFragment.java", "BlindSpotDisclaimerDialogFragment.java",
-                "BlindSpotFloatingWindowView.java", "BlindSpotLabFragment.java",
-                "BlindSpotService.java", "BlindSpotSettingsFragment.java",
-                "SecondaryBlindSpotAdjustFragment.java", "CarSignalManagerObserver.java",
-                "DoorSignalObserver.java"}) {
-            JAVA_ALLOWED.put(f, blindSpot);
         }
         JAVA_ALLOWED.put("StorageCleanupManager.java", "清理通知只在录到内部存储时才发，而内部存储只有开发者能选");
         // ---- 不上界面的文字 ----
@@ -105,16 +96,6 @@ public class HardcodedTextTest {
         // ---- 故意中英并列 ----
         JAVA_ALLOWED.put("share/FileShareServer.java",
                 "手机浏览器里那一页：不知道手机是什么语言，中英并列");
-
-        String xmlDeveloper = "开发者工具 / 自定义车型（排查用）的布局";
-        for (String f : new String[]{
-                "layout/activity_logcat_viewer.xml", "layout/dialog_blind_spot_disclaimer.xml", "layout/fragment_blind_spot_correction.xml", "layout/fragment_blind_spot_lab.xml",
-                "layout/fragment_secondary_blind_spot_adjust.xml",
-                "layout/fragment_secondary_display_settings.xml",
-                "layout/view_blind_spot_floating.xml", "layout/view_blind_spot_floating_multiview.xml",
-                "layout/view_mock_turn_signal_floating.xml"}) {
-            XML_ALLOWED.put(f, xmlDeveloper);
-        }
     }
 
     private static final Pattern COMPARISON =

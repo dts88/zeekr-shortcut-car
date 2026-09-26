@@ -494,7 +494,7 @@ public class MultiCameraManager {
     /**
      * 手动触发所有已有 previewSize 的摄像头的 PreviewSizeCallback。
      * 用于后台初始化（CameraManagerHolder）复用场景：
-     * 摄像头在 BlindSpotService 中已打开并确定了预览尺寸，
+     * 摄像头在后台服务里已打开并确定了预览尺寸，
      * 但 MainActivity 的回调（旋转变换等）此时尚未注册。
      * 在 MainActivity 注册回调后调用此方法，补偿缺失的回调触发。
      */

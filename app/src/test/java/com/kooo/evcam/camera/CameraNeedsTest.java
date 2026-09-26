@@ -69,31 +69,6 @@ public class CameraNeedsTest {
         assertTrue(needs.heldByAnyoneExcept(CameraNeeds.Holder.PREVIEW));
     }
 
-    /** 补盲那几个窗口不走登记，是现问现答 —— 它们的开关由别处管着。 */
-    @Test
-    public void overlayWindowsAreAskedNotRegistered() {
-        final boolean[] active = {true};
-        needs.setOverlayProbe(() -> active[0]);
-
-        assertTrue(needs.heldByAnyone());
-        assertTrue(needs.heldByAnyoneExcept(CameraNeeds.Holder.PREVIEW));
-        assertEquals("OVERLAY", needs.describe());
-
-        active[0] = false;
-        assertFalse(needs.heldByAnyone());
-    }
-
-    /** 问悬浮窗时炸了不能拖累整个判断 —— 宁可当成「没人要」，也不要卡在那里。 */
-    @Test
-    public void aBrokenProbeDoesNotBreakTheAnswer() {
-        needs.setOverlayProbe(() -> {
-            throw new IllegalStateException("服务没了");
-        });
-        assertFalse(needs.heldByAnyone());
-
-        needs.claim(CameraNeeds.Holder.RECORDING);
-        assertTrue("登记过的还是算数", needs.heldByAnyone());
-    }
 
     @Test
     public void describeListsEveryone() {

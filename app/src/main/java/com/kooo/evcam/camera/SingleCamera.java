@@ -82,9 +82,6 @@ public class SingleCamera {
     private Surface recordSurface;  // 录制Surface
     private Surface mainFloatingSurface; // 主屏悬浮窗Surface
     private android.graphics.SurfaceTexture mainFloatingSurfaceTexture; // 主屏悬浮窗SurfaceTexture（用于设置buffer尺寸）
-    private Surface secondaryDisplaySurface; // 副屏预览Surface
-    private android.graphics.SurfaceTexture secondaryDisplaySurfaceTexture; // 副屏SurfaceTexture（用于设置buffer尺寸）
-    private OutputConfiguration activePreviewConfig; // 共享预览配置，用于动态 Surface 增减
     private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
 
     /**
@@ -206,8 +203,6 @@ public class SingleCamera {
     private static final int MAX_CONFIG_FAIL_RETRIES = 3; // 最大重试次数
     private final Object sessionLock = new Object(); // 新增：用于同步 Session 操作
 
-    // 相机打开后的一次性回调（用于副屏等待相机就绪后立即绑定 Surface）
-    private final java.util.List<Runnable> onCameraOpenedCallbacks = new java.util.ArrayList<>();
 
     public SingleCamera(Context context, String cameraId, TextureView textureView) {
         this.context = context;
@@ -469,36 +464,6 @@ public class SingleCamera {
     }
 
     /**
-     * 注册一次性回调：相机打开后立即执行（在 createCameraPreviewSession 之前）。
-     * 如果相机已经打开，立即执行。
-     */
-    public void addOnCameraOpenedCallback(Runnable callback) {
-        if (cameraDevice != null) {
-            callback.run();
-            return;
-        }
-        synchronized (onCameraOpenedCallbacks) {
-            onCameraOpenedCallbacks.add(callback);
-        }
-    }
-
-    private void fireOnCameraOpenedCallbacks() {
-        java.util.List<Runnable> copy;
-        synchronized (onCameraOpenedCallbacks) {
-            if (onCameraOpenedCallbacks.isEmpty()) return;
-            copy = new java.util.ArrayList<>(onCameraOpenedCallbacks);
-            onCameraOpenedCallbacks.clear();
-        }
-        for (Runnable cb : copy) {
-            try {
-                cb.run();
-            } catch (Exception e) {
-                AppLog.e(TAG, "Camera " + cameraId + " onCameraOpened callback error: " + e.getMessage());
-            }
-        }
-    }
-
-    /**
      * 向相机请求一个帧率区间。
      *
      * <p><b>这一项此前全项目一次都没设过。</b>不设的话，自动曝光会在 HAL 的默认区间里
@@ -560,10 +525,6 @@ public class SingleCamera {
      */
     public Size getPreviewBufferSize() {
         return previewSize;
-    }
-
-    public boolean isSecondaryDisplaySurfaceBound(Surface surface) {
-        return surface != null && secondaryDisplaySurface == surface && secondaryDisplaySurface.isValid();
     }
 
     /**
@@ -634,35 +595,6 @@ public class SingleCamera {
         }
     }
 
-    /**
-     * 设置副屏显示Surface
-     */
-    public void setSecondaryDisplaySurface(Surface surface) {
-        setSecondaryDisplaySurface(surface, null);
-    }
-
-    /**
-     * 设置副屏显示Surface（带SurfaceTexture引用，用于在创建Session时统一设置buffer尺寸）
-     */
-    public void setSecondaryDisplaySurface(Surface surface, android.graphics.SurfaceTexture surfaceTexture) {
-        this.secondaryDisplaySurface = surface;
-        this.secondaryDisplaySurfaceTexture = surfaceTexture;
-        if (surface != null) {
-            AppLog.d(TAG, "Secondary display surface set for camera " + cameraId + ": " + surface + ", isValid=" + surface.isValid());
-        } else {
-            AppLog.d(TAG, "Secondary display surface cleared for camera " + cameraId);
-        }
-    }
-
-    /**
-     * 设置副屏预览Surface (保留兼容性)
-     * @param surface 副屏预览Surface
-     * @deprecated 请使用 setMainFloatingSurface 或 setSecondaryDisplaySurface
-     */
-    @Deprecated
-    public void setSecondarySurface(Surface surface) {
-        setSecondaryDisplaySurface(surface);
-    }
 
     /**
      * 清除录制Surface
@@ -933,7 +865,6 @@ public class SingleCamera {
                 + " outputs[main-preview=" + surfaceState(previewSurface)
                 + " mirror=" + surfaceState(mainFloatingSurface)
                 + " record=" + surfaceState(recordSurface)
-                + " secondary=" + surfaceState(secondaryDisplaySurface)
                 + " jpeg=" + (jpegReader != null) + "]"
                 + " fps=" + String.format(java.util.Locale.US, "%.1f", currentFps)
                 + " lastResult=" + (last > 0 ? (System.currentTimeMillis() - last) + "ms ago" : "never")
@@ -960,9 +891,6 @@ public class SingleCamera {
         }
         if (target == recordSurface) {
             return "record";
-        }
-        if (target == secondaryDisplaySurface) {
-            return "secondary";
         }
         if (jpegReader != null && target == jpegReader.getSurface()) {
             return "jpeg";
@@ -1004,7 +932,7 @@ public class SingleCamera {
     public boolean wantsFrames() {
         return isPrimaryInstance && !isPausedByLifecycle
                 && (previewSurface != null || mainFloatingSurface != null
-                || recordSurface != null || secondaryDisplaySurface != null);
+                || recordSurface != null);
     }
 
     public boolean isPausedByLifecycle() {
@@ -1365,9 +1293,6 @@ public class SingleCamera {
                     callback.onCameraOpened(cameraId);
                 }
             }
-            // 触发一次性回调（副屏绑定等），在 createCameraPreviewSession 之前执行
-            // 这样回调中设置的 Surface 能被第一次 Session 包含，避免重建
-            fireOnCameraOpenedCallbacks();
             if (deferSessionCreation) {
                 deferSessionCreation = false;
                 if (mainFloatingSurface != null && mainFloatingSurface.isValid()) {
@@ -1593,15 +1518,12 @@ public class SingleCamera {
             if (surface == null) {
                 if (mainFloatingSurface != null && mainFloatingSurface.isValid()) {
                     surface = mainFloatingSurface;
-                } else if (secondaryDisplaySurface != null && secondaryDisplaySurface.isValid()) {
-                    surface = secondaryDisplaySurface;
                 }
             }
             
             // 检查是否有可用的输出 Surface（后台初始化时可能全部为 null）
             boolean hasAnySurface = (surface != null && surface.isValid())
                     || (mainFloatingSurface != null && mainFloatingSurface.isValid())
-                    || (secondaryDisplaySurface != null && secondaryDisplaySurface.isValid())
                     || (recordSurface != null && recordSurface.isValid());
             if (!hasAnySurface) {
                 AppLog.d(TAG, "Camera " + cameraId + " no available surfaces, skipping session creation (waiting for surface)");
@@ -1652,25 +1574,21 @@ public class SingleCamera {
                     AppLog.d(TAG, "Camera " + cameraId + " Using Surface Sharing for preview streams");
 
                     // 统一设置所有共享 Surface 的 buffer 尺寸，确保与相机输出一致
-                    // 避免悬浮窗/副屏 TextureView 使用物理布局尺寸导致 OutputConfiguration 尺寸不匹配
+                    // 避免悬浮窗 TextureView 使用物理布局尺寸导致 OutputConfiguration 尺寸不匹配
                     if (previewSize != null) {
                         if (mainFloatingSurfaceTexture != null) {
                             mainFloatingSurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
-                        }
-                        if (secondaryDisplaySurfaceTexture != null) {
-                            secondaryDisplaySurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                         }
                     }
 
                     if (surface != null && surface.isValid()) {
                         OutputConfiguration previewSharedConfig = new OutputConfiguration(surface);
                         previewSharedConfig.enableSurfaceSharing();
-                        activePreviewConfig = previewSharedConfig;
                         surfaces.add(surface);
                         previewRequestBuilder.addTarget(surface);
 
                         if (previewSurface != null && previewSurface.isValid() && previewSurface != surface &&
-                            previewSurface != mainFloatingSurface && previewSurface != secondaryDisplaySurface) {
+                            previewSurface != mainFloatingSurface) {
                             previewSharedConfig.addSurface(previewSurface);
                             surfaces.add(previewSurface);
                             previewRequestBuilder.addTarget(previewSurface);
@@ -1682,14 +1600,6 @@ public class SingleCamera {
                             surfaces.add(mainFloatingSurface);
                             previewRequestBuilder.addTarget(mainFloatingSurface);
                             AppLog.d(TAG, "Added main floating surface to SHARED preview stream");
-                        }
-
-                        if (secondaryDisplaySurface != null && secondaryDisplaySurface.isValid() &&
-                            secondaryDisplaySurface != surface && secondaryDisplaySurface != mainFloatingSurface) {
-                            previewSharedConfig.addSurface(secondaryDisplaySurface);
-                            surfaces.add(secondaryDisplaySurface);
-                            previewRequestBuilder.addTarget(secondaryDisplaySurface);
-                            AppLog.d(TAG, "Added secondary display surface to SHARED preview stream");
                         }
 
 
@@ -1842,12 +1752,7 @@ public class SingleCamera {
                     if (recordSurface != null) {
                         // 录制中：丢弃可选 Surface 后重试
                         boolean droppedOptionalSurface = false;
-                        if (secondaryDisplaySurface != null) {
-                            secondaryDisplaySurface = null;
-                            droppedOptionalSurface = true;
-                            AppLog.w(TAG, "Retrying without secondary display surface...");
-                        }
-                        if (!droppedOptionalSurface && mainFloatingSurface != null) {
+                        if (mainFloatingSurface != null) {
                             mainFloatingSurface = null;
                             droppedOptionalSurface = true;
                             AppLog.w(TAG, "Retrying without main floating surface...");
@@ -1881,17 +1786,9 @@ public class SingleCamera {
                                 }, 200);
                             }
                         } else {
-                            // 重试耗尽，丢弃副屏 Surface 后尝试只用主 Surface
-                            AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + configFailRetryCount + "), dropping secondary display surface");
+                            // 重试耗尽：不再重试，下面报错误
+                            AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + configFailRetryCount + ")");
                             configFailRetryCount = 0;
-                            if (secondaryDisplaySurface != null) {
-                                secondaryDisplaySurface = null;
-                                if (backgroundHandler != null) {
-                                    backgroundHandler.postDelayed(() -> {
-                                        if (cameraDevice != null) createCameraPreviewSession();
-                                    }, 100);
-                                }
-                            }
                         }
                         if (callback != null) {
                             callback.onCameraError(cameraId, -3);
@@ -1937,12 +1834,7 @@ public class SingleCamera {
             if (message != null && message.contains("abandoned")) {
                 AppLog.e(TAG, "Camera " + cameraId + " detected abandoned Surface, attempting recovery...");
                 boolean cleared = false;
-                if (secondaryDisplaySurface != null) {
-                    secondaryDisplaySurface = null;
-                    cleared = true;
-                    AppLog.w(TAG, "Camera " + cameraId + " cleared abandoned secondaryDisplaySurface and retrying");
-                }
-                if (!cleared && mainFloatingSurface != null) {
+                if (mainFloatingSurface != null) {
                     mainFloatingSurface = null;
                     cleared = true;
                     AppLog.w(TAG, "Camera " + cameraId + " cleared abandoned mainFloatingSurface and retrying");
@@ -2061,168 +1953,13 @@ public class SingleCamera {
         }
     }
 
-    // ===== 动态 Surface 管理（补盲优化：避免 ~300ms Session 关闭等待） =====
-
-    /**
-     * 动态添加 Surface 到当前预览 Session。
-     * 利用 OutputConfiguration.addSurface() + finalizeOutputConfigurations() 实现
-     * 在不关闭旧 Session 的情况下添加新输出，跳过 ~300ms 的 HAL 关闭等待。
-     * 失败时自动降级到 recreateSession。
-     *
-     * @param surface 要添加的 Surface
-     * @param isMainFloating true=主屏悬浮窗, false=副屏
-     */
-    public void addDynamicSurface(Surface surface, boolean isMainFloating) {
-        // 1. 存储引用（无论动态是否成功，后续 createCameraPreviewSession 都能拿到）
-        if (isMainFloating) {
-            this.mainFloatingSurface = surface;
-            AppLog.d(TAG, "Main floating surface set for camera " + cameraId +
-                    ": " + surface + ", isValid=" + (surface != null && surface.isValid()));
-        } else {
-            this.secondaryDisplaySurface = surface;
-            AppLog.d(TAG, "Secondary display surface set for camera " + cameraId +
-                    ": " + surface + ", isValid=" + (surface != null && surface.isValid()));
-        }
-
-        if (surface == null || !surface.isValid()) return;
-
-        // 2. 如果 Session 正忙，新 Surface 会被进行中的 createCameraPreviewSession 自动包含
-        synchronized (sessionLock) {
-            if (isConfiguring || isSessionClosing) {
-                AppLog.d(TAG, "Camera " + cameraId + " session busy, dynamic surface will be included in pending session");
-                return;
-            }
-        }
-
-        // 3. 尝试动态添加（在后台线程执行）
-        if (backgroundHandler != null && captureSession != null && activePreviewConfig != null) {
-            backgroundHandler.removeCallbacks(recreateSessionRunnable);
-            backgroundHandler.post(() -> {
-                if (!tryDynamicSurfaceAdd(surface, isMainFloating)) {
-                    AppLog.d(TAG, "Camera " + cameraId + " dynamic add failed, falling back to full session rebuild");
-                    createCameraPreviewSession();
-                }
-            });
-        } else {
-            // 没有现有 Session（如摄像头刚打开），走正常创建路径
-            recreateSession(true);
-        }
-    }
-
-    /**
-     * 动态移除 Surface（补盲隐藏优化）。
-     * 利用 OutputConfiguration.removeSurface() + finalizeOutputConfigurations() 实现
-     * 在不关闭 Session 的情况下移除输出。
-     * 失败时自动降级到 recreateSession。
-     *
-     * @param isMainFloating true=主屏悬浮窗, false=副屏
-     */
-    public void removeDynamicSurface(boolean isMainFloating) {
-        // 1. 取出并清除引用
-        final Surface surfaceToRemove;
-        if (isMainFloating) {
-            surfaceToRemove = this.mainFloatingSurface;
-            this.mainFloatingSurface = null;
-            AppLog.d(TAG, "Main floating surface cleared for camera " + cameraId);
-        } else {
-            surfaceToRemove = this.secondaryDisplaySurface;
-            this.secondaryDisplaySurface = null;
-            AppLog.d(TAG, "Secondary display surface cleared for camera " + cameraId);
-        }
-
-        // 2. 立即停止推帧，防止 Surface 销毁后 queueBuffer abandoned
-        stopRepeatingNow();
-
-        // 3. 尝试动态移除（在后台线程执行）
-        if (surfaceToRemove != null && backgroundHandler != null
-                && captureSession != null && activePreviewConfig != null) {
-            backgroundHandler.removeCallbacks(recreateSessionRunnable);
-            backgroundHandler.post(() -> {
-                if (!tryDynamicSurfaceRemove(surfaceToRemove)) {
-                    AppLog.d(TAG, "Camera " + cameraId + " dynamic remove failed, falling back to full session rebuild");
-                    createCameraPreviewSession();
-                }
-            });
-        } else {
-            recreateSession(false);
-        }
-    }
-
-    private boolean tryDynamicSurfaceAdd(Surface surface, boolean isMainFloating) {
-        synchronized (sessionLock) {
-            if (isConfiguring || isSessionClosing) return false;
-        }
-        if (captureSession == null || activePreviewConfig == null || currentRequestBuilder == null) {
-            return false;
-        }
-        if (surface == null || !surface.isValid()) return false;
-
-        try {
-            // 1. 添加到共享 OutputConfiguration
-            activePreviewConfig.addSurface(surface);
-
-            // 2. 通知 Session 配置变更
-            captureSession.finalizeOutputConfigurations(
-                    java.util.Collections.singletonList(activePreviewConfig));
-
-            // 3. 将新 Surface 加入 CaptureRequest 目标
-            currentRequestBuilder.addTarget(surface);
-
-            // 4. 更新 repeating request
-            captureSession.setRepeatingRequest(
-                    currentRequestBuilder.build(), activeCaptureCallback, backgroundHandler);
-
-            AppLog.d(TAG, "Camera " + cameraId + " dynamic surface ADD succeeded (" +
-                    (isMainFloating ? "main floating" : "secondary display") + ")");
-            return true;
-        } catch (Exception e) {
-            AppLog.w(TAG, "Camera " + cameraId + " dynamic surface add failed: " + e.getMessage());
-            // 回滚：尽力恢复状态
-            try { activePreviewConfig.removeSurface(surface); } catch (Exception ignored) {}
-            try { currentRequestBuilder.removeTarget(surface); } catch (Exception ignored) {}
-            return false;
-        }
-    }
-
-    private boolean tryDynamicSurfaceRemove(Surface surface) {
-        synchronized (sessionLock) {
-            if (isConfiguring || isSessionClosing) return false;
-        }
-        if (captureSession == null || activePreviewConfig == null || currentRequestBuilder == null) {
-            return false;
-        }
-        if (surface == null) return false;
-
-        try {
-            // 1. 从 CaptureRequest 移除目标（停止向该 Surface 推帧）
-            currentRequestBuilder.removeTarget(surface);
-
-            // 2. 从共享 OutputConfiguration 移除
-            activePreviewConfig.removeSurface(surface);
-
-            // 3. 通知 Session 配置变更
-            captureSession.finalizeOutputConfigurations(
-                    java.util.Collections.singletonList(activePreviewConfig));
-
-            // 4. 恢复 repeating request（仅包含剩余 Surface）
-            captureSession.setRepeatingRequest(
-                    currentRequestBuilder.build(), activeCaptureCallback, backgroundHandler);
-
-            AppLog.d(TAG, "Camera " + cameraId + " dynamic surface REMOVE succeeded");
-            return true;
-        } catch (Exception e) {
-            AppLog.w(TAG, "Camera " + cameraId + " dynamic surface remove failed: " + e.getMessage());
-            return false;
-        }
-    }
-
     public void recreateSession() {
         recreateSession(false);
     }
 
     /**
      * 重新创建会话
-     * @param urgent 紧急模式（如补盲悬浮窗），跳过防抖延迟以最快速度重建
+     * @param urgent 紧急模式，跳过防抖延迟以最快速度重建
      */
     public void recreateSession(boolean urgent) {
         if (cameraDevice != null) {
@@ -2232,7 +1969,7 @@ public class SingleCamera {
                 
                 int delay;
                 if (urgent) {
-                    // 紧急模式：最小延迟，用于补盲悬浮窗等需要快速响应的场景
+                    // 紧急模式：最小延迟，用于需要快速响应的场景
                     delay = isConfiguring ? 50 : 0;
                 } else {
                     // 普通模式：保持防抖延迟
@@ -2768,9 +2505,6 @@ public class SingleCamera {
                 isConfiguring = false;
                 isPendingReconfiguration = false;
             }
-            synchronized (onCameraOpenedCallbacks) {
-                onCameraOpenedCallbacks.clear();
-            }
 
             // 要关的从字段上摘下来，交给相机线程去关
             session = captureSession;
@@ -2779,13 +2513,11 @@ public class SingleCamera {
             cameraDevice = null;
             preview = previewSurface;
             previewSurface = null;
-            // 录制、悬浮窗、副屏的 Surface 只清引用、不 release：它们归各自的主人管
+            // 录制、悬浮窗的 Surface 只清引用、不 release：它们归各自的主人管
             // （录制那个不清的话，下次建会话会碰上 Surface abandoned）
             recordSurface = null;
             mainFloatingSurface = null;
             mainFloatingSurfaceTexture = null;
-            secondaryDisplaySurface = null;
-            secondaryDisplaySurfaceTexture = null;
 
             // 这一轮的相机线程也摘下来：之后来自它的回调就是过时的（见 isStale）
             thread = backgroundThread;
@@ -2900,57 +2632,6 @@ public class SingleCamera {
             }
         }
         return stuck;
-    }
-
-
-    private boolean tryDynamicSurfaceAddFullscreen(Surface surface) {
-        synchronized (sessionLock) {
-            if (isConfiguring || isSessionClosing) return false;
-        }
-        if (captureSession == null || activePreviewConfig == null || currentRequestBuilder == null) {
-            return false;
-        }
-        if (surface == null || !surface.isValid()) return false;
-
-        try {
-            activePreviewConfig.addSurface(surface);
-            captureSession.finalizeOutputConfigurations(
-                    java.util.Collections.singletonList(activePreviewConfig));
-            currentRequestBuilder.addTarget(surface);
-            captureSession.setRepeatingRequest(
-                    currentRequestBuilder.build(), activeCaptureCallback, backgroundHandler);
-            AppLog.d(TAG, "Camera " + cameraId + " dynamic fullscreen surface ADD succeeded");
-            return true;
-        } catch (Exception e) {
-            AppLog.w(TAG, "Camera " + cameraId + " dynamic fullscreen surface add failed: " + e.getMessage());
-            try { activePreviewConfig.removeSurface(surface); } catch (Exception ignored) {}
-            try { currentRequestBuilder.removeTarget(surface); } catch (Exception ignored) {}
-            return false;
-        }
-    }
-
-    private boolean tryDynamicSurfaceRemoveFullscreen(Surface surface) {
-        synchronized (sessionLock) {
-            if (isConfiguring || isSessionClosing) return false;
-        }
-        if (captureSession == null || activePreviewConfig == null || currentRequestBuilder == null) {
-            return false;
-        }
-        if (surface == null) return false;
-
-        try {
-            currentRequestBuilder.removeTarget(surface);
-            activePreviewConfig.removeSurface(surface);
-            captureSession.finalizeOutputConfigurations(
-                    java.util.Collections.singletonList(activePreviewConfig));
-            captureSession.setRepeatingRequest(
-                    currentRequestBuilder.build(), activeCaptureCallback, backgroundHandler);
-            AppLog.d(TAG, "Camera " + cameraId + " dynamic fullscreen surface REMOVE succeeded");
-            return true;
-        } catch (Exception e) {
-            AppLog.w(TAG, "Camera " + cameraId + " dynamic fullscreen surface remove failed: " + e.getMessage());
-            return false;
-        }
     }
 
 

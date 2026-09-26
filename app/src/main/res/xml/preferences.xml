@@ -355,14 +355,6 @@
             android:title="@string/dev_permissions_title"
             android:summary="@string/dev_permissions_summary" />
 
-        <Preference
-            android:key="pref_blind_spot"
-            android:title="@string/dev_blind_spot_title" />
-
-        <Preference
-            android:key="pref_supervision"
-            android:title="@string/dev_supervision_title" />
-
         <SwitchPreferenceCompat
             android:key="pref_raw_frame_dump"
             android:title="@string/dev_raw_frame_title"

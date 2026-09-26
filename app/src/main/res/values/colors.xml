@@ -28,33 +28,24 @@
     <color name="dialog_guide_button_ripple">#30000000</color>
 
     <!-- 旧名字 → 语义色 -->
-    <color name="colorPrimary">@color/energy</color>
     <color name="text_hint">@color/text_tertiary</color>
     <color name="input_background">@color/sunken</color>
-    <color name="nav_header_background">@color/surface</color>
     <color name="nav_background">@color/surface</color>
     <color name="nav_header_text">@color/text_primary</color>
     <color name="nav_header_text_secondary">@color/text_secondary</color>
     <color name="nav_item_selected_background">@color/sunken</color>
     <color name="nav_item_pressed_background">@color/sunken</color>
-    <color name="nav_divider_color">@color/line</color>
-    <color name="nav_icon_background">@color/sunken</color>
     <color name="nav_icon_tint">@color/text_secondary</color>
     <color name="nav_icon_tint_selected">@color/text_primary</color>
     <color name="nav_text_primary">@color/text_primary</color>
-    <color name="nav_text_secondary">@color/text_secondary</color>
     <color name="nav_section_title">@color/text_tertiary</color>
-    <color name="nav_version_text">@color/text_tertiary</color>
     <color name="preview_background">@color/bg</color>
-    <color name="preview_grid_divider">@color/bg</color>
     <color name="preview_placeholder_text">@color/text_secondary</color>
     <color name="preview_controls_background">@color/bg</color>
     <color name="dialog_guide_background">@color/surface</color>
     <color name="dialog_guide_title">@color/text_primary</color>
     <color name="dialog_guide_content">@color/text_primary</color>
     <color name="dialog_guide_accent">@color/energy_text</color>
-    <color name="dialog_guide_secondary">@color/text_secondary</color>
-    <color name="dialog_guide_divider">@color/line</color>
     <color name="dialog_guide_button_bg">@color/energy</color>
     <color name="dialog_guide_button_text">@color/on_energy</color>
 

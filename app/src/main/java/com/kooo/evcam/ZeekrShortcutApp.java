@@ -32,10 +32,6 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
         Languages.apply(new AppConfig(this).getLanguageMode());
         StallWatch.start(this);
-        // 补盲 / 常驻 / 副屏那几个窗口的开关由 BlindSpotService 自己管着，
-        // 让它再登记一遍就成了两个真相 —— 所以是现问现答，见 CameraNeeds
-        com.kooo.evcam.camera.CameraNeeds.current().setOverlayProbe(
-                com.kooo.evcam.BlindSpotService::hasActiveCameraWindows);
     }
 
     /**

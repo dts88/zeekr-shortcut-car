@@ -253,8 +253,6 @@
     <string name="nav_video_playback">Video</string>
     <string name="nav_photo_playback">Foto</string>
     <string name="nav_group_system">Sistem</string>
-    <string name="nav_blind_spot">Pilihan titik buta</string>
-    <string name="nav_supervision">Pandangan super</string>
     <string name="nav_settings">Tetapan</string>
     <string name="nav_header_subtitle">Kamera pemandu pandangan keliling</string>
     <string name="nav_header_alt_name">极氪即刻</string>
@@ -563,8 +561,6 @@
     <string name="composite_probed">disiasat %1$d×%2$d</string>
     <string name="composite_kind_real">komposit</string>
     <string name="composite_kind_plain">kamera biasa</string>
-    <string name="msg_supervision_on">Pandangan super dibuka</string>
-    <string name="msg_supervision_off">Pandangan super ditutup</string>
     <string name="debug_on">Maklumat nyahpepijat dibuka</string>
     <string name="debug_off">Maklumat nyahpepijat ditutup</string>
     <string name="debug_recording">Rakaman: %1$s</string>
@@ -628,8 +624,6 @@
     <string name="set_section_developer">Pilihan pembangun</string>
     <string name="dev_permissions_title">Kebenaran</string>
     <string name="dev_permissions_summary">Urus kebenaran yang diperlukan apl</string>
-    <string name="dev_blind_spot_title">Pilihan titik buta</string>
-    <string name="dev_supervision_title">Pandangan super</string>
     <string name="dev_raw_frame_title">Simpan juga bingkai asal</string>
     <string name="dev_raw_frame_summary">Tanpa dipecah atau ditera, bersama nota geometri bingkai, dalam photos/raw. Untuk mengkaji susunan lorong dan parameter kanta</string>
     <string name="dev_repair_mp4_title">Baiki video tanpa indeks</string>

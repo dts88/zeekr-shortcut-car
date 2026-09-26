@@ -1164,12 +1164,10 @@ public class MainActivity extends AppCompatActivity {
         drawerLayout.addDrawerListener(new androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
             @Override
             public void onDrawerOpened(View drawerView) {
-                syncDeveloperMenuVisibility();
                 // 后视镜也可能在设置里、或者悬浮窗自己关掉过
                 syncRearViewSwitch();
             }
         });
-        syncDeveloperMenuVisibility();
         syncRearViewSwitch();
 
         navigationView.setNavigationItemSelectedListener(item -> {
@@ -1200,12 +1198,6 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_photo_playback) {
                 // 显示图片回看界面
                 showPhotoPlaybackInterface();
-            } else if (itemId == R.id.nav_secondary_display) {
-                // 显示补盲选项界面
-                showBlindSpotInterface();
-            } else if (itemId == R.id.nav_supervision_mode) {
-                // 切换超视模式
-                toggleSupervisionMode();
             } else if (itemId == R.id.nav_settings) {
                 showSettingsInterface();
             } else if (itemId == R.id.nav_about) {
@@ -1519,46 +1511,6 @@ public class MainActivity extends AppCompatActivity {
         showFragment(new com.kooo.evcam.settings.SettingsShellFragment());
     }
 
-    /**
-     * 显示补盲选项设置界面
-     */
-    public void showBlindSpotInterface() {
-        showFragment(new BlindSpotSettingsFragment());
-    }
-
-    /**
-     * 切换超视模式
-     * 超视模式会同时显示左右两个补盲悬浮窗
-     */
-    public void toggleSupervisionMode() {
-        AppConfig appConfig = new AppConfig(this);
-        boolean currentEnabled = appConfig.isSupervisionModeEnabled();
-        boolean newEnabled = !currentEnabled;
-        
-        // 更新配置
-        appConfig.setSupervisionModeEnabled(newEnabled);
-        
-        // 显示提示
-        String message = getString(newEnabled
-                ? R.string.msg_supervision_on : R.string.msg_supervision_off);
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        
-        // 发送广播通知BlindSpotService
-        Intent intent = new Intent("com.kooo.evcam.SUPERVISION_MODE_CHANGED");
-        intent.putExtra("enabled", newEnabled);
-        sendBroadcast(intent);
-        
-        // 启动或停止服务
-        Intent serviceIntent = new Intent(this, BlindSpotService.class);
-        if (newEnabled) {
-            serviceIntent.setAction("START_SUPERVISION_MODE");
-        } else {
-            serviceIntent.setAction("STOP_SUPERVISION_MODE");
-        }
-        startService(serviceIntent);
-        
-        AppLog.d(TAG, "超视模式切换: " + newEnabled);
-    }
 
     /**
      * 录制这一项的登记跟着状态走。
@@ -1962,7 +1914,7 @@ public class MainActivity extends AppCompatActivity {
      * 漂到功能上就是「同样的操作，冷启动和从后台回来表现不一致」，
      * 这种问题查起来最费劲，因为两条路看着都对。</p>
      *
-     * <p>后台（BlindSpotService）建的那份没有主界面的回调，
+     * <p>后台建的那份没有主界面的回调，
      * 不补上的话左右摄像头的旋转变换、录制计时都不正常。</p>
      */
     private void wireCameraCallbacks() {
@@ -3848,9 +3800,6 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.camera.StallWatch.setForeground(false);
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
         
-        // 通知悬浮窗：应用退到后台
-        OverlayCoordinator.onAppBackground(this);
-        
         // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表
         syncRecordingClaim();
         com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
@@ -3919,9 +3868,6 @@ public class MainActivity extends AppCompatActivity {
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording + ", firstResume=" + wasFirstResume);
         
-        // 通知悬浮窗：应用回到前台
-        OverlayCoordinator.onAppForeground(this);
-
         // 人已经在界面上了，屏幕一定亮着。熄屏标记还挂着就说明亮屏广播没来，补跑一次
         reconcileScreenState("onResume");
 
@@ -3966,12 +3912,6 @@ public class MainActivity extends AppCompatActivity {
                     // 回到前台不是开始录制的理由：启动时开一次由 checkAutoStartRecording 管，
                     // 录着录着意外停了由 checkAndRestoreAutoRecording 接，两条都在
                     // RecordingIntent 里统一判断。
-                    
-                    // 重新启动超视模式窗口的摄像头预览
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                        AppLog.d(TAG, "重新启动超视模式摄像头预览");
-                        BlindSpotService.restartSupervisionCameraPreview();
-                    }, 500);  // 等待摄像头打开后
                 } else {
                     AppLog.d(TAG, "Recording in progress, cameras should still be connected");
                 }
@@ -4701,25 +4641,4 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * 补盲和超视只在开发者选项打开时出现在抽屉里。
-     *
-     * <p>每次拉开抽屉都对一次：开发者选项随时可能在「关于」里被打开或关掉，
-     * 菜单得跟着它走，不能只在启动时判断一次。</p>
-     */
-    private void syncDeveloperMenuVisibility() {
-        if (navigationView == null) {
-            return;
-        }
-        boolean unlocked = com.kooo.evcam.settings.DeveloperMode.isUnlocked();
-        android.view.Menu menu = navigationView.getMenu();
-        android.view.MenuItem blindSpot = menu.findItem(R.id.nav_secondary_display);
-        if (blindSpot != null) {
-            blindSpot.setVisible(unlocked);
-        }
-        android.view.MenuItem supervision = menu.findItem(R.id.nav_supervision_mode);
-        if (supervision != null) {
-            supervision.setVisible(unlocked);
-        }
-    }
 }

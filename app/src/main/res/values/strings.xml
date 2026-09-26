@@ -261,8 +261,6 @@
     <string name="nav_video_playback">视频回看</string>
     <string name="nav_photo_playback">图片回看</string>
     <string name="nav_group_system">系统</string>
-    <string name="nav_blind_spot">补盲选项</string>
-    <string name="nav_supervision">超视模式</string>
     <string name="nav_settings">软件设置</string>
     <string name="nav_header_subtitle">车机版环视记录仪</string>
     <string name="nav_header_alt_name">Zeekr Shortcut</string>
@@ -573,8 +571,6 @@
     <string name="composite_probed">探测结果 %1$d×%2$d</string>
     <string name="composite_kind_real">合成流</string>
     <string name="composite_kind_plain">普通相机</string>
-    <string name="msg_supervision_on">超视模式已开启</string>
-    <string name="msg_supervision_off">超视模式已关闭</string>
     <string name="debug_on">调试信息已开启</string>
     <string name="debug_off">调试信息已关闭</string>
     <string name="debug_recording">录制：%1$s</string>
@@ -638,8 +634,6 @@
     <string name="set_section_developer">开发者选项</string>
     <string name="dev_permissions_title">权限设置</string>
     <string name="dev_permissions_summary">管理应用所需的各项权限</string>
-    <string name="dev_blind_spot_title">补盲选项</string>
-    <string name="dev_supervision_title">超视模式</string>
     <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
     <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
     <string name="dev_repair_mp4_title">修复未封口的视频</string>

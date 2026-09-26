@@ -46,16 +46,6 @@
     <item android:title="@string/nav_group_system">
         <menu>
             <item
-                android:id="@+id/nav_secondary_display"
-                android:checkable="true"
-                android:icon="@drawable/ic_floating"
-                android:title="@string/nav_blind_spot" />
-            <item
-                android:id="@+id/nav_supervision_mode"
-                android:checkable="true"
-                android:icon="@drawable/ic_grid"
-                android:title="@string/nav_supervision" />
-            <item
                 android:id="@+id/nav_settings"
                 android:checkable="true"
                 android:icon="@drawable/ic_settings"

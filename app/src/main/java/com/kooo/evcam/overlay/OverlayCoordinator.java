@@ -7,13 +7,12 @@ import android.os.Looper;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.BlindSpotService;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 
 /**
- * 四个悬浮窗「该不该开、能不能开、什么时候开」。
+ * 两个悬浮窗（超级后视镜、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
  *
  * <h3>为什么要有这么个地方</h3>
  *
@@ -25,12 +24,6 @@ import com.kooo.evcam.zeekr.RearViewMirrorService;
  *
  * <p>这类「设置里显示开着、实际没开」的毛病，根子是同一个判断被抄了好几份。
  * 抄的时候都对，改的时候只改一处。所以这里只留一份。</p>
- *
- * <h3>补盲不在这里管生命周期</h3>
- *
- * <p>{@link BlindSpotService#update} 自己会按配置决定开哪几个窗、关哪几个，
- * 调用方只负责「捅它一下」。这里只回答「现在该不该捅」这个判断
- * （{@link #blindSpotWanted}），不接管它内部的编排。</p>
  */
 public final class OverlayCoordinator {
 
@@ -52,39 +45,6 @@ public final class OverlayCoordinator {
         return WakeUpHelper.hasOverlayPermission(context);
     }
 
-    /**
-     * 补盲那一套该不该起来。
-     *
-     * <p>规则是「全局开关打开<b>并且</b>至少有一项子功能打开」，
-     * 唯独定制键唤醒独立于全局开关 —— 它是从车上的实体键进来的，
-     * 不该被一个界面里的总开关挡住。</p>
-     *
-     * <p>取纯布尔而不是 AppConfig，是为了这条规则能单独测：
-     * 它有七个输入，光看代码判断不出哪几种组合会开。</p>
-     */
-    public static boolean blindSpotWanted(boolean global,
-                                          boolean secondaryDisplay,
-                                          boolean mainFloating,
-                                          boolean turnSignalLinkage,
-                                          boolean mockTurnSignal,
-                                          boolean avmAvoidance,
-                                          boolean customKeyWakeup) {
-        boolean anySubFeature = secondaryDisplay || mainFloating || turnSignalLinkage
-                || mockTurnSignal || avmAvoidance;
-        return (global && anySubFeature) || customKeyWakeup;
-    }
-
-    /** 同上，从配置里取那七个开关。 */
-    public static boolean blindSpotWanted(AppConfig config) {
-        return blindSpotWanted(
-                config.isBlindSpotGlobalEnabled(),
-                config.isSecondaryDisplayEnabled(),
-                config.isMainFloatingEnabled(),
-                config.isTurnSignalLinkageEnabled(),
-                config.isMockTurnSignalFloatingEnabled(),
-                config.isAvmAvoidanceEnabled(),
-                config.isCustomKeyWakeupEnabled());
-    }
 
     // ------------------------------------------------------------------ 启动时恢复
 
@@ -115,11 +75,6 @@ public final class OverlayCoordinator {
                     afterPreviewWindowStarted.run();
                 }
             }, STATE_PUSH_DELAY_MS);
-        }
-
-        if (blindSpotWanted(config)) {
-            BlindSpotService.update(context);
-            AppLog.d(TAG, "补盲选项服务已启动");
         }
     }
 
@@ -163,22 +118,6 @@ public final class OverlayCoordinator {
         return true;
     }
 
-    // ------------------------------------------------------------------ 前后台
-
-    /**
-     * 应用退到后台 / 回到前台。
-     *
-     * <p>0.45 之前这里还要让「打开应用」那个按钮在前台时藏起来 —— 它在主界面上
-     * 没有意义。合并之后不再藏：留下的这个按钮管的是录制、拍照这些事，
-     * 在哪儿都用得上，而且一个会自己消失的按钮比一个一直在的更难解释。</p>
-     */
-    public static void onAppBackground(Context context) {
-        BlindSpotService.notifySelfBackground();
-    }
-
-    public static void onAppForeground(Context context) {
-        BlindSpotService.notifySelfForeground();
-    }
 
     /**
      * 主界面销毁时的清理。

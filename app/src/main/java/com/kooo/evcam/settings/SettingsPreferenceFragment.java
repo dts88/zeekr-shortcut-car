@@ -893,18 +893,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
-        onClick("pref_blind_spot", pref -> {
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).showBlindSpotInterface();
-            }
-        });
-
-        onClick("pref_supervision", pref -> {
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).toggleSupervisionMode();
-            }
-        });
-
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
 

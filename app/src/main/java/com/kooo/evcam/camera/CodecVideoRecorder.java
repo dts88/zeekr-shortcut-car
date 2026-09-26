@@ -47,10 +47,6 @@ public class CodecVideoRecorder {
     // 编码参数（可配置）
     private int frameRate = 20;       // 默认 20fps - 降低帧率减少CPU占用，同时保持流畅
     
-    // 录制时补盲优化模式
-    private boolean blindSpotOptimizeMode = false;  // 是否启用补盲优化模式（录制时降低负载）
-    private static final int BLIND_SPOT_OPTIMIZED_FPS = 15;  // 补盲优化模式帧率
-
     // 编码器选择：是否强制使用 H.264（默认 false，优先使用 HEVC）
     private boolean forceH264 = false;
     
@@ -422,7 +418,7 @@ public class CodecVideoRecorder {
      * 编码器，不需要这个值。</p>
      */
     private long ptsStepUs() {
-        int fps = blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate;
+        int fps = frameRate;
         if (fps <= 0) {
             fps = 25;  // 兜底，与历史行为一致
         }
@@ -480,7 +476,7 @@ public class CodecVideoRecorder {
             return;  // 还没创建，创建时会再套用一次
         }
         // 节流用上限（可以是 0 = 不限制），不是标称值
-        encoder.setFrameRate(blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRateCap);
+        encoder.setFrameRate(frameRateCap);
     }
 
     /**
@@ -507,28 +503,7 @@ public class CodecVideoRecorder {
     public int getFrameRate() {
         return frameRate;
     }
-    
-    /**
-     * 设置补盲优化模式
-     * 启用后降低帧率以减少CPU/GPU负载，改善补盲画面延迟
-     * @param enabled true 表示启用补盲优化模式
-     */
-    public void setBlindSpotOptimizeMode(boolean enabled) {
-        this.blindSpotOptimizeMode = enabled;
-        applyEncoderFrameRate();
-        if (enabled) {
-            AppLog.i(TAG, "Camera " + cameraId + " 启用补盲优化模式，帧率降至 " + BLIND_SPOT_OPTIMIZED_FPS + "fps");
-        } else {
-            AppLog.i(TAG, "Camera " + cameraId + " 关闭补盲优化模式，恢复 " + frameRate + "fps");
-        }
-    }
-    
-    /**
-     * 获取补盲优化模式状态
-     */
-    public boolean isBlindSpotOptimizeMode() {
-        return blindSpotOptimizeMode;
-    }
+
 
     /**
      * 准备录制
@@ -1116,8 +1091,7 @@ public class CodecVideoRecorder {
         // 检测并选择最优编码格式（forceH264 开启时固定 H.264）
         mimeType = selectBestEncoder();
 
-        // 如果启用了补盲优化模式，使用降低的帧率
-        int effectiveFrameRate = blindSpotOptimizeMode ? BLIND_SPOT_OPTIMIZED_FPS : frameRate;
+        int effectiveFrameRate = frameRate;
 
         // 码率只有一条公式（TargetBitrate），两种编码都走它 —— 它自己知道 H.264
         // 要的比 HEVC 多。以前兼容模式走另一条公式，于是「强制 H.264」这个为了
@@ -1158,7 +1132,7 @@ public class CodecVideoRecorder {
         bufferInfo = new MediaCodec.BufferInfo();
 
         AppLog.d(TAG, "Camera " + cameraId + " Encoder created: " + width + "x" + height +
-                " @ " + effectiveFrameRate + "fps" + (blindSpotOptimizeMode ? "(补盲优化)" : "") +
+                " @ " + effectiveFrameRate + "fps" +
                 ", " + (effectiveBitrate / 1000) + " Kbps, " +
                 (mimeType.equals(MIME_TYPE_HEVC) ? "HEVC" : "H.264") +
                 (forceH264 ? " [兼容模式]" : ""));
