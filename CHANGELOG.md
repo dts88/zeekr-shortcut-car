@@ -7,6 +7,15 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.46.0-alpha] - 2026-09-26
+
+- The black box records USB drives being mounted, unmounted or dropping out, with the drives
+  present at that moment. It also records which drive each recording writes to, and says so when
+  that is not the drive chosen in settings.
+- Diagnostics: "Recent recordings" lists the folder the last recording actually went to. When the
+  chosen drive dropped out and recording moved to the other one, the report used to show none of
+  the new clips.
+
 ## [1.45.0-alpha] - 2026-09-26
 
 - **No more "recording" when nothing is being recorded.** If the screen and the floating button
