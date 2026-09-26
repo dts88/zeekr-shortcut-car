@@ -419,6 +419,8 @@
     <string name="status_bitrate_high">高码率</string>
     <string name="status_storage_free">U 盘 %1$s 可用</string>
     <string name="status_storage_none">未检测到 U 盘</string>
+    <string name="status_recording_fallback">录像已改写到 %1$s（%2$s 不可用）</string>
+    <string name="status_internal_storage">内置存储</string>
     <string name="nav_group_switches">开关</string>
 
     <!-- 视频流配置编辑 -->

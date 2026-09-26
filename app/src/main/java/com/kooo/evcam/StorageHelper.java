@@ -38,6 +38,35 @@ public class StorageHelper {
         lastRecordingDir = dir;
     }
 
+    /**
+     * 这次录像写在「不是设定的那个盘」上：{写的盘, 设定的盘}，卷名（如 B905-2EDD）或 emulated；平时为 null。
+     *
+     * <p>状态条一直显示它，直到这次录像停止 —— 换盘时只弹一次提示的话，人不在车上就看不到
+     * （2026-09-26 哨兵模式：固态盘掉线、自动改写到另一个盘，回来的人以为什么都没录上）。</p>
+     */
+    private static volatile String[] recordingFallback;
+
+    public static void noteRecordingFallback(String writingTo, String chosen) {
+        recordingFallback = writingTo == null ? null : new String[]{writingTo, chosen};
+    }
+
+    public static String[] recordingFallback() {
+        return recordingFallback;
+    }
+
+    /** 路径所在的卷：/storage/B905-2EDD/... → B905-2EDD；/storage/emulated/0/... → emulated；认不出返回整条路径。 */
+    public static String volumeOf(String path) {
+        if (path == null) {
+            return "";
+        }
+        String prefix = "/storage/";
+        if (path.startsWith(prefix)) {
+            int end = path.indexOf('/', prefix.length());
+            return end > 0 ? path.substring(prefix.length(), end) : path.substring(prefix.length());
+        }
+        return path;
+    }
+
     /** 最近一次录像实际写进的目录；这个进程里还没录过时为 null。 */
     public static File lastRecordingDir() {
         return lastRecordingDir;

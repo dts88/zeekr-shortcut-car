@@ -411,6 +411,8 @@
     <string name="status_bitrate_high">Kadar bit tinggi</string>
     <string name="status_storage_free">USB %1$s kosong</string>
     <string name="status_storage_none">Tiada pemacu USB</string>
+    <string name="status_recording_fallback">Merakam ke %1$s (%2$s tidak tersedia)</string>
+    <string name="status_internal_storage">storan dalaman</string>
     <string name="nav_group_switches">Suis</string>
 
     <!-- Editor profil strim -->

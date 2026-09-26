@@ -411,6 +411,8 @@
     <string name="status_bitrate_high">High bitrate</string>
     <string name="status_storage_free">USB %1$s free</string>
     <string name="status_storage_none">No USB drive</string>
+    <string name="status_recording_fallback">Recording to %1$s (%2$s unavailable)</string>
+    <string name="status_internal_storage">internal storage</string>
     <string name="nav_group_switches">Switches</string>
 
     <!-- Stream profile editor -->

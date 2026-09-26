@@ -63,6 +63,18 @@ public final class StatusLine {
         }
     }
 
+    /** 卷名写短：B905-2EDD → B905；内置存储写成字。 */
+    private static String volumeLabel(Context context, String volume) {
+        if (volume == null || volume.isEmpty()) {
+            return "?";
+        }
+        if ("emulated".equals(volume)) {
+            return context.getString(R.string.status_internal_storage);
+        }
+        int dash = volume.indexOf('-');
+        return dash > 0 ? volume.substring(0, dash) : volume;
+    }
+
     /** 现在生效的那份配置叫什么；读不出来就空着，不编一个名字。 */
     private static String profileName(Context context) {
         try {
@@ -99,7 +111,13 @@ public final class StatusLine {
             stream.setVisibility(View.VISIBLE);
         }
         TextView storage = root.findViewById(R.id.tv_status_storage);
-        if (storage != null) {
+        String[] fallback = StorageHelper.recordingFallback();
+        if (storage != null && fallback != null) {
+            // 录像改写到了别的盘：这一格一直说明，直到这次录像停止
+            NumberRoll.set(storage, context.getString(R.string.status_recording_fallback,
+                    volumeLabel(context, fallback[0]), volumeLabel(context, fallback[1])));
+            storage.setVisibility(View.VISIBLE);
+        } else if (storage != null) {
             File sdCard = StorageHelper.getExternalSdCardRoot(context);
             long free = sdCard != null ? StorageHelper.getAvailableSpace(sdCard) : -1;
             NumberRoll.set(storage, free >= 0

@@ -3407,6 +3407,8 @@ public class MainActivity extends AppCompatActivity {
             syncRecordingClaim();
             setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
+            // 状态条上「录像改写到别的盘」那句随这次录像结束
+            updateStatusLine();
 
             // 为什么停的：停之前有人写下原因的就用它；没人写，就是录制器自己停的
             com.kooo.evcam.recording.RecordingStops.Reason reason = nextStopReason != null ? nextStopReason

@@ -368,6 +368,8 @@ public class MultiCameraManager {
             String custom = new AppConfig(context).getCustomSdCardPath();
             boolean offTarget = custom != null && !custom.isEmpty()
                     && !dir.getAbsolutePath().startsWith(custom);
+            StorageHelper.noteRecordingFallback(offTarget ? StorageHelper.volumeOf(dir.getAbsolutePath()) : null,
+                    offTarget ? StorageHelper.volumeOf(custom) : null);
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录像写到 " + dir.getAbsolutePath()
                     + (offTarget ? "（设定的是 " + custom + "，那个盘此刻不可用）" : "")
                     + "；此刻挂着的盘：" + StorageHelper.describeMounts());
@@ -2017,6 +2019,7 @@ public class MultiCameraManager {
         isRecording = false;
         mainHandler.removeCallbacks(storageTick);
         mainHandler.removeCallbacks(writeWatch);
+        StorageHelper.noteRecordingFallback(null, null);
 
         // 在后台线程执行停止操作，避免阻塞主线程
         new Thread(() -> {
