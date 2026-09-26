@@ -86,7 +86,6 @@ public class HardcodedTextTest {
                 "修不了时抛出的原因，只出现在开发者选项那份修复报告里");
         JAVA_ALLOWED.put("zeekr/RawFrameDump.java",
                 "工程模式导出的那份说明文件的正文，写进 txt，不上界面");
-        JAVA_ALLOWED.put("service/CameraRecordingService.java", "录制开始 / 停止的过程只写进日志");
         JAVA_ALLOWED.put("profile/ProfileMigration.java",
                 "预设配置里存的名字；编辑器按配置 id 显示本地化名字，不读它");
         JAVA_ALLOWED.put("camera/SingleCamera.java",
