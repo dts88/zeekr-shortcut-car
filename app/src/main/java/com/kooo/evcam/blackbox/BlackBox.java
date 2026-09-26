@@ -477,19 +477,26 @@ public final class BlackBox {
 
     // ================================================================= 导出
 
-    /** 诊断报告 / 保存日志用。只取末尾一段，完整的在文件里。 */
+    /**
+     * 诊断报告 / 保存日志用。只取末尾一段，完整的在文件里。
+     *
+     * <p>连上一份（轮换下来的 {@link #OLD_FILE}）一起取。刚轮换过时，新的那份只有几十行，
+     * 出事的那一段全在上一份里 —— 2026-09-26 就是这样：12:40 刚轮换，12:30 前后
+     * 环视相机坏掉的那一段，导出来一行都没有。</p>
+     */
     public static String export(Context context, int maxChars) {
         if (context == null) {
             return "（没有上下文）\n";
         }
         StringBuilder sb = new StringBuilder();
         try {
-            File file = new File(new File(context.getFilesDir(), DIR), FILE);
-            if (!file.isFile()) {
+            File dir = new File(context.getFilesDir(), DIR);
+            File file = new File(dir, FILE);
+            File old = new File(dir, OLD_FILE);
+            if (!file.isFile() && !old.isFile()) {
                 return "还没有记录。\n";
             }
-            String text = tail(new String(Files.readAllBytes(file.toPath()),
-                    StandardCharsets.UTF_8), maxChars);
+            String text = tail(joined(readIfThere(old), readIfThere(file)), maxChars);
             sb.append(text);
             if (!text.endsWith("\n")) {
                 sb.append('\n');
@@ -498,6 +505,19 @@ public final class BlackBox {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
         return sb.toString();
+    }
+
+    private static String readIfThere(File file) throws IOException {
+        return file.isFile()
+                ? new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8) : "";
+    }
+
+    /** 上一份接在前面：两份都是按时间往后写的，接起来还是一条时间线。 */
+    static String joined(String older, String current) {
+        if (older == null || older.isEmpty()) {
+            return current == null ? "" : current;
+        }
+        return (older.endsWith("\n") ? older : older + "\n") + (current == null ? "" : current);
     }
 
     // ================================================================= 零碎

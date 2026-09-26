@@ -13,6 +13,9 @@ Nothing yet.
   enlarged photo, or the surround photo when nothing is enlarged.
 - **Diagnostics: the "Share" button is gone.** The head unit has no app that accepts a share,
   so it always failed. Use "Send to phone", or "Save" and take the report off the USB drive.
+- **Diagnostics: the black box now includes the previous log file.** When the log had just
+  rolled over to a new file, the report showed only the few lines since then and left out what
+  happened before.
 
 ## [1.42.0-alpha] - 2026-09-26
 

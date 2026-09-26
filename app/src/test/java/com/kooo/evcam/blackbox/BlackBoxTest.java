@@ -19,6 +19,16 @@ public class BlackBoxTest {
                     + "09-20 10:01:00  心跳\n"
                     + "09-20 10:02:00  心跳\n";
 
+    /** 刚轮换过：上一份接在前面，时间线不断。 */
+    @Test
+    public void theRotatedFileComesFirst() {
+        assertEquals("a\nb\n", BlackBox.joined("a\n", "b\n"));
+        assertEquals("上一份没以换行结尾也不能把两条粘成一行",
+                "a\nb\n", BlackBox.joined("a", "b\n"));
+        assertEquals("b\n", BlackBox.joined("", "b\n"));
+        assertEquals("a\n", BlackBox.joined("a\n", ""));
+    }
+
     @Test
     public void shortLogComesBackWhole() {
         assertEquals(LOG, BlackBox.tail(LOG, 10_000));
