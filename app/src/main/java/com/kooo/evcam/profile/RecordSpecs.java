@@ -47,6 +47,21 @@ public final class RecordSpecs {
         return forRole(context, ProfileSizes.roleForCameraKey(cameraKey));
     }
 
+    /**
+     * 这一路的录像和照片是不是拼成 2×2 存的。
+     *
+     * <p>只有环视合成流那一路会拆 —— 真正拆的地方（{@code EncodeSize.forSource}、
+     * {@code CompositeBitmapComposer.toGrid}）认的是相机 id。座舱那几路的
+     * {@code grid} 也是 true，那是一个对它们没有意义的默认值，所以不能只看它：
+     * 回看界面以前就是只看它，把座舱的整幅画面当成四格去放大、去做鱼眼校正。</p>
+     *
+     * @param cameraKey 接线用的槽位名（front / back / left）
+     */
+    public static boolean storedAsGrid(Context context, String cameraKey) {
+        return CameraProfile.ROLE_COMPOSITE.equals(ProfileSizes.roleForCameraKey(cameraKey))
+                && forCameraKey(context, cameraKey).grid;
+    }
+
     /** 同上，按角色取。 */
     public static StreamSpec forRole(Context context, String role) {
         if (context == null || role == null) {

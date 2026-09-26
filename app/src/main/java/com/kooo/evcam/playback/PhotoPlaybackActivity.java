@@ -636,8 +636,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private int gridColumns(String position) {
         try {
             // 配置那边按内部 key 存，这里拿到的是对外的名字，翻一下
-            return RecordSpecs.forCameraKey(PhotoPlaybackActivity.this,
-                    com.kooo.evcam.camera.CameraSlots.keyForSuffix(position)).grid ? 2 : 1;
+            return RecordSpecs.storedAsGrid(PhotoPlaybackActivity.this,
+                    com.kooo.evcam.camera.CameraSlots.keyForSuffix(position)) ? 2 : 1;
         } catch (Exception e) {
             Log.w(TAG, "读不到 " + position + " 的排列，按不拆处理: " + e);
             return 1;

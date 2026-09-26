@@ -7,6 +7,20 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.36.0-alpha] - 2026-09-26
+
+- **Cabin views are one whole picture in both playback screens.** Tapping an enlarged cabin
+  view goes back to the grid instead of zooming into a quarter; only the surround view is a
+  2×2 grid. Photo playback also stops applying fisheye correction to cabin photos.
+- **Rear cabin recordings are no longer mirrored.** Android flips the picture of any camera
+  that reports itself as front-facing (the rear cabin one does), and the recorder drew that
+  flipped picture, time overlay included. The normal view is now what the camera sees,
+  unmirrored, same as photos; the flip is undone where it comes in (recording, preview,
+  preview-grab photos). Recordings made before this version stay mirrored.
+- Preview: with "Mirror" on in the profile editor (the default for both cabins), the rear
+  cabin is now mirrored like the front one. Before, the system flip and the switch cancelled
+  out, so the same switch did opposite things on the two cabins.
+
 ## [1.35.0-alpha] - 2026-09-26
 
 - **Video playback shows every camera, laid out like photo playback**: surround on the

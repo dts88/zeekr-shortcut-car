@@ -168,6 +168,17 @@ public class EglSurfaceEncoder {
     private final float[] mvpMatrix = new float[16];
     private final float[] texMatrix = new float[16];
 
+    /** 左右翻回来：纹理坐标 x → 1 − x。 */
+    private static final float[] FLIP_X = {
+            -1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            1f, 0f, 0f, 1f,
+    };
+    private final float[] unmirroredMatrix = new float[16];
+    /** 输入带不带左右镜像；null 表示还没看过。只在变化时写日志。 */
+    private Boolean inputMirrored;
+
     // 输入 SurfaceTexture（来自 Camera）
     private SurfaceTexture inputSurfaceTexture;
 
@@ -483,6 +494,7 @@ public class EglSurfaceEncoder {
             // 更新纹理（需要在正确的 EGL context 中）
             inputSurfaceTexture.updateTexImage();
             inputSurfaceTexture.getTransformMatrix(texMatrix);
+            toNormalView(texMatrix);
             // 节流由 throttle 记账，这个字段只留给日志/诊断看「上一帧什么时候画的」
             lastFrameTimeNs = currentTimeNs;
             renderedFrames++;   // 过了节流这一关，这一帧才真的进编码器
@@ -602,6 +614,32 @@ public class EglSurfaceEncoder {
 
         GLES20.glDisableVertexAttribArray(positionHandle);
         GLES20.glDisableVertexAttribArray(texCoordHandle);
+    }
+
+    /**
+     * 系统给的这一帧要是带着左右翻转，把它翻回正常视角。
+     *
+     * <p>安卓对朝向为「前置」的相机，默认把给 SurfaceTexture 的画面左右翻一次，好让预览
+     * 像照镜子。这台车上后座舱那一路报的就是前置。录像不该带这一下：照着这个矩阵画，
+     * 画面是反的，时间角标（它按纹理坐标贴）也跟着反。安卓 13 起可以用
+     * {@code OutputConfiguration.setMirrorMode} 关掉，这台车是 12，只能自己翻回来。</p>
+     *
+     * <p>不按「前置 / 后置」去猜，直接看这一帧的矩阵：SurfaceTexture 的矩阵本来就带一次
+     * 上下翻转（GL 的原点在左下），左上角 2×2 的行列式是负的；再多一次左右翻转就成了正的。
+     * 翻回来之后，所有相机的矩阵都是同一种形状，水印的位置和朝向也就一样了。</p>
+     */
+    private void toNormalView(float[] m) {
+        boolean mirrored = m[0] * m[5] - m[4] * m[1] > 0f;
+        if (inputMirrored == null || inputMirrored != mirrored) {
+            inputMirrored = mirrored;
+            AppLog.i(TAG, "Camera " + cameraId + (mirrored
+                    ? " 录像输入带左右镜像（系统对前置相机的默认翻转），翻回正常视角再编码"
+                    : " 录像输入不带镜像"));
+        }
+        if (mirrored) {
+            android.opengl.Matrix.multiplyMM(unmirroredMatrix, 0, m, 0, FLIP_X, 0);
+            System.arraycopy(unmirroredMatrix, 0, m, 0, 16);
+        }
     }
 
     /**

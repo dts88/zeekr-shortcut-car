@@ -157,6 +157,11 @@ public final class DiagnosticsCollector {
 
                     Integer facing = cc.get(CameraCharacteristics.LENS_FACING);
                     sb.append("朝向: ").append(describeFacing(facing)).append('\n');
+                    if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                        sb.append(">> 前置：系统会把给预览、录像的画面左右翻一次；")
+                                .append("App 在预览、录像、预览抓图三处各翻回一次，正常视角 = 不镜像")
+                                .append('\n');
+                    }
 
                     Integer level = cc.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
                     sb.append("硬件级别: ").append(describeLevel(level)).append('\n');

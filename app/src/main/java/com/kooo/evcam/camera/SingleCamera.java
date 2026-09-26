@@ -123,6 +123,8 @@ public class SingleCamera {
     // 亮度/降噪调节相关
     private CaptureRequest.Builder currentRequestBuilder;  // 当前的请求构建器（用于实时更新参数）
     private CameraCharacteristics cameraCharacteristics;  // 摄像头特性（缓存）
+    /** 系统有没有把这台相机给 SurfaceTexture 的画面左右翻过；null 表示还没查到。 */
+    private Boolean sourceMirrored;
     private boolean imageAdjustEnabled = false;  // 是否启用亮度/降噪调节
     
     // 当前相机实际使用的参数（从 CaptureResult 读取）
@@ -348,6 +350,12 @@ public class SingleCamera {
                     lane.cropTop, lane.cropBottom, lane.cropLeft, lane.cropRight,
                     lane.scaleX, lane.scaleY, lane.translateX, lane.translateY,
                     fitOverride != null ? fitOverride : lane.fit);
+            if (sourceMirrored()) {
+                // 系统翻过的先翻回正常视角：裁剪、旋转、配置里的「镜像」都作用在正常视角上，
+                // 配置里开着镜像就是镜像，关着就是正的 —— 每一路都一样
+                matrix.preScale(-1f, 1f, width / 2f, height / 2f);
+                shaped = true;
+            }
             com.kooo.evcam.PreviewCorrection.postApply(
                     matrix, new AppConfig(context), cameraPosition, width, height);
             view.setTransform(matrix);
@@ -2330,41 +2338,6 @@ public class SingleCamera {
     }
 
     /**
-     * 实时捕获当前画面（不保存文件）
-     * 用于心跳推图等需要实时获取图片的功能
-     * 注意：必须在主线程调用
-     * 
-     * @return 当前画面的 Bitmap，失败返回 null（调用方负责回收）
-     */
-    public android.graphics.Bitmap captureBitmap() {
-        if (textureView == null || !textureView.isAvailable()) {
-            AppLog.w(TAG, "Camera " + cameraId + " TextureView not available for capture");
-            return null;
-        }
-
-        if (previewSize == null) {
-            AppLog.w(TAG, "Camera " + cameraId + " preview size not available for capture");
-            return null;
-        }
-
-        try {
-            android.graphics.Bitmap bitmap = textureView.getBitmap(
-                    previewSize.getWidth(),
-                    previewSize.getHeight()
-            );
-            
-            if (bitmap != null) {
-                AppLog.d(TAG, "Camera " + cameraId + " captured bitmap: " + 
-                        bitmap.getWidth() + "x" + bitmap.getHeight());
-            }
-            return bitmap;
-        } catch (Exception e) {
-            AppLog.e(TAG, "Camera " + cameraId + " failed to capture bitmap", e);
-            return null;
-        }
-    }
-
-    /**
      * 建拍照用的 JPEG 输出。
      *
      * <p>尺寸取这一路声明的<b>最大</b>那个 —— 拍照是单张，没有帧率压力，
@@ -2555,6 +2528,7 @@ public class SingleCamera {
                     AppLog.e(TAG, "Camera " + cameraId + " failed to get bitmap from TextureView");
                     return;
                 }
+                bitmap = toNormalView(bitmap);
                 AppLog.d(TAG, "Camera " + cameraId + " picture captured ("
                         + bitmap.getWidth() + "x" + bitmap.getHeight() + ")");
                 saveBitmapAsJPEG(bitmap, timestamp);
@@ -2600,7 +2574,7 @@ public class SingleCamera {
         android.graphics.Bitmap sourceBitmap = bitmap;
         android.graphics.Bitmap gridBitmap = null;
         // 照片跟着这一路录制的排列走：录像是 2×2，照片就该是 2×2
-        if (com.kooo.evcam.profile.RecordSpecs.forCameraKey(context, cameraPosition).grid) {
+        if (com.kooo.evcam.profile.RecordSpecs.storedAsGrid(context, cameraPosition)) {
             gridBitmap = com.kooo.evcam.zeekr.CompositeBitmapComposer.toGrid(
                     cameraId, bitmap, null);
             if (gridBitmap != bitmap) {
@@ -3435,6 +3409,52 @@ public class SingleCamera {
     /**
      * 获取摄像头特性（带缓存）
      */
+    /**
+     * 系统有没有把这台相机给预览的画面左右翻过一次。
+     *
+     * <h3>正常视角</h3>
+     *
+     * <p>定为<b>相机实际看到的样子、不镜像</b>。照片走 JPEG 通道，系统不翻，本来就是这样；
+     * 录像和预览吃到了系统那一下，所以在它们进来的地方各翻回一次（录像见
+     * {@code EglSurfaceEncoder.toNormalView}）。之后配置里的「镜像」只在显示时再翻一次。</p>
+     *
+     * <h3>系统那一下</h3>
+     *
+     * <p>安卓对朝向为「前置」的相机，默认把给 SurfaceTexture 的画面左右翻一次，好让预览像照镜子。
+     * 这台车上后座舱那一路报的是前置：它的预览被系统翻了一次、配置里的「镜像」又翻一次，
+     * 两下抵消 —— 前座舱开着镜像是镜像的，后座舱开着镜像反而是正的。</p>
+     */
+    private boolean sourceMirrored() {
+        if (sourceMirrored != null) {
+            return sourceMirrored;
+        }
+        CameraCharacteristics chars = getCameraCharacteristics();
+        if (chars == null) {
+            return false;   // 这次查不到，下次再查
+        }
+        Integer facing = chars.get(CameraCharacteristics.LENS_FACING);
+        sourceMirrored = facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT;
+        AppLog.i(TAG, "Camera " + cameraId + " LENS_FACING=" + facing + (sourceMirrored
+                ? "：前置，系统会把预览左右翻一次，显示前先翻回正常视角" : ""));
+        return sourceMirrored;
+    }
+
+    /** 从预览抓的图也吃到了系统那一下（抓的是 SurfaceTexture 按它的矩阵画出来的样子），翻回来再存。 */
+    private android.graphics.Bitmap toNormalView(android.graphics.Bitmap bitmap) {
+        if (!sourceMirrored()) {
+            return bitmap;
+        }
+        android.graphics.Matrix flip = new android.graphics.Matrix();
+        flip.setScale(-1f, 1f);
+        android.graphics.Bitmap normal = android.graphics.Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), flip, true);
+        if (normal != bitmap) {
+            bitmap.recycle();
+        }
+        AppLog.i(TAG, "Camera " + cameraId + " 预览抓图：前置相机，翻回正常视角再存");
+        return normal;
+    }
+
     private CameraCharacteristics getCameraCharacteristics() {
         if (cameraCharacteristics != null) {
             return cameraCharacteristics;

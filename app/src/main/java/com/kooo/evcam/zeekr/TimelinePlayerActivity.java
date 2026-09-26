@@ -707,7 +707,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      */
     private int gridColumns(Lane lane) {
         try {
-            return RecordSpecs.forCameraKey(this, CameraSlots.keyForSuffix(lane.slot)).grid ? 2 : 1;
+            return RecordSpecs.storedAsGrid(this, CameraSlots.keyForSuffix(lane.slot)) ? 2 : 1;
         } catch (Exception e) {
             AppLog.w(TAG, "读不到 " + lane.slot + " 的排列，按不拆处理: " + e);
             return 1;
