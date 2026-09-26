@@ -92,6 +92,16 @@
             android:layout_weight="1"
             android:text="@string/action_share" />
 
+        <!-- 和照片、视频回看同一个「发送到手机」：扫码，手机上点下载 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/diagnostics_send_phone"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:text="@string/action_send_to_phone" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/diagnostics_refresh"
             style="@style/Widget.Cam.RailSmall"

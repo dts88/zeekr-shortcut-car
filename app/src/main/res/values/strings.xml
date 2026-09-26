@@ -353,6 +353,7 @@
     <string name="action_send_to_phone">发送到手机</string>
     <string name="share_phone_title">发送到手机</string>
     <string name="share_phone_steps">用手机扫描二维码 → 浏览器会打开这个文件 → 长按图片或视频，选择「保存」</string>
+    <string name="share_phone_steps_file">用手机扫描二维码 → 浏览器打开下载页 → 点「下载」，文件就存到手机里了</string>
     <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
     <string name="share_phone_keep_open">保存完成前请不要关闭本窗口 —— 关掉就断开了</string>
     <string name="share_phone_switch_address">换一个地址</string>
@@ -597,6 +598,7 @@
     <string name="diag_btn_save">保存到存储</string>
     <string name="diag_btn_copy">复制</string>
     <string name="diag_btn_refresh">重新采集</string>
+    <string name="diag_send_phone_note">诊断报告是一个 .json 文件。存到手机后，直接发给要看的人即可。</string>
     <string name="diag_collecting">正在采集诊断信息…</string>
     <string name="diag_collect_failed">采集失败：%1$s</string>
     <string name="diag_not_ready">诊断信息尚未生成</string>

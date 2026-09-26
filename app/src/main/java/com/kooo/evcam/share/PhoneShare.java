@@ -131,7 +131,8 @@ public final class PhoneShare {
             qrFailed.setVisibility(android.view.View.GONE);
             root.addView(qrFailed);
 
-            root.addView(text(activity.getString(R.string.share_phone_steps), R.dimen.text_body, false));
+            root.addView(text(activity.getString(FileShareServer.isMedia(file.getName())
+                    ? R.string.share_phone_steps : R.string.share_phone_steps_file), R.dimen.text_body, false));
             if (extraNote != null && !extraNote.isEmpty()) {
                 root.addView(text(extraNote, R.dimen.text_caption, false));
             }

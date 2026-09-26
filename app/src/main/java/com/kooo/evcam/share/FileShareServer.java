@@ -114,10 +114,12 @@ public class FileShareServer extends NanoHTTPD {
         try {
             Response response = newFixedLengthResponse(Response.Status.OK,
                     mimeTypeOf(shared.getName()), new FileInputStream(shared), shared.length());
-            // inline 而不是 attachment：手机浏览器直接把图片/视频显示出来，
-            // 用户长按就能存 —— attachment 会变成一次下载，反而多一步
+            // 图片、视频用 inline：手机浏览器直接显示出来，用户长按就能存 ——
+            // attachment 会变成一次下载，反而多一步。诊断报告这种文件正相反：
+            // 显示出来是一屏看不懂的字，直接下载才对
             response.addHeader("Content-Disposition",
-                    "inline; filename=\"" + shared.getName() + "\"");
+                    (isMedia(shared.getName()) ? "inline" : "attachment")
+                            + "; filename=\"" + shared.getName() + "\"");
             return response;
         } catch (IOException e) {
             AppLog.e(TAG, "读不到要分享的文件", e);
@@ -127,6 +129,9 @@ public class FileShareServer extends NanoHTTPD {
 
     /** 一个极简页面：内容本身 + 怎么存。 */
     private Response landingPage(File shared, String tokenValue) {
+        if (!isMedia(shared.getName())) {
+            return downloadPage(shared, tokenValue);
+        }
         boolean video = isVideo(shared.getName());
         String media = video
                 ? "<video src=\"/f/" + tokenValue + "\" controls playsinline></video>"
@@ -160,11 +165,41 @@ public class FileShareServer extends NanoHTTPD {
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html);
     }
 
+    /** 不是图片、视频的文件（诊断报告）：页面上只有一个下载按钮。 */
+    private Response downloadPage(File shared, String tokenValue) {
+        String html = "<!doctype html><html lang=\"zh\"><head>"
+                + "<meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                + "<title>" + escape(shared.getName()) + "</title><style>"
+                + "body{margin:0;padding:24px 16px;background:#1a1a1a;color:#fff;"
+                + "font-family:system-ui,-apple-system,sans-serif;text-align:center}"
+                + ".name{margin:12px 0 4px;font-size:15px;word-break:break-all}"
+                + ".size{color:#999;font-size:13px}"
+                + ".btn{display:inline-block;margin-top:24px;padding:16px 32px;background:#4a90d9;"
+                + "color:#fff;border-radius:10px;font-size:17px;text-decoration:none}"
+                + ".tip{margin-top:20px;font-size:14px;line-height:1.7;color:#ddd}"
+                + "</style></head><body>"
+                + "<div class=\"name\">" + escape(shared.getName()) + "</div>"
+                + "<div class=\"size\">" + readableSize(shared.length()) + "</div>"
+                + "<a class=\"btn\" href=\"/f/" + tokenValue + "\" download>下载 / Download</a>"
+                + "<div class=\"tip\">点上面的按钮，文件就存到手机里了<br>"
+                + "Tap the button to save the file to your phone</div>"
+                + "</body></html>";
+        return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html);
+    }
+
     private Response text(Response.Status status, String body) {
         return newFixedLengthResponse(status, "text/plain; charset=utf-8", body);
     }
 
     // ------------------------------------------------------------------ 小工具
+
+    /** 图片或视频：手机浏览器能直接显示、长按就能存的那种。 */
+    static boolean isMedia(String name) {
+        String lower = name == null ? "" : name.toLowerCase(Locale.US);
+        return isVideo(name) || lower.endsWith(".png") || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg");
+    }
 
     static boolean isVideo(String name) {
         String lower = name == null ? "" : name.toLowerCase(Locale.US);
@@ -187,6 +222,12 @@ public class FileShareServer extends NanoHTTPD {
         }
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
             return "image/jpeg";
+        }
+        if (lower.endsWith(".json")) {
+            return "application/json; charset=utf-8";
+        }
+        if (lower.endsWith(".txt") || lower.endsWith(".log")) {
+            return "text/plain; charset=utf-8";
         }
         return "application/octet-stream";
     }

@@ -7,6 +7,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.42.0-alpha] - 2026-09-26
+
+- **Diagnostics: "Send to phone"**, the same QR transfer as in photo and video playback. Scan
+  the code and the phone opens a download page for the report; tap Download and the .json file
+  is on the phone. Each tap saves a fresh copy of the report on screen.
+
 ## [1.41.0-alpha] - 2026-09-26
 
 - **"Keep recording when the screen goes off" is now on by default.** It is there for the

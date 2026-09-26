@@ -345,6 +345,7 @@
     <string name="action_send_to_phone">Send to phone</string>
     <string name="share_phone_title">Send to phone</string>
     <string name="share_phone_steps">Scan with your phone → the file opens in the browser → long-press it and choose Save</string>
+    <string name="share_phone_steps_file">Scan the QR code with your phone → the download page opens → tap Download to save the file</string>
     <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
     <string name="share_phone_keep_open">Keep this open until the file is saved</string>
     <string name="share_phone_switch_address">Try another address</string>
@@ -589,6 +590,7 @@
     <string name="diag_btn_save">Save</string>
     <string name="diag_btn_copy">Copy</string>
     <string name="diag_btn_refresh">Collect again</string>
+    <string name="diag_send_phone_note">The report is a .json file. Once it is on your phone, send it to whoever needs to see it.</string>
     <string name="diag_collecting">Collecting diagnostics…</string>
     <string name="diag_collect_failed">Collection failed: %1$s</string>
     <string name="diag_not_ready">The report is not ready yet</string>

@@ -53,6 +53,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private Button saveButton;
     private Button copyButton;
     private Button shareButton;
+    private Button sendPhoneButton;
     private Button refreshButton;
 
 
@@ -69,6 +70,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
         saveButton = findViewById(R.id.diagnostics_save);
         copyButton = findViewById(R.id.diagnostics_copy);
         shareButton = findViewById(R.id.diagnostics_share);
+        sendPhoneButton = findViewById(R.id.diagnostics_send_phone);
         refreshButton = findViewById(R.id.diagnostics_refresh);
 
         View close = findViewById(R.id.diagnostics_close);
@@ -86,6 +88,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         if (shareButton != null) {
             shareButton.setOnClickListener(v -> shareReport());
+        }
+        if (sendPhoneButton != null) {
+            sendPhoneButton.setOnClickListener(v -> sendToPhone());
         }
 
         runCollection();
@@ -174,6 +179,9 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         if (shareButton != null) {
             shareButton.setEnabled(enabled);
+        }
+        if (sendPhoneButton != null) {
+            sendPhoneButton.setEnabled(enabled);
         }
         if (refreshButton != null) {
             refreshButton.setEnabled(enabled);
@@ -265,6 +273,16 @@ public class DiagnosticsActivity extends AppCompatActivity {
                 }
             });
         }, "diagnostics-save").start();
+    }
+
+    /**
+     * 扫码发到手机：和照片、视频回看的「发送到手机」同一套。
+     *
+     * <p>每次都重新存一份：页面上的报告可能刚刷新过，发出去的要和眼前看到的一样。</p>
+     */
+    private void sendToPhone() {
+        saveInBackground(file -> com.kooo.evcam.share.PhoneShare.show(this, file,
+                getString(R.string.diag_send_phone_note)));
     }
 
     private void shareReport() {

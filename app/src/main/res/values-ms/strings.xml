@@ -345,6 +345,7 @@
     <string name="action_send_to_phone">Hantar ke telefon</string>
     <string name="share_phone_title">Hantar ke telefon</string>
     <string name="share_phone_steps">Imbas dengan telefon → fail dibuka dalam pelayar → tekan lama dan pilih Simpan</string>
+    <string name="share_phone_steps_file">Imbas kod QR dengan telefon → halaman muat turun dibuka → ketik Muat turun untuk menyimpan fail</string>
     <string name="share_phone_address">%1$s\n%2$s · %3$s</string>
     <string name="share_phone_keep_open">Biarkan ini terbuka sehingga fail disimpan</string>
     <string name="share_phone_switch_address">Cuba alamat lain</string>
@@ -587,6 +588,7 @@
     <string name="diag_btn_save">Simpan</string>
     <string name="diag_btn_copy">Salin</string>
     <string name="diag_btn_refresh">Kumpul semula</string>
+    <string name="diag_send_phone_note">Laporan ialah fail .json. Setelah ada di telefon, hantar kepada sesiapa yang perlu melihatnya.</string>
     <string name="diag_collecting">Mengumpul maklumat diagnostik…</string>
     <string name="diag_collect_failed">Pengumpulan gagal: %1$s</string>
     <string name="diag_not_ready">Laporan belum sedia</string>
