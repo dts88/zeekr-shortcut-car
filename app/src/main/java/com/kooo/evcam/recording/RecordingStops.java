@@ -24,6 +24,11 @@ public final class RecordingStops {
         STORAGE_CANNOT_FREE,
         /** 开始录之后一直没收到画面，看门狗把它停了。 */
         NO_DATA,
+        /**
+         * 录着录着写不进文件了：编码器坏了没修好，或者 U 盘写不进。相机可能一切正常 ——
+         * 2026-09-26 哨兵模式那一次就是这样，界面显示「录制中」两个小时，一个文件都没写。
+         */
+        WRITE_STALLED,
         /** 录制器自己停了，没人告诉我们为什么。 */
         UNKNOWN,
     }
@@ -38,11 +43,12 @@ public final class RecordingStops {
      *   <li>人停的 —— 永远不接；</li>
      *   <li>熄屏 10 秒 —— 不在这一次的范围里，维持原来亮屏时接回的做法；</li>
      *   <li>存储满了 —— 环视好不好跟它无关，接回去也录不下；</li>
+     *   <li>写不进文件 —— 重开一次录制就是换一个新的编码器、新的文件，常常就好了；</li>
      *   <li>其余 —— 都是相机那一侧的问题，环视回来了就接。</li>
      * </ul>
      */
     public static boolean resumesOnSurround(Reason reason) {
-        return reason == Reason.NO_DATA || reason == Reason.UNKNOWN;
+        return reason == Reason.NO_DATA || reason == Reason.UNKNOWN || reason == Reason.WRITE_STALLED;
     }
 
     /**

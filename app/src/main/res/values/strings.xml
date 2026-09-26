@@ -203,6 +203,7 @@
     <string name="msg_recording_resume_gave_up">自动恢复录像连续 %1$d 次没成功，不再尝试</string>
     <string name="rec_reason_no_data">开始录像后一直没收到画面</string>
     <string name="rec_reason_unknown">录制器自己停了</string>
+    <string name="rec_reason_write_stalled">录像写不进文件</string>
     <string name="msg_recording_auto_started">已自动开始录制</string>
     <string name="msg_resume_failed">摄像头未就绪，恢复录制失败</string>
     <string name="msg_auto_record_failed">摄像头未就绪，自动录制失败</string>

@@ -296,6 +296,82 @@ public class MultiCameraManager {
             mainHandler.postDelayed(this, STORAGE_TICK_MS);
         }
     };
+    /**
+     * 界面说在录、实际多久没写进文件就算断了。
+     *
+     * <p>2026-09-26 哨兵模式那一次：编码器在 19:05 前后坏了，重建失败之后录制器自己不录了，
+     * 可相机照样出帧、编码线程照样在转，界面和悬浮按钮显示「录制中」整整两个小时。
+     * 相机层的看门狗只看有没有帧，文件在不在长没人看 —— 这里看。</p>
+     *
+     * <p>用开机时长（深睡不算）：车机睡着时本来就什么都不写，醒来不能算成写不进。
+     * 分段切换要重建编码器，一两秒就好；15 秒足够把它和真的断了分开。
+     * 只看软编码录制器：MediaRecorder 那条路拿不到写入的字节数。</p>
+     */
+    private static final long WRITE_STALL_MS = 15_000L;
+    private static final long WRITE_WATCH_MS = 5_000L;
+    private WriteStallCallback writeStallCallback;
+    private boolean writeStallReported;
+
+    private final Runnable writeWatch = new Runnable() {
+        @Override
+        public void run() {
+            if (!isRecording) {
+                return;
+            }
+            if (useCodecRecording && !writeStallReported) {
+                long now = android.os.SystemClock.uptimeMillis();
+                String worstKey = null;
+                long worst = -1L;
+                try {
+                    for (Map.Entry<String, CodecVideoRecorder> entry : codecRecorders.entrySet()) {
+                        long ms = entry.getValue().msSinceLastWrite(now);
+                        if (ms > worst) {
+                            worst = ms;
+                            worstKey = entry.getKey();
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    // 停录的后台线程正在清这张表：这一轮不算，下一轮再看
+                    worst = -1L;
+                }
+                if (worst >= WRITE_STALL_MS) {
+                    writeStallReported = true;
+                    CodecVideoRecorder stuck = codecRecorders.get(worstKey);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("录像写不进文件：" + worstKey + " 已 "
+                            + (worst / 1000) + " 秒没有新数据（"
+                            + (stuck == null ? "" : stuck.describeWriteState()) + "）");
+                    onWriteStalled(worst);
+                    return;
+                }
+            }
+            mainHandler.postDelayed(this, WRITE_WATCH_MS);
+        }
+    };
+
+    /**
+     * 录像写不进文件了。
+     *
+     * <p>界面在的时候交给界面：它按「录像被打断」处理，按钮、悬浮按钮回到未录，等能录了再接。
+     * 界面不在的时候相机层自己停，至少别再显示在录。</p>
+     */
+    public interface WriteStallCallback {
+        void onWriteStalled(long stalledMs);
+    }
+
+    public void setWriteStallCallback(WriteStallCallback callback) {
+        this.writeStallCallback = callback;
+    }
+
+    private void onWriteStalled(long stalledMs) {
+        if (writeStallCallback != null) {
+            writeStallCallback.onWriteStalled(stalledMs);
+            return;
+        }
+        stopRecording();
+        com.kooo.evcam.CameraForegroundService.stop(context);
+        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(context, false);
+    }
+
     private CorruptedFilesCallback corruptedFilesCallback;
     private CodecFallbackCallback codecFallbackCallback;
     private FirstDataWrittenCallback firstDataWrittenCallback;
@@ -373,6 +449,7 @@ public class MultiCameraManager {
         firstDataWrittenCallback = () -> { };
         timestampUpdateCallback = newTimestamp -> { };
         storageFullCallback = null;
+        writeStallCallback = null;
         AppLog.i(TAG, "主界面已离开，回调换成空实现，录制管线继续 recording=" + isRecording);
     }
 
@@ -756,6 +833,7 @@ public class MultiCameraManager {
             @Override
             public void onRecordError(String cameraId, String error) {
                 AppLog.e(TAG, "Recording error for camera " + cameraId + ": " + error);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录制器报错（相机 " + cameraId + "）：" + error);
             }
 
             @Override
@@ -979,6 +1057,9 @@ public class MultiCameraManager {
             lastStorageCheckMs = 0;
             mainHandler.removeCallbacks(storageTick);
             mainHandler.postDelayed(storageTick, STORAGE_TICK_MS);
+            writeStallReported = false;
+            mainHandler.removeCallbacks(writeWatch);
+            mainHandler.postDelayed(writeWatch, WRITE_WATCH_MS);
         }
         return started;
     }
@@ -1528,6 +1609,8 @@ public class MultiCameraManager {
                 @Override
                 public void onRecordError(String cameraId, String error) {
                     AppLog.e(TAG, "Codec recording error for camera " + cameraId + ": " + error);
+                    // 以前到这里就完了：只写一行内部日志，界面和黑匣子都不知道
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("录制器报错（相机 " + cameraId + "）：" + error);
                 }
 
                 @Override
@@ -1910,6 +1993,7 @@ public class MultiCameraManager {
         final boolean wasRecording = isRecording;
         isRecording = false;
         mainHandler.removeCallbacks(storageTick);
+        mainHandler.removeCallbacks(writeWatch);
 
         // 在后台线程执行停止操作，避免阻塞主线程
         new Thread(() -> {
@@ -2323,6 +2407,7 @@ public class MultiCameraManager {
      * 添加完善的清理逻辑和异常保护
      */
     public void release() {
+        mainHandler.removeCallbacks(writeWatch);
         AppLog.d(TAG, "Releasing MultiCameraManager resources");
         livenessRunning = false;
         

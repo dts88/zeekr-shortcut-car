@@ -1950,6 +1950,17 @@ public class MainActivity extends AppCompatActivity {
                     : R.string.msg_storage_cannot_free, Toast.LENGTH_LONG).show();
         }));
 
+        // 录像写不进文件（编码器坏了没修好、U 盘写不进）：按「录像被打断」处理 ——
+        // 按钮和悬浮按钮如实回到未录，提示原因，等环视正常再自动接回。
+        // 以前这种情况界面一直显示「录制中」，实际一个字节都没写（2026-09-26 哨兵模式）
+        cameraManager.setWriteStallCallback(stalledMs -> runOnUiThread(() -> {
+            if (!isRecording) {
+                return;
+            }
+            nextStopReason = com.kooo.evcam.recording.RecordingStops.Reason.WRITE_STALLED;
+            stopRecording();
+        }));
+
         // 设置损坏文件删除回调
         cameraManager.setCorruptedFilesCallback(deletedFiles -> {
             showCorruptedFilesDeletedDialog(deletedFiles);
@@ -2689,7 +2700,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void onRecordingInterrupted(com.kooo.evcam.recording.RecordingStops.Reason reason) {
         String why = getString(reason == com.kooo.evcam.recording.RecordingStops.Reason.NO_DATA
-                ? R.string.rec_reason_no_data : R.string.rec_reason_unknown);
+                ? R.string.rec_reason_no_data
+                : reason == com.kooo.evcam.recording.RecordingStops.Reason.WRITE_STALLED
+                ? R.string.rec_reason_write_stalled : R.string.rec_reason_unknown);
         interruptedAtMs = android.os.SystemClock.elapsedRealtime();
         com.kooo.evcam.recording.RecordingIntent intent =
                 com.kooo.evcam.recording.RecordingIntent.current();

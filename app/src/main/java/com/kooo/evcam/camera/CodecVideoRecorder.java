@@ -179,6 +179,17 @@ public class CodecVideoRecorder {
     private long lastEncoderOutputTime = 0;  // 最后一次编码器输出时间
     private int framesWithoutEncoderOutput = 0;  // 无编码器输出的连续帧数
     private volatile boolean encoderHealthy = true;  // 编码器是否健康
+
+    /**
+     * 最后一次真的往文件里写进数据的时刻（开机时长，深睡不算）。
+     *
+     * <p>录制管线的看门狗拿它判断「界面说在录、实际写不进文件」。相机有帧、编码线程在转，
+     * 都不等于写进去了 —— 2026-09-26 哨兵模式那一次，这两样都好好的，文件却两个小时没长。</p>
+     */
+    private volatile long lastWriteUptimeMs;
+    private volatile boolean everWrote;
+    /** 最近一次出错在哪一步、系统怎么说的。写不进文件时黑匣子带上它。 */
+    private volatile String lastTrouble = "";
     private Runnable healthCheckRunnable;  // 健康检查任务
 
     // 回调
@@ -287,6 +298,8 @@ public class CodecVideoRecorder {
         if (size <= 0) {
             return;
         }
+        lastWriteUptimeMs = android.os.SystemClock.uptimeMillis();
+        everWrote = true;
         bytesThisSecond += size;
         framesThisSecond++;
         long now = android.os.SystemClock.elapsedRealtime();
@@ -675,8 +688,11 @@ public class CodecVideoRecorder {
                             }
 
                         } catch (Exception e) {
-                            AppLog.e(TAG, "Camera " + cameraId + " Error processing frame", e);
-                            // 发生异常时标记编码器不健康
+                            // 只记这一轮坏掉的第一次：坏了之后每一帧都会再抛一次，逐帧记会把别的日志全冲掉
+                            if (encoderHealthy) {
+                                AppLog.e(TAG, "Camera " + cameraId + " Error processing frame", e);
+                                noteTrouble("frame", e);
+                            }
                             encoderHealthy = false;
                         }
                     }, encoderHandler);
@@ -1081,6 +1097,65 @@ public class CodecVideoRecorder {
         return isRecording.get();
     }
 
+    /** 距最后一次写进文件过了多久（开机时长，深睡不算）；这次录制还没写出过数据时返回 -1。 */
+    public long msSinceLastWrite(long nowUptimeMs) {
+        return everWrote ? nowUptimeMs - lastWriteUptimeMs : -1L;
+    }
+
+    /** 黑匣子里用的一行现状：录制器自己以为在不在录、编码器好不好、写到哪个文件、最近一次错在哪。 */
+    public String describeWriteState() {
+        return "recording=" + isRecording.get() + " encoderHealthy=" + encoderHealthy
+                + " muxerStarted=" + muxerStarted + " recoveryAttempts=" + recoveryAttempts
+                + " segment=" + segmentIndex
+                + " file=" + (currentFilePath == null ? "none" : new File(currentFilePath).getName())
+                + (lastTrouble.isEmpty() ? "" : " lastTrouble=" + lastTrouble);
+    }
+
+    /** 记下出错在哪一步、系统怎么说的，并进黑匣子。 */
+    private void noteTrouble(String step, Throwable t) {
+        String what = describe(t);
+        lastTrouble = step + ": " + what;
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("录像出错（相机 " + cameraId + "，" + step + "）：" + what);
+    }
+
+    /**
+     * 一个异常写成一行：类名、消息、编解码器给的错误码和说明、起因、出在我们哪个方法。
+     *
+     * <p>编解码器的错误要把错误码和「能不能恢复」带上：被系统收回（资源不够、给了别人）
+     * 和编码器自己坏了，处理办法完全不同。</p>
+     */
+    static String describe(Throwable t) {
+        if (t == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(t.getClass().getSimpleName());
+        if (t.getMessage() != null) {
+            sb.append(": ").append(t.getMessage());
+        }
+        if (t instanceof MediaCodec.CodecException) {
+            MediaCodec.CodecException ce = (MediaCodec.CodecException) t;
+            sb.append(" [code=").append(ce.getErrorCode())
+                    .append(" transient=").append(ce.isTransient())
+                    .append(" recoverable=").append(ce.isRecoverable())
+                    .append(' ').append(ce.getDiagnosticInfo()).append(']');
+        }
+        Throwable cause = t.getCause();
+        if (cause != null && cause != t) {
+            sb.append(" <- ").append(cause.getClass().getSimpleName());
+            if (cause.getMessage() != null) {
+                sb.append(": ").append(cause.getMessage());
+            }
+        }
+        for (StackTraceElement frame : t.getStackTrace()) {
+            if (frame.getClassName().startsWith("com.kooo")) {
+                sb.append(" @").append(frame.getMethodName()).append(':').append(frame.getLineNumber());
+                break;
+            }
+        }
+        String text = sb.toString().replace('\n', ' ');
+        return text.length() > 400 ? text.substring(0, 400) + "..." : text;
+    }
+
     // ===== 私有方法 =====
 
     /**
@@ -1274,7 +1349,10 @@ public class CodecVideoRecorder {
                     outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
                 } catch (IllegalStateException e) {
                     // 编码器处于无效状态，标记为不健康
-                    AppLog.e(TAG, "Camera " + cameraId + " Encoder in invalid state during dequeueOutputBuffer", e);
+                    if (encoderHealthy) {
+                        AppLog.e(TAG, "Camera " + cameraId + " Encoder in invalid state during dequeueOutputBuffer", e);
+                        noteTrouble("dequeue", e);
+                    }
                     encoderHealthy = false;
                     return;
                 }
@@ -1343,7 +1421,10 @@ public class CodecVideoRecorder {
                     try {
                         encoder.releaseOutputBuffer(outputBufferIndex, false);
                     } catch (IllegalStateException e) {
-                        AppLog.e(TAG, "Camera " + cameraId + " Encoder in invalid state during releaseOutputBuffer", e);
+                        if (encoderHealthy) {
+                            AppLog.e(TAG, "Camera " + cameraId + " Encoder in invalid state during releaseOutputBuffer", e);
+                            noteTrouble("release-output", e);
+                        }
                         encoderHealthy = false;
                         return;
                     }
@@ -1354,7 +1435,10 @@ public class CodecVideoRecorder {
                 }
             }
         } catch (Exception e) {
-            AppLog.e(TAG, "Camera " + cameraId + " Unexpected error in drainEncoder", e);
+            if (encoderHealthy) {
+                AppLog.e(TAG, "Camera " + cameraId + " Unexpected error in drainEncoder", e);
+                noteTrouble("drain", e);
+            }
             encoderHealthy = false;
         }
 
@@ -1385,6 +1469,10 @@ public class CodecVideoRecorder {
                 try {
                     outputBufferIndex = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_USEC);
                 } catch (IllegalStateException e) {
+                    if (encoderHealthy) {
+                        AppLog.e(TAG, "Camera " + cameraId + " Encoder in invalid state during dequeueOutputBuffer", e);
+                        noteTrouble("dequeue", e);
+                    }
                     encoderHealthy = false;
                     return false;
                 }
@@ -1427,6 +1515,10 @@ public class CodecVideoRecorder {
                     try {
                         encoder.releaseOutputBuffer(outputBufferIndex, false);
                     } catch (IllegalStateException e) {
+                        if (encoderHealthy) {
+                            AppLog.e(TAG, "Camera " + cameraId + " Encoder in invalid state during releaseOutputBuffer", e);
+                            noteTrouble("release-output", e);
+                        }
                         encoderHealthy = false;
                         return gotOutput;
                     }
@@ -1437,7 +1529,10 @@ public class CodecVideoRecorder {
                 }
             }
         } catch (Exception e) {
-            AppLog.e(TAG, "Camera " + cameraId + " Error in drainEncoderWithResult", e);
+            if (encoderHealthy) {
+                AppLog.e(TAG, "Camera " + cameraId + " Error in drainEncoderWithResult", e);
+                noteTrouble("drain", e);
+            }
             encoderHealthy = false;
         }
 
@@ -1534,6 +1629,9 @@ public class CodecVideoRecorder {
 
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Failed to switch segment (attempt " + (recoveryAttempts + 1) + ")", e);
+            if (recoveryAttempts == 0) {
+                noteTrouble("segment-switch", e);
+            }
             
             // 标记录制状态（允许帧回调继续消费帧）
             isRecording.set(false);
@@ -1624,12 +1722,18 @@ public class CodecVideoRecorder {
             recoveryAttempts = 0;
             
             AppLog.d(TAG, "Camera " + cameraId + " Recovery successful, recording resumed: " + currentFilePath);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像恢复了（相机 " + cameraId + "），新文件 "
+                    + new File(currentFilePath).getName());
             
             // 调度正常的1分钟定时器
             segmentHandler.post(() -> scheduleNextSegment());
             
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Recovery attempt failed", e);
+            // 5 秒一次、最多 60 次：第一次和之后每一分钟记一行，别的只算次数
+            if (recoveryAttempts <= 1 || recoveryAttempts % 12 == 0) {
+                noteTrouble("recovery#" + recoveryAttempts, e);
+            }
             isRecording.set(false);
             
             // 继续快速重试或回到正常间隔
@@ -1639,8 +1743,10 @@ public class CodecVideoRecorder {
                     + (RECOVERY_RETRY_INTERVAL_MS / 1000) + "s (attempt " + recoveryAttempts + "/" + MAX_RECOVERY_ATTEMPTS + ")");
                 scheduleRecoveryRetry();
             } else {
-                AppLog.w(TAG, "Camera " + cameraId + " Max recovery attempts reached, will retry in " 
+                AppLog.w(TAG, "Camera " + cameraId + " Max recovery attempts reached, will retry in "
                     + (segmentDurationMs / 1000) + " seconds");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像快速恢复试满 " + MAX_RECOVERY_ATTEMPTS
+                        + " 次都没成（相机 " + cameraId + "），停止快速重试");
                 recoveryAttempts = 0;
                 segmentHandler.post(() -> scheduleNextSegment());
             }
@@ -1778,6 +1884,8 @@ public class CodecVideoRecorder {
             if (needsRecovery) {
                 AppLog.w(TAG, "Camera " + cameraId + " Encoder health check FAILED: " + reason);
                 AppLog.w(TAG, "Camera " + cameraId + " Attempting to rebuild encoder...");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像编码器不正常（相机 " + cameraId + "）："
+                        + reason + "，重建");
 
                 // 在编码线程上执行重建
                 if (encoderHandler != null) {
@@ -1873,6 +1981,8 @@ public class CodecVideoRecorder {
             isRecording.set(true);
 
             AppLog.d(TAG, "Camera " + cameraId + " Encoder rebuilt successfully, new file: " + newFilePath);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录像编码器重建好了（相机 " + cameraId + "），新文件 "
+                    + new File(newFilePath).getName());
 
             // 9. 继续健康检查
             segmentHandler.post(() -> scheduleEncoderHealthCheck());
@@ -1882,6 +1992,7 @@ public class CodecVideoRecorder {
 
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Failed to rebuild encoder", e);
+            noteTrouble("rebuild", e);
 
             // 重建失败，启动恢复重试机制
             recoveryAttempts++;
@@ -1891,6 +2002,7 @@ public class CodecVideoRecorder {
                 scheduleRecoveryRetry();
             } else {
                 AppLog.e(TAG, "Camera " + cameraId + " Max recovery attempts reached, giving up");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像编码器重建失败，放弃（相机 " + cameraId + "）");
                 if (callback != null) {
                     final String errorMsg = e.getMessage();
                     segmentHandler.post(() -> callback.onRecordError(cameraId, "Encoder rebuild failed: " + errorMsg));

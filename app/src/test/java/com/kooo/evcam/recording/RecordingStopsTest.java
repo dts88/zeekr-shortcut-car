@@ -18,6 +18,8 @@ public class RecordingStopsTest {
     public void onlyCameraSideProblemsResumeWhenTheSurroundComesBack() {
         assertTrue(RecordingStops.resumesOnSurround(RecordingStops.Reason.NO_DATA));
         assertTrue(RecordingStops.resumesOnSurround(RecordingStops.Reason.UNKNOWN));
+        assertTrue("写不进文件：重开一次录制就是新编码器、新文件",
+                RecordingStops.resumesOnSurround(RecordingStops.Reason.WRITE_STALLED));
     }
 
     @Test

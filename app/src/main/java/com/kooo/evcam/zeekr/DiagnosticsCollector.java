@@ -79,6 +79,7 @@ public final class DiagnosticsCollector {
         timings.run("share", () -> com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context));
         timings.run("recordings", () -> RecentRecordings.appendTo(sb, context));
         timings.run("logcat", () -> appendLogcat(sb));
+        timings.run("app warnings", () -> appendAppWarnings(sb, context));
 
         String took = timings.describe();
         sb.append('\n').append("## 生成耗时（从长到短）").append('\n').append(took).append('\n');
@@ -592,6 +593,27 @@ public final class DiagnosticsCollector {
      * 主界面、后视镜这些标签不含关键词，整类被漏掉。改成滤掉已知的噪声
      * （容器的调用跟踪、编解码框架的配置细节），剩下的都留。</p>
      */
+    /**
+     * 应用自己记下的警告和错误（{@code AppLog} 落盘的那份），重启、升级后也在。
+     *
+     * <p>上面 logcat 那一节是系统的环形缓冲区，几个小时前的早被冲掉了；
+     * 出事那一刻为什么坏，要在这里找。</p>
+     */
+    private static void appendAppWarnings(StringBuilder sb, Context context) {
+        sb.append('\n').append("## 9.1 应用记下的警告和错误（重启后也在，最近 ")
+                .append(APP_WARNINGS_MAX).append(" 条）").append('\n');
+        List<String> entries = AppLog.readWarnings(context, APP_WARNINGS_MAX);
+        if (entries.isEmpty()) {
+            sb.append("(没有)").append('\n');
+            return;
+        }
+        for (String entry : entries) {
+            sb.append(entry).append('\n');
+        }
+    }
+
+    private static final int APP_WARNINGS_MAX = 150;
+
     private static void appendLogcat(StringBuilder sb) {
         sb.append("## 9. 最近日志（本进程）").append('\n');
         try {

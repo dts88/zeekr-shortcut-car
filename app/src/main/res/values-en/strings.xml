@@ -195,6 +195,7 @@
     <string name="msg_recording_resume_gave_up">Recording failed to resume %1$d times in a row; no longer retrying</string>
     <string name="rec_reason_no_data">no picture arrived after recording started</string>
     <string name="rec_reason_unknown">the recorder stopped on its own</string>
+    <string name="rec_reason_write_stalled">nothing was being written to the file</string>
     <string name="msg_recording_auto_started">Recording started automatically</string>
     <string name="msg_resume_failed">Camera not ready — could not resume recording</string>
     <string name="msg_auto_record_failed">Camera not ready — automatic recording did not start</string>
