@@ -371,24 +371,31 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     /**
-     * 把当前这张照片发到手机上。
+     * 把当前这张照片发到手机上：放大着哪一路就发哪一路；什么都没放大时发环视那张
+     * （项目拥有者 2026-09-26 定）。以前没放大时只提示「先点一路放大」，多一步。
      *
-     * <p>四宫格模式下不发：那时屏幕上是四张图，「这一张」没有定义。
-     * 与其挑一张替用户做主，不如让他先放大到想要的那一路。</p>
+     * <p>这一组没拍到环视时，按 {@link #POSITIONS} 的顺序发第一张有的。</p>
      */
     private void sendCurrentPhotoToPhone() {
-        if (expandedPosition == null) {
-            Toast.makeText(PhotoPlaybackActivity.this, R.string.share_photo_pick_lane_first,
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (currentGroup == null) {
+        String position = currentGroup == null ? null
+                : expandedPosition != null ? expandedPosition : firstPhotoPosition();
+        if (position == null) {
             Toast.makeText(PhotoPlaybackActivity.this, R.string.share_phone_no_file,
                     Toast.LENGTH_SHORT).show();
             return;
         }
         com.kooo.evcam.share.PhoneShare.show(PhotoPlaybackActivity.this,
-                currentGroup.getPhotoFile(expandedPosition));
+                currentGroup.getPhotoFile(position));
+    }
+
+    /** 这一组里按 {@link #POSITIONS} 顺序第一张有的照片（环视排第一）；一张都没有返回 null。 */
+    private String firstPhotoPosition() {
+        for (String position : POSITIONS) {
+            if (currentGroup.hasPhoto(position)) {
+                return position;
+            }
+        }
+        return null;
     }
 
     /** 这一格装的是哪一路相机，名字和主界面同一个来源。 */

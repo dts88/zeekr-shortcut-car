@@ -361,7 +361,6 @@
     <string name="share_phone_failed">启动失败：%1$s</string>
     <string name="share_phone_need_hotspot_title">需要先把两台设备连起来</string>
     <string name="share_phone_need_hotspot_msg">手机和车机要在同一个局域网里：用手机开热点让车机连上，或者用车机开热点让手机连上。\n\n连好之后再试一次。</string>
-    <string name="share_photo_pick_lane_first">请先点一路画面放大，再发送</string>
 
     <!-- 分享提示 -->
     <string name="share_phone_network_hint">需要手机和车机在同一个网络里。最省事的做法：**用手机开热点，让车机连上这个 Wi-Fi**。</string>

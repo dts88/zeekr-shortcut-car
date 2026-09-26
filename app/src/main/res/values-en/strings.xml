@@ -353,7 +353,6 @@
     <string name="share_phone_failed">Could not start: %1$s</string>
     <string name="share_phone_need_hotspot_title">Connect the two devices first</string>
     <string name="share_phone_need_hotspot_msg">The phone and the head unit must be on the same network: connect one to the other\'s hotspot.\n\nThen try again.</string>
-    <string name="share_photo_pick_lane_first">Tap a view to enlarge it, then send</string>
 
     <!-- Share hints -->
     <string name="share_phone_network_hint">The phone and the head unit must be on the same network. Easiest: **turn on the phone\'s hotspot and connect the car to it**.</string>
