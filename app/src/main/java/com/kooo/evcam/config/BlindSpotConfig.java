@@ -25,14 +25,6 @@ public class BlindSpotConfig {
     private static final float DEFAULT_RIGHT_CROP_W = 0.5f;
     private static final float DEFAULT_RIGHT_CROP_H = 0.5f;
 
-    private static final float DEFAULT_FISHEYE_K1 = -0.35f;
-    private static final float DEFAULT_FISHEYE_K2 = 0.12f;
-    private static final float DEFAULT_FISHEYE_K3 = -0.03f;
-    private static final float DEFAULT_FISHEYE_K4 = 0.005f;
-    private static final float DEFAULT_FISHEYE_CENTER_X = 0.5f;
-    private static final float DEFAULT_FISHEYE_CENTER_Y = 0.5f;
-    private static final float DEFAULT_FISHEYE_STRENGTH = 1.0f;
-
     private static final int DEFAULT_WINDOW_WIDTH_DP = 950;
     private static final int DEFAULT_WINDOW_HEIGHT_DP = 550;
     private static final int DEFAULT_WINDOW_POS_X = 0;
@@ -42,7 +34,6 @@ public class BlindSpotConfig {
 
     // SharedPreferences 键名
     private static final String KEY_ENABLED = "blind_spot_enabled";
-    private static final String KEY_FISHEYE_ENABLED = "blind_spot_fisheye_enabled";
 
     private static final String KEY_LEFT_CROP_X = "blind_spot_left_crop_x";
     private static final String KEY_LEFT_CROP_Y = "blind_spot_left_crop_y";
@@ -53,22 +44,6 @@ public class BlindSpotConfig {
     private static final String KEY_RIGHT_CROP_Y = "blind_spot_right_crop_y";
     private static final String KEY_RIGHT_CROP_W = "blind_spot_right_crop_w";
     private static final String KEY_RIGHT_CROP_H = "blind_spot_right_crop_h";
-
-    private static final String KEY_LEFT_FISHEYE_K1 = "blind_spot_left_fisheye_k1";
-    private static final String KEY_LEFT_FISHEYE_K2 = "blind_spot_left_fisheye_k2";
-    private static final String KEY_LEFT_FISHEYE_K3 = "blind_spot_left_fisheye_k3";
-    private static final String KEY_LEFT_FISHEYE_K4 = "blind_spot_left_fisheye_k4";
-    private static final String KEY_LEFT_FISHEYE_CENTER_X = "blind_spot_left_fisheye_center_x";
-    private static final String KEY_LEFT_FISHEYE_CENTER_Y = "blind_spot_left_fisheye_center_y";
-    private static final String KEY_LEFT_FISHEYE_STRENGTH = "blind_spot_left_fisheye_strength";
-
-    private static final String KEY_RIGHT_FISHEYE_K1 = "blind_spot_right_fisheye_k1";
-    private static final String KEY_RIGHT_FISHEYE_K2 = "blind_spot_right_fisheye_k2";
-    private static final String KEY_RIGHT_FISHEYE_K3 = "blind_spot_right_fisheye_k3";
-    private static final String KEY_RIGHT_FISHEYE_K4 = "blind_spot_right_fisheye_k4";
-    private static final String KEY_RIGHT_FISHEYE_CENTER_X = "blind_spot_right_fisheye_center_x";
-    private static final String KEY_RIGHT_FISHEYE_CENTER_Y = "blind_spot_right_fisheye_center_y";
-    private static final String KEY_RIGHT_FISHEYE_STRENGTH = "blind_spot_right_fisheye_strength";
 
     private static final String KEY_WINDOW_WIDTH = "blind_spot_window_width";
     private static final String KEY_WINDOW_HEIGHT = "blind_spot_window_height";
@@ -93,15 +68,6 @@ public class BlindSpotConfig {
     public void setEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply();
         AppLog.d(TAG, "补盲功能: " + (enabled ? "开启" : "关闭"));
-    }
-
-    public boolean isFisheyeEnabled() {
-        return prefs.getBoolean(KEY_FISHEYE_ENABLED, false);
-    }
-
-    public void setFisheyeEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_FISHEYE_ENABLED, enabled).apply();
-        AppLog.d(TAG, "鱼眼畸变校准: " + (enabled ? "开启" : "关闭"));
     }
 
     // ========== 裁剪区域 ==========
@@ -197,94 +163,6 @@ public class BlindSpotConfig {
                 .putFloat(prefix + "h", clamp(h, 0.05f, 1f))
                 .apply();
         AppLog.d(TAG, String.format("%s 裁剪区域: x=%.2f, y=%.2f, w=%.2f, h=%.2f", side, x, y, w, h));
-    }
-
-    // ========== 鱼眼矫正参数 ==========
-
-    public float getFisheyeK1(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K1 : KEY_RIGHT_FISHEYE_K1;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_K1);
-    }
-
-    public void setFisheyeK1(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K1 : KEY_RIGHT_FISHEYE_K1;
-        prefs.edit().putFloat(key, value).apply();
-    }
-
-    public float getFisheyeK2(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K2 : KEY_RIGHT_FISHEYE_K2;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_K2);
-    }
-
-    public void setFisheyeK2(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K2 : KEY_RIGHT_FISHEYE_K2;
-        prefs.edit().putFloat(key, value).apply();
-    }
-
-    public float getFisheyeK3(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K3 : KEY_RIGHT_FISHEYE_K3;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_K3);
-    }
-
-    public void setFisheyeK3(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K3 : KEY_RIGHT_FISHEYE_K3;
-        prefs.edit().putFloat(key, value).apply();
-    }
-
-    public float getFisheyeK4(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K4 : KEY_RIGHT_FISHEYE_K4;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_K4);
-    }
-
-    public void setFisheyeK4(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_K4 : KEY_RIGHT_FISHEYE_K4;
-        prefs.edit().putFloat(key, value).apply();
-    }
-
-    public float getFisheyeCenterX(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_CENTER_X : KEY_RIGHT_FISHEYE_CENTER_X;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_CENTER_X);
-    }
-
-    public void setFisheyeCenterX(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_CENTER_X : KEY_RIGHT_FISHEYE_CENTER_X;
-        prefs.edit().putFloat(key, clamp(value, 0f, 1f)).apply();
-    }
-
-    public float getFisheyeCenterY(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_CENTER_Y : KEY_RIGHT_FISHEYE_CENTER_Y;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_CENTER_Y);
-    }
-
-    public void setFisheyeCenterY(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_CENTER_Y : KEY_RIGHT_FISHEYE_CENTER_Y;
-        prefs.edit().putFloat(key, clamp(value, 0f, 1f)).apply();
-    }
-
-    public float getFisheyeStrength(String side) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_STRENGTH : KEY_RIGHT_FISHEYE_STRENGTH;
-        return prefs.getFloat(key, DEFAULT_FISHEYE_STRENGTH);
-    }
-
-    public void setFisheyeStrength(String side, float value) {
-        String key = SIDE_LEFT.equals(side) ? KEY_LEFT_FISHEYE_STRENGTH : KEY_RIGHT_FISHEYE_STRENGTH;
-        prefs.edit().putFloat(key, clamp(value, 0f, 1f)).apply();
-    }
-
-    public void setFisheyeParams(String side, float k1, float k2, float k3, float k4,
-                                  float centerX, float centerY, float strength) {
-        String prefix = SIDE_LEFT.equals(side) ? "blind_spot_left_fisheye_" : "blind_spot_right_fisheye_";
-        prefs.edit()
-                .putFloat(prefix + "k1", k1)
-                .putFloat(prefix + "k2", k2)
-                .putFloat(prefix + "k3", k3)
-                .putFloat(prefix + "k4", k4)
-                .putFloat(prefix + "center_x", clamp(centerX, 0f, 1f))
-                .putFloat(prefix + "center_y", clamp(centerY, 0f, 1f))
-                .putFloat(prefix + "strength", clamp(strength, 0f, 1f))
-                .apply();
-        AppLog.d(TAG, String.format("%s 鱼眼校准参数: k1=%.4f, k2=%.4f, k3=%.4f, k4=%.4f, center=(%.2f,%.2f), strength=%.2f",
-                side, k1, k2, k3, k4, centerX, centerY, strength));
     }
 
     // ========== 悬浮窗配置 ==========

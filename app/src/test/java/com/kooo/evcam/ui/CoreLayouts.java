@@ -35,7 +35,7 @@ final class CoreLayouts {
             "layout_custom_buttons_multi_vertical.xml", "layout_custom_buttons_standard.xml",
             "layout_custom_buttons_standard_vertical.xml", "presentation_secondary_display.xml",
             "presentation_secondary_display_multiview.xml", "view_blind_spot_floating.xml",
-            "view_blind_spot_floating_multiview.xml", "view_fisheye_correction_floating.xml",
+            "view_blind_spot_floating_multiview.xml",
             "view_mock_turn_signal_floating.xml", "view_preview_correction_floating.xml"));
 
     private CoreLayouts() {

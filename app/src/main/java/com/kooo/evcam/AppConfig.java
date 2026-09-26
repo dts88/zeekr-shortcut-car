@@ -916,7 +916,7 @@ public class AppConfig {
 
     /** 是否对后视镜画面做鱼眼校正。只影响显示，录制的原始画面不动。 */
     public boolean isRearViewFisheyeCorrection() {
-        // 默认开：这几路都是鱼眼镜头，不校正的画面本来就不该是「正常」状态
+        // 默认关。0.52.0 之前默认开，那次默认值调整把它改成了关
         return prefs.getBoolean(KEY_REARVIEW_FISHEYE, false);
     }
 
@@ -2277,8 +2277,6 @@ public class AppConfig {
         return KEY_FISHEYE_CORRECTION_PREFIX + cameraPos + "_" + suffix;
     }
 
-    // --- K1 (主畸变系数) ---
-    // --- K2 (二次畸变系数) ---
     // --- Zoom (矫正后缩放) ---
     public void setFisheyeCorrectionZoom(String cameraPos, float zoom) {
         prefs.edit().putFloat(getFisheyeCorrectionKey(cameraPos, "zoom"), zoom).apply();
