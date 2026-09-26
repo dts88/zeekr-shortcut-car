@@ -587,8 +587,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 悬浮窗
 
     private void bindFloating() {
-        appConfig.mergeFloatingButtonsOnce();
-
         bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
                 OverlayCoordinator::setRecordButtonEnabled, on -> {
                     if (on && getActivity() instanceof MainActivity) {
@@ -724,7 +722,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_reset_floating", pref -> {
             // 以前清的是旧「主屏悬浮窗」那几个键，合并后的按钮根本不读它们 ——
             // 点了提示「已重置」，按钮纹丝不动。现在清按钮自己的位置、大小、字号，
-            // 并让它当场挪回默认位置（原来那个「打开应用」按钮的位置）
+            // 并让它当场挪回默认位置（右上角）
             appConfig.resetRecordingFloatingLayout();
             sendToRecordingFloating(RecordingFloatingService.ACTION_RESET_POSITION, null);
             // 两个滑块跟着回去，否则界面上还写着重置之前的数

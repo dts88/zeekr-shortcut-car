@@ -397,15 +397,15 @@ public class RecordingFloatingService extends Service {
     /**
      * 放到上次拖到的位置；没存过（或刚被重置）就放到默认位置。
      *
-     * <p>默认位置是原来那个「打开应用」按钮调好的位置（3200x2000 上测得，
-     * 按当前屏幕等比换算，见 AppConfig）。</p>
+     * <p>默认位置贴在右上角，离右边、离上边多远按 dp 记（实车调好后测得，见 AppConfig）。</p>
      */
     private void placeAtSavedOrDefault(int buttonSizePx) {
         int x = appConfig.getRecordingFloatingX();
         int y = appConfig.getRecordingFloatingY();
         if (x < 0 || y < 0) {
-            x = AppConfig.scaleDefaultX(AppConfig.DEFAULT_FLOATING_WINDOW_X, screenWidth);
-            y = AppConfig.scaleDefaultY(AppConfig.DEFAULT_FLOATING_WINDOW_Y, screenHeight);
+            float density = getResources().getDisplayMetrics().density;
+            x = AppConfig.defaultFloatingX(screenWidth, buttonSizePx, density);
+            y = AppConfig.defaultFloatingY(density);
         }
         layoutParams.x = Math.min(x, Math.max(0, screenWidth - buttonSizePx));
         layoutParams.y = Math.min(y, Math.max(0, screenHeight - buttonSizePx));

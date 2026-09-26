@@ -45,11 +45,7 @@ public class AppConfig {
     private static boolean sdFallbackShownThisSession = false;
     
     // 悬浮窗配置
-    private static final String KEY_FLOATING_WINDOW_ENABLED = "floating_window_enabled";  // 悬浮窗开关
-    private static final String KEY_FLOATING_WINDOW_SIZE = "floating_window_size";  // 悬浮窗大小
     private static final String KEY_FLOATING_WINDOW_ALPHA = "floating_window_alpha";  // 悬浮窗透明度
-    private static final String KEY_FLOATING_WINDOW_X = "floating_window_x";  // 悬浮窗X位置
-    private static final String KEY_FLOATING_WINDOW_Y = "floating_window_y";  // 悬浮窗Y位置
     
     // 存储清理配置
     private static final String KEY_VIDEO_STORAGE_LIMIT_GB = "video_storage_limit_gb";  // 视频存储限制（GB）
@@ -254,63 +250,29 @@ public class AppConfig {
     public static final int EFFECT_MODE_SOLARIZE = 3;  // 曝光过度
     public static final int EFFECT_MODE_SEPIA = 4;  // 怀旧
     public static final int EFFECT_MODE_AQUA = 6;  // 水蓝
-    
-    
-    // 悬浮窗大小常量
-    public static final int FLOATING_SIZE_TINY = 32;        // 超小
-    public static final int FLOATING_SIZE_EXTRA_SMALL = 40; // 特小
-    public static final int FLOATING_SIZE_SMALL = 48;       // 小
-    public static final int FLOATING_SIZE_MEDIUM = 64;      // 中
-    public static final int FLOATING_SIZE_LARGE = 80;       // 大
-    public static final int FLOATING_SIZE_EXTRA_LARGE = 96; // 超大
-    public static final int FLOATING_SIZE_HUGE = 112;       // 特大
-    public static final int FLOATING_SIZE_GIANT = 128;      // 特特大
-    public static final int FLOATING_SIZE_PLUS = 144;       // PLUS大
-    public static final int FLOATING_SIZE_MAX = 160;        // MAX大
 
-    /** 悬浮窗按钮的默认大小（dp）。 */
-    public static final int FLOATING_SIZE_DEFAULT = 85;
     /** 悬浮窗按钮的默认不透明度（%）。 */
     public static final int FLOATING_ALPHA_DEFAULT = 95;
 
-    // ---- 悬浮元素的默认位置（2026-08-29 实车调好后测得，见诊断报告第 7 节）----
+    // ---- 悬浮按钮的默认位置（2026-09-24 实车调好后测得，见诊断报告第 7 节）----
     //
-    // 位置按下面这块参照屏幕记录，使用时再按实际屏幕等比换算。
-    // 直接存像素值的话，换一块尺寸不同的屏就会跑到画面外面去。
+    // 3200x2000、密度 1.5 的屏上，92 dp 的按钮拖到了 (2881, 29)。
+    // 按离右边、离上边多远记，单位 dp：换一块尺寸不同的屏，按钮照样贴在右上角同一个地方，
+    // 不会跑到画面外面；按钮调大调小，往左长，右边留的空不变。
 
-    /** 记录这些默认位置时的屏幕尺寸（极氪 7X 内置屏，整屏）。 */
-    public static final int REFERENCE_SCREEN_WIDTH = 3200;
-    public static final int REFERENCE_SCREEN_HEIGHT = 2000;
+    /** 按钮右边到屏幕右边：3200 − 2881 − 138（92 dp）= 181 px，÷ 1.5。 */
+    public static final float DEFAULT_FLOATING_RIGHT_MARGIN_DP = 120.67f;
+    /** 按钮上边到屏幕上边：29 px，÷ 1.5。 */
+    public static final float DEFAULT_FLOATING_TOP_MARGIN_DP = 19.33f;
 
-    /**
-     * 悬浮按钮的默认位置 —— 原来那个「打开应用」按钮调好的位置。
-     *
-     * <p>两个按钮合并之后，默认位置沿用的一直是录制按钮那一个（2943, 205）。
-     * 项目拥有者定：合并后的按钮默认回到「打开应用」那个按钮的位置，
-     * 「重置悬浮窗布局」也回到这里。录制按钮那一组坐标随之删掉。</p>
-     */
-    public static final int DEFAULT_FLOATING_WINDOW_X = 2890;
-    public static final int DEFAULT_FLOATING_WINDOW_Y = 33;
-
-    /**
-     * 把参照屏幕上的横坐标换算到当前屏幕。
-     *
-     * @param referenceX  参照屏幕上的 X
-     * @param screenWidth 当前屏幕宽度；&lt;= 0 时原样返回
-     */
-    public static int scaleDefaultX(int referenceX, int screenWidth) {
-        if (screenWidth <= 0) {
-            return referenceX;
-        }
-        return Math.round(referenceX * (float) screenWidth / REFERENCE_SCREEN_WIDTH);
+    /** 默认位置的 X（窗口左上角，像素）。 */
+    public static int defaultFloatingX(int screenWidth, int buttonSizePx, float density) {
+        return screenWidth - buttonSizePx - Math.round(DEFAULT_FLOATING_RIGHT_MARGIN_DP * density);
     }
 
-    /** @see #scaleDefaultX(int, int) */
-    public static int scaleDefaultY(int referenceY, int screenHeight) {
-        if (screenHeight <= 0) {
-            return referenceY;
-        }
-        return Math.round(referenceY * (float) screenHeight / REFERENCE_SCREEN_HEIGHT);
+    /** 默认位置的 Y（窗口左上角，像素）。 */
+    public static int defaultFloatingY(float density) {
+        return Math.round(DEFAULT_FLOATING_TOP_MARGIN_DP * density);
     }
     
     // 录制模式常量
@@ -1721,41 +1683,7 @@ public class AppConfig {
         return prefs.getBoolean(KEY_RELAY_WRITE_ENABLED, false);
     }
     
-    // ==================== 悬浮窗配置相关方法 ====================
-    
-    /**
-     * 设置悬浮窗开关
-     * @param enabled true 表示启用悬浮窗
-     */
-    public void setFloatingWindowEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_FLOATING_WINDOW_ENABLED, enabled).apply();
-        AppLog.d(TAG, "悬浮窗设置: " + (enabled ? "启用" : "禁用"));
-    }
-    
-    /**
-     * 获取悬浮窗开关状态
-     * @return true 表示启用悬浮窗
-     */
-    public boolean isFloatingWindowEnabled() {
-        return prefs.getBoolean(KEY_FLOATING_WINDOW_ENABLED, false);
-    }
-    
-    /**
-     * 设置悬浮窗大小（dp）
-     * @param sizeDp 悬浮窗大小，单位dp
-     */
-    public void setFloatingWindowSize(int sizeDp) {
-        prefs.edit().putInt(KEY_FLOATING_WINDOW_SIZE, sizeDp).apply();
-        AppLog.d(TAG, "悬浮窗大小设置: " + sizeDp + "dp");
-    }
-    
-    /**
-     * 获取悬浮窗大小（dp）
-     * @return 悬浮窗大小，默认为中等大小
-     */
-    public int getFloatingWindowSize() {
-        return prefs.getInt(KEY_FLOATING_WINDOW_SIZE, FLOATING_SIZE_DEFAULT);
-    }
+    // ==================== 悬浮按钮透明度 ====================
     
     /**
      * 设置悬浮窗透明度（0-100）
@@ -1772,34 +1700,6 @@ public class AppConfig {
      */
     public int getFloatingWindowAlpha() {
         return prefs.getInt(KEY_FLOATING_WINDOW_ALPHA, FLOATING_ALPHA_DEFAULT);
-    }
-    
-    /**
-     * 保存悬浮窗位置
-     * @param x X坐标
-     * @param y Y坐标
-     */
-    public void setFloatingWindowPosition(int x, int y) {
-        prefs.edit()
-            .putInt(KEY_FLOATING_WINDOW_X, x)
-            .putInt(KEY_FLOATING_WINDOW_Y, y)
-            .apply();
-    }
-    
-    /**
-     * 获取悬浮窗X位置
-     * @return X坐标，默认-1表示未设置
-     */
-    public int getFloatingWindowX() {
-        return prefs.getInt(KEY_FLOATING_WINDOW_X, -1);
-    }
-    
-    /**
-     * 获取悬浮窗Y位置
-     * @return Y坐标，默认-1表示未设置
-     */
-    public int getFloatingWindowY() {
-        return prefs.getInt(KEY_FLOATING_WINDOW_Y, -1);
     }
     
     // ==================== 存储清理配置相关方法 ====================
@@ -3794,7 +3694,6 @@ public class AppConfig {
     private static final String KEY_FLOATING_TAP_ACTION = "floating_tap_action";
     private static final String KEY_FLOATING_LONG_PRESS_ACTION = "floating_long_press_action";
     private static final String KEY_FLOATING_DURATION_VISIBLE = "floating_duration_visible";
-    private static final String KEY_FLOATING_MERGED = "floating_buttons_merged";
     private static final String KEY_FLOATING_LOCKED = "floating_position_locked";
 
     /**
@@ -3841,26 +3740,6 @@ public class AppConfig {
 
     public void setFloatingDurationVisible(boolean visible) {
         prefs.edit().putBoolean(KEY_FLOATING_DURATION_VISIBLE, visible).apply();
-    }
-
-    /**
-     * 两个悬浮按钮合成一个：只跑一次。
-     *
-     * <p>合并前有两个开关。录制那个默认就是开的，所以绝大多数人不受影响；
-     * 唯一会丢东西的是「关了录制按钮、只留打开应用那个」的人 —— 不迁移的话，
-     * 他升级之后屏幕上什么都没有，还不知道是为什么。</p>
-     */
-    public void mergeFloatingButtonsOnce() {
-        if (prefs.getBoolean(KEY_FLOATING_MERGED, false)) {
-            return;
-        }
-        if (prefs.getBoolean(KEY_FLOATING_WINDOW_ENABLED, false)
-                && !prefs.getBoolean(KEY_RECORDING_FLOATING_ENABLED,
-                        DEFAULT_RECORDING_FLOATING_ENABLED)) {
-            prefs.edit().putBoolean(KEY_RECORDING_FLOATING_ENABLED, true).apply();
-            AppLog.i(TAG, "悬浮按钮合并：原来只开了「打开应用」那一个，合并后保留按钮");
-        }
-        prefs.edit().putBoolean(KEY_FLOATING_MERGED, true).apply();
     }
 
     // ==================== 录制悬浮按钮配置 ====================

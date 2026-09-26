@@ -62,11 +62,6 @@ public class TransparentBootActivity extends Activity {
         AppConfig appConfig = new AppConfig(this);
         
         boolean shouldAutoRecord = appConfig.isAutoStartRecording();
-        boolean shouldShowFloatingWindow = appConfig.isFloatingWindowEnabled();
-        
-        if (shouldShowFloatingWindow) {
-            AppLog.d(TAG, "悬浮窗已在 CameraForegroundService 中启动，无需启动 MainActivity");
-        }
         
         // 只有自动录制需要启动 MainActivity（因为需要摄像头）
         if (shouldAutoRecord) {

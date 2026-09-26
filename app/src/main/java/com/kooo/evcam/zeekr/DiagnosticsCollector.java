@@ -628,30 +628,27 @@ public final class DiagnosticsCollector {
             } else {
                 sb.append("     位置 X = ").append(rx).append(" px").append('\n');
                 sb.append("     位置 Y = ").append(ry).append(" px").append('\n');
+                // 默认位置按离右上角多远记，这里换算好，发回来就能直接用
+                int sizePx = (int) (cfg.getRecordingFloatingButtonSizeDp() * dm.density);
+                int right = dm.widthPixels - rx - sizePx;
+                sb.append("     离右边 = ").append(right).append(" px（")
+                        .append(String.format(java.util.Locale.US, "%.2f", right / dm.density))
+                        .append(" dp），离上边 = ").append(ry).append(" px（")
+                        .append(String.format(java.util.Locale.US, "%.2f", ry / dm.density))
+                        .append(" dp）").append('\n');
             }
+            sb.append("     默认位置: 离右边 ").append(AppConfig.DEFAULT_FLOATING_RIGHT_MARGIN_DP)
+                    .append(" dp，离上边 ").append(AppConfig.DEFAULT_FLOATING_TOP_MARGIN_DP)
+                    .append(" dp").append('\n');
             sb.append("     按钮大小 = ").append(cfg.getRecordingFloatingButtonSizeDp())
                     .append(" dp").append('\n');
             sb.append("     时间字号 = ").append(cfg.getRecordingFloatingTimeTextSizeSp())
                     .append(" sp").append('\n');
-
-            // 这一组键（floating_window_*）里现在只剩透明度还在用，
-            // 它画的是 FloatingButtonView —— 一个点击打开应用、随录制状态变色的
-            // 悬浮按钮，不是画中画小窗。上一版这里的名字是错的。
-            sb.append('\n').append("[悬浮按钮（打开应用/状态指示）]").append('\n');
-            int fx = cfg.getFloatingWindowX();
-            int fy = cfg.getFloatingWindowY();
-            if (fx < 0 || fy < 0) {
-                sb.append("     位置: 尚未拖动过（使用内置默认位置）").append('\n');
-            } else {
-                sb.append("     位置 X = ").append(fx).append(" px").append('\n');
-                sb.append("     位置 Y = ").append(fy).append(" px").append('\n');
-            }
-            sb.append("     大小档位 = ").append(cfg.getFloatingWindowSize()).append('\n');
             sb.append("     透明度 = ").append(cfg.getFloatingWindowAlpha()).append('\n');
 
-            sb.append('\n').append(">> 要把当前位置设为默认值，请把以上三组数字连同屏幕尺寸一起发回。")
+            sb.append('\n').append(">> 要把当前位置设为默认值，请把以上数字连同屏幕尺寸一起发回。")
                     .append('\n');
-            sb.append(">> 注意：位置是像素值，只在同尺寸屏幕上通用；屏幕尺寸变了需要重新取。")
+            sb.append(">> 拖动后存下的位置是像素值，只在同尺寸屏幕上通用；悬浮按钮的默认位置按离右上角多远记，换屏也贴在右上角。")
                     .append('\n');
         } catch (Throwable t) {
             sb.append("!! 读取失败: ").append(t).append('\n');
