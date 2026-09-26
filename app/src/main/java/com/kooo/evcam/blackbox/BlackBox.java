@@ -119,6 +119,7 @@ public final class BlackBox {
         }
         noteImportant("==== 进程启动，起因: " + starter + " ====");
         noteBootIfNew(appContext, starter);
+        noteVersionIfNew(appContext);
         // 这一次进程起来时开关是什么样的 —— 事后看一段时间线，才知道当时在什么设置下
         noteImportant("开关: " + describeSwitches(appContext));
         appendPreviousExits();
@@ -381,6 +382,33 @@ public final class BlackBox {
         }
     }
 
+    /**
+     * 版本变了就记一行。
+     *
+     * <p>装新版时，系统用信号结束还在跑的旧进程，下面「上次退出」里就是一条「收到信号」。
+     * 不记这一行，看的人会以为是被谁强杀了或者崩了 —— 2026-09-26 从 1.42.0 升 1.43.0
+     * 就被这样误读过一次。</p>
+     */
+    private static void noteVersionIfNew(Context context) {
+        try {
+            String now = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).versionName;
+            SharedPreferences seen = context.getSharedPreferences(SEEN_PREFS, Context.MODE_PRIVATE);
+            String last = seen.getString(KEY_LAST_VERSION, null);
+            if (now == null || now.equals(last)) {
+                return;
+            }
+            seen.edit().putString(KEY_LAST_VERSION, now).apply();
+            noteImportant(last == null ? "版本 " + now + "（第一次记录）"
+                    : "版本变了：" + last + " → " + now
+                            + "（装新版时旧进程是被系统用信号结束的，紧挨着的「收到信号」退出多半就是它）");
+        } catch (Throwable t) {
+            AppLog.w(TAG, "noteVersionIfNew: " + t);
+        }
+    }
+
+    /** 上次进程起来时的版本号。 */
+    private static final String KEY_LAST_VERSION = "last_version";
     /** 抄过的最后一次 ANR 的时间戳存在这里，同一次 ANR 只抄一遍。 */
     private static final String SEEN_PREFS = "blackbox_seen";
     private static final String KEY_LAST_ANR = "last_anr_ts";
