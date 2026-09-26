@@ -16,12 +16,15 @@ import com.kooo.evcam.AppLog;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -78,7 +81,24 @@ public class CodecVideoRecorder {
     // MediaMuxer 相关
     private MediaMuxer muxer;
     private int videoTrackIndex = -1;
-    private boolean muxerStarted = false;
+    private volatile boolean muxerStarted = false;
+    /** muxer 写的那个文件，我们自己开的：muxer 内部 dup 了描述符，这一份留着 fsync。 */
+    private volatile RandomAccessFile muxerFile;
+    /** 每开一个文件加一。分段线程上 fsync 报错时，凭它认出说的是不是还是这个文件。 */
+    private volatile int muxerSerial;
+
+    // 盘写不进时换盘（见 SampleRing）
+    private final SampleRing ring = new SampleRing();
+    /** 环里样本那一代编码器的输出格式；补写时用它开轨。 */
+    private MediaFormat ringFormat;
+    private int ringGeneration = -1;
+    /** 每建一个编码器加一：两代编码器的样本不能写进同一个文件。 */
+    private int encoderGeneration;
+    private Runnable syncTick;
+    private FallbackDirs fallbackDirs;
+    /** 这次录像里写不进的卷名，不再试。 */
+    private final Set<String> deadVolumes = new HashSet<>();
+    private int relocations;
 
     // EGL 渲染器
     private volatile EglSurfaceEncoder eglEncoder;
@@ -555,6 +575,13 @@ public class CodecVideoRecorder {
         this.framesWithoutEncoderOutput = 0;
         this.lastEncoderOutputTime = System.currentTimeMillis();
 
+        // 重置换盘状态
+        ring.clear();
+        ringFormat = null;
+        ringGeneration = -1;
+        deadVolumes.clear();
+        relocations = 0;
+
         // 清空并初始化本次录制的文件列表
         recordedFilePaths.clear();
         recordedFilePaths.add(filePath);
@@ -842,6 +869,9 @@ public class CodecVideoRecorder {
         // 启动编码器健康检查
         scheduleEncoderHealthCheck();
 
+        // 每 5 秒 fsync 一次：内存环靠它知道什么落盘了，盘掉线也靠它最早发现
+        scheduleSyncTick();
+
         if (callback != null && segmentIndex == 0) {
             callback.onRecordStart(cameraId);
         }
@@ -889,6 +919,11 @@ public class CodecVideoRecorder {
             segmentHandler.removeCallbacks(healthCheckRunnable);
             healthCheckRunnable = null;
         }
+        cancelSyncTick();
+
+        // 文件收好了没、确认落盘了没（编码线程上填）
+        final boolean[] closed = {false};
+        final boolean[] confirmed = {false};
 
         // 在编码线程上执行停止操作
         if (encoderHandler != null) {
@@ -913,15 +948,9 @@ public class CodecVideoRecorder {
                         }
                     }
 
-                    // 停止 muxer
-                    if (muxerStarted && muxer != null) {
-                        try {
-                            muxer.stop();
-                        } catch (Exception e) {
-                            AppLog.e(TAG, "Camera " + cameraId + " Error stopping muxer", e);
-                        }
-                        muxerStarted = false;
-                    }
+                    // 收文件：写文件尾、fsync
+                    confirmed[0] = closeMuxer("stop");
+                    closed[0] = true;
 
                     AppLog.d(TAG, "Camera " + cameraId + " Codec recording stopped on encoder thread, frames recorded: " + recordedFrameCount);
                 } catch (Exception e) {
@@ -942,6 +971,9 @@ public class CodecVideoRecorder {
                 }
             }
         }
+
+        // 文件没确认落盘（盘掉了、或者编码线程卡住没收成）：内存里的最后一段抢救出来
+        settleRing(closed[0] && confirmed[0], "stop");
 
         // 验证并清理所有录制的文件
         List<String> deletedFiles = validateAndCleanupAllFiles();
@@ -1012,17 +1044,8 @@ public class CodecVideoRecorder {
         }
 
         // 释放 muxer
-        if (muxer != null) {
-            try {
-                if (muxerStarted) {
-                    muxer.stop();
-                }
-            } catch (Exception e) {
-                // Ignore
-            }
-            muxer.release();
-            muxer = null;
-        }
+        closeMuxer("release");
+        ring.clear();
 
         // 停止编码线程
         if (encoderThread != null) {
@@ -1108,6 +1131,8 @@ public class CodecVideoRecorder {
                 + " muxerStarted=" + muxerStarted + " recoveryAttempts=" + recoveryAttempts
                 + " segment=" + segmentIndex
                 + " file=" + (currentFilePath == null ? "none" : new File(currentFilePath).getName())
+                + " dir=" + saveDirectory + " relocations=" + relocations
+                + " ring=" + (ring.spanMs() / 1000) + "s/" + (ring.bytes() >> 20) + "MB"
                 + (lastTrouble.isEmpty() ? "" : " lastTrouble=" + lastTrouble);
     }
 
@@ -1163,6 +1188,7 @@ public class CodecVideoRecorder {
      * 优先尝试 HEVC (H.265)，如果不支持则回退到 H.264
      */
     private void createEncoder() throws IOException {
+        encoderGeneration++;
         // 检测并选择最优编码格式（forceH264 开启时固定 H.264）
         mimeType = selectBestEncoder();
 
@@ -1309,10 +1335,28 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 创建 MediaMuxer
+     * 创建 MediaMuxer。
+     *
+     * <p>文件由我们自己打开、把描述符交给 muxer（它内部会 dup 一份），这样才能对它 fsync：
+     * 写进去不等于落盘，盘掉线时留在系统缓存里的那些就没了（见 {@link SampleRing}）。</p>
      */
     private void createMuxer(String filePath) throws IOException {
-        muxer = new MediaMuxer(filePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        closeMuxerFile();
+        RandomAccessFile file = new RandomAccessFile(filePath, "rw");
+        try {
+            file.setLength(0);
+            muxer = new MediaMuxer(file.getFD(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        } catch (IOException | RuntimeException e) {
+            try {
+                file.close();
+            } catch (IOException ignored) {
+                // 开都没开成，关不上也无所谓
+            }
+            new File(filePath).delete();
+            throw e;
+        }
+        muxerFile = file;
+        muxerSerial++;
         videoTrackIndex = -1;
         muxerStarted = false;
 
@@ -1370,12 +1414,7 @@ public class CodecVideoRecorder {
                     if (muxerStarted) {
                         AppLog.w(TAG, "Camera " + cameraId + " Format changed twice");
                     } else {
-                        MediaFormat newFormat = encoder.getOutputFormat();
-                        videoTrackIndex = muxer.addTrack(newFormat);
-                        muxer.start();
-                        muxerStarted = true;
-                        encoderHealthy = true;  // 收到格式变化说明编码器正常
-                        lastEncoderOutputTime = System.currentTimeMillis();
+                        startMuxerTrack(encoder.getOutputFormat());
                         AppLog.d(TAG, "Camera " + cameraId + " Muxer started, track=" + videoTrackIndex);
                     }
                     gotOutput = true;
@@ -1393,24 +1432,8 @@ public class CodecVideoRecorder {
                         if (!muxerStarted) {
                             AppLog.e(TAG, "Camera " + cameraId + " Muxer not started but got data");
                         } else {
-                            // 用编码器给出的真实时间戳，不要按帧数推算
-                            // （见 nextPtsUs：推算会让回放速度不等于录制速度）
-                            long calculatedPtsUs = nextPtsUs(bufferInfo.presentationTimeUs);
-                            
-                            // 调试日志（仅第一帧）
-                            if (encodedOutputFrameCount == 0) {
-                                AppLog.d(TAG, "Camera " + cameraId + " First frame PTS: " + calculatedPtsUs + " us");
-                            }
-                            
-                            bufferInfo.presentationTimeUs = calculatedPtsUs;
-                            
-                            encodedData.position(bufferInfo.offset);
-                            encodedData.limit(bufferInfo.offset + bufferInfo.size);
-                            long writeStart = StallWatch.now();
-                            muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo);
-                            StallWatch.noteOp(encoderBeat, cameraId, "write", writeStart);
-                            noteEncodedBytes(bufferInfo.size);
-                            
+                            writeSample(encodedData, bufferInfo);
+
                             encodedOutputFrameCount++;
                             lastEncoderOutputTime = System.currentTimeMillis();
                             gotOutput = true;
@@ -1483,12 +1506,7 @@ public class CodecVideoRecorder {
                     }
                 } else if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     if (!muxerStarted) {
-                        MediaFormat newFormat = encoder.getOutputFormat();
-                        videoTrackIndex = muxer.addTrack(newFormat);
-                        muxer.start();
-                        muxerStarted = true;
-                        encoderHealthy = true;
-                        lastEncoderOutputTime = System.currentTimeMillis();
+                        startMuxerTrack(encoder.getOutputFormat());
                     }
                     gotOutput = true;
                 } else if (outputBufferIndex >= 0) {
@@ -1496,15 +1514,7 @@ public class CodecVideoRecorder {
 
                     if (encodedData != null && bufferInfo.size != 0) {
                         if (muxerStarted) {
-                            // 与 drainEncoder 中的处理保持一致：用编码器的真实时间戳
-                            bufferInfo.presentationTimeUs = nextPtsUs(bufferInfo.presentationTimeUs);
-
-                            encodedData.position(bufferInfo.offset);
-                            encodedData.limit(bufferInfo.offset + bufferInfo.size);
-                            long writeStart = StallWatch.now();
-                            muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo);
-                            StallWatch.noteOp(encoderBeat, cameraId, "write", writeStart);
-                            noteEncodedBytes(bufferInfo.size);
+                            writeSample(encodedData, bufferInfo);
 
                             encodedOutputFrameCount++;
                             lastEncoderOutputTime = System.currentTimeMillis();
@@ -1598,10 +1608,7 @@ public class CodecVideoRecorder {
 
             // 3. 准备下一段
             segmentIndex++;
-            String nextSegmentPath = generateSegmentPath();
-            currentFilePath = nextSegmentPath;
-            recordedFilePaths.add(nextSegmentPath);  // 记录新分段文件
-            
+
             // 重置分段开始时间和帧计数
             segmentStartTimeNs = System.nanoTime();
             encodedOutputFrameCount = 0;
@@ -1609,8 +1616,9 @@ public class CodecVideoRecorder {
             segmentBasePtsUs = -1L;
             // 不重置 firstFrameTimestampNs，保持 EGL 时间戳单调递增
 
-            // 4. 创建新的 Muxer
-            createMuxer(nextSegmentPath);
+            // 4. 开下一个文件（这个盘开不了就换盘）
+            openNextFile();
+            String nextSegmentPath = currentFilePath;
             
             // 5. 重新开始录制
             isRecording.set(true);
@@ -1701,11 +1709,9 @@ public class CodecVideoRecorder {
                 }
             }
             
-            // 创建新的 Muxer
+            // 开新文件（这个盘开不了就换盘）
             if (muxer == null) {
-                String nextSegmentPath = generateSegmentPath();
-                currentFilePath = nextSegmentPath;
-                createMuxer(nextSegmentPath);
+                openNextFile();
             }
             
             // 重置分段开始时间和帧计数
@@ -1774,20 +1780,9 @@ public class CodecVideoRecorder {
             }
         }
         
-        // 3. 停止 Muxer（即使失败也继续）
-        if (muxer != null) {
-            try {
-                if (muxerStarted) {
-                    muxer.stop();
-                }
-                muxer.release();
-            } catch (Exception e) {
-                AppLog.e(TAG, "Camera " + cameraId + " Error stopping muxer during segment switch", e);
-            }
-            muxer = null;
-            muxerStarted = false;
-            videoTrackIndex = -1;
-        }
+        // 3. 收文件。没确认落盘的话（盘掉了），内存环里的最后一段先抢救出来 ——
+        //    下面要换编码器，两代样本不能混在一个文件里
+        settleRing(closeMuxer("segment-switch"), "segment-switch");
         
         // 4. 释放旧编码器（即使失败也继续）
         if (encoder != null) {
@@ -1832,11 +1827,11 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 生成新的分段文件路径
+     * 生成新的分段文件名
      * 优先使用 TimestampProvider 获取统一时间戳（多路摄像头同步）
      * 如果没有设置 provider，则使用当前时间
      */
-    private String generateSegmentPath() {
+    private String segmentFileName() {
         String timestamp;
         if (timestampProvider != null) {
             // 使用统一的时间戳提供者（确保多路摄像头使用相同时间戳）
@@ -1847,8 +1842,436 @@ public class CodecVideoRecorder {
             timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
             AppLog.d(TAG, "Camera " + cameraId + " using local timestamp: " + timestamp);
         }
-        String fileName = timestamp + "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
-        return new File(saveDirectory, fileName).getAbsolutePath();
+        return timestamp + "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
+    }
+
+    // ===== 盘写不进时换盘：内存环、fsync、抢救 =====
+
+    /** 录像盘写不进时还能写到哪些目录，按优先顺序；相机层提供，它知道此刻挂着哪些盘。 */
+    public interface FallbackDirs {
+        List<File> candidates(Set<String> deadVolumes);
+    }
+
+    public void setFallbackDirs(FallbackDirs dirs) {
+        this.fallbackDirs = dirs;
+    }
+
+    private static final long SYNC_INTERVAL_MS = 5_000L;
+    /** muxer 自己还攒着最近一秒左右的样本没写出去；fsync 时刻往前留这么多余量才算落盘。 */
+    private static final long SYNC_SLACK_MS = 3_000L;
+
+    /**
+     * 每 5 秒把文件 fsync 一次（在分段线程上，不占编码线程）。
+     *
+     * <p>两件事：告诉内存环哪些样本已经落盘、可以丢了；盘掉了但写入还「成功」（进的是系统缓存）时，
+     * fsync 会报错 —— 这是发现盘没了最早的一道，比等写入报错早。</p>
+     */
+    private void scheduleSyncTick() {
+        cancelSyncTick();
+        syncTick = () -> {
+            if (!isRecording.get() || isReleased) {
+                return;
+            }
+            RandomAccessFile file = muxerFile;
+            final int serial = muxerSerial;
+            if (file != null && muxerStarted) {
+                long started = System.currentTimeMillis();
+                try {
+                    file.getFD().sync();
+                    ring.markSyncedBefore(started - SYNC_SLACK_MS);
+                } catch (IOException e) {
+                    Handler handler = encoderHandler;
+                    if (handler != null) {
+                        handler.post(() -> {
+                            // 这期间文件可能已经换过了：那这次报错说的是旧文件，不理
+                            if (muxerSerial != serial || !isRecording.get() || muxer == null) {
+                                return;
+                            }
+                            if (!relocate("fsync", e)) {
+                                encoderHealthy = false;
+                            }
+                        });
+                    }
+                }
+            }
+            Handler segment = segmentHandler;
+            if (segment != null && syncTick != null) {
+                segment.postDelayed(syncTick, SYNC_INTERVAL_MS);
+            }
+        };
+        segmentHandler.postDelayed(syncTick, SYNC_INTERVAL_MS);
+    }
+
+    private void cancelSyncTick() {
+        if (syncTick != null && segmentHandler != null) {
+            segmentHandler.removeCallbacks(syncTick);
+        }
+        syncTick = null;
+    }
+
+    /**
+     * 编码器报了输出格式：开轨、启动 muxer。
+     *
+     * <p>格式同时记给内存环 —— 补写环里的样本时要用<b>它们那一代</b>编码器的格式开轨。
+     * 文件头都写不进去的话换盘；换不了就把异常抛回去，走原来的路。</p>
+     */
+    private void startMuxerTrack(MediaFormat format) {
+        if (ringGeneration != encoderGeneration && !ring.isEmpty()) {
+            // 不该发生：上一代的样本该在收文件时就清掉或抢救掉了
+            AppLog.w(TAG, "Camera " + cameraId + " ring still holds samples of encoder #" + ringGeneration
+                    + ", dropping them");
+            ring.clear();
+        }
+        ringFormat = format;
+        ringGeneration = encoderGeneration;
+        try {
+            videoTrackIndex = muxer.addTrack(format);
+            muxer.start();
+        } catch (RuntimeException e) {
+            if (!relocate("start", e)) {
+                throw e;
+            }
+            return;  // 换盘时已经在新文件上开好了轨
+        }
+        muxerStarted = true;
+        encoderHealthy = true;  // 收到格式变化说明编码器正常
+        lastEncoderOutputTime = System.currentTimeMillis();
+    }
+
+    /**
+     * 写一个样本：先进内存环，再写文件。
+     *
+     * <p>用编码器给出的真实时间戳，不按帧数推算（见 {@link #nextPtsUs}：推算会让回放速度不等于录制速度）。
+     * 文件写不进就换盘，换盘会把环里的（包括这一个）先补写进新文件；换不了就把异常抛回去，
+     * 走原来的路（编码器标不健康 → 重建 → 看门狗）。</p>
+     */
+    private void writeSample(ByteBuffer encodedData, MediaCodec.BufferInfo info) {
+        boolean keyframe = (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0;
+        encodedData.position(info.offset);
+        encodedData.limit(info.offset + info.size);
+        ring.add(info.presentationTimeUs, System.currentTimeMillis(), keyframe, encodedData, info.size);
+        info.presentationTimeUs = nextPtsUs(info.presentationTimeUs);
+        long writeStart = StallWatch.now();
+        try {
+            muxer.writeSampleData(videoTrackIndex, encodedData, info);
+        } catch (RuntimeException e) {
+            if (!relocate("write", e)) {
+                throw e;
+            }
+            return;  // 这一个样本已经随环补写进新文件了
+        }
+        StallWatch.noteOp(encoderBeat, cameraId, "write", writeStart);
+        noteEncodedBytes(info.size);
+    }
+
+    /**
+     * 收掉当前 muxer 和文件。
+     *
+     * @return 文件是不是确认落盘了：stop（写文件尾）和 fsync 都成功。没确认的话这个文件多半坏了，
+     *         内存环里的是它最后那段的唯一副本（见 {@link #settleRing}）
+     */
+    private boolean closeMuxer(String stage) {
+        boolean confirmed = true;
+        if (muxer != null) {
+            try {
+                if (muxerStarted) {
+                    muxer.stop();
+                    RandomAccessFile file = muxerFile;
+                    if (file != null) {
+                        file.getFD().sync();
+                    }
+                }
+            } catch (Exception e) {
+                confirmed = false;
+                AppLog.e(TAG, "Camera " + cameraId + " Error closing muxer (" + stage + ")", e);
+                noteTrouble(stage + "-close", e);
+            }
+            try {
+                muxer.release();
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " Error releasing muxer: " + e.getMessage());
+            }
+            muxer = null;
+            muxerStarted = false;
+            videoTrackIndex = -1;
+        }
+        closeMuxerFile();
+        return confirmed;
+    }
+
+    /** 旧 muxer 作废（盘已经写不进了）：能收就收，收不了不算错。 */
+    private void discardMuxer() {
+        if (muxer != null) {
+            try {
+                if (muxerStarted) {
+                    muxer.stop();
+                }
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " Discarded muxer would not stop: " + e.getMessage());
+            }
+            try {
+                muxer.release();
+            } catch (Exception ignored) {
+                // 作废的东西释放不掉也没什么可做的
+            }
+            muxer = null;
+            muxerStarted = false;
+            videoTrackIndex = -1;
+        }
+        closeMuxerFile();
+    }
+
+    private void closeMuxerFile() {
+        RandomAccessFile file = muxerFile;
+        muxerFile = null;
+        if (file != null) {
+            try {
+                file.close();
+            } catch (IOException e) {
+                AppLog.w(TAG, "Camera " + cameraId + " Error closing muxer file: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 文件收掉之后，环里的样本怎么办。
+     *
+     * <p>确认落盘了就清掉。没确认（盘掉了、stop 报错），环里的就是那个文件最后一段的唯一副本，
+     * 先抢救成单独的文件再清 —— 清是因为接下来是新一代编码器，两代样本不能混在一个文件里。</p>
+     */
+    private void settleRing(boolean confirmed, String stage) {
+        if (!confirmed && !ring.isEmpty()) {
+            rescueRing(stage);
+        }
+        ring.clear();
+    }
+
+    /**
+     * 把环里的样本单独写成一个文件。
+     *
+     * <p>先试现在这个目录 —— 盘也许没事，只是 stop 报了错；不行再换别的盘。
+     * 写成一个就够。</p>
+     */
+    private void rescueRing(String stage) {
+        List<SampleRing.Sample> pending = ring.snapshot();
+        if (pending.isEmpty() || ringFormat == null) {
+            return;
+        }
+        long spanMs = pending.get(pending.size() - 1).wallMs - pending.get(0).wallMs;
+        List<File> dirs = new ArrayList<>();
+        dirs.add(new File(saveDirectory));
+        for (File dir : dirs) {
+            try {
+                String path = writeRescueFile(dir, pending);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("上一个文件没确认落盘（相机 " + cameraId + "，"
+                        + stage + "），把内存里的 " + (spanMs / 1000) + " 秒抢救到 " + path);
+                return;
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " rescue to " + dir + " failed: " + e);
+                deadVolumes.add(StorageHelper.volumeOf(dir.getAbsolutePath()));
+                if (dirs.size() == 1) {
+                    dirs.addAll(candidateDirs());
+                }
+            }
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("上一个文件没确认落盘（相机 " + cameraId + "，"
+                + stage + "），内存里的 " + (spanMs / 1000) + " 秒没地方抢救；此刻挂着的盘："
+                + StorageHelper.describeMounts());
+    }
+
+    /**
+     * 把这些样本写成一个独立的 mp4，文件名是第一个样本的时刻。
+     *
+     * <p>写完 fsync：没确认落盘的抢救文件和没抢救一样。不成功就删掉并抛出。</p>
+     */
+    private String writeRescueFile(File dir, List<SampleRing.Sample> samples) throws IOException {
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("cannot create " + dir);
+        }
+        String path = pathNamedAt(dir, samples.get(0).wallMs);
+        RandomAccessFile file = new RandomAccessFile(path, "rw");
+        MediaMuxer rescue = null;
+        boolean ok = false;
+        try {
+            file.setLength(0);
+            rescue = new MediaMuxer(file.getFD(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int track = rescue.addTrack(ringFormat);
+            rescue.start();
+            writeSamples(rescue, track, samples);
+            rescue.stop();
+            file.getFD().sync();
+            ok = true;
+        } finally {
+            if (rescue != null) {
+                try {
+                    rescue.release();
+                } catch (RuntimeException ignored) {
+                    // 释放失败不影响结果
+                }
+            }
+            try {
+                file.close();
+            } catch (IOException ignored) {
+                // 同上
+            }
+            if (!ok) {
+                new File(path).delete();
+            }
+        }
+        recordedFilePaths.add(path);
+        return path;
+    }
+
+    /** 按顺序写进 muxer，时间戳从第一个样本归零；返回最后写的时间戳。 */
+    private long writeSamples(MediaMuxer target, int track, List<SampleRing.Sample> samples) {
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        long base = samples.get(0).ptsUs;
+        long last = -1L;
+        for (SampleRing.Sample s : samples) {
+            long pts = s.ptsUs - base;
+            if (pts <= last) {
+                pts = last + ptsStepUs();
+            }
+            last = pts;
+            info.set(0, s.data.length, pts, s.keyframe ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0);
+            target.writeSampleData(track, ByteBuffer.wrap(s.data), info);
+        }
+        return last;
+    }
+
+    /**
+     * 现在这个盘写不进了：换一个盘接着录。
+     *
+     * <p>在编码线程上。旧 muxer 作废；环里的样本补写进新文件 —— 还是同一个编码器的话写进新文件开头、
+     * 接着录（一个文件，画面连续）；编码器已经换过（分段切换时才发现盘没了）的话，环先单独落成一个
+     * 抢救文件，新文件等编码器报格式再开轨。</p>
+     *
+     * @return 换成了没有。没换成时 muxer 已经没了，调用者把异常抛回去走原来的错误路径
+     */
+    private boolean relocate(String why, Throwable cause) {
+        final boolean[] ok = {false};
+        StallWatch.runTask(encoderBeat, cameraId, "relocate", () -> ok[0] = relocateNow(why, cause));
+        return ok[0];
+    }
+
+    private boolean relocateNow(String why, Throwable cause) {
+        String failed = saveDirectory;
+        String failedVolume = StorageHelper.volumeOf(failed);
+        deadVolumes.add(failedVolume);
+        discardMuxer();
+        String trouble = describe(cause);
+        for (File dir : candidateDirs()) {
+            try {
+                long rescuedMs = openContinuationAt(dir);
+                saveDirectory = dir.getAbsolutePath();
+                relocations++;
+                lastTrouble = why + ": " + trouble;
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像盘 " + failedVolume + " 写不进了（相机 " + cameraId
+                        + "，" + why + "：" + trouble + "），改写到 " + dir + "，补写了内存里的 "
+                        + (rescuedMs / 1000) + " 秒；此刻挂着的盘：" + StorageHelper.describeMounts());
+                if (callback != null && segmentHandler != null) {
+                    final File newDir = dir;
+                    segmentHandler.post(() -> callback.onRecordingRelocated(cameraId, newDir, why, rescuedMs));
+                }
+                return true;
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " cannot relocate to " + dir + ": " + e);
+                deadVolumes.add(StorageHelper.volumeOf(dir.getAbsolutePath()));
+                discardMuxer();
+            }
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("录像盘 " + failedVolume + " 写不进了（相机 " + cameraId
+                + "，" + why + "：" + trouble + "），没有别的盘可换；此刻挂着的盘：" + StorageHelper.describeMounts());
+        return false;
+    }
+
+    /** 除了现在这个目录，还能写到哪。 */
+    private List<File> candidateDirs() {
+        List<File> out = new ArrayList<>();
+        if (fallbackDirs == null) {
+            return out;
+        }
+        for (File dir : fallbackDirs.candidates(new HashSet<>(deadVolumes))) {
+            if (!dir.getAbsolutePath().equals(saveDirectory)) {
+                out.add(dir);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 在 dir 里开新文件接着录，环里的先补写进去。
+     *
+     * @return 补写了多长（毫秒）
+     */
+    private long openContinuationAt(File dir) throws IOException {
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("cannot create " + dir);
+        }
+        List<SampleRing.Sample> pending = ring.snapshot();
+        boolean sameEncoder = ringFormat != null && ringGeneration == encoderGeneration;
+        long rescuedMs = pending.isEmpty() ? 0 : pending.get(pending.size() - 1).wallMs - pending.get(0).wallMs;
+        if (!pending.isEmpty() && !sameEncoder) {
+            // 环里是上一代编码器的：单独落一个抢救文件；这个盘不行的话这里就抛出了
+            writeRescueFile(dir, pending);
+            ring.clear();
+            pending = new ArrayList<>();
+        }
+        String path = pending.isEmpty()
+                ? new File(dir, segmentFileName()).getAbsolutePath()
+                : pathNamedAt(dir, pending.get(0).wallMs);  // 文件名说的是画面从什么时候开始
+        createMuxer(path);
+        currentFilePath = path;
+        recordedFilePaths.add(path);
+        segmentStartTimeNs = System.nanoTime();
+        encodedOutputFrameCount = 0;
+        lastWrittenPtsUs = -1L;
+        segmentBasePtsUs = -1L;
+        if (sameEncoder) {
+            // 编码器不会再报一次格式：这里直接开轨
+            videoTrackIndex = muxer.addTrack(ringFormat);
+            muxer.start();
+            muxerStarted = true;
+            if (!pending.isEmpty()) {
+                segmentBasePtsUs = pending.get(0).ptsUs;
+                lastWrittenPtsUs = writeSamples(muxer, videoTrackIndex, pending);
+                encodedOutputFrameCount = pending.size();
+                lastWriteUptimeMs = android.os.SystemClock.uptimeMillis();
+                everWrote = true;
+            }
+        }
+        return rescuedMs;
+    }
+
+    /**
+     * 在当前目录开下一个文件；开不了就换盘（含补写）。
+     *
+     * <p>哪个盘都开不了时抛出，调用者走原来的恢复路径。</p>
+     */
+    private void openNextFile() throws IOException {
+        String path = new File(saveDirectory, segmentFileName()).getAbsolutePath();
+        try {
+            createMuxer(path);
+        } catch (IOException e) {
+            if (!relocate("open", e)) {
+                throw e;
+            }
+            return;  // 换盘时已经开好了文件
+        }
+        currentFilePath = path;
+        recordedFilePaths.add(path);
+    }
+
+    /** 以这一刻命名的文件路径；撞名就往后挪一秒 —— 不能覆盖已有的文件。 */
+    private String pathNamedAt(File dir, long wallMs) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
+        String suffix = "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
+        for (int i = 0; ; i++) {
+            File file = new File(dir, format.format(new Date(wallMs + i * 1000L)) + suffix);
+            if (!file.exists()) {
+                return file.getAbsolutePath();
+            }
+        }
     }
 
     /**
@@ -1911,20 +2334,8 @@ public class CodecVideoRecorder {
         isRecording.set(false);
 
         try {
-            // 1. 清理旧的 Muxer（可能已损坏）
-            if (muxer != null) {
-                try {
-                    if (muxerStarted) {
-                        muxer.stop();
-                    }
-                    muxer.release();
-                } catch (Exception e) {
-                    AppLog.w(TAG, "Camera " + cameraId + " Error releasing old muxer: " + e.getMessage());
-                }
-                muxer = null;
-                muxerStarted = false;
-                videoTrackIndex = -1;
-            }
+            // 1. 收掉旧文件；没确认落盘的话内存环里的先抢救出来（下面要换编码器）
+            settleRing(closeMuxer("rebuild"), "rebuild");
 
             // 2. 清理旧的编码器
             if (encoder != null) {
@@ -1961,12 +2372,10 @@ public class CodecVideoRecorder {
                 eglEncoder.updateOutputSurface(encoderInputSurface);
             }
 
-            // 6. 创建新的 Muxer（生成新的文件名）
+            // 6. 开新文件（这个盘开不了就换盘）
             segmentIndex++;
-            String newFilePath = generateSegmentPath();
-            currentFilePath = newFilePath;
-            recordedFilePaths.add(newFilePath);
-            createMuxer(newFilePath);
+            openNextFile();
+            String newFilePath = currentFilePath;
 
             // 7. 重置状态
             segmentStartTimeNs = System.nanoTime();

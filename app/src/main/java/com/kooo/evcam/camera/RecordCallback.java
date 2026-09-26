@@ -1,5 +1,6 @@
 package com.kooo.evcam.camera;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -54,6 +55,15 @@ public interface RecordCallback {
      * @param reason 重建原因（"no_write" 或 "first_write_timeout"）
      */
     void onRecordingRebuildRequested(String cameraId, String reason);
+
+    /**
+     * 录像换了盘：原来的盘写不进了，已经改写到别的盘接着录
+     * @param cameraId 相机ID
+     * @param dir 现在写进的目录
+     * @param why 哪一步发现的（write / fsync / open / start）
+     * @param rescuedMs 从内存里补写进新文件的时长（毫秒）
+     */
+    void onRecordingRelocated(String cameraId, File dir, String why, long rescuedMs);
 
     /**
      * 首次数据写入成功

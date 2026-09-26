@@ -289,7 +289,7 @@ public class MultiCameraManager {
             if (!isRecording) {
                 return;
             }
-            long free = StorageGuard.freeBytes(com.kooo.evcam.StorageHelper.getVideoDir(context));
+            long free = StorageGuard.freeBytes(guardedVideoDir());
             if (free >= 0 && free < StorageGuard.lastMarginBytes()) {
                 checkStorage("剩余空间低于余量");
             }
@@ -380,6 +380,48 @@ public class MultiCameraManager {
 
     public interface WriteStallCallback {
         void onWriteStalled(long stalledMs);
+    }
+
+    /** 存储检查看哪个目录：录像实际写进的那个（换过盘就是新盘）；中转写入时看最终目录。 */
+    private File guardedVideoDir() {
+        File actual = StorageHelper.lastRecordingDir();
+        if (!isRecording || useRelayWrite || actual == null) {
+            return StorageHelper.getVideoDir(context);
+        }
+        return actual;
+    }
+
+    /**
+     * 录像盘写不进时还能写到哪，给录制器换盘用。
+     *
+     * <p>别的挂着的 U 盘，设定的那个优先、其余按剩余空间；开发者放行时最后是内置存储。
+     * 中转写入时录制器写的是内置缓存，U 盘掉不掉线它感觉不到，不换。</p>
+     */
+    private List<File> fallbackDirsFor(Set<String> deadVolumes) {
+        List<File> dirs = new ArrayList<>();
+        AppConfig config = new AppConfig(context);
+        if (config.shouldUseRelayWrite()) {
+            return dirs;
+        }
+        StorageHelper.clearCache();
+        File internal = StorageHelper.isInternalStorageAllowed()
+                ? Environment.getExternalStorageDirectory() : null;
+        for (File root : FallbackVolumes.rank(StorageHelper.mountedVolumes(), config.getCustomSdCardPath(),
+                deadVolumes, StorageHelper::getAvailableSpace, internal)) {
+            dirs.add(StorageHelper.videoDirOn(root));
+        }
+        return dirs;
+    }
+
+    /** 录制器换了盘：记下实际写到哪、状态条那一格跟着变、存储检查改看新盘。 */
+    private void noteRelocated(File dir) {
+        StorageHelper.noteRecordingDir(dir);
+        String custom = new AppConfig(context).getCustomSdCardPath();
+        boolean offTarget = custom != null && !custom.isEmpty()
+                && !dir.getAbsolutePath().startsWith(custom);
+        StorageHelper.noteRecordingFallback(offTarget ? StorageHelper.volumeOf(dir.getAbsolutePath()) : null,
+                offTarget ? StorageHelper.volumeOf(custom) : null);
+        checkStorage("换盘");
     }
 
     public void setWriteStallCallback(WriteStallCallback callback) {
@@ -931,6 +973,11 @@ public class MultiCameraManager {
             }
 
             @Override
+            public void onRecordingRelocated(String cameraId, File dir, String why, long rescuedMs) {
+                // MediaRecorder 录制器不换盘
+            }
+
+            @Override
             public void onFirstDataWritten(String cameraId) {
                 AppLog.d(TAG, "First data written for camera " + cameraId);
                 // 只在第一个摄像头首次写入时通知外部（每次录制只通知一次）
@@ -1101,7 +1148,7 @@ public class MultiCameraManager {
             return;
         }
         lastStorageCheckMs = now;
-        StorageGuard.enforceAsync(context, com.kooo.evcam.StorageHelper.getVideoDir(context),
+        StorageGuard.enforceAsync(context, guardedVideoDir(),
                 decision -> {
                     if (decision.verdict != StoragePlan.Verdict.FULL || !isRecording) {
                         return;
@@ -1530,6 +1577,8 @@ public class MultiCameraManager {
         }
         // 统一时间戳提供者：多路摄像头分段切换时用同一个时间戳
         codecRecorder.setTimestampProvider(segmentTimestampProvider);
+        // 盘写不进时换到哪个盘
+        codecRecorder.setFallbackDirs(this::fallbackDirsFor);
         codecRecorder.setSegmentDuration(segmentDurationMs);
         codecRecorder.setFrameRate(targetFrameRate, frameRateCap);
         // 跟随这一路配置里的码率等级。写死一档的话那个选项就是个摆设。
@@ -1682,6 +1731,13 @@ public class MultiCameraManager {
                     // CodecVideoRecorder 通常不会触发此回调，但为了接口完整性实现
                     AppLog.e(TAG, "Codec recording rebuild requested for camera " + cameraId + ", reason: " + reason);
                     // Codec 模式不需要回退，记录日志即可
+                }
+
+                @Override
+                public void onRecordingRelocated(String cameraId, File dir, String why, long rescuedMs) {
+                    AppLog.w(TAG, "Camera " + cameraId + " relocated recording to " + dir + " (" + why
+                            + "), rescued " + rescuedMs + "ms from memory");
+                    noteRelocated(dir);
                 }
 
                 @Override

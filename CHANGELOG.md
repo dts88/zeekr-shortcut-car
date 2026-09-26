@@ -5,7 +5,16 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- **Recording moves to another drive the moment its drive stops taking data, without losing
+  the last 15 seconds.** The recorder keeps the most recent 15 seconds of encoded video in
+  memory (longer while the drive has not confirmed the data on disk, up to one minute), fsyncs
+  the file every 5 seconds, and on the first write, fsync or file-open error switches to another
+  mounted drive, writes the buffered video into the new file first, then carries on. When the
+  loss is only found at a segment switch, the buffered video is saved as its own file. In sentry
+  mode the M.2 drive drops out when the car locks; about 40 seconds around the drop used to be
+  lost.
+- While a recording is on a drive other than the chosen one, the status line says so until the
+  recording stops, e.g. "Recording to B905 (1D8C unavailable)".
 
 ## [1.46.0-alpha] - 2026-09-26
 

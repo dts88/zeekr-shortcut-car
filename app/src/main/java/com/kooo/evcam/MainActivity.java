@@ -247,6 +247,8 @@ public class MainActivity extends AppCompatActivity {
     private android.os.Handler recordingTimerHandler;
 
     private Runnable recordingTimerRunnable;
+    /** 状态条上现在显示的「换过盘」状态。换盘发生在相机层，界面靠计时器每秒对一下。 */
+    private String[] shownFallback;
     private long recordingStartTime = 0;  // 录制开始时间
     private int currentSegmentCount = 1;  // 当前分段数
     private long segmentStartTime = 0;  // 本段开始时间（分段进度环用）
@@ -987,6 +989,9 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 if (isRecording) {
                     updateRecordingStatsDisplay();
+                    if (StorageHelper.recordingFallback() != shownFallback) {
+                        updateStatusLine();
+                    }
                     recordingTimerHandler.postDelayed(this, 1000);  // 每秒更新一次
                 }
             }
@@ -1112,6 +1117,7 @@ public class MainActivity extends AppCompatActivity {
      * 从 Activity 上找会撞到看不见的那一份。</p>
      */
     private void updateStatusLine() {
+        shownFallback = StorageHelper.recordingFallback();
         com.kooo.evcam.ui.StatusLine.overlay(recordingLayout);
         com.kooo.evcam.ui.StatusLine.fill(recordingLayout);
     }

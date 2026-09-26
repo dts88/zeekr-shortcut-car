@@ -72,6 +72,16 @@ public class StorageHelper {
         return lastRecordingDir;
     }
 
+    /** 此刻挂着的 U 盘根目录（读 /proc/mounts）。 */
+    public static java.util.List<File> mountedVolumes() {
+        return listSdCardRootsFromMounts();
+    }
+
+    /** 某个盘上录像该放的目录：root/DCIM/EVCam_Video，和 {@link #getVideoDir} 选好盘之后的规则一样。 */
+    public static File videoDirOn(File root) {
+        return new File(new File(root, Environment.DIRECTORY_DCIM), VIDEO_DIR_NAME);
+    }
+
     /**
      * 此刻系统里挂着哪些 U 盘（读 /proc/mounts），黑匣子用：「XXXX-XXXX, YYYY-YYYY」，一个都没有时「none」。
      *
