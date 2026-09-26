@@ -97,10 +97,6 @@
     <string name="set_image_adjust_reset_title">Reset brightness / noise reduction</string>
     <string name="set_camera_mapping_title">Camera mapping</string>
     <string name="set_camera_mapping_summary">Assign cameras manually (troubleshooting)</string>
-    <string name="set_debug_title">Debug mode</string>
-    <string name="set_debug_summary">Logs more detail</string>
-    <string name="set_save_logs_title">Save logs</string>
-    <string name="set_save_logs_summary">Saves the log to storage</string>
     <string name="set_diagnostics_title">Diagnostics</string>
     <string name="set_diagnostics_summary">Camera, display, vehicle signal and storage details, for export</string>
     <string name="set_language_title">Language</string>
@@ -139,8 +135,6 @@
     <string name="msg_floating_reset">Floating button reset</string>
     <string name="msg_adjust_opened">Adjustment window opened</string>
     <string name="msg_adjust_reset">Brightness / noise reduction restored to defaults</string>
-    <string name="msg_logs_saved">Log saved to %1$s</string>
-    <string name="msg_logs_failed">Could not save the log</string>
     <string name="info_mapping_manual">Camera mapping set manually</string>
     <string name="info_mapping_auto">Automatic. If a camera shows nothing, assign it here</string>
     <string name="msg_need_overlay">Grant the overlay permission first</string>
@@ -373,7 +367,6 @@
     <string name="set_plate_empty">Not set</string>
     <string name="msg_plate_cleaned">Saved as %1$s</string>
     <string name="msg_restart_required">Takes effect after restarting the app</string>
-    <string name="set_current_profile_title">Current profile</string>
 
     <!-- Main screen (shared skeleton) -->
     <string name="main_title">Zeekr Shortcut</string>
@@ -565,9 +558,6 @@
     <string name="cd_selected">Selected</string>
 
     <!-- Developer: preview correction · current profile -->
-    <string name="msg_correction_needs_switch">Turn on Preview correction first</string>
-    <string name="msg_correction_reset">Preview correction reset</string>
-    <string name="profile_unreadable">Could not read it: %1$s</string>
 
     <!-- Main screen: surround stream summary in the status bar · super view · debug overlay -->
     <string name="composite_summary">Surround stream %1$d×%2$d · %3$s</string>
@@ -647,16 +637,10 @@
     <string name="dev_supervision_title">Super view</string>
     <string name="dev_custom_config_title">Custom layout</string>
     <string name="dev_custom_config_summary">After choosing “Custom” in Stream profile, set up cameras, mapping, rotation and layout here</string>
-    <string name="dev_preview_correction_title">Preview correction</string>
-    <string name="dev_preview_correction_summary">Pan, zoom or rotate the preview of plain cameras (cabin cameras, custom). The surround view is not affected</string>
-    <string name="dev_preview_correction_adjust_title">Adjust preview correction</string>
-    <string name="dev_preview_correction_adjust_summary">Opens a floating window to adjust each camera; turn on the switch above first</string>
-    <string name="dev_preview_correction_reset_title">Reset preview correction</string>
     <string name="dev_raw_frame_title">Also save the raw frame</string>
     <string name="dev_raw_frame_summary">Uncut and unstamped, with a note on the frame geometry, in photos/raw. For working out the lane layout and the lens parameters</string>
     <string name="dev_repair_mp4_title">Repair unfinalised videos</string>
     <string name="dev_repair_mp4_summary">A clip cut short by a power loss has no index, so nothing will open it. Rebuilds one using a healthy clip from the same camera, keeping the file name</string>
-    <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
     <string name="dev_note">“Custom” in Stream profile is only available here. Tap “Safety notice” in About to turn developer options off; this section then hides.</string>
 
     <!-- Log upload · device name (developer) -->

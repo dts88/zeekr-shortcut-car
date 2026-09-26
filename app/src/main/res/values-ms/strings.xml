@@ -97,10 +97,6 @@
     <string name="set_image_adjust_reset_title">Set semula kecerahan / pengurangan hingar</string>
     <string name="set_camera_mapping_title">Pemetaan kamera</string>
     <string name="set_camera_mapping_summary">Tetapkan kamera secara manual (penyelesaian masalah)</string>
-    <string name="set_debug_title">Mod nyahpepijat</string>
-    <string name="set_debug_summary">Merekod log yang lebih terperinci</string>
-    <string name="set_save_logs_title">Simpan log</string>
-    <string name="set_save_logs_summary">Menyimpan log ke storan</string>
     <string name="set_diagnostics_title">Maklumat diagnostik</string>
     <string name="set_diagnostics_summary">Butiran kamera, paparan, isyarat kenderaan dan storan, untuk dieksport</string>
     <string name="set_language_title">Bahasa</string>
@@ -139,8 +135,6 @@
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
     <string name="msg_adjust_opened">Tetingkap pelarasan dibuka</string>
     <string name="msg_adjust_reset">Kecerahan / pengurangan hingar dipulihkan kepada asal</string>
-    <string name="msg_logs_saved">Log disimpan ke %1$s</string>
-    <string name="msg_logs_failed">Tidak dapat menyimpan log</string>
     <string name="info_mapping_manual">Pemetaan kamera ditetapkan secara manual</string>
     <string name="info_mapping_auto">Automatik. Jika sesuatu kamera tidak menunjukkan apa-apa, tetapkan di sini</string>
     <string name="msg_need_overlay">Berikan kebenaran paparan di atas apl lain dahulu</string>
@@ -373,7 +367,6 @@
     <string name="set_plate_empty">Belum ditetapkan</string>
     <string name="msg_plate_cleaned">Disimpan sebagai %1$s</string>
     <string name="msg_restart_required">Berkuat kuasa selepas apl dimulakan semula</string>
-    <string name="set_current_profile_title">Profil semasa</string>
 
     <!-- Skrin utama (rangka kongsi) -->
     <string name="main_title">Zeekr Shortcut</string>
@@ -563,9 +556,6 @@
     <string name="cd_selected">Dipilih</string>
 
     <!-- Pembangun: pembetulan pratonton · profil semasa -->
-    <string name="msg_correction_needs_switch">Buka Pembetulan pratonton dahulu</string>
-    <string name="msg_correction_reset">Pembetulan pratonton ditetapkan semula</string>
-    <string name="profile_unreadable">Tidak dapat membacanya: %1$s</string>
 
     <!-- Skrin utama: ringkasan strim keliling pada bar status · pandangan super · lapisan nyahpepijat -->
     <string name="composite_summary">Strim keliling %1$d×%2$d · %3$s</string>
@@ -645,16 +635,10 @@
     <string name="dev_supervision_title">Pandangan super</string>
     <string name="dev_custom_config_title">Susun atur tersuai</string>
     <string name="dev_custom_config_summary">Selepas memilih “Tersuai” dalam Profil strim, sediakan kamera, pemetaan, putaran dan susun atur di sini</string>
-    <string name="dev_preview_correction_title">Pembetulan pratonton</string>
-    <string name="dev_preview_correction_summary">Alih, zum atau putar pratonton kamera biasa (kamera kabin, tersuai). Pandangan keliling tidak terjejas</string>
-    <string name="dev_preview_correction_adjust_title">Laraskan pembetulan pratonton</string>
-    <string name="dev_preview_correction_adjust_summary">Membuka tetingkap terapung untuk melaraskan setiap kamera; buka suis di atas dahulu</string>
-    <string name="dev_preview_correction_reset_title">Set semula pembetulan pratonton</string>
     <string name="dev_raw_frame_title">Simpan juga bingkai asal</string>
     <string name="dev_raw_frame_summary">Tanpa dipecah atau ditera, bersama nota geometri bingkai, dalam photos/raw. Untuk mengkaji susunan lorong dan parameter kanta</string>
     <string name="dev_repair_mp4_title">Baiki video tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus kerana bekalan kuasa hilang tiada indeks, jadi tiada apa boleh membukanya. Indeks dibina semula daripada klip sihat kamera yang sama, nama fail kekal</string>
-    <string name="dev_current_profile_summary">Teks penuh profil yang berkuat kuasa, untuk semakan baris demi baris</string>
     <string name="dev_note">“Tersuai” dalam Profil strim hanya tersedia di sini. Ketik “Notis keselamatan” dalam Perihal untuk mematikan pilihan pembangun; bahagian ini kemudian tersembunyi.</string>
 
     <!-- Muat naik log · nama peranti (pembangun) -->

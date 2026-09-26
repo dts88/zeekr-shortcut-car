@@ -6,8 +6,6 @@ import android.os.Bundle;
 import android.text.InputType;
 import com.kooo.evcam.profile.ProfileMigration;
 import com.kooo.evcam.profile.ProfileStore;
-import android.widget.TextView;
-import android.widget.ScrollView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -23,8 +21,6 @@ import androidx.appcompat.app.AlertDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
-import com.kooo.evcam.zeekr.StreamLayoutTable;
-import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.CustomCameraConfigFragment;
 import com.kooo.evcam.MainActivity;
@@ -878,25 +874,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
         updateCameraMappingSummary();
 
-        SwitchPreferenceCompat debug = findPreference("pref_debug");
-        if (debug != null && getContext() != null) {
-            debug.setPersistent(false);
-            debug.setChecked(AppLog.isDebugToInfoEnabled(getContext()));
-            debug.setOnPreferenceChangeListener((preference, newValue) -> {
-                AppLog.setDebugToInfoEnabled(getContext(), Boolean.TRUE.equals(newValue));
-                return true;
-            });
-        }
-
-        onClick("pref_save_logs", pref -> {
-            if (getContext() == null) {
-                return;
-            }
-            java.io.File file = AppLog.saveLogsToFile(getContext());
-            toast(file != null
-                    ? getString(R.string.msg_logs_saved, file.getAbsolutePath())
-                    : getString(R.string.msg_logs_failed));
-        });
     }
 
     private void updateCameraMappingSummary() {
@@ -953,23 +930,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
 
-        bindSwitch("pref_preview_correction", appConfig.isPreviewCorrectionEnabled(), value -> {
-            appConfig.setPreviewCorrectionEnabled(value);
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).refreshPreviewCorrection();
-            }
-        });
-
-        onClick("pref_preview_correction_adjust", pref -> {
-            if (!appConfig.isPreviewCorrectionEnabled()) {
-                toast(getString(R.string.msg_correction_needs_switch));
-                return;
-            }
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).showPreviewCorrectionFloating();
-            }
-        });
-
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {
                 return;
@@ -980,16 +940,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             com.kooo.evcam.repair.Mp4RepairFlow.start(getActivity(), recording);
         });
 
-        onClick("pref_current_profile", pref -> showCurrentProfile());
-
-
-        onClick("pref_preview_correction_reset", pref -> {
-            appConfig.resetAllPreviewCorrection();
-            if (getActivity() instanceof MainActivity) {
-                ((MainActivity) getActivity()).refreshPreviewCorrection();
-            }
-            toast(getString(R.string.msg_correction_reset));
-        });
     }
 
     /**
@@ -1092,38 +1042,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    /**
-     * 把翻译出来的配置全文摆出来。
-     *
-     * <p>第 1 步只做翻译，不改取值路径。迷失一项的代价是某个设置悄悄回到
-     * 默认值，得等到开车时才发现 —— 所以先让它能被逐行核对。</p>
-     */
-    private void showCurrentProfile() {
-        if (getContext() == null) {
-            return;
-        }
-        String text;
-        try {
-            text = new ProfileStore(getContext()).current().toString();
-        } catch (Exception e) {
-            text = getString(R.string.profile_unreadable, String.valueOf(e));
-        }
-        TextView view = new TextView(getContext());
-        view.setText(text);
-        view.setTextIsSelectable(true);
-        view.setTypeface(android.graphics.Typeface.MONOSPACE);
-        view.setTextSize(13f);
-        int pad = (int) (16 * getResources().getDisplayMetrics().density);
-        view.setPadding(pad, pad, pad, pad);
-        ScrollView scroll = new ScrollView(getContext());
-        scroll.addView(view);
-
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.set_current_profile_title)
-                .setView(scroll)
-                .setPositiveButton(R.string.action_got_it, null));
-    }
-
+    
     // ------------------------------------------------------------------ 关于
 
     // ------------------------------------------------------------------ 检查更新

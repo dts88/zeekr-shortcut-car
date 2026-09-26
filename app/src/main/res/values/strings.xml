@@ -115,10 +115,6 @@
     <string name="set_image_adjust_reset_title">恢复亮度 / 降噪默认值</string>
     <string name="set_camera_mapping_title">相机映射</string>
     <string name="set_camera_mapping_summary">手动指定各路视频流的对应关系（排查用）</string>
-    <string name="set_debug_title">Debug 模式</string>
-    <string name="set_debug_summary">记录更详细的日志</string>
-    <string name="set_save_logs_title">保存日志</string>
-    <string name="set_save_logs_summary">将运行日志写入存储，便于导出</string>
     <string name="set_diagnostics_title">诊断信息</string>
     <string name="set_diagnostics_summary">导出相机、屏幕、车辆信号与存储的实测信息</string>
     <string name="set_language_title">语言 / Language</string>
@@ -157,8 +153,6 @@
     <string name="msg_floating_reset">悬浮窗布局已重置</string>
     <string name="msg_adjust_opened">调节窗口已打开</string>
     <string name="msg_adjust_reset">亮度 / 降噪参数已恢复默认</string>
-    <string name="msg_logs_saved">日志已保存到：%1$s</string>
-    <string name="msg_logs_failed">保存日志失败</string>
     <string name="info_mapping_manual">已手动指定相机映射</string>
     <string name="info_mapping_auto">自动分配。多路配置下若某一路没有画面，可在这里手动指定</string>
     <string name="msg_need_overlay">请先授权悬浮窗权限</string>
@@ -381,7 +375,6 @@
     <string name="set_plate_empty">未填写</string>
     <string name="msg_plate_cleaned">已按规则整理为 %1$s</string>
     <string name="msg_restart_required">重启应用后生效</string>
-    <string name="set_current_profile_title">当前配置</string>
 
     <!-- 主界面（统一骨架） -->
     <string name="main_title">极氪即刻</string>
@@ -573,9 +566,6 @@
     <string name="cd_selected">已选中</string>
 
     <!-- 开发者：预览矫正 · 当前配置 -->
-    <string name="msg_correction_needs_switch">请先打开「预览画面矫正」</string>
-    <string name="msg_correction_reset">预览矫正参数已重置</string>
-    <string name="profile_unreadable">读不出来：%1$s</string>
 
     <!-- 主界面：状态条上的环视流摘要 · 超视 · 调试覆盖层 -->
     <string name="composite_summary">环视流 %1$d×%2$d · %3$s</string>
@@ -655,16 +645,10 @@
     <string name="dev_supervision_title">超视模式</string>
     <string name="dev_custom_config_title">自定义界面配置</string>
     <string name="dev_custom_config_summary">「视频流配置」选「自定义」后，在这里配摄像头路数、映射、旋转与布局</string>
-    <string name="dev_preview_correction_title">预览画面矫正</string>
-    <string name="dev_preview_correction_summary">对预览画面做平移 / 缩放 / 旋转修正。只作用于走普通预览的那几路（三路配置的座舱相机、自定义），环视合成流由四宫格容器自己排版，不受影响</string>
-    <string name="dev_preview_correction_adjust_title">预览矫正调参</string>
-    <string name="dev_preview_correction_adjust_summary">打开悬浮窗逐路调整，需要先打开上面的开关</string>
-    <string name="dev_preview_correction_reset_title">重置预览矫正参数</string>
     <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
     <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
     <string name="dev_repair_mp4_title">修复未封口的视频</string>
     <string name="dev_repair_mp4_summary">断电时正在录的那一段没有索引，播放器打不开。按同一路相机完好片段的参数补一个索引回去，文件名不变</string>
-    <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
     <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。在「关于」里点「安全须知」可以关掉开发者选项，关掉后本区隐藏。</string>
 
     <!-- 上传日志 · 设备识别名称（开发者） -->

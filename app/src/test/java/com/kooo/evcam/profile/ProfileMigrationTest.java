@@ -276,43 +276,8 @@ public class ProfileMigrationTest {
         }
     }
 
-    // ---------- 预览矫正 ----------
+    // ---------- 缩放 / 平移 ----------
 
-    /** 矫正开着时，缩放和平移跟着搬过来。 */
-    @Test
-    public void previewCorrectionCarriesOverWhenEnabled() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.carModel = "zeekr_7x_multi";
-        snapshot.previewCorrectionEnabled = true;
-        snapshot.scaleX = key -> "back".equals(key) ? 1.2f : 1f;
-        snapshot.translateY = key -> "back".equals(key) ? 0.05f : 0f;
-
-        LaneLayout lane = ProfileMigration.migrate(snapshot)
-                .camera(CameraProfile.ROLE_CABIN_1).lanes.get(0);
-
-        assertEquals(1.2f, lane.scaleX, 1e-4f);
-        assertEquals(0.05f, lane.translateY, 1e-4f);
-    }
-
-    /**
-     * 矫正开关关着时不能搬。
-     *
-     * <p>那几个值现在不生效，搬过来等于悄悄给用户开了一个他从没开过的功能。</p>
-     */
-    @Test
-    public void previewCorrectionIsNotCarriedOverWhenDisabled() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.carModel = "zeekr_7x_multi";
-        snapshot.previewCorrectionEnabled = false;
-        snapshot.scaleX = key -> 1.2f;
-        snapshot.translateY = key -> 0.05f;
-
-        LaneLayout lane = ProfileMigration.migrate(snapshot)
-                .camera(CameraProfile.ROLE_CABIN_1).lanes.get(0);
-
-        assertEquals("关着的功能不能被迁移带开", 1f, lane.scaleX, 1e-4f);
-        assertEquals(0f, lane.translateY, 1e-4f);
-    }
 
     /** 缩放平移也要经得起存取往返。 */
     @Test

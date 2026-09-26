@@ -60,7 +60,7 @@ import java.util.Map;
  * {@link #count} 的做法是：<b>第一次立刻记</b>（「它到底会不会来」这个问题，第一次就回答完了），
  * 之后只累加，每隔一段时间汇总一行。</p>
  *
- * <p>文件在应用私有目录的 {@code blackbox/} 下，重启还在，诊断报告和「保存日志」都会带上。</p>
+ * <p>文件在应用私有目录的 {@code blackbox/} 下，重启还在，诊断报告会带上。</p>
  */
 public final class BlackBox {
 

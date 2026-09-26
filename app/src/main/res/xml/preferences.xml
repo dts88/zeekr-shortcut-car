@@ -350,16 +350,6 @@
             android:title="@string/set_camera_mapping_title"
             android:summary="@string/set_camera_mapping_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_debug"
-            android:title="@string/set_debug_title"
-            android:summary="@string/set_debug_summary" />
-
-        <Preference
-            android:key="pref_save_logs"
-            android:title="@string/set_save_logs_title"
-            android:summary="@string/set_save_logs_summary" />
-
         <Preference
             android:key="pref_permissions"
             android:title="@string/dev_permissions_title"
@@ -384,20 +374,6 @@
             android:summary="@string/dev_custom_config_summary" />
 
         <SwitchPreferenceCompat
-            android:key="pref_preview_correction"
-            android:title="@string/dev_preview_correction_title"
-            android:summary="@string/dev_preview_correction_summary" />
-
-        <Preference
-            android:key="pref_preview_correction_adjust"
-            android:title="@string/dev_preview_correction_adjust_title"
-            android:summary="@string/dev_preview_correction_adjust_summary" />
-
-        <Preference
-            android:key="pref_preview_correction_reset"
-            android:title="@string/dev_preview_correction_reset_title" />
-
-        <SwitchPreferenceCompat
             android:key="pref_raw_frame_dump"
             android:title="@string/dev_raw_frame_title"
             android:summary="@string/dev_raw_frame_summary" />
@@ -406,11 +382,6 @@
             android:key="pref_repair_mp4"
             android:title="@string/dev_repair_mp4_title"
             android:summary="@string/dev_repair_mp4_summary" />
-
-        <Preference
-            android:key="pref_current_profile"
-            android:title="@string/set_current_profile_title"
-            android:summary="@string/dev_current_profile_summary" />
 
         <Preference
             android:key="pref_developer_note"

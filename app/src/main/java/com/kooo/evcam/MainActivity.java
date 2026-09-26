@@ -106,8 +106,6 @@ public class MainActivity extends AppCompatActivity {
     /** 极氪合成流四宫格容器；非该车型时为 null。 */
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
-    private final java.util.Map<String, android.graphics.Matrix> previewBaseTransforms = new java.util.HashMap<>();
-    private PreviewCorrectionFloatingWindow previewCorrectionFloatingWindow;
 
     // 调试信息覆盖层（连点5下空白处显示）
     private TextView tvDebugOverlay;
@@ -319,20 +317,11 @@ public class MainActivity extends AppCompatActivity {
     private static final long SURROUND_FRESH_MS = 2000;
 
 
-
-
-
-
-
-
-
-
   // 待处理的飞书 Chat ID
 
     
     // 存储清理管理器
     private StorageCleanupManager storageCleanupManager;
-
 
 
     @Override
@@ -393,7 +382,6 @@ public class MainActivity extends AppCompatActivity {
         if (!checkPermissions()) {
             requestPermissions();
         }
-
 
 
         // 启动定时保活任务（车机必需，始终开启）
@@ -558,13 +546,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-
-
-
-
-
-    
     /**
      * 执行启动持续录制（等同点击录制按钮）
      */
@@ -1406,11 +1387,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    
-
-    
-
-
     /**
      * 切换侧边栏的打开/关闭状态
      */
@@ -1780,13 +1756,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-
-
-
-
-
-    
     /**
      * 显示软件设置界面
      */
@@ -2746,7 +2715,7 @@ public class MainActivity extends AppCompatActivity {
         // 配置里有这一路的那一格时，矩阵由 SingleCamera 一家说了算。
         //
         // 这里原来按车型分了好几个分支，每一条最后都会往 TextureView 上写一次矩阵
-        // （applyPreviewCorrectionOnly 写的是单位阵）。而车型这个键默认是 zeekr_7x，
+        // （有的写的是单位阵）。而车型这个键默认是 zeekr_7x，
         // 于是三路配置的座舱相机掉进了「E5 兜底」那一条，把按配置算好的摆位盖掉 ——
         // 座舱旋转连修三次都没生效，就是栽在这。判断不看车型，只看配置里有没有那一格。
         com.kooo.evcam.profile.LaneLayout ownLane = laneFor(cameraKey);
@@ -2786,7 +2755,7 @@ public class MainActivity extends AppCompatActivity {
             if (customLayoutManager != null) {
                 customLayoutManager.updateCameraAspectRatio(cameraKey, previewSize.getWidth(), previewSize.getHeight(), 0);
             }
-            applyPreviewCorrectionOnly(textureView, cameraKey);
+            textureView.setTransform(new android.graphics.Matrix());   // 回到单位阵：这一路以前可能带着别的矩阵
         } else {
             // E5 等其他车型
             boolean needRotation = "left".equals(cameraKey) || "right".equals(cameraKey);
@@ -2805,7 +2774,7 @@ public class MainActivity extends AppCompatActivity {
                     textureView.setFillContainer(false);
                     AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 适应模式");
                 }
-                applyPreviewCorrectionOnly(textureView, cameraKey);
+                textureView.setTransform(new android.graphics.Matrix());   // 回到单位阵：这一路以前可能带着别的矩阵
             }
         }
     }
@@ -2856,86 +2825,11 @@ public class MainActivity extends AppCompatActivity {
                 matrix.postRotate(180, centerX, centerY);
             }
 
-            // 保存基础变换，并叠加预览矫正
-            previewBaseTransforms.put(cameraKey, new android.graphics.Matrix(matrix));
-            PreviewCorrection.postApply(matrix, appConfig, cameraKey, viewWidth, viewHeight);
-
             textureView.setTransform(matrix);
             AppLog.d(TAG, cameraKey + " 应用修正旋转: " + rotation + "度");
         });
     }
 
-    /**
-     * 对没有基础变换的 TextureView 单独应用预览矫正
-     * 用于 E5/L7 前后摄像头、自定义车型等不需要旋转的场景
-     */
-    private void applyPreviewCorrectionOnly(AutoFitTextureView textureView, String cameraKey) {
-        textureView.post(() -> {
-            int viewWidth = textureView.getWidth();
-            int viewHeight = textureView.getHeight();
-            if (viewWidth <= 0 || viewHeight <= 0) {
-                textureView.postDelayed(() -> applyPreviewCorrectionOnly(textureView, cameraKey), 100);
-                return;
-            }
-            android.graphics.Matrix matrix = new android.graphics.Matrix(); // identity
-            previewBaseTransforms.put(cameraKey, new android.graphics.Matrix(matrix));
-            PreviewCorrection.postApply(matrix, appConfig, cameraKey, viewWidth, viewHeight);
-            textureView.setTransform(matrix);
-        });
-    }
-
-    /**
-     * 刷新所有预览 TextureView 的矫正变换
-     * 由悬浮窗调参或设置页调用
-     */
-    public void refreshPreviewCorrection() {
-        runOnUiThread(() -> {
-            refreshSinglePreviewCorrection(textureFront, "front");
-            refreshSinglePreviewCorrection(textureBack, "back");
-            refreshSinglePreviewCorrection(textureLeft, "left");
-            refreshSinglePreviewCorrection(textureRight, "right");
-        });
-    }
-
-    private void refreshSinglePreviewCorrection(AutoFitTextureView textureView, String cameraKey) {
-        if (textureView == null) return;
-        textureView.post(() -> {
-            int viewWidth = textureView.getWidth();
-            int viewHeight = textureView.getHeight();
-            if (viewWidth <= 0 || viewHeight <= 0) return;
-
-            android.graphics.Matrix base = previewBaseTransforms.get(cameraKey);
-            android.graphics.Matrix matrix;
-            if (base != null) {
-                matrix = new android.graphics.Matrix(base);
-            } else {
-                matrix = new android.graphics.Matrix(); // identity
-            }
-            PreviewCorrection.postApply(matrix, appConfig, cameraKey, viewWidth, viewHeight);
-            textureView.setTransform(matrix);
-        });
-    }
-
-    /**
-     * 显示预览画面矫正悬浮窗
-     */
-    public void showPreviewCorrectionFloating() {
-        if (previewCorrectionFloatingWindow != null && previewCorrectionFloatingWindow.isShowing()) {
-            return;
-        }
-        previewCorrectionFloatingWindow = new PreviewCorrectionFloatingWindow(this);
-        previewCorrectionFloatingWindow.show();
-    }
-
-    /**
-     * 关闭预览画面矫正悬浮窗
-     */
-    public void dismissPreviewCorrectionFloating() {
-        if (previewCorrectionFloatingWindow != null) {
-            previewCorrectionFloatingWindow.dismiss();
-            previewCorrectionFloatingWindow = null;
-        }
-    }
 
     // ==================== 调试信息覆盖层（连点5下显示） ====================
 
@@ -4240,31 +4134,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // ==================== 飞书服务管理 ====================
-
-
-
-
-
-
-
-
-
 
 
     /**
@@ -4292,7 +4162,6 @@ public class MainActivity extends AppCompatActivity {
         storageCleanupManager.start();
         AppLog.d(TAG, "存储清理任务已重启");
     }
-
 
 
     @Override
@@ -4485,7 +4354,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 关闭预览矫正悬浮窗
-        dismissPreviewCorrectionFloating();
 
         // 停止调试信息更新
         stopDebugUpdates();
@@ -4730,11 +4598,8 @@ public class MainActivity extends AppCompatActivity {
     }
     
     // ==================== 心跳推图相关方法 ====================
-    
 
-    
 
-    
     /**
      * 获取已连接的摄像头数量
      */
@@ -4751,11 +4616,8 @@ public class MainActivity extends AppCompatActivity {
     public int getTotalCameraCount() {
         return configuredCameraCount;
     }
-    
 
-    
 
-    
     /**
      * 转义 JSON 字符串
      */

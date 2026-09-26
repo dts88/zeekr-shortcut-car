@@ -22,10 +22,8 @@ import android.media.ImageReader;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.os.HandlerThread;
-import android.util.Log;
 import android.util.Size;
 import android.hardware.camera2.params.OutputConfiguration;
-import android.hardware.camera2.params.SessionConfiguration;
 import android.os.Build;
 import android.view.Surface;
 import android.view.TextureView;
@@ -375,8 +373,6 @@ public class SingleCamera {
                 matrix.preScale(-1f, 1f, width / 2f, height / 2f);
                 shaped = true;
             }
-            com.kooo.evcam.PreviewCorrection.postApply(
-                    matrix, new AppConfig(context), cameraPosition, width, height);
             view.setTransform(matrix);
             laneTransformNote = (shaped ? "已应用 " + lane : "这一格没有任何变换")
                     + "，视图 " + width + "x" + height;

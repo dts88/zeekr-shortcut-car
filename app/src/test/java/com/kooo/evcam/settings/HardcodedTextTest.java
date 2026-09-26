@@ -123,7 +123,6 @@ public class HardcodedTextTest {
                 "layout/layout_custom_buttons_multi_vertical.xml",
                 "layout/view_blind_spot_floating.xml", "layout/view_blind_spot_floating_multiview.xml",
                 "layout/view_mock_turn_signal_floating.xml",
-                "layout/view_preview_correction_floating.xml",
                 // 自定义车型的画面长按打开的窗口调整；自定义只在开发者选项里能选
                 "layout/dialog_fullscreen_preview.xml"}) {
             XML_ALLOWED.put(f, xmlDeveloper);
