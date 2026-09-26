@@ -7,6 +7,13 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.43.0-alpha] - 2026-09-26
+
+- **Photo playback: "Send to phone" works without enlarging a view first.** It sends the
+  enlarged photo, or the surround photo when nothing is enlarged.
+- **Diagnostics: the "Share" button is gone.** The head unit has no app that accepts a share,
+  so it always failed. Use "Send to phone", or "Save" and take the report off the USB drive.
+
 ## [1.42.0-alpha] - 2026-09-26
 
 - **Developer options stay on once turned on.** Restarts and updates no longer turn them off.
