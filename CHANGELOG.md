@@ -7,6 +7,21 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.44.0-alpha] - 2026-09-26
+
+- **Removed the EVCam code this app never used, about 18,000 lines.** The blind-spot,
+  secondary-display and supervision windows with their turn-signal and door observers (turn
+  signals cannot be read inside the App Lab container); the "Custom" stream profile with its
+  layout manager and camera-mapping page; the ADB permission tools; the panoramic engine and
+  second recording pipeline; "Upload logs", which posted to the upstream author's server; the
+  old car models; and developer options the app has since replaced (preview correction, current
+  profile, save logs, the debug switch). No user-facing feature of this app changes.
+- Developer options that remain: raw frame dump, repair clips, force H.264, image adjustment,
+  camera mapping, permissions, the keep-alive switches and screen-off recording.
+- Diagnostics: the black box notes when the app version changed (an update ends the old process
+  with a signal, which read like a crash), and a recording that survives a main screen rebuild
+  keeps its start time, so the black box no longer logs it as "0 seconds".
+
 ## [1.43.0-alpha] - 2026-09-26
 
 - **Photo playback: "Send to phone" works without enlarging a view first.** It sends the
