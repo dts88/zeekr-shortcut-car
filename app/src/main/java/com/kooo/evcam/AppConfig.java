@@ -540,14 +540,18 @@ public class AppConfig {
      * 熄屏持续录制（项目拥有者 2026-09-26 定）。
      *
      * <p>停车前在录像（手动、自动都算），熄屏后接着录。只管录：不申请唤醒、不拉住车机，
-     * 车机睡了录像就停在那一刻，醒来接着录；熄屏期间断了也不去抢相机、不反复重试，等亮屏再接。
-     * 每一段都记黑匣子。</p>
+     * 车机睡了录像就停在那一刻，醒来接着录；醒着的时候（哨兵模式）断了，环视一恢复就接回，
+     * 和亮屏时一样。每一段都记黑匣子。</p>
+     *
+     * <p>为什么要有它（项目拥有者，实测过的事实）：下车前打开车机自己的「哨兵模式」，
+     * 车机会一直醒着、只是黑屏；这时 App 开着录像，人下车、屏幕黑了，录像照样一直录。
+     * 这个选项就是为了保住这件事，所以<b>默认开</b>。</p>
      *
      * <p>和开发者选项里的「息屏录制」是两回事：那个没在录的时候也不关相机，这个不管那件事。
      * 让车机保持醒着（保活）留给「定时保活」去研究。</p>
      */
     public boolean isScreenOffKeepRecording() {
-        return prefs.getBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, false);
+        return prefs.getBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, true);
     }
 
     public void setScreenOffKeepRecording(boolean enabled) {

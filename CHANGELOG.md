@@ -7,6 +7,16 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.41.0-alpha] - 2026-09-26
+
+- **"Keep recording when the screen goes off" is now on by default.** It is there for the
+  car's sentry mode: the car stays awake with the screen dark, and recording should keep going.
+- An interrupted recording is resumed while the screen is off again, as soon as the surround
+  view is back (1.39.0 had made it wait for the screen). While it waits to resume, the cameras
+  count as in use by recording, so the super mirror no longer releases them at screen-off.
+- The black box summary at screen-on now says how many times recording stopped during the
+  screen-off stretch, not just whether it is recording now.
+
 ## [1.40.0-alpha] - 2026-09-26
 
 - **Fisheye correction on the live surround view and in video playback** (experimental).

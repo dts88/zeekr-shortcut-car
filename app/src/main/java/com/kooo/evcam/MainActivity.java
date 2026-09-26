@@ -230,8 +230,8 @@ public class MainActivity extends AppCompatActivity {
      */
     private long keepRecordingOffAtElapsed;
     private long keepRecordingOffAtUptime;
-    /** 熄屏中「录像先不接回」这一句，每次打断只记一次。 */
-    private boolean resumeDeferredNoted;
+    /** 熄屏持续录制这一段里录像停过几次（停了又接回的也算）。 */
+    private int keepRecordingStops;
     private static final long SCREEN_OFF_DELAY_MS = 10000;  // 息屏后等待10秒（停止录制）
     private static final long SCREEN_ON_DELAY_MS = 10000;   // 亮屏后等待10秒（恢复录制）
     private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
@@ -1844,7 +1844,9 @@ public class MainActivity extends AppCompatActivity {
      */
     private void syncRecordingClaim() {
         com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
-        if (isRecording || isRemoteRecording || isAutoRecordingPending) {
+        // 在等环视恢复、准备接回录像的，也算「正要开始录」：不算的话，后视镜熄屏那一步会把相机放掉，
+        // 哨兵模式（车机醒着、黑屏）下录像一断就再也接不回来
+        if (isRecording || isRemoteRecording || isAutoRecordingPending || surroundResumeCheck != null) {
             needs.claim(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
         } else {
             needs.release(com.kooo.evcam.camera.CameraNeeds.Holder.RECORDING);
@@ -3220,7 +3222,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void armSurroundResume() {
         disarmSurroundResume();
-        resumeDeferredNoted = false;
         surroundResumeCheck = new Runnable() {
             @Override
             public void run() {
@@ -3233,16 +3234,7 @@ public class MainActivity extends AppCompatActivity {
                         || !intent.shouldRestore(true)) {
                     // 已经有人把它开起来了，或者人停了：不用等了
                     surroundResumeCheck = null;
-                    return;
-                }
-                if (reconcileScreenState("resume-poll")) {
-                    // 熄屏中：不去抢相机、不反复重试 —— 这时候车机或原厂功能可能正用着相机，
-                    // 也不该为了接回录像把车机折腾醒。等亮屏再接
-                    if (!resumeDeferredNoted) {
-                        resumeDeferredNoted = true;
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏中，录像先不接回，等亮屏");
-                    }
-                    surroundResumeHandler.postDelayed(this, SURROUND_RESUME_POLL_MS);
+                    syncRecordingClaim();
                     return;
                 }
                 if (surroundHealthy()) {
@@ -3261,12 +3253,14 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         surroundResumeHandler.postDelayed(surroundResumeCheck, SURROUND_RESUME_POLL_MS);
+        syncRecordingClaim();
     }
 
     private void disarmSurroundResume() {
         if (surroundResumeCheck != null) {
             surroundResumeHandler.removeCallbacks(surroundResumeCheck);
             surroundResumeCheck = null;
+            syncRecordingClaim();
         }
     }
 
@@ -3302,10 +3296,6 @@ public class MainActivity extends AppCompatActivity {
         }
         // 正在等环视的那个检查会处理；额度用完了也不再试
         if (surroundResumeCheck != null || !resumeBudget.allows()) {
-            return;
-        }
-        // 熄屏中不接（同 armSurroundResume）：等亮屏
-        if (reconcileScreenState("30s-check")) {
             return;
         }
         
@@ -3465,6 +3455,7 @@ public class MainActivity extends AppCompatActivity {
             if (appConfig.isScreenOffKeepRecording()) {
                 keepRecordingOffAtElapsed = android.os.SystemClock.elapsedRealtime();
                 keepRecordingOffAtUptime = android.os.SystemClock.uptimeMillis();
+                keepRecordingStops = 0;
                 AppLog.d(TAG, "熄屏持续录制开着，接着录");
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：熄屏持续录制开着，接着录（不唤醒车机）");
                 return;
@@ -3546,9 +3537,13 @@ public class MainActivity extends AppCompatActivity {
         long awakeMs = android.os.SystemClock.uptimeMillis() - keepRecordingOffAtUptime;
         keepRecordingOffAtElapsed = 0;
         keepRecordingOffAtUptime = 0;
+        int stops = keepRecordingStops;
+        keepRecordingStops = 0;
         com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏：熄屏持续录制这一段结束。熄屏 "
                 + offMs / 1000 + " 秒，其中车机睡了 " + Math.max(0L, offMs - awakeMs) / 1000
-                + " 秒；录像" + (isRecording ? "一直在录" : "中途停了（原因见上面的「录像停止原因」）"));
+                + " 秒；录像" + (stops == 0 && isRecording ? "一直在录"
+                        : "中途停过 " + stops + " 次（原因见上面的「录像停止原因」），现在"
+                        + (isRecording ? "在录" : "没在录")));
     }
 
     /**
@@ -3905,6 +3900,9 @@ public class MainActivity extends AppCompatActivity {
             resumeBudget.noteRecordingLasted(lasted);
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录像停止原因: " + reason
                     + "，这一段录了 " + (lasted / 1000) + " 秒");
+            if (keepRecordingOffAtElapsed > 0) {
+                keepRecordingStops++;
+            }
 
             if (reason == com.kooo.evcam.recording.RecordingStops.Reason.USER) {
                 if (!quietStop) {

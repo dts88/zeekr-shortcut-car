@@ -295,6 +295,7 @@
 
         <SwitchPreferenceCompat
             android:key="pref_screen_off_keep_recording"
+            android:defaultValue="true"
             android:title="@string/set_screen_off_keep_title"
             android:summary="@string/set_screen_off_keep_summary" />
 
