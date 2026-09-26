@@ -71,8 +71,7 @@ public class HardcodedTextTest {
         // ---- 纯开发者工具：入口都在开发者选项里（抽屉里的补盲 / 超视也只在解锁后显示） ----
         String developer = "开发者工具，只在开发者选项里出现";
         for (String f : new String[]{
-                "settings/PermissionsPreferenceFragment.java", "CustomCameraConfigFragment.java", "CustomLayoutManager.java",
-                "LogcatViewerActivity.java", "repair/Mp4RepairFlow.java"}) {
+                "settings/PermissionsPreferenceFragment.java", "LogcatViewerActivity.java", "repair/Mp4RepairFlow.java"}) {
             JAVA_ALLOWED.put(f, developer);
         }
         String blindSpot = "补盲 / 超视：设置页和抽屉入口都只在开发者模式解锁后出现";
@@ -109,17 +108,11 @@ public class HardcodedTextTest {
 
         String xmlDeveloper = "开发者工具 / 自定义车型（排查用）的布局";
         for (String f : new String[]{
-                "layout/activity_logcat_viewer.xml", "layout/activity_main_custom.xml",
-                "layout/dialog_blind_spot_disclaimer.xml", "layout/dialog_wheel_settings.xml",
-                "layout/fragment_blind_spot_correction.xml", "layout/fragment_blind_spot_lab.xml",
-                "layout/fragment_custom_camera_config.xml", "layout/fragment_secondary_blind_spot_adjust.xml",
+                "layout/activity_logcat_viewer.xml", "layout/dialog_blind_spot_disclaimer.xml", "layout/fragment_blind_spot_correction.xml", "layout/fragment_blind_spot_lab.xml",
+                "layout/fragment_secondary_blind_spot_adjust.xml",
                 "layout/fragment_secondary_display_settings.xml",
-                "layout/layout_custom_buttons_multi.xml",
-                "layout/layout_custom_buttons_multi_vertical.xml",
                 "layout/view_blind_spot_floating.xml", "layout/view_blind_spot_floating_multiview.xml",
-                "layout/view_mock_turn_signal_floating.xml",
-                // 自定义车型的画面长按打开的窗口调整；自定义只在开发者选项里能选
-                "layout/dialog_fullscreen_preview.xml"}) {
+                "layout/view_mock_turn_signal_floating.xml"}) {
             XML_ALLOWED.put(f, xmlDeveloper);
         }
     }

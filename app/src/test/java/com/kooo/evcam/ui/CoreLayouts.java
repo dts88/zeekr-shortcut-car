@@ -15,7 +15,7 @@ import java.util.stream.Stream;
 /**
  * 哪些布局算「核心界面」。
  *
- * <p>规范（`docs/ui-spec.md`）管的是用户用得到的那些界面。开发者工具、自定义车型、
+ * <p>规范（`docs/ui-spec.md`）管的是用户用得到的那些界面。开发者工具、
  * 副屏这些是排查用的，不参与设计体系 —— 名单写在这一处，几条测试共用，
  * 不各抄一份（抄三份的下场是改了两份、忘了第三份）。</p>
  *
@@ -26,14 +26,9 @@ final class CoreLayouts {
 
     /** 排查用的界面，不参与设计体系。 */
     private static final Set<String> TROUBLESHOOTING = new HashSet<>(Arrays.asList(
-            "activity_logcat_viewer.xml", "activity_main_custom.xml",
-            "dialog_blind_spot_disclaimer.xml", "dialog_fullscreen_preview.xml",
-            "dialog_wheel_settings.xml", "fragment_blind_spot_correction.xml",
-            "fragment_blind_spot_lab.xml", "fragment_custom_camera_config.xml",
-            "fragment_secondary_blind_spot_adjust.xml",
-            "fragment_secondary_display_settings.xml", "layout_custom_buttons_multi.xml",
-            "layout_custom_buttons_multi_vertical.xml", "layout_custom_buttons_standard.xml",
-            "layout_custom_buttons_standard_vertical.xml", "presentation_secondary_display.xml",
+            "activity_logcat_viewer.xml", "dialog_blind_spot_disclaimer.xml", "fragment_blind_spot_correction.xml",
+            "fragment_blind_spot_lab.xml", "fragment_secondary_blind_spot_adjust.xml",
+            "fragment_secondary_display_settings.xml", "presentation_secondary_display.xml",
             "presentation_secondary_display_multiview.xml", "view_blind_spot_floating.xml",
             "view_blind_spot_floating_multiview.xml",
             "view_mock_turn_signal_floating.xml", "view_preview_correction_floating.xml"));

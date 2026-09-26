@@ -125,7 +125,7 @@
 **设置界面整体低一档**（行标题用 Body、说明用 Micro）：它是停着读的密集列表，
 一屏十几行，按开车时瞟一眼的尺寸排会挤满整屏。
 
-`TypeScaleTest` 钉住这条，开发者工具和自定义车型的布局不在其列。
+`TypeScaleTest` 钉住这条，开发者工具的布局不在其列。
 
 ### 颜色（`colors.xml` / `values-night/colors.xml`）
 

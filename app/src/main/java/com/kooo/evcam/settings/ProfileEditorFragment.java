@@ -602,9 +602,6 @@ public class ProfileEditorFragment extends Fragment {
         if (Profile.PRESET_COMPOSITE_MULTI.equals(profile.id)) {
             return getString(R.string.opt_model_zeekr_multi);
         }
-        if (Profile.PRESET_CUSTOM.equals(profile.id)) {
-            return getString(R.string.opt_model_custom);
-        }
         return profile.name.isEmpty() ? profile.id : profile.name;
     }
 

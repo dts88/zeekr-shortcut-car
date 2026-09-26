@@ -127,7 +127,6 @@
     <string name="opt_mode_auto">自动（推荐）</string>
     <string name="opt_model_zeekr">极氪7X（环视合成流）</string>
     <string name="opt_model_zeekr_multi">极氪7X（环视 + 前后座舱）</string>
-    <string name="opt_model_custom">自定义（排查用）</string>
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
@@ -641,8 +640,6 @@
     <string name="dev_permissions_summary">管理应用所需的各项权限</string>
     <string name="dev_blind_spot_title">补盲选项</string>
     <string name="dev_supervision_title">超视模式</string>
-    <string name="dev_custom_config_title">自定义界面配置</string>
-    <string name="dev_custom_config_summary">「视频流配置」选「自定义」后，在这里配摄像头路数、映射、旋转与布局</string>
     <string name="dev_raw_frame_title">拍照时另存原始整帧</string>
     <string name="dev_raw_frame_summary">不切分、不盖角标，连同画面几何一起存到 photos/raw。用来分析合成流的排布和鱼眼参数</string>
     <string name="dev_repair_mp4_title">修复未封口的视频</string>

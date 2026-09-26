@@ -39,14 +39,13 @@ public final class SettingsRegistry {
     /**
      * 车型（视频流配置）。
      *
-     * <p>只列出本项目实际提供的三项。上游那些银河/星舰/手机车型的常量与分支代码都还在，
+     * <p>只列出本项目实际提供的两项。上游那些银河/星舰/手机车型的常量与分支代码都还在，
      * 但不出现在这里 —— 不提供的选项就不该出现在合法取值里，否则自检会把它们放行。</p>
      */
     public static final SettingSpec CAR_MODEL = SettingSpec.of(
             "car_model", "车型", "zeekr_7x",
             entry("zeekr_7x", "极氪7X（环视合成流）", R.string.opt_model_zeekr),
-            entry("zeekr_7x_multi", "极氪7X（环视 + 前后座舱）", R.string.opt_model_zeekr_multi),
-            entry("custom", "自定义（排查用）", R.string.opt_model_custom));
+            entry("zeekr_7x_multi", "极氪7X（环视 + 前后座舱）", R.string.opt_model_zeekr_multi));
 
     /**
      * 界面语言。

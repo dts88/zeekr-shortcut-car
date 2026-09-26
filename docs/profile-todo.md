@@ -68,8 +68,3 @@ axis mapping (`LaneOrientation`) but not the fit-and-rotate arithmetic. The drag
 stage (0.49.0) was built without merging them, because it only edits surround lanes. The
 merge belongs with the step above: once a cabin pane can be placed, both paths place a
 picture in a rectangle and should share one implementation.
-
-## Custom camera mapping
-
-`Profile.PRESET_CUSTOM` still delegates to the old camera-mapping data
-(`CustomCameraConfigFragment`). Camera ids and names are not part of a profile yet.

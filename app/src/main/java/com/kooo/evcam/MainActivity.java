@@ -10,14 +10,12 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SubMenu;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,12 +48,7 @@ import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -102,7 +95,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private AutoFitTextureView textureFront, textureBack, textureLeft, textureRight;
+    private AutoFitTextureView textureFront, textureBack, textureLeft;
     /** 极氪合成流四宫格容器；非该车型时为 null。 */
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
     private TextView tvCompositeInfo;
@@ -119,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** 极氪布局里是一张卡片（点 + 环 + 两行字），自定义车型里还是普通按钮 —— 所以只当 View 用。 */
     private View btnStartRecord;
-    private Button btnExit, btnMinimize, btnTakePhoto;
+    private Button btnMinimize, btnTakePhoto;
 
     /** 点开放大了哪一块：环视那一块，或者座舱的某一格；null 表示没放大。 */
     private View expandedPreview;
@@ -249,8 +242,6 @@ public class MainActivity extends AppCompatActivity {
     // 车型配置相关
     private AppConfig appConfig;
     private int configuredCameraCount = 4;  // 配置的摄像头数量
-    private CustomLayoutManager customLayoutManager;  // 自定义车型布局管理器
-
     // 录制状态显示相关
     private TextView tvRecordingStats;
     private android.os.Handler recordingTimerHandler;
@@ -597,7 +588,7 @@ public class MainActivity extends AppCompatActivity {
      * 按车型选布局。
      *
      * <p>只有三种可能：{@code getCarModel()} 走 {@link SettingsRegistry} 做净化，
-     * 取值只会是极氪的两档或自定义。以前这里还排着银河 E5 / L6 / L7 / 星舰 / 手机
+     * 取值只会是极氪的两档。以前这里还排着银河 E5 / L6 / L7 / 星舰 / 手机
      * 等一长串分支，它们判断的取值早就选不出来了 —— 那些布局连同分支一起删掉了，
      * 留着只会让人以为还支持那些车。</p>
      */
@@ -617,11 +608,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (Profile.PRESET_CUSTOM.equals(profile.id)) {
-            layoutId = R.layout.activity_main_custom;
-            configuredCameraCount = appConfig.getCameraCount();
-            AppLog.d(TAG, "自定义布局：" + configuredCameraCount + " 路");
-        } else if (enabled > 1) {
+        if (enabled > 1) {
             layoutId = R.layout.activity_main_zeekr_7x_multi;
             configuredCameraCount = Math.min(enabled, 3);
             AppLog.d(TAG, "多路布局：配置里启用了 " + enabled + " 路");
@@ -694,7 +681,6 @@ public class MainActivity extends AppCompatActivity {
         textureFront = findViewById(R.id.texture_front);
         textureBack = findViewById(R.id.texture_back);  // 1摄布局中为null
         textureLeft = findViewById(R.id.texture_left);  // 1摄和2摄布局中为null
-        textureRight = findViewById(R.id.texture_right);  // 1摄和2摄布局中为null
 
         // 极氪合成流：texture_front 是容器里那个普通的 TextureView，
         // 四宫格由父容器 FourLaneContainer 重画子视图实现
@@ -719,11 +705,7 @@ public class MainActivity extends AppCompatActivity {
         tvDebugOverlay = findViewById(R.id.tv_debug_overlay);
         initDebugOverlayTapDetection();
         
-        // 更新摄像头标签（如果是自定义车型）
         updateCameraLabels();
-
-        // 初始化自定义布局管理器（如果是自定义车型）
-        initCustomLayoutManager();
 
         // 菜单按钮点击事件（部分布局可能没有此按钮）
         View btnMenu = findViewById(R.id.btn_menu);
@@ -792,9 +774,6 @@ public class MainActivity extends AppCompatActivity {
         if (textureLeft != null && PreviewSlots.exists(configuredCameraCount, "left")) {
             textureLeft.setSurfaceTextureListener(buildSurfaceListener("left"));
         }
-        if (textureRight != null && PreviewSlots.exists(configuredCameraCount, "right")) {
-            textureRight.setSurfaceTextureListener(buildSurfaceListener("right"));
-        }
     }
 
     /** 从别的界面按菜单键回来：抽屉要开着，否则那一下点击看起来没反应。 */
@@ -829,7 +808,7 @@ public class MainActivity extends AppCompatActivity {
                     if (cameraManager == null) {
                         initCamera();
                     } else {
-                        cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, textureRight);
+                        cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
                     }
                 }
             }
@@ -867,7 +846,6 @@ public class MainActivity extends AppCompatActivity {
         TextView labelFront = findViewById(R.id.label_front);
         TextView labelBack = findViewById(R.id.label_back);
         TextView labelLeft = findViewById(R.id.label_left);
-        TextView labelRight = findViewById(R.id.label_right);
         
         // 设置自定义名称，如果名称为空则隐藏标签
         if (labelFront != null) {
@@ -878,9 +856,6 @@ public class MainActivity extends AppCompatActivity {
         }
         if (labelLeft != null && configuredCameraCount >= 3) {
             updateCameraLabel(labelLeft, appConfig.getCameraName(this, "left"));
-        }
-        if (labelRight != null && configuredCameraCount >= 4) {
-            updateCameraLabel(labelRight, appConfig.getCameraName(this, "right"));
         }
     }
     
@@ -894,105 +869,6 @@ public class MainActivity extends AppCompatActivity {
             label.setText(name);
             label.setVisibility(View.VISIBLE);
         }
-    }
-
-    /**
-     * 初始化自定义布局管理器（仅在自定义车型时有效）
-     * 业务逻辑委托给 CustomLayoutManager 处理
-     */
-    private void initCustomLayoutManager() {
-        if (!appConfig.needsCustomLayoutManager()) {
-            return;
-        }
-
-        // 获取视图引用
-        android.widget.FrameLayout frameFront = findViewById(R.id.frame_front);
-        android.widget.FrameLayout frameBack = findViewById(R.id.frame_back);
-        android.widget.FrameLayout frameLeft = findViewById(R.id.frame_left);
-        android.widget.FrameLayout frameRight = findViewById(R.id.frame_right);
-        View editControls = findViewById(R.id.edit_controls);
-        View containerCameras = findViewById(R.id.container_cameras);
-        
-        // 按钮容器根据方向选择
-        String buttonOrientation = appConfig.getCustomButtonOrientation();
-        boolean isVertical = AppConfig.BUTTON_ORIENTATION_VERTICAL.equals(buttonOrientation);
-        android.view.ViewGroup buttonContainer = isVertical ? 
-            findViewById(R.id.container_buttons_left) : 
-            findViewById(R.id.container_buttons_bottom);
-
-        // 根据摄像头数量隐藏不需要的容器。
-        // 同样按槽位序号分开判断：3 路时 left 该留着，只藏 right。
-        if (configuredCameraCount < 4) {
-            if (frameRight != null) frameRight.setVisibility(View.GONE);
-        }
-        if (configuredCameraCount < 3) {
-            if (frameLeft != null) frameLeft.setVisibility(View.GONE);
-        }
-        if (configuredCameraCount < 2) {
-            if (frameBack != null) frameBack.setVisibility(View.GONE);
-        }
-
-        // 动态加载按钮布局
-        setupCustomButtonLayout(buttonContainer);
-
-        // 初始化布局管理器（所有业务逻辑由 Manager 处理）
-        customLayoutManager = new CustomLayoutManager(this);
-        customLayoutManager.setCameraCount(configuredCameraCount);
-        customLayoutManager.setOnButtonLayoutChangeListener(orientation -> {
-            // 重新加载按钮布局
-            android.view.ViewGroup newContainer = orientation.equals(AppConfig.BUTTON_ORIENTATION_VERTICAL) ?
-                    findViewById(R.id.container_buttons_left) : findViewById(R.id.container_buttons_bottom);
-            setupCustomButtonLayout(newContainer);
-            
-            // 更新布局管理器中的按钮容器引用
-            customLayoutManager.updateButtonContainer(newContainer);
-        });
-        customLayoutManager.setupFloatingViews(
-                frameFront, frameBack, frameLeft, frameRight, null,
-                buttonContainer, editControls, containerCameras,
-                textureFront, textureBack, textureLeft, textureRight);
-
-        // 初始化摄像头录制开关
-        initCameraToggleButtons();
-
-        AppLog.d(TAG, "自定义布局管理器初始化完成");
-    }
-
-    /**
-     * 初始化摄像头开关（多视角布局）
-     * 在每个画面右上角显示macOS风格开关，同时控制画面显示/隐藏和录制
-     */
-    private void initCameraToggleButtons() {
-        // 获取摄像头画面容器
-        android.widget.FrameLayout frameFront = findViewById(R.id.frame_front);
-        android.widget.FrameLayout frameBack = findViewById(R.id.frame_back);
-        android.widget.FrameLayout frameLeft = findViewById(R.id.frame_left);
-        android.widget.FrameLayout frameRight = findViewById(R.id.frame_right);
-
-        setupCameraFrameTouchListeners(frameFront, frameBack, frameLeft, frameRight);
-    }
-
-    private FullscreenPreviewDialog currentFullscreenDialog;
-
-    private void setupCameraFrameTouchListeners(android.widget.FrameLayout frameFront,
-                                                  android.widget.FrameLayout frameBack,
-                                                  android.widget.FrameLayout frameLeft,
-                                                  android.widget.FrameLayout frameRight) {
-        setupSingleCameraFrameTouchListener(frameFront, "front");
-        setupSingleCameraFrameTouchListener(frameBack, "back");
-        setupSingleCameraFrameTouchListener(frameLeft, "left");
-        setupSingleCameraFrameTouchListener(frameRight, "right");
-    }
-
-    private void setupSingleCameraFrameTouchListener(android.widget.FrameLayout frame, String cameraPosition) {
-        if (frame == null) return;
-
-        frame.setOnClickListener(v -> {
-            if (currentFullscreenDialog != null && currentFullscreenDialog.isShowing()) {
-                return;
-            }
-            showFullscreenPreview(cameraPosition);
-        });
     }
 
     /**
@@ -1013,127 +889,7 @@ public class MainActivity extends AppCompatActivity {
         }, 3000);
     }
 
-    private void showFullscreenPreview(String cameraPosition) {
-        AppLog.d(TAG, "显示全屏预览: " + cameraPosition);
-
-        currentFullscreenDialog = new FullscreenPreviewDialog(this, cameraPosition);
-        currentFullscreenDialog.setOnDismissListener(dialog -> {
-            currentFullscreenDialog = null;
-        });
-        currentFullscreenDialog.show();
-    }
-
-    /**
-     * 设置自定义按钮布局
-     * 根据配置动态加载按钮样式和方向
-     */
-    private void setupCustomButtonLayout(android.view.ViewGroup ignoredContainer) {
-        // 获取配置
-        String buttonStyle = appConfig.getCustomButtonStyle();
-        String buttonOrientation = appConfig.getCustomButtonOrientation();
-        boolean isVertical = AppConfig.BUTTON_ORIENTATION_VERTICAL.equals(buttonOrientation);
         
-        AppLog.d(TAG, "按钮配置读取: style=" + buttonStyle + " (standard=" + AppConfig.BUTTON_STYLE_STANDARD + "), orientation=" + buttonOrientation);
-        
-        // 获取两个按钮容器
-        android.widget.FrameLayout leftContainer = findViewById(R.id.container_buttons_left);
-        android.widget.FrameLayout bottomContainer = findViewById(R.id.container_buttons_bottom);
-        
-        if (leftContainer == null || bottomContainer == null) {
-            AppLog.e(TAG, "Button containers not found");
-            return;
-        }
-        
-        // 清除两个容器
-        leftContainer.removeAllViews();
-        bottomContainer.removeAllViews();
-        
-        // 选择布局资源
-        int layoutResId;
-        boolean isStandard = AppConfig.BUTTON_STYLE_STANDARD.equals(buttonStyle);
-        AppLog.d(TAG, "按钮样式判断: buttonStyle='" + buttonStyle + "', STANDARD='" + AppConfig.BUTTON_STYLE_STANDARD + "', isStandard=" + isStandard);
-        
-        if (isStandard) {
-            // 标准按钮（E5风格图标按钮）
-            layoutResId = isVertical ? 
-                R.layout.layout_custom_buttons_standard_vertical : 
-                R.layout.layout_custom_buttons_standard;
-            AppLog.d(TAG, ">>> 使用标准按钮布局(图标) - " + (isVertical ? "竖版" : "横版") + ", layoutResId=" + layoutResId);
-        } else {
-            // 多按钮（文字按钮）
-            layoutResId = isVertical ? 
-                R.layout.layout_custom_buttons_multi_vertical : 
-                R.layout.layout_custom_buttons_multi;
-            AppLog.d(TAG, ">>> 使用多按钮布局(文字) - " + (isVertical ? "竖版" : "横版") + ", layoutResId=" + layoutResId);
-        }
-        
-        // 加载布局到正确的容器
-        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
-        View buttonsView = inflater.inflate(layoutResId, null, false);
-        
-        android.view.ViewGroup targetContainer;
-        if (isVertical) {
-            // 竖版：按钮在左侧
-            leftContainer.addView(buttonsView);
-            leftContainer.setVisibility(View.VISIBLE);
-            bottomContainer.setVisibility(View.GONE);
-            targetContainer = leftContainer;
-        } else {
-            // 横版：按钮在底部
-            bottomContainer.addView(buttonsView);
-            bottomContainer.setVisibility(View.VISIBLE);
-            leftContainer.setVisibility(View.GONE);
-            targetContainer = bottomContainer;
-        }
-
-        // 重新获取按钮引用
-        btnStartRecord = targetContainer.findViewById(R.id.btn_start_record);
-        btnExit = targetContainer.findViewById(R.id.btn_exit);
-        btnTakePhoto = targetContainer.findViewById(R.id.btn_take_photo);
-        bindRecordButtonUi();
-
-        // 设置按钮点击事件
-        if (btnStartRecord != null) {
-            btnStartRecord.setOnClickListener(v -> toggleRecording());
-        }
-        if (btnExit != null) {
-            btnExit.setOnClickListener(v -> exitApp());
-        }
-        if (btnTakePhoto != null) {
-            btnTakePhoto.setOnClickListener(v -> takePicture());
-        }
-
-        // 设置其他快捷按钮
-        View btnVideoPlayback = targetContainer.findViewById(R.id.btn_video_playback);
-        if (btnVideoPlayback != null) {
-            btnVideoPlayback.setOnClickListener(v -> showPlaybackInterface());
-        }
-
-        View btnPhotoPlayback = targetContainer.findViewById(R.id.btn_photo_playback);
-        if (btnPhotoPlayback != null) {
-            btnPhotoPlayback.setOnClickListener(v -> showPhotoPlaybackInterface());
-        }
-
-        View btnSettings = targetContainer.findViewById(R.id.btn_settings);
-        if (btnSettings != null) {
-            btnSettings.setOnClickListener(v -> showSettingsInterface());
-        }
-        
-        // 菜单按钮（标准按钮样式有此按钮）
-        View btnMenu = targetContainer.findViewById(R.id.btn_menu);
-        if (btnMenu != null) {
-            btnMenu.setOnClickListener(v -> {
-                if (drawerLayout != null) {
-                    if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                        drawerLayout.closeDrawer(GravityCompat.START);
-                    } else {
-                        drawerLayout.openDrawer(GravityCompat.START);
-                    }
-                }
-            });
-        }
-    }
-    
     /**
      * 初始化录制状态显示
      */
@@ -1894,7 +1650,7 @@ public class MainActivity extends AppCompatActivity {
             wireCameraCallbacks();
 
             // 绑定 TextureView
-            cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, textureRight);
+            cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
 
             // 布局是新建的，座舱两格默认都显示。管线里只有真正分到了相机的那一路才有实例，
             // 所以问它就等于新建路径当时的结论 —— 以前这一步只在新建路径里做，
@@ -1995,11 +1751,6 @@ public class MainActivity extends AppCompatActivity {
         applyProfileCells();
         AppLog.i(TAG, "本次相机初始化使用的配置:\n" + activeProfile);
 
-        if (Profile.PRESET_CUSTOM.equals(activeProfile.id)) {
-            // 自定义的相机映射还是另一套数据，第 4 步才收编
-            initCamerasForCustomModel(cameraIds);
-            return;
-        }
         int enabled = 0;
         for (CameraProfile camera : activeProfile.cameras) {
             if (camera.enabled) {
@@ -2337,7 +2088,6 @@ public class MainActivity extends AppCompatActivity {
                     case "front": textureView = textureFront; break;
                     case "back":  textureView = textureBack;  break;
                     case "left":  textureView = textureLeft;  break;
-                    case "right": textureView = textureRight; break;
                     default:      textureView = null;         break;
                 }
                 if (textureView != null) {
@@ -2575,85 +2325,6 @@ public class MainActivity extends AppCompatActivity {
                 getString(split ? R.string.composite_split : R.string.composite_whole));
     }
 
-    /**
-     * 自定义车型：使用用户配置的摄像头映射
-     */
-    private void initCamerasForCustomModel(String[] cameraIds) {
-        // 获取用户配置的摄像头ID
-        String frontId = appConfig.getCameraId("front");
-        String backId = appConfig.getCameraId("back");
-        String leftId = appConfig.getCameraId("left");
-        String rightId = appConfig.getCameraId("right");
-        
-        AppLog.d(TAG, "自定义车型配置 - 摄像头数量: " + configuredCameraCount);
-        AppLog.d(TAG, "  前: " + frontId + ", 后: " + backId + ", 左: " + leftId + ", 右: " + rightId);
-        
-        switch (configuredCameraCount) {
-            case 1:
-                // 1摄像头模式
-                if (textureFront != null) {
-                    cameraManager.initCameras(
-                            frontId, textureFront,
-                            null, null,
-                            null, null,
-                            null, null
-                    );
-                }
-                break;
-            case 2:
-                // 2摄像头模式
-                if (textureFront != null && textureBack != null) {
-                    cameraManager.initCameras(
-                            frontId, textureFront,
-                            backId, textureBack,
-                            null, null,
-                            null, null
-                    );
-                }
-                break;
-            default:
-                // 4摄像头模式
-                if (textureFront != null && textureBack != null && textureLeft != null && textureRight != null) {
-                    cameraManager.initCameras(
-                            frontId, textureFront,
-                            backId, textureBack,
-                            leftId, textureLeft,
-                            rightId, textureRight
-                    );
-
-                    // 设置自定义旋转角度（仅用于自定义车型）
-                    setCustomRotationForCameras();
-                }
-                break;
-        }
-    }
-
-    /**
-     * 为自定义车型的摄像头设置旋转角度
-     * 注意：自定义布局默认不旋转、不镜像，所有调节在自由调节界面进行
-     */
-    private void setCustomRotationForCameras() {
-        if (!appConfig.needsCustomLayoutManager()) {
-            return;  // 只对自定义车型/多视角应用
-        }
-
-        // 自定义布局：默认不应用任何旋转，保持原始状态
-        // 所有旋转、镜像等调节都在自由调节界面进行
-        AppLog.d(TAG, "自定义车型：保持摄像头原始状态，不应用自动旋转");
-        
-        // 明确设置所有摄像头旋转为0
-        if (cameraManager != null) {
-            SingleCamera frontCamera = cameraManager.getCamera("front");
-            SingleCamera backCamera = cameraManager.getCamera("back");
-            SingleCamera leftCamera = cameraManager.getCamera("left");
-            SingleCamera rightCamera = cameraManager.getCamera("right");
-
-            if (frontCamera != null) frontCamera.setCustomRotation(0);
-            if (backCamera != null) backCamera.setCustomRotation(0);
-            if (leftCamera != null) leftCamera.setCustomRotation(0);
-            if (rightCamera != null) rightCamera.setCustomRotation(0);
-        }
-    }
 
     /**
      * 对 TextureView 应用旋转变换 (修正版 - 解决变形问题)
@@ -2748,34 +2419,24 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (appConfig.needsCustomLayoutManager()) {
+        // 配置里没有这一格：按老规矩摆（上游给银河 E5 写的那条路）
+        boolean needRotation = "left".equals(cameraKey) || "right".equals(cameraKey);
+        if (needRotation) {
+            textureView.setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
+            AppLog.d(TAG, "设置 " + cameraKey + " 宽高比(E5旋转后): " + previewSize.getHeight() + ":" + previewSize.getWidth());
+            int rotation = "left".equals(cameraKey) ? 270 : 90;
+            applyRotationTransform(textureView, previewSize, rotation, cameraKey);
+        } else {
             textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
-            textureView.setFillContainer(true);
-            AppLog.d(TAG, "设置 " + cameraKey + " 宽高比(自定义-填充): " + previewSize.getWidth() + "x" + previewSize.getHeight());
-            if (customLayoutManager != null) {
-                customLayoutManager.updateCameraAspectRatio(cameraKey, previewSize.getWidth(), previewSize.getHeight(), 0);
+            boolean useFillMode = configuredCameraCount >= 4;
+            if (useFillMode) {
+                textureView.setFillContainer(true);
+                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 填满模式");
+            } else {
+                textureView.setFillContainer(false);
+                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 适应模式");
             }
             textureView.setTransform(new android.graphics.Matrix());   // 回到单位阵：这一路以前可能带着别的矩阵
-        } else {
-            // E5 等其他车型
-            boolean needRotation = "left".equals(cameraKey) || "right".equals(cameraKey);
-            if (needRotation) {
-                textureView.setAspectRatio(previewSize.getHeight(), previewSize.getWidth());
-                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比(E5旋转后): " + previewSize.getHeight() + ":" + previewSize.getWidth());
-                int rotation = "left".equals(cameraKey) ? 270 : 90;
-                applyRotationTransform(textureView, previewSize, rotation, cameraKey);
-            } else {
-                textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
-                boolean useFillMode = configuredCameraCount >= 4;
-                if (useFillMode) {
-                    textureView.setFillContainer(true);
-                    AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 填满模式");
-                } else {
-                    textureView.setFillContainer(false);
-                    AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 适应模式");
-                }
-                textureView.setTransform(new android.graphics.Matrix());   // 回到单位阵：这一路以前可能带着别的矩阵
-            }
         }
     }
 
@@ -2921,7 +2582,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 车型
         sb.append("\n").append(getString(R.string.debug_model,
-                appConfig.getCarModel(), appConfig.getCameraCount()));
+                appConfig.getCarModel(), configuredCameraCount));
 
         // 版本
         try {
@@ -3764,7 +3425,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 int count = cameras.size();
                 Toast.makeText(MainActivity.this,
-                        count == appConfig.getCameraCount()
+                        count == configuredCameraCount
                                 ? getString(R.string.msg_recording_started_all)
                                 : getString(R.string.msg_recording_started_n, count),
                         Toast.LENGTH_SHORT).show();

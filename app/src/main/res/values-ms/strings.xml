@@ -109,7 +109,6 @@
     <string name="opt_mode_auto">Automatik (disyorkan)</string>
     <string name="opt_model_zeekr">Zeekr 7X (strim komposit keliling)</string>
     <string name="opt_model_zeekr_multi">Zeekr 7X (keliling + kabin depan dan belakang)</string>
-    <string name="opt_model_custom">Tersuai (penyelesaian masalah)</string>
 
     <!-- Gesaan dan dialog tetapan -->
     <string name="msg_stream_changed">Profil strim ditetapkan kepada “%1$s”. Mulakan semula apl untuk terpakai</string>
@@ -631,8 +630,6 @@
     <string name="dev_permissions_summary">Urus kebenaran yang diperlukan apl</string>
     <string name="dev_blind_spot_title">Pilihan titik buta</string>
     <string name="dev_supervision_title">Pandangan super</string>
-    <string name="dev_custom_config_title">Susun atur tersuai</string>
-    <string name="dev_custom_config_summary">Selepas memilih “Tersuai” dalam Profil strim, sediakan kamera, pemetaan, putaran dan susun atur di sini</string>
     <string name="dev_raw_frame_title">Simpan juga bingkai asal</string>
     <string name="dev_raw_frame_summary">Tanpa dipecah atau ditera, bersama nota geometri bingkai, dalam photos/raw. Untuk mengkaji susunan lorong dan parameter kanta</string>
     <string name="dev_repair_mp4_title">Baiki video tanpa indeks</string>

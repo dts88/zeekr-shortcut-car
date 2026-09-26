@@ -363,11 +363,6 @@
             android:key="pref_supervision"
             android:title="@string/dev_supervision_title" />
 
-        <Preference
-            android:key="pref_custom_config"
-            android:title="@string/dev_custom_config_title"
-            android:summary="@string/dev_custom_config_summary" />
-
         <SwitchPreferenceCompat
             android:key="pref_raw_frame_dump"
             android:title="@string/dev_raw_frame_title"

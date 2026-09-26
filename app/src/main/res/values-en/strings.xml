@@ -109,7 +109,6 @@
     <string name="opt_mode_auto">Automatic (recommended)</string>
     <string name="opt_model_zeekr">Zeekr 7X (surround composite)</string>
     <string name="opt_model_zeekr_multi">Zeekr 7X (surround + front and rear cabin)</string>
-    <string name="opt_model_custom">Custom (troubleshooting)</string>
 
     <!-- Settings prompts and dialogs -->
     <string name="msg_stream_changed">Stream profile set to “%1$s”. Restart the app to apply</string>
@@ -633,8 +632,6 @@
     <string name="dev_permissions_summary">Manage the permissions the app needs</string>
     <string name="dev_blind_spot_title">Blind-spot options</string>
     <string name="dev_supervision_title">Super view</string>
-    <string name="dev_custom_config_title">Custom layout</string>
-    <string name="dev_custom_config_summary">After choosing “Custom” in Stream profile, set up cameras, mapping, rotation and layout here</string>
     <string name="dev_raw_frame_title">Also save the raw frame</string>
     <string name="dev_raw_frame_summary">Uncut and unstamped, with a note on the frame geometry, in photos/raw. For working out the lane layout and the lens parameters</string>
     <string name="dev_repair_mp4_title">Repair unfinalised videos</string>

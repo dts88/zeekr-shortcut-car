@@ -713,8 +713,8 @@ ro.board.platform   = msmnile
 
 - `getCameraCount()` —— 进而决定 `requiredTextureCount`、`maxOpenCameras`、
   哪些槽位参与录制、设置页哪些勾选框可见
-- 加载哪个布局（单路四宫格 / 三路 / 自定义）
-- 是否走 `FourLaneContainer` 拆分、是否需要自定义布局管理器
+- 加载哪个布局（单路四宫格 / 三路）
+- 是否走 `FourLaneContainer` 拆分
 - 预览变换分支（旋转与否）
 - 切换车型时会 `resetRecordingCameraSelection()`
 

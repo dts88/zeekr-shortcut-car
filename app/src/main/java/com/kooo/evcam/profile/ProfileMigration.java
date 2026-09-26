@@ -1,7 +1,7 @@
 package com.kooo.evcam.profile;
 
 /**
- * 建一份配置：按预设摆好相机，把还在设置里的那几项（车型、旋转、镜像）搬过来。
+ * 建一份配置：按预设摆好相机。旧设置里只有车型这一项还要看。
  *
  * <h3>为什么不直接读 AppConfig</h3>
  *
@@ -24,24 +24,6 @@ public final class ProfileMigration {
     public static final class Snapshot {
         /** 车型 / 视频流配置：zeekr_7x / zeekr_7x_multi / 其他。 */
         public String carModel = "zeekr_7x";
-        /** 每一路的旋转角度，按相机键取。 */
-        public IntByKey rotation = key -> 0;
-        /** 每一路是否镜像。只有自定义车型搬它：极氪两份预设里座舱默认镜像。 */
-        public BoolByKey mirror = key -> false;
-        /** 四边裁切，旧值是像素。 */
-        public CropByKey crop = (key, side) -> 0;
-    }
-
-    public interface CropByKey {
-        int get(String key, String side);
-    }
-
-    public interface IntByKey {
-        int get(String key);
-    }
-
-    public interface BoolByKey {
-        boolean get(String key);
     }
 
     private ProfileMigration() {
@@ -52,9 +34,6 @@ public final class ProfileMigration {
         if ("zeekr_7x_multi".equals(carModel)) {
             return Profile.PRESET_COMPOSITE_MULTI;
         }
-        if ("custom".equals(carModel)) {
-            return Profile.PRESET_CUSTOM;
-        }
         return Profile.PRESET_COMPOSITE;
     }
 
@@ -62,9 +41,6 @@ public final class ProfileMigration {
     public static String carModelFor(String profileId) {
         if (Profile.PRESET_COMPOSITE_MULTI.equals(profileId)) {
             return "zeekr_7x_multi";
-        }
-        if (Profile.PRESET_CUSTOM.equals(profileId)) {
-            return "custom";
         }
         return "zeekr_7x";
     }
@@ -83,29 +59,17 @@ public final class ProfileMigration {
         }
     }
 
-    /** 普通相机：一格铺满。 */
-    static void addFullFrame(CameraProfile camera, Snapshot snapshot, String cameraKey) {
-        LaneLayout layout = LaneLayout.cell(-1, 0f, 0f, 1f, 1f);
-        layout.rotation = snapshot.rotation.get(cameraKey);
-        layout.mirrored = snapshot.mirror.get(cameraKey);
-        // 四边裁切旧值是像素，这里存的是比例；当时的画面尺寸拿不到，硬换算是假的，留 0，
-        // 用户在布局编辑里重设。开发者选项里那套「预览矫正」的缩放 / 平移 1.44.0 删了，不再搬
-        camera.lanes.add(layout);
+    /** 普通相机：一格铺满。旋转、镜像、裁切都是默认值，要改去配置编辑里改。 */
+    static void addFullFrame(CameraProfile camera) {
+        camera.lanes.add(LaneLayout.cell(-1, 0f, 0f, 1f, 1f));
     }
 
-    
     public static Profile migrate(Snapshot snapshot) {
         boolean multi = "zeekr_7x_multi".equals(snapshot.carModel);
-        boolean custom = "custom".equals(snapshot.carModel);
 
         Profile profile = new Profile();
-        profile.id = multi ? Profile.PRESET_COMPOSITE_MULTI
-                : custom ? Profile.PRESET_CUSTOM : Profile.PRESET_COMPOSITE;
-        // 「自定义」的相机映射是另一套数据（CustomLayoutManager 那边），第 1 步没有翻译它。
-        // 名字必须说实话 —— 顶着「极氪7X」的名头给出一份不是它的配置，
-        // 比不给更糟：核对的人会以为翻译对了。
-        profile.name = multi ? "环视 + 两路座舱"
-                : custom ? "自定义（相机映射尚未翻译）" : "极氪7X（环视合成流）";
+        profile.id = multi ? Profile.PRESET_COMPOSITE_MULTI : Profile.PRESET_COMPOSITE;
+        profile.name = multi ? "环视 + 两路座舱" : "极氪7X（环视合成流）";
 
         // ---- 环视那一路 ----
         CameraProfile composite = new CameraProfile(CameraProfile.ROLE_COMPOSITE);
@@ -128,19 +92,14 @@ public final class ProfileMigration {
         // 尺寸给 auto：具体多大由相机声明决定，要钉死就去配置编辑里钉
         String cabinSize = StreamSpec.RESOLUTION_AUTO;
         String[] roles = {CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2};
-        String[] keys = {"back", "left"};
         for (int i = 0; i < roles.length; i++) {
             CameraProfile cabin = new CameraProfile(roles[i]);
             cabin.enabled = multi;
             cabin.preview = StreamSpec.preview(cabinSize);
             cabin.record = defaultRecord(cabinSize);
             cabin.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
-            addFullFrame(cabin, snapshot, keys[i]);
-            if (!custom) {
-                // 旧设置里的镜像键不算数：那几个键只有自定义车型的相机映射改得到，
-                // 在极氪预设里它们只是没人动过的 false
-                cabin.lanes.get(0).mirrored = CameraProfile.CABIN_MIRRORED_BY_DEFAULT;
-            }
+            addFullFrame(cabin);
+            cabin.lanes.get(0).mirrored = CameraProfile.CABIN_MIRRORED_BY_DEFAULT;
             profile.cameras.add(cabin);
         }
         return profile;

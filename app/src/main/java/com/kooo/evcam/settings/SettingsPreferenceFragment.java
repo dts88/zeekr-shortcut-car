@@ -22,7 +22,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.CustomCameraConfigFragment;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
@@ -187,19 +186,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         String[] allValues = SettingsRegistry.CAR_MODEL.values();
         String[] allNames = localizedNames(SettingsRegistry.CAR_MODEL);
 
-        List<String> values = new ArrayList<>();
-        List<String> names = new ArrayList<>();
-        for (int i = 0; i < allValues.length; i++) {
-            boolean devOnly = AppConfig.CAR_MODEL_CUSTOM.equals(allValues[i]);
-            if (!devOnly || DeveloperMode.isUnlocked() || allValues[i].equals(current)) {
-                values.add(allValues[i]);
-                names.add(allNames[i]);
-            }
-        }
-
         pref.setPersistent(false);
-        pref.setEntries(names.toArray(new String[0]));
-        pref.setEntryValues(values.toArray(new String[0]));
+        pref.setEntries(allNames);
+        pref.setEntryValues(allValues);
         pref.setValue(current);
         pref.setSummary(pref.getEntry());
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
@@ -915,12 +904,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 ((MainActivity) getActivity()).toggleSupervisionMode();
             }
         });
-
-        // 「自定义」这档视频流配置是能选出来的，但配置它的界面一直没有入口 ——
-        // 选了之后没有任何地方能配摄像头路数和映射
-        onClick("pref_custom_config",
-                pref -> openFragment(new CustomCameraConfigFragment(),
-                        R.string.dev_custom_config_title));
 
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);

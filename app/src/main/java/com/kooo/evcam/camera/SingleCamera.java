@@ -52,7 +52,6 @@ public class SingleCamera {
     private TextureView textureView;
     private CameraCallback callback;
     private String cameraPosition;  // 摄像头位置（front/back/left/right）
-    private int customRotation = 0;  // 自定义旋转角度（仅用于自定义车型）
     /** 最近一次按配置摆位的结果，只给诊断报告看。 */
     private volatile String laneTransformNote = "还没试过";
     /** 挂在预览视图上的重算监听，挂一次就够。 */
@@ -85,8 +84,6 @@ public class SingleCamera {
     private android.graphics.SurfaceTexture mainFloatingSurfaceTexture; // 主屏悬浮窗SurfaceTexture（用于设置buffer尺寸）
     private Surface secondaryDisplaySurface; // 副屏预览Surface
     private android.graphics.SurfaceTexture secondaryDisplaySurfaceTexture; // 副屏SurfaceTexture（用于设置buffer尺寸）
-    private Surface fullscreenPreviewSurface; // 全屏预览Surface
-    private android.graphics.SurfaceTexture fullscreenPreviewSurfaceTexture; // 全屏预览SurfaceTexture（用于设置buffer尺寸）
     private OutputConfiguration activePreviewConfig; // 共享预览配置，用于动态 Surface 增减
     private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
 
@@ -258,10 +255,6 @@ public class SingleCamera {
         if (autoMirrorBack() && this.textureView != null) {
             applyMirrorTransform();
         }
-        if (customRotation != 0 && laneForThisCamera() == null
-                && this.textureView != null && this.textureView.isAvailable()) {
-            applyCustomRotation();
-        }
         if (this.textureView != null) {
             applyLaneTransform();
         }
@@ -277,19 +270,6 @@ public class SingleCamera {
         }
     }
 
-    /**
-     * 设置自定义旋转角度（仅用于自定义车型）
-     * @param rotation 旋转角度（0/90/180/270）
-     */
-    public void setCustomRotation(int rotation) {
-        this.customRotation = rotation;
-        AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") custom rotation set to " + rotation + "°");
-
-        // 如果TextureView已经可用，立即应用旋转
-        if (textureView != null && textureView.isAvailable()) {
-            applyCustomRotation();
-        }
-    }
 
     /**
      * 设置是否为主实例（用于多实例共享同一个cameraId时）
@@ -439,34 +419,6 @@ public class SingleCamera {
         });
     }
 
-    /**
-     * 应用自定义旋转角度（仅用于自定义车型）
-     */
-    private void applyCustomRotation() {
-        if (textureView == null || customRotation == 0) {
-            return;
-        }
-
-        // 在主线程中执行UI操作
-        textureView.post(() -> {
-            android.graphics.Matrix matrix = new android.graphics.Matrix();
-
-            // 获取TextureView的中心点
-            float centerX = textureView.getWidth() / 2f;
-            float centerY = textureView.getHeight() / 2f;
-
-            // 应用旋转
-            matrix.setRotate(customRotation, centerX, centerY);
-
-            // 如果是后摄像头，还需要应用镜像
-            if ("back".equals(cameraPosition)) {
-                matrix.postScale(-1f, 1f, centerX, centerY);
-            }
-
-            textureView.setTransform(matrix);
-            AppLog.d(TAG, "Camera " + cameraId + " (" + cameraPosition + ") applied custom rotation: " + customRotation + "°");
-        });
-    }
 
     public String getCameraId() {
         return cameraId;
@@ -982,7 +934,6 @@ public class SingleCamera {
                 + " mirror=" + surfaceState(mainFloatingSurface)
                 + " record=" + surfaceState(recordSurface)
                 + " secondary=" + surfaceState(secondaryDisplaySurface)
-                + " fullscreen=" + surfaceState(fullscreenPreviewSurface)
                 + " jpeg=" + (jpegReader != null) + "]"
                 + " fps=" + String.format(java.util.Locale.US, "%.1f", currentFps)
                 + " lastResult=" + (last > 0 ? (System.currentTimeMillis() - last) + "ms ago" : "never")
@@ -1012,9 +963,6 @@ public class SingleCamera {
         }
         if (target == secondaryDisplaySurface) {
             return "secondary";
-        }
-        if (target == fullscreenPreviewSurface) {
-            return "fullscreen";
         }
         if (jpegReader != null && target == jpegReader.getSurface()) {
             return "jpeg";
@@ -1056,8 +1004,7 @@ public class SingleCamera {
     public boolean wantsFrames() {
         return isPrimaryInstance && !isPausedByLifecycle
                 && (previewSurface != null || mainFloatingSurface != null
-                || recordSurface != null || secondaryDisplaySurface != null
-                || fullscreenPreviewSurface != null);
+                || recordSurface != null || secondaryDisplaySurface != null);
     }
 
     public boolean isPausedByLifecycle() {
@@ -1624,10 +1571,6 @@ public class SingleCamera {
                     applyMirrorTransform();
                 }
 
-                if (customRotation != 0 && laneForThisCamera() == null) {
-                    applyCustomRotation();
-                }
-
                 applyLaneTransform();
 
                 if (previewSurface == null || !previewSurface.isValid()) {
@@ -1652,8 +1595,6 @@ public class SingleCamera {
                     surface = mainFloatingSurface;
                 } else if (secondaryDisplaySurface != null && secondaryDisplaySurface.isValid()) {
                     surface = secondaryDisplaySurface;
-                } else if (fullscreenPreviewSurface != null && fullscreenPreviewSurface.isValid()) {
-                    surface = fullscreenPreviewSurface;
                 }
             }
             
@@ -1661,7 +1602,6 @@ public class SingleCamera {
             boolean hasAnySurface = (surface != null && surface.isValid())
                     || (mainFloatingSurface != null && mainFloatingSurface.isValid())
                     || (secondaryDisplaySurface != null && secondaryDisplaySurface.isValid())
-                    || (fullscreenPreviewSurface != null && fullscreenPreviewSurface.isValid())
                     || (recordSurface != null && recordSurface.isValid());
             if (!hasAnySurface) {
                 AppLog.d(TAG, "Camera " + cameraId + " no available surfaces, skipping session creation (waiting for surface)");
@@ -1720,9 +1660,6 @@ public class SingleCamera {
                         if (secondaryDisplaySurfaceTexture != null) {
                             secondaryDisplaySurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
                         }
-                        if (fullscreenPreviewSurfaceTexture != null) {
-                            fullscreenPreviewSurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
-                        }
                     }
 
                     if (surface != null && surface.isValid()) {
@@ -1753,25 +1690,6 @@ public class SingleCamera {
                             surfaces.add(secondaryDisplaySurface);
                             previewRequestBuilder.addTarget(secondaryDisplaySurface);
                             AppLog.d(TAG, "Added secondary display surface to SHARED preview stream");
-                        }
-
-                        AppLog.d(TAG, "Camera " + cameraId + " Checking fullscreenPreviewSurface: " + 
-                                fullscreenPreviewSurface + ", isValid=" + (fullscreenPreviewSurface != null && fullscreenPreviewSurface.isValid()) +
-                                ", surface=" + surface + ", mainFloating=" + mainFloatingSurface + ", secondary=" + secondaryDisplaySurface);
-
-                        if (fullscreenPreviewSurface != null && fullscreenPreviewSurface.isValid() &&
-                            fullscreenPreviewSurface != surface && fullscreenPreviewSurface != mainFloatingSurface &&
-                            fullscreenPreviewSurface != secondaryDisplaySurface) {
-                            previewSharedConfig.addSurface(fullscreenPreviewSurface);
-                            surfaces.add(fullscreenPreviewSurface);
-                            previewRequestBuilder.addTarget(fullscreenPreviewSurface);
-                            AppLog.d(TAG, "Added fullscreen preview surface to SHARED preview stream");
-                        } else if (fullscreenPreviewSurface != null) {
-                            AppLog.w(TAG, "Camera " + cameraId + " fullscreenPreviewSurface NOT added: " +
-                                    "valid=" + fullscreenPreviewSurface.isValid() +
-                                    ", sameAsSurface=" + (fullscreenPreviewSurface == surface) +
-                                    ", sameAsMainFloating=" + (fullscreenPreviewSurface == mainFloatingSurface) +
-                                    ", sameAsSecondary=" + (fullscreenPreviewSurface == secondaryDisplaySurface));
                         }
 
 
@@ -2984,38 +2902,6 @@ public class SingleCamera {
         return stuck;
     }
 
-    /**
-     * 设置全屏预览的 Surface（用于全屏预览对话框）
-     * 需要重建 session 来添加新的 Surface
-     */
-    public void setFullscreenPreviewSurface(Surface surface) {
-        setFullscreenPreviewSurface(surface, null);
-    }
-
-    /**
-     * 设置全屏预览的 Surface 和 SurfaceTexture（用于全屏预览对话框）
-     * 需要重建 session 来添加新的 Surface
-     */
-    public void setFullscreenPreviewSurface(Surface surface, android.graphics.SurfaceTexture surfaceTexture) {
-        AppLog.d(TAG, "Camera " + cameraId + " setFullscreenPreviewSurface called, surface=" + surface +
-                ", isValid=" + (surface != null && surface.isValid()));
-
-        this.fullscreenPreviewSurface = surface;
-        this.fullscreenPreviewSurfaceTexture = surfaceTexture;
-
-        if (surface == null) {
-            AppLog.d(TAG, "Fullscreen preview surface is null for camera " + cameraId);
-            return;
-        }
-
-        if (!surface.isValid()) {
-            AppLog.e(TAG, "Camera " + cameraId + " fullscreen preview surface is NOT valid!");
-            return;
-        }
-
-        AppLog.d(TAG, "Camera " + cameraId + " recreating session for fullscreen preview surface");
-        recreateSession(true);
-    }
 
     private boolean tryDynamicSurfaceAddFullscreen(Surface surface) {
         synchronized (sessionLock) {
@@ -3067,26 +2953,6 @@ public class SingleCamera {
         }
     }
 
-    /**
-     * 清除全屏预览的 Surface
-     */
-    public void clearFullscreenPreviewSurface() {
-        final Surface surfaceToRemove = this.fullscreenPreviewSurface;
-        if (surfaceToRemove == null) {
-            AppLog.d(TAG, "Fullscreen preview surface already null for camera " + cameraId);
-            return;
-        }
-        this.fullscreenPreviewSurface = null;
-        this.fullscreenPreviewSurfaceTexture = null;
-
-        AppLog.d(TAG, "Camera " + cameraId + " recreating session to remove fullscreen preview surface");
-        if (backgroundHandler != null) {
-            backgroundHandler.postDelayed(() -> recreateSession(true), 100);
-        } else {
-            recreateSession(true);
-        }
-        AppLog.d(TAG, "Camera " + cameraId + " fullscreen preview surface cleared");
-    }
 
     /**
      * 手动触发重连（重置重连计数）

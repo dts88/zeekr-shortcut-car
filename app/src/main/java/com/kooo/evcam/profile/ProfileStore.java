@@ -127,9 +127,6 @@ public final class ProfileStore {
         AppConfig config = new AppConfig(context);
         ProfileMigration.Snapshot snapshot = new ProfileMigration.Snapshot();
         snapshot.carModel = config.getCarModel();
-        snapshot.rotation = config::getCameraRotation;
-        snapshot.mirror = config::getCameraMirror;
-        snapshot.crop = config::getCameraCrop;
         return snapshot;
     }
 }

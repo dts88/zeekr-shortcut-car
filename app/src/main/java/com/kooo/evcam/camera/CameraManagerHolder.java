@@ -132,8 +132,6 @@ public class CameraManagerHolder {
         String carModel = appConfig.getCarModel();
         if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
             return 3; // 环视 + 两路座舱
-        } else if (appConfig.isCustomCarModel()) {
-            return appConfig.getCameraCount();
         }
         return 1; // 极氪7X：一路合成流，也是兜底
     }
@@ -141,17 +139,15 @@ public class CameraManagerHolder {
     /**
      * 按车型建立摄像头映射（与 MainActivity 同一套，但 TextureView 全部传 null）。
      *
-     * <p>只剩三种：{@code getCarModel()} 读出来已经 sanitize 过，
-     * 设置里列的就那三项，别的值会被拨回 zeekr_7x。银河 E5/L7、星舰7、
-     * 手机模式那几个分支走不到，连同它们的映射方法一起删了。</p>
+     * <p>只剩两种：{@code getCarModel()} 读出来已经 sanitize 过，
+     * 设置里列的就那两项，别的值会被拨回 zeekr_7x。银河 E5/L7、星舰7、
+     * 手机模式那几个分支走不到，连同它们的映射方法一起删了；「自定义」1.44.0 也删了。</p>
      */
     private void initCamerasByCarModel(AppConfig appConfig, CameraManager cm, String[] cameraIds) {
         String carModel = appConfig.getCarModel();
 
         if (AppConfig.CAR_MODEL_ZEEKR_7X_MULTI.equals(carModel)) {
             initCamerasForZeekrMulti(appConfig, cm, cameraIds);
-        } else if (appConfig.isCustomCarModel()) {
-            initCamerasForCustomModel(appConfig, cameraIds);
         } else {
             initCamerasForZeekrComposite(cm, cameraIds);
         }
@@ -220,25 +216,5 @@ public class CameraManagerHolder {
             }
         }
         AppLog.i(TAG, "后台极氪多路映射: " + plan);
-    }
-
-    private void initCamerasForCustomModel(AppConfig appConfig, String[] cameraIds) {
-        String frontId = appConfig.getCameraId("front");
-        String backId = appConfig.getCameraId("back");
-        String leftId = appConfig.getCameraId("left");
-        String rightId = appConfig.getCameraId("right");
-
-        int count = appConfig.getCameraCount();
-        switch (count) {
-            case 1:
-                cameraManager.initCameras(frontId, null, null, null, null, null, null, null);
-                break;
-            case 2:
-                cameraManager.initCameras(frontId, null, backId, null, null, null, null, null);
-                break;
-            default:
-                cameraManager.initCameras(frontId, null, backId, null, leftId, null, rightId, null);
-                break;
-        }
     }
 }

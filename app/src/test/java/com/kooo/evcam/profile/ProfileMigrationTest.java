@@ -120,31 +120,18 @@ public class ProfileMigrationTest {
         }
     }
 
-    /** 每一路的旋转跟着搬过来。 */
-    @Test
-    public void rotationCarriesOverPerCamera() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.carModel = "zeekr_7x_multi";
-        snapshot.rotation = key -> "back".equals(key) ? 180 : 0;
-
-        Profile profile = ProfileMigration.migrate(snapshot);
-
-        assertEquals(180, profile.camera(CameraProfile.ROLE_CABIN_1).lanes.get(0).rotation);
-        assertEquals(0, profile.camera(CameraProfile.ROLE_CABIN_2).lanes.get(0).rotation);
-    }
 
     /**
      * 座舱两路在两份极氪预设里都默认镜像，环视四格不镜像。
      *
      * <p>「环视合成流」那份里两路是关着的，但之后在配置编辑里打开时也得是镜像的，
-     * 所以关着的也要带上。旧设置里的镜像键不算数：那几个键只有自定义车型改得到。</p>
+     * 所以关着的也要带上。</p>
      */
     @Test
     public void cabinsStartMirroredInBothZeekrPresets() {
         for (String model : new String[]{"zeekr_7x", "zeekr_7x_multi"}) {
             ProfileMigration.Snapshot snapshot = snapshot();
             snapshot.carModel = model;
-            snapshot.mirror = key -> false;
 
             Profile profile = ProfileMigration.migrate(snapshot);
 
@@ -156,36 +143,6 @@ public class ProfileMigrationTest {
         }
     }
 
-    /** 自定义车型的镜像是用户在相机映射里设的，照旧搬过来。 */
-    @Test
-    public void theCustomModelKeepsItsOwnMirrorSettings() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.carModel = "custom";
-        snapshot.mirror = key -> "left".equals(key);
-
-        Profile profile = ProfileMigration.migrate(snapshot);
-
-        assertFalse(profile.camera(CameraProfile.ROLE_CABIN_1).lanes.get(0).mirrored);
-        assertTrue(profile.camera(CameraProfile.ROLE_CABIN_2).lanes.get(0).mirrored);
-    }
-
-    /**
-     * 「自定义」不能被当成极氪7X翻译。
-     *
-     * <p>顶着「极氪7X」的名头给出一份不是它的配置，比不给更糟 ——
-     * 核对的人会以为翻译对了。</p>
-     */
-    @Test
-    public void theCustomModelIsNotDisguisedAsTheZeekrPreset() {
-        ProfileMigration.Snapshot snapshot = snapshot();
-        snapshot.carModel = "custom";
-
-        Profile profile = ProfileMigration.migrate(snapshot);
-
-        assertEquals(Profile.PRESET_CUSTOM, profile.id);
-        assertTrue("名字要说明相机映射还没翻译，实际: " + profile.name,
-                profile.name.contains("尚未翻译"));
-    }
 
     // ---------- 意图，不是数字 ----------
 
@@ -234,11 +191,11 @@ public class ProfileMigrationTest {
     public void aProfileSurvivesTheRoundTrip() {
         ProfileMigration.Snapshot snapshot = snapshot();
         snapshot.carModel = "zeekr_7x_multi";
-        snapshot.rotation = key -> "back".equals(key) ? 90 : 0;
 
         Profile before = ProfileMigration.migrate(snapshot);
         // 往返要拿真值试，全是默认值的话，丢了哪一项都看不出来
         CameraProfile edited = before.camera(CameraProfile.ROLE_CABIN_1);
+        edited.lanes.get(0).rotation = 90;
         edited.enabled = false;
         edited.record.resolution = "1920x1080";
         edited.record.fps = "24";
