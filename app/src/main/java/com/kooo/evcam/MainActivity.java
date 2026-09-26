@@ -224,6 +224,14 @@ public class MainActivity extends AppCompatActivity {
         return dark;
     }
     private boolean wasRecordingBeforeScreenOff = false;  // 息屏前是否正在录制
+    /**
+     * 熄屏持续录制这一段是什么时候熄的屏（elapsedRealtime，含深睡）；0 表示不在这种状态。
+     * 亮屏时和 {@link #keepRecordingOffAtUptime}（不含深睡）一减，就知道车机睡了多久。
+     */
+    private long keepRecordingOffAtElapsed;
+    private long keepRecordingOffAtUptime;
+    /** 熄屏中「录像先不接回」这一句，每次打断只记一次。 */
+    private boolean resumeDeferredNoted;
     private static final long SCREEN_OFF_DELAY_MS = 10000;  // 息屏后等待10秒（停止录制）
     private static final long SCREEN_ON_DELAY_MS = 10000;   // 亮屏后等待10秒（恢复录制）
     private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
@@ -3212,6 +3220,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void armSurroundResume() {
         disarmSurroundResume();
+        resumeDeferredNoted = false;
         surroundResumeCheck = new Runnable() {
             @Override
             public void run() {
@@ -3224,6 +3233,16 @@ public class MainActivity extends AppCompatActivity {
                         || !intent.shouldRestore(true)) {
                     // 已经有人把它开起来了，或者人停了：不用等了
                     surroundResumeCheck = null;
+                    return;
+                }
+                if (reconcileScreenState("resume-poll")) {
+                    // 熄屏中：不去抢相机、不反复重试 —— 这时候车机或原厂功能可能正用着相机，
+                    // 也不该为了接回录像把车机折腾醒。等亮屏再接
+                    if (!resumeDeferredNoted) {
+                        resumeDeferredNoted = true;
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏中，录像先不接回，等亮屏");
+                    }
+                    surroundResumeHandler.postDelayed(this, SURROUND_RESUME_POLL_MS);
                     return;
                 }
                 if (surroundHealthy()) {
@@ -3283,6 +3302,10 @@ public class MainActivity extends AppCompatActivity {
         }
         // 正在等环视的那个检查会处理；额度用完了也不再试
         if (surroundResumeCheck != null || !resumeBudget.allows()) {
+            return;
+        }
+        // 熄屏中不接（同 armSurroundResume）：等亮屏
+        if (reconcileScreenState("30s-check")) {
             return;
         }
         
@@ -3436,6 +3459,17 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             
+            // 熄屏持续录制：停车前在录，熄屏后接着录，手动、自动都一样。
+            // 不申请唤醒、不拉住车机 —— 车机睡了录像就停在那一刻，醒来接着录；
+            // 熄屏期间断了也不去抢相机，等亮屏再接（见 armSurroundResume）
+            if (appConfig.isScreenOffKeepRecording()) {
+                keepRecordingOffAtElapsed = android.os.SystemClock.elapsedRealtime();
+                keepRecordingOffAtUptime = android.os.SystemClock.uptimeMillis();
+                AppLog.d(TAG, "熄屏持续录制开着，接着录");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏时在录像：熄屏持续录制开着，接着录（不唤醒车机）");
+                return;
+            }
+
             // 如果未开启自动录制功能，不干预手动录制，也不退后台
             if (!appConfig.isAutoStartRecording()) {
                 AppLog.d(TAG, "手动录制中，不受息屏影响，保持前台");
@@ -3451,8 +3485,9 @@ public class MainActivity extends AppCompatActivity {
             wasRecordingBeforeScreenOff = true;
             
             screenOffStopRunnable = () -> {
-                // 再次检查是否仍然息屏
-                if (!isScreenOff) {
+                // 再次检查是否仍然息屏 —— 问实际状态。深睡时这个计时是停住的，醒来之后才到点，
+                // 而醒来时亮屏广播不来，只看标记会以为还黑着，把刚回到车上的人的录像停掉
+                if (!reconcileScreenState("10s-stop") || !isScreenOff) {
                     AppLog.d(TAG, "屏幕已亮起，取消停止录制");
                     return;
                 }
@@ -3502,6 +3537,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     
+    /** 亮屏时，熄屏持续录制那一段的结果记一行：熄屏多久、其中车机睡了多久、录像是不是一直在录。 */
+    private void noteKeepRecordingStretch() {
+        if (keepRecordingOffAtElapsed <= 0) {
+            return;
+        }
+        long offMs = android.os.SystemClock.elapsedRealtime() - keepRecordingOffAtElapsed;
+        long awakeMs = android.os.SystemClock.uptimeMillis() - keepRecordingOffAtUptime;
+        keepRecordingOffAtElapsed = 0;
+        keepRecordingOffAtUptime = 0;
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏：熄屏持续录制这一段结束。熄屏 "
+                + offMs / 1000 + " 秒，其中车机睡了 " + Math.max(0L, offMs - awakeMs) / 1000
+                + " 秒；录像" + (isRecording ? "一直在录" : "中途停了（原因见上面的「录像停止原因」）"));
+    }
+
     /**
      * 安排息屏后退到后台的任务
      */
@@ -3592,6 +3641,7 @@ public class MainActivity extends AppCompatActivity {
     private void onScreenOn() {
         isScreenOff = false;
         AppLog.d(TAG, "检测到亮屏");
+        noteKeepRecordingStretch();
         
 // 取消可能存在的息屏停止录制任务
         if (screenOffStopRunnable != null) {
@@ -3865,6 +3915,15 @@ public class MainActivity extends AppCompatActivity {
             } else if (!quietStop) {
                 // 存储、熄屏那几条各自已经提示过了（它们都是 quietStop）；走到这里的不会重复
                 Toast.makeText(MainActivity.this, R.string.msg_recording_stopped, Toast.LENGTH_SHORT).show();
+            }
+            // 熄屏期间停下来的（熄屏持续录制录不下去了，或者别的原因）：照熄屏的规矩放开相机、
+            // 退后台，别开着相机睡过去；亮屏再接回。熄屏 10 秒停录那一条在熄屏时已经安排过了
+            if (reason != com.kooo.evcam.recording.RecordingStops.Reason.SCREEN_OFF) {
+                runOnUiThread(() -> {
+                    if (isScreenOff && reconcileScreenState("recording-stopped")) {
+                        scheduleBackgroundTask();
+                    }
+                });
             }
         }
 

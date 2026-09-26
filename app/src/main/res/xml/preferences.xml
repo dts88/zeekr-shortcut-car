@@ -294,6 +294,11 @@
             android:summary="@string/set_screen_off_summary" />
 
         <SwitchPreferenceCompat
+            android:key="pref_screen_off_keep_recording"
+            android:title="@string/set_screen_off_keep_title"
+            android:summary="@string/set_screen_off_keep_summary" />
+
+        <SwitchPreferenceCompat
             android:key="pref_keep_alive"
             android:title="@string/set_keep_alive_title"
             android:summary="@string/set_keep_alive_summary" />

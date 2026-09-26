@@ -834,6 +834,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
                 value -> appConfig.setScreenOffRecordingEnabled(value));
         lockScreenOffRecording();
+        bindSwitch("pref_screen_off_keep_recording", appConfig.isScreenOffKeepRecording(),
+                value -> appConfig.setScreenOffKeepRecording(value));
         bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> appConfig.setKeepAliveEnabled(value));
     }

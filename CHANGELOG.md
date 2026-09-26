@@ -7,6 +7,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.39.0-alpha] - 2026-09-26
+
+- **New in Settings -> System: "Keep recording when the screen goes off"** (off by default).
+  If you are recording when the screen goes off, manual or automatic, it keeps recording. It
+  never wakes the car: recording pauses while the car sleeps and carries on when it wakes. The
+  black box notes how long the screen was off, how long the car slept, and whether recording
+  kept going. The developer-only "Screen-off recording" is unchanged.
+- An interrupted recording is no longer resumed while the screen is off; it waits for the
+  screen to come on instead of competing for the cameras.
+- If a recording stops while the screen is off, the cameras are released as usual.
+- The 10-second screen-off stop now checks whether the screen is really off, so a recording is
+  not stopped right after the car wakes up.
+
 ## [1.38.0-alpha] - 2026-09-26
 
 - **Cameras open and close on their own threads; the main thread no longer waits.** Closing a

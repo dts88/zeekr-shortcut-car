@@ -28,6 +28,7 @@ public class AppConfig {
     private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
+    private static final String KEY_SCREEN_OFF_KEEP_RECORDING = "screen_off_keep_recording";  // 熄屏持续录制
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
     private static final String KEY_KEEP_ALIVE_ENABLED = "keep_alive_enabled";  // 保活服务
     private static final String KEY_RECORDING_MODE = "recording_mode";  // 录制模式
@@ -505,10 +506,6 @@ public class AppConfig {
     }
     
     /**
-     * 获取息屏录制设置
-     * @return true 表示息屏时继续录制
-     */
-    /**
      * 主界面是不是<b>因为熄屏</b>才退到后台的。
      *
      * <p>熄屏 15 秒后应用会把自己退到后台、关掉相机（见 MainActivity 的
@@ -539,6 +536,29 @@ public class AppConfig {
         return prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
     }
 
+    /**
+     * 熄屏持续录制（项目拥有者 2026-09-26 定）。
+     *
+     * <p>停车前在录像（手动、自动都算），熄屏后接着录。只管录：不申请唤醒、不拉住车机，
+     * 车机睡了录像就停在那一刻，醒来接着录；熄屏期间断了也不去抢相机、不反复重试，等亮屏再接。
+     * 每一段都记黑匣子。</p>
+     *
+     * <p>和开发者选项里的「息屏录制」是两回事：那个没在录的时候也不关相机，这个不管那件事。
+     * 让车机保持醒着（保活）留给「定时保活」去研究。</p>
+     */
+    public boolean isScreenOffKeepRecording() {
+        return prefs.getBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, false);
+    }
+
+    public void setScreenOffKeepRecording(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, enabled).apply();
+    }
+
+    /**
+     * 息屏录制（开发者选项）有没有生效。
+     *
+     * @return true 表示息屏时继续录制，而且没在录时也不关相机
+     */
     public boolean isScreenOffRecordingEnabled() {
         // 默认禁用息屏录制
         // 锁在开发者选项后面：没解锁时一律当关着，存着的值不动。
