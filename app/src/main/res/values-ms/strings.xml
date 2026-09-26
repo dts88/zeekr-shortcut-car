@@ -532,9 +532,13 @@
     <!-- Buka pilihan pembangun -->
     <string name="dev_unlock_hint">Kata laluan</string>
     <string name="dev_unlock_title">Pilihan pembangun</string>
-    <string name="dev_unlock_msg">Ciri yang belum siap dan untuk penyelesaian masalah. Ia ditutup semula apabila apl dimulakan semula.</string>
-    <string name="dev_unlocked">Pilihan pembangun dibuka (sehingga apl dimulakan semula)</string>
+    <string name="dev_unlock_msg">Ciri yang belum siap dan untuk penyelesaian masalah. Ia kekal hidup sehingga anda kembali ke sini dan ketik sekali lagi.</string>
+    <string name="dev_unlocked">Pilihan pembangun dibuka</string>
     <string name="dev_wrong_password">Kata laluan salah</string>
+    <string name="dev_lock_title">Matikan pilihan pembangun</string>
+    <string name="dev_lock_msg">Pilihan pembangun akan disembunyikan, dan ciri di dalamnya (seperti rakaman skrin padam dan menghantar diagnostik ke telefon) berhenti berfungsi. Untuk menghidupkannya semula, kembali ke sini dan masukkan kata laluan.</string>
+    <string name="dev_lock_confirm">Matikan</string>
+    <string name="dev_locked">Pilihan pembangun dimatikan</string>
 
     <!-- Pemberitahuan -->
     <string name="notif_recording_title">Merakam</string>
@@ -657,7 +661,7 @@
     <string name="dev_repair_mp4_title">Baiki video tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus kerana bekalan kuasa hilang tiada indeks, jadi tiada apa boleh membukanya. Indeks dibina semula daripada klip sihat kamera yang sama, nama fail kekal</string>
     <string name="dev_current_profile_summary">Teks penuh profil yang berkuat kuasa, untuk semakan baris demi baris</string>
-    <string name="dev_note">“Tersuai” dalam Profil strim hanya tersedia di sini. Bahagian ini tersembunyi selepas apl dimulakan semula.</string>
+    <string name="dev_note">“Tersuai” dalam Profil strim hanya tersedia di sini. Ketik “Notis keselamatan” dalam Perihal untuk mematikan pilihan pembangun; bahagian ini kemudian tersembunyi.</string>
 
     <!-- Muat naik log · nama peranti (pembangun) -->
     <string name="nick_confirm_title">Sahkan nama peranti</string>

@@ -388,6 +388,8 @@ public class AppConfig {
     public AppConfig(Context context) {
         this.context = context.getApplicationContext();
         this.prefs = this.context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        // 开发者模式是存着的（见 DeveloperMode）；进程里谁先建 AppConfig 谁把它读进来
+        com.kooo.evcam.settings.DeveloperMode.init(this.context);
         repairInvalidSettings();
     }
     
@@ -529,8 +531,8 @@ public class AppConfig {
     /**
      * 息屏录制<b>存着</b>的值，不管开发者选项解没解锁。
      *
-     * <p>只给黑匣子和诊断报告用：开发者选项的解锁不保存，装一次新版本、进程重启一次就锁回去，
-     * 于是「存着是开的、实际没生效」会悄悄发生。两个值摆在一起，才看得出是这种情况。</p>
+     * <p>只给黑匣子和诊断报告用：开发者选项关着时，「存着是开的、实际没生效」会发生
+     * （1.42.0 之前解锁不保存，每次更新都会这样）。两个值摆在一起，才看得出是这种情况。</p>
      */
     public boolean isScreenOffRecordingStoredOn() {
         return prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);

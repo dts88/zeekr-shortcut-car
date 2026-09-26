@@ -9,9 +9,14 @@ Nothing yet.
 
 ## [1.42.0-alpha] - 2026-09-26
 
-- **Diagnostics: "Send to phone"**, the same QR transfer as in photo and video playback. Scan
-  the code and the phone opens a download page for the report; tap Download and the .json file
-  is on the phone. Each tap saves a fresh copy of the report on screen.
+- **Developer options stay on once turned on.** Restarts and updates no longer turn them off.
+  They turn off only when you tap "Safety notice" in About again and confirm, clear the app's
+  data, or uninstall and reinstall (they are left out of Android backups so a reinstall does
+  not bring them back).
+- **Diagnostics: "Send to phone"** (developer options), the same QR transfer as in photo and
+  video playback. Scan the code and the phone opens a download page for the report; tap
+  Download and the .json file is on the phone. Each tap saves a fresh copy of the report on
+  screen.
 
 ## [1.41.0-alpha] - 2026-09-26
 

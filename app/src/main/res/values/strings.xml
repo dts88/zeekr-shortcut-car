@@ -542,9 +542,13 @@
     <!-- 开发者选项解锁 -->
     <string name="dev_unlock_hint">密码</string>
     <string name="dev_unlock_title">开发者选项</string>
-    <string name="dev_unlock_msg">这里面是没做完的和排查用的功能。重启应用后会自动关闭。</string>
-    <string name="dev_unlocked">开发者选项已打开（重启后失效）</string>
+    <string name="dev_unlock_msg">这里面是没做完的和排查用的功能。打开后一直开着，要关的话回到这里再点一次。</string>
+    <string name="dev_unlocked">开发者选项已打开</string>
     <string name="dev_wrong_password">密码不对</string>
+    <string name="dev_lock_title">关闭开发者选项</string>
+    <string name="dev_lock_msg">关掉后，开发者选项会隐藏起来，锁在里面的功能（比如息屏录制、诊断页的发送到手机）不再生效。要再打开，回到这里输密码。</string>
+    <string name="dev_lock_confirm">关闭</string>
+    <string name="dev_locked">开发者选项已关闭</string>
 
     <!-- 通知 -->
     <string name="notif_recording_title">正在录制</string>
@@ -667,7 +671,7 @@
     <string name="dev_repair_mp4_title">修复未封口的视频</string>
     <string name="dev_repair_mp4_summary">断电时正在录的那一段没有索引，播放器打不开。按同一路相机完好片段的参数补一个索引回去，文件名不变</string>
     <string name="dev_current_profile_summary">当前生效的那一份配置的全文，用来逐行核对</string>
-    <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。重启应用后本区隐藏。</string>
+    <string name="dev_note">「视频流配置」里的「自定义」也只在这里可选。在「关于」里点「安全须知」可以关掉开发者选项，关掉后本区隐藏。</string>
 
     <!-- 上传日志 · 设备识别名称（开发者） -->
     <string name="nick_confirm_title">确认设备名称</string>

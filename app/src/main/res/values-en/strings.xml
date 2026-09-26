@@ -534,9 +534,13 @@
     <!-- Developer options unlock -->
     <string name="dev_unlock_hint">Password</string>
     <string name="dev_unlock_title">Developer options</string>
-    <string name="dev_unlock_msg">Unfinished and troubleshooting features. They close again when the app restarts.</string>
-    <string name="dev_unlocked">Developer options on (until the app restarts)</string>
+    <string name="dev_unlock_msg">Unfinished and troubleshooting features. They stay on until you come back here and tap again.</string>
+    <string name="dev_unlocked">Developer options on</string>
     <string name="dev_wrong_password">Wrong password</string>
+    <string name="dev_lock_title">Turn off developer options</string>
+    <string name="dev_lock_msg">Developer options will be hidden, and the features behind them (such as screen-off recording and sending the diagnostics to a phone) stop working. To turn them on again, come back here and enter the password.</string>
+    <string name="dev_lock_confirm">Turn off</string>
+    <string name="dev_locked">Developer options off</string>
 
     <!-- Notifications -->
     <string name="notif_recording_title">Recording</string>
@@ -659,7 +663,7 @@
     <string name="dev_repair_mp4_title">Repair unfinalised videos</string>
     <string name="dev_repair_mp4_summary">A clip cut short by a power loss has no index, so nothing will open it. Rebuilds one using a healthy clip from the same camera, keeping the file name</string>
     <string name="dev_current_profile_summary">The full text of the profile in effect, for line-by-line checking</string>
-    <string name="dev_note">“Custom” in Stream profile is only available here. This section hides after the app restarts.</string>
+    <string name="dev_note">“Custom” in Stream profile is only available here. Tap “Safety notice” in About to turn developer options off; this section then hides.</string>
 
     <!-- Log upload · device name (developer) -->
     <string name="nick_confirm_title">Confirm device name</string>

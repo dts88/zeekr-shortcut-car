@@ -5176,7 +5176,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 补盲和超视只在开发者选项打开时出现在抽屉里。
      *
-     * <p>每次拉开抽屉都对一次：开发者选项是不持久化的，重启就关，
+     * <p>每次拉开抽屉都对一次：开发者选项随时可能在「关于」里被打开或关掉，
      * 菜单得跟着它走，不能只在启动时判断一次。</p>
      */
     private void syncDeveloperMenuVisibility() {

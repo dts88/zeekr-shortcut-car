@@ -6,6 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
+    <!-- 开发者模式卸载重装后要关着：不让系统把它备份、再恢复回来（见 DeveloperMode） -->
+    <exclude domain="sharedpref" path="developer_mode.xml"/>
     <!--
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>

@@ -91,7 +91,7 @@ public class AboutActivity extends AppCompatActivity {
 
 
     /**
-     * 在「安全须知」上连点若干次，再输密码，打开开发者选项。
+     * 点「安全须知」标题：没打开时输密码打开开发者选项，打开了就在这里关掉。
      *
      * <p>藏在这里而不是给个显眼的入口：后面那些要么没做完、要么是排查用的，
      * 平时不该出现在设置里让人以为是正常功能。</p>
@@ -107,9 +107,10 @@ public class AboutActivity extends AppCompatActivity {
         }
         heading.setOnClickListener(v -> {
             if (com.kooo.evcam.settings.DeveloperMode.isUnlocked()) {
-                return;
+                promptToLockDeveloperMode();
+            } else {
+                promptForDeveloperPassword();
             }
-            promptForDeveloperPassword();
         });
     }
 
@@ -124,7 +125,7 @@ public class AboutActivity extends AppCompatActivity {
                 .setMessage(R.string.dev_unlock_msg)
                 .setView(input)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                    if (com.kooo.evcam.settings.DeveloperMode.unlock(input.getText().toString())) {
+                    if (com.kooo.evcam.settings.DeveloperMode.unlock(this, input.getText().toString())) {
                         Toast.makeText(this, R.string.dev_unlocked,
                                 Toast.LENGTH_LONG).show();
                     } else {
@@ -134,5 +135,15 @@ public class AboutActivity extends AppCompatActivity {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    /** 连点的间隔上限，超过就重新数。 */
+    /** 开发者选项打开之后一直开着，关只在这里关（见 DeveloperMode）。 */
+    private void promptToLockDeveloperMode() {
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.dev_lock_title)
+                .setMessage(R.string.dev_lock_msg)
+                .setPositiveButton(R.string.dev_lock_confirm, (dialog, which) -> {
+                    com.kooo.evcam.settings.DeveloperMode.lock(this);
+                    Toast.makeText(this, R.string.dev_locked, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
 }
