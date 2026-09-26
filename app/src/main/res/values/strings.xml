@@ -99,7 +99,7 @@
     <string name="set_auto_start_summary">系统启动后自动运行</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动后自动开始录制；从后台返回前台时同样恢复</string>
-    <string name="set_screen_off_title">息屏录制</string>
+    <string name="set_screen_off_title">熄屏录制（开发者）</string>
     <string name="set_screen_off_summary">息屏（锁车黑屏）后继续录制</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
     <string name="set_screen_off_keep_summary">熄屏前在录像，熄屏后接着录。不会唤醒车机：车机睡了就停在那一刻，醒来接着录</string>
@@ -535,7 +535,7 @@
     <string name="dev_unlocked">开发者选项已打开</string>
     <string name="dev_wrong_password">密码不对</string>
     <string name="dev_lock_title">关闭开发者选项</string>
-    <string name="dev_lock_msg">关掉后，开发者选项会隐藏起来，锁在里面的功能（比如息屏录制、诊断页的发送到手机）不再生效。要再打开，回到这里输密码。</string>
+    <string name="dev_lock_msg">关掉后，开发者选项会隐藏起来，锁在里面的功能（比如熄屏录制（开发者）、诊断页的发送到手机）不再生效。要再打开，回到这里输密码。</string>
     <string name="dev_lock_confirm">关闭</string>
     <string name="dev_locked">开发者选项已关闭</string>
 

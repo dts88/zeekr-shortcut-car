@@ -81,7 +81,7 @@
     <string name="set_auto_start_summary">Dilancarkan secara automatik selepas sistem bermula</string>
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka atau kembali ke depan</string>
-    <string name="set_screen_off_title">Rakam dengan skrin mati</string>
+    <string name="set_screen_off_title">Rakaman skrin padam (pembangun)</string>
     <string name="set_screen_off_summary">Terus merakam selepas skrin dimatikan</string>
     <string name="set_screen_off_keep_title">Terus merakam apabila skrin padam</string>
     <string name="set_screen_off_keep_summary">Jika sedang merakam semasa skrin padam, teruskan. Tidak mengejutkan kereta: rakaman berhenti sementara kereta tidur dan bersambung apabila ia bangun</string>
