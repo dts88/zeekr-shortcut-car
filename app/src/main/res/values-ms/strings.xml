@@ -604,9 +604,6 @@
     <string name="diag_copied">Disalin ke papan keratan</string>
     <string name="diag_copy_failed">Salin gagal: %1$s</string>
     <string name="diag_exporting">Mengeksport…</string>
-    <string name="diag_share_subject">Laporan diagnostik %1$s</string>
-    <string name="diag_share_chooser">Kongsi laporan diagnostik</string>
-    <string name="diag_share_failed">Tidak dapat dikongsi; fail disimpan di:\n%1$s</string>
 
     <!-- Tetingkap pelarasan gambar -->
     <string name="adj_title">Kecerahan &amp; hingar</string>

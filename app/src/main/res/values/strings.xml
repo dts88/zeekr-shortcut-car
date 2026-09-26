@@ -614,9 +614,6 @@
     <string name="diag_copied">已复制到剪贴板</string>
     <string name="diag_copy_failed">复制失败：%1$s</string>
     <string name="diag_exporting">正在导出…</string>
-    <string name="diag_share_subject">%1$s 诊断报告</string>
-    <string name="diag_share_chooser">分享诊断报告</string>
-    <string name="diag_share_failed">无法分享，文件已保存在：\n%1$s</string>
 
     <!-- 画面调节悬浮窗 -->
     <string name="adj_title">亮度/降噪调节</string>

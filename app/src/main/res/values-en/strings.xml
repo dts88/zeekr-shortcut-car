@@ -606,9 +606,6 @@
     <string name="diag_copied">Copied to the clipboard</string>
     <string name="diag_copy_failed">Copy failed: %1$s</string>
     <string name="diag_exporting">Exporting…</string>
-    <string name="diag_share_subject">%1$s diagnostics report</string>
-    <string name="diag_share_chooser">Share diagnostics report</string>
-    <string name="diag_share_failed">Could not share; the file is saved at:\n%1$s</string>
 
     <!-- Image adjustment floating window -->
     <string name="adj_title">Brightness &amp; noise</string>

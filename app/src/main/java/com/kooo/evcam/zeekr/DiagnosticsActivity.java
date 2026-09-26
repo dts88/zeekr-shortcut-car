@@ -3,7 +3,6 @@ package com.kooo.evcam.zeekr;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,7 +11,6 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.core.content.FileProvider;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
@@ -35,8 +33,10 @@ import java.util.Locale;
  * <ul>
  *   <li><b>保存到存储</b>——写成 .json，U 盘拔下来就能拷走，最可靠；</li>
  *   <li><b>复制到剪贴板</b>——车机上没有文件管理器时的退路；</li>
- *   <li><b>分享</b>——有微信/邮件之类应用时直接发出去。</li>
+ *   <li><b>发送到手机</b>——扫码下载，只在开发者模式下有。</li>
  * </ul>
+ *
+ * <p>以前还有一个系统「分享」：车机上没有能接收分享的应用，每次都失败，删了（1.43.0）。</p>
  *
  * <p>导出的是 JSON 而不是纯文本：屏幕上那份为了能翻，每块有条数上限、长值会截断，
  * 而这些上限对事后分析是有害的 —— <b>被截掉的那部分恰恰可能是要找的东西</b>。
@@ -52,14 +52,12 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private TextView reportView;
     private Button saveButton;
     private Button copyButton;
-    private Button shareButton;
     private Button sendPhoneButton;
     private Button refreshButton;
 
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile String report = "";
-    private File lastSavedFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,7 +67,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
         reportView = findViewById(R.id.diagnostics_report);
         saveButton = findViewById(R.id.diagnostics_save);
         copyButton = findViewById(R.id.diagnostics_copy);
-        shareButton = findViewById(R.id.diagnostics_share);
         sendPhoneButton = findViewById(R.id.diagnostics_send_phone);
         refreshButton = findViewById(R.id.diagnostics_refresh);
 
@@ -85,9 +82,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
         }
         if (copyButton != null) {
             copyButton.setOnClickListener(v -> copyReport());
-        }
-        if (shareButton != null) {
-            shareButton.setOnClickListener(v -> shareReport());
         }
         if (sendPhoneButton != null) {
             sendPhoneButton.setOnClickListener(v -> sendToPhone());
@@ -188,9 +182,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (copyButton != null) {
             copyButton.setEnabled(enabled);
         }
-        if (shareButton != null) {
-            shareButton.setEnabled(enabled);
-        }
         if (sendPhoneButton != null) {
             sendPhoneButton.setEnabled(enabled);
         }
@@ -238,7 +229,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
                 writer.close();
             }
 
-            lastSavedFile = out;
             AppLog.i(TAG, "诊断报告已保存: " + out.getAbsolutePath()
                     + "（" + out.length() / 1024 + " KB）");
             toast(getString(R.string.diag_saved, out.getAbsolutePath()));
@@ -272,7 +262,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
     /**
      * 保存到后台线程上去做，完成后回到主线程。
      *
-     * @param then 保存完要做的事（例如接着分享）；不需要就传 null
+     * @param then 保存完要做的事（例如接着发到手机）；不需要就传 null
      */
     private void saveInBackground(java.util.function.Consumer<File> then) {
         toast(getString(R.string.diag_exporting));
@@ -294,37 +284,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private void sendToPhone() {
         saveInBackground(file -> com.kooo.evcam.share.PhoneShare.show(this, file,
                 getString(R.string.diag_send_phone_note)));
-    }
-
-    private void shareReport() {
-        File file = lastSavedFile;
-        if (file == null || !file.exists()) {
-            // 还没存过，先存再分享 —— 存要读一遍系统属性，不能占着主线程
-            saveInBackground(this::shareFile);
-            return;
-        }
-        shareFile(file);
-    }
-
-    private void shareFile(File file) {
-        if (file == null) {
-            return;
-        }
-        try {
-            android.net.Uri uri = FileProvider.getUriForFile(
-                    this, getPackageName() + ".fileprovider", file);
-            Intent intent = new Intent(Intent.ACTION_SEND);
-            intent.setType("application/json");
-            intent.putExtra(Intent.EXTRA_STREAM, uri);
-            intent.putExtra(Intent.EXTRA_SUBJECT,
-                    getString(R.string.diag_share_subject, getString(R.string.app_name_full)));
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(intent, getString(R.string.diag_share_chooser)));
-        } catch (Exception e) {
-            // 车机上常常没有可分享的应用，退回提示文件路径
-            AppLog.w(TAG, "分享失败", e);
-            toast(getString(R.string.diag_share_failed, file.getAbsolutePath()));
-        }
     }
 
     /**
