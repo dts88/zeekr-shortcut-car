@@ -139,10 +139,17 @@
                         android:layout_weight="22"
                         android:background="@drawable/bg_preview_frame">
 
-                        <TextureView
-                            android:id="@+id/video_surround"
+                        <!-- 取景和鱼眼校正由外框画：校正是非线性的，TextureView 自己的矩阵做不到 -->
+                        <com.kooo.evcam.playback.FisheyeVideoFrame
+                            android:id="@+id/video_surround_frame"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent" />
+                            android:layout_height="match_parent">
+
+                            <TextureView
+                                android:id="@+id/video_surround"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent" />
+                        </com.kooo.evcam.playback.FisheyeVideoFrame>
 
                         <TextView
                             android:id="@+id/cover_surround"

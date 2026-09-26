@@ -170,6 +170,21 @@ public final class PlaybackViewport {
     }
 
     /**
+     * 2×2 排列的画面，每一格是不是正方形。
+     *
+     * <p>环视合成流每一路都是 1280×1280，录成 2560×2560 —— 只有这样的画面才是四路鱼眼，
+     * 才该做鱼眼校正。座舱录像是 16:9 的一整幅，不是。和图片回看那边的判断
+     * （{@code FisheyeCorrector}：格子宽高比在 0.96–1.04 之内）一致。</p>
+     */
+    public static boolean hasSquareCells(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        float ratio = ((float) width / 2f) / ((float) height / 2f);
+        return ratio >= 0.96f && ratio <= 1.04f;
+    }
+
+    /**
      * 按源的宽高比把目标矩形塞进视图，居中，留黑边。
      *
      * <p>宁可留黑边也不拉变形 —— 环视是方的，这块视图是宽的。</p>

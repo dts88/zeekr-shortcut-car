@@ -1,7 +1,7 @@
 package com.kooo.evcam.playback;
 
 import android.content.Intent;
-import android.content.res.ColorStateList;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.content.res.Configuration;
 import android.graphics.drawable.BitmapDrawable;
@@ -19,13 +19,11 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.bumptech.glide.Glide;
@@ -83,7 +81,6 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private TextView currentDatetime;
     private View noSelectionHint;
     private Button btnMenu, btnRefresh, btnMultiSelect, btnHome;
-    private MaterialButton btnFisheye;
     private Button btnSelectAll, btnDeleteSelected, btnCancelSelect, btnShareSelected;
     private TextView selectedCount;
     private static final String TAG = "PhotoPlaybackActivity";
@@ -131,6 +128,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     };
     /** 鱼眼校正：只改屏幕上的样子，原图不动。开关记在设置里，下次进来还是这个状态。 */
     private boolean fisheyeOn;
+    /** 开关和参数的监听。拿住它：SharedPreferences 只弱引用监听器。 */
+    private SharedPreferences.OnSharedPreferenceChangeListener fisheyeListener;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -144,6 +143,13 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         applyStatusBarInsets();
     }
 
+    @Override
+    protected void onDestroy() {
+        new AppConfig(PhotoPlaybackActivity.this).removeFisheyeListener(fisheyeListener);
+        fisheyeListener = null;
+        super.onDestroy();
+    }
+
     private void initViews() {
         // 工具栏
         toolbar = findViewById(R.id.toolbar);
@@ -153,9 +159,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         btnRefresh = findViewById(R.id.pb_refresh);
         btnMultiSelect = findViewById(R.id.pb_multi_select);
         btnHome = findViewById(R.id.pb_home);
-        btnFisheye = findViewById(R.id.pb_fisheye);
-        fisheyeOn = new AppConfig(PhotoPlaybackActivity.this).isPhotoFisheyeCorrection();
-        updateFisheyeButton();
+        fisheyeOn = new AppConfig(PhotoPlaybackActivity.this).isFisheyeCorrection();
         currentDatetime = findViewById(R.id.current_datetime);
 
         // 多选工具栏
@@ -235,11 +239,10 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // 鱼眼校正开关。改的是「怎么画」，所以只要把当前这一组重新贴一遍
-        btnFisheye.setOnClickListener(v -> {
-            fisheyeOn = !fisheyeOn;
-            new AppConfig(PhotoPlaybackActivity.this).setPhotoFisheyeCorrection(fisheyeOn);
-            updateFisheyeButton();
+        // 鱼眼校正。开关由按钮自己拨（FisheyeToggleButton，主界面和视频回看上是同一个开关），
+        // 这里只管开关或参数变了之后的事：改的是「怎么画」，把当前这一组重新贴一遍
+        fisheyeListener = new AppConfig(PhotoPlaybackActivity.this).onFisheyeChanged(() -> {
+            fisheyeOn = new AppConfig(PhotoPlaybackActivity.this).isFisheyeCorrection();
             if (currentGroup != null) {
                 loadPhotoGroup(currentGroup);
             }
@@ -560,7 +563,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         if (lanes > 1) {
             AppConfig config = new AppConfig(PhotoPlaybackActivity.this);
             options = options.transform(new FisheyeTransformation(lanes, lanes,
-                    config.getPhotoFisheyeFov(), config.getFisheyeProjection(),
+                    config.getFisheyeFov(), config.getFisheyeProjection(),
                     config.getFisheyeStrength() / 100f));
         }
         options = options.placeholder(keepShowing(imageView));
@@ -642,18 +645,6 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             Log.w(TAG, "读不到 " + position + " 的排列，按不拆处理: " + e);
             return 1;
         }
-    }
-
-    /** 开着的时候按主色点亮，一眼能看出现在看到的画面动过手脚。 */
-    private void updateFisheyeButton() {
-        if (btnFisheye == null) {
-            return;
-        }
-        int background = fisheyeOn ? R.color.energy : R.color.sunken;
-        int foreground = fisheyeOn ? R.color.on_energy : R.color.text_primary;
-        btnFisheye.setBackgroundTintList(
-                ColorStateList.valueOf(ContextCompat.getColor(PhotoPlaybackActivity.this, background)));
-        btnFisheye.setTextColor(ContextCompat.getColor(PhotoPlaybackActivity.this, foreground));
     }
 
     /**

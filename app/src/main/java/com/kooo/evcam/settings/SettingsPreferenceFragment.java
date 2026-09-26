@@ -778,24 +778,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setFisheyeProjection(value);
                     // 上限跟着投影变，滑块得重新绑 —— 否则界面上还能拖到 180°，
                     // 实际生效的却是夹过的 140°
-                    bindPhotoFisheyeFov();
+                    bindFisheyeFov();
                 }, this::showProjectionSummary);
-        bindPhotoFisheyeFov();
+        bindFisheyeFov();
 
         bindSlider("pref_fisheye_strength", 10, 100, appConfig.getFisheyeStrength(), "%",
                 value -> appConfig.setFisheyeStrength(value));
     }
 
     /** 校正视野。范围随投影方式变，所以单独一个方法，换投影时再叫一次。 */
-    private void bindPhotoFisheyeFov() {
+    private void bindFisheyeFov() {
         String projection = appConfig.getFisheyeProjection();
         bindSlider("pref_fisheye_fov", (int) FisheyeProjectionBounds.MIN,
                 (int) com.kooo.evcam.zeekr.FisheyeProjection.maxFovFor(projection),
-                Math.round(appConfig.getPhotoFisheyeFov()), "°",
-                value -> appConfig.setPhotoFisheyeFov(value));
+                Math.round(appConfig.getFisheyeFov()), "°",
+                value -> appConfig.setFisheyeFov(value));
     }
 
-    /** 摘要里除了选中项，还要写清楚它现在管到哪里 —— 目前只有图片回看。 */
+    /** 摘要里除了选中项，还要写清楚它管到哪里：主界面预览、图片回看、视频回看。 */
     private void showProjectionSummary() {
         ListPreference pref = findPreference("pref_fisheye_projection");
         if (pref != null && getContext() != null) {

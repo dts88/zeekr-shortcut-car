@@ -123,7 +123,7 @@ public final class RawFrameDump {
             AppConfig config = new AppConfig(context);
             sb.append("后视镜校正: ").append(config.isRearViewFisheyeCorrection())
                     .append("，视野 ").append(config.getRearViewFov()).append("°\n");
-            sb.append("图片回看校正: ").append(config.isPhotoFisheyeCorrection())
+            sb.append("图片回看校正: ").append(config.isFisheyeCorrection())
                     .append("，视野 ").append(FisheyeProjection.PHOTO_FOV_DEGREES).append("°\n");
         } catch (Exception e) {
             sb.append("读不出来: ").append(e).append('\n');

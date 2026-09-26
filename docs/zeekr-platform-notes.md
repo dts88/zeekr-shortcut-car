@@ -110,6 +110,15 @@ Camera2，然后用着色器把四个画面渲染成四宫格。**这条路在�
 > GL-owned SurfaceTexture. The current path has been verified on the car: Camera2 feeds
 > one ordinary TextureView and its parent redraws that same child into four cells."
 
+【更正（2026-09-26）】这段注释出自 openavm-recorder，而它自己的 V5（2026-09-26）已经把
+相机唯一的消费者换成了 GL 自建的 OES 输入：一路喂编码器，一路把原始长条画进屏幕上的
+TextureView（它的 `ContinuousCameraInput`）。本项目的录像也一直是 Camera2 直接写进
+GL 自建的 SurfaceTexture（`EglSurfaceEncoder`），在车上没出过问题。所以「GL 自建
+SurfaceTexture 当相机输出就会崩」不成立，当年崩的更可能是那一版的具体写法。
+
+本项目的预览仍走下面这套结构，没有理由不动它；但预览逐像素做鱼眼校正、预览和录像共用
+一路输入，这些路并没有被平台堵死。【未验证】本项目没有在车上试过用 GL 画预览。
+
 ### 2.2 验证可行的结构
 
 ```

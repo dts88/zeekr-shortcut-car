@@ -54,11 +54,11 @@ public final class FisheyeProjection {
     public static final float MAX_CYLINDRICAL_FOV_DEGREES = 180f;
 
     /**
-     * 图片回看用的视野角度。
+     * 屏幕上鱼眼校正（主界面预览、图片回看、视频回看）的默认视野角度。
      *
      * <p>比后视镜的默认值宽：后视镜是边开车边扫一眼，窄一点、大一点反而好认；
-     * 照片是事后翻看，留下的范围越大越有用，四角裁掉的也少一些。
-     * 校正的<b>算法</b>两边完全一样，差的只是这一个数。</p>
+     * 预览和回看要看全，留下的范围越大越有用，四角裁掉的也少一些。
+     * 校正的<b>算法</b>两边完全一样，差的只是这一个数。名字里的 PHOTO 是历史：它最早只管图片回看。</p>
      */
     public static final float PHOTO_FOV_DEGREES = 140f;
 

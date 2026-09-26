@@ -925,17 +925,47 @@ public class AppConfig {
     }
 
     /**
-     * 图片回看里是否对画面做鱼眼校正。
+     * 环视画面在屏幕上是否做鱼眼校正：主界面预览、图片回看、视频回看共用这一个开关。
      *
-     * <p>和后视镜那一档各管各的：这一档只改屏幕上看到的样子，U 盘里的原图不动。
+     * <p>三处各有一个按钮（{@code FisheyeToggleButton}），拨的都是它。和后视镜那一档各管各的。
+     * 只改屏幕上看到的样子：录像和照片落盘的都是原始画面，一个字节都不动。
      * 默认关 —— 回看首先要能看到「拍下来的就是这样」。</p>
+     *
+     * <p>键名还是 {@code photo_fisheye}：它最早只管图片回看，改名的话用户拨过的状态就丢了。</p>
      */
-    public boolean isPhotoFisheyeCorrection() {
+    public boolean isFisheyeCorrection() {
         return prefs.getBoolean(KEY_PHOTO_FISHEYE, false);
     }
 
-    public void setPhotoFisheyeCorrection(boolean on) {
+    public void setFisheyeCorrection(boolean on) {
         prefs.edit().putBoolean(KEY_PHOTO_FISHEYE, on).apply();
+    }
+
+    /**
+     * 屏幕上的鱼眼校正（开关、投影、视野、强度）一有变化就叫 {@code action}，在主线程上。
+     *
+     * <p>开关在三个界面上都能拨，投影这几项在设置里改 —— 正在显示的画面得跟上，
+     * 不然就是「按钮亮着、画面没变」。</p>
+     *
+     * <p>返回的监听器<b>调用方要自己拿住</b>，用完交给 {@link #removeFisheyeListener}：
+     * SharedPreferences 只弱引用监听器，不拿住会被回收，之后就再也收不到了。</p>
+     */
+    public SharedPreferences.OnSharedPreferenceChangeListener onFisheyeChanged(Runnable action) {
+        SharedPreferences.OnSharedPreferenceChangeListener listener = (changed, key) -> {
+            if (KEY_PHOTO_FISHEYE.equals(key) || KEY_PHOTO_FISHEYE_FOV.equals(key)
+                    || KEY_FISHEYE_STRENGTH.equals(key)
+                    || SettingsRegistry.FISHEYE_PROJECTION.key.equals(key)) {
+                action.run();
+            }
+        };
+        prefs.registerOnSharedPreferenceChangeListener(listener);
+        return listener;
+    }
+
+    public void removeFisheyeListener(SharedPreferences.OnSharedPreferenceChangeListener listener) {
+        if (listener != null) {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener);
+        }
     }
 
     /**
@@ -951,7 +981,7 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_RAW_FRAME_DUMP, on).apply();
     }
 
-    /** 鱼眼校正用哪种投影（直线 / 柱面）。目前只作用于图片回看。 */
+    /** 鱼眼校正用哪种投影（直线 / 柱面 / 立体）。主界面预览、图片回看、视频回看共用；后视镜不用它。 */
     public String getFisheyeProjection() {
         return readEnum(SettingsRegistry.FISHEYE_PROJECTION);
     }
@@ -961,18 +991,18 @@ public class AppConfig {
     }
 
     /**
-     * 图片回看的校正视野。
+     * 屏幕上鱼眼校正的视野。主界面预览、图片回看、视频回看共用；后视镜有它自己的一项。
      *
      * <p>读的时候按<b>当前投影</b>夹一次：两种投影的上限不一样（直线 140°、柱面 180°），
      * 从柱面切回直线时存着的 170° 不该还当 170° 用 —— 界面显示多少，生效的就得是多少。</p>
      */
-    public float getPhotoFisheyeFov() {
+    public float getFisheyeFov() {
         return FisheyeProjection.clampFov(
                 prefs.getFloat(KEY_PHOTO_FISHEYE_FOV, FisheyeProjection.PHOTO_FOV_DEGREES),
                 getFisheyeProjection());
     }
 
-    public void setPhotoFisheyeFov(float degrees) {
+    public void setFisheyeFov(float degrees) {
         prefs.edit().putFloat(KEY_PHOTO_FISHEYE_FOV,
                 FisheyeProjection.clampFov(degrees, getFisheyeProjection())).apply();
     }

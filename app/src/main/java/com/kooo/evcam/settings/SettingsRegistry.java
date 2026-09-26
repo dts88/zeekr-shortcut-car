@@ -68,7 +68,7 @@ public final class SettingsRegistry {
      * 这边是界面，中间只隔着这一个字符串。{@code FisheyeProjectionTest} 钉着这一条。</p>
      *
      * <p>默认直线投影：它把直线掰得笔直，是大多数人说「矫正」时想要的那个样子。
-     * 目前只作用于图片回看。</p>
+     * 主界面预览、图片回看、视频回看共用；超级后视镜不用它。</p>
      */
     public static final SettingSpec FISHEYE_PROJECTION = SettingSpec.of(
             "fisheye_projection", "鱼眼校正方式", "rectilinear",

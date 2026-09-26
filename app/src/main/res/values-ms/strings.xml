@@ -399,7 +399,7 @@
     <string name="set_reduce_motion_title">Kurangkan animasi semasa merakam</string>
     <string name="set_reduce_motion_summary">Tiada peralihan skrin semasa merakam, GPU dibiarkan untuk pengekod</string>
     <string name="set_fisheye_projection_title">Pembetulan mata ikan</string>
-    <string name="set_fisheye_projection_summary">%1$s · buat masa ini untuk lihat foto sahaja</string>
+    <string name="set_fisheye_projection_summary">%1$s · untuk pratonton langsung, foto dan video</string>
     <string name="opt_projection_rectilinear">Garisan lurus</string>
     <string name="opt_projection_cylindrical">Luas (ufuk melengkung)</string>
     <string name="set_fisheye_fov_title">Medan pandangan dibetulkan</string>

@@ -19,6 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+import com.kooo.evcam.playback.FisheyeVideoFrame;
 import com.kooo.evcam.playback.PlaybackViewport;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -128,6 +129,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     /** 四格，[0] 是环视，其余按右边那一列从上到下。 */
     private Lane[] lanes;
     private Lane surround;
+    /** 环视那一格 TextureView 外面那一层：取景和鱼眼校正都交给它。 */
+    private FisheyeVideoFrame surroundFrame;
     /** 座舱那一列。这一条录制里座舱都没有文件时整列让开，环视独占整块。 */
     private View cabinColumn;
     /** 现在是哪一路占满整块；null 表示摆成网格。 */
@@ -244,6 +247,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                         R.id.cover_fourth, R.id.label_fourth),
         };
         surround = lanes[0];
+        surroundFrame = findViewById(R.id.video_surround_frame);
         for (Lane lane : lanes) {
             wire(lane);
         }
@@ -265,12 +269,6 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         com.kooo.evcam.ui.StatusLine.fill(findViewById(android.R.id.content));
         selectedCountText = findViewById(R.id.pb_selected_count);
         sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);
-
-        // 鱼眼校正目前只做在图片回看上：视频那边要逐帧算，性能还没量过
-        View fisheye = findViewById(R.id.pb_fisheye);
-        if (fisheye != null) {
-            fisheye.setVisibility(View.GONE);
-        }
 
         View menu = findViewById(R.id.timeline_menu);
         if (menu != null) {
@@ -722,6 +720,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      */
     private void applyViewport(Lane lane) {
         int cell = lane == expanded ? zoomedCell : PlaybackViewport.NO_CELL;
+        if (lane == surround && surroundFrame != null) {
+            // 环视：取景连同鱼眼校正交给外框。开关（pb_fisheye）是按钮自己拨的，
+            // 外框自己听着，这里不用管
+            surroundFrame.show(cell, lane.player.getVideoWidth(), lane.player.getVideoHeight(),
+                    gridColumns(lane) >= 2);
+            return;
+        }
         float[] r = PlaybackViewport.transformRects(cell,
                 lane.player.getVideoWidth(), lane.player.getVideoHeight(),
                 lane.view.getWidth(), lane.view.getHeight());

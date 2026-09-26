@@ -23,7 +23,8 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
+        <!-- 和主界面动作栏上那个是同一个开关，点击和颜色都在按钮自己身上 -->
+        <com.kooo.evcam.ui.FisheyeToggleButton
             android:id="@+id/pb_fisheye"
             style="@style/Widget.Cam.RailSmall"
             android:layout_width="wrap_content"

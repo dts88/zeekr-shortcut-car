@@ -399,7 +399,7 @@
     <string name="set_reduce_motion_title">Less motion while recording</string>
     <string name="set_reduce_motion_summary">No screen transitions while recording, leaving the GPU to the encoder</string>
     <string name="set_fisheye_projection_title">Fisheye correction</string>
-    <string name="set_fisheye_projection_summary">%1$s · photo playback only for now</string>
+    <string name="set_fisheye_projection_summary">%1$s · applies to the live preview, photos and videos</string>
     <string name="opt_projection_rectilinear">Straight lines</string>
     <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
     <string name="set_fisheye_fov_title">Corrected field of view</string>

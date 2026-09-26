@@ -1,6 +1,7 @@
 package com.kooo.evcam.playback;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -237,5 +238,16 @@ public class PlaybackViewportTest {
         }
         assertEquals(R.string.zeekr_mode_grid,
                 PlaybackViewport.labelRes(PlaybackViewport.NO_CELL));
+    }
+
+    /** 只有每格是正方形的 2×2 才是四路鱼眼：环视录像 2560×2560 算，座舱 16:9 不算。 */
+    @Test
+    public void onlySquareCellsCountAsFourFisheyeLanes() {
+        assertTrue(PlaybackViewport.hasSquareCells(2560, 2560));
+        assertTrue(PlaybackViewport.hasSquareCells(2560, 2500));
+        assertFalse(PlaybackViewport.hasSquareCells(3840, 2160));
+        assertFalse(PlaybackViewport.hasSquareCells(1920, 1080));
+        assertFalse(PlaybackViewport.hasSquareCells(0, 0));
+        assertFalse(PlaybackViewport.hasSquareCells(2560, -1));
     }
 }

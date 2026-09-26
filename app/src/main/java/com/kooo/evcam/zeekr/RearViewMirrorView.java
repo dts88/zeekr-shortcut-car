@@ -114,9 +114,9 @@ public class RearViewMirrorView extends ViewGroup {
     /** 鱼眼校正开关与目标视野，进入时读一次，设置页改了再推过来。 */
     private boolean fisheyeCorrection;
     private float fovDegrees;
-    /** 分片绘制用的临时数组，避免每帧、每格都新建。 */
-    private final float[] meshSource = new float[8];
-    private final float[] meshDest = new float[8];
+    /** 分片绘制（和主界面预览、视频回看同一套）。 */
+    private final FisheyeMesh mesh = new FisheyeMesh();
+    private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     /**
      * 多久没有新画面就不再拿它当实时画面看。
      *
@@ -1106,72 +1106,36 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     /**
-     * 带鱼眼校正的绘制：把输出切成小格，逐格反投影。
+     * 带鱼眼校正的绘制：把输出切成小格，逐格反投影（{@link FisheyeMesh}）。
      *
      * <p>校正是非线性的，一个矩阵表达不了整幅画面 —— 但一小格之内，用四个角
-     * 定出的映射已经足够接近。于是每格用 {@code setPolyToPoly} 走一次线性映射，
+     * 定出的映射已经足够接近。于是每格用 {@code setPolyToPoly} 走一次透视映射，
      * 格子够密，拼起来看不出接缝。</p>
      *
      * <p>关键在于这样做<b>不需要 OpenGL</b>：画的还是原来那个 TextureView，
-     * 相机的消费者始终只有它一个。这台车机上用 GL 自建 SurfaceTexture 顶替
-     * 相机生产者是已知会崩的（见 {@link CompositeStreamGeometry} 的平台记录），
-     * 而校正本身并不值得去冒那个险。</p>
+     * 相机的消费者始终只有它一个（为什么不上 GL，见 docs/zeekr-platform-notes.md §2.1）。</p>
      *
-     * <p>代价是每帧 {@code N²} 次绘制。后视镜是一块小窗口，这个量级扛得住。</p>
+     * <p>代价是每帧 {@code N²} 次绘制。后视镜是一块小窗口，固定每边
+     * {@link FisheyeProjection#MESH_DIVISIONS} 格；投影固定是直线投影，只有视野可调。</p>
+     *
+     * <p>每个角点三步走，顺序不能换：先按取景落到「校正后画面」里，再反投影回原始鱼眼画面，
+     * 最后加上这一路在合成流里的偏移。取景之所以作用在校正之后，是因为用户是对着
+     * 校正后的成像取景的 —— 框住的就该是他看到的那一块。</p>
      */
     private void drawCorrected(Canvas canvas, int width, int height,
                                RearViewGeometry.Viewport viewport) {
         RearViewGeometry.ShaderRects r =
                 RearViewGeometry.toShaderRects(plan, laneIndex, viewport);
-        int divisions = FisheyeProjection.MESH_DIVISIONS;
-        long drawingTime = getDrawingTime();
-
-        for (int row = 0; row < divisions; row++) {
-            float v0 = (float) row / divisions;
-            float v1 = (float) (row + 1) / divisions;
-            for (int column = 0; column < divisions; column++) {
-                float u0 = (float) column / divisions;
-                float u1 = (float) (column + 1) / divisions;
-
-                // 目标：这一格在窗口里的四个角，顺序为左上、右上、右下、左下
-                meshDest[0] = u0 * width; meshDest[1] = v0 * height;
-                meshDest[2] = u1 * width; meshDest[3] = v0 * height;
-                meshDest[4] = u1 * width; meshDest[5] = v1 * height;
-                meshDest[6] = u0 * width; meshDest[7] = v1 * height;
-
-                // 源：同样四个角，逐个经「取景 -> 校正 -> 该路在合成流里的位置」换算
-                sourceCorner(r, u0, v0, width, height, 0);
-                sourceCorner(r, u1, v0, width, height, 2);
-                sourceCorner(r, u1, v1, width, height, 4);
-                sourceCorner(r, u0, v1, width, height, 6);
-
-                int save = canvas.save();
-                destRect.set(meshDest[0], meshDest[1], meshDest[4], meshDest[5]);
-                canvas.clipRect(destRect);
-                drawMatrix.reset();
-                if (drawMatrix.setPolyToPoly(meshSource, 0, meshDest, 0, 4)) {
-                    canvas.concat(drawMatrix);
-                    drawChild(canvas, textureView, drawingTime);
-                }
-                canvas.restoreToCount(save);
-            }
-        }
+        mesh.setCorrection(fovDegrees, FisheyeProjection.PROJECTION_RECTILINEAR, 1f);
+        mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
+                r.laneOffsetX * width, r.laneOffsetY * height,
+                r.laneScaleX * width, r.laneScaleY * height,
+                r.viewOffsetX, r.viewOffsetY, r.viewScaleX, r.viewScaleY);
+        mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
     }
 
-    /**
-     * 窗口里的一个角 → 子视图坐标系里的采样点。
-     *
-     * <p>三步走，顺序不能换：先按蒙版落到「校正后画面」里，再反投影回原始鱼眼画面，
-     * 最后加上这一路在合成流里的偏移。蒙版之所以作用在校正之后，是因为用户是对着
-     * 校正后的成像取景的 —— 框住的就该是他看到的那一块。</p>
-     */
-    private void sourceCorner(RearViewGeometry.ShaderRects r, float u, float v,
-                              int width, int height, int offset) {
-        float correctedX = r.viewOffsetX + u * r.viewScaleX;
-        float correctedY = r.viewOffsetY + v * r.viewScaleY;
-        FisheyeProjection.sourcePoint(correctedX, correctedY, fovDegrees, meshSource, offset);
-        meshSource[offset] = (r.laneOffsetX + meshSource[offset] * r.laneScaleX) * width;
-        meshSource[offset + 1] = (r.laneOffsetY + meshSource[offset + 1] * r.laneScaleY) * height;
+    private void drawTextureOnce(Canvas canvas) {
+        drawChild(canvas, textureView, getDrawingTime());
     }
 
     /** 设置页改了校正开关或视野后，推到正在显示的窗口。 */

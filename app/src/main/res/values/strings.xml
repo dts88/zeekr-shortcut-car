@@ -407,7 +407,7 @@
     <string name="set_reduce_motion_title">录制时减少动效</string>
     <string name="set_reduce_motion_summary">录制时界面之间直接切换、不做过渡；录制键和进度环照常动。编码器正在用 GPU，界面不跟它抢</string>
     <string name="set_fisheye_projection_title">鱼眼校正方式</string>
-    <string name="set_fisheye_projection_summary">%1$s · 目前只作用于图片回看</string>
+    <string name="set_fisheye_projection_summary">%1$s · 作用于主界面预览、图片回看和视频回看</string>
     <string name="opt_projection_rectilinear">直线投影</string>
     <string name="opt_projection_cylindrical">柱面投影</string>
     <string name="set_fisheye_fov_title">校正视野</string>

@@ -5,7 +5,12 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 ## [Unreleased]
 
-Nothing yet.
+- **Fisheye correction on the live surround view and in video playback** (experimental).
+  A "Fisheye" button in the action rail on the main screen; video playback gets the same
+  button, which was hidden until now. It is one switch with the button in photo playback,
+  and all three use the projection, field of view and strength under Settings -> Interface.
+  Only the screen changes: recordings and photos on the drive stay as the camera took them.
+  Each lane is redrawn in up to 24 x 24 patches, so watch for stutter on the live view.
 
 ## [1.39.0-alpha] - 2026-09-26
 

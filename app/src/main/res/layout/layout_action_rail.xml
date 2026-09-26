@@ -3,8 +3,8 @@
   ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
 
   按钮：btn_start_record / btn_take_photo / btn_video_playback / btn_photo_playback /
-  btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，再点还原
-  （MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
+  btn_fisheye / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
+  再点还原（MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
   「隐藏到后台」；真正的退出在抽屉和设置左栏的最底下。
 
   主操作只有录制一个：它大一档（132dp），状态由左侧的点（圆 ⇄ 方）和外圈分段进度环表示，
@@ -144,6 +144,19 @@
             android:text="@string/nav_photo_playback"
             app:icon="@drawable/ic_photo" />
     </LinearLayout>
+
+    <!--
+      环视画面的鱼眼校正，和图片回看、视频回看上那个是同一个开关。只改屏幕上的样子，
+      录像不动。按钮自己管点击和颜色（FisheyeToggleButton），MainActivity 不用接线；
+      画面那边由 FourLaneContainer 自己听开关。先放在这里试效果，位置以后再定。
+    -->
+    <com.kooo.evcam.ui.FisheyeToggleButton
+        android:id="@+id/btn_fisheye"
+        style="@style/Widget.Cam.RailSmall"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/rail_small_height"
+        android:layout_marginTop="@dimen/gutter"
+        android:text="@string/photo_fisheye" />
 
     <Space
         android:layout_width="match_parent"

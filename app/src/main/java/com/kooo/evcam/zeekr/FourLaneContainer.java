@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -16,6 +17,7 @@ import android.view.animation.PathInterpolator;
 
 import androidx.core.content.ContextCompat;
 
+import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.camera.LaneOrientation;
 import com.kooo.evcam.AutoFitTextureView;
@@ -54,6 +56,13 @@ import com.kooo.evcam.ui.MotionPolicy;
  * 仍是同一份四联合成内容，只是被压扁了。因此拆分几何必须按<b>合成流的真实尺寸</b>
  * （如 1280x5140）计算，得到归一化窗口后再套到子视图的实际绘制区域上。
  * 这样无论缓冲区多大，四个画面的位置和比例都正确。</p>
+ *
+ * <h3>鱼眼校正</h3>
+ *
+ * <p>开着的时候，每一格不再是一个矩阵画一次，而是切成小格逐格反投影（{@link FisheyeMesh}），
+ * 画的仍然是同一个子视图，相机链路照样没动。开关和图片回看、视频回看是同一个
+ * （{@link AppConfig#isFisheyeCorrection}），投影、视野、强度也用同一套设置。
+ * 容器自己听开关：拨开关的是动作栏上那个按钮自己，MainActivity 不用接线。</p>
  */
 public class FourLaneContainer extends ViewGroup {
 
@@ -168,6 +177,16 @@ public class FourLaneContainer extends ViewGroup {
 
     /** 上一帧走的是哪条绘制路径。变了才记日志 —— 每帧都记会把日志冲掉。 */
     private String drawPath = "";
+
+    /** 屏幕上的鱼眼校正开没开。挂上窗口时读，之后开关或设置一变就重读。 */
+    private boolean fisheye;
+    private final FisheyeMesh mesh = new FisheyeMesh();
+    private final FisheyeMesh.Painter paintTexture =
+            canvas -> drawChild(canvas, textureView, getDrawingTime());
+    /** 这一格的旋转、镜像。校正时它先作用在画布上，格子在转之前的框里切。 */
+    private final Matrix cellMatrix = new Matrix();
+    /** 拿住它：SharedPreferences 只弱引用监听器。 */
+    private SharedPreferences.OnSharedPreferenceChangeListener fisheyeListener;
 
     public FourLaneContainer(Context context) {
         this(context, null);
@@ -444,6 +463,7 @@ public class FourLaneContainer extends ViewGroup {
                         : current.isComposite() ? "split into " + current.laneCount() : "not split")
                 + " mode=" + displayMode
                 + " cells=" + (activeCells == null ? "default 2x2" : String.valueOf(activeCells.length))
+                + " fisheye=" + (fisheye ? "on" : "off")
                 + " drawing=" + (drawPath.isEmpty() ? "not drawn yet" : drawPath);
     }
 
@@ -462,13 +482,30 @@ public class FourLaneContainer extends ViewGroup {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         lastAttached = new java.lang.ref.WeakReference<>(this);
+        readFisheye();
+        fisheyeListener = new AppConfig(getContext()).onFisheyeChanged(this::readFisheye);
         AppLog.i(TAG, "attached: " + describeState());
     }
 
     @Override
     protected void onDetachedFromWindow() {
         AppLog.i(TAG, "detached: " + describeState());
+        new AppConfig(getContext()).removeFisheyeListener(fisheyeListener);
+        fisheyeListener = null;
         super.onDetachedFromWindow();
+    }
+
+    /** 读鱼眼校正的开关和参数。挂上窗口时读一次，之后开关或设置一变再读。 */
+    private void readFisheye() {
+        AppConfig config = new AppConfig(getContext());
+        fisheye = config.isFisheyeCorrection();
+        mesh.setCorrection(config.getFisheyeFov(), config.getFisheyeProjection(),
+                config.getFisheyeStrength() / 100f);
+        AppLog.i(TAG, "鱼眼校正 " + (fisheye
+                ? "开：" + mesh.projection() + " " + mesh.fovDegrees() + "° 强度 "
+                        + Math.round(mesh.strength() * 100f) + "%"
+                : "关") + " " + instanceTag());
+        invalidate();
     }
 
     /** 绘制路径变了就记一笔。传进来的都是常量字符串，每帧比较不分配。 */
@@ -542,8 +579,10 @@ public class FourLaneContainer extends ViewGroup {
         if (width <= 0 || height <= 0) {
             return;
         }
-        noteDrawPath(transitioning ? "grow transition"
-                : displayMode == DisplayMode.SINGLE ? "single lane" : "grid");
+        noteDrawPath(transitioning ? (fisheye ? "grow transition, fisheye corrected" : "grow transition")
+                : displayMode == DisplayMode.SINGLE
+                        ? (fisheye ? "single lane, fisheye corrected" : "single lane")
+                        : (fisheye ? "grid, fisheye corrected" : "grid"));
 
         if (transitioning) {
             // 过渡中：先照常画四宫格（主角那一格除外），再把主角从它自己的格子
@@ -803,6 +842,11 @@ public class FourLaneContainer extends ViewGroup {
             // 合成流，而不是什么都不画。宁可这一格空着
             return;
         }
+        if (fisheye) {
+            drawLaneCorrected(canvas, lane, cell, rotation, childWidth, childHeight,
+                    cellLeft, cellTop, cellWidth, cellHeight);
+            return;
+        }
         drawMatrix.setRectToRect(sourceRect, destinationRect, Matrix.ScaleToFit.FILL);
         if (cell != null) {
             float cx = destinationRect.centerX();
@@ -835,6 +879,47 @@ public class FourLaneContainer extends ViewGroup {
         // 验证过的。裁剪则整个停用，见 LaneOrientation.CROP_SUPPORTED。
         canvas.clipRect(sourceRect);
         drawChild(canvas, textureView, getDrawingTime());
+        canvas.restoreToCount(save);
+    }
+
+    /**
+     * 带鱼眼校正地画一路。{@link #drawLane} 把源矩形和目标框都算好之后才走到这里。
+     *
+     * <p>摆位、缩放方式、裁切平移都和不校正时一样算：算出来的源矩形换成「这一路里的
+     * 归一化窗口」，就是校正后的画面里要看的那一块。每一路是正方形，校正后也是正方形，
+     * 所以按比例摆放那一套不用改。</p>
+     *
+     * <p>不需要不校正时那第二次「裁到这一路的取景窗」：每一小格的四个源点都夹在这一路之内，
+     * 格内是透视映射，画出来的东西落不到这一路外面去。</p>
+     */
+    private void drawLaneCorrected(Canvas canvas, CompositeStreamGeometry.Lane lane, Cell cell,
+                                   int rotation, float childWidth, float childHeight,
+                                   float cellLeft, float cellTop, float cellWidth, float cellHeight) {
+        float laneLeft = lane.u0 * childWidth;
+        float laneTop = lane.v0 * childHeight;
+        float laneWidth = (lane.u1 - lane.u0) * childWidth;
+        float laneHeight = (lane.v1 - lane.v0) * childHeight;
+        mesh.prepare(FisheyeMesh.divisionsFor(
+                        Math.max(destinationRect.width(), destinationRect.height())),
+                laneLeft, laneTop, laneWidth, laneHeight,
+                (sourceRect.left - laneLeft) / laneWidth, (sourceRect.top - laneTop) / laneHeight,
+                sourceRect.width() / laneWidth, sourceRect.height() / laneHeight);
+
+        int save = canvas.save();
+        canvas.clipRect(cellLeft, cellTop, cellLeft + cellWidth, cellTop + cellHeight);
+        canvas.drawRect(cellLeft, cellTop, cellLeft + cellWidth, cellTop + cellHeight, backdrop);
+        if (cell != null && (rotation != 0 || cell.mirrored)) {
+            // 和不校正时同一个顺序：先转，再镜像，都绕目标框的中心
+            float cx = destinationRect.centerX();
+            float cy = destinationRect.centerY();
+            cellMatrix.setRotate(rotation, cx, cy);
+            if (cell.mirrored) {
+                cellMatrix.postScale(-1f, 1f, cx, cy);
+            }
+            canvas.concat(cellMatrix);
+        }
+        mesh.draw(canvas, destinationRect.left, destinationRect.top,
+                destinationRect.width(), destinationRect.height(), paintTexture);
         canvas.restoreToCount(save);
     }
 }
