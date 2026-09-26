@@ -4148,6 +4148,12 @@ public class MainActivity extends AppCompatActivity {
         // 录制根本没断，不存在「恢复」—— 那条路会以为要重开一次
         shouldResumeRecordingAfterRecreate = false;
         savedRecordingStartTime = 0;
+        // 这一段从什么时候开始也要接上：新界面的这个字段是 0，停的时候黑匣子会记成「录了 0 秒」
+        // （2026-09-26：录制中夜间模式切换、界面重建，之后录了 40 分钟，停时记的是 0 秒）
+        long now = android.os.SystemClock.elapsedRealtime();
+        recordingStartedAtMs = cameraManager.hasWrittenFirstData()
+                ? now - Math.max(0L, System.currentTimeMillis() - cameraManager.getFirstDataWrittenAtMs())
+                : now;
         if (cameraManager.hasWrittenFirstData()) {
             isPreparingRecording = false;
             startRecordingTimer(cameraManager.getFirstDataWrittenAtMs(),
