@@ -71,7 +71,6 @@ public final class UserExit {
         if (!isExited(context)) {
             return false;
         }
-        BlackBox.count("已退出，拦下: " + who);
         return true;
     }
 

@@ -33,8 +33,13 @@ public final class DiagnosticsJson {
 
     private static final String TAG = "DiagnosticsJson";
 
-    /** 输出格式版本。字段结构变了就加一，方便日后对比历史报告。 */
-    private static final int SCHEMA_VERSION = 1;
+    /**
+     * 输出格式版本。字段结构变了就加一，方便日后对比历史报告。
+     *
+     * <p>2：去掉 properties / settings / services / vehicle_packages 和
+     * meta.ungranted_car_permissions —— 找车辆信号那一轮的原始数据，结论已有（1.37.0）。</p>
+     */
+    private static final int SCHEMA_VERSION = 2;
 
     private DiagnosticsJson() {
     }
@@ -52,10 +57,6 @@ public final class DiagnosticsJson {
             root.put("schema_version", SCHEMA_VERSION);
             root.put("generated_at", System.currentTimeMillis());
             root.put("meta", meta(context));
-            root.put("properties", toJson(VehicleSignalProbe.captureProperties()));
-            root.put("settings", settings(context));
-            root.put("services", toJson(VehicleEnumeration.readServices()));
-            root.put("vehicle_packages", packages(context));
             root.put("text_report", textReport != null ? textReport : "");
         } catch (Throwable t) {
             AppLog.e(TAG, "组装 JSON 失败", t);
@@ -89,62 +90,7 @@ public final class DiagnosticsJson {
         } catch (Throwable t) {
             meta.put("app_version", "unknown");
         }
-        JSONArray ungranted = new JSONArray();
-        for (String permission : VehicleSignalProbe.ungrantedCarPermissions(context)) {
-            ungranted.put(permission);
-        }
-        meta.put("ungranted_car_permissions", ungranted);
         return meta;
     }
 
-    private static JSONObject settings(Context context) throws Exception {
-        JSONObject tables = new JSONObject();
-        for (String table : VehicleEnumeration.SETTINGS_TABLES) {
-            tables.put(table, toJson(VehicleEnumeration.readSettings(context, table)));
-        }
-        return tables;
-    }
-
-    private static JSONArray packages(Context context) throws Exception {
-        JSONArray array = new JSONArray();
-        for (VehicleEnumeration.PackageEntry entry
-                : VehicleEnumeration.readVehiclePackages(context)) {
-            JSONObject object = new JSONObject();
-            object.put("package", entry.packageName);
-            object.put("system_app", entry.systemApp);
-
-            JSONArray providers = new JSONArray();
-            for (int i = 0; i < entry.exportedProviders.size(); i++) {
-                JSONObject provider = new JSONObject();
-                provider.put("authority", entry.exportedProviders.get(i));
-                String permission = entry.providerPermissions.get(i);
-                // 没有读权限要求的 provider 是最值得先试的，单独标出来
-                provider.put("read_permission", permission == null ? JSONObject.NULL : permission);
-                provider.put("readable_without_permission", permission == null);
-                providers.put(provider);
-            }
-            object.put("exported_providers", providers);
-            object.put("exported_receivers", toJson(entry.exportedReceivers));
-            array.put(object);
-        }
-        return array;
-    }
-
-    private static JSONObject toJson(Map<String, String> map) throws Exception {
-        JSONObject object = new JSONObject();
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            // 值不截断：被截掉的那部分恰恰可能是要找的东西
-            object.put(entry.getKey(),
-                    entry.getValue() == null ? JSONObject.NULL : entry.getValue());
-        }
-        return object;
-    }
-
-    private static JSONArray toJson(List<String> values) {
-        JSONArray array = new JSONArray();
-        for (String value : values) {
-            array.put(value);
-        }
-        return array;
-    }
 }

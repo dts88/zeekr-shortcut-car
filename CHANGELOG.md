@@ -7,6 +7,23 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.37.0-alpha] - 2026-09-26
+
+- **Diagnostics keep only what is still open.** Removed the probes whose answers are known
+  and written down: vehicle signals (ignition, gear, handbrake are structurally out of
+  reach), shutdown broadcasts (never sent), encoder and decoder capability, and floating
+  window positions. The diagnostics page loses "Request car permissions", "Snapshot" and
+  "Compare"; the app no longer declares or asks for car permissions. The JSON export drops
+  the raw system property and settings dumps (schema 2).
+- Black box: routine counters (broadcasts, foreground service wake-ups) are gone; earlier
+  process exits are listed once instead of at every start; service starts are logged only
+  when the system restarts a service.
+- The report's recent log covers minutes instead of about two seconds: it drops the
+  container's call tracing and codec setup chatter, and no longer skips the log lines of our
+  own screens. Stall snapshots filter the same noise.
+- Periodic log lines (per-camera frame rate every 5 s, encoded frame counts) are down to once
+  a minute or removed.
+
 ## [1.36.0-alpha] - 2026-09-26
 
 - **Cabin views are one whole picture in both playback screens.** Tapping an enlarged cabin

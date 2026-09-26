@@ -84,10 +84,6 @@ public class CameraForegroundService extends Service {
         // 全在这些行的 slept= 里；中间断掉的那一段就是「我们不在」
         startBlackBoxHeartbeat();
 
-        // 挂上车辆信号监听。放在前台服务里而不是界面里：要盯的是熄火那一刻，
-        // 那时候界面多半已经不在了，而这个服务还在。只读，失败也不影响别的
-        com.kooo.evcam.zeekr.VehicleSignalWatch.start(this);
-
         // 相机服务眼里每一路空不空。环视卡死、只能重启车机的那种状态，
         // 要靠它说出「是谁占着」—— 注册时系统会把当前状态报一遍
         com.kooo.evcam.camera.CameraAvailabilityWatch.start(this);
@@ -206,15 +202,13 @@ public class CameraForegroundService extends Service {
         // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
         // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它。
         //
-        // 只有那种才值一行：每分钟那一次例行叫醒只计数。原来一律记，结果 48KB 的
-        // 导出只装得下三个小时 —— 而要看的那一夜正好在三个小时之外
+        // 只有那种才值一行。每分钟那一次例行叫醒不记：原来一律记，48KB 的导出只装得下
+        // 三个小时；后来改成计数，睡眠唤醒那一轮研究完（平台笔记 §3.6）计数也没用了
         if (flags != 0 || intent == null) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant(
                     "CameraForegroundService onStartCommand flags=" + flags
                             + (intent == null ? " intent=null(sticky重启)" : "")
                             + " startId=" + startId);
-        } else {
-            com.kooo.evcam.blackbox.BlackBox.count("前台服务例行叫醒");
         }
         AppLog.d(TAG, "Service started");
         
@@ -504,7 +498,6 @@ public class CameraForegroundService extends Service {
             try {
                 context.startForegroundService(intent);
                 AppLog.d(TAG, "Starting foreground service: " + title);
-                com.kooo.evcam.blackbox.BlackBox.count("startForegroundService 成功");
             } catch (Exception e) {
                 // Android 12 起，后台启前台服务会被拦 —— 拦不拦、什么条件下拦，看这一行
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("startForegroundService 被拒: " + e.getClass().getSimpleName()

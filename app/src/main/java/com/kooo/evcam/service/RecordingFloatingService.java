@@ -307,11 +307,13 @@ public class RecordingFloatingService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        // flags 里的 START_FLAG_RETRY / START_FLAG_REDELIVERY 直接说明
-        // 这一次是不是系统在做 sticky 重启 —— 「START_STICKY 到底生不生效」看它
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onStartCommand flags=" + flags
-                + (intent == null ? " intent=null(sticky重启)" : "")
-                + " startId=" + startId);
+        // 只记系统做 sticky 重启的那种（flags 里有 RETRY / REDELIVERY，或 intent 为空）：
+        // 「START_STICKY 到底生不生效」看它。例行的启动不记，和前台服务一样
+        if (flags != 0 || intent == null) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onStartCommand flags=" + flags
+                    + (intent == null ? " intent=null(sticky重启)" : "")
+                    + " startId=" + startId);
+        }
         if (intent != null) {
             String action = intent.getAction();
             if (ACTION_HIDE.equals(action)) {

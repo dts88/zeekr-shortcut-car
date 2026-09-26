@@ -80,8 +80,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_PERMISSIONS = 100;
-    /** 读点火状态那个权限单独申请，见 requestPowertrainPermissionQuietly。 */
-    private static final int REQUEST_CAR_POWERTRAIN = 101;
     
     // 静态实例引用（用于悬浮窗等外部组件访问）
     private static MainActivity instance;
@@ -389,8 +387,6 @@ public class MainActivity extends AppCompatActivity {
             requestPermissions();
         }
 
-        // 和相机那套分开：这一个是 normal 级、不弹框，没必要卷进去
-        requestPowertrainPermissionQuietly();
 
 
         // 启动定时保活任务（车机必需，始终开启）
@@ -1860,34 +1856,6 @@ public class MainActivity extends AppCompatActivity {
     private void requestPermissions() {
         AppLog.d(TAG, "Requesting permissions...");
         ActivityCompat.requestPermissions(this, getRequiredPermissions(), REQUEST_PERMISSIONS);
-    }
-
-    /**
-     * 悄悄申请一次读点火状态的权限。
-     *
-     * <p>{@code CAR_POWERTRAIN} 是 <b>normal</b> 级（2026-08-29 在车上读出来的保护级别），
-     * 本该安装时自动授予，但这台车机的容器没有代为授予。normal 级申请<b>不弹框</b>，
-     * 所以这一次对用户是无感的。</p>
-     *
-     * <p>只申请这一个：同组的车速、电量是 dangerous 级会弹框，留给诊断页那颗按钮；
-     * 转向灯和车门是 signature|privileged，申请也没用。</p>
-     *
-     * <p>拿到之后 {@link com.kooo.evcam.zeekr.VehicleSignalWatch} 才读得到点火状态 ——
-     * 那是「断电前把录像关干净」目前最有希望的一条路。</p>
-     */
-    private void requestPowertrainPermissionQuietly() {
-        String permission = "android.car.permission.CAR_POWERTRAIN";
-        try {
-            if (ContextCompat.checkSelfPermission(this, permission)
-                    == PackageManager.PERMISSION_GRANTED) {
-                return;
-            }
-            AppLog.i(TAG, "申请 CAR_POWERTRAIN（normal 级，不弹框）");
-            ActivityCompat.requestPermissions(this, new String[]{permission},
-                    REQUEST_CAR_POWERTRAIN);
-        } catch (Exception e) {
-            AppLog.w(TAG, "申请 CAR_POWERTRAIN 失败: " + e);
-        }
     }
 
     @Override

@@ -100,34 +100,6 @@
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
             android:text="@string/diag_btn_refresh" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/diagnostics_request_car_perms"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:text="@string/diag_btn_car_perms" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/diagnostics_snapshot"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="52dp"
-            android:layout_marginEnd="8dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:text="@string/diag_btn_snapshot" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/diagnostics_compare"
-            style="@style/Widget.Cam.RailSmall"
-            android:layout_width="wrap_content"
-            android:layout_height="52dp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:text="@string/diag_btn_compare" />
     </LinearLayout>
 
     <!-- 报告正文：等宽字体，横竖都能滚，垫在一块卡片上 -->

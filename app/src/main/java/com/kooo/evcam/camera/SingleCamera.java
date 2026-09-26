@@ -139,7 +139,7 @@ public class SingleCamera {
     // 调试：帧捕获监控
     private long frameCount = 0;  // 总帧数
     private long lastFrameLogTime = 0;  // 上次输出帧计数的时间
-    private static final long FRAME_LOG_INTERVAL_MS = 5000;  // 每5秒输出一次帧计数
+    private static final long FRAME_LOG_INTERVAL_MS = 60_000;  // 每分钟一行帧率；卡住另有卡顿监测
 
     // 实时 FPS（1秒滚动窗口，供调试信息展示）
     private float currentFps = 0f;

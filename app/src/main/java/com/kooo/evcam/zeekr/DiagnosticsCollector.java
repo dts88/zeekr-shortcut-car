@@ -41,8 +41,13 @@ public final class DiagnosticsCollector {
 
     private static final String TAG = "DiagnosticsCollector";
 
-    /** logcat 抓取的行数上限，避免报告过大。 */
+    /** 报告里最多留多少行 logcat。 */
     private static final int LOGCAT_MAX_LINES = 400;
+    /**
+     * 从 logcat 读多少行再滤。本进程的 logcat 大半是容器和编解码框架的话
+     * （见 {@code LogcatNoise}），只读最后 400 行的话，滤完只剩几秒。
+     */
+    private static final int LOGCAT_READ_LINES = 4000;
 
     private DiagnosticsCollector() {
     }
@@ -67,18 +72,12 @@ public final class DiagnosticsCollector {
         timings.run("stall watch", () -> appendStallWatch(sb, context));
         timings.run("multi mapping", () -> appendMultiMapping(sb, context));
         timings.run("displays", () -> appendDisplays(sb, context));
-        timings.run("vehicle signals", () -> appendSignalSources(sb, context));
-        timings.run("shutdown probe", () -> appendShutdownProbe(sb, context));
-        timings.run("vehicle watch", () -> appendVehicleWatch(sb, context));
         timings.run("black box", () -> appendBlackBox(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
-        timings.run("floating layout", () -> appendFloatingLayout(sb, context));
-        timings.run("encoders", () -> appendEncoders(sb, context));
         timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
         timings.run("share", () -> com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context));
-        timings.run("playback", () -> PlaybackCapabilityProbe.appendTo(sb, context));
-        timings.run("vehicle enumeration", () -> VehicleEnumeration.appendTo(sb, context));
+        timings.run("recordings", () -> RecentRecordings.appendTo(sb, context));
         timings.run("logcat", () -> appendLogcat(sb));
 
         String took = timings.describe();
@@ -249,44 +248,12 @@ public final class DiagnosticsCollector {
         sb.append("## 2.3 卡顿监测（后视镜 / 录制卡住时自动留下的现场）").append('\n');
         try {
             // 页面放不下太长的文字，报告只带最新的一段；完整的在「保存日志」里
-            sb.append(com.kooo.evcam.camera.StallWatch.exportText(context, 64 * 1024)).append('\n');
+            sb.append(com.kooo.evcam.camera.StallWatch.exportText(context, 32 * 1024)).append('\n');
         } catch (Exception e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
         sb.append('\n');
         appendCameraAvailability(sb);
-    }
-
-    /**
-     * 熄火时车机有没有通知过我们。
-     *
-     * <p>这一节是为了回答一个很具体的问题：断电前能不能先把正在录的那一段正常关掉。
-     * 能收到关机广播就能，收不到就只能靠事后修索引。</p>
-     */
-    private static void appendShutdownProbe(StringBuilder sb, Context context) {
-        sb.append("## 2.4 关机信号探测（熄火时车机有没有通知应用）").append('\n');
-        try {
-            sb.append(ShutdownProbe.describe(context));
-        } catch (Exception e) {
-            sb.append("!! 读取失败: ").append(e).append('\n');
-        }
-        sb.append('\n');
-    }
-
-    /**
-     * 点火状态这一类信号的监听结果。
-     *
-     * <p>和 2.4 的关机广播是同一个问题的两条路：知道「快断电了」，才能在断电前
-     * 把正在录的那一段关干净。</p>
-     */
-    private static void appendVehicleWatch(StringBuilder sb, Context context) {
-        sb.append("## 2.5 车辆信号监听（点火 / 档位 / 手刹）").append('\n');
-        try {
-            sb.append(VehicleSignalWatch.describe());
-        } catch (Exception e) {
-            sb.append("!! 读取失败: ").append(e).append('\n');
-        }
-        sb.append('\n');
     }
 
     /**
@@ -492,16 +459,6 @@ public final class DiagnosticsCollector {
         sb.append('\n');
     }
 
-    /**
-     * 车辆信号探测。
-     *
-     * <p>之前这里按猜出来的类名找 CarSignalManager，全都没找到就下了结论 ——
-     * 那是错的。真正的读法见 {@link VehicleSignalProbe}。</p>
-     */
-    private static void appendSignalSources(StringBuilder sb, Context context) {
-        VehicleSignalProbe.appendTo(sb, context);
-    }
-
     private static void appendStorage(StringBuilder sb, Context context) {
         sb.append("## 5. 存储").append('\n');
         try {
@@ -583,112 +540,6 @@ public final class DiagnosticsCollector {
     }
 
     /**
-     * 悬浮窗与悬浮按钮的位置、大小。
-     *
-     * <p>用途是「把手动调好的位置定为新的默认值」：先在车机上把各个悬浮元素拖到
-     * 合适的位置和大小，再导出这份报告，把本节的数字发回来，就能写进代码当默认值。</p>
-     *
-     * <p>所以这里同时给出<b>当前值</b>与<b>现行默认值</b> —— 只有能看出差别，
-     * 才知道哪些需要改。位置是像素，同时附上屏幕尺寸与密度，换算才有依据。</p>
-     */
-    private static void appendFloatingLayout(StringBuilder sb, Context context) {
-        sb.append("## 7. 悬浮窗位置与大小").append('\n');
-        sb.append("把悬浮元素拖到合适位置后导出本报告，把这一节发回即可设为默认值。").append('\n');
-        try {
-            AppConfig cfg = new AppConfig(context);
-
-            android.util.DisplayMetrics dm = context.getResources().getDisplayMetrics();
-            sb.append('\n').append("[屏幕]").append('\n');
-            sb.append("     应用可用区域: ").append(dm.widthPixels).append(" x ")
-                    .append(dm.heightPixels).append(" px（不含状态栏/导航栏）").append('\n');
-            // 悬浮窗用的是整屏坐标，只报可用区域会让人把位置算错一整条系统栏
-            try {
-                android.view.WindowManager wm = (android.view.WindowManager)
-                        context.getSystemService(Context.WINDOW_SERVICE);
-                android.util.DisplayMetrics real = new android.util.DisplayMetrics();
-                wm.getDefaultDisplay().getRealMetrics(real);
-                sb.append("     整屏: ").append(real.widthPixels).append(" x ")
-                        .append(real.heightPixels).append(" px（悬浮窗坐标用这个）").append('\n');
-            } catch (Throwable t) {
-                sb.append("     整屏尺寸读取失败: ").append(t).append('\n');
-            }
-            sb.append("     密度: ").append(dm.density).append("  (1dp = ")
-                    .append(dm.density).append("px, densityDpi=").append(dm.densityDpi)
-                    .append(")").append('\n');
-
-            sb.append('\n').append("[主屏悬浮窗（摄像头画面窗口）]").append('\n');
-            sb.append("     开关: ").append(cfg.isMainFloatingEnabled() ? "开" : "关").append('\n');
-            sb.append("     摄像头: ").append(cfg.getMainFloatingCamera()).append('\n');
-            appendValueVsDefault(sb, "位置 X", cfg.getMainFloatingX(), 100);
-            appendValueVsDefault(sb, "位置 Y", cfg.getMainFloatingY(), 100);
-            appendValueVsDefault(sb, "宽度", cfg.getMainFloatingWidth(), 480);
-            appendValueVsDefault(sb, "高度", cfg.getMainFloatingHeight(), 320);
-
-            sb.append('\n').append("[录制悬浮按钮（开始/停止录制）]").append('\n');
-            int rx = cfg.getRecordingFloatingX();
-            int ry = cfg.getRecordingFloatingY();
-            sb.append("     开关: ").append(cfg.isRecordingFloatingEnabled() ? "开" : "关").append('\n');
-            if (rx < 0 || ry < 0) {
-                sb.append("     位置: 尚未拖动过（使用内置默认位置）").append('\n');
-            } else {
-                sb.append("     位置 X = ").append(rx).append(" px").append('\n');
-                sb.append("     位置 Y = ").append(ry).append(" px").append('\n');
-                // 默认位置按离右上角多远记，这里换算好，发回来就能直接用
-                int sizePx = (int) (cfg.getRecordingFloatingButtonSizeDp() * dm.density);
-                int right = dm.widthPixels - rx - sizePx;
-                sb.append("     离右边 = ").append(right).append(" px（")
-                        .append(String.format(java.util.Locale.US, "%.2f", right / dm.density))
-                        .append(" dp），离上边 = ").append(ry).append(" px（")
-                        .append(String.format(java.util.Locale.US, "%.2f", ry / dm.density))
-                        .append(" dp）").append('\n');
-            }
-            sb.append("     默认位置: 离右边 ").append(AppConfig.DEFAULT_FLOATING_RIGHT_MARGIN_DP)
-                    .append(" dp，离上边 ").append(AppConfig.DEFAULT_FLOATING_TOP_MARGIN_DP)
-                    .append(" dp").append('\n');
-            sb.append("     按钮大小 = ").append(cfg.getRecordingFloatingButtonSizeDp())
-                    .append(" dp").append('\n');
-            sb.append("     时间字号 = ").append(cfg.getRecordingFloatingTimeTextSizeSp())
-                    .append(" sp").append('\n');
-            sb.append("     透明度 = ").append(cfg.getFloatingWindowAlpha()).append('\n');
-
-            sb.append('\n').append(">> 要把当前位置设为默认值，请把以上数字连同屏幕尺寸一起发回。")
-                    .append('\n');
-            sb.append(">> 拖动后存下的位置是像素值，只在同尺寸屏幕上通用；悬浮按钮的默认位置按离右上角多远记，换屏也贴在右上角。")
-                    .append('\n');
-        } catch (Throwable t) {
-            sb.append("!! 读取失败: ").append(t).append('\n');
-        }
-        sb.append('\n');
-    }
-
-    /** 当前值与默认值并排显示；相同就标出来，一眼能看出哪些是手动调过的。 */
-    private static void appendValueVsDefault(StringBuilder sb, String label, int value, int fallback) {
-        sb.append("     ").append(label).append(" = ").append(value);
-        if (value == fallback) {
-            sb.append("  (与当前默认值相同)");
-        } else {
-            sb.append("  (当前默认值 ").append(fallback).append(")");
-        }
-        sb.append('\n');
-    }
-
-    /**
-     * 抓一段本应用的 logcat，便于排查启动/相机错误。
-     */
-    /**
-     * 硬件编码器到底允许什么。
-     *
-     * <h3>为什么要把这些数抄出来</h3>
-     *
-     * <p>码率上限一直是代码里写死的一个数（上游给小得多的画面定的 8 Mbps），
-     * 从来没有对照过这台车机自己声明的范围。同理，录制曾经写死 HEVC Level 4 ——
-     * 而 Level 4 的最大画面是 1920×1080，环视四宫格是它的三倍。这两件事在车上
-     * 都看不出来：编码器不会报错，只会安静地把画质压下去。</p>
-     *
-     * <p>所以这一节只做一件事：把编码器<b>自己声明</b>的尺寸范围、码率范围和
-     * Profile/Level 抄出来。有了这几行，「20 Mbps 会不会被夹」就不再是猜的。</p>
-     */
-    /**
      * 每一路的摆位现在是什么状态。
      *
      * <h3>为什么要把这个印出来</h3>
@@ -734,116 +585,34 @@ public final class DiagnosticsCollector {
         sb.append('\n');
     }
 
-    private static void appendEncoders(StringBuilder sb, Context context) {
-        sb.append("## 8. 硬件编码器能力").append('\n');
-        int[] target = encodeTarget(context);
-        if (target != null) {
-            sb.append("环视这一路要编的尺寸: ").append(target[0]).append('x').append(target[1])
-                    .append("  (").append((long) target[0] * target[1] / 10000).append(" 万像素)")
-                    .append('\n');
-        }
-        appendEncoder(sb, MediaFormat.MIMETYPE_VIDEO_HEVC, "H.265 / HEVC", target);
-        appendEncoder(sb, MediaFormat.MIMETYPE_VIDEO_AVC, "H.264 / AVC", target);
-        sb.append('\n');
-    }
-
-    /** 环视那一路最终送进编码器的尺寸；算不出来返回 null。 */
-    private static int[] encodeTarget(Context context) {
-        try {
-            int[] max = com.kooo.evcam.profile.ProfileSizes.declaredMax(
-                    context, com.kooo.evcam.profile.CameraProfile.ROLE_COMPOSITE);
-            if (max == null) {
-                return null;
-            }
-            com.kooo.evcam.camera.EncodeSize size = com.kooo.evcam.camera.EncodeSize.forSource(
-                    com.kooo.evcam.zeekr.StreamLayoutTable.compositeCameraId(), max[0], max[1], true);
-            return size.width > 0 ? new int[]{size.width, size.height} : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static void appendEncoder(StringBuilder sb, String mime, String label, int[] target) {
-        sb.append("### ").append(label).append('\n');
-        boolean found = false;
-        try {
-            MediaCodecList list = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
-            for (MediaCodecInfo info : list.getCodecInfos()) {
-                if (!info.isEncoder()) {
-                    continue;
-                }
-                boolean matches = false;
-                for (String type : info.getSupportedTypes()) {
-                    if (type.equalsIgnoreCase(mime)) {
-                        matches = true;
-                        break;
-                    }
-                }
-                if (!matches) {
-                    continue;
-                }
-                found = true;
-                String name = info.getName();
-                boolean software = name.contains("c2.android") || name.contains("OMX.google");
-                sb.append(name).append(software ? "  (软编码)" : "  (硬编码)").append('\n');
-                MediaCodecInfo.CodecCapabilities caps = info.getCapabilitiesForType(mime);
-                MediaCodecInfo.VideoCapabilities video = caps.getVideoCapabilities();
-                if (video != null) {
-                    sb.append("  尺寸: ").append(video.getSupportedWidths()).append(" x ")
-                            .append(video.getSupportedHeights()).append('\n');
-                    sb.append("  码率: ").append(video.getBitrateRange()).append(" bps")
-                            .append('\n');
-                    if (target != null) {
-                        boolean ok = false;
-                        try {
-                            ok = video.isSizeSupported(target[0], target[1]);
-                        } catch (Exception ignored) {
-                            // 有的实现对超范围的尺寸直接抛，那就是「不支持」
-                        }
-                        sb.append("  能编 ").append(target[0]).append('x').append(target[1])
-                                .append(": ").append(ok ? "能" : "不能").append('\n');
-                    }
-                }
-                MediaCodecInfo.CodecProfileLevel[] levels = caps.profileLevels;
-                if (levels != null && levels.length > 0) {
-                    sb.append("  声明的 Profile/Level: ");
-                    for (int i = 0; i < levels.length; i++) {
-                        if (i > 0) {
-                            sb.append(", ");
-                        }
-                        sb.append(levels[i].profile).append('/').append(levels[i].level);
-                    }
-                    sb.append('\n');
-                }
-            }
-        } catch (Exception e) {
-            sb.append("!! 读取失败: ").append(e).append('\n');
-        }
-        if (!found) {
-            sb.append("(这台设备没有这种编码器)").append('\n');
-        }
-    }
-
+    /**
+     * 本进程最近的 logcat。
+     *
+     * <p>这台车机上应用只读得到自己进程的行，所以不再按关键词挑 —— 以前那样挑，
+     * 主界面、后视镜这些标签不含关键词，整类被漏掉。改成滤掉已知的噪声
+     * （容器的调用跟踪、编解码框架的配置细节），剩下的都留。</p>
+     */
     private static void appendLogcat(StringBuilder sb) {
-        sb.append("## 9. 最近日志（本应用相关）").append('\n');
+        sb.append("## 9. 最近日志（本进程）").append('\n');
         try {
-            Process p = Runtime.getRuntime().exec(
-                    new String[]{"logcat", "-d", "-v", "time", "-t", String.valueOf(LOGCAT_MAX_LINES)});
+            Process p = Runtime.getRuntime().exec(new String[]{
+                    "logcat", "-d", "-v", "time", "-t", String.valueOf(LOGCAT_READ_LINES)});
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             List<String> kept = new ArrayList<>();
+            int dropped = 0;
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.contains("evcam") || line.contains("EVCam")
-                        || line.contains("Zeekr") || line.contains("Composite")
-                        || line.contains("FourLane") || line.contains("Camera")
-                        || line.contains("Signal") || line.contains("Codec")) {
-                    kept.add(line);
+                if (com.kooo.evcam.camera.LogcatNoise.isNoise(line)) {
+                    dropped++;
+                } else {
+                    kept.add(com.kooo.evcam.camera.LogcatNoise.clip(line));
                 }
             }
             reader.close();
             if (kept.isEmpty()) {
                 sb.append("(未抓到相关日志)").append('\n');
             } else {
+                sb.append("（滤掉容器和编解码框架的 ").append(dropped).append(" 行）").append('\n');
                 int from = Math.max(0, kept.size() - LOGCAT_MAX_LINES);
                 for (int i = from; i < kept.size(); i++) {
                     sb.append(kept.get(i)).append('\n');

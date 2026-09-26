@@ -315,13 +315,25 @@ public final class BlackBox {
                 return;
             }
             noteNewestAnrTrace(context, exits);
+            // 系统留着最近几次，同一次退出以后每次进程启动都会再列出来 —— 只抄没抄过的。
+            // 「本该有却没有」照样看得出：用户退出那一行后面，没跟着一条自己退的记录
+            SharedPreferences seen = context.getSharedPreferences(SEEN_PREFS, Context.MODE_PRIVATE);
+            long lastSeen = seen.getLong(KEY_LAST_EXIT, 0L);
+            long newest = lastSeen;
             for (ApplicationExitInfo exit : exits) {
+                if (exit.getTimestamp() <= lastSeen) {
+                    continue;
+                }
+                newest = Math.max(newest, exit.getTimestamp());
                 note("上次退出: " + wallClock(exit.getTimestamp())
                         + " pid=" + exit.getPid()
                         + " 原因=" + reasonName(exit.getReason())
                         + " status=" + exit.getStatus()
                         + " 当时重要性=" + exit.getImportance()
                         + (exit.getDescription() != null ? " (" + exit.getDescription() + ")" : ""));
+            }
+            if (newest > lastSeen) {
+                seen.edit().putLong(KEY_LAST_EXIT, newest).apply();
             }
         } catch (Throwable t) {
             AppLog.w(TAG, "读进程退出原因失败: " + t);
@@ -371,6 +383,8 @@ public final class BlackBox {
     /** 抄过的最后一次 ANR 的时间戳存在这里，同一次 ANR 只抄一遍。 */
     private static final String SEEN_PREFS = "blackbox_seen";
     private static final String KEY_LAST_ANR = "last_anr_ts";
+    /** 抄过的最近一次进程退出的时间戳。 */
+    private static final String KEY_LAST_EXIT = "last_exit_ts";
     /** 主线程抄多少帧。够看出卡在哪一个调用里就行。 */
     private static final int ANR_FRAMES = 25;
 

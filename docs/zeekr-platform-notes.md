@@ -392,8 +392,8 @@ AppLabIntentInterceptor: onInterceptStartActivity ...
   `CameraForegroundService`。WorkManager 的 JobService 同样走 StubService。
 - **车辆权限永远拿不到。**`CAR_POWERTRAIN` 是 normal 级，装上就该自动授予，
   但它在 `ungranted_car_permissions` 里 —— 系统认识的是容器的包，不是我们的包。
-  **这不是代码写错，是结构性的。**`VehicleSignalWatch` 与诊断 §2.5 现在只是在
-  反复证明这一条。
+  **这不是代码写错，是结构性的。**找车辆信号的那几样（`VehicleSignalWatch`、
+  属性快照对比、诊断里的车辆信号几节、关机广播探测）只是在反复证明这一条，1.37.0 删了。
 
 #### 停车期间车机醒了多久：用 `up=` 的增量量（2026-09-24 实测）
 

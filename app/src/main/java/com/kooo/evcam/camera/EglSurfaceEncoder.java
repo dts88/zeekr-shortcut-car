@@ -258,8 +258,12 @@ public class EglSurfaceEncoder {
     /** 帧率统计的窗口。5 秒足够平滑，又不至于要等很久才看到第一条。 */
     private static final long RATE_WINDOW_NS = 5_000_000_000L;
 
+    /** 渲染跟得上时，隔多少个窗口才打一行（12 × 5 秒 = 一分钟）。 */
+    private static final int QUIET_WINDOWS = 12;
+    private int windowsSinceLog;
+
     /**
-     * 每隔几秒把两个帧率打进日志。
+     * 把两个帧率打进日志：渲染跟不上时每个窗口都打，跟得上时一分钟一行。
      *
      * <p><b>为什么要两个数：</b>「录出来只有 15fps」有两种完全不同的原因 ——
      * 相机就只给了 15 帧，或者相机给了 25 帧而我们只渲染得出 15 帧。
@@ -278,11 +282,15 @@ public class EglSurfaceEncoder {
         float seconds = elapsed / 1_000_000_000f;
         float delivered = deliveredFrames / seconds;
         float rendered = renderedFrames / seconds;
-        AppLog.i(TAG, String.format(java.util.Locale.US,
-                "Camera %s 帧率：相机送来 %.1f fps，实际渲染 %.1f fps（上限 %.0f fps，0=不限制）%s",
-                cameraId, delivered, rendered,
-                minFrameIntervalNs > 0 ? 1_000_000_000f / minFrameIntervalNs : 0f,
-                delivered - rendered > 1f ? "  << 渲染跟不上" : ""));
+        boolean behind = delivered - rendered > 1f;
+        if (behind || ++windowsSinceLog >= QUIET_WINDOWS) {
+            windowsSinceLog = 0;
+            AppLog.i(TAG, String.format(java.util.Locale.US,
+                    "Camera %s 帧率：相机送来 %.1f fps，实际渲染 %.1f fps（上限 %.0f fps，0=不限制）%s",
+                    cameraId, delivered, rendered,
+                    minFrameIntervalNs > 0 ? 1_000_000_000f / minFrameIntervalNs : 0f,
+                    behind ? "  << 渲染跟不上" : ""));
+        }
         lastDeliveredFps = delivered;
         lastRenderedFps = rendered;
         deliveredFrames = 0;

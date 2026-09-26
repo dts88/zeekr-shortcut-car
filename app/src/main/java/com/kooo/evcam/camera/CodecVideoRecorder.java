@@ -676,11 +676,6 @@ public class CodecVideoRecorder {
                                 StallWatch.noteOp(encoderBeat, cameraId, "draw", drawStart);
                                 recordedFrameCount++;
                                 framesSinceLastDrain++;
-
-                                // 定期输出帧计数
-                                if (recordedFrameCount % 100 == 0) {
-                                    AppLog.d(TAG, "Camera " + cameraId + " Encoded frames: " + recordedFrameCount);
-                                }
                             }
 
                             // 自适应 drain 控制：根据时间间隔决定是否 drain
@@ -1353,18 +1348,6 @@ public class CodecVideoRecorder {
                             // 调试日志（仅第一帧）
                             if (encodedOutputFrameCount == 0) {
                                 AppLog.d(TAG, "Camera " + cameraId + " First frame PTS: " + calculatedPtsUs + " us");
-                            } else if (encodedOutputFrameCount % 300 == 0 && calculatedPtsUs > 0) {
-                                // 实测帧率 = 已写帧数 / 时间戳跨度。
-                                // 这是验证「回放速度是否等于录制速度」的直接依据：
-                                // 若它明显低于设置里选的帧率，说明车机就是跑不满，
-                                // 而现在时间戳如实反映了这一点，回放不会再被加速。
-                                // 这只是日志。角标的那个数由 noteEncodedBytes 负责 ——
-                                // 这里所在的是两条写入路径中的一条，数不全。
-                                long measured = encodedOutputFrameCount * 1_000_000L / calculatedPtsUs;
-                                AppLog.d(TAG, "Camera " + cameraId + " 按时间戳折算 ~" + measured
-                                        + " fps（标称 " + frameRate + "，角标用的实测值 "
-                                        + measuredFrameRate + "），已写 "
-                                        + encodedOutputFrameCount + " 帧");
                             }
                             
                             bufferInfo.presentationTimeUs = calculatedPtsUs;

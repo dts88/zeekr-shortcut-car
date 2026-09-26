@@ -59,10 +59,8 @@ public class HardcodedTextTest {
         // ---- 报告与核对：诊断报告正文、当前配置全文、调试统计，给维护者看 ----
         String report = "诊断报告 / 当前配置全文 / 调试统计，给维护者看";
         for (String f : new String[]{
-                "zeekr/DiagnosticsCollector.java", "zeekr/VehicleSignalProbe.java",
-                "zeekr/VehicleEnumeration.java", "zeekr/PlaybackCapabilityProbe.java",
-                "zeekr/SnapshotDiff.java", "zeekr/ShutdownProbe.java",
-                "zeekr/VehicleSignalWatch.java", "blackbox/BlackBox.java", "zeekr/ZeekrCameraLocator.java", "zeekr/ZeekrMultiPlan.java",
+                "zeekr/DiagnosticsCollector.java", "zeekr/RecentRecordings.java",
+                "blackbox/BlackBox.java", "zeekr/ZeekrCameraLocator.java", "zeekr/ZeekrMultiPlan.java",
                 "zeekr/ZeekrCompositeProfile.java", "zeekr/CompositeStreamGeometry.java",
                 "share/ShareDiagnostics.java",
                 "camera/PreviewFrameRates.java", "camera/FrameRateMeter.java",

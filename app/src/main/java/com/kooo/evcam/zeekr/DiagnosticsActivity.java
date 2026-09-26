@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 诊断页：一次性列出相机、屏幕、车辆信号来源、存储与最近日志，并支持导出。
+ * 诊断页：一次性列出相机、屏幕、存储、黑匣子与最近日志，并支持导出。
  *
  * <p>导出提供三种方式，因为车机上能用哪种不一定：</p>
  * <ul>
@@ -54,14 +54,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
     private Button copyButton;
     private Button shareButton;
     private Button refreshButton;
-    private Button requestCarPermsButton;
-    private Button snapshotButton;
-    private Button compareButton;
 
-    /** 「拍快照」存下的那一份，等着和之后的状态对比。 */
-    private Map<String, String> baselineSnapshot;
-    private long baselineAtMs;
-    private static final int REQUEST_CAR_PERMISSIONS = 4101;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile String report = "";
@@ -77,16 +70,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
         copyButton = findViewById(R.id.diagnostics_copy);
         shareButton = findViewById(R.id.diagnostics_share);
         refreshButton = findViewById(R.id.diagnostics_refresh);
-        requestCarPermsButton = findViewById(R.id.diagnostics_request_car_perms);
-
-        snapshotButton = findViewById(R.id.diagnostics_snapshot);
-        compareButton = findViewById(R.id.diagnostics_compare);
-        if (snapshotButton != null) {
-            snapshotButton.setOnClickListener(v -> takeBaselineSnapshot());
-        }
-        if (compareButton != null) {
-            compareButton.setOnClickListener(v -> compareWithBaseline());
-        }
 
         View close = findViewById(R.id.diagnostics_close);
         if (close != null) {
@@ -104,50 +87,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (shareButton != null) {
             shareButton.setOnClickListener(v -> shareReport());
         }
-        if (requestCarPermsButton != null) {
-            requestCarPermsButton.setOnClickListener(v -> requestCarPermissions());
-        }
 
-        runCollection();
-    }
-
-    /**
-     * 申请车辆权限。
-     *
-     * <p>申请<b>全部</b>尚未授予的车辆权限，而不是只挑 dangerous 的 ——
-     * 「车机会不会弹框」本身就是要在车上观察的实验，替系统先筛掉一部分就把实验做没了。
-     * dangerous 的会弹授权框；signature/privileged 的系统会当场静默拒绝、弹都不弹。
-     * 两种结果用户都能直接看到，再采一次报告对照即可：申请过之后仍是「未授予」，
-     * 才真正说明是被系统挡住，而不是没问过。</p>
-     */
-    private void requestCarPermissions() {
-        String[] pending = VehicleSignalProbe.ungrantedCarPermissions(this);
-        if (pending.length == 0) {
-            Toast.makeText(this, R.string.diag_perms_none, Toast.LENGTH_LONG).show();
-            return;
-        }
-        Toast.makeText(this,
-                getString(R.string.diag_perms_requesting, pending.length),
-                Toast.LENGTH_LONG).show();
-        requestPermissions(pending, REQUEST_CAR_PERMISSIONS);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                                           int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQUEST_CAR_PERMISSIONS) {
-            return;
-        }
-        int granted = 0;
-        for (int result : grantResults) {
-            if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                granted++;
-            }
-        }
-        Toast.makeText(this,
-                getString(R.string.diag_perms_result, granted, grantResults.length),
-                Toast.LENGTH_LONG).show();
         runCollection();
     }
 
@@ -235,9 +175,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
         if (shareButton != null) {
             shareButton.setEnabled(enabled);
         }
-        if (requestCarPermsButton != null) {
-            requestCarPermsButton.setEnabled(enabled);
-        }
         if (refreshButton != null) {
             refreshButton.setEnabled(enabled);
         }
@@ -249,8 +186,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
     /**
      * 写出诊断报告。
      *
-     * <p>组装 JSON 要重新读一遍系统属性和三张 Settings 表，比写文件本身慢得多，
-     * 所以调用方必须在后台线程上调它 —— 主线程卡住在车机上立刻能感觉到。</p>
+     * <p>写文件是 I/O，调用方必须在后台线程上调它 —— 主线程卡住在车机上立刻能感觉到。</p>
      */
     private File saveReport() {
         if (report == null || report.isEmpty()) {
@@ -293,77 +229,6 @@ public class DiagnosticsActivity extends AppCompatActivity {
             toast(getString(R.string.diag_save_failed, String.valueOf(e.getMessage())));
             return null;
         }
-    }
-
-    /**
-     * 拍下当前状态，作为对比的基准。
-     *
-     * <p>用法：在车里先按「拍快照」，然后做一个动作（挂倒挡、开门、打转向灯），
-     * 再按「对比变化」—— 变了的属性就是这个动作的候选信号源。</p>
-     *
-     * <p>这个流程存在的理由是：**不必事先知道属性叫什么**。
-     * 之前找车辆信号一直卡在猜名字上，而猜不中并不能证明信号不存在。</p>
-     */
-    private void takeBaselineSnapshot() {
-        reportView.setText(R.string.diag_snapshotting);
-        // getprop 要开一个进程、读上千行，别占着主线程 —— 车机上卡一下就能感觉到
-        new Thread(() -> {
-            Map<String, String> snapshot = VehicleSignalProbe.captureProperties();
-            mainHandler.post(() -> {
-                baselineSnapshot = snapshot;
-                baselineAtMs = System.currentTimeMillis();
-                reportView.setText(getString(R.string.diag_snapshot_done, snapshot.size()));
-                toast(getString(R.string.diag_snapshot_toast));
-            });
-        }, "snapshot-baseline").start();
-    }
-
-    /** 和基准快照对比，把变了的属性列出来。 */
-    private void compareWithBaseline() {
-        if (baselineSnapshot == null) {
-            Toast.makeText(this, R.string.diag_snapshot_first, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        reportView.setText(R.string.diag_comparing);
-        new Thread(() -> {
-            Map<String, String> now = VehicleSignalProbe.captureProperties();
-            String result = describeChanges(now);
-            mainHandler.post(() -> {
-                reportView.setText(result);
-                report = result;
-            });
-        }, "snapshot-compare").start();
-    }
-
-    /** 把对比结果写成报告文本。 */
-    private String describeChanges(Map<String, String> now) {
-        List<SnapshotDiff.Change> all = SnapshotDiff.between(baselineSnapshot, now);
-        List<SnapshotDiff.Change> signal = SnapshotDiff.signalOnly(all);
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(getString(R.string.diag_cmp_title)).append("\n\n");
-        sb.append(getString(R.string.diag_cmp_baseline,
-                new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date(baselineAtMs)),
-                (System.currentTimeMillis() - baselineAtMs) / 1000)).append('\n');
-        sb.append(getString(R.string.diag_cmp_counts, now.size(), all.size(), signal.size()))
-                .append("\n\n");
-
-        if (signal.isEmpty()) {
-            sb.append(getString(R.string.diag_cmp_none)).append('\n');
-        } else {
-            sb.append(getString(R.string.diag_cmp_changed_title)).append("\n\n");
-            for (SnapshotDiff.Change change : signal) {
-                sb.append("- ").append(change.toString()).append('\n');
-            }
-            sb.append('\n').append(getString(R.string.diag_cmp_next)).append('\n');
-        }
-
-        if (all.size() > signal.size()) {
-            sb.append('\n').append(getString(R.string.diag_cmp_noise, all.size() - signal.size()))
-                    .append('\n');
-        }
-
-        return sb.toString();
     }
 
     private void copyReport() {

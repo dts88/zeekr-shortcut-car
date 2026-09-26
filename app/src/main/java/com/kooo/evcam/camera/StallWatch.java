@@ -97,7 +97,7 @@ public final class StallWatch {
     private static final long FILE_LIMIT_BYTES = 512L * 1024L;
     private static final int STALL_TAIL_LINES = 200;
     private static final int RECOVER_TAIL_LINES = 60;
-    private static final int LOGCAT_LINES = 300;
+    private static final int LOGCAT_LINES = 600;   // 滤掉噪声之后还剩多少，要比这少得多
     private static final int STACK_DEPTH = 32;
     private static final long MB = 1024L * 1024L;
     private static final String DIR = "stall";
@@ -612,7 +612,10 @@ public final class StallWatch {
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    sb.append(line).append('\n');
+                    // 容器的调用跟踪和编解码框架的配置细节占了大半，见 LogcatNoise
+                    if (!LogcatNoise.isNoise(line)) {
+                        sb.append(LogcatNoise.clip(line)).append('\n');
+                    }
                 }
             }
         } catch (Exception e) {
