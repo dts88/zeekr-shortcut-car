@@ -7,6 +7,19 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.38.0-alpha] - 2026-09-26
+
+- **Cameras open and close on their own threads; the main thread no longer waits.** Closing a
+  camera once blocked the main thread for 13.6 s, freezing the main screen, the super mirror
+  and the floating button. Now each camera's open and close run on that camera's thread, a
+  reopen waits for the previous close, and a camera that is stuck only stalls itself.
+- **Exit always finishes within 3 seconds.** If cleanup or a camera close is stuck, the app
+  still quits and the black box says what was stuck.
+- Black box records which thread is stuck and where (main or a camera) when it is blocked for
+  more than 2 s, when the display stops producing frames while the screen is on, what changed
+  when the system changes configuration, and when each camera has actually closed after the
+  screen goes off.
+
 ## [1.37.0-alpha] - 2026-09-26
 
 - **Diagnostics keep only what is still open.** Removed the probes whose answers are known

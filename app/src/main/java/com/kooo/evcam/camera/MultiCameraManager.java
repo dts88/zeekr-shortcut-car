@@ -911,11 +911,20 @@ public class MultiCameraManager {
      * 关闭所有摄像头
      */
     public void closeAllCameras() {
+        closeAllCameras(null);
+    }
+
+    /**
+     * 关闭所有摄像头：每一路交给自己的相机线程去关，这里不等（见 {@link SingleCamera#closeCamera(String)}）。
+     *
+     * @param why 为什么关（英文短语）。给了的话，每一路关完时往黑匣子记一行，带用时
+     */
+    public void closeAllCameras(String why) {
         repairSuppressed = true;
         for (SingleCamera camera : cameras.values()) {
-            camera.closeCamera();
+            camera.closeCamera(why);
         }
-        AppLog.d(TAG, "All cameras closed (repair suppressed)");
+        AppLog.d(TAG, "All cameras asked to close (repair suppressed)");
     }
 
     /**
@@ -2342,9 +2351,9 @@ public class MultiCameraManager {
                 AppLog.e(TAG, "Error stopping recording during release", e);
             }
             
-            // 5. 关闭所有摄像头
+            // 5. 关闭所有摄像头（各自的相机线程去关，这里不等）
             try {
-                closeAllCameras();
+                closeAllCameras("release");
             } catch (Exception e) {
                 AppLog.e(TAG, "Error closing cameras during release", e);
             }

@@ -125,6 +125,7 @@ public final class StallWatch {
 
     private static volatile Context appContext;
     private static volatile Handler watchHandler;
+    private static volatile Handler mainHandler;
     private static volatile boolean foreground;
 
     private StallWatch() {
@@ -143,7 +144,8 @@ public final class StallWatch {
             return;
         }
         appContext = context.getApplicationContext();
-        watchLooper("main", new Handler(Looper.getMainLooper()));
+        mainHandler = new Handler(Looper.getMainLooper());
+        watchLooper("main", mainHandler);
         HandlerThread thread = new HandlerThread(TAG, Process.THREAD_PRIORITY_BACKGROUND);
         thread.start();
         watchHandler = new Handler(thread.getLooper());
@@ -301,6 +303,7 @@ public final class StallWatch {
         boolean active = isActive();
 
         for (LooperProbe probe : LOOPERS.values()) {
+            noteLooperInBlackBox(probe, now);
             long blocked = probe.blockedMs(now);
             if (blocked > StallRules.LOOPER_STALL_MS && now - probe.lastLogMs >= LOOPER_LOG_GAP_MS) {
                 probe.lastLogMs = now;
@@ -310,13 +313,14 @@ public final class StallWatch {
                 AppLog.w(TAG, "thread " + probe.name + " has not run a queued task for "
                         + blocked + "ms\n" + stack);
             }
-            if (active) {
-                probe.poke(now);
-            }
+            // 一直都探，不只在录像 / 后视镜开着的时候：退出、熄屏关相机时恰好都不在录，
+            // 而那正是「卡住的是主线程还是相机线程」最要紧的时候。一次只丢一个空任务，开销可以忽略
+            probe.poke(now);
         }
 
         // 息屏、窗口被系统藏起来时画面本来就不更新，不算卡；重新可见时从头计时
         boolean screenOn = isScreenOn();
+        checkDisplay(now, screenOn);
         boolean mirrorWatched = MIRROR.isArmed() && screenOn
                 && RearViewMirrorService.isWindowVisibleForStall();
         if (mirrorWatched && !mirrorWasWatched) {
@@ -795,6 +799,130 @@ public final class StallWatch {
                 + " (last reason " + trouble.lastFailReason + ")");
     }
 
+    // ------------------------------------------------------------------ 卡住的是谁：记进黑匣子
+
+    /**
+     * 一条线程卡超过这么久，就往黑匣子记一行：是哪条线程、卡在哪。恢复时再记一行卡了多久。
+     *
+     * <p>主线程卡住时，主界面、超级后视镜、悬浮按钮全都不动；相机线程卡住时只是那一路相机没反应。
+     * 这两行把两者分开 —— 2026-09-26 那次「车机卡死」之后，这正是分不清的地方。</p>
+     */
+    private static final long LOOPER_BLACKBOX_MS = 2000L;
+
+    private static void noteLooperInBlackBox(LooperProbe probe, long now) {
+        if (probe.stuckSinceMs != 0L && !probe.pending) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("线程 " + probe.name + " 恢复，卡了 "
+                    + probe.lastLagMs + "ms");
+            probe.stuckSinceMs = 0L;
+            return;
+        }
+        long blocked = probe.blockedMs(now);
+        if (probe.stuckSinceMs == 0L && blocked >= LOOPER_BLACKBOX_MS) {
+            probe.stuckSinceMs = probe.postedAtMs;
+            Thread thread = probe.handler.getLooper().getThread();
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("线程 " + probe.name + " 卡住 " + blocked
+                    + "ms 还没恢复，正在：" + whereStuck(thread.getStackTrace()));
+        }
+    }
+
+    /**
+     * 卡在哪：栈顶三帧，再加上第一帧我们自己的代码（栈顶多半是 binder 调用，看不出是谁发起的）。
+     */
+    static String whereStuck(StackTraceElement[] stack) {
+        if (stack == null || stack.length == 0) {
+            return "?";
+        }
+        StringBuilder sb = new StringBuilder();
+        int top = Math.min(3, stack.length);
+        for (int i = 0; i < top; i++) {
+            if (i > 0) {
+                sb.append(" <- ");
+            }
+            sb.append(shortFrame(stack[i]));
+        }
+        for (int i = top; i < stack.length; i++) {
+            if (stack[i].getClassName().startsWith("com.kooo.")) {
+                sb.append(" ... ").append(shortFrame(stack[i]));
+                break;
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String shortFrame(StackTraceElement frame) {
+        String cls = frame.getClassName();
+        return cls.substring(cls.lastIndexOf('.') + 1) + "." + frame.getMethodName();
+    }
+
+    // ------------------------------------------------------------------ 显示有没有在出帧
+
+    /**
+     * 亮屏时这么久没出新的一帧（vsync），就算显示卡住。
+     *
+     * <p>隔一次检查向系统要一帧：来了就是显示在走。没来、而主线程是正常的，那就是显示这一层
+     * （系统的合成、屏幕）停了，不是我们。主线程同时卡着的不算 —— 那是主线程的事，上面另有记录。</p>
+     */
+    private static final long DISPLAY_STALL_MS = 2000L;
+    /** 请求已经派给主线程、还没轮到它执行。只在监测线程上置位，主线程执行时清掉。 */
+    private static volatile boolean frameRequestQueued;
+    /** 在等的那一帧是主线程什么时候要的；0 表示没在等。 */
+    private static volatile long frameRequestedAtMs;
+    /** 这一次显示卡住从什么时候算起；0 表示没卡。 */
+    private static volatile long displayStuckSinceMs;
+
+    private static final android.view.Choreographer.FrameCallback FRAME = frameTimeNanos -> {
+        long since = displayStuckSinceMs;
+        if (since != 0L) {
+            displayStuckSinceMs = 0L;
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("显示恢复：停了 " + (now() - since) + "ms");
+        }
+        frameRequestedAtMs = 0L;
+    };
+
+    private static final Runnable REQUEST_FRAME = () -> {
+        frameRequestQueued = false;
+        frameRequestedAtMs = now();
+        android.view.Choreographer.getInstance().postFrameCallback(FRAME);
+    };
+
+    private static void checkDisplay(long now, boolean screenOn) {
+        Handler main = mainHandler;
+        if (main == null) {
+            return;
+        }
+        if (!screenOn) {
+            // 息屏时显示本来就不出帧。在等的那一帧作废，卡着的那一段到此为止
+            long since = displayStuckSinceMs;
+            if (since != 0L) {
+                displayStuckSinceMs = 0L;
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("显示卡住那一段随息屏结束（卡了 "
+                        + (now - since) + "ms）");
+            }
+            frameRequestedAtMs = 0L;
+            return;
+        }
+        if (frameRequestQueued) {
+            return;   // 请求还没轮到主线程执行：那是主线程慢，不归这里
+        }
+        long requested = frameRequestedAtMs;
+        if (requested == 0L) {
+            frameRequestQueued = true;
+            if (!main.post(REQUEST_FRAME)) {
+                frameRequestQueued = false;
+            }
+            return;
+        }
+        long waited = now - requested;
+        if (waited >= DISPLAY_STALL_MS && displayStuckSinceMs == 0L) {
+            LooperProbe mainProbe = LOOPERS.get("main");
+            if (mainProbe == null || mainProbe.blockedMs(now) < StallRules.LOOPER_STALL_MS) {
+                displayStuckSinceMs = requested;
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("显示卡住：亮屏 " + waited
+                        + "ms 没有新的一帧，主线程正常");
+            }
+        }
+    }
+
     private static List<LooperProbe> sortedLoopers() {
         List<LooperProbe> list = new ArrayList<>(LOOPERS.values());
         Collections.sort(list, (a, b) -> a.name.compareTo(b.name));
@@ -848,7 +976,11 @@ public final class StallWatch {
         volatile boolean pending;
         volatile long postedAtMs;
         volatile long maxLagMs;
+        /** 上一次丢进去的任务等了多久才被执行。 */
+        volatile long lastLagMs;
         long lastLogMs = Long.MIN_VALUE / 2;
+        /** 这一次卡住已经记进黑匣子了（从什么时候算起）；0 表示没卡。只在监测线程上读写。 */
+        long stuckSinceMs;
 
         LooperProbe(String name, Handler handler) {
             this.name = name;
@@ -858,6 +990,7 @@ public final class StallWatch {
         @Override
         public void run() {
             long lag = now() - postedAtMs;
+            lastLagMs = lag;
             if (lag > maxLagMs) {
                 maxLagMs = lag;
             }

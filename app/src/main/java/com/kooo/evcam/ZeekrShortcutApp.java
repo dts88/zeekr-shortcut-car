@@ -1,6 +1,9 @@
 package com.kooo.evcam;
 
 import android.app.Application;
+import android.content.res.Configuration;
+
+import androidx.annotation.NonNull;
 
 import com.kooo.evcam.camera.StallWatch;
 import com.kooo.evcam.settings.Languages;
@@ -17,9 +20,13 @@ import com.kooo.evcam.settings.Languages;
  */
 public class ZeekrShortcutApp extends Application {
 
+    /** 上一次看到的配置，拿来和新的比，看变的到底是哪一项。 */
+    private Configuration lastConfig;
+
     @Override
     public void onCreate() {
         super.onCreate();
+        lastConfig = new Configuration(getResources().getConfiguration());
         // 黑匣子尽早接上。ContentProvider 比这里还早，那边也会接一次，谁先谁算
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
         Languages.apply(new AppConfig(this).getLanguageMode());
@@ -28,6 +35,51 @@ public class ZeekrShortcutApp extends Application {
         // 让它再登记一遍就成了两个真相 —— 所以是现问现答，见 CameraNeeds
         com.kooo.evcam.camera.CameraNeeds.current().setOverlayProbe(
                 com.kooo.evcam.BlindSpotService::hasActiveCameraWindows);
+    }
+
+    /**
+     * 配置一变，界面就被系统重建。2026-09-26 那次车机卡死、恢复之后，主界面被重建过一次，
+     * 当时看不出变的是什么 —— 现在把变了的那几项记进黑匣子。
+     */
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        Configuration old = lastConfig;
+        lastConfig = new Configuration(newConfig);
+        if (old != null) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("配置变化：" + describeChange(old, newConfig));
+        }
+    }
+
+    /** 变了哪几项、从什么变成什么。只给维护者看，写英文字段名。 */
+    static String describeChange(Configuration a, Configuration b) {
+        StringBuilder sb = new StringBuilder();
+        int nightA = a.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        int nightB = b.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        if (nightA != nightB) {
+            sb.append(" night ").append(nightA == Configuration.UI_MODE_NIGHT_YES ? "on" : "off")
+                    .append("->").append(nightB == Configuration.UI_MODE_NIGHT_YES ? "on" : "off");
+        }
+        if (a.screenWidthDp != b.screenWidthDp || a.screenHeightDp != b.screenHeightDp) {
+            sb.append(" screen ").append(a.screenWidthDp).append('x').append(a.screenHeightDp)
+                    .append("dp->").append(b.screenWidthDp).append('x').append(b.screenHeightDp).append("dp");
+        }
+        if (a.densityDpi != b.densityDpi) {
+            sb.append(" density ").append(a.densityDpi).append("->").append(b.densityDpi);
+        }
+        if (a.orientation != b.orientation) {
+            sb.append(" orientation ").append(a.orientation).append("->").append(b.orientation);
+        }
+        if (a.fontScale != b.fontScale) {
+            sb.append(" fontScale ").append(a.fontScale).append("->").append(b.fontScale);
+        }
+        if (!a.getLocales().equals(b.getLocales())) {
+            sb.append(" locale ").append(a.getLocales().toLanguageTags())
+                    .append("->").append(b.getLocales().toLanguageTags());
+        }
+        // 上面没列到的也不漏：系统给的差异位原样写上
+        sb.append(" (diff=0x").append(Integer.toHexString(a.diff(b))).append(')');
+        return sb.toString().trim();
     }
 
     @Override

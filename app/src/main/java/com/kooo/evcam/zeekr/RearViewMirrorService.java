@@ -566,8 +566,9 @@ public class RearViewMirrorService extends Service {
         }
         MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
         if (manager != null) {
-            manager.closeAllCameras();
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：相机已放开（后视镜这边）");
+            // 关是相机线程去做的，这里不等；每一路关完时各自记一行「相机 X 已关」，带用时
+            manager.closeAllCameras("screen off (mirror)");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：让相机去关（后视镜这边）");
             AppLog.i(TAG, "熄屏且没人要相机，关掉");
         }
     }

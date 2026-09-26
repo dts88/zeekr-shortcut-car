@@ -3548,8 +3548,8 @@ public class MainActivity extends AppCompatActivity {
             
             // 关闭摄像头释放资源
             if (cameraManager != null) {
-                cameraManager.closeAllCameras();
-                AppLog.d(TAG, "已关闭所有摄像头");
+                cameraManager.closeAllCameras("screen off 15s");
+                AppLog.d(TAG, "已让所有摄像头去关");
             }
             
             // 退到后台
@@ -3576,8 +3576,10 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             if (cameraManager != null) {
-                cameraManager.closeAllCameras();
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：相机已放开（深睡前）");
+                // 关是相机线程去做的，这里不等；每一路关完时各自记一行「相机 X 已关」，带用时 ——
+                // 深睡前到底关没关好，看那几行
+                cameraManager.closeAllCameras("screen off");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：让相机去关（深睡前）");
                 AppLog.i(TAG, "熄屏，没人要相机，先关掉 —— 别开着相机睡过去");
             }
         };
@@ -3924,6 +3926,12 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("==== 用户退出应用 ====");
         // 必须在停服务之前：前台服务的 onDestroy 会发保活广播，保活接收器收到就去重启它
         UserExit.markExited(this);
+        // 结束进程交给看门的线程：它等主线程收尾、等每一路相机关完，最多等 EXIT_DEADLINE_MS，
+        // 到点照样结束。以前是主线程自己关相机、关完再结束 —— 相机服务一卡，进程就退不掉
+        // （2026-09-26 09:40 那一次：点了退出，系统里却没有这次退出的记录）
+        final long exitStartedAt = android.os.SystemClock.elapsedRealtime();
+        final java.util.concurrent.CountDownLatch mainCleanupDone = new java.util.concurrent.CountDownLatch(1);
+        new Thread(() -> finishExit(exitStartedAt, mainCleanupDone), "exit-watchdog").start();
 
         // 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
         com.kooo.evcam.recording.RecordingIntent.current().reset();
@@ -3959,10 +3967,37 @@ public class MainActivity extends AppCompatActivity {
         // 保存日志（System.exit 会跳过 onDestroy，所以这里手动保存）
         AppLog.saveToPersistentLog(this);
 
-        // 结束所有Activity并退出应用
+        // 结束所有Activity；进程由看门的线程结束（见 finishExit）
         finishAffinity();
+        mainCleanupDone.countDown();
+    }
 
-        // 完全退出进程
+    /** 退出最多等多久：主线程收尾、每一路相机关完。到点没好也照样结束进程。 */
+    private static final long EXIT_DEADLINE_MS = 3000L;
+
+    /**
+     * 退出的最后一步，在看门的线程上跑：等主线程收尾、等相机关完，然后结束进程。
+     *
+     * <p>黑匣子里记一行结果：用了多久；到点没好的话，卡在哪 —— 是主线程收尾，还是哪一路相机。
+     * 下次再「点了退出却退不掉」，这一行就是答案。</p>
+     */
+    private static void finishExit(long startedAt, java.util.concurrent.CountDownLatch mainCleanupDone) {
+        boolean mainDone = false;
+        try {
+            mainDone = mainCleanupDone.await(EXIT_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
+        java.util.List<String> stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(left);
+        long took = android.os.SystemClock.elapsedRealtime() - startedAt;
+        if (mainDone && stuck.isEmpty()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：收尾用了 " + took + "ms，相机都关好了");
+        } else {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：等满 " + EXIT_DEADLINE_MS
+                    + "ms 强制结束。" + (mainDone ? "" : "主线程收尾没做完；")
+                    + (stuck.isEmpty() ? "" : "相机 " + stuck + " 还没关好"));
+        }
         System.exit(0);
     }
 
@@ -4233,7 +4268,7 @@ public class MainActivity extends AppCompatActivity {
                 AppLog.d(TAG, "退到后台，相机留着 —— 还有人要: " + needs.describe());
             } else {
                 AppLog.d(TAG, "退到后台，没人要相机，关掉");
-                cameraManager.closeAllCameras();
+                cameraManager.closeAllCameras("background");
             }
         }
     }
