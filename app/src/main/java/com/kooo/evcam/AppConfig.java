@@ -31,7 +31,6 @@ public class AppConfig {
     private static final String KEY_SCREEN_OFF_KEEP_RECORDING = "screen_off_keep_recording";  // 熄屏持续录制
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
     private static final String KEY_KEEP_ALIVE_ENABLED = "keep_alive_enabled";  // 保活服务
-    private static final String KEY_RECORDING_MODE = "recording_mode";  // 录制模式
     
     // 存储位置配置
     private static final String KEY_STORAGE_LOCATION = "storage_location";  // 存储位置
@@ -121,9 +120,6 @@ public class AppConfig {
     // 车门联动配置
     private static final String KEY_DOOR_LINKAGE_ENABLED = "door_linkage_enabled";             // 车门联动开关
     private static final String KEY_DOOR_TIMEOUT = "door_timeout";                             // 车门关闭后延迟消失时间 (秒)
-    private static final String KEY_DOOR_PRESET_SELECTION = "door_preset_selection";           // 车门联动车型选择 (l6l7/boyue_l)
-    private static final String KEY_DOOR_REUSE_MAIN_FLOATING = "door_reuse_main_floating";     // 车门联动是否复用主屏悬浮窗
-    private static final String KEY_DOOR_SECONDARY_DISPLAY_ENABLED = "door_secondary_display_enabled"; // 车门联动副屏显示开关
     
     private static final String KEY_TURN_SIGNAL_REUSE_MAIN_FLOATING = "turn_signal_reuse_main_floating"; // 是否复用主屏悬浮窗
     private static final String KEY_TURN_SIGNAL_FLOATING_X = "turn_signal_floating_x";          // 独立补盲悬浮窗X
@@ -199,10 +195,6 @@ public class AppConfig {
     // 录制摄像头选择配置
     
     // 摄像头画面显示配置（与录制开关分离）
-    private static final String KEY_CAMERA_FRONT_VISIBLE = "camera_front_visible";  // 前摄像头画面显示
-    private static final String KEY_CAMERA_BACK_VISIBLE = "camera_back_visible";    // 后摄像头画面显示
-    private static final String KEY_CAMERA_LEFT_VISIBLE = "camera_left_visible";    // 左摄像头画面显示
-    private static final String KEY_CAMERA_RIGHT_VISIBLE = "camera_right_visible";  // 右摄像头画面显示
     
     // 亮度/降噪调节配置
     private static final String KEY_IMAGE_ADJUST_ENABLED = "image_adjust_enabled";  // 是否启用亮度/降噪调节
@@ -289,12 +281,9 @@ public class AppConfig {
     public static final String BITRATE_HIGH = "high";      // 高码率（计算值的150%）
     
     private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
-    
 
 
-    
     // 车型配置相关键名
-    private static final String KEY_CAR_MODEL = "car_model";  // 车型（galaxy_e5 / custom）
     private static final String KEY_CAMERA_COUNT = "camera_count";  // 摄像头数量（4/2/1）
     private static final String KEY_SCREEN_ORIENTATION = "screen_orientation";  // 屏幕方向（landscape/portrait，仅4摄像头时有效）
     private static final String KEY_CAMERA_FRONT_ID = "camera_front_id";  // 前摄像头编号
@@ -370,14 +359,7 @@ public class AppConfig {
     // 版本更新配置
     
     // 车型常量
-    public static final String CAR_MODEL_GALAXY_E5 = "galaxy_e5";  // 银河E5
-    public static final String CAR_MODEL_GALAXY_A7 = "galaxy_a7";  // 银河A7（沿用E5配置）
-    public static final String CAR_MODEL_E5_MULTI = "galaxy_e5_multi";  // 银河E5-多按钮
-    public static final String CAR_MODEL_L7 = "galaxy_l7";  // 银河L6/L7
-    public static final String CAR_MODEL_L7_MULTI = "galaxy_l7_multi";  // 银河L7-多按钮
-    public static final String CAR_MODEL_PHONE = "phone";  // 手机
     public static final String CAR_MODEL_CUSTOM = "custom";  // 自定义车型
-    public static final String CAR_MODEL_XINGHAN_7 = "xinghan_7";  // 26款星舰7
     public static final String CAR_MODEL_MULTIVIEW = "multiview";  // 多视角布局
     public static final String CAR_MODEL_ZEEKR_7X = "zeekr_7x";  // 极氪7X（一路四联合成环视流）
     public static final String CAR_MODEL_ZEEKR_7X_MULTI = "zeekr_7x_multi";  // 极氪7X（环视合成流 + 两路座舱）
@@ -645,15 +627,11 @@ public class AppConfig {
     }
     
     // ==================== 分辨率配置相关方法 ====================
-    
-    
-    
-    
-    
+
+
     // ==================== 码率配置相关方法 ====================
-    
-    
-    
+
+
     /**
      * 根据分辨率和帧率计算码率（bps）
      * 公式：像素数 × 帧率 × 0.1
@@ -720,9 +698,8 @@ public class AppConfig {
     
     
     // ==================== 帧率配置相关方法 ====================
-    
-    
-    
+
+
     /**
      * 实际使用的录制帧率。
      *
@@ -797,8 +774,6 @@ public class AppConfig {
     }
 
 
-    
-    
     // ==================== 设置项自检 ====================
 
     /** 每个进程只自检一次，AppConfig 到处都在 new，不必每次都查。 */
@@ -1241,21 +1216,8 @@ public class AppConfig {
     public boolean isMultiviewCarModel() {
         return CAR_MODEL_MULTIVIEW.equals(getCarModel());
     }
-    
-    /**
-     * 是否为极氪合成流车型。
-     * 该模式下车机只提供一路四联合成流，预览由 FourLaneContainer 拆成四宫格。
-     */
-    public boolean isZeekrCompositeModel() {
-        String model = getCarModel();
-        return CAR_MODEL_ZEEKR_7X.equals(model) || CAR_MODEL_ZEEKR_7X_MULTI.equals(model);
-    }
 
-    /** 是否为「环视 + 两路座舱」的多路极氪配置。 */
-    public boolean isZeekrMultiModel() {
-        return CAR_MODEL_ZEEKR_7X_MULTI.equals(getCarModel());
-    }
-    
+
     /**
      * 是否需要自定义布局管理器（自定义车型和多视角都需要）
      */
@@ -1281,15 +1243,6 @@ public class AppConfig {
         String carModel = getCarModel();
         // 预设车型返回固定的摄像头数量
         switch (carModel) {
-            case CAR_MODEL_PHONE:
-                return 2;  // 手机：2摄
-            case CAR_MODEL_GALAXY_E5:
-            case CAR_MODEL_GALAXY_A7:
-            case CAR_MODEL_E5_MULTI:
-            case CAR_MODEL_L7:
-            case CAR_MODEL_L7_MULTI:
-            case CAR_MODEL_XINGHAN_7:
-                return 4;  // 银河E5/L7/26款星舰7：4摄
             case CAR_MODEL_ZEEKR_7X:
                 return 1;  // 极氪7X：车机只给一路合成流，四个画面在同一帧里
             case CAR_MODEL_ZEEKR_7X_MULTI:
@@ -1302,14 +1255,7 @@ public class AppConfig {
         }
     }
     
-    /**
-     * 获取用户设置的摄像头数量（仅用于自定义车型）
-     * @return 用户设置的摄像头数量，默认为4
-     */
-    public int getCustomCameraCount() {
-        return prefs.getInt(KEY_CAMERA_COUNT, 4);
-    }
-    
+        
     /**
      * 设置屏幕方向（仅4摄像头时有效）
      * @param orientation 屏幕方向（landscape/portrait）
@@ -1319,14 +1265,7 @@ public class AppConfig {
         AppLog.d(TAG, "屏幕方向设置: " + orientation);
     }
     
-    /**
-     * 获取屏幕方向（仅4摄像头时有效）
-     * @return 屏幕方向，默认为横屏
-     */
-    public String getScreenOrientation() {
-        return prefs.getString(KEY_SCREEN_ORIENTATION, "landscape");
-    }
-    
+        
     /**
      * 设置摄像头编号
      * @param position 位置（front/back/left/right）
@@ -1655,13 +1594,7 @@ public class AppConfig {
         return path;
     }
     
-    /**
-     * 是否使用自定义U盘路径
-     */
-    public boolean hasCustomSdCardPath() {
-        return getCustomSdCardPath() != null;
-    }
-    
+        
     /**
      * 设置上次自动检测到的U盘路径（缓存）
      * @param path U盘路径
@@ -1794,19 +1727,10 @@ public class AppConfig {
         return prefs.getInt(KEY_PHOTO_STORAGE_LIMIT_GB, 10);
     }
     
-    /**
-     * 检查是否启用了存储清理功能
-     * @return true 如果至少有一项存储限制设置大于0
-     */
-    public boolean isStorageCleanupEnabled() {
-        return getVideoStorageLimitGb() > 0 || getPhotoStorageLimitGb() > 0;
-    }
-    
+        
     // ==================== 分段录制配置相关方法 ====================
-    
-    
-    
-    
+
+
     // ==================== 录制状态显示配置相关方法 ====================
     
     /**
@@ -2008,18 +1932,8 @@ public class AppConfig {
     public boolean isSecondaryDisplayEnabled() {
         return prefs.getBoolean(KEY_SECONDARY_DISPLAY_ENABLED, false);
     }
-    
-    /**
-     * 设置副屏显示的摄像头位置
-     */
-    public void setSecondaryDisplayCamera(String position) {
-        prefs.edit().putString(KEY_SECONDARY_DISPLAY_CAMERA, position).apply();
-    }
-    
-    public String getSecondaryDisplayCamera() {
-        return prefs.getString(KEY_SECONDARY_DISPLAY_CAMERA, "front");
-    }
-    
+
+
     /**
      * 设置副屏 Display ID
      */
@@ -2349,28 +2263,6 @@ public class AppConfig {
         return prefs.getInt(getFisheyeCorrectionKey(cameraPos, "rotation"), 0);
     }
 
-    /**
-     * 重置单路摄像头的鱼眼矫正参数
-     */
-    public void resetFisheyeCorrection(String cameraPos) {
-        prefs.edit()
-                .putFloat(getFisheyeCorrectionKey(cameraPos, "zoom"), 1.0f)
-                .putFloat(getFisheyeCorrectionKey(cameraPos, "center_x"), 0.5f)
-                .putFloat(getFisheyeCorrectionKey(cameraPos, "center_y"), 0.5f)
-                .putInt(getFisheyeCorrectionKey(cameraPos, "rotation"), 0)
-                .apply();
-    }
-
-    /**
-     * 重置所有摄像头的鱼眼矫正参数
-     */
-    public void resetAllFisheyeCorrection() {
-        resetFisheyeCorrection("front");
-        resetFisheyeCorrection("back");
-        resetFisheyeCorrection("left");
-        resetFisheyeCorrection("right");
-        AppLog.d(TAG, "所有鱼眼矫正参数已重置");
-    }
 
     // ==================== 全屏预览窗口位置和大小配置 ====================
 
@@ -2411,21 +2303,6 @@ public class AppConfig {
         return prefs.getInt(KEY_FULLSCREEN_WINDOW_HEIGHT + "_" + cameraPos, -1);
     }
 
-    public boolean hasFullscreenWindowParams(String cameraPos) {
-        return getFullscreenWindowX(cameraPos) != -1 &&
-               getFullscreenWindowY(cameraPos) != -1 &&
-               getFullscreenWindowWidth(cameraPos) != -1 &&
-               getFullscreenWindowHeight(cameraPos) != -1;
-    }
-
-    public void clearFullscreenWindowParams(String cameraPos) {
-        prefs.edit()
-                .remove(KEY_FULLSCREEN_WINDOW_X + "_" + cameraPos)
-                .remove(KEY_FULLSCREEN_WINDOW_Y + "_" + cameraPos)
-                .remove(KEY_FULLSCREEN_WINDOW_WIDTH + "_" + cameraPos)
-                .remove(KEY_FULLSCREEN_WINDOW_HEIGHT + "_" + cameraPos)
-                .apply();
-    }
 
     // ==================== 主屏悬浮窗配置相关方法 ====================
 
@@ -2574,14 +2451,7 @@ public class AppConfig {
         return prefs.getString(KEY_TURN_SIGNAL_TRIGGER_MODE, TRIGGER_MODE_VHAL_GRPC);
     }
 
-    /**
-     * 是否使用 CarAPI 触发模式（兼容性方法）
-     */
-    public boolean isCarApiTriggerMode() {
-        String mode = getTurnSignalTriggerMode();
-        return TRIGGER_MODE_VHAL_GRPC.equals(mode) || TRIGGER_MODE_CAR_API.equals(mode);
-    }
-
+    
     /**
      * 是否使用车辆API 触发模式
      */
@@ -2627,55 +2497,6 @@ public class AppConfig {
         return prefs.getBoolean(KEY_DOOR_LINKAGE_ENABLED, false);
     }
 
-    /**
-     * 设置车门关闭后延迟消失时间
-     */
-    public void setDoorTimeout(int seconds) {
-        prefs.edit().putInt(KEY_DOOR_TIMEOUT, seconds).apply();
-    }
-
-    public int getDoorTimeout() {
-        return prefs.getInt(KEY_DOOR_TIMEOUT, 10); // 默认10秒
-    }
-
-    /**
-     * 保存用户选择的车门联动预设选项（用于恢复具体的 RadioButton 选择）
-     * @param presetName 预设名称，如 "l6l7" 或 "boyue_l"
-     */
-    public void setDoorPresetSelection(String presetName) {
-        prefs.edit().putString(KEY_DOOR_PRESET_SELECTION, presetName).apply();
-        AppLog.d(TAG, "保存车门联动预设选择: " + presetName);
-    }
-
-    /**
-     * 获取用户选择的车门联动预设选项
-     * @return 预设名称，如 "l6l7" 或 "boyue_l"
-     */
-    public String getDoorPresetSelection() {
-        return prefs.getString(KEY_DOOR_PRESET_SELECTION, "l6l7"); // 默认返回 l6l7
-    }
-
-    /**
-     * 设置车门联动是否复用主屏悬浮窗
-     */
-    public void setDoorReuseMainFloating(boolean reuse) {
-        prefs.edit().putBoolean(KEY_DOOR_REUSE_MAIN_FLOATING, reuse).apply();
-    }
-
-    public boolean isDoorReuseMainFloating() {
-        return prefs.getBoolean(KEY_DOOR_REUSE_MAIN_FLOATING, true); // 默认复用
-    }
-
-    /**
-     * 设置车门联动副屏显示开关
-     */
-    public void setDoorSecondaryDisplayEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_DOOR_SECONDARY_DISPLAY_ENABLED, enabled).apply();
-    }
-
-    public boolean isDoorSecondaryDisplayEnabled() {
-        return prefs.getBoolean(KEY_DOOR_SECONDARY_DISPLAY_ENABLED, false); // 默认关闭
-    }
 
     /**
      * 设置独立补盲悬浮窗位置和大小
@@ -2905,65 +2726,8 @@ public class AppConfig {
 
 
     // ==================== 录制摄像头选择配置相关方法 ====================
-    
-    
-    
-    
-    
-    /**
-     * 获取某个摄像头画面是否显示（与录制开关分离）
-     * @param position 位置（front/back/left/right）
-     * @return true 表示显示画面，默认为 true
-     */
-    public boolean isCameraVisible(String position) {
-        String key;
-        switch (position) {
-            case "front":
-                key = KEY_CAMERA_FRONT_VISIBLE;
-                break;
-            case "back":
-                key = KEY_CAMERA_BACK_VISIBLE;
-                break;
-            case "left":
-                key = KEY_CAMERA_LEFT_VISIBLE;
-                break;
-            case "right":
-                key = KEY_CAMERA_RIGHT_VISIBLE;
-                break;
-            default:
-                return true;  // 未知位置默认显示
-        }
-        // 默认显示（开启）
-        return prefs.getBoolean(key, true);
-    }
-    
-    /**
-     * 设置某个摄像头画面是否显示（与录制开关分离）
-     * @param position 位置（front/back/left/right）
-     * @param visible true 表示显示画面
-     */
-    public void setCameraVisible(String position, boolean visible) {
-        String key;
-        switch (position) {
-            case "front":
-                key = KEY_CAMERA_FRONT_VISIBLE;
-                break;
-            case "back":
-                key = KEY_CAMERA_BACK_VISIBLE;
-                break;
-            case "left":
-                key = KEY_CAMERA_LEFT_VISIBLE;
-                break;
-            case "right":
-                key = KEY_CAMERA_RIGHT_VISIBLE;
-                break;
-            default:
-                return;  // 未知位置不处理
-        }
-        prefs.edit().putBoolean(key, visible).apply();
-    }
-    
-    
+
+
     // ==================== 亮度/降噪调节配置相关方法 ====================
     
     /**
@@ -3084,24 +2848,8 @@ public class AppConfig {
     public int getEffectMode() {
         return prefs.getInt(KEY_EFFECT_MODE, EFFECT_MODE_DEFAULT);
     }
-    
-    /**
-     * 设置场景模式
-     * @param mode 场景模式
-     */
-    public void setSceneMode(int mode) {
-        prefs.edit().putInt(KEY_SCENE_MODE, mode).apply();
-        AppLog.d(TAG, "场景模式设置: " + mode);
-    }
-    
-    /**
-     * 获取场景模式
-     * @return 场景模式，默认为 -1（不设置）
-     */
-    public int getSceneMode() {
-        return prefs.getInt(KEY_SCENE_MODE, -1);
-    }
-    
+
+
     /**
      * 重置所有亮度/降噪调节参数为默认值
      */
@@ -3326,14 +3074,7 @@ public class AppConfig {
 
     // ==================== 定制键唤醒配置相关方法 ====================
 
-    /**
-     * 设置定制键唤醒开关
-     */
-    public void setCustomKeyWakeupEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_CUSTOM_KEY_WAKEUP_ENABLED, enabled).apply();
-        AppLog.d(TAG, "定制键唤醒设置: " + (enabled ? "启用" : "禁用"));
-    }
-
+    
     /**
      * 获取定制键唤醒开关状态
      */
@@ -3341,14 +3082,7 @@ public class AppConfig {
         return prefs.getBoolean(KEY_CUSTOM_KEY_WAKEUP_ENABLED, false);
     }
 
-    /**
-     * 设置速度阈值（秒速 m/s）
-     */
-    public void setCustomKeySpeedThreshold(float threshold) {
-        prefs.edit().putFloat(KEY_CUSTOM_KEY_SPEED_THRESHOLD, threshold).apply();
-        AppLog.d(TAG, "定制键速度阈值: " + threshold + " m/s");
-    }
-
+    
     /**
      * 获取速度阈值（秒速 m/s），默认8.34
      */
@@ -3356,13 +3090,7 @@ public class AppConfig {
         return prefs.getFloat(KEY_CUSTOM_KEY_SPEED_THRESHOLD, 8.34f);
     }
 
-    /**
-     * 设置速度属性ID
-     */
-    public void setCustomKeySpeedPropId(int propId) {
-        prefs.edit().putInt(KEY_CUSTOM_KEY_SPEED_PROP_ID, propId).apply();
-    }
-
+    
     /**
      * 获取速度属性ID，默认291504647
      */
@@ -3370,13 +3098,7 @@ public class AppConfig {
         return prefs.getInt(KEY_CUSTOM_KEY_SPEED_PROP_ID, 291504647);
     }
 
-    /**
-     * 设置按钮属性ID
-     */
-    public void setCustomKeyButtonPropId(int propId) {
-        prefs.edit().putInt(KEY_CUSTOM_KEY_BUTTON_PROP_ID, propId).apply();
-    }
-
+    
     /**
      * 获取按钮属性ID，默认557872183
      */
@@ -3680,68 +3402,6 @@ public class AppConfig {
         return prefs.getInt(KEY_NORMAL_RIGHT_ROTATION, defaultValue);
     }
 
-    /**
-     * 重置前轮模式视图参数为默认值
-     */
-    public void resetFrontWheelViewParams() {
-        setFrontWheelLeftViewParams(1120, 662, 10, 397, 270);
-        setFrontWheelRightViewParams(1211, 662, -76, 502, 90);
-        AppLog.d(TAG, "前轮模式视图参数已重置为默认值");
-    }
-
-    /**
-     * 重置后轮模式视图参数为默认值
-     */
-    public void resetRearWheelViewParams() {
-        setRearWheelLeftViewParams(1120, 662, 10, -624, 270);
-        setRearWheelRightViewParams(1298, 662, -164, -702, 90);
-        AppLog.d(TAG, "后轮模式视图参数已重置为默认值");
-    }
-
-    /**
-     * 重置普通模式视图参数为默认值
-     * 普通模式下保持车辆控制区域可见，左右视图宽度相等
-     */
-    public void resetNormalViewParams(int defaultLeftWidth, int defaultLeftHeight, int defaultRightWidth, int defaultRightHeight, int containerHeight) {
-        int halfHeight = (containerHeight - 20) / 2;
-        int padding = 10;
-        int vehicleControlWidth = 280;
-        
-        // 计算左右视图宽度，使其相等且右视图右边缘与后视图对齐
-        int totalViewWidth = defaultLeftWidth + defaultRightWidth + vehicleControlWidth + padding * 4;
-        // 从传入的宽度反推容器宽度，这里简化处理
-        int leftViewWidth = defaultLeftWidth;
-        int rightViewWidth = defaultRightWidth;
-
-        setNormalLeftViewParams(leftViewWidth, halfHeight, padding, padding * 2 + halfHeight, 0);
-        setNormalRightViewParams(rightViewWidth, halfHeight, padding * 2 + leftViewWidth + vehicleControlWidth, padding * 2 + halfHeight, 0);
-        AppLog.d(TAG, "普通模式视图参数已重置为默认值");
-    }
-
-    /**
-     * 获取补盲配置实例
-     */
-    public BlindSpotConfig getBlindSpotConfig() {
-        return new BlindSpotConfig(
-                context.getSharedPreferences("blind_spot_config", Context.MODE_PRIVATE)
-        );
-    }
-
-    /**
-     * 检查是否使用新的录制架构（D:\yuan方案）
-     */
-    public boolean useNewRecordingArchitecture() {
-        // 默认启用新的录制架构
-        return prefs.getBoolean("use_new_recording_architecture", true);
-    }
-
-    /**
-     * 设置是否使用新的录制架构
-     */
-    public void setUseNewRecordingArchitecture(boolean enabled) {
-        prefs.edit().putBoolean("use_new_recording_architecture", enabled).apply();
-        AppLog.d(TAG, "新录制架构设置: " + (enabled ? "启用" : "禁用"));
-    }
 
     // ==================== 悬浮按钮的动作 ====================
 

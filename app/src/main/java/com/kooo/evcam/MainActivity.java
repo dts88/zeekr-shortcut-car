@@ -49,7 +49,6 @@ import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
-import com.kooo.evcam.view.MacOSToggleButton;
 
 import java.io.BufferedReader;
 import java.io.File;

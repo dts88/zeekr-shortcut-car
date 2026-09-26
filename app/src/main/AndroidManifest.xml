@@ -5,8 +5,6 @@
     <!-- 摄像头权限 -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_LOGS" />
-    <!-- 录音权限（如果需要音频） -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 存储权限 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -18,19 +16,16 @@
     <!-- Android 11+ 所有文件访问权限（用于访问U盘公共目录） -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
-    <!-- 网络权限（用于钉钉远程查看和扫码互传） -->
+    <!-- 网络权限：检查更新访问 GitHub；「发送到手机」在局域网里临时提供一个文件 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- 检查更新：下载回来的 APK 要交给系统安装器 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- 前台服务权限（Android 9+） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- 前台服务类型：摄像头（Android 10+） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
-    <!-- 前台服务类型：数据同步（Android 10+，用于 Telegram 服务） -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- CPU唤醒锁（保持CPU运行，不亮屏，用于息屏状态下拍照/录制） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 悬浮窗权限（绕过后台启动Activity限制，需要用户手动授权） -->
