@@ -44,6 +44,16 @@ public class AppConfig {
     
     // 悬浮窗配置
     private static final String KEY_FLOATING_WINDOW_ALPHA = "floating_window_alpha";  // 悬浮窗透明度
+
+    // 全屏遮罩：压暗导航地图。跟超级后视镜一样是系统悬浮窗。
+    private static final String KEY_DIM_ENABLED = "dim_overlay_enabled";
+    private static final String KEY_DIM_OPACITY = "dim_overlay_opacity";
+    private static final String KEY_DIM_BRIGHTNESS = "dim_overlay_brightness";
+    private static final String KEY_DIM_WARMTH = "dim_overlay_warmth";
+    private static final String KEY_DIM_PASS_THROUGH = "dim_overlay_pass_through";
+    public static final int DIM_OPACITY_DEFAULT = 90;
+    public static final int DIM_BRIGHTNESS_DEFAULT = 0;
+    public static final int DIM_WARMTH_DEFAULT = 0;
     
     // 存储清理配置
     private static final String KEY_VIDEO_STORAGE_LIMIT_GB = "video_storage_limit_gb";  // 视频存储限制（GB）
@@ -1699,6 +1709,68 @@ public class AppConfig {
     public void setRecordingFloatingTimeTextSizeSp(int sizeSp) {
         prefs.edit().putInt(KEY_RECORDING_FLOATING_TIME_TEXT_SIZE, sizeSp).apply();
         AppLog.d(TAG, "录制悬浮按钮时间文字大小设置: " + sizeSp + "sp");
+    }
+
+    // ==================== 全屏遮罩 ====================
+
+    public boolean isDimOverlayEnabled() {
+        return prefs.getBoolean(KEY_DIM_ENABLED, false);
+    }
+
+    public void setDimOverlayEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_DIM_ENABLED, enabled).apply();
+    }
+
+    public int getDimOpacity() {
+        return clampPercent(prefs.getInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT));
+    }
+
+    public void setDimOpacity(int percent) {
+        prefs.edit().putInt(KEY_DIM_OPACITY, clampPercent(percent)).apply();
+    }
+
+    public int getDimBrightness() {
+        return clampPercent(prefs.getInt(KEY_DIM_BRIGHTNESS, DIM_BRIGHTNESS_DEFAULT));
+    }
+
+    public void setDimBrightness(int percent) {
+        prefs.edit().putInt(KEY_DIM_BRIGHTNESS, clampPercent(percent)).apply();
+    }
+
+    public int getDimWarmth() {
+        return clampPercent(prefs.getInt(KEY_DIM_WARMTH, DIM_WARMTH_DEFAULT));
+    }
+
+    public void setDimWarmth(int percent) {
+        prefs.edit().putInt(KEY_DIM_WARMTH, clampPercent(percent)).apply();
+    }
+
+    /** 开着时手指穿过遮罩，地图照常能点。 */
+    public boolean isDimPassThrough() {
+        return prefs.getBoolean(KEY_DIM_PASS_THROUGH, true);
+    }
+
+    public void setDimPassThrough(boolean passThrough) {
+        prefs.edit().putBoolean(KEY_DIM_PASS_THROUGH, passThrough).apply();
+    }
+
+    public void resetDimOverlay() {
+        prefs.edit()
+                .putInt(KEY_DIM_OPACITY, DIM_OPACITY_DEFAULT)
+                .putInt(KEY_DIM_BRIGHTNESS, DIM_BRIGHTNESS_DEFAULT)
+                .putInt(KEY_DIM_WARMTH, DIM_WARMTH_DEFAULT)
+                .putBoolean(KEY_DIM_PASS_THROUGH, true)
+                .apply();
+    }
+
+    private static int clampPercent(int value) {
+        if (value < 0) {
+            return 0;
+        }
+        if (value > 100) {
+            return 100;
+        }
+        return value;
     }
 
 }

@@ -174,6 +174,8 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return R.drawable.ic_rearview;
             case "screen_floating":
                 return R.drawable.ic_floating;
+            case "screen_dim":
+                return R.drawable.ic_dim;
             case "screen_interface":
                 return R.drawable.ic_interface;
             case "screen_system":

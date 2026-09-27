@@ -121,6 +121,11 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- 全屏遮罩：压暗导航，窗口类型与超级后视镜相同 -->
+        <service
+            android:name=".overlay.DimOverlayService"
+            android:exported="false" />
+
         <!-- 连续时间轴回放（实验性）：把分段拼成一条时间轴，可跨文件拖动 -->
         <!-- 视频回看。用 Theme.Cam 而不是全屏主题：全屏会把窗口铺到
              状态栏底下，顶部的标题和列表被车机状态栏压住。

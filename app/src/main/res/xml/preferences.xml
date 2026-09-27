@@ -230,6 +230,49 @@
             android:summary="@string/set_reset_floating_summary" />
     </PreferenceScreen>
 
+    <!-- ==================== 屏幕遮罩 ==================== -->
+    <PreferenceScreen
+        android:key="screen_dim"
+        android:title="@string/set_section_dim">
+
+        <SwitchPreferenceCompat
+            android:key="pref_dim"
+            android:title="@string/set_dim_title"
+            android:summary="@string/set_dim_summary" />
+
+        <SeekBarPreference
+            android:key="pref_dim_opacity"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_opacity_title"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_dim_brightness"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_brightness_title"
+            android:summary="@string/set_dim_brightness_summary"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_dim_warmth"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_warmth_title"
+            android:summary="@string/set_dim_warmth_summary"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_dim_passthrough"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_passthrough_title"
+            android:summary="@string/set_dim_passthrough_summary" />
+
+        <Preference
+            android:key="pref_dim_reset"
+            android:dependency="pref_dim"
+            android:title="@string/set_dim_reset_title"
+            android:summary="@string/set_dim_reset_summary" />
+    </PreferenceScreen>
+
     <!-- ==================== 界面 ==================== -->
     <PreferenceScreen
         android:key="screen_interface"

@@ -67,6 +67,11 @@ public final class OverlayCoordinator {
             }, REAR_VIEW_DELAY_MS);
         }
 
+        if (config.isDimOverlayEnabled() && allowed) {
+            DimOverlayService.show(context);
+            AppLog.d(TAG, "屏幕遮罩已按设置打开");
+        }
+
         if (config.isRecordingFloatingEnabled() && allowed) {
             sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
             AppLog.d(TAG, "悬浮按钮已启动");
@@ -97,6 +102,22 @@ public final class OverlayCoordinator {
         sendToRecordingFloating(context, enabled
                 ? RecordingFloatingService.ACTION_SHOW
                 : RecordingFloatingService.ACTION_HIDE);
+        return true;
+    }
+
+    /**
+     * 开 / 关全屏遮罩。返回值含义同 {@link #setRecordButtonEnabled}。
+     */
+    public static boolean setDimOverlayEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setDimOverlayEnabled(enabled);
+        if (enabled) {
+            DimOverlayService.show(context);
+        } else {
+            DimOverlayService.hide(context);
+        }
         return true;
     }
 

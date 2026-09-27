@@ -26,6 +26,7 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
+import com.kooo.evcam.overlay.DimOverlayService;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
@@ -97,6 +98,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindStorage();
         bindRearView();
         bindFloating();
+        bindDim();
         bindInterface();
         bindSystem();
         bindAdvanced();
@@ -120,6 +122,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateStorageUsage();
         refreshRearViewSize();
+        SwitchPreferenceCompat dim = findPreference("pref_dim");
+        if (dim != null && appConfig != null) {
+            dim.setChecked(appConfig.isDimOverlayEnabled());
+        }
     }
 
     // ------------------------------------------------------------------ 录制
@@ -765,6 +771,57 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             toast(getString(R.string.msg_floating_reset));
         });
+    }
+
+    // ------------------------------------------------------------------ 屏幕遮罩
+
+    private void bindDim() {
+        bindOverlaySwitch("pref_dim", appConfig.isDimOverlayEnabled(),
+                OverlayCoordinator::setDimOverlayEnabled, on -> pushFloatingStyle());
+
+        bindSlider("pref_dim_opacity", 10, 100, appConfig.getDimOpacity(), "%", value -> {
+            appConfig.setDimOpacity(value);
+            pushDimLook();
+        });
+        bindSlider("pref_dim_brightness", 0, 100, appConfig.getDimBrightness(), "", value -> {
+            appConfig.setDimBrightness(value);
+            pushDimLook();
+        });
+        bindSlider("pref_dim_warmth", 0, 100, appConfig.getDimWarmth(), "", value -> {
+            appConfig.setDimWarmth(value);
+            pushDimLook();
+        });
+        bindSwitch("pref_dim_passthrough", appConfig.isDimPassThrough(), value -> {
+            appConfig.setDimPassThrough(value);
+            pushDimLook();
+        });
+        onClick("pref_dim_reset", pref -> {
+            appConfig.resetDimOverlay();
+            SeekBarPreference opacity = findPreference("pref_dim_opacity");
+            if (opacity != null) {
+                opacity.setValue(appConfig.getDimOpacity());
+            }
+            SeekBarPreference brightness = findPreference("pref_dim_brightness");
+            if (brightness != null) {
+                brightness.setValue(appConfig.getDimBrightness());
+            }
+            SeekBarPreference warmth = findPreference("pref_dim_warmth");
+            if (warmth != null) {
+                warmth.setValue(appConfig.getDimWarmth());
+            }
+            SwitchPreferenceCompat pass = findPreference("pref_dim_passthrough");
+            if (pass != null) {
+                pass.setChecked(appConfig.isDimPassThrough());
+            }
+            pushDimLook();
+            toast(getString(R.string.msg_dim_reset));
+        });
+    }
+
+    private void pushDimLook() {
+        if (getContext() != null && appConfig.isDimOverlayEnabled()) {
+            DimOverlayService.apply(getContext());
+        }
     }
 
     // ------------------------------------------------------------------ 系统
