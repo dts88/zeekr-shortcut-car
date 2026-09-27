@@ -7,7 +7,7 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
-## [1.57.0-beta] - 2026-09-27
+## [1.57.0-alpha] - 2026-09-27
 
 - **Recording keeps going around the car's own camera use.** On this head unit only one of
   the cabin and surround cameras can be open at a time, and the camera service decides by
