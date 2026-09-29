@@ -7,6 +7,36 @@ Notable changes only, newest first. Each version's section becomes the body of i
 
 Nothing yet.
 
+## [1.67.0-beta] - 2026-09-29
+
+Changes since 1.0.0.
+
+### Upgrade notes
+
+- When the installer finishes, tap **Back** at the top left, not **Open**. Otherwise the head
+  unit's installer gets stuck and later installs or updates fail.
+- The "Custom" stream profile is gone. If you used it, the app switches to Zeekr 7X (surround
+  composite).
+- **Keep recording when the screen goes off** and **Timestamp overlay** are now on by default.
+
+### New and improved
+
+- Malay interface.
+- Fisheye correction (**Straighten**) on every screen: the main screen, photo playback and
+  video playback.
+- Recording can cover the surround view alone, or the surround view plus the cabin cameras,
+  with more detailed camera, quality and frame-rate options (Settings → Recording).
+- Video playback shows all cameras in sync. Tap one to enlarge it, tap again to go back.
+- Photo playback uses the same layout as the main screen. One tap enlarges a view.
+- Super mirror button mode: tap the top, bottom, left or right of the window to switch to the
+  front, rear, left or right camera.
+- The super mirror shows "tap to resume" when its picture stops, and reconnects by itself
+  after the car wakes.
+- An interrupted recording, for example when the USB drive drops out, resumes by itself.
+- Taking a photo from the floating button opens the cameras first if they are off, and the
+  message says whether the photo was saved.
+- Improved stability and smoother operation.
+
 ## [1.67.0-alpha] - 2026-09-29
 
 - **Taking a photo opens the cameras when they are closed, and says what actually happened.**
