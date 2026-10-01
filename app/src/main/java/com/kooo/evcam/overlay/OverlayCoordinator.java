@@ -10,6 +10,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
+import com.kooo.evcam.zeekr.SideViewPopupService;
 
 /**
  * 两个悬浮窗（超级后视镜、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
@@ -67,6 +68,14 @@ public final class OverlayCoordinator {
             }, REAR_VIEW_DELAY_MS);
         }
 
+        if (config.isSidePopupEnabled() && allowed) {
+            // 和后视镜一样等相机开起来；它平时只听信号，弹的时候才接相机
+            main().postDelayed(() -> {
+                SideViewPopupService.start(context);
+                AppLog.d(TAG, "打转向灯弹侧视已按设置开启");
+            }, REAR_VIEW_DELAY_MS);
+        }
+
         if (config.isRecordingFloatingEnabled() && allowed) {
             sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
             AppLog.d(TAG, "悬浮按钮已启动");
@@ -118,6 +127,19 @@ public final class OverlayCoordinator {
         return true;
     }
 
+    /** 开 / 关打转向灯弹侧视。返回值含义同 {@link #setRecordButtonEnabled}。 */
+    public static boolean setSidePopupEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setSidePopupEnabled(enabled);
+        if (enabled) {
+            SideViewPopupService.start(context);
+        } else {
+            SideViewPopupService.stop(context);
+        }
+        return true;
+    }
 
     /**
      * 主界面销毁时的清理。

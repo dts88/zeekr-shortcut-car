@@ -540,6 +540,14 @@ public class SingleCamera {
     }
 
     /**
+     * 此刻占着附加输出槽位的是谁的 SurfaceTexture。侧视弹窗和超级后视镜共用这个槽位，
+     * 放手前先看一眼还是不是自己的，免得把后来接上的那一个摘掉。
+     */
+    public android.graphics.SurfaceTexture getMainFloatingSurfaceTexture() {
+        return mainFloatingSurfaceTexture;
+    }
+
+    /**
      * 设置主屏悬浮窗Surface（带SurfaceTexture引用，用于在创建Session时统一设置buffer尺寸）
      */
     public void setMainFloatingSurface(Surface surface, android.graphics.SurfaceTexture surfaceTexture) {

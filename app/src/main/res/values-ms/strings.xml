@@ -234,6 +234,27 @@
     <string name="info_reading">Membaca…</string>
     <string name="info_read_failed">Tidak dapat dibaca</string>
     <string name="msg_rearview_on">Cermin super dibuka. Tengah: leret atas atau bawah untuk ubah bingkai, kiri atau kanan untuk tukar kamera. Tepi: seret untuk alih</string>
+    <string name="set_side_popup_title">Pandangan sisi isyarat membelok</string>
+    <string name="set_side_popup_summary">Semasa anda memberi isyarat, tetingkap timbul menunjukkan kamera di sisi itu: isyarat kiri, kamera kiri. Ia ditutup apabila isyarat dimatikan. Paparan asal kereta diutamakan: tiada tetingkap timbul semasa mengundur atau ketika paparan 360 atau sisi asal sedang ditunjukkan. Tidak muncul semasa cermin super dibuka</string>
+    <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
+    <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
+    <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>
+    <string name="set_side_popup_straighten_title">Luruskan gambar</string>
+    <string name="set_side_popup_straighten_summary">Membetulkan lengkungan fisheye sebelum dipaparkan; tiga tetapan di bawah menetapkan lebar dan arah pandangan. Hanya mengubah tetingkap timbul; rakaman tidak terjejas</string>
+    <string name="set_side_popup_fov_title">Lebar pandangan (°)</string>
+    <string name="set_side_popup_fov_summary">Lebih kecil untuk zum masuk. Hanya berfungsi apabila Luruskan gambar dihidupkan</string>
+    <string name="set_side_popup_yaw_title">Hala ke belakang (°)</string>
+    <string name="set_side_popup_yaw_summary">Positif memusingkan pandangan ke belakang (titik buta), negatif ke hadapan. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
+    <string name="set_side_popup_pitch_title">Hala ke atas (°)</string>
+    <string name="set_side_popup_pitch_summary">Positif memusingkan pandangan ke luar, ke jalan yang lebih jauh, negatif ke bawah ke arah kereta dan tanah. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
+    <string name="set_side_popup_close_delay_ms_title">Kekal dibuka selepas isyarat (ms)</string>
+    <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 saat. 0 menutupnya sebaik sahaja isyarat dimatikan. Paparan asal kereta tetap menutupnya serta-merta</string>
+    <string name="set_side_popup_instant_title">Tetingkap timbul segera</string>
+    <string name="set_side_popup_instant_summary">Dalam gear D, pandangan sisi disediakan di latar belakang supaya gambar muncul sebaik sahaja anda memberi isyarat. Kamera kekal hidup semasa memandu dan menggunakan sedikit lagi kuasa</string>
+    <string name="set_side_popup_size_title">Saiz tetingkap timbul (% ketinggian skrin)</string>
+    <string name="set_side_popup_size_summary">Sehingga separuh lebar skrin: tetingkap kiri dan kanan bertemu di tengah</string>
+    <string name="set_side_popup_vertical_title">Ketinggian pada skrin (%)</string>
+    <string name="set_side_popup_vertical_summary">0 ialah atas, 100 ialah bawah</string>
     <string name="msg_rearview_reset">Bingkai dan kedudukan cermin super ditetapkan semula</string>
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
     <string name="msg_adjust_opened">Tetingkap pelarasan dibuka</string>
