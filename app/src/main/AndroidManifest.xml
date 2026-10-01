@@ -112,6 +112,10 @@
             android:exported="false" />
 
         <service
+            android:name=".zeekr.SideViewPopupService"
+            android:exported="false" />
+
+        <service
             android:name=".service.CameraRecordingService"
             android:enabled="true"
             android:exported="false"

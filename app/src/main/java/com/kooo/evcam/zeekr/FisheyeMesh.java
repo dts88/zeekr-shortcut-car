@@ -114,6 +114,34 @@ public final class FisheyeMesh {
         }
     }
 
+    /** 输出画面里的一点 (u, v) → 这一路原始画面里的采样点，两边都是 0..1。 */
+    public interface SourceMap {
+        void map(float u, float v, float[] out);
+    }
+
+    /**
+     * 算网格，但每个角点怎么反投影由调用方给（侧视弹窗用：虚拟相机转了个角度，见 {@link SideViewProjection}）。
+     * 画法和 {@link #prepare(int, float, float, float, float, float, float, float, float)} 完全一样。
+     */
+    public void prepare(int divisions, float laneLeft, float laneTop, float laneWidth, float laneHeight,
+                        SourceMap map) {
+        this.divisions = Math.max(1, divisions);
+        int side = this.divisions + 1;
+        if (grid.length != side * side * 2) {
+            grid = new float[side * side * 2];
+        }
+        int index = 0;
+        for (int row = 0; row < side; row++) {
+            float v = (float) row / this.divisions;
+            for (int column = 0; column < side; column++) {
+                float u = (float) column / this.divisions;
+                map.map(u, v, point);
+                grid[index++] = laneLeft + point[0] * laneWidth;
+                grid[index++] = laneTop + point[1] * laneHeight;
+            }
+        }
+    }
+
     public int divisions() {
         return divisions;
     }

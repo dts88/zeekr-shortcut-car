@@ -60,6 +60,11 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
+    /** 后视镜在不在：侧视弹窗和它共用一个相机输出槽位，它在就不弹。 */
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
     /** 设置页开关了按键模式之后通知正在显示的窗口。 */
     public static void applyButtonMode(Context context) {
         RearViewMirrorService svc = instance;

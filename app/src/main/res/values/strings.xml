@@ -253,6 +253,27 @@
     <string name="info_reading">正在读取…</string>
     <string name="info_read_failed">读取失败</string>
     <string name="msg_rearview_on">超级后视镜已开启：中间三分之一上下划调取景、左右划换一路，两侧拖动窗口</string>
+    <string name="set_side_popup_title">打转向灯弹侧视</string>
+    <string name="set_side_popup_summary">打转向灯时弹出那一侧的画面：左灯左侧、右灯右侧，灯灭就收。原厂画面优先：挂 R 档、原厂 360 或侧方小窗在显示时不弹。超级后视镜开着时不弹</string>
+    <string name="set_side_popup_speed_title">从这个车速起弹（km/h）</string>
+    <string name="set_side_popup_speed_summary">低于这个车速原厂会自己弹侧方小窗。0 表示任何车速都弹</string>
+    <string name="msg_side_popup_on">打转向灯弹侧视已开启：打左灯看左侧、打右灯看右侧</string>
+    <string name="set_side_popup_straighten_title">拉直画面</string>
+    <string name="set_side_popup_straighten_summary">把鱼眼画面拉直再显示，下面三项调视野和朝向。只影响弹窗的显示，录像照旧</string>
+    <string name="set_side_popup_fov_title">视野（°）</string>
+    <string name="set_side_popup_fov_summary">越小越放大。只在「拉直画面」开着时起作用</string>
+    <string name="set_side_popup_yaw_title">往后看（°）</string>
+    <string name="set_side_popup_yaw_summary">正数朝车尾（盲区）转，负数朝车头。方向是猜的：反了就往另一头拉</string>
+    <string name="set_side_popup_pitch_title">往上看（°）</string>
+    <string name="set_side_popup_pitch_summary">正数朝车外、远处的路转，负数朝车身和地面。方向是猜的：反了就往另一头拉</string>
+    <string name="set_side_popup_close_delay_ms_title">灯灭后再留（毫秒）</string>
+    <string name="set_side_popup_close_delay_ms_summary">1000 毫秒 = 1 秒。0 表示灯一灭就收。原厂画面出来时照样立刻收</string>
+    <string name="set_side_popup_instant_title">即时弹出</string>
+    <string name="set_side_popup_instant_summary">挂 D 档时让侧视窗在后台备着，打灯马上有画面。代价是开车时相机一直开着，多用一点电</string>
+    <string name="set_side_popup_size_title">弹窗大小（屏幕高度的 %）</string>
+    <string name="set_side_popup_size_summary">最大到半个屏幕宽：左右两个弹窗在屏幕中线相接</string>
+    <string name="set_side_popup_vertical_title">上下位置（%）</string>
+    <string name="set_side_popup_vertical_summary">0 贴顶，100 贴底</string>
     <string name="msg_rearview_reset">超级后视镜取景与位置已重置</string>
     <string name="msg_floating_reset">悬浮按钮已重置</string>
     <string name="msg_adjust_opened">调节窗口已打开</string>

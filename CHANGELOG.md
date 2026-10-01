@@ -13,6 +13,10 @@ commit message, not here.
   and Chinese owner communities for their suggestions, insights and support.
 - The About page comes in Chinese and English only: the Chinese interface shows Chinese, every
   other language shows English.
+- Turn-signal side view (off by default, Settings → Super mirror): signalling pops up that side's
+  camera, straightened and turned towards the blind spot, and closes it about a second after the
+  signal goes off. Stock views (reverse, 360, side pop-up, park assist) take precedence; minimum
+  speed, view width, aim, size, position and stay-open time are adjustable.
 
 ## [2.0.1-beta] - 2026-10-01
 

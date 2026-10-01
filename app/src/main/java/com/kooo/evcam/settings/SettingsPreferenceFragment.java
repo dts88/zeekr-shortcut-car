@@ -96,6 +96,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindRecording();
         bindStorage();
         bindRearView();
+        bindSidePopup();
         bindFloating();
         bindInterface();
         bindSystem();
@@ -550,6 +551,64 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 requireActivity().runOnUiThread(() -> pref.setSummary(result));
             }
         }, "storage-usage").start();
+    }
+
+    // ------------------------------------------------------------------ 打转向灯弹侧视
+
+    private void bindSidePopup() {
+        bindOverlaySwitch("pref_side_popup", appConfig.isSidePopupEnabled(),
+                OverlayCoordinator::setSidePopupEnabled, on -> {
+                    if (on) {
+                        toast(getString(R.string.msg_side_popup_on));
+                    }
+                });
+        bindSlider("pref_side_popup_min_speed", 0, AppConfig.SIDE_POPUP_MAX_MIN_SPEED,
+                appConfig.getSidePopupMinSpeed(), "km/h", value -> {
+                    appConfig.setSidePopupMinSpeed(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSwitch("pref_side_popup_straighten", appConfig.isSidePopupStraighten(), value -> {
+            appConfig.setSidePopupStraighten(value);
+            com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+        });
+        bindSlider("pref_side_popup_fov",
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES),
+                appConfig.getSidePopupFov(), "°", value -> {
+                    appConfig.setSidePopupFov(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        int maxYaw = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        bindSlider("pref_side_popup_yaw", -maxYaw, maxYaw,
+                appConfig.getSidePopupYaw(), "°", value -> {
+                    appConfig.setSidePopupYaw(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        int maxPitch = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        bindSlider("pref_side_popup_pitch", -maxPitch, maxPitch,
+                appConfig.getSidePopupPitch(), "°", value -> {
+                    appConfig.setSidePopupPitch(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSwitch("pref_side_popup_instant", appConfig.isSidePopupInstant(), value -> {
+            appConfig.setSidePopupInstant(value);
+            com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+        });
+        bindSlider("pref_side_popup_close_delay_ms", 0, AppConfig.SIDE_POPUP_MAX_CLOSE_DELAY_MS,
+                appConfig.getSidePopupCloseDelayMs(), "ms", value -> {
+                    appConfig.setSidePopupCloseDelayMs(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_size", AppConfig.SIDE_POPUP_MIN_SIZE_PERCENT,
+                AppConfig.SIDE_POPUP_MAX_SIZE_PERCENT, appConfig.getSidePopupSizePercent(), "%", value -> {
+                    appConfig.setSidePopupSizePercent(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_vertical", 0, 100,
+                appConfig.getSidePopupVerticalPercent(), "%", value -> {
+                    appConfig.setSidePopupVerticalPercent(value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
     }
 
     // ------------------------------------------------------------------ 超级后视镜

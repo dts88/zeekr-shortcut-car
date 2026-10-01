@@ -234,6 +234,27 @@
     <string name="info_reading">Reading…</string>
     <string name="info_read_failed">Could not read</string>
     <string name="msg_rearview_on">Super mirror on. Middle: swipe up or down to reframe, left or right to change camera. Sides: drag to move</string>
+    <string name="set_side_popup_title">Turn-signal side view</string>
+    <string name="set_side_popup_summary">While you signal, a pop-up shows the camera on that side: left signal, left camera. It closes when the signal goes off. The car\'s own views come first: no pop-up in reverse or while the stock 360 or side view is showing. Not shown while the Super mirror is on</string>
+    <string name="set_side_popup_speed_title">Show from speed (km/h)</string>
+    <string name="set_side_popup_speed_summary">Below this speed the car shows its own side view. 0 shows it at any speed</string>
+    <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>
+    <string name="set_side_popup_straighten_title">Straighten picture</string>
+    <string name="set_side_popup_straighten_summary">Corrects the fisheye curve before showing it; the three settings below set how wide it looks and where it points. Only changes the pop-up; recordings are not affected</string>
+    <string name="set_side_popup_fov_title">View width (°)</string>
+    <string name="set_side_popup_fov_summary">Smaller zooms in. Only applies with Straighten picture on</string>
+    <string name="set_side_popup_yaw_title">Aim back (°)</string>
+    <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_pitch_title">Aim up (°)</string>
+    <string name="set_side_popup_pitch_summary">Positive turns the view out towards the road further away, negative down at the car and the ground. The direction is a guess: if it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_close_delay_ms_title">Stay open after the signal (ms)</string>
+    <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 second. 0 closes it as soon as the signal goes off. A stock view still closes it straight away</string>
+    <string name="set_side_popup_instant_title">Instant pop-up</string>
+    <string name="set_side_popup_instant_summary">In D, keeps the side view ready in the background so the picture is there as soon as you signal. The camera stays on while driving, which uses a little more power</string>
+    <string name="set_side_popup_size_title">Pop-up size (% of screen height)</string>
+    <string name="set_side_popup_size_summary">Up to half the screen width: the left and right pop-ups meet at the middle</string>
+    <string name="set_side_popup_vertical_title">Height on screen (%)</string>
+    <string name="set_side_popup_vertical_summary">0 is the top, 100 the bottom</string>
     <string name="msg_rearview_reset">Super mirror framing and position reset</string>
     <string name="msg_floating_reset">Floating button reset</string>
     <string name="msg_adjust_opened">Adjustment window opened</string>

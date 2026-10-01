@@ -190,6 +190,78 @@
             android:dependency="pref_rearview"
             android:title="@string/set_rearview_reset_title"
             android:summary="@string/set_rearview_reset_summary" />
+
+        <!-- 打转向灯弹侧视：不依赖后视镜开关，后视镜关着也能用（开着时反而不弹） -->
+        <PreferenceCategory
+            android:key="cat_side_popup"
+            android:title="@string/set_side_popup_title">
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup"
+                android:title="@string/set_side_popup_title"
+                android:summary="@string/set_side_popup_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_min_speed"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_speed_title"
+                android:summary="@string/set_side_popup_speed_summary"
+                app:showSeekBarValue="true" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup_straighten"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_straighten_title"
+                android:summary="@string/set_side_popup_straighten_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_fov"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_fov_title"
+                android:summary="@string/set_side_popup_fov_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_yaw"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_yaw_title"
+                android:summary="@string/set_side_popup_yaw_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_pitch"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_pitch_title"
+                android:summary="@string/set_side_popup_pitch_summary"
+                app:showSeekBarValue="true" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup_instant"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_instant_title"
+                android:summary="@string/set_side_popup_instant_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_close_delay_ms"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_close_delay_ms_title"
+                android:summary="@string/set_side_popup_close_delay_ms_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_size"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_size_title"
+                android:summary="@string/set_side_popup_size_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_vertical"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_vertical_title"
+                android:summary="@string/set_side_popup_vertical_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 悬浮窗 ==================== -->
