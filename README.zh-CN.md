@@ -110,3 +110,11 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 把 App Lab 的合成流拆成四宫格并渲染出来，是本项目独立实现的。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。
+
+---
+
+## 推荐
+
+**[CarPiano](https://github.com/jlunnn/CarPiano)**：任何车速下都能用车外喇叭播放声音，不再像原车功能那样只能在 P 挡使用。目前还在早期开发阶段，但很值得期待。
+
+在公共道路上使用车外喇叭前，请先了解当地法规。
