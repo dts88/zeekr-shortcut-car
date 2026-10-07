@@ -853,6 +853,8 @@
     <string name="dev_perm_overlay_why">Used by Super mirror, the floating button and the image adjustment window</string>
     <string name="dev_perm_accessibility">Accessibility service</string>
     <string name="dev_perm_accessibility_why">Used by Keep running in background</string>
+    <string name="dev_perm_usage_access">Usage access</string>
+    <string name="dev_perm_usage_access_why">Used to log apps that may be using a camera</string>
     <string name="dev_perm_battery">Ignore battery optimisation</string>
     <string name="dev_perm_battery_why">Stops the system from ending recording in the background</string>
     <string name="dev_perm_granted">Granted ✓</string>
@@ -864,6 +866,8 @@
     <string name="dev_gpu_fisheye_preview_summary">Corrects the live surround view pixel by pixel on the GPU, rendered through the app GL pipeline, as straight as photo playback instead of in patches. Picks the method only; the Straighten button still turns correction on and off. Takes effect after restarting the app.</string>
     <string name="dev_gpu_fisheye_video_title">Video playback: per-pixel fisheye correction on the GPU</string>
     <string name="dev_gpu_fisheye_video_summary">Corrects the surround view in video playback pixel by pixel on the GPU. Picks the method only; the Straighten button still turns correction on and off. Takes effect the next time video playback opens.</string>
+    <string name="dev_camera_suspects_title">Log apps that may be using a camera</string>
+    <string name="dev_camera_suspects_summary">Records which other apps started or stopped a foreground service or moved to the foreground or background from 10 seconds before to 3 seconds after another app takes or releases a camera, for reference only. Requires usage access; other apps\' package names are written to the diagnostics report.</string>
     <string name="dev_repair_mp4_title">Repair unindexed recordings</string>
     <string name="dev_repair_mp4_summary">A clip cut off unexpectedly, for example by power loss, has no index and will not play. Rebuilds the index from a healthy clip of the same camera, keeping the file name.</string>
     <string name="dev_repair_refuse_recording">Can\'t repair while recording: the clip being recorded has no index either, so it can\'t be told apart from a clip that was cut off. Stop recording first.</string>

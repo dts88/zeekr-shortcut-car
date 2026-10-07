@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.1-alpha] - 2026-10-07
+
+- Developer options: new switch to log apps that may be using a camera. When another app takes or releases a camera, the diagnostics note which apps started or stopped a foreground service or switched to or from the foreground around that moment (a hint, not proof). Needs usage access, which can be granted from the permissions page in developer options.
+
 ## [2.10.0-alpha] - 2026-10-06
 
 Version jump: the whole interface text was reviewed and reworded in the 2.1.x alphas; this build finishes it and reworks the recording start/stop.

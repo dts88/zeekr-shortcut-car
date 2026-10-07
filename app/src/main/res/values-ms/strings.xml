@@ -834,6 +834,8 @@
     <string name="dev_perm_overlay_why">Digunakan oleh Cermin super, butang terapung dan tetingkap pelarasan imej</string>
     <string name="dev_perm_accessibility">Perkhidmatan kebolehcapaian</string>
     <string name="dev_perm_accessibility_why">Digunakan oleh Kekal berjalan di latar belakang</string>
+    <string name="dev_perm_usage_access">Akses penggunaan</string>
+    <string name="dev_perm_usage_access_why">Digunakan untuk merekod apl yang mungkin menggunakan kamera</string>
     <string name="dev_perm_battery">Abaikan pengoptimuman bateri</string>
     <string name="dev_perm_battery_why">Menghalang sistem daripada menghentikan rakaman di latar belakang</string>
     <string name="dev_perm_granted">Dibenarkan ✓</string>
@@ -845,6 +847,8 @@
     <string name="dev_gpu_fisheye_preview_summary">Membetulkan pratonton langsung sekeliling piksel demi piksel dengan GPU, melalui GL apl, selurus main semula foto dan bukan secara tampalan. Ini memilih kaedah sahaja; butang Luruskan masih menghidupkan dan mematikan pembetulan. Berkuat kuasa selepas apl dimulakan semula.</string>
     <string name="dev_gpu_fisheye_video_title">Main semula video: pembetulan mata ikan per piksel dengan GPU</string>
     <string name="dev_gpu_fisheye_video_summary">Paparan sekeliling dalam main semula video dibetulkan piksel demi piksel dengan GPU. Ini memilih kaedah sahaja; butang Luruskan masih menghidupkan dan mematikan pembetulan. Berkuat kuasa apabila main semula video dibuka lagi.</string>
+    <string name="dev_camera_suspects_title">Rekod apl yang mungkin menggunakan kamera</string>
+    <string name="dev_camera_suspects_summary">Merekod apl lain yang memulakan atau menghentikan perkhidmatan latar depan, atau beralih ke latar depan atau latar belakang, dari 10 saat sebelum hingga 3 saat selepas apl lain mula menggunakan atau melepaskan kamera, sebagai rujukan sahaja. Memerlukan akses penggunaan; nama pakej apl lain ditulis dalam laporan diagnostik.</string>
     <string name="dev_repair_mp4_title">Baiki rakaman tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus secara tiba-tiba, contohnya kerana kuasa terputus, tiada indeks dan tidak boleh dimainkan. Indeks dibina semula daripada klip sihat kamera yang sama; nama fail kekal.</string>
     <string name="dev_repair_refuse_recording">Tidak dapat membaiki semasa merakam: klip yang sedang dirakam juga tiada indeks, jadi ia tidak dapat dibezakan daripada klip yang terputus. Hentikan rakaman dahulu.</string>

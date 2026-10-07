@@ -414,6 +414,12 @@
             android:title="@string/dev_gpu_fisheye_video_title"
             android:summary="@string/dev_gpu_fisheye_video_summary" />
 
+        <!-- 别的程序占用 / 放开相机时，查那几秒里谁起停了前台服务、切了前后台（CameraHolderSuspects） -->
+        <SwitchPreferenceCompat
+            android:key="pref_camera_holder_suspects"
+            android:title="@string/dev_camera_suspects_title"
+            android:summary="@string/dev_camera_suspects_summary" />
+
         <Preference
             android:key="pref_repair_mp4"
             android:title="@string/dev_repair_mp4_title"

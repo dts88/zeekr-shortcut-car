@@ -55,6 +55,8 @@ public final class CameraAvailabilityWatch {
         if (cm == null) {
             return;
         }
+        // 嫌疑应用要查使用情况，得有个 Context；争用都从这里来，在这里接上
+        CameraHolderSuspects.attach(context);
         callback = new CameraManager.AvailabilityCallback() {
             @Override
             public void onCameraAccessPrioritiesChanged() {
@@ -96,7 +98,7 @@ public final class CameraAvailabilityWatch {
             CameraContention.othersReleased(cameraId);
             CameraTaken.othersReleased(cameraId);
         } else if (!ours) {
-            CameraContention.othersTook(cameraId);
+            CameraContention.othersTook(cameraId, before == null);
             CameraTaken.othersTook(cameraId);
         }
         if (available) {

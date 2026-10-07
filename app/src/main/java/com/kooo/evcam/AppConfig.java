@@ -64,6 +64,7 @@ public class AppConfig {
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
+    private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
     private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
@@ -580,7 +581,8 @@ public class AppConfig {
      *
      * <p>什么时候按新的算，和改这一项本身一样，看它在哪一刻被读：开录时读的（存储位置、中转写入、
      * 强制 H.264）从下一次开录起；建相机时读的（录制模式、相机映射、画面调节、预览走 GPU）
-     * 从下一次启动应用起；熄屏录制从下一次熄屏起；拍照另存整帧从下一张起；视频回看走 GPU 从下一次打开回看起。</p>
+     * 从下一次启动应用起；熄屏录制从下一次熄屏起；拍照另存整帧从下一张起；视频回看走 GPU 从下一次打开回看起；
+     * 记录可能占用摄像头的应用从下一次别的程序占用或放开相机起。</p>
      *
      * <p>收进来的有两种：开发者选项分区里的设置（{@code preferences.xml} 的 {@code screen_developer}）；
      * 别的分区里只有开发者才选得了的值 —— 存储位置选内置存储、中转写入（先写内置存储）。
@@ -603,6 +605,7 @@ public class AppConfig {
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
+                KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
                 KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
                 KEY_RELAY_WRITE_ENABLED));            // 中转写入 → 关
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
@@ -867,6 +870,21 @@ public class AppConfig {
 
     public void setGpuFisheyeVideo(boolean on) {
         prefs.edit().putBoolean(KEY_GPU_FISHEYE_VIDEO, on).apply();
+    }
+
+    /**
+     * 别的程序占用或放开相机时，查那几秒里哪些应用起停了前台服务、切了前后台，记进黑匣子
+     * （{@code CameraHolderSuspects}）。只是嫌疑，不是定论。
+     *
+     * <p>开发者选项，默认关：要使用情况访问，还会把别的应用的包名写进诊断报告。
+     * 归开发者选项管，关着时按关算；从下一次争用起生效。</p>
+     */
+    public boolean isCameraHolderSuspectsEnabled() {
+        return readBoolean(KEY_CAMERA_HOLDER_SUSPECTS, false);
+    }
+
+    public void setCameraHolderSuspectsEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_CAMERA_HOLDER_SUSPECTS, on).apply();
     }
 
     /** 鱼眼校正用哪种投影（直线 / 柱面 / 立体）。主界面预览、图片回看、视频回看共用；后视镜不用它。 */

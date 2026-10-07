@@ -1122,6 +1122,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_gpu_fisheye_video", appConfig.isGpuFisheyeVideo(),
                 appConfig::setGpuFisheyeVideo);
 
+        // 别的程序占用 / 放开相机时记嫌疑应用；要使用情况访问，在权限设置里授予
+        bindSwitch("pref_camera_holder_suspects", appConfig.isCameraHolderSuspectsEnabled(),
+                appConfig::setCameraHolderSuspectsEnabled);
+
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {
                 return;

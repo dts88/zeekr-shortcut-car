@@ -844,6 +844,8 @@
     <string name="dev_perm_overlay_why">用于超级后视镜、悬浮按钮和画面调节窗口</string>
     <string name="dev_perm_accessibility">无障碍服务</string>
     <string name="dev_perm_accessibility_why">用于保持后台运行</string>
+    <string name="dev_perm_usage_access">使用情况访问</string>
+    <string name="dev_perm_usage_access_why">用于记录可能占用摄像头的应用</string>
     <string name="dev_perm_battery">忽略电池优化</string>
     <string name="dev_perm_battery_why">防止系统在后台终止录制</string>
     <string name="dev_perm_granted">已授权 ✓</string>
@@ -855,6 +857,8 @@
     <string name="dev_gpu_fisheye_preview_summary">主界面环视预览改用 GPU 逐像素校正（画面经应用内 GL 渲染后显示），效果与照片回放一致，不再分块近似。仅切换算法，是否校正仍由「鱼眼校正」按钮控制。重启应用后生效。</string>
     <string name="dev_gpu_fisheye_video_title">录像回放：GPU 逐像素鱼眼校正</string>
     <string name="dev_gpu_fisheye_video_summary">录像回放中的环视画面改用 GPU 逐像素校正。仅切换算法，是否校正仍由「鱼眼校正」按钮控制。下次打开录像回放时生效。</string>
+    <string name="dev_camera_suspects_title">记录可能占用摄像头的应用</string>
+    <string name="dev_camera_suspects_summary">其他应用占用或释放摄像头时，记录此前 10 秒至此后 3 秒内启动或停止前台服务、切换到前台或后台的其他应用，结果仅供参考。需授予使用情况访问权限；其他应用的包名会写入诊断报告。</string>
     <string name="dev_repair_mp4_title">修复缺少索引的录像</string>
     <string name="dev_repair_mp4_summary">录制意外中断（如断电）的片段缺少索引，无法播放。参照同一摄像头的完好片段重建索引，文件名不变。</string>
     <string name="dev_repair_refuse_recording">录制时无法修复：正在录制的片段同样没有索引，无法与意外中断的片段区分。请先停止录制。</string>

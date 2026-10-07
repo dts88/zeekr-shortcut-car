@@ -95,6 +95,10 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
                 WakeUpHelper.hasOverlayPermission(context), this::requestOverlay);
         add(advanced, context, R.string.dev_perm_accessibility, R.string.dev_perm_accessibility_why,
                 isAccessibilityEnabled(context), this::openAccessibilitySettings);
+        // 开发者选项「记录可能占用摄像头的应用」要它；查法和那边是同一个
+        add(advanced, context, R.string.dev_perm_usage_access, R.string.dev_perm_usage_access_why,
+                com.kooo.evcam.camera.CameraHolderSuspects.hasUsageAccess(context),
+                this::openUsageAccessSettings);
         add(advanced, context, R.string.dev_perm_battery, R.string.dev_perm_battery_why,
                 isIgnoringBatteryOptimizations(context), this::requestIgnoreBattery);
     }
@@ -186,6 +190,16 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void openAccessibilitySettings() {
         launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+    }
+
+    /** 车机上未必有「使用情况访问」那一页：打不开就退到本应用的详情页。 */
+    private void openUsageAccessSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+        } catch (Throwable t) {
+            AppLog.w("PermissionsPreference", "打不开使用情况访问设置页，改开应用详情: " + t);
+            openAppSettings();
+        }
     }
 
     private void requestIgnoreBattery() {

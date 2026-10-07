@@ -20,6 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>要回答的问题：车机的座舱画面拿相机 1 时，我们的相机 2 是不是紧跟着被断开（两路在相机服务里冲突）；
  * 我们重开相机 2 之后，相机 1 是不是马上空出来（我们把原厂画面顶掉了）；
  * 以及这两件事跟主界面在不在前台有没有关系。</p>
+ *
+ * <p>是谁拿的，相机服务不说。开发者选项开着时，别的程序拿、放的每一次另记一行嫌疑应用
+ * （{@link CameraHolderSuspects}，几秒后才写）。</p>
  */
 public final class CameraContention {
 
@@ -35,13 +38,20 @@ public final class CameraContention {
     private CameraContention() {
     }
 
-    /** 相机服务报：别的程序拿了这一路。 */
-    static void othersTook(String cameraId) {
+    /**
+     * 相机服务报：别的程序拿了这一路。
+     *
+     * @param initial 注册回调时报的当前状态：什么时候拿的不知道，前后几秒的嫌疑应用对不上，不查
+     */
+    static void othersTook(String cameraId, boolean initial) {
         long now = SystemClock.elapsedRealtime();
         OTHERS_TOOK_AT.put(cameraId, now);
         lastOthersId = cameraId;
         lastOthersAt = now;
         BlackBox.noteImportant("争用：别的程序拿了相机 " + cameraId + "；我们此刻 " + describeUs());
+        if (!initial) {
+            CameraHolderSuspects.lookAround(cameraId, true);
+        }
     }
 
     /** 相机服务报：这一路空出来了。 */
@@ -55,6 +65,7 @@ public final class CameraContention {
         BlackBox.noteImportant("争用：相机 " + cameraId + " 空出来了，别的程序拿了 " + (now - took) + " ms"
                 + (sinceOurOpen >= 0 && sinceOurOpen < LINK_MS
                         ? "；距我们重开相机 " + lastOurOpenId + " 才 " + sinceOurOpen + " ms —— 多半是被我们顶掉的" : ""));
+        CameraHolderSuspects.lookAround(cameraId, false);
     }
 
     /** 我们的一路被相机服务断开了（onDisconnected）。 */

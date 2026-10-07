@@ -231,22 +231,64 @@ public final class DiagnosticsCollector {
      * 只有重启车机才好 —— 如果那时这里写着「2 被占用（不是我们）」，
      * 占着它的就在相机服务那一侧，应用这边怎么重试都没用。</p>
      */
-    private static void appendCameraAvailability(StringBuilder sb) {
+    private static void appendCameraAvailability(StringBuilder sb, Context context) {
         sb.append("## 2.3.1 相机可用性（相机服务视角）").append('\n');
         if (!com.kooo.evcam.camera.CameraAvailabilityWatch.heardAnything()) {
-            sb.append("没收到过可用性回调（前台服务没起来，或者容器没转这条接口）").append('\n').append('\n');
+            sb.append("没收到过可用性回调（前台服务没起来，或者容器没转这条接口）").append('\n');
+        } else {
+            for (java.util.Map.Entry<String, long[]> e
+                    : com.kooo.evcam.camera.CameraAvailabilityWatch.snapshot().entrySet()) {
+                long[] v = e.getValue();
+                sb.append("  相机 ").append(e.getKey()).append(": ")
+                        .append(v[0] == 1 ? "空闲" : "被占用")
+                        .append(v[0] == 1 ? "" : (v[2] == 1 ? "（我们开着）" : "（不是我们）"))
+                        .append(v[1] >= 0 ? "，已持续 " + (v[1] / 1000) + " 秒" : "")
+                        .append('\n');
+            }
+        }
+        appendHolderSuspects(sb, context);
+        sb.append('\n');
+    }
+
+    /**
+     * 开发者选项「记录可能占用摄像头的应用」开着时：本进程里每一路查到过哪些嫌疑应用、各几次。
+     * 每一次的明细在黑匣子（2.6）的「争用：… 的嫌疑应用（不是定论）」那几行。
+     */
+    private static void appendHolderSuspects(StringBuilder sb, Context context) {
+        if (!com.kooo.evcam.camera.CameraHolderSuspects.isEnabled(context)) {
             return;
         }
-        for (java.util.Map.Entry<String, long[]> e
-                : com.kooo.evcam.camera.CameraAvailabilityWatch.snapshot().entrySet()) {
-            long[] v = e.getValue();
-            sb.append("  相机 ").append(e.getKey()).append(": ")
-                    .append(v[0] == 1 ? "空闲" : "被占用")
-                    .append(v[0] == 1 ? "" : (v[2] == 1 ? "（我们开着）" : "（不是我们）"))
-                    .append(v[1] >= 0 ? "，已持续 " + (v[1] / 1000) + " 秒" : "")
-                    .append('\n');
+        sb.append("  占用相机的嫌疑应用（不是定论，本进程内）: 使用情况访问 ")
+                .append(com.kooo.evcam.camera.CameraHolderSuspects.hasUsageAccess(context)
+                        ? "已授权" : "未授权，查不到")
+                .append('\n');
+        java.util.Map<String, com.kooo.evcam.camera.CameraHolderSuspects.Tally> tally =
+                com.kooo.evcam.camera.CameraHolderSuspects.tally();
+        if (tally.isEmpty()) {
+            sb.append("    还没查过").append('\n');
+            return;
         }
-        sb.append('\n');
+        for (java.util.Map.Entry<String, com.kooo.evcam.camera.CameraHolderSuspects.Tally> e
+                : tally.entrySet()) {
+            com.kooo.evcam.camera.CameraHolderSuspects.Tally t = e.getValue();
+            List<java.util.Map.Entry<String, Integer>> ranked = t.ranked();
+            sb.append("    相机 ").append(e.getKey()).append("（查了 ").append(t.lookups()).append(" 次）: ");
+            if (ranked.isEmpty()) {
+                sb.append("每次都没有别的应用起停前台服务或切换前后台");
+            }
+            int shown = Math.min(ranked.size(), 8);
+            for (int i = 0; i < shown; i++) {
+                sb.append(i > 0 ? ", " : "").append(ranked.get(i).getKey())
+                        .append(" ×").append(ranked.get(i).getValue());
+            }
+            if (ranked.size() > shown) {
+                sb.append("，另 ").append(ranked.size() - shown).append(" 个");
+            }
+            if (t.dropped() > 0) {
+                sb.append("，超出上限未计 ").append(t.dropped()).append(" 次");
+            }
+            sb.append('\n');
+        }
     }
 
     private static void appendStallWatch(StringBuilder sb, Context context) {
@@ -258,7 +300,7 @@ public final class DiagnosticsCollector {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
         sb.append('\n');
-        appendCameraAvailability(sb);
+        appendCameraAvailability(sb, context);
     }
 
     /**
