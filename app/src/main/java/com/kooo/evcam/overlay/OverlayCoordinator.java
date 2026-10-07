@@ -32,9 +32,6 @@ public final class OverlayCoordinator {
     /** 后视镜要绑相机，相机这会儿还在开，等一下再拉。 */
     private static final long REAR_VIEW_DELAY_MS = 2000;
 
-    /** 悬浮窗服务起来之后才收得到状态广播。 */
-    private static final long STATE_PUSH_DELAY_MS = 500;
-
     private OverlayCoordinator() {
     }
 
@@ -51,10 +48,11 @@ public final class OverlayCoordinator {
     /**
      * 按设置把该开的悬浮窗都开起来。
      *
-     * @param afterPreviewWindowStarted 画面悬浮窗起来之后要做的事（推录制状态过去）；
-     *                                  没开这个窗时不会被调用
+     * <p>悬浮按钮的录制状态不从这里推：它显示出来时自己问 {@code RecordingCoordinator}，之后听协调器的广播。
+     * 以前这里隔 500 ms 推一次主界面记的状态 —— 主界面刚重建、还没对上录制状态时推的是「没在录」，
+     * 录着像按钮却是灰的（2.10.0 实车，2026-10-08）。</p>
      */
-    public static void restoreOnLaunch(Context context, Runnable afterPreviewWindowStarted) {
+    public static void restoreOnLaunch(Context context) {
         AppConfig config = new AppConfig(context);
         boolean allowed = canShowOverlay(context);
 
@@ -70,11 +68,6 @@ public final class OverlayCoordinator {
         if (config.isRecordingFloatingEnabled() && allowed) {
             sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
             AppLog.d(TAG, "悬浮按钮已启动");
-            main().postDelayed(() -> {
-                if (afterPreviewWindowStarted != null) {
-                    afterPreviewWindowStarted.run();
-                }
-            }, STATE_PUSH_DELAY_MS);
         }
     }
 

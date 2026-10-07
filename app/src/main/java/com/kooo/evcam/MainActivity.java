@@ -339,7 +339,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级后视镜 /
         // 录制悬浮按钮 / 补盲）。该不该开、能不能开都在协调器里判断。
-        OverlayCoordinator.restoreOnLaunch(this, this::broadcastCurrentRecordingState);
+        OverlayCoordinator.restoreOnLaunch(this);
         
         // 悬浮按钮发来的录制切换 / 拍照广播
         // 屏幕状态只听 ScreenState；整个界面生命周期都听着（熄屏时界面可能先被暂停、广播后到）
@@ -2754,20 +2754,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    /**
-     * 获取当前录制状态（供外部查询）
-     */
-    public boolean isCurrentlyRecording() {
-        return isRecording;
-    }
-
-    /**
-     * 发送当前录制状态广播（供悬浮窗服务查询）
-     */
-    public void broadcastCurrentRecordingState() {
-        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, isRecording);
-    }
-    
 
     @Override
     protected void onPause() {
@@ -3510,8 +3496,6 @@ public class MainActivity extends AppCompatActivity {
         if (!OverlayCoordinator.setRecordButtonEnabled(this, on)) {
             Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
             WakeUpHelper.requestOverlayPermission(this);
-        } else if (on) {
-            broadcastCurrentRecordingState();
         }
         syncRearViewSwitch();
     }

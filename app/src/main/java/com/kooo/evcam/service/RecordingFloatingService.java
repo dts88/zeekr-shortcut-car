@@ -548,6 +548,10 @@ public class RecordingFloatingService extends Service {
         // 添加到窗口
         try {
             windowManager.addView(floatingContainer, layoutParams);
+            // 在不在录只问协调器（和录制服务、前台通知同一个答案），之后的变化它会广播过来。
+            // 以前靠主界面隔 500 ms 推它自己记的状态：主界面刚重建、还没对上时推的是「没在录」，
+            // 录着像按钮却是灰的
+            updateRecordingState(com.kooo.evcam.recording.RecordingCoordinator.get(this).isRecording());
             applyStyle();
             AppLog.d(TAG, "录制悬浮窗创建成功");
         } catch (Exception e) {
@@ -744,7 +748,10 @@ public class RecordingFloatingService extends Service {
         }
 
         if (recording) {
-            recordingStartTime = System.currentTimeMillis();
+            // 从这一段真正开录的时刻算（中途才显示出来的按钮也对得上），用开机以来的时钟：
+            // 车机对时会把系统时钟往回拨（2026-10-08 实车拨回过 20 秒），按系统时钟算时长会变负
+            long startedAt = com.kooo.evcam.recording.RecordingCoordinator.get(this).startedAtElapsedMs();
+            recordingStartTime = startedAt > 0 ? startedAt : android.os.SystemClock.elapsedRealtime();
             startTimeUpdate();
             if (timeTextView != null) {
                 // 时长是个开关：有人只要一个按钮，不要旁边那串数字
@@ -773,7 +780,7 @@ public class RecordingFloatingService extends Service {
             @Override
             public void run() {
                 if (isRecording && timeTextView != null) {
-                    long duration = System.currentTimeMillis() - recordingStartTime;
+                    long duration = Math.max(0, android.os.SystemClock.elapsedRealtime() - recordingStartTime);
                     String timeStr = formatDuration(duration);
                     timeTextView.setText(timeStr);
                     updateRingProgress(duration);

@@ -100,7 +100,7 @@ public final class Recovery {
         StringBuilder did = new StringBuilder();
         if (OverlayCoordinator.canShowOverlay(context)) {
             // 按设置起悬浮按钮和后视镜；已经在的不会重复。后视镜自己知道屏幕黑着就不接相机
-            OverlayCoordinator.restoreOnLaunch(context, null);
+            OverlayCoordinator.restoreOnLaunch(context);
             did.append("overlays");
         }
 

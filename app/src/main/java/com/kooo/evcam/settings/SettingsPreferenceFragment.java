@@ -656,8 +656,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         pref.setSummary(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
-        final boolean recording = getActivity() instanceof MainActivity
-                && ((MainActivity) getActivity()).isCurrentlyRecording();
+        final boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
         final String noDrive = getString(R.string.set_storage_usage_no_drive);
         final String failed = getString(R.string.info_read_failed);
         new Thread(() -> {
@@ -786,12 +785,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 悬浮窗
 
     private void bindFloating() {
+        // 按钮显示出来时自己问协调器在不在录，这里不用再推状态
         bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
-                OverlayCoordinator::setRecordButtonEnabled, on -> {
-                    if (on && getActivity() instanceof MainActivity) {
-                        ((MainActivity) getActivity()).broadcastCurrentRecordingState();
-                    }
-                });
+                OverlayCoordinator::setRecordButtonEnabled, null);
 
         // 整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半
         bindSlider("pref_button_size", 48, 150,
@@ -1131,8 +1127,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return;
             }
             // 录制中不能修：正在录的那一段也没有索引，和断电留下的半截文件长得一样
-            boolean recording = getActivity() instanceof MainActivity
-                    && ((MainActivity) getActivity()).isCurrentlyRecording();
+            boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
             com.kooo.evcam.repair.Mp4RepairFlow.start(getActivity(), recording);
         });
 
@@ -1141,8 +1136,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (getActivity() == null) {
                 return;
             }
-            boolean recording = getActivity() instanceof MainActivity
-                    && ((MainActivity) getActivity()).isCurrentlyRecording();
+            boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
             com.kooo.evcam.repair.ArchiveFlow.start(getActivity(), recording);
         });
 

@@ -237,6 +237,14 @@ public final class RecordingCoordinator {
         return lifecycle.isRecording();
     }
 
+    /**
+     * 这一段录像是什么时候开的（{@code SystemClock.elapsedRealtime}）；没在录是 0。
+     * 悬浮按钮的时长从这里算：用系统时钟算的话，车机对时把钟往回拨，时长就成了负数。
+     */
+    public long startedAtElapsedMs() {
+        return isRecording() ? startedAtMs : 0;
+    }
+
     /** 正在等环视出画面、准备开录。 */
     public boolean isWaiting() {
         return pending != null;
