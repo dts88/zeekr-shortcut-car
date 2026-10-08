@@ -11,6 +11,25 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.3-beta] - 2026-10-08
+
+Upgrade from 2.1.0-beta. Same code as 2.10.3-alpha.
+
+- **Reworked how the app records, and how it takes and releases the cameras.** Starting, stopping and recovering now go through one path:
+  - If no camera starts recording, the app says so and retries, instead of showing that it is recording.
+  - Stopping, even right after starting, fully releases the cameras' recording outputs and the video encoder, so the next recording starts cleanly.
+  - Stopping now stops all cameras at once and no longer hangs on a stuck USB drive; the last frames are no longer cut off.
+  - No more short skips at high bitrate and full frame rate: writing to the USB drive has its own thread and a few seconds of buffer. If the drive can't keep up, the app says so.
+  - The floating button always shows the real recording state.
+- Photos are saved to the USB drive only, like videos.
+- Interface text reviewed and reworded in all three languages.
+
+### Notice: App Lab missing after a restart
+
+Several users have reported that App Lab disappeared after the head unit restarted and had to be reinstalled. This is quite possibly related to Zeekr Shortcut, but how is not yet known. If you run into this, or the app lags abnormally or camera images don't come up, please **export a report from Settings → System → Diagnostics before restarting the head unit**, and get in touch through a GitHub issue or other channels. I'm sorry for the trouble.
+
+近期陆续有用户反映，重启车机后 App Lab 不见了，需要重新安装。这很可能与极氪即刻（Zeekr Shortcut）有关，但具体如何产生影响，目前还不清楚。如果您遇到类似情况，或者应用异常卡顿、摄像头画面无法获取，请**在重启车机之前**，先在「设置 → 系统 → 诊断信息」中导出诊断报告，再通过 GitHub 等渠道联系作者。由此给您带来的不便，我非常抱歉。
+
 ## [2.10.3-alpha] - 2026-10-08
 
 - Fixed short skips in recordings at high bitrate and full frame rate: writing to the USB drive now happens on its own thread with a few seconds of memory buffer, so a slow moment on the drive no longer drops frames. If the drive keeps falling behind, the app says so once instead of silently dropping frames.

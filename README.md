@@ -4,6 +4,9 @@ A surround-view dash cam for the ZEEKR 7X head unit.
 
 [中文说明](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Credits](NOTICE.md) · [Platform notes](docs/zeekr-platform-notes.md)
 
+> [!IMPORTANT]
+> **App Lab missing after a restart.** Several users have reported that App Lab disappeared after the head unit restarted and had to be reinstalled. This is quite possibly related to Zeekr Shortcut, but how is not yet known. If you run into this, or the app lags abnormally or camera images don't come up, please **export a report from Settings → System → Diagnostics before restarting the head unit**, and get in touch through a [GitHub issue](https://github.com/dts88/zeekr-shortcut-car/issues) or other channels. I'm sorry for the trouble.
+
 > [!WARNING]
 > Experimental, unofficial software. Not affiliated with, approved by, or endorsed by ZEEKR,
 > and not certified for any vehicle safety function. It does **not** replace the factory dash cam,
