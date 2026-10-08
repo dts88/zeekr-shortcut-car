@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.8-alpha] - 2026-10-08
+
+- Cameras open one at a time only once the previous one is actually delivering frames, not merely configured: with three cameras the surround often configured and then never delivered a frame while the cabin cameras were started on top of it.
+- A session that never delivered a frame is no longer rebuilt first: rebuilding it always timed out and ended in a device error before the reopen that actually helps (4-13 s lost each time); the watchdog now reopens the camera directly.
+
 ## [2.10.7-alpha] - 2026-10-08
 
 - Coming back to the main screen touches the camera service less: the preview is registered only once its views exist, so each camera\'s first session already carries the preview instead of being built twice (the surround\'s second build stalled 12 s on 2026-10-08).
