@@ -83,6 +83,14 @@ public class MultiCameraManager {
     private String closeWhy;
     private final Runnable openStepTimeout = this::openStepTimedOut;
     private final Runnable closeStepTimeout = this::closeStepTimedOut;
+    /**
+     * 次序队列自己的 Handler（同一个主线程 Looper）。不用 mainHandler：release() 开头会
+     * removeCallbacksAndMessages(null)，而退出时 release() 会被调三次 —— 第二次把「上一路关完、
+     * 关下一路」的续命清掉了，后两路没关进程就退了（2026-10-08 23:18，退出等满 20 秒）。
+     */
+    private final android.os.Handler rollCall = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final List<String> openTrail = new ArrayList<>();
+    private final List<String> closeTrail = new ArrayList<>();
     /** 有没有哪份管理器正在按次序关相机。退出时等它排完队（MainActivity.finishExit）。 */
     private static volatile boolean closingInOrder;
     private Runnable sessionTimeoutRunnable = null;
@@ -1128,6 +1136,7 @@ public class MultiCameraManager {
     private static final class Step {
         final String key;
         final SingleCamera camera;
+        long startedAt;
 
         Step(String key, SingleCamera camera) {
             this.key = key;
@@ -1135,15 +1144,50 @@ public class MultiCameraManager {
         }
     }
 
+    /** 黑匣子里的叫法：环视 / 后座舱 / 前座舱；别的 key 原样。 */
+    private static String roleName(String key) {
+        if (CameraSlots.KEY_SURROUND.equals(key)) {
+            return "环视";
+        }
+        if (CameraSlots.KEY_CABIN_REAR.equals(key)) {
+            return "后座舱";
+        }
+        if (CameraSlots.KEY_CABIN_FRONT.equals(key)) {
+            return "前座舱";
+        }
+        return key;
+    }
+
+    /** 一步走完，记到这一轮的轨迹里；整轮走完黑匣子记一行「环视 1.1s → 后座舱 0.2s → 前座舱 0.3s」。 */
+    private static void noteStep(List<String> trail, Step step) {
+        if (step != null) {
+            trail.add(roleName(step.key) + " "
+                    + String.format(java.util.Locale.US, "%.1fs",
+                    (android.os.SystemClock.uptimeMillis() - step.startedAt) / 1000f));
+        }
+    }
+
+    private static void noteTrail(String what, List<String> trail) {
+        if (!trail.isEmpty()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(what + "：" + String.join(" → ", trail));
+            trail.clear();
+        }
+    }
+
     /**
      * 打开所有摄像头 —— 按次序，一路配好会话再开下一路（项目所有者 2026-10-08 定）：
      * 环视先开，再后座舱，最后前座舱。三路一起开时相机服务一次关要 2–20 秒、配会话超时；
      * 只开环视几百毫秒就好。已经在按次序开的话，这一次只把还没开的排进队。
+     * 正在按次序关的话，排着还没关的不关了（人回来了）；正在关的那一路关完再开。
      */
     public void openAllCameras() {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
-            mainHandler.post(this::openAllCameras);
+            rollCall.post(this::openAllCameras);
             return;
+        }
+        if (!closeQueue.isEmpty()) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("又要相机了：排着还没关的 " + closeQueue.size() + " 路不关了");
+            closeQueue.clear();
         }
         activeCameraKeys.clear();
         Set<String> openedIds = new HashSet<>();
@@ -1184,18 +1228,21 @@ public class MultiCameraManager {
 
     /** 开下一路：已经开着、会话也在的跳过；其余的开一路，等它配好或报错（最多 OPEN_STEP_MAX_MS）。 */
     private void openNext() {
-        mainHandler.removeCallbacks(openStepTimeout);
+        rollCall.removeCallbacks(openStepTimeout);
+        noteStep(openTrail, openingStep);
         openingStep = null;
         while (!openQueue.isEmpty()) {
             Step step = openQueue.poll();
             if (step.camera.isSessionReady()) {
                 continue;
             }
+            step.startedAt = android.os.SystemClock.uptimeMillis();
             openingStep = step;
             step.camera.openCamera();   // 已经在开、在重连的它自己会跳过；我们照样等它的「配好 / 报错」
-            mainHandler.postDelayed(openStepTimeout, OPEN_STEP_MAX_MS);
+            rollCall.postDelayed(openStepTimeout, OPEN_STEP_MAX_MS);
             return;
         }
+        noteTrail("按次序开相机", openTrail);
     }
 
     private void openStepTimedOut() {
@@ -1203,14 +1250,14 @@ public class MultiCameraManager {
         if (step == null) {
             return;
         }
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("按次序开相机：" + step.key + "(" + step.camera.getCameraId()
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("按次序开相机：" + roleName(step.key) + "(" + step.camera.getCameraId()
                 + ") 等了 " + (OPEN_STEP_MAX_MS / 1000) + " 秒还没配好会话，先开下一路");
         openNext();
     }
 
     /** 配好了、或者报错了：是正在等的那一路就开下一路。回调来自相机线程，挪到主线程。 */
     private void onCameraSettled(String cameraId) {
-        mainHandler.post(() -> {
+        rollCall.post(() -> {
             Step step = openingStep;
             if (step != null && step.camera.getCameraId().equals(cameraId)) {
                 openNext();
@@ -1219,9 +1266,10 @@ public class MultiCameraManager {
     }
 
     private void cancelOpenInOrder() {
-        mainHandler.removeCallbacks(openStepTimeout);
+        rollCall.removeCallbacks(openStepTimeout);
         openQueue.clear();
         openingStep = null;
+        openTrail.clear();
     }
 
     /** 按次序开相机走完了没有。开录前要等它：没开完就开录，晚开的那一路这一段就录不上。 */
@@ -1252,7 +1300,7 @@ public class MultiCameraManager {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
             // 退出那条路会看这个标志等我们：先立起来，再挪到主线程
             closingInOrder = true;
-            mainHandler.post(() -> closeAllCameras(why));
+            rollCall.post(() -> closeAllCameras(why));
             return;
         }
         cancelOpenInOrder();
@@ -1280,7 +1328,8 @@ public class MultiCameraManager {
 
     /** 关下一路：没开着的只清标志、不进相机服务、不用等；开着的关一路，等它关完（最多 CLOSE_STEP_MAX_MS）。 */
     private void closeNext() {
-        mainHandler.removeCallbacks(closeStepTimeout);
+        rollCall.removeCallbacks(closeStepTimeout);
+        noteStep(closeTrail, closingStep);
         closingStep = null;
         while (!closeQueue.isEmpty()) {
             Step step = closeQueue.poll();
@@ -1288,12 +1337,14 @@ public class MultiCameraManager {
                 step.camera.closeCamera(closeWhy);
                 continue;
             }
+            step.startedAt = android.os.SystemClock.uptimeMillis();
             closingStep = step;
             step.camera.closeCamera(closeWhy);
-            mainHandler.postDelayed(closeStepTimeout, CLOSE_STEP_MAX_MS);
+            rollCall.postDelayed(closeStepTimeout, CLOSE_STEP_MAX_MS);
             return;
         }
         closingInOrder = false;
+        noteTrail("按次序关相机", closeTrail);
         AppLog.d(TAG, "All cameras asked to close");
     }
 
@@ -1302,14 +1353,14 @@ public class MultiCameraManager {
         if (step == null) {
             return;
         }
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("按次序关相机：" + step.key + "(" + step.camera.getCameraId()
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("按次序关相机：" + roleName(step.key) + "(" + step.camera.getCameraId()
                 + ") 等了 " + (CLOSE_STEP_MAX_MS / 1000) + " 秒还没关完，先关下一路");
         closeNext();
     }
 
     /** 关完了：是正在等的那一路就关下一路。回调可能来自相机线程，也可能就在 closeCamera 里同步来，一律挪到主线程。 */
     private void onCameraClosedInOrder(String cameraId) {
-        mainHandler.post(() -> {
+        rollCall.post(() -> {
             Step step = closingStep;
             if (step != null && step.camera.getCameraId().equals(cameraId)) {
                 closeNext();

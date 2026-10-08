@@ -32,6 +32,10 @@ public final class UserExit {
 
     private static final String PREFS = "user_exit";
     private static final String KEY_EXITED_AT = "exited_at";
+    /** 退出那一刻车机的开机时刻（墙钟减去开机以来的毫秒数）：下次进程起来，开机时刻变了才算真正开机过。 */
+    private static final String KEY_EXITED_BOOT_AT = "exited_boot_at";
+    /** 车机时钟会跳二十来秒（平台笔记），开机时刻差这么多以内算同一次开机。 */
+    private static final long SAME_BOOT_TOLERANCE_MS = 60_000L;
 
     private UserExit() {
     }
@@ -40,7 +44,8 @@ public final class UserExit {
      * 用户点了退出。同步落盘 —— 后面紧跟着 {@code System.exit}，异步写会丢。
      */
     public static void markExited(Context context) {
-        prefs(context).edit().putLong(KEY_EXITED_AT, System.currentTimeMillis()).commit();
+        prefs(context).edit().putLong(KEY_EXITED_AT, System.currentTimeMillis())
+                .putLong(KEY_EXITED_BOOT_AT, bootAt()).commit();
         KeepAliveManager.stopKeepAliveWork(context);
         BlackBox.noteImportant("用户退出：暂停自启动，已取消保活任务，直到真正开机或手动打开");
     }
@@ -71,13 +76,24 @@ public final class UserExit {
         if (!isExited(context)) {
             return false;
         }
-        // 开机广播这个容器不送（平台笔记 §3.6），「真正开机」靠黑匣子的重启检测：
-        // 进程起来时发现车机重启过，退出标记就作废（规格 1.4）
-        if (BlackBox.rebootedSinceLastRun()) {
+        // 开机广播这个容器不送（平台笔记 §3.6），「真正开机」看退出那一刻和现在的开机时刻是不是同一次：
+        // 退出之后车机重启过，退出标记就作废（规格 1.4）。以前看的是黑匣子的「上次运行后重启过」——
+        // 那是进程级的，车机重启后开的那个进程里，退出 6 秒就被它当成「又开机了」拉回来（2026-10-08 23:18）
+        if (rebootedSinceExit(context)) {
             clear(context, "reboot (" + who + ")");
             return false;
         }
         return true;
+    }
+
+    /** 退出之后车机有没有真正重启过：开机时刻变了。老记录里没有开机时刻的按重启过算（和以前一样）。 */
+    private static boolean rebootedSinceExit(Context context) {
+        long exitedBootAt = prefs(context).getLong(KEY_EXITED_BOOT_AT, 0L);
+        return exitedBootAt == 0L || Math.abs(bootAt() - exitedBootAt) > SAME_BOOT_TOLERANCE_MS;
+    }
+
+    private static long bootAt() {
+        return System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime();
     }
 
     private static SharedPreferences prefs(Context context) {
