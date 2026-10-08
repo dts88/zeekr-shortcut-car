@@ -5,7 +5,7 @@
     -->
     <string name="app_name">极氪即刻</string>
     <string name="app_name_full">极氪即刻（车机版）</string>
-    <string name="accessibility_service_description">用于「保持后台运行」，帮助应用在后台持续运行。\n\n本服务不读取、不操作任何界面内容，也不收集任何信息。</string>
+    <string name="accessibility_service_description">用于「开机自启动」，帮助应用在后台持续运行。\n\n本服务不读取、不操作任何界面内容，也不收集任何信息。</string>
 
     <!-- 极氪合成流模式 -->
     <string name="zeekr_lane_front">前</string>
@@ -100,7 +100,7 @@
     <string name="set_reset_floating_title">重置悬浮按钮</string>
     <string name="set_reset_floating_summary">恢复默认位置、按钮大小和时长文字大小</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">车机重启或应用被系统关闭后，恢复已开启的超级后视镜、悬浮按钮和自动录制。需配合「保持后台运行」使用。</string>
+    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级后视镜、悬浮按钮和自动录制。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
@@ -114,8 +114,6 @@
     <string name="sentry_status_off">哨兵模式：未开启</string>
     <string name="sentry_status_reading">哨兵模式：读取中…</string>
     <string name="sentry_status_unknown">哨兵模式：无法读取</string>
-    <string name="set_keep_alive_title">保持后台运行</string>
-    <string name="set_keep_alive_summary">保持应用在后台运行，应用被关闭或车机重启后自动重新启动。关闭后不再自动启动。</string>
     <string name="set_recording_mode_title">录制模式</string>
     <string name="set_recording_mode_summary">%1$s；录制固定使用 MediaCodec，此项不生效</string>
     <string name="set_force_h264_title">强制 H.264</string>
@@ -844,7 +842,7 @@
     <string name="dev_perm_overlay">悬浮窗权限</string>
     <string name="dev_perm_overlay_why">用于超级后视镜、悬浮按钮和画面调节窗口</string>
     <string name="dev_perm_accessibility">无障碍服务</string>
-    <string name="dev_perm_accessibility_why">用于保持后台运行</string>
+    <string name="dev_perm_accessibility_why">用于开机自启动</string>
     <string name="dev_perm_usage_access">使用情况访问</string>
     <string name="dev_perm_usage_access_why">用于记录可能占用摄像头的应用</string>
     <string name="dev_perm_battery">忽略电池优化</string>

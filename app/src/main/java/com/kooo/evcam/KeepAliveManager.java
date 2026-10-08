@@ -20,7 +20,7 @@ public class KeepAliveManager {
      * 每15分钟执行一次（Android WorkManager 最小间隔）
      */
     public static void startKeepAliveWork(Context context) {
-        if (!new AppConfig(context).isKeepAliveEnabled()) {
+        if (!new AppConfig(context).isAutoStartOnBoot()) {
             // 保活关着：不登记，已经登记的也取消（规格 §3：关 = 被杀了不回来）
             stopKeepAliveWork(context);
             return;

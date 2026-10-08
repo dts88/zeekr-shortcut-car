@@ -73,7 +73,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         }
         // 亮屏把因熄屏退下去的主界面接回来，是「回到用户设定的状态」（规格 §0），不归保活管：
         // 那是 ScreenState → Recovery.bringBackUiAfterScreenOn 的事，这里只把亮屏当保活的触发
-        if (!new AppConfig(context).isKeepAliveEnabled()) {
+        if (!new AppConfig(context).isAutoStartOnBoot()) {
             // 保活关着（规格 §3）：不拉
             return;
         }

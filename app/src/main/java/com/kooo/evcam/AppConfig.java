@@ -23,14 +23,16 @@ public class AppConfig {
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_SCREEN_OFF_WAKE_MINUTES = "screen_off_wake_min";  // 熄屏录制：最多不让车机睡多久（分钟）
-    private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
+    // 开机自启动（2.10.4 起含保活）。键名沿用合并前「保持后台运行」的，老用户的选择才接得上
+    private static final String KEY_AUTO_START_ON_BOOT = "keep_alive_enabled";
+    // 合并前「开机自启动」自己的键：只在合并时读一次，读完删掉
+    private static final String KEY_AUTO_START_ON_BOOT_LEGACY = "auto_start_on_boot";
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
     private static final String KEY_SCREEN_OFF_KEEP_RECORDING = "screen_off_keep_recording";  // 熄屏持续录制
     private static final String KEY_FOOTAGE_LOCK = "footage_lock";  // 锁定影像
     private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 闪远光时自动锁定当前录像
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
-    private static final String KEY_KEEP_ALIVE_ENABLED = "keep_alive_enabled";  // 保活服务
     
     // 存储位置配置
     private static final String KEY_STORAGE_LOCATION = "storage_location";  // 存储位置
@@ -209,21 +211,15 @@ public class AppConfig {
     }
 
 
-    // ==================== 开机自启动相关方法 ====================
-    
-    /**
-     * 设置开机自启动
-     * @param enabled true 表示启用开机自启动
-     */
+    // ==================== 开机自启动 ====================
+
     public void setAutoStartOnBoot(boolean enabled) {
-        prefs.edit().putBoolean(KEY_AUTO_START_ON_BOOT, enabled).apply();
-        AppLog.d(TAG, "开机自启动设置: " + (enabled ? "启用" : "禁用"));
+        // 用户亲手设过，合并前的旧键就没有再合并的必要
+        prefs.edit().putBoolean(KEY_AUTO_START_ON_BOOT, enabled)
+                .remove(KEY_AUTO_START_ON_BOOT_LEGACY).apply();
+        AppLog.d(TAG, "开机自启动: " + (enabled ? "开" : "关"));
     }
-    
-    /**
-     * 获取开机自启动设置
-     * @return true 表示启用开机自启动
-     */
+
     /** 熄屏录制默认最多不让车机睡 1 小时（项目所有者 2026-09-27 定）。 */
     public static final int DEFAULT_SCREEN_OFF_WAKE_MINUTES = 60;
 
@@ -242,10 +238,30 @@ public class AppConfig {
         prefs.edit().putInt(KEY_SCREEN_OFF_WAKE_MINUTES, Math.max(1, minutes)).apply();
     }
 
+    /**
+     * 开机自启动（规格 §1、§3）：App 不在了要不要自己回来。一个开关管两件事 ——
+     * 保活（WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
+     * 系统对 START_STICKY 服务的重启）让进程尽量活着、被杀了拉回来；回来之后 {@code Recovery}
+     * 按设置恢复悬浮按钮、超级后视镜和自动录制。关 = 被杀了不回来、也不恢复。默认开。
+     */
     public boolean isAutoStartOnBoot() {
-        // 默认启用开机自启动（车机系统场景）
-        // 默认关：开机就自己起来是件挺重的事，该由用户明确开启
-        return prefs.getBoolean(KEY_AUTO_START_ON_BOOT, false);
+        mergeAutoStartSwitches();
+        return prefs.getBoolean(KEY_AUTO_START_ON_BOOT, true);
+    }
+
+    /**
+     * 2.10.4 之前「开机自启动」和「保持后台运行」是两个开关，任一开着，合并后的就开（项目所有者 2026-10-08 定）。
+     * 旧「开机自启动」键还在就说明没合并过：算一次、写入、删旧键，之后用户再关不会被旧值翻回来。
+     */
+    private void mergeAutoStartSwitches() {
+        if (!prefs.contains(KEY_AUTO_START_ON_BOOT_LEGACY)) {
+            return;
+        }
+        boolean on = prefs.getBoolean(KEY_AUTO_START_ON_BOOT, true)
+                || prefs.getBoolean(KEY_AUTO_START_ON_BOOT_LEGACY, false);
+        prefs.edit().putBoolean(KEY_AUTO_START_ON_BOOT, on)
+                .remove(KEY_AUTO_START_ON_BOOT_LEGACY).apply();
+        AppLog.i(TAG, "开机自启动：「保持后台运行」并入，合并结果 " + (on ? "开" : "关"));
     }
     
     /**
@@ -359,22 +375,7 @@ public class AppConfig {
         // 默认关。归开发者选项管：关着时按关算，存着的值不动（DEVELOPER_KEYS）
         return readBoolean(KEY_SCREEN_OFF_RECORDING, false);
     }
-    
-    public void setKeepAliveEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_KEEP_ALIVE_ENABLED, enabled).apply();
-        AppLog.d(TAG, "保活: " + (enabled ? "开" : "关"));
-    }
 
-    /**
-     * 保活（规格 §3）：不正常的状态下用各种手段让进程尽量活着。App 里所有保活手段都归它管 ——
-     * WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
-     * 系统对 START_STICKY 服务的重启。关 = 被杀了不回来。默认开。
-     */
-    public boolean isKeepAliveEnabled() {
-        return prefs.getBoolean(KEY_KEEP_ALIVE_ENABLED, true);
-    }
-    
-    
     /**
      * 设置录制模式
      * @param mode 录制模式（auto/media_recorder/codec）

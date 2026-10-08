@@ -307,7 +307,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        // 定时保活任务：只在「保持后台运行」开关打开时登记，关着就取消（见 KeepAliveManager）
+        // 定时保活任务：只在「开机自启动」开关打开时登记，关着就取消（见 KeepAliveManager）
         KeepAliveManager.startKeepAliveWork(this);
         AppLog.d(TAG, "定时保活任务已启动");
         

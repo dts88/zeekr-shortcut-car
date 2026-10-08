@@ -82,7 +82,7 @@
     <string name="set_reset_floating_title">Set semula butang terapung</string>
     <string name="set_reset_floating_summary">Memulihkan kedudukan, saiz butang dan saiz teks masa kepada lalai</string>
     <string name="set_auto_start_title">Mula semasa but</string>
-    <string name="set_auto_start_summary">Selepas unit kepala dimulakan semula atau sistem menutup apl, memulihkan Cermin super, butang terapung dan rakaman automatik jika dihidupkan. Berfungsi bersama Kekal berjalan di latar belakang.</string>
+    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan Cermin super, butang terapung dan rakaman automatik jika dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka, dan menyambung rakaman yang berhenti kerana skrin padam apabila skrin hidup semula; rakaman yang anda hentikan tidak dimulakan semula</string>
     <string name="set_screen_off_title">Rakaman skrin padam (kekal berjaga)</string>
@@ -96,8 +96,6 @@
     <string name="sentry_status_off">Mod Sentry: mati</string>
     <string name="sentry_status_reading">Mod Sentry: membaca…</string>
     <string name="sentry_status_unknown">Mod Sentry: tidak tersedia</string>
-    <string name="set_keep_alive_title">Kekal berjalan di latar belakang</string>
-    <string name="set_keep_alive_summary">Memastikan apl terus berjalan di latar belakang dan memulakannya semula selepas ia ditutup atau unit kepala dimulakan semula. Jika dimatikan, apl tidak dimulakan semula.</string>
     <string name="set_recording_mode_title">Saluran rakaman</string>
     <string name="set_recording_mode_summary">%1$s; rakaman sentiasa menggunakan MediaCodec, tetapan ini tiada kesan</string>
     <string name="set_force_h264_title">Paksa H.264</string>
@@ -297,7 +295,7 @@
 
     <!-- Antara muka utama -->
     <string name="about_title">Perihal &amp; penghargaan</string>
-    <string name="accessibility_service_description">Digunakan oleh Kekal berjalan di latar belakang untuk membantu apl terus berjalan.\n\nIa tidak membaca atau mengawal apa-apa pada skrin dan tidak mengumpul data.</string>
+    <string name="accessibility_service_description">Digunakan oleh Mula semasa but untuk membantu apl terus berjalan.\n\nIa tidak membaca atau mengawal apa-apa pada skrin dan tidak mengumpul data.</string>
     <string name="zeekr_composite_not_found">Tiada strim komposit sekeliling ditemui. Unit kepala ini mungkin tidak disokong.</string>
     <string name="msg_no_camera_available">Tiada kamera tersedia</string>
     <string name="zeekr_lane_front">Depan</string>
@@ -834,7 +832,7 @@
     <string name="dev_perm_overlay">Paparan di atas apl lain</string>
     <string name="dev_perm_overlay_why">Digunakan oleh Cermin super, butang terapung dan tetingkap pelarasan imej</string>
     <string name="dev_perm_accessibility">Perkhidmatan kebolehcapaian</string>
-    <string name="dev_perm_accessibility_why">Digunakan oleh Kekal berjalan di latar belakang</string>
+    <string name="dev_perm_accessibility_why">Digunakan oleh Mula semasa but</string>
     <string name="dev_perm_usage_access">Akses penggunaan</string>
     <string name="dev_perm_usage_access_why">Digunakan untuk merekod apl yang mungkin menggunakan kamera</string>
     <string name="dev_perm_battery">Abaikan pengoptimuman bateri</string>

@@ -41,7 +41,7 @@ public class BootReceiver extends BroadcastReceiver {
             UserExit.clear(context, "boot");
             
             // 保活开着才起前台服务（规格 §3）
-            if (new AppConfig(context).isKeepAliveEnabled()) {
+            if (new AppConfig(context).isAutoStartOnBoot()) {
                 startForegroundServiceImmediately(context);
             }
                         
@@ -86,7 +86,7 @@ public class BootReceiver extends BroadcastReceiver {
         AppLog.d(TAG, "执行延迟初始化...");
         
         try {
-            if (new AppConfig(context).isKeepAliveEnabled()) {
+            if (new AppConfig(context).isAutoStartOnBoot()) {
                 KeepAliveReceiver.registerTimeTick(context);
             }
         } catch (Exception e) {

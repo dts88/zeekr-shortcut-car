@@ -39,7 +39,7 @@ public class KeepAliveProvider extends ContentProvider {
             // 进程是被别的东西拉起来的（多半是系统），用户已经退出：不启动前台服务、不注册 TIME_TICK
             return true;
         }
-        if (!new AppConfig(context).isKeepAliveEnabled()) {
+        if (!new AppConfig(context).isAutoStartOnBoot()) {
             // 保活关着（规格 §3）：被拉起来也不起前台服务，让系统把空进程收掉
             return true;
         }

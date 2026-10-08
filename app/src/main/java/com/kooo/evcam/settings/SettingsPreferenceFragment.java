@@ -999,7 +999,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 系统：诊断信息、系统信息、开机自启、保活、熄屏持续录制。
+     * 系统：诊断信息、系统信息、开机自启动（含保活）、熄屏持续录制。
      * 开发者的「熄屏录制（阻止休眠）」不在这里，在开发者选项分区（{@link #bindAdvanced}）。
      */
     private void bindSystem() {
@@ -1010,12 +1010,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
 
+        // 开机自启动接手全部保活手段（规格 §3）：关了就把定时任务也取消，别等它下次到点再自己退出
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
-                value -> appConfig.setAutoStartOnBoot(value));
-        // 保活开关接手全部保活手段（规格 §3）：关了就把定时任务也取消，别等它下次到点再自己退出
-        bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> {
-                    appConfig.setKeepAliveEnabled(value);
+                    appConfig.setAutoStartOnBoot(value);
                     if (value) {
                         com.kooo.evcam.KeepAliveManager.startKeepAliveWork(requireContext());
                     } else {

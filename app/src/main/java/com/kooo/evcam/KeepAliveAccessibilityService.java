@@ -36,7 +36,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         // 是它把进程拉起来的话，「拉起者」那一行会写它
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Accessibility");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("无障碍服务已创建：系统让它跑了");
-        if (!new AppConfig(this).isKeepAliveEnabled()) {
+        if (!new AppConfig(this).isAutoStartOnBoot()) {
             AppLog.d(TAG, "保活关着，无障碍服务不做事");
             return;
         }
@@ -127,7 +127,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
      * 辅助服务拉起前台服务，形成双重保活
      */
     private void ensureForegroundServiceRunning() {
-        if (!new AppConfig(this).isKeepAliveEnabled() || CameraForegroundService.isRunning()) {
+        if (!new AppConfig(this).isAutoStartOnBoot() || CameraForegroundService.isRunning()) {
             return;
         }
         try {
@@ -162,7 +162,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         super.onServiceConnected();
         AppLog.d(TAG, "无障碍服务已连接到系统");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("无障碍服务已连接到系统");
-        if (!new AppConfig(this).isKeepAliveEnabled()) {
+        if (!new AppConfig(this).isAutoStartOnBoot()) {
             return;
         }
 

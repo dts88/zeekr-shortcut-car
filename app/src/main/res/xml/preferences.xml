@@ -321,14 +321,9 @@
         <!-- 这个分区只回答两个问题（规格 §0）：App 不在了要不要自己回来；熄屏算不算出状况 -->
         <SwitchPreferenceCompat
             android:key="pref_auto_start"
+            android:defaultValue="true"
             android:title="@string/set_auto_start_title"
             android:summary="@string/set_auto_start_summary" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_keep_alive"
-            android:defaultValue="true"
-            android:title="@string/set_keep_alive_title"
-            android:summary="@string/set_keep_alive_summary" />
 
         <SwitchPreferenceCompat
             android:key="pref_screen_off_keep_recording"

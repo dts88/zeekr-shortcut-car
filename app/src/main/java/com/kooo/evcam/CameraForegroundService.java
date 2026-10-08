@@ -90,7 +90,7 @@ public class CameraForegroundService extends Service {
 
     /** 被系统杀了要不要重启：保活开着才要（规格 §3：关 = 被杀了不回来）。几个服务共用这一条。 */
     public static int stickiness(Context context) {
-        return new AppConfig(context).isKeepAliveEnabled() ? START_STICKY : START_NOT_STICKY;
+        return new AppConfig(context).isAutoStartOnBoot() ? START_STICKY : START_NOT_STICKY;
     }
     
     /**
@@ -100,7 +100,7 @@ public class CameraForegroundService extends Service {
 
     /** 保活开着就注册 TIME_TICK 广播（每分钟触发，前台服务不在就拉起来）；无障碍服务在跑的话它自己有心跳。 */
     private void registerTimeTickIfNeeded() {
-        if (new AppConfig(this).isKeepAliveEnabled() && !KeepAliveAccessibilityService.isRunning()
+        if (new AppConfig(this).isAutoStartOnBoot() && !KeepAliveAccessibilityService.isRunning()
                 && !KeepAliveReceiver.isTimeTickRegistered()) {
             KeepAliveReceiver.registerTimeTick(this);
         }
@@ -228,7 +228,7 @@ public class CameraForegroundService extends Service {
 
         // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §3）；
         // 用户主动退出时不做 —— 这正是以前「退不掉」的一条路
-        if (!UserExit.isExited(this) && new AppConfig(this).isKeepAliveEnabled()) {
+        if (!UserExit.isExited(this) && new AppConfig(this).isAutoStartOnBoot()) {
             scheduleServiceRestart();
         }
 
@@ -242,7 +242,7 @@ public class CameraForegroundService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         AppLog.d(TAG, "onTaskRemoved - 应用被从最近任务清除");
-        if (!UserExit.isExited(this) && new AppConfig(this).isKeepAliveEnabled()) {
+        if (!UserExit.isExited(this) && new AppConfig(this).isAutoStartOnBoot()) {
             scheduleServiceRestart();
         }
         super.onTaskRemoved(rootIntent);
@@ -374,13 +374,13 @@ public class CameraForegroundService extends Service {
     /**
      * 录像停了（RecordingCoordinator 调）、或主界面收尾 / 退出要停服务。
      *
-     * <p>前台服务的寿命 = 「保持后台运行」开着 或 在录（规格 §3）。保活开着时它本来就该一直在：
+     * <p>前台服务的寿命 = 「开机自启动」开着 或 在录（规格 §3）。保活开着时它本来就该一直在：
      * 这里只把通知换回「在后台运行」，不停。保活关着、或用户退出了，才真的停。
      * 以前一律 stopService，保活开着时它 onDestroy 里一秒后又把自己拉起来 ——
      * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
      */
     public static void stop(Context context) {
-        if (!UserExit.isExited(context) && new AppConfig(context).isKeepAliveEnabled()) {
+        if (!UserExit.isExited(context) && new AppConfig(context).isAutoStartOnBoot()) {
             if (isForegroundReady) {
                 start(context, context.getString(R.string.notif_background_title),
                         context.getString(R.string.notif_tap_to_return));

@@ -141,7 +141,7 @@
 
 | 改写前 | 改写后 |
 |---|---|
-| 保活 / 被杀了、车机重启了，尽量把自己拉回来。关掉就不回来了 | 保持后台运行 / 保持应用在后台运行，应用被关闭或车机重启后自动重新启动。关闭后不再自动启动。 |
+| 保活 / 被杀了、车机重启了，尽量把自己拉回来。关掉就不回来了 | 开机自启动 / 保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级后视镜、悬浮按钮和自动录制。关闭后不再自动启动。 |
 | 熄屏录制 / 熄屏时在录像，就接着录，并且不让车机睡，最长按下面设的时长 | 熄屏录制（阻止休眠） / 熄屏时若正在录制，继续录制并阻止车机休眠，最长为下方设定的时长 |
 | 熄屏后不让车机睡，最多（小时） | 阻止休眠时长上限（小时） |
 | 录像被打断：%1$s。等环视画面恢复后自动继续 | 录制中断：%1$s。环视画面正常后自动恢复录制。 |
@@ -204,7 +204,7 @@
 | 手势 | 点击、长按、拖动、滑动（上下滑动 / 左右滑动） | tap、long press、drag、swipe | ketik、tekan lama、seret、leret | 不用「点一下」「划」「单击」 |
 | 诊断信息 / 诊断报告 | 诊断信息（设置项与页面）；诊断报告（导出的文件） | Diagnostics；Diagnostics report | Maklumat diagnostik；Laporan diagnostik | — |
 | 引用写法 | 「设置 → 系统 → 诊断信息」 | Settings → System → Diagnostics | Tetapan → Sistem → Maklumat diagnostik | 见 §5 |
-| 保持后台运行 | 保持后台运行 | Keep running in background | Kekal berjalan di latar belakang | 不用「保活」 |
+| 开机自启动 | 开机自启动（2.10.4 起含保活，不再有「保持后台运行」） | Start on boot | Mula semasa but | 不用「保活」 |
 | 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | 不用「角标」；英文不用 overlay、badge |
 | 试验性 | 功能名后缀「（试验性）」 | (experimental) | (percubaan) | 不用「实验性」「试验功能」 |
 | 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级后视镜）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | 英文引用按钮时写 Straighten |
