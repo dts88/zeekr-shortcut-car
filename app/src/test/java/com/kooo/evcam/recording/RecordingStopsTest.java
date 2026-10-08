@@ -25,6 +25,15 @@ public class RecordingStopsTest {
                 RecordingStops.resumesOnSurround(RecordingStops.Reason.START_FAILED));
     }
 
+    /** 相机被别的程序拿走不花额度；没人占着却被断开（自己顶自己）要花，否则无限循环（2026-10-08）。 */
+    @Test
+    public void onlyACameraTakenByAnotherAppIsFreeToResume() {
+        assertFalse(RecordingStops.countsTowardBudget(RecordingStops.Reason.CAMERA_LOST, true));
+        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.CAMERA_LOST, false));
+        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.NO_DATA, true));
+        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.START_FAILED, false));
+    }
+
     @Test
     public void aStopByThePersonIsNeverUndone() {
         assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.USER));

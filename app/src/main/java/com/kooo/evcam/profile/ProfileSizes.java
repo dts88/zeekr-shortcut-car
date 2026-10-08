@@ -117,10 +117,22 @@ public final class ProfileSizes {
             return null;
         }
         try {
-            CameraManager manager =
-                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-            StreamConfigurationMap map = manager.getCameraCharacteristics(cameraId)
-                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            CameraCharacteristics characteristics =
+                    com.kooo.evcam.camera.CameraCapabilities.characteristics(cameraId);
+            if (characteristics == null) {
+                if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                    // 主线程不进相机服务：它忙的时候这一问要等几秒到十几秒，2026-10-08 开录时
+                    // 就在这里卡成了 ANR。相机打开过就有缓存；没开过说明还不到要这个尺寸的时候
+                    AppLog.w(TAG, role + " 的相机参数还没缓存，不在主线程上问相机服务");
+                    return null;
+                }
+                CameraManager manager =
+                        (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+                characteristics = manager.getCameraCharacteristics(cameraId);
+                com.kooo.evcam.camera.CameraCapabilities.record(cameraId, characteristics);
+            }
+            StreamConfigurationMap map =
+                    characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             if (map == null) {
                 return null;
             }

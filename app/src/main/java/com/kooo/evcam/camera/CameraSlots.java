@@ -103,6 +103,37 @@ public final class CameraSlots {
         return suffixFor(keyForSuffix(suffix));
     }
 
+    /** 开相机的次序（项目所有者 2026-10-08 定）：环视先开，再后座舱，最后前座舱。 */
+    private static final String[] OPEN_ORDER = {KEY_SURROUND, KEY_CABIN_REAR, KEY_CABIN_FRONT};
+
+    /**
+     * 按开的次序排这些 key：环视、后座舱、前座舱；认不出来的排在最后，保持原来的先后。
+     *
+     * <p>三路一起开时相机服务一次关要 2–20 秒、配会话超时；只开环视几百毫秒就好
+     * （2026-10-08 实测）。所以一路配好会话再开下一路，环视最要紧，先开。</p>
+     */
+    public static java.util.List<String> openOrder(java.util.Collection<String> keys) {
+        java.util.List<String> order = new java.util.ArrayList<>();
+        for (String key : OPEN_ORDER) {
+            if (keys.contains(key)) {
+                order.add(key);
+            }
+        }
+        for (String key : keys) {
+            if (!order.contains(key)) {
+                order.add(key);
+            }
+        }
+        return order;
+    }
+
+    /** 关相机的次序：开的次序倒过来 —— 前座舱先关，再后座舱，最后环视。 */
+    public static java.util.List<String> closeOrder(java.util.Collection<String> keys) {
+        java.util.List<String> order = openOrder(keys);
+        java.util.Collections.reverse(order);
+        return order;
+    }
+
     /** 是不是改名之前那一套写法。只用来在日志和报告里说明「这是旧文件」。 */
     public static boolean isLegacySuffix(String suffix) {
         return KEY_SURROUND.equals(suffix)

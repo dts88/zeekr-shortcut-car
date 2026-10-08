@@ -2632,8 +2632,12 @@ public class MainActivity extends AppCompatActivity {
         mainCleanupDone.countDown();
     }
 
-    /** 退出最多等多久：主线程收尾、每一路相机关完。到点没好也照样结束进程。 */
-    private static final long EXIT_DEADLINE_MS = 3000L;
+    /**
+     * 退出最多等多久：主线程收尾、每一路相机按次序关完。到点没好也照样结束进程。
+     * 相机服务一次关实测 2–20 秒（2026-10-08），三路按次序关要留够；进程带着没关完的相机死掉，
+     * 相机服务里就剩一个没人收的句柄，下一个进程开相机全部超时。
+     */
+    private static final long EXIT_DEADLINE_MS = 20_000L;
 
     /**
      * 退出的最后一步，在看门的线程上跑：等主线程收尾、等相机关完，然后结束进程。
@@ -2648,8 +2652,15 @@ public class MainActivity extends AppCompatActivity {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
-        java.util.List<String> stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(left);
+        // 相机是一路一路按次序关的（MultiCameraManager.closeAllCameras）：等它排完队，再等最后那几路关完
+        java.util.List<String> stuck;
+        while (true) {
+            long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
+            stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(Math.min(Math.max(left, 0L), 200L));
+            if (left <= 0 || (!com.kooo.evcam.camera.MultiCameraManager.closingInOrder() && stuck.isEmpty())) {
+                break;
+            }
+        }
         long took = android.os.SystemClock.elapsedRealtime() - startedAt;
         if (mainDone && stuck.isEmpty()) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：收尾用了 " + took + "ms，相机都关好了");

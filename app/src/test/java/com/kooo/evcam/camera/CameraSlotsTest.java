@@ -28,6 +28,19 @@ public class CameraSlotsTest {
         assertEquals(CameraSlots.KEY_CABIN_REAR, CameraSlots.keyForSuffix(CameraSlots.CABIN_REAR));
     }
 
+    /** 开的次序：环视、后座舱、前座舱；关的次序倒过来。认不出来的 key 排在最后。 */
+    @Test
+    public void camerasOpenSurroundFirstAndCloseItLast() {
+        java.util.List<String> keys = java.util.Arrays.asList(
+                CameraSlots.KEY_CABIN_FRONT, CameraSlots.KEY_SURROUND, "custom", CameraSlots.KEY_CABIN_REAR);
+        assertEquals(java.util.Arrays.asList(CameraSlots.KEY_SURROUND, CameraSlots.KEY_CABIN_REAR,
+                CameraSlots.KEY_CABIN_FRONT, "custom"), CameraSlots.openOrder(keys));
+        assertEquals(java.util.Arrays.asList("custom", CameraSlots.KEY_CABIN_FRONT,
+                CameraSlots.KEY_CABIN_REAR, CameraSlots.KEY_SURROUND), CameraSlots.closeOrder(keys));
+        assertEquals(java.util.Collections.singletonList(CameraSlots.KEY_SURROUND),
+                CameraSlots.openOrder(java.util.Collections.singletonList(CameraSlots.KEY_SURROUND)));
+    }
+
     /** 改名之前录的文件还在 U 盘上，读的时候必须照样认得。 */
     @Test
     public void oldFilesStillResolve() {

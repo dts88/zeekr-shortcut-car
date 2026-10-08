@@ -11,6 +11,7 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.CameraNeeds;
+import com.kooo.evcam.camera.CameraTaken;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.storage.StorageState;
@@ -335,7 +336,8 @@ public final class RecordingCoordinator {
                 return;
             }
             MultiCameraManager manager = currentManager();
-            if (manager != null && manager.surroundHealthy()) {
+            // 环视出画面了，而且该开的几路都按次序开完了：没开完就开录，晚开的那一路这一段录不上
+            if (manager != null && manager.surroundHealthy() && manager.openInOrderDone()) {
                 Why why = pending;
                 boolean counts = pendingCounts;
                 long waited = (android.os.SystemClock.elapsedRealtime() - pendingSinceMs) / 1000;
@@ -669,7 +671,8 @@ public final class RecordingCoordinator {
             BlackBox.noteImportant("录像被打断（" + reason + "），不自动接回");
             return false;
         }
-        boolean counts = reason != RecordingStops.Reason.CAMERA_LOST;
+        // 相机被别的程序拿走的那种不计额度；没人占着却被断开的（自己顶自己）照计，否则无限循环（2026-10-08）
+        boolean counts = RecordingStops.countsTowardBudget(reason, CameraTaken.othersHold());
         if (counts && !budget.allows()) {
             BlackBox.noteImportant("录像被打断（" + reason + "），自动恢复已连续失败 "
                     + budget.attempts() + " 次，不再尝试");

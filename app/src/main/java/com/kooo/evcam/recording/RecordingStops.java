@@ -67,6 +67,17 @@ public final class RecordingStops {
     }
 
     /**
+     * 这次接回计不计入额度。
+     *
+     * <p>额度防的是「接回去又立刻停」的循环。相机确实被别的程序拿走的那种不计：它放开之前接不回去，
+     * 不会循环。但「被相机服务断开」还有一种是自己顶掉自己（2026-10-08：同一路相机两个打开在途），
+     * 相机马上回来、马上又被顶掉，不计额度就是无限循环 —— 所以只有别的程序真占着相机时才不计。</p>
+     */
+    public static boolean countsTowardBudget(Reason reason, boolean othersHoldCamera) {
+        return reason != Reason.CAMERA_LOST || !othersHoldCamera;
+    }
+
+    /**
      * 自动恢复的额度：连着失败这么多次就不再试。
      *
      * <h3>成功的标准是「录满一分钟」，不是「开始录了」</h3>
