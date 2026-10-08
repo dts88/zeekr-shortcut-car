@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.4-alpha] - 2026-10-08
+
+- Settings → System: Start on boot and Keep running in background are now one switch, Start on boot, on by default. It keeps the app running in the background and, after the head unit restarts or the system closes the app, restarts it and restores Super mirror, the floating button and auto-recording. On upgrade it is on if either of the two switches was on.
+
 ## [2.10.3-beta] - 2026-10-08
 
 Upgrade from 2.1.0-beta. Same code as 2.10.3-alpha.
