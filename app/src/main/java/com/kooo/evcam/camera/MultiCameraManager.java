@@ -70,8 +70,12 @@ public class MultiCameraManager {
     private android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
     // ---- 按次序开关相机（项目所有者 2026-10-08 定）：环视 → 后座舱 → 前座舱，关的时候反过来 ----
-    /** 一路开到「会话配好 / 报错」最多等多久；再久就先开下一路，别让一路坏的挡住全部。 */
-    private static final long OPEN_STEP_MAX_MS = 30_000L;
+    /** 一路开到「出画面 / 报错」最多等多久；再久就先开下一路，别让一路坏的挡住全部，它自己由看门狗救。 */
+    private static final long OPEN_STEP_MAX_MS = 15_000L;
+    /** 配好会话之后多久看一眼出没出画面。 */
+    private static final long FIRST_FRAME_POLL_MS = 250L;
+    /** 会话配好以后，这么长时间里有帧就算出画面了。 */
+    private static final long FIRST_FRAME_FRESH_MS = 1_000L;
     /** 一路关完最多等多久：相机服务一次关实测 2–20 秒（2026-10-08）。 */
     private static final long CLOSE_STEP_MAX_MS = 30_000L;
     private final java.util.ArrayDeque<Step> openQueue = new java.util.ArrayDeque<>();
@@ -321,8 +325,10 @@ public class MultiCameraManager {
             }
             CameraLiveness.Action action = CameraLiveness.step(state, watch, age, now);
             if (action == CameraLiveness.Action.RESET) {
-                if (state.attempts() == 1 && camera.isConnected()) {
-                    // 第一次先只重建会话（便宜、快）；再不行才重开相机。
+                if (state.attempts() == 1 && camera.isConnected() && camera.sessionHasStreamed()) {
+                    // 出过画面、后来停了的：第一次先只重建会话（便宜、快）；再不行才重开相机。
+                    // 配好之后一帧都没出过的不走这一步：它没有东西可排空，重建每次都 waitUntilIdle 超时、
+                    // 报设备错误、再关一次设备（2026-10-08，环视一次 4–13 秒），直接重开设备才出画面
                     // 这两级以前是 SingleCamera 自己那套 2.5 秒墙钟检测在做，现在只有这一处判
                     AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
                             + age + "ms 没有画面，先重建会话");
@@ -827,7 +833,7 @@ public class MultiCameraManager {
             @Override
             public void onCameraConfigured(String cameraId) {
                 AppLog.d(TAG, "Callback: Camera " + cameraId + " configured");
-                onCameraSettled(cameraId);
+                onCameraSettled(cameraId, true);
                 if (statusCallback != null) {
                     statusCallback.onCameraStatusUpdate(cameraId, STATUS_PREVIEW_STARTED);
                 }
@@ -905,7 +911,7 @@ public class MultiCameraManager {
             public void onCameraError(String cameraId, int errorCode) {
                 String errorMsg = getErrorMessage(errorCode);
                 AppLog.e(TAG, "Callback: Camera " + cameraId + " error: " + errorCode + " - " + errorMsg);
-                onCameraSettled(cameraId);
+                onCameraSettled(cameraId, false);
                 if (statusCallback != null) {
                     statusCallback.onCameraStatusUpdate(cameraId, STATUS_ERROR_PREFIX + errorCode);
                 }
@@ -1243,7 +1249,7 @@ public class MultiCameraManager {
         openingStep = null;
         while (!openQueue.isEmpty()) {
             Step step = openQueue.poll();
-            if (step.camera.isSessionReady()) {
+            if (step.camera.isSessionReady() && step.camera.hasFramesWithin(FIRST_FRAME_FRESH_MS)) {
                 continue;
             }
             step.startedAt = android.os.SystemClock.uptimeMillis();
@@ -1261,18 +1267,38 @@ public class MultiCameraManager {
             return;
         }
         com.kooo.evcam.blackbox.BlackBox.noteImportant("按次序开相机：" + roleName(step.key) + "(" + step.camera.getCameraId()
-                + ") 等了 " + (OPEN_STEP_MAX_MS / 1000) + " 秒还没配好会话，先开下一路");
+                + ") 等了 " + (OPEN_STEP_MAX_MS / 1000) + " 秒还没出画面，先开下一路");
         openNext();
     }
 
-    /** 配好了、或者报错了：是正在等的那一路就开下一路。回调来自相机线程，挪到主线程。 */
-    private void onCameraSettled(String cameraId) {
+    /**
+     * 配好了、或者报错了：是正在等的那一路就往下走。报错的直接开下一路；配好的还要等它真出画面 ——
+     * 三路配置下环视配好会话之后常常一帧都不出（2026-10-08），「配好」不等于「在出画面」，
+     * 这时就开下一路等于三路一起起管线。回调来自相机线程，挪到主线程。
+     */
+    private void onCameraSettled(String cameraId, boolean configured) {
         rollCall.post(() -> {
             Step step = openingStep;
-            if (step != null && step.camera.getCameraId().equals(cameraId)) {
+            if (step == null || !step.camera.getCameraId().equals(cameraId)) {
+                return;
+            }
+            if (configured) {
+                waitForFirstFrame(step);
+            } else {
                 openNext();
             }
         });
+    }
+
+    private void waitForFirstFrame(Step step) {
+        if (openingStep != step) {
+            return;
+        }
+        if (step.camera.hasFramesWithin(FIRST_FRAME_FRESH_MS)) {
+            openNext();
+            return;
+        }
+        rollCall.postDelayed(() -> waitForFirstFrame(step), FIRST_FRAME_POLL_MS);
     }
 
     private void cancelOpenInOrder() {

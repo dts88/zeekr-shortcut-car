@@ -179,6 +179,8 @@ public class SingleCamera {
     private volatile boolean reopenInFlight;
     /** 最近一个动作（开 / 关 / 重连 / 配会话）上路的时刻（uptime）；0 = 没有过。见 {@link #isBusy()}。 */
     private volatile long inFlightSinceMs;
+    /** 现在这份会话配好的时刻（uptime）；0 = 还没有会话。见 {@link #sessionHasStreamed()}。 */
+    private volatile long sessionStartedUptimeMs;
     /**
      * 重连任务跑起来了（在关旧设备 / 要开新设备）。只排着队等延迟的重连不算在途：
      * 别的程序放开相机时要立刻接回（CameraTaken），强制重开得能把排着队的那次取消掉、自己上。
@@ -890,6 +892,17 @@ public class SingleCamera {
     public boolean hasFramesWithin(long ms) {
         long last = lastCaptureUptimeMs;
         return last != 0 && SystemClock.uptimeMillis() - last < ms;
+    }
+
+    /**
+     * 这一份会话出过画面没有。配好之后一帧都没出过的会话，重建没有意义 —— 它没有东西可以排空，
+     * 重建的 waitUntilIdle 每次都超时、报设备错误，再关一次设备（2026-10-08 实测，环视一次要 4–13 秒）；
+     * 直接重开设备才出画面。
+     */
+    public boolean sessionHasStreamed() {
+        long last = lastCaptureUptimeMs;
+        long started = sessionStartedUptimeMs;
+        return started != 0 && last >= started;
     }
 
     public long progressAgeMs() {
@@ -1666,6 +1679,7 @@ public class SingleCamera {
                         AppLog.d(TAG, "Camera " + cameraId + " preview started!");
                         lastFrameTimestampMs = System.currentTimeMillis();
                         lastProgressUptimeMs = SystemClock.uptimeMillis();
+                        sessionStartedUptimeMs = lastProgressUptimeMs;
                         if (callback != null) callback.onCameraConfigured(cameraId);
                     } catch (CameraAccessException e) {
                         AppLog.e(TAG, "Failed to start preview", e);
