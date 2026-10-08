@@ -3,6 +3,7 @@ package com.kooo.evcam.storage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.camera.CodecVideoRecorder;
 import com.kooo.evcam.zeekr.RecordingTimeline;
 
 import org.junit.Test;
@@ -116,6 +117,18 @@ public class LockWindowTest {
                 clip(0, SURROUND), clip(MIN, SURROUND),
                 clip(0, CABIN_FRONT), clip(MIN, CABIN_FRONT),
                 clip(0, CABIN_REAR), clip(MIN, CABIN_REAR)), secondPass);
+    }
+
+    /**
+     * 第二遍什么时候锁：窗口结束之后，晚切的那一路换文件（最多晚 11 秒）、写入线程排着队再卡一次才把文件建好
+     * （最多再晚 6 秒），再留 1 秒。少等了，t 之后开始的那一段第二遍时还不在盘上，就漏了。
+     */
+    @Test
+    public void theSecondPassWaitsUntilTheLatestFileIsOnDisk() {
+        assertEquals(11 * SEC, LockWindow.SLACK_MS);
+        assertEquals(6 * SEC, CodecVideoRecorder.MAX_FILE_LAG_MS);
+        assertEquals(LockWindow.SLACK_MS + CodecVideoRecorder.MAX_FILE_LAG_MS + SEC, LockWindow.SECOND_PASS_DELAY_MS);
+        assertEquals(18 * SEC, LockWindow.SECOND_PASS_DELAY_MS);
     }
 
     // ================================================================= 各路分段长度不一样

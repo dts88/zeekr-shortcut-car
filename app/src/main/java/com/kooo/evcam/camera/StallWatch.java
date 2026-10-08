@@ -55,15 +55,18 @@ import java.util.function.Supplier;
  * <ul>
  *   <li>后视镜窗口的新画面：TextureView 每显示一帧新画面回调一次；</li>
  *   <li>每路相机的出帧结果（onCaptureCompleted），以及请求失败、某一路输出没拿到帧；</li>
- *   <li>每路录制编码线程收到的帧，单次绘制 / 编码 / 写文件的用时，分段切换用时；</li>
- *   <li>主线程和各相机线程有没有被堵住。</li>
+ *   <li>每路录制编码线程收到的帧，单次绘制 / 取编码输出的用时，分段切换用时；</li>
+ *   <li>每路录制写入线程（2026-10-08 起写文件不在编码线程上）：单次写文件 / fsync / 开、收文件的用时，
+ *       卡在其中一次里多久；</li>
+ *   <li>主线程、各相机线程、编码线程、写入线程有没有被堵住。</li>
  * </ul>
  *
  * <h3>怎么对照着看</h3>
  *
  * <ul>
  *   <li>后视镜停了，相机结果和录制帧都还在 → 问题在预览这条流或后视镜窗口本身；</li>
- *   <li>三者一起停，编码线程栈停在写文件 / 分段切换里 → 录制把相机拖住了；</li>
+ *   <li>三者一起停，编码线程栈停在分段切换里 → 录制把相机拖住了；</li>
+ *   <li>写入线程卡在写文件 / fsync 里、编码线程照常 → U 盘慢，写入排队在涨，涨满了录像才丢帧；</li>
  *   <li>三者一起停，线程都没堵 → 相机或 HAL 那一侧；</li>
  *   <li>主线程堵住 → 窗口画不出来，和相机无关。</li>
  * </ul>
@@ -107,6 +110,7 @@ public final class StallWatch {
     private static final Heartbeat MIRROR = new Heartbeat();
     private static final Map<String, Heartbeat> CAPTURE = new ConcurrentHashMap<>();
     private static final Map<String, Heartbeat> ENCODER = new ConcurrentHashMap<>();
+    private static final Map<String, Heartbeat> WRITER = new ConcurrentHashMap<>();
     private static final Map<String, Trouble> TROUBLE = new ConcurrentHashMap<>();
     private static final Map<String, LooperProbe> LOOPERS = new ConcurrentHashMap<>();
     /** 所有建过的相机实例。弱引用：报告只是顺便看一眼，不能拖住已经不用的相机。 */
@@ -156,8 +160,40 @@ public final class StallWatch {
         return CAPTURE.computeIfAbsent(String.valueOf(cameraId), key -> new Heartbeat());
     }
 
-    public static Heartbeat encoder(String cameraId) {
-        return ENCODER.computeIfAbsent(String.valueOf(cameraId), key -> new Heartbeat());
+    /**
+     * 登记一个录制器的编码线程心跳，释放时撤（{@link #unwatchEncoder}）。
+     *
+     * <p>每个录制器自己一份。同一路相机新旧两个录制器会前后交替（上一次停录还在收尾、这一次已经开了）：
+     * 以前按相机 id 共用一份，旧的那个收尾时一撤，新的这个也没人盯了。</p>
+     */
+    public static void watchEncoder(String cameraId, Heartbeat beat) {
+        if (beat != null) {
+            ENCODER.put(String.valueOf(cameraId), beat);
+        }
+    }
+
+    /** 撤掉编码线程心跳，只在登记的还是这一份时（同一路新的录制器已经登记了就不动）。 */
+    public static void unwatchEncoder(String cameraId, Heartbeat beat) {
+        if (beat != null) {
+            ENCODER.remove(String.valueOf(cameraId), beat);
+        }
+    }
+
+    /**
+     * 登记一个录制器的写入线程心跳：写进文件一个样本跳一下；正在写 / fsync / 开、收文件时记着在忙什么、从什么时候起。
+     * 和编码线程分开盯：写入线程闲着（没有要写的）不算卡，卡在一次操作里太久才算。每个录制器自己一份（同 {@link #watchEncoder}）。
+     */
+    public static void watchWriter(String cameraId, Heartbeat beat) {
+        if (beat != null) {
+            WRITER.put(String.valueOf(cameraId), beat);
+        }
+    }
+
+    /** 撤掉写入线程心跳，只在登记的还是这一份时。 */
+    public static void unwatchWriter(String cameraId, Heartbeat beat) {
+        if (beat != null) {
+            WRITER.remove(String.valueOf(cameraId), beat);
+        }
     }
 
     public static void registerCamera(SingleCamera camera) {
@@ -205,6 +241,15 @@ public final class StallWatch {
         }
     }
 
+    /**
+     * 撤掉线程探针，只在登记的还是这一个 Handler 时：同名的新线程（同一路相机新的录制器）已经接上了就不动它。
+     */
+    public static void unwatchLooper(String name, Handler handler) {
+        if (name != null && handler != null) {
+            LOOPERS.computeIfPresent(name, (key, probe) -> probe.handler == handler ? null : probe);
+        }
+    }
+
     /** 记一次操作用时；慢的当场写日志，写文件卡住时一眼能看到是哪一次、卡了多久。 */
     public static void noteOp(Heartbeat beat, String cameraId, String op, long startMs) {
         long took = now() - startMs;
@@ -215,10 +260,10 @@ public final class StallWatch {
     }
 
     /**
-     * 在编码线程上跑一件会占住它一阵子的事，并记下用时。
+     * 在编码线程或写入线程上跑一件会占住它一阵子的事，并记下用时。
      *
-     * <p>分段切换就是这种事：收尾上一个文件、重建编码器都在编码线程上做，
-     * 这期间相机送来的录制帧没人取。卡住时报告里能看到「正在分段切换，已经多久」。</p>
+     * <p>分段切换就是这种事：重建编码器在编码线程上做，这期间相机送来的录制帧没人取；
+     * 收文件、换盘在写入线程上做，这期间排队在涨。卡住时报告里能看到「正在做什么，已经多久」。</p>
      */
     public static void runTask(Heartbeat beat, String cameraId, String task, Runnable body) {
         long start = now();
@@ -301,6 +346,11 @@ public final class StallWatch {
                 return true;
             }
         }
+        for (Heartbeat beat : WRITER.values()) {
+            if (beat.isArmed()) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -339,6 +389,16 @@ public final class StallWatch {
             Heartbeat beat = entry.getValue();
             step("recorder " + entry.getKey(), beat.isArmed(), beat.ageMs(now),
                     StallRules.ENCODER_STALL_MS, now, "recording received no camera frame");
+        }
+
+        // 写入线程闲着（排队空了）不算卡；卡在一次写 / fsync / 开、收文件里才算 ——
+        // 这时排队在涨，涨满了相机那边就开始丢帧
+        for (Map.Entry<String, Heartbeat> entry : WRITER.entrySet()) {
+            Heartbeat beat = entry.getValue();
+            String task = beat.task();
+            long busyMs = task == null ? 0L : Math.max(0L, beat.taskAgeMs(now));
+            step("writer " + entry.getKey(), beat.isArmed(), busyMs,
+                    StallRules.WRITER_STALL_MS, now, "recording writer stuck in " + task);
         }
 
         if (active && now - lastHealthMs >= HEALTH_INTERVAL_MS) {
@@ -402,6 +462,18 @@ public final class StallWatch {
             String slowest = beat.takeSlowestOp();
             if (beat.isArmed()) {
                 sb.append(" | rec ").append(entry.getKey()).append(' ').append(fps(rate));
+                if (slowest != null) {
+                    sb.append(" slowest ").append(slowest);
+                }
+            }
+        }
+        // 写入线程：每秒写进文件几个样本、这一分钟里最慢的一次（write / sync / open / close…）
+        for (Map.Entry<String, Heartbeat> entry : new TreeMap<>(WRITER).entrySet()) {
+            Heartbeat beat = entry.getValue();
+            float rate = beat.takeRate(now);
+            String slowest = beat.takeSlowestOp();
+            if (beat.isArmed()) {
+                sb.append(" | write ").append(entry.getKey()).append(' ').append(fps(rate));
                 if (slowest != null) {
                     sb.append(" slowest ").append(slowest);
                 }
@@ -472,6 +544,10 @@ public final class StallWatch {
         }
         for (Map.Entry<String, Heartbeat> entry : new TreeMap<>(ENCODER).entrySet()) {
             sb.append(" | recorder ").append(entry.getKey()).append(' ')
+                    .append(describeBeat(entry.getValue(), now, true));
+        }
+        for (Map.Entry<String, Heartbeat> entry : new TreeMap<>(WRITER).entrySet()) {
+            sb.append(" | writer ").append(entry.getKey()).append(' ')
                     .append(describeBeat(entry.getValue(), now, true));
         }
         return sb.toString();

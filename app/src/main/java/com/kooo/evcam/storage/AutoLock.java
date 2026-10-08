@@ -48,8 +48,8 @@ import java.util.TreeSet;
  *       和文件名里的时刻是同一个钟。连着闪几下各算各的，锁过的再锁一遍没影响。</li>
  *   <li><b>锁哪些</b>：{@link LockWindow}（纯函数）—— [t − 10 秒, t + 10 秒] 碰到的录像文件，每一路都算。</li>
  *   <li><b>锁两遍</b>，都在 {@link #worker} 这一个线程上：t 那一刻锁盘上已经有的；t + 10 秒再过
- *       {@link #SECOND_PASS_DELAY_MS} 再锁一遍，接住 t 之后才开始的那一段（几路共用一个文件名时间戳，
- *       晚切的那一路要晚一阵才建好文件；停了录也照样补）。两遍都先看开关。
+ *       {@link LockWindow#SECOND_PASS_DELAY_MS} 再锁一遍，接住 t 之后才开始的那一段（几路共用一个文件名时间戳，
+ *       晚切的那一路要晚一阵才换文件，写入线程排着队还要晚一阵才建好；停了录也照样补）。两遍都先看开关。
  *       写进 {@link FootageLocks}，和回放里手动锁的是同一份清单，删除规则一个字不用改。</li>
  *   <li><b>录像在哪</b>（{@link #scan}）：U 盘录像目录；录制器换过盘就还有新盘上那个；中转写入时先写在内部缓存里，
  *       写完才搬到开录时定下的目标目录 —— 缓存里的按文件名锁进<b>那个</b>目录的清单（搬过去时名字不变），
@@ -65,11 +65,6 @@ public final class AutoLock implements Telemetry.Listener {
     private static final String TAG = "AutoLock";
     /** 在 {@link Telemetry} 登记用的名字。 */
     private static final String USER = "auto-lock";
-    /**
-     * 窗口结束后再等这么久锁第二遍：t 之后开始的那一段要先建好文件 —— 名字落在窗口里的那一段，
-     * 晚切的那一路最多晚 {@link LockWindow#SLACK_MS} 才建文件，再留 1 秒。
-     */
-    static final long SECOND_PASS_DELAY_MS = LockWindow.SLACK_MS + 1_000L;
     /** 中转写入的目标目录不在（盘掉了）时，隔多久再试一遍。 */
     static final long RELAY_RETRY_MS = 30_000L;
     /** 最多再试几遍：一小时。中转缓存里的文件放一小时就过期删掉（{@code FileTransferManager}），再等也没用。 */
@@ -199,7 +194,7 @@ public final class AutoLock implements Telemetry.Listener {
         final File target = relayTarget;
         worker.post(() -> pass(context, window, target, 0));
         worker.postDelayed(() -> pass(context, window, target, 1),
-                window.endMs - momentMs + SECOND_PASS_DELAY_MS);
+                window.endMs - momentMs + LockWindow.SECOND_PASS_DELAY_MS);
     }
 
     /**

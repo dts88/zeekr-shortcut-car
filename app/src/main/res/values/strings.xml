@@ -330,6 +330,7 @@
     <string name="msg_storage_full_refuse">U 盘空间不足，无法开始录制。未设置「录像存储上限」，不会自动清理旧录像。</string>
     <string name="msg_storage_cleaning">空间不足，正在清理最旧的录像，完成后开始录制…</string>
     <string name="msg_storage_cannot_free">U 盘空间不足，即使删除本应用的旧录像也不够，无法录制。请清理 U 盘上的其他文件。</string>
+    <string name="msg_storage_too_slow">U 盘写入速度跟不上，录像可能丢帧</string>
     <plurals name="msg_cleanup_photos">
         <item quantity="other">已自动清理 %1$d 张照片，释放 %2$s</item>
     </plurals>

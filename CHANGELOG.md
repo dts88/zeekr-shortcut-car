@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.3-alpha] - 2026-10-08
+
+- Fixed short skips in recordings at high bitrate and full frame rate: writing to the USB drive now happens on its own thread with a few seconds of memory buffer, so a slow moment on the drive no longer drops frames. If the drive keeps falling behind, the app says so once instead of silently dropping frames.
+- Stopping a recording now stops all cameras at once and finishes within a fixed time even on a stuck drive; what is still in memory is copied to another drive if possible.
+- The last frames of a recording are no longer cut off at stop.
+- Moving a recording to another drive when the current one fails now works (it never did before).
+- Flash-to-pass auto lock waits a little longer for its second pass, so a camera whose file is created late is still locked.
+
 ## [2.10.2-alpha] - 2026-10-08
 
 - Fixed: the floating button could show not recording while a recording was running, after the main screen was rebuilt (for example on a day/night switch).

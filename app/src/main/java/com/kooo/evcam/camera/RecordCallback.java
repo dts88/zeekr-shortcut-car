@@ -66,6 +66,13 @@ public interface RecordCallback {
     }
 
     /**
+     * 写盘跟不上：写入排队满了（约 3 秒的画面），编码线程开始在相机这一侧丢帧。录像照常在录，
+     * 不算打断；每满一段报一次（那一段刚开始时）。提示不提示用户、多久提示一次由 RecordingCoordinator 定。
+     */
+    default void onWriteBacklog(String cameraId) {
+    }
+
+    /**
      * 录像换了盘：原来的盘写不进了，已经改写到别的盘接着录
      * @param cameraId 相机ID
      * @param dir 现在写进的目录

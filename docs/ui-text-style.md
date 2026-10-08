@@ -177,6 +177,7 @@
 | 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | 「录像」不作动词；不用单字「录」 |
 | 录像（保存的文件） | 录像；录像存储上限 | recording(s)；与照片并列时 video(s)；Video storage cap | rakaman；与照片并列时 video；Had storan video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
 | 片段与一次录像 | 片段（量词「段」：每段 3 分钟、第 2 段）；一次从开始到停止的录制 = 录像；回放里切换用「上一条 / 下一条」 | clip；recording；Previous / Next | klip；rakaman；Sebelumnya / Seterusnya | — |
+| 丢帧 | 丢帧（录像里少了画面）；U 盘写入速度跟不上 | dropped frames、drop frames；writes too slowly | bingkai tercicir；menulis terlalu perlahan | 不用「掉帧」「卡帧」 |
 | 影像 | 影像（录像和照片的合称） | footage | rakaman | 单指一种时写录像或照片；「倒车影像」「泊车影像」是原厂功能名 |
 | 照片 | 照片（量词「张」「组」）；照片存储上限 | photo(s)；Photo storage cap | foto；Had storan foto | 「图片」只指非照片的图像（使用指南插图） |
 | 回放 | 回放；页面名：录像回放、照片回放 | playback；页面名 Videos、Photos | main semula；页面名 Video、Foto | 不用「回看」 |

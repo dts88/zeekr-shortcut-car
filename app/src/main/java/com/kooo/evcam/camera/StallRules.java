@@ -19,6 +19,13 @@ public final class StallRules {
      */
     public static final long ENCODER_STALL_MS = 3000L;
 
+    /**
+     * 录制写入线程卡在一次写文件 / fsync / 开、收文件里多久算卡住。
+     * 写入排队兜得住约 3 秒（SampleRing.QUEUE_MS）：卡过这么久，排队就满了，相机那边开始丢帧。
+     * U 盘刷写缓存时一次写卡 0.3–1 秒是常态（2026-10-08 实测），那只是排队涨，不算卡。
+     */
+    public static final long WRITER_STALL_MS = 3000L;
+
     /** 主线程 / 相机线程上排着的任务多久没被执行，记一笔带栈的日志。 */
     public static final long LOOPER_STALL_MS = 1000L;
 

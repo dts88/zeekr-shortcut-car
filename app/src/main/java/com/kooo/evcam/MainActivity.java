@@ -2554,6 +2554,12 @@ public class MainActivity extends AppCompatActivity {
             lastRefusalShown = reason;
             Toast.makeText(MainActivity.this, reason, Toast.LENGTH_LONG).show();
         }
+
+        @Override
+        public void onWriteSlow() {
+            // 录像照常在录，只是 U 盘写不过来、开始丢帧；多久提示一次协调器已经定了
+            Toast.makeText(MainActivity.this, R.string.msg_storage_too_slow, Toast.LENGTH_LONG).show();
+        }
     };
 
     /**

@@ -321,6 +321,7 @@
     <string name="msg_storage_full_refuse">Ruang pemacu USB tidak cukup untuk mula merakam. Tiada had storan video ditetapkan, jadi rakaman lama tidak dibersihkan secara automatik.</string>
     <string name="msg_storage_cleaning">Ruang tidak cukup. Membersihkan rakaman paling lama, kemudian rakaman bermula…</string>
     <string name="msg_storage_cannot_free">Ruang pemacu USB tidak cukup walaupun rakaman lama apl ini dipadam. Tidak dapat merakam. Kosongkan ruang yang digunakan oleh fail lain.</string>
+    <string name="msg_storage_too_slow">Pemacu USB menulis terlalu perlahan; bingkai rakaman mungkin tercicir</string>
     <plurals name="msg_cleanup_photos">
         <item quantity="other">Pembersihan automatik: %1$d foto dipadam (%2$s)</item>
     </plurals>

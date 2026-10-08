@@ -1,6 +1,7 @@
 package com.kooo.evcam.storage;
 
 import com.kooo.evcam.camera.CameraSlots;
+import com.kooo.evcam.camera.CodecVideoRecorder;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.StoragePlan;
 import com.kooo.evcam.zeekr.RecordingTimeline;
@@ -48,11 +49,17 @@ public final class LockWindow {
     /** 往后锁多久。 */
     public static final long AFTER_MS = 10_000L;
     /**
-     * 文件名里的时刻最多比这一路真正切换（建好文件）早多久：几路分段切换时共用一个时间戳的有效期，
-     * 再加秒被截掉的那 1 秒。每个文件的结束多算这么多（见类说明）；第二遍锁定也要多等这么久，
-     * 晚切的那一路才建好文件（{@link AutoLock}）。
+     * 文件名里的时刻最多比这一路真正切换早多久：几路分段切换时共用一个时间戳的有效期，
+     * 再加秒被截掉的那 1 秒。每个文件的结束多算这么多（见类说明）；第二遍锁定也要多等这么久
+     * （{@link #SECOND_PASS_DELAY_MS}）。
      */
     public static final long SLACK_MS = MultiCameraManager.TIMESTAMP_CACHE_DURATION_MS + 1_000L;
+    /**
+     * 第二遍锁定在窗口结束之后再等多久（{@link AutoLock}）：t 之后才开始的那一段要先在盘上。
+     * 名字落在窗口里的那一段，晚切的那一路最多晚 {@link #SLACK_MS} 才换文件；文件由写入线程建，
+     * 它排着队、再卡一次，最多还要晚 {@link CodecVideoRecorder#MAX_FILE_LAG_MS}；再留 1 秒。一共 18 秒。
+     */
+    public static final long SECOND_PASS_DELAY_MS = SLACK_MS + CodecVideoRecorder.MAX_FILE_LAG_MS + 1_000L;
     /**
      * 同一路下一个文件比「开始 + 标称时长」晚多少以内，还算接着录的下一段（它的开始就是这一段的结束）：
      * 第一段从开录到写进第一帧的那几秒（会话重建最多 3 秒、等画面稳定最多 2 秒、截掉的 1 秒），

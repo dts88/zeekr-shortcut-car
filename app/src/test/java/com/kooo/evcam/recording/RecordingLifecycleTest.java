@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.camera.CodecVideoRecorder;
 import com.kooo.evcam.recording.RecordingLifecycle.Action;
 import com.kooo.evcam.recording.RecordingLifecycle.Phase;
 import com.kooo.evcam.recording.RecordingLifecycle.Report;
@@ -182,5 +183,19 @@ public class RecordingLifecycleTest {
         life.begin();
         assertFalse(life.stopOverdue(T0 + RecordingLifecycle.STOP_DEADLINE_MS * 10));
         assertEquals(Phase.PREPARING, life.phase());
+    }
+
+    /**
+     * 相机层停录：几路一起叫停、一起等写入线程收好，共用 {@link CodecVideoRecorder#STOP_BUDGET_MS} 这一个期限；
+     * 编码线程拖到期限的，期限之后再多给写入线程 {@link CodecVideoRecorder#STOP_GRACE_MS}（几路共用，只多这一次）。
+     * 两样加起来只用协调器收拾期限的一半 —— 另一半留给释放录制器、摘录像输出、重建会话。以前一路一路等，
+     * 三路加起来超过了期限，协调器不等了、又开下一次，上一次还在写同一个盘。
+     */
+    @Test
+    public void theCameraStopBudgetLeavesHalfOfTheDeadline() {
+        assertTrue(CodecVideoRecorder.STOP_BUDGET_MS > 0);
+        assertTrue(CodecVideoRecorder.STOP_GRACE_MS > 0);
+        assertTrue((CodecVideoRecorder.STOP_BUDGET_MS + CodecVideoRecorder.STOP_GRACE_MS) * 2
+                <= RecordingLifecycle.STOP_DEADLINE_MS);
     }
 }

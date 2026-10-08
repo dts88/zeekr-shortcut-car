@@ -321,6 +321,7 @@
     <string name="msg_storage_full_refuse">Not enough space on the USB drive to start recording. No video storage cap is set, so old recordings aren\'t cleaned up automatically.</string>
     <string name="msg_storage_cleaning">Not enough space. Cleaning up the oldest recordings, then recording starts…</string>
     <string name="msg_storage_cannot_free">Not enough space on the USB drive, even if this app\'s old recordings were deleted. Can\'t record. Free up space used by other files.</string>
+    <string name="msg_storage_too_slow">USB drive writes too slowly; recording may drop frames</string>
     <plurals name="msg_cleanup_photos">
         <item quantity="one">Automatic cleanup: deleted %1$d photo (%2$s)</item>
         <item quantity="other">Automatic cleanup: deleted %1$d photos (%2$s)</item>
