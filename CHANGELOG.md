@@ -24,11 +24,11 @@ Upgrade from 2.1.0-beta. Same code as 2.10.3-alpha.
 - Photos are saved to the USB drive only, like videos.
 - Interface text reviewed and reworded in all three languages.
 
-### Notice: App Lab missing after a restart
+### Known issue: App Lab lost after a restart
 
-Several users have reported that App Lab disappeared after the head unit restarted and had to be reinstalled. This is quite possibly related to Zeekr Shortcut, but how is not yet known. If you run into this, or the app lags abnormally or camera images don't come up, please **export a report from Settings → System → Diagnostics before restarting the head unit**, and get in touch through a GitHub issue or other channels. I'm sorry for the trouble.
+Some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. If this happens, or the app stutters or camera images are unavailable, **export a report from Settings → System → Diagnostics before restarting the head unit** and report it via a GitHub issue or other channels. Apologies for the inconvenience.
 
-近期陆续有用户反映，重启车机后 App Lab 不见了，需要重新安装。这很可能与极氪即刻（Zeekr Shortcut）有关，但具体如何产生影响，目前还不清楚。如果您遇到类似情况，或者应用异常卡顿、摄像头画面无法获取，请**在重启车机之前**，先在「设置 → 系统 → 诊断信息」中导出诊断报告，再通过 GitHub 等渠道联系作者。由此给您带来的不便，我非常抱歉。
+**已知问题：重启车机后 App Lab 丢失。** 部分用户反馈，重启车机后 App Lab 消失，需重新安装。该问题疑似与本应用有关，原因仍在排查。如遇此问题，或出现应用异常卡顿、摄像头画面无法获取，请**在重启车机前**于「设置 → 系统 → 诊断信息」导出诊断报告，并通过 GitHub 等渠道反馈。给您带来不便，深表歉意。
 
 ## [2.10.3-alpha] - 2026-10-08
 

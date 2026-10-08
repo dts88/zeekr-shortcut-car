@@ -5,7 +5,7 @@
 [English](README.md) · [更新日志](CHANGELOG.md) · [来源与致谢](NOTICE.md) · [平台笔记](docs/zeekr-platform-notes.md)
 
 > [!IMPORTANT]
-> **重启车机后 App Lab 消失。** 近期陆续有用户反映，重启车机后 App Lab 不见了，需要重新安装。这很可能与极氪即刻（Zeekr Shortcut）有关，但具体如何产生影响，目前还不清楚。如果您遇到类似情况，或者应用异常卡顿、摄像头画面无法获取，请**在重启车机之前**，先在「设置 → 系统 → 诊断信息」中导出诊断报告，再通过 [GitHub](https://github.com/dts88/zeekr-shortcut-car/issues) 等渠道联系作者。由此给您带来的不便，我非常抱歉。
+> **已知问题：重启车机后 App Lab 丢失。** 部分用户反馈，重启车机后 App Lab 消失，需重新安装。该问题疑似与本应用有关，原因仍在排查。如遇此问题，或出现应用异常卡顿、摄像头画面无法获取，请**在重启车机前**于「设置 → 系统 → 诊断信息」导出诊断报告，并通过 [GitHub](https://github.com/dts88/zeekr-shortcut-car/issues) 等渠道反馈。给您带来不便，深表歉意。
 
 > [!WARNING]
 > 实验性非官方软件，与极氪（ZEEKR）没有任何关联，未经其批准或认可，也未经过任何车辆功能安全认证。
