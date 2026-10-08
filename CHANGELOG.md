@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.6-alpha] - 2026-10-08
+
+- Fixed: with three cameras open, quitting closed only the first camera and then waited 20 s; the ordered close now survives the cleanup that runs during exit, so the process no longer dies holding cameras.
+- Fixed: on a head unit that had restarted, quitting could be undone seconds later by the "rebooted" check and the app restarted itself while exiting; an exit now only yields to a restart that happens after it.
+- Coming back while cameras are still being closed leaves the not-yet-closed ones open instead of closing and reopening them.
+- The black box records the open and close order with each camera\'s time, e.g. 环视 1.1s → 后座舱 0.2s → 前座舱 0.3s.
+
 ## [2.10.5-alpha] - 2026-10-08
 
 - A camera that is opening, closing, reconnecting or reconfiguring is left alone: the watchdog and forced reopen no longer put a second open on top of it. That second open made the camera service kick out the app\'s own first handle (seven times on 2026-10-08) and the recording looped stop/resume until the app hung.
