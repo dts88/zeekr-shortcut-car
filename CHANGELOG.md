@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.9-alpha] - 2026-10-09
+
+- Cameras close together again instead of one after another. On the head unit, closing the last open camera by itself took 8-17 s (whichever camera was last), and reopening it right after produced a session that never delivered a frame; closing all cameras at once takes 0.1-0.3 s each, and the next open works. Exit is back to well under a second.
+- The ordered open waits for any camera that is still closing before it starts, so no camera is opened while another one is being torn down.
+
 ## [2.10.8-alpha] - 2026-10-08
 
 - Cameras open one at a time only once the previous one is actually delivering frames, not merely configured: with three cameras the surround often configured and then never delivered a frame while the cabin cameras were started on top of it.

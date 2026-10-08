@@ -2678,6 +2678,11 @@ public class SingleCamera {
     }
 
 
+    /** 有没有哪一路相机正在关（任何一份实例）。开相机前等它们关完：不在别的相机关的途中开。 */
+    public static boolean anyClosing() {
+        return !CLOSING.isEmpty();
+    }
+
     /**
      * 检查摄像头是否已连接
      */
