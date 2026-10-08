@@ -720,6 +720,12 @@ public class MultiCameraManager {
         updatePreviewTextureView("right", rightView);
     }
 
+    /**
+     * 主界面的画布没了（退后台、界面重建）。预览输出从这一路摘掉；要不要为此重配会话，看还有没有人要画面：
+     * 没人要（退后台时预览已经注销，也没在录、没开后视镜）—— 1.5 秒后整路就关，不必为了摘掉预览再进一次
+     * 相机服务；人要是这期间回来，画布接上时会重配一次。有人要画面（在录、后视镜）—— 照旧立刻重配，
+     * 不能让会话对着一块已经没了的画布。
+     */
     public void onPreviewTextureDestroyed(String cameraKey) {
         SingleCamera camera = cameras.get(cameraKey);
         if (camera == null) {
@@ -727,6 +733,10 @@ public class MultiCameraManager {
         }
         camera.setTextureView(null);
         camera.clearPreviewSurface();
+        if (!CameraNeeds.current().heldByAnyone()) {
+            AppLog.d(TAG, "Preview texture for " + cameraKey + " gone and nobody needs frames; not rebuilding the session");
+            return;
+        }
         camera.recreateSession();
     }
 

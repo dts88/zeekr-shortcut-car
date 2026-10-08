@@ -615,6 +615,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /** 「预览要相机」只在画布都在的时候登记：登记了相机就开，开出来的第一份会话要带着预览。 */
+    private void claimPreviewIfReady() {
+        if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
+            com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        }
+    }
+
     private TextureView.SurfaceTextureListener buildSurfaceListener(String cameraKey) {
         return new TextureView.SurfaceTextureListener() {
             @Override
@@ -630,6 +637,10 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
                     }
+                    // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
+                    // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
+                    // 画布一到又重配一遍，三路各多一次进相机服务（2026-10-08，环视那一次重配卡了 12 秒）
+                    claimPreviewIfReady();
                 }
             }
 
@@ -2843,8 +2854,8 @@ public class MainActivity extends AppCompatActivity {
         // 还是用户自己点回来的
         appConfig.setUiLeftForScreenOff(false);
 
-        // 预览又要用相机了
-        com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        // 预览又要用相机了 —— 画布还在的话现在登记；画布没了（退过后台）等它回来再登记（见 claimPreviewIfReady）
+        claimPreviewIfReady();
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
