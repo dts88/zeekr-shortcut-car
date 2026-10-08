@@ -69,13 +69,13 @@ public class MultiCameraManager {
     private Runnable pendingRecordingStart = null;
     private android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
 
-    // ---- 开相机按次序、关相机一起关（项目所有者 2026-10-08 定开的次序，2026-10-09 定关法）----
+    // ---- 环视永远排第一：开第一个开，关第一个关（项目所有者 2026-10-09：「依照单个环视的思路」）----
     // 开：环视 → 后座舱 → 前座舱，一路出了画面再开下一路；开第一路之前先等所有在关的相机关完。
-    // 关：三路一起发出去，不等上一路关完。2.10.5–2.10.8 关也按次序，实测（10-08 21:00 到 10-09 00:17）：
-    // 一路关完再关下一路时，排最后的那一路要 8–17 秒 —— 谁排最后谁慢，环视在报错状态时就是后座舱慢；
-    // 紧接着再开它，会话配好却一帧不出，要等看门狗重开设备。三路同时关每一路 0.1–0.3 秒，之后立刻再开正常；
-    // 只开环视时关永远 0.1 秒。相机服务把「几路同开过之后单独关最后一路」当成整条管线的收尾，慢的就是那一次；
-    // 几路一起关时每一路开始关的那一刻别的都还开着，没有哪一路是最后一路。
+    // 关：三路一起发出去、不等，发的顺序也是 环视 → 后座舱 → 前座舱。只开环视时它永远是唯一一路，
+    // 开关各 0.1 秒、怎么开关都正常；三路时排在别的相机后面关的那一路要 8–17 秒（谁排最后谁慢），紧接着
+    // 再开它一帧不出。2.10.5–2.10.8 让环视最后关（车主原来定的次序）、2.10.9 三路一起发但环视排最后发，
+    // 上车都是环视慢、再开卡；2.10.3 时代环视第一个发出去关，干净情况下三路各 0.1–0.3 秒，再开正常。
+    // 环视是车机拼出来的虚拟相机，经不起排在别人后面收尾。
     /** 一路开到「出画面 / 报错」最多等多久；再久就先开下一路，别让一路坏的挡住全部，它自己由看门狗救。 */
     private static final long OPEN_STEP_MAX_MS = 15_000L;
     /** 配好会话之后多久看一眼出没出画面。 */
@@ -309,10 +309,12 @@ public class MultiCameraManager {
      * 这一层只看有没有帧，不看任何状态标志。</p>
      */
     private void checkLiveness() {
-        if (cameras.isEmpty() || CameraTaken.othersHold()) {
-            // 别的程序拿着相机时不算卡：重开只会失败，它放开时 retryTaken 会接
+        if (cameras.isEmpty() || !openInOrderDone()) {
+            // 正在按次序开：开到哪一路由次序管（一路最多等 15 秒），看门狗这时不插手
             return;
         }
+        // 别的程序拿着相机时重开多半失败：只每 30 秒试一次（CameraLiveness 里判），它放开时 retryTaken 立刻接
+        boolean othersHold = CameraTaken.othersHold();
         long now = android.os.SystemClock.uptimeMillis();
         for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
             SingleCamera camera = entry.getValue();
@@ -324,28 +326,31 @@ public class MultiCameraManager {
                 state = new CameraLiveness.State();
                 livenessStates.put(entry.getKey(), state);
             }
-            long age = camera.progressAgeMs();
+            // 设备报错 / 被断开之后不用等 8 秒：有人要画面，下一次检查就动手（2.10.10 起相机自己不重连）
+            boolean lost = camera.deviceLost();
+            long age = lost ? Long.MAX_VALUE : camera.progressAgeMs();
             // 有人要画面就盯着 —— 包括「打开发出去了、一直没回音」的那种（以前靠前台服务每 10 秒
             // 一次的修复循环兜着，那个循环会把退避和放弃全部作废，1.62.0 删了）
-            boolean watch = camera.wantsFrames();
+            boolean watch = wanted(camera);
             if (watch && camera.isBusy()) {
                 // 这一路正在开 / 关 / 重连 / 配会话：那是进度，不是卡死。再叠一次重开只会让相机服务更慢，
                 // 还会把自己刚开的那份顶掉（2026-10-08：7 次「被相机服务断开」全是自己顶自己）
                 continue;
             }
-            CameraLiveness.Action action = CameraLiveness.step(state, watch, age, now);
+            CameraLiveness.Action action = CameraLiveness.step(state, watch, age, now, othersHold);
+            String since = lost ? "设备报错 / 被断开" : "已经 " + age + "ms 没有画面";
             if (action == CameraLiveness.Action.RESET) {
                 if (state.attempts() == 1 && camera.isConnected() && camera.sessionHasStreamed()) {
                     // 出过画面、后来停了的：第一次先只重建会话（便宜、快）；再不行才重开相机。
                     // 配好之后一帧都没出过的不走这一步：它没有东西可排空，重建每次都 waitUntilIdle 超时、
                     // 报设备错误、再关一次设备（2026-10-08，环视一次 4–13 秒），直接重开设备才出画面
                     // 这两级以前是 SingleCamera 自己那套 2.5 秒墙钟检测在做，现在只有这一处判
-                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
-                            + age + "ms 没有画面，先重建会话");
+                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") " + since + "，先重建会话");
                     camera.recreateSession();
                 } else {
-                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") 已经 "
-                            + age + "ms 没有画面，重开（第 " + state.attempts() + " 次）");
+                    AppLog.w(TAG, "相机 " + entry.getKey() + "(" + camera.getCameraId() + ") " + since + "，重开"
+                            + (othersHold ? "（别的程序占着 " + CameraTaken.describe() + "，每 "
+                            + (CameraTaken.RETRY_WHILE_HELD_MS / 1000) + " 秒试一次）" : "（第 " + state.attempts() + " 次）"));
                     camera.forceReopen();
                 }
             } else if (action == CameraLiveness.Action.GIVE_UP) {
@@ -359,6 +364,20 @@ public class MultiCameraManager {
                         + "最后一次报错: " + camera.lastErrorName());
             }
         }
+    }
+
+    /**
+     * 这一路该不该出画面：有输出挂着（预览 / 后视镜 / 录像）、有人等拍照，或者登记表上有人要全部的路
+     * （预览 / 录像 / 拍照 —— 和 {@link #reconcileCameras} 开相机的条件同一个）。只看输出不够：
+     * 打开就报错的那一路从来没有过输出，看门狗得知道它是该开着的。
+     */
+    private static boolean wanted(SingleCamera camera) {
+        if (camera.wantsFrames()) {
+            return true;
+        }
+        CameraNeeds needs = CameraNeeds.current();
+        return needs.isHeld(CameraNeeds.Holder.PREVIEW) || needs.isHeld(CameraNeeds.Holder.RECORDING)
+                || needs.isHeld(CameraNeeds.Holder.PHOTO);
     }
 
     /**
@@ -1357,10 +1376,10 @@ public class MultiCameraManager {
     }
 
     /**
-     * 关闭所有摄像头 —— 三路一起关（项目所有者 2026-10-09 定；2.10.5–2.10.8 是一路关完再关下一路）：
-     * 按 前座舱 → 后座舱 → 环视 的顺序把关的指令发出去，不等上一路关完。每一路交给自己的相机线程去关
+     * 关闭所有摄像头 —— 三路一起关、环视第一个发（项目所有者 2026-10-09 定；2.10.5–2.10.8 是一路关完再关下一路，
+     * 环视最后）：按 环视 → 后座舱 → 前座舱 的顺序把关的指令发出去，不等上一路关完。每一路交给自己的相机线程去关
      * （见 {@link SingleCamera#closeCamera(String)}），这里不等；都关完了黑匣子记一行每一路用了多久。
-     * 为什么不排队：排队关时排最后的那一路要 8–17 秒，紧接着再开它一帧不出（见类顶上的说明）。
+     * 为什么环视第一：排在别的相机后面关的那一路要 8–17 秒，紧接着再开它一帧不出（见类顶上的说明）。
      *
      * @param why 为什么关（英文短语）。给了的话，每一路关完时往黑匣子记一行，带用时
      */
@@ -3113,8 +3132,7 @@ public class MultiCameraManager {
         StringBuilder which = new StringBuilder();
         for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
             SingleCamera camera = entry.getValue();
-            if (camera.isTakenByOthers() || (camera.wantsFrames() && !camera.isConnected())) {
-                camera.clearTaken();
+            if (wanted(camera) && !camera.isConnected()) {
                 camera.forceReopen();
                 which.append(which.length() > 0 ? ", " : "")
                         .append(entry.getKey()).append("(").append(camera.getCameraId()).append(")");

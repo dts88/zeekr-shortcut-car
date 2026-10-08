@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.10-alpha] - 2026-10-09
+
+- The surround camera closes first as well as opening first. Closed after the cabin cameras (2.10.5-2.10.9) its close took 8-17 s and the next open of it never delivered a frame; closed first it takes 0.1-0.3 s and reopens normally, the same as the surround-only setup.
+- One recovery path: a camera that reports an error or gets disconnected only closes its handle; the watchdog reopens it at the next check (every 30 s while another app holds the camera), three tries then a pause. The per-camera reconnect ladder that raced the watchdog is gone; the watchdog stays out of the way while the ordered open is running.
+- Exit releases the camera pipeline once instead of three times; closing the main screen no longer waits on a 3 s background release.
+- Diagnostics: Send to phone is available to everyone, not only with developer options on.
+
 ## [2.10.9-alpha] - 2026-10-09
 
 - Cameras close together again instead of one after another. On the head unit, closing the last open camera by itself took 8-17 s (whichever camera was last), and reopening it right after produced a session that never delivered a frame; closing all cameras at once takes 0.1-0.3 s each, and the next open works. Exit is back to well under a second.

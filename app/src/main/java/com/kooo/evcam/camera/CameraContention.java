@@ -78,12 +78,12 @@ public final class CameraContention {
     }
 
     /** 我们打开（或重开）成功了。别的程序还占着相机时才值一行。 */
-    public static void ourCameraOpened(String cameraId, int attempt) {
+    public static void ourCameraOpened(String cameraId) {
         lastOurOpenId = cameraId;
         lastOurOpenAt = SystemClock.elapsedRealtime();
         if (!OTHERS_TOOK_AT.isEmpty()) {
             BlackBox.noteImportant("争用：别的程序占着相机 " + OTHERS_TOOK_AT.keySet() + "，我们开相机 " + cameraId
-                    + " 成功（第 " + attempt + " 次重连）；我们此刻 " + describeUs());
+                    + " 成功；我们此刻 " + describeUs());
         }
     }
 

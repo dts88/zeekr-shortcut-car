@@ -16,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <h3>规则（项目所有者 2026-09-27 定）</h3>
  *
  * <ul>
- *   <li>它拿着的时候不按退避猛试（每次都失败、还刷日志），只每 {@link #RETRY_WHILE_HELD_MS} 试一次 ——
+ *   <li>它拿着的时候不按退避猛试（每次都失败、还刷日志），只每 {@link #RETRY_WHILE_HELD_MS} 试一次
+ *       （2.10.10 起这个节奏在看门狗 {@link CameraLiveness} 里，相机自己不再重连）——
  *       这一下是保险：它要是占着很久、而我们是别的原因断的（哨兵模式下相机 1 被车机自己的服务占过两个小时，
  *       我们照常录着），不至于一直不接；</li>
  *   <li>它一放开（相机服务会通知）立刻接回；</li>
@@ -28,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class CameraTaken {
 
-    /** 别的程序占着相机时多久试一次。 */
+    /** 别的程序占着相机时多久试一次（看门狗 {@link CameraLiveness#step} 用）。 */
     static final long RETRY_WHILE_HELD_MS = 30_000L;
 
     private static final Set<String> HELD_BY_OTHERS = ConcurrentHashMap.newKeySet();
@@ -39,11 +40,6 @@ public final class CameraTaken {
     /** 此刻有没有别的程序占着相机。 */
     public static boolean othersHold() {
         return !HELD_BY_OTHERS.isEmpty();
-    }
-
-    /** 纯规则：别的程序占着相机就慢慢试，否则按正常退避。 */
-    static long reconnectDelayMs(boolean othersHold, long backoffMs) {
-        return othersHold ? RETRY_WHILE_HELD_MS : backoffMs;
     }
 
     /** 别的程序占着哪几路，给日志看。 */

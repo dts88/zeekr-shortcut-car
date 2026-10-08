@@ -26,6 +26,12 @@ package com.kooo.evcam.camera;
  * SingleCamera 那套 2.5 秒检测、前台服务每 10 秒一次的修复循环都删了；第一次先重建会话（便宜），
  * 再不行才重开相机，两级都在 MultiCameraManager.checkLiveness 里。</p>
  *
+ * <p><b>2.10.10 起连报错重连也归这里</b>（项目所有者 2026-10-09：「获取打开，关闭退出，仅此而已」）：
+ * SingleCamera 收到设备报错 / 被断开只把设备关掉、标成「没开」，不再自己按错误码退避重连 ——
+ * 那一套和这里互相顶（2026-10-08 自己顶自己 7 次）。设备报错算「已经卡住」，不用再等 {@link #STUCK_MS}；
+ * 别的程序占着相机时（{@link CameraTaken}）每 {@link CameraTaken#RETRY_WHILE_HELD_MS} 试一次、不计次数，
+ * 它放开时 MultiCameraManager.retryTaken 立刻接。</p>
+ *
  * <h3>为什么要停手</h3>
  *
  * <p>相机真被别的应用占着的时候，重开是救不回来的。一直重开只会不停地打扰相机服务，
@@ -121,12 +127,21 @@ public final class CameraLiveness {
      *                    <b>而且这一趟成功打开过</b> —— 压根没打开过的不归这里管
      * @param frameAgeMs  距上一次「有动静」多久 —— 出了一帧、开了相机、建好会话，都算动静
      * @param now         单调时钟，不含深度睡眠（车停着睡一夜，醒来不该算卡了一整夜）
+     * @param othersHold  别的程序此刻占着相机：重开多半失败，只每 {@link CameraTaken#RETRY_WHILE_HELD_MS}
+     *                    试一次（保险），不计次数、不停手；它一放开由 retryTaken 立刻接
      */
-    public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now) {
+    public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now, boolean othersHold) {
         if (!wantsFrames || frameAgeMs < STUCK_MS) {
             // 没人用，或者帧回来了 —— 前面攒的次数一笔勾销
             state.clear();
             return Action.NONE;
+        }
+        if (othersHold) {
+            if (state.lastResetMs != 0 && now - state.lastResetMs < CameraTaken.RETRY_WHILE_HELD_MS) {
+                return Action.NONE;
+            }
+            state.lastResetMs = now;
+            return Action.RESET;
         }
         if (state.stopped) {
             return Action.NONE;

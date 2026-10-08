@@ -103,7 +103,7 @@ public final class CameraSlots {
         return suffixFor(keyForSuffix(suffix));
     }
 
-    /** 开相机的次序（项目所有者 2026-10-08 定）：环视先开，再后座舱，最后前座舱。 */
+    /** 开、关相机都按这个次序（项目所有者 2026-10-08 定开的次序；2026-10-09 定关也一样）：环视第一，再后座舱，最后前座舱。 */
     private static final String[] OPEN_ORDER = {KEY_SURROUND, KEY_CABIN_REAR, KEY_CABIN_FRONT};
 
     /**
@@ -127,11 +127,15 @@ public final class CameraSlots {
         return order;
     }
 
-    /** 关相机的次序：开的次序倒过来 —— 前座舱先关，再后座舱，最后环视。 */
+    /**
+     * 关相机的次序：和开一样，环视第一个。
+     *
+     * <p>2.10.5–2.10.9 是倒过来的（环视最后关）：实测只要环视排在别的相机后面关，那一次关要 8–17 秒，
+     * 紧接着再开它一帧不出；只开环视（它永远是唯一一路）时开关各 0.1 秒、怎么都正常。所以让它在三路里
+     * 也永远排第一 —— 「依照单个环视的思路」（项目所有者 2026-10-09）。</p>
+     */
     public static java.util.List<String> closeOrder(java.util.Collection<String> keys) {
-        java.util.List<String> order = openOrder(keys);
-        java.util.Collections.reverse(order);
-        return order;
+        return openOrder(keys);
     }
 
     /** 是不是改名之前那一套写法。只用来在日志和报告里说明「这是旧文件」。 */

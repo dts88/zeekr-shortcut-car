@@ -52,8 +52,6 @@ import com.kooo.evcam.StorageHelper;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -2629,11 +2627,13 @@ public class MainActivity extends AppCompatActivity {
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();
 
-        // 释放摄像头资源
-        if (cameraManager != null) {
+        // 释放摄像头资源，只放一次：Holder 里那份就是主界面这份（initCamera 登记的）。
+        // 以前这里放一次、Holder 再放一次、onDestroy 又放一次 —— 三次都无害，但两次是摆设
+        com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
+        if (cameraManager != null && cameraManager != holder.getCameraManager()) {
             cameraManager.release();
         }
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().release();
+        holder.release();
         
         // 保存日志（System.exit 会跳过 onDestroy，所以这里手动保存）
         AppLog.saveToPersistentLog(this);
@@ -2951,50 +2951,13 @@ public class MainActivity extends AppCompatActivity {
         if (keepPipeline) {
             // 留着管线：只摘掉这个界面设的回调
             cameraManager.detachUiCallbacks();
-        } else if (cameraManager != null) {
-            // 带超时保护的摄像头资源释放
-            releaseCameraManagerWithTimeout(3000);  // 3秒超时
+        } else if (cameraManager != null && !cameraManager.isReleased()) {
+            // 关相机是各自相机线程上的异步动作，release() 不卡主线程，直接调。
+            // 以前这里起一条后台线程再等 3 秒，是关相机还在主线程上做时的遗物；退出那条路已经放过的不再放
+            cameraManager.release();
         }
     }
     
-    /**
-     * 带超时保护的摄像头管理器释放
-     * 防止 release() 操作阻塞过久导致 ANR
-     * 
-     * @param timeoutMs 超时时间（毫秒）
-     */
-    private void releaseCameraManagerWithTimeout(long timeoutMs) {
-        if (cameraManager == null) {
-            return;
-        }
-        
-        final CountDownLatch latch = new CountDownLatch(1);
-        
-        // 在后台线程执行 release，避免阻塞主线程
-        new Thread(() -> {
-            try {
-                AppLog.d(TAG, "Releasing camera manager in background thread...");
-                cameraManager.release();
-                AppLog.d(TAG, "Camera manager released successfully");
-            } catch (Exception e) {
-                AppLog.e(TAG, "Error releasing camera manager", e);
-            } finally {
-                latch.countDown();
-            }
-        }, "CameraRelease").start();
-        
-        try {
-            // 等待 release 完成，但设置超时避免 ANR
-            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-                AppLog.w(TAG, "Camera manager release timed out after " + timeoutMs + "ms, " +
-                        "resources may not be fully released");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            AppLog.w(TAG, "Camera manager release interrupted");
-        }
-    }
-
     /**
      * 显示录制异常的提示（自动消失，每20秒最多显示一次）
      */
