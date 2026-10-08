@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.5-alpha] - 2026-10-08
+
+- A camera that is opening, closing, reconnecting or reconfiguring is left alone: the watchdog and forced reopen no longer put a second open on top of it. That second open made the camera service kick out the app\'s own first handle (seven times on 2026-10-08) and the recording looped stop/resume until the app hung.
+- A recording stopped because a camera was disconnected now spends the auto-resume budget unless another app actually holds the camera, so it stops after three failures instead of looping forever.
+- Starting a recording and laying out the preview no longer ask the camera service on the main thread (the ANR of 2026-10-08 was blocked there); camera parameters are cached when a camera opens.
+- Cameras open one at a time, surround first, then rear cabin, then front cabin, and close in the reverse order; recording starts once the sequence is done.
+- Exit waits up to 20 s for the cameras to close in order, instead of 3 s, so the process does not die holding a camera.
+
 ## [2.10.4-alpha] - 2026-10-08
 
 - Settings → System: Start on boot and Keep running in background are now one switch, Start on boot, on by default. It keeps the app running in the background and, after the head unit restarts or the system closes the app, restarts it and restores Super mirror, the floating button and auto-recording. On upgrade it is on if either of the two switches was on.
