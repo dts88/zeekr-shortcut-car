@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.7-alpha] - 2026-10-08
+
+- Coming back to the main screen touches the camera service less: the preview is registered only once its views exist, so each camera\'s first session already carries the preview instead of being built twice (the surround\'s second build stalled 12 s on 2026-10-08).
+- Leaving the main screen while nothing needs the cameras no longer rebuilds the sessions just to drop the preview; the cameras close 1.5 s later anyway.
+
 ## [2.10.6-alpha] - 2026-10-08
 
 - Fixed: with three cameras open, quitting closed only the first camera and then waited 20 s; the ordered close now survives the cleanup that runs during exit, so the process no longer dies holding cameras.
