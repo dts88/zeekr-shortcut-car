@@ -1454,7 +1454,8 @@ public class AppConfig {
      *
      * <p>关着时照片只能从主界面的预览上截。主界面在后台时没有预览 —— 悬浮按钮怎么拍都拍不到画面
      * （为一张照片开三路相机，一张也存不下，再关三路）。所以 2.10.12 起它归开发者选项管
-     * （{@link #DEVELOPER_KEYS}，没解锁时一律按开算），以前关掉的升级时一次性改回开（{@link #resetPhotoViaJpegOnce}）。</p>
+     * （{@link #DEVELOPER_KEYS}，没解锁时一律按开算），以前关掉的升级时一次性改回开（{@link #resetPhotoViaJpegOnce}）。
+     * 开关留在「设置 → 录制」：没解锁时开着、灰着、点不动。</p>
      *
      * <h3>为什么默认开着</h3>
      *
@@ -1469,7 +1470,7 @@ public class AppConfig {
      * {@code SingleCamera} 在会话配不上时<b>第一个丢掉的就是它</b>：丢掉之后
      * 画面照旧，拍照退回抓预览。画面优先于照片清晰度。</p>
      *
-     * <p>开发者仍然可以关（设置 → 开发者选项），代价是拍照分辨率随之失效，主界面在后台时拍不到画面。</p>
+     * <p>开发者仍然可以关（开发者选项开着时，设置 → 录制），代价是拍照分辨率随之失效，主界面在后台时拍不到画面。</p>
      */
     public boolean isPhotoViaJpegEnabled() {
         return readBoolean(KEY_PHOTO_VIA_JPEG, true);

@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.13-alpha] - 2026-10-09
+
+- "Use JPEG output for photos" is back in Settings > Recording. It stays on and greyed out unless developer options are on.
+
 ## [2.10.12-alpha] - 2026-10-09
 
 - Cameras stay open for 30 s after nothing needs them (minimizing, opening diagnostics or playback), so coming back within that time needs no reopen; with the screen off, or without the background service, they still close after 1.5 s. While the main screen is away during those 30 s, the cameras keep streaming into a hidden output.

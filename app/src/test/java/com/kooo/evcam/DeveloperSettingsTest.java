@@ -40,7 +40,7 @@ public class DeveloperSettingsTest {
 
     /** 开发者选项分区里每一行 → 它存的键。 */
     private static final Map<String, List<String>> ROWS = new LinkedHashMap<>();
-    /** 别的分区里只有开发者才选得了的值：存储位置（内置存储）、中转写入。 */
+    /** 别的分区里只有开发者才选得了的值：存储位置（内置存储）、中转写入、拍照使用 JPEG 输出（关）。 */
     private static final Map<String, List<String>> OUTSIDE = new LinkedHashMap<>();
     /** 只是动作或说明，不存设置。 */
     private static final List<String> NONE = Collections.emptyList();
@@ -56,7 +56,6 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_camera_mapping", Arrays.asList("zeekr_camera_override_front",
                 "zeekr_camera_override_back", "zeekr_camera_override_left"));
         ROWS.put("pref_permissions", NONE);
-        ROWS.put("pref_photo_via_jpeg", Arrays.asList("photo_via_jpeg"));
         ROWS.put("pref_raw_frame_dump", Arrays.asList("raw_frame_dump"));
         ROWS.put("pref_gpu_fisheye_preview", Arrays.asList("gpu_fisheye_preview"));
         ROWS.put("pref_gpu_fisheye_video", Arrays.asList("gpu_fisheye_video"));
@@ -67,6 +66,7 @@ public class DeveloperSettingsTest {
 
         OUTSIDE.put("pref_storage_location", Arrays.asList("storage_location"));
         OUTSIDE.put("pref_relay_write", Arrays.asList("relay_write_enabled"));
+        OUTSIDE.put("pref_photo_via_jpeg", Arrays.asList("photo_via_jpeg"));
     }
 
     /** 普通设置：关着开发者选项也照常读。 */
