@@ -11,7 +11,7 @@ commit message, not here.
 
 Nothing yet.
 
-## [2.10.14-beta] - 2026-10-10
+## [2.10.15-beta] - 2026-10-10
 
 Upgrade from 2.0.0. Same code as 2.10.14-alpha.
 
@@ -19,7 +19,6 @@ Upgrade from 2.0.0. Same code as 2.10.14-alpha.
 - Fixed stutter that could occur at high bitrate and high frame rate.
 - Driving info bar: redesigned, with new items such as Sentry Mode, the rear lamps and a 7X front view, and a little easter egg. Choose what it shows in Settings → System → System info (experimental). It now appears only below the surround view recording.
 - Lock footage (Settings → Storage): lock videos and photos in playback, or turn on Lock footage on flash-to-pass to lock the current clips when you flash the high beams. Locked files are never removed by loop recording.
-- Vehicle status (experimental, Settings → Interface): shows flash-to-pass and hazard lights on the main screen.
 - The record button explains more clearly what happens.
 - The app name and version, and the plate number if set, are on every recording and photo.
 - Photos are saved to the USB drive only, like videos.
