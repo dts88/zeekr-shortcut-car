@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.11-alpha] - 2026-10-09
+
+- The surround camera closes on its own first, and the cabin cameras close only after it has finished; opening stays surround first, cabins after it streams. When the surround finished closing after the cabins (2.10.5-2.10.10), that close took 4-17 s (the floating button lingered on exit) and the next open of the surround never delivered a frame.
+- Opening waits until the previous round of closing is over; the watchdog acts on one camera at a time and stays out of the way while cameras are opening or closing.
+
 ## [2.10.10-alpha] - 2026-10-09
 
 - The surround camera closes first as well as opening first. Closed after the cabin cameras (2.10.5-2.10.9) its close took 8-17 s and the next open of it never delivered a frame; closed first it takes 0.1-0.3 s and reopens normally, the same as the surround-only setup.

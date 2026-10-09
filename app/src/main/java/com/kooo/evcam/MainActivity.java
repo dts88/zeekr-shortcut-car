@@ -2645,7 +2645,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * 退出最多等多久：主线程收尾、每一路相机关完。到点没好也照样结束进程。
-     * 三路一起关通常 0.2 秒；相机服务卡住时一次关实测 2–20 秒（2026-10-08），要留够：进程带着没关完的相机死掉，
+     * 环视先关、座舱后关，通常不到半秒；相机服务卡住时一次关实测 2–20 秒（2026-10-08），要留够：进程带着没关完的相机死掉，
      * 相机服务里就剩一个没人收的句柄，下一个进程开相机全部超时。
      */
     private static final long EXIT_DEADLINE_MS = 20_000L;
@@ -2663,12 +2663,12 @@ public class MainActivity extends AppCompatActivity {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        // 相机是一起关的（MultiCameraManager.closeAllCameras）：等那一轮都报关完，再等还在关的那几路的 latch
+        // 相机按一轮关（环视先、座舱后，MultiCameraManager.closeAllCameras）：等这一轮都报关完，再等还在关的那几路的 latch
         java.util.List<String> stuck;
         while (true) {
             long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
             stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(Math.min(Math.max(left, 0L), 200L));
-            if (left <= 0 || (!com.kooo.evcam.camera.MultiCameraManager.closingTogether() && stuck.isEmpty())) {
+            if (left <= 0 || (!com.kooo.evcam.camera.MultiCameraManager.closingAll() && stuck.isEmpty())) {
                 break;
             }
         }
