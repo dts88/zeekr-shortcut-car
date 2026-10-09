@@ -28,7 +28,7 @@
     <string name="set_watermark_spec_title">Include recording specs</string>
     <string name="set_watermark_spec_summary">Adds resolution, measured frame rate, codec and live bitrate to the video stamp</string>
     <string name="set_info_bar_title">Driving info bar</string>
-    <string name="set_info_bar_summary">Adds a strip of vehicle signals below the video. Choose what it shows in Settings → System → System info. Experimental.</string>
+    <string name="set_info_bar_summary">Adds a strip of vehicle signals below the surround view video. Choose what it shows in Settings → System → System info. Experimental.</string>
     <string name="set_storage_location_title">Storage location</string>
     <string name="set_storage_sentry_note">With Sentry Mode on, only the USB-A port (where Sentry Mode saves its recordings) stays powered after you leave the car, so recording can continue. If the storage location is a drive on the Type-C port, that port loses power and recording switches to the drive on the USB-A port.</string>
     <string name="set_relay_title">Relay write</string>
@@ -253,6 +253,7 @@
     <!-- Settings prompts and dialogs -->
     <string name="msg_stream_changed">Stream profile set to “%1$s”. Takes effect after restarting the app.</string>
     <string name="msg_relay_dev_only">Requires developer options (writes to internal storage first)</string>
+    <string name="msg_dev_only">Requires developer options</string>
     <string name="dlg_internal_title">Use internal storage?</string>
     <string name="dlg_internal_msg">Recording writes data continuously. Internal storage has limited write endurance and usually can\'t be replaced.\n\nA USB drive is recommended: it can be replaced if it fails, and removed to copy files.</string>
     <string name="dlg_internal_ok">Use internal storage anyway</string>

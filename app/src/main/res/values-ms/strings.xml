@@ -28,7 +28,7 @@
     <string name="set_watermark_spec_title">Sertakan spesifikasi rakaman</string>
     <string name="set_watermark_spec_summary">Menambah resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada tera video</string>
     <string name="set_info_bar_title">Bar maklumat pemanduan</string>
-    <string name="set_info_bar_summary">Menambah jalur isyarat kenderaan di bawah video. Pilih apa yang dipaparkan dalam Tetapan → Sistem → Maklumat sistem. Percubaan.</string>
+    <string name="set_info_bar_summary">Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Pilih apa yang dipaparkan dalam Tetapan → Sistem → Maklumat sistem. Percubaan.</string>
     <string name="set_storage_location_title">Lokasi storan</string>
     <string name="set_storage_sentry_note">Apabila Mod Sentry dihidupkan, hanya port USB-A (tempat Mod Sentry menyimpan rakamannya) kekal berkuasa selepas anda keluar dari kereta, jadi rakaman boleh diteruskan. Jika lokasi storan ialah pemacu pada port Type-C, port itu terputus kuasa dan rakaman beralih ke pemacu pada port USB-A.</string>
     <string name="set_relay_title">Tulis melalui perantara</string>
@@ -253,6 +253,7 @@
     <!-- Gesaan dan dialog tetapan -->
     <string name="msg_stream_changed">Profil strim ditetapkan kepada “%1$s”. Berkuat kuasa selepas apl dimulakan semula.</string>
     <string name="msg_relay_dev_only">Memerlukan pilihan pembangun (menulis ke storan dalaman dahulu)</string>
+    <string name="msg_dev_only">Memerlukan pilihan pembangun</string>
     <string name="dlg_internal_title">Guna storan dalaman?</string>
     <string name="dlg_internal_msg">Rakaman menulis data secara berterusan. Storan dalaman mempunyai hayat tulis yang terhad dan biasanya tidak boleh diganti.\n\nPemacu USB disyorkan: ia boleh diganti jika rosak, dan boleh dicabut untuk menyalin fail.</string>
     <string name="dlg_internal_ok">Guna storan dalaman juga</string>

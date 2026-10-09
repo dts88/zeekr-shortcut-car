@@ -162,15 +162,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setAutoStartRecording(value));
 
         // 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（关着时主界面在后台拍不到画面，见 AppConfig）。
-        // 没开时和「应用名与版本」那一行一样：开着、灰着、点不动 —— 读到的值本来就按开算（DEVELOPER_KEYS）
+        // 没开时开着、灰着、点不动，下面写「需开启开发者选项」（同「中转写入」）—— 读到的值本来就按开算（DEVELOPER_KEYS）
         bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
                 enabled -> {
                     appConfig.setPhotoViaJpegEnabled(enabled);
                     toast(getString(R.string.msg_restart_required));
                 });
         SwitchPreferenceCompat jpeg = findPreference("pref_photo_via_jpeg");
-        if (jpeg != null) {
-            jpeg.setEnabled(boundUnlocked);
+        if (jpeg != null && !boundUnlocked) {
+            jpeg.setEnabled(false);
+            jpeg.setSummary(getString(R.string.msg_dev_only));
         }
 
 

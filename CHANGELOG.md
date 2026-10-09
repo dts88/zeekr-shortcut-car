@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.14-alpha] - 2026-10-09
+
+- "Use JPEG output for photos" shows "Requires developer options" while it is locked.
+- The driving info bar is added only below the surround view recording; the cabin recordings no longer carry it.
+
 ## [2.10.13-alpha] - 2026-10-09
 
 - "Use JPEG output for photos" is back in Settings > Recording. It stays on and greyed out unless developer options are on.

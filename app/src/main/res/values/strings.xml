@@ -42,7 +42,7 @@
     <string name="set_watermark_spec_title">水印显示录制规格</string>
     <string name="set_watermark_spec_summary">在录像水印中标注分辨率、实测帧率、编码和实时码率</string>
     <string name="set_info_bar_title">行驶信息条</string>
-    <string name="set_info_bar_summary">在录像画面下方附加一栏车辆信号，显示项在「设置 → 系统 → 系统信息」中选择。试验性功能。</string>
+    <string name="set_info_bar_summary">在环视录像画面下方附加一栏车辆信号，显示项在「设置 → 系统 → 系统信息」中选择。试验性功能。</string>
     <string name="set_storage_location_title">存储位置</string>
     <string name="set_storage_sentry_note">哨兵模式开启时，下车后仅 USB-A 口（哨兵模式保存录像的接口）保持供电，可继续录制。若存储位置为 Type-C 口的 U 盘，下车后该口断电，将自动改为录制到 USB-A 口的 U 盘。</string>
     <string name="set_relay_title">中转写入</string>
@@ -271,6 +271,7 @@
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
     <string name="msg_relay_dev_only">需开启开发者选项（会先写入内置存储）</string>
+    <string name="msg_dev_only">需开启开发者选项</string>
     <string name="dlg_internal_title">使用内置存储？</string>
     <string name="dlg_internal_msg">录制时会持续写入数据。内置存储的写入寿命有限，且通常无法更换。\n\n建议使用 U 盘：损坏后可随时更换，也便于取下拷贝文件。</string>
     <string name="dlg_internal_ok">仍然使用内置存储</string>

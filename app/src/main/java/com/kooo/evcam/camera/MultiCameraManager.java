@@ -2076,8 +2076,9 @@ public class MultiCameraManager {
         int sourceHeight = source.getHeight();
         EncodeSize encodeSize = EncodeSize.forSource(
                 camera.getCameraId(), sourceWidth, sourceHeight, spec.grid);
-        // 行驶信息条：开着就在画面下面加一条。一条规则，每一路都一样；窄的路少放几格
-        boolean infoBar = com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context);
+        // 行驶信息条：开着就在环视录像的画面下面加一条（项目所有者 2026-10-09：只放环视，座舱两路不放）
+        boolean infoBar = CameraSlots.KEY_SURROUND.equals(key)
+                && com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context);
         if (infoBar) {
             encodeSize = encodeSize.withInfoBar(com.kooo.evcam.telemetry.InfoBar.HEIGHT);
         }
