@@ -56,6 +56,7 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_camera_mapping", Arrays.asList("zeekr_camera_override_front",
                 "zeekr_camera_override_back", "zeekr_camera_override_left"));
         ROWS.put("pref_permissions", NONE);
+        ROWS.put("pref_photo_via_jpeg", Arrays.asList("photo_via_jpeg"));
         ROWS.put("pref_raw_frame_dump", Arrays.asList("raw_frame_dump"));
         ROWS.put("pref_gpu_fisheye_preview", Arrays.asList("gpu_fisheye_preview"));
         ROWS.put("pref_gpu_fisheye_video", Arrays.asList("gpu_fisheye_video"));
@@ -72,7 +73,7 @@ public class DeveloperSettingsTest {
     private static final List<String> ORDINARY = Arrays.asList(
             "screen_off_keep_recording", "auto_start_recording", "footage_lock",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
-            "exposure_compensation", "awb_mode", "photo_via_jpeg", "car_model");
+            "exposure_compensation", "awb_mode", "car_model");
 
     private static final Pattern KEY = Pattern.compile("android:key=\"([^\"]+)\"");
 

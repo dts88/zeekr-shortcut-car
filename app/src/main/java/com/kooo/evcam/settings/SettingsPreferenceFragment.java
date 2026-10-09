@@ -161,12 +161,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_auto_record", appConfig.isAutoStartRecording(),
                 value -> appConfig.setAutoStartRecording(value));
 
-        bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
-                enabled -> {
-                    appConfig.setPhotoViaJpegEnabled(enabled);
-                    toast(getString(R.string.msg_restart_required));
-                });
-
 
         bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
                 enabled -> {
@@ -1106,6 +1100,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
+
+        // 拍照使用 JPEG 输出：普通用户一直开，只有开发者能关（关着时主界面在后台拍不到画面，见 AppConfig）
+        bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
+                enabled -> {
+                    appConfig.setPhotoViaJpegEnabled(enabled);
+                    toast(getString(R.string.msg_restart_required));
+                });
 
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);

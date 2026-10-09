@@ -247,18 +247,56 @@ public class MultiCameraManager {
         mainHandler.postDelayed(livenessTick, LIVENESS_TICK_MS);
         // 登记表一变就来看：有人要就开，没人要就关（相机开关的唯一裁判）
         CameraNeeds.current().setListener(this::reconcileCameras);
+        // 熄屏时没人要相机就不等 30 秒（ScreenState 在主线程上叫）
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            com.kooo.evcam.screen.ScreenState.addListener(screenListener);
+        } else {
+            mainHandler.post(() -> com.kooo.evcam.screen.ScreenState.addListener(screenListener));
+        }
     }
+
+    /** 熄屏：没人要相机的话，原来排着的 30 秒改成 1.5 秒 —— 车机熄屏约 6 秒就深睡，相机不能开着睡过去。 */
+    private final com.kooo.evcam.screen.ScreenState.Listener screenListener =
+            new com.kooo.evcam.screen.ScreenState.Listener() {
+                @Override
+                public void onScreenOff() {
+                    reconcileCameras();
+                }
+
+                @Override
+                public void onScreenOn() {
+                    // 亮屏不自己开相机：主界面在前面时它自己登记「预览」
+                }
+            };
 
     // ------------------------------------------------------------------ 相机开关的裁判
 
-    /** 没人要相机了多久才关：主界面重建、切去回看那一下会先注销再登记，别跟着关了又开。 */
-    private static final long CLOSE_WHEN_UNNEEDED_MS = 1_500L;
+    /**
+     * 没人要相机了多久才关（项目所有者 2026-10-09 定 30 秒，原来 1.5 秒）：最小化、进诊断信息 / 回看，
+     * 报告里 79% 在 30 秒内回来 —— 这段时间里相机不关，回来不用重开，通道不动。
+     */
+    private static final long CLOSE_WHEN_UNNEEDED_MS = 30_000L;
+    /**
+     * 熄屏、或者前台服务不在时，没人要了还是 1.5 秒就关：车机熄屏约 6 秒就深睡，相机不能开着睡过去；
+     * 后台拿着相机安卓要求有前台服务，没有它我们一退到后台相机就会被系统停掉。
+     */
+    private static final long CLOSE_WHEN_UNNEEDED_NOW_MS = 1_500L;
+
+    /** 这一次没人要了，等多久关：亮屏、前台服务在 → 30 秒；否则 1.5 秒。 */
+    private static long closeDelayMs() {
+        boolean canHoldInBackground = !com.kooo.evcam.screen.ScreenState.dark()
+                && com.kooo.evcam.CameraForegroundService.isRunning();
+        return canHoldInBackground ? CLOSE_WHEN_UNNEEDED_MS : CLOSE_WHEN_UNNEEDED_NOW_MS;
+    }
 
     private final Runnable closeWhenUnneeded = () -> {
         if (isRecording || CameraNeeds.current().heldByAnyone()) {
             return;
         }
         com.kooo.evcam.blackbox.BlackBox.noteImportant("没人要相机了，让相机去关");
+        for (SingleCamera camera : cameras.values()) {
+            camera.setKeepStreaming(false);
+        }
         closeAllCameras("nobody-needs");
     };
 
@@ -266,8 +304,10 @@ public class MultiCameraManager {
      * 相机开不开、关不关，只看登记表（{@link CameraNeeds}）：谁要用就登记，没人登记才关（1.65.0）。
      *
      * <p>主界面预览、录像、拍照要的是全部启用的路，登记了就开；后视镜只要自己那一路，它自己开（{@code bindCamera}）。
-     * 开着的每一路再按登记表调整自己的输出（{@link SingleCamera#followNeeds}：等拍照而没有别的输出时挂上出帧口）。
-     * 没人要了等 {@link #CLOSE_WHEN_UNNEEDED_MS} 再关 —— 熄屏后 1.5 秒也正好是深睡之前。
+     * 没人要了等 {@link #CLOSE_WHEN_UNNEEDED_MS}（30 秒）再关；熄屏、或者前台服务不在时 1.5 秒就关（{@link #closeDelayMs}）。
+     * 等的这 30 秒里相机照常出帧：主界面看不见，画面没地方显示，就送进不显示的出帧口
+     * （{@link SingleCamera#setKeepStreaming}）—— 停了流再起，和关了再开一样要动通道。
+     * 开着的每一路再按这些调整自己的输出（{@link SingleCamera#followNeeds}）。
      * 以前这个判断散在主界面退后台、熄屏 1.5 秒、熄屏 15 秒、后视镜四处，各问一遍登记表。</p>
      */
     public void reconcileCameras() {
@@ -277,6 +317,7 @@ public class MultiCameraManager {
         }
         CameraNeeds needs = CameraNeeds.current();
         mainHandler.removeCallbacks(closeWhenUnneeded);
+        boolean waitingToClose = false;
         if (needs.heldByAnyone()) {
             if (!isReleased() && (needs.isHeld(CameraNeeds.Holder.PREVIEW)
                     || needs.isHeld(CameraNeeds.Holder.RECORDING)
@@ -284,9 +325,13 @@ public class MultiCameraManager {
                 openAllCameras();   // 已经开着的那几路会被 openCamera 自己跳过
             }
         } else {
-            mainHandler.postDelayed(closeWhenUnneeded, CLOSE_WHEN_UNNEEDED_MS);
+            long delay = closeDelayMs();
+            waitingToClose = delay == CLOSE_WHEN_UNNEEDED_MS;
+            mainHandler.postDelayed(closeWhenUnneeded, delay);
         }
         for (SingleCamera camera : cameras.values()) {
+            // 等关的这 30 秒照常出帧；1.5 秒就关的不必为它重建会话。只剩后视镜要的时候（座舱没人看）不出帧，和以前一样
+            camera.setKeepStreaming(waitingToClose);
             camera.followNeeds();
         }
     }
@@ -770,10 +815,9 @@ public class MultiCameraManager {
     }
 
     /**
-     * 主界面的画布没了（退后台、界面重建）。预览输出从这一路摘掉；要不要为此重配会话，看还有没有人要画面：
-     * 没人要（退后台时预览已经注销，也没在录、没开后视镜）—— 1.5 秒后整路就关，不必为了摘掉预览再进一次
-     * 相机服务；人要是这期间回来，画布接上时会重配一次。有人要画面（在录、后视镜）—— 照旧立刻重配，
-     * 不能让会话对着一块已经没了的画布。
+     * 主界面的画布没了（退后台、界面重建）。预览输出从这一路摘掉，重配会话：有人要画面（在录、后视镜）、
+     * 或者在等关的那 30 秒里（照常出帧，画面送进不显示的出帧口），都不能让会话对着一块已经没了的画布。
+     * 只有马上就关的（熄屏、没有前台服务，1.5 秒后关）不重配：不必为了摘掉预览再进一次相机服务。
      */
     public void onPreviewTextureDestroyed(String cameraKey) {
         SingleCamera camera = cameras.get(cameraKey);
@@ -782,8 +826,8 @@ public class MultiCameraManager {
         }
         camera.setTextureView(null);
         camera.clearPreviewSurface();
-        if (!CameraNeeds.current().heldByAnyone()) {
-            AppLog.d(TAG, "Preview texture for " + cameraKey + " gone and nobody needs frames; not rebuilding the session");
+        if (!CameraNeeds.current().heldByAnyone() && !camera.keepsStreaming()) {
+            AppLog.d(TAG, "Preview texture for " + cameraKey + " gone and the camera closes in a moment; not rebuilding the session");
             return;
         }
         camera.recreateSession();
@@ -2904,6 +2948,7 @@ public class MultiCameraManager {
      */
     public void release() {
         CameraNeeds.current().setListener(null);
+        com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
         mainHandler.removeCallbacks(closeWhenUnneeded);
         if (photoJob != null) {
             // 拍到一半管理器没了（退出）：这一张作罢，登记也撤掉

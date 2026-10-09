@@ -2857,6 +2857,13 @@ public class MainActivity extends AppCompatActivity {
         // 预览又要用相机了 —— 画布还在的话现在登记；画布没了（退过后台）等它回来再登记（见 claimPreviewIfReady）
         claimPreviewIfReady();
 
+        // 「开机自启动」开着，前台服务就该在（规格 §3）。退出后再手动打开时没人拉它；在主界面在前面时拉起 ——
+        // 安卓 12 起，后台才拉起的前台服务用不了相机。有它，没人要相机后那 30 秒相机才留得住（MultiCameraManager）
+        if (appConfig.isAutoStartOnBoot() && !CameraForegroundService.isRunning()) {
+            CameraForegroundService.start(this, getString(R.string.notif_background_title),
+                    getString(R.string.notif_tap_to_return));
+        }
+
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
 

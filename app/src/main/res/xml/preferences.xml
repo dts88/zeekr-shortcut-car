@@ -48,11 +48,6 @@
             android:summary="@string/set_auto_record_summary" />
 
         <SwitchPreferenceCompat
-            android:key="pref_photo_via_jpeg"
-            android:title="@string/set_photo_jpeg_title"
-            android:summary="@string/set_photo_jpeg_summary" />
-
-        <SwitchPreferenceCompat
             android:key="pref_watermark_brand"
             android:title="@string/set_watermark_brand_title"
             android:summary="@string/set_watermark_brand_summary" />
@@ -393,6 +388,13 @@
             android:key="pref_permissions"
             android:title="@string/dev_permissions_title"
             android:summary="@string/dev_permissions_summary" />
+
+        <!-- 拍照使用 JPEG 输出：普通用户一直开（2.10.12，项目所有者 2026-10-09）。关着时照片只能从主界面的预览上截，
+             主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面（AppConfig.isPhotoViaJpegEnabled） -->
+        <SwitchPreferenceCompat
+            android:key="pref_photo_via_jpeg"
+            android:title="@string/set_photo_jpeg_title"
+            android:summary="@string/set_photo_jpeg_summary" />
 
         <SwitchPreferenceCompat
             android:key="pref_raw_frame_dump"

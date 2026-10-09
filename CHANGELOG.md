@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.10.12-alpha] - 2026-10-09
+
+- Cameras stay open for 30 s after nothing needs them (minimizing, opening diagnostics or playback), so coming back within that time needs no reopen; with the screen off, or without the background service, they still close after 1.5 s. While the main screen is away during those 30 s, the cameras keep streaming into a hidden output.
+- The background service starts with the main screen when Start on boot is on; after exiting and reopening the app it did not.
+- "Use JPEG output for photos" is always on and moves to Developer options; if it was off, it is turned on once on upgrade. With it off, photos taken while the main screen is in the background had no picture.
+
 ## [2.10.11-alpha] - 2026-10-09
 
 - The surround camera closes on its own first, and the cabin cameras close only after it has finished; opening stays surround first, cabins after it streams. When the surround finished closing after the cabins (2.10.5-2.10.10), that close took 4-17 s (the floating button lingered on exit) and the next open of the surround never delivered a frame.

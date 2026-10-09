@@ -88,9 +88,10 @@ public class SingleCamera {
      * 拍照用的 JPEG 输出，<b>常驻在会话里</b>。
      *
      * <p>方案 A：建会话时就把它挂上去，按下快门直接发一次静态拍照请求，
-     * 不用重建会话，预览和录制都不会顿。代价是每一路多一条输出流 ——
-     * 这也是它藏在开发者选项后面、默认关着的原因：真撑爆了表现是
-     * 「会话配置失败 = 没有画面」，得先在车上确认三路都起得来。</p>
+     * 不用重建会话，预览和录制都不会顿。代价是每一路多一条输出流。</p>
+     *
+     * <p>2.10.12 起一直开着、只有开发者能关（{@code AppConfig.isPhotoViaJpegEnabled}）：关着时照片只能
+     * 从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面。</p>
      */
     private ImageReader jpegReader;
 
@@ -118,14 +119,21 @@ public class SingleCamera {
     /**
      * 不显示的出帧口。
      *
-     * <p>拍照登记着（{@link CameraNeeds.Holder#PHOTO}）、而这一路此刻没有预览、后视镜、录像
-     * 任何一个输出时（主界面在后台，它的预览画面已被系统收回），会话挂上它，相机才有地方出帧、
-     * 拍照才有画面可拍；拍完注销了就从会话里摘掉。和预览同尺寸、同格式，帧到了就丢。</p>
+     * <p>这一路此刻没有预览、后视镜、录像任何一个输出（主界面在后台，它的预览画面已被系统收回），
+     * 而它还该出帧时，会话挂上它，相机才有地方出帧：拍照登记着（{@link CameraNeeds.Holder#PHOTO}），
+     * 或者没人要了、在等那 30 秒关（{@link #setKeepStreaming}）。不该出帧了就从会话里摘掉。
+     * 和预览同尺寸、同格式，帧到了就丢。</p>
      */
     private ImageReader frameSink;
 
     /** 眼下的会话里挂着出帧口没有（相机线程写，主线程读）。 */
     private volatile boolean frameSinkInSession;
+
+    /**
+     * 没人要了、在等那 30 秒关（{@code MultiCameraManager.reconcileCameras} 设）：这期间照常出帧，
+     * 没有别的输出就送进出帧口。停了流再起，和关了再开一样要动车机的采集通道；这 30 秒里回来就不用动。
+     */
+    private volatile boolean keepStreaming;
 
     // 鱼眼矫正
     
@@ -918,6 +926,20 @@ public class SingleCamera {
         return CameraNeeds.current().isHeld(CameraNeeds.Holder.PHOTO);
     }
 
+    /** 见 {@link #keepStreaming}。只改标志；要不要换输出由紧接着的 {@link #followNeeds} 或会话重建定。 */
+    public void setKeepStreaming(boolean keep) {
+        keepStreaming = keep;
+    }
+
+    public boolean keepsStreaming() {
+        return keepStreaming;
+    }
+
+    /** 没有别的输出时，这一路还该不该出帧：有人等拍照，或者在等那 30 秒关。 */
+    private boolean sinkWanted() {
+        return keepStreaming || photoWantsFrames();
+    }
+
     /** 能按快门了：设备开着、会话在、最近 {@code freshMs} 毫秒里真出过画面。 */
     public boolean readyForPhoto(long freshMs) {
         return cameraDevice != null && captureSession != null && hasFramesWithin(freshMs);
@@ -926,7 +948,7 @@ public class SingleCamera {
     /**
      * 登记表变了（{@link MultiCameraManager#reconcileCameras}）：这一路的输出要不要跟着变。
      *
-     * <p>跟着登记表走的输出只有出帧口：有人等拍照、而没有别的输出时挂上，拍完摘掉。
+     * <p>跟着登记表走的输出只有出帧口：还该出帧（{@link #sinkWanted}）而没有别的输出时挂上，不该了摘掉。
      * 会话里有没有它和该不该有它对不上，就请求重建一次 —— 重建按最新情况定输出。
      * 相机还没开好的不用管：开好建会话时自然按登记表来。</p>
      */
@@ -934,10 +956,10 @@ public class SingleCamera {
         if (cameraDevice == null) {
             return;
         }
-        boolean want = photoWantsFrames() && previewSurface == null
+        boolean want = sinkWanted() && previewSurface == null
                 && mainFloatingSurface == null && recordSurface == null;
         if (want != frameSinkInSession) {
-            requestSessionRebuild(want ? "photo-needs-frames" : "photo-done", 0);
+            requestSessionRebuild(want ? "sink-on" : "sink-off", 0);
         }
     }
 
@@ -1319,11 +1341,12 @@ public class SingleCamera {
                 }
             }
             
-            // 有人等拍照、而这一路没有任何显示或录像输出（主界面在后台）：挂上不显示的出帧口
+            // 还该出帧（有人等拍照、或者在等那 30 秒关），而这一路没有任何显示或录像输出（主界面在后台）：
+            // 挂上不显示的出帧口
             boolean nothingElse = (surface == null || !surface.isValid())
                     && (mainFloatingSurface == null || !mainFloatingSurface.isValid())
                     && (recordSurface == null || !recordSurface.isValid());
-            Surface sinkSurface = (nothingElse && photoWantsFrames()) ? frameSinkSurface() : null;
+            Surface sinkSurface = (nothingElse && sinkWanted()) ? frameSinkSurface() : null;
             frameSinkInSession = sinkSurface != null;
 
             // 检查是否有可用的输出 Surface（后台初始化时可能全部为 null）

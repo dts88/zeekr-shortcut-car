@@ -607,6 +607,7 @@ public class AppConfig {
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
+                KEY_PHOTO_VIA_JPEG,                   // 拍照使用 JPEG 输出 → 开（关着时主界面在后台拍不到画面）
                 KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
                 KEY_RELAY_WRITE_ENABLED));            // 中转写入 → 关
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
@@ -674,6 +675,25 @@ public class AppConfig {
         // 遍历注册表，新增设置项自动纳入自检，不必记得回来加一行
         for (SettingSpec spec : SettingsRegistry.ALL) {
             repairEnum(spec);
+        }
+        resetPhotoViaJpegOnce();
+    }
+
+    /** 做过一次「拍照使用 JPEG 输出改回开」的记号（2.10.12）。 */
+    private static final String KEY_PHOTO_VIA_JPEG_RESET = "photo_via_jpeg_reset_2_10_12";
+
+    /**
+     * 「拍照使用 JPEG 输出」2.10.12 起锁成开（见 {@link #isPhotoViaJpegEnabled}）：以前关掉的，升级后一次性改回开。
+     * 只做一次 —— 之后开发者再关，不会被这里翻回来。
+     */
+    private void resetPhotoViaJpegOnce() {
+        if (prefs.getBoolean(KEY_PHOTO_VIA_JPEG_RESET, false)) {
+            return;
+        }
+        boolean wasOn = prefs.getBoolean(KEY_PHOTO_VIA_JPEG, true);
+        prefs.edit().putBoolean(KEY_PHOTO_VIA_JPEG, true).putBoolean(KEY_PHOTO_VIA_JPEG_RESET, true).apply();
+        if (!wasOn) {
+            AppLog.i(TAG, "拍照使用 JPEG 输出：以前关着，2.10.12 起一律开（只有开发者能关），已改回开");
         }
     }
 
@@ -1430,6 +1450,12 @@ public class AppConfig {
     /**
      * 拍照走相机自己的 JPEG 输出通道，而不是抓预览画面。
      *
+     * <h3>为什么一直开着、只有开发者能关（项目所有者 2026-10-09）</h3>
+     *
+     * <p>关着时照片只能从主界面的预览上截。主界面在后台时没有预览 —— 悬浮按钮怎么拍都拍不到画面
+     * （为一张照片开三路相机，一张也存不下，再关三路）。所以 2.10.12 起它归开发者选项管
+     * （{@link #DEVELOPER_KEYS}，没解锁时一律按开算），以前关掉的升级时一次性改回开（{@link #resetPhotoViaJpegOnce}）。</p>
+     *
      * <h3>为什么默认开着</h3>
      *
      * <p>关着时拍照是从预览画面上抓一张，尺寸只能是预览的尺寸 —— 配置里那个
@@ -1443,10 +1469,10 @@ public class AppConfig {
      * {@code SingleCamera} 在会话配不上时<b>第一个丢掉的就是它</b>：丢掉之后
      * 画面照旧，拍照退回抓预览。画面优先于照片清晰度。</p>
      *
-     * <p>关掉它仍然可以（设置 → 录制），代价是拍照分辨率随之失效。</p>
+     * <p>开发者仍然可以关（设置 → 开发者选项），代价是拍照分辨率随之失效，主界面在后台时拍不到画面。</p>
      */
     public boolean isPhotoViaJpegEnabled() {
-        return prefs.getBoolean(KEY_PHOTO_VIA_JPEG, true);
+        return readBoolean(KEY_PHOTO_VIA_JPEG, true);
     }
 
     public void setPhotoViaJpegEnabled(boolean enabled) {
