@@ -20,7 +20,6 @@ import com.kooo.evcam.camera.CameraTaken;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.camera.StallWatch;
-import com.kooo.evcam.CameraForegroundService;
 
 /**
  * 超级后视镜的窗口生命周期与相机绑定。
@@ -318,13 +317,14 @@ public class RearViewMirrorService extends Service {
 
         if (camera.isCameraOpened()) {
             camera.recreateSession(false);
-        } else if (CameraTaken.benched(camera.getCameraId())) {
-            // 环视被别的程序拿走了：画面挂上就行，不自己开 —— 它只从看门狗的闸门重开（放开了、通道安静了才开）。
-            // 以前这里每 2 秒（ensureStillBound）开一次，相机服务交接的中途也开（2026-10-10）
-            AppLog.i(TAG, "环视被别的程序拿走了：后视镜先挂上，等它放开由看门狗重开");
         } else {
-            final SingleCamera cam = camera;
-            CameraForegroundService.whenReady(this, cam::openCamera);
+            // 不自己开（2.11 阶段 3）：下面登记 MIRROR 就叫醒通道调度 —— 开不开、什么时候开、被别的程序拿着时等不等，
+            // 只由它判（唯一动相机的地方）。以前这里在前台服务就绪后 openCamera，看门狗每 2 秒（ensureStillBound）一次：
+            // 绕过救援的节奏和「被拿走时只问、不开」，丢失还在判的那几百毫秒里也开，开出来的设备还让调度把这一开引起的
+            // 「被占用」当成别的程序拿着（审查 2026-10-11）。调度开出来的会话只带声明了的输出，后视镜的输出阶段 4b 才声明：
+            // 在那之前，环视由调度开起来时后视镜没有画面（阶段 3–5 的包不上车）。看门狗每 2 秒走到这里一次，只记 debug
+            AppLog.d(TAG, "环视没开着：后视镜先挂上，登记 MIRROR，由通道调度开"
+                    + (CameraTaken.benched(camera.getCameraId()) ? "（它被别的程序拿着，等它放开）" : ""));
         }
         retryCount = 0;
         // 登记：这一路相机后视镜要用。没人登记时别处才会关它

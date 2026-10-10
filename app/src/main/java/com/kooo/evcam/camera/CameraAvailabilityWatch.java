@@ -42,8 +42,8 @@ import java.util.function.Predicate;
  * 注册的那一刻系统会把每一路当前的状态报一遍，所以卡死之后只要应用还能起来，
  * 黑匣子第一屏就能看到答案。</p>
  *
- * <p>2026-10-10 起看门狗也按这张表重开被别的程序拿走的那一路（{@link CameraTaken#gate}）：读的是此刻的状态
- * （这一路空闲了多久、所有相机多久没变过），不是一声声的事件 —— 相机服务会乱报，事件也会被当成重复丢掉。</p>
+ * <p>2026-10-10 那一版看门狗按这张表重开被别的程序拿走的那一路（2.10 的 CameraTaken 闸门）；2.11 起只有通道调度读它，
+ * 读的是每一路的最后一句和「上一次别人引起的变化」（见下），只问、不开。</p>
  *
  * <h3>2.11 起：每一声分我们引起的、别人引起的；问一次补漏收的</h3>
  *
@@ -73,8 +73,9 @@ import java.util.function.Predicate;
  *       {@link CameraHolderSuspects} 一样。调度换到自己的钟：自己的此刻 −（{@code elapsedRealtime()} − 那个时刻）。</li>
  * </ul>
  *
- * <p>旧的看门狗那一套（{@code lastChangeAt}、{@link #quietForMs}、{@link #availableForMs}、{@link #statusAfterLoss}、
- * {@link #markTaken}、对 {@link CameraTaken} 的几处调用）照旧记、照旧报：调度接手、看门狗拆掉之后一起删。</p>
+ * <p>2.10 看门狗那一套（所有相机多久没变过、这一路空闲了多久、丢了之后表上怎么说、判出被拿走后改账，
+ * 以及对 CameraTaken 的几处调用 —— 它们会叫看门狗去重开）2.11 阶段 3 随看门狗一起拆了。旧的表（{@link #snapshot}）
+ * 只留给诊断报告，争用日志（{@link CameraContention}）照旧。</p>
  */
 public final class CameraAvailabilityWatch {
 
@@ -86,11 +87,6 @@ public final class CameraAvailabilityWatch {
     private static final Map<String, Long> SINCE = new ConcurrentHashMap<>();
     /** 那一刻是不是我们自己开着（或正在开）。 */
     private static final Map<String, Boolean> OURS = new ConcurrentHashMap<>();
-    /**
-     * 最近一次哪一路的状态变了（开机起算，含深睡）；0 = 还没收到过。哪一路都算，我们开着的那几路被乱报的也算 ——
-     * 看门狗的闸门要「所有相机这么久没变过」才重开被拿走的那一路（{@link CameraTaken#gate}，2026-10-10）。
-     */
-    private static volatile long lastChangeAt;
 
     private static CameraManager.AvailabilityCallback callback;
 
@@ -164,9 +160,8 @@ public final class CameraAvailabilityWatch {
 
         @Override
         public void onCameraAccessPrioritiesChanged() {
-            // 前后台切换时相机服务重排优先级（API 29+）：记一行；别的程序占着相机的话趁机试一次（旧的看门狗）
+            // 前后台切换时相机服务重排优先级（API 29+）：记一行（2.11 起不再趁机试开 —— 被拿着的只问，不开）
             CameraContention.prioritiesChanged();
-            CameraTaken.prioritiesChanged();
             // 调度：叫醒、马上问一次，绝不因此去开
             for (Listener listener : LISTENERS) {
                 try {
@@ -204,7 +199,7 @@ public final class CameraAvailabilityWatch {
 
     /**
      * 相机服务说了一声（主线程）：用 {@link #classify} 分类、记进 {@link Ledger}，写黑匣子那一行，叫醒调度；
-     * 旧的看门狗那一套照旧记（{@link #changed}）。
+     * 诊断报告的旧表、争用日志照旧记（{@link #changed}）。
      *
      * <p>黑匣子那一行的格式不变（「相机服务: N 空闲 / 被占用」加括号），括号按新的分类写：我们开着它时报的「空闲」
      * 是相机服务乱报、算别人引起的变化；丢了之后那一次关的途中报的「被占用」是新的主人，算在途。</p>
@@ -238,9 +233,8 @@ public final class CameraAvailabilityWatch {
     }
 
     /**
-     * 旧的看门狗那一套的记账（2.10 的 {@link CameraTaken} 闸门、{@link #statusAfterLoss}、诊断报告的 {@link #snapshot}）：
-     * 照旧记、照旧报争用。黑匣子那一行挪到了 {@link #heard}。对 {@link CameraTaken} 的几处调用在调度接手、看门狗拆掉之后删，
-     * 对 {@link CameraContention} 的留着。
+     * 诊断报告的旧表（{@link #snapshot}）和争用日志（{@link CameraContention}）。黑匣子那一行在 {@link #heard}。
+     * 2.11 阶段 3 起不再调 CameraTaken：它那几个事件入口会叫看门狗去重开，动相机的只剩通道调度一处。
      */
     private static void changed(String cameraId, boolean available) {
         Boolean before = AVAILABLE.put(cameraId, available);
@@ -254,16 +248,13 @@ public final class CameraAvailabilityWatch {
         long now = SystemClock.elapsedRealtime();
         SINCE.put(cameraId, now);
         OURS.put(cameraId, ours);
-        lastChangeAt = now;
-        // 别的程序拿走了相机：争用日志记一行；重开的节奏和接回由 CameraTaken 管
+        // 别的程序拿走了相机：争用日志记一行（是不是被拿走、什么时候放开、要不要开，由通道调度判）
         if (available) {
             if (!spurious) {
                 CameraContention.othersReleased(cameraId);
-                CameraTaken.othersReleased(cameraId);
             }
         } else if (!ours) {
             CameraContention.othersTook(cameraId, before == null);
-            CameraTaken.othersTook(cameraId);
         }
     }
 
@@ -297,51 +288,6 @@ public final class CameraAvailabilityWatch {
             AppLog.w(TAG, "anyOfOurs: " + e);
         }
         return false;
-    }
-
-    /**
-     * 丢了这一路之后，相机服务的表对它怎么说：true 空闲、false 被别的程序占着、null 说不准
-     * （规则见 {@link CameraTaken#serviceSays}）。
-     *
-     * @param lostAt 丢的那一刻（开机起算，含深睡）
-     */
-    static Boolean statusAfterLoss(String cameraId, long lostAt) {
-        Long since = SINCE.get(cameraId);
-        return CameraTaken.serviceSays(AVAILABLE.get(cameraId), Boolean.TRUE.equals(OURS.get(cameraId)),
-                since == null ? 0 : since, lostAt);
-    }
-
-    /** 相机服务说这一路空闲了多久（毫秒）；被占用、没收到过都是 -1。 */
-    static long availableForMs(String cameraId) {
-        Boolean available = AVAILABLE.get(cameraId);
-        Long since = SINCE.get(cameraId);
-        if (available == null || !available || since == null) {
-            return -1;
-        }
-        return SystemClock.elapsedRealtime() - since;
-    }
-
-    /** 所有相机的空闲 / 占用多久没变过（毫秒）；一次都没收到过是 {@link Long#MAX_VALUE}。 */
-    static long quietForMs() {
-        long at = lastChangeAt;
-        return at == 0 ? Long.MAX_VALUE : SystemClock.elapsedRealtime() - at;
-    }
-
-    /**
-     * 这一路判定被别的程序拿走了（{@link CameraTaken#judgeLoss}）：表上改成「被占用、不是我们、从现在起」。
-     *
-     * <p>相机服务那一声「被占用」到的时候设备要是还算我们的（比断开到得早），就被记成了「我们开着」——
-     * 2026-10-10 黑匣子里的「1 被占用（我们开着）」就是这样（那时还是先关设备、关完才摘）。改过来之后诊断报告
-     * 说的是实情，下一声真的「空闲」也照常算放开。已经是「被占用、不是我们」的不动，原来的时刻更准。
-     * 不算一次变化：这是我们改账，不是相机服务又报了一声。</p>
-     */
-    static void markTaken(String cameraId) {
-        if (Boolean.FALSE.equals(AVAILABLE.get(cameraId)) && Boolean.FALSE.equals(OURS.get(cameraId))) {
-            return;
-        }
-        AVAILABLE.put(cameraId, false);
-        OURS.put(cameraId, false);
-        SINCE.put(cameraId, SystemClock.elapsedRealtime());
     }
 
     /** 有没有收到过回调。没有的话，多半是容器没把这条接口转过来。 */

@@ -1230,7 +1230,7 @@ public final class ChannelRules {
      *       {@link #IN_FLIGHT_MAX_MS}。车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
      *       座舱等环视先关完。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
-     *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完）；</li>
+     *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
      *       但照 §二.6 仍要等安静；</li>
      *   <li><b>开</b>（要安静、能用相机）：按开的次序，第一路该开、没开、没被拿着、不在救援梯子上的。它有录像要、录像输出还在备
@@ -1270,14 +1270,25 @@ public final class ChannelRules {
             }
             return Decision.idle();
         }
+        // 待判的等全部到点一起判（judgeDue）：等的是最晚到点的那一路。已经到点、只等别的路的那一路按 0 等的话，
+        // 调度每一毫秒醒一次，一直醒到另一路到点（审查 2026-10-11）
+        String judgingKey = null;
+        long judgingLeft = 0;
         for (Lane lane : w.lanes) {
             Failure failure = lane.failure;
-            if (failure != null) {
-                long left = failure.closedAt != 0
-                        ? JUDGE_DELAY_MS - (now - failure.closedAt)
-                        : IN_FLIGHT_MAX_MS - (now - failure.at);
-                return Decision.waitFor(Why.JUDGING, lane.key, Math.max(0, left));
+            if (failure == null) {
+                continue;
             }
+            long left = failure.closedAt != 0
+                    ? JUDGE_DELAY_MS - (now - failure.closedAt)
+                    : IN_FLIGHT_MAX_MS - (now - failure.at);
+            if (judgingKey == null || left > judgingLeft) {
+                judgingKey = lane.key;
+                judgingLeft = left;
+            }
+        }
+        if (judgingKey != null) {
+            return Decision.waitFor(Why.JUDGING, judgingKey, Math.max(0, judgingLeft));
         }
         long quietLeft = w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (now - w.lastOthersChangeAt);
         boolean quiet = quietLeft <= 0;

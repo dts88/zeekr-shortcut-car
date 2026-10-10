@@ -94,7 +94,11 @@ public class SingleCamera {
     private volatile String fitOverride;
 
     private CameraManager cameraManager;
-    private CameraDevice cameraDevice;
+    /**
+     * 开着的设备。改在 {@link #deviceLock} 里，读不拿锁（主线程上的调度、相机服务的监听都读）：volatile，
+     * 读到「设备没了」的就一定也看得到改它之前登记的「在关」（{@link #loseDevice}，审查 2026-10-11）。
+     */
+    private volatile CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
     /** 这一轮的相机线程。关相机时从这里摘下来，之后来自它的回调就是过时的（见 isStale）。 */
     private volatile HandlerThread backgroundThread;
@@ -226,16 +230,13 @@ public class SingleCamera {
     private volatile String lastErrorName;
 
     /**
-     * 设备报错或被断开之后、还没重开：有人要画面的话，看门狗下一次检查就动手，不用等 8 秒。
-     * 这一路不再自己重连（2.10.10 之前有一套按错误码退避的重连阶梯，和看门狗互相顶，2026-10-08 自己顶自己 7 次）：
-     * 报错就关掉自己、标成「没开」，要不要再开、什么节奏，只有 MultiCameraManager 的看门狗一个地方判。
+     * 设备报错或被断开之后、还没重开。这一路不再自己重连（2.10.10 之前有一套按错误码退避的重连阶梯，和看门狗互相顶，
+     * 2026-10-08 自己顶自己 7 次）：报错就关掉自己、标成「没开」，要不要再开、什么节奏，只有通道调度
+     * （{@link ChannelScheduler}）一个地方判 —— 它从 {@link CameraCallback#onLossStarted} / {@link CameraCallback#onLossClosed}
+     * 知道这件事，等关完、再等 300 ms 判是不是被别的程序拿走的（2.11 阶段 3 起；以前是这里关完 post 到主线程的
+     * CameraTaken.judgeLoss，判完再叫看门狗重开）。
      */
     private volatile boolean deviceLost;
-    /**
-     * 被断开 / 报错 1、2 之后，关完了、还在等主线程判是不是被别的程序拿走的（{@link #loseDevice}）：
-     * 判完之前也算在途，看门狗不抢在判定前面按普通失败去重开。
-     */
-    private volatile boolean judgingLoss;
     /** 被断开、报错 1 / 2 之后的那一次关（{@link #CLOSING} 里登记的那个）；null = 没有。见 {@link #holdsInService()}。 */
     private volatile java.util.concurrent.CountDownLatch lostClose;
     /** 一次强制重开还在路上（关旧的、等 300 ms、开新的、等回调）：这期间再来的重开请求合并掉，不双开。 */
@@ -273,13 +274,6 @@ public class SingleCamera {
     private static final long LATE_OPEN_GRACE_MS = 3_000L;
     /** 被相机服务断开时报给 MultiCameraManager 的错误码（自定义，onError 的码都是正的）。 */
     private static final int LOST_DISCONNECTED = -4;
-    /**
-     * 丢了设备、关完之后隔多久在主线程上判是不是被别的程序拿走的：相机服务那几声「空闲 / 被占用」是单向通知，
-     * 经 binder 线程转到主线程，可能比关设备的返回晚一点到 —— 判的时候它们要已经记进表里。
-     */
-    private static final long LOSS_JUDGE_DELAY_MS = 300L;
-    /** 主线程：丢了设备之后的判定挪到这里做，和相机服务的通知同一条线。 */
-    private static final Handler MAIN = new Handler(android.os.Looper.getMainLooper());
     private boolean isConfiguring = false;    // 一次 createCaptureSession 发出去了、回调还没来
     private boolean isSessionClosing = false; // 旧会话在关，等 onClosed
     /**
@@ -643,14 +637,15 @@ public class SingleCamera {
     }
 
     /**
-     * 这一路此刻有没有动作在途：在开、在关、在重开、在配会话，以及丢了设备之后在判是不是被拿走。
+     * 这一路此刻有没有动作在途：在开、在关（含丢了设备之后的那一次关）、在重开、在配会话。
+     * 丢了之后的判定不在这里：它在通道调度的账上（等关完、再等 300 ms，那段时间调度自己不动别的路，2.11 阶段 3 起）。
      *
      * <p>在途的时候不叠第二个动作 —— 看门狗不重开，强制重开合并。2026-10-08 的七次
      * 「被相机服务断开」全是自己顶自己：重连那一次打开还没回来，看门狗又开了一次，
      * 相机服务把先开的那份踢掉。在途超过 {@link #IN_FLIGHT_MAX_MS} 才当回调不会来了，不再算在途。</p>
      */
     public boolean isBusy() {
-        boolean inFlight = isOpening || reopenInFlight || judgingLoss || CLOSING.containsKey(cameraId);
+        boolean inFlight = isOpening || reopenInFlight || CLOSING.containsKey(cameraId);
         if (!inFlight) {
             synchronized (sessionLock) {
                 inFlight = isConfiguring || isSessionClosing;
@@ -665,18 +660,25 @@ public class SingleCamera {
 
     /** 在途的是什么、多久了，给日志看。 */
     public String describeBusy() {
+        long since = inFlightSinceMs;
+        return busyKinds() + (since == 0 ? "" : " " + (SystemClock.uptimeMillis() - since) + "ms");
+    }
+
+    /**
+     * 在途的是什么，只有记号（{@code closing-lost}、{@code opening configuring} …），不带时长：
+     * 通道调度写「等 X 在途（closing-lost 2.1 s）」那一行用，时长它按自己的账算。
+     */
+    public String busyKinds() {
         StringBuilder sb = new StringBuilder();
         if (isOpening) sb.append("opening ");
         if (reopenInFlight) sb.append("reopen ");
-        if (judgingLoss) sb.append("judging-loss ");
         java.util.concurrent.CountDownLatch closing = CLOSING.get(cameraId);
         if (closing != null) sb.append(closing == lostClose ? "closing-lost " : "closing ");
         synchronized (sessionLock) {
             if (isConfiguring) sb.append("configuring ");
             if (isSessionClosing) sb.append("session-closing ");
         }
-        long since = inFlightSinceMs;
-        return sb.toString().trim() + (since == 0 ? "" : " " + (SystemClock.uptimeMillis() - since) + "ms");
+        return sb.toString().trim();
     }
 
     /** 设备开着、会话建好了、没在重配：按次序开相机时，这样的一路不用等。 */
@@ -1242,7 +1244,7 @@ public class SingleCamera {
     }
 
     /**
-     * 登记表变了（{@link MultiCameraManager#reconcileCameras}）：这一路的输出要不要跟着变。
+     * 登记表变了（2.10 的 MultiCameraManager.reconcileCameras 调，2.11 阶段 3 起没人调，阶段 7 删）：这一路的输出要不要跟着变。
      *
      * <p>跟着登记表走的输出只有出帧口：还该出帧（{@link #sinkWanted}）而没有别的输出时挂上，不该了摘掉。
      * 会话里有没有它和该不该有它对不上，就请求重建一次 —— 重建按最新情况定输出。
@@ -1953,8 +1955,6 @@ public class SingleCamera {
                 lastErrorName = null;
                 deviceLost = false;
                 CameraContention.ourCameraOpened(cameraId);
-                // 开成了就是别的程序这会儿不占着它（前台的一方拿得到）：从「别的程序占着」的表上划掉
-                CameraTaken.ourCameraOpened(cameraId);
                 AppLog.d(TAG, "Camera " + cameraId + " opened");
                 if (callback != null) {
                     callback.onCameraOpened(cameraId);
@@ -2021,17 +2021,19 @@ public class SingleCamera {
      * 相机服务那一声「被占用」也被记成了「我们开着」。</p>
      *
      * <ul>
-     *   <li>被断开、报错 1（被占用）/ 2（相机数到上限）：多半是别的程序拿走了 —— 先报（录像那一侧当场知道），再关；
-     *       关完挪到主线程判是不是被别的程序拿走的（{@link CameraTaken#judgeLoss}），判完才不算在途；</li>
-     *   <li>设备错误 3 / 4 / 5：照旧关完再报 —— 录制器留着，看门狗重开，画面回来同一个录制器接着录。</li>
+     *   <li>被断开、报错 1（被占用）/ 2（相机数到上限）：多半是别的程序拿走了 —— 先报（录像那一侧当场知道），再关；</li>
+     *   <li>设备错误 3 / 4 / 5：照旧关完再报 —— 录制器留着，调度重开，画面回来同一个录制器接着录。</li>
      * </ul>
+     *
+     * <p>是不是被别的程序拿走的、要不要重开、什么节奏，2.11 阶段 3 起只由通道调度判（下面那条给调度的路）：
+     * 以前这里关完还 post 一个 CameraTaken.judgeLoss 到主线程，判完叫看门狗重开 —— 和调度两头动手，删了。</p>
      *
      * <p>关的途中被 {@link #closeCamera} 关了（这一轮的相机线程已经摘下）：关完什么都不再写、不再报 ——
      * 它已经关了，不是丢了。</p>
      *
      * <p>2.11 起另有一条给调度的路（{@link CameraCallback} 下半截），不论错误码都一样：设备交到过我们手上的，
      * 关之前报 {@code onLossStarted}、关之后报 {@code onLossClosed}，判定交给调度；打开途中就出错的（设备从没交到我们手上），
-     * 关完报 {@code onOpenFailed}。上面两条旧的报法照旧，调用方迁完以后删。</p>
+     * 关完报 {@code onOpenFailed}。旧的报法（{@code onCameraError}）照旧，录像那一侧迁完（阶段 5）以后删。</p>
      *
      * @param code      报给 MultiCameraManager 的错误码：被断开是 {@link #LOST_DISCONNECTED}，其余是 onError 的
      * @param errorName 记进 {@link #lastErrorName} 的短名
@@ -2045,13 +2047,23 @@ public class SingleCamera {
         final boolean maybeTaken = code == LOST_DISCONNECTED
                 || code == CameraDevice.StateCallback.ERROR_CAMERA_IN_USE
                 || code == CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE;
-        final Handler round = backgroundHandler;
         final long lostAt = SystemClock.elapsedRealtime();
         final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
         final java.util.concurrent.CountDownLatch previous;
         final boolean opened;
         synchronized (deviceLock) {
             opened = cameraDevice == camera;
+            lastErrorName = errorName;
+            deviceLost = true;   // 要不要再开、什么节奏：调度一处判（被别的程序拿走的，等它放开、通道安静了单独开）
+            // 先登记再报：报出去之后按次序开相机看 anyClosing() 就会等这一次关完。被断开、报 1 / 2 的那一次关
+            // 相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着。
+            // 也先登记、再把设备从字段上摘下：通道调度在主线程上不拿这把锁读「设备在不在、有没有在途」，反过来的话
+            // 中间那一下读到「没设备、也没在关」，这一路被记成关着、当场又被开一次（审查 2026-10-11）
+            if (maybeTaken) {
+                lostClose = done;
+            }
+            previous = CLOSING.put(cameraId, done);
+            markInFlight();
             if (opened) {
                 // 会话跟着设备一起没了：排着的重建取消、在途的配置作废，没人再拿它当活的
                 cameraDevice = null;
@@ -2059,16 +2071,6 @@ public class SingleCamera {
                 voidSessionWork();
                 sessionGone();
             }
-            lastErrorName = errorName;
-            deviceLost = true;   // 要不要再开、什么节奏：看门狗一处判（被别的程序拿走的，等它放开、通道安静了单独重开）
-            judgingLoss = maybeTaken;
-            // 先登记再报：报出去之后按次序开相机看 anyClosing() 就会等这一次关完。被断开、报 1 / 2 的那一次关
-            // 相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着
-            if (maybeTaken) {
-                lostClose = done;
-            }
-            previous = CLOSING.put(cameraId, done);
-            markInFlight();
             if (maybeTaken && callback != null) {
                 callback.onCameraError(cameraId, code);
             }
@@ -2108,15 +2110,7 @@ public class SingleCamera {
                     callback.onCameraError(cameraId, code);
                 }
             }
-            return;
         }
-        MAIN.postDelayed(() -> {
-            if (round != backgroundHandler) {
-                return;   // 这期间被关了、或者换了一轮：closeCamera 已经把在途的标记清掉
-            }
-            CameraTaken.judgeLoss(cameraId, who(), code, errorName, lostAt, closeMs);
-            judgingLoss = false;
-        }, LOSS_JUDGE_DELAY_MS);
     }
 
     /** 黑匣子里的叫法：编号加环视 / 前座舱 / 后座舱，「1（后座舱）」。 */
@@ -3540,10 +3534,9 @@ public class SingleCamera {
         synchronized (deviceLock) {
             openInFlight = isOpening && cameraDevice == null;
             isOpening = false;
-            // 这一趟的标记都归零：路上的强制重开、设备报错的记号、丢了之后还没判完的那一次
+            // 这一趟的标记都归零：路上的强制重开、设备报错的记号
             reopenInFlight = false;
             deviceLost = false;
-            judgingLoss = false;
             voidSessionWork();
 
             // 要关的从字段上摘下来，交给相机线程去关

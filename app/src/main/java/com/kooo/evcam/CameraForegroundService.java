@@ -39,6 +39,8 @@ public class CameraForegroundService extends Service {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static volatile boolean isForegroundReady = false;
+    /** 见 {@link #startedWhileVisible()}。 */
+    private static volatile boolean startedWhileVisible = false;
     private static final java.util.List<Runnable> pendingReadyCallbacks = new java.util.ArrayList<>();
 
     /**
@@ -86,6 +88,20 @@ public class CameraForegroundService extends Service {
     /** 前台服务此刻在不在（startForeground 做完了）。保活的各条路只在它不在时才去启动它。 */
     public static boolean isRunning() {
         return isForegroundReady;
+    }
+
+    /**
+     * 这个前台服务能用相机：它是在主界面在前时起的，或者主界面在前时刷新过（{@code onStartCommand} 那一刻主界面在前）。
+     *
+     * <p>安卓 12 起，后台才起的前台服务用不了相机（lifecycle-spec §3）：通道调度据此判「能用相机」 ——
+     * 主界面在前，或者这一项为真（项目所有者 2026-10-10 确认，大纲 §0）。不能用时它不开、不重开、不计次数。</p>
+     *
+     * <p>只升不降，服务停了才清：AOSP 12 的 {@code ActiveServices.setFgsRestrictionLocked} 对已经放行的服务不再收回
+     * （同一个服务在后台再被 start 一次，例如停录时换通知文字，还是放行的）。照「每次 start 都重新判」的话，
+     * 录着时在后台换一下通知，这一路丢了就再也不重开。</p>
+     */
+    public static boolean startedWhileVisible() {
+        return isForegroundReady && startedWhileVisible;
     }
 
     /** 被系统杀了要不要重启：保活开着才要（规格 §3：关 = 被杀了不回来）。几个服务共用这一条。 */
@@ -151,8 +167,14 @@ public class CameraForegroundService extends Service {
         // 启动前台服务
         startForeground(NOTIFICATION_ID, notification);
 
+        // 这一次 start 时主界面在前：从此能用相机（只升不降，见 startedWhileVisible）
+        if (com.kooo.evcam.camera.StallWatch.isForeground()) {
+            startedWhileVisible = true;
+        }
         // 标记就绪，执行所有等待的回调
         isForegroundReady = true;
+        // 前台服务在了：没人要的相机可以保持 30 秒、后台也能用相机了 —— 叫醒通道调度
+        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
         synchronized (pendingReadyCallbacks) {
             for (Runnable cb : pendingReadyCallbacks) {
                 mainHandler.post(cb);
@@ -225,6 +247,9 @@ public class CameraForegroundService extends Service {
         blackBoxHandler.removeCallbacks(blackBoxTick);
         AppLog.d(TAG, "Service destroyed - 尝试重启...");
         isForegroundReady = false;
+        startedWhileVisible = false;
+        // 前台服务没了：不再保持，后台用不了相机 —— 叫醒通道调度
+        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
 
         // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §3）；
         // 用户主动退出时不做 —— 这正是以前「退不掉」的一条路
@@ -390,6 +415,7 @@ public class CameraForegroundService extends Service {
             return;
         }
         isForegroundReady = false;
+        startedWhileVisible = false;
         Intent intent = new Intent(context, CameraForegroundService.class);
         context.stopService(intent);
         AppLog.d(TAG, "Stopping foreground service");

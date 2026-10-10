@@ -2712,13 +2712,23 @@ public class MainActivity extends AppCompatActivity {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        // 相机按一轮关（环视先、座舱后，MultiCameraManager.closeAllCameras）：等这一轮都报关完，再等还在关的那几路的 latch
+        // 相机由通道调度按次序关（环视先、座舱后）：等它报关完（closingAnywhere 变假），再等还在关的那几路的 latch
         java.util.List<String> stuck;
         while (true) {
             long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
             stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(Math.min(Math.max(left, 0L), 200L));
-            if (left <= 0 || (!com.kooo.evcam.camera.MultiCameraManager.closingAll() && stuck.isEmpty())) {
+            if (left <= 0 || (!com.kooo.evcam.camera.ChannelScheduler.closingAnywhere() && stuck.isEmpty())) {
                 break;
+            }
+            if (stuck.isEmpty()) {
+                // 眼下没有一路在关（调度还在等手上那一步做完，开到一半、配会话最多 15 秒）：awaitAllClosed 当场返回，
+                // 不歇一下就空转占满一个核，和要跑关相机那几轮的主线程抢（审查 2026-10-11）
+                try {
+                    Thread.sleep(Math.min(200L, left));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
         long took = android.os.SystemClock.elapsedRealtime() - startedAt;
