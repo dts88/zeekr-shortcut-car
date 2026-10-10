@@ -181,8 +181,23 @@ public class CodecVideoRecorder {
     private String cameraPosition;
     private VideoRecorder.SegmentTimestampProvider timestampProvider;  // 分段时间戳提供者（用于多路同步）
     private long recordedFrameCount = 0;
-    /** 本次录制的所有文件路径。写入线程开文件、抢救时加，停录时读，所以加锁。 */
+    /**
+     * 本次录制还在这个录制器手里的文件路径。写入线程开文件、抢救时加，分段切换收好、报出去（{@link RecordCallback#onSegmentSwitch}）
+     * 时拿掉，停录时读，所以加锁。
+     */
     private final List<String> recordedFilePaths = Collections.synchronizedList(new ArrayList<>());
+    /** 上一次停录收掉的文件（{@link #finishStop} 结束时还在手里的那几个），见 {@link #stoppedFiles}。 */
+    private volatile List<String> stoppedFiles = Collections.emptyList();
+    /**
+     * 第一个文件等开录时再开（单独接回的一路，{@link #prepareWithoutFile}）：名字是开录那一刻。
+     * 准备的线程上写、开录的线程上读，中间隔着一次 Handler 投递。
+     */
+    private boolean firstFileAtStart;
+    /**
+     * 现在这个文件的名字不是共用的分段时间戳（单独接回时按那一刻起的）：别的路一换新的共用名字，
+     * 这一路马上跟着切（{@link #switchNow}）。开录时置上，从共用的时间戳拿到名字时清掉。
+     */
+    private volatile boolean offCycleName;
     
     /** 这次录制写出过第一笔数据没有：分段计时、外面的「录制中」都从那一刻起。 */
     private volatile boolean hasFirstWrite = false;
@@ -558,12 +573,42 @@ public class CodecVideoRecorder {
      * @return 用于 Camera 输出的 SurfaceTexture
      */
     public SurfaceTexture prepareRecording(String filePath) {
+        // 从文件路径中提取保存目录和摄像头位置
+        File file = new File(filePath);
+        String fileName = file.getName();
+        int lastUnderscoreIndex = fileName.lastIndexOf('_');
+        String position = lastUnderscoreIndex > 0 && fileName.endsWith(".mp4")
+                ? fileName.substring(lastUnderscoreIndex + 1, fileName.length() - 4) : "unknown";
+        return prepare(file.getParent(), position, fileName);
+    }
+
+    /**
+     * 准备好、先不开文件：单独接回录像的一路用（2026-10-10）。编码器、EGL、SurfaceTexture 照样建好，
+     * 第一个文件等开录时再开（{@link #startRecording}），名字是开录那一刻 —— 准备完还要等相机开好、会话配好、出画面，
+     * 按准备那一刻起名的话，名字比画面早好几秒（回放按名字里的时刻摆）。
+     *
+     * <p>和 {@link #prepareRecording} 一样会阻塞（等 EGL 初始化，最多 5 秒）：不要在主线程上调。</p>
+     *
+     * @param dir       写到哪个目录（录像此刻实际写在哪个盘上）
+     * @param cameraKey 这一路的 key（文件名的后缀按它取）
+     * @return 给相机输出的 SurfaceTexture；没准备好是 null（已经放掉）
+     */
+    public SurfaceTexture prepareWithoutFile(File dir, String cameraKey) {
+        return prepare(dir.getAbsolutePath(), CameraSlots.suffixFor(cameraKey), null);
+    }
+
+    /**
+     * @param dir           写到哪个目录
+     * @param position      文件名的后缀（surround / cabinfront / cabinrear）
+     * @param firstFileName 第一个文件的名字，在这里开好；null = 开录时再开（{@link #prepareWithoutFile}）
+     */
+    private SurfaceTexture prepare(String dir, String position, String firstFileName) {
         // 检查是否在主线程调用（可能导致 ANR）
         if (Looper.myLooper() == Looper.getMainLooper()) {
             AppLog.w(TAG, "Camera " + cameraId + " WARNING: prepareRecording() called on MAIN THREAD! " +
                     "This may cause ANR due to blocking operations.");
         }
-        
+
         if (isRecording.get()) {
             AppLog.w(TAG, "Camera " + cameraId + " is already recording");
             return inputSurfaceTexture;
@@ -589,16 +634,9 @@ public class CodecVideoRecorder {
         // 清空本次录制的文件列表：写入线程开成一个文件才记一个
         recordedFilePaths.clear();
 
-        // 从文件路径中提取保存目录和摄像头位置
-        File file = new File(filePath);
-        this.saveDirectory = file.getParent();
-        String fileName = file.getName();
-        int lastUnderscoreIndex = fileName.lastIndexOf('_');
-        if (lastUnderscoreIndex > 0 && fileName.endsWith(".mp4")) {
-            this.cameraPosition = fileName.substring(lastUnderscoreIndex + 1, fileName.length() - 4);
-        } else {
-            this.cameraPosition = "unknown";
-        }
+        this.saveDirectory = dir;
+        this.cameraPosition = position;
+        this.firstFileAtStart = firstFileName == null;
 
         try {
             // 创建编码线程
@@ -623,8 +661,11 @@ public class CodecVideoRecorder {
             // 创建 MediaCodec 编码器
             createEncoder();
 
-            // 第一个文件：排给写入线程开，在这里等结果。开不了就是开录失败（这一步不换盘，和以前一样）
-            openFirstFile(fileName);
+            // 第一个文件：排给写入线程开，在这里等结果。开不了就是开录失败（这一步不换盘，和以前一样）。
+            // 单独接回的一路不给名字：开录时再开（openFirstFileNow）
+            if (firstFileName != null) {
+                openFirstFile(firstFileName);
+            }
 
             // 在编码线程上初始化 EGL 和 SurfaceTexture（重要：必须在同一线程上）
             // 使用 CountDownLatch 等待初始化完成
@@ -815,6 +856,13 @@ public class CodecVideoRecorder {
 
         AppLog.d(TAG, "Camera " + cameraId + " Starting codec recording");
 
+        // 单独接回的一路：第一个文件现在才开，名字是此刻 —— 画面从这一刻起才往里编。
+        // 排在置「在录」之前：开文件那条命令要排在第一帧编出来的开轨之前
+        if (firstFileAtStart) {
+            firstFileAtStart = false;
+            openFirstFileNow();
+        }
+
         // 重置首次写入状态；写不进文件的裁判从此刻起算
         hasFirstWrite = false;
         startedUptimeMs = android.os.SystemClock.uptimeMillis();
@@ -1001,8 +1049,22 @@ public class CodecVideoRecorder {
                 callback.onCorruptedFilesDeleted(cameraId, deletedFiles);
             }
         }
-        
-        recordedFilePaths.clear();
+
+        synchronized (recordedFilePaths) {
+            stoppedFiles = new ArrayList<>(recordedFilePaths);
+            recordedFilePaths.clear();
+        }
+    }
+
+    /**
+     * 这一次停录收掉的文件：{@link #finishStop} 结束时还在这个录制器手里的那几个 —— 最后一个文件、重建 / 恢复时收掉的、
+     * 抢救出来的；太小删掉了的也在单子上（用的时候看在不在）。分段切换收好的那几个当时就报出去了
+     * （{@link RecordCallback#onSegmentSwitch}，中转写入那时就转存），不在里面。
+     *
+     * <p>一路单独离开录像时，中转写入只转存这几个（{@code MultiCameraManager}）：缓存目录里别的路还在写。</p>
+     */
+    public List<String> stoppedFiles() {
+        return stoppedFiles;
     }
 
     /**
@@ -1184,6 +1246,39 @@ public class CodecVideoRecorder {
      */
     public boolean isRecording() {
         return isRecording.get();
+    }
+
+    /**
+     * 这一路算不算在录：开过录、没叫停（2026-10-10）。
+     *
+     * <p>和 {@link #isRecording} 不同：那个在分段切换、快速恢复、重建编码器的那一下是 false。
+     * 一路离开录像时要数「还有没有别的路在录」，按那个数，别的路正好在切段就会被当成没在录，整次停录。</p>
+     */
+    public boolean isLive() {
+        return everStarted && !stopRequested;
+    }
+
+    /** 正在写的文件（写入线程开成了才有）；没有是 null。黑匣子用。 */
+    public String currentFile() {
+        return currentFilePath;
+    }
+
+    /**
+     * 共用的分段时间戳刚生成了一个新的（别的路在切段，{@code MultiCameraManager} 叫）：这一路的名字要是还和别的路错开着
+     * （单独接回的那一路，{@link #offCycleName}），马上跟着切，拿同一个名字（{@link RecordingLanes#alignsNow}）。
+     * 在编码线程上判、切（和分段计时到点切的是同一个 {@link #switchToNextSegment}）；名字本来就对得上的什么都不做。
+     */
+    public void switchNow() {
+        Handler encoderLooper = encoderHandler;
+        if (!offCycleName || encoderLooper == null) {
+            return;
+        }
+        encoderLooper.post(() -> {
+            if (RecordingLanes.alignsNow(offCycleName, isRecording.get(), stopRequested)) {
+                AppLog.d(TAG, "Camera " + cameraId + " joined off-cycle, switching to the shared segment name");
+                StallWatch.runTask(encoderBeat, cameraId, "segment-align", this::switchToNextSegment);
+            }
+        });
     }
 
     /**
@@ -1894,6 +1989,8 @@ public class CodecVideoRecorder {
         if (timestampProvider != null) {
             // 使用统一的时间戳提供者（确保多路摄像头使用相同时间戳）
             timestamp = timestampProvider.getSegmentTimestamp();
+            // 单独接回的一路从这一段起和别的路同名了：别的路再换名字，它照自己的分段计时走（switchNow 不再切）
+            offCycleName = false;
             AppLog.d(TAG, "Camera " + cameraId + " using provider timestamp: " + timestamp);
         } else {
             // 回退到独立生成时间戳（兼容旧逻辑）
@@ -2110,6 +2207,20 @@ public class CodecVideoRecorder {
         if (open.failure != null) {
             throw open.failure;
         }
+    }
+
+    /**
+     * 单独接回的一路开录（{@link #startRecording}）：第一个文件按此刻命名，不经共用的分段时间戳 —— 经它的话，
+     * 十秒内另一路切段会拿到这个名字，这一路也可能拿到别的路早先的名字，都比画面早。排给写入线程开，不在这里等：
+     * 开录在主线程上，不等盘；这个盘开不了，写入线程自己换盘（和分段切换开下一个文件同一条路）。
+     * 撞名由写入线程按此刻另起一个（{@link #freshPath}）。
+     */
+    private void openFirstFileNow() {
+        queuedFileName = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date())
+                + "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
+        offCycleName = true;
+        fileQueued = true;
+        queueCommand(new OpenFile(queuedFileName, ++openSerial, true, null));
     }
 
     /** 开下一个文件（名字按分段时间戳）：写入线程上开，这个盘开不了它自己换盘。编码线程上调。 */
@@ -2712,6 +2823,8 @@ public class CodecVideoRecorder {
             Handler segment = segmentHandler;
             if (close.nextSegmentIndex >= 0 && segment != null) {
                 final int nextIndex = close.nextSegmentIndex;
+                // 这一段交出去了（中转写入这就转存）：不再算这个录制器手里的，停录收掉的单子里没有它（stoppedFiles）
+                recordedFilePaths.remove(completed);
                 segment.post(() -> validateAndCleanupFile(completed));
                 RecordCallback cb = callback;
                 if (cb != null) {

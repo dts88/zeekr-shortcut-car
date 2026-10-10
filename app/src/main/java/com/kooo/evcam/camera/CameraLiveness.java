@@ -29,8 +29,8 @@ package com.kooo.evcam.camera;
  * <p><b>2.10.10 起连报错重连也归这里</b>（项目所有者 2026-10-09：「获取打开，关闭退出，仅此而已」）：
  * SingleCamera 收到设备报错 / 被断开只把设备关掉、标成「没开」，不再自己按错误码退避重连 ——
  * 那一套和这里互相顶（2026-10-08 自己顶自己 7 次）。设备报错算「已经卡住」，不用再等 {@link #STUCK_MS}；
- * 别的程序占着相机时（{@link CameraTaken}）每 {@link CameraTaken#RETRY_WHILE_HELD_MS} 试一次、不计次数，
- * 它放开时 MultiCameraManager.retryTaken 立刻接。</p>
+ * 这一路被别的程序拿走时（{@link CameraTaken#benched}）每 {@link CameraTaken#RETRY_WHILE_HELD_MS} 试一次、不计次数，
+ * 它放开、通道安静了由 MultiCameraManager.checkLiveness 单独重开（{@link CameraTaken#gate}）—— 被拿走的相机只从这里重开。</p>
  *
  * <h3>为什么要停手</h3>
  *
@@ -118,6 +118,23 @@ public final class CameraLiveness {
             cycles = 0;
             stopped = false;
         }
+
+        /**
+         * 别的程序放开了相机、或者访问优先级变了（{@link CameraTaken}）：被拿走的这一路下一次检查就可以试，
+         * 不等 {@link CameraTaken#RETRY_WHILE_HELD_MS} 的节奏。2026-10-10 起放开时不再当场重开，
+         * 由下一次检查按闸门来（{@link CameraTaken#gate}）。
+         */
+        public void due() {
+            lastResetMs = 0;
+        }
+
+        /**
+         * 被拿走的这一路放开了、通道也安静了，看门狗要单独重开它：从头算 —— 被别的程序占着的那段时间不是
+         * 「救不动」，之前攒的次数、歇着、彻底停手都作废（以前放开时 retryTaken 不看这些、直接重开）。
+         */
+        public void released() {
+            clear();
+        }
     }
 
     /**
@@ -127,16 +144,18 @@ public final class CameraLiveness {
      *                    <b>而且这一趟成功打开过</b> —— 压根没打开过的不归这里管
      * @param frameAgeMs  距上一次「有动静」多久 —— 出了一帧、开了相机、建好会话，都算动静
      * @param now         单调时钟，不含深度睡眠（车停着睡一夜，醒来不该算卡了一整夜）
-     * @param othersHold  别的程序此刻占着相机：重开多半失败，只每 {@link CameraTaken#RETRY_WHILE_HELD_MS}
-     *                    试一次（保险），不计次数、不停手；它一放开由 retryTaken 立刻接
+     * @param heldByOthers 这一路被别的程序拿走了、还没放开（{@link CameraTaken#benched}，看的是这一路自己，
+     *                    不是「别的程序占着哪一路」—— 2026-10-10 之前看后者，一路被占着，卡住的环视也跟着每 30 秒
+     *                    整个重开、不计次数）：重开多半失败，只每 {@link CameraTaken#RETRY_WHILE_HELD_MS} 试一次（保险），
+     *                    不计次数、不停手；放开、通道安静了由看门狗的闸门单独重开（{@link CameraTaken#gate}）
      */
-    public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now, boolean othersHold) {
+    public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now, boolean heldByOthers) {
         if (!wantsFrames || frameAgeMs < STUCK_MS) {
             // 没人用，或者帧回来了 —— 前面攒的次数一笔勾销
             state.clear();
             return Action.NONE;
         }
-        if (othersHold) {
+        if (heldByOthers) {
             if (state.lastResetMs != 0 && now - state.lastResetMs < CameraTaken.RETRY_WHILE_HELD_MS) {
                 return Action.NONE;
             }

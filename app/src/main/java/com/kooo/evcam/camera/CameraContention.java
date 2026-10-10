@@ -54,6 +54,24 @@ public final class CameraContention {
         }
     }
 
+    /**
+     * 我们的一路丢了、关完了才认出是别的程序拿走的（{@link CameraTaken#judgeLoss}，2026-10-10）：
+     * 按丢的那一刻记，嫌疑应用也按那一刻查 —— 那一次关在相机服务里能卡 5–8 秒。只有 {@link #othersTook}
+     * 没记上的才走这里：相机服务那一声「被占用」到得比断开还早（那时设备还是我们的，被记成「我们开着」），
+     * 或者根本没有那一声（被占用只是换了个主人，状态没变）。
+     *
+     * @param atElapsed 丢的那一刻（开机起算，含深睡）
+     */
+    static void othersTookAt(String cameraId, long atElapsed) {
+        long ago = Math.max(0, SystemClock.elapsedRealtime() - atElapsed);
+        OTHERS_TOOK_AT.put(cameraId, atElapsed);
+        lastOthersId = cameraId;
+        lastOthersAt = atElapsed;
+        BlackBox.noteImportant("争用：别的程序拿了相机 " + cameraId + "（" + ago + " ms 前我们丢了它，关完才认出来）；我们此刻 "
+                + describeUs());
+        CameraHolderSuspects.lookAround(cameraId, true, System.currentTimeMillis() - ago);
+    }
+
     /** 相机服务报：这一路空出来了。 */
     static void othersReleased(String cameraId) {
         Long took = OTHERS_TOOK_AT.remove(cameraId);

@@ -47,7 +47,7 @@ public class RecordingStopsTest {
         assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.STORAGE_LOCKED));
     }
 
-    /** 熄屏录制不在这一次的范围里，维持原来的做法。 */
+    /** 熄屏停的不等环视：黑着的时候不该自己录起来，亮屏时接（接不接熄屏时照 ScreenOffPlan 定）。 */
     @Test
     public void theScreenOffRuleIsLeftAsItWas() {
         assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.SCREEN_OFF));

@@ -80,6 +80,8 @@ public class SingleCamera {
      */
 
     private Surface recordSurface;  // 录制Surface
+    /** 眼下这份配好的会话里挂着的录像输出；null = 没挂。会话配好时（相机线程）写，见 {@link #sessionCarries}。 */
+    private volatile Surface sessionRecordSurface;
     private Surface mainFloatingSurface; // 主屏悬浮窗Surface
     private android.graphics.SurfaceTexture mainFloatingSurfaceTexture; // 主屏悬浮窗SurfaceTexture（用于设置buffer尺寸）
     private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
@@ -174,6 +176,18 @@ public class SingleCamera {
     private volatile long lastProgressUptimeMs = 0;
     /** 最近一次真的收到画面（capture 完成）—— 开相机、建会话不算。 */
     private volatile long lastCaptureUptimeMs = 0;
+    /**
+     * 两帧之间隔了这么久以上才记成一次断帧（{@link #longestFrameGapSince}）：30 / 15 fps 正常是 33–66 ms 一帧，
+     * 会话重建、相机服务卡一下都在几百毫秒以上。
+     */
+    static final long NOTABLE_GAP_MS = 200L;
+    /** 最近的断帧留几次：一路离开、接回录像那几秒里的，够了。 */
+    private static final int GAP_HISTORY = 16;
+    /** 最近几次断帧：结束的时刻（uptime）和隔了多久，循环覆盖。出帧回调（相机线程）写，主线程读，拿 gapLock。 */
+    private final long[] gapEndedAt = new long[GAP_HISTORY];
+    private final long[] gapLength = new long[GAP_HISTORY];
+    private int gapNext;
+    private final Object gapLock = new Object();
     /** 最后一次相机报错的短名，给界面说明「为什么点了没反应」。 */
     private volatile String lastErrorName;
 
@@ -183,6 +197,13 @@ public class SingleCamera {
      * 报错就关掉自己、标成「没开」，要不要再开、什么节奏，只有 MultiCameraManager 的看门狗一个地方判。
      */
     private volatile boolean deviceLost;
+    /**
+     * 被断开 / 报错 1、2 之后，关完了、还在等主线程判是不是被别的程序拿走的（{@link #loseDevice}）：
+     * 判完之前也算在途，看门狗不抢在判定前面按普通失败去重开。
+     */
+    private volatile boolean judgingLoss;
+    /** 被断开、报错 1 / 2 之后的那一次关（{@link #CLOSING} 里登记的那个）；null = 没有。见 {@link #holdsInService()}。 */
+    private volatile java.util.concurrent.CountDownLatch lostClose;
     /** 一次强制重开还在路上（关旧的、等 300 ms、开新的、等回调）：这期间再来的重开请求合并掉，不双开。 */
     private volatile boolean reopenInFlight;
     /** 最近一个动作（开 / 关 / 重开 / 配会话）上路的时刻（uptime）；0 = 没有过。见 {@link #isBusy()}。 */
@@ -216,6 +237,15 @@ public class SingleCamera {
     private static final long OPEN_WAIT_FOR_CLOSE_MS = IN_FLIGHT_MAX_MS;
     /** 关的时候还有一次打开在途：它的回调可能晚到，这一轮的相机线程多留这么久，好把晚到的设备关掉。 */
     private static final long LATE_OPEN_GRACE_MS = 3_000L;
+    /** 被相机服务断开时报给 MultiCameraManager 的错误码（自定义，onError 的码都是正的）。 */
+    private static final int LOST_DISCONNECTED = -4;
+    /**
+     * 丢了设备、关完之后隔多久在主线程上判是不是被别的程序拿走的：相机服务那几声「空闲 / 被占用」是单向通知，
+     * 经 binder 线程转到主线程，可能比关设备的返回晚一点到 —— 判的时候它们要已经记进表里。
+     */
+    private static final long LOSS_JUDGE_DELAY_MS = 300L;
+    /** 主线程：丢了设备之后的判定挪到这里做，和相机服务的通知同一条线。 */
+    private static final Handler MAIN = new Handler(android.os.Looper.getMainLooper());
     private boolean isConfiguring = false;    // 一次 createCaptureSession 发出去了、回调还没来
     private boolean isSessionClosing = false; // 旧会话在关，等 onClosed
     /**
@@ -440,14 +470,29 @@ public class SingleCamera {
     }
 
     /**
-     * 这一路此刻有没有动作在途：在开、在关、在重开、在配会话。
+     * 相机服务那边此刻算不算我们占着这一路：开着、正在开、正在照常关。
+     *
+     * <p>被断开、报错 1 / 2 之后的那一次关不算（{@link #loseDevice}，2026-10-10）：那一刻相机服务已经把我们踢了
+     * （或者压根没让我们连上），那几秒里它报的「被占用」是新的主人。算成我们的话，别的程序拿走相机被记成「我们开着」，
+     * 它在那几秒里放开又被当成乱报。关相机的次序照样等这一次关完（那边问的是 {@link #holdsOrIsOpening()}）。</p>
+     */
+    public boolean holdsInService() {
+        if (cameraDevice != null || isOpening) {
+            return true;
+        }
+        java.util.concurrent.CountDownLatch closing = CLOSING.get(cameraId);
+        return closing != null && closing != lostClose;
+    }
+
+    /**
+     * 这一路此刻有没有动作在途：在开、在关、在重开、在配会话，以及丢了设备之后在判是不是被拿走。
      *
      * <p>在途的时候不叠第二个动作 —— 看门狗不重开，强制重开合并。2026-10-08 的七次
      * 「被相机服务断开」全是自己顶自己：重连那一次打开还没回来，看门狗又开了一次，
      * 相机服务把先开的那份踢掉。在途超过 {@link #IN_FLIGHT_MAX_MS} 才当回调不会来了，不再算在途。</p>
      */
     public boolean isBusy() {
-        boolean inFlight = isOpening || reopenInFlight || CLOSING.containsKey(cameraId);
+        boolean inFlight = isOpening || reopenInFlight || judgingLoss || CLOSING.containsKey(cameraId);
         if (!inFlight) {
             synchronized (sessionLock) {
                 inFlight = isConfiguring || isSessionClosing;
@@ -465,7 +510,9 @@ public class SingleCamera {
         StringBuilder sb = new StringBuilder();
         if (isOpening) sb.append("opening ");
         if (reopenInFlight) sb.append("reopen ");
-        if (CLOSING.containsKey(cameraId)) sb.append("closing ");
+        if (judgingLoss) sb.append("judging-loss ");
+        java.util.concurrent.CountDownLatch closing = CLOSING.get(cameraId);
+        if (closing != null) sb.append(closing == lostClose ? "closing-lost " : "closing ");
         synchronized (sessionLock) {
             if (isConfiguring) sb.append("configuring ");
             if (isSessionClosing) sb.append("session-closing ");
@@ -633,6 +680,17 @@ public class SingleCamera {
     /** 挂着的录像输出；null = 没挂。停录只摘挂着的那几路、只重建它们的会话：没挂的不必白白重建一次。 */
     public Surface getRecordSurface() {
         return recordSurface;
+    }
+
+    /**
+     * 眼下这份配好的会话里是不是挂着 {@code surface} 这个录像输出（2026-10-10）。
+     *
+     * <p>「设了」不等于「会话里有」：挂上要等会话重建才生效，重建配不上时还会把录像输出丢掉
+     * （{@code onConfigureFailed}）。一路单独接回录像时，录制器要等这一句是真的、而且出了画面才启动，
+     * 不然它一帧都收不到，15 秒后被当成写不进。</p>
+     */
+    public boolean sessionCarries(Surface surface) {
+        return surface != null && captureSession != null && sessionRecordSurface == surface;
     }
 
     /**
@@ -894,6 +952,45 @@ public class SingleCamera {
         return last != 0 && SystemClock.uptimeMillis() - last < ms;
     }
 
+    /** 记一次断帧（出帧回调里，相机线程）。 */
+    private void noteFrameGap(long endedAt, long length) {
+        synchronized (gapLock) {
+            gapEndedAt[gapNext] = endedAt;
+            gapLength[gapNext] = length;
+            gapNext = (gapNext + 1) % GAP_HISTORY;
+        }
+    }
+
+    /**
+     * 从 {@code sinceUptimeMs} 到现在，这一路最长断了多久帧（毫秒）：这段时间里记下的断帧（只算落在这段时间里的那一截），
+     * 和此刻还没结束的那一段。不到 {@link #NOTABLE_GAP_MS} 的不记，那时返回的也不到它。
+     *
+     * <p>一路单独离开、接回录像时（2026-10-10），黑匣子要写「这几秒里别的路最长断帧多久」：车上核对「别的路没被动到」
+     * 看的就是它 —— 相机层的调试日志只留在内存里，车机断电、进程被杀之后就没了。</p>
+     */
+    public long longestFrameGapSince(long sinceUptimeMs) {
+        long longest = 0;
+        synchronized (gapLock) {
+            for (int i = 0; i < GAP_HISTORY; i++) {
+                if (gapEndedAt[i] > sinceUptimeMs) {
+                    longest = Math.max(longest, Math.min(gapLength[i], gapEndedAt[i] - sinceUptimeMs));
+                }
+            }
+        }
+        long last = lastCaptureUptimeMs;
+        return Math.max(longest, SystemClock.uptimeMillis() - Math.max(last, sinceUptimeMs));
+    }
+
+    /**
+     * 会话重建的代数（每真去建一次、作废在途的一次、设备没了，都 +1）。一路单独离开、接回录像时记下别的路的，
+     * 结束时对一下：变了就是它们的会话这段时间里被动过。
+     */
+    public int sessionGeneration() {
+        synchronized (sessionLock) {
+            return sessionGeneration;
+        }
+    }
+
     /**
      * 这一份会话出过画面没有。配好之后一帧都没出过的会话，重建没有意义 —— 它没有东西可以排空，
      * 重建的 waitUntilIdle 每次都超时、报设备错误，再关一次设备（2026-10-08 实测，环视一次要 4–13 秒）；
@@ -995,20 +1092,43 @@ public class SingleCamera {
             AppLog.d(TAG, "Camera " + cameraId + " already opening, skipping duplicate openCamera");
             return;
         }
+        open(null);
+    }
+
+    /**
+     * 带着录像输出打开这一路：输出在打开的同一把锁里挂上（2026-10-10，一路单独接回录像时用）。
+     *
+     * <p>{@link #openCamera()} 会把残留的录像输出清掉（防 Surface abandoned），所以先 {@link #setRecordSurface}
+     * 再开，挂上的就被它清了；而后台没有预览时这一路没有别的输出，压根建不起会话、出不了帧。
+     * 强制重开在没有相机线程时也退回 openCamera，同样会清。</p>
+     *
+     * @return false：这一路已经开着或正在开，什么都没做 —— 那种情况挂输出、重建会话由调用方来
+     */
+    public boolean openForRecording(Surface surface) {
+        if (cameraDevice != null || isOpening) {
+            return false;
+        }
+        open(surface);
+        return true;
+    }
+
+    /** 打开：{@code record} 是要一起挂上的录像输出，null = 不挂（清掉残留的）。 */
+    private void open(Surface record) {
         isOpening = true;
         markInFlight();
 
         synchronized (deviceLock) {
-            // 安全措施：清理可能残留的录制 Surface 引用（防止 Surface abandoned 错误）
+            // 安全措施：清理可能残留的录制 Surface 引用（防止 Surface abandoned 错误），要一起挂的那个换上
             // 放在同步块内，避免与 setRecordSurface() 的竞态条件
-            if (recordSurface != null) {
+            if (recordSurface != null && recordSurface != record) {
                 AppLog.w(TAG, "Camera " + cameraId + " found stale recordSurface on open, clearing it");
-                recordSurface = null;
             }
+            recordSurface = record;
             deviceLost = false;
-            AppLog.d(TAG, "openCamera: Starting for camera " + cameraId);
+            AppLog.d(TAG, "openCamera: Starting for camera " + cameraId
+                    + (record != null ? " with record surface " + record : ""));
         }
-        
+
         // 相机服务的调用（查设备、查参数、打开）都放到这一路自己的相机线程上：
         // 相机服务卡住时，卡住的是这一路的相机线程，不是主线程 —— 卡顿监测里一眼分得清
         startBackgroundThread();
@@ -1178,6 +1298,8 @@ public class SingleCamera {
                 lastErrorName = null;
                 deviceLost = false;
                 CameraContention.ourCameraOpened(cameraId);
+                // 开成了就是别的程序这会儿不占着它（前台的一方拿得到）：从「别的程序占着」的表上划掉
+                CameraTaken.ourCameraOpened(cameraId);
                 AppLog.d(TAG, "Camera " + cameraId + " opened");
                 if (callback != null) {
                     callback.onCameraOpened(cameraId);
@@ -1192,25 +1314,12 @@ public class SingleCamera {
                 closeDeviceTimed(camera, "stale disconnect");
                 return;
             }
-            isOpening = false;
-            reopenInFlight = false;
             // 这是相机服务把我们踢掉：被别的程序（多半是原厂功能）拿走，或者设备自己没了。
             // 基座把它记成自定义的 -4，标签写的「资源耗尽」是错的
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 被相机服务断开（onDisconnected）");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 被相机服务断开（onDisconnected）：先报、再关");
             CameraContention.ourCameraDisconnected(cameraId);
-            // 锁外关：它进相机服务，可能卡住（见 closeDeviceTimed）
-            closeDeviceTimed(camera, "onDisconnected");
-            synchronized (deviceLock) {
-                if (cameraDevice == camera) {
-                    cameraDevice = null;
-                }
-                lastErrorName = "DISCONNECTED";
-                deviceLost = true;   // 要不要再开、什么节奏：看门狗判（别的程序占着时每 30 秒一次）
-                AppLog.w(TAG, "Camera " + cameraId + " DISCONNECTED");
-                if (callback != null) {
-                    callback.onCameraError(cameraId, -4); // 自定义错误码：断开连接
-                }
-            }
+            AppLog.w(TAG, "Camera " + cameraId + " DISCONNECTED");
+            loseDevice(camera, LOST_DISCONNECTED, "DISCONNECTED", "onDisconnected");
         }
 
         @Override
@@ -1219,46 +1328,122 @@ public class SingleCamera {
                 closeDeviceTimed(camera, "stale error");
                 return;
             }
-            isOpening = false;
-            reopenInFlight = false;
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 出错 error=" + error);
-            // 锁外关：它进相机服务，可能卡住（见 closeDeviceTimed）
-            closeDeviceTimed(camera, "onError");
-            synchronized (deviceLock) {
-                if (cameraDevice == camera) {
-                    cameraDevice = null;
-                }
-                String errorMsg;
-                switch (error) {
-                    case CameraDevice.StateCallback.ERROR_CAMERA_IN_USE:
-                        errorMsg = "ERROR_CAMERA_IN_USE (1) - Camera is being used by another app";
-                        break;
-                    case CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE:
-                        errorMsg = "ERROR_MAX_CAMERAS_IN_USE (2) - Too many cameras open";
-                        break;
-                    case CameraDevice.StateCallback.ERROR_CAMERA_DISABLED:
-                        errorMsg = "ERROR_CAMERA_DISABLED (3) - Camera disabled by policy (likely background restriction)";
-                        break;
-                    case CameraDevice.StateCallback.ERROR_CAMERA_DEVICE:
-                        errorMsg = "ERROR_CAMERA_DEVICE (4) - Device error (may be temporary due to resource contention)";
-                        break;
-                    case CameraDevice.StateCallback.ERROR_CAMERA_SERVICE:
-                        errorMsg = "ERROR_CAMERA_SERVICE (5) - Camera service error";
-                        break;
-                    default:
-                        errorMsg = "UNKNOWN (" + error + ")";
-                        break;
-                }
-                AppLog.e(TAG, "Camera " + cameraId + " error: " + errorMsg);
-                lastErrorName = errorMsg;
-                deviceLost = true;   // 再开不再在这里按错误码退避：看门狗一处判
-                CameraContention.ourOpenFailed(cameraId, errorMsg);
-                if (callback != null) {
-                    callback.onCameraError(cameraId, error);
-                }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 出错 error=" + error);
+            String errorMsg;
+            switch (error) {
+                case CameraDevice.StateCallback.ERROR_CAMERA_IN_USE:
+                    errorMsg = "ERROR_CAMERA_IN_USE (1) - Camera is being used by another app";
+                    break;
+                case CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE:
+                    errorMsg = "ERROR_MAX_CAMERAS_IN_USE (2) - Too many cameras open";
+                    break;
+                case CameraDevice.StateCallback.ERROR_CAMERA_DISABLED:
+                    errorMsg = "ERROR_CAMERA_DISABLED (3) - Camera disabled by policy (likely background restriction)";
+                    break;
+                case CameraDevice.StateCallback.ERROR_CAMERA_DEVICE:
+                    errorMsg = "ERROR_CAMERA_DEVICE (4) - Device error (may be temporary due to resource contention)";
+                    break;
+                case CameraDevice.StateCallback.ERROR_CAMERA_SERVICE:
+                    errorMsg = "ERROR_CAMERA_SERVICE (5) - Camera service error";
+                    break;
+                default:
+                    errorMsg = "UNKNOWN (" + error + ")";
+                    break;
             }
+            AppLog.e(TAG, "Camera " + cameraId + " error: " + errorMsg);
+            CameraContention.ourOpenFailed(cameraId, errorMsg);
+            loseDevice(camera, error, errorMsg, "onError");
         }
     };
+
+    /**
+     * 设备没了：被相机服务断开（{@code onDisconnected}），或者报错（{@code onError}）。在这一轮的相机线程上。
+     *
+     * <p>2026-10-10 起先摘、再关：锁里把设备和会话从字段上摘下来、标成「没开」，这一次关登记成在途
+     * （{@link #isBusy()}、{@link #anyClosing()} 都算上，最多 {@link #IN_FLIGHT_MAX_MS}），然后才去关。
+     * 以前是先关、关完才摘：车机拿走后座舱相机 1 时，这一次关在相机服务里卡 5–8 秒（{@code ICameraDeviceUser.disconnect}），
+     * 这几秒里设备字段还在、也不算在途 —— 看门狗、按次序开相机都当通道是静的，录像要等它关完才知道这一路没了，
+     * 相机服务那一声「被占用」也被记成了「我们开着」。</p>
+     *
+     * <ul>
+     *   <li>被断开、报错 1（被占用）/ 2（相机数到上限）：多半是别的程序拿走了 —— 先报（录像那一侧当场知道），再关；
+     *       关完挪到主线程判是不是被别的程序拿走的（{@link CameraTaken#judgeLoss}），判完才不算在途；</li>
+     *   <li>设备错误 3 / 4 / 5：照旧关完再报 —— 录制器留着，看门狗重开，画面回来同一个录制器接着录。</li>
+     * </ul>
+     *
+     * <p>关的途中被 {@link #closeCamera} 关了（这一轮的相机线程已经摘下）：关完什么都不再写、不再报 ——
+     * 它已经关了，不是丢了。</p>
+     *
+     * @param code      报给 MultiCameraManager 的错误码：被断开是 {@link #LOST_DISCONNECTED}，其余是 onError 的
+     * @param errorName 记进 {@link #lastErrorName} 的短名
+     * @param why       关设备那一行写的原因
+     */
+    private void loseDevice(CameraDevice camera, int code, String errorName, String why) {
+        isOpening = false;
+        reopenInFlight = false;
+        final boolean maybeTaken = code == LOST_DISCONNECTED
+                || code == CameraDevice.StateCallback.ERROR_CAMERA_IN_USE
+                || code == CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE;
+        final Handler round = backgroundHandler;
+        final long lostAt = SystemClock.elapsedRealtime();
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        final java.util.concurrent.CountDownLatch previous;
+        synchronized (deviceLock) {
+            if (cameraDevice == camera) {
+                // 会话跟着设备一起没了：排着的重建取消、在途的配置作废，没人再拿它当活的
+                cameraDevice = null;
+                captureSession = null;
+                voidSessionWork();
+            }
+            lastErrorName = errorName;
+            deviceLost = true;   // 要不要再开、什么节奏：看门狗一处判（被别的程序拿走的，等它放开、通道安静了单独重开）
+            judgingLoss = maybeTaken;
+            // 先登记再报：报出去之后按次序开相机看 anyClosing() 就会等这一次关完。被断开、报 1 / 2 的那一次关
+            // 相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着
+            if (maybeTaken) {
+                lostClose = done;
+            }
+            previous = CLOSING.put(cameraId, done);
+            markInFlight();
+            if (maybeTaken && callback != null) {
+                callback.onCameraError(cameraId, code);
+            }
+        }
+        // 锁外关：它进相机服务，可能卡住（见 closeDeviceTimed）
+        closeDeviceTimed(camera, why);
+        // 同一台相机上一次的关闭要是还没完，等它：「这一次关完」要蕴含「之前的都关完」
+        awaitQuietly(previous, OPEN_WAIT_FOR_CLOSE_MS);
+        final long closeMs = SystemClock.elapsedRealtime() - lostAt;
+        CLOSING.remove(cameraId, done);
+        if (lostClose == done) {
+            lostClose = null;
+        }
+        done.countDown();
+        if (isStale()) {
+            return;   // closeCamera 已经把在途的标记清掉
+        }
+        if (!maybeTaken) {
+            synchronized (deviceLock) {
+                if (callback != null) {
+                    callback.onCameraError(cameraId, code);
+                }
+            }
+            return;
+        }
+        MAIN.postDelayed(() -> {
+            if (round != backgroundHandler) {
+                return;   // 这期间被关了、或者换了一轮：closeCamera 已经把在途的标记清掉
+            }
+            CameraTaken.judgeLoss(cameraId, who(), code, errorName, lostAt, closeMs);
+            judgingLoss = false;
+        }, LOSS_JUDGE_DELAY_MS);
+    }
+
+    /** 黑匣子里的叫法：编号加环视 / 前座舱 / 后座舱，「1（后座舱）」。 */
+    private String who() {
+        return cameraPosition == null ? cameraId
+                : cameraId + "（" + MultiCameraManager.roleName(cameraPosition) + "）";
+    }
 
     /**
      * 创建预览会话
@@ -1433,11 +1618,12 @@ public class SingleCamera {
                 AppLog.d(TAG, "Camera " + cameraId + " 没有显示输出，拍照用不显示的出帧口: " + previewSize);
             }
 
-            // 录制 Surface 作为一个独立的硬件流
-            if (recordSurface != null && recordSurface.isValid()) {
-                outputConfigs.add(new OutputConfiguration(recordSurface));
-                surfaces.add(recordSurface);
-                previewRequestBuilder.addTarget(recordSurface);
+            // 录制 Surface 作为一个独立的硬件流；配好时记下这份会话带的是哪一个（见 sessionCarries）
+            final Surface recordInSession = (recordSurface != null && recordSurface.isValid()) ? recordSurface : null;
+            if (recordInSession != null) {
+                outputConfigs.add(new OutputConfiguration(recordInSession));
+                surfaces.add(recordInSession);
+                previewRequestBuilder.addTarget(recordInSession);
                 AppLog.d(TAG, "Added record surface as SEPARATE stream");
             }
 
@@ -1511,6 +1697,7 @@ public class SingleCamera {
                         return;
                     }
 
+                    sessionRecordSurface = recordInSession;
                     captureSession = session;
                     try {
                         frameCount = 0;
@@ -1754,8 +1941,12 @@ public class SingleCamera {
                                       @NonNull CaptureRequest request,
                                       @NonNull TotalCaptureResult result) {
             captureBeat.beat(StallWatch.now());
+            long previousCapture = lastCaptureUptimeMs;
             lastProgressUptimeMs = SystemClock.uptimeMillis();
             lastCaptureUptimeMs = lastProgressUptimeMs;
+            if (previousCapture != 0 && lastCaptureUptimeMs - previousCapture >= NOTABLE_GAP_MS) {
+                noteFrameGap(lastCaptureUptimeMs, lastCaptureUptimeMs - previousCapture);
+            }
             frameCount++;
             long now = System.currentTimeMillis();
             lastFrameTimestampMs = now;
@@ -2371,9 +2562,10 @@ public class SingleCamera {
         synchronized (deviceLock) {
             openInFlight = isOpening && cameraDevice == null;
             isOpening = false;
-            // 这一趟的标记都归零：路上的强制重开、设备报错的记号
+            // 这一趟的标记都归零：路上的强制重开、设备报错的记号、丢了之后还没判完的那一次
             reopenInFlight = false;
             deviceLost = false;
+            judgingLoss = false;
             voidSessionWork();
 
             // 要关的从字段上摘下来，交给相机线程去关
@@ -2432,8 +2624,8 @@ public class SingleCamera {
             long ms = SystemClock.elapsedRealtime() - requestedAt;
             AppLog.d(TAG, "Camera " + cameraId + " closed in " + ms + "ms");
             if (why != null) {
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 已关（"
-                        + why + "，" + ms + "ms）");
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 已关（"
+                        + why + "，" + ms + "ms" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + "）");
             }
             CLOSING.remove(cameraId, done);
             done.countDown();

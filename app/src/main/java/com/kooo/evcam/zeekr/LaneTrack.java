@@ -82,15 +82,46 @@ public final class LaneTrack {
     }
 
     /**
-     * 属于这一条录制的文件：开头落在这条时间轴里的那些。
+     * 这一条录制的画面上要放的文件：和它的时间段有重叠的那些（2026-10-10）。
      *
-     * <p>按开头算，不按「有重叠」算：删除和分享也用它，一个文件只能归一条录制。
-     * 开头往前放宽 {@link RecordingTimeline#DEFAULT_MAX_GAP_MS} —— 几路相机不是同一刻
-     * 开录的，座舱那一路比环视早一两秒开头很正常，它仍然是这一次录的。</p>
+     * <p>按重叠算，不按开头算。一路相机被别的程序占用时只停那一路、其余照录，放开后单独接回
+     * —— 停的也可能是环视。这时座舱的文件可能在环视重新开录之前就开头了；按开头算它不归这一条，
+     * 环视开录后的那几十秒里座舱那一格就写着「该路此时无录像」，其实录像在。</p>
+     *
+     * <p>按重叠算，一个文件可能在相邻两条录制里都露面，所以删除、分享、算大小不用它，
+     * 用 {@link #belongingTo}：每个文件恰好归一条。</p>
      */
-    public LaneTrack within(RecordingTimeline.Session session) {
-        long from = session.startEpochMs - RecordingTimeline.DEFAULT_MAX_GAP_MS;
+    public LaneTrack shownIn(RecordingTimeline.Session session) {
+        long from = session.startEpochMs;
         long to = session.endEpochMs();
+        List<Clip> list = new ArrayList<>();
+        for (Clip clip : clips) {
+            if (clip.endEpochMs() > from && clip.startEpochMs < to) {
+                list.add(clip);
+            }
+        }
+        return new LaneTrack(list);
+    }
+
+    /**
+     * 归第 index 条录制的文件：删除、分享、大小、「含已锁定文件」都按它算（2026-10-10）。
+     *
+     * <p>每个文件<b>恰好归一条</b>：开头之前最近开录的那一条；比第一条还早的归第一条。
+     * 开头往前放宽 {@link RecordingTimeline#DEFAULT_MAX_GAP_MS} —— 几路相机不是同一刻开录的，
+     * 座舱那一路比环视早一两秒开头很正常，它仍然是这一次录的。</p>
+     *
+     * <p>以前只收开头落在这一条时间段里的。环视停着、座舱照录的那段时间里录下的文件于是
+     * 不归任何一条：回放里删不掉、不算大小，锁上了列表里也不标 —— 只能等自动清理。
+     * 现在它归前一条，和前一条一起删。它在环视之外的那一截不在任何一条的画面上
+     * （进度条跟着环视），这是有意的。</p>
+     *
+     * @param sessions 全部录制，按先后排（{@link RecordingTimeline#build} 的结果）
+     */
+    public LaneTrack belongingTo(List<RecordingTimeline.Session> sessions, int index) {
+        long gap = RecordingTimeline.DEFAULT_MAX_GAP_MS;
+        long from = index == 0 ? Long.MIN_VALUE : sessions.get(index).startEpochMs - gap;
+        long to = index == sessions.size() - 1
+                ? Long.MAX_VALUE : sessions.get(index + 1).startEpochMs - gap;
         List<Clip> list = new ArrayList<>();
         for (Clip clip : clips) {
             if (clip.startEpochMs >= from && clip.startEpochMs < to) {

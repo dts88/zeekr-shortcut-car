@@ -8,6 +8,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.blackbox.BlackBox;
@@ -36,9 +37,11 @@ import java.util.List;
  * <ol>
  *   <li>熄屏录制的唤醒锁（{@link ScreenOffRecording}）；</li>
  *   <li>录像的规矩（{@link RecordingCoordinator#screenOff()} / {@link RecordingCoordinator#screenOn()}）：
- *       熄屏持续录制关着就 10 秒后停，亮屏再判接不接；</li>
- *   <li>相机不在这里管：谁要用就登记，没人登记 1.5 秒后关，由相机层按登记表判（MultiCameraManager.reconcileCameras）——
- *       熄屏时后视镜注销、主界面暂停注销，相机自然就关了，正好赶在深睡之前；</li>
+ *       照 {@code ScreenOffPlan} 接着录、10 秒后停、或者现在停（哨兵模式没开、车没在走：车机几秒后就断电），
+ *       亮屏再判接不接；</li>
+ *   <li>相机不在这里管：谁要用就登记，熄屏时没人登记了就现在关（环视先单独关），由相机层按登记表判
+ *       （MultiCameraManager.reconcileCameras）—— 现在停的那一次录像先放开，后视镜、主界面跟着注销，相机自然就关了，
+ *       赶在断电之前；</li>
  *   <li>界面：因熄屏自己退下去的主界面，亮屏就接回来（{@link Recovery#bringBackUiAfterScreenOn}）；</li>
  *   <li>之后才是主界面、后视镜自己登记的监听者（退后台、摘/接后视镜）。</li>
  * </ol>
@@ -61,6 +64,8 @@ public final class ScreenState {
     private static Context app;
     private static boolean installed;
     private static volatile boolean dark;
+    /** 这一次是什么时候黑的（开机起算，含深睡）；0 = 亮着，或者进程起来时就黑着（不知道什么时候黑的）。 */
+    private static volatile long darkAtMs;
 
     private ScreenState() {
     }
@@ -101,6 +106,15 @@ public final class ScreenState {
     /** 记下来的状态：黑着 = 收到过熄屏、还没亮。要最新的用 {@link #refresh()}。 */
     public static boolean dark() {
         return dark;
+    }
+
+    /**
+     * 熄屏多久了（毫秒，含深睡）；亮着、或者不知道什么时候黑的，是 -1。
+     * 熄屏后按次序关的那几步在黑匣子里记成「熄屏后 +N ms」（{@code BlackBox.afterScreenOff}），任何线程都能问。
+     */
+    public static long darkForMs() {
+        long at = darkAtMs;
+        return dark && at > 0 ? SystemClock.elapsedRealtime() - at : -1;
     }
 
     /**
@@ -153,6 +167,7 @@ public final class ScreenState {
         if (dark) {
             return;
         }
+        darkAtMs = SystemClock.elapsedRealtime();
         dark = true;
         BlackBox.noteImportant("熄屏");
         ScreenOffRecording.onScreenOff(app);
@@ -169,6 +184,7 @@ public final class ScreenState {
             return;
         }
         dark = false;
+        darkAtMs = 0;
         MAIN.removeCallbacks(WAKE_POLL);
         // 总原则（规格 §0）：停车熄屏是特殊情况；屏幕亮了，特殊情况就结束了，回到用户设定的状态
         BlackBox.noteImportant("亮屏（" + how + "）");

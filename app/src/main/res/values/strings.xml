@@ -108,7 +108,7 @@
     <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
-    <string name="set_screen_off_keep_summary">需配合哨兵模式使用。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
+    <string name="set_screen_off_keep_summary">需配合哨兵模式使用。未开启哨兵模式时，停车熄屏后暂停录制，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
@@ -390,7 +390,7 @@
     <string name="reason_timeout">连接超时</string>
     <string name="reason_no_space">存储空间不足</string>
     <string name="reason_file_not_found">文件不存在</string>
-    <string name="msg_screen_off_stopped">熄屏 10 秒，已自动停止录制</string>
+    <string name="msg_screen_off_stopped">熄屏后已停止录制</string>
     <string name="msg_screen_off_background">熄屏 15 秒，已转入后台</string>
     <string name="msg_stats_on">录制状态显示已开启</string>
     <string name="msg_stats_off">录制状态显示已关闭</string>
@@ -606,6 +606,9 @@
     <string name="status_storage_none">未检测到 U 盘</string>
     <string name="status_recording_fallback">已改为录制到 %1$s（%2$s 不可用）</string>
     <string name="status_camera_taken">摄像头被占用，释放后自动继续录制</string>
+    <string name="status_camera_lane_taken">%1$s：摄像头被占用，其他摄像头继续录制；释放后该路自动恢复录制</string>
+    <string name="status_cameras_taken">部分摄像头被占用，其他摄像头继续录制；释放后自动恢复录制</string>
+    <string name="status_camera_lane_unavailable">%1$s：摄像头无法打开，其他摄像头继续录制</string>
     <string name="status_internal_storage">内置存储</string>
     <string name="nav_group_switches">开关</string>
 

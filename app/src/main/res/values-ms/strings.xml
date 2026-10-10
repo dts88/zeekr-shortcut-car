@@ -90,7 +90,7 @@
     <string name="set_screen_off_wake_title">Kekal berjaga sehingga (jam)</string>
     <string name="unit_hours">%1$s jam</string>
     <string name="set_screen_off_keep_title">Terus merakam apabila skrin padam</string>
-    <string name="set_screen_off_keep_summary">Memerlukan Mod Sentry. Tanpanya, rakaman dijeda semasa kereta tidur dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.</string>
+    <string name="set_screen_off_keep_summary">Memerlukan Mod Sentry. Tanpanya, jika kenderaan berhenti, rakaman dijeda apabila skrin padam dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.</string>
     <string name="sentry_status_on">Mod Sentry: hidup</string>
     <string name="sentry_status_armed">Mod Sentry: bersiaga</string>
     <string name="sentry_status_off">Mod Sentry: mati</string>
@@ -381,7 +381,7 @@
     <string name="reason_timeout">sambungan tamat masa</string>
     <string name="reason_no_space">ruang storan tidak cukup</string>
     <string name="reason_file_not_found">fail tidak ditemui</string>
-    <string name="msg_screen_off_stopped">Skrin padam selama 10 saat. Rakaman dihentikan.</string>
+    <string name="msg_screen_off_stopped">Rakaman dihentikan selepas skrin padam</string>
     <string name="msg_screen_off_background">Skrin padam selama 15 saat. Dialihkan ke latar belakang.</string>
     <string name="msg_stats_on">Paparan status rakaman dihidupkan</string>
     <string name="msg_stats_off">Paparan status rakaman dimatikan</string>
@@ -598,6 +598,9 @@
     <string name="status_storage_none">Tiada pemacu USB</string>
     <string name="status_recording_fallback">Merakam ke %1$s (%2$s tidak tersedia)</string>
     <string name="status_camera_taken">Kamera sedang digunakan. Rakaman disambung semula apabila ia dilepaskan.</string>
+    <string name="status_camera_lane_taken">%1$s: kamera sedang digunakan. Kamera lain terus merakam. Rakaman kamera ini disambung semula apabila ia dilepaskan.</string>
+    <string name="status_cameras_taken">Sebahagian kamera sedang digunakan. Kamera lain terus merakam. Rakaman setiap kamera disambung semula apabila ia dilepaskan.</string>
+    <string name="status_camera_lane_unavailable">%1$s: kamera tidak dapat dibuka. Kamera lain terus merakam.</string>
     <string name="status_internal_storage">storan dalaman</string>
     <string name="nav_group_switches">Suis</string>
 

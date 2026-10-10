@@ -1,5 +1,6 @@
 package com.kooo.evcam.recording;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -93,21 +94,27 @@ public class RecordingIntentTest {
         assertFalse(intent.stoppedByUser());
     }
 
+    /** 内存里的一份「盘」：新实例从同一份里读回来，就是进程被杀又拉回来。数一下写了几次。 */
+    private static final class MemoryStore implements RecordingIntent.Store {
+        final java.util.Map<String, Boolean> saved = new java.util.HashMap<>();
+        int writes;
+
+        @Override
+        public boolean get(String key, boolean fallback) {
+            return saved.containsKey(key) ? saved.get(key) : fallback;
+        }
+
+        @Override
+        public void put(java.util.Map<String, Boolean> values) {
+            saved.putAll(values);
+            writes++;
+        }
+    }
+
     /** 规格 1.2：进程被杀又拉回来，「这一趟」的选择还在 —— 新实例从同一份存储里读回来。 */
     @Test
     public void choicesSurviveANewInstanceThroughTheStore() {
-        java.util.Map<String, Boolean> saved = new java.util.HashMap<>();
-        RecordingIntent.Store store = new RecordingIntent.Store() {
-            @Override
-            public boolean get(String key, boolean fallback) {
-                return saved.containsKey(key) ? saved.get(key) : fallback;
-            }
-
-            @Override
-            public void put(String key, boolean value) {
-                saved.put(key, value);
-            }
-        };
+        MemoryStore store = new MemoryStore();
         RecordingIntent first = new RecordingIntent();
         first.attach(store);
         first.noteRecordingStarted();
@@ -118,5 +125,76 @@ public class RecordingIntentTest {
         assertTrue(second.stoppedByUser());
         assertFalse(second.shouldRestore(true));
         assertFalse(second.shouldAutoStart(true));
+    }
+
+    /**
+     * 「这一趟要录」被车机结束进程之后还在（2026-10-10：哨兵模式没开时熄屏停录、等亮屏接，熄屏 3–5 秒后进程被结束，
+     * 以前「亮屏接着录」只记在内存里，新进程不接）。
+     */
+    @Test
+    public void recordingWantedSurvivesTheProcessBeingKilled() {
+        MemoryStore store = new MemoryStore();
+        RecordingIntent first = new RecordingIntent();
+        first.attach(store);
+        assertFalse(first.recordingWanted());
+        assertTrue("立起来算变了", first.noteRecordingWanted(true));
+
+        RecordingIntent second = new RecordingIntent();
+        second.attach(store);
+        assertTrue(second.recordingWanted());
+    }
+
+    /** 立、撤只在变了的时候落盘：在录、在等、接回时一遍遍立，不该一遍遍写盘（写的是 commit，同步的）。 */
+    @Test
+    public void recordingWantedIsWrittenOnlyWhenItChanges() {
+        MemoryStore store = new MemoryStore();
+        intent.attach(store);
+        assertTrue(intent.noteRecordingWanted(true));
+        int writes = store.writes;
+        assertFalse("没变", intent.noteRecordingWanted(true));
+        assertEquals("没变就不写", writes, store.writes);
+        assertTrue(intent.noteRecordingWanted(false));
+        assertEquals(writes + 1, store.writes);
+        assertFalse(store.saved.get("recordingWanted"));
+    }
+
+    /** 手动停止：这一趟里没有任何一条路可以再自动开起来 —— 进程被杀了也不接。 */
+    @Test
+    public void stoppingByHandDropsRecordingWanted() {
+        MemoryStore store = new MemoryStore();
+        intent.attach(store);
+        intent.noteRecordingWanted(true);
+        intent.noteUserStopped();
+        assertFalse(intent.recordingWanted());
+
+        RecordingIntent afterKill = new RecordingIntent();
+        afterKill.attach(store);
+        assertFalse(afterKill.recordingWanted());
+    }
+
+    /** 车机真正开机、人点开主界面、退出（reset）是新的一趟：被杀之前要录的不再接。 */
+    @Test
+    public void aFreshLaunchDropsRecordingWanted() {
+        MemoryStore store = new MemoryStore();
+        intent.attach(store);
+        intent.noteRecordingWanted(true);
+        intent.reset();
+        assertFalse(intent.recordingWanted());
+
+        RecordingIntent afterKill = new RecordingIntent();
+        afterKill.attach(store);
+        assertFalse(afterKill.recordingWanted());
+    }
+
+    /** 「这一趟要录」和别的选择互不牵连：立起来、撤掉，自动开过没有、人停过没有都不变。 */
+    @Test
+    public void recordingWantedLeavesTheOtherChoicesAlone() {
+        intent.noteAutoStarted();
+        intent.noteRecordingStarted();
+        intent.noteRecordingWanted(true);
+        intent.noteRecordingWanted(false);
+        assertFalse(intent.shouldAutoStart(true));
+        assertTrue(intent.shouldRestore(true));
+        assertFalse(intent.stoppedByUser());
     }
 }

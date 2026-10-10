@@ -207,6 +207,15 @@ public final class BlackBox {
         return on ? "开" : "关";
     }
 
+    /**
+     * 熄屏期间那几步（停录、放开相机、每一路关完、整轮关完、放唤醒锁）后面带的「，熄屏后 +N ms」；亮着时是空串。
+     * 哨兵模式没开时车机熄屏 3–5 秒就结束进程（2026-10-10）：每一步赶没赶在那之前，对着「熄屏」那一行就看得出。
+     */
+    public static String afterScreenOff() {
+        long ms = com.kooo.evcam.screen.ScreenState.darkForMs();
+        return ms < 0 ? "" : "，熄屏后 +" + ms + "ms";
+    }
+
     /** 已经接上了没有。没接上时事件先攒在内存里。 */
     public static boolean isAttached() {
         return appContext != null;

@@ -16,6 +16,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.camera.CameraManagerHolder;
+import com.kooo.evcam.camera.CameraTaken;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.camera.StallWatch;
@@ -138,8 +139,9 @@ public class RearViewMirrorService extends Service {
      * 运气差的那次，是连重开都失败，只能重启车机。</p>
      *
      * <p>所以熄屏就放手：看不见的画面不值得占着相机睡过去。亮屏再接回来。
-     * 后视镜在 {@link #unbindCamera} 里注销自己那一份登记，{@link com.kooo.evcam.screen.ScreenState}
-     * 熄屏 1.5 秒后「没人要就关相机」那条规矩才成立。</p>
+     * 后视镜在 {@link #unbindCamera} 里注销自己那一份登记，熄屏后「没人要就关相机」那条规矩才成立
+     * （熄屏时没人要了现在就关，环视先单独关）。摘下时请求的那一次环视会话重建要去抖 100 毫秒，
+     * 关相机在它之前就到了，先把它作废（{@code SingleCamera.closeCamera} → {@code voidSessionWork}），不在关之前再动环视。</p>
      *
      * <h3>屏幕亮没亮，只问 ScreenState</h3>
      *
@@ -161,7 +163,8 @@ public class RearViewMirrorService extends Service {
                         com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：正在录像，后视镜先不放开，录完再放");
                         return;
                     }
-                    com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：后视镜放开相机");
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏：后视镜放开相机"
+                            + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
                     unbindCamera();
                 }
 
@@ -315,6 +318,10 @@ public class RearViewMirrorService extends Service {
 
         if (camera.isCameraOpened()) {
             camera.recreateSession(false);
+        } else if (CameraTaken.benched(camera.getCameraId())) {
+            // 环视被别的程序拿走了：画面挂上就行，不自己开 —— 它只从看门狗的闸门重开（放开了、通道安静了才开）。
+            // 以前这里每 2 秒（ensureStillBound）开一次，相机服务交接的中途也开（2026-10-10）
+            AppLog.i(TAG, "环视被别的程序拿走了：后视镜先挂上，等它放开由看门狗重开");
         } else {
             final SingleCamera cam = camera;
             CameraForegroundService.whenReady(this, cam::openCamera);
@@ -387,8 +394,9 @@ public class RearViewMirrorService extends Service {
         }
         if (com.kooo.evcam.screen.ScreenState.dark() && boundCamera != null && !recordingHoldsCamera()) {
             // 熄屏那一刻在录像，所以没摘；现在录完了，补上。放开之后相机就可能没人要了，
-            // 让 ScreenState 按熄屏那条规矩再确认一遍（1.5 秒后没人要就关）—— 别开着相机睡过去
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏中录像结束：后视镜放开相机");
+            // 相机层按熄屏那条规矩现在就关（没人要了不等）—— 别开着相机睡过去
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏中录像结束：后视镜放开相机"
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
             unbindCamera();
             return;
         }
@@ -489,7 +497,10 @@ public class RearViewMirrorService extends Service {
             return;
         }
         String error = camera == null ? null : camera.lastErrorName();
-        String message = error != null && error.contains("IN_USE")
+        // 被别的程序拿走的（被断开那种报的是 DISCONNECTED，不带 IN_USE）也是「被占用」：放开了看门狗会重开它
+        boolean busy = error != null && error.contains("IN_USE")
+                || camera != null && CameraTaken.benched(camera.getCameraId());
+        String message = busy
                 ? getString(R.string.mirror_resume_busy)
                 : getString(R.string.mirror_resume_failed, error == null ? "?" : error);
         AppLog.w(TAG, "点击恢复之后相机仍然没打开: " + error);
