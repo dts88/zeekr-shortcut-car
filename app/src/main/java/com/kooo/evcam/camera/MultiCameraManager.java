@@ -321,6 +321,9 @@ public class MultiCameraManager {
 
     public MultiCameraManager(Context context) {
         this.context = context;
+        // 相机服务眼里每一路空不空：管线一建就听。以前只有前台服务调它，前台服务没起来时相机服务说的话一句都没收，
+        // 每次丢失都被判成「没说空闲」。注册那一刻的回放在主线程上收全，排在之后 post 的每一轮之前（重复调用无害）
+        CameraAvailabilityWatch.start(context);
         livenessRunning = true;
         mainHandler.postDelayed(livenessTick, LIVENESS_TICK_MS);
         // 登记表一变就来看：有人要就开，没人要就关（相机开关的唯一裁判）
