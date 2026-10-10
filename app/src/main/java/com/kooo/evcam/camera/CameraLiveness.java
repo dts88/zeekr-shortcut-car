@@ -38,6 +38,17 @@ package com.kooo.evcam.camera;
  * 还把日志刷满。所以连着救 {@link #MAX_ATTEMPTS} 次没用就<b>停手一分钟</b>，
  * 一分钟后再来一轮 —— 人回到车上、别的应用退出，都在这个尺度上。</p>
  *
+ * <h3>2.11 起</h3>
+ *
+ * <p>救的是通道调度（项目所有者 2026-10-10 确认），梯子上的数字不变。被别的程序拿着的那一路
+ * 根本不上梯子：调度判它被拿着（{@link CameraTaken.Verdict#TAKEN} / {@link CameraTaken.Verdict#BLOCKED}）就不救、不试开，
+ * 只问相机服务它空没空，所以新的 {@link #step(State, boolean, long, long)} 没有「被别人拿着」那个参数。
+ * 只在「保持 30 秒」里的路不算有人要，不救。</p>
+ *
+ * <p>彻底停手之后再试的时机（{@link State#liftStop()}）：登记表变了（项目所有者 2026-10-10 确认）；
+ * 项目所有者 2026-10-11 又加上相机服务报这一路「空闲」、亮屏 —— 录像开着时 RECORDING 一直登记着，登记表不会自己变，
+ * 只等它的话，各路都停手之后录像会一直「等待」下去。</p>
+ *
  * <p>纯逻辑，时间由调用方传入，见 {@code CameraLivenessTest}。</p>
  */
 public final class CameraLiveness {
@@ -135,10 +146,36 @@ public final class CameraLiveness {
         public void released() {
             clear();
         }
+
+        /**
+         * 解除停手、从头救：彻底停手（{@link #stopped()}）的这一路，攒的次数、轮数都作废，
+         * 下一次 {@link CameraLiveness#step(State, boolean, long, long)} 当场就救。
+         *
+         * <p>三件事调它，是同一个判断：登记表变了（{@link #registerChanged()}，项目所有者 2026-10-10 确认）、
+         * 相机服务报这一路「空闲」、亮屏（项目所有者 2026-10-11 定）。代价是 HAL 真坏了时会多试几轮；不加新的界面文字。</p>
+         *
+         * <p>只管彻底停手的：歇着的（{@link #gaveUp()}）、梯子上的照原来的节奏走 —— 后视镜收起又放出、登记表来回变，
+         * 不该让救援比 {@link CameraLiveness#RETRY_GAP_MS} 一次更密。</p>
+         *
+         * @return true：原来停着手、这一下解除了（调用方据此写一行「停手的 … 重新救」）；false：本来就没停手，什么都没动
+         */
+        public boolean liftStop() {
+            if (!stopped) {
+                return false;
+            }
+            clear();
+            return true;
+        }
+
+        /** 登记表变了（谁要哪几路变了）：停手的这一路重新救，同 {@link #liftStop()}。 */
+        public boolean registerChanged() {
+            return liftStop();
+        }
     }
 
     /**
-     * 往前走一步。
+     * 往前走一步（2.10 的入口，看门狗用）。没被别人拿着时走的就是下面那个不带 {@code heldByOthers} 的；
+     * 「被拿着每 30 秒试一次」这一支连同这个入口，等看门狗换成通道调度之后一起删。
      *
      * @param wantsFrames 这一路此刻该不该出帧：有人在用它的画面、不是被主动暂停的，
      *                    <b>而且这一趟成功打开过</b> —— 压根没打开过的不归这里管
@@ -150,17 +187,29 @@ public final class CameraLiveness {
      *                    不计次数、不停手；放开、通道安静了由看门狗的闸门单独重开（{@link CameraTaken#gate}）
      */
     public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now, boolean heldByOthers) {
-        if (!wantsFrames || frameAgeMs < STUCK_MS) {
-            // 没人用，或者帧回来了 —— 前面攒的次数一笔勾销
-            state.clear();
-            return Action.NONE;
-        }
-        if (heldByOthers) {
+        if (heldByOthers && wantsFrames && frameAgeMs >= STUCK_MS) {
             if (state.lastResetMs != 0 && now - state.lastResetMs < CameraTaken.RETRY_WHILE_HELD_MS) {
                 return Action.NONE;
             }
             state.lastResetMs = now;
             return Action.RESET;
+        }
+        return step(state, wantsFrames, frameAgeMs, now);
+    }
+
+    /**
+     * 往前走一步（2.11 起通道调度用）：梯子和上面那个一样，只是没有「被别人拿着」—— 被拿着的路调度根本不救。
+     *
+     * @param wantsFrames 这一路此刻有人要画面（登记表里有人要它 —— 只在「保持 30 秒」里的不算），
+     *                    而且没被拿着（不是 TAKEN / BLOCKED）、现在能用相机
+     * @param frameAgeMs  距上一次「有动静」多久 —— 出了一帧、开了相机、建好会话，都算动静；丢了算无穷大
+     * @param now         单调时钟，不含深度睡眠
+     */
+    public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now) {
+        if (!wantsFrames || frameAgeMs < STUCK_MS) {
+            // 没人用，或者帧回来了 —— 前面攒的次数一笔勾销
+            state.clear();
+            return Action.NONE;
         }
         if (state.stopped) {
             return Action.NONE;
