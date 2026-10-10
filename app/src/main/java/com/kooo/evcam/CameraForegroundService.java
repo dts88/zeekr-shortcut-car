@@ -374,13 +374,15 @@ public class CameraForegroundService extends Service {
     /**
      * 录像停了（RecordingCoordinator 调）、或主界面收尾 / 退出要停服务。
      *
-     * <p>前台服务的寿命 = 「开机自启动」开着 或 在录（规格 §3）。保活开着时它本来就该一直在：
-     * 这里只把通知换回「在后台运行」，不停。保活关着、或用户退出了，才真的停。
+     * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3）。保活开着时它本来就该一直在：
+     * 这里只把通知换回「在后台运行」，不停。等着接回的也一样（「这一趟要录」立着：被打断等环视、因熄屏停下等亮屏，
+     * 2026-10-10）—— 接回时相机是从后台开的，后台拿着相机安卓要求有前台服务。都不是、或用户退出了，才真的停。
      * 以前一律 stopService，保活开着时它 onDestroy 里一秒后又把自己拉起来 ——
      * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
      */
     public static void stop(Context context) {
-        if (!UserExit.isExited(context) && new AppConfig(context).isAutoStartOnBoot()) {
+        if (!UserExit.isExited(context) && (new AppConfig(context).isAutoStartOnBoot()
+                || com.kooo.evcam.recording.RecordingIntent.current().recordingWanted())) {
             if (isForegroundReady) {
                 start(context, context.getString(R.string.notif_background_title),
                         context.getString(R.string.notif_tap_to_return));

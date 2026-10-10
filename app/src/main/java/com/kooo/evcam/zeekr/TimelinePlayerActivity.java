@@ -59,7 +59,8 @@ import java.util.Map;
  *
  * <p>时间轴按环视排，<b>环视领着时间走</b>，座舱各路按真实时刻跟着它 —— 几路的分段
  * 各切各的，开录的时刻也差一两秒，按「第几段」对不上。环视被收起来（放大了某一路座舱）
- * 的时候，由放大的那一路领。</p>
+ * 的时候，由放大的那一路领，但只在它此时有录像的时候：没有就收回网格，环视接着领
+ * （{@link PlaybackLead}）。所以<b>进度条永远跟着环视</b>，环视之外的座舱录像存着、不放。</p>
  *
  * <p><b>收起来的那几路一律暂停</b>：TextureView 看不见的时候没人取它的画面，
  * 解码器往里推帧推不动，会被堵住。重新露出来时按当时的时刻再对一次。</p>
@@ -131,6 +132,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private int sessionIndex = 0;
     /** 扫描出来的其余几路的文件，按槽位（归一之后的名字）分。 */
     private final Map<String, List<RecordingTimeline.Source>> laneSources = new HashMap<>();
+    /**
+     * 其余几路的文件各归哪一条录制（{@link LaneTrack#byRecording}），按槽位分，每一份和 sessions 一一对应。
+     * 扫描时一次分好：大小、列表里的锁定标记、删除、细条、「锁定此刻」都从这里取（见 {@link #ownedBy}）。
+     */
+    private final Map<String, List<LaneTrack>> laneOwned = new HashMap<>();
     /** 每一条录制所有文件的大小（字节），和 sessions 一一对应。见 {@link #filesOf}。 */
     private long[] sessionBytes = new long[0];
 
@@ -187,6 +193,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         final TextView cover;
         final ManagedVideoPlayer player;
         LaneTrack track = LaneTrack.EMPTY;
+        /**
+         * 这一路归这一条录制的文件（{@link LaneTrack#belongingTo}）。和 track 不是同一批：
+         * track 是画面上放的（按重叠），这里多出环视之外的那几段、少了归相邻那一条的。环视那一格不用。
+         */
+        LaneTrack owned = LaneTrack.EMPTY;
         /** 打开的是 track 里第几个文件（打开途中也算）；-1 表示没开。 */
         int openIndex = -1;
         /** 打开时交给播放器的偏移。 */
@@ -471,6 +482,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             }
 
             final List<RecordingTimeline.Session> built = RecordingTimeline.build(sources);
+            // 其余几路的文件各归哪一条，在这里一次分好（见 LaneTrack#belongingTo）
+            final Map<String, List<LaneTrack>> owned = new HashMap<>();
+            for (Map.Entry<String, List<RecordingTimeline.Source>> entry : others.entrySet()) {
+                owned.put(entry.getKey(), LaneTrack.of(entry.getValue())
+                        .byRecording(built, segmentMsOf(entry.getKey())));
+            }
             final boolean locksOn = com.kooo.evcam.storage.FootageLocks.enabled(getApplicationContext());
             final java.util.Set<String> locked = com.kooo.evcam.storage.FootageLocks.shown(
                     getApplicationContext(), StorageHelper.getVideoDir(getApplicationContext()));
@@ -478,12 +495,14 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                 sessions = built;
                 laneSources.clear();
                 laneSources.putAll(others);
+                laneOwned.clear();
+                laneOwned.putAll(owned);
                 lockEnabled = locksOn;
                 lockedVideos.clear();
                 lockedVideos.addAll(locked);
                 sessionBytes = new long[sessions.size()];
                 for (int i = 0; i < sessions.size(); i++) {
-                    sessionBytes[i] = bytesOf(filesOf(sessions.get(i)));
+                    sessionBytes[i] = bytesOf(filesOf(i));
                 }
                 sessionAdapter.setLocked(lockedFlags());
                 sessionAdapter.setSessions(sessions, sessionBytes);
@@ -494,6 +513,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                     for (Lane lane : lanes) {
                         resetLane(lane);
                         lane.track = LaneTrack.EMPTY;
+                        lane.owned = LaneTrack.EMPTY;
                     }
                     expanded = null;
                     zoomedCell = PlaybackViewport.NO_CELL;
@@ -529,13 +549,14 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             if (lane != surround) {
                 List<RecordingTimeline.Source> sources = laneSources.get(lane.slot);
                 lane.track = sources == null ? LaneTrack.EMPTY
-                        : LaneTrack.of(sources).within(session);
+                        : LaneTrack.of(sources).shownIn(session);
+                lane.owned = ownedBy(lane.slot, sessionIndex);
             }
             resetLane(lane);
         }
-        // 正占着整块的那一路，这一条录制里没有的话就收回网格；
+        // 正占着整块的那一路，这一条录制开头没有它的录像的话就收回网格（见 leadsAt）；
         // 取景回到整幅 —— 留着上一条的放大格子，会把新画面按别人的格子切
-        if (expanded != null && expanded.track.isEmpty()) {
+        if (expanded != null && !leadsAt(expanded, session.startEpochMs)) {
             expanded = null;
         }
         zoomedCell = PlaybackViewport.NO_CELL;
@@ -607,6 +628,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      *   <li>占满的环视上再点 → 放大那一路。</li>
      *   <li>已经放大了的话，点哪儿都是收回网格；黑边上也没有画面可点。</li>
      *   <li>占满的座舱上再点 → 一整幅画面，没有格子可分，直接收回网格。</li>
+     *   <li>网格里写着「该路此时无录像」的座舱 → 不放大（2026-10-10）：放大的那一路要领着时间走，
+     *       它此时没有录像就领不了（{@link #leadsAt}）。以前会放大它、时间跳到它的下一段。</li>
      * </ul>
      *
      * <p>环视录像本身就是一个 2×2 网格文件，所以放大只是换个取景 ——
@@ -617,7 +640,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return;
         }
         if (expanded == null) {
-            long epoch = clockEpoch();
+            long epoch = nowInSession();
+            if (!leadsAt(lane, epoch)) {
+                return;   // 格子上写着「该路此时无录像」，放大了也没有画面
+            }
             expanded = lane;
             zoomedCell = gridColumns(lane) >= 2 ? cellUnderTouch(lane) : PlaybackViewport.NO_CELL;
             applyViewMode(epoch);
@@ -647,30 +673,37 @@ public class TimelinePlayerActivity extends AppCompatActivity {
 
     /** 收回网格。 */
     private void collapse() {
-        long epoch = clockEpoch();
+        collapseAt(nowInSession());
+    }
+
+    /** 收回网格，环视从 epochMs 这一刻领着走。 */
+    private void collapseAt(long epochMs) {
         expanded = null;
         zoomedCell = PlaybackViewport.NO_CELL;
-        applyViewMode(epoch);
+        applyViewMode(epochMs);
     }
 
     /**
-     * 底部那个按钮：网格 → 有录像的每一路 → 回到网格。
+     * 底部那个按钮：网格 → 此时有录像的每一路 → 回到网格。
      *
      * <p>点画面已经能到任何一路了，这个按钮留着是因为它同时是<b>现在在看哪一路</b>
      * 的标签 —— 图片回看也是这么做的。</p>
+     *
+     * <p>此时没有录像的座舱跳过（2026-10-10）：放大了它也领不了时间（{@link #leadsAt}），
+     * 和点画面不放大它是同一条。</p>
      */
     private void cycleViewMode() {
         if (sessions.isEmpty()) {
             return;
         }
+        long epoch = nowInSession();
         List<Lane> order = new ArrayList<>();
         order.add(null);            // 网格
         for (Lane lane : lanes) {
-            if (!lane.track.isEmpty()) {
+            if (leadsAt(lane, epoch)) {
                 order.add(lane);
             }
         }
-        long epoch = clockEpoch();
         int at = order.indexOf(expanded);
         expanded = order.get((Math.max(at, 0) + 1) % order.size());
         zoomedCell = PlaybackViewport.NO_CELL;
@@ -776,9 +809,32 @@ public class TimelinePlayerActivity extends AppCompatActivity {
 
     // ================================================================ 几路对齐
 
-    /** 领着时间走的那一路：环视看得见就是环视，否则是占满整块的那一路。 */
+    /**
+     * 领着时间走的那一路：环视看得见就是环视，否则是占满整块的那一路。
+     *
+     * <p>放大的座舱只在它此时有录像时才占着整块：改「放大哪一路」、跳时刻、放完一段的地方
+     * 都先按要去的那一刻定过（{@link #leadsAt}、{@link PlaybackLead#afterClip}），
+     * 所以这里不用再判断。</p>
+     */
     private Lane leader() {
         return expanded == null || expanded == surround ? surround : expanded;
+    }
+
+    /**
+     * 这一路放大之后，到 epochMs 这一刻能不能领着时间走（项目所有者 2026-10-10：进度条跟着环视）。
+     *
+     * <p>环视能（这一条录制有它才成立）；座舱只在此时有录像时能，规则在 {@link PlaybackLead#cabinLeads}。</p>
+     */
+    private boolean leadsAt(Lane lane, long epochMs) {
+        if (lane == surround) {
+            return !lane.track.isEmpty();
+        }
+        return PlaybackLead.cabinLeads(lane.track, sessions.get(sessionIndex), epochMs);
+    }
+
+    /** 现在播到的真实时刻，夹进这一条录制（见 {@link PlaybackLead#clamp}）。 */
+    private long nowInSession() {
+        return PlaybackLead.clamp(sessions.get(sessionIndex), clockEpoch());
     }
 
     /** 现在播到的真实时刻：领头的就绪了按它的进度，否则就是要去的那一刻。 */
@@ -942,19 +998,27 @@ public class TimelinePlayerActivity extends AppCompatActivity {
 
     private void laneCompleted(Lane lane) {
         if (lane == leader()) {
-            int next = lane.openIndex + 1;
-            if (next >= lane.track.size()) {
-                // 最后一段放完：停在末尾，跟着的几路也停
-                lane.completedIndex = lane.openIndex;
-                playWhenReady = false;
-                for (Lane other : lanes) {
-                    other.player.pause();
-                }
-                updatePlayPauseLabel();
+            RecordingTimeline.Session session = sessions.get(sessionIndex);
+            PlaybackLead.AfterClip after = PlaybackLead.afterClip(lane == surround, lane.track,
+                    lane.openIndex, session);
+            if (after == PlaybackLead.AfterClip.END) {
+                endOfSession(lane);
+                return;
+            }
+            if (after == PlaybackLead.AfterClip.SURROUND) {
+                // 放大的座舱这一段之后没有录像了（被别的程序占用过、单独停过）：收回网格，
+                // 环视从这一段结束的那一刻接着领 —— 以前跳到它的下一段，或者整个停下（2026-10-10）
+                long epoch = PlaybackLead.clamp(session,
+                        lane.track.clip(lane.openIndex).endEpochMs());
+                AppLog.i(TAG, "放大的 " + lane.slot + " 第 " + (lane.openIndex + 1)
+                        + " 段之后此时没有录像：收回网格，环视从时间轴 "
+                        + TimelineFormat.duration(session.positionAt(epoch)) + " 接着放");
+                collapseAt(epoch);
                 return;
             }
             // 直接打开下一段，不要绕回定位 —— 那会再做一次换算，
             // 边界上可能又落回当前段，造成原地打转
+            int next = lane.openIndex + 1;
             targetEpochMs = lane.track.clip(next).startEpochMs;
             open(lane, next, 0L);
             return;
@@ -965,8 +1029,31 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         place(lane, clockEpoch(), false, true);
     }
 
+    /**
+     * 这一条录制放完了：停在末尾，跟着的几路也停。
+     *
+     * <p>领头的那一段记成放完的 —— 再点播放就从这一条的开头重新放（见 {@link #togglePlayPause}）。</p>
+     */
+    private void endOfSession(Lane lead) {
+        lead.completedIndex = lead.openIndex;
+        playWhenReady = false;
+        for (Lane other : lanes) {
+            other.player.pause();
+        }
+        updatePlayPauseLabel();
+    }
+
     private void laneFailed(Lane lane) {
         lane.ready = false;
+        if (lane == leader() && lane != surround) {
+            // 放大的座舱这个文件放不出来：此时它没有能放的录像，同 laneCompleted 交回环视 ——
+            // 当成放完了接下一段的话，进度条会跳过环视的这一段（2026-10-10）。
+            // 先记下放不出来，收回网格之后这一格写着字、不再每半秒重开
+            lane.failedIndex = lane.openIndex;
+            cover(lane, R.string.player_lane_unplayable);
+            collapse();
+            return;
+        }
         if (lane == leader()) {
             uncover(lane);
             if (++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
@@ -1015,6 +1102,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             long position = timelinePosition();
             seekBar.setProgress((int) position);
             showPosition(position);
+        }
+        if (lead != surround && targetEpochMs >= sessions.get(sessionIndex).endEpochMs()) {
+            // 放大的座舱放过了环视的末尾（环视先停了、座舱还在录）：
+            // 环视之外的座舱录像存着、不放，这一条到这里就放完了（2026-10-10）
+            AppLog.i(TAG, "放大的 " + lead.slot + " 放到了环视的末尾：这一条录制放完");
+            endOfSession(lead);
+            return;
         }
         for (Lane lane : lanes) {
             if (lane != lead && isShown(lane)) {
@@ -1086,12 +1180,20 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      * <p>只有在播放器<b>确实 prepare 完成</b>时才直接 seek，否则等它就绪（见 {@link #place}）。
      * 对还没准备好的播放器 seek，解码器会进入坏状态：先是几帧几帧地抽搐，
      * 然后卡住，再拖也不会恢复，最后出乱码。</p>
+     *
+     * <p>先按要去的那一刻定谁领头（2026-10-10）：放大的座舱那一刻没有录像，就收回网格，
+     * 环视领着去 —— 以前它停在空隙里盖着字，领头的没就绪，整个画面卡住不动。</p>
      */
     private void seekEpoch(long epochMs, boolean exact) {
-        targetEpochMs = epochMs;
+        long epoch = PlaybackLead.clamp(sessions.get(sessionIndex), epochMs);
+        if (expanded != null && !leadsAt(expanded, epoch)) {
+            collapseAt(epoch);
+            return;
+        }
+        targetEpochMs = epoch;
         for (Lane lane : lanes) {
             if (isShown(lane)) {
-                place(lane, epochMs, true, exact || lane != leader());
+                place(lane, epoch, true, exact || lane != leader());
             }
         }
     }
@@ -1126,46 +1228,73 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      *
      * <p>一条时间轴是一次连续录制，可能有很多个分段文件，
      * 所以删除和分享都是对整组文件操作 —— 只删其中一段会在时间轴上留个洞。</p>
+     *
+     * <p>文件清单在这里取一次，标题里的大小、分享、删除都用它：对话框开着的时候列表可能重扫过
+     * （比如回来时「锁定影像」拨过），再按下标去取就成了另一条录制的文件。</p>
      */
     private void showSessionActions(int index) {
         if (index < 0 || index >= sessions.size()) {
             return;
         }
         RecordingTimeline.Session session = sessions.get(index);
+        final List<LaneTrack.Clip> files = filesOf(index);
         String title = getResources().getQuantityString(R.plurals.player_session_title,
                 session.segmentCount(),
                 new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
                         .format(new Date(session.startEpochMs)),
                 session.segmentCount(),
-                TimelineFormat.size(bytesOf(filesOf(session))));
+                TimelineFormat.size(bytesOf(files)));
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
                 .setItems(new CharSequence[]{getString(R.string.action_share_clip),
                         getString(R.string.action_delete_clip)}, (dialog, which) -> {
                     if (which == 0) {
-                        shareSession(session);
+                        shareFiles(files);
                     } else {
-                        confirmDeleteSession(index, session);
+                        confirmDeleteSession(index, files);
                     }
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
     /**
-     * 这一条录制的全部文件：环视的分段，加上同一次录制里其余几路的文件。
+     * 第 index 条录制的全部文件：环视的分段，加上其余几路归这一条的文件（{@link LaneTrack#belongingTo}）。
      *
      * <p>画面上几路是一起放的，删除和分享也按这个算。以前只删环视那一路，
      * 座舱的文件留在 U 盘上，列表里又再也找不到它们。</p>
+     *
+     * <p>按「归哪一条」算，不按「画面上放哪些」算（2026-10-10）：环视停着、座舱照录的那段时间里
+     * 录下的文件，环视之外的那一截不在画面上，但也要删得掉、算进大小、列表里标得出锁定；
+     * 而按重叠算，一个文件会在相邻两条里都算一次。</p>
+     *
+     * <p>归哪一条的规则 2026-10-11 改过（执行大纲阶段 P）：归离它最近的那一条，不重叠的最多隔一个分段时长，
+     * 再远的不归任何一条 —— 以前环视加入之前录的座舱片段会挂到上一条、可能是前一天的录制上。</p>
      */
-    private List<LaneTrack.Clip> filesOf(RecordingTimeline.Session session) {
-        List<LaneTrack.Clip> files = new ArrayList<>(LaneTrack.of(session).clips());
+    private List<LaneTrack.Clip> filesOf(int index) {
+        List<LaneTrack.Clip> files = new ArrayList<>(LaneTrack.of(sessions.get(index)).clips());
         for (Lane lane : lanes) {
-            List<RecordingTimeline.Source> sources = laneSources.get(lane.slot);
-            if (lane != surround && sources != null) {
-                files.addAll(LaneTrack.of(sources).within(session).clips());
+            if (lane != surround) {
+                files.addAll(ownedBy(lane.slot, index).clips());
             }
         }
         return files;
+    }
+
+    /** 这一路归第 index 条录制的文件（扫描时分好的，见 {@link #laneOwned}）；这一路没有文件时是空的。 */
+    private LaneTrack ownedBy(String slot, int index) {
+        List<LaneTrack> owned = laneOwned.get(slot);
+        return owned == null || index < 0 || index >= owned.size() ? LaneTrack.EMPTY : owned.get(index);
+    }
+
+    /**
+     * 这一路的一个分段时长：不和环视重叠的文件，最多隔这么远还算那一条录制的（{@link LaneTrack#belongingTo}）。
+     *
+     * <p>各路分段时长可以不一样，取这一路自己的（同 {@link #sendCurrentSegment}）；读的是现在的设置，
+     * 和自动锁定算窗口是同一处（{@code RecordSpecs}）。扫描在后台线程上，读设置也在那里。</p>
+     */
+    private long segmentMsOf(String slot) {
+        return RecordSpecs.segmentMs(RecordSpecs.forCameraKey(getApplicationContext(),
+                CameraSlots.keyForSuffix(slot)).segmentMinutes);
     }
 
     private static long bytesOf(List<LaneTrack.Clip> files) {
@@ -1176,9 +1305,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         return bytes;
     }
 
-    private void shareSession(RecordingTimeline.Session session) {
+    private void shareFiles(List<LaneTrack.Clip> files) {
         ArrayList<Uri> uris = new ArrayList<>();
-        for (LaneTrack.Clip clip : filesOf(session)) {
+        for (LaneTrack.Clip clip : files) {
             File file = new File(clip.path);
             if (!file.exists()) {
                 continue;
@@ -1245,70 +1374,58 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.msg_selected_none, Toast.LENGTH_SHORT).show();
             return;
         }
-        int files = 0;
-        long bytes = 0;
+        // 清单在这里取一次，确认框里报的和真删的是同一批（同 showSessionActions）
+        final List<LaneTrack.Clip> files = new ArrayList<>();
         for (int index : indexes) {
             if (index >= 0 && index < sessions.size()) {
-                List<LaneTrack.Clip> clips = filesOf(sessions.get(index));
-                files += clips.size();
-                bytes += bytesOf(clips);
+                files.addAll(filesOf(index));
             }
         }
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
                 .setMessage(getResources().getQuantityString(R.plurals.player_delete_msg,
-                        files, files, TimelineFormat.size(bytes)))
-                .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteChosen(indexes))
+                        files.size(), files.size(), TimelineFormat.size(bytesOf(files))))
+                .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteChosen(files))
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    private void deleteChosen(List<Integer> indexes) {
+    private void deleteChosen(List<LaneTrack.Clip> files) {
         // 正在播的那一段可能也在里面，先停下，否则删的是一个还开着的文件
         for (Lane lane : lanes) {
             resetLane(lane);
         }
         int deleted = 0;
-        int total = 0;
         int kept = 0;
-        for (int index : indexes) {
-            if (index < 0 || index >= sessions.size()) {
-                continue;
-            }
-            for (LaneTrack.Clip clip : filesOf(sessions.get(index))) {
-                total++;
-                File file = new File(clip.path);
-                if (isLocked(clip.path)) {
-                    kept++;
-                } else if (file.exists() && file.delete()) {
-                    deleted++;
-                }
+        for (LaneTrack.Clip clip : files) {
+            File file = new File(clip.path);
+            if (isLocked(clip.path)) {
+                kept++;
+            } else if (file.exists() && file.delete()) {
+                deleted++;
             }
         }
-        AppLog.i(TAG, "多选删除：" + deleted + "/" + total + " 个文件，锁定的留下 " + kept + " 个");
+        AppLog.i(TAG, "多选删除：" + deleted + "/" + files.size() + " 个文件，锁定的留下 " + kept + " 个");
         Toast.makeText(this, deletedText(deleted, kept), Toast.LENGTH_SHORT).show();
         setSelecting(false);
         loadTimelines();
     }
 
-    private void confirmDeleteSession(int index, RecordingTimeline.Session session) {
-        List<LaneTrack.Clip> files = filesOf(session);
-        long bytes = bytesOf(files);
+    private void confirmDeleteSession(int index, List<LaneTrack.Clip> files) {
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
                 .setMessage(getResources().getQuantityString(R.plurals.player_delete_msg,
-                        files.size(), files.size(), TimelineFormat.size(bytes)))
-                .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteSession(index, session))
+                        files.size(), files.size(), TimelineFormat.size(bytesOf(files))))
+                .setPositiveButton(R.string.action_delete, (dialog, which) -> deleteSession(index, files))
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    private void deleteSession(int index, RecordingTimeline.Session session) {
-        // 正在播这一条就先停下，否则删的是一个还开着的文件
-        if (index == sessionIndex) {
-            for (Lane lane : lanes) {
-                resetLane(lane);
-            }
+    private void deleteSession(int index, List<LaneTrack.Clip> files) {
+        // 先停下，否则删的是一个还开着的文件。不只是在播这一条的时候：这一条的座舱文件
+        // 也可能正在相邻那一条的画面上（跨着两条的归重叠得多的那条，见 LaneTrack#belongingTo）。
+        // 删完反正要重扫、重开
+        for (Lane lane : lanes) {
+            resetLane(lane);
         }
-        List<LaneTrack.Clip> files = filesOf(session);
         int deleted = 0;
         int kept = 0;
         for (LaneTrack.Clip clip : files) {
@@ -1336,13 +1453,25 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                 + (kept > 0 ? getResources().getQuantityString(R.plurals.msg_kept_locked, kept, kept) : "");
     }
 
-    /** 此刻各路正在放的文件：环视和座舱各一个（段与段之间那一两秒算下一段，同 {@link #place}）。 */
+    /**
+     * 「此刻」的那一批文件：锁定、解锁、按钮上写哪个字都按它（执行大纲阶段 P，2026-10-11）。
+     *
+     * <ul>
+     *   <li>画面上此刻各路正在放的文件：环视和座舱各一个（段与段之间那一两秒算下一段，同 {@link #place}）；</li>
+     *   <li>加上挂在此刻环视那一段上的、环视之外的座舱文件（{@link LaneTrack#attachedTo}）：
+     *       归这一条录制、却在哪一刻的画面上都没有的那几段（环视加入之前、停着的时候座舱录的），
+     *       跟着离它最近的那一段环视锁、解。以前它们锁不上，锁着的也解不开。</li>
+     * </ul>
+     *
+     * <p>此刻画面上没有环视的文件（放大的座舱领着、走到了环视的空里），就没有「那一段」，只有第一批。</p>
+     */
     private List<File> filesHere() {
         List<File> files = new ArrayList<>();
         if (sessions.isEmpty()) {
             return files;
         }
         long epoch = clockEpoch();
+        int segment = -1;
         for (Lane lane : lanes) {
             if (lane.track.isEmpty()) {
                 continue;
@@ -1356,6 +1485,25 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             }
             if (hit != null) {
                 files.add(new File(hit.clip.path));
+                if (lane == surround) {
+                    segment = hit.index;   // 环视那一格的 track 就是这一条的分段，下标一样
+                }
+            }
+        }
+        if (segment < 0 || sessionIndex >= sessions.size()) {
+            // 重扫完、还没换到要看的那一条之前也会走到这里（loadTimelines 先刷按钮），这时下标可能越界
+            return files;
+        }
+        RecordingTimeline.Session session = sessions.get(sessionIndex);
+        for (Lane lane : lanes) {
+            if (lane == surround) {
+                continue;
+            }
+            for (LaneTrack.Clip clip : lane.owned.attachedTo(session, segment).clips()) {
+                File file = new File(clip.path);
+                if (!files.contains(file)) {   // 不和画面上的重复：同一个文件只锁、只数一次
+                    files.add(file);
+                }
             }
         }
         return files;
@@ -1370,7 +1518,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     /**
-     * 锁定此刻 / 解锁（项目所有者 2026-10-03）：此刻各路正在放的文件 —— 环视、前座舱、后座舱有几路锁几路。
+     * 锁定此刻 / 解锁（项目所有者 2026-10-03）：此刻各路正在放的文件 —— 环视、前座舱、后座舱有几路锁几路；
+     * 2026-10-11 起还带上挂在此刻环视那一段上的、环视之外的座舱文件（见 {@link #filesHere}）。
      * 都已经锁着就一起解开，否则一起锁上。
      */
     private void toggleLockHere() {
@@ -1396,6 +1545,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             } else {
                 lockedVideos.addAll(names);
             }
+            AppLog.i(TAG, (unlock ? "解锁此刻：" : "锁定此刻：") + names.size() + " 个文件 " + names);
             Toast.makeText(this, getResources().getQuantityString(
                     unlock ? R.plurals.msg_footage_unlocked : R.plurals.msg_footage_locked,
                     names.size(), names.size()), Toast.LENGTH_SHORT).show();
@@ -1410,7 +1560,19 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         updateLockButton();
     }
 
-    /** 这一条录制里锁定的文件，换算成时间轴上的起止，各路合在一起画。 */
+    /**
+     * 这一条录制里锁定的文件，换算成时间轴上的起止，各路合在一起画。
+     *
+     * <p>画两批，同一个文件只画一次（2026-10-10）：</p>
+     * <ul>
+     *   <li>归这一条的文件 —— 和删除、列表里的「含已锁定文件」是同一批（{@link #filesOf}），
+     *       列表标着锁定，细条上就有。整个在环视之外的座舱文件换算出来，正好落在它挂靠的那一段环视的一端
+     *       （{@link LaneTrack#attachedTo}），画成一个点 —— 放到那一段按「锁定 / 解锁」，碰的就有它
+     *       （2026-10-11，挂靠和锁定、列表、删除同一个规则）；</li>
+     *   <li>画面上露面的文件 —— 归相邻那一条、但和这一条重叠的座舱文件也在这条进度条上，
+     *       放到那里按「锁定 / 解锁」碰的就是它，细条上不能没有。</li>
+     * </ul>
+     */
     private void updateLockedStrip() {
         if (lockedStrip == null) {
             return;
@@ -1420,15 +1582,18 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return;
         }
         RecordingTimeline.Session session = sessions.get(sessionIndex);
-        List<Long> ends = new ArrayList<>();
+        List<LaneTrack.Clip> clips = filesOf(sessionIndex);
         for (Lane lane : lanes) {
-            for (LaneTrack.Clip clip : lane.track.clips()) {
-                if (lockedVideos.contains(new File(clip.path).getName())) {
-                    long from = session.positionAt(clip.startEpochMs);
-                    long to = session.positionAt(clip.startEpochMs + clip.durationMs);
-                    ends.add(from);
-                    ends.add(Math.max(from, to));
-                }
+            clips.addAll(lane.track.clips());
+        }
+        java.util.Set<String> drawn = new java.util.HashSet<>();
+        List<Long> ends = new ArrayList<>();
+        for (LaneTrack.Clip clip : clips) {
+            if (drawn.add(clip.path) && lockedVideos.contains(new File(clip.path).getName())) {
+                long from = session.positionAt(clip.startEpochMs);
+                long to = session.positionAt(clip.startEpochMs + clip.durationMs);
+                ends.add(from);
+                ends.add(Math.max(from, to));
             }
         }
         long[] ranges = new long[ends.size()];
@@ -1440,7 +1605,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         lockedStrip.setVisibility(ranges.length > 0 ? View.VISIBLE : View.INVISIBLE);
     }
 
-    /** 按钮说的是这一刻：各路的文件都锁着写「解锁」，否则写「锁定」。 */
+    /** 按钮说的是这一刻：这一刻的那一批文件（{@link #filesHere}）都锁着写「解锁」，否则写「锁定」。 */
     private void updateLockButton() {
         if (lockButton == null) {
             return;
@@ -1461,7 +1626,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return flags;
         }
         for (int i = 0; i < flags.length; i++) {
-            for (LaneTrack.Clip clip : filesOf(sessions.get(i))) {
+            for (LaneTrack.Clip clip : filesOf(i)) {
                 if (lockedVideos.contains(new File(clip.path).getName())) {
                     flags[i] = true;
                     break;

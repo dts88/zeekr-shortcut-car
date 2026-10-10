@@ -23,6 +23,10 @@ package com.kooo.evcam.recording;
  * <p>状态挂在进程上而不是界面上 —— 界面会被重建，而「这次启动开过没有」「用户停过没有」
  * 说的是整个应用这一趟，不是某一个界面实例。</p>
  *
+ * <p>还有一位「这一趟要录」（{@link #recordingWanted}，2026-10-10）：在录、在等开录、因熄屏停下等亮屏接回时立着，
+ * 进程被车机结束了也还在 —— 新的进程在屏幕亮着时照它接着录（规格 1.2：被杀又拉回来，恢复到被杀前的状态）。
+ * 以前「熄屏暂停，唤醒后恢复」只记在内存里，熄屏几秒后进程一被结束就忘了。</p>
+ *
  * <p>纯逻辑，见 {@code RecordingIntentTest}。</p>
  */
 public final class RecordingIntent {
@@ -43,6 +47,7 @@ public final class RecordingIntent {
     private boolean autoStarted;
     private boolean stoppedByUser;
     private boolean everStarted;
+    private boolean recordingWanted;
 
     /**
      * 落盘（规格 1.2）：进程被杀又拉回来时，「这一趟」的选择要还在 ——
@@ -52,7 +57,11 @@ public final class RecordingIntent {
     public interface Store {
         boolean get(String key, boolean fallback);
 
-        void put(String key, boolean value);
+        /**
+         * 这几项一起写，写到盘上才返回（不是排队异步写）：哨兵模式没开时车机熄屏 3–5 秒就把进程结束（2026-10-10），
+         * 熄屏那一刻改的「这一趟要录」（亮屏接不接）得赶在那之前落盘。
+         */
+        void put(java.util.Map<String, Boolean> values);
     }
 
     private Store store;
@@ -63,14 +72,18 @@ public final class RecordingIntent {
             autoStarted = store.get("autoStarted", false);
             stoppedByUser = store.get("stoppedByUser", false);
             everStarted = store.get("everStarted", false);
+            recordingWanted = store.get("recordingWanted", false);
         }
     }
 
     private void persist() {
         if (store != null) {
-            store.put("autoStarted", autoStarted);
-            store.put("stoppedByUser", stoppedByUser);
-            store.put("everStarted", everStarted);
+            java.util.Map<String, Boolean> values = new java.util.LinkedHashMap<>();
+            values.put("autoStarted", autoStarted);
+            values.put("stoppedByUser", stoppedByUser);
+            values.put("everStarted", everStarted);
+            values.put("recordingWanted", recordingWanted);
+            store.put(values);
         }
     }
 
@@ -113,9 +126,10 @@ public final class RecordingIntent {
         persist();
     }
 
-    /** 用户自己按了停止。在这一趟里，没有任何一条路可以再自动开起来。 */
+    /** 用户自己按了停止。在这一趟里，没有任何一条路可以再自动开起来（「这一趟要录」也撤）。 */
     public void noteUserStopped() {
         stoppedByUser = true;
+        recordingWanted = false;
         persist();
     }
 
@@ -123,17 +137,41 @@ public final class RecordingIntent {
         return stoppedByUser;
     }
 
+    /**
+     * 这一趟要录：在录、在等开录，或者因熄屏停下、亮屏要接回。进程被结束了也还在（落盘），
+     * 屏幕亮着时（亮屏、进程在屏幕亮着时被拉起来）协调器照它接着录。立、撤都由录像协调器做；
+     * 人停了、退出、车机真正开机、人点开主界面时撤（{@link #noteUserStopped}、{@link #reset}）。
+     */
+    public boolean recordingWanted() {
+        return recordingWanted;
+    }
+
+    /**
+     * 立、撤「这一趟要录」。
+     *
+     * @return 变了没有：变了才落盘，调用方据此记黑匣子
+     */
+    public boolean noteRecordingWanted(boolean wanted) {
+        if (recordingWanted == wanted) {
+            return false;
+        }
+        recordingWanted = wanted;
+        persist();
+        return true;
+    }
+
     /** 退出应用时归零 —— 下一次打开是新的一趟。 */
     public void reset() {
         autoStarted = false;
         stoppedByUser = false;
         everStarted = false;
+        recordingWanted = false;
         persist();
     }
 
     /** 诊断报告里的一行。 */
     public String describe() {
         return "autoStarted=" + autoStarted + " stoppedByUser=" + stoppedByUser
-                + " everStarted=" + everStarted;
+                + " everStarted=" + everStarted + " recordingWanted=" + recordingWanted;
     }
 }

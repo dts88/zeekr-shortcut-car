@@ -90,7 +90,7 @@
     <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Requires Sentry Mode. Without it, recording pauses while the car sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Requires Sentry Mode. Without it, if the vehicle is stopped, recording pauses when the screen turns off and resumes on wake. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
@@ -386,7 +386,7 @@
     <string name="reason_timeout">connection timed out</string>
     <string name="reason_no_space">not enough storage space</string>
     <string name="reason_file_not_found">file not found</string>
-    <string name="msg_screen_off_stopped">Screen off for 10 seconds. Recording stopped.</string>
+    <string name="msg_screen_off_stopped">Recording stopped after the screen turned off</string>
     <string name="msg_screen_off_background">Screen off for 15 seconds. Moved to the background.</string>
     <string name="msg_stats_on">Recording status readout on</string>
     <string name="msg_stats_off">Recording status readout off</string>
@@ -608,6 +608,9 @@
     <string name="status_storage_none">No USB drive</string>
     <string name="status_recording_fallback">Recording to %1$s (%2$s unavailable)</string>
     <string name="status_camera_taken">Camera in use. Recording resumes when it is released.</string>
+    <string name="status_camera_lane_taken">%1$s: camera in use. The other cameras keep recording. This camera resumes recording when it is released.</string>
+    <string name="status_cameras_taken">Some cameras are in use. The others keep recording. Each resumes recording when it is released.</string>
+    <string name="status_camera_lane_unavailable">%1$s: camera can\'t be opened. The other cameras keep recording.</string>
     <string name="status_internal_storage">internal storage</string>
     <string name="nav_group_switches">Switches</string>
 

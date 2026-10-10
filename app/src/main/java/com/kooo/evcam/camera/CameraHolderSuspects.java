@@ -301,11 +301,18 @@ public final class CameraHolderSuspects {
      * 调用的地方（主线程上的相机服务回调）不等。</p>
      */
     static void lookAround(String cameraId, boolean taken) {
+        lookAround(cameraId, taken, System.currentTimeMillis());
+    }
+
+    /**
+     * 同上，但「那一刻」由调用方给（墙上时间）：被拿走要等那一次关设备关完才认得出（5–8 秒，2026-10-10），
+     * 窗口得按丢的那一刻摆，不按认出来的时候。
+     */
+    static void lookAround(String cameraId, boolean taken, long atMs) {
         Context app = appContext;
         if (app == null || !isEnabled(app)) {
             return;
         }
-        long atMs = System.currentTimeMillis();
         try {
             worker().postDelayed(() -> {
                 try {

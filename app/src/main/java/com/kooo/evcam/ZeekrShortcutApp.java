@@ -34,7 +34,8 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.blackbox.VolumeEvents.register(this);
         // 熄屏录制的唤醒锁活在进程上：熄屏 / 亮屏广播在这里注册，主界面在不在都一样（规格 §3.1）
         com.kooo.evcam.screen.ScreenState.install(this);
-        // 「这一趟」的录像选择落盘（规格 1.2）：进程被杀又拉回来时还在；车机真正开机就清
+        // 「这一趟」的录像选择落盘（规格 1.2）：进程被杀又拉回来时还在；车机真正开机就清。
+        // 写到盘上才返回（commit）：熄屏那一刻改的「这一趟要录」要赶在车机几秒后结束进程之前落盘（2026-10-10）
         final android.content.SharedPreferences choices = getSharedPreferences("recording_intent", MODE_PRIVATE);
         com.kooo.evcam.recording.RecordingIntent.current().attach(new com.kooo.evcam.recording.RecordingIntent.Store() {
             @Override
@@ -43,8 +44,14 @@ public class ZeekrShortcutApp extends Application {
             }
 
             @Override
-            public void put(String key, boolean value) {
-                choices.edit().putBoolean(key, value).apply();
+            public void put(java.util.Map<String, Boolean> values) {
+                android.content.SharedPreferences.Editor editor = choices.edit();
+                for (java.util.Map.Entry<String, Boolean> entry : values.entrySet()) {
+                    editor.putBoolean(entry.getKey(), entry.getValue());
+                }
+                if (!editor.commit()) {
+                    AppLog.w("App", "recording intent not saved: " + values);
+                }
             }
         });
         if (com.kooo.evcam.blackbox.BlackBox.rebootedSinceLastRun()) {
