@@ -89,7 +89,7 @@ public final class LaneTrack {
      * 环视开录后的那几十秒里座舱那一格就写着「该路此时无录像」，其实录像在。</p>
      *
      * <p>按重叠算，一个文件可能在相邻两条录制里都露面，所以删除、分享、算大小不用它，
-     * 用 {@link #belongingTo}：每个文件恰好归一条。</p>
+     * 用 {@link #belongingTo}：每个文件至多归一条。</p>
      */
     public LaneTrack shownIn(RecordingTimeline.Session session) {
         long from = session.startEpochMs;
@@ -104,31 +104,161 @@ public final class LaneTrack {
     }
 
     /**
-     * 归第 index 条录制的文件：删除、分享、大小、「含已锁定文件」都按它算（2026-10-10）。
+     * 归第 index 条录制的文件：删除、分享、大小、「含已锁定文件」都按它算（执行大纲阶段 P，2026-10-11）。
      *
-     * <p>每个文件<b>恰好归一条</b>：开头之前最近开录的那一条；比第一条还早的归第一条。
-     * 开头往前放宽 {@link RecordingTimeline#DEFAULT_MAX_GAP_MS} —— 几路相机不是同一刻开录的，
-     * 座舱那一路比环视早一两秒开头很正常，它仍然是这一次录的。</p>
+     * <p>每个文件<b>至多归一条</b>，归时间上离它最近的那一条（怎么比远近见 {@link #recordingOf}）：</p>
+     * <ul>
+     *   <li>和它重叠的那一条。座舱比环视早一两秒开头、环视中途单独停过又接回，都还是这一条；</li>
+     *   <li>不重叠的，归隔得最近的那一条，一样近归前一条；但最多隔 {@code maxGapMs}（一个分段时长）
+     *       —— 环视停着、座舱照录时，紧挨着环视的那一段还算这一次录的；</li>
+     *   <li>再远的不归任何一条：回放里删不掉、锁不到，只由循环清理收（大纲 §6 风险 12，
+     *       要不要给它们单独一条以后再定）。</li>
+     * </ul>
      *
-     * <p>以前只收开头落在这一条时间段里的。环视停着、座舱照录的那段时间里录下的文件于是
-     * 不归任何一条：回放里删不掉、不算大小，锁上了列表里也不标 —— 只能等自动清理。
-     * 现在它归前一条，和前一条一起删。它在环视之外的那一截不在任何一条的画面上
-     * （进度条跟着环视），这是有意的。</p>
+     * <p>以前（v2）归「开头之前最近开录的那一条」，比第一条还早的归第一条，没有上限。
+     * 2026-10-10 起录像每一路各自进出，环视可能比座舱晚加入（开录时原厂 360 正拿着它）：
+     * 环视加入之前座舱录下的那几段于是挂到了上一条录制上 —— 可能是前一天的，
+     * 删前一天那条时跟着被删掉，而它们明明是这一次录的。</p>
+     *
+     * <p>它在环视之外的那一截不在任何一刻的画面上（进度条跟着环视），这是有意的；
+     * 锁定、解锁时它跟着离它最近的那一段环视走（{@link #attachedTo}）。</p>
      *
      * @param sessions 全部录制，按先后排（{@link RecordingTimeline#build} 的结果）
+     * @param maxGapMs 不重叠时最多隔多远还算这一条：这一路的一个分段时长
+     *                 （各路分段时长可以不一样，调用方取这一路自己的）
      */
-    public LaneTrack belongingTo(List<RecordingTimeline.Session> sessions, int index) {
-        long gap = RecordingTimeline.DEFAULT_MAX_GAP_MS;
-        long from = index == 0 ? Long.MIN_VALUE : sessions.get(index).startEpochMs - gap;
-        long to = index == sessions.size() - 1
-                ? Long.MAX_VALUE : sessions.get(index + 1).startEpochMs - gap;
+    public LaneTrack belongingTo(List<RecordingTimeline.Session> sessions, int index,
+                                 long maxGapMs) {
         List<Clip> list = new ArrayList<>();
         for (Clip clip : clips) {
-            if (clip.startEpochMs >= from && clip.startEpochMs < to) {
+            if (recordingOf(clip, sessions, maxGapMs) == index) {
                 list.add(clip);
             }
         }
         return new LaneTrack(list);
+    }
+
+    /**
+     * 一次分好：第 i 个就是 {@code belongingTo(sessions, i, maxGapMs)}，规则同一条。
+     *
+     * <p>回放列表要每一条录制的大小和锁定标记。挨条调 {@link #belongingTo} 是录制条数 × 文件数，
+     * U 盘上存着好几天的录像时，扫完那一下会在主线程上卡住；这里每个文件只判一次。</p>
+     */
+    public List<LaneTrack> byRecording(List<RecordingTimeline.Session> sessions, long maxGapMs) {
+        List<List<Clip>> lists = new ArrayList<>();
+        for (int i = 0; i < sessions.size(); i++) {
+            lists.add(new ArrayList<>());
+        }
+        for (Clip clip : clips) {
+            int index = recordingOf(clip, sessions, maxGapMs);
+            if (index >= 0) {
+                lists.get(index).add(clip);
+            }
+        }
+        List<LaneTrack> tracks = new ArrayList<>();
+        for (List<Clip> list : lists) {
+            tracks.add(new LaneTrack(list));
+        }
+        return tracks;
+    }
+
+    /**
+     * 这个文件归第几条录制（{@link #belongingTo} 的规则）；不归任何一条返回 -1。
+     *
+     * <p>远近只用一个数比（{@link #closeness}）：重叠的按重叠了多长，越长越近；不重叠的按隔了多远，
+     * 越短越近，隔得超过 maxGapMs 的不算。一样近不换，归前一条。</p>
+     *
+     * <p>和两条都重叠的也有：环视被原厂 360 拿走半分钟（倒车），环视的录像断成两条，座舱照录，
+     * 它那一段跨着两条。按同一个数，它归重叠得多的那一条 —— 删掉另一条时它留下，
+     * 留下的那一条画面上它占的那一大截不缺。</p>
+     */
+    static int recordingOf(Clip clip, List<RecordingTimeline.Session> sessions, long maxGapMs) {
+        long limit = Math.max(0L, maxGapMs);
+        // 录制按先后排、首尾隔开，结束的时刻也是递增的：先二分跳过结束得太早、够不着它的那些
+        int lo = 0;
+        int hi = sessions.size();
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (sessions.get(mid).endEpochMs() + limit < clip.startEpochMs) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        int best = -1;
+        long bestCloseness = Long.MIN_VALUE;
+        for (int i = lo; i < sessions.size(); i++) {
+            RecordingTimeline.Session session = sessions.get(i);
+            if (session.startEpochMs - clip.endEpochMs() > limit) {
+                break;   // 开头得太晚，够不着；后面的更晚
+            }
+            long closeness = closeness(clip, session.startEpochMs, session.endEpochMs());
+            if (closeness > bestCloseness) {   // 一样近不换：归前一条
+                best = i;
+                bestCloseness = closeness;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * 这一路归这一条录制、却在环视之外的文件里，挂在环视第 segment 段上的那些（执行大纲阶段 P，2026-10-11）。
+     *
+     * <p>「环视之外」：和环视的哪一段都不重叠 —— 回放从头放到尾，哪一刻的画面上都没有它
+     * （进度条跟着环视，项目所有者 2026-10-10）。「锁定此刻 / 解锁」碰的是此刻画面上的文件，
+     * 再加上挂在此刻环视那一段上的这些；不然它们锁不上、锁着的也解不开，这是 v2 记下的缺口。
+     * 进度条下的细条也按这个挂法画（见 {@link #attachedSegment}）。</p>
+     *
+     * @param session 这些文件归的那一条录制（先用 {@link #belongingTo} 挑出来）
+     * @param segment 环视的第几段；负数时什么都不挂
+     */
+    public LaneTrack attachedTo(RecordingTimeline.Session session, int segment) {
+        List<Clip> list = new ArrayList<>();
+        if (segment >= 0) {
+            for (Clip clip : clips) {
+                if (attachedSegment(clip, session) == segment) {
+                    list.add(clip);
+                }
+            }
+        }
+        return new LaneTrack(list);
+    }
+
+    /**
+     * 环视之外的一个文件挂在这一条录制的第几段环视上：同一条录制里，时间上最近的那一段，一样近挂前一段。
+     *
+     * <p>远近和 {@link #recordingOf} 用同一个数。挂上去的那一段的一端，正是
+     * {@link RecordingTimeline.Session#positionAt} 把这个文件换算到进度条上的那一点 ——
+     * 时间轴把段与段之间的空挤掉了，空两边的那两段在进度条上是同一点 ——
+     * 所以细条上它画成那一端的一个点，和按「锁定 / 解锁」时跟着哪一段走对得上。</p>
+     *
+     * @return 和环视的某一段重叠（它在画面上，不用挂）、或这一条没有分段时返回 -1
+     */
+    static int attachedSegment(Clip clip, RecordingTimeline.Session session) {
+        int best = -1;
+        long bestCloseness = Long.MIN_VALUE;
+        for (int i = 0; i < session.segments.size(); i++) {
+            RecordingTimeline.Segment segment = session.segments.get(i);
+            long closeness = closeness(clip, segment.startEpochMs,
+                    segment.startEpochMs + segment.durationMs);
+            if (closeness > 0) {
+                return -1;   // 和这一段重叠：它在画面上
+            }
+            if (closeness > bestCloseness) {   // 一样近不换：挂前一段
+                best = i;
+                bestCloseness = closeness;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * 这个文件离 [from, to) 有多近：重叠时是重叠的长度（正数），不重叠时是隔开的距离取负，正好挨着是 0。
+     *
+     * <p>两种情况是同一个式子：两段里先结束的那一端减去后开头的那一端。</p>
+     */
+    private static long closeness(Clip clip, long from, long to) {
+        return Math.min(clip.endEpochMs(), to) - Math.max(clip.startEpochMs, from);
     }
 
     public boolean isEmpty() {
