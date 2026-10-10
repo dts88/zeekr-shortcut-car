@@ -15,17 +15,17 @@ Nothing yet.
 
 Upgrade from 2.0.0. Same code as 2.10.14-alpha.
 
-- **Much more stable with several video streams** (surround view plus cabin cameras).
-- Fixed stutter that could occur at high bitrate and high frame rate.
-- Driving info bar: redesigned, with new items such as Sentry Mode, the rear lamps and a 7X front view, and a little easter egg. Choose what it shows in Settings → System → System info (experimental). It now appears only below the surround view recording.
-- Lock footage (Settings → Storage): lock videos and photos in playback, or turn on Lock footage on flash-to-pass to lock the current clips when you flash the high beams. Locked files are never removed by loop recording.
-- The record button explains more clearly what happens.
-- The app name and version, and the plate number if set, are on every recording and photo.
-- Photos are saved to the USB drive only, like videos.
-- Start on boot (Settings → System) now also keeps the app running in the background, replacing the separate switch for that.
-- Interface text reviewed and reworded in all three languages.
-- Diagnostics: Send to phone is available to everyone.
-- Improved stability and fixed bugs.
+- **Significantly improved stability with multiple video streams** (surround view and cabin cameras).
+- Fixed stuttering that could occur at high bitrates and frame rates.
+- Driving info bar redesigned, with new items including Sentry Mode, rear lamps and a 7X front view, plus an easter egg. Items are selected in Settings → System → System info (experimental). The bar is now added to the surround view recording only.
+- Lock footage (Settings → Storage): videos and photos can be locked during playback, or locked automatically when the high beams are flashed (optional). Locked files are never deleted by loop recording.
+- While recording, the record button shows what will happen when the screen turns off.
+- The app name, version and, if enabled, the plate number are stamped on every recording and photo.
+- Photos are saved to the USB drive only, as with videos.
+- Start on boot (Settings → System) now also keeps the app running in the background, replacing the separate setting for this.
+- Interface text revised in all three languages.
+- Send to phone in Diagnostics is now available to all users.
+- Stability improvements and bug fixes.
 
 ## [2.10.14-alpha] - 2026-10-09
 
