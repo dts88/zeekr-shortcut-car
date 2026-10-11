@@ -22,7 +22,10 @@ import com.kooo.evcam.recording.RecordingIntent;
  *
  * <p>只有「开机自启动」开着才做（规格 1.3：它管的是 App 不在时要不要带回来）；
  * 用户退出了不做（1.4）。主界面还在的时候，它自己会回到设定状态（§0），这里只管它不在的情况。
- * 录像要经过主界面这个对象（1.6）：静默把主界面拉起来，它闪一下就退后台，录像照常。屏幕黑着时不为录像拉（2026-10-10）。</p>
+ * 相机管线属于应用（2.11 阶段 6），接录像不必经过主界面；但现在用不了相机（前台服务是后台起的）时，先静默把主界面拉起来，
+ * 它闪一下就退后台，录像照样当场要、等它起来再开相机（{@link #bringUpMainForRecording}）。「启动自动录制」的入口在主界面，
+ * 主界面不在也静默拉起来（1.6）。
+ * 屏幕黑着时只记一笔，不拉主界面、不开录（2026-10-10）。</p>
  */
 public final class Recovery {
 
@@ -62,6 +65,11 @@ public final class Recovery {
                 return;
             }
             config.setUiLeftForScreenOff(false);
+            if (com.kooo.evcam.camera.StallWatch.isForeground()) {
+                // 记号是熄屏那一刻记的（主界面在前就记，进程被车机结束了也接得回来）；熄屏期间它一直没退下去（在录、在等开录、
+                // 熄屏录制开着）就还在前面，不用再拉
+                return;
+            }
             boolean alive = MainActivity.getInstance() != null;
             Intent intent = new Intent(context, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
@@ -70,10 +78,68 @@ public final class Recovery {
                 intent.putExtra("restored_by_app", true);
             }
             context.startActivity(intent);
+            // 主界面这就起来了：这一阵不再为接录像另外静默拉一次（那样它起来闪一下又退回后台）
+            broughtUpAtMs = SystemClock.elapsedRealtime();
             BlackBox.noteImportant("亮屏：把因熄屏退下去的主界面接回前台（" + (alive ? "界面还在" : "重新起一个") + "）");
         } catch (Exception e) {
             AppLog.w(TAG, "bringBackUiAfterScreenOn failed: " + e);
         }
+    }
+
+    /**
+     * 上一次为接录像把主界面拉起来（或者亮屏把因熄屏退下去的主界面接回来）的时刻（elapsedRealtime）：
+     * 亮屏那一下协调器、恢复各叫一次，拉一次就够。
+     */
+    private static long broughtUpAtMs;
+    /** 这么久之内再要拉，当作还在拉（主界面起来、登记预览要一两秒）。 */
+    private static final long BRING_UP_DEDUPE_MS = 5_000L;
+
+    /**
+     * 「这一趟要录」要接、而现在用不了相机（主界面不在前，前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机，
+     * lifecycle-spec §3）：把主界面静默拉起来（大纲 §2 阶段 6）。录像照样当场要（{@link RecordingCoordinator#resumeIfWanted}），
+     * 先「等待摄像头」；主界面一起来、登记了预览就能用相机了，调度开的时候带着预览和录像输出。不拉的话录像输出声明了、
+     * 相机却开不起来，没人打开主界面就永远开不起来。
+     *
+     * <p>静默：带着不是人点开的记号（这一趟的录像选择不清，规格 1.2），起来闪一下就退后台（1.6）。用户退出了不拉；
+     * 5 秒内拉过（亮屏那一下协调器、恢复各叫一次）不再拉。只由 {@link RecordingCoordinator#resumeIfWanted} 调
+     * （亮屏、恢复都经它），屏幕黑着时它根本不接。</p>
+     *
+     * @param where 谁要接的（ASCII，进黑匣子）
+     */
+    public static void bringUpMainForRecording(Context context, String where) {
+        if (UserExit.isExited(context)) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (broughtUpAtMs != 0 && now - broughtUpAtMs < BRING_UP_DEDUPE_MS) {
+            return;
+        }
+        broughtUpAtMs = now;
+        try {
+            if (new AppConfig(context).didUiLeaveForScreenOff()) {
+                // 熄屏那一刻主界面就在前（因熄屏退下去的记号还在）：照亮屏接回界面那样接回来、留在前面 ——
+                // 静默拉的话它起来闪一下又退回后台，人上车看到的是车机桌面
+                bringBackUiAfterScreenOn(context);
+            } else {
+                launchMainSilently(context);
+            }
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "bringUpMainForRecording failed: " + e);
+            return;
+        }
+        BlackBox.noteImportant("「这一趟要录」还在（" + where + "）：现在用不了相机（主界面不在前、前台服务是后台起的），"
+                + "先拉起主界面，录像等它起来再开相机");
+    }
+
+    /** 静默拉起主界面：不是人点开的（这一趟的录像选择不清），起来闪一下就退后台。还活着就挪到前面。 */
+    private static void launchMainSilently(Context context) {
+        boolean alive = MainActivity.getInstance() != null;
+        Intent main = new Intent(context, MainActivity.class);
+        main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
+                | (alive ? Intent.FLAG_ACTIVITY_SINGLE_TOP : 0));
+        main.putExtra("auto_start_from_boot", true);
+        main.putExtra(EXTRA_SILENT, true);
+        context.startActivity(main);
     }
 
     private static void restoreNow(Context context, String why) {
@@ -109,22 +175,25 @@ public final class Recovery {
         boolean recording = coordinator.isRecording();
         boolean mainScreenAlive = MainActivity.getInstance() != null;
         RecordingIntent intent = RecordingIntent.current();
-        // 录像只在屏幕亮着时接（2026-10-10）：哨兵模式没开时车机熄屏几秒就断电，黑着拉起来的主界面一开就是三路相机。
-        // 被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘）：和亮屏同一个接回入口，
-        // 不看「启动自动录制」—— 以前只看它，而它关着、熄屏持续录制开着（默认）时「唤醒后恢复」在进程被结束后就落空了。
-        // 开录要经过主界面建的相机管线（1.6），主界面不在就静默拉起来
-        if (!dark) {
+        boolean wanted = !recording && intent.recordingWanted();
+        boolean autoStart = !recording && config.isAutoStartRecording() && intent.shouldAutoStart(true);
+        if (dark) {
+            // 录像只在屏幕亮着时接（2026-10-10）：哨兵模式没开时车机熄屏几秒就断电，黑着拉起来的主界面一开就是三路相机。
+            // 黑着只记一笔（在下面那一行里），不拉主界面、不开录
+            if (wanted || autoStart) {
+                did.append(did.length() > 0 ? "; " : "").append("recording-waits-for-screen-on");
+            }
+        } else {
+            // 被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘）：和亮屏同一个接回入口，
+            // 不看「启动自动录制」—— 以前只看它，而它关着、熄屏持续录制开着（默认）时「唤醒后恢复」在进程被结束后就落空了。
+            // 现在用不了相机（前台服务是后台起的）时它把主界面拉起来（bringUpMainForRecording），录像照样当场要、
+            // 等它起来再开相机；能用相机就直接接 —— 管线属于应用，开录不用再经过主界面（大纲 §2 阶段 6）
             coordinator.resumeIfWanted(why);
-        }
-        boolean wantRecording = !dark && !recording && (intent.recordingWanted()
-                || config.isAutoStartRecording() && intent.shouldAutoStart(true));
-        if (wantRecording && !mainScreenAlive) {
-            Intent main = new Intent(context, MainActivity.class);
-            main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-            main.putExtra("auto_start_from_boot", true);
-            main.putExtra(EXTRA_SILENT, true);
-            context.startActivity(main);
-            did.append(did.length() > 0 ? "; " : "").append("main-screen-for-recording");
+            // 「启动自动录制」的入口在主界面（这一趟开没开过、停没停过都在那里记）：主界面不在就静默拉起来
+            if (autoStart && !wanted && !mainScreenAlive) {
+                launchMainSilently(context);
+                did.append(did.length() > 0 ? "; " : "").append("main-screen-for-recording");
+            }
         }
 
         String summary = did.length() == 0 ? "nothing" : did.toString();

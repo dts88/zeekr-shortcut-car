@@ -200,7 +200,8 @@ public class RearViewMirrorView extends ViewGroup {
 
     /**
      * 相机要写进的 TextureView：服务把它的 SurfaceTexture 声明成环视的后视镜输出，会话由通道调度建。
-     * 贴边收起时它不可见、不画（见 {@link #syncDockState()}）。
+     * 贴边收起时它不可见、不画（见 {@link #syncDockState()}）。窗口移走时画布由管线留着，新窗口可以用
+     * {@code setSurfaceTexture} 接回上一个窗口留下的那一块（大纲 §7.7，见 RearViewMirrorService）。
      */
     public AutoFitTextureView getTextureView() {
         return textureView;
@@ -371,6 +372,16 @@ public class RearViewMirrorView extends ViewGroup {
         }
     }
 
+    /**
+     * 把窗口移走（服务退出时）。
+     *
+     * <p><b>当场移走</b>（{@code removeViewImmediate}，2026-10-11，大纲 §7.7）：画布（TextureView 的 SurfaceTexture）在窗口
+     * 移走、视图从窗口上摘下来那一下才被收走，服务在那一下（onSurfaceTextureDestroyed）把它交给管线留着。{@code removeView}
+     * 只排一个消息、过一会儿才摘：那时服务已经走完 onDestroy，紧接着再开的后视镜（设置里重置布局时关了再开、关了又打开、
+     * 被恢复拉起）新窗口可能先建好，接不回这一块，只好自己建一块 —— 环视为此多改一次输出。当场移走，这一下就在服务的
+     * onDestroy 里做完，新窗口建起来时画布已经在管线手里。这里只从服务的 onDestroy 调，不在本窗口的绘制、触摸分发途中，
+     * 当场摘是安全的。</p>
+     */
     public void hide() {
         idleHandler.removeCallbacks(idleTick);
         cancelGlide();
@@ -379,7 +390,7 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
         try {
-            windowManager.removeView(this);
+            windowManager.removeViewImmediate(this);
         } catch (Exception e) {
             AppLog.w(TAG, "后视镜窗口移除失败: " + e);
         }

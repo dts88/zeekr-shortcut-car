@@ -108,7 +108,7 @@
     <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
-    <string name="set_screen_off_keep_summary">需配合哨兵模式使用。未开启哨兵模式时，停车熄屏后暂停录制，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
+    <string name="set_screen_off_keep_summary">需配合哨兵模式使用。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>

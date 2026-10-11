@@ -14,6 +14,7 @@ import com.kooo.evcam.camera.CameraNeeds;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.RecordingLanes;
+import com.kooo.evcam.recovery.Recovery;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.storage.StorageState;
@@ -155,6 +156,8 @@ public final class RecordingCoordinator {
     private final RecordingStops.ResumeBudget budget = new RecordingStops.ResumeBudget();
     /** 下一次开录用的那一份管线。 */
     private MultiCameraManager cameraManager;
+    /** 正等着建好的那一份管线（{@link #currentManager}）：一份只挂一次「建好了再看」。 */
+    private MultiCameraManager awaitedBuild;
     /** 这一次录像在哪一份管线上开的：停、收拾都找它，它报上来的才算数（管线换了也一样）。 */
     private MultiCameraManager attemptManager;
     private final RecordingLifecycle lifecycle = new RecordingLifecycle();
@@ -386,7 +389,10 @@ public final class RecordingCoordinator {
         return pending != null;
     }
 
-    /** 录制管线还有人要：在录、在等开录、或者上一次还在收拾。主界面销毁时据此决定留不留管线。 */
+    /**
+     * 录制管线还有人要：在录、在等开录、或者上一次还在收拾。主界面销毁时据此决定留不留前台服务和中转写入
+     * （管线本身属于应用，主界面销毁不放它，大纲 §2 阶段 6）。
+     */
     public boolean needsPipeline() {
         return !lifecycle.isIdle() || pending != null;
     }
@@ -514,9 +520,22 @@ public final class RecordingCoordinator {
 
     // ================================================================= 要录
 
-    /** 要录：查过盘就开，不等环视。已经在录、已经在等，都无害。主线程调。 */
+    /**
+     * 要录：查过盘就开，不等环视。已经在录、已经在等，都无害。主线程调。
+     *
+     * <p>屏幕黑着时不开（channel-logic §五：熄屏时不开相机）：只记下「这一趟要录」，亮屏时 {@link #screenOn} 照它接
+     * （§四：醒来时熄屏持续录制或自动录制开着就接着录）。熄屏那张表只在熄屏那一刻、和录着时的重判里判，黑着以后才来的要录
+     * 没人判 —— 以前它照样开起来：管线在相机线程上建、比熄屏晚好了，主界面这时才提出「启动自动录制」，录像意图在黑屏里开、
+     * 熄屏录制拿着唤醒锁拉住车机，却因为「车机要睡」一路都开不起来（审查 2026-10-11）。唯一的例外是熄屏时照表接着录的那一次
+     * 录像被存储一类打断后的自动接回（{@link Why#RESUME}）：它在表允许的那一段里。</p>
+     */
     public void request(Why why) {
         if (isRecording()) {
+            return;
+        }
+        if (ScreenState.dark() && why != Why.RESUME) {
+            BlackBox.noteImportant("要录像（" + why + "）：屏幕黑着，先不开录，亮屏后接着录");
+            noteWanted(true, why.name());
             return;
         }
         if (pending == null) {
@@ -566,20 +585,22 @@ public final class RecordingCoordinator {
     };
 
     /**
-     * 熄屏了（ScreenState 在主线程调）：在录（含等接回）就照 {@link ScreenOffPlan#atScreenOff} 判一次、照着做 ——
-     * 接着录、{@link #SCREEN_OFF_STOP_MS} 后停，或者现在停（哨兵模式没开、车没在走：车机几秒后就断电。录像一停，
-     * 相机由登记表按次序关，环视先单独关，项目所有者 2026-10-10）。手动开的、自动开的一样。
-     * 这里先于主界面、后视镜的熄屏监听者被叫到（ScreenState 的固定顺序）：现在停的话它们看到的已经是停了的录像，当场放开相机。
+     * 熄屏了（ScreenState 在主线程调）：不管在不在录，都照 {@link ScreenOffPlan#atScreenOff} 判一次、照着做（大纲 §2 阶段 6；
+     * 以前没在录就不判）。在录（含等开录）的：接着录、{@link #SCREEN_OFF_STOP_MS} 后停，或者现在停（哨兵模式没开、车没在走：
+     * 车机几秒后就断电）。判成现在停的，在不在录都写下「车机要睡」（{@link CameraNeeds#setHeadUnitSleeps}）：通道调度从此不保持、
+     * 手上那一步最多再等 1 秒，然后按次序关相机（环视先单独关，channel-logic §四，项目所有者 2026-10-10）。没在录时车辆信号没人登记，
+     * 读不到按没开算，于是空闲熄屏就是「车机要睡」—— 空闲熄屏本来也不保持、照登记表按次序关，结果一样，只是关得更早、更确定。
+     * 手动开的、自动开的一样。这里先于主界面、后视镜的熄屏监听者被叫到（ScreenState 的固定顺序）：调度的那一轮排在它们之后。
      */
     public void screenOff() {
         cancelScreenOffStop();
         darkAction = null;
-        if (!isRecording() && pending == null) {
-            return;
+        if (isRecording() || pending != null) {
+            // 熄屏这一段的汇总（亮屏时一行）只记在录、在等的那一段
+            darkSinceElapsedMs = android.os.SystemClock.elapsedRealtime();
+            darkSinceUptimeMs = android.os.SystemClock.uptimeMillis();
+            stopsWhileDark = 0;
         }
-        darkSinceElapsedMs = android.os.SystemClock.elapsedRealtime();
-        darkSinceUptimeMs = android.os.SystemClock.uptimeMillis();
-        stopsWhileDark = 0;
         decideWhileDark(DarkCheck.SCREEN_OFF);
     }
 
@@ -587,9 +608,10 @@ public final class RecordingCoordinator {
      * 开发者熄屏录制的唤醒锁到点了（ScreenOffRecording 排到主线程上调）：锁不算拉着车机了，照熄屏那张表再判一次，
      * 和熄屏那一刻一样做（2026-10-10，以前到点就放锁，车机带着开着的相机睡过去）。现在停的那种，锁留到相机按次序关完
      * （{@link ScreenOffRecording#holdUntilCamerasClosed}）；接着录、10 秒后停的（车机醒着、或者车在走），锁现在就放。
+     * 屏幕黑着就判，在不在录都一样（大纲 §2 阶段 6：每一次熄屏判定都要判）。
      */
     public void lockTimedOut() {
-        if (!ScreenState.dark() || (!isRecording() && pending == null)) {
+        if (!ScreenState.dark()) {
             ScreenOffRecording.release("timeout");
             return;
         }
@@ -599,8 +621,11 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 照熄屏那张表判一次、照着做（主线程；屏幕黑着、在录或在等接回时）：熄屏那一刻、10 秒到点、唤醒锁到点、
+     * 照熄屏那张表判一次、照着做（主线程；屏幕黑着时）—— 熄屏的唯一裁判：熄屏那一刻、10 秒到点、唤醒锁到点、
      * 车辆信号变了都走这里，黑匣子一行写清判的时候哨兵模式、挡位是什么、多久没变，判成了什么。
+     *
+     * <p>判成现在停：先写下「车机要睡」（调度当场置「正在按次序关」，熄屏录制放锁之前要读它），再停录。写不写、清不清只照
+     * {@link ScreenOffPlan#sleepFact}：已经写着的不再写，起算时刻不挪。没在录、也没在等开录的，只写这项事实，录像那边没有可做的。</p>
      *
      * @return 判下来的做法
      */
@@ -608,33 +633,46 @@ public final class RecordingCoordinator {
         boolean lockHeld = ScreenOffRecording.holdsCarAwake(context);
         VehicleState vehicle = Telemetry.get().latest();
         ScreenOffPlan.Decision decision = ScreenOffPlan.atScreenOff(appConfig, lockHeld, vehicle);
+        boolean busy = isRecording() || pending != null;
         // 唤醒锁拉着车机时判下来一定是接着录
         darkAction = decision.action;
         darkActionByLock = lockHeld;
         long now = android.os.SystemClock.elapsedRealtime();
-        BlackBox.noteImportant((check == DarkCheck.SCREEN_OFF ? "熄屏时在录像"
+        BlackBox.noteImportant((check == DarkCheck.SCREEN_OFF ? (busy ? "熄屏时在录像" : "熄屏时没在录像")
                 : check == DarkCheck.STOP_DUE ? "熄屏已 " + (SCREEN_OFF_STOP_MS / 1000) + " 秒"
                 : check == DarkCheck.LOCK_TIMEOUT ? "熄屏录制的唤醒锁到点" : "熄屏中哨兵模式 / 挡位变了")
                 + "：哨兵模式" + (vehicle.sentry == null ? "读不到" : vehicle.sentry == 0 ? "关"
-                : vehicle.sentry == 1 ? "开" : "布防") + "（" + (now - sentrySinceMs) / 1000 + " 秒没变）、挡位 "
-                + (vehicle.gear == null ? "读不到" : vehicle.gear) + "（" + (now - gearSinceMs) / 1000 + " 秒没变）、车速 "
+                : vehicle.sentry == 1 ? "开" : "布防")
+                + (watchingVehicle ? "（" + (now - sentrySinceMs) / 1000 + " 秒没变）" : "") + "、挡位 "
+                + (vehicle.gear == null ? "读不到" : vehicle.gear)
+                + (watchingVehicle ? "（" + (now - gearSinceMs) / 1000 + " 秒没变）" : "") + "、车速 "
                 + (vehicle.speedKmh == null ? "读不到" : String.format(Locale.US, "%.1f", vehicle.speedKmh))
                 + "；熄屏持续录制" + (appConfig.isScreenOffKeepRecording() ? "开" : "关")
                 + "、熄屏录制" + (appConfig.isScreenOffRecordingEnabled() ? (lockHeld ? "拉着车机" : "开（锁不拉着车机）")
                 : appConfig.isScreenOffRecordingStoredOn() ? "没生效（存着是开，开发者选项没解锁）" : "关")
                 + "、启动自动录制" + (appConfig.isAutoStartRecording() ? "开" : "关") + " → "
-                + (decision.action == ScreenOffPlan.Action.CONTINUE ? "接着录"
+                + (!busy ? (decision.action == ScreenOffPlan.Action.STOP_NOW
+                ? "车机要睡了：相机按次序关（环视先单独关）" : "车机醒着：相机照登记表")
+                : decision.action == ScreenOffPlan.Action.CONTINUE ? "接着录"
                 : decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：现在停录，相机按次序关（环视先单独关）"
                 : check == DarkCheck.STOP_DUE ? "停录" : (SCREEN_OFF_STOP_MS / 1000) + " 秒后停录")
-                + (decision.action == ScreenOffPlan.Action.CONTINUE ? ""
+                + (!busy || decision.action == ScreenOffPlan.Action.CONTINUE ? ""
                 : decision.resumesOnWake ? "；亮屏后接着录" : "；亮屏后不接")
                 + BlackBox.afterScreenOff());
+        // 「车机要睡」先于停录写下：调度当场置「正在按次序关」，停录放开 RECORDING 时它已经不再保持
+        CameraNeeds needs = CameraNeeds.current();
+        if (ScreenOffPlan.sleepFact(true, decision.action, needs.headUnitSleeps()) == ScreenOffPlan.SleepFact.WRITE) {
+            needs.setHeadUnitSleeps(true);
+        }
         switch (decision.action) {
             case CONTINUE:
                 cancelScreenOffStop();
                 break;
             case STOP_LATER:
+                if (!busy) {
+                    break;   // 没在录：没有可停的，车机醒着，相机照登记表
+                }
                 if (check == DarkCheck.STOP_DUE) {
                     stopForScreenOff(decision.resumesOnWake);
                 } else if (screenOffStop == null) {
@@ -725,12 +763,17 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 亮屏了（ScreenState 在主线程调）：熄屏那一段的结果记一行；这一趟要录而眼下没在录的（因熄屏停下的、
-     * 进程被车机结束过的），接着录（{@link #resumeIfWanted}）。
+     * 亮屏了（ScreenState 在主线程调）：「车机要睡」清掉（车机醒着了，调度照常保持、开相机，{@link ScreenOffPlan#sleepFact}）；
+     * 熄屏那一段的结果记一行；这一趟要录而眼下没在录的（因熄屏停下的、进程被车机结束过的），接着录（{@link #resumeIfWanted}）。
      */
     public void screenOn() {
         cancelScreenOffStop();
         darkAction = null;
+        CameraNeeds needs = CameraNeeds.current();
+        if (ScreenOffPlan.sleepFact(false, null, needs.headUnitSleeps()) == ScreenOffPlan.SleepFact.CLEAR) {
+            needs.setHeadUnitSleeps(false);
+            BlackBox.note("亮屏：撤掉「车机要睡」，通道调度照常保持、开相机");
+        }
         if (darkSinceElapsedMs > 0) {
             long offMs = android.os.SystemClock.elapsedRealtime() - darkSinceElapsedMs;
             long awakeMs = android.os.SystemClock.uptimeMillis() - darkSinceUptimeMs;
@@ -751,12 +794,21 @@ public final class RecordingCoordinator {
      * 亮屏（{@link #screenOn}）、进程在屏幕亮着时被拉起来（Recovery）都走它；进程被车机结束过也接（规格 1.2）。
      * 屏幕黑着不接（2026-10-10）：哨兵模式没开时车机几秒后就断电，车机自己醒来的那几分钟里也不该录起来。
      *
+     * <p>现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机；和通道调度读的同一个事实，
+     * {@link MultiCameraManager#cameraUsableNow}）：先把主界面拉起来（{@link Recovery#bringUpMainForRecording}，大纲 §2 阶段 6），
+     * 录像照样现在就要 —— 没人拉主界面的话录像输出声明了、相机却开不起来，录像一直「等待摄像头」；拉了，它一起来、登记了预览，
+     * 调度就能开，带着录像输出开。不等它起来再要（大纲原写法）：拉主界面可能被系统悄悄拦下（后台起界面的限制）、
+     * 5 秒内重复的那一次也不再拉，那时没人再来要，录像就丢到下一次亮屏或 5 分钟一次的例行恢复（审查 2026-10-11）。</p>
+     *
      * @param where 谁叫的（ASCII，进黑匣子）
      */
     public void resumeIfWanted(String where) {
         if (ScreenState.dark() || isRecording() || pending != null
                 || !RecordingIntent.current().recordingWanted()) {
             return;
+        }
+        if (!MultiCameraManager.cameraUsableNow()) {
+            Recovery.bringUpMainForRecording(context, where);
         }
         BlackBox.noteImportant("「这一趟要录」还在（" + where
                 + (lastStopReason == null ? "，上一个进程留下的" : "，" + lastStopReason + " 停的") + "）：接着录");
@@ -766,15 +818,31 @@ public final class RecordingCoordinator {
     // ================================================================= 开
 
     /**
-     * 开录用哪一份管线。手里那份没了（被释放）而进程里已经有了新的一份（{@link CameraManagerHolder}），
-     * 就换成它 —— 换管线的地方不一定都记得交过来（后台建的那一份、换车型重建的那一份）。
+     * 开录用哪一份管线：进程里那一份（{@link CameraManagerHolder#getOrInit}；大纲 §2 阶段 6：管线属于应用，只在那里建，
+     * 主界面在不在都一样）。还没有就让它建；还在建（相机列表、合成流探测在相机线程上做）就当还没有，建好那一下马上再看
+     * （{@link CameraManagerHolder#whenBuilt}，不等 {@link #POLL_MS} 的下一轮 —— 管线一般几百毫秒就建好，冷启动开录不该白等两秒）。
+     * 换了一份（换车型重建了）就交过来 —— 以前从 Holder 里拿现成的，没有就一直等到主界面把它建出来。
      */
     private MultiCameraManager currentManager() {
-        MultiCameraManager held = CameraManagerHolder.getInstance().getCameraManager();
-        if (held != null && held != cameraManager && (cameraManager == null || cameraManager.isReleased())) {
+        CameraManagerHolder holder = CameraManagerHolder.getInstance();
+        MultiCameraManager held = holder.getOrInit(context);
+        if (held != cameraManager) {
             setCameraManager(held);
         }
-        return cameraManager;
+        if (held.isBuilt()) {
+            return held;
+        }
+        if (awaitedBuild != held) {
+            awaitedBuild = held;
+            holder.whenBuilt(held, built -> {
+                awaitedBuild = null;
+                if (pending != null) {
+                    main.removeCallbacks(poll);
+                    main.post(poll);
+                }
+            });
+        }
+        return null;
     }
 
     /** 真正去开：先查盘。查盘在存储线程上，查完回主线程接着开。 */

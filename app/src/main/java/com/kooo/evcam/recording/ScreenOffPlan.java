@@ -5,8 +5,9 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.telemetry.VehicleState;
 
 /**
- * 正在录的时候熄屏，这段录像会怎样。一张表（{@link #atScreenOff}），几处照它：{@link RecordingCoordinator} 照它停不停、
- * 什么时候停、亮屏接不接；主界面照它退不退后台；录制键上那行小字照它说（{@link #of}）—— 界面上写的就是实际会发生的。
+ * 正在录的时候熄屏，这段录像会怎样。一张表（{@link #atScreenOff}），两处照它：{@link RecordingCoordinator} 照它停不停、
+ * 什么时候停、亮屏接不接、写不写「车机要睡」（熄屏的唯一裁判，在不在录都判）；录制键上那行小字照它说（{@link #of}）——
+ * 界面上写的就是实际会发生的。主界面熄屏时只管界面，不再自己算这张表（大纲 §2 阶段 6）。
  *
  * <p>车机睡不睡由车辆的哨兵模式决定：开着时车机一直醒着、只是黑屏，录像不断；没开的话车机熄屏后几秒就断电
  * （2026-10-10 实测：U 盘先写不进，不到 1 秒熄屏，3–5 秒后进程被结束或冻住）。所以哨兵模式没开、也没在开车，
@@ -115,7 +116,7 @@ public enum ScreenOffPlan {
     }
 
     /**
-     * 此刻熄屏的话怎么做（输入都在这里取齐）：协调器熄屏那一刻、唤醒锁到点、车辆信号变了，主界面熄屏那一刻，都调它。
+     * 此刻熄屏的话怎么做（输入都在这里取齐）：协调器熄屏那一刻、10 秒到点、唤醒锁到点、车辆信号变了，都调它。
      *
      * @param lockHeld 开发者的唤醒锁拉着车机（{@link ScreenOffRecording#holdsCarAwake}）
      * @param vehicle  车辆信号此刻的快照（{@code Telemetry.latest()}）

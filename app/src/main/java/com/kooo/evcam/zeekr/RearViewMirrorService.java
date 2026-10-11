@@ -38,6 +38,13 @@ import com.kooo.evcam.camera.StallWatch;
  * {@code setMainFloatingSurface} + {@code recreateSession}，贴边、熄屏、放回来、亮屏各重建一次环视会话，
  * 环视关着时还自己去开 —— 那是调度之外的第二个动手方（阶段 3 先拿掉了「自己开」，阶段 4b 拿掉其余的）。</p>
  *
+ * <p><b>关后视镜时画布由管线留着</b>（大纲 §7.7，项目所有者 2026-10-11「按建议，留住」；做法同 §7.6 主界面的预览画布）：
+ * 窗口移走（服务退出、窗口被拆）、画布要被系统收走时 onSurfaceTextureDestroyed 返回 false，画布交给管线
+ * （{@link MultiCameraManager#keepMirrorCanvas}）—— 它还活着，就只是环视会话里一个「留着的输出」，关后视镜时环视（含环视的录像）
+ * 一步不动；没人接回的，等调度照「减输出」的规矩摘掉、或者随环视关了再放。新开的后视镜窗口接回同一块
+ * （{@link #takeBackKeptCanvas}）：同一块画布就是同一个输出，通道零变动。以前（阶段 4b）放掉画布，它成了死输出，
+ * 调度排一步马上摘，摘到之前环视整条重复请求停着（大纲 §6 风险 2）。</p>
+ *
  * <p>后视镜和主界面预览共用环视的那一条预览流（Surface Sharing，见 SingleCamera 建会话那一段）。
  * <b>没有新建 GL 管线</b> —— 那是这台车机上最容易出问题的地方。</p>
  */
@@ -69,6 +76,12 @@ public class RearViewMirrorService extends Service {
      * 交一次窗口就重算一次取景、写一行日志、重画一次。换了窗口（{@link #showMirror}）清掉。
      */
     private Size sourceSize;
+    /**
+     * 刚接回上一个窗口留下的画布（{@link #takeBackKeptCanvas}），下一次出帧时把缓冲区尺寸拨回去：新视图第一次画它时
+     * （建图层那一下）会把缓冲区尺寸改成窗口的布局尺寸，又不叫 onSurfaceTextureAvailable；紧跟着的就是那一次
+     * onSurfaceTextureUpdated（2026-10-11，§7.7）。
+     */
+    private boolean restoreBufferOnFrame;
     private int retryCount;
     private Runnable retryRunnable;
     private Runnable watchdog;
@@ -251,6 +264,7 @@ public class RearViewMirrorService extends Service {
         mirrorView = new RearViewMirrorView(this, appConfig);
         // 新窗口还不知道合成流尺寸：下一次声明时照环视的尺寸交给它
         sourceSize = null;
+        restoreBufferOnFrame = false;
         mirrorView.getTextureView().setSurfaceTextureListener(
                 new TextureView.SurfaceTextureListener() {
                     @Override
@@ -265,25 +279,17 @@ public class RearViewMirrorService extends Service {
 
                     @Override
                     public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
-                        // 画布被系统收走（窗口移走了：服务退出、窗口被拆）。放开登记、撤回输出，返回 true 让 TextureView 把它放掉：
-                        // 放掉以后它就是会话里的死输出，调度排一步马上摘（channel-logic §二.4「画面被系统收走的必须马上摘」）。
-                        // 服务退出时 onDestroy 已经撤回过了（那时 boundTexture 已清），这里照样叫醒：这个回调返回之后 TextureView
-                        // 才放，post 出去的那一轮看到的就是死的，不用等调度每 2 秒一次的那一轮。重试一律取消 —— 排着的那一次
-                        // 拿的是这块画布，没声明上（拿不到环视）时 boundTexture 不是它。
-                        // 死输出摘到之前环视整条重复请求停着（大纲 §6 风险 2）；要不要像主界面预览那样留住画布
-                        // （返回 false、交给调度 handOver），是大纲 §7 第 7 问，车主答复之前照现在做
-                        cancelRetry();
-                        if (st == boundTexture) {
-                            AppLog.i(TAG, "后视镜画布没了：放开登记、撤回输出，由通道调度马上摘");
-                            unbindCamera();
-                            withdrawOutput();
-                        }
-                        ChannelScheduler.wakeAll();
-                        return true;
+                        // 画布要被系统收走了（窗口移走：服务退出、窗口被拆）：交给管线留着就返回 false，TextureView 不放（大纲 §7.7）
+                        return !handCanvasToPipeline(st);
                     }
 
                     @Override
                     public void onSurfaceTextureUpdated(SurfaceTexture st) {
+                        if (restoreBufferOnFrame) {
+                            // 接回的画布第一次画出来：建图层那一下刚把缓冲区尺寸改成了窗口的布局尺寸（见 restoreBufferOnFrame）
+                            restoreBufferOnFrame = false;
+                            restoreBufferSize(st);
+                        }
                         // 每显示一帧新画面响一次。卡顿监测靠它判断后视镜是不是卡住了，
                         // 窗口自己靠它判断要不要把那张过时的画面盖起来
                         StallWatch.mirrorFrame();
@@ -296,7 +302,82 @@ public class RearViewMirrorService extends Service {
         mirrorView.setResumeAction(() -> rebindNow(true));
         mirrorView.setDockListener(this::onDockChanged);
         mirrorView.show();
+        takeBackKeptCanvas();
         startWatchdog();
+    }
+
+    /**
+     * 上一个后视镜窗口留下的画布接回来（大纲 §7.7，项目所有者 2026-10-11「按建议，留住」；留是 {@link #handCanvasToPipeline}）。
+     *
+     * <p>在窗口加上之后、第一次画之前做（加窗口只排一次布局和绘制，这一趟主线程走完之前不会画）：
+     * {@code TextureView.setSurfaceTexture} 之后视图不再自己建画布，也就不会来 onSurfaceTextureAvailable ——
+     * 所以这里当场照「画布准备好」走一遍 {@link #bindCamera}：同一块画布就是同一个输出，会话里还带着它，
+     * 通道零变动、画面马上就有。黑着屏、窗口贴边收起时 bindCamera 照它的两道守卫先不声明、不登记，画布照样归这个窗口，
+     * 亮屏、放回来时再声明。没留下的照旧等系统建。</p>
+     *
+     * <p>窗口没加上（{@code show()} 失败）就不接：视图永远挂不上窗口，也就永远不会放它 —— 留在管线手里，照旧由调度放。
+     * 留着画布的只会是进程里那一份管线（管线属于应用，后视镜服务退出不放它），这里不建。</p>
+     */
+    private void takeBackKeptCanvas() {
+        if (mirrorView == null || !mirrorView.isShowing()) {
+            return;
+        }
+        MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
+        if (pipeline == null || pipeline.isReleased()) {
+            return;
+        }
+        SurfaceTexture kept = pipeline.takeKeptMirror();
+        if (kept == null) {
+            return;
+        }
+        try {
+            mirrorView.getTextureView().setSurfaceTexture(kept);
+        } catch (RuntimeException e) {
+            // 接不上：还给管线，照旧等它离开会话再放；还不回去（管线里已经没有环视那一路）就放掉，这块画布不在它的会话里
+            AppLog.w(TAG, "接回留着的后视镜画布失败: " + e);
+            if (!pipeline.keepMirrorCanvas(kept)) {
+                kept.release();
+            }
+            return;
+        }
+        restoreBufferOnFrame = true;
+        com.kooo.evcam.blackbox.BlackBox.note("后视镜重新打开：接回留着的画布（同一块画布，通道不动）");
+        bindCamera(kept);
+    }
+
+    /**
+     * 窗口的画布要被系统收走了（onSurfaceTextureDestroyed：窗口移走 —— 服务退出、窗口被拆）：交给管线留着
+     * （大纲 §7.7，项目所有者 2026-10-11「按建议，留住」；做法同 §7.6 主界面的预览画布）。
+     *
+     * <p>以前（阶段 4b）返回 true，TextureView 把它放掉：它成了环视会话里的死输出，调度排一步马上摘；摘到之前环视整条重复请求
+     * 停着 —— 预览、环视的录像一起停（大纲 §6 风险 2），而那一步要等安静、等别的路手上那一步，碰上另一路正被别人接手时
+     * 能停十几秒以上。现在画布还活着：放开登记、撤回输出之后它只是「留着的输出」，关后视镜时环视一步不动；下一次本来要动环视、
+     * 或者关环视时一起摘，摘掉以后由调度放（{@link MultiCameraManager#keepMirrorCanvas}）。新开的后视镜窗口可以接回同一块
+     * （{@link #takeBackKeptCanvas}）。</p>
+     *
+     * <p>服务退出时 {@link #onDestroy} 已经放开登记、撤回过了（那时 boundTexture 已清，窗口随后当场移走）；服务还在而窗口被拆的，
+     * 这里先放开、撤回。重试一律取消 —— 排着的那一次拿的是这块画布，没声明上（拿不到环视）时 boundTexture 不是它。
+     * 管线没了、放了、里面没有环视那一路时照旧让 TextureView 放：会话里那个成了死输出，叫醒调度马上摘 —— 这个回调返回之后
+     * TextureView 才放，post 出去的那一轮看到的就是死的，不用等调度每 2 秒一次的那一轮。</p>
+     *
+     * @return true：画布交给管线了（回调返回 false）；false：照旧让 TextureView 放
+     */
+    private boolean handCanvasToPipeline(SurfaceTexture st) {
+        cancelRetry();
+        restoreBufferOnFrame = false;
+        if (st == boundTexture) {
+            unbindCamera();
+            withdrawOutput();
+        }
+        MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
+        boolean kept = pipeline != null && !pipeline.isReleased() && pipeline.keepMirrorCanvas(st);
+        if (kept) {
+            com.kooo.evcam.blackbox.BlackBox.note("后视镜窗口移走：画布交给管线留着，环视不动（没人接回的等它离开环视的会话再放）");
+        } else {
+            AppLog.i(TAG, "后视镜画布没了、管线里没有环视：照旧放掉，还在会话里的由通道调度马上摘");
+            ChannelScheduler.wakeAll();
+        }
+        return kept;
     }
 
     /** 每隔几秒重新声明、重新登记一次（见 {@link #ensureStillBound}）。 */
@@ -323,8 +404,8 @@ public class RearViewMirrorService extends Service {
      * 声明后视镜输出、登记 MIRROR —— 只做这两件事（大纲 §2 阶段 4b）。
      *
      * <p>两道守卫留着：屏幕黑着不登记（见 {@link #screenListener}）；贴边收起不登记（那条窄边上只写名字，
-     * 不该为它要一路画面）。通往这里的路不止一条（画布准备好、看门狗到点、放回来、亮屏、点「点击恢复」），
-     * 所以守在入口，而不是守在每一个调用方。</p>
+     * 不该为它要一路画面）。通往这里的路不止一条（画布准备好、接回上一个窗口留下的画布、看门狗到点、放回来、亮屏、
+     * 点「点击恢复」），所以守在入口，而不是守在每一个调用方。</p>
      *
      * <p>同一块画布再声明一次、同一项再登记一次都不算变化：看门狗每 2 秒走到这里一次，什么都没变就什么都不做、
      * 不写日志、不叫醒调度。声明变了叫醒这一份管线的调度；登记变了，登记表的监听自己会叫醒它。</p>
@@ -598,8 +679,9 @@ public class RearViewMirrorService extends Service {
     }
 
     /**
-     * 撤回后视镜输出：画布没了、服务退出、或者换了一路相机 / 一块画布时。撤回不碰会话 ——
-     * 画布还活着就是「留着的输出」，等下一次本来要动、或者关相机时一起摘；已经被系统收走的，调度排一步马上摘。
+     * 撤回后视镜输出：画布要被收走、服务退出、或者换了一路相机 / 一块画布时。撤回不碰会话 ——
+     * 画布还活着就是「留着的输出」，等下一次本来要动、或者关相机时一起摘（关后视镜时画布交给管线留着，
+     * 见 {@link #handCanvasToPipeline}）；已经被系统收走的，调度排一步马上摘。
      */
     private void withdrawOutput() {
         SingleCamera camera = boundCamera;
@@ -624,7 +706,8 @@ public class RearViewMirrorService extends Service {
         cancelRetry();
         cancelWatchdog();
         handler.removeCallbacks(explainRunnable);
-        // 服务退出：放开登记、撤回输出。窗口随后移走，画布被放掉时（onSurfaceTextureDestroyed）再叫醒一次调度去摘
+        // 服务退出：放开登记、撤回输出。窗口接着当场移走（RearViewMirrorView.hide），画布要被收走的那一下
+        // （onSurfaceTextureDestroyed → handCanvasToPipeline）交给管线留着，环视不动（大纲 §7.7）
         unbindCamera();
         withdrawOutput();
         if (mirrorView != null) {

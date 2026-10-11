@@ -38,7 +38,8 @@ import java.util.function.Consumer;
  *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；</li>
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
- *   <li>交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、换下来的录制器）离开了会话的，放掉；</li>
+ *   <li>交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级后视镜留住的画布、换下来的录制器）
+ *       离开了会话的，放掉；</li>
  *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；</li>
  *   <li>告诉录像那一侧（{@link Recording}）：哪几路走了、哪几路的样子变了、哪几路带着新会话出了画面 ——
  *       录像按路加入、退出只看这几声，自己从不动相机。</li>
@@ -477,7 +478,8 @@ public final class ChannelScheduler {
 
     /**
      * 有没有哪一份调度正在为退出、车机要睡按次序关相机，还没关完。谁读它：新实例开相机之前（换车型时，见大纲 §6 风险 10），
-     * 退出的最后一步（MainActivity.finishExit），熄屏录制放唤醒锁之前（ScreenOffRecording）。哪个线程都能读。
+     * 退出的最后一步（MainActivity.finishExit），熄屏录制放唤醒锁之前（ScreenOffRecording 经 {@link #whenClosedEverywhere}
+     * 等它变假）。哪个线程都能读。
      *
      * <p>每一份从进来起最多算 {@link ChannelRules#EXIT_WAIT_MAX_MS}（手上那一步封顶 + 按次序关封顶 + 余量）：一次关卡死在
      * 相机服务里的那一份永远关不完，不封顶的话进程活着就一直为真 —— 读它的旧路径（画布没了、停录收拾完不重建会话）
@@ -490,6 +492,48 @@ public final class ChannelScheduler {
             }
         }
         return false;
+    }
+
+    /** 等「都关完了」的那几位（{@link #whenClosedEverywhere}），只在主线程上增删、叫。 */
+    private static final List<Runnable> CLOSED_WAITERS = new CopyOnWriteArrayList<>();
+
+    /**
+     * 都关完了（{@link #closingAnywhere} 为假）就叫 {@code done}，只叫一次（主线程上调，主线程上叫）：此刻就是，当场叫；
+     * 否则等哪一份调度报告关完、或者车机要睡被亮屏清掉之后，再没有一份在关时叫 —— 这就是调度发出的「关完」。
+     *
+     * <p>熄屏录制的唤醒锁等它再放（ScreenOffRecording，大纲 §2 阶段 6）：以前每 100 ms 问一次管理器「关完没有」、5 秒封顶，
+     * 5 秒盖不住环视单独先关（最多 10 秒）再关座舱。这里不封顶，封顶由等的一方定（唤醒锁最多拉
+     * {@link ChannelRules#WAKE_HOLD_MAX_MS}）；不等了调 {@link #cancelClosedWaiter}。{@link #closingAnywhere} 到了
+     * {@link ChannelRules#EXIT_WAIT_MAX_MS} 自己变假的那一下不叫（没有哪一轮报关完）—— 等的一方的封顶都比它短。</p>
+     */
+    public static void whenClosedEverywhere(Runnable done) {
+        if (done == null) {
+            return;
+        }
+        if (!closingAnywhere()) {
+            done.run();
+            return;
+        }
+        if (!CLOSED_WAITERS.contains(done)) {
+            CLOSED_WAITERS.add(done);
+        }
+    }
+
+    /** 不等「关完」了（等的一方到了自己的封顶、或者亮屏了）。没在等也无害。 */
+    public static void cancelClosedWaiter(Runnable done) {
+        CLOSED_WAITERS.remove(done);
+    }
+
+    /** 再没有一份在关了：叫等着的那几位（先摘下来再叫，叫的时候再登记的不算这一次）。 */
+    private static void tellClosedWaiters() {
+        if (CLOSED_WAITERS.isEmpty() || closingAnywhere()) {
+            return;
+        }
+        List<Runnable> due = new ArrayList<>(CLOSED_WAITERS);
+        CLOSED_WAITERS.removeAll(due);
+        for (Runnable done : due) {
+            done.run();
+        }
     }
 
     /** 叫醒每一份调度：前台服务就绪 / 没了、主界面进出前台（这几件事是进程级的，不归哪一份管理器）。 */
@@ -601,7 +645,8 @@ public final class ChannelScheduler {
     /** 每一路我们最近一次开好、关完的时刻（调度的钟）：之后 {@link #OWN_WORD_GRACE_MS} 以内相机服务的话还算我们的。 */
     private final Map<String, Long> ownStepEndedAt = new HashMap<>();
     /**
-     * 交给调度、等它离开会话再放的消费者（{@link #handOver}），按路：输出 → 怎么放。大纲 §7.6 主界面重建时留住的预览画布。
+     * 交给调度、等它离开会话再放的消费者（{@link #handOver}），按路：输出 → 怎么放。大纲 §7.6 主界面重建时留住的预览画布、
+     * §7.7 关掉的超级后视镜留住的画布、换下来的录制器。
      * 不随 {@link #setLanes} 清：路没了的下一轮就放，不漏。
      */
     private final Map<String, Map<ChannelRules.Out, Runnable>> handedOver = new LinkedHashMap<>();
@@ -721,9 +766,10 @@ public final class ChannelScheduler {
      * （{@link ChannelRules#composition}）等下一次本来要动、或者关相机时一起摘 —— 这里只等它离开会话。
      * 不能早放：会话还带着它的时候放掉，它就成了死输出，那一路整条重复请求停下，只能马上摘（大纲 §6 风险 2）。</p>
      *
-     * <p>用在大纲 §7.6（项目所有者 2026-10-11）：主界面重建（换日夜模式、换语言、从最近任务划掉）时
-     * onSurfaceTextureDestroyed 返回 false，预览画布交到这里；新界面用 {@code TextureView.setSurfaceTexture}
-     * 接回同一块的，先 {@link #reclaim} 拿回去 —— 同一块画布就是同一个输出，通道零变动。</p>
+     * <p>用在大纲 §7.6、§7.7（项目所有者 2026-10-11 都答「按建议」）：主界面重建（换日夜模式、换语言、从最近任务划掉）、
+     * 关超级后视镜（服务退出、窗口移走）时 onSurfaceTextureDestroyed 返回 false，预览画布、后视镜画布交到这里；
+     * 新界面、新开的后视镜窗口用 {@code TextureView.setSurfaceTexture} 接回同一块的，先 {@link #reclaim} 拿回去 ——
+     * 同一块画布就是同一个输出，通道零变动。调度这一侧不分是谁的画布：输出种类、哪一路都在 {@code out}、{@code key} 里。</p>
      */
     public void handOver(String key, ChannelRules.Out out, Runnable release) {
         if (key == null || out == null || release == null) {
@@ -937,10 +983,11 @@ public final class ChannelScheduler {
         return sb.toString();
     }
 
-    /** 测试和停下来时用：从进程级的两张表里摘掉自己。 */
+    /** 测试和停下来时用：从进程级的两张表里摘掉自己；摘掉之后再没有一份在关，等「关完」的那几位现在叫。 */
     void detach() {
         LIVE.remove(this);
         WINDING.remove(this);
+        tellClosedWaiters();
     }
 
     // ================================================================= 一轮
@@ -976,6 +1023,8 @@ public final class ChannelScheduler {
             return;
         }
         arm(d, now);
+        // 这一份关完了（或者车机要睡被亮屏清掉）、也没有别的在关：等「关完」的那几位现在叫（{@link #whenClosedEverywhere}）
+        tellClosedWaiters();
     }
 
     // ---- 1. 刷新事实

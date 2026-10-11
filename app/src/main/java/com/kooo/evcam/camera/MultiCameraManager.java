@@ -37,6 +37,10 @@ public class MultiCameraManager {
     private final Map<String, SingleCamera> cameras = new LinkedHashMap<>();
     private final List<String> activeCameraKeys = new ArrayList<>();
     private int maxOpenCameras = DEFAULT_MAX_OPEN_CAMERAS;
+    /** 放了（{@link #release}）。见 {@link #isReleased}。 */
+    private volatile boolean released;
+    /** 建好了（{@link #initCameras} 做完）。见 {@link #isBuilt}。 */
+    private volatile boolean camerasBuilt;
 
     private boolean isRecording = false;
     /** 用软编码录制（编码录制器）；false = MediaRecorder（开发者选项里的非默认模式）。建管线时定一次。 */
@@ -1838,7 +1842,7 @@ public class MultiCameraManager {
      * @param position 位置（front/back/left/right）
      * @return SingleCamera实例，如果不存在则返回null
      */
-    /** 当前已初始化的摄像头路数。用于判断后台那份实例是否还匹配当前车型。 */
+    /** 当前已初始化的摄像头路数（照存下的映射建时，相机列表里此刻没有的那一路也算）。 */
     public int getCameraCount() {
         return cameras.size();
     }
@@ -1847,20 +1851,33 @@ public class MultiCameraManager {
         return cameras.get(position);
     }
 
-    // ------------------------------------------------------------------ 主界面的预览画布（2.11 阶段 4a）
-    // 主界面只声明、撤回自己的画布，再叫醒调度；带不带、什么时候摘由调度定（channel-logic §一、§二.4）。
+    // ------------------------------------------------------------------ 主界面的预览画布、后视镜的画布（2.11 阶段 4a、4b）
+    // 主界面、超级后视镜只声明、撤回自己的画布，再叫醒调度；带不带、什么时候摘由调度定（channel-logic §一、§二.4）。
     // 以前画布一就绪、一销毁就 setTextureView + recreateSession，是调度之外的又一个动手方。
 
     /**
-     * 主界面重建时留下的预览画布，按路（主线程）：大纲 §7.6，项目所有者 2026-10-11「按建议」。
+     * 画布被系统收走时由管线留下的那几块（主线程），按输出的种类、再按路：主界面重建时的预览画布（大纲 §7.6），
+     * 关掉的超级后视镜的画布（大纲 §7.7，只在环视那一路）。项目所有者 2026-10-11 两问都答「按建议」，做法同一套。
      *
      * <p>为什么留：画布被系统收走时，会话里的消费者一死，那一路整条重复请求停下 —— 预览和录像一起停，只能一路一路马上摘，
-     * 摘到之前录像断着（大纲 §6 风险 2；10-10 09:13:10 在录时就发生过）。所以主界面销毁时 onSurfaceTextureDestroyed
-     * 返回 false，画布交到这里（{@link #keepPreviewCanvas}）：新界面用 {@code TextureView.setSurfaceTexture} 接回同一块
-     * （{@link #takeKeptPreview}）—— 同一块画布就是同一个输出，通道零变动、录像不断；没人接回的交给调度
-     * （{@link ChannelScheduler#handOver}），等它照「减输出」的规矩摘掉再放（{@link #releaseKeptPreview}）。</p>
+     * 摘到之前录像断着（大纲 §6 风险 2；10-10 09:13:10 主界面重建时在录就发生过；关后视镜时环视也一样，那一步还要等安静、
+     * 等别的路手上那一步）。所以画布销毁时 onSurfaceTextureDestroyed 返回 false，画布交到这里（{@link #keepPreviewCanvas}、
+     * {@link #keepMirrorCanvas}）：新界面、新开的后视镜窗口用 {@code TextureView.setSurfaceTexture} 接回同一块
+     * （{@link #takeKeptPreview}、{@link #takeKeptMirror}）—— 同一块画布就是同一个输出，通道零变动、录像不断；
+     * 没人接回的交给调度（{@link ChannelScheduler#handOver}），等它照「减输出」的规矩摘掉、或者随相机关了再放
+     * （{@link #releaseKeptCanvas}）。</p>
      */
-    private final Map<String, android.graphics.SurfaceTexture> keptCanvases = new HashMap<>();
+    private final Map<ChannelRules.Kind, Map<String, android.graphics.SurfaceTexture>> keptCanvases = new HashMap<>();
+
+    /** 这一种画布留着的那几块，按路（主线程）。 */
+    private Map<String, android.graphics.SurfaceTexture> keptOf(ChannelRules.Kind kind) {
+        Map<String, android.graphics.SurfaceTexture> byLane = keptCanvases.get(kind);
+        if (byLane == null) {
+            byLane = new HashMap<>();
+            keptCanvases.put(kind, byLane);
+        }
+        return byLane;
+    }
 
     /**
      * 主界面这几格画布就绪了：各自声明预览（主线程）。同一块画布再声明一次什么都不做（{@link SingleCamera#declarePreview}），
@@ -1884,9 +1901,10 @@ public class MultiCameraManager {
         if (camera == null || texture == null || texture.isReleased()) {
             return false;
         }
-        if (keptCanvases.get(cameraKey) == texture) {
+        Map<String, android.graphics.SurfaceTexture> kept = keptOf(ChannelRules.Kind.PREVIEW);
+        if (kept.get(cameraKey) == texture) {
             // 留着的那一块被接回了（平常由 takeKeptPreview 先拿回去；这里兜一下，免得调度回头把它放掉）
-            keptCanvases.remove(cameraKey);
+            kept.remove(cameraKey);
             scheduler.reclaim(cameraKey, new ChannelRules.Out(ChannelRules.Kind.PREVIEW, texture));
         }
         boolean changed = camera.declarePreview(view, texture);
@@ -1898,34 +1916,63 @@ public class MultiCameraManager {
 
     /**
      * 主界面这一格的画布要被系统收走了（onSurfaceTextureDestroyed，主线程；主界面销毁时视图从窗口上摘下来那一下）：
-     * 撤回预览，画布由管线留着（大纲 §7.6，见 {@link #keptCanvases}）。
-     *
-     * <p>撤回不碰会话：画布还活着，就是「留着的输出」，照「减输出能拖就拖」留在会话里。撤回之前先摘掉旧视图挂在画布上的
-     * 出帧监听 —— 那个监听拿着旧视图（连同销毁了的界面），新视图接回时会挂它自己的。</p>
+     * 撤回预览，画布由管线留着（大纲 §7.6，见 {@link #keptCanvases}、{@link #keepCanvas}）。
      *
      * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：管线没了、没有这一路，调用方照常让它放
      */
     public boolean keepPreviewCanvas(String cameraKey, android.graphics.SurfaceTexture texture) {
+        return keepCanvas(ChannelRules.Kind.PREVIEW, cameraKey, texture);
+    }
+
+    /**
+     * 超级后视镜的画布要被系统收走了（onSurfaceTextureDestroyed，主线程；关后视镜 —— 服务退出、窗口移走那一下）：
+     * 撤回后视镜输出，画布由管线留着（大纲 §7.7，项目所有者 2026-10-11「按建议，留住」；见 {@link #keptCanvases}、
+     * {@link #keepCanvas}）。后视镜只声明在环视那一路上。
+     *
+     * <p>这样关后视镜时环视零变动：画布还活着就是「留着的输出」，环视（含环视的录像）照旧出画面，等下一次本来要动环视
+     * （改输出）、或者关环视时一起摘，摘掉以后才放。代价是这期间环视还往一块没人显示的画布送帧，和贴边、熄屏时留着的一样
+     * （大纲 §6 风险 3）。</p>
+     *
+     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：管线里没有环视那一路，调用方照常让它放
+     */
+    public boolean keepMirrorCanvas(android.graphics.SurfaceTexture texture) {
+        return keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    }
+
+    /**
+     * 留下这一块画布（主线程）：预览、后视镜同一套（大纲 §7.6、§7.7）。
+     *
+     * <p>先摘掉旧视图挂在画布上的出帧监听 —— 那个监听拿着旧视图（连同销毁了的主界面、退出了的后视镜服务），新视图接回时
+     * 会挂它自己的；再撤回这一种输出的声明 —— 撤回不碰会话：画布还活着，就是「留着的输出」，照「减输出能拖就拖」留在会话里；
+     * 最后交给调度，等它离开会话再放。</p>
+     */
+    private boolean keepCanvas(ChannelRules.Kind kind, String cameraKey, android.graphics.SurfaceTexture texture) {
         SingleCamera camera = cameras.get(cameraKey);
         if (camera == null || texture == null || texture.isReleased()) {
             return false;
         }
         texture.setOnFrameAvailableListener(null);
-        boolean withdrawn = camera.withdrawPreview(texture);
-        android.graphics.SurfaceTexture older = keptCanvases.put(cameraKey, texture);
+        boolean withdrawn = withdrawCanvas(camera, kind, texture);
+        android.graphics.SurfaceTexture older = keptOf(kind).put(cameraKey, texture);
         if (older != null && older != texture) {
-            // 上一块留着的还没人接回就又来一块（新界面没接回它，自己建了画布）：那一块不再等人接回，
-            // 仍在调度手里，等它离开会话再放（releaseKeptPreview 看到表里已经不是它，只放不摘表）
-            AppLog.w(TAG, "Kept preview canvas for " + cameraKey + " replaced before it was taken back");
+            // 上一块留着的还没人接回就又来一块（新界面、新窗口没接回它，自己建了画布）：那一块不再等人接回，
+            // 仍在调度手里，等它离开会话再放（releaseKeptCanvas 看到表里已经不是它，只放不摘表）
+            AppLog.w(TAG, "Kept " + kind + " canvas for " + cameraKey + " replaced before it was taken back");
         }
-        ChannelRules.Out out = new ChannelRules.Out(ChannelRules.Kind.PREVIEW, texture);
-        scheduler.handOver(cameraKey, out, () -> releaseKeptPreview(cameraKey, texture));
+        ChannelRules.Out out = new ChannelRules.Out(kind, texture);
+        scheduler.handOver(cameraKey, out, () -> releaseKeptCanvas(kind, cameraKey, texture));
         if (withdrawn) {
             scheduler.wake();
         }
-        AppLog.d(TAG, "Preview canvas for " + cameraKey + " kept by the pipeline (withdrawn=" + withdrawn
+        AppLog.d(TAG, kind + " canvas for " + cameraKey + " kept by the pipeline (withdrawn=" + withdrawn
                 + ", in session=" + camera.sessionOutputs().carries(out) + ")");
         return true;
+    }
+
+    /** 撤回这一种画布的声明（只撤回 {@code texture} 这一块，不是它就什么都不做）。 */
+    private static boolean withdrawCanvas(SingleCamera camera, ChannelRules.Kind kind,
+                                          android.graphics.SurfaceTexture texture) {
+        return kind == ChannelRules.Kind.MIRROR ? camera.withdrawMirror(texture) : camera.withdrawPreview(texture);
     }
 
     /**
@@ -1936,15 +1983,30 @@ public class MultiCameraManager {
      * @return 留着、还活着的那一块；没有是 null
      */
     public android.graphics.SurfaceTexture takeKeptPreview(String cameraKey) {
-        android.graphics.SurfaceTexture texture = keptCanvases.remove(cameraKey);
+        return takeKeptCanvas(ChannelRules.Kind.PREVIEW, cameraKey);
+    }
+
+    /**
+     * 新开的后视镜窗口要接回上一个窗口留下的画布（主线程，RearViewMirrorService 窗口加上之后、第一次画之前）：
+     * 从调度那里拿回来，交给调用方（{@code TextureView.setSurfaceTexture}，之后归那个窗口；它再被收走时再走一遍
+     * {@link #keepMirrorCanvas}）。拿回来之后调用方要接着在环视上重新声明后视镜输出（{@link SingleCamera#declareMirror}）。
+     *
+     * @return 留着、还活着的那一块；没有是 null
+     */
+    public android.graphics.SurfaceTexture takeKeptMirror() {
+        return takeKeptCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND);
+    }
+
+    private android.graphics.SurfaceTexture takeKeptCanvas(ChannelRules.Kind kind, String cameraKey) {
+        android.graphics.SurfaceTexture texture = keptOf(kind).remove(cameraKey);
         if (texture == null) {
             return null;
         }
-        boolean held = scheduler.reclaim(cameraKey, new ChannelRules.Out(ChannelRules.Kind.PREVIEW, texture));
+        boolean held = scheduler.reclaim(cameraKey, new ChannelRules.Out(kind, texture));
         if (!held || texture.isReleased()) {
             return null;   // 调度已经放了（不会走到这里：放的时候先从表里拿掉）
         }
-        AppLog.i(TAG, "Kept preview canvas for " + cameraKey + " taken back by the new main screen");
+        AppLog.i(TAG, "Kept " + kind + " canvas for " + cameraKey + " taken back by a new view");
         return texture;
     }
 
@@ -1952,25 +2014,29 @@ public class MultiCameraManager {
      * 调度说这一块留着的画布已经离开了会话（被「改输出」顺带摘掉、随相机关了、或者调度停了）：放掉它（主线程）。
      * 没人接回才会走到这里 —— 接回的已经从调度那里拿走了。
      */
-    private void releaseKeptPreview(String cameraKey, android.graphics.SurfaceTexture texture) {
-        if (keptCanvases.get(cameraKey) == texture) {
-            keptCanvases.remove(cameraKey);
+    private void releaseKeptCanvas(ChannelRules.Kind kind, String cameraKey, android.graphics.SurfaceTexture texture) {
+        Map<String, android.graphics.SurfaceTexture> kept = keptOf(kind);
+        if (kept.get(cameraKey) == texture) {
+            kept.remove(cameraKey);
         }
         SingleCamera camera = cameras.get(cameraKey);
         if (camera != null) {
-            camera.withdrawPreview(texture);   // 留下时已经撤回了；这里只防万一，撤回过的什么都不做
+            withdrawCanvas(camera, kind, texture);   // 留下时已经撤回了；这里只防万一，撤回过的什么都不做
         }
         texture.release();
-        com.kooo.evcam.blackbox.BlackBox.note("主界面留下的预览画布没人接回：" + roleName(cameraKey)
-                + " 那一块已经离开会话，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        if (kind == ChannelRules.Kind.MIRROR) {
+            com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：环视的会话里已经没有它，放掉"
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        } else {
+            com.kooo.evcam.blackbox.BlackBox.note("主界面留下的预览画布没人接回：" + roleName(cameraKey)
+                    + " 那一块已经离开会话，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
     }
 
     /**
      * 手动触发所有已有 previewSize 的摄像头的 PreviewSizeCallback。
-     * 用于后台初始化（CameraManagerHolder）复用场景：
-     * 摄像头在后台服务里已打开并确定了预览尺寸，
-     * 但 MainActivity 的回调（旋转变换等）此时尚未注册。
-     * 在 MainActivity 注册回调后调用此方法，补偿缺失的回调触发。
+     * 管线属于应用（CameraManagerHolder 建，比主界面活得久）：各路的画面尺寸可能在主界面挂上回调（旋转变换等）之前就算出来了。
+     * 主界面接上建好的管线后调用此方法，补偿缺失的回调触发。
      */
     public void firePreviewSizeCallbacks() {
         if (previewSizeCallback == null) return;
@@ -1984,8 +2050,9 @@ public class MultiCameraManager {
     }
 
     /**
-     * 初始化摄像头
-     * 支持 null 参数以适配不同数量的摄像头配置（1摄/2摄/4摄）
+     * 按分好的槽位建各路相机、交给调度（主线程）。只有 {@link CameraManagerHolder} 调（大纲 §2 阶段 6：管线只在那里建，
+     * 槽位照存下的映射或相机列表分，相机列表、合成流探测都在相机线程上做完了才到这里）。画布一律是 null：主界面只声明自己的画布
+     * （{@link #declarePreviews}）。某一路的 id 传 null 就不建那一路。做完算建好了（{@link #isBuilt}）。
      */
     public void initCameras(String frontId, TextureView frontView,
                            String backId, TextureView backView,
@@ -2146,6 +2213,7 @@ public class MultiCameraManager {
             }
         });
 
+        camerasBuilt = true;
         AppLog.d(TAG, "Cameras initialized: " + activeCameraKeys);
     }
 
@@ -2214,10 +2282,20 @@ public class MultiCameraManager {
 
     /**
      * 这一份管线的相机都关好了：调度的账上每一路都关着，相机层也没有一路开着、在开、在关。
-     * 熄屏录制到点停录之后，等它成立再放唤醒锁（{@code ScreenOffRecording}，阶段 6 改等 {@link ChannelScheduler#closingAnywhere}）。
+     * （熄屏录制放唤醒锁以前轮询它；2.11 阶段 6 起改等调度发出的「关完」，{@link ChannelScheduler#whenClosedEverywhere}。）
      */
     public boolean allCamerasClosed() {
         return scheduler.allClosed();
+    }
+
+    /**
+     * 此刻能不能用相机（大纲 §0 名词「能用相机」）：主界面在前，或者前台服务是主界面在前时起的、那时刷新过 ——
+     * 安卓 12 起后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度读的是同一对事实（{@link ChannelSide} 的
+     * mainForeground、serviceStartedWhileVisible）；录像接回（RecordingCoordinator.resumeIfWanted）照它决定要不要先把主界面拉起来。
+     * 哪个线程都能读。
+     */
+    public static boolean cameraUsableNow() {
+        return StallWatch.isForeground() || com.kooo.evcam.CameraForegroundService.startedWhileVisible();
     }
 
     /** 这一份管线的通道调度（录像、后视镜、诊断读它的事实：condition、usable、describe）。 */
@@ -3450,6 +3528,16 @@ public class MultiCameraManager {
         AppLog.d(TAG, "All cameras stopped recording");
     }
 
+    /**
+     * 排在此刻已经排着的停录收拾后面叫 {@code done}（在收拾线程上叫，不在主线程）：整次停、一路单独退出的收拾都在
+     * {@link #teardown} 这一条线程上按先后做（等编码线程排空、写入线程收好文件，期限 {@link CodecVideoRecorder#STOP_BUDGET_MS}），
+     * 轮到它时前面那几次的文件都封好了（或者到了期限不再等）。退出的最后一步（MainActivity.finishExit）据此等文件收好再结束进程
+     * —— 以前只等相机关完，U 盘慢时进程可能在最后一段收好之前就结束了（审查 2026-10-11）。管线放了也照样能用。
+     */
+    public void afterStopsFinished(Runnable done) {
+        teardown.execute(done);
+    }
+
     /** 停录收拾完了（主线程，文件都封好了）：报给协调器。之后又停过、又开过的不算数（那一次自己报）。 */
     private void pipelineStopped(int gen) {
         if (gen != recordGeneration) {
@@ -4041,6 +4129,7 @@ public class MultiCameraManager {
      * 添加完善的清理逻辑和异常保护
      */
     public void release() {
+        released = true;
         // 登记表的监听只在还是自己时才摘：换车型时旧的这份晚 release，不能把新那份接上的监听摘了
         CameraNeeds.current().clearListener(needsListener);
         com.kooo.evcam.screen.ScreenState.removeListener(screenWake);
@@ -4091,10 +4180,21 @@ public class MultiCameraManager {
     }
 
     /**
-     * release() 后 cameras map 为空，此方法用于外部判断实例是否已失效。
+     * 这一份已经放了（{@link #release}）：外部据此判断实例是否已失效。
+     *
+     * <p>以前看 cameras 是不是空的。2.11 阶段 6 起管线在 CameraManagerHolder 里先建出对象、相机列表和合成流探测在相机线程上做完才
+     * {@link #initCameras}：还在建的那一份 cameras 也是空的，却不是放了 —— 照旧看空的话，它一建出来就被当成放了、再建一份。</p>
      */
     public boolean isReleased() {
-        return cameras.isEmpty();
+        return released;
+    }
+
+    /**
+     * 建好了：相机列表、合成流探测做完，各路相机交给调度了（{@link #initCameras}，CameraManagerHolder 在主线程上调）。
+     * 开录等它（RecordingCoordinator）；一路相机都没分到的也算建好了。
+     */
+    public boolean isBuilt() {
+        return camerasBuilt;
     }
 
     // ------------------------------------------------------------------ 拍照

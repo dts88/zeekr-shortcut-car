@@ -9,6 +9,8 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.ChannelRules;
+import com.kooo.evcam.camera.ChannelScheduler;
 
 /**
  * 熄屏录制（开发者选项，规格 §3.1）：熄屏时正在录像，就拿住唤醒锁不让车机睡。
@@ -33,9 +35,12 @@ public final class ScreenOffRecording {
     private static final String TAG = "ScreenOffRecording";
     private static final Handler HANDLER = new Handler(Looper.getMainLooper());
 
-    /** 到点停录之后等相机关完再放锁：多久看一次、最多等多久（锁一放，车机几秒就睡）。 */
-    private static final long CLOSE_POLL_MS = 100L;
-    private static final long CLOSE_WAIT_MAX_MS = 5_000L;
+    /**
+     * 到点判了「现在停」之后，等相机按次序关完再放锁：最多等这么久（锁一放，车机几秒就睡）—— 调度的「唤醒锁最多拉」：
+     * 车机要睡时手上那一步再等 1 秒，再按次序关一轮（环视单独先关最多 10 秒，座舱最多 30 秒），由常量算出来（大纲 §2 阶段 6）。
+     * 以前 5 秒封顶，盖不住环视那一次关。
+     */
+    private static final long CLOSE_WAIT_MAX_MS = ChannelRules.WAKE_HOLD_MAX_MS;
 
     private static Runnable timeout;
     /** 屏幕什么时候黑的（开机起算，含深睡）；0 = 亮着或不知道。 */
@@ -138,34 +143,43 @@ public final class ScreenOffRecording {
     }
 
     /**
-     * 到点之后判了「现在停、相机按次序关」：锁留着，等相机都关好（或等满 {@link #CLOSE_WAIT_MAX_MS}）再放 ——
+     * 到点之后判了「现在停、相机按次序关」：锁留着，等调度发出「关完」（{@link ChannelScheduler#closingAnywhere} 变假，
+     * {@link ChannelScheduler#whenClosedEverywhere}），或者等满 {@link #CLOSE_WAIT_MAX_MS}，再放 ——
      * 先放的话车机几秒就睡，环视、座舱还没关完（2026-10-10）。停录那一步的放锁这时不放（{@link #onRecordingStopped}）；
-     * 亮屏照样当场放。协调器在停录之前调。
+     * 亮屏照样当场放。协调器在写下「车机要睡」之后、停录之前调：调度那时已经当场置了「正在按次序关」。
+     *
+     * <p>以前每 100 ms 问一次管理器「关完没有」、5 秒封顶（大纲 §2 阶段 6 改）。</p>
      */
     static void holdUntilCamerasClosed() {
         if (!WakeUpHelper.isPersistentWakeLockHeld()) {
             return;
         }
         closeWaitSinceMs = SystemClock.elapsedRealtime();
-        HANDLER.removeCallbacks(closeWait);
-        HANDLER.postDelayed(closeWait, CLOSE_POLL_MS);
+        HANDLER.removeCallbacks(closeWaitCap);
+        HANDLER.postDelayed(closeWaitCap, CLOSE_WAIT_MAX_MS);
+        ChannelScheduler.cancelClosedWaiter(camerasClosed);
+        // 此刻已经没有在关的（没有管线、相机本来就关着）：当场叫，当场放
+        ChannelScheduler.whenClosedEverywhere(camerasClosed);
     }
 
-    private static final Runnable closeWait = new Runnable() {
+    /** 调度说都关完了：放锁。 */
+    private static final Runnable camerasClosed = new Runnable() {
         @Override
         public void run() {
-            if (closeWaitSinceMs == 0) {
-                return;
+            if (closeWaitSinceMs != 0) {
+                release("timeout, cameras closed after "
+                        + (SystemClock.elapsedRealtime() - closeWaitSinceMs) + "ms");
             }
-            com.kooo.evcam.camera.MultiCameraManager manager =
-                    com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-            boolean closed = manager == null || manager.isReleased() || manager.allCamerasClosed();
-            if (!closed && SystemClock.elapsedRealtime() - closeWaitSinceMs < CLOSE_WAIT_MAX_MS) {
-                HANDLER.postDelayed(this, CLOSE_POLL_MS);
-                return;
+        }
+    };
+
+    /** 等满了还没关完：照样放（锁不能一直拿着）。 */
+    private static final Runnable closeWaitCap = new Runnable() {
+        @Override
+        public void run() {
+            if (closeWaitSinceMs != 0) {
+                release("timeout, cameras still closing after " + CLOSE_WAIT_MAX_MS / 1000 + "s");
             }
-            release(closed ? "timeout, cameras closed" : "timeout, cameras still open after "
-                    + CLOSE_WAIT_MAX_MS / 1000 + "s");
         }
     };
 
@@ -176,7 +190,8 @@ public final class ScreenOffRecording {
      */
     public static void release(String why) {
         cancelTimeout();
-        HANDLER.removeCallbacks(closeWait);
+        HANDLER.removeCallbacks(closeWaitCap);
+        ChannelScheduler.cancelClosedWaiter(camerasClosed);
         closeWaitSinceMs = 0;
         if (!WakeUpHelper.isPersistentWakeLockHeld()) {
             return;

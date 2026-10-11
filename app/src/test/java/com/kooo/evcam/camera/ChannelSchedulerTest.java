@@ -29,7 +29,7 @@ import java.util.function.Consumer;
 /**
  * 通道调度（channel-logic §二，项目所有者 2026-10-10 确认）：调度只读事实、照做、记账、写黑匣子 —— 该做哪一步在
  * {@link ChannelRules}（有它自己的测试）。这里钉住的是调度这一层：叫醒并成一次、一步做完没有、15 秒和 60 秒到点、
- * 「输出被丢」派给谁、交给调度的画布什么时候放（大纲 §7.6）、问的节奏、{@link ChannelScheduler#closingAnywhere()} 的起落，
+ * 「输出被丢」派给谁、交给调度的画布什么时候放（大纲 §7.6、§7.7）、问的节奏、{@link ChannelScheduler#closingAnywhere()} 的起落，
  * 再把 1a 的现场回放 (a)–(e) 原样跑一遍 —— 这一次是经调度、经假的相机层（{@link FakePort}）跑。
  *
  * <p>相机层由这里扮演：动作只记下来；开好、配好、第一帧、关完、丢了、开不起来，都是测试说了算，照 SingleCamera 的样子
@@ -335,7 +335,7 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("RECORD CLOSED"), surround.drops);
     }
 
-    // ================================================================= 交给调度的画布（大纲 §7.6）
+    // ================================================================= 交给调度的画布（大纲 §7.6、§7.7）
 
     /**
      * 主界面被划掉，留下的预览画布交给调度：还挂在会话里就不放（留着的活输出，照「减输出能拖就拖」不为它改会话）；
@@ -469,6 +469,46 @@ public class ChannelSchedulerTest {
         settle();
         assertTrue(host.stopped);
         assertEquals("只放一次", Arrays.asList("pvS"), released);
+    }
+
+    /**
+     * 大纲 §7.7（项目所有者 2026-10-11「按建议，留住」）：关超级后视镜时画布也交给调度。环视在录、只有后视镜和录像要它：
+     * 后视镜放开登记、撤回输出、画布交过来 —— 环视一步不动（留着的活输出不为它改会话、不当死输出马上摘，录像不断）；
+     * 新开的窗口没接回、自己建了一块，下一次改输出加上新的、顺带摘掉旧的，新会话配好之后才放旧的那一块。
+     */
+    @Test
+    public void aClosedMirrorsCanvasLeavesTheRecordingSurroundAloneUntilALaterApply() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-a");
+        host.plan(SUR);
+        claim(Holder.RECORDING);
+        claim(Holder.MIRROR);
+        streaming(surround, mirror, recS);
+        settle();
+        assertTrue(surround.actions.isEmpty());
+        List<String> released = new ArrayList<>();
+        drop(Holder.MIRROR);
+        surround.declared.remove(mirror);
+        s.handOver(SUR, mirror, () -> released.add("mirror-a"));
+        settle();
+        at(10_000);
+        assertTrue("环视一步不动：" + surround.actions, surround.actions.isEmpty());
+        assertTrue("还挂在会话里：不放", released.isEmpty());
+        assertTrue("录像输出没被摘", surround.drops.isEmpty());
+
+        Out next = new Out(Kind.MIRROR, "mirror-b");
+        declare(surround, next);
+        claim(Holder.MIRROR);
+        settle();
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
+        assertTrue("新会话还没配好：不放", released.isEmpty());
+        at(10_300);
+        configured(surround, next, recS);
+        frame(surround);
+        settle();
+        assertEquals(Arrays.asList("mirror-a"), released);
+        at(15_000);
+        assertEquals("只放一次", Arrays.asList("mirror-a"), released);
+        assertTrue("座舱不受影响", rear.actions.isEmpty() && front.actions.isEmpty());
     }
 
     /** 相机层自己丢的录像输出（会话配不上、消费者被收走）：当场告诉；别的输出不归录像管。 */
@@ -744,6 +784,45 @@ public class ChannelSchedulerTest {
         s.onNeedsChanged();
         settle();
         assertFalse(ChannelScheduler.closingAnywhere());
+    }
+
+    /**
+     * 等「关完」（熄屏录制的唤醒锁等它再放，大纲 §2 阶段 6）：没有在关的时候当场叫；车机要睡时登记的，按次序关、最后一路关完的那一轮
+     * 才叫，只叫一次；不等了摘掉的不叫。
+     */
+    @Test
+    public void aCloseWaiterRunsOnceWhenTheLastLaneClosedAndAtOnceWhenNothingCloses() {
+        List<String> calls = new ArrayList<>();
+        ChannelScheduler.whenClosedEverywhere(() -> calls.add("idle"));
+        assertEquals("没有在关的：当场叫", Arrays.asList("idle"), calls);
+
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        host.sleeps = true;
+        s.onNeedsChanged();
+        Runnable cancelled = () -> calls.add("cancelled");
+        ChannelScheduler.whenClosedEverywhere(() -> calls.add("closed"));
+        ChannelScheduler.whenClosedEverywhere(cancelled);
+        ChannelScheduler.cancelClosedWaiter(cancelled);
+        settle();
+        assertEquals("环视单独先关", Arrays.asList("close head-unit-sleeps"), surround.actions);
+        assertEquals("还在关：不叫", Arrays.asList("idle"), calls);
+        at(200);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close head-unit-sleeps"), rear.actions);
+        assertEquals("座舱还没关完", Arrays.asList("idle"), calls);
+        at(300);
+        closed(rear);
+        closed(front);
+        settle();
+        assertFalse(ChannelScheduler.closingAnywhere());
+        assertEquals("最后一路关完的那一轮叫", Arrays.asList("idle", "closed"), calls);
+        at(10_000);
+        assertEquals("只叫一次", Arrays.asList("idle", "closed"), calls);
     }
 
     /**

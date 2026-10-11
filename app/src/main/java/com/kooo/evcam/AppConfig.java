@@ -177,6 +177,7 @@ public class AppConfig {
     public static final String BITRATE_HIGH = "high";      // 高码率（计算值的150%）
     
     private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
+    private static final String KEY_SLOT_MAP_PREFIX = "slot_map_";  // 存下的槽位映射（按车型），见 getStoredSlotMap
 
 
     public static final String CAR_MODEL_ZEEKR_7X_MULTI = "zeekr_7x_multi";  // 极氪7X（环视合成流 + 两路座舱）
@@ -294,18 +295,22 @@ public class AppConfig {
     /**
      * 主界面是不是<b>因为熄屏</b>才退到后台的。
      *
-     * <p>熄屏 15 秒后应用会把自己退到后台、关掉相机（见 MainActivity 的
-     * {@code scheduleBackgroundTask}）。既然是我们自己退下去的，亮屏时就该自己回来 ——
-     * 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。</p>
+     * <p>熄屏 15 秒后主界面会把自己退到后台（见 MainActivity 的 {@code scheduleBackgroundTask}）。
+     * 既然是我们自己退下去的，亮屏时就该自己回来 —— 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。
+     * 熄屏那一刻主界面在前就记（2.11 阶段 6）：车机几秒后就可能结束进程，等不到 15 秒。</p>
      *
      * <p>存在配置里而不是内存字段里：退到后台之后这个界面很可能撑不到亮屏那一刻，
-     * 被系统收走之后只有存下来的记号还在。</p>
+     * 被系统收走之后只有存下来的记号还在。所以同步落盘（commit），和「这一趟要录」一样：熄屏后 3–5 秒进程就可能被结束，
+     * 异步写可能还没落盘（2026-10-11 审查）。没变就不写 —— 主界面每次回到前台都清一次，不为它每次进一趟盘。</p>
      *
      * <p>只有这个记号在时才会把界面拉回前台。用户自己切走的、从来没进过前台的，
      * 一律不动 —— 不能因为有人点亮了屏幕就抢到最前面。</p>
      */
     public void setUiLeftForScreenOff(boolean value) {
-        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).apply();
+        if (prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false) == value) {
+            return;
+        }
+        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).commit();
     }
 
     public boolean didUiLeaveForScreenOff() {
@@ -370,8 +375,11 @@ public class AppConfig {
 
     /**
      * 熄屏录制（开发者选项，规格 §3.1）有没有生效：熄屏时在录像就接着录，并拿住唤醒锁不让车机睡，
-     * 最长 {@link #getScreenOffWakeMinutes()} 分钟。没在录时不拿锁：熄屏后车机要睡了（哨兵模式没开、车没在走），
-     * 主界面现在就退后台、相机按次序关；车机醒着时主界面留在前台，相机不关（{@code ScreenOffPlan}）。
+     * 最长 {@link #getScreenOffWakeMinutes()} 分钟；到点照熄屏那张表再判（{@code ScreenOffPlan}）。
+     *
+     * <p>没在录时不拿锁，空闲时也不再留着相机（大纲 §7 第 5 问，项目所有者 2026-10-11「按建议」：照登记表）：
+     * 熄屏时主界面不算看得见、预览不算有人要，也不保持，于是相机照登记表按次序关 —— 车机要睡（哨兵模式没开、车没在走）的话
+     * 当场按次序关。以前这个开关开着时主界面熄屏不退后台、相机一直开着。主界面熄屏时照旧不退后台（只是界面，不管相机）。</p>
      */
     public boolean isScreenOffRecordingEnabled() {
         // 默认关。归开发者选项管：关着时按关算，存着的值不动（DEVELOPER_KEYS）
@@ -564,6 +572,26 @@ public class AppConfig {
         }
         editor.apply();
         AppLog.i(TAG, "相机映射已全部恢复自动");
+    }
+
+    // ==================== 存下的槽位映射（2.11 阶段 6） ====================
+
+    /**
+     * 存下的槽位映射，按车型存（大纲 §1 CameraManagerHolder）：上一次相机列表完整时分好的三路相机 id、环视是不是真合成流、
+     * 合成流尺寸，外加那时的手动指定。编码和读回在 {@code ZeekrMultiPlan.Stored} 里，这里只存一行字。
+     *
+     * <p>为什么存：车机拿着后座舱（相机 1）时它不在相机列表里，这时冷启动照列表分，后座舱这一格就没有了，以后既认不出、
+     * 也开不了。列表不完整时照存下的建，少的那一路照样建出来，交给通道调度判「不在」。不归开发者选项管：这是车的事实，不是设置。</p>
+     *
+     * @return 存着的那一行；没存过是 null
+     */
+    public String getStoredSlotMap(String carModel) {
+        return prefs.getString(KEY_SLOT_MAP_PREFIX + carModel, null);
+    }
+
+    /** 存下这个车型的槽位映射（建管线的那条线程上调；只在变了时写）。 */
+    public void setStoredSlotMap(String carModel, String encoded) {
+        prefs.edit().putString(KEY_SLOT_MAP_PREFIX + carModel, encoded).apply();
     }
 
 

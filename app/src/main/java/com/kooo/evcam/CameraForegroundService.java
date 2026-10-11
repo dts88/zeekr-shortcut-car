@@ -36,26 +36,9 @@ public class CameraForegroundService extends Service {
     // 服务重启延迟时间
     private static final long RESTART_DELAY_MS = 1000;
 
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
     private static volatile boolean isForegroundReady = false;
     /** 见 {@link #startedWhileVisible()}。 */
     private static volatile boolean startedWhileVisible = false;
-    private static final java.util.List<Runnable> pendingReadyCallbacks = new java.util.ArrayList<>();
-
-    /**
-     * 前台服务就绪后执行回调。
-     * 如果服务已经运行，立即在主线程执行；否则排队等待 startForeground 完成后执行。
-     */
-    public static void whenReady(Context context, Runnable callback) {
-        if (isForegroundReady) {
-            callback.run();
-        } else {
-            synchronized (pendingReadyCallbacks) {
-                pendingReadyCallbacks.add(callback);
-            }
-        }
-    }
 
     @Override
     public void onCreate() {
@@ -164,16 +147,10 @@ public class CameraForegroundService extends Service {
         if (com.kooo.evcam.camera.StallWatch.isForeground()) {
             startedWhileVisible = true;
         }
-        // 标记就绪，执行所有等待的回调
         isForegroundReady = true;
-        // 前台服务在了：没人要的相机可以保持 30 秒、后台也能用相机了 —— 叫醒通道调度
+        // 服务就绪：叫醒通道调度 —— 没人要的相机可以保持 30 秒（isRunning），是主界面在前时起的、刷新的，后台也能用相机了
+        // （startedWhileVisible）。以前这里还执行排着的「就绪后」回调（whenReady，开相机用的）：相机只由调度开，2.11 阶段 6 删了
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
-        synchronized (pendingReadyCallbacks) {
-            for (Runnable cb : pendingReadyCallbacks) {
-                mainHandler.post(cb);
-            }
-            pendingReadyCallbacks.clear();
-        }
 
         return stickiness(this);
     }
@@ -206,7 +183,7 @@ public class CameraForegroundService extends Service {
                     || now - lastBeatAtMs >= BLACK_BOX_QUIET_MS) {
                 // view：录像此刻的样子（开录中 / 在录 / 等待摄像头），一夜里一路都录不了的那几段在这里看得出来
                 com.kooo.evcam.blackbox.BlackBox.note("心跳 recording=" + recording + " view="
-                        + com.kooo.evcam.recording.RecordingCoordinator.get(this).view() + " screenOn=" + screenOn);
+                        + com.kooo.evcam.recording.RecordingCoordinator.get(CameraForegroundService.this).view() + " screenOn=" + screenOn);
                 lastBeatRecording = recording;
                 lastBeatScreenOn = screenOn;
                 lastBeatAtMs = now;

@@ -8,8 +8,6 @@ import android.os.IBinder;
 import android.os.Looper;
 
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.camera.CameraManagerHolder;
-import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.recording.RecordingIntent;
 import com.kooo.evcam.recording.RecordingStops;
@@ -73,17 +71,13 @@ public class CameraRecordingService extends Service {
 
     // ========== 录制控制 ==========
 
-    /** 悬浮按钮按了「开始」：人开的，前面的失败都不算了；查过盘就录，不等环视。 */
+    /**
+     * 悬浮按钮按了「开始」：人开的，前面的失败都不算了；查过盘就录，不等环视。
+     * 相机管线由协调器自己从 CameraManagerHolder 拿（管线属于应用，2.11 阶段 6），这里不用先建、先交过去。
+     */
     public void startRecording() {
         mainHandler.post(() -> {
-            MultiCameraManager cameraManager = CameraManagerHolder.getInstance().getOrInit(this);
-            if (cameraManager == null || cameraManager.isReleased()) {
-                // 后台服务不能自己打开相机，相机得是主界面在前台时开好的
-                AppLog.e(TAG, "摄像头未初始化，请先打开应用界面");
-                return;
-            }
             RecordingCoordinator coordinator = RecordingCoordinator.get(this);
-            coordinator.setCameraManager(cameraManager);
             RecordingIntent.current().noteUserStarted();
             coordinator.resetBudget();
             coordinator.request(RecordingCoordinator.Why.FLOATING);
