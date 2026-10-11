@@ -9,48 +9,55 @@ import org.junit.Test;
 /**
  * 录像被打断之后接不接回去、接几次。
  *
- * <p>最要紧的一条是最后那个测试：开始录了但一直没画面的时候，不能无限循环地接回去 ——
- * 每接一次都会把环视重建一次。</p>
+ * <p>最要紧的一条是最后那个测试：开始录了但一直写不进的时候，不能无限循环地接回去。</p>
+ *
+ * <p>摄像头被拿走、断开不在这里：那不是停（2.11，只那一路退出，一路都录不了时显示等待摄像头），
+ * 没有停的原因，也就没有接回、没有额度。</p>
  */
 public class RecordingStopsTest {
 
+    /** 存储一类的整次停照旧自动接回（大纲 §7 第 3 问，2026-10-11）：收拾完、查过盘就重开，不等环视。 */
     @Test
-    public void onlyCameraSideProblemsResumeWhenTheSurroundComesBack() {
-        assertTrue(RecordingStops.resumesOnSurround(RecordingStops.Reason.NO_DATA));
-        assertTrue(RecordingStops.resumesOnSurround(RecordingStops.Reason.UNKNOWN));
+    public void storageSideStopsResumeAutomatically() {
+        assertTrue(RecordingStops.resumesAutomatically(RecordingStops.Reason.NO_DATA));
+        assertTrue("管线被换：在新的管线上接回",
+                RecordingStops.resumesAutomatically(RecordingStops.Reason.UNKNOWN));
         assertTrue("写不进文件：重开一次录制就是新编码器、新文件",
-                RecordingStops.resumesOnSurround(RecordingStops.Reason.WRITE_STALLED));
-        assertTrue(RecordingStops.resumesOnSurround(RecordingStops.Reason.CAMERA_LOST));
-        assertTrue("开录时一路都没起来：用户要录，环视好了再试，走同一份额度",
-                RecordingStops.resumesOnSurround(RecordingStops.Reason.START_FAILED));
+                RecordingStops.resumesAutomatically(RecordingStops.Reason.WRITE_STALLED));
+        assertTrue("每一路的录制器都建不起来：用户要录，查过盘再试，走同一份额度",
+                RecordingStops.resumesAutomatically(RecordingStops.Reason.START_FAILED));
     }
 
-    /** 相机被别的程序拿走不花额度；没人占着却被断开（自己顶自己）要花，否则无限循环（2026-10-08）。 */
+    /**
+     * 每一个停的原因都要表态：自动接回的只有存储一类（写不进、一笔没写进、管线被换、录制器都建不起来）。
+     * 新加一个原因而没想过接不接，这里就会失败。摄像头被拿走、断开不在原因里 —— 那不是停。
+     */
     @Test
-    public void onlyACameraTakenByAnotherAppIsFreeToResume() {
-        assertFalse(RecordingStops.countsTowardBudget(RecordingStops.Reason.CAMERA_LOST, true));
-        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.CAMERA_LOST, false));
-        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.NO_DATA, true));
-        assertTrue(RecordingStops.countsTowardBudget(RecordingStops.Reason.START_FAILED, false));
+    public void onlyTheStorageSideStopsResume() {
+        java.util.Set<RecordingStops.Reason> resuming = java.util.EnumSet.of(RecordingStops.Reason.NO_DATA,
+                RecordingStops.Reason.WRITE_STALLED, RecordingStops.Reason.START_FAILED, RecordingStops.Reason.UNKNOWN);
+        for (RecordingStops.Reason reason : RecordingStops.Reason.values()) {
+            assertEquals(reason.name(), resuming.contains(reason), RecordingStops.resumesAutomatically(reason));
+        }
     }
 
     @Test
     public void aStopByThePersonIsNeverUndone() {
-        assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.USER));
+        assertFalse(RecordingStops.resumesAutomatically(RecordingStops.Reason.USER));
     }
 
-    /** 存储满了跟环视好不好无关，接回去也录不下。 */
+    /** 存储满了：接回去也录不下。 */
     @Test
-    public void storageProblemsDoNotWaitForTheSurround() {
-        assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.STORAGE_FULL));
-        assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.STORAGE_CANNOT_FREE));
-        assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.STORAGE_LOCKED));
+    public void aFullDriveIsNotResumed() {
+        assertFalse(RecordingStops.resumesAutomatically(RecordingStops.Reason.STORAGE_FULL));
+        assertFalse(RecordingStops.resumesAutomatically(RecordingStops.Reason.STORAGE_CANNOT_FREE));
+        assertFalse(RecordingStops.resumesAutomatically(RecordingStops.Reason.STORAGE_LOCKED));
     }
 
-    /** 熄屏停的不等环视：黑着的时候不该自己录起来，亮屏时接（接不接熄屏时照 ScreenOffPlan 定）。 */
+    /** 熄屏停的不自动接：黑着的时候不该自己录起来，亮屏时接（接不接熄屏时照 ScreenOffPlan 定）。 */
     @Test
     public void theScreenOffRuleIsLeftAsItWas() {
-        assertFalse(RecordingStops.resumesOnSurround(RecordingStops.Reason.SCREEN_OFF));
+        assertFalse(RecordingStops.resumesAutomatically(RecordingStops.Reason.SCREEN_OFF));
     }
 
     @Test
@@ -75,16 +82,16 @@ public class RecordingStopsTest {
     }
 
     /**
-     * 开始录了、但一直没画面：每一轮都「开始」了，却都没录满一分钟。
+     * 开始录了、但一直写不进：每一轮都「开始」了，却都没录满一分钟。
      * 以前在「开始」时就清零，这种情况会无限循环。
      */
     @Test
-    public void startingWithoutPicturesDoesNotLoopForever() {
+    public void startingWithoutWritingDoesNotLoopForever() {
         RecordingStops.ResumeBudget budget = new RecordingStops.ResumeBudget();
         int rounds = 0;
         while (budget.allows() && rounds < 100) {
             budget.noteAttempt();
-            budget.noteRecordingLasted(8_000L);   // 开始了，8 秒后没画面超时停掉
+            budget.noteRecordingLasted(15_000L);   // 开始了，15 秒一笔没写进，停掉
             rounds++;
         }
         assertEquals(RecordingStops.ResumeBudget.MAX_FAILURES, rounds);

@@ -23,19 +23,11 @@ public interface RecordCallback {
     void onRecordError(String cameraId, String error);
 
     /**
-     * 预分段切换（在停止当前 MediaRecorder 之前调用）
-     * 用于通知外部暂停 CaptureSession 的录制输出，避免向即将释放的 Surface 发送帧
-     * 
-     * @param cameraId 相机ID
-     * @param currentSegmentIndex 当前分段索引（即将结束的分段）
-     */
-    void onPrepareSegmentSwitch(String cameraId, int currentSegmentIndex);
-
-    /**
-     * 分段切换（需要重新配置相机会话）
+     * 分段切换：上一段收好了（录制器自己的线程上报）。录像这边不为它动相机 —— MediaRecorder 换段时新的录像输出由
+     * 宿主声明、调度去改会话（{@link VideoRecorder.SegmentOutputs}）。
      * @param cameraId 相机ID
      * @param newSegmentIndex 新的分段索引
-     * @param completedFilePath 已完成的文件路径（可用于传输到最终目录）
+     * @param completedFilePath 已完成的文件路径（可用于传输到最终目录）；空壳删了是 null
      */
     void onSegmentSwitch(String cameraId, int newSegmentIndex, String completedFilePath);
 
@@ -47,18 +39,11 @@ public interface RecordCallback {
     void onCorruptedFilesDeleted(String cameraId, List<String> deletedFiles);
 
     /**
-     * 请求重建录制（MediaRecorder 那条路的看门狗触发；软编码录制器不用它）
-     *
-     * @param cameraId 相机ID
-     * @param reason 重建原因（"no_write"）
-     */
-    void onRecordingRebuildRequested(String cameraId, String reason);
-
-    /**
      * 写不进文件：从开录（或最后一次写进文件）起 {@code stalledMs} 毫秒没有新数据写进文件，
-     * 录制器自己的修复（换盘、重建编码器、快速恢复）都没救回来。
-     * 这是「录像健不健康」唯一的裁判（项目所有者 2026-09-27）：收到就按打断处理，
-     * 接不接由 RecordingCoordinator 判。
+     * 录制器自己的修复（换盘、重建编码器、快速恢复）都没救回来（MediaRecorder 没有这些修复：9 秒没再长、
+     * 开录 10 秒还没写进第一笔、换段时新的一段开不起来，见 {@link VideoRecorder}）。
+     * 这是「录像健不健康」唯一的裁判（项目所有者 2026-09-27）。收到后宿主先看是不是相机的事
+     * （{@link RecordingLanes#stallIsCamera}）：是就只这一路退出；不是才按打断处理，接不接由 RecordingCoordinator 判。
      *
      * @param everWrote false：这次录制一个字节都没写出过（对应「没收到画面」）
      */

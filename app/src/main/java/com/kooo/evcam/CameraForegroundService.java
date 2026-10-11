@@ -150,19 +150,12 @@ public class CameraForegroundService extends Service {
         // 每次被启动都按开机自启动的规矩看一眼该恢复什么（例行的那种五分钟做一次）
         com.kooo.evcam.recovery.Recovery.restore(this, com.kooo.evcam.recovery.Recovery.WHY_ROUTINE);
 
-        // 从Intent获取通知内容，如果没有则使用默认内容
-        String title = intent != null ? intent.getStringExtra("title") : null;
-        String content = intent != null ? intent.getStringExtra("content") : null;
-
-        if (title == null) {
-            title = getString(R.string.notif_background_title);
-        }
-        if (content == null) {
-            content = getString(R.string.notif_tap_to_return);
-        }
-
-        // 创建通知
-        Notification notification = createNotification(title, content);
+        // 通知上的字照录像此刻的样子写（正在录制 / 等待摄像头 / 在后台运行，大纲 5c），谁叫起来的都一样 ——
+        // 以前由叫的那一处带着字来：保活那几处只会写「在后台运行」，录着时被它们叫起来，通知就说错了
+        com.kooo.evcam.recording.RecordingCoordinator coordinator =
+                com.kooo.evcam.recording.RecordingCoordinator.get(this);
+        Notification notification = buildNotification(this,
+                coordinator.notificationTitle(), coordinator.notificationContent());
 
         // 启动前台服务
         startForeground(NOTIFICATION_ID, notification);
@@ -211,8 +204,9 @@ public class CameraForegroundService extends Service {
             long now = android.os.SystemClock.elapsedRealtime();
             if (lastBeatAtMs == 0 || recording != lastBeatRecording || screenOn != lastBeatScreenOn
                     || now - lastBeatAtMs >= BLACK_BOX_QUIET_MS) {
-                com.kooo.evcam.blackbox.BlackBox.note(
-                        "心跳 recording=" + recording + " screenOn=" + screenOn);
+                // view：录像此刻的样子（开录中 / 在录 / 等待摄像头），一夜里一路都录不了的那几段在这里看得出来
+                com.kooo.evcam.blackbox.BlackBox.note("心跳 recording=" + recording + " view="
+                        + com.kooo.evcam.recording.RecordingCoordinator.get(this).view() + " screenOn=" + screenOn);
                 lastBeatRecording = recording;
                 lastBeatScreenOn = screenOn;
                 lastBeatAtMs = now;
@@ -283,8 +277,7 @@ public class CameraForegroundService extends Service {
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 try {
                     AppLog.d(TAG, "执行延迟重启...");
-                    start(getApplicationContext(), getString(R.string.notif_background_title),
-                            getString(R.string.notif_tap_to_return));
+                    start(getApplicationContext());
                 } catch (Exception e) {
                     AppLog.e(TAG, "延迟重启失败: " + e.getMessage(), e);
                 }
@@ -323,19 +316,17 @@ public class CameraForegroundService extends Service {
         }
     }
 
-    /**
-     * 创建通知
-     */
-    private Notification createNotification(String title, String content) {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+    /** 前台服务那一条通知：标题写状态，正文写能做的动作，点了回主界面。 */
+    private static Notification buildNotification(Context context, String title, String content) {
+        Intent notificationIntent = new Intent(context, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
-                this,
+                context,
                 0,
                 notificationIntent,
                 PendingIntent.FLAG_IMMUTABLE
         );
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
+        return new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(content)
                 .setSmallIcon(R.drawable.ic_stat_app)
@@ -346,37 +337,37 @@ public class CameraForegroundService extends Service {
     }
 
     /**
-     * 更新通知内容
+     * 换通知上的字（录像的样子变了、停录换回「在后台运行」）：服务在就用 {@link NotificationManager} 当场换同一条通知，
+     * 不再 start 一次 —— 安卓 12 起在后台 startForegroundService 会被拦（大纲 5c：在后台时绝不为换字起服务）。
+     * 服务不在就什么都不做：它起来时自己照录像此刻的样子写（{@link #onStartCommand}）。
      */
-    public void updateNotification(String title, String content) {
-        Notification notification = createNotification(title, content);
-        NotificationManager manager = getSystemService(NotificationManager.class);
+    public static void showText(Context context, String title, String content) {
+        if (!isForegroundReady) {
+            return;
+        }
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager != null) {
-            manager.notify(NOTIFICATION_ID, notification);
+            manager.notify(NOTIFICATION_ID, buildNotification(context, title, content));
         }
     }
 
     /**
-     * 静态方法：启动前台服务
-     * @param context 上下文
-     * @param title 通知标题
-     * @param content 通知内容
+     * 启动前台服务（已经在的再走一次 onStartCommand）。通知上的字不由叫的这一处给：服务起来时照录像此刻的样子写
+     * （{@code RecordingCoordinator#notificationTitle}）。
      */
-    public static void start(Context context, String title, String content) {
+    public static void start(Context context) {
         // 保活广播、ContentProvider、无障碍服务都从这里启动前台服务 —— 用户退出后一律不启动
         if (UserExit.blocks(context, "CameraForegroundService.start")) {
             return;
         }
         Intent intent = new Intent(context, CameraForegroundService.class);
-        intent.putExtra("title", title);
-        intent.putExtra("content", content);
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Android 13+ 对前台服务启动有限制，但录制时需要强制启动
             // 使用 startForegroundService 启动，服务必须在 5 秒内调用 startForeground
             try {
                 context.startForegroundService(intent);
-                AppLog.d(TAG, "Starting foreground service: " + title);
+                AppLog.d(TAG, "Starting foreground service");
             } catch (Exception e) {
                 // Android 12 起，后台启前台服务会被拦 —— 拦不拦、什么条件下拦，看这一行
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("startForegroundService 被拒: " + e.getClass().getSimpleName()
@@ -392,7 +383,7 @@ public class CameraForegroundService extends Service {
             }
         } else {
             context.startService(intent);
-            AppLog.d(TAG, "Starting service: " + title);
+            AppLog.d(TAG, "Starting service");
         }
     }
 
@@ -400,18 +391,18 @@ public class CameraForegroundService extends Service {
      * 录像停了（RecordingCoordinator 调）、或主界面收尾 / 退出要停服务。
      *
      * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3）。保活开着时它本来就该一直在：
-     * 这里只把通知换回「在后台运行」，不停。等着接回的也一样（「这一趟要录」立着：被打断等环视、因熄屏停下等亮屏，
-     * 2026-10-10）—— 接回时相机是从后台开的，后台拿着相机安卓要求有前台服务。都不是、或用户退出了，才真的停。
+     * 这里只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次），不停。等着接回的也一样
+     * （「这一趟要录」立着：存储一类被打断等自动接回、因熄屏停下等亮屏，2026-10-10）—— 接回时相机是从后台开的，
+     * 后台拿着相机安卓要求有前台服务。都不是、或用户退出了，才真的停。
      * 以前一律 stopService，保活开着时它 onDestroy 里一秒后又把自己拉起来 ——
      * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
      */
     public static void stop(Context context) {
         if (!UserExit.isExited(context) && (new AppConfig(context).isAutoStartOnBoot()
                 || com.kooo.evcam.recording.RecordingIntent.current().recordingWanted())) {
-            if (isForegroundReady) {
-                start(context, context.getString(R.string.notif_background_title),
-                        context.getString(R.string.notif_tap_to_return));
-            }
+            com.kooo.evcam.recording.RecordingCoordinator coordinator =
+                    com.kooo.evcam.recording.RecordingCoordinator.get(context);
+            showText(context, coordinator.notificationTitle(), coordinator.notificationContent());
             return;
         }
         isForegroundReady = false;

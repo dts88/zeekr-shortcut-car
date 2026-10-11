@@ -288,9 +288,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
 
         try {
             // 启动前台服务
-            CameraForegroundService.start(context,
-                    context.getString(R.string.notif_background_title),
-                    context.getString(R.string.notif_tap_to_return));
+            CameraForegroundService.start(context);
             AppLog.d(TAG, "已请求启动前台服务 (触发: " + reason + ")");
         } catch (Exception e) {
             AppLog.e(TAG, "启动服务失败: " + e.getMessage(), e);
@@ -314,9 +312,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         
         try {
             // 启动前台服务
-            CameraForegroundService.start(context,
-                    context.getString(R.string.notif_background_title),
-                    context.getString(R.string.notif_tap_to_return));
+            CameraForegroundService.start(context);
         } catch (Exception e) {
             // 静默失败，不输出日志
         }

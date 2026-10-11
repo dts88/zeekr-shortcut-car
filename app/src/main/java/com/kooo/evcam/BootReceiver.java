@@ -62,9 +62,8 @@ public class BootReceiver extends BroadcastReceiver {
             
             // 直接启动前台服务，不检查任何配置
             // 这是保活应用的关键做法：无条件启动
+            // 通知上的字服务自己照录像此刻的样子写（CameraForegroundService.onStartCommand）
             Intent serviceIntent = new Intent(context, CameraForegroundService.class);
-            serviceIntent.putExtra("title", context.getString(R.string.notif_background_title));
-            serviceIntent.putExtra("content", context.getString(R.string.notif_tap_to_return));
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent);

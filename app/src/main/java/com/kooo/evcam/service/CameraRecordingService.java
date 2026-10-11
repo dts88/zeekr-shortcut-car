@@ -73,7 +73,7 @@ public class CameraRecordingService extends Service {
 
     // ========== 录制控制 ==========
 
-    /** 悬浮按钮按了「开始」：人开的，前面的失败都不算了；环视出画面就录。 */
+    /** 悬浮按钮按了「开始」：人开的，前面的失败都不算了；查过盘就录，不等环视。 */
     public void startRecording() {
         mainHandler.post(() -> {
             MultiCameraManager cameraManager = CameraManagerHolder.getInstance().getOrInit(this);

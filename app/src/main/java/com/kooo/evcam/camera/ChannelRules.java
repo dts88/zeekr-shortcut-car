@@ -1215,6 +1215,19 @@ public final class ChannelRules {
         return Condition.BRINGING_UP;
     }
 
+    /** 此刻能用相机（大纲 §0）：能开、能重开。开相机报过「现在用不了」的，主界面回到前台之前也不算（{@link #mainCameForward}）。 */
+    static boolean usable(World w) {
+        return w.cameraUsable && w.unusableSince == 0;
+    }
+
+    /**
+     * 这一路该开、关着，而此刻用不了相机：调度不会开它，主界面回到前台之前它起不来（{@link #condition} 照旧说它在起来）。
+     * 给录像读：这样的一路不算在起来，不然录像一直是「准备中」（RecordingLanes.Facts#cannotOpen）。
+     */
+    static boolean cannotOpen(World w, Lane lane) {
+        return lane.device == Device.CLOSED && !usable(w) && shouldOpen(w, lane);
+    }
+
     /** 拍照不拍这一路：被拿着、或者停手了；在出画面的照拍（哪怕它的录像路不在）。 */
     static boolean excludedFromPhoto(Lane lane) {
         return !streaming(lane) && (lane.mark != null || lane.ladder.stopped());
@@ -1292,7 +1305,7 @@ public final class ChannelRules {
         }
         long quietLeft = w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (now - w.lastOthersChangeAt);
         boolean quiet = quietLeft <= 0;
-        boolean usable = w.cameraUsable && w.unusableSince == 0;
+        boolean usable = usable(w);
 
         // 摘死输出
         for (Lane lane : w.lanes) {

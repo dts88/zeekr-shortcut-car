@@ -315,7 +315,6 @@
     <!-- Main screen, notifications, playback -->
     <string name="msg_need_camera_storage">Camera and storage permissions are required</string>
     <string name="msg_camera_access_failed">Can\'t access the cameras</string>
-    <string name="msg_codec_fallback">Recording error. Switched to MediaCodec and kept recording.</string>
     <string name="msg_storage_full_stopped">USB drive full. Recording stopped. No video storage cap is set, so old recordings aren\'t cleaned up automatically.</string>
     <string name="msg_storage_full_refuse">Not enough space on the USB drive to start recording. No video storage cap is set, so old recordings aren\'t cleaned up automatically.</string>
     <string name="msg_storage_cleaning">Not enough space. Cleaning up the oldest recordings, then recording starts…</string>
@@ -377,10 +376,9 @@
     <string name="msg_recording_started_n">Recording started (cameras: %1$d)</string>
     <string name="msg_sd_fallback">No USB drive found. Recording to internal storage.</string>
     <string name="msg_recording_interrupted">Recording interrupted: %1$s</string>
-    <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. It resumes once the surround view is working.</string>
+    <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. Resuming…</string>
     <string name="rec_reason_unknown">unknown cause</string>
     <string name="rec_reason_write_stalled">can\'t write to the file</string>
-    <string name="rec_reason_camera_lost">the camera is in use</string>
     <!-- The reason in "X failed: reason", picked from the exception by ui/FailureReason; otherwise no reason is shown -->
     <string name="reason_no_network">no network connection</string>
     <string name="reason_timeout">connection timed out</string>
@@ -597,6 +595,8 @@
     <string name="msg_rail_side_hint">Action buttons are on the driver\'s side. Change this in Settings → Interface → Action button side.</string>
     <string name="record_unavailable">Insert a USB drive to record</string>
     <string name="record_unavailable_detail">No USB drive</string>
+    <string name="record_waiting_cameras">Waiting for cameras</string>
+    <string name="record_waiting_detail">Resumes automatically when available</string>
     <string name="status_profile_composite">Zeekr 7X (surround)</string>
     <string name="status_profile_composite_multi">Zeekr 7X (surround + front and rear cabin)</string>
     <string name="status_fps">≤%1$s fps</string>
@@ -607,10 +607,9 @@
     <string name="status_storage_free">USB %1$s free</string>
     <string name="status_storage_none">No USB drive</string>
     <string name="status_recording_fallback">Recording to %1$s (%2$s unavailable)</string>
-    <string name="status_camera_taken">Camera in use. Recording resumes when it is released.</string>
     <string name="status_camera_lane_taken">%1$s: camera in use. The other cameras keep recording. This camera resumes recording when it is released.</string>
     <string name="status_cameras_taken">Some cameras are in use. The others keep recording. Each resumes recording when it is released.</string>
-    <string name="status_camera_lane_unavailable">%1$s: camera can\'t be opened. The other cameras keep recording.</string>
+    <string name="status_camera_lane_unavailable">%1$s: can\'t record. The other cameras keep recording.</string>
     <string name="status_internal_storage">internal storage</string>
     <string name="nav_group_switches">Switches</string>
 
@@ -746,6 +745,7 @@
 
     <!-- Notifications -->
     <string name="notif_recording_title">Recording</string>
+    <string name="notif_waiting_cameras_title">Waiting for cameras. Recording resumes automatically when they\'re available.</string>
     <string name="notif_recording_tap">Tap to return to the app</string>
     <string name="notif_background_title">Running in the background</string>
     <string name="notif_tap_to_return">Tap to return to the app</string>

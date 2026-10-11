@@ -921,79 +921,65 @@ public class SingleCamera {
     }
 
     /**
-     * 切换到仅预览模式（优化的分段切换方法）
-     * 
-     * 与 pauseRecordSurface() 不同，此方法不会停止预览，而是：
-     * 1. 创建一个只包含预览 Surface 的新请求
-     * 2. 继续向预览 Surface 发送帧（预览不卡顿）
-     * 3. 停止向录制 Surface 发送帧（安全停止 MediaRecorder）
-     * 
-     * <p>2.11 修过两处：一是会话里除录像以外的输出（预览、后视镜、出帧口）都照送 —— 以前只送主界面预览，
-     * 后视镜、后台没有预览的那一路在分段那一下整个停住；二是带上出帧回调 —— 以前传的是 null，这期间的帧不计数，
-     * 看门狗 8 秒后把好好的相机当成没画面去救。调度那条路只在「换录像输出」那一步里调它（{@link #applyOutputs}）。</p>
+     * 切换到仅预览模式 —— 停止往要走的录像输出送帧（相机线程，只由「改输出」那一步在重配之前调，{@link #reconfigure}；
+     * 大纲阶段 5d）：
+     * 重复请求换成只送会话里别的活输出 —— 除了要走的录像输出（会话里有、要的那一组里没有的录像），预览、后视镜、出帧口、
+     * 留着的输出都照送，带上出帧回调（这期间的帧照样计数，不会被当成没画面）。
      *
-     * @return true 如果成功切换，false 如果失败（将回退到 pauseRecordSurface）
+     * <p>为什么：MediaRecorder 分段要换一个新的录像输出，旧的那个 MediaRecorder 等它离开会话才停、收文件
+     * （{@link VideoRecorder}）。先停止往它送帧，它的文件就停在这一刻，重配的那几百毫秒不再往里写。</p>
+     *
+     * <p>没有别的活输出可送（会话里只有要走的录像）、或者会话、设备不在，就不换 —— 接着重配时关旧会话，送帧照样停。
+     * 不再退回停掉整条重复请求（{@code stopRepeating}）：那样预览、后视镜跟着一起停。</p>
+     *
+     * @param wanted 这一步要的那一组输出
+     * @return true：换成了只送别的输出
      */
-    public boolean switchToPreviewOnlyMode() {
+    private boolean switchToPreviewOnlyMode(Set<ChannelRules.Out> wanted) {
         final CameraCaptureSession session = captureSession;
         final CameraDevice device = cameraDevice;
         List<Surface> keep = new ArrayList<>();
         synchronized (outputLock) {
             for (Map.Entry<ChannelRules.Out, Surface> entry : carried.entrySet()) {
-                if (entry.getKey().kind != ChannelRules.Kind.RECORD && alive(entry.getKey().consumer)
-                        && entry.getValue().isValid()) {
+                ChannelRules.Out out = entry.getKey();
+                boolean leavingRecord = out.kind == ChannelRules.Kind.RECORD && !wanted.contains(out);
+                if (!leavingRecord && alive(out.consumer) && entry.getValue().isValid()) {
                     keep.add(entry.getValue());
                 }
             }
         }
         if (session == null || device == null || keep.isEmpty()) {
-            AppLog.w(TAG, "Camera " + cameraId + " cannot switch to preview-only mode: session/device/surface not ready");
-            // 回退到旧方法
-            pauseRecordSurface();
+            AppLog.d(TAG, "Camera " + cameraId + " no other live output to keep while the record output leaves;"
+                    + " the reconfigure closes the old session");
             return false;
         }
-
         try {
-            // 创建一个只包含预览性质输出的请求（会话里除录像以外的那几样）
-            CaptureRequest.Builder previewOnlyBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            CaptureRequest.Builder builder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             for (Surface surface : keep) {
-                previewOnlyBuilder.addTarget(surface);
+                builder.addTarget(surface);
             }
-
-            // 应用当前的图像调节参数（如果启用）
+            // 画面调节开着：曝光补偿、白平衡照现在的请求带上
             if (imageAdjustEnabled && currentRequestBuilder != null) {
-                // 复制关键参数
                 try {
                     Integer exposure = currentRequestBuilder.get(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION);
                     if (exposure != null) {
-                        previewOnlyBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, exposure);
+                        builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, exposure);
                     }
                     Integer awbMode = currentRequestBuilder.get(CaptureRequest.CONTROL_AWB_MODE);
                     if (awbMode != null) {
-                        previewOnlyBuilder.set(CaptureRequest.CONTROL_AWB_MODE, awbMode);
+                        builder.set(CaptureRequest.CONTROL_AWB_MODE, awbMode);
                     }
                 } catch (Exception e) {
-                    // 忽略参数复制错误
+                    // 复制不了就用模板的默认值
                 }
             }
-            
-            // 替换当前的重复请求（预览继续，但不再向录制 Surface 发送帧）；带上出帧回调，这期间的帧照样计数
-            session.setRepeatingRequest(previewOnlyBuilder.build(), activeCaptureCallback, backgroundHandler);
-            AppLog.d(TAG, "Camera " + cameraId + " switched to preview-only mode (preview continues, recording paused)");
+            session.setRepeatingRequest(builder.build(), activeCaptureCallback, backgroundHandler);
+            AppLog.d(TAG, "Camera " + cameraId + " stopped frames to the leaving record output, " + keep.size()
+                    + " output(s) keep streaming");
             return true;
-            
-        } catch (CameraAccessException e) {
-            AppLog.e(TAG, "Camera " + cameraId + " failed to switch to preview-only mode", e);
-            // 回退到旧方法
-            pauseRecordSurface();
-            return false;
-        } catch (IllegalStateException e) {
-            AppLog.w(TAG, "Camera " + cameraId + " session closed when switching to preview-only mode");
-            return false;
-        } catch (IllegalArgumentException e) {
-            // 某些设备可能不支持动态切换请求目标
-            AppLog.w(TAG, "Camera " + cameraId + " device may not support dynamic request change: " + e.getMessage());
-            pauseRecordSurface();
+        } catch (CameraAccessException | IllegalStateException | IllegalArgumentException e) {
+            // 会话正在关、设备不支持换请求目标：不换，接着重配时关旧会话，送帧照样停
+            AppLog.w(TAG, "Camera " + cameraId + " could not stop frames to the leaving record output: " + e);
             return false;
         }
     }
@@ -1163,10 +1149,6 @@ public class SingleCamera {
             }
         }
         return "other";
-    }
-
-    public long getLastFrameTimestampMs() {
-        return lastFrameTimestampMs;
     }
 
     /**
@@ -1457,7 +1439,7 @@ public class SingleCamera {
             }
             configFailRetryCount = 0;   // 新的一步：重试从头数
             if (swapRecordFirst && replacesRecord(wanted)) {
-                switchToPreviewOnlyMode();
+                switchToPreviewOnlyMode(wanted);
             }
             handler.removeCallbacks(recreateSessionRunnable);
             createCameraPreviewSession();

@@ -38,8 +38,10 @@ import java.util.function.Consumer;
  *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；</li>
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
- *   <li>交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布）离开了会话的，放掉；</li>
- *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）。</li>
+ *   <li>交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、换下来的录制器）离开了会话的，放掉；</li>
+ *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；</li>
+ *   <li>告诉录像那一侧（{@link Recording}）：哪几路走了、哪几路的样子变了、哪几路带着新会话出了画面 ——
+ *       录像按路加入、退出只看这几声，自己从不动相机。</li>
  * </ol>
  *
  * <h3>线程</h3>
@@ -200,6 +202,52 @@ public final class ChannelScheduler {
         /** 退出之后都关完了，调度停了：摘掉它接在别处的监听。 */
         void stopped();
     }
+
+    /**
+     * 录像那一侧（MultiCameraManager 的录像宿主，大纲 §2 阶段 5 定的接口）：每一路的相机此刻怎样，调度在每一轮最后、
+     * 主线程上告诉它（{@link #setRecording}）。录像只声明、撤回录像输出，照这几声加入、退出，从不动相机。
+     * 录像输出离开会话由 {@link CameraPort#dropped} 告诉声明它的那一方（SingleCamera.dropListener），不在这里。
+     */
+    interface Recording {
+        /** 这一路带着一份新会话出了画面（会话配好、出了第一帧，sessionOutputs 读得到）：每一份会话说一次。 */
+        void onLaneCameraStreaming(String key);
+
+        /**
+         * 这一路的相机走了：丢了（{@link Gone#LOST}，在阻塞的关之前；{@code reason} 是丢的那一下）、我们关了它
+         * （{@link Gone#CLOSED}）、或者它卡住了在救（{@link Gone#RESCUED}：重建会话、重开）。
+         */
+        void onLaneCameraGone(String key, Gone why, CameraTaken.Reason reason);
+
+        /**
+         * 这一路的 {@link #condition} 变了（被拿着、放开了、在救、停手、在出画面），或者它关着时能不能用相机变了
+         * （{@link #cannotOpen}）。
+         */
+        void onLaneConditionChanged(String key);
+    }
+
+    /** 一路的相机为什么走了（{@link Recording#onLaneCameraGone}）。 */
+    enum Gone {
+        /** 丢了：被断开、报错（在那一次阻塞的关之前就说）。 */
+        LOST,
+        /** 我们关的：没人要、保持到点、熄屏、车机要睡、退出。 */
+        CLOSED,
+        /** 开着却没进展（卡住了），调度在救：重建会话或者重开。 */
+        RESCUED
+    }
+
+    private static final Recording NO_RECORDING = new Recording() {
+        @Override
+        public void onLaneCameraStreaming(String key) {
+        }
+
+        @Override
+        public void onLaneCameraGone(String key, Gone why, CameraTaken.Reason reason) {
+        }
+
+        @Override
+        public void onLaneConditionChanged(String key) {
+        }
+    };
 
     /** 现在用不了相机是因为什么（黑匣子那一行）。 */
     enum Unusable {
@@ -452,8 +500,9 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 这台相机此刻在哪一份调度里判的是被拿着（TAKEN / BLOCKED）。给还没迁走的旧读者（后视镜服务 → 阶段 4，
-     * 协调器 → 阶段 5）回答 {@link CameraTaken#benched}：被拿着这件事只记在调度里。主线程上读。
+     * 这台相机此刻在哪一份调度里判的是被拿着（TAKEN / BLOCKED）。给旧读者回答 {@link CameraTaken#benched}：
+     * 被拿着这件事只记在调度里。后视镜服务（阶段 4）、协调器（阶段 5）都已改读 {@link #condition}，应用里没有读者了，
+     * 阶段 7 随 {@link CameraTaken#benched} 一起删。主线程上读。
      */
     static boolean takenAnywhere(String cameraId) {
         for (ChannelScheduler scheduler : LIVE) {
@@ -465,7 +514,7 @@ public final class ChannelScheduler {
         return false;
     }
 
-    /** 此刻有没有哪一路判的是被别的程序拿着（TAKEN）。给 {@link CameraTaken#othersHold} 答。主线程上读。 */
+    /** 此刻有没有哪一路判的是被别的程序拿着（TAKEN）。给 {@link CameraTaken#othersHold} 答（阶段 7 随它一起删）。主线程上读。 */
     static boolean anyTakenAnywhere() {
         for (ChannelScheduler scheduler : LIVE) {
             if (scheduler.anyTaken()) {
@@ -478,7 +527,8 @@ public final class ChannelScheduler {
     /**
      * 此刻有没有哪一路丢了 / 开不起来、原因是「被占用」一类（被断开、报错 1 / 2 …，{@link CameraTaken.Reason#inUseKind}），
      * 还没判完（关完再过 300 ms 才判）。给 {@link CameraTaken#othersHold} 答：协调器在丢的那一刻就要知道这一次停录算不算
-     * 接回的次数，那时还判不出来（审查 2026-10-11）。阶段 5 去掉「最后一路丢了整次停」后跟着删。主线程上读。
+     * 接回的次数，那时还判不出来（审查 2026-10-11）。阶段 5 起相机丢了不再整次停、协调器不再问它，
+     * 阶段 7 随 {@link CameraTaken#othersHold} 一起删。主线程上读。
      */
     static boolean takeoverPendingAnywhere() {
         for (ChannelScheduler scheduler : LIVE) {
@@ -556,6 +606,18 @@ public final class ChannelScheduler {
      */
     private final Map<String, Map<ChannelRules.Out, Runnable>> handedOver = new LinkedHashMap<>();
 
+    // ---- 告诉录像那一侧的（主线程）----
+
+    private Recording recording = NO_RECORDING;
+    /** 每一路上一次告诉录像时在出画面的那一份会话（它配好的时刻；0 = 没在出画面）。 */
+    private final Map<String, Long> toldStreaming = new HashMap<>();
+    /** 每一路上一次告诉录像时的 condition。 */
+    private final Map<String, ChannelRules.Condition> toldCondition = new HashMap<>();
+    /** 每一路上一次告诉录像时，它是不是关着、而此刻用不了相机（{@link #cannotOpen}）。 */
+    private final Map<String, Boolean> toldCannotOpen = new HashMap<>();
+    /** 这一轮里走了的几路（丢了、我们关了、在救），一轮最后按先后告诉录像。 */
+    private final List<Object[]> gone = new ArrayList<>();
+
     ChannelScheduler(Clock clock, Poster poster, Host host, Journal journal) {
         this.clock = Objects.requireNonNull(clock);
         this.poster = Objects.requireNonNull(poster);
@@ -588,7 +650,16 @@ public final class ChannelScheduler {
         drops.clear();
         recordWaitSince.clear();
         ownStepEndedAt.clear();
+        toldStreaming.clear();
+        toldCondition.clear();
+        toldCannotOpen.clear();
+        gone.clear();
         wake();
+    }
+
+    /** 录像那一侧（主线程，MultiCameraManager 构造里接上）：之后每一轮最后照 {@link Recording} 告诉它。 */
+    void setRecording(Recording recording) {
+        this.recording = recording == null ? NO_RECORDING : recording;
     }
 
     // ================================================================= 叫醒（哪个线程都能调）
@@ -726,13 +797,18 @@ public final class ChannelScheduler {
         wake();
     }
 
-    /** 一路开着的相机丢了，在那一次阻塞的关之前：进 LOSING，算在途，别的路这几秒里一步都不动。 */
+    /**
+     * 一路开着的相机丢了，在那一次阻塞的关之前：进 LOSING，算在途，别的路这几秒里一步都不动。
+     * 录像那一侧在这一轮最后听说（{@link Recording#onLaneCameraGone}），那一路自己收尾退出。
+     */
     void onLossStarted(String cameraId, int code) {
         ChannelRules.Lane lane = live(cameraId);
         if (lane == null) {
             return;
         }
-        ChannelRules.lossStarted(w, lane, CameraTaken.Reason.ofLoss(code));
+        CameraTaken.Reason reason = CameraTaken.Reason.ofLoss(code);
+        ChannelRules.lossStarted(w, lane, reason);
+        noteGone(lane.key, Gone.LOST, reason);
         wake();
     }
 
@@ -803,24 +879,6 @@ public final class ChannelScheduler {
         return ended != null && clock.now() - ended < OWN_WORD_GRACE_MS;
     }
 
-    /**
-     * 还有没开完的：手上是开的那一步，或者有一路该开、还没开、没被拿着、不在救援梯子上（等安静、等录像输出、
-     * 现在用不了相机的都算）。录像开录之前等它（RecordingCoordinator，阶段 5 删那道闸）。
-     */
-    public boolean openStepsPending() {
-        ChannelRules.Step step = w.step;
-        if (step != null && step.move == ChannelRules.Move.OPEN) {
-            return true;
-        }
-        for (ChannelRules.Lane lane : w.lanes) {
-            if (lane.device != ChannelRules.Device.OPEN && lane.mark == null && !ChannelRules.rescuing(lane)
-                    && ChannelRules.shouldOpen(w, lane)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** 几路都关好了：账上都关着，相机层也没有一路开着、在开、在关。 */
     public boolean allClosed() {
         return ChannelRules.allClosed(w) && !anyPortHolds();
@@ -837,37 +895,24 @@ public final class ChannelScheduler {
         return lane == null ? ChannelRules.Condition.BRINGING_UP : ChannelRules.condition(lane);
     }
 
-    /**
-     * 这一路丢了 / 开不起来，还没判完：还在被别人接手（LOSING），或者关完了、等那 300 ms（等别的丢失关完）。
-     * 判完之前 {@link #condition} 还说不出是不是被拿着（TAKEN 还是 RESCUING）：录像离开的那一路等它判完再定说法
-     * （MultiCameraManager.settleLeave，以前等的是 SingleCamera 的 judgingLoss，审查 2026-10-11）。
-     */
-    public boolean judging(String key) {
-        ChannelRules.Lane lane = w.lane(key);
-        return lane != null && (lane.failure != null || lane.device == ChannelRules.Device.LOSING);
-    }
-
     /** 这一路此刻能用：在出画面。 */
     public boolean usable(String key) {
         return condition(key) == ChannelRules.Condition.STREAMING;
+    }
+
+    /**
+     * 这一路关着、而此刻用不了相机（主界面不在前、前台服务是后台起的，或者开相机报过「现在用不了」）：主界面回到前台之前
+     * 不会开它。{@link #condition} 照旧说它在起来；录像读这一句，不把它算作在起来（RecordingLanes.Facts#cannotOpen）。
+     */
+    public boolean cannotOpen(String key) {
+        ChannelRules.Lane lane = w.lane(key);
+        return lane != null && ChannelRules.cannotOpen(w, lane);
     }
 
     /** 拍照不拍这一路：被拿着、被挡着、或者停手了；在出画面的照拍（哪怕它的录像路不在）。 */
     public boolean excludedFromPhoto(String key) {
         ChannelRules.Lane lane = w.lane(key);
         return lane != null && ChannelRules.excludedFromPhoto(lane);
-    }
-
-    /** 被拿着的那几路（日志用的英文记号）：{@code [left TAKEN 12s, front BLOCKED 12s]}。 */
-    public String marks() {
-        StringBuilder sb = new StringBuilder("[");
-        for (ChannelRules.Lane lane : w.lanes) {
-            if (lane.mark != null) {
-                sb.append(sb.length() > 1 ? ", " : "").append(lane.key).append(' ').append(lane.mark).append(' ')
-                        .append((w.now - lane.markSince) / 1000).append('s');
-            }
-        }
-        return sb.append(']').toString();
     }
 
     /** 诊断报告用：每一路的账和手上那一步（英文记号）。 */
@@ -925,6 +970,7 @@ public final class ChannelScheduler {
         dispatchDrops();
         releaseHandedOver(false);
         maybeAsk();
+        tellRecording();
         if (updateWinding(now)) {
             stop();
             return;
@@ -1433,6 +1479,10 @@ public final class ChannelScheduler {
         if (!started) {
             return;
         }
+        // 开着却卡住了的一路（关着等救的那种丢的时候已经说过）：录像那一路自己收尾退出，救好了带着录像输出出画面再加入
+        if (lane.device == ChannelRules.Device.OPEN || lane.device == ChannelRules.Device.OPENING) {
+            noteGone(key, Gone.RESCUED, null);
+        }
         queueRemoved(lane, d.outputs);
         if (!rebuild) {
             setDevice(lane, ChannelRules.Device.OPENING, now);
@@ -1459,6 +1509,7 @@ public final class ChannelScheduler {
             }
             setDevice(lane, ChannelRules.Device.CLOSING, now);
             closedAt.remove(key);
+            noteGone(key, Gone.CLOSED, null);
         }
         if (keys.isEmpty()) {
             return;
@@ -1674,7 +1725,50 @@ public final class ChannelScheduler {
         wake();
     }
 
-    // ---- 9. 退出、车机要睡：关完了没有
+    // ---- 9. 告诉录像那一侧
+
+    private void noteGone(String key, Gone why, CameraTaken.Reason reason) {
+        gone.add(new Object[]{key, why, reason});
+    }
+
+    /**
+     * 一轮最后告诉录像那一侧（{@link Recording}）：先说这一轮里走了的几路（录像那一路先退出），再说 condition 变了的
+     * （含关着时能不能用相机变了的，{@link #cannotOpen}），
+     * 最后说带着一份新会话出了画面的（录像那一路看会话带没带着它的录像输出，带着就加入）。
+     * 走了的那一路，下一份出画面的会话一定算新的。录像那一侧在回调里只叫醒、声明、撤回，不在这里再跑一轮。
+     */
+    private void tellRecording() {
+        List<Object[]> left = new ArrayList<>(gone);
+        gone.clear();
+        for (Object[] g : left) {
+            toldStreaming.remove((String) g[0]);
+            recording.onLaneCameraGone((String) g[0], (Gone) g[1], (CameraTaken.Reason) g[2]);
+        }
+        List<String> changed = new ArrayList<>();
+        List<String> streamingNow = new ArrayList<>();
+        for (ChannelRules.Lane lane : w.lanes) {
+            ChannelRules.Condition condition = ChannelRules.condition(lane);
+            boolean conditionChanged = toldCondition.put(lane.key, condition) != condition;
+            boolean cannotOpen = ChannelRules.cannotOpen(w, lane);
+            boolean cannotOpenChanged = !Boolean.valueOf(cannotOpen).equals(toldCannotOpen.put(lane.key, cannotOpen));
+            if (conditionChanged || cannotOpenChanged) {
+                changed.add(lane.key);
+            }
+            long session = ChannelRules.streaming(lane) ? lane.sessionSince : 0L;
+            Long told = toldStreaming.put(lane.key, session);
+            if (session != 0 && (told == null || told != session)) {
+                streamingNow.add(lane.key);
+            }
+        }
+        for (String key : changed) {
+            recording.onLaneConditionChanged(key);
+        }
+        for (String key : streamingNow) {
+            recording.onLaneCameraStreaming(key);
+        }
+    }
+
+    // ---- 10. 退出、车机要睡：关完了没有
 
     /**
      * 退出、车机要睡时：都关完了就从「在关」那张表里拿掉；退出的关完了调度就停（返回 true）。
@@ -1707,7 +1801,7 @@ public final class ChannelScheduler {
         host.stopped();
     }
 
-    // ---- 10. 下一次什么时候醒
+    // ---- 11. 下一次什么时候醒
 
     /**
      * 最迟 {@link ChannelRules#TICK_MS} 醒一次；手上那一步到点、等的东西到点（待判 300 ms、安静、录像输出、车机要睡的 1 秒）、

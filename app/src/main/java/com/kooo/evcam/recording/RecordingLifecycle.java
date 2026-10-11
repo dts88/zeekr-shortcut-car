@@ -23,29 +23,38 @@ package com.kooo.evcam.recording;
  *   <li><b>管线的报告</b>（{@link #on}）只在对得上的阶段算数，过时的、重复的一律不理。</li>
  * </ul>
  *
+ * <p>「在录」说的是录像意图开着（2.11，确认文档 §三）：每一路带着录像输出出了画面就加入，一路都录不了时
+ * 录像也不停（显示等待摄像头）—— 那是各路的样子（{@code RecordingCoordinator#view}），不是这里的阶段。</p>
+ *
  * <p>纯逻辑，见 {@code RecordingLifecycleTest}。</p>
  */
 public final class RecordingLifecycle {
 
-    /** 停录中最多等管线收拾多久。编码器一路最坏要五六秒（排空、收文件、拆 GL、等线程），三路串着做。 */
+    /** 停录中最多等管线收拾多久。编码器一路最坏要五六秒（排空、收文件、等写线程），几路一起叫停、共用一个期限。 */
     public static final long STOP_DEADLINE_MS = 20_000L;
 
     public enum Phase {
         /** 没在录，也没在收拾。 */
         IDLE,
-        /** 开录指令发出去了，录制器还没启动（建会话、等画面稳定）。 */
+        /**
+         * 开录指令发出去了，还没有一路加入（每一路的相机带着录像输出出了画面才加入，两种录制器一样）。
+         * 一路都在等摄像头时一直是它，照样算在录。
+         */
         PREPARING,
-        /** 至少一路录制器启动了。 */
+        /** 至少一路加入过。之后一路都不在录（等待摄像头）也还是它。 */
         RECORDING,
-        /** 停了，管线还在收拾（编码器、录像输出、会话、排着的任务）。 */
+        /** 停了，管线还在收拾（各路收尾封好文件、录制器停放、排着的任务）。 */
         STOPPING
     }
 
     /** 管线（相机层）报上来的事。 */
     public enum Report {
-        /** 至少一路录制器启动了（含 MediaRecorder 重建后又启动）。 */
+        /** 第一路加入录像。 */
         STARTED,
-        /** 开录走到底一路都没起来（含重建后没起来）。 */
+        /**
+         * 计划里每一路的录制器都建不起来（会话都带不上它们的录像输出；MediaRecorder 还算上开录没成）。
+         * 相机没出画面不是这个：那几路等着加入。
+         */
         START_FAILED,
         /** 停录收拾完了。 */
         STOPPED
@@ -132,8 +141,8 @@ public final class RecordingLifecycle {
     /**
      * 一份报告让这一次录像到头了（{@link Action#END}）：按什么原因停。停之前调（看的是现在的阶段）。
      *
-     * <p>开录中一路都没起来是开录失败 —— 录像根本没开始，提示不说「中断」。
-     * 已经录了一阵、MediaRecorder 重建后没起来，录像是开始过的：和没人叫它停、它自己停了一样，是原因不明。</p>
+     * <p>开录中录制器都建不起来是开录失败 —— 录像根本没开始，提示不说「中断」。
+     * 已经录了一阵之后才每一路都录不了的，录像是开始过的：和没人叫它停、它自己停了一样，是原因不明。</p>
      */
     public RecordingStops.Reason endReason(Report report) {
         return report == Report.START_FAILED && phase == Phase.PREPARING

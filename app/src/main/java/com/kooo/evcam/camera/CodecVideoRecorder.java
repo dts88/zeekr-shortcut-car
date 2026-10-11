@@ -30,17 +30,39 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 使用 MediaCodec + MediaMuxer 进行视频编码和录制
  * 用于 L6/L7 等不支持 MediaRecorder 直接录制的车机平台
- * 
+ *
  * 工作流程：
  * 1. 创建 MediaCodec 编码器，获取其输入 Surface
  * 2. 使用 EglSurfaceEncoder 将 Camera 的帧渲染到编码器输入 Surface（编码线程）
  * 3. 从 MediaCodec 取出编码后的数据，拷出来排给写入线程（编码线程，见 SampleRing）
  * 4. 写入线程通过 MediaMuxer 写入 MP4 文件（MediaMuxer 只在写入线程上动，见「写入线程」那一节）
+ *
+ * <h3>一个录制器录好几次（2026-10-11，录像每一路各自进出）</h3>
+ *
+ * <p>准备（{@link #prepareWithoutFile}）→ 开录 → 叫停、收好 → 停放（{@link #park}）→ 重新备好（{@link #rearm}）→ 再开录 ……
+ * → 放掉（{@link #release}）。一路的相机走了，这一路收好文件、停放；相机回来了，重新备好、再开录。停录之后也停放着，
+ * 下一次开录直接沿用。每一步之前先在 {@link RecorderRun} 上走一次，走不成就不做。</p>
+ *
+ * <ul>
+ *   <li><b>录像输出一辈子不变</b>：{@link #getRecordSurface}（和准备时交出去的输入 SurfaceTexture）准备好时建、放掉时才放，
+ *       停放、重新备好、开录、停录、分段切换、重建编码器都不换它。它留在会话里，这一路退出、再加入都不用为它改会话。</li>
+ *   <li><b>不在录时照样取帧</b>：帧回调里不在录就只取帧、不编（见 {@link #prepare} 里的帧回调）。停放时也一样 ——
+ *       编码器放掉了，EGL 改画到一个谁也不取的占位输出上（{@link #aimAtPlaceholder}），上下文才当前得了、帧才取得走。
+ *       不取的话相机往这个输出送的缓冲区很快占满，会话里别的输出跟着卡。</li>
+ *   <li><b>线程</b>：准备、停放、重新备好、放掉在后台线程上调，会等（准备、停放、重新备好各最多 {@link #ENCODER_WAIT_MS}，
+ *       放掉还要等收文件和线程退出），四者互相排着做；开录、叫停、{@link #switchNow} 在主线程上调，不等。
+ *       编码器、EGL 只在编码线程上动：停放、重新备好、放掉里动它们的那几步都排到编码线程上，和帧回调、分段切换、重建排在同一条队里。</li>
+ *   <li><b>上一次的不算到这一次头上</b>：排到分段线程上、只对一次开录有效的事带着它是第几次开录（{@link #runSerial}），
+ *       到时候对不上就作废（{@link #postForThisRun}；分段计时、健康检查、快速恢复的定时也一样）—— 以前一个录制器只录一次，
+ *       「叫停了」就够挡。</li>
+ * </ul>
  */
 public class CodecVideoRecorder {
     private static final String TAG = "CodecVideoRecorder";
@@ -98,13 +120,20 @@ public class CodecVideoRecorder {
     private boolean csdInFormat;
     /** 排了「开文件」、还没排「收文件」（编码线程上）。快速恢复时据此决定要不要开新文件。 */
     private boolean fileQueued;
-    /** 开过录没有（{@link #startRecording} 成功过）。停录时没开过录的不收文件、不报，留给释放。 */
+    /** 这一次开录开过录没有（{@link #startRecording} 成功过）。停录时没开过录的没有文件要收、不报。 */
     private volatile boolean everStarted;
     /**
-     * 叫停了（{@link #beginStop}）。之后分段切换、快速恢复、重建编码器都不再开新文件、不再把「在录」置回去 ——
+     * 这一次开录叫停了（{@link #beginStop}）。之后分段切换、快速恢复、重建编码器都不再开新文件、不再把「在录」置回去 ——
      * 这些都在编码线程上，停录的收尾也排在编码线程上，所以「收文件（停录）」之后不会再有「开文件」。
+     * 重新备好时清掉（{@link #resetRun}，在编码线程上：上一次排在编码线程上的都已经做完了）。
      */
     private volatile boolean stopRequested;
+    /** 这个录制器走到哪一步、每一步之前的闸（见类说明）。 */
+    private final RecorderRun run = new RecorderRun();
+    /** 准备、停放、重新备好、放掉互相排着做（都在后台线程上，会等编码线程）：放掉不会插到另外三步中间。 */
+    private final Object lifecycle = new Object();
+    /** 第几次开录：准备、每次重新备好各加一（{@link #resetRun}）。排到分段线程上的事带着它，见 {@link #postForThisRun}。 */
+    private volatile int runSerial;
     /** 编码线程排的第几个文件。写入线程说哪个文件写不下去了，凭它认出说的是不是还是现在这个。 */
     private int openSerial;
     /** 最近一次排的文件名（给日志和黑匣子用；真正写到哪个盘由写入线程定）。 */
@@ -122,12 +151,18 @@ public class CodecVideoRecorder {
     // 状态
     private final AtomicBoolean isRecording = new AtomicBoolean(false);  // 使用 AtomicBoolean 确保线程安全
     private volatile boolean isReleased = false;
-    /** 正在写的文件（写入线程开文件、换盘时改；开录时先填上第一个）。 */
+    /** 正在写的文件（写入线程开文件、换盘时改）。 */
     private volatile String currentFilePath;
-    
-    // 缓存的录制 Surface，避免重复创建导致内存泄漏
-    private Surface cachedRecordSurface = null;
-    
+
+    /** 这一路的录像输出（{@link #getRecordSurface}）：准备好时建在输入 SurfaceTexture 上，放掉时才放，中间不换。 */
+    private volatile Surface recordSurface;
+    /**
+     * 停放时 EGL 画到的地方（{@link #aimAtPlaceholder}）：第一次停放时建，放掉时放（编码线程上）。
+     * 谁也不取的 SurfaceTexture（脱离模式，不占 GL 贴图）；停放时只取帧、不画，里面一直是空的。
+     */
+    private SurfaceTexture placeholderTexture;
+    private Surface placeholderSurface;
+
     // 时间戳基准（用于计算相对时间戳，供输入端使用）
     private long firstFrameTimestampNs = -1;
 
@@ -186,15 +221,10 @@ public class CodecVideoRecorder {
      * 时拿掉，停录时读，所以加锁。
      */
     private final List<String> recordedFilePaths = Collections.synchronizedList(new ArrayList<>());
-    /** 上一次停录收掉的文件（{@link #finishStop} 结束时还在手里的那几个），见 {@link #stoppedFiles}。 */
+    /** 这一次开录停录时收掉的文件（{@link #finishStop} 结束时还在手里的那几个），见 {@link #stoppedFiles}。每次开录清空。 */
     private volatile List<String> stoppedFiles = Collections.emptyList();
     /**
-     * 第一个文件等开录时再开（单独接回的一路，{@link #prepareWithoutFile}）：名字是开录那一刻。
-     * 准备的线程上写、开录的线程上读，中间隔着一次 Handler 投递。
-     */
-    private boolean firstFileAtStart;
-    /**
-     * 现在这个文件的名字不是共用的分段时间戳（单独接回时按那一刻起的）：别的路一换新的共用名字，
+     * 现在这个文件的名字不是共用的分段时间戳（每次开录的第一个文件按开录那一刻起名）：别的路一换新的共用名字，
      * 这一路马上跟着切（{@link #switchNow}）。开录时置上，从共用的时间戳拿到名字时清掉。
      */
     private volatile boolean offCycleName;
@@ -237,8 +267,8 @@ public class CodecVideoRecorder {
     private volatile String lastTrouble = "";
     private Runnable healthCheckRunnable;  // 健康检查任务
 
-    // 回调
-    private RecordCallback callback;
+    // 回调（宿主每次开录可以换一个：哪个线程上报都读这一份）
+    private volatile RecordCallback callback;
 
     // 时间水印设置
     private boolean watermarkEnabled = false;
@@ -400,7 +430,7 @@ public class CodecVideoRecorder {
 
     private String brandLine = "";
 
-    /** 录像下方的行驶信息条；null 表示没有。要在 prepareRecording 之前设好。 */
+    /** 录像下方的行驶信息条；null 表示没有。要在 prepareWithoutFile 之前设好。 */
     private com.kooo.evcam.telemetry.InfoBarRenderer infoBar;
 
     /**
@@ -564,79 +594,51 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 准备录制
-     *
-     * 警告：此方法包含阻塞操作（CountDownLatch.await），不建议在主线程调用
-     * 如果必须在主线程调用，可能导致 ANR。建议在后台线程调用
-     *
-     * @param filePath 输出文件路径
-     * @return 用于 Camera 输出的 SurfaceTexture
-     */
-    public SurfaceTexture prepareRecording(String filePath) {
-        // 从文件路径中提取保存目录和摄像头位置
-        File file = new File(filePath);
-        String fileName = file.getName();
-        int lastUnderscoreIndex = fileName.lastIndexOf('_');
-        String position = lastUnderscoreIndex > 0 && fileName.endsWith(".mp4")
-                ? fileName.substring(lastUnderscoreIndex + 1, fileName.length() - 4) : "unknown";
-        return prepare(file.getParent(), position, fileName);
-    }
-
-    /**
-     * 准备好、先不开文件：单独接回录像的一路用（2026-10-10）。编码器、EGL、SurfaceTexture 照样建好，
+     * 准备好、先不开文件（2026-10-10 起单独接回的一路这样；2026-10-11 起每一路都这样）。编码器、EGL、SurfaceTexture 建好，
      * 第一个文件等开录时再开（{@link #startRecording}），名字是开录那一刻 —— 准备完还要等相机开好、会话配好、出画面，
      * 按准备那一刻起名的话，名字比画面早好几秒（回放按名字里的时刻摆）。
      *
-     * <p>和 {@link #prepareRecording} 一样会阻塞（等 EGL 初始化，最多 5 秒）：不要在主线程上调。</p>
+     * <p>会阻塞（等 EGL 初始化，最多 {@link #ENCODER_WAIT_MS}）：不要在主线程上调。一个录制器只准备一次
+     * （{@link RecorderRun.Phase#NEW} 才准备）；之后要再录，停放了重新备好（{@link #rearm}）。</p>
      *
-     * @param dir       写到哪个目录（录像此刻实际写在哪个盘上）
+     * @param dir       录像此刻实际写在哪个盘上（写入线程起来之前诊断、抢救读它；第一个文件开在哪由开录时给的目录定）
      * @param cameraKey 这一路的 key（文件名的后缀按它取）
-     * @return 给相机输出的 SurfaceTexture；没准备好是 null（已经放掉）
+     * @return 给相机输出的 SurfaceTexture（录像输出 {@link #getRecordSurface} 就建在它上面）；没准备好是 null（已经放掉）
      */
     public SurfaceTexture prepareWithoutFile(File dir, String cameraKey) {
-        return prepare(dir.getAbsolutePath(), CameraSlots.suffixFor(cameraKey), null);
+        return prepare(dir.getAbsolutePath(), CameraSlots.suffixFor(cameraKey));
     }
 
     /**
-     * @param dir           写到哪个目录
-     * @param position      文件名的后缀（surround / cabinfront / cabinrear）
-     * @param firstFileName 第一个文件的名字，在这里开好；null = 开录时再开（{@link #prepareWithoutFile}）
+     * @param dir      录像此刻实际写在哪个盘上
+     * @param position 文件名的后缀（surround / cabinfront / cabinrear）
      */
-    private SurfaceTexture prepare(String dir, String position, String firstFileName) {
+    private SurfaceTexture prepare(String dir, String position) {
         // 检查是否在主线程调用（可能导致 ANR）
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            AppLog.w(TAG, "Camera " + cameraId + " WARNING: prepareRecording() called on MAIN THREAD! " +
+            AppLog.w(TAG, "Camera " + cameraId + " WARNING: prepareWithoutFile() called on MAIN THREAD! " +
                     "This may cause ANR due to blocking operations.");
         }
+        synchronized (lifecycle) {
+            return prepareLocked(dir, position);
+        }
+    }
 
-        if (isRecording.get()) {
-            AppLog.w(TAG, "Camera " + cameraId + " is already recording");
+    /** {@link #prepare} 的正文，拿着 {@link #lifecycle}：放掉要等它做完。 */
+    private SurfaceTexture prepareLocked(String dir, String position) {
+        if (run.phase() != RecorderRun.Phase.NEW) {
+            AppLog.w(TAG, "Camera " + cameraId + " already prepared (" + run + ")");
             return inputSurfaceTexture;
         }
 
         AppLog.d(TAG, "Camera " + cameraId + " Preparing codec recording: " + width + "x" + height);
 
-        // 保存录制参数（正在写的文件由写入线程开成了才填，见 openFile）
-        this.segmentIndex = 0;
-        this.recordedFrameCount = 0;
-        this.firstFrameTimestampNs = -1;  // 重置时间戳基准
-        // 每个文件的 PTS 基准由写入线程在开文件时清（createMuxer）
-
-        // 重置健康检查状态
-        this.encoderHealthy = true;
-
-        // 重置排队、换盘状态（写入线程这时还没起来）
-        ring.clear();
-        backpressure.reset();
-        deadVolumes.clear();
-        relocations = 0;
-
-        // 清空本次录制的文件列表：写入线程开成一个文件才记一个
-        recordedFilePaths.clear();
-
-        this.saveDirectory = dir;
+        this.firstFrameTimestampNs = -1;  // 时间戳基准：整个录制器一辈子只定一次（见帧回调），停放、重新备好都不清
         this.cameraPosition = position;
-        this.firstFileAtStart = firstFileName == null;
+        // 写入线程起来之前先填上（诊断、抢救读它）；之后每次开录的第一个文件由写入线程按那一次给的目录改（openFile）
+        this.saveDirectory = dir;
+        // 每次开录用的那些字段（写入线程这时还没起来）
+        resetRun();
 
         try {
             // 创建编码线程
@@ -658,14 +660,8 @@ public class CodecVideoRecorder {
             // 写入线程：MediaMuxer 只在它上面动（开文件、写、fsync、收文件、换盘、抢救）
             startWriterThread();
 
-            // 创建 MediaCodec 编码器
+            // 创建 MediaCodec 编码器（第一个文件开录时才开：openFirstFileNow）
             createEncoder();
-
-            // 第一个文件：排给写入线程开，在这里等结果。开不了就是开录失败（这一步不换盘，和以前一样）。
-            // 单独接回的一路不给名字：开录时再开（openFirstFileNow）
-            if (firstFileName != null) {
-                openFirstFile(firstFileName);
-            }
 
             // 在编码线程上初始化 EGL 和 SurfaceTexture（重要：必须在同一线程上）
             // 使用 CountDownLatch 等待初始化完成
@@ -682,7 +678,7 @@ public class CodecVideoRecorder {
                     eglEncoder.setBrandLine(brandLine);
                     // 行驶信息条也要在 initialize() 之前：画面区域按它的高让出来
                     eglEncoder.setInfoBar(infoBar);
-                    // setFrameRate 通常在 prepareRecording 之前就调用了，这里补上
+                    // setFrameRate 通常在 prepareWithoutFile 之前就调用了，这里补上
                     applyEncoderFrameRate();
                     resultTextureId[0] = eglEncoder.initialize(encoderInputSurface);
                     textureId = resultTextureId[0];
@@ -706,7 +702,9 @@ public class CodecVideoRecorder {
                             // 否则 SurfaceTexture 会保持 pending 状态，不再触发后续回调
                             // updateTexImage 在 drawFrame 内部调用，这里单独处理非录制状态
                             if (!isRecording.get()) {
-                                // 不在录制状态时，仍需消费帧以保持 SurfaceTexture 正常工作
+                                // 不在录制状态时，仍需消费帧以保持 SurfaceTexture 正常工作。
+                                // 备好了还没开录、停录之后、停放着（EGL 画在占位输出上，见 aimAtPlaceholder）都走这里：
+                                // 录像输出留在会话里的时候，相机送来的每一帧都得有人取走
                                 if (eglEncoder != null && eglEncoder.isInitialized()) {
                                     eglEncoder.consumeFrame();  // 只消费帧，不编码
                                 }
@@ -734,7 +732,7 @@ public class CodecVideoRecorder {
                             long absoluteTimestampNs = surfaceTexture.getTimestamp();
                             
                             // 计算相对时间戳（以第一帧为基准）
-                            // 注意：firstFrameTimestampNs 在整个录制期间不重置
+                            // 注意：firstFrameTimestampNs 在录制器的一辈子里不重置（分段切换、停放、重新备好都不清）
                             // 因为 eglPresentationTimeANDROID 需要单调递增的时间戳
                             // 否则 GraphicBufferSource 会拒绝帧
                             if (firstFrameTimestampNs < 0) {
@@ -811,8 +809,8 @@ public class CodecVideoRecorder {
                 }
             });
 
-            // 等待初始化完成（最多 5 秒）
-            if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+            // 等待初始化完成（最多 ENCODER_WAIT_MS）
+            if (!latch.await(ENCODER_WAIT_MS, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Timeout waiting for EGL initialization");
             }
 
@@ -821,6 +819,10 @@ public class CodecVideoRecorder {
                 throw initException[0];
             }
 
+            // 录像输出：一辈子就这一个（getRecordSurface）
+            recordSurface = new Surface(inputSurfaceTexture);
+            run.prepared();
+
             AppLog.d(TAG, "Camera " + cameraId + " Codec recording prepared, textureId=" + textureId);
 
             return inputSurfaceTexture;
@@ -828,40 +830,35 @@ public class CodecVideoRecorder {
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Failed to prepare codec recording", e);
             release();
-            if (callback != null) {
-                callback.onRecordError(cameraId, e.getMessage());
+            RecordCallback cb = callback;
+            if (cb != null) {
+                cb.onRecordError(cameraId, e.getMessage());
             }
             return null;
         }
     }
 
     /**
-     * 开始录制
+     * 开录（主线程上调，不等）。备好了的才开（{@link RecorderRun#canStart}：新备好的、重新备好的都算；
+     * 开着的、在停的、停放着的、写入线程被放弃过的、放掉了的都不开）。
+     *
+     * <p>第一个文件的目录也在这一刻给：备好到开录之间可能隔了好几分钟（相机被拿着，回来才加入），这期间别的路换过盘的话，
+     * 备好时的那个目录已经是死盘。</p>
+     *
+     * @param dir 这一次开录写到哪个目录（录像此刻实际写在哪个盘上）
+     * @return 开了没有；没开的什么都没动
      */
-    public boolean startRecording() {
-        if (encoder == null || eglEncoder == null) {
-            AppLog.e(TAG, "Camera " + cameraId + " Encoder not prepared");
-            return false;
-        }
-
-        if (isRecording.get()) {
-            AppLog.w(TAG, "Camera " + cameraId + " Already recording");
-            return false;
-        }
-        if (stopRequested) {
-            // 叫停过的录制器不再开（停录和开录任务交错时）：要录就是新的一次、新的录制器
-            AppLog.w(TAG, "Camera " + cameraId + " already stopped, not starting again");
+    public boolean startRecording(File dir) {
+        if (!run.start()) {
+            AppLog.w(TAG, "Camera " + cameraId + " not ready to start recording (" + run + ")");
             return false;
         }
 
         AppLog.d(TAG, "Camera " + cameraId + " Starting codec recording");
 
-        // 单独接回的一路：第一个文件现在才开，名字是此刻 —— 画面从这一刻起才往里编。
+        // 第一个文件现在才开，名字是此刻 —— 画面从这一刻起才往里编。
         // 排在置「在录」之前：开文件那条命令要排在第一帧编出来的开轨之前
-        if (firstFileAtStart) {
-            firstFileAtStart = false;
-            openFirstFileNow();
-        }
+        openFirstFileNow(dir.getAbsolutePath());
 
         // 重置首次写入状态；写不进文件的裁判从此刻起算
         hasFirstWrite = false;
@@ -869,7 +866,7 @@ public class CodecVideoRecorder {
 
         everStarted = true;
         isRecording.set(true);
-        // 从现在起盯着这一路；录制 Surface 要等会话重建后才出帧，宽限期够它建好
+        // 从现在起盯着这一路（宽限期：开录时会话一般已经带着录像输出在出帧，宽限只兜那一下）
         encoderBeat.arm(StallWatch.now(), StallRules.ARM_GRACE_MS);
         // 写入线程另外盯：卡在一次写 / fsync / 收文件里太久就记一份报告（闲着不算）
         writerBeat.arm(StallWatch.now(), 0L);
@@ -892,8 +889,9 @@ public class CodecVideoRecorder {
 
         // 每 5 秒 fsync 一次的定时在写入线程上，写入线程起来时就排好了（startWriterThread）
 
-        if (callback != null && segmentIndex == 0) {
-            callback.onRecordStart(cameraId);
+        RecordCallback cb = callback;
+        if (cb != null) {
+            cb.onRecordStart(cameraId);
         }
 
         AppLog.d(TAG, "Camera " + cameraId + " Codec recording started");
@@ -901,26 +899,29 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 停止录制（只停这一路）：叫停，再等它收好，期限 {@link #STOP_BUDGET_MS}。
-     * 几路一起停时 {@code MultiCameraManager} 分开调：先每一路都叫停（{@link #beginStop}），再一起等 ——
-     * 先等编码线程都排空（{@link #awaitDrain}），再等写入线程都收好（{@link #finishStop}），共用一个期限。
+     * 停录第一步：叫停，不等（主线程上调）。几路一起停时，先每一路都叫停，再一起等 —— 先等编码线程都排空
+     * （{@link #awaitDrain}），再等写入线程都收好（{@link #finishStop}），共用一个期限（{@link #STOP_BUDGET_MS}）。
+     * 以前一路一路停，后面几路在等前面的时候还在录，可能跨过分段又开出新文件，三路加起来还超过协调器的收拾期限。
+     *
+     * <p>开着的、备好了还没开过录的才叫得停（{@link RecorderRun#canStop}），叫停只做一次。不再录、不再分段切换 / 恢复 / 重建
+     * （{@link #stopRequested}），定时器都撤掉；编码线程上排空编码器（结束流，等到最后一帧），把「收文件」排在最后一个样本后面。
+     * 备好了还没开过录的没有文件要收，这就算停完（{@link RecorderRun#stopped}），可以停放。</p>
      */
-    public void stopRecording() {
-        beginStop();
-        finishStop(SystemClock.uptimeMillis() + STOP_BUDGET_MS);
+    public void beginStop() {
+        if (!run.beginStop()) {
+            return;
+        }
+        if (!beginStopNow()) {
+            run.stopped();
+        }
     }
 
     /**
-     * 停录第一步：叫停，不等（几路一起停时，先每一路都叫停，再一起等 —— 以前一路一路停，
-     * 后面几路在等前面的时候还在录，可能跨过分段又开出新文件，三路加起来还超过协调器的收拾期限）。
+     * 叫停这一次开录（{@link #beginStop} 走过闸之后；放掉时不经闸直接走这里）。
      *
-     * <p>不再录、不再分段切换 / 恢复 / 重建（{@link #stopRequested}），定时器都撤掉；编码线程上排空编码器
-     * （结束流，等到最后一帧），把「收文件」排在最后一个样本后面。没开过录的什么都不做，文件留给释放收。</p>
+     * @return 有没有文件要收：开过录的有（「收文件」已经排上，{@link #finishStop} 等它）；没开过录的没有
      */
-    public void beginStop() {
-        if (stopRequested) {
-            return;
-        }
+    private boolean beginStopNow() {
         stopRequested = true;
         // 立即标记停止状态，防止新帧处理
         isRecording.set(false);
@@ -946,7 +947,7 @@ public class CodecVideoRecorder {
         cancelWriteStallCheck();
 
         if (!everStarted) {
-            return;
+            return false;
         }
         AppLog.d(TAG, "Camera " + cameraId + " Stopping codec recording");
 
@@ -954,8 +955,8 @@ public class CodecVideoRecorder {
         // 写入线程写完排着的，写文件尾、fsync、关掉（没确认落盘就抢救），这个文件才算完
         final CloseFile close = new CloseFile("stop", -1);
         final CountDownLatch drained = new CountDownLatch(1);
-        stopClose = close;
         stopDrained = drained;
+        stopClose.set(close);
         Runnable drain = () -> {
             try {
                 // 分段切换、恢复刚好在叫停之前把「在录」置回去的话（它们在这条线程上、排在这一步前面），这里再关一次
@@ -991,6 +992,7 @@ public class CodecVideoRecorder {
             queueClose(close);
             drained.countDown();
         }
+        return true;
     }
 
     /**
@@ -1000,7 +1002,7 @@ public class CodecVideoRecorder {
      * 到点没排空的几路，收文件都在期限那一刻排上，谁也不用等前面那几路收完文件才排上。
      */
     public void awaitDrain(long deadlineMs) {
-        CloseFile close = stopClose;
+        CloseFile close = stopClose.get();
         CountDownLatch drained = stopDrained;
         if (close == null || drained == null) {
             return;  // 没开过录，或者已经等过了
@@ -1019,19 +1021,33 @@ public class CodecVideoRecorder {
      * 停录第二步的后一半：等写入线程写完、写文件尾、fsync、关好，最多到 deadlineMs（和前一半同一个期限；
      * 单停一路时前一半也在这里做）。编码线程拖到了期限、写入线程却没卡住的 —— 收文件是到点才排上的 ——
      * 期限之后再给 {@link #STOP_GRACE_MS}，不然好好的写入线程会因为编码线程慢而被放弃。
-     * 到点还没收好（盘多半没了，或者极慢）就不等了（{@link #abandonWriter}）。然后验证文件、报停。
+     * 到点还没收好（盘多半没了，或者极慢）就不等了（{@link #abandonWriter}）。然后验证文件、报停，算停完（{@link RecorderRun#stopped}），
+     * 可以停放（{@link #park}）。后台线程上调。
      */
     public void finishStop(long deadlineMs) {
-        CloseFile close = stopClose;
+        if (finishStopNow(deadlineMs)) {
+            run.stopped();
+        }
+    }
+
+    /**
+     * {@link #finishStop} 的正文（放掉时不经闸直接走这里）。
+     *
+     * @return 这一次的文件是不是这一回收的：没开过录、已经收拾过、另一条线程在收（放掉和收尾撞上）的都是 false
+     */
+    private boolean finishStopNow(long deadlineMs) {
+        CloseFile close = stopClose.get();
         if (close == null) {
-            return;  // 没开过录（文件留给释放收），或者已经收拾过
+            return false;  // 没开过录（没有文件要收），或者已经收拾过
         }
         awaitDrain(deadlineMs);
-        stopClose = null;
 
         // 等写入线程写完、收好文件，最多到点（上面说的那种多给一会儿）
         long closeDeadlineMs = drainLate && !writerStuck() ? deadlineMs + STOP_GRACE_MS : deadlineMs;
         boolean finished = awaitUntil(close.done, closeDeadlineMs);
+        if (!stopClose.compareAndSet(close, null)) {
+            return false;  // 另一条线程等到了同一个，由它收拾
+        }
         if (!finished) {
             abandonWriter("stop");
         }
@@ -1042,11 +1058,12 @@ public class CodecVideoRecorder {
 
         AppLog.d(TAG, "Camera " + cameraId + " Codec recording stopped, frames recorded: " + recordedFrameCount);
 
-        if (callback != null) {
-            callback.onRecordStop(cameraId);
+        RecordCallback cb = callback;
+        if (cb != null) {
+            cb.onRecordStop(cameraId);
             // 通知损坏文件被删除
             if (!deletedFiles.isEmpty()) {
-                callback.onCorruptedFilesDeleted(cameraId, deletedFiles);
+                cb.onCorruptedFilesDeleted(cameraId, deletedFiles);
             }
         }
 
@@ -1054,17 +1071,27 @@ public class CodecVideoRecorder {
             stoppedFiles = new ArrayList<>(recordedFilePaths);
             recordedFilePaths.clear();
         }
+        return true;
     }
 
     /**
      * 这一次停录收掉的文件：{@link #finishStop} 结束时还在这个录制器手里的那几个 —— 最后一个文件、重建 / 恢复时收掉的、
      * 抢救出来的；太小删掉了的也在单子上（用的时候看在不在）。分段切换收好的那几个当时就报出去了
-     * （{@link RecordCallback#onSegmentSwitch}，中转写入那时就转存），不在里面。
+     * （{@link RecordCallback#onSegmentSwitch}，中转写入那时就转存），不在里面。没开过录的那一次是空的；
+     * 下一次开录（重新备好）时清空。
      *
      * <p>一路单独离开录像时，中转写入只转存这几个（{@code MultiCameraManager}）：缓存目录里别的路还在写。</p>
      */
     public List<String> stoppedFiles() {
         return stoppedFiles;
+    }
+
+    /**
+     * 上一次停录时编码线程到期限还没排空（{@link #awaitDrain}）：最后几帧没要，收文件是到点才排上的。
+     * 宿主写停录那一行黑匣子时带上；下一次开录（重新备好）时清掉。
+     */
+    public boolean drainLate() {
+        return drainLate;
     }
 
     /**
@@ -1076,37 +1103,52 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 释放资源
+     * 放掉（后台线程上调）。哪一步都能放（{@link RecorderRun#canRelease}），放了之后什么都走不成。
+     * 手上有准备、停放、重新备好的，等它做完再放（{@link #lifecycle}）。录像输出（{@link #getRecordSurface}）这时才放：
+     * 宿主要等调度把它摘出会话（或者相机关了）再放这个录制器。
      */
     public void release() {
-        if (isReleased) {
+        synchronized (lifecycle) {
+            releaseLocked();
+        }
+    }
+
+    /** {@link #release} 的正文，拿着 {@link #lifecycle}（准备失败时在准备里面调：同一条线程，拿得到）。 */
+    private void releaseLocked() {
+        RecorderRun.Phase was = run.release();
+        if (was == RecorderRun.Phase.RELEASED) {
             return;
         }
 
-        AppLog.d(TAG, "Camera " + cameraId + " Releasing CodecVideoRecorder");
+        AppLog.d(TAG, "Camera " + cameraId + " Releasing CodecVideoRecorder (was " + was + ")");
 
         isReleased = true;
         encoderBeat.disarm();
 
-        // 还没叫停的先停（单独释放这一路时）；叫停了、还没等它收好的，在这里等
-        if (!stopRequested) {
-            stopRecording();
-        } else if (stopClose != null) {
-            finishStop(SystemClock.uptimeMillis() + STOP_BUDGET_MS);
+        // 还在录的、备好了没开过录的先叫停（单独放掉这一路时）；叫停了、还没等它收好的，在这里等。
+        // 放掉之后表上什么都走不成了，所以这两步不经 beginStop / finishStop 的闸
+        long stopDeadlineMs = SystemClock.uptimeMillis() + STOP_BUDGET_MS;
+        if (was == RecorderRun.Phase.RECORDING || was == RecorderRun.Phase.PREPARED) {
+            if (beginStopNow()) {
+                finishStopNow(stopDeadlineMs);
+            }
+        } else if (was == RecorderRun.Phase.STOPPING) {
+            finishStopNow(stopDeadlineMs);
         }
 
-        // 释放 EGL 渲染器：排到编码线程上拆，等它拆完（见 releaseGlOnEncoderThread）。
+        // EGL 渲染器、编码器、占位输出：排到编码线程上拆，等它拆完（见 releaseOnEncoderThread）。
         // 拆完之后不会再有帧去画，下面收信息条位图才不会跟 drawFrame 撞上
-        releaseGlOnEncoderThread();
+        releaseOnEncoderThread();
         if (infoBar != null) {
             infoBar.recycle();
             infoBar = null;
         }
 
-        // 释放缓存的录制 Surface（必须在 SurfaceTexture 之前释放）
-        if (cachedRecordSurface != null) {
-            cachedRecordSurface.release();
-            cachedRecordSurface = null;
+        // 释放录像输出（必须在 SurfaceTexture 之前释放）
+        Surface output = recordSurface;
+        recordSurface = null;
+        if (output != null) {
+            output.release();
         }
 
         // 释放 SurfaceTexture
@@ -1115,24 +1157,7 @@ public class CodecVideoRecorder {
             inputSurfaceTexture = null;
         }
 
-        // 释放编码器
-        if (encoder != null) {
-            try {
-                encoder.stop();
-            } catch (Exception e) {
-                // Ignore
-            }
-            encoder.release();
-            encoder = null;
-        }
-
-        // 释放编码器输入 Surface
-        if (encoderInputSurface != null) {
-            encoderInputSurface.release();
-            encoderInputSurface = null;
-        }
-
-        // 写入线程：还开着的文件在这里收（开录没起来、停录前就不在录的那几种），排着的做完，退出
+        // 写入线程：排着的做完（还开着的文件也在这里收 —— 停录都收好了的话没有），退出
         stopWriter();
 
         // 停止编码线程。卡顿监测按这一个录制器的撤：同一路新的录制器可能已经登记了
@@ -1172,27 +1197,28 @@ public class CodecVideoRecorder {
     private static final long GL_TEARDOWN_WAIT_MS = 1000L;
 
     /**
-     * 拆 EGL 渲染器（上下文、着色器、贴图）—— 排到编码线程上拆，这里最多等 {@link #GL_TEARDOWN_WAIT_MS}。
+     * 拆 EGL 渲染器（上下文、着色器、贴图），再放编码器和它的输入 Surface、占位输出 —— 排到编码线程上做，
+     * 这里最多等 {@link #GL_TEARDOWN_WAIT_MS}。
      *
      * <p>为什么非得在编码线程上：EGL 上下文是在编码线程上建的，每一帧也在那里画，它只在那个线程上是「当前」的。
      * 以前在调用者线程上直接 {@code eglEncoder.release()}：那个线程没有当前上下文，里面的 glDelete* 全是空操作；
      * eglDestroyContext 碰上一个还在编码线程上当前的上下文，也只是记成「待删」，等编码线程放开才真释放。
-     * 而且拆的同时编码线程可能正在 drawFrame，两边一起动同一套 EGL/GL 对象。</p>
+     * 而且拆的同时编码线程可能正在 drawFrame，两边一起动同一套 EGL/GL 对象。编码器也一样：停放、重新备好都在编码线程上换它，
+     * 在这里另放一遍会两边一起动同一个编码器。先拆 EGL（它画在哪个 Surface 上，那个窗口就跟着拆了），再放它画过的那几个。</p>
      *
-     * <p>排在编码线程的队列里：前面正在画的那一帧、stopRecording 收文件那一步都先做完；拆完之后再来的帧，
-     * 帧回调看到 isReleased 就返回，不会再画。prepareRecording 失败走到这里时也一样 ——
-     * 初始化那一步就算还没跑完，拆的这一步也排在它后面。</p>
+     * <p>排在编码线程的队列里：前面正在画的那一帧、停录收文件那一步、停放和重新备好都先做完；拆完之后再来的帧，
+     * 帧回调看到 isReleased 就返回，不会再画。准备失败走到这里时也一样 —— 初始化那一步就算还没跑完，拆的这一步也排在它后面。</p>
      *
      * <p>等不到（编码线程卡在写盘之类的地方）就不等了，接着放后面的东西。拆这一步仍排在编码线程上，
      * 线程一空就做（下面的 quitSafely 会先把已经排着的做完），不在这里另拆一遍 ——
-     * 在这个线程上拆既拆不干净，又会跟卡住的那一帧抢。</p>
+     * 在这个线程上拆既拆不干净，又会跟卡住的那一帧抢；代价是编码线程一直卡着的话，硬件编码器也一直没放。</p>
      */
-    private void releaseGlOnEncoderThread() {
+    private void releaseOnEncoderThread() {
         Handler handler = encoderHandler;
         if (handler == null) {
-            return;  // 编码线程没建起来：EGL 渲染器只在编码线程上建，也就没有可拆的
+            return;  // 编码线程没建起来：编码器、EGL 渲染器都在它建起来之后才建，也就没有可拆的
         }
-        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        final CountDownLatch done = new CountDownLatch(1);
         handler.post(() -> {
             try {
                 EglSurfaceEncoder egl = eglEncoder;
@@ -1200,45 +1226,314 @@ public class CodecVideoRecorder {
                 if (egl != null) {
                     egl.release();
                 }
+                releaseEncoder();
+                releasePlaceholder();
             } finally {
                 done.countDown();
             }
         });
-        try {
-            if (!done.await(GL_TEARDOWN_WAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                AppLog.w(TAG, "Camera " + cameraId + " encoder thread busy for " + GL_TEARDOWN_WAIT_MS
-                        + "ms, GL teardown stays queued on it");
+        if (!awaitUntil(done, SystemClock.uptimeMillis() + GL_TEARDOWN_WAIT_MS)) {
+            AppLog.w(TAG, "Camera " + cameraId + " encoder thread busy for " + GL_TEARDOWN_WAIT_MS
+                    + "ms, GL and encoder teardown stays queued on it");
+        }
+    }
+
+    // ===== 停放、重新备好（2026-10-11）=====
+
+    /** 等编码线程做完一步最多多久：初始化 EGL（准备）、停放、重新备好。正常几十到几百毫秒；它卡住时多等也没用。 */
+    private static final long ENCODER_WAIT_MS = 5_000L;
+
+    /**
+     * 停放（后台线程上调，最多等 {@link #ENCODER_WAIT_MS}）：停完了的才停放（{@link RecorderRun#canPark}）。
+     * 放掉编码器和它的输入 Surface，硬件编码器腾出来；EGL 和输入 SurfaceTexture 留着，照常取帧 ——
+     * 录像输出（{@link #getRecordSurface}）还活着，留在会话里，等这一路再加入（{@link #rearm}），或者等调度把它摘掉、宿主放掉。
+     * 写入线程被放弃过的也停放（放掉编码器），只是再也重新备不好。
+     *
+     * <p>做在编码线程上，排在停录排空编码器那一步（结束流、等最后一帧）后面：放掉的是已经收到结束标记、排空了的编码器，
+     * 不用另外等。到点编码线程还没做到（多半卡在排空或者画一帧上）就不等了：这一步还排着，轮到时自己做完、停放好；
+     * 在那之前重新备好走不成（还在停放），宿主就换一个新录制器。</p>
+     *
+     * @return 停放好了没有（没停完、已经放掉、到点还没做完都是 false）
+     */
+    public boolean park() {
+        synchronized (lifecycle) {
+            if (!run.beginPark()) {
+                AppLog.w(TAG, "Camera " + cameraId + " cannot park (" + run + ")");
+                return false;
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            Handler encoderLooper = encoderHandler;
+            final CountDownLatch done = new CountDownLatch(1);
+            long start = SystemClock.uptimeMillis();
+            Runnable step = () -> {
+                try {
+                    StallWatch.runTask(encoderBeat, cameraId, "park", this::parkOnEncoderThread);
+                } finally {
+                    done.countDown();
+                }
+            };
+            if (encoderLooper == null || !encoderLooper.post(step)) {
+                // 不该发生：编码线程放掉时才退
+                AppLog.w(TAG, "Camera " + cameraId + " has no encoder thread to park on");
+                return false;
+            }
+            if (!awaitUntil(done, start + ENCODER_WAIT_MS)) {
+                noteTrouble("park", new TimeoutException("encoder thread busy for " + ENCODER_WAIT_MS
+                        + "ms; parks when it gets there"));
+                return false;
+            }
+            return run.phase() == RecorderRun.Phase.PARKED;
+        }
+    }
+
+    /** 停放（编码线程上）。 */
+    private void parkOnEncoderThread() {
+        if (isReleased) {
+            return;  // 放掉排在后面，它拆
+        }
+        parkEncoder();
+        run.parked();
+    }
+
+    /**
+     * 重新备好（后台线程上调，最多等 {@link #ENCODER_WAIT_MS}）：停放着的才行（{@link RecorderRun#canRearm}），
+     * 已经放掉、还在停、还在停放、写入线程被放弃过的都不行 —— 返回 false，宿主这一路换一个新录制器。
+     *
+     * <p>在编码线程上建一个新编码器、EGL 改画到它的输入 Surface 上，和分段切换换编码器是同一套（{@link #startNewEncoder}）；
+     * 然后这一次开录用的那些字段从头来（{@link #resetRun}）；第一个文件开录时按那一刻起名、开在那时给的目录里（{@link #startRecording}）。
+     * 录像输出不变（{@link #getRecordSurface}）：会话不用动。</p>
+     *
+     * <p>建不起来就还是停放着（新建的放掉、EGL 引回占位输出，照常取帧），返回 false。
+     * 到点编码线程还没做完就不等了，也返回 false：它做完时发现没人等，把刚建的编码器放掉，回到停放。</p>
+     *
+     * @return 备好了、能开录了没有
+     */
+    public boolean rearm() {
+        synchronized (lifecycle) {
+            if (!run.beginRearm()) {
+                AppLog.w(TAG, "Camera " + cameraId + " cannot rearm (" + run + ")");
+                return false;
+            }
+            Handler encoderLooper = encoderHandler;
+            final Rearm attempt = new Rearm();
+            long start = SystemClock.uptimeMillis();
+            if (encoderLooper == null || !encoderLooper.post(() ->
+                    StallWatch.runTask(encoderBeat, cameraId, "rearm", () -> rearmOnEncoderThread(attempt)))) {
+                // 不该发生：编码线程放掉时才退
+                AppLog.w(TAG, "Camera " + cameraId + " has no encoder thread to rearm on");
+                run.rearmFailed();
+                return false;
+            }
+            boolean finished = awaitUntil(attempt.done, start + ENCODER_WAIT_MS);
+            if (!finished && attempt.decided.compareAndSet(false, true)) {
+                // 不等了：编码线程做完时看到这一步已经定了，自己放掉刚建的编码器、回到停放（rearmOnEncoderThread）
+                noteTrouble("rearm", new TimeoutException("encoder thread busy for " + ENCODER_WAIT_MS + "ms"));
+                return false;
+            }
+            if (!finished) {
+                // 编码线程刚好在这一刻定了结果：剩下的几行马上做完
+                awaitUntil(attempt.done, SystemClock.uptimeMillis() + GL_TEARDOWN_WAIT_MS);
+            }
+            AppLog.i(TAG, "Camera " + cameraId + " rearm " + (attempt.ok ? "done" : "failed") + " in "
+                    + (SystemClock.uptimeMillis() - start) + "ms");
+            return attempt.ok;
+        }
+    }
+
+    /** 一次重新备好：调用方等着，编码线程做。到点没做完调用方就不等了 —— 结果由先定下来的那一方说了算（{@code decided}）。 */
+    private static final class Rearm {
+        final CountDownLatch done = new CountDownLatch(1);
+        /** 结果定了没有：编码线程做完时定，调用方等到点时定（不等了）。只有先定的那一方算数。 */
+        final AtomicBoolean decided = new AtomicBoolean();
+        /** 备好了（编码线程定下来、而且调用方还在等）。 */
+        volatile boolean ok;
+    }
+
+    /**
+     * 重新备好（编码线程上）。上一次开录排在编码线程上的事这时都已经做完了（排在停录、停放后面），
+     * 所以在这里把每次开录用的字段清掉，不会被上一次的任务看到「没叫停」。
+     */
+    private void rearmOnEncoderThread(Rearm attempt) {
+        boolean built = false;
+        if (!isReleased) {
+            try {
+                EglSurfaceEncoder egl = eglEncoder;
+                if (egl == null || !egl.isInitialized()) {
+                    throw new IllegalStateException("EGL renderer is gone");
+                }
+                // 和分段切换同一套：旧的（停放时引不到占位输出、留下来的那个）先放，建新的，EGL 改画到它上面
+                releaseEncoder();
+                startNewEncoder();
+                built = true;
+            } catch (Exception e) {
+                AppLog.e(TAG, "Camera " + cameraId + " cannot rearm the encoder", e);
+                noteTrouble("rearm", e);
+            }
+        }
+        try {
+            boolean owner = attempt.decided.compareAndSet(false, true);
+            if (built && owner) {
+                resetRun();
+                attempt.ok = run.rearmed();
+                return;
+            }
+            if (built) {
+                AppLog.w(TAG, "Camera " + cameraId + " rearm finished after the caller gave up, parking again");
+            }
+            // 没建成、或者建成了没人要：还是停放着，照常取帧
+            if (!isReleased) {
+                parkEncoder();
+            }
+            run.rearmFailed();
+        } finally {
+            attempt.done.countDown();
         }
     }
 
     /**
-     * 获取录制用的 Surface（供 Camera 使用）
-     * 使用缓存模式避免重复创建 Surface 导致内存泄漏
+     * 放掉编码器和它的输入 Surface，EGL 改画到占位输出上（编码线程上）：停放、重新备好没成时用。
+     *
+     * <p>引不过去（建不起占位输出、或者 EGL 在它上面建不起窗口）就不放编码器：EGL 接回它的输入 Surface，
+     * 照样当前得了、取得了帧（停放时只取不画，编码器什么都收不到），下一次重新备好时一起换。
+     * 总之不能让 EGL 挂在一个已经放掉的 Surface 上：那样上下文当前不了，帧没人取。</p>
+     */
+    private void parkEncoder() {
+        if (aimAtPlaceholder()) {
+            releaseEncoder();
+            return;
+        }
+        EglSurfaceEncoder egl = eglEncoder;
+        Surface input = encoderInputSurface;
+        if (egl != null && egl.isInitialized() && input != null) {
+            try {
+                egl.updateOutputSurface(input);
+            } catch (RuntimeException e) {
+                AppLog.e(TAG, "Camera " + cameraId + " cannot put EGL back on the encoder input either", e);
+            }
+        }
+    }
+
+    /**
+     * EGL 改画到占位输出上（编码线程上）。
+     *
+     * <p>为什么要有它：编码器的输入 Surface 放掉之后，EGL 的窗口还挂在那个已经没人接的 BufferQueue 上，
+     * 有的驱动在这种窗口上当前不了上下文 —— updateTexImage 跟着做不了，帧没人取，相机往录像输出送的缓冲区很快占满，
+     * 同一个会话里别的输出跟着卡。所以停放时 EGL 得有个活着的窗口：一个谁也不取的 SurfaceTexture
+     * （脱离模式，不占 GL 贴图；只当窗口用，一像素就够）。停放时只取帧、不画（{@link EglSurfaceEncoder#consumeFrame}
+     * 不交换缓冲区），它里面一直是空的。第一次停放时建，放掉时放（{@link #releasePlaceholder}）。</p>
+     *
+     * @return 引过去了没有
+     */
+    private boolean aimAtPlaceholder() {
+        EglSurfaceEncoder egl = eglEncoder;
+        if (egl == null || !egl.isInitialized()) {
+            return false;
+        }
+        try {
+            if (placeholderSurface == null) {
+                SurfaceTexture texture = new SurfaceTexture(false);
+                texture.setDefaultBufferSize(1, 1);
+                try {
+                    placeholderSurface = new Surface(texture);
+                } catch (RuntimeException e) {
+                    texture.release();
+                    throw e;
+                }
+                placeholderTexture = texture;
+            }
+            egl.updateOutputSurface(placeholderSurface);
+            return true;
+        } catch (RuntimeException e) {
+            AppLog.e(TAG, "Camera " + cameraId + " cannot move EGL onto the placeholder output", e);
+            noteTrouble("park", e);
+            return false;
+        }
+    }
+
+    /** 放掉占位输出（编码线程上，EGL 拆完之后：它在上面建的窗口跟着 EGL 拆了）。 */
+    private void releasePlaceholder() {
+        Surface surface = placeholderSurface;
+        SurfaceTexture texture = placeholderTexture;
+        placeholderSurface = null;
+        placeholderTexture = null;
+        if (surface != null) {
+            surface.release();
+        }
+        if (texture != null) {
+            texture.release();
+        }
+    }
+
+    /**
+     * 新的一次开录从头来：每次开录用的那些字段清掉（第一个文件开录时才开，{@link #openFirstFileNow}）。
+     *
+     * <p>准备时（调用者线程上，编码、写入线程还没起来）和每次重新备好时（编码线程上）调。重新备好时写入线程闲着 ——
+     * 上一次的文件收好了、它没被放弃过（不然走不到停放）—— 这里清排队、换盘状态不会和它撞上；
+     * 上一次排在编码线程上的事都已经做完了；排到分段线程上的上一次的事，靠 {@link #runSerial} 作废（{@link #postForThisRun}）。</p>
+     *
+     * <p>不清的：时间戳基准（{@link #firstFrameTimestampNs}，EGL 要单调递增）、实测帧率（相机的出帧率没变）、
+     * 文件的序号（{@link #openSerial}：写入线程报上一次的文件写不下去时，凭它认出不是现在这个）。</p>
+     */
+    private void resetRun() {
+        runSerial = runSerial + 1;
+        segmentIndex = 0;
+        recordedFrameCount = 0;
+        encoderHealthy = true;
+        recoveryAttempts = 0;
+        lastTrouble = "";
+        everStarted = false;
+        stopRequested = false;
+        hasFirstWrite = false;
+        everWrote = false;
+        drainLate = false;
+        fileQueued = false;
+        offCycleName = false;
+        // 排队、换盘状态
+        ring.clear();
+        backpressure.reset();
+        deadVolumes.clear();
+        relocations = 0;
+        // 这一次的文件：写入线程开成一个才记一个；上一次停录收掉的单子不算这一次的
+        recordedFilePaths.clear();
+        stoppedFiles = Collections.emptyList();
+        // 码率、帧率的取样窗口（编码线程的）：停放了好一阵，旧窗口的起点不能算进来
+        bytesThisSecond = 0;
+        framesThisSecond = 0;
+        bitrateWindowStartMs = 0;
+    }
+
+    /**
+     * 排到分段线程上、只对这一次开录有效的事（分段计时、健康检查、「写进第一笔」）：到时候这一次已经叫停了、放掉了、
+     * 或者已经又开了一次（重新备好），就不做。分段线程上排着的可能拖到下一次开录之后才轮到（前面有一次慢盘上的验证文件），
+     * 以前一个录制器只录一次，看「叫停了」就够；现在重新备好会把它清掉。
+     */
+    private void postForThisRun(Runnable task) {
+        Handler segment = segmentHandler;
+        if (segment == null) {
+            return;
+        }
+        final int serial = runSerial;
+        segment.post(() -> {
+            if (serial == runSerial && !stopRequested && !isReleased) {
+                task.run();
+            }
+        });
+    }
+
+    /**
+     * 录制器此刻走到哪一步（{@link RecorderRun.Phase}）：宿主据此判「停放着或备好了」（一路加入的条件之一），
+     * 也据此决定要不要换新录制器（重新备不好的：写入线程被放弃过、还在停放）。
+     */
+    public RecorderRun.Phase phase() {
+        return run.phase();
+    }
+
+    /**
+     * 这一路的录像输出（给相机的 Surface，建在输入 SurfaceTexture 上）。<b>一辈子就这一个</b>：准备好时建、放掉时才放，
+     * 停放、重新备好、开录、停录、分段切换、重建编码器都不换它 —— 它留在会话里，录制器在录也好、停放着也好，
+     * 帧都有人取（不在录时只取不编，见帧回调）。没准备好、已经放掉是 null。
      */
     public Surface getRecordSurface() {
-        if (inputSurfaceTexture == null) {
-            return null;
-        }
-        
-        // 检查缓存的 Surface 是否有效
-        if (cachedRecordSurface != null && cachedRecordSurface.isValid()) {
-            return cachedRecordSurface;
-        }
-        
-        // 释放旧的无效 Surface
-        if (cachedRecordSurface != null) {
-            AppLog.d(TAG, "Camera " + cameraId + " releasing invalid cached record surface");
-            cachedRecordSurface.release();
-            cachedRecordSurface = null;
-        }
-        
-        // 创建新的 Surface 并缓存
-        cachedRecordSurface = new Surface(inputSurfaceTexture);
-        AppLog.d(TAG, "Camera " + cameraId + " created new record surface");
-        return cachedRecordSurface;
+        return recordSurface;
     }
 
     /**
@@ -1249,13 +1544,13 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 这一路算不算在录：开过录、没叫停（2026-10-10）。
+     * 这一路算不算在录：开过录、没叫停（{@link RecorderRun.Phase#RECORDING}）。
      *
      * <p>和 {@link #isRecording} 不同：那个在分段切换、快速恢复、重建编码器的那一下是 false。
-     * 一路离开录像时要数「还有没有别的路在录」，按那个数，别的路正好在切段就会被当成没在录，整次停录。</p>
+     * 一路离开录像时要数「还有没有别的路在录」，按那个数，别的路正好在切段就会被当成没在录。</p>
      */
     public boolean isLive() {
-        return everStarted && !stopRequested;
+        return run.phase() == RecorderRun.Phase.RECORDING;
     }
 
     /** 正在写的文件（写入线程开成了才有）；没有是 null。黑匣子用。 */
@@ -1265,7 +1560,7 @@ public class CodecVideoRecorder {
 
     /**
      * 共用的分段时间戳刚生成了一个新的（别的路在切段，{@code MultiCameraManager} 叫）：这一路的名字要是还和别的路错开着
-     * （单独接回的那一路，{@link #offCycleName}），马上跟着切，拿同一个名字（{@link RecordingLanes#alignsNow}）。
+     * （还在这一次开录的第一个文件上，名字是开录那一刻，{@link #offCycleName}），马上跟着切，拿同一个名字（{@link RecordingLanes#alignsNow}）。
      * 在编码线程上判、切（和分段计时到点切的是同一个 {@link #switchToNextSegment}）；名字本来就对得上的什么都不做。
      */
     public void switchNow() {
@@ -1282,14 +1577,14 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 黑匣子里用的一行现状：录制器自己以为在不在录、编码器好不好、写到哪个文件、
+     * 黑匣子里用的一行现状：走到哪一步（{@link RecorderRun}）、录制器自己以为在不在录、编码器好不好、写到哪个文件、
      * 写入排队排了多少（最深到过多少、满过几次、因此丢了几帧相机帧）、写入线程在忙什么、最近一次错在哪。
      * 不加锁读，拿到的是近似值。
      */
     public String describeWriteState() {
         String writerTask = writerBeat.task();
         String file = currentFilePath;
-        return "recording=" + isRecording.get() + " encoderHealthy=" + encoderHealthy
+        return "run=" + run + " recording=" + isRecording.get() + " encoderHealthy=" + encoderHealthy
                 + " muxerStarted=" + muxerStarted + " recoveryAttempts=" + recoveryAttempts
                 + " segment=" + segmentIndex
                 + " file=" + (file == null ? "none" : new File(file).getName())
@@ -1426,6 +1721,49 @@ public class CodecVideoRecorder {
         // 实测值不清零：换分段会重建编码器，而相机的出帧率不会因此改变。
         // 清零的话每段开头都要重新等一秒，角标先闪回「~标称值」再跳回来。
         rebuildSpecLine();
+    }
+
+    /**
+     * 建一个新编码器，EGL 改画到它的输入 Surface 上（编码线程上；旧的先放掉，{@link #releaseEncoder}）。
+     * 分段切换、重建、快速恢复、重新备好换编码器都走这一步。
+     */
+    private void startNewEncoder() throws IOException {
+        createEncoder();
+        EglSurfaceEncoder egl = eglEncoder;
+        if (egl != null && encoderInputSurface != null) {
+            egl.updateOutputSurface(encoderInputSurface);
+        }
+    }
+
+    /**
+     * 放掉编码器和它的输入 Surface（编码线程上；放掉录制器时也在编码线程上，见 {@link #releaseOnEncoderThread}）。
+     * 出错也接着放，不抛。EGL 这时还画在那个输入 Surface 上的话，紧接着就得引到别处：换新的编码器（{@link #startNewEncoder}）、
+     * 引到占位输出（{@link #parkEncoder}，它先引再放）、或者 EGL 一起拆了（放掉录制器）。
+     */
+    private void releaseEncoder() {
+        MediaCodec codec = encoder;
+        encoder = null;
+        if (codec != null) {
+            try {
+                codec.stop();
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " Error stopping encoder: " + e.getMessage());
+            }
+            try {
+                codec.release();
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " Error releasing encoder: " + e.getMessage());
+            }
+        }
+        Surface input = encoderInputSurface;
+        encoderInputSurface = null;
+        if (input != null) {
+            try {
+                input.release();
+            } catch (Exception e) {
+                AppLog.w(TAG, "Camera " + cameraId + " Error releasing encoder surface: " + e.getMessage());
+            }
+        }
     }
 
     /**
@@ -1740,8 +2078,11 @@ public class CodecVideoRecorder {
             segmentHandler.removeCallbacks(segmentRunnable);
         }
 
+        // 只对这一次开录算数（见 runSerial）：叫停那一下在主线程上摘它，可能正赶上这里刚排上一个 —— 漏摘的那个到点时
+        // 这一次已经停了、又重新备好开了一次，不能把下一次的文件切成两半
+        final int serial = runSerial;
         segmentRunnable = () -> {
-            if (isRecording.get() && !stopRequested && encoderHandler != null) {
+            if (serial == runSerial && isRecording.get() && !stopRequested && encoderHandler != null) {
                 AppLog.d(TAG, "Camera " + cameraId + " Scheduling segment switch on encoder thread");
                 // 在编码线程上执行切换，避免线程冲突
                 encoderHandler.post(() -> StallWatch.runTask(encoderBeat, cameraId, "segment-switch", this::switchToNextSegment));
@@ -1808,17 +2149,19 @@ public class CodecVideoRecorder {
             
             // 标记录制状态（允许帧回调继续消费帧）
             isRecording.set(false);
-            
-            if (callback != null) {
+
+            RecordCallback cb = callback;
+            Handler segment = segmentHandler;
+            if (cb != null && segment != null) {
                 final String errorMsg = e.getMessage();
-                segmentHandler.post(() -> callback.onRecordError(cameraId, "Failed to switch segment: " + errorMsg));
+                segment.post(() -> cb.onRecordError(cameraId, "Failed to switch segment: " + errorMsg));
             }
         }
-        
+
         // 6. 根据结果调度下一次操作
         if (switchSuccess) {
             // 成功：调度正常的1分钟定时器
-            segmentHandler.post(() -> scheduleNextSegment());
+            postForThisRun(this::scheduleNextSegment);
         } else {
             // 失败：5 秒后再试；一直修不好的话，写不进文件的裁判会在 15 秒时报一次、停
             recoveryAttempts++;
@@ -1837,8 +2180,9 @@ public class CodecVideoRecorder {
             segmentHandler.removeCallbacks(recoveryRunnable);
         }
         
+        final int serial = runSerial;  // 只对这一次开录算数，同分段计时
         recoveryRunnable = () -> {
-            if (!isReleased && !stopRequested && encoderHandler != null) {
+            if (serial == runSerial && !isReleased && !stopRequested && encoderHandler != null) {
                 AppLog.d(TAG, "Camera " + cameraId + " Recovery retry triggered");
                 // 在编码线程上执行恢复
                 encoderHandler.post(() -> StallWatch.runTask(encoderBeat, cameraId, "recovery", this::attemptRecovery));
@@ -1862,10 +2206,7 @@ public class CodecVideoRecorder {
         try {
             // 确保编码器和 EGL 已准备好
             if (encoder == null) {
-                createEncoder();
-                if (eglEncoder != null && encoderInputSurface != null) {
-                    eglEncoder.updateOutputSurface(encoderInputSurface);
-                }
+                startNewEncoder();
             }
             if (stopRequested) {
                 return;  // 建编码器这一阵里叫停了
@@ -1888,8 +2229,8 @@ public class CodecVideoRecorder {
                     + queuedFileName);
             
             // 调度正常的1分钟定时器；健康检查也接着跑 —— 写入线程报写不下去（编码器标不健康）时要靠它原地重建
-            segmentHandler.post(() -> scheduleNextSegment());
-            segmentHandler.post(this::scheduleEncoderHealthCheck);
+            postForThisRun(this::scheduleNextSegment);
+            postForThisRun(this::scheduleEncoderHealthCheck);
             
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Recovery attempt failed", e);
@@ -1938,38 +2279,12 @@ public class CodecVideoRecorder {
         }
 
         // 4. 释放旧编码器（即使失败也继续）
-        if (encoder != null) {
-            try {
-                encoder.stop();
-            } catch (Exception e) {
-                AppLog.w(TAG, "Camera " + cameraId + " Error stopping encoder: " + e.getMessage());
-            }
-            try {
-                encoder.release();
-            } catch (Exception e) {
-                AppLog.w(TAG, "Camera " + cameraId + " Error releasing encoder: " + e.getMessage());
-            }
-            encoder = null;
-        }
-        
-        if (encoderInputSurface != null) {
-            try {
-                encoderInputSurface.release();
-            } catch (Exception e) {
-                AppLog.w(TAG, "Camera " + cameraId + " Error releasing encoder surface: " + e.getMessage());
-            }
-            encoderInputSurface = null;
-        }
-        
-        // 5. 重新创建编码器
+        releaseEncoder();
+
+        // 5. 重新创建编码器，EGL 改画到它上面
         try {
-            createEncoder();
-            
-            // 重新设置 EGL 的输出 Surface
-            if (eglEncoder != null && encoderInputSurface != null) {
-                eglEncoder.updateOutputSurface(encoderInputSurface);
-            }
-            
+            startNewEncoder();
+
             AppLog.d(TAG, "Camera " + cameraId + " Encoder recreated for new segment");
             
         } catch (Exception e) {
@@ -1989,7 +2304,7 @@ public class CodecVideoRecorder {
         if (timestampProvider != null) {
             // 使用统一的时间戳提供者（确保多路摄像头使用相同时间戳）
             timestamp = timestampProvider.getSegmentTimestamp();
-            // 单独接回的一路从这一段起和别的路同名了：别的路再换名字，它照自己的分段计时走（switchNow 不再切）
+            // 这一路从这一段起和别的路同名了：别的路再换名字，它照自己的分段计时走（switchNow 不再切）
             offCycleName = false;
             AppLog.d(TAG, "Camera " + cameraId + " using provider timestamp: " + timestamp);
         } else {
@@ -1997,7 +2312,7 @@ public class CodecVideoRecorder {
             timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
             AppLog.d(TAG, "Camera " + cameraId + " using local timestamp: " + timestamp);
         }
-        return timestamp + "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
+        return timestamp + "_" + cameraPosition + ".mp4";
     }
 
     // ===== 写入线程：MediaMuxer 只在它上面动 =====
@@ -2024,15 +2339,13 @@ public class CodecVideoRecorder {
     private static final long WRITER_SLICE_MS = 200L;
     /** 排队满了，编码线程先等这么久：写入线程一般写走一两个样本就让出空位。还满就不编这一帧。 */
     private static final long ADMIT_WAIT_MS = 50L;
-    /** 开录时等写入线程开好第一个文件最多多久（和等 EGL 初始化一样）。 */
-    private static final long FIRST_OPEN_WAIT_MS = 5_000L;
     /** 停录时排空编码器（结束流）最多等多久：编码器里在路上的只有几帧，正常几十毫秒就交出结束标记。 */
     private static final long EOS_DRAIN_MS = 2_000L;
     /**
      * 停录的期限：几路一起叫停之后，一起等编码线程排空、写入线程写完收好，共用这一个期限
      * （{@code MultiCameraManager} 停录分两步：先每一路都叫停，再一起等）。按开机时长（不含深睡）算，
      * 和协调器的收拾期限、等待用的计时是同一个钟。协调器等收拾最多 20 秒（{@code RecordingLifecycle.STOP_DEADLINE_MS}），
-     * 这里连同 {@link #STOP_GRACE_MS} 最多用一半，另一半留给释放录制器、摘录像输出、重建会话。
+     * 这里连同 {@link #STOP_GRACE_MS} 最多用一半，另一半留给停放录制器（放编码器，最多 {@link #ENCODER_WAIT_MS}）。
      * 排队最多 3 秒的画面，盘还在动的话 9 秒写得完；到点还没收好（盘多半没了），不再等（{@link #abandonWriter}）。
      */
     public static final long STOP_BUDGET_MS = 9_000L;
@@ -2057,8 +2370,9 @@ public class CodecVideoRecorder {
     /** 写入线程做完了「退出」那一条。 */
     private volatile boolean writerQuit;
     /**
-     * 等写入线程等到放弃了（停录到点没收好、开录时第一个文件开不出来）：释放时不再干等第二遍。
-     * 它回过神来只把手里那个文件收好、退出 —— 不再开新文件、开轨、换盘、抢救（每一步开始前都看这个）。
+     * 等写入线程等到放弃了（停录到点没收好、释放时收尾也卡住）：释放时不再干等第二遍；这个录制器再也不开录、不重新备好
+     * （{@link RecorderRun#noteWriterAbandoned}）。它回过神来只把手里那个文件收好、退出 ——
+     * 不再开新文件、开轨、换盘、抢救（每一步开始前都看这个）。
      */
     private volatile boolean writerAbandoned;
     /** 放弃那时写入线程手里开着的文件（{@link #heldFile}）。 */
@@ -2070,10 +2384,16 @@ public class CodecVideoRecorder {
      * 不一定是 {@link #saveDirectory}（换盘换到一半卡在新盘上时，录像目录还是旧的）。抢救线程不往这个盘上写。
      */
     private volatile String writerTargetDir;
-    /** 停录第一步排的「收文件」和编码线程排空的信号：{@link #beginStop} 设，{@link #awaitDrain} / {@link #finishStop} 等。 */
-    private volatile CloseFile stopClose;
+    /**
+     * 停录第一步排的「收文件」和编码线程排空的信号：{@link #beginStop} 设，{@link #awaitDrain} / {@link #finishStop} 等。
+     * 收文件那一个由等到它的那条线程拿走（放掉和收尾撞上时只收一遍，见 {@link #finishStopNow}）。
+     */
+    private final AtomicReference<CloseFile> stopClose = new AtomicReference<>();
     private volatile CountDownLatch stopDrained;
-    /** 停录时编码线程到期限还没排空，收文件是到点才排上的（{@link #finishStop} 据此多给写入线程一会儿）。 */
+    /**
+     * 停录时编码线程到期限还没排空，收文件是到点才排上的（{@link #finishStop} 据此多给写入线程一会儿；宿主看 {@link #drainLate()}）。
+     * 每次开录清掉。
+     */
     private volatile boolean drainLate;
     /** 已经叫过写入线程、它还没开始干：不再叫第二遍。 */
     private final AtomicBoolean pumpPosted = new AtomicBoolean();
@@ -2103,21 +2423,23 @@ public class CodecVideoRecorder {
 
     // ----- 写入线程的命令：和样本一起按顺序排在 ring 里 -----
 
-    /** 开一个新文件。名字由编码线程定（分段时间戳几路共用），目录由写入线程定（换过盘就是新盘）。 */
+    /**
+     * 开一个新文件。名字由编码线程定（分段时间戳几路共用；每次开录的第一个文件按开录那一刻），
+     * 目录由写入线程定（换过盘就是新盘）。这个目录开不了就换盘。
+     */
     private static final class OpenFile {
         final String name;
+        /**
+         * 每次开录的第一个文件：写到这一次开录给的目录（开录时给的，{@link #startRecording}），写入线程从此按它写；
+         * 之后的文件 null：接着写在录像此刻在的目录（换过盘就是新盘）。
+         */
+        final String dir;
         final int serial;
-        /** 这个目录开不了就换盘。开录时的第一个文件不换：开不了就是开录失败，和以前一样。 */
-        final boolean relocate;
-        /** 开录时在这里等结果；别的时候 null。 */
-        final CountDownLatch done;
-        volatile Exception failure;
 
-        OpenFile(String name, int serial, boolean relocate, CountDownLatch done) {
+        OpenFile(String name, String dir, int serial) {
             this.name = name;
+            this.dir = dir;
             this.serial = serial;
-            this.relocate = relocate;
-            this.done = done;
         }
 
         @Override
@@ -2191,43 +2513,26 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 开录时的第一个文件：排给写入线程开，等它的结果（开录多半在主线程上，所以有期限）。
-     * 等不到就是写入线程卡在这个盘上了：开录失败，也不再等它（{@link #abandonWriter}）。
-     */
-    private void openFirstFile(String name) throws Exception {
-        CountDownLatch opened = new CountDownLatch(1);
-        OpenFile open = new OpenFile(name, ++openSerial, false, opened);
-        queuedFileName = name;
-        fileQueued = true;
-        queueCommand(open);
-        if (!opened.await(FIRST_OPEN_WAIT_MS, TimeUnit.MILLISECONDS)) {
-            abandonWriter("open");
-            throw new IOException("writer thread did not open " + name + " within " + FIRST_OPEN_WAIT_MS + "ms");
-        }
-        if (open.failure != null) {
-            throw open.failure;
-        }
-    }
-
-    /**
-     * 单独接回的一路开录（{@link #startRecording}）：第一个文件按此刻命名，不经共用的分段时间戳 —— 经它的话，
-     * 十秒内另一路切段会拿到这个名字，这一路也可能拿到别的路早先的名字，都比画面早。排给写入线程开，不在这里等：
+     * 开录时的第一个文件（{@link #startRecording}，每一次开录都这样）：按此刻命名，不经共用的分段时间戳 —— 经它的话，
+     * 十秒内另一路切段会拿到这个名字，这一路也可能拿到别的路早先的名字，都比画面早。排给写入线程开在 dir 里，不在这里等：
      * 开录在主线程上，不等盘；这个盘开不了，写入线程自己换盘（和分段切换开下一个文件同一条路）。
      * 撞名由写入线程按此刻另起一个（{@link #freshPath}）。
+     *
+     * @param dir 这一次开录写到哪个目录（开录时给的）
      */
-    private void openFirstFileNow() {
+    private void openFirstFileNow(String dir) {
         queuedFileName = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date())
-                + "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
+                + "_" + cameraPosition + ".mp4";
         offCycleName = true;
         fileQueued = true;
-        queueCommand(new OpenFile(queuedFileName, ++openSerial, true, null));
+        queueCommand(new OpenFile(queuedFileName, dir, ++openSerial));
     }
 
     /** 开下一个文件（名字按分段时间戳）：写入线程上开，这个盘开不了它自己换盘。编码线程上调。 */
     private void openNextFile() {
         queuedFileName = segmentFileName();
         fileQueued = true;
-        queueCommand(new OpenFile(queuedFileName, ++openSerial, true, null));
+        queueCommand(new OpenFile(queuedFileName, null, ++openSerial));
     }
 
     /** 收现在这个文件：写入线程写完前面排着的再收。编码线程上调。 */
@@ -2409,6 +2714,8 @@ public class CodecVideoRecorder {
             return;
         }
         writerAbandoned = true;
+        // 新文件只会排给这条卡住的线程：这个录制器不再开录、不再重新备好，这一路要录宿主换一个新的
+        run.noteWriterAbandoned();
         heldFilePath = currentFilePath;
         List<Object> unsynced = ring.abandon();
         int samples = 0;
@@ -2628,57 +2935,44 @@ public class CodecVideoRecorder {
 
     /** 开文件（写入线程上）。这个目录开不了就换盘；换不了，这个文件就写不了，告诉编码线程。 */
     private void openFile(OpenFile open) {
-        boolean opened = false;
-        try {
-            if (muxer != null || muxerFile != null) {
-                // 不该发生：每个文件开之前都排过一条收文件
-                AppLog.w(TAG, "Camera " + cameraId + " previous file still open when opening " + open.name);
-                settleRing(closeMuxer("reopen"), "reopen");
-            }
-            writerFileName = open.name;
-            fileSerial = open.serial;
-            fileFormat = null;
-            fileStarted = false;
-            fileFailed = false;
-            // 这个文件开成了才填：收文件时按它报，没开成就没什么可报的（见 closeFile）
-            currentFilePath = null;
-            if (writerAbandoned) {
-                // 已经不再等这个写入线程了（内存里的交给了抢救线程）：它回过神来只收尾、退出，不再开新文件
-                fileFailed = true;
-                return;
-            }
-            writerTargetDir = saveDirectory;
-            String path = freshPath(new File(saveDirectory), open.name);
-            long start = StallWatch.now();
-            writerBeat.beginTask("open", start);
-            try {
-                createMuxer(path);
-            } catch (IOException | RuntimeException e) {
-                writerBeat.endTask();
-                if (!open.relocate) {
-                    // 开录时的第一个文件：开不了就是开录失败，调用者在等这个结果
-                    open.failure = e;
-                    fileFailed = true;
-                } else if (relocate("open", e)) {
-                    opened = true;  // 换盘时已经在新盘上开好了
-                } else {
-                    failFile("open", e);
-                }
-                return;
-            }
-            writerBeat.endTask();
-            StallWatch.noteOp(writerBeat, cameraId, "open", start);
-            currentFilePath = path;
-            recordedFilePaths.add(path);
-            opened = true;
-        } finally {
-            if (open.done != null) {
-                if (!opened && open.failure == null) {
-                    open.failure = new IOException("writer could not open " + open.name);
-                }
-                open.done.countDown();
-            }
+        if (muxer != null || muxerFile != null) {
+            // 不该发生：每个文件开之前都排过一条收文件
+            AppLog.w(TAG, "Camera " + cameraId + " previous file still open when opening " + open.name);
+            settleRing(closeMuxer("reopen"), "reopen");
         }
+        writerFileName = open.name;
+        fileSerial = open.serial;
+        fileFormat = null;
+        fileStarted = false;
+        fileFailed = false;
+        // 这个文件开成了才填：收文件时按它报，没开成就没什么可报的（见 closeFile）
+        currentFilePath = null;
+        if (writerAbandoned) {
+            // 已经不再等这个写入线程了（内存里的交给了抢救线程）：它回过神来只收尾、退出，不再开新文件
+            fileFailed = true;
+            return;
+        }
+        if (open.dir != null) {
+            // 一次开录的第一个文件：写到这一次给的目录。录像目录还是只有写入线程改（这里，和换盘）
+            saveDirectory = open.dir;
+        }
+        writerTargetDir = saveDirectory;
+        String path = freshPath(new File(saveDirectory), open.name);
+        long start = StallWatch.now();
+        writerBeat.beginTask("open", start);
+        try {
+            createMuxer(path);
+        } catch (IOException | RuntimeException e) {
+            writerBeat.endTask();
+            if (!relocate("open", e)) {
+                failFile("open", e);
+            }
+            return;  // 换成了的话新盘上已经开好了
+        }
+        writerBeat.endTask();
+        StallWatch.noteOp(writerBeat, cameraId, "open", start);
+        currentFilePath = path;
+        recordedFilePaths.add(path);
     }
 
     /** 开轨、启动 muxer（写入线程上）。文件头都写不进去的话换盘；换不了，这个文件就写不了。 */
@@ -2806,7 +3100,7 @@ public class CodecVideoRecorder {
                 return;  // 这个文件没开成：没有可验证、可报的（以前这里会把上一个文件再报一遍）
             }
             if (!started) {
-                // 开录没起来、开第一个文件等超时了：开了、一直没开轨，是个空文件。删掉，不报
+                // 开了、一直没开轨（开录之后一帧都没编出来就叫停了）：是个空文件。删掉，不报
                 if (new File(completed).delete()) {
                     recordedFilePaths.remove(completed);
                     AppLog.d(TAG, "Camera " + cameraId + " removed never-started file " + completed);
@@ -3248,7 +3542,7 @@ public class CodecVideoRecorder {
     /** 以这一刻命名的文件路径；撞名就往后挪一秒 —— 不能覆盖已有的文件。 */
     private String pathNamedAt(File dir, long wallMs) {
         SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
-        String suffix = "_" + CameraSlots.suffixFor(cameraPosition) + ".mp4";
+        String suffix = "_" + cameraPosition + ".mp4";
         for (int i = 0; ; i++) {
             File file = new File(dir, format.format(new Date(wallMs + i * 1000L)) + suffix);
             if (!file.exists()) {
@@ -3269,8 +3563,9 @@ public class CodecVideoRecorder {
             segmentHandler.removeCallbacks(healthCheckRunnable);
         }
 
+        final int serial = runSerial;  // 只对这一次开录算数，同分段计时：漏摘的那条不会和下一次的并排查、重建两次
         healthCheckRunnable = () -> {
-            if (stopRequested || isReleased) {
+            if (serial != runSerial || stopRequested || isReleased) {
                 return;
             }
             if (!isRecording.get()) {
@@ -3336,39 +3631,13 @@ public class CodecVideoRecorder {
             }
 
             // 2. 清理旧的编码器
-            if (encoder != null) {
-                try {
-                    encoder.stop();
-                } catch (Exception e) {
-                    // Ignore
-                }
-                try {
-                    encoder.release();
-                } catch (Exception e) {
-                    // Ignore
-                }
-                encoder = null;
-            }
-
-            if (encoderInputSurface != null) {
-                try {
-                    encoderInputSurface.release();
-                } catch (Exception e) {
-                    // Ignore
-                }
-                encoderInputSurface = null;
-            }
+            releaseEncoder();
 
             // 3. 小延迟让系统释放资源
             Thread.sleep(100);
 
-            // 4. 重新创建编码器
-            createEncoder();
-
-            // 5. 更新 EGL 输出 Surface
-            if (eglEncoder != null && encoderInputSurface != null) {
-                eglEncoder.updateOutputSurface(encoderInputSurface);
-            }
+            // 4. 重新创建编码器，EGL 改画到它上面
+            startNewEncoder();
 
             // 重建这一阵里叫停了：不再开新文件，也不再置回「在录」
             if (stopRequested) {
@@ -3391,10 +3660,10 @@ public class CodecVideoRecorder {
                     + queuedFileName);
 
             // 9. 继续健康检查
-            segmentHandler.post(() -> scheduleEncoderHealthCheck());
+            postForThisRun(this::scheduleEncoderHealthCheck);
 
             // 10. 重新调度分段定时器
-            segmentHandler.post(() -> scheduleNextSegment());
+            postForThisRun(this::scheduleNextSegment);
 
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Failed to rebuild encoder", e);
@@ -3423,21 +3692,17 @@ public class CodecVideoRecorder {
         }
         hasFirstWrite = true;
         AppLog.d(TAG, "Camera " + cameraId + " first data written");
-        Handler segment = segmentHandler;
-        if (segment != null) {
-            segment.post(() -> {
-                // 看叫停没有，不看「在录」：写入线程比编码线程晚，第一笔写进去时编码线程可能正好在换编码器、
-                // 「在录」暂时是关的，那时一看就把这次通知丢了（上一次录像的由相机层按代数挡掉）
-                if (stopRequested || isReleased) {
-                    return;
-                }
-                // 【核心】首次写入后才启动分段定时器：分段时长是「有效录制时长」，不是「尝试录制时长」
-                scheduleNextSegment();
-                if (callback != null) {
-                    callback.onFirstDataWritten(cameraId);
-                }
-            });
-        }
+        // 报给这一次开录的回调（宿主每次开录可以换一个）
+        final RecordCallback cb = callback;
+        // 看叫停没有，不看「在录」：写入线程比编码线程晚，第一笔写进去时编码线程可能正好在换编码器、
+        // 「在录」暂时是关的，那时一看就把这次通知丢了。这一次已经停了、或者又开了一次的，不算（postForThisRun）
+        postForThisRun(() -> {
+            // 【核心】首次写入后才启动分段定时器：分段时长是「有效录制时长」，不是「尝试录制时长」
+            scheduleNextSegment();
+            if (cb != null) {
+                cb.onFirstDataWritten(cameraId);
+            }
+        });
     }
 
     /**
@@ -3460,8 +3725,9 @@ public class CodecVideoRecorder {
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("录像写不进文件：相机 " + cameraId + " 已 "
                             + (since / 1000) + " 秒没有新数据（" + describeWriteState()
                             + "）；此刻挂着的盘：" + com.kooo.evcam.storage.StorageState.current().mounts);
-                    if (callback != null) {
-                        callback.onWriteStalled(cameraId, since, everWrote);
+                    RecordCallback cb = callback;
+                    if (cb != null) {
+                        cb.onWriteStalled(cameraId, since, everWrote);
                     }
                     return;
                 }

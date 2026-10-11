@@ -315,7 +315,6 @@
     <!-- Skrin utama, pemberitahuan, main balik -->
     <string name="msg_need_camera_storage">Kebenaran kamera dan storan diperlukan</string>
     <string name="msg_camera_access_failed">Tidak dapat mengakses kamera</string>
-    <string name="msg_codec_fallback">Ralat rakaman. Ditukar kepada MediaCodec dan rakaman diteruskan.</string>
     <string name="msg_storage_full_stopped">Pemacu USB penuh. Rakaman dihentikan. Tiada had storan video ditetapkan, jadi rakaman lama tidak dibersihkan secara automatik.</string>
     <string name="msg_storage_full_refuse">Ruang pemacu USB tidak cukup untuk mula merakam. Tiada had storan video ditetapkan, jadi rakaman lama tidak dibersihkan secara automatik.</string>
     <string name="msg_storage_cleaning">Ruang tidak cukup. Membersihkan rakaman paling lama, kemudian rakaman bermula…</string>
@@ -372,10 +371,9 @@
     <string name="msg_recording_started_n">Rakaman bermula (%1$d kamera)</string>
     <string name="msg_sd_fallback">Tiada pemacu USB ditemui. Merakam ke storan dalaman.</string>
     <string name="msg_recording_interrupted">Rakaman terganggu: %1$s</string>
-    <string name="msg_recording_interrupted_resuming">Rakaman terganggu: %1$s. Ia disambung semula apabila paparan sekeliling berfungsi.</string>
+    <string name="msg_recording_interrupted_resuming">Rakaman terganggu: %1$s. Menyambung semula…</string>
     <string name="rec_reason_unknown">punca tidak diketahui</string>
     <string name="rec_reason_write_stalled">tidak dapat menulis ke fail</string>
-    <string name="rec_reason_camera_lost">kamera sedang digunakan</string>
     <!-- Sebab dalam "X gagal: sebab", dipilih daripada pengecualian oleh ui/FailureReason; jika tiada, sebab tidak ditunjukkan -->
     <string name="reason_no_network">tiada sambungan rangkaian</string>
     <string name="reason_timeout">sambungan tamat masa</string>
@@ -586,6 +584,8 @@
     <string name="msg_rail_side_hint">Butang tindakan di sebelah pemandu. Tukar di Tetapan → Antara muka → Sebelah butang tindakan.</string>
     <string name="record_unavailable">Masukkan pemacu USB untuk merakam</string>
     <string name="record_unavailable_detail">Tiada pemacu USB</string>
+    <string name="record_waiting_cameras">Menunggu kamera</string>
+    <string name="record_waiting_detail">Disambung semula secara automatik apabila tersedia</string>
     <!-- 配置名只做中英两种：马来文界面也用英文名 -->
     <string name="status_profile_composite">Zeekr 7X (sekeliling)</string>
     <string name="status_profile_composite_multi">Zeekr 7X (sekeliling + kabin depan dan belakang)</string>
@@ -597,10 +597,9 @@
     <string name="status_storage_free">USB %1$s kosong</string>
     <string name="status_storage_none">Tiada pemacu USB</string>
     <string name="status_recording_fallback">Merakam ke %1$s (%2$s tidak tersedia)</string>
-    <string name="status_camera_taken">Kamera sedang digunakan. Rakaman disambung semula apabila ia dilepaskan.</string>
     <string name="status_camera_lane_taken">%1$s: kamera sedang digunakan. Kamera lain terus merakam. Rakaman kamera ini disambung semula apabila ia dilepaskan.</string>
     <string name="status_cameras_taken">Sebahagian kamera sedang digunakan. Kamera lain terus merakam. Rakaman setiap kamera disambung semula apabila ia dilepaskan.</string>
-    <string name="status_camera_lane_unavailable">%1$s: kamera tidak dapat dibuka. Kamera lain terus merakam.</string>
+    <string name="status_camera_lane_unavailable">%1$s: tidak dapat merakam. Kamera lain terus merakam.</string>
     <string name="status_internal_storage">storan dalaman</string>
     <string name="nav_group_switches">Suis</string>
 
@@ -728,6 +727,7 @@
 
     <!-- Pemberitahuan -->
     <string name="notif_recording_title">Merakam</string>
+    <string name="notif_waiting_cameras_title">Menunggu kamera. Rakaman disambung semula secara automatik apabila kamera tersedia.</string>
     <string name="notif_recording_tap">Ketik untuk kembali ke apl</string>
     <string name="notif_background_title">Berjalan di latar belakang</string>
     <string name="notif_tap_to_return">Ketik untuk kembali ke apl</string>

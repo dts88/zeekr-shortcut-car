@@ -11,41 +11,48 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.CameraNeeds;
-import com.kooo.evcam.camera.CameraTaken;
+import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.camera.RecordingLanes;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.storage.StorageState;
 import com.kooo.evcam.telemetry.Telemetry;
 import com.kooo.evcam.telemetry.VehicleState;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * 录像的唯一入口：要不要录、能不能录、什么时候录、为什么停、停了接不接。
+ * 录像的唯一入口：要不要录、能不能录、什么时候录、为什么停、停了接不接、此刻是什么样子。
  *
- * <h3>规则（项目所有者 2026-09-27：一个框架，不到处建小房子）</h3>
+ * <h3>规则（项目所有者 2026-09-27：一个框架，不到处建小房子；2026-10-10 确认文档 §三）</h3>
  *
  * <ul>
  *   <li><b>要不要录</b>由 {@link RecordingIntent}（这一趟开过没有、人停过没有）和开关决定，
  *       决定的人只需要调 {@link #request}；</li>
  *   <li><b>能不能录</b>只看这里：至少选了一路、有 U 盘（存储快照）、写得下；</li>
- *   <li><b>什么时候录</b>：环视出画面就录（规格 §2.2）。这里只有<b>一个</b>等待 —— 每 {@link #POLL_MS}
- *       看一眼环视，出画面就开。以前主界面里有七处各自「等两秒再开」的梯子，都归到这一个；</li>
- *   <li><b>为什么停</b>：停的人把原因交给 {@link #stop}；停了之后接不接（{@link RecordingStops#resumesOnSurround}）、
- *       还剩几次额度（{@link RecordingStops.ResumeBudget}），都在这里判；</li>
+ *   <li><b>什么时候录</b>：查过盘就开 —— 打开录像意图（{@link RecordingLifecycle#begin}），定下这次录哪几路、存在哪，
+ *       不等环视，也不等相机开完。每一路的相机带着录像输出出了画面，那一路就加入；第一次开录和中途接回是同一件事，
+ *       都是相机层的事（{@link MultiCameraManager#startRecording}）；</li>
+ *   <li><b>一路的事不是停</b>：一路相机被别的程序拿走、断开、卡住，那一路自己收尾退出、回来自己加入，别的路不动；
+ *       一路都录不了时录像也不停，显示「等待摄像头，恢复后自动继续」（{@link View#WAITING}）。这里什么都不动，
+ *       只把样子推出去（{@link #pushView}）；</li>
+ *   <li><b>为什么停</b>：停的人把原因交给 {@link #stop}；停了之后接不接（存储一类自动接回，
+ *       {@link RecordingStops#resumesAutomatically}，大纲 §7 第 3 问）、还剩几次额度（{@link RecordingStops.ResumeBudget}），
+ *       都在这里判；</li>
  *   <li><b>在不在录</b>只有这里说了算（{@link RecordingLifecycle}：空闲 → 开录中 → 在录 → 停录中）。
- *       熄屏录制、恢复、前台服务心跳、主界面、悬浮按钮都问 {@link #isRecording}，不再问相机层（2026-10-05）；</li>
+ *       熄屏录制、恢复、前台服务心跳、主界面、悬浮按钮都问 {@link #isRecording}，不再问相机层（2026-10-05）；
+ *       录像此刻是什么样子（开录中 / 在录 / 等待摄像头）问 {@link #view}；</li>
+ *   <li><b>登记</b>：「录像要用相机」（{@link CameraNeeds.Holder#RECORDING}）和车辆信号只在录像意图开着时登记 ——
+ *       在等 U 盘、在等上一次收拾完的请求不登记，相机不为它白白出画面，GPS 也不一直开着；</li>
  *   <li><b>停只有一条路</b>（{@link #end}）：人停的、被打断、开录失败、录着的那一份管线没了，
  *       都在这里收通知、悬浮按钮、唤醒锁，让相机层按同一套收拾（{@link MultiCameraManager#stopRecording()}），
- *       收拾完了才开下一次。一路相机被别的程序拿走、而别的路还在录，不是停（2026-10-10）：相机层只停那一路、
- *       放开了单独接回，这里什么都不动，只叫界面重画（{@link Listener#onLanesChanged}）；</li>
+ *       收拾完了才开下一次；</li>
  *   <li><b>熄屏</b>照 {@link ScreenOffPlan} 一张表：接着录、10 秒后停，或者现在停（哨兵模式没开、车没在走，2026-10-10）；
  *       「这一趟要录」落盘（{@link RecordingIntent#recordingWanted}），亮屏、进程被结束后在屏幕亮着时被拉起来，
  *       都从 {@link #resumeIfWanted} 接回；</li>
@@ -59,7 +66,7 @@ public final class RecordingCoordinator {
 
     private static final String TAG = "RecordingCoordinator";
 
-    /** 等环视时多久看一眼。 */
+    /** 要录、却还没有相机管线时多久再看一眼。 */
     static final long POLL_MS = 2_000L;
     /** 条件不满足（没 U 盘、盘满）时多久再试：不必两秒一次地去探盘。 */
     static final long REFUSED_RETRY_MS = 30_000L;
@@ -69,26 +76,46 @@ public final class RecordingCoordinator {
         USER, FLOATING, AUTO_START, RESUME, SCREEN_ON
     }
 
+    /**
+     * 录像此刻的样子（{@link #view}）：录制键、悬浮按钮、前台通知、黑匣子都照它。
+     * 录像意图开着的三种照管线给的各路摘要定（{@link RecordingLanes}，确认文档 §三）。
+     */
+    public enum View {
+        /** 没在录（含上一次停录还在收拾）。 */
+        IDLE,
+        /** 录像意图开着，这一次还没有一路在录过，有一路在起来。 */
+        PREPARING,
+        /** 至少一路在录。 */
+        RECORDING,
+        /**
+         * 录像意图开着，一路都没在录：都被别的程序占用、在救、停手了、现在用不了相机（主界面不在前、前台服务是后台起的），
+         * 或者录制器建不起来。录像不算停 ——
+         * 「等待摄像头，恢复后自动继续」，哪一路回来哪一路自己加入。
+         */
+        WAITING
+    }
+
     /** 决策的结果告诉谁（主线程）。实现方负责画面上的反馈。 */
     public interface Listener {
-        /** 开录了（开录指令发出去了，录制器还在准备）。真正录起来的是哪几路，见 {@link #onLanesStarted}。 */
+        /** 开录了：录像意图开着。各路带着录像输出出了画面才加入，落定时报 {@link #onStartSettled}。 */
         void onRecordingStarted();
 
         /**
-         * 录制器启动了：真正录起来的是哪几路（管线报上来的）。开录指令发出去时还不知道 —— 被别的程序占着的那一路不开、
-         * 会话没配好的那一路不录（2026-10-10，它们之后单独接回）。只报这一次开录的第一次。
+         * 开录落定了（管线说的，每个录像意图只报一次）：此刻在录的是哪几路、这次计划录哪几路。被占用、在救、
+         * 还没出画面的那几路不算在录 —— 它们回来了自己加入，状态条上说。
          *
-         * @param started    录起来的几路
+         * @param liveKeys   落定时在录的几路；空 = 一路都没在录（等待摄像头）
+         * @param planned    这次计划录的几路
          * @param sdFellBack 用户选了 U 盘但没插，这次落到了内置存储
          */
-        default void onLanesStarted(Set<String> started, boolean sdFellBack) {
+        default void onStartSettled(Collection<String> liveKeys, Collection<String> planned, boolean sdFellBack) {
         }
 
         /**
-         * 录像里有一路离开、接回了（2026-10-10，一路被别的程序拿走只停这一路）：照
-         * {@link MultiCameraManager#lanesOut()} 重画。只是叫重画，状态以管线为准。
+         * 录像的样子（{@link RecordingCoordinator#view}）或者各路的摘要（{@link RecordingCoordinator#summary}）可能变了：
+         * 照它们重画。只是叫重画，样子以协调器此刻说的为准。
          */
-        default void onLanesChanged() {
+        default void onRecordingViewChanged() {
         }
 
         /**
@@ -96,7 +123,7 @@ public final class RecordingCoordinator {
          *
          * @param reason     为什么停
          * @param lastedMs   这一段录了多久
-         * @param willResume 这里会等环视恢复再自动接回
+         * @param willResume 这里会在收拾完、查过盘后自动接回
          */
         void onRecordingStopped(RecordingStops.Reason reason, long lastedMs, boolean willResume);
 
@@ -133,18 +160,28 @@ public final class RecordingCoordinator {
     private final RecordingLifecycle lifecycle = new RecordingLifecycle();
 
     /**
-     * 正在等环视出画面、或者已经决定开录在查盘；null = 没在等。
+     * 在等开录：查盘、等 U 盘插上、等上一次停录收拾完、等相机管线建出来；null = 没在等。
      * 一直留到真正开录（{@link RecordingLifecycle#begin}）才清：查盘是异步的，这中间人停了、退出了，
      * 清掉它，查完回来就不开。
      */
     private Why pending;
-    /** 这次接回计不计入额度（相机被别的程序拿走的那种不计）。 */
-    private boolean pendingCounts;
-    private long pendingSinceMs;
     private RecordingStops.Reason lastStopReason;
     private long startedAtMs;
-    /** 这一次开录落到了内置存储（用户选了 U 盘但没插）：录制器启动时随开录的提示一起告诉界面。 */
+    /** 这一次开录落到了内置存储（用户选了 U 盘但没插）：开录落定时随开录的提示一起告诉界面。 */
     private boolean startedOnFallback;
+
+    /** 上一次推出去的样子（{@link #pushView}）：变了才换通知上的字、告诉悬浮按钮。 */
+    private View shownView = View.IDLE;
+    /** {@link #shownView} 从什么时候起是这个样子（elapsedRealtime）；0 = 还没推过。 */
+    private long viewSinceMs;
+    /** 这一次录像里有一路在录一共多久（{@link #account}）：自动恢复的额度照它算录没录满一分钟。 */
+    private long recordedMs;
+    /** 这一次录像里一路都不在录（等待摄像头）一共多久：停录那一行写。 */
+    private long waitedMs;
+    /** 这一次录像的开录落定报过没有：每个录像意图只报一次。 */
+    private boolean settleReported;
+    /** 这一阵有一路在录是从什么时候起的（elapsedRealtime）：一路都没在录变成有一路在录的那一刻；0 = 眼下没有一路在录。 */
+    private long liveSinceMs;
 
     /**
      * 「U 盘写入跟不上」提示的限频：一次录像最多提示一次，两次提示之间至少隔这么久
@@ -178,7 +215,7 @@ public final class RecordingCoordinator {
     private boolean screenOffResumes;
 
     /**
-     * 向车辆信号登记用的名字：在录、在等开录时登记（{@link #watchVehicle}）。不能和相机层信息条那份（"recording"）同名：
+     * 向车辆信号登记用的名字：录像意图开着时登记（{@link #watchVehicle}）。不能和相机层信息条那份（"recording"）同名：
      * 登记是按名字算的，它停录时一注销，这一份也跟着没了。
      */
     private static final String VEHICLE_USER = "screen-off-plan";
@@ -214,10 +251,10 @@ public final class RecordingCoordinator {
 
     /**
      * 相机管理器换了对象就要重新交一次：它换了而这里还握着旧的，表现是「按了录制，什么都没发生」。
-     * 录制管线的几个回调（写不进、相机被拿走、盘满、开录 / 停录走到哪一步）都接到这里，主界面在不在都一样。
+     * 录制管线的几个回调（写不进、盘满、一路加入 / 退出、开录 / 停录走到哪一步）都接到这里，主界面在不在都一样。
      *
      * <p>录着的时候换了一份（车型变了、路数对不上，旧的那份被释放重建）：旧的那份上的录像到头了，
-     * 按「录制器自己停了」走停录那条路，环视好了在新的这一份上接回。以前这里不知道，
+     * 按「录制器自己停了」走停录那条路，收拾完、查过盘在新的这一份上自动接回。以前这里不知道，
      * 一直以为还在录。</p>
      */
     public void setCameraManager(MultiCameraManager manager) {
@@ -230,7 +267,7 @@ public final class RecordingCoordinator {
         }
         wire(manager);
         if (lifecycle.isRecording() && attemptManager != null && attemptManager != manager) {
-            BlackBox.noteImportant("录着的那一份相机管线换掉了：这一段到头，等环视恢复后在新的管线上接回");
+            BlackBox.noteImportant("录着的那一份相机管线换掉了：这一段到头，收拾完在新的管线上自动接回");
             end(RecordingStops.Reason.UNKNOWN);
         }
     }
@@ -246,24 +283,17 @@ public final class RecordingCoordinator {
                         ? RecordingStops.Reason.STORAGE_LOCKED : RecordingStops.Reason.STORAGE_CANNOT_FREE);
             }
         }));
-        // 录制器判的：写出过数据又断了是「写不进」，一个字节都没写出过是「没收到画面」
+        // 录制器判的、管线认定是盘或编码器的事（相机在出画面、会话里带着它的录像输出）：写出过数据又断了是「写不进」，
+        // 一个字节都没写出过是「没写进」。相机的问题只那一路退出，不报到这里
         manager.setWriteStallCallback((stalledMs, everWrote) -> main.post(() -> {
             if (manager == attemptManager) {
                 stop(everWrote ? RecordingStops.Reason.WRITE_STALLED : RecordingStops.Reason.NO_DATA);
             }
         }));
-        // 录着的最后一路被拿走（别的路还在录时只停那一路，管线自己处理、不报到这里）
-        manager.setCameraLostCallback(cameraId -> main.post(() -> {
-            if (manager == attemptManager) {
-                stop(RecordingStops.Reason.CAMERA_LOST);
-            }
-        }));
-        // 一路离开、接回：录像状态、前台服务、悬浮按钮、唤醒锁、计时都不动，只叫界面重画
+        // 一路加入、退出，各路的样子变了：录像状态、前台服务、唤醒锁、计时都不动，只把样子推出去
         manager.setLaneListener(() -> main.post(() -> {
             if (manager == attemptManager) {
-                for (Listener listener : new ArrayList<>(listeners)) {
-                    listener.onLanesChanged();
-                }
+                pushView();
             }
         }));
         // 写盘跟不上：不停录（录像照常，只是开始丢帧），提示一句，限频
@@ -275,7 +305,8 @@ public final class RecordingCoordinator {
         manager.setPipelineCallback(new MultiCameraManager.PipelineCallback() {
             @Override
             public void onPipelineStarted(Set<String> active, Set<String> failed) {
-                main.post(() -> onRecordersStarted(manager, active, failed));
+                main.post(() -> onPipelineReport(manager, RecordingLifecycle.Report.STARTED,
+                        active + (failed.isEmpty() ? "" : " / failed " + failed)));
             }
 
             @Override
@@ -290,21 +321,6 @@ public final class RecordingCoordinator {
         });
     }
 
-    /**
-     * 管线报上来录制器启动了（主线程）。和别的报告一样由 {@link RecordingLifecycle#on} 判；这一次开录的第一次
-     * （开录中 → 在录）再把真正录起来的几路告诉界面（{@link Listener#onLanesStarted}）—— MediaRecorder 重建后又起来的不算。
-     */
-    private void onRecordersStarted(MultiCameraManager from, Set<String> active, Set<String> failed) {
-        boolean first = from == attemptManager && lifecycle.phase() == RecordingLifecycle.Phase.PREPARING;
-        onPipelineReport(from, RecordingLifecycle.Report.STARTED,
-                active + (failed.isEmpty() ? "" : " / failed " + failed));
-        if (first && lifecycle.phase() == RecordingLifecycle.Phase.RECORDING) {
-            for (Listener listener : new ArrayList<>(listeners)) {
-                listener.onLanesStarted(active, startedOnFallback);
-            }
-        }
-    }
-
     /** 管线报上来开录 / 停录走到了哪一步（主线程）。该怎么办由 {@link RecordingLifecycle#on} 判。 */
     private void onPipelineReport(MultiCameraManager from, RecordingLifecycle.Report report, String detail) {
         if (from != attemptManager) {
@@ -314,11 +330,12 @@ public final class RecordingCoordinator {
         switch (action) {
             case NOTE:
                 BlackBox.noteImportant("录制器已启动 " + detail);
+                pushView();
                 break;
             case END:
                 BlackBox.noteImportant(report == RecordingLifecycle.Report.START_FAILED
                         ? "开录失败：" + detail : "录制管线自己停了（没人叫它停，被释放了）");
-                // 原因按停之前的阶段定：开录中没起来是开录失败，录了一阵之后重建没起来是录制器自己停了
+                // 原因按停之前的阶段定：开录中录制器都建不起来是开录失败，录了一阵之后每一路都录不了了是录制器自己停了
                 end(lifecycle.endReason(report));
                 break;
             case SETTLED:
@@ -340,8 +357,8 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 在不在录 —— 进程里唯一的答案：开录指令发出去起（开录中），到停为止（{@link RecordingLifecycle}）。
-     * 录制器是不是已经写出了第一笔数据是另一回事（主界面的「准备中」），问相机层的 {@code hasWrittenFirstData}。
+     * 在不在录 —— 进程里唯一的答案：录像意图开着，从开录指令发出去起（开录中），到停为止（{@link RecordingLifecycle}）。
+     * 一路都没在录（等待摄像头）也算在录；此刻是什么样子问 {@link #view}。
      */
     public boolean isRecording() {
         return lifecycle.isRecording();
@@ -355,7 +372,16 @@ public final class RecordingCoordinator {
         return isRecording() ? startedAtMs : 0;
     }
 
-    /** 正在等环视出画面、准备开录。 */
+    /**
+     * 这一阵有一路在录是从什么时候起的（{@code SystemClock.elapsedRealtime}）；眼下没有一路在录是 0。
+     * 录制键、悬浮按钮上「本段」的进度从这里量：一路都不在录（等待摄像头）之后第一路接回，它的文件从那一刻起，
+     * 分段也从那一刻重新算（RecordingLanes：之后加入的几路到下一次分段时跟它对齐），不再是开录时的那个节拍。
+     */
+    public long liveSinceElapsedMs() {
+        return isRecording() ? liveSinceMs : 0;
+    }
+
+    /** 在等开录：查盘、等 U 盘插上、等上一次停录收拾完、等相机管线建出来。 */
     public boolean isWaiting() {
         return pending != null;
     }
@@ -369,27 +395,135 @@ public final class RecordingCoordinator {
         return lastStopReason;
     }
 
-    // ================================================================= 要录
+    // ================================================================= 样子
 
-    /** 要录：环视一出画面就开。已经在录、已经在等，都无害。主线程调。 */
-    public void request(Why why) {
-        request(why, true);
+    /**
+     * 录像此刻的样子 —— 录制键、悬浮按钮、前台通知都照它画（大纲 5c）。没在录是 {@link View#IDLE}；
+     * 录像意图开着时照管线给的各路摘要（{@link #summary}，{@link RecordingLanes}）：有一路在录是在录；
+     * 这一次还没有一路录过、有一路在起来是开录中；一路都没在录、也没有一路在起来是等待摄像头。
+     * 管线还没定下这一次录哪几路时（开录指令发出去的那一下）照生命周期的阶段说。主线程。
+     */
+    public View view() {
+        return viewOf(summary());
     }
 
-    private void request(Why why, boolean counts) {
+    /**
+     * 这一次录像各路的摘要（管线给的：计划录哪几路、在录的几路、落定没有、状态条该说哪一句）；
+     * 没在录（含停录中）、没有管线时是 null。主线程。
+     */
+    public RecordingLanes.Summary summary() {
+        return lifecycle.isRecording() && attemptManager != null ? attemptManager.laneSummary() : null;
+    }
+
+    private View viewOf(RecordingLanes.Summary summary) {
+        if (!lifecycle.isRecording()) {
+            return View.IDLE;
+        }
+        if (summary == null || summary.planned.isEmpty()) {
+            return lifecycle.phase() == RecordingLifecycle.Phase.RECORDING ? View.RECORDING : View.PREPARING;
+        }
+        switch (summary.view) {
+            case RECORDING:
+                return View.RECORDING;
+            case WAITING:
+                return View.WAITING;
+            default:
+                return View.PREPARING;
+        }
+    }
+
+    /**
+     * 前台通知的标题照录像此刻的样子写（通知：标题写状态）：正在录制、等待摄像头；没在录是在后台运行。
+     * 前台服务每次被叫起来（{@link CameraForegroundService#start}）都照它写，样子变了由 {@link #pushView} 当场换。
+     */
+    public String notificationTitle() {
+        return titleFor(view());
+    }
+
+    /** 前台通知的正文：能做的动作（点击返回应用）。 */
+    public String notificationContent() {
+        return contentFor(view());
+    }
+
+    private String titleFor(View view) {
+        return context.getString(view == View.WAITING ? R.string.notif_waiting_cameras_title
+                : view == View.IDLE ? R.string.notif_background_title : R.string.notif_recording_title);
+    }
+
+    private String contentFor(View view) {
+        return context.getString(view == View.IDLE ? R.string.notif_tap_to_return : R.string.notif_recording_tap);
+    }
+
+    /**
+     * 把录像的样子推出去（主线程）：开录、停录、管线报上来、一路加入或退出、各路的样子变了都叫一次。
+     *
+     * <ul>
+     *   <li>样子变了：前台通知换字（服务在才换，用 NotificationManager 当场换 —— 在后台时绝不为换字
+     *       startForegroundService，{@link CameraForegroundService#showText}）、悬浮按钮重画；
+     *       在录、等摄像头各自多久记下来（{@link #account}）。黑匣子里那几行（一路都不在录了、又有一路在录了、
+     *       各路都停手了、开录落定）只在管线里写（MultiCameraManager 算各路样子的那一处）：各路此刻怎样只有它知道；</li>
+     *   <li>开录落定（管线说的，每个录像意图只报一次）：告诉监听者此刻在录的几路、计划的几路；</li>
+     *   <li>监听者每次都叫：状态条上那一句跟着摘要变，不一定换样子。</li>
+     * </ul>
+     */
+    private void pushView() {
+        RecordingLanes.Summary summary = summary();
+        View now = viewOf(summary);
+        if (now != shownView) {
+            long at = android.os.SystemClock.elapsedRealtime();
+            account(at);
+            AppLog.i(TAG, "录像的样子：" + shownView + " → " + now);
+            liveSinceMs = now == View.RECORDING ? at : 0;
+            shownView = now;
+            CameraForegroundService.showText(context, titleFor(now), contentFor(now));
+            RecordingFloatingService.sendRecordingStateChanged(context);
+        }
+        if (summary != null && summary.settled && !settleReported) {
+            settleReported = true;
+            for (Listener listener : new ArrayList<>(listeners)) {
+                listener.onStartSettled(summary.liveKeys, summary.planned, startedOnFallback);
+            }
+        }
+        for (Listener listener : new ArrayList<>(listeners)) {
+            listener.onRecordingViewChanged();
+        }
+    }
+
+    /**
+     * 眼下这个样子（{@link #shownView}）算到 {@code at}（elapsedRealtime）为止：这一次录像里有一路在录一共多久、
+     * 一路都不在录（等待摄像头）一共多久。自动恢复的额度只认有一路在录的那几段（{@link #end}）。
+     */
+    private void account(long at) {
+        long span = viewSinceMs > 0 ? at - viewSinceMs : 0;
+        if (shownView == View.RECORDING) {
+            recordedMs += span;
+        } else if (shownView == View.WAITING) {
+            waitedMs += span;
+        }
+        viewSinceMs = at;
+    }
+
+    /** 黑匣子里的几路：按开的次序写每一路的叫法（环视、后座舱、前座舱）。 */
+    private static String roles(Collection<String> keys) {
+        List<String> names = new ArrayList<>();
+        for (String key : CameraSlots.openOrder(keys)) {
+            names.add(MultiCameraManager.roleName(key));
+        }
+        return String.join("、", names);
+    }
+
+    // ================================================================= 要录
+
+    /** 要录：查过盘就开，不等环视。已经在录、已经在等，都无害。主线程调。 */
+    public void request(Why why) {
         if (isRecording()) {
             return;
         }
         if (pending == null) {
-            pendingSinceMs = android.os.SystemClock.elapsedRealtime();
-            BlackBox.noteImportant("要录像（" + why + "）：等环视出画面");
+            BlackBox.noteImportant("要录像（" + why + "）：查过盘就开录，不等环视");
         }
         pending = why;
-        pendingCounts = counts;
-        // 等的时候相机算「录像要用」：登记了相机层就会开着它，熄屏那一步也不会把它放掉
-        CameraNeeds.current().claim(CameraNeeds.Holder.RECORDING);
         noteWanted(true, why.name());
-        watchVehicle();
         main.removeCallbacks(poll);
         main.post(poll);
     }
@@ -399,15 +533,15 @@ public final class RecordingCoordinator {
         if (pending == null) {
             return;
         }
-        AppLog.i(TAG, "不再等环视（" + why + "）");
+        AppLog.i(TAG, "不再等开录（" + why + "）");
         pending = null;
         main.removeCallbacks(poll);
-        if (!isRecording()) {
-            CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
-            watchVehicle();
-        }
     }
 
+    /**
+     * 等开录的那一个等待：要录、上一次收拾完了（{@link #settled}）、拒了之后过一会儿、还没有管线时过一会儿，都从这里再看一次。
+     * 以前主界面里有七处各自「等两秒再开」的梯子，后来都归到这一个；2.11 起它不再等环视。
+     */
     private final Runnable poll = new Runnable() {
         @Override
         public void run() {
@@ -419,25 +553,15 @@ public final class RecordingCoordinator {
                 return;
             }
             if (!lifecycle.isIdle()) {
-                // 上一次还在收拾：收拾完了（settled）会立刻再来看
+                // 上一次还在收拾：收拾完了（settled，到期限也算）会立刻再来看
+                return;
+            }
+            if (currentManager() == null) {
+                // 还没有相机管线：过一会儿再看
                 main.postDelayed(this, POLL_MS);
                 return;
             }
-            MultiCameraManager manager = currentManager();
-            // 环视出画面了，而且该开的几路都按次序开完了：没开完就开录，晚开的那一路这一段录不上
-            if (manager != null && manager.surroundHealthy() && manager.openInOrderDone()) {
-                Why why = pending;
-                boolean counts = pendingCounts;
-                long waited = (android.os.SystemClock.elapsedRealtime() - pendingSinceMs) / 1000;
-                if (why == Why.RESUME && counts) {
-                    budget.noteAttempt();
-                }
-                BlackBox.noteImportant("环视正常了，开录（" + why + "，等了 " + waited + " 秒"
-                        + (why == Why.RESUME ? "，第 " + budget.attempts() + " 次接回" : "") + "）");
-                start(why, counts);
-                return;
-            }
-            main.postDelayed(this, POLL_MS);
+            start(pending);
         }
     };
 
@@ -550,7 +674,7 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 车辆信号变了（主线程；在录、在等开录时听着）。只看哨兵模式、挡位：车速一停一走不算 —— 等红灯不是停车。
+     * 车辆信号变了（主线程；录像意图开着时听着）。只看哨兵模式、挡位：车速一停一走不算 —— 等红灯不是停车。
      * 熄屏期间接着录的（不是唤醒锁拉着的那种，{@link ScreenOffPlan#rejudgesOnVehicleChange}）照熄屏那张表再判一次。
      */
     private void onVehicleChanged() {
@@ -574,12 +698,12 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 在录、在等开录时向车辆信号登记（主线程；在录 / 在等的样子一变就对一遍）：熄屏那一刻照哨兵模式、挡位、车速判
-     * （{@link ScreenOffPlan#atScreenOff}），没人登记时这些都读不到。等接回的那一段也登记着 —— 以前只有信息条开着才有，
-     * 停录到接回之间读成「不知道」。
+     * 录像意图开着时向车辆信号登记（主线程；开录、停录时对一遍）：熄屏那一刻照哨兵模式、挡位、车速判
+     * （{@link ScreenOffPlan#atScreenOff}），没人登记时这些都读不到。在等开录（等 U 盘、等上一次收拾完）的不登记 ——
+     * 以前等着的时候也登记，等 U 盘时 GPS 一直开着（大纲 §1）。
      */
     private void watchVehicle() {
-        boolean want = isRecording() || pending != null;
+        boolean want = isRecording();
         if (want == watchingVehicle) {
             return;
         }
@@ -653,26 +777,28 @@ public final class RecordingCoordinator {
         return cameraManager;
     }
 
-    /** 环视出画面了，真正去开。查盘在存储线程上，查完回主线程接着开。 */
-    private void start(Why why, boolean counts) {
+    /** 真正去开：先查盘。查盘在存储线程上，查完回主线程接着开。 */
+    private void start(Why why) {
         // 录哪几路 = 配置里启用了哪几路。这两件事本来就是同一件：关掉的相机不开、不录、不占流
         Set<String> cameras = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context);
         if (cameras.isEmpty()) {
-            refused(why, counts, context.getString(R.string.msg_keep_one_camera_refuse));
+            refused(why, context.getString(R.string.msg_keep_one_camera_refuse));
             return;
         }
         // 查盘是异步的：查完回来就接着开（或者拒了再等）。万一一直不回来，到点再看一次，别一直等下去
         main.removeCallbacks(poll);
         main.postDelayed(poll, REFUSED_RETRY_MS);
-        StorageState.refresh(context, "start", snapshot -> startWith(snapshot, cameras, why, counts, true));
+        StorageState.refresh(context, "start", snapshot -> startWith(snapshot, cameras, why, true));
     }
 
     /**
+     * 查过盘了：打开录像意图。相机层定下这次录哪几路、建录制器、声明各路的录像输出；
+     * 每一路带着录像输出出了画面就加入，落定了报上来（{@link #pushView}）。
+     *
      * @param checkStorage false：刚为这次开录清理过空间，不再检查一遍 ——
      *                     否则估算的余量稍有变化就会清完又清，一直开不起来
      */
-    private void startWith(StorageState.Snapshot storage, Set<String> cameras, Why why, boolean counts,
-                           boolean checkStorage) {
+    private void startWith(StorageState.Snapshot storage, Set<String> cameras, Why why, boolean checkStorage) {
         // 查盘这段时间里人停了、退出了（不等了）：不开
         if (pending == null) {
             return;
@@ -687,14 +813,14 @@ public final class RecordingCoordinator {
         // 正常模式下不往内置存储录：行车记录是一直在写的，而车机闪存换不了。
         // 判断放在这里，所有入口才是同一个答案（以前只有按按钮那条路拦得住）
         if (!storage.available) {
-            refused(why, counts, context.getString(R.string.msg_refuse_no_external));
+            refused(why, context.getString(R.string.msg_refuse_no_external));
             return;
         }
         // 开录前先确认写得下：以前不查，盘满时照常开录，第一笔数据写不进去，按钮就卡在「正在准备」
-        if (checkStorage && !ensureRoomToStart(storage, cameras, why, counts)) {
+        if (checkStorage && !ensureRoomToStart(storage, cameras, why)) {
             return;
         }
-        // 从这里起算「在录」（开录中）：到这一步才清掉「等」
+        // 从这里起算「在录」（开录中）：录像意图开了，到这一步才清掉「等」
         lifecycle.begin();
         pending = null;
         main.removeCallbacks(poll);
@@ -703,29 +829,41 @@ public final class RecordingCoordinator {
         startedOnFallback = storage.sdFellBack;
         lastStopReason = null;
         slowWriteNoticedThisRecording = false;
+        settleReported = false;
+        viewSinceMs = 0;
+        recordedMs = 0;
+        waitedMs = 0;
+        // 自动接回每开一次就算一次：连着 3 次都没录满一分钟就不再试（{@link RecordingStops.ResumeBudget}）
+        if (why == Why.RESUME) {
+            budget.noteAttempt();
+        }
+        BlackBox.noteImportant("录像意图开（" + why + (why == Why.RESUME ? "，第 " + budget.attempts() + " 次自动接回" : "")
+                + "）：计划 " + roles(cameras) + "，写到 " + storage.videoDir
+                + "；不等环视，每一路带着录像输出出了画面就加入");
+        // 录像意图开着才登记「录像要用相机」和车辆信号：相机关着的那几路，调度开的时候就带着录像输出
         CameraNeeds.current().claim(CameraNeeds.Holder.RECORDING);
+        watchVehicle();
         // 这一趟要录过了：开录失败也算，失败了照样接回（规格 2.3）
         RecordingIntent.current().noteRecordingStarted();
         // 在录就立着「这一趟要录」：等的时候被清过（人点开主界面是新的一趟）也一样，录着的进程被结束了要接得回来
         noteWanted(true, why.name());
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-        if (!manager.startRecording(timestamp, cameras)) {
-            // 准备就失败了：准备到一半的录像输出、编码器照样由停录那条路收拾
+        if (!manager.startRecording(cameras)) {
+            // 准备就失败了：准备到一半的录制器、录像输出照样由停录那条路收拾
             BlackBox.noteImportant("开录失败：相机层没能开始（" + why + "）");
             end(RecordingStops.Reason.START_FAILED);
             return;
         }
-        BlackBox.noteImportant("录像开始: " + cameras + "（" + why + "）");
-        // 前台服务：没有它，系统会在应用退到后台后把录制掐掉
-        CameraForegroundService.start(context,
-                context.getString(R.string.notif_recording_title),
-                context.getString(R.string.notif_recording_tap));
-        RecordingFloatingService.sendRecordingStateChanged(context, true);
         // 屏幕已经黑着才开始的录像（熄屏期间接回的那种），熄屏录制同样要拿锁
         ScreenOffRecording.onRecordingStarted(context);
         AppLog.d(TAG, "开始录制 " + cameras.size() + " 路: " + cameras);
         for (Listener listener : new ArrayList<>(listeners)) {
             listener.onRecordingStarted();
+        }
+        pushView();
+        // 前台服务：没有它，系统会在应用退到后台后把录制掐掉。已经在的不再 start 一次 —— 通知上的字由 pushView 换；
+        // 不在的起来时照此刻的样子写（notificationTitle）
+        if (!CameraForegroundService.isRunning()) {
+            CameraForegroundService.start(context);
         }
     }
 
@@ -733,14 +871,14 @@ public final class RecordingCoordinator {
      * 空间够就返回 true。不够时：没设上限直接拒绝（不删录像）；设了上限就在后台清理，
      * 清完再开一次，这次返回 false。
      */
-    private boolean ensureRoomToStart(StorageState.Snapshot storage, Set<String> cameras, Why why, boolean counts) {
+    private boolean ensureRoomToStart(StorageState.Snapshot storage, Set<String> cameras, Why why) {
         java.io.File dir = storage.videoDir;
         long free = storage.freeBytes;
         if (dir == null || free < 0 || free >= com.kooo.evcam.camera.StorageGuard.lastMarginBytes()) {
             return true;
         }
         if (appConfig.getVideoStorageLimitGb() <= 0) {
-            refused(why, counts, context.getString(R.string.msg_storage_full_refuse));
+            refused(why, context.getString(R.string.msg_storage_full_refuse));
             return false;
         }
         AppLog.i(TAG, "开录前空间不够，先清理最旧的录像");
@@ -754,20 +892,19 @@ public final class RecordingCoordinator {
                 return;  // 清理的这段时间里人停了、退出了
             }
             if (decision.verdict == com.kooo.evcam.camera.StoragePlan.Verdict.FULL) {
-                refused(why, counts, context.getString(decision.lockedFull
+                refused(why, context.getString(decision.lockedFull
                         ? R.string.msg_storage_locked_refuse : R.string.msg_storage_cannot_free));
             } else {
-                startWith(storage, cameras, why, counts, false);
+                startWith(storage, cameras, why, false);
             }
         });
         return false;
     }
 
     /** 条件不满足：告诉界面，然后留在「要录」的状态里，过一会儿再看（U 盘插上、盘清出来了都算）。 */
-    private void refused(Why why, boolean counts, String reason) {
+    private void refused(Why why, String reason) {
         notifyRefused(reason);
         pending = why;
-        pendingCounts = counts;
         main.removeCallbacks(poll);
         main.postDelayed(poll, REFUSED_RETRY_MS);
     }
@@ -778,8 +915,8 @@ public final class RecordingCoordinator {
      * 停。停的人说清原因；接不接、什么时候接，这里判。主线程调。
      *
      * <p>人停的、退出的：不再等。熄屏停的：等亮屏（{@link #screenOn}），接不接熄屏那一刻照表定好了。
-     * 写不进、相机被拿走、没画面、开录失败、录制器自己停了：环视恢复了自动接回，有额度。
-     * 盘满：接回去也录不下，不接。</p>
+     * 写不进、没写进、开录失败、录制器自己停了（存储一类）：收拾完、查过盘就自动接回，有额度。
+     * 盘满：接回去也录不下，不接。摄像头被拿走、断开不是停，不会走到这里。</p>
      */
     public void stop(RecordingStops.Reason reason) {
         boolean wasRecording = isRecording();
@@ -789,7 +926,7 @@ public final class RecordingCoordinator {
         // 人停的：不再等。熄屏停的：也不再等（黑着的时候不该自己录起来），亮屏时 screenOn 再判
         if (reason == RecordingStops.Reason.USER || reason == RecordingStops.Reason.SCREEN_OFF) {
             if (!wasRecording) {
-                // 只是在等：「这一趟要录」留不留先定，前台服务跟着收（等着接回时为它留着的），再放开相机 ——
+                // 只是在等开录（没登记相机）：「这一趟要录」留不留先定，前台服务跟着收（等着接回时为它留着的）——
                 // 和停录同一个次序（见 end）
                 lastStopReason = reason;
                 settleWanted(reason);
@@ -822,18 +959,20 @@ public final class RecordingCoordinator {
         }
         main.removeCallbacks(stopDeadline);
         main.postDelayed(stopDeadline, RecordingLifecycle.STOP_DEADLINE_MS);
-        RecordingFloatingService.sendRecordingStateChanged(context, false);
         // 熄屏录制的唤醒锁只在录像期间拿（规格 §3.1）；到点判了「现在停」的那一次留到相机关完再放
         ScreenOffRecording.onRecordingStopped();
 
         long lasted = startedAtMs > 0 ? now - startedAtMs : 0;
+        account(now);
         startedAtMs = 0;
         lastStopReason = reason;
         if (darkSinceElapsedMs > 0) {
             stopsWhileDark++;
         }
-        budget.noteRecordingLasted(lasted);
-        BlackBox.noteImportant("录像停止原因: " + reason + "，这一段录了 " + (lasted / 1000) + " 秒"
+        // 录满一分钟说的是有一路在录满一分钟：一路都不在录（等待摄像头）、开录中的那几段不算
+        budget.noteRecordingLasted(recordedMs);
+        BlackBox.noteImportant("录像停止原因: " + reason + "，这一段录了 " + (lasted / 1000) + " 秒（有一路在录 "
+                + recordedMs / 1000 + " 秒" + (waitedMs > 0 ? "，一路都不在录 " + waitedMs / 1000 + " 秒" : "") + "）"
                 + BlackBox.afterScreenOff());
         AppLog.d(TAG, "录制已停止（" + reason + "）");
 
@@ -844,13 +983,13 @@ public final class RecordingCoordinator {
             settleWanted(reason);
         }
         watchVehicle();
-        // 前台服务在接不接定了之后、放开相机之前收：等着接回（这一趟要录）时留着「在后台运行」的通知 ——
-        // 亮屏后从后台开相机要有它；不接了、开机自启动又关着的先停服务再放相机：相机层看到没有前台服务，
-        // 没人要了 1.5 秒就关，不在后台拿着相机等 30 秒
+        // 停录的次序：「这一趟要录」留不留 → 前台服务 → 放开相机。等着接回（这一趟要录）时前台服务留着 ——
+        // 亮屏后从后台开相机要有它；不接了、开机自启动又关着的先停服务再放相机：调度看到没有前台服务，
+        // 没人要的相机当场按次序关，不在后台拿着相机保持 30 秒
         CameraForegroundService.stop(context);
-        if (letGo) {
-            CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
-        }
+        // 「录像要用相机」只在录像意图开着时登记：自动接回的那一次开录时再登记（相机关着的照样带着录像输出开）
+        CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
+        pushView();
         for (Listener listener : new ArrayList<>(listeners)) {
             listener.onRecordingStopped(reason, lasted, willResume);
         }
@@ -877,30 +1016,28 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 录像因为这个原因停了，要不要等环视恢复再接回。
+     * 录像因为这个原因停了，要不要自动接回（大纲 §7 第 3 问：存储一类照旧接回）。
      *
      * <p>总原则（规格 §0）：用户开着录像，App 就该一直录着 —— 手动开的、自动开的都算，
-     * 只要这一趟录起来过、不是人停的。相机被别的程序拿走的不计入额度：额度防的是
-     * 「接回去又立刻停」的循环，那一种要等它放开才接，不会循环。</p>
+     * 只要这一趟录起来过、不是人停的。每一次自动接回都计入额度：额度防的是「接回去又立刻停」的循环，
+     * 连着 3 次都没有一路录满一分钟就不再试。不再等环视：收拾完、查过盘就重开。</p>
      */
     private boolean resumeAfter(RecordingStops.Reason reason) {
-        if (!RecordingStops.resumesOnSurround(reason)) {
+        if (!RecordingStops.resumesAutomatically(reason)) {
             return false;
         }
         if (!RecordingIntent.current().shouldRestore(true)) {
             BlackBox.noteImportant("录像被打断（" + reason + "），不自动接回");
             return false;
         }
-        // 相机被别的程序拿走的那种不计额度；没人占着却被断开的（自己顶自己）照计，否则无限循环（2026-10-08）
-        boolean counts = RecordingStops.countsTowardBudget(reason, CameraTaken.othersHold());
-        if (counts && !budget.allows()) {
-            BlackBox.noteImportant("录像被打断（" + reason + "），自动恢复已连续失败 "
-                    + budget.attempts() + " 次，不再尝试");
+        if (!budget.allows()) {
+            BlackBox.noteImportant("录像被打断（" + reason + "），自动恢复已连续 "
+                    + budget.attempts() + " 次没录满一分钟，不再尝试");
             return false;
         }
-        BlackBox.noteImportant("录像被打断（" + reason + "），等环视恢复后自动接回（已试 "
+        BlackBox.noteImportant("录像被打断（" + reason + "）：收拾完、查过盘就自动接回（已试 "
                 + budget.attempts() + " 次）");
-        request(Why.RESUME, counts);
+        request(Why.RESUME);
         return true;
     }
 

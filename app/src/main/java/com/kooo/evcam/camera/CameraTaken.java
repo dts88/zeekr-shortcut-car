@@ -556,13 +556,14 @@ public final class CameraTaken {
     /**
      * 此刻有没有别的程序拿着我们的哪一路：通道调度判的 {@link Verdict#TAKEN}，或者丢了、原因是「被占用」一类、还没判完的。
      *
-     * <p>2.11 起被拿着只记在调度里（{@link ChannelScheduler}）：这里只是给还没迁走的读者（录像协调器，阶段 5 删）
-     * 照调度的账答，自己不再记账 —— 以前的账本由相机服务的通知和关完之后的判定（judgeLoss）记，那两条路连同
+     * <p>2.11 起被拿着只记在调度里（{@link ChannelScheduler}）：这里只照调度的账答（以前的读者是录像协调器，阶段 5 起不问了），
+     * 自己不再记账 —— 以前的账本由相机服务的通知和关完之后的判定（judgeLoss）记，那两条路连同
      * 「放开了就叫看门狗重开」（retryNow → retryTaken）一起拆了：动相机的只剩调度一处。主线程上读。</p>
      *
      * <p>还没判完的也算（{@link ChannelScheduler#takeoverPendingAnywhere}）：协调器在丢的那一刻（最后一路被拿走、整次停）
      * 就问这一句，定这一次停录算不算接回的次数，而调度要等那一次关完再过 300 ms 才判。只看判完的，车机每拿走一次
-     * 都被算成一次失败，倒车几下就用完 3 次（审查 2026-10-11）。阶段 5 去掉那种整次停以后，这个方法跟着删。</p>
+     * 都被算成一次失败，倒车几下就用完 3 次（审查 2026-10-11）。阶段 5 去掉了那种整次停，协调器不再问它：
+     * 应用里没有读者了，阶段 7 删（大纲 §1 CameraTaken「删」）。</p>
      */
     public static boolean othersHold() {
         return ChannelScheduler.anyTakenAnywhere() || ChannelScheduler.takeoverPendingAnywhere();
@@ -570,7 +571,7 @@ public final class CameraTaken {
 
     /**
      * 我们的这一路此刻被拿着（被别的程序拿着 TAKEN，或者被拿着的另一路挡着 BLOCKED）：照调度的账答。
-     * 给还没迁走的读者（超级后视镜服务写提示，阶段 4 删）。主线程上读。
+     * 超级后视镜服务阶段 4 起改读调度的 condition，应用里没有读者了，阶段 7 删（大纲 §1 CameraTaken「删」）。主线程上读。
      */
     public static boolean benched(String cameraId) {
         return ChannelScheduler.takenAnywhere(cameraId);

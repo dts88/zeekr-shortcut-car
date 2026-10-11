@@ -51,6 +51,8 @@ public class ChannelSchedulerTest {
     private final FakePoster poster = new FakePoster();
     private final FakeHost host = new FakeHost();
     private final List<String> journal = new ArrayList<>();
+    /** 调度告诉录像那一侧的（「streaming front」「gone left LOST DISCONNECTED」「condition left TAKEN」）。 */
+    private final List<String> told = new ArrayList<>();
     private final FakePort surround = new FakePort("2");
     private final FakePort rear = new FakePort("1");
     private final FakePort front = new FakePort("0");
@@ -70,6 +72,7 @@ public class ChannelSchedulerTest {
         host.mainForeground = true;
         host.heard = true;
         s = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        s.setRecording(new FakeRecording());
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
         // 故意不按开的次序给：调度照开的次序排
         lanes.put(FRONT, front);
@@ -132,7 +135,6 @@ public class ChannelSchedulerTest {
         settle();
         assertEquals(Arrays.asList("open [PREVIEW]"), rear.actions);
         assertTrue(lines("stepEnded OPEN front").size() == 1);
-        assertTrue(s.openStepsPending());
         at(1_000);
         opened(rear);
         frame(rear);
@@ -141,7 +143,6 @@ public class ChannelSchedulerTest {
         opened(front);
         frame(front);
         settle();
-        assertFalse(s.openStepsPending());
         assertEquals(Arrays.asList("openTrail [front, left, back]"), lines("openTrail"));
         assertEquals(ChannelRules.Condition.STREAMING, s.condition(SUR));
         assertTrue(s.usable(SUR));
@@ -223,43 +224,41 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 丢了还没判完：{@link ChannelScheduler#judging} 一直为真，判完之前 condition 说不出是不是被拿着（录像离开的那一路等它）；
-     * 原因是「被占用」一类的，旧读者问 {@link CameraTaken#othersHold} 当场就是真（协调器在丢的那一刻定算不算接回的次数）。
+     * 丢了还没判完：判完之前 condition 说不出是不是被拿着（在救）；原因是「被占用」一类的，旧读者问
+     * {@link CameraTaken#othersHold} 当场就是真（阶段 7 随它一起删）。
      */
     @Test
-    public void anInUseLossIsJudgingUntilJudgedAndCountsAsHeldMeanwhile() {
+    public void anInUseLossIsRescuingUntilJudgedAndCountsAsHeldMeanwhile() {
         claim(Holder.PREVIEW);
         streaming(surround, pvS);
         streaming(rear, pvR);
         streaming(front, pvF);
         settle();
-        assertFalse(s.judging(REAR));
+        assertEquals(ChannelRules.Condition.STREAMING, s.condition(REAR));
         assertFalse(CameraTaken.othersHold());
         rear.lose(now);
         s.onLossStarted("1", DISCONNECTED);
-        assertTrue(s.judging(REAR));
+        assertEquals(ChannelRules.Condition.RESCUING, s.condition(REAR));
         assertTrue("被断开、还没判：算别的程序拿着", CameraTaken.othersHold());
         at(5_400);
         rear.closedNow();
         s.onLossClosed("1", 5_400);
         settle();
-        assertTrue("关完了，那 300 ms 里还在判", s.judging(REAR));
-        assertEquals("判完之前说不出是被拿着", ChannelRules.Condition.RESCUING, s.condition(REAR));
+        assertEquals("关完了，那 300 ms 里还在判：说不出是被拿着", ChannelRules.Condition.RESCUING, s.condition(REAR));
         at(5_700);
-        assertFalse(s.judging(REAR));
         assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
         assertTrue(CameraTaken.othersHold());
     }
 
-    /** 设备错误（4）丢了：还在判，但不属于「被占用」一类，旧读者不当成别的程序拿着。 */
+    /** 设备错误（4）丢了：还在判（在救），但不属于「被占用」一类，旧读者不当成别的程序拿着。 */
     @Test
-    public void aDeviceErrorLossIsJudgingButNotHeld() {
+    public void aDeviceErrorLossIsRescuingButNotHeld() {
         claim(Holder.PREVIEW);
         streaming(surround, pvS);
         settle();
         surround.lose(now);
         s.onLossStarted("2", DEVICE_ERROR);
-        assertTrue(s.judging(SUR));
+        assertEquals(ChannelRules.Condition.RESCUING, s.condition(SUR));
         assertFalse(CameraTaken.othersHold());
     }
 
@@ -286,7 +285,6 @@ public class ChannelSchedulerTest {
         s.onOpened("2");
         at(2_000);
         assertTrue("待判作废，不判", lines("judged").isEmpty());
-        assertFalse(s.judging(SUR));
         assertEquals(ChannelRules.Condition.STREAMING, s.condition(SUR));
     }
 
@@ -480,6 +478,113 @@ public class ChannelSchedulerTest {
         s.onOutputDropped("2", recS, SingleCamera.Drop.CONFIG_FAILED);
         s.onOutputDropped("2", pvS, SingleCamera.Drop.RELEASED);
         assertEquals(Arrays.asList("RECORD CONFIG_FAILED"), surround.drops);
+    }
+
+    // ================================================================= 告诉录像那一侧（大纲 §2 阶段 5）
+
+    /**
+     * 一份会话出了画面（配好、出了第一帧）才告诉录像：同一份会话只说一次，换了一份（改输出加了后视镜）再说一次 ——
+     * 录像那一侧每次都看会话带没带着它的录像输出，带着就加入。配好了还没出第一帧不说。
+     */
+    @Test
+    public void eachSessionThatStreamsIsToldToRecordingOnce() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        declare(surround, recS);
+        settle();
+        assertEquals("关着的带着录像输出开", Arrays.asList("open [RECORD]"), surround.actions);
+        at(300);
+        opened(surround);
+        settle();
+        assertTrue("配好了还没出第一帧：不说", told("streaming").isEmpty());
+        at(500);
+        frame(surround);
+        settle();
+        assertEquals(Arrays.asList("streaming front"), told("streaming"));
+        at(ChannelRules.TICK_MS * 3);
+        assertEquals("同一份会话只说一次", 1, told("streaming").size());
+
+        // 后视镜打开了：改输出加上它，新的一份会话出了画面再说一次
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        declare(surround, mirror);
+        claim(Holder.MIRROR);
+        settle();
+        assertEquals(2, surround.actions.size());
+        assertTrue(surround.actions.get(1), surround.actions.get(1).startsWith("apply"));
+        at(ChannelRules.TICK_MS * 3 + 300);
+        configured(surround, mirror, recS);
+        frame(surround);
+        settle();
+        assertEquals("新的一份会话出了画面：再说一次", 2, told("streaming").size());
+    }
+
+    /**
+     * 丢了：在阻塞的关之前（丢的那一轮）就告诉录像「走了」，带着丢的那一下；判完被拿着再说一声样子变了。
+     * 关完不再说一次走了。
+     */
+    @Test
+    public void aLossIsToldAsGoneBeforeTheBlockingCloseEnds() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        settle();
+        assertEquals(Arrays.asList("streaming front", "streaming left"), told("streaming"));
+        told.clear();
+        rear.lose(now);
+        s.onLossStarted("1", DISCONNECTED);
+        settle();
+        assertEquals(Arrays.asList("gone left LOST DISCONNECTED"), told("gone"));
+        assertEquals(Arrays.asList("condition left RESCUING"), told("condition left"));
+        at(5_400);
+        rear.closedNow();
+        s.onLossClosed("1", 5_400);
+        settle();
+        at(5_700);
+        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        assertEquals(Arrays.asList("condition left RESCUING", "condition left TAKEN"), told("condition left"));
+        assertEquals("关完不再说一次走了", 1, told("gone").size());
+        assertTrue("别的路不受影响", told("gone front").isEmpty() && told("condition front").isEmpty());
+    }
+
+    /** 我们关的（没人要了、没有前台服务）：开始关的那一轮告诉录像「走了」。 */
+    @Test
+    public void aCloseIsToldAsGone() {
+        host.foregroundService = false;
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        settle();
+        told.clear();
+        drop(Holder.RECORDING);
+        settle();
+        assertEquals(Arrays.asList("close unwanted"), surround.actions);
+        assertEquals(Arrays.asList("gone front CLOSED"), told("gone"));
+    }
+
+    /**
+     * 开着却卡住了（8 秒没进展），调度在救：告诉录像「走了」（那一路收尾退出）；救好了新会话带着同一个录像输出出了画面，
+     * 再告诉一次出画面（那一路再加入）。救的那一步照旧带着录像输出，不算被丢。
+     */
+    @Test
+    public void aRescueOfAStuckLaneIsToldAsGoneAndItsNextSessionAsStreaming() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        settle();
+        told.clear();
+        surround.progressAgeMs = CameraLiveness.STUCK_MS;
+        s.wake();
+        settle();
+        assertEquals(1, surround.actions.size());
+        assertTrue(surround.actions.get(0), surround.actions.get(0).startsWith("rebuild"));
+        assertEquals(Arrays.asList("gone front RESCUED"), told("gone"));
+        at(300);
+        configured(surround, recS);
+        frame(surround);
+        settle();
+        assertEquals(Arrays.asList("streaming front"), told("streaming"));
+        assertTrue("救的那一步照旧带着录像输出", surround.drops.isEmpty());
     }
 
     // ================================================================= 问（只问，不开）
@@ -721,6 +826,30 @@ public class ChannelSchedulerTest {
         s.wake();
         settle();
         assertEquals("拍照：没开的路带出帧口开", Arrays.asList("open [SINK]"), surround.actions);
+    }
+
+    /**
+     * 现在用不了相机时，该开的那一路关着、调度不开它：录像那一侧照 {@link ChannelScheduler#cannotOpen} 不把它算作在起来
+     * （不然录像一直是「准备中」）。主界面回到前台、它开了，告诉录像那一侧一声 —— condition 没变（还是在起来）也说。
+     */
+    @Test
+    public void aWantedLaneCannotOpenWhileTheCameraIsUnusableAndRecordingHearsWhenThatChanges() {
+        host.mainForeground = false;
+        host.startedWhileVisible = false;
+        host.plan(SUR);
+        claim(Holder.RECORDING);
+        declare(surround, recS);
+        settle();
+        assertTrue(s.cannotOpen(SUR));
+        assertFalse("没人要的那几路不算", s.cannotOpen(REAR));
+        assertEquals(ChannelRules.Condition.BRINGING_UP, s.condition(SUR));
+        told.clear();
+        host.mainForeground = true;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), surround.actions);
+        assertFalse(s.cannotOpen(SUR));
+        assertEquals(Arrays.asList("condition " + SUR + " BRINGING_UP"), told("condition"));
     }
 
     /** 开的时候报「用不了相机」：不计次数，记下来，等主界面回到前台。 */
@@ -1070,6 +1199,16 @@ public class ChannelSchedulerTest {
         return t + ELAPSED_AHEAD;
     }
 
+    private List<String> told(String prefix) {
+        List<String> out = new ArrayList<>();
+        for (String line : told) {
+            if (line.startsWith(prefix)) {
+                out.add(line);
+            }
+        }
+        return out;
+    }
+
     private List<String> lines(String prefix) {
         List<String> out = new ArrayList<>();
         for (String line : journal) {
@@ -1408,6 +1547,24 @@ public class ChannelSchedulerTest {
         @Override
         public void stopped() {
             stopped = true;
+        }
+    }
+
+    /** 录像那一侧：调度告诉它的每一声记成一行记号。 */
+    private final class FakeRecording implements ChannelScheduler.Recording {
+        @Override
+        public void onLaneCameraStreaming(String key) {
+            told.add("streaming " + key);
+        }
+
+        @Override
+        public void onLaneCameraGone(String key, ChannelScheduler.Gone why, CameraTaken.Reason reason) {
+            told.add("gone " + key + " " + why + (reason == null ? "" : " " + reason.source));
+        }
+
+        @Override
+        public void onLaneConditionChanged(String key) {
+            told.add("condition " + key + " " + s.condition(key));
         }
     }
 

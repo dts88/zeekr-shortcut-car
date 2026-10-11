@@ -34,7 +34,7 @@ public class RecordingLifecycleTest {
         assertTrue(life.isRecording());
     }
 
-    /** 每一路都没起来：这一次录像到头了，要走停录那条路 —— 以前是「没在录，不用停」，什么都没收拾。 */
+    /** 每一路的录制器都建不起来：这一次录像到头了，要走停录那条路 —— 以前是「没在录，不用停」，什么都没收拾。 */
     @Test
     public void aStartThatFailsEverywhereEndsTheAttempt() {
         RecordingLifecycle life = new RecordingLifecycle();
@@ -49,8 +49,8 @@ public class RecordingLifecycleTest {
     }
 
     /**
-     * 一路都没起来按「开录失败」停（提示「录制未能启动」，不说「中断：原因未知」），
-     * 照样等环视接回、走同一份额度。
+     * 录制器都建不起来按「开录失败」停（提示「录制未能启动」，不说「中断：原因未知」），
+     * 照样自动接回（查过盘就重开）、走同一份额度。
      */
     @Test
     public void aFailedStartStopsAsStartFailedAndIsResumed() {
@@ -59,7 +59,7 @@ public class RecordingLifecycleTest {
         assertEquals(Action.END, life.on(Report.START_FAILED));
         RecordingStops.Reason reason = life.endReason(Report.START_FAILED);
         assertEquals(RecordingStops.Reason.START_FAILED, reason);
-        assertTrue(RecordingStops.resumesOnSurround(reason));
+        assertTrue(RecordingStops.resumesAutomatically(reason));
     }
 
     /** 管线自己停了（被释放、换了一份）：原因不明，照样接回。 */
@@ -71,7 +71,23 @@ public class RecordingLifecycleTest {
         assertEquals(Action.END, life.on(Report.STOPPED));
         RecordingStops.Reason reason = life.endReason(Report.STOPPED);
         assertEquals(RecordingStops.Reason.UNKNOWN, reason);
-        assertTrue(RecordingStops.resumesOnSurround(reason));
+        assertTrue(RecordingStops.resumesAutomatically(reason));
+    }
+
+    /**
+     * 一路都还没加入（相机都被占着、在救）：一直是开录中，照样算在录 —— 录像不算停，界面上是「等待摄像头」，
+     * 那是各路的样子，不是这里的阶段（2.11）。没有哪一份报告让它到头，只有停。
+     */
+    @Test
+    public void noLaneHasJoinedYetStillCountsAsRecording() {
+        RecordingLifecycle life = new RecordingLifecycle();
+        life.begin();
+        assertEquals(Phase.PREPARING, life.phase());
+        assertTrue(life.isRecording());
+        assertFalse("开录中不会自己到点", life.stopOverdue(T0 + RecordingLifecycle.STOP_DEADLINE_MS * 100));
+        assertTrue(life.isRecording());
+        assertEquals(Action.NOTE, life.on(Report.STARTED));
+        assertEquals("第一路加入了", Phase.RECORDING, life.phase());
     }
 
     /**
@@ -188,7 +204,7 @@ public class RecordingLifecycleTest {
     /**
      * 相机层停录：几路一起叫停、一起等写入线程收好，共用 {@link CodecVideoRecorder#STOP_BUDGET_MS} 这一个期限；
      * 编码线程拖到期限的，期限之后再多给写入线程 {@link CodecVideoRecorder#STOP_GRACE_MS}（几路共用，只多这一次）。
-     * 两样加起来只用协调器收拾期限的一半 —— 另一半留给释放录制器、摘录像输出、重建会话。以前一路一路等，
+     * 两样加起来只用协调器收拾期限的一半 —— 另一半留给停放录制器（放掉编码器）。以前一路一路等，
      * 三路加起来超过了期限，协调器不等了、又开下一次，上一次还在写同一个盘。
      */
     @Test
