@@ -136,13 +136,6 @@ public class MainActivity extends AppCompatActivity {
     /** 悬浮按钮拉起主界面来开录：录起来之后让用户看一眼，再把主界面收到后台。 */
     private boolean hideMainAfterStart;
 
-    public MultiCameraManager getCameraManager() {
-        if (cameraManager == null) {
-            cameraManager = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-            attachRecordingCoordinator();
-        }
-        return cameraManager;
-    }
     private ImageAdjustManager imageAdjustManager;  // 亮度/降噪调节管理器
     private ImageAdjustFloatingWindow imageAdjustFloatingWindow;  // 亮度/降噪调节悬浮窗
     private int textureReadyCount = 0;  // 记录准备好的TextureView数量

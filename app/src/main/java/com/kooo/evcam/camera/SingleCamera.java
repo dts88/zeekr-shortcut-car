@@ -54,7 +54,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * <h3>2.11 起：给通道调度的接口（channel-logic §二，项目所有者 2026-10-10 确认）</h3>
  *
  * <p>项目所有者定：一个通道调度（ChannelScheduler）是唯一动相机的地方。这一类只照做、只报事实，自己不判该不该开、
- * 该带哪几样输出。接口分四块：</p>
+ * 该带哪几样输出。接口分五块：</p>
  *
  * <ul>
  *   <li><b>动作</b>（只给调度调，主线程）：{@link #open(Set)}、{@link #applyOutputs}、{@link #rebuildSession}、
@@ -66,15 +66,13 @@ import java.util.concurrent.atomic.AtomicReference;
  *   <li><b>事实</b>（主线程读）：{@link #sessionOutputs()}、{@link #declaredOutputs()}、{@link #deadInSession()}、
  *       {@link #firstFrameOfSessionAt()}、{@link #resolvedSize()}、{@link #busySince()}。</li>
  *   <li><b>回调</b>：{@link CameraCallback} 下半截那几个，在相机线程上发。</li>
+ *   <li><b>诊断</b>（调度交来，主线程）：会话里每一样输出算要的、留着的、还是死的（{@link #noteOutputStates}），
+ *       只给卡顿现场标出来（{@link #describeForStall}）。</li>
  * </ul>
  *
  * <p><b>调度之外唯一允许的相机调用是请求级的</b>：画面调节（{@link #updateImageAdjustParams}）只改重复请求，
  * 拍照（{@link #takePicture}）只往常驻的 JPEG 输出发一张静态请求 —— 都不改会话、不改输出、不开不关。
  * 画面调节在这一路有一步在途时先不做，下一次建会话时带上最新的参数。</p>
- *
- * <p>旧的入口（{@link #openCamera()}、{@link #openForRecording}、{@link #recreateSession()}、{@link #forceReopen()}，
- * 以及 setTextureView / setRecordSurface / setMainFloatingSurface 那几个旧字段）照旧按旧字段工作，是另一条入口：
- * 哪条入口最后动的会话，会话就按哪一条的输出建（{@link #requested} 为 null 就是旧入口）。调用方迁完以后旧入口整个删掉。</p>
  */
 public class SingleCamera {
     private static final String TAG = "SingleCamera";
@@ -120,17 +118,6 @@ public class SingleCamera {
      * 这个尺寸。之前是把合成流尺寸写进全局配置，等于命令所有相机都去够这个尺寸。</p>
      */
     private Size preferredSize;
-    /**
-     * 预览缓冲区尺寸。默认等于 {@link #previewSize}；开启「预览/录制分辨率解耦」后
-     * 会是一个更小的已声明尺寸，录制仍用 previewSize。
-     */
-
-    private Surface recordSurface;  // 录制Surface
-    /** 眼下这份配好的会话里挂着的录像输出；null = 没挂。会话配好时（相机线程）写，见 {@link #sessionCarries}。 */
-    private volatile Surface sessionRecordSurface;
-    private Surface mainFloatingSurface; // 主屏悬浮窗Surface
-    private android.graphics.SurfaceTexture mainFloatingSurfaceTexture; // 主屏悬浮窗SurfaceTexture（用于设置buffer尺寸）
-    private Surface previewSurface;  // 预览Surface（缓存以避免重复创建）
 
     /**
      * 拍照用的 JPEG 输出，<b>常驻在会话里</b>。
@@ -165,23 +152,13 @@ public class SingleCamera {
     }
 
     /**
-     * 不显示的出帧口。
+     * 不显示的出帧口（{@link ChannelRules.Out#SINK}）。
      *
-     * <p>这一路此刻没有预览、后视镜、录像任何一个输出（主界面在后台，它的预览画面已被系统收回），
-     * 而它还该出帧时，会话挂上它，相机才有地方出帧：拍照登记着（{@link CameraNeeds.Holder#PHOTO}），
-     * 或者没人要了、在等那 30 秒关（{@link #setKeepStreaming}）。不该出帧了就从会话里摘掉。
-     * 和预览同尺寸、同格式，帧到了就丢。</p>
+     * <p>这一路此刻没有预览、后视镜、录像任何一个活着的输出（主界面在后台，它的预览画面已被系统收回），
+     * 而它还该出帧时（拍照时相机没开、在「保持 30 秒」里，又没有留着的活输出），调度要的那一组里就是它，相机才有地方出帧；
+     * 要的输出一样都不剩时建会话也补上它（{@link #requestedTargets}）。和预览同尺寸、同格式，帧到了就丢。</p>
      */
     private ImageReader frameSink;
-
-    /** 眼下的会话里挂着出帧口没有（相机线程写，主线程读）。 */
-    private volatile boolean frameSinkInSession;
-
-    /**
-     * 没人要了、在等那 30 秒关（{@code MultiCameraManager.reconcileCameras} 设）：这期间照常出帧，
-     * 没有别的输出就送进出帧口。停了流再起，和关了再开一样要动车机的采集通道；这 30 秒里回来就不用动。
-     */
-    private volatile boolean keepStreaming;
 
     // 鱼眼矫正
     
@@ -251,8 +228,6 @@ public class SingleCamera {
     private volatile boolean reopenInFlight;
     /** 最近一个动作（开 / 关 / 重开 / 配会话）上路的时刻（uptime）；0 = 没有过。见 {@link #isBusy()}。 */
     private volatile long inFlightSinceMs;
-    /** 现在这份会话配好的时刻（uptime）；0 = 还没有会话。见 {@link #sessionHasStreamed()}。 */
-    private volatile long sessionStartedUptimeMs;
     private volatile boolean isOpening = false;  // 是否正在打开中（防止并行触发时重复调用 openCamera）
     /** 设备、会话、相机线程这几个字段的锁；拿着它时不调相机服务，见 closeCamera。 */
     private final Object deviceLock = new Object();
@@ -272,7 +247,7 @@ public class SingleCamera {
             new java.util.concurrent.ConcurrentHashMap<>();
     /**
      * 一路相机的开、关、重连、配会话，一次最多在途多久。在途期间同一路不叠第二个动作：
-     * 看门狗不插队，强制重开合并，打开等上一次关完。相机服务一次关实测要 2–20 秒
+     * 调度不插队，强制重开合并，打开等上一次关完。相机服务一次关实测要 2–20 秒
      * （2026-10-08），所以留足；超过就当回调不会来了，强制重开接手。
      */
     static final long IN_FLIGHT_MAX_MS = 60_000L;
@@ -301,12 +276,13 @@ public class SingleCamera {
     // ===================================================================== 2.11 通道调度的接口
 
     /**
-     * 调度要这一份会话带的那一组输出（不可变）；null = 会话按旧入口的旧字段建（见类说明）。
+     * 调度要这一份会话带的那一组输出（不可变）；关着时是空的。
      *
      * <p>调度的动作在主线程上换它；相机线程建会话时读一次。会话配不上、消费者死了，相机线程从里面摘掉那一样 ——
      * 摘用 {@code updateAndGet}，主线程同时换了一组新的也不会被盖回旧的。</p>
      */
-    private final AtomicReference<Set<ChannelRules.Out>> requested = new AtomicReference<>();
+    private final AtomicReference<Set<ChannelRules.Out>> requested =
+            new AtomicReference<>(Collections.emptySet());
 
     /** 声明、我们建的 Surface、上一份会话带着的输出，这几样的锁。拿着它时不进相机服务、不回调。 */
     private final Object outputLock = new Object();
@@ -326,6 +302,11 @@ public class SingleCamera {
     private final Map<ChannelRules.Out, Surface> carried = new LinkedHashMap<>();
     /** 眼下这份会话的快照；没有会话是 {@link SessionOutputs#NONE}。相机线程写，主线程读。 */
     private volatile SessionOutputs sessionSnapshot = SessionOutputs.NONE;
+    /**
+     * 调度给的：会话里每一样输出算哪一类（要的、留着的、死的）、从什么时候起（{@link #noteOutputStates}）。
+     * 只给卡顿现场看（{@link #describeForStall}），这一类自己不据此做任何事。
+     */
+    private volatile Map<ChannelRules.Out, ChannelScheduler.OutputState> outputStates = Collections.emptyMap();
     /** 本会话第一帧的时刻（uptime）；0 = 还没有。每建一份会话归零。 */
     private volatile long firstFrameAt;
     /** 不开设备先算出来的画面尺寸（{@link #resolveSize}），开相机时也跟着更新；null = 还没算出来。 */
@@ -462,28 +443,6 @@ public class SingleCamera {
     private boolean autoMirrorBack() {
         return "back".equals(cameraPosition) && laneForThisCamera() == null;
     }
-
-    public void setTextureView(TextureView textureView) {
-        this.textureView = textureView;
-        clearPreviewSurface();
-        if (autoMirrorBack() && this.textureView != null) {
-            applyMirrorTransform();
-        }
-        if (this.textureView != null) {
-            applyLaneTransform();
-        }
-    }
-
-    public void clearPreviewSurface() {
-        if (previewSurface != null) {
-            try {
-                previewSurface.release();
-            } catch (Exception e) {
-            }
-            previewSurface = null;
-        }
-    }
-
 
     /**
      * 这一路的摆法：旋转、镜像、裁剪、缩放平移，全部来自配置里那一格。
@@ -672,7 +631,7 @@ public class SingleCamera {
      * 这一路此刻有没有动作在途：在开、在关（含丢了设备之后的那一次关）、在重开、在配会话。
      * 丢了之后的判定不在这里：它在通道调度的账上（等关完、再等 300 ms，那段时间调度自己不动别的路，2.11 阶段 3 起）。
      *
-     * <p>在途的时候不叠第二个动作 —— 看门狗不重开，强制重开合并。2026-10-08 的七次
+     * <p>在途的时候不叠第二个动作 —— 调度不重开，强制重开合并。2026-10-08 的七次
      * 「被相机服务断开」全是自己顶自己：重连那一次打开还没回来，看门狗又开了一次，
      * 相机服务把先开的那份踢掉。在途超过 {@link #IN_FLIGHT_MAX_MS} 才当回调不会来了，不再算在途。</p>
      */
@@ -713,17 +672,7 @@ public class SingleCamera {
         return sb.toString().trim();
     }
 
-    /** 设备开着、会话建好了、没在重配：按次序开相机时，这样的一路不用等。 */
-    public boolean isSessionReady() {
-        if (cameraDevice == null || captureSession == null) {
-            return false;
-        }
-        synchronized (sessionLock) {
-            return !isConfiguring && !isSessionClosing;
-        }
-    }
-
-    /** 有动作上路了：记下时刻。看门狗据此把它算作进度，而不是卡死。 */
+    /** 有动作上路了：记下时刻。调度的救援据此把它算作进度，而不是卡死（{@link #progressAgeMs()}）。 */
     private void markInFlight() {
         long now = SystemClock.uptimeMillis();
         inFlightSinceMs = now;
@@ -735,7 +684,7 @@ public class SingleCamera {
      *
      * <p>{@code CameraDevice.close()} 是一次进相机服务的 binder 调用。醒来之后它卡过一秒多
      * （2026-09-23，Camera-2 线程停在 {@code ICameraDeviceUser.disconnect()}）；
-     * 而这几处调用都拿着 {@link #deviceLock}，主线程上的 {@link #closeCamera()} 也要这把锁 ——
+     * 而这几处调用都拿着 {@link #deviceLock}，主线程上的 {@link #closeCamera(String)} 也要这把锁 ——
      * 一边卡在 binder 里，另一边就在锁上等。超过半秒的都记进黑匣子，带上线程名：
      * 是不是卡在主线程上，看这一行就知道。</p>
      */
@@ -826,101 +775,6 @@ public class SingleCamera {
     }
 
     /**
-     * 设置录制Surface（带模式标识）
-     * @param surface 录制Surface
-     * @param isCodec true 表示 Codec 模式，false 表示 MediaRecorder 模式
-     */
-    public void setRecordSurface(Surface surface, boolean isCodec) {
-        this.recordSurface = surface;
-        if (surface != null) {
-            AppLog.d(TAG, "Record surface set for camera " + cameraId + ": " + surface + 
-                    ", isValid=" + surface.isValid() + ", mode=" + (isCodec ? "Codec" : "MediaRecorder"));
-        } else {
-            AppLog.w(TAG, "Record surface set to NULL for camera " + cameraId);
-        }
-    }
-
-    /**
-     * 设置主屏悬浮窗Surface
-     */
-    public void setMainFloatingSurface(Surface surface) {
-        setMainFloatingSurface(surface, null);
-    }
-
-    /**
-     * 设置主屏悬浮窗Surface（带SurfaceTexture引用，用于在创建Session时统一设置buffer尺寸）
-     */
-    public void setMainFloatingSurface(Surface surface, android.graphics.SurfaceTexture surfaceTexture) {
-        this.mainFloatingSurface = surface;
-        this.mainFloatingSurfaceTexture = surfaceTexture;
-        if (surface != null) {
-            AppLog.d(TAG, "Main floating surface set for camera " + cameraId + ": " + surface + ", isValid=" + surface.isValid());
-        } else {
-            AppLog.d(TAG, "Main floating surface cleared for camera " + cameraId);
-        }
-    }
-
-
-    /**
-     * 清除录制Surface
-     */
-    public void clearRecordSurface() {
-        this.recordSurface = null;
-        AppLog.d(TAG, "Record surface cleared for camera " + cameraId);
-    }
-
-    /** 挂着的录像输出；null = 没挂。停录只摘挂着的那几路、只重建它们的会话：没挂的不必白白重建一次。 */
-    public Surface getRecordSurface() {
-        return recordSurface;
-    }
-
-    /**
-     * 眼下这份配好的会话里是不是挂着 {@code surface} 这个录像输出（2026-10-10）。
-     *
-     * <p>「设了」不等于「会话里有」：挂上要等会话重建才生效，重建配不上时还会把录像输出丢掉
-     * （{@code onConfigureFailed}）。一路单独接回录像时，录制器要等这一句是真的、而且出了画面才启动，
-     * 不然它一帧都收不到，15 秒后被当成写不进。</p>
-     */
-    public boolean sessionCarries(Surface surface) {
-        return surface != null && captureSession != null && sessionRecordSurface == surface;
-    }
-
-    /**
-     * 挂着的还是 {@code expected} 这一个才摘。停录在后台收拾完才回来摘，这中间又开了录、挂上了新的输出，
-     * 就不能把新的也摘掉。
-     *
-     * @return true：摘了（会话要重建才生效）
-     */
-    public boolean clearRecordSurfaceIf(Surface expected) {
-        if (expected == null || recordSurface != expected) {
-            return false;
-        }
-        clearRecordSurface();
-        return true;
-    }
-
-    /**
-     * 暂停向录制 Surface 发送帧（旧方法，保留兼容性）
-     * 注意：此方法会停止整个预览，导致画面卡顿，建议使用 switchToPreviewOnlyMode() 代替
-     */
-    public void pauseRecordSurface() {
-        if (captureSession != null) {
-            try {
-                // 停止向所有 Surface（包括 recordSurface）发送帧
-                captureSession.stopRepeating();
-                AppLog.d(TAG, "Camera " + cameraId + " paused recording surface (stopped repeating request)");
-            } catch (CameraAccessException e) {
-                AppLog.e(TAG, "Camera " + cameraId + " failed to pause recording surface", e);
-            } catch (IllegalStateException e) {
-                // Session 可能已经关闭
-                AppLog.w(TAG, "Camera " + cameraId + " session already closed when trying to pause");
-            }
-        } else {
-            AppLog.w(TAG, "Camera " + cameraId + " captureSession is null, cannot pause recording surface");
-        }
-    }
-
-    /**
      * 切换到仅预览模式 —— 停止往要走的录像输出送帧（相机线程，只由「改输出」那一步在重配之前调，{@link #reconfigure}；
      * 大纲阶段 5d）：
      * 重复请求换成只送会话里别的活输出 —— 除了要走的录像输出（会话里有、要的那一组里没有的录像），预览、后视镜、出帧口、
@@ -982,21 +836,6 @@ public class SingleCamera {
             AppLog.w(TAG, "Camera " + cameraId + " could not stop frames to the leaving record output: " + e);
             return false;
         }
-    }
-
-    public Surface getSurface() {
-        if (textureView != null && textureView.isAvailable()) {
-            SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
-            if (surfaceTexture != null) {
-                // 缓存 Surface 以避免重复创建和资源泄漏
-                if (previewSurface == null) {
-                    previewSurface = new Surface(surfaceTexture);
-                    AppLog.d(TAG, "Camera " + cameraId + " created new preview surface");
-                }
-                return previewSurface;
-            }
-        }
-        return null;
     }
 
     /**
@@ -1092,46 +931,63 @@ public class SingleCamera {
                 + " configuring=" + isConfiguring
                 + " closing=" + isSessionClosing
                 + " lost=" + deviceLost
-                + " outputs[main-preview=" + surfaceState(previewSurface)
-                + " mirror=" + surfaceState(mainFloatingSurface)
-                + " record=" + surfaceState(recordSurface)
-                + " jpeg=" + (jpegReader != null) + "]"
-                + " channel[" + describeRequested() + " session=" + sessionSnapshot + "]"
+                + " jpeg=" + (jpegReader != null)
+                + " channel[requested=" + requested.get() + " session=" + describeSessionOutputs() + "]"
                 + " fps=" + String.format(java.util.Locale.US, "%.1f", currentFps)
                 + " lastResult=" + (last > 0 ? (System.currentTimeMillis() - last) + "ms ago" : "never");
     }
 
-    private static String surfaceState(Surface surface) {
-        if (surface == null) {
-            return "none";
+    /**
+     * 卡顿现场里的会话：每一样输出标上调度怎么看它 ——「要」「留着 31 秒」「死 3 秒」（大纲 §2 阶段 8）。
+     * 调度还没分过类的那一样只写种类。
+     */
+    private String describeSessionOutputs() {
+        SessionOutputs session = sessionSnapshot;
+        if (!session.exists()) {
+            return session.toString();
         }
-        return surface.isValid() ? "ok" : "INVALID";
+        Map<ChannelRules.Out, ChannelScheduler.OutputState> states = outputStates;
+        long now = SystemClock.uptimeMillis();
+        StringBuilder sb = new StringBuilder("gen=").append(session.generation).append(" [");
+        boolean first = true;
+        for (ChannelRules.Out out : session.outputs) {
+            sb.append(first ? "" : ", ").append(out.kind);
+            first = false;
+            ChannelScheduler.OutputState state = states.get(out);
+            if (state == null) {
+                continue;
+            }
+            long seconds = Math.max(0, now - state.since) / 1000;
+            switch (state.state) {
+                case WANTED:
+                    sb.append(" 要");
+                    break;
+                case KEPT:
+                    sb.append(" 留着 ").append(seconds).append(" 秒");
+                    break;
+                default:
+                    sb.append(" 死 ").append(seconds).append(" 秒");
+                    break;
+            }
+        }
+        return sb.append(']').toString();
     }
 
-    /** 会话按哪条来路建：调度要的那一组，或者旧入口（legacy）。给日志看。 */
-    private String describeRequested() {
-        Set<ChannelRules.Out> wanted = requested.get();
-        return wanted == null ? "legacy" : "requested=" + wanted;
+    /**
+     * 调度交来会话里每一样输出算哪一类、从什么时候起（主线程，变了才交；交的是不可变的一份）：只给卡顿现场标「要 / 留着 / 死」。
+     */
+    void noteOutputStates(Map<ChannelRules.Out, ChannelScheduler.OutputState> states) {
+        outputStates = states == null ? Collections.emptyMap() : states;
     }
 
-    /** 丢帧回调里的 Surface 是哪一路输出。 */
+    /** 丢帧回调里的 Surface 是哪一路输出：拍照的 JPEG，或者按会话带着的输出认。 */
     private String describeTarget(Surface target) {
         if (target == null) {
             return "null";
         }
-        if (target == previewSurface) {
-            return "main-preview";
-        }
-        if (target == mainFloatingSurface) {
-            return "mirror";
-        }
-        if (target == recordSurface) {
-            return "record";
-        }
         if (jpegReader != null && target == jpegReader.getSurface()) {
             return "jpeg";
         }
-        // 调度那条路建的会话：旧字段里没有它，按会话带着的输出认
         synchronized (outputLock) {
             for (Map.Entry<ChannelRules.Out, Surface> entry : carried.entrySet()) {
                 if (entry.getValue() == target) {
@@ -1152,15 +1008,11 @@ public class SingleCamera {
     }
 
     /**
-     * 距上一次「有动静」多久。给 {@link CameraLiveness} 那层兜底看门狗用。
-     *
-     * <p>从没开过相机的返回 0（不是无穷大）—— 没开过就不该被判成卡住。</p>
-     */
-    /**
      * 最近 {@code ms} 毫秒里有没有真的出过画面。
      *
      * <p>和 {@link #progressAgeMs()} 不同：那个开相机、建会话也算「有动静」；
-     * 这里只认画面。「环视恢复了没有」要问的是这个。</p>
+     * 这里只认画面。一路录像写不进时，看它的相机是不是真在出画面（{@link RecordingLanes#FRESH_FRAMES_MS}），
+     * 拍照能不能按快门（{@link #readyForPhoto}），问的都是这个。</p>
      */
     public boolean hasFramesWithin(long ms) {
         long last = lastCaptureUptimeMs;
@@ -1207,49 +1059,14 @@ public class SingleCamera {
     }
 
     /**
-     * 这一份会话出过画面没有。配好之后一帧都没出过的会话，重建没有意义 —— 它没有东西可以排空，
-     * 重建的 waitUntilIdle 每次都超时、报设备错误，再关一次设备（2026-10-08 实测，环视一次要 4–13 秒）；
-     * 直接重开设备才出画面。
+     * 距上一次「有动静」多久：出了一帧、开了相机、建好会话、有动作上路，都算。调度的救援据此判这一路卡住没有
+     * （{@link CameraLiveness#STUCK_MS}）。
+     *
+     * <p>从没开过相机的返回 0（不是无穷大）—— 没开过就不该被判成卡住。</p>
      */
-    public boolean sessionHasStreamed() {
-        long last = lastCaptureUptimeMs;
-        long started = sessionStartedUptimeMs;
-        return started != 0 && last >= started;
-    }
-
     public long progressAgeMs() {
         long last = lastProgressUptimeMs;
         return last == 0 ? 0 : Math.max(0, SystemClock.uptimeMillis() - last);
-    }
-
-    /**
-     * 此刻该不该有帧：是主实例、而且至少有一路输出在等画面。
-     *
-     * <p>注意这里<b>不看</b>相机开没开、会话建没建 —— 兜底看门狗要救的恰恰是
-     * 那些状态标志卡住的情形，拿卡住的标志当前提就等于不救。</p>
-     */
-    public boolean wantsFrames() {
-        return previewSurface != null || mainFloatingSurface != null || recordSurface != null
-                || photoWantsFrames();
-    }
-
-    /** 有人在等拍照（登记表上的 PHOTO）。 */
-    private static boolean photoWantsFrames() {
-        return CameraNeeds.current().isHeld(CameraNeeds.Holder.PHOTO);
-    }
-
-    /** 见 {@link #keepStreaming}。只改标志；要不要换输出由紧接着的 {@link #followNeeds} 或会话重建定。 */
-    public void setKeepStreaming(boolean keep) {
-        keepStreaming = keep;
-    }
-
-    public boolean keepsStreaming() {
-        return keepStreaming;
-    }
-
-    /** 没有别的输出时，这一路还该不该出帧：有人等拍照，或者在等那 30 秒关。 */
-    private boolean sinkWanted() {
-        return keepStreaming || photoWantsFrames();
     }
 
     /** 能按快门了：设备开着、会话在、最近 {@code freshMs} 毫秒里真出过画面。 */
@@ -1257,35 +1074,9 @@ public class SingleCamera {
         return cameraDevice != null && captureSession != null && hasFramesWithin(freshMs);
     }
 
-    /**
-     * 登记表变了（2.10 的 MultiCameraManager.reconcileCameras 调，2.11 阶段 3 起没人调，阶段 7 删）：这一路的输出要不要跟着变。
-     *
-     * <p>跟着登记表走的输出只有出帧口：还该出帧（{@link #sinkWanted}）而没有别的输出时挂上，不该了摘掉。
-     * 会话里有没有它和该不该有它对不上，就请求重建一次 —— 重建按最新情况定输出。
-     * 相机还没开好的不用管：开好建会话时自然按登记表来。</p>
-     */
-    public void followNeeds() {
-        if (cameraDevice == null) {
-            return;
-        }
-        if (requested.get() != null) {
-            return;   // 会话是调度那条路建的：出帧口补不补由调度定（规则里的「补位」），这里不跟
-        }
-        boolean want = sinkWanted() && previewSurface == null
-                && mainFloatingSurface == null && recordSurface == null;
-        if (want != frameSinkInSession) {
-            requestSessionRebuild(want ? "sink-on" : "sink-off", 0);
-        }
-    }
-
     /** 最后一次报错的短名，没有就返回 null。 */
     public String lastErrorName() {
         return lastErrorName;
-    }
-
-    /** 设备报错 / 被断开之后还没重开。看门狗据此不等 8 秒就动手（有人要画面的话）。 */
-    public boolean deviceLost() {
-        return deviceLost;
     }
 
     /**
@@ -1296,65 +1087,19 @@ public class SingleCamera {
     }
 
     /**
-     * 打开摄像头
-     */
-    public void openCamera() {
-        // 已经打开，不重复打开
-        if (cameraDevice != null) {
-            AppLog.d(TAG, "Camera " + cameraId + " already opened, skipping openCamera");
-            return;
-        }
-
-        // 正在打开中，不重复触发
-        if (isOpening) {
-            AppLog.d(TAG, "Camera " + cameraId + " already opening, skipping duplicate openCamera");
-            return;
-        }
-        beginOpen(null, null);
-    }
-
-    /**
-     * 带着录像输出打开这一路：输出在打开的同一把锁里挂上（2026-10-10，一路单独接回录像时用）。
-     *
-     * <p>{@link #openCamera()} 会把残留的录像输出清掉（防 Surface abandoned），所以先 {@link #setRecordSurface}
-     * 再开，挂上的就被它清了；而后台没有预览时这一路没有别的输出，压根建不起会话、出不了帧。
-     * 强制重开在没有相机线程时也退回 openCamera，同样会清。</p>
-     *
-     * @return false：这一路已经开着或正在开，什么都没做 —— 那种情况挂输出、重建会话由调用方来
-     */
-    public boolean openForRecording(Surface surface) {
-        if (cameraDevice != null || isOpening) {
-            return false;
-        }
-        beginOpen(surface, null);
-        return true;
-    }
-
-    /**
      * 打开。
      *
-     * @param record 旧入口：要一起挂上的录像输出，null = 不挂（清掉残留的）。{@code wanted} 不是 null 时不看它
-     * @param wanted 调度要这份会话带的那一组输出（新入口）；null = 旧入口，会话按旧字段建
+     * @param wanted 调度要这份会话带的那一组输出
      * @return false：没有相机线程，开不了（已经报了 {@link CameraCallback#onOpenFailed}）
      */
-    private boolean beginOpen(Surface record, Set<ChannelRules.Out> wanted) {
+    private boolean beginOpen(Set<ChannelRules.Out> wanted) {
         isOpening = true;
         markInFlight();
 
         synchronized (deviceLock) {
-            if (wanted == null) {
-                // 安全措施：清理可能残留的录制 Surface 引用（防止 Surface abandoned 错误），要一起挂的那个换上
-                // 放在同步块内，避免与 setRecordSurface() 的竞态条件
-                if (recordSurface != null && recordSurface != record) {
-                    AppLog.w(TAG, "Camera " + cameraId + " found stale recordSurface on open, clearing it");
-                }
-                recordSurface = record;
-            }
             requested.set(wanted);
             deviceLost = false;
-            AppLog.d(TAG, "openCamera: Starting for camera " + cameraId
-                    + (wanted != null ? " (channel) outputs " + wanted
-                    : record != null ? " with record surface " + record : ""));
+            AppLog.d(TAG, "openCamera: Starting for camera " + cameraId + " (channel) outputs " + wanted);
         }
 
         // 相机服务的调用（查设备、查参数、打开）都放到这一路自己的相机线程上：
@@ -1386,7 +1131,7 @@ public class SingleCamera {
             AppLog.d(TAG, "Camera " + cameraId + " already open or opening, channel open skipped");
             return false;
         }
-        return beginOpen(null, frozen(outputs));
+        return beginOpen(frozen(outputs));
     }
 
     /**
@@ -1402,7 +1147,9 @@ public class SingleCamera {
     }
 
     /**
-     * 救：重建会话（第一次救、本会话出过画面时用；没出过画面的重建没有意义，见 {@link #sessionHasStreamed()}）。
+     * 救：重建会话（第一次救、本会话出过画面时用）。配好之后一帧都没出过的会话，重建没有意义 —— 它没有东西可以排空，
+     * 重建的 waitUntilIdle 每次都超时、报设备错误，再关一次设备（2026-10-08 实测，环视一次要 4–13 秒）；
+     * 那种由调度直接重开（{@link #reopen}）。
      *
      * @return false：设备没开着，什么都没做
      */
@@ -1413,7 +1160,7 @@ public class SingleCamera {
     /**
      * 救：重开（关掉设备，等 300 ms，再开），会话带着 {@code outputs}。关着的一路也走这里。
      *
-     * <p>合并的规矩照 {@link #forceReopen()}：一次重开还在路上、或者这一路有动作在途，就合并掉、什么都不做 ——
+     * <p>合并：一次重开还在路上、或者这一路有动作在途，就合并掉、什么都不做 ——
      * 同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）。</p>
      *
      * @return false：合并掉了
@@ -1493,20 +1240,13 @@ public class SingleCamera {
             }
         }
         if (textureView != view) {
-            if (changed && !sessionSnapshot.carries(out)) {
-                // 换了一块画布：照旧入口的做法，放掉用旧画布建的预览 Surface（声明变了，调度随后按新画布改输出）
-                setTextureView(view);
-            } else {
-                // 同一块画布换了视图（还声明着时换了视图；或者撤回后被新界面接回、会话里还带着它 —— 主界面重建，大纲 §7.6）：
-                // 只换视图和摆位，不走 setTextureView ——
-                // 它会放掉旧入口用这块画布建的预览 Surface，而那份 Surface 可能正挂在旧入口建的会话里：声明不触发重建，
-                // 会话就往一个放掉了的 Surface 送帧，快照里画布又还活着，调度看不出来。调用方迁完之前两条入口并存
-                textureView = view;
-                if (autoMirrorBack()) {
-                    applyMirrorTransform();
-                }
-                applyLaneTransform();
+            // 换了视图（换了一块画布；或者同一块画布换了视图 —— 撤回后被新界面接回、会话里还带着它，主界面重建，大纲 §7.6）：
+            // 只换视图和摆位。预览的 Surface 按画布记（owned），不跟着视图放
+            textureView = view;
+            if (autoMirrorBack()) {
+                applyMirrorTransform();
             }
+            applyLaneTransform();
         }
         if (changed) {
             AppLog.d(TAG, "Camera " + cameraId + " preview declared: " + texture);
@@ -1520,9 +1260,7 @@ public class SingleCamera {
      * 等下一次本来要动、或者关相机时一起摘；画布已被系统收走的，调度排一步马上摘。
      *
      * <p>撤回的那一格的视图也不再拿着（2026-10-11，阶段 4a）：画布销毁时主界面也销毁了，管线比界面活得久，
-     * 拿着它就把整个销毁了的界面留住（以前画布销毁时 setTextureView(null) 清掉，阶段 4a 改成只撤回）。
-     * 只清字段，不走 setTextureView：旧入口用这块画布建的预览 Surface 可能正挂在旧入口建的会话里（见 {@link #declarePreview}），
-     * 旧入口下一次建会话时看到没有视图，自己放。</p>
+     * 拿着它就把整个销毁了的界面留住。只清视图：预览的 Surface 按画布记，会话里还带着它（留着的输出）就不能放。</p>
      */
     public boolean withdrawPreview(SurfaceTexture texture) {
         boolean changed;
@@ -1953,7 +1691,7 @@ public class SingleCamera {
             cameraManager.openCamera(cameraId, stateCallback, handler);
 
         } catch (CameraAccessException | RuntimeException e) {
-            // 打开没发出去（相机服务不可用、没权限、无效相机）：标成「没开」，有人要画面的话看门狗按它的节奏再试
+            // 打开没发出去（相机服务不可用、没权限、无效相机）：标成「没开」，报开不起来，再不再试由调度判
             isOpening = false;
             deviceLost = true;
             lastErrorName = e.getClass().getSimpleName();
@@ -2044,7 +1782,7 @@ public class SingleCamera {
      * 设备没了：被相机服务断开（{@code onDisconnected}），或者报错（{@code onError}）。在这一轮的相机线程上。
      *
      * <p>2026-10-10 起先摘、再关：锁里把设备和会话从字段上摘下来、标成「没开」，这一次关登记成在途
-     * （{@link #isBusy()}、{@link #anyClosing()} 都算上，最多 {@link #IN_FLIGHT_MAX_MS}），然后才去关。
+     * （{@link #isBusy()}、{@link #holdsOrIsOpening()} 都算上，最多 {@link #IN_FLIGHT_MAX_MS}），然后才去关。
      * 以前是先关、关完才摘：车机拿走后座舱相机 1 时，这一次关在相机服务里卡 5–8 秒（{@code ICameraDeviceUser.disconnect}），
      * 这几秒里设备字段还在、也不算在途 —— 看门狗、按次序开相机都当通道是静的，录像要等它关完才知道这一路没了，
      * 相机服务那一声「被占用」也被记成了「我们开着」。</p>
@@ -2062,7 +1800,7 @@ public class SingleCamera {
      *
      * <p>2.11 起另有一条给调度的路（{@link CameraCallback} 下半截），不论错误码都一样：设备交到过我们手上的，
      * 关之前报 {@code onLossStarted}、关之后报 {@code onLossClosed}，判定交给调度；打开途中就出错的（设备从没交到我们手上），
-     * 关完报 {@code onOpenFailed}。旧的报法（{@code onCameraError}）照旧，录像那一侧迁完（阶段 5）以后删。</p>
+     * 关完报 {@code onOpenFailed}。旧的报法（{@code onCameraError}）照旧发：给界面上的相机状态，也叫醒调度。</p>
      *
      * @param code      报给 MultiCameraManager 的错误码：被断开是 {@link #LOST_DISCONNECTED}，其余是 onError 的
      * @param errorName 记进 {@link #lastErrorName} 的短名
@@ -2084,7 +1822,7 @@ public class SingleCamera {
             opened = cameraDevice == camera;
             lastErrorName = errorName;
             deviceLost = true;   // 要不要再开、什么节奏：调度一处判（被别的程序拿走的，等它放开、通道安静了单独开）
-            // 先登记再报：报出去之后按次序开相机看 anyClosing() 就会等这一次关完。被断开、报 1 / 2 的那一次关
+            // 先登记再报：报出去之后调度看 isBusy() 就会等这一次关完。被断开、报 1 / 2 的那一次关
             // 相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着。
             // 也先登记、再把设备从字段上摘下：通道调度在主线程上不拿这把锁读「设备在不在、有没有在途」，反过来的话
             // 中间那一下读到「没设备、也没在关」，这一路被记成关着、当场又被开一次（审查 2026-10-11）
@@ -2151,8 +1889,8 @@ public class SingleCamera {
     /**
      * 创建预览会话（相机线程）。
      *
-     * <p>会话带哪几样输出有两条来路：调度给的那一组（{@link #requested}，见 {@link #requestedTargets}），
-     * 或者旧入口的旧字段（{@link #legacyTargets}）。之后建流、配会话、配不上怎么丢输出，两条来路走同一段（{@link #configureSession}）。</p>
+     * <p>会话带调度给的那一组输出（{@link #requested}，见 {@link #requestedTargets}）；建流、配会话、
+     * 配不上怎么丢输出见 {@link #configureSession}。</p>
      */
     private void createCameraPreviewSession() {
         if (cameraDevice == null) {
@@ -2190,18 +1928,10 @@ public class SingleCamera {
                 return;
             }
 
-            Set<ChannelRules.Out> wanted = requested.get();
-            int template;
-            if (wanted != null) {
-                targets = requestedTargets(wanted);
-                // 只有带着录像输出才用录像模板
-                template = carriesKind(targets, ChannelRules.Kind.RECORD)
-                        ? CameraDevice.TEMPLATE_RECORD : CameraDevice.TEMPLATE_PREVIEW;
-            } else {
-                targets = legacyTargets();
-                template = (recordSurface != null) ? CameraDevice.TEMPLATE_RECORD : CameraDevice.TEMPLATE_PREVIEW;
-            }
-            frameSinkInSession = carriesKind(targets, ChannelRules.Kind.SINK);
+            targets = requestedTargets(requested.get());
+            // 只有带着录像输出才用录像模板
+            int template = carriesKind(targets, ChannelRules.Kind.RECORD)
+                    ? CameraDevice.TEMPLATE_RECORD : CameraDevice.TEMPLATE_PREVIEW;
 
             // 检查是否有可用的输出 Surface（后台初始化时可能全部为 null）
             if (targets.isEmpty()) {
@@ -2279,7 +2009,7 @@ public class SingleCamera {
         }
         for (ChannelRules.Out out : dead) {
             AppLog.w(TAG, "Camera " + cameraId + " output " + out + " was released before the session was built, dropped");
-            dropOutput(out, out.kind, Drop.RELEASED);
+            dropOutput(out, Drop.RELEASED);
         }
         if (targets.isEmpty()) {
             Surface sink = frameSinkSurface();
@@ -2289,7 +2019,7 @@ public class SingleCamera {
             }
         }
         if (carriesKind(targets, ChannelRules.Kind.PREVIEW)) {
-            // 摆位跟着这一路的画面尺寸：开相机之前尺寸可能还不知道，建会话时再摆一次（和旧入口一样）
+            // 摆位跟着这一路的画面尺寸：开相机之前尺寸可能还不知道，建会话时再摆一次
             if (autoMirrorBack()) {
                 applyMirrorTransform();
             }
@@ -2351,90 +2081,8 @@ public class SingleCamera {
     }
 
     /**
-     * 旧入口的输出：主界面预览（旧字段 textureView / previewSurface）、后视镜（setMainFloatingSurface）、
-     * 出帧口（拍照登记着、或者在等那 30 秒关）、录像（setRecordSurface）。和 2.10 的做法一样，调用方迁完以后删。
-     */
-    private List<Target> legacyTargets() {
-        SurfaceTexture surfaceTexture = null;
-        if (textureView != null && textureView.isAvailable()) {
-            surfaceTexture = textureView.getSurfaceTexture();
-        }
-        if (surfaceTexture != null) {
-            if (previewSize != null) {
-                surfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
-                AppLog.d(TAG, "Camera " + cameraId + " buffer size set to: " + previewSize);
-            } else {
-                AppLog.e(TAG, "Camera " + cameraId + " Cannot set buffer size - previewSize: " + previewSize + ", SurfaceTexture: " + surfaceTexture);
-            }
-
-            if (autoMirrorBack()) {
-                applyMirrorTransform();
-            }
-
-            applyLaneTransform();
-
-            if (previewSurface == null || !previewSurface.isValid()) {
-                if (previewSurface != null) {
-                    try { previewSurface.release(); } catch (Exception e) {}
-                    previewSurface = null;
-                }
-
-                // 平时就是 new Surface(surfaceTexture)；开发者选项开着时，环视这一路改写进
-                // GPU 逐像素鱼眼校正的管线，由它再画到这个 TextureView 上（见 PreviewDewarp）
-                previewSurface = com.kooo.evcam.zeekr.PreviewDewarp.surfaceFor(
-                        cameraId, textureView, surfaceTexture, getPreviewBufferSize());
-                AppLog.d(TAG, "Camera " + cameraId + " Created NEW preview surface: " + previewSurface);
-            }
-        } else {
-            if (previewSurface != null) {
-                try { previewSurface.release(); } catch (Exception e) {}
-                previewSurface = null;
-            }
-        }
-
-        Surface surface = (previewSurface != null && previewSurface.isValid()) ? previewSurface : null;
-        if (surface == null) {
-            if (mainFloatingSurface != null && mainFloatingSurface.isValid()) {
-                surface = mainFloatingSurface;
-            }
-        }
-
-        // 还该出帧（有人等拍照、或者在等那 30 秒关），而这一路没有任何显示或录像输出（主界面在后台）：
-        // 挂上不显示的出帧口
-        boolean nothingElse = (surface == null || !surface.isValid())
-                && (mainFloatingSurface == null || !mainFloatingSurface.isValid())
-                && (recordSurface == null || !recordSurface.isValid());
-        Surface sinkSurface = (nothingElse && sinkWanted()) ? frameSinkSurface() : null;
-
-        // 统一设置所有共享 Surface 的 buffer 尺寸，确保与相机输出一致
-        // 避免悬浮窗 TextureView 使用物理布局尺寸导致 OutputConfiguration 尺寸不匹配
-        if (previewSize != null && mainFloatingSurfaceTexture != null) {
-            mainFloatingSurfaceTexture.setDefaultBufferSize(getPreviewBufferSize().getWidth(), getPreviewBufferSize().getHeight());
-        }
-
-        // 身份照调度那条路的认法记（预览、后视镜认画布，录像这条路上只知道 Surface），给会话快照用
-        List<Target> targets = new ArrayList<>();
-        if (previewSurface != null && previewSurface.isValid()) {
-            targets.add(new Target(new ChannelRules.Out(ChannelRules.Kind.PREVIEW,
-                    surfaceTexture != null ? surfaceTexture : previewSurface), previewSurface));
-        }
-        if (mainFloatingSurface != null && mainFloatingSurface.isValid()) {
-            targets.add(new Target(new ChannelRules.Out(ChannelRules.Kind.MIRROR,
-                    mainFloatingSurfaceTexture != null ? mainFloatingSurfaceTexture : mainFloatingSurface),
-                    mainFloatingSurface));
-        }
-        if (sinkSurface != null) {
-            targets.add(new Target(ChannelRules.Out.SINK, sinkSurface));
-        }
-        if (recordSurface != null && recordSurface.isValid()) {
-            targets.add(new Target(new ChannelRules.Out(ChannelRules.Kind.RECORD, recordSurface), recordSurface));
-        }
-        return targets;
-    }
-
-    /**
      * 按这一组输出建会话（相机线程）：预览、后视镜共用一条流（Surface Sharing，预览打头），出帧口、录像各一条，
-     * 常驻的拍照 JPEG 只进会话、不进预览请求。两条来路（调度的、旧入口的）走的是这同一段。
+     * 常驻的拍照 JPEG 只进会话、不进预览请求。
      */
     private void configureSession(final int generation, final List<Target> targets, int template)
             throws CameraAccessException {
@@ -2459,7 +2107,6 @@ public class SingleCamera {
         // 将所有预览性质的 Surface（主预览、后视镜）组合成一个硬件流；
         // 两者的缓冲区尺寸在这之前都拨成了相机的输出尺寸，OutputConfiguration 才对得上
         OutputConfiguration previewSharedConfig = null;
-        Surface recordTarget = null;
         final Map<ChannelRules.Out, Surface> built = new LinkedHashMap<>();
         for (Target target : targets) {
             ChannelRules.Kind kind = target.out.kind;
@@ -2474,9 +2121,6 @@ public class SingleCamera {
             } else {
                 // 出帧口、录像各自一条独立的硬件流
                 outputConfigs.add(new OutputConfiguration(target.surface));
-                if (kind == ChannelRules.Kind.RECORD && recordTarget == null) {
-                    recordTarget = target.surface;
-                }
             }
             surfaces.add(target.surface);
             previewRequestBuilder.addTarget(target.surface);
@@ -2512,8 +2156,7 @@ public class SingleCamera {
             AppLog.d(TAG, "Camera " + cameraId + " Surface[" + i + "]: " + s + ", isValid=" + s.isValid());
         }
 
-        // 配好时记下这份会话带的是哪一个录像输出（见 sessionCarries）；配不上时按这份会话里有什么来丢
-        final Surface recordInSession = recordTarget;
+        // 配不上时按这份会话里有什么来丢
         final ChannelRules.Out mirrorOut = firstOfKind(targets, ChannelRules.Kind.MIRROR);
         final ChannelRules.Out recordOut = firstOfKind(targets, ChannelRules.Kind.RECORD);
 
@@ -2555,7 +2198,6 @@ public class SingleCamera {
                     return;
                 }
 
-                sessionRecordSurface = recordInSession;
                 firstFrameAt = 0;
                 captureSession = session;
                 // 记下这份会话带着哪几样：给调度的快照，和「留着的输出」下一份会话照留时要用的 Surface
@@ -2572,7 +2214,6 @@ public class SingleCamera {
                     AppLog.d(TAG, "Camera " + cameraId + " preview started!");
                     lastFrameTimestampMs = System.currentTimeMillis();
                     lastProgressUptimeMs = SystemClock.uptimeMillis();
-                    sessionStartedUptimeMs = lastProgressUptimeMs;
                     if (callback != null) callback.onCameraConfigured(cameraId);
                 } catch (CameraAccessException e) {
                     AppLog.e(TAG, "Failed to start preview", e);
@@ -2615,27 +2256,19 @@ public class SingleCamera {
                     return;
                 }
 
-                boolean channel = requested.get() != null;
-                boolean recording = channel ? recordOut != null : recordSurface != null;
-                if (recording) {
+                if (recordOut != null) {
                     // 录制中：丢弃可选 Surface 后重试。丢了哪一样都报出去 —— 丢了录像输出，录像那一路当场退出，
                     // 不再悄悄饿 15 秒、然后被当成写不进整次停
-                    if (channel ? mirrorOut != null : mainFloatingSurface != null) {
+                    if (mirrorOut != null) {
                         AppLog.w(TAG, "Retrying without main floating surface...");
                         com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
                                 + " 录像中会话配置失败：丢掉后视镜输出重试");
-                        dropOutput(mirrorOut, ChannelRules.Kind.MIRROR, Drop.CONFIG_FAILED);
+                        dropOutput(mirrorOut, Drop.CONFIG_FAILED);
                     } else {
                         AppLog.w(TAG, "Retrying without recording surface...");
-                        if (channel) {
-                            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who()
-                                    + " 录像中会话配置失败：丢掉录像输出重试（已报给录像那一侧，这一路退出录像）");
-                        } else {
-                            // 这一路从这里起不再往录像里送帧，而界面上什么都看不出来
-                            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
-                                    + " 录像中会话配置失败：丢掉了录像输出，这一路从此不再录");
-                        }
-                        dropOutput(recordOut, ChannelRules.Kind.RECORD, Drop.CONFIG_FAILED);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who()
+                                + " 录像中会话配置失败：丢掉录像输出重试（已报给录像那一侧，这一路退出录像）");
+                        dropOutput(recordOut, Drop.CONFIG_FAILED);
                     }
                     requestSessionRebuild("config-failed-recording", 500);
                 } else {
@@ -2664,7 +2297,7 @@ public class SingleCamera {
                 }
                 boolean rebuild;
                 synchronized (sessionLock) {
-                    // 正在等的就是这份关完（closeCamera / forceReopen 会先把 closing 清掉）
+                    // 正在等的就是这份关完（closeCamera、重开会先把 closing 清掉）
                     rebuild = isSessionClosing;
                     isSessionClosing = false;
                 }
@@ -2687,7 +2320,7 @@ public class SingleCamera {
     /**
      * 建会话碰上 "Surface was abandoned"（相机线程）：查出到底是哪几样的消费者死了（{@code SurfaceTexture.isReleased()}、
      * Surface 失效），只摘它们、报出来，在同一步里重试。以前是先猜后视镜、再猜录像 —— 猜错了就把好好的输出摘了。
-     * 调度那条路认不出是哪一个就不重试（重试也是同一个错），这一步到点由救援接手；旧入口认不出时照旧按猜的摘。
+     * 认不出是哪一个就不重试（重试也是同一个错），这一步到点由救援接手。
      *
      * @return true：摘了，该重试
      */
@@ -2699,64 +2332,26 @@ public class SingleCamera {
                 dead.add(target.out);
             }
         }
-        if (!dead.isEmpty()) {
-            AppLog.e(TAG, "Camera " + cameraId + " detected abandoned Surface " + dead + ", dropping only those and retrying");
-            for (ChannelRules.Out out : dead) {
-                dropOutput(out, out.kind, Drop.RELEASED);
-            }
-            return true;
-        }
-        if (requested.get() != null) {
+        if (dead.isEmpty()) {
             AppLog.e(TAG, "Camera " + cameraId + " Surface abandoned, but every output still looks alive: not guessing, not retrying");
             return false;
         }
-        AppLog.e(TAG, "Camera " + cameraId + " detected abandoned Surface, attempting recovery...");
-        if (mainFloatingSurface != null) {
-            mainFloatingSurface = null;
-            AppLog.w(TAG, "Camera " + cameraId + " cleared abandoned mainFloatingSurface and retrying");
-            return true;
+        AppLog.e(TAG, "Camera " + cameraId + " detected abandoned Surface " + dead + ", dropping only those and retrying");
+        for (ChannelRules.Out out : dead) {
+            dropOutput(out, Drop.RELEASED);
         }
-        if (recordSurface != null) {
-            recordSurface = null;
-            AppLog.w(TAG, "Camera " + cameraId + " cleared abandoned recordSurface and retrying");
-            return true;
-        }
-        return false;
+        return true;
     }
 
     /**
-     * 从这一路的会话里丢掉一样输出（相机线程）：调度那条路从要的那一组里摘掉它（{@code updateAndGet}，
-     * 主线程同时换了一组新的不会被盖回去），旧入口清掉对应的旧字段。认得出是哪一样（{@code out} 不是 null）就报出去。
+     * 从这一路的会话里丢掉一样输出（相机线程）：从要的那一组里摘掉它（{@code updateAndGet}，
+     * 主线程同时换了一组新的不会被盖回去），再报出去。
      */
-    private void dropOutput(ChannelRules.Out out, ChannelRules.Kind kind, Drop why) {
-        if (requested.get() != null) {
-            if (out == null) {
-                return;
-            }
-            requested.updateAndGet(set -> set == null ? null : without(set, out));
-        } else {
-            switch (kind) {
-                case PREVIEW:
-                    if (previewSurface != null) {
-                        releaseQuietly(previewSurface);
-                        previewSurface = null;
-                    }
-                    break;
-                case MIRROR:
-                    mainFloatingSurface = null;
-                    break;
-                case RECORD:
-                    recordSurface = null;
-                    break;
-                default:
-                    break;
-            }
-        }
-        if (out != null) {
-            CameraCallback cb = callback;
-            if (cb != null) {
-                cb.onOutputDropped(cameraId, out, why);
-            }
+    private void dropOutput(ChannelRules.Out out, Drop why) {
+        requested.updateAndGet(set -> without(set, out));
+        CameraCallback cb = callback;
+        if (cb != null) {
+            cb.onOutputDropped(cameraId, out, why);
         }
     }
 
@@ -2908,8 +2503,8 @@ public class SingleCamera {
     }
 
     /**
-     * 所有重建请求的唯一入口（外面的 {@link #recreateSession}、关完旧会话、配置失败重试、
-     * Surface 被弃、在途配置被作废 —— 都到这里）。同一时刻只排一个；正在关旧会话时任务会自己等。
+     * 相机层自己的重建请求都到这里（关完旧会话、配置失败重试、Surface 被弃、在途配置被作废；
+     * 调度的改输出、重建会话在 {@link #reconfigure} 里当场建）。同一时刻只排一个；正在关旧会话时任务会自己等。
      */
     private void requestSessionRebuild(String why, long delayMs) {
         Handler handler = backgroundHandler;
@@ -2986,34 +2581,6 @@ public class SingleCamera {
             StallWatch.bufferLost(cameraId, describeTarget(target));
         }
     };
-
-    public void recreateSession() {
-        recreateSession(false);
-    }
-
-    /**
-     * 重新创建会话
-     * @param urgent 紧急模式，跳过防抖延迟以最快速度重建
-     */
-    public void recreateSession(boolean urgent) {
-        if (cameraDevice == null) {
-            return;
-        }
-        // 旧入口：会话按旧字段建（调度那条路改输出走 applyOutputs，见类说明）
-        requested.set(null);
-        if (backgroundHandler == null) {
-            createCameraPreviewSession();
-            return;
-        }
-        requestSessionRebuild(urgent ? "urgent" : "debounced", urgent ? 0 : REBUILD_DEBOUNCE_MS);
-    }
-
-    /**
-     * 获取当前 TextureView（用于心跳推图等功能）
-     */
-    public TextureView getTextureView() {
-        return textureView;
-    }
 
     /**
      * 建拍照用的 JPEG 输出。
@@ -3155,7 +2722,6 @@ public class SingleCamera {
     }
 
     private void closeFrameSink() {
-        frameSinkInSession = false;
         if (frameSink != null) {
             frameSink.close();
             frameSink = null;
@@ -3531,15 +3097,6 @@ public class SingleCamera {
     }
 
     /**
-     * 关闭摄像头。
-     *
-     * @see #closeCamera(String)
-     */
-    public void closeCamera() {
-        closeCamera(null);
-    }
-
-    /**
      * 关闭摄像头：调用方不等。
      *
      * <p>关相机是一次进相机服务的调用，实测卡过 13.6 秒（2026-09-26，主线程）。以前它在调用方的
@@ -3551,12 +3108,11 @@ public class SingleCamera {
      * 做完这一轮的相机线程也就退了。相机服务再卡，卡的是那条线程，主线程照常。
      * 紧接着的「再打开」会先等这一次关完，见 {@link #CLOSING}。</p>
      *
-     * @param why 为什么关（英文短语）。给了就在关完时往黑匣子记一行，带用时；null 表示例行的关，不记
+     * @param why 为什么关（英文短语，调度给的）。关完时往黑匣子记一行，带用时
      */
     public void closeCamera(String why) {
         final CameraCaptureSession session;
         final CameraDevice device;
-        final Surface preview;
         final HandlerThread thread;
         final Handler handler;
         final boolean openInFlight;
@@ -3573,15 +3129,8 @@ public class SingleCamera {
             captureSession = null;
             device = cameraDevice;
             cameraDevice = null;
-            preview = previewSurface;
-            previewSurface = null;
-            // 录制、悬浮窗的 Surface 只清引用、不 release：它们归各自的主人管
-            // （录制那个不清的话，下次建会话会碰上 Surface abandoned）
-            recordSurface = null;
-            mainFloatingSurface = null;
-            mainFloatingSurfaceTexture = null;
-            // 调度那条路：只清会话和设备，不清声明（预览、后视镜、录像的声明留着，下一次开照样带上）
-            requested.set(null);
+            // 只清会话和设备，不清声明（预览、后视镜、录像的声明留着，下一次开照样带上）
+            requested.set(Collections.emptySet());
             sessionGone();
 
             // 这一轮的相机线程也摘下来：之后来自它的回调就是过时的（见 isStale）
@@ -3612,14 +3161,7 @@ public class SingleCamera {
         final long requestedAt = SystemClock.elapsedRealtime();
         Runnable job = () -> {
             closeSessionQuietly(session);
-            closeDeviceTimed(device, why != null ? why : "closeCamera");
-            if (preview != null) {
-                try {
-                    preview.release();
-                } catch (Exception e) {
-                    AppLog.d(TAG, "Camera " + cameraId + " ignored exception while releasing preview surface: " + e.getMessage());
-                }
-            }
+            closeDeviceTimed(device, why);
             // 拍照通道、出帧口也要放，否则下次建会话会多一条悬着的流
             closeJpegReader();
             closeFrameSink();
@@ -3629,10 +3171,8 @@ public class SingleCamera {
             forgetCarried();
             long ms = SystemClock.elapsedRealtime() - requestedAt;
             AppLog.d(TAG, "Camera " + cameraId + " closed in " + ms + "ms");
-            if (why != null) {
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 已关（"
-                        + why + "，" + ms + "ms" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + "）");
-            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 已关（"
+                    + why + "，" + ms + "ms" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + "）");
             CLOSING.remove(cameraId, done);
             done.countDown();
             lastProgressUptimeMs = SystemClock.uptimeMillis();
@@ -3707,11 +3247,6 @@ public class SingleCamera {
     }
 
 
-    /** 有没有哪一路相机正在关（任何一份实例）。开相机前等它们关完：不在别的相机关的途中开。 */
-    public static boolean anyClosing() {
-        return !CLOSING.isEmpty();
-    }
-
     /**
      * 检查摄像头是否已连接
      */
@@ -3720,30 +3255,22 @@ public class SingleCamera {
     }
 
     /**
-     * 强制重新打开摄像头（用于从后台返回前台时）
-     * 即使摄像头当前是连接状态，也会重新打开
+     * 重开的实际步骤（{@link #reopen}）：即使这一路此刻开着也关了再开，会话带着 {@code wanted}。
      *
      * <p>关旧的、开新的都在这一路的相机线程上按顺序做，主线程只是把活派过去 ——
      * 以前旧的是在调用方线程上、拿着 {@link #deviceLock} 关的。</p>
-     */
-    public void forceReopen() {
-        reopenWith(null);
-    }
-
-    /**
-     * 重开：旧入口 {@link #forceReopen()}（{@code wanted} 为 null，会话按旧字段建）和调度的 {@link #reopen} 共用这一段。
      *
      * @return false：合并掉了，什么都没做
      */
     private boolean reopenWith(Set<ChannelRules.Out> wanted) {
         if (reopenInFlight) {
-            AppLog.d(TAG, "Camera " + cameraId + " force reopen already in flight, coalesced");
+            AppLog.d(TAG, "Camera " + cameraId + " reopen already in flight, coalesced");
             return false;
         }
         if (isBusy()) {
             // 开 / 关 / 重连 / 配会话还在途：那一次自己会有结果（开成、报错、关完）。这时再开一次，
             // 就是同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）
-            AppLog.d(TAG, "Camera " + cameraId + " busy (" + describeBusy() + "), force reopen coalesced");
+            AppLog.d(TAG, "Camera " + cameraId + " busy (" + describeBusy() + "), reopen coalesced");
             return false;
         }
         reopenInFlight = true;
@@ -3752,12 +3279,11 @@ public class SingleCamera {
         final CameraDevice oldDevice;
         final Handler handler;
         synchronized (deviceLock) {
-            AppLog.d(TAG, "Camera " + cameraId + " force reopen requested"
-                    + (wanted != null ? " (channel) outputs " + wanted : ""));
+            AppLog.d(TAG, "Camera " + cameraId + " reopen requested (channel) outputs " + wanted);
             // 重置状态。isOpening / isConfiguring / isSessionClosing 这三个也要清 ——
             // 它们只在相机回调里复位，而回调不来正是这条路被走到的原因。
-            // 不清的话：isOpening 会挡掉之后每一次 openCamera，
-            // isConfiguring 会让自愈的每次检查都直接跳过。设备和会话下面就关掉了，
+            // 不清的话：isOpening 会挡掉之后每一次打开，
+            // isConfiguring 会让之后每一次建会话都只作废、不去建。设备和会话下面就关掉了，
             // 在途的那一次配置已经作废，清掉不会和谁打架。
             isOpening = false;
             voidSessionWork();
@@ -3774,17 +3300,13 @@ public class SingleCamera {
         }
 
         if (handler == null) {
-            // 这一路眼下没有相机线程（没开着）：走正常的打开（它自己有 isOpening 挡重复）
+            // 这一路眼下没有相机线程（没开着）：走正常的打开（在开的上面已经按在途合并掉了）
             reopenInFlight = false;
-            if (wanted == null) {
-                openCamera();
-                return true;
-            }
-            return beginOpen(null, wanted);
+            return beginOpen(wanted);
         }
         handler.post(() -> {
             closeSessionQuietly(oldSession);
-            closeDeviceTimed(oldDevice, "forceReopen");
+            closeDeviceTimed(oldDevice, "reopen");
             if (retiringDevice == oldDevice) {
                 retiringDevice = null;
             }
@@ -3792,12 +3314,12 @@ public class SingleCamera {
             forgetCarried();
         });
         // 延迟300ms，给系统时间释放资源
-        handler.postDelayed(() -> forceReopenOnCameraThread(handler), 300);
+        handler.postDelayed(() -> reopenOnCameraThread(handler), 300);
         return true;
     }
 
     /** 强制重开的那一下打开：先确认这一轮还没被关掉、这台相机还在，打开在锁外。 */
-    private void forceReopenOnCameraThread(Handler handler) {
+    private void reopenOnCameraThread(Handler handler) {
         synchronized (deviceLock) {
             if (handler != backgroundHandler) {
                 reopenInFlight = false;
@@ -3835,13 +3357,13 @@ public class SingleCamera {
                 return;
             }
             openCameraMarked(handler);
-            AppLog.d(TAG, "Camera " + cameraId + " force reopen initiated");
+            AppLog.d(TAG, "Camera " + cameraId + " reopen initiated");
         } catch (CameraAccessException | RuntimeException e) {
-            // 没发出去：标成「没开」，看门狗按它的节奏再试
+            // 没发出去：标成「没开」，报开不起来，再不再试由调度判
             reopenInFlight = false;
             deviceLost = true;
             lastErrorName = e.getClass().getSimpleName();
-            AppLog.e(TAG, "Failed to force reopen camera " + cameraId, e);
+            AppLog.e(TAG, "Failed to reopen camera " + cameraId, e);
             reportOpenFailed(reasonOf(e));
         }
     }
@@ -4199,7 +3721,7 @@ public class SingleCamera {
                     edgeMode, noiseReductionMode, effectMode);
 
             // 重新提交请求（实时生效）；带上出帧回调 —— 以前传 null，这之后的帧不计数，
-            // 看门狗 8 秒后把好好的相机当成没画面去救
+            // 调度 8 秒后把好好的相机当成没画面去救
             captureSession.setRepeatingRequest(currentRequestBuilder.build(), activeCaptureCallback, backgroundHandler);
             AppLog.d(TAG, "Camera " + cameraId + " image adjust params updated successfully");
             return true;

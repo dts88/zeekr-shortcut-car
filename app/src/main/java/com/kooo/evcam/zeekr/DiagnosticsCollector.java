@@ -301,6 +301,24 @@ public final class DiagnosticsCollector {
         }
         sb.append('\n');
         appendCameraAvailability(sb, context);
+        appendChannel(sb);
+    }
+
+    /**
+     * 通道调度（2.11 起唯一动相机的地方）此刻怎么看每一路，紧跟在相机服务视角那张表后面，两边对着看：
+     * 该不该开、实际怎样，会话里的输出（要的、留着的、死的），被拿着、不在，开失败和判定，救援梯子，问相机服务；
+     * 能不能用相机、手上那一步、在等什么。句子在 MultiCameraManager 里拼。只读调度记下的快照，不建管线。
+     */
+    private static void appendChannel(StringBuilder sb) {
+        sb.append("## 2.3.2 通道调度（Channel）").append('\n');
+        try {
+            com.kooo.evcam.camera.MultiCameraManager manager =
+                    com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+            sb.append(manager == null ? "管线还没建（这个进程还没用过相机）\n" : manager.describeChannel());
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
     }
 
     /**

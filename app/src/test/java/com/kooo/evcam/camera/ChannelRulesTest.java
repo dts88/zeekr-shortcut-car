@@ -1508,6 +1508,27 @@ public class ChannelRulesTest {
         assertFalse(ChannelRules.excludedFromPhoto(surround));
     }
 
+    /**
+     * 大纲 §0 的名词：会话里的输出算要的、留着的、死的 —— 诊断报告、卡顿现场、关相机那一行（「带走留着的输出」）照它分。
+     * 只是分类：留着的不为它改会话（上面「减输出能拖就拖」那几条）。
+     */
+    @Test
+    public void sessionOutputsAreWantedKeptOrDead() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS, recS);   // 停录后留着的录像输出（录制器停放着，还声明着）
+        assertEquals(ChannelRules.OutState.WANTED, ChannelRules.outState(w, surround, pvS));
+        assertEquals("没人要了、消费者还活着：留着", ChannelRules.OutState.KEPT, ChannelRules.outState(w, surround, recS));
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        assertEquals("又开录了：要的", ChannelRules.OutState.WANTED, ChannelRules.outState(w, surround, recS));
+        w.screenOn = false;
+        assertEquals("熄屏时主界面看不见：预览留着", ChannelRules.OutState.KEPT, ChannelRules.outState(w, surround, pvS));
+        surround.dead.add(pvS);
+        assertEquals("画布被系统收走：死的", ChannelRules.OutState.DEAD, ChannelRules.outState(w, surround, pvS));
+        streaming(rear, Out.SINK);
+        assertEquals("出帧口在会话里就算要的", ChannelRules.OutState.WANTED, ChannelRules.outState(w, rear, Out.SINK));
+    }
+
     /** 输出按消费者认（§7.6）：同一块画布再声明一次还是同一个输出，换了画布才是另一个。 */
     @Test
     public void outputsAreIdentifiedByTheirConsumer() {

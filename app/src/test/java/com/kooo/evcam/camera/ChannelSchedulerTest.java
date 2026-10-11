@@ -223,23 +223,18 @@ public class ChannelSchedulerTest {
         assertEquals(2, lines("judged").size());
     }
 
-    /**
-     * 丢了还没判完：判完之前 condition 说不出是不是被拿着（在救）；原因是「被占用」一类的，旧读者问
-     * {@link CameraTaken#othersHold} 当场就是真（阶段 7 随它一起删）。
-     */
+    /** 丢了还没判完：判完之前 condition 说不出是不是被拿着（在救），判完才是 TAKEN。 */
     @Test
-    public void anInUseLossIsRescuingUntilJudgedAndCountsAsHeldMeanwhile() {
+    public void anInUseLossIsRescuingUntilJudged() {
         claim(Holder.PREVIEW);
         streaming(surround, pvS);
         streaming(rear, pvR);
         streaming(front, pvF);
         settle();
         assertEquals(ChannelRules.Condition.STREAMING, s.condition(REAR));
-        assertFalse(CameraTaken.othersHold());
         rear.lose(now);
         s.onLossStarted("1", DISCONNECTED);
         assertEquals(ChannelRules.Condition.RESCUING, s.condition(REAR));
-        assertTrue("被断开、还没判：算别的程序拿着", CameraTaken.othersHold());
         at(5_400);
         rear.closedNow();
         s.onLossClosed("1", 5_400);
@@ -247,19 +242,17 @@ public class ChannelSchedulerTest {
         assertEquals("关完了，那 300 ms 里还在判：说不出是被拿着", ChannelRules.Condition.RESCUING, s.condition(REAR));
         at(5_700);
         assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
-        assertTrue(CameraTaken.othersHold());
     }
 
-    /** 设备错误（4）丢了：还在判（在救），但不属于「被占用」一类，旧读者不当成别的程序拿着。 */
+    /** 设备错误（4）丢了：还在判，算在救。 */
     @Test
-    public void aDeviceErrorLossIsRescuingButNotHeld() {
+    public void aDeviceErrorLossIsRescuing() {
         claim(Holder.PREVIEW);
         streaming(surround, pvS);
         settle();
         surround.lose(now);
         s.onLossStarted("2", DEVICE_ERROR);
         assertEquals(ChannelRules.Condition.RESCUING, s.condition(SUR));
-        assertFalse(CameraTaken.othersHold());
     }
 
     /**
@@ -1135,21 +1128,19 @@ public class ChannelSchedulerTest {
         assertTrue(front.actions.isEmpty());
     }
 
-    // ================================================================= 被拿着的旧读者（后视镜服务、协调器）
+    // ================================================================= 拍照照调度的账
 
-    /** 被拿着只记在调度里：还没迁走的旧读者问 CameraTaken，照调度的账答。 */
+    /** 被拿着只记在调度里：拍照照调度的账不拍被拿着的那一路，在出画面的照拍。 */
     @Test
-    public void theOldReadersSeeTheSchedulersMarks() {
+    public void photoLeavesOutTheLaneTheSchedulerMarksTaken() {
         claim(Holder.PREVIEW);
         streaming(surround, pvS);
         streaming(front, pvF);
         rear.declared.add(pvR);
-        assertFalse(CameraTaken.benched("1"));
+        assertFalse(s.excludedFromPhoto(REAR));
         host.absent("1");
         settle();
-        assertTrue(CameraTaken.benched("1"));
-        assertTrue(CameraTaken.othersHold());
-        assertFalse(CameraTaken.benched("2"));
+        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
         assertTrue(s.excludedFromPhoto(REAR));
         assertFalse(s.excludedFromPhoto(SUR));
     }
@@ -1195,7 +1186,136 @@ public class ChannelSchedulerTest {
         assertTrue(lines("recordWaitEnded").isEmpty());
     }
 
+    // ================================================================= 诊断：关相机那两行、快照（大纲 §2 阶段 8）
+
+    /**
+     * 关相机那一行末尾带上会话里带走的留着的输出、各留了多久；每关一路再交一份这一次开着的小结（重配了几次、各为什么）——
+     * 停录、关后视镜都不动通道（留着的输出），保持到点关的时候一起带走。卡顿现场那一份分类也交给了相机层。
+     */
+    @Test
+    public void aCloseCarriesTheKeptOutputsAndSumsUpTheOpen() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        settle();
+        declare(surround, mirror);
+        claim(Holder.MIRROR);
+        settle();
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
+        at(300);
+        configured(surround, mirror, recS);
+        frame(surround);
+        settle();
+        assertEquals(ChannelRules.OutState.WANTED, surround.states.get(recS).state);
+
+        at(1_000);
+        drop(Holder.RECORDING);   // 停录：录制器停放，录像输出留在会话里
+        settle();
+        assertEquals("停录不动通道：留着", ChannelRules.OutState.KEPT, surround.states.get(recS).state);
+        assertEquals(T0 + 1_000, surround.states.get(recS).since);
+        at(2_000);
+        drop(Holder.MIRROR);   // 后视镜关了：亮屏、前台服务在，环视保持 30 秒
+        settle();
+        assertEquals(1, surround.actions.size());
+
+        at(2_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]", "close hold-over"), surround.actions);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("closeRound front |  | carried front MIRROR 30000, front RECORD 31000"),
+                lines("closeRound"));
+        assertEquals(Arrays.asList("openSpan front open=32000 added=1 dead=0 rescued=0 removedOnly=0"),
+                lines("openSpan"));
+        assertTrue("关了：分类清空", surround.states.isEmpty());
+    }
+
+    /** 一路一没人要就关（没有前台服务、不保持）：会话里的输出是跟着关的，不算留着；小结照记。 */
+    @Test
+    public void anOutputDroppedInTheRoundThatClosesIsNotCountedAsKept() {
+        host.foregroundService = false;
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        at(5_000);
+        drop(Holder.PREVIEW);
+        settle();
+        assertEquals(Arrays.asList("close unwanted"), surround.actions);
+        at(5_100);
+        closed(surround);
+        settle();
+        at(5_200);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals(Arrays.asList("closeRound front | left, back"), lines("closeRound"));
+        assertEquals(Arrays.asList("openSpan front open=5000 added=0 dead=0 rescued=0 removedOnly=0",
+                "openSpan left open=5100 added=0 dead=0 rescued=0 removedOnly=0",
+                "openSpan back open=5100 added=0 dead=0 rescued=0 removedOnly=0"), lines("openSpan"));
+    }
+
+    /**
+     * 诊断报告读的快照：每一轮最后记一份 —— 每一路会话里的输出算要的、留着的、死的，从什么时候起；被拿着、不在；
+     * 最近一次问相机服务问成了没有、它怎么说；手上那一步。
+     */
+    @Test
+    public void theSnapshotShowsOutputsMarksAnswersAndTheStepInHand() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS, recS);   // 停录后留着的录像输出
+        streaming(front, pvF);
+        rear.declared.add(pvR);
+        host.absent("1");
+        settle();
+        ChannelScheduler.Snapshot snap = s.snapshot();
+        ChannelScheduler.LaneView sur = view(snap, SUR);
+        assertEquals(2, sur.outputs.size());
+        assertEquals(ChannelRules.OutState.WANTED, sur.outputs.get(0).state);
+        assertEquals(ChannelRules.OutState.KEPT, sur.outputs.get(1).state);
+        assertEquals(T0, sur.outputs.get(1).since);
+        ChannelScheduler.LaneView left = view(snap, REAR);
+        assertEquals(CameraTaken.Verdict.TAKEN, left.mark);
+        assertTrue(left.absent);
+        assertTrue(left.shouldOpen);
+        assertEquals(T0, snap.askedAt);
+        assertEquals("问了，还没答回来", 0, snap.answeredAt);
+        assertTrue(snap.usable);
+        assertTrue("手上没有一步", snap.step == null);
+
+        at(500);
+        host.answer();
+        snap = s.snapshot();
+        assertEquals(T0 + 500, snap.answeredAt);
+        assertTrue("收到了回放：问成了", snap.answered);
+        assertEquals(1, view(snap, REAR).lastAnswer.n);
+        assertTrue(view(snap, REAR).lastAnswer.absent);
+
+        // 环视的预览画布被系统收走：死的，调度马上摘 —— 手上那一步就是它
+        at(1_000);
+        surround.dead.add(pvS);
+        surround.declared.remove(pvS);
+        s.wake();
+        settle();
+        snap = s.snapshot();
+        assertEquals(ChannelRules.OutState.DEAD, view(snap, SUR).outputs.get(0).state);
+        assertEquals(T0 + 1_000, view(snap, SUR).outputs.get(0).since);
+        assertEquals(ChannelRules.Move.APPLY, snap.step.move);
+        assertEquals(Arrays.asList(SUR), snap.step.keys);
+    }
+
     // ================================================================= 帮手：扮演相机层、登记表
+
+    /** 快照里的那一路。 */
+    private static ChannelScheduler.LaneView view(ChannelScheduler.Snapshot snap, String key) {
+        for (ChannelScheduler.LaneView lane : snap.lanes) {
+            if (lane.key.equals(key)) {
+                return lane;
+            }
+        }
+        fail("快照里没有 " + key);
+        return null;
+    }
 
     /** 把钟拨到 T0 + ms，到点的任务按先后跑。 */
     private void at(long ms) {
@@ -1367,6 +1487,8 @@ public class ChannelSchedulerTest {
         long firstFrameAt;
         long progressAgeMs;
         int generation;
+        /** 调度最后一次交来的输出分类（卡顿现场用的那一份）。 */
+        Map<Out, ChannelScheduler.OutputState> states = new HashMap<>();
 
         FakePort(String id) {
             this.id = id;
@@ -1507,6 +1629,11 @@ public class ChannelSchedulerTest {
         public void dropped(Out out, SingleCamera.Drop why) {
             drops.add(out.kind + " " + why);
         }
+
+        @Override
+        public void outputStates(Map<Out, ChannelScheduler.OutputState> states) {
+            this.states = states;
+        }
     }
 
     /** 全局事实：登记表、亮熄屏、前台服务、相机服务那几句（含深睡的钟）；问相机服务的回调排着，测试来答。 */
@@ -1514,7 +1641,7 @@ public class ChannelSchedulerTest {
         final Set<Holder> holders = EnumSet.noneOf(Holder.class);
         final Set<String> plan = new LinkedHashSet<>();
         final Map<String, CameraAvailabilityWatch.Word> words = new HashMap<>();
-        final List<Consumer<Set<String>>> asks = new ArrayList<>();
+        final List<Consumer<CameraAvailabilityWatch.Asked>> asks = new ArrayList<>();
         final List<String> took = new ArrayList<>();
         boolean sleeps;
         boolean screenOn;
@@ -1541,10 +1668,16 @@ public class ChannelSchedulerTest {
             words.put(cameraId, new CameraAvailabilityWatch.Word(false, false, false, elapsed(now)));
         }
 
-        /** 答上还没答的那一次问（和记录一致：没有改的）。 */
+        /** 答上还没答的那一次问：回放照记录（说过话的那几路），和记录一致，没有改的。 */
         void answer() {
+            Map<String, Boolean> replay = new HashMap<>();
+            for (Map.Entry<String, CameraAvailabilityWatch.Word> entry : words.entrySet()) {
+                if (!entry.getValue().absent && entry.getValue().free != null) {
+                    replay.put(entry.getKey(), entry.getValue().free);
+                }
+            }
             while (answered < asks.size()) {
-                asks.get(answered++).accept(new LinkedHashSet<>());
+                asks.get(answered++).accept(new CameraAvailabilityWatch.Asked(replay, new ArrayList<>()));
             }
             settle();
         }
@@ -1614,7 +1747,7 @@ public class ChannelSchedulerTest {
         }
 
         @Override
-        public void ask(Consumer<Set<String>> answered) {
+        public void ask(Consumer<CameraAvailabilityWatch.Asked> answered) {
             asks.add(answered);
         }
 
@@ -1732,8 +1865,19 @@ public class ChannelSchedulerTest {
 
         @Override
         public void closeRound(String surroundKey, long surroundMs, boolean surroundTimedOut,
-                               List<String> cabinKeys, List<Long> cabinMs) {
-            journal.add("closeRound " + surroundKey + " | " + String.join(", ", cabinKeys));
+                               List<String> cabinKeys, List<Long> cabinMs, List<ChannelScheduler.Carried> carried) {
+            List<String> kept = new ArrayList<>();
+            for (ChannelScheduler.Carried one : carried) {
+                kept.add(one.key + " " + one.kind + " " + one.keptMs);
+            }
+            journal.add("closeRound " + surroundKey + " | " + String.join(", ", cabinKeys)
+                    + (kept.isEmpty() ? "" : " | carried " + String.join(", ", kept)));
+        }
+
+        @Override
+        public void openSpan(ChannelScheduler.OpenSpan span) {
+            journal.add("openSpan " + span.key + " open=" + span.openMs + " added=" + span.added
+                    + " dead=" + span.deadRemoved + " rescued=" + span.rescued + " removedOnly=" + span.removedOnly);
         }
 
         @Override

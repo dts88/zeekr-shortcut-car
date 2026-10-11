@@ -56,7 +56,8 @@ import java.util.function.Consumer;
  *       都要进相机服务，在 {@link #setup} 这条线程上做 —— 主线程不进相机服务（lifecycle-spec §3.5：相机服务忙的时候一问要等
  *       几秒到十几秒）。做完回主线程 {@link MultiCameraManager#initCameras}，各路的画面尺寸由 SingleCamera 在它自己的相机线程上
  *       不开设备先算（{@code resolveSize}）。</li>
- *   <li>槽位照存下的映射建（{@link ZeekrMultiPlan#choose}）：相机列表完整时照列表分、存下来（只在变了时写）；不完整时照存下的建，
+ *   <li>槽位照存下的映射建（{@link ZeekrMultiPlan#choose}）：相机列表完整时照列表分，值得存才存下来（{@code worthStoring}：
+ *       环视是探测到的合成流、或者还没存过能用的；只在变了时写）；不完整时照存下的建，
  *       列表里少的那一路照样建出来，交给通道调度判「不在」（被别的程序拿着）—— 车机拿着后座舱时它就不在列表里，以前照列表分，
  *       后座舱这一格就没了，以后既认不出、也开不了。没存过（第一次装）照列表建（大纲 §6 风险 13）。</li>
  *   <li>用几路、座舱哪两格要建，照当前配置（{@link Profile}：开了几路、座舱那一路开没开、有没有格子）—— 和主界面的布局同一个判断；

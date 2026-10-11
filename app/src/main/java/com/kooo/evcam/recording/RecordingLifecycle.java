@@ -52,8 +52,9 @@ public final class RecordingLifecycle {
         /** 第一路加入录像。 */
         STARTED,
         /**
-         * 计划里每一路的录制器都建不起来（会话都带不上它们的录像输出；MediaRecorder 还算上开录没成）。
-         * 相机没出画面不是这个：那几路等着加入。
+         * 计划里每一路的录制器都建不起来（编码录制建不起来；MediaRecorder 备不起来、或者开不了录）。
+         * 会话带不上录像输出不是这个（相机那一侧的事，那一路退出、隔一会儿再声明）；相机没出画面也不是：那几路等着加入。
+         * 停成什么原因看此刻的阶段（{@link RecordingLifecycle#endReason}）。
          */
         START_FAILED,
         /** 停录收拾完了。 */

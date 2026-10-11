@@ -3,11 +3,7 @@ package com.kooo.evcam.camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
 
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 别的程序拿着相机的时候我们怎么办。
@@ -18,34 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * 断开；之后我们每次重开都报 {@code ERROR_MAX_CAMERAS_IN_USE}，直到它放开。谁拿得到由相机服务按
  * 进程优先级定 —— 我们在前台它开不了（我们收不到任何信号），我们在后台就是我们被踢。
  * 所以「让路」没有意义：前台让不出去，后台不用让。</p>
- *
- * <h3>规则（项目所有者 2026-09-27 定）</h3>
- *
- * <ul>
- *   <li>它拿着的时候不按退避猛试（每次都失败、还刷日志），只每 {@link #RETRY_WHILE_HELD_MS} 试一次、不计次数
- *       （2.10.10 起这个节奏在看门狗 {@link CameraLiveness} 里，相机自己不再重连）——
- *       这一下是保险：它要是占着很久、而我们是别的原因断的（哨兵模式下相机 1 被车机自己的服务占过两个小时，
- *       我们照常录着），不至于一直不接；</li>
- *   <li>它一放开（相机服务会通知）就接回 —— 2026-10-10 起由看门狗的闸门接（{@link #gate}）：别的程序一路都不占了、
- *       这一路自己空闲满 {@link #QUIET_MS}、所有相机的空闲 / 占用这么久没变过，才单独重开这一路。
- *       以前是相机服务一说放开，就把断掉的几路当场全部重开，不管别的相机是不是正在开、正在关；</li>
- *   <li>相机服务说访问优先级变了（我们回到前台那种）立刻试一次：前台的一方拿得到。</li>
- * </ul>
- *
- * <h3>哪一路算「被拿走」（2026-10-10）</h3>
- *
- * <p>我们的一路被断开、或者报错 1 / 2，那一次关设备关完了才判（2.10 的 judgeLoss）：相机服务说这一路被占用、
- * 而我们自己已经不占着它 —— 那就是别的程序拿着；或者报的是 2（相机数到上限）、而别的程序占着另一路 ——
- * 1 和 2 在相机服务里冲突的那种，它自己没人占，是被另一路挡着。都不是就按普通的失败算（看门狗计次数，三次停手）：
- * 2026-10-08 那七次「被断开」全是自己顶自己，相机服务并没说别的程序占着，不能因此不计次数。</p>
- *
- * <p>以前没有这一步：被拿走的那一刻我们还卡在关设备里（5–8 秒），相机服务报「被占用」时设备字段还在，
- * 于是被记成「我们开着」，这一路从来没进过这张表 —— 30 秒的节奏、放开就接回、嫌疑应用都没有它的份
- * （2026-10-10 黑匣子，车主离车时车机拿走后座舱相机 1）。</p>
- *
- * <p>录像那一侧（2026-10-10）：录着的一路被断开时只停这一路，别的路照录（{@link RecordingLanes}）；
- * 它放开、通道安静了，看门狗单独重开它，那一下重开就是这一路单独接回录像。它是最后一路在录的，
- * 才整次停、由主界面按「录像被打断」的路子等环视恢复再接。</p>
  *
  * <h3>2.11 起：只问、不开；判定和放开是纯规则（项目所有者 2026-10-10 确认）</h3>
  *
@@ -60,15 +28,19 @@ import java.util.concurrent.ConcurrentHashMap;
  * 那只能是别人；或者这一路干脆不在（10-10 车机拿走后座舱时，相机服务一句话都不说，开的时候相机列表里也没有它）。
  * 判定由调度在主线程上做（{@link ChannelScheduler}，判完的账记在调度里）。</p>
  *
- * <p>2.10 那一套 2.11 阶段 3 起不再动手：事件入口（相机服务报别的程序拿、放，访问优先级变了，我们开成了）、
- * 关完之后的判定（judgeLoss）、放开了叫看门狗重开（retryNow → MultiCameraManager.retryTaken）都删了 ——
- * 它们会在调度之外自己去开相机。剩下的账本（{@link Book}）、闸门（{@link #gate}）、旧的判法（{@link #serviceSays}、
- * {@code judge(int, …)}）只是纯函数，只给旧的测试用，阶段 7 和那些测试一起删。</p>
+ * <h3>以前（2.10）</h3>
+ *
+ * <p>项目所有者 2026-09-27 定的是：它拿着的时候不按退避猛试，只每 30 秒试开一次、不计次数 —— 这一下是保险：
+ * 它要是占着很久、而我们是别的原因断的（哨兵模式下相机 1 被车机自己的服务占过两个小时，我们照常录着），不至于一直不接；
+ * 它一放开（相机服务会通知）就接回，2026-10-10 起等别的程序一路都不占了、这一路自己空闲满 3 秒、所有相机这么久没变过，
+ * 才单独重开；访问优先级变了（我们回到前台那种）立刻试一次。2026-10-10 起一路被断开、报错 1 / 2，关完才判是不是被拿走的：
+ * 以前被拿走的那一刻我们还卡在关设备里（5–8 秒），相机服务报「被占用」时设备字段还在，被记成「我们开着」，
+ * 这一路从来没被认出来（2026-10-10 黑匣子，车主离车时车机拿走后座舱相机 1）。</p>
+ *
+ * <p>那一套的事件入口（相机服务报别的程序拿、放，访问优先级变了，我们开成了）、关完之后的判定、放开了叫看门狗重开，
+ * 会在调度之外自己去开相机，2.11 阶段 3 拆了；只给它们用的账本、闸门、旧的判法，阶段 7 和它们的测试一起删了。</p>
  */
 public final class CameraTaken {
-
-    /** 别的程序占着相机时多久试一次（看门狗 {@link CameraLiveness#step} 用）。 */
-    static final long RETRY_WHILE_HELD_MS = 30_000L;
 
     /**
      * 被拿着的一路（{@link Verdict#TAKEN} / {@link Verdict#BLOCKED}）有人要时，多久问一次相机服务它空没空。
@@ -86,107 +58,13 @@ public final class CameraTaken {
      * <p>交接的时候相机服务一连串地报（2026-10-10：车机拿走相机 1 的同一毫秒，还报了我们正开着的 0 和 2「空闲」），
      * 那几秒里再动一路，就是在交接的中途动通道 —— 通道规则是一次只变一路、变完一步再下一步。</p>
      *
-     * <p>2.11 起只算别人引起的：我们自己开、关一路时它报的那几声不挡。旧的闸门（{@link #gate}，只管被拿走的那一路）
+     * <p>2.11 起只算别人引起的：我们自己开、关一路时它报的那几声不挡。2.10 的闸门（只管被拿走的那一路）
      * 算的是所有相机多久没变过，连我们自己开关时它报的那几声都算 —— 2.11 开、改输出、救都要等安静，照那个算法，
-     * 按次序开每一路都要多等 3 秒。旧的闸门还按旧的算法喂它，数值没变。</p>
+     * 按次序开每一路都要多等 3 秒。</p>
      */
     static final long QUIET_MS = 3_000L;
 
-    /**
-     * 别的程序拿走一路时，相机服务那一声「被占用」最多比我们收到断开早多久还算是它。被拿走时相机服务先报这一路空闲
-     * （我们被踢了）、紧接着报被占用（新主人连上了）；这两声和断开不在同一条线上到，被占用可能先到 ——
-     * 那时设备还算我们的，被记成了「我们开着」。
-     */
-    static final long TAKE_LINK_MS = 5_000L;
-
-    /** 丢了一路、关完之后的判定，见 {@link #judge}。 */
-    enum Loss {
-        /** 相机服务没说别的程序占着：按普通的失败算，看门狗计次数、三次停手。 */
-        ORDINARY,
-        /** 这一路被别的程序拿着。 */
-        HELD,
-        /** 这一路自己没人占，是别的程序占着的另一路把它挡住了（报错 2，1 和 2 冲突的那种）。 */
-        BLOCKED
-    }
-
-    /** 被拿走的一路，看门狗这一次检查怎么办，见 {@link #gate}。 */
-    enum Gate {
-        /** 通道还在变：这一次不动这一路。 */
-        WAIT,
-        /** 还被占着（或者相机服务的说法对不上）：按 {@link #RETRY_WHILE_HELD_MS} 的节奏试一下，不计次数。 */
-        PROBE,
-        /** 放开了、通道也安静了：现在单独重开。 */
-        REOPEN
-    }
-
     private CameraTaken() {
-    }
-
-    // ================================================================= 纯规则
-
-    /**
-     * 丢了一路、关完之后，相机服务的表对它怎么说：true 空闲、false 被别的程序占着、null 说不准。
-     *
-     * <p>「被占用」当时就认出不是我们的，或者是在丢之前 {@link #TAKE_LINK_MS} 以内才报的，算别的程序占着。
-     * 更早报的、记成「我们开着」的，是我们自己开着它时的旧账：被断开之后相机服务那一声「空闲」可能还在路上，
-     * 不能因此当成被拿走 —— 不然自己被断开也不计次数了（2026-10-08 那七次都是自己顶自己）。</p>
-     *
-     * @param available    表上最近一次的状态：true 空闲、false 被占用、null 没收到过
-     * @param recordedOurs 那一声报的时候记成了我们开着
-     * @param sinceMs      那一声的时刻（开机起算，含深睡）
-     * @param lostAt       丢的那一刻（同一个钟）
-     */
-    static Boolean serviceSays(Boolean available, boolean recordedOurs, long sinceMs, long lostAt) {
-        if (!Boolean.FALSE.equals(available)) {
-            return available;
-        }
-        if (!recordedOurs || sinceMs >= lostAt - TAKE_LINK_MS) {
-            return Boolean.FALSE;
-        }
-        return null;
-    }
-
-    /**
-     * 我们的一路丢了（被断开、报错 1 / 2），那一次关也关完了：是不是被别的程序拿走的。
-     *
-     * @param error             相机层报的错：-4 被断开，或者 {@code onError} 的错误码
-     * @param available         相机服务的表对它怎么说（{@link #serviceSays}）：true 空闲、false 被别的程序占着、null 说不准
-     * @param oursNow           我们此刻又占着、或者正在开这一路（另一次打开排在后面）：被占用说的是我们自己
-     * @param othersHoldAnother 别的程序此刻占着另外哪一路
-     */
-    static Loss judge(int error, Boolean available, boolean oursNow, boolean othersHoldAnother) {
-        if (oursNow) {
-            return Loss.ORDINARY;
-        }
-        if (Boolean.FALSE.equals(available)) {
-            return Loss.HELD;
-        }
-        if (error == CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE && othersHoldAnother) {
-            return Loss.BLOCKED;
-        }
-        return Loss.ORDINARY;
-    }
-
-    /**
-     * 被拿走的这一路，有人要画面时看门狗这一次检查怎么办 —— 它只能从这里重开，别处（按次序开相机、后视镜）一律跳过。
-     *
-     * <p>放开不看「这一路自己的空闲」一个事件，而看两样此刻的状态：别的程序一路都不占了（1 和 2 冲突时，
-     * 相机 1 放开也就放开了被它挡着的 2 —— 2 自己从头到尾都是空闲），这一路自己空闲满 {@link #QUIET_MS}；
-     * 再加上所有相机这么久没变过。相机服务的说法对不上（别的程序都不占了、这一路却还报被占用）时
-     * 照 {@link #RETRY_WHILE_HELD_MS} 的节奏试，不至于永远不接。</p>
-     *
-     * @param othersHoldAny     别的程序此刻占着哪一路（{@link #othersHold()}）
-     * @param ownAvailableForMs 相机服务说这一路空闲了多久；被占用、没收到过都是负数
-     * @param quietForMs        所有相机的空闲 / 占用多久没变过
-     */
-    static Gate gate(boolean othersHoldAny, long ownAvailableForMs, long quietForMs) {
-        if (quietForMs < QUIET_MS) {
-            return Gate.WAIT;
-        }
-        if (!othersHoldAny && ownAvailableForMs >= QUIET_MS) {
-            return Gate.REOPEN;
-        }
-        return Gate.PROBE;
     }
 
     // ================================================================= 2.11 的纯规则：丢失和开失败共用一个判法
@@ -467,113 +345,5 @@ public final class CameraTaken {
             return !anyTaken;
         }
         return false;
-    }
-
-    /**
-     * 账本：别的程序占着哪几路（相机服务报的，全局一张），我们的哪几路被拿走了（每一路自己一条）。
-     *
-     * <p>全局那张表的规矩不变：别的程序一路都不占了才算真放开 —— 1 和 2 冲突时，2 自己没人占，
-     * 等的是 1 放开。纯数据，见 {@code CameraTakenTest}。2.11 起运行时不再记它（被拿着只记在通道调度里），
-     * 只留给旧的测试，阶段 7 和那些测试一起删。</p>
-     */
-    static final class Book {
-        private final Set<String> held = ConcurrentHashMap.newKeySet();
-        /** 我们被拿走的那几路：相机 id → 从什么时候起（开机起算，含深睡）、是不是被另一路挡着。 */
-        private final Map<String, Bench> benched = new ConcurrentHashMap<>();
-
-        boolean othersHold() {
-            return !held.isEmpty();
-        }
-
-        /** 别的程序此刻占着除这一路以外的哪一路。 */
-        boolean othersHoldOtherThan(String cameraId) {
-            for (String id : held) {
-                if (!id.equals(cameraId)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        Set<String> heldIds() {
-            return new TreeSet<>(held);
-        }
-
-        /** @return true：这一路原来不在表上 */
-        boolean othersTook(String cameraId) {
-            return held.add(cameraId);
-        }
-
-        /** @return true：划掉这一路之后别的程序一路都不占了 —— 这一下才是真放开 */
-        boolean released(String cameraId) {
-            return held.remove(cameraId) && held.isEmpty();
-        }
-
-        boolean benched(String cameraId) {
-            return benched.containsKey(cameraId);
-        }
-
-        boolean anyBenched() {
-            return !benched.isEmpty();
-        }
-
-        /** 记下我们这一路被拿走了。已经在表上的（试的那一下又没拿到）从最初那一刻算起。 */
-        void bench(String cameraId, long sinceMs, boolean blocked) {
-            Bench before = benched.get(cameraId);
-            benched.put(cameraId, new Bench(before != null ? before.sinceMs : sinceMs, blocked));
-        }
-
-        /** @return 被拿走了多久（毫秒）；-1 = 本来就不在表上 */
-        long unbench(String cameraId, long nowMs) {
-            Bench bench = benched.remove(cameraId);
-            return bench == null ? -1 : Math.max(0, nowMs - bench.sinceMs);
-        }
-
-        /** 给日志看：{@code 1, 2<-[1]}（2 被别的程序占着的 1 挡着）。 */
-        String describeBenched() {
-            StringBuilder sb = new StringBuilder();
-            for (String id : new TreeSet<>(benched.keySet())) {
-                Bench bench = benched.get(id);
-                sb.append(sb.length() > 0 ? ", " : "").append(id)
-                        .append(bench != null && bench.blocked ? "<-" + heldIds() : "");
-            }
-            return sb.toString();
-        }
-    }
-
-    private static final class Bench {
-        final long sinceMs;
-        final boolean blocked;
-
-        Bench(long sinceMs, boolean blocked) {
-            this.sinceMs = sinceMs;
-            this.blocked = blocked;
-        }
-    }
-
-    // ================================================================= 对外（2.11：只读调度的账）
-
-    /**
-     * 此刻有没有别的程序拿着我们的哪一路：通道调度判的 {@link Verdict#TAKEN}，或者丢了、原因是「被占用」一类、还没判完的。
-     *
-     * <p>2.11 起被拿着只记在调度里（{@link ChannelScheduler}）：这里只照调度的账答（以前的读者是录像协调器，阶段 5 起不问了），
-     * 自己不再记账 —— 以前的账本由相机服务的通知和关完之后的判定（judgeLoss）记，那两条路连同
-     * 「放开了就叫看门狗重开」（retryNow → retryTaken）一起拆了：动相机的只剩调度一处。主线程上读。</p>
-     *
-     * <p>还没判完的也算（{@link ChannelScheduler#takeoverPendingAnywhere}）：协调器在丢的那一刻（最后一路被拿走、整次停）
-     * 就问这一句，定这一次停录算不算接回的次数，而调度要等那一次关完再过 300 ms 才判。只看判完的，车机每拿走一次
-     * 都被算成一次失败，倒车几下就用完 3 次（审查 2026-10-11）。阶段 5 去掉了那种整次停，协调器不再问它：
-     * 应用里没有读者了，阶段 7 删（大纲 §1 CameraTaken「删」）。</p>
-     */
-    public static boolean othersHold() {
-        return ChannelScheduler.anyTakenAnywhere() || ChannelScheduler.takeoverPendingAnywhere();
-    }
-
-    /**
-     * 我们的这一路此刻被拿着（被别的程序拿着 TAKEN，或者被拿着的另一路挡着 BLOCKED）：照调度的账答。
-     * 超级后视镜服务阶段 4 起改读调度的 condition，应用里没有读者了，阶段 7 删（大纲 §1 CameraTaken「删」）。主线程上读。
-     */
-    public static boolean benched(String cameraId) {
-        return ChannelScheduler.takenAnywhere(cameraId);
     }
 }

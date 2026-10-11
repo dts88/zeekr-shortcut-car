@@ -132,9 +132,9 @@ public enum ScreenOffPlan {
      * <ul>
      *   <li>车机要睡（{@link #headUnitSleeps}：唤醒锁没拉着、哨兵模式关（0）或读不到、没在开车）→ 现在停，相机按次序关；</li>
      *   <li>唤醒锁拉着车机 → 接着录；</li>
-     *   <li>其余是车机醒着（哨兵模式开（1）/ 布防（2），或者在开车）：熄屏持续录制开着接着录，
-     *       关着 10 秒后停（和以前一样）；</li>
-     *   <li>停了之后亮屏接不接：熄屏持续录制、启动自动录制开着一个就接。</li>
+     *   <li>其余是车机醒着（哨兵模式开（1）/ 布防（2），或者在开车）：熄屏后不停录（{@link #keepsRecording}：熄屏持续录制、
+     *       开发者熄屏录制开着一个）就接着录，都关着 10 秒后停（和以前一样）；</li>
+     *   <li>停了之后亮屏接不接：熄屏后不停录、启动自动录制开着一个就接。</li>
      * </ul>
      *
      * @param keeps      熄屏后不停录（{@link #keepsRecording}）
@@ -201,8 +201,8 @@ public enum ScreenOffPlan {
 
     /**
      * 录制键上那行小字：现在熄屏的话会怎样。和 {@link #atScreenOff} 是同一张表：接着录 →「熄屏后继续录制」；
-     * 停了亮屏接 →「熄屏暂停，唤醒后恢复」；不接 →「熄屏后停止录制」；熄屏持续录制开着却读不到哨兵模式（按没开算，
-     * 现在停、亮屏接）→「熄屏续录需开启哨兵模式」。
+     * 停了亮屏接 →「熄屏暂停，唤醒后恢复」；不接 →「熄屏后停止录制」；熄屏后不停录（{@link #keepsRecording}）却读不到哨兵模式
+     * （按没开算，现在停、亮屏接）→「熄屏续录需开启哨兵模式」。
      */
     public static ScreenOffPlan of(AppConfig config, boolean lockHeld, VehicleState vehicle) {
         return of(keepsRecording(config), lockHeld, config.isAutoStartRecording(), vehicle.sentry,

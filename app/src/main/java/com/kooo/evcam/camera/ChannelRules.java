@@ -13,8 +13,8 @@ import java.util.Set;
  *
  * <h3>为什么单独成一层</h3>
  *
- * <p>2.10 动相机的有两处：登记表触发的有序开关（MultiCameraManager.reconcileCameras / openAllCameras / closeAllCameras），
- * 和看门狗的闸门（checkLiveness）。两处各看各的条件，谁先动看时机 —— 环视正在关，看门狗去重开座舱；
+ * <p>2.10 动相机的有两处（见 {@link ChannelScheduler} 的类说明）：登记表触发的有序开关，
+ * 和看门狗的闸门。两处各看各的条件，谁先动看时机 —— 环视正在关，看门狗去重开座舱；
  * 被拿走的那一路，一边按次序开跳过它，一边每 30 秒试开它。项目所有者 2026-10-10 定：登记表只记「谁要哪几路」，
  * 一个通道调度（ChannelScheduler）是唯一动相机的地方，看门狗并进去。调度只管读事实、照做、写黑匣子；
  * 该做哪一步全在这里。纯 Java，时间由调用方传入，见 {@code ChannelRulesTest} —— 确认文档的每一句都有一条测试对着。</p>
@@ -1116,6 +1116,31 @@ public final class ChannelRules {
         Set<Out> live = new LinkedHashSet<>(lane.session);
         live.removeAll(lane.dead);
         return live;
+    }
+
+    /** 会话里的一样输出此刻算哪一类（大纲 §0 的名词；{@link #outState}）。 */
+    enum OutState {
+        /** 要的：有人要、已声明、消费者还活着（{@link #wantedOutputs}）。出帧口也算：它只在没有别的活输出时才加。 */
+        WANTED,
+        /** 留着的：没人要了，消费者还活着 —— 照「减输出能拖就拖」等下一次本来要动、或者关相机时一起摘（§二.4）。 */
+        KEPT,
+        /** 死的：消费者已被系统收走，马上摘。 */
+        DEAD
+    }
+
+    /**
+     * 会话里的 {@code out} 此刻算哪一类：诊断报告的「Channel」一节、卡顿现场、关相机那一行（「带走留着的输出」）都照它分。
+     * 只是分类，动不动它照旧由 {@link #next} 定。出帧口是我们自己的：在会话里就算要的 —— 有了要的输出，
+     * 下一次改输出顺带摘掉它（{@link #composition}）。
+     */
+    static OutState outState(World w, Lane lane, Out out) {
+        if (lane.dead.contains(out)) {
+            return OutState.DEAD;
+        }
+        if (out.kind == Kind.SINK || wantedOutputs(w, lane).contains(out)) {
+            return OutState.WANTED;
+        }
+        return OutState.KEPT;
     }
 
     /**

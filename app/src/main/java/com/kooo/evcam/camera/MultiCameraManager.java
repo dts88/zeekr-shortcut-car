@@ -525,6 +525,18 @@ public class MultiCameraManager {
         return (s / 60) + " 分 " + (s % 60) + " 秒";
     }
 
+    /** 整秒的时长：「31 秒」「12 分 3 秒」「2 小时 5 分」—— 留了多久、开了多久、多久以前（关相机那两行、诊断报告）。 */
+    private static String timeText(long ms) {
+        long s = Math.max(0, ms) / 1000;
+        if (s < 60) {
+            return s + " 秒";
+        }
+        if (s < 3600) {
+            return (s / 60) + " 分 " + (s % 60) + " 秒";
+        }
+        return (s / 3600) + " 小时 " + (s % 3600 / 60) + " 分";
+    }
+
     /** 几路的叫法连起来：「环视、后座舱」。 */
     private static String roles(List<String> keys) {
         List<String> names = new ArrayList<>();
@@ -2272,15 +2284,6 @@ public class MultiCameraManager {
     }
 
     /**
-     * 叫醒通道调度（2.11）。以前这里按次序把每一路开起来；现在开不开、先开哪一路、带什么输出只由调度判
-     * （{@link ChannelScheduler}，项目所有者 2026-10-10）：相机靠登记表（主界面的 PREVIEW、录像、拍照、后视镜）开起来。
-     * MainActivity 的两处调用阶段 4a 已删（主界面只声明画布、登记 PREVIEW），没人调了；阶段 7 删掉这个方法。
-     */
-    public void openAllCameras() {
-        scheduler.wake();
-    }
-
-    /**
      * 这一份管线的相机都关好了：调度的账上每一路都关着，相机层也没有一路开着、在开、在关。
      * （熄屏录制放唤醒锁以前轮询它；2.11 阶段 6 起改等调度发出的「关完」，{@link ChannelScheduler#whenClosedEverywhere}。）
      */
@@ -2298,9 +2301,307 @@ public class MultiCameraManager {
         return StallWatch.isForeground() || com.kooo.evcam.CameraForegroundService.startedWhileVisible();
     }
 
-    /** 这一份管线的通道调度（录像、后视镜、诊断读它的事实：condition、usable、describe）。 */
+    /** 这一份管线的通道调度（录像、后视镜读它的事实：condition、usable；诊断报告读 {@link #describeChannel}）。 */
     public ChannelScheduler channelScheduler() {
         return scheduler;
+    }
+
+    // ------------------------------------------------------------------ 诊断报告的「Channel」一节
+
+    /**
+     * 诊断报告的「Channel」一节（DiagnosticsCollector 接在相机服务视角那张表后面；哪个线程都能调）：通道调度此刻怎么看每一路 ——
+     * 该开还是实际开着；会话里的输出分要的、留着的、死的，各从什么时候起；被拿着（TAKEN / BLOCKED）、不在，从什么时候起；
+     * 最近一次开不起来、丢了和它的判定；救援梯子；最后一次问相机服务的时间和答案。另起两行：能不能用相机、为什么；
+     * 手上正在做哪一步、在等什么（大纲 §2 阶段 8）。读的是调度每一轮最后记的那一份快照（{@link ChannelScheduler#snapshot()}），
+     * 不碰调度的账。
+     */
+    public String describeChannel() {
+        ChannelScheduler.Snapshot s = scheduler.snapshot();
+        if (s == null) {
+            return "调度还没跑过一轮\n";
+        }
+        long now = android.os.SystemClock.uptimeMillis();
+        StringBuilder sb = new StringBuilder();
+        sb.append("快照：").append(timeText(now - s.at)).append("前（调度每一轮最后记一份）")
+                .append(s.stopped ? "；调度已停（退出之后都关完了）" : "").append('\n');
+        sb.append("登记表：").append(channelSide.holderCodes(s.holders))
+                .append(s.recordKeys.isEmpty() ? "" : "（录 " + roles(s.recordKeys) + "）")
+                .append("；").append(s.screenOn ? "亮屏" : "熄屏")
+                .append("；前台服务").append(s.foregroundService ? "在" : "不在").append('\n');
+        sb.append("能用相机：").append(usableText(s, now)).append('\n');
+        sb.append("手上：").append(stepText(s.step, now)).append('\n');
+        sb.append("在等：").append(waitText(s)).append('\n');
+        if (s.sleepSince != 0) {
+            sb.append("车机要睡：").append(timeText(now - s.sleepSince)).append("前起（不保持；手上那一步最多再等 ")
+                    .append(ChannelRules.SLEEP_GRACE_MS / 1000).append(" 秒，然后按次序关）").append('\n');
+        }
+        if (s.exitSince != 0) {
+            sb.append("退出：").append(timeText(now - s.exitSince)).append("前起（登记表作废，只关）").append('\n');
+        }
+        if (s.otherClosingSince != 0) {
+            sb.append("另一份管线在关相机：").append(timeText(now - s.otherClosingSince)).append("前起").append('\n');
+        }
+        sb.append("别人引起的变化：").append(s.lastOthersChangeAt == 0 ? "没有过"
+                : "上一次 " + timeText(now - s.lastOthersChangeAt) + "前（安静满 " + (ChannelRules.QUIET_MS / 1000)
+                + " 秒才开、改输出、救）").append('\n');
+        sb.append("问相机服务：").append(askText(s, now)).append('\n');
+        for (ChannelScheduler.LaneView lane : s.lanes) {
+            appendLane(sb, lane, now);
+        }
+        return sb.toString();
+    }
+
+    /** 能不能用相机、为什么（和调度判「能用相机」是同一对事实）。 */
+    private static String usableText(ChannelScheduler.Snapshot s, long now) {
+        if (s.unusableSince != 0) {
+            return "不能 —— 开相机时报了用不了相机（" + timeText(now - s.unusableSince) + "前），等主界面回到前台";
+        }
+        if (s.mainForeground) {
+            return "能 —— 主界面在前";
+        }
+        if (s.serviceStartedWhileVisible) {
+            return "能 —— 前台服务是主界面在前时起的（或那时刷新过）";
+        }
+        return "不能 —— 主界面不在前，前台服务" + (s.foregroundService
+                ? "是后台起的（安卓 12 起后台才起的前台服务用不了相机）" : "不在");
+    }
+
+    /** 手上那一步：做什么、哪一路、带哪些输出、做了多久。 */
+    private String stepText(ChannelRules.Step step, long now) {
+        if (step == null) {
+            return "没有";
+        }
+        String keys = roles(step.keys);
+        String outputs = channelSide.kindNames(kindsOf(step.outputs));
+        String what;
+        switch (step.move) {
+            case OPEN:
+                what = "开 " + keys + "（输出 " + outputs + "）";
+                break;
+            case APPLY:
+                what = "改输出 " + keys + "（改成 " + outputs + "）";
+                break;
+            case RESCUE:
+                what = "救 " + keys + "：" + (step.rescue == ChannelRules.Rescue.REBUILD ? "重建会话" : "重开")
+                        + "（输出 " + outputs + "）";
+                break;
+            default:
+                what = "关 " + keys;
+                break;
+        }
+        return what + "，做了 " + seconds(now - step.startedAt) + "（最多 " + (step.maxMs / 1000) + " 秒）";
+    }
+
+    /** 这一轮在等什么；有一路因为现在用不了相机先不开的，也写上。 */
+    private String waitText(ChannelScheduler.Snapshot s) {
+        String deferred = s.deferredKey == null ? "" : "；现在用不了相机，先不开 " + roleName(s.deferredKey);
+        if (s.move != ChannelRules.Move.WAIT) {
+            return "没在等" + deferred;
+        }
+        String key = s.key == null ? "" : roleName(s.key);
+        String text;
+        switch (s.why) {
+            case STEP:
+                text = "手上那一步做完";
+                break;
+            case LOSING:
+                text = key + " 正被别人接手，我们这边的关还没关完（别的路这时一步都不动）";
+                break;
+            case BUSY:
+                text = key + " 在途（相机层手上有动作）";
+                break;
+            case OTHER_INSTANCE:
+                text = "另一份管线把相机关完（换车型、退出后马上又开）";
+                break;
+            case SURROUND_CLOSING:
+                text = "环视先关完，再关座舱";
+                break;
+            case JUDGING:
+                text = "判 " + key + " 那一次丢了 / 开不起来（关完再等 " + ChannelRules.JUDGE_DELAY_MS + " ms）";
+                break;
+            case QUIET:
+                text = "通道安静（相机服务 " + (ChannelRules.QUIET_MS / 1000) + " 秒内报过别人引起的变化），再"
+                        + channelSide.pendingText(s.pending, s.key);
+                break;
+            case RECORD_OUTPUT:
+                text = "开 " + key + " 之前等它的录像输出（录制器在建）";
+                break;
+            case CLOSING:
+                text = "退出 / 车机要睡：等 " + key + " 关完";
+                break;
+            default:
+                text = s.why.name();
+                break;
+        }
+        return text + (s.waitMs < 0 ? "" : "，最多还要 " + seconds(s.waitMs)) + deferred;
+    }
+
+    /** 最后一次问相机服务：什么时候、问成了没有。 */
+    private static String askText(ChannelScheduler.Snapshot s, long now) {
+        if (s.askedAt == 0) {
+            return "还没问过（被拿着的一路有人要时每 " + (ChannelRules.ASK_EVERY_MS / 1000) + " 秒问一次，只问，不开）";
+        }
+        String asked = "上一次 " + timeText(now - s.askedAt) + "前问的";
+        if (s.answeredAt < s.askedAt) {
+            return asked + "，还没答回来";
+        }
+        return asked + "，" + (s.answered ? "问成了（收到了回放）" : "问不成（一声回放都没有：多半没连上相机服务）");
+    }
+
+    /** 一路：调度怎么看它，几行。 */
+    private void appendLane(StringBuilder sb, ChannelScheduler.LaneView v, long now) {
+        sb.append("  ").append(roleName(v.key)).append("（相机 ").append(v.cameraId).append("）：")
+                .append(conditionText(v)).append('\n');
+        sb.append("    该开：").append(wantText(v, now)).append("；实际：").append(deviceText(v, now))
+                .append(v.cannotOpen ? "；现在用不了相机，主界面回到前台之前不开" : "").append('\n');
+        sb.append("    会话：").append(outputsText(v, now)).append('\n');
+        sb.append("    被拿着：").append(v.mark == null ? "没有"
+                : (v.mark == CameraTaken.Verdict.TAKEN ? "别的程序拿着（TAKEN）" : "被拿着的另一路挡着（BLOCKED）")
+                + "，" + timeText(now - v.markSince) + "前起")
+                .append(v.absent ? "；不在：相机服务的缓存里没有它，" + timeText(now - v.serviceWordAt) + "前起" : "")
+                .append('\n');
+        sb.append("    相机服务最后一句：").append(v.absent ? "不在" : v.serviceFree == null ? "没说过"
+                : (v.serviceFree ? "空闲" : "被占用") + (v.serviceWordOurs ? "（我们引起的）" : "（别人引起的）")
+                + "，" + timeText(now - v.serviceWordAt) + "前").append('\n');
+        sb.append("    最近一次开不起来：").append(judgedText(v.lastOpenFailure, now)).append('\n');
+        sb.append("    最近一次丢了：").append(judgedText(v.lastLoss, now)).append('\n');
+        sb.append("    救援梯子：").append(ladderText(v, now)).append('\n');
+        if (v.asks > 0 || v.lastAnswer != null) {
+            ChannelScheduler.Answer a = v.lastAnswer;
+            sb.append("    问相机服务：被拿着以来问了 ").append(v.asks).append(" 次")
+                    .append(a == null ? "" : "；最后一次（第 " + a.n + " 次）" + timeText(now - a.at) + "前答："
+                            + (a.absent ? "还是不在" : Boolean.TRUE.equals(a.free) ? "说空闲了" : "还被占着"))
+                    .append('\n');
+        }
+    }
+
+    private static String conditionText(ChannelScheduler.LaneView v) {
+        switch (v.condition) {
+            case STREAMING:
+                return "在出画面";
+            case TAKEN:
+                return "被拿着";
+            case RESCUING:
+                return "在救";
+            case GAVE_UP:
+                return "停手了";
+            default:
+                return v.shouldOpen ? "在起来" : "没在用";
+        }
+    }
+
+    /** 该开还是不该开、为谁；保持的写没人要多久了。 */
+    private String wantText(ChannelScheduler.LaneView v, long now) {
+        String unwanted = v.unwantedSince == 0 ? "" : " " + timeText(now - v.unwantedSince);
+        if (!v.wantedBy.isEmpty()) {
+            return v.shouldOpen ? "是（为 " + channelSide.holderNames(v.wantedBy) + "）"
+                    : "不该开（退出 / 车机要睡：只关）";
+        }
+        return v.holding ? "保持（没人要" + unwanted + "，满 " + (ChannelRules.HOLD_MS / 1000) + " 秒关）"
+                : "不该开（没人要" + unwanted + "）";
+    }
+
+    /** 设备此刻在哪一步、从什么时候起；相机层手上有动作也写上。 */
+    private static String deviceText(ChannelScheduler.LaneView v, long now) {
+        String since = v.deviceSince == 0 ? "" : " " + timeText(now - v.deviceSince);
+        String busy = v.busySince == 0 ? "" : "，相机层手上有动作 " + seconds(now - v.busySince);
+        switch (v.device) {
+            case OPEN:
+                return "开着" + since + busy;
+            case OPENING:
+                return "在开" + since;
+            case CLOSING:
+                return "在关" + since;
+            case LOSING:
+                return "被接手（丢了，我们这边的关还没关完）" + since;
+            default:
+                return "关着" + since;
+        }
+    }
+
+    /** 会话里的输出：要的、留着的、死的，各从什么时候起；交给管线留着、等离开会话再放的也写上。 */
+    private String outputsText(ChannelScheduler.LaneView v, long now) {
+        StringBuilder sb = new StringBuilder();
+        if (v.sessionSince == 0 || v.outputs.isEmpty()) {
+            sb.append("没有");
+        } else {
+            sb.append("配好 ").append(timeText(now - v.sessionSince)).append("前");
+            ChannelRules.OutState[] order = {
+                    ChannelRules.OutState.WANTED, ChannelRules.OutState.KEPT, ChannelRules.OutState.DEAD};
+            String[] names = {"要的", "留着的", "死的"};
+            for (int i = 0; i < order.length; i++) {
+                List<String> items = new ArrayList<>();
+                for (ChannelScheduler.OutputState state : v.outputs) {
+                    if (state.state == order[i]) {
+                        items.add(channelSide.kindNames(java.util.EnumSet.of(state.kind)) + "（"
+                                + timeText(now - state.since) + "前起）");
+                    }
+                }
+                sb.append("；").append(names[i]).append(' ').append(items.isEmpty() ? "没有" : String.join("、", items));
+            }
+        }
+        if (!v.handedOver.isEmpty()) {
+            sb.append("；交给管线留着、等离开会话再放：").append(channelSide.kindNames(v.handedOver));
+        }
+        return sb.toString();
+    }
+
+    /** 一次判定：多久以前、怎么丢的 / 为什么开不起来、判成什么。 */
+    private String judgedText(ChannelScheduler.Judgement j, long now) {
+        if (j == null) {
+            return "没有";
+        }
+        boolean loss = j.origin == ChannelRules.Failure.Origin.LOSS;
+        String cause = loss ? channelSide.lossText(j.reason)
+                + (j.closeMs >= 0 ? "，关完用了 " + seconds(j.closeMs) : "")
+                : j.reason != null && j.reason.source == CameraTaken.Reason.Source.NOT_LISTED ? "不在相机列表里"
+                : channelSide.openFailText(j.reason)
+                + (j.origin == ChannelRules.Failure.Origin.REOPEN ? "（救援里的重开）" : "");
+        String verdict;
+        switch (j.verdict) {
+            case TAKEN:
+                verdict = "别的程序拿着它（TAKEN）";
+                break;
+            case BLOCKED:
+                verdict = "它自己空着，别的程序拿着相机 " + String.join("、", j.takenIds) + "，也算被拿着（BLOCKED）";
+                break;
+            case UNUSABLE:
+                verdict = "现在用不了相机，不计次数";
+                break;
+            default:
+                verdict = "普通故障，按救援的节奏救";
+                break;
+        }
+        return timeText(now - j.at) + "前，" + cause + " → " + verdict;
+    }
+
+    /** 救援梯子：待判、等救、第几次第几轮、歇着、停手了。 */
+    private static String ladderText(ChannelScheduler.LaneView v, long now) {
+        if (v.ladderStopped) {
+            return "停手了（救了 " + CameraLiveness.MAX_CYCLES + " 轮没用"
+                    + (v.stoppedAt == 0 ? "" : "，" + timeText(now - v.stoppedAt) + "前")
+                    + "；等登记表变了、相机服务报它空闲、或者亮屏再试）";
+        }
+        if (v.resting) {
+            return "连着救 " + CameraLiveness.MAX_ATTEMPTS + " 次没用，歇 " + (CameraLiveness.COOL_OFF_MS / 1000)
+                    + " 秒（已 " + v.cycles + " 轮）";
+        }
+        if (v.judging) {
+            return "丢了 / 开不起来，等判";
+        }
+        if (v.attempts > 0) {
+            return "第 " + v.attempts + " 次（第 " + (v.cycles + 1) + " 轮）";
+        }
+        return v.lostForRescue ? "丢了、判成普通故障，等救" : "没在救";
+    }
+
+    /** 几样输出的种类。 */
+    private static Set<ChannelRules.Kind> kindsOf(Set<ChannelRules.Out> outs) {
+        Set<ChannelRules.Kind> kinds = java.util.EnumSet.noneOf(ChannelRules.Kind.class);
+        for (ChannelRules.Out out : outs) {
+            kinds.add(out.kind);
+        }
+        return kinds;
     }
 
     /** 录像要哪几路：这一次录像的计划；计划还没定（开录之前）就是启用的全部 —— 和以前一样。 */
@@ -2430,6 +2731,11 @@ public class MultiCameraManager {
                 listener.onDropped(why);
             }
         }
+
+        @Override
+        public void outputStates(Map<ChannelRules.Out, ChannelScheduler.OutputState> states) {
+            camera.noteOutputStates(states);
+        }
     }
 
     /**
@@ -2518,14 +2824,8 @@ public class MultiCameraManager {
         }
 
         @Override
-        public void ask(java.util.function.Consumer<Set<String>> answered) {
-            CameraAvailabilityWatch.ask(asked -> {
-                Set<String> corrected = new java.util.TreeSet<>();
-                for (CameraAvailabilityWatch.Correction fix : asked.corrections) {
-                    corrected.add(fix.cameraId);
-                }
-                answered.accept(corrected);
-            });
+        public void ask(java.util.function.Consumer<CameraAvailabilityWatch.Asked> answered) {
+            CameraAvailabilityWatch.ask(answered);
         }
 
         @Override
@@ -2777,7 +3077,7 @@ public class MultiCameraManager {
 
         @Override
         public void closeRound(String surroundKey, long surroundMs, boolean surroundTimedOut,
-                               List<String> cabinKeys, List<Long> cabinMs) {
+                               List<String> cabinKeys, List<Long> cabinMs, List<ChannelScheduler.Carried> carried) {
             List<String> cabins = new ArrayList<>();
             for (int i = 0; i < cabinKeys.size(); i++) {
                 noteStep(cabins, cabinKeys.get(i), cabinMs.get(i));
@@ -2788,10 +3088,43 @@ public class MultiCameraManager {
             String cabinLine = String.join("、", cabins);
             String line = surround == null ? cabinLine : cabinLine.isEmpty() ? surround : surround + " → " + cabinLine;
             if (!line.isEmpty()) {
-                // 「关相机：…」这一行的格式从 2.10.10 起没变，旧的分析脚本照样能读（阶段 8 只在末尾追加）
+                // 「关相机：…」这一行的格式从 2.10.10 起没变，旧的分析脚本照样能读；阶段 8 只在末尾追加带走的留着的输出
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("关相机：" + line
-                        + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+                        + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + carriedText(carried));
             }
+        }
+
+        @Override
+        public void openSpan(ChannelScheduler.OpenSpan span) {
+            // 车主问过「拖着摘有没有用」：这一行和 2.10.x 的黑匣子比，看每开一次相机重配了几次
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("关相机小结：" + roleName(span.key) + " 这一次开了 "
+                    + timeText(span.openMs) + "：重配 " + span.reconfigured() + " 次（加输出 " + span.added
+                    + "、摘死的 " + span.deadRemoved + "、救援 " + span.rescued + "），"
+                    + (span.removedOnly == 0 ? "没为摘输出重建过" : "为摘输出重建过 " + span.removedOnly + " 次"));
+        }
+
+        /**
+         * 「关相机：…」那一行末尾：关的时候各路会话里带走的留着的输出、各留了多久 ——
+         * 「；带走留着的输出：环视 录像（留了 12 分 3 秒）、预览（31 秒）；后座舱 预览（留了 31 秒）」。没有是空的。
+         */
+        private String carriedText(List<ChannelScheduler.Carried> carried) {
+            if (carried.isEmpty()) {
+                return "";
+            }
+            StringBuilder sb = new StringBuilder();
+            String lane = null;
+            for (ChannelScheduler.Carried one : carried) {
+                boolean first = !one.key.equals(lane);
+                if (first) {
+                    sb.append(lane == null ? "" : "；").append(roleName(one.key)).append(' ');
+                    lane = one.key;
+                } else {
+                    sb.append('、');
+                }
+                sb.append(kindNames(java.util.EnumSet.of(one.kind))).append('（').append(first ? "留了 " : "")
+                        .append(timeText(one.keptMs)).append('）');
+            }
+            return "；带走留着的输出：" + sb;
         }
 
         @Override
@@ -4216,7 +4549,7 @@ public class MultiCameraManager {
         void onNoStorage();
     }
 
-    /** 等各路出画面最多多久：冷开相机，加上看门狗第一次重建会话（8 秒）都等得到。 */
+    /** 等各路出画面最多多久：冷开相机，加上调度第一次救（8 秒没画面就重建会话，{@link CameraLiveness#STUCK_MS}）都等得到。 */
     private static final long PHOTO_READY_TIMEOUT_MS = 10_000L;
     /** 按下快门后等各路存完最多多久（一张 JPEG 120–200 ms，加解码、盖角标、写盘）。 */
     private static final long PHOTO_SAVE_TIMEOUT_MS = 5_000L;
@@ -4336,7 +4669,7 @@ public class MultiCameraManager {
             }
         }
         boolean allReady = !keys.isEmpty() && ready.size() == keys.size();
-        // 每一路都被拿走了、不在录像里：没有可等的，不白等到点
+        // 每一路都被拿着或停手了：没有可等的，不白等到点
         boolean nothingToWaitFor = keys.isEmpty() && !leftOut.isEmpty();
         if (!allReady && !nothingToWaitFor && now < job.readyDeadline) {
             if (!job.toldWaiting) {

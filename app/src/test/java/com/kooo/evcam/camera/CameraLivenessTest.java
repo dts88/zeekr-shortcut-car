@@ -19,9 +19,9 @@ public class CameraLivenessTest {
     @Test
     public void quietWhileFramesKeepComing() {
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, 0, 1000, false));
+                CameraLiveness.step(state, true, 0, 1000));
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS - 1, 2000, false));
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS - 1, 2000));
         assertEquals(0, state.attempts());
     }
 
@@ -29,29 +29,29 @@ public class CameraLivenessTest {
     @Test
     public void quietWhenNobodyWantsFrames() {
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, false, 10 * CameraLiveness.STUCK_MS, 1000, false));
+                CameraLiveness.step(state, false, 10 * CameraLiveness.STUCK_MS, 1000));
         assertEquals(0, state.attempts());
     }
 
     @Test
     public void resetsOnceTheFramesHaveBeenGoneLongEnough() {
         assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 10_000, false));
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 10_000));
         assertEquals(1, state.attempts());
     }
 
     /** 重开要花时间，紧接着的几次检查里帧还是没有 —— 不能因此连着重开。 */
     @Test
     public void waitsBetweenAttempts() {
-        CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 10_000, false);
+        CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 10_000);
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 11_000, false));
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 11_000));
         assertEquals(CameraLiveness.Action.NONE,
                 CameraLiveness.step(state, true,
-                        CameraLiveness.STUCK_MS, 10_000 + CameraLiveness.RETRY_GAP_MS - 1, false));
+                        CameraLiveness.STUCK_MS, 10_000 + CameraLiveness.RETRY_GAP_MS - 1));
         assertEquals(CameraLiveness.Action.RESET,
                 CameraLiveness.step(state, true,
-                        CameraLiveness.STUCK_MS, 10_000 + CameraLiveness.RETRY_GAP_MS, false));
+                        CameraLiveness.STUCK_MS, 10_000 + CameraLiveness.RETRY_GAP_MS));
         assertEquals(2, state.attempts());
     }
 
@@ -60,25 +60,25 @@ public class CameraLivenessTest {
         long now = 10_000;
         for (int i = 1; i <= CameraLiveness.MAX_ATTEMPTS; i++) {
             assertEquals("第 " + i + " 次该重开", CameraLiveness.Action.RESET,
-                    CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now, false));
+                    CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now));
             now += CameraLiveness.RETRY_GAP_MS;
         }
         assertEquals(CameraLiveness.Action.GIVE_UP,
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now, false));
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now));
         assertTrue(state.gaveUp());
 
         // 停手期间一声不吭，不再刷日志也不再打扰相机
         long gaveUpAt = now;
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, gaveUpAt + 1000, false));
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, gaveUpAt + 1000));
         assertEquals(CameraLiveness.Action.NONE,
                 CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
-                        gaveUpAt + CameraLiveness.COOL_OFF_MS - 1, false));
+                        gaveUpAt + CameraLiveness.COOL_OFF_MS - 1));
 
         // 一分钟之后再来一轮 —— 人可能刚回到车上，占着相机的那个应用可能已经退了
         assertEquals(CameraLiveness.Action.RESET,
                 CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
-                        gaveUpAt + CameraLiveness.COOL_OFF_MS, false));
+                        gaveUpAt + CameraLiveness.COOL_OFF_MS));
         assertFalse(state.gaveUp());
         assertEquals(1, state.attempts());
     }
@@ -86,17 +86,17 @@ public class CameraLivenessTest {
     /** 救活了就该彻底忘掉之前的次数，下一次卡住重新从第一次算起。 */
     @Test
     public void forgetsEverythingOnceFramesComeBack() {
-        CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 10_000, false);
+        CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 10_000);
         CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
-                10_000 + CameraLiveness.RETRY_GAP_MS, false);
+                10_000 + CameraLiveness.RETRY_GAP_MS);
         assertEquals(2, state.attempts());
 
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, 0, 40_000, false));
+                CameraLiveness.step(state, true, 0, 40_000));
         assertEquals(0, state.attempts());
 
         assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 50_000, false));
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, 50_000));
         assertEquals(1, state.attempts());
     }
 
@@ -112,11 +112,11 @@ public class CameraLivenessTest {
         long now = 10_000;
         for (int cycle = 1; cycle <= CameraLiveness.MAX_CYCLES; cycle++) {
             for (int i = 0; i < CameraLiveness.MAX_ATTEMPTS; i++) {
-                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now, false);
+                CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now);
                 now += CameraLiveness.RETRY_GAP_MS;
             }
             CameraLiveness.Action action =
-                    CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now, false);
+                    CameraLiveness.step(state, true, CameraLiveness.STUCK_MS, now);
             if (cycle < CameraLiveness.MAX_CYCLES) {
                 assertEquals("第 " + cycle + " 轮该只是歇一会儿",
                         CameraLiveness.Action.GIVE_UP, action);
@@ -130,16 +130,16 @@ public class CameraLivenessTest {
         // 停手之后就是彻底安静，等多久都不再试
         assertEquals(CameraLiveness.Action.NONE,
                 CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
-                        now + 10 * CameraLiveness.COOL_OFF_MS, false));
+                        now + 10 * CameraLiveness.COOL_OFF_MS));
 
         // 但相机真活过来了就重新算 —— 重启车机之后不该还记着仇
         assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, 0, now + 11 * CameraLiveness.COOL_OFF_MS, false));
+                CameraLiveness.step(state, true, 0, now + 11 * CameraLiveness.COOL_OFF_MS));
         assertFalse(state.stopped());
         assertEquals(0, state.cycles());
         assertEquals(CameraLiveness.Action.RESET,
                 CameraLiveness.step(state, true, CameraLiveness.STUCK_MS,
-                        now + 12 * CameraLiveness.COOL_OFF_MS, false));
+                        now + 12 * CameraLiveness.COOL_OFF_MS));
     }
 
     /** 门槛要留出会话重建的时间，两次重开之间要比门槛还长。 */
@@ -153,58 +153,13 @@ public class CameraLivenessTest {
     @Test
     public void aLostDeviceIsResetAtTheNextCheck() {
         assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, 1000, false));
+                CameraLiveness.step(state, true, Long.MAX_VALUE, 1000));
         assertEquals(1, state.attempts());
-    }
-
-    /**
-     * 这一路被别的程序拿走了：只每 30 秒试一次，不计次数、不停手 —— 它占多久我们就慢慢等多久。
-     * 它放开、通道安静了由看门狗的闸门单独重开（{@link CameraLiveness.State#released}，见下面那条）。
-     */
-    @Test
-    public void retriesEveryThirtySecondsWhileOthersHold() {
-        assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, 10_000, true));
-        assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, 10_000 + CameraTaken.RETRY_WHILE_HELD_MS - 1, true));
-        long now = 10_000;
-        for (int i = 0; i < 20; i++) {
-            now += CameraTaken.RETRY_WHILE_HELD_MS;
-            assertEquals("第 " + (i + 2) + " 次照样试", CameraLiveness.Action.RESET,
-                    CameraLiveness.step(state, true, Long.MAX_VALUE, now, true));
-        }
-        assertEquals(0, state.attempts());
-        assertFalse(state.gaveUp());
-        assertFalse(state.stopped());
-        // 不再算被拿走（试的那一下报的错相机服务没说别的程序占着，按普通的失败算）：
-        // 接着按正常的节奏算，上一次试过的那一下也算间隔
-        assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, now + 1000, false));
-        assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, now + CameraLiveness.RETRY_GAP_MS, false));
-        assertEquals(1, state.attempts());
-    }
-
-    /**
-     * 别的程序放开了、或者访问优先级变了（retryTaken）：被拿走的这一路下一次检查就试，不等满 30 秒 ——
-     * 2026-10-10 起 retryTaken 不再自己重开，只把节奏清零，动手的还是这里。
-     */
-    @Test
-    public void dueLetsTheNextCheckTryAtOnce() {
-        assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, 10_000, true));
-        assertEquals(CameraLiveness.Action.NONE,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, 12_000, true));
-        state.due();
-        assertEquals(CameraLiveness.Action.RESET,
-                CameraLiveness.step(state, true, Long.MAX_VALUE, 14_000, true));
-        assertEquals("试的那一下照样不计次数", 0, state.attempts());
     }
 
     /**
      * 被拿走的这一路放开了、通道也安静了，要单独重开它：从头算 —— 被占着之前攒的次数、歇着、
-     * 彻底停手都作废，当场就动手。被拿着的那段时间调度根本不救它（只问相机服务，不开），所以用不带
-     * 「被别人拿着」的那个 step。
+     * 彻底停手都作废，当场就动手。被拿着的那段时间调度根本不救它（只问相机服务，不开）。
      */
     @Test
     public void aReleasedCameraStartsAFreshRound() {
@@ -222,10 +177,10 @@ public class CameraLivenessTest {
         assertEquals(1, state.attempts());
     }
 
-    // ------------------------------------------------------------------ 2.11：通道调度用的那一个
+    // ------------------------------------------------------------------ 2.11：通道调度用
 
     /**
-     * 新的 step（通道调度用）梯子上的数字不变：8 秒没动静算卡住，12 秒一次，3 次后歇 60 秒，3 轮之后彻底停手。
+     * 通道调度用的梯子上数字不变：8 秒没动静算卡住，12 秒一次，3 次后歇 60 秒，3 轮之后彻底停手。
      */
     @Test
     public void theLadderNumbersAreUnchanged() {
@@ -338,7 +293,7 @@ public class CameraLivenessTest {
         assertEquals(0, state.attempts());
     }
 
-    /** 用新的 step 按普通失败一路试到彻底停手（三轮，每轮三次加一次歇），返回走完时的时刻。 */
+    /** 按普通失败一路试到彻底停手（三轮，每轮三次加一次歇），返回走完时的时刻。 */
     private static long driveToStop(CameraLiveness.State state, long now) {
         for (int cycle = 1; cycle <= CameraLiveness.MAX_CYCLES; cycle++) {
             for (int i = 0; i <= CameraLiveness.MAX_ATTEMPTS; i++) {

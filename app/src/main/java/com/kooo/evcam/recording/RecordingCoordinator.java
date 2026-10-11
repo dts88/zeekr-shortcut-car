@@ -616,7 +616,8 @@ public final class RecordingCoordinator {
     /**
      * 熄屏了（ScreenState 在主线程调）：不管在不在录，都照 {@link ScreenOffPlan#atScreenOff} 判一次、照着做（大纲 §2 阶段 6；
      * 以前没在录就不判）。在录（含等开录）的：接着录、{@link #SCREEN_OFF_STOP_MS} 后停，或者现在停（哨兵模式没开、车没在走：
-     * 车机几秒后就断电）。判成现在停的，在不在录都写下「车机要睡」（{@link CameraNeeds#setHeadUnitSleeps}）：通道调度从此不保持、
+     * 车机几秒后就断电）；只在等开录的，停就是不等了（黑匣子那一行照实写「接着等 / 不等开录了」）。
+     * 判成现在停的，在不在录都写下「车机要睡」（{@link CameraNeeds#setHeadUnitSleeps}）：通道调度从此不保持、
      * 手上那一步最多再等 1 秒，然后按次序关相机（环视先单独关，channel-logic §四，项目所有者 2026-10-10）。没在录（也没留着等自动接回，
      * {@link #isRecordingOrResuming}）时车辆信号没人登记，
      * 读不到按没开算，于是空闲熄屏就是「车机要睡」—— 空闲熄屏本来也不保持、照登记表按次序关，结果一样，只是关得更早、更确定。
@@ -665,11 +666,16 @@ public final class RecordingCoordinator {
         VehicleState vehicle = Telemetry.get().latest();
         ScreenOffPlan.Decision decision = ScreenOffPlan.atScreenOff(appConfig, lockHeld, vehicle);
         boolean busy = isRecording() || pending != null;
+        // 只在等开录（查盘、等 U 盘、等上一次收拾完；没登记相机，不算录像那一段）：判下来是接着等、不等了，
+        // 不是接着录、停录。存储停之后等自动接回的那一段照在录写（相机、车辆信号都留着，大纲 §7 第 8 问）
+        boolean waitingOnly = pending != null && !isRecordingOrResuming();
         // 唤醒锁拉着车机时判下来一定是接着录
         darkAction = decision.action;
         darkActionByLock = lockHeld;
         long now = android.os.SystemClock.elapsedRealtime();
-        BlackBox.noteImportant((check == DarkCheck.SCREEN_OFF ? (busy ? "熄屏时在录像" : "熄屏时没在录像")
+        BlackBox.noteImportant((check == DarkCheck.SCREEN_OFF ? (!busy ? "熄屏时没在录像"
+                : waitingOnly ? "熄屏时在等开录（" + pending + "）"
+                : isRecording() ? "熄屏时在录像" : "熄屏时在等自动接回")
                 : check == DarkCheck.STOP_DUE ? "熄屏已 " + (SCREEN_OFF_STOP_MS / 1000) + " 秒"
                 : check == DarkCheck.LOCK_TIMEOUT ? "熄屏录制的唤醒锁到点"
                 : check == DarkCheck.ENDED ? "熄屏中录像停了、不接回，唤醒锁不再拉着车机"
@@ -687,6 +693,10 @@ public final class RecordingCoordinator {
                 + "、启动自动录制" + (appConfig.isAutoStartRecording() ? "开" : "关") + " → "
                 + (!busy ? (decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：相机按次序关（环视先单独关）" : "车机醒着：相机照登记表")
+                : waitingOnly ? (decision.action == ScreenOffPlan.Action.CONTINUE ? "接着等，好了就开录"
+                : decision.action == ScreenOffPlan.Action.STOP_NOW
+                ? "车机要睡了：不等开录了，相机按次序关（环视先单独关）"
+                : check == DarkCheck.STOP_DUE ? "不等开录了" : (SCREEN_OFF_STOP_MS / 1000) + " 秒后不等开录了")
                 : decision.action == ScreenOffPlan.Action.CONTINUE ? "接着录"
                 : decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：现在停录，相机按次序关（环视先单独关）"

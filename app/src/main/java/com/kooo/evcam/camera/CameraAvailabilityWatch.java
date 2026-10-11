@@ -7,7 +7,6 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.blackbox.BlackBox;
@@ -67,7 +66,7 @@ import java.util.function.Predicate;
  *       哪几路不在、上一次别人引起的变化。纯 Java，见 {@code CameraAvailabilityWatchTest}。只在主线程上改。</li>
  *   <li><b>交给调度</b>：调度（ChannelScheduler）用 {@link #addListener} 接上：分类时问它「这一路有没有我们的开或关在途」
  *       （它在主线程上的账最准，见 {@link Listener#ourStepInFlight}），有话、问完、回放收全时叫醒它；
- *       调度读 {@link #word}、{@link #serviceSaysFree}、{@link #absent}、{@link #lastOthersChangeAt}、{@link #heardAnything}，
+ *       调度读 {@link #word}（最后一句：空闲 / 被占用、在不在、是不是我们引起的）、{@link #lastOthersChangeAt}、{@link #heardAnything}，
  *       被拿着的那一路有人要时每 30 秒 {@link #ask}。</li>
  *   <li><b>时刻</b>都是开机起算、含深睡（{@code SystemClock.elapsedRealtime}），和 {@link CameraContention}、
  *       {@link CameraHolderSuspects} 一样。调度换到自己的钟：自己的此刻 −（{@code elapsedRealtime()} − 那个时刻）。</li>
@@ -121,7 +120,7 @@ public final class CameraAvailabilityWatch {
         if (callback != null || context == null) {
             return;
         }
-        // 用应用的 Context：这里留着 CameraManager 给 ask() 用，拿 Activity 取的那份会把界面留住
+        // 用应用的 Context：这里留着 CameraManager 给 ask 用，拿 Activity 取的那份会把界面留住
         Context app = context.getApplicationContext();
         if (app == null) {
             app = context;
@@ -351,27 +350,9 @@ public final class CameraAvailabilityWatch {
         return LEDGER.word(cameraId);
     }
 
-    /**
-     * 相机服务对这一路说的最后一句是「空闲」，不管是多早说的：AOSP 对「空闲 → 空闲」不再回调 —— 10-10 08:56:57 那句假的
-     * 「2 空闲」之后我们关 2，相机服务就没再说话（大纲 §7 解读 1）。不在的不算。
-     */
-    static boolean serviceSaysFree(String cameraId) {
-        return Boolean.TRUE.equals(LEDGER.word(cameraId).free);
-    }
-
-    /** 不在：相机服务的缓存里没有这一路，回放里也没有它（{@link Word#absent}）。车机拿着后座舱时就是这样。 */
-    static boolean absent(String cameraId) {
-        return LEDGER.word(cameraId).absent;
-    }
-
     /** 上一次<b>别人引起的</b>变化（开机起算、含深睡）；0 = 没有过。通道的「安静」从这里算（{@link CameraTaken#QUIET_MS}）。 */
     static long lastOthersChangeAt() {
         return LEDGER.lastOthersChangeAt();
-    }
-
-    /** 问相机服务一次，不要结果（结果照样并进记录、叫醒调度）。 */
-    static void ask() {
-        ask(null);
     }
 
     /**
@@ -384,9 +365,9 @@ public final class CameraAvailabilityWatch {
      * <p>黑匣子：对不上的每一处这里写一行（「问相机服务：表上 1 被占用，它现在说空闲（漏收了一声）→ 照它说的改」）；
      * 每问一次写 AppLog。「第一次、每第 10 次」那一行由调度写 —— 被拿走多久、第几次在它的账上。</p>
      *
-     * @param then 收尾时在主线程上交回结果；问不成（还没开始听、登记失败）也交，回放是空的。可以是 null
+     * @param then 收尾时在主线程上交回结果；问不成（还没开始听、登记失败）也交，回放是空的
      */
-    static void ask(@Nullable Consumer<Asked> then) {
+    static void ask(Consumer<Asked> then) {
         Handler main = main();
         if (Looper.myLooper() != Looper.getMainLooper()) {
             main.post(() -> ask(then));
@@ -434,14 +415,13 @@ public final class CameraAvailabilityWatch {
      */
     private static final class Asker extends CameraManager.AvailabilityCallback {
         private final CameraManager cm;
-        @Nullable
         private final Consumer<Asked> then;
         /** 回放里收到的每一路（true 空闲）。只在主线程上读写。 */
         private final Map<String, Boolean> replay = new TreeMap<>();
         /** 收尾跑过了。只在主线程上读写。 */
         private boolean done;
 
-        Asker(CameraManager cm, @Nullable Consumer<Asked> then) {
+        Asker(CameraManager cm, Consumer<Asked> then) {
             this.cm = cm;
             this.then = then;
         }
@@ -537,10 +517,7 @@ public final class CameraAvailabilityWatch {
         }
     }
 
-    private static void answer(@Nullable Consumer<Asked> then, Asked asked) {
-        if (then == null) {
-            return;
-        }
+    private static void answer(Consumer<Asked> then, Asked asked) {
         try {
             then.accept(asked);
         } catch (RuntimeException e) {
@@ -674,7 +651,7 @@ public final class CameraAvailabilityWatch {
     }
 
     /**
-     * 用问来的快照修正我们的记录（{@code ask()}、以及注册那一刻的回放收全之后）：返回要改的那几路，按相机编号排好；
+     * 用问来的快照修正我们的记录（{@link #ask}、以及注册那一刻的回放收全之后）：返回要改的那几路，按相机编号排好；
      * 一致就是空的，什么都不动。
      *
      * <ul>

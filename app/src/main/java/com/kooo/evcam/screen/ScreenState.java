@@ -40,7 +40,7 @@ import java.util.List;
  *       照 {@code ScreenOffPlan} 接着录、10 秒后停、或者现在停（哨兵模式没开、车没在走：车机几秒后就断电），
  *       亮屏再判接不接；</li>
  *   <li>相机不在这里管：谁要用就登记，熄屏时没人登记了就现在关（环视先单独关），由相机层按登记表判
- *       （MultiCameraManager.reconcileCameras）—— 现在停的那一次录像先放开，后视镜、主界面跟着注销，相机自然就关了，
+ *       （通道调度 {@link com.kooo.evcam.camera.ChannelScheduler}）—— 现在停的那一次录像先放开，后视镜、主界面跟着注销，相机自然就关了，
  *       赶在断电之前；</li>
  *   <li>界面：因熄屏自己退下去的主界面，亮屏就接回来（{@link Recovery#bringBackUiAfterScreenOn}）；</li>
  *   <li>之后才是主界面、后视镜自己登记的监听者（退后台、摘/接后视镜）。</li>

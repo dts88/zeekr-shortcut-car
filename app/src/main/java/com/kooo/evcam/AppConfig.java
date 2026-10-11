@@ -484,21 +484,6 @@ public class AppConfig {
     }
     
     
-    /**
-     * 格式化码率为可读字符串
-     * @param bitrate 码率（bps）
-     * @return 格式化字符串，如 "3.0 Mbps"
-     */
-    public static String formatBitrate(int bitrate) {
-        float mbps = bitrate / 1000000f;
-        if (mbps >= 1) {
-            return String.format(java.util.Locale.getDefault(), "%.1f Mbps", mbps);
-        } else {
-            return String.format(java.util.Locale.getDefault(), "%d Kbps", bitrate / 1000);
-        }
-    }
-    
-    
     // ==================== 帧率配置相关方法 ====================
 
 
