@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
 
 import com.kooo.evcam.camera.CameraNeeds.Holder;
@@ -221,6 +222,60 @@ public class ChannelSchedulerTest {
         assertTrue(lines("judged").isEmpty());
         at(1_300);
         assertEquals(2, lines("judged").size());
+    }
+
+    /**
+     * openCamera 发出去一直没回音（相机层一直「在开」）：开那一步满 15 秒算救援第 1 次，之后不救 —— 这时重开相机层只会合并掉，
+     * 梯子白算次数（审查 2026-10-11）。相机层到了自己的在途封顶（60 秒）不再算在开，调度才重开，算第 2 次
+     * （SingleCamera 那一边作废那一轮、换一条相机线程开）。
+     */
+    @Test
+    public void anOpenThatNeverAnswersIsReopenedOnlyOnceTheCameraLayerGivesItUp() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        declare(surround, mirror);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+        surround.progressAgeMs = 20_000;   // 开出去以后一点进展都没有
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded OPEN front timedOut").size());
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertEquals("相机层还在开：不救", Arrays.asList("open [MIRROR]"), surround.actions);
+        assertEquals("一次也没被合并掉", 0, surround.refused);
+        assertTrue(lines("gaveUp").isEmpty());
+        assertEquals(1, view(s.snapshot(), SUR).attempts);
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        surround.busySince = 0;   // 相机层的在途封顶到了
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]", "reopen [MIRROR]"), surround.actions);
+        assertEquals(0, surround.refused);
+        assertEquals(2, view(s.snapshot(), SUR).attempts);
+    }
+
+    /**
+     * 改输出卡在配会话里（新会话一直配不好）：这一步满 15 秒，救援接手重开 —— 相机层的重开不因为在配会话合并掉
+     * （它把那一次配置作废、连设备一起关掉再开；审查 2026-10-11：以前合并掉，救援梯子空转到 60 秒封顶）。
+     */
+    @Test
+    public void aStuckApplyIsTakenOverByAReopenAtFifteenSeconds() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        host.plan(SUR);
+        declare(surround, recS);
+        claim(Holder.RECORDING);
+        settle();
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
+        at(100);
+        surround.session = SingleCamera.SessionOutputs.NONE;   // 旧会话关掉了，新的一直配不好
+        surround.firstFrameAt = 0;
+        surround.progressAgeMs = ChannelRules.STEP_MAX_MS;
+        at(ChannelRules.STEP_MAX_MS + ChannelRules.TICK_MS);
+        assertEquals(1, lines("stepEnded APPLY front timedOut").size());
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]", "reopen [MIRROR, RECORD]"), surround.actions);
+        assertEquals(0, surround.refused);
     }
 
     /** 丢了还没判完：判完之前 condition 说不出是不是被拿着（在救），判完才是 TAKEN。 */
@@ -596,6 +651,41 @@ public class ChannelSchedulerTest {
     }
 
     /**
+     * 停放着的录制器所在的那一路丢了：关完时它「随相机关了」，录像那一侧放掉录制器 —— 重开时不再带它，不派的话它永远回不到
+     * 会话里、永远等不到被丢（审查 2026-10-11）。在录时丢了照旧不派：相机回来时同一个录制器直接加入。
+     */
+    @Test
+    public void aParkedRecorderOnALostLaneIsDroppedWhenTheCloseEnds() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        settle();
+        rear.lose(now);
+        s.onLossStarted("1", DISCONNECTED);
+        settle();
+        at(5_000);
+        rear.closedNow();
+        s.onLossClosed("1", 5_000);
+        settle();
+        assertTrue("在录：同一个录制器等相机回来直接加入", rear.drops.isEmpty());
+
+        drop(Holder.RECORDING);   // 停录：环视的录制器停放，录像输出留在会话里
+        settle();
+        assertEquals(ChannelRules.OutState.KEPT, surround.states.get(recS).state);
+        at(6_000);
+        surround.lose(now);
+        s.onLossStarted("2", DISCONNECTED);
+        settle();
+        assertTrue("关完之前不派", surround.drops.isEmpty());
+        at(8_000);
+        surround.closedNow();
+        s.onLossClosed("2", 2_000);
+        settle();
+        assertEquals(Arrays.asList("RECORD CLOSED"), surround.drops);
+    }
+
+    /**
      * 开着却卡住了（8 秒没进展），调度在救：告诉录像「走了」（那一路收尾退出）；救好了新会话带着同一个录像输出出了画面，
      * 再告诉一次出画面（那一路再加入）。救的那一步照旧带着录像输出，不算被丢。
      */
@@ -882,6 +972,69 @@ public class ChannelSchedulerTest {
         assertFalse(s.ourStepInFlight("2"));
     }
 
+    /**
+     * 管线在同一个进程里重建（配置里开关了一路、换车型、退出后马上又开）：新的一份读到的「被占用」还是旧的那一份开的时候记下的
+     * 「我们开着」，旧的那一份早关完了 —— 关着的这一路还被占着，只能是别人（原厂 360 拿着环视）。认出来，只问、不开；
+     * 相机服务说它空了，安静 3 秒再开（审查 2026-10-11：以前当成我们的，安静了就去开，正是 §二.7 不许的试开）。
+     */
+    @Test
+    public void aRebuiltPipelineDoesNotOpenALaneOthersHoldBehindAnOldOursWord() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        host.words.put("2", new CameraAvailabilityWatch.Word(false, false, true, elapsed(now - 600_000)));
+        claim(Holder.MIRROR);
+        declare(surround, mirror);
+        settle();
+        assertEquals(Arrays.asList("recognized front busy"), lines("recognized"));
+        assertTrue("一次也不试开", surround.actions.isEmpty());
+        assertEquals("有人要：马上问", 1, host.asks.size());
+        host.answer();
+        at(ChannelRules.ASK_EVERY_MS);
+        assertEquals(2, host.asks.size());
+        assertTrue(surround.actions.isEmpty());
+
+        at(40_000);
+        say(surround, true, false);
+        s.wake();
+        settle();
+        assertEquals(1, lines("released front TAKEN").size());
+        at(40_000 + ChannelRules.QUIET_MS);
+        assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+    }
+
+    /**
+     * 同上，旧的那一份还在关（退出、换车型时两份并存）：那一句「被占用（我们开着）」还算我们的 —— 不认成别人拿着，等它关完；
+     * 它关完、相机服务说「空闲」，照常开。
+     */
+    @Test
+    public void anOursWordWhileAnotherPipelineIsStillClosingIsNotTakenForOthers() {
+        FakePort old = new FakePort("2");
+        ChannelScheduler b = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        try {
+            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+            lanes.put(SUR, old);
+            b.setLanes(lanes);
+            Out mirror = new Out(Kind.MIRROR, "mirror-2");
+            claim(Holder.MIRROR);
+            streaming(old, mirror);   // 旧的那一份开着环视
+            b.exit();
+            declare(surround, mirror);
+            settle();
+            assertEquals(Arrays.asList("close exit"), old.actions);
+            assertTrue("另一份还在关：那一句还算我们的", lines("recognized").isEmpty());
+            assertTrue(surround.actions.isEmpty());
+
+            at(1_000);
+            old.closedNow();
+            say(old, true, true);
+            b.onClosed("2");
+            at(1_000 + ChannelRules.TICK_MS * 2);
+            assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+            assertTrue(lines("recognized").isEmpty());
+        } finally {
+            b.detach();
+        }
+    }
+
     // ================================================================= 能用相机
 
     /** 前台服务是后台起的、主界面不在前：不开、不计次数，写一行「现在用不了相机」；主界面回到前台才开。 */
@@ -944,6 +1097,59 @@ public class ChannelSchedulerTest {
         s.wake();
         settle();
         assertEquals(2, surround.actions.size());
+    }
+
+    /**
+     * 开的时候报「用不了相机」，而主界面一直在前（隐私开关、策略禁用那种）：没什么可等，按普通故障走梯子 —— 12 秒后重开
+     * （审查 2026-10-11：以前记下「用不了」、只等主界面「回到前台」那一下，主界面一直在前，就一直不开）。
+     */
+    @Test
+    public void anOpenFailingAsUnusableWithTheMainScreenInFrontGoesOnTheLadder() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        declare(surround, mirror);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+        at(100);
+        surround.busySince = 0;
+        surround.holds = false;
+        s.onOpenFailed("2", CameraTaken.Reason.ofAccess(CameraAccessException.CAMERA_DISABLED));
+        at(100 + ChannelRules.JUDGE_DELAY_MS);
+        assertEquals(1, lines("judged front UNUSABLE OPEN LADDER").size());
+        assertTrue("不等主界面", lines("deferred").isEmpty());
+        at(CameraLiveness.RETRY_GAP_MS - 1);
+        assertEquals(1, surround.actions.size());
+        at(CameraLiveness.RETRY_GAP_MS + ChannelRules.TICK_MS);
+        assertEquals(Arrays.asList("open [MIRROR]", "reopen [MIRROR]"), surround.actions);
+    }
+
+    /**
+     * 丢了、报「用不了相机」（错误 3，后台，前台服务是主界面在前时起的），关的那几秒里人回到了主界面：判的时候已经不用等了 ——
+     * 不计次数，当场重新开（审查 2026-10-11：以前记下「用不了」，可主界面「回到前台」那一下已经过去了，一直不开）。
+     */
+    @Test
+    public void aLossJudgedUnusableAfterTheMainScreenCameBackOpensAgainAtOnce() {
+        host.mainForeground = false;
+        host.startedWhileVisible = true;
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        surround.lose(now);
+        s.onLossStarted("2", CameraDevice.StateCallback.ERROR_CAMERA_DISABLED);
+        settle();
+        at(2_000);
+        host.mainForeground = true;   // 那一次关还没关完
+        s.wake();
+        settle();
+        at(5_000);
+        say(surround, true, true);
+        surround.closedNow();
+        s.onLossClosed("2", 5_000);
+        at(5_000 + ChannelRules.JUDGE_DELAY_MS);
+        assertEquals(1, lines("judged front UNUSABLE LOSS close=5000 MAIN_CAME_BACK").size());
+        assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+        assertTrue(lines("deferred").isEmpty());
     }
 
     // ================================================================= 现场回放（diag_15_bb.txt，10-10；09-27 的冲突）
@@ -1110,6 +1316,10 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("judged left TAKEN LOSS close=5400", "judged front BLOCKED LOSS close=1000"),
                 lines("judged"));
         assertEquals("BLOCKED 不记争用", Arrays.asList("1@" + (T0 + ELAPSED_AHEAD)), host.took);
+        host.answer();
+        assertEquals("被挡着的那一路问出来是空的：不是放开，等挡着它的那一路",
+                Arrays.asList("asked front 1 important blocked"), lines("asked front"));
+        assertEquals(Arrays.asList("asked left 1 important"), lines("asked left"));
         at(60_000);
         assertTrue("被拿着的时候一次也不试开", surround.actions.isEmpty() && rear.actions.isEmpty());
 
@@ -1184,6 +1394,64 @@ public class ChannelSchedulerTest {
         settle();
         assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
         assertTrue(lines("recordWaitEnded").isEmpty());
+    }
+
+    /**
+     * 「现在用不了相机，先不开 X」只在变了时写：别的路做了一步（改输出）、那几轮在等它，之后也不再写一遍（审查 2026-10-11）。
+     */
+    @Test
+    public void theDeferredLineIsNotRewrittenAfterAnotherLanesStep() {
+        host.mainForeground = false;
+        host.startedWhileVisible = false;
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        host.plan(SUR, REAR);
+        claim(Holder.MIRROR);
+        claim(Holder.RECORDING);
+        streaming(surround, mirror);
+        declare(rear, recR);
+        settle();
+        assertEquals(Arrays.asList("deferred left SERVICE_FROM_BACKGROUND"), lines("deferred"));
+        declare(surround, recS);
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
+        at(300);
+        configured(surround, mirror, recS);
+        frame(surround);
+        settle();
+        at(5_000);
+        assertEquals("同一句不再写", 1, lines("deferred").size());
+    }
+
+    /**
+     * 开不起来的那一路照旧记进「按次序开相机」，一轮一行 —— 判完（300 ms）接着开下一路，还在这一轮里
+     * （审查 2026-10-11：以前不记它、判的那一下就把这一轮断了，旧的分析脚本看到的是拆开的、缺一路的两行）。
+     */
+    @Test
+    public void aLaneThatFailsToOpenStaysInTheOpenTrail() {
+        claim(Holder.PREVIEW);
+        declare(surround, pvS);
+        declare(rear, pvR);
+        declare(front, pvF);
+        settle();
+        at(300);
+        opened(surround);
+        frame(surround);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), rear.actions);
+        at(500);
+        rear.busySince = 0;
+        rear.holds = false;
+        s.onOpenFailed("1", CameraTaken.Reason.ofNotListed());
+        at(500 + ChannelRules.JUDGE_DELAY_MS);
+        assertEquals(1, lines("judged left TAKEN OPEN").size());
+        assertTrue("判完接着开：还在这一轮里", lines("openTrail").isEmpty());
+        assertEquals(Arrays.asList("open [PREVIEW]"), front.actions);
+        at(1_000);
+        opened(front);
+        frame(front);
+        settle();
+        assertEquals(Arrays.asList("openTrail [front, left, back]"), lines("openTrail"));
     }
 
     // ================================================================= 诊断：关相机那两行、快照（大纲 §2 阶段 8）
@@ -1359,6 +1627,7 @@ public class ChannelSchedulerTest {
     /** 开成了，会话按它这一步要的那一组配好了。 */
     private void opened(FakePort port) {
         port.deviceOpen = true;
+        port.opening = false;
         port.holds = true;
         configured(port, port.lastOutputs.toArray(new Out[0]));
         s.onOpened(port.id);
@@ -1381,8 +1650,10 @@ public class ChannelSchedulerTest {
         s.onCameraEvent();
     }
 
+    /** 我们关的那一路关完了；相机服务照例为这一关说一句「空闲」（我们引起的）。 */
     private void closed(FakePort port) {
         port.closedNow();
+        host.words.put(port.id, new CameraAvailabilityWatch.Word(true, false, true, elapsed(now)));
         s.onClosed(port.id);
     }
 
@@ -1487,6 +1758,10 @@ public class ChannelSchedulerTest {
         long firstFrameAt;
         long progressAgeMs;
         int generation;
+        /** 开、重开发出去了、设备还没回来（SingleCamera.isOpening / reopenInFlight）。 */
+        boolean opening;
+        /** 重开被合并掉了几次（相机层的开、重开还在途时）。 */
+        int refused;
         /** 调度最后一次交来的输出分类（卡顿现场用的那一份）。 */
         Map<Out, ChannelScheduler.OutputState> states = new HashMap<>();
 
@@ -1497,6 +1772,7 @@ public class ChannelSchedulerTest {
         /** 丢了：设备、会话从字段上摘下，那一次关在途（SingleCamera.loseDevice）。 */
         void lose(long at) {
             deviceOpen = false;
+            opening = false;
             session = SingleCamera.SessionOutputs.NONE;
             firstFrameAt = 0;
             busySince = at;
@@ -1505,6 +1781,7 @@ public class ChannelSchedulerTest {
 
         void closedNow() {
             deviceOpen = false;
+            opening = false;
             holds = false;
             busySince = 0;
             session = SingleCamera.SessionOutputs.NONE;
@@ -1527,6 +1804,7 @@ public class ChannelSchedulerTest {
 
         @Override
         public boolean open(Set<Out> outputs) {
+            opening = true;
             return start("open", outputs);
         }
 
@@ -1540,8 +1818,16 @@ public class ChannelSchedulerTest {
             return start("rebuild", outputs);
         }
 
+        /**
+         * 照 SingleCamera.reopen 的规矩：开、重开还在途（busySince 没到封顶归 0）就合并掉；配会话还挂着不挡（CameraPort.reopen）。
+         */
         @Override
         public boolean reopen(Set<Out> outputs) {
+            if (opening && busySince != 0) {
+                refused++;
+                return false;
+            }
+            opening = true;
             return start("reopen", outputs);
         }
 
@@ -1549,6 +1835,7 @@ public class ChannelSchedulerTest {
         public void close(String why) {
             actions.add("close " + why);
             deviceOpen = false;
+            opening = false;
             session = SingleCamera.SessionOutputs.NONE;
             busySince = now;
             holds = true;
@@ -1805,7 +2092,8 @@ public class ChannelSchedulerTest {
         @Override
         public void judged(ChannelScheduler.Judgement j) {
             journal.add("judged " + j.key + " " + j.verdict + " " + j.origin
-                    + (j.closeMs >= 0 ? " close=" + j.closeMs : ""));
+                    + (j.closeMs >= 0 ? " close=" + j.closeMs : "")
+                    + (j.unusableThen != null ? " " + j.unusableThen : ""));
         }
 
         @Override
@@ -1891,9 +2179,10 @@ public class ChannelSchedulerTest {
         }
 
         @Override
-        public void asked(String key, String cameraId, int n, long heldMs, Boolean free, boolean absent,
-                          boolean important) {
-            journal.add("asked " + key + " " + n + (important ? " important" : " quiet"));
+        public void asked(String key, String cameraId, CameraTaken.Verdict mark, int n, long heldMs, Boolean free,
+                          boolean absent, boolean important) {
+            journal.add("asked " + key + " " + n + (important ? " important" : " quiet")
+                    + (mark == CameraTaken.Verdict.BLOCKED ? " blocked" : ""));
         }
     }
 }

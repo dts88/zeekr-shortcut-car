@@ -14,7 +14,7 @@ import com.kooo.evcam.telemetry.Telemetry;
  *
  * <p>说什么由 {@link ScreenOffPlan} 定 —— 录制协调器熄屏时照的也是它，所以写的就是实际会发生的。
  * 看这几样：熄屏持续录制（和开发者的熄屏录制）、启动自动录制，车辆的哨兵模式、挡位和车速（车在走时哨兵模式读成关，
- * 照样接着录）；哪样变了就跟着换。只在录制中显示（{@link RecordButtonUi} 管显隐），看不见时不读车辆信号。</p>
+ * 照样接着录）；哪样变了就跟着换。录制中、等待摄像头时显示（{@link RecordButtonUi} 管显隐），看不见时不读车辆信号。</p>
  */
 public class ScreenOffHintView extends TelemetryTextView {
 

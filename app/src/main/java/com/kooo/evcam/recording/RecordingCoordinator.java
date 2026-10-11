@@ -212,6 +212,8 @@ public final class RecordingCoordinator {
      */
     static final long SCREEN_OFF_STOP_MS = 10_000L;
     private Runnable screenOffStop;
+    /** {@link #screenOffStop} 到点的时刻（elapsedRealtime）：重判时计时照原来的走，那一行写还剩几秒。 */
+    private long screenOffStopAtMs;
     /** 熄屏那一刻在录（含等接回）：熄屏时刻（含深睡 / 不含深睡）和中途停过几次，亮屏时汇总一行。 */
     private long darkSinceElapsedMs;
     private long darkSinceUptimeMs;
@@ -673,6 +675,9 @@ public final class RecordingCoordinator {
         darkAction = decision.action;
         darkActionByLock = lockHeld;
         long now = android.os.SystemClock.elapsedRealtime();
+        // 又判成 10 秒后停（哨兵模式、挡位变了，还是车机醒着）：计时照原来的走、不重新开始，那一行照实写还剩几秒
+        boolean timerKept = screenOffStop != null;
+        long leftS = (Math.max(0L, screenOffStopAtMs - now) + 999) / 1000;
         BlackBox.noteImportant((check == DarkCheck.SCREEN_OFF ? (!busy ? "熄屏时没在录像"
                 : waitingOnly ? "熄屏时在等开录（" + pending + "）"
                 : isRecording() ? "熄屏时在录像" : "熄屏时在等自动接回")
@@ -696,11 +701,13 @@ public final class RecordingCoordinator {
                 : waitingOnly ? (decision.action == ScreenOffPlan.Action.CONTINUE ? "接着等，好了就开录"
                 : decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：不等开录了，相机按次序关（环视先单独关）"
-                : check == DarkCheck.STOP_DUE ? "不等开录了" : (SCREEN_OFF_STOP_MS / 1000) + " 秒后不等开录了")
+                : check == DarkCheck.STOP_DUE ? "不等开录了" : timerKept ? "照原来的计时（还剩 " + leftS + " 秒）不等开录了"
+                : (SCREEN_OFF_STOP_MS / 1000) + " 秒后不等开录了")
                 : decision.action == ScreenOffPlan.Action.CONTINUE ? "接着录"
                 : decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：现在停录，相机按次序关（环视先单独关）"
-                : check == DarkCheck.STOP_DUE ? "停录" : (SCREEN_OFF_STOP_MS / 1000) + " 秒后停录")
+                : check == DarkCheck.STOP_DUE ? "停录" : timerKept ? "照原来的计时（还剩 " + leftS + " 秒）停录"
+                : (SCREEN_OFF_STOP_MS / 1000) + " 秒后停录")
                 + (!busy || decision.action == ScreenOffPlan.Action.CONTINUE ? ""
                 : decision.resumesOnWake ? "；亮屏后接着录" : "；亮屏后不接")
                 + BlackBox.afterScreenOff());
@@ -727,6 +734,7 @@ public final class RecordingCoordinator {
                             decideWhileDark(DarkCheck.STOP_DUE);
                         }
                     };
+                    screenOffStopAtMs = now + SCREEN_OFF_STOP_MS;
                     main.postDelayed(screenOffStop, SCREEN_OFF_STOP_MS);
                 }
                 break;
@@ -840,11 +848,10 @@ public final class RecordingCoordinator {
      * 亮屏（{@link #screenOn}）、进程在屏幕亮着时被拉起来（Recovery）都走它；进程被车机结束过也接（规格 1.2）。
      * 屏幕黑着不接（2026-10-10）：哨兵模式没开时车机几秒后就断电，车机自己醒来的那几分钟里也不该录起来。
      *
-     * <p>现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机；和通道调度读的同一个事实，
-     * {@link MultiCameraManager#cameraUsableNow}）：先把主界面拉起来（{@link Recovery#bringUpMainForRecording}，大纲 §2 阶段 6），
-     * 录像照样现在就要 —— 没人拉主界面的话录像输出声明了、相机却开不起来，录像一直「等待摄像头」；拉了，它一起来、登记了预览，
-     * 调度就能开，带着录像输出开。不等它起来再要（大纲原写法）：拉主界面可能被系统悄悄拦下（后台起界面的限制）、
-     * 5 秒内重复的那一次也不再拉，那时没人再来要，录像就丢到下一次亮屏或 5 分钟一次的例行恢复（审查 2026-10-11）。</p>
+     * <p>现在用不了相机（主界面不在前、前台服务是后台起的）时先把主界面拉起来，和别的开录一样在打开录像意图那一下判
+     * （{@link #startWith}，{@link Recovery#bringUpMainForRecording}）：录像照样当场要，不等主界面起来再要 —— 拉主界面可能被系统
+     * 悄悄拦下（后台起界面的限制）、5 秒内重复的那一次也不再拉，那时没人再来要，录像就丢到下一次亮屏或 5 分钟一次的例行恢复
+     * （审查 2026-10-11）。</p>
      *
      * @param where 谁叫的（ASCII，进黑匣子）
      */
@@ -852,9 +859,6 @@ public final class RecordingCoordinator {
         if (ScreenState.dark() || isRecording() || pending != null
                 || !RecordingIntent.current().recordingWanted()) {
             return;
-        }
-        if (!MultiCameraManager.cameraUsableNow()) {
-            Recovery.bringUpMainForRecording(context, where);
         }
         BlackBox.noteImportant("「这一趟要录」还在（" + where
                 + (lastStopReason == null ? "，上一个进程留下的" : "，" + lastStopReason + " 停的") + "）：接着录");
@@ -921,7 +925,8 @@ public final class RecordingCoordinator {
 
     /**
      * 查过盘了：打开录像意图。相机层定下这次录哪几路、建录制器、声明各路的录像输出；
-     * 每一路带着录像输出出了画面就加入，落定了报上来（{@link #pushView}）。
+     * 每一路带着录像输出出了画面就加入，落定了报上来（{@link #pushView}）。屏幕亮着、现在用不了相机时先把主界面拉起来
+     * （{@link Recovery#bringUpMainForRecording}）：哪一条路要的录像都在这一处判。
      *
      * @param checkStorage false：刚为这次开录清理过空间，不再检查一遍 ——
      *                     否则估算的余量稍有变化就会清完又清，一直开不起来
@@ -977,7 +982,7 @@ public final class RecordingCoordinator {
         RecordingIntent.current().noteRecordingStarted();
         // 在录就立着「这一趟要录」：等的时候被清过（人点开主界面是新的一趟）也一样，录着的进程被结束了要接得回来
         noteWanted(true, why.name());
-        if (!manager.startRecording(cameras)) {
+        if (!manager.startRecording(cameras, storage)) {
             // 准备就失败了：准备到一半的录制器、录像输出照样由停录那条路收拾
             BlackBox.noteImportant("开录失败：相机层没能开始（" + why + "）");
             end(RecordingStops.Reason.START_FAILED);
@@ -994,6 +999,16 @@ public final class RecordingCoordinator {
         // 不在的起来时照此刻的样子写（notificationTitle）
         if (!CameraForegroundService.isRunning()) {
             CameraForegroundService.start(context);
+        }
+        // 现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机；和通道调度读的同一对事实，
+        // MultiCameraManager.cameraUsableNow）：先把主界面拉起来（Recovery.bringUpMainForRecording），录像照样现在就开 ——
+        // 不拉的话录像输出声明了、相机却开不起来，录像一直「等待摄像头」，直到人自己打开主界面；拉了，它一起来、刷新了前台服务，
+        // 调度就带着录像输出开。每一条开录的路都经过这里（人按的、悬浮按钮、启动自动录制、亮屏接回、存储一类的自动接回），
+        // 一处判（审查 2026-10-11：以前只有亮屏接回拉，悬浮按钮在后台开录、前台服务是后台起的就一直「等待摄像头」）。
+        // 黑着屏不拉（黑着拉起来的主界面一开就是三路相机）。不放在 request 里：悬浮按钮拉起的主界面在 onCreate 里就要录，
+        // 那时还没 onResume、算不在前；查盘总是异步回来的，到这一步它已经在前了
+        if (!ScreenState.dark() && !MultiCameraManager.cameraUsableNow()) {
+            Recovery.bringUpMainForRecording(context, why.name());
         }
     }
 

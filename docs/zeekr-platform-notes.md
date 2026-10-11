@@ -291,7 +291,9 @@ Camera2 ──写入──> 一个普通的 TextureView（唯一的相机消费�
 - `线程 main 卡住 …ms 还没恢复，正在：…` / `线程 main 恢复，卡了 …ms` —— 主线程的问题
 - `线程 Camera-2 closing 卡住 …，正在：BinderProxy.transactNative … SingleCamera.closeDeviceTimed` —— 相机服务的问题
 - `相机 2（环视）已关（unwanted，87ms，熄屏后 +412ms）` —— 这一路真的关好了、用了多久、为什么关（2.11 起是调度关的原因：
-  `unwanted` / `hold-over` / `screen-off` / `head-unit-sleeps` / `exit`）；熄屏期间带上离熄屏多久
+  `unwanted` / `hold-over` / `screen-off` / `head-unit-sleeps` / `exit`；`stale-open` 是开、重开 60 秒没回音、那一轮被作废，
+  作废的时候先有一行「…上一次打开 60 秒还没回音（相机服务卡住？）：作废那一轮，换一条相机线程再开」，那条线程卡着就等不到「已关」）；
+  熄屏期间带上离熄屏多久
   （2026-10-10 起；停录、主界面退后台、后视镜放开、整轮关完、放唤醒锁那几行也带），车机结束进程之前关没关完看它
 - `显示卡住：亮屏 …ms 没有新的一帧，主线程正常` / `显示恢复：停了 …ms` —— 系统的显示这一层停了，不是我们
 - `配置变化：night off->on …` —— 界面为什么被重建

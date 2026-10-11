@@ -378,6 +378,7 @@
     <string name="msg_recording_stopped">录制已停止</string>
     <string name="msg_recording_started_all">已开始录制（全部摄像头）</string>
     <string name="msg_recording_started_n">已开始录制 %1$d 路</string>
+    <string name="msg_recording_waiting_cameras">等待摄像头，恢复后自动继续</string>
     <string name="msg_sd_fallback">未检测到 U 盘，已改为录制到内置存储</string>
     <string name="msg_recording_interrupted">录制中断：%1$s</string>
     <string name="msg_recording_interrupted_resuming">录制中断：%1$s，正在自动恢复…</string>

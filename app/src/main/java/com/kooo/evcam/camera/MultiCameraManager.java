@@ -87,6 +87,7 @@ public class MultiCameraManager {
                 @Override
                 public void onScreenOn() {
                     scheduler.wake();
+                    liftRefusals("亮屏了");
                 }
             };
     private PipelineCallback pipelineCallback;
@@ -268,6 +269,12 @@ public class MultiCameraManager {
         long parkedAt;
         /** 黑匣子写过「沿用停放着的那个」的那个录像代数。 */
         int reuseNotedGen = -1;
+        /**
+         * 这一路写不进、判成了盘或编码器的事（整次停，{@link #onLaneWriteStalled}）：停放好就换下来（这里写换下来的原因），
+         * 接回时另建一个；null = 没事。毛病可能就在这个录制器自己（EGL 每帧出错、编码器怎么重建都不成），沿用的话每次接回都重演，
+         * 三次之后额度用完、录像彻底停（审查 2026-10-11）。写入线程被放弃过的（盘的事）本来就重新备不好、也要换，换得早一点而已。
+         */
+        String suspectWhy;
         /** 不用了（换下来、录像输出被丢了、管线放了）：撤回了声明，手上那一步做完就交出去放掉。 */
         boolean retired;
         String retiredWhy = "";
@@ -484,8 +491,12 @@ public class MultiCameraManager {
         scheduler.setRecording(new LaneSide());
         // 相机服务每说一句、问的结果回来、注册回放收全：叫醒调度；分类时问它「这一路有没有我们的开或关在途」
         CameraAvailabilityWatch.addListener(channelSide);
-        // 登记表一变就叫醒调度（只认这一份：换车型时旧的那份晚 release，摘不掉这份的监听）
-        needsListener = scheduler::onNeedsChanged;
+        // 登记表一变就叫醒调度（只认这一份：换车型时旧的那份晚 release，摘不掉这份的监听）；会话连着几次带不上录像输出、
+        // 等着的那几路这时也重新声明（和救援停手一样解锁，liftRefusals）。监听可能在别的线程上叫
+        needsListener = () -> {
+            scheduler.onNeedsChanged();
+            laneHandler.post(() -> liftRefusals("登记表变了"));
+        };
         CameraNeeds.current().setListener(needsListener);
         // 亮屏、熄屏叫醒调度（ScreenState 在主线程上叫）
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
@@ -609,14 +620,12 @@ public class MultiCameraManager {
      *
      * <p>设定的盘不在时，路径选择会悄悄改用别的盘（2026-09-26 21:55 那次，1D8C 掉线后自动接回，
      * 就写到了 B905 上）—— 不记下来的话，事后连「录像在哪」都要猜。</p>
+     *
+     * <p>目录是开录前查盘那一次在存储线程上找好的（{@link #openRecordingIntent}），这里不再找一遍：
+     * 主线程上找目录要碰 U 盘，盘掉线时会卡住（审查 2026-10-11）。</p>
      */
-    private void noteRecordingDir() {
+    private void noteRecordingDir(File dir) {
         try {
-            File dir = StorageHelper.getRecordingDir(context);
-            if (dir == null) {
-                // 刚开录盘就没了（没有地方可存）：录制器写不进会自己换盘或报停，这里没有目录可记
-                return;
-            }
             StorageHelper.noteRecordingDir(dir);
             String custom = new AppConfig(context).getCustomSdCardPath();
             boolean offTarget = custom != null && !custom.isEmpty()
@@ -757,7 +766,7 @@ public class MultiCameraManager {
             return useCodecRecording ? "录制器建不起来" : "MediaRecorder 备不起来、或者开不了录";
         }
         if (refusedUntilGone(lane.key)) {
-            return "会话连着 " + CameraLiveness.MAX_ATTEMPTS + " 次带不上录像输出，等相机走了回来再试";
+            return "会话连着 " + CameraLiveness.MAX_ATTEMPTS + " 次带不上录像输出，等相机走了回来、登记表变了或者亮屏再试";
         }
         switch (lane.condition) {
             case TAKEN:
@@ -1274,6 +1283,10 @@ public class MultiCameraManager {
             retire(slot, slot.retired ? slot.retiredWhy : "随管线放了");
             return;
         }
+        if (slot.suspectWhy != null) {
+            // 写不进、判成盘或编码器的事的那个录制器不沿用（Slot.suspectWhy）：换下来；又在录了（接回开得快）就另建一个
+            retire(slot, slot.suspectWhy);
+        }
         ensureRecorder(slot.key);
         publishLanes();
     }
@@ -1306,10 +1319,44 @@ public class MultiCameraManager {
                 || android.os.SystemClock.uptimeMillis() < refusal.retryAt);
     }
 
-    /** 会话连着 {@link CameraLiveness#MAX_ATTEMPTS} 次都带不上这一路的录像输出：等它的相机走了、回来时再试（主线程）。 */
+    /**
+     * 会话连着 {@link CameraLiveness#MAX_ATTEMPTS} 次都带不上这一路的录像输出：等它的相机走了回来、登记表变了、或者亮屏再试
+     * （主线程，{@link #liftRefusals}）。
+     */
     private boolean refusedUntilGone(String key) {
         Refusal refusal = refusals.get(key);
         return refusal != null && refusal.count >= CameraLiveness.MAX_ATTEMPTS;
+    }
+
+    /**
+     * 会话连着几次都带不上录像输出、等着的那几路（{@link #refusedUntilGone}）重新声明（主线程）：和救援梯子停手之后同样的解锁
+     * （ChannelRules.liftStops，§7.4）—— 登记表变了、亮屏；相机服务报它空闲说明它的相机走过了，那时已经清了
+     * （{@link LaneSide#onLaneCameraGone}）。以前只等相机走：录像开着时 RECORDING 一直让它开着、在出画面，相机不会走，
+     * 这一路这一趟就再也不录，「等待摄像头，恢复后自动继续」和「各路都停手了 …再试」那一行都不属实（审查 2026-10-11）。
+     *
+     * @param why 为什么现在再试（进黑匣子）
+     */
+    private void liftRefusals(String why) {
+        if (!isRecording || refusals.isEmpty()) {
+            return;
+        }
+        List<String> lifted = new ArrayList<>();
+        for (String key : new ArrayList<>(refusals.keySet())) {
+            if (refusedUntilGone(key)) {
+                refusals.remove(key);
+                lifted.add(key);
+            }
+        }
+        if (lifted.isEmpty()) {
+            return;
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("录像：" + roles(lifted) + " 的会话连着 " + CameraLiveness.MAX_ATTEMPTS
+                + " 次带不上录像输出，" + why + "：重新声明，从头再试");
+        for (String key : lifted) {
+            ensureLane(key);
+        }
+        scheduler.wake();
+        publishLanes();
     }
 
     /**
@@ -1450,7 +1497,12 @@ public class MultiCameraManager {
             leaveLane(key, (stalledMs / 1000) + " 秒没写进、" + what);
             return;
         }
-        com.kooo.evcam.blackbox.BlackBox.noteImportant(head + "，它在出画面、会话里有它的录像输出 → 盘或编码器的事：整次停");
+        com.kooo.evcam.blackbox.BlackBox.noteImportant(head + "，它在出画面、会话里有它的录像输出 → 盘或编码器的事：整次停"
+                + (useCodecRecording ? "，这一路的录制器停放好就换下来、接回时另建" : ""));
+        Slot stalled = useCodecRecording ? slots.get(key) : null;
+        if (stalled != null) {
+            stalled.suspectWhy = "换下来了（写不进，整次停）";
+        }
         // 「一笔没写进」说的是这一次录像：录制器的那个数每次加入从头算，中途接回的一路还没写进就卡住，也是录着录着写不进了
         onWriteStalled(stalledMs, everWrote || firstDataWritten);
     }
@@ -2294,7 +2346,7 @@ public class MultiCameraManager {
     /**
      * 此刻能不能用相机（大纲 §0 名词「能用相机」）：主界面在前，或者前台服务是主界面在前时起的、那时刷新过 ——
      * 安卓 12 起后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度读的是同一对事实（{@link ChannelSide} 的
-     * mainForeground、serviceStartedWhileVisible）；录像接回（RecordingCoordinator.resumeIfWanted）照它决定要不要先把主界面拉起来。
+     * mainForeground、serviceStartedWhileVisible）；录像协调器打开录像意图时（RecordingCoordinator.startWith）照它决定要不要先把主界面拉起来。
      * 哪个线程都能读。
      */
     public static boolean cameraUsableNow() {
@@ -2566,7 +2618,11 @@ public class MultiCameraManager {
                 verdict = "它自己空着，别的程序拿着相机 " + String.join("、", j.takenIds) + "，也算被拿着（BLOCKED）";
                 break;
             case UNUSABLE:
-                verdict = "现在用不了相机，不计次数";
+                verdict = j.unusableThen == ChannelRules.UnusableThen.LADDER
+                        ? "现在用不了相机，主界面一直在前：按普通故障救"
+                        : j.unusableThen == ChannelRules.UnusableThen.MAIN_CAME_BACK
+                        ? "现在用不了相机，主界面已经回到前台：不计次数，不用再等"
+                        : "现在用不了相机，不计次数，等主界面回到前台";
                 break;
             default:
                 verdict = "普通故障，按救援的节奏救";
@@ -2905,7 +2961,11 @@ public class MultiCameraManager {
                                 + " → 也算被拿着，等都放开再开";
                         break;
                     case UNUSABLE:
-                        line = head + "现在用不了相机 → 不计次数，等主界面回到前台";
+                        line = head + (j.unusableThen == ChannelRules.UnusableThen.LADDER
+                                ? "主界面一直在前也用不了相机 → 按普通故障，按救援的节奏重开"
+                                : j.unusableThen == ChannelRules.UnusableThen.MAIN_CAME_BACK
+                                ? "现在用不了相机，主界面在这之后回到了前台 → 不计次数，不用再等"
+                                : "现在用不了相机 → 不计次数，等主界面回到前台");
                         break;
                     default:
                         line = head + (!j.heardAnything ? "相机服务从没报过空闲 / 被占用 → 认不出被拿走，按普通故障救"
@@ -2926,7 +2986,11 @@ public class MultiCameraManager {
                         line = head + "，别的程序拿着相机 " + String.join("、", j.takenIds) + " → 也算被拿着，等都放开再开";
                         break;
                     case UNUSABLE:
-                        line = head + " → 不计次数，等主界面回到前台";
+                        line = head + (j.unusableThen == ChannelRules.UnusableThen.LADDER
+                                ? " → 主界面一直在前也用不了：按普通故障，按救援的节奏，第 " + Math.max(1, j.attempt) + " 次"
+                                : j.unusableThen == ChannelRules.UnusableThen.MAIN_CAME_BACK
+                                ? " → 不计次数；主界面已经回到前台，不用再等"
+                                : " → 不计次数，等主界面回到前台");
                         break;
                     default:
                         line = head + (j.heardAnything ? "" : "（相机服务从没报过空闲 / 被占用，认不出被拿走）")
@@ -3144,11 +3208,14 @@ public class MultiCameraManager {
         }
 
         @Override
-        public void asked(String key, String cameraId, int n, long heldMs, Boolean free, boolean absent,
-                          boolean important) {
-            String line = "问相机服务：" + cameraId + " " + (absent ? "还是不在"
-                    : Boolean.TRUE.equals(free) ? "说空闲了" : "还被占着") + "（被拿走 " + duration(heldMs)
-                    + "，第 " + n + " 次）";
+        public void asked(String key, String cameraId, CameraTaken.Verdict mark, int n, long heldMs, Boolean free,
+                          boolean absent, boolean important) {
+            // 被挡着的那一路自己本来就空着：「说空闲了」不是放开，它等的是挡着它的那一路（审查 2026-10-11）
+            boolean blocked = mark == CameraTaken.Verdict.BLOCKED && !absent && Boolean.TRUE.equals(free);
+            String line = "问相机服务：" + cameraId + " " + (blocked
+                    ? "自己空着，等挡着它的那一路放开（被挡了 "
+                    : (absent ? "还是不在" : Boolean.TRUE.equals(free) ? "说空闲了" : "还被占着") + "（被拿走 ")
+                    + duration(heldMs) + "，第 " + n + " 次）";
             AppLog.i(TAG, line);
             if (important) {
                 com.kooo.evcam.blackbox.BlackBox.note(line);
@@ -3341,9 +3408,10 @@ public class MultiCameraManager {
      * （{@link #openRecordingIntent}）。两种录制器一样，文件都按这一路真实开始的时刻起名。
      *
      * @param enabledCameras 要录的那几路（如 ["front", "back"]）；null 或空是启用的全部
+     * @param storage        开录前刚查过的那一份存储快照：写到哪照它（目录在存储线程上找好、建好），主线程不碰盘
      * @return false：没有地方存、没有能录的一路 —— 这里不收拾，协调器按开录失败走停录，由 {@link #stopRecording()} 收
      */
-    public boolean startRecording(Set<String> enabledCameras) {
+    public boolean startRecording(Set<String> enabledCameras, com.kooo.evcam.storage.StorageState.Snapshot storage) {
         // 以前还有不带参数的两个重载给悬浮按钮走，那条路没有写入看门狗、没有存储检查、也不拒录内置存储（2026-09-27 审查），删了
         if (isRecording) {
             AppLog.w(TAG, "Already recording");
@@ -3354,12 +3422,12 @@ public class MultiCameraManager {
         sharedName.reset();
         interruptReported = false;
 
-        boolean started = openRecordingIntent(enabledCameras);
+        boolean started = openRecordingIntent(enabledCameras, storage);
         if (started) {
             lastStorageCheckMs = 0;
             mainHandler.removeCallbacks(storageTick);
             mainHandler.postDelayed(storageTick, STORAGE_TICK_MS);
-            noteRecordingDir();
+            noteRecordingDir(recordDir);
         }
         return started;
     }
@@ -3569,24 +3637,26 @@ public class MultiCameraManager {
      * 照样在计划里，它回来了自己加入。以前要等环视正常、各路按次序开完，再一起重建会话、等 3 秒会话计数，被拿着的那一路
      * 这一次不录（MediaRecorder 模式还要等画面稳定、再等 300 ms）。</p>
      *
+     * <p>写到哪照开录前查盘的那一份快照（{@code storage.recordDir}、中转写入的目标 {@code storage.videoDir}）：
+     * 目录在存储线程上找好、建好，主线程不碰盘 —— 以前这里在主线程上再找一遍、exists / mkdirs，盘掉线时会卡住主线程
+     * （审查 2026-10-11）。</p>
+     *
      * @return false：没有地方存、没有能录的一路（这时什么都没动）
      */
-    private boolean openRecordingIntent(Set<String> enabledCameras) {
+    private boolean openRecordingIntent(Set<String> enabledCameras, com.kooo.evcam.storage.StorageState.Snapshot storage) {
         // 重置首次写入通知标志（每次录制只通知一次）
         hasNotifiedFirstDataWritten = false;
         firstDataWritten = false;
         firstDataWrittenAtMs = 0;
 
         AppConfig appConfig = new AppConfig(context);
-        // 获取录制目录（可能是临时目录或最终目录）
-        File saveDir = StorageHelper.getRecordingDir(context);
-        if (saveDir == null) {
-            // 没有地方可存（没有 U 盘、开发者选项没开）：RecordingCoordinator 开录前已经拦过，走到这里是查完之后盘没了
+        // 录制目录（中转写入时是内置存储上的临时目录，否则是最终目录）：查盘时在存储线程上找好、建好的
+        File saveDir = storage == null ? null : storage.recordDir;
+        boolean relay = appConfig.shouldUseRelayWrite();
+        if (saveDir == null || (relay && storage.videoDir == null)) {
+            // 没有地方可存（没有 U 盘、开发者选项没开）：RecordingCoordinator 开录前已经拦过，走到这里是查盘时就没找到目录
             AppLog.e(TAG, "没有地方存录像（没有 U 盘），不开录");
             return false;
-        }
-        if (!saveDir.exists()) {
-            saveDir.mkdirs();
         }
         // 这次录哪几路：启用的、这一份管线里有的，按开的次序
         List<String> keys = new ArrayList<>();
@@ -3601,12 +3671,9 @@ public class MultiCameraManager {
         }
 
         // 如果使用中转写入，记录最终目录
-        useRelayWrite = appConfig.shouldUseRelayWrite();
+        useRelayWrite = relay;
         if (useRelayWrite) {
-            finalSaveDir = StorageHelper.getFinalVideoDir(context);
-            if (!finalSaveDir.exists()) {
-                finalSaveDir.mkdirs();
-            }
+            finalSaveDir = storage.videoDir;
             AppLog.d(TAG, "Relay write mode: recording to " + saveDir.getAbsolutePath()
                     + ", will transfer to " + finalSaveDir.getAbsolutePath());
         } else {
@@ -3935,13 +4002,13 @@ public class MultiCameraManager {
 
     /**
      * 「录像：相机 … 的会话带不上录像输出（配不上，被相机丢了；连着第 N 次）：这一路退出，别的路照录；隔 12 秒再声明一次」，
-     * 到了次数是「…；等这一路的相机走了、回来时再试」。
+     * 到了次数是「…；等这一路的相机走了回来、登记表变了或者亮屏时再试」。
      */
     private static void noteSessionRefused(String name, int count, boolean again) {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("录像：相机 " + name + " 的会话带不上录像输出（配不上，被相机丢了；连着第 "
                 + count + " 次）：这一路退出，别的路照录；" + (again
                 ? "隔 " + (CameraLiveness.RETRY_GAP_MS / 1000) + " 秒再声明一次"
-                : "等这一路的相机走了、回来时再试"));
+                : "等这一路的相机走了回来、登记表变了或者亮屏时再试"));
     }
 
     /**

@@ -833,18 +833,54 @@ public class ChannelRulesTest {
         assertEquals(1, count(Move.OPEN, rear));
     }
 
-    /** 主动认只认别人的：相机服务说「被占用（我们开着）」的，关着也不算被拿走。 */
+    /**
+     * 主动认只认别人的：相机服务说「被占用（我们开着）」、而我们刚关完它（0.5 秒以内，为这一关说的「空闲」还在路上），不算被拿走；
+     * 关完 0.5 秒还被占着，只能是别人 —— 那个「我们开着」只记说的那一刻（审查 2026-10-11）。
+     */
     @Test
     public void recognizesOnlyWhatOthersHold() {
+        rear.deviceSince = w.now - 100;   // 我们刚关完它
         serviceSays(rear, false, true);
         serviceSays(front, false, false);
         w.lastOthersChangeAt = 0;
         round();
-        assertNull(rear.mark);
+        assertNull("刚关完：那一句还算我们的", rear.mark);
         assertEquals(CameraTaken.Verdict.TAKEN, front.mark);
         Event recognized = event(Event.Type.RECOGNIZED);
         assertEquals(Collections.singletonList(FRONT), recognized.keys);
         assertFalse(recognized.absent);
+
+        at(ChannelRules.OWN_WORD_GRACE_MS - 100 - 1);
+        round();
+        assertNull(rear.mark);
+        at(ChannelRules.OWN_WORD_GRACE_MS - 100);
+        round();
+        assertEquals("关完 0.5 秒还被占着：别人拿着", CameraTaken.Verdict.TAKEN, rear.mark);
+        assertEquals(Collections.singletonList(REAR), event(Event.Type.RECOGNIZED).keys);
+    }
+
+    /**
+     * 管线在同一个进程里重建（配置里开关了一路、换车型、退出后马上又开）：新的一份从没碰过这一路，读到的「被占用（我们开着）」
+     * 是旧的那一份开的时候记下的。旧的那一份还在关 —— 算我们的，等它；关完了还被占着（原厂 360 拿着环视）—— 别人拿着，
+     * 一次也不试开（§二.7，审查 2026-10-11）。
+     */
+    @Test
+    public void anOldOursWordIsOursOnlyWhileAnotherPipelineIsStillClosing() {
+        claim(Holder.PREVIEW);
+        declarePreviews();
+        serviceSays(surround, false, true);
+        w.otherClosingSince = w.now;
+        Decision d = round();
+        assertNull("另一份还在关：那一句还算我们的", surround.mark);
+        assertWait(Why.OTHER_INSTANCE, null, d);
+
+        at(1_000);
+        w.otherClosingSince = 0;
+        assertEquals(Move.IDLE, run().move);
+        assertEquals(CameraTaken.Verdict.TAKEN, surround.mark);
+        assertEquals("一次也不试开", 0, count(Move.OPEN, surround));
+        assertEquals("被拿着的跳过，不挡后面", 2, count(Move.OPEN));
+        assertTrue(ChannelRules.askDue(w));
     }
 
     /** 1 是 TAKEN 时开 2，报 MAX_CAMERAS_IN_USE：判 BLOCKED、不计次数；1 放开了，两路一起放开，先开环视再开后座舱。 */
@@ -925,9 +961,13 @@ public class ChannelRulesTest {
         assertTrue(ChannelRules.excludedFromPhoto(surround));
     }
 
-    /** 报错误 3 / CAMERA_DISABLED（现在用不了相机）：不计次数，等主界面回到前台。 */
+    /**
+     * 报错误 3 / CAMERA_DISABLED（现在用不了相机），主界面不在前（前台服务是主界面在前时起的）：不计次数，等主界面回到前台。
+     * 主界面回到前台、又退到后台以后开的那一次再报，照样等。
+     */
     @Test
     public void cameraDisabledIsNotCountedAndWaitsForTheMainScreen() {
+        w.mainForeground = false;
         claim(Holder.MIRROR);
         surround.declared.add(mirror);
         Decision d = round();
@@ -939,6 +979,7 @@ public class ChannelRulesTest {
         at(600);
         d = round();
         assertEquals(CameraTaken.Verdict.UNUSABLE, event(Event.Type.JUDGED).verdict);
+        assertEquals(ChannelRules.UnusableThen.WAIT_FOR_MAIN, event(Event.Type.JUDGED).unusableThen);
         assertEquals(Move.IDLE, d.move);
         assertEquals(SUR, d.deferredKey);
         assertEquals(0, surround.ladder.attempts());
@@ -957,8 +998,101 @@ public class ChannelRulesTest {
         at(60_600);
         d = round();
         assertEquals(CameraTaken.Verdict.UNUSABLE, event(Event.Type.JUDGED).verdict);
+        assertEquals(ChannelRules.UnusableThen.WAIT_FOR_MAIN, event(Event.Type.JUDGED).unusableThen);
         assertEquals(Move.IDLE, d.move);
         assertEquals(0, surround.ladder.attempts());
+    }
+
+    /**
+     * 开的时候报「用不了相机」，而主界面从开之前到判的时候一直在前（隐私开关、策略禁用那种）：没什么可等，按普通故障走梯子 ——
+     * 算第 1 次，12 秒后重开（审查 2026-10-11：以前记下「用不了」、只等主界面「回到前台」那一下，主界面一直在前，就一直不开、
+     * 也不上梯子）。
+     */
+    @Test
+    public void cameraDisabledWithTheMainScreenInFrontAllAlongGoesOnTheLadder() {
+        w.mainForeground = true;
+        w.mainForwardAt = T0 - 60_000;
+        claim(Holder.MIRROR);
+        surround.declared.add(mirror);
+        Decision d = round();
+        startOnly(d);
+        at(300);
+        ChannelRules.openFailed(w, surround, CameraTaken.Reason.ofAccess(CameraAccessException.CAMERA_DISABLED));
+        surround.busySince = 0;
+        at(600);
+        d = round();
+        Event judged = event(Event.Type.JUDGED);
+        assertEquals(CameraTaken.Verdict.UNUSABLE, judged.verdict);
+        assertEquals(ChannelRules.UnusableThen.LADDER, judged.unusableThen);
+        assertEquals("不等主界面", 0, w.unusableSince);
+        assertNull(d.deferredKey);
+        assertEquals("算救援的第 1 次", 1, surround.ladder.attempts());
+        assertEquals(Move.IDLE, d.move);
+        at(CameraLiveness.RETRY_GAP_MS - 1);
+        assertEquals(Move.IDLE, round().move);
+        at(CameraLiveness.RETRY_GAP_MS);
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(2, d.attempt);
+    }
+
+    /**
+     * 丢了、报「用不了相机」（错误 3，后台），关的那几秒里主界面回到了前台：判的时候要等的已经等到了 —— 不计次数、不记「用不了」，
+     * 当场重新开（审查 2026-10-11：以前记下「用不了」，可主界面「回到前台」那一下已经过去了，一直不开）。
+     */
+    @Test
+    public void aLossJudgedUnusableAfterTheMainScreenCameBackIsNotWaitedFor() {
+        w.mainForeground = false;
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        assertEquals(Move.IDLE, round().move);
+        ChannelRules.lossStarted(w, surround,
+                CameraTaken.Reason.ofDeviceError(CameraDevice.StateCallback.ERROR_CAMERA_DISABLED));
+        surround.busySince = w.now;
+        at(2_000);
+        w.mainForeground = true;
+        ChannelRules.mainCameForward(w);
+        assertWait(Why.LOSING, SUR, round());
+        at(5_000);
+        serviceSays(surround, true, true);
+        ChannelRules.lossClosed(w, surround);
+        closed(surround);
+        at(5_300);
+        Decision d = round();
+        Event judged = event(Event.Type.JUDGED);
+        assertEquals(CameraTaken.Verdict.UNUSABLE, judged.verdict);
+        assertEquals(ChannelRules.UnusableThen.MAIN_CAME_BACK, judged.unusableThen);
+        assertEquals(0, w.unusableSince);
+        assertEquals("不计次数", 0, surround.ladder.attempts());
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+    }
+
+    /**
+     * 开那一步满 15 秒没出画面、相机层还挂着那一次打开（openCamera 一直没回音）：算救援第 1 次，但相机层还在开的时候不救 ——
+     * 这时重开只会被合并掉，梯子却白算一次（审查 2026-10-11）。相机层到了它的在途封顶（60 秒，busySince 归 0）才重开，算第 2 次。
+     */
+    @Test
+    public void anOpeningLaneIsNotRescuedWhileTheCameraLayerStillOpensIt() {
+        claim(Holder.MIRROR);
+        surround.declared.add(mirror);
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
+        startOnly(d);
+        surround.progressAgeMs = 20_000;
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("开那一步到点：算第 1 次", 1, surround.ladder.attempts());
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertEquals("相机层还在开：不救", Move.IDLE, round().move);
+        assertEquals(1, surround.ladder.attempts());
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        surround.busySince = 0;
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(2, d.attempt);
     }
 
     /** 一个卡死的关最多占住通道 60 秒，之后按当时的状态判（大纲 §6 风险 5）。 */

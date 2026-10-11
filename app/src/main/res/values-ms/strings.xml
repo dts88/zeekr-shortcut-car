@@ -369,6 +369,7 @@
     <string name="msg_recording_stopped">Rakaman dihentikan</string>
     <string name="msg_recording_started_all">Rakaman bermula (semua kamera)</string>
     <string name="msg_recording_started_n">Rakaman bermula (%1$d kamera)</string>
+    <string name="msg_recording_waiting_cameras">Menunggu kamera. Rakaman disambung semula secara automatik apabila kamera tersedia.</string>
     <string name="msg_sd_fallback">Tiada pemacu USB ditemui. Merakam ke storan dalaman.</string>
     <string name="msg_recording_interrupted">Rakaman terganggu: %1$s</string>
     <string name="msg_recording_interrupted_resuming">Rakaman terganggu: %1$s. Menyambung semula…</string>

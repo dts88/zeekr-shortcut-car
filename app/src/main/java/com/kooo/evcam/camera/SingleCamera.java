@@ -246,9 +246,11 @@ public class SingleCamera {
     private static final java.util.Map<String, java.util.concurrent.CountDownLatch> CLOSING =
             new java.util.concurrent.ConcurrentHashMap<>();
     /**
-     * 一路相机的开、关、重连、配会话，一次最多在途多久。在途期间同一路不叠第二个动作：
+     * 一路相机的开、关、重开、配会话，一次最多在途多久。在途期间同一路不叠第二个动作：
      * 调度不插队，强制重开合并，打开等上一次关完。相机服务一次关实测要 2–20 秒
-     * （2026-10-08），所以留足；超过就当回调不会来了，强制重开接手。
+     * （2026-10-08），所以留足；超过就当回调不会来了，强制重开接手。每一种在途都封顶，重开那一次也一样
+     * （审查 2026-10-11：以前重开在途单独挡、不封顶，那一次 openCamera 没回音，这一路就再也救不回来）：
+     * 超过封顶的那一轮开、重开不拿来接着用，像关相机一样作废，换一条相机线程重开（{@link #retireStaleOpen}）。
      */
     static final long IN_FLIGHT_MAX_MS = 60_000L;
     /** 打开前最多等上一次关闭多久：同一路相机在相机服务里不能有两个句柄，等它关完为止。 */
@@ -259,6 +261,12 @@ public class SingleCamera {
     private static final int LOST_DISCONNECTED = -4;
     private boolean isConfiguring = false;    // 一次 createCaptureSession 发出去了、回调还没来
     private boolean isSessionClosing = false; // 旧会话在关，等 onClosed
+    /**
+     * 相机层自己排了一次会话重建、还没开始建（{@link #requestSessionRebuild}：关完旧会话后 50 ms、配置失败后 200 / 500 ms、
+     * 关的兜底）。算在途（{@link #isBusy()}）：这几百毫秒里会话快照是空的、旧的标志都清了，不算的话调度会当这一路闲着、
+     * 会话里没有那一样 —— 把交给它的画布放掉，而排着的那一次重建正要带上它（审查 2026-10-11）。{@link #sessionLock}。
+     */
+    private boolean rebuildQueued = false;
     /**
      * 会话重建的代数：每次真正去建就 +1；建到一半又有人要重建，就再 +1 把在途的那一次作废。
      * 回调带着自己那一代回来，不是最新一代的一律作废（关掉、然后按最新的输出再建一次）。
@@ -628,7 +636,7 @@ public class SingleCamera {
     }
 
     /**
-     * 这一路此刻有没有动作在途：在开、在关（含丢了设备之后的那一次关）、在重开、在配会话。
+     * 这一路此刻有没有动作在途：在开、在关（含丢了设备之后的那一次关）、在重开、在配会话、排着一次会话重建。
      * 丢了之后的判定不在这里：它在通道调度的账上（等关完、再等 300 ms，那段时间调度自己不动别的路，2.11 阶段 3 起）。
      *
      * <p>在途的时候不叠第二个动作 —— 调度不重开，强制重开合并。2026-10-08 的七次
@@ -639,14 +647,24 @@ public class SingleCamera {
         boolean inFlight = isOpening || reopenInFlight || CLOSING.containsKey(cameraId);
         if (!inFlight) {
             synchronized (sessionLock) {
-                inFlight = isConfiguring || isSessionClosing;
+                inFlight = isConfiguring || isSessionClosing || rebuildQueued;
             }
         }
-        if (!inFlight) {
-            return false;
-        }
+        return inFlight && inFlightFresh();
+    }
+
+    /** 上一个动作上路还不到 {@link #IN_FLIGHT_MAX_MS}。 */
+    private boolean inFlightFresh() {
         long since = inFlightSinceMs;
         return since != 0 && SystemClock.uptimeMillis() - since < IN_FLIGHT_MAX_MS;
+    }
+
+    /**
+     * 开、重开、关还在途（封顶同 {@link #isBusy()}）：这时再开就是同一台相机两个句柄，相机服务会踢掉先开的那份
+     * （2026-10-08，自己顶自己 7 次）。配会话、关旧会话不在此列 —— 设备在我们手上，重开时连它们一起作废、关掉。
+     */
+    private boolean openOrCloseInFlight() {
+        return (isOpening || reopenInFlight || CLOSING.containsKey(cameraId)) && inFlightFresh();
     }
 
     /** 在途的是什么、多久了，给日志看。 */
@@ -668,6 +686,7 @@ public class SingleCamera {
         synchronized (sessionLock) {
             if (isConfiguring) sb.append("configuring ");
             if (isSessionClosing) sb.append("session-closing ");
+            if (rebuildQueued) sb.append("rebuild-queued ");
         }
         return sb.toString().trim();
     }
@@ -1123,13 +1142,23 @@ public class SingleCamera {
      *
      * <p>这一步做完看 {@link CameraCallback#onFirstFrame}；开不起来报 {@link CameraCallback#onOpenFailed}。</p>
      *
+     * <p>上一次开、重开在途已经超过 {@link #IN_FLIGHT_MAX_MS}（回调当它不会来了）：那一轮作废，换一轮开
+     * （{@link #retireStaleOpen}），和 {@link #reopen} 同一条规矩。</p>
+     *
      * @return false：这一路已经开着或正在开（含一次强制重开还在路上：那 300 ms 里设备是空的、也不算在开，
      *         可相机线程是同一条 —— 再开就是同一台相机两个句柄），什么都没做；或者没有相机线程
      */
     boolean open(Set<ChannelRules.Out> outputs) {
-        if (cameraDevice != null || isOpening || reopenInFlight) {
-            AppLog.d(TAG, "Camera " + cameraId + " already open or opening, channel open skipped");
+        if (cameraDevice != null) {
+            AppLog.d(TAG, "Camera " + cameraId + " already open, channel open skipped");
             return false;
+        }
+        if (isOpening || reopenInFlight) {
+            if (openOrCloseInFlight()) {
+                AppLog.d(TAG, "Camera " + cameraId + " already opening (" + describeBusy() + "), channel open skipped");
+                return false;
+            }
+            return retireStaleOpen(frozen(outputs));
         }
         return beginOpen(frozen(outputs));
     }
@@ -1160,8 +1189,11 @@ public class SingleCamera {
     /**
      * 救：重开（关掉设备，等 300 ms，再开），会话带着 {@code outputs}。关着的一路也走这里。
      *
-     * <p>合并：一次重开还在路上、或者这一路有动作在途，就合并掉、什么都不做 ——
-     * 同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）。</p>
+     * <p>合并：这一台相机的开、重开、关还在途（{@link #openOrCloseInFlight}，封顶 {@link #IN_FLIGHT_MAX_MS}），
+     * 就合并掉、什么都不做 —— 同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）。
+     * 配会话、关旧会话还挂着不合并：设备在我们手上，重开把那一次作废、连设备一起关掉再开。调度只在那一步到点之后才来救
+     * （审查 2026-10-11：以前也合并，卡在配会话里的那一路，救援梯子空转 60 秒、白算次数）。
+     * 开、重开在途超过封顶的，那一轮作废、换一轮开（{@link #retireStaleOpen}）。</p>
      *
      * @return false：合并掉了
      */
@@ -1189,6 +1221,9 @@ public class SingleCamera {
                 switchToPreviewOnlyMode(wanted);
             }
             handler.removeCallbacks(recreateSessionRunnable);
+            synchronized (sessionLock) {
+                rebuildQueued = false;   // 排着的那一次并进这一次
+            }
             createCameraPreviewSession();
         });
     }
@@ -1610,12 +1645,9 @@ public class SingleCamera {
             if (!cameraExists) {
                 AppLog.e(TAG, "Camera ID " + cameraId + " does not exist on this device. Available IDs: " +
                          java.util.Arrays.toString(availableCameraIds));
-                if (callback != null) {
-                    callback.onCameraError(cameraId, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE);
-                }
-                isOpening = false;
                 // 车机拿着后座舱时就是这样：相机服务的列表里干脆没有它（2026-10-10）
-                reportOpenFailed(CameraTaken.Reason.ofNotListed());
+                failOpenIfCurrent(handler, CameraTaken.Reason.ofNotListed(), false,
+                        CameraDevice.StateCallback.ERROR_CAMERA_DEVICE, null);
                 return;
             }
 
@@ -1629,12 +1661,7 @@ public class SingleCamera {
                 noteCharacteristics(characteristics);
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be virtual/invalid", e);
-                if (callback != null) {
-                    callback.onCameraError(cameraId, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE);
-                }
-                deviceLost = true;
-                isOpening = false;
-                reportOpenFailed(reasonOf(e));
+                failOpenIfCurrent(handler, reasonOf(e), true, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE, null);
                 return;
             }
 
@@ -1643,12 +1670,8 @@ public class SingleCamera {
                 Size chosen = sizeFrom(map);
                 if (chosen == null) {
                     AppLog.e(TAG, "Camera " + cameraId + " has no output sizes for PRIVATE/SurfaceTexture - camera may be virtual/invalid");
-                    if (callback != null) {
-                        callback.onCameraError(cameraId, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE);
-                    }
-                    deviceLost = true;
-                    isOpening = false;
-                    reportOpenFailed(CameraTaken.Reason.ofException("NoOutputSizes"));
+                    failOpenIfCurrent(handler, CameraTaken.Reason.ofException("NoOutputSizes"), true,
+                            CameraDevice.StateCallback.ERROR_CAMERA_DEVICE, null);
                     return;
                 }
 
@@ -1671,12 +1694,8 @@ public class SingleCamera {
                 }
             } else {
                 AppLog.e(TAG, "Camera " + cameraId + " StreamConfigurationMap is null - camera may be virtual/invalid!");
-                if (callback != null) {
-                    callback.onCameraError(cameraId, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE);
-                }
-                deviceLost = true;
-                isOpening = false;
-                reportOpenFailed(CameraTaken.Reason.ofException("NoStreamConfigurationMap"));
+                failOpenIfCurrent(handler, CameraTaken.Reason.ofException("NoStreamConfigurationMap"), true,
+                        CameraDevice.StateCallback.ERROR_CAMERA_DEVICE, null);
                 return;
             }
 
@@ -1686,21 +1705,16 @@ public class SingleCamera {
                 AppLog.d(TAG, "Camera " + cameraId + " SurfaceTexture exists");
             }
 
-            // 打开摄像头
+            // 打开摄像头（前面几次进相机服务的时候这一轮可能被关了：openCameraMarked 在锁里最后看一次）
             AppLog.d(TAG, "Camera " + cameraId + " calling openCamera...");
-            cameraManager.openCamera(cameraId, stateCallback, handler);
+            openCameraMarked(handler);
 
         } catch (CameraAccessException | RuntimeException e) {
             // 打开没发出去（相机服务不可用、没权限、无效相机）：标成「没开」，报开不起来，再不再试由调度判
-            isOpening = false;
-            deviceLost = true;
-            lastErrorName = e.getClass().getSimpleName();
             AppLog.e(TAG, "Failed to open camera " + cameraId, e);
-            if (callback != null) {
-                callback.onCameraError(cameraId, e instanceof SecurityException ? -2
-                        : e instanceof CameraAccessException ? -1 : CameraDevice.StateCallback.ERROR_CAMERA_DEVICE);
-            }
-            reportOpenFailed(reasonOf(e));
+            failOpenIfCurrent(handler, reasonOf(e), true, e instanceof SecurityException ? -2
+                            : e instanceof CameraAccessException ? -1 : CameraDevice.StateCallback.ERROR_CAMERA_DEVICE,
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -1710,22 +1724,28 @@ public class SingleCamera {
     private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
-            if (isStale()) {
-                // 这一轮在打开途中就被关了：设备晚到一步。直接关掉，别让它挂着占住相机
+            // 过时不过时、把设备挂上，在同一把锁里定（审查 2026-10-11）：以前锁外先看、锁里再挂，
+            // 主线程的 closeCamera 落在中间的话，设备挂到一轮已经关掉的账上，再没人关它
+            boolean stale;
+            synchronized (deviceLock) {
+                stale = isStale();
+                if (!stale) {
+                    isOpening = false;
+                    reopenInFlight = false;
+                    cameraDevice = camera;
+                    lastErrorName = null;
+                    deviceLost = false;
+                    CameraContention.ourCameraOpened(cameraId);
+                    AppLog.d(TAG, "Camera " + cameraId + " opened");
+                    if (callback != null) {
+                        callback.onCameraOpened(cameraId);
+                    }
+                }
+            }
+            if (stale) {
+                // 这一轮在打开途中就被关了：设备晚到一步。直接关掉（锁外：它进相机服务），别让它挂着占住相机
                 closeDeviceTimed(camera, "opened after close");
                 return;
-            }
-            isOpening = false;
-            reopenInFlight = false;
-            synchronized (deviceLock) {
-                cameraDevice = camera;
-                lastErrorName = null;
-                deviceLost = false;
-                CameraContention.ourCameraOpened(cameraId);
-                AppLog.d(TAG, "Camera " + cameraId + " opened");
-                if (callback != null) {
-                    callback.onCameraOpened(cameraId);
-                }
             }
             createCameraPreviewSession();
         }
@@ -1807,40 +1827,52 @@ public class SingleCamera {
      * @param why       关设备那一行写的原因
      */
     private void loseDevice(CameraDevice camera, int code, String errorName, String why) {
-        // 打开还在途、来的又不是强制重开时我们自己摘下的旧设备：这是「开不起来」，不是「丢了」
-        final boolean opening = (isOpening || reopenInFlight) && camera != retiringDevice;
-        isOpening = false;
-        reopenInFlight = false;
         final boolean maybeTaken = code == LOST_DISCONNECTED
                 || code == CameraDevice.StateCallback.ERROR_CAMERA_IN_USE
                 || code == CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE;
         final long lostAt = SystemClock.elapsedRealtime();
         final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
-        final java.util.concurrent.CountDownLatch previous;
-        final boolean opened;
+        java.util.concurrent.CountDownLatch previous = null;
+        boolean opened = false;
+        boolean opening = false;
+        boolean stale;
         synchronized (deviceLock) {
-            opened = cameraDevice == camera;
-            lastErrorName = errorName;
-            deviceLost = true;   // 要不要再开、什么节奏：调度一处判（被别的程序拿走的，等它放开、通道安静了单独开）
-            // 先登记再报：报出去之后调度看 isBusy() 就会等这一次关完。被断开、报 1 / 2 的那一次关
-            // 相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着。
-            // 也先登记、再把设备从字段上摘下：通道调度在主线程上不拿这把锁读「设备在不在、有没有在途」，反过来的话
-            // 中间那一下读到「没设备、也没在关」，这一路被记成关着、当场又被开一次（审查 2026-10-11）
-            if (maybeTaken) {
-                lostClose = done;
+            // 过时不过时、收标记，和主线程的 closeCamera 在同一把锁里定（审查 2026-10-11）：回调进来时看过一次，
+            // 那之后被关了的话，标记已经归关它的那一下（或者新的一轮），这里不能再清、不能再登记在关、不能再报
+            stale = isStale();
+            if (!stale) {
+                // 打开还在途、来的又不是强制重开时我们自己摘下的旧设备：这是「开不起来」，不是「丢了」
+                opening = (isOpening || reopenInFlight) && camera != retiringDevice;
+                isOpening = false;
+                reopenInFlight = false;
+                opened = cameraDevice == camera;
+                lastErrorName = errorName;
+                deviceLost = true;   // 要不要再开、什么节奏：调度一处判（被别的程序拿走的，等它放开、通道安静了单独开）
+                // 先登记再报：报出去之后调度看 isBusy() 就会等这一次关完。被断开、报 1 / 2 的那一次关
+                // 相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着。
+                // 也先登记、再把设备从字段上摘下：通道调度在主线程上不拿这把锁读「设备在不在、有没有在途」，反过来的话
+                // 中间那一下读到「没设备、也没在关」，这一路被记成关着、当场又被开一次（审查 2026-10-11）
+                if (maybeTaken) {
+                    lostClose = done;
+                }
+                previous = CLOSING.put(cameraId, done);
+                markInFlight();
+                if (opened) {
+                    // 会话跟着设备一起没了：排着的重建取消、在途的配置作废，没人再拿它当活的
+                    cameraDevice = null;
+                    captureSession = null;
+                    voidSessionWork();
+                    sessionGone();
+                }
+                if (maybeTaken && callback != null) {
+                    callback.onCameraError(cameraId, code);
+                }
             }
-            previous = CLOSING.put(cameraId, done);
-            markInFlight();
-            if (opened) {
-                // 会话跟着设备一起没了：排着的重建取消、在途的配置作废，没人再拿它当活的
-                cameraDevice = null;
-                captureSession = null;
-                voidSessionWork();
-                sessionGone();
-            }
-            if (maybeTaken && callback != null) {
-                callback.onCameraError(cameraId, code);
-            }
+        }
+        if (stale) {
+            // 这一轮已经关了：设备就地关掉（锁外：它进相机服务），别的都归关它的那一下
+            closeDeviceTimed(camera, "stale " + why);
+            return;
         }
         final CameraCallback channel = callback;
         if (opened && channel != null) {
@@ -2369,7 +2401,12 @@ public class SingleCamera {
     }
 
     /** 会话重建这一件事只有一个任务：去抖后在相机线程上跑 {@link #createCameraPreviewSession}。 */
-    private final Runnable recreateSessionRunnable = this::createCameraPreviewSession;
+    private final Runnable recreateSessionRunnable = () -> {
+        synchronized (sessionLock) {
+            rebuildQueued = false;
+        }
+        createCameraPreviewSession();
+    };
 
     /**
      * 设备要没了（关相机 / 强制重开 / 掉线重连）：排着的重建取消，在途的配置作废，等着的关闭不再接着建。
@@ -2383,6 +2420,7 @@ public class SingleCamera {
         synchronized (sessionLock) {
             isConfiguring = false;
             isSessionClosing = false;
+            rebuildQueued = false;
             sessionGeneration++;
         }
     }
@@ -2512,10 +2550,15 @@ public class SingleCamera {
             return;
         }
         handler.removeCallbacks(recreateSessionRunnable);
-        if (delayMs <= 0) {
-            handler.post(recreateSessionRunnable);
-        } else {
-            handler.postDelayed(recreateSessionRunnable, delayMs);
+        synchronized (sessionLock) {
+            rebuildQueued = true;   // 先记、再排：任务跑起来时清
+        }
+        boolean posted = delayMs <= 0 ? handler.post(recreateSessionRunnable)
+                : handler.postDelayed(recreateSessionRunnable, delayMs);
+        if (!posted) {
+            synchronized (sessionLock) {
+                rebuildQueued = false;   // 线程在退了：这一轮已经关了，不会再建
+            }
         }
         AppLog.d(TAG, "Camera " + cameraId + " session rebuild requested (" + why + ", " + delayMs + "ms)");
     }
@@ -3263,16 +3306,17 @@ public class SingleCamera {
      * @return false：合并掉了，什么都没做
      */
     private boolean reopenWith(Set<ChannelRules.Out> wanted) {
-        if (reopenInFlight) {
-            AppLog.d(TAG, "Camera " + cameraId + " reopen already in flight, coalesced");
-            return false;
-        }
-        if (isBusy()) {
-            // 开 / 关 / 重连 / 配会话还在途：那一次自己会有结果（开成、报错、关完）。这时再开一次，
+        if (openOrCloseInFlight()) {
+            // 开 / 重开 / 关还在途：那一次自己会有结果（开成、报错、关完）。这时再开一次，
             // 就是同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）
             AppLog.d(TAG, "Camera " + cameraId + " busy (" + describeBusy() + "), reopen coalesced");
             return false;
         }
+        if (isOpening || reopenInFlight) {
+            // 上一次开、重开在途已经超过封顶：回调当它不会来了 —— 那一轮作废，不接着用它的相机线程
+            return retireStaleOpen(wanted);
+        }
+        // 配会话、关旧会话还挂着不挡：下面连设备一起作废、关掉（调度只在那一步到点之后才来救）
         reopenInFlight = true;
         markInFlight();
         final CameraCaptureSession oldSession;
@@ -3318,13 +3362,16 @@ public class SingleCamera {
         return true;
     }
 
-    /** 强制重开的那一下打开：先确认这一轮还没被关掉、这台相机还在，打开在锁外。 */
+    /**
+     * 强制重开的那一下打开：先确认这一轮还没被关掉、这台相机还在，打开在锁外。
+     *
+     * <p>中间那两次进相机服务（列相机、查参数）可能卡几秒，这期间这一轮可能被关掉：真正打开之前在锁里再看一次
+     * （{@link #openCameraMarked}），没开成的只在这一轮还是当前的时候收标记、报上去（{@link #failOpenIfCurrent}）。
+     * 早退的那一下什么标记都不碰：关它的 {@link #closeCamera} 已经清了，标记可能已经是新一轮的。</p>
+     */
     private void reopenOnCameraThread(Handler handler) {
-        synchronized (deviceLock) {
-            if (handler != backgroundHandler) {
-                reopenInFlight = false;
-                return;   // 等的时候被关了，或者已经换了一轮
-            }
+        if (handler != backgroundHandler) {
+            return;   // 等的时候被关了，或者已经换了一轮
         }
         configFailRetryCount = 0;   // 新的一步：会话配不上的重试从头数
         try {
@@ -3340,10 +3387,8 @@ public class SingleCamera {
             if (!cameraExists) {
                 AppLog.e(TAG, "Camera ID " + cameraId + " does not exist anymore. Available IDs: " +
                         java.util.Arrays.toString(availableCameraIds));
-                deviceLost = true;
-                reopenInFlight = false;
                 // 以前这里什么都不报：重开时不在列表里，正是车机刚拿走它的样子
-                reportOpenFailed(CameraTaken.Reason.ofNotListed());
+                failOpenIfCurrent(handler, CameraTaken.Reason.ofNotListed(), true, 0, null);
                 return;
             }
             // 验证摄像头是否真正可用
@@ -3351,40 +3396,98 @@ public class SingleCamera {
                 cameraManager.getCameraCharacteristics(cameraId);
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be invalid", e);
-                deviceLost = true;
-                reopenInFlight = false;
-                reportOpenFailed(reasonOf(e));
+                failOpenIfCurrent(handler, reasonOf(e), true, 0, null);
                 return;
             }
-            openCameraMarked(handler);
-            AppLog.d(TAG, "Camera " + cameraId + " reopen initiated");
+            if (openCameraMarked(handler)) {
+                AppLog.d(TAG, "Camera " + cameraId + " reopen initiated");
+            }
         } catch (CameraAccessException | RuntimeException e) {
             // 没发出去：标成「没开」，报开不起来，再不再试由调度判
-            reopenInFlight = false;
-            deviceLost = true;
-            lastErrorName = e.getClass().getSimpleName();
             AppLog.e(TAG, "Failed to reopen camera " + cameraId, e);
-            reportOpenFailed(reasonOf(e));
+            failOpenIfCurrent(handler, reasonOf(e), true, 0, e.getClass().getSimpleName());
         }
     }
 
     /**
-     * 强制重开那一下的 openCamera：进相机服务之前先标上「正在打开」。
+     * 开、重开那一下的 openCamera（相机线程）：进相机服务之前在 {@link #deviceLock} 里最后看一次这一轮还是不是当前的，
+     * 是才标上「正在打开」—— 判断和标记在同一把锁里，和主线程上的 {@link #closeCamera} 不会错开。
      *
-     * <p>相机服务随后报这一路「被占用」时，{@link CameraAvailabilityWatch} 靠 {@link #holdsOrIsOpening()}
-     * 认我们；重开时 {@code cameraDevice} 还是 null，不标的话每次重开都被记成「不是我们」——
-     * 2026-09-27 的日志里就是这样，争用日志和让路判断都被自己的重开带偏。抛异常就把标记收回，
-     * 成功与否由 {@code onOpened} / {@code onError} 清。</p>
+     * <p>以前不看就标（审查 2026-10-11）：前面那几次进相机服务卡着的时候调度把这一路关了，这里照样标上「正在打开」、照样打开，
+     * 晚到的设备在过时的回调里就地关掉，「正在打开」却再也没人清 —— 这一路从此每一次开都被「已经在开」挡掉。
+     * 被关了的这一轮什么都不做、不报：关它的那一下已经把账结了。</p>
+     *
+     * <p>「正在打开」也是给相机服务那几声认人用的：随后报这一路「被占用」时，{@link CameraAvailabilityWatch} 靠
+     * {@link #holdsOrIsOpening()} 认我们；重开时 {@code cameraDevice} 还是 null，不标的话每次重开都被记成「不是我们」——
+     * 2026-09-27 的日志里就是这样。抛异常就把标记收回（这一轮还是当前的话），成功与否由 {@code onOpened} / {@code onError} 清。</p>
+     *
+     * @return false：这一轮已经被关了、或者换了一轮，没打开
      */
-    private void openCameraMarked(Handler handler) throws CameraAccessException {
-        isOpening = true;
-        markInFlight();
+    private boolean openCameraMarked(Handler handler) throws CameraAccessException {
+        synchronized (deviceLock) {
+            if (handler != backgroundHandler) {
+                return false;
+            }
+            isOpening = true;
+            markInFlight();
+        }
         try {
             cameraManager.openCamera(cameraId, stateCallback, handler);
+            return true;
         } catch (CameraAccessException | RuntimeException e) {
-            isOpening = false;
+            synchronized (deviceLock) {
+                if (handler == backgroundHandler) {
+                    isOpening = false;
+                }
+            }
             throw e;
         }
+    }
+
+    /**
+     * 开、重开没成（相机线程，{@code handler} 那一轮上）：这一轮还是当前的，才收标记、报开不起来 —— 判断和改标记在同一把锁里。
+     * 被关了、换了一轮的什么都不做：那是关，不是开不起来，标记归关它的那一下、或者新的那一轮（审查 2026-10-11：
+     * 以前照报，调度把一路已经在关、或者已经重开的记成开不起来、关着，再判一次）。
+     *
+     * @param lost      记成丢了设备（{@link #deviceLost}）
+     * @param uiError   给界面相机状态的码（{@link CameraCallback#onCameraError}）；0 = 不报
+     * @param errorName 记进 {@link #lastErrorName} 的短名；null = 不改
+     */
+    private void failOpenIfCurrent(Handler handler, CameraTaken.Reason reason, boolean lost, int uiError,
+                                   String errorName) {
+        synchronized (deviceLock) {
+            if (handler != backgroundHandler) {
+                return;
+            }
+            isOpening = false;
+            reopenInFlight = false;
+            if (lost) {
+                deviceLost = true;
+            }
+            if (errorName != null) {
+                lastErrorName = errorName;
+            }
+        }
+        if (uiError != 0 && callback != null) {
+            callback.onCameraError(cameraId, uiError);
+        }
+        reportOpenFailed(reason);
+    }
+
+    /**
+     * 上一次开、重开在途已经超过 {@link #IN_FLIGHT_MAX_MS}（相机服务一直没回调，或者这一路的相机线程卡在相机服务里）：
+     * 那一轮当它丢了 —— 像关相机一样作废（{@link #closeCamera}：摘下那条相机线程，它晚到的回调都是过时的，
+     * 晚到的设备就地关掉；这一次关登记成在关），再在一条新的相机线程上开（审查 2026-10-11）。
+     * 新的那一轮先等这一次关完（最多 {@link #OPEN_WAIT_FOR_CLOSE_MS}），同一台相机不会有两个句柄。
+     * 以前重开在途不封顶，那一次 openCamera 没回音，这一路就再也救不回来；接着用那条相机线程的话，卡住的还是它。
+     *
+     * <p>这一下的关完回调（{@link CameraCallback#onCameraClosed}）调度不当回事：调度那边这一路已经记成在开。</p>
+     */
+    private boolean retireStaleOpen(Set<ChannelRules.Out> wanted) {
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 上一次打开 " + (IN_FLIGHT_MAX_MS / 1000)
+                + " 秒还没回音（相机服务卡住？）：作废那一轮，换一条相机线程再开");
+        closeCamera("stale-open");
+        return beginOpen(wanted);
     }
 
     // ==================== 亮度/降噪调节相关方法 ====================

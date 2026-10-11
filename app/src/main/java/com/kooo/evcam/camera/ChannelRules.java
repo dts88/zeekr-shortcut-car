@@ -100,6 +100,13 @@ public final class ChannelRules {
     public static final long IN_FLIGHT_MAX_MS = SingleCamera.IN_FLIGHT_MAX_MS;
 
     /**
+     * 我们的开、关做完之后多久以内，相机服务为这一路说的话还算我们引起的：那一句从 binder 线程上来，和相机线程报的开好 / 关完
+     * 谁先到主线程没有保证，差的是同一次进相机服务的前后脚，几十毫秒的事。分类相机服务的话（ChannelScheduler.ourStepInFlight）
+     * 和主动认（{@link #recognize}）用的是这同一个数。
+     */
+    static final long OWN_WORD_GRACE_MS = 500L;
+
+    /**
      * 退出最多等多久才结束进程：手上那一步最坏占满在途封顶，再按次序关一轮，留 5 秒余量（最坏约 105 秒，平常一两秒）。
      * 2.10 用的 20 秒盖不住调度自己关相机的上限（10 + 30 秒），所以由常量算出来。
      */
@@ -264,7 +271,10 @@ public final class ChannelRules {
         boolean absent;
         /** 相机服务对这一路说的最后一句：TRUE 空闲、FALSE 被占用、null 从没说过。不论多早说的（大纲 §7 解读 1）。 */
         Boolean serviceFree;
-        /** 那一句是不是我们引起的（我们在这一路有开或关在途，见 CameraAvailabilityWatch.classify）。 */
+        /**
+         * 那一句是不是我们引起的（说的时候我们在这一路有开或关在途，见 CameraAvailabilityWatch.classify）。只记说的那一刻：
+         * 关着的一路，这个记号过了多久还作数由主动认判（{@link ChannelRules#recognize}）。
+         */
         boolean serviceWordOurs;
         /** 那一句的时刻（问出来的、照快照改的，就是改的那一刻）。 */
         long serviceWordAt;
@@ -332,6 +342,8 @@ public final class ChannelRules {
          * 安卓 12 起后台才起的前台服务用不了相机（lifecycle-spec §3）。
          */
         boolean cameraUsable;
+        /** 主界面在前（{@link ChannelRules#applyVerdict}：开相机报「用不了」时主界面一直在前，就没什么可等）。 */
+        boolean mainForeground;
         /** 相机服务的可用性回调收到过没有（哪一路都算）：从没收到过，判不出被拿走（{@link CameraTaken#judge} 第 3 条）。 */
         boolean heardAnything;
         /** 上一次<b>别人引起的</b>变化（CameraAvailabilityWatch.lastOthersChangeAt）；0 = 没有过。 */
@@ -351,8 +363,13 @@ public final class ChannelRules {
         int seenNeedsVersion;
         /** RECORDING 从什么时候起登记着；0 = 没登记。开之前等录像输出从这里算。 */
         long recordingSince;
-        /** 开不起来判成「现在用不了相机」的时刻；0 = 没有。主界面回到前台才清（{@link ChannelRules#mainCameForward}）。 */
+        /**
+         * 开不起来判成「现在用不了相机」、要等主界面回到前台的时刻；0 = 没有。主界面回到前台才清（{@link ChannelRules#mainCameForward}）。
+         * 只在判的时候主界面不在前、出事以后它也没回到过前台时记（{@link ChannelRules#applyVerdict}）。
+         */
         long unusableSince;
+        /** 主界面最近一次回到前台的时刻；0 = 还没有（{@link ChannelRules#mainCameForward}）。 */
+        long mainForwardAt;
         /** 上一次问相机服务的时刻；0 = 没问过。 */
         long lastAskAt;
 
@@ -511,6 +528,11 @@ public final class ChannelRules {
         long maxMs;
         /** 有一路因为现在用不了相机先不开 / 不重开（主界面不在前、前台服务是后台起的）：哪一路；null = 没有。 */
         String deferredKey;
+        /**
+         * 这一轮看过「先不开」没有：走到开那一段才看（{@link #deferredKey} 才作数）；在途、关、待判、摘死输出那几种在它前面就答了，
+         * 不知道 —— 调度写「先不开」那一行时不拿它们当「不再先不开」（黑匣子只在变了时写）。
+         */
+        boolean deferralKnown;
         /** 这一轮救援梯子上发生的事（歇 60 秒、停手）。 */
         final List<Event> events = new ArrayList<>();
 
@@ -604,6 +626,8 @@ public final class ChannelRules {
         Cause cause;
         /** RECOGNIZED：是「不在」（true），还是「被占用、不是我们」（false）。 */
         boolean absent;
+        /** JUDGED 成「现在用不了相机」：接下来怎么办；别的判定是 null。 */
+        UnusableThen unusableThen;
 
         Event(Type type, List<String> keys) {
             this.type = type;
@@ -618,6 +642,22 @@ public final class ChannelRules {
         public String toString() {
             return type + " " + keys + (verdict != null ? " " + verdict : "") + (cause != null ? " " + cause : "");
         }
+    }
+
+    /**
+     * 判成「现在用不了相机」（{@link CameraTaken.Verdict#UNUSABLE}）以后怎么办（{@link #applyVerdict}，审查 2026-10-11）：
+     * 「等主界面回到前台」只对在后台出的事有意义 —— 按时间判，不按「主界面从后台回到前台」那一下判。
+     */
+    enum UnusableThen {
+        /** 主界面不在前：不计次数，记下「用不了」，等主界面回到前台。 */
+        WAIT_FOR_MAIN,
+        /** 出事以后主界面回到过前台：要等的已经等到了，不计次数，照常开（救援梯子上的照梯子的节奏）。 */
+        MAIN_CAME_BACK,
+        /**
+         * 主界面从出事前到判的时候一直在前，相机还是用不了（隐私开关、策略禁用、车机自己的限制）：没什么可等，
+         * 按普通故障走救援的梯子 —— 隔 12 秒、3 次歇 60 秒、3 轮停手，不会没完没了地等下去。
+         */
+        LADDER
     }
 
     // ================================================================= 相机层报来的：丢了、开不起来
@@ -654,9 +694,12 @@ public final class ChannelRules {
         lane.failure.closedAt = w.now;
     }
 
-    /** 主界面回到前台：「现在用不了相机」作废，照常开。 */
+    /**
+     * 主界面回到前台：「现在用不了相机」作废，照常开；记下这一刻 —— 之前出的事、之后才判的，也不再等（{@link #applyVerdict}）。
+     */
     static void mainCameForward(World w) {
         w.unusableSince = 0;
+        w.mainForwardAt = w.now;
     }
 
     // ================================================================= 手上那一步
@@ -795,13 +838,15 @@ public final class ChannelRules {
     /**
      * 主动认（§二.7）：我们既没开、也没在开这一路，而相机服务说它不在、或者被占用、不是我们 → 直接判 TAKEN，不碰。
      * 冷启动时车机还拿着相机 1 就是这样。不查嫌疑应用：不知道是什么时候拿的（和「注册时报的初始状态不查」同一条规矩）。
+     *
+     * <p>「被占用」是不是我们，按此刻判（{@link #stillOurs}），不只看说的时候：那个记号只记说的那一刻、之后同一句不再改它。</p>
      */
     private static void recognize(World w, List<Event> events) {
         for (Lane lane : w.lanes) {
             if (lane.mark != null || lane.failure != null || lane.device != Device.CLOSED) {
                 continue;
             }
-            boolean othersHold = Boolean.FALSE.equals(lane.serviceFree) && !lane.serviceWordOurs;
+            boolean othersHold = Boolean.FALSE.equals(lane.serviceFree) && !stillOurs(w, lane);
             if (!lane.absent && !othersHold) {
                 continue;
             }
@@ -813,6 +858,22 @@ public final class ChannelRules {
             event.absent = lane.absent;
             events.add(event);
         }
+    }
+
+    /**
+     * 关着的这一路，相机服务那一句「被占用（我们引起的）」此刻还能不能算我们的：只在我们的哪一份还可能拿着它的时候 ——
+     * 这一路刚关完、开不起来、丢了之后关完（{@link #OWN_WORD_GRACE_MS} 以内，为这一关说的「空闲」可能还在路上），
+     * 或者另一份管线还在关（换车型、退出后马上又开，最多 {@link #IN_FLIGHT_MAX_MS}：占着它的可能是那一份）。
+     *
+     * <p>过了这些还被占着，只能是别人（审查 2026-10-11）。两种来路：别的程序在我们开着时悄悄拿走 —— 相机服务从「我们开着」
+     * 直接变成「别人开着」，中间不说「空闲」（10-10，§二.7），同一句「被占用」不再改那个记号；管线在同一个进程里重建
+     * （配置里开关了一路、换车型、退出后马上又开），新的一份读到的还是旧的那一份开的时候记下的那一句。
+     * 当成我们的话，新的一份不认它、又不算它被拿着，安静了就去开 —— 正是 §二.7 不许的试开。</p>
+     */
+    private static boolean stillOurs(World w, Lane lane) {
+        return lane.serviceWordOurs
+                && (w.now - lane.deviceSince < OWN_WORD_GRACE_MS
+                || w.otherClosingSince != 0 && w.now - w.otherClosingSince < IN_FLIGHT_MAX_MS);
     }
 
     /**
@@ -859,14 +920,25 @@ public final class ChannelRules {
      * 判完了照做（§二.5、§二.7）：
      * <ul>
      *   <li>TAKEN / BLOCKED：不计次数，记下被拿着，从丢的那一刻算；</li>
-     *   <li>现在用不了相机：不计次数，记下「用不了」，等主界面回到前台；</li>
+     *   <li>现在用不了相机（{@link UnusableThen}）：主界面不在前 → 不计次数，记下「用不了」，等主界面回到前台；
+     *       出事以后主界面回到过前台 → 要等的已经等到了，不计次数、照常开；主界面一直在前 → 没什么可等，按普通故障走梯子；</li>
      *   <li>普通故障：开那一步开不起来的，算救援的第 1 次（开那一步因此不会马上再开它，由救援按 12 秒的节奏救）；
      *       开着丢了的，交给救援（第一次救就是第 1 次）；救援里重开没成的，救的时候已经算过。</li>
      * </ul>
+     *
+     * <p>「现在用不了」按时间判（审查 2026-10-11）：判在出事之后 300 ms、丢了的还要等关完（车上一次关要 2–20 秒），
+     * 主界面可能在这中间回到前台。以前一律记下「用不了」、只等主界面「从后台回到前台」那一下清 —— 判的时候主界面已经在前，
+     * 那一下不会再来，开、重开就一直不做，也不上梯子，直到人离开主界面再回来。出事的那一刻用那一步开始的时刻
+     * （丢了的是丢的那一刻）。</p>
      */
     private static void applyVerdict(World w, Lane lane, CameraTaken.Verdict verdict, List<Event> events) {
         Failure failure = lane.failure;
         lane.failure = null;
+        UnusableThen unusableThen = null;
+        if (verdict == CameraTaken.Verdict.UNUSABLE) {
+            unusableThen = w.mainForwardAt > failure.stepStartedAt ? UnusableThen.MAIN_CAME_BACK
+                    : w.mainForeground ? UnusableThen.LADDER : UnusableThen.WAIT_FOR_MAIN;
+        }
         switch (verdict) {
             case TAKEN:
             case BLOCKED:
@@ -876,22 +948,33 @@ public final class ChannelRules {
                 lane.asks = 0;
                 break;
             case UNUSABLE:
-                if (w.unusableSince == 0) {
+                if (unusableThen == UnusableThen.LADDER) {
+                    rescueLater(lane, failure);
+                } else if (unusableThen == UnusableThen.WAIT_FOR_MAIN && w.unusableSince == 0) {
                     w.unusableSince = w.now;
                 }
                 break;
             default:
-                if (failure.origin == Failure.Origin.OPEN) {
-                    count(lane, failure.stepStartedAt);
-                } else if (failure.origin == Failure.Origin.LOSS) {
-                    lane.lostForRescue = true;
-                }
+                rescueLater(lane, failure);
                 break;
         }
         Event event = new Event(Event.Type.JUDGED, lane.key);
         event.verdict = verdict;
+        event.unusableThen = unusableThen;
         event.failure = failure;
         events.add(event);
+    }
+
+    /**
+     * 按普通故障交给救援：开那一步开不起来的，算救援的第 1 次；开着丢了的，交给救援（第一次救就是第 1 次）；
+     * 救援里重开没成的，救的时候已经算过。
+     */
+    private static void rescueLater(Lane lane, Failure failure) {
+        if (failure.origin == Failure.Origin.OPEN) {
+            count(lane, failure.stepStartedAt);
+        } else if (failure.origin == Failure.Origin.LOSS) {
+            lane.lostForRescue = true;
+        }
     }
 
     /**
@@ -1240,7 +1323,10 @@ public final class ChannelRules {
         return Condition.BRINGING_UP;
     }
 
-    /** 此刻能用相机（大纲 §0）：能开、能重开。开相机报过「现在用不了」的，主界面回到前台之前也不算（{@link #mainCameForward}）。 */
+    /**
+     * 此刻能用相机（大纲 §0）：能开、能重开。开相机报过「现在用不了」、判的时候主界面不在前的，主界面回到前台之前也不算
+     * （{@link #mainCameForward}、{@link #applyVerdict}）。
+     */
     static boolean usable(World w) {
         return w.cameraUsable && w.unusableSince == 0;
     }
@@ -1276,7 +1362,8 @@ public final class ChannelRules {
      *       被拿着的跳过，不挡后面；</li>
      *   <li><b>改输出</b>（要安静）：缺了要的输出、或者该出帧却没有活输出的那一路，环视先；</li>
      *   <li><b>救</b>（要安静；重开还要能用相机，重建不要）：有人要（保持不算）、没被拿着、关着等救或者开着 8 秒没进展的那一路，
-     *       环视先。梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手；</li>
+     *       环视先；关着、在开而相机层手上还有开或关的，等它（最多 {@link #IN_FLIGHT_MAX_MS}，{@link #rescueAge}）。
+     *       梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手；</li>
      *   <li>都没有 → 空闲。</li>
      * </ol>
      *
@@ -1353,14 +1440,16 @@ public final class ChannelRules {
                 deferredKey = lane.key;
                 break;
             }
+            // 走到这里能用相机：「先不开」的没有（deferredKey 还是 null），也照样标上「看过了」
             if (!quiet) {
-                return Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.OPEN);
+                return withDeferred(Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.OPEN), deferredKey);
             }
             long recordLeft = recordOutputLeft(w, lane);
             if (recordLeft > 0) {
-                return Decision.waitFor(Why.RECORD_OUTPUT, lane.key, recordLeft).about(Move.OPEN);
+                return withDeferred(Decision.waitFor(Why.RECORD_OUTPUT, lane.key, recordLeft).about(Move.OPEN),
+                        deferredKey);
             }
-            return open(w, lane);
+            return withDeferred(open(w, lane), deferredKey);
         }
 
         // 改输出
@@ -1566,9 +1655,17 @@ public final class ChannelRules {
     /**
      * 这一路该不该救、多久没进展（§二.5）：有人要（保持不算）、没被拿着、没在待判、没停手，并且关着等救（丢了、开不起来），
      * 或者开着 8 秒没进展（{@link CameraLiveness#STUCK_MS}）。不救是 -1；关着的是 {@link Long#MAX_VALUE}。
+     *
+     * <p>设备不在我们手上（关着、在开）而相机层手上还有动作（{@link Lane#busySince}，开、重开、关还在途）的不救，
+     * 等它有结果、或者到它自己的封顶（{@link #IN_FLIGHT_MAX_MS}）：这时重开，相机层只会合并掉（同一台相机不许两个句柄），
+     * 梯子却已经算了一次 —— 一次没救的「救」，3 次不成歇 60 秒、3 轮停手都会提前（审查 2026-10-11）。
+     * 开着的那一路卡在配会话里不在此列：相机层的重开会把那一次配置作废、关掉设备再开（SingleCamera.reopen），满 8 秒照救。</p>
      */
     private static long rescueAge(World w, Lane lane) {
         if (lane.mark != null || lane.failure != null || lane.ladder.stopped() || !wanted(w, lane)) {
+            return -1;
+        }
+        if (lane.device != Device.OPEN && lane.busySince != 0) {
             return -1;
         }
         switch (lane.device) {
@@ -1595,6 +1692,7 @@ public final class ChannelRules {
 
     private static Decision withDeferred(Decision d, String deferredKey) {
         d.deferredKey = deferredKey;
+        d.deferralKnown = true;
         return d;
     }
 

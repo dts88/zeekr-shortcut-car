@@ -58,10 +58,13 @@ public final class RecordingIntent {
         boolean get(String key, boolean fallback);
 
         /**
-         * 这几项一起写，写到盘上才返回（不是排队异步写）：哨兵模式没开时车机熄屏 3–5 秒就把进程结束（2026-10-10），
-         * 熄屏那一刻改的「这一趟要录」（亮屏接不接）得赶在那之前落盘。
+         * 这几项一起写。
+         *
+         * @param durable true：写到盘上才返回（commit）—— 只给「这一趟要录」变了、人按了停止这两种：哨兵模式没开时车机熄屏
+         *                3–5 秒就把进程结束（2026-10-10），熄屏那一刻改的「这一趟要录」（亮屏接不接）得赶在那之前落盘；
+         *                这是主线程上唯一一处同步写盘（大纲 §3 线程）。false：排队异步写（apply），别的几项不值得在主线程上等盘
          */
-        void put(java.util.Map<String, Boolean> values);
+        void put(java.util.Map<String, Boolean> values, boolean durable);
     }
 
     private Store store;
@@ -76,14 +79,20 @@ public final class RecordingIntent {
         }
     }
 
-    private void persist() {
+    /**
+     * 写下这几项。调用方只在真变了时叫：每次开录、每次立「这一趟要录」都来一遍，没变也写的话，开录时主线程上一两次同步写盘
+     * （中转写入时内置闪存正忙着写三路视频，审查 2026-10-11）。
+     *
+     * @param durable 见 {@link Store#put}
+     */
+    private void persist(boolean durable) {
         if (store != null) {
             java.util.Map<String, Boolean> values = new java.util.LinkedHashMap<>();
             values.put("autoStarted", autoStarted);
             values.put("stoppedByUser", stoppedByUser);
             values.put("everStarted", everStarted);
             values.put("recordingWanted", recordingWanted);
-            store.put(values);
+            store.put(values, durable);
         }
     }
 
@@ -99,8 +108,11 @@ public final class RecordingIntent {
 
     /** 已经自动开过一次了（不管最后录没录起来，这一趟都不再自动开第二次）。 */
     public void noteAutoStarted() {
+        if (autoStarted) {
+            return;
+        }
         autoStarted = true;
-        persist();
+        persist(false);
     }
 
     /**
@@ -115,22 +127,31 @@ public final class RecordingIntent {
     }
 
     public void noteRecordingStarted() {
+        if (everStarted) {
+            return;
+        }
         everStarted = true;
-        persist();
+        persist(false);
     }
 
     /** 用户自己按了开始 —— 「停过」的记录作废，自动开的额度也算用掉了。 */
     public void noteUserStarted() {
+        if (!stoppedByUser && autoStarted) {
+            return;
+        }
         stoppedByUser = false;
         autoStarted = true;
-        persist();
+        persist(false);
     }
 
     /** 用户自己按了停止。在这一趟里，没有任何一条路可以再自动开起来（「这一趟要录」也撤）。 */
     public void noteUserStopped() {
+        if (stoppedByUser && !recordingWanted) {
+            return;
+        }
         stoppedByUser = true;
         recordingWanted = false;
-        persist();
+        persist(true);
     }
 
     public boolean stoppedByUser() {
@@ -156,17 +177,21 @@ public final class RecordingIntent {
             return false;
         }
         recordingWanted = wanted;
-        persist();
+        persist(true);
         return true;
     }
 
     /** 退出应用时归零 —— 下一次打开是新的一趟。 */
     public void reset() {
+        if (!autoStarted && !stoppedByUser && !everStarted && !recordingWanted) {
+            return;
+        }
+        boolean wantedDropped = recordingWanted;
         autoStarted = false;
         stoppedByUser = false;
         everStarted = false;
         recordingWanted = false;
-        persist();
+        persist(wantedDropped);
     }
 
     /** 诊断报告里的一行。 */

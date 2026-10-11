@@ -105,7 +105,10 @@ public final class ChannelScheduler {
         /** 救：重建会话。 */
         boolean rebuildSession(Set<ChannelRules.Out> outputs);
 
-        /** 救：重开（关着的一路也走这里）。 */
+        /**
+         * 救：重开（关着的一路也走这里）。只在这一台相机的开、重开、关还在途（各封顶 60 秒）时合并掉、返回 false；
+         * 配会话、关旧会话还挂着不挡它 —— 重开把那一次作废、连设备一起关掉再开。在途超过封顶的那一轮当它丢了，换一轮重开。
+         */
         boolean reopen(Set<ChannelRules.Out> outputs);
 
         /** 关（只清会话和设备，不清声明）。{@code why} 是给相机那一行的英文短语。 */
@@ -343,8 +346,12 @@ public final class ChannelScheduler {
         /** 退出：登记表作废，手上那一步做完后按次序关。 */
         void exit(String key, ChannelRules.Move move, long ms);
 
-        /** 问了相机服务，答回来了：这一路此刻怎么说（第 {@code n} 次）。 */
-        void asked(String key, String cameraId, int n, long heldMs, Boolean free, boolean absent, boolean important);
+        /**
+         * 问了相机服务，答回来了：这一路此刻怎么说（第 {@code n} 次）。{@code mark} 是它被拿着（TAKEN）还是被挡着（BLOCKED）：
+         * 被挡着的那一路自己本来就空着，等的是挡着它的那一路放开，「说空闲了」对它不是放开。
+         */
+        void asked(String key, String cameraId, CameraTaken.Verdict mark, int n, long heldMs, Boolean free,
+                   boolean absent, boolean important);
     }
 
     /** 一次判定，黑匣子那一行要的东西；诊断报告也留着每一路最近一次开不起来、最近一次丢了的那一份。 */
@@ -352,6 +359,8 @@ public final class ChannelScheduler {
         final String key;
         final String cameraId;
         final CameraTaken.Verdict verdict;
+        /** 判成「现在用不了相机」：接下来怎么办（等主界面、不用再等、按普通故障走梯子）；别的判定是 null。 */
+        final ChannelRules.UnusableThen unusableThen;
         final ChannelRules.Failure.Origin origin;
         final CameraTaken.Reason reason;
         /** 丢了 / 开不起来的那一刻（调度的钟）。 */
@@ -369,12 +378,14 @@ public final class ChannelScheduler {
         /** 判成普通故障：救援梯子上第几次了。 */
         final int attempt;
 
-        Judgement(String key, String cameraId, CameraTaken.Verdict verdict, ChannelRules.Failure.Origin origin,
-                  CameraTaken.Reason reason, long at, long closeMs, boolean heardAnything, Boolean serviceFree,
-                  boolean absent, long wordBeforeCloseMs, List<String> takenIds, int attempt) {
+        Judgement(String key, String cameraId, CameraTaken.Verdict verdict, ChannelRules.UnusableThen unusableThen,
+                  ChannelRules.Failure.Origin origin, CameraTaken.Reason reason, long at, long closeMs,
+                  boolean heardAnything, Boolean serviceFree, boolean absent, long wordBeforeCloseMs,
+                  List<String> takenIds, int attempt) {
             this.key = key;
             this.cameraId = cameraId;
             this.verdict = verdict;
+            this.unusableThen = unusableThen;
             this.origin = origin;
             this.reason = reason;
             this.at = at;
@@ -722,8 +733,9 @@ public final class ChannelScheduler {
     /**
      * 我们的开、关做完之后多久以内，相机服务为这一路说的话还算我们引起的（{@link #ourStepInFlight}）。那一句从 binder 线程上来，
      * 和相机线程报的开好 / 关完谁先到主线程没有保证；差的是同一次进相机服务的前后脚，几十毫秒的事。
+     * 数在 {@link ChannelRules#OWN_WORD_GRACE_MS}：主动认（关着的一路那一句「被占用」还算不算我们的）用的是同一个。
      */
-    static final long OWN_WORD_GRACE_MS = 500L;
+    static final long OWN_WORD_GRACE_MS = ChannelRules.OWN_WORD_GRACE_MS;
 
     // ================================================================= 进程里的几份调度
 
@@ -1093,11 +1105,25 @@ public final class ChannelScheduler {
     /**
      * 一路开着的相机丢了，在那一次阻塞的关之前：进 LOSING，算在途，别的路这几秒里一步都不动。
      * 录像那一侧在这一轮最后听说（{@link Recording#onLaneCameraGone}），那一路自己收尾退出。
+     *
+     * <p>没人要的录像输出（停放着的录制器：录像意图关着，或者这一路不在计划里）和我们关相机一样算「随相机关了」
+     * （{@link #close}），关完时告诉录像那一侧，它才放那个录制器 —— 不然重开时不再带它，它再也回不到会话里、
+     * 也就永远等不到被丢，EGL、编码线程、输入画布一直占着（审查 2026-10-11）。要的（在录、等自动接回）照旧不派：
+     * 相机回来时同一个录制器直接加入。会话里的看上一轮记下的那一份，再加上声明着的 —— 丢的那一下相机层已经把会话摘了，
+     * 中间要是跑过一轮，记下的会话就是空的。</p>
      */
     void onLossStarted(String cameraId, int code) {
         ChannelRules.Lane lane = live(cameraId);
         if (lane == null) {
             return;
+        }
+        Set<ChannelRules.Out> wanted = ChannelRules.wantedOutputs(w, lane);
+        Set<ChannelRules.Out> carried = new LinkedHashSet<>(lane.session);
+        carried.addAll(lane.declared);
+        for (ChannelRules.Out out : carried) {
+            if (out.kind == ChannelRules.Kind.RECORD && !wanted.contains(out)) {
+                queueDrop(lane.key, out, SingleCamera.Drop.CLOSED);
+            }
         }
         CameraTaken.Reason reason = CameraTaken.Reason.ofLoss(code);
         ChannelRules.lossStarted(w, lane, reason);
@@ -1284,10 +1310,11 @@ public final class ChannelScheduler {
         w.foregroundService = host.foregroundService();
         boolean main = host.mainForeground();
         if (main && !mainWasForeground) {
-            // 主界面回到前台：开失败判出来的「现在用不了相机」作废，照常开
+            // 主界面回到前台：开失败判出来的「现在用不了相机」作废，照常开（之前出的事、之后才判的也不再等）
             ChannelRules.mainCameForward(w);
         }
         mainWasForeground = main;
+        w.mainForeground = main;
         serviceStartedVisible = host.serviceStartedWhileVisible();
         w.cameraUsable = main || serviceStartedVisible;
         w.heardAnything = host.heardAnything();
@@ -1504,12 +1531,22 @@ public final class ChannelScheduler {
             closeEnded(step, now);
             return;
         }
-        if (outcome == ChannelRules.Outcome.FAILED || r == null || step.keys.isEmpty()) {
-            return;   // 开不起来、这一步里丢了：判定那一行写
+        if (r == null || step.keys.isEmpty()) {
+            return;
         }
         String key = step.keys.get(0);
         ChannelRules.Lane lane = w.lane(key);
         if (lane == null) {
+            return;
+        }
+        if (outcome == ChannelRules.Outcome.FAILED) {
+            // 开不起来、这一步里丢了：判定那一行写。开不起来的那一路照旧记进「按次序开相机」，和 2.10 一样一轮一行
+            // （审查 2026-10-11：以前不记，后面的路接着开就另起一行，旧的分析脚本看到的是拆开的、缺一路的两行）
+            if (step.move == ChannelRules.Move.OPEN) {
+                ChannelRules.Failure failure = lane.failure;
+                trailKeys.add(key);
+                trailMs.add(Math.max(0, (failure != null ? failure.at : now) - step.startedAt));
+            }
             return;
         }
         boolean timedOut = outcome == ChannelRules.Outcome.TIMED_OUT;
@@ -1647,9 +1684,9 @@ public final class ChannelScheduler {
                 ? failure.closedAt - lane.serviceWordAt : Long.MIN_VALUE;
         Long closeMs = lossCloseMs.get(lane.key);
         boolean loss = failure.origin == ChannelRules.Failure.Origin.LOSS;
-        Judgement judgement = new Judgement(lane.key, lane.cameraId, event.verdict, failure.origin, failure.reason,
-                failure.at, loss && closeMs != null ? closeMs : -1, w.heardAnything, lane.serviceFree, lane.absent,
-                wordBeforeClose, takenIds, lane.ladder.attempts());
+        Judgement judgement = new Judgement(lane.key, lane.cameraId, event.verdict, event.unusableThen, failure.origin,
+                failure.reason, failure.at, loss && closeMs != null ? closeMs : -1, w.heardAnything, lane.serviceFree,
+                lane.absent, wordBeforeClose, takenIds, lane.ladder.attempts());
         if (loss) {
             lastLoss.put(lane.key, judgement);
         } else {
@@ -1721,6 +1758,11 @@ public final class ChannelScheduler {
         }
         lastWait = sig;
 
+        if (!d.deferralKnown) {
+            // 这一轮在「开」那一段之前就答了（在途、关、待判、摘死输出）：没看「先不开」，记的那一条不动 ——
+            // 不然别的路每做一步，同一句「现在用不了相机，先不开 X」就重写一次（审查 2026-10-11）
+            return;
+        }
         String deferred = null;
         Unusable why = null;
         if (d.deferredKey != null) {
@@ -2059,10 +2101,11 @@ public final class ChannelScheduler {
 
     private void flushTrails(ChannelRules.Decision d) {
         ChannelRules.Step step = w.step;
+        // 开不起来之后等判（300 ms）也还在这一轮里：判完接着开下一路，「按次序开相机」照旧一行
         boolean opening = d.move == ChannelRules.Move.OPEN
                 || step != null && step.move == ChannelRules.Move.OPEN
                 || d.move == ChannelRules.Move.WAIT && (d.pending == ChannelRules.Move.OPEN
-                || d.why == ChannelRules.Why.RECORD_OUTPUT);
+                || d.why == ChannelRules.Why.RECORD_OUTPUT || d.why == ChannelRules.Why.JUDGING);
         if (!opening && !trailKeys.isEmpty()) {
             journal.openTrail(new ArrayList<>(trailKeys), new ArrayList<>(trailMs));
             trailKeys.clear();
@@ -2139,7 +2182,7 @@ public final class ChannelScheduler {
             CameraAvailabilityWatch.Word word = host.word(lane.cameraId);
             int n = lane.asks;
             answers.put(key, new Answer(now, n, word.free, word.absent));
-            journal.asked(key, lane.cameraId, n, now - lane.markSince, word.free, word.absent, n % 10 == 1);
+            journal.asked(key, lane.cameraId, lane.mark, n, now - lane.markSince, word.free, word.absent, n % 10 == 1);
         }
         wake();
     }

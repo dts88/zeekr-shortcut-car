@@ -22,8 +22,8 @@ import com.kooo.evcam.recording.RecordingIntent;
  *
  * <p>只有「开机自启动」开着才做（规格 1.3：它管的是 App 不在时要不要带回来）；
  * 用户退出了不做（1.4）。主界面还在的时候，它自己会回到设定状态（§0），这里只管它不在的情况。
- * 相机管线属于应用（2.11 阶段 6），接录像不必经过主界面；但现在用不了相机（前台服务是后台起的）时，先静默把主界面拉起来，
- * 它闪一下就退后台，录像照样当场要、等它起来再开相机（{@link #bringUpMainForRecording}）。「启动自动录制」的入口在主界面，
+ * 相机管线属于应用（2.11 阶段 6），接录像不必经过主界面；但现在用不了相机（前台服务是后台起的）时，录像协调器打开录像意图那一下
+ * 先静默把主界面拉起来，它闪一下就退后台，录像照样当场开、等它起来再开相机（{@link #bringUpMainForRecording}）。「启动自动录制」的入口在主界面，
  * 主界面不在也静默拉起来（1.6）。
  * 屏幕黑着时只记一笔，不拉主界面、不开录（2026-10-10）。</p>
  */
@@ -95,16 +95,16 @@ public final class Recovery {
     private static final long BRING_UP_DEDUPE_MS = 5_000L;
 
     /**
-     * 「这一趟要录」要接、而现在用不了相机（主界面不在前，前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机，
-     * lifecycle-spec §3）：把主界面静默拉起来（大纲 §2 阶段 6）。录像照样当场要（{@link RecordingCoordinator#resumeIfWanted}），
-     * 先「等待摄像头」；主界面一起来、登记了预览就能用相机了，调度开的时候带着预览和录像输出。不拉的话录像输出声明了、
+     * 录像意图开了、而现在用不了相机（主界面不在前，前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机，
+     * lifecycle-spec §3）：把主界面静默拉起来（大纲 §2 阶段 6）。录像照样当场开，先「等待摄像头」；主界面一起来、
+     * 刷新了前台服务（从此能用相机）、登记了预览，调度开的时候带着预览和录像输出。不拉的话录像输出声明了、
      * 相机却开不起来，没人打开主界面就永远开不起来。
      *
      * <p>静默：带着不是人点开的记号（这一趟的录像选择不清，规格 1.2），起来闪一下就退后台（1.6）。用户退出了不拉；
-     * 5 秒内拉过（亮屏那一下协调器、恢复各叫一次）不再拉。只由 {@link RecordingCoordinator#resumeIfWanted} 调
-     * （亮屏、恢复都经它），屏幕黑着时它根本不接。</p>
+     * 5 秒内拉过（亮屏那一下接回界面、接回录像各来一次）不再拉。只由 RecordingCoordinator 打开录像意图那一下调
+     * （人按的、悬浮按钮、启动自动录制、亮屏接回、存储一类的自动接回都经那里，审查 2026-10-11），屏幕黑着时它不调。</p>
      *
-     * @param where 谁要接的（ASCII，进黑匣子）
+     * @param where 谁要录的（ASCII，进黑匣子：RecordingCoordinator.Why）
      */
     public static void bringUpMainForRecording(Context context, String where) {
         if (UserExit.isExited(context)) {
@@ -127,7 +127,7 @@ public final class Recovery {
             AppLog.w(TAG, "bringUpMainForRecording failed: " + e);
             return;
         }
-        BlackBox.noteImportant("「这一趟要录」还在（" + where + "）：现在用不了相机（主界面不在前、前台服务是后台起的），"
+        BlackBox.noteImportant("要录像（" + where + "）：现在用不了相机（主界面不在前、前台服务是后台起的），"
                 + "先拉起主界面，录像等它起来再开相机");
     }
 
@@ -186,8 +186,8 @@ public final class Recovery {
         } else {
             // 被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘）：和亮屏同一个接回入口，
             // 不看「启动自动录制」—— 以前只看它，而它关着、熄屏持续录制开着（默认）时「唤醒后恢复」在进程被结束后就落空了。
-            // 现在用不了相机（前台服务是后台起的）时它把主界面拉起来（bringUpMainForRecording），录像照样当场要、
-            // 等它起来再开相机；能用相机就直接接 —— 管线属于应用，开录不用再经过主界面（大纲 §2 阶段 6）
+            // 现在用不了相机（前台服务是后台起的）时协调器打开录像意图那一下把主界面拉起来（bringUpMainForRecording），
+            // 录像照样当场开、等它起来再开相机；能用相机就直接接 —— 管线属于应用，开录不用再经过主界面（大纲 §2 阶段 6）
             coordinator.resumeIfWanted(why);
             // 「启动自动录制」的入口在主界面（这一趟开没开过、停没停过都在那里记）：主界面不在就静默拉起来
             if (autoStart && !wanted && !mainScreenAlive) {

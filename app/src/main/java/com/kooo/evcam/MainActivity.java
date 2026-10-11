@@ -638,7 +638,7 @@ public class MainActivity extends AppCompatActivity {
      * 「预览要相机」只在画布都在的时候登记：登记了相机就开，开出来的第一份会话要带着预览。
      *
      * <p>登记了就是主界面起来了（在前、能用相机）：「这一趟要录」还在、又没在录没在等的，现在接
-     * （{@link RecordingCoordinator#resumeIfWanted}）。亮屏要接录像、而那时用不了相机时，协调器把主界面拉起来、录像当场就要了
+     * （{@link RecordingCoordinator#resumeIfWanted}）。要录像、而那时用不了相机时，协调器打开录像意图那一下把主界面拉起来、录像当场就开了
      * （大纲 §2 阶段 6），这里什么都不做；这一下兜的是别的路起来的主界面。人自己点开的主界面是新的一趟，
      * 「这一趟要录」在 onCreate 里撤了，这里也什么都不做。</p>
      */
@@ -725,9 +725,13 @@ public class MainActivity extends AppCompatActivity {
             try {
                 view.setSurfaceTexture(kept);
             } catch (RuntimeException e) {
-                // 接不上（已经放了、还挂在别的 GL 上下文）：放掉它，这一格照旧等系统建；会话里那个成了死输出，调度马上摘
+                // 接不上（还挂在别的 GL 上下文）：还给管线，照旧等它离开会话再放 —— 当场放的话，会话里那个成了死输出，
+                // 那一路整条重复请求停到调度摘掉它（审查 2026-10-11，和后视镜接不上时一样）；还不回去（管线里已经没有这一路）
+                // 才放掉，这块画布不在它的会话里。这一格照旧等系统建
                 AppLog.w(TAG, "接回留着的预览画布失败 " + key + ": " + e);
-                kept.release();
+                if (!pipeline.keepPreviewCanvas(key, kept)) {
+                    kept.release();
+                }
                 continue;
             }
             pipeline.declarePreview(key, view);
@@ -2357,7 +2361,7 @@ public class MainActivity extends AppCompatActivity {
                         R.string.msg_sd_fallback, Toast.LENGTH_LONG).show();
             } else if (liveKeys.isEmpty()) {
                 Toast.makeText(MainActivity.this,
-                        R.string.notif_waiting_cameras_title, Toast.LENGTH_LONG).show();
+                        R.string.msg_recording_waiting_cameras, Toast.LENGTH_LONG).show();
             } else {
                 int count = liveKeys.size();
                 Toast.makeText(MainActivity.this,

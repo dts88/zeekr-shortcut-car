@@ -94,10 +94,11 @@ public class RecordingIntentTest {
         assertFalse(intent.stoppedByUser());
     }
 
-    /** 内存里的一份「盘」：新实例从同一份里读回来，就是进程被杀又拉回来。数一下写了几次。 */
+    /** 内存里的一份「盘」：新实例从同一份里读回来，就是进程被杀又拉回来。数一下写了几次、其中几次是同步写盘。 */
     private static final class MemoryStore implements RecordingIntent.Store {
         final java.util.Map<String, Boolean> saved = new java.util.HashMap<>();
         int writes;
+        int durableWrites;
 
         @Override
         public boolean get(String key, boolean fallback) {
@@ -105,10 +106,46 @@ public class RecordingIntentTest {
         }
 
         @Override
-        public void put(java.util.Map<String, Boolean> values) {
+        public void put(java.util.Map<String, Boolean> values, boolean durable) {
             saved.putAll(values);
             writes++;
+            if (durable) {
+                durableWrites++;
+            }
         }
+    }
+
+    /**
+     * 只有「这一趟要录」变了、人按了停止才同步写盘（主线程上唯一的例外，大纲 §3 线程）；别的几项异步写，没变就不写 ——
+     * 以前每次开录都同步写一两次（审查 2026-10-11）。
+     */
+    @Test
+    public void onlyRecordingWantedAndUserStopAreWrittenDurably() {
+        MemoryStore store = new MemoryStore();
+        intent.attach(store);
+        intent.noteRecordingStarted();
+        intent.noteAutoStarted();
+        intent.noteUserStarted();
+        assertEquals("开过、自动开过：异步写", 0, store.durableWrites);
+        int writes = store.writes;
+        intent.noteRecordingStarted();
+        intent.noteAutoStarted();
+        intent.noteUserStarted();
+        assertEquals("每次开录都来一遍，没变就不写", writes, store.writes);
+
+        intent.noteRecordingWanted(true);
+        assertEquals("「这一趟要录」立起来：同步写", 1, store.durableWrites);
+        intent.noteUserStopped();
+        assertEquals("人按了停止：同步写", 2, store.durableWrites);
+        writes = store.writes;
+        intent.noteUserStopped();
+        assertEquals("再按一次停止，没变就不写", writes, store.writes);
+
+        intent.reset();
+        assertEquals("「这一趟要录」本来就撤了：重置异步写", 2, store.durableWrites);
+        writes = store.writes;
+        intent.reset();
+        assertEquals("已经是新的一趟，不写", writes, store.writes);
     }
 
     /** 规格 1.2：进程被杀又拉回来，「这一趟」的选择还在 —— 新实例从同一份存储里读回来。 */
