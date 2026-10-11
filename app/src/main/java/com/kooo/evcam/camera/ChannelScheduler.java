@@ -38,6 +38,7 @@ import java.util.function.Consumer;
  *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；</li>
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
+ *   <li>交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布）离开了会话的，放掉；</li>
  *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）。</li>
  * </ol>
  *
@@ -549,6 +550,11 @@ public final class ChannelScheduler {
     private final Map<String, Long> recordWaitSince = new HashMap<>();
     /** 每一路我们最近一次开好、关完的时刻（调度的钟）：之后 {@link #OWN_WORD_GRACE_MS} 以内相机服务的话还算我们的。 */
     private final Map<String, Long> ownStepEndedAt = new HashMap<>();
+    /**
+     * 交给调度、等它离开会话再放的消费者（{@link #handOver}），按路：输出 → 怎么放。大纲 §7.6 主界面重建时留住的预览画布。
+     * 不随 {@link #setLanes} 清：路没了的下一轮就放，不漏。
+     */
+    private final Map<String, Map<ChannelRules.Out, Runnable>> handedOver = new LinkedHashMap<>();
 
     ChannelScheduler(Clock clock, Poster poster, Host host, Journal journal) {
         this.clock = Objects.requireNonNull(clock);
@@ -632,6 +638,53 @@ public final class ChannelScheduler {
     void askNow() {
         askRequested = true;
         wake();
+    }
+
+    // ================================================================= 交给调度的消费者（主线程）
+
+    /**
+     * 把一个已经撤回了声明、可能还挂在会话里的输出交给调度：等这一路的会话里没有它了、相机层手上也没有动作
+     * （或者这一路关了、调度停了），再调 {@code release} 放掉它的消费者。同一个输出再交一次，换成新的 {@code release}。
+     *
+     * <p>摘不摘、什么时候摘不在这里判：消费者还活着，它就是「留着的输出」，照「减输出能拖就拖」
+     * （{@link ChannelRules#composition}）等下一次本来要动、或者关相机时一起摘 —— 这里只等它离开会话。
+     * 不能早放：会话还带着它的时候放掉，它就成了死输出，那一路整条重复请求停下，只能马上摘（大纲 §6 风险 2）。</p>
+     *
+     * <p>用在大纲 §7.6（项目所有者 2026-10-11）：主界面重建（换日夜模式、换语言、从最近任务划掉）时
+     * onSurfaceTextureDestroyed 返回 false，预览画布交到这里；新界面用 {@code TextureView.setSurfaceTexture}
+     * 接回同一块的，先 {@link #reclaim} 拿回去 —— 同一块画布就是同一个输出，通道零变动。</p>
+     */
+    public void handOver(String key, ChannelRules.Out out, Runnable release) {
+        if (key == null || out == null || release == null) {
+            return;
+        }
+        if (stopped) {
+            release.run();   // 调度停了：相机都关完了，没有会话会带着它
+            return;
+        }
+        Map<ChannelRules.Out, Runnable> outs = handedOver.get(key);
+        if (outs == null) {
+            outs = new LinkedHashMap<>();
+            handedOver.put(key, outs);
+        }
+        outs.put(out, release);
+        wake();
+    }
+
+    /**
+     * 拿回交给调度的那一个（新界面接回了同一块画布）：从此不归调度放，归接回的那一方。
+     *
+     * @return true：拿回来了（还没放）；false：没交过，或者已经放了
+     */
+    public boolean reclaim(String key, ChannelRules.Out out) {
+        Map<ChannelRules.Out, Runnable> outs = handedOver.get(key);
+        if (outs == null || outs.remove(out) == null) {
+            return false;
+        }
+        if (outs.isEmpty()) {
+            handedOver.remove(key);
+        }
+        return true;
     }
 
     // ================================================================= 相机层报来的（主线程，由管理器 post 过来）
@@ -828,6 +881,7 @@ public final class ChannelScheduler {
                     .append(lane.ladder.gaveUp() ? " resting" : "").append(lane.ladder.stopped() ? " stopped" : "")
                     .append(lane.absent ? " absent" : "")
                     .append(" word=").append(lane.serviceFree).append(lane.serviceWordOurs ? "(ours)" : "")
+                    .append(handedOver.containsKey(lane.key) ? " handedOver=" + handedOver.get(lane.key).keySet() : "")
                     .append('\n');
         }
         sb.append("step=").append(w.step)
@@ -869,6 +923,7 @@ public final class ChannelScheduler {
         execute(d, now);
         flushTrails(d);
         dispatchDrops();
+        releaseHandedOver(false);
         maybeAsk();
         if (updateWinding(now)) {
             stop();
@@ -1503,6 +1558,42 @@ public final class ChannelScheduler {
         }
     }
 
+    /**
+     * 交给调度的消费者（{@link #handOver}），离开了会话的放掉：这一路开着或关着、相机层手上没有动作、会话快照里没有它
+     * （照做之后再问一次相机层，不用这一轮早先读的 —— 这一轮刚开始的改输出、关还在途，旧会话可能还带着它）。
+     * 这一路不在这一份里、或者调度停了（{@code all}），一律放。放在遍历之外调，{@code release} 里再交、再拿回都无害。
+     */
+    private void releaseHandedOver(boolean all) {
+        if (handedOver.isEmpty()) {
+            return;
+        }
+        List<Runnable> due = new ArrayList<>();
+        for (Iterator<Map.Entry<String, Map<ChannelRules.Out, Runnable>>> it = handedOver.entrySet().iterator();
+             it.hasNext(); ) {
+            Map.Entry<String, Map<ChannelRules.Out, Runnable>> entry = it.next();
+            ChannelRules.Lane lane = w.lane(entry.getKey());
+            CameraPort port = ports.get(entry.getKey());
+            boolean idle = lane == null || port == null
+                    || (port.busySince() == 0
+                    && (lane.device == ChannelRules.Device.OPEN || lane.device == ChannelRules.Device.CLOSED));
+            SingleCamera.SessionOutputs session = port == null ? SingleCamera.SessionOutputs.NONE : port.sessionOutputs();
+            for (Iterator<Map.Entry<ChannelRules.Out, Runnable>> outs = entry.getValue().entrySet().iterator();
+                 outs.hasNext(); ) {
+                Map.Entry<ChannelRules.Out, Runnable> handed = outs.next();
+                if (all || idle && !session.carries(handed.getKey())) {
+                    outs.remove();
+                    due.add(handed.getValue());
+                }
+            }
+            if (entry.getValue().isEmpty()) {
+                it.remove();
+            }
+        }
+        for (Runnable release : due) {
+            release.run();
+        }
+    }
+
     // ---- 7. 黑匣子的轨迹：连着开的、一轮关的
 
     private void flushTrails(ChannelRules.Decision d) {
@@ -1611,6 +1702,7 @@ public final class ChannelScheduler {
         stopped = true;
         poster.cancel(timerTask);
         dispatchDrops();
+        releaseHandedOver(true);
         detach();
         host.stopped();
     }

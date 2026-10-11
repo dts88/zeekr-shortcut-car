@@ -310,7 +310,8 @@ public class MainActivity extends AppCompatActivity {
         setupNavigationDrawer();
 
         // 界面重建（切日夜模式、换语言）时录制管线一直在跑（见 onDestroy 的 keepPipeline），
-        // 新界面只是把它现在的样子画出来（syncRecordingStateFromManager），没有「恢复录制」这回事
+        // 新界面只是把它现在的样子画出来（syncRecordingStateFromManager），没有「恢复录制」这回事；
+        // 预览画布也是管线留着的那几块，initViews 里接回（reattachKeptCanvases，大纲 §7.6）
 
         // 检查是否首次启动
         checkFirstLaunch();
@@ -609,6 +610,8 @@ public class MainActivity extends AppCompatActivity {
         if (textureLeft != null && PreviewSlots.exists(configuredCameraCount, "left")) {
             textureLeft.setSurfaceTextureListener(buildSurfaceListener("left"));
         }
+        // 主界面重建：上一个界面留下的预览画布接回来（大纲 §7.6），要在画布挂上窗口、系统自己建画布之前
+        reattachKeptCanvases();
     }
 
     /** 从别的界面按菜单键回来：抽屉要开着，否则那一下点击看起来没反应。 */
@@ -637,26 +640,105 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 一块画布就绪了（系统建的，或者接回的上一个界面留下的那一块）：数到齐了就把相机这一侧接上、声明各路预览、登记 PREVIEW。
+     */
+    private void onPreviewCanvasReady(String cameraKey) {
+        textureReadyCount++;
+        AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount
+                + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
+        startPreviewIfReady();
+    }
+
+    /**
+     * 画布都在了：头一次接上管线（{@link #initCamera}，它声明各路预览），之后每次把各路画布重新声明一遍 ——
+     * 同一块画布再声明一次什么都不做（2.11 阶段 4a：只声明、叫醒通道调度；开不开、带不带由调度定，
+     * 以前这里是 setTextureView + 重建会话）。然后登记「预览要相机」。
+     */
+    private void startPreviewIfReady() {
+        if (!PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount) || !checkPermissions()) {
+            return;
+        }
+        if (cameraManager == null) {
+            initCamera();
+        } else {
+            cameraManager.declarePreviews(textureFront, textureBack, textureLeft);
+        }
+        // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
+        // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
+        // 画布一到又重配一遍，三路各多一次进相机服务（2026-10-08，环视那一次重配卡了 12 秒）
+        claimPreviewIfReady();
+    }
+
+    /** 这一格的画布；这套布局里没有这一路（没挂监听）是 null。 */
+    private AutoFitTextureView canvasFor(String cameraKey) {
+        switch (cameraKey) {
+            case "front":
+                return textureFront;
+            case "back":
+                return PreviewSlots.exists(configuredCameraCount, "back") ? textureBack : null;
+            case "left":
+                return PreviewSlots.exists(configuredCameraCount, "left") ? textureLeft : null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 主界面重建（换日夜模式、换语言、从最近任务划掉后再打开）：上一个界面留下的预览画布接回来
+     * （大纲 §7.6，项目所有者 2026-10-11「按建议」；留是 {@link MultiCameraManager#keepPreviewCanvas}）。
+     *
+     * <p>在 onCreate 里、画布挂上窗口之前做：{@code TextureView.setSurfaceTexture} 之后视图不再自己建画布，
+     * 也就不会来 onSurfaceTextureAvailable —— 所以这里当场把预览声明回去（同一块画布就是同一个输出，
+     * 通道零变动、录像不断），画布照「就绪」数上，onResume 照常登记 PREVIEW：重建这一趟里调度醒来时，
+     * 登记表和声明都和重建之前一样。相机这一侧的其余部分（回调、亮度调节、录制状态）等 onCreate 走完再接，
+     * 和系统建的画布一样晚。没留下的那几格照旧等系统建。</p>
+     */
+    private void reattachKeptCanvases() {
+        MultiCameraManager pipeline = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+        if (pipeline == null || pipeline.isReleased() || pipeline.getCameraCount() != configuredCameraCount) {
+            return;   // 没有管线，或者 initCamera 会因为路数对不上把它丢掉重建：留着的画布由那一份的调度放
+        }
+        List<String> back = new ArrayList<>();
+        for (String key : PreviewSlots.KEYS) {
+            AutoFitTextureView view = canvasFor(key);
+            if (view == null || view.isAvailable()) {
+                continue;
+            }
+            android.graphics.SurfaceTexture kept = pipeline.takeKeptPreview(key);
+            if (kept == null) {
+                continue;
+            }
+            try {
+                view.setSurfaceTexture(kept);
+            } catch (RuntimeException e) {
+                // 接不上（已经放了、还挂在别的 GL 上下文）：放掉它，这一格照旧等系统建；会话里那个成了死输出，调度马上摘
+                AppLog.w(TAG, "接回留着的预览画布失败 " + key + ": " + e);
+                kept.release();
+                continue;
+            }
+            pipeline.declarePreview(key, view);
+            textureReadyCount++;
+            back.add(MultiCameraManager.roleName(key));
+        }
+        if (back.isEmpty()) {
+            return;
+        }
+        com.kooo.evcam.blackbox.BlackBox.note("主界面重建：接回留着的预览画布 " + String.join("、", back)
+                + "（同一块画布，通道不动）");
+        // 视图挂上窗口时跑（View.post 在挂上之前排进视图自己的队列）：onCreate、onResume 都走完了
+        getWindow().getDecorView().post(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                startPreviewIfReady();
+            }
+        });
+    }
+
     private TextureView.SurfaceTextureListener buildSurfaceListener(String cameraKey) {
         return new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int width, int height) {
-                textureReadyCount++;
-                AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount
-                        + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
-
-                if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)
-                        && checkPermissions()) {
-                    if (cameraManager == null) {
-                        initCamera();
-                    } else {
-                        cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
-                    }
-                    // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
-                    // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
-                    // 画布一到又重配一遍，三路各多一次进相机服务（2026-10-08，环视那一次重配卡了 12 秒）
-                    claimPreviewIfReady();
-                }
+                onPreviewCanvasReady(cameraKey);
             }
 
             @Override
@@ -664,14 +746,22 @@ public class MainActivity extends AppCompatActivity {
                 AppLog.d(TAG, "TextureView " + cameraKey + " size changed: " + width + "x" + height);
             }
 
+            /**
+             * 画布要被收走了（主界面销毁，视图从窗口上摘下来；最小化不走这里 —— 安卓 12 的 TextureView 那时只拆显示层）。
+             * 管线还在就把画布交给它（大纲 §7.6）：返回 false，TextureView 不放；新界面接回同一块，没人接回的
+             * 由通道调度等它离开会话再放。管线没了（退出、没人要了被释放）照常让 TextureView 放。
+             * 这一下在 onDestroy 之后才来（ActivityThread 先 performDestroy、再从窗口上摘视图）。
+             */
             @Override
             public boolean onSurfaceTextureDestroyed(@NonNull android.graphics.SurfaceTexture surface) {
                 textureReadyCount--;
-                AppLog.d(TAG, "TextureView " + cameraKey + " destroyed, remaining: " + textureReadyCount);
-                if (cameraManager != null) {
-                    cameraManager.onPreviewTextureDestroyed(cameraKey);
-                }
-                return true;
+                MultiCameraManager pipeline = cameraManager != null ? cameraManager
+                        : com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+                boolean kept = pipeline != null && !pipeline.isReleased()
+                        && pipeline.keepPreviewCanvas(cameraKey, surface);
+                AppLog.d(TAG, "TextureView " + cameraKey + " destroyed, remaining: " + textureReadyCount
+                        + (kept ? ", canvas kept by the pipeline" : ""));
+                return !kept;
             }
 
             @Override
@@ -1415,18 +1505,16 @@ public class MainActivity extends AppCompatActivity {
             // 后台建的那份没有主界面的回调，在这里补上
             wireCameraCallbacks();
 
-            // 绑定 TextureView
-            cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
+            // 声明各路画布（接回的留着的那几块已经声明过，再声明一次什么都不做）。相机由通道调度开：
+            // 画布都在时登记 PREVIEW（startPreviewIfReady），它照登记表按次序开、开的时候就带着预览 ——
+            // 以前这里接着叫 openAllCameras 按次序开（2.11 阶段 4a 删：主界面只声明、只登记，不动相机）
+            cameraManager.declarePreviews(textureFront, textureBack, textureLeft);
 
             // 布局是新建的，座舱两格默认都显示。管线里只有真正分到了相机的那一路才有实例，
             // 所以问它就等于新建路径当时的结论 —— 以前这一步只在新建路径里做，
             // 界面一重建，没开的「前座舱」就成了一块空格子
             showCabinPanes(cameraManager.getCamera("back") != null,
                     cameraManager.getCamera("left") != null);
-
-            // 打开所有摄像头（后台初始化时仅创建了对象，可能只打开了补盲所需的单个摄像头）
-            // 主界面需要所有摄像头画面，已打开的摄像头会被 openCamera 内部的防重复检查跳过
-            cameraManager.openAllCameras();
 
             // 手动触发 previewSizeCallback（摄像头可能已在补盲阶段打开并确定了预览尺寸）
             cameraManager.firePreviewSizeCallbacks();
@@ -1473,9 +1561,10 @@ public class MainActivity extends AppCompatActivity {
                 String modeDesc = useCodecRecording ? "MediaCodec" : "MediaRecorder";
                 AppLog.d(TAG, "录制模式: " + modeDesc + " (设置: " + recordingMode + ")");
 
-                // 打开所有摄像头
-                cameraManager.openAllCameras();
-                
+                // 声明各路画布，相机由通道调度开（PREVIEW 在画布都在时已经登记了，startPreviewIfReady）：
+                // 管线刚交给调度的那一轮排在这之后，它开第一路时就带着预览。以前这里叫 openAllCameras 开相机（阶段 4a 删）
+                cameraManager.declarePreviews(textureFront, textureBack, textureLeft);
+
                 // 注册摄像头到亮度/降噪调节管理器
                 registerCamerasToImageAdjustManager();
 
@@ -2853,7 +2942,17 @@ public class MainActivity extends AppCompatActivity {
 
         // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表。
         // 录像那一项由协调器登记（在录、在等环视都算），这里不替它填
-        // 关不关由相机层按登记表判（没人要了：熄屏时现在关，否则 30 秒、没有前台服务时 1.5 秒），这里不再自己关
+        // 关不关由通道调度按登记表判（没人要了的那一路：亮屏、前台服务在时各自保持 30 秒，否则当场按次序关），
+        // 这里不自己关。画布不撤回：最小化时它还在（安卓 12 只拆显示层），预览输出成了「留着的」，通道不动
+        //
+        // 重建（换日夜模式、换语言）时不注销：主界面一直看得见，新界面在同一趟里接回画布、自己再登记（大纲 §7.6）。
+        // 有一格没接回（管线里没有那一路的相机，画布留不住），新界面要等第一次绘制建出那一格画布才数齐、才登记 ——
+        // 这里先注销的话，调度在那之前醒来那一轮看到没人要，没有前台服务时就当场把相机关了，画布一齐又按次序重开
+        // （2026-10-11 审查，阶段 4a）。从最近任务划掉不是重建，照常注销
+        if (isChangingConfigurations()) {
+            AppLog.d(TAG, "onPause during a configuration change: PREVIEW stays claimed for the new instance");
+            return;
+        }
         com.kooo.evcam.camera.CameraNeeds.current().release(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
     }
 
@@ -2919,12 +3018,8 @@ public class MainActivity extends AppCompatActivity {
         // 预览又要用相机了 —— 画布还在的话现在登记；画布没了（退过后台）等它回来再登记（见 claimPreviewIfReady）
         claimPreviewIfReady();
 
-        // 「开机自启动」开着，前台服务就该在（规格 §3）。退出后再手动打开时没人拉它；在主界面在前面时拉起 ——
-        // 安卓 12 起，后台才拉起的前台服务用不了相机。有它，没人要相机后那 30 秒相机才留得住（MultiCameraManager）
-        if (appConfig.isAutoStartOnBoot() && !CameraForegroundService.isRunning()) {
-            CameraForegroundService.start(this, getString(R.string.notif_background_title),
-                    getString(R.string.notif_tap_to_return));
-        }
+        // 前台服务：每次回到前台都刷新一次（大纲 §1 MainActivity，2.11 阶段 4a）
+        refreshForegroundService();
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
@@ -2935,9 +3030,31 @@ public class MainActivity extends AppCompatActivity {
         refreshRecordAvailability();
         updateStatusLine();
         com.kooo.evcam.storage.StorageState.refresh(this, "resume");
-        
-        // 回到前台要用相机：上面 claim(PREVIEW) 那一下相机层自己会开（reconcileCameras）
-}
+
+        // 回到前台要用相机：上面 claim(PREVIEW) 那一下叫醒通道调度，它照登记表开（主界面在前就能用相机）
+    }
+
+    /**
+     * 刷新前台服务：开机自启动开着、或者有录像意图（「这一趟要录」：在录、在等开录、因熄屏停下等亮屏接回）时，
+     * 主界面每次回到前台都 start 一次，通知文字照此刻的样子写（在录写「正在录制」，否则「在后台运行」）。
+     *
+     * <p>为什么每次都刷：安卓 12 起，后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度只认两种「能用相机」：
+     * 主界面在前，或者前台服务是主界面在前时起的、那时刷新过（{@link CameraForegroundService#startedWhileVisible()}，
+     * 在 onStartCommand 那一刻判，只升不降）。以前只在服务不在时才起 —— 开机后在后台起的那个一直在，
+     * 就永远不会变成「能用相机」，主界面一退到后台调度就什么都不开（大纲 §1、§6 风险 7：通知会刷一下）。</p>
+     *
+     * <p>留不留服务的条件和 {@link CameraForegroundService#stop} 是同一条（开机自启动、或者这一趟要录）：
+     * 都不是就不起 —— 停不停由停录、退出那几处管。</p>
+     */
+    private void refreshForegroundService() {
+        boolean recording = recordingCoordinator.isRecording();
+        if (!appConfig.isAutoStartOnBoot() && !RecordingIntent.current().recordingWanted() && !recording) {
+            return;
+        }
+        CameraForegroundService.start(this,
+                getString(recording ? R.string.notif_recording_title : R.string.notif_background_title),
+                getString(recording ? R.string.notif_recording_tap : R.string.notif_tap_to_return));
+    }
 
     @Override
     protected void onDestroy() {

@@ -88,8 +88,16 @@ public class SingleCamera {
     private String cameraPosition;  // 摄像头位置（front/back/left/right）
     /** 最近一次按配置摆位的结果，只给诊断报告看。 */
     private volatile String laneTransformNote = "还没试过";
-    /** 挂在预览视图上的重算监听，挂一次就够。 */
+    /** 挂在预览视图上的重算监听：视图尺寸一变就重新摆位（见 {@link #watchLaneLayout}）。 */
     private android.view.View.OnLayoutChangeListener laneLayoutWatch;
+    /**
+     * 重算监听此刻挂在哪个视图上（只在主线程改）。弱引用：管线比主界面活得久，不能因为它留住销毁了的界面。
+     *
+     * <p>以前只挂一次、挂在头一个视图上（2026-10-11 审查，阶段 4a）：主界面重建以前总要重建会话，建会话时再摆一次位，
+     * 看不出来；§7.6 起新界面接回同一块画布、通道零变动，没有那一次了 —— 新视图上没有监听，
+     * 主界面按画面比例改了视图尺寸也没人重算，座舱一格就按格子尺寸摆着（缩放、裁剪不对），直到下一次动这一路。</p>
+     */
+    private java.lang.ref.WeakReference<TextureView> laneWatchedView;
     /** 主界面点开放大时临时改成「填充」；null 表示按配置里那一格走。 */
     private volatile String fitOverride;
 
@@ -503,17 +511,11 @@ public class SingleCamera {
             laneTransformNote = "配置里没有这一路";
             return;
         }
-        if (laneLayoutWatch == null) {
-            // 视图尺寸一变就重算：设宽高比会触发重新布局，而它和这里谁先谁后
-            // 没有保证 —— 只算一次的话，算的可能是上一次的尺寸
-            laneLayoutWatch = (v, l, t, r, b, ol, ot, or2, ob) -> {
-                if (r - l != or2 - ol || b - t != ob - ot) {
-                    applyLaneTransform();
-                }
-            };
-            view.addOnLayoutChangeListener(laneLayoutWatch);
-        }
         view.post(() -> {
+            // 先挂监听再量尺寸（主线程）：之后尺寸再变，监听会再算一次；之前变的，这里量到的就是变过的
+            if (view == textureView) {
+                watchLaneLayout(view);
+            }
             int width = view.getWidth();
             int height = view.getHeight();
             if (width <= 0 || height <= 0) {
@@ -543,6 +545,34 @@ public class SingleCamera {
             AppLog.i(TAG, "Camera " + cameraId + " (" + cameraPosition + ") 按配置摆位: "
                     + laneTransformNote);
         });
+    }
+
+    /**
+     * 把重算监听挂到这个视图上（主线程）：视图尺寸一变就重新摆位 —— 设宽高比会触发重新布局，而它和摆位谁先谁后
+     * 没有保证，只算一次的话，算的可能是上一次的尺寸。
+     *
+     * <p>跟着视图走：换了视图（主界面重建，新界面接回同一块画布，大纲 §7.6）就从旧视图上摘下、挂到新视图上
+     * （2026-10-11 审查，阶段 4a；以前只挂在头一个视图上，见 {@link #laneWatchedView}）。
+     * 已经挂在它上面的什么都不做。</p>
+     */
+    private void watchLaneLayout(TextureView view) {
+        TextureView watched = laneWatchedView == null ? null : laneWatchedView.get();
+        if (watched == view) {
+            return;
+        }
+        if (laneLayoutWatch == null) {
+            laneLayoutWatch = (v, l, t, r, b, ol, ot, or2, ob) -> {
+                // 只认此刻的那个视图：撤回了的那一格（textureView 已清）尺寸变了不关这一路的事
+                if (v == textureView && (r - l != or2 - ol || b - t != ob - ot)) {
+                    applyLaneTransform();
+                }
+            };
+        }
+        if (watched != null) {
+            watched.removeOnLayoutChangeListener(laneLayoutWatch);
+        }
+        view.addOnLayoutChangeListener(laneLayoutWatch);
+        laneWatchedView = new java.lang.ref.WeakReference<>(view);
     }
 
     /**
@@ -583,22 +613,24 @@ public class SingleCamera {
      * 应用左右镜像变换到TextureView
      */
     private void applyMirrorTransform() {
-        if (textureView == null) {
+        // 取一次：post 出去之后字段可能已被清掉（撤回预览、换视图），和 applyLaneTransform 一样认这一刻的那个视图
+        final TextureView view = textureView;
+        if (view == null) {
             return;
         }
 
         // 在主线程中执行UI操作
-        textureView.post(() -> {
+        view.post(() -> {
             android.graphics.Matrix matrix = new android.graphics.Matrix();
 
             // 获取TextureView的中心点
-            float centerX = textureView.getWidth() / 2f;
-            float centerY = textureView.getHeight() / 2f;
+            float centerX = view.getWidth() / 2f;
+            float centerY = view.getHeight() / 2f;
 
             // 应用水平镜像：scaleX = -1
             matrix.setScale(-1f, 1f, centerX, centerY);
 
-            textureView.setTransform(matrix);
+            view.setTransform(matrix);
             AppLog.d(TAG, "Camera " + cameraId + " (back) applied mirror transform");
         });
     }
@@ -1459,6 +1491,10 @@ public class SingleCamera {
      * 声明主界面这一格的预览：以画布（{@code texture}）作身份。同一块画布再声明一次什么都不做；
      * 视图换了（主界面重建后新界面接回同一块画布）只换视图 —— 摆位、抓预览跟着新视图走，通道零变化。
      *
+     * <p>主界面重建时（大纲 §7.6）旧界面销毁那一下已经撤回了声明（{@link #withdrawPreview}），新界面接回同一块画布时
+     * 这里看到的是「原来没有」—— 照样返回 true（调用方叫醒调度，规则看到的还是会话里那个输出，通道不动）；
+     * 会话里正带着这块画布，就也只换视图（2026-10-11，阶段 4a）。</p>
+     *
      * @return true：声明变了（换了一块画布，或者原来没有），调用方该叫醒调度
      */
     public boolean declarePreview(TextureView view, SurfaceTexture texture) {
@@ -1475,11 +1511,12 @@ public class SingleCamera {
             }
         }
         if (textureView != view) {
-            if (changed) {
+            if (changed && !sessionSnapshot.carries(out)) {
                 // 换了一块画布：照旧入口的做法，放掉用旧画布建的预览 Surface（声明变了，调度随后按新画布改输出）
                 setTextureView(view);
             } else {
-                // 同一块画布换了视图（主界面重建后新界面接回，大纲 §7.6）：只换视图和摆位，不走 setTextureView ——
+                // 同一块画布换了视图（还声明着时换了视图；或者撤回后被新界面接回、会话里还带着它 —— 主界面重建，大纲 §7.6）：
+                // 只换视图和摆位，不走 setTextureView ——
                 // 它会放掉旧入口用这块画布建的预览 Surface，而那份 Surface 可能正挂在旧入口建的会话里：声明不触发重建，
                 // 会话就往一个放掉了的 Surface 送帧，快照里画布又还活着，调度看不出来。调用方迁完之前两条入口并存
                 textureView = view;
@@ -1499,16 +1536,26 @@ public class SingleCamera {
     /**
      * 撤回预览：只撤回 {@code texture} 这一块（不是它就什么都不做）。撤回不碰会话 —— 画布还活着就是「留着的输出」，
      * 等下一次本来要动、或者关相机时一起摘；画布已被系统收走的，调度排一步马上摘。
+     *
+     * <p>撤回的那一格的视图也不再拿着（2026-10-11，阶段 4a）：画布销毁时主界面也销毁了，管线比界面活得久，
+     * 拿着它就把整个销毁了的界面留住（以前画布销毁时 setTextureView(null) 清掉，阶段 4a 改成只撤回）。
+     * 只清字段，不走 setTextureView：旧入口用这块画布建的预览 Surface 可能正挂在旧入口建的会话里（见 {@link #declarePreview}），
+     * 旧入口下一次建会话时看到没有视图，自己放。</p>
      */
     public boolean withdrawPreview(SurfaceTexture texture) {
         boolean changed;
+        TextureView view = null;
         synchronized (outputLock) {
             changed = texture != null && declaredPreview != null && declaredPreview.out.consumer == texture;
             if (changed) {
+                view = declaredPreview.view;
                 declaredPreview = null;
             }
         }
         if (changed) {
+            if (view != null && textureView == view) {
+                textureView = null;
+            }
             AppLog.d(TAG, "Camera " + cameraId + " preview withdrawn: " + texture);
             tidyLater();
         }

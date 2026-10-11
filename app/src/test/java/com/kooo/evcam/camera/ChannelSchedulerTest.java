@@ -29,8 +29,8 @@ import java.util.function.Consumer;
 /**
  * 通道调度（channel-logic §二，项目所有者 2026-10-10 确认）：调度只读事实、照做、记账、写黑匣子 —— 该做哪一步在
  * {@link ChannelRules}（有它自己的测试）。这里钉住的是调度这一层：叫醒并成一次、一步做完没有、15 秒和 60 秒到点、
- * 「输出被丢」派给谁、问的节奏、{@link ChannelScheduler#closingAnywhere()} 的起落，再把 1a 的现场回放 (a)–(e)
- * 原样跑一遍 —— 这一次是经调度、经假的相机层（{@link FakePort}）跑。
+ * 「输出被丢」派给谁、交给调度的画布什么时候放（大纲 §7.6）、问的节奏、{@link ChannelScheduler#closingAnywhere()} 的起落，
+ * 再把 1a 的现场回放 (a)–(e) 原样跑一遍 —— 这一次是经调度、经假的相机层（{@link FakePort}）跑。
  *
  * <p>相机层由这里扮演：动作只记下来；开好、配好、第一帧、关完、丢了、开不起来，都是测试说了算，照 SingleCamera 的样子
  * 改事实、再调调度的入口（真机上由 MultiCameraManager 从相机线程 post 到主线程）。队列和钟也是假的：
@@ -335,6 +335,142 @@ public class ChannelSchedulerTest {
         closed(surround);
         settle();
         assertEquals(Arrays.asList("RECORD CLOSED"), surround.drops);
+    }
+
+    // ================================================================= 交给调度的画布（大纲 §7.6）
+
+    /**
+     * 主界面被划掉，留下的预览画布交给调度：还挂在会话里就不放（留着的活输出，照「减输出能拖就拖」不为它改会话）；
+     * 下一次本来要动（这里是开录加录像）顺带摘掉，新会话配好之后才放 —— 早放了它就成了死输出，整条重复请求停下。
+     */
+    @Test
+    public void aHandedOverCanvasIsReleasedOnlyOnceALaterApplyLeftItOut() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        List<String> released = new ArrayList<>();
+        drop(Holder.PREVIEW);
+        surround.declared.remove(pvS);
+        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        settle();
+        assertTrue("还挂在会话里：不放", released.isEmpty());
+        assertTrue("留着的活输出不为它改会话", surround.actions.isEmpty());
+
+        at(1_000);
+        host.plan(SUR);
+        declare(surround, recS);
+        claim(Holder.RECORDING);
+        settle();
+        assertEquals(Arrays.asList("apply [RECORD]"), surround.actions);
+        assertTrue("新会话还没配好：不放", released.isEmpty());
+        at(1_100);
+        surround.session = SingleCamera.SessionOutputs.NONE;   // 旧会话关掉了，新的在配
+        s.wake();
+        settle();
+        assertTrue(released.isEmpty());
+        at(1_400);
+        configured(surround, recS);
+        frame(surround);
+        settle();
+        assertEquals(Arrays.asList("pvS"), released);
+        at(5_000);
+        assertEquals("只放一次", Arrays.asList("pvS"), released);
+    }
+
+    /** 留下的画布随相机关了：关完才放。 */
+    @Test
+    public void aHandedOverCanvasCarriedIntoACloseIsReleasedWhenClosed() {
+        host.foregroundService = false;
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        List<String> released = new ArrayList<>();
+        drop(Holder.PREVIEW);
+        surround.declared.remove(pvS);
+        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        settle();
+        assertEquals("没人要、没有前台服务：不保持，关", Arrays.asList("close unwanted"), surround.actions);
+        assertTrue("还在关：不放", released.isEmpty());
+        at(200);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("pvS"), released);
+    }
+
+    /** 交过来时这一路没有会话带着它（相机关着）：下一轮就放；不认识的路也放，不漏。 */
+    @Test
+    public void aHandedOverCanvasNoSessionCarriesIsReleasedAtOnce() {
+        settle();
+        List<String> released = new ArrayList<>();
+        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        s.handOver("nowhere", new Out(Kind.PREVIEW, "preview-x"), () -> released.add("x"));
+        settle();
+        assertEquals(Arrays.asList("pvS", "x"), released);
+    }
+
+    /**
+     * 新界面接回同一块画布（主界面重建）：拿回去之后不归调度放；再声明就是同一个输出 —— 通道零变动，
+     * 之后相机关了也不放（归接回的那个视图）。
+     */
+    @Test
+    public void aReclaimedCanvasIsNeverReleasedAndChangesNothing() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        List<String> released = new ArrayList<>();
+        drop(Holder.PREVIEW);
+        surround.declared.remove(pvS);
+        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        assertTrue(s.reclaim(SUR, pvS));
+        assertFalse("拿回过了", s.reclaim(SUR, pvS));
+        surround.declared.add(pvS);
+        claim(Holder.PREVIEW);
+        settle();
+        assertTrue("通道零变动", surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+
+        host.foregroundService = false;
+        drop(Holder.PREVIEW);
+        settle();
+        at(200);
+        closed(surround);
+        settle();
+        assertTrue(surround.actions.contains("close unwanted"));
+        assertTrue("接回的不归调度放", released.isEmpty());
+    }
+
+    /** 退出：按次序关，留下的画布随它那一路关完就放（不等别的路），调度停下之后也不再放第二次。 */
+    @Test
+    public void exitReleasesAHandedOverCanvasOnceItsLaneIsClosed() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        List<String> released = new ArrayList<>();
+        drop(Holder.PREVIEW);
+        surround.declared.remove(pvS);
+        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        s.exit();
+        settle();
+        assertEquals(Arrays.asList("close exit"), surround.actions);
+        assertTrue(released.isEmpty());
+        at(300);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("pvS"), released);
+        assertEquals(Arrays.asList("close exit"), rear.actions);
+        at(400);
+        closed(rear);
+        closed(front);
+        settle();
+        assertTrue(host.stopped);
+        assertEquals("只放一次", Arrays.asList("pvS"), released);
     }
 
     /** 相机层自己丢的录像输出（会话配不上、消费者被收走）：当场告诉；别的输出不归录像管。 */
