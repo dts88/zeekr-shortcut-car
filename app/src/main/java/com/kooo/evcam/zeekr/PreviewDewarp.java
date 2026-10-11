@@ -55,10 +55,17 @@ public final class PreviewDewarp {
         return routed != null ? routed : new Surface(texture);
     }
 
-    /** 这个 TextureView 上的画面此刻是不是已经由 GPU 校正过（或至少经过了管线）。 */
+    /**
+     * 这个 TextureView 上的画面此刻是不是已经由 GPU 校正过（或至少经过了管线）。
+     *
+     * <p>也按画布认（管线画进的就是这个视图的 SurfaceTexture）：主界面重建时画布由管线留着、新界面接回同一块
+     * （大纲 §7.6，2.11 阶段 4a），管线照旧画进它、不重建，而建管线时记下的是旧视图 —— 只按视图认的话，
+     * 新界面会把校正过的画面当成没校正的再分格一遍。</p>
+     */
     public static boolean isActive(TextureView view) {
         FisheyeGlPipe current = pipe;
-        return view != null && current != null && current.isAlive() && pipeView.get() == view;
+        return view != null && current != null && current.isAlive()
+                && (pipeView.get() == view || current.output() == view.getSurfaceTexture());
     }
 
     private static Surface routed(String cameraId, TextureView view, SurfaceTexture texture,

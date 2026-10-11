@@ -217,7 +217,7 @@ public final class StallWatch {
         AppLog.d(TAG, "mirror watch " + (on ? "on" : "off"));
     }
 
-    /** 主界面此刻在不在前台（争用日志用）。 */
+    /** 主界面此刻在不在前台（争用日志用；2.11 起通道调度据此判「能用相机」）。 */
     public static boolean isForeground() {
         return foreground;
     }
@@ -226,6 +226,8 @@ public final class StallWatch {
         if (foreground != value) {
             foreground = value;
             AppLog.d(TAG, "main window " + (value ? "foreground" : "background"));
+            // 主界面进出前台改了「能用相机」：叫醒通道调度（回到前台，开失败判出的「现在用不了相机」作废、照常开）
+            ChannelScheduler.wakeAll();
         }
     }
 

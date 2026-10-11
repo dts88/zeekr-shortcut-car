@@ -132,8 +132,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         }
         try {
             // 启动摄像头前台服务
-            CameraForegroundService.start(this, getString(R.string.notif_background_title),
-                    getString(R.string.notif_tap_to_return));
+            CameraForegroundService.start(this);
         } catch (Exception e) {
             AppLog.e(TAG, "拉起前台服务失败: " + e.getMessage(), e);
         }

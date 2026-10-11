@@ -2,6 +2,7 @@ package com.kooo.evcam.camera;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,9 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li><b>设了上限</b>：保持「已用 + 下一个分段」不超过上限，同时盘上始终留出余量。
  *       不够就从最旧的分段删起，一次删一整组（同一分钟里几路相机的文件一起删，不留半组）。
- *       正在写的那一组永远不碰。</li>
+ *       <b>每一路最新的那个文件永远不碰</b>，它在的那一组整组留着（{@link #newestOfEachSlot}）：
+ *       正在写的文件就是它那一路最新的。以前只留「最新的一组」—— 一路单独接回录像时（2026-10-10），
+ *       它的第一个文件按接回那一刻命名、自己成了最新的一组，别的路正在写的那一组反倒成了可删的。</li>
  *   <li><b>没设上限</b>：一个文件都不删。剩余空间低于余量就停下来 —— 这是用户选的
  *       「不限制」的含义：不替他决定哪些录像可以丢。</li>
  *   <li>删光本应用自己的旧录像也腾不出余量（盘被别的东西占满了）：<b>不删</b>，直接停。
@@ -59,6 +62,43 @@ public final class StoragePlan {
     /** 分组键：文件名开头的时间戳。同一分段里几路相机的文件共用它，字典序就是时间序。 */
     public static String groupOf(String name) {
         return name != null && name.length() >= 15 ? name.substring(0, 15) : "";
+    }
+
+    /** 文件是哪一路的（文件名最后一个下划线之后）：改名前后的两种叫法算同一路（{@link CameraSlots#canonical}）。 */
+    static String slotOf(String name) {
+        String slot = com.kooo.evcam.zeekr.RecordingTimeline.parseCameraSlot(name);
+        return slot == null ? "" : CameraSlots.canonical(slot);
+    }
+
+    /** 每一路的文件，各自从新到旧（名字开头是时刻，字典序就是时间序）。 */
+    private static Map<String, List<Clip>> newestFirstBySlot(List<Clip> clips) {
+        Map<String, List<Clip>> bySlot = new LinkedHashMap<>();
+        for (Clip clip : clips) {
+            String slot = slotOf(clip.name);
+            List<Clip> list = bySlot.get(slot);
+            if (list == null) {
+                list = new ArrayList<>();
+                bySlot.put(slot, list);
+            }
+            list.add(clip);
+        }
+        for (List<Clip> list : bySlot.values()) {
+            Collections.sort(list, (a, b) -> b.name.compareTo(a.name));
+        }
+        return bySlot;
+    }
+
+    /**
+     * 每一路最新的那个文件：永远不删（2026-10-10）。正在写的文件一定是它那一路最新的 ——
+     * 几路的分段不再一定同名：一路单独接回录像时，第一个文件按接回那一刻命名，和别的路错开。
+     * 一路不录了（离开了录像、关掉了这一路）的最后一个文件也在里面：多留它那一组，不少留正在写的。
+     */
+    static Set<String> newestOfEachSlot(List<Clip> clips) {
+        Set<String> newest = new HashSet<>();
+        for (List<Clip> list : newestFirstBySlot(clips).values()) {
+            newest.add(list.get(0).name);
+        }
+        return newest;
     }
 
     /** 余量：两个分段，但不少于 {@link #MIN_MARGIN_BYTES}。 */
@@ -114,19 +154,19 @@ public final class StoragePlan {
     }
 
     /**
-     * 用最近一个<b>写完的</b>分段组估算一个分段（所有相机合起来）有多大。
+     * 用每一路最近一个<b>写完的</b>文件估算一个分段（所有相机合起来）有多大：每一路第二新的那个加起来。
      *
-     * <p>最新那一组正在写，不算；倒数第二组是最近一个完整的。量出来的比按码率算的准 ——
-     * 实际码率随画面内容浮动。</p>
+     * <p>每一路最新的那个正在写，不算；第二新的是它最近一个完整的。量出来的比按码率算的准 ——
+     * 实际码率随画面内容浮动。以前取倒数第二组：一路单独接回录像、第一个文件自成最新的一组时（2026-10-10），
+     * 倒数第二组是别的路正在写的那一组，估小了。</p>
      */
     public static long estimateSegmentBytes(List<Clip> clips) {
-        Map<String, Long> groups = groupSizes(clips);
-        if (groups.size() < 2) {
-            return DEFAULT_SEGMENT_BYTES;
+        long bytes = 0;
+        for (List<Clip> list : newestFirstBySlot(clips).values()) {
+            if (list.size() >= 2) {
+                bytes += Math.max(0, list.get(1).bytes);
+            }
         }
-        List<String> keys = new ArrayList<>(groups.keySet());
-        Collections.sort(keys);
-        long bytes = groups.get(keys.get(keys.size() - 2));
         return bytes > 0 ? bytes : DEFAULT_SEGMENT_BYTES;
     }
 
@@ -171,21 +211,23 @@ public final class StoragePlan {
             return new Decision(Verdict.OK, Collections.emptyList(), 0, margin, false);
         }
 
-        // 最旧的组在前；最新一组正在写，不可删
+        // 最旧的组在前；哪一路最新的文件（正在写的就是它）在里面，这一组整组不可删
+        Set<String> newest = newestOfEachSlot(clips);
         Map<String, List<Clip>> groups = new LinkedHashMap<>();
-        List<String> order = new ArrayList<>();
+        Set<String> kept = new HashSet<>();
         for (Clip clip : clips) {
             String key = groupOf(clip.name);
             if (!groups.containsKey(key)) {
                 groups.put(key, new ArrayList<>());
-                order.add(key);
             }
             groups.get(key).add(clip);
+            if (newest.contains(clip.name)) {
+                kept.add(key);
+            }
         }
+        List<String> order = new ArrayList<>(groups.keySet());
+        order.removeAll(kept);
         Collections.sort(order);
-        if (!order.isEmpty()) {
-            order.remove(order.size() - 1);
-        }
 
         long deletable = 0;
         long lockedOld = 0;
@@ -222,19 +264,9 @@ public final class StoragePlan {
             }
         }
         if (toDelete.isEmpty()) {
-            // 超了上限但只剩正在写的那一组：没有能删的，这一组写完下次再算
+            // 超了上限但只剩正在写的那几组：没有能删的，写完下次再算
             return new Decision(Verdict.OK, Collections.emptyList(), 0, margin, false);
         }
         return new Decision(Verdict.DELETE, toDelete, freed, margin, false);
-    }
-
-    private static Map<String, Long> groupSizes(List<Clip> clips) {
-        Map<String, Long> sizes = new LinkedHashMap<>();
-        for (Clip clip : clips) {
-            String key = groupOf(clip.name);
-            Long current = sizes.get(key);
-            sizes.put(key, (current == null ? 0 : current) + Math.max(0, clip.bytes));
-        }
-        return sizes;
     }
 }

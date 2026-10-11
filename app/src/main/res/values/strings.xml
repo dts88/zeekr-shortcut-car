@@ -324,7 +324,6 @@
     <!-- 主界面 / 通知 / 回放 -->
     <string name="msg_need_camera_storage">需要相机和存储权限</string>
     <string name="msg_camera_access_failed">无法访问摄像头</string>
-    <string name="msg_codec_fallback">录制出错，已改用 MediaCodec 继续录制</string>
     <string name="msg_storage_full_stopped">U 盘已满，录制已停止。未设置「录像存储上限」，不会自动清理旧录像。</string>
     <string name="msg_storage_full_refuse">U 盘空间不足，无法开始录制。未设置「录像存储上限」，不会自动清理旧录像。</string>
     <string name="msg_storage_cleaning">空间不足，正在清理最旧的录像，完成后开始录制…</string>
@@ -379,18 +378,18 @@
     <string name="msg_recording_stopped">录制已停止</string>
     <string name="msg_recording_started_all">已开始录制（全部摄像头）</string>
     <string name="msg_recording_started_n">已开始录制 %1$d 路</string>
+    <string name="msg_recording_waiting_cameras">等待摄像头，恢复后自动继续</string>
     <string name="msg_sd_fallback">未检测到 U 盘，已改为录制到内置存储</string>
     <string name="msg_recording_interrupted">录制中断：%1$s</string>
-    <string name="msg_recording_interrupted_resuming">录制中断：%1$s。环视画面正常后自动恢复录制。</string>
+    <string name="msg_recording_interrupted_resuming">录制中断：%1$s，正在自动恢复…</string>
     <string name="rec_reason_unknown">原因未知</string>
     <string name="rec_reason_write_stalled">无法写入文件</string>
-    <string name="rec_reason_camera_lost">摄像头被占用</string>
     <!-- 「X 失败：原因」里的原因，由 ui/FailureReason 按异常挑选；挑不出的不显示原因 -->
     <string name="reason_no_network">无网络连接</string>
     <string name="reason_timeout">连接超时</string>
     <string name="reason_no_space">存储空间不足</string>
     <string name="reason_file_not_found">文件不存在</string>
-    <string name="msg_screen_off_stopped">熄屏 10 秒，已自动停止录制</string>
+    <string name="msg_screen_off_stopped">熄屏后已停止录制</string>
     <string name="msg_screen_off_background">熄屏 15 秒，已转入后台</string>
     <string name="msg_stats_on">录制状态显示已开启</string>
     <string name="msg_stats_off">录制状态显示已关闭</string>
@@ -595,6 +594,8 @@
     <string name="msg_rail_side_hint">操作按钮已放在驾驶座一侧，可在「设置 → 界面 → 操作按钮位置」中更改</string>
     <string name="record_unavailable">插入 U 盘后可录制</string>
     <string name="record_unavailable_detail">未检测到 U 盘</string>
+    <string name="record_waiting_cameras">等待摄像头</string>
+    <string name="record_waiting_detail">恢复后自动继续</string>
     <string name="status_profile_composite">极氪7X（环视）</string>
     <string name="status_profile_composite_multi">极氪7X（环视 + 前后座舱）</string>
     <string name="status_fps">≤%1$s fps</string>
@@ -605,7 +606,9 @@
     <string name="status_storage_free">U 盘 %1$s 可用</string>
     <string name="status_storage_none">未检测到 U 盘</string>
     <string name="status_recording_fallback">已改为录制到 %1$s（%2$s 不可用）</string>
-    <string name="status_camera_taken">摄像头被占用，释放后自动继续录制</string>
+    <string name="status_camera_lane_taken">%1$s：摄像头被占用，其他摄像头继续录制；释放后该路自动恢复录制</string>
+    <string name="status_cameras_taken">部分摄像头被占用，其他摄像头继续录制；释放后自动恢复录制</string>
+    <string name="status_camera_lane_unavailable">%1$s：无法录制，其他摄像头继续录制</string>
     <string name="status_internal_storage">内置存储</string>
     <string name="nav_group_switches">开关</string>
 
@@ -735,6 +738,7 @@
 
     <!-- 通知 -->
     <string name="notif_recording_title">正在录制</string>
+    <string name="notif_waiting_cameras_title">等待摄像头，恢复后自动继续</string>
     <string name="notif_recording_tap">点击返回应用</string>
     <string name="notif_background_title">在后台运行</string>
     <string name="notif_tap_to_return">点击返回应用</string>
