@@ -11,6 +11,19 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.0-alpha] - 2026-10-11
+
+- Cameras are opened, closed and reconfigured in one place, one step at a time; the surround view changes alone.
+- A camera taken by another app is left alone: the app asks the camera service every 30 seconds whether it is free, without opening it, and opens it alone once it is free.
+- Each camera joins and leaves the recording on its own; a camera taken away no longer stops the others. A camera that rejoins starts a file named at its own start time and aligns at the next segment.
+- When no camera can record, the recording stays on and shows that it is waiting for the cameras.
+- Storage interruptions still resume automatically, now without waiting for the surround view; the cameras stay open meanwhile.
+- Screen off with Sentry Mode off and the car not driving: recording stops at once and the cameras close in order, surround view first.
+- Outputs no longer needed stay until the next necessary change or until the camera closes; the main screen's and the Super mirror's pictures are kept across a screen rebuild or closing the mirror.
+- Each unneeded camera stays open for 30 seconds while the screen is on and the background service runs.
+- Playback: the progress bar follows the surround view; cabin footage outside it can be locked and deleted with its recording.
+- Diagnostics: new Channel section.
+
 ## [2.10.15-beta] - 2026-10-10
 
 Upgrade from 2.0.0. Same code as 2.10.14-alpha.
