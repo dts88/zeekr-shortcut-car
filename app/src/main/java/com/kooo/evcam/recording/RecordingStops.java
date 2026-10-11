@@ -114,4 +114,86 @@ public final class RecordingStops {
             return attempts;
         }
     }
+
+    /**
+     * 存储一类整次停、判了自动接回之后，录像要的几样留不留（大纲 §7 第 8 问，项目所有者 2026-10-11「留」）：
+     * 「录像要用相机」（RECORDING）、车辆信号的登记、熄屏录制的唤醒锁。
+     *
+     * <ul>
+     *   <li><b>判了自动接回就留着</b>（{@link #onStopped}）：相机不放、停放的录制器留在会话里，接回时直接加入 ——
+     *       存储停不动通道。熄屏那张表照样读得到哨兵模式、挡位（以前这一段不登记，熄屏一律判成车机要睡：开车、
+     *       哨兵模式开着时也停）；唤醒锁拉着车机的照样拉着，它自己的时限照算（以前一停就放，车机几秒后睡过去，
+     *       不经那张表重判。审查 2026-10-11）；</li>
+     *   <li><b>接回开录了</b>（{@link #finish}）：留着的几样从此是这一次录像的，什么都不放；</li>
+     *   <li><b>确定不接了</b>（{@link #finish}，调用方照返回值放）：人停了、退出了、熄屏照表停了、查盘拒了
+     *       （没 U 盘、盘满 —— 之后是等，等的不登记）、接回前的查盘卡住了（{@link #checkStuck}）。
+     *       额度用完、本来就不接的原因，停的那一下就不留。</li>
+     * </ul>
+     *
+     * <p>纯逻辑，见 {@code RecordingStopsTest}。</p>
+     */
+    public static final class ResumeHold {
+        /**
+         * 接回前的查盘多久没回来算卡住了：正常几十毫秒；盘掉线时探测会卡在存储线程上（2026-09-26 固态盘掉过 5 秒），
+         * 存储线程只有一个，后面排着的也回不来。开录那边每次查盘之前问它：到点再看的那一轮（30 秒）一定判得出来，
+         * 刚发出去又来查一次（人这时按了录制）不算。
+         */
+        public static final long CHECK_STUCK_MS = 10_000L;
+
+        private boolean held;
+
+        /** 一次录像停了：判了自动接回就留着，不接回就不留。 */
+        public void onStopped(boolean willResume) {
+            held = willResume;
+        }
+
+        /**
+         * 留着的这一段到头了：接回开录了（交给这一次录像），或者确定不接了（调用方照返回值放）。
+         *
+         * @return 刚才留着
+         */
+        public boolean finish() {
+            boolean was = held;
+            held = false;
+            return was;
+        }
+
+        /** 留着、等自动接回。 */
+        public boolean held() {
+            return held;
+        }
+
+        /**
+         * 录像要的几样此刻该不该拿着（「录像要用相机」、车辆信号、熄屏录制的唤醒锁）：在录（录像意图开着），
+         * 或者留着等自动接回。
+         */
+        public boolean claims(boolean recording) {
+            return recording || held;
+        }
+
+        /**
+         * 留着等自动接回，而接回前的查盘卡住了（发出去 {@link #CHECK_STUCK_MS} 还没回来）：留着的几样该放了，
+         * 「要录」留着、接着等 —— 不然相机开着、车辆信号登记着，什么都不录，一直到有人停、退出（审查 2026-10-11；
+         * 以前存储一停就都放了，查盘卡住只是一直等）。
+         *
+         * @param checkSentAtMs 还没回来的那一次查盘什么时候发出去的（elapsedRealtime）；0 = 没有
+         * @param now           此刻（elapsedRealtime）
+         */
+        public boolean checkStuck(long checkSentAtMs, long now) {
+            return held && checkSentAtMs != 0 && now - checkSentAtMs >= CHECK_STUCK_MS;
+        }
+    }
+
+    /**
+     * 录像要的几样放了（录像停了、不接回；不等自动接回了）的时候，熄屏录制的唤醒锁要不要先照熄屏那张表重判再放：
+     * 屏幕黑着、锁正拉着车机时要 —— 锁一放车机几秒就睡，和锁到点那一次一样：判成现在停的，先写下「车机要睡」、
+     * 停掉还在等的，锁留到相机按次序关完再放；接着录、10 秒后停的（车机醒着）当场放。亮着、锁没拿着、
+     * 已经在等相机关完（熄屏照表停的那一次）：照停录那一下放（审查 2026-10-11）。
+     *
+     * @param dark        屏幕黑着
+     * @param lockPulling 锁拿着、不是在等相机关完（看锁本身，不看时限）
+     */
+    public static boolean rejudgesBeforeLockGoes(boolean dark, boolean lockPulling) {
+        return dark && lockPulling;
+    }
 }

@@ -49,8 +49,10 @@ import java.util.Set;
  *   <li><b>在不在录</b>只有这里说了算（{@link RecordingLifecycle}：空闲 → 开录中 → 在录 → 停录中）。
  *       熄屏录制、恢复、前台服务心跳、主界面、悬浮按钮都问 {@link #isRecording}，不再问相机层（2026-10-05）；
  *       录像此刻是什么样子（开录中 / 在录 / 等待摄像头）问 {@link #view}；</li>
- *   <li><b>登记</b>：「录像要用相机」（{@link CameraNeeds.Holder#RECORDING}）和车辆信号只在录像意图开着时登记 ——
- *       在等 U 盘、在等上一次收拾完的请求不登记，相机不为它白白出画面，GPS 也不一直开着；</li>
+ *   <li><b>登记</b>：「录像要用相机」（{@link CameraNeeds.Holder#RECORDING}）和车辆信号在录像意图开着时登记；
+ *       存储一类整次停之后判了自动接回的，连同熄屏录制的唤醒锁一起留到接回开录、或者确定不接了
+ *       （{@link RecordingStops.ResumeHold}，大纲 §7 第 8 问：存储停不动通道，停放的录制器接回时直接加入）。
+ *       别的在等开录的（等 U 盘、等上一次收拾完）不登记，相机不为它白白出画面，GPS 也不一直开着；</li>
  *   <li><b>停只有一条路</b>（{@link #end}）：人停的、被打断、开录失败、录着的那一份管线没了，
  *       都在这里收通知、悬浮按钮、唤醒锁，让相机层按同一套收拾（{@link MultiCameraManager#stopRecording()}），
  *       收拾完了才开下一次；</li>
@@ -154,6 +156,13 @@ public final class RecordingCoordinator {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<Listener> listeners = new ArrayList<>();
     private final RecordingStops.ResumeBudget budget = new RecordingStops.ResumeBudget();
+    /** 判了自动接回、还没开起来：录像要的几样留着（{@link #isRecordingOrResuming}）。 */
+    private final RecordingStops.ResumeHold resumeHold = new RecordingStops.ResumeHold();
+    /**
+     * 开录前还没回来的那一次查盘是什么时候发出去的（elapsedRealtime）；0 = 没有。查盘卡住了，
+     * 判了自动接回时留着的几样不跟着一直拿着（{@link #start}，{@link RecordingStops.ResumeHold#checkStuck}）。
+     */
+    private long checkSentAtMs;
     /** 下一次开录用的那一份管线。 */
     private MultiCameraManager cameraManager;
     /** 正等着建好的那一份管线（{@link #currentManager}）：一份只挂一次「建好了再看」。 */
@@ -218,7 +227,7 @@ public final class RecordingCoordinator {
     private boolean screenOffResumes;
 
     /**
-     * 向车辆信号登记用的名字：录像意图开着时登记（{@link #watchVehicle}）。不能和相机层信息条那份（"recording"）同名：
+     * 向车辆信号登记用的名字：录像意图开着、留着等自动接回时登记（{@link #watchVehicle}）。不能和相机层信息条那份（"recording"）同名：
      * 登记是按名字算的，它停录时一注销，这一份也跟着没了。
      */
     private static final String VEHICLE_USER = "screen-off-plan";
@@ -233,16 +242,27 @@ public final class RecordingCoordinator {
     private long gearSinceMs;
     private final Telemetry.Listener vehicleListener = readings -> onVehicleChanged();
 
-    /** 熄屏期间为什么判了一次（只进黑匣子那一行）。 */
+    /** 熄屏期间为什么判了一次（进黑匣子那一行；判下来要放唤醒锁时，放锁那一行也写它）。 */
     private enum DarkCheck {
         /** 熄屏那一刻。 */
-        SCREEN_OFF,
+        SCREEN_OFF("screen-off"),
         /** 熄屏 {@link RecordingCoordinator#SCREEN_OFF_STOP_MS} 到了（10 秒后停的那种）。 */
-        STOP_DUE,
+        STOP_DUE("stop-due"),
         /** 开发者熄屏录制的唤醒锁到点。 */
-        LOCK_TIMEOUT,
+        LOCK_TIMEOUT("timeout"),
+        /** 录像停了、不接回，而开发者熄屏录制的唤醒锁正拉着车机（{@link RecordingCoordinator#letLockGo}）。 */
+        ENDED("recording-stopped"),
+        /** 不等自动接回了，而开发者熄屏录制的唤醒锁正拉着车机（{@link RecordingCoordinator#letLockGo}）。 */
+        RESUME_DROPPED("resume-dropped"),
         /** 接着录的时候哨兵模式、挡位变了。 */
-        VEHICLE_CHANGED
+        VEHICLE_CHANGED("vehicle-changed");
+
+        /** 这一次判下来放唤醒锁时，放锁那一行写的原因（ASCII，{@link ScreenOffRecording#release}）。 */
+        final String lockWhy;
+
+        DarkCheck(String lockWhy) {
+            this.lockWhy = lockWhy;
+        }
     }
 
     private RecordingCoordinator(Context context) {
@@ -365,6 +385,15 @@ public final class RecordingCoordinator {
      */
     public boolean isRecording() {
         return lifecycle.isRecording();
+    }
+
+    /**
+     * 录像要的几样此刻该不该拿着：在录（{@link #isRecording}），或者存储一类整次停之后判了自动接回、还没开起来
+     * （{@link RecordingStops.ResumeHold}，大纲 §7 第 8 问）。车辆信号照它登记（{@link #watchVehicle}），
+     * 熄屏录制的唤醒锁照它拿、照它算拉不拉得住车机（{@link ScreenOffRecording#holdsCarAwake}）。主线程。
+     */
+    public boolean isRecordingOrResuming() {
+        return resumeHold.claims(isRecording());
     }
 
     /**
@@ -547,14 +576,14 @@ public final class RecordingCoordinator {
         main.post(poll);
     }
 
-    /** 不等了：人停了、退出了、熄屏了。 */
+    /** 不等了：人停了、退出了、熄屏了。判了自动接回时留着的几样一起放（{@link #dropResumeHold}）。 */
     public void cancelPending(String why) {
-        if (pending == null) {
-            return;
+        if (pending != null) {
+            AppLog.i(TAG, "不再等开录（" + why + "）");
+            pending = null;
+            main.removeCallbacks(poll);
         }
-        AppLog.i(TAG, "不再等开录（" + why + "）");
-        pending = null;
-        main.removeCallbacks(poll);
+        dropResumeHold(why);
     }
 
     /**
@@ -588,7 +617,8 @@ public final class RecordingCoordinator {
      * 熄屏了（ScreenState 在主线程调）：不管在不在录，都照 {@link ScreenOffPlan#atScreenOff} 判一次、照着做（大纲 §2 阶段 6；
      * 以前没在录就不判）。在录（含等开录）的：接着录、{@link #SCREEN_OFF_STOP_MS} 后停，或者现在停（哨兵模式没开、车没在走：
      * 车机几秒后就断电）。判成现在停的，在不在录都写下「车机要睡」（{@link CameraNeeds#setHeadUnitSleeps}）：通道调度从此不保持、
-     * 手上那一步最多再等 1 秒，然后按次序关相机（环视先单独关，channel-logic §四，项目所有者 2026-10-10）。没在录时车辆信号没人登记，
+     * 手上那一步最多再等 1 秒，然后按次序关相机（环视先单独关，channel-logic §四，项目所有者 2026-10-10）。没在录（也没留着等自动接回，
+     * {@link #isRecordingOrResuming}）时车辆信号没人登记，
      * 读不到按没开算，于是空闲熄屏就是「车机要睡」—— 空闲熄屏本来也不保持、照登记表按次序关，结果一样，只是关得更早、更确定。
      * 手动开的、自动开的一样。这里先于主界面、后视镜的熄屏监听者被叫到（ScreenState 的固定顺序）：调度的那一轮排在它们之后。
      */
@@ -622,7 +652,8 @@ public final class RecordingCoordinator {
 
     /**
      * 照熄屏那张表判一次、照着做（主线程；屏幕黑着时）—— 熄屏的唯一裁判：熄屏那一刻、10 秒到点、唤醒锁到点、
-     * 车辆信号变了都走这里，黑匣子一行写清判的时候哨兵模式、挡位是什么、多久没变，判成了什么。
+     * 车辆信号变了、录像停了不接回或者不等自动接回了而唤醒锁正拉着车机（{@link #letLockGo}）都走这里，
+     * 黑匣子一行写清判的时候哨兵模式、挡位是什么、多久没变，判成了什么。
      *
      * <p>判成现在停：先写下「车机要睡」（调度当场置「正在按次序关」，熄屏录制放锁之前要读它），再停录。写不写、清不清只照
      * {@link ScreenOffPlan#sleepFact}：已经写着的不再写，起算时刻不挪。没在录、也没在等开录的，只写这项事实，录像那边没有可做的。</p>
@@ -640,7 +671,10 @@ public final class RecordingCoordinator {
         long now = android.os.SystemClock.elapsedRealtime();
         BlackBox.noteImportant((check == DarkCheck.SCREEN_OFF ? (busy ? "熄屏时在录像" : "熄屏时没在录像")
                 : check == DarkCheck.STOP_DUE ? "熄屏已 " + (SCREEN_OFF_STOP_MS / 1000) + " 秒"
-                : check == DarkCheck.LOCK_TIMEOUT ? "熄屏录制的唤醒锁到点" : "熄屏中哨兵模式 / 挡位变了")
+                : check == DarkCheck.LOCK_TIMEOUT ? "熄屏录制的唤醒锁到点"
+                : check == DarkCheck.ENDED ? "熄屏中录像停了、不接回，唤醒锁不再拉着车机"
+                : check == DarkCheck.RESUME_DROPPED ? "熄屏中不等自动接回了，唤醒锁不再拉着车机"
+                : "熄屏中哨兵模式 / 挡位变了")
                 + "：哨兵模式" + (vehicle.sentry == null ? "读不到" : vehicle.sentry == 0 ? "关"
                 : vehicle.sentry == 1 ? "开" : "布防")
                 + (watchingVehicle ? "（" + (now - sentrySinceMs) / 1000 + " 秒没变）" : "") + "、挡位 "
@@ -674,7 +708,7 @@ public final class RecordingCoordinator {
                     break;   // 没在录：没有可停的，车机醒着，相机照登记表
                 }
                 if (check == DarkCheck.STOP_DUE) {
-                    stopForScreenOff(decision.resumesOnWake);
+                    stopForScreenOff(decision.resumesOnWake, check);
                 } else if (screenOffStop == null) {
                     screenOffStop = () -> {
                         screenOffStop = null;
@@ -687,7 +721,7 @@ public final class RecordingCoordinator {
                 }
                 break;
             default:
-                stopForScreenOff(decision.resumesOnWake);
+                stopForScreenOff(decision.resumesOnWake, check);
                 break;
         }
         return decision.action;
@@ -695,12 +729,13 @@ public final class RecordingCoordinator {
 
     /**
      * 因熄屏停录（现在停、10 秒到点）：亮屏接不接先记下，{@link #settleWanted} 照它留不留「这一趟要录」。
-     * 开发者的唤醒锁还拿着的（到点那一次），留到相机按次序关完再放，不在停录那一步当场放。
+     * 开发者的唤醒锁还拿着的（到点那一次、录像停了不接回或者不等自动接回了的那一次，{@link #letLockGo}），
+     * 留到相机按次序关完再放，不在停录那一步当场放；放锁那一行写这一次为什么判（{@link DarkCheck#lockWhy}）。
      */
-    private void stopForScreenOff(boolean resumes) {
+    private void stopForScreenOff(boolean resumes, DarkCheck check) {
         cancelScreenOffStop();
         screenOffResumes = resumes;
-        ScreenOffRecording.holdUntilCamerasClosed();
+        ScreenOffRecording.holdUntilCamerasClosed(check.lockWhy);
         stop(RecordingStops.Reason.SCREEN_OFF);
     }
 
@@ -712,7 +747,7 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 车辆信号变了（主线程；录像意图开着时听着）。只看哨兵模式、挡位：车速一停一走不算 —— 等红灯不是停车。
+     * 车辆信号变了（主线程；录像意图开着、留着等自动接回时听着）。只看哨兵模式、挡位：车速一停一走不算 —— 等红灯不是停车。
      * 熄屏期间接着录的（不是唤醒锁拉着的那种，{@link ScreenOffPlan#rejudgesOnVehicleChange}）照熄屏那张表再判一次。
      */
     private void onVehicleChanged() {
@@ -736,12 +771,13 @@ public final class RecordingCoordinator {
     }
 
     /**
-     * 录像意图开着时向车辆信号登记（主线程；开录、停录时对一遍）：熄屏那一刻照哨兵模式、挡位、车速判
-     * （{@link ScreenOffPlan#atScreenOff}），没人登记时这些都读不到。在等开录（等 U 盘、等上一次收拾完）的不登记 ——
-     * 以前等着的时候也登记，等 U 盘时 GPS 一直开着（大纲 §1）。
+     * 录像意图开着、或者判了自动接回留着等的时候（{@link #isRecordingOrResuming}）向车辆信号登记（主线程；开录、停录、
+     * 不等自动接回了时对一遍）：熄屏那一刻照哨兵模式、挡位、车速判（{@link ScreenOffPlan#atScreenOff}），没人登记时这些都读不到 ——
+     * 存储一停就注销的话，接回之前熄屏一律判成车机要睡，开车、哨兵模式开着时也停（审查 2026-10-11，大纲 §7 第 8 问）。
+     * 别的在等开录的（等 U 盘、等上一次收拾完）不登记 —— 以前等着的时候也登记，等 U 盘时 GPS 一直开着（大纲 §1）。
      */
     private void watchVehicle() {
-        boolean want = isRecording();
+        boolean want = isRecordingOrResuming();
         if (want == watchingVehicle) {
             return;
         }
@@ -847,6 +883,14 @@ public final class RecordingCoordinator {
 
     /** 真正去开：先查盘。查盘在存储线程上，查完回主线程接着开。 */
     private void start(Why why) {
+        // 上一次查盘到点还没回来（盘掉线时探测卡在存储线程上，后面排着的也回不来）：判了自动接回时留着的相机、车辆信号、
+        // 唤醒锁不跟着一直拿着 —— 放掉，「要录」留着、接着等（审查 2026-10-11）。熄屏中照表把等的也停了，就不再查
+        if (resumeHold.checkStuck(checkSentAtMs, android.os.SystemClock.elapsedRealtime())) {
+            dropResumeHold("check-stuck");
+            if (pending == null) {
+                return;
+            }
+        }
         // 录哪几路 = 配置里启用了哪几路。这两件事本来就是同一件：关掉的相机不开、不录、不占流
         Set<String> cameras = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context);
         if (cameras.isEmpty()) {
@@ -856,7 +900,13 @@ public final class RecordingCoordinator {
         // 查盘是异步的：查完回来就接着开（或者拒了再等）。万一一直不回来，到点再看一次，别一直等下去
         main.removeCallbacks(poll);
         main.postDelayed(poll, REFUSED_RETRY_MS);
-        StorageState.refresh(context, "start", snapshot -> startWith(snapshot, cameras, why, true));
+        if (checkSentAtMs == 0) {
+            checkSentAtMs = android.os.SystemClock.elapsedRealtime();
+        }
+        StorageState.refresh(context, "start", snapshot -> {
+            checkSentAtMs = 0;
+            startWith(snapshot, cameras, why, true);
+        });
     }
 
     /**
@@ -892,6 +942,8 @@ public final class RecordingCoordinator {
         lifecycle.begin();
         pending = null;
         main.removeCallbacks(poll);
+        // 判了自动接回时留着的几样（相机、车辆信号、唤醒锁）从这里起是这一次录像的：下面再登记一遍无害，什么都不放
+        resumeHold.finish();
         attemptManager = manager;
         startedAtMs = android.os.SystemClock.elapsedRealtime();
         startedOnFallback = storage.sdFellBack;
@@ -969,12 +1021,16 @@ public final class RecordingCoordinator {
         return false;
     }
 
-    /** 条件不满足：告诉界面，然后留在「要录」的状态里，过一会儿再看（U 盘插上、盘清出来了都算）。 */
+    /**
+     * 条件不满足：告诉界面，然后留在「要录」的状态里，过一会儿再看（U 盘插上、盘清出来了都算）。
+     * 自动接回查过盘被拒了，就是确定这一次不接了：之后是等，等的不登记 —— 留着的几样放掉（{@link #dropResumeHold}）。
+     */
     private void refused(Why why, String reason) {
         notifyRefused(reason);
         pending = why;
         main.removeCallbacks(poll);
         main.postDelayed(poll, REFUSED_RETRY_MS);
+        dropResumeHold("refused");
     }
 
     // ================================================================= 停
@@ -983,6 +1039,7 @@ public final class RecordingCoordinator {
      * 停。停的人说清原因；接不接、什么时候接，这里判。主线程调。
      *
      * <p>人停的、退出的：不再等。熄屏停的：等亮屏（{@link #screenOn}），接不接熄屏那一刻照表定好了。
+     * 这两种停在等自动接回的那一段里，留着的几样一起放（{@link #cancelPending}）。
      * 写不进、没写进、开录失败、录制器自己停了（存储一类）：收拾完、查过盘就自动接回，有额度。
      * 盘满：接回去也录不下，不接。摄像头被拿走、断开不是停，不会走到这里。</p>
      */
@@ -1016,6 +1073,15 @@ public final class RecordingCoordinator {
      * <p>以前停录先问相机层在不在录，一路都没起来时它说没有，于是通知、悬浮按钮、唤醒锁都没人收，
      * 也不接回（2026-10-05）。现在不问：这里说在录就收，相机层按同一套收拾（开录走到哪一步都一样），
      * 收拾完了报上来（{@link #settled}）才开下一次。</p>
+     *
+     * <p>判了自动接回的（存储一类）：「录像要用相机」、车辆信号、熄屏录制的唤醒锁都留着（{@link RecordingStops.ResumeHold}，
+     * 大纲 §7 第 8 问，项目所有者 2026-10-11「留」）—— 相机不放、停放的录制器留在会话里，接回开录时直接加入，存储停不动通道；
+     * 接回之前熄屏，那张表照样读得到哨兵模式、挡位，锁拉着车机的照样拉着。接回开录了交给那一次录像（{@link #startWith}），
+     * 确定不接了才放（{@link #dropResumeHold}）。以前停的那一下全放：熄屏时调度当场按次序关相机、接回时再开一轮，
+     * 中间几秒到几十秒没录；接回之前熄屏一律判成车机要睡；锁一放车机几秒就睡。</p>
+     *
+     * <p>不接回的（人停的、盘满、额度用完……）当场放；熄屏录制的唤醒锁和不接了的那一次走同一条路（{@link #letLockGo}）：
+     * 屏幕黑着、锁正拉着车机的先照熄屏那张表重判，车机要睡的锁留到相机按次序关完。</p>
      */
     private void end(RecordingStops.Reason reason) {
         long now = android.os.SystemClock.elapsedRealtime();
@@ -1027,8 +1093,6 @@ public final class RecordingCoordinator {
         }
         main.removeCallbacks(stopDeadline);
         main.postDelayed(stopDeadline, RecordingLifecycle.STOP_DEADLINE_MS);
-        // 熄屏录制的唤醒锁只在录像期间拿（规格 §3.1）；到点判了「现在停」的那一次留到相机关完再放
-        ScreenOffRecording.onRecordingStopped();
 
         long lasted = startedAtMs > 0 ? now - startedAtMs : 0;
         account(now);
@@ -1045,18 +1109,25 @@ public final class RecordingCoordinator {
         AppLog.d(TAG, "录制已停止（" + reason + "）");
 
         boolean willResume = resumeAfter(reason);
+        // 判了自动接回：录像要的几样留到接回开录、或者确定不接了
+        resumeHold.onStopped(willResume);
         // 不接回、也没别人在等：这一次连同「要录」都到头了
         boolean letGo = !willResume && pending == null;
         if (letGo) {
             settleWanted(reason);
+        }
+        if (!willResume) {
+            // 熄屏录制的唤醒锁只在录像期间拿（规格 §3.1）：屏幕黑着、锁正拉着车机的先照熄屏那张表重判再放（车辆信号还登记着）
+            letLockGo(DarkCheck.ENDED);
         }
         watchVehicle();
         // 停录的次序：「这一趟要录」留不留 → 前台服务 → 放开相机。等着接回（这一趟要录）时前台服务留着 ——
         // 亮屏后从后台开相机要有它；不接了、开机自启动又关着的先停服务再放相机：调度看到没有前台服务，
         // 没人要的相机当场按次序关，不在后台拿着相机保持 30 秒
         CameraForegroundService.stop(context);
-        // 「录像要用相机」只在录像意图开着时登记：自动接回的那一次开录时再登记（相机关着的照样带着录像输出开）
-        CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
+        if (!willResume) {
+            CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
+        }
         pushView();
         for (Listener listener : new ArrayList<>(listeners)) {
             listener.onRecordingStopped(reason, lasted, willResume);
@@ -1104,9 +1175,53 @@ public final class RecordingCoordinator {
             return false;
         }
         BlackBox.noteImportant("录像被打断（" + reason + "）：收拾完、查过盘就自动接回（已试 "
-                + budget.attempts() + " 次）");
+                + budget.attempts() + " 次）；相机、车辆信号留着等接回");
         request(Why.RESUME);
         return true;
+    }
+
+    /**
+     * 不接了（主线程）：人停了、退出了、熄屏照表停了（{@link #cancelPending}），自动接回查过盘被拒了（{@link #refused}），
+     * 接回前的查盘卡住了（{@link #start}）—— 判了自动接回时留着的几样放掉（{@link RecordingStops.ResumeHold}，大纲 §7 第 8 问）。
+     * 没留着什么都不做，叫几次都一样。
+     *
+     * <p>次序和停录一样：「这一趟要录」留不留、前台服务（调用方已经定了）→ 唤醒锁（{@link #letLockGo}：屏幕黑着、锁正拉着车机的
+     * 先照熄屏那张表重判）→ 车辆信号 → 放开相机。先不算留着，再判：锁不算拉着车机了。</p>
+     *
+     * @param why 为什么不接了（ASCII，进黑匣子）
+     */
+    private void dropResumeHold(String why) {
+        if (!resumeHold.finish()) {
+            return;
+        }
+        BlackBox.noteImportant("不等自动接回了（" + why + "）：留着的相机、车辆信号放开");
+        letLockGo(DarkCheck.RESUME_DROPPED);
+        watchVehicle();
+        CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
+    }
+
+    /**
+     * 录像要的几样放了（录像停了、不接回 {@link #end}；不等自动接回了 {@link #dropResumeHold}）：熄屏录制的唤醒锁怎么放 ——
+     * 两处同一条路（审查 2026-10-11；以前录像停了不接回就当场放，不经熄屏那张表）。
+     *
+     * <p>屏幕黑着、锁正拉着车机（{@link RecordingStops#rejudgesBeforeLockGoes}）：锁一放车机几秒就睡，先照熄屏那张表重判
+     * （锁不算拉着了，和到点那一次一样，{@link #lockTimedOut}）—— 车机要睡的写下「车机要睡」、停掉还在等的，
+     * 锁留到相机按次序关完再放；车机醒着的锁当场放。别的当场放，已经在等相机关完的那一次留到关完。
+     * 「拉着」看的是锁本身（{@link ScreenOffRecording#pullsCarAwake}），不是时限：时限刚过、到点那一下还没轮到主线程时，
+     * 锁还拉着车机。</p>
+     *
+     * <p>调用方在放车辆信号、「录像要用相机」之前叫：重判要读得到哨兵模式、挡位，「车机要睡」要先于放 RECORDING 写下
+     * （调度当场置「正在按次序关」，放锁之前要读它）。</p>
+     */
+    private void letLockGo(DarkCheck check) {
+        if (RecordingStops.rejudgesBeforeLockGoes(ScreenState.dark(), ScreenOffRecording.pullsCarAwake())) {
+            // 判成现在停的：stopForScreenOff 让锁等相机按次序关完再放；还在等的停掉时又叫到 dropResumeHold，那时已经不留着了
+            if (decideWhileDark(check) != ScreenOffPlan.Action.STOP_NOW) {
+                ScreenOffRecording.release(check.lockWhy);
+            }
+        } else {
+            ScreenOffRecording.onRecordingStopped(check.lockWhy);
+        }
     }
 
     /**

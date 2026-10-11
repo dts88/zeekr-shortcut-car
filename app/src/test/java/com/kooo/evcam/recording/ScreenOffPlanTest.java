@@ -343,4 +343,23 @@ public class ScreenOffPlanTest {
             }
         }
     }
+
+    /**
+     * 存储一类停了、等自动接回的那一段里熄屏（大纲 §7 第 8 问）：车辆信号还登记着，照在录时那样判 —— 在开车、哨兵模式开着时
+     * 熄屏持续录制开着就接着录（接回照常开）；哨兵模式没开、停在 P 挡才现在停。以前这一段注销了车辆信号，哨兵模式、挡位、
+     * 车速都读不到，一律判成车机要睡、当场停掉接回（审查 2026-10-11）。
+     */
+    @Test
+    public void aResumeWaitingAfterAStorageStopIsJudgedFromTheCar() {
+        for (boolean autoRecord : BOTH) {
+            assertEquals("D 挡、哨兵模式读成 0", ScreenOffPlan.Action.CONTINUE,
+                    action(true, false, autoRecord, 0, ScreenOffPlan.driving("D", 0f)));
+            assertEquals("P 挡、哨兵模式开着", ScreenOffPlan.Action.CONTINUE,
+                    action(true, false, autoRecord, 1, ScreenOffPlan.driving("P", 0f)));
+            assertEquals("P 挡、哨兵模式关", ScreenOffPlan.Action.STOP_NOW,
+                    action(true, false, autoRecord, 0, ScreenOffPlan.driving("P", 0f)));
+            assertEquals("车辆信号注销了：都读不到", ScreenOffPlan.Action.STOP_NOW,
+                    action(true, false, autoRecord, null, ScreenOffPlan.driving(null, null)));
+        }
+    }
 }
