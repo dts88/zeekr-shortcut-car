@@ -6,6 +6,8 @@ import android.os.HandlerThread;
 import android.os.SystemClock;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.blackbox.ChangeTracker;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -45,6 +47,10 @@ import java.util.Set;
  * </ul>
  *
  * <p>信号表在 {@link Signal}；读数进 {@link Readings}，信息条那份快照由 {@link VehicleStateMapper} 推出来。</p>
+ *
+ * <p><b>找黑屏信号，只记录</b>（2026-10-12）：{@link DarkScreenProbes} 那几个信号表里没有的号跟着一起订、对账时一起读
+ * （它们的可用状态回调也记），连同信号表里的点火、挡位、哨兵、主驾门 / 座椅 / 安全带，每变一次进黑匣子一行（{@link #probeLog}）。
+ * 不进读数、不进信息条、不改任何判断，出了错也只写日志；来源停了就不记。</p>
  */
 final class EcarxSource {
 
@@ -98,6 +104,18 @@ final class EcarxSource {
     private Method getSensorLatestValue;
     private Object functionWatcher;
     private int[] functionIds = new int[0];
+
+    /**
+     * 找黑屏信号的那几项（{@link DarkScreenProbes}）：上一个值和限量。只在自己的线程上碰。
+     * 一次处理（一个回调、一遍对账）里变了的攒在 {@link #probeChanges}，处理完写成一行（{@link #writeProbeChanges}）。
+     */
+    private final ChangeTracker probeLog =
+            new ChangeTracker(DarkScreenProbes.MAX_LINES_PER_WINDOW, DarkScreenProbes.WINDOW_MS);
+    private final List<String> probeChanges = new ArrayList<>();
+    /** 起点那一行记过了：之前的（注册后读的第一遍）是起点，不算变化。 */
+    private boolean probesStarted;
+    /** 记录出过错、日志写过了（只写一次，{@link #probeFailed}）。 */
+    private boolean probeFailureLogged;
 
     private final Runnable floatPoll = this::pollFloats;
     private final Runnable reconcile = this::reconcileDiscrete;
@@ -287,6 +305,10 @@ final class EcarxSource {
                 ids.add(s.id);
             }
         }
+        // 2026-10-12 只加记录：找黑屏信号的那几个号一起订上；它们不在信号表里，回调到了只进黑匣子（onFunctionValue）
+        for (int id : DarkScreenProbes.IDS) {
+            ids.add(id);
+        }
         functionIds = new int[ids.size()];
         int i = 0;
         for (Integer id : ids) {
@@ -384,6 +406,18 @@ final class EcarxSource {
                 }
                 return null;
             }
+            // 2026-10-12 只加记录：找黑屏信号那几个号的「可用状态」也记（Lab §2.39：熄屏 / 上下电前后屏幕电源事件 0 → 1 → 0，
+            // 同一刻电源开关的可用状态 active ↔ notactive）。别的号的不管；返回值照旧（下面的 proxyDefault）
+            if ("onSupportedFunctionStatusChanged".equals(method.getName()) && args != null && args.length >= 2
+                    && args[0] instanceof Integer && DarkScreenProbes.indexOf((Integer) args[0]) >= 0) {
+                final int id = (Integer) args[0];
+                final int zone = args.length >= 3 && args[1] instanceof Integer ? (Integer) args[1] : 0;
+                final Object status = args[args.length - 1];
+                Handler h = handler;
+                if (h != null && !stopped) {
+                    h.post(() -> onFunctionStatus(id, zone, status));
+                }
+            }
             return proxyDefault(proxy, method, args, "EcarxSource.FunctionCallback");
         }
     }
@@ -462,6 +496,8 @@ final class EcarxSource {
                 apply(s, value);
             }
         }
+        probeFunction(id, zone, value);
+        writeProbeChanges(false);
     }
 
     private void onSensor(Signal.Kind kind, int type, Object value) {
@@ -471,6 +507,7 @@ final class EcarxSource {
                 apply(s, value);
             }
         }
+        writeProbeChanges(false);
     }
 
     /** 归一、比对、有变化才记；发布合并在一个小窗口里。 */
@@ -486,6 +523,7 @@ final class EcarxSource {
         } else {
             values.put(s, decoded);
         }
+        probeSignal(s, decoded);
         schedulePublish(0);
         long hold = VehicleStateMapper.republishAfterMs(s);
         if (hold > 0) {
@@ -546,6 +584,7 @@ final class EcarxSource {
             apply(s, read(s));
         }
         schedulePublish(0);
+        startProbes();
     }
 
     private void reconcileDiscrete() {
@@ -557,6 +596,7 @@ final class EcarxSource {
                 apply(s, read(s));
             }
         }
+        reconcileProbes();
         Handler h = handler;
         if (h != null) {
             h.postDelayed(reconcile, RECONCILE_MS);
@@ -595,6 +635,165 @@ final class EcarxSource {
             }
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    // ================================================================= 找黑屏信号：只记录（2026-10-12，都在自己的线程上）
+    //
+    // 从原来的流程里调进来的几处（startProbes、probeFunction、probeSignal、writeProbeChanges、reconcileProbes、
+    // onFunctionStatus）各自兜住异常、只写一次日志（probeFailed）：记录出了错，连接、对账的重排、回调线程都不能跟着出事。
+
+    /** 注册后读的第一遍当起点：记一行每一项此刻的值，之后只记变化。 */
+    private void startProbes() {
+        try {
+            StringBuilder line = new StringBuilder();
+            for (int i = 0; i < DarkScreenProbes.IDS.length; i++) {
+                String v = DarkScreenProbes.raw(readFunction(DarkScreenProbes.IDS[i]));
+                probeLog.seed(DarkScreenProbes.NAMES[i], v);
+                if (line.length() > 0) {
+                    line.append(' ');
+                }
+                line.append(DarkScreenProbes.NAMES[i]).append('=').append(v);
+            }
+            for (Signal s : DarkScreenProbes.WATCHED) {
+                String v = DarkScreenProbes.text(s, values.get(s));
+                probeLog.seed(DarkScreenProbes.key(s), v);
+                line.append(' ').append(DarkScreenProbes.key(s)).append('=').append(v);
+            }
+            probesStarted = true;
+            BlackBox.note("车辆信号起点：" + line);
+        } catch (RuntimeException e) {
+            probeFailed("start", e);
+        }
+    }
+
+    /** 功能号的回调：是要记的号就记它的原值（区域不是 0 的单独一项，{@link DarkScreenProbes#name}）。 */
+    private void probeFunction(int id, int zone, Object value) {
+        try {
+            int probe = DarkScreenProbes.indexOf(id);
+            if (probe >= 0) {
+                probeChanged(DarkScreenProbes.name(probe, zone), DarkScreenProbes.raw(value));
+            }
+        } catch (RuntimeException e) {
+            probeFailed("function", e);
+        }
+    }
+
+    /** 信号表里的一项变了（{@link #apply}）：是跟着记的那几项就记它解出来的值。 */
+    private void probeSignal(Signal s, Object decoded) {
+        try {
+            if (DarkScreenProbes.watches(s)) {
+                probeChanged(DarkScreenProbes.key(s), DarkScreenProbes.text(s, decoded));
+            }
+        } catch (RuntimeException e) {
+            probeFailed("signal", e);
+        }
+    }
+
+    /** 那几个号的可用状态变了（回调 {@code onSupportedFunctionStatusChanged}）：和值分开，一项「名字.status」。 */
+    private void onFunctionStatus(int id, int zone, Object status) {
+        try {
+            int probe = DarkScreenProbes.indexOf(id);
+            if (probe >= 0) {
+                probeChanged(DarkScreenProbes.name(probe, zone) + DarkScreenProbes.STATUS, DarkScreenProbes.status(status));
+            }
+        } catch (RuntimeException e) {
+            probeFailed("status", e);
+        }
+        writeProbeChanges(false);
+    }
+
+    /** 对账那一遍里（信号表那几项已经在 {@link #apply} 里攒上了）：读那几个号、写成一行、补记压下过的。 */
+    private void reconcileProbes() {
+        try {
+            readProbes();
+            writeProbeChanges(true);
+            noteProbeOverflow();
+        } catch (RuntimeException e) {
+            probeFailed("reconcile", e);
+        }
+    }
+
+    /**
+     * 对账时那几个号也直接读一遍：回调漏了、车机服务重启后回调断了，靠它补上（那一行带「对账时读到」）。
+     * 读不到的跳过，不记成「?」：不然读不了的车上它会和回调来回跳。
+     */
+    private void readProbes() {
+        for (int i = 0; i < DarkScreenProbes.IDS.length; i++) {
+            Object raw = readFunction(DarkScreenProbes.IDS[i]);
+            if (raw != null) {
+                probeChanged(DarkScreenProbes.NAMES[i], DarkScreenProbes.raw(raw));
+            }
+        }
+    }
+
+    /** 一项读到一个值：变了（没超量）就攒进这一次处理的那一行。起点之前读到的不算变化。 */
+    private void probeChanged(String name, String value) {
+        if (!probesStarted) {
+            return;
+        }
+        String change = probeLog.change(name, value, SystemClock.elapsedRealtime());
+        if (change != null) {
+            probeChanges.add(name + " " + change);
+        }
+    }
+
+    /**
+     * 这一次处理（一个回调、一遍对账）里变了的写成一行：「车辆信号：screen_power_event 0 → 1；gear P → D」。
+     * 对账读到的标出来：回调没来，实际变化最多可能早一个对账间隔（{@link #RECONCILE_MS}）。
+     */
+    private void writeProbeChanges(boolean reconciled) {
+        if (probeChanges.isEmpty()) {
+            return;
+        }
+        try {
+            StringBuilder line = new StringBuilder();
+            for (String change : probeChanges) {
+                if (line.length() > 0) {
+                    line.append('；');
+                }
+                line.append(change);
+            }
+            probeChanges.clear();
+            BlackBox.noteImportant("车辆信号：" + line
+                    + (reconciled ? "（对账时读到，实际可能早到 " + (RECONCILE_MS / 1000) + " 秒）" : ""));
+        } catch (RuntimeException e) {
+            probeChanges.clear();
+            probeFailed("write", e);
+        }
+    }
+
+    /**
+     * 超量压下过的项，窗口过了补一行：最后停在了哪个值（{@link ChangeTracker#drain}）。
+     * 这一行写下的时刻不是变化的时刻，单独一行、标「限量后补记」。
+     */
+    private void noteProbeOverflow() {
+        StringBuilder line = new StringBuilder();
+        for (Map.Entry<String, String> item : probeLog.drain(SystemClock.elapsedRealtime()).entrySet()) {
+            if (line.length() > 0) {
+                line.append('；');
+            }
+            line.append(item.getKey()).append(' ').append(item.getValue());
+        }
+        if (line.length() > 0) {
+            BlackBox.note("车辆信号（限量后补记，时刻不是变化的时刻）：" + line);
+        }
+    }
+
+    /** 不在信号表里的功能号直接读一次；读不到返回 null。 */
+    private Object readFunction(int id) {
+        try {
+            return getFunctionValue == null ? null : getFunctionValue.invoke(function, id);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** 记录出了错：只写一次日志，别的什么都不动（这次是只加记录，不能因为它改了原来的流程）。 */
+    private void probeFailed(String where, RuntimeException e) {
+        if (!probeFailureLogged) {
+            probeFailureLogged = true;
+            AppLog.w(TAG, "dark-screen probe " + where + " failed (logged once): " + describe(e));
         }
     }
 

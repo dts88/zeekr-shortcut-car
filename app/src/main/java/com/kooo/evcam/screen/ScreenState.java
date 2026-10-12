@@ -101,6 +101,8 @@ public final class ScreenState {
             MAIN.postDelayed(WAKE_POLL, WAKE_POLL_MS);
         }
         AppLog.i(TAG, "installed, dark=" + dark);
+        // 2026-10-12 只加记录：每块显示屏的状态变了进黑匣子（找「车机把屏幕真的黑掉」对应哪个信号），谁也不听它
+        DisplayWatch.install(app);
     }
 
     /** 记下来的状态：黑着 = 收到过熄屏、还没亮。要最新的用 {@link #refresh()}。 */
@@ -177,6 +179,8 @@ public final class ScreenState {
         }
         MAIN.removeCallbacks(WAKE_POLL);
         MAIN.postDelayed(WAKE_POLL, WAKE_POLL_MS);
+        // 2026-10-12 只加记录：熄屏这一刻每块屏是什么状态（DisplayWatch）。放在最后，不耽误上面赶在下电前的那几步
+        BlackBox.note("熄屏时显示屏：" + DisplayWatch.describeNow() + "；可交互=" + (DisplayWatch.interactiveNow() ? "是" : "否"));
     }
 
     private static void screenOn(String how) {
@@ -196,6 +200,8 @@ public final class ScreenState {
         for (Listener listener : new ArrayList<>(LISTENERS)) {
             listener.onScreenOn();
         }
+        // 2026-10-12 只加记录：亮屏这一刻每块屏是什么状态（DisplayWatch）
+        BlackBox.note("亮屏时显示屏：" + DisplayWatch.describeNow() + "；可交互=" + (DisplayWatch.interactiveNow() ? "是" : "否"));
     }
 
     private static boolean interactive(Context context) {
