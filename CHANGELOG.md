@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.1-beta] - 2026-10-12
+
+### New and improved
+
+- Version name is 2.11.1-beta, so Check updates can offer this build. Version code is 311, so it installs over 2.11.0-alpha.
+
+## [2.11.1-alpha] - 2026-10-12
+
+- Diagnostics: the black box records each display's on/off state and the vehicle's screen, power, gear, Sentry Mode, driver door, seat and belt signals when they change.
+
 ## [2.11.0-alpha] - 2026-10-12
 
 - Version name matches upstream 2.11.0-alpha. Version code is 310, so this fork still installs over the previous builds.
