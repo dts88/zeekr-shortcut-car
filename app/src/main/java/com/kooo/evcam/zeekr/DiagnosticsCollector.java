@@ -17,6 +17,12 @@ import android.view.Display;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.StorageHelper;
+import com.kooo.evcam.screen.DisplayWatch;
+import com.kooo.evcam.screen.ScreenState;
+import com.kooo.evcam.screen.VehicleScreen;
+import com.kooo.evcam.telemetry.Readings;
+import com.kooo.evcam.telemetry.Signal;
+import com.kooo.evcam.telemetry.Telemetry;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -72,9 +78,11 @@ public final class DiagnosticsCollector {
         timings.run("stall watch", () -> appendStallWatch(sb, context));
         timings.run("multi mapping", () -> appendMultiMapping(sb, context));
         timings.run("displays", () -> appendDisplays(sb, context));
+        timings.run("screen", () -> appendScreen(sb));
         timings.run("black box", () -> appendBlackBox(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
+        timings.run("vehicle signals", () -> appendVehicleSignals(sb));
         timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
         timings.run("share", () -> com.kooo.evcam.share.ShareDiagnostics.appendTo(sb, context));
         timings.run("recordings", () -> RecentRecordings.appendTo(sb, context));
@@ -492,7 +500,11 @@ public final class DiagnosticsCollector {
     }
 
     /**
-     * 副屏：决定「推送到副屏」这个功能有没有可能。
+     * 副屏：决定「推送到副屏」这个功能有没有可能。每块屏的状态写名字（ON / OFF / DOZE……，{@link DisplayWatch#stateName}），
+     * 不写系统给的数字，和黑匣子里「显示屏：…」那几行对得上。
+     *
+     * <p>这台 7X 上安卓的显示屏状态、可交互只在车机下电时才变（2026-10-12）：车主走开、中控屏真黑了，这里还写 ON、可交互。
+     * 屏幕真黑没黑看下一节「3.1 熄屏」。</p>
      */
     private static void appendDisplays(StringBuilder sb, Context context) {
         sb.append("## 3. 显示屏").append('\n');
@@ -513,15 +525,178 @@ public final class DiagnosticsCollector {
             sb.append("  [id=").append(d.getDisplayId()).append("] ")
                     .append(d.getName())
                     .append("  ").append(size.x).append('x').append(size.y)
-                    .append("  state=").append(d.getState())
+                    .append("  state=").append(DisplayWatch.stateName(d.getState()))
                     .append('\n');
         }
+        sb.append("可交互（isInteractive）: ").append(DisplayWatch.interactiveNow() ? "是" : "否").append('\n');
         if (displays.length <= 1) {
             sb.append(">> 只有一块屏，副屏推送不可用").append('\n');
         } else {
             sb.append(">> 检测到多块屏，副屏推送有可能实现").append('\n');
         }
+        sb.append(">> 这台车上安卓的显示屏状态、可交互只在车机下电时才变；屏幕真黑没黑看 3.1").append('\n');
         sb.append('\n');
+    }
+
+    // ------------------------------------------------------------------ 熄屏（物理屏幕）、车辆信号
+
+    /**
+     * 熄屏（物理屏幕）：此刻屏幕真黑没黑、谁判的、从什么时候起；判断用的两项车辆信号和车辆接口；安卓那一半；车机要睡没有。
+     *
+     * <h3>为什么要这一节（熄屏 v3，项目所有者 2026-10-12 D1、D4）</h3>
+     *
+     * <p>「熄屏」跟着屏幕真黑走：安卓熄屏，或者车辆说黑（{@link VehicleScreen}）。这台车上安卓只在车机下电时才熄屏，
+     * 车主走开后中控屏黑了四到六分钟（哨兵模式开着时一直）安卓还说亮着 —— 只看上面「显示屏」那一节，这一段在报告里看不见；
+     * 座舱这时已经放开、环视照表接着录，导出时屏幕是哪一种黑、谁判的，这里一眼看得到。</p>
+     *
+     * <p>读的是 {@link ScreenState#describeNow} 一次取齐的那一份；文字在这里写（ScreenState 里不放中文，设计 v3.1 C20）。只读。</p>
+     */
+    private static void appendScreen(StringBuilder sb) {
+        sb.append("## 3.1 熄屏（物理屏幕）").append('\n');
+        try {
+            ScreenState.Now n = ScreenState.describeNow();
+            long wallNow = System.currentTimeMillis();
+            sb.append("此刻: ").append(n.dark ? "熄屏（" + darkText(n.source, n.darkForMs) + "）" : "亮屏")
+                    .append(n.dark && n.darkForMs >= 0 ? "，" + clock(wallNow - n.darkForMs) + " 起" : "")
+                    .append('\n');
+            sb.append("屏幕此刻: ").append(n.known ? "知道"
+                    : n.wakePending ? "不知道 —— 安卓刚亮，在等醒来那一遍车辆信号（等到之前只按安卓熄屏算）"
+                    : "不知道 —— 进程刚起来，在等第一份车辆判断（恢复、接回录像排着等）").append('\n');
+            sb.append("车辆判断（判断用着的）: ").append(verdictText(n.vehicle)).append('\n');
+            sb.append("  screen_power_event=").append(eventText(n.screenPowerEvent))
+                    .append("，点火=").append(ignitionText(n.ignition))
+                    .append(" → 此刻读数判下来: ").append(verdictText(VehicleScreen.verdict(n.screenPowerEvent, n.ignition)))
+                    .append('\n');
+            sb.append("  车辆接口: ").append(linkText(n.carLink)).append('\n');
+            sb.append("安卓: 可交互=").append(n.interactive ? "是" : "否")
+                    .append("，判断用的安卓熄屏=").append(n.androidOff ? "是" : "否").append('\n');
+            sb.append("车机要睡（黑着时安卓熄屏）: ").append(!n.dark ? "没有（亮着）"
+                    : !n.androidOff ? "没有（车机醒着：安卓亮着）"
+                    : n.androidOffForMs < 0 ? "安卓熄屏着，起点不明（进程起来时就熄屏着）"
+                    : clock(wallNow - n.androidOffForMs) + " 起，" + duration(n.androidOffForMs) + "前"
+                    + (n.wakePending ? "；安卓刚又亮了，在等车辆信号" : "")).append('\n');
+            sb.append("说明: 熄屏 = 安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
+                    .append("只读得到一项看那一项，都读不到只看安卓）。时刻是墙上时钟，多久前含深睡").append('\n');
+        } catch (RuntimeException e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * 车辆信号（导出这一刻）：车辆接口连没连上、谁登记着，熄屏判断和熄屏那张表看的几项读数。
+     *
+     * <p>熄屏 v3 起车辆信号进程活着一直在读离散信号（核心，熄屏判断登记的）；录像的信息条、「系统信息」页这些完整用户另外开浮点
+     * 传感器和定位（设计 v3 §2）。以前报告里一项车辆读数都没有：熄屏那张表为什么那样判、屏幕黑没黑，只能翻黑匣子。</p>
+     *
+     * <p>只读：不登记、不叫车辆接口读一遍，读的是 {@link Telemetry} 此刻那一份快照。车速是浮点传感器，没有完整用户时不读，
+     * 写「没在读」—— 不是读不到。</p>
+     */
+    private static void appendVehicleSignals(StringBuilder sb) {
+        sb.append("## 6.2 车辆信号（导出这一刻）").append('\n');
+        try {
+            Telemetry telemetry = Telemetry.get();
+            String detail = telemetry.carDetail();
+            sb.append("  车辆接口: ").append(linkText(telemetry.carLink()))
+                    .append(detail == null ? "" : "（" + detail + "）").append('\n');
+            List<String> full = telemetry.fullUsers();
+            sb.append("  登记: 核心").append(telemetry.coreKept() ? "在（熄屏判断：离散信号一直在读）" : "不在")
+                    .append("；完整 ").append(full.isEmpty() ? "没有（浮点传感器、定位没在读）"
+                            : full + "（浮点传感器、定位在读）").append('\n');
+            Readings r = telemetry.readings();
+            sb.append("  读数: 第 ").append(r.version).append(" 份，有数据的信号 ").append(r.knownCount()).append(" 个")
+                    .append('\n');
+            sb.append("  点火: ").append(ignitionText(r.code(Signal.IGNITION))).append('\n');
+            sb.append("  screen_power_event: ").append(eventText(r.bool(Signal.SCREEN_POWER_EVENT))).append('\n');
+            sb.append("  哨兵模式: ").append(sentryText(r.code(Signal.SENTRY_MODE))).append('\n');
+            String gear = r.text(Signal.GEAR);
+            sb.append("  挡位: ").append(gear == null ? "读不到" : gear).append('\n');
+            Float speed = r.number(Signal.SPEED);
+            sb.append("  车速: ").append(full.isEmpty() ? "没在读（没有完整用户，浮点传感器不读）"
+                    : speed == null ? "读不到" : String.format(Locale.US, "%.1f km/h", speed)).append('\n');
+        } catch (RuntimeException e) {
+            sb.append("  !! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * 这一次熄屏谁判的、从什么时候起，括号里的那一段：「车辆信号，12 分 3 秒前起」「安卓熄屏，进程起来时就黑着，起点不明」。
+     * 报告「3.1 熄屏」和通道调度那一节（{@code MultiCameraManager.describeChannel} 的登记表那一行）都用它，两处写法一样。
+     *
+     * @param source    {@link ScreenState.Now#source}
+     * @param darkForMs {@link ScreenState.Now#darkForMs}：-1 是不知道什么时候黑的
+     */
+    public static String darkText(ScreenState.Source source, long darkForMs) {
+        String who = source == ScreenState.Source.ANDROID ? "安卓熄屏" : source == null ? "?" : "车辆信号";
+        if (darkForMs < 0) {
+            return who + "，进程起来时就黑着，起点不明";
+        }
+        // 读到时已经黑着（进程刚起来、或者之前读不到）：记下的是读到的那一刻，不是黑的那一刻
+        return who + "，" + duration(darkForMs) + "前"
+                + (source == ScreenState.Source.VEHICLE_READ ? "读到时已经黑着，起点不明" : "起");
+    }
+
+    /** 车辆的判断：黑 / 亮 / 说不上来（只看安卓）。 */
+    static String verdictText(Boolean verdict) {
+        return verdict == null ? "说不上来（只看安卓）" : verdict ? "黑" : "亮";
+    }
+
+    /** 屏幕电源事件：原值和意思，「1（黑）」「0（亮）」；读不到（255、没读过）是「读不到」。 */
+    static String eventText(Boolean event) {
+        return event == null ? "读不到" : VehicleScreen.eventText(event) + (event ? "（黑）" : "（亮）");
+    }
+
+    /** 点火：名字和原值（「ACC（0x00200104）」），没名字的只写原值（「0x00200102」），读不到「读不到」。 */
+    static String ignitionText(Integer ignition) {
+        if (ignition == null) {
+            return "读不到";
+        }
+        String name = VehicleScreen.ignitionText(ignition);
+        String raw = String.format(Locale.US, "0x%08X", ignition);
+        return name.equals(raw) || name.equals(String.valueOf(ignition)) ? name : name + "（" + raw + "）";
+    }
+
+    /** 哨兵模式：0 关、1 开、2 布防（{@code Signal.Format.SENTRY}），带原值。 */
+    static String sentryText(Integer sentry) {
+        if (sentry == null) {
+            return "读不到";
+        }
+        return (sentry == 0 ? "关" : sentry == 1 ? "开" : "布防") + "（" + sentry + "）";
+    }
+
+    /** 车辆接口此刻的结果。 */
+    static String linkText(Telemetry.CarLink link) {
+        if (link == null) {
+            return "没人登记（核心还没登记，熄屏只看安卓）";
+        }
+        switch (link) {
+            case CONNECTED:
+                return "接上了";
+            case CONNECTING:
+                return "在连（熄屏先只看安卓）";
+            case UNAVAILABLE:
+                return "这台车机没有这套接口（熄屏只看安卓，不再试）";
+            default:
+                return "连不上（熄屏只看安卓；每 " + (Telemetry.RETRY_MS / 60_000L) + " 分钟、安卓亮屏时再试）";
+        }
+    }
+
+    /** 整秒的时长：「31 秒」「12 分 3 秒」「2 小时 5 分」（和通道调度那一节一样的写法）。 */
+    static String duration(long ms) {
+        long s = Math.max(0, ms) / 1000;
+        if (s < 60) {
+            return s + " 秒";
+        }
+        if (s < 3600) {
+            return (s / 60) + " 分 " + (s % 60) + " 秒";
+        }
+        return (s / 3600) + " 小时 " + (s % 3600 / 60) + " 分";
+    }
+
+    /** 墙上时钟「10-12 20:05:46」，和黑匣子每行开头对得上。 */
+    private static String clock(long wallMs) {
+        return new SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(new Date(wallMs));
     }
 
     private static void appendStorage(StringBuilder sb, Context context) {

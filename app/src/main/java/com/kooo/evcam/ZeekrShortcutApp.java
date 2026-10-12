@@ -32,7 +32,8 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
         // U 盘挂上、卸下、异常掉线进黑匣子（2026-09-26 录像盘掉线，系统那边发生了什么一行都没记下）
         com.kooo.evcam.blackbox.VolumeEvents.register(this);
-        // 熄屏录制的唤醒锁活在进程上：熄屏 / 亮屏广播在这里注册，主界面在不在都一样（规格 §3.1）
+        // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），
+        // 主界面在不在都一样（规格 §3.1）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的录像意图先接上
         com.kooo.evcam.screen.ScreenState.install(this);
         // 「这一趟」的录像选择落盘（规格 1.2）：进程被杀又拉回来时还在；车机真正开机就清。
         // 「这一趟要录」变了、人按了停止时写到盘上才返回（commit）：熄屏那一刻改的「这一趟要录」要赶在车机几秒后结束进程之前落盘

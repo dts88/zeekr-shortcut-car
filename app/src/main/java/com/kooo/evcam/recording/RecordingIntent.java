@@ -60,8 +60,8 @@ public final class RecordingIntent {
         /**
          * 这几项一起写。
          *
-         * @param durable true：写到盘上才返回（commit）—— 只给「这一趟要录」变了、人按了停止这两种：哨兵模式没开时车机熄屏
-         *                3–5 秒就把进程结束（2026-10-10），熄屏那一刻改的「这一趟要录」（亮屏接不接）得赶在那之前落盘；
+         * @param durable true：写到盘上才返回（commit）—— 只给「这一趟要录」变了、人按了停止这两种：哨兵模式没开时车机下电
+         *                （安卓熄屏）3–5 秒后就把进程结束（2026-10-10），车机要睡那一刻改的「这一趟要录」（亮屏接不接）得赶在那之前落盘；
          *                这是主线程上唯一一处同步写盘（大纲 §3 线程）。false：排队异步写（apply），别的几项不值得在主线程上等盘
          */
         void put(java.util.Map<String, Boolean> values, boolean durable);

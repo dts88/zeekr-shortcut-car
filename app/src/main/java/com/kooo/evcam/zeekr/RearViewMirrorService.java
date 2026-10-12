@@ -200,7 +200,8 @@ public class RearViewMirrorService extends Service {
      * {@link #bindCamera} 一律拒绝，连用户点「点击恢复」也被拒 —— 那就是「点了没反应」（1.27.0 修）。</p>
      *
      * <p>1.63.0 起这里不再自己记标记、不再自己注册广播：屏幕状态只有 ScreenState 一份，
-     * 黑着的时候它每两秒问系统一次，亮了就当收到了亮屏，按固定顺序叫到这里。</p>
+     * 亮了就按固定顺序叫到这里。熄屏 v3 起「熄屏」是屏幕真黑了（安卓熄屏，或者车辆信号说黑）：车主下车那一下就放开相机，
+     * 开车门亮屏时接回来；车机要睡、车机黑着醒了都还是熄屏，不叫到这里。</p>
      */
     private final com.kooo.evcam.screen.ScreenState.Listener screenListener =
             new com.kooo.evcam.screen.ScreenState.Listener() {
@@ -582,8 +583,8 @@ public class RearViewMirrorService extends Service {
      */
     private void rebindNow(boolean explainIfItFails) {
         if (explainIfItFails && com.kooo.evcam.screen.ScreenState.dark()) {
-            // 人点了，那就是人回来了：记下来的还黑着，就是亮屏还没被察觉（黑着时它每两秒才问一次）。
-            // 让 ScreenState 现在就问 —— 真亮了它会照亮屏的顺序走一遍，其中就有这里的 onScreenOn
+            // 人点了，那就是人回来了：记下来的还黑着，就是亮屏还没被察觉。让 ScreenState 现在就问 —— 安卓那一半现问，
+            // 车辆说黑着的让车辆信号当场读一遍；真亮了它会照亮屏的顺序走一遍，其中就有这里的 onScreenOn
             com.kooo.evcam.blackbox.BlackBox.noteImportant("点了后视镜：接回相机");
             com.kooo.evcam.screen.ScreenState.refresh();
         }

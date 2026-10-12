@@ -31,7 +31,7 @@ import java.util.Map;
  * <h3>整体的样子（{@link #summarize}）</h3>
  *
  * <p>录制键、通知、悬浮按钮照 {@link View} 画：有一路在录是在录；一路都没在录、但有一路在起来，这个意图里还没录起来过是准备中，
- * 录起来过是等待；一路都没在录、也没有一路在起来（都被拿着、在救、停手、现在用不了相机，或者录制器建不起来）是等待，
+ * 录起来过是等待；一路都没在录、也没有一路在起来（都被拿着、在救、停手、现在用不了相机、熄屏放开了，或者录制器建不起来）是等待，
  * 开录时也一样。一个意图里出了准备中，就不再回到准备中。</p>
  *
  * <p>纯 Java，时间由调用方传入，见 {@code RecordingLanesTest}。</p>
@@ -58,7 +58,8 @@ public final class RecordingLanes {
     public enum Recorder {
         /**
          * 还没有：这一路的画面尺寸还没算出来（它不在相机列表里），等它回来再建；会话刚带不上它的录像输出，隔一会儿再声明；
-         * MediaRecorder 模式下相机被拿着、在救、停手、现在用不了相机时也不备（{@link #keepsNamedRecorder}）。
+         * MediaRecorder 模式下相机被拿着、在救、停手、现在用不了相机、熄屏放开时也不备（{@link #keepsNamedRecorder}）；
+         * 编码录制熄屏放开的座舱也不建（亮屏再建，MultiCameraManager.ensureRecorder）。
          */
         NONE,
         /** 在建（编码器、EGL、输入 SurfaceTexture；MediaRecorder 在配、在 prepare）。 */
@@ -95,13 +96,21 @@ public final class RecordingLanes {
          * 其实一时半会儿起不来。
          */
         public final boolean cannotOpen;
+        /**
+         * 这一路被熄屏放开了（ChannelScheduler.releasedByDark：熄屏时座舱谁都不要，项目所有者 2026-10-12 D2）：亮屏之前调度
+         * 不会开它。调度照旧说它「在起来」或者「被拿着」（车机熄屏约 98 秒后拿走后座舱），其实是熄屏让它走的 ——
+         * 不算在起来（不然熄屏时开的录落定不了），不为它备文件名定死了的录制器，状态条不说它被占用。
+         */
+        public final boolean releasedByDark;
         public final Recorder recorder;
 
-        public Facts(String key, State state, ChannelRules.Condition condition, boolean cannotOpen, Recorder recorder) {
+        public Facts(String key, State state, ChannelRules.Condition condition, boolean cannotOpen,
+                     boolean releasedByDark, Recorder recorder) {
             this.key = key;
             this.state = state;
             this.condition = condition;
             this.cannotOpen = cannotOpen;
+            this.releasedByDark = releasedByDark;
             this.recorder = recorder;
         }
     }
@@ -153,7 +162,7 @@ public final class RecordingLanes {
         /** 此刻在录的那几路（{@link State#LIVE}），按开的次序。 */
         public final List<String> liveKeys;
         /**
-         * 开录落定了：每一路都录起来了、或者暂时起不来（被拿着、在救、停手、现在用不了相机、录不了）。
+         * 开录落定了：每一路都录起来了、或者暂时起不来（被拿着、在救、停手、现在用不了相机、熄屏放开了、录不了）。
          * 一个录像意图里只从假变真一次。
          */
         public final boolean settled;
@@ -209,13 +218,15 @@ public final class RecordingLanes {
     /**
      * 文件名在备好时就定了的录制器（MediaRecorder 模式，{@link VideoRecorder}）：这一路的相机此刻这个样子，备不备、
      * 备好了还没开录的留不留。只在相机在出画面、或者正在起来（排着要开、在开）时备、留着 —— 它多半马上就带着录像输出
-     * 出了画面，文件名就是开录那一刻；被拿着、在救、停手、现在用不了相机（{@link Facts#cannotOpen}）的不备，
+     * 出了画面，文件名就是开录那一刻；被拿着、在救、停手、现在用不了相机（{@link Facts#cannotOpen}）、熄屏放开了
+     * （{@link Facts#releasedByDark}：亮屏之前不会开，熄屏时备的那一个文件名早了几分钟到一整夜）的不备，
      * 备好还没开录的放掉，回来时按那一刻另备一个（channel-logic §三：新加入的那一路，文件名用它真实开始的时刻）。
      * 编码录制器第一个文件开录时才起名，不用这一条。
      */
-    public static boolean keepsNamedRecorder(ChannelRules.Condition condition, boolean cannotOpen) {
-        return condition == ChannelRules.Condition.STREAMING
-                || (condition == ChannelRules.Condition.BRINGING_UP && !cannotOpen);
+    public static boolean keepsNamedRecorder(ChannelRules.Condition condition, boolean cannotOpen,
+                                             boolean releasedByDark) {
+        return !releasedByDark && (condition == ChannelRules.Condition.STREAMING
+                || (condition == ChannelRules.Condition.BRINGING_UP && !cannotOpen));
     }
 
     /**
@@ -236,13 +247,14 @@ public final class RecordingLanes {
     /**
      * 这一路在起来：在加入；或者在等着、录制器不是录不了，而相机在开的次序里排着、在开、或者已经出画面（录制器在备、
      * 会话还没带上它）。被拿着、在救、停手的不算 —— 它们一时半会儿回不来；关着而调度现在用不了相机的也不算
-     * （{@link Facts#cannotOpen}：主界面回到前台之前它不会开，算它在起来的话「准备中」没有尽头）。
+     * （{@link Facts#cannotOpen}：主界面回到前台之前它不会开，算它在起来的话「准备中」没有尽头）；熄屏放开的也不算
+     * （{@link Facts#releasedByDark}：亮屏之前它不会开 —— 熄屏时开的录只等环视就落定）。
      */
     static boolean bringingUp(Facts lane) {
         if (lane.state == State.STARTING) {
             return true;
         }
-        return lane.state == State.WAITING && lane.recorder != Recorder.FAILED
+        return lane.state == State.WAITING && lane.recorder != Recorder.FAILED && !lane.releasedByDark
                 && ((lane.condition == ChannelRules.Condition.BRINGING_UP && !lane.cannotOpen)
                 || lane.condition == ChannelRules.Condition.STREAMING);
     }
@@ -258,7 +270,8 @@ public final class RecordingLanes {
      *
      * <ul>
      *   <li>至少一路在录：有一路停手了、或者录不了，说它无法录制（它不会因为别人放开就回来）；
-     *       否则一路被拿着说它被占用、释放后自动恢复，两路以上说部分摄像头被占用；在救、在起来的不说。</li>
+     *       否则一路被拿着说它被占用、释放后自动恢复，两路以上说部分摄像头被占用；在救、在起来的不说，熄屏放开的不说
+     *       （{@link Facts#releasedByDark}：车机熄屏后拿走后座舱，可它没在录是因为熄屏，亮屏它自己回来）。</li>
      *   <li>一路都没在录，而每一路都停手了或者录不了：{@link Hint.Kind#ALL_GAVE_UP}（只进黑匣子，见它的说明）。</li>
      * </ul>
      */
@@ -278,7 +291,7 @@ public final class RecordingLanes {
         String taken = null;
         int takenCount = 0;
         for (Facts lane : lanes) {
-            if (lane.state != State.LIVE && lane.condition == ChannelRules.Condition.TAKEN) {
+            if (lane.state != State.LIVE && lane.condition == ChannelRules.Condition.TAKEN && !lane.releasedByDark) {
                 takenCount++;
                 if (taken == null) {
                     taken = lane.key;

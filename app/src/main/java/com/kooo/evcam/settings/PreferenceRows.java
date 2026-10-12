@@ -31,7 +31,7 @@ import com.kooo.evcam.R;
  *   <li>开关放在行首（{@link R.layout#pref_row}），橙色轨道 + 白色方块滑块；</li>
  *   <li>有当前值的（下拉、输入），值放行尾再加 ›（{@link R.layout#pref_row_value}）；</li>
  *   <li>点进去还有下一层的，行尾 ›（{@link R.layout#pref_row_nav}）；</li>
- *   <li>开关能不能起作用要看哨兵模式的，行尾写着哨兵模式此刻开没开（{@link R.layout#pref_row_sentry}）；</li>
+ *   <li>开关的效果要看哨兵模式的，行尾写着哨兵模式此刻开没开（{@link R.layout#pref_row_sentry}）；</li>
  *   <li>组名是小号灰字（{@link R.layout#pref_category}）。</li>
  * </ul>
  *
@@ -60,7 +60,10 @@ final class PreferenceRows {
         preference.getExtras().putString(EXTRA_ROW, ROW_VALUE);
     }
 
-    /** 开关行，行尾带哨兵模式此刻的状态：这个开关起不起作用要看哨兵模式（熄屏持续录制）。 */
+    /**
+     * 开关行，行尾带哨兵模式此刻的状态（熄屏持续录制）：熄屏 v3 起哨兵模式定的是环视录到什么时候 ——
+     * 开着车机不下电、一直录；没开录到车机要睡（规格 2.4）。
+     */
     static void markSentryStatus(Preference preference) {
         preference.getExtras().putString(EXTRA_ROW, ROW_SENTRY);
     }

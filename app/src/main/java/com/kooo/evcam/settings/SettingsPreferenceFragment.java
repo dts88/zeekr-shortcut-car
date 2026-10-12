@@ -1027,7 +1027,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         com.kooo.evcam.KeepAliveManager.stopKeepAliveWork(requireContext());
                     }
                 });
-        // 熄屏持续录制能不能起作用看哨兵模式：行尾写着哨兵模式此刻开没开（行样式在 apply 之前标上）
+        // 熄屏持续录制录到什么时候看哨兵模式（熄屏 v3：开着一直录环视，没开录到车机要睡）：行尾写着哨兵模式此刻开没开（行样式在 apply 之前标上）
         androidx.preference.Preference keepRecording = findPreference("pref_screen_off_keep_recording");
         if (keepRecording != null) {
             PreferenceRows.markSentryStatus(keepRecording);

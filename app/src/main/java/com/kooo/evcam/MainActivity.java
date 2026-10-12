@@ -163,6 +163,8 @@ public class MainActivity extends AppCompatActivity {
             new android.os.Handler(android.os.Looper.getMainLooper());  // 熄屏退后台的延迟处理
     private Runnable screenOffBackgroundRunnable;  // 息屏退后台的延迟任务
     private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
+    /** 熄屏 15 秒那一步到点时屏幕黑没黑还不知道（安卓刚亮、车辆信号还没读回来）：过这么久再看（设计 v3.1 C7）。 */
+    private static final long SCREEN_UNKNOWN_RECHECK_MS = 2000;
     /** 这一次熄屏已经退过后台了（亮屏、回到前台时清）：熄屏时停录之后会再排一次 15 秒，只退一次、只提示一次。 */
     private boolean leftForScreenOff;
     /**
@@ -175,6 +177,8 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 熄屏 / 亮屏（{@link com.kooo.evcam.screen.ScreenState} 在主线程调；onCreate 登记、onDestroy 摘掉）。
      * 只管界面自己的事（大纲 §2 阶段 6）：熄屏那一刻主界面在前，就留下「因熄屏退下去」的记号；熄屏 15 秒退后台；亮屏取消它。
+     * 熄屏 v3 起「熄屏」是屏幕真黑了（车主下车那一下，车辆信号判的；车机要睡、车机黑着醒了都还是熄屏，不叫到这里）：
+     * 记号在屏幕一黑就记上，开车门亮屏时主界面就接回来（以前要等几分钟后车机下电那一次安卓熄屏）。
      *
      * <p>熄屏那张表（车机会不会睡、停不停录）不在这里算，预览也不在这里放：熄屏时预览按规则就不算有人要
      * （{@code ChannelRules}），车机要睡由录像协调器判、写给通道调度，相机由调度照登记表按次序关。以前这里自己再算一遍那张表，
@@ -2215,16 +2219,28 @@ public class MainActivity extends AppCompatActivity {
      * 都在 {@link com.kooo.evcam.screen.ScreenState} 里按固定顺序做完了；相机由通道调度照登记表关（熄屏时预览不算有人要），
      * 这里不放预览、不再自己算那张表。
      * 到点先问一遍屏幕是不是真的还黑着：深睡时这个计时是停住的，醒来之后才到点，
-     * 而醒来时亮屏广播不来，只信旧标记就会把刚回到车上的人的界面退下去。
+     * 而醒来时亮屏广播不来，只信旧标记就会把刚回到车上的人的界面退下去。安卓刚亮、车辆信号还没读回来
+     * （{@link com.kooo.evcam.screen.ScreenState#known} 为假）时屏幕黑没黑还不知道：过 2 秒再看，不当场退（设计 v3.1 C7）。
      * 录像还在（含等待摄像头，或者在等开录、等自动接回）、熄屏录制生效，就留在前台（这几个条件照旧）；
      * 熄屏期间停了录，停录那一下再排一次（{@link #recordingListener}）。一次熄屏只退一次。</p>
      */
     private void scheduleBackgroundTask() {
+        scheduleBackgroundStep(SCREEN_OFF_BACKGROUND_DELAY_MS);
+    }
+
+    /** 熄屏后退后台那一步排在 {@code delayMs} 之后（到点还不知道屏幕黑没黑的，过一会儿再排一次）。 */
+    private void scheduleBackgroundStep(long delayMs) {
         cancelBackgroundTask();
 
         screenOffBackgroundRunnable = () -> {
             screenOffBackgroundRunnable = null;
-            if (!com.kooo.evcam.screen.ScreenState.refresh()) {
+            boolean dark = com.kooo.evcam.screen.ScreenState.refresh();
+            if (!com.kooo.evcam.screen.ScreenState.known()) {
+                // 安卓刚亮，车辆信号还没读回来：屏幕可能已经亮了，过一会儿再看
+                scheduleBackgroundStep(SCREEN_UNKNOWN_RECHECK_MS);
+                return;
+            }
+            if (!dark) {
                 AppLog.d(TAG, "屏幕已亮起，取消退后台");
                 return;
             }
@@ -2251,7 +2267,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(MainActivity.this, R.string.msg_screen_off_background, Toast.LENGTH_SHORT).show();
         };
 
-        screenStateHandler.postDelayed(screenOffBackgroundRunnable, SCREEN_OFF_BACKGROUND_DELAY_MS);
+        screenStateHandler.postDelayed(screenOffBackgroundRunnable, delayMs);
     }
 
     private void cancelBackgroundTask() {
@@ -2793,7 +2809,8 @@ public class MainActivity extends AppCompatActivity {
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording);
         
-        // 人已经在界面上了，屏幕一定亮着。ScreenState 记的还是黑着就说明亮屏广播没来，让它补跑一次亮屏
+        // 回到前台：让 ScreenState 重问一遍安卓（亮屏广播没来的话这一下补上）；车辆说屏幕黑着的，让车辆信号当场读一遍 ——
+        // 人真回来了它会读到亮屏。熄屏 v3 起回到前台不等于屏幕亮着：黑着时为录像拉起来的也会走到这里，所以不硬当亮屏
         com.kooo.evcam.screen.ScreenState.refresh();
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，

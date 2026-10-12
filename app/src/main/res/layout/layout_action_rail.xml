@@ -105,7 +105,7 @@
                     android:textColor="@color/text_secondary"
                     android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
-                <!-- 录制中才有：熄屏后这段录像会怎样（自己读设置和哨兵模式，RecordButtonUi 管显隐） -->
+                <!-- 录制中才有：熄屏后这段录像会怎样（自己读设置和这一次录像里有没有环视，熄屏 v3 起不看哨兵模式；RecordButtonUi 管显隐） -->
                 <com.kooo.evcam.ui.ScreenOffHintView
                     android:id="@+id/record_hint"
                     android:layout_width="wrap_content"

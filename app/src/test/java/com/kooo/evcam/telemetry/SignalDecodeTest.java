@@ -1,6 +1,7 @@
 package com.kooo.evcam.telemetry;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -81,6 +82,25 @@ public class SignalDecodeTest {
         assertNull(Signal.DAY_NIGHT.decode(0x00201003));
         assertEquals(Boolean.TRUE, Signal.STOCK_POPUP.decode(1));
         assertEquals(Boolean.FALSE, Signal.STOCK_POPUP.decode(0));
+    }
+
+    /**
+     * 屏幕电源事件：0 亮着、1 黑了（车主 2026-10-12 确认），别的（255 读不到、没见过的数）都是不知道 ——
+     * 熄屏判断把不知道当「这一项读不到」，不能当成亮着。先用着的信号，非开发者也拿得到。
+     */
+    @Test
+    public void screenPowerEventIsZeroLitOneDark() {
+        Signal s = Signal.SCREEN_POWER_EVENT;
+        assertEquals(Boolean.FALSE, s.decode(0));
+        assertEquals(Boolean.TRUE, s.decode(1));
+        assertNull(s.decode(255));
+        assertNull(s.decode(2));
+        assertNull(s.decode(null));
+        assertEquals(Signal.Format.SCREEN, s.format);
+        assertEquals(Signal.Kind.FUNCTION, s.kind);
+        assertEquals(0x20290300, s.id);
+        assertTrue(s.usable());
+        assertFalse("不按节拍读：熄屏判断那一层（只读离散信号）也要它", s.isFloat());
     }
 
     @Test

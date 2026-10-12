@@ -12,6 +12,7 @@ import java.util.Set;
 /**
  * 找黑屏信号只加记录（2026-10-12）：要记的那几项、黑匣子里写成什么样。
  * 它们不能动信号表（「系统信息」页、信息条都从那张表来），名字和号要一一对上。
+ * 屏幕电源事件确认之后进了信号表（{@link Signal#SCREEN_POWER_EVENT}）：黑匣子里的名字和 0 / 1 的写法不能变，老脚本按它找。
  */
 public class DarkScreenProbesTest {
 
@@ -38,11 +39,13 @@ public class DarkScreenProbesTest {
             assertFalse("只放离散的", s.isFloat());
         }
         assertEquals(-1, DarkScreenProbes.indexOf(0x20259000));
-        assertEquals(0, DarkScreenProbes.indexOf(0x20290300));
+        assertEquals("屏幕电源事件走信号表那条路", -1, DarkScreenProbes.indexOf(0x20290300));
     }
 
     @Test
     public void watchesOnlyTheChosenSignals() {
+        assertEquals("屏幕电源事件排第一个", Signal.SCREEN_POWER_EVENT, DarkScreenProbes.WATCHED[0]);
+        assertTrue(DarkScreenProbes.watches(Signal.SCREEN_POWER_EVENT));
         assertTrue(DarkScreenProbes.watches(Signal.IGNITION));
         assertTrue(DarkScreenProbes.watches(Signal.GEAR));
         assertTrue(DarkScreenProbes.watches(Signal.SENTRY_MODE));
@@ -52,6 +55,8 @@ public class DarkScreenProbesTest {
         assertFalse(DarkScreenProbes.watches(Signal.SPEED));
         assertFalse(DarkScreenProbes.watches(Signal.DOOR_PASSENGER));
         assertEquals("door_driver", DarkScreenProbes.key(Signal.DOOR_DRIVER));
+        assertEquals("黑匣子里的名字和它还在原值那几项里时一样", "screen_power_event",
+                DarkScreenProbes.key(Signal.SCREEN_POWER_EVENT));
     }
 
     /** 原值照记，占位值 255 也记（它变成别的数正是要看的）；ECARX 枚举那种大数写十六进制。 */
@@ -75,8 +80,9 @@ public class DarkScreenProbesTest {
     @Test
     public void zonedAndStatusNames() {
         int power = DarkScreenProbes.indexOf(0x21100100);
-        assertEquals("screen_power_event", DarkScreenProbes.name(0, 0));
-        assertEquals("screen_power_event@0x1", DarkScreenProbes.name(0, 1));
+        int display = DarkScreenProbes.indexOf(0x20316800);
+        assertEquals("screen_dis_power_event", DarkScreenProbes.name(display, 0));
+        assertEquals("screen_dis_power_event@0x1", DarkScreenProbes.name(display, 1));
         assertEquals("bcm_power_onoff@0x20000000", DarkScreenProbes.name(power, 0x20000000));
         assertEquals("bcm_power_onoff.status", DarkScreenProbes.name(power, 0) + DarkScreenProbes.STATUS);
         assertEquals("notactive", DarkScreenProbes.status(FunctionStatus.notactive));
@@ -107,5 +113,15 @@ public class DarkScreenProbesTest {
         assertEquals("unbuckled", DarkScreenProbes.text(Signal.BELT_DRIVER, Signal.BELT_DRIVER.decode(0)));
         assertEquals("没数据（占位值）", "?", DarkScreenProbes.text(Signal.GEAR, Signal.GEAR.decode(255)));
         assertEquals("?", DarkScreenProbes.text(Signal.DOOR_DRIVER, null));
+    }
+
+    /** 屏幕电源事件照原值写 0 / 1（「screen_power_event 0 → 1」），不写 on / off；读不到（255）是「?」。 */
+    @Test
+    public void screenPowerEventKeepsItsZeroOne() {
+        Signal s = Signal.SCREEN_POWER_EVENT;
+        assertEquals("0", DarkScreenProbes.text(s, s.decode(0)));
+        assertEquals("1", DarkScreenProbes.text(s, s.decode(1)));
+        assertEquals("?", DarkScreenProbes.text(s, s.decode(255)));
+        assertEquals("?", DarkScreenProbes.text(s, null));
     }
 }

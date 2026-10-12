@@ -40,8 +40,8 @@ import java.util.Map;
  * 还是文字（项目所有者 2026-10-04；哪几格从 {@link InfoBarLayout#cellsFor} 来，和信息条摆格子同一处），
  * 后面是号码，对照 Lab 的记录用。</p>
  *
- * <p>资源只在这一页开着时占：进来登记（{@link Telemetry#acquire}），离开注销 —— 没别人（录像的信息条）
- * 在用的话，车辆接口的监听、定位订阅、线程全都停掉。</p>
+ * <p>多占的资源只在这一页开着时占：进来完整登记（{@link Telemetry#acquire}），离开注销 —— 没别人（录像的信息条）
+ * 在用的话，浮点传感器和定位停掉。离散信号进程活着一直在读（熄屏判断登记的核心，{@link Telemetry#keepCore}，熄屏 v3）。</p>
  */
 public class VehicleInfoFragment extends Fragment implements Telemetry.Listener {
 
@@ -170,7 +170,7 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
 
     /**
      * 图例下方那行：有数据几项 · 车辆接口 · 定位。只写结果，连接经过（耗时、方法探测、订阅、异常原文）
-     * 只进日志和黑匣子（{@code Telemetry.sourceReported}）。不写「正在读取 / 已停止」：页面在 onStart 里
+     * 只进日志和黑匣子（{@code Telemetry.carReported} / {@code locationReported}）。不写「正在读取 / 已停止」：页面在 onStart 里
      * 先登记再画，看得见的时候一直在收集。车辆接口还在连（第一次约一秒）时先不写这一项，连上或连不上后再补上。
      */
     private static String status(Context ctx, Readings r) {

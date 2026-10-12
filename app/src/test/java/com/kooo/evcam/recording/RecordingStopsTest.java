@@ -200,9 +200,10 @@ public class RecordingStopsTest {
 
     /**
      * 录像要的几样放了（录像停了、不接回；不等自动接回了）的时候唤醒锁怎么放：屏幕黑着、锁正拉着车机 —— 先照熄屏那张表重判
-     * （锁不算拉着了）。锁拿着就是开发者「熄屏录制」开着，熄屏后不停录（keepsRecording 为真）。哨兵模式没开、停在 P 挡：
-     * 判成现在停、写下「车机要睡」（已经写着的不再写），锁留到相机按次序关完再放；哨兵模式开着、在开车：车机醒着，锁当场放。
-     * 亮着、锁没拿着、已经在等相机关完：照停录那一下放（审查 2026-10-11：以前录像停了一律当场放，车机几秒后睡过去）。
+     * （锁不算拉着了）。锁拿着就是开发者「熄屏录制」开着，熄屏后不停录（keepsRecording 为真）。安卓已经熄屏（车机要睡）、
+     * 哨兵模式没开、停在 P 挡：判成现在停、写下「车机要睡」（已经写着的不再写），锁留到相机按次序关完再放；哨兵模式开着、
+     * 在开车、或者安卓还亮着（屏幕黑了、车机醒着，熄屏 v3）：锁当场放，环视照表接着录。亮着、锁没拿着、已经在等相机关完：
+     * 照停录那一下放（审查 2026-10-11：以前录像停了一律当场放，车机几秒后睡过去）。
      */
     @Test
     public void lettingGoWhileTheLockPullsTheCarIsJudgedByTheTable() {
@@ -212,15 +213,17 @@ public class RecordingStopsTest {
         assertFalse(RecordingStops.rejudgesBeforeLockGoes(false, false));
         boolean parked = ScreenOffPlan.driving("P", 0f);
         for (boolean autoRecord : new boolean[]{false, true}) {
-            ScreenOffPlan.Decision sentryOff = ScreenOffPlan.atScreenOff(true, false, autoRecord, 0, parked);
+            ScreenOffPlan.Decision sentryOff = ScreenOffPlan.atDark(true, false, autoRecord, 0, parked, true, true);
             assertEquals(ScreenOffPlan.Action.STOP_NOW, sentryOff.action);
             assertEquals(ScreenOffPlan.SleepFact.WRITE, ScreenOffPlan.sleepFact(true, sentryOff.action, false));
             assertEquals("已经写着：不再写，起算时刻不挪", ScreenOffPlan.SleepFact.KEEP,
                     ScreenOffPlan.sleepFact(true, sentryOff.action, true));
+            assertEquals("安卓还亮着：车机醒着", ScreenOffPlan.Action.CONTINUE,
+                    ScreenOffPlan.atDark(true, false, autoRecord, 0, parked, false, true).action);
             assertEquals("哨兵模式开着：车机醒着", ScreenOffPlan.Action.CONTINUE,
-                    ScreenOffPlan.atScreenOff(true, false, autoRecord, 1, parked).action);
+                    ScreenOffPlan.atDark(true, false, autoRecord, 1, parked, true, true).action);
             assertEquals("在开车：车机醒着", ScreenOffPlan.Action.CONTINUE,
-                    ScreenOffPlan.atScreenOff(true, false, autoRecord, 0, ScreenOffPlan.driving("D", 0f)).action);
+                    ScreenOffPlan.atDark(true, false, autoRecord, 0, ScreenOffPlan.driving("D", 0f), true, true).action);
         }
     }
 }

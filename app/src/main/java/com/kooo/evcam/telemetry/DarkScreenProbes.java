@@ -13,12 +13,14 @@ import java.util.Locale;
  * <ul>
  *   <li>{@link #IDS}：信号表里没有的几个功能号（不带区域）。号码、名字照 zeekr-shortcut-lab 的信号手册和 0.4.0 的遍历
  *       （{@code docs/signals.md}、{@code docs/findings.md} §2.39、{@code docs/reports/2026-09-28-sweep-0.4.0.txt}）：
- *       屏幕电源事件「点火进出附件档前后 0 → 1 → 0」，其余停车时读到 0、1 或 255（未知），含义都没弄清。
+ *       停车时读到 0、1 或 255（未知），含义都没弄清。
  *       <b>不进信号表</b>：「系统信息」页、信息条都不变；{@link EcarxSource} 只是一起订上、对账时一起读，原值照记（255 也记）。
  *       这几个号的<b>可用状态</b>（回调 {@code onSupportedFunctionStatusChanged}，Lab §2.39：熄屏 / 上下电前后电源开关的可用状态
  *       active ↔ notactive，和屏幕电源事件 0 → 1 → 0 同一刻）也记，单独一项「名字.status」（{@link #STATUS}），只有回调、不去读。</li>
- *   <li>{@link #WATCHED}：信号表里已有的几项（点火 / 用车状态 0x20259000、挡位、哨兵、主驾门、主驾座椅、主驾安全带），
- *       用它们自己的解法（{@link Signal#decode}），变了也记。</li>
+ *   <li>{@link #WATCHED}：信号表里已有的几项（屏幕电源事件、点火 / 用车状态 0x20259000、挡位、哨兵、主驾门、主驾座椅、主驾安全带），
+ *       用它们自己的解法（{@link Signal#decode}），变了也记。屏幕电源事件原来在 {@link #IDS} 里，车主 2026-10-12 确认它就是
+ *       「屏幕真黑了」之后进了信号表（{@link Signal#SCREEN_POWER_EVENT}，熄屏判断用它）；黑匣子里的名字和 0 / 1 的写法不变，
+ *       只是读不到（255、读失败）现在写「?」—— 和信号表别的几项一样。</li>
  * </ul>
  *
  * <p>写成英文记号（和「第一轮读数」那一行一样小写），好和 Lab 手册里的常量名对上；纯函数（{@code DarkScreenProbesTest}）。</p>
@@ -31,7 +33,6 @@ final class DarkScreenProbes {
 
     /** 功能号，不带区域；回调里的区域不是 0 的单独一项（{@link #name}）。 */
     static final int[] IDS = {
-            0x20290300,   // IVehicle.SETTING_FUNC_SCREEN_POWER_EVENT
             0x20316800,   // IVehicle.SETTING_FUNC_SCREEN_DIS_POWER_EVENT
             0x20316900,   // IVehicle.SETTING_FUNC_SCREEN_HUD_POWER_EVENT
             0x2032A800,   // IVehicle.SETTING_FUNC_POWER_MODE_STATE
@@ -42,7 +43,6 @@ final class DarkScreenProbes {
 
     /** 和 {@link #IDS} 一一对应。 */
     static final String[] NAMES = {
-            "screen_power_event",
             "screen_dis_power_event",
             "screen_hud_power_event",
             "power_mode_state",
@@ -54,8 +54,10 @@ final class DarkScreenProbes {
     /**
      * 信号表里已有的、也跟着记的几项。点火这一项就是 Lab 的 {@code AVAILABLE_USGMODE}（0x20259000）。
      * 只放离散的：变了的那一行在回调、对账处理完时写，浮点的按节拍读、不经过那两处。
+     * 屏幕电源事件放第一个：起点那一行（「车辆信号起点：」）里它排在信号表这几项的最前面。
      */
     static final Signal[] WATCHED = {
+            Signal.SCREEN_POWER_EVENT,
             Signal.IGNITION,
             Signal.GEAR,
             Signal.SENTRY_MODE,
@@ -72,7 +74,7 @@ final class DarkScreenProbes {
 
     /**
      * 第 {@code index} 个号在区域 {@code zone} 上的那一项的名字。区域 0（Lab 遍历里这几个号都没有区域，回调按理都是 0）就是 {@link #NAMES} 里的；
-     * 不是 0 的单独一项「screen_power_event@0x1」：几个区域的值混成一项，看着就像来回跳，还把限量用完。对账读的是不带区域的值，算区域 0。
+     * 不是 0 的单独一项「screen_dis_power_event@0x1」：几个区域的值混成一项，看着就像来回跳，还把限量用完。对账读的是不带区域的值，算区域 0。
      */
     static String name(int index, int zone) {
         return zone == 0 ? NAMES[index] : NAMES[index] + "@0x" + Integer.toHexString(zone);
@@ -127,6 +129,9 @@ final class DarkScreenProbes {
             return "?";
         }
         switch (s.format) {
+            case SCREEN:
+                // 照原值写 0 / 1（它还是原值那一项时就这么写，「screen_power_event 0 → 1」老脚本按这个找）
+                return Boolean.TRUE.equals(decoded) ? "1" : "0";
             case GEAR:
                 return String.valueOf(decoded);
             case IGNITION: {

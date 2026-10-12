@@ -21,10 +21,11 @@ import java.util.TreeMap;
  * <h3>为什么要（2026-10-12，项目所有者同意先只加记录）</h3>
  *
  * <p>这台 7X 上车主下车走开，中控屏真的黑了，安卓却还是「可交互」：没有熄屏广播，黑匣子心跳一直 {@code screenOn=true}；
- * 熄屏广播要等约 4 分钟后下电才来（先 U 盘写不进 EIO，不到 1 秒熄屏，再 3–5 秒进程被结束或冻住）。
- * {@link ScreenState} 只看熄屏 / 亮屏广播和 {@code isInteractive}，看不到「屏幕真黑了」那一下。
- * 先在车上试一次（录着像、下车走开），看哪个信号和它对得上：这里是安卓自己的那一份（每块屏的 {@link Display#getState()}），
- * 车辆信号那一份在 {@code telemetry.EcarxSource}（{@code DarkScreenProbes}）。</p>
+ * 熄屏广播要等约 4 分钟后下电才来（先 U 盘写不进 EIO，不到 1 秒熄屏，再 3–5 秒进程被结束或冻住）。当时在车上试了一次，
+ * 看哪个信号和「屏幕真黑了」对得上：这里是安卓自己的那一份（每块屏的 {@link Display#getState()}），车辆信号那一份在
+ * {@code telemetry.EcarxSource}（{@code DarkScreenProbes}）。结果是车辆信号对得上（屏幕电源事件、点火），安卓这一份和熄屏广播一样
+ * 只在下电时变 —— 熄屏判断（{@link ScreenState}）看车辆信号；这里照旧只记录，诊断报告「显示屏」那一节也读它
+ * （{@link #describeNow}、{@link #stateName}）。</p>
  *
  * <h3>怎么记</h3>
  *
@@ -38,7 +39,6 @@ import java.util.TreeMap;
  *   <li>屏多了、少了也记，带上此刻有哪几块屏。只记看得到的屏：别的应用私有的虚拟屏拿掉时也会通知到这里，
  *       可那些查不到、没见过，不记。虚拟屏每次编号都是新的，各算各的限量就限不住，所以多了、少了那几行合起来限量
  *       （{@link #SHOWN}）；拿掉的屏连同记下的东西一起扔掉，账本不跟着越记越大；</li>
- *   <li>熄屏 / 亮屏广播那一刻，{@link ScreenState} 在做完该做的之后再记一行此刻各块屏的状态（{@link #describeNow}，现问系统）；</li>
  *   <li>每一项限量（{@link ChangeTracker}：5 分钟最多 8 行），来回跳也刷不爆黑匣子；压下过的，窗口一过就掐着点补一行停在哪儿，
  *       不等下一次屏的事件（可能永远不来：下电时进程说没就没）。</li>
  * </ul>
@@ -119,10 +119,10 @@ public final class DisplayWatch {
     }
 
     /**
-     * 此刻每块屏的状态，现问系统（不用记下来的）：「0（名字）ON，2（名字）OFF」。熄屏 / 亮屏那一行用，任何线程都能调；
-     * 没装上或者出错是「?」。
+     * 此刻每块屏的状态，现问系统（不用记下来的）：「0（名字）ON，2（名字）OFF」。诊断报告用（要一次 DisplayManager 调用：
+     * 不放在熄屏、车机要睡那几步里，那时 DisplayWatch 自己早一秒已经记过了），任何线程都能调；没装上或者出错是「?」。
      */
-    static String describeNow() {
+    public static String describeNow() {
         DisplayManager dm = displays;
         if (dm == null) {
             return ChangeTracker.UNKNOWN;
@@ -139,7 +139,7 @@ public final class DisplayWatch {
     }
 
     /** 此刻 {@code PowerManager.isInteractive()}；拿不到、出错都当是（和 {@link ScreenState} 一样）。任何线程都能调，不抛。 */
-    static boolean interactiveNow() {
+    public static boolean interactiveNow() {
         PowerManager pm = power;
         try {
             return pm == null || pm.isInteractive();
@@ -149,7 +149,7 @@ public final class DisplayWatch {
     }
 
     /** {@link Display} 的状态写成名字（系统那个 {@code stateToString} 是隐藏的）。 */
-    static String stateName(int state) {
+    public static String stateName(int state) {
         switch (state) {
             case Display.STATE_UNKNOWN: return "UNKNOWN";
             case Display.STATE_OFF: return "OFF";

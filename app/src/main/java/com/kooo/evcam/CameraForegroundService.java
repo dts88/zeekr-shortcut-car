@@ -163,6 +163,7 @@ public class CameraForegroundService extends Service {
     /** 上一行心跳写的是什么状态，以及什么时候写的（开机起算，含深睡）。 */
     private boolean lastBeatRecording;
     private boolean lastBeatScreenOn;
+    private boolean lastBeatAndroidOn;
     private long lastBeatAtMs;
 
     private final android.os.Handler blackBoxHandler =
@@ -177,15 +178,21 @@ public class CameraForegroundService extends Service {
             // 真正要看的是变化：什么时候开始录、什么时候熄的屏，以及
             // <b>两行之间 slept= 涨了多少</b>，那一段就是车机睡过去的时间。
             boolean recording = isRecordingNow();
-            boolean screenOn = isScreenOnNow();
+            // 熄屏 v3（设计 v3 §6 L10）：screenOn 是屏幕真亮着（ScreenState：安卓熄屏、或者车辆说黑都算黑），android 是安卓自己说的
+            // 可交互。这台车上安卓只在车机下电时才说黑：车主走开后屏幕黑了四到六分钟（哨兵模式开着时一直）它还说亮着，
+            // 以前心跳只写它，10-12 那二十分钟的熄屏整段都是 screenOn=true。两样哪个变了都写一行
+            boolean screenOn = !com.kooo.evcam.screen.ScreenState.dark();
+            boolean androidOn = com.kooo.evcam.screen.DisplayWatch.interactiveNow();
             long now = android.os.SystemClock.elapsedRealtime();
             if (lastBeatAtMs == 0 || recording != lastBeatRecording || screenOn != lastBeatScreenOn
-                    || now - lastBeatAtMs >= BLACK_BOX_QUIET_MS) {
+                    || androidOn != lastBeatAndroidOn || now - lastBeatAtMs >= BLACK_BOX_QUIET_MS) {
                 // view：录像此刻的样子（开录中 / 在录 / 等待摄像头），一夜里一路都录不了的那几段在这里看得出来
                 com.kooo.evcam.blackbox.BlackBox.note("心跳 recording=" + recording + " view="
-                        + com.kooo.evcam.recording.RecordingCoordinator.get(CameraForegroundService.this).view() + " screenOn=" + screenOn);
+                        + com.kooo.evcam.recording.RecordingCoordinator.get(CameraForegroundService.this).view()
+                        + " screenOn=" + screenOn + " android=" + (androidOn ? "on" : "off"));
                 lastBeatRecording = recording;
                 lastBeatScreenOn = screenOn;
+                lastBeatAndroidOn = androidOn;
                 lastBeatAtMs = now;
             }
             com.kooo.evcam.blackbox.BlackBox.flushCountsIfDue();
@@ -200,16 +207,6 @@ public class CameraForegroundService extends Service {
 
     private boolean isRecordingNow() {
         return com.kooo.evcam.recording.RecordingCoordinator.get(this).isRecording();
-    }
-
-    private boolean isScreenOnNow() {
-        try {
-            android.os.PowerManager pm =
-                    (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
-            return pm == null || pm.isInteractive();
-        } catch (Throwable t) {
-            return true;
-        }
     }
 
     @Override

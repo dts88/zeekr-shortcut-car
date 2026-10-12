@@ -86,11 +86,11 @@
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka, dan menyambung rakaman yang berhenti kerana skrin padam apabila skrin hidup semula; rakaman yang anda hentikan tidak dimulakan semula</string>
     <string name="set_screen_off_title">Rakaman skrin padam (kekal berjaga)</string>
-    <string name="set_screen_off_summary">Jika sedang merakam semasa skrin padam, terus merakam dan kekalkan unit kepala berjaga sehingga tempoh yang ditetapkan di bawah</string>
+    <string name="set_screen_off_summary">Jika sedang merakam semasa skrin padam, terus merakam paparan sekeliling dan kekalkan unit kepala berjaga sehingga tempoh yang ditetapkan di bawah</string>
     <string name="set_screen_off_wake_title">Kekal berjaga sehingga (jam)</string>
     <string name="unit_hours">%1$s jam</string>
     <string name="set_screen_off_keep_title">Terus merakam apabila skrin padam</string>
-    <string name="set_screen_off_keep_summary">Memerlukan Mod Sentry. Tanpanya, rakaman dijeda semasa kereta tidur dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.</string>
+    <string name="set_screen_off_keep_summary">Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin depan dan belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, rakaman dijeda semasa unit kepala tidur dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.</string>
     <string name="sentry_status_on">Mod Sentry: hidup</string>
     <string name="sentry_status_armed">Mod Sentry: bersiaga</string>
     <string name="sentry_status_off">Mod Sentry: mati</string>
@@ -202,6 +202,7 @@
     <string name="vi_battery_temp">Suhu bateri</string>
     <string name="vi_day_night">Siang / malam</string>
     <string name="vi_sentry_mode">Mod Sentry</string>
+    <string name="vi_screen_power_event">Skrin tengah</string>
     <string name="vi_aeb">AEB</string>
     <string name="vi_fcw">Amaran perlanggaran hadapan</string>
     <string name="vi_ldw">Amaran keluar lorong</string>
@@ -239,6 +240,8 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Memandu</string>
+    <string name="vi_v_screen_off">Skrin padam</string>
+    <string name="vi_v_screen_on">Skrin hidup</string>
     <string name="set_language_title">Bahasa / Language</string>
     <string name="lang_auto">Ikut sistem</string>
     <string name="lang_zh">中文</string>
@@ -551,10 +554,9 @@
     <string name="record_preparing">Bermula…</string>
     <string name="record_idle_detail">Klip %1$d min</string>
     <string name="record_segment_detail">Klip ini %1$s / %2$d min</string>
-    <string name="record_screen_off_continue">Diteruskan ketika skrin padam</string>
-    <string name="record_screen_off_pause">Dijeda ketika skrin padam, disambung apabila bangun</string>
+    <string name="record_screen_off_continue">Terus merakam paparan sekeliling ketika skrin padam</string>
+    <string name="record_screen_off_pause">Dijeda ketika skrin padam, disambung apabila skrin hidup</string>
     <string name="record_screen_off_stop">Berhenti apabila skrin padam</string>
-    <string name="record_screen_off_needs_sentry">Perlu Mod Sentry untuk merakam ketika skrin padam</string>
     <string name="recording_chip">Merakam %1$s · klip %2$d</string>
     <string name="rail_photo">Ambil foto</string>
     <string name="rail_settings">Tetapan</string>

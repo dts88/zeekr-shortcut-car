@@ -39,12 +39,17 @@ public class RecordingLanesTest {
     private static final long T0 = 1_000_000L;
 
     private static Facts lane(String key, State state, Condition condition, Recorder recorder) {
-        return new Facts(key, state, condition, false, recorder);
+        return new Facts(key, state, condition, false, false, recorder);
     }
 
     /** 等着、录制器能用，相机关着、调度现在用不了相机（主界面不在前、前台服务是后台起的）。 */
     private static Facts cannotOpen(String key) {
-        return new Facts(key, State.WAITING, Condition.BRINGING_UP, true, Recorder.READY);
+        return new Facts(key, State.WAITING, Condition.BRINGING_UP, true, false, Recorder.READY);
+    }
+
+    /** 等着、录制器停放着，熄屏放开了（座舱熄屏时谁都不要，项目所有者 2026-10-12 D2）；调度说它是这个样子。 */
+    private static Facts dark(String key, Condition condition) {
+        return new Facts(key, State.WAITING, condition, false, true, Recorder.READY);
     }
 
     /** 等着、录制器能用、相机是这个样子。 */
@@ -205,6 +210,37 @@ public class RecordingLanesTest {
                 waiting(SURROUND, Condition.BRINGING_UP), cannotOpen(CABIN_REAR), cannotOpen(CABIN_FRONT))).view);
     }
 
+    /**
+     * 熄屏放开的座舱不算在起来（设计 v3.1 C4）：调度照旧说它「在起来」（关着、没人要），可亮屏之前它不会开 —— 熄屏时开的录
+     * 只等环视：环视在起来是准备中，环视录起来了就落定；算它在起来的话，开录永远落定不了。
+     */
+    @Test
+    public void lanesReleasedByTheDarkAreNotComingUp() {
+        assertFalse(RecordingLanes.bringingUp(dark(CABIN_REAR, Condition.BRINGING_UP)));
+        assertFalse("被车机拿着也一样", RecordingLanes.bringingUp(dark(CABIN_REAR, Condition.TAKEN)));
+        assertTrue("在加入的照算（它马上会退出）", RecordingLanes.bringingUp(new Facts(CABIN_REAR, State.STARTING,
+                Condition.BRINGING_UP, false, true, Recorder.BUSY)));
+
+        RecordingLanes lanes = begun();
+        Summary first = lanes.summarize(Arrays.asList(waiting(SURROUND, Condition.BRINGING_UP),
+                dark(CABIN_REAR, Condition.BRINGING_UP), dark(CABIN_FRONT, Condition.BRINGING_UP)));
+        assertEquals("环视在起来：准备中", View.PREPARING, first.view);
+        assertFalse(first.settled);
+        Summary settled = lanes.summarize(Arrays.asList(live(SURROUND),
+                dark(CABIN_REAR, Condition.BRINGING_UP), dark(CABIN_FRONT, Condition.BRINGING_UP)));
+        assertEquals(View.RECORDING, settled.view);
+        assertTrue("环视录起来就落定", settled.settled);
+        assertEquals(Collections.singletonList(SURROUND), settled.liveKeys);
+    }
+
+    /** 亮着、谁都没登记的座舱照旧算在起来（只有熄屏放开才不算）：刚开录、调度还没跑那一轮也落定不了。 */
+    @Test
+    public void aLitLaneNobodyHasClaimedYetIsStillComingUp() {
+        RecordingLanes lanes = begun();
+        assertFalse(lanes.summarize(Arrays.asList(live(SURROUND), waiting(CABIN_REAR, Condition.BRINGING_UP),
+                waiting(CABIN_FRONT, Condition.BRINGING_UP))).settled);
+    }
+
     /** 有一路在录就是在录，别的路在不在录都一样。 */
     @Test
     public void oneLiveLaneIsRecording() {
@@ -312,6 +348,20 @@ public class RecordingLanesTest {
         assertEquals(CABIN_REAR, hint.key);
     }
 
+    /**
+     * 熄屏放开的后座舱被车机拿走（熄屏约 98 秒后）：它没在录是因为熄屏，亮屏自己回来 —— 状态条不说它被占用
+     * （夜里车机自己醒着、屏幕黑着的那几分钟，主界面可能在前）。
+     */
+    @Test
+    public void aLaneReleasedByTheDarkIsNotSaidToBeTaken() {
+        assertEquals(Hint.Kind.NONE, RecordingLanes.hint(Arrays.asList(
+                live(SURROUND), dark(CABIN_REAR, Condition.TAKEN), dark(CABIN_FRONT, Condition.BRINGING_UP))).kind);
+        Hint hint = RecordingLanes.hint(Arrays.asList(
+                live(SURROUND), dark(CABIN_REAR, Condition.TAKEN), waiting(CABIN_FRONT, Condition.TAKEN)));
+        assertEquals("只说亮着时被拿着的那一路", Hint.Kind.LANE_TAKEN, hint.kind);
+        assertEquals(CABIN_FRONT, hint.key);
+    }
+
     /** 两路或更多被占用（1 和 2 冲突时一起被拿走）：说部分摄像头被占用。 */
     @Test
     public void twoTakenLanesAreSaidTogether() {
@@ -390,20 +440,24 @@ public class RecordingLanesTest {
     /** 相机在出画面、或者正在起来（排着要开、在开）：备、备好了的留着 —— 它多半马上带着录像输出出画面，文件名就是开录那一刻。 */
     @Test
     public void aNamedRecorderIsPreparedWhileTheCameraStreamsOrComesUp() {
-        assertTrue(RecordingLanes.keepsNamedRecorder(Condition.STREAMING, false));
-        assertTrue(RecordingLanes.keepsNamedRecorder(Condition.BRINGING_UP, false));
+        assertTrue(RecordingLanes.keepsNamedRecorder(Condition.STREAMING, false, false));
+        assertTrue(RecordingLanes.keepsNamedRecorder(Condition.BRINGING_UP, false, false));
     }
 
     /**
-     * 被拿着、在救、停手、关着而现在用不了相机：不备，备好还没开录的放掉 —— 车机拿着后座舱 9 分钟的话，按备好那一刻起的名
-     * 早了 9 分钟，回放里摆错地方（channel-logic §三：文件名用它真实开始的时刻）。
+     * 被拿着、在救、停手、关着而现在用不了相机、熄屏放开了：不备，备好还没开录的放掉 —— 车机拿着后座舱 9 分钟的话，
+     * 按备好那一刻起的名早了 9 分钟，回放里摆错地方（channel-logic §三：文件名用它真实开始的时刻）；熄屏放开的座舱要到亮屏
+     * 才开，早的可能是一整夜。
      */
     @Test
     public void aNamedRecorderIsNotKeptForACameraThatWillNotStreamSoon() {
-        assertFalse("被拿着", RecordingLanes.keepsNamedRecorder(Condition.TAKEN, false));
-        assertFalse("在救", RecordingLanes.keepsNamedRecorder(Condition.RESCUING, false));
-        assertFalse("停手", RecordingLanes.keepsNamedRecorder(Condition.GAVE_UP, false));
-        assertFalse("关着、现在用不了相机", RecordingLanes.keepsNamedRecorder(Condition.BRINGING_UP, true));
+        assertFalse("被拿着", RecordingLanes.keepsNamedRecorder(Condition.TAKEN, false, false));
+        assertFalse("在救", RecordingLanes.keepsNamedRecorder(Condition.RESCUING, false, false));
+        assertFalse("停手", RecordingLanes.keepsNamedRecorder(Condition.GAVE_UP, false, false));
+        assertFalse("关着、现在用不了相机", RecordingLanes.keepsNamedRecorder(Condition.BRINGING_UP, true, false));
+        assertFalse("熄屏放开了", RecordingLanes.keepsNamedRecorder(Condition.BRINGING_UP, false, true));
+        assertFalse("熄屏那一下还在出画面也一样：调度这一轮就关它", RecordingLanes.keepsNamedRecorder(
+                Condition.STREAMING, false, true));
     }
 
     // ------------------------------------------------------------------ 对齐分段

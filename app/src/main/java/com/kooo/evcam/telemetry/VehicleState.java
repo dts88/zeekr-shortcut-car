@@ -83,7 +83,7 @@ public final class VehicleState {
     public final Boolean reverseLamps;
     /** 正在按喇叭（Lab 还没找到读数，现在总是 null）。 */
     public final Boolean horn;
-    /** 哨兵模式：0 关、1 开、2 布防（锁车后）。熄屏后还能不能录，看的就是它。 */
+    /** 哨兵模式：0 关、1 开、2 布防（锁车后）。熄屏后环视录到什么时候（车机要不要睡），看的就是它（规格 2.4）。 */
     public final Integer sentry;
     public final Float odometerKm;
     public final Double latitude;

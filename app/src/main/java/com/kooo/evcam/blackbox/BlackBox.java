@@ -209,11 +209,17 @@ public final class BlackBox {
 
     /**
      * 熄屏期间那几步（停录、放开相机、每一路关完、整轮关完、放唤醒锁）后面带的「，熄屏后 +N ms」；亮着时是空串。
-     * 哨兵模式没开时车机熄屏 3–5 秒就结束进程（2026-10-10）：每一步赶没赶在那之前，对着「熄屏」那一行就看得出。
+     * 熄屏 v3 起「熄屏后」从屏幕真黑的那一刻算（车辆信号判的，车主下车那一下；{@code ScreenState.darkForMs}），
+     * 格式不变（「，熄屏后 +Nms」，旧的分析脚本照样读）。黑着时安卓也熄屏了（车机要睡：哨兵模式没开时离车约 4–6 分钟后，
+     * 3–5 秒后进程就被结束），后面再带「、安卓熄屏起 +N ms」：车机要睡那几步赶没赶在进程没了之前，对着「车机要睡」那一行就看得出。
      */
     public static String afterScreenOff() {
         long ms = com.kooo.evcam.screen.ScreenState.darkForMs();
-        return ms < 0 ? "" : "，熄屏后 +" + ms + "ms";
+        if (ms < 0) {
+            return "";
+        }
+        long off = com.kooo.evcam.screen.ScreenState.androidOffForMs();
+        return "，熄屏后 +" + ms + "ms" + (off < 0 ? "" : "、安卓熄屏起 +" + off + "ms");
     }
 
     /** 已经接上了没有。没接上时事件先攒在内存里。 */

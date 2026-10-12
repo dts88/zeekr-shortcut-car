@@ -514,7 +514,10 @@ public final class StallWatch {
         Context ctx = appContext;
         sb.append("app ").append(ctx != null ? safe(() -> UpdateFlow.currentVersion(ctx)) : "?")
                 .append(" mainWindowForeground=").append(foreground)
-                .append(" screenOn=").append(isScreenOn())
+                // 熄屏 v3（设计 v3 §6 L10）：screenOn 是屏幕真亮着（ScreenState），android 是安卓自己说的可交互 ——
+                // 车上安卓只在车机断电前那一下才说黑，屏幕早黑了几分钟它还说亮着。卡顿判据照旧看安卓（它不画就不算卡）
+                .append(" screenOn=").append(!com.kooo.evcam.screen.ScreenState.dark())
+                .append(" android=").append(isScreenOn() ? "on" : "off")
                 .append(" uptime=").append(now).append("ms\n");
         sb.append(safe(RearViewMirrorService::describeForStall)).append('\n');
         sb.append("signals: ").append(describeBeats(now)).append('\n');

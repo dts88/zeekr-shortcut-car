@@ -104,11 +104,11 @@
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
-    <string name="set_screen_off_summary">熄屏时若正在录制，继续录制并阻止车机休眠，最长为下方设定的时长</string>
+    <string name="set_screen_off_summary">熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长</string>
     <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
-    <string name="set_screen_off_keep_summary">需配合哨兵模式使用。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
+    <string name="set_screen_off_keep_summary">熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
@@ -220,6 +220,7 @@
     <string name="vi_battery_temp">电池温度</string>
     <string name="vi_day_night">白天 / 夜晚</string>
     <string name="vi_sentry_mode">哨兵模式</string>
+    <string name="vi_screen_power_event">中控屏</string>
     <string name="vi_aeb">自动紧急制动</string>
     <string name="vi_fcw">前碰预警</string>
     <string name="vi_ldw">车道偏离预警</string>
@@ -257,6 +258,8 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">行驶</string>
+    <string name="vi_v_screen_off">熄屏</string>
+    <string name="vi_v_screen_on">亮屏</string>
     <string name="set_language_title">语言 / Language</string>
     <string name="lang_auto">跟随系统</string>
     <string name="lang_zh">中文</string>
@@ -560,10 +563,9 @@
     <string name="record_preparing">正在准备…</string>
     <string name="record_idle_detail">每段 %1$d 分钟</string>
     <string name="record_segment_detail">本段 %1$s / %2$d 分钟</string>
-    <string name="record_screen_off_continue">熄屏后继续录制</string>
-    <string name="record_screen_off_pause">熄屏暂停，唤醒后恢复</string>
+    <string name="record_screen_off_continue">熄屏后继续录制环视</string>
+    <string name="record_screen_off_pause">熄屏暂停，亮屏后恢复</string>
     <string name="record_screen_off_stop">熄屏后停止录制</string>
-    <string name="record_screen_off_needs_sentry">熄屏续录需开启哨兵模式</string>
     <string name="recording_chip">录制中 %1$s · 第 %2$d 段</string>
     <string name="rail_photo">拍照</string>
     <string name="rail_settings">设置</string>
