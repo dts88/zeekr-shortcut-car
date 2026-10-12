@@ -28,7 +28,8 @@ import java.util.Locale;
  * <h3>四个状态，一个动作讲清楚</h3>
  *
  * <ul>
- *   <li><b>待机</b>：红色圆点，环只剩轨道，「开始录制」。</li>
+     *   <li><b>待机</b>：灰色圆点，环只剩轨道，「开始录制」。红色只在准备和录制时出现，
+     *       和悬浮按钮一致。</li>
  *   <li><b>不可用</b>：灰色圆点 —— 没插 U 盘，按下去也不会录。和拒录用的是同一个判断
  *       （{@code StorageHelper.isRecordingStorageAvailable}），按钮不会说一套、做一套。</li>
  *   <li><b>准备中</b>：点已经收成方块、一明一暗地呼吸，环在转 —— 录制器还没起来。</li>
@@ -148,14 +149,20 @@ public final class RecordButtonUi {
         flashAnimator.start();
     }
 
-    /** Red marks a recording that is starting or running. The floating button uses the same rule. */
+    /**
+     * Red marks a recording that is starting or running.
+     * The floating button uses the same rule.
+     */
     public static int markColorRes(boolean live) {
-        return R.color.recording;
+        return live ? R.color.recording : R.color.text_tertiary;
     }
 
-    /** The floating button follows the recorder. A rebuilt activity starts with its own flag cleared. */
+    /**
+     * The floating button follows the recorder.
+     * A rebuilt activity starts with its own flag cleared.
+     */
     public static boolean floatShowsRecording(boolean activityFlag, boolean pipeline) {
-        return activityFlag;
+        return pipeline;
     }
 
     // ------------------------------------------------------------------ 状态
@@ -170,7 +177,8 @@ public final class RecordButtonUi {
                 : R.string.record_stop;
         root.setContentDescription(context.getString(description));
         if (dotShape != null) {
-            dotShape.setColor(color(next == State.UNAVAILABLE ? R.color.text_tertiary : R.color.recording));
+            boolean live = next == State.PREPARING || next == State.RECORDING;
+            dotShape.setColor(color(markColorRes(live)));
         }
         switch (next) {
             case PREPARING:

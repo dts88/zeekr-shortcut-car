@@ -469,6 +469,14 @@ public final class StickerHub {
         }
     }
 
+    private static int othersUp(String address) {
+        int count = UP.size();
+        if (address != null && UP.contains(address)) {
+            count--;
+        }
+        return count;
+    }
+
     private static void connect(Context application, String address, boolean auto) {
         if (address.isEmpty() || OPEN.containsKey(address) || PENDING.contains(address)
                 || PAUSED.contains(address)) {
@@ -496,9 +504,10 @@ public final class StickerHub {
         phase(address, PHASE_CONNECTING);
         state(address, false);
         BluetoothGattCallback callback = callback(address);
+        boolean gentle = auto || StickerRecover.gentleConnect(othersUp(address));
         BluetoothGatt gatt;
         try {
-            gatt = device.connectGatt(application, auto, callback, BluetoothDevice.TRANSPORT_LE);
+            gatt = device.connectGatt(application, gentle, callback, BluetoothDevice.TRANSPORT_LE);
         } catch (SecurityException e) {
             PENDING.remove(address);
             fail(address, FAIL_BLUETOOTH, 0);
@@ -510,16 +519,15 @@ public final class StickerHub {
             return;
         }
         OPEN.put(address, gatt);
-        if (!auto) {
-            MAIN.postDelayed(() -> {
-                if (PENDING.contains(address)) {
-                    refresh(OPEN.get(address));
-                    close(address);
-                    failOrRetry(address, FAIL_TIMEOUT, 0);
-                }
-            }, CONNECT_TIMEOUT_MS);
-        }
-        AppLog.d(TAG, "连接智能贴 " + address + " auto=" + auto);
+        long wait = gentle ? 20_000L : CONNECT_TIMEOUT_MS;
+        MAIN.postDelayed(() -> {
+            if (PENDING.contains(address)) {
+                refresh(OPEN.get(address));
+                close(address);
+                failOrRetry(address, FAIL_TIMEOUT, 0);
+            }
+        }, wait);
+        AppLog.d(TAG, "连接智能贴 " + address + " auto=" + gentle);
     }
 
     private static BluetoothGattCallback callback(String address) {
@@ -594,6 +602,7 @@ public final class StickerHub {
                     DISCOVERING.remove(address);
                     ready(address);
                     writeNext(gatt, address);
+                    connectMissing();
                 });
             }
 

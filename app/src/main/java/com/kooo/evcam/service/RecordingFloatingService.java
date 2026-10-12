@@ -1188,6 +1188,8 @@ public class RecordingFloatingService extends Service {
                     isRecording ? R.color.recording_track : R.color.text_tertiary));
             canvas.drawCircle(centerX, centerY, ringRadius, ringPaint);
 
+            iconPaint.setColor(ContextCompat.getColor(getContext(),
+                    com.kooo.evcam.ui.RecordButtonUi.markColorRes(isRecording)));
             if (isRecording) {
                 // 轨道上走过的那一段：从十二点开始顺时针
                 ringRect.set(centerX - ringRadius, centerY - ringRadius,
@@ -1207,13 +1209,7 @@ public class RecordingFloatingService extends Service {
                         iconPaint
                 );
             } else {
-                // 待机：中间那个点留着，但和外圈一样是灰的。
-                //
-                // 试过中间不画东西，只剩一个空圈 —— 太素，一眼认不出这是个按钮。
-                // 红色仍然只在录制时出现：说明「正在录」的是颜色，不是有没有点。
-                iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.text_tertiary));
                 canvas.drawCircle(centerX, centerY, radius * 0.32f, iconPaint);
-                iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
             }
         }
     }

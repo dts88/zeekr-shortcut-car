@@ -27,9 +27,12 @@ public final class StickerRecover {
      * @param scanHold sticker screen owns the radio
      * @param busy     this sticker already has a gatt open, pending, or up
      */
-    /** A second direct connect drops a sticker this radio already has up. */
+    /**
+     * A second direct connect drops a sticker this radio already has up.
+     * Dial the next one gently when another link is up.
+     */
     public static boolean gentleConnect(int othersUp) {
-        return false;
+        return othersUp > 0;
     }
 
     public static int allowConnect(boolean scanHold, boolean busy) {

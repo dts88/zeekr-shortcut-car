@@ -21,6 +21,11 @@ import com.kooo.evcam.storage.LockWindow;
 import com.kooo.evcam.zeekr.RecordingTimeline;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -71,6 +76,8 @@ public final class InstantCapture {
         long longest = longestSegment(app);
         long deadline = window.endMs + longest * 2L + 15_000L;
         List<File> sources = new ArrayList<>();
+        List<File> repaired = new ArrayList<>();
+        long lastRepair = 0L;
         while (true) {
             long now = System.currentTimeMillis();
             if (now >= window.endMs + LockWindow.SLACK_MS) {
@@ -78,6 +85,15 @@ public final class InstantCapture {
                 if (ready != null) {
                     sources = ready;
                     break;
+                }
+                if (now - lastRepair >= 5_000L) {
+                    lastRepair = now;
+                    dropOpenCopies(repaired);
+                    repaired = repairOverlap(app, window);
+                    if (!repaired.isEmpty()) {
+                        sources = repaired;
+                        break;
+                    }
                 }
             }
             if (now >= deadline) {
@@ -88,16 +104,19 @@ public final class InstantCapture {
                 Thread.sleep(1000L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                dropOpenCopies(repaired);
                 return;
             }
         }
         sources = oneClip(sources, momentMs);
         if (sources.isEmpty()) {
+            dropOpenCopies(repaired);
             toast(app, app.getString(R.string.instant_capture_failed));
             return;
         }
         File cache = new File(app.getCacheDir(), "instant");
         if (!cache.exists() && !cache.mkdirs()) {
+            dropOpenCopies(repaired);
             toast(app, app.getString(R.string.instant_capture_failed));
             return;
         }
@@ -135,6 +154,7 @@ public final class InstantCapture {
                     AppLog.w(TAG, "删不掉临时片段: " + clip.getAbsolutePath());
                 }
             }
+            dropOpenCopies(repaired);
         }
     }
 
@@ -279,7 +299,11 @@ public final class InstantCapture {
             AppLog.w(TAG, "要存即时片段，但没有 U 盘");
             return 0;
         }
-        File dest = UsbExport.instantCaptures(root);
+        File dest = instantFolder(root, StorageHelper.getVideoDir(app));
+        if (dest == null) {
+            AppLog.w(TAG, "要存即时片段，但目录建不出来");
+            return 0;
+        }
         int copied = 0;
         for (File clip : clips) {
             try {
@@ -309,12 +333,119 @@ public final class InstantCapture {
         return next;
     }
 
-    static boolean snapshotOpenFile(Mp4Repair.Status status) {
-        return false;
+    /**
+     * Copy a still-open surround file and rebuild its index from a finished sibling.
+     * The live file stays untouched, because the recorder is still writing it.
+     */
+    private static List<File> repairOverlap(Context app, LockWindow window) {
+        List<File> hits = candidates(app, window);
+        File templateFile = healthyTemplate(app, hits);
+        if (templateFile == null) {
+            return new ArrayList<>();
+        }
+        Mp4Repair.Template template;
+        try {
+            template = Mp4Repair.templateFrom(templateFile);
+        } catch (IOException e) {
+            AppLog.e(TAG, "即时片段没有可参考的完好文件", e);
+            return new ArrayList<>();
+        }
+        File cache = new File(app.getCacheDir(), "instant");
+        if (!cache.exists() && !cache.mkdirs()) {
+            return new ArrayList<>();
+        }
+        List<File> out = new ArrayList<>();
+        for (File file : hits) {
+            long start = RecordingTimeline.parseStartEpochMs(file.getName());
+            if (start < 0 || InstantSpan.inFile(start, window.startMs, window.endMs) == null) {
+                continue;
+            }
+            if (UsbExport.playable(file)) {
+                out.add(file);
+                continue;
+            }
+            if (!snapshotOpenFile(Mp4Repair.scan(file).status)) {
+                continue;
+            }
+            File copy = new File(cache, "open-" + file.getName());
+            try {
+                copySnapshot(file, copy);
+                Mp4Repair.repair(copy, template, null);
+                if (UsbExport.playable(copy)) {
+                    out.add(copy);
+                }
+            } catch (IOException e) {
+                AppLog.e(TAG, "补即时片段索引失败: " + file.getAbsolutePath(), e);
+                if (copy.exists() && !copy.delete()) {
+                    AppLog.w(TAG, "删不掉半成品: " + copy.getAbsolutePath());
+                }
+            }
+        }
+        return out;
     }
 
+    private static File healthyTemplate(Context app, List<File> hits) {
+        for (File file : hits) {
+            if (UsbExport.playable(file)) {
+                return file;
+            }
+        }
+        File video = StorageHelper.getVideoDir(app);
+        if (video == null) {
+            return null;
+        }
+        File[] listed = video.listFiles();
+        if (listed == null) {
+            return null;
+        }
+        for (File file : listed) {
+            if (file.isFile() && surround(file) && UsbExport.playable(file)) {
+                return file;
+            }
+        }
+        return null;
+    }
+
+    private static void dropOpenCopies(List<File> repaired) {
+        for (File extra : repaired) {
+            if (extra != null && extra.getName().startsWith("open-")
+                    && extra.exists() && !extra.delete()) {
+                AppLog.w(TAG, "删不掉补过索引的副本: " + extra.getAbsolutePath());
+            }
+        }
+    }
+
+    private static void copySnapshot(File source, File dest) throws IOException {
+        try (InputStream in = new FileInputStream(source);
+             OutputStream out = new FileOutputStream(dest)) {
+            byte[] buf = new byte[1024 * 1024];
+            int n;
+            while ((n = in.read(buf)) >= 0) {
+                if (n > 0) {
+                    out.write(buf, 0, n);
+                }
+            }
+        }
+    }
+
+    /** An open segment has picture bytes and no index. The cut can use a repaired copy. */
+    static boolean snapshotOpenFile(Mp4Repair.Status status) {
+        return status == Mp4Repair.Status.REPAIRABLE;
+    }
+
+    /** Prefer the USB root. Fall back beside the video folder when that root cannot be created. */
     static File instantFolder(File usbRoot, File videoDir) {
-        return new File(usbRoot, UsbExport.INSTANT_DIR);
+        File atRoot = usbRoot == null ? null : new File(usbRoot, UsbExport.INSTANT_DIR);
+        if (atRoot != null && (atRoot.isDirectory() || atRoot.mkdirs())) {
+            return atRoot;
+        }
+        if (videoDir != null && videoDir.getParentFile() != null) {
+            File beside = new File(videoDir.getParentFile(), UsbExport.INSTANT_DIR);
+            if (beside.isDirectory() || beside.mkdirs()) {
+                return beside;
+            }
+        }
+        return atRoot;
     }
 
     /** 闪远光要的是车外那一路。座舱录像留在录像目录里。 */

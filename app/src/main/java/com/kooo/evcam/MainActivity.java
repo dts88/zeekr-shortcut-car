@@ -1442,10 +1442,11 @@ public class MainActivity extends AppCompatActivity {
         if (bw < 2 || bh < 2) {
             return null;
         }
-        float scale = 960f / Math.max(bw, bh);
-        int w = Math.max(2, ((int) (bw * scale)) / 2 * 2);
-        int h = Math.max(2, ((int) (bh * scale)) / 2 * 2);
-        return new int[]{w, h};
+        int[] sized = com.kooo.evcam.zeekr.RemoteFrame.grabSize(bw, bh);
+        if (sized[0] < 2 || sized[1] < 2) {
+            return null;
+        }
+        return sized;
     }
 
     private android.graphics.Bitmap grabCabin(android.view.TextureView view) {
@@ -2949,9 +2950,14 @@ public class MainActivity extends AppCompatActivity {
                 + " segment=" + (cameraManager.getCurrentSegmentIndex() + 1));
     }
 
-    /** 悬浮录制按钮跟上界面记的录制状态。回到前台时对过账也要再发一次。 */
+    /** 悬浮录制按钮跟上录制器。界面自己那面旗在重建后是关的，不能拿它当准。 */
     private void broadcastCurrentRecordingState() {
-        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, isRecording);
+        boolean pipeline = recordingCoordinator != null && recordingCoordinator.isRecording();
+        boolean show = com.kooo.evcam.ui.RecordButtonUi.floatShowsRecording(isRecording, pipeline);
+        if (show && !isRecording) {
+            syncRecordingStateFromManager();
+        }
+        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, show);
     }
 
     /**

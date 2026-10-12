@@ -9,7 +9,12 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- The floating record button and the main screen use the same recording state. Red means recording on both.
+- Flash-to-pass saves the instant capture from the surround segment that is still open. If the USB root cannot hold that folder, the capture is saved beside the videos.
+- More than one smart sticker can stay connected.
+- Remote surround fills the phone frame. Each camera is wide enough for its cell.
 
 ## [2.11.1-beta] - 2026-10-12
 
