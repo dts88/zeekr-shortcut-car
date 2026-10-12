@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.1-alpha] - 2026-10-12
+
+- Diagnostics: the black box records each display's on/off state and the vehicle's screen, power, gear, Sentry Mode, driver door, seat and belt signals when they change.
+
 ## [2.11.0-alpha] - 2026-10-11
 
 - Cameras are opened, closed and reconfigured in one place, one step at a time; the surround view changes alone.
