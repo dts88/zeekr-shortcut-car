@@ -24,6 +24,14 @@ public class RemoteFrameTest {
     }
 
     @Test
+    public void surroundGrabKeepsEachLaneAtLeastAsWideAsACell() {
+        int[] vertical = RemoteFrame.grabSize(1280, 5140);
+        assertTrue(Math.min(vertical[0], vertical[1]) >= RemoteFrame.CELL_WIDTH);
+        int[] horizontal = RemoteFrame.grabSize(5120, 1280);
+        assertTrue(Math.min(horizontal[0], horizontal[1]) >= RemoteFrame.CELL_WIDTH);
+    }
+
+    @Test
     public void wideCellUsesFullWidthAndAShorterVerticalSpan() {
         float[] window = new float[4];
         RemoteFrame.correctedWindow(16f / 9f, window);

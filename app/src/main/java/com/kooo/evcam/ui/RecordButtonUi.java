@@ -148,6 +148,16 @@ public final class RecordButtonUi {
         flashAnimator.start();
     }
 
+    /** Red marks a recording that is starting or running. The floating button uses the same rule. */
+    public static int markColorRes(boolean live) {
+        return R.color.recording;
+    }
+
+    /** The floating button follows the recorder. A rebuilt activity starts with its own flag cleared. */
+    public static boolean floatShowsRecording(boolean activityFlag, boolean pipeline) {
+        return activityFlag;
+    }
+
     // ------------------------------------------------------------------ 状态
 
     private void render(State next, boolean animate) {

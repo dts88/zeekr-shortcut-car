@@ -1,6 +1,8 @@
 package com.kooo.evcam.input;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -54,6 +56,13 @@ public class StickerRecoverTest {
     public void intentionalCloseAndPreLinkNoiseDoNotReconnect() {
         assertEquals(0, StickerRecover.onDisconnect(true, true, 8, false).size());
         assertEquals(0, StickerRecover.onDisconnect(false, false, 0, false).size());
+    }
+
+    @Test
+    public void secondStickerDialsGentlyWhileTheFirstStaysUp() {
+        assertFalse(StickerRecover.gentleConnect(0));
+        assertTrue(StickerRecover.gentleConnect(1));
+        assertTrue(StickerRecover.gentleConnect(2));
     }
 
     @Test

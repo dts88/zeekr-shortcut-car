@@ -20,6 +20,18 @@ public final class RemoteFrame {
     public static final int CELL_WIDTH = 480;
     public static final int CELL_HEIGHT = 270;
 
+    /** Bitmap size for a surround grab. The short side has to cover one cell. */
+    public static int[] grabSize(int bufferW, int bufferH) {
+        int longest = Math.max(bufferW, bufferH);
+        if (longest < 2 || bufferW < 2 || bufferH < 2) {
+            return new int[]{0, 0};
+        }
+        float scale = 960f / longest;
+        int w = Math.max(2, ((int) (bufferW * scale)) / 2 * 2);
+        int h = Math.max(2, ((int) (bufferH * scale)) / 2 * 2);
+        return new int[]{w, h};
+    }
+
     private static final int DIVISIONS = 8;
 
     private final FisheyeMesh mesh = new FisheyeMesh();

@@ -13,6 +13,7 @@ import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.StoragePlan;
 import com.kooo.evcam.profile.RecordSpecs;
+import com.kooo.evcam.repair.Mp4Repair;
 import com.kooo.evcam.share.DriveExport;
 import com.kooo.evcam.share.SurroundDefish;
 import com.kooo.evcam.share.UsbExport;
@@ -306,6 +307,14 @@ public final class InstantCapture {
             n++;
         } while (!used.add(next));
         return next;
+    }
+
+    static boolean snapshotOpenFile(Mp4Repair.Status status) {
+        return false;
+    }
+
+    static File instantFolder(File usbRoot, File videoDir) {
+        return new File(usbRoot, UsbExport.INSTANT_DIR);
     }
 
     /** 闪远光要的是车外那一路。座舱录像留在录像目录里。 */
