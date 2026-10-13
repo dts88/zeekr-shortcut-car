@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.2-alpha] - 2026-10-13
+
+- Screen off now follows the physical screen: the vehicle's screen signal counts, not only Android's screen-off at power-down.
+- While the screen is off, the front and rear cabin cameras are released; they rejoin recording when the screen turns on.
+- With Keep recording when the screen goes off on, the surround view keeps recording: until the head unit sleeps without Sentry Mode, and on with it.
+- Record-button hint and setting descriptions updated to match.
+- Vehicle signals are read while the app runs (no GPS).
+- System info shows the center screen state.
+- Diagnostics: the black box and report record each screen-off period, the cabin release and the head unit's sleep.
+
 ## [2.11.1-alpha] - 2026-10-12
 
 - Diagnostics: the black box records each display's on/off state and the vehicle's screen, power, gear, Sentry Mode, driver door, seat and belt signals when they change.
