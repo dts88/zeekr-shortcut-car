@@ -303,7 +303,7 @@
     <string name="set_side_popup_straighten_title">拉直画面</string>
     <string name="set_side_popup_straighten_summary">校正鱼眼并调整侧视取景，适用于已有后视镜和独立侧视窗口；不改变录像。</string>
     <string name="set_side_popup_fov_title">视野（°）</string>
-    <string name="set_side_popup_fov_summary">越小越放大。只在「拉直画面」开着时起作用</string>
+    <string name="set_side_popup_fov_summary">越小越放大。开启「拉直画面」时，靠近相机画面边缘会自动缩小视野；大角度取景可能明显减少可见范围</string>
     <string name="set_side_popup_yaw_title">往后看（°）</string>
     <string name="set_side_popup_yaw_summary">正数朝车尾（盲区）转，负数朝车头。方向是猜的：反了就往另一头拉</string>
     <string name="set_side_popup_pitch_title">往上看（°）</string>

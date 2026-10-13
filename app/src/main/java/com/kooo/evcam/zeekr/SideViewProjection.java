@@ -15,6 +15,10 @@ package com.kooo.evcam.zeekr;
  * 往后 = 绕竖轴朝车尾那一边转，往上 = 绕横轴朝画面上边转。猜反了滑块往另一头拉。</p>
  *
  * <p>纯 Java，见 {@code SideViewProjectionTest}。</p>
+ *
+ * <p>Rendering uses {@link SideViewFraming} to fit the view before sampling. Direct
+ * {@code sourcePoint} calls retain the original clamping behavior for comparison;
+ * clamping individual mesh corners at large aiming angles can collapse whole tiles.</p>
  */
 public final class SideViewProjection {
 
@@ -48,36 +52,50 @@ public final class SideViewProjection {
                                    int lane, float aspectRatio, float[] out, int offset) {
         double fov = Math.toRadians(clamp(fovDegrees, MIN_FOV_DEGREES, MAX_FOV_DEGREES));
         double t = Math.tan(fov / 2.0);
-        // 虚拟相机里的射线：x 右、y 下、z 朝前
-        double x = (u * 2.0 - 1.0) * t;
-        double aspect = Float.isFinite(aspectRatio) && aspectRatio > 0f ? aspectRatio : 1.0;
-        double y = (v * 2.0 - 1.0) * t / aspect;
-        double z = 1.0;
+        new Rays(backDegrees, upDegrees, lane).map(u, v, t, aspectRatio, out, offset);
+        out[offset] = clamp01(out[offset]);
+        out[offset + 1] = clamp01(out[offset + 1]);
+    }
 
-        // 先往上（绕 x 轴，朝 −y 转），再往后（绕 y 轴，朝车尾那一边转）
-        double pitch = Math.toRadians(clamp(upDegrees, -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES));
-        double cp = Math.cos(pitch);
-        double sp = Math.sin(pitch);
-        double y1 = y * cp - z * sp;
-        double z1 = y * sp + z * cp;
+    /** Unclipped projection, so framing can detect overflow before corners collapse at an edge. */
+    static final class Rays {
+        private final double cp, sp, cy, sy;
 
-        double towardRear = lane == LaneCycle.RIGHT ? 1.0 : -1.0;
-        double yaw = Math.toRadians(clamp(backDegrees, -MAX_YAW_DEGREES, MAX_YAW_DEGREES)) * towardRear;
-        double cy = Math.cos(yaw);
-        double sy = Math.sin(yaw);
-        double x2 = x * cy + z1 * sy;
-        double z2 = -x * sy + z1 * cy;
-        double y2 = y1;
+        Rays(float backDegrees, float upDegrees, int lane) {
+            double pitch = Math.toRadians(clamp(upDegrees, -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES));
+            cp = Math.cos(pitch);
+            sp = Math.sin(pitch);
+            double towardRear = lane == LaneCycle.RIGHT ? 1.0 : -1.0;
+            double yaw = Math.toRadians(clamp(backDegrees, -MAX_YAW_DEGREES, MAX_YAW_DEGREES)) * towardRear;
+            cy = Math.cos(yaw);
+            sy = Math.sin(yaw);
+        }
 
-        // 射线偏离鱼眼光轴多少度 → 原图上离中心多远（等距：半径 0.5 = 90°）
-        double length = Math.sqrt(x2 * x2 + y2 * y2 + z2 * z2);
-        double angle = Math.acos(Math.max(-1.0, Math.min(1.0, z2 / length)));
-        double planar = Math.hypot(x2, y2);
-        double dirX = planar > EPSILON ? x2 / planar : 0.0;
-        double dirY = planar > EPSILON ? y2 / planar : 0.0;
-        double radius = angle / (Math.PI / 2.0) * 0.5;
-        out[offset] = clamp01((float) (0.5 + dirX * radius));
-        out[offset + 1] = clamp01((float) (0.5 + dirY * radius));
+        void map(float u, float v, double t, float aspectRatio, float[] out, int offset) {
+            // 虚拟相机里的射线：x 右、y 下、z 朝前
+            double x = (u * 2.0 - 1.0) * t;
+            double aspect = Float.isFinite(aspectRatio) && aspectRatio > 0f ? aspectRatio : 1.0;
+            double y = (v * 2.0 - 1.0) * t / aspect;
+            double z = 1.0;
+
+            // 先往上（绕 x 轴，朝 −y 转），再往后（绕 y 轴，朝车尾那一边转）
+            double y1 = y * cp - z * sp;
+            double z1 = y * sp + z * cp;
+
+            double x2 = x * cy + z1 * sy;
+            double z2 = -x * sy + z1 * cy;
+            double y2 = y1;
+
+            // 射线偏离鱼眼光轴多少度 → 原图上离中心多远（等距：半径 0.5 = 90°）
+            double length = Math.sqrt(x2 * x2 + y2 * y2 + z2 * z2);
+            double angle = Math.acos(Math.max(-1.0, Math.min(1.0, z2 / length)));
+            double planar = Math.hypot(x2, y2);
+            double dirX = planar > EPSILON ? x2 / planar : 0.0;
+            double dirY = planar > EPSILON ? y2 / planar : 0.0;
+            double radius = angle / (Math.PI / 2.0) * 0.5;
+            out[offset] = (float) (0.5 + dirX * radius);
+            out[offset + 1] = (float) (0.5 + dirY * radius);
+        }
     }
 
     private static float clamp(float v, float lo, float hi) {
