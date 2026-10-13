@@ -60,8 +60,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private static final String TAG = "SettingsPreference";
 
     private AppConfig appConfig;
+    /** 绑定这一页时开发者选项开没开；回到这一页时变了就重绑（见 {@link #onResume}）。 */
+    private boolean boundUnlocked;
     /** 外置卷的取值前缀，后面接它在探测结果里的下标。 */
     private static final String EXTERNAL_PREFIX = "external:";
+    /**
+     * 设置里选的是 U 盘、眼下却一个都没探测到时那一项的取值。故意不带 {@link #EXTERNAL_PREFIX}：
+     * 它后面没有下标，不能当成某个卷去解析；选它什么都不改。
+     */
+    private static final String EXTERNAL_MISSING = "external-missing";
     private List<StorageHelper.VolumeInfo> storageVolumes;
 
     private static final String ARG_SECTION = "section";
@@ -92,6 +99,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         appConfig = new AppConfig(getContext());
+        boundUnlocked = DeveloperMode.isUnlocked();
 
         bindRecording();
         bindStorage();
@@ -100,8 +108,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindFloating();
         bindInterface();
         bindSystem();
-        bindAdvanced();
-        bindDeveloper();
+        // 开发者选项分区：没开时不接线。左栏已经把整块拿掉了；万一是直接跳进来的，点了也不起作用 ——
+        // 里面的设置这时本来就按没存过算（AppConfig.DEVELOPER_KEYS）
+        if (boundUnlocked) {
+            bindAdvanced();
+            bindDeveloper();
+        }
         bindUpdate();
 
         // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
@@ -118,6 +130,19 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     @Override
     public void onResume() {
         super.onResume();
+        // 停在开发者选项这一页时把它关了（「关于与致谢」里关的）：这一页不能再留着，换回默认分区
+        if (!DeveloperMode.isUnlocked() && getArguments() != null
+                && SettingsShellFragment.DEVELOPER_SECTION.equals(getArguments().getString(ARG_SECTION))
+                && getParentFragment() instanceof SettingsShellFragment) {
+            ((SettingsShellFragment) getParentFragment()).showSection(SettingsShellFragment.DEFAULT_SECTION);
+            return;
+        }
+        // 开发者选项在「关于与致谢」（另一个 Activity）里开关：回来时变了就按新的状态整页重绑 ——
+        // 中转写入能不能开、内置存储那一项怎么写、开发者分区接不接线都跟着它
+        if (appConfig != null && boundUnlocked != DeveloperMode.isUnlocked()) {
+            onCreatePreferences(null, null);
+            return;
+        }
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateStorageUsage();
         refreshRearViewSize();
@@ -129,7 +154,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindCarModel();
 
         // 相机与视频流的参数（每一路的三条流、每一格的摆法）都在下面这个
-        // 「视频流配置编辑」里。同一件事只留一个入口：两个入口意味着
+        // 「编辑视频流配置」里。同一件事只留一个入口：两个入口意味着
         // 迟早会出现「这边写着 30、那边写着 15」。
         onClick("pref_profile_editor",
                 pref -> openFragment(new ProfileEditorFragment(), R.string.set_profile_editor_title));
@@ -137,11 +162,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_auto_record", appConfig.isAutoStartRecording(),
                 value -> appConfig.setAutoStartRecording(value));
 
+        // 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（关着时主界面在后台拍不到画面，见 AppConfig）。
+        // 没开时开着、灰着、点不动，下面写「需开启开发者选项」（同「中转写入」）—— 读到的值本来就按开算（DEVELOPER_KEYS）
         bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
                 enabled -> {
                     appConfig.setPhotoViaJpegEnabled(enabled);
                     toast(getString(R.string.msg_restart_required));
                 });
+        SwitchPreferenceCompat jpeg = findPreference("pref_photo_via_jpeg");
+        if (jpeg != null && !boundUnlocked) {
+            jpeg.setEnabled(false);
+            jpeg.setSummary(getString(R.string.msg_dev_only));
+        }
 
 
         bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
@@ -151,7 +183,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 });
         bindLicensePlate();
 
-        // 应用名与版本是无条件盖上去的（见 MultiCameraManager.buildBrandLine），
+        // 应用名与版本（填了车牌号跟在后面）每一路 MediaCodec 录像、每一张照片都盖，和「时间水印」开不开无关
+        // （录像见 EglSurfaceEncoder.drawBrandOverlay，照片见 SingleCamera.addWatermark；
+        // 开发者选项里的 MediaRecorder 模式什么角标都画不了），
         // 这里只是把这件事摆在界面上：开着、灰着、点不动。
         // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
         SwitchPreferenceCompat brand = findPreference("pref_watermark_brand");
@@ -167,59 +201,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_watermark_spec", appConfig.isWatermarkSpecEnabled(),
                 value -> appConfig.setWatermarkSpecEnabled(value));
 
-        // 行驶信息条（试验项目）：打开时顺手要定位权限 —— 经纬度和 GPS 车速靠它
-        bindSwitch("pref_info_bar", appConfig.isInfoBarEnabled(), enabled -> {
-            appConfig.setInfoBarEnabled(enabled);
-            if (enabled) {
-                askLocationPermission();
-            }
-        });
-        // 「激活所有栏目信息」锁在开发者模式后面：没解锁时灰掉、关着、写明为什么（值那边 AppConfig 同样锁着）
-        bindSwitch("pref_info_bar_all", appConfig.isInfoBarAllActive(),
-                value -> appConfig.setInfoBarAllActive(value));
-        SwitchPreferenceCompat infoBarAll = findPreference("pref_info_bar_all");
-        if (infoBarAll != null && !DeveloperMode.isUnlocked()) {
-            infoBarAll.setEnabled(false);
-            infoBarAll.setSummary(getString(R.string.set_info_bar_all_dev_only));
-        }
-    }
-
-    private static final int REQUEST_LOCATION = 41;
-
-    /** 信息条要经纬度和车速：向系统要定位权限。容器给不给、弹不弹框，看黑匣子。 */
-    private void askLocationPermission() {
-        android.content.Context context = getContext();
-        if (context == null) {
-            return;
-        }
-        boolean granted = androidx.core.content.ContextCompat.checkSelfPermission(context,
-                android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED;
-        com.kooo.evcam.blackbox.BlackBox.note("行驶信息条打开，定位权限" + (granted ? "已有" : "没有，向系统申请"));
-        if (!granted) {
-            requestPermissions(new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @androidx.annotation.NonNull String[] permissions,
-                                           @androidx.annotation.NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_LOCATION) {
-            boolean granted = grantResults.length > 0
-                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
-            com.kooo.evcam.blackbox.BlackBox.note("定位权限申请结果：" + (granted ? "已授予" : "被拒绝或没有弹框"));
-        }
+        // 行驶信息条（试验项目）：经纬度和 GPS 车速要定位权限，已经有了（比如车机预先授予）才用，
+        // 不弹权限框（项目所有者 2026-10-06）；没有就不显示，见 LocationSource
+        bindSwitch("pref_info_bar", appConfig.isInfoBarEnabled(),
+                value -> appConfig.setInfoBarEnabled(value));
     }
 
     /**
      * 视频流配置。
      *
-     * <p>「环视 + 两路座舱」0.48 起对所有人开放：座舱那两路的旋转、镜像、
-     * 画面填充都做完并在车上验证过了，它不再是半成品。</p>
+     * <p>「极氪7X（环视 + 前后座舱）」0.48 起对所有人开放：座舱那两路的旋转、镜像、
+     * 画面适配都做完并在车上验证过了，它不再是半成品。</p>
      *
      * <p>「自定义」仍然只在开发者选项里 —— 那一档要手动指定每一路接哪个相机，
      * 用途是排查，不是日常使用。半成品混在正常选项里，选中之后出问题会让人
@@ -262,7 +254,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindStorageLocation();
 
         // 中转写入是「先写内置再搬走」，本质上就是往内置存储规律性地写，
-        // 所以和内置存储同一个门槛
+        // 所以和内置存储同一个门槛：开发者选项关着时置灰，值也按关算（AppConfig 那道门），写着关就是关
         SwitchPreferenceCompat relay = findPreference("pref_relay_write");
         if (relay != null) {
             relay.setPersistent(false);
@@ -282,7 +274,115 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindGigabyteLimit("pref_photo_limit", appConfig.getPhotoStorageLimitGb(),
                 value -> appConfig.setPhotoStorageLimitGb(value));
 
+        bindFootageLock();
+        bindAutoLock();
         updateStorageUsage();
+    }
+
+    /**
+     * 锁定影像下面的两个自动锁定（项目所有者 2026-10-04），默认关：自动锁的也占空间，锁满了就停录。
+     * 「锁定影像」关着时闪远光那一项置灰、不起作用（XML 里的 dependency；{@code AutoLock.flashEnabled} 也看它）。
+     * 鸣笛那一项：车上还读不到喇叭信号，一直置灰、打不开，没有触发它的代码。「打不开」只在这里设
+     * （XML 里不写 enabled，和水印品牌那一行一样）。
+     */
+    private void bindAutoLock() {
+        bindSwitch("pref_footage_lock_flash", appConfig.isFlashLockEnabled(), value -> {
+            appConfig.setFlashLockEnabled(value);
+            com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
+        });
+        SwitchPreferenceCompat horn = findPreference("pref_footage_lock_horn");
+        if (horn != null) {
+            horn.setPersistent(false);
+            horn.setChecked(false);
+            horn.setEnabled(false);
+        }
+    }
+
+    /**
+     * 锁定影像。打开直接生效；关掉时如果锁着东西，先说清楚代价（项目所有者 2026-10-03）：
+     * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。
+     */
+    private void bindFootageLock() {
+        SwitchPreferenceCompat pref = findPreference("pref_footage_lock");
+        if (pref == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setChecked(appConfig.isFootageLockEnabled());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            if (Boolean.TRUE.equals(newValue)) {
+                applyFootageLock(pref, true);
+                return true;
+            }
+            // 先不拨：量完锁了多少再决定要不要问
+            final Context context = getContext() != null ? getContext().getApplicationContext() : null;
+            if (context == null) {
+                return false;
+            }
+            new Thread(() -> {
+                com.kooo.evcam.storage.FootageLocks.Usage videos =
+                        com.kooo.evcam.storage.FootageLocks.usage(StorageHelper.getVideoDir(context));
+                com.kooo.evcam.storage.FootageLocks.Usage photos =
+                        com.kooo.evcam.storage.FootageLocks.usage(StorageHelper.getPhotoDir(context));
+                if (!isAdded()) {
+                    return;
+                }
+                requireActivity().runOnUiThread(() -> confirmFootageLockOff(pref,
+                        videos.files + photos.files, videos.bytes + photos.bytes));
+            }, "footage-lock-off").start();
+            return false;
+        });
+        updateFootageLocked();
+    }
+
+    private void confirmFootageLockOff(SwitchPreferenceCompat pref, int files, long bytes) {
+        if (files == 0 || getContext() == null) {
+            applyFootageLock(pref, false);
+            return;
+        }
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(getContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.dlg_footage_lock_off_title)
+                .setMessage(getResources().getQuantityString(R.plurals.dlg_footage_lock_off_msg,
+                        files, files, StorageHelper.formatSize(bytes)))
+                .setPositiveButton(R.string.dlg_footage_lock_off_ok, (dialog, which) -> applyFootageLock(pref, false))
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    private void applyFootageLock(SwitchPreferenceCompat pref, boolean on) {
+        appConfig.setFootageLockEnabled(on);
+        pref.setChecked(on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock → " + (on ? "开" : "关"));
+        // 闪远光自动锁定跟着它：正在录的话马上开始 / 不再看信号
+        com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
+        updateFootageLocked();
+    }
+
+    /** 「已锁定」那一行：录像几个文件多大、照片几张多大；开关关着时注明不受保护。 */
+    private void updateFootageLocked() {
+        Preference pref = findPreference("pref_footage_locked");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        pref.setSummary(getString(R.string.info_reading));
+        final Context context = getContext().getApplicationContext();
+        final boolean on = appConfig.isFootageLockEnabled();
+        new Thread(() -> {
+            com.kooo.evcam.storage.FootageLocks.Usage videos =
+                    com.kooo.evcam.storage.FootageLocks.usage(StorageHelper.getVideoDir(context));
+            com.kooo.evcam.storage.FootageLocks.Usage photos =
+                    com.kooo.evcam.storage.FootageLocks.usage(StorageHelper.getPhotoDir(context));
+            if (!isAdded()) {
+                return;
+            }
+            String text = videos.files + photos.files == 0
+                    ? getString(R.string.set_footage_locked_none)
+                    : getString(R.string.set_footage_locked_summary,
+                            videos.files, StorageHelper.formatSize(videos.bytes),
+                            photos.files, StorageHelper.formatSize(photos.bytes));
+            final String result = on || videos.files + photos.files == 0 ? text
+                    : getString(R.string.set_footage_locked_unprotected, text);
+            requireActivity().runOnUiThread(() -> pref.setSummary(result));
+        }, "footage-locked").start();
     }
 
     /**
@@ -345,6 +445,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             // 真正被记住的是下面钉进 customSdCardPath 的根目录
             values.add(EXTERNAL_PREFIX + i);
         }
+        // 选的是 U 盘、盘却不在：单列一项照实写。不列的话，选中项只能落到下面的
+        // 「内置存储」上 —— 看着像设置被改过，其实一直是 U 盘
+        String current = currentStorageValue(volumes);
+        if (EXTERNAL_MISSING.equals(current)) {
+            labels.add(getString(R.string.storage_external_missing));
+            values.add(EXTERNAL_MISSING);
+        }
         // 内置存储照样列出来 —— 藏起来只会让人以为软件没这个能力。
         // 但标明它要开发者选项，选中时也会被拦下。
         labels.add(getString(StorageHelper.isInternalStorageAllowed()
@@ -353,12 +460,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         pref.setEntries(labels.toArray(new String[0]));
         pref.setEntryValues(values.toArray(new String[0]));
-        pref.setValue(currentStorageValue(volumes));
-        pref.setSummary(pref.getEntry() != null
-                ? pref.getEntry() : getString(R.string.info_none_selected));
+        // 当前值一定在列表里：某个卷、「U 盘（未检测到）」，或者一直列着的内置存储
+        pref.setValue(current);
+        pref.setSummary(pref.getEntry());
 
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
+            if (EXTERNAL_MISSING.equals(value)) {
+                // 没有卷可钉，也不该借这一下改成别的：原样不动
+                return false;
+            }
             if (AppConfig.STORAGE_INTERNAL.equals(value)) {
                 if (!StorageHelper.isInternalStorageAllowed()) {
                     explainInternalStorageIsGated();
@@ -373,10 +484,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         updateStorageUsage();
     }
 
-    /** 当前生效的是哪一项。外置时要对上具体哪个卷，不能笼统算「外置」。 */
+    /**
+     * 当前生效的是哪一项。外置时要对上具体哪个卷，不能笼统算「外置」；
+     * 选了外置却一个卷都没有时是 {@link #EXTERNAL_MISSING}，不能算成内置。
+     * 开发者选项关着时，存着的内置存储按 U 盘算（{@code AppConfig.getStorageLocation}），这里写的也是 U 盘。
+     */
     private String currentStorageValue(List<StorageHelper.VolumeInfo> volumes) {
-        if (!appConfig.isUsingExternalSdCard() || volumes.isEmpty()) {
+        if (!appConfig.isUsingExternalSdCard()) {
             return AppConfig.STORAGE_INTERNAL;
+        }
+        if (volumes.isEmpty()) {
+            return EXTERNAL_MISSING;
         }
         String pinned = appConfig.getCustomSdCardPath();
         if (pinned != null && !pinned.isEmpty()) {
@@ -451,7 +569,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 熄屏录制最多不让车机睡多久：用户自己填小时数，可带小数（24、30 都行），存成分钟。
-     * 填错、填 0 或负数都不收，提示「请输入数字」。
+     * 填错、留空、填 0 或负数（折成分钟四舍五入为 0 的也算）都不收，提示「请输入大于 0 的数字」；
+     * 大到分钟数存不下的，按能存的最大值收。
      */
     private void bindScreenOffWakeHours() {
         EditTextPreference pref = findPreference("pref_screen_off_wake_hours");
@@ -465,12 +584,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             int minutes;
             try {
                 double hours = Double.parseDouble(String.valueOf(newValue).trim());
-                minutes = (int) Math.round(hours * 60);
+                // 先夹在 int 范围里再收窄：直接强转，太大的正数会绕成负数被当成「填了负数」，
+                // 太小的负数反倒绕成正数被收下
+                minutes = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(hours * 60)));
             } catch (NumberFormatException e) {
                 minutes = 0;
             }
             if (minutes <= 0) {
-                toast(getString(R.string.msg_enter_number));
+                toast(getString(R.string.msg_enter_positive_number));
                 return false;
             }
             appConfig.setScreenOffWakeMinutes(minutes);
@@ -532,6 +653,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         return gigabytes > 0 ? gigabytes + " GB" : getString(R.string.info_unlimited);
     }
 
+    /**
+     * 「录像保存路径」：在录写录制器实际写的目录，没在录写下一次会写的目录；
+     * 此刻录不了（没有 U 盘、开发者选项没开）写「未检测到 U 盘」（{@link StorageHelper#savedVideoDir}）。
+     */
     private void updateStorageUsage() {
         Preference pref = findPreference("pref_storage_usage");
         if (pref == null || getContext() == null) {
@@ -539,12 +664,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         pref.setSummary(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
+        final boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
+        final String noDrive = getString(R.string.set_storage_usage_no_drive);
+        final String failed = getString(R.string.info_read_failed);
         new Thread(() -> {
             String desc;
             try {
-                desc = StorageHelper.getCurrentStoragePathDesc(context);
+                java.io.File dir = StorageHelper.savedVideoDir(context, recording);
+                desc = dir != null ? dir.getAbsolutePath() : noDrive;
             } catch (Throwable t) {
-                desc = getString(R.string.info_read_failed);
+                desc = failed;
             }
             final String result = desc;
             if (isAdded()) {
@@ -722,12 +851,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 悬浮窗
 
     private void bindFloating() {
+        // 按钮显示出来时自己问协调器在不在录，这里不用再推状态
         bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
-                OverlayCoordinator::setRecordButtonEnabled, on -> {
-                    if (on && getActivity() instanceof MainActivity) {
-                        ((MainActivity) getActivity()).broadcastCurrentRecordingState();
-                    }
-                });
+                OverlayCoordinator::setRecordButtonEnabled, null);
 
         // 整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半
         bindSlider("pref_button_size", 48, 150,
@@ -907,6 +1033,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_reduce_motion", appConfig.isReduceMotionWhileRecording(),
                 value -> appConfig.setReduceMotionWhileRecording(value));
+        // 车辆状态面板：主界面那个控件自己听这个开关
+        bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
+                value -> appConfig.setVehicleStatusEnabled(value));
 
         bindEnum("pref_fisheye_projection", SettingsRegistry.FISHEYE_PROJECTION,
                 appConfig.getFisheyeProjection(), value -> {
@@ -916,9 +1045,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     bindFisheyeFov();
                 }, this::showProjectionSummary);
         bindFisheyeFov();
-
-        bindSlider("pref_fisheye_strength", 10, 100, appConfig.getFisheyeStrength(), "%",
-                value -> appConfig.setFisheyeStrength(value));
     }
 
     /** 校正视野。范围随投影方式变，所以单独一个方法，换投影时再叫一次。 */
@@ -939,31 +1065,32 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 息屏录制：没开开发者选项时锁住 —— 灰掉、关着、写明为什么。
-     *
-     * <p>用「锁」不用「藏」：这是一个普通人会来找的选项，藏起来的话找的人不知道它存在，
-     * 也不知道去哪打开。值那边 AppConfig 同样锁着，界面写着关，实际就是关。</p>
+     * 系统：诊断信息、系统信息、开机自启动（含保活）、熄屏持续录制。
+     * 开发者的「熄屏录制（阻止休眠）」不在这里，在开发者选项分区（{@link #bindAdvanced}）。
      */
     private void bindSystem() {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
-        // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时收，离开就把资源放掉
+        // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
 
+        // 开机自启动接手全部保活手段（规格 §3）：关了就把定时任务也取消，别等它下次到点再自己退出
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
-                value -> appConfig.setAutoStartOnBoot(value));
-        // 保活开关接手全部保活手段（规格 §3）：关了就把定时任务也取消，别等它下次到点再自己退出
-        bindSwitch("pref_keep_alive", appConfig.isKeepAliveEnabled(),
                 value -> {
-                    appConfig.setKeepAliveEnabled(value);
+                    appConfig.setAutoStartOnBoot(value);
                     if (value) {
                         com.kooo.evcam.KeepAliveManager.startKeepAliveWork(requireContext());
                     } else {
                         com.kooo.evcam.KeepAliveManager.stopKeepAliveWork(requireContext());
                     }
                 });
+        // 熄屏持续录制录到什么时候看哨兵模式（熄屏 v3：开着一直录环视，没开录到车机要睡）：行尾写着哨兵模式此刻开没开（行样式在 apply 之前标上）
+        androidx.preference.Preference keepRecording = findPreference("pref_screen_off_keep_recording");
+        if (keepRecording != null) {
+            PreferenceRows.markSentryStatus(keepRecording);
+        }
         bindSwitch("pref_screen_off_keep_recording", appConfig.isScreenOffKeepRecording(),
                 value -> appConfig.setScreenOffKeepRecording(value));
     }
@@ -972,7 +1099,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void bindAdvanced() {
         bindEnum("pref_recording_mode", SettingsRegistry.RECORDING_MODE,
-                appConfig.getRecordingMode(), value -> appConfig.setRecordingMode(value));
+                appConfig.getRecordingMode(), value -> appConfig.setRecordingMode(value),
+                this::showRecordingModeSummary);
 
         // 熄屏录制 = 熄屏持续录制 + 唤醒锁（规格 §3.1）。整块只在开发者选项里出现，不用再单独锁
         bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
@@ -981,11 +1109,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
 
+        // 画面调节：打开调节窗口（MainActivity 管着它，退出设置也还在），同时开启画面调节、套上存着的参数。
+        // 窗口开没开成由 MainActivity 说：没有悬浮窗权限、相机还没好时它自己提示
         onClick("pref_image_adjust", pref -> {
             if (getActivity() instanceof MainActivity) {
+                MainActivity main = (MainActivity) getActivity();
                 appConfig.setImageAdjustEnabled(true);
-                ((MainActivity) getActivity()).setImageAdjustEnabled(true);
-                toast(getString(R.string.msg_adjust_opened));
+                main.setImageAdjustEnabled(true);
+                main.showImageAdjustFloatingWindow();
             }
         });
 
@@ -1010,6 +1141,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     }
 
+    /** 摘要除了选中项，还写明这一项现在不起作用：录制固定走 MediaCodec。 */
+    private void showRecordingModeSummary() {
+        ListPreference pref = findPreference("pref_recording_mode");
+        if (pref != null && getContext() != null) {
+            pref.setSummary(getString(R.string.set_recording_mode_summary, pref.getEntry()));
+        }
+    }
+
     private void updateCameraMappingSummary() {
         Preference pref = findPreference("pref_camera_mapping");
         if (pref == null) {
@@ -1022,20 +1161,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 开发者选项
 
     /**
-     * 开发者选项整块的显隐。
+     * 开发者选项里的工具。只在开发者选项开着时接线（见 {@link #onCreatePreferences}）。
      *
-     * <p>没解锁时把整个分类从界面上移除，而不是置灰 —— 置灰等于告诉别人
+     * <p>没开时整个分区从左栏上移除，而不是置灰 —— 置灰等于告诉别人
      * 「这里有东西但你用不了」，而这些本来就不该出现在普通用户的设置里。</p>
      */
     private void bindDeveloper() {
         // 这里原来先找一个 key 为 cat_developer 的分类，找不到就整个返回 ——
         // 而 0.21.0 把分区改成嵌套 PreferenceScreen 之后，这个 key 就不存在了。
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
-        if (!DeveloperMode.isUnlocked()) {
-            // 左栏已经把整块拿掉了；万一是直接跳进来的，这里也不接线
-            return;
-        }
-
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
@@ -1048,13 +1182,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_gpu_fisheye_video", appConfig.isGpuFisheyeVideo(),
                 appConfig::setGpuFisheyeVideo);
 
+        // 别的程序占用 / 放开相机时记嫌疑应用；要使用情况访问，在权限设置里授予
+        bindSwitch("pref_camera_holder_suspects", appConfig.isCameraHolderSuspectsEnabled(),
+                appConfig::setCameraHolderSuspectsEnabled);
+
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {
                 return;
             }
             // 录制中不能修：正在录的那一段也没有索引，和断电留下的半截文件长得一样
-            boolean recording = getActivity() instanceof MainActivity
-                    && ((MainActivity) getActivity()).isCurrentlyRecording();
+            boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
             com.kooo.evcam.repair.Mp4RepairFlow.start(getActivity(), recording);
         });
 
@@ -1063,8 +1200,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (getActivity() == null) {
                 return;
             }
-            boolean recording = getActivity() instanceof MainActivity
-                    && ((MainActivity) getActivity()).isCurrentlyRecording();
+            boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
             com.kooo.evcam.repair.ArchiveFlow.start(getActivity(), recording);
         });
 
@@ -1127,7 +1263,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    /** 单行文本输入：车牌号、视频 / 图片存储上限。 */
+    /**
+     * 单行文本输入：车牌号、视频 / 图片存储上限。
+     * 标题和说明取 XML 里的 dialogTitle / dialogMessage（存储上限靠它们写单位和清理规则），
+     * 和下拉框一个规矩：没写标题就用这一行的标题，没写说明就不带。
+     */
     private void showTextDialog(EditTextPreference pref) {
         final android.widget.EditText input =
                 com.kooo.evcam.ui.CamDialogs.input(requireContext());
@@ -1139,8 +1279,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(input);
 
+        CharSequence title = pref.getDialogTitle() != null
+                ? pref.getDialogTitle() : pref.getTitle();
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(pref.getTitle())
+                .setTitle(title)
+                .setMessage(pref.getDialogMessage())
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (dialog, which) -> {
                     String value = input.getText().toString();

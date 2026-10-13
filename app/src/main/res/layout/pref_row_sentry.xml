@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行：开关类，行尾多一行哨兵模式此刻的状态（SentryStatusView 自己读、自己换字）。
+  其余和 pref_row.xml 一样：开关在最前，id 和 androidx.preference 的默认布局一致。
+  用在「熄屏持续录制」上：它录到什么时候，看的是哨兵模式开没开。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp">
+
+    <LinearLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="18dp"
+        android:gravity="center"
+        android:orientation="vertical" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/pref_title"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:maxLines="6"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Micro" />
+    </LinearLayout>
+
+    <com.kooo.evcam.ui.SentryStatusView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:gravity="end"
+        android:maxLines="2"
+        android:textColor="@color/text_secondary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption" />
+</LinearLayout>

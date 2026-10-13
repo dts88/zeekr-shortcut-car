@@ -1,6 +1,7 @@
 package com.kooo.evcam.telemetry;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -83,6 +84,25 @@ public class SignalDecodeTest {
         assertEquals(Boolean.FALSE, Signal.STOCK_POPUP.decode(0));
     }
 
+    /**
+     * 屏幕电源事件：0 亮着、1 黑了（车主 2026-10-12 确认），别的（255 读不到、没见过的数）都是不知道 ——
+     * 熄屏判断把不知道当「这一项读不到」，不能当成亮着。先用着的信号，非开发者也拿得到。
+     */
+    @Test
+    public void screenPowerEventIsZeroLitOneDark() {
+        Signal s = Signal.SCREEN_POWER_EVENT;
+        assertEquals(Boolean.FALSE, s.decode(0));
+        assertEquals(Boolean.TRUE, s.decode(1));
+        assertNull(s.decode(255));
+        assertNull(s.decode(2));
+        assertNull(s.decode(null));
+        assertEquals(Signal.Format.SCREEN, s.format);
+        assertEquals(Signal.Kind.FUNCTION, s.kind);
+        assertEquals(0x20290300, s.id);
+        assertTrue(s.usable());
+        assertFalse("不按节拍读：熄屏判断那一层（只读离散信号）也要它", s.isFloat());
+    }
+
     @Test
     public void indicatorIsZeroToThree() {
         assertEquals(Integer.valueOf(0), Signal.INDICATOR.decode(0));
@@ -112,7 +132,14 @@ public class SignalDecodeTest {
         assertEquals(Float.valueOf(11053f), Signal.ODOMETER.decode(11053f));
         assertEquals(Float.valueOf(0f), Signal.SPEED.decode(0f));
         assertNull(Signal.SPEED.decode(255f));
-        assertEquals(Float.valueOf(-12f), Signal.STEERING.decode(-12f));
+        // 方向盘读数是弧度、左正右负；我们这边正 = 向右：左打满 8.789 ≈ -504°，右打满 -8.746 ≈ +501°
+        assertEquals(-503.6f, (Float) Signal.STEERING.decode(8.789f), 0.1f);
+        assertEquals(501.1f, (Float) Signal.STEERING.decode(-8.746f), 0.1f);
+        // 刹车踩到底约 44 = 100 % 行程，开车时的 22 是一半
+        assertEquals(100f, (Float) Signal.BRAKE_DEPTH.decode(44f), 0.01f);
+        assertEquals(50f, (Float) Signal.BRAKE_DEPTH.decode(22f), 0.01f);
+        assertEquals(Integer.valueOf(2), Signal.SENTRY_MODE.decode(2));
+        assertNull(Signal.SENTRY_MODE.decode(3));
     }
 
     /** 车速传感器给的是 m/s（Lab 0.10.0：15.833 = 57 km/h），表里直接换成 km/h。 */

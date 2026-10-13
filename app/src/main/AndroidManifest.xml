@@ -39,7 +39,8 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- 通知权限（Android 13+，用于显示前台服务通知） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 使用情况访问权限：只剩开发者选项的权限页显示它的状态 -->
+    <!-- 使用情况访问：开发者选项「记录可能占用摄像头的应用」查别的程序占用相机前后谁起停了前台服务、切了前后台；
+         要在系统设置里单独授予，开发者选项的权限页显示它的状态 -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
     <!-- 蓝牙权限（用于监听蓝牙状态变化，车机启动会自动连蓝牙） -->
@@ -150,7 +151,7 @@
         <!-- 诊断信息：相机/屏幕/车辆信号/存储/日志，可导出 -->
         <activity
             android:name=".zeekr.DiagnosticsActivity"
-            android:label="诊断信息"
+            android:label="@string/set_diagnostics_title"
             android:theme="@style/Theme.Cam"
             android:exported="false" />
 

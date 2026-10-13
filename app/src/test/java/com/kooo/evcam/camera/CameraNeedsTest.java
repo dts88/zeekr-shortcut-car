@@ -87,4 +87,50 @@ public class CameraNeedsTest {
         assertTrue(text, text.contains("PREVIEW"));
         assertTrue(text, text.contains("RECORDING"));
     }
+
+    // ================================================================= 车机要睡（2.11，阶段 3 加；阶段 6 由协调器写）
+
+    /** 「车机要睡」是一项事实，不是谁要相机：写了、清了都不动登记表。 */
+    @Test
+    public void theHeadUnitSleepsFactIsNotAHolder() {
+        assertFalse(needs.headUnitSleeps());
+        needs.claim(CameraNeeds.Holder.RECORDING);
+        needs.setHeadUnitSleeps(true);
+        assertTrue(needs.headUnitSleeps());
+        assertTrue("登记表不变", needs.isHeld(CameraNeeds.Holder.RECORDING));
+        needs.setHeadUnitSleeps(false);
+        assertFalse(needs.headUnitSleeps());
+        assertTrue(needs.isHeld(CameraNeeds.Holder.RECORDING));
+    }
+
+    /** 变了才叫监听者（调度据此当场置「正在按次序关」）；再写一遍同样的不叫。 */
+    @Test
+    public void writingTheHeadUnitSleepsFactWakesTheListenerOnlyWhenItChanges() {
+        final int[] calls = {0};
+        needs.setListener(() -> calls[0]++);
+        needs.setHeadUnitSleeps(true);
+        assertEquals(1, calls[0]);
+        needs.setHeadUnitSleeps(true);
+        assertEquals("同样的再写一遍不叫", 1, calls[0]);
+        needs.setHeadUnitSleeps(false);
+        assertEquals("亮屏清掉也叫", 2, calls[0]);
+    }
+
+    /** 换车型时两份管理器并存：旧的那份晚 release，摘不掉新那份的监听。 */
+    @Test
+    public void clearingTheListenerOnlyClearsItsOwn() {
+        final int[] older = {0};
+        final int[] newer = {0};
+        CameraNeeds.Listener old = () -> older[0]++;
+        CameraNeeds.Listener fresh = () -> newer[0]++;
+        needs.setListener(old);
+        needs.setListener(fresh);
+        needs.clearListener(old);
+        needs.claim(CameraNeeds.Holder.PREVIEW);
+        assertEquals("新那份还在听", 1, newer[0]);
+        assertEquals(0, older[0]);
+        needs.clearListener(fresh);
+        needs.release(CameraNeeds.Holder.PREVIEW);
+        assertEquals("摘掉之后不再叫", 1, newer[0]);
+    }
 }

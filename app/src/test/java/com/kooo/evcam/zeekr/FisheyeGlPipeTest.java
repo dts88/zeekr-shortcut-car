@@ -17,8 +17,8 @@ public class FisheyeGlPipeTest {
     private static final float TOLERANCE = 0.0005f;
     private static final double HALF_PI = 1.5707963268;
 
-    /** 照抄 FRAGMENT_SHADER 里的 corrected() 和强度插值。 */
-    private static float[] shader(float x, float y, int projection, float param, float strength) {
+    /** 照抄 FRAGMENT_SHADER 里的 corrected()。 */
+    private static float[] shader(float x, float y, int projection, float param) {
         double px;
         double py;
         if (projection == 0) {
@@ -57,10 +57,7 @@ public class FisheyeGlPipeTest {
                 py = clamp01(0.5 + dy / r * sr * 0.5);
             }
         }
-        return new float[]{
-                (float) (x + (px - x) * strength),
-                (float) (y + (py - y) * strength),
-        };
+        return new float[]{(float) px, (float) py};
     }
 
     private static double clamp01(double value) {
@@ -72,22 +69,18 @@ public class FisheyeGlPipeTest {
         String[] projections = {FisheyeProjection.PROJECTION_RECTILINEAR,
                 FisheyeProjection.PROJECTION_CYLINDRICAL, FisheyeProjection.PROJECTION_STEREOGRAPHIC};
         float[] fovs = {90f, 110f, 140f, 170f, 180f};
-        float[] strengths = {1f, 0.6f, 0.1f};
         float[] want = new float[2];
         for (String projection : projections) {
             int code = FisheyeProjection.shaderProjectionCode(projection);
             for (float fov : fovs) {
                 float param = FisheyeProjection.shaderParameter(fov, projection);
-                for (float strength : strengths) {
-                    for (float y = 0f; y <= 1.0001f; y += 0.0625f) {
-                        for (float x = 0f; x <= 1.0001f; x += 0.0625f) {
-                            FisheyeProjection.sourcePoint(x, y, fov, projection, strength, want, 0);
-                            float[] got = shader(x, y, code, param, strength);
-                            String at = projection + " fov=" + fov + " strength=" + strength
-                                    + " @" + x + "," + y;
-                            assertEquals(at + " x", want[0], got[0], TOLERANCE);
-                            assertEquals(at + " y", want[1], got[1], TOLERANCE);
-                        }
+                for (float y = 0f; y <= 1.0001f; y += 0.0625f) {
+                    for (float x = 0f; x <= 1.0001f; x += 0.0625f) {
+                        FisheyeProjection.sourcePoint(x, y, fov, projection, want, 0);
+                        float[] got = shader(x, y, code, param);
+                        String at = projection + " fov=" + fov + " @" + x + "," + y;
+                        assertEquals(at + " x", want[0], got[0], TOLERANCE);
+                        assertEquals(at + " y", want[1], got[1], TOLERANCE);
                     }
                 }
             }

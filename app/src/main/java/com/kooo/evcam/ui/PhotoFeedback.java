@@ -9,7 +9,7 @@ import com.kooo.evcam.camera.MultiCameraManager;
 /**
  * 拍照之后跟用户说什么 —— 主界面的拍照键和悬浮按钮说同一套话。
  *
- * <p>说的是相机层回报的真实结果（存下了几路），不是「按了」。
+ * <p>说的是相机层回报的真实结果（存下了几路，或者没有 U 盘、一路都没拍），不是「按了」。
  * 用应用级 Context：结果到的时候，按键的那个界面可能已经不在了。</p>
  */
 public final class PhotoFeedback implements MultiCameraManager.PhotoCallback {
@@ -37,5 +37,10 @@ public final class PhotoFeedback implements MultiCameraManager.PhotoCallback {
         } else {
             Toast.makeText(context, R.string.msg_photo_no_picture, Toast.LENGTH_LONG).show();
         }
+    }
+
+    @Override
+    public void onNoStorage() {
+        Toast.makeText(context, R.string.msg_photo_no_drive, Toast.LENGTH_LONG).show();
     }
 }

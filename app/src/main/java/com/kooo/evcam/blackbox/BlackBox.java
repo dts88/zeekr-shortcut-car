@@ -195,7 +195,6 @@ public final class BlackBox {
                             ? "(存着是开，开发者选项没解锁，没生效)" : "")
                     + (c.isScreenOffRecordingEnabled() ? "(最多 " + c.getScreenOffWakeMinutes() + " 分钟不让睡)" : "")
                     + " 熄屏持续录制=" + onOff(c.isScreenOffKeepRecording())
-                    + " 保活=" + onOff(c.isKeepAliveEnabled())
                     + " 超级后视镜=" + onOff(c.isRearViewEnabled())
                     + " 按键模式=" + onOff(c.isRearViewButtonMode())
                     + " 录制悬浮按钮=" + onOff(c.isRecordingFloatingEnabled());
@@ -206,6 +205,21 @@ public final class BlackBox {
 
     private static String onOff(boolean on) {
         return on ? "开" : "关";
+    }
+
+    /**
+     * 熄屏期间那几步（停录、放开相机、每一路关完、整轮关完、放唤醒锁）后面带的「，熄屏后 +N ms」；亮着时是空串。
+     * 熄屏 v3 起「熄屏后」从屏幕真黑的那一刻算（车辆信号判的，车主下车那一下；{@code ScreenState.darkForMs}），
+     * 格式不变（「，熄屏后 +Nms」，旧的分析脚本照样读）。黑着时安卓也熄屏了（车机要睡：哨兵模式没开时离车约 4–6 分钟后，
+     * 3–5 秒后进程就被结束），后面再带「、安卓熄屏起 +N ms」：车机要睡那几步赶没赶在进程没了之前，对着「车机要睡」那一行就看得出。
+     */
+    public static String afterScreenOff() {
+        long ms = com.kooo.evcam.screen.ScreenState.darkForMs();
+        if (ms < 0) {
+            return "";
+        }
+        long off = com.kooo.evcam.screen.ScreenState.androidOffForMs();
+        return "，熄屏后 +" + ms + "ms" + (off < 0 ? "" : "、安卓熄屏起 +" + off + "ms");
     }
 
     /** 已经接上了没有。没接上时事件先攒在内存里。 */

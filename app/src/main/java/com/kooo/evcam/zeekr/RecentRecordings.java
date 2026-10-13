@@ -5,25 +5,36 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
 import com.kooo.evcam.StorageHelper;
+import com.kooo.evcam.camera.CameraSlots;
+import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.camera.StoragePlan;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * 诊断报告里「最近几个录像文件实际是什么规格」。
+ * 诊断报告里「每一路最新的录像文件实际是什么规格」。
  *
  * <p>编码、尺寸、容器声明的帧率、时长，读的是文件本身，不是设置里填的值 ——
  * 两者不一样的时候，以这里为准。</p>
  *
  * <p>原来它是「回放与解码能力」的一半，另一半是解码器声明的尺寸上限。那一半的问题
  * 早有结论（平台笔记 §4.8：解码器吃得下，已排除），1.37.0 删了；这一半一直有用，留着。</p>
+ *
+ * <h3>每一路看它最新的那一个（熄屏 v3，设计 v3 §6）</h3>
+ *
+ * <p>以前看的是全盘最新的三个文件，三路一起录时正好是同一段的三个。熄屏后座舱放开、只剩环视接着录几分钟
+ * （项目所有者 2026-10-12 D2、D4），最新的三个就全是环视，座舱最后录到哪儿、录下来是什么样，报告里看不见了。
+ * 现在每一路列它最新的那一个，后面写最后写入的时刻：座舱那几路停在熄屏放开的那一刻，环视停在车机要睡（或者还在写），
+ * 对着黑匣子的「熄屏」「车机要睡」那几行看。</p>
  */
 public final class RecentRecordings {
-
-    /** 最多看几个最新的录像文件。三路录制时正好是同一段的三个文件。 */
-    private static final int MAX_FILES = 3;
 
     private RecentRecordings() {
     }
@@ -35,7 +46,7 @@ public final class RecentRecordings {
      * 报告里就一个新文件都看不到，像是什么都没录上。</p>
      */
     public static void appendTo(StringBuilder sb, Context context) {
-        sb.append("## 8. 最近的录像文件实际规格").append('\n');
+        sb.append("## 8. 每一路最新的录像文件实际规格").append('\n');
         File chosen = null;
         try {
             chosen = StorageHelper.getVideoDir(context);
@@ -61,29 +72,71 @@ public final class RecentRecordings {
     private static void appendDir(StringBuilder sb, File dir) {
         try {
             File[] files = dir != null ? dir.listFiles() : null;
-            List<File> videos = new ArrayList<>();
+            List<String> names = new ArrayList<>();
             if (files != null) {
                 for (File f : files) {
                     if (f.isFile() && f.getName().toLowerCase(Locale.US).endsWith(".mp4")) {
-                        videos.add(f);
+                        names.add(f.getName());
                     }
                 }
             }
-            if (videos.isEmpty()) {
-                sb.append("  没有找到 mp4 文件").append('\n');
+            int foreign = 0;
+            for (String name : names) {
+                if (!StoragePlan.isOwnClip(name)) {
+                    foreign++;
+                }
+            }
+            String others = foreign == 0 ? "" : "（另有 " + foreign + " 个 mp4 不是本应用的分段文件名，没列）";
+            // 每一路一个就够：读每个文件都要开一次 extractor，不必全扫
+            List<String> newest = newestOfEachSlot(names);
+            if (newest.isEmpty()) {
+                sb.append("  没有找到本应用的录像文件").append(others).append('\n');
                 return;
             }
-            // 最新的几个即可：读每个文件都要开一次 extractor，不必全扫
-            videos.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-            for (int i = 0; i < Math.min(MAX_FILES, videos.size()); i++) {
-                File video = videos.get(i);
-                sb.append("  ").append(video.getName())
-                        .append("  ").append(StorageHelper.formatSize(video.length())).append('\n');
+            SimpleDateFormat clock = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.US);
+            for (String name : newest) {
+                File video = new File(dir, name);
+                sb.append("  ").append(MultiCameraManager.roleName(slotKey(name))).append(": ").append(name)
+                        .append("  ").append(StorageHelper.formatSize(video.length()))
+                        .append("  最后写入 ").append(clock.format(new Date(video.lastModified()))).append('\n');
                 describeTrack(sb, video);
+            }
+            if (!others.isEmpty()) {
+                sb.append("  ").append(others).append('\n');
             }
         } catch (Throwable t) {
             sb.append("!! 读取失败: ").append(t).append('\n');
         }
+    }
+
+    /**
+     * 每一路最新的那个文件名（纯函数，{@code RecentRecordingsTest} 直接调）。只认本应用写的分段文件名
+     * （{@link StoragePlan#isOwnClip}，U 盘上用户自己的不算）；哪个是每一路最新的照录像空间那边的认法
+     * （{@link StoragePlan#newestOfEachSlot}：改名前后的两种叫法算同一路，名字开头是时刻、字典序就是时间序），不另写一份。
+     * 按开相机的次序排：环视、后座舱、前座舱，认不出来的在后（{@link CameraSlots#openOrder}）。
+     */
+    static List<String> newestOfEachSlot(List<String> names) {
+        List<StoragePlan.Clip> clips = new ArrayList<>();
+        for (String name : names) {
+            if (StoragePlan.isOwnClip(name)) {
+                // 大小在这里用不上
+                clips.add(new StoragePlan.Clip(name, 0));
+            }
+        }
+        Map<String, String> newest = new LinkedHashMap<>();
+        for (String name : StoragePlan.newestOfEachSlot(clips)) {
+            newest.put(slotKey(name), name);
+        }
+        List<String> ordered = new ArrayList<>();
+        for (String key : CameraSlots.openOrder(newest.keySet())) {
+            ordered.add(newest.get(key));
+        }
+        return ordered;
+    }
+
+    /** 文件是哪一路的内部 key（{@code _surround} 和改名前的 {@code _front} 都是环视那一路）。 */
+    private static String slotKey(String name) {
+        return CameraSlots.keyForSuffix(RecordingTimeline.parseCameraSlot(name));
     }
 
     /** 用 MediaExtractor 读视频轨的真实格式。 */

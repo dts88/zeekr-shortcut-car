@@ -1,7 +1,5 @@
 package com.kooo.evcam.playback;
 
-import com.kooo.evcam.R;
-
 /**
  * 回放画面的取景：决定 TextureView 上那个变换矩阵的源矩形与目标矩形。
  *
@@ -23,7 +21,7 @@ import com.kooo.evcam.R;
  * <b>这个已经拉伸过的结果</b>上再作用一次。所以源矩形用的是视图坐标，
  * 而不是视频像素坐标 —— 这一点弄反了画面就会跑偏。</p>
  *
- * <p>除了那张资源 id 表（一堆 int 常量）以外不碰 Android，方便直接跑单元测试。</p>
+ * <p>不碰 Android，方便直接跑单元测试。</p>
  */
 public final class PlaybackViewport {
 
@@ -258,29 +256,5 @@ public final class PlaybackViewport {
         float destLeft = (viewWidth - destWidth) / 2f;
         float destTop = (viewHeight - destHeight) / 2f;
         return new float[]{destLeft, destTop, destLeft + destWidth, destTop + destHeight};
-    }
-
-    /**
-     * 格子的名字，返回的是字符串资源 id。
-     *
-     * <p>四格对应哪个方向<b>早就实车确认过</b>：左上 前、右上 后、左下 左、右下 右。
-     * 超级后视镜就建立在这个映射上 —— 它按「后 → 左 → 前 → 右」顺时针遍历，
-     * 而且只给「后」做左右镜像；映射要是错的，那个窗口第一天就穿帮了。</p>
-     *
-     * <p>这里原先只敢说右上是后方、其余三格按位置叫「左上 / 左下 / 右下」——
-     * 那是确认之前留下的措辞，一直没跟上。按位置叫的问题不只是含糊：
-     * 「左上」和环视里真正的「左」<b>指的是两个东西</b>，摆在一起只会让人对不上。</p>
-     *
-     * <p>返回 id 而不是文字：这个类不拿 Context，取字交给有界面的调用方 ——
-     * 顺带也就不会再有写死中文的那一版。</p>
-     */
-    public static int labelRes(int cell) {
-        switch (cell) {
-            case 0: return R.string.zeekr_lane_front;
-            case 1: return R.string.zeekr_lane_back;
-            case 2: return R.string.zeekr_lane_left;
-            case 3: return R.string.zeekr_lane_right;
-            default: return R.string.zeekr_mode_grid;
-        }
     }
 }

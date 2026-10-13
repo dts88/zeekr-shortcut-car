@@ -11,7 +11,7 @@ import com.kooo.evcam.R;
  * （分工：Lab 把信号找准，这里把找到的用准）。</p>
  *
  * <p>每条信号有一个可信程度（{@link Trust}）：实验中观察一致的、先用着的、没验证的。
- * 信息条默认只启用信号都{@linkplain #usable() 能用}的栏目，其余划掉。</p>
+ * 没验证的（{@linkplain #usable() 不能用}）只有开发者能勾上信息条，非开发者的信息条读数里没有它们（{@code InfoBar}）。</p>
  *
  * <p><b>全都是实验结论</b>：号码是在车外试出来的，一个操作常常让好几个号一起变（挂 R 一次动六七个），
  * 联动车外无从得知。所以「确认」只是「实验中观察一致」，Lab 每次运行都在交叉验证，对不上的在手册里降级，
@@ -27,15 +27,15 @@ public enum Signal {
     SPEED(Group.DRIVE, Kind.SENSOR_VALUE, 0x00100100, 0, R.string.vi_speed, Trust.CONFIRMED, Format.MPS),
     IGNITION(Group.DRIVE, Kind.FUNCTION, 0x20259000, 0, R.string.vi_ignition, Trust.CONFIRMED, Format.IGNITION),
     BRAKE_PEDAL(Group.DRIVE, Kind.FUNCTION, 0x20317A00, 0, R.string.vi_brake_pedal, Trust.CONFIRMED, Format.ON_OFF),
-    /** 跟着变（停车踩下 11–15，开车最大见过 17.4），踩到底是多少没测；先按 0–100 画。用户定：保留。 */
-    BRAKE_DEPTH(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101300, 0, R.string.vi_brake_depth, Trust.PROVISIONAL, Format.PERCENT),
-    /** 行驶中跟着变（开车最大见过 64，像 %），踩到底是多少没测；先按 0–100 画。用户定：保留。 */
-    THROTTLE_DEPTH(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101400, 0, R.string.vi_throttle_depth, Trust.PROVISIONAL, Format.PERCENT),
+    /** 停车踩到底 43.2–43.8，开车一般 10–20（Lab 0.19.0）；单位不明、不是 %，按踩到底 {@link #BRAKE_FULL} 换算成行程 %。 */
+    BRAKE_DEPTH(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101300, 0, R.string.vi_brake_depth, Trust.CONFIRMED, Format.BRAKE),
+    /** 量程 0–100，单位 %（Lab 0.16.0 开车读到过 100.000）。 */
+    THROTTLE_DEPTH(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101400, 0, R.string.vi_throttle_depth, Trust.CONFIRMED, Format.PERCENT),
     /**
-     * 开车时跟着变。倒车入库一段读到 -8.9 … 7.3，Lab 判断很可能是弧度（度 = 读数 × 57.3），但左右哪边为负、
-     * 满舵读数还没测（Lab 0.14.0），比例先不改（{@link #STEERING_DEGREES_PER_UNIT}）。用户定：能用，开放。
+     * 单位是弧度，<b>左正右负</b>（ISO 8855 的习惯）：先左后右打到底，停在 8.789、-8.746（Lab 0.19.0）；
+     * 打满约 ±8.75–8.95 ≈ ±501–513°，左满到右满约 2.8 圈，公开资料 2.7 圈。换算和方向在 {@link #STEERING_DEGREES_PER_UNIT}。
      */
-    STEERING(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101000, 0, R.string.vi_steering, Trust.PROVISIONAL, Format.DEGREES),
+    STEERING(Group.DRIVE, Kind.SENSOR_VALUE, 0x00101000, 0, R.string.vi_steering, Trust.CONFIRMED, Format.DEGREES),
     /** 自动驻车的功能开关（设置项），不是「正在驻车」——信息条不用它。 */
     AUTO_HOLD(Group.DRIVE, Kind.FUNCTION, 0x20060400, 0, R.string.vi_auto_hold, Trust.CONFIRMED, Format.ON_OFF),
     /** 自动驻车「正在驻车」（车辆保持时的灯光请求）：停下被接管时 1，起步回 0；中间踩放踏板不变（Lab 0.13.0）。 */
@@ -49,6 +49,8 @@ public enum Signal {
     TURN_RIGHT(Group.LAMPS, Kind.FUNCTION, 0x21051200, 0, R.string.vi_turn_right, Trust.CONFIRMED, Format.ON_OFF),
     LOW_BEAM(Group.LAMPS, Kind.FUNCTION, 0x21050100, 0, R.string.vi_low_beam, Trust.CONFIRMED, Format.ON_OFF),
     HIGH_BEAM(Group.LAMPS, Kind.FUNCTION, 0x21050200, 0, R.string.vi_high_beam, Trust.CONFIRMED, Format.ON_OFF),
+    /** 闪远光：往前拨着拨杆时 1，松手回 0（轻拨也有 0.5 秒）；这时远光灯 0x21050200 一直是 0（Lab 0.16.0）。 */
+    HIGH_BEAM_FLASH(Group.LAMPS, Kind.FUNCTION, 0x2A091300, 0, R.string.vi_high_beam_flash, Trust.CONFIRMED, Format.ON_OFF),
     /** 近光没亮时才是 1：切到位置灯档 0 → 1，关灯或近光一亮回 0；晚上前灯带亮着时报的是前位置灯（Lab 0.13.0，用户确认）。 */
     DRL(Group.LAMPS, Kind.FUNCTION, 0x21050900, 0, R.string.vi_drl, Trust.CONFIRMED, Format.ON_OFF),
     /** 一直 0，车机报 notavailable：这台车多半没装前雾灯。 */
@@ -71,6 +73,11 @@ public enum Signal {
     DOOR_TRUNK(Group.BODY, Kind.FUNCTION_ZONE, 0x21020100, 0x20000000, R.string.vi_door_trunk, Trust.CONFIRMED, Format.DOOR),
     CHARGE_PORT(Group.BODY, Kind.FUNCTION, 0x21020500, 0, R.string.vi_charge_port, Trust.CONFIRMED, Format.DOOR),
     SUNROOF_SHADE(Group.BODY, Kind.FUNCTION_ZONE, 0x20080100, 0x8, R.string.vi_sunroof_shade, Trust.CONFIRMED, Format.RAW),
+    /**
+     * 主驾安全带：1 系着、0 没系。车刚唤醒那一刻会先读成 1（锁车 14 分钟后唤醒，没人坐、车门没开就 0 → 1，Lab 0.21.0，
+     * 只见过一次）：唤醒后、有人坐下之前的读数不可信。信息条车厢图上系着优先（{@link VehicleStateMapper#seatState}）：
+     * 这个假的 1 画出来是系着，不会误报红；红只在座椅有人、安全带读到没系时画。
+     */
     BELT_DRIVER(Group.BODY, Kind.SENSOR_EVENT, 0x00201200, 0, R.string.vi_belt_driver, Trust.CONFIRMED, Format.BELT),
     BELT_PASSENGER(Group.BODY, Kind.SENSOR_EVENT, 0x00201300, 0, R.string.vi_belt_passenger, Trust.UNVERIFIED, Format.BELT),
     BELT_REAR_LEFT(Group.BODY, Kind.SENSOR_EVENT, 0x00201800, 0, R.string.vi_belt_rear_left, Trust.UNVERIFIED, Format.BELT),
@@ -97,10 +104,18 @@ public enum Signal {
     BATTERY_TEMP(Group.VEHICLE, Kind.SENSOR_VALUE, 0x00102A00, 0, R.string.vi_battery_temp, Trust.CONFIRMED, Format.CELSIUS),
     DAY_NIGHT(Group.VEHICLE, Kind.SENSOR_EVENT, 0x00201000, 0, R.string.vi_day_night, Trust.CONFIRMED, Format.DAY_NIGHT),
     /**
-     * 哨兵模式（SETTING_FUNC_VSTD_MODE_STS）：0 / 1，用户下车前手动开关过一次时跟着变（Lab 0.13.0）。
-     * 只见过一次，是「开关」还是「哨兵在工作」还没分开，Lab 标待定。
+     * 哨兵模式（SETTING_FUNC_VSTD_MODE_STS）：0 关，1 开，2 推测是锁车后布防（锁车一分半后 1 → 2，解锁回 1，挂 D 回 0；
+     * Lab 0.18.0）。1 和 2 都算开着。Lab 还在对；用户 2026-10-02 点名先开放：熄屏后还能不能录，看的就是它。
      */
-    SENTRY_MODE(Group.VEHICLE, Kind.FUNCTION, 0x20240100, 0, R.string.vi_sentry_mode, Trust.UNVERIFIED, Format.ON_OFF),
+    SENTRY_MODE(Group.VEHICLE, Kind.FUNCTION, 0x20240100, 0, R.string.vi_sentry_mode, Trust.PROVISIONAL, Format.SENTRY),
+    /**
+     * 中控屏真的黑了没有（IVehicle.SETTING_FUNC_SCREEN_POWER_EVENT）：0 亮着，1 黑了，255 读不到。
+     * 车主 2026-10-12 对着当天车上的熄屏、亮屏确认：屏幕真黑的那一刻它 0 → 1，和点火 ON → ACC 同一毫秒；
+     * 开车门亮屏时 1 → 0，比点火 ACC → ON 晚不到 0.1 秒。安卓的熄屏广播要等车机下电才来（几分钟后），
+     * 熄屏判断（{@code screen.ScreenState}）看的是它和点火。先用着：只在这台 7X 上看过那几次。
+     */
+    SCREEN_POWER_EVENT(Group.VEHICLE, Kind.FUNCTION, 0x20290300, 0, R.string.vi_screen_power_event, Trust.PROVISIONAL,
+            Format.SCREEN),
 
     // ---- 安全辅助（读的是开关）
     AEB(Group.ASSIST, Kind.FUNCTION, 0x20070E00, 0, R.string.vi_aeb, Trust.CONFIRMED, Format.ON_OFF),
@@ -119,7 +134,7 @@ public enum Signal {
     public enum Trust {
         /** Lab 手册「实验中观察一致的」一节里有它，这里用到的含义、取值、量程都没挂着「待测 / 待定」 */
         CONFIRMED,
-        /** 车上跟着变、能用，但量程 / 比例 / 某个场景还等 Lab 测；用户点名先开放的（方向盘、油门刹车、日行灯） */
+        /** 车上跟着变、能用，但含义 / 量程 / 某个场景还等 Lab 测；用户点名先开放的（现在是哨兵模式、屏幕电源事件） */
         PROVISIONAL,
         /** 读得到，含义没对上，或者还没专门测过 */
         UNVERIFIED
@@ -175,6 +190,10 @@ public enum Signal {
         MIRROR_DIP,
         /** 白天 / 夜晚的枚举码 → Integer（0x00201001 白天、0x00201002 夜晚） */
         DAY_NIGHT,
+        /** 哨兵模式 → Integer（0 关、1 开、2 布防） */
+        SENTRY,
+        /** 屏幕电源事件 0 亮着 1 黑了 → Boolean（黑了为 true）；页面上写熄屏 / 亮屏，不写开 / 关（{@link SignalText}） */
+        SCREEN,
         /** 0 关 1 左 2 右 3 双闪 → Integer */
         INDICATOR,
         /** 点火状态的枚举码 → Integer（0x00200104 ACC、05 ON、07 DRIVING） */
@@ -186,14 +205,19 @@ public enum Signal {
         /** 传感器给的是 m/s（0.2778 = 1 km/h）→ 乘 3.6 记成 km/h（Float） */
         MPS,
         /** 浮点 → Float */
-        KMH, KM, PERCENT, PERCENT_RAW, DEGREES, CELSIUS
+        KMH, KM, PERCENT, PERCENT_RAW, DEGREES, CELSIUS,
+        /** 刹车深度读数 → 行程 %（读数 / {@link #BRAKE_FULL} × 100，Float），和油门一样是 0–100 */
+        BRAKE
     }
 
     /**
-     * 方向盘转角：读数 → 方向盘转过的度数（信息条上的数字和图标的转动都用它）。
-     * 满舵几圈、满舵时读数多少还没测（等 Lab），先按读数就是度数（1:1）。
+     * 方向盘转角：读数（弧度）→ 方向盘转过的度数，正 = 向右（顺时针）。信息条上的数字、左黄右白、图标的转动都用它。
+     * 车给的是左正右负（Lab 0.19.0），我们这边正 = 向右，所以带负号。
      */
-    public static final float STEERING_DEGREES_PER_UNIT = 1f;
+    public static final float STEERING_DEGREES_PER_UNIT = (float) (-180.0 / Math.PI);
+
+    /** 刹车深度踩到底的读数（Lab 0.19.0：43.2–43.8 两次）；读数 / 它 = 行程。 */
+    public static final float BRAKE_FULL = 44f;
 
     public static final int LIGHT_SWITCH_POSITION = 0x20040E01;
     public static final int LIGHT_SWITCH_LOW_BEAM = 0x20040E02;
@@ -255,6 +279,10 @@ public enum Signal {
         if (raw == null) {
             return null;
         }
+        if (format == Format.BRAKE) {
+            Float depth = raw instanceof Number ? floatOrNull(((Number) raw).floatValue()) : null;
+            return depth == null ? null : depth / BRAKE_FULL * 100f;
+        }
         if (format == Format.DEGREES) {
             Float units = raw instanceof Number ? floatOrNull(((Number) raw).floatValue()) : null;
             return units == null ? null : units * STEERING_DEGREES_PER_UNIT;
@@ -287,14 +315,18 @@ public enum Signal {
                     default: return null;
                 }
             case SHOWN:
-                // 1 原厂 360 画面；2 没显示；0 推测是打转向灯弹的侧方小窗 —— 对「360 画面在不在」来说 0 和 2 都是不在
+                // 1 原厂 360 画面；2 没显示；0 多半是打转向灯弹的侧方小窗（挂 D 那一刻也闪过 60 ms 的 0，Lab 0.16.0）——
+                // 不拿 0 判断侧方画面，只认「1 = 360 在」，所以 0 和 2 都是不在
                 return v == 1 ? Boolean.TRUE : (v == 2 || v == 0 ? Boolean.FALSE : null);
             case POPUP:
+            case SCREEN:
                 return onOff(v);
             case MIRROR_DIP:
                 return v >= MIRROR_NORMAL && v <= MIRROR_TILTING ? v : null;
             case DAY_NIGHT:
                 return v == DAY || v == NIGHT ? v : null;
+            case SENTRY:
+                return v >= 0 && v <= 2 ? v : null;
             case INDICATOR:
                 return v >= 0 && v <= 3 ? v : null;
             case LEVEL:

@@ -28,11 +28,12 @@ import java.util.Locale;
 /**
  * 「检查更新」这件事从头到尾。
  *
- * <h3>装完之后不留东西</h3>
+ * <h3>安装包放在哪、什么时候删</h3>
  *
  * <p>APK 下到<b>应用缓存目录</b>。系统装包必须从一个真实文件读，没法从内存直接装，
- * 所以「不落盘」做不到；能做到的是不落到用户的存储里，并且<b>每次检查前先把上一次
- * 的残留清掉</b>。缓存目录也在系统的回收范围内，空间紧张时会被自动清理。</p>
+ * 所以「不落盘」做不到；能做到的是不落到用户的存储里，并且<b>每次下载前先把上一次
+ * 下的安装包删掉</b>（{@link #clear}）。装完不删：交给系统安装界面之后，应用这边不知道它什么时候装完。
+ * 缓存目录也在系统的回收范围内，空间紧张时会被自动清理。</p>
  *
  * <h3>这是本应用唯一一次主动出网</h3>
  *
@@ -59,15 +60,16 @@ public final class UpdateFlow {
             try {
                 release = GithubReleases.fetchLatest(includeBeta, currentVersion(activity));
             } catch (Exception e) {
-                AppLog.w(TAG, "检查更新失败: " + e);
-                error = reason(activity, e);
+                AppLog.w(TAG, "检查更新失败", e);
+                error = failureText(activity, e,
+                        R.string.upd_check_failed, R.string.upd_cannot_check);
             }
             final GithubReleases.Release found = release;
             final String failure = error;
             post(activity, () -> {
                 dismiss(checking);
                 if (failure != null) {
-                    toast(activity, activity.getString(R.string.upd_check_failed, failure));
+                    toast(activity, failure);
                 } else if (found == null) {
                     // 只查正式版时说清楚：不是「没有新版本」，是「没有正式版」
                     toast(activity, activity.getString(includeBeta
@@ -115,7 +117,6 @@ public final class UpdateFlow {
         ProgressBar bar = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
         bar.setMax(100);
         TextView label = new TextView(activity);
-        label.setText(R.string.upd_downloading);
         label.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                 activity.getResources().getDimension(R.dimen.text_body));
         LinearLayout box = new LinearLayout(activity);
@@ -163,7 +164,8 @@ public final class UpdateFlow {
                 }));
             } catch (Exception e) {
                 AppLog.e(TAG, "下载失败", e);
-                error = reason(activity, e);
+                error = failureText(activity, e,
+                        R.string.upd_download_failed, R.string.upd_cannot_download);
             }
             final String failure = error;
             post(activity, () -> {
@@ -173,8 +175,7 @@ public final class UpdateFlow {
                     // 一闪而过的提示等于「点了没反应」
                     com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(activity, R.style.Theme_Cam_MaterialAlertDialog)
                             .setTitle(R.string.upd_download_failed_title)
-                            .setMessage(activity.getString(
-                                    R.string.upd_download_failed, failure))
+                            .setMessage(failure)
                             .setPositiveButton(R.string.action_got_it, null));
                 } else {
                     install(activity, target);
@@ -192,7 +193,7 @@ public final class UpdateFlow {
         }
         // 不先问 canRequestPackageInstalls()。车上的虚拟化容器（App Lab）里它回 false，
         // 可系统安装界面其实打得开 —— 浏览器下载的 APK 就是这样装上的。以前先问这一句，
-        // 于是永远弹「需要允许安装应用」，而「去设置」那一页车机上又打不开，应用内更新就卡死了。
+        // 于是永远弹「需要『安装未知应用』权限」，而「打开设置」那一页车机上又打不开，应用内更新就卡死了。
         // 直接交给系统安装器：真缺授权时，安装器会自己提示并带去设置的入口。
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AppLog.i(TAG, "canRequestPackageInstalls="
@@ -205,7 +206,7 @@ public final class UpdateFlow {
                     activity.getPackageName() + ".fileprovider", apk);
         } catch (IllegalArgumentException e) {
             AppLog.e(TAG, "FileProvider 拿不到 URI", e);
-            toast(activity, activity.getString(R.string.upd_cannot_open_apk, e.getMessage()));
+            toast(activity, activity.getString(R.string.upd_cannot_open_apk));
             return;
         }
 
@@ -221,7 +222,7 @@ public final class UpdateFlow {
             askForInstallPermission(activity);
         } catch (Exception e) {
             AppLog.e(TAG, "打不开安装界面", e);
-            toast(activity, activity.getString(R.string.upd_no_installer, e.getMessage()));
+            toast(activity, activity.getString(R.string.upd_no_installer));
         }
     }
 
@@ -262,14 +263,23 @@ public final class UpdateFlow {
         }
     }
 
-    /** 失败原因按当前语言说；说不清的（网络层抛的）照原样给出类名和原文。 */
-    private static String reason(Context context, Exception e) {
+    /**
+     * 失败时界面上那一句：能说清原因就是「X 失败：原因」，说不清就用不带原因的那句。
+     *
+     * <p>原因按当前语言说：{@link GithubReleases.Failure} 自带文字；网络层抛的异常只认
+     * 没网、超时这几种（{@link com.kooo.evcam.ui.FailureReason}）。异常的英文原文和类名不上界面，
+     * 调用方已经写进日志。</p>
+     */
+    private static String failureText(Context context, Exception e, int withReason, int withoutReason) {
+        String reason;
         if (e instanceof GithubReleases.Failure) {
             GithubReleases.Failure failure = (GithubReleases.Failure) e;
-            return context.getString(failure.messageRes, failure.args);
+            reason = context.getString(failure.messageRes, failure.args);
+        } else {
+            reason = com.kooo.evcam.ui.FailureReason.of(context, e);
         }
-        return e.getClass().getSimpleName()
-                + (e.getMessage() == null ? "" : ": " + e.getMessage());
+        return reason != null
+                ? context.getString(withReason, reason) : context.getString(withoutReason);
     }
 
     /** 本机装的是哪个版本；设置里「检查更新」那一行也显示它。 */

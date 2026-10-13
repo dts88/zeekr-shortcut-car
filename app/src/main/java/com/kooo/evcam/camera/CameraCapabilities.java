@@ -23,6 +23,11 @@ public final class CameraCapabilities {
 
     private static final Map<String, Integer> MAX_FPS = new ConcurrentHashMap<>();
     private static final Map<String, int[][]> FPS_RANGES = new ConcurrentHashMap<>();
+    /**
+     * 相机参数整份记下来。主线程不进相机服务（2026-10-08 的 ANR 卡在 getCameraCharacteristics 上），
+     * 要参数的地方先来这里拿；相机打开时记一次，之后参数不会变。
+     */
+    private static final Map<String, CameraCharacteristics> CHARACTERISTICS = new ConcurrentHashMap<>();
 
     private CameraCapabilities() {
     }
@@ -32,6 +37,7 @@ public final class CameraCapabilities {
         if (cameraId == null || characteristics == null) {
             return;
         }
+        CHARACTERISTICS.put(cameraId, characteristics);
         Range<Integer>[] ranges =
                 characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
         if (ranges == null || ranges.length == 0) {
@@ -52,6 +58,11 @@ public final class CameraCapabilities {
             pairs[i][1] = ranges[i] == null || ranges[i].getUpper() == null ? 0 : ranges[i].getUpper();
         }
         FPS_RANGES.put(cameraId, pairs);
+    }
+
+    /** 某台相机的参数；这个进程里还没开过它就是 null —— 那时别在主线程上去问相机服务。 */
+    public static CameraCharacteristics characteristics(String cameraId) {
+        return cameraId == null ? null : CHARACTERISTICS.get(cameraId);
     }
 
     /** 某台相机声明的全部帧率区间；没记到时返回 null。 */
@@ -83,5 +94,6 @@ public final class CameraCapabilities {
     public static void reset() {
         MAX_FPS.clear();
         FPS_RANGES.clear();
+        CHARACTERISTICS.clear();
     }
 }

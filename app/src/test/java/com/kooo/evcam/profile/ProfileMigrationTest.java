@@ -149,14 +149,17 @@ public class ProfileMigrationTest {
     /**
      * 新建的配置正好是「均衡」那一档。
      *
-     * <p>初值必须落在某一档上 —— 否则刚建的配置一打开，三张卡一张都没选中，
-     * 每一路还都标着「已细调」。</p>
+     * <p>每一路都得正好是记下的那一档 —— 否则刚建的配置一打开，
+     * 每一路都标着「自定义」。</p>
      */
     @Test
     public void aNewProfileIsExactlyTheBalancedStep() {
         Profile profile = ProfileMigration.migrate(snapshot());
 
-        assertEquals(QualityPreset.BALANCED, QualityPreset.of(profile));
+        assertEquals(QualityPreset.BALANCED, profile.quality);
+        for (CameraProfile camera : profile.cameras) {
+            assertTrue(camera.role, profile.quality.matches(camera.record));
+        }
     }
 
     /** 拍照没有旧设置，直接给「最大」这个模式，不是某个具体尺寸。 */
@@ -202,10 +205,12 @@ public class ProfileMigrationTest {
         edited.record.bitrate = "high";
         edited.record.codec = "h264";
         edited.record.segmentMinutes = 10;
+        before.quality = QualityPreset.SAVE_SPACE;
         Map<String, String> flat = before.toMap();
         Profile after = Profile.fromMap(flat);
 
         assertEquals(before.id, after.id);
+        assertEquals(before.quality, after.quality);
         assertEquals(before.cameras.size(), after.cameras.size());
         for (CameraProfile camera : before.cameras) {
             CameraProfile copy = after.camera(camera.role);

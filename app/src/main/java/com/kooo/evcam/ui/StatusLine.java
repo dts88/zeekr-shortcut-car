@@ -115,7 +115,7 @@ public final class StatusLine {
                     : level == 1 ? R.string.status_bitrate_low
                     : level == 3 ? R.string.status_bitrate_high
                     : R.string.status_bitrate_medium;
-            // 配置名原来在标题栏里（「环视 + 两路座舱」那一行）。标题栏拆了之后
+            // 配置名原来在标题栏里（「极氪7X（环视 + 前后座舱）」那一行）。标题栏拆了之后
             // 它归到这里 —— 它本来就是一条「现在按什么在跑」的状态，和帧率码率同类
             String profile = profileName(context);
             NumberRoll.set(stream, (profile.isEmpty() ? "" : profile + " · ")

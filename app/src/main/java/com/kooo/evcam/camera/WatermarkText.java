@@ -22,7 +22,9 @@ public final class WatermarkText {
     /**
      * 左上角第一行：应用名 + 版本，填了车牌号就跟在后面。
      *
-     * <p>这一行是<b>无条件</b>盖的：录出来的东西常常拿去当凭据或者发给别人，
+     * <p>这一行是<b>无条件</b>盖的 —— 每一路 MediaCodec 录像的每一帧、每一张照片，
+     * 和「时间水印」开关无关（开发者选项里的 MediaRecorder 模式没有 GL 这一步，什么角标都不盖；
+     * 工程模式存在 photos/raw 的原始帧故意不盖）：录出来的东西常常拿去当凭据或者发给别人，
      * 落上是哪个应用、哪个版本录的，回头才对得上。车牌号是可选的，
      * 因为那是车主自己的信息，要不要落在画面里应当由他决定。</p>
      */
@@ -49,5 +51,28 @@ public final class WatermarkText {
             return "";
         }
         return width + "x" + height;
+    }
+
+    /**
+     * 照片左上角从上到下的几行。应用名那一行（{@link #brandLine}）每一张都有；
+     * 时间和尺寸只在「时间水印」开着时才有 —— 和录像一样，开关只管时间那一块，不管应用名和车牌号。
+     * 空的行不画；一行都没有时返回空列表，调用方就不用复制图片。
+     */
+    public static java.util.List<String> photoLines(String brandLine, String time,
+                                                    int width, int height, boolean withTime) {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        if (brandLine != null && !brandLine.isEmpty()) {
+            lines.add(brandLine);
+        }
+        if (withTime) {
+            if (time != null && !time.isEmpty()) {
+                lines.add(time);
+            }
+            String spec = photoSpecLine(width, height);
+            if (!spec.isEmpty()) {
+                lines.add(spec);
+            }
+        }
+        return lines;
     }
 }

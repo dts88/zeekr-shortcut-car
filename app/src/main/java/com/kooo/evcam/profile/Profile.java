@@ -35,6 +35,14 @@ public final class Profile {
     /** 显示名。用户另存时自己起。 */
     public String name = "";
 
+    /**
+     * 三档里选的是哪一档。
+     *
+     * <p>单独存，不从各路的参数倒推：单独改过一路之后就推不出来了，
+     * 而「自定义」标记要比的、哪张卡该亮着，问的都是它（见 {@link QualityPreset}）。</p>
+     */
+    public QualityPreset quality = QualityPreset.BALANCED;
+
     public final List<CameraProfile> cameras = new ArrayList<>();
 
     public CameraProfile camera(String role) {
@@ -52,6 +60,7 @@ public final class Profile {
         Map<String, String> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("name", name);
+        out.put("quality", quality.key);
         StringBuilder roles = new StringBuilder();
         for (CameraProfile camera : cameras) {
             if (roles.length() > 0) {
@@ -110,6 +119,10 @@ public final class Profile {
             }
             profile.cameras.add(camera);
         }
+        // 这个键是后加的：早先存下的配置里没有它，只能按各路的参数倒推
+        String quality = values.get("quality");
+        profile.quality = quality != null
+                ? QualityPreset.fromKey(quality) : QualityPreset.inferredFrom(profile);
         return profile;
     }
 
@@ -143,6 +156,7 @@ public final class Profile {
             sb.append("（").append(name).append("）");
         }
         sb.append('\n');
+        sb.append("  画质档 ").append(quality.key).append('\n');
         for (CameraProfile camera : cameras) {
             sb.append("  ").append(camera);
         }

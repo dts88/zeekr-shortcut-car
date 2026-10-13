@@ -33,6 +33,19 @@ public class SideViewDecisionTest {
     }
 
     @Test
+    public void factoryViewsAlsoReleaseTheInstantPopupReadiness() {
+        SideViewDecision.Input in = driving(0);
+        in.stock360Shown = true;
+        org.junit.Assert.assertFalse(SideViewDecision.shouldStayReady(in));
+        in.stock360Shown = false;
+        in.stockPopupShown = true;
+        org.junit.Assert.assertFalse(SideViewDecision.shouldStayReady(in));
+        in.stockPopupShown = false;
+        in.parkAssistOn = true;
+        org.junit.Assert.assertFalse(SideViewDecision.shouldStayReady(in));
+    }
+
+    @Test
     public void signalOffCloses() {
         SideViewDecision.Input in = driving(0);
         in.showing = LaneCycle.LEFT;

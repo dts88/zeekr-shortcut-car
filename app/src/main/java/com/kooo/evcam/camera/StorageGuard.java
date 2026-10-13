@@ -10,7 +10,9 @@ import com.kooo.evcam.StorageHelper;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -79,6 +81,21 @@ public final class StorageGuard {
      * <p>不要在主线程调：U 盘上列目录和删文件都可能慢。</p>
      */
     public static StoragePlan.Decision enforce(Context context, File videoDir) {
+        return enforce(context, videoDir, null);
+    }
+
+    /**
+     * @param beforeDelete 真要删的那一刻先发到主线程（只在决定是「删」时发）。
+     *                     「正在删除最旧的录像」这类提示挂在这里，什么都不删时就不会弹
+     */
+    private static StoragePlan.Decision enforce(Context context, File videoDir, Runnable beforeDelete) {
+        // 读锁定清单、决定、删，整段拿着：中间有人锁上的文件不会正好在这一轮的删除名单里
+        synchronized (com.kooo.evcam.storage.FootageLocks.guard()) {
+            return enforceLocked(context, videoDir, beforeDelete);
+        }
+    }
+
+    private static StoragePlan.Decision enforceLocked(Context context, File videoDir, Runnable beforeDelete) {
         List<StoragePlan.Clip> clips = new ArrayList<>();
         File[] files = videoDir != null ? videoDir.listFiles() : null;
         if (files != null) {
@@ -89,12 +106,22 @@ public final class StorageGuard {
             }
         }
 
+        Set<String> locked = com.kooo.evcam.storage.FootageLocks.protectedNames(context, videoDir);
+        if (locked == null) {
+            // 锁定清单读不出来：这一轮一个都不删，宁可空间不够停录也不误删锁定的
+            locked = new HashSet<>();
+            for (StoragePlan.Clip clip : clips) {
+                locked.add(clip.name);
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("存储检查：锁定清单读不出来，这一轮不删录像");
+        }
+
         long capBytes = new AppConfig(context).getVideoStorageLimitGb() * GB;
         long free = freeBytes(videoDir);
         long segment = StoragePlan.estimateSegmentBytes(clips);
         // 读不到剩余空间时不据此下结论：当作足够，只按上限管
         StoragePlan.Decision decision = StoragePlan.decide(
-                clips, capBytes, free < 0 ? Long.MAX_VALUE : free, segment);
+                clips, locked, capBytes, free < 0 ? Long.MAX_VALUE : free, segment);
         lastMarginBytes = decision.marginBytes;
 
         AppLog.i(TAG, "存储检查: " + clips.size() + " 个录像 上限="
@@ -104,19 +131,27 @@ public final class StorageGuard {
                 + " 余量=" + StorageHelper.formatSize(decision.marginBytes)
                 + " → " + decision.verdict
                 + (decision.verdict == StoragePlan.Verdict.FULL
-                        ? (decision.capless ? "（没设上限，不删）" : "（删光本应用的旧录像也不够）")
+                        ? (decision.capless ? "（没设上限，不删）" : decision.lockedFull
+                                ? "（剩下的都锁着，没锁的删光也不够）" : "（删光本应用的旧录像也不够）")
                         : ""));
 
         if (decision.verdict == StoragePlan.Verdict.DELETE) {
+            if (beforeDelete != null) {
+                MAIN.post(beforeDelete);
+            }
             int deleted = 0;
+            List<String> gone = new ArrayList<>();
             for (String name : decision.toDelete) {
                 File file = new File(videoDir, name);
                 if (file.delete()) {
                     deleted++;
+                    gone.add(name);
                 } else {
                     AppLog.w(TAG, "删不掉: " + name);
                 }
             }
+            // 开关关着时锁定的也会被删：删掉的从清单里拿掉
+            com.kooo.evcam.storage.FootageLocks.forget(videoDir, gone);
             AppLog.i(TAG, "删掉最旧的录像 " + deleted + "/" + decision.toDelete.size()
                     + " 个，约 " + StorageHelper.formatSize(decision.deleteBytes));
         }
@@ -125,11 +160,16 @@ public final class StorageGuard {
 
     /** 在自己的线程上跑 {@link #enforce}，结果回主线程。 */
     public static void enforceAsync(Context context, File videoDir, Callback callback) {
+        enforceAsync(context, videoDir, null, callback);
+    }
+
+    /** 同上；真要删时先在主线程跑 {@code beforeDelete}（见 {@link #enforce(Context, File, Runnable)}）。 */
+    public static void enforceAsync(Context context, File videoDir, Runnable beforeDelete, Callback callback) {
         final Context app = context.getApplicationContext();
         EXECUTOR.execute(() -> {
             StoragePlan.Decision decision;
             try {
-                decision = enforce(app, videoDir);
+                decision = enforce(app, videoDir, beforeDelete);
             } catch (Exception e) {
                 AppLog.e(TAG, "存储检查失败", e);
                 return;

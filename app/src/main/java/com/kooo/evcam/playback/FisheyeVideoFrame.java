@@ -107,8 +107,7 @@ public class FisheyeVideoFrame extends FrameLayout {
     private void readConfig() {
         AppConfig config = new AppConfig(getContext());
         switchedOn = config.isFisheyeCorrection();
-        mesh.setCorrection(config.getFisheyeFov(), config.getFisheyeProjection(),
-                config.getFisheyeStrength() / 100f);
+        mesh.setCorrection(config.getFisheyeFov(), config.getFisheyeProjection());
         apply();
     }
 
@@ -128,7 +127,7 @@ public class FisheyeVideoFrame extends FrameLayout {
     }
 
     /**
-     * 开发者选项「视频回看：GPU 逐像素鱼眼校正」开着时，给播放器的转接；没开返回 null。
+     * 开发者选项「录像回放：GPU 逐像素鱼眼校正」开着时，给播放器的转接；没开返回 null。
      * 要在 TextureView 的画布好之前交给播放器（{@link ManagedVideoPlayer#setSurfaceRoute}）。
      */
     public ManagedVideoPlayer.SurfaceRoute gpuRoute() {
@@ -177,7 +176,7 @@ public class FisheyeVideoFrame extends FrameLayout {
                 && PlaybackViewport.hasSquareCells(videoWidth, videoHeight - inset);
         if (pipe != null) {
             // 走 GPU：开没开交给管线，这里只做取景。输出按视频原尺寸，放大一格时才不糊
-            pipe.setCorrection(fisheyeVideo, mesh.fovDegrees(), mesh.projection(), mesh.strength());
+            pipe.setCorrection(fisheyeVideo, mesh.fovDegrees(), mesh.projection());
             if (videoWidth > 0 && videoHeight > 0) {
                 pipe.setOutputSize(videoWidth, videoHeight);
                 pipe.setLanes(FisheyeGlPipe.gridLanes(
@@ -192,8 +191,7 @@ public class FisheyeVideoFrame extends FrameLayout {
         boolean now = fisheyeVideo && pipe == null;
         if (now != correcting) {
             AppLog.i(TAG, now
-                    ? "分格校正开：" + mesh.projection() + " " + mesh.fovDegrees() + "° 强度 "
-                            + Math.round(mesh.strength() * 100f) + "%"
+                    ? "分格校正开：" + mesh.projection() + " " + mesh.fovDegrees() + "°"
                     : "分格校正关" + (pipe != null ? "（走 GPU 逐像素）"
                             : switchedOn ? "（这段录像不是四路鱼眼："
                             + videoWidth + "x" + videoHeight + " grid=" + grid + "）" : ""));

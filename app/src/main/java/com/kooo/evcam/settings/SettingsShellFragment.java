@@ -39,6 +39,8 @@ public class SettingsShellFragment extends Fragment {
 
     /** 打开设置时默认停在哪一段。 */
     static final String DEFAULT_SECTION = "screen_recording";
+    /** 开发者选项那一段：没打开时不显示（左栏也没有这一行）。 */
+    static final String DEVELOPER_SECTION = "screen_developer";
 
     private SlidingPaneLayout slidingPane;
     private com.google.android.material.button.MaterialButton navButton;
@@ -103,6 +105,12 @@ public class SettingsShellFragment extends Fragment {
      * @param order 这个分区在左栏里是第几行；不知道就传 -1（按「往下」处理）
      */
     void showSection(String screenKey, int order) {
+        // 开发者选项关着时右栏不显示那一段：关掉的那一刻正停在那里，回来时换到默认分区 ——
+        // 留着的话那一页没接线，点里面的选项会崩，开关也只是空写
+        if (DEVELOPER_SECTION.equals(screenKey) && !DeveloperMode.isUnlocked()) {
+            screenKey = DEFAULT_SECTION;
+            order = -1;
+        }
         boolean down = order < 0 || order >= currentOrder;
         currentSection = screenKey;
         if (order >= 0) {

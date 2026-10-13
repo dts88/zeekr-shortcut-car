@@ -310,25 +310,4 @@ public class FisheyeProjectionTest {
                 FisheyeProjection.PROJECTION_RECTILINEAR), TOLERANCE);
         assertEquals(1f, stereographic(1f, 0.5f, 180f)[0], 0.002f);
     }
-
-    /** 强度 0 就是原图不动；1 就是这种投影本来的样子；中间是插值。 */
-    @Test
-    public void strengthInterpolatesTowardsTheUntouchedPicture() {
-        float[] out = new float[2];
-        FisheyeProjection.sourcePoint(0.8f, 0.3f, 120f,
-                FisheyeProjection.PROJECTION_RECTILINEAR, 0f, out, 0);
-        assertEquals(0.8f, out[0], TOLERANCE);
-        assertEquals(0.3f, out[1], TOLERANCE);
-
-        float[] full = new float[2];
-        FisheyeProjection.sourcePoint(0.8f, 0.3f, 120f,
-                FisheyeProjection.PROJECTION_RECTILINEAR, 1f, full, 0);
-        assertEquals(at(0.8f, 0.3f, 120f)[0], full[0], TOLERANCE);
-
-        float[] half = new float[2];
-        FisheyeProjection.sourcePoint(0.8f, 0.3f, 120f,
-                FisheyeProjection.PROJECTION_RECTILINEAR, 0.5f, half, 0);
-        assertEquals((0.8f + full[0]) / 2f, half[0], TOLERANCE);
-        assertEquals((0.3f + full[1]) / 2f, half[1], TOLERANCE);
-    }
 }

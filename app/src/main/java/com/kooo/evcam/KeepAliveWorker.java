@@ -24,7 +24,7 @@ public class KeepAliveWorker extends Worker {
         com.kooo.evcam.blackbox.BlackBox.attach(getApplicationContext(), "WorkManager");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("保活任务执行");
         if (UserExit.blocks(getApplicationContext(), "KeepAliveWorker")
-                || !new AppConfig(getApplicationContext()).isKeepAliveEnabled()) {
+                || !new AppConfig(getApplicationContext()).isAutoStartOnBoot()) {
             // 退出时 / 关保活时已经取消过；还能跑到这里说明取消没赶上，再取消一次
             KeepAliveManager.stopKeepAliveWork(getApplicationContext());
             return Result.success();

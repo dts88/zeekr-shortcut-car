@@ -78,10 +78,7 @@ def main():
 
     out.append("## Getting started")
     out.append("")
-    out.append("1. Plug in a USB drive.")
-    out.append("2. Open **Settings \u2192 Recording \u2192 Stream profile**, pick "
-               "*Zeekr 7X (surround composite)* or *Zeekr 7X (surround + front and rear cabin)*, "
-               "and restart the app.")
+    out.append("Plug in a USB drive.")
     out.append("")
     out.append("Something wrong? Export a report from **Settings \u2192 System \u2192 Diagnostics** "
                "and attach it to an issue.")

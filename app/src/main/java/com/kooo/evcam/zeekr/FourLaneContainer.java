@@ -521,11 +521,9 @@ public class FourLaneContainer extends ViewGroup {
     private void readFisheye() {
         AppConfig config = new AppConfig(getContext());
         fisheye = config.isFisheyeCorrection();
-        mesh.setCorrection(config.getFisheyeFov(), config.getFisheyeProjection(),
-                config.getFisheyeStrength() / 100f);
+        mesh.setCorrection(config.getFisheyeFov(), config.getFisheyeProjection());
         AppLog.i(TAG, "鱼眼校正 " + (fisheye
-                ? "开：" + mesh.projection() + " " + mesh.fovDegrees() + "° 强度 "
-                        + Math.round(mesh.strength() * 100f) + "%"
+                ? "开：" + mesh.projection() + " " + mesh.fovDegrees() + "°"
                 : "关") + " " + instanceTag());
         invalidate();
     }

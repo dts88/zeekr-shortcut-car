@@ -19,7 +19,7 @@
 
     <!--
       车机上没有系统返回键可用，侧滑抽屉在行车时也不好按，
-      所以把「回到录制界面」明确放在最上面一条。
+      所以把「返回主界面」明确放在最上面一条。
     -->
     <Preference
         android:key="pref_back_to_recording"
@@ -47,6 +47,9 @@
             android:title="@string/set_auto_record_title"
             android:summary="@string/set_auto_record_summary" />
 
+        <!-- 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（项目所有者 2026-10-09；行留在录制分区）。
+             关着时照片只能从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面
+             （AppConfig.isPhotoViaJpegEnabled） -->
         <SwitchPreferenceCompat
             android:key="pref_photo_via_jpeg"
             android:title="@string/set_photo_jpeg_title"
@@ -79,17 +82,11 @@
             android:title="@string/set_watermark_spec_title"
             android:summary="@string/set_watermark_spec_summary" />
 
-        <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。子项只在总开关开着时可拨 -->
+        <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。显示哪几项在「系统 → 系统信息」里勾 -->
         <SwitchPreferenceCompat
             android:key="pref_info_bar"
             android:title="@string/set_info_bar_title"
             android:summary="@string/set_info_bar_summary" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_info_bar_all"
-            android:dependency="pref_info_bar"
-            android:title="@string/set_info_bar_all_title"
-            android:summary="@string/set_info_bar_all_summary" />
     </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->
@@ -123,7 +120,31 @@
             android:key="pref_photo_limit"
             android:title="@string/set_photo_limit_title"
             android:dialogTitle="@string/set_photo_limit_dialog"
-            android:dialogMessage="@string/set_limit_message" />
+            android:dialogMessage="@string/set_photo_limit_message" />
+
+        <!-- 锁定影像：锁定的不被自动清理删掉（FootageLocks）；下面一行是锁了多少 -->
+        <SwitchPreferenceCompat
+            android:key="pref_footage_lock"
+            android:title="@string/set_footage_lock_title"
+            android:summary="@string/set_footage_lock_summary" />
+
+        <!-- 车机信号自动锁定（AutoLock），默认关：自动锁的也占空间，锁满了就停录。锁定影像关着时置灰 -->
+        <SwitchPreferenceCompat
+            android:key="pref_footage_lock_flash"
+            android:dependency="pref_footage_lock"
+            android:title="@string/set_footage_lock_flash_title"
+            android:summary="@string/set_footage_lock_flash_summary" />
+
+        <!-- 鸣笛：车上还读不到喇叭信号，一直置灰、打不开（只在 SettingsPreferenceFragment.bindAutoLock 里设，和水印品牌那一行一样） -->
+        <SwitchPreferenceCompat
+            android:key="pref_footage_lock_horn"
+            android:title="@string/set_footage_lock_horn_title"
+            android:summary="@string/set_footage_lock_horn_summary" />
+
+        <Preference
+            android:key="pref_footage_locked"
+            android:title="@string/set_footage_locked_title"
+            android:selectable="false" />
 
         <Preference
             android:key="pref_storage_usage"
@@ -271,7 +292,7 @@
 
         <SwitchPreferenceCompat
             android:key="pref_recording_floating"
-            android:title="@string/set_recording_floating_title"
+            android:title="@string/set_section_floating"
             android:summary="@string/set_recording_floating_summary" />
 
         <ListPreference
@@ -346,6 +367,11 @@
             android:title="@string/set_reduce_motion_title"
             android:summary="@string/set_reduce_motion_summary" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_vehicle_status"
+            android:title="@string/set_vehicle_status_title"
+            android:summary="@string/set_vehicle_status_summary" />
+
         <!--
           鱼眼校正的两项：开关在图片回看的右上角，这里只管「怎么校正」。
           两种投影的视野上限不同，所以换投影时滑块要重新绑一次。
@@ -360,12 +386,6 @@
             android:summary="@string/set_fisheye_fov_summary"
             app:showSeekBarValue="true" />
 
-        <SeekBarPreference
-            android:key="pref_fisheye_strength"
-            android:title="@string/set_fisheye_strength_title"
-            android:summary="@string/set_fisheye_strength_summary"
-            app:showSeekBarValue="true" />
-
     </PreferenceScreen>
 
     <!-- ==================== 系统 ==================== -->
@@ -376,14 +396,9 @@
         <!-- 这个分区只回答两个问题（规格 §0）：App 不在了要不要自己回来；熄屏算不算出状况 -->
         <SwitchPreferenceCompat
             android:key="pref_auto_start"
+            android:defaultValue="true"
             android:title="@string/set_auto_start_title"
             android:summary="@string/set_auto_start_summary" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_keep_alive"
-            android:defaultValue="true"
-            android:title="@string/set_keep_alive_title"
-            android:summary="@string/set_keep_alive_summary" />
 
         <SwitchPreferenceCompat
             android:key="pref_screen_off_keep_recording"
@@ -404,8 +419,9 @@
     </PreferenceScreen>
 
     <!--
-      开发者选项。默认整块隐藏，在「关于本应用」里连点「安全须知」再输密码才出现，
-      而且重启应用就恢复隐藏 —— 里面要么是没做完的，要么是排查用的。
+      开发者选项。默认整块隐藏，在「关于与致谢」里点击「安全须知」再输密码才出现，
+      重启、更新都不会关（见 DeveloperMode）—— 里面要么是没做完的，要么是排查用的。
+      关闭后整块隐藏，里面的设置按没存过算（AppConfig.DEVELOPER_KEYS）。
     -->
     <PreferenceScreen
         android:key="screen_developer"
@@ -468,6 +484,12 @@
             android:title="@string/dev_gpu_fisheye_video_title"
             android:summary="@string/dev_gpu_fisheye_video_summary" />
 
+        <!-- 别的程序占用 / 放开相机时，查那几秒里谁起停了前台服务、切了前后台（CameraHolderSuspects） -->
+        <SwitchPreferenceCompat
+            android:key="pref_camera_holder_suspects"
+            android:title="@string/dev_camera_suspects_title"
+            android:summary="@string/dev_camera_suspects_summary" />
+
         <Preference
             android:key="pref_repair_mp4"
             android:title="@string/dev_repair_mp4_title"
@@ -485,7 +507,7 @@
     </PreferenceScreen>
 
     <!--
-      检查更新放在顶层：藏在「关于」里面没人找得到，而这是安装新版本的唯一途径。
+      检查更新放在顶层：藏在「关于与致谢」里面没人找得到，而这是安装新版本的唯一途径。
       原来是左栏里一个点了就查的动作行；加了「接收 Beta 版」之后改成一个分区 ——
       左边选、右边改，和其他分区一个样子。
     -->
@@ -505,7 +527,7 @@
 
     <!--
       关于：顶层一行，点了直接打开关于页。以前是一个分区，里面只有「关于本应用」和「诊断信息」两行，
-      多点一层才到。诊断信息搬去了「系统」—— 它是给所有人导出报告用的，不该跟着「关于」藏一层。
+      多点一层才到。诊断信息搬去了「系统」—— 它是给所有人导出报告用的，不该跟着「关于与致谢」藏一层。
     -->
     <Preference
         android:key="pref_about"

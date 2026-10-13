@@ -322,6 +322,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
+                <!-- 锁定的那几段：进度条正下方一条细条，只画不接触摸（锁定影像关着时收起） -->
+                <com.kooo.evcam.ui.LockedRangeStrip
+                    android:id="@+id/timeline_locked_strip"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="2dp"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/timeline_position"
                     android:layout_width="wrap_content"
@@ -383,6 +391,17 @@
                         android:layout_marginEnd="8dp"
                         android:layout_weight="1"
                         android:text="@string/photo_mode_multi" />
+
+                    <!-- 锁定此刻 / 解锁：此刻各路正在放的文件一起（锁定影像关着时收起） -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_lock"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/action_lock_footage"
+                        android:visibility="gone" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/timeline_send"

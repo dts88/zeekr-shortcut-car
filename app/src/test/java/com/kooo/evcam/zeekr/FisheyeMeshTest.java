@@ -21,15 +21,15 @@ public class FisheyeMeshTest {
     private static final float LANE_WIDTH = 1000f;
     private static final float LANE_HEIGHT = 1000f;
 
-    private static FisheyeMesh mesh(float fov, String projection, float strength) {
+    private static FisheyeMesh mesh(float fov, String projection) {
         FisheyeMesh mesh = new FisheyeMesh();
-        mesh.setCorrection(fov, projection, strength);
+        mesh.setCorrection(fov, projection);
         return mesh;
     }
 
-    private static float[] expected(float u, float v, float fov, String projection, float strength) {
+    private static float[] expected(float u, float v, float fov, String projection) {
         float[] p = new float[2];
-        FisheyeProjection.sourcePoint(u, v, fov, projection, strength, p, 0);
+        FisheyeProjection.sourcePoint(u, v, fov, projection, p, 0);
         return new float[]{LANE_LEFT + p[0] * LANE_WIDTH, LANE_TOP + p[1] * LANE_HEIGHT};
     }
 
@@ -38,12 +38,12 @@ public class FisheyeMeshTest {
     public void everyCornerIsTheProjectionOfThatPoint() {
         for (String projection : new String[]{FisheyeProjection.PROJECTION_RECTILINEAR,
                 FisheyeProjection.PROJECTION_CYLINDRICAL, FisheyeProjection.PROJECTION_STEREOGRAPHIC}) {
-            FisheyeMesh mesh = mesh(140f, projection, 0.8f);
+            FisheyeMesh mesh = mesh(140f, projection);
             int n = 12;
             mesh.prepare(n, LANE_LEFT, LANE_TOP, LANE_WIDTH, LANE_HEIGHT, 0f, 0f, 1f, 1f);
             for (int row = 0; row <= n; row++) {
                 for (int column = 0; column <= n; column++) {
-                    float[] want = expected((float) column / n, (float) row / n, 140f, projection, 0.8f);
+                    float[] want = expected((float) column / n, (float) row / n, 140f, projection);
                     assertEquals(projection + " x @" + row + "," + column,
                             want[0], mesh.sourceX(row, column), TOLERANCE);
                     assertEquals(projection + " y @" + row + "," + column,
@@ -56,7 +56,7 @@ public class FisheyeMeshTest {
     /** 正中间那个角点落在这一路的正中间：光心假设在画面正中。 */
     @Test
     public void theMiddleCornerIsTheMiddleOfTheLane() {
-        FisheyeMesh mesh = mesh(110f, FisheyeProjection.PROJECTION_RECTILINEAR, 1f);
+        FisheyeMesh mesh = mesh(110f, FisheyeProjection.PROJECTION_RECTILINEAR);
         mesh.prepare(16, LANE_LEFT, LANE_TOP, LANE_WIDTH, LANE_HEIGHT, 0f, 0f, 1f, 1f);
         assertEquals(LANE_LEFT + LANE_WIDTH / 2f, mesh.sourceX(8, 8), TOLERANCE);
         assertEquals(LANE_TOP + LANE_HEIGHT / 2f, mesh.sourceY(8, 8), TOLERANCE);
@@ -70,7 +70,7 @@ public class FisheyeMeshTest {
     public void noCornerLeavesTheLane() {
         for (String projection : new String[]{FisheyeProjection.PROJECTION_RECTILINEAR,
                 FisheyeProjection.PROJECTION_CYLINDRICAL, FisheyeProjection.PROJECTION_STEREOGRAPHIC}) {
-            FisheyeMesh mesh = mesh(180f, projection, 1f);
+            FisheyeMesh mesh = mesh(180f, projection);
             int n = FisheyeMesh.MAX_DIVISIONS;
             mesh.prepare(n, LANE_LEFT, LANE_TOP, LANE_WIDTH, LANE_HEIGHT, -0.3f, -0.3f, 1.6f, 1.6f);
             for (int row = 0; row <= n; row++) {
@@ -87,10 +87,10 @@ public class FisheyeMeshTest {
     /** 取景窗是在校正之后的画面里取的：窗口的左上角就是校正后画面里那一点。 */
     @Test
     public void theWindowIsTakenFromTheCorrectedPicture() {
-        FisheyeMesh mesh = mesh(120f, FisheyeProjection.PROJECTION_RECTILINEAR, 1f);
+        FisheyeMesh mesh = mesh(120f, FisheyeProjection.PROJECTION_RECTILINEAR);
         mesh.prepare(10, LANE_LEFT, LANE_TOP, LANE_WIDTH, LANE_HEIGHT, 0.25f, 0.3f, 0.5f, 0.4f);
-        float[] topLeft = expected(0.25f, 0.3f, 120f, FisheyeProjection.PROJECTION_RECTILINEAR, 1f);
-        float[] bottomRight = expected(0.75f, 0.7f, 120f, FisheyeProjection.PROJECTION_RECTILINEAR, 1f);
+        float[] topLeft = expected(0.25f, 0.3f, 120f, FisheyeProjection.PROJECTION_RECTILINEAR);
+        float[] bottomRight = expected(0.75f, 0.7f, 120f, FisheyeProjection.PROJECTION_RECTILINEAR);
         assertEquals(topLeft[0], mesh.sourceX(0, 0), TOLERANCE);
         assertEquals(topLeft[1], mesh.sourceY(0, 0), TOLERANCE);
         assertEquals(bottomRight[0], mesh.sourceX(10, 10), TOLERANCE);
@@ -101,13 +101,11 @@ public class FisheyeMeshTest {
     @Test
     public void theFieldOfViewIsClampedPerProjection() {
         assertEquals(FisheyeProjection.MAX_FOV_DEGREES,
-                mesh(170f, FisheyeProjection.PROJECTION_RECTILINEAR, 1f).fovDegrees(), 0.001f);
-        assertEquals(170f, mesh(170f, FisheyeProjection.PROJECTION_CYLINDRICAL, 1f).fovDegrees(), 0.001f);
+                mesh(170f, FisheyeProjection.PROJECTION_RECTILINEAR).fovDegrees(), 0.001f);
+        assertEquals(170f, mesh(170f, FisheyeProjection.PROJECTION_CYLINDRICAL).fovDegrees(), 0.001f);
         assertEquals(FisheyeProjection.MIN_FOV_DEGREES,
-                mesh(10f, FisheyeProjection.PROJECTION_STEREOGRAPHIC, 1f).fovDegrees(), 0.001f);
-        assertEquals(FisheyeProjection.PROJECTION_RECTILINEAR, mesh(110f, null, 1f).projection());
-        assertEquals(1f, mesh(110f, null, 3f).strength(), 0.001f);
-        assertEquals(0f, mesh(110f, null, -1f).strength(), 0.001f);
+                mesh(10f, FisheyeProjection.PROJECTION_STEREOGRAPHIC).fovDegrees(), 0.001f);
+        assertEquals(FisheyeProjection.PROJECTION_RECTILINEAR, mesh(110f, null).projection());
     }
 
     /** 格数跟着屏幕上的大小走，夹在上下限之间：四宫格每路约 800px 是 16 格。 */

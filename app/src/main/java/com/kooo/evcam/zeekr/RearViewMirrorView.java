@@ -97,6 +97,14 @@ public class RearViewMirrorView extends ViewGroup {
     private CompositeStreamGeometry.Plan plan;
     /** 当前显示哪一路。中间三分之一左右划切换，见 {@link LaneCycle}。 */
     private int laneIndex;
+    private final MirrorSideView sideView = new MirrorSideView();
+    private boolean sideStraighten;
+    private int sideFov;
+    private int sideYaw;
+    private int sidePitch;
+    private final FisheyeMesh.SourceMap sideMap = (u, v, out) ->
+            SideViewProjection.sourcePoint(u, v, sideFov, sideYaw, sidePitch, sideView.lane(),
+                    (float) getWidth() / Math.max(1, getHeight()), out, 0);
     /** 取景在画面上的高低位置，0..1。宽高比锁死后，可调的就只剩这个。 */
     private float pan;
 
@@ -158,7 +166,7 @@ public class RearViewMirrorView extends ViewGroup {
     private final Path flashPath = new Path();
     /** 点一下要做的恢复动作，由服务给。 */
     private Runnable resumeAction;
-    /** 贴边状态变了通知服务，好把相机那一路的推流停掉 / 接回来。 */
+    /** 贴边状态变了通知服务：收起放开相机登记、放回来重新登记（输出声明不动，画面留在会话里）。 */
     private DockListener dockListener;
 
     private boolean dragging;
@@ -198,7 +206,11 @@ public class RearViewMirrorView extends ViewGroup {
 
     }
 
-    /** 相机预览要写进的 TextureView。绑定方式与其它悬浮窗一致，不改相机会话。 */
+    /**
+     * 相机要写进的 TextureView：服务把它的 SurfaceTexture 声明成环视的后视镜输出，会话由通道调度建。
+     * 贴边收起时它不可见、不画（见 {@link #syncDockState()}）。窗口移走时画布由管线留着，新窗口可以用
+     * {@code setSurfaceTexture} 接回上一个窗口留下的那一块（大纲 §7.7，见 RearViewMirrorService）。
+     */
     public AutoFitTextureView getTextureView() {
         return textureView;
     }
@@ -257,6 +269,8 @@ public class RearViewMirrorView extends ViewGroup {
             buttonMode = appConfig.isRearViewButtonMode();
             docked = RearViewTouchModel.dockedAt(params.x, params.width, screenWidth())
                     != RearViewTouchModel.Dock.NONE;
+            // 上次就是贴边收起来的：画布一开始就不可见，和贴边那一刻一样（见 syncDockState）
+            textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
             idleHandler.postDelayed(idleTick, IDLE_TICK_MS);
         } catch (Exception e) {
             AppLog.e(TAG, "后视镜窗口添加失败", e);
@@ -294,6 +308,66 @@ public class RearViewMirrorView extends ViewGroup {
         return docked;
     }
 
+    public int sideViewLane() {
+        return sideView.lane();
+    }
+
+    /** Change only presentation: keep the same TextureView, output and normal mirror settings. */
+    public void showSideView(int lane) {
+        if (!attached || params == null) {
+            return;
+        }
+        sideView.show(lane, params.x, params.y, docked);
+        cancelGlide();
+        cancelTapFlash();
+        dragging = false;
+        pinching = false;
+        pinchedThisGesture = false;
+        if (velocityTracker != null) {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
+        refreshSideViewConfig();
+        if (docked) {
+            params.x = Math.max(0, Math.min(screenWidth() - params.width, params.x));
+            docked = false;
+            textureView.setVisibility(View.VISIBLE);
+            lastFrameUptimeMs = SystemClock.uptimeMillis();
+            applyLayout();
+            if (dockListener != null) {
+                dockListener.onDockChanged(false);
+            }
+        }
+        invalidate();
+    }
+
+    public void refreshSideViewConfig() {
+        sideStraighten = appConfig.isSidePopupStraighten();
+        sideFov = appConfig.getSidePopupFov();
+        sideYaw = appConfig.getSidePopupYaw();
+        sidePitch = appConfig.getSidePopupPitch();
+        if (sideView.active()) {
+            invalidate();
+        }
+    }
+
+    public void clearSideView() {
+        MirrorSideView.Placement restore = sideView.clear();
+        if (restore == null || params == null) {
+            return;
+        }
+        boolean dockChanged = docked != restore.docked;
+        params.x = restore.x;
+        params.y = restore.y;
+        docked = restore.docked;
+        textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+        applyLayout();
+        if (dockChanged && dockListener != null) {
+            dockListener.onDockChanged(docked);
+        }
+        invalidate();
+    }
+
     /** 贴边收起 / 放回来。 */
     public interface DockListener {
         void onDockChanged(boolean docked);
@@ -324,13 +398,20 @@ public class RearViewMirrorView extends ViewGroup {
     };
 
     /**
-     * 贴边状态变了就通知一次。
+     * 贴边状态变了就改一次画布的可见、通知一次服务。
      *
-     * <p>贴边之后那条窄边只有 72px，画面在里面既看不清也没有意义，
-     * 却要相机一直多推一路流。所以贴边即停流，放回来再接上。</p>
+     * <p>贴边之后那条窄边只有 72px，画面在里面既看不清也没有意义。2.11 起贴边<b>不停流</b>（大纲 §2 阶段 4b）：
+     * 画布（TextureView）设成不可见，它就不再逐帧取帧、不再逐帧叫重画（TextureView 不可见时摘掉自己的帧监听）；
+     * 服务那边只放开相机登记，后视镜的输出照旧留在会话里（减输出能拖就拖，channel-logic §二.4）。
+     * 放回来设回可见：只要会话里还带着它，画面马上就有，不用重建会话。</p>
+     *
+     * <p>以前（2.10）贴边即停流：服务摘掉这一路输出、重建一次环视会话，放回来再重建一次，画面比窗口晚到零点几秒。</p>
+     *
+     * <p>不画的画布还在会话里，相机照样往它送帧：按 AOSP，相机往 SurfaceTexture 送帧是异步的，没人取就丢掉旧的一帧，
+     * 不会卡住相机（大纲 §6 风险 3，车上看环视帧率）。</p>
      */
     private void syncDockState() {
-        if (params == null) {
+        if (params == null || sideView.active()) {
             return;
         }
         if (dragging || pinching || glide != null) {
@@ -345,17 +426,30 @@ public class RearViewMirrorView extends ViewGroup {
         }
         docked = nowDocked;
         if (docked) {
-            frozen = false;   // 收起来不算「画面停了」，是我们自己停的
+            frozen = false;   // 收起来不算「画面停了」，是我们自己不画的
         } else {
-            lastFrameUptimeMs = SystemClock.uptimeMillis();   // 给重新接上留出时间
+            // 给画面回来留出时间：会话里还带着它就是下一帧，不在了就等调度排的那一步
+            lastFrameUptimeMs = SystemClock.uptimeMillis();
         }
-        AppLog.i(TAG, docked ? "后视镜贴边收起，停止推流" : "后视镜放回来，恢复推流");
+        // 状态先改好再改可见：设回可见时 TextureView 会叫重画，那一次 dispatchDraw 要按「放回来」画
+        textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+        AppLog.i(TAG, docked ? "后视镜贴边收起：画布设为不可见，不再逐帧画" : "后视镜放回来：画布设回可见，接着画");
         invalidate();
         if (dockListener != null) {
             dockListener.onDockChanged(docked);
         }
     }
 
+    /**
+     * 把窗口移走（服务退出时）。
+     *
+     * <p><b>当场移走</b>（{@code removeViewImmediate}，2026-10-11，大纲 §7.7）：画布（TextureView 的 SurfaceTexture）在窗口
+     * 移走、视图从窗口上摘下来那一下才被收走，服务在那一下（onSurfaceTextureDestroyed）把它交给管线留着。{@code removeView}
+     * 只排一个消息、过一会儿才摘：那时服务已经走完 onDestroy，紧接着再开的后视镜（设置里重置布局时关了再开、关了又打开、
+     * 被恢复拉起）新窗口可能先建好，接不回这一块，只好自己建一块 —— 环视为此多改一次输出。当场移走，这一下就在服务的
+     * onDestroy 里做完，新窗口建起来时画布已经在管线手里。这里只从服务的 onDestroy 调，不在本窗口的绘制、触摸分发途中，
+     * 当场摘是安全的。</p>
+     */
     public void hide() {
         idleHandler.removeCallbacks(idleTick);
         cancelGlide();
@@ -364,7 +458,7 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
         try {
-            windowManager.removeView(this);
+            windowManager.removeViewImmediate(this);
         } catch (Exception e) {
             AppLog.w(TAG, "后视镜窗口移除失败: " + e);
         }
@@ -465,6 +559,14 @@ public class RearViewMirrorView extends ViewGroup {
         if (plan == null || !plan.isComposite()) {
             // 还不知道几何，先原样显示，总比全黑好
             super.dispatchDraw(canvas);
+            if (frozen) {
+                drawFrozenHint(canvas, width, height);
+            }
+            return;
+        }
+
+        if (sideView.active()) {
+            drawSideView(canvas, width, height);
             if (frozen) {
                 drawFrozenHint(canvas, width, height);
             }
@@ -579,6 +681,12 @@ public class RearViewMirrorView extends ViewGroup {
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (sideView.active()) {
+            if (frozen && event.getActionMasked() == MotionEvent.ACTION_UP && resumeAction != null) {
+                resumeAction.run();
+            }
+            return true;
+        }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (velocityTracker == null) {
@@ -868,6 +976,9 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     private void savePosition() {
+        if (sideView.active()) {
+            return;
+        }
         appConfig.setRearViewPosition(params.x, params.y);
         appConfig.setRearViewSize(params.width, params.height,
                 screenWidth(), screenHeight());
@@ -963,8 +1074,8 @@ public class RearViewMirrorView extends ViewGroup {
     /**
      * 贴边收起时那条窄边上画什么。
      *
-     * <p><b>不画画面。</b>72px 宽的一条里既看不出什么，还要相机一直多推一路流 ——
-     * 推流本身在贴边时就停掉了（见 {@link #syncDockState()}），这里画的是替代品：
+     * <p><b>不画画面。</b>72px 宽的一条里什么也看不出来 ——
+     * 画布在贴边时就设成了不可见、不再逐帧画（见 {@link #syncDockState()}），这里画的是替代品：
      * 写上名字，这条边才说得清自己是谁，否则屏幕边上就是一条没来由的深色条。</p>
      *
      * <p>字是<b>那一串英文</b>，三个语言都一样：72px 宽的一条上放的是应用在车上的
@@ -1068,7 +1179,7 @@ public class RearViewMirrorView extends ViewGroup {
                                RearViewGeometry.Viewport viewport) {
         RearViewGeometry.ShaderRects r =
                 RearViewGeometry.toShaderRects(plan, laneIndex, viewport);
-        mesh.setCorrection(fovDegrees, FisheyeProjection.PROJECTION_RECTILINEAR, 1f);
+        mesh.setCorrection(fovDegrees, FisheyeProjection.PROJECTION_RECTILINEAR);
         mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
                 r.laneOffsetX * width, r.laneOffsetY * height,
                 r.laneScaleX * width, r.laneScaleY * height,
@@ -1078,6 +1189,37 @@ public class RearViewMirrorView extends ViewGroup {
 
     private void drawTextureOnce(Canvas canvas) {
         drawChild(canvas, textureView, getDrawingTime());
+    }
+
+    private void drawSideView(Canvas canvas, int width, int height) {
+        int lane = sideView.displayLane(laneIndex);
+        if (sideStraighten) {
+            RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
+                    plan, lane, RearViewGeometry.Viewport.full());
+            mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
+                    r.laneOffsetX * width, r.laneOffsetY * height,
+                    r.laneScaleX * width, r.laneScaleY * height, sideMap);
+            mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
+            return;
+        }
+        RearViewGeometry.Viewport aimed = SideViewAim.viewport(lane,
+                Math.round(180f / sideFov * 100f),
+                Math.round(sideYaw / SideViewProjection.MAX_YAW_DEGREES * 100f),
+                Math.round(sidePitch / SideViewProjection.MAX_PITCH_DEGREES * 100f));
+        RearViewGeometry.Viewport crop = RearViewGeometry.Viewport.forWindow(width, height, 0.5f);
+        RearViewGeometry.Viewport viewport = new RearViewGeometry.Viewport(
+                aimed.x + crop.x * aimed.width, aimed.y + crop.y * aimed.height,
+                crop.width * aimed.width, crop.height * aimed.height);
+        float[] rect = RearViewGeometry.combinedSourceRect(plan, lane, viewport);
+        sourceRect.set(rect[0] * width, rect[1] * height,
+                (rect[0] + rect[2]) * width, (rect[1] + rect[3]) * height);
+        destRect.set(0, 0, width, height);
+        drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
+        int save = canvas.save();
+        canvas.clipRect(destRect);
+        canvas.concat(drawMatrix);
+        drawChild(canvas, textureView, getDrawingTime());
+        canvas.restoreToCount(save);
     }
 
     /** 设置页改了校正开关或视野后，推到正在显示的窗口。 */

@@ -5,6 +5,10 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * {@link WatermarkText} 的单元测试。
  *
@@ -40,5 +44,43 @@ public class WatermarkTextTest {
         assertEquals("2560x2560", WatermarkText.photoSpecLine(2560, 2560));
         assertEquals("", WatermarkText.photoSpecLine(0, 1080));
         assertEquals("", WatermarkText.photoSpecLine(-1, -1));
+    }
+
+    /** 时间水印关着：照片上只剩应用名那一行 —— 开关不管它。 */
+    @Test
+    public void withTheTimestampOffOnlyTheBrandLineRemains() {
+        assertEquals(Collections.singletonList("极氪即刻 v2.1.1"),
+                WatermarkText.photoLines("极氪即刻 v2.1.1", "2026-10-04 12:00:00",
+                        2560, 2560, false));
+    }
+
+    /** 时间水印开着：应用名、时间、尺寸，按这个顺序。 */
+    @Test
+    public void withTheTimestampOnItIsBrandTimeThenSize() {
+        assertEquals(Arrays.asList("极氪即刻 v2.1.1", "2026-10-04 12:00:00", "2560x2560"),
+                WatermarkText.photoLines("极氪即刻 v2.1.1", "2026-10-04 12:00:00",
+                        2560, 2560, true));
+    }
+
+    /** 车牌号跟着应用名走，时间水印关了也还在。 */
+    @Test
+    public void thePlateSurvivesWithTheTimestampOff() {
+        List<String> lines = WatermarkText.photoLines(
+                WatermarkText.brandLine("极氪即刻", "0.36.2", "A12345"),
+                "2026-10-04 12:00:00", 2560, 2560, false);
+        assertEquals(1, lines.size());
+        assertTrue("车牌号应当还在：" + lines, lines.get(0).contains("A12345"));
+    }
+
+    /** 空的部分不留空行：尺寸不合法就没有尺寸行，应用名为空就没有那一行。 */
+    @Test
+    public void emptyPartsAreSkipped() {
+        assertEquals(Arrays.asList("极氪即刻 v2.1.1", "2026-10-04 12:00:00"),
+                WatermarkText.photoLines("极氪即刻 v2.1.1", "2026-10-04 12:00:00",
+                        0, 1080, true));
+        assertEquals(Arrays.asList("2026-10-04 12:00:00", "2560x2560"),
+                WatermarkText.photoLines("", "2026-10-04 12:00:00", 2560, 2560, true));
+        assertTrue(WatermarkText.photoLines(null, "2026-10-04 12:00:00",
+                2560, 2560, false).isEmpty());
     }
 }

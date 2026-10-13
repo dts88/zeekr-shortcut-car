@@ -24,13 +24,30 @@ package com.kooo.evcam.camera;
  * <p>所以这一层<b>不看相机的任何状态标志，只看有没有帧</b>。该出帧而长时间没有，
  * 就动手，不问为什么 —— 卡在哪个标志上都一样救。<b>1.62.0 起它是唯一的一个</b>：
  * SingleCamera 那套 2.5 秒检测、前台服务每 10 秒一次的修复循环都删了；第一次先重建会话（便宜），
- * 再不行才重开相机，两级都在 MultiCameraManager.checkLiveness 里。</p>
+ * 再不行才重开相机（2.10 在 MultiCameraManager 的看门狗里，2.11 起在通道调度里，见下）。</p>
+ *
+ * <p><b>2.10.10 起连报错重连也归这里</b>（项目所有者 2026-10-09：「获取打开，关闭退出，仅此而已」）：
+ * SingleCamera 收到设备报错 / 被断开只把设备关掉、标成「没开」，不再自己按错误码退避重连 ——
+ * 那一套和这里互相顶（2026-10-08 自己顶自己 7 次）。设备报错算「已经卡住」，不用再等 {@link #STUCK_MS}。
+ * 2.10 里被别的程序拿走的那一路每 30 秒试开一次、不计次数，放开、通道安静了由看门狗单独重开；
+ * 2.11 起不再试开（见下）。</p>
  *
  * <h3>为什么要停手</h3>
  *
  * <p>相机真被别的应用占着的时候，重开是救不回来的。一直重开只会不停地打扰相机服务，
  * 还把日志刷满。所以连着救 {@link #MAX_ATTEMPTS} 次没用就<b>停手一分钟</b>，
  * 一分钟后再来一轮 —— 人回到车上、别的应用退出，都在这个尺度上。</p>
+ *
+ * <h3>2.11 起</h3>
+ *
+ * <p>救的是通道调度（项目所有者 2026-10-10 确认），梯子上的数字不变。被别的程序拿着的那一路
+ * 根本不上梯子：调度判它被拿着（{@link CameraTaken.Verdict#TAKEN} / {@link CameraTaken.Verdict#BLOCKED}）就不救、不试开，
+ * 只问相机服务它空没空，所以 {@link #step(State, boolean, long, long)} 没有「被别人拿着」那个参数。
+ * 只在「保持 30 秒」里的路不算有人要，不救。</p>
+ *
+ * <p>彻底停手之后再试的时机（{@link State#liftStop()}）：登记表变了（项目所有者 2026-10-10 确认）；
+ * 项目所有者 2026-10-11 又加上相机服务报这一路「空闲」、亮屏 —— 录像开着时 RECORDING 一直登记着，登记表不会自己变，
+ * 只等它的话，各路都停手之后录像会一直「等待」下去。</p>
  *
  * <p>纯逻辑，时间由调用方传入，见 {@code CameraLivenessTest}。</p>
  */
@@ -59,8 +76,8 @@ public final class CameraLiveness {
      * 我们每分钟去捶一次，一夜下来几百次，既救不回来，又让已经卡住的
      * 相机服务更难缓过来，日志也被刷满。</p>
      *
-     * <p>彻底停手之后只有两件事能让它重新开始：真的出了一帧，
-     * 或者这一路不再需要画面（收起后视镜、停止录制）之后重新需要。</p>
+     * <p>彻底停手之后能让它重新开始的：真的出了一帧；这一路不再需要画面（收起后视镜、停止录制）之后重新需要；
+     * 2.11 起还有 {@link State#liftStop()} 那三件事（登记表变了、相机服务报它空闲、亮屏）。</p>
      */
     public static final int MAX_CYCLES = 3;
 
@@ -78,7 +95,7 @@ public final class CameraLiveness {
         STOP
     }
 
-    /** 一路相机的救援状态，只在监测线程上读写。 */
+    /** 一路相机的救援状态，只在主线程上由通道调度读写（{@link ChannelRules}）。 */
     public static final class State {
         private int attempts;
         private long lastResetMs;
@@ -112,15 +129,48 @@ public final class CameraLiveness {
             cycles = 0;
             stopped = false;
         }
+
+        /**
+         * 被拿走的这一路放开了（{@link CameraTaken#releases}）、通道也安静了，调度要单独开它：从头算 ——
+         * 被别的程序占着的那段时间不是「救不动」，之前攒的次数、歇着、彻底停手都作废。
+         */
+        public void released() {
+            clear();
+        }
+
+        /**
+         * 解除停手、从头救：彻底停手（{@link #stopped()}）的这一路，攒的次数、轮数都作废，
+         * 下一次 {@link CameraLiveness#step(State, boolean, long, long)} 当场就救。
+         *
+         * <p>三件事调它，是同一个判断：登记表变了（{@link #registerChanged()}，项目所有者 2026-10-10 确认）、
+         * 相机服务报这一路「空闲」、亮屏（项目所有者 2026-10-11 定）。代价是 HAL 真坏了时会多试几轮；不加新的界面文字。</p>
+         *
+         * <p>只管彻底停手的：歇着的（{@link #gaveUp()}）、梯子上的照原来的节奏走 —— 后视镜收起又放出、登记表来回变，
+         * 不该让救援比 {@link CameraLiveness#RETRY_GAP_MS} 一次更密。</p>
+         *
+         * @return true：原来停着手、这一下解除了（调用方据此写一行「停手的 … 重新救」）；false：本来就没停手，什么都没动
+         */
+        public boolean liftStop() {
+            if (!stopped) {
+                return false;
+            }
+            clear();
+            return true;
+        }
+
+        /** 登记表变了（谁要哪几路变了）：停手的这一路重新救，同 {@link #liftStop()}。 */
+        public boolean registerChanged() {
+            return liftStop();
+        }
     }
 
     /**
-     * 往前走一步。
+     * 往前走一步（2.11 起通道调度用）：没有「被别人拿着」—— 被拿着的路调度根本不救。
      *
-     * @param wantsFrames 这一路此刻该不该出帧：有人在用它的画面、不是被主动暂停的，
-     *                    <b>而且这一趟成功打开过</b> —— 压根没打开过的不归这里管
-     * @param frameAgeMs  距上一次「有动静」多久 —— 出了一帧、开了相机、建好会话，都算动静
-     * @param now         单调时钟，不含深度睡眠（车停着睡一夜，醒来不该算卡了一整夜）
+     * @param wantsFrames 这一路此刻有人要画面（登记表里有人要它 —— 只在「保持 30 秒」里的不算），
+     *                    而且没被拿着（不是 TAKEN / BLOCKED）、现在能用相机
+     * @param frameAgeMs  距上一次「有动静」多久 —— 出了一帧、开了相机、建好会话，都算动静；丢了算无穷大
+     * @param now         单调时钟，不含深度睡眠
      */
     public static Action step(State state, boolean wantsFrames, long frameAgeMs, long now) {
         if (!wantsFrames || frameAgeMs < STUCK_MS) {

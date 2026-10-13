@@ -31,9 +31,9 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 /**
- * 摆位：这一路的舞台，和正在改的那一格（位置、旋转、镜像、画面填充）。
+ * 摆位：这一路的舞台，和正在改的那一格（位置、旋转、镜像、画面适配）。
  *
- * <p>从配置编辑里那个「摆位」进来。流参数不在这里 —— 那一页问的是「录成什么样」，
+ * <p>从配置编辑里那个「画面布局」进来。流参数不在这里 —— 那一页问的是「录成什么样」，
  * 这一页问的是「摆在哪」，两件事分开问，各自都短。</p>
  *
  * <p>数据和所有「怎么取值、怎么选、怎么存」都在 {@link ProfileEditorFragment} 里，
@@ -194,7 +194,9 @@ public class ProfileEditorPane extends PreferenceFragmentCompat {
         });
         group.addPreference(mirror);
 
-        row(group, context, R.string.editor_fit, fitName(context, lane.fit), true, () -> {
+        // 环视格这一行只改 lane.fit（鱼眼校正关着时用）；开着时用 fitCorrected，还没有地方改
+        row(group, context, splits ? R.string.editor_fit_surround : R.string.editor_fit,
+                fitName(context, lane.fit), true, () -> {
             // 三档轮着换：点一下换一个，不弹框。和旋转那一行一个手感
             lane.fit = nextFit(lane.fit);
             changed();

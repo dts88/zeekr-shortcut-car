@@ -40,24 +40,34 @@ public final class StorageState {
         public final boolean known;
         /** 录像盘根目录；null = 没有 U 盘。 */
         public final File root;
-        /** 按当前设置算出来的录像目录（开发者放行时可能在内置存储）。 */
+        /**
+         * 按当前设置算出来的录像目录。没有 U 盘时：开发者选项开着是内置存储上的那个，
+         * 关着是 null（没有地方可存，{@code StorageHelper.footageRoot}）。
+         */
         public final File videoDir;
+        /**
+         * 录制器实际写进的目录：中转写入开着是内置存储上的临时目录（录完再搬到 {@link #videoDir}），否则就是 {@link #videoDir}；
+         * null = 没有地方可存。开录照它和 {@link #videoDir} 定写到哪 —— 主线程不再自己去找目录、建目录（盘掉线时会卡住，
+         * 审查 2026-10-11）。
+         */
+        public final File recordDir;
         /** 录像目录所在盘的剩余空间；-1 = 不知道。 */
         public final long freeBytes;
-        /** 此刻能不能开录（和拒录用的是同一个判断）。 */
+        /** 此刻能不能开录、拍照（和拒录、拒拍用的是同一个判断）。 */
         public final boolean available;
-        /** 开发者模式下落到了内置存储。 */
+        /** 选的是 U 盘、此刻没检测到：能录的话（开发者选项放行）落在内置存储上。 */
         public final boolean sdFellBack;
         /** 此刻挂着的盘，黑匣子那种写法。 */
         public final String mounts;
 
-        static final Snapshot EMPTY = new Snapshot(false, null, null, -1L, false, false, "?");
+        static final Snapshot EMPTY = new Snapshot(false, null, null, null, -1L, false, false, "?");
 
-        Snapshot(boolean known, File root, File videoDir, long freeBytes, boolean available,
+        Snapshot(boolean known, File root, File videoDir, File recordDir, long freeBytes, boolean available,
                  boolean sdFellBack, String mounts) {
             this.known = known;
             this.root = root;
             this.videoDir = videoDir;
+            this.recordDir = recordDir;
             this.freeBytes = freeBytes;
             this.available = available;
             this.sdFellBack = sdFellBack;
@@ -159,6 +169,9 @@ public final class StorageState {
         StorageHelper.clearCache();
         File root = StorageHelper.getExternalSdCardRoot(context);
         File videoDir = StorageHelper.getVideoDir(context);
+        // 中转写入关着时就是 videoDir：不再去碰一遍盘（盘卡住时一次探测就是几秒）
+        File recordDir = new com.kooo.evcam.AppConfig(context).shouldUseRelayWrite()
+                ? StorageHelper.getRecordingDir(context) : videoDir;
         long free = -1L;
         if (videoDir != null) {
             try {
@@ -169,7 +182,7 @@ public final class StorageState {
         }
         boolean available = StorageHelper.isRecordingStorageAvailable(context);
         boolean fellBack = StorageHelper.isSdCardFallback(context);
-        return new Snapshot(true, root, videoDir, free, available, fellBack, StorageHelper.describeMounts());
+        return new Snapshot(true, root, videoDir, recordDir, free, available, fellBack, StorageHelper.describeMounts());
     }
 
     /** 主线程调。第一个监听者到了就开始定时刷新。 */

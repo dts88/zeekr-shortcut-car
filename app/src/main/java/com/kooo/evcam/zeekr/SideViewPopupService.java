@@ -9,7 +9,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Size;
-import android.view.Surface;
 import android.view.TextureView;
 
 import com.kooo.evcam.AppConfig;
@@ -19,6 +18,7 @@ import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.CameraNeeds;
+import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.screen.ScreenState;
@@ -34,8 +34,9 @@ import com.kooo.evcam.telemetry.VehicleState;
  * <h3>相机</h3>
  *
  * <p>和超级后视镜走同一条路（见 {@link RearViewMirrorService}）：窗口的 Surface 交给
- * {@code SingleCamera.setMainFloatingSurface()}，当一路附加输出。两者共用这一个槽位，
- * 所以<b>超级后视镜开着时不弹</b>。窗口挂着就登记 {@link CameraNeeds.Holder#SIDE_POPUP}，拿掉就注销。</p>
+ * {@code SingleCamera.declareMirror()}，由通道调度添加输出。两者共用这一个槽位，
+ * 超级后视镜开着时，只临时改变它的取景，不声明第二个输出；关着时使用自己的窗口。
+ * 自己的窗口挂着就登记 {@link CameraNeeds.Holder#SIDE_POPUP}，拿掉就注销。</p>
  *
  * <h3>即时弹出</h3>
  *
@@ -63,6 +64,7 @@ public class SideViewPopupService extends Service {
     private AppConfig appConfig;
     private SideViewPopupView popup;
     private SingleCamera boundCamera;
+    private MultiCameraManager boundManager;
     /** 交给相机的是哪一个 SurfaceTexture：放手时确认槽位还是自己的。 */
     private SurfaceTexture boundTexture;
     private boolean listening;
@@ -70,6 +72,8 @@ public class SideViewPopupService extends Service {
     private Runnable retryRunnable;
     /** 上一次判定时该不该备着。 */
     private boolean lastReady;
+    private boolean readyExpiryScheduled;
+    private boolean destroyed;
     /** 最近显示过哪一边：备着时窗口停在那一边，下次多半还是它。 */
     private int lastLane = LaneCycle.LEFT;
     /** 这一次显示的时刻和第一帧来没来：黑匣子里看「弹了多久才有画面」。 */
@@ -84,6 +88,7 @@ public class SideViewPopupService extends Service {
     private boolean closePending;
     /** 离开 D 档宽限期满：拿掉备着的窗口。 */
     private final Runnable readyExpired = () -> {
+        readyExpiryScheduled = false;
         if (!lastReady && popup != null && !popup.isShowing()) {
             AppLog.i(TAG, "侧视弹窗：离开 D 档，不再备着");
             detachPopup();
@@ -98,6 +103,14 @@ public class SideViewPopupService extends Service {
         context.stopService(new Intent(context, SideViewPopupService.class));
     }
 
+    /** Re-evaluate which window hosts the side view when the mirror starts or stops. */
+    public static void mirrorChanged() {
+        SideViewPopupService svc = instance;
+        if (svc != null) {
+            svc.handler.post(svc::evaluate);
+        }
+    }
+
     /** 设置页改了侧视的任何一项：窗口套用新的大小位置拉直，再按新规则判一次。 */
     public static void applyConfig() {
         SideViewPopupService svc = instance;
@@ -105,6 +118,7 @@ public class SideViewPopupService extends Service {
             if (svc.popup != null) {
                 svc.popup.applyConfig();
             }
+            RearViewMirrorService.refreshSideViewConfig();
             svc.evaluate();
         }
     }
@@ -146,9 +160,11 @@ public class SideViewPopupService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        if (!ScreenState.dark()) {
-            startListening();
-        }
+        ScreenState.whenKnown(() -> {
+            if (!destroyed && !ScreenState.dark()) {
+                startListening();
+            }
+        });
         return CameraForegroundService.stickiness(this);
     }
 
@@ -173,6 +189,7 @@ public class SideViewPopupService extends Service {
         Telemetry.get().removeListener(readingsListener);
         Telemetry.get().release(TELEMETRY_USER);
         lastReady = false;
+        RearViewMirrorService.clearSideView();
         detachPopup();
         AppLog.i(TAG, "侧视弹窗：停止听转向灯");
     }
@@ -193,16 +210,31 @@ public class SideViewPopupService extends Service {
         in.parkAssistOn = r.bool(Signal.PARK_ASSIST);
         in.speedKmh = s.speedKmh;
         in.minSpeedKmh = appConfig.getSidePopupMinSpeed();
-        in.showing = popup != null && popup.isShowing() ? popup.lane() : SideViewDecision.NONE;
+        int mirrorLane = RearViewMirrorService.sideViewLane();
+        in.showing = mirrorLane != SideViewDecision.NONE ? mirrorLane
+                : popup != null && popup.isShowing() ? popup.lane() : SideViewDecision.NONE;
 
-        boolean blocked = ScreenState.dark() || RearViewMirrorService.isRunning();
-        int want = blocked ? SideViewDecision.NONE : SideViewDecision.decide(in);
-        lastReady = !blocked && appConfig.isSidePopupInstant() && SideViewDecision.shouldStayReady(in);
+        boolean mirrorRunning = RearViewMirrorService.isRunning();
+        boolean blocked = ScreenState.dark();
+        if (blocked || SideViewDecision.factoryViewActive(in)) {
+            lastReady = false;
+            RearViewMirrorService.clearSideView();
+            detachPopup();
+            return;
+        }
+        int want = SideViewDecision.decide(in);
+        lastReady = !mirrorRunning && appConfig.isSidePopupInstant() && SideViewDecision.shouldStayReady(in);
 
         if (want != SideViewDecision.NONE) {
             cancelDelayedClose();
-            handler.removeCallbacks(readyExpired);
-            if (want != in.showing) {
+            cancelReadyExpiry();
+            if (mirrorRunning) {
+                // Withdraw only our old canvas; the mirror keeps its own output and session.
+                detachPopup();
+                if (want != mirrorLane) {
+                    RearViewMirrorService.showSideView(want);
+                }
+            } else if (want != in.showing) {
                 AppLog.i(TAG, "转向灯：弹出「" + LaneCycle.labelOf(want) + "」路");
                 showPopup(want);
             }
@@ -213,7 +245,7 @@ public class SideViewPopupService extends Service {
             boolean factory = SideViewDecision.factoryViewActive(in);
             int delayMs = appConfig.getSidePopupCloseDelayMs();
             if (factory || blocked || delayMs <= 0) {
-                AppLog.i(TAG, "侧视收起：" + (factory ? "原厂画面在" : blocked ? "超级后视镜开着或熄屏" : "转向灯灭"));
+                AppLog.i(TAG, "侧视收起：" + (factory ? "原厂画面在" : blocked ? "熄屏" : "转向灯灭"));
                 closeNow();
             } else if (!closePending) {
                 closePending = true;
@@ -222,16 +254,22 @@ public class SideViewPopupService extends Service {
             return;
         }
 
+        if (mirrorRunning) {
+            // An idle mirror already supplies the feed. Do not attach a hidden second window.
+            detachPopup();
+            return;
+        }
+
         // 没在显示：管「备着」
         if (lastReady) {
-            handler.removeCallbacks(readyExpired);
+            cancelReadyExpiry();
             if (popup == null || !popup.isAttached()) {
                 AppLog.i(TAG, "侧视弹窗：D 档，窗口备着");
                 attachPopup(lastLane, false);
             }
-        } else if (popup != null && popup.isAttached() && !closePending) {
-            handler.removeCallbacks(readyExpired);
-            handler.postDelayed(readyExpired, blocked ? 0 : READY_GRACE_MS);
+        } else if (popup != null && popup.isAttached() && !closePending && !readyExpiryScheduled) {
+            readyExpiryScheduled = true;
+            handler.postDelayed(readyExpired, READY_GRACE_MS);
         }
     }
 
@@ -247,6 +285,7 @@ public class SideViewPopupService extends Service {
     /** 收起：该备着就只拨暗（相机照推），不该就整个拿掉。 */
     private void closeNow() {
         cancelDelayedClose();
+        RearViewMirrorService.clearSideView();
         if (popup == null || !popup.isShowing()) {
             return;
         }
@@ -306,7 +345,7 @@ public class SideViewPopupService extends Service {
 
     private void detachPopup() {
         cancelDelayedClose();
-        handler.removeCallbacks(readyExpired);
+        cancelReadyExpiry();
         cancelRetry();
         if (popup != null && popup.isShowing()) {
             noteIfNoFrame();
@@ -316,6 +355,11 @@ public class SideViewPopupService extends Service {
             popup.detach();
             popup = null;
         }
+    }
+
+    private void cancelReadyExpiry() {
+        handler.removeCallbacks(readyExpired);
+        readyExpiryScheduled = false;
     }
 
     /** 显示过、到收起时一帧都没来：记下来，诊断报告里看得到。 */
@@ -355,14 +399,15 @@ public class SideViewPopupService extends Service {
     // ================================================================= 相机
 
     private void bindCamera(SurfaceTexture surfaceTexture) {
-        if (popup == null || !popup.isAttached() || surfaceTexture == null || ScreenState.dark()) {
+        if (popup == null || !popup.isAttached() || surfaceTexture == null || surfaceTexture.isReleased()
+                || ScreenState.dark() || RearViewMirrorService.isRunning()) {
             return;
         }
         MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
         if (manager == null) {
             manager = CameraManagerHolder.getInstance().getOrInit(this);
         }
-        SingleCamera camera = manager != null ? manager.getCamera("front") : null;
+        SingleCamera camera = manager != null ? manager.getCamera(CameraSlots.KEY_SURROUND) : null;
         if (camera == null) {
             scheduleRetry(surfaceTexture);
             return;
@@ -372,17 +417,16 @@ public class SideViewPopupService extends Service {
             popup.setSourceSize(previewSize);
         }
         boundCamera = camera;
+        boundManager = manager;
         boundTexture = surfaceTexture;
         restoreBufferSize(surfaceTexture);
-        camera.setMainFloatingSurface(new Surface(surfaceTexture), surfaceTexture);
         boolean wasOpen = camera.isCameraOpened();
-        if (wasOpen) {
-            camera.recreateSession(false);
-        } else {
-            CameraForegroundService.whenReady(this, camera::openCamera);
-        }
+        boolean declared = camera.declareMirror(surfaceTexture);
         retryCount = 0;
         CameraNeeds.current().claim(CameraNeeds.Holder.SIDE_POPUP);
+        if (declared) {
+            manager.channelScheduler().wake();
+        }
         BlackBox.note("侧视弹窗接相机：「" + LaneCycle.labelOf(popup.lane()) + "」路，"
                 + (popup.isShowing() ? "显示中" : "备着") + "，相机" + (wasOpen ? "已开" : "未开，现在开")
                 + "，预览尺寸 " + previewSize + "，几何" + (popup.hasGeometry() ? "已知" : "未知（等第一帧补）"));
@@ -403,16 +447,12 @@ public class SideViewPopupService extends Service {
         cancelRetry();
         CameraNeeds.current().release(CameraNeeds.Holder.SIDE_POPUP);
         if (boundCamera != null) {
-            // 槽位要是已经被超级后视镜接走了，就别动它 —— 摘掉的会是后视镜的画面
-            if (boundCamera.getMainFloatingSurfaceTexture() == boundTexture) {
-                try {
-                    boundCamera.setMainFloatingSurface(null, null);
-                    boundCamera.recreateSession(false);
-                } catch (Exception e) {
-                    AppLog.w(TAG, "解绑相机失败: " + e);
-                }
+            // Identity-based withdrawal leaves a newer Super mirror declaration intact.
+            if (boundCamera.withdrawMirror(boundTexture) && boundManager != null) {
+                boundManager.channelScheduler().wake();
             }
             boundCamera = null;
+            boundManager = null;
             boundTexture = null;
         }
     }
@@ -437,10 +477,13 @@ public class SideViewPopupService extends Service {
 
     @Override
     public void onDestroy() {
+        destroyed = true;
         instance = null;
         ScreenState.removeListener(screenListener);
         stopListening();
+        RearViewMirrorService.clearSideView();
         detachPopup();
+        handler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
 

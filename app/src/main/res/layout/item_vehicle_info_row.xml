@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  系统信息的一行：名字在左（下面一行小字是号码），此刻的值在右
-  （车机系统设置里「Activation duration   Always on」的排法），不可点。
+  系统信息的一行：最前面一个勾（勾上的显示在行驶信息条上），名字在左（下面一行小字：勾上显示成哪一格图标还是文字，
+  后面是号码；窄的时候折成两行），此刻的值在右
+  （车机系统设置里「Activation duration   Always on」的排法）。勾得了的行整行可点（代码里换成有按压反馈的底），
+  勾不了的（没验证、又不是开发者）不可点。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -16,6 +18,15 @@
     android:paddingTop="12dp"
     android:paddingEnd="20dp"
     android:paddingBottom="12dp">
+
+    <CheckBox
+        android:id="@+id/vehicle_info_check"
+        android:saveEnabled="false"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:minWidth="48dp"
+        android:minHeight="48dp" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -37,7 +48,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:maxLines="1"
+            android:ellipsize="end"
+            android:maxLines="2"
             android:textColor="@color/text_tertiary"
             android:textAppearance="@style/TextAppearance.Cam.Micro" />
     </LinearLayout>

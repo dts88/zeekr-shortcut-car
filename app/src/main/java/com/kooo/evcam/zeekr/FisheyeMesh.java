@@ -50,7 +50,6 @@ public final class FisheyeMesh {
 
     private float fovDegrees = FisheyeProjection.PHOTO_FOV_DEGREES;
     private String projection = FisheyeProjection.PROJECTION_RECTILINEAR;
-    private float strength = 1f;
 
     private int divisions;
     /** (N+1)² 个源点，子视图坐标，按行排：[x0, y0, x1, y1, ...]。 */
@@ -61,11 +60,10 @@ public final class FisheyeMesh {
     /** 第一次画的时候才建：算网格的那部分要能在没有 Android 的 JVM 上跑。 */
     private Matrix matrix;
 
-    /** 校正用哪种投影、多大视野、多大强度。含义和 {@link FisheyeProjection#sourcePoint} 一样。 */
-    public void setCorrection(float fovDegrees, String projection, float strength) {
+    /** 校正用哪种投影、多大视野。含义和 {@link FisheyeProjection#sourcePoint} 一样。 */
+    public void setCorrection(float fovDegrees, String projection) {
         this.projection = projection == null ? FisheyeProjection.PROJECTION_RECTILINEAR : projection;
         this.fovDegrees = FisheyeProjection.clampFov(fovDegrees, this.projection);
-        this.strength = Math.max(0f, Math.min(1f, strength));
     }
 
     public float fovDegrees() {
@@ -74,10 +72,6 @@ public final class FisheyeMesh {
 
     public String projection() {
         return projection;
-    }
-
-    public float strength() {
-        return strength;
     }
 
     /** 目标在屏幕上有多大（取长边，px），就切多少格。 */
@@ -107,7 +101,7 @@ public final class FisheyeMesh {
             for (int column = 0; column < side; column++) {
                 float u = windowLeft + windowWidth * column / this.divisions;
                 // 校正后画面里的一点 → 原始鱼眼画面里的采样点（这一路内，夹在 0..1）
-                FisheyeProjection.sourcePoint(u, v, fovDegrees, projection, strength, point, 0);
+                FisheyeProjection.sourcePoint(u, v, fovDegrees, projection, point, 0);
                 grid[index++] = laneLeft + point[0] * laneWidth;
                 grid[index++] = laneTop + point[1] * laneHeight;
             }

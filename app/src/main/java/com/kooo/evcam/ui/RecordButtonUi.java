@@ -17,14 +17,15 @@ import com.kooo.evcam.R;
 import java.util.Locale;
 
 /**
- * 录制键：左边一个会变形的点（圆 ⇄ 圆角方块）套一圈分段进度环，右边两行字。
+ * 录制键：左边一个会变形的点（圆 ⇄ 圆角方块）套一圈分段进度环，右边两行字；
+ * 录制中、等待摄像头时多一行小字，说现在熄屏的话这段录像会怎样（{@link ScreenOffHintView}，这里只管显隐）。
  *
  * <h3>为什么不再是一整块红</h3>
  *
  * <p>红色的面积大，标的就成了「这个按钮」；红色只留在点和环上，标的才是
  * 「正在录」这件事。按钮本身的分量靠尺寸（它比旁边的方块大一档）撑着。</p>
  *
- * <h3>四个状态，一个动作讲清楚</h3>
+ * <h3>五个状态，一个动作讲清楚</h3>
  *
  * <ul>
  *   <li><b>待机</b>：红色圆点，环只剩轨道，「开始录制」。</li>
@@ -33,6 +34,8 @@ import java.util.Locale;
  *   <li><b>准备中</b>：点已经收成方块、一明一暗地呼吸，环在转 —— 录制器还没起来。</li>
  *   <li><b>录制中</b>：方块，环按本段已录的比例走，走满一圈换下一段；
  *       换段的那一下，点淡一下再回来。</li>
+ *   <li><b>等待摄像头</b>：录像开着、一路都没在录（都被占用、在救，2.11 确认文档 §三）—— 录像不算停。
+ *       灰色方块慢慢地一明一暗，环不转、不走，不显示本段时长；按下去仍然是停止录制。红色只标「正在录」。</li>
  * </ul>
  *
  * <h3>动效只用属性动画</h3>
@@ -44,10 +47,12 @@ import java.util.Locale;
  */
 public final class RecordButtonUi {
 
-    public enum State { IDLE, UNAVAILABLE, PREPARING, RECORDING }
+    public enum State { IDLE, UNAVAILABLE, PREPARING, RECORDING, WAITING }
 
     private static final long MORPH_MS = 220;
     private static final long PULSE_MS = 600;
+    /** 等待摄像头时的呼吸：比准备中慢得多 —— 不是马上就好，是在等。 */
+    private static final long WAITING_PULSE_MS = 1_600;
     private static final long FLASH_MS = 300;
 
     private final View root;
@@ -57,6 +62,7 @@ public final class RecordButtonUi {
     private final View dot;
     private final TextView title;
     private final TextView detail;
+    private final View hint;
     private final GradientDrawable dotShape;
     private final float density;
 
@@ -79,6 +85,7 @@ public final class RecordButtonUi {
         this.dot = root.findViewById(R.id.record_dot);
         this.title = root.findViewById(R.id.record_title);
         this.detail = root.findViewById(R.id.record_detail);
+        this.hint = root.findViewById(R.id.record_hint);
         if (dot != null) {
             dotShape = new GradientDrawable();
             dotShape.setColor(color(R.color.recording));
@@ -149,18 +156,23 @@ public final class RecordButtonUi {
 
     private void render(State next, boolean animate) {
         state = next;
+        if (hint != null) {
+            // 等待摄像头时录像也开着：熄屏的话这段录像会怎样，照常说
+            hint.setVisibility(next == State.RECORDING || next == State.WAITING ? View.VISIBLE : View.GONE);
+        }
         int description = next == State.IDLE ? R.string.record_start
                 : next == State.UNAVAILABLE ? R.string.record_unavailable
                 : R.string.record_stop;
         root.setContentDescription(context.getString(description));
         if (dotShape != null) {
-            dotShape.setColor(color(next == State.UNAVAILABLE ? R.color.text_tertiary : R.color.recording));
+            dotShape.setColor(color(next == State.UNAVAILABLE || next == State.WAITING
+                    ? R.color.text_tertiary : R.color.recording));
         }
         switch (next) {
             case PREPARING:
                 setIndeterminate(true);
                 morphTo(1f, animate);
-                startPulse();
+                startPulse(PULSE_MS);
                 backgroundTo(R.color.recording_quiet, animate);
                 setTitle(R.string.record_preparing);
                 setDetail("");
@@ -175,6 +187,17 @@ public final class RecordButtonUi {
                 backgroundTo(R.color.recording_quiet, animate);
                 setTitle(R.string.record_stop);
                 setDetail(context.getString(R.string.record_segment_detail, mmss(0), segmentMinutes));
+                break;
+            case WAITING:
+                setIndeterminate(false);
+                if (ring != null) {
+                    ring.setProgressCompat(0, animate);
+                }
+                morphTo(1f, animate);
+                startPulse(WAITING_PULSE_MS);
+                backgroundTo(R.color.sunken, animate);
+                setTitle(R.string.record_waiting_cameras);
+                setDetail(context.getString(R.string.record_waiting_detail));
                 break;
             case UNAVAILABLE:
                 stopPulse();
@@ -269,12 +292,14 @@ public final class RecordButtonUi {
         dot.setScaleY(scale);
     }
 
-    private void startPulse() {
-        if (dot == null || pulseAnimator != null) {
+    /** 点一明一暗；已经在按这个节奏呼吸就不动，换了节奏（准备中 ⇄ 等待摄像头）从头起。 */
+    private void startPulse(long periodMs) {
+        if (dot == null || (pulseAnimator != null && pulseAnimator.getDuration() == periodMs)) {
             return;
         }
+        stopPulse();
         pulseAnimator = ValueAnimator.ofFloat(1f, 0.35f);
-        pulseAnimator.setDuration(PULSE_MS);
+        pulseAnimator.setDuration(periodMs);
         pulseAnimator.setRepeatMode(ValueAnimator.REVERSE);
         pulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
         pulseAnimator.addUpdateListener(a -> dot.setAlpha((float) a.getAnimatedValue()));

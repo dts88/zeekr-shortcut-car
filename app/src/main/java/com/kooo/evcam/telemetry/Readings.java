@@ -60,6 +60,20 @@ public final class Readings {
         return new Readings(kept, version);
     }
 
+    /**
+     * 信息条那份快照用的读数：能用的，加上勾了的（没验证的只有开发者勾得了，见 {@link InfoBar#selection}）。
+     * 开发者没勾的没验证信号照样不进 —— 不然车厢图会拿没验证的副驾安全带把坐了人的副驾画成红的。版本号不变。
+     */
+    public Readings usableOr(java.util.Set<String> ticked) {
+        Map<Signal, Object> kept = new EnumMap<>(Signal.class);
+        for (Map.Entry<Signal, Object> e : values.entrySet()) {
+            if (e.getKey().usable() || ticked.contains(e.getKey().name())) {
+                kept.put(e.getKey(), e.getValue());
+            }
+        }
+        return new Readings(kept, version);
+    }
+
     /** 有数据的信号个数。 */
     public int knownCount() {
         return values.size();

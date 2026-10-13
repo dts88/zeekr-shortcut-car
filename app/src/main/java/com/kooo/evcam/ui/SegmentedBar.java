@@ -91,7 +91,7 @@ public class SegmentedBar extends LinearLayout {
         return view;
     }
 
-    /** 现在这一排里有没有这个值，用来判断「已细调」。 */
+    /** 现在这一排里有没有这个值，用来判断「自定义」。 */
     public boolean has(String value) {
         for (String candidate : values) {
             if (candidate.equals(value)) {

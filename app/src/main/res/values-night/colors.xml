@@ -21,6 +21,7 @@
     <color name="recording_quiet">#FF33191A</color>  <!-- 录制中那一块的底 -->
     <color name="recording_track">#FF52282A</color>  <!-- 分段进度环的轨道 -->
     <color name="recording_text">#FFF59A9D</color>  <!-- 录制状态文字 -->
+    <color name="locked">#FFF2B630</color>  <!-- 锁定的影像（回放进度条下面那条）：琥珀色，和录制红、极氪橙都分得开 -->
 
     <!-- 昼夜各自取值的 -->
     <color name="preview_frame_background">#FF1C1D20</color>

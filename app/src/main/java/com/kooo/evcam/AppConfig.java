@@ -23,12 +23,16 @@ public class AppConfig {
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_SCREEN_OFF_WAKE_MINUTES = "screen_off_wake_min";  // 熄屏录制：最多不让车机睡多久（分钟）
-    private static final String KEY_AUTO_START_ON_BOOT = "auto_start_on_boot";  // 开机自启动
+    // 开机自启动（2.10.4 起含保活）。键名沿用合并前「保持后台运行」的，老用户的选择才接得上
+    private static final String KEY_AUTO_START_ON_BOOT = "keep_alive_enabled";
+    // 合并前「开机自启动」自己的键：只在合并时读一次，读完删掉
+    private static final String KEY_AUTO_START_ON_BOOT_LEGACY = "auto_start_on_boot";
     private static final String KEY_AUTO_START_RECORDING = "auto_start_recording";  // 启动自动录制
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
     private static final String KEY_SCREEN_OFF_KEEP_RECORDING = "screen_off_keep_recording";  // 熄屏持续录制
+    private static final String KEY_FOOTAGE_LOCK = "footage_lock";  // 锁定影像
+    private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 闪远光时自动锁定当前录像
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
-    private static final String KEY_KEEP_ALIVE_ENABLED = "keep_alive_enabled";  // 保活服务
     
     // 存储位置配置
     private static final String KEY_STORAGE_LOCATION = "storage_location";  // 存储位置
@@ -62,8 +66,8 @@ public class AppConfig {
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
+    private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
     private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
-    private static final String KEY_FISHEYE_STRENGTH = "fisheye_strength";        // 校正强度（百分比）
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
     private static final String KEY_REARVIEW_WIDTH = "rearview_width";            // 窗口宽度（px）
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
@@ -85,7 +89,8 @@ public class AppConfig {
     private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
     private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";
     private static final String KEY_INFO_BAR = "info_bar_enabled";  // 录像下方的行驶信息条
-    private static final String KEY_INFO_BAR_ALL = "info_bar_all";  // 开发者：连没验证的栏目一起启用
+    private static final String KEY_VEHICLE_STATUS = "vehicle_status_panel";  // 主界面的车辆状态面板（试验性）
+    private static final String KEY_INFO_BAR_ITEMS = "info_bar_items";  // 信息条上放哪几项（系统信息里勾的）
     private static final String KEY_SIDE_POPUP = "side_popup_enabled";  // 打转向灯弹侧视
     private static final String KEY_SIDE_POPUP_MIN_SPEED = "side_popup_min_speed";  // 侧视弹窗的车速门槛 km/h
     /** 默认 30 km/h：再慢原厂自己会弹侧方小窗。 */
@@ -195,6 +200,7 @@ public class AppConfig {
     public static final String BITRATE_HIGH = "high";      // 高码率（计算值的150%）
     
     private static final String KEY_CAMERA_OVERRIDE_PREFIX = "zeekr_camera_override_";  // 手动指定的相机映射
+    private static final String KEY_SLOT_MAP_PREFIX = "slot_map_";  // 存下的槽位映射（按车型），见 getStoredSlotMap
 
 
     public static final String CAR_MODEL_ZEEKR_7X_MULTI = "zeekr_7x_multi";  // 极氪7X（环视合成流 + 两路座舱）
@@ -229,32 +235,26 @@ public class AppConfig {
     }
 
 
-    // ==================== 开机自启动相关方法 ====================
-    
-    /**
-     * 设置开机自启动
-     * @param enabled true 表示启用开机自启动
-     */
+    // ==================== 开机自启动 ====================
+
     public void setAutoStartOnBoot(boolean enabled) {
-        prefs.edit().putBoolean(KEY_AUTO_START_ON_BOOT, enabled).apply();
-        AppLog.d(TAG, "开机自启动设置: " + (enabled ? "启用" : "禁用"));
+        // 用户亲手设过，合并前的旧键就没有再合并的必要
+        prefs.edit().putBoolean(KEY_AUTO_START_ON_BOOT, enabled)
+                .remove(KEY_AUTO_START_ON_BOOT_LEGACY).apply();
+        AppLog.d(TAG, "开机自启动: " + (enabled ? "开" : "关"));
     }
-    
-    /**
-     * 获取开机自启动设置
-     * @return true 表示启用开机自启动
-     */
+
     /** 熄屏录制默认最多不让车机睡 1 小时（项目所有者 2026-09-27 定）。 */
     public static final int DEFAULT_SCREEN_OFF_WAKE_MINUTES = 60;
 
     /**
      * 熄屏录制最多不让车机睡多久（分钟）。用户在设置里按小时填，可带小数（24、30 都行）。
      *
-     * <p>从熄屏那一刻起算：App 拿不到「下车」这个事件，熄屏是最接近的近似（平台笔记 §3.6）。
-     * 到点放开唤醒锁，车机该睡就睡（规格 §3.1）。</p>
+     * <p>从熄屏那一刻起算。熄屏 v3 起熄屏是屏幕真黑了（车辆信号判的，车主下车关门那一下；平台笔记 §3.6「屏幕真黑了」），
+     * 不再是几分钟后车机下电时的安卓熄屏。到点照熄屏那张表再判（规格 §3.1）。</p>
      */
     public int getScreenOffWakeMinutes() {
-        int minutes = prefs.getInt(KEY_SCREEN_OFF_WAKE_MINUTES, DEFAULT_SCREEN_OFF_WAKE_MINUTES);
+        int minutes = readInt(KEY_SCREEN_OFF_WAKE_MINUTES, DEFAULT_SCREEN_OFF_WAKE_MINUTES);
         return minutes > 0 ? minutes : DEFAULT_SCREEN_OFF_WAKE_MINUTES;
     }
 
@@ -262,10 +262,30 @@ public class AppConfig {
         prefs.edit().putInt(KEY_SCREEN_OFF_WAKE_MINUTES, Math.max(1, minutes)).apply();
     }
 
+    /**
+     * 开机自启动（规格 §1、§3）：App 不在了要不要自己回来。一个开关管两件事 ——
+     * 保活（WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
+     * 系统对 START_STICKY 服务的重启）让进程尽量活着、被杀了拉回来；回来之后 {@code Recovery}
+     * 按设置恢复悬浮按钮、超级后视镜和自动录制。关 = 被杀了不回来、也不恢复。默认开。
+     */
     public boolean isAutoStartOnBoot() {
-        // 默认启用开机自启动（车机系统场景）
-        // 默认关：开机就自己起来是件挺重的事，该由用户明确开启
-        return prefs.getBoolean(KEY_AUTO_START_ON_BOOT, false);
+        mergeAutoStartSwitches();
+        return prefs.getBoolean(KEY_AUTO_START_ON_BOOT, true);
+    }
+
+    /**
+     * 2.10.4 之前「开机自启动」和「保持后台运行」是两个开关，任一开着，合并后的就开（项目所有者 2026-10-08 定）。
+     * 旧「开机自启动」键还在就说明没合并过：算一次、写入、删旧键，之后用户再关不会被旧值翻回来。
+     */
+    private void mergeAutoStartSwitches() {
+        if (!prefs.contains(KEY_AUTO_START_ON_BOOT_LEGACY)) {
+            return;
+        }
+        boolean on = prefs.getBoolean(KEY_AUTO_START_ON_BOOT, true)
+                || prefs.getBoolean(KEY_AUTO_START_ON_BOOT_LEGACY, false);
+        prefs.edit().putBoolean(KEY_AUTO_START_ON_BOOT, on)
+                .remove(KEY_AUTO_START_ON_BOOT_LEGACY).apply();
+        AppLog.i(TAG, "开机自启动：「保持后台运行」并入，合并结果 " + (on ? "开" : "关"));
     }
     
     /**
@@ -298,18 +318,23 @@ public class AppConfig {
     /**
      * 主界面是不是<b>因为熄屏</b>才退到后台的。
      *
-     * <p>熄屏 15 秒后应用会把自己退到后台、关掉相机（见 MainActivity 的
-     * {@code scheduleBackgroundTask}）。既然是我们自己退下去的，亮屏时就该自己回来 ——
-     * 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。</p>
+     * <p>熄屏 15 秒后主界面会把自己退到后台（见 MainActivity 的 {@code scheduleBackgroundTask}）。
+     * 既然是我们自己退下去的，亮屏时就该自己回来 —— 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。
+     * 熄屏那一刻主界面在前就记（2.11 阶段 6）：车辆信号读不到时熄屏就是车机下电，几秒后就可能结束进程，等不到 15 秒。
+     * 熄屏 v3 起熄屏是屏幕真黑了：车主下车那一下就记，开车门亮屏时主界面就接回来（规格 2.4）。</p>
      *
      * <p>存在配置里而不是内存字段里：退到后台之后这个界面很可能撑不到亮屏那一刻，
-     * 被系统收走之后只有存下来的记号还在。</p>
+     * 被系统收走之后只有存下来的记号还在。所以同步落盘（commit），和「这一趟要录」一样：车机下电（安卓熄屏）后 3–5 秒进程就可能被结束，
+     * 异步写可能还没落盘（2026-10-11 审查）。没变就不写 —— 主界面每次回到前台都清一次，不为它每次进一趟盘。</p>
      *
      * <p>只有这个记号在时才会把界面拉回前台。用户自己切走的、从来没进过前台的，
      * 一律不动 —— 不能因为有人点亮了屏幕就抢到最前面。</p>
      */
     public void setUiLeftForScreenOff(boolean value) {
-        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).apply();
+        if (prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false) == value) {
+            return;
+        }
+        prefs.edit().putBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, value).commit();
     }
 
     public boolean didUiLeaveForScreenOff() {
@@ -317,7 +342,7 @@ public class AppConfig {
     }
 
     /**
-     * 息屏录制<b>存着</b>的值，不管开发者选项解没解锁。
+     * 息屏录制<b>存着</b>的值，不管开发者选项开没开（{@link #DEVELOPER_KEYS} 那道门不过）。
      *
      * <p>只给黑匣子和诊断报告用：开发者选项关着时，「存着是开的、实际没生效」会发生
      * （1.42.0 之前解锁不保存，每次更新都会这样）。两个值摆在一起，才看得出是这种情况。</p>
@@ -329,15 +354,16 @@ public class AppConfig {
     /**
      * 熄屏持续录制（项目拥有者 2026-09-26 定）。
      *
-     * <p>停车前在录像（手动、自动都算），熄屏后接着录。只管录：不申请唤醒、不拉住车机，
-     * 车机睡了录像就停在那一刻，醒来接着录；醒着的时候（哨兵模式）断了，环视一恢复就接回，
-     * 和亮屏时一样。每一段都记黑匣子。</p>
+     * <p>停车前在录像（手动、自动都算），熄屏（屏幕真黑了）后接着录环视；两路座舱屏幕一黑就放开，亮屏再回来
+     * （项目所有者 2026-10-12，熄屏 v3）。只管录：不申请唤醒、不拉住车机；醒着的时候被存储一类打断了，收拾完、查过盘就接回。
+     * 哨兵模式开着，车机一直醒着，环视一直录；没开（车也没在走），录到车机要睡（安卓熄屏，离车约 4–6 分钟后），
+     * 那一刻停录、相机按次序关，亮屏后接着录（{@code ScreenOffPlan}）。关着时屏幕一黑 10 秒后停录。每一段都记黑匣子。</p>
      *
      * <p>为什么要有它（项目拥有者，实测过的事实）：下车前打开车机自己的「哨兵模式」，
      * 车机会一直醒着、只是黑屏；这时 App 开着录像，人下车、屏幕黑了，录像照样一直录。
      * 这个选项就是为了保住这件事，所以<b>默认开</b>。</p>
      *
-     * <p>和开发者选项里的「息屏录制」是两回事：那个没在录的时候也不关相机，这个不管那件事。</p>
+     * <p>和开发者选项里的「息屏录制」是两回事：那个拿唤醒锁拉住车机，这个不拉。</p>
      */
     public boolean isScreenOffKeepRecording() {
         return prefs.getBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, true);
@@ -348,33 +374,42 @@ public class AppConfig {
     }
 
     /**
-     * 熄屏录制（开发者选项，规格 §3.1）有没有生效：熄屏时在录像就接着录，并拿住唤醒锁不让车机睡，
-     * 最长 {@link #getScreenOffWakeMinutes()} 分钟；没在录时也不关相机。
+     * 锁定影像（存储页，默认开）：回放里能锁录像和照片，锁定的不会被自动清理删掉、也不能直接删。
+     * 关掉时锁定按钮收起、清理不再跳过锁定的；清单留在 U 盘上，重新打开恢复保护。见 {@code FootageLocks}。
      */
-    public boolean isScreenOffRecordingEnabled() {
-        // 默认禁用息屏录制
-        // 锁在开发者选项后面：没解锁时一律当关着，存着的值不动。
-        // 设置里那个开关没解锁时是灰的、关着的 —— 这里必须和它说同一句话，
-        // 否则界面写着关、实际还在息屏录
-        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                && prefs.getBoolean(KEY_SCREEN_OFF_RECORDING, false);
+    public boolean isFootageLockEnabled() {
+        return prefs.getBoolean(KEY_FOOTAGE_LOCK, true);
     }
-    
-    public void setKeepAliveEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_KEEP_ALIVE_ENABLED, enabled).apply();
-        AppLog.d(TAG, "保活: " + (enabled ? "开" : "关"));
+
+    public void setFootageLockEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_FOOTAGE_LOCK, enabled).apply();
     }
 
     /**
-     * 保活（规格 §3）：不正常的状态下用各种手段让进程尽量活着。App 里所有保活手段都归它管 ——
-     * WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
-     * 系统对 START_STICKY 服务的重启。关 = 被杀了不回来。默认开。
+     * 闪远光时自动锁定当前录像（存储页「锁定影像」下面，默认关 —— 自动锁的也占空间，锁满了就停录）。
+     * 这是存着的值；只在「锁定影像」也开着时起作用，见 {@code AutoLock.flashEnabled}。
      */
-    public boolean isKeepAliveEnabled() {
-        return prefs.getBoolean(KEY_KEEP_ALIVE_ENABLED, true);
+    public boolean isFlashLockEnabled() {
+        return prefs.getBoolean(KEY_FOOTAGE_LOCK_FLASH, false);
     }
-    
-    
+
+    public void setFlashLockEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_FOOTAGE_LOCK_FLASH, enabled).apply();
+    }
+
+    /**
+     * 熄屏录制（开发者选项，规格 §3.1）有没有生效：熄屏时在录像就接着录环视（座舱屏幕一黑就放开，熄屏 v3），
+     * 并拿住唤醒锁不让车机睡，最长 {@link #getScreenOffWakeMinutes()} 分钟；到点照熄屏那张表再判（{@code ScreenOffPlan}）。
+     *
+     * <p>没在录时不拿锁，空闲时也不再留着相机（大纲 §7 第 5 问，项目所有者 2026-10-11「按建议」：照登记表）：
+     * 熄屏时主界面不算看得见、预览不算有人要，座舱谁都不要，也不保持，于是相机照登记表按次序关 —— 车机要睡
+     * （安卓熄屏，哨兵模式没开、车没在走）的话当场按次序关。以前这个开关开着时主界面熄屏不退后台、相机一直开着。主界面熄屏时照旧不退后台（只是界面，不管相机）。</p>
+     */
+    public boolean isScreenOffRecordingEnabled() {
+        // 默认关。归开发者选项管：关着时按关算，存着的值不动（DEVELOPER_KEYS）
+        return readBoolean(KEY_SCREEN_OFF_RECORDING, false);
+    }
+
     /**
      * 设置录制模式
      * @param mode 录制模式（auto/media_recorder/codec）
@@ -385,7 +420,7 @@ public class AppConfig {
     }
     
     /**
-     * 获取录制模式
+     * 获取录制模式。归开发者选项管，关着开发者选项时是默认的自动。
      * @return 录制模式，默认为自动
      */
     public String getRecordingMode() {
@@ -473,21 +508,6 @@ public class AppConfig {
     }
     
     
-    /**
-     * 格式化码率为可读字符串
-     * @param bitrate 码率（bps）
-     * @return 格式化字符串，如 "3.0 Mbps"
-     */
-    public static String formatBitrate(int bitrate) {
-        float mbps = bitrate / 1000000f;
-        if (mbps >= 1) {
-            return String.format(java.util.Locale.getDefault(), "%.1f Mbps", mbps);
-        } else {
-            return String.format(java.util.Locale.getDefault(), "%d Kbps", bitrate / 1000);
-        }
-    }
-    
-    
     // ==================== 帧率配置相关方法 ====================
 
 
@@ -537,27 +557,123 @@ public class AppConfig {
         AppLog.d(TAG, "相机映射覆盖 " + slot + " = " + cameraId);
     }
 
-    /** 返回 null 表示该槽位走自动分配。 */
+    /** 返回 null 表示该槽位走自动分配。归开发者选项管：关着时一律自动分配。 */
     public String getCameraOverride(String slot) {
-        String value = prefs.getString(KEY_CAMERA_OVERRIDE_PREFIX + slot, null);
+        String value = readString(KEY_CAMERA_OVERRIDE_PREFIX + slot, null);
         return (value == null || value.trim().isEmpty()) ? null : value;
     }
 
     /** 是否有任何槽位被手动指定过。 */
     public boolean hasCameraOverride() {
-        return getCameraOverride("front") != null
-                || getCameraOverride("back") != null
-                || getCameraOverride("left") != null;
+        for (String slot : CAMERA_OVERRIDE_SLOTS) {
+            if (getCameraOverride(slot) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 清掉所有手动指定，全部恢复自动。 */
     public void clearCameraOverrides() {
-        prefs.edit()
-                .remove(KEY_CAMERA_OVERRIDE_PREFIX + "front")
-                .remove(KEY_CAMERA_OVERRIDE_PREFIX + "back")
-                .remove(KEY_CAMERA_OVERRIDE_PREFIX + "left")
-                .apply();
+        SharedPreferences.Editor editor = prefs.edit();
+        for (String slot : CAMERA_OVERRIDE_SLOTS) {
+            editor.remove(KEY_CAMERA_OVERRIDE_PREFIX + slot);
+        }
+        editor.apply();
         AppLog.i(TAG, "相机映射已全部恢复自动");
+    }
+
+    // ==================== 存下的槽位映射（2.11 阶段 6） ====================
+
+    /**
+     * 存下的槽位映射，按车型存（大纲 §1 CameraManagerHolder）：上一次相机列表完整时分好的三路相机 id、环视是不是真合成流、
+     * 合成流尺寸，外加那时的手动指定。编码和读回在 {@code ZeekrMultiPlan.Stored} 里，这里只存一行字。
+     *
+     * <p>为什么存：车机拿着后座舱（相机 1）时它不在相机列表里，这时冷启动照列表分，后座舱这一格就没有了，以后既认不出、
+     * 也开不了。列表不完整时照存下的建，少的那一路照样建出来，交给通道调度判「不在」。不归开发者选项管：这是车的事实，不是设置。</p>
+     *
+     * @return 存着的那一行；没存过是 null
+     */
+    public String getStoredSlotMap(String carModel) {
+        return prefs.getString(KEY_SLOT_MAP_PREFIX + carModel, null);
+    }
+
+    /** 存下这个车型的槽位映射（建管线的那条线程上调；只在变了时写）。 */
+    public void setStoredSlotMap(String carModel, String encoded) {
+        prefs.edit().putString(KEY_SLOT_MAP_PREFIX + carModel, encoded).apply();
+    }
+
+
+    // ==================== 归开发者选项管的设置 ====================
+
+    /** 「摄像头映射」能手动指定的三格。 */
+    private static final String[] CAMERA_OVERRIDE_SLOTS = {"front", "back", "left"};
+
+    /**
+     * 归开发者选项管的设置，按存储键列（项目所有者 2026-10-05：关闭开发者选项后，「其中的功能停止生效」）。
+     *
+     * <h3>规则只有一条</h3>
+     *
+     * <p>开发者选项关着时，这些键<b>按没存过算</b>：getter 读到的是默认值，而每一项的默认值就是
+     * 普通用户用的那个值 —— 关、自动、U 盘。存着的值不动，再打开开发者选项就回来。
+     * 判断只在 {@link #readsAsUnset} 这一处，读取走 {@link #readBoolean} 这几个；
+     * 用的地方照旧调原来的 getter，不用各自再问开发者模式。</p>
+     *
+     * <p>什么时候按新的算，和改这一项本身一样，看它在哪一刻被读：开录时读的（存储位置、中转写入、
+     * 强制 H.264）从下一次开录起；建相机时读的（录制模式、相机映射、画面调节、预览走 GPU）
+     * 从下一次启动应用起；熄屏录制从下一次熄屏起；拍照另存整帧从下一张起；视频回看走 GPU 从下一次打开回看起；
+     * 记录可能占用摄像头的应用从下一次别的程序占用或放开相机起。</p>
+     *
+     * <p>收进来的有两种：开发者选项分区里的设置（{@code preferences.xml} 的 {@code screen_developer}）；
+     * 别的分区里只有开发者才选得了的值 —— 存储位置选内置存储、中转写入（先写内置存储）。
+     * 分区里只是动作的几行（恢复画面调节默认值、权限、修复录像、归档）不存设置，不在这里。
+     * 画面调节的几个参数也不在：它们只在「画面调节」开着时才用到；按没存过算的话，
+     * 画面调节窗口在开发者选项关着时建好、打开后再存一次，就把存着的参数冲掉了。</p>
+     *
+     * <p>加一项开发者设置 = 把它的键加进这里，并让它的默认值就是关着时该用的值。
+     * {@code DeveloperSettingsTest} 对着 {@code screen_developer} 逐行核对。</p>
+     */
+    private static final java.util.Set<String> DEVELOPER_KEYS = developerKeys();
+
+    private static java.util.Set<String> developerKeys() {
+        java.util.Set<String> keys = new java.util.HashSet<>(java.util.Arrays.asList(
+                SettingsRegistry.RECORDING_MODE.key,  // 录制模式 → 自动
+                KEY_FORCE_H264_ENCODING,              // 强制 H.264 → 关，各路按自己配置里的编码
+                KEY_SCREEN_OFF_RECORDING,             // 熄屏录制 → 关
+                KEY_SCREEN_OFF_WAKE_MINUTES,          // 熄屏录制的最长时长 → 默认（熄屏录制关着，用不到）
+                KEY_IMAGE_ADJUST_ENABLED,             // 画面调节 → 关
+                KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
+                KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
+                KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
+                KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
+                KEY_PHOTO_VIA_JPEG,                   // 拍照使用 JPEG 输出 → 开（关着时主界面在后台拍不到画面）
+                KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
+                KEY_RELAY_WRITE_ENABLED));            // 中转写入 → 关
+        for (String slot : CAMERA_OVERRIDE_SLOTS) {
+            keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
+        }
+        return java.util.Collections.unmodifiableSet(keys);
+    }
+
+    /** 这个键此刻按没存过算吗：开发者选项关着，而它归开发者选项管。纯函数，测试直接调。 */
+    static boolean readsAsUnset(String key, boolean developerUnlocked) {
+        return !developerUnlocked && DEVELOPER_KEYS.contains(key);
+    }
+
+    private static boolean readsAsUnset(String key) {
+        return readsAsUnset(key, com.kooo.evcam.settings.DeveloperMode.isUnlocked());
+    }
+
+    private boolean readBoolean(String key, boolean defaultValue) {
+        return readsAsUnset(key) ? defaultValue : prefs.getBoolean(key, defaultValue);
+    }
+
+    private int readInt(String key, int defaultValue) {
+        return readsAsUnset(key) ? defaultValue : prefs.getInt(key, defaultValue);
+    }
+
+    private String readString(String key, String defaultValue) {
+        return readsAsUnset(key) ? defaultValue : prefs.getString(key, defaultValue);
     }
 
 
@@ -599,6 +715,25 @@ public class AppConfig {
         for (SettingSpec spec : SettingsRegistry.ALL) {
             repairEnum(spec);
         }
+        resetPhotoViaJpegOnce();
+    }
+
+    /** 做过一次「拍照使用 JPEG 输出改回开」的记号（2.10.12）。 */
+    private static final String KEY_PHOTO_VIA_JPEG_RESET = "photo_via_jpeg_reset_2_10_12";
+
+    /**
+     * 「拍照使用 JPEG 输出」2.10.12 起锁成开（见 {@link #isPhotoViaJpegEnabled}）：以前关掉的，升级后一次性改回开。
+     * 只做一次 —— 之后开发者再关，不会被这里翻回来。
+     */
+    private void resetPhotoViaJpegOnce() {
+        if (prefs.getBoolean(KEY_PHOTO_VIA_JPEG_RESET, false)) {
+            return;
+        }
+        boolean wasOn = prefs.getBoolean(KEY_PHOTO_VIA_JPEG, true);
+        prefs.edit().putBoolean(KEY_PHOTO_VIA_JPEG, true).putBoolean(KEY_PHOTO_VIA_JPEG_RESET, true).apply();
+        if (!wasOn) {
+            AppLog.i(TAG, "拍照使用 JPEG 输出：以前关着，2.10.12 起一律开（只有开发者能关），已改回开");
+        }
     }
 
     /** 一个枚举项的自检：存的值不合法就修回默认值。 */
@@ -619,10 +754,11 @@ public class AppConfig {
      * 读一个枚举型设置。
      *
      * <p>一律过一遍 {@link SettingSpec#sanitize(String)} —— 不合法的值<b>根本不可能被
-     * 读出来</b>，启动自检只是顺手把坏值从存储里清掉，不是唯一的防线。</p>
+     * 读出来</b>，启动自检只是顺手把坏值从存储里清掉，不是唯一的防线。
+     * 归开发者选项管的（录制模式）关着开发者选项时读到默认值，见 {@link #DEVELOPER_KEYS}。</p>
      */
     private String readEnum(SettingSpec spec) {
-        return spec.sanitize(prefs.getString(spec.key, spec.defaultValue));
+        return spec.sanitize(readString(spec.key, spec.defaultValue));
     }
 
     /** 写一个枚举型设置；不合法的值直接拒绝，避免把坏值写进存储。 */
@@ -719,10 +855,29 @@ public class AppConfig {
      * SharedPreferences 只弱引用监听器，不拿住会被回收，之后就再也收不到了。</p>
      */
     public SharedPreferences.OnSharedPreferenceChangeListener onFisheyeChanged(Runnable action) {
+        return onChanged(action, KEY_PHOTO_FISHEYE, KEY_PHOTO_FISHEYE_FOV,
+                SettingsRegistry.FISHEYE_PROJECTION.key);
+    }
+
+    public void removeFisheyeListener(SharedPreferences.OnSharedPreferenceChangeListener listener) {
+        removeChangeListener(listener);
+    }
+
+    /** 车辆状态面板的开关一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onVehicleStatusChanged(Runnable action) {
+        return onChanged(action, KEY_VEHICLE_STATUS);
+    }
+
+    /** 熄屏后录像会怎样（{@code ScreenOffPlan}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onScreenOffPlanChanged(Runnable action) {
+        return onChanged(action, KEY_SCREEN_OFF_RECORDING, KEY_SCREEN_OFF_KEEP_RECORDING, KEY_AUTO_START_RECORDING);
+    }
+
+    /** 这几项里有一项变了就叫 {@code action}。返回的监听器调用方要拿住，用完交给 {@link #removeChangeListener}。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onChanged(Runnable action, String... keys) {
+        java.util.List<String> watched = java.util.Arrays.asList(keys);
         SharedPreferences.OnSharedPreferenceChangeListener listener = (changed, key) -> {
-            if (KEY_PHOTO_FISHEYE.equals(key) || KEY_PHOTO_FISHEYE_FOV.equals(key)
-                    || KEY_FISHEYE_STRENGTH.equals(key)
-                    || SettingsRegistry.FISHEYE_PROJECTION.key.equals(key)) {
+            if (watched.contains(key)) {
                 action.run();
             }
         };
@@ -730,7 +885,7 @@ public class AppConfig {
         return listener;
     }
 
-    public void removeFisheyeListener(SharedPreferences.OnSharedPreferenceChangeListener listener) {
+    public void removeChangeListener(SharedPreferences.OnSharedPreferenceChangeListener listener) {
         if (listener != null) {
             prefs.unregisterOnSharedPreferenceChangeListener(listener);
         }
@@ -742,7 +897,7 @@ public class AppConfig {
      * <p>工程模式用：拿去量画面几何和鱼眼参数。平时没有理由开着 —— 每拍一张多占一份空间。</p>
      */
     public boolean isRawFrameDumpEnabled() {
-        return prefs.getBoolean(KEY_RAW_FRAME_DUMP, false);
+        return readBoolean(KEY_RAW_FRAME_DUMP, false);
     }
 
     public void setRawFrameDumpEnabled(boolean on) {
@@ -752,14 +907,13 @@ public class AppConfig {
     /**
      * 主界面环视预览的鱼眼校正走 GPU 逐像素（{@code PreviewDewarp}），而不是分格近似。
      *
-     * <p>开发者选项：相机画面要先进应用自己的 GL 再显示，还没在车上验证过。锁在开发者模式后面，
-     * 没解锁时一律当关着 —— 关掉开发者模式就回到验证过的那条路。改了要重启应用才生效。</p>
+     * <p>开发者选项：相机画面要先进应用自己的 GL 再显示，还没在车上验证过。归开发者选项管，
+     * 关着时按关算 —— 关掉开发者选项就回到验证过的那条路。改了要重启应用才生效。</p>
      *
      * <p>只决定算法。校正开不开还是看 {@link #isFisheyeCorrection}。</p>
      */
     public boolean isGpuFisheyePreview() {
-        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                && prefs.getBoolean(KEY_GPU_FISHEYE_PREVIEW, false);
+        return readBoolean(KEY_GPU_FISHEYE_PREVIEW, false);
     }
 
     public void setGpuFisheyePreview(boolean on) {
@@ -768,15 +922,29 @@ public class AppConfig {
 
     /**
      * 视频回看里环视那一格的鱼眼校正走 GPU 逐像素（{@code FisheyeVideoFrame}）。
-     * 开发者选项，同上锁在开发者模式后面；下次打开视频回看时生效。
+     * 开发者选项，同上归开发者选项管；下次打开视频回看时生效。
      */
     public boolean isGpuFisheyeVideo() {
-        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                && prefs.getBoolean(KEY_GPU_FISHEYE_VIDEO, false);
+        return readBoolean(KEY_GPU_FISHEYE_VIDEO, false);
     }
 
     public void setGpuFisheyeVideo(boolean on) {
         prefs.edit().putBoolean(KEY_GPU_FISHEYE_VIDEO, on).apply();
+    }
+
+    /**
+     * 别的程序占用或放开相机时，查那几秒里哪些应用起停了前台服务、切了前后台，记进黑匣子
+     * （{@code CameraHolderSuspects}）。只是嫌疑，不是定论。
+     *
+     * <p>开发者选项，默认关：要使用情况访问，还会把别的应用的包名写进诊断报告。
+     * 归开发者选项管，关着时按关算；从下一次争用起生效。</p>
+     */
+    public boolean isCameraHolderSuspectsEnabled() {
+        return readBoolean(KEY_CAMERA_HOLDER_SUSPECTS, false);
+    }
+
+    public void setCameraHolderSuspectsEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_CAMERA_HOLDER_SUSPECTS, on).apply();
     }
 
     /** 鱼眼校正用哪种投影（直线 / 柱面 / 立体）。主界面预览、图片回看、视频回看共用；后视镜不用它。 */
@@ -805,18 +973,6 @@ public class AppConfig {
                 FisheyeProjection.clampFov(degrees, getFisheyeProjection())).apply();
     }
 
-    /**
-     * 校正强度，百分比。100 就是这种投影本来的样子，小于 100 是往原图那边插值。
-     *
-     * <p>下限 10 而不是 0：0 等于没校正，那是开关该管的事，不该在滑块上再来一个关。</p>
-     */
-    public int getFisheyeStrength() {
-        return Math.max(10, Math.min(100, prefs.getInt(KEY_FISHEYE_STRENGTH, 100)));
-    }
-
-    public void setFisheyeStrength(int percent) {
-        prefs.edit().putInt(KEY_FISHEYE_STRENGTH, Math.max(10, Math.min(100, percent))).apply();
-    }
 
     /** 校正的目标视野角度（度）。 */
     public float getRearViewFov() {
@@ -1061,12 +1217,14 @@ public class AppConfig {
     }
     
     /**
-     * 获取存储位置
-     * @return 存储位置，默认为内部存储
+     * 存储位置：U 盘（默认）或内置存储。
+     *
+     * <p>默认 U 盘：行车记录是持续大量写入，默认写内置闪存会消耗它的寿命。内置存储只有开发者选得了，
+     * 所以这一项归开发者选项管（{@link #DEVELOPER_KEYS}）：关着开发者选项时一律是 U 盘 ——
+     * 录像写 U 盘、没插 U 盘就不录、插上就录；存着的「内置存储」不动，再打开开发者选项就回来。</p>
      */
     public String getStorageLocation() {
-        // 默认 U 盘：行车记录是持续大量写入，默认写内置闪存会消耗它的寿命
-        return prefs.getString(KEY_STORAGE_LOCATION, STORAGE_EXTERNAL_SD);
+        return readString(KEY_STORAGE_LOCATION, STORAGE_EXTERNAL_SD);
     }
     
     /**
@@ -1172,13 +1330,14 @@ public class AppConfig {
     }
     
     /**
-     * 获取中转写入开关状态
-     * @return true 表示中转写入已启用
+     * 中转写入开没开。
+     *
+     * <p>默认关闭：中转写入会先写内部存储再搬到 U 盘，闪存写入量翻倍。
+     * 只有在 U 盘写入速度确实跟不上、录制出现卡顿时才值得开。
+     * 它是规律性地写内置存储，和内置存储同一个门槛：归开发者选项管，关着时按关算（{@link #DEVELOPER_KEYS}）。</p>
      */
     public boolean isRelayWriteEnabled() {
-        // 默认关闭：中转写入会先写内部存储再搬到 U 盘，闪存写入量翻倍。
-        // 只有在 U 盘写入速度确实跟不上、录制出现卡顿时才值得开。
-        return prefs.getBoolean(KEY_RELAY_WRITE_ENABLED, false);
+        return readBoolean(KEY_RELAY_WRITE_ENABLED, false);
     }
     
     // ==================== 悬浮按钮透明度 ====================
@@ -1284,10 +1443,6 @@ public class AppConfig {
     }
 
     /**
-     * 获取时间角标开关状态
-     * @return true 表示启用时间角标
-     */
-    /**
      * 要落进画面的车牌号；关掉开关或者没填时返回空串。
      *
      * <p>存进来的值一律先过 {@link LicensePlate#sanitize} —— 界面上显示的、
@@ -1320,10 +1475,10 @@ public class AppConfig {
      * 打开之后所有相机一律 H.264。它是一个排查用的总闸，
      * 用在「怀疑 H.265 有问题、想一次性排除掉」的时候。</p>
      *
-     * <p>关着时（默认）各路按自己配置里的编码走。</p>
+     * <p>关着时（默认）各路按自己配置里的编码走。归开发者选项管，关着开发者选项时按关算。</p>
      */
     public boolean isForceH264Encoding() {
-        return prefs.getBoolean(KEY_FORCE_H264_ENCODING, false);
+        return readBoolean(KEY_FORCE_H264_ENCODING, false);
     }
 
     public void setForceH264Encoding(boolean enabled) {
@@ -1333,6 +1488,13 @@ public class AppConfig {
 
     /**
      * 拍照走相机自己的 JPEG 输出通道，而不是抓预览画面。
+     *
+     * <h3>为什么一直开着、只有开发者能关（项目所有者 2026-10-09）</h3>
+     *
+     * <p>关着时照片只能从主界面的预览上截。主界面在后台时没有预览 —— 悬浮按钮怎么拍都拍不到画面
+     * （为一张照片开三路相机，一张也存不下，再关三路）。所以 2.10.12 起它归开发者选项管
+     * （{@link #DEVELOPER_KEYS}，没解锁时一律按开算），以前关掉的升级时一次性改回开（{@link #resetPhotoViaJpegOnce}）。
+     * 开关留在「设置 → 录制」：没解锁时开着、灰着、点不动，下面写「需开启开发者选项」。</p>
      *
      * <h3>为什么默认开着</h3>
      *
@@ -1347,10 +1509,10 @@ public class AppConfig {
      * {@code SingleCamera} 在会话配不上时<b>第一个丢掉的就是它</b>：丢掉之后
      * 画面照旧，拍照退回抓预览。画面优先于照片清晰度。</p>
      *
-     * <p>关掉它仍然可以（开发者选项），代价是拍照分辨率随之失效。</p>
+     * <p>开发者仍然可以关（开发者选项开着时，设置 → 录制），代价是拍照分辨率随之失效，主界面在后台时拍不到画面。</p>
      */
     public boolean isPhotoViaJpegEnabled() {
-        return prefs.getBoolean(KEY_PHOTO_VIA_JPEG, true);
+        return readBoolean(KEY_PHOTO_VIA_JPEG, true);
     }
 
     public void setPhotoViaJpegEnabled(boolean enabled) {
@@ -1362,7 +1524,7 @@ public class AppConfig {
      * 录像下方的行驶信息条（试验项目，1.68.0）。默认关。
      *
      * <p>开着时录制走 MediaCodec（{@link #shouldUseCodecRecording}），画面比视频高 100 像素。
-     * 默认只有实车验证过的栏目启用，其余画斜杠；{@link #isInfoBarAllActive()} 才全部启用（{@code telemetry.InfoBar}）。</p>
+     * 显示哪几项在系统信息里勾选（{@link #getInfoBarItems}，{@code telemetry.InfoBar}）。</p>
      */
     public boolean isInfoBarEnabled() {
         return prefs.getBoolean(KEY_INFO_BAR, false);
@@ -1373,19 +1535,28 @@ public class AppConfig {
         AppLog.i(TAG, "行驶信息条: " + (enabled ? "开" : "关"));
     }
 
-    /**
-     * 信息条激活所有栏目：连没在实车验证过的一起启用，给开发者验证图标真不真、能不能用。
-     * 锁在开发者模式后面：没解锁时一律当关着，存着的值不动 ——
-     * 设置里那个开关没解锁时是灰的、关着的，这里必须和它说同一句话。
-     */
-    public boolean isInfoBarAllActive() {
-        return com.kooo.evcam.settings.DeveloperMode.isUnlocked()
-                && prefs.getBoolean(KEY_INFO_BAR_ALL, false);
+    /** 主界面动作栏里的车辆状态面板（试验性）。默认关。 */
+    public boolean isVehicleStatusEnabled() {
+        return prefs.getBoolean(KEY_VEHICLE_STATUS, false);
     }
 
-    public void setInfoBarAllActive(boolean enabled) {
-        prefs.edit().putBoolean(KEY_INFO_BAR_ALL, enabled).apply();
-        AppLog.i(TAG, "行驶信息条激活所有栏目: " + (enabled ? "开" : "关"));
+    public void setVehicleStatusEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_VEHICLE_STATUS, enabled).apply();
+    }
+
+    /**
+     * 信息条上放哪几项：信号名（{@code telemetry.Signal}），加上经纬度那一项。系统信息里勾选；
+     * 没存过时是 2.0.10 信息条上在用的那些（{@code InfoBarLayout.defaultSelection}）。读写走 {@code telemetry.InfoBar}。
+     */
+    public java.util.Set<String> getInfoBarItems() {
+        java.util.Set<String> saved = prefs.getStringSet(KEY_INFO_BAR_ITEMS, null);
+        return saved == null ? com.kooo.evcam.telemetry.InfoBarLayout.defaultSelection()
+                : new java.util.LinkedHashSet<>(saved);
+    }
+
+    public void setInfoBarItems(java.util.Set<String> items) {
+        prefs.edit().putStringSet(KEY_INFO_BAR_ITEMS, new java.util.HashSet<>(items)).apply();
+        AppLog.i(TAG, "信息条显示项: " + items);
     }
 
     /** 打转向灯弹侧视，默认关。 */
@@ -1499,6 +1670,11 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_LICENSE_PLATE_ENABLED, enabled).apply();
     }
 
+    /**
+     * 「时间水印」开关：只管日期时间（录像还有跟着它的规格行，照片还有尺寸行）。
+     * 左上角的应用名和车牌号不看它。
+     * @return true 表示启用时间水印
+     */
     public boolean isTimestampWatermarkEnabled() {
         // 默认开启（项目所有者 2026-09-27 定；以前默认关）
         return prefs.getBoolean(KEY_TIMESTAMP_WATERMARK_ENABLED, true);
@@ -1516,11 +1692,11 @@ public class AppConfig {
     }
     
     /**
-     * 获取是否启用亮度/降噪调节
+     * 画面调节开没开。归开发者选项管，关着开发者选项时按关算；下面那几个参数只在开着时才用到。
      * @return true 表示启用
      */
     public boolean isImageAdjustEnabled() {
-        return prefs.getBoolean(KEY_IMAGE_ADJUST_ENABLED, false);
+        return readBoolean(KEY_IMAGE_ADJUST_ENABLED, false);
     }
     
     /**

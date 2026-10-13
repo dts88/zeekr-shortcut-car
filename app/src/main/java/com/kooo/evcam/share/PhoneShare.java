@@ -30,7 +30,7 @@ import java.util.List;
  *
  * <p>只在这个对话框开着的时候。关掉就停 —— 一个能被局域网访问的文件服务，
  * 没有理由在用户已经不看它的时候继续开着。所以对话框里写明了
- * 「保存完成前请不要关闭」。</p>
+ * 保存完成前不要关闭（{@code share_phone_keep_open}）。</p>
  */
 public final class PhoneShare {
 
@@ -78,8 +78,9 @@ public final class PhoneShare {
             server.start();
             server.share(file);
         } catch (Exception e) {
+            // 异常原文（可能是 null，也可能是英文）只进日志，界面上只说没起来、请重试
             AppLog.e(TAG, "起不来分享服务", e);
-            toast(activity, activity.getString(R.string.share_phone_failed, e.getMessage()));
+            toast(activity, activity.getString(R.string.share_phone_failed));
             return;
         }
         AppLog.i(TAG, "分享 " + file.getName() + "，端口 " + server.getListeningPort()
@@ -91,7 +92,7 @@ public final class PhoneShare {
         Toast.makeText(activity, text, Toast.LENGTH_LONG).show();
     }
 
-    /** 对话框本身。拆出来是因为「换一个地址」要改二维码，得留着几个引用。 */
+    /** 对话框本身。拆出来是因为「切换地址」要改二维码，得留着几个引用。 */
     private static final class Presenter {
         private final Activity activity;
         private final FileShareServer server;

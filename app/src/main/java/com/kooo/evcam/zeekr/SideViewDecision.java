@@ -75,7 +75,7 @@ public final class SideViewDecision {
      * 档位读不到就不备（退回打灯时再接相机，慢一点而已）。</p>
      */
     public static boolean shouldStayReady(Input in) {
-        return "D".equals(in.gear);
+        return "D".equals(in.gear) && !factoryViewActive(in);
     }
 
     /** 原厂有画面在屏幕上（或马上要有）：倒车、360、原厂弹窗、泊车辅助。 */

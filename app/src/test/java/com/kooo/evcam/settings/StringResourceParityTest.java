@@ -41,6 +41,12 @@ public class StringResourceParityTest {
     private static final Pattern STRING = Pattern.compile(
             "<string\\s+name=\"([^\"]+)\"[^>]*>(.*?)</string>", Pattern.DOTALL);
     private static final Pattern PLACEHOLDER = Pattern.compile("%\\d\\$[sd]");
+    private static final Pattern PLURALS = Pattern.compile(
+            "<plurals\\s+name=\"([^\"]+)\"[^>]*>(.*?)</plurals>", Pattern.DOTALL);
+    private static final Pattern ITEM = Pattern.compile(
+            "<item\\s+quantity=\"([a-z]+)\"\\s*>(.*?)</item>", Pattern.DOTALL);
+    /** 复数条目里也有不带序号的 {@code %d}（「已锁定 %d 个文件」），一起算。 */
+    private static final Pattern PLURAL_PLACEHOLDER = Pattern.compile("%(\\d\\$)?[sd]");
 
     /** 翻译目录。新增一种语言时，这里和 xml/locales_config.xml 一起改。 */
     private static final String[] TRANSLATIONS = {"values-en", "values-ms"};
@@ -83,6 +89,56 @@ public class StringResourceParityTest {
         }
     }
 
+    /**
+     * 复数（{@code <plurals>}）同样要每种语言都有、占位符对得上。
+     *
+     * <p>中文和马来文只有 {@code other} 一条，英文另有 {@code one}。每种语言都必须有 {@code other}
+     * （任何数量都能落到它）；{@code other} 的占位符要和中文的一致，其他条目不能多出中文没有的占位符
+     * （{@code one} 可以不写数字，但不能多要参数）。</p>
+     */
+    @Test
+    public void everyChinesePluralHasATranslationWithMatchingPlaceholders() throws IOException {
+        File module = findModuleRoot();
+        assumeTrue("定位不到模块根目录，跳过", module != null);
+
+        Map<String, Map<String, String>> zh = parsePlurals(
+                new File(module, "src/main/res/values/strings.xml"));
+        for (Map.Entry<String, Map<String, String>> entry : zh.entrySet()) {
+            assertTrue("中文复数 " + entry.getKey() + " 缺 other 条目",
+                    entry.getValue().containsKey("other"));
+        }
+
+        for (String dir : TRANSLATIONS) {
+            Map<String, Map<String, String>> other = parsePlurals(
+                    new File(module, "src/main/res/" + dir + "/strings.xml"));
+
+            TreeSet<String> missing = new TreeSet<>(zh.keySet());
+            missing.removeAll(other.keySet());
+            assertTrue("这些复数条目没有 " + dir + " 翻译: " + missing, missing.isEmpty());
+
+            TreeSet<String> stray = new TreeSet<>(other.keySet());
+            stray.removeAll(zh.keySet());
+            assertTrue("这些 " + dir + " 复数条目在中文里没有对应: " + stray, stray.isEmpty());
+
+            List<String> mismatched = new ArrayList<>();
+            for (Map.Entry<String, Map<String, String>> entry : zh.entrySet()) {
+                TreeSet<String> expected = pluralPlaceholders(entry.getValue().get("other"));
+                Map<String, String> items = other.get(entry.getKey());
+                if (!items.containsKey("other")
+                        || !pluralPlaceholders(items.get("other")).equals(expected)) {
+                    mismatched.add(entry.getKey() + "/other");
+                }
+                for (Map.Entry<String, String> item : items.entrySet()) {
+                    if (!expected.containsAll(pluralPlaceholders(item.getValue()))) {
+                        mismatched.add(entry.getKey() + "/" + item.getKey());
+                    }
+                }
+            }
+            assertTrue("这些复数条目和 " + dir + " 的占位符不一致，运行期格式化会出错: "
+                    + mismatched, mismatched.isEmpty());
+        }
+    }
+
     @Test
     public void zhEnOnlyFilesMatchAndStayOutOfTheTranslations() throws IOException {
         File module = findModuleRoot();
@@ -114,6 +170,34 @@ public class StringResourceParityTest {
             found.add(matcher.group());
         }
         return found;
+    }
+
+    private static TreeSet<String> pluralPlaceholders(String text) {
+        TreeSet<String> found = new TreeSet<>();
+        Matcher matcher = PLURAL_PLACEHOLDER.matcher(text == null ? "" : text);
+        while (matcher.find()) {
+            found.add(matcher.group());
+        }
+        return found;
+    }
+
+    /** 键 → （quantity → 文字）。 */
+    private static Map<String, Map<String, String>> parsePlurals(File file) throws IOException {
+        Map<String, Map<String, String>> out = new LinkedHashMap<>();
+        if (!file.isFile()) {
+            return out;
+        }
+        String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        Matcher plurals = PLURALS.matcher(text);
+        while (plurals.find()) {
+            Map<String, String> items = new LinkedHashMap<>();
+            Matcher item = ITEM.matcher(plurals.group(2));
+            while (item.find()) {
+                items.put(item.group(1), item.group(2));
+            }
+            out.put(plurals.group(1), items);
+        }
+        return out;
     }
 
     private static Map<String, String> parse(File file) throws IOException {
@@ -170,18 +254,32 @@ public class StringResourceParityTest {
             String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
             Matcher matcher = STRING.matcher(text);
             while (matcher.find()) {
-                String body = matcher.group(2);
-                for (int i = 0; i < body.length(); i++) {
-                    if (body.charAt(i) == '\''
-                            && (i == 0 || body.charAt(i - 1) != '\\')) {
-                        offenders.add(dir + ":" + matcher.group(1));
-                        break;
+                if (hasBareApostrophe(matcher.group(2))) {
+                    offenders.add(dir + ":" + matcher.group(1));
+                }
+            }
+            // 复数条目里的每一条也一样
+            Matcher plurals = PLURALS.matcher(text);
+            while (plurals.find()) {
+                Matcher item = ITEM.matcher(plurals.group(2));
+                while (item.find()) {
+                    if (hasBareApostrophe(item.group(2))) {
+                        offenders.add(dir + ":" + plurals.group(1) + "/" + item.group(1));
                     }
                 }
             }
         }
         assertTrue("这些字符串里的撇号没有转义，aapt 会直接编不过（写成 \\' 即可）: "
                 + offenders, offenders.isEmpty());
+    }
+
+    private static boolean hasBareApostrophe(String body) {
+        for (int i = 0; i < body.length(); i++) {
+            if (body.charAt(i) == '\'' && (i == 0 || body.charAt(i - 1) != '\\')) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

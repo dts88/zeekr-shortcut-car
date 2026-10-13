@@ -6,8 +6,6 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
@@ -37,7 +35,6 @@ import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.PreviewSlots;
 import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.Profile;
-import com.kooo.evcam.profile.ProfileResolution;
 import com.kooo.evcam.profile.ProfileStore;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.settings.Languages;
@@ -52,8 +49,6 @@ import com.kooo.evcam.StorageHelper;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -141,13 +136,6 @@ public class MainActivity extends AppCompatActivity {
     /** 悬浮按钮拉起主界面来开录：录起来之后让用户看一眼，再把主界面收到后台。 */
     private boolean hideMainAfterStart;
 
-    public MultiCameraManager getCameraManager() {
-        if (cameraManager == null) {
-            cameraManager = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-            attachRecordingCoordinator();
-        }
-        return cameraManager;
-    }
     private ImageAdjustManager imageAdjustManager;  // 亮度/降噪调节管理器
     private ImageAdjustFloatingWindow imageAdjustFloatingWindow;  // 亮度/降噪调节悬浮窗
     private int textureReadyCount = 0;  // 记录准备好的TextureView数量
@@ -169,29 +157,53 @@ public class MainActivity extends AppCompatActivity {
     private android.content.BroadcastReceiver toggleRecordingReceiver;  // 录制切换广播接收器（来自悬浮窗）
 
     // 熄屏：屏幕状态只有 ScreenState 一份（熄屏广播 + 黑着时每 2 秒问系统一次代替亮屏广播）。
-    // 唤醒锁、录像的 10 秒停 / 亮屏接回、1.5 秒没人要就关相机、亮屏把退下去的界面接回来，
-    // 都在它那里按固定顺序做完；主界面只剩自己的事 —— 熄屏 15 秒退后台
+    // 唤醒锁、录像照熄屏那张表停不停 / 亮屏接回、「车机要睡」、亮屏把退下去的界面接回来，
+    // 都在它那里按固定顺序做完；相机由通道调度照登记表关（熄屏时预览不算有人要）。主界面只剩界面自己的事 —— 熄屏 15 秒退后台
     private final android.os.Handler screenStateHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());  // 熄屏退后台的延迟处理
     private Runnable screenOffBackgroundRunnable;  // 息屏退后台的延迟任务
     private static final long SCREEN_OFF_BACKGROUND_DELAY_MS = 15000;  // 息屏后等待15秒（退后台）
+    /** 熄屏 15 秒那一步到点时屏幕黑没黑还不知道（安卓刚亮、车辆信号还没读回来）：过这么久再看（设计 v3.1 C7）。 */
+    private static final long SCREEN_UNKNOWN_RECHECK_MS = 2000;
+    /** 这一次熄屏已经退过后台了（亮屏、回到前台时清）：熄屏时停录之后会再排一次 15 秒，只退一次、只提示一次。 */
+    private boolean leftForScreenOff;
+    /**
+     * 上一次 onPause 是熄屏带来的（那一刻系统已经不交互了；onResume 清）。熄屏时系统常常先把在前的界面暂停、熄屏广播后到
+     * （见 onCreate 里登记 ScreenState 那一处），那时 {@link #isInBackground} 已经是真 —— 只看它的话，熄屏那一刻明明在前的主界面
+     * 记不上「因熄屏退下去」，亮屏接不回来（审查 2026-10-11）。
+     */
+    private boolean pausedByScreenOff;
 
     /**
-     * 熄屏 / 亮屏（{@link com.kooo.evcam.screen.ScreenState} 在主线程调；onStart 登记、onStop 摘掉，
-     * 和存储监听放在一起）。只管界面自己的事：熄屏 15 秒退后台，亮屏取消它。
-     * 接回录像、接回界面不在这里 —— ScreenState 在叫到这里之前已经做完了。
+     * 熄屏 / 亮屏（{@link com.kooo.evcam.screen.ScreenState} 在主线程调；onCreate 登记、onDestroy 摘掉）。
+     * 只管界面自己的事（大纲 §2 阶段 6）：熄屏那一刻主界面在前，就留下「因熄屏退下去」的记号；熄屏 15 秒退后台；亮屏取消它。
+     * 熄屏 v3 起「熄屏」是屏幕真黑了（车主下车那一下，车辆信号判的；车机要睡、车机黑着醒了都还是熄屏，不叫到这里）：
+     * 记号在屏幕一黑就记上，开车门亮屏时主界面就接回来（以前要等几分钟后车机下电那一次安卓熄屏）。
+     *
+     * <p>熄屏那张表（车机会不会睡、停不停录）不在这里算，预览也不在这里放：熄屏时预览按规则就不算有人要
+     * （{@code ChannelRules}），车机要睡由录像协调器判、写给通道调度，相机由调度照登记表按次序关。以前这里自己再算一遍那张表，
+     * 判成现在停就当场退后台、放开预览。记号在熄屏那一刻就落盘：车机几秒后就可能结束进程，等到 15 秒才记就记不上了 ——
+     * 记上了，下次亮屏 Recovery 照样把主界面接回来。接回录像、接回界面不在这里 —— ScreenState 在叫到这里之前已经做完了。</p>
      */
     private final com.kooo.evcam.screen.ScreenState.Listener screenListener =
             new com.kooo.evcam.screen.ScreenState.Listener() {
                 @Override
                 public void onScreenOff() {
-                    AppLog.d(TAG, "检测到息屏，15 秒后退后台（录像中、熄屏录制生效则留在前台）");
+                    if (!isInBackground || pausedByScreenOff) {
+                        // 主界面在前（或者正是熄屏把它暂停的）：是我们自己因为熄屏退下去的，亮屏时 Recovery 据此把界面接回来。
+                        // 在后台时熄屏不记（人自己切走的，亮屏不抢到最前面）
+                        appConfig.setUiLeftForScreenOff(true);
+                    }
+                    AppLog.d(TAG, "检测到息屏，15 秒后退后台（录像中、在等开录、熄屏录制生效则留在前台）");
                     scheduleBackgroundTask();
                 }
 
                 @Override
                 public void onScreenOn() {
                     AppLog.d(TAG, "检测到亮屏，取消退后台任务");
+                    leftForScreenOff = false;
+                    // 那一次熄屏带来的暂停到此为止：没被接回前台的话，下一次熄屏时它是人切走之后的后台，不再算在前
+                    pausedByScreenOff = false;
                     cancelBackgroundTask();
                 }
             };
@@ -210,6 +222,8 @@ public class MainActivity extends AppCompatActivity {
     private long recordingStartTime = 0;  // 录制开始时间
     private int currentSegmentCount = 1;  // 当前分段数
     private long segmentStartTime = 0;  // 本段开始时间（分段进度环用）
+    /** 上一次画录制键时录像的样子（renderRecordState）：等待摄像头之后又有一路在录时，本段从接回那一刻重新算。 */
+    private RecordingCoordinator.View renderedRecordView;
     private long segmentLengthMs = com.kooo.evcam.profile.RecordSpecs.segmentMs(com.kooo.evcam.profile.RecordSpecs.DEFAULT_SEGMENT_MINUTES);
     private boolean isRecordingStatsEnabled = true;  // 录制状态显示开关
     private long lastStatsClickTime = 0;  // 上次点击录制状态显示的时间
@@ -222,22 +236,15 @@ public class MainActivity extends AppCompatActivity {
     private View fragmentContainer;  // Fragment容器
 
 
-    private boolean isPreparingRecording = false;  // 是否正在准备录制（等待首次写入）
-
     /**
-     * 「准备中」最多等多久。
-     *
-     * <p>开始录制之后，要等录制器写出第一笔数据才算真的录上。以前这一步<b>没有超时</b>：
-     * 第一笔数据一直不来，按钮就永远停在「正在准备」，而录制器其实早就没在录了。
-     * 到点就按「没收到画面」停掉（{@code RecordingStops.Reason.NO_DATA}）；
-     * 停了之后接不接、还剩几次额度，由 {@link RecordingCoordinator} 判。</p>
+     * 悬浮按钮拉起来开录时，录起来之后隔一会儿把主界面收回后台（{@link #hideMainAfterStart}）。
+     * 录制键是什么样子（开录中、在录、等待摄像头）不在这里计时：照协调器说的画（{@link #renderRecordState}）。
      */
     private final android.os.Handler preparingHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
 
-    /** 状态条最右那一格的正文（合成流识别结果）；环视被拿走时那一格临时改写成提示。 */
+    /** 状态条最右那一格的正文（合成流识别结果）；摄像头被占用时那一格临时改写成提示（{@link #cameraHint}）。 */
     private String compositeInfoText = "";
-    private boolean cameraTakenHint;
     /** 存储快照变了（U 盘插拔、换盘、定时探测）：录制键可不可录、状态条余量跟着变。 */
     private final com.kooo.evcam.storage.StorageState.Listener storageListener = snapshot -> {
         refreshRecordAvailability();
@@ -261,7 +268,12 @@ public class MainActivity extends AppCompatActivity {
         if (savedInstanceState == null
                 && !getIntent().getBooleanExtra(com.kooo.evcam.recovery.Recovery.EXTRA_SILENT, false)
                 && !getIntent().getBooleanExtra("restored_by_app", false)) {
-            com.kooo.evcam.recording.RecordingIntent.current().reset();
+            RecordingIntent choices = RecordingIntent.current();
+            if (choices.recordingWanted()) {
+                // 人自己点开的是新的一趟：之前要录的（被结束的进程留下的、等亮屏接的）不再接；启动自动录制开着的照常自动开
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("人点开主界面，新的一趟：撤掉「这一趟要录」");
+            }
+            choices.reset();
         }
         instance = this;  // 设置静态实例引用
         AppLog.init(this);
@@ -278,7 +290,7 @@ public class MainActivity extends AppCompatActivity {
         appConfig = new AppConfig(this);
 
         // 录像的唯一入口是进程级的协调器：相机管理器还没建出来时就可以先「要录」，
-        // 它会等相机交过来、环视出画面再开（见 attachRecordingCoordinator）
+        // 它等相机管线交过来、查过盘就开，不等环视（见 attachRecordingCoordinator）
         recordingCoordinator = RecordingCoordinator.get(this);
         recordingCoordinator.addListener(recordingListener);
 
@@ -294,8 +306,9 @@ public class MainActivity extends AppCompatActivity {
         initViews();
         setupNavigationDrawer();
 
-        // 界面重建（切日夜模式、换语言）时录制管线一直在跑（见 onDestroy 的 keepPipeline），
-        // 新界面只是把它现在的样子画出来（syncRecordingStateFromManager），没有「恢复录制」这回事
+        // 界面重建（切日夜模式、换语言）时录制管线一直在跑（管线属于应用，主界面销毁不放它，见 onDestroy），
+        // 新界面只是把它现在的样子画出来（syncRecordingStateFromManager），没有「恢复录制」这回事；
+        // 预览画布也是管线留着的那几块，initViews 里接回（reattachKeptCanvases，大纲 §7.6）
 
         // 检查是否首次启动
         checkFirstLaunch();
@@ -307,11 +320,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        // 定时保活任务：只在「保活」开关打开时登记，关着就取消（见 KeepAliveManager）
+        // 定时保活任务：只在「开机自启动」开关打开时登记，关着就取消（见 KeepAliveManager）
         KeepAliveManager.startKeepAliveWork(this);
         AppLog.d(TAG, "定时保活任务已启动");
         
-        // 唤醒锁只属于「熄屏录制」（规格 §3.1）：熄屏时在录像才拿，见 ScreenOffRecording
+        // 唤醒锁只属于「熄屏录制（阻止休眠）」（规格 §3.1）：熄屏时在录像才拿，见 ScreenOffRecording
                 
         // 启动存储清理任务（如果用户设置了限制）
         storageCleanupManager = new StorageCleanupManager(this);
@@ -327,23 +340,25 @@ public class MainActivity extends AppCompatActivity {
             getIntent().removeExtra("auto_start_from_boot");
 
             // 静默拉起来的主界面闪一下就退后台（规格 1.6）：录像不靠主界面显示，
-            // 退到后台照常录；开始录像由协调器在环视出画面时开（checkAutoStartRecording 只是提出要录）
+            // 退到后台照常录；开始录像由协调器查过盘就开（checkAutoStartRecording 只是提出要录）
             AppLog.d(TAG, "开机自启动模式：等待窗口准备好后移到后台");
             shouldMoveToBackgroundOnReady = true;
         }
 
-        // 从录制悬浮按钮拉起来的：要录。相机还没建，协调器先记着，环视出画面就开
+        // 从录制悬浮按钮拉起来的：要录。相机还没建，协调器先记着，管线交过去、查过盘就开
         if (getIntent().getBooleanExtra("auto_start_recording", false)) {
             requestRecordingFromFloatingButton(getIntent());
         }
 
         // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级后视镜 /
         // 录制悬浮按钮 / 补盲）。该不该开、能不能开都在协调器里判断。
-        OverlayCoordinator.restoreOnLaunch(this, this::broadcastCurrentRecordingState);
+        OverlayCoordinator.restoreOnLaunch(this);
         
         // 悬浮按钮发来的录制切换 / 拍照广播
         // 屏幕状态只听 ScreenState；整个界面生命周期都听着（熄屏时界面可能先被暂停、广播后到）
         com.kooo.evcam.screen.ScreenState.addListener(screenListener);
+        // 管线被 Holder 放掉重建时当场接上新的那一份（见 pipelineReplaced），onDestroy 摘掉
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().addReplacedListener(pipelineReplaced);
         initToggleRecordingReceiver();
     }
 
@@ -354,6 +369,12 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "onNewIntent called");
         openDrawerIfAsked(intent);
 
+        // 还活着的主界面被静默拉到前面（Recovery：要接录像、而那时用不了相机）：接上之后照样退回后台（规格 1.6）
+        if (intent.getBooleanExtra("auto_start_from_boot", false)) {
+            intent.removeExtra("auto_start_from_boot");
+            shouldMoveToBackgroundOnReady = true;
+        }
+
 // 处理从录制悬浮按钮启动（需要自动开始录制）
         if (intent.getBooleanExtra("auto_start_recording", false)) {
             requestRecordingFromFloatingButton(intent);
@@ -363,7 +384,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 悬浮按钮在主界面不在前台时按了「开始录制」，把主界面拉了起来。
      *
-     * <p>人按的：前面的失败都不算了。什么时候开由协调器定（环视出画面就开）；
+     * <p>人按的：前面的失败都不算了。什么时候开由协调器定（查过盘就开，不等环视）；
      * 录起来之后让用户看一眼，再把主界面收回后台（见 {@link #recordingListener}）。
      * 以前这里是「等一秒再等两秒再开」的梯子，onCreate 和 onNewIntent 各抄一份 —— 都归到协调器那一个等待里。</p>
      */
@@ -594,6 +615,8 @@ public class MainActivity extends AppCompatActivity {
         if (textureLeft != null && PreviewSlots.exists(configuredCameraCount, "left")) {
             textureLeft.setSurfaceTextureListener(buildSurfaceListener("left"));
         }
+        // 主界面重建：上一个界面留下的预览画布接回来（大纲 §7.6），要在画布挂上窗口、系统自己建画布之前
+        reattachKeptCanvases();
     }
 
     /** 从别的界面按菜单键回来：抽屉要开着，否则那一下点击看起来没反应。 */
@@ -615,22 +638,128 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 「预览要相机」只在画布都在的时候登记：登记了相机就开，开出来的第一份会话要带着预览。
+     *
+     * <p>登记了就是主界面起来了（在前、能用相机）：「这一趟要录」还在、又没在录没在等的，现在接
+     * （{@link RecordingCoordinator#resumeIfWanted}）。要录像、而那时用不了相机时，协调器打开录像意图那一下把主界面拉起来、录像当场就开了
+     * （大纲 §2 阶段 6），这里什么都不做；这一下兜的是别的路起来的主界面。人自己点开的主界面是新的一趟，
+     * 「这一趟要录」在 onCreate 里撤了，这里也什么都不做。</p>
+     */
+    private void claimPreviewIfReady() {
+        if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
+            com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+            if (!isInBackground) {
+                recordingCoordinator.resumeIfWanted("main-screen");
+            }
+        }
+    }
+
+    /**
+     * 一块画布就绪了（系统建的，或者接回的上一个界面留下的那一块）：数到齐了就把相机这一侧接上、声明各路预览、登记 PREVIEW。
+     */
+    private void onPreviewCanvasReady(String cameraKey) {
+        textureReadyCount++;
+        AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount
+                + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
+        startPreviewIfReady();
+    }
+
+    /**
+     * 画布都在了：头一次接上管线（{@link #initCamera}，它声明各路预览），之后每次把各路画布重新声明一遍 ——
+     * 同一块画布再声明一次什么都不做（2.11 阶段 4a：只声明、叫醒通道调度；开不开、带不带由调度定，
+     * 以前这里是 setTextureView + 重建会话）。然后登记「预览要相机」。
+     */
+    private void startPreviewIfReady() {
+        if (!PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount) || !checkPermissions()) {
+            return;
+        }
+        if (cameraManager == null) {
+            initCamera();
+        } else {
+            cameraManager.declarePreviews(textureFront, textureBack, textureLeft);
+        }
+        // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
+        // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
+        // 画布一到又重配一遍，三路各多一次进相机服务（2026-10-08，环视那一次重配卡了 12 秒）
+        claimPreviewIfReady();
+    }
+
+    /** 这一格的画布；这套布局里没有这一路（没挂监听）是 null。 */
+    private AutoFitTextureView canvasFor(String cameraKey) {
+        switch (cameraKey) {
+            case "front":
+                return textureFront;
+            case "back":
+                return PreviewSlots.exists(configuredCameraCount, "back") ? textureBack : null;
+            case "left":
+                return PreviewSlots.exists(configuredCameraCount, "left") ? textureLeft : null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 主界面重建（换日夜模式、换语言、从最近任务划掉后再打开）：上一个界面留下的预览画布接回来
+     * （大纲 §7.6，项目所有者 2026-10-11「按建议」；留是 {@link MultiCameraManager#keepPreviewCanvas}）。
+     *
+     * <p>在 onCreate 里、画布挂上窗口之前做：{@code TextureView.setSurfaceTexture} 之后视图不再自己建画布，
+     * 也就不会来 onSurfaceTextureAvailable —— 所以这里当场把预览声明回去（同一块画布就是同一个输出，
+     * 通道零变动、录像不断），画布照「就绪」数上，onResume 照常登记 PREVIEW：重建这一趟里调度醒来时，
+     * 登记表和声明都和重建之前一样。相机这一侧的其余部分（回调、亮度调节、录制状态）等 onCreate 走完再接，
+     * 和系统建的画布一样晚。没留下的那几格照旧等系统建。</p>
+     */
+    private void reattachKeptCanvases() {
+        // 留着画布的只会是进程里那一份管线（管线属于应用，主界面销毁不放它）。这里不建：没有就没有画布可接。
+        // 它要是随后因为换车型、配置里开关了一路被 Holder 放掉重建，接回的画布归视图，新的那一份照样声明它
+        MultiCameraManager pipeline = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+        if (pipeline == null || pipeline.isReleased()) {
+            return;
+        }
+        List<String> back = new ArrayList<>();
+        for (String key : PreviewSlots.KEYS) {
+            AutoFitTextureView view = canvasFor(key);
+            if (view == null || view.isAvailable()) {
+                continue;
+            }
+            android.graphics.SurfaceTexture kept = pipeline.takeKeptPreview(key);
+            if (kept == null) {
+                continue;
+            }
+            try {
+                view.setSurfaceTexture(kept);
+            } catch (RuntimeException e) {
+                // 接不上（还挂在别的 GL 上下文）：还给管线，照旧等它离开会话再放 —— 当场放的话，会话里那个成了死输出，
+                // 那一路整条重复请求停到调度摘掉它（审查 2026-10-11，和后视镜接不上时一样）；还不回去（管线里已经没有这一路）
+                // 才放掉，这块画布不在它的会话里。这一格照旧等系统建
+                AppLog.w(TAG, "接回留着的预览画布失败 " + key + ": " + e);
+                if (!pipeline.keepPreviewCanvas(key, kept)) {
+                    kept.release();
+                }
+                continue;
+            }
+            pipeline.declarePreview(key, view);
+            textureReadyCount++;
+            back.add(MultiCameraManager.roleName(key));
+        }
+        if (back.isEmpty()) {
+            return;
+        }
+        com.kooo.evcam.blackbox.BlackBox.note("主界面重建：接回留着的预览画布 " + String.join("、", back)
+                + "（同一块画布，通道不动）");
+        // 视图挂上窗口时跑（View.post 在挂上之前排进视图自己的队列）：onCreate、onResume 都走完了
+        getWindow().getDecorView().post(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                startPreviewIfReady();
+            }
+        });
+    }
+
     private TextureView.SurfaceTextureListener buildSurfaceListener(String cameraKey) {
         return new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int width, int height) {
-                textureReadyCount++;
-                AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount
-                        + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
-
-                if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)
-                        && checkPermissions()) {
-                    if (cameraManager == null) {
-                        initCamera();
-                    } else {
-                        cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
-                    }
-                }
+                onPreviewCanvasReady(cameraKey);
             }
 
             @Override
@@ -638,14 +767,22 @@ public class MainActivity extends AppCompatActivity {
                 AppLog.d(TAG, "TextureView " + cameraKey + " size changed: " + width + "x" + height);
             }
 
+            /**
+             * 画布要被收走了（主界面销毁，视图从窗口上摘下来；最小化不走这里 —— 安卓 12 的 TextureView 那时只拆显示层）。
+             * 管线还在就把画布交给它（大纲 §7.6）：返回 false，TextureView 不放；新界面接回同一块，没人接回的
+             * 由通道调度等它离开会话再放。管线没了（退出、没人要了被释放）照常让 TextureView 放。
+             * 这一下在 onDestroy 之后才来（ActivityThread 先 performDestroy、再从窗口上摘视图）。
+             */
             @Override
             public boolean onSurfaceTextureDestroyed(@NonNull android.graphics.SurfaceTexture surface) {
                 textureReadyCount--;
-                AppLog.d(TAG, "TextureView " + cameraKey + " destroyed, remaining: " + textureReadyCount);
-                if (cameraManager != null) {
-                    cameraManager.onPreviewTextureDestroyed(cameraKey);
-                }
-                return true;
+                MultiCameraManager pipeline = cameraManager != null ? cameraManager
+                        : com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
+                boolean kept = pipeline != null && !pipeline.isReleased()
+                        && pipeline.keepPreviewCanvas(cameraKey, surface);
+                AppLog.d(TAG, "TextureView " + cameraKey + " destroyed, remaining: " + textureReadyCount
+                        + (kept ? ", canvas kept by the pipeline" : ""));
+                return !kept;
             }
 
             @Override
@@ -706,7 +843,7 @@ public class MainActivity extends AppCompatActivity {
         }
         
         // 从设置加载显示开关状态
-        isRecordingStatsEnabled = appConfig.isRecordingStatsEnabled();
+        applyRecordingStatsSetting();
         
         // 初始化计时器 Handler
         recordingTimerHandler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -750,6 +887,17 @@ public class MainActivity extends AppCompatActivity {
         
         AppLog.d(TAG, "录制状态显示切换: " + (isRecordingStatsEnabled ? "开启" : "关闭"));
     }
+
+    /**
+     * 按设置里的「录制状态显示」画角标。主界面建好时读一次，从设置回到主界面时再读一次 ——
+     * 以前只在 onCreate 读，设置里切了要等界面重建才生效。不在录时角标是 GONE，只记下开关。
+     */
+    private void applyRecordingStatsSetting() {
+        isRecordingStatsEnabled = appConfig.isRecordingStatsEnabled();
+        if (tvRecordingStats != null) {
+            tvRecordingStats.setAlpha(isRecordingStatsEnabled ? 1.0f : 0.0f);
+        }
+    }
     
     /**
      * 开始录制计时器
@@ -782,8 +930,7 @@ public class MainActivity extends AppCompatActivity {
         updateStatusLine();
 
         if (tvRecordingStats != null) {
-            // 始终设为 VISIBLE，通过 alpha 控制可见性
-            tvRecordingStats.setVisibility(View.VISIBLE);
+            // 显不显示照录像的样子（renderRecordState：在录时显示，等待摄像头时收起）；开关只管 alpha
             tvRecordingStats.setAlpha(isRecordingStatsEnabled ? 1.0f : 0.0f);
             updateRecordingStatsDisplay();
         }
@@ -812,12 +959,7 @@ public class MainActivity extends AppCompatActivity {
         if (recordingTimerHandler != null && recordingTimerRunnable != null) {
             recordingTimerHandler.removeCallbacks(recordingTimerRunnable);
         }
-        
-        // 隐藏录制状态显示
-        if (tvRecordingStats != null) {
-            tvRecordingStats.setVisibility(View.GONE);
-        }
-        
+        // 角标随之收起：recordingStartTime 归零后 renderRecordState 不再显示它
         recordingStartTime = 0;
         currentSegmentCount = 1;
         segmentStartTime = 0;
@@ -885,10 +1027,10 @@ public class MainActivity extends AppCompatActivity {
      * 待机时录制键该是「开始录制」还是「插入 U 盘后可录制」。
      *
      * <p>判断和拒录是同一个（快照里的 {@code available}，源头都是 {@code StorageHelper.isRecordingStorageAvailable}）——
-     * 按钮不会显示能录、按下去却被拒。录制中不动它：盘拔了由录制链路自己处理。</p>
+     * 按钮不会显示能录、按下去却被拒。录像意图开着时不动它（开录中、在录、等待摄像头）：盘拔了由录制链路自己处理。</p>
      */
     private void refreshRecordAvailability() {
-        if (recordButtonUi == null || isRecording) {
+        if (recordButtonUi == null || recordingCoordinator.view() != RecordingCoordinator.View.IDLE) {
             return;
         }
         // 只读快照，不碰盘；还没探测过时先按能录画，探测完监听器会再画一次
@@ -925,11 +1067,7 @@ public class MainActivity extends AppCompatActivity {
         }
         recordButtonUi.setSegmentMinutes(
                 com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
-        if (isRecording) {
-            recordButtonUi.setState(isPreparingRecording ? com.kooo.evcam.ui.RecordButtonUi.State.PREPARING : com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
-        } else {
-            refreshRecordAvailability();
-        }
+        renderRecordState();
     }
 
 
@@ -1202,6 +1340,8 @@ public class MainActivity extends AppCompatActivity {
 
         // 可能刚在设置里换了边
         applyActionRailSide();
+        // 可能刚在设置里开关了「录制状态显示」
+        applyRecordingStatsSetting();
         // 可能刚在设置里换了录像盘：状态条的余量按新盘重算（探测缓存已在设置里清掉）
         updateStatusLine();
         recordingLayout.setVisibility(View.VISIBLE);
@@ -1336,6 +1476,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * 接上相机管线（画布都在时）。管线属于应用，只在 {@link com.kooo.evcam.camera.CameraManagerHolder} 里建（大纲 §2 阶段 6，
+     * channel-logic §五）：这里拿进程里那一份（没有就让它去建 —— 相机列表、合成流探测在相机线程上做，主线程不进相机服务），
+     * 挂上主界面的回调，建好了再声明画布、画状态条（{@link #onPipelineBuilt}）。
+     *
+     * <p>以前这里自己按配置建一份映射（列相机、探测合成流都在主线程上），后台（悬浮窗、录制服务）在 Holder 里按车型再建一份，
+     * 两份规则对不上；路数对不上时还会把后台那份放掉重建。现在只有一份，放不放、重不重建由 Holder 定：换车型、上一次列相机出错，
+     * 以及主界面接上时（这里，{@code getForMainScreen}）配置里开的几路和它对不上 —— 布局照的就是此刻的配置。
+     * Holder 放掉重建了会告诉这里（{@link #pipelineReplaced}），当场接上新的那一份。</p>
+     */
     private void initCamera() {
         // 确保所有需要的TextureView都准备好
         if (!PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
@@ -1343,150 +1493,117 @@ public class MainActivity extends AppCompatActivity {
                     + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
             return;
         }
-        
+
         // 防止重复初始化：如果 cameraManager 已经存在，直接返回
         if (cameraManager != null) {
             AppLog.d(TAG, "Camera already initialized, skipping");
             return;
         }
 
-        // 检查 Holder 中是否已有后台初始化的实例
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        MultiCameraManager existingManager = holder.getCameraManager();
-        if (existingManager != null && existingManager.isReleased()) {
-            AppLog.w(TAG, "Holder 中的 CameraManager 已被 release，丢弃");
-            holder.setCameraManager(null);
-            existingManager = null;
-        }
-        // 后台那份可能是按别的车型建的（切换车型只提示重启，但前台服务让进程一直活着，
-        // 单例连同旧的摄像头映射就留下来了）。路数对不上就别复用，否则画面会全黑。
-        if (existingManager != null && existingManager.getCameraCount() != configuredCameraCount) {
-            AppLog.w(TAG, "后台摄像头映射为 " + existingManager.getCameraCount()
-                    + " 路，当前车型需要 " + configuredCameraCount + " 路，丢弃重建");
-            existingManager.release();
-            holder.setCameraManager(null);
-            existingManager = null;
-        }
-        if (existingManager != null) {
-            // 后台已初始化，复用实例并绑定 TextureView
-            AppLog.d(TAG, "复用后台已初始化的摄像头管理器，绑定 TextureView");
-            cameraManager = existingManager;
-            attachRecordingCoordinator();
-
-            // 后台建的那份没有主界面的回调，在这里补上
-            wireCameraCallbacks();
-
-            // 绑定 TextureView
-            cameraManager.updatePreviewTextureViews(textureFront, textureBack, textureLeft, null);
-
-            // 布局是新建的，座舱两格默认都显示。管线里只有真正分到了相机的那一路才有实例，
-            // 所以问它就等于新建路径当时的结论 —— 以前这一步只在新建路径里做，
-            // 界面一重建，没开的「前座舱」就成了一块空格子
-            showCabinPanes(cameraManager.getCamera("back") != null,
-                    cameraManager.getCamera("left") != null);
-
-            // 打开所有摄像头（后台初始化时仅创建了对象，可能只打开了补盲所需的单个摄像头）
-            // 主界面需要所有摄像头画面，已打开的摄像头会被 openCamera 内部的防重复检查跳过
-            cameraManager.openAllCameras();
-
-            // 手动触发 previewSizeCallback（摄像头可能已在补盲阶段打开并确定了预览尺寸）
-            cameraManager.firePreviewSizeCallbacks();
-
-            // 初始化亮度/降噪调节管理器
-            imageAdjustManager = new ImageAdjustManager(this);
-            registerCamerasToImageAdjustManager();
-            AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras (reused from background)");
-            // 管线还在录的话，界面先画成它现在的样子；然后才问要不要自动开一次
-            syncRecordingStateFromManager();
-            checkAutoStartRecording();
-            return;
-        }
-
-        cameraManager = new MultiCameraManager(this);
+        final MultiCameraManager pipeline = holder.getForMainScreen(this);
+        cameraManager = pipeline;
         attachRecordingCoordinator();
-        cameraManager.setMaxOpenCameras(configuredCameraCount);
-        // 注册到全局 Holder
-        holder.setCameraManager(cameraManager);
-        
+        // 管线比界面活得久：回调在 onDestroy 一律摘掉（detachUiCallbacks），这里每个界面重新挂一遍
+        wireCameraCallbacks();
         // 初始化亮度/降噪调节管理器
         imageAdjustManager = new ImageAdjustManager(this);
-
-        wireCameraCallbacks();
-
-        // 等待TextureView准备好
-        textureFront.post(() -> {
-            try {
-                // 检测可用的摄像头
-                CameraManager cm = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-                String[] cameraIds = cm.getCameraIdList();
-
-                // 相机清单不在这里打了：诊断信息页采的是同样的东西而且不截断，
-                // 极氪这一路 ZeekrCameraLocator 还会把候选尺寸和选用结果完整打一遍。
-                // 这里每次初始化都遍历一遍 getCameraCharacteristics，只是白等。
-                AppLog.d(TAG, "可用相机 " + cameraIds.length + " 个");
-
-                initCamerasForConfiguredModel(cm, cameraIds);
-                
-                // 根据设置决定录制模式（支持用户手动选择）
-                boolean useCodecRecording = appConfig.shouldUseCodecRecording();
-                cameraManager.setCodecRecordingMode(useCodecRecording);
-                String recordingMode = appConfig.getRecordingMode();
-                String modeDesc = useCodecRecording ? "MediaCodec" : "MediaRecorder";
-                AppLog.d(TAG, "录制模式: " + modeDesc + " (设置: " + recordingMode + ")");
-
-                // 打开所有摄像头
-                cameraManager.openAllCameras();
-                
-                // 注册摄像头到亮度/降噪调节管理器
-                registerCamerasToImageAdjustManager();
-
-                AppLog.d(TAG, "Camera initialized with " + configuredCameraCount + " cameras");
-
-                // 「启动自动录制」开着就要录一次；什么时候开由协调器定（环视出画面就开）
-                checkAutoStartRecording();
-
-            } catch (CameraAccessException e) {
-                AppLog.e(TAG, "Failed to access camera", e);
-                Toast.makeText(this, getString(R.string.msg_camera_access_failed, e.getMessage()),
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
+        holder.whenBuilt(pipeline, built -> onPipelineBuilt(pipeline, built));
     }
 
     /**
-     * 按当前车型建立摄像头映射。
-     *
-     * <p>只剩三种：{@code getCarModel()} 读出来就已经 sanitize 过，
-     * 存的值不在设置里列的三项之内会被拨回 zeekr_7x —— 所以银河 E5/L7、
-     * 星舰7、手机模式那几个分支是<b>永远走不到</b>的，连同它们各自的
-     * 映射方法一起删掉了。真要再支持别的车型，得先让它能被选出来。</p>
+     * Holder 放掉重建了（换车型、上一次列相机出错）：主界面在前就当场接上新的那一份；在后台的等回到前台（onResume）再接 ——
+     * 接的时候会登记预览（{@link #claimPreviewIfReady}），后台的主界面不该要相机。onCreate 挂上、onDestroy 摘掉
+     * （CameraManagerHolder.addReplacedListener）。以前只在 onResume 里看手里那份放没放：主界面在前时管线被别人换掉
+     * （录像在等开录时每 2 秒要一次管线，碰上上一次列相机出错就重建；拍照碰上换了车型），它握着死的那一份，预览黑着、
+     * 回调挂在死的那份上，直到离开再回来（审查 2026-10-11）。
      */
-    private void initCamerasForConfiguredModel(CameraManager cm, String[] cameraIds) {
-        // 走哪条路由配置决定，不再看车型这个字符串。两个内置预设的区别就是
-        // 「配置里有几路相机」——这本来就是它们唯一的实质区别。
-        activeProfile = new ProfileStore(this).current();
-        applyProfileCells();
-        AppLog.i(TAG, "本次相机初始化使用的配置:\n" + activeProfile);
-
-        int enabled = 0;
-        for (CameraProfile camera : activeProfile.cameras) {
-            if (camera.enabled) {
-                enabled++;
-            }
+    private final Runnable pipelineReplaced = () -> {
+        if (!isInBackground && !isFinishing() && !isDestroyed()) {
+            reattachPipelineIfReplaced("replaced");
         }
-        // 和 setupLayout 用同一个判断：布局摆了几个窗口，就接几路
-        if (enabled > 1) {
-            initCamerasForZeekrMulti(cm, cameraIds);
+    };
+
+    /**
+     * 手里那份管线不再是进程里在用的那一份（被 Holder 放掉重建了，或者建的时候列相机出错 —— 隔够了 Holder 会重建）：
+     * 摘掉旧的回调，接上现在那一份（{@link #startPreviewIfReady} → {@link #initCamera}）。
+     *
+     * @param when 什么时候发现的（ASCII，进日志）
+     */
+    private void reattachPipelineIfReplaced(String when) {
+        if (cameraManager == null || com.kooo.evcam.camera.CameraManagerHolder.getInstance().isCurrent(cameraManager)) {
             return;
         }
-        initCamerasForZeekrComposite(cm, cameraIds);
+        AppLog.i(TAG, "相机管线换过了（" + when + "）：摘掉旧的回调，接上进程里现在那一份 " + instanceTag());
+        cameraManager.detachUiCallbacks();
+        cameraManager = null;
+        startPreviewIfReady();
     }
 
     /**
-     * 这次相机初始化用的那份配置。
+     * 管线建好了（主线程；已经建好的当场来）：画出它是照什么建的（四宫格几何、状态条那一格、座舱格子、出错的提示），
+     * 声明各路画布，然后把录制状态画成它现在的样子、问要不要自动开一次。
+     *
+     * <p>相机由通道调度开：画布都在时登记了 PREVIEW（{@link #startPreviewIfReady}），它照登记表按次序开、开的时候就带着声明了的预览。
+     * 接回的留着的那几块已经声明过，再声明一次什么都不做。</p>
+     */
+    private void onPipelineBuilt(MultiCameraManager pipeline, com.kooo.evcam.camera.CameraManagerHolder.Built built) {
+        if (pipeline != cameraManager || isFinishing() || isDestroyed()) {
+            return;
+        }
+        showBuilt(built);
+        // 布局是新建的，座舱两格默认都显示。管线里只有真正要建的那一路才有实例（配置里关着的那一路没有），问它就是结论
+        showCabinPanes(pipeline.getCamera("back") != null, pipeline.getCamera("left") != null);
+        pipeline.declarePreviews(textureFront, textureBack, textureLeft);
+        // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
+        pipeline.firePreviewSizeCallbacks();
+        registerCamerasToImageAdjustManager();
+        AppLog.d(TAG, "Camera initialized with " + pipeline.getCameraCount() + " cameras (layout "
+                + configuredCameraCount + ")");
+        // 管线还在录的话，界面先画成它现在的样子；然后才问要不要自动开一次（什么时候开由协调器定：查过盘就开，不等环视）
+        syncRecordingStateFromManager();
+        checkAutoStartRecording();
+    }
+
+    /**
+     * 管线是照什么建的，画到界面上：合成流的几何交给四宫格容器，状态条最右那一格写槽位（多路）或合成流尺寸（单路）；
+     * 列相机出错、一路都没分到、没找到合成流时提示一句（和以前主界面自己建时的提示一样）。
+     */
+    private void showBuilt(com.kooo.evcam.camera.CameraManagerHolder.Built built) {
+        if (built.failed || built.plan == null) {
+            // 列相机时相机服务出错：原因（英文原话和错误码）只进日志，下次有人要管线时 Holder 重建
+            Toast.makeText(this, R.string.msg_camera_access_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        com.kooo.evcam.zeekr.ZeekrMultiPlan plan = built.plan;
+        // 合成流的几何先按探测（或存下）的尺寸给上；按配置钉了别的尺寸就照钉的。最终协商到的尺寸由 previewSizeCallback 再刷一次
+        if (plan.compositeIsReal && built.compositeSize != null && compositeContainer != null) {
+            compositeContainer.setSourceSize(built.compositeUse != null ? built.compositeUse : built.compositeSize);
+        }
+        if (configuredCameraCount > 1) {
+            if (plan.assignedCount() == 0) {
+                AppLog.w(TAG, "没有任何可用相机，三路模式无法显示");
+                Toast.makeText(this, R.string.msg_no_camera_available, Toast.LENGTH_LONG).show();
+            }
+            updateCompositeInfoOverlay(describeMultiSlots(plan));
+            return;
+        }
+        if (!plan.compositeIsReal) {
+            // 没找到合成流：管线拿第一个相机顶上，界面上显示原始画面并提示不支持
+            Toast.makeText(this, R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show();
+        }
+        // 角标先写探测结果；相机真正开起来之后会用实际尺寸再刷一次（见 refreshCompositeSizeOverlay）——
+        // 强制换了尺寸而 HAL 不认时，这里写探测值就成了「界面一个数、实际另一个数」
+        compositeProbeInfo = built.diagnostics;
+        compositeProbeSize = built.compositeSize;
+        updateCompositeInfoOverlay(compositeSummary(plan.compositeId, built.compositeSize));
+    }
+
+    /**
+     * 这一界面的配置（布局、各格摆法、哪一路的摆位由配置说了算）。
      *
      * <p>取一次存着，别在初始化过程中反复去读 —— 中途换了值，前半截和后半截
-     * 按不同的配置接线，出来的东西不属于任何一份配置。</p>
+     * 按不同的配置接线，出来的东西不属于任何一份配置。管线照的是同一份（CameraManagerHolder 建的时候读）。</p>
      */
     private Profile activeProfile;
 
@@ -1650,29 +1767,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 某一路在配置里要用的预览尺寸。
-     *
-     * @param probed 这一路探测到的尺寸；没有传 null
-     * @return null 表示不指定，交给 {@code chooseOptimalSize} 按老规则挑
-     */
-    private android.util.Size profileSize(String role, android.util.Size probed) {
-        if (activeProfile == null) {
-            return probed;
-        }
-        CameraProfile camera = activeProfile.camera(role);
-        if (camera == null) {
-            return probed;
-        }
-        int[] probedPair = probed == null
-                ? null : new int[]{probed.getWidth(), probed.getHeight()};
-        // 「最大」也要能解出来：不给声明的最大尺寸的话，选了 max 等于没选 ——
-        // 解成「不指定」，相机就按老规则挑一个 1280x800 附近的
-        ProfileResolution.Size size = ProfileResolution.resolve(camera.preview.resolution,
-                probedPair, com.kooo.evcam.profile.ProfileSizes.declaredMax(this, role));
-        return size.specified() ? new android.util.Size(size.width, size.height) : null;
-    }
-
-    /**
      * 把主界面要的几个<b>画面</b>回调挂到 {@link #cameraManager} 上。
      *
      * <p>复用后台实例和新建实例两条路都要挂，而且挂的必须<b>一模一样</b> ——
@@ -1710,33 +1804,18 @@ public class MainActivity extends AppCompatActivity {
             showCorruptedFilesDeletedDialog(deletedFiles);
         });
 
-        // 设置 Codec 回退通知回调
-        cameraManager.setCodecFallbackCallback(() -> {
-            runOnUiThread(() -> {
-                Toast.makeText(this, 
-                    getString(R.string.msg_codec_fallback),
-                    Toast.LENGTH_LONG).show();
-            });
-        });
-
         // 设置首次数据写入回调
-        // 用于在摄像头真正开始输出数据后启动计时器（分段计时等）
+        // 这一次录像第一笔数据写出来了：计时从这里起（之后一路都不在录、等待摄像头，计时的起点也不变）
         cameraManager.setFirstDataWrittenCallback(() -> {
             AppLog.d(TAG, "收到首次数据写入回调，录制已真正开始");
             runOnUiThread(() -> {
-                // 结束"准备中"状态
-                if (isPreparingRecording) {
-                    isPreparingRecording = false;
-                    hidePreparingIndicator();
-                    AppLog.d(TAG, "准备状态结束，录制进入正常状态");
-                }
-
                 // 启动录制计时器（从首次写入开始计时，而不是从录制请求开始）
                 // 这样右上角显示的时间是"有效录制时长"
                 if (isRecording) {
                     startRecordingTimer();
                     AppLog.d(TAG, "录制计时器已启动（首次写入后）");
                 }
+                renderRecordState();
             });
         });
 
@@ -1756,70 +1835,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         });
-    }
-
-    /**
-     * 极氪7X：车机只提供一路四联合成流。
-     *
-     * <p>不写死摄像头下标，而是遍历所有相机、挑出真正声明了合成流尺寸的那一路。
-     * 找到后把分辨率写进配置，让 SingleCamera.chooseOptimalSize 精确命中它。</p>
-     */
-    private void initCamerasForZeekrComposite(CameraManager cm, String[] cameraIds) {
-        com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
-                com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
-        AppLog.i(TAG, "极氪合成流探测结果:\n" + located.diagnostics);
-
-        String cameraId;
-        if (located.found()) {
-            cameraId = located.cameraId;
-            if (compositeContainer != null) {
-                compositeContainer.setSourceSize(located.size);
-            }
-        } else {
-            // 没找到就退回第一个相机，界面上会显示原始画面并提示不支持
-            cameraId = cameraIds.length > 0 ? cameraIds[0] : null;
-            AppLog.w(TAG, "未找到合成流，退回相机 " + cameraId);
-            runOnUiThread(() -> Toast.makeText(this,
-                    R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show());
-        }
-
-        // 角标先写探测结果；相机真正开起来之后会用实际尺寸再刷一次
-        // （见 refreshCompositeSizeOverlay）—— 强制换了尺寸而 HAL 不认时，
-        // 这里写探测值就成了「界面一个数、实际另一个数」。
-        compositeProbeInfo = located.diagnostics;
-        compositeProbeSize = located.size;
-        updateCompositeInfoOverlay(compositeSummary(located.cameraId, located.size));
-
-        // 手动指定优先于自动探测
-        String overrideFront = appConfig.getCameraOverride("front");
-        if (overrideFront != null) {
-            AppLog.i(TAG, "环视使用手动指定的相机 " + overrideFront + "（自动探测结果为 " + cameraId + "）");
-            cameraId = overrideFront;
-        }
-
-        if (cameraId != null) {
-            cameraManager.initCameras(cameraId, textureFront, null, null, null, null, null, null);
-            // 只对这一路指定合成流尺寸，不去改全局「画质设置」
-            if (located.found()) {
-                com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
-                if (cam != null) {
-                    // 尺寸来自配置。配置里是 auto 时就是探测结果，
-                    // 是具体值时（开发者选项改过的）就用那个值。
-                    android.util.Size use = profileSize(
-                            CameraProfile.ROLE_COMPOSITE, located.size);
-                    if (use != null && !use.equals(located.size)) {
-                        AppLog.w(TAG, "环视流尺寸按配置定为 " + use
-                                + "（探测结果是 " + located.size + "）");
-                        if (compositeContainer != null) {
-                            compositeContainer.setSourceSize(use);
-                        }
-                    }
-                    if (use != null) {
-                        cam.setPreferredSize(use);
-                    }
-                }
-            }
-        }
     }
 
     /**
@@ -1852,113 +1867,6 @@ public class MainActivity extends AppCompatActivity {
                 compositeContainer.setSourceSize(actual);
             }
         });
-    }
-
-    /**
-     * 「环视 + 座舱 3 路」模式的相机初始化。
-     *
-     * <p>槽位分配交给 {@link com.kooo.evcam.zeekr.ZeekrMultiPlan}（纯逻辑、有单元测试），
-     * 这里只负责套用与显示。</p>
-     *
-     * <p><b>环视这一路固定用探测到的合成流尺寸</b>，与单路配置一致。</p>
-     *
-     * <p>0.6.0 曾以「强制 1280×5140 撑爆了 HAL 并发预算」为由去掉了这个固定，
-     * 那个判断是错的 —— 0.7.0 找到真正的原因（{@code configuredCameraCount >= 4}
-     * 那道判断让 initCamera 根本没被调用），固定与否都不影响三路能不能出画面。
-     * 而不固定会留下一个真实的坑：环视相机会退回去用全局「目标分辨率」，
-     * 可相机 2 压根没声明 1280×800，最近匹配会落到 1280×720 ——
-     * <b>四联合成的内容就此丢失，画面变成一张普通的小图</b>。
-     * 也就是说三路能正常工作，只是因为用户手动把画质里的目标分辨率设成了
-     * 1280×5140，这不该是它的依赖。</p>
-     *
-     * <p>合成流的尺寸是硬件事实、不是偏好：四联内容只在 1280×5140 下存在。
-     * 固定它之后，「目标分辨率」才回到它应有的含义 —— 那是给普通相机（座舱两路）
-     * 用的设置，在那里选择才是真的有意义。</p>
-     */
-    private void initCamerasForZeekrMulti(CameraManager cm, String[] cameraIds) {
-        com.kooo.evcam.zeekr.ZeekrCameraLocator.Result located =
-                com.kooo.evcam.zeekr.ZeekrCameraLocator.locate(cm);
-        AppLog.i(TAG, "极氪多路探测结果:\n" + located.diagnostics);
-
-        // 三路模式下以计划为准：顶替上来的普通相机不是合成流，不能按四格拆
-        com.kooo.evcam.zeekr.ZeekrMultiPlan plan = com.kooo.evcam.zeekr.ZeekrMultiPlan.build(
-                cameraIds,
-                located.found() ? located.cameraId : null,
-                appConfig.getCameraOverride("front"),
-                appConfig.getCameraOverride("back"),
-                appConfig.getCameraOverride("left"));
-
-        AppLog.i(TAG, "极氪多路槽位分配:\n" + plan.explanation + "-> " + plan);
-
-        if (plan.assignedCount() == 0) {
-            AppLog.w(TAG, "没有任何可用相机，三路模式无法显示");
-            runOnUiThread(() -> Toast.makeText(this,
-                    R.string.zeekr_composite_not_found, Toast.LENGTH_LONG).show());
-        }
-
-        // 合成流的几何先按探测结果给上；若最终协商到的不是条带尺寸，
-        // onPreviewSizeChosen 那一路会保持原样显示（容器会忽略非条带尺寸）
-        if (plan.compositeIsReal && compositeContainer != null) {
-            compositeContainer.setSourceSize(located.size);
-        }
-
-        // 座舱那两路按<b>配置里有哪一路</b>分槽位，不按相机 id 的先后。
-        //
-        // ZeekrMultiPlan 只认相机 id 的顺序：除去合成流之后，第一个填座舱 1、
-        // 第二个填座舱 2。于是在配置里只加了「后座舱」的人，画面会出现在前座舱
-        // 那一格里 —— 报上来的现象是「无论加哪一路，先出来的总是前座」。
-        // 角色和相机是<b>固定</b>对应的：除去合成流之后，第一路是前座舱、第二路是
-        // 后座舱（和 ProfileSizes.cameraIdFor 同一条规则）。只加了后座舱时，
-        // 前座舱那一路就空着 —— 不能拿它去填后座舱的位置。
-        //
-        // 上一版这里写的是「只加了后座舱就把第一路顶上，别让槽位空着」。结果是
-        // 格子对、名字对、画面是前座舱的 —— 比空着更难发现。
-        boolean wantsFront = laneFor("back") != null;
-        boolean wantsRear = laneFor("left") != null;
-        String cabinFrontId = wantsFront ? plan.cabin1Id : null;
-        String cabinRearId = wantsRear ? plan.cabin2Id : null;
-        AppLog.i(TAG, "座舱槽位按配置分: 前座舱=" + cabinFrontId + "，后座舱=" + cabinRearId
-                + "（配置里 前=" + wantsFront + " 后=" + wantsRear + "）");
-
-        showCabinPanes(cabinFrontId != null, cabinRearId != null);
-
-        cameraManager.initCameras(
-                plan.compositeId, textureFront,
-                cabinFrontId, textureBack,
-                cabinRearId, textureLeft,
-                null, null);
-
-        // 只钉住环视这一路的尺寸，不动全局「画质设置」——
-        // 座舱两路仍然按目标分辨率自己挑。
-        if (plan.compositeIsReal && located.found()) {
-            com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera("front");
-            android.util.Size use = profileSize(CameraProfile.ROLE_COMPOSITE, located.size);
-            if (cam != null && use != null) {
-                cam.setPreferredSize(use);
-            }
-        }
-
-        // 座舱两路的尺寸也从配置来。配置里是 auto 时不指定，
-        // chooseOptimalSize 按它原来的规则挑 —— 和以前一模一样。
-        pinCabinSize(CameraProfile.ROLE_CABIN_1, "back");
-        pinCabinSize(CameraProfile.ROLE_CABIN_2, "left");
-
-        com.kooo.evcam.zeekr.StreamLayoutTable.setCompositeCameraId(
-                plan.compositeIsReal ? plan.compositeId : null);
-
-        updateCompositeInfoOverlay(describeMultiSlots(plan));
-    }
-
-    private void pinCabinSize(String role, String cameraKey) {
-        android.util.Size use = profileSize(role, null);
-        if (use == null) {
-            return;
-        }
-        com.kooo.evcam.camera.SingleCamera cam = cameraManager.getCamera(cameraKey);
-        if (cam != null) {
-            cam.setPreferredSize(use);
-            AppLog.i(TAG, role + " 尺寸按配置定为 " + use);
-        }
     }
 
     /** 三路模式下把槽位分配显示在画面上——黑屏时这是最直接的线索。 */
@@ -2027,7 +1935,7 @@ public class MainActivity extends AppCompatActivity {
         // 极氪合成流：比例与排版由 FourLaneContainer 负责。
         //
         // 这一段必须排在下面「配置里有这一格」前面：环视在配置里也有格子（四格），
-        // 排在后面就永远走不到这里。冷启动时 initCamerasForZeekrMulti 会另外把尺寸交给容器，
+        // 排在后面就永远走不到这里。冷启动时管线建好那一下（showBuilt）会另外把尺寸交给容器，
         // 所以一直没露馅；应用被重启、主界面复用后视镜在后台建好的相机时只剩这一条路，
         // 容器拿不到尺寸，环视就成了一整条被拉伸的画面（2026-09-15 的诊断报告）。
         //
@@ -2231,8 +2139,11 @@ public class MainActivity extends AppCompatActivity {
         sb.append("\n\n");
         sb.append(getString(R.string.debug_recording,
                 getString(isRecording ? R.string.debug_rec : R.string.debug_stopped)));
-        if (isRecording) {
-            sb.append("  ").append(getString(R.string.debug_mode, appConfig.getRecordingMode()));
+        if (isRecording && cameraManager != null) {
+            // 实际在用的管线（相机管理器建好时定的，回退后会变），括号里是设置值：两者可以不一样
+            sb.append("  ").append(getString(R.string.debug_mode,
+                    cameraManager.isCodecRecordingMode() ? "MediaCodec" : "MediaRecorder",
+                    appConfig.getRecordingMode()));
         }
 
         // 内存使用
@@ -2259,7 +2170,7 @@ public class MainActivity extends AppCompatActivity {
      *
      * <p>开过没有、停过没有记在进程级的 {@link RecordingIntent} 上 ——
      * 以前记在界面的字段里，界面一重建（切日夜模式、换语言、关掉再打开）就忘了，
-     * 于是用户明明按过停止，重建之后又自己录上了。什么时候真的开（环视出画面）、
+     * 于是用户明明按过停止，重建之后又自己录上了。什么时候真的开（查过盘就开，不等环视）、
      * 录不起来怎么办，都是协调器的事；以前这里的「等两秒再开」和 30 秒定时检查都归到它那一个等待里。</p>
      */
     private void checkAutoStartRecording() {
@@ -2270,7 +2181,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         intent.noteAutoStarted();
-        AppLog.d(TAG, "启动自动录制开着，交给协调器：环视出画面就录");
+        AppLog.d(TAG, "启动自动录制开着，交给协调器：查过盘就录");
         recordingCoordinator.request(RecordingCoordinator.Why.AUTO_START);
     }
 
@@ -2302,59 +2213,61 @@ public class MainActivity extends AppCompatActivity {
     
     
     /**
-     * 熄屏 15 秒后退到后台 —— 主界面在熄屏这件事上唯一自己管的一步。
+     * 熄屏 15 秒后退到后台 —— 主界面在熄屏这件事上自己管的唯一一步（大纲 §2 阶段 6：熄屏时只管界面）。
      *
-     * <p>唤醒锁、录像（10 秒停 / 接着录）、1.5 秒没人要就关相机、亮屏接回因熄屏退下去的界面，
-     * 都在 {@link com.kooo.evcam.screen.ScreenState} 里按固定顺序做完了，这里不再有自己的一份。
+     * <p>唤醒锁、录像（照熄屏那张表停不停）、车机要睡、亮屏接回因熄屏退下去的界面，
+     * 都在 {@link com.kooo.evcam.screen.ScreenState} 里按固定顺序做完了；相机由通道调度照登记表关（熄屏时预览不算有人要），
+     * 这里不放预览、不再自己算那张表。
      * 到点先问一遍屏幕是不是真的还黑着：深睡时这个计时是停住的，醒来之后才到点，
-     * 而醒来时亮屏广播不来，只信旧标记就会把刚回到车上的人的界面退下去。
-     * 录像还在（或还在等环视接回）、熄屏录制生效，就留在前台。</p>
+     * 而醒来时亮屏广播不来，只信旧标记就会把刚回到车上的人的界面退下去。安卓刚亮、车辆信号还没读回来
+     * （{@link com.kooo.evcam.screen.ScreenState#known} 为假）时屏幕黑没黑还不知道：过 2 秒再看，不当场退（设计 v3.1 C7）。
+     * 录像还在（含等待摄像头，或者在等开录、等自动接回）、熄屏录制生效，就留在前台（这几个条件照旧）；
+     * 熄屏期间停了录，停录那一下再排一次（{@link #recordingListener}）。一次熄屏只退一次。</p>
      */
     private void scheduleBackgroundTask() {
+        scheduleBackgroundStep(SCREEN_OFF_BACKGROUND_DELAY_MS);
+    }
+
+    /** 熄屏后退后台那一步排在 {@code delayMs} 之后（到点还不知道屏幕黑没黑的，过一会儿再排一次）。 */
+    private void scheduleBackgroundStep(long delayMs) {
         cancelBackgroundTask();
 
         screenOffBackgroundRunnable = () -> {
             screenOffBackgroundRunnable = null;
-            if (!com.kooo.evcam.screen.ScreenState.refresh()) {
+            boolean dark = com.kooo.evcam.screen.ScreenState.refresh();
+            if (!com.kooo.evcam.screen.ScreenState.known()) {
+                // 安卓刚亮，车辆信号还没读回来：屏幕可能已经亮了，过一会儿再看
+                scheduleBackgroundStep(SCREEN_UNKNOWN_RECHECK_MS);
+                return;
+            }
+            if (!dark) {
                 AppLog.d(TAG, "屏幕已亮起，取消退后台");
                 return;
             }
 
-            // 正在录制、或在等环视接回：不退后台
+            // 正在录制（含等待摄像头）、或在等开录（等 U 盘、等自动接回）：不退后台
             if (isRecording || recordingCoordinator.isWaiting()) {
-                AppLog.d(TAG, "正在录制中（或在等环视接回），不退后台");
+                AppLog.d(TAG, "正在录制中（或在等开录），不退后台");
                 return;
             }
 
-            // 熄屏录制开着，不退后台
+            // 熄屏录制开着，不退后台（只是界面：没在录时相机照样照登记表关，大纲 §7 第 5 问）
             if (appConfig.isScreenOffRecordingEnabled()) {
                 AppLog.d(TAG, "息屏录制模式已启用，不退后台");
                 return;
             }
 
-            // 以前这里直接关相机，不看后视镜也不看悬浮窗 —— 于是开着后视镜时
-            // 关掉两秒后又被它的看门狗打开，每次熄屏白做一遍。现在问同一张登记表
-            com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
-            if (needs.heldByAnyoneExcept(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW)) {
-                AppLog.d(TAG, "息屏 15 秒，但相机还有人要: " + needs.describe() + "，不关");
-                appConfig.setUiLeftForScreenOff(true);
-                moveTaskToBack(true);
+            if (leftForScreenOff) {
                 return;
             }
-
-            AppLog.d(TAG, "息屏已持续15秒，退到后台释放相机资源");
-
-            // 留个记号：是我们自己因为熄屏退下去的。亮屏时 Recovery 据此把界面接回来 ——
-            // 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标
-            appConfig.setUiLeftForScreenOff(true);
-
-            // 退到后台
+            leftForScreenOff = true;
             moveTaskToBack(true);
-
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("熄屏 15 秒：主界面退到后台"
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
             Toast.makeText(MainActivity.this, R.string.msg_screen_off_background, Toast.LENGTH_SHORT).show();
         };
 
-        screenStateHandler.postDelayed(screenOffBackgroundRunnable, SCREEN_OFF_BACKGROUND_DELAY_MS);
+        screenStateHandler.postDelayed(screenOffBackgroundRunnable, delayMs);
     }
 
     private void cancelBackgroundTask() {
@@ -2409,7 +2322,7 @@ public class MainActivity extends AppCompatActivity {
         
         if (isRecording) {
             // 用户手动停止：这一趟里没有任何一条路可以再自动开起来（RecordingIntent），
-            // 协调器收到 USER 也不会去等环视接回
+            // 协调器收到 USER 也不会自动接回
             RecordingIntent.current().noteUserStopped();
             AppLog.d(TAG, "用户手动停止录制，这一趟不再自动开始");
             recordingCoordinator.stop(RecordingStops.Reason.USER);
@@ -2426,36 +2339,20 @@ public class MainActivity extends AppCompatActivity {
      * 录制结果的画面反馈。
      *
      * <p>所有决定都在 {@link RecordingCoordinator} 里：要不要录、能不能录、什么时候开、
-     * 为什么停、停了接不接、还剩几次额度、黑匣子里的起止记录、前台服务、悬浮按钮的状态。
-     * 这里只把结果画出来 —— 指示器、计时器、Toast。它们出错只是看着别扭，
+     * 为什么停、停了接不接、还剩几次额度、黑匣子里的起止记录、前台服务、悬浮按钮的状态、
+     * 录像此刻的样子（开录中 / 在录 / 等待摄像头）。
+     * 这里只把结果画出来 —— 录制键、计时器、Toast。它们出错只是看着别扭，
      * 和「有没有录上」不是一回事，混在一起会让后者也没法单独验证。回调都在主线程。</p>
      */
     private final RecordingCoordinator.Listener recordingListener =
             new RecordingCoordinator.Listener() {
         @Override
-        public void onRecordingStarted(java.util.Set<String> cameras, boolean sdFellBack) {
+        public void onRecordingStarted() {
             lastRefusalShown = null;
             isRecording = true;
-            isPreparingRecording = true;
-
-            // 橙色旋转圈；首次写入回调里换成绿色闪烁。
-            // 计时器也在那时才启动 —— 从「真的录上了」开始计，而不是从「尝试录」开始
-            showPreparingIndicator();
-            // 等相机放开的那句提示随接回撤掉
-            showCameraTakenHint(false);
-
-            if (sdFellBack && !AppConfig.isSdFallbackShownThisSession()) {
-                AppConfig.setSdFallbackShownThisSession(true);
-                Toast.makeText(MainActivity.this,
-                        R.string.msg_sd_fallback, Toast.LENGTH_LONG).show();
-            } else {
-                int count = cameras.size();
-                Toast.makeText(MainActivity.this,
-                        count == configuredCameraCount
-                                ? getString(R.string.msg_recording_started_all)
-                                : getString(R.string.msg_recording_started_n, count),
-                        Toast.LENGTH_SHORT).show();
-            }
+            // 录制键照协调器此刻的样子画：开录中（各路带着录像输出出了画面才加入）。
+            // 计时器在第一笔数据写出来时才启动 —— 从「真的录上了」开始计，而不是从「尝试录」开始
+            renderRecordState();
 
             // 悬浮按钮拉起来开录的：让用户看一眼「录上了」，再把主界面收回后台
             if (hideMainAfterStart) {
@@ -2470,12 +2367,39 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
+        public void onStartSettled(java.util.Collection<String> liveKeys, java.util.Collection<String> planned,
+                                   boolean sdFellBack) {
+            // 说的是落定时真正在录的几路：被占用、在救、没录起来的那一路不算（它回来了自己加入，状态条上说）；
+            // 一路都没在录，就说在等摄像头 —— 录像没停
+            if (sdFellBack && !AppConfig.isSdFallbackShownThisSession()) {
+                AppConfig.setSdFallbackShownThisSession(true);
+                Toast.makeText(MainActivity.this,
+                        R.string.msg_sd_fallback, Toast.LENGTH_LONG).show();
+            } else if (liveKeys.isEmpty()) {
+                Toast.makeText(MainActivity.this,
+                        R.string.msg_recording_waiting_cameras, Toast.LENGTH_LONG).show();
+            } else {
+                int count = liveKeys.size();
+                Toast.makeText(MainActivity.this,
+                        count == planned.size()
+                                ? getString(R.string.msg_recording_started_all)
+                                : getString(R.string.msg_recording_started_n, count),
+                        Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        @Override
+        public void onRecordingViewChanged() {
+            // 一路加入、退出，开录中 → 在录 → 等待摄像头：录制键、角标、状态条那一句都照协调器此刻的样子重画
+            renderRecordState();
+        }
+
+        @Override
         public void onRecordingStopped(RecordingStops.Reason reason, long lastedMs, boolean willResume) {
             lastRefusalShown = null;
             isRecording = false;
-            isPreparingRecording = false;
-            setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
             stopRecordingTimer();
+            renderRecordState();
             // 状态条上「录像改写到别的盘」那句随这次录像结束
             updateStatusLine();
 
@@ -2493,19 +2417,23 @@ public class MainActivity extends AppCompatActivity {
                 case STORAGE_CANNOT_FREE:
                     text = getString(R.string.msg_storage_cannot_free);
                     break;
+                case STORAGE_LOCKED:
+                    text = getString(R.string.msg_storage_locked_stopped);
+                    break;
                 case SCREEN_OFF:
                     text = getString(R.string.msg_screen_off_stopped);
                     length = Toast.LENGTH_SHORT;
                     break;
                 case NO_DATA:
+                case START_FAILED:
+                    // 录制器都建不起来、一笔都没写进：录像没开始，不说「中断」（界面文字审查 rec_reason_unknown）
                     text = getString(willResume
                             ? R.string.msg_record_start_retrying : R.string.msg_record_start_gave_up);
                     break;
                 default: {
+                    // 存储一类（写不进、管线被换）：照旧自动恢复（大纲 §7 第 3 问）。摄像头被占用不是停，不会走到这里
                     String why = getString(reason == RecordingStops.Reason.WRITE_STALLED
-                            ? R.string.rec_reason_write_stalled
-                            : reason == RecordingStops.Reason.CAMERA_LOST
-                            ? R.string.rec_reason_camera_lost : R.string.rec_reason_unknown);
+                            ? R.string.rec_reason_write_stalled : R.string.rec_reason_unknown);
                     text = getString(willResume
                             ? R.string.msg_recording_interrupted_resuming
                             : R.string.msg_recording_interrupted, why);
@@ -2513,12 +2441,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             Toast.makeText(MainActivity.this, text, length).show();
-            // 相机被别的程序拿走、正在等它放开：状态条上说一声
-            showCameraTakenHint(reason == RecordingStops.Reason.CAMERA_LOST && willResume);
 
-            // 熄屏期间停下来的（熄屏持续录制录不下去了，或者别的原因）：照熄屏的规矩退后台、
-            // 放开相机，别开着相机睡过去；亮屏再接回。熄屏 10 秒停录那一条协调器在熄屏时已经安排过了
-            if (reason != RecordingStops.Reason.SCREEN_OFF && com.kooo.evcam.screen.ScreenState.refresh()) {
+            // 熄屏期间停下来的（因熄屏停的、录不下去了的）：熄屏那一刻排的 15 秒那一步可能早就因为在录没退，再排一次。
+            // 只是界面：相机由通道调度照登记表关（熄屏时预览不算有人要），不用等主界面退下去
+            if (com.kooo.evcam.screen.ScreenState.refresh() && screenOffBackgroundRunnable == null
+                    && !leftForScreenOff) {
                 scheduleBackgroundTask();
             }
         }
@@ -2535,8 +2462,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onRecordingFailed(String reason) {
-            Toast.makeText(MainActivity.this, reason, Toast.LENGTH_SHORT).show();
+        public void onWriteSlow() {
+            // 录像照常在录，只是 U 盘写不过来、开始丢帧；多久提示一次协调器已经定了
+            Toast.makeText(MainActivity.this, R.string.msg_storage_too_slow, Toast.LENGTH_LONG).show();
         }
     };
 
@@ -2546,7 +2474,7 @@ public class MainActivity extends AppCompatActivity {
      * <p>每一处给 {@code cameraManager} 赋值之后都要调一次：它换了对象而协调器
      * 还握着旧的，表现会是「按了录制，什么都没发生」—— 这种不报错的失败最难查。
      * 协调器是进程级的那一份（onCreate 里已经取到、挂上了监听）；相机建好之前它收到的「要录」
-     * 会一直等到这里把相机交过去、环视出画面为止。</p>
+     * 会一直等到这里把相机交过去、查过盘为止。</p>
      */
     private void attachRecordingCoordinator() {
         if (recordingCoordinator == null) {
@@ -2568,28 +2496,38 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("==== 用户退出应用 ====");
         // 必须在停服务之前：前台服务的 onDestroy 会发保活广播，保活接收器收到就去重启它
         UserExit.markExited(this);
-        // 结束进程交给看门的线程：它等主线程收尾、等每一路相机关完，最多等 EXIT_DEADLINE_MS，
+        // 结束进程交给看门的线程：它等主线程收尾、等停录收好文件、等每一路相机关完，最多等 EXIT_DEADLINE_MS，
         // 到点照样结束。以前是主线程自己关相机、关完再结束 —— 相机服务一卡，进程就退不掉
         // （2026-09-26 09:40 那一次：点了退出，系统里却没有这次退出的记录）
         final long exitStartedAt = android.os.SystemClock.elapsedRealtime();
         final java.util.concurrent.CountDownLatch mainCleanupDone = new java.util.concurrent.CountDownLatch(1);
-        new Thread(() -> finishExit(exitStartedAt, mainCleanupDone), "exit-watchdog").start();
+        final java.util.concurrent.CountDownLatch filesClosed = new java.util.concurrent.CountDownLatch(1);
+        final Context app = getApplicationContext();
+        new Thread(() -> finishExit(app, exitStartedAt, mainCleanupDone, filesClosed), "exit-watchdog").start();
 
-        // 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
+        // 退出的次序（channel-logic §五：停录 → 登记表清空 → 调度按顺序关完 → 再退出；大纲 §2 阶段 6）：
+        // 1. 先告诉调度「退出」：同步写下、置 closingAnywhere，从此只关，不开、不改输出、不救；登记表从此作废。
+        //    它的下一轮是 post 出去的，跑的时候下面几步的同步部分都已做完
+        com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
+        MultiCameraManager pipeline = holder.getCameraManager();
+        if (pipeline != null) {
+            pipeline.channelScheduler().exit();
+        }
+
+        // 2. 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
         com.kooo.evcam.recording.RecordingIntent.current().reset();
         // 主动退出之后不该再被亮屏拉回来
         appConfig.setUiLeftForScreenOff(false);
 
-        // 停止录制（在录的停掉，在等环视的也不等了）
+        // 3. 停止录制（在录的停掉，在等开录的也不等了）
         recordingCoordinator.stop(RecordingStops.Reason.USER);
 
         // 停止前台服务（确保清理）
         CameraForegroundService.stop(this);
 
-
-        // 退出就是退出：后视镜、录制按钮、补盲一起停。以前这里写着「不停，它们本来就是
-        // 脱离主界面用的」—— 但紧接着 System.exit，它们反正活不下去，留着只是让系统
-        // 以 START_STICKY 的名义再去重启它们
+        // 4. 退出就是退出：后视镜、录制按钮、补盲一起停（它们的画布死了，调度也不会再为它们排改输出 —— 退出时只关）。
+        //    以前这里写着「不停，它们本来就是脱离主界面用的」—— 但紧接着 System.exit，它们反正活不下去，
+        //    留着只是让系统以 START_STICKY 的名义再去重启它们
         OverlayCoordinator.onActivityDestroyed(this);
         com.kooo.evcam.zeekr.RearViewMirrorService.stop(this);
         com.kooo.evcam.zeekr.SideViewPopupService.stop(this);
@@ -2597,12 +2535,17 @@ public class MainActivity extends AppCompatActivity {
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();
 
-        // 释放摄像头资源
-        if (cameraManager != null) {
-            cameraManager.release();
+        // 5. 放管线（只在退出和换车型时才放）：停录收尾；调度关完相机、丢掉输出，再放录制器（MultiCameraManager.release）。
+        //    这一份的调度已经在退出了，release 里再叫一次 exit 无害
+        holder.release();
+        // 6. 停录收尾（等编码排空、收好文件）在管线的收拾线程上排着：排在它们后面数一下，退出的最后一步等到它
+        //    （finishExit；channel-logic §五 停录在先 —— 以前只等相机关完，U 盘慢时进程可能在收好最后一段之前就结束了）
+        if (pipeline != null) {
+            pipeline.afterStopsFinished(filesClosed::countDown);
+        } else {
+            filesClosed.countDown();
         }
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().release();
-        
+
         // 保存日志（System.exit 会跳过 onDestroy，所以这里手动保存）
         AppLog.saveToPersistentLog(this);
 
@@ -2611,120 +2554,171 @@ public class MainActivity extends AppCompatActivity {
         mainCleanupDone.countDown();
     }
 
-    /** 退出最多等多久：主线程收尾、每一路相机关完。到点没好也照样结束进程。 */
-    private static final long EXIT_DEADLINE_MS = 3000L;
+    /**
+     * 退出最多等多久：主线程收尾、停录收好文件、调度按次序关完每一路相机。到点没好也照样结束进程。
+     * 环视先关、座舱后关，通常不到半秒；相机服务卡住时一次关实测 2–20 秒（2026-10-08），要留够：进程带着没关完的相机死掉，
+     * 相机服务里就剩一个没人收的句柄，下一个进程开相机全部超时。数由调度的常量算出来（{@code ChannelRules.EXIT_WAIT_MAX_MS}：
+     * 手上那一步的在途封顶 + 按次序关一轮的封顶 + 余量，最坏约 105 秒，界面早就没了，用户看不到）；以前的 20 秒盖不住调度自己
+     * 关相机的上限（环视 10 秒 + 座舱 30 秒）。
+     */
+    private static final long EXIT_DEADLINE_MS = com.kooo.evcam.camera.ChannelRules.EXIT_WAIT_MAX_MS;
 
     /**
-     * 退出的最后一步，在看门的线程上跑：等主线程收尾、等相机关完，然后结束进程。
+     * 退出的最后一步，在看门的线程上跑：等主线程收尾、等相机关完、等停录收好文件，然后结束进程。
      *
-     * <p>黑匣子里记一行结果：用了多久；到点没好的话，卡在哪 —— 是主线程收尾，还是哪一路相机。
+     * <p>黑匣子里记一行结果：用了多久；到点没好的话，卡在哪 —— 是主线程收尾、录像文件，还是哪一路相机。
      * 下次再「点了退出却退不掉」，这一行就是答案。</p>
+     *
+     * <p>收尾的这段时间里人又点开了应用（主界面 onCreate 清掉了退出标记，{@link UserExit#isExited}）：不结束进程 ——
+     * 新打开的主界面正接着用，它自己建了一份管线、等这一份关完才开相机，这时结束进程就把它一起杀了，相机开到一半丢给相机服务
+     * （审查 2026-10-11；EXIT_DEADLINE_MS 加长到「退出最多等」之后这段时间可以很长）。</p>
+     *
+     * @param filesClosed 停录收尾都做完了（{@link MultiCameraManager#afterStopsFinished}）
      */
-    private static void finishExit(long startedAt, java.util.concurrent.CountDownLatch mainCleanupDone) {
+    private static void finishExit(Context app, long startedAt, java.util.concurrent.CountDownLatch mainCleanupDone,
+                                   java.util.concurrent.CountDownLatch filesClosed) {
         boolean mainDone = false;
         try {
             mainDone = mainCleanupDone.await(EXIT_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
-        java.util.List<String> stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(left);
+        // 相机由通道调度按次序关（环视先、座舱后）：等它报关完（closingAnywhere 变假），再等还在关的那几路的 latch
+        java.util.List<String> stuck;
+        while (true) {
+            long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
+            stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(Math.min(Math.max(left, 0L), 200L));
+            if (left <= 0 || (!com.kooo.evcam.camera.ChannelScheduler.closingAnywhere() && stuck.isEmpty())) {
+                break;
+            }
+            if (stuck.isEmpty()) {
+                // 眼下没有一路在关（调度还在等手上那一步做完，开到一半、配会话最多 15 秒）：awaitAllClosed 当场返回，
+                // 不歇一下就空转占满一个核，和要跑关相机那几轮的主线程抢（审查 2026-10-11）
+                try {
+                    Thread.sleep(Math.min(200L, left));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        // 停录收尾（收拾线程上，每一路最多 CodecVideoRecorder.STOP_BUDGET_MS）：通常比关相机先做完，没做完就等到同一个期限
+        boolean filesDone = false;
+        try {
+            long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
+            filesDone = filesClosed.await(Math.max(left, 0L), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
         long took = android.os.SystemClock.elapsedRealtime() - startedAt;
-        if (mainDone && stuck.isEmpty()) {
+        if (mainDone && stuck.isEmpty() && filesDone) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：收尾用了 " + took + "ms，相机都关好了");
         } else {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：等满 " + EXIT_DEADLINE_MS
                     + "ms 强制结束。" + (mainDone ? "" : "主线程收尾没做完；")
+                    + (filesDone ? "" : "停录还没收好文件；")
                     + (stuck.isEmpty() ? "" : "相机 " + stuck + " 还没关好"));
+        }
+        if (!UserExit.isExited(app)) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：收尾的时候应用又被打开了，不结束进程（新打开的主界面接着用）");
+            return;
         }
         // 黑匣子在自己的线程上写：等它把上面几行写完再结束进程
         com.kooo.evcam.blackbox.BlackBox.flush(1000);
         System.exit(0);
     }
 
-    /** 录制键切到某个状态。回调可能来自相机线程，统一丢回主线程。 */
-    private void setRecordState(com.kooo.evcam.ui.RecordButtonUi.State state) {
-        com.kooo.evcam.ui.MotionPolicy.setRecording(state == com.kooo.evcam.ui.RecordButtonUi.State.PREPARING
-                || state == com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
-        runOnUiThread(() -> {
-            if (recordButtonUi == null) {
-                return;
-            }
-            if (state == com.kooo.evcam.ui.RecordButtonUi.State.IDLE) {
-                refreshRecordAvailability();
-            } else {
-                recordButtonUi.setState(state);
-            }
-        });
-    }
-
     /**
-     * 准备中：点已收成方块、一明一暗，外圈在转 —— 录制器还没写出第一笔数据。
-     * 迟迟不来怎么办由录制器判（15 秒没写出就报「没收到画面」），这里不再另设看门狗。
-     */
-    private void showPreparingIndicator() {
-        setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.PREPARING);
-    }
-
-    /**
-     * 接上一条还在进行的录制：状态以录制管线为准，而不是去「恢复」它。
+     * 录像的样子画在界面上 —— 只有这一处（大纲 5c）：录制键、计时角标、状态条上摄像头那一句，
+     * 都照协调器此刻的 {@link RecordingCoordinator#view()}。协调器的回调、第一笔数据、界面重建、回到前台都走这里。主线程。
      *
-     * <p>主界面被重建或者重新打开时，录制管线一直在跑（见 onDestroy 的 keepPipeline）。
-     * 新界面要做的只是把按钮、计时器画成管线现在的样子：写出过第一笔数据就是录制中，
-     * 计时从那一刻接着走；还没写出就是准备中，看门狗照常盯着。</p>
+     * <ul>
+     *   <li>开录中：点收成方块、一明一暗，外圈在转 —— 还没有一路加入；</li>
+     *   <li>在录：方块，外圈按本段走；计时角标从第一笔数据起算；</li>
+     *   <li>等待摄像头：一路都没在录（录像不算停），灰方块慢慢呼吸、外圈不走，角标收起；</li>
+     *   <li>没在录：照存储快照画成「开始录制」或「插入 U 盘后可录制」（{@link #refreshRecordAvailability}）。</li>
+     * </ul>
+     */
+    private void renderRecordState() {
+        RecordingCoordinator.View view = recordingCoordinator.view();
+        long liveSince = recordingCoordinator.liveSinceElapsedMs();
+        if (renderedRecordView == RecordingCoordinator.View.WAITING && view == RecordingCoordinator.View.RECORDING
+                && segmentStartTime > 0 && liveSince > 0) {
+            // 等摄像头之后第一路接回：它的文件从那一刻起（按那一刻起名），本段从这里重新算；段号只在出新的共用名字时加 1
+            segmentStartTime = System.currentTimeMillis() - (android.os.SystemClock.elapsedRealtime() - liveSince);
+            updateSegmentProgress();
+        }
+        renderedRecordView = view;
+        // 录像意图开着（开录中、在录、等待摄像头）就算在录：装饰动效让路
+        com.kooo.evcam.ui.MotionPolicy.setRecording(view != RecordingCoordinator.View.IDLE);
+        if (recordButtonUi != null) {
+            switch (view) {
+                case PREPARING:
+                    recordButtonUi.setState(com.kooo.evcam.ui.RecordButtonUi.State.PREPARING);
+                    break;
+                case RECORDING:
+                    recordButtonUi.setState(com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
+                    break;
+                case WAITING:
+                    recordButtonUi.setState(com.kooo.evcam.ui.RecordButtonUi.State.WAITING);
+                    break;
+                default:
+                    refreshRecordAvailability();
+                    break;
+            }
+        }
+        if (tvRecordingStats != null) {
+            // 计时角标只在在录、而且计时已经起来（写出过第一笔）时显示；等待摄像头时收起，计时的起点不变
+            tvRecordingStats.setVisibility(view == RecordingCoordinator.View.RECORDING && recordingStartTime > 0
+                    ? View.VISIBLE : View.GONE);
+        }
+        renderCompositeInfoCell();
+    }
+
+    /**
+     * 接上一条还在进行的录制：状态以协调器和录制管线为准，而不是去「恢复」它。
+     *
+     * <p>主界面被重建或者重新打开时，录制管线一直在跑（管线属于应用，主界面销毁不放它，见 onDestroy）。
+     * 新界面要做的只是把按钮、计时器画成现在的样子（{@link #renderRecordState}）：写出过第一笔数据，
+     * 计时从那一刻接着走。在不在录、什么样子（开录中 / 在录 / 等待摄像头）问协调器 ——
+     * 以前问相机层，开录中重建的界面会画成没在录。</p>
      */
     private void syncRecordingStateFromManager() {
-        if (cameraManager == null || !cameraManager.isRecording()) {
-            return;
+        if (cameraManager != null && recordingCoordinator.isRecording()) {
+            isRecording = true;
+            // 这一段从什么时候开始、停时录了多久，协调器记着（它不随界面重建），这里只画
+            if (cameraManager.hasWrittenFirstData()) {
+                startRecordingTimer(cameraManager.getFirstDataWrittenAtMs(),
+                        cameraManager.getCurrentSegmentIndex() + 1);
+            }
+            AppLog.i(TAG, "接上了还在进行的录制 " + instanceTag() + " view=" + recordingCoordinator.view()
+                    + " firstData=" + cameraManager.hasWrittenFirstData()
+                    + " segment=" + (cameraManager.getCurrentSegmentIndex() + 1));
         }
-        isRecording = true;
-        // 这一段从什么时候开始、停时录了多久，协调器记着（它不随界面重建），这里只画
-        if (cameraManager.hasWrittenFirstData()) {
-            isPreparingRecording = false;
-            startRecordingTimer(cameraManager.getFirstDataWrittenAtMs(),
-                    cameraManager.getCurrentSegmentIndex() + 1);
-            setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.RECORDING);
-        } else {
-            isPreparingRecording = true;
-            showPreparingIndicator();
-        }
-        AppLog.i(TAG, "接上了还在进行的录制 " + instanceTag()
-                + " firstData=" + cameraManager.hasWrittenFirstData()
-                + " segment=" + (cameraManager.getCurrentSegmentIndex() + 1));
+        // 状态条上摄像头那一句也照此刻的样子画：界面重建时一路正被占用，新界面一样要说
+        renderRecordState();
     }
 
     /**
      * 回到前台时，对一下「界面以为在录」和「录制器真的在录」是不是一回事。
      *
      * <p>以前这里只写了一句「录制中，相机应该还连着」就什么都不查。录制器若在后台停了，
-     * 界面会一直停在准备中或录制中，要等用户去点才暴露。录制器在请求开始的那一刻就会
-     * 把自己标成在录（不等第一笔数据），所以正常的准备中不会被误判。</p>
+     * 界面会一直停在准备中或录制中，要等用户去点才暴露。在不在录问协调器：开录指令一发出去就算
+     * （不等录制器启动、不等第一笔数据），所以正常的准备中不会被误判 —— 以前问的是相机层，
+     * 它要等会话建好才算，开录那几秒里回到前台会被误判成「已在后台停止」。</p>
      */
     private void reconcileRecordingState() {
         if (!isRecording || cameraManager == null) {
             return;
         }
-        if (cameraManager.isRecording()) {
+        if (recordingCoordinator.isRecording()) {
             return;
         }
-        AppLog.w(TAG, "回到前台：界面以为在录，录制器其实没在录 " + instanceTag()
-                + " preparing=" + isPreparingRecording);
+        AppLog.w(TAG, "回到前台：界面以为在录，录制器其实没在录 " + instanceTag());
         isRecording = false;
-        isPreparingRecording = false;
         stopRecordingTimer();
-        setRecordState(com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
+        renderRecordState();
         Toast.makeText(this, R.string.msg_recording_lost_in_background, Toast.LENGTH_LONG).show();
-    }
-
-    /**
-     * 结束准备中：真的录上了就进录制中，没录上就回待机。
-     *
-     * <p>以前没录上时这里什么都不做，按钮就停在「准备中」的颜色上。</p>
-     */
-    private void hidePreparingIndicator() {
-        setRecordState(isRecording
-                ? com.kooo.evcam.ui.RecordButtonUi.State.RECORDING
-                : com.kooo.evcam.ui.RecordButtonUi.State.IDLE);
     }
 
     /**
@@ -2737,31 +2731,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    /**
-     * 获取当前录制状态（供外部查询）
-     */
-    public boolean isCurrentlyRecording() {
-        return isRecording;
-    }
-
-    /**
-     * 发送当前录制状态广播（供悬浮窗服务查询）
-     */
-    public void broadcastCurrentRecordingState() {
-        com.kooo.evcam.service.RecordingFloatingService.sendRecordingStateChanged(this, isRecording);
-    }
-    
 
     @Override
     protected void onPause() {
         super.onPause();
         isInBackground = true;
+        // 熄屏带来的暂停：那一刻系统已经不交互了（人切走、重建、关掉时还交互着）。熄屏广播后到时据此照样记「因熄屏退下去」
+        android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+        pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
         com.kooo.evcam.camera.StallWatch.setForeground(false);
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
 
         // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表。
-        // 录像那一项由协调器登记（在录、在等环视都算），这里不替它填
-        // 关不关由相机层按登记表判（没人要 1.5 秒后关），这里不再自己关
+        // 录像那一项由协调器登记（录像意图开着时），这里不替它填
+        // 关不关由通道调度按登记表判（没人要了的那一路：亮屏、前台服务在时各自保持 30 秒，否则当场按次序关），
+        // 这里不自己关。画布不撤回：最小化时它还在（安卓 12 只拆显示层），预览输出成了「留着的」，通道不动
+        //
+        // 重建（换日夜模式、换语言）时不注销：主界面一直看得见，新界面在同一趟里接回画布、自己再登记（大纲 §7.6）。
+        // 有一格没接回（管线里没有那一路的相机，画布留不住），新界面要等第一次绘制建出那一格画布才数齐、才登记 ——
+        // 这里先注销的话，调度在那之前醒来那一轮看到没人要，没有前台服务时就当场把相机关了，画布一齐又按次序重开
+        // （2026-10-11 审查，阶段 4a）。从最近任务划掉不是重建，照常注销
+        if (isChangingConfigurations()) {
+            AppLog.d(TAG, "onPause during a configuration change: PREVIEW stays claimed for the new instance");
+            return;
+        }
         com.kooo.evcam.camera.CameraNeeds.current().release(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
     }
 
@@ -2811,31 +2804,62 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         boolean wasInBackground = isInBackground;
         isInBackground = false;
+        pausedByScreenOff = false;
         com.kooo.evcam.camera.StallWatch.setForeground(true);
         AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording);
         
-        // 人已经在界面上了，屏幕一定亮着。ScreenState 记的还是黑着就说明亮屏广播没来，让它补跑一次亮屏
+        // 回到前台：让 ScreenState 重问一遍安卓（亮屏广播没来的话这一下补上）；车辆说屏幕黑着的，让车辆信号当场读一遍 ——
+        // 人真回来了它会读到亮屏。熄屏 v3 起回到前台不等于屏幕亮着：车辆说黑而安卓亮着时（车机黑着醒了）主界面也可能回到前台，
+        // 所以不硬当亮屏
         com.kooo.evcam.screen.ScreenState.refresh();
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，
-        // 还是用户自己点回来的
+        // 还是用户自己点回来的；下一次熄屏照样再退一次
         appConfig.setUiLeftForScreenOff(false);
+        leftForScreenOff = false;
 
-        // 预览又要用相机了
-        com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        // 手里那份管线不再是进程里在用的那一份（在后台时被 Holder 放掉重建了、建的时候列相机出错）：接上现在那一份
+        reattachPipelineIfReplaced("resume");
+
+        // 预览又要用相机了 —— 画布还在的话现在登记；画布没了（退过后台）等它回来再登记（见 claimPreviewIfReady）
+        claimPreviewIfReady();
+
+        // 前台服务：每次回到前台都刷新一次（大纲 §1 MainActivity，2.11 阶段 4a）
+        refreshForegroundService();
 
         // 界面记的录制状态和录制器的真实状态先对一下；对不上就以录制器为准
         reconcileRecordingState();
-
-        // U 盘可能在后台时插拔过：先按上一份快照画，再去后台探测一次（结果经 storageListener 回来）
-        refreshRecordAvailability();
+        // 在后台的这段时间里有一路退出、加入过（回调可能没赶上这个界面），U 盘可能插拔过：
+        // 录制键、状态条照此刻的样子重画（存储先按上一份快照，再去后台探测一次，结果经 storageListener 回来）
+        renderRecordState();
         updateStatusLine();
         com.kooo.evcam.storage.StorageState.refresh(this, "resume");
-        
-        // 回到前台要用相机：上面 claim(PREVIEW) 那一下相机层自己会开（reconcileCameras）
-}
+
+        // 回到前台要用相机：上面 claim(PREVIEW) 那一下叫醒通道调度，它照登记表开（主界面在前就能用相机）
+    }
+
+    /**
+     * 刷新前台服务：开机自启动开着、或者有录像意图（「这一趟要录」：在录、在等开录、因熄屏停下等亮屏接回）时，
+     * 主界面每次回到前台都 start 一次。通知上的字服务自己照录像此刻的样子写（{@link RecordingCoordinator#notificationTitle}：
+     * 正在录制、等待摄像头，或者在后台运行）。
+     *
+     * <p>为什么每次都刷：安卓 12 起，后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度只认两种「能用相机」：
+     * 主界面在前，或者前台服务是主界面在前时起的、那时刷新过（{@link CameraForegroundService#startedWhileVisible()}，
+     * 在 onStartCommand 那一刻判，只升不降）。以前只在服务不在时才起 —— 开机后在后台起的那个一直在，
+     * 就永远不会变成「能用相机」，主界面一退到后台调度就什么都不开（大纲 §1、§6 风险 7：通知会刷一下）。</p>
+     *
+     * <p>留不留服务的条件和 {@link CameraForegroundService#stop} 是同一条（开机自启动、或者这一趟要录）：
+     * 都不是就不起 —— 停不停由停录、退出那几处管。</p>
+     */
+    private void refreshForegroundService() {
+        if (!appConfig.isAutoStartOnBoot() && !RecordingIntent.current().recordingWanted()
+                && !recordingCoordinator.isRecording()) {
+            return;
+        }
+        CameraForegroundService.start(this);
+    }
 
     @Override
     protected void onDestroy() {
@@ -2845,30 +2869,24 @@ public class MainActivity extends AppCompatActivity {
         AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
 
-        // 录制管线留不留：还在录，或者只是重建（夜间模式、语言切换）—— 留着，界面再起来时接回去。
-        // 以前这里一律释放，录制就断在重建上；新界面再去「恢复录制」，恢复没接上就卡在准备中
-        // 还有别人在用相机（超级后视镜、悬浮窗、补盲）也要留着 —— 以前只看录制，
-        // 主界面一被销毁就把整个相机管理器拆掉，后视镜当场黑掉，两秒后它的看门狗又去重开：
-        // 环视就这样被关了又开。登记表的规矩是「都不用了才释放」，这里是最后绕过它的一处
+        // 相机管线属于应用，不属于主界面（大纲 §2 阶段 6，channel-logic §五）：主界面销毁不放它，相机关不关交给通道调度 ——
+        // 主界面只是登记表里的一个需要方。预览画布在画布销毁那一下交给管线（keepPreviewCanvas；onSurfaceTextureDestroyed 在
+        // onDestroy 之后才来），PREVIEW 在 onPause 放过了（重建时留给新界面）：这里都不再做 —— 再放一遍 PREVIEW 的话，
+        // 重建时调度会把相机关了再开。以前这里看「还要不要」决定放不放管线：放了的话后视镜当场黑掉、录像断在重建上
+        if (cameraManager != null && !cameraManager.isReleased()) {
+            // 退出那条路已经放了管线（exitApp），那时不写
+            com.kooo.evcam.blackbox.BlackBox.note("主界面销毁：预览画布交给管线，管线留给应用");
+        }
+        // 前台服务、中转写入留不留（keepServices，条件照旧）：还在录、在等开录（开机自启动、悬浮按钮拉起）、上一次停录还在收拾
+        // （needsPipeline），只是重建（夜间模式、语言切换），或者还有别人在用相机（超级后视镜、拍照）—— 留着
         com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
         final boolean othersNeedCamera = needs.heldByAnyoneExcept(
                 com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
-        // 协调器还在等环视开录的（开机自启动、悬浮按钮拉起）也算有人要：管线拆了它就永远开不起来
-        final boolean keepPipeline = cameraManager != null && !cameraManager.isReleased()
-                && (cameraManager.isRecording() || isChangingConfigurations() || othersNeedCamera
-                || recordingCoordinator.isWaiting());
-        if (othersNeedCamera && cameraManager != null && !cameraManager.isReleased()) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面销毁，但相机还有人要（"
-                    + needs.describe() + "），不释放");
-        }
-        AppLog.i(TAG, "onDestroy 录制管线" + (keepPipeline ? "保留" : "释放") + " "
-                + instanceTag() + " recording=" + (cameraManager != null && cameraManager.isRecording())
-                + " changingConfigurations=" + isChangingConfigurations());
-        if (!keepPipeline) {
-            // 不留就清掉 Holder：release() 会清空 cameras map，进程若因 Service 存活而不退出，
-            // Holder 会握着一个已清空的实例被下次复用
-            com.kooo.evcam.camera.CameraManagerHolder.getInstance().setCameraManager(null);
-        }
+        final boolean keepServices = cameraManager != null && !cameraManager.isReleased()
+                && (recordingCoordinator.needsPipeline() || isChangingConfigurations() || othersNeedCamera);
+        AppLog.i(TAG, "onDestroy 前台服务、中转写入" + (keepServices ? "保留" : "照没人要收") + " "
+                + instanceTag() + " recording=" + recordingCoordinator.isRecording()
+                + " changingConfigurations=" + isChangingConfigurations() + " needs=" + needs.describe());
 
         // 关闭预览矫正悬浮窗
 
@@ -2900,10 +2918,11 @@ public class MainActivity extends AppCompatActivity {
         }
         // 熄屏退后台的那一步：界面都没了，不用退
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
         cancelBackgroundTask();
 
-        // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉
-        if (!keepPipeline) {
+        // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉（停不停还看开机自启动、这一趟要录，见 stop）
+        if (!keepServices) {
             CameraForegroundService.stop(this);
         }
 
@@ -2911,59 +2930,18 @@ public class MainActivity extends AppCompatActivity {
         if (storageCleanupManager != null) {
             storageCleanupManager.stop();
         }
-        
+
         // 文件传输（U 盘中转写入）：录制还在继续，分段还要往 U 盘搬，不能停
-        if (!keepPipeline) {
+        if (!keepServices) {
             FileTransferManager.getInstance(this).stop();
         }
 
-        if (keepPipeline) {
-            // 留着管线：只摘掉这个界面设的回调
+        // 这个界面设在管线上的回调一律摘掉：管线比界面活得久，不摘的话销毁了的界面被它留住、还被回调
+        if (cameraManager != null) {
             cameraManager.detachUiCallbacks();
-        } else if (cameraManager != null) {
-            // 带超时保护的摄像头资源释放
-            releaseCameraManagerWithTimeout(3000);  // 3秒超时
         }
     }
     
-    /**
-     * 带超时保护的摄像头管理器释放
-     * 防止 release() 操作阻塞过久导致 ANR
-     * 
-     * @param timeoutMs 超时时间（毫秒）
-     */
-    private void releaseCameraManagerWithTimeout(long timeoutMs) {
-        if (cameraManager == null) {
-            return;
-        }
-        
-        final CountDownLatch latch = new CountDownLatch(1);
-        
-        // 在后台线程执行 release，避免阻塞主线程
-        new Thread(() -> {
-            try {
-                AppLog.d(TAG, "Releasing camera manager in background thread...");
-                cameraManager.release();
-                AppLog.d(TAG, "Camera manager released successfully");
-            } catch (Exception e) {
-                AppLog.e(TAG, "Error releasing camera manager", e);
-            } finally {
-                latch.countDown();
-            }
-        }, "CameraRelease").start();
-        
-        try {
-            // 等待 release 完成，但设置超时避免 ANR
-            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
-                AppLog.w(TAG, "Camera manager release timed out after " + timeoutMs + "ms, " +
-                        "resources may not be fully released");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            AppLog.w(TAG, "Camera manager release interrupted");
-        }
-    }
-
     /**
      * 显示录制异常的提示（自动消失，每20秒最多显示一次）
      */
@@ -2975,10 +2953,12 @@ public class MainActivity extends AppCompatActivity {
         // 记录日志（始终记录）
         AppLog.w(TAG, "Recording error, deleted " + deletedFiles.size() + " corrupted files: " + deletedFiles);
 
-        // 准备中超时后按「没收到画面」停掉录制器，清掉的正是那个空分段 —— 这是在收拾，不是新的异常。
+        // 准备中超时后按「没收到画面」停掉录制器、开录一路都没起来时停录收拾，清掉的正是那个空分段 ——
+        // 这是在收拾，不是新的异常，提示里已经说了「录制未能启动」。
         // 这个回调是发到主线程上来的，到这里时协调器已经把停录原因记下了
-        if (recordingCoordinator.lastStopReason() == RecordingStops.Reason.NO_DATA) {
-            AppLog.d(TAG, "准备中超时的清理，不弹录制异常");
+        if (recordingCoordinator.lastStopReason() == RecordingStops.Reason.NO_DATA
+                || recordingCoordinator.lastStopReason() == RecordingStops.Reason.START_FAILED) {
+            AppLog.d(TAG, "准备中超时、开录失败的清理，不弹录制异常");
             return;
         }
 
@@ -3162,7 +3142,12 @@ public class MainActivity extends AppCompatActivity {
             AppLog.d(TAG, "Image adjust floating window dismissed");
         });
         imageAdjustFloatingWindow.show();
-        
+        // 窗口真打开了才说「已打开」：没权限、摄像头没就绪各有自己的提示（上面两处）；
+        // show() 加不上窗口时只记日志不抛，所以问一下它
+        if (imageAdjustFloatingWindow.isShowing()) {
+            Toast.makeText(this, R.string.msg_adjust_opened, Toast.LENGTH_SHORT).show();
+        }
+
         AppLog.d(TAG, "Image adjust floating window shown");
     }
     
@@ -3441,23 +3426,48 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(this::renderCompositeInfoCell);
     }
 
-    /** 状态条最右那一格：环视被车机占用时写这件事，否则是合成流的识别结果。 */
+    /** 状态条最右那一格：在录时有一路被占用、无法录制，写这件事（{@link #cameraHint}），否则是合成流的识别结果。 */
     private void renderCompositeInfoCell() {
         if (tvCompositeInfo == null) {
             return;
         }
-        String line = cameraTakenHint ? getString(R.string.status_camera_taken) : compositeInfoText;
+        String hint = cameraHint();
+        String line = hint != null ? hint : compositeInfoText;
         tvCompositeInfo.setText(line);
         tvCompositeInfo.setVisibility(line.isEmpty() ? View.INVISIBLE : View.VISIBLE);
     }
 
-    /** 环视被别的程序拿走、正在等它放开：状态条上说一声，接回后撤掉。 */
-    private void showCameraTakenHint(boolean on) {
-        if (cameraTakenHint == on) {
-            return;
+    /**
+     * 状态条上关于摄像头的那一句，照此刻的样子说（2026-10-10）；不用说是 null。
+     *
+     * <p>只在在录（至少一路在录）时说，取自协调器给的各路摘要（{@link RecordingCoordinator#summary}，
+     * 管线按 {@link com.kooo.evcam.camera.RecordingLanes#hint} 选的那一句）：一路被占用、两路以上被占用、
+     * 一路无法录制（停手了、录制器建不起来）。一路都没在录时录制键上说「等待摄像头」，这里不再说。</p>
+     *
+     * <p>每次都现问协调器，不靠回调时记下的标记：界面重建、回到前台时，一路正被占用，新界面照样说。</p>
+     */
+    private String cameraHint() {
+        if (recordingCoordinator == null
+                || recordingCoordinator.view() != RecordingCoordinator.View.RECORDING) {
+            return null;
         }
-        cameraTakenHint = on;
-        renderCompositeInfoCell();
+        com.kooo.evcam.camera.RecordingLanes.Summary summary = recordingCoordinator.summary();
+        if (summary == null) {
+            return null;
+        }
+        com.kooo.evcam.camera.RecordingLanes.Hint hint = summary.hint;
+        switch (hint.kind) {
+            case LANE_TAKEN:
+                return getString(R.string.status_camera_lane_taken,
+                        com.kooo.evcam.camera.CameraNames.ofSlot(this, hint.key));
+            case LANES_TAKEN:
+                return getString(R.string.status_cameras_taken);
+            case LANE_UNAVAILABLE:
+                return getString(R.string.status_camera_lane_unavailable,
+                        com.kooo.evcam.camera.CameraNames.ofSlot(this, hint.key));
+            default:
+                return null;
+        }
     }
 
 
@@ -3486,8 +3496,6 @@ public class MainActivity extends AppCompatActivity {
         if (!OverlayCoordinator.setRecordButtonEnabled(this, on)) {
             Toast.makeText(this, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
             WakeUpHelper.requestOverlayPermission(this);
-        } else if (on) {
-            broadcastCurrentRecordingState();
         }
         syncRearViewSwitch();
     }

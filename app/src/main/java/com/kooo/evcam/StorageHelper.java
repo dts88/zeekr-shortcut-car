@@ -163,7 +163,7 @@ public class StorageHelper {
     
     /**
      * 检测是否发生了U盘回退
-     * 即：用户选择了U盘存储，但U盘不可用，实际使用内部存储
+     * 即：用户选择了U盘存储，但U盘不可用 —— 开发者选项开着时实际落在内置存储上，关着时没有地方可存（{@link #footageRoot}）
      * @param context 上下文
      * @return true 如果发生了回退
      */
@@ -309,36 +309,44 @@ public class StorageHelper {
      * 获取视频存储目录
      * @param context 上下文
      * @param useExternalSd 是否使用U盘
-     * @return 视频存储目录
+     * @return 视频存储目录；没有地方可存时为 null（见 {@link #footageRoot}）
      */
     public static File getVideoDir(Context context, boolean useExternalSd) {
-        return getStorageDir(context, useExternalSd, VIDEO_DIR_NAME, Environment.DIRECTORY_DCIM);
+        return getStorageDir(footageRoot(context, useExternalSd), VIDEO_DIR_NAME, Environment.DIRECTORY_DCIM);
     }
-    
+
     /**
      * 获取图片存储目录
      * @param context 上下文
      * @param useExternalSd 是否使用U盘
-     * @return 图片存储目录
+     * @return 图片存储目录；没有地方可存时为 null（见 {@link #footageRoot}）
      */
     public static File getPhotoDir(Context context, boolean useExternalSd) {
-        return getStorageDir(context, useExternalSd, PHOTO_DIR_NAME, Environment.DIRECTORY_DCIM);
+        return getStorageDir(footageRoot(context, useExternalSd), PHOTO_DIR_NAME, Environment.DIRECTORY_DCIM);
     }
-    
+
     /**
-     * 获取日志存储目录
+     * 获取日志存储目录（导出的诊断报告）。
+     *
+     * <p>不归 {@link #footageRoot} 管：诊断报告不是录下来的影像，没有 U 盘时照旧写在内置存储上，
+     * 没插盘也能导出。</p>
      * @param context 上下文
      * @param useExternalSd 是否使用U盘
      * @return 日志存储目录
      */
     public static File getLogDir(Context context, boolean useExternalSd) {
-        return getStorageDir(context, useExternalSd, LOG_DIR_NAME, Environment.DIRECTORY_DOWNLOADS);
+        File sdCardRoot = useExternalSd ? getExternalSdCardRoot(context) : null;
+        if (useExternalSd && sdCardRoot == null) {
+            AppLog.w(TAG, "U盘不可用，日志目录回退到内置存储");
+        }
+        return getStorageDir(sdCardRoot != null ? sdCardRoot : Environment.getExternalStorageDirectory(),
+                LOG_DIR_NAME, Environment.DIRECTORY_DOWNLOADS);
     }
-    
+
     /**
      * 根据 AppConfig 配置获取视频存储目录
      * @param context 上下文
-     * @return 视频存储目录
+     * @return 视频存储目录；没有地方可存（没有 U 盘、开发者选项没开）时为 null
      */
     public static File getVideoDir(Context context) {
         AppConfig config = new AppConfig(context);
@@ -348,15 +356,18 @@ public class StorageHelper {
     /**
      * 获取录制时实际写入的目录
      * 如果启用了中转写入，返回临时目录；否则返回最终存储目录
+     *
+     * <p>中转写入的临时目录在内置存储上，和 {@link #footageRoot} 是同一道门：中转写入归开发者选项管，
+     * 开发者选项关着时按关算（{@code AppConfig.DEVELOPER_KEYS}），走不到这条分支。</p>
      * @param context 上下文
-     * @return 录制写入目录
+     * @return 录制写入目录；没有地方可存（没有 U 盘、开发者选项没开）时为 null
      */
     public static File getRecordingDir(Context context) {
         AppConfig config = new AppConfig(context);
-        
+
         // 检查是否应该使用中转写入
         if (config.shouldUseRelayWrite()) {
-            // 使用临时目录（内部存储的缓存目录）
+            // 使用临时目录（内置存储的缓存目录）
             File tempDir = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
             if (!tempDir.exists()) {
                 if (tempDir.mkdirs()) {
@@ -377,7 +388,7 @@ public class StorageHelper {
      * 获取视频的最终存储目录
      * 即使启用了中转写入，这个方法也返回最终的目标目录
      * @param context 上下文
-     * @return 最终存储目录
+     * @return 最终存储目录；没有地方可存时为 null
      */
     public static File getFinalVideoDir(Context context) {
         AppConfig config = new AppConfig(context);
@@ -387,41 +398,55 @@ public class StorageHelper {
     /**
      * 根据 AppConfig 配置获取图片存储目录
      * @param context 上下文
-     * @return 图片存储目录
+     * @return 图片存储目录；没有地方可存（没有 U 盘、开发者选项没开）时为 null
      */
     public static File getPhotoDir(Context context) {
         AppConfig config = new AppConfig(context);
         return getPhotoDir(context, config.isUsingExternalSdCard());
     }
-    
+
     /**
-     * 获取存储目录
-     * @param context 上下文
-     * @param useExternalSd 是否使用U盘
+     * 影像（录像、照片）放在哪个盘上 —— 只有这一处决定（项目所有者 2026-10-06：不允许存到内置存储）。
+     *
+     * <p>规则只有一条：设定的 U 盘；没有 U 盘（或者选的就是内置存储，那只有开发者选得了）时，
+     * 开发者选项开着（{@link #isInternalStorageAllowed}）才落在内置存储上，否则返回 null ——
+     * 没有地方可存，不退到内置存储。</p>
+     *
+     * <p>录像、照片、锁定清单、开发者选项里的整帧另存，目录都从这里来，拿到 null 就不写；
+     * 开录和拍照之前先问 {@link #isRecordingStorageAvailable}（同一条规则），不录、不拍。
+     * 回放、存储页读的也是这个目录，拿到 null 就是「这里什么都没有」；存在内置存储上的
+     * （开发者选项开着时录、拍的），打开开发者选项照常能看。</p>
+     */
+    private static File footageRoot(Context context, boolean useExternalSd) {
+        if (useExternalSd) {
+            // U盘的公共目录（U盘/DCIM/EVCam_Video 或 U盘/DCIM/EVCam_Photo）
+            File sdCardRoot = getExternalSdCardRoot(context);
+            if (sdCardRoot != null) {
+                return sdCardRoot;
+            }
+        }
+        if (!isInternalStorageAllowed()) {
+            return null;
+        }
+        if (useExternalSd) {
+            AppLog.w(TAG, "U盘不可用，回退到内置存储");
+        }
+        return Environment.getExternalStorageDirectory();
+    }
+
+    /**
+     * 盘上的存储目录：root/父目录/目录名，不存在就建。
+     * @param root 盘的根目录；null（没有地方可存）时返回 null
      * @param dirName 目录名称
      * @param parentDirType 父目录类型（如 DCIM, Downloads）
      * @return 存储目录
      */
-    private static File getStorageDir(Context context, boolean useExternalSd, String dirName, String parentDirType) {
-        File dir;
-        
-        if (useExternalSd) {
-            // 使用U盘的公共目录（U盘/DCIM/EVCam_Video 或 U盘/DCIM/EVCam_Photo）
-            File sdCardRoot = getExternalSdCardRoot(context);
-            if (sdCardRoot != null) {
-                // 在U盘的公共目录下创建子目录（如 /storage/xxxx-xxxx/DCIM/EVCam_Video）
-                File parentDir = new File(sdCardRoot, parentDirType);
-                dir = new File(parentDir, dirName);
-            } else {
-                // 如果没有U盘，回退到内部存储
-                AppLog.w(TAG, "U盘不可用，回退到内部存储");
-                dir = new File(Environment.getExternalStoragePublicDirectory(parentDirType), dirName);
-            }
-        } else {
-            // 使用内部存储的公共目录
-            dir = new File(Environment.getExternalStoragePublicDirectory(parentDirType), dirName);
+    private static File getStorageDir(File root, String dirName, String parentDirType) {
+        if (root == null) {
+            return null;
         }
-        
+        File dir = new File(new File(root, parentDirType), dirName);
+
         // 确保目录存在
         if (!dir.exists()) {
             boolean created = dir.mkdirs();
@@ -447,16 +472,21 @@ public class StorageHelper {
      * <p>只有开发者选项打开时才允许。行车记录是持续写入，而车机闪存
      * 写坏了换不了 —— 这个代价不该由「不熟悉软件、一路点确定」的人承担，
      * 所以它不是一个弹窗能放行的选择，而是默认就不给。</p>
+     *
+     * <p>选过的「内置存储」在开发者选项关着时本来就按 U 盘算（{@code AppConfig.getStorageLocation}）；
+     * 这里管的是选 U 盘、盘却不在时，录像、照片能不能退到内置存储上存（{@link #footageRoot}），
+     * 以及设置里那一项能不能选、录制器换盘时最后一站。</p>
      */
     public static boolean isInternalStorageAllowed() {
         return com.kooo.evcam.settings.DeveloperMode.isUnlocked();
     }
 
     /**
-     * 现在能不能开始录：有 U 盘，或者开发者选项放行了内置存储。
+     * 现在有没有地方存录像、照片：有 U 盘，或者开发者选项放行了内置存储（{@link #footageRoot} 的那条规则）。
      *
-     * <p>拒录（{@code RecordingCoordinator}）和录制键的「不可用」状态问的是同一件事，
-     * 所以只有这一处判断 —— 两处各写一遍，迟早出现「按钮说能录、按下去说不能」。</p>
+     * <p>拒录（{@code RecordingCoordinator}）、拍照入口的拒拍（{@code MultiCameraManager.takePhoto}）
+     * 和录制键的「不可用」状态问的是同一件事，所以只有这一处判断 —— 各写一遍，
+     * 迟早出现「按钮说能录、按下去说不能」。</p>
      */
     public static boolean isRecordingStorageAvailable(Context context) {
         return !willRecordToInternal(context) || isInternalStorageAllowed();
@@ -465,8 +495,8 @@ public class StorageHelper {
     /**
      * 录像实际上会不会落在内置存储上。
      *
-     * <p>两种情况都算：选的就是内置存储，或者选了 U 盘但盘不在
-     * （那时会回退到内置，见 {@code getStorageDir}）。</p>
+     * <p>两种情况都算：选的就是内置存储（开发者选项开着时才算数），或者选了 U 盘但盘不在
+     * （开发者选项开着时会回退到内置，见 {@link #footageRoot}）。</p>
      *
      * <p>后一种尤其值得提醒 —— 用户以为在写 U 盘，实际在写车机闪存，
      * 而这是个不声不响就发生的降级。</p>
@@ -478,7 +508,7 @@ public class StorageHelper {
         if (!new AppConfig(context).isUsingExternalSdCard()) {
             return true;
         }
-        // 选了 U 盘但盘不在，走的是 getStorageDir 里那条回退分支
+        // 选了 U 盘但盘不在，走的是 footageRoot 里那条回退分支
         return isSdCardFallback(context);
     }
 
@@ -714,15 +744,28 @@ public class StorageHelper {
     }
     
     /**
-     * 获取当前存储路径描述
-     * @param context 上下文
-     * @return 当前存储路径描述
+     * 设置里「录像保存路径」那一行写的目录。
+     *
+     * <ul>
+     *   <li>正在录：录制器实际写的那个（盘写不进、换过盘就是新盘）。中转写入时录像先在内部缓存里，
+     *       写完才转存过去 —— 这一行写转存到的目录，不写缓存；</li>
+     *   <li>没在录：按设置下一次开录会写的那个；</li>
+     *   <li>此刻录不了（没有 U 盘、开发者选项没开）：null —— 那一行写「未检测到 U 盘」，
+     *       不写一个永远不会写进去的内置存储路径。</li>
+     * </ul>
+     *
+     * <p>会碰盘，不要在主线程调。</p>
      */
-    public static String getCurrentStoragePathDesc(Context context) {
-        AppConfig config = new AppConfig(context);
-        boolean useExternalSd = config.isUsingExternalSdCard();
-        
-        File videoDir = getVideoDir(context, useExternalSd);
-        return videoDir.getAbsolutePath();
+    public static File savedVideoDir(Context context, boolean recording) {
+        File actual = lastRecordingDir;
+        File relayCache = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
+        if (recording && actual != null
+                && !actual.getAbsoluteFile().equals(relayCache.getAbsoluteFile())) {
+            return actual;
+        }
+        if (!isRecordingStorageAvailable(context)) {
+            return null;
+        }
+        return getVideoDir(context);
     }
 }

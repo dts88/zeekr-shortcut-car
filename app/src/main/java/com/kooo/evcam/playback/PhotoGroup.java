@@ -4,9 +4,13 @@ import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 图片分组模型
@@ -191,16 +195,44 @@ public class PhotoGroup {
         return photoFiles.containsKey(position);
     }
 
-    public int deleteAll() {
-        int deleted = 0;
+    /** 这一组的文件名（锁定影像按文件名记）。 */
+    public List<String> fileNames() {
+        List<String> names = new ArrayList<>();
         for (File file : photoFiles.values()) {
-            if (file.delete()) {
-                deleted++;
+            names.add(file.getName());
+        }
+        return names;
+    }
+
+    /** 有没有锁定的（{@code locked} 是锁定的文件名）。 */
+    public boolean isLocked(Set<String> locked) {
+        for (File file : photoFiles.values()) {
+            if (locked.contains(file.getName())) {
+                return true;
             }
         }
-        if (deleted > 0) {
-            photoFiles.clear();
-            totalSize = 0;
+        return false;
+    }
+
+    /**
+     * 删掉这一组里不在 {@code keep} 里的文件（锁定的留下）。删掉的从组里拿掉，留下的还在。
+     *
+     * @return 删掉了几个
+     */
+    public int deleteAllExcept(Set<String> keep) {
+        int deleted = 0;
+        Iterator<Map.Entry<String, File>> it = photoFiles.entrySet().iterator();
+        while (it.hasNext()) {
+            File file = it.next().getValue();
+            if (keep.contains(file.getName())) {
+                continue;
+            }
+            long size = file.length();
+            if (file.delete()) {
+                deleted++;
+                totalSize -= size;
+                it.remove();
+            }
         }
         return deleted;
     }

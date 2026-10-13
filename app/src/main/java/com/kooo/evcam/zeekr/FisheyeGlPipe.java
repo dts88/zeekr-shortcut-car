@@ -94,7 +94,6 @@ public final class FisheyeGlPipe {
             "uniform float uOn;\n" +
             "uniform float uProjection;\n" +
             "uniform float uParam;\n" +
-            "uniform float uStrength;\n" +
             "const float HALF_PI = 1.5707963268;\n" +
             "vec2 corrected(vec2 p) {\n" +
             "    if (uProjection < 0.5) {\n" +
@@ -129,7 +128,6 @@ public final class FisheyeGlPipe {
             "            vec2 local = (vPos - lane.xy) / lane.zw;\n" +
             "            if (local.x >= 0.0 && local.x <= 1.0 && local.y >= 0.0 && local.y <= 1.0) {\n" +
             "                vec2 s = corrected(local);\n" +
-            "                s = local + (s - local) * uStrength;\n" +
             "                src = lane.xy + s * lane.zw;\n" +
             "                break;\n" +
             "            }\n" +
@@ -147,13 +145,11 @@ public final class FisheyeGlPipe {
         final boolean on;
         final float projection;
         final float parameter;
-        final float strength;
 
-        Correction(boolean on, float projection, float parameter, float strength) {
+        Correction(boolean on, float projection, float parameter) {
             this.on = on;
             this.projection = projection;
             this.parameter = parameter;
-            this.strength = strength;
         }
     }
 
@@ -167,7 +163,7 @@ public final class FisheyeGlPipe {
     private final HandlerThread thread;
     private final Handler handler;
 
-    private volatile Correction correction = new Correction(false, 0f, 1f, 1f);
+    private volatile Correction correction = new Correction(false, 0f, 1f);
     private volatile boolean released;
     private volatile boolean outputBroken;
     private volatile Runnable onReleased;
@@ -184,7 +180,6 @@ public final class FisheyeGlPipe {
     private int onHandle;
     private int projectionHandle;
     private int parameterHandle;
-    private int strengthHandle;
     private SurfaceTexture input;
     private final float[] texMatrix = new float[16];
     private final int[] size = new int[2];
@@ -308,11 +303,10 @@ public final class FisheyeGlPipe {
      * 校正开没开、用什么参数。任何线程都能调，下一帧生效。
      * 关着就原样拷过去 —— 生产者始终接在这条管线上，拨开关不用重建。
      */
-    public void setCorrection(boolean on, float fovDegrees, String projection, float strength) {
+    public void setCorrection(boolean on, float fovDegrees, String projection) {
         correction = new Correction(on,
                 FisheyeProjection.shaderProjectionCode(projection),
-                FisheyeProjection.shaderParameter(fovDegrees, projection),
-                Math.max(0f, Math.min(1f, strength)));
+                FisheyeProjection.shaderParameter(fovDegrees, projection));
         if (!released) {
             handler.post(this::drawLatest);
         }
@@ -404,7 +398,6 @@ public final class FisheyeGlPipe {
         onHandle = GLES20.glGetUniformLocation(program, "uOn");
         projectionHandle = GLES20.glGetUniformLocation(program, "uProjection");
         parameterHandle = GLES20.glGetUniformLocation(program, "uParam");
-        strengthHandle = GLES20.glGetUniformLocation(program, "uStrength");
         quad = ByteBuffer.allocateDirect(QUAD.length * 4).order(ByteOrder.nativeOrder())
                 .asFloatBuffer();
         quad.put(QUAD).position(0);
@@ -476,7 +469,6 @@ public final class FisheyeGlPipe {
         GLES20.glUniform1f(onHandle, c.on ? 1f : 0f);
         GLES20.glUniform1f(projectionHandle, c.projection);
         GLES20.glUniform1f(parameterHandle, c.parameter);
-        GLES20.glUniform1f(strengthHandle, c.strength);
         GLES20.glEnableVertexAttribArray(positionHandle);
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, quad);
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);

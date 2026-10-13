@@ -119,24 +119,6 @@ public final class FisheyeProjection {
     }
 
     /**
-     * 带强度的反向映射：{@code strength} 从 0 到 1，在「原图不动」和「完全校正」之间插值。
-     *
-     * <p>0 就是原样：输出点直接取源图同一个位置。1 就是那一种投影本来的样子。
-     * 中间是线性插值 —— 它不对应任何一种真实的成像模型，但这里要的是一个能用手感调的旋钮：
-     * 校正过头和校正不足都能看出来，中间那一档往往才是顺眼的。</p>
-     */
-    public static void sourcePoint(float x, float y, float fovDegrees, String projection,
-                                   float strength, float[] out, int offset) {
-        sourcePoint(x, y, fovDegrees, projection, out, offset);
-        if (strength >= 1f) {
-            return;
-        }
-        float amount = Math.max(0f, strength);
-        out[offset] = x + (out[offset] - x) * amount;
-        out[offset + 1] = y + (out[offset + 1] - y) * amount;
-    }
-
-    /**
      * 立体投影的反向映射：校正后画面里的一点 → 原始鱼眼画面里的采样点。
      *
      * <p>和直线投影同一个约定：画面边缘对应偏离光轴 fov/2 的那条射线。差别只在中间怎么分配 ——

@@ -13,6 +13,10 @@ package com.kooo.evcam.profile;
  * 细调过的那一路会被标出来（{@link #matches}），因为「我选了均衡，但后座舱不是」
  * 这件事必须看得见。</p>
  *
+ * <p>选的是哪一档存在配置里（{@link Profile#quality}），标记拿它来比。
+ * 不能从各路的参数倒推：单独改过一路之后几路各不相同，推出来的是「哪一档都不是」，
+ * 于是三张卡一张都不亮，被改过的那一路也没有可比的对象。</p>
+ *
  * <h3>帧率</h3>
  *
  * <p>10 / 20 / 不限。帧率和码率同方向走：帧数少了，同样的码率落在每一帧上就多，
@@ -59,7 +63,7 @@ public enum QualityPreset {
         return BALANCED;
     }
 
-    /** 这一路的录制参数是不是正好是这一档。不是就该标「已细调」。 */
+    /** 这一路的录制参数是不是正好是这一档。不是就该标「自定义」。 */
     public boolean matches(StreamSpec record) {
         if (record == null) {
             return false;
@@ -75,37 +79,46 @@ public enum QualityPreset {
         }
     }
 
-    /** 把这一档写进整份配置里每一路。 */
+    /** 把这一档写进整份配置里每一路，并记下选的是这一档。 */
     public void applyTo(Profile profile) {
         if (profile == null) {
             return;
         }
+        profile.quality = this;
         for (CameraProfile camera : profile.cameras) {
             applyTo(camera.record);
         }
     }
 
     /**
-     * 这份配置现在整体上是哪一档 —— 每一路都正好是那一档时才算。
+     * 早先存下的配置里没记选的是哪一档，读的时候从开着的那几路倒推一个。
      *
-     * @return 对得上的那一档；哪一路都对不上，或者几路各不相同，返回 null
+     * <p>哪一档对得上的路最多就是哪一档：单独改过一路之后，其余几路还是当初选的那一档。
+     * 关着的不算 —— 后来补上的那几路是默认值，不代表当初选了什么。
+     * 一样多（包括一路都对不上）时算「均衡」，和认不出来的词一样（{@link #fromKey}）。</p>
+     *
+     * <p>只在读老配置时用一次：存过之后，选的那一档就记在配置里了。</p>
      */
-    public static QualityPreset of(Profile profile) {
-        if (profile == null || profile.cameras.isEmpty()) {
-            return null;
-        }
+    static QualityPreset inferredFrom(Profile profile) {
+        QualityPreset best = BALANCED;
+        int bestCount = enabledMatching(profile, BALANCED);
         for (QualityPreset preset : values()) {
-            boolean all = true;
-            for (CameraProfile camera : profile.cameras) {
-                if (!preset.matches(camera.record)) {
-                    all = false;
-                    break;
-                }
-            }
-            if (all) {
-                return preset;
+            int count = enabledMatching(profile, preset);
+            if (count > bestCount) {
+                best = preset;
+                bestCount = count;
             }
         }
-        return null;
+        return best;
+    }
+
+    private static int enabledMatching(Profile profile, QualityPreset preset) {
+        int count = 0;
+        for (CameraProfile camera : profile.cameras) {
+            if (camera.enabled && preset.matches(camera.record)) {
+                count++;
+            }
+        }
+        return count;
     }
 }

@@ -73,7 +73,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         }
         // 亮屏把因熄屏退下去的主界面接回来，是「回到用户设定的状态」（规格 §0），不归保活管：
         // 那是 ScreenState → Recovery.bringBackUiAfterScreenOn 的事，这里只把亮屏当保活的触发
-        if (!new AppConfig(context).isKeepAliveEnabled()) {
+        if (!new AppConfig(context).isAutoStartOnBoot()) {
             // 保活关着（规格 §3）：不拉
             return;
         }
@@ -288,9 +288,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
 
         try {
             // 启动前台服务
-            CameraForegroundService.start(context,
-                    context.getString(R.string.notif_background_title),
-                    context.getString(R.string.notif_tap_to_return));
+            CameraForegroundService.start(context);
             AppLog.d(TAG, "已请求启动前台服务 (触发: " + reason + ")");
         } catch (Exception e) {
             AppLog.e(TAG, "启动服务失败: " + e.getMessage(), e);
@@ -314,9 +312,7 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         
         try {
             // 启动前台服务
-            CameraForegroundService.start(context,
-                    context.getString(R.string.notif_background_title),
-                    context.getString(R.string.notif_tap_to_return));
+            CameraForegroundService.start(context);
         } catch (Exception e) {
             // 静默失败，不输出日志
         }

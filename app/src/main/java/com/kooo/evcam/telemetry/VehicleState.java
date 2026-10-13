@@ -10,7 +10,8 @@ package com.kooo.evcam.telemetry;
  * 只看这份快照，不知道就画成「没数据」—— 而不是画成「关」。「没数据」和「关」
  * 在画面上必须分得开，否则转向灯亮着而我们读不到，画出来就是「没打灯」。</p>
  *
- * <p>所以每个字段都是可空的包装类型：{@code null} = 没数据。</p>
+ * <p>所以每个字段都是可空的包装类型：{@code null} = 没数据。座位例外：五个座位各自有一个状态，
+ * 「没数据」是其中之一（{@link #SEAT_UNKNOWN}，{@link #seat}）。</p>
  *
  * <p>纯数据，不碰 Android，{@code VehicleStateTest} 里测。</p>
  */
@@ -20,12 +21,21 @@ public final class VehicleState {
     public static final int TURN_LEFT = 1;
     public static final int TURN_RIGHT = 2;
 
-    /** 车门 / 座椅的位掩码：位 0 左前、位 1 右前、位 2 左后、位 3 右后、位 4 后排中间（只有座椅有）。 */
+    /** 车门 / 座位的位置位：位 0 左前、位 1 右前、位 2 左后、位 3 右后、位 4 后排中间（只有座位有）。 */
     public static final int FRONT_LEFT = 1;
     public static final int FRONT_RIGHT = 1 << 1;
     public static final int REAR_LEFT = 1 << 2;
     public static final int REAR_RIGHT = 1 << 3;
     public static final int REAR_CENTER = 1 << 4;
+
+    /**
+     * 一个座位的状态（{@link #seat}）：没数据、没人、系着、有人没系。
+     * 怎么从座椅和安全带的读数算出来，看 {@link VehicleStateMapper#seatState}。
+     */
+    public static final int SEAT_UNKNOWN = 0;
+    public static final int SEAT_EMPTY = 1;
+    public static final int SEAT_BELTED = 2;
+    public static final int SEAT_UNBELTED = 3;
 
     /** 每发布一份就 +1，画的人据此知道要不要重画。 */
     public final long version;
@@ -42,12 +52,8 @@ public final class VehicleState {
     public final Float brake;
     public final Float speedKmh;
     public final Boolean autoHold;
-    public final Boolean adaptiveCruise;
-    public final Boolean laneCentering;
     /** 原厂 360 画面此刻显示着（倒车时车机自己的环视；它开着时占着相机）。 */
     public final Boolean stockSurroundShown;
-    /** 驾驶员手在方向盘上（车上还没找到读数，先留着位置）。 */
-    public final Boolean handsOnWheel;
     /** 六项安全辅助的开关：自动紧急制动、前碰预警、车道偏离预警、车道保持、盲区辅助、后碰预警。 */
     public final Boolean aeb;
     public final Boolean forwardCollisionWarning;
@@ -57,16 +63,33 @@ public final class VehicleState {
     public final Boolean rearCollisionWarning;
     /** 开着的门（位掩码）。 */
     public final Integer doorsOpen;
-    /** 没系安全带的座位（位掩码）。 */
-    public final Integer beltsUnbuckled;
+    /**
+     * 五个座位各自的状态（{@link #SEAT_UNKNOWN} … {@link #SEAT_UNBELTED}），打包在一个 int 里：每个座位 2 位，
+     * 按位置位的序号排（左前 0、右前 1、左后 2、右后 3、后排中间 4，见 {@link #seatShift}）；全 0 = 都没数据。
+     * 不用可空的包装类型：每个座位自己就有「没数据」这个状态。读的时候用 {@link #seat}。
+     */
+    private final int seats;
     /** 前灯带亮着（日行灯，或者开着灯时以位置灯身份亮着）—— 和车外看到的一样。 */
     public final Boolean daytimeRunningLights;
     public final Boolean lowBeam;
     public final Boolean highBeam;
+    /** 正在闪远光（一下最短 0.1 秒，至少算 500 毫秒）。{@link #highBeam} 里也算上了；车辆状态面板单独一格。 */
+    public final Boolean flashToPass;
+    /** 后雾灯（前雾灯这台车多半没装，不画）。 */
     public final Boolean fogLights;
+    /** 后位置灯、刹车灯、倒车灯：都按车外看到的亮灭（刹车灯也会被自动驻车、动能回收点亮）。 */
+    public final Boolean rearPositionLamps;
+    public final Boolean stopLamps;
+    public final Boolean reverseLamps;
+    /** 正在按喇叭（Lab 还没找到读数，现在总是 null）。 */
+    public final Boolean horn;
+    /** 哨兵模式：0 关、1 开、2 布防（锁车后）。熄屏后环视录到什么时候（车机要不要睡），看的就是它（规格 2.4）。 */
+    public final Integer sentry;
     public final Float odometerKm;
     public final Double latitude;
     public final Double longitude;
+    /** 这份快照用的读数（非开发者已滤掉没验证的）：信息条的文字格从这里取值。 */
+    public final Readings readings;
 
     private VehicleState(Builder b) {
         this.version = b.version;
@@ -78,10 +101,7 @@ public final class VehicleState {
         this.brake = b.brake;
         this.speedKmh = b.speedKmh;
         this.autoHold = b.autoHold;
-        this.adaptiveCruise = b.adaptiveCruise;
-        this.laneCentering = b.laneCentering;
         this.stockSurroundShown = b.stockSurroundShown;
-        this.handsOnWheel = b.handsOnWheel;
         this.aeb = b.aeb;
         this.forwardCollisionWarning = b.forwardCollisionWarning;
         this.laneDepartureWarning = b.laneDepartureWarning;
@@ -89,14 +109,21 @@ public final class VehicleState {
         this.blindSpotAssist = b.blindSpotAssist;
         this.rearCollisionWarning = b.rearCollisionWarning;
         this.doorsOpen = b.doorsOpen;
-        this.beltsUnbuckled = b.beltsUnbuckled;
+        this.seats = b.seats;
         this.daytimeRunningLights = b.daytimeRunningLights;
         this.lowBeam = b.lowBeam;
         this.highBeam = b.highBeam;
+        this.flashToPass = b.flashToPass;
         this.fogLights = b.fogLights;
+        this.rearPositionLamps = b.rearPositionLamps;
+        this.stopLamps = b.stopLamps;
+        this.reverseLamps = b.reverseLamps;
+        this.horn = b.horn;
+        this.sentry = b.sentry;
         this.odometerKm = b.odometerKm;
         this.latitude = b.latitude;
         this.longitude = b.longitude;
+        this.readings = b.readings;
     }
 
     /** 什么都不知道。 */
@@ -109,20 +136,20 @@ public final class VehicleState {
         return new Builder(this);
     }
 
-    /** 有几项是有数据的（黑匣子那一行用）。 */
-    public int knownCount() {
-        int n = 0;
-        Object[] all = {turnSignal, hazard, steeringDegrees, gear, throttle, brake, speedKmh,
-                autoHold, adaptiveCruise, laneCentering, stockSurroundShown, handsOnWheel,
-                aeb, forwardCollisionWarning, laneDepartureWarning, laneKeepingAid, blindSpotAssist,
-                rearCollisionWarning, doorsOpen, beltsUnbuckled,
-                daytimeRunningLights, lowBeam, highBeam, fogLights, odometerKm, latitude, longitude};
-        for (Object o : all) {
-            if (o != null) {
-                n++;
-            }
+    /**
+     * 这个座位（{@link #FRONT_LEFT} / {@link #FRONT_RIGHT} / {@link #REAR_LEFT} / {@link #REAR_CENTER} /
+     * {@link #REAR_RIGHT}，一次一个）的状态；没数据 = {@link #SEAT_UNKNOWN}。
+     */
+    public int seat(int bit) {
+        return (seats >>> seatShift(bit)) & 3;
+    }
+
+    /** 座位在 {@link #seats} 里的位移；只收一个位置位。 */
+    static int seatShift(int bit) {
+        if (bit <= 0 || bit > REAR_CENTER || Integer.bitCount(bit) != 1) {
+            throw new IllegalArgumentException("seat bit " + bit);
         }
-        return n;
+        return 2 * Integer.numberOfTrailingZeros(bit);
     }
 
     public static final class Builder {
@@ -135,10 +162,7 @@ public final class VehicleState {
         private Float brake;
         private Float speedKmh;
         private Boolean autoHold;
-        private Boolean adaptiveCruise;
-        private Boolean laneCentering;
         private Boolean stockSurroundShown;
-        private Boolean handsOnWheel;
         private Boolean aeb;
         private Boolean forwardCollisionWarning;
         private Boolean laneDepartureWarning;
@@ -146,14 +170,21 @@ public final class VehicleState {
         private Boolean blindSpotAssist;
         private Boolean rearCollisionWarning;
         private Integer doorsOpen;
-        private Integer beltsUnbuckled;
+        private int seats;
         private Boolean daytimeRunningLights;
         private Boolean lowBeam;
         private Boolean highBeam;
+        private Boolean flashToPass;
         private Boolean fogLights;
+        private Boolean rearPositionLamps;
+        private Boolean stopLamps;
+        private Boolean reverseLamps;
+        private Boolean horn;
+        private Integer sentry;
         private Float odometerKm;
         private Double latitude;
         private Double longitude;
+        private Readings readings;
 
         public Builder() {
         }
@@ -168,10 +199,7 @@ public final class VehicleState {
             brake = s.brake;
             speedKmh = s.speedKmh;
             autoHold = s.autoHold;
-            adaptiveCruise = s.adaptiveCruise;
-            laneCentering = s.laneCentering;
             stockSurroundShown = s.stockSurroundShown;
-            handsOnWheel = s.handsOnWheel;
             aeb = s.aeb;
             forwardCollisionWarning = s.forwardCollisionWarning;
             laneDepartureWarning = s.laneDepartureWarning;
@@ -179,14 +207,21 @@ public final class VehicleState {
             blindSpotAssist = s.blindSpotAssist;
             rearCollisionWarning = s.rearCollisionWarning;
             doorsOpen = s.doorsOpen;
-            beltsUnbuckled = s.beltsUnbuckled;
+            seats = s.seats;
             daytimeRunningLights = s.daytimeRunningLights;
             lowBeam = s.lowBeam;
             highBeam = s.highBeam;
+            flashToPass = s.flashToPass;
             fogLights = s.fogLights;
+            rearPositionLamps = s.rearPositionLamps;
+            stopLamps = s.stopLamps;
+            reverseLamps = s.reverseLamps;
+            horn = s.horn;
+            sentry = s.sentry;
             odometerKm = s.odometerKm;
             latitude = s.latitude;
             longitude = s.longitude;
+            readings = s.readings;
         }
 
         public Builder turnSignal(Integer v) { turnSignal = v; return this; }
@@ -197,10 +232,7 @@ public final class VehicleState {
         public Builder brake(Float v) { brake = clamp01(v); return this; }
         public Builder speedKmh(Float v) { speedKmh = v; return this; }
         public Builder autoHold(Boolean v) { autoHold = v; return this; }
-        public Builder adaptiveCruise(Boolean v) { adaptiveCruise = v; return this; }
-        public Builder laneCentering(Boolean v) { laneCentering = v; return this; }
         public Builder stockSurroundShown(Boolean v) { stockSurroundShown = v; return this; }
-        public Builder handsOnWheel(Boolean v) { handsOnWheel = v; return this; }
         public Builder aeb(Boolean v) { aeb = v; return this; }
         public Builder forwardCollisionWarning(Boolean v) { forwardCollisionWarning = v; return this; }
         public Builder laneDepartureWarning(Boolean v) { laneDepartureWarning = v; return this; }
@@ -208,24 +240,34 @@ public final class VehicleState {
         public Builder blindSpotAssist(Boolean v) { blindSpotAssist = v; return this; }
         public Builder rearCollisionWarning(Boolean v) { rearCollisionWarning = v; return this; }
         public Builder doorsOpen(Integer v) { doorsOpen = v; return this; }
-        public Builder beltsUnbuckled(Integer v) { beltsUnbuckled = v; return this; }
         public Builder daytimeRunningLights(Boolean v) { daytimeRunningLights = v; return this; }
         public Builder lowBeam(Boolean v) { lowBeam = v; return this; }
         public Builder highBeam(Boolean v) { highBeam = v; return this; }
+        public Builder flashToPass(Boolean v) { flashToPass = v; return this; }
         public Builder fogLights(Boolean v) { fogLights = v; return this; }
+        public Builder rearPositionLamps(Boolean v) { rearPositionLamps = v; return this; }
+        public Builder stopLamps(Boolean v) { stopLamps = v; return this; }
+        public Builder reverseLamps(Boolean v) { reverseLamps = v; return this; }
+        public Builder horn(Boolean v) { horn = v; return this; }
+        public Builder readings(Readings v) { readings = v; return this; }
+        public Builder sentry(Integer v) { sentry = v; return this; }
         public Builder odometerKm(Float v) { odometerKm = v; return this; }
         public Builder position(Double lat, Double lon) { latitude = lat; longitude = lon; return this; }
 
-        /** 改一个门 / 一个座位的那一位，其余位不动；之前不知道就从 0 起。 */
+        /** 改一扇门的那一位，其余位不动；之前不知道就从 0 起。 */
         public Builder door(int bit, boolean open) {
             int mask = doorsOpen == null ? 0 : doorsOpen;
             doorsOpen = open ? (mask | bit) : (mask & ~bit);
             return this;
         }
 
-        public Builder belt(int bit, boolean unbuckled) {
-            int mask = beltsUnbuckled == null ? 0 : beltsUnbuckled;
-            beltsUnbuckled = unbuckled ? (mask | bit) : (mask & ~bit);
+        /** 一个座位（一次一个位置位）的状态（{@link #SEAT_UNKNOWN} … {@link #SEAT_UNBELTED}），其余座位不动。 */
+        public Builder seat(int bit, int state) {
+            if (state < SEAT_UNKNOWN || state > SEAT_UNBELTED) {
+                throw new IllegalArgumentException("seat state " + state);
+            }
+            int shift = seatShift(bit);
+            seats = (seats & ~(3 << shift)) | (state << shift);
             return this;
         }
 

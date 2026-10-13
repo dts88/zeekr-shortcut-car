@@ -41,7 +41,7 @@ public class BootReceiver extends BroadcastReceiver {
             UserExit.clear(context, "boot");
             
             // 保活开着才起前台服务（规格 §3）
-            if (new AppConfig(context).isKeepAliveEnabled()) {
+            if (new AppConfig(context).isAutoStartOnBoot()) {
                 startForegroundServiceImmediately(context);
             }
                         
@@ -62,9 +62,8 @@ public class BootReceiver extends BroadcastReceiver {
             
             // 直接启动前台服务，不检查任何配置
             // 这是保活应用的关键做法：无条件启动
+            // 通知上的字服务自己照录像此刻的样子写（CameraForegroundService.onStartCommand）
             Intent serviceIntent = new Intent(context, CameraForegroundService.class);
-            serviceIntent.putExtra("title", context.getString(R.string.notif_background_title));
-            serviceIntent.putExtra("content", context.getString(R.string.notif_tap_to_return));
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent);
@@ -86,7 +85,7 @@ public class BootReceiver extends BroadcastReceiver {
         AppLog.d(TAG, "执行延迟初始化...");
         
         try {
-            if (new AppConfig(context).isKeepAliveEnabled()) {
+            if (new AppConfig(context).isAutoStartOnBoot()) {
                 KeepAliveReceiver.registerTimeTick(context);
             }
         } catch (Exception e) {

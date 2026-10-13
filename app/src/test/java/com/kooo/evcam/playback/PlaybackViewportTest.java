@@ -6,8 +6,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import com.kooo.evcam.R;
-
 import org.junit.Test;
 
 /**
@@ -216,28 +214,6 @@ public class PlaybackViewportTest {
         assertEquals(0f, r[5], TOLERANCE);
         assertEquals(900f, r[6], TOLERANCE);
         assertEquals(900f, r[7], TOLERANCE);
-    }
-
-    /**
-     * 四格按方向命名，而且和超级后视镜是同一套映射。
-     *
-     * <p>左上 前、右上 后、左下 左、右下 右 —— 后视镜按「后 → 左 → 前 → 右」
-     * 顺时针遍历，只给「后」做镜像，两边对不上的话就是有一边错了。</p>
-     */
-    @Test
-    public void cellsAreNamedByDirection() {
-        assertEquals(R.string.zeekr_lane_front, PlaybackViewport.labelRes(0));
-        assertEquals(R.string.zeekr_lane_back, PlaybackViewport.labelRes(1));
-        assertEquals(R.string.zeekr_lane_left, PlaybackViewport.labelRes(2));
-        assertEquals(R.string.zeekr_lane_right, PlaybackViewport.labelRes(3));
-
-        java.util.Set<Integer> seen = new java.util.HashSet<>();
-        for (int cell = 0; cell < PlaybackViewport.CELL_COUNT; cell++) {
-            assertNotEquals("每一格都该有名字", 0, PlaybackViewport.labelRes(cell));
-            assertTrue("四个名字不能重复", seen.add(PlaybackViewport.labelRes(cell)));
-        }
-        assertEquals(R.string.zeekr_mode_grid,
-                PlaybackViewport.labelRes(PlaybackViewport.NO_CELL));
     }
 
     /** 只有每格是正方形的 2×2 才是四路鱼眼：环视录像 2560×2560 算，座舱 16:9 不算。 */

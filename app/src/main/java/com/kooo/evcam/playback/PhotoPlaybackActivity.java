@@ -32,6 +32,7 @@ import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.signature.ObjectKey;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
@@ -93,10 +94,16 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     /** 两路座舱那一列。两格都没有文件时整列让开，环视独占整块。 */
     private View cabinColumn;
     private TextView labelFront, labelBack, labelLeft, labelRight;
-    /** 只有环视那一格有：别的几格没有文件时整个收起来，没有地方需要说「无图片」。 */
+    /** 只有环视那一格有：别的几格没有文件时整个收起来，没有地方需要说「无照片」。 */
     private TextView placeholderFront;
     private Button btnViewMode;
     private Button btnSendToPhone;
+    /** 锁定 / 解锁这一组（锁定影像开着时才有）。 */
+    private Button btnLock;
+    /** 「锁定影像」开着没有：扫描时读一次，回到前台时再看一眼。 */
+    private boolean lockEnabled;
+    /** 照片目录里锁定的文件名（开关关着时是空的）。 */
+    private Set<String> lockedPhotos = new HashSet<>();
     private View controlsLayout;
 
     // 数据
@@ -141,6 +148,15 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         setupTapToExpand();
         updatePhotoList();
         applyStatusBarInsets();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (com.kooo.evcam.storage.FootageLocks.enabled(this) != lockEnabled) {
+            // 设置里刚拨过「锁定影像」：重新扫一遍，按钮、标记都跟着
+            updatePhotoList();
+        }
     }
 
     @Override
@@ -213,6 +229,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         // 摄像头切换按钮和控制栏
         btnViewMode = findViewById(R.id.btn_view_mode);
         btnSendToPhone = findViewById(R.id.btn_send_to_phone);
+        btnLock = findViewById(R.id.btn_lock);
         controlsLayout = findViewById(R.id.controls_layout);
 
         // 设置列表（竖屏2列，横屏1列，日期头部跨越所有列）
@@ -289,6 +306,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         if (btnSendToPhone != null) {
             btnSendToPhone.setOnClickListener(v -> sendCurrentPhotoToPhone());
+        }
+        if (btnLock != null) {
+            btnLock.setOnClickListener(v -> toggleLockGroup());
         }
     }
 
@@ -506,6 +526,51 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         currentDatetime.setText(group.getFormattedDateTime());
         updatePhotoDisplay(group);
+        updateLockButton();
+    }
+
+    // ------------------------------------------------------------------ 锁定影像
+
+    /** 按钮说的是这一组：整组都锁着写「解锁」，否则写「锁定」。 */
+    private void updateLockButton() {
+        if (btnLock == null) {
+            return;
+        }
+        btnLock.setVisibility(lockEnabled && currentGroup != null ? View.VISIBLE : View.GONE);
+        if (lockEnabled && currentGroup != null) {
+            boolean locked = lockedPhotos.containsAll(currentGroup.fileNames());
+            btnLock.setText(locked ? R.string.action_unlock_footage : R.string.action_lock_footage);
+        }
+    }
+
+    /** 锁定 / 解锁这一组（项目所有者 2026-10-03：照片直接锁一整组）。 */
+    private void toggleLockGroup() {
+        if (currentGroup == null || currentGroup.getPhotoCount() == 0) {
+            return;
+        }
+        final List<String> names = currentGroup.fileNames();
+        final boolean unlock = lockedPhotos.containsAll(names);
+        btnLock.setEnabled(false);
+        com.kooo.evcam.storage.FootageLocks.set(StorageHelper.getPhotoDir(this), names, !unlock, ok -> {
+            if (isFinishing() || isDestroyed()) {
+                return;
+            }
+            btnLock.setEnabled(true);
+            if (!ok) {
+                Toast.makeText(this, R.string.msg_footage_lock_failed, Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (unlock) {
+                lockedPhotos.removeAll(names);
+            } else {
+                lockedPhotos.addAll(names);
+            }
+            Toast.makeText(this, getResources().getQuantityString(
+                    unlock ? R.plurals.msg_footage_unlocked : R.plurals.msg_footage_locked,
+                    names.size(), names.size()), Toast.LENGTH_SHORT).show();
+            adapter.setLockedNames(lockedPhotos);
+            updateLockButton();
+        });
     }
 
     /**
@@ -570,8 +635,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         if (lanes > 1) {
             AppConfig config = new AppConfig(PhotoPlaybackActivity.this);
             options = options.transform(new FisheyeTransformation(lanes, lanes,
-                    config.getFisheyeFov(), config.getFisheyeProjection(),
-                    config.getFisheyeStrength() / 100f));
+                    config.getFisheyeFov(), config.getFisheyeProjection()));
         }
         options = options.placeholder(keepShowing(imageView));
 
@@ -664,7 +728,12 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         dateSections.clear();
 
         File saveDir = StorageHelper.getPhotoDir(PhotoPlaybackActivity.this);
-        if (!saveDir.exists() || !saveDir.isDirectory()) {
+        lockEnabled = com.kooo.evcam.storage.FootageLocks.enabled(PhotoPlaybackActivity.this);
+        lockedPhotos = com.kooo.evcam.storage.FootageLocks.shown(PhotoPlaybackActivity.this, saveDir);
+        adapter.setLockedNames(lockedPhotos);
+        updateLockButton();
+        // null：没有地方存照片（没有 U 盘、开发者选项没开），也就没有照片可列
+        if (saveDir == null || !saveDir.exists() || !saveDir.isDirectory()) {
             showEmptyState();
             showNoSelection();
             return;
@@ -817,16 +886,23 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_delete_photos_title)
-                .setMessage(getString(R.string.dlg_delete_photos_msg, selectedGroups.size()))
+                .setMessage(getResources().getQuantityString(R.plurals.dlg_delete_photos_msg,
+                        selectedGroups.size(), selectedGroups.size()))
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> {
                     // selectedGroups 就是 adapter 手里那个集合，下面会被清空，
                     // 先留一份 —— 删完还要拿它对一下预览区放的是不是其中之一
                     Set<PhotoGroup> deleted = new HashSet<>(selectedGroups);
                     int deletedCount = 0;
+                    int keptCount = 0;
                     
-                    // 删除选中的图片组
-                    for (PhotoGroup group : deleted) {
-                        deletedCount += group.deleteAll();
+                    // 删除选中的图片组：锁定的留下（锁定影像关着时不算），留下的那几组还在列表里
+                    Set<String> keep = lockEnabled ? lockedPhotos : new HashSet<String>();
+                    for (PhotoGroup group : new HashSet<>(deleted)) {
+                        deletedCount += group.deleteAllExcept(keep);
+                        if (group.getPhotoCount() > 0) {
+                            keptCount += group.getPhotoCount();
+                            deleted.remove(group);
+                        }
                     }
                     
                     // 从日期分组中移除已删除的组
@@ -849,7 +925,10 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
                     updateSelectedCount();
 
                     android.widget.Toast.makeText(PhotoPlaybackActivity.this,
-                            getString(R.string.msg_photos_deleted, deletedCount),
+                            getResources().getQuantityString(R.plurals.msg_photos_deleted,
+                                    deletedCount, deletedCount)
+                                    + (keptCount > 0 ? getResources().getQuantityString(
+                                            R.plurals.msg_kept_locked, keptCount, keptCount) : ""),
                             android.widget.Toast.LENGTH_SHORT).show();
 
                     if (dateSections.isEmpty()) {
@@ -936,8 +1015,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
 
         // 显示分享选项对话框
         showPhotoShareOptionsDialog(getString(R.string.action_share_photos),
-            getString(R.string.photo_share_count,
-                    selectedGroups.size(), allPhotoFiles.size()),
+            getResources().getQuantityString(R.plurals.photo_share_count,
+                    selectedGroups.size(), selectedGroups.size(), allPhotoFiles.size()),
             allPhotoFiles);
     }
 
@@ -960,7 +1039,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         }
 
         showPhotoShareOptionsDialog(getString(R.string.action_share_photos),
-            getString(R.string.photo_share_total, photoFiles.size()),
+            getResources().getQuantityString(R.plurals.photo_share_total,
+                    photoFiles.size(), photoFiles.size()),
             photoFiles);
     }
 
@@ -1060,12 +1140,13 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
                 }
             }
         } catch (IllegalArgumentException e) {
-            Log.e(TAG, "分享图片失败: FileProvider 无法处理该文件路径", e);
+            AppLog.e(TAG, "分享图片失败: FileProvider 无法处理该文件路径", e);
             Toast.makeText(PhotoPlaybackActivity.this, R.string.msg_share_path_unsupported,
                     Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Log.e(TAG, "分享图片失败", e);
-            Toast.makeText(PhotoPlaybackActivity.this, getString(R.string.msg_share_failed, e.getMessage()),
+            // 异常原文（英文、有时是 null）只进日志，界面上只说分享不了
+            AppLog.e(TAG, "分享图片失败", e);
+            Toast.makeText(PhotoPlaybackActivity.this, R.string.msg_share_failed,
                     Toast.LENGTH_SHORT).show();
         }
     }

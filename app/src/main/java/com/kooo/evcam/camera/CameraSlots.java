@@ -103,6 +103,44 @@ public final class CameraSlots {
         return suffixFor(keyForSuffix(suffix));
     }
 
+    /** 开、关相机都按这个次序（项目所有者 2026-10-08 定开的次序；2026-10-09 定关也一样）：环视第一，再后座舱，最后前座舱。 */
+    private static final String[] OPEN_ORDER = {KEY_SURROUND, KEY_CABIN_REAR, KEY_CABIN_FRONT};
+
+    /**
+     * 按开的次序排这些 key：环视、后座舱、前座舱；认不出来的排在最后，保持原来的先后。
+     *
+     * <p>三路一起开时相机服务一次关要 2–20 秒、配会话超时；只开环视几百毫秒就好
+     * （2026-10-08 实测）。所以一路配好会话再开下一路，环视最要紧，先开。</p>
+     */
+    public static java.util.List<String> openOrder(java.util.Collection<String> keys) {
+        java.util.List<String> order = new java.util.ArrayList<>();
+        for (String key : OPEN_ORDER) {
+            if (keys.contains(key)) {
+                order.add(key);
+            }
+        }
+        for (String key : keys) {
+            if (!order.contains(key)) {
+                order.add(key);
+            }
+        }
+        return order;
+    }
+
+    /**
+     * 关相机的次序：和开一样，环视第一个 —— 而且要等它关完才关座舱（2.11 起由通道调度按 ChannelRules 关）。
+     *
+     * <p>2.10.5–2.10.9 是倒过来的（环视最后关），2.10.10 环视先发、但三路一起关：只要环视比座舱晚关完，
+     * 那一次关就要 4–17 秒，下一次打开它一帧不出；只开环视（它开、关的时候没有别的相机在动）时开关各 0.1 秒、
+     * 怎么都正常 —— 「依照单个环视的思路」（项目所有者 2026-10-09）。</p>
+     *
+     * <p>熄屏 v3（项目所有者 2026-10-12 D2、D4）：屏幕一黑座舱就放开、环视接着录，座舱比环视早关 3–6 分钟 ——
+     * 环视先关只对连环视一起关的那几次（车机要睡、退出、没人要）还成立（ChannelRules.releasedByDark）。</p>
+     */
+    public static java.util.List<String> closeOrder(java.util.Collection<String> keys) {
+        return openOrder(keys);
+    }
+
     /** 是不是改名之前那一套写法。只用来在日志和报告里说明「这是旧文件」。 */
     public static boolean isLegacySuffix(String suffix) {
         return KEY_SURROUND.equals(suffix)

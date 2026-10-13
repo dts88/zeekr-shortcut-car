@@ -38,8 +38,8 @@ import java.util.stream.Stream;
  *
  * <h3>白名单</h3>
  *
- * <p>下面列出的文件允许有中文，每一组写明原因。其中<b>开发者工具那几组是长期允许</b>：
- * 那些界面只要能用就行，不做英文化（项目拥有者 2026-09 定）。确实会出现在
+ * <p>下面列出的文件允许有中文，每一组写明原因。开发者工具的界面也走 strings
+ * （项目拥有者 2026-10-05 定，原先不做英文化的那几组已经搬完）。确实会出现在
  * 普通用户界面上、只是还没来得及搬的，要单列一组标「待迁移」，不能混进别的理由里。
  * 另有一条检查保证名单只减不增：名单里的文件已经清干净、或者已经不在了，测试就失败，
  * 提醒把它从名单里拿掉。</p>
@@ -68,14 +68,6 @@ public class HardcodedTextTest {
                 "profile/LaneLayout.java", "profile/ProfileResolution.java"}) {
             JAVA_ALLOWED.put(f, report);
         }
-        // ---- 纯开发者工具：入口都在开发者选项里 ----
-        String developer = "开发者工具，只在开发者选项里出现";
-        for (String f : new String[]{
-                "settings/PermissionsPreferenceFragment.java", "repair/Mp4RepairFlow.java",
-                "repair/ArchiveFlow.java"}) {
-            JAVA_ALLOWED.put(f, developer);
-        }
-        JAVA_ALLOWED.put("StorageCleanupManager.java", "清理通知只在录到内部存储时才发，而内部存储只有开发者能选");
         // ---- 不上界面的文字 ----
         JAVA_ALLOWED.put("camera/EglSurfaceEncoder.java", "GLSL 着色器源码里的注释");
         JAVA_ALLOWED.put("settings/SettingSpec.java", "设置定义写错时抛给开发者的异常");
@@ -84,7 +76,9 @@ public class HardcodedTextTest {
         JAVA_ALLOWED.put("KeepAliveReceiver.java", "触发原因只写进日志");
         JAVA_ALLOWED.put("zeekr/LaneCycle.java", "日志里的方位名");
         JAVA_ALLOWED.put("repair/Mp4Repair.java",
-                "修不了时抛出的原因，只出现在开发者选项那份修复报告里");
+                "修不了时抛出的原因，只写进日志（修复报告里只说「无法修复」）");
+        JAVA_ALLOWED.put("repair/ArchiveFlow.java",
+                "复制失败时抛出的原因，只写进日志（归档报告里只列文件名）");
         JAVA_ALLOWED.put("zeekr/RawFrameDump.java",
                 "工程模式导出的那份说明文件的正文，写进 txt，不上界面");
         JAVA_ALLOWED.put("profile/ProfileMigration.java",

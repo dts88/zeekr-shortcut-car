@@ -45,8 +45,8 @@ import com.kooo.evcam.overlay.FloatingAction;
  * —— 录制那套「应用在前台 / 在后台 / 没运行」的分支是真正难的部分，另一个只是
  * 一句 startActivity。类名没跟着改：改名和合并放进同一个提交，diff 就没法看了。</p>
  *
- * <p>按钮的颜色说明现在是不是在录（录制红 + 呼吸，空闲是个空心圈）。单击和长按
- * 各做什么由设置决定，默认都是打开主界面（见 {@link FloatingAction}）。</p>
+ * <p>按钮的颜色说明现在是不是在录（录制红的方块 + 本段进度，空闲是个空心圈；一路都没在录、在等摄像头时
+ * 是灰环、灰方块，没有进度弧）。单击和长按各做什么由设置决定，默认都是打开主界面（见 {@link FloatingAction}）。</p>
  */
 public class RecordingFloatingService extends Service {
     private static final String TAG = "RecordingFloatingService";
@@ -62,18 +62,17 @@ public class RecordingFloatingService extends Service {
     public static final String ACTION_RESET_POSITION = "com.kooo.evcam.action.RESET_FLOATING_POSITION";
 
     /**
-     * 录制状态变了，告诉按钮换颜色。
+     * 录像的样子变了（RecordingCoordinator 推的：开录、停录、等待摄像头、又有一路在录），告诉按钮重画。
      *
-     * <p>这个广播原来由已删掉的那个按钮的类发，本服务一直同时听着这两个 action
-     * ——所以搬过来只是换个发信人，收信的规则一个字没动。</p>
+     * <p>这个广播原来由已删掉的那个按钮的类发，本服务一直同时听着这两个 action。广播只是叫一声：
+     * 收到了照协调器此刻的样子画（{@link #renderRecordingState}），不带状态 —— 以前带着「在不在录」，
+     * 说不出「在等摄像头」。</p>
      */
     public static final String ACTION_RECORDING_STATE_CHANGED = "com.kooo.evcam.RECORDING_STATE_CHANGED";
-    public static final String EXTRA_IS_RECORDING = "is_recording";
 
-    public static void sendRecordingStateChanged(Context context, boolean isRecording) {
+    public static void sendRecordingStateChanged(Context context) {
         Intent intent = new Intent(ACTION_RECORDING_STATE_CHANGED);
         intent.setPackage(context.getPackageName());
-        intent.putExtra(EXTRA_IS_RECORDING, isRecording);
         context.sendBroadcast(intent);
     }
 
@@ -117,8 +116,11 @@ public class RecordingFloatingService extends Service {
     private CameraRecordingService recordingService;
     private boolean isServiceBound = false;
 
-    // 录制状态
+    // 录制状态（照协调器画，见 renderRecordingState）
+    /** 录像意图开着（开录中、在录、等待摄像头）：按一下是停。 */
     private boolean isRecording = false;
+    /** 一路都没在录、在等摄像头：灰环、灰方块、没有进度弧，不显示时长。 */
+    private boolean waitingForCameras = false;
     private long recordingStartTime = 0;
     private Runnable timeUpdateRunnable;
 
@@ -139,8 +141,8 @@ public class RecordingFloatingService extends Service {
             recordingService = binder.getService();
             isServiceBound = true;
 
-            // 之后的变化服务会发 ACTION_RECORDING_STATE_CHANGED 广播，本服务一直听着；这里只对一次当前状态
-            updateRecordingState(recordingService.isRecording());
+            // 之后的变化协调器会发 ACTION_RECORDING_STATE_CHANGED 广播，本服务一直听着；这里只对一次当前状态
+            renderRecordingState();
         }
 
         @Override
@@ -204,12 +206,11 @@ public class RecordingFloatingService extends Service {
             @Override
             public void onReceive(Context context, Intent intent) {
                 String action = intent.getAction();
-                // 兼容两种广播 action
+                // 兼容两种广播 action；广播只是叫一声，样子照协调器此刻的画
                 if ("com.kooo.evcam.RECORDING_STATE_CHANGED".equals(action) ||
                     "com.kooo.evcam.action.RECORDING_STATE_CHANGED".equals(action)) {
-                    boolean recording = intent.getBooleanExtra("is_recording", false);
-                    AppLog.d(TAG, "收到录制状态广播: isRecording=" + recording);
-                    mainHandler.post(() -> updateRecordingState(recording));
+                    AppLog.d(TAG, "收到录制状态广播");
+                    mainHandler.post(() -> renderRecordingState());
                 }
             }
         };
@@ -274,7 +275,7 @@ public class RecordingFloatingService extends Service {
         updateFloatingSize(appConfig.getRecordingFloatingButtonSizeDp(),
                 appConfig.getRecordingFloatingTimeTextSizeSp());
         floatingContainer.setAlpha(appConfig.getFloatingWindowAlpha() / 100f);
-        timeTextView.setVisibility(isRecording && appConfig.isFloatingDurationVisible()
+        timeTextView.setVisibility(isRecording && !waitingForCameras && appConfig.isFloatingDurationVisible()
                 ? View.VISIBLE : View.GONE);
         AppLog.d(TAG, "悬浮按钮外观已更新: 大小 "
                 + appConfig.getRecordingFloatingButtonSizeDp() + "dp, 透明度 "
@@ -315,7 +316,7 @@ public class RecordingFloatingService extends Service {
                 showFloatingWindow();
             }
         }
-        // 被杀了要不要重启：跟着「保活」开关（规格 §3）。悬浮按钮由 Recovery 按设置恢复，不用自己粘着
+        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §3）。悬浮按钮由 Recovery 按设置恢复，不用自己粘着
         return com.kooo.evcam.CameraForegroundService.stickiness(this);
     }
 
@@ -548,6 +549,10 @@ public class RecordingFloatingService extends Service {
         // 添加到窗口
         try {
             windowManager.addView(floatingContainer, layoutParams);
+            // 在不在录、什么样子只问协调器（和录制服务、前台通知同一个答案），之后的变化它会广播过来。
+            // 以前靠主界面隔 500 ms 推它自己记的状态：主界面刚重建、还没对上时推的是「没在录」，
+            // 录着像按钮却是灰的
+            renderRecordingState();
             applyStyle();
             AppLog.d(TAG, "录制悬浮窗创建成功");
         } catch (Exception e) {
@@ -681,8 +686,8 @@ public class RecordingFloatingService extends Service {
                         recordingService.stopRecording();
                     } catch (Exception e) {
                         AppLog.e(TAG, "Error stopping recording in background", e);
-                        // 确保状态重置
-                        mainHandler.post(() -> updateRecordingState(false));
+                        // 按钮照协调器此刻的样子重画
+                        mainHandler.post(() -> renderRecordingState());
                     }
                 }, "StopRecordingBg").start();
             } else {
@@ -736,15 +741,27 @@ public class RecordingFloatingService extends Service {
         return AppState.NOT_RUNNING;
     }
 
-    private void updateRecordingState(boolean recording) {
-        isRecording = recording;
+    /**
+     * 照协调器此刻的样子画按钮（主线程）：开录中、在录是录制红的方块 + 本段进度 + 时长；等待摄像头是灰环、灰方块，
+     * 没有进度弧、不显示时长；没在录是灰圈灰点。在不在录、什么样子只问协调器（{@code RecordingCoordinator#view}），
+     * 和主界面录制键、前台通知同一个答案。
+     */
+    private void renderRecordingState() {
+        com.kooo.evcam.recording.RecordingCoordinator coordinator =
+                com.kooo.evcam.recording.RecordingCoordinator.get(this);
+        com.kooo.evcam.recording.RecordingCoordinator.View view = coordinator.view();
+        isRecording = view != com.kooo.evcam.recording.RecordingCoordinator.View.IDLE;
+        waitingForCameras = view == com.kooo.evcam.recording.RecordingCoordinator.View.WAITING;
 
         if (recordingButton != null) {
-            recordingButton.setRecording(recording);
+            recordingButton.setRecording(isRecording, waitingForCameras);
         }
 
-        if (recording) {
-            recordingStartTime = System.currentTimeMillis();
+        if (isRecording && !waitingForCameras) {
+            // 从这一段真正开录的时刻算（中途才显示出来的按钮也对得上），用开机以来的时钟：
+            // 车机对时会把系统时钟往回拨（2026-10-08 实车拨回过 20 秒），按系统时钟算时长会变负
+            long startedAt = coordinator.startedAtElapsedMs();
+            recordingStartTime = startedAt > 0 ? startedAt : android.os.SystemClock.elapsedRealtime();
             startTimeUpdate();
             if (timeTextView != null) {
                 // 时长是个开关：有人只要一个按钮，不要旁边那串数字
@@ -754,7 +771,7 @@ public class RecordingFloatingService extends Service {
         } else {
             stopTimeUpdate();
             if (recordingButton != null) {
-                // 环归零：下次开录从十二点开始，而不是接着上次那一段
+                // 环归零：下次开录从十二点开始，而不是接着上次那一段；等摄像头时没有进度弧
                 recordingButton.setProgress(0f);
             }
             if (timeTextView != null) {
@@ -773,10 +790,14 @@ public class RecordingFloatingService extends Service {
             @Override
             public void run() {
                 if (isRecording && timeTextView != null) {
-                    long duration = System.currentTimeMillis() - recordingStartTime;
+                    long now = android.os.SystemClock.elapsedRealtime();
+                    long duration = Math.max(0, now - recordingStartTime);
                     String timeStr = formatDuration(duration);
                     timeTextView.setText(timeStr);
-                    updateRingProgress(duration);
+                    // 本段的进度从这一阵有一路在录起量：等摄像头之后接回，分段从接回那一刻重新算
+                    long liveSince = com.kooo.evcam.recording.RecordingCoordinator.get(RecordingFloatingService.this)
+                            .liveSinceElapsedMs();
+                    updateRingProgress(liveSince > 0 ? Math.max(0, now - liveSince) : duration);
                     mainHandler.postDelayed(this, 1000);
                 }
             }
@@ -795,9 +816,11 @@ public class RecordingFloatingService extends Service {
     /**
      * 环走到哪儿了。
      *
-     * <p>服务这边只知道整场录制是什么时候开始的，不知道当前这一段是什么时候切的
-     * —— 但分段是等长的，所以「已录时长对分段时长取余」就是本段的进度。
-     * 差别只会出现在中途改过分段长度的那一次。</p>
+     * <p>服务这边不知道当前这一段是什么时候切的，只知道这一阵有一路在录是从什么时候起的（协调器的
+     * {@code liveSinceElapsedMs}；等摄像头之后接回，分段从接回那一刻重新算）—— 分段是等长的，
+     * 所以「从那一刻起录了多久对分段时长取余」就是本段的进度。差别只会出现在中途改过分段长度的那一次。</p>
+     *
+     * @param elapsedMs 这一阵有一路在录了多久
      */
     private void updateRingProgress(long elapsedMs) {
         if (recordingButton == null) {
@@ -832,12 +855,14 @@ public class RecordingFloatingService extends Service {
         private Paint backgroundPaint;
         private Paint iconPaint;
         private Paint shadowPaint;
-        /** 外面那一圈：待机是灰的空心圈，录制中是浅红的轨道。 */
+        /** 外面那一圈：待机、等摄像头是灰的空心圈，录制中是浅红的轨道。 */
         private Paint ringPaint;
         /** 录制中沿着轨道走的那一段，和主界面录制键的分段进度环同一个意思。 */
         private Paint progressPaint;
         private final android.graphics.RectF ringRect = new android.graphics.RectF();
         private boolean isRecording = false;
+        /** 录像意图开着、一路都没在录（等摄像头）：灰方块、灰环，没有进度弧 —— 红色只标「正在录」。 */
+        private boolean waiting = false;
         /** 本段录到哪儿了，0–1。 */
         private float progress = 0f;
         private float centerX, centerY;
@@ -885,8 +910,9 @@ public class RecordingFloatingService extends Service {
             }
         }
 
-        public void setRecording(boolean recording) {
+        public void setRecording(boolean recording, boolean waitingForCameras) {
             isRecording = recording;
+            waiting = waitingForCameras;
             invalidate();
         }
 
@@ -909,11 +935,12 @@ public class RecordingFloatingService extends Service {
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
 
-            // 和主界面那个录制键一样：底色只在两档之间走（待机 sunken、
+            // 和主界面那个录制键一样：底色只在两档之间走（待机、等摄像头 sunken、
             // 录制中 recording_quiet），红色始终只出现在中间那个点上。
             // 整块变红等于把「这个按钮」和「正在录」混为一谈。
+            boolean live = isRecording && !waiting;
             backgroundPaint.setColor(ContextCompat.getColor(getContext(),
-                    isRecording ? R.color.recording_quiet : R.color.sunken));
+                    live ? R.color.recording_quiet : R.color.sunken));
 
             // 绘制阴影（iOS 风格）
             float shadowOffset = radius * 0.08f;
@@ -947,16 +974,20 @@ public class RecordingFloatingService extends Service {
             ringPaint.setStrokeWidth(stroke);
             progressPaint.setStrokeWidth(stroke);
             ringPaint.setColor(ContextCompat.getColor(getContext(),
-                    isRecording ? R.color.recording_track : R.color.text_tertiary));
+                    live ? R.color.recording_track : R.color.text_tertiary));
             canvas.drawCircle(centerX, centerY, ringRadius, ringPaint);
 
             if (isRecording) {
-                // 轨道上走过的那一段：从十二点开始顺时针
-                ringRect.set(centerX - ringRadius, centerY - ringRadius,
-                        centerX + ringRadius, centerY + ringRadius);
-                canvas.drawArc(ringRect, -90f, 360f * progress, false, progressPaint);
+                if (live) {
+                    // 轨道上走过的那一段：从十二点开始顺时针
+                    ringRect.set(centerX - ringRadius, centerY - ringRadius,
+                            centerX + ringRadius, centerY + ringRadius);
+                    canvas.drawArc(ringRect, -90f, 360f * progress, false, progressPaint);
+                }
 
-                // 停止方块
+                // 停止方块：在录是红的；等摄像头时是灰的 —— 还是方块，按一下照样是停
+                iconPaint.setColor(ContextCompat.getColor(getContext(),
+                        live ? R.color.recording : R.color.text_tertiary));
                 float rectSize = radius * 0.42f;
                 float iconCornerRadius = rectSize * 0.2f;
                 canvas.drawRoundRect(

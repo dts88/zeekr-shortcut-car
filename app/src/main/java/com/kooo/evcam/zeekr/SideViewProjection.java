@@ -40,11 +40,18 @@ public final class SideViewProjection {
      */
     public static void sourcePoint(float u, float v, float fovDegrees, float backDegrees, float upDegrees,
                                    int lane, float[] out, int offset) {
+        sourcePoint(u, v, fovDegrees, backDegrees, upDegrees, lane, 1f, out, offset);
+    }
+
+    /** Horizontal FOV stays fixed; adapt vertical FOV to the existing mirror window's shape. */
+    public static void sourcePoint(float u, float v, float fovDegrees, float backDegrees, float upDegrees,
+                                   int lane, float aspectRatio, float[] out, int offset) {
         double fov = Math.toRadians(clamp(fovDegrees, MIN_FOV_DEGREES, MAX_FOV_DEGREES));
         double t = Math.tan(fov / 2.0);
         // 虚拟相机里的射线：x 右、y 下、z 朝前
         double x = (u * 2.0 - 1.0) * t;
-        double y = (v * 2.0 - 1.0) * t;
+        double aspect = Float.isFinite(aspectRatio) && aspectRatio > 0f ? aspectRatio : 1.0;
+        double y = (v * 2.0 - 1.0) * t / aspect;
         double z = 1.0;
 
         // 先往上（绕 x 轴，朝 −y 转），再往后（绕 y 轴，朝车尾那一边转）

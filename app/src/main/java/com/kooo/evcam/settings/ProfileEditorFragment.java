@@ -36,7 +36,6 @@ import com.kooo.evcam.profile.QualityPreset;
 import com.kooo.evcam.profile.StreamSpec;
 import com.kooo.evcam.ui.CamDialogs;
 import com.kooo.evcam.ui.SegmentedBar;
-import com.kooo.evcam.zeekr.CompositeStreamGeometry;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
 
 import java.util.ArrayList;
@@ -118,8 +117,10 @@ public class ProfileEditorFragment extends Fragment {
      *
      * <h3>分辨率一个，拍照固定</h3>
      *
-     * <p>前台只给一个分辨率，写进预览和录制；拍照永远用这一路的最大尺寸，
-     * 质量固定 95。拍照是一张存下来就不再动的图，它不占持续带宽，没有降一档的理由。</p>
+     * <p>前台只给一个分辨率，写进预览和录制；拍照这条流固定是这一路的最大尺寸，
+     * 质量固定 95。拍照是一张存下来就不再动的图，它不占持续带宽，没有降一档的理由。
+     * 照片最后多大还要看拍照走哪条路：不走相机的 JPEG 输出时，照片是从预览上抓的，
+     * 和预览一样大（见 {@link #photoSize}）。</p>
      *
      * <p>配置里还是三个独立的分辨率字段（后台照旧各问各的），但既然前台改不到，
      * 就不能把旧数据里的差异留在那 —— 一个既看不见、又改不了、还在悷悷生效的值，
@@ -240,7 +241,8 @@ public class ProfileEditorFragment extends Fragment {
     private void renderPresets() {
         Context context = requireContext();
         LayoutInflater inflater = LayoutInflater.from(context);
-        QualityPreset current = QualityPreset.of(profile);
+        // 亮的是选过的那一档，单独改过某一路也一样 —— 改过的那一路在它自己的卡上标出来
+        QualityPreset current = profile.quality;
         long free = freeBytes();
         presetRow.removeAllViews();
         for (QualityPreset preset : QualityPreset.values()) {
@@ -303,7 +305,6 @@ public class ProfileEditorFragment extends Fragment {
     private void renderCameras() {
         Context context = requireContext();
         LayoutInflater inflater = LayoutInflater.from(context);
-        QualityPreset current = QualityPreset.of(profile);
         int on = 0;
         for (CameraProfile camera : profile.cameras) {
             if (camera.enabled) {
@@ -334,8 +335,9 @@ public class ProfileEditorFragment extends Fragment {
             float dim = camera.enabled ? 1f : 0.45f;
             card.findViewById(R.id.camera_name).setAlpha(dim);
             card.findViewById(R.id.camera_summary).setAlpha(dim);
-            // 「我选了均衡，但后座舱不是」—— 这件事必须看得见
-            boolean tuned = current != null && !current.matches(camera.record);
+            // 「我选了均衡，但后座舱不是」—— 这件事必须看得见。比的是记下来的那一档：
+            // 以前比的是从各路参数倒推出来的档，倒推得出来就说明每一路都对得上，标记永远不出现
+            boolean tuned = !profile.quality.matches(camera.record);
             card.findViewById(R.id.camera_tuned)
                     .setVisibility(tuned ? View.VISIBLE : View.GONE);
             android.widget.CompoundButton toggle = card.findViewById(R.id.camera_enabled);
@@ -505,9 +507,11 @@ public class ProfileEditorFragment extends Fragment {
         String size = String.format(Locale.US, "%.1f", StorageBudget.gigabytesPerHour(perHour));
         // 合计码率也写出来：每改一下这一行都该动，
         // 写了它，「动没动」不用盯着一位小数去比
+        // 剩余小时数取整显示；英文的 hour / hours 跟着同一个整数走
+        int wholeHours = Math.round(hours);
         budgetLine.setText(hours > 0f
-                ? getString(R.string.editor_budget_with_space, lanes, sum, size,
-                        String.format(Locale.US, "%.0f", hours))
+                ? getResources().getQuantityString(R.plurals.editor_budget_with_space, wholeHours,
+                        lanes, sum, size, String.valueOf(wholeHours))
                 : getString(R.string.editor_budget, lanes, sum, size));
         renderIssues();
     }
@@ -675,9 +679,17 @@ public class ProfileEditorFragment extends Fragment {
         return sb.toString();
     }
 
-    /** 拍照用的尺寸 —— 固定是这一路的最大值，不跟上面那个选择走。 */
+    /**
+     * 照片实际多大。
+     *
+     * <p>走相机的 JPEG 输出时是拍照这条流的尺寸：固定是这一路的最大值，不跟上面那个选择走。
+     * 那个开关关着时照片是从预览上抓的（{@code SingleCamera.grabPreview}），就是预览的尺寸。
+     * 以前这里不管开关一律写最大值，关着时写的数和存下来的照片对不上。</p>
+     */
     private String photoSize(CameraProfile camera) {
-        int[] size = resolvedSource(camera.role, camera.photo);
+        StreamSpec used = new AppConfig(requireContext()).isPhotoViaJpegEnabled()
+                ? camera.photo : camera.preview;
+        int[] size = resolvedSource(camera.role, used);
         return size == null ? getString(R.string.editor_resolved_by_camera)
                 : size[0] + "×" + size[1];
     }
@@ -795,26 +807,6 @@ public class ProfileEditorFragment extends Fragment {
                 : getString(R.string.editor_fps_cap, fps);
     }
 
-    String bitrateLabel(String bitrate) {
-        if (StreamSpec.BITRATE_VERY_LOW.equals(bitrate)) {
-            return getString(R.string.editor_very_low);
-        }
-        if (StreamSpec.BITRATE_LOW.equals(bitrate)) {
-            return getString(R.string.editor_low);
-        }
-        if (StreamSpec.BITRATE_HIGH.equals(bitrate)) {
-            return getString(R.string.editor_high);
-        }
-        if (StreamSpec.BITRATE_MEDIUM.equals(bitrate)) {
-            return getString(R.string.editor_medium);
-        }
-        return getString(R.string.editor_bitrate_auto);
-    }
-
-    String codecLabel(String codec) {
-        return "h264".equals(codec) ? "H.264" : getString(R.string.editor_codec_auto);
-    }
-
     /** 小数统一两位、统一用点：不跟着系统语言变成逗号。 */
     static String num(float value) {
         return String.format(Locale.US, "%.2f", value);
@@ -870,7 +862,8 @@ public class ProfileEditorFragment extends Fragment {
                         getString(R.string.editor_resolution)),
                 labels.toArray(new String[0]), values.toArray(new String[0]),
                 value -> {
-                    // 拍照不跟：它永远用这一路的最大尺寸
+                    // 拍照这条流不跟：它固定是这一路的最大尺寸。不走 JPEG 输出时
+                    // 照片是从预览上抓的，那就是这里选的尺寸
                     camera.preview.resolution = value;
                     camera.record.resolution = value;
                 });
@@ -895,17 +888,6 @@ public class ProfileEditorFragment extends Fragment {
         return both;
     }
 
-
-
-    void pickCodec(StreamSpec spec) {
-        pickOne(getString(R.string.editor_record_codec),
-                new String[]{getString(R.string.editor_codec_auto), "H.264"},
-                new String[]{"auto", "h264"},
-                value -> spec.codec = value);
-    }
-
-
-
     private interface Chosen {
         void set(String value);
     }
@@ -925,8 +907,9 @@ public class ProfileEditorFragment extends Fragment {
     private CameraProfile newCamera(String role) {
         CameraProfile camera = new CameraProfile(role);
         camera.preview = StreamSpec.preview(StreamSpec.RESOLUTION_AUTO);
+        // 补上的这一路跟着选过的那一档走，不然一补上就标着「自定义」
         camera.record = StreamSpec.record(StreamSpec.RESOLUTION_AUTO,
-                QualityPreset.BALANCED.fps, QualityPreset.BALANCED.bitrate, "auto", 1);
+                profile.quality.fps, profile.quality.bitrate, "auto", 1);
         camera.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);
         if (splitsFor(role)) {
             for (int lane = 0; lane < 4; lane++) {
@@ -959,49 +942,26 @@ public class ProfileEditorFragment extends Fragment {
     private String describe(ProfileValidation.Issue issue) {
         String text;
         switch (issue.kind) {
-            case NO_CAMERAS:
-                text = getString(R.string.editor_issue_no_cameras);
-                break;
-            case NONE_ENABLED:
-                text = getString(R.string.editor_issue_none_enabled);
-                break;
             case UNDECLARED_SIZE:
                 text = getString(R.string.editor_issue_undeclared_size, roleName(issue.role),
                         streamName(issue.stream), issue.width, issue.height);
                 break;
-            case PREVIEW_SPLIT_ONLY:
-                text = getString(R.string.editor_issue_preview_split_only, roleName(issue.role));
-                break;
             default:
-                text = getString(R.string.editor_issue_record_split_only, roleName(issue.role));
+                text = getString(R.string.editor_issue_none_enabled);
                 break;
         }
-        return (issue.blocking ? "✗ " : "⚠ ") + text;
+        return "✗ " + text;
     }
 
     private String streamName(ProfileValidation.Issue.Stream stream) {
-        switch (stream) {
-            case RECORD:
-                return getString(R.string.editor_stream_record);
-            case PHOTO:
-                return getString(R.string.editor_stream_photo);
-            default:
-                return getString(R.string.editor_stream_preview);
-        }
+        return getString(stream == ProfileValidation.Issue.Stream.RECORD
+                ? R.string.editor_stream_record : R.string.editor_stream_preview);
     }
 
     private ProfileValidation.Capabilities capabilities() {
-        return new ProfileValidation.Capabilities() {
-            @Override
-            public int[][] declaredSizes(String role) {
-                List<int[]> sizes = ProfileEditorFragment.this.declaredSizes(role);
-                return sizes.isEmpty() ? null : sizes.toArray(new int[0][]);
-            }
-
-            @Override
-            public boolean splits(String role, int width, int height) {
-                return splitsFor(role, width, height);
-            }
+        return role -> {
+            List<int[]> sizes = declaredSizes(role);
+            return sizes.isEmpty() ? null : sizes.toArray(new int[0][]);
         };
     }
 
@@ -1016,13 +976,6 @@ public class ProfileEditorFragment extends Fragment {
      */
     boolean splitsFor(String role) {
         return CameraProfile.ROLE_COMPOSITE.equals(role);
-    }
-
-    private boolean splitsFor(String role, int width, int height) {
-        String cameraId = CameraProfile.ROLE_COMPOSITE.equals(role)
-                ? StreamLayoutTable.compositeCameraId() : null;
-        return StreamLayoutTable.stackingFor(cameraId, width, height)
-                != CompositeStreamGeometry.Stacking.NOT_COMPOSITE;
     }
 
     private List<int[]> declaredSizes(String role) {
@@ -1081,11 +1034,7 @@ public class ProfileEditorFragment extends Fragment {
         if (cameraId == null) {
             return getString(R.string.editor_camera_missing);
         }
-        List<int[]> sizes = declaredSizes(role);
-        String largest = sizes.isEmpty()
-                ? getString(R.string.editor_size_unknown)
-                : sizes.get(0)[0] + "x" + sizes.get(0)[1];
-        return getString(R.string.editor_camera_summary, cameraId, largest)
+        return getString(R.string.editor_camera_summary, cameraId)
                 + (splitsFor(role) ? " · " + getString(R.string.editor_splits) : "");
     }
 

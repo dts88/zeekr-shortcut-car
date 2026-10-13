@@ -3,7 +3,7 @@
   ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
 
   按钮：btn_start_record / btn_take_photo / btn_video_playback / btn_photo_playback /
-  btn_fisheye / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
+  btn_fisheye / vehicle_status_panel / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
   再点还原（MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
   「隐藏到后台」；真正的退出在抽屉和设置左栏的最底下。
 
@@ -104,6 +104,17 @@
                     android:maxLines="1"
                     android:textColor="@color/text_secondary"
                     android:textAppearance="@style/TextAppearance.Cam.Caption" />
+
+                <!-- 录制中才有：熄屏后这段录像会怎样（自己读设置和这一次录像里有没有环视，熄屏 v3 起不看哨兵模式；RecordButtonUi 管显隐） -->
+                <com.kooo.evcam.ui.ScreenOffHintView
+                    android:id="@+id/record_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:maxLines="2"
+                    android:textColor="@color/text_secondary"
+                    android:textAppearance="@style/TextAppearance.Cam.Micro"
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -158,10 +169,25 @@
         android:layout_marginTop="@dimen/gutter"
         android:text="@string/photo_fisheye" />
 
-    <Space
+    <!--
+      车辆状态（试验性，设置 → 界面）：用信息条的图标显示哨兵模式、刹车 / 油门、驾驶辅助、喇叭。
+      控件自己管开关和收信号（VehicleStatusPanel），关着就不占地方，MainActivity 不用接线。
+    -->
+    <!-- 鱼眼校正和设置之间剩下的那块：面板放在里面，放不下就按比例缩小，不会把设置那一行挤出去 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <com.kooo.evcam.ui.VehicleStatusPanel
+            android:id="@+id/vehicle_status_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="@dimen/gutter"
+            android:layout_marginBottom="@dimen/gutter"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

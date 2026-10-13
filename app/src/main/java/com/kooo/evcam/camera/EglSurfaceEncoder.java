@@ -88,12 +88,14 @@ public class EglSurfaceEncoder {
             "    }\n" +
             "}\n";
 
-    // 四宫格模式下的 2D 水印叠加着色器。
+    // 2D 叠加着色器：每一路左上角的应用名、四宫格的时间水印、信息条都用它。
     //
     // 为什么不能复用 FRAGMENT_SHADER_WITH_WATERMARK：那个着色器是靠 vTextureCoord
     // （纹理坐标）判断像素是否落在水印矩形内的。四宫格模式下每个画面只采样纹理的
     // 一个子区间，这个判断会在错误的位置命中。所以水印改为独立一遍，直接在 NDC
     // 里画一个小四边形，只采样水印位图并做 alpha 混合。
+    // 单路画应用名也不用那个着色器：它按纹理坐标贴，跟着相机矩阵走（后座舱曾因此左右反），
+    // 这里直接在画面区的 NDC 里画，位置只看输出尺寸。
     private static final String WATERMARK_OVERLAY_VERTEX_SHADER =
             "attribute vec4 aPosition;\n" +
             "attribute vec2 aTexCoord;\n" +
@@ -196,7 +198,7 @@ public class EglSurfaceEncoder {
     private boolean isInitialized = false;
     private boolean isReleased = false;
 
-    // 时间水印相关
+    // 角标：右上角时间水印（跟开关走）+ 左上角应用名（每一路都画）
     private boolean watermarkEnabled = false;
     private int watermarkProgram;
     private int watermarkTextureId;
@@ -208,7 +210,7 @@ public class EglSurfaceEncoder {
     private int watermarkTexMatrixHandle;
     private int watermarkOesTextureHandle;
     private Bitmap watermarkBitmap;
-    /** 左上角那块：应用名 + 版本号。内容不变，画一次就够。 */
+    /** 左上角那块：应用名 + 版本号（填了车牌号跟在后面）。每一路都画，和时间水印无关；一次录制里不变，画一次就够。 */
     private int brandTextureId;
     private String brandLine = "";
     private String lastWatermarkTime = "";
@@ -390,25 +392,28 @@ public class EglSurfaceEncoder {
     }
 
     /**
-     * 设置是否启用时间水印
-     * @param enabled true 表示启用水印
+     * 左上角的应用名 + 版本号（填了车牌号跟在后面）。要在 {@link #initialize} 之前设：
+     * 贴图在 initGl 里画一次，每一路、每一帧都盖。空串表示不画。
      */
+    public void setBrandLine(String line) {
+        this.brandLine = line == null ? "" : line;
+    }
+
     /**
      * 设置角标第二行（录制规格）。传空串则只画时间那一行。
      *
      * <p>规格在一次录制中是不变的，所以这里只是存下来；真正重绘由每秒一次的
      * 时间更新顺带完成 —— 清空 {@code lastWatermarkTime} 是为了不必等到秒数变化。</p>
      */
-    /** 左上角显示的应用名与版本号。空字符串表示不显示。 */
-    public void setBrandLine(String line) {
-        this.brandLine = line == null ? "" : line;
-    }
-
     public void setWatermarkInfoLine(String line) {
         this.watermarkInfoLine = line == null ? "" : line;
         this.lastWatermarkTime = "";
     }
 
+    /**
+     * 设置是否启用时间水印。只管右上角时间 + 规格；左上角应用名不看它。
+     * @param enabled true 表示启用水印
+     */
     public void setWatermarkEnabled(boolean enabled) {
         this.watermarkEnabled = enabled;
         AppLog.d(TAG, "Camera " + cameraId + " Watermark " + (enabled ? "enabled" : "disabled"));
@@ -539,7 +544,7 @@ public class EglSurfaceEncoder {
                 needsClear = false;
             }
 
-            // 四宫格模式优先：拆成 2x2 渲染，水印另走一遍叠加
+            // 四宫格模式优先：拆成 2x2 渲染，时间水印另走一遍叠加
             com.kooo.evcam.zeekr.CompositeStreamGeometry.Plan plan = fourLanePlan;
             if (plan != null) {
                 drawFourLanes(plan);
@@ -551,6 +556,9 @@ public class EglSurfaceEncoder {
             } else {
                 drawFrameWithoutWatermark();
             }
+            // 左上角应用名（+ 车牌号）：三条路径画完都走这一步，和时间水印开不开无关。
+            // 视口还是画面区，要在信息条之前画（信息条会把视口换到下面那一条）
+            drawBrandOverlay();
             drawInfoBar();
 
             // 设置呈现时间戳并交换缓冲区
@@ -674,7 +682,8 @@ public class EglSurfaceEncoder {
     }
 
     /**
-     * 四宫格模式下的水印：单独一遍，画在输出画面的右上角。
+     * 四宫格模式下的时间水印：单独一遍，画在画面区右上角。
+     * 左上角应用名不在这里画，见 {@link #drawBrandOverlay}。
      */
     private void drawWatermarkOverlay() {
         if (watermarkOverlayProgram == 0 || watermarkTextureId == 0) {
@@ -690,12 +699,42 @@ public class EglSurfaceEncoder {
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // 右上角：时间 + 规格 + 实时码率
-        drawOverlayQuad(watermarkTextureId, WATERMARK_WIDTH, WATERMARK_HEIGHT, true);
-        // 左上角：应用名 + 版本号，和右上角对称
-        drawOverlayQuad(brandTextureId, brandWidthPx, BRAND_HEIGHT, false);
+        // 右上角：时间 + 规格 + 实时码率（和应用名并排放不下时在它下面一行，见 timeBlockDropPx）
+        drawOverlayQuad(watermarkTextureId, WATERMARK_WIDTH, WATERMARK_HEIGHT, true,
+                timeBlockDropPx());
 
         GLES20.glDisable(GLES20.GL_BLEND);
+    }
+
+    /**
+     * 左上角：应用名 + 版本号（填了车牌号跟在后面）。三条画面路径画完都走这一步，
+     * 和时间水印开不开无关。叠加程序或贴图没建起来（见 initGl）就不画。
+     */
+    private void drawBrandOverlay() {
+        if (watermarkOverlayProgram == 0 || brandTextureId == 0) {
+            return;
+        }
+        GLES20.glUseProgram(watermarkOverlayProgram);
+        GLES20.glEnable(GLES20.GL_BLEND);
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
+
+        drawOverlayQuad(brandTextureId, brandWidthPx, BRAND_HEIGHT, false, 0);
+
+        // 关掉混合：后面的信息条和下一帧的整幅画面都是不透明的，不该再混
+        GLES20.glDisable(GLES20.GL_BLEND);
+    }
+
+    /**
+     * 右上角时间那块往下让多少像素。两块角标都贴在画面区顶上：这一路够宽就并排；
+     * 并排放不下（窄的座舱尺寸，或填了车牌号让应用名那一行变长）就让时间那块挪到应用名下面一行，
+     * 不叠在一起。单路（按纹理坐标贴）和四宫格（NDC 里画）都按它摆。
+     */
+    private int timeBlockDropPx() {
+        if (brandTextureId == 0) {
+            return 0;
+        }
+        // 左右边距各 1%，两块中间再隔 1%
+        return brandWidthPx + WATERMARK_WIDTH + 0.03f * width > width ? BRAND_HEIGHT : 0;
     }
 
     /**
@@ -769,7 +808,8 @@ public class EglSurfaceEncoder {
             watermarkW = (float) WATERMARK_WIDTH / width;   // 水印宽度占比
             watermarkH = (float) WATERMARK_HEIGHT / contentHeight; // 水印高度占比（画面区，不含信息条）
             watermarkX = 1.0f - watermarkW - 0.01f;  // 右边距 1%
-            watermarkY = 0.01f;  // 上边距 1%
+            // 上边距 1%；和左上角应用名并排放不下时挪到它下面一行（见 timeBlockDropPx）
+            watermarkY = 0.01f + (float) timeBlockDropPx() / contentHeight;
             watermarkPositionCached = true;
         }
         GLES20.glUniform4f(watermarkRectHandle, watermarkX, watermarkY, watermarkW, watermarkH);
@@ -860,7 +900,12 @@ public class EglSurfaceEncoder {
     }
 
     /**
-     * 释放资源
+     * 释放资源。
+     *
+     * <p><b>只能在建它的那个线程（编码线程）上调</b>：EGL 上下文只在那个线程上是当前的。
+     * 在别的线程上调，下面的 glDelete* 全是空操作，eglDestroyContext 也只是把上下文记成「待删」，
+     * 而编码线程那边可能正在画一帧。CodecVideoRecorder 把它排到编码线程上（releaseGlOnEncoderThread）；
+     * initialize 失败时本来就在编码线程上。</p>
      */
     public void release() {
         if (isReleased) {
@@ -1081,15 +1126,18 @@ public class EglSurfaceEncoder {
         laneVertexBuffer = createFloatBuffer(new float[8]);
         laneTexCoordBuffer = createFloatBuffer(new float[8]);
 
-        // 四宫格下的水印叠加程序（失败不致命，只是没有水印）
+        // 叠加程序：左上角应用名（每一路）、四宫格的时间水印、信息条共用（失败不致命，只是这几样画不了）
         watermarkOverlayProgram = createProgram(
                 WATERMARK_OVERLAY_VERTEX_SHADER, WATERMARK_OVERLAY_FRAGMENT_SHADER);
         if (watermarkOverlayProgram != 0) {
             overlayPositionHandle = GLES20.glGetAttribLocation(watermarkOverlayProgram, "aPosition");
             overlayTexCoordHandle = GLES20.glGetAttribLocation(watermarkOverlayProgram, "aTexCoord");
             overlayTextureHandle = GLES20.glGetUniformLocation(watermarkOverlayProgram, "sWatermark");
+            // 左上角应用名（+ 车牌号）：每一路都画，和时间水印开不开无关，
+            // 所以在这里建（每次录制一次），不放进 initWatermarkGl
+            createBrandTexture();
         } else {
-            AppLog.w(TAG, "Camera " + cameraId + " 水印叠加着色器创建失败，四宫格模式将没有水印");
+            AppLog.w(TAG, "Camera " + cameraId + " 叠加着色器创建失败：左上角应用名、四宫格的时间水印和信息条都画不了");
         }
 
         // 行驶信息条的贴图（用同一个叠加程序画）
@@ -1160,7 +1208,7 @@ public class EglSurfaceEncoder {
     }
 
     /**
-     * 初始化水印相关的 OpenGL 资源
+     * 初始化时间水印相关的 OpenGL 资源（左上角应用名不在这里建，见 initGl）
      */
     private void initWatermarkGl() {
         if (watermarkProgram != 0) {
@@ -1200,69 +1248,78 @@ public class EglSurfaceEncoder {
         watermarkBitmap = Bitmap.createBitmap(WATERMARK_WIDTH, WATERMARK_HEIGHT, Bitmap.Config.ARGB_8888);
         updateWatermarkBitmap();
 
-        createBrandTexture();
-
         AppLog.d(TAG, "Camera " + cameraId + " Watermark OpenGL resources initialized, textureId=" + watermarkTextureId);
     }
 
     /**
      * 生成左上角那块贴图。
      *
-     * <p>只在初始化时画一次 —— 应用名和版本号在一次录制里不会变，
+     * <p>只在 initGl 里画一次：应用名、版本号和车牌号在一次录制里不变（车牌号改了从下一次开始录制起生效），
      * 没有理由每帧甚至每秒重画。</p>
+     *
+     * <p>失败不致命，和叠加程序、信息条一个规矩：记一条日志，这一路不画应用名，照常录。</p>
      */
     private void createBrandTexture() {
         if (brandLine.isEmpty()) {
             return;
         }
-        if (brandTextureId != 0) {
-            // 车牌号改了会重建，旧纹理不删就漏了
-            GLES20.glDeleteTextures(1, new int[]{brandTextureId}, 0);
-            brandTextureId = 0;
+        Bitmap bitmap = null;
+        try {
+            int[] textures = new int[1];
+            GLES20.glGenTextures(1, textures, 0);
+            brandTextureId = textures[0];
+
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, brandTextureId);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
+            Paint shadow = new Paint();
+            shadow.setColor(Color.BLACK);
+            shadow.setTextSize(BRAND_TEXT_SIZE);
+            shadow.setAntiAlias(true);
+            shadow.setTypeface(Typeface.MONOSPACE);
+
+            Paint text = new Paint();
+            text.setColor(Color.WHITE);
+            text.setTextSize(BRAND_TEXT_SIZE);
+            text.setAntiAlias(true);
+            text.setTypeface(Typeface.MONOSPACE);
+
+            // 量出来再建贴图：车牌号让这一行长短不定，写死宽度就会把尾巴裁掉。
+            // 左右各留出画阴影和描边的余量。
+            brandWidthPx = (int) Math.ceil(text.measureText(brandLine)) + 16;
+            bitmap = Bitmap.createBitmap(brandWidthPx, BRAND_HEIGHT, Bitmap.Config.ARGB_8888);
+            bitmap.eraseColor(Color.TRANSPARENT);
+            Canvas canvas = new Canvas(bitmap);
+
+            canvas.drawText(brandLine, 8, 30, shadow);
+            canvas.drawText(brandLine, 6, 28, text);
+
+            GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
+        } catch (Exception e) {
+            AppLog.w(TAG, "Camera " + cameraId + " 左上角应用名贴图创建失败，这一路不画应用名: " + e);
+            // 已经生成的纹理删掉；brandTextureId 归零，drawBrandOverlay 就跳过
+            if (brandTextureId != 0) {
+                GLES20.glDeleteTextures(1, new int[]{brandTextureId}, 0);
+                brandTextureId = 0;
+            }
+        } finally {
+            if (bitmap != null) {
+                bitmap.recycle();
+            }
         }
-        int[] textures = new int[1];
-        GLES20.glGenTextures(1, textures, 0);
-        brandTextureId = textures[0];
-
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, brandTextureId);
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-
-        Paint shadow = new Paint();
-        shadow.setColor(Color.BLACK);
-        shadow.setTextSize(BRAND_TEXT_SIZE);
-        shadow.setAntiAlias(true);
-        shadow.setTypeface(Typeface.MONOSPACE);
-
-        Paint text = new Paint();
-        text.setColor(Color.WHITE);
-        text.setTextSize(BRAND_TEXT_SIZE);
-        text.setAntiAlias(true);
-        text.setTypeface(Typeface.MONOSPACE);
-
-        // 量出来再建贴图：车牌号让这一行长短不定，写死宽度就会把尾巴裁掉。
-        // 左右各留出画阴影和描边的余量。
-        brandWidthPx = (int) Math.ceil(text.measureText(brandLine)) + 16;
-        Bitmap bitmap = Bitmap.createBitmap(brandWidthPx, BRAND_HEIGHT, Bitmap.Config.ARGB_8888);
-        bitmap.eraseColor(Color.TRANSPARENT);
-        Canvas canvas = new Canvas(bitmap);
-
-        canvas.drawText(brandLine, 8, 30, shadow);
-        canvas.drawText(brandLine, 6, 28, text);
-
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0);
-        bitmap.recycle();
     }
 
     /**
      * 画一块角标。
      *
      * @param alignRight true 贴右上角，false 贴左上角
+     * @param dropPx     从顶边距再往下让多少像素（见 {@link #timeBlockDropPx}）
      */
     private void drawOverlayQuad(int textureId, int bitmapWidth, int bitmapHeight,
-                                 boolean alignRight) {
+                                 boolean alignRight, int dropPx) {
         if (textureId == 0) {
             return;
         }
@@ -1271,7 +1328,7 @@ public class EglSurfaceEncoder {
         float margin = 0.02f;
         float left = alignRight ? (1.0f - margin - w) : (-1.0f + margin);
         float right = left + w;
-        float top = 1.0f - margin;
+        float top = 1.0f - margin - 2.0f * dropPx / contentHeight;
         float bottom = top - h;
 
         laneVertexScratch[0] = left;  laneVertexScratch[1] = bottom;

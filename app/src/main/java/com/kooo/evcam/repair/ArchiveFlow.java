@@ -28,11 +28,10 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 「归档到固态盘」这个开发者入口的全部流程：把录像、照片、日志从录像盘搬到另一个盘。
+ * 「归档到其他 U 盘」这个开发者入口的全部流程：把录像、照片、日志从录像盘搬到另一个盘。
  *
  * <p>项目所有者的用法（2026-09-27）：平时录在 USB-A 口的盘上（熄屏后只有这个口还能用），
- * 定期把东西归档到 Type-C 口的固态盘统一管理。界面文字都写在这里，不走 strings ——
- * 开发者工具不做多语言（见 HardcodedTextTest 的白名单）。</p>
+ * 定期把东西归档到 Type-C 口的固态盘统一管理。</p>
  *
  * <h3>规矩</h3>
  *
@@ -62,18 +61,18 @@ public final class ArchiveFlow {
     public static void start(Activity activity, boolean recording) {
         if (recording) {
             CamDialogs.show(builder(activity)
-                    .setTitle("正在录制")
-                    .setMessage("录制中不能归档：正在写的那一段搬不得。先停止录制再来。")
-                    .setPositiveButton("知道了", null));
+                    .setTitle(R.string.dev_tool_recording_title)
+                    .setMessage(R.string.dev_archive_refuse_recording)
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
         StorageHelper.clearCache();
         File source = StorageHelper.getExternalSdCardRoot(activity);
         if (source == null) {
             CamDialogs.show(builder(activity)
-                    .setTitle("没有录像盘")
-                    .setMessage("归档是把录像盘上的东西搬到另一个盘，现在没有检测到录像盘。")
-                    .setPositiveButton("知道了", null));
+                    .setTitle(R.string.dlg_no_external_title)
+                    .setMessage(R.string.dev_archive_no_drive_msg)
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
         List<File> targets = new ArrayList<>();
@@ -84,24 +83,26 @@ public final class ArchiveFlow {
         }
         if (targets.isEmpty()) {
             CamDialogs.show(builder(activity)
-                    .setTitle("只插了一个盘")
-                    .setMessage("归档需要把东西从录像盘 " + source.getName() + " 搬到另一个盘上。"
-                            + "再插一个盘（比如 Type-C 口的固态盘）再来。")
-                    .setPositiveButton("知道了", null));
+                    .setTitle(R.string.dev_archive_one_drive_title)
+                    .setMessage(activity.getString(R.string.dev_archive_one_drive_msg, source.getName()))
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
         if (targets.size() == 1) {
             scan(activity, source, targets.get(0));
             return;
         }
+        // 和「存储位置」列表里同一种写法：盘名 · 剩余 / 共
         String[] labels = new String[targets.size()];
         for (int i = 0; i < targets.size(); i++) {
-            labels[i] = targets.get(i).getName() + "　剩余 " + size(targets.get(i).getUsableSpace());
+            File target = targets.get(i);
+            labels[i] = activity.getString(R.string.storage_volume_desc, target.getName(),
+                    size(target.getUsableSpace()), size(target.getTotalSpace()));
         }
         CamDialogs.show(builder(activity)
-                .setTitle("归档到哪个盘")
+                .setTitle(R.string.dev_archive_pick_target)
                 .setItems(labels, (d, which) -> scan(activity, source, targets.get(which)))
-                .setNegativeButton("取消", null));
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     // ================================================================= 清点
@@ -129,7 +130,7 @@ public final class ArchiveFlow {
     }
 
     private static void scan(Activity activity, File source, File target) {
-        AlertDialog waiting = spinner(activity, "正在清点 " + source.getName() + " 上的文件…");
+        AlertDialog waiting = spinner(activity, activity.getString(R.string.dev_archive_scanning, source.getName()));
         new Thread(() -> {
             Plan plan = new Plan();
             File dcimFrom = new File(source, Environment.DIRECTORY_DCIM);
@@ -180,39 +181,36 @@ public final class ArchiveFlow {
     }
 
     private static void confirm(Activity activity, File source, File target, Plan plan) {
+        String skipped = plan.skippedFresh > 0 ? "\n\n" + activity.getResources().getQuantityString(
+                R.plurals.dev_archive_skipped_fresh, plan.skippedFresh, plan.skippedFresh) : "";
         if (plan.items.isEmpty()) {
             CamDialogs.show(builder(activity)
-                    .setTitle("没有要归档的")
-                    .setMessage(source.getName() + " 上没有本应用的录像、照片或日志。"
-                            + (plan.skippedFresh > 0 ? "\n\n（" + plan.skippedFresh
-                            + " 个两分钟内写过的文件当成还在写，没算）" : ""))
-                    .setPositiveButton("知道了", null));
+                    .setTitle(R.string.dev_archive_nothing_title)
+                    .setMessage(activity.getString(R.string.dev_archive_nothing_msg, source.getName()) + skipped)
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
         long free = target.getUsableSpace();
         StringBuilder message = new StringBuilder();
         message.append(source.getName()).append(" → ").append(target.getName()).append("\n\n")
-                .append("录像 ").append(plan.videos).append(" 个、照片 ").append(plan.photos)
-                .append(" 个、日志 ").append(plan.logs).append(" 个，共 ").append(size(plan.bytes)).append("。\n")
-                .append("目标盘剩余 ").append(size(free)).append("。\n\n")
-                .append("录像、照片、诊断报告是搬过去（复制、核对大小、再删源文件）；")
-                .append("应用运行日志只复制。目标盘上已有的同名同大小文件当作搬过了。");
-        if (plan.skippedFresh > 0) {
-            message.append("\n\n").append(plan.skippedFresh).append(" 个两分钟内写过的文件当成还在写，这次不动。");
-        }
+                .append(activity.getString(R.string.dev_archive_counts,
+                        plan.videos, plan.photos, plan.logs, size(plan.bytes))).append('\n')
+                .append(activity.getString(R.string.dev_archive_target_free, size(free))).append("\n\n")
+                .append(activity.getString(R.string.dev_archive_explain))
+                .append(skipped);
         if (free < plan.bytes) {
-            message.append("\n\n目标盘空间不够，这次不能归档。");
+            message.append("\n\n").append(activity.getString(R.string.dev_archive_no_space));
             CamDialogs.show(builder(activity)
-                    .setTitle("归档")
+                    .setTitle(R.string.dev_archive_title)
                     .setMessage(message.toString())
-                    .setPositiveButton("知道了", null));
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
         CamDialogs.show(builder(activity)
-                .setTitle("归档")
+                .setTitle(R.string.dev_archive_title)
                 .setMessage(message.toString())
-                .setPositiveButton("开始归档", (d, w) -> run(activity, source, target, plan))
-                .setNegativeButton("取消", null));
+                .setPositiveButton(R.string.dev_archive_start, (d, w) -> run(activity, source, target, plan))
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     // ================================================================= 搬
@@ -227,10 +225,10 @@ public final class ArchiveFlow {
         AtomicBoolean cancelled = new AtomicBoolean(false);
 
         AlertDialog dialog = CamDialogs.style(builder(activity)
-                .setTitle("正在归档")
+                .setTitle(R.string.dev_archive_running)
                 .setView(box)
                 .setCancelable(false)
-                .setNegativeButton("停止", (d, w) -> cancelled.set(true))
+                .setNegativeButton(R.string.dev_archive_stop, (d, w) -> cancelled.set(true))
                 .create());
         dialog.show();
 
@@ -246,7 +244,8 @@ public final class ArchiveFlow {
                 final int index = i;
                 final long doneSoFar = done;
                 activity.runOnUiThread(() -> {
-                    label.setText("（" + (index + 1) + "/" + plan.items.size() + "）" + item.from.getName());
+                    label.setText(activity.getString(R.string.dev_tool_progress,
+                            index + 1, plan.items.size(), item.from.getName()));
                     bar.setProgress(plan.bytes > 0 ? (int) (doneSoFar * 100 / plan.bytes) : 0);
                 });
                 long length = item.from.length();
@@ -262,14 +261,17 @@ public final class ArchiveFlow {
                         }
                     }
                     if (item.move && !item.from.delete()) {
-                        failed.add(item.from.getName() + "：复制好了，源文件删不掉");
+                        failed.add(activity.getString(R.string.dev_archive_delete_failed, item.from.getName()));
                     }
                 } catch (IOException e) {
                     AppLog.e(TAG, "归档失败：" + item.from.getAbsolutePath(), e);
                     if (item.to.exists() && !item.to.delete()) {
                         AppLog.w(TAG, "写了一半的目标文件删不掉：" + item.to.getAbsolutePath());
                     }
-                    failed.add(item.from.getName() + "：" + e.getMessage());
+                    // 原因说得清（空间不足之类）就写上；说不清的只列文件名，原文在上面那行日志里
+                    String reason = com.kooo.evcam.ui.FailureReason.of(activity, e);
+                    failed.add(reason == null ? item.from.getName()
+                            : activity.getString(R.string.dev_tool_file_result, item.from.getName(), reason));
                 }
                 done += length;
             }
@@ -285,19 +287,19 @@ public final class ArchiveFlow {
             activity.runOnUiThread(() -> {
                 dismiss(dialog);
                 StringBuilder report = new StringBuilder();
-                report.append("搬到 ").append(target.getName()).append("：").append(m).append(" 个，复制 ")
-                        .append(c).append(" 个，本来就有 ").append(a).append(" 个，共 ").append(size(bytes)).append("。");
+                report.append(activity.getString(R.string.dev_archive_report, target.getName(), m, c, a, size(bytes)));
                 if (stopped) {
-                    report.append("\n\n中途停止了，剩下的还在 ").append(source.getName()).append(" 上，下次接着归档。");
+                    report.append("\n\n").append(activity.getString(R.string.dev_archive_stopped, source.getName()));
                 }
                 if (!failed.isEmpty()) {
-                    report.append("\n\n失败 ").append(failed.size()).append(" 个（源文件原样留着）：\n")
-                            .append(join(failed));
+                    report.append("\n\n").append(activity.getString(R.string.dev_archive_failed, failed.size()))
+                            .append('\n').append(join(failed));
                 }
                 CamDialogs.show(builder(activity)
-                        .setTitle(failed.isEmpty() && !stopped ? "归档完成" : "归档结束")
+                        .setTitle(failed.isEmpty() && !stopped
+                                ? R.string.dev_archive_done_title : R.string.dev_archive_ended_title)
                         .setMessage(report.toString())
-                        .setPositiveButton("知道了", null));
+                        .setPositiveButton(R.string.action_got_it, null));
             });
         }, "archive").start();
     }

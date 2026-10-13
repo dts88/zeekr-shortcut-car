@@ -99,6 +99,14 @@ public class TimelineSessionAdapter
      * 所以大小由界面算好了给过来。没给的按会话自己的算。</p>
      */
     private long[] sessionBytes = new long[0];
+    /** 每一条有没有锁定的文件（锁定影像），和 sessions 一一对应。 */
+    private boolean[] sessionLocked = new boolean[0];
+
+    /** 哪几条含锁定的文件：行尾多写一句「含已锁定文件」。 */
+    public void setLocked(boolean[] locked) {
+        sessionLocked = locked != null ? locked : new boolean[0];
+        notifyDataSetChanged();
+    }
 
     /**
      * @param sessions 正序（最早在前）的会话列表，与 {@link RecordingTimeline#build} 的输出一致
@@ -246,7 +254,8 @@ public class TimelineSessionAdapter
         SessionViewHolder sessionHolder = (SessionViewHolder) holder;
         long bytes = row.sessionIndex < sessionBytes.length
                 ? sessionBytes[row.sessionIndex] : row.session.totalSizeBytes;
-        sessionHolder.bind(row.session, bytes, row.sessionIndex == selectedSessionIndex,
+        boolean locked = row.sessionIndex < sessionLocked.length && sessionLocked[row.sessionIndex];
+        sessionHolder.bind(row.session, bytes, locked, row.sessionIndex == selectedSessionIndex,
                 selectionMode, chosen.contains(row.sessionIndex));
         sessionHolder.itemView.setOnClickListener(v -> {
             int clicked = sessionHolder.getAdapterPosition();
@@ -303,7 +312,7 @@ public class TimelineSessionAdapter
             check = itemView.findViewById(R.id.session_check);
         }
 
-        void bind(RecordingTimeline.Session session, long bytes, boolean selected,
+        void bind(RecordingTimeline.Session session, long bytes, boolean locked, boolean selected,
                   boolean selecting, boolean chosen) {
             Date start = new Date(session.startEpochMs);
             Date end = new Date(session.startEpochMs + session.totalDurationMs);
@@ -314,8 +323,9 @@ public class TimelineSessionAdapter
 
             metaText.setText(TimelineFormat.duration(session.totalDurationMs)
                     + " · " + TimelineFormat.size(bytes)
-                    + " · " + itemView.getContext().getString(
-                            R.string.player_clip_count, session.segmentCount()));
+                    + " · " + itemView.getContext().getResources().getQuantityString(
+                            R.plurals.player_clip_count, session.segmentCount(), session.segmentCount())
+                    + (locked ? " · " + itemView.getContext().getString(R.string.player_session_locked) : ""));
 
             // 正在播的那条留着红条；多选时右边多一个勾
             selectedBar.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);

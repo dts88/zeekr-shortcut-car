@@ -39,7 +39,7 @@ public class KeepAliveProvider extends ContentProvider {
             // 进程是被别的东西拉起来的（多半是系统），用户已经退出：不启动前台服务、不注册 TIME_TICK
             return true;
         }
-        if (!new AppConfig(context).isKeepAliveEnabled()) {
+        if (!new AppConfig(context).isAutoStartOnBoot()) {
             // 保活关着（规格 §3）：被拉起来也不起前台服务，让系统把空进程收掉
             return true;
         }
@@ -78,9 +78,7 @@ public class KeepAliveProvider extends ContentProvider {
             // 延迟一小段时间启动，避免在系统初始化完成前启动
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                 try {
-                    CameraForegroundService.start(context,
-                            context.getString(R.string.notif_background_title),
-                            context.getString(R.string.notif_tap_to_return));
+                    CameraForegroundService.start(context);
                     AppLog.d(TAG, "前台服务已从 Provider 启动");
                 } catch (Exception e) {
                     AppLog.e(TAG, "从 Provider 启动服务失败: " + e.getMessage(), e);

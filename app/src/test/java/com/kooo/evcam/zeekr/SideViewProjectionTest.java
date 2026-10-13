@@ -67,4 +67,39 @@ public class SideViewProjectionTest {
         SideViewProjection.sourcePoint(1f, 0.5f, 120f, 0f, 0f, LaneCycle.RIGHT, wide, 0);
         assertTrue(wide[0] > narrow[0]);
     }
+
+    @Test
+    public void squareMirrorMatchesTheSeparatePopupProjection() {
+        float[] popup = new float[2];
+        float[] mirror = new float[2];
+        SideViewProjection.sourcePoint(0.8f, 0.2f, 90f, 50f, 15f, LaneCycle.LEFT, popup, 0);
+        SideViewProjection.sourcePoint(0.8f, 0.2f, 90f, 50f, 15f, LaneCycle.LEFT, 1f, mirror, 0);
+        assertEquals(popup[0], mirror[0], EPS);
+        assertEquals(popup[1], mirror[1], EPS);
+    }
+
+    @Test
+    public void wideMirrorKeepsHorizontalFovAndCropsVertically() {
+        float[] square = new float[2];
+        float[] wide = new float[2];
+        SideViewProjection.sourcePoint(0.5f, 1f, 90f, 0f, 0f, LaneCycle.LEFT, 1f, square, 0);
+        SideViewProjection.sourcePoint(0.5f, 1f, 90f, 0f, 0f, LaneCycle.LEFT, 3f, wide, 0);
+        assertTrue(wide[1] < square[1]);
+        SideViewProjection.sourcePoint(1f, 0.5f, 90f, 0f, 0f, LaneCycle.LEFT, 1f, square, 0);
+        SideViewProjection.sourcePoint(1f, 0.5f, 90f, 0f, 0f, LaneCycle.LEFT, 3f, wide, 0);
+        assertEquals(square[0], wide[0], EPS);
+        assertEquals(square[1], wide[1], EPS);
+    }
+
+    @Test
+    public void invalidWindowAspectFallsBackToSquare() {
+        float[] expected = new float[2];
+        float[] actual = new float[2];
+        SideViewProjection.sourcePoint(0.8f, 0.9f, 90f, 10f, 15f, LaneCycle.RIGHT, expected, 0);
+        for (float aspect : new float[]{0f, -1f, Float.NaN, Float.POSITIVE_INFINITY}) {
+            SideViewProjection.sourcePoint(0.8f, 0.9f, 90f, 10f, 15f, LaneCycle.RIGHT, aspect, actual, 0);
+            assertEquals(expected[0], actual[0], EPS);
+            assertEquals(expected[1], actual[1], EPS);
+        }
+    }
 }

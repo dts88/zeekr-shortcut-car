@@ -31,6 +31,7 @@ import com.kooo.evcam.R;
  *   <li>开关放在行首（{@link R.layout#pref_row}），橙色轨道 + 白色方块滑块；</li>
  *   <li>有当前值的（下拉、输入），值放行尾再加 ›（{@link R.layout#pref_row_value}）；</li>
  *   <li>点进去还有下一层的，行尾 ›（{@link R.layout#pref_row_nav}）；</li>
+ *   <li>开关的效果要看哨兵模式的，行尾写着哨兵模式此刻开没开（{@link R.layout#pref_row_sentry}）；</li>
  *   <li>组名是小号灰字（{@link R.layout#pref_category}）。</li>
  * </ul>
  *
@@ -46,6 +47,7 @@ final class PreferenceRows {
     private static final String EXTRA_ROW = "cam_row";
     private static final String ROW_VALUE = "value";
     private static final String ROW_PRIMARY = "primary";
+    private static final String ROW_SENTRY = "sentry";
 
     private PreferenceRows() {
     }
@@ -56,6 +58,14 @@ final class PreferenceRows {
      */
     static void markValue(Preference preference) {
         preference.getExtras().putString(EXTRA_ROW, ROW_VALUE);
+    }
+
+    /**
+     * 开关行，行尾带哨兵模式此刻的状态（熄屏持续录制）：熄屏 v3 起哨兵模式定的是环视录到什么时候 ——
+     * 开着车机不下电、一直录；没开录到车机要睡（规格 2.4）。
+     */
+    static void markSentryStatus(Preference preference) {
+        preference.getExtras().putString(EXTRA_ROW, ROW_SENTRY);
     }
 
     /** 这一屏的主操作（比如「保存」）：实心能量色的一行。一屏最多一处。 */
@@ -78,6 +88,9 @@ final class PreferenceRows {
                     ? preference.peekExtras().getString(EXTRA_ROW) : null;
             if (ROW_PRIMARY.equals(row)) {
                 preference.setLayoutResource(R.layout.pref_row_primary);
+            } else if (ROW_SENTRY.equals(row)) {
+                preference.setLayoutResource(R.layout.pref_row_sentry);
+                preference.setWidgetLayoutResource(R.layout.pref_widget_switch);
             } else if (ROW_VALUE.equals(row)) {
                 preference.setLayoutResource(R.layout.pref_row_value);
             } else if (preference instanceof PreferenceCategory) {

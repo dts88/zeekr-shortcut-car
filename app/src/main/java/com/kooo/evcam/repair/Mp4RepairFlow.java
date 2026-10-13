@@ -33,10 +33,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 「修复未封口的视频」这个开发者入口的全部流程。
- *
- * <p>界面文字都写在这里，没走 strings —— 这是开发者工具，只在解锁开发者选项之后出现，
- * 不做多语言（见 HardcodedTextTest 的白名单）。</p>
+ * 「修复缺少索引的录像」这个开发者入口的全部流程。
  *
  * <h3>不碰不该碰的</h3>
  *
@@ -63,14 +60,13 @@ public final class Mp4RepairFlow {
     public static void start(Activity activity, boolean recording) {
         if (recording) {
             CamDialogs.show(builder(activity)
-                    .setTitle("正在录制")
-                    .setMessage("录制中不能修复：正在录的那一段也没有索引，"
-                            + "分不清它和断电留下的半截文件。先停止录制再来。")
-                    .setPositiveButton("知道了", null));
+                    .setTitle(R.string.dev_tool_recording_title)
+                    .setMessage(R.string.dev_repair_refuse_recording)
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
 
-        AlertDialog waiting = spinner(activity, "正在检查视频文件…");
+        AlertDialog waiting = spinner(activity, activity.getString(R.string.dev_repair_scanning));
         new Thread(() -> {
             List<File> broken = new ArrayList<>();
             Map<String, List<File>> healthy = new HashMap<>();
@@ -118,36 +114,34 @@ public final class Mp4RepairFlow {
                                      Map<String, List<File>> healthy, int scanned) {
         if (broken.isEmpty()) {
             CamDialogs.show(builder(activity)
-                    .setTitle("没有需要修的")
-                    .setMessage("检查了 " + scanned + " 个片段，索引都在。\n\n"
-                            + "（正在录的那一段、以及两分钟内写过的文件不在检查范围内）")
-                    .setPositiveButton("知道了", null));
+                    .setTitle(R.string.dev_repair_none_title)
+                    .setMessage(activity.getResources().getQuantityString(
+                            R.plurals.dev_repair_none_msg, scanned, scanned)
+                            + "\n\n" + activity.getString(R.string.dev_repair_none_note))
+                    .setPositiveButton(R.string.action_got_it, null));
             return;
         }
 
         StringBuilder message = new StringBuilder();
-        message.append("发现 ").append(broken.size())
-                .append(" 个没有封口的片段 —— 断电时正在录的那一段。画面数据还在，缺的是索引。\n\n");
+        message.append(activity.getResources().getQuantityString(
+                R.plurals.dev_repair_found, broken.size(), broken.size())).append("\n\n");
         long bytes = 0;
         for (File file : broken) {
             bytes += file.length();
-            message.append(file.getName()).append("　").append(size(file.length()));
-            String key = cameraKey(file.getName());
-            if (!healthy.containsKey(key)) {
-                message.append("（没有同一路相机的完好片段可做参考）");
+            String line = file.getName() + "　" + size(file.length());
+            if (!healthy.containsKey(cameraKey(file.getName()))) {
+                line = activity.getString(R.string.dev_repair_no_reference, line);
             }
-            message.append('\n');
+            message.append(line).append('\n');
         }
-        message.append('\n').append("共 ").append(size(bytes)).append("。\n\n")
-                .append("修复直接改这些文件：把重建出来的索引追加在文件末尾，文件名不变。")
-                .append("解码参数和帧率从同一路相机最近一个完好片段抄，")
-                .append("所以时间轴可能和原始录制差一点点。修完读不出来的会自动退回原样。");
+        message.append('\n').append(activity.getString(R.string.dev_repair_total, size(bytes))).append("\n\n")
+                .append(activity.getString(R.string.dev_repair_explain));
 
         CamDialogs.show(builder(activity)
-                .setTitle("修复未封口的视频")
+                .setTitle(R.string.dev_repair_mp4_title)
                 .setMessage(message.toString())
-                .setPositiveButton("开始修复", (d, w) -> repairAll(activity, broken, healthy))
-                .setNegativeButton("取消", null));
+                .setPositiveButton(R.string.dev_repair_start, (d, w) -> repairAll(activity, broken, healthy))
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     // ================================================================= 修
@@ -162,7 +156,7 @@ public final class Mp4RepairFlow {
         box.addView(bar, wide());
 
         AlertDialog dialog = CamDialogs.style(builder(activity)
-                .setTitle("正在修复")
+                .setTitle(R.string.dev_repair_running)
                 .setView(box)
                 .setCancelable(false)
                 .create());
@@ -176,12 +170,13 @@ public final class Mp4RepairFlow {
                 File file = broken.get(i);
                 final int index = i;
                 activity.runOnUiThread(() -> {
-                    label.setText("（" + (index + 1) + "/" + broken.size() + "）" + file.getName());
+                    label.setText(activity.getString(R.string.dev_tool_progress,
+                            index + 1, broken.size(), file.getName()));
                     bar.setProgress(0);
                 });
-                String outcome = repairOne(activity, file, healthy, templates, bar);
-                report.add(file.getName() + "：" + outcome);
-                if (outcome.startsWith("好了")) {
+                Outcome outcome = repairOne(activity, file, healthy, templates, bar);
+                report.add(activity.getString(R.string.dev_tool_file_result, file.getName(), outcome.text));
+                if (outcome.fixed) {
                     fixed++;
                 }
             }
@@ -189,24 +184,35 @@ public final class Mp4RepairFlow {
             activity.runOnUiThread(() -> {
                 dismiss(dialog);
                 CamDialogs.show(builder(activity)
-                        .setTitle(done + " / " + broken.size() + " 个修好了")
+                        .setTitle(activity.getString(R.string.dev_repair_done_title, done, broken.size()))
                         .setMessage(join(report)
-                                + (done > 0 ? "\n\n修好的片段在「视频回看」里就能看到了。" : ""))
-                        .setPositiveButton("知道了", null));
+                                + (done > 0 ? "\n\n" + activity.getString(R.string.dev_repair_done_hint) : ""))
+                        .setPositiveButton(R.string.action_got_it, null));
             });
         }, "mp4-repair").start();
     }
 
-    /** 修一个，返回写进报告的那句话。 */
-    private static String repairOne(Activity activity, File file,
-                                    Map<String, List<File>> healthy,
-                                    Map<String, Mp4Repair.Template> templates, ProgressBar bar) {
+    /** 修一个的结果：写进报告的那句话，和算不算修好（计数看这个，不去比文字）。 */
+    private static final class Outcome {
+        final boolean fixed;
+        final String text;
+
+        Outcome(boolean fixed, String text) {
+            this.fixed = fixed;
+            this.text = text;
+        }
+    }
+
+    /** 修一个。 */
+    private static Outcome repairOne(Activity activity, File file,
+                                     Map<String, List<File>> healthy,
+                                     Map<String, Mp4Repair.Template> templates, ProgressBar bar) {
         String key = cameraKey(file.getName());
         Mp4Repair.Template template = templates.get(key);
         if (template == null) {
             List<File> references = healthy.get(key);
             if (references == null || references.isEmpty()) {
-                return "跳过，没有同一路相机的完好片段可做参考";
+                return new Outcome(false, activity.getString(R.string.dev_repair_skip_no_reference));
             }
             IOException last = null;
             for (File reference : references) {
@@ -218,7 +224,9 @@ public final class Mp4RepairFlow {
                 }
             }
             if (template == null) {
-                return "跳过，参考片段读不出解码参数（" + (last == null ? "?" : last.getMessage()) + "）";
+                // 读不出的原因（Mp4Repair 抛的中文说明、系统的英文原话）只进日志，报告里只说跳过了
+                AppLog.w(TAG, key + " 的参考片段都读不出解码参数，跳过 " + file.getName(), last);
+                return new Outcome(false, activity.getString(R.string.dev_repair_skip_bad_reference));
             }
             AppLog.i(TAG, key + " 的参考片段：" + template.source.getName()
                     + "，" + template.width + "x" + template.height
@@ -234,25 +242,26 @@ public final class Mp4RepairFlow {
             });
         } catch (Exception e) {
             AppLog.e(TAG, "修复失败：" + file.getName(), e);
-            return "修不了，" + e.getMessage();
+            return new Outcome(false, activity.getString(R.string.dev_repair_failed));
         }
 
         if (!playable(file)) {
             try {
                 repaired.rollback();
                 AppLog.w(TAG, "补出来的索引读不出来，已退回：" + file.getName());
-                return "补出来的索引读不出来，已退回原样";
+                return new Outcome(false, activity.getString(R.string.dev_repair_rolled_back));
             } catch (IOException e) {
                 AppLog.e(TAG, "退回失败：" + file.getName(), e);
-                return "补出来的索引读不出来，退回也失败了：" + e.getMessage();
+                return new Outcome(false, activity.getString(R.string.dev_repair_rollback_failed));
             }
         }
         AppLog.i(TAG, "修好 " + file.getName() + "：" + repaired.samples + " 帧，"
                 + repaired.durationMs + "ms，丢掉结尾 " + repaired.tailIgnored + " 字节");
-        return "好了，" + repaired.samples + " 帧 / "
-                + String.format(Locale.US, "%.1f", repaired.durationMs / 1000f) + " 秒"
-                + (repaired.tailIgnored > 0
-                ? "（结尾写了一半的那一帧丢掉了）" : "");
+        String done = activity.getResources().getQuantityString(R.plurals.dev_repair_ok,
+                repaired.samples, repaired.samples,
+                String.format(Locale.US, "%.1f", repaired.durationMs / 1000f));
+        return new Outcome(true, repaired.tailIgnored > 0
+                ? activity.getString(R.string.dev_repair_ok_tail, done) : done);
     }
 
     /**

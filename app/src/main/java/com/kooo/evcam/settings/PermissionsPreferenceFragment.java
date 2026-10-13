@@ -1,7 +1,6 @@
 package com.kooo.evcam.settings;
 
 import android.Manifest;
-import android.app.AppOpsManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -12,6 +11,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.core.content.ContextCompat;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -19,6 +19,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceScreen;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 
 /**
@@ -69,37 +70,42 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     private void build(PreferenceScreen screen, Context context) {
-        PreferenceCategory basic = category(screen, context, "基础权限");
-        add(basic, context, "相机权限", "录制和拍照都要用",
+        PreferenceCategory basic = category(screen, context, R.string.dev_perm_group_basic);
+        add(basic, context, R.string.dev_perm_camera, R.string.dev_perm_camera_why,
                 hasPermission(context, Manifest.permission.CAMERA), this::openAppSettings);
-        add(basic, context, "麦克风权限", "录像带声音时要用",
+        add(basic, context, R.string.dev_perm_microphone, R.string.dev_perm_microphone_why,
                 hasPermission(context, Manifest.permission.RECORD_AUDIO), this::openAppSettings);
-        add(basic, context, "存储权限", "保存和读取录像、照片",
+        add(basic, context, R.string.dev_perm_storage, R.string.dev_perm_storage_why,
                 hasStoragePermission(context), this::openAppSettings);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(basic, context, "通知权限", "显示录制状态通知",
+            add(basic, context, R.string.dev_perm_notifications, R.string.dev_perm_notifications_why,
                     hasPermission(context, Manifest.permission.POST_NOTIFICATIONS),
                     this::openAppSettings);
         }
+        // 行驶信息条的经纬度：LocationSource 认的就是精确定位这一条
+        add(basic, context, R.string.dev_perm_location, R.string.dev_perm_location_why,
+                hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION), this::openAppSettings);
 
-        PreferenceCategory advanced = category(screen, context, "高级权限");
+        PreferenceCategory advanced = category(screen, context, R.string.dev_perm_group_advanced);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            add(advanced, context, "所有文件访问", "访问 U 盘上的公共目录",
+            add(advanced, context, R.string.dev_perm_all_files, R.string.dev_perm_all_files_why,
                     Environment.isExternalStorageManager(), this::requestAllFiles);
         }
-        add(advanced, context, "悬浮窗权限", "超级后视镜、悬浮窗、录制按钮都要用",
+        add(advanced, context, R.string.dev_perm_overlay, R.string.dev_perm_overlay_why,
                 WakeUpHelper.hasOverlayPermission(context), this::requestOverlay);
-        add(advanced, context, "无障碍服务", "保活手段之一；系统肯不肯让它跑，看黑匣子",
+        add(advanced, context, R.string.dev_perm_accessibility, R.string.dev_perm_accessibility_why,
                 isAccessibilityEnabled(context), this::openAccessibilitySettings);
-        add(advanced, context, "使用情况访问", "判断应用是否在前台",
-                hasUsageStats(context), this::openUsageStatsSettings);
-        add(advanced, context, "忽略电池优化", "避免系统在后台掐掉录制",
+        // 开发者选项「记录可能占用摄像头的应用」要它；查法和那边是同一个
+        add(advanced, context, R.string.dev_perm_usage_access, R.string.dev_perm_usage_access_why,
+                com.kooo.evcam.camera.CameraHolderSuspects.hasUsageAccess(context),
+                this::openUsageAccessSettings);
+        add(advanced, context, R.string.dev_perm_battery, R.string.dev_perm_battery_why,
                 isIgnoringBatteryOptimizations(context), this::requestIgnoreBattery);
     }
 
     // ------------------------------------------------------------------ 构造条目
 
-    private PreferenceCategory category(PreferenceScreen screen, Context context, String title) {
+    private PreferenceCategory category(PreferenceScreen screen, Context context, @StringRes int title) {
         PreferenceCategory category = new PreferenceCategory(context);
         category.setTitle(title);
         screen.addPreference(category);
@@ -112,11 +118,12 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
      * <p>已授权的那条<b>不可点</b>：点了也只是又跳一次系统设置，
      * 给一个什么都不会发生的按钮不如不给。</p>
      */
-    private void add(PreferenceCategory parent, Context context, String title,
-                     String why, boolean granted, Runnable onGrant) {
+    private void add(PreferenceCategory parent, Context context, @StringRes int title,
+                     @StringRes int why, boolean granted, Runnable onGrant) {
         Preference preference = new Preference(context);
         preference.setTitle(title);
-        preference.setSummary(granted ? "已授权 ✓" : "未授权 · " + why);
+        preference.setSummary(granted ? context.getString(R.string.dev_perm_granted)
+                : context.getString(R.string.dev_perm_not_granted, context.getString(why)));
         preference.setSelectable(!granted);
         if (!granted) {
             preference.setOnPreferenceClickListener(p -> {
@@ -147,20 +154,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
             String enabled = Settings.Secure.getString(context.getContentResolver(),
                     Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
             return enabled != null && enabled.contains(context.getPackageName());
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    private boolean hasUsageStats(Context context) {
-        try {
-            AppOpsManager appOps = (AppOpsManager) context.getSystemService(Context.APP_OPS_SERVICE);
-            if (appOps == null) {
-                return false;
-            }
-            int mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
-                    android.os.Process.myUid(), context.getPackageName());
-            return mode == AppOpsManager.MODE_ALLOWED;
         } catch (Throwable t) {
             return false;
         }
@@ -199,8 +192,14 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
     }
 
-    private void openUsageStatsSettings() {
-        launch(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+    /** 车机上未必有「使用情况访问」那一页：打不开就退到本应用的详情页。 */
+    private void openUsageAccessSettings() {
+        try {
+            startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+        } catch (Throwable t) {
+            AppLog.w("PermissionsPreference", "打不开使用情况访问设置页，改开应用详情: " + t);
+            openAppSettings();
+        }
     }
 
     private void requestIgnoreBattery() {
@@ -214,7 +213,7 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         } catch (Throwable t) {
             AppLog.w("PermissionsPreference", "打不开系统设置页: " + t);
             android.widget.Toast.makeText(getContext(),
-                    "这台车机上打不开对应的系统设置页", android.widget.Toast.LENGTH_SHORT).show();
+                    R.string.dev_perm_settings_unavailable, android.widget.Toast.LENGTH_SHORT).show();
         }
     }
 }

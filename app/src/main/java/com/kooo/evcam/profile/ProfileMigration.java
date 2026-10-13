@@ -109,8 +109,8 @@ public final class ProfileMigration {
      * 新建配置时录制流的默认值。
      *
      * <p>帧率和码率跟着「均衡」那一档走（{@link QualityPreset#BALANCED}），
-     * 编码交给编码器挑，1 分钟一段。初值必须正好是某一档 ——
-     * 否则刚建的配置一打开，三张卡一张都没选中，每一路还都标着「已细调」。</p>
+     * 编码交给编码器挑，1 分钟一段。初值必须正好是配置里记的那一档
+     * （{@link Profile#quality} 默认就是均衡）—— 否则刚建的配置一打开，每一路都标着「自定义」。</p>
      */
     private static StreamSpec defaultRecord(String resolution) {
         StreamSpec spec = StreamSpec.record(resolution, QualityPreset.BALANCED.fps,

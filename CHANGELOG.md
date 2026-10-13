@@ -9,14 +9,300 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Turn-signal side view, adapted from PR #4 to the current channel scheduler. Off by default
+  under Settings → Super mirror; adjustable speed threshold, field of view, aim and placement.
+- With Super mirror on, signalling temporarily switches its existing window to the side camera;
+  afterwards it restores the previous camera, framing and position, including a docked window.
+
+## [2.11.2-alpha] - 2026-10-13
+
+- Screen off now follows the physical screen: the vehicle's screen signal counts, not only Android's screen-off at power-down.
+- While the screen is off, the front and rear cabin cameras are released; they rejoin recording when the screen turns on.
+- With Keep recording when the screen goes off on, the surround view keeps recording: until the head unit sleeps without Sentry Mode, and on with it.
+- Record-button hint and setting descriptions updated to match.
+- Vehicle signals are read while the app runs (no GPS).
+- System info shows the center screen state.
+- Diagnostics: the black box and report record each screen-off period, the cabin release and the head unit's sleep.
+
+## [2.11.1-alpha] - 2026-10-12
+
+- Diagnostics: the black box records each display's on/off state and the vehicle's screen, power, gear, Sentry Mode, driver door, seat and belt signals when they change.
+
+## [2.11.0-alpha] - 2026-10-11
+
+- Cameras are opened, closed and reconfigured in one place, one step at a time; the surround view changes alone.
+- A camera taken by another app is left alone: the app asks the camera service every 30 seconds whether it is free, without opening it, and opens it alone once it is free.
+- Each camera joins and leaves the recording on its own; a camera taken away no longer stops the others. A camera that rejoins starts a file named at its own start time and aligns at the next segment.
+- When no camera can record, the recording stays on and shows that it is waiting for the cameras.
+- Storage interruptions still resume automatically, now without waiting for the surround view; the cameras stay open meanwhile.
+- Screen off with Sentry Mode off and the car not driving: recording stops at once and the cameras close in order, surround view first.
+- Outputs no longer needed stay until the next necessary change or until the camera closes; the main screen's and the Super mirror's pictures are kept across a screen rebuild or closing the mirror.
+- Each unneeded camera stays open for 30 seconds while the screen is on and the background service runs.
+- Playback: the progress bar follows the surround view; cabin footage outside it can be locked and deleted with its recording.
+- Diagnostics: new Channel section.
+
+## [2.10.15-beta] - 2026-10-10
+
+Upgrade from 2.0.0. Same code as 2.10.14-alpha.
+
+- **Significantly improved stability with multiple video streams** (surround view and cabin cameras).
+- Fixed stuttering that could occur at high bitrates and frame rates.
+- Driving info bar redesigned, with new items including Sentry Mode, rear lamps and a 7X front view, plus an easter egg. Items are selected in Settings → System → System info (experimental). The bar is now added to the surround view recording only.
+- Lock footage (Settings → Storage): videos and photos can be locked during playback, or locked automatically when the high beams are flashed (optional). Locked files are never deleted by loop recording.
+- While recording, the record button shows what will happen when the screen turns off.
+- The app name, version and, if enabled, the plate number are stamped on every recording and photo.
+- Photos are saved to the USB drive only, as with videos.
+- Start on boot (Settings → System) now also keeps the app running in the background, replacing the separate setting for this.
+- Interface text revised in all three languages.
+- Send to phone in Diagnostics is now available to all users.
+- Stability improvements and bug fixes.
+
+## [2.10.14-alpha] - 2026-10-09
+
+- "Use JPEG output for photos" shows "Requires developer options" while it is locked.
+- The driving info bar is added only below the surround view recording; the cabin recordings no longer carry it.
+
+## [2.10.13-alpha] - 2026-10-09
+
+- "Use JPEG output for photos" is back in Settings > Recording. It stays on and greyed out unless developer options are on.
+
+## [2.10.12-alpha] - 2026-10-09
+
+- Cameras stay open for 30 s after nothing needs them (minimizing, opening diagnostics or playback), so coming back within that time needs no reopen; with the screen off, or without the background service, they still close after 1.5 s. While the main screen is away during those 30 s, the cameras keep streaming into a hidden output.
+- The background service starts with the main screen when Start on boot is on; after exiting and reopening the app it did not.
+- "Use JPEG output for photos" is always on and moves to Developer options; if it was off, it is turned on once on upgrade. With it off, photos taken while the main screen is in the background had no picture.
+
+## [2.10.11-alpha] - 2026-10-09
+
+- The surround camera closes on its own first, and the cabin cameras close only after it has finished; opening stays surround first, cabins after it streams. When the surround finished closing after the cabins (2.10.5-2.10.10), that close took 4-17 s (the floating button lingered on exit) and the next open of the surround never delivered a frame.
+- Opening waits until the previous round of closing is over; the watchdog acts on one camera at a time and stays out of the way while cameras are opening or closing.
+
+## [2.10.10-alpha] - 2026-10-09
+
+- The surround camera closes first as well as opening first. Closed after the cabin cameras (2.10.5-2.10.9) its close took 8-17 s and the next open of it never delivered a frame; closed first it takes 0.1-0.3 s and reopens normally, the same as the surround-only setup.
+- One recovery path: a camera that reports an error or gets disconnected only closes its handle; the watchdog reopens it at the next check (every 30 s while another app holds the camera), three tries then a pause. The per-camera reconnect ladder that raced the watchdog is gone; the watchdog stays out of the way while the ordered open is running.
+- Exit releases the camera pipeline once instead of three times; closing the main screen no longer waits on a 3 s background release.
+- Diagnostics: Send to phone is available to everyone, not only with developer options on.
+
+## [2.10.9-alpha] - 2026-10-09
+
+- Cameras close together again instead of one after another. On the head unit, closing the last open camera by itself took 8-17 s (whichever camera was last), and reopening it right after produced a session that never delivered a frame; closing all cameras at once takes 0.1-0.3 s each, and the next open works. Exit is back to well under a second.
+- The ordered open waits for any camera that is still closing before it starts, so no camera is opened while another one is being torn down.
+
+## [2.10.8-alpha] - 2026-10-08
+
+- Cameras open one at a time only once the previous one is actually delivering frames, not merely configured: with three cameras the surround often configured and then never delivered a frame while the cabin cameras were started on top of it.
+- A session that never delivered a frame is no longer rebuilt first: rebuilding it always timed out and ended in a device error before the reopen that actually helps (4-13 s lost each time); the watchdog now reopens the camera directly.
+
+## [2.10.7-alpha] - 2026-10-08
+
+- Coming back to the main screen touches the camera service less: the preview is registered only once its views exist, so each camera\'s first session already carries the preview instead of being built twice (the surround\'s second build stalled 12 s on 2026-10-08).
+- Leaving the main screen while nothing needs the cameras no longer rebuilds the sessions just to drop the preview; the cameras close 1.5 s later anyway.
+
+## [2.10.6-alpha] - 2026-10-08
+
+- Fixed: with three cameras open, quitting closed only the first camera and then waited 20 s; the ordered close now survives the cleanup that runs during exit, so the process no longer dies holding cameras.
+- Fixed: on a head unit that had restarted, quitting could be undone seconds later by the "rebooted" check and the app restarted itself while exiting; an exit now only yields to a restart that happens after it.
+- Coming back while cameras are still being closed leaves the not-yet-closed ones open instead of closing and reopening them.
+- The black box records the open and close order with each camera\'s time, e.g. 环视 1.1s → 后座舱 0.2s → 前座舱 0.3s.
+
+## [2.10.5-alpha] - 2026-10-08
+
+- A camera that is opening, closing, reconnecting or reconfiguring is left alone: the watchdog and forced reopen no longer put a second open on top of it. That second open made the camera service kick out the app\'s own first handle (seven times on 2026-10-08) and the recording looped stop/resume until the app hung.
+- A recording stopped because a camera was disconnected now spends the auto-resume budget unless another app actually holds the camera, so it stops after three failures instead of looping forever.
+- Starting a recording and laying out the preview no longer ask the camera service on the main thread (the ANR of 2026-10-08 was blocked there); camera parameters are cached when a camera opens.
+- Cameras open one at a time, surround first, then rear cabin, then front cabin, and close in the reverse order; recording starts once the sequence is done.
+- Exit waits up to 20 s for the cameras to close in order, instead of 3 s, so the process does not die holding a camera.
+
+## [2.10.4-alpha] - 2026-10-08
+
+- Settings → System: Start on boot and Keep running in background are now one switch, Start on boot, on by default. It keeps the app running in the background and, after the head unit restarts or the system closes the app, restarts it and restores Super mirror, the floating button and auto-recording. On upgrade it is on if either of the two switches was on.
+
+## [2.10.3-beta] - 2026-10-08
+
+Upgrade from 2.1.0-beta. Same code as 2.10.3-alpha.
+
+- **Reworked how the app records, and how it takes and releases the cameras.** Starting, stopping and recovering now go through one path:
+  - If no camera starts recording, the app says so and retries, instead of showing that it is recording.
+  - Stopping, even right after starting, fully releases the cameras' recording outputs and the video encoder, so the next recording starts cleanly.
+  - Stopping now stops all cameras at once and no longer hangs on a stuck USB drive; the last frames are no longer cut off.
+  - No more short skips at high bitrate and full frame rate: writing to the USB drive has its own thread and a few seconds of buffer. If the drive can't keep up, the app says so.
+  - The floating button always shows the real recording state.
+- Photos are saved to the USB drive only, like videos.
+- Interface text reviewed and reworded in all three languages.
+
+### Known issue: App Lab lost after a restart
+
+Some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. If this happens, or the app stutters or camera images are unavailable, **export a report from Settings → System → Diagnostics before restarting the head unit** and report it via a GitHub issue or other channels. Apologies for the inconvenience.
+
+**已知问题：重启车机后 App Lab 丢失。** 部分用户反馈，重启车机后 App Lab 消失，需重新安装。该问题疑似与本应用有关，原因仍在排查。如遇此问题，或出现应用异常卡顿、摄像头画面无法获取，请**在重启车机前**于「设置 → 系统 → 诊断信息」导出诊断报告，并通过 GitHub 等渠道反馈。给您带来不便，深表歉意。
+
+## [2.10.3-alpha] - 2026-10-08
+
+- Fixed short skips in recordings at high bitrate and full frame rate: writing to the USB drive now happens on its own thread with a few seconds of memory buffer, so a slow moment on the drive no longer drops frames. If the drive keeps falling behind, the app says so once instead of silently dropping frames.
+- Stopping a recording now stops all cameras at once and finishes within a fixed time even on a stuck drive; what is still in memory is copied to another drive if possible.
+- The last frames of a recording are no longer cut off at stop.
+- Moving a recording to another drive when the current one fails now works (it never did before).
+- Flash-to-pass auto lock waits a little longer for its second pass, so a camera whose file is created late is still locked.
+
+## [2.10.2-alpha] - 2026-10-08
+
+- Fixed: the floating button could show not recording while a recording was running, after the main screen was rebuilt (for example on a day/night switch).
+- The floating button's recording time no longer goes wrong when the head unit adjusts its clock.
+
+## [2.10.1-alpha] - 2026-10-07
+
+- Developer options: new switch to log apps that may be using a camera. When another app takes or releases a camera, the diagnostics note which apps started or stopped a foreground service or switched to or from the foreground around that moment (a hint, not proof). Needs usage access, which can be granted from the permissions page in developer options.
+
+## [2.10.0-alpha] - 2026-10-06
+
+Version jump: the whole interface text was reviewed and reworded in the 2.1.x alphas; this build finishes it and reworks the recording start/stop.
+
+- Super mirror, floating button, System info and vehicle-signal texts reworded in all three languages; System info is now called System info in English and Malay too.
+- The System info status line is translated and no longer shows raw error text.
+- "Camera in use" on the Super mirror no longer tells you to restart the head unit.
+- When no camera starts recording, the notification and floating button no longer stay on recording: the app shows "Recording didn't start. Retrying…" and retries when the surround view is back, up to three times.
+- A recording that starts while the screen is off now holds the wake lock from the start when Screen-off recording (keep awake) is on.
+- Stopping right after starting no longer leaves a dead recording output on the cameras or stops the next recording; a stop during a MediaRecorder rebuild is no longer undone.
+
+## [2.1.4-alpha] - 2026-10-06
+
+- Photos are saved to the USB drive only, like videos; with no drive the shutter says so instead of saving to internal storage (developer options excepted).
+- Turning on the driving info bar no longer asks for location permission; latitude and longitude show when the head unit already allows it.
+- English: correct singular and plural forms, full stops on multi-sentence texts, and failure messages no longer show raw error text or "null".
+
+## [2.1.3-alpha] - 2026-10-06
+
+- Interface text reworded across the app in all three languages, following one terminology and style guide (docs/ui-text-style.md).
+- Turning developer options off now really switches their features off; turning them back on restores the previous settings.
+- Removed the extra cleanup rule that deleted 20% of files on internal storage below 3 GB; storage caps are the only cleanup rules.
+- "Deleting oldest recordings" now only shows when recordings are actually being deleted.
+- Settings: Image adjustment opens its window again; Video folder shows when no USB drive is found; the stream profile editor remembers the chosen quality and marks cameras tuned by hand; the photo size row shows the size actually saved.
+- Recording stats and the debug overlay follow the setting without reopening the app; the overlay shows the pipeline in use.
+- The info bar shows "—" for missing data, as the System info page does.
+- Developer tools (permissions, repair, archive) are translated.
+- Ending a recording now actually frees the video encoder's graphics resources, and no longer races the last frame being drawn.
+
+## [2.1.2-alpha] - 2026-10-04
+
+- The app name and version, and the plate number when it is turned on, are now on every recording, including the cabin cameras, and on every photo, whether or not the timestamp is on. The timestamp switch now only controls the date and time.
+- Storage cap dialogs now show their title and explanation.
+- Storage location shows "USB drive (not found)" instead of internal storage when the selected drive isn't plugged in.
+- Clearer wording in recording, storage, Super mirror and floating button settings, in all three languages.
+
+## [2.1.1-alpha] - 2026-10-04
+
+- Clearer wording for recording, storage and notification messages and the first-run guide, in all three languages.
+- "No camera available" now has its own message instead of the surround-stream one.
+
+## [2.1.0-beta] - 2026-10-04
+
+Upgrade from 2.0.0.
+
+- Driving info bar: refined design, integration and display. There's a little easter egg in it, see if you can find it.
+- Lock videos and photos, by hand or automatically. Locked videos and photos are marked and are never removed by the app's loop recording.
+  - Including flash-to-pass: flash the high beams to lock the current recording automatically.
+- The record button explains more clearly what happens.
+- Improved stability.
+
+## [2.0.17-alpha] - 2026-10-04
+
+- Lock footage: new option to lock automatically on flash-to-pass (off by default): every segment of every camera within 10 s before and after the flash is locked. A "lock on horn" option is shown but can't be turned on yet (the horn signal isn't readable).
+- Car-signal reading during recording is now released when a recording fails to start.
+
+## [2.0.16-alpha] - 2026-10-04
+
+- Info bar cabin: empty seats are a darker grey, a seated passenger without a belt is red, belted is the light look; seats with unreadable belts show as no data instead of looking belted.
+- System info: seat sensors, the turn indicator display and the brake pedal now bring their icons; every row says whether a tick shows as an icon (which one) or as text.
+
+## [2.0.15-alpha] - 2026-10-04
+
+- Easter egg: if a licence plate is set (Settings → Recording), the plate on the info bar's front view shows its digits in white (last 4 if longer).
+
+## [2.0.14-alpha] - 2026-10-04
+
+- Info bar front view redrawn as the 7X nose: two straight daytime running light strips with a dark middle, flat low/high beam lamps below them; high beam lights with a strong round glow. The separate low/high beam cell stays for now.
+
+## [2.0.13-alpha] - 2026-10-04
+
+- Info bar steering: the angle digits and the degree sign are drawn over the wheel with a background outline, so the ring and spokes break around them instead of crossing them.
+
+## [2.0.12-alpha] - 2026-10-04
+
+- Info bar: left turn, hazard and right turn are one cell; off is a grey outline, lit arrows are white with green light, hazard lights both arrows and a red nested double triangle (same mark on the vehicle status panel).
+- Info bar: narrower steering (78), speed (172), cabin (110); rear view keeps its drawing at 106 wide and the front view matches it.
+
+## [2.0.11-alpha] - 2026-10-03
+
+- Info bar: choose what it shows by ticking items in Settings → System → System info. A ticked signal with an icon brings its whole icon; signals without an icon appear as text (name + value); what doesn't fit is left out. Defaults match 2.0.10.
+- Unverified signals can only be ticked by developers; the "Activate all items" switch is removed.
+- Hands-on-wheel cell removed (no data source).
+- Driver assistance: the four verified badges now show; lane departure and blind spot are crossed out on their own.
+
+## [2.0.10-alpha] - 2026-10-03
+
+- Info bar: Sentry Mode cell added right of the stock 360 cell; the ACC and lane centering cells are gone.
+- Settings → Interface: Correction strength removed; fisheye correction is always full strength.
+
+## [2.0.9-alpha] - 2026-10-03
+
+- Lock footage (Settings → Storage, on by default): lock videos and photos in playback; locked files are never removed by automatic cleanup or plain delete.
+- Video playback: Lock / Unlock for the files playing at this moment (all cameras), locked parts marked under the progress bar, sessions with locked files marked in the list.
+- Photo playback: Lock / Unlock a whole photo group; locked groups marked in the list.
+- If locked footage fills the space, recording stops and says so.
+
+## [2.0.8-alpha] - 2026-10-03
+
+- Vehicle status panel: now only the horn, flash-to-pass and hazard lights.
+- Sentry Mode no longer has to hold for 2 s before it counts (the blink it guarded against was most likely a manual toggle).
+
+## [2.0.7-alpha] - 2026-10-03
+
+- Record button: while recording, a small line says what happens when the screen goes off.
+- Settings → System → Keep recording when the screen goes off: shorter description.
+- Sentry Mode has to hold for 2 s before it counts (it can blink on for a second while parked).
+
+## [2.0.6-alpha] - 2026-10-03
+
+- Sentry Mode status can now be shown anywhere it matters (SentryStatusView).
+- Settings → System → Keep recording when the screen goes off: clearer description of how it works
+  with Sentry Mode, and the row shows whether Sentry Mode is on right now.
+
+## [2.0.5-alpha] - 2026-10-02
+
+- Sentry Mode status is read for everyone (it decides whether recording can carry on with the screen off).
+- Vehicle status panel: Sentry Mode (off, on, armed) takes the first cell; doors and seat belts
+  are no longer on it.
+
+## [2.0.4-alpha] - 2026-10-02
+
+- Main screen: vehicle status panel (experimental, off by default).
+- Settings → Interface → Vehicle status (experimental): a panel below Straighten on the main screen
+  shows doors and seat belts, brake and throttle, driver assistance switches and the horn, with the
+  info bar icons. The horn stays crossed out until its signal is found.
+- Driving info bar: the hands-on-wheel cell moves next to the driver assistance badges.
+
+## [2.0.3-alpha] - 2026-10-02
+
+- Driving info bar: lamp cells reworked as agreed on the mock-ups; more adjustments to follow.
+- Driving info bar: low and high beam share one cell; the direction of its four rays shows
+  which beams are on.
+- Driving info bar: a rear lamp group drawn from the 7X tail shows the rear position lamps,
+  stop lamps, rear fog lamps and reversing lamps; the separate fog cell is gone.
+
+## [2.0.2-alpha] - 2026-10-01
+
+- Driving info bar: the number in the steering wheel is the wheel's angle in degrees.
 - About: thanks now name the Singapore Zeekr Group and add members of the Malaysian, Australian
   and Chinese owner communities for their suggestions, insights and support.
 - The About page comes in Chinese and English only: the Chinese interface shows Chinese, every
   other language shows English.
-- Turn-signal side view (off by default, Settings → Super mirror): signalling pops up that side's
-  camera, straightened and turned towards the blind spot, and closes it about a second after the
-  signal goes off. Stock views (reverse, 360, side pop-up, park assist) take precedence; minimum
-  speed, view width, aim, size, position and stay-open time are adjustable.
+- Driving info bar: the high beam cell also lights while you flash the high beams, for at least
+  half a second so a quick flash still shows in the recording.
+- Driving info bar: the steering wheel turns by its real angle and in the right direction (up to
+  about 510° each way, yellow to the left).
+- Driving info bar: the brake bar fills at a full press; it used to stop at about a fifth.
+- Vehicle info page: Sentry Mode shows on, armed or off.
 
 ## [2.0.1-beta] - 2026-10-01
 

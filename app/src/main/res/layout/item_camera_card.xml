@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   一路相机。一行看完：叫什么、开没开、录成什么样。
-  和上面那一档不一样的地方标「已细调」——「我选了均衡，但后座舱不是」这件事必须看得见。
+  和上面那一档不一样的地方标「自定义」——「我选了均衡，但后座舱不是」这件事必须看得见。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

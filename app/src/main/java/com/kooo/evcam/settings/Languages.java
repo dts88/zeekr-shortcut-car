@@ -1,5 +1,9 @@
 package com.kooo.evcam.settings;
 
+import android.content.Context;
+import android.content.res.Configuration;
+import android.os.LocaleList;
+
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 
@@ -57,6 +61,22 @@ public final class Languages {
         }
         // 包括 auto 和任何不认识的值：不指定，交回给系统
         return "";
+    }
+
+    /**
+     * 按「应用语言」取字串的 Context，给不在界面上的地方用（录像里的信息条在编码线程上画）。
+     * Application 的 Context 在 Android 13 以下给的是系统语言（见 {@code CameraNames}）：
+     * 这里按 appcompat 记着的应用语言另起一份配置；跟随系统时就是 Application 的那份。
+     */
+    public static Context localized(Context context) {
+        Context app = context.getApplicationContext();
+        LocaleListCompat locales = AppCompatDelegate.getApplicationLocales();
+        if (locales.isEmpty()) {
+            return app;
+        }
+        Configuration config = new Configuration(app.getResources().getConfiguration());
+        config.setLocales(LocaleList.forLanguageTags(locales.toLanguageTags()));
+        return app.createConfigurationContext(config);
     }
 
     /** 把设置里的选择真正应用到界面上。 */

@@ -2,16 +2,17 @@ package com.kooo.evcam.profile;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+
+import java.util.Map;
 
 /**
  * {@link QualityPreset} 的单元测试。
  *
  * <p>钉两件事：存下去的那几个词不能改（它们写进了用户的配置），以及
- * 「我选了均衡，但后座舱不是」这件事一定认得出来 —— 界面上那个「已细调」
+ * 「我选了均衡，但后座舱不是」这件事一定认得出来 —— 界面上那个「自定义」
  * 角标全靠它。</p>
  */
 public class QualityPresetTest {
@@ -61,28 +62,63 @@ public class QualityPresetTest {
         assertEquals(StreamSpec.FPS_UNLIMITED, QualityPreset.SHARPEST.fps);
     }
 
-    /** 每一路都对得上才算这一档。 */
+    /**
+     * 选了一档、再单独改一路：选的那一档不变，改过的那一路对不上它。
+     *
+     * <p>「自定义」标记和哪张卡亮着全靠这两件事，存取往返之后也得成立。
+     * 以前选的是哪一档是从各路的参数倒推的，一路改过就推不出来了。</p>
+     */
     @Test
-    public void aProfileMatchesOnlyWhenEveryCameraDoes() {
-        Profile balanced = profileWith(
+    public void thePickSurvivesTuningAndTheRoundTrip() {
+        Profile profile = profileWith(
                 QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM,
                 QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM);
-        assertEquals(QualityPreset.BALANCED, QualityPreset.of(balanced));
+        QualityPreset.SHARPEST.applyTo(profile);
+        profile.cameras.get(1).record.bitrate = StreamSpec.BITRATE_LOW;
 
-        Profile mixed = profileWith(
-                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM,
-                QualityPreset.SAVE_SPACE.fps, StreamSpec.BITRATE_LOW);
-        assertNull("一路细调过就不该算整体是哪一档", QualityPreset.of(mixed));
+        Profile after = Profile.fromMap(profile.toMap());
+
+        assertEquals(QualityPreset.SHARPEST, after.quality);
+        assertTrue(after.quality.matches(after.cameras.get(0).record));
+        assertFalse("改过的那一路要标出来", after.quality.matches(after.cameras.get(1).record));
     }
 
-    /** 空配置没有档。 */
+    /** 早先存下的配置里没有这个键：按开着的几路里对得上最多的那一档算。 */
     @Test
-    public void anEmptyProfileHasNoStep() {
-        assertNull(QualityPreset.of(new Profile()));
-        assertNull(QualityPreset.of(null));
+    public void anOldProfileInfersTheStepMostCamerasStillMatch() {
+        Profile profile = profileWith(
+                QualityPreset.SHARPEST.fps, StreamSpec.BITRATE_HIGH,
+                QualityPreset.SHARPEST.fps, StreamSpec.BITRATE_HIGH,
+                "24", StreamSpec.BITRATE_LOW);
+        Map<String, String> flat = profile.toMap();
+        flat.remove("quality");
+
+        assertEquals("单独改过一路，其余几路还是当初选的那一档",
+                QualityPreset.SHARPEST, Profile.fromMap(flat).quality);
     }
 
-    /** 选一档写下去，每一路都跟着走；其余参数不动。 */
+    /** 关着的那几路不算：后来补上的是默认值，不代表当初选了什么。 */
+    @Test
+    public void camerasThatAreOffDoNotCount() {
+        Profile profile = profileWith(
+                QualityPreset.SHARPEST.fps, StreamSpec.BITRATE_HIGH,
+                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM,
+                QualityPreset.BALANCED.fps, StreamSpec.BITRATE_MEDIUM);
+        profile.cameras.get(1).enabled = false;
+        profile.cameras.get(2).enabled = false;
+
+        assertEquals(QualityPreset.SHARPEST, QualityPreset.inferredFrom(profile));
+    }
+
+    /** 推不出来（没有相机、或者哪一档都对不上）时算「均衡」，和认不出来的词一样。 */
+    @Test
+    public void nothingToGoOnMeansBalanced() {
+        assertEquals(QualityPreset.BALANCED, QualityPreset.inferredFrom(new Profile()));
+        assertEquals(QualityPreset.BALANCED, QualityPreset.inferredFrom(
+                profileWith("24", StreamSpec.BITRATE_VERY_LOW)));
+    }
+
+    /** 选一档写下去，每一路都跟着走，并记下选的是它；其余参数不动。 */
     @Test
     public void applyingWritesEveryCameraAndLeavesTheRest() {
         Profile profile = profileWith("10", StreamSpec.BITRATE_VERY_LOW,
@@ -92,14 +128,17 @@ public class QualityPresetTest {
 
         QualityPreset.SHARPEST.applyTo(profile);
 
-        assertEquals(QualityPreset.SHARPEST, QualityPreset.of(profile));
+        assertEquals(QualityPreset.SHARPEST, profile.quality);
+        for (CameraProfile camera : profile.cameras) {
+            assertTrue(QualityPreset.SHARPEST.matches(camera.record));
+        }
         assertEquals("分段不该被档位动", 5, profile.cameras.get(0).record.segmentMinutes);
         assertEquals("编码不该被档位动", "h264", profile.cameras.get(0).record.codec);
         assertEquals("分辨率不该被档位动",
                 StreamSpec.RESOLUTION_AUTO, profile.cameras.get(0).record.resolution);
     }
 
-    /** 单独一路也认得出对不对得上，「已细调」角标靠它。 */
+    /** 单独一路也认得出对不对得上，「自定义」角标靠它。 */
     @Test
     public void oneCameraKnowsWhetherItMatches() {
         StreamSpec record = StreamSpec.record(StreamSpec.RESOLUTION_AUTO,
