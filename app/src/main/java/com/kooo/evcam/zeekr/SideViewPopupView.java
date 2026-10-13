@@ -8,7 +8,9 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.util.Size;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 
@@ -17,7 +19,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.AutoFitTextureView;
 
 /**
- * 打转向灯弹出的侧视窗：只显示左或右那一路，双指缩放，单指不操作。
+ * 打转向灯弹出的侧视窗：只显示左或右那一路，双指缩放，单指拖动。
  *
  * <p>画法和超级后视镜一样（见 {@link RearViewMirrorView} 的类说明）：子视图是普通 TextureView，
  * 本容器在 {@code dispatchDraw} 里按 {@link RearViewGeometry#combinedSourceRect} 把那一路放大重画，
@@ -34,8 +36,8 @@ import com.kooo.evcam.AutoFitTextureView;
  *   <li>显示：alpha 1，在对应那一边。</li>
  * </ul>
  *
- * <p>位置：屏幕中线是两边的分界，左侧那一路的右边缘贴中线，右侧那一路的左边缘贴中线；
- * 大小和上下位置在设置里调，也可以双指缩放。显示时接触摸，隐藏备着时点击穿过去。</p>
+ * <p>两侧共用同一个保存的位置。可以单指拖动、双指缩放；大小和上下位置也能在设置里调。
+ * 显示时接触摸，隐藏备着时点击穿过去。</p>
  */
 public class SideViewPopupView extends ViewGroup {
 
@@ -54,6 +56,12 @@ public class SideViewPopupView extends ViewGroup {
     private WindowManager.LayoutParams params;
     private boolean attached;
     private boolean visible;
+    private float dragStartX;
+    private float dragStartY;
+    private int windowStartX;
+    private int windowStartY;
+    private boolean multiTouchGesture;
+    private final int dragSlop;
     private CompositeStreamGeometry.Plan plan;
     private int lane = LaneCycle.LEFT;
     private boolean straighten;
@@ -66,6 +74,7 @@ public class SideViewPopupView extends ViewGroup {
     public SideViewPopupView(Context context, AppConfig appConfig) {
         super(context);
         this.appConfig = appConfig;
+        dragSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         resizeGesture = new ScaleGestureDetector(context,
                 new ScaleGestureDetector.SimpleOnScaleGestureListener() {
                     private float startSpan;
@@ -78,6 +87,7 @@ public class SideViewPopupView extends ViewGroup {
                         }
                         startSpan = detector.getCurrentSpan();
                         startSize = params.width;
+                        savePosition();
                         return startSpan > 0f;
                     }
 
@@ -88,7 +98,8 @@ public class SideViewPopupView extends ViewGroup {
                                 getResources().getDisplayMetrics().heightPixels);
                         if (percent != appConfig.getSidePopupSizePercent()) {
                             appConfig.setSidePopupSizePercent(percent);
-                            place(lane);
+                            place();
+                            savePosition();
                             update();
                             invalidate();
                         }
@@ -180,7 +191,7 @@ public class SideViewPopupView extends ViewGroup {
     public void applyConfig() {
         readConfig();
         if (attached) {
-            place(lane);
+            place();
             update();
         }
         invalidate();
@@ -201,7 +212,7 @@ public class SideViewPopupView extends ViewGroup {
             visible = show;
             applyVisibility(show);
             if (sideChanged) {
-                place(side);
+                place();
             }
             if (sideChanged || visibilityChanged) {
                 update();
@@ -220,7 +231,7 @@ public class SideViewPopupView extends ViewGroup {
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
         applyVisibility(show);
-        place(side);
+        place();
         try {
             windowManager.addView(this, params);
             attached = true;
@@ -247,12 +258,54 @@ public class SideViewPopupView extends ViewGroup {
         }
     }
 
-    /** Pinch the visible popup to resize; leave one-finger taps inert. */
+    /** Drag to position or pinch to resize; both sides share the saved window geometry. */
     @android.annotation.SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(android.view.MotionEvent event) {
+        if (!attached || !visible || params == null) {
+            return true;
+        }
         resizeGesture.onTouchEvent(event);
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                multiTouchGesture = false;
+                dragStartX = event.getRawX();
+                dragStartY = event.getRawY();
+                windowStartX = params.x;
+                windowStartY = params.y;
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                multiTouchGesture = true;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (!multiTouchGesture && event.getPointerCount() == 1) {
+                    float dx = event.getRawX() - dragStartX;
+                    float dy = event.getRawY() - dragStartY;
+                    if (Math.hypot(dx, dy) >= dragSlop) {
+                        params.x = SidePopupSizing.clampPosition(windowStartX + Math.round(dx),
+                                getResources().getDisplayMetrics().widthPixels, params.width);
+                        params.y = SidePopupSizing.clampPosition(windowStartY + Math.round(dy),
+                                getResources().getDisplayMetrics().heightPixels, params.height);
+                        savePosition();
+                        update();
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                multiTouchGesture = false;
+                break;
+            default:
+                break;
+        }
         return true;
+    }
+
+    private void savePosition() {
+        if (params != null) {
+            appConfig.setSidePopupPosition(params.x, params.y,
+                    getResources().getDisplayMetrics().heightPixels, params.height);
+        }
     }
 
     private void update() {
@@ -264,18 +317,22 @@ public class SideViewPopupView extends ViewGroup {
     }
 
     /**
-     * 大小和位置。边长按屏幕高度的百分比，最多半个屏幕宽（两边在中线相接，不能超过一半）；
-     * 上下位置是剩余高度里的百分比，0 贴顶、100 贴底。
+     * One shared position for both lanes. Default is horizontally centred; dragging saves
+     * its location, and resizing keeps that location within the screen.
      */
-    private void place(int side) {
+    private void place() {
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
         int size = SidePopupSizing.size(appConfig.getSidePopupSizePercent(), w, h);
-        int center = w / 2;
         params.width = size;
         params.height = size;
-        params.x = side == LaneCycle.LEFT ? center - size : center;
-        params.y = Math.round(Math.max(0, h - size) * appConfig.getSidePopupVerticalPercent() / 100f);
+        int savedX = appConfig.getSidePopupX();
+        int savedY = appConfig.getSidePopupY();
+        params.x = SidePopupSizing.clampPosition(savedX < 0 ? (w - size) / 2 : savedX, w, size);
+        int y = savedY < 0
+                ? Math.round(Math.max(0, h - size) * appConfig.getSidePopupVerticalPercent() / 100f)
+                : savedY;
+        params.y = SidePopupSizing.clampPosition(y, h, size);
     }
 
     // ------------------------------------------------------------------ 布局与绘制

@@ -315,7 +315,7 @@
     <string name="set_side_popup_size_title">弹窗大小（屏幕高度的 %）</string>
     <string name="set_side_popup_size_summary">独立窗口使用此大小，也可以双指缩放；最大为屏幕宽度的一半。</string>
     <string name="set_side_popup_vertical_title">上下位置（%）</string>
-    <string name="set_side_popup_vertical_summary">仅用于超级后视镜关闭时的独立弹窗。0 贴顶，100 贴底</string>
+    <string name="set_side_popup_vertical_summary">独立窗口两侧共用同一位置；可拖动窗口定位，或用此滑块调整高度。0 为顶部，100 为底部。</string>
     <string name="msg_floating_reset">悬浮按钮已重置</string>
     <string name="msg_adjust_opened">已打开画面调节窗口，返回主界面查看效果</string>
     <string name="msg_adjust_reset">画面参数已恢复默认</string>

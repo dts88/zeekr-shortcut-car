@@ -102,6 +102,8 @@ public class AppConfig {
     private static final String KEY_SIDE_POPUP_CLOSE_DELAY_MS = "side_popup_close_delay_ms";  // 灯灭后再留多少毫秒
     private static final String KEY_SIDE_POPUP_SIZE = "side_popup_size";  // 边长，屏幕高度的百分比
     private static final String KEY_SIDE_POPUP_VERTICAL = "side_popup_vertical";  // 上下位置，0 顶 100 底
+    private static final String KEY_SIDE_POPUP_X = "side_popup_x";
+    private static final String KEY_SIDE_POPUP_Y = "side_popup_y";
     /** 以毫秒存：按秒只有 0–3 四档，车机那条很宽的滑块拖一小段根本不动（PR 作者 2026-10-01 实车）。 */
     public static final int SIDE_POPUP_MAX_CLOSE_DELAY_MS = 3000;
     public static final int SIDE_POPUP_DEFAULT_CLOSE_DELAY_MS = 1000;
@@ -1637,7 +1639,24 @@ public class AppConfig {
     }
 
     public void setSidePopupVerticalPercent(int percent) {
-        prefs.edit().putInt(KEY_SIDE_POPUP_VERTICAL, Math.max(0, Math.min(100, percent))).apply();
+        prefs.edit().putInt(KEY_SIDE_POPUP_VERTICAL, Math.max(0, Math.min(100, percent)))
+                .remove(KEY_SIDE_POPUP_Y).apply();
+    }
+
+    public int getSidePopupX() {
+        return prefs.getInt(KEY_SIDE_POPUP_X, -1);
+    }
+
+    public int getSidePopupY() {
+        return prefs.getInt(KEY_SIDE_POPUP_Y, -1);
+    }
+
+    /** One saved location for both cameras; keep the height slider in sync with dragging. */
+    public void setSidePopupPosition(int x, int y, int screenHeight, int windowHeight) {
+        int available = Math.max(0, screenHeight - windowHeight);
+        int vertical = available == 0 ? 0 : Math.round(y * 100f / available);
+        prefs.edit().putInt(KEY_SIDE_POPUP_X, x).putInt(KEY_SIDE_POPUP_Y, y)
+                .putInt(KEY_SIDE_POPUP_VERTICAL, Math.max(0, Math.min(100, vertical))).apply();
     }
 
     /** 侧视虚拟相机的视野（度）。 */

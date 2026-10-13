@@ -296,7 +296,7 @@
     <string name="set_side_popup_size_title">Pop-up size (% of screen height)</string>
     <string name="set_side_popup_size_summary">Separate window only; pinch it to resize too. Limited to half the screen width.</string>
     <string name="set_side_popup_vertical_title">Height on screen (%)</string>
-    <string name="set_side_popup_vertical_summary">Separate pop-up only, when Super mirror is off. 0 is the top, 100 the bottom</string>
+    <string name="set_side_popup_vertical_summary">Both cameras use one saved position. Drag the separate window to place it, or use this slider for height: 0 top, 100 bottom.</string>
     <string name="msg_floating_reset">Floating button reset</string>
     <string name="msg_adjust_opened">Image adjustment window opened. Go back to the main screen to see the effect.</string>
     <string name="msg_adjust_reset">Image settings reset to defaults</string>

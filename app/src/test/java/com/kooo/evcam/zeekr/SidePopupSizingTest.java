@@ -28,4 +28,18 @@ public class SidePopupSizingTest {
         assertEquals(55, SidePopupSizing.resizedPercent(550, Float.POSITIVE_INFINITY, 1000));
         assertEquals(55, SidePopupSizing.resizedPercent(550, 2f, 0));
     }
+
+    @Test
+    public void growingWindowKeepsSavedPositionInsideTheScreen() {
+        assertEquals(1600, SidePopupSizing.clampPosition(1600, 2000, 300));
+        assertEquals(1500, SidePopupSizing.clampPosition(1600, 2000, 500));
+        assertEquals(500, SidePopupSizing.clampPosition(900, 1000, 500));
+    }
+
+    @Test
+    public void draggingCannotLoseTheWindowBeyondScreenEdges() {
+        assertEquals(0, SidePopupSizing.clampPosition(-100, 2000, 550));
+        assertEquals(1450, SidePopupSizing.clampPosition(2500, 2000, 550));
+        assertEquals(0, SidePopupSizing.clampPosition(100, 300, 550));
+    }
 }
