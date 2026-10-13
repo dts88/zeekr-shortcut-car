@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.3-alpha] - 2026-10-13
+
+- Opening a door within 30 seconds of the screen going off no longer stops and restarts the cabin cameras.
+- Closed cabin cameras are not opened while the screen is off.
+- A recording waiting for the USB drive starts as soon as the drive is usable.
+
 ## [2.11.2-alpha] - 2026-10-13
 
 - Screen off now follows the physical screen: the vehicle's screen signal counts, not only Android's screen-off at power-down.
