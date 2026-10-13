@@ -684,6 +684,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 超级后视镜
 
     private void bindRearView() {
+        bindSwitch("pref_rearview_camera_label", appConfig.isRearViewCameraLabelEnabled(), value -> {
+            appConfig.setRearViewCameraLabelEnabled(value);
+            RearViewMirrorService.refreshCameraLabel();
+        });
         // 这个开关原先没查悬浮窗权限：没授权时它会拨上去、提示语还讲了手势怎么用，
         // 而服务在 onStartCommand 里就 stopSelf() 走了，屏幕上什么都没有。
         bindOverlaySwitch("pref_rearview", appConfig.isRearViewEnabled(),
@@ -743,6 +747,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         onClick("pref_rearview_reset", pref -> {
             appConfig.resetRearViewLayout();
+            SwitchPreferenceCompat label = findPreference("pref_rearview_camera_label");
+            if (label != null) {
+                label.setChecked(appConfig.isRearViewCameraLabelEnabled());
+            }
             if (getContext() != null && appConfig.isRearViewEnabled()) {
                 // 重开一次让新的默认值生效
                 RearViewMirrorService.stop(getContext());

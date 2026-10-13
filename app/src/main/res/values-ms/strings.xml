@@ -913,4 +913,6 @@
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
+    <string name="set_rearview_camera_label_title">Tunjukkan label kamera</string>
+    <string name="set_rearview_camera_label_summary">Memaparkan Depan, Belakang, Kiri atau Kanan dalam tetingkap Cermin super</string>
 </resources>

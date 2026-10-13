@@ -923,4 +923,6 @@
     <string name="dev_tool_progress">（%1$d/%2$d）%3$s</string>
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
+    <string name="set_rearview_camera_label_title">显示摄像头名称</string>
+    <string name="set_rearview_camera_label_summary">在超级后视镜窗口显示前、后、左、右摄像头方向</string>
 </resources>

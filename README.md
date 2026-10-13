@@ -49,6 +49,11 @@ switch camera. Push it half off-screen to hide it at the edge, and tap to bring 
 rear camera is mirrored, like a real mirror. Fisheye correction with an adjustable field of view is
 optional.
 
+**Settings → Super mirror → Show camera label** adds a Front, Rear, Left or Right badge
+to the window (on by default). The label follows the app language and stays upright when
+the camera image is mirrored. Switch it off for an unobstructed view; resetting the Super
+mirror layout restores the label to its default.
+
 ### Playback
 
 Video playback shows every camera together, in sync; tap one to enlarge it, tap again to go back.
