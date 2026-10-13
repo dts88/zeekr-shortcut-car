@@ -296,7 +296,7 @@
     <string name="set_side_popup_size_title">Saiz tetingkap timbul (% ketinggian skrin)</string>
     <string name="set_side_popup_size_summary">Tetingkap berasingan sahaja; cubit dengan dua jari untuk mengubah saiz. Terhad kepada separuh lebar skrin.</string>
     <string name="set_side_popup_vertical_title">Ketinggian pada skrin (%)</string>
-    <string name="set_side_popup_vertical_summary">Untuk tetingkap timbul berasingan sahaja, apabila cermin super dimatikan. 0 ialah atas, 100 ialah bawah</string>
+    <string name="set_side_popup_vertical_summary">Kedua-dua kamera menggunakan satu kedudukan tersimpan. Seret tetingkap berasingan atau laraskan ketinggian: 0 atas, 100 bawah.</string>
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
     <string name="msg_adjust_opened">Tetingkap pelarasan imej dibuka. Kembali ke skrin utama untuk melihat kesannya.</string>
     <string name="msg_adjust_reset">Tetapan imej dipulihkan kepada lalai</string>

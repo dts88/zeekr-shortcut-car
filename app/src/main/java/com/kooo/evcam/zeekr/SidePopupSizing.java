@@ -23,4 +23,8 @@ public final class SidePopupSizing {
         return Math.max(AppConfig.SIDE_POPUP_MIN_SIZE_PERCENT,
                 Math.min(AppConfig.SIDE_POPUP_MAX_SIZE_PERCENT, percent));
     }
+
+    public static int clampPosition(int coordinate, int screenExtent, int windowExtent) {
+        return Math.max(0, Math.min(Math.max(0, screenExtent - windowExtent), coordinate));
+    }
 }

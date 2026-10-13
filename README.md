@@ -63,8 +63,9 @@ window has its own output and does not replace the mirror output. Reverse, facto
 side view and park assist take precedence.
 
 Side-camera correction and aim apply to either window. The pop-up size and placement settings
-apply only to the separate pop-up; pinch that window to resize it and save its size. It stays
-square, on its corresponding side of the screen, and is limited to half the screen width.
+apply only to the separate pop-up. Left and right cameras use one shared window position.
+Drag the window to place it and pinch to resize; both position and size are saved. It stays
+square and is limited to half the screen width.
 Super mirror keeps its own size and position. If the head unit rejects the additional output,
 the side window is closed and a message suggests using Replace Super mirror. This feature
 uses the turn signals; blind-spot obstacle alerts are not yet a trigger.
