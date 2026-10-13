@@ -40,17 +40,25 @@ import java.util.Set;
  *       {@code onFunctionValueChanged(id, zone, value)} / {@code onSensorEventChanged} / {@code onSensorValueChanged}。
  *       回调在车的 binder 线程上来，转到自己的线程处理。</li>
  *   <li>注册后立刻把每一项读一遍当起点（注册时车不推当前值）；之后每 {@link #RECONCILE_MS} 再读一遍对账，
- *       防车机服务重启后回调断了。</li>
- *   <li>浮点传感器（车速、转角、深度、温度……）不订阅 —— 变一点就推，订了只是噪声 —— 按 {@link #FLOAT_POLL_MS} 读。</li>
- *   <li><b>传感器监听疑似注销不掉</b>（注销再注册，回调会变成两条三条），所以传感器只在进程里注册一次、永远留着，
- *       停了就不理它的回调；功能号的监听每次停都注销。车辆对象整个进程只建一次（{@code Car.create} 要一秒）。</li>
+ *       防车机服务重启后回调断了。对账只有一条节拍：当场要的那一遍（{@link #reconcileNow}：安卓刚亮、有人在时）先撤掉排着的那一次，
+ *       读完再排一次。</li>
+ *   <li>浮点传感器（车速、转角、深度、温度……）不订阅 —— 变一点就推，订了只是噪声 —— 按 {@link #FLOAT_POLL_MS} 读，
+ *       而且只在有完整用户时读（{@link #floats}，{@link TelemetryUsers}）：熄屏判断那一层只要离散信号。</li>
+ *   <li><b>传感器监听疑似注销不掉</b>（注销再注册，回调会变成两条三条），所以传感器在一个车辆对象上只注册一次、永远留着，
+ *       停了就不理它的回调；功能号的监听每次停都注销。车辆对象建一次一直用（{@code Car.create} 要一秒），
+ *       连不上（{@link Telemetry.CarLink#FAILED}）时丢掉，下次再连重建、传感器在新的上面重新挂（{@link #forgetCar}）。</li>
  * </ul>
  *
  * <p>信号表在 {@link Signal}；读数进 {@link Readings}，信息条那份快照由 {@link VehicleStateMapper} 推出来。</p>
  *
+ * <p><b>连接的结果</b>（{@link Telemetry.CarLink}）：没有那个类、没有 {@code Car.create} 是这台车机没有（不再试）；
+ * 别的连不上（出错、{@code Car.create} 给了 null、接口里没有能读的、连上那一遍一个值都读不到），以及连上之后连着
+ * {@link #DEAD_PASSES} 遍对账一个值都读不到（车机服务多半没了），都算连不上：这个来源就此不再读，
+ * {@link Telemetry} 过一会儿换一个新的再连。占位值（255）算读到了：车回了话，只是这一项没数据。</p>
+ *
  * <p><b>找黑屏信号，只记录</b>（2026-10-12）：{@link DarkScreenProbes} 那几个信号表里没有的号跟着一起订、对账时一起读
- * （它们的可用状态回调也记），连同信号表里的点火、挡位、哨兵、主驾门 / 座椅 / 安全带，每变一次进黑匣子一行（{@link #probeLog}）。
- * 不进读数、不进信息条、不改任何判断，出了错也只写日志；来源停了就不记。</p>
+ * （它们的可用状态回调也记），连同信号表里的屏幕电源事件、点火、挡位、哨兵、主驾门 / 座椅 / 安全带，每变一次进黑匣子一行（{@link #probeLog}）。
+ * 那几个号不进读数、不进信息条、不改任何判断，出了错也只写日志；来源停了就不记。</p>
  */
 final class EcarxSource {
 
@@ -64,14 +72,18 @@ final class EcarxSource {
     static final long RECONCILE_MS = 3000L;
     /** 一次变化引起的发布合并在这么长的窗口里。 */
     private static final long PUBLISH_COALESCE_MS = 40L;
+    /** 连着这么多遍对账一个值都读不到，就算断了（{@link #stillAnswering}）：约 6 秒，一次偶尔的读失败不算。 */
+    static final int DEAD_PASSES = 2;
+    /** 两遍对账之间深睡过多久算「睡过」（{@link #emptyPassesAfter}）：两个钟各读一次有一两毫秒的出入，不算。 */
+    static final long SLEPT_BETWEEN_MS = 1_000L;
     /** 车辆信息：主驾在哪一边（ICarInfo.INT_INFO_DRIVER_SIDE），读到 0x00100302 = 右、0x00100301 = 左。 */
     private static final int INFO_DRIVER_SIDE = 0x00100300;
     private static final int DRIVER_SIDE_LEFT = 0x00100301;
     private static final int DRIVER_SIDE_RIGHT = 0x00100302;
 
-    /** 车辆对象整个进程只建一次。 */
+    /** 车辆对象：建一次一直用；连不上的那一个丢掉（{@link #forgetCar}），下次再连重建。 */
     private static volatile Object cachedCar;
-    /** 传感器监听：进程里只注册一次、永不注销（注销不掉）；回调转给此刻活着的那个来源。 */
+    /** 传感器监听：一个车辆对象上只注册一次、永不注销（注销不掉）；回调转给此刻活着的那个来源。车辆对象丢掉时清（{@link #forgetCar}）。 */
     private static final Object SENSOR_LOCK = new Object();
     private static Object sensorProxy;
     private static final Set<Integer> sensorTypesRegistered = new HashSet<>();
@@ -84,11 +96,23 @@ final class EcarxSource {
     private final Map<Long, List<Signal>> byKey = new HashMap<>();
     private HandlerThread thread;
     private volatile Handler handler;
-    /** 连接经过的细节：只进日志和黑匣子（{@link Telemetry#sourceReported}）。 */
+    /** 连接经过的细节：只进日志和黑匣子（{@link Telemetry#carReported}），诊断报告也读它（{@link #status()}）。 */
     private volatile String status = "not started";
-    /** 连接的结果：页面上的状态行只显示这个。 */
+    /** 连接的结果：页面上的状态行、熄屏判断看这个。 */
     private volatile Telemetry.CarLink link = Telemetry.CarLink.CONNECTING;
     private volatile boolean stopped;
+    /** 连上了、还在读（没断）：回调、对账、浮点只在这时算数。只在自己的线程上碰。 */
+    private boolean connected;
+    /** 读不读浮点传感器（有完整用户）。构造时给，之后只在自己的线程上碰（{@link #floats}）。 */
+    private boolean floatsOn;
+    /** 连着几遍对账一个值都没读到（两遍之间车机深睡过的不算连着，{@link #emptyPassesAfter}）。 */
+    private int emptyPasses;
+    /** 上一遍对账时车机一共深睡过多久（elapsedRealtime − uptimeMillis）：这一遍和它比，涨了就是两遍之间睡过。 */
+    private long sleptAtLastPass;
+    /** 这个来源用的车辆对象（{@link #cachedCar} 里拿的、或者刚建的）；还没拿到是 null。只在自己的线程上碰。 */
+    private Object car;
+    /** 等着「当场对一次账」读完的回调（{@link #reconcileNow}）：停的时候还没轮到的也交给主线程，一个不丢。 */
+    private final List<Runnable> waiting = new ArrayList<>();
     private long readingsVersion;
     private boolean publishPending;
     private boolean firstRoundReported;
@@ -119,10 +143,32 @@ final class EcarxSource {
 
     private final Runnable floatPoll = this::pollFloats;
     private final Runnable reconcile = this::reconcileDiscrete;
+    /** 合并窗口到点的那一次发布；当场对账（{@link #reconcileNow}）要立刻发布，撤的是它。 */
     private final Runnable publish = this::publishNow;
+    /** 显示里有保持的信号到点再算的那一次（{@link #apply}）：和 {@link #publish} 分开，立刻发布时不把它撤掉。 */
+    private final Runnable holdPublish = this::publishNow;
 
-    EcarxSource(Telemetry telemetry) {
+    /** 这一遍读是谁触发的：黑匣子那一行据此标出来（{@link #writeProbeChanges}）。 */
+    private enum Pass {
+        /** 一个回调 */
+        CALLBACK,
+        /**
+         * 每 {@link #RECONCILE_MS} 的对账；有人在时提前读的那一遍（{@link #reconcileNow}，不是刚醒）也是它 ——
+         * 节拍一直在走，读到的变化同样最多早一个对账间隔
+         */
+        RECONCILE,
+        /** 安卓刚亮时要的那一遍（{@link #reconcileNow}，刚醒）：车机睡着时变的，什么时候变的不知道 */
+        WAKE
+    }
+
+    /**
+     * @param floats 读不读浮点传感器（有完整用户）；之后由 {@link #floats} 改
+     */
+    EcarxSource(Telemetry telemetry, boolean floats) {
         this.telemetry = telemetry;
+        this.floatsOn = floats;
+        // 再连时换的新来源接着旧的版本号往上数（快照的版本号只往上走）
+        this.readingsVersion = telemetry.readings().version;
         for (Signal s : Signal.values()) {
             long key = key(s.kind, s.id, s.zone);
             List<Signal> list = byKey.get(key);
@@ -170,10 +216,110 @@ final class EcarxSource {
             t.quitSafely();
         }
         status = "stopped";
+        // 还没轮到的「当场对一次账」：不读了，回调照样交给主线程（叫的人在等它）
+        List<Runnable> left;
+        synchronized (waiting) {
+            left = new ArrayList<>(waiting);
+            waiting.clear();
+        }
+        for (Runnable r : left) {
+            telemetry.toMain(r);
+        }
     }
 
     Telemetry.CarLink link() {
         return link;
+    }
+
+    /** 连接经过的细节（英文）：日志、黑匣子、诊断报告用。 */
+    String status() {
+        return status;
+    }
+
+    /**
+     * 读不读浮点传感器（{@link Telemetry} 在第一个完整用户来、最后一个走时叫）。在自己的线程上改：
+     * 开 —— 连着的话马上读一遍，之后按节拍读；关 —— 停节拍、表里的浮点值清掉、位置和 GPS 车速跟着清，再发布一次。
+     * 不发空快照：离散的读数照旧。
+     */
+    void floats(boolean on) {
+        Handler h = handler;
+        if (h != null && !stopped) {
+            h.post(() -> setFloats(on));
+        }
+    }
+
+    private void setFloats(boolean on) {
+        Handler h = handler;
+        if (stopped || h == null || floatsOn == on) {
+            return;
+        }
+        floatsOn = on;
+        h.removeCallbacks(floatPoll);
+        if (on) {
+            if (connected) {
+                pollFloats();
+            }
+            return;
+        }
+        values.keySet().removeIf(Signal::isFloat);
+        telemetry.floatsCleared(this);
+        schedulePublish(0);
+    }
+
+    /**
+     * 当场对一次账（{@link Telemetry#reconcileNow}）：交给自己的线程，读完把 {@code onDone} 交给主线程。
+     *
+     * @param afterWake 安卓刚亮（车机睡过，黑匣子那一行标「醒来时读到」）；不是的（有人在、提前读）和对账一样标
+     * @return 交出去了；停了的是 false，叫的人自己把 {@code onDone} 交给主线程
+     */
+    boolean reconcileNow(boolean afterWake, Runnable onDone) {
+        Handler h = handler;
+        if (h == null || stopped) {
+            return false;
+        }
+        synchronized (waiting) {
+            waiting.add(onDone);
+        }
+        final Pass pass = afterWake ? Pass.WAKE : Pass.RECONCILE;
+        if (!h.post(() -> {
+            readNow(pass);
+            deliver(onDone);
+        })) {
+            // 线程刚好退了：不读了，回调照样交出去
+            deliver(onDone);
+        }
+        return true;
+    }
+
+    /** 回调交给主线程，一次：{@link #stop} 那边先交了的就不再交。 */
+    private void deliver(Runnable onDone) {
+        boolean mine;
+        synchronized (waiting) {
+            mine = waiting.remove(onDone);
+        }
+        if (mine) {
+            telemetry.toMain(onDone);
+        }
+    }
+
+    /**
+     * 当场要的那一遍：撤掉排着的对账，离散信号和那几个号读一遍，有变化立刻发布（撤掉合并窗口那一次，当场发），
+     * 再排下一次对账 —— 对账的节拍始终只有一条。发布先把监听者那一批交给主线程，回调（{@link #deliver}）排在它后面。
+     */
+    private void readNow(Pass pass) {
+        Handler h = handler;
+        if (h == null || stopped || !connected) {
+            return;
+        }
+        h.removeCallbacks(reconcile);
+        boolean alive = stillAnswering(readPass(pass));
+        if (publishPending) {
+            h.removeCallbacks(publish);
+            publishNow();
+        }
+        if (alive) {
+            h.postDelayed(reconcile, RECONCILE_MS);
+        }
     }
 
     // ================================================================= 连接（在自己的线程上）
@@ -192,12 +338,14 @@ final class EcarxSource {
                 }
                 car = create.invoke(null, context);
                 if (car == null) {
+                    // 开机时车机服务还没起来也会这样：算连不上，过一会儿再试（不当成这台车没有）
                     status = "Car.create returned null";
-                    report(Telemetry.CarLink.UNAVAILABLE);
+                    report(Telemetry.CarLink.FAILED);
                     return;
                 }
                 cachedCar = car;
             }
+            this.car = car;
             function = call(car, "getICarFunction");
             sensor = call(car, "getSensorManager");
             if (function != null) {
@@ -209,8 +357,9 @@ final class EcarxSource {
                 getSensorLatestValue = findMethod(sensor, "getSensorLatestValue", int.class);
             }
             if (getFunctionValue == null && getSensorEvent == null) {
+                // 同上：开机时可能只是还没好，算连不上、过一会儿再试
                 status = "no readable managers (function=" + (function != null) + ", sensor=" + (sensor != null) + ")";
-                report(Telemetry.CarLink.UNAVAILABLE);
+                report(Telemetry.CarLink.FAILED);
                 return;
             }
             String side = readDriverSide(car);
@@ -221,7 +370,17 @@ final class EcarxSource {
                 return;
             }
             active = this;
-            readAll();
+            connected = true;
+            if (!readAll()) {
+                // 方法都找到了，读却一个值都回不来（车机服务没起来、或者已经没了）：不算连上，过一会儿换新的再连。
+                // 起点、第一轮读数那两行也不写 —— 不然每次再连都多两行全是「?」的。细节不带耗时：
+                // 每次再连都一样的结果，黑匣子只记一次（Telemetry.carReported 按细节比）
+                connected = false;
+                status = "managers found but no read answered";
+                report(Telemetry.CarLink.FAILED);
+                return;
+            }
+            sleptAtLastPass = sleptMs();
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -229,7 +388,9 @@ final class EcarxSource {
             report(Telemetry.CarLink.CONNECTED);
             Handler h = handler;
             if (h != null && !stopped) {
-                h.postDelayed(floatPoll, FLOAT_POLL_MS);
+                if (floatsOn) {
+                    h.postDelayed(floatPoll, FLOAT_POLL_MS);
+                }
                 h.postDelayed(reconcile, RECONCILE_MS);
             }
         } catch (ClassNotFoundException e) {
@@ -241,11 +402,36 @@ final class EcarxSource {
         }
     }
 
-    /** 结果给页面（{@link #link}），经过（{@link #status}，含异常原文）只进日志和黑匣子。 */
+    /**
+     * 结果给页面和熄屏判断（{@link #link}），经过（{@link #status}，含异常原文）跟着进日志和黑匣子（{@link Telemetry#carReported}）。
+     * 连不上的，手上的车辆对象不再用（{@link #forgetCar}）。
+     */
     private void report(Telemetry.CarLink result) {
         link = result;
-        AppLog.i(TAG, status);
-        telemetry.sourceReported("ecarx", status);
+        if (result == Telemetry.CarLink.FAILED) {
+            forgetCar(car);
+        }
+        telemetry.carReported(this, result, status);
+    }
+
+    /**
+     * 这个车辆对象不再用：拿着它连不上（接口拿不到、找到了却一个值都读不到、出错），或者连上之后读的路断了（{@link #lose}）——
+     * 车机服务多半没了或者重启过，旧的对象连着的是死的那一个，拿它再连多少次都一样（审查 rev3 B4：以前整个进程只建一次，
+     * 车机服务重启一次，这一趟停车就一直只看安卓）。下一次再连重新 {@code Car.create}；传感器的监听也在新的那一个上重新挂
+     * （挂在旧的上的回调不会再来；万一旧的还活着、回调来两份，{@link #apply} 比对后只算一次变化）。
+     */
+    static void forgetCar(Object car) {
+        if (car == null) {
+            return;
+        }
+        synchronized (SENSOR_LOCK) {
+            if (cachedCar != car) {
+                return;
+            }
+            cachedCar = null;
+            sensorTypesRegistered.clear();
+        }
+        AppLog.i(TAG, "car object dropped: the next connect runs Car.create again");
     }
 
     /** 主驾在哪一边：车辆信息 INT_INFO_DRIVER_SIDE。读不到按右舵（这台车）。 */
@@ -483,6 +669,10 @@ final class EcarxSource {
     // ================================================================= 读数进表（都在自己的线程上）
 
     private void onFunctionValue(int id, int zone, Object value) {
+        if (!connected) {
+            // 断了（连着几遍读不到）：这个来源不再算数，等 Telemetry 换新的
+            return;
+        }
         // 不带区域的信号：回调里的 zone 不管是什么都收；带区域的按区域对
         List<Signal> global = byKey.get(key(Signal.Kind.FUNCTION, id, 0));
         if (global != null) {
@@ -497,21 +687,27 @@ final class EcarxSource {
             }
         }
         probeFunction(id, zone, value);
-        writeProbeChanges(false);
+        writeProbeChanges(Pass.CALLBACK);
     }
 
     private void onSensor(Signal.Kind kind, int type, Object value) {
+        if (!connected) {
+            return;
+        }
         List<Signal> list = byKey.get(key(kind, type, 0));
         if (list != null) {
             for (Signal s : list) {
                 apply(s, value);
             }
         }
-        writeProbeChanges(false);
+        writeProbeChanges(Pass.CALLBACK);
     }
 
-    /** 归一、比对、有变化才记；发布合并在一个小窗口里。 */
+    /** 归一、比对、有变化才记；发布合并在一个小窗口里。没有完整用户时浮点的一概不收（回调来的也不收）。 */
     private void apply(Signal s, Object raw) {
+        if (s.isFloat() && !floatsOn) {
+            return;
+        }
         Object decoded = s.decode(raw);
         Object before = values.get(s);
         boolean changed = decoded == null ? before != null : !decoded.equals(before);
@@ -541,13 +737,14 @@ final class EcarxSource {
         }
     }
 
+    /** 排一次发布。没连着（还在连、连不上、断了）的来源不发布：它没有读数，断的那一刻 {@link #lose} 自己发最后一份。 */
     private void schedulePublish(long delayMs) {
         Handler h = handler;
-        if (h == null || stopped) {
+        if (h == null || stopped || !connected) {
             return;
         }
         if (delayMs > 0) {
-            h.postDelayed(publish, delayMs);
+            h.postDelayed(holdPublish, delayMs);
             return;
         }
         if (!publishPending) {
@@ -570,41 +767,128 @@ final class EcarxSource {
         Context app = appContext;
         final Readings forBar = app == null ? snapshot.usableOnly()
                 : snapshot.usableOr(InfoBar.selection(app));
-        telemetry.edit(b -> mapper.apply(b, forBar, now, driverOnRight));
-        telemetry.publishReadings(snapshot);
+        telemetry.edit(this, b -> mapper.apply(b, forBar, now, driverOnRight));
+        telemetry.publishReadings(this, snapshot);
         if (!firstRoundReported) {
             firstRoundReported = true;
             com.kooo.evcam.blackbox.BlackBox.note("行驶信息 ecarx 第一轮读数：" + snapshot.describe());
         }
     }
 
-    /** 每一项读一遍：起点。 */
-    private void readAll() {
+    /**
+     * 每一项读一遍：起点（浮点的只在读浮点时读）。
+     *
+     * @return 读到了至少一个值（占位值也算）；一个都没读到时不发布、不记起点
+     */
+    private boolean readAll() {
+        int answered = 0;
         for (Signal s : Signal.values()) {
-            apply(s, read(s));
+            if (!s.isFloat() || floatsOn) {
+                Object raw = read(s);
+                if (raw != null) {
+                    answered++;
+                }
+                apply(s, raw);
+            }
+        }
+        if (answered == 0) {
+            return false;
         }
         schedulePublish(0);
         startProbes();
+        return true;
     }
 
+    /** 每 {@link #RECONCILE_MS} 一次的对账；断了就不再排。 */
     private void reconcileDiscrete() {
-        if (stopped) {
+        if (stopped || !connected) {
             return;
         }
-        for (Signal s : Signal.values()) {
-            if (!s.isFloat()) {
-                apply(s, read(s));
-            }
+        if (!stillAnswering(readPass(Pass.RECONCILE))) {
+            return;
         }
-        reconcileProbes();
         Handler h = handler;
         if (h != null) {
             h.postDelayed(reconcile, RECONCILE_MS);
         }
     }
 
+    /**
+     * 离散信号和那几个号直接读一遍（对账、当场要的那一遍都是这一遍），变了的照常记；那一行黑匣子按 {@code pass} 标出来。
+     *
+     * @return 读到了至少一个值（占位值 255 也算读到：车回话了）；一个都没读到说明读的路断了
+     */
+    private boolean readPass(Pass pass) {
+        int answered = 0;
+        for (Signal s : Signal.values()) {
+            if (!s.isFloat()) {
+                Object raw = read(s);
+                if (raw != null) {
+                    answered++;
+                }
+                apply(s, raw);
+            }
+        }
+        answered += reconcileProbes(pass);
+        return answered > 0;
+    }
+
+    /**
+     * 这一遍读到了没有：读到了清零；连着 {@link #DEAD_PASSES} 遍都没读到算断了（{@link #lose}）。两遍之间车机深睡过的不算连着
+     * （{@link #emptyPassesAfter}）。
+     */
+    private boolean stillAnswering(boolean answered) {
+        long slept = sleptMs();
+        boolean sleptBetween = slept - sleptAtLastPass >= SLEPT_BETWEEN_MS;
+        sleptAtLastPass = slept;
+        emptyPasses = emptyPassesAfter(emptyPasses, answered, sleptBetween);
+        if (emptyPasses < DEAD_PASSES) {
+            return true;
+        }
+        lose();
+        return false;
+    }
+
+    /**
+     * 这一遍之后「连着几遍一个值都没读到」：读到了清零；没读到加一 —— 上一遍和这一遍之间车机深睡过的，从这一遍重新数：
+     * 车机下电时那一遍读不到、醒来头一遍也读不到（车机服务刚起来），两遍隔着一觉，不是读的路断了；以前它俩凑成「连着两遍」，
+     * 醒来车辆接口就算断了、只看安卓（审查 rev3 F1）。纯函数，测试直接调。
+     *
+     * @param sleptBetween 上一遍和这一遍之间车机深睡过（{@link #SLEPT_BETWEEN_MS} 以上）
+     */
+    static int emptyPassesAfter(int before, boolean answered, boolean sleptBetween) {
+        if (answered) {
+            return 0;
+        }
+        return (sleptBetween ? 0 : before) + 1;
+    }
+
+    /** 开机以来车机一共深睡过多久（毫秒）。 */
+    private static long sleptMs() {
+        return SystemClock.elapsedRealtime() - SystemClock.uptimeMillis();
+    }
+
+    /**
+     * 断了：连着几遍一个值都读不到，车机服务多半没了（重启后回调也断了）。这个来源不再读：停节拍、不收回调，
+     * 剩下的值清掉、发布（读数全是「不知道」），报连不上 —— {@link Telemetry} 过一会儿换一个新来源重新连、重新订。
+     */
+    private void lose() {
+        connected = false;
+        Handler h = handler;
+        if (h != null) {
+            h.removeCallbacks(reconcile);
+            h.removeCallbacks(floatPoll);
+            h.removeCallbacks(publish);
+            h.removeCallbacks(holdPublish);
+        }
+        values.clear();
+        publishNow();
+        status = "lost: " + DEAD_PASSES + " read passes in a row returned nothing";
+        report(Telemetry.CarLink.FAILED);
+    }
+
     private void pollFloats() {
-        if (stopped) {
+        if (stopped || !connected || !floatsOn) {
             return;
         }
         for (Signal s : Signal.values()) {
@@ -692,6 +976,9 @@ final class EcarxSource {
 
     /** 那几个号的可用状态变了（回调 {@code onSupportedFunctionStatusChanged}）：和值分开，一项「名字.status」。 */
     private void onFunctionStatus(int id, int zone, Object status) {
+        if (!connected) {
+            return;
+        }
         try {
             int probe = DarkScreenProbes.indexOf(id);
             if (probe >= 0) {
@@ -700,31 +987,42 @@ final class EcarxSource {
         } catch (RuntimeException e) {
             probeFailed("status", e);
         }
-        writeProbeChanges(false);
+        writeProbeChanges(Pass.CALLBACK);
     }
 
-    /** 对账那一遍里（信号表那几项已经在 {@link #apply} 里攒上了）：读那几个号、写成一行、补记压下过的。 */
-    private void reconcileProbes() {
+    /**
+     * 对账、当场要的那一遍里（信号表那几项已经在 {@link #apply} 里攒上了）：读那几个号、写成一行、补记压下过的。
+     *
+     * @return 那几个号读到了几个（记录出了错算 0，只影响「这一遍读到了没有」的计数）
+     */
+    private int reconcileProbes(Pass pass) {
         try {
-            readProbes();
-            writeProbeChanges(true);
+            int answered = readProbes();
+            writeProbeChanges(pass);
             noteProbeOverflow();
+            return answered;
         } catch (RuntimeException e) {
             probeFailed("reconcile", e);
+            return 0;
         }
     }
 
     /**
      * 对账时那几个号也直接读一遍：回调漏了、车机服务重启后回调断了，靠它补上（那一行带「对账时读到」）。
      * 读不到的跳过，不记成「?」：不然读不了的车上它会和回调来回跳。
+     *
+     * @return 读到了几个
      */
-    private void readProbes() {
+    private int readProbes() {
+        int answered = 0;
         for (int i = 0; i < DarkScreenProbes.IDS.length; i++) {
             Object raw = readFunction(DarkScreenProbes.IDS[i]);
             if (raw != null) {
+                answered++;
                 probeChanged(DarkScreenProbes.NAMES[i], DarkScreenProbes.raw(raw));
             }
         }
+        return answered;
     }
 
     /** 一项读到一个值：变了（没超量）就攒进这一次处理的那一行。起点之前读到的不算变化。 */
@@ -740,9 +1038,10 @@ final class EcarxSource {
 
     /**
      * 这一次处理（一个回调、一遍对账）里变了的写成一行：「车辆信号：screen_power_event 0 → 1；gear P → D」。
-     * 对账读到的标出来：回调没来，实际变化最多可能早一个对账间隔（{@link #RECONCILE_MS}）。
+     * 对账读到的标出来：回调没来，实际变化最多可能早一个对账间隔（{@link #RECONCILE_MS}；有人在时提前读的那一遍也一样）。
+     * 安卓刚亮那一遍（{@link #reconcileNow}，刚醒）读到的标「醒来时读到」：车机睡着时变的，什么时候变的不知道。
      */
-    private void writeProbeChanges(boolean reconciled) {
+    private void writeProbeChanges(Pass pass) {
         if (probeChanges.isEmpty()) {
             return;
         }
@@ -756,7 +1055,8 @@ final class EcarxSource {
             }
             probeChanges.clear();
             BlackBox.noteImportant("车辆信号：" + line
-                    + (reconciled ? "（对账时读到，实际可能早到 " + (RECONCILE_MS / 1000) + " 秒）" : ""));
+                    + (pass == Pass.RECONCILE ? "（对账时读到，实际可能早到 " + (RECONCILE_MS / 1000) + " 秒）"
+                    : pass == Pass.WAKE ? "（醒来时读到）" : ""));
         } catch (RuntimeException e) {
             probeChanges.clear();
             probeFailed("write", e);

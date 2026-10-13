@@ -43,6 +43,10 @@ import java.util.Set;
  *       新界面接回同一个 SurfaceTexture 就是同一个输出，通道零变动；没人接回的照「减输出能拖就拖」等下一次本来要动时摘。</li>
  * </ul>
  *
+ * <p>项目所有者 2026-10-12（熄屏 v3，D2）：屏幕一黑，两路座舱谁都不要 —— 录像、预览、拍照一样不留，亮屏再回来；
+ * 环视照登记表（熄屏持续录制那张表定它录不录）。只有一处判断：{@link #releasedByDark}。座舱这样比环视早关 3–6 分钟，
+ * 「环视先关」只对连环视一起关的那几次（车机要睡、退出、没人要）还成立（D4 接受）。</p>
+ *
  * <p>§7.2（怎么算在开车）、§7.3（存储一类停了照旧接回）不在这一层。大纲 §7 末尾的四处解读：
  * ①「最后一句」不论多早说的、②同一次交接里被断开的另一路直接判 BLOCKED，都在 {@link CameraTaken#judge} 和这里的
  * 「先判 TAKEN」；③不在相机列表里、打开报被占用一类而最后一句不是空闲，都算被拿走（同上）；④摘死输出排在开前面，仍要等安静（{@link #next}）。</p>
@@ -78,7 +82,10 @@ public final class ChannelRules {
      */
     public static final long STEP_MAX_MS = 15_000L;
 
-    /** 开一路之前最多等它的录像输出多久（从录像登记起算）：备好了就带着它开，省一次改输出。 */
+    /**
+     * 开一路之前最多等它的录像输出多久（从这一路的录像输出变成要的那一刻起算，{@link Lane#recordWantedSince}）：
+     * 备好了就带着它开，省一次改输出。
+     */
     public static final long RECORD_OUTPUT_WAIT_MS = 2_000L;
 
     /** 环视单独关最多等多久（§二.2）；到点（相机服务卡住）不再等它，接着关座舱。 */
@@ -304,6 +311,12 @@ public final class ChannelRules {
         long excusedBusySince;
         /** 被拿着以来问了几次（给黑匣子「第 11 次」）。 */
         int asks;
+        /**
+         * 这一路的录像输出从什么时候起是要的（{@link #wantsKind} RECORD）；0 = 不要。开之前等录像输出从这里算：
+         * 开录时就是 RECORDING 登记的那一刻；熄屏放开的座舱亮屏回来时是亮屏的那一轮 —— 它的录制器那时才建
+         * （熄屏时不为放开的座舱建录制器，设计 v3.1 C4），从开录那一刻算的话早过了 2 秒，开了还得再改一次输出。
+         */
+        long recordWantedSince;
 
         Lane(String key, String cameraId) {
             this.key = Objects.requireNonNull(key);
@@ -361,8 +374,6 @@ public final class ChannelRules {
 
         /** 上一轮看到的 {@link #needsVersion}。 */
         int seenNeedsVersion;
-        /** RECORDING 从什么时候起登记着；0 = 没登记。开之前等录像输出从这里算。 */
-        long recordingSince;
         /**
          * 开不起来判成「现在用不了相机」、要等主界面回到前台的时刻；0 = 没有。主界面回到前台才清（{@link ChannelRules#mainCameForward}）。
          * 只在判的时候主界面不在前、出事以后它也没回到过前台时记（{@link ChannelRules#applyVerdict}）。
@@ -448,8 +459,13 @@ public final class ChannelRules {
         UNWANTED,
         /** 保持 30 秒到点。 */
         HOLD_OVER,
-        /** 熄屏：PREVIEW 不算、不保持。 */
+        /** 熄屏：PREVIEW 不算、不保持（环视在熄屏时没人要了就是这个）。 */
         SCREEN_OFF,
+        /**
+         * 熄屏放开座舱（{@link #releasedByDark}，项目所有者 2026-10-12 D2）：座舱谁都不要，跟着熄屏关。
+         * 和 {@link #SCREEN_OFF} 分开，环视熄屏时关不写成「座舱放开」（设计 v3.1 C14）。
+         */
+        DARK_RELEASE,
         /** 车机要睡。 */
         SLEEP,
         /** 退出。 */
@@ -789,12 +805,12 @@ public final class ChannelRules {
         List<Event> events = new ArrayList<>();
         boolean needsChanged = w.needsVersion != w.seenNeedsVersion;
         w.seenNeedsVersion = w.needsVersion;
-        if (w.holders.contains(CameraNeeds.Holder.RECORDING)) {
-            if (w.recordingSince == 0) {
-                w.recordingSince = w.now;
+        for (Lane lane : w.lanes) {
+            if (!wantsKind(w, lane, Kind.RECORD)) {
+                lane.recordWantedSince = 0;
+            } else if (lane.recordWantedSince == 0) {
+                lane.recordWantedSince = w.now;
             }
-        } else {
-            w.recordingSince = 0;
         }
         noteNeeds(w, events);
         recognize(w, events);
@@ -1113,6 +1129,9 @@ public final class ChannelRules {
      *
      * <p>熄屏时 PREVIEW 不算：主界面看不见。开发者「熄屏录制（阻止休眠）」开着、熄屏时没在录，于是照登记表关
      * （项目所有者 2026-10-11，§7.5）。</p>
+     *
+     * <p>熄屏时座舱谁都不要（{@link #releasedByDark}，项目所有者 2026-10-12 D2）：预览、录像、拍照、后视镜一律不算，
+     * 环视照登记表。</p>
      */
     static Set<CameraNeeds.Holder> wantedBy(World w, Lane lane) {
         Set<CameraNeeds.Holder> by = EnumSet.noneOf(CameraNeeds.Holder.class);
@@ -1135,6 +1154,9 @@ public final class ChannelRules {
     }
 
     private static boolean holderWants(World w, Lane lane, CameraNeeds.Holder holder) {
+        if (releasedByDark(w, lane)) {
+            return false;
+        }
         switch (holder) {
             case PREVIEW:
                 return w.screenOn;
@@ -1169,8 +1191,40 @@ public final class ChannelRules {
         return w.exitSince != 0 || w.sleepSince != 0;
     }
 
-    /** 这一路要的这一种输出：预览 —— PREVIEW 登记着且亮屏；后视镜 —— MIRROR 登记着、这一路是环视；录像 —— 录像计划里有它。 */
+    /**
+     * 这一路被熄屏放开了：熄屏时除了环视，谁都不要它（项目所有者 2026-10-12 D2：屏幕一黑两路座舱都放开 ——
+     * 录像、预览、拍照，一样不留。为了稳：车机熄屏约 98 秒后要拿后座舱相机 1，那时我们拿着它，关它要卡 5–8 秒，
+     * 4 次里 3 次环视跟着断了 35–43 秒；我们不拿着它的那一晚车机拿了 6 次，环视一次没断）。亮屏又都要了。
+     *
+     * <p>和谁登记着无关，只看屏幕和是不是环视：{@link #holderWants}、{@link #wantsKind} 开头的那一道闸、录像的事实
+     * （RecordingLanes.Facts#releasedByDark）、拍照不拍哪几路（{@link #excludedFromPhoto}）、关的原因（{@link #closeWhy}）
+     * 问的都是这一句（设计 v3.1 C4）—— 按「有没有人要」问的话，录像刚登记、拍照刚登记的那一下读到的是上一轮的登记表，
+     * 开录落定不了、拍照一路不拍就收尾。</p>
+     *
+     * <p>按「不是环视那一路」认：非极氪的自定义车型上，熄屏时除了环视那一路，别的路一律放开（记进规格）。</p>
+     */
+    static boolean releasedByDark(World w, Lane lane) {
+        return !w.screenOn && !isSurround(lane);
+    }
+
+    /**
+     * 录像留着这一路的录像输出（录制器）：RECORDING 登记着、这一路在录像计划里（设计 v3.1 C13）。相机关着的一路（我们关的、
+     * 丢了的、被拿着的、熄屏放开的），录制器在这期间一直停放着，相机回来时同一个录制器直接加入；不再留着了 ——
+     * 停了录、这一路不在计划里 —— 调度当轮就告诉录像那一侧它「随相机关了」（{@link SingleCamera.Drop#CLOSED}），
+     * 它才放掉那个录制器（ChannelScheduler 每一轮的那一条规矩）。
+     */
+    static boolean keepsRecordOutput(World w, Lane lane) {
+        return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
+    }
+
+    /**
+     * 这一路要的这一种输出：预览 —— PREVIEW 登记着且亮屏；后视镜 —— MIRROR 登记着、这一路是环视；录像 —— 录像计划里有它。
+     * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
+     */
     private static boolean wantsKind(World w, Lane lane, Kind kind) {
+        if (releasedByDark(w, lane)) {
+            return false;
+        }
         switch (kind) {
             case PREVIEW:
                 return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn;
@@ -1297,7 +1351,11 @@ public final class ChannelRules {
     public enum Condition {
         /** 在出画面。 */
         STREAMING,
-        /** 在开、或者等着开（排着、等安静、等录像输出、现在用不了相机）；没人要、关着的也算这一种 —— 读的人只问自己要的路。 */
+        /**
+         * 在开、或者等着开（排着、等安静、等录像输出、现在用不了相机）；没人要、关着的也算这一种 —— 读的人只问自己要的路。
+         * 录像计划里的座舱熄屏时也是这一种，录像另读 {@link ChannelRules#releasedByDark}（RecordingLanes.Facts）：
+         * 它一时半会儿不会开。
+         */
         BRINGING_UP,
         /** 被别的程序拿着（TAKEN），或者被拿着的另一路挡着（BLOCKED）：不抢，等它空出来。 */
         TAKEN,
@@ -1339,9 +1397,12 @@ public final class ChannelRules {
         return lane.device == Device.CLOSED && !usable(w) && shouldOpen(w, lane);
     }
 
-    /** 拍照不拍这一路：被拿着、或者停手了；在出画面的照拍（哪怕它的录像路不在）。 */
-    static boolean excludedFromPhoto(Lane lane) {
-        return !streaming(lane) && (lane.mark != null || lane.ladder.stopped());
+    /**
+     * 拍照不拍这一路：被拿着、停手了、或者熄屏放开了（{@link #releasedByDark}：熄屏拍的那一张只有环视，不白等 10 秒，
+     * 该拍几路照实数）；在出画面的照拍（哪怕它的录像路不在）。
+     */
+    static boolean excludedFromPhoto(World w, Lane lane) {
+        return !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || releasedByDark(w, lane));
     }
 
     // ================================================================= 下一步
@@ -1533,6 +1594,7 @@ public final class ChannelRules {
     /**
      * 关（§二.2）：环视开着或正在开、但已不该开 → 单独关它；否则不该开的座舱一起关 —— 环视还在关（10 秒以内）就先等它关完。
      * 2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出。关不等安静。
+     * 熄屏放开座舱、环视还要（在录、后视镜）时，座舱一起关、环视一步不动（{@link #releasedByDark}）。
      */
     private static Decision closeStep(World w) {
         List<Lane> toClose = new ArrayList<>();
@@ -1568,13 +1630,19 @@ public final class ChannelRules {
         return d;
     }
 
-    /** 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 车机要睡 / 退出）」）。 */
+    /**
+     * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出）」）。一步里的几路原因一样：
+     * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。
+     */
     private static Why closeWhy(World w, Lane lane) {
         if (w.exitSince != 0) {
             return Why.EXIT;
         }
         if (w.sleepSince != 0) {
             return Why.SLEEP;
+        }
+        if (releasedByDark(w, lane)) {
+            return Why.DARK_RELEASE;
         }
         if (!w.screenOn) {
             return Why.SCREEN_OFF;
@@ -1594,9 +1662,12 @@ public final class ChannelRules {
         return false;
     }
 
-    /** 开这一路之前还要等它的录像输出多久（毫秒）；不用等是 0 或负数。 */
+    /**
+     * 开这一路之前还要等它的录像输出多久（毫秒）；不用等是 0 或负数。从这一路的录像输出变成要的那一刻算
+     * （{@link Lane#recordWantedSince}）。
+     */
     private static long recordOutputLeft(World w, Lane lane) {
-        if (!wantsKind(w, lane, Kind.RECORD) || lane.record == RecordPrep.FAILED || w.recordingSince == 0) {
+        if (!wantsKind(w, lane, Kind.RECORD) || lane.record == RecordPrep.FAILED || lane.recordWantedSince == 0) {
             return 0;
         }
         for (Out out : lane.declared) {
@@ -1604,7 +1675,7 @@ public final class ChannelRules {
                 return 0;
             }
         }
-        return RECORD_OUTPUT_WAIT_MS - (w.now - w.recordingSince);
+        return RECORD_OUTPUT_WAIT_MS - (w.now - lane.recordWantedSince);
     }
 
     private static Decision open(World w, Lane lane) {

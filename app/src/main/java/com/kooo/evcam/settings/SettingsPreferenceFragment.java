@@ -1013,7 +1013,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
-        // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时收，离开就把资源放掉
+        // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
 
@@ -1027,7 +1027,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         com.kooo.evcam.KeepAliveManager.stopKeepAliveWork(requireContext());
                     }
                 });
-        // 熄屏持续录制能不能起作用看哨兵模式：行尾写着哨兵模式此刻开没开（行样式在 apply 之前标上）
+        // 熄屏持续录制录到什么时候看哨兵模式（熄屏 v3：开着一直录环视，没开录到车机要睡）：行尾写着哨兵模式此刻开没开（行样式在 apply 之前标上）
         androidx.preference.Preference keepRecording = findPreference("pref_screen_off_keep_recording");
         if (keepRecording != null) {
             PreferenceRows.markSentryStatus(keepRecording);

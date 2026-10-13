@@ -12,11 +12,13 @@ import com.kooo.evcam.telemetry.Telemetry;
 
 /**
  * 一行跟着车辆信号换的字。自己管自己：看得见（挂在窗口上、窗口和它自己都可见）就向 {@link Telemetry}
- * 登记、听读数，看不见就注销 —— 没别人在用的话车辆信号就停下来。子类只管「现在该写什么」（{@link #show}），
+ * 登记、听读数，看不见就注销。离散信号（哨兵模式、挡位……）进程活着一直在读（熄屏判断登记的核心，{@link Telemetry#keepCore}），
+ * 这里的登记另外开浮点传感器和定位；最后一个走了，浮点和定位就停。子类只管「现在该写什么」（{@link #show}），
  * 要听设置的在 {@link #onStart} / {@link #onStop} 里挂、摘。
  *
- * <p>现在有两处：{@link SentryStatusView}（设置里「熄屏持续录制」那一行的右边）和
- * {@link ScreenOffHintView}（录制键上的小字）。{@link VehicleStatusPanel} 是画出来的，同一个规矩自己写了一份。</p>
+ * <p>现在有一处：{@link SentryStatusView}（设置里「熄屏持续录制」那一行的右边）。录制键上的小字（{@link ScreenOffHintView}）
+ * 不登记：它用到的哨兵模式、挡位是离散的，核心一直在读，只听不开浮点和定位。
+ * {@link VehicleStatusPanel} 是画出来的，同一个规矩自己写了一份。</p>
  */
 public abstract class TelemetryTextView extends AppCompatTextView implements Telemetry.Listener {
 

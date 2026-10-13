@@ -92,8 +92,9 @@ public final class StoragePlan {
      * 每一路最新的那个文件：永远不删（2026-10-10）。正在写的文件一定是它那一路最新的 ——
      * 几路的分段不再一定同名：一路单独接回录像时，第一个文件按接回那一刻命名，和别的路错开。
      * 一路不录了（离开了录像、关掉了这一路）的最后一个文件也在里面：多留它那一组，不少留正在写的。
+     * 诊断报告「每一路最新的录像文件」也用它（{@code zeekr.RecentRecordings}，熄屏 v3）：同一个「每一路最新的」只有这一种认法。
      */
-    static Set<String> newestOfEachSlot(List<Clip> clips) {
+    public static Set<String> newestOfEachSlot(List<Clip> clips) {
         Set<String> newest = new HashSet<>();
         for (List<Clip> list : newestFirstBySlot(clips).values()) {
             newest.add(list.get(0).name);

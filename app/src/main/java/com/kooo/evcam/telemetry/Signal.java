@@ -108,6 +108,14 @@ public enum Signal {
      * Lab 0.18.0）。1 和 2 都算开着。Lab 还在对；用户 2026-10-02 点名先开放：熄屏后还能不能录，看的就是它。
      */
     SENTRY_MODE(Group.VEHICLE, Kind.FUNCTION, 0x20240100, 0, R.string.vi_sentry_mode, Trust.PROVISIONAL, Format.SENTRY),
+    /**
+     * 中控屏真的黑了没有（IVehicle.SETTING_FUNC_SCREEN_POWER_EVENT）：0 亮着，1 黑了，255 读不到。
+     * 车主 2026-10-12 对着当天车上的熄屏、亮屏确认：屏幕真黑的那一刻它 0 → 1，和点火 ON → ACC 同一毫秒；
+     * 开车门亮屏时 1 → 0，比点火 ACC → ON 晚不到 0.1 秒。安卓的熄屏广播要等车机下电才来（几分钟后），
+     * 熄屏判断（{@code screen.ScreenState}）看的是它和点火。先用着：只在这台 7X 上看过那几次。
+     */
+    SCREEN_POWER_EVENT(Group.VEHICLE, Kind.FUNCTION, 0x20290300, 0, R.string.vi_screen_power_event, Trust.PROVISIONAL,
+            Format.SCREEN),
 
     // ---- 安全辅助（读的是开关）
     AEB(Group.ASSIST, Kind.FUNCTION, 0x20070E00, 0, R.string.vi_aeb, Trust.CONFIRMED, Format.ON_OFF),
@@ -126,7 +134,7 @@ public enum Signal {
     public enum Trust {
         /** Lab 手册「实验中观察一致的」一节里有它，这里用到的含义、取值、量程都没挂着「待测 / 待定」 */
         CONFIRMED,
-        /** 车上跟着变、能用，但含义 / 量程 / 某个场景还等 Lab 测；用户点名先开放的（现在是哨兵模式） */
+        /** 车上跟着变、能用，但含义 / 量程 / 某个场景还等 Lab 测；用户点名先开放的（现在是哨兵模式、屏幕电源事件） */
         PROVISIONAL,
         /** 读得到，含义没对上，或者还没专门测过 */
         UNVERIFIED
@@ -184,6 +192,8 @@ public enum Signal {
         DAY_NIGHT,
         /** 哨兵模式 → Integer（0 关、1 开、2 布防） */
         SENTRY,
+        /** 屏幕电源事件 0 亮着 1 黑了 → Boolean（黑了为 true）；页面上写熄屏 / 亮屏，不写开 / 关（{@link SignalText}） */
+        SCREEN,
         /** 0 关 1 左 2 右 3 双闪 → Integer */
         INDICATOR,
         /** 点火状态的枚举码 → Integer（0x00200104 ACC、05 ON、07 DRIVING） */
@@ -309,6 +319,7 @@ public enum Signal {
                 // 不拿 0 判断侧方画面，只认「1 = 360 在」，所以 0 和 2 都是不在
                 return v == 1 ? Boolean.TRUE : (v == 2 || v == 0 ? Boolean.FALSE : null);
             case POPUP:
+            case SCREEN:
                 return onOff(v);
             case MIRROR_DIP:
                 return v >= MIRROR_NORMAL && v <= MIRROR_TILTING ? v : null;

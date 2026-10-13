@@ -40,9 +40,11 @@ import java.util.function.Consumer;
  *       留着的、还是死的，从什么时候起（{@link #trackOutputs}）；</li>
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
- *   <li>交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级后视镜留住的画布、换下来的录制器）
- *       离开了会话的，放掉；</li>
- *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；</li>
+ *   <li>录像输出离开了会话（改输出摘掉的），或者关着的一路录像不再留着它（停了录、不在计划里），告诉声明它的那一方
+ *       （{@link #dispatchDrops}）；交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级后视镜留住的画布、
+ *       换下来的录制器）离开了会话的，放掉；</li>
+ *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；关完一轮 30 秒的、别的程序拿走一路相机 30 秒的
+ *       （{@link #watchAfter}），量一次还开着的那几路（{@link #noteAftermaths}；在那之前我们自己动了它的，量到动它那一刻）；</li>
  *   <li>告诉录像那一侧（{@link Recording}）：哪几路走了、哪几路的样子变了、哪几路带着新会话出了画面 ——
  *       录像按路加入、退出只看这几声，自己从不动相机；</li>
  *   <li>记下诊断报告读的快照（{@link #snapshot()}）。</li>
@@ -228,13 +230,18 @@ public final class ChannelScheduler {
 
         /**
          * 这一路的相机走了：丢了（{@link Gone#LOST}，在阻塞的关之前；{@code reason} 是丢的那一下）、我们关了它
-         * （{@link Gone#CLOSED}）、或者它卡住了在救（{@link Gone#RESCUED}：重建会话、重开）。
+         * （{@link Gone#CLOSED}；{@code closed} 是关的原因，熄屏放开座舱是 {@link ChannelRules.Why#DARK_RELEASE} ——
+         * 退出录像那一行照它写「熄屏：座舱放开」）、或者它卡住了在救（{@link Gone#RESCUED}：重建会话、重开）。
+         *
+         * @param reason 丢的那一下；不是丢了的是 null
+         * @param closed 我们关它的原因；不是我们关的是 null
          */
-        void onLaneCameraGone(String key, Gone why, CameraTaken.Reason reason);
+        void onLaneCameraGone(String key, Gone why, CameraTaken.Reason reason, ChannelRules.Why closed);
 
         /**
          * 这一路的 {@link #condition} 变了（被拿着、放开了、在救、停手、在出画面），或者它关着时能不能用相机变了
-         * （{@link #cannotOpen}）。
+         * （{@link #cannotOpen}），或者它被不被熄屏放开变了（{@link #releasedByDark}：熄屏放开的座舱亮屏时，编码录制在这时
+         * 补建录制器 —— 熄屏时不为它建）。
          */
         void onLaneConditionChanged(String key);
     }
@@ -243,7 +250,7 @@ public final class ChannelScheduler {
     enum Gone {
         /** 丢了：被断开、报错（在那一次阻塞的关之前就说）。 */
         LOST,
-        /** 我们关的：没人要、保持到点、熄屏、车机要睡、退出。 */
+        /** 我们关的：没人要、保持到点、熄屏、熄屏放开座舱、车机要睡、退出。 */
         CLOSED,
         /** 开着却没进展（卡住了），调度在救：重建会话或者重开。 */
         RESCUED
@@ -255,7 +262,7 @@ public final class ChannelScheduler {
         }
 
         @Override
-        public void onLaneCameraGone(String key, Gone why, CameraTaken.Reason reason) {
+        public void onLaneCameraGone(String key, Gone why, CameraTaken.Reason reason, ChannelRules.Why closed) {
         }
 
         @Override
@@ -329,10 +336,23 @@ public final class ChannelScheduler {
         /**
          * 一轮关完：「关相机：环视 0.1s → 后座舱 0.1s、前座舱 0.1s」。{@code surroundKey} 为 null 是这一轮没关环视；
          * 座舱按关完的先后。{@code carried}：关的时候各路会话里带走的留着的输出（{@link Carried}），追加在那一行末尾
-         * （「带走留着的输出：录像（留了 12 分 3 秒）、预览（31 秒）」）；没有是空的。
+         * （「带走留着的输出：录像（留了 12 分 3 秒）、预览（31 秒）」）；没有是空的。{@code others}：这一轮关完还开着、
+         * 关的时候在出画面的那几路，关的这段时间里最长断帧、会话动没动（熄屏只放开座舱时就是环视，设计 v3 §6 L3）；
+         * 写在那一行最末尾、括号里，旧的分析脚本照样读，也不会被读成又一路带走的输出。没有是空的。
          */
         void closeRound(String surroundKey, long surroundMs, boolean surroundTimedOut,
-                        List<String> cabinKeys, List<Long> cabinMs, List<Carried> carried);
+                        List<String> cabinKeys, List<Long> cabinMs, List<Carried> carried, List<Other> others);
+
+        /**
+         * 关了一轮、还开着的那几路（关的时候在出画面）从开始关起 {@link ChannelScheduler#AFTERMATH_MS} 怎样：最长断帧、会话动没动
+         * （设计 v3.1 C22）。关那一下只有零点几秒，看不出后劲 —— 10-12 那次环视是相机 1 被拿走 6–14 秒之后才断的。
+         * 这段时间里我们自己动了其中一路（关、改输出、救）的，那一路量到动它那一刻，带着是哪一步（{@link Other#ours}）：
+         * 我们自己之后的关、改不算成它的断帧（审查 rev3 B2）。
+         *
+         * @param closedKeys 那一轮关的几路，按开始关的先后（环视单独关的那一步在前）
+         * @param why        那一轮第一步关的原因
+         */
+        void closeAftermath(List<String> closedKeys, ChannelRules.Why why, List<Other> others);
 
         /**
          * 这一轮关的一路这一次开着的小结（{@link OpenSpan}），一路一行，跟在「关相机：…」那一行后面：
@@ -476,16 +496,33 @@ public final class ChannelScheduler {
         }
     }
 
-    /** 一步里别的路：最长断帧、会话动没动过（「这段时间里环视最长断帧不到 0.2 秒、会话没动」）。 */
+    /**
+     * 一步里别的路：最长断帧、会话动没动过（「这段时间里环视最长断帧不到 0.2 秒、会话没动」）。开、改输出、救那一步、
+     * 关一轮、关完之后 {@link ChannelScheduler#AFTERMATH_MS}（{@link ChannelScheduler#othersSince}），还有别的程序拿走一路相机之后的
+     * 那一行（MultiCameraManager，争用，{@link ChannelScheduler#watchAfter}），量的是同一样东西。
+     */
     static final class Other {
         final String key;
         final long gapMs;
         final boolean sessionChanged;
+        /**
+         * 过一阵再量的那两行（{@link ChannelScheduler#watchAfter}）：量到一半我们自己在这一路上走了一步（关、改输出、救），
+         * 就只量到那一刻 —— 是哪一步；没有是 null。
+         */
+        final ChannelRules.Move ours;
+        /** 那一步从开始量起多久开始的（毫秒）；{@link #ours} 为 null 时是 -1。 */
+        final long oursAtMs;
 
         Other(String key, long gapMs, boolean sessionChanged) {
+            this(key, gapMs, sessionChanged, null, -1);
+        }
+
+        Other(String key, long gapMs, boolean sessionChanged, ChannelRules.Move ours, long oursAtMs) {
             this.key = key;
             this.gapMs = gapMs;
             this.sessionChanged = sessionChanged;
+            this.ours = ours;
+            this.oursAtMs = oursAtMs;
         }
     }
 
@@ -588,6 +625,8 @@ public final class ChannelScheduler {
         final long unwantedSince;
         /** 关着、该开，而此刻用不了相机：主界面回到前台之前不开（{@link ChannelRules#cannotOpen}）。 */
         final boolean cannotOpen;
+        /** 熄屏放开了：座舱熄屏时谁都不要（{@link ChannelRules#releasedByDark}）。诊断报告「该开」照它写原因。 */
+        final boolean releasedByDark;
         final ChannelRules.Device device;
         final long deviceSince;
         /** 相机层手上的动作从什么时候起；0 = 没有。 */
@@ -631,6 +670,7 @@ public final class ChannelScheduler {
             this.holding = ChannelRules.holding(w, lane);
             this.unwantedSince = lane.unwantedSince;
             this.cannotOpen = ChannelRules.cannotOpen(w, lane);
+            this.releasedByDark = ChannelRules.releasedByDark(w, lane);
             this.device = lane.device;
             this.deviceSince = lane.deviceSince;
             this.busySince = lane.busySince;
@@ -736,6 +776,13 @@ public final class ChannelScheduler {
      * 数在 {@link ChannelRules#OWN_WORD_GRACE_MS}：主动认（关着的一路那一句「被占用」还算不算我们的）用的是同一个。
      */
     static final long OWN_WORD_GRACE_MS = ChannelRules.OWN_WORD_GRACE_MS;
+
+    /**
+     * 关了一轮之后多久再量一次还开着的那几路（{@link Journal#closeAftermath}，设计 v3.1 C22）；别的程序拿走一路相机之后
+     * 量环视也是这个数（MultiCameraManager，设计 v3 §6 L5，{@link #watchAfter}）。10-12 黑匣子：车机拿走相机 1 之后 6–14 秒环视才断，
+     * 量满 30 秒看得到后劲；断帧记录（SingleCamera 最近 16 次）盖得住。
+     */
+    static final long AFTERMATH_MS = 30_000L;
 
     // ================================================================= 进程里的几份调度
 
@@ -868,8 +915,15 @@ public final class ChannelScheduler {
     /** 每一路相机服务最后一句的原始时刻（elapsedRealtime），和问来改过的那一句对着看：放开是不是问出来的。 */
     private final Map<String, Long> wordAtRaw = new HashMap<>();
     private final Map<String, Long> askedWordAt = new HashMap<>();
-    /** 等着派发的「录像输出离开了会话」：改输出摘掉的（REMOVED）、随相机关了的（CLOSED）。 */
+    /** 等着派发的「录像输出离开了会话」：改输出摘掉、救的时候不再带的（REMOVED），开着的一路等新会话配好再说。 */
     private final Map<String, Map<ChannelRules.Out, SingleCamera.Drop>> drops = new HashMap<>();
+    /**
+     * 关着的每一路，已经说过「随相机关了」的录像输出（{@link #dispatchDrops}）：同一个只说一次 —— 声明它的那一方听到后
+     * 撤回声明，下一轮就不在声明里了；这一路一开就清。
+     */
+    private final Map<String, Set<ChannelRules.Out>> closedDropsTold = new HashMap<>();
+    /** 等着到点再量一次的：关完一轮还开着的那几路、别的程序拿走一路相机之后的环视（{@link #watchAfter}、{@link #noteAftermaths}）。 */
+    private final List<Aftermath> aftermaths = new ArrayList<>();
     /** 开之前在等录像输出的那几路，从什么时候起。 */
     private final Map<String, Long> recordWaitSince = new HashMap<>();
     /** 每一路我们最近一次开好、关完的时刻（调度的钟）：之后 {@link #OWN_WORD_GRACE_MS} 以内相机服务的话还算我们的。 */
@@ -911,8 +965,10 @@ public final class ChannelScheduler {
     private final Map<String, ChannelRules.Condition> toldCondition = new HashMap<>();
     /** 每一路上一次告诉录像时，它是不是关着、而此刻用不了相机（{@link #cannotOpen}）。 */
     private final Map<String, Boolean> toldCannotOpen = new HashMap<>();
+    /** 每一路上一次告诉录像时，它是不是被熄屏放开了（{@link #releasedByDark}）。 */
+    private final Map<String, Boolean> toldReleasedByDark = new HashMap<>();
     /** 这一轮里走了的几路（丢了、我们关了、在救），一轮最后按先后告诉录像。 */
-    private final List<Object[]> gone = new ArrayList<>();
+    private final List<Left> gone = new ArrayList<>();
 
     ChannelScheduler(Clock clock, Poster poster, Host host, Journal journal) {
         this.clock = Objects.requireNonNull(clock);
@@ -933,6 +989,8 @@ public final class ChannelScheduler {
             list.add(new ChannelRules.Lane(entry.getKey(), entry.getValue().cameraId()));
         }
         w = new ChannelRules.World(list);
+        // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）
+        w.screenOn = host.screenOn();
         running = null;
         lastWait = null;
         lastDeferred = null;
@@ -944,11 +1002,14 @@ public final class ChannelScheduler {
         wordAtRaw.clear();
         askedWordAt.clear();
         drops.clear();
+        closedDropsTold.clear();
+        aftermaths.clear();
         recordWaitSince.clear();
         ownStepEndedAt.clear();
         toldStreaming.clear();
         toldCondition.clear();
         toldCannotOpen.clear();
+        toldReleasedByDark.clear();
         gone.clear();
         outputStates.clear();
         unneededSince.clear();
@@ -1063,6 +1124,37 @@ public final class ChannelScheduler {
         return true;
     }
 
+    // ================================================================= 过一阵再量一路（主线程）
+
+    /**
+     * 从 {@code since} 起 {@link #AFTERMATH_MS} 再量一次这一路：最长断帧、会话动没动（{@link Other}），交给 {@code report}
+     * （在一轮里、主线程上）—— 别的程序拿走一路相机之后的环视那一行（MultiCameraManager，设计 v3 §6 L5）。关完一轮之后
+     * 还开着的那几路（C22）走的也是这一份（{@link #flushTrails}）。在那之前我们自己要在这一路上走一步（关、改输出、救），
+     * 就量到那一刻为止、记下是哪一步（{@link Other#ours}）：我们自己之后的关、改不算成它的断帧（审查 rev3 B2）。
+     * 这一路不在这一份管线里、同一件（{@code tag}）还在等、调度停了，不排。
+     *
+     * @param tag   同一件只等一次（「take 1」：相机 1 被拿走那一件）
+     * @param since 从什么时候量（调度的钟）
+     * @return 排上了
+     */
+    boolean watchAfter(String tag, String key, long since, Consumer<List<Other>> report) {
+        CameraPort port = ports.get(key);
+        if (stopped || port == null || tag == null || report == null) {
+            return false;
+        }
+        for (Aftermath a : aftermaths) {
+            if (tag.equals(a.tag)) {
+                return false;
+            }
+        }
+        Map<String, Integer> generations = new LinkedHashMap<>();
+        generations.put(key, port.sessionGeneration());
+        aftermaths.add(new Aftermath(since, tag, generations, report));
+        // 下一次醒的时刻要算上它（arm）
+        wake();
+        return true;
+    }
+
     // ================================================================= 相机层报来的（主线程，由管理器 post 过来）
 
     /**
@@ -1106,28 +1198,19 @@ public final class ChannelScheduler {
      * 一路开着的相机丢了，在那一次阻塞的关之前：进 LOSING，算在途，别的路这几秒里一步都不动。
      * 录像那一侧在这一轮最后听说（{@link Recording#onLaneCameraGone}），那一路自己收尾退出。
      *
-     * <p>没人要的录像输出（停放着的录制器：录像意图关着，或者这一路不在计划里）和我们关相机一样算「随相机关了」
-     * （{@link #close}），关完时告诉录像那一侧，它才放那个录制器 —— 不然重开时不再带它，它再也回不到会话里、
-     * 也就永远等不到被丢，EGL、编码线程、输入画布一直占着（审查 2026-10-11）。要的（在录、等自动接回）照旧不派：
-     * 相机回来时同一个录制器直接加入。会话里的看上一轮记下的那一份，再加上声明着的 —— 丢的那一下相机层已经把会话摘了，
-     * 中间要是跑过一轮，记下的会话就是空的。</p>
+     * <p>它的录像输出（录制器）留不留，和我们关相机一样由每一轮的那一条规矩管（{@link #dispatchDrops}）：关完以后录像不再留着它
+     * 就当轮「随相机关了」，录像那一侧才放那个录制器 —— 不然重开时不再带它，它再也回不到会话里、也就永远等不到被丢，
+     * EGL、编码线程、输入画布一直占着（审查 2026-10-11）；录像留着（在录、等自动接回）就不派，相机回来时同一个录制器直接加入，
+     * 停了录的那一轮再派（设计 v3.1 C13：以前丢的那一下按「要不要」定了就不再看，在录时丢了、之后停录，录制器就一直留着）。</p>
      */
     void onLossStarted(String cameraId, int code) {
         ChannelRules.Lane lane = live(cameraId);
         if (lane == null) {
             return;
         }
-        Set<ChannelRules.Out> wanted = ChannelRules.wantedOutputs(w, lane);
-        Set<ChannelRules.Out> carried = new LinkedHashSet<>(lane.session);
-        carried.addAll(lane.declared);
-        for (ChannelRules.Out out : carried) {
-            if (out.kind == ChannelRules.Kind.RECORD && !wanted.contains(out)) {
-                queueDrop(lane.key, out, SingleCamera.Drop.CLOSED);
-            }
-        }
         CameraTaken.Reason reason = CameraTaken.Reason.ofLoss(code);
         ChannelRules.lossStarted(w, lane, reason);
-        noteGone(lane.key, Gone.LOST, reason);
+        noteGone(lane.key, Gone.LOST, reason, null);
         wake();
     }
 
@@ -1223,10 +1306,20 @@ public final class ChannelScheduler {
         return lane != null && ChannelRules.cannotOpen(w, lane);
     }
 
-    /** 拍照不拍这一路：被拿着、被挡着、或者停手了；在出画面的照拍（哪怕它的录像路不在）。 */
+    /**
+     * 这一路被熄屏放开了（{@link ChannelRules#releasedByDark}：熄屏时座舱谁都不要，项目所有者 2026-10-12 D2），读的是这一轮的
+     * 亮熄屏。和谁登记着无关 —— 录像、拍照刚登记的那一下来问，读到的也是对的（设计 v3.1 C4）。它变了告诉录像那一侧
+     * （{@link Recording#onLaneConditionChanged}）。录像据此不把它算作在起来（RecordingLanes.Facts）、不为它备录制器。
+     */
+    public boolean releasedByDark(String key) {
+        ChannelRules.Lane lane = w.lane(key);
+        return lane != null && ChannelRules.releasedByDark(w, lane);
+    }
+
+    /** 拍照不拍这一路：被拿着、被挡着、停手了、或者熄屏放开了；在出画面的照拍（哪怕它的录像路不在）。 */
     public boolean excludedFromPhoto(String key) {
         ChannelRules.Lane lane = w.lane(key);
-        return lane != null && ChannelRules.excludedFromPhoto(lane);
+        return lane != null && ChannelRules.excludedFromPhoto(w, lane);
     }
 
     /**
@@ -1272,6 +1365,7 @@ public final class ChannelScheduler {
         dispatchDrops();
         releaseHandedOver(false);
         maybeAsk();
+        noteAftermaths(now);
         tellRecording();
         if (updateWinding(now)) {
             stop();
@@ -1528,7 +1622,7 @@ public final class ChannelScheduler {
         Running r = running;
         running = null;
         if (step.move == ChannelRules.Move.CLOSE) {
-            closeEnded(step, now);
+            closeEnded(step, r, now);
             return;
         }
         if (r == null || step.keys.isEmpty()) {
@@ -1553,16 +1647,9 @@ public final class ChannelScheduler {
         long frameMs = !timedOut && lane.firstFrameAt >= step.startedAt ? lane.firstFrameAt - step.startedAt : -1;
         long configuredMs = lane.sessionSince >= step.startedAt ? lane.sessionSince - step.startedAt : -1;
         ChannelRules.Decision d = r.decision;
-        List<Other> others = new ArrayList<>();
-        for (Map.Entry<String, Integer> entry : r.generations.entrySet()) {
-            CameraPort other = ports.get(entry.getKey());
-            if (other != null) {
-                others.add(new Other(entry.getKey(), other.longestFrameGapSince(step.startedAt),
-                        other.sessionGeneration() != entry.getValue()));
-            }
-        }
         journal.stepEnded(new StepReport(step.move, d.why, key, d.rescue, d.attempt, d.ms, d.forWhom,
-                kinds(d.outputs), kinds(d.added), kinds(d.removed), timedOut, configuredMs, frameMs, others));
+                kinds(d.outputs), kinds(d.added), kinds(d.removed), timedOut, configuredMs, frameMs,
+                othersSince(r.generations, step.startedAt)));
         if (step.move == ChannelRules.Move.OPEN) {
             trailKeys.add(key);
             trailMs.add(timedOut ? now - step.startedAt : frameMs);
@@ -1571,11 +1658,15 @@ public final class ChannelScheduler {
 
     /**
      * 关的一步结束了（都关完了，或者到点）：记进这一轮关的轨迹 —— 环视单独那一步一项，座舱按关完的先后；
-     * 到点还没关完的写一行，不再等它们。
+     * 到点还没关完的写一行，不再等它们。关的时候在出画面的别的几路，这段时间里最长断帧、会话动没动也记进这一轮
+     * （{@link CloseRound#others}，设计 v3 §6 L3：熄屏只放开座舱时，环视有没有被带着）。
      */
-    private void closeEnded(ChannelRules.Step step, long now) {
+    private void closeEnded(ChannelRules.Step step, Running r, long now) {
         if (closeRound == null) {
             closeRound = new CloseRound();
+        }
+        if (r != null) {
+            closeRound.noteOthers(othersSince(r.generations, step.startedAt));
         }
         boolean surroundStep = step.maxMs == ChannelRules.CLOSE_SURROUND_MAX_MS;
         List<String> stuck = new ArrayList<>();
@@ -1777,21 +1868,18 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 开之前等录像输出的那几路，不再等着开的作废：录像登记放了，或者那一路不再是「该开、关着、没被拿着、不在救」。
-     * 不作废的话，很久以后为别的原因开它时（预览、放开之后）会写一行从没发生过的「等录像输出：…」（审查 2026-10-11）。
+     * 开之前等录像输出的那几路，不再等着开的作废：这一路的录像输出不再是要的（录像登记放了、熄屏放开了），或者那一路不再是
+     * 「该开、关着、没被拿着、不在救」。不作废的话，很久以后为别的原因开它时（预览、放开之后）会写一行从没发生过的
+     * 「等录像输出：…」（审查 2026-10-11）。
      */
     private void pruneRecordWaits() {
         if (recordWaitSince.isEmpty()) {
             return;
         }
-        if (w.recordingSince == 0) {
-            recordWaitSince.clear();
-            return;
-        }
         for (Iterator<String> it = recordWaitSince.keySet().iterator(); it.hasNext(); ) {
             ChannelRules.Lane lane = w.lane(it.next());
-            if (lane == null || lane.device != ChannelRules.Device.CLOSED || lane.mark != null
-                    || ChannelRules.rescuing(lane) || !ChannelRules.shouldOpen(w, lane)) {
+            if (lane == null || lane.recordWantedSince == 0 || lane.device != ChannelRules.Device.CLOSED
+                    || lane.mark != null || ChannelRules.rescuing(lane) || !ChannelRules.shouldOpen(w, lane)) {
                 it.remove();
             }
         }
@@ -1814,6 +1902,10 @@ public final class ChannelScheduler {
     // ---- 5. 照做
 
     private void execute(ChannelRules.Decision d, long now) {
+        if (d.move == ChannelRules.Move.OPEN || d.move == ChannelRules.Move.APPLY
+                || d.move == ChannelRules.Move.RESCUE || d.move == ChannelRules.Move.CLOSE) {
+            cutAftermaths(d, now);
+        }
         switch (d.move) {
             case OPEN:
                 open(d, now);
@@ -1829,6 +1921,26 @@ public final class ChannelScheduler {
                 break;
             default:
                 break;
+        }
+    }
+
+    /**
+     * 这一步要动的路里有等着再量的（{@link #watchAfter}、关完一轮之后的那几路）：那一路量到此刻、记下是哪一步，到点时照这一份写 ——
+     * 我们自己的关、改、救不算成它的断帧（审查 rev3 B2：以前熄屏持续录制关着时，座舱放开 10 秒后照表停录、环视跟着关，
+     * 30 秒那一行把我们关环视之后的 20 秒写成了「环视最长断帧 20.0 秒、会话被重建过」）。在照做之前量：关相机、改输出
+     * 当场就让会话代数变了。一路只量第一次。
+     */
+    private void cutAftermaths(ChannelRules.Decision d, long now) {
+        for (Aftermath a : aftermaths) {
+            for (String key : d.keys) {
+                Integer generation = a.generations.get(key);
+                CameraPort port = ports.get(key);
+                if (generation == null || port == null || a.cut.containsKey(key)) {
+                    continue;
+                }
+                a.cut.put(key, new Other(key, port.longestFrameGapSince(a.since),
+                        port.sessionGeneration() != generation, d.move, now - a.since));
+            }
         }
     }
 
@@ -1875,7 +1987,7 @@ public final class ChannelScheduler {
         }
         // 开着却卡住了的一路（关着等救的那种丢的时候已经说过）：录像那一路自己收尾退出，救好了带着录像输出出画面再加入
         if (lane.device == ChannelRules.Device.OPEN || lane.device == ChannelRules.Device.OPENING) {
-            noteGone(key, Gone.RESCUED, null);
+            noteGone(key, Gone.RESCUED, null, null);
         }
         queueRemoved(lane, d.outputs);
         if (!rebuild) {
@@ -1886,8 +1998,10 @@ public final class ChannelScheduler {
 
     /**
      * 关：先在账上记成在关（相机层的回调可能就在 close 里同步来，由管理器 post 过来），再交给相机层去关。
-     * 会话里带着的录像输出随相机关了：关完时告诉录像那一侧。会话里带走的留着的输出、这一次开着的账记进这一轮关
-     * （{@link CloseRound}），整轮关完跟着「关相机：…」那一行写。
+     * 会话里带着的录像输出留不留由每一轮的那一条规矩管（{@link #dispatchDrops}）：关完以后录像不再留着它就「随相机关了」，
+     * 录像还留着它（在录、这一路在计划里 —— 熄屏放开的座舱就是这样）就停放着等相机回来（设计 v3.1 C13）。
+     * 会话里带走的留着的输出、这一次开着的账记进这一轮关（{@link CloseRound}），整轮关完跟着「关相机：…」那一行写。
+     * 录像那一侧听说这一路走了，带着关的原因（{@link Recording#onLaneCameraGone}）。
      */
     private void close(ChannelRules.Decision d, long now) {
         List<String> keys = new ArrayList<>();
@@ -1897,15 +2011,10 @@ public final class ChannelScheduler {
                 continue;
             }
             keys.add(key);
-            for (ChannelRules.Out out : lane.session) {
-                if (out.kind == ChannelRules.Kind.RECORD) {
-                    queueDrop(key, out, SingleCamera.Drop.CLOSED);
-                }
-            }
             noteClosing(lane, now);
             setDevice(lane, ChannelRules.Device.CLOSING, now);
             closedAt.remove(key);
-            noteGone(key, Gone.CLOSED, null);
+            noteGone(key, Gone.CLOSED, null, d.why);
         }
         if (keys.isEmpty()) {
             return;
@@ -1918,18 +2027,24 @@ public final class ChannelScheduler {
         begin(d, now);
     }
 
+    /**
+     * 记下手上这一步：别的在出画面的几路此刻的会话代数，这一步结束时对一下（开、改、救那一行，关一轮那一行）。
+     * 关的那一步也记（设计 v3 §6 L3）：熄屏只放开座舱时环视一直开着，要看得出它有没有被带着；一轮关的第一步还记下
+     * 从什么时候起、为什么关，关完之后 {@link ChannelScheduler#AFTERMATH_MS} 再量一次（{@link #noteAftermaths}）。
+     */
     private void begin(ChannelRules.Decision d, long now) {
         ChannelRules.begin(w, d);
         Map<String, Integer> generations = new LinkedHashMap<>();
-        if (d.move != ChannelRules.Move.CLOSE) {
-            for (ChannelRules.Lane lane : w.lanes) {
-                CameraPort port = ports.get(lane.key);
-                if (!d.keys.contains(lane.key) && port != null && ChannelRules.streaming(lane)) {
-                    generations.put(lane.key, port.sessionGeneration());
-                }
+        for (ChannelRules.Lane lane : w.lanes) {
+            CameraPort port = ports.get(lane.key);
+            if (!d.keys.contains(lane.key) && port != null && ChannelRules.streaming(lane)) {
+                generations.put(lane.key, port.sessionGeneration());
             }
         }
         running = new Running(d, generations);
+        if (d.move == ChannelRules.Move.CLOSE && closeRound != null) {
+            closeRound.begun(now, d.why, generations);
+        }
         noteTally(d, now);
     }
 
@@ -1972,6 +2087,7 @@ public final class ChannelScheduler {
         if (closeRound == null) {
             closeRound = new CloseRound();
         }
+        closeRound.keys.add(lane.key);
         Long unneeded = unneededSince.get(lane.key);
         long until = unneeded == null ? now : unneeded;
         Map<ChannelRules.Out, OutputState> states = outputStates.get(lane.key);
@@ -1997,6 +2113,8 @@ public final class ChannelScheduler {
                 return "head-unit-sleeps";
             case SCREEN_OFF:
                 return "screen-off";
+            case DARK_RELEASE:
+                return "dark-release";
             case HOLD_OVER:
                 return "hold-over";
             default:
@@ -2029,8 +2147,16 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 派发：关完了的一路，它带走的录像输出一律「随相机关了」；开着的一路，会话里已经没有它、相机层手上也没有动作
-     * （旧会话关掉了、新会话配好了）才算「摘掉了」。
+     * 派发，每一轮：
+     * <ul>
+     *   <li>改输出、救排着的（{@link #queueRemoved}）：开着的一路，会话里已经没有它、相机层手上也没有动作
+     *       （旧会话关掉了、新会话配好了）才算「摘掉了」；这一路先关了的，算「随相机关了」；</li>
+     *   <li>关着的一路（我们关的、丢了的、被拿着的、熄屏放开的）声明着的录像输出，录像不再留着它
+     *       （{@link ChannelRules#keepsRecordOutput}：停了录、这一路不在计划里）就当轮「随相机关了」，录像那一侧才放那个录制器；
+     *       录像还留着它就停放着，相机回来时同一个录制器直接加入（设计 v3.1 C13，一条规矩管我们关的和丢了的 ——
+     *       以前关、丢的那一下按当时定了就不再看：在录时丢了、之后停录，录制器就一直留着；熄屏放开的座舱要它停放过夜）。</li>
+     * </ul>
+     * 关着的一路，同一个录像输出只说一次（{@link #closedDropsTold}）。
      */
     private void dispatchDrops() {
         for (Iterator<Map.Entry<String, Map<ChannelRules.Out, SingleCamera.Drop>>> it = drops.entrySet().iterator();
@@ -2048,7 +2174,9 @@ public final class ChannelScheduler {
                 Map.Entry<ChannelRules.Out, SingleCamera.Drop> drop = outs.next();
                 if (closed) {
                     outs.remove();
-                    port.dropped(drop.getKey(), SingleCamera.Drop.CLOSED);
+                    if (toldClosed(lane.key).add(drop.getKey())) {
+                        port.dropped(drop.getKey(), SingleCamera.Drop.CLOSED);
+                    }
                 } else if (lane.device == ChannelRules.Device.OPEN && lane.busySince == 0
                         && !lane.session.contains(drop.getKey())) {
                     outs.remove();
@@ -2059,6 +2187,35 @@ public final class ChannelScheduler {
                 it.remove();
             }
         }
+        for (ChannelRules.Lane lane : w.lanes) {
+            CameraPort port = ports.get(lane.key);
+            if (lane.device != ChannelRules.Device.CLOSED || port == null) {
+                closedDropsTold.remove(lane.key);
+                continue;
+            }
+            Set<ChannelRules.Out> told = closedDropsTold.get(lane.key);
+            if (told != null) {
+                told.retainAll(lane.declared);   // 撤回了的不再记：同一个再声明进来，照样要说
+            }
+            if (ChannelRules.keepsRecordOutput(w, lane)) {
+                continue;
+            }
+            for (ChannelRules.Out out : new ArrayList<>(lane.declared)) {
+                if (out.kind == ChannelRules.Kind.RECORD && toldClosed(lane.key).add(out)) {
+                    port.dropped(out, SingleCamera.Drop.CLOSED);
+                }
+            }
+        }
+    }
+
+    /** 这一路关着时已经说过「随相机关了」的录像输出（{@link #closedDropsTold}）。 */
+    private Set<ChannelRules.Out> toldClosed(String key) {
+        Set<ChannelRules.Out> told = closedDropsTold.get(key);
+        if (told == null) {
+            told = new LinkedHashSet<>();
+            closedDropsTold.put(key, told);
+        }
+        return told;
     }
 
     /**
@@ -2099,6 +2256,10 @@ public final class ChannelScheduler {
 
     // ---- 7. 黑匣子的轨迹：连着开的、一轮关的
 
+    /**
+     * 连着开的一轮开完了、一轮关完了，各写一行。一轮关完时，关的时候在出画面、关完还开着的那几路要过
+     * {@link ChannelScheduler#AFTERMATH_MS} 再量一次（{@link #noteAftermaths}），这里排上。
+     */
     private void flushTrails(ChannelRules.Decision d) {
         ChannelRules.Step step = w.step;
         // 开不起来之后等判（300 ms）也还在这一轮里：判完接着开下一路，「按次序开相机」照旧一行
@@ -2118,11 +2279,61 @@ public final class ChannelScheduler {
             CloseRound round = closeRound;
             closeRound = null;
             journal.closeRound(round.surroundKey, round.surroundMs, round.surroundTimedOut,
-                    round.cabinKeys, round.cabinMs, round.carried);
+                    round.cabinKeys, round.cabinMs, round.carried, round.staying());
             for (OpenSpan span : round.spans) {
                 journal.openSpan(span);
             }
+            Map<String, Integer> staying = new LinkedHashMap<>(round.generations);
+            staying.keySet().removeAll(round.keys);
+            if (round.startedAt != 0 && !staying.isEmpty()) {
+                final List<String> closedKeys = Collections.unmodifiableList(new ArrayList<>(round.keys));
+                final ChannelRules.Why why = round.why;
+                aftermaths.add(new Aftermath(round.startedAt, null, staying,
+                        others -> journal.closeAftermath(closedKeys, why, others)));
+            }
         }
+    }
+
+    /**
+     * 到了 {@link ChannelScheduler#AFTERMATH_MS} 的：那几路从开始量起最长断帧多久、会话动没动，交出去写一行（关完一轮的那一行
+     * {@link Journal#closeAftermath}，设计 v3.1 C22；别的程序拿走一路相机之后的那一行，{@link #watchAfter}）。
+     * 我们中途动过的那一路用动它那一刻量的（{@link #cutAftermaths}）。一件事一行，量完就扔。交出去的在遍历之外调。
+     */
+    private void noteAftermaths(long now) {
+        List<Aftermath> due = new ArrayList<>();
+        for (Iterator<Aftermath> it = aftermaths.iterator(); it.hasNext(); ) {
+            Aftermath a = it.next();
+            if (now >= a.since + AFTERMATH_MS) {
+                it.remove();
+                due.add(a);
+            }
+        }
+        for (Aftermath a : due) {
+            List<Other> others = new ArrayList<>();
+            for (Other measured : othersSince(a.generations, a.since)) {
+                Other cut = a.cut.get(measured.key);
+                others.add(cut != null ? cut : measured);
+            }
+            if (!others.isEmpty()) {
+                a.report.accept(others);
+            }
+        }
+    }
+
+    /**
+     * 别的几路（{@code generations}：开始时在出画面的那几路、那一刻的会话代数）从 {@code since}（调度的钟）起最长断帧多久、
+     * 会话动没动 —— 开、改、救那一行，关一轮那一行，关完之后再量的那一行都照它。这一份管线里已经没有的一路不算。
+     */
+    private List<Other> othersSince(Map<String, Integer> generations, long since) {
+        List<Other> others = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : generations.entrySet()) {
+            CameraPort other = ports.get(entry.getKey());
+            if (other != null) {
+                others.add(new Other(entry.getKey(), other.longestFrameGapSince(since),
+                        other.sessionGeneration() != entry.getValue()));
+            }
+        }
+        return others;
     }
 
     // ---- 8. 问（只问，不开）
@@ -2189,22 +2400,22 @@ public final class ChannelScheduler {
 
     // ---- 9. 告诉录像那一侧
 
-    private void noteGone(String key, Gone why, CameraTaken.Reason reason) {
-        gone.add(new Object[]{key, why, reason});
+    private void noteGone(String key, Gone why, CameraTaken.Reason reason, ChannelRules.Why closed) {
+        gone.add(new Left(key, why, reason, closed));
     }
 
     /**
-     * 一轮最后告诉录像那一侧（{@link Recording}）：先说这一轮里走了的几路（录像那一路先退出），再说 condition 变了的
-     * （含关着时能不能用相机变了的，{@link #cannotOpen}），
+     * 一轮最后告诉录像那一侧（{@link Recording}）：先说这一轮里走了的几路（录像那一路先退出；我们关的带着关的原因），
+     * 再说 condition 变了的（含关着时能不能用相机变了的 {@link #cannotOpen}、被不被熄屏放开变了的 {@link #releasedByDark}），
      * 最后说带着一份新会话出了画面的（录像那一路看会话带没带着它的录像输出，带着就加入）。
      * 走了的那一路，下一份出画面的会话一定算新的。录像那一侧在回调里只叫醒、声明、撤回，不在这里再跑一轮。
      */
     private void tellRecording() {
-        List<Object[]> left = new ArrayList<>(gone);
+        List<Left> left = new ArrayList<>(gone);
         gone.clear();
-        for (Object[] g : left) {
-            toldStreaming.remove((String) g[0]);
-            recording.onLaneCameraGone((String) g[0], (Gone) g[1], (CameraTaken.Reason) g[2]);
+        for (Left g : left) {
+            toldStreaming.remove(g.key);
+            recording.onLaneCameraGone(g.key, g.why, g.reason, g.closed);
         }
         List<String> changed = new ArrayList<>();
         List<String> streamingNow = new ArrayList<>();
@@ -2213,7 +2424,9 @@ public final class ChannelScheduler {
             boolean conditionChanged = toldCondition.put(lane.key, condition) != condition;
             boolean cannotOpen = ChannelRules.cannotOpen(w, lane);
             boolean cannotOpenChanged = !Boolean.valueOf(cannotOpen).equals(toldCannotOpen.put(lane.key, cannotOpen));
-            if (conditionChanged || cannotOpenChanged) {
+            boolean dark = ChannelRules.releasedByDark(w, lane);
+            boolean darkChanged = !Boolean.valueOf(dark).equals(toldReleasedByDark.put(lane.key, dark));
+            if (conditionChanged || cannotOpenChanged || darkChanged) {
                 changed.add(lane.key);
             }
             long session = ChannelRules.streaming(lane) ? lane.sessionSince : 0L;
@@ -2259,6 +2472,7 @@ public final class ChannelScheduler {
         poster.cancel(timerTask);
         dispatchDrops();
         releaseHandedOver(true);
+        aftermaths.clear();
         detach();
         host.stopped();
     }
@@ -2267,7 +2481,7 @@ public final class ChannelScheduler {
 
     /**
      * 最迟 {@link ChannelRules#TICK_MS} 醒一次；手上那一步到点、等的东西到点（待判 300 ms、安静、录像输出、车机要睡的 1 秒）、
-     * 保持到点，早一点醒。
+     * 保持到点、关完一轮之后再量的那一下到点（{@link #noteAftermaths}），早一点醒。
      *
      * <p>待判的只算还没到点的：已经到点、只等别的丢失关完的那一路，算进来就是负数，按 1 ms 醒 —— 另一路那一次关要 5–8 秒，
      * 这几秒里主线程每一毫秒跑一轮（审查 2026-10-11）。另一路关完有回调叫醒，关卡死的由在途封顶（等的 {@code d.ms}）叫醒。</p>
@@ -2292,6 +2506,9 @@ public final class ChannelScheduler {
                     delay = Math.min(delay, due - now);
                 }
             }
+        }
+        for (Aftermath a : aftermaths) {
+            delay = Math.min(delay, a.since + AFTERMATH_MS - now);
         }
         poster.cancel(timerTask);
         poster.postDelayed(timerTask, Math.max(1, delay));
@@ -2378,8 +2595,8 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 一轮关：环视单独那一步、座舱一起那一步，整轮完了写一行「关相机：…」（末尾带上各路带走的留着的输出），
-     * 再每一路一行这一次开着的小结。
+     * 一轮关：环视单独那一步、座舱一起那一步，整轮完了写一行「关相机：…」（末尾带上各路带走的留着的输出、还开着的那几路
+     * 这段时间里怎样），再每一路一行这一次开着的小结；还开着的那几路 {@link ChannelScheduler#AFTERMATH_MS} 之后再量一次（{@link Aftermath}）。
      */
     private static final class CloseRound {
         String surroundKey;
@@ -2387,10 +2604,90 @@ public final class ChannelScheduler {
         boolean surroundTimedOut;
         final List<String> cabinKeys = new ArrayList<>();
         final List<Long> cabinMs = new ArrayList<>();
+        /** 这一轮关的几路，按关的先后（含到点还没关完的）。 */
+        final List<String> keys = new ArrayList<>();
         /** 关的时候各路会话里带走的留着的输出，按关的先后。 */
         final List<Carried> carried = new ArrayList<>();
         /** 这一轮关的各路这一次开着的小结，按关的先后。 */
         final List<OpenSpan> spans = new ArrayList<>();
+        /** 第一步开始关的时刻（调度的钟）；0 = 还没有一步开始。 */
+        long startedAt;
+        /** 第一步关的原因。 */
+        ChannelRules.Why why;
+        /** 每一步开始时别的在出画面的几路的会话代数（同一路记最早的那一份）。 */
+        final Map<String, Integer> generations = new LinkedHashMap<>();
+        /** 每一步里别的在出画面的几路怎样（同一路并成一份：最长的断帧，会话动过就算动过）。 */
+        final Map<String, Other> others = new LinkedHashMap<>();
+
+        /** 一步开始关了（{@link ChannelScheduler#begin}）。 */
+        void begun(long at, ChannelRules.Why stepWhy, Map<String, Integer> stepGenerations) {
+            if (startedAt == 0) {
+                startedAt = at;
+                why = stepWhy;
+            }
+            for (Map.Entry<String, Integer> entry : stepGenerations.entrySet()) {
+                if (!generations.containsKey(entry.getKey())) {
+                    generations.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+
+        /** 一步关完了：这一步里别的几路怎样，并进这一轮。 */
+        void noteOthers(List<Other> stepOthers) {
+            for (Other other : stepOthers) {
+                Other before = others.get(other.key);
+                others.put(other.key, before == null ? other : new Other(other.key,
+                        Math.max(before.gapMs, other.gapMs), before.sessionChanged || other.sessionChanged));
+            }
+        }
+
+        /** 这一轮关完还开着的那几路这段时间里怎样（关了的那几路不算：它们自己就在关）。 */
+        List<Other> staying() {
+            List<Other> staying = new ArrayList<>();
+            for (Other other : others.values()) {
+                if (!keys.contains(other.key)) {
+                    staying.add(other);
+                }
+            }
+            return staying;
+        }
+    }
+
+    /**
+     * 等着从 {@code since} 起 {@link ChannelScheduler#AFTERMATH_MS} 再量一次的那几路（{@link ChannelScheduler#noteAftermaths}）：
+     * 关完一轮还开着的、别的程序拿走一路相机之后的环视（{@link ChannelScheduler#watchAfter}）。从什么时候量、那几路开始时的会话代数、
+     * 量好了交给谁写；中途我们自己动了的那几路在动它那一刻量的（{@link ChannelScheduler#cutAftermaths}）。
+     */
+    private static final class Aftermath {
+        final long since;
+        /** 同一件只等一次（{@link ChannelScheduler#watchAfter}）；关完一轮的那一种是 null。 */
+        final String tag;
+        final Map<String, Integer> generations;
+        final Consumer<List<Other>> report;
+        /** 中途我们自己动了的那几路：动它那一刻量的（{@link Other#ours}）。 */
+        final Map<String, Other> cut = new LinkedHashMap<>();
+
+        Aftermath(long since, String tag, Map<String, Integer> generations, Consumer<List<Other>> report) {
+            this.since = since;
+            this.tag = tag;
+            this.generations = generations;
+            this.report = report;
+        }
+    }
+
+    /** 这一轮里走了的一路（{@link #tellRecording}）：哪一路、怎么走的、丢的那一下、我们关它的原因。 */
+    private static final class Left {
+        final String key;
+        final Gone why;
+        final CameraTaken.Reason reason;
+        final ChannelRules.Why closed;
+
+        Left(String key, Gone why, CameraTaken.Reason reason, ChannelRules.Why closed) {
+            this.key = key;
+            this.why = why;
+            this.reason = reason;
+            this.closed = closed;
+        }
     }
 
     /** 一路这一次开着的账：从什么时候开起来的，重配了几次、各为什么（关的时候成了 {@link OpenSpan}）。 */

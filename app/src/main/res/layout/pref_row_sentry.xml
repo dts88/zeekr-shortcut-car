@@ -2,7 +2,7 @@
 <!--
   设置行：开关类，行尾多一行哨兵模式此刻的状态（SentryStatusView 自己读、自己换字）。
   其余和 pref_row.xml 一样：开关在最前，id 和 androidx.preference 的默认布局一致。
-  用在「熄屏持续录制」上：它能不能起作用，看的就是哨兵模式开没开。
+  用在「熄屏持续录制」上：它录到什么时候，看的是哨兵模式开没开。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

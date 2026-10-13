@@ -64,6 +64,8 @@ public class MultiCameraManager {
     // 开、关、改输出、救、重开都只在 ChannelScheduler 一处：这里的有序开（一路出了画面再开下一路）、关一轮（环视单独先关，
     // 关完再关座舱）、看门狗、登记表的「没人要等 30 秒再关」都搬了进去。为什么环视要单独开、单独关，见 ChannelRules
     // closeStep 的说明（2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出）。
+    // 熄屏 v3（项目所有者 2026-10-12 D2）：屏幕一黑两路座舱就放开（一起关），环视照熄屏持续录制那张表录 ——
+    // 座舱比环视早关几分钟，环视先关只对连环视一起关的那几次还成立（ChannelRules.releasedByDark）。
     /**
      * 调度自己的 Handler（同一个主线程 Looper）。不用 mainHandler：release() 开头会 removeCallbacksAndMessages(null)，
      * 而调度那时正要按次序关相机 —— 2.10.5 时就是这样把「上一路关完、关下一路」的续命清掉了，后两路没关进程就退了
@@ -76,21 +78,38 @@ public class MultiCameraManager {
     private final ChannelSide channelSide = new ChannelSide();
     /** 登记表的监听：只叫醒自己这一份调度。release 时只在它还是监听者时才摘（换车型时两份并存）。 */
     private final CameraNeeds.Listener needsListener;
-    /** 亮屏、熄屏：叫醒调度（熄屏时 PREVIEW 不算、不保持，由规则判）。 */
+    /**
+     * 亮屏、熄屏：叫醒调度（熄屏时 PREVIEW 不算、不保持、座舱谁都不要，由规则判 —— ChannelRules.releasedByDark）。
+     * 熄屏那一下从头记这一段熄屏的座舱放开（{@link #newDarkPeriod}）。
+     */
     private final com.kooo.evcam.screen.ScreenState.Listener screenWake =
             new com.kooo.evcam.screen.ScreenState.Listener() {
                 @Override
                 public void onScreenOff() {
+                    newDarkPeriod();
                     scheduler.wake();
                 }
 
                 @Override
                 public void onScreenOn() {
+                    // 这一段熄屏结束：之后亮着时关座舱（保持到点）不算熄屏放开；记下的那一刻留到下一次熄屏
+                    awaitingCabinRelease = false;
                     scheduler.wake();
                     liftRefusals("亮屏了");
                 }
             };
     private PipelineCallback pipelineCallback;
+
+    // ---- 熄屏放开座舱（项目所有者 2026-10-12 D2）：协调器写熄屏小结要的那一个数（设计 v3.1 C16）----
+    /**
+     * 这一段熄屏里座舱放开完的那一刻（elapsedRealtime，含深睡）：熄屏以后第一轮关了座舱的那一轮关完时；0 = 还没有。
+     * 每次熄屏从头算（{@link #newDarkPeriod}）。主线程上写，哪个线程都能读。
+     */
+    private volatile long cabinsReleasedAt;
+    /** 熄屏那一刻座舱（环视以外的几路）开着、在开、或者在关。 */
+    private volatile boolean cabinsOpenAtDark;
+    /** 在等这一段熄屏里第一轮关了座舱的那一轮关完（主线程）。 */
+    private boolean awaitingCabinRelease;
 
     /**
      * 录像的代数：每次开录、每次停录都 +1（主线程上改）。录制器的回调、排着的回帖都带着开录时的那一代，
@@ -762,6 +781,10 @@ public class MultiCameraManager {
         if (lane.state == RecordingLanes.State.STARTING) {
             return "在加入";
         }
+        // 熄屏放开的座舱先说这一句（设计 v3.1 C4）：车机熄屏约 98 秒后拿走后座舱，它也是「被占用」，可没在录是因为熄屏
+        if (lane.releasedByDark) {
+            return "熄屏：座舱放开";
+        }
         if (unrecordable.contains(lane.key)) {
             return useCodecRecording ? "录制器建不起来" : "MediaRecorder 备不起来、或者开不了录";
         }
@@ -782,12 +805,15 @@ public class MultiCameraManager {
         }
     }
 
-    /** 这个录像意图里每一路此刻的事实，按开的次序：录像表上的状态、调度说的相机怎样（能不能开）、录制器怎样。 */
+    /**
+     * 这个录像意图里每一路此刻的事实，按开的次序：录像表上的状态、调度说的相机怎样（能不能开、是不是被熄屏放开了）、
+     * 录制器怎样。
+     */
     private List<RecordingLanes.Facts> laneFacts() {
         List<RecordingLanes.Facts> facts = new ArrayList<>();
         for (String key : lanes.keys()) {
             facts.add(new RecordingLanes.Facts(key, lanes.state(key), scheduler.condition(key),
-                    scheduler.cannotOpen(key), recorderOf(key)));
+                    scheduler.cannotOpen(key), scheduler.releasedByDark(key), recorderOf(key)));
         }
         return facts;
     }
@@ -846,9 +872,12 @@ public class MultiCameraManager {
         }
 
         @Override
-        public void onLaneCameraGone(String key, ChannelScheduler.Gone why, CameraTaken.Reason reason) {
+        public void onLaneCameraGone(String key, ChannelScheduler.Gone why, CameraTaken.Reason reason,
+                                     ChannelRules.Why closed) {
+            // 熄屏放开的座舱：退出录像那一行写「熄屏：座舱放开」（设计 v3 §4），别的我们关的照旧是「相机关了」
             leaveLane(key, why == ChannelScheduler.Gone.LOST ? channelSide.lossText(reason)
-                    : why == ChannelScheduler.Gone.CLOSED ? "相机关了" : "相机卡住了，调度在救");
+                    : why == ChannelScheduler.Gone.RESCUED ? "相机卡住了，调度在救"
+                    : closed == ChannelRules.Why.DARK_RELEASE ? channelSide.closeWhyText(closed) : "相机关了");
             // 会话带不上它的录像输出的账随这一路的相机走了就清：回来时是一份新会话，照常声明
             if (refusals.remove(key) != null) {
                 ensureLane(key);
@@ -856,9 +885,16 @@ public class MultiCameraManager {
             publishLanes();
         }
 
+        /**
+         * 这一路的样子变了：MediaRecorder 看备好的那一趟还留不留（{@link #mediaConditionChanged}）；编码录制缺了录制器的
+         * 现在补（{@link #ensureRecorder}）—— 熄屏放开的座舱熄屏时不为它建，亮屏它不再被放开的那一下在这里建
+         * （设计 v3.1 C4），调度开它之前最多等它 2 秒（ChannelRules.RECORD_OUTPUT_WAIT_MS）。
+         */
         @Override
         public void onLaneConditionChanged(String key) {
-            if (!useCodecRecording) {
+            if (useCodecRecording) {
+                ensureRecorder(key);
+            } else {
                 mediaConditionChanged(key);
             }
             publishLanes();
@@ -870,10 +906,14 @@ public class MultiCameraManager {
      * （{@link #retire}）、另建一个（{@link #build}）。手上有事的（在加入、在录、在停）等它做完再看（{@link #slotIdle}）；
      * 画面尺寸还没算出来（它不在相机列表里）的等它回来算出来（{@link #onSizeResolved}）—— 不再要求「本进程开过这一路」，
      * 也不用 1280×800 兜底。有了能用的，就看能不能加入（{@link #tryJoin}）。
+     *
+     * <p>熄屏放开的座舱（{@link ChannelScheduler#releasedByDark}）不建、不换：熄屏时它不会开，建好的录制器（编码器、EGL、
+     * 输入画面）白白占一整夜（设计 v3.1 C4）。停放着的照旧停放着（调度留着它的录像输出）；亮屏它不再被放开时调度告诉一声
+     * （{@link LaneSide#onLaneConditionChanged}），那时再看。</p>
      */
     private void ensureRecorder(String key) {
         if (!isRecording || !useCodecRecording || !recordingPlan.containsKey(key) || unrecordable.contains(key)
-                || refused(key) || building.containsKey(key)) {
+                || refused(key) || building.containsKey(key) || scheduler.releasedByDark(key)) {
             return;
         }
         SingleCamera camera = cameras.get(key);
@@ -1579,19 +1619,40 @@ public class MultiCameraManager {
 
     /** 黑匣子：这一段里别的在录的几路最长断帧多久、会话动没动过 —— 车上核对「一路退出时别的路没被动到」看这一句。 */
     private String othersDuring(LaneChange change) {
-        StringBuilder sb = new StringBuilder();
+        List<ChannelScheduler.Other> others = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : change.generations.entrySet()) {
             SingleCamera camera = cameras.get(entry.getKey());
-            if (camera == null) {
-                continue;
+            if (camera != null) {
+                others.add(new ChannelScheduler.Other(entry.getKey(), camera.longestFrameGapSince(change.startedAt),
+                        camera.sessionGeneration() != entry.getValue()));
             }
-            long gap = camera.longestFrameGapSince(change.startedAt);
-            sb.append(sb.length() > 0 ? "，" : "").append(roleName(entry.getKey()))
-                    .append(gap < SingleCamera.NOTABLE_GAP_MS ? "最长断帧不到 " + seconds(SingleCamera.NOTABLE_GAP_MS)
-                            : "最长断帧 " + seconds(gap))
-                    .append(camera.sessionGeneration() == entry.getValue() ? "、会话没动" : "、会话被重建过");
         }
-        return sb.length() == 0 ? "这段时间里没有别的路在录" : "这段时间里" + sb;
+        return others.isEmpty() ? "这段时间里没有别的路在录" : "这段时间里" + gapsText(others);
+    }
+
+    /**
+     * 黑匣子：几路这段时间里最长断帧多久、会话动没动 ——「环视最长断帧不到 0.2 秒、会话没动，后座舱最长断帧 3.4 秒、会话被重建过」。
+     * 一路退出录像时别的路、调度开 / 改 / 救 / 关那一行、关完之后 30 秒再量的那一行、别的程序拿走一路相机之后 30 秒的那一行
+     * 都照它写（{@link ChannelScheduler.Other}），同一句话只有这一处。过一阵再量的那两行里我们中途自己动了那一路的
+     * （{@link ChannelScheduler.Other#ours}），只量到那一刻，写明「（只量到第 10.0 秒：那时我们关了它）」—— 之后的不是断帧（审查 rev3 B2）。
+     */
+    private static String gapsText(List<ChannelScheduler.Other> others) {
+        StringBuilder sb = new StringBuilder();
+        for (ChannelScheduler.Other other : others) {
+            sb.append(sb.length() > 0 ? "，" : "").append(roleName(other.key))
+                    .append(other.gapMs < SingleCamera.NOTABLE_GAP_MS
+                            ? "最长断帧不到 " + seconds(SingleCamera.NOTABLE_GAP_MS) : "最长断帧 " + seconds(other.gapMs))
+                    .append(other.sessionChanged ? "、会话被重建过" : "、会话没动");
+            if (other.ours != null) {
+                sb.append("（只量到第 ").append(seconds(other.oursAtMs)).append("：那时我们")
+                        .append(other.ours == ChannelRules.Move.CLOSE ? "关了它"
+                                : other.ours == ChannelRules.Move.APPLY ? "改了它的输出"
+                                : other.ours == ChannelRules.Move.RESCUE ? "在救它"
+                                : other.ours == ChannelRules.Move.OPEN ? "重开了它" : "动了它")
+                        .append("）");
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -2346,7 +2407,8 @@ public class MultiCameraManager {
     /**
      * 此刻能不能用相机（大纲 §0 名词「能用相机」）：主界面在前，或者前台服务是主界面在前时起的、那时刷新过 ——
      * 安卓 12 起后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度读的是同一对事实（{@link ChannelSide} 的
-     * mainForeground、serviceStartedWhileVisible）；录像协调器打开录像意图时（RecordingCoordinator.startWith）照它决定要不要先把主界面拉起来。
+     * mainForeground、serviceStartedWhileVisible）；录像协调器在屏幕亮着、打开录像意图和亮屏时
+     * （RecordingCoordinator.bringUpMainIfCamerasUnusable）照它决定要不要先把主界面拉起来。
      * 哪个线程都能读。
      */
     public static boolean cameraUsableNow() {
@@ -2356,6 +2418,103 @@ public class MultiCameraManager {
     /** 这一份管线的通道调度（录像、后视镜读它的事实：condition、usable；诊断报告读 {@link #describeChannel}）。 */
     public ChannelScheduler channelScheduler() {
         return scheduler;
+    }
+
+    // ------------------------------------------------------------------ 熄屏放开座舱：给熄屏小结、诊断报告的几个数
+
+    /**
+     * 这一段熄屏里座舱放开完的那一刻（elapsedRealtime，含深睡；设计 v3.1 C16，协调器写熄屏小结「座舱 熄屏后 +N ms 放开完」用）：
+     * 熄屏以后第一轮关了座舱的那一轮关完时 —— 平常就是熄屏放开座舱的那一轮（{@link ChannelRules.Why#DARK_RELEASE}），
+     * 安卓直接熄屏、车机马上要睡的那种是按次序关的那一轮。0 = 还没有：熄屏时座舱就没开着（{@link #cabinsOpenAtDark}），
+     * 或者还没关完。每次熄屏（ScreenState 的熄屏那一下，{@link #newDarkPeriod}）从头算，亮屏后留着到下一次熄屏。
+     * 哪个线程都能读。
+     */
+    public long cabinsReleasedAtElapsed() {
+        return cabinsReleasedAt;
+    }
+
+    /** 这一段熄屏开始的那一刻座舱（环视以外的几路）开着、在开、或者在关：没开着的就没什么可放开。哪个线程都能读。 */
+    public boolean cabinsOpenAtDark() {
+        return cabinsOpenAtDark;
+    }
+
+    /**
+     * 熄屏了（ScreenState 的熄屏那一下，主线程）：这一段熄屏的座舱放开从头记 —— 那一刻座舱开着没有，之后第一轮关了座舱的
+     * 那一轮关完时记下时刻（{@link ChannelSide#closeRound}）。
+     */
+    private void newDarkPeriod() {
+        boolean open = false;
+        for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
+            if (!CameraSlots.KEY_SURROUND.equals(entry.getKey()) && entry.getValue().holdsOrIsOpening()) {
+                open = true;
+                break;
+            }
+        }
+        cabinsOpenAtDark = open;
+        cabinsReleasedAt = 0;
+        awaitingCabinRelease = open;
+    }
+
+    /**
+     * 别的程序拿走了一路相机（{@link CameraContention} 记争用那一行时调；哪个线程都能调）：拿走的不是环视、环视那时开着，
+     * 就在拿走之后 {@link ChannelScheduler#AFTERMATH_MS} 写一行环视怎样（设计 v3 §6 L5）—— 最长断帧、会话动没动、
+     * 在不在录、是不是被挡着（BLOCKED）。在不在录都写：10-11 只录环视那一晚车机拿了 6 次相机 1，环视一次没断；
+     * 10-12 我们拿着相机 1 的 4 次里 3 次环视在 6–14 秒后断了 35–43 秒 —— 下一次上车要看熄屏放开座舱之后是哪一种。
+     * 同一路相机一次只等一件。量在调度里（{@link ChannelScheduler#watchAfter}，和关完一轮之后再量的那一行同一份）：
+     * 这 30 秒里我们自己关了、改了、救了环视的，只量到那一刻、写明是我们动的 —— 不把我们自己的关写成环视断帧（审查 rev3 B2）。
+     *
+     * @param tookAtElapsed 拿走的那一刻（elapsedRealtime，含深睡）
+     */
+    void watchSurroundAfterTake(String cameraId, long tookAtElapsed) {
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            mainHandler.post(() -> watchSurroundAfterTake(cameraId, tookAtElapsed));
+            return;
+        }
+        SingleCamera surround = cameras.get(CameraSlots.KEY_SURROUND);
+        if (released || cameraId == null || surround == null || cameraId.equals(surround.getCameraId())
+                || !surround.holdsOrIsOpening()) {
+            return;
+        }
+        long ago = Math.max(0, android.os.SystemClock.elapsedRealtime() - tookAtElapsed);
+        // 断帧记录、调度用的是开机以来、不含深睡的钟：拿走的那一刻换过去
+        long since = android.os.SystemClock.uptimeMillis() - ago;
+        scheduler.watchAfter("take " + cameraId, CameraSlots.KEY_SURROUND, since,
+                others -> noteSurroundAfterTake(cameraId, surround, others));
+    }
+
+    /**
+     * 别的程序拿走相机 {@code cameraId} 之后到点了（主线程，调度量好的那一份）：环视这段时间里怎样，一行。
+     * 环视这时已经不开着（我们关了、或者它也丢了）就写「环视已关」，不写在没在录。
+     */
+    private void noteSurroundAfterTake(String cameraId, SingleCamera surround, List<ChannelScheduler.Other> others) {
+        if (released || cameras.get(CameraSlots.KEY_SURROUND) != surround) {
+            return;
+        }
+        CameraTaken.Verdict mark = markOf(CameraSlots.KEY_SURROUND);
+        RecordingLanes.State state = isRecording ? lanes.state(CameraSlots.KEY_SURROUND) : null;
+        String recording = !surround.holdsOrIsOpening() ? "环视已关"
+                : !isRecording ? "没在录像"
+                : state == null ? "环视不在这一次录像里"
+                : state == RecordingLanes.State.LIVE ? "环视在录" : "环视没在录";
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("争用：相机 " + cameraId + " 被拿走之后 "
+                + (ChannelScheduler.AFTERMATH_MS / 1000) + " 秒：" + gapsText(others)
+                + (mark == CameraTaken.Verdict.BLOCKED ? "；环视被挡着（BLOCKED：等被拿着的那一路放开）"
+                : mark == CameraTaken.Verdict.TAKEN ? "；环视也被别的程序拿着" : "")
+                + "；" + recording + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+    }
+
+    /** 调度此刻记着这一路被拿着（TAKEN）还是被挡着（BLOCKED）；没有是 null（读调度最后一轮的快照）。 */
+    private CameraTaken.Verdict markOf(String key) {
+        ChannelScheduler.Snapshot s = scheduler.snapshot();
+        if (s == null) {
+            return null;
+        }
+        for (ChannelScheduler.LaneView lane : s.lanes) {
+            if (lane.key.equals(key)) {
+                return lane.mark;
+            }
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------ 诊断报告的「Channel」一节
@@ -2378,8 +2537,11 @@ public class MultiCameraManager {
                 .append(s.stopped ? "；调度已停（退出之后都关完了）" : "").append('\n');
         sb.append("登记表：").append(channelSide.holderCodes(s.holders))
                 .append(s.recordKeys.isEmpty() ? "" : "（录 " + roles(s.recordKeys) + "）")
-                .append("；").append(s.screenOn ? "亮屏" : "熄屏")
+                .append("；").append(s.screenOn ? "亮屏" : "熄屏" + darkSinceText())
                 .append("；前台服务").append(s.foregroundService ? "在" : "不在").append('\n');
+        if (!s.screenOn) {
+            sb.append("熄屏放开座舱：").append(cabinReleaseText()).append('\n');
+        }
         sb.append("能用相机：").append(usableText(s, now)).append('\n');
         sb.append("手上：").append(stepText(s.step, now)).append('\n');
         sb.append("在等：").append(waitText(s)).append('\n');
@@ -2401,6 +2563,31 @@ public class MultiCameraManager {
             appendLane(sb, lane, now);
         }
         return sb.toString();
+    }
+
+    /**
+     * 熄屏是谁判的、多久了：「（车辆信号，12 分 3 秒前起）」—— 熄屏 v3 起熄屏是屏幕真黑了（安卓熄屏，或者车辆说黑，设计 v3 §1、§6），
+     * 车主走开后安卓还亮着的那几分钟也算。写法和报告「3.1 熄屏」那一节是同一处（{@code DiagnosticsCollector.darkText}）。
+     * 读 ScreenState 此刻一次取齐的那一份；快照之后又亮了的是空的。
+     */
+    private static String darkSinceText() {
+        com.kooo.evcam.screen.ScreenState.Now n = com.kooo.evcam.screen.ScreenState.describeNow();
+        return n.dark ? "（" + com.kooo.evcam.zeekr.DiagnosticsCollector.darkText(n.source, n.darkForMs) + "）" : "";
+    }
+
+    /** 这一段熄屏里座舱放开了没有：「熄屏后 +212ms 放开完」/「熄屏时座舱没开着」/「还没关完」（{@link #cabinsReleasedAtElapsed}）。 */
+    private String cabinReleaseText() {
+        if (!cabinsOpenAtDark) {
+            return "熄屏时座舱没开着";
+        }
+        long releasedAt = cabinsReleasedAt;
+        if (releasedAt == 0) {
+            return "还没关完";
+        }
+        long darkMs = com.kooo.evcam.screen.ScreenState.darkForMs();
+        long now = android.os.SystemClock.elapsedRealtime();
+        return darkMs < 0 ? timeText(now - releasedAt) + "前放开完"
+                : "熄屏后 +" + (releasedAt - (now - darkMs)) + "ms 放开完";
     }
 
     /** 能不能用相机、为什么（和调度判「能用相机」是同一对事实）。 */
@@ -2542,8 +2729,11 @@ public class MultiCameraManager {
         }
     }
 
-    /** 该开还是不该开、为谁；保持的写没人要多久了。 */
+    /** 该开还是不该开、为谁；保持的写没人要多久了；熄屏放开的座舱先说是熄屏（设计 v3 §4）。 */
     private String wantText(ChannelScheduler.LaneView v, long now) {
+        if (v.releasedByDark) {
+            return "不该开（" + channelSide.closeWhyText(ChannelRules.Why.DARK_RELEASE) + "）";
+        }
         String unwanted = v.unwantedSince == 0 ? "" : " " + timeText(now - v.unwantedSince);
         if (!v.wantedBy.isEmpty()) {
             return v.shouldOpen ? "是（为 " + channelSide.holderNames(v.wantedBy) + "）"
@@ -3141,7 +3331,8 @@ public class MultiCameraManager {
 
         @Override
         public void closeRound(String surroundKey, long surroundMs, boolean surroundTimedOut,
-                               List<String> cabinKeys, List<Long> cabinMs, List<ChannelScheduler.Carried> carried) {
+                               List<String> cabinKeys, List<Long> cabinMs, List<ChannelScheduler.Carried> carried,
+                               List<ChannelScheduler.Other> others) {
             List<String> cabins = new ArrayList<>();
             for (int i = 0; i < cabinKeys.size(); i++) {
                 noteStep(cabins, cabinKeys.get(i), cabinMs.get(i));
@@ -3152,10 +3343,23 @@ public class MultiCameraManager {
             String cabinLine = String.join("、", cabins);
             String line = surround == null ? cabinLine : cabinLine.isEmpty() ? surround : surround + " → " + cabinLine;
             if (!line.isEmpty()) {
-                // 「关相机：…」这一行的格式从 2.10.10 起没变，旧的分析脚本照样能读；阶段 8 只在末尾追加带走的留着的输出
+                // 「关相机：…」这一行的格式从 2.10.10 起没变，旧的分析脚本照样能读；阶段 8 只在末尾追加带走的留着的输出，
+                // 熄屏 v3 再在最末尾、括号里追加还开着的那几路这段时间里怎样（设计 v3 §6 L3、v3.1 C22）
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("关相机：" + line
-                        + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + carriedText(carried));
+                        + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + carriedText(carried) + othersText(others));
             }
+            // 这一段熄屏里第一轮关了座舱的那一轮关完了：记下那一刻（熄屏小结「座舱 熄屏后 +N ms 放开完」，设计 v3.1 C16）
+            if (awaitingCabinRelease && !cabinKeys.isEmpty()) {
+                awaitingCabinRelease = false;
+                cabinsReleasedAt = android.os.SystemClock.elapsedRealtime();
+            }
+        }
+
+        @Override
+        public void closeAftermath(List<String> closedKeys, ChannelRules.Why why, List<ChannelScheduler.Other> others) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：关 " + roles(closedKeys) + "（" + closeWhyText(why)
+                    + "）之后 " + (ChannelScheduler.AFTERMATH_MS / 1000) + " 秒：" + gapsText(others)
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         }
 
         @Override
@@ -3298,6 +3502,7 @@ public class MultiCameraManager {
             return record ? "画布被系统收走、MediaRecorder 停了" : "画布被系统收走";
         }
 
+        /** 关的原因（「通道：关 …（…）」、退出录像那一行、诊断报告「该开」、拍照不拍哪几路）。 */
         private String closeWhyText(ChannelRules.Why why) {
             switch (why) {
                 case EXIT:
@@ -3306,6 +3511,8 @@ public class MultiCameraManager {
                     return "车机要睡";
                 case SCREEN_OFF:
                     return "熄屏";
+                case DARK_RELEASE:
+                    return "熄屏：座舱放开";
                 case HOLD_OVER:
                     return "保持到点";
                 default:
@@ -3387,19 +3594,9 @@ public class MultiCameraManager {
             return (s / 60) + " 分 " + (s % 60) + " 秒";
         }
 
-        /** 「（这段时间里环视最长断帧不到 0.2 秒、会话没动）」。 */
+        /** 「（这段时间里环视最长断帧不到 0.2 秒、会话没动）」；没有别的路是空的。 */
         private String othersText(List<ChannelScheduler.Other> others) {
-            if (others.isEmpty()) {
-                return "";
-            }
-            StringBuilder sb = new StringBuilder();
-            for (ChannelScheduler.Other other : others) {
-                sb.append(sb.length() > 0 ? "，" : "").append(roleName(other.key))
-                        .append(other.gapMs < SingleCamera.NOTABLE_GAP_MS
-                                ? "最长断帧不到 " + seconds(SingleCamera.NOTABLE_GAP_MS) : "最长断帧 " + seconds(other.gapMs))
-                        .append(other.sessionChanged ? "、会话被重建过" : "、会话没动");
-            }
-            return "（这段时间里" + sb + "）";
+            return others.isEmpty() ? "" : "（这段时间里" + gapsText(others) + "）";
         }
     }
 
@@ -4046,8 +4243,8 @@ public class MultiCameraManager {
 
     /**
      * MediaRecorder：这一路现在备不备这一趟（主线程）。在录像计划里、在等着、手上没有一趟、这个意图还录它、画面尺寸算出来了，
-     * 而且相机在出画面或者正要开（{@link RecordingLanes#keepsNamedRecorder}）—— 文件名在备好时就定了，被拿着、在救、停手时
-     * 不备，回来时再备。在 {@link #lanePrep} 上备，备好回主线程声明录像输出（{@link #mediaPrepared}）。
+     * 而且相机在出画面或者正要开（{@link RecordingLanes#keepsNamedRecorder}）—— 文件名在备好时就定了，被拿着、在救、停手、
+     * 熄屏放开时不备，回来时再备。在 {@link #lanePrep} 上备，备好回主线程声明录像输出（{@link #mediaPrepared}）。
      */
     private void ensureMedia(String key) {
         if (!isRecording || useCodecRecording || !recordingPlan.containsKey(key) || unrecordable.contains(key)
@@ -4055,7 +4252,8 @@ public class MultiCameraManager {
             return;
         }
         SingleCamera camera = cameras.get(key);
-        if (camera == null || !RecordingLanes.keepsNamedRecorder(scheduler.condition(key), scheduler.cannotOpen(key))) {
+        if (camera == null || !RecordingLanes.keepsNamedRecorder(scheduler.condition(key), scheduler.cannotOpen(key),
+                scheduler.releasedByDark(key))) {
             return;
         }
         final Size size = camera.resolvedSize();
@@ -4134,7 +4332,8 @@ public class MultiCameraManager {
         media.out = new ChannelRules.Out(ChannelRules.Kind.RECORD, prepared.surface);
         media.file = prepared.file;
         media.preparedAt = android.os.SystemClock.uptimeMillis();
-        if (!current || !RecordingLanes.keepsNamedRecorder(scheduler.condition(key), scheduler.cannotOpen(key))) {
+        if (!current || !RecordingLanes.keepsNamedRecorder(scheduler.condition(key), scheduler.cannotOpen(key),
+                scheduler.releasedByDark(key))) {
             media.retired = true;
             stopMedia(media, null, media.relayOnStop);
             return;
@@ -4235,8 +4434,9 @@ public class MultiCameraManager {
     }
 
     /**
-     * MediaRecorder：这一路的相机换了样子（主线程）。备好还没开录的那一趟，相机被拿走了、在救、停手了、关着而现在用不了相机 —— 停掉放掉，
-     * 回来时按那一刻另备（文件名在备好时就定了，{@link RecordingLanes#keepsNamedRecorder}）；手上没有一趟的看要不要备。
+     * MediaRecorder：这一路的相机换了样子（主线程）。备好还没开录的那一趟，相机被拿走了、在救、停手了、关着而现在用不了相机、
+     * 熄屏放开了 —— 停掉放掉，回来时按那一刻另备（文件名在备好时就定了，{@link RecordingLanes#keepsNamedRecorder}）；
+     * 手上没有一趟的看要不要备。
      */
     private void mediaConditionChanged(String key) {
         MediaSlot media = mediaSlots.get(key);
@@ -4246,10 +4446,11 @@ public class MultiCameraManager {
         }
         ChannelRules.Condition condition = scheduler.condition(key);
         boolean cannotOpen = scheduler.cannotOpen(key);
+        boolean dark = scheduler.releasedByDark(key);
         if (media.phase == MediaPhase.READY && !media.retired
-                && !RecordingLanes.keepsNamedRecorder(condition, cannotOpen)) {
+                && !RecordingLanes.keepsNamedRecorder(condition, cannotOpen, dark)) {
             AppLog.i(TAG, "MediaRecorder of " + key + " was prepared but the camera is " + condition
-                    + (cannotOpen ? " (cannot open now)" : "")
+                    + (cannotOpen ? " (cannot open now)" : "") + (dark ? " (released by the dark screen)" : "")
                     + ": released, a new one is prepared when it comes back");
             media.retired = true;
             stopMedia(media, null, null);
@@ -4713,12 +4914,15 @@ public class MultiCameraManager {
         List<String> keys = getActiveCameraKeys();
         // 调度判出被别的程序拿着（含被拿着的另一路挡着）、救了 3 轮停手的那几路这一张不拍、也不算在该拍的里面
         // （2026-10-10）：它们等到点也出不了画面 —— 以前每一张都白等满 10 秒，再报「有几路没出画面」。
+        // 熄屏放开的座舱也一样（项目所有者 2026-10-12 D2，设计 v3.1 C4）：熄屏拍的那一张只有环视。
         // 一路只要在出画面就算数，哪怕它的录像路不在（2.11：以前录像里不在录的那几路也不拍）
         List<String> leftOut = new ArrayList<>();
         for (java.util.Iterator<String> it = keys.iterator(); it.hasNext(); ) {
             String key = it.next();
             if (scheduler.excludedFromPhoto(key)) {
-                leftOut.add(laneName(key) + (scheduler.condition(key) == ChannelRules.Condition.TAKEN
+                leftOut.add(laneName(key) + (scheduler.releasedByDark(key) ? channelSide.closeWhyText(
+                        ChannelRules.Why.DARK_RELEASE)
+                        : scheduler.condition(key) == ChannelRules.Condition.TAKEN
                         ? "被别的程序拿着" : "救了 " + CameraLiveness.MAX_CYCLES + " 轮没用、停手了"));
                 it.remove();
             }

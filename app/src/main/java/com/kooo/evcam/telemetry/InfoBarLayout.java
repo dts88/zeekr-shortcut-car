@@ -66,7 +66,7 @@ public final class InfoBarLayout {
         AUTO_HOLD(70, R.string.vi_cell_auto_hold, Signal.AUTO_HOLD_ACTIVE),
         /** 原厂 360 画面显示中：它占着相机，我们的录像会断。 */
         STOCK_360(80, R.string.vi_cell_stock_360, Signal.STOCK_360),
-        /** 哨兵模式：关 / 开 / 布防。放在原厂 360 右边（项目所有者 2026-10-03）；熄屏后能不能接着录看的就是它。 */
+        /** 哨兵模式：关 / 开 / 布防。放在原厂 360 右边（项目所有者 2026-10-03）；熄屏后环视录到什么时候看的就是它（规格 2.4）。 */
         SENTRY(80, R.string.vi_cell_sentry, Signal.SENTRY_MODE),
         /**
          * 俯视的车：四扇门 + 五个座位，每个座位没人 / 系着 / 有人没系 / 没数据（{@link VehicleState#seat}，

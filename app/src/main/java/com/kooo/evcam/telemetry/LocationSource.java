@@ -31,7 +31,7 @@ final class LocationSource implements LocationListener {
     private final Telemetry telemetry;
     private LocationManager manager;
     private HandlerThread thread;
-    /** 订阅经过的细节：只进日志和黑匣子（{@link Telemetry#sourceReported}）。 */
+    /** 订阅经过的细节：只进日志和黑匣子（{@link Telemetry#locationReported}）。 */
     private volatile String status = "not started";
     /** 订阅的结果：页面上的状态行只显示这个。 */
     private volatile Telemetry.LocationLink link = Telemetry.LocationLink.OFF;
@@ -45,14 +45,14 @@ final class LocationSource implements LocationListener {
                 != PackageManager.PERMISSION_GRANTED) {
             status = "no permission";
             link = Telemetry.LocationLink.NO_PERMISSION;
-            telemetry.sourceReported("location", status);
+            telemetry.locationReported(this, status);
             return;
         }
         manager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         if (manager == null) {
             status = "no service";
             link = Telemetry.LocationLink.OFF;
-            telemetry.sourceReported("location", status);
+            telemetry.locationReported(this, status);
             return;
         }
         thread = new HandlerThread("Telemetry-Location");
@@ -86,7 +86,7 @@ final class LocationSource implements LocationListener {
         }
         link = subscribed.length() > 0 ? Telemetry.LocationLink.ON
                 : denied ? Telemetry.LocationLink.NO_PERMISSION : Telemetry.LocationLink.OFF;
-        telemetry.sourceReported("location", status);
+        telemetry.locationReported(this, status);
     }
 
     void stop() {
@@ -117,7 +117,8 @@ final class LocationSource implements LocationListener {
         final double lon = location.getLongitude();
         final boolean hasSpeed = location.hasSpeed() && !telemetry.hasCarSpeed();
         final float kmh = location.getSpeed() * 3.6f;
-        telemetry.edit(b -> {
+        // 停了之后定位线程上还排着的那一次也会到这里：Telemetry 只收当前来源的写入，它被丢掉，清掉的位置不会被写回来
+        telemetry.edit(this, b -> {
             b.position(lat, lon);
             if (hasSpeed) {
                 b.speedKmh(kmh);

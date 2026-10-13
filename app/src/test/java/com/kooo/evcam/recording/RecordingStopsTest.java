@@ -200,9 +200,10 @@ public class RecordingStopsTest {
 
     /**
      * 录像要的几样放了（录像停了、不接回；不等自动接回了）的时候唤醒锁怎么放：屏幕黑着、锁正拉着车机 —— 先照熄屏那张表重判
-     * （锁不算拉着了）。锁拿着就是开发者「熄屏录制」开着，熄屏后不停录（keepsRecording 为真）。哨兵模式没开、停在 P 挡：
-     * 判成现在停、写下「车机要睡」（已经写着的不再写），锁留到相机按次序关完再放；哨兵模式开着、在开车：车机醒着，锁当场放。
-     * 亮着、锁没拿着、已经在等相机关完：照停录那一下放（审查 2026-10-11：以前录像停了一律当场放，车机几秒后睡过去）。
+     * （锁不算拉着了）。锁拿着就是开发者「熄屏录制」开着，熄屏后不停录（keepsRecording 为真）。安卓已经熄屏（车机要睡）、
+     * 哨兵模式没开、停在 P 挡：判成现在停、写下「车机要睡」（已经写着的不再写），锁留到相机按次序关完再放；哨兵模式开着、
+     * 在开车、或者安卓还亮着（屏幕黑了、车机醒着，熄屏 v3）：锁当场放，环视照表接着录。亮着、锁没拿着、已经在等相机关完：
+     * 照停录那一下放（审查 2026-10-11：以前录像停了一律当场放，车机几秒后睡过去）。
      */
     @Test
     public void lettingGoWhileTheLockPullsTheCarIsJudgedByTheTable() {
@@ -212,15 +213,45 @@ public class RecordingStopsTest {
         assertFalse(RecordingStops.rejudgesBeforeLockGoes(false, false));
         boolean parked = ScreenOffPlan.driving("P", 0f);
         for (boolean autoRecord : new boolean[]{false, true}) {
-            ScreenOffPlan.Decision sentryOff = ScreenOffPlan.atScreenOff(true, false, autoRecord, 0, parked);
+            ScreenOffPlan.Decision sentryOff = ScreenOffPlan.atDark(true, false, autoRecord, 0, parked, true, true);
             assertEquals(ScreenOffPlan.Action.STOP_NOW, sentryOff.action);
             assertEquals(ScreenOffPlan.SleepFact.WRITE, ScreenOffPlan.sleepFact(true, sentryOff.action, false));
             assertEquals("已经写着：不再写，起算时刻不挪", ScreenOffPlan.SleepFact.KEEP,
                     ScreenOffPlan.sleepFact(true, sentryOff.action, true));
+            assertEquals("安卓还亮着：车机醒着", ScreenOffPlan.Action.CONTINUE,
+                    ScreenOffPlan.atDark(true, false, autoRecord, 0, parked, false, true).action);
             assertEquals("哨兵模式开着：车机醒着", ScreenOffPlan.Action.CONTINUE,
-                    ScreenOffPlan.atScreenOff(true, false, autoRecord, 1, parked).action);
+                    ScreenOffPlan.atDark(true, false, autoRecord, 1, parked, true, true).action);
             assertEquals("在开车：车机醒着", ScreenOffPlan.Action.CONTINUE,
-                    ScreenOffPlan.atScreenOff(true, false, autoRecord, 0, ScreenOffPlan.driving("D", 0f)).action);
+                    ScreenOffPlan.atDark(true, false, autoRecord, 0, ScreenOffPlan.driving("D", 0f), true, true).action);
         }
+    }
+
+    /**
+     * 熄屏小结的停、开账（审查 rev3 B6）：熄屏持续录制开着、哨兵模式没开 —— 车机要睡（E2）照表停了，夜里车机醒来（E2'）
+     * 接着录环视，下一次车机要睡又停。两次照表停都数上、记第一次的时刻，醒来那一次开录也数上；照表停的不算「中途停过」，
+     * 存储一类的停才算。熄屏那一下清零。
+     */
+    @Test
+    public void theDarkSummaryCountsEveryTableStopAndEveryWakeStart() {
+        RecordingStops.DarkTally tally = new RecordingStops.DarkTally();
+        tally.reset();
+        assertFalse(tally.anyStop());
+        tally.stopped(RecordingStops.Reason.SCREEN_OFF, 300_000L);
+        tally.wokeStarted();
+        tally.stopped(RecordingStops.Reason.WRITE_STALLED, 330_000L);
+        tally.stopped(RecordingStops.Reason.SCREEN_OFF, 390_000L);
+        assertEquals("两次照表停都数上", 2, tally.tableStops());
+        assertEquals("第一次的时刻", 300_000L, tally.firstTableStopAt());
+        assertEquals("醒来接着录", 1, tally.wokeStarts());
+        assertEquals("照表停的不算中途停过", 1, tally.midwayStops());
+        assertTrue(tally.anyStop());
+
+        tally.reset();
+        assertEquals(0, tally.tableStops());
+        assertEquals(0L, tally.firstTableStopAt());
+        assertEquals(0, tally.wokeStarts());
+        assertEquals(0, tally.midwayStops());
+        assertFalse("下一段熄屏从零数", tally.anyStop());
     }
 }

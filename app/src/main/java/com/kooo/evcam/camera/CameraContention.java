@@ -23,6 +23,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>是谁拿的，相机服务不说。开发者选项开着时，别的程序拿、放的每一次另记一行嫌疑应用
  * （{@link CameraHolderSuspects}，几秒后才写）。</p>
+ *
+ * <p>熄屏 v3（项目所有者 2026-10-12 D4：记清楚）：拿走、空出来、我们被断开那几行熄屏时带「，熄屏后 +N ms」
+ * （{@link BlackBox#afterScreenOff}）—— 车机熄屏约 98 秒后拿相机 1 以前要对着「熄屏」那一行手算；别的程序拿走一路之后
+ * 30 秒，管理器再写一行环视那段时间里怎样（MultiCameraManager.watchSurroundAfterTake）。</p>
  */
 public final class CameraContention {
 
@@ -48,9 +52,10 @@ public final class CameraContention {
         OTHERS_TOOK_AT.put(cameraId, now);
         lastOthersId = cameraId;
         lastOthersAt = now;
-        BlackBox.noteImportant("争用：别的程序拿了相机 " + cameraId + "；我们此刻 " + describeUs());
+        BlackBox.noteImportant("争用：别的程序拿了相机 " + cameraId + "；我们此刻 " + describeUs() + BlackBox.afterScreenOff());
         if (!initial) {
             CameraHolderSuspects.lookAround(cameraId, true);
+            watchSurroundAfter(cameraId, now);
         }
     }
 
@@ -68,8 +73,24 @@ public final class CameraContention {
         lastOthersId = cameraId;
         lastOthersAt = atElapsed;
         BlackBox.noteImportant("争用：别的程序拿了相机 " + cameraId + "（" + ago + " ms 前我们丢了它，关完才认出来）；我们此刻 "
-                + describeUs());
+                + describeUs() + BlackBox.afterScreenOff());
         CameraHolderSuspects.lookAround(cameraId, true, System.currentTimeMillis() - ago);
+        watchSurroundAfter(cameraId, atElapsed);
+    }
+
+    /**
+     * 别的程序拿走了一路：拿走之后 30 秒管理器写一行环视那段时间里怎样（设计 v3 §6 L5；拿走的是环视、环视没开着的不写）。
+     * 注册时报的初始状态不在此列：不知道是什么时候拿的。
+     */
+    private static void watchSurroundAfter(String cameraId, long atElapsed) {
+        try {
+            MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
+            if (manager != null) {
+                manager.watchSurroundAfterTake(cameraId, atElapsed);
+            }
+        } catch (Throwable t) {
+            com.kooo.evcam.AppLog.w("CameraContention", "watchSurroundAfter: " + t);
+        }
     }
 
     /** 这一路此刻在表上记着「别的程序拿了」（相机服务那一声当时就记过、还没报空出来）：调度判出被拿走时不再记一遍。 */
@@ -87,7 +108,8 @@ public final class CameraContention {
         long sinceOurOpen = lastOurOpenAt == 0 ? -1 : now - lastOurOpenAt;
         BlackBox.noteImportant("争用：相机 " + cameraId + " 空出来了，别的程序拿了 " + (now - took) + " ms"
                 + (sinceOurOpen >= 0 && sinceOurOpen < LINK_MS
-                        ? "；距我们重开相机 " + lastOurOpenId + " 才 " + sinceOurOpen + " ms —— 多半是被我们顶掉的" : ""));
+                        ? "；距我们重开相机 " + lastOurOpenId + " 才 " + sinceOurOpen + " ms —— 多半是被我们顶掉的" : "")
+                + BlackBox.afterScreenOff());
         CameraHolderSuspects.lookAround(cameraId, false);
     }
 
@@ -97,7 +119,7 @@ public final class CameraContention {
         BlackBox.noteImportant("争用：我们的相机 " + cameraId + " 被断开"
                 + (since >= 0 && since < LINK_MS
                         ? "，距别的程序拿相机 " + lastOthersId + " 才 " + since + " ms —— 两路在相机服务里冲突" : "")
-                + "；我们此刻 " + describeUs());
+                + "；我们此刻 " + describeUs() + BlackBox.afterScreenOff());
     }
 
     /** 我们打开（或重开）成功了。别的程序还占着相机时才值一行。 */

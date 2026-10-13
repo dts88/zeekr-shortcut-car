@@ -86,11 +86,11 @@
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <string name="set_screen_off_title">Screen-off recording (keep awake)</string>
-    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording and keep the head unit awake for up to the time set below</string>
+    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the time set below</string>
     <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Requires Sentry Mode. Without it, recording pauses while the car sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; front and rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
@@ -202,6 +202,7 @@
     <string name="vi_battery_temp">Battery temperature</string>
     <string name="vi_day_night">Day / night</string>
     <string name="vi_sentry_mode">Sentry Mode</string>
+    <string name="vi_screen_power_event">Center screen</string>
     <string name="vi_aeb">AEB</string>
     <string name="vi_fcw">Forward collision warning</string>
     <string name="vi_ldw">Lane departure warning</string>
@@ -239,6 +240,8 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Driving</string>
+    <string name="vi_v_screen_off">Screen off</string>
+    <string name="vi_v_screen_on">Screen on</string>
     <string name="set_language_title">Language / 语言</string>
     <string name="lang_auto">Follow system</string>
     <string name="lang_zh">中文</string>
@@ -562,10 +565,9 @@
     <string name="record_preparing">Starting…</string>
     <string name="record_idle_detail">%1$d-min clips</string>
     <string name="record_segment_detail">This clip %1$s / %2$d min</string>
-    <string name="record_screen_off_continue">Continues with screen off</string>
-    <string name="record_screen_off_pause">Pauses with screen off, resumes on wake</string>
+    <string name="record_screen_off_continue">Keeps recording surround view with screen off</string>
+    <string name="record_screen_off_pause">Pauses with screen off, resumes when the screen turns on</string>
     <string name="record_screen_off_stop">Stops when screen turns off</string>
-    <string name="record_screen_off_needs_sentry">Needs Sentry Mode to continue with screen off</string>
     <string name="recording_chip">Recording %1$s · clip %2$d</string>
     <string name="rail_photo">Take photo</string>
     <string name="rail_settings">Settings</string>

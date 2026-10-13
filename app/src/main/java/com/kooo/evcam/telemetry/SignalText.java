@@ -32,6 +32,9 @@ public final class SignalText {
             case SHOWN:
             case POPUP:
                 return pick(ctx, v, R.string.vi_v_shown, R.string.vi_v_hidden);
+            case SCREEN:
+                // 屏幕说熄屏 / 亮屏（术语表），不说开 / 关：「中控屏：开」读起来是亮着，实际 1 是黑了
+                return pick(ctx, v, R.string.vi_v_screen_off, R.string.vi_v_screen_on);
             case MIRROR_DIP: {
                 int code = v instanceof Integer ? (Integer) v : -1;
                 return ctx.getString(code == Signal.MIRROR_TILTING ? R.string.vi_v_mirror_tilting
