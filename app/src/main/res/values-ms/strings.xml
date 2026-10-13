@@ -278,8 +278,8 @@
     <string name="msg_rearview_reset">Tetingkap dan paparan Cermin super ditetapkan semula</string>
     <string name="set_side_popup_title">Pandangan sisi isyarat membelok</string>
     <string name="set_side_popup_summary">Memaparkan kamera di sebelah isyarat belok. Pilih untuk menggantikan Cermin super atau membuka tetingkap sisi berasingan. Undur dan paparan kamera asal kereta diutamakan.</string>
-    <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
-    <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
+    <string name="set_side_popup_speed_title">Kelajuan minimum untuk buka (km/j)</string>
+    <string name="set_side_popup_speed_summary">Dibuka pada atau melebihi kelajuan ini; 0 membuang had kelajuan. Pandangan sisi masih disembunyikan semasa mengundur, bantuan parkir atau paparan kamera asal, termasuk tetingkap 360° yang dicetuskan oleh isyarat belok pada kelajuan rendah.</string>
     <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>
     <string name="set_side_popup_straighten_title">Luruskan gambar</string>
     <string name="set_side_popup_straighten_summary">Membetulkan lengkungan mata ikan dan melaraskan pandangan sisi dalam kedua-dua tetingkap; rakaman tidak berubah.</string>

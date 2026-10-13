@@ -297,8 +297,8 @@
     <string name="msg_rearview_reset">超级后视镜窗口与画面已重置</string>
     <string name="set_side_popup_title">打转向灯弹侧视</string>
     <string name="set_side_popup_summary">打转向灯时显示对应侧摄像头；可替换超级后视镜画面或另外弹窗。倒车、原厂环视或侧视显示时让路。</string>
-    <string name="set_side_popup_speed_title">从这个车速起弹（km/h）</string>
-    <string name="set_side_popup_speed_summary">低于这个车速原厂会自己弹侧方小窗。0 表示任何车速都弹</string>
+    <string name="set_side_popup_speed_title">弹出所需最低车速（km/h）</string>
+    <string name="set_side_popup_speed_summary">达到此车速才弹出；0 表示不限制车速。倒车、泊车辅助或原厂相机画面显示时，侧视仍会隐藏，包括低速打转向灯触发的原厂 360° 弹窗。</string>
     <string name="msg_side_popup_on">打转向灯弹侧视已开启：打左灯看左侧、打右灯看右侧</string>
     <string name="set_side_popup_straighten_title">拉直画面</string>
     <string name="set_side_popup_straighten_summary">校正鱼眼并调整侧视取景，适用于已有后视镜和独立侧视窗口；不改变录像。</string>
