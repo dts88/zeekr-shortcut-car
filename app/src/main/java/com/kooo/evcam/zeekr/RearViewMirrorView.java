@@ -97,6 +97,14 @@ public class RearViewMirrorView extends ViewGroup {
     private CompositeStreamGeometry.Plan plan;
     /** 当前显示哪一路。中间三分之一左右划切换，见 {@link LaneCycle}。 */
     private int laneIndex;
+    private final MirrorSideView sideView = new MirrorSideView();
+    private boolean sideStraighten;
+    private int sideFov;
+    private int sideYaw;
+    private int sidePitch;
+    private final FisheyeMesh.SourceMap sideMap = (u, v, out) ->
+            SideViewProjection.sourcePoint(u, v, sideFov, sideYaw, sidePitch, sideView.lane(),
+                    (float) getWidth() / Math.max(1, getHeight()), out, 0);
     /** 取景在画面上的高低位置，0..1。宽高比锁死后，可调的就只剩这个。 */
     private float pan;
 
@@ -300,6 +308,66 @@ public class RearViewMirrorView extends ViewGroup {
         return docked;
     }
 
+    public int sideViewLane() {
+        return sideView.lane();
+    }
+
+    /** Change only presentation: keep the same TextureView, output and normal mirror settings. */
+    public void showSideView(int lane) {
+        if (!attached || params == null) {
+            return;
+        }
+        sideView.show(lane, params.x, params.y, docked);
+        cancelGlide();
+        cancelTapFlash();
+        dragging = false;
+        pinching = false;
+        pinchedThisGesture = false;
+        if (velocityTracker != null) {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
+        refreshSideViewConfig();
+        if (docked) {
+            params.x = Math.max(0, Math.min(screenWidth() - params.width, params.x));
+            docked = false;
+            textureView.setVisibility(View.VISIBLE);
+            lastFrameUptimeMs = SystemClock.uptimeMillis();
+            applyLayout();
+            if (dockListener != null) {
+                dockListener.onDockChanged(false);
+            }
+        }
+        invalidate();
+    }
+
+    public void refreshSideViewConfig() {
+        sideStraighten = appConfig.isSidePopupStraighten();
+        sideFov = appConfig.getSidePopupFov();
+        sideYaw = appConfig.getSidePopupYaw();
+        sidePitch = appConfig.getSidePopupPitch();
+        if (sideView.active()) {
+            invalidate();
+        }
+    }
+
+    public void clearSideView() {
+        MirrorSideView.Placement restore = sideView.clear();
+        if (restore == null || params == null) {
+            return;
+        }
+        boolean dockChanged = docked != restore.docked;
+        params.x = restore.x;
+        params.y = restore.y;
+        docked = restore.docked;
+        textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+        applyLayout();
+        if (dockChanged && dockListener != null) {
+            dockListener.onDockChanged(docked);
+        }
+        invalidate();
+    }
+
     /** 贴边收起 / 放回来。 */
     public interface DockListener {
         void onDockChanged(boolean docked);
@@ -343,7 +411,7 @@ public class RearViewMirrorView extends ViewGroup {
      * 不会卡住相机（大纲 §6 风险 3，车上看环视帧率）。</p>
      */
     private void syncDockState() {
-        if (params == null) {
+        if (params == null || sideView.active()) {
             return;
         }
         if (dragging || pinching || glide != null) {
@@ -497,6 +565,14 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
 
+        if (sideView.active()) {
+            drawSideView(canvas, width, height);
+            if (frozen) {
+                drawFrozenHint(canvas, width, height);
+            }
+            return;
+        }
+
         RearViewGeometry.Viewport viewport = viewport();
         float[] rect = RearViewGeometry.combinedSourceRect(plan, laneIndex, viewport);
 
@@ -605,6 +681,12 @@ public class RearViewMirrorView extends ViewGroup {
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (sideView.active()) {
+            if (frozen && event.getActionMasked() == MotionEvent.ACTION_UP && resumeAction != null) {
+                resumeAction.run();
+            }
+            return true;
+        }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 if (velocityTracker == null) {
@@ -894,6 +976,9 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     private void savePosition() {
+        if (sideView.active()) {
+            return;
+        }
         appConfig.setRearViewPosition(params.x, params.y);
         appConfig.setRearViewSize(params.width, params.height,
                 screenWidth(), screenHeight());
@@ -1104,6 +1189,37 @@ public class RearViewMirrorView extends ViewGroup {
 
     private void drawTextureOnce(Canvas canvas) {
         drawChild(canvas, textureView, getDrawingTime());
+    }
+
+    private void drawSideView(Canvas canvas, int width, int height) {
+        int lane = sideView.displayLane(laneIndex);
+        if (sideStraighten) {
+            RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
+                    plan, lane, RearViewGeometry.Viewport.full());
+            mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
+                    r.laneOffsetX * width, r.laneOffsetY * height,
+                    r.laneScaleX * width, r.laneScaleY * height, sideMap);
+            mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
+            return;
+        }
+        RearViewGeometry.Viewport aimed = SideViewAim.viewport(lane,
+                Math.round(180f / sideFov * 100f),
+                Math.round(sideYaw / SideViewProjection.MAX_YAW_DEGREES * 100f),
+                Math.round(sidePitch / SideViewProjection.MAX_PITCH_DEGREES * 100f));
+        RearViewGeometry.Viewport crop = RearViewGeometry.Viewport.forWindow(width, height, 0.5f);
+        RearViewGeometry.Viewport viewport = new RearViewGeometry.Viewport(
+                aimed.x + crop.x * aimed.width, aimed.y + crop.y * aimed.height,
+                crop.width * aimed.width, crop.height * aimed.height);
+        float[] rect = RearViewGeometry.combinedSourceRect(plan, lane, viewport);
+        sourceRect.set(rect[0] * width, rect[1] * height,
+                (rect[0] + rect[2]) * width, (rect[1] + rect[3]) * height);
+        destRect.set(0, 0, width, height);
+        drawMatrix.setRectToRect(sourceRect, destRect, Matrix.ScaleToFit.FILL);
+        int save = canvas.save();
+        canvas.clipRect(destRect);
+        canvas.concat(drawMatrix);
+        drawChild(canvas, textureView, getDrawingTime());
+        canvas.restoreToCount(save);
     }
 
     /** 设置页改了校正开关或视野后，推到正在显示的窗口。 */

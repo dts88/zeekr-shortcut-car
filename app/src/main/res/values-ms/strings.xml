@@ -277,7 +277,7 @@
     <string name="msg_rearview_on">Cermin super dihidupkan. Seret tepi untuk mengalihkannya; leret bahagian tengah ke atas atau bawah untuk mengubah bingkai.</string>
     <string name="msg_rearview_reset">Tetingkap dan paparan Cermin super ditetapkan semula</string>
     <string name="set_side_popup_title">Pandangan sisi isyarat membelok</string>
-    <string name="set_side_popup_summary">Semasa anda memberi isyarat, tetingkap timbul menunjukkan kamera di sisi itu: isyarat kiri, kamera kiri. Ia ditutup apabila isyarat dimatikan. Paparan asal kereta diutamakan: tiada tetingkap timbul semasa mengundur atau ketika paparan 360 atau sisi asal sedang ditunjukkan. Tidak muncul semasa cermin super dibuka</string>
+    <string name="set_side_popup_summary">Semasa memberi isyarat, kamera di sisi itu ditunjukkan. Jika cermin super dibuka, tetingkapnya menunjukkan kamera sisi buat sementara dan kemudian kembali ke paparan sebelumnya. Jika tidak, tetingkap timbul berasingan digunakan. Paparan asal kereta diutamakan: tiada paparan sisi semasa mengundur atau ketika paparan 360 atau sisi asal ditunjukkan</string>
     <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
     <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
     <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>
@@ -294,9 +294,9 @@
     <string name="set_side_popup_instant_title">Tetingkap timbul segera</string>
     <string name="set_side_popup_instant_summary">Dalam gear D, pandangan sisi disediakan di latar belakang supaya gambar muncul sebaik sahaja anda memberi isyarat. Kamera kekal hidup semasa memandu dan menggunakan sedikit lagi kuasa</string>
     <string name="set_side_popup_size_title">Saiz tetingkap timbul (% ketinggian skrin)</string>
-    <string name="set_side_popup_size_summary">Sehingga separuh lebar skrin: tetingkap kiri dan kanan bertemu di tengah</string>
+    <string name="set_side_popup_size_summary">Untuk tetingkap timbul berasingan sahaja, apabila cermin super dimatikan. Sehingga separuh lebar skrin: tetingkap kiri dan kanan bertemu di tengah</string>
     <string name="set_side_popup_vertical_title">Ketinggian pada skrin (%)</string>
-    <string name="set_side_popup_vertical_summary">0 ialah atas, 100 ialah bawah</string>
+    <string name="set_side_popup_vertical_summary">Untuk tetingkap timbul berasingan sahaja, apabila cermin super dimatikan. 0 ialah atas, 100 ialah bawah</string>
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
     <string name="msg_adjust_opened">Tetingkap pelarasan imej dibuka. Kembali ke skrin utama untuk melihat kesannya.</string>
     <string name="msg_adjust_reset">Tetapan imej dipulihkan kepada lalai</string>

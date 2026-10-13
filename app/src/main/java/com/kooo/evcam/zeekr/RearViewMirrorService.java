@@ -106,9 +106,40 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
-    /** 后视镜在不在：侧视弹窗和它共用一个相机输出槽位，它在就不弹。 */
+    /** Is the mirror service available to host the temporary side view? */
     public static boolean isRunning() {
         return instance != null;
+    }
+
+    public static int sideViewLane() {
+        RearViewMirrorService svc = instance;
+        return svc != null && svc.mirrorView != null
+                ? svc.mirrorView.sideViewLane() : SideViewDecision.NONE;
+    }
+
+    public static boolean showSideView(int lane) {
+        RearViewMirrorService svc = instance;
+        if (svc == null || svc.mirrorView == null || !svc.mirrorView.isShowing()
+                || com.kooo.evcam.screen.ScreenState.dark()) {
+            return false;
+        }
+        svc.mirrorView.showSideView(lane);
+        svc.rebindNow();
+        return true;
+    }
+
+    public static void clearSideView() {
+        RearViewMirrorService svc = instance;
+        if (svc != null && svc.mirrorView != null) {
+            svc.mirrorView.clearSideView();
+        }
+    }
+
+    public static void refreshSideViewConfig() {
+        RearViewMirrorService svc = instance;
+        if (svc != null && svc.mirrorView != null) {
+            svc.mirrorView.refreshSideViewConfig();
+        }
     }
 
     /** 设置页开关了按键模式之后通知正在显示的窗口。 */
@@ -311,6 +342,7 @@ public class RearViewMirrorService extends Service {
         mirrorView.show();
         takeBackKeptCanvas();
         startWatchdog();
+        SideViewPopupService.mirrorChanged();
     }
 
     /**
