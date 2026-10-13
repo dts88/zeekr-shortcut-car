@@ -331,7 +331,9 @@ public class RearViewMirrorView extends ViewGroup {
         if (!attached || params == null) {
             return;
         }
-        sideView.show(lane, params.x, params.y, docked);
+        sideView.show(lane, params.x, params.y, params.width, params.height, docked);
+        params.width = Math.min(screenWidth(), Math.max(params.width, sideControls.minimumWindowSize()));
+        params.height = Math.min(screenHeight(), Math.max(params.height, sideControls.barHeight()));
         sideControls.setVisibility(View.VISIBLE);
         invalidateOutline();
         cancelGlide();
@@ -354,6 +356,9 @@ public class RearViewMirrorView extends ViewGroup {
                 dockListener.onDockChanged(false);
             }
         }
+        params.x = Math.max(0, Math.min(screenWidth() - params.width, params.x));
+        params.y = Math.max(0, Math.min(screenHeight() - params.height, params.y));
+        applyLayout();
         invalidate();
     }
 
@@ -376,6 +381,10 @@ public class RearViewMirrorView extends ViewGroup {
         boolean dockChanged = docked != restore.docked;
         params.x = restore.x;
         params.y = restore.y;
+        if (restore.width > 0 && restore.height > 0) {
+            params.width = restore.width;
+            params.height = restore.height;
+        }
         docked = restore.docked;
         sideControls.setVisibility(View.GONE);
         invalidateOutline();
@@ -570,6 +579,11 @@ public class RearViewMirrorView extends ViewGroup {
         restoreSideViewExpanded();
         params.width = appConfig.getRearViewWidth(screenWidth());
         params.height = appConfig.getRearViewHeight(screenHeight());
+        if (sideView.active()) {
+            sideView.updateNormalSize(params.width, params.height);
+            params.width = Math.min(screenWidth(), Math.max(params.width, sideControls.minimumWindowSize()));
+            params.height = Math.min(screenHeight(), Math.max(params.height, sideControls.barHeight()));
+        }
         params.x = RearViewTouchModel.clampX(params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
         params.y = RearViewTouchModel.clampY(params.y, params.height, screenHeight());
         applyLayout();
