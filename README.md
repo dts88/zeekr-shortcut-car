@@ -70,6 +70,13 @@ Super mirror keeps its own size and position. If the head unit rejects the addit
 the side window is closed and a message suggests using Replace Super mirror. This feature
 uses the turn signals; blind-spot obstacle alerts are not yet a trigger.
 
+The side-view window has corner buttons matching the factory-style controls: **Expand**
+at top-left toggles a larger view and restores the previous size; **Close** at top-right
+dismisses only the current indicator activation. It returns after the indicator is turned
+off and activated again, or when you signal the other side. Neither feature toggle is changed.
+In replacement mode, Close restores the normal mirror. Normal-size separate windows still
+support dragging and pinch resizing; expanded mode is temporary and restores on dismissal.
+
 Use **Left image rotation** and **Right image rotation** to level a tilted side image.
 Positive angles rotate clockwise, negative counterclockwise; edges are cropped to fill the
 window. The controls apply in either window, including when Straighten picture is off, and

@@ -943,4 +943,7 @@
     <string name="set_side_popup_rotation_left_title">Putaran imej kiri (°)</string>
     <string name="set_side_popup_rotation_right_title">Putaran imej kanan (°)</string>
     <string name="set_side_popup_rotation_summary">Laraskan imej senget: positif mengikut arah jam, negatif melawan arah jam. Tepi dipotong untuk memenuhi tetingkap. Digunakan dalam kedua-dua tetingkap; rakaman tidak berubah.</string>
+    <string name="side_control_close">Tutup pandangan sisi ini</string>
+    <string name="side_control_expand">Besarkan pandangan sisi</string>
+    <string name="side_control_restore">Pulihkan saiz tetingkap</string>
 </resources>

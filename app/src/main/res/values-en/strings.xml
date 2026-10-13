@@ -966,4 +966,7 @@
     <string name="set_side_popup_rotation_left_title">Left image rotation (°)</string>
     <string name="set_side_popup_rotation_right_title">Right image rotation (°)</string>
     <string name="set_side_popup_rotation_summary">Level a tilted image: positive clockwise, negative counterclockwise. Crops edges to fill the window. Applies in either window; recordings are unchanged.</string>
+    <string name="side_control_close">Dismiss this side view</string>
+    <string name="side_control_expand">Expand side view</string>
+    <string name="side_control_restore">Restore window size</string>
 </resources>
