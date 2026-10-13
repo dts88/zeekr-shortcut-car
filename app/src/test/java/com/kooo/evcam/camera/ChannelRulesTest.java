@@ -67,6 +67,7 @@ public class ChannelRulesTest {
     private final Out recR = new Out(Kind.RECORD, "recorder-1");
     private final Out recF = new Out(Kind.RECORD, "recorder-0");
     private final Out mirror = new Out(Kind.MIRROR, "mirror");
+    private final Out sidePopup = new Out(Kind.SIDE_POPUP, "side-popup");
 
     /** 最近这一轮记账报的事。 */
     private List<Event> events = new ArrayList<>();
@@ -134,11 +135,11 @@ public class ChannelRulesTest {
     @Test
     public void sidePopupUsesOnlyTheSurroundWhileTheScreenIsOn() {
         claim(Holder.SIDE_POPUP);
-        surround.declared.add(mirror);
-        rear.declared.add(mirror);
-        front.declared.add(mirror);
+        surround.declared.add(sidePopup);
+        rear.declared.add(sidePopup);
+        front.declared.add(sidePopup);
         assertEquals(EnumSet.of(Holder.SIDE_POPUP), ChannelRules.wantedBy(w, surround));
-        assertEquals(set(mirror), ChannelRules.wantedOutputs(w, surround));
+        assertEquals(set(sidePopup), ChannelRules.wantedOutputs(w, surround));
         assertFalse(ChannelRules.wanted(w, rear));
         assertFalse(ChannelRules.wanted(w, front));
         assertTrue(ChannelRules.wantedOutputs(w, rear).isEmpty());
@@ -155,13 +156,53 @@ public class ChannelRulesTest {
         planAll();
         claim(Holder.SIDE_POPUP);
         surround.declared.add(recS);
-        surround.declared.add(mirror);
-        assertEquals(set(recS, mirror), ChannelRules.wantedOutputs(w, surround));
+        surround.declared.add(sidePopup);
+        assertEquals(set(recS, sidePopup), ChannelRules.wantedOutputs(w, surround));
 
         drop(Holder.SIDE_POPUP);
         assertTrue(ChannelRules.wanted(w, surround));
         assertEquals(set(recS), ChannelRules.wantedOutputs(w, surround));
         assertTrue(ChannelRules.keepsRecordOutput(w, surround));
+    }
+
+    @Test
+    public void mirrorAndSidePopupHaveIndependentDemand() {
+        surround.declared.add(mirror);
+        surround.declared.add(sidePopup);
+        claim(Holder.MIRROR);
+        assertEquals(set(mirror), ChannelRules.wantedOutputs(w, surround));
+        claim(Holder.SIDE_POPUP);
+        assertEquals(set(mirror, sidePopup), ChannelRules.wantedOutputs(w, surround));
+        drop(Holder.SIDE_POPUP);
+        assertEquals(set(mirror), ChannelRules.wantedOutputs(w, surround));
+        claim(Holder.SIDE_POPUP);
+        drop(Holder.MIRROR);
+        assertEquals(set(sidePopup), ChannelRules.wantedOutputs(w, surround));
+    }
+
+    @Test
+    public void independentWindowsCoexistWithMainPreviewAndRecording() {
+        surround.declared.addAll(set(pvS, mirror, sidePopup, recS));
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        claim(Holder.SIDE_POPUP);
+        claim(Holder.RECORDING);
+        planAll();
+        assertEquals(set(pvS, mirror, sidePopup, recS), ChannelRules.wantedOutputs(w, surround));
+        surround.dead.add(sidePopup);
+        assertEquals(set(pvS, mirror, recS), ChannelRules.wantedOutputs(w, surround));
+    }
+
+    @Test
+    public void screenOffStopsSideOutputWhileMirrorAndRecordingRemainIndependent() {
+        surround.declared.addAll(set(mirror, sidePopup, recS));
+        claim(Holder.MIRROR);
+        claim(Holder.SIDE_POPUP);
+        claim(Holder.RECORDING);
+        planAll();
+        w.screenOn = false;
+        assertEquals(set(mirror, recS), ChannelRules.wantedOutputs(w, surround));
+        assertFalse(ChannelRules.wantedBy(w, surround).contains(Holder.SIDE_POPUP));
     }
 
     /**

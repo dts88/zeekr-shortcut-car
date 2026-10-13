@@ -277,12 +277,12 @@
     <string name="msg_rearview_on">Cermin super dihidupkan. Seret tepi untuk mengalihkannya; leret bahagian tengah ke atas atau bawah untuk mengubah bingkai.</string>
     <string name="msg_rearview_reset">Tetingkap dan paparan Cermin super ditetapkan semula</string>
     <string name="set_side_popup_title">Pandangan sisi isyarat membelok</string>
-    <string name="set_side_popup_summary">Semasa memberi isyarat, kamera di sisi itu ditunjukkan. Jika cermin super dibuka, tetingkapnya menunjukkan kamera sisi buat sementara dan kemudian kembali ke paparan sebelumnya. Jika tidak, tetingkap timbul berasingan digunakan. Paparan asal kereta diutamakan: tiada paparan sisi semasa mengundur atau ketika paparan 360 atau sisi asal ditunjukkan</string>
+    <string name="set_side_popup_summary">Memaparkan kamera di sebelah isyarat belok. Pilih untuk menggantikan Cermin super atau membuka tetingkap sisi berasingan. Undur dan paparan kamera asal kereta diutamakan.</string>
     <string name="set_side_popup_speed_title">Tunjuk mulai kelajuan (km/j)</string>
     <string name="set_side_popup_speed_summary">Di bawah kelajuan ini kereta menunjukkan paparan sisinya sendiri. 0 untuk sebarang kelajuan</string>
     <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>
     <string name="set_side_popup_straighten_title">Luruskan gambar</string>
-    <string name="set_side_popup_straighten_summary">Membetulkan lengkungan fisheye sebelum dipaparkan; tiga tetapan di bawah menetapkan lebar dan arah pandangan. Hanya mengubah tetingkap timbul; rakaman tidak terjejas</string>
+    <string name="set_side_popup_straighten_summary">Membetulkan lengkungan mata ikan dan melaraskan pandangan sisi dalam kedua-dua tetingkap; rakaman tidak berubah.</string>
     <string name="set_side_popup_fov_title">Lebar pandangan (°)</string>
     <string name="set_side_popup_fov_summary">Lebih kecil untuk zum masuk. Hanya berfungsi apabila Luruskan gambar dihidupkan</string>
     <string name="set_side_popup_yaw_title">Hala ke belakang (°)</string>
@@ -294,7 +294,7 @@
     <string name="set_side_popup_instant_title">Tetingkap timbul segera</string>
     <string name="set_side_popup_instant_summary">Dalam gear D, pandangan sisi disediakan di latar belakang supaya gambar muncul sebaik sahaja anda memberi isyarat. Kamera kekal hidup semasa memandu dan menggunakan sedikit lagi kuasa</string>
     <string name="set_side_popup_size_title">Saiz tetingkap timbul (% ketinggian skrin)</string>
-    <string name="set_side_popup_size_summary">Untuk tetingkap timbul berasingan sahaja, apabila cermin super dimatikan. Sehingga separuh lebar skrin: tetingkap kiri dan kanan bertemu di tengah</string>
+    <string name="set_side_popup_size_summary">Tetingkap berasingan sahaja; cubit dengan dua jari untuk mengubah saiz. Terhad kepada separuh lebar skrin.</string>
     <string name="set_side_popup_vertical_title">Ketinggian pada skrin (%)</string>
     <string name="set_side_popup_vertical_summary">Untuk tetingkap timbul berasingan sahaja, apabila cermin super dimatikan. 0 ialah atas, 100 ialah bawah</string>
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
@@ -934,4 +934,7 @@
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
+    <string name="set_side_popup_replace_mirror_title">Gantikan Cermin super</string>
+    <string name="set_side_popup_replace_mirror_summary">Hidup: paparkan kamera sisi sementara dalam cermin. Mati: kekalkan pandangan cermin dan buka tetingkap sisi berasingan.</string>
+    <string name="msg_side_popup_unavailable">Tetingkap sisi tidak tersedia. Cuba Gantikan Cermin super apabila Cermin super dihidupkan.</string>
 </resources>

@@ -277,12 +277,12 @@
     <string name="msg_rearview_on">Super mirror on. Drag the sides to move it; swipe the middle up or down to reframe.</string>
     <string name="msg_rearview_reset">Super mirror window and view reset</string>
     <string name="set_side_popup_title">Turn-signal side view</string>
-    <string name="set_side_popup_summary">While you signal, the camera on that side is shown. With Super mirror on, its window temporarily shows the side camera and then returns to your previous view. Otherwise a separate pop-up is used. The car\'s own views come first: no side view in reverse or while the stock 360 or side view is showing</string>
+    <string name="set_side_popup_summary">Shows the camera on the side you signal. Choose whether to replace Super mirror or open a separate window alongside it. Reverse and the car\'s own camera views take priority.</string>
     <string name="set_side_popup_speed_title">Show from speed (km/h)</string>
     <string name="set_side_popup_speed_summary">Below this speed the car shows its own side view. 0 shows it at any speed</string>
     <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>
     <string name="set_side_popup_straighten_title">Straighten picture</string>
-    <string name="set_side_popup_straighten_summary">Corrects the fisheye curve before showing it; the three settings below set how wide it looks and where it points. Only changes the pop-up; recordings are not affected</string>
+    <string name="set_side_popup_straighten_summary">Corrects the fisheye curve and adjusts side-view framing in either window; recordings are unchanged.</string>
     <string name="set_side_popup_fov_title">View width (°)</string>
     <string name="set_side_popup_fov_summary">Smaller zooms in. Only applies with Straighten picture on</string>
     <string name="set_side_popup_yaw_title">Aim back (°)</string>
@@ -294,7 +294,7 @@
     <string name="set_side_popup_instant_title">Instant pop-up</string>
     <string name="set_side_popup_instant_summary">In D, keeps the side view ready in the background so the picture is there as soon as you signal. The camera stays on while driving, which uses a little more power</string>
     <string name="set_side_popup_size_title">Pop-up size (% of screen height)</string>
-    <string name="set_side_popup_size_summary">Separate pop-up only, when Super mirror is off. Up to half the screen width: the left and right pop-ups meet at the middle</string>
+    <string name="set_side_popup_size_summary">Separate window only; pinch it to resize too. Limited to half the screen width.</string>
     <string name="set_side_popup_vertical_title">Height on screen (%)</string>
     <string name="set_side_popup_vertical_summary">Separate pop-up only, when Super mirror is off. 0 is the top, 100 the bottom</string>
     <string name="msg_floating_reset">Floating button reset</string>
@@ -957,4 +957,7 @@
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
+    <string name="set_side_popup_replace_mirror_title">Replace Super mirror</string>
+    <string name="set_side_popup_replace_mirror_summary">On: temporarily show the side camera in the existing mirror. Off: keep the mirror view and show a separate side-view pop-up.</string>
+    <string name="msg_side_popup_unavailable">Side-view pop-up unavailable. Try Replace Super mirror when Super mirror is enabled.</string>
 </resources>

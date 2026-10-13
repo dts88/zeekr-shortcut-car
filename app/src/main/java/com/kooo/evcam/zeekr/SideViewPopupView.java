@@ -8,6 +8,7 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.util.Size;
 import android.view.Gravity;
+import android.view.ScaleGestureDetector;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 
@@ -16,7 +17,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.AutoFitTextureView;
 
 /**
- * 打转向灯弹出的侧视窗：只显示左或右那一路，不能拖、不能点。
+ * 打转向灯弹出的侧视窗：只显示左或右那一路，双指缩放，单指不操作。
  *
  * <p>画法和超级后视镜一样（见 {@link RearViewMirrorView} 的类说明）：子视图是普通 TextureView，
  * 本容器在 {@code dispatchDraw} 里按 {@link RearViewGeometry#combinedSourceRect} 把那一路放大重画，
@@ -34,7 +35,7 @@ import com.kooo.evcam.AutoFitTextureView;
  * </ul>
  *
  * <p>位置：屏幕中线是两边的分界，左侧那一路的右边缘贴中线，右侧那一路的左边缘贴中线；
- * 大小和上下位置在设置里调。{@code FLAG_NOT_TOUCHABLE}：点击穿过去，不挡底下的导航。</p>
+ * 大小和上下位置在设置里调，也可以双指缩放。显示时接触摸，隐藏备着时点击穿过去。</p>
  */
 public class SideViewPopupView extends ViewGroup {
 
@@ -43,6 +44,7 @@ public class SideViewPopupView extends ViewGroup {
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
+    private final ScaleGestureDetector resizeGesture;
     private final Matrix drawMatrix = new Matrix();
     private final RectF sourceRect = new RectF();
     private final RectF destRect = new RectF();
@@ -64,6 +66,35 @@ public class SideViewPopupView extends ViewGroup {
     public SideViewPopupView(Context context, AppConfig appConfig) {
         super(context);
         this.appConfig = appConfig;
+        resizeGesture = new ScaleGestureDetector(context,
+                new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    private float startSpan;
+                    private int startSize;
+
+                    @Override
+                    public boolean onScaleBegin(ScaleGestureDetector detector) {
+                        if (!attached || !visible || params == null) {
+                            return false;
+                        }
+                        startSpan = detector.getCurrentSpan();
+                        startSize = params.width;
+                        return startSpan > 0f;
+                    }
+
+                    @Override
+                    public boolean onScale(ScaleGestureDetector detector) {
+                        int percent = SidePopupSizing.resizedPercent(startSize,
+                                detector.getCurrentSpan() / startSpan,
+                                getResources().getDisplayMetrics().heightPixels);
+                        if (percent != appConfig.getSidePopupSizePercent()) {
+                            appConfig.setSidePopupSizePercent(percent);
+                            place(lane);
+                            update();
+                            invalidate();
+                        }
+                        return true;
+                    }
+                });
         windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         setBackgroundColor(0xFF000000);
         textureView = new AutoFitTextureView(context);
@@ -216,10 +247,11 @@ public class SideViewPopupView extends ViewGroup {
         }
     }
 
-    /** 弹着时点在窗口上的手势吃掉，什么也不做：窗口不能拖、不能点。 */
+    /** Pinch the visible popup to resize; leave one-finger taps inert. */
     @android.annotation.SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(android.view.MotionEvent event) {
+        resizeGesture.onTouchEvent(event);
         return true;
     }
 
@@ -238,8 +270,7 @@ public class SideViewPopupView extends ViewGroup {
     private void place(int side) {
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
-        int size = Math.round(Math.min(h * appConfig.getSidePopupSizePercent() / 100f, w / 2f));
-        size = Math.max(AppConfig.REARVIEW_MIN_SIZE, size);
+        int size = SidePopupSizing.size(appConfig.getSidePopupSizePercent(), w, h);
         int center = w / 2;
         params.width = size;
         params.height = size;
