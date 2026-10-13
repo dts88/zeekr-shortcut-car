@@ -6,6 +6,27 @@ import org.junit.Test;
 
 public class MirrorSideViewTest {
     @Test
+    public void clearingReturnsTheOriginalSizeEvenIfControlsTemporarilyNeedMoreRoom() {
+        MirrorSideView state = new MirrorSideView();
+        state.show(LaneCycle.LEFT, 100, 200, 120, 120, false);
+        state.show(LaneCycle.RIGHT, 80, 180, 360, 192, false);
+        MirrorSideView.Placement normal = state.clear();
+        assertEquals(120, normal.width);
+        assertEquals(120, normal.height);
+        assertEquals(100, normal.x);
+        assertEquals(200, normal.y);
+    }
+
+    @Test
+    public void settingsChangedDuringSideViewBecomeTheRestoredNormalSize() {
+        MirrorSideView state = new MirrorSideView();
+        state.show(LaneCycle.LEFT, 100, 200, 120, 120, false);
+        state.updateNormalSize(600, 250);
+        MirrorSideView.Placement normal = state.clear();
+        assertEquals(600, normal.width);
+        assertEquals(250, normal.height);
+    }
+    @Test
     public void cancellingTheIndicatorReturnsToTheOriginalCamera() {
         MirrorSideView view = new MirrorSideView();
         assertEquals(LaneCycle.REAR, view.displayLane(LaneCycle.REAR));
