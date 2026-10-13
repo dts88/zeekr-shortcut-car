@@ -305,7 +305,7 @@
     <string name="set_side_popup_fov_title">视野（°）</string>
     <string name="set_side_popup_fov_summary">越小越放大。开启「拉直画面」时，靠近相机画面边缘会自动缩小视野；大角度取景可能明显减少可见范围</string>
     <string name="set_side_popup_yaw_title">往后看（°）</string>
-    <string name="set_side_popup_yaw_summary">正数朝车尾（盲区）转，负数朝车头。方向是猜的：反了就往另一头拉。开启「拉直画面」时，大角度可能明显放大画面；详见下方说明。</string>
+    <string name="set_side_popup_yaw_summary">开启「拉直画面」时，大角度往后看会自动放大画面以避免黑块，可见的周围范围也会减少。正数朝车尾，负数朝车头。</string>
     <string name="set_side_popup_pitch_title">往上看（°）</string>
     <string name="set_side_popup_pitch_summary">正数朝车外、远处的路转，负数朝车身和地面。方向是猜的：反了就往另一头拉</string>
     <string name="set_side_popup_edge_note_title">大角度取景会放大画面</string>

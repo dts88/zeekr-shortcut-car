@@ -254,19 +254,19 @@
                 android:summary="@string/set_side_popup_yaw_summary"
                 app:showSeekBarValue="true" />
 
-            <SeekBarPreference
-                android:key="pref_side_popup_pitch"
-                android:dependency="pref_side_popup"
-                android:title="@string/set_side_popup_pitch_title"
-                android:summary="@string/set_side_popup_pitch_summary"
-                app:showSeekBarValue="true" />
-
             <Preference
                 android:key="pref_side_popup_edge_note"
                 android:title="@string/set_side_popup_edge_note_title"
                 android:summary="@string/set_side_popup_edge_note_summary"
                 android:selectable="false"
                 android:persistent="false" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_pitch"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_pitch_title"
+                android:summary="@string/set_side_popup_pitch_summary"
+                app:showSeekBarValue="true" />
 
             <SwitchPreferenceCompat
                 android:key="pref_side_popup_instant"
