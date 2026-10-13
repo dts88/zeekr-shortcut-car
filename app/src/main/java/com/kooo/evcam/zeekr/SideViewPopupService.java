@@ -125,6 +125,16 @@ public class SideViewPopupService extends Service {
         }
     }
 
+    /** Reset opens a fresh decision so the restored speed threshold is applied again. */
+    public static void resetConfig() {
+        SideViewPopupService svc = instance;
+        if (svc != null) {
+            svc.lastReady = false;
+            svc.closeNow();
+        }
+        applyConfig();
+    }
+
     private final Telemetry.Listener readingsListener = readings -> evaluate();
 
     private final ScreenState.Listener screenListener = new ScreenState.Listener() {

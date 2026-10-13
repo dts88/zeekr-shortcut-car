@@ -113,6 +113,8 @@ public class AppConfig {
     private static final String KEY_SIDE_POPUP_FOV = "side_popup_fov";  // 虚拟相机视野（度）
     private static final String KEY_SIDE_POPUP_YAW = "side_popup_yaw";  // 往车尾转多少度，负数往车头
     private static final String KEY_SIDE_POPUP_PITCH = "side_popup_pitch";  // 往上（车外）转多少度，负数往下
+    private static final String KEY_SIDE_POPUP_ROTATION_LEFT = "side_popup_rotation_left";
+    private static final String KEY_SIDE_POPUP_ROTATION_RIGHT = "side_popup_rotation_right";
     /** 默认值是猜的（见 SideViewProjection）：视野 90°，往车尾转 50°，稍往上 15°。 */
     public static final int SIDE_POPUP_DEFAULT_FOV = 90;
     public static final int SIDE_POPUP_DEFAULT_YAW = 50;
@@ -1080,6 +1082,7 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_PAN)
                 .remove(KEY_REARVIEW_LANE)
                 .remove(KEY_REARVIEW_FRONT_REAR)
+                .remove(KEY_REARVIEW_BUTTON_MODE)
                 .apply();
         AppLog.i(TAG, "超级后视镜布局已恢复默认");
     }
@@ -1567,8 +1570,50 @@ public class AppConfig {
         return prefs.getBoolean(KEY_SIDE_POPUP, false);
     }
 
+    /** Restore tuning and layout while retaining the feature's current on/off state. */
+    public void resetSidePopupSettings() {
+        prefs.edit()
+                .remove(KEY_SIDE_POPUP_REPLACE_MIRROR)
+                .remove(KEY_SIDE_POPUP_MIN_SPEED)
+                .remove(KEY_SIDE_POPUP_STRAIGHTEN)
+                .remove(KEY_SIDE_POPUP_FOV)
+                .remove(KEY_SIDE_POPUP_YAW)
+                .remove(KEY_SIDE_POPUP_PITCH)
+                .remove(KEY_SIDE_POPUP_ROTATION_LEFT)
+                .remove(KEY_SIDE_POPUP_ROTATION_RIGHT)
+                .remove(KEY_SIDE_POPUP_INSTANT)
+                .remove(KEY_SIDE_POPUP_CLOSE_DELAY_MS)
+                .remove(KEY_SIDE_POPUP_SIZE)
+                .remove(KEY_SIDE_POPUP_VERTICAL)
+                .remove(KEY_SIDE_POPUP_X)
+                .remove(KEY_SIDE_POPUP_Y)
+                .apply();
+    }
+
     public boolean isSidePopupReplaceMirror() {
         return prefs.getBoolean(KEY_SIDE_POPUP_REPLACE_MIRROR, true);
+    }
+
+    public int getSidePopupRotation(int lane) {
+        String key = sidePopupRotationKey(lane);
+        return key == null ? 0 : com.kooo.evcam.zeekr.SideViewRotation.clamp(prefs.getInt(key, 0));
+    }
+
+    public void setSidePopupRotation(int lane, int degrees) {
+        String key = sidePopupRotationKey(lane);
+        if (key != null) {
+            prefs.edit().putInt(key, com.kooo.evcam.zeekr.SideViewRotation.clamp(degrees)).apply();
+        }
+    }
+
+    private static String sidePopupRotationKey(int lane) {
+        if (lane == com.kooo.evcam.zeekr.LaneCycle.LEFT) {
+            return KEY_SIDE_POPUP_ROTATION_LEFT;
+        }
+        if (lane == com.kooo.evcam.zeekr.LaneCycle.RIGHT) {
+            return KEY_SIDE_POPUP_ROTATION_RIGHT;
+        }
+        return null;
     }
 
     public void setSidePopupReplaceMirror(boolean replace) {

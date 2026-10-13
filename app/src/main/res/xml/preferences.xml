@@ -208,7 +208,6 @@
 
         <Preference
             android:key="pref_rearview_reset"
-            android:dependency="pref_rearview"
             android:title="@string/set_rearview_reset_title"
             android:summary="@string/set_rearview_reset_summary" />
 
@@ -269,6 +268,20 @@
                 android:summary="@string/set_side_popup_instant_summary" />
 
             <SeekBarPreference
+                android:key="pref_side_popup_rotation_left"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_rotation_left_title"
+                android:summary="@string/set_side_popup_rotation_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_popup_rotation_right"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_rotation_right_title"
+                android:summary="@string/set_side_popup_rotation_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
                 android:key="pref_side_popup_close_delay_ms"
                 android:dependency="pref_side_popup"
                 android:title="@string/set_side_popup_close_delay_ms_title"
@@ -288,6 +301,10 @@
                 android:title="@string/set_side_popup_vertical_title"
                 android:summary="@string/set_side_popup_vertical_summary"
                 app:showSeekBarValue="true" />
+            <Preference
+                android:key="pref_side_popup_reset"
+                android:title="@string/set_side_popup_reset_title"
+                android:summary="@string/set_side_popup_reset_summary" />
         </PreferenceCategory>
     </PreferenceScreen>
 

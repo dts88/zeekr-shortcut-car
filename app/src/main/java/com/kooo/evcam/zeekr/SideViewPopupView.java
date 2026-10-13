@@ -362,7 +362,7 @@ public class SideViewPopupView extends ViewGroup {
             canvas.drawColor(0xFF000000);
             return;
         }
-        int save = canvas.save();
+        int save = SideViewRotation.begin(canvas, appConfig.getSidePopupRotation(lane), width, height);
         if (LaneCycle.isMirrored(lane)) {
             canvas.scale(-1f, 1f, width / 2f, height / 2f);
         }
