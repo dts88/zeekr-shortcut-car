@@ -134,7 +134,7 @@ public final class CameraSlots {
      * 那一次关就要 4–17 秒，下一次打开它一帧不出；只开环视（它开、关的时候没有别的相机在动）时开关各 0.1 秒、
      * 怎么都正常 —— 「依照单个环视的思路」（项目所有者 2026-10-09）。</p>
      *
-     * <p>熄屏 v3（项目所有者 2026-10-12 D2、D4）：屏幕一黑座舱就放开、环视接着录，座舱比环视早关 3–6 分钟 ——
+     * <p>熄屏 v3（项目所有者 2026-10-12 D2、D4）：屏幕黑满 30 秒座舱就放开、环视接着录，座舱比环视早关 3–6 分钟 ——
      * 环视先关只对连环视一起关的那几次（车机要睡、退出、没人要）还成立（ChannelRules.releasedByDark）。</p>
      */
     public static java.util.List<String> closeOrder(java.util.Collection<String> keys) {

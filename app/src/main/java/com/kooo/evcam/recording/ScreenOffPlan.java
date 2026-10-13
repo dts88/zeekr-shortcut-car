@@ -16,7 +16,8 @@ import com.kooo.evcam.telemetry.VehicleState;
  * （2026-10-10、10-12 实测）；哨兵模式开着时车机一直醒着、安卓一直不熄屏。所以表里分两件事：</p>
  *
  * <ul>
- *   <li><b>座舱</b>不归这张表：屏幕一黑，前后座舱谁都不要（录像、预览、拍照……，{@code ChannelRules.releasedByDark}，D2），
+ *   <li><b>座舱</b>不归这张表：屏幕黑满 30 秒（或者车机要睡），前后座舱谁都不要（录像、预览、拍照……，
+ *       {@code ChannelRules.releasedByDark}、{@code darkForChannel}，D2、项目所有者 2026-10-13「黑满 30 秒再放」），
  *       亮屏回来、各自接回录像；</li>
  *   <li><b>环视</b>照表：熄屏持续录制开着（或开发者的唤醒锁拉着车机）、计划里有环视 → 接着录；否则熄屏
  *       {@link RecordingCoordinator#SCREEN_OFF_STOP_MS} 后停；</li>

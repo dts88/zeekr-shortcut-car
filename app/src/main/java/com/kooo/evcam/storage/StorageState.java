@@ -25,9 +25,10 @@ import java.util.concurrent.Executors;
  *
  * <h3>规则</h3>
  *
- * <p>一份快照 {@link Snapshot}。刷新时机：U 盘事件、开录（查完再开）、停录、换盘、改存储设置、
- * 主界面回到前台，以及主界面在前台时每 {@link #PERIODIC_MS} 一次（这台车机收不到 U 盘插拔广播，
- * 见平台笔记，定时是兜底）。结果回主线程通知 {@link Listener}。</p>
+ * <p>一份快照 {@link Snapshot}。刷新时机：U 盘事件、开录（查完再开；盘不能用拒了的，头 2 分钟每 2 秒再查一次，
+ * RecordingStops.DiskWait）、停录、换盘、改存储设置、主界面回到前台，以及主界面在前台时每 {@link #PERIODIC_MS} 一次
+ * （这台车机收不到 U 盘插拔广播 —— 09-26 到 10-13 的黑匣子里一行「U 盘事件」都没有，见平台笔记，定时是兜底）。
+ * 结果回主线程通知 {@link Listener}。</p>
  */
 public final class StorageState {
 

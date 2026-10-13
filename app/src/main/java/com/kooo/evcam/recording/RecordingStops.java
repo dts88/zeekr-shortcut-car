@@ -190,6 +190,66 @@ public final class RecordingStops {
     }
 
     /**
+     * 开录等 U 盘（项目所有者 2026-10-13「U 盘一可用就开录」）：开录前查盘，盘不能用（没插、车机刚醒还没挂上）就拒了、接着等。
+     * 以前一律隔 30 秒再查一次；这台车机收不到 U 盘插拔的广播（VolumeEvents 注册着，09-26 到 10-13 的 32 份黑匣子里
+     * 一行「U 盘事件」都没有），盘回来没有人叫。10-13 20:08:02 车机醒了要录，盘还没挂上；20:08:09 主界面回到前台时一查，
+     * 盘已经能用了，录像却等到 20:08:33 那一次才开。所以等盘的头 {@link #FAST_FOR_MS}（从第一次拒起算）每
+     * {@link #FAST_EVERY_MS} 查一次（查的是存储快照，便宜；黑匣子只在盘的样子变了时写一行），之后照旧 30 秒一次。
+     * 只有这一个等法：拒的那一处（RecordingCoordinator.refused）照它排下一次查盘。
+     *
+     * <p>主线程上用；纯逻辑，见 {@code RecordingStopsTest}。</p>
+     */
+    public static final class DiskWait {
+        /** 等盘的头 2 分钟多久查一次。 */
+        public static final long FAST_EVERY_MS = 2_000L;
+        /** 从第一次拒起，查得勤的那一段多长。 */
+        public static final long FAST_FOR_MS = 120_000L;
+
+        /** 这一次等盘从什么时候起（第一次因为盘不能用拒的那一刻，elapsedRealtime）；0 = 没在等盘。 */
+        private long since;
+
+        /**
+         * 查盘时盘不能用：等盘从这一刻起（已经在等的不挪起点）。
+         *
+         * @return 这一次是查得勤的那一段里又查了一次（不是头一次）：拒录的提示不再说一遍 —— 还是同一个原因，
+         *         界面本来也只说一次；过了那一段照旧每次都说（30 秒一次，和以前一样）
+         */
+        public boolean refused(long now) {
+            boolean again = since != 0 && now - since < FAST_FOR_MS;
+            if (since == 0) {
+                since = now;
+            }
+            return again;
+        }
+
+        /** 下一次查盘隔多久：等盘的头 2 分钟 {@link #FAST_EVERY_MS}，之后（或者没在等盘）{@code slowMs}。 */
+        public long nextCheckMs(long now, long slowMs) {
+            return since != 0 && now - since < FAST_FOR_MS ? FAST_EVERY_MS : slowMs;
+        }
+
+        /**
+         * 查盘时盘能用了：这一次等盘到头。
+         *
+         * @return 等了多久（毫秒）；没在等盘是 -1
+         */
+        public long ready(long now) {
+            long waited = since == 0 ? -1 : now - since;
+            since = 0;
+            return waited;
+        }
+
+        /** 不等了（人停了、熄屏照表停了、退出了）。 */
+        public void cancel() {
+            since = 0;
+        }
+
+        /** 在等盘。 */
+        public boolean waiting() {
+            return since != 0;
+        }
+    }
+
+    /**
      * 录像要的几样放了（录像停了、不接回；不等自动接回了）的时候，熄屏录制的唤醒锁要不要先照熄屏那张表重判再放：
      * 屏幕黑着、锁正拉着车机时要 —— 和锁到点那一次一样：安卓已经熄屏、判成现在停的，先写下「车机要睡」、
      * 停掉还在等的，锁留到相机按次序关完再放；接着录、10 秒后停的（车机醒着）当场放。亮着、锁没拿着、
