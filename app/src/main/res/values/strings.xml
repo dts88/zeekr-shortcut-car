@@ -305,9 +305,11 @@
     <string name="set_side_popup_fov_title">视野（°）</string>
     <string name="set_side_popup_fov_summary">越小越放大。开启「拉直画面」时，靠近相机画面边缘会自动缩小视野；大角度取景可能明显减少可见范围</string>
     <string name="set_side_popup_yaw_title">往后看（°）</string>
-    <string name="set_side_popup_yaw_summary">正数朝车尾（盲区）转，负数朝车头。方向是猜的：反了就往另一头拉</string>
+    <string name="set_side_popup_yaw_summary">正数朝车尾（盲区）转，负数朝车头。方向是猜的：反了就往另一头拉 开启「拉直画面」时，大角度可能明显放大画面；详见下方说明。</string>
     <string name="set_side_popup_pitch_title">往上看（°）</string>
     <string name="set_side_popup_pitch_summary">正数朝车外、远处的路转，负数朝车身和地面。方向是猜的：反了就往另一头拉</string>
+    <string name="set_side_popup_edge_note_title">大角度取景会放大画面</string>
+    <string name="set_side_popup_edge_note_summary">开启「拉直画面」时，靠近相机画面边缘会自动缩小视野，以避免黑块。例如：方形窗口内，往后看 80°、往上看 15°、视野设为 90°，实际视野约为 20.5°，可见的周围范围会减少。降低取景角度可获得更宽的视野。保存的视野设置不会改变。</string>
     <string name="set_side_popup_close_delay_ms_title">灯灭后再留（毫秒）</string>
     <string name="set_side_popup_close_delay_ms_summary">1000 毫秒 = 1 秒。0 表示灯一灭就收。原厂画面出来时照样立刻收</string>
     <string name="set_side_popup_instant_title">即时弹出</string>

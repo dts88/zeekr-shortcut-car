@@ -286,9 +286,11 @@
     <string name="set_side_popup_fov_title">Lebar pandangan (°)</string>
     <string name="set_side_popup_fov_summary">Lebih kecil untuk zum masuk. Apabila Luruskan gambar dihidupkan, pandangan dikecilkan secara automatik berhampiran tepi imej kamera; sudut hala yang besar boleh mengurangkan kawasan yang kelihatan</string>
     <string name="set_side_popup_yaw_title">Hala ke belakang (°)</string>
-    <string name="set_side_popup_yaw_summary">Positif memusingkan pandangan ke belakang (titik buta), negatif ke hadapan. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
+    <string name="set_side_popup_yaw_summary">Positif memusingkan pandangan ke belakang (titik buta), negatif ke hadapan. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain Apabila Luruskan gambar dihidupkan, sudut besar boleh mengezum masuk dengan banyak; lihat nota di bawah.</string>
     <string name="set_side_popup_pitch_title">Hala ke atas (°)</string>
     <string name="set_side_popup_pitch_summary">Positif memusingkan pandangan ke luar, ke jalan yang lebih jauh, negatif ke bawah ke arah kereta dan tanah. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
+    <string name="set_side_popup_edge_note_title">Sudut besar mengezum masuk</string>
+    <string name="set_side_popup_edge_note_summary">Apabila Luruskan gambar dihidupkan, pandangan dikecilkan secara automatik berhampiran tepi imej kamera untuk mengelakkan tompok hitam. Contoh: dalam tetingkap segi empat sama, Hala ke belakang 80° + Hala ke atas 15° dengan Lebar pandangan 90° memberikan pandangan sebenar kira-kira 20.5°. Kawasan sekeliling yang kelihatan menjadi lebih kecil. Kurangkan sudut hala untuk pandangan lebih luas. Tetapan Lebar pandangan yang disimpan tidak berubah.</string>
     <string name="set_side_popup_close_delay_ms_title">Kekal dibuka selepas isyarat (ms)</string>
     <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 saat. 0 menutupnya sebaik sahaja isyarat dimatikan. Paparan asal kereta tetap menutupnya serta-merta</string>
     <string name="set_side_popup_instant_title">Tetingkap timbul segera</string>
