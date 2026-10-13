@@ -2407,7 +2407,8 @@ public class MultiCameraManager {
     /**
      * 此刻能不能用相机（大纲 §0 名词「能用相机」）：主界面在前，或者前台服务是主界面在前时起的、那时刷新过 ——
      * 安卓 12 起后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度读的是同一对事实（{@link ChannelSide} 的
-     * mainForeground、serviceStartedWhileVisible）；录像协调器打开录像意图时（RecordingCoordinator.startWith）照它决定要不要先把主界面拉起来。
+     * mainForeground、serviceStartedWhileVisible）；录像协调器在屏幕亮着、打开录像意图和亮屏时
+     * （RecordingCoordinator.bringUpMainIfCamerasUnusable）照它决定要不要先把主界面拉起来。
      * 哪个线程都能读。
      */
     public static boolean cameraUsableNow() {

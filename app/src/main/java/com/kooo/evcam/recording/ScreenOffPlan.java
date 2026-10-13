@@ -6,8 +6,8 @@ import com.kooo.evcam.telemetry.VehicleState;
 
 /**
  * 熄屏时这段录像会怎样。一张表（{@link #atDark}），两处照它：{@link RecordingCoordinator} 照它停不停、什么时候停、
- * 亮屏接不接、黑着能不能开录、写不写「车机要睡」（熄屏的唯一裁判，在不在录都判）；录制键上那行小字照它说（{@link #of}，
- * 输入和协调器熄屏那一刻的一样）—— 界面上写的就是实际会发生的。
+ * 亮屏接不接、黑着能不能开录、写不写「车机要睡」（熄屏的唯一裁判，在不在录都判）；录制键上那行小字照它说（{@link #of}：
+ * 熄屏那一刻、车机要睡那一刻各照它判一次，输入和协调器的一样）—— 界面上写的就是实际会发生的。
  *
  * <h3>熄屏 v3（项目所有者 2026-10-12 D1–D3，设计 v3 §3）</h3>
  *
@@ -31,11 +31,16 @@ import com.kooo.evcam.telemetry.VehicleState;
  */
 public enum ScreenOffPlan {
 
-    /** 熄屏后继续录制环视（座舱亮屏后接回）。 */
+    /**
+     * 熄屏后继续录制环视（座舱亮屏后接回），车机要睡那一刻照表也还是接着录：车机睡不了 —— 哨兵模式开着、在开车，
+     * 或者开发者的唤醒锁拉着车机。
+     */
     CONTINUE(R.string.record_screen_off_continue),
     /**
      * 熄屏后停，亮屏后恢复：熄屏持续录制关着（或计划里没有环视）、启动自动录制开着；或者车辆信号判不出屏幕（降级），
      * 熄屏就是车机下电 —— 现在停，熄屏持续录制、启动自动录制开着一个就亮屏接。
+     * 还有熄屏那一刻接着录环视、车机要睡那一刻照表停（哨兵模式关或读不到）的那一种：环视录到车机休眠，暂停，醒来、亮屏照表接 ——
+     * 项目所有者 2026-10-13 定这种也写这一句，不另加句子（行为不变）。
      */
     PAUSE(R.string.record_screen_off_pause),
     /** 熄屏后停止录制，亮屏也不接。 */
@@ -100,8 +105,9 @@ public enum ScreenOffPlan {
      * 车机只在 P 挡断电，所以挡位说了算（项目所有者 2026-10-11，大纲 §7 第 2 问）。以前还要车速大于 0：
      * 等红灯时熄屏（哨兵模式在 D 挡读成 0）就判成「车机马上要睡」，当场停录、按次序关相机，车开走了也判不回来。
      * 都读不到就按没在开车算，相机赶在断电之前关（2026-10-10）。
+     * 车辆信号里这张表只看它和哨兵模式：录制键上的小字只在这两样变了时重判（{@code ui.ScreenOffHintView}）。
      */
-    static boolean driving(String gear, Float speedKmh) {
+    public static boolean driving(String gear, Float speedKmh) {
         if (gear != null) {
             return !"P".equals(gear);
         }
@@ -225,30 +231,43 @@ public enum ScreenOffPlan {
     }
 
     /**
-     * 录制键上那行小字：现在熄屏的话会怎样 —— 就是下一次熄屏那一刻（E1）协调器照这张表判出来的（{@link #atDark}，同样的输入）。
-     * 接着录 →「熄屏后继续录制环视」；停了亮屏接 →「熄屏暂停，亮屏后恢复」；不接 →「熄屏后停止录制」。
+     * 录制键上那行小字：现在熄屏的话会怎样 —— 协调器照这张表判的那两下，同样的输入（{@link #atDark}）：
+     * 下一次熄屏那一刻（E1），和之后车机要睡那一刻（E2：同样的输入，只是安卓熄屏了）。不另立规矩，见 {@link #of(Decision, Decision)}。
      *
      * <p>熄屏那一刻安卓熄没熄屏（{@code androidOff}）由叫的人按屏幕此刻怎么判给（{@code screen.ScreenState#vehicleJudges}）：
-     * 车辆信号判着屏幕时是车辆先说黑、车机还醒着（false）—— 判不出现在停，哨兵模式、挡位改不了它；判不出屏幕时（降级：
-     * 车辆接口没连着、两项读不到）熄屏只能是安卓熄屏，也就是车机下电（true）—— 和协调器一样照「车机要睡」那一行算上唤醒锁、
-     * 哨兵模式、挡位：熄屏持续录制开着、哨兵模式没开的是「熄屏暂停，亮屏后恢复」（审查 rev3 B1；以前一律按车机醒着判，
-     * 降级时写「继续录制」，熄屏那一下却现在停）。</p>
+     * 车辆信号判着屏幕时是车辆先说黑、车机还醒着（false）—— 熄屏那一刻判不出现在停，哨兵模式、挡位要到车机要睡那一刻才改得了结果；
+     * 判不出屏幕时（降级：车辆接口没连着、两项读不到）熄屏只能是安卓熄屏，也就是车机下电（true）—— 两下是同一下，
+     * 和协调器一样照「车机要睡」那一行算上唤醒锁、哨兵模式、挡位（审查 rev3 B1）。</p>
      *
      * @param lockHeld        熄屏那一刻开发者的唤醒锁拉不拉得住车机（{@link ScreenOffRecording#holdsCarAwake}：亮着时问的就是这个）
-     * @param vehicle         车辆信号此刻的快照（{@code Telemetry.latest()}）
+     * @param vehicle         车辆信号此刻的快照（{@code Telemetry.latest()}：哨兵模式、挡位，核心一直在读）
      * @param androidOff      熄屏那一刻安卓也熄屏了（车辆信号判不出屏幕，降级）
      * @param surroundPlanned 这一次录像（没在录时：配置里启用的那几路）里有环视（{@link RecordingCoordinator#surroundPlanned}）
      */
     public static ScreenOffPlan of(AppConfig config, boolean lockHeld, VehicleState vehicle, boolean androidOff,
                                    boolean surroundPlanned) {
-        return of(atDark(config, lockHeld, vehicle, androidOff, surroundPlanned));
+        return of(atDark(config, lockHeld, vehicle, androidOff, surroundPlanned),
+                atDark(config, lockHeld, vehicle, true, surroundPlanned));
     }
 
-    /** 判下来的做法写成哪一句。纯函数，测试直接调。 */
-    static ScreenOffPlan of(Decision decision) {
-        if (decision.action == Action.CONTINUE) {
-            return CONTINUE;
+    /**
+     * 两下判下来的做法写成哪一句（项目所有者 2026-10-13：小字要说清车机休眠时还录不录）。纯函数，测试直接调。
+     *
+     * <ul>
+     *   <li>熄屏那一刻接着录、车机要睡那一刻也接着录（哨兵模式开着、在开车、唤醒锁拉着）→「熄屏后继续录制环视」；</li>
+     *   <li>熄屏那一刻接着录、车机要睡那一刻现在停 →「熄屏暂停，亮屏后恢复」（项目所有者 2026-10-13 定：不另加句子；环视照样录到车机休眠）；</li>
+     *   <li>熄屏那一刻就停（10 秒后停、现在停）→ 亮屏接的「熄屏暂停，亮屏后恢复」，不接的「熄屏后停止录制」。</li>
+     * </ul>
+     *
+     * <p>熄屏那一刻接着录时，车机要睡那一刻只会是接着录或现在停（表里能让它往「10 秒后停」走的只有开关和唤醒锁，两下一样）。</p>
+     *
+     * @param atDark  熄屏那一刻（E1）的判定
+     * @param atSleep 同样的输入、安卓熄屏了（车机要睡，E2）的判定
+     */
+    static ScreenOffPlan of(Decision atDark, Decision atSleep) {
+        if (atDark.action == Action.CONTINUE) {
+            return atSleep.action == Action.STOP_NOW ? PAUSE : CONTINUE;
         }
-        return decision.resumesOnWake ? PAUSE : STOP;
+        return atDark.resumesOnWake ? PAUSE : STOP;
     }
 }

@@ -2810,7 +2810,8 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording);
         
         // 回到前台：让 ScreenState 重问一遍安卓（亮屏广播没来的话这一下补上）；车辆说屏幕黑着的，让车辆信号当场读一遍 ——
-        // 人真回来了它会读到亮屏。熄屏 v3 起回到前台不等于屏幕亮着：黑着时为录像拉起来的也会走到这里，所以不硬当亮屏
+        // 人真回来了它会读到亮屏。熄屏 v3 起回到前台不等于屏幕亮着：车辆说黑而安卓亮着时（车机黑着醒了）主界面也可能回到前台，
+        // 所以不硬当亮屏
         com.kooo.evcam.screen.ScreenState.refresh();
 
         // 人已经在界面上了，「因熄屏退下去」这个记号就作废 —— 不管是自己接回来的，

@@ -883,7 +883,8 @@ public final class RecordingCoordinator {
 
     /**
      * 亮屏了（ScreenState 在主线程调）：「车机要睡」写着就清（车机醒着了，调度照常保持、开相机，{@link ScreenOffPlan#sleepFact}）；
-     * 熄屏这一段的小结写一行；这一趟要录而眼下没在录的（因熄屏停下的、进程被车机结束过的），接着录（{@link #resumeIfWanted}）。
+     * 熄屏这一段的小结写一行；这一趟要录而眼下没在录的（因熄屏停下的、进程被车机结束过的），接着录（{@link #resumeIfWanted}）；
+     * 黑着时开起来、用不了相机一直「等待摄像头」的，照开录时那条规矩拉主界面（{@link #bringUpMainIfCamerasUnusable}）。
      * 座舱不用这里管：亮屏了相机层又要它们，开出画面就各自接回录像。
      */
     public void screenOn() {
@@ -900,6 +901,9 @@ public final class RecordingCoordinator {
         darkSinceWallMs = 0;
         darkSource = null;
         resume("screen-on", Why.SCREEN_ON);
+        if (isRecording()) {
+            bringUpMainIfCamerasUnusable(Why.SCREEN_ON);
+        }
     }
 
     /**
@@ -981,13 +985,12 @@ public final class RecordingCoordinator {
      * （{@code ScreenState.whenKnown}，设计 v3.1 C11）。
      *
      * <p>屏幕黑着时照熄屏那张表：车机醒着、熄屏持续录制开着、计划里有环视才接，只录环视（{@link ScreenOffPlan#startsWhileDark}）；
-     * 不然什么都不做、也不写（C9：恢复每 5 分钟例行来一次）。以前黑着一律不接（2026-10-10）：哨兵模式开着停车时进程被结束过，
-     * 黑着的那一段就一路都不录了。</p>
+     * 不然什么都不做、也不写（C9：恢复每 5 分钟例行来一次）。以前黑着一律不接（2026-10-10）：车机黑着醒了的那一段一路都不录。</p>
      *
-     * <p>现在用不了相机（主界面不在前、前台服务是后台起的）时先把主界面拉起来，和别的开录一样在打开录像意图那一下判
-     * （{@link #startWith}，{@link Recovery#bringUpMainForRecording}）：录像照样当场要，不等主界面起来再要 —— 拉主界面可能被系统
-     * 悄悄拦下（后台起界面的限制）、5 秒内重复的那一次也不再拉，那时没人再来要，录像就丢到下一次亮屏或 5 分钟一次的例行恢复
-     * （审查 2026-10-11）。</p>
+     * <p>现在用不了相机（主界面不在前、前台服务是后台起的）时，屏幕亮着就先把主界面拉起来，和别的开录一样在打开录像意图那一下判
+     * （{@link #bringUpMainIfCamerasUnusable}）：录像照样当场要，不等主界面起来再要 —— 拉主界面可能被系统悄悄拦下（后台起界面的限制）、
+     * 5 秒内重复的那一次也不再拉，那时录像「等待摄像头」，到下一次亮屏再判（审查 2026-10-11）。屏幕黑着不拉（项目所有者 2026-10-13）：
+     * 进程被结束过、前台服务是后台起的，黑着时照表开起来的录像用不了相机，「等待摄像头」到亮屏。</p>
      *
      * @param where 谁叫的（ASCII，进黑匣子）
      */
@@ -1071,7 +1074,7 @@ public final class RecordingCoordinator {
     /**
      * 查过盘了：打开录像意图。相机层定下这次录哪几路、建录制器、声明各路的录像输出；
      * 每一路带着录像输出出了画面就加入，落定了报上来（{@link #pushView}）。屏幕亮着、现在用不了相机时先把主界面拉起来
-     * （{@link Recovery#bringUpMainForRecording}）：哪一条路要的录像都在这一处判。
+     * （{@link #bringUpMainIfCamerasUnusable}）：哪一条路要的录像都在这一处判。
      *
      * @param checkStorage false：刚为这次开录清理过空间，不再检查一遍 ——
      *                     否则估算的余量稍有变化就会清完又清，一直开不起来
@@ -1148,16 +1151,26 @@ public final class RecordingCoordinator {
         if (!CameraForegroundService.isRunning()) {
             CameraForegroundService.start(context);
         }
-        // 现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机；和通道调度读的同一对事实，
-        // MultiCameraManager.cameraUsableNow）：先把主界面拉起来（Recovery.bringUpMainForRecording），录像照样现在就开 ——
-        // 不拉的话录像输出声明了、相机却开不起来，录像一直「等待摄像头」，直到人自己打开主界面；拉了，它一起来、刷新了前台服务，
-        // 调度就带着录像输出开。每一条开录的路都经过这里（人按的、悬浮按钮、启动自动录制、亮屏接回、存储一类的自动接回），
-        // 一处判（审查 2026-10-11：以前只有亮屏接回拉，悬浮按钮在后台开录、前台服务是后台起的就一直「等待摄像头」）。
-        // 黑着屏只在熄屏那张表允许黑着开录时拉（车机醒着、熄屏持续录制开着、计划里有环视；设计 v3.1 C11(b)）：以前「黑着不拉」
-        // 是因为拉起来的主界面一开就是三路相机，现在黑着时预览、座舱都没人要，只开环视 —— 不拉的话进程被结束过、前台服务是后台起的，
-        // 哨兵模式开着停车、车机夜里醒了的那一段环视一直开不起来。不放在 request 里：悬浮按钮拉起的主界面在 onCreate 里就要录，
-        // 那时还没 onResume、算不在前；查盘总是异步回来的，到这一步它已经在前了
-        if ((!ScreenState.dark() || startsWhileDarkNow()) && !MultiCameraManager.cameraUsableNow()) {
+        // 现在用不了相机：屏幕亮着就先把主界面拉起来，录像照样现在就开（黑着不拉，等亮屏）。不放在 request 里：悬浮按钮拉起的
+        // 主界面在 onCreate 里就要录，那时还没 onResume、算不在前；查盘总是异步回来的，到这一步它已经在前了
+        bringUpMainIfCamerasUnusable(why);
+    }
+
+    /**
+     * 录像意图开着、屏幕亮着、现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机；
+     * 和通道调度读的同一对事实，{@link MultiCameraManager#cameraUsableNow}）：先把主界面拉起来（{@link Recovery#bringUpMainForRecording}）。
+     * 不拉的话录像输出声明了、相机却开不起来，录像一直「等待摄像头」，直到人自己打开主界面；拉了，它一起来、刷新了前台服务，
+     * 调度就带着录像输出开。
+     *
+     * <p>一条规矩，在它可能变成真的两下判：打开录像意图那一下（{@link #startWith}：人按的、悬浮按钮、启动自动录制、亮屏接回、
+     * 存储一类的自动接回、黑着时照表开的，都经过那里；审查 2026-10-11：以前只有亮屏接回拉，悬浮按钮在后台开录、前台服务是后台起的
+     * 就一直「等待摄像头」），和亮屏那一下（{@link #screenOn}：黑着时开起来的录像）。</p>
+     *
+     * <p>屏幕黑着一律不拉（项目所有者 2026-10-13：熄屏时不拉主界面；前后座舱不录、环视照设置录或不录，都由通道调度那一处管）：
+     * 黑着时开起来的录像用不了相机就「等待摄像头」，亮屏时这里再判。</p>
+     */
+    private void bringUpMainIfCamerasUnusable(Why why) {
+        if (!ScreenState.dark() && !MultiCameraManager.cameraUsableNow()) {
             Recovery.bringUpMainForRecording(context, why.name());
         }
     }
