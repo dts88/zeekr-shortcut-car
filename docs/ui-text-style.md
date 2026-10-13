@@ -163,17 +163,22 @@
 
 - 功能名：超级后视镜 / Super mirror（「电子后视镜」只作解释）；锁定影像 / Lock footage；熄屏持续录制；行驶信息条；车辆状态（试验性）；系统信息（试验性）；鱼眼校正按钮的英文 Straighten；按钮透明度；关于与致谢。
 - 文字：record_screen_off_continue（2026-10-12 批准「熄屏后继续录制环视」）/ _stop；dlg_footage_lock_off_msg；set_footage_lock_*；msg_storage_locked_*；关于页的致谢与来源（about_thanks_*、about_credits_*）。
-- 2026-10-13 批准（2.11.2，熄屏 v3）：record_screen_off_pause「熄屏暂停，亮屏后恢复」（原来是「…唤醒后恢复」）；set_screen_off_keep_summary「熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；set_screen_off_summary（开发者「熄屏录制（阻止休眠）」）「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长」；vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）。
+- 2026-10-13 批准（2.11.2，熄屏 v3）：record_screen_off_pause「熄屏暂停，亮屏后恢复」（原来是「…唤醒后恢复」）；set_screen_off_summary（开发者「熄屏录制（阻止休眠）」）「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长」；vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）。
 - record_screen_off_needs_sentry（「熄屏续录需开启哨兵模式」）2.11.2 删了：熄屏那一下接着录不再要哨兵模式；车机休眠时也接着录（哨兵模式开着等）才写 record_screen_off_continue，休眠时会停的写 record_screen_off_pause（项目所有者 2026-10-13 定，不另加句子）。
+- set_screen_off_keep_summary 2026-10-13 批过「熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；同一晚项目所有者定「黑满 30 秒再放」（熄屏后头 30 秒座舱照录，规格 §3.5），第一句不再属实，移到下面「待项目所有者确认」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
-### 待项目所有者确认（2.11.2）
+### 待项目所有者确认（2.11.3）
 
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- set_screen_off_keep_summary（「黑满 30 秒再放」，项目所有者 2026-10-13：熄屏后头 30 秒座舱照录，30 秒后才只录环视）。只改第一句里的时间，其余照 2026-10-13 批准的原文：
+  - 中文：熄屏 30 秒后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。
+  - English: Records only the surround view from 30 seconds after the screen turns off; front and rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.
+  - Bahasa Melayu: Hanya merakam paparan sekeliling bermula 30 saat selepas skrin padam; rakaman kabin depan dan belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, rakaman dijeda semasa unit kepala tidur dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.
+  - 录制键上的小字（record_screen_off_continue「熄屏后继续录制环视」、record_screen_off_pause「熄屏暂停，亮屏后恢复」、_stop）只说环视和录制停不停，没提座舱，仍然属实，不改。
 
 ---
 

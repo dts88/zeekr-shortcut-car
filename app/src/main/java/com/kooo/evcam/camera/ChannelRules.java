@@ -43,9 +43,12 @@ import java.util.Set;
  *       新界面接回同一个 SurfaceTexture 就是同一个输出，通道零变动；没人接回的照「减输出能拖就拖」等下一次本来要动时摘。</li>
  * </ul>
  *
- * <p>项目所有者 2026-10-12（熄屏 v3，D2）：屏幕一黑，两路座舱谁都不要 —— 录像、预览、拍照一样不留，亮屏再回来；
+ * <p>项目所有者 2026-10-12（熄屏 v3，D2）：屏幕一黑（2026-10-13 起是黑满 30 秒），两路座舱谁都不要 —— 录像、预览、拍照一样不留，亮屏再回来；
  * 环视照登记表（熄屏持续录制那张表定它录不录）。只有一处判断：{@link #releasedByDark}。座舱这样比环视早关 3–6 分钟，
  * 「环视先关」只对连环视一起关的那几次（车机要睡、退出、没人要）还成立（D4 接受）。</p>
+ *
+ * <p>项目所有者 2026-10-13「黑满 30 秒再放」：通道眼里的熄屏是屏幕黑满 {@link #HOLD_MS}、或者车机要睡
+ * （{@link #darkForChannel}）—— 和「保持 30 秒」同一个数。不到 30 秒又亮了，通道零变动。</p>
  *
  * <p>§7.2（怎么算在开车）、§7.3（存储一类停了照旧接回）不在这一层。大纲 §7 末尾的四处解读：
  * ①「最后一句」不论多早说的、②同一次交接里被断开的另一路直接判 BLOCKED，都在 {@link CameraTaken#judge} 和这里的
@@ -70,6 +73,9 @@ public final class ChannelRules {
     /**
      * 没人要的一路，亮屏、前台服务在时留多久（§一「保持 30 秒」）。项目所有者 2026-10-09 定 30 秒：最小化、进诊断信息 / 回看，
      * 报告里 79% 在 30 秒内回来，这段时间里通道不动；2026-10-11 定每一路各自算（{@link #holding}）。
+     *
+     * <p>屏幕黑了也先留这么久（项目所有者 2026-10-13「黑满 30 秒再放」，{@link #darkForChannel}）：同一个数、同一个意思 ——
+     * 30 秒内回来，通道零变动。</p>
      */
     public static final long HOLD_MS = 30_000L;
 
@@ -345,8 +351,17 @@ public final class ChannelRules {
         final Set<String> recordPlan = new LinkedHashSet<>();
         /** 登记表每变一次（含停了再开录）调度在 CameraNeeds 的监听里 +1：几次变化并成一轮也认得出「变过」。 */
         int needsVersion;
+        /**
+         * 通道眼里屏幕亮着（{@link ChannelRules#darkForChannel} 的反面）：屏幕真黑了还不到 30 秒、车机也没要睡，照亮着算。
+         * 预览要不要、保持、熄屏放开座舱、关的原因、亮屏解除停手，读的都是它。
+         */
         boolean screenOn;
-        /** 最近一次亮屏的时刻（§7.4：亮屏解除停手）。 */
+        /**
+         * 屏幕真黑了（ScreenState.dark，物理屏幕）。黑了还不到 30 秒时 {@link #screenOn} 照亮着算，这时只有一件事看它：
+         * 关着的座舱不开（{@link ChannelRules#releasedByDark}）—— 「30 秒内一步不动」，也不在黑屏里去开它（项目所有者 2026-10-13）。
+         */
+        boolean screenDark;
+        /** 最近一次（通道眼里）亮屏的时刻（§7.4：亮屏解除停手）。黑了不到 30 秒又亮的，没黑过，不算。 */
         long screenOnAt;
         /** 前台服务在不在（CameraForegroundService.isRunning）：没有它就不保持 —— 后台拿着相机安卓要求有前台服务。 */
         boolean foregroundService;
@@ -1175,6 +1190,9 @@ public final class ChannelRules {
      * <p>「没人要」每一路各自算（项目所有者 2026-10-11，§7.1）：只开超级后视镜、主界面最小化时，两路座舱各自保持 30 秒，
      * 30 秒内回到主界面通道零变动；字面那种「登记表全空了才一起算」会让座舱当场关、回来再开。规则里只有这一处判断。
      * 关着的路不会为了保持去开。</p>
+     *
+     * <p>「亮屏」是通道眼里的（{@link World#screenOn}）：屏幕黑了还不到 30 秒也算亮着 —— 那时没人要了的（熄屏持续录制关着、
+     * 10 秒后停了录）保持到屏幕黑满 30 秒，和座舱放开同一刻关（项目所有者 2026-10-13）。</p>
      */
     static boolean holding(World w, Lane lane) {
         return lane.device == Device.OPEN && w.screenOn && w.foregroundService && !winding(w)
@@ -1192,11 +1210,45 @@ public final class ChannelRules {
     }
 
     /**
+     * 通道眼里屏幕黑了（{@link World#screenOn} 的反面，调度每一轮照它填）：屏幕真黑了满 {@link #HOLD_MS}，或者车机要睡
+     * （黑着时安卓熄屏 —— 这台车上就是车机下电，那一下照旧马上关）。项目所有者 2026-10-13「黑满 30 秒再放」：
+     * 屏幕黑了不到 30 秒，相机一样不动 —— 开着的接着开、输出不改、录像不分段、录制器不停放，关着的座舱也不开
+     * （{@link #releasedByDark} 看 {@link World#screenDark}）；这期间亮了，什么都没发生过。
+     * 黑满 30 秒才照熄屏的规矩来（座舱放开 {@link #releasedByDark}、预览不算、不保持）。
+     *
+     * <p>为什么：10-13 20:10:11 车门开关的那 4.7 秒（哨兵模式开着）里我们关了后座舱、亮屏又开，重开 15 秒没画面，
+     * 救援的那一次关又卡了 6.2 秒；车机要拿后座舱是在屏幕黑了 98 秒以后（98.5、148 秒），30 秒还赶在它前面。
+     * 和「保持 30 秒」同一个数、同一个意思（没人要的一路亮屏时留 30 秒，屏幕黑了的也先留 30 秒），不另立一个数。</p>
+     *
+     * <p>只挪相机：录像那张表（熄屏持续录制、10 秒后停、车机要睡现在停，RecordingCoordinator / ScreenOffPlan）照屏幕真黑的那一刻判。
+     * 起点不明（进程起来时已经黑着、车辆信号读到时已经黑着）按满 30 秒算。</p>
+     *
+     * @param dark       屏幕真黑了（ScreenState.dark）
+     * @param darkForMs  黑了多久；起点不明是负数
+     * @param androidOff 黑着时安卓也熄屏了（车机要睡 / 睡着）
+     */
+    static boolean darkForChannel(boolean dark, long darkForMs, boolean androidOff) {
+        return dark && (androidOff || darkForMs < 0 || darkForMs >= HOLD_MS);
+    }
+
+    /**
+     * 屏幕真黑了、还不到 30 秒（{@link #darkForChannel}）：再过多久通道就算黑了（毫秒）—— 调度到点醒那一下，不等下一个两秒。
+     * 不用等（亮着、已经算黑了）是 -1。
+     */
+    static long untilDarkForChannel(boolean dark, long darkForMs, boolean androidOff) {
+        return !dark || darkForChannel(dark, darkForMs, androidOff) ? -1 : HOLD_MS - darkForMs;
+    }
+
+    /**
      * 这一路被熄屏放开了：熄屏时除了环视，谁都不要它（项目所有者 2026-10-12 D2：屏幕一黑两路座舱都放开 ——
      * 录像、预览、拍照，一样不留。为了稳：车机熄屏约 98 秒后要拿后座舱相机 1，那时我们拿着它，关它要卡 5–8 秒，
      * 4 次里 3 次环视跟着断了 35–43 秒；我们不拿着它的那一晚车机拿了 6 次，环视一次没断）。亮屏又都要了。
+     * 「熄屏」是通道眼里的（{@link World#screenOn}）：屏幕黑满 30 秒、或者车机要睡（{@link #darkForChannel}，项目所有者 2026-10-13）。
+     * 屏幕真黑了还不到 30 秒（{@link World#screenDark}）时，关着的座舱也算放开：开着的照旧，关着的不在黑屏里开 ——
+     * 「30 秒内一步不动」（项目所有者 2026-10-13；黑屏里用不着它，哨兵模式开着时开后座舱正是 10-12、10-13 两次一帧不出的那一种操作），
+     * 这期间来的开录、拍照、接回只开环视（和 2.11.2 一样），黑满 30 秒时也就没有座舱可放。在开的、在关的照旧走完。
      *
-     * <p>和谁登记着无关，只看屏幕和是不是环视：{@link #holderWants}、{@link #wantsKind} 开头的那一道闸、录像的事实
+     * <p>和谁登记着无关，只看屏幕和是不是环视（黑了不到 30 秒时再看它关没关着）：{@link #holderWants}、{@link #wantsKind} 开头的那一道闸、录像的事实
      * （RecordingLanes.Facts#releasedByDark）、拍照不拍哪几路（{@link #excludedFromPhoto}）、关的原因（{@link #closeWhy}）
      * 问的都是这一句（设计 v3.1 C4）—— 按「有没有人要」问的话，录像刚登记、拍照刚登记的那一下读到的是上一轮的登记表，
      * 开录落定不了、拍照一路不拍就收尾。</p>
@@ -1204,7 +1256,7 @@ public final class ChannelRules {
      * <p>按「不是环视那一路」认：非极氪的自定义车型上，熄屏时除了环视那一路，别的路一律放开（记进规格）。</p>
      */
     static boolean releasedByDark(World w, Lane lane) {
-        return !w.screenOn && !isSurround(lane);
+        return !isSurround(lane) && (!w.screenOn || w.screenDark && lane.device == Device.CLOSED);
     }
 
     /**

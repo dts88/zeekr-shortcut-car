@@ -162,6 +162,70 @@ public class ChannelRulesTest {
     }
 
     /**
+     * 通道眼里的熄屏（项目所有者 2026-10-13「黑满 30 秒再放」）：屏幕黑满 30 秒（和「保持 30 秒」同一个数）、或者车机要睡
+     * （黑着时安卓也熄屏了）才算黑；黑了不到 30 秒照亮着算。起点不明按满 30 秒算。还要多久才算黑，调度照它到点醒。
+     */
+    @Test
+    public void theChannelCallsItDarkOnlyAfterThirtySecondsOrWhenTheHeadUnitSleeps() {
+        assertFalse("亮着", ChannelRules.darkForChannel(false, -1, false));
+        assertFalse("刚黑", ChannelRules.darkForChannel(true, 0, false));
+        assertFalse("10-13 20:10:11 车门开关的那 4.7 秒", ChannelRules.darkForChannel(true, 4_700, false));
+        assertFalse("29.999 秒", ChannelRules.darkForChannel(true, ChannelRules.HOLD_MS - 1, false));
+        assertTrue("黑满 30 秒", ChannelRules.darkForChannel(true, ChannelRules.HOLD_MS, false));
+        assertTrue("起点不明：按满 30 秒算", ChannelRules.darkForChannel(true, -1, false));
+        assertTrue("车机要睡：不等 30 秒", ChannelRules.darkForChannel(true, 5_000, true));
+        assertTrue(ChannelRules.darkForChannel(true, -1, true));
+
+        assertEquals("亮着不等", -1, ChannelRules.untilDarkForChannel(false, -1, false));
+        assertEquals(ChannelRules.HOLD_MS, ChannelRules.untilDarkForChannel(true, 0, false));
+        assertEquals(ChannelRules.HOLD_MS - 4_700, ChannelRules.untilDarkForChannel(true, 4_700, false));
+        assertEquals(1, ChannelRules.untilDarkForChannel(true, ChannelRules.HOLD_MS - 1, false));
+        assertEquals("已经算黑了", -1, ChannelRules.untilDarkForChannel(true, ChannelRules.HOLD_MS, false));
+        assertEquals("起点不明", -1, ChannelRules.untilDarkForChannel(true, -1, false));
+        assertEquals("车机要睡", -1, ChannelRules.untilDarkForChannel(true, 5_000, true));
+    }
+
+    /**
+     * 屏幕真黑了、还不到 30 秒（{@link World#screenDark}，通道照亮着算）：开着的座舱照旧，关着的不在黑屏里开、算熄屏放开 ——
+     * 「30 秒内一步不动」（项目所有者 2026-10-13）。这时来的录像只开环视（和 2.11.2 一样）；黑满 30 秒时没有座舱可放，
+     * 什么都不动；亮了座舱照常一路一路开。
+     */
+    @Test
+    public void aClosedCabinIsNotOpenedWhileTheScreenIsDarkButNotYetThirtySeconds() {
+        w.screenDark = true;
+        assertTrue("关着的座舱不开：算放开", ChannelRules.releasedByDark(w, rear));
+        assertTrue(ChannelRules.releasedByDark(w, front));
+        assertFalse("环视照登记表", ChannelRules.releasedByDark(w, surround));
+        rear.device = Device.OPEN;
+        assertFalse("开着的照旧", ChannelRules.releasedByDark(w, rear));
+        rear.device = Device.OPENING;
+        assertFalse("在开的照旧开完", ChannelRules.releasedByDark(w, rear));
+        rear.device = Device.CLOSED;
+
+        planAll();
+        surround.declared.add(recS);
+        rear.declared.add(recR);
+        front.declared.add(recF);
+        claim(Holder.RECORDING);
+        assertEquals(Move.IDLE, run().move);
+        assertEquals("只开了环视", 1, done.size());
+        assertEquals(Move.OPEN, done.get(0).move);
+        assertEquals(Collections.singletonList(SUR), done.get(0).keys);
+        assertTrue(rear.device == Device.CLOSED && front.device == Device.CLOSED);
+
+        w.screenOn = false;
+        assertEquals("黑满 30 秒：没有座舱可放，什么都不动", Move.IDLE, run().move);
+        assertEquals(1, done.size());
+
+        w.screenOn = true;
+        w.screenDark = false;
+        assertEquals(Move.IDLE, run().move);
+        assertEquals("亮了：后座舱、前座舱一路一路开", 3, done.size());
+        assertEquals(Collections.singletonList(REAR), done.get(1).keys);
+        assertEquals(Collections.singletonList(FRONT), done.get(2).keys);
+    }
+
+    /**
      * 录像留着一路的录像输出（录制器）：RECORDING 登记着、这一路在计划里 —— 熄屏放开的座舱也留着（停放过夜，亮屏同一个录制器
      * 接回）；停了录、不在计划里就不留（设计 v3.1 C13）。
      */
