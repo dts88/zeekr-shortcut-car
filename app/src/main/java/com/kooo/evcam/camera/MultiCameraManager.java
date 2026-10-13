@@ -3478,6 +3478,9 @@ public class MultiCameraManager {
                     case MIRROR:
                         names.add("后视镜");
                         break;
+                    case SIDE_POPUP:
+                        names.add("侧视窗");
+                        break;
                     case RECORD:
                         names.add("录像");
                         break;
@@ -3494,7 +3497,8 @@ public class MultiCameraManager {
          * 它的 Surface。编码录制的录像输出离开会话之后才放，不会死在会话里（这一步顺带摘的录像是留着的输出）。
          */
         private String deadText(Set<ChannelRules.Kind> removed) {
-            boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR);
+            boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR)
+                    || removed.contains(ChannelRules.Kind.SIDE_POPUP);
             boolean record = !useCodecRecording && removed.contains(ChannelRules.Kind.RECORD);
             if (record && !canvas) {
                 return "MediaRecorder 停了";

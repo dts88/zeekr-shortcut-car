@@ -212,7 +212,7 @@
             android:title="@string/set_rearview_reset_title"
             android:summary="@string/set_rearview_reset_summary" />
 
-        <!-- 打转向灯弹侧视：不依赖后视镜开关，后视镜关着也能用（开着时反而不弹） -->
+        <!-- Side view works with or without Super mirror. -->
         <PreferenceCategory
             android:key="cat_side_popup"
             android:title="@string/set_side_popup_title">
@@ -221,6 +221,12 @@
                 android:key="pref_side_popup"
                 android:title="@string/set_side_popup_title"
                 android:summary="@string/set_side_popup_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_popup_replace_mirror"
+                android:dependency="pref_side_popup"
+                android:title="@string/set_side_popup_replace_mirror_title"
+                android:summary="@string/set_side_popup_replace_mirror_summary" />
 
             <SeekBarPreference
                 android:key="pref_side_popup_min_speed"

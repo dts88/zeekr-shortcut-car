@@ -34,8 +34,8 @@ import com.kooo.evcam.telemetry.VehicleState;
  * <h3>相机</h3>
  *
  * <p>和超级后视镜走同一条路（见 {@link RearViewMirrorService}）：窗口的 Surface 交给
- * {@code SingleCamera.declareMirror()}，由通道调度添加输出。两者共用这一个槽位，
- * 超级后视镜开着时，只临时改变它的取景，不声明第二个输出；关着时使用自己的窗口。
+ * {@code SingleCamera.declareSidePopup()}，由通道调度添加独立输出。
+ * 「替换超级后视镜」开启时复用后视镜画布，否则两个窗口可同时显示。
  * 自己的窗口挂着就登记 {@link CameraNeeds.Holder#SIDE_POPUP}，拿掉就注销。</p>
  *
  * <h3>即时弹出</h3>
@@ -74,6 +74,7 @@ public class SideViewPopupService extends Service {
     private boolean lastReady;
     private boolean readyExpiryScheduled;
     private boolean destroyed;
+    private boolean popupUnavailable;
     /** 最近显示过哪一边：备着时窗口停在那一边，下次多半还是它。 */
     private int lastLane = LaneCycle.LEFT;
     /** 这一次显示的时刻和第一帧来没来：黑匣子里看「弹了多久才有画面」。 */
@@ -115,6 +116,7 @@ public class SideViewPopupService extends Service {
     public static void applyConfig() {
         SideViewPopupService svc = instance;
         if (svc != null) {
+            svc.popupUnavailable = false;
             if (svc.popup != null) {
                 svc.popup.applyConfig();
             }
@@ -201,6 +203,11 @@ public class SideViewPopupService extends Service {
         }
         Readings r = Telemetry.get().readings();
         VehicleState s = Telemetry.get().latest();
+        boolean useMirror = RearViewMirrorService.isRunning() && appConfig.isSidePopupReplaceMirror();
+        int previousMirrorLane = RearViewMirrorService.sideViewLane();
+        if (!useMirror) {
+            RearViewMirrorService.clearSideView();
+        }
         SideViewDecision.Input in = new SideViewDecision.Input();
         in.turnSignal = s.turnSignal;
         in.hazard = s.hazard;
@@ -211,10 +218,9 @@ public class SideViewPopupService extends Service {
         in.speedKmh = s.speedKmh;
         in.minSpeedKmh = appConfig.getSidePopupMinSpeed();
         int mirrorLane = RearViewMirrorService.sideViewLane();
-        in.showing = mirrorLane != SideViewDecision.NONE ? mirrorLane
+        in.showing = previousMirrorLane != SideViewDecision.NONE ? previousMirrorLane
                 : popup != null && popup.isShowing() ? popup.lane() : SideViewDecision.NONE;
 
-        boolean mirrorRunning = RearViewMirrorService.isRunning();
         boolean blocked = ScreenState.dark();
         if (blocked || SideViewDecision.factoryViewActive(in)) {
             lastReady = false;
@@ -223,18 +229,20 @@ public class SideViewPopupService extends Service {
             return;
         }
         int want = SideViewDecision.decide(in);
-        lastReady = !mirrorRunning && appConfig.isSidePopupInstant() && SideViewDecision.shouldStayReady(in);
+        lastReady = !useMirror && !popupUnavailable && appConfig.isSidePopupInstant()
+                && SideViewDecision.shouldStayReady(in);
 
         if (want != SideViewDecision.NONE) {
             cancelDelayedClose();
             cancelReadyExpiry();
-            if (mirrorRunning) {
+            if (useMirror) {
                 // Withdraw only our old canvas; the mirror keeps its own output and session.
                 detachPopup();
                 if (want != mirrorLane) {
                     RearViewMirrorService.showSideView(want);
                 }
-            } else if (want != in.showing) {
+            } else if (!popupUnavailable
+                    && (popup == null || !popup.isShowing() || popup.lane() != want)) {
                 AppLog.i(TAG, "转向灯：弹出「" + LaneCycle.labelOf(want) + "」路");
                 showPopup(want);
             }
@@ -254,7 +262,7 @@ public class SideViewPopupService extends Service {
             return;
         }
 
-        if (mirrorRunning) {
+        if (useMirror || popupUnavailable) {
             // An idle mirror already supplies the feed. Do not attach a hidden second window.
             detachPopup();
             return;
@@ -400,7 +408,8 @@ public class SideViewPopupService extends Service {
 
     private void bindCamera(SurfaceTexture surfaceTexture) {
         if (popup == null || !popup.isAttached() || surfaceTexture == null || surfaceTexture.isReleased()
-                || ScreenState.dark() || RearViewMirrorService.isRunning()) {
+                || ScreenState.dark() || popupUnavailable
+                || (RearViewMirrorService.isRunning() && appConfig.isSidePopupReplaceMirror())) {
             return;
         }
         MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
@@ -421,7 +430,19 @@ public class SideViewPopupService extends Service {
         boundTexture = surfaceTexture;
         restoreBufferSize(surfaceTexture);
         boolean wasOpen = camera.isCameraOpened();
-        boolean declared = camera.declareMirror(surfaceTexture);
+        boolean declared = camera.declareSidePopup(surfaceTexture, why -> {
+            if (why != SingleCamera.Drop.CONFIG_FAILED || destroyed
+                    || boundCamera != camera || boundTexture != surfaceTexture) {
+                return;
+            }
+            popupUnavailable = true;
+            lastReady = false;
+            BlackBox.note("侧视输出被相机拒绝：关闭侧视窗，保留后视镜和录像");
+            detachPopup();
+            android.widget.Toast.makeText(com.kooo.evcam.settings.Languages.localized(this),
+                    com.kooo.evcam.R.string.msg_side_popup_unavailable,
+                    android.widget.Toast.LENGTH_LONG).show();
+        });
         retryCount = 0;
         CameraNeeds.current().claim(CameraNeeds.Holder.SIDE_POPUP);
         if (declared) {
@@ -447,8 +468,8 @@ public class SideViewPopupService extends Service {
         cancelRetry();
         CameraNeeds.current().release(CameraNeeds.Holder.SIDE_POPUP);
         if (boundCamera != null) {
-            // Identity-based withdrawal leaves a newer Super mirror declaration intact.
-            if (boundCamera.withdrawMirror(boundTexture) && boundManager != null) {
+            // Withdraw only the independent popup; the mirror owns a different declaration.
+            if (boundCamera.withdrawSidePopup(boundTexture) && boundManager != null) {
                 boundManager.channelScheduler().wake();
             }
             boundCamera = null;

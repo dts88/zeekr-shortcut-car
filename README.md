@@ -53,13 +53,20 @@ optional.
 
 Enable **Settings → Super mirror → Turn-signal side view** (off by default). Above the configured
 speed threshold (default 30 km/h), signalling shows the camera on that side. When Super mirror is
-on, it temporarily shows the side camera in the same window and restores the previous camera,
+on and **Replace Super mirror** is enabled (default), it temporarily shows the side camera in
+the same window and restores the previous camera,
 framing and position after the signal ends and the configured close delay. A docked mirror is
 brought into view temporarily and docks again afterwards. With Super mirror off, a separate
-pop-up is used. Reverse, factory 360, factory side view and park assist take precedence.
+pop-up is used. Turn **Replace Super mirror** off to keep the mirror and show a separate
+side window alongside it. Both windows share the existing surround camera stream; the side
+window has its own output and does not replace the mirror output. Reverse, factory 360, factory
+side view and park assist take precedence.
 
 Side-camera correction and aim apply to either window. The pop-up size and placement settings
-apply only to the separate pop-up; Super mirror keeps its own size and position. This feature
+apply only to the separate pop-up; pinch that window to resize it and save its size. It stays
+square, on its corresponding side of the screen, and is limited to half the screen width.
+Super mirror keeps its own size and position. If the head unit rejects the additional output,
+the side window is closed and a message suggests using Replace Super mirror. This feature
 uses the turn signals; blind-spot obstacle alerts are not yet a trigger.
 
 ### Playback

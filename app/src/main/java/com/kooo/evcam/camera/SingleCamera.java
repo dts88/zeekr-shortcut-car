@@ -297,6 +297,7 @@ public class SingleCamera {
     /** 声明着的预览、后视镜、录像，每样最多一个（{@link #outputLock}）。 */
     private Declared declaredPreview;
     private Declared declaredMirror;
+    private Declared declaredSidePopup;
     private Declared declaredRecord;
     /**
      * 我们自己建的 Surface（预览、后视镜的 {@code new Surface(SurfaceTexture)}，或者鱼眼校正管线的入口），按输出记。
@@ -327,9 +328,10 @@ public class SingleCamera {
     /** 强制重开时我们自己摘下、正在关的旧设备：它晚到的报错不是「开不起来」。 */
     private volatile CameraDevice retiringDevice;
 
-    /** 会话里几样输出的次序：预览、后视镜共用一条流（预览打头），出帧口、录像各一条，JPEG 最后。 */
+    /** Preview, mirror and side popup share one stream; recording and JPEG are separate. */
     private static final ChannelRules.Kind[] SESSION_ORDER = {
-            ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
+            ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SIDE_POPUP,
+            ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
 
     /**
      * 会话的快照：配好时记下的，之后不变。调度拿它填 {@code ChannelRules.Lane} 的 session / sessionSince。
@@ -1015,6 +1017,8 @@ public class SingleCamera {
                             return "main-preview";
                         case MIRROR:
                             return "mirror";
+                        case SIDE_POPUP:
+                            return "side-popup";
                         case RECORD:
                             return "record";
                         default:
@@ -1356,6 +1360,40 @@ public class SingleCamera {
         return changed;
     }
 
+    /** Side window owns its own canvas; declaring it never replaces the mirror. */
+    public boolean declareSidePopup(SurfaceTexture texture, RecordDropped onDropped) {
+        if (texture == null) {
+            return false;
+        }
+        ChannelRules.Out out = new ChannelRules.Out(ChannelRules.Kind.SIDE_POPUP, texture);
+        boolean changed;
+        synchronized (outputLock) {
+            changed = declaredSidePopup == null || !declaredSidePopup.out.equals(out);
+            declaredSidePopup = new Declared(out, null, null, onDropped);
+        }
+        if (changed) {
+            AppLog.d(TAG, "Camera " + cameraId + " side popup declared: " + texture);
+            tidyLater();
+        }
+        return changed;
+    }
+
+    public boolean withdrawSidePopup(SurfaceTexture texture) {
+        boolean changed;
+        synchronized (outputLock) {
+            changed = texture != null && declaredSidePopup != null
+                    && declaredSidePopup.out.consumer == texture;
+            if (changed) {
+                declaredSidePopup = null;
+            }
+        }
+        if (changed) {
+            AppLog.d(TAG, "Camera " + cameraId + " side popup withdrawn: " + texture);
+            tidyLater();
+        }
+        return changed;
+    }
+
     /**
      * 声明录像输出。
      *
@@ -1396,10 +1434,11 @@ public class SingleCamera {
         return changed;
     }
 
-    /** 声明着的录像输出 {@code out} 离开会话时该告诉谁；不是它、或者已经撤回了返回 null。 */
+    /** Notify the declared recorder or side-popup owner when its output is dropped. */
     public RecordDropped dropListener(ChannelRules.Out out) {
         synchronized (outputLock) {
-            Declared current = declaredRecord;
+            Declared current = out.kind == ChannelRules.Kind.SIDE_POPUP
+                    ? declaredSidePopup : declaredRecord;
             return current != null && current.out.equals(out) ? current.onDropped : null;
         }
     }
@@ -1415,7 +1454,7 @@ public class SingleCamera {
     public Set<ChannelRules.Out> declaredOutputs() {
         Set<ChannelRules.Out> result = new LinkedHashSet<>();
         synchronized (outputLock) {
-            for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredRecord}) {
+            for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredSidePopup, declaredRecord}) {
                 if (declared != null && alive(declared.out.consumer)
                         && (declared.surface == null || declared.surface.isValid())) {
                     result.add(declared.out);
@@ -1599,7 +1638,7 @@ public class SingleCamera {
 
     /** 和这一样输出相同的声明；没有返回 null（{@link #outputLock}）。 */
     private Declared declaredFor(ChannelRules.Out out) {
-        for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredRecord}) {
+        for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredSidePopup, declaredRecord}) {
             if (declared != null && declared.out.equals(out)) {
                 return declared;
             }
@@ -2142,12 +2181,20 @@ public class SingleCamera {
         final Map<ChannelRules.Out, Surface> built = new LinkedHashMap<>();
         for (Target target : targets) {
             ChannelRules.Kind kind = target.out.kind;
-            if (kind == ChannelRules.Kind.PREVIEW || kind == ChannelRules.Kind.MIRROR) {
+            if (kind == ChannelRules.Kind.PREVIEW || kind == ChannelRules.Kind.MIRROR
+                    || kind == ChannelRules.Kind.SIDE_POPUP) {
                 if (previewSharedConfig == null) {
                     previewSharedConfig = new OutputConfiguration(target.surface);
                     previewSharedConfig.enableSurfaceSharing();
                     outputConfigs.add(previewSharedConfig);
                 } else {
+                    if (kind == ChannelRules.Kind.SIDE_POPUP
+                            && previewSharedConfig.getSurfaces().size()
+                            >= previewSharedConfig.getMaxSharedSurfaceCount()) {
+                        AppLog.w(TAG, "Camera " + cameraId + " shared surface limit: skipping side popup");
+                        dropOutput(target.out, Drop.CONFIG_FAILED);
+                        continue;
+                    }
                     previewSharedConfig.addSurface(target.surface);
                 }
             } else {
@@ -2190,6 +2237,7 @@ public class SingleCamera {
 
         // 配不上时按这份会话里有什么来丢
         final ChannelRules.Out mirrorOut = firstOfKind(targets, ChannelRules.Kind.MIRROR);
+        final ChannelRules.Out sidePopupOut = firstOfKind(targets, ChannelRules.Kind.SIDE_POPUP);
         final ChannelRules.Out recordOut = firstOfKind(targets, ChannelRules.Kind.RECORD);
 
         // 注：旧会话关闭已提前到方法开头处理（确保 SurfaceTexture 断开连接后再创建 EGL Surface）
@@ -2276,7 +2324,15 @@ public class SingleCamera {
                     return;
                 }
 
-                // 重试逻辑：按 JPEG → 后视镜 → 录像的次序丢输出，一步里的重试都不往外报
+                // Retry by yielding the optional side popup first, then JPEG, mirror and recording.
+                // The optional side window yields before the existing mirror, recording or JPEG.
+                if (sidePopupOut != null && built.containsKey(sidePopupOut)) {
+                    AppLog.w(TAG, "Camera " + cameraId + " retrying without side popup output");
+                    dropOutput(sidePopupOut, Drop.CONFIG_FAILED);
+                    requestSessionRebuild("config-failed-side-popup", 200);
+                    return;
+                }
+
                 // 先丢拍照通道：它是这条会话里最可有可无的一条流，
                 // 丢了照片退回抓预览，画面一帧不少；留着它却可能一帧都没有。
                 if (jpegReader != null && !jpegDropped) {

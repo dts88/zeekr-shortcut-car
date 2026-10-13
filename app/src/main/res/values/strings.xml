@@ -296,12 +296,12 @@
     <string name="msg_rearview_on">超级后视镜已开启：拖动两侧移动窗口，中间上下滑动调整取景</string>
     <string name="msg_rearview_reset">超级后视镜窗口与画面已重置</string>
     <string name="set_side_popup_title">打转向灯弹侧视</string>
-    <string name="set_side_popup_summary">打转向灯时显示那一侧的画面。超级后视镜开启时，在原窗口临时显示侧视，结束后恢复原取景；未开启时使用独立弹窗。原厂画面优先：挂 R 档、原厂 360 或侧方小窗显示时不弹</string>
+    <string name="set_side_popup_summary">打转向灯时显示对应侧摄像头；可替换超级后视镜画面或另外弹窗。倒车、原厂环视或侧视显示时让路。</string>
     <string name="set_side_popup_speed_title">从这个车速起弹（km/h）</string>
     <string name="set_side_popup_speed_summary">低于这个车速原厂会自己弹侧方小窗。0 表示任何车速都弹</string>
     <string name="msg_side_popup_on">打转向灯弹侧视已开启：打左灯看左侧、打右灯看右侧</string>
     <string name="set_side_popup_straighten_title">拉直画面</string>
-    <string name="set_side_popup_straighten_summary">把鱼眼画面拉直再显示，下面三项调视野和朝向。只影响弹窗的显示，录像照旧</string>
+    <string name="set_side_popup_straighten_summary">校正鱼眼并调整侧视取景，适用于已有后视镜和独立侧视窗口；不改变录像。</string>
     <string name="set_side_popup_fov_title">视野（°）</string>
     <string name="set_side_popup_fov_summary">越小越放大。只在「拉直画面」开着时起作用</string>
     <string name="set_side_popup_yaw_title">往后看（°）</string>
@@ -313,7 +313,7 @@
     <string name="set_side_popup_instant_title">即时弹出</string>
     <string name="set_side_popup_instant_summary">挂 D 档时让侧视窗在后台备着，打灯马上有画面。代价是开车时相机一直开着，多用一点电</string>
     <string name="set_side_popup_size_title">弹窗大小（屏幕高度的 %）</string>
-    <string name="set_side_popup_size_summary">仅用于超级后视镜关闭时的独立弹窗。最大到半个屏幕宽，左右弹窗在屏幕中线相接</string>
+    <string name="set_side_popup_size_summary">独立窗口使用此大小，也可以双指缩放；最大为屏幕宽度的一半。</string>
     <string name="set_side_popup_vertical_title">上下位置（%）</string>
     <string name="set_side_popup_vertical_summary">仅用于超级后视镜关闭时的独立弹窗。0 贴顶，100 贴底</string>
     <string name="msg_floating_reset">悬浮按钮已重置</string>
@@ -944,4 +944,7 @@
     <string name="dev_tool_progress">（%1$d/%2$d）%3$s</string>
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
+    <string name="set_side_popup_replace_mirror_title">替换超级后视镜</string>
+    <string name="set_side_popup_replace_mirror_summary">开启时在已有后视镜窗口中临时显示侧视；关闭时保留后视镜并显示独立侧视窗口</string>
+    <string name="msg_side_popup_unavailable">侧视窗口无法显示。超级后视镜开启时，可以尝试启用“替换超级后视镜”。</string>
 </resources>
