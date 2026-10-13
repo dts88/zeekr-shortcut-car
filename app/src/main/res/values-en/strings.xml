@@ -284,7 +284,7 @@
     <string name="set_side_popup_straighten_title">Straighten picture</string>
     <string name="set_side_popup_straighten_summary">Corrects the fisheye curve and adjusts side-view framing in either window; recordings are unchanged.</string>
     <string name="set_side_popup_fov_title">View width (°)</string>
-    <string name="set_side_popup_fov_summary">Smaller zooms in. Only applies with Straighten picture on</string>
+    <string name="set_side_popup_fov_summary">Smaller zooms in. With Straighten picture on, the view automatically narrows near the camera image edge; high aiming angles can greatly reduce coverage</string>
     <string name="set_side_popup_yaw_title">Aim back (°)</string>
     <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way</string>
     <string name="set_side_popup_pitch_title">Aim up (°)</string>

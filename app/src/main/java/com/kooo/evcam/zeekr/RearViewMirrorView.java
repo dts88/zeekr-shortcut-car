@@ -104,9 +104,8 @@ public class RearViewMirrorView extends ViewGroup {
     private int sideFov;
     private int sideYaw;
     private int sidePitch;
-    private final FisheyeMesh.SourceMap sideMap = (u, v, out) ->
-            SideViewProjection.sourcePoint(u, v, sideFov, sideYaw, sidePitch, sideView.lane(),
-                    (float) getWidth() / Math.max(1, getHeight()), out, 0);
+    private final SideViewFraming sideFraming = new SideViewFraming();
+    private final FisheyeMesh.SourceMap sideMap = sideFraming::sourcePoint;
     /** 取景在画面上的高低位置，0..1。宽高比锁死后，可调的就只剩这个。 */
     private float pan;
 
@@ -1265,6 +1264,8 @@ public class RearViewMirrorView extends ViewGroup {
     private void drawSideView(Canvas canvas, int width, int height) {
         int lane = sideView.displayLane(laneIndex);
         if (sideStraighten) {
+            sideFraming.configure(sideFov, sideYaw, sidePitch, lane,
+                    (float) width / Math.max(1, height));
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                     plan, lane, RearViewGeometry.Viewport.full());
             mesh.prepare(FisheyeProjection.MESH_DIVISIONS,

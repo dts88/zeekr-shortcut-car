@@ -284,7 +284,7 @@
     <string name="set_side_popup_straighten_title">Luruskan gambar</string>
     <string name="set_side_popup_straighten_summary">Membetulkan lengkungan mata ikan dan melaraskan pandangan sisi dalam kedua-dua tetingkap; rakaman tidak berubah.</string>
     <string name="set_side_popup_fov_title">Lebar pandangan (°)</string>
-    <string name="set_side_popup_fov_summary">Lebih kecil untuk zum masuk. Hanya berfungsi apabila Luruskan gambar dihidupkan</string>
+    <string name="set_side_popup_fov_summary">Lebih kecil untuk zum masuk. Apabila Luruskan gambar dihidupkan, pandangan dikecilkan secara automatik berhampiran tepi imej kamera; sudut hala yang besar boleh mengurangkan kawasan yang kelihatan</string>
     <string name="set_side_popup_yaw_title">Hala ke belakang (°)</string>
     <string name="set_side_popup_yaw_summary">Positif memusingkan pandangan ke belakang (titik buta), negatif ke hadapan. Arah ini hanya tekaan: jika berpusing ke arah salah, seret ke arah lain</string>
     <string name="set_side_popup_pitch_title">Hala ke atas (°)</string>

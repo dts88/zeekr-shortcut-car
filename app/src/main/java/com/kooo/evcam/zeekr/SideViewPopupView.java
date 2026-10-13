@@ -70,8 +70,8 @@ public class SideViewPopupView extends ViewGroup {
     private int viewFov;
     private int yaw;
     private int pitch;
-    private final FisheyeMesh.SourceMap turnedMap = (u, v, out) ->
-            SideViewProjection.sourcePoint(u, v, viewFov, yaw, pitch, lane, out, 0);
+    private final SideViewFraming framing = new SideViewFraming();
+    private final FisheyeMesh.SourceMap turnedMap = framing::sourcePoint;
 
     public SideViewPopupView(Context context, AppConfig appConfig) {
         super(context);
@@ -424,6 +424,7 @@ public class SideViewPopupView extends ViewGroup {
             canvas.scale(-1f, 1f, width / 2f, height / 2f);
         }
         if (straighten) {
+            framing.configure(viewFov, yaw, pitch, lane, 1f);
             // 虚拟相机转过去（往后、往上）再拉直，见 SideViewProjection
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                     plan, lane, RearViewGeometry.Viewport.full());
