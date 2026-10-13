@@ -75,6 +75,7 @@ public class SideViewPopupService extends Service {
     private boolean readyExpiryScheduled;
     private boolean destroyed;
     private boolean popupUnavailable;
+    private final SideViewDismissal dismissal = new SideViewDismissal();
     /** 最近显示过哪一边：备着时窗口停在那一边，下次多半还是它。 */
     private int lastLane = LaneCycle.LEFT;
     /** 这一次显示的时刻和第一帧来没来：黑匣子里看「弹了多久才有画面」。 */
@@ -102,6 +103,23 @@ public class SideViewPopupService extends Service {
 
     public static void stop(Context context) {
         context.stopService(new Intent(context, SideViewPopupService.class));
+    }
+
+    public static void dismissCurrentSideView() {
+        SideViewPopupService svc = instance;
+        if (svc == null) {
+            return;
+        }
+        int lane = RearViewMirrorService.sideViewLane();
+        if (lane == SideViewDecision.NONE && svc.popup != null && svc.popup.isShowing()) {
+            lane = svc.popup.lane();
+        }
+        if (lane == SideViewDecision.NONE) {
+            return;
+        }
+        svc.dismissal.dismiss(lane == LaneCycle.LEFT ? 1 : 2);
+        svc.closeNow();
+        svc.evaluate();
     }
 
     /** Re-evaluate which window hosts the side view when the mirror starts or stops. */
@@ -230,6 +248,7 @@ public class SideViewPopupService extends Service {
         int mirrorLane = RearViewMirrorService.sideViewLane();
         in.showing = previousMirrorLane != SideViewDecision.NONE ? previousMirrorLane
                 : popup != null && popup.isShowing() ? popup.lane() : SideViewDecision.NONE;
+        boolean suppressed = dismissal.suppress(in.turnSignal, in.hazard);
 
         boolean blocked = ScreenState.dark();
         if (blocked || SideViewDecision.factoryViewActive(in)) {
@@ -238,7 +257,7 @@ public class SideViewPopupService extends Service {
             detachPopup();
             return;
         }
-        int want = SideViewDecision.decide(in);
+        int want = suppressed ? SideViewDecision.NONE : SideViewDecision.decide(in);
         lastReady = !useMirror && !popupUnavailable && appConfig.isSidePopupInstant()
                 && SideViewDecision.shouldStayReady(in);
 

@@ -1,0 +1,9 @@
+<resources>
+    <dimen name="side_control_target">48dp</dimen>
+    <dimen name="side_control_margin">8dp</dimen>
+    <dimen name="side_control_padding">12dp</dimen>
+    <dimen name="side_control_radius">8dp</dimen>
+    <color name="side_control_background">#E6212121</color>
+    <color name="side_control_icon">#FFFFFF</color>
+    <color name="side_control_pressed">#40FFFFFF</color>
+</resources>

@@ -89,6 +89,8 @@ public class RearViewMirrorView extends ViewGroup {
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
+    private final SideViewControls sideControls;
+    private final SideViewExpansion sideExpansion = new SideViewExpansion();
 
     private WindowManager.LayoutParams params;
     private boolean attached;
@@ -203,6 +205,18 @@ public class RearViewMirrorView extends ViewGroup {
 
         textureView = new AutoFitTextureView(context);
         addView(textureView);
+        sideControls = new SideViewControls(context, SideViewPopupService::dismissCurrentSideView,
+                this::toggleSideViewExpanded);
+        sideControls.setVisibility(View.GONE);
+        addView(sideControls);
+        setClipToOutline(true);
+        setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), sideView.active()
+                        ? getResources().getDimension(R.dimen.side_control_radius) : 0f);
+            }
+        });
 
     }
 
@@ -318,6 +332,8 @@ public class RearViewMirrorView extends ViewGroup {
             return;
         }
         sideView.show(lane, params.x, params.y, docked);
+        sideControls.setVisibility(View.VISIBLE);
+        invalidateOutline();
         cancelGlide();
         cancelTapFlash();
         dragging = false;
@@ -352,6 +368,7 @@ public class RearViewMirrorView extends ViewGroup {
     }
 
     public void clearSideView() {
+        restoreSideViewExpanded();
         MirrorSideView.Placement restore = sideView.clear();
         if (restore == null || params == null) {
             return;
@@ -360,12 +377,43 @@ public class RearViewMirrorView extends ViewGroup {
         params.x = restore.x;
         params.y = restore.y;
         docked = restore.docked;
+        sideControls.setVisibility(View.GONE);
+        invalidateOutline();
         textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
         applyLayout();
         if (dockChanged && dockListener != null) {
             dockListener.onDockChanged(docked);
         }
         invalidate();
+    }
+
+    private void toggleSideViewExpanded() {
+        if (!sideView.active() || params == null) {
+            return;
+        }
+        SideViewExpansion.Geometry next = sideExpansion.toggle(
+                new SideViewExpansion.Geometry(params.x, params.y, params.width, params.height),
+                screenWidth(), screenHeight(),
+                getResources().getDimensionPixelSize(R.dimen.side_control_margin));
+        applySideGeometry(next);
+        sideControls.setExpanded(sideExpansion.expanded());
+        applyLayout();
+        invalidate();
+    }
+
+    private void restoreSideViewExpanded() {
+        SideViewExpansion.Geometry normal = sideExpansion.restore();
+        if (normal != null && params != null) {
+            applySideGeometry(normal);
+            sideControls.setExpanded(false);
+        }
+    }
+
+    private void applySideGeometry(SideViewExpansion.Geometry geometry) {
+        params.x = geometry.x;
+        params.y = geometry.y;
+        params.width = geometry.width;
+        params.height = geometry.height;
     }
 
     /** 贴边收起 / 放回来。 */
@@ -519,6 +567,7 @@ public class RearViewMirrorView extends ViewGroup {
         if (params == null) {
             return;
         }
+        restoreSideViewExpanded();
         params.width = appConfig.getRearViewWidth(screenWidth());
         params.height = appConfig.getRearViewHeight(screenHeight());
         params.x = RearViewTouchModel.clampX(params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
@@ -536,6 +585,7 @@ public class RearViewMirrorView extends ViewGroup {
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         // 子视图铺满，实际取景由 dispatchDraw 的矩阵决定
         textureView.layout(0, 0, getWidth(), getHeight());
+        sideControls.layoutIn(getWidth());
     }
 
     @Override
@@ -558,9 +608,12 @@ public class RearViewMirrorView extends ViewGroup {
         }
         if (plan == null || !plan.isComposite()) {
             // 还不知道几何，先原样显示，总比全黑好
-            super.dispatchDraw(canvas);
+            drawTextureOnce(canvas);
             if (frozen) {
                 drawFrozenHint(canvas, width, height);
+            }
+            if (sideView.active()) {
+                drawChild(canvas, sideControls, getDrawingTime());
             }
             return;
         }
@@ -573,6 +626,7 @@ public class RearViewMirrorView extends ViewGroup {
             if (frozen) {
                 drawFrozenHint(canvas, width, height);
             }
+            drawChild(canvas, sideControls, getDrawingTime());
             return;
         }
 

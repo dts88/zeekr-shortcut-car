@@ -953,4 +953,7 @@
     <string name="set_side_popup_rotation_left_title">左侧画面旋转（°）</string>
     <string name="set_side_popup_rotation_right_title">右侧画面旋转（°）</string>
     <string name="set_side_popup_rotation_summary">调整画面倾斜；正数顺时针，负数逆时针。旋转时裁切边缘填满窗口；适用于两种窗口，不改变录像。</string>
+    <string name="side_control_close">关闭本次侧视</string>
+    <string name="side_control_expand">放大侧视窗口</string>
+    <string name="side_control_restore">恢复窗口大小</string>
 </resources>
