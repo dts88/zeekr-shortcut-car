@@ -9,7 +9,8 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Turn-signal side view, adapted from PR #4 to the current channel scheduler. Off by default
+  under Settings → Super mirror; adjustable speed threshold, field of view, aim and placement.
 
 ## [2.11.2-alpha] - 2026-10-13
 

@@ -1164,6 +1164,8 @@ public final class ChannelRules {
                 return w.recordPlan.contains(lane.key);
             case MIRROR:
                 return isSurround(lane);
+            case SIDE_POPUP:
+                return w.screenOn && isSurround(lane);
             default:
                 return true;
         }
@@ -1229,7 +1231,9 @@ public final class ChannelRules {
             case PREVIEW:
                 return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn;
             case MIRROR:
-                return w.holders.contains(CameraNeeds.Holder.MIRROR) && isSurround(lane);
+                return (w.holders.contains(CameraNeeds.Holder.MIRROR)
+                        || (w.screenOn && w.holders.contains(CameraNeeds.Holder.SIDE_POPUP)))
+                        && isSurround(lane);
             case RECORD:
                 return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
             default:

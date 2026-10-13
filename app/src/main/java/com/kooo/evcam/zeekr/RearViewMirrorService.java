@@ -106,6 +106,11 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
+    /** 后视镜在不在：侧视弹窗和它共用一个相机输出槽位，它在就不弹。 */
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
     /** 设置页开关了按键模式之后通知正在显示的窗口。 */
     public static void applyButtonMode(Context context) {
         RearViewMirrorService svc = instance;
@@ -226,6 +231,7 @@ public class RearViewMirrorService extends Service {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("后台服务 RearViewMirrorService onCreate");
         appConfig = new AppConfig(this);
         instance = this;
+        SideViewPopupService.mirrorChanged();
         // 熄屏放开、亮屏登记：听进程里唯一那份屏幕状态（主线程回调）
         com.kooo.evcam.screen.ScreenState.addListener(screenListener);
     }
@@ -703,6 +709,7 @@ public class RearViewMirrorService extends Service {
     public void onDestroy() {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RearViewMirrorService onDestroy");
         instance = null;
+        SideViewPopupService.mirrorChanged();
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
         cancelRetry();
         cancelWatchdog();

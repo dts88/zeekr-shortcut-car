@@ -131,6 +131,39 @@ public class ChannelRulesTest {
         assertTrue(ChannelRules.wantedBy(w, front).isEmpty());
     }
 
+    @Test
+    public void sidePopupUsesOnlyTheSurroundWhileTheScreenIsOn() {
+        claim(Holder.SIDE_POPUP);
+        surround.declared.add(mirror);
+        rear.declared.add(mirror);
+        front.declared.add(mirror);
+        assertEquals(EnumSet.of(Holder.SIDE_POPUP), ChannelRules.wantedBy(w, surround));
+        assertEquals(set(mirror), ChannelRules.wantedOutputs(w, surround));
+        assertFalse(ChannelRules.wanted(w, rear));
+        assertFalse(ChannelRules.wanted(w, front));
+        assertTrue(ChannelRules.wantedOutputs(w, rear).isEmpty());
+        assertTrue(ChannelRules.wantedOutputs(w, front).isEmpty());
+
+        w.screenOn = false;
+        assertFalse(ChannelRules.wanted(w, surround));
+        assertTrue(ChannelRules.wantedOutputs(w, surround).isEmpty());
+    }
+
+    @Test
+    public void dismissingSidePopupKeepsTheRecordingOutputWanted() {
+        claim(Holder.RECORDING);
+        planAll();
+        claim(Holder.SIDE_POPUP);
+        surround.declared.add(recS);
+        surround.declared.add(mirror);
+        assertEquals(set(recS, mirror), ChannelRules.wantedOutputs(w, surround));
+
+        drop(Holder.SIDE_POPUP);
+        assertTrue(ChannelRules.wanted(w, surround));
+        assertEquals(set(recS), ChannelRules.wantedOutputs(w, surround));
+        assertTrue(ChannelRules.keepsRecordOutput(w, surround));
+    }
+
     /**
      * 熄屏放开座舱（项目所有者 2026-10-12 D2，设计 v3.1 C4）：只看屏幕和是不是环视，和谁登记着无关 —— 预览、录像、拍照、
      * 后视镜一律不要座舱；环视照各自的规矩。自定义车型上环视以外的每一路都一样放开。
@@ -150,13 +183,15 @@ public class ChannelRulesTest {
             claim(holder);
             assertFalse(holder + "：熄屏时后座舱谁都不要", ChannelRules.wanted(w, rear));
             assertFalse(holder + "：熄屏时前座舱谁都不要", ChannelRules.wanted(w, front));
-            assertEquals(holder + "：环视照它自己的规矩", holder != Holder.PREVIEW, ChannelRules.wanted(w, surround));
+            assertEquals(holder + "：环视照它自己的规矩", holder != Holder.PREVIEW && holder != Holder.SIDE_POPUP,
+                    ChannelRules.wanted(w, surround));
         }
         w.screenOn = true;
         for (Holder holder : Holder.values()) {
             w.holders.clear();
             claim(holder);
-            assertEquals(holder + "：亮屏照登记表", holder != Holder.MIRROR, ChannelRules.wanted(w, rear));
+            assertEquals(holder + "：亮屏照登记表", holder != Holder.MIRROR && holder != Holder.SIDE_POPUP,
+                    ChannelRules.wanted(w, rear));
             assertFalse(ChannelRules.releasedByDark(w, rear));
         }
     }

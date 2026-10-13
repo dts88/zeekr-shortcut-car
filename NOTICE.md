@@ -73,3 +73,9 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 **没有任何关系。** 本项目是独立的第三方实验性软件，与浙江极氪智能科技有限公司
 及其关联方无隶属、合作或背书关系。「极氪」「ZEEKR」「7X」等名称仅用于说明本应用
 适用于哪种车机环境，相关商标权归其各自所有者所有。
+
+## Turn-signal side view
+
+The turn-signal side-view feature and projection tests were contributed by
+[FerixzTanz in PR #4](https://github.com/dts88/zeekr-shortcut-car/pull/4), then adapted
+to the current camera scheduler. They remain covered by the repository's GPL-3.0 license.
