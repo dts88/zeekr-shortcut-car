@@ -278,8 +278,8 @@
     <string name="msg_rearview_reset">Super mirror window and view reset</string>
     <string name="set_side_popup_title">Turn-signal side view</string>
     <string name="set_side_popup_summary">Shows the camera on the side you signal. Choose whether to replace Super mirror or open a separate window alongside it. Reverse and the car\'s own camera views take priority.</string>
-    <string name="set_side_popup_speed_title">Show from speed (km/h)</string>
-    <string name="set_side_popup_speed_summary">Below this speed the car shows its own side view. 0 shows it at any speed</string>
+    <string name="set_side_popup_speed_title">Minimum opening speed (km/h)</string>
+    <string name="set_side_popup_speed_summary">Opens at or above this speed; 0 removes the speed restriction. The side view still stays hidden during reverse, parking assist or a factory camera view, including the low-speed indicator-triggered 360° pop-up.</string>
     <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>
     <string name="set_side_popup_straighten_title">Straighten picture</string>
     <string name="set_side_popup_straighten_summary">Corrects the fisheye curve and adjusts side-view framing in either window; recordings are unchanged.</string>
