@@ -286,7 +286,7 @@
     <string name="set_side_popup_fov_title">View width (°)</string>
     <string name="set_side_popup_fov_summary">Smaller zooms in. With Straighten picture on, the view automatically narrows near the camera image edge; high aiming angles can greatly reduce coverage</string>
     <string name="set_side_popup_yaw_title">Aim back (°)</string>
-    <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way With Straighten picture on, high angles can zoom in strongly; see the note below.</string>
+    <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way. With Straighten picture on, high angles can zoom in strongly; see the note below.</string>
     <string name="set_side_popup_pitch_title">Aim up (°)</string>
     <string name="set_side_popup_pitch_summary">Positive turns the view out towards the road further away, negative down at the car and the ground. The direction is a guess: if it turns the wrong way, drag the other way</string>
     <string name="set_side_popup_edge_note_title">High angles zoom in</string>
