@@ -69,11 +69,6 @@ final class TelemetryUsers {
         return core ? Change.FLOATS_OFF : Change.STOP;
     }
 
-    /** 来源该不该跑。 */
-    boolean running() {
-        return core || !full.isEmpty();
-    }
-
     /** 浮点传感器和定位该不该开：有完整用户。 */
     boolean full() {
         return !full.isEmpty();

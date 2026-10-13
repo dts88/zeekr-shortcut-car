@@ -44,8 +44,9 @@ import java.util.Set;
  *       读完再排一次。</li>
  *   <li>浮点传感器（车速、转角、深度、温度……）不订阅 —— 变一点就推，订了只是噪声 —— 按 {@link #FLOAT_POLL_MS} 读，
  *       而且只在有完整用户时读（{@link #floats}，{@link TelemetryUsers}）：熄屏判断那一层只要离散信号。</li>
- *   <li><b>传感器监听疑似注销不掉</b>（注销再注册，回调会变成两条三条），所以传感器只在进程里注册一次、永远留着，
- *       停了就不理它的回调；功能号的监听每次停都注销。车辆对象整个进程只建一次（{@code Car.create} 要一秒）。</li>
+ *   <li><b>传感器监听疑似注销不掉</b>（注销再注册，回调会变成两条三条），所以传感器在一个车辆对象上只注册一次、永远留着，
+ *       停了就不理它的回调；功能号的监听每次停都注销。车辆对象建一次一直用（{@code Car.create} 要一秒），
+ *       连不上（{@link Telemetry.CarLink#FAILED}）时丢掉，下次再连重建、传感器在新的上面重新挂（{@link #forgetCar}）。</li>
  * </ul>
  *
  * <p>信号表在 {@link Signal}；读数进 {@link Readings}，信息条那份快照由 {@link VehicleStateMapper} 推出来。</p>
@@ -73,14 +74,16 @@ final class EcarxSource {
     private static final long PUBLISH_COALESCE_MS = 40L;
     /** 连着这么多遍对账一个值都读不到，就算断了（{@link #stillAnswering}）：约 6 秒，一次偶尔的读失败不算。 */
     static final int DEAD_PASSES = 2;
+    /** 两遍对账之间深睡过多久算「睡过」（{@link #emptyPassesAfter}）：两个钟各读一次有一两毫秒的出入，不算。 */
+    static final long SLEPT_BETWEEN_MS = 1_000L;
     /** 车辆信息：主驾在哪一边（ICarInfo.INT_INFO_DRIVER_SIDE），读到 0x00100302 = 右、0x00100301 = 左。 */
     private static final int INFO_DRIVER_SIDE = 0x00100300;
     private static final int DRIVER_SIDE_LEFT = 0x00100301;
     private static final int DRIVER_SIDE_RIGHT = 0x00100302;
 
-    /** 车辆对象整个进程只建一次。 */
+    /** 车辆对象：建一次一直用；连不上的那一个丢掉（{@link #forgetCar}），下次再连重建。 */
     private static volatile Object cachedCar;
-    /** 传感器监听：进程里只注册一次、永不注销（注销不掉）；回调转给此刻活着的那个来源。 */
+    /** 传感器监听：一个车辆对象上只注册一次、永不注销（注销不掉）；回调转给此刻活着的那个来源。车辆对象丢掉时清（{@link #forgetCar}）。 */
     private static final Object SENSOR_LOCK = new Object();
     private static Object sensorProxy;
     private static final Set<Integer> sensorTypesRegistered = new HashSet<>();
@@ -102,8 +105,12 @@ final class EcarxSource {
     private boolean connected;
     /** 读不读浮点传感器（有完整用户）。构造时给，之后只在自己的线程上碰（{@link #floats}）。 */
     private boolean floatsOn;
-    /** 连着几遍对账一个值都没读到。 */
+    /** 连着几遍对账一个值都没读到（两遍之间车机深睡过的不算连着，{@link #emptyPassesAfter}）。 */
     private int emptyPasses;
+    /** 上一遍对账时车机一共深睡过多久（elapsedRealtime − uptimeMillis）：这一遍和它比，涨了就是两遍之间睡过。 */
+    private long sleptAtLastPass;
+    /** 这个来源用的车辆对象（{@link #cachedCar} 里拿的、或者刚建的）；还没拿到是 null。只在自己的线程上碰。 */
+    private Object car;
     /** 等着「当场对一次账」读完的回调（{@link #reconcileNow}）：停的时候还没轮到的也交给主线程，一个不丢。 */
     private final List<Runnable> waiting = new ArrayList<>();
     private long readingsVersion;
@@ -338,6 +345,7 @@ final class EcarxSource {
                 }
                 cachedCar = car;
             }
+            this.car = car;
             function = call(car, "getICarFunction");
             sensor = call(car, "getSensorManager");
             if (function != null) {
@@ -372,6 +380,7 @@ final class EcarxSource {
                 report(Telemetry.CarLink.FAILED);
                 return;
             }
+            sleptAtLastPass = sleptMs();
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -393,10 +402,36 @@ final class EcarxSource {
         }
     }
 
-    /** 结果给页面和熄屏判断（{@link #link}），经过（{@link #status}，含异常原文）跟着进日志和黑匣子（{@link Telemetry#carReported}）。 */
+    /**
+     * 结果给页面和熄屏判断（{@link #link}），经过（{@link #status}，含异常原文）跟着进日志和黑匣子（{@link Telemetry#carReported}）。
+     * 连不上的，手上的车辆对象不再用（{@link #forgetCar}）。
+     */
     private void report(Telemetry.CarLink result) {
         link = result;
+        if (result == Telemetry.CarLink.FAILED) {
+            forgetCar(car);
+        }
         telemetry.carReported(this, result, status);
+    }
+
+    /**
+     * 这个车辆对象不再用：拿着它连不上（接口拿不到、找到了却一个值都读不到、出错），或者连上之后读的路断了（{@link #lose}）——
+     * 车机服务多半没了或者重启过，旧的对象连着的是死的那一个，拿它再连多少次都一样（审查 rev3 B4：以前整个进程只建一次，
+     * 车机服务重启一次，这一趟停车就一直只看安卓）。下一次再连重新 {@code Car.create}；传感器的监听也在新的那一个上重新挂
+     * （挂在旧的上的回调不会再来；万一旧的还活着、回调来两份，{@link #apply} 比对后只算一次变化）。
+     */
+    static void forgetCar(Object car) {
+        if (car == null) {
+            return;
+        }
+        synchronized (SENSOR_LOCK) {
+            if (cachedCar != car) {
+                return;
+            }
+            cachedCar = null;
+            sensorTypesRegistered.clear();
+        }
+        AppLog.i(TAG, "car object dropped: the next connect runs Car.create again");
     }
 
     /** 主驾在哪一边：车辆信息 INT_INFO_DRIVER_SIDE。读不到按右舵（这台车）。 */
@@ -798,17 +833,39 @@ final class EcarxSource {
         return answered > 0;
     }
 
-    /** 这一遍读到了没有：读到了清零；连着 {@link #DEAD_PASSES} 遍都没读到算断了（{@link #lose}）。 */
+    /**
+     * 这一遍读到了没有：读到了清零；连着 {@link #DEAD_PASSES} 遍都没读到算断了（{@link #lose}）。两遍之间车机深睡过的不算连着
+     * （{@link #emptyPassesAfter}）。
+     */
     private boolean stillAnswering(boolean answered) {
-        if (answered) {
-            emptyPasses = 0;
-            return true;
-        }
-        if (++emptyPasses < DEAD_PASSES) {
+        long slept = sleptMs();
+        boolean sleptBetween = slept - sleptAtLastPass >= SLEPT_BETWEEN_MS;
+        sleptAtLastPass = slept;
+        emptyPasses = emptyPassesAfter(emptyPasses, answered, sleptBetween);
+        if (emptyPasses < DEAD_PASSES) {
             return true;
         }
         lose();
         return false;
+    }
+
+    /**
+     * 这一遍之后「连着几遍一个值都没读到」：读到了清零；没读到加一 —— 上一遍和这一遍之间车机深睡过的，从这一遍重新数：
+     * 车机下电时那一遍读不到、醒来头一遍也读不到（车机服务刚起来），两遍隔着一觉，不是读的路断了；以前它俩凑成「连着两遍」，
+     * 醒来车辆接口就算断了、只看安卓（审查 rev3 F1）。纯函数，测试直接调。
+     *
+     * @param sleptBetween 上一遍和这一遍之间车机深睡过（{@link #SLEPT_BETWEEN_MS} 以上）
+     */
+    static int emptyPassesAfter(int before, boolean answered, boolean sleptBetween) {
+        if (answered) {
+            return 0;
+        }
+        return (sleptBetween ? 0 : before) + 1;
+    }
+
+    /** 开机以来车机一共深睡过多久（毫秒）。 */
+    private static long sleptMs() {
+        return SystemClock.elapsedRealtime() - SystemClock.uptimeMillis();
     }
 
     /**

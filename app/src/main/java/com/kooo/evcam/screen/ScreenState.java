@@ -54,7 +54,9 @@ import java.util.List;
  * <p><b>安卓刚亮的那一下不信记着的车辆读数</b>（设计 v3.1 C2/C6）：睡之前最后读到的是「黑」，醒来先拿它判，每个早上都会被当成
  * 「车机自己醒了」。所以安卓亮了先让车辆信号当场读一遍（{@link Telemetry#reconcileNow}），读回来再判 E2' 还是 E3，最多等
  * {@link #WAKE_SETTLE_MAX_MS}（等满了、接口没连着就只看安卓）。这一段只有一个在等（世代号），广播、轮询、{@link #refresh}
- * 都不会再起第二个；等的时候安卓又熄屏就作废（还算车机睡着）。车辆接口连不上的，在这条边做完之后再连一次。</p>
+ * 都不会再起第二个；等的时候安卓又熄屏就作废（还算车机睡着）。车辆接口连不上的<b>先再连一次</b>，在连就等它连上后的第一份读数
+ * 或者连不上的结果（和进程刚起来那一段同一个判法，{@link ScreenTransitions#linkSettled}），同样最多等那么久 —— 以前先判边、
+ * 后再连：这一遍只看安卓判成亮屏、座舱开回来，连上以后又读到黑、再放开（审查 rev3 F1）。</p>
  *
  * <p><b>不知道屏幕黑没黑时不动手</b>（C11）：进程起来时安卓亮着，车辆信号还没读到（约 0.1–1.2 秒），这时屏幕可能早就黑了 ——
  * 恢复（{@link Recovery}）、接回录像都排到知道了再做（{@link #whenKnown}），最多等 {@link #STARTUP_SETTLE_MAX_MS}。
@@ -180,6 +182,11 @@ public final class ScreenState {
     /** 安卓是怎么亮的（broadcast / noticed）、醒来那一遍等满了没读回来：亮屏、E2' 那一行写（主线程）。 */
     private static String wakeHow = "";
     private static boolean wakeCapped;
+    /**
+     * 安卓刚亮的这一段在等车辆接口连上（连不上的再连了一次、或者赶上它在连）：车辆信号的那一批读数到了就看
+     * （{@link #vehicleChanged}），不等 {@link Telemetry#reconcileNow} 的回调。一段里只再连一次（主线程）。
+     */
+    private static boolean wakeOnLink;
 
     private ScreenState() {
     }
@@ -247,6 +254,16 @@ public final class ScreenState {
     /** 安卓熄屏着（判断用的那一份：安卓刚亮、还在等车辆信号时还算熄屏）。黑着时它就是「车机要睡了 / 睡着」。 */
     public static boolean androidOff() {
         return facts.state.androidOff;
+    }
+
+    /**
+     * 车辆信号此刻判着屏幕（有车辆的判断）：下一次熄屏是车辆说黑，车机还醒着（E1）。没有时只看安卓 —— 车辆接口没连着
+     * （在连、连不上、这台车机没有）、连着却两项读不到超过 {@link ScreenTransitions#KEEP_UNKNOWN_MS}、进程刚起来还没读到：
+     * 下一次熄屏就是安卓熄屏，也就是车机下电（E1 和 E2 一起来，降级）。录制键上的小字照它判熄屏那一刻
+     * （{@code ui.ScreenOffHintView}，审查 rev3 B1）。任何线程都能问。
+     */
+    public static boolean vehicleJudges() {
+        return facts.state.vehicle != null;
     }
 
     /**
@@ -353,10 +370,11 @@ public final class ScreenState {
         long now = SystemClock.elapsedRealtime();
         ScreenTransitions.State before = facts.state;
         ScreenTransitions.State next = ScreenTransitions.verdict(before, fresh, connected, now);
-        // 进程起来后的第一份：读到了判断，或者车辆接口有了结果（连上了要等那一遍读数发布出来：连上的通知比读数早 40 ms）
-        boolean startupEnds = settle == Settle.STARTUP && (fresh != null
-                || (link != null && link != Telemetry.CarLink.CONNECTING && !connected)
-                || (connected && readings.knownCount() > 0));
+        // 进程起来后的第一份、安卓刚亮时等着连上的那一份：读到了判断，或者车辆接口有了结果（连上了要等那一遍读数发布出来：
+        // 连上的通知比读数早 40 ms）
+        boolean linkSettled = ScreenTransitions.linkSettled(link, fresh, readings.knownCount());
+        boolean startupEnds = settle == Settle.STARTUP && linkSettled;
+        boolean wakeEnds = settle == Settle.WAKE && wakeOnLink && linkSettled;
         if (startupEnds) {
             endSettle();
         }
@@ -372,6 +390,10 @@ public final class ScreenState {
         }
         if (startupEnds) {
             drainWhenKnown();
+        }
+        if (wakeEnds) {
+            // 连上后的第一份（醒来后读的）或者连不上的结果：照它判 E2' 还是 E3
+            wakeRead(settleGen, false);
         }
     }
 
@@ -411,8 +433,8 @@ public final class ScreenState {
     }
 
     /**
-     * 安卓亮了（广播、轮询、{@link #refresh}）：先让车辆信号当场读一遍，读回来再判（{@link #wakeRead}）。只有一个在等：
-     * 已经在等的不再起第二个。
+     * 安卓亮了（广播、轮询、{@link #refresh}）：先让车辆信号当场读一遍，读回来再判（{@link #wakeRead}）；车辆接口连不上的先再连、
+     * 等连上后的第一份（{@link #awaitLink}）。只有一个在等：已经在等的不再起第二个。
      */
     private static void androidWentOn(String how) {
         if (!facts.state.androidOff || settle == Settle.WAKE) {
@@ -423,19 +445,47 @@ public final class ScreenState {
         wakeHow = how;
         MAIN.removeCallbacks(WAKE_CAP);
         MAIN.postDelayed(WAKE_CAP, WAKE_SETTLE_MAX_MS);
-        Telemetry.get().reconcileNow(true, () -> wakeRead(gen, false));
+        Telemetry telemetry = Telemetry.get();
+        if (!awaitLink(telemetry)) {
+            telemetry.reconcileNow(true, () -> wakeRead(gen, false));
+        }
+    }
+
+    /**
+     * 安卓刚亮、要判 E2' 还是 E3 之前：车辆接口连不上（{@link Telemetry.CarLink#FAILED}）就先再连一次 —— 车机睡醒，车机服务可能刚起来；
+     * 此刻在连（刚叫的、或者赶上了每 5 分钟那一次）就等它：连上后的第一份读数是醒来后读的，连不上就只看安卓
+     * （{@link #vehicleChanged} 收，{@link ScreenTransitions#linkSettled}），最多等到 {@link #WAKE_SETTLE_MAX_MS}。
+     * 一段只等一次（{@link #wakeOnLink}）。以前先判这条边、判完再连：这一遍只看安卓判成亮屏，座舱开回来、主界面拉起来，
+     * 连上以后又读到黑，再放开（审查 rev3 F1）。
+     *
+     * @return true：在等车辆接口，这一段接着等
+     */
+    private static boolean awaitLink(Telemetry telemetry) {
+        if (wakeOnLink) {
+            return false;
+        }
+        telemetry.retryLinkIfFailed();
+        if (telemetry.carLink() != Telemetry.CarLink.CONNECTING) {
+            return false;
+        }
+        wakeOnLink = true;
+        return true;
     }
 
     /** 安卓亮了以后等醒来那一遍车辆信号，等满了：没读回来，只看安卓。 */
     private static final Runnable WAKE_CAP = () -> wakeRead(settleGen, true);
 
     /**
-     * 醒来那一遍车辆信号读回来了（监听者那一批已经先到，读数是醒来后的），或者等满了：再问一次安卓、对一下世代号，
-     * 然后照这一遍判 E2'（车辆还说黑）还是 E3。这条边做完了才让车辆接口连不上的再连一次（C6：先连的话这一遍只看安卓，
-     * 连上以后又黑回去）。
+     * 醒来那一遍车辆信号读回来了（监听者那一批已经先到，读数是醒来后的），或者等着的车辆接口连上了、有了结果，或者等满了：
+     * 再问一次安卓、对一下世代号，然后照这一遍判 E2'（车辆还说黑）还是 E3。醒来那一遍读的时候车辆接口断了（连着两遍没读到）的，
+     * 先再连一次、接着等（{@link #awaitLink}），不拿「只看安卓」先判。
      */
     private static void wakeRead(int gen, boolean capped) {
         if (settle != Settle.WAKE || gen != settleGen) {
+            return;
+        }
+        Telemetry telemetry = Telemetry.get();
+        if (!capped && awaitLink(telemetry)) {
             return;
         }
         endSettle();
@@ -445,7 +495,6 @@ public final class ScreenState {
             drainWhenKnown();
             return;
         }
-        Telemetry telemetry = Telemetry.get();
         boolean connected = telemetry.carLinkConnected();
         Readings r = telemetry.readings();
         Boolean event = connected ? r.bool(Signal.SCREEN_POWER_EVENT) : null;
@@ -454,7 +503,6 @@ public final class ScreenState {
         Boolean fresh = capped ? null : VehicleScreen.verdict(event, ignition);
         move(ScreenTransitions.androidOn(facts.state, fresh, connected), event, ignition);
         drainWhenKnown();
-        telemetry.retryLinkIfFailed();
     }
 
     /** 安卓熄屏着的时候每两秒问一次系统「亮了没」：深睡醒来亮屏广播不来。只看安卓。 */
@@ -480,6 +528,7 @@ public final class ScreenState {
     private static void endSettle() {
         settle = Settle.NONE;
         settleGen++;
+        wakeOnLink = false;
         MAIN.removeCallbacks(STARTUP_CAP);
         MAIN.removeCallbacks(WAKE_CAP);
     }

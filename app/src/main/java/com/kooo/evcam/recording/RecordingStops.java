@@ -201,4 +201,71 @@ public final class RecordingStops {
     public static boolean rejudgesBeforeLockGoes(boolean dark, boolean lockPulling) {
         return dark && lockPulling;
     }
+
+    /**
+     * 一段熄屏里录像停了几次、开了几次（熄屏小结，设计 v3 §6 L8、v3.1 C16）：照表停的（10 秒到点、车机要睡，
+     * {@link Reason#SCREEN_OFF}）单独数、记下第一次的那一刻，不算「中途停过」；别的停都算中途停过；车机黑着醒了照表接着录
+     * （E2'，只录环视）、真开起来的单独数。一段熄屏里照表停可能不止一次：车机要睡停了，夜里车机醒来接着录，下一次车机要睡又停
+     * （审查 rev3 B6：以前只记第一次，后面那一段录像和它的停在小结里看不到）。熄屏那一下清零，亮屏那一行写完不清（下一次熄屏再清）。
+     * 主线程上用；纯逻辑。
+     */
+    public static final class DarkTally {
+        private int midwayStops;
+        private int tableStops;
+        private long firstTableStopAt;
+        private int wokeStarts;
+
+        /** 熄屏了：这一段从零数。 */
+        public void reset() {
+            midwayStops = 0;
+            tableStops = 0;
+            firstTableStopAt = 0;
+            wokeStarts = 0;
+        }
+
+        /**
+         * 这一段里录像停了。
+         *
+         * @param at 停的那一刻（elapsedRealtime）
+         */
+        public void stopped(Reason reason, long at) {
+            if (reason != Reason.SCREEN_OFF) {
+                midwayStops++;
+                return;
+            }
+            if (tableStops++ == 0) {
+                firstTableStopAt = at;
+            }
+        }
+
+        /** 车机黑着醒了、照表接着录，这一次真开起来了。 */
+        public void wokeStarted() {
+            wokeStarts++;
+        }
+
+        /** 中途停过几次（照表停的不算）。 */
+        public int midwayStops() {
+            return midwayStops;
+        }
+
+        /** 照表停录几次。 */
+        public int tableStops() {
+            return tableStops;
+        }
+
+        /** 第一次照表停录的那一刻（elapsedRealtime）；没有是 0。 */
+        public long firstTableStopAt() {
+            return firstTableStopAt;
+        }
+
+        /** 车机醒来接着录、开起来了几次。 */
+        public int wokeStarts() {
+            return wokeStarts;
+        }
+
+        /** 这一段里停过（中途的、照表的都算）。 */
+        public boolean anyStop() {
+            return midwayStops > 0 || tableStops > 0;
+        }
+    }
 }

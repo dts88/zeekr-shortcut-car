@@ -162,13 +162,20 @@
 ## 9. 车主定过的名称与文字（不改）
 
 - 功能名：超级后视镜 / Super mirror（「电子后视镜」只作解释）；锁定影像 / Lock footage；熄屏持续录制；行驶信息条；车辆状态（试验性）；系统信息（试验性）；鱼眼校正按钮的英文 Straighten；按钮透明度；关于与致谢。
-- 文字：set_screen_off_keep_summary；record_screen_off_continue / _pause / _stop；dlg_footage_lock_off_msg；set_footage_lock_*；msg_storage_locked_*；关于页的致谢与来源（about_thanks_*、about_credits_*）。
-- 2.11.2（熄屏 v3：熄屏是屏幕真黑了，熄屏后只录制环视）改过的：record_screen_off_continue「熄屏后继续录制环视」（项目所有者 2026-10-12 批准）；
-  record_screen_off_pause「熄屏暂停，亮屏后恢复」、set_screen_off_keep_summary「熄屏后只录制环视，亮屏后前后座舱恢复录制。…」、
-  set_screen_off_summary（开发者「熄屏录制」，加了「环视」）、新加的 vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）
-  三种语言照草稿上了，待项目所有者看；_needs_sentry（「熄屏续录需开启哨兵模式」）删了：熄屏后接着录不再要哨兵模式。
+- 文字：record_screen_off_continue（2026-10-12 批准「熄屏后继续录制环视」）/ _stop；dlg_footage_lock_off_msg；set_footage_lock_*；msg_storage_locked_*；关于页的致谢与来源（about_thanks_*、about_credits_*）。
+- record_screen_off_needs_sentry（「熄屏续录需开启哨兵模式」）2.11.2 删了：熄屏后接着录不再要哨兵模式。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认（2.11.2）
+
+下面这几条**不在**上面「不改」的单子里：2.11.2（熄屏 v3：熄屏是屏幕真黑了，熄屏后只录制环视）照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- record_screen_off_pause「熄屏暂停，亮屏后恢复」（车主定过的是旧句，2.11.2 改了）。
+- set_screen_off_keep_summary「熄屏后只录制环视，亮屏后前后座舱恢复录制。…」（车主定过的是旧句，2.11.2 改了）。
+- set_screen_off_summary（开发者「熄屏录制」，加了「环视」）。
+- 新加的 vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）。
 
 ---
 

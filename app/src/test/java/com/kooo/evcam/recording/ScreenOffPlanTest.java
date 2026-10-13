@@ -31,6 +31,11 @@ public class ScreenOffPlanTest {
         return judge(keeps, lockHeld, autoRecord, sentry, driving, androidOff).action;
     }
 
+    /** 车辆信号判着屏幕（熄屏那一刻车机醒着）时录制键上那一句：唤醒锁不拉着，哨兵模式、挡位读不到。 */
+    private static ScreenOffPlan hint(boolean keeps, boolean autoRecord, boolean surround) {
+        return ScreenOffPlan.of(ScreenOffPlan.atDark(keeps, false, autoRecord, null, false, false, surround));
+    }
+
     /**
      * 屏幕黑了、车机还醒着（安卓亮着）：怎样都不会现在停 —— 车机几分钟后才下电。熄屏持续录制开着接着录环视，关着 10 秒后停；
      * 哨兵模式、挡位、启动自动录制都改不了（以前熄屏那一刻哨兵模式没开就现在停，那时安卓的熄屏就是下电）。
@@ -164,9 +169,9 @@ public class ScreenOffPlanTest {
             }
             assertFalse(ScreenOffPlan.startsWhileDark(keeps, false));
         }
-        assertEquals(ScreenOffPlan.PAUSE, ScreenOffPlan.of(true, false, false));
-        assertEquals(ScreenOffPlan.PAUSE, ScreenOffPlan.of(false, true, false));
-        assertEquals(ScreenOffPlan.STOP, ScreenOffPlan.of(false, false, false));
+        assertEquals(ScreenOffPlan.PAUSE, hint(true, false, false));
+        assertEquals(ScreenOffPlan.PAUSE, hint(false, true, false));
+        assertEquals(ScreenOffPlan.STOP, hint(false, false, false));
     }
 
     /** 停了之后亮屏接不接：熄屏持续录制、启动自动录制开着一个就接（现在停、10 秒后停都一样）。 */
@@ -219,16 +224,17 @@ public class ScreenOffPlanTest {
     }
 
     /**
-     * 录制键上的小字就是熄屏那一刻（屏幕黑了、车机醒着）表判出来的：接着录 →「熄屏后继续录制环视」，停了亮屏接 →
-     * 「熄屏暂停，亮屏后恢复」，不接 →「熄屏后停止录制」。只看熄屏持续录制、启动自动录制、计划里有没有环视；
-     * 哨兵模式、挡位、唤醒锁都改不了它（以前还有一句「熄屏续录需开启哨兵模式」，熄屏 v3 起续录不看哨兵模式，删了）。
+     * 录制键上的小字就是熄屏那一刻表判出来的：接着录 →「熄屏后继续录制环视」，停了亮屏接 →「熄屏暂停，亮屏后恢复」，
+     * 不接 →「熄屏后停止录制」。车辆信号判着屏幕时熄屏那一刻车机醒着（安卓亮着）：只看熄屏持续录制、启动自动录制、
+     * 计划里有没有环视；哨兵模式、挡位改不了它，唤醒锁拉着时熄屏持续录制必定开着、结果一样（以前还有一句
+     * 「熄屏续录需开启哨兵模式」，熄屏 v3 起续录不看哨兵模式，删了）。
      */
     @Test
     public void theRecordButtonTextIsTheDecisionAtTheDarkEdge() {
         for (boolean keeps : BOTH) {
             for (boolean autoRecord : BOTH) {
                 for (boolean surround : BOTH) {
-                    ScreenOffPlan text = ScreenOffPlan.of(keeps, autoRecord, surround);
+                    ScreenOffPlan text = hint(keeps, autoRecord, surround);
                     String row = "keeps=" + keeps + " auto=" + autoRecord + " surround=" + surround;
                     for (Integer sentry : ANY_SENTRY) {
                         for (boolean driving : BOTH) {
@@ -236,16 +242,50 @@ public class ScreenOffPlanTest {
                                     false, surround);
                             assertEquals(row, atDark.action == ScreenOffPlan.Action.CONTINUE ? ScreenOffPlan.CONTINUE
                                     : atDark.resumesOnWake ? ScreenOffPlan.PAUSE : ScreenOffPlan.STOP, text);
+                            assertEquals("车机醒着：哨兵模式、挡位改不了它", text, ScreenOffPlan.of(atDark));
+                            if (keeps) {
+                                assertEquals("唤醒锁拉着（熄屏持续录制必定算开着）：一样", text, ScreenOffPlan.of(
+                                        ScreenOffPlan.atDark(true, true, autoRecord, sentry, driving, false, surround)));
+                            }
                         }
                     }
                 }
             }
         }
-        assertEquals(ScreenOffPlan.CONTINUE, ScreenOffPlan.of(true, false, true));
-        assertEquals(ScreenOffPlan.CONTINUE, ScreenOffPlan.of(true, true, true));
-        assertEquals(ScreenOffPlan.PAUSE, ScreenOffPlan.of(false, true, true));
-        assertEquals(ScreenOffPlan.STOP, ScreenOffPlan.of(false, false, true));
+        assertEquals(ScreenOffPlan.CONTINUE, hint(true, false, true));
+        assertEquals(ScreenOffPlan.CONTINUE, hint(true, true, true));
+        assertEquals(ScreenOffPlan.PAUSE, hint(false, true, true));
+        assertEquals(ScreenOffPlan.STOP, hint(false, false, true));
         assertEquals("三句，没有「需开启哨兵模式」", 3, ScreenOffPlan.values().length);
+    }
+
+    /**
+     * 车辆信号判不出屏幕（降级：车辆接口没连着、两项读不到）：熄屏只能是安卓熄屏 = 车机下电，小字照协调器那一刻的判法
+     * （安卓熄屏了）—— 熄屏持续录制开着、哨兵模式没开或读不到、没在开车、唤醒锁没拉着：现在停、亮屏接，写「熄屏暂停，亮屏后恢复」，
+     * 不再写「继续录制」（审查 rev3 B1）。唤醒锁拉着、哨兵模式开着、在开车的，熄屏那一下照样接着录。
+     */
+    @Test
+    public void whenTheVehicleCannotTellTheScreenTheHintIsTheHeadUnitSleeping() {
+        for (Integer sentry : SENTRY_OFF_OR_UNKNOWN) {
+            for (boolean autoRecord : BOTH) {
+                ScreenOffPlan.Decision atDark = ScreenOffPlan.atDark(true, false, autoRecord, sentry, false, true, true);
+                assertEquals(ScreenOffPlan.Action.STOP_NOW, atDark.action);
+                assertEquals("熄屏那一下就停，亮屏接", ScreenOffPlan.PAUSE, ScreenOffPlan.of(atDark));
+                assertEquals("车辆判着时同样的设置是接着录", ScreenOffPlan.CONTINUE, hint(true, autoRecord, true));
+            }
+            assertEquals(ScreenOffPlan.PAUSE, ScreenOffPlan.of(
+                    ScreenOffPlan.atDark(false, false, true, sentry, false, true, true)));
+            assertEquals(ScreenOffPlan.STOP, ScreenOffPlan.of(
+                    ScreenOffPlan.atDark(false, false, false, sentry, false, true, true)));
+            assertEquals("唤醒锁拉着车机：接着录", ScreenOffPlan.CONTINUE, ScreenOffPlan.of(
+                    ScreenOffPlan.atDark(true, true, false, sentry, false, true, true)));
+            assertEquals("在开车：接着录", ScreenOffPlan.CONTINUE, ScreenOffPlan.of(
+                    ScreenOffPlan.atDark(true, false, false, sentry, true, true, true)));
+        }
+        for (Integer sentry : SENTRY_ON) {
+            assertEquals("哨兵模式开着（读得到）：车机不下电，接着录", ScreenOffPlan.CONTINUE, ScreenOffPlan.of(
+                    ScreenOffPlan.atDark(true, false, false, sentry, false, true, true)));
+        }
     }
 
     /**

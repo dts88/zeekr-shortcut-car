@@ -118,6 +118,25 @@ final class ScreenTransitions {
         return new State(false, connected ? fresh : null, 0);
     }
 
+    /**
+     * 等车辆接口的那一段有了着落（{@code ScreenState}：进程刚起来、安卓亮着；安卓刚亮、接口在连）：这一批读数判出了屏幕，
+     * 或者接口有了结果 —— 连不上、这台车机没有（只看安卓），或者连上了、发布出了有值的读数（连上的通知比那一遍读数早约 40 ms，
+     * 那一下读数还是空的，要等读数）。还在连、核心还没登记都不算。
+     *
+     * @param link       车辆接口此刻的结果（{@code Telemetry.carLink}；null = 核心还没登记）
+     * @param fresh      这一批读数判出来的（{@link VehicleScreen#verdict}；没连着时 null）
+     * @param knownCount 这一批读数里有值的信号有几个
+     */
+    static boolean linkSettled(Telemetry.CarLink link, Boolean fresh, int knownCount) {
+        if (fresh != null) {
+            return true;
+        }
+        if (link == null || link == Telemetry.CarLink.CONNECTING) {
+            return false;
+        }
+        return link != Telemetry.CarLink.CONNECTED || knownCount > 0;
+    }
+
     /** 从 {@code before} 到 {@code after} 跨过了哪一条边；没跨是 null。 */
     static Edge edge(State before, State after) {
         boolean wasDark = before.dark();

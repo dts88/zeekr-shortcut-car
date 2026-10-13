@@ -6,8 +6,8 @@ import com.kooo.evcam.telemetry.VehicleState;
 
 /**
  * 熄屏时这段录像会怎样。一张表（{@link #atDark}），两处照它：{@link RecordingCoordinator} 照它停不停、什么时候停、
- * 亮屏接不接、黑着能不能开录、写不写「车机要睡」（熄屏的唯一裁判，在不在录都判）；录制键上那行小字照它说（{@link #of}）——
- * 界面上写的就是实际会发生的。
+ * 亮屏接不接、黑着能不能开录、写不写「车机要睡」（熄屏的唯一裁判，在不在录都判）；录制键上那行小字照它说（{@link #of}，
+ * 输入和协调器熄屏那一刻的一样）—— 界面上写的就是实际会发生的。
  *
  * <h3>熄屏 v3（项目所有者 2026-10-12 D1–D3，设计 v3 §3）</h3>
  *
@@ -33,7 +33,10 @@ public enum ScreenOffPlan {
 
     /** 熄屏后继续录制环视（座舱亮屏后接回）。 */
     CONTINUE(R.string.record_screen_off_continue),
-    /** 熄屏后停，亮屏后恢复：熄屏持续录制关着（或计划里没有环视）、启动自动录制开着。 */
+    /**
+     * 熄屏后停，亮屏后恢复：熄屏持续录制关着（或计划里没有环视）、启动自动录制开着；或者车辆信号判不出屏幕（降级），
+     * 熄屏就是车机下电 —— 现在停，熄屏持续录制、启动自动录制开着一个就亮屏接。
+     */
     PAUSE(R.string.record_screen_off_pause),
     /** 熄屏后停止录制，亮屏也不接。 */
     STOP(R.string.record_screen_off_stop);
@@ -222,19 +225,27 @@ public enum ScreenOffPlan {
     }
 
     /**
-     * 录制键上那行小字：现在熄屏的话会怎样 —— 就是熄屏那一刻（E1：屏幕黑了、车机醒着）表判出来的。接着录 →
-     * 「熄屏后继续录制环视」；停了亮屏接 →「熄屏暂停，亮屏后恢复」；不接 →「熄屏后停止录制」。哨兵模式、挡位、唤醒锁
-     * 都改不了它（车机醒着时判不出现在停；唤醒锁拉着时熄屏持续录制必定开着），不看车辆信号。
+     * 录制键上那行小字：现在熄屏的话会怎样 —— 就是下一次熄屏那一刻（E1）协调器照这张表判出来的（{@link #atDark}，同样的输入）。
+     * 接着录 →「熄屏后继续录制环视」；停了亮屏接 →「熄屏暂停，亮屏后恢复」；不接 →「熄屏后停止录制」。
      *
+     * <p>熄屏那一刻安卓熄没熄屏（{@code androidOff}）由叫的人按屏幕此刻怎么判给（{@code screen.ScreenState#vehicleJudges}）：
+     * 车辆信号判着屏幕时是车辆先说黑、车机还醒着（false）—— 判不出现在停，哨兵模式、挡位改不了它；判不出屏幕时（降级：
+     * 车辆接口没连着、两项读不到）熄屏只能是安卓熄屏，也就是车机下电（true）—— 和协调器一样照「车机要睡」那一行算上唤醒锁、
+     * 哨兵模式、挡位：熄屏持续录制开着、哨兵模式没开的是「熄屏暂停，亮屏后恢复」（审查 rev3 B1；以前一律按车机醒着判，
+     * 降级时写「继续录制」，熄屏那一下却现在停）。</p>
+     *
+     * @param lockHeld        熄屏那一刻开发者的唤醒锁拉不拉得住车机（{@link ScreenOffRecording#holdsCarAwake}：亮着时问的就是这个）
+     * @param vehicle         车辆信号此刻的快照（{@code Telemetry.latest()}）
+     * @param androidOff      熄屏那一刻安卓也熄屏了（车辆信号判不出屏幕，降级）
      * @param surroundPlanned 这一次录像（没在录时：配置里启用的那几路）里有环视（{@link RecordingCoordinator#surroundPlanned}）
      */
-    public static ScreenOffPlan of(AppConfig config, boolean surroundPlanned) {
-        return of(keepsRecording(config), config.isAutoStartRecording(), surroundPlanned);
+    public static ScreenOffPlan of(AppConfig config, boolean lockHeld, VehicleState vehicle, boolean androidOff,
+                                   boolean surroundPlanned) {
+        return of(atDark(config, lockHeld, vehicle, androidOff, surroundPlanned));
     }
 
-    /** 纯函数，测试直接调。 */
-    static ScreenOffPlan of(boolean keeps, boolean autoRecord, boolean surroundPlanned) {
-        Decision decision = atDark(keeps, false, autoRecord, null, false, false, surroundPlanned);
+    /** 判下来的做法写成哪一句。纯函数，测试直接调。 */
+    static ScreenOffPlan of(Decision decision) {
         if (decision.action == Action.CONTINUE) {
             return CONTINUE;
         }

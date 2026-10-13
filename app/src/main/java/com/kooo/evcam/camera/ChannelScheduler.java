@@ -43,8 +43,8 @@ import java.util.function.Consumer;
  *   <li>录像输出离开了会话（改输出摘掉的），或者关着的一路录像不再留着它（停了录、不在计划里），告诉声明它的那一方
  *       （{@link #dispatchDrops}）；交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级后视镜留住的画布、
  *       换下来的录制器）离开了会话的，放掉；</li>
- *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；关完一轮 30 秒的，量一次还开着的那几路
- *       （{@link #noteAftermaths}）；</li>
+ *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；关完一轮 30 秒的、别的程序拿走一路相机 30 秒的
+ *       （{@link #watchAfter}），量一次还开着的那几路（{@link #noteAftermaths}；在那之前我们自己动了它的，量到动它那一刻）；</li>
  *   <li>告诉录像那一侧（{@link Recording}）：哪几路走了、哪几路的样子变了、哪几路带着新会话出了画面 ——
  *       录像按路加入、退出只看这几声，自己从不动相机；</li>
  *   <li>记下诊断报告读的快照（{@link #snapshot()}）。</li>
@@ -346,6 +346,8 @@ public final class ChannelScheduler {
         /**
          * 关了一轮、还开着的那几路（关的时候在出画面）从开始关起 {@link ChannelScheduler#AFTERMATH_MS} 怎样：最长断帧、会话动没动
          * （设计 v3.1 C22）。关那一下只有零点几秒，看不出后劲 —— 10-12 那次环视是相机 1 被拿走 6–14 秒之后才断的。
+         * 这段时间里我们自己动了其中一路（关、改输出、救）的，那一路量到动它那一刻，带着是哪一步（{@link Other#ours}）：
+         * 我们自己之后的关、改不算成它的断帧（审查 rev3 B2）。
          *
          * @param closedKeys 那一轮关的几路，按开始关的先后（环视单独关的那一步在前）
          * @param why        那一轮第一步关的原因
@@ -497,17 +499,30 @@ public final class ChannelScheduler {
     /**
      * 一步里别的路：最长断帧、会话动没动过（「这段时间里环视最长断帧不到 0.2 秒、会话没动」）。开、改输出、救那一步、
      * 关一轮、关完之后 {@link ChannelScheduler#AFTERMATH_MS}（{@link ChannelScheduler#othersSince}），还有别的程序拿走一路相机之后的
-     * 那一行（MultiCameraManager，争用），量的是同一样东西。
+     * 那一行（MultiCameraManager，争用，{@link ChannelScheduler#watchAfter}），量的是同一样东西。
      */
     static final class Other {
         final String key;
         final long gapMs;
         final boolean sessionChanged;
+        /**
+         * 过一阵再量的那两行（{@link ChannelScheduler#watchAfter}）：量到一半我们自己在这一路上走了一步（关、改输出、救），
+         * 就只量到那一刻 —— 是哪一步；没有是 null。
+         */
+        final ChannelRules.Move ours;
+        /** 那一步从开始量起多久开始的（毫秒）；{@link #ours} 为 null 时是 -1。 */
+        final long oursAtMs;
 
         Other(String key, long gapMs, boolean sessionChanged) {
+            this(key, gapMs, sessionChanged, null, -1);
+        }
+
+        Other(String key, long gapMs, boolean sessionChanged, ChannelRules.Move ours, long oursAtMs) {
             this.key = key;
             this.gapMs = gapMs;
             this.sessionChanged = sessionChanged;
+            this.ours = ours;
+            this.oursAtMs = oursAtMs;
         }
     }
 
@@ -764,7 +779,7 @@ public final class ChannelScheduler {
 
     /**
      * 关了一轮之后多久再量一次还开着的那几路（{@link Journal#closeAftermath}，设计 v3.1 C22）；别的程序拿走一路相机之后
-     * 量环视也是这个数（MultiCameraManager，设计 v3 §6 L5）。10-12 黑匣子：车机拿走相机 1 之后 6–14 秒环视才断，
+     * 量环视也是这个数（MultiCameraManager，设计 v3 §6 L5，{@link #watchAfter}）。10-12 黑匣子：车机拿走相机 1 之后 6–14 秒环视才断，
      * 量满 30 秒看得到后劲；断帧记录（SingleCamera 最近 16 次）盖得住。
      */
     static final long AFTERMATH_MS = 30_000L;
@@ -907,7 +922,7 @@ public final class ChannelScheduler {
      * 撤回声明，下一轮就不在声明里了；这一路一开就清。
      */
     private final Map<String, Set<ChannelRules.Out>> closedDropsTold = new HashMap<>();
-    /** 关完一轮、等着到点再量一次还开着的那几路（{@link #noteAftermaths}）。 */
+    /** 等着到点再量一次的：关完一轮还开着的那几路、别的程序拿走一路相机之后的环视（{@link #watchAfter}、{@link #noteAftermaths}）。 */
     private final List<Aftermath> aftermaths = new ArrayList<>();
     /** 开之前在等录像输出的那几路，从什么时候起。 */
     private final Map<String, Long> recordWaitSince = new HashMap<>();
@@ -1106,6 +1121,37 @@ public final class ChannelScheduler {
         if (outs.isEmpty()) {
             handedOver.remove(key);
         }
+        return true;
+    }
+
+    // ================================================================= 过一阵再量一路（主线程）
+
+    /**
+     * 从 {@code since} 起 {@link #AFTERMATH_MS} 再量一次这一路：最长断帧、会话动没动（{@link Other}），交给 {@code report}
+     * （在一轮里、主线程上）—— 别的程序拿走一路相机之后的环视那一行（MultiCameraManager，设计 v3 §6 L5）。关完一轮之后
+     * 还开着的那几路（C22）走的也是这一份（{@link #flushTrails}）。在那之前我们自己要在这一路上走一步（关、改输出、救），
+     * 就量到那一刻为止、记下是哪一步（{@link Other#ours}）：我们自己之后的关、改不算成它的断帧（审查 rev3 B2）。
+     * 这一路不在这一份管线里、同一件（{@code tag}）还在等、调度停了，不排。
+     *
+     * @param tag   同一件只等一次（「take 1」：相机 1 被拿走那一件）
+     * @param since 从什么时候量（调度的钟）
+     * @return 排上了
+     */
+    boolean watchAfter(String tag, String key, long since, Consumer<List<Other>> report) {
+        CameraPort port = ports.get(key);
+        if (stopped || port == null || tag == null || report == null) {
+            return false;
+        }
+        for (Aftermath a : aftermaths) {
+            if (tag.equals(a.tag)) {
+                return false;
+            }
+        }
+        Map<String, Integer> generations = new LinkedHashMap<>();
+        generations.put(key, port.sessionGeneration());
+        aftermaths.add(new Aftermath(since, tag, generations, report));
+        // 下一次醒的时刻要算上它（arm）
+        wake();
         return true;
     }
 
@@ -1856,6 +1902,10 @@ public final class ChannelScheduler {
     // ---- 5. 照做
 
     private void execute(ChannelRules.Decision d, long now) {
+        if (d.move == ChannelRules.Move.OPEN || d.move == ChannelRules.Move.APPLY
+                || d.move == ChannelRules.Move.RESCUE || d.move == ChannelRules.Move.CLOSE) {
+            cutAftermaths(d, now);
+        }
         switch (d.move) {
             case OPEN:
                 open(d, now);
@@ -1871,6 +1921,26 @@ public final class ChannelScheduler {
                 break;
             default:
                 break;
+        }
+    }
+
+    /**
+     * 这一步要动的路里有等着再量的（{@link #watchAfter}、关完一轮之后的那几路）：那一路量到此刻、记下是哪一步，到点时照这一份写 ——
+     * 我们自己的关、改、救不算成它的断帧（审查 rev3 B2：以前熄屏持续录制关着时，座舱放开 10 秒后照表停录、环视跟着关，
+     * 30 秒那一行把我们关环视之后的 20 秒写成了「环视最长断帧 20.0 秒、会话被重建过」）。在照做之前量：关相机、改输出
+     * 当场就让会话代数变了。一路只量第一次。
+     */
+    private void cutAftermaths(ChannelRules.Decision d, long now) {
+        for (Aftermath a : aftermaths) {
+            for (String key : d.keys) {
+                Integer generation = a.generations.get(key);
+                CameraPort port = ports.get(key);
+                if (generation == null || port == null || a.cut.containsKey(key)) {
+                    continue;
+                }
+                a.cut.put(key, new Other(key, port.longestFrameGapSince(a.since),
+                        port.sessionGeneration() != generation, d.move, now - a.since));
+            }
         }
     }
 
@@ -2216,25 +2286,36 @@ public final class ChannelScheduler {
             Map<String, Integer> staying = new LinkedHashMap<>(round.generations);
             staying.keySet().removeAll(round.keys);
             if (round.startedAt != 0 && !staying.isEmpty()) {
-                aftermaths.add(new Aftermath(round.startedAt, round.why, round.keys, staying));
+                final List<String> closedKeys = Collections.unmodifiableList(new ArrayList<>(round.keys));
+                final ChannelRules.Why why = round.why;
+                aftermaths.add(new Aftermath(round.startedAt, null, staying,
+                        others -> journal.closeAftermath(closedKeys, why, others)));
             }
         }
     }
 
     /**
-     * 关完一轮、到了 {@link ChannelScheduler#AFTERMATH_MS} 的：还开着的那几路从开始关起最长断帧多久、会话动没动，写一行
-     * （{@link Journal#closeAftermath}，设计 v3.1 C22）。一件事一行，量完就扔。
+     * 到了 {@link ChannelScheduler#AFTERMATH_MS} 的：那几路从开始量起最长断帧多久、会话动没动，交出去写一行（关完一轮的那一行
+     * {@link Journal#closeAftermath}，设计 v3.1 C22；别的程序拿走一路相机之后的那一行，{@link #watchAfter}）。
+     * 我们中途动过的那一路用动它那一刻量的（{@link #cutAftermaths}）。一件事一行，量完就扔。交出去的在遍历之外调。
      */
     private void noteAftermaths(long now) {
+        List<Aftermath> due = new ArrayList<>();
         for (Iterator<Aftermath> it = aftermaths.iterator(); it.hasNext(); ) {
             Aftermath a = it.next();
-            if (now < a.since + AFTERMATH_MS) {
-                continue;
+            if (now >= a.since + AFTERMATH_MS) {
+                it.remove();
+                due.add(a);
             }
-            it.remove();
-            List<Other> others = othersSince(a.generations, a.since);
+        }
+        for (Aftermath a : due) {
+            List<Other> others = new ArrayList<>();
+            for (Other measured : othersSince(a.generations, a.since)) {
+                Other cut = a.cut.get(measured.key);
+                others.add(cut != null ? cut : measured);
+            }
             if (!others.isEmpty()) {
-                journal.closeAftermath(a.closedKeys, a.why, others);
+                a.report.accept(others);
             }
         }
     }
@@ -2573,20 +2654,24 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 关完一轮、还开着的那几路，等着从开始关起 {@link ChannelScheduler#AFTERMATH_MS} 再量一次（{@link #noteAftermaths}）：从什么时候量、
-     * 那一轮关了哪几路、为什么，那几路开始时的会话代数。
+     * 等着从 {@code since} 起 {@link ChannelScheduler#AFTERMATH_MS} 再量一次的那几路（{@link ChannelScheduler#noteAftermaths}）：
+     * 关完一轮还开着的、别的程序拿走一路相机之后的环视（{@link ChannelScheduler#watchAfter}）。从什么时候量、那几路开始时的会话代数、
+     * 量好了交给谁写；中途我们自己动了的那几路在动它那一刻量的（{@link ChannelScheduler#cutAftermaths}）。
      */
     private static final class Aftermath {
         final long since;
-        final ChannelRules.Why why;
-        final List<String> closedKeys;
+        /** 同一件只等一次（{@link ChannelScheduler#watchAfter}）；关完一轮的那一种是 null。 */
+        final String tag;
         final Map<String, Integer> generations;
+        final Consumer<List<Other>> report;
+        /** 中途我们自己动了的那几路：动它那一刻量的（{@link Other#ours}）。 */
+        final Map<String, Other> cut = new LinkedHashMap<>();
 
-        Aftermath(long since, ChannelRules.Why why, List<String> closedKeys, Map<String, Integer> generations) {
+        Aftermath(long since, String tag, Map<String, Integer> generations, Consumer<List<Other>> report) {
             this.since = since;
-            this.why = why;
-            this.closedKeys = Collections.unmodifiableList(new ArrayList<>(closedKeys));
+            this.tag = tag;
             this.generations = generations;
+            this.report = report;
         }
     }
 

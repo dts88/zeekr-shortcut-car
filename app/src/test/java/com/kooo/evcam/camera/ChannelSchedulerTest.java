@@ -776,6 +776,8 @@ public class ChannelSchedulerTest {
     /**
      * 熄屏放开的座舱关着的时候停了录（熄屏持续录制关着，10 秒后停）：停录那一轮就告诉它们「随相机关了」，录像那一侧放掉
      * 停放着的录制器（设计 v3.1 C13），只说一次；环视熄屏不保持，跟着关（原因是熄屏，不是座舱放开）。
+     * 座舱那一轮关完 30 秒再量环视的那一行只量到我们关环视那一刻、写明是我们关的 —— 不把之后的 20 秒算成环视断帧、
+     * 会话被重建（审查 rev3 B2）。
      */
     @Test
     public void stoppingTheRecordingWhileTheCabinsAreDarkDropsTheirParkedRecorders() {
@@ -808,6 +810,46 @@ public class ChannelSchedulerTest {
         at(20_000);
         assertEquals("只说一次", Arrays.asList("RECORD CLOSED"), rear.drops);
         assertEquals(Arrays.asList("RECORD CLOSED"), surround.drops);
+        assertTrue(lines("closeAftermath").isEmpty());
+        at(31_000);
+        assertEquals("量到我们关环视那一刻（座舱那一轮开始关起 10 秒），会话照关之前的算",
+                Arrays.asList("closeAftermath [left, back] DARK_RELEASE front gap=0 same ours=CLOSE@10000"),
+                lines("closeAftermath"));
+    }
+
+    /**
+     * 别的程序拿走一路相机之后再量环视（设计 v3 §6 L5，{@link ChannelScheduler#watchAfter}）：同一件只等一次；
+     * 这 30 秒里我们给环视加了录像输出（重配会话，会话代数变了），只量到加输出那一刻、写明是我们改的，不算会话被重建（审查 rev3 B2）。
+     * 量完这一件，同一路相机再被拿走又能排上。
+     */
+    @Test
+    public void aWatchAfterATakeStopsMeasuringAtOurOwnStepOnTheLane() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        List<String> reports = new ArrayList<>();
+        Consumer<List<ChannelScheduler.Other>> report = others -> reports.add(othersText(others));
+        assertTrue(s.watchAfter("take 1", SUR, now, report));
+        assertFalse("同一件只等一次", s.watchAfter("take 1", SUR, now, report));
+        assertFalse("这一份管线里没有的一路", s.watchAfter("take 9", "nowhere", now, report));
+
+        at(5_000);
+        host.plan(SUR);
+        declare(surround, recS);
+        claim(Holder.RECORDING);
+        settle();
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
+        at(5_300);
+        configured(surround, mirror, recS);
+        frame(surround);
+        settle();
+
+        at(ChannelScheduler.AFTERMATH_MS - 1);
+        assertTrue(reports.isEmpty());
+        at(ChannelScheduler.AFTERMATH_MS);
+        assertEquals(Arrays.asList("front gap=0 same ours=APPLY@5000"), reports);
+        assertTrue("量完了，同一路再被拿走又能排上", s.watchAfter("take 1", SUR, now, report));
     }
 
     /**
@@ -1829,6 +1871,16 @@ public class ChannelSchedulerTest {
         return t + ELAPSED_AHEAD;
     }
 
+    /** 「front gap=0 same」；中途我们自己动了它的带上是哪一步、从开始量起多久（「front gap=0 same ours=CLOSE@10000」）。 */
+    private static String othersText(List<ChannelScheduler.Other> others) {
+        List<String> parts = new ArrayList<>();
+        for (ChannelScheduler.Other other : others) {
+            parts.add(other.key + " gap=" + other.gapMs + (other.sessionChanged ? " changed" : " same")
+                    + (other.ours == null ? "" : " ours=" + other.ours + "@" + other.oursAtMs));
+        }
+        return String.join(", ", parts);
+    }
+
     private List<String> told(String prefix) {
         List<String> out = new ArrayList<>();
         for (String line : told) {
@@ -2323,21 +2375,12 @@ public class ChannelSchedulerTest {
             }
             journal.add("closeRound " + surroundKey + " | " + String.join(", ", cabinKeys)
                     + (kept.isEmpty() ? "" : " | carried " + String.join(", ", kept))
-                    + (others.isEmpty() ? "" : " | others " + others(others)));
+                    + (others.isEmpty() ? "" : " | others " + othersText(others)));
         }
 
         @Override
         public void closeAftermath(List<String> closedKeys, ChannelRules.Why why, List<ChannelScheduler.Other> others) {
-            journal.add("closeAftermath " + closedKeys + " " + why + " " + others(others));
-        }
-
-        /** 「front gap=0 same」。 */
-        private String others(List<ChannelScheduler.Other> others) {
-            List<String> parts = new ArrayList<>();
-            for (ChannelScheduler.Other other : others) {
-                parts.add(other.key + " gap=" + other.gapMs + (other.sessionChanged ? " changed" : " same"));
-            }
-            return String.join(", ", parts);
+            journal.add("closeAftermath " + closedKeys + " " + why + " " + othersText(others));
         }
 
         @Override

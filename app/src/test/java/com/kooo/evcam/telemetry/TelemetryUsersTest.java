@@ -20,9 +20,9 @@ public class TelemetryUsersTest {
     @Test
     public void theCoreAloneReadsDiscreteSignalsOnly() {
         TelemetryUsers u = new TelemetryUsers();
-        assertFalse(u.running());
+        assertFalse(u.core() || u.full());
         assertEquals(TelemetryUsers.Change.START_CORE, u.keepCore());
-        assertTrue(u.running());
+        assertTrue(u.core());
         assertFalse("核心不读浮点、不开定位", u.full());
         assertEquals("核心只登记一次", TelemetryUsers.Change.NONE, u.keepCore());
     }
@@ -41,7 +41,7 @@ public class TelemetryUsersTest {
         assertTrue("还有人要浮点", u.full());
         assertEquals(TelemetryUsers.Change.FLOATS_OFF, u.release("vehicle-info"));
         assertFalse(u.full());
-        assertTrue("核心还在：离散信号照读", u.running());
+        assertTrue("核心还在：离散信号照读", u.core());
         assertEquals(Collections.emptyList(), u.names());
     }
 
@@ -60,9 +60,9 @@ public class TelemetryUsersTest {
     public void withoutTheCoreTheLastUserStopsEverything() {
         TelemetryUsers u = new TelemetryUsers();
         assertEquals(TelemetryUsers.Change.START_FULL, u.acquire("vehicle-info"));
-        assertTrue(u.running());
+        assertTrue(u.full());
         assertEquals(TelemetryUsers.Change.STOP, u.release("vehicle-info"));
-        assertFalse(u.running());
+        assertFalse(u.full());
         assertFalse(u.core());
     }
 
@@ -74,6 +74,7 @@ public class TelemetryUsersTest {
         assertEquals(TelemetryUsers.Change.NONE, u.keepCore());
         assertTrue(u.core());
         assertEquals(TelemetryUsers.Change.FLOATS_OFF, u.release("recording"));
-        assertTrue(u.running());
+        assertFalse(u.full());
+        assertTrue("核心还在：来源照跑", u.core());
     }
 }

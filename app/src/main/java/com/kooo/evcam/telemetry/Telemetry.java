@@ -178,7 +178,8 @@ public final class Telemetry {
 
     /**
      * 车辆接口此刻连不上（{@link CarLink#FAILED}）就换一个新来源再连一次；连着的、在连的、这台车没有的不动。
-     * 每 {@link #RETRY_MS} 自己叫一次；熄屏判断在安卓亮屏、把亮屏处理完之后也叫（车机睡醒，车机服务可能刚起来）。主线程上叫。
+     * 每 {@link #RETRY_MS} 自己叫一次；熄屏判断在安卓亮屏、判那条边之前也叫（车机睡醒，车机服务可能刚起来）—— 它等连上后的
+     * 第一份读数再判（{@code ScreenState}）。主线程上叫。
      */
     public void retryLinkIfFailed() {
         String last;
@@ -188,12 +189,14 @@ public final class Telemetry {
                 return;
             }
             last = old.status();
+            // 排着的那一次再连撤掉 —— 在新来源起来之前撤：它连不上会在自己的线程上马上排下一次（carReported），
+            // 放到起来之后再撤，就可能把那一次撤掉，从此没有定时再连（审查 rev3 F3）
+            main.removeCallbacks(retry);
             // 旧的先停：它停的时候把传感器回调的去处（EcarxSource.active）清掉，新的连上后再接过去
             old.stop();
             car = new EcarxSource(this, users.full());
             car.start(app);
         }
-        main.removeCallbacks(retry);
         AppLog.i(TAG, "车辆接口再连一次（上次：" + last + "）");
     }
 

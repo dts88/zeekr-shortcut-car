@@ -229,10 +229,8 @@ public final class RecordingCoordinator {
     private ScreenState.Source darkSource;
     /** 熄屏那一刻在录（含等开录、等自动接回）。 */
     private boolean busyAtDark;
-    /** 这一段里录像中途停过几次：照表停的那一次（10 秒到点、车机要睡）不算，那一次单独记（{@link #tableStopAtMs}）。 */
-    private int stopsWhileDark;
-    /** 这一段里照表停录的那一刻（elapsedRealtime）；0 = 没有。 */
-    private long tableStopAtMs;
+    /** 这一段里录像停了几次（中途的、照表的分开数）、车机黑着醒了接着录开起来几次（{@link RecordingStops.DarkTally}）。 */
+    private final RecordingStops.DarkTally darkTally = new RecordingStops.DarkTally();
     /** 这一段里一路都不在录（等待摄像头）几次、一共多久（不含眼下还在等的这一阵，写小结时补上）。 */
     private int darkWaits;
     private long darkWaitedMs;
@@ -673,8 +671,7 @@ public final class RecordingCoordinator {
         darkSinceWallMs = System.currentTimeMillis();
         darkSource = ScreenState.source();
         busyAtDark = isRecording() || pending != null;
-        stopsWhileDark = 0;
-        tableStopAtMs = 0;
+        darkTally.reset();
         // 熄屏时已经在等待摄像头：这一阵算这一段里的一次，时长从熄屏起算（noteDarkSummary）
         darkWaits = shownView == View.WAITING ? 1 : 0;
         darkWaitedMs = 0;
@@ -910,6 +907,7 @@ public final class RecordingCoordinator {
      * （整段，带上车机睡了多久）。替代以前亮屏时那一行「亮屏：熄屏这一段结束…」（那一行只在熄屏时在录才有，哨兵模式开着、
      * 安卓一直不熄屏的那一种一行都没有）。「共」「车机睡了」用 elapsedRealtime（含深睡）减 uptime（不含深睡）；
      * 座舱放开完用相机层记的那一刻（{@link MultiCameraManager#cabinsReleasedAtElapsed}，elapsedRealtime）。
+     * 录像停、开的次数照 {@link RecordingStops.DarkTally}：中途停过、照表停录（每一次都数，第一次的时刻）、车机醒来接着录。
      *
      * @param atSleep      车机要睡时写（否则亮屏时）
      * @param withDarkEdge 车机要睡和熄屏是同一下（车辆信号读不到，安卓熄屏就是两样一起来）：座舱还没开始关，相机层这一段还没起算
@@ -924,7 +922,7 @@ public final class RecordingCoordinator {
         long waitedMs = darkWaitedMs + (shownView == View.WAITING && viewSinceMs > 0
                 ? Math.max(0L, now - Math.max(viewSinceMs, darkSinceElapsedMs)) : 0L);
         boolean recordingNow = isRecording();
-        boolean allAlong = busyAtDark && stopsWhileDark == 0 && darkWaits == 0 && tableStopAtMs == 0 && recordingNow;
+        boolean allAlong = busyAtDark && !darkTally.anyStop() && darkWaits == 0 && recordingNow;
         MultiCameraManager manager = cameraManager;
         long releasedAt = manager == null ? 0 : manager.cabinsReleasedAtElapsed();
         BlackBox.noteImportant("熄屏小结：" + clock(darkSinceWallMs) + " 起（"
@@ -935,9 +933,12 @@ public final class RecordingCoordinator {
                 + (darkWakes > 0 ? "，车机黑着醒过 " + darkWakes + " 次" : "")
                 + "；录像：" + (allAlong ? "一直在录"
                 : (busyAtDark ? "熄屏时在录" : "熄屏时没在录")
-                + (stopsWhileDark > 0 ? "，中途停过 " + stopsWhileDark + " 次（原因见上面的「录像停止原因」）" : "")
+                + (darkTally.midwayStops() > 0
+                ? "，中途停过 " + darkTally.midwayStops() + " 次（原因见上面的「录像停止原因」）" : "")
                 + (darkWaits > 0 ? "，等待摄像头 " + darkWaits + " 次共 " + waitedMs / 1000 + " 秒" : "")
-                + (tableStopAtMs > 0 ? "，熄屏后 +" + (tableStopAtMs - darkSinceElapsedMs) / 1000 + " 秒照表停录" : "")
+                + (darkTally.tableStops() > 0 ? "，照表停录 " + darkTally.tableStops() + " 次（第一次熄屏后 +"
+                + (darkTally.firstTableStopAt() - darkSinceElapsedMs) / 1000 + " 秒）" : "")
+                + (darkTally.wokeStarts() > 0 ? "，车机醒来接着录 " + darkTally.wokeStarts() + " 次" : "")
                 + "，现在" + (recordingNow ? "在录" : "没在录"))
                 + "；座舱" + (manager == null ? "：没有相机管线"
                 : withDarkEdge ? "：和环视一起按次序关（安卓熄屏就是车机要睡）"
@@ -1131,6 +1132,10 @@ public final class RecordingCoordinator {
             end(RecordingStops.Reason.START_FAILED);
             return;
         }
+        if (why == Why.WOKE && darkSinceElapsedMs > 0) {
+            // 熄屏小结：车机黑着醒了、照表接着录，真开起来的这一次
+            darkTally.wokeStarted();
+        }
         // 屏幕已经黑着才开始的录像（熄屏期间接回的那种），熄屏录制同样要拿锁
         ScreenOffRecording.onRecordingStarted(context);
         AppLog.d(TAG, "开始录制 " + cameras.size() + " 路: " + cameras);
@@ -1269,14 +1274,8 @@ public final class RecordingCoordinator {
         startedAtMs = 0;
         lastStopReason = reason;
         if (darkSinceElapsedMs > 0) {
-            // 熄屏小结：照表停的那一次（10 秒到点、车机要睡）单独记，不算「中途停过」
-            if (reason == RecordingStops.Reason.SCREEN_OFF) {
-                if (tableStopAtMs == 0) {
-                    tableStopAtMs = now;
-                }
-            } else {
-                stopsWhileDark++;
-            }
+            // 熄屏小结：照表停的（10 秒到点、车机要睡）单独数，不算「中途停过」
+            darkTally.stopped(reason, now);
         }
         // 录满一分钟说的是有一路在录满一分钟：一路都不在录（等待摄像头）、开录中的那几段不算
         budget.noteRecordingLasted(recordedMs);

@@ -6,6 +6,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.kooo.evcam.telemetry.Signal;
+import com.kooo.evcam.telemetry.Telemetry;
 
 import org.junit.Test;
 
@@ -225,5 +226,22 @@ public class ScreenTransitionsTest {
         assertTrue(r.edges.isEmpty());
         Run v = new Run(false).car(true, ACC, 0).androidOff().androidOff();
         assertEquals(Arrays.asList(DARK, SLEEPS), v.edges);
+    }
+
+    /**
+     * 等车辆接口的那一段什么时候有了着落（进程刚起来；安卓刚亮、连不上的先再连了一次，审查 rev3 F1）：读到判断就算；
+     * 还在连、核心还没登记不算；连不上、这台车机没有就只看安卓；连上了的那一下读数还是空的（连上的通知比读数早约 40 ms），
+     * 等发布出有值的那一份 —— 不然醒来那一下又只看安卓判成亮屏，连上以后再黑回去。
+     */
+    @Test
+    public void waitingForTheLinkEndsOnTheFirstVerdictOrAResult() {
+        assertTrue(ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, true, 2));
+        assertTrue(ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, false, 1));
+        assertFalse("在连", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTING, null, 0));
+        assertFalse("核心还没登记", ScreenTransitions.linkSettled(null, null, 0));
+        assertTrue("连不上：只看安卓", ScreenTransitions.linkSettled(Telemetry.CarLink.FAILED, null, 0));
+        assertTrue("这台车机没有：只看安卓", ScreenTransitions.linkSettled(Telemetry.CarLink.UNAVAILABLE, null, 0));
+        assertFalse("连上的通知先到、读数还是空的", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, null, 0));
+        assertTrue("有值的读数到了，两项都读不到：只看安卓", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, null, 3));
     }
 }

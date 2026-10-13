@@ -110,8 +110,6 @@ public class MultiCameraManager {
     private volatile boolean cabinsOpenAtDark;
     /** 在等这一段熄屏里第一轮关了座舱的那一轮关完（主线程）。 */
     private boolean awaitingCabinRelease;
-    /** 别的程序拿走一路相机之后、等着到点量环视的那几件（按被拿走的相机编号，主线程；{@link #watchSurroundAfterTake}）。 */
-    private final Map<String, Runnable> takeChecks = new HashMap<>();
 
     /**
      * 录像的代数：每次开录、每次停录都 +1（主线程上改）。录制器的回调、排着的回帖都带着开录时的那一代，
@@ -1635,7 +1633,8 @@ public class MultiCameraManager {
     /**
      * 黑匣子：几路这段时间里最长断帧多久、会话动没动 ——「环视最长断帧不到 0.2 秒、会话没动，后座舱最长断帧 3.4 秒、会话被重建过」。
      * 一路退出录像时别的路、调度开 / 改 / 救 / 关那一行、关完之后 30 秒再量的那一行、别的程序拿走一路相机之后 30 秒的那一行
-     * 都照它写（{@link ChannelScheduler.Other}），同一句话只有这一处。
+     * 都照它写（{@link ChannelScheduler.Other}），同一句话只有这一处。过一阵再量的那两行里我们中途自己动了那一路的
+     * （{@link ChannelScheduler.Other#ours}），只量到那一刻，写明「（只量到第 10.0 秒：那时我们关了它）」—— 之后的不是断帧（审查 rev3 B2）。
      */
     private static String gapsText(List<ChannelScheduler.Other> others) {
         StringBuilder sb = new StringBuilder();
@@ -1644,6 +1643,14 @@ public class MultiCameraManager {
                     .append(other.gapMs < SingleCamera.NOTABLE_GAP_MS
                             ? "最长断帧不到 " + seconds(SingleCamera.NOTABLE_GAP_MS) : "最长断帧 " + seconds(other.gapMs))
                     .append(other.sessionChanged ? "、会话被重建过" : "、会话没动");
+            if (other.ours != null) {
+                sb.append("（只量到第 ").append(seconds(other.oursAtMs)).append("：那时我们")
+                        .append(other.ours == ChannelRules.Move.CLOSE ? "关了它"
+                                : other.ours == ChannelRules.Move.APPLY ? "改了它的输出"
+                                : other.ours == ChannelRules.Move.RESCUE ? "在救它"
+                                : other.ours == ChannelRules.Move.OPEN ? "重开了它" : "动了它")
+                        .append("）");
+            }
         }
         return sb.toString();
     }
@@ -2452,7 +2459,8 @@ public class MultiCameraManager {
      * 就在拿走之后 {@link ChannelScheduler#AFTERMATH_MS} 写一行环视怎样（设计 v3 §6 L5）—— 最长断帧、会话动没动、
      * 在不在录、是不是被挡着（BLOCKED）。在不在录都写：10-11 只录环视那一晚车机拿了 6 次相机 1，环视一次没断；
      * 10-12 我们拿着相机 1 的 4 次里 3 次环视在 6–14 秒后断了 35–43 秒 —— 下一次上车要看熄屏放开座舱之后是哪一种。
-     * 同一路相机一次只等一件。
+     * 同一路相机一次只等一件。量在调度里（{@link ChannelScheduler#watchAfter}，和关完一轮之后再量的那一行同一份）：
+     * 这 30 秒里我们自己关了、改了、救了环视的，只量到那一刻、写明是我们动的 —— 不把我们自己的关写成环视断帧（审查 rev3 B2）。
      *
      * @param tookAtElapsed 拿走的那一刻（elapsedRealtime，含深睡）
      */
@@ -2463,37 +2471,28 @@ public class MultiCameraManager {
         }
         SingleCamera surround = cameras.get(CameraSlots.KEY_SURROUND);
         if (released || cameraId == null || surround == null || cameraId.equals(surround.getCameraId())
-                || !surround.holdsOrIsOpening() || takeChecks.containsKey(cameraId)) {
+                || !surround.holdsOrIsOpening()) {
             return;
         }
         long ago = Math.max(0, android.os.SystemClock.elapsedRealtime() - tookAtElapsed);
-        // 断帧记录用的是开机以来、不含深睡的钟（SingleCamera）：拿走的那一刻换过去
-        final long since = android.os.SystemClock.uptimeMillis() - ago;
-        final int generation = surround.sessionGeneration();
-        Runnable check = new Runnable() {
-            @Override
-            public void run() {
-                if (takeChecks.get(cameraId) == this) {
-                    takeChecks.remove(cameraId);
-                }
-                noteSurroundAfterTake(cameraId, surround, since, generation);
-            }
-        };
-        takeChecks.put(cameraId, check);
-        mainHandler.postDelayed(check, Math.max(0, ChannelScheduler.AFTERMATH_MS - ago));
+        // 断帧记录、调度用的是开机以来、不含深睡的钟：拿走的那一刻换过去
+        long since = android.os.SystemClock.uptimeMillis() - ago;
+        scheduler.watchAfter("take " + cameraId, CameraSlots.KEY_SURROUND, since,
+                others -> noteSurroundAfterTake(cameraId, surround, others));
     }
 
-    /** 别的程序拿走相机 {@code cameraId} 之后到点了（主线程）：环视这段时间里怎样，一行。 */
-    private void noteSurroundAfterTake(String cameraId, SingleCamera surround, long since, int generation) {
+    /**
+     * 别的程序拿走相机 {@code cameraId} 之后到点了（主线程，调度量好的那一份）：环视这段时间里怎样，一行。
+     * 环视这时已经不开着（我们关了、或者它也丢了）就写「环视已关」，不写在没在录。
+     */
+    private void noteSurroundAfterTake(String cameraId, SingleCamera surround, List<ChannelScheduler.Other> others) {
         if (released || cameras.get(CameraSlots.KEY_SURROUND) != surround) {
             return;
         }
-        List<ChannelScheduler.Other> others = new ArrayList<>();
-        others.add(new ChannelScheduler.Other(CameraSlots.KEY_SURROUND, surround.longestFrameGapSince(since),
-                surround.sessionGeneration() != generation));
         CameraTaken.Verdict mark = markOf(CameraSlots.KEY_SURROUND);
         RecordingLanes.State state = isRecording ? lanes.state(CameraSlots.KEY_SURROUND) : null;
-        String recording = !isRecording ? "没在录像"
+        String recording = !surround.holdsOrIsOpening() ? "环视已关"
+                : !isRecording ? "没在录像"
                 : state == null ? "环视不在这一次录像里"
                 : state == RecordingLanes.State.LIVE ? "环视在录" : "环视没在录";
         com.kooo.evcam.blackbox.BlackBox.noteImportant("争用：相机 " + cameraId + " 被拿走之后 "
