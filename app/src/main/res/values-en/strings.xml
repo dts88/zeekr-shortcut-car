@@ -286,9 +286,11 @@
     <string name="set_side_popup_fov_title">View width (°)</string>
     <string name="set_side_popup_fov_summary">Smaller zooms in. With Straighten picture on, the view automatically narrows near the camera image edge; high aiming angles can greatly reduce coverage</string>
     <string name="set_side_popup_yaw_title">Aim back (°)</string>
-    <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_yaw_summary">Positive turns the view towards the rear (the blind spot), negative towards the front. The direction is a guess: if it turns the wrong way, drag the other way With Straighten picture on, high angles can zoom in strongly; see the note below.</string>
     <string name="set_side_popup_pitch_title">Aim up (°)</string>
     <string name="set_side_popup_pitch_summary">Positive turns the view out towards the road further away, negative down at the car and the ground. The direction is a guess: if it turns the wrong way, drag the other way</string>
+    <string name="set_side_popup_edge_note_title">High angles zoom in</string>
+    <string name="set_side_popup_edge_note_summary">With Straighten picture on, the view automatically narrows near the camera image edge to prevent black patches. Example: in a square window, 80° Aim back + 15° Aim up with 90° View width gives about 20.5° of actual view. This shows less of the surroundings. Lower the aiming angles for a wider view. Your saved View width stays unchanged.</string>
     <string name="set_side_popup_close_delay_ms_title">Stay open after the signal (ms)</string>
     <string name="set_side_popup_close_delay_ms_summary">1000 ms = 1 second. 0 closes it as soon as the signal goes off. A stock view still closes it straight away</string>
     <string name="set_side_popup_instant_title">Instant pop-up</string>
