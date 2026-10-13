@@ -53,8 +53,8 @@
     <string name="set_rearview_width_title">Lebar tetingkap</string>
     <string name="set_rearview_height_title">Tinggi tetingkap</string>
     <string name="set_rearview_height_summary">Setiap satu boleh sehingga skrin penuh; nisbah gambar kekal dan bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
-    <string name="set_rearview_reset_title">Set semula tetingkap dan paparan</string>
-    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan dan Depan dan belakang sahaja kepada lalai, serta kembali ke pandangan belakang</string>
+    <string name="set_rearview_reset_title">Set semula tetapan Cermin super</string>
+    <string name="set_rearview_reset_summary">Memulihkan tetingkap, bingkai, pembetulan dan mod penukaran lalai, serta kembali ke pandangan belakang; mengekalkan keadaan hidup/mati</string>
     <string name="set_rearview_guide_title">Cara guna</string>
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
     <string name="rearview_guide_hint">Leret untuk tukar halaman · Ketik di luar untuk tutup</string>
@@ -937,4 +937,10 @@
     <string name="set_side_popup_replace_mirror_title">Gantikan Cermin super</string>
     <string name="set_side_popup_replace_mirror_summary">Hidup: paparkan kamera sisi sementara dalam cermin. Mati: kekalkan pandangan cermin dan buka tetingkap sisi berasingan.</string>
     <string name="msg_side_popup_unavailable">Tetingkap sisi tidak tersedia. Cuba Gantikan Cermin super apabila Cermin super dihidupkan.</string>
+    <string name="set_side_popup_reset_title">Set semula tetapan pandangan sisi</string>
+    <string name="set_side_popup_reset_summary">Memulihkan kelajuan, gambar, mod paparan, masa, saiz dan kedudukan lalai; mengekalkan keadaan hidup/mati</string>
+    <string name="msg_side_popup_reset">Tetapan pandangan sisi dipulihkan kepada lalai</string>
+    <string name="set_side_popup_rotation_left_title">Putaran imej kiri (°)</string>
+    <string name="set_side_popup_rotation_right_title">Putaran imej kanan (°)</string>
+    <string name="set_side_popup_rotation_summary">Laraskan imej senget: positif mengikut arah jam, negatif melawan arah jam. Tepi dipotong untuk memenuhi tetingkap. Digunakan dalam kedua-dua tetingkap; rakaman tidak berubah.</string>
 </resources>

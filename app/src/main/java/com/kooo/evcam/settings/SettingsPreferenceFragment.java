@@ -146,6 +146,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateStorageUsage();
         refreshRearViewSize();
+        refreshSidePopupSize();
     }
 
     // ------------------------------------------------------------------ 录制
@@ -727,6 +728,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setSidePopupInstant(value);
             com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
         });
+        bindSlider("pref_side_popup_rotation_left", -90, 90,
+                appConfig.getSidePopupRotation(com.kooo.evcam.zeekr.LaneCycle.LEFT), "°", value -> {
+                    appConfig.setSidePopupRotation(com.kooo.evcam.zeekr.LaneCycle.LEFT, value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
+        bindSlider("pref_side_popup_rotation_right", -90, 90,
+                appConfig.getSidePopupRotation(com.kooo.evcam.zeekr.LaneCycle.RIGHT), "°", value -> {
+                    appConfig.setSidePopupRotation(com.kooo.evcam.zeekr.LaneCycle.RIGHT, value);
+                    com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
+                });
         bindSlider("pref_side_popup_close_delay_ms", 0, AppConfig.SIDE_POPUP_MAX_CLOSE_DELAY_MS,
                 appConfig.getSidePopupCloseDelayMs(), "ms", value -> {
                     appConfig.setSidePopupCloseDelayMs(value);
@@ -742,6 +753,23 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setSidePopupVerticalPercent(value);
                     com.kooo.evcam.zeekr.SideViewPopupService.applyConfig();
                 });
+        onClick("pref_side_popup_reset", pref -> {
+            appConfig.resetSidePopupSettings();
+            com.kooo.evcam.zeekr.SideViewPopupService.resetConfig();
+            bindSidePopup();
+            toast(getString(R.string.msg_side_popup_reset));
+        });
+    }
+
+    private void refreshSidePopupSize() {
+        SeekBarPreference size = findPreference("pref_side_popup_size");
+        if (size != null) {
+            size.setValue(appConfig.getSidePopupSizePercent());
+        }
+        SeekBarPreference vertical = findPreference("pref_side_popup_vertical");
+        if (vertical != null) {
+            vertical.setValue(appConfig.getSidePopupVerticalPercent());
+        }
     }
 
     // ------------------------------------------------------------------ 超级后视镜
@@ -806,6 +834,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         onClick("pref_rearview_reset", pref -> {
             appConfig.resetRearViewLayout();
+            bindRearView();
             if (getContext() != null && appConfig.isRearViewEnabled()) {
                 // 重开一次让新的默认值生效
                 RearViewMirrorService.stop(getContext());

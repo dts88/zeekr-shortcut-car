@@ -70,6 +70,15 @@ Super mirror keeps its own size and position. If the head unit rejects the addit
 the side window is closed and a message suggests using Replace Super mirror. This feature
 uses the turn signals; blind-spot obstacle alerts are not yet a trigger.
 
+Use **Left image rotation** and **Right image rotation** to level a tilted side image.
+Positive angles rotate clockwise, negative counterclockwise; edges are cropped to fill the
+window. The controls apply in either window, including when Straighten picture is off, and
+do not change recordings. Each defaults to 0°; camera orientation needs on-car calibration.
+
+**Reset side-view settings** restores the default aim, speed threshold, display mode, timing,
+size and saved position. **Reset Super mirror settings** restores its window, view and switching
+modes. Both reset actions are available while the feature is off and preserve its on/off state.
+
 ### Playback
 
 Video playback shows every camera together, in sync; tap one to enlarge it, tap again to go back.

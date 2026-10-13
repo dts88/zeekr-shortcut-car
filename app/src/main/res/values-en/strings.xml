@@ -53,8 +53,8 @@
     <string name="set_rearview_width_title">Window width</string>
     <string name="set_rearview_height_title">Window height</string>
     <string name="set_rearview_height_summary">Each can go up to full screen; the picture keeps its proportions and the window shape only sets how much is visible</string>
-    <string name="set_rearview_reset_title">Reset window and view</string>
-    <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction and Front and rear only, and switches back to the rear view</string>
+    <string name="set_rearview_reset_title">Reset Super mirror settings</string>
+    <string name="set_rearview_reset_summary">Restores default window, framing, correction and switching modes, and returns to the rear view; keeps the current on/off state</string>
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="rearview_guide_hint">Swipe to turn pages · Tap outside to close</string>
@@ -960,4 +960,10 @@
     <string name="set_side_popup_replace_mirror_title">Replace Super mirror</string>
     <string name="set_side_popup_replace_mirror_summary">On: temporarily show the side camera in the existing mirror. Off: keep the mirror view and show a separate side-view pop-up.</string>
     <string name="msg_side_popup_unavailable">Side-view pop-up unavailable. Try Replace Super mirror when Super mirror is enabled.</string>
+    <string name="set_side_popup_reset_title">Reset side-view settings</string>
+    <string name="set_side_popup_reset_summary">Restores default speed, picture, display mode, timing, window size and position; keeps the current on/off state</string>
+    <string name="msg_side_popup_reset">Side-view settings restored to defaults</string>
+    <string name="set_side_popup_rotation_left_title">Left image rotation (°)</string>
+    <string name="set_side_popup_rotation_right_title">Right image rotation (°)</string>
+    <string name="set_side_popup_rotation_summary">Level a tilted image: positive clockwise, negative counterclockwise. Crops edges to fill the window. Applies in either window; recordings are unchanged.</string>
 </resources>

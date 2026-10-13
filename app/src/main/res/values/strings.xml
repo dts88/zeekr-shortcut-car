@@ -67,8 +67,8 @@
     <string name="set_rearview_width_title">窗口宽度</string>
     <string name="set_rearview_height_title">窗口高度</string>
     <string name="set_rearview_height_summary">宽度和高度均可调至全屏；画面比例不变，窗口形状只决定可见范围</string>
-    <string name="set_rearview_reset_title">重置窗口与画面</string>
-    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正和「只显示前后视」的默认值，并切回后视</string>
+    <string name="set_rearview_reset_title">重置超级后视镜设置</string>
+    <string name="set_rearview_reset_summary">恢复窗口、取景、校正和切换模式的默认值，并切回后视；保留当前开关状态</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <string name="rearview_guide_hint">左右滑动翻页 · 点击图片外关闭</string>
@@ -947,4 +947,10 @@
     <string name="set_side_popup_replace_mirror_title">替换超级后视镜</string>
     <string name="set_side_popup_replace_mirror_summary">开启时在已有后视镜窗口中临时显示侧视；关闭时保留后视镜并显示独立侧视窗口</string>
     <string name="msg_side_popup_unavailable">侧视窗口无法显示。超级后视镜开启时，可以尝试启用“替换超级后视镜”。</string>
+    <string name="set_side_popup_reset_title">重置侧视设置</string>
+    <string name="set_side_popup_reset_summary">恢复速度、画面、显示模式、时机、窗口大小和位置的默认值；保留当前开关状态</string>
+    <string name="msg_side_popup_reset">侧视设置已恢复默认</string>
+    <string name="set_side_popup_rotation_left_title">左侧画面旋转（°）</string>
+    <string name="set_side_popup_rotation_right_title">右侧画面旋转（°）</string>
+    <string name="set_side_popup_rotation_summary">调整画面倾斜；正数顺时针，负数逆时针。旋转时裁切边缘填满窗口；适用于两种窗口，不改变录像。</string>
 </resources>
