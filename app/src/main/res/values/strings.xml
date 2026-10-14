@@ -295,11 +295,11 @@
     <string name="info_read_failed">无法读取</string>
     <string name="msg_rearview_on">超级后视镜已开启：拖动两侧移动窗口，中间上下滑动调整取景</string>
     <string name="msg_rearview_reset">超级后视镜窗口与画面已重置</string>
-    <string name="set_side_popup_title">打转向灯弹侧视</string>
-    <string name="set_side_popup_summary">打转向灯时显示对应侧摄像头；可替换超级后视镜画面或另外弹窗。倒车、原厂环视或侧视显示时让路。</string>
+    <string name="set_side_popup_title">自动盲区摄像头</string>
+    <string name="set_side_popup_summary">打转向灯时显示左侧或右侧摄像头。原厂相机画面优先。</string>
     <string name="set_side_popup_speed_title">弹出所需最低车速（km/h）</string>
     <string name="set_side_popup_speed_summary">达到此车速才弹出；0 表示不限制车速。倒车、泊车辅助或原厂相机画面显示时，侧视仍会隐藏，包括低速打转向灯触发的原厂 360° 弹窗。</string>
-    <string name="msg_side_popup_on">打转向灯弹侧视已开启：打左灯看左侧、打右灯看右侧</string>
+    <string name="msg_side_popup_on">自动盲区摄像头已开启：打左灯看左侧、打右灯看右侧</string>
     <string name="set_side_popup_straighten_title">拉直画面</string>
     <string name="set_side_popup_straighten_summary">校正鱼眼并调整侧视取景，适用于已有后视镜和独立侧视窗口；不改变录像。</string>
     <string name="set_side_popup_fov_title">视野（°）</string>
@@ -946,16 +946,17 @@
     <string name="dev_tool_progress">（%1$d/%2$d）%3$s</string>
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
-    <string name="set_side_popup_replace_mirror_title">替换超级后视镜</string>
-    <string name="set_side_popup_replace_mirror_summary">开启时在已有后视镜窗口中临时显示侧视；关闭时保留后视镜并显示独立侧视窗口</string>
-    <string name="msg_side_popup_unavailable">侧视窗口无法显示。超级后视镜开启时，可以尝试启用“替换超级后视镜”。</string>
-    <string name="set_side_popup_reset_title">重置侧视设置</string>
+    <string name="set_side_popup_replace_mirror_title">超级后视镜开启时使用其窗口</string>
+    <string name="set_side_popup_replace_mirror_summary">开启：超级后视镜运行时在其窗口临时显示侧视，否则使用独立窗口。关闭：始终使用独立窗口，与后视镜同时显示。</string>
+    <string name="msg_side_popup_unavailable">盲区摄像头窗口不可用。请开启超级后视镜，并尝试开启「超级后视镜开启时使用其窗口」。</string>
+    <string name="set_side_popup_reset_title">重置盲区摄像头设置</string>
     <string name="set_side_popup_reset_summary">恢复速度、画面、显示模式、时机、窗口大小和位置的默认值；保留当前开关状态</string>
-    <string name="msg_side_popup_reset">侧视设置已恢复默认</string>
+    <string name="msg_side_popup_reset">盲区摄像头设置已恢复默认</string>
     <string name="set_side_popup_rotation_left_title">左侧画面旋转（°）</string>
     <string name="set_side_popup_rotation_right_title">右侧画面旋转（°）</string>
     <string name="set_side_popup_rotation_summary">调整画面倾斜；正数顺时针，负数逆时针。旋转时裁切边缘填满窗口；适用于两种窗口，不改变录像。</string>
     <string name="side_control_close">关闭本次侧视</string>
     <string name="side_control_expand">放大侧视窗口</string>
     <string name="side_control_restore">恢复窗口大小</string>
+    <string name="set_section_blind_spot_camera">盲区摄像头</string>
 </resources>

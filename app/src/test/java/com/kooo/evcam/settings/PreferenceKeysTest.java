@@ -15,6 +15,10 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
 /**
  * 设置界面里用到的 key，XML 里必须真有。
  *
@@ -59,6 +63,41 @@ public class PreferenceKeysTest {
         missing.removeAll(declared);
         assertTrue("这些 key 在 preferences.xml 里不存在，对应的界面会点了没反应: " + missing,
                 missing.isEmpty());
+    }
+
+    @Test
+    public void blindSpotCameraControlsAndDependenciesShareTheirOwnSection() throws Exception {
+        File moduleRoot = findModuleRoot();
+        assumeTrue("Cannot locate module sources", moduleRoot != null);
+        Element document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new File(moduleRoot, "src/main/res/xml/preferences.xml")).getDocumentElement();
+        Element sideSection = null;
+        NodeList all = document.getElementsByTagName("*");
+        Set<String> allSideKeys = new LinkedHashSet<>();
+        for (int i = 0; i < all.getLength(); i++) {
+            Element element = (Element) all.item(i);
+            String key = element.getAttribute("android:key");
+            if (key.startsWith("pref_side_popup")) {
+                allSideKeys.add(key);
+            }
+            if ("screen_blind_spot_camera".equals(key)) {
+                sideSection = element;
+            }
+        }
+        assertTrue("Independent camera section is missing", sideSection != null);
+        assertTrue("Camera section must be top-level", sideSection.getParentNode() == document);
+        assertTrue("Side controls are missing", allSideKeys.size() > 1);
+        Set<String> localKeys = new LinkedHashSet<>();
+        NodeList controls = sideSection.getElementsByTagName("*");
+        for (int i = 0; i < controls.getLength(); i++) {
+            localKeys.add(((Element) controls.item(i)).getAttribute("android:key"));
+        }
+        assertTrue("Some camera controls are outside their section", localKeys.containsAll(allSideKeys));
+        for (int i = 0; i < controls.getLength(); i++) {
+            String dependency = ((Element) controls.item(i)).getAttribute("android:dependency");
+            assertTrue("Cross-section dependency: " + dependency,
+                    dependency.isEmpty() || localKeys.contains(dependency));
+        }
     }
 
     private static Set<String> extract(File file, Pattern pattern) throws IOException {
