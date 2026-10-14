@@ -17,6 +17,7 @@ import android.view.Display;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.StorageHelper;
+import com.kooo.evcam.camera.StepStats;
 import com.kooo.evcam.screen.DisplayWatch;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.screen.VehicleScreen;
@@ -310,6 +311,223 @@ public final class DiagnosticsCollector {
         sb.append('\n');
         appendCameraAvailability(sb, context);
         appendChannel(sb);
+        appendStepStats(sb, context);
+    }
+
+    /**
+     * 相机步骤统计（项目所有者 2026-10-14：「识别前后座舱摄像头被卡住的原因或者统计」，2.11.4 R2）：最近 200 步，跨进程留着
+     * （{@code camera.StepLog}）。按相机、动作数出画面、没画面、出错、关的用时；再按哨兵、主界面在不在前、离我们上一次关它多久、
+     * 是不是车机刚放开它分开数；备选方案「关座舱时先短暂关环视」要比的那一组（R3，只记录）；最后最近 30 步。
+     * 只读那个文件，不碰调度、不建管线。
+     */
+    private static void appendStepStats(StringBuilder sb, Context context) {
+        sb.append("## 2.3.3 相机步骤统计").append('\n');
+        try {
+            sb.append(stepStatsText(com.kooo.evcam.camera.StepLog.read(context)));
+        } catch (RuntimeException e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    /** 「2.3.3 相机步骤统计」那一节的正文（纯函数，{@code DiagnosticsCollectorTest}）。 */
+    static String stepStatsText(List<StepStats.Entry> entries) {
+        StringBuilder sb = new StringBuilder();
+        if (entries.isEmpty()) {
+            return "还没有记下的步骤（2.11.4 起每结束一步记一条）\n";
+        }
+        sb.append("最近 ").append(entries.size()).append(" 步（最多 ").append(StepStats.MAX).append(" 步，跨进程留着）：")
+                .append(clock(entries.get(0).at)).append(" 到 ").append(clock(entries.get(entries.size() - 1).at))
+                .append('\n');
+        sb.append("按相机、动作：").append('\n');
+        appendGroups(sb, entries, StepStats::laneMove, null);
+        sb.append("按哨兵模式：").append('\n');
+        appendGroups(sb, entries, StepStats::laneMove, StepStats::sentryBucket);
+        sb.append("按主界面在不在前：").append('\n');
+        appendGroups(sb, entries, StepStats::laneMove, StepStats::mainBucket);
+        sb.append("按离我们上一次关它多久：").append('\n');
+        appendGroups(sb, entries, StepStats::laneMove, StepStats::sinceCloseBucket);
+        sb.append("按是不是车机刚放开它（放开以后我们还没关过它）：").append('\n');
+        appendGroups(sb, entries, StepStats::laneMove, StepStats::releaseBucket);
+        sb.append("备选方案「关座舱时先短暂关环视」要比的（只记录，没做）：座舱每一次关，按关的时候环视怎样分，关的用时、之后那一次开：")
+                .append('\n');
+        java.util.Map<String, StepStats.CloseComparison> closes = StepStats.cabinClosesBySurround(entries);
+        if (closes.isEmpty()) {
+            sb.append("  还没有座舱的关").append('\n');
+        }
+        for (java.util.Map.Entry<String, StepStats.CloseComparison> group : closes.entrySet()) {
+            StepStats.CloseComparison c = group.getValue();
+            sb.append("  环视").append(surroundText(group.getKey())).append("：").append(tallyText(StepStats.tally(c.closes)))
+                    .append("；之后那一次开 ").append(c.nextOpens).append(" 次，没画面 ").append(c.nextNoFrames).append('\n');
+        }
+        sb.append("最近 30 步（新的在前）：").append('\n');
+        for (int i = entries.size() - 1; i >= Math.max(0, entries.size() - 30); i--) {
+            sb.append("  ").append(entryText(entries.get(i))).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /** 一个维度一组一行：「  后座舱 开 · 哨兵 开：3 次：出画面 1、没画面 2、出错 0」；{@code by} 为 null 是只按相机、动作。 */
+    private static void appendGroups(StringBuilder sb, List<StepStats.Entry> entries,
+                                     java.util.function.Function<StepStats.Entry, String> lane,
+                                     java.util.function.Function<StepStats.Entry, String> by) {
+        final java.util.Map<String, List<StepStats.Entry>> groups = StepStats.groupBy(entries,
+                e -> by == null ? lane.apply(e) : lane.apply(e) + "|" + by.apply(e));
+        List<String> names = new ArrayList<>(groups.keySet());
+        // 环视、后座舱、前座舱；同一路按动作的次序；同一个动作按分组的名字
+        java.util.Collections.sort(names, (a, b) -> {
+            StepStats.Entry x = groups.get(a).get(0);
+            StepStats.Entry y = groups.get(b).get(0);
+            int c = Integer.compare(StepStats.laneRank(x), StepStats.laneRank(y));
+            if (c == 0) {
+                c = x.move.compareTo(y.move);
+            }
+            return c != 0 ? c : a.compareTo(b);
+        });
+        for (String name : names) {
+            String[] parts = name.split("\\|", 2);
+            StepStats.Entry first = groups.get(name).get(0);
+            sb.append("  ").append(laneText(first.key)).append(' ').append(moveText(first.move))
+                    .append(parts.length > 1 ? " · " + bucketText(parts[1]) : "")
+                    .append("：").append(tallyText(StepStats.tally(groups.get(name)))).append('\n');
+        }
+    }
+
+    /** 一组的数：「12 次：出画面 10、没画面 2、出错 0」；关的那几次：「关 10 次，用时中位 0.2 秒、最长 6.2 秒，超过 1 秒 1 次」。 */
+    static String tallyText(StepStats.Tally t) {
+        StringBuilder sb = new StringBuilder().append(t.count).append(" 次");
+        if (t.count > t.closes) {
+            sb.append("：出画面 ").append(t.framed).append("、没画面 ").append(t.noFrames).append("、出错 ").append(t.errors);
+        }
+        if (t.closes > 0) {
+            sb.append(t.count > t.closes ? "；" : "：").append("关 ").append(t.closes).append(" 次");
+            if (t.closeMedianMs >= 0) {
+                sb.append("，用时中位 ").append(secondsText(t.closeMedianMs)).append("、最长 ").append(secondsText(t.closeMaxMs));
+            }
+            sb.append("，超过 ").append(StepStats.SLOW_CLOSE_MS / 1000).append(" 秒 ").append(t.slowCloses).append(" 次");
+            if (t.closeTimedOut > 0) {
+                sb.append("（到点还没关完 ").append(t.closeTimedOut).append(" 次）");
+            }
+        }
+        return sb.toString();
+    }
+
+    /** 分组的名字（{@code StepStats} 的那几个分组记号），中文。 */
+    static String bucketText(String bucket) {
+        switch (bucket) {
+            case "sentry:0":
+                return "哨兵 关";
+            case "sentry:1":
+                return "哨兵 开";
+            case "sentry:2":
+                return "哨兵 布防";
+            case "sentry:?":
+                return "哨兵 读不到";
+            case "main:yes":
+                return "主界面在前";
+            case "main:no":
+                return "主界面在后台";
+            case "main:?":
+                return "主界面 不知道";
+            case "close:none":
+                return "这一次进程里没关过它";
+            case "close:<3":
+                return "离上次关不到 3 秒";
+            case "close:3-6":
+                return "离上次关 3–6 秒";
+            case "close:6-30":
+                return "离上次关 6–30 秒";
+            case "close:>30":
+                return "离上次关 30 秒以上";
+            case "release:yes":
+                return "车机刚放开";
+            case "release:no":
+                return "不是车机刚放开";
+            default:
+                return bucket;
+        }
+    }
+
+    /** 一步一行：「10-13 20:10:30 后座舱 开 → 15 秒没画面（一个都没回…）；哨兵 1、主界面后台、离上次关 4.5 秒、车机放开后 3.0 秒」。 */
+    static String entryText(StepStats.Entry e) {
+        StringBuilder sb = new StringBuilder().append(clock(e.at)).append(' ').append(laneText(e.key)).append(' ')
+                .append(moveText(e.move)).append(" → ");
+        switch (e.result) {
+            case FRAMED:
+                sb.append("出画面 ").append(secondsText(e.ms));
+                break;
+            case NO_FRAMES:
+                sb.append(e.ms / 1000).append(" 秒没画面");
+                break;
+            case ERROR:
+                sb.append("出事（").append(e.error == null ? "?" : e.error).append("），做了 ").append(secondsText(e.ms));
+                break;
+            case CLOSED:
+                sb.append("关了 ").append(secondsText(e.ms));
+                break;
+            default:
+                sb.append(secondsText(e.ms)).append(" 还没关完");
+                break;
+        }
+        if (e.counts != null) {
+            sb.append("（").append(com.kooo.evcam.camera.SingleCamera.kindText(e.counts)).append("：开始 ").append(e.starts)
+                    .append("、结果 ").append(e.results).append("、失败 ").append(e.failures).append("、丢缓冲 ")
+                    .append(e.lost).append('）');
+        }
+        if (e.oldCloseMs >= 0) {
+            sb.append("，旧设备关了 ").append(secondsText(e.oldCloseMs));
+        }
+        sb.append("；哨兵 ").append(e.sentry < 0 ? "?" : String.valueOf(e.sentry))
+                .append("、主界面").append(e.mainForeground < 0 ? "?" : e.mainForeground == 1 ? "在前" : "后台")
+                .append("、离上次关 ").append(e.sinceCloseMs < 0 ? "没关过" : secondsText(e.sinceCloseMs));
+        if (e.closeMs >= 0) {
+            sb.append("（那次关了 ").append(secondsText(e.closeMs)).append('）');
+        }
+        if (e.releasedAgoMs >= 0) {
+            sb.append("、车机拿过 ").append(duration(e.heldMs)).append("、放开 ").append(secondsText(e.releasedAgoMs)).append("前");
+        }
+        if (e.surround != null) {
+            sb.append("、环视").append(surroundText(e.surround));
+            if (e.surroundGapMs >= 0) {
+                sb.append("（这段时间最长断帧 ").append(secondsText(e.surroundGapMs))
+                        .append(e.surroundChanged == 1 ? "、会话被重建过" : "、会话没动").append('）');
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String laneText(String key) {
+        return com.kooo.evcam.camera.MultiCameraManager.roleName(key);
+    }
+
+    private static String moveText(StepStats.Move move) {
+        switch (move) {
+            case OPEN:
+                return "开";
+            case REOPEN:
+                return "救援重开";
+            case REBUILD:
+                return "救援重建";
+            case APPLY:
+                return "改输出";
+            default:
+                return "关";
+        }
+    }
+
+    private static String surroundText(String state) {
+        if ("STREAMING".equals(state)) {
+            return "在出画面";
+        }
+        if ("OPEN".equals(state)) {
+            return "开着、没在出画面";
+        }
+        return "CLOSED".equals(state) ? "关着" : "不知道";
+    }
+
+    /** 「0.3 秒」。 */
+    private static String secondsText(long ms) {
+        return String.format(Locale.US, "%.1f 秒", Math.max(0, ms) / 1000f);
     }
 
     /**

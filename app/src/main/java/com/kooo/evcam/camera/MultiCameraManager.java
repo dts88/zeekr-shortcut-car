@@ -2051,10 +2051,16 @@ public class MultiCameraManager {
      * 主界面这一格的画布要被系统收走了（onSurfaceTextureDestroyed，主线程；主界面销毁时视图从窗口上摘下来那一下）：
      * 撤回预览，画布由管线留着（大纲 §7.6，见 {@link #keptCanvases}、{@link #keepCanvas}）。
      *
-     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：管线没了、没有这一路，调用方照常让它放
+     * <p>交给会话里还带着它的那一份管线（{@link #ownerOf}）：退出、换车型时那一份已经放了、它的调度还在按次序关，
+     * 画布多半还在它的会话里 —— 以前这时照常让 TextureView 放，关到一半的会话里多一个死输出（2.11.4 R1 审查）。</p>
+     *
+     * @param current 调用方手里的那一份（可能是 null、可能已经放了）
+     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：哪一份都不带着它、也没有这一路，调用方照常让它放
      */
-    public boolean keepPreviewCanvas(String cameraKey, android.graphics.SurfaceTexture texture) {
-        return keepCanvas(ChannelRules.Kind.PREVIEW, cameraKey, texture);
+    public static boolean keepPreviewCanvas(MultiCameraManager current, String cameraKey,
+                                            android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.PREVIEW, cameraKey, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.PREVIEW, cameraKey, texture);
     }
 
     /**
@@ -2066,10 +2072,34 @@ public class MultiCameraManager {
      * （改输出）、或者关环视时一起摘，摘掉以后才放。代价是这期间环视还往一块没人显示的画布送帧，和贴边、熄屏时留着的一样
      * （大纲 §6 风险 3）。</p>
      *
-     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：管线里没有环视那一路，调用方照常让它放
+     * @param current 调用方手里的那一份（可能是 null、可能已经放了）；交给哪一份照 {@link #ownerOf}
+     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：哪一份都不带着它、也没有环视那一路，调用方照常让它放
      */
-    public boolean keepMirrorCanvas(android.graphics.SurfaceTexture texture) {
-        return keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    public static boolean keepMirrorCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    }
+
+    /**
+     * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜的画布
+     * （{@link #ownerOf}）。弱引用；放的那一下（哪个线程都可能）写，主线程上读。
+     */
+    private static volatile java.lang.ref.WeakReference<MultiCameraManager> lastReleased =
+            new java.lang.ref.WeakReference<>(null);
+
+    /**
+     * 一块画布要被系统收走时，交给哪一份管线留着（R1，项目所有者 2026-10-14：动相机的都归通道调度管 —— 会话里还带着的画布，
+     * 不许由别人放掉，只交给带着它的那一份调度，等它离开会话再放）：最近放了、调度还在关、会话里正带着它的那一份优先；
+     * 否则就是 {@code current}（可能是 null）。主线程。
+     */
+    static MultiCameraManager ownerOf(MultiCameraManager current, ChannelRules.Kind kind, String cameraKey,
+                                      android.graphics.SurfaceTexture texture) {
+        MultiCameraManager released = lastReleased.get();
+        if (released != null && released != current && texture != null
+                && released.scheduler.sessionCarries(cameraKey, new ChannelRules.Out(kind, texture))) {
+            return released;
+        }
+        return current;
     }
 
     /**
@@ -2078,14 +2108,20 @@ public class MultiCameraManager {
      * <p>先摘掉旧视图挂在画布上的出帧监听 —— 那个监听拿着旧视图（连同销毁了的主界面、退出了的后视镜服务），新视图接回时
      * 会挂它自己的；再撤回这一种输出的声明 —— 撤回不碰会话：画布还活着，就是「留着的输出」，照「减输出能拖就拖」留在会话里；
      * 最后交给调度，等它离开会话再放。</p>
+     *
+     * <p>这一份已经放了（退出、换车型）：各路的相机对象已经交给调度（{@link #cameras} 清了），会话里还带着这块画布就照样交给调度 ——
+     * 它随相机关了才放（2.11.4 R1）；不带着的照常让 TextureView 放。</p>
      */
     private boolean keepCanvas(ChannelRules.Kind kind, String cameraKey, android.graphics.SurfaceTexture texture) {
+        if (texture == null || texture.isReleased()) {
+            return false;
+        }
         SingleCamera camera = cameras.get(cameraKey);
-        if (camera == null || texture == null || texture.isReleased()) {
+        if (camera == null && !scheduler.sessionCarries(cameraKey, new ChannelRules.Out(kind, texture))) {
             return false;
         }
         texture.setOnFrameAvailableListener(null);
-        boolean withdrawn = withdrawCanvas(camera, kind, texture);
+        boolean withdrawn = camera != null && withdrawCanvas(camera, kind, texture);
         android.graphics.SurfaceTexture older = keptOf(kind).put(cameraKey, texture);
         if (older != null && older != texture) {
             // 上一块留着的还没人接回就又来一块（新界面、新窗口没接回它，自己建了画布）：那一块不再等人接回，
@@ -2098,7 +2134,8 @@ public class MultiCameraManager {
             scheduler.wake();
         }
         AppLog.d(TAG, kind + " canvas for " + cameraKey + " kept by the pipeline (withdrawn=" + withdrawn
-                + ", in session=" + camera.sessionOutputs().carries(out) + ")");
+                + ", in session=" + scheduler.sessionCarries(cameraKey, out) + (released ? ", released pipeline" : "")
+                + ")");
         return true;
     }
 
@@ -2968,6 +3005,21 @@ public class MultiCameraManager {
         }
 
         @Override
+        public long closingSince() {
+            return camera.closingSince();
+        }
+
+        @Override
+        public SingleCamera.LastClose lastClose() {
+            return camera.lastClose();
+        }
+
+        @Override
+        public SessionCounts.Snapshot sessionCounts() {
+            return camera.sessionCounts();
+        }
+
+        @Override
         public String describeBusy() {
             return camera.busyKinds();
         }
@@ -3120,6 +3172,26 @@ public class MultiCameraManager {
         @Override
         public ChannelRules.RecordPrep recordPrep(String key) {
             return recordPrepOf(key);
+        }
+
+        /**
+         * 车上的几样事实（ChannelScheduler.Vehicle）：哨兵原值读车辆信号那一份快照，点火 / 主驾门 / 屏幕电源事件多久以前变过读
+         * {@link com.kooo.evcam.telemetry.SignalAges}，进程的重要性读监测线程缓存的 —— 都不进车辆接口、不进系统服务（主线程）。
+         */
+        @Override
+        public ChannelScheduler.Vehicle vehicle() {
+            try {
+                com.kooo.evcam.telemetry.Readings r = com.kooo.evcam.telemetry.Telemetry.get().readings();
+                long now = android.os.SystemClock.elapsedRealtime();
+                return new ChannelScheduler.Vehicle(r.code(com.kooo.evcam.telemetry.Signal.SENTRY_MODE),
+                        com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.IGNITION, now),
+                        com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.DOOR_DRIVER, now),
+                        com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.SCREEN_POWER_EVENT, now),
+                        StallWatch.importance());
+            } catch (RuntimeException e) {
+                AppLog.w(TAG, "vehicle facts unavailable: " + e);
+                return ChannelScheduler.Vehicle.UNKNOWN;
+            }
         }
 
         @Override
@@ -3327,14 +3399,33 @@ public class MultiCameraManager {
                     : (ChannelRules.RECORD_OUTPUT_WAIT_MS / 1000) + " 秒还没好，先开"));
         }
 
+        /**
+         * 开、改输出、救那一行。出了画面的格式从 2.11 起没变（旧的分析脚本照样读）；15 秒没出画面的带上配好没有、配好以来相机回了什么
+         * （SingleCamera.countsText：HAL 一个都没回 / 我们的输出接不住 / 开始了没结果）；这一步里出了事的（开不起来、丢了）
+         * 2.11.4 起也写一行：做了多久、什么时候开始的、怎么没做完（项目所有者 2026-10-14 批准的诊断，第 1a 项）。
+         */
         @Override
         public void stepEnded(ChannelScheduler.StepReport r) {
             String name = roleName(r.key);
-            String result = r.timedOut
-                    ? (ChannelRules.STEP_MAX_MS / 1000) + " 秒没出画面" + (r.move == ChannelRules.Move.OPEN
-                    ? "，先往下走（由救援接手）" : "（由救援接手）")
-                    : (r.configuredMs >= 0 && r.move != ChannelRules.Move.OPEN ? "配好 " + seconds(r.configuredMs) + "、" : "")
-                    + "出画面 " + seconds(Math.max(0, r.frameMs));
+            String result;
+            if (r.failure != null) {
+                result = "没做完：" + (r.failure.origin == ChannelRules.Failure.Origin.LOSS
+                        ? "这一步里丢了（" + lossText(r.failure.reason) + "）"
+                        : "开不起来（" + openFailText(r.failure.reason) + "）")
+                        + "，做了 " + seconds(r.durationMs) + "（" + wallClock(r.startedAt) + " 开始）"
+                        + (r.configuredMs >= 0 ? "，配好过（" + seconds(r.configuredMs) + "）" : "");
+            } else if (r.timedOut) {
+                result = (ChannelRules.STEP_MAX_MS / 1000) + " 秒没出画面" + (r.move == ChannelRules.Move.OPEN
+                        ? "，先往下走（由救援接手）" : "（由救援接手）")
+                        + "；" + (r.configuredMs >= 0 ? "配好 " + seconds(r.configuredMs) : "没配好");
+            } else {
+                result = (r.configuredMs >= 0 && r.move != ChannelRules.Move.OPEN
+                        ? "配好 " + seconds(r.configuredMs) + "、" : "")
+                        + "出画面 " + seconds(Math.max(0, r.frameMs));
+            }
+            if (r.counts != null && (r.failure != null || r.timedOut)) {
+                result += "；" + SingleCamera.countsText(r.counts);
+            }
             String line;
             switch (r.move) {
                 case OPEN:
@@ -3357,6 +3448,81 @@ public class MultiCameraManager {
                     break;
             }
             com.kooo.evcam.blackbox.BlackBox.noteImportant(line + othersText(r.others));
+        }
+
+        /**
+         * 开座舱（开、救援的重开）那一刻的情形，一行（项目所有者 2026-10-14 批准的诊断，2.11.4 第 1a 项）：
+         * 「通道：开 后座舱 时的情形：哨兵 1（开）；点火 0.2 秒前变过、主驾门 4.6 秒前变过、屏幕电源事件 0.1 秒前变过；主界面在后台（importance 125）；
+         * 相机服务 4.5 秒前说空闲（我们引起的）；我们上一次关它 4.5 秒前、关了 0.2 秒；车机拿过它 18 分 47 秒、3.0 秒前放开；环视在出画面」。
+         * 只给座舱写：两次一帧不出的都是后座舱，要攒的是座舱的样本（环视的情形照样进相机步骤统计）。
+         */
+        @Override
+        public void opening(ChannelScheduler.StepContext c) {
+            if (CameraSlots.KEY_SURROUND.equals(c.key)) {
+                return;
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + (c.move == ChannelRules.Move.RESCUE ? "救" : "开") + " "
+                    + roleName(c.key) + " 时的情形：" + contextText(c));
+        }
+
+        /** 开座舱那一行「时的情形：」后面那一段。 */
+        private String contextText(ChannelScheduler.StepContext c) {
+            ChannelScheduler.Vehicle v = c.vehicle;
+            StringBuilder sb = new StringBuilder("哨兵 ").append(v.sentry == null ? "读不到"
+                    : v.sentry + (v.sentry == 0 ? "（关）" : v.sentry == 1 ? "（开）" : v.sentry == 2 ? "（布防）" : ""));
+            sb.append("；点火").append(changedText(v.sinceIgnitionMs)).append("、主驾门").append(changedText(v.sinceDoorMs))
+                    .append("、屏幕电源事件").append(changedText(v.sinceScreenEventMs));
+            sb.append("；主界面").append(c.mainForeground ? "在前" : "在后台")
+                    .append("（importance ").append(v.importance < 0 ? "?" : String.valueOf(v.importance)).append('）');
+            sb.append("；相机服务").append(c.wordAgoMs < 0 ? "没说过它"
+                    : " " + duration(c.wordAgoMs) + "前说" + (c.wordAbsent ? "不在" : Boolean.TRUE.equals(c.wordFree)
+                    ? "空闲" : Boolean.FALSE.equals(c.wordFree) ? "被占用" : "?") + (c.wordOurs ? "（我们引起的）" : "（别人引起的）"));
+            sb.append("；我们").append(c.sinceCloseMs < 0 ? "这一次进程里没关过它"
+                    : "上一次关它 " + duration(c.sinceCloseMs) + "前、关了 " + seconds(c.closeMs));
+            if (c.heldMs >= 0) {
+                sb.append("；车机拿过它 ").append(duration(c.heldMs)).append("、").append(duration(c.releasedAgoMs)).append("前放开");
+            }
+            if (c.surround != null) {
+                sb.append("；环视").append(c.surround == ChannelScheduler.SurroundState.STREAMING ? "在出画面"
+                        : c.surround == ChannelScheduler.SurroundState.OPEN ? "开着、没在出画面" : "关着");
+            }
+            return sb.toString();
+        }
+
+        /** 「 0.2 秒前变过」；进程起来以后没见它变过：「起来以后没变过」。 */
+        private String changedText(long agoMs) {
+            return agoMs < 0 ? "起来以后没变过" : " " + duration(agoMs) + "前变过";
+        }
+
+        /**
+         * 一步结束了：相机步骤统计记一条（{@link StepLog}，应用目录，最近 200 条；诊断报告「2.3.3 相机步骤统计」读）。
+         * 不写黑匣子 —— 那一步自己的那一行另有。写在 StepLog 自己的线程上，主线程不碰盘。
+         */
+        @Override
+        public void recorded(ChannelScheduler.StepRecord r) {
+            ChannelScheduler.StepContext c = r.context;
+            ChannelScheduler.Vehicle v = c.vehicle;
+            StepStats.Builder b = new StepStats.Builder()
+                    .step(System.currentTimeMillis(), c.key, c.cameraId, r.move, r.result, r.ms)
+                    .configured(r.configuredMs)
+                    .error(r.reason == null ? null : r.reason.source + (r.reason.code == 0 ? "" : ":" + r.reason.code))
+                    .counts(r.counts)
+                    .oldClose(r.oldCloseMs)
+                    .vehicle(v.sentry, v.sinceIgnitionMs, v.sinceDoorMs, v.sinceScreenEventMs, v.importance)
+                    .main(c.mainForeground)
+                    .lastClose(c.sinceCloseMs, c.closeMs)
+                    .released(c.heldMs, c.releasedAgoMs)
+                    .word(c.wordAgoMs, c.wordAgoMs < 0 ? null : c.wordOurs)
+                    .surround(c.surround == null ? null : c.surround.name(),
+                            r.surround == null ? -1 : r.surround.gapMs,
+                            r.surround == null ? null : r.surround.sessionChanged);
+            StepLog.append(context, b.build());
+        }
+
+        /** 调度的钟（uptime）上的一刻换成墙上时钟「20:10:30.918」，和黑匣子每行开头对得上。 */
+        private String wallClock(long uptimeMs) {
+            long wall = System.currentTimeMillis() - (android.os.SystemClock.uptimeMillis() - uptimeMs);
+            return new SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(new Date(wall));
         }
 
         @Override
@@ -4792,6 +4958,8 @@ public class MultiCameraManager {
      */
     public void release() {
         released = true;
+        // 调度还要按次序关一阵：这期间被系统收走的画布交给这一份（ownerOf），等它离开会话再放
+        lastReleased = new java.lang.ref.WeakReference<>(this);
         // 登记表的监听只在还是自己时才摘：换车型时旧的这份晚 release，不能把新那份接上的监听摘了
         CameraNeeds.current().clearListener(needsListener);
         com.kooo.evcam.screen.ScreenState.removeListener(screenWake);

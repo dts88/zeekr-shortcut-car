@@ -491,13 +491,17 @@ public class ChannelRulesTest {
         assertEquals(ChannelRules.CLOSE_CABINS_MAX_MS, d.maxMs);
     }
 
-    /** 环视关卡住了：10 秒到点不再等它，接着关座舱。 */
+    /**
+     * 环视关卡住了：10 秒到点不再等它，接着关座舱。相机层还报着它在关（closingSince）也一样 —— 我们按次序关的那一步照 §二.2 的封顶，
+     * 「在关一个设备就是在途」（2.11.4 第 1c 项）不管它（{@link #aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut}）。
+     */
     @Test
     public void aStuckSurroundCloseStopsHoldingTheCabinsAfterTenSeconds() {
         w.foregroundService = false;
         streamingAll();
         Decision d = round();
         startOnly(d);
+        assertTrue("相机层登记着在关", surround.closingSince != 0);
         at(ChannelRules.CLOSE_SURROUND_MAX_MS - 1);
         assertEquals(Outcome.RUNNING, ChannelRules.outcome(w));
         assertWait(Why.STEP, SUR, round());
@@ -1458,6 +1462,177 @@ public class ChannelRulesTest {
         assertEquals(Move.RESCUE, d.move);
         assertEquals(Rescue.REOPEN, d.rescue);
         assertEquals(1, d.attempt);
+
+        // 缺了要的输出也一样：不改输出，第一次救就重开、带上它（2.11.4 第 1d 项）
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        surround.declared.add(recS);
+        at(CameraLiveness.RETRY_GAP_MS);
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(set(mirror, recS), d.outputs);
+        assertEquals(0, count(Move.APPLY));
+    }
+
+    // ================================================================= 本会话没出过画面的不改输出（2.11.4 第 1d 项）
+
+    /**
+     * 10-13 20:10 的回放（项目所有者 2026-10-14 批准：本会话没出过画面的，不改输出、不摘死输出；由救援重开时带上现在要的输出）：
+     * 后座舱只为录像开（主界面在后台），配好了、一帧不出；这 15 秒里主界面回到前台，要预览了。到点先开排在后面的前座舱，
+     * 再救后座舱：第 2 次、重开、带着预览和录像 —— 不在一帧不出的会话上改输出（那一下卡在 waitUntilIdle 4.8 秒、报错 4、
+     * 再关 6.2 秒，2.11.2 实测；10-12 20:04 环视、哨兵关着时也一样）。
+     */
+    @Test
+    public void replay1013_aSessionThatNeverFramedIsReopenedWithTheOutputsWantedNowNotReconfigured() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        rear.declared.add(recR);
+        front.declared.add(recF);
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(set(recR), d.outputs);
+        startOnly(d);
+        at(100);
+        opened(rear, d.outputs);   // 配好了，一帧不出
+        at(6_700);
+        claim(Holder.PREVIEW);     // 主界面回到前台：两路座舱要预览（环视的画布这里不声明，免得它也改一次输出）
+        rear.declared.add(pvR);
+        front.declared.add(pvF);
+        assertWait(Why.STEP, REAR, round());
+
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;   // 配好以来一点进展都没有
+        at(ChannelRules.STEP_MAX_MS);
+        d = round();
+        assertEquals("先往下走：排在后面的前座舱先开", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+        assertEquals(set(pvF, recF), d.outputs);
+        assertEquals("开那一步到点：后座舱算第 1 次", 1, rear.ladder.attempts());
+        perform(d);
+
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(2, d.attempt);
+        assertEquals("重开带上现在要的输出", set(pvR, recR), d.outputs);
+        assertEquals("一帧不出的会话不改输出", 0, count(Move.APPLY));
+    }
+
+    /** 本会话没出过画面的那一路，会话里的死输出也不摘：留给救援的重开丢掉（重开只带活着的、要的）。别的路照常。 */
+    @Test
+    public void aDeadOutputOnASessionThatNeverFramedIsLeftForTheReopenToDrop() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(front, pvF);
+        rear.declared.add(pvR);
+        Decision d = round();
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        startOnly(d);
+        at(100);
+        opened(rear, d.outputs);   // 配好了，一帧不出
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        at(ChannelRules.STEP_MAX_MS);
+        // 主界面换了一块画布：旧的那一块被系统收走（会话里那个死了），新的声明了
+        rear.dead.add(pvR);
+        rear.declared.remove(pvR);
+        Out pvR2 = new Out(Kind.PREVIEW, "preview-1b");
+        rear.declared.add(pvR2);
+        d = round();
+        assertEquals("不摘死输出，直接救", Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals("重开带新画布、丢掉死的", set(pvR2), d.outputs);
+        assertEquals(0, count(Move.APPLY));
+    }
+
+    /** 第一帧晚到了（开那一步已经到点）：本会话出过画面了，缺的输出照常由改输出加上，不重开。 */
+    @Test
+    public void aLateFirstFrameMakesTheSessionReconfigurableAgain() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(front, pvF);
+        rear.device = Device.OPEN;
+        rear.deviceSince = w.now;
+        configured(rear, set(Out.SINK));   // 只为拍照开着的那种：带出帧口，配好了，还没出过画面
+        rear.declared.add(pvR);
+        assertEquals("没出过画面：不改输出，也还不到救的时候", Move.IDLE, round().move);
+        at(3_000);
+        frame(rear);
+        Decision d = round();
+        assertEquals(Move.APPLY, d.move);
+        assertEquals(Why.MISSING, d.why);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(set(pvR), d.added);
+        assertEquals(set(Out.SINK), d.removed);
+    }
+
+    // ================================================================= 在关的设备是在途（2.11.4 第 1c 项）
+
+    /**
+     * 救援的重开那一步 15 秒到点、旧设备还在关（相机层报着在关）：照样是在途，别的路一步都不动（项目所有者 2026-10-14 批准：
+     * 在关旧设备的相机是在途，不管它属于哪一步，到点也不放过，封顶 60 秒 —— 和丢了之后的那一次关同一条规矩）。10-13 19:55:29
+     * 那一次关了 14.0 秒，离到点只差 1 秒；2.10.x 的强制重开关到过 21.4 秒。关完了、开新设备那一下是一个新动作，照常挡着；开好了别的路才动。
+     */
+    @Test
+    public void aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        w.recordPlan.add(REAR);
+        streaming(surround, recS);
+        rear.declared.add(recR);
+        rear.device = Device.OPEN;
+        rear.deviceSince = w.now;
+        configured(rear, set(recR));   // 配好了，一帧不出
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        startOnly(d);
+        // 相机层（SingleCamera.reopenWith）：旧设备从字段上摘下来、登记在关，关完才开新的
+        rear.closingSince = w.now;
+        rear.session.clear();
+        rear.sessionSince = 0;
+
+        // 这期间前座舱也要了：它排着
+        w.recordPlan.add(FRONT);
+        front.declared.add(recF);
+        assertWait(Why.STEP, REAR, round());
+        at(ChannelRules.STEP_MAX_MS);
+        d = round();
+        assertWait(Why.BUSY, REAR, d);
+        assertEquals(ChannelRules.IN_FLIGHT_MAX_MS - ChannelRules.STEP_MAX_MS, d.ms);
+        at(ChannelRules.STEP_MAX_MS + 5_000);
+        assertWait(Why.BUSY, REAR, round());
+        assertEquals("旧设备还在关：前座舱不开", 1, done.size());
+
+        // 旧设备关完了（20.0 秒），开新设备那一下上路：一个新动作，照常挡着
+        at(20_000);
+        rear.closingSince = 0;
+        rear.busySince = w.now;
+        assertWait(Why.BUSY, REAR, round());
+        at(20_300);
+        opened(rear, set(recR));
+        frame(rear);
+        d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+    }
+
+    /** 在关的设备一直关不完：最多挡 60 秒（在途封顶），之后别的路照常动。 */
+    @Test
+    public void anOldDeviceThatNeverFinishesClosingStopsHoldingAfterSixtySeconds() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        front.declared.add(pvF);
+        rear.closingSince = w.now;   // 晚到的设备在就地关（上一轮的相机线程上）
+        assertWait(Why.BUSY, REAR, round());
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertWait(Why.BUSY, REAR, round());
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
     }
 
     @Test
@@ -2023,6 +2198,7 @@ public class ChannelRulesTest {
             } else if (d.move == Move.CLOSE) {
                 lane.device = Device.CLOSING;
                 lane.deviceSince = w.now;
+                lane.closingSince = w.now;   // 照 SingleCamera.closeCamera：关那一下当场登记在关
             }
         }
     }
@@ -2055,6 +2231,7 @@ public class ChannelRulesTest {
         lane.device = Device.CLOSED;
         lane.deviceSince = w.now;
         lane.busySince = 0;
+        lane.closingSince = 0;
         lane.session.clear();
         lane.dead.clear();
         lane.sessionSince = 0;
