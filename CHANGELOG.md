@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.4-alpha] - 2026-10-14
+
+- A camera that opens without delivering frames is reopened instead of reconfigured.
+- While any camera is still closing, no other camera step starts.
+- Removed an unneeded 3-second wait before recovering a camera.
+- Photos and exit no longer act on a camera outside the camera scheduler.
+- Diagnostics: a camera that opens without frames is classified in the black box; the report adds camera step statistics.
+
 ## [2.11.3-alpha] - 2026-10-13
 
 - Opening a door within 30 seconds of the screen going off no longer stops and restarts the cabin cameras.
