@@ -73,8 +73,9 @@ import java.util.function.Supplier;
  *
  * <h3>不做什么</h3>
  *
- * <p><b>只记录，不修复。</b>自动恢复会把证据抹掉；而且 {@code SingleCamera} 里已经有一套
- * 按出帧结果触发的恢复（重建会话、重开相机），这里再动手只会和它打架。</p>
+ * <p><b>只记录，不修复。</b>自动恢复会把证据抹掉；而且动相机的只有通道调度一个地方（{@link ChannelScheduler}：
+ * 救援按出帧判、重建会话或重开相机；2.10.10 起 SingleCamera 自己不再重连），这里再动手只会和它打架
+ * （项目所有者 2026-10-14 R1 审查：这里一个相机动作都没有，只读、只写报告和黑匣子）。</p>
  *
  * <p>报告写在应用私有目录的 {@code stall/} 下，重启后还在。「保存日志」和诊断报告都会带上。
  * 报告是写给维护者看的，不做翻译。</p>
@@ -222,6 +223,36 @@ public final class StallWatch {
         return foreground;
     }
 
+    /** 进程的重要性多久读一次（监测线程上读，{@link #refreshImportance}）。 */
+    private static final long IMPORTANCE_EVERY_MS = 2_000L;
+    /** 最近一次读到的进程重要性（{@code RunningAppProcessInfo.importance}）；-1 = 还没读到。 */
+    private static volatile int importance = -1;
+    /** 上一次读的时刻；只在监测线程上读写。 */
+    private static long importanceReadAt = Long.MIN_VALUE / 2;
+
+    /**
+     * 进程此刻的重要性（相机服务按它排优先级），缓存的：监测线程每 2 秒读一次。开座舱那一行、相机步骤统计在主线程上读它
+     * （2.11.4，项目所有者 2026-10-14 批准的诊断）—— 主线程不为一行诊断进系统服务。-1 = 还没读到。
+     */
+    public static int importance() {
+        return importance;
+    }
+
+    /** 到点就读一次进程的重要性（监测线程）。读不到不改上一次的值。 */
+    private static void refreshImportance(long now) {
+        if (now - importanceReadAt < IMPORTANCE_EVERY_MS) {
+            return;
+        }
+        importanceReadAt = now;
+        try {
+            ActivityManager.RunningAppProcessInfo info = new ActivityManager.RunningAppProcessInfo();
+            ActivityManager.getMyMemoryState(info);
+            importance = info.importance;
+        } catch (Throwable t) {
+            AppLog.d(TAG, "importance unavailable: " + t);
+        }
+    }
+
     public static void setForeground(boolean value) {
         if (foreground != value) {
             foreground = value;
@@ -333,6 +364,7 @@ public final class StallWatch {
         } catch (Throwable t) {
             AppLog.w(TAG, "check failed: " + t);
         }
+        refreshImportance(now());
         Handler handler = watchHandler;
         if (handler != null) {
             handler.postDelayed(TICK, isActive() ? TICK_ACTIVE_MS : TICK_IDLE_MS);
@@ -912,7 +944,11 @@ public final class StallWatch {
     }
 
     /**
-     * 卡在哪：栈顶三帧，再加上第一帧我们自己的代码（栈顶多半是 binder 调用，看不出是谁发起的）。
+     * 卡在哪：栈顶三帧，再加上下面每一帧我们自己的代码（栈顶多半是 binder 调用，看不出是谁发起的）。中间隔着别人的帧写「 ... 」，
+     * 挨着的写「 <- 」。
+     *
+     * <p>以前只带第一帧我们自己的代码（2.11.4 起全带，项目所有者 2026-10-14 批准的诊断）：10-13 那一次相机线程卡在
+     * {@code configureSession} 里，是改输出、救援重建、还是开好之后建会话，只看那一帧分不出 —— 只能事后拿关相机小结的账倒推。</p>
      */
     static String whereStuck(StackTraceElement[] stack) {
         if (stack == null || stack.length == 0) {
@@ -926,10 +962,11 @@ public final class StallWatch {
             }
             sb.append(shortFrame(stack[i]));
         }
+        int last = top - 1;
         for (int i = top; i < stack.length; i++) {
             if (stack[i].getClassName().startsWith("com.kooo.")) {
-                sb.append(" ... ").append(shortFrame(stack[i]));
-                break;
+                sb.append(i == last + 1 ? " <- " : " ... ").append(shortFrame(stack[i]));
+                last = i;
             }
         }
         return sb.toString();

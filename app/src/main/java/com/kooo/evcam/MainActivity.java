@@ -733,7 +733,7 @@ public class MainActivity extends AppCompatActivity {
                 // 那一路整条重复请求停到调度摘掉它（审查 2026-10-11，和后视镜接不上时一样）；还不回去（管线里已经没有这一路）
                 // 才放掉，这块画布不在它的会话里。这一格照旧等系统建
                 AppLog.w(TAG, "接回留着的预览画布失败 " + key + ": " + e);
-                if (!pipeline.keepPreviewCanvas(key, kept)) {
+                if (!MultiCameraManager.keepPreviewCanvas(pipeline, key, kept)) {
                     kept.release();
                 }
                 continue;
@@ -769,8 +769,9 @@ public class MainActivity extends AppCompatActivity {
 
             /**
              * 画布要被收走了（主界面销毁，视图从窗口上摘下来；最小化不走这里 —— 安卓 12 的 TextureView 那时只拆显示层）。
-             * 管线还在就把画布交给它（大纲 §7.6）：返回 false，TextureView 不放；新界面接回同一块，没人接回的
-             * 由通道调度等它离开会话再放。管线没了（退出、没人要了被释放）照常让 TextureView 放。
+             * 把画布交给管线（大纲 §7.6）：返回 false，TextureView 不放；新界面接回同一块，没人接回的
+             * 由通道调度等它离开会话再放。退出、换车型时管线已经放了、它的调度还在按次序关：会话里还带着这块的照样交给那一份的调度，
+             * 随相机关了再放（2.11.4 R1：会话里的画布只由通道调度放，MultiCameraManager.ownerOf）；哪一份都不带着它才照常让 TextureView 放。
              * 这一下在 onDestroy 之后才来（ActivityThread 先 performDestroy、再从窗口上摘视图）。
              */
             @Override
@@ -778,8 +779,7 @@ public class MainActivity extends AppCompatActivity {
                 textureReadyCount--;
                 MultiCameraManager pipeline = cameraManager != null ? cameraManager
                         : com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-                boolean kept = pipeline != null && !pipeline.isReleased()
-                        && pipeline.keepPreviewCanvas(cameraKey, surface);
+                boolean kept = MultiCameraManager.keepPreviewCanvas(pipeline, cameraKey, surface);
                 AppLog.d(TAG, "TextureView " + cameraKey + " destroyed, remaining: " + textureReadyCount
                         + (kept ? ", canvas kept by the pipeline" : ""));
                 return !kept;

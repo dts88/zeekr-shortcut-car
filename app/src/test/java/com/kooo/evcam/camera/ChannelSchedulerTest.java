@@ -54,6 +54,8 @@ public class ChannelSchedulerTest {
     private final List<String> journal = new ArrayList<>();
     /** 调度告诉录像那一侧的（「streaming front」「gone left LOST DISCONNECTED」「condition left TAKEN」）。 */
     private final List<String> told = new ArrayList<>();
+    /** 交给相机步骤统计的每一条（Journal.recorded）。 */
+    private final List<ChannelScheduler.StepRecord> records = new ArrayList<>();
     private final FakePort surround = new FakePort("2");
     private final FakePort rear = new FakePort("1");
     private final FakePort front = new FakePort("0");
@@ -334,6 +336,209 @@ public class ChannelSchedulerTest {
         at(2_000);
         assertTrue("待判作废，不判", lines("judged").isEmpty());
         assertEquals(ChannelRules.Condition.STREAMING, s.condition(SUR));
+    }
+
+    // ================================================================= 2.11.4（项目所有者 2026-10-14 批准）
+
+    /**
+     * 丢了之后的那一次关也是我们的关（第 1b 项）：关完 5 ms 后相机服务为这一关说的「空闲」，照调度的答案（ourStepInFlight，
+     * CameraAvailabilityWatch.classify 问的就是它）算我们引起的 —— 判完普通故障就救，不白等 3 秒安静。
+     * 10-13 20:10:42：「1 空闲」比关完晚 6 ms 到，被记成别人引起的变化，救援白等了 3 秒。
+     */
+    @Test
+    public void theFreeWordJustAfterOurLossCloseIsOursAndTheRescueDoesNotWaitForQuiet() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        rear.lose(now);
+        s.onLossStarted("1", DEVICE_ERROR);
+        settle();
+        at(6_200);
+        rear.closedNow();
+        s.onLossClosed("1", 6_200);
+        settle();
+        at(6_205);
+        boolean ours = s.ourStepInFlight("1");
+        assertTrue("关完 5 ms：为这一关说的「空闲」是我们的", ours);
+        say(rear, true, ours);
+        s.wake();
+        at(6_200 + ChannelRules.JUDGE_DELAY_MS);
+        assertEquals(1, lines("judged left ORDINARY LOSS").size());
+        assertTrue("不等安静：" + lines("waiting"), lines("waiting QUIET").isEmpty());
+        assertEquals(Arrays.asList("reopen [PREVIEW]"), rear.actions);
+    }
+
+    /**
+     * 在关旧设备的相机是在途（第 1c 项）：救援的重开 15 秒到点、旧设备还在关（相机层登记着在关），别的路一步都不动；
+     * 关完、新设备开好出了画面，排着的前座舱才开。以前到点就「先往下走」，旧设备还在拆，别的路就动了。
+     */
+    @Test
+    public void aRescueReopenWhoseOldDeviceIsStillClosingHoldsEveryoneAfterItsStepTimesOut() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR);
+        streaming(surround, recS);
+        declare(rear, recR);
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), rear.actions);
+        at(100);
+        opened(rear);   // 配好了，一帧不出
+        settle();
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals("第 2 次：重开", Arrays.asList("open [RECORD]", "reopen [RECORD]"), rear.actions);
+        long reopenAt = now;
+        // SingleCamera.reopenWith：旧设备从字段上摘下来、登记在关，关完才开新的
+        rear.deviceOpen = false;
+        rear.session = SingleCamera.SessionOutputs.NONE;
+        rear.firstFrameAt = 0;
+        rear.closingSince = reopenAt;
+
+        host.plan(FRONT);   // 这期间前座舱也要录了：它排着
+        declare(front, recF);
+        s.onNeedsChanged();
+        settle();
+        at(reopenAt - T0 + ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded RESCUE left timedOut").size());
+        assertEquals(1, lines("waiting BUSY left").size());
+        at(reopenAt - T0 + ChannelRules.STEP_MAX_MS + 5_000);
+        assertTrue("旧设备还在关：前座舱不开", front.actions.isEmpty());
+
+        // 旧设备关了 20.5 秒，关完；开新设备那一下上路（一个新动作，照常挡着）
+        at(reopenAt - T0 + 20_500);
+        rear.closingSince = 0;
+        rear.lastClose = new SingleCamera.LastClose(now, 20_500, "reopen");
+        rear.busySince = now;
+        s.wake();
+        settle();
+        assertTrue(front.actions.isEmpty());
+        at(reopenAt - T0 + 20_800);
+        opened(rear);
+        frame(rear);
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), front.actions);
+    }
+
+    /**
+     * 10-13 20:10 经调度回放（第 1a、1d 项、R2）：后座舱只为录像开、配好了一帧不出，那 15 秒里要了预览；到点先开前座舱，
+     * 再救后座舱 —— 重开、带着预览和录像，不改输出。开座舱的那两下各有一行「时的情形」（哨兵、主界面、离上次关多久、环视）；
+     * 15 秒那一行带着配好以来相机回了什么（HAL 一个都没回）；每一步结束交一条统计，重开那一条带着旧设备关了多久。
+     */
+    @Test
+    public void replay1013_aBlackRearIsReopenedWithItsPreviewAndEveryStepIsRecorded() {
+        host.vehicle = new ChannelScheduler.Vehicle(1, 100, 4_600, 100, 125);
+        host.mainForeground = false;
+        host.startedWhileVisible = true;
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        declare(rear, recR);
+        declare(front, recF);
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), rear.actions);
+        assertEquals(1, lines("opening left OPEN sentry=1 fg=false sinceClose=-1 held=-1 surround=STREAMING").size());
+        at(100);
+        opened(rear);
+        rear.counts = new SessionCounts.Snapshot(now, now, 0, 0, 0, 0, -1, -1,
+                java.util.Collections.<String, Long>emptyMap());
+        settle();
+
+        at(6_700);   // 主界面回到前台：两路座舱要预览
+        host.mainForeground = true;
+        claim(Holder.PREVIEW);
+        declare(rear, pvR);
+        declare(front, pvF);
+        settle();
+        assertEquals("开那一步在途：不动", Arrays.asList("open [RECORD]"), rear.actions);
+
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded OPEN left timedOut counts=HAL_HOLDING").size());
+        assertEquals("排在后面的前座舱先开", Arrays.asList("open [PREVIEW, RECORD]"), front.actions);
+        opened(front);
+        frame(front);
+        settle();
+        assertEquals("不改输出，重开带上预览", Arrays.asList("open [RECORD]", "reopen [PREVIEW, RECORD]"),
+                rear.actions);
+        assertTrue(lines("stepEnded APPLY").isEmpty());
+        assertEquals(1, lines("opening left RESCUE").size());
+
+        long reopenAt = now;
+        rear.deviceOpen = false;
+        rear.session = SingleCamera.SessionOutputs.NONE;
+        rear.closingSince = reopenAt;
+        at(reopenAt - T0 + 8_535);
+        rear.closingSince = 0;
+        rear.lastClose = new SingleCamera.LastClose(now, 8_535, "reopen");
+        rear.busySince = now;
+        s.wake();
+        at(reopenAt - T0 + 8_700);
+        opened(rear);
+        frame(rear);
+        settle();
+
+        assertEquals(Arrays.asList(
+                "recorded left OPEN NO_FRAMES ms=15000 counts=HAL_HOLDING surround=STREAMING",
+                "recorded back OPEN FRAMED ms=0 surround=STREAMING",
+                "recorded left REOPEN FRAMED ms=8700 oldClose=8535 surround=STREAMING"), lines("recorded"));
+        ChannelScheduler.StepRecord open = records.get(0);
+        assertEquals(Integer.valueOf(1), open.context.vehicle.sentry);
+        assertFalse("开的那一刻主界面在后台", open.context.mainForeground);
+        assertEquals(125, open.context.vehicle.importance);
+    }
+
+    /**
+     * 这一步里出了事（改输出时丢了）：2.11.4 起也写一行（第 1a 项）、交一条统计 —— 以前什么都不写，
+     * 10-13 那一次没做完的改输出只在关相机小结的账里看得出来。
+     */
+    @Test
+    public void aFailedApplyWritesItsOwnLineAndIsRecorded() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        host.plan(SUR);
+        declare(surround, recS);
+        claim(Holder.RECORDING);
+        settle();
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
+        at(600);
+        surround.lose(now);
+        s.onLossStarted("2", DEVICE_ERROR);
+        settle();
+        assertEquals(1, lines("stepEnded APPLY front failed LOSS after=600 added=[RECORD]").size());
+        assertEquals(Arrays.asList("recorded front APPLY ERROR ms=600"), lines("recorded"));
+        assertEquals(CameraTaken.Reason.Source.DEVICE_ERROR, records.get(0).reason.source);
+    }
+
+    /**
+     * 座舱的每一次关都记下关的时候环视怎样、关了多久（R3：备选方案「关座舱时先短暂关环视」要比的就是它，只记录）。
+     */
+    @Test
+    public void everyCabinCloseRecordsWhatTheSurroundWasDoing() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        at(1_000 + ChannelRules.HOLD_MS + 200);
+        closed(rear);
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS + 6_200);
+        closed(front);
+        settle();
+        assertEquals(Arrays.asList(
+                "recorded left CLOSE CLOSED ms=200 surround=STREAMING",
+                "recorded back CLOSE CLOSED ms=6200 surround=STREAMING"), lines("recorded"));
+        assertEquals("环视这段时间里量了：会话没动", Boolean.FALSE, records.get(1).surround.sessionChanged);
     }
 
     // ================================================================= 「输出被丢」派给录像那一侧
@@ -2180,6 +2385,12 @@ public class ChannelSchedulerTest {
         boolean opening;
         /** 重开被合并掉了几次（相机层的开、重开还在途时）。 */
         int refused;
+        /** 相机层在关一个设备，从什么时候起（SingleCamera.closingSince）；0 = 没在关。我们关的那一下当场登记，关完清。 */
+        long closingSince;
+        /** 最近一次关完（SingleCamera.lastClose）；没关过是 null。 */
+        SingleCamera.LastClose lastClose;
+        /** 眼下这份会话配好以来相机回了什么（SingleCamera.sessionCounts）。 */
+        SessionCounts.Snapshot counts = SessionCounts.NONE;
         /** 调度最后一次交来的输出分类（卡顿现场用的那一份）。 */
         Map<Out, ChannelScheduler.OutputState> states = new HashMap<>();
 
@@ -2205,6 +2416,10 @@ public class ChannelSchedulerTest {
             session = SingleCamera.SessionOutputs.NONE;
             firstFrameAt = 0;
             progressAgeMs = 0;
+            if (closingSince != 0) {
+                lastClose = new SingleCamera.LastClose(now, now - closingSince, "test");
+            }
+            closingSince = 0;
         }
 
         private boolean start(String what, Set<Out> outputs) {
@@ -2256,6 +2471,7 @@ public class ChannelSchedulerTest {
             opening = false;
             session = SingleCamera.SessionOutputs.NONE;
             busySince = now;
+            closingSince = now;   // 照 SingleCamera.closeCamera：关那一下当场登记在关
             holds = true;
         }
 
@@ -2281,6 +2497,21 @@ public class ChannelSchedulerTest {
         @Override
         public long busySince() {
             return busySince;
+        }
+
+        @Override
+        public long closingSince() {
+            return closingSince;
+        }
+
+        @Override
+        public SingleCamera.LastClose lastClose() {
+            return lastClose;
+        }
+
+        @Override
+        public SessionCounts.Snapshot sessionCounts() {
+            return counts;
         }
 
         @Override
@@ -2481,6 +2712,14 @@ public class ChannelSchedulerTest {
             return ChannelRules.RecordPrep.NONE;
         }
 
+        /** 车上的那几样：测试改它（哨兵、点火多久以前变过……）；没改是「都不知道」。 */
+        ChannelScheduler.Vehicle vehicle = ChannelScheduler.Vehicle.UNKNOWN;
+
+        @Override
+        public ChannelScheduler.Vehicle vehicle() {
+            return vehicle;
+        }
+
         @Override
         public void ask(Consumer<CameraAvailabilityWatch.Asked> answered) {
             asks.add(answered);
@@ -2583,7 +2822,25 @@ public class ChannelSchedulerTest {
 
         @Override
         public void stepEnded(ChannelScheduler.StepReport r) {
-            journal.add("stepEnded " + r.move + " " + r.key + (r.timedOut ? " timedOut" : ""));
+            journal.add("stepEnded " + r.move + " " + r.key + (r.timedOut ? " timedOut" : "")
+                    + (r.failure != null ? " failed " + r.failure.origin + " after=" + r.durationMs : "")
+                    + (r.added.isEmpty() ? "" : " added=" + r.added)
+                    + (r.counts != null ? " counts=" + r.counts.kind() : ""));
+        }
+
+        @Override
+        public void opening(ChannelScheduler.StepContext c) {
+            journal.add("opening " + c.key + " " + c.move + " sentry=" + c.vehicle.sentry + " fg=" + c.mainForeground
+                    + " sinceClose=" + c.sinceCloseMs + " held=" + c.heldMs + " surround=" + c.surround);
+        }
+
+        @Override
+        public void recorded(ChannelScheduler.StepRecord r) {
+            records.add(r);
+            journal.add("recorded " + r.context.key + " " + r.move + " " + r.result + " ms=" + r.ms
+                    + (r.counts != null ? " counts=" + r.counts.kind() : "")
+                    + (r.oldCloseMs >= 0 ? " oldClose=" + r.oldCloseMs : "")
+                    + (r.context.surround != null ? " surround=" + r.context.surround : ""));
         }
 
         @Override

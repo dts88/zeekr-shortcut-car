@@ -719,6 +719,8 @@ final class EcarxSource {
         } else {
             values.put(s, decoded);
         }
+        // 上一次真变了是什么时候（开座舱那一行、相机步骤统计读：点火、主驾门、屏幕电源事件多久以前变过，2.11.4）
+        SignalAges.changed(s, before, decoded, SystemClock.elapsedRealtime());
         probeSignal(s, decoded);
         schedulePublish(0);
         long hold = VehicleStateMapper.republishAfterMs(s);
