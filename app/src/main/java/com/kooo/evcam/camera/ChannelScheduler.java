@@ -180,7 +180,17 @@ public final class ChannelScheduler {
         /** 录像要哪几路：这一次录像的计划。 */
         Set<String> recordPlan();
 
+        /**
+         * 屏幕亮着（屏幕真没黑：ScreenState.dark 的反面）。通道眼里亮不亮由调度照规则算（{@link ChannelRules#darkForChannel}：
+         * 黑满 30 秒、或者车机要睡才算黑），下面两样是它要的另外两个事实。
+         */
         boolean screenOn();
+
+        /** 屏幕黑了多久（毫秒）；亮着、或者起点不明（进程起来时、车辆信号读到时已经黑着）是 -1。 */
+        long darkForMs();
+
+        /** 黑着时安卓也熄屏了（车机要睡 / 睡着；ScreenState.androidOff）。 */
+        boolean androidOff();
 
         /** 前台服务在不在：没有它不保持。 */
         boolean foregroundService();
@@ -708,6 +718,7 @@ public final class ChannelScheduler {
         final Set<CameraNeeds.Holder> holders;
         /** 录像要的那几路（RECORDING 登记着时，按开的次序）。 */
         final List<String> recordKeys;
+        /** 通道眼里亮着（{@link ChannelRules#darkForChannel} 的反面：屏幕黑了不到 30 秒、车机没要睡也算亮着）。 */
         final boolean screenOn;
         final boolean foregroundService;
         final boolean mainForeground;
@@ -903,6 +914,11 @@ public final class ChannelScheduler {
     private final List<String> lastRecordKeys = new ArrayList<>();
     private boolean mainWasForeground;
     private boolean screenSeen;
+    /**
+     * 屏幕黑了还不到 30 秒时，再过多久通道就算黑了（毫秒，这一轮刷新事实时算的，{@link ChannelRules#untilDarkForChannel}）；
+     * 不用等是 -1。{@link #arm} 照它到点醒：亮了、车机要睡了，下一轮它就是 -1，那一下也就不排了。
+     */
+    private long darkDueInMs = -1;
     private long sleepNoted;
     private boolean exitNoted;
     private final List<String> trailKeys = new ArrayList<>();
@@ -990,7 +1006,7 @@ public final class ChannelScheduler {
         }
         w = new ChannelRules.World(list);
         // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）
-        w.screenOn = host.screenOn();
+        readScreen();
         running = null;
         lastWait = null;
         lastDeferred = null;
@@ -1310,6 +1326,7 @@ public final class ChannelScheduler {
      * 这一路被熄屏放开了（{@link ChannelRules#releasedByDark}：熄屏时座舱谁都不要，项目所有者 2026-10-12 D2），读的是这一轮的
      * 亮熄屏。和谁登记着无关 —— 录像、拍照刚登记的那一下来问，读到的也是对的（设计 v3.1 C4）。它变了告诉录像那一侧
      * （{@link Recording#onLaneConditionChanged}）。录像据此不把它算作在起来（RecordingLanes.Facts）、不为它备录制器。
+     * 屏幕黑了还不到 30 秒时，开着的座舱不算、关着的算（黑着不开它；项目所有者 2026-10-13「黑满 30 秒再放」）。
      */
     public boolean releasedByDark(String key) {
         ChannelRules.Lane lane = w.lane(key);
@@ -1395,12 +1412,12 @@ public final class ChannelScheduler {
         w.recordPlan.addAll(host.recordPlan());
         noteNeeds();
 
-        boolean on = host.screenOn();
-        if (on && (!w.screenOn || !screenSeen)) {
+        boolean wasOn = w.screenOn;
+        readScreen();
+        if (w.screenOn && (!wasOn || !screenSeen)) {
             w.screenOnAt = now;
         }
         screenSeen = true;
-        w.screenOn = on;
         w.foregroundService = host.foregroundService();
         boolean main = host.mainForeground();
         if (main && !mainWasForeground) {
@@ -1432,6 +1449,21 @@ public final class ChannelScheduler {
                 refreshLane(lane, port, offset, now);
             }
         }
+    }
+
+    /**
+     * 屏幕的两样事实，只在这里填（项目所有者 2026-10-13「黑满 30 秒再放」）：{@code w.screenOn} 是通道眼里亮着没有
+     * （{@link ChannelRules#darkForChannel}：屏幕黑满 30 秒、或者车机要睡才算黑）—— 规则里读它的每一处（预览、保持、
+     * 熄屏放开座舱、关的原因、亮屏解除停手）都是这一个；{@code w.screenDark} 是屏幕真黑了没有，黑了还不到 30 秒时
+     * 关着的座舱不开（{@link ChannelRules#releasedByDark}）。顺带记下还要多久才算黑（{@link #darkDueInMs}），{@link #arm} 照它到点醒。
+     */
+    private void readScreen() {
+        boolean dark = !host.screenOn();
+        long darkForMs = host.darkForMs();
+        boolean androidOff = host.androidOff();
+        darkDueInMs = ChannelRules.untilDarkForChannel(dark, darkForMs, androidOff);
+        w.screenOn = !ChannelRules.darkForChannel(dark, darkForMs, androidOff);
+        w.screenDark = dark;
     }
 
     private void refreshLane(ChannelRules.Lane lane, CameraPort port, long offset, long now) {
@@ -2481,7 +2513,7 @@ public final class ChannelScheduler {
 
     /**
      * 最迟 {@link ChannelRules#TICK_MS} 醒一次；手上那一步到点、等的东西到点（待判 300 ms、安静、录像输出、车机要睡的 1 秒）、
-     * 保持到点、关完一轮之后再量的那一下到点（{@link #noteAftermaths}），早一点醒。
+     * 保持到点、屏幕黑满 30 秒（{@link #darkDueInMs}）、关完一轮之后再量的那一下到点（{@link #noteAftermaths}），早一点醒。
      *
      * <p>待判的只算还没到点的：已经到点、只等别的丢失关完的那一路，算进来就是负数，按 1 ms 醒 —— 另一路那一次关要 5–8 秒，
      * 这几秒里主线程每一毫秒跑一轮（审查 2026-10-11）。另一路关完有回调叫醒，关卡死的由在途封顶（等的 {@code d.ms}）叫醒。</p>
@@ -2509,6 +2541,10 @@ public final class ChannelScheduler {
         }
         for (Aftermath a : aftermaths) {
             delay = Math.min(delay, a.since + AFTERMATH_MS - now);
+        }
+        if (darkDueInMs >= 0) {
+            // 屏幕黑满 30 秒的那一刻（ChannelRules.darkForChannel）：到点就醒，座舱当场放开
+            delay = Math.min(delay, darkDueInMs);
         }
         poster.cancel(timerTask);
         poster.postDelayed(timerTask, Math.max(1, delay));

@@ -66,6 +66,7 @@ public class MultiCameraManager {
     // closeStep 的说明（2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出）。
     // 熄屏 v3（项目所有者 2026-10-12 D2）：屏幕一黑两路座舱就放开（一起关），环视照熄屏持续录制那张表录 ——
     // 座舱比环视早关几分钟，环视先关只对连环视一起关的那几次还成立（ChannelRules.releasedByDark）。
+    // 2026-10-13 起「一黑」是黑满 30 秒（或者车机要睡）：不到 30 秒又亮，相机一样不动（ChannelRules.darkForChannel）。
     /**
      * 调度自己的 Handler（同一个主线程 Looper）。不用 mainHandler：release() 开头会 removeCallbacksAndMessages(null)，
      * 而调度那时正要按次序关相机 —— 2.10.5 时就是这样把「上一路关完、关下一路」的续命清掉了，后两路没关进程就退了
@@ -79,8 +80,11 @@ public class MultiCameraManager {
     /** 登记表的监听：只叫醒自己这一份调度。release 时只在它还是监听者时才摘（换车型时两份并存）。 */
     private final CameraNeeds.Listener needsListener;
     /**
-     * 亮屏、熄屏：叫醒调度（熄屏时 PREVIEW 不算、不保持、座舱谁都不要，由规则判 —— ChannelRules.releasedByDark）。
+     * 亮屏、熄屏：叫醒调度（熄屏时 PREVIEW 不算、不保持、座舱谁都不要，由规则判 —— ChannelRules.releasedByDark；
+     * 屏幕黑满 30 秒才算，那一刻调度自己醒，ChannelRules.darkForChannel）。
      * 熄屏那一下从头记这一段熄屏的座舱放开（{@link #newDarkPeriod}）。
+     * 亮屏时等着的录像输出重新声明（{@link #liftRefusals}），和调度的「亮屏解除停手」是同一个亮屏：通道把这一段算作黑过
+     * （{@link #channelCountedDark}）才算 —— 黑了不到 30 秒又亮，通道一步不动，录像输出也不动（项目所有者 2026-10-13）。
      */
     private final com.kooo.evcam.screen.ScreenState.Listener screenWake =
             new com.kooo.evcam.screen.ScreenState.Listener() {
@@ -92,10 +96,14 @@ public class MultiCameraManager {
 
                 @Override
                 public void onScreenOn() {
+                    // 亮屏那一轮还没跑（wake 只是排一轮）：快照还是这一段熄屏最后的样子
+                    boolean countedDark = channelCountedDark();
                     // 这一段熄屏结束：之后亮着时关座舱（保持到点）不算熄屏放开；记下的那一刻留到下一次熄屏
                     awaitingCabinRelease = false;
                     scheduler.wake();
-                    liftRefusals("亮屏了");
+                    if (countedDark) {
+                        liftRefusals("亮屏了");
+                    }
                 }
             };
     private PipelineCallback pipelineCallback;
@@ -2439,6 +2447,36 @@ public class MultiCameraManager {
     }
 
     /**
+     * 屏幕黑了多久，按通道的算法（{@link ChannelRules#darkForChannel} 要的那个数，调度经 {@link ChannelSide#darkForMs} 读它）：
+     * 起点不明交 -1（按黑满 30 秒算）。车辆信号读到时已经黑着的（进程刚起来、之前读不到）也是起点不明 —— ScreenState 那时
+     * 从读到的那一刻起算「熄屏后 +N ms」，屏幕其实早就黑了（熄屏小结写「起点不明」的就是这一种）。哪个线程都能调。
+     */
+    static long channelDarkForMs() {
+        return com.kooo.evcam.screen.ScreenState.source() == com.kooo.evcam.screen.ScreenState.Source.VEHICLE_READ
+                ? -1 : com.kooo.evcam.screen.ScreenState.darkForMs();
+    }
+
+    /**
+     * 此刻通道眼里屏幕黑了（{@link ChannelRules#darkForChannel}：黑满 30 秒、起点不明、或者车机要睡）—— 座舱放开、预览不算、
+     * 不保持。和调度用的是同一句、同一组事实（{@link #channelDarkForMs}）；协调器写黑匣子时问它，不自己再判一遍
+     * （熄屏判的那一行「座舱放开 / 座舱黑满 30 秒后放开」、黑着开录的那几行）。哪个线程都能调。
+     */
+    public static boolean channelCountsDark() {
+        return ChannelRules.darkForChannel(com.kooo.evcam.screen.ScreenState.dark(), channelDarkForMs(),
+                com.kooo.evcam.screen.ScreenState.androidOff());
+    }
+
+    /**
+     * 调度最近一轮把屏幕算作黑了（{@link ChannelScheduler#snapshot}，还没跑过一轮算没有）。亮屏那一下（协调器写熄屏小结、
+     * 相机层的亮屏监听，都在亮屏后的那一轮之前 —— 叫醒调度只是排一轮）读的就是这一段熄屏最后的样子：不是，就是屏幕黑了
+     * 不到 30 秒又亮了，通道一步没动（项目所有者 2026-10-13「黑满 30 秒再放」）。主线程。
+     */
+    public boolean channelCountedDark() {
+        ChannelScheduler.Snapshot s = scheduler.snapshot();
+        return s != null && !s.screenOn;
+    }
+
+    /**
      * 熄屏了（ScreenState 的熄屏那一下，主线程）：这一段熄屏的座舱放开从头记 —— 那一刻座舱开着没有，之后第一轮关了座舱的
      * 那一轮关完时记下时刻（{@link ChannelSide#closeRound}）。
      */
@@ -2537,7 +2575,11 @@ public class MultiCameraManager {
                 .append(s.stopped ? "；调度已停（退出之后都关完了）" : "").append('\n');
         sb.append("登记表：").append(channelSide.holderCodes(s.holders))
                 .append(s.recordKeys.isEmpty() ? "" : "（录 " + roles(s.recordKeys) + "）")
-                .append("；").append(s.screenOn ? "亮屏" : "熄屏" + darkSinceText())
+                .append("；").append(!s.screenOn ? "熄屏" + darkSinceText()
+                        // 屏幕黑了还不到 30 秒：通道照亮着算（ChannelRules.darkForChannel，项目所有者 2026-10-13）
+                        : com.kooo.evcam.screen.ScreenState.dark() ? "熄屏" + darkSinceText() + "，不到 "
+                        + (ChannelRules.HOLD_MS / 1000) + " 秒：开着的相机照旧、关着的座舱不开，黑满 "
+                        + (ChannelRules.HOLD_MS / 1000) + " 秒放开座舱" : "亮屏")
                 .append("；前台服务").append(s.foregroundService ? "在" : "不在").append('\n');
         if (!s.screenOn) {
             sb.append("熄屏放开座舱：").append(cabinReleaseText()).append('\n');
@@ -3029,6 +3071,17 @@ public class MultiCameraManager {
             return !com.kooo.evcam.screen.ScreenState.dark();
         }
 
+        /** 屏幕黑了多久；起点不明交 -1（规则按黑满 30 秒算）。算法只在 {@link MultiCameraManager#channelDarkForMs} 一处。 */
+        @Override
+        public long darkForMs() {
+            return channelDarkForMs();
+        }
+
+        @Override
+        public boolean androidOff() {
+            return com.kooo.evcam.screen.ScreenState.androidOff();
+        }
+
         @Override
         public boolean foregroundService() {
             return com.kooo.evcam.CameraForegroundService.isRunning();
@@ -3114,10 +3167,18 @@ public class MultiCameraManager {
                     + (recordKeys.isEmpty() ? "" : "（录 " + roles(recordKeys) + "）"));
         }
 
+        /**
+         * 保持开始。屏幕黑了还不到 30 秒时也在保持（通道眼里还亮着，ChannelRules.darkForChannel）：那时保持到屏幕黑满 30 秒为止，
+         * 和座舱放开同一刻关 —— 那一行照实写，带「，熄屏后 +Nms」。
+         */
         @Override
         public void holding(List<String> keys, Set<ChannelRules.Kind> outlets) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：没人要 " + roles(keys) + " 了：亮屏、前台服务在，保持 "
-                    + (ChannelRules.HOLD_MS / 1000) + " 秒（画面接着送进 " + kindNames(outlets) + "）");
+            boolean dark = com.kooo.evcam.screen.ScreenState.dark();
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：没人要 " + roles(keys) + " 了：" + (dark
+                    ? "熄屏还不到 " + (ChannelRules.HOLD_MS / 1000) + " 秒、前台服务在，保持到熄屏满 "
+                    + (ChannelRules.HOLD_MS / 1000) + " 秒"
+                    : "亮屏、前台服务在，保持 " + (ChannelRules.HOLD_MS / 1000) + " 秒")
+                    + "（画面接着送进 " + kindNames(outlets) + "）" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         }
 
         @Override
