@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.5-alpha] - 2026-10-15
+
+- Diagnostics only; camera behaviour unchanged.
+- A camera session where the camera never started a frame is labelled as a camera-side failure.
+- Each cabin close while the surround view is open is logged with the surround view's last frame and re-checked after 1 and 30 seconds.
+- The report shows how many times each camera was opened since the head unit last reset it, and the surround view's side of cabin closes.
+- Keeps the last stall reports; logs the first run after an install.
+
 ## [2.11.4-alpha] - 2026-10-14
 
 - A camera that opens without delivering frames is reopened instead of reconfigured.
