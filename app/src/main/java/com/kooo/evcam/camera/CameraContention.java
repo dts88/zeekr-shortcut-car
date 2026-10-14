@@ -98,12 +98,16 @@ public final class CameraContention {
         return OTHERS_TOOK_AT.containsKey(cameraId);
     }
 
-    /** 相机服务报：这一路空出来了。 */
+    /**
+     * 相机服务报：这一路空出来了。别的程序（多半是车机自己，醒来时那 1 秒）拿过它又放开 = 车机重新初始化了它：
+     * 这一台的来历从头数（{@link CameraHistory.Reset#TAKEN}，2.11.5 第 D1 项，只记录）。
+     */
     static void othersReleased(String cameraId) {
         Long took = OTHERS_TOOK_AT.remove(cameraId);
         if (took == null) {
             return;
         }
+        StepLog.cameraReset(cameraId, CameraHistory.Reset.TAKEN);
         long now = SystemClock.elapsedRealtime();
         long sinceOurOpen = lastOurOpenAt == 0 ? -1 : now - lastOurOpenAt;
         BlackBox.noteImportant("争用：相机 " + cameraId + " 空出来了，别的程序拿了 " + (now - took) + " ms"

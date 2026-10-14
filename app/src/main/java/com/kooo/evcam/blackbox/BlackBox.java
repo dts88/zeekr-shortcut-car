@@ -480,24 +480,44 @@ public final class BlackBox {
      */
     private static void noteVersionIfNew(Context context) {
         try {
-            String now = context.getPackageManager()
-                    .getPackageInfo(context.getPackageName(), 0).versionName;
+            android.content.pm.PackageInfo info = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0);
+            String now = info.versionName;
             SharedPreferences seen = context.getSharedPreferences(SEEN_PREFS, Context.MODE_PRIVATE);
             String last = seen.getString(KEY_LAST_VERSION, null);
-            if (now == null || now.equals(last)) {
-                return;
+            if (now != null && !now.equals(last)) {
+                seen.edit().putString(KEY_LAST_VERSION, now).apply();
+                noteImportant(last == null ? "版本 " + now + "（第一次记录）"
+                        : "版本变了：" + last + " → " + now
+                                + "（装新版时旧进程是被系统用信号结束的，紧挨着的「收到信号」退出多半就是它）");
             }
-            seen.edit().putString(KEY_LAST_VERSION, now).apply();
-            noteImportant(last == null ? "版本 " + now + "（第一次记录）"
-                    : "版本变了：" + last + " → " + now
-                            + "（装新版时旧进程是被系统用信号结束的，紧挨着的「收到信号」退出多半就是它）");
+            noteFirstRunOfInstall(seen, info.lastUpdateTime);
         } catch (Throwable t) {
             AppLog.w(TAG, "noteVersionIfNew: " + t);
         }
     }
 
+    /**
+     * 装了一次（新版、或者同一版重装）之后第一次运行：一行「这一版装好 X 秒后第一次运行（安装于 …）」（项目所有者 2026-10-15 批准，2.11.5 第 D4 项）。
+     * X 从装好（{@code PackageInfo.lastUpdateTime}）算到这个进程起来那一刻。
+     *
+     * <p>为什么：2.11.1–2.11.4 每一次装完第一次开环视都 15 秒没画面（rel_final §5），装完到打开隔了多久、从哪里打开的，只能事后猜；
+     * 下一次装（测试 T1）看这一行就知道。只认装的时刻变了，和版本号无关。</p>
+     */
+    private static void noteFirstRunOfInstall(SharedPreferences seen, long installedAt) {
+        if (installedAt <= 0 || seen.getLong(KEY_LAST_INSTALL, 0L) == installedAt) {
+            return;
+        }
+        seen.edit().putLong(KEY_LAST_INSTALL, installedAt).apply();
+        long startedWall = System.currentTimeMillis() - (SystemClock.elapsedRealtime() - startedAtMs);
+        noteImportant("这一版装好 " + String.format(Locale.US, "%.1f", (startedWall - installedAt) / 1000f)
+                + " 秒后第一次运行（安装于 " + wallClock(installedAt) + "）");
+    }
+
     /** 上次进程起来时的版本号。 */
     private static final String KEY_LAST_VERSION = "last_version";
+    /** 上一次记下的装好的时刻（{@code PackageInfo.lastUpdateTime}）：变了就是装完之后第一次运行。 */
+    private static final String KEY_LAST_INSTALL = "last_install_ts";
     /** 抄过的最后一次 ANR 的时间戳存在这里，同一次 ANR 只抄一遍。 */
     private static final String SEEN_PREFS = "blackbox_seen";
     private static final String KEY_LAST_ANR = "last_anr_ts";

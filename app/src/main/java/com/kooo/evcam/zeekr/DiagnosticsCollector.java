@@ -317,7 +317,8 @@ public final class DiagnosticsCollector {
     /**
      * 相机步骤统计（项目所有者 2026-10-14：「识别前后座舱摄像头被卡住的原因或者统计」，2.11.4 R2）：最近 200 步，跨进程留着
      * （{@code camera.StepLog}）。按相机、动作数出画面、没画面、出错、关的用时；再按哨兵、主界面在不在前、离我们上一次关它多久、
-     * 是不是车机刚放开它分开数；备选方案「关座舱时先短暂关环视」要比的那一组（R3，只记录）；最后最近 30 步。
+     * 是不是车机刚放开它、环视是不是车机重新初始化后的第一台（2.11.5）分开数；备选方案「关座舱时先短暂关环视」要比的那一组（R3，只记录；
+     * 2.11.5 起加上环视那一边：关座舱之后 30 秒里环视断没断）；最后最近 30 步、关座舱时环视最近 10 次。
      * 只读那个文件，不碰调度、不建管线。
      */
     private static void appendStepStats(StringBuilder sb, Context context) {
@@ -331,25 +332,35 @@ public final class DiagnosticsCollector {
     }
 
     /** 「2.3.3 相机步骤统计」那一节的正文（纯函数，{@code DiagnosticsCollectorTest}）。 */
-    static String stepStatsText(List<StepStats.Entry> entries) {
+    static String stepStatsText(List<StepStats.Entry> all) {
         StringBuilder sb = new StringBuilder();
-        if (entries.isEmpty()) {
+        // 一步一条的（开、救、改、关）和关座舱时环视那一条（2.11.5）分开数
+        List<StepStats.Entry> entries = new ArrayList<>();
+        List<StepStats.Entry> couples = new ArrayList<>();
+        for (StepStats.Entry e : all) {
+            (StepStats.isStep(e) ? entries : couples).add(e);
+        }
+        if (entries.isEmpty() && couples.isEmpty()) {
             return "还没有记下的步骤（2.11.4 起每结束一步记一条）\n";
         }
-        sb.append("最近 ").append(entries.size()).append(" 步（最多 ").append(StepStats.MAX).append(" 步，跨进程留着）：")
-                .append(clock(entries.get(0).at)).append(" 到 ").append(clock(entries.get(entries.size() - 1).at))
-                .append('\n');
+        if (!entries.isEmpty()) {
+            sb.append("最近 ").append(entries.size()).append(" 步（最多 ").append(StepStats.MAX).append(" 步，跨进程留着）：")
+                    .append(clock(entries.get(0).at)).append(" 到 ").append(clock(entries.get(entries.size() - 1).at))
+                    .append('\n');
+        }
         sb.append("按相机、动作：").append('\n');
         appendGroups(sb, entries, StepStats::laneMove, null);
         sb.append("按哨兵模式：").append('\n');
         appendGroups(sb, entries, StepStats::laneMove, StepStats::sentryBucket);
         sb.append("按主界面在不在前：").append('\n');
         appendGroups(sb, entries, StepStats::laneMove, StepStats::mainBucket);
-        sb.append("按离我们上一次关它多久：").append('\n');
+        sb.append("按离我们上一次关它多久（2.11.5 起跨进程算）：").append('\n');
         appendGroups(sb, entries, StepStats::laneMove, StepStats::sinceCloseBucket);
         sb.append("按是不是车机刚放开它（放开以后我们还没关过它）：").append('\n');
         appendGroups(sb, entries, StepStats::laneMove, StepStats::releaseBucket);
-        sb.append("备选方案「关座舱时先短暂关环视」要比的（只记录，没做）：座舱每一次关，按关的时候环视怎样分，关的用时、之后那一次开：")
+        sb.append("按环视是不是车机重新初始化后的第一台（环视自己开的：这一台；座舱的：那时开着的环视；2.11.5 起记）：").append('\n');
+        appendGroups(sb, entries, StepStats::laneMove, StepStats::lineageBucket);
+        sb.append("备选方案「关座舱时先短暂关环视」要比的（只记录，没做）：座舱每一次关（计划里的关），按关的时候环视怎样分，关的用时、之后那一次开：")
                 .append('\n');
         java.util.Map<String, StepStats.CloseComparison> closes = StepStats.cabinClosesBySurround(entries);
         if (closes.isEmpty()) {
@@ -360,19 +371,137 @@ public final class DiagnosticsCollector {
             sb.append("  环视").append(surroundText(group.getKey())).append("：").append(tallyText(StepStats.tally(c.closes)))
                     .append("；之后那一次开 ").append(c.nextOpens).append(" 次，没画面 ").append(c.nextNoFrames).append('\n');
         }
+        appendSurroundAfterCloses(sb, couples);
         sb.append("最近 30 步（新的在前）：").append('\n');
         for (int i = entries.size() - 1; i >= Math.max(0, entries.size() - 30); i--) {
             sb.append("  ").append(entryText(entries.get(i))).append('\n');
         }
+        if (!couples.isEmpty()) {
+            sb.append("关座舱时环视最近 10 次（新的在前）：").append('\n');
+            for (int i = couples.size() - 1; i >= Math.max(0, couples.size() - 10); i--) {
+                sb.append("  ").append(coupleText(couples.get(i))).append('\n');
+            }
+        }
         return sb.toString();
+    }
+
+    /**
+     * 备选方案那一组的另一边（项目所有者 2026-10-15 批准，2.11.5 第 D3 项）：每一次关座舱、环视开着（任何原因的关），关完 30 秒里环视断没断、
+     * 断了最长多久；按环视是不是车机重新初始化后的第一台、主界面在不在前分开数（10-15 的统计：不是第一台、主界面在后台的 8 次全断了，
+     * 第一台的 10 次一次没断）。以前只数座舱下一次开，看不见环视。
+     */
+    private static void appendSurroundAfterCloses(StringBuilder sb, List<StepStats.Entry> couples) {
+        sb.append("  环视那一边：关座舱时环视开着，关完 ").append(30).append(" 秒里环视断没断（最长断帧到 ")
+                .append(StepStats.SURROUND_STALL_MS / 1000).append(" 秒算断；2.11.5 起记，任何原因的关）：").append('\n');
+        if (couples.isEmpty()) {
+            sb.append("    还没有").append('\n');
+            return;
+        }
+        sb.append("    一共：").append(surroundAfterText(StepStats.surroundAfterCloses(couples))).append('\n');
+        final java.util.Map<String, List<StepStats.Entry>> groups = StepStats.groupBy(couples,
+                e -> lineageGroup(e) + " · " + bucketText(StepStats.mainBucket(e)));
+        List<String> names = new ArrayList<>(groups.keySet());
+        java.util.Collections.sort(names);
+        for (String name : names) {
+            sb.append("    ").append(name).append("：").append(surroundAfterText(StepStats.surroundAfterCloses(groups.get(name))))
+                    .append('\n');
+        }
+    }
+
+    /** 「环视是第一台」「环视不是第一台」「环视第几台不可信（从记录开始数的）」「环视第几台不知道」。 */
+    private static String lineageGroup(StepStats.Entry e) {
+        String bucket = StepStats.lineageBucket(e);
+        return bucket == null ? "环视第几台不知道" : bucketText(bucket);
+    }
+
+    /** 「8 次：断了 8 次，最长 48.8 秒」。 */
+    static String surroundAfterText(StepStats.SurroundAfterClose t) {
+        return t.closes + " 次：断了 " + t.stalled + " 次" + (t.longestMs >= 0 ? "，最长 " + secondsText(t.longestMs) : "");
+    }
+
+    /**
+     * 关座舱时环视那一条：「10-14 21:52:20 关 后座舱、前座舱（DARK_RELEASE）：环视断了 8.1 秒（我们救它那一刻量的）；最后一帧在关完前 35 ms；
+     * 关完 1 秒后没出过画面；环视第 5 台（重置：它在相机服务里没了又回来）；主界面后台；点火 ACC」。
+     */
+    static String coupleText(StepStats.Entry e) {
+        StringBuilder sb = new StringBuilder().append(clock(e.at)).append(' ');
+        if (e.closeKind == StepStats.CloseKind.LOSS) {
+            sb.append(closedLanes(e.closedKeys)).append(" 丢了（").append(e.closeWhy == null ? "?" : e.closeWhy).append('）');
+        } else if (e.closeKind == StepStats.CloseKind.REOPEN) {
+            sb.append("救 ").append(closedLanes(e.closedKeys)).append(" 重开时关旧设备");
+        } else {
+            sb.append("关 ").append(closedLanes(e.closedKeys)).append('（').append(e.closeWhy == null ? "?" : e.closeWhy)
+                    .append('）');
+        }
+        sb.append("：环视").append(e.result == StepStats.Result.STALLED ? "断了 " + secondsText(e.ms)
+                : "没断（最长断帧 " + secondsText(e.ms) + "）");
+        if (e.ours != null) {
+            sb.append("（只量到关开始后第 ").append(secondsText(e.oursAtMs)).append("：那时我们").append(oursText(e.ours)).append('）');
+        }
+        if (e.lastResultMs != Long.MIN_VALUE) {
+            sb.append("；最后一帧在关完").append(e.lastResultMs >= 0 ? "后 +" : "前 ").append(Math.abs(e.lastResultMs)).append(" ms");
+        }
+        sb.append(e.deliveredAfter == 1 ? "；关完 1 秒后出过画面" : e.deliveredAfter == 0 ? "；关完 1 秒后没出过画面" : "");
+        sb.append("；").append(lineageEntryText(e));
+        sb.append("；主界面").append(e.mainForeground < 0 ? "?" : e.mainForeground == 1 ? "在前" : "后台");
+        if (e.ignition != null) {
+            sb.append("；点火 ").append(e.ignition);
+        }
+        return sb.toString();
+    }
+
+    /** 「后座舱、前座舱」（存的是 {@code left,back}）。 */
+    private static String closedLanes(String keys) {
+        if (keys == null || keys.isEmpty()) {
+            return "?";
+        }
+        List<String> names = new ArrayList<>();
+        for (String key : keys.split(",")) {
+            names.add(laneText(key));
+        }
+        return String.join("、", names);
+    }
+
+    /** 我们中途动了它的那一步（{@code RESCUE}…）：「在救它」。 */
+    private static String oursText(String move) {
+        switch (move) {
+            case "CLOSE":
+                return "关了它";
+            case "APPLY":
+                return "改了它的输出";
+            case "RESCUE":
+                return "在救它";
+            case "OPEN":
+                return "重开了它";
+            default:
+                return "动了它";
+        }
+    }
+
+    /** 「环视第 5 台（重置：它在相机服务里没了又回来）」「环视第 5 台（从记录开始数）」「环视第几台不知道」。 */
+    private static String lineageEntryText(StepStats.Entry e) {
+        if (e.lineage <= 0) {
+            return "环视第几台不知道";
+        }
+        String reset = e.lineageReset == null ? "从记录开始数"
+                : "BOOT".equals(e.lineageReset) ? "重置：车机开机"
+                : "TAKEN".equals(e.lineageReset) ? "重置：别的程序拿了它又空出来"
+                : "CAME_BACK".equals(e.lineageReset) ? "重置：它在相机服务里没了又回来" : "重置：" + e.lineageReset;
+        return "环视第 " + e.lineage + " 台（" + reset + "）";
     }
 
     /** 一个维度一组一行：「  后座舱 开 · 哨兵 开：3 次：出画面 1、没画面 2、出错 0」；{@code by} 为 null 是只按相机、动作。 */
     private static void appendGroups(StringBuilder sb, List<StepStats.Entry> entries,
                                      java.util.function.Function<StepStats.Entry, String> lane,
                                      java.util.function.Function<StepStats.Entry, String> by) {
-        final java.util.Map<String, List<StepStats.Entry>> groups = StepStats.groupBy(entries,
-                e -> by == null ? lane.apply(e) : lane.apply(e) + "|" + by.apply(e));
+        // 分不进哪一组的（by 交回 null：比如 2.11.5 之前记的没有「环视第几台」）不算
+        final java.util.Map<String, List<StepStats.Entry>> groups = StepStats.groupBy(entries, e -> {
+            if (by == null) {
+                return lane.apply(e);
+            }
+            String bucket = by.apply(e);
+            return bucket == null ? null : lane.apply(e) + "|" + bucket;
+        });
         List<String> names = new ArrayList<>(groups.keySet());
         // 环视、后座舱、前座舱；同一路按动作的次序；同一个动作按分组的名字
         java.util.Collections.sort(names, (a, b) -> {
@@ -387,7 +516,7 @@ public final class DiagnosticsCollector {
         for (String name : names) {
             String[] parts = name.split("\\|", 2);
             StepStats.Entry first = groups.get(name).get(0);
-            sb.append("  ").append(laneText(first.key)).append(' ').append(moveText(first.move))
+            sb.append("  ").append(laneText(first.key)).append(' ').append(moveText(first))
                     .append(parts.length > 1 ? " · " + bucketText(parts[1]) : "")
                     .append("：").append(tallyText(StepStats.tally(groups.get(name)))).append('\n');
         }
@@ -430,7 +559,7 @@ public final class DiagnosticsCollector {
             case "main:?":
                 return "主界面 不知道";
             case "close:none":
-                return "这一次进程里没关过它";
+                return "没有关过它的记录";
             case "close:<3":
                 return "离上次关不到 3 秒";
             case "close:3-6":
@@ -443,6 +572,12 @@ public final class DiagnosticsCollector {
                 return "车机刚放开";
             case "release:no":
                 return "不是车机刚放开";
+            case "lineage:first":
+                return "环视是车机重新初始化后的第一台";
+            case "lineage:later":
+                return "环视不是第一台";
+            case "lineage:?":
+                return "环视第几台不可信（从记录开始数的）";
             default:
                 return bucket;
         }
@@ -451,7 +586,7 @@ public final class DiagnosticsCollector {
     /** 一步一行：「10-13 20:10:30 后座舱 开 → 15 秒没画面（一个都没回…）；哨兵 1、主界面后台、离上次关 4.5 秒、车机放开后 3.0 秒」。 */
     static String entryText(StepStats.Entry e) {
         StringBuilder sb = new StringBuilder().append(clock(e.at)).append(' ').append(laneText(e.key)).append(' ')
-                .append(moveText(e.move)).append(" → ");
+                .append(moveText(e)).append(" → ");
         switch (e.result) {
             case FRAMED:
                 sb.append("出画面 ").append(secondsText(e.ms));
@@ -470,9 +605,13 @@ public final class DiagnosticsCollector {
                 break;
         }
         if (e.counts != null) {
-            sb.append("（").append(com.kooo.evcam.camera.SingleCamera.kindText(e.counts)).append("：开始 ").append(e.starts)
-                    .append("、结果 ").append(e.results).append("、失败 ").append(e.failures).append("、丢缓冲 ")
-                    .append(e.lost).append('）');
+            // 照存下的数按今天的规矩重算（2.11.5 第 D0 项）：HAL 开始出帧以后才说我们的输出接不住
+            sb.append("（").append(com.kooo.evcam.camera.SingleCamera.kindText(e.kind(), e.failures, e.lost))
+                    .append("：开始 ").append(e.starts).append("、结果 ").append(e.results).append("、失败 ").append(e.failures)
+                    .append("、丢缓冲 ").append(e.lost).append('）');
+        }
+        if (e.error != null && e.result == StepStats.Result.CLOSED) {
+            sb.append("（").append(e.error).append('）');
         }
         if (e.oldCloseMs >= 0) {
             sb.append("，旧设备关了 ").append(secondsText(e.oldCloseMs));
@@ -493,7 +632,21 @@ public final class DiagnosticsCollector {
                         .append(e.surroundChanged == 1 ? "、会话被重建过" : "、会话没动").append('）');
             }
         }
+        if (e.lineage > 0) {
+            sb.append("、").append(lineageEntryText(e));
+        }
         return sb.toString();
+    }
+
+    /** 动作的叫法；丢了之后那一次关、救援重开时关旧设备另外写（2.11.5 第 D3 项）。 */
+    private static String moveText(StepStats.Entry e) {
+        if (e.move == StepStats.Move.CLOSE && e.closeKind == StepStats.CloseKind.LOSS) {
+            return "关（丢了之后）";
+        }
+        if (e.move == StepStats.Move.CLOSE && e.closeKind == StepStats.CloseKind.REOPEN) {
+            return "关（救援重开时关旧设备）";
+        }
+        return moveText(e.move);
     }
 
     private static String laneText(String key) {
@@ -510,6 +663,8 @@ public final class DiagnosticsCollector {
                 return "救援重建";
             case APPLY:
                 return "改输出";
+            case COUPLE:
+                return "关座舱时";
             default:
                 return "关";
         }
@@ -1091,7 +1246,7 @@ public final class DiagnosticsCollector {
             if (kept.isEmpty()) {
                 sb.append("(未抓到相关日志)").append('\n');
             } else {
-                sb.append("（滤掉容器和编解码框架的 ").append(dropped).append(" 行）").append('\n');
+                sb.append("（滤掉容器、编解码框架和车辆接口 SDK（AdaptL_）的 ").append(dropped).append(" 行）").append('\n');
                 int from = Math.max(0, kept.size() - LOGCAT_MAX_LINES);
                 for (int i = from; i < kept.size(); i++) {
                     sb.append(kept.get(i)).append('\n');

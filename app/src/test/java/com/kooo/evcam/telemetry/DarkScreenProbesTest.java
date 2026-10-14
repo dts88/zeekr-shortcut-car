@@ -59,6 +59,36 @@ public class DarkScreenProbesTest {
                 DarkScreenProbes.key(Signal.SCREEN_POWER_EVENT));
     }
 
+    /**
+     * 原厂 360 那几项照原值记（2.11.5 第 D4 项）：是信号表里的号（不另订、不另读），名字不和别的几项撞；
+     * 信号表的解法把原厂 360 显示的 0（侧方小窗）和 2（没显示）都算「不在」，原值分得开。
+     */
+    @Test
+    public void stockDisplayStatesAreLoggedRaw() {
+        Set<String> names = new HashSet<>();
+        for (String name : DarkScreenProbes.NAMES) {
+            names.add(name);
+        }
+        for (Signal s : DarkScreenProbes.WATCHED) {
+            names.add(DarkScreenProbes.key(s));
+        }
+        for (Signal s : DarkScreenProbes.RAW_WATCHED) {
+            assertTrue(s.kind == Signal.Kind.FUNCTION || s.kind == Signal.Kind.FUNCTION_ZONE);
+            assertFalse("只放离散的", s.isFloat());
+            assertFalse("不和照解法记的那几项重", DarkScreenProbes.watches(s));
+            assertTrue("名字不撞", names.add(DarkScreenProbes.key(s)));
+            assertTrue(DarkScreenProbes.watchesRaw(s));
+            assertEquals("不是另订的号", -1, DarkScreenProbes.indexOf(s.id));
+        }
+        assertEquals(0x2031FE00, Signal.STOCK_360.id);
+        assertEquals(0x2031B200, Signal.STOCK_POPUP.id);
+        assertEquals(0x23030100, Signal.PARK_ASSIST.id);
+        assertEquals("stock_360", DarkScreenProbes.key(Signal.STOCK_360));
+        assertFalse(DarkScreenProbes.watchesRaw(Signal.SCREEN_POWER_EVENT));
+        assertEquals("信号表把 0 和 2 都算不在", Signal.STOCK_360.decode(0), Signal.STOCK_360.decode(2));
+        assertFalse("原值分得开", DarkScreenProbes.raw(0).equals(DarkScreenProbes.raw(2)));
+    }
+
     /** 原值照记，占位值 255 也记（它变成别的数正是要看的）；ECARX 枚举那种大数写十六进制。 */
     @Test
     public void rawValues() {

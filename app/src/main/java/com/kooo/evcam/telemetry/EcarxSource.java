@@ -136,6 +136,8 @@ final class EcarxSource {
     private final ChangeTracker probeLog =
             new ChangeTracker(DarkScreenProbes.MAX_LINES_PER_WINDOW, DarkScreenProbes.WINDOW_MS);
     private final List<String> probeChanges = new ArrayList<>();
+    /** 照原值记的那几项（{@link DarkScreenProbes#RAW_WATCHED}）最近读到的原值：起点那一行照它写，不为起点另读一遍。只在自己的线程上碰。 */
+    private final Map<Signal, String> rawProbes = new EnumMap<>(Signal.class);
     /** 起点那一行记过了：之前的（注册后读的第一遍）是起点，不算变化。 */
     private boolean probesStarted;
     /** 记录出过错、日志写过了（只写一次，{@link #probeFailed}）。 */
@@ -708,6 +710,7 @@ final class EcarxSource {
         if (s.isFloat() && !floatsOn) {
             return;
         }
+        probeRaw(s, raw);
         Object decoded = s.decode(raw);
         Object before = values.get(s);
         boolean changed = decoded == null ? before != null : !decoded.equals(before);
@@ -946,6 +949,11 @@ final class EcarxSource {
                 probeLog.seed(DarkScreenProbes.key(s), v);
                 line.append(' ').append(DarkScreenProbes.key(s)).append('=').append(v);
             }
+            for (Signal s : DarkScreenProbes.RAW_WATCHED) {
+                String v = rawProbes.containsKey(s) ? rawProbes.get(s) : "?";
+                probeLog.seed(DarkScreenProbes.key(s), v);
+                line.append(' ').append(DarkScreenProbes.key(s)).append('=').append(v);
+            }
             probesStarted = true;
             BlackBox.note("车辆信号起点：" + line);
         } catch (RuntimeException e) {
@@ -973,6 +981,23 @@ final class EcarxSource {
             }
         } catch (RuntimeException e) {
             probeFailed("signal", e);
+        }
+    }
+
+    /**
+     * 信号表里照原值记的那几项（{@link DarkScreenProbes#RAW_WATCHED}，2.11.5）读到一个值（{@link #apply}：回调、对账都走它）：记它的原值，
+     * 变了（没超量）进这一次处理的那一行。起点之前读到的只留着给起点那一行。读不到的跳过（和 {@link #readProbes} 一样：
+     * 不然读不了的那几遍会和回调来回跳）。
+     */
+    private void probeRaw(Signal s, Object raw) {
+        try {
+            if (raw != null && DarkScreenProbes.watchesRaw(s)) {
+                String v = DarkScreenProbes.raw(raw);
+                rawProbes.put(s, v);
+                probeChanged(DarkScreenProbes.key(s), v);
+            }
+        } catch (RuntimeException e) {
+            probeFailed("raw", e);
         }
     }
 

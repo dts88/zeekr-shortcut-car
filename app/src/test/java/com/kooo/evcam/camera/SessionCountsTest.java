@@ -68,12 +68,42 @@ public class SessionCountsTest {
     }
 
     @Test
-    public void repeatedFailuresWithoutStartsOrLostBuffersAreFailing() {
+    public void repeatedFailuresWithoutStartsOrLostBuffersAreTheHalFailing() {
         SessionCounts counts = new SessionCounts();
         counts.reset(CONFIGURED);
         counts.failed(CONFIGURED + 500, 0, 1);
         counts.failed(CONFIGURED + 1_500, 0, 2);
-        assertEquals(SessionCounts.Kind.FAILING, counts.snapshot().kind());
+        assertEquals(SessionCounts.Kind.HAL_FAILING, counts.snapshot().kind());
+    }
+
+    /**
+     * 2.11.5 第 D0 项（rel_final §6）：HAL 开始出帧以后才怪我们的输出。10-14 装新版后第一次开环视「开始 0、结果 0、失败 2、
+     * 丢缓冲 main-preview 1」、亮屏重开后座舱「失败 2、丢缓冲 record 1」—— 以前都写成「我们的输出接不住」。
+     */
+    @Test
+    public void lostBuffersBeforeAnyStartAreTheHalFailingNotOurOutputs() {
+        SessionCounts counts = new SessionCounts();
+        counts.reset(CONFIGURED);
+        counts.failed(CONFIGURED + 1_000, 0, 0);
+        counts.lost("main-preview");
+        assertEquals("一次失败、丢了缓冲、没开始", SessionCounts.Kind.HAL_FAILING, counts.snapshot().kind());
+        counts.failed(CONFIGURED + 2_000, 0, 1);
+        assertEquals(SessionCounts.Kind.HAL_FAILING, counts.snapshot().kind());
+        counts.started();
+        assertEquals("开始过以后丢缓冲才算我们接不住", SessionCounts.Kind.STARVING, counts.snapshot().kind());
+    }
+
+    /** 一条规矩，先到先得：没配好、出过结果、开始过（丢没丢缓冲）、没开始（一次以内的失败、没丢缓冲 / 其余）。 */
+    @Test
+    public void classifyIsOneRuleInOrder() {
+        assertEquals(SessionCounts.Kind.NOT_CONFIGURED, SessionCounts.classify(false, 3, 5, 2, 1));
+        assertEquals(SessionCounts.Kind.FRAMED, SessionCounts.classify(true, 0, 1, 9, 9));
+        assertEquals(SessionCounts.Kind.STARVING, SessionCounts.classify(true, 1, 0, 0, 1));
+        assertEquals(SessionCounts.Kind.LATE_START, SessionCounts.classify(true, 1, 0, 3, 0));
+        assertEquals(SessionCounts.Kind.HAL_HOLDING, SessionCounts.classify(true, 0, 0, 0, 0));
+        assertEquals(SessionCounts.Kind.HAL_HOLDING, SessionCounts.classify(true, 0, 0, 1, 0));
+        assertEquals(SessionCounts.Kind.HAL_FAILING, SessionCounts.classify(true, 0, 0, 2, 0));
+        assertEquals(SessionCounts.Kind.HAL_FAILING, SessionCounts.classify(true, 0, 0, 0, 1));
     }
 
     /** 新的一份会话从头数；重复请求只记第一次（画面调节、录像换输出那几次重发不算）；新的一台设备没配好之前不算上一台的。 */
