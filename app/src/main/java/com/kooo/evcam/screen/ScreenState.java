@@ -630,6 +630,8 @@ public final class ScreenState {
                 + "；车辆信号 screen_power_event=" + VehicleScreen.eventText(after.event)
                 + "、点火=" + VehicleScreen.ignitionText(after.ignition));
         RecordingCoordinator.get(app).headUnitSleeps();
+        // 相机：通道眼里的熄屏也看安卓熄没熄屏（车机要睡不等黑满 30 秒，ChannelRules.darkForChannel）—— 叫醒调度，不等下一个两秒
+        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
         startWakePoll();
     }
 
@@ -641,6 +643,8 @@ public final class ScreenState {
                 + VehicleScreen.eventText(after.event) + "、点火=" + VehicleScreen.ignitionText(after.ignition)
                 + "）：车机醒着、屏幕黑着" + (darkMs < 0 ? "" : "，熄屏后 +" + darkMs / 1000 + " 秒"));
         RecordingCoordinator.get(app).headUnitWoke();
+        // 相机：安卓又亮了，通道眼里的熄屏照黑了多久算（ChannelRules.darkForChannel）—— 叫醒调度
+        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
         // 车机醒着：按开机自启动的规矩恢复服务；黑着不拉界面，录像接不接协调器照表判
         Recovery.restore(app, "wake");
     }

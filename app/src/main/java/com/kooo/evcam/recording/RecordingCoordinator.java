@@ -57,7 +57,7 @@ import java.util.Set;
  *   <li><b>停只有一条路</b>（{@link #end}）：人停的、被打断、开录失败、录着的那一份管线没了，
  *       都在这里收通知、悬浮按钮、唤醒锁，让相机层按同一套收拾（{@link MultiCameraManager#stopRecording()}），
  *       收拾完了才开下一次；</li>
- *   <li><b>熄屏</b>（屏幕真黑了，熄屏 v3）照 {@link ScreenOffPlan} 一张表：座舱屏幕一黑就放开（相机层的事），环视接着录或 10 秒后停；
+ *   <li><b>熄屏</b>（屏幕真黑了，熄屏 v3）照 {@link ScreenOffPlan} 一张表：座舱屏幕黑满 30 秒放开（相机层的事，2026-10-13），环视接着录或 10 秒后停；
  *       车机要睡（黑着时安卓熄屏）时现在停（哨兵模式没开、车没在走，2026-10-10）；车机黑着醒了照表接不接（只录环视）。
  *       「这一趟要录」落盘（{@link RecordingIntent#recordingWanted}），亮屏、车机醒了、进程被结束后又被拉起来，
  *       都从 {@link #resumeIfWanted} 接回；</li>
@@ -73,7 +73,10 @@ public final class RecordingCoordinator {
 
     /** 要录、却还没有相机管线时多久再看一眼。 */
     static final long POLL_MS = 2_000L;
-    /** 条件不满足（没 U 盘、盘满）时多久再试：不必两秒一次地去探盘。 */
+    /**
+     * 条件不满足（盘满、一路都没选）时多久再试：不必两秒一次地去探盘。U 盘不能用的那种头 2 分钟每 2 秒查一次、之后才是它
+     * （{@link RecordingStops.DiskWait}，项目所有者 2026-10-13「U 盘一可用就开录」）。
+     */
     static final long REFUSED_RETRY_MS = 30_000L;
 
     /**
@@ -163,6 +166,8 @@ public final class RecordingCoordinator {
     private final RecordingStops.ResumeBudget budget = new RecordingStops.ResumeBudget();
     /** 判了自动接回、还没开起来：录像要的几样留着（{@link #isRecordingOrResuming}）。 */
     private final RecordingStops.ResumeHold resumeHold = new RecordingStops.ResumeHold();
+    /** 开录在等 U 盘（查盘时盘不能用，拒了接着等）：头 2 分钟每 2 秒查一次（{@link #refused}）。 */
+    private final RecordingStops.DiskWait diskWait = new RecordingStops.DiskWait();
     /**
      * 开录前还没回来的那一次查盘是什么时候发出去的（elapsedRealtime）；0 = 没有。查盘卡住了，
      * 判了自动接回时留着的几样不跟着一直拿着（{@link #start}，{@link RecordingStops.ResumeHold#checkStuck}）。
@@ -606,8 +611,12 @@ public final class RecordingCoordinator {
             return;
         }
         if (pending == null) {
+            // 黑着开录录哪几路照通道眼里的熄屏写（MultiCameraManager.channelCountsDark）：黑了不到 30 秒时关着的座舱不开、
+            // 开着的录到黑满 30 秒才放开（ChannelRules.releasedByDark，项目所有者 2026-10-13）
             BlackBox.noteImportant("要录像（" + why + "）：查过盘就开录，不等环视"
-                    + (ScreenState.dark() ? "（屏幕黑着：只录环视）" : ""));
+                    + (!ScreenState.dark() ? "" : MultiCameraManager.channelCountsDark() ? "（屏幕黑着：只录环视）"
+                    : "（屏幕黑了不到 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000)
+                    + " 秒：座舱不开，开着的录到黑满 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000) + " 秒）"));
         }
         pending = why;
         noteWanted(true, why.name());
@@ -622,6 +631,7 @@ public final class RecordingCoordinator {
             pending = null;
             main.removeCallbacks(poll);
         }
+        diskWait.cancel();
         dropResumeHold(why);
     }
 
@@ -655,7 +665,8 @@ public final class RecordingCoordinator {
     /**
      * 熄屏了（ScreenState 在主线程调，屏幕真黑了）：不管在不在录，都照 {@link ScreenOffPlan#atDark} 判一次、照着做。
      * 平常这时车机醒着（安卓还亮着，几分钟后才下电）：熄屏持续录制开着、计划里有环视就接着录环视，不然 10 秒后停 ——
-     * 座舱不归这张表，屏幕一黑相机层就放开（{@code ChannelRules.releasedByDark}，项目所有者 2026-10-12 D2）。
+     * 座舱不归这张表，屏幕黑满 30 秒相机层放开（{@code ChannelRules.releasedByDark}、{@code darkForChannel}，项目所有者 2026-10-12 D2、
+     * 2026-10-13「黑满 30 秒再放」）—— 这张表不跟着挪，10 秒后停照屏幕真黑的那一刻算。
      * 车辆信号读不到时熄屏就是安卓熄屏（{@code androidOff}），也就是车机要睡一起来了：照表现在停、写下「车机要睡」
      * （和 2.11.1 一样），熄屏小结当场写（几秒后进程就可能没了，C16）。
      * 这一段熄屏的小结从这里起算，在不在录都算（以前只算在录、在等的那一段）。这里先于主界面、后视镜、相机层的熄屏监听者被叫到
@@ -781,7 +792,9 @@ public final class RecordingCoordinator {
                 + (androidOff ? "；安卓熄屏了" : "；车机醒着（安卓亮着）") + " → "
                 + (!busy ? (decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：相机按次序关" : "环视照登记表")
-                : waitingOnly ? (decision.action == ScreenOffPlan.Action.CONTINUE ? "接着等，好了就开录（只录环视）"
+                : waitingOnly ? (decision.action == ScreenOffPlan.Action.CONTINUE
+                ? "接着等，好了就开录（" + (MultiCameraManager.channelCountsDark() ? "只录环视"
+                : "座舱不开，开着的录到黑满 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000) + " 秒") + "）"
                 : decision.action == ScreenOffPlan.Action.STOP_NOW
                 ? "车机要睡了：不等开录了，相机按次序关"
                 : check == DarkCheck.STOP_DUE ? "不等开录了" : timerKept ? "照原来的计时（还剩 " + leftS + " 秒）不等开录了"
@@ -794,7 +807,15 @@ public final class RecordingCoordinator {
                 : (SCREEN_OFF_STOP_MS / 1000) + " 秒后停录")
                 + (busy && (keeps || lockHeld) && !surround && decision.action == ScreenOffPlan.Action.STOP_LATER
                 ? "（计划里没有环视）" : "")
-                + (check == DarkCheck.DARK ? "，座舱放开" : "")
+                // 座舱不归这张表：通道眼里黑了才放开 —— 黑满 30 秒；起点不明、安卓也熄屏了（车机要睡）是当场
+                // （MultiCameraManager.channelCountsDark，和调度同一句，不在这里另判）。停录时前台服务一起停的（亮屏后不接、
+                // 开机自启动关着，CameraForegroundService.stop）：之后没人要的相机不保持，当场关（规格 §3.5「保持」）
+                + (check != DarkCheck.DARK ? "" : MultiCameraManager.channelCountsDark() ? "，座舱放开"
+                : "，座舱黑满 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000) + " 秒后放开"
+                + (isRecording() && decision.action == ScreenOffPlan.Action.STOP_LATER && !decision.resumesOnWake
+                && !appConfig.isAutoStartOnBoot()
+                ? "（停录时前台服务一起停：那时没人要的相机当场关，不等 "
+                + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000) + " 秒）" : ""))
                 + (!busy || decision.action == ScreenOffPlan.Action.CONTINUE ? ""
                 : !decision.resumesOnWake ? "；亮屏后不接"
                 : ScreenOffPlan.startsWhileDark(keeps, surround) ? "；车机醒来或亮屏后接着录" : "；亮屏后接着录")
@@ -910,7 +931,8 @@ public final class RecordingCoordinator {
      * 熄屏小结（设计 v3 §6 L8、v3.1 C16），一段熄屏最多两行：车机要睡时一行（进程几秒后就可能没了，赶在那之前），亮屏时一行
      * （整段，带上车机睡了多久）。替代以前亮屏时那一行「亮屏：熄屏这一段结束…」（那一行只在熄屏时在录才有，哨兵模式开着、
      * 安卓一直不熄屏的那一种一行都没有）。「共」「车机睡了」用 elapsedRealtime（含深睡）减 uptime（不含深睡）；
-     * 座舱放开完用相机层记的那一刻（{@link MultiCameraManager#cabinsReleasedAtElapsed}，elapsedRealtime）。
+     * 座舱放开完用相机层记的那一刻（{@link MultiCameraManager#cabinsReleasedAtElapsed}，elapsedRealtime；平常是熄屏后约 30 秒，
+     * 通道一直没把这一段算作黑就亮了的写「没到 30 秒，座舱没动」，{@link MultiCameraManager#channelCountedDark}）。
      * 录像停、开的次数照 {@link RecordingStops.DarkTally}：中途停过、照表停录（每一次都数，第一次的时刻）、车机醒来接着录。
      *
      * @param atSleep      车机要睡时写（否则亮屏时）
@@ -944,11 +966,16 @@ public final class RecordingCoordinator {
                 + (darkTally.firstTableStopAt() - darkSinceElapsedMs) / 1000 + " 秒）" : "")
                 + (darkTally.wokeStarts() > 0 ? "，车机醒来接着录 " + darkTally.wokeStarts() + " 次" : "")
                 + "，现在" + (recordingNow ? "在录" : "没在录"))
-                + "；座舱" + (manager == null ? "：没有相机管线"
-                : withDarkEdge ? "：和环视一起按次序关（安卓熄屏就是车机要睡）"
+                + "；" + (manager == null ? "座舱：没有相机管线"
+                : withDarkEdge ? "座舱：和环视一起按次序关（安卓熄屏就是车机要睡）"
                 : releasedAt > 0 && releasedAt >= darkSinceElapsedMs
-                ? " 熄屏后 +" + (releasedAt - darkSinceElapsedMs) + "ms 放开完"
-                : !manager.cabinsOpenAtDark() ? "：熄屏时没开着" : "：还没关完"));
+                ? "座舱 熄屏后 +" + (releasedAt - darkSinceElapsedMs) + "ms 放开完"
+                : !manager.cabinsOpenAtDark() ? "座舱：熄屏时没开着"
+                // 黑满 30 秒才放开座舱（ChannelRules.darkForChannel，项目所有者 2026-10-13）：通道一直没把这一段算作黑
+                // （亮屏那一轮还没跑，快照是这一段最后的样子；起点不明的当场就算黑了），之前就亮了，相机一步没动
+                : !atSleep && !manager.channelCountedDark()
+                ? "没到 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000) + " 秒，座舱没动"
+                : "座舱：还没关完"));
     }
 
     /** 墙上时间写成「20:05:46.709」（熄屏小结用）。 */
@@ -1009,7 +1036,9 @@ public final class RecordingCoordinator {
         }
         BlackBox.noteImportant("「这一趟要录」还在（" + where
                 + (lastStopReason == null ? "，上一个进程留下的" : "，" + lastStopReason + " 停的") + "）：接着录"
-                + (dark ? "（屏幕黑着，只录环视）" : ""));
+                + (!dark ? "" : MultiCameraManager.channelCountsDark() ? "（屏幕黑着，只录环视）"
+                : "（屏幕黑了不到 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000)
+                + " 秒，座舱不开，开着的录到黑满 " + (com.kooo.evcam.camera.ChannelRules.HOLD_MS / 1000) + " 秒）"));
         request(why);
     }
 
@@ -1056,7 +1085,7 @@ public final class RecordingCoordinator {
         // 录哪几路 = 配置里启用了哪几路。这两件事本来就是同一件：关掉的相机不开、不录、不占流
         Set<String> cameras = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context);
         if (cameras.isEmpty()) {
-            refused(why, context.getString(R.string.msg_keep_one_camera_refuse));
+            refused(why, context.getString(R.string.msg_keep_one_camera_refuse), false);
             return;
         }
         // 查盘是异步的：查完回来就接着开（或者拒了再等）。万一一直不回来，到点再看一次，别一直等下去
@@ -1094,8 +1123,17 @@ public final class RecordingCoordinator {
         // 正常模式下不往内置存储录：行车记录是一直在写的，而车机闪存换不了。
         // 判断放在这里，所有入口才是同一个答案（以前只有按按钮那条路拦得住）
         if (!storage.available) {
-            refused(why, context.getString(R.string.msg_refuse_no_external));
+            refused(why, context.getString(R.string.msg_refuse_no_external), true);
             return;
+        }
+        // 在等 U 盘的，等到了（项目所有者 2026-10-13「U 盘一可用就开录」）：等了多久写一行。只说盘能用了，不说开录 ——
+        // 下面还要查写不写得下（盘满了拒的不进黑匣子），开没开看后面「录像意图开」那一行
+        long waitedForDisk = diskWait.ready(android.os.SystemClock.elapsedRealtime());
+        if (waitedForDisk >= 0) {
+            BlackBox.noteImportant("U 盘能用了：开录（" + why + "）等了 " + String.format(Locale.US, "%.1f",
+                    waitedForDisk / 1000f) + " 秒（盘不能用时头 " + (RecordingStops.DiskWait.FAST_FOR_MS / 60_000)
+                    + " 分钟每 " + (RecordingStops.DiskWait.FAST_EVERY_MS / 1000) + " 秒查一次）；此刻挂着的盘："
+                    + storage.mounts);
         }
         // 开录前先确认写得下：以前不查，盘满时照常开录，第一笔数据写不进去，按钮就卡在「正在准备」
         if (checkStorage && !ensureRoomToStart(storage, cameras, why)) {
@@ -1186,7 +1224,7 @@ public final class RecordingCoordinator {
             return true;
         }
         if (appConfig.getVideoStorageLimitGb() <= 0) {
-            refused(why, context.getString(R.string.msg_storage_full_refuse));
+            refused(why, context.getString(R.string.msg_storage_full_refuse), false);
             return false;
         }
         AppLog.i(TAG, "开录前空间不够，先清理最旧的录像");
@@ -1201,7 +1239,7 @@ public final class RecordingCoordinator {
             }
             if (decision.verdict == com.kooo.evcam.camera.StoragePlan.Verdict.FULL) {
                 refused(why, context.getString(decision.lockedFull
-                        ? R.string.msg_storage_locked_refuse : R.string.msg_storage_cannot_free));
+                        ? R.string.msg_storage_locked_refuse : R.string.msg_storage_cannot_free), false);
             } else {
                 startWith(storage, cameras, why, false);
             }
@@ -1212,12 +1250,20 @@ public final class RecordingCoordinator {
     /**
      * 条件不满足：告诉界面，然后留在「要录」的状态里，过一会儿再看（U 盘插上、盘清出来了都算）。
      * 自动接回查过盘被拒了，就是确定这一次不接了：之后是等，等的不登记 —— 留着的几样放掉（{@link #dropResumeHold}）。
+     *
+     * <p>U 盘不能用拒的（{@code noDisk}）：盘一能用就开（项目所有者 2026-10-13）—— 这台车机收不到 U 盘插拔的广播，
+     * 所以等盘的头 2 分钟每 2 秒再查一次，之后照旧 {@link #REFUSED_RETRY_MS}（{@link RecordingStops.DiskWait}）。
+     * 查得勤的那一段里同一个原因不再告诉界面（界面本来也只说一次），黑匣子不为每一次查写行（存储快照只在盘的样子变了时写）；
+     * 等到了，开录那一下写一行等了多久（{@link #startWith}）。别的原因（盘满、一路都没选）照旧 30 秒一次。</p>
      */
-    private void refused(Why why, String reason) {
-        notifyRefused(reason);
+    private void refused(Why why, String reason, boolean noDisk) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (!(noDisk && diskWait.refused(now))) {
+            notifyRefused(reason);
+        }
         pending = why;
         main.removeCallbacks(poll);
-        main.postDelayed(poll, REFUSED_RETRY_MS);
+        main.postDelayed(poll, noDisk ? diskWait.nextCheckMs(now, REFUSED_RETRY_MS) : REFUSED_RETRY_MS);
         dropResumeHold("refused");
     }
 

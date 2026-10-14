@@ -276,11 +276,11 @@
     <string name="info_read_failed">Tidak dapat dibaca</string>
     <string name="msg_rearview_on">Cermin super dihidupkan. Seret tepi untuk mengalihkannya; leret bahagian tengah ke atas atau bawah untuk mengubah bingkai.</string>
     <string name="msg_rearview_reset">Tetingkap dan paparan Cermin super ditetapkan semula</string>
-    <string name="set_side_popup_title">Pandangan sisi isyarat membelok</string>
-    <string name="set_side_popup_summary">Memaparkan kamera di sebelah isyarat belok. Pilih untuk menggantikan Cermin super atau membuka tetingkap sisi berasingan. Undur dan paparan kamera asal kereta diutamakan.</string>
+    <string name="set_side_popup_title">Kamera titik buta automatik</string>
+    <string name="set_side_popup_summary">Memaparkan kamera kiri atau kanan apabila anda memberi isyarat belok. Paparan kamera asal kereta diutamakan.</string>
     <string name="set_side_popup_speed_title">Kelajuan minimum untuk buka (km/j)</string>
     <string name="set_side_popup_speed_summary">Dibuka pada atau melebihi kelajuan ini; 0 membuang had kelajuan. Pandangan sisi masih disembunyikan semasa mengundur, bantuan parkir atau paparan kamera asal, termasuk tetingkap 360° yang dicetuskan oleh isyarat belok pada kelajuan rendah.</string>
-    <string name="msg_side_popup_on">Pandangan sisi isyarat membelok dibuka. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>
+    <string name="msg_side_popup_on">Kamera titik buta automatik dihidupkan. Beri isyarat kiri atau kanan untuk melihat sisi itu</string>
     <string name="set_side_popup_straighten_title">Luruskan gambar</string>
     <string name="set_side_popup_straighten_summary">Membetulkan lengkungan mata ikan dan melaraskan pandangan sisi dalam kedua-dua tetingkap; rakaman tidak berubah.</string>
     <string name="set_side_popup_fov_title">Lebar pandangan (°)</string>
@@ -936,16 +936,17 @@
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
-    <string name="set_side_popup_replace_mirror_title">Gantikan Cermin super</string>
-    <string name="set_side_popup_replace_mirror_summary">Hidup: paparkan kamera sisi sementara dalam cermin. Mati: kekalkan pandangan cermin dan buka tetingkap sisi berasingan.</string>
-    <string name="msg_side_popup_unavailable">Tetingkap sisi tidak tersedia. Cuba Gantikan Cermin super apabila Cermin super dihidupkan.</string>
-    <string name="set_side_popup_reset_title">Set semula tetapan pandangan sisi</string>
+    <string name="set_side_popup_replace_mirror_title">Guna Cermin super apabila aktif</string>
+    <string name="set_side_popup_replace_mirror_summary">Hidup: paparkan kamera sisi sementara dalam Cermin super apabila aktif; jika tidak, guna tetingkap berasingan. Mati: sentiasa guna tetingkap berasingan bersama cermin.</string>
+    <string name="msg_side_popup_unavailable">Tetingkap kamera titik buta tidak tersedia. Cuba Guna Cermin super apabila aktif dengan Cermin super dihidupkan.</string>
+    <string name="set_side_popup_reset_title">Set semula tetapan kamera titik buta</string>
     <string name="set_side_popup_reset_summary">Memulihkan kelajuan, gambar, mod paparan, masa, saiz dan kedudukan lalai; mengekalkan keadaan hidup/mati</string>
-    <string name="msg_side_popup_reset">Tetapan pandangan sisi dipulihkan kepada lalai</string>
+    <string name="msg_side_popup_reset">Tetapan kamera titik buta dipulihkan kepada lalai</string>
     <string name="set_side_popup_rotation_left_title">Putaran imej kiri (°)</string>
     <string name="set_side_popup_rotation_right_title">Putaran imej kanan (°)</string>
     <string name="set_side_popup_rotation_summary">Laraskan imej senget: positif mengikut arah jam, negatif melawan arah jam. Tepi dipotong untuk memenuhi tetingkap. Digunakan dalam kedua-dua tetingkap; rakaman tidak berubah.</string>
     <string name="side_control_close">Tutup pandangan sisi ini</string>
     <string name="side_control_expand">Besarkan pandangan sisi</string>
     <string name="side_control_restore">Pulihkan saiz tetingkap</string>
+    <string name="set_section_blind_spot_camera">Kamera titik buta</string>
 </resources>

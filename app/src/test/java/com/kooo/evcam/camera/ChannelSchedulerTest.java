@@ -912,6 +912,212 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("close dark-release"), front.actions);
     }
 
+    // ================================================================= 黑满 30 秒再放（项目所有者 2026-10-13）
+
+    /**
+     * 屏幕黑了不到 30 秒又亮（10-13 20:10:11 车门开关的那 4.7 秒，哨兵模式开着：那时关了后座舱、亮屏再开，重开 15 秒没画面，
+     * 救援那一次关又卡了 6.2 秒）：相机一步不动 —— 不关、不改输出，录像那一侧什么都没听说，座舱不算放开。黑了 29 秒才亮也一样。
+     */
+    @Test
+    public void aDarkShorterThanThirtySecondsTouchesNoCamera() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+        told.clear();
+        int journalLines = journal.size();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        assertFalse("黑了还不到 30 秒：不算放开", s.releasedByDark(REAR));
+        at(5_700);
+        host.goLit();
+        s.wake();
+        settle();
+
+        at(100_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(100_000 + ChannelRules.HOLD_MS - 1_000);
+        assertFalse(s.releasedByDark(REAR) || s.releasedByDark(FRONT));
+        host.goLit();
+        s.wake();
+        settle();
+        at(300_000);
+
+        assertTrue("一步不动：" + surround.actions + rear.actions + front.actions,
+                surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        assertTrue("录像那一侧什么都没听说：" + told, told.isEmpty());
+        assertTrue("录制器不停放、不派「随相机关了」", rear.drops.isEmpty() && front.drops.isEmpty());
+        assertTrue(lines("closing").isEmpty() && lines("holding").isEmpty());
+        assertEquals("黑匣子里通道这一侧一行都没有", journalLines, journal.size());
+    }
+
+    /**
+     * 黑满 30 秒的那一刻（不是下一个两秒）两路座舱一起关（dark-release，「熄屏：座舱放开」），环视照录。
+     * 黑下来的那一下比调度那一轮早半秒（监听者先做完才轮到调度）：照黑下来的那一刻算。
+     */
+    @Test
+    public void theCabinsLeaveTheMomentTheScreenHasBeenDarkForThirtySeconds() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+        told.clear();
+
+        at(1_000);
+        host.goDark();
+        host.darkAt = T0 + 500;
+        s.wake();
+        settle();
+        at(500 + ChannelRules.HOLD_MS - 1);
+        assertTrue("差 1 毫秒：不动", rear.actions.isEmpty() && front.actions.isEmpty());
+        assertFalse(s.releasedByDark(REAR));
+        at(500 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertTrue("环视一步不动", surround.actions.isEmpty());
+        assertEquals(1, lines("closing [left, back] DARK_RELEASE").size());
+        assertEquals(Arrays.asList("gone left CLOSED DARK_RELEASE", "gone back CLOSED DARK_RELEASE"), told("gone"));
+        assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
+        assertFalse(s.releasedByDark(SUR));
+    }
+
+    /**
+     * 车机要睡（黑着时安卓熄屏）不等 30 秒：黑了 5 秒就要睡的，当场按次序关（环视先单独关，再关座舱）。
+     * 安卓熄屏了而车机不睡的（开发者唤醒锁拉着）：座舱当场放开，环视照录。
+     */
+    @Test
+    public void theHeadUnitSleepingDoesNotWaitThirtySeconds() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(6_000);
+        assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty());
+        host.androidOff = true;
+        host.sleeps = true;
+        s.onNeedsChanged();
+        settle();
+        assertEquals("当场按次序关：环视单独先关", Arrays.asList("close head-unit-sleeps"), surround.actions);
+        assertTrue(rear.actions.isEmpty());
+        at(6_100);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close head-unit-sleeps"), rear.actions);
+        assertEquals(Arrays.asList("close head-unit-sleeps"), front.actions);
+    }
+
+    /** 安卓熄屏了、车机没判成要睡（开发者唤醒锁拉着车机）：同样不等 30 秒，座舱当场放开，环视照录。 */
+    @Test
+    public void androidGoingOffWhileDarkReleasesTheCabinsAtOnce() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(6_000);
+        host.androidOff = true;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertTrue("环视照录", surround.actions.isEmpty());
+    }
+
+    /**
+     * 熄屏持续录制关着：录像 10 秒后停（那张表不跟着挪），座舱、环视没人要了，前台服务在 —— 保持到屏幕黑满 30 秒，
+     * 那一刻照熄屏的规矩关：环视单独先关（熄屏），关完再关座舱（熄屏：座舱放开）。不早于 30 秒。
+     */
+    @Test
+    public void aRecordingStoppedAtTenSecondsLeavesTheCamerasUntilThirtySeconds() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(11_000);
+        drop(Holder.RECORDING);
+        settle();
+        assertEquals("没人要了：保持（到屏幕黑满 30 秒）", 1, lines("holding").size());
+        at(1_000 + ChannelRules.HOLD_MS - 1);
+        assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        assertTrue("座舱等环视先关完", rear.actions.isEmpty());
+        at(1_000 + ChannelRules.HOLD_MS + 100);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+    }
+
+    /**
+     * 黑了不到 30 秒时才来的开录（等 U 盘的那一次这时等到了、存储停了接回）：关着的座舱不开，只开环视（和 2.11.2 一样 ——
+     * 黑屏里用不着它，哨兵模式开着时开后座舱正是 10-12、10-13 两次一帧不出的那一种操作）；录像那一侧读到座舱被熄屏放开，不等它们。
+     * 黑满 30 秒时没有座舱可放，什么都不动；亮了座舱照常一路一路开（后座舱 → 前座舱）。
+     */
+    @Test
+    public void aStartInTheFirstThirtySecondsOfDarkLeavesTheClosedCabinsClosed() {
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        assertTrue("关着的座舱黑着不开：算熄屏放开", s.releasedByDark(REAR) && s.releasedByDark(FRONT));
+        assertFalse(s.releasedByDark(SUR));
+
+        at(7_000);
+        host.plan(SUR, REAR, FRONT);
+        declare(surround, recS);
+        declare(rear, recR);
+        declare(front, recF);
+        claim(Holder.RECORDING);
+        settle();
+        assertEquals("只开环视", Arrays.asList("open [RECORD]"), surround.actions);
+        at(7_300);
+        opened(surround);
+        frame(surround);
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS + 5_000);
+        assertTrue("座舱一直没开：" + rear.actions + front.actions, rear.actions.isEmpty() && front.actions.isEmpty());
+        assertTrue(lines("closing").isEmpty());
+        assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
+
+        host.goLit();
+        s.wake();
+        settle();
+        assertEquals("亮了：后座舱先开", Arrays.asList("open [RECORD]"), rear.actions);
+        assertTrue("一路一路来", front.actions.isEmpty());
+        assertFalse(s.releasedByDark(REAR) || s.releasedByDark(FRONT));
+    }
+
     // ================================================================= 问（只问，不开）
 
     /**
@@ -2144,6 +2350,13 @@ public class ChannelSchedulerTest {
         final List<String> took = new ArrayList<>();
         boolean sleeps;
         boolean screenOn;
+        /**
+         * 屏幕黑下来的那一刻（调度的钟）；0 = 起点不明 —— 规则按黑满 30 秒算（ChannelRules.darkForChannel），
+         * 只设 {@link #screenOn} 的那些测试就是「一黑就放开」。
+         */
+        long darkAt;
+        /** 黑着时安卓也熄屏了（车机要睡 / 睡着）。 */
+        boolean androidOff;
         boolean foregroundService;
         boolean mainForeground;
         boolean startedWhileVisible;
@@ -2202,6 +2415,29 @@ public class ChannelSchedulerTest {
         @Override
         public boolean screenOn() {
             return screenOn;
+        }
+
+        @Override
+        public long darkForMs() {
+            return screenOn || darkAt == 0 ? -1 : now - darkAt;
+        }
+
+        @Override
+        public boolean androidOff() {
+            return androidOff;
+        }
+
+        /** 屏幕真黑了（车主下车那一下）：从此刻起算黑了多久。 */
+        void goDark() {
+            screenOn = false;
+            darkAt = now;
+        }
+
+        /** 亮了（开车门）。 */
+        void goLit() {
+            screenOn = true;
+            darkAt = 0;
+            androidOff = false;
         }
 
         @Override

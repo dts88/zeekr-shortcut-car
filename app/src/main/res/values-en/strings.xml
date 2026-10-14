@@ -276,11 +276,11 @@
     <string name="info_read_failed">Can\'t read</string>
     <string name="msg_rearview_on">Super mirror on. Drag the sides to move it; swipe the middle up or down to reframe.</string>
     <string name="msg_rearview_reset">Super mirror window and view reset</string>
-    <string name="set_side_popup_title">Turn-signal side view</string>
-    <string name="set_side_popup_summary">Shows the camera on the side you signal. Choose whether to replace Super mirror or open a separate window alongside it. Reverse and the car\'s own camera views take priority.</string>
+    <string name="set_side_popup_title">Automatic blind spot camera</string>
+    <string name="set_side_popup_summary">Shows the left or right camera when you signal. Factory camera views take priority.</string>
     <string name="set_side_popup_speed_title">Minimum opening speed (km/h)</string>
     <string name="set_side_popup_speed_summary">Opens at or above this speed; 0 removes the speed restriction. The side view still stays hidden during reverse, parking assist or a factory camera view, including the low-speed indicator-triggered 360° pop-up.</string>
-    <string name="msg_side_popup_on">Turn-signal side view on. Signal left or right to see that side</string>
+    <string name="msg_side_popup_on">Automatic blind spot camera on. Signal left or right to see that side</string>
     <string name="set_side_popup_straighten_title">Straighten picture</string>
     <string name="set_side_popup_straighten_summary">Corrects the fisheye curve and adjusts side-view framing in either window; recordings are unchanged.</string>
     <string name="set_side_popup_fov_title">View width (°)</string>
@@ -959,16 +959,17 @@
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
-    <string name="set_side_popup_replace_mirror_title">Replace Super mirror</string>
-    <string name="set_side_popup_replace_mirror_summary">On: temporarily show the side camera in the existing mirror. Off: keep the mirror view and show a separate side-view pop-up.</string>
-    <string name="msg_side_popup_unavailable">Side-view pop-up unavailable. Try Replace Super mirror when Super mirror is enabled.</string>
-    <string name="set_side_popup_reset_title">Reset side-view settings</string>
+    <string name="set_side_popup_replace_mirror_title">Use Super mirror when active</string>
+    <string name="set_side_popup_replace_mirror_summary">On: temporarily show the side camera in Super mirror when it is active; otherwise use a separate window. Off: always use a separate window alongside the mirror.</string>
+    <string name="msg_side_popup_unavailable">Blind spot camera window unavailable. Try Use Super mirror when active with Super mirror enabled.</string>
+    <string name="set_side_popup_reset_title">Reset blind spot camera settings</string>
     <string name="set_side_popup_reset_summary">Restores default speed, picture, display mode, timing, window size and position; keeps the current on/off state</string>
-    <string name="msg_side_popup_reset">Side-view settings restored to defaults</string>
+    <string name="msg_side_popup_reset">Blind spot camera settings restored to defaults</string>
     <string name="set_side_popup_rotation_left_title">Left image rotation (°)</string>
     <string name="set_side_popup_rotation_right_title">Right image rotation (°)</string>
     <string name="set_side_popup_rotation_summary">Level a tilted image: positive clockwise, negative counterclockwise. Crops edges to fill the window. Applies in either window; recordings are unchanged.</string>
     <string name="side_control_close">Dismiss this side view</string>
     <string name="side_control_expand">Expand side view</string>
     <string name="side_control_restore">Restore window size</string>
+    <string name="set_section_blind_spot_camera">Blind spot camera</string>
 </resources>
