@@ -175,6 +175,121 @@ public class StepStatsTest {
         assertEquals(Collections.singletonList(6L), Collections.singletonList(closed.closes.get(0).at));
     }
 
+    /**
+     * 关座舱时环视那一条（2.11.5 第 D2、D3 项）存得下、读得回：关的几路、为什么关、环视最后一帧比关完早（负数）、关完 1 秒后没出过画面、
+     * 我们救它那一刻、环视第几台、点火。
+     */
+    @Test
+    public void aCouplingEntryRoundTripsThroughItsLine() {
+        StepStats.Entry e = new StepStats.Builder()
+                .step(1_697_000_000_000L, SUR, "2", StepStats.Move.COUPLE, StepStats.Result.STALLED, 8_121)
+                .vehicle(0, 30_000, -1, 30_000, 125)
+                .main(false)
+                .surround(null, 8_121, Boolean.FALSE)
+                .lineage(5, "CAME_BACK")
+                .coupling(Arrays.asList(FRONT, REAR), "DARK_RELEASE", -35, 0, "RESCUE", 8_100)
+                .ignition("ACC")
+                .build();
+        String line = e.encode();
+        StepStats.Entry back = StepStats.parse(line);
+        assertNotNull(line, back);
+        assertEquals(line, back.encode());
+        assertEquals(StepStats.Move.COUPLE, back.move);
+        assertEquals(StepStats.Result.STALLED, back.result);
+        assertEquals(8_121, back.ms);
+        assertEquals("back,left", back.closedKeys);
+        assertEquals("DARK_RELEASE", back.closeWhy);
+        assertEquals("负数照存", -35, back.lastResultMs);
+        assertEquals(0, back.deliveredAfter);
+        assertEquals("RESCUE", back.ours);
+        assertEquals(8_100, back.oursAtMs);
+        assertEquals(5, back.lineage);
+        assertEquals("CAME_BACK", back.lineageReset);
+        assertEquals("ACC", back.ignition);
+        assertNull(back.closeKind);
+        assertEquals("关座舱时环视那一条不是一步", false, StepStats.isStep(back));
+
+        StepStats.Entry plain = StepStats.parse("v1 t=5 k=left m=CLOSE r=CLOSED ms=200");
+        assertEquals("没记的是 MIN_VALUE", Long.MIN_VALUE, plain.lastResultMs);
+        assertEquals(-1, plain.lineage);
+        assertNull("2.11.4 记的行没有这几项", StepStats.lineageBucket(plain));
+        assertNull("认不出的关的种类：整行不要", StepStats.parse("v1 t=5 k=left m=CLOSE r=CLOSED ck=TELEPORT"));
+    }
+
+    /**
+     * 丢了之后那一次关、救援重开时关旧设备（2.11.5 第 D3 项）单算一组；备选方案那一组只比计划里的关；
+     * 环视那一台是不是第一台分三种（不知道的不算进哪一组）。
+     */
+    @Test
+    public void rescueAndLossClosesAreTheirOwnGroupAndLineageSplitsFirstFromLater() {
+        StepStats.Entry loss = new StepStats.Builder()
+                .step(1, SUR, "2", StepStats.Move.CLOSE, StepStats.Result.CLOSED, 5_798)
+                .closeKind(StepStats.CloseKind.LOSS).error("DEVICE_ERROR:4").build();
+        StepStats.Entry back = StepStats.parse(loss.encode());
+        assertEquals(StepStats.CloseKind.LOSS, back.closeKind);
+        assertEquals("front CLOSE:LOSS", StepStats.laneMove(back));
+        assertEquals("front CLOSE", StepStats.laneMove(entry(2, SUR, StepStats.Move.CLOSE, StepStats.Result.CLOSED, 100)));
+
+        StepStats.Entry first = new StepStats.Builder()
+                .step(3, SUR, "2", StepStats.Move.OPEN, StepStats.Result.FRAMED, 200).lineage(1, "TAKEN").build();
+        StepStats.Entry later = new StepStats.Builder()
+                .step(4, REAR, "1", StepStats.Move.CLOSE, StepStats.Result.CLOSED, 200).lineage(5, "CAME_BACK").build();
+        StepStats.Entry counted = new StepStats.Builder()
+                .step(5, SUR, "2", StepStats.Move.OPEN, StepStats.Result.FRAMED, 200).lineage(1, null).build();
+        assertEquals("lineage:first", StepStats.lineageBucket(first));
+        assertEquals("lineage:later", StepStats.lineageBucket(later));
+        assertEquals("从记录开始数的不可信", "lineage:?", StepStats.lineageBucket(counted));
+        assertNull(StepStats.lineageBucket(new StepStats.Builder()
+                .step(6, SUR, "2", StepStats.Move.OPEN, StepStats.Result.FRAMED, 200).lineage(0, "TAKEN").build()));
+
+        StepStats.Entry cabinLoss = new StepStats.Builder()
+                .step(7, REAR, "1", StepStats.Move.CLOSE, StepStats.Result.CLOSED, 7_822)
+                .closeKind(StepStats.CloseKind.LOSS).surround("STREAMING", 0, Boolean.FALSE).build();
+        Map<String, StepStats.CloseComparison> groups = StepStats.cabinClosesBySurround(Arrays.asList(
+                closeWithSurround(8, REAR, "STREAMING", 220), cabinLoss));
+        assertEquals("丢了之后那一次关不比", 1, groups.get("STREAMING").closes.size());
+    }
+
+    /**
+     * 关座舱之后环视那一边（2.11.5 第 D3 项）：几次关座舱、环视断了几次、最长的那一次；别的条不算。10-15 的统计那样：
+     * 不是第一台、主界面在后台的断了，第一台的没断。
+     */
+    @Test
+    public void surroundAfterClosesCountsStallsAndTheLongest() {
+        List<StepStats.Entry> couples = Arrays.asList(
+                couple(1, StepStats.Result.STALLED, 48_800, 5, false),
+                couple(2, StepStats.Result.STALLED, 42_400, 5, false),
+                couple(3, StepStats.Result.STEADY, 100, 1, false),
+                entry(4, REAR, StepStats.Move.CLOSE, StepStats.Result.CLOSED, 200));
+        StepStats.SurroundAfterClose all = StepStats.surroundAfterCloses(couples);
+        assertEquals(3, all.closes);
+        assertEquals(2, all.stalled);
+        assertEquals(48_800, all.longestMs);
+        Map<String, List<StepStats.Entry>> byLineage = StepStats.groupBy(couples, StepStats::lineageBucket);
+        assertEquals(2, StepStats.surroundAfterCloses(byLineage.get("lineage:later")).stalled);
+        StepStats.SurroundAfterClose firsts = StepStats.surroundAfterCloses(byLineage.get("lineage:first"));
+        assertEquals(1, firsts.closes);
+        assertEquals(0, firsts.stalled);
+        assertEquals("没断过", -1, firsts.longestMs);
+    }
+
+    /**
+     * 存下的「配好以来回了什么」照今天的规矩重算（2.11.5 第 D0 项）：2.11.4 记的 STARVING 里开始 0 的那几条其实是 HAL 一帧没开始；
+     * 旧的 FAILING 也是这一种；数不全的照存下的名字。
+     */
+    @Test
+    public void storedCountsAreReclassifiedWithTodaysRule() {
+        assertEquals("HAL_FAILING", StepStats.parse(
+                "v1 t=1 k=front m=OPEN r=NO_FRAMES cnt=STARVING st=0 res=0 fail=2 lost=1").kind());
+        assertEquals("STARVING", StepStats.parse(
+                "v1 t=1 k=front m=OPEN r=NO_FRAMES cnt=STARVING st=3 res=0 fail=2 lost=1").kind());
+        assertEquals("HAL_FAILING", StepStats.parse(
+                "v1 t=1 k=front m=OPEN r=NO_FRAMES cnt=FAILING st=0 res=0 fail=3 lost=0").kind());
+        assertEquals("NOT_CONFIGURED", StepStats.parse("v1 t=1 k=front m=OPEN r=NO_FRAMES cnt=NOT_CONFIGURED").kind());
+        assertEquals("数不全", "STARVING", StepStats.parse("v1 t=1 k=front m=OPEN r=NO_FRAMES cnt=STARVING").kind());
+        assertNull(entry(1, REAR, StepStats.Move.OPEN, StepStats.Result.FRAMED, 100).kind());
+    }
+
     @Test
     public void tokensNeverCarrySpacesOrEquals() {
         assertEquals("a_b_c", StepStats.token("a b=c"));
@@ -187,6 +302,12 @@ public class StepStatsTest {
     private static StepStats.Entry withClose(long sinceCloseMs) {
         return new StepStats.Builder().step(1, REAR, "1", StepStats.Move.OPEN, StepStats.Result.FRAMED, 100)
                 .lastClose(sinceCloseMs, 200).build();
+    }
+
+    private static StepStats.Entry couple(long at, StepStats.Result result, long ms, int lineage, boolean main) {
+        return new StepStats.Builder().step(at, SUR, "2", StepStats.Move.COUPLE, result, ms).main(main)
+                .lineage(lineage, "CAME_BACK").coupling(Arrays.asList(REAR, FRONT), "DARK_RELEASE", -35, 0, null, -1)
+                .build();
     }
 
     private static StepStats.Entry closeWithSurround(long at, String key, String surround, long ms) {

@@ -28,6 +28,17 @@ public class LogcatNoiseTest {
         assertFalse(LogcatNoise.isNoise("09-26 08:16:02.4 I/MPEG4Writer( 9314): Received total/0-length"));
     }
 
+    /** 车辆接口 SDK 的流水账（标签带进程号）按开头滤（2.11.5 第 D4 项：10-14 21:52 的卡顿现场 logcat 一段全是它）。 */
+    @Test
+    public void dropsTheVehicleSdkChatterByTagPrefix() {
+        assertTrue(LogcatNoise.isNoise(
+                "10-14 21:52:21.992 D/AdaptL_13951_ISensorImpl(13951): getSensorLatestValue function=1051392"));
+        assertTrue(LogcatNoise.isNoise(
+                "10-14 21:52:21.993 D/AdaptL_13951_AdaptFuncManager(13951): getCustomizeFunctionValue function=-1"));
+        assertFalse(LogcatNoise.isNoise("10-14 21:52:23.259 W/StallWatch(13951): STALL recorder 2"));
+        assertFalse("开头不一样的不算", LogcatNoise.isNoise("10-14 21:52:23.259 D/MyAdaptL_1(13951): x"));
+    }
+
     @Test
     public void keepsLinesItCannotParse() {
         assertNull(LogcatNoise.tagOf("--------- beginning of main"));

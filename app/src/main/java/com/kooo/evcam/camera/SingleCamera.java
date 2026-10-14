@@ -205,6 +205,12 @@ public class SingleCamera {
     /** 最近一次真的收到画面（capture 完成）—— 开相机、建会话不算。 */
     private volatile long lastCaptureUptimeMs = 0;
     /**
+     * 这一份相机对象建起来以来一共失败了几次请求、丢了几次缓冲（不分会话，只增不减；出帧回调里加）。关座舱时环视那一行
+     * 「开始关以来每一路失败 / 丢缓冲」拿开始关那一刻和之后的差（2.11.5 第 D2 项，{@link #captureFailures}、{@link #lostBuffers}）。
+     */
+    private final java.util.concurrent.atomic.AtomicLong failuresTotal = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicLong lostTotal = new java.util.concurrent.atomic.AtomicLong();
+    /**
      * 两帧之间隔了这么久以上才记成一次断帧（{@link #longestFrameGapSince}）：30 / 15 fps 正常是 33–66 ms 一帧，
      * 会话重建、相机服务卡一下都在几百毫秒以上。
      */
@@ -252,8 +258,6 @@ public class SingleCamera {
      * {@link #closingSince} 认「这一台还在关一个设备」—— 那是在途，手上那一步到点也不放过（ChannelRules.inFlight）。</p>
      */
     private static final java.util.Map<String, Closing> CLOSING = new java.util.concurrent.ConcurrentHashMap<>();
-    /** 每台相机最近一次关完的那一次（{@link #lastClose}），按相机 id 记。 */
-    private static final java.util.Map<String, LastClose> LAST_CLOSE = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** 一次关：等它关完的 latch，加上从什么时候起关的（uptime）、为什么关、关它的那一下在哪条线程上做。 */
     private static final class Closing extends java.util.concurrent.CountDownLatch {
@@ -278,7 +282,10 @@ public class SingleCamera {
         }
     }
 
-    /** 一台相机最近一次关完：什么时候关完的（uptime，和调度同一个钟）、关了多久、为什么关（英文短语）。不可变。 */
+    /**
+     * 一台相机最近一次关完：什么时候关完的（uptime，和调度同一个钟）、关了多久、为什么关（英文短语）。不可变。
+     * 记在每一台相机的来历里（{@link CameraHistory}，跨进程留着，{@link #lastClose}）。
+     */
     public static final class LastClose {
         public final long endedAt;
         public final long ms;
@@ -804,7 +811,8 @@ public class SingleCamera {
     private void finishClosing(Closing closing, java.util.concurrent.CountDownLatch previous) {
         awaitQuietly(previous, OPEN_WAIT_FOR_CLOSE_MS);
         long endedAt = SystemClock.uptimeMillis();
-        LAST_CLOSE.put(cameraId, new LastClose(endedAt, endedAt - closing.since, closing.why));
+        // 最近一次关完记进这一台的来历（跨进程留着：「离上次关」装新版、退出之后也算得出，2.11.5 第 D3 项）
+        StepLog.deviceClosed(cameraId, endedAt - closing.since, closing.why);
         CLOSING.remove(cameraId, closing);
         closing.countDown();
     }
@@ -818,9 +826,32 @@ public class SingleCamera {
         return closing == null ? 0L : closing.since;
     }
 
-    /** 这一台相机最近一次关完的那一次（任何一份实例的）；没关过是 null。开座舱那一行、相机步骤统计要「我们上一次关它」。 */
+    /**
+     * 这一台相机最近一次关完的那一次（任何一份实例的，2.11.5 起也算之前的进程：记在 {@link CameraHistory} 里，同一次开机里跨进程对得上）；
+     * 没有记录是 null。开座舱那一行、相机步骤统计要「我们上一次关它」。关完的时刻按含深睡的钟记，这里换回调度的钟：此刻 −（多久以前）。
+     */
     public LastClose lastClose() {
-        return LAST_CLOSE.get(cameraId);
+        CameraHistory.Camera history = StepLog.history().camera(cameraId);
+        if (history == null || history.closedElapsed < 0) {
+            return null;
+        }
+        long ago = Math.max(0, SystemClock.elapsedRealtime() - history.closedElapsed);
+        return new LastClose(SystemClock.uptimeMillis() - ago, history.closeMs, history.closeWhy);
+    }
+
+    /** 最后一次收到画面（{@code onCaptureCompleted}）的时刻（uptime，和调度同一个钟）；没有过是 0。 */
+    public long lastResultAt() {
+        return lastCaptureUptimeMs;
+    }
+
+    /** 这一份相机对象建起来以来一共失败了几次请求（不分会话，只增不减）。 */
+    public long captureFailures() {
+        return failuresTotal.get();
+    }
+
+    /** 这一份相机对象建起来以来一共丢了几次缓冲（各样输出加起来，不分会话，只增不减）。 */
+    public long lostBuffers() {
+        return lostTotal.get();
     }
 
     /** 眼下这份会话配好以来相机回了什么（{@link SessionCounts}）；设备开好、会话还没配好时 {@code configuredAt} 是 0。 */
@@ -864,7 +895,7 @@ public class SingleCamera {
      */
     static String countsText(SessionCounts.Snapshot c) {
         if (c.configuredAt == 0) {
-            return "会话没配好 → " + kindText(c.kind().name());
+            return "会话没配好 → " + kindText(c.kind().name(), c.failures, c.lostTotal());
         }
         long wallOffset = System.currentTimeMillis() - SystemClock.uptimeMillis();
         StringBuilder sb = new StringBuilder("配好于 ")
@@ -886,12 +917,24 @@ public class SingleCamera {
                 first = false;
             }
         }
-        return sb.append(" → ").append(kindText(c.kind().name())).toString();
+        return sb.append(" → ").append(kindText(c.kind().name(), c.failures, c.lostTotal())).toString();
+    }
+
+    /**
+     * 同 {@link #kindText(String)}，HAL 只回了错误的那一种带上数：「相机 HAL 没出过一帧，只回了错误（失败 2、丢缓冲 1）」
+     * （2.11.5 第 D0 项）。黑匣子那两行、诊断报告「2.3.3」有数的地方都用这一个。
+     */
+    public static String kindText(String kind, long failures, long lost) {
+        String text = kindText(kind);
+        if ("HAL_FAILING".equals(kind) || "FAILING".equals(kind)) {
+            return text + "（失败 " + Math.max(0, failures) + "、丢缓冲 " + Math.max(0, lost) + "）";
+        }
+        return text;
     }
 
     /**
      * 配好以来相机回了什么算哪一种（{@link SessionCounts.Kind} 的名字），中文：黑匣子那两行、诊断报告「2.3.3 相机步骤统计」共用。
-     * 认不出的名字原样。
+     * 认不出的名字原样。HAL 开始出帧以后才说「我们的输出接不住」（2.11.5 第 D0 项，{@link SessionCounts#classify}）。
      */
     public static String kindText(String kind) {
         if (kind == null) {
@@ -908,8 +951,9 @@ public class SingleCamera {
                 return "我们的输出接不住（丢缓冲）";
             case "LATE_START":
                 return "开始了、没有结果";
-            case "FAILING":
-                return "一再失败，没开始也没丢缓冲";
+            case "HAL_FAILING":
+            case "FAILING":   // 2.11.4 存下的旧名字：没开始、失败不止一次 —— 照新的规矩就是这一种
+                return "相机 HAL 没出过一帧，只回了错误";
             default:
                 return kind;
         }
@@ -1919,6 +1963,9 @@ public class SingleCamera {
     private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
+            // 相机服务交给我们一台设备：记进这一台的来历（车机重新初始化以来第几台，2.11.5 第 D1 项）。过时的也算 ——
+            // 那也是 HAL 为我们开的一台，紧接着就地关掉
+            StepLog.deviceOpened(cameraId);
             // 过时不过时、把设备挂上，在同一把锁里定（审查 2026-10-11）：以前锁外先看、锁里再挂，
             // 主线程的 closeCamera 落在中间的话，设备挂到一轮已经关掉的账上，再没人关它
             boolean stale;
@@ -2845,6 +2892,7 @@ public class SingleCamera {
                                     @NonNull CaptureRequest request,
                                     @NonNull android.hardware.camera2.CaptureFailure failure) {
             StallWatch.captureFailed(cameraId, failure.getReason());
+            failuresTotal.incrementAndGet();
             if (session == captureSession) {
                 counts.failed(SystemClock.uptimeMillis(), failure.getReason(), failure.getFrameNumber());
             }
@@ -2856,6 +2904,7 @@ public class SingleCamera {
                                         @NonNull Surface target, long frameNumber) {
             String which = describeTarget(target);
             StallWatch.bufferLost(cameraId, which);
+            lostTotal.incrementAndGet();
             if (session == captureSession) {
                 counts.lost(which);
             }

@@ -21,6 +21,8 @@ import java.util.Locale;
  *       用它们自己的解法（{@link Signal#decode}），变了也记。屏幕电源事件原来在 {@link #IDS} 里，车主 2026-10-12 确认它就是
  *       「屏幕真黑了」之后进了信号表（{@link Signal#SCREEN_POWER_EVENT}，熄屏判断用它）；黑匣子里的名字和 0 / 1 的写法不变，
  *       只是读不到（255、读失败）现在写「?」—— 和信号表别的几项一样。</li>
+ *   <li>{@link #RAW_WATCHED}（2.11.5）：信号表里已有、但照原值记的几项（原厂 360 显示状态、原厂画面弹出、泊车影像激活）：信号表的解法把几种值并成一种，
+ *       这里要的是原值。</li>
  * </ul>
  *
  * <p>写成英文记号（和「第一轮读数」那一行一样小写），好和 Lab 手册里的常量名对上；纯函数（{@code DarkScreenProbesTest}）。</p>
@@ -66,7 +68,36 @@ final class DarkScreenProbes {
             Signal.BELT_DRIVER
     };
 
+    /**
+     * 信号表里已有、但变了照<b>原值</b>记的几项（项目所有者 2026-10-15 批准，2.11.5 第 D4 项；只记录）。名字、含义照 zeekr-shortcut-lab 的信号手册
+     * （{@code docs/signals.md}、{@code docs/findings.md}）：
+     *
+     * <ul>
+     *   <li>0x2031FE00 原厂 360 显示状态（{@code stock_360}）：2 没显示、1 原厂 360 画面、0 侧方小窗 —— 信号表把 0 和 2 都算「不在」；</li>
+     *   <li>0x2031B200 原厂画面弹出（{@code stock_popup}，{@code CEM_SMALL_POP_RES}）：原厂 360 或侧方小窗弹着 1，收起来 0；</li>
+     *   <li>0x23030100 泊车影像激活（{@code park_assist}）：挂 R 时 1，原厂 360 开着时也是 1。</li>
+     * </ul>
+     *
+     * <p>为什么：熄屏放开座舱那一下环视断了的那两次（10-13 23:59、10-14 21:52），车机在 ACC 后约 30 秒自己有没有动原厂 360 / 环视
+     * 不知道（rel_final §3、rel_hypotheses M4）。以前这几项只在「第一轮读数」里出现一次。和别的几项一样一项一个窗口限量（{@link #MAX_LINES_PER_WINDOW}）。</p>
+     */
+    static final Signal[] RAW_WATCHED = {
+            Signal.STOCK_360,
+            Signal.STOCK_POPUP,
+            Signal.PARK_ASSIST
+    };
+
     private DarkScreenProbes() {
+    }
+
+    /** 是不是照原值记的那几项之一（{@link #RAW_WATCHED}）。 */
+    static boolean watchesRaw(Signal s) {
+        for (Signal w : RAW_WATCHED) {
+            if (w == s) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 可用状态那一项的名字是功能号那一项的名字加上它：「bcm_power_onoff.status」。 */

@@ -30,12 +30,19 @@ public final class SessionCounts {
          * 原因 0、丢缓冲 0；是框架「HAL 一直没还缓冲」的那种超时）。
          */
         HAL_HOLDING,
-        /** 我们的输出接不住：丢过缓冲（录像、预览、出帧口的消费者拿不出缓冲），失败跟着一再来。 */
+        /**
+         * 我们的输出接不住：HAL 开始出帧了，丢过缓冲（录像、预览、出帧口的消费者拿不出缓冲）。只在开始过之后才这样算
+         * （2.11.5 第 D0 项）：HAL 一帧都没开始时丢的缓冲是 HAL 的错误（{@code ERROR_CAMERA_BUFFER}），不是我们接不住。
+         */
         STARVING,
-        /** 开始了、没有结果：HAL 在出帧，结果迟迟不回。 */
+        /** 开始了、没有结果、没丢缓冲：HAL 在出帧，结果迟迟不回。 */
         LATE_START,
-        /** 没开始、没结果、没丢缓冲，失败却不止一次：上面几种都不像。 */
-        FAILING
+        /**
+         * 相机 HAL 没出过一帧（没开始、没结果），只回了错误：失败不止一次，或者丢过缓冲（2.11.5 第 D0 项，代替以前的 FAILING）。
+         * 10-14 装新版后第一次开环视「开始 0、结果 0、失败 2、丢缓冲 main-preview 1」、亮屏重开后座舱「丢缓冲 record 1」
+         * 以前被写成「我们的输出接不住」：开始 0 时 HAL 连快门都没发，AOSP 12 里消费者拿不出缓冲报的是请求失败、不是丢缓冲。
+         */
+        HAL_FAILING
     }
 
     /** 某一刻的一份（不可变）。时刻都是 {@code SystemClock.uptimeMillis()}，和调度同一个钟；0 = 没有。 */
@@ -76,27 +83,9 @@ public final class SessionCounts {
             return total;
         }
 
-        /**
-         * 算哪一种，先到先得：没配好；出过结果；丢过缓冲（我们接不住）；开始了没结果；失败不止一次；剩下的是 HAL 一个都没回。
-         * 丢缓冲排在「开始了」前面：接不住的时候 HAL 照样开始，开始了却没结果的两种只有丢没丢缓冲分得开。
-         */
+        /** 算哪一种（{@link SessionCounts#classify}）。 */
         public Kind kind() {
-            if (configuredAt == 0) {
-                return Kind.NOT_CONFIGURED;
-            }
-            if (results > 0) {
-                return Kind.FRAMED;
-            }
-            if (lostTotal() > 0) {
-                return Kind.STARVING;
-            }
-            if (starts > 0) {
-                return Kind.LATE_START;
-            }
-            if (failures > 1) {
-                return Kind.FAILING;
-            }
-            return Kind.HAL_HOLDING;
+            return classify(configuredAt != 0, starts, results, failures, lostTotal());
         }
 
         /** 日志用的记号，不是给人读的句子。 */
@@ -104,6 +93,39 @@ public final class SessionCounts {
         public String toString() {
             return kind() + " starts=" + starts + " results=" + results + " failures=" + failures + " lost=" + lost;
         }
+    }
+
+    /**
+     * 一份会话算哪一种，一条规矩、先到先得（项目所有者 2026-10-15 批准，2.11.5 第 D0 项）：HAL 开始出帧以后才怪我们的输出。
+     *
+     * <ol>
+     *   <li>没配好 → {@link Kind#NOT_CONFIGURED}；</li>
+     *   <li>出过结果 → {@link Kind#FRAMED}；</li>
+     *   <li>开始过 → 丢过缓冲是 {@link Kind#STARVING}（我们接不住），没丢是 {@link Kind#LATE_START}；</li>
+     *   <li>没开始、至多一次失败、没丢缓冲 → {@link Kind#HAL_HOLDING}（HAL 收了请求不回）；</li>
+     *   <li>其余（没开始，失败不止一次或者丢过缓冲）→ {@link Kind#HAL_FAILING}。</li>
+     * </ol>
+     *
+     * <p>以前丢缓冲排在「开始了」前面，开始 0 的那几次也被算成我们接不住（rel_final §6）。诊断报告读存下的旧记录时也照这一条重算
+     * （{@code StepStats.Entry#kind}），只有这一处判。</p>
+     *
+     * @param configured 会话配好了
+     * @param lost       各样输出一共丢了几次缓冲
+     */
+    public static Kind classify(boolean configured, long starts, long results, long failures, long lost) {
+        if (!configured) {
+            return Kind.NOT_CONFIGURED;
+        }
+        if (results > 0) {
+            return Kind.FRAMED;
+        }
+        if (starts > 0) {
+            return lost > 0 ? Kind.STARVING : Kind.LATE_START;
+        }
+        if (failures <= 1 && lost == 0) {
+            return Kind.HAL_HOLDING;
+        }
+        return Kind.HAL_FAILING;
     }
 
     /** 还没有一份会话。 */

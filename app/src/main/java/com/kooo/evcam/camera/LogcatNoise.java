@@ -30,6 +30,17 @@ public final class LogcatNoise {
             "CCodecConfig", "CCodec", "CCodecBufferChannel", "Codec2Client",
             "ReflectedParamUpdater", "ColorUtils", "MediaCodecList"));
 
+    /**
+     * 按开头滤掉的标签（标签里带着进程号，一个进程一个样）。
+     *
+     * <ul>
+     *   <li>{@code AdaptL_}：车辆接口 SDK（ECARX）读传感器的流水账，标签是 {@code AdaptL_<pid>_ISensorImpl} 这种，信息条每读一次刷几行。
+     *       10-14 21:52 那一次卡顿现场，logcat 那一段 190 多行全是它，相机、编解码框架那几行一行都没留下来（项目所有者 2026-10-15 批准，
+     *       2.11.5 第 D4 项）。车辆信号要看的在黑匣子「车辆信号：」那几行里。</li>
+     * </ul>
+     */
+    static final String[] TAG_PREFIXES = {"AdaptL_"};
+
     /** 一行最多留多长。超长的多半是在打整个对象，前面几百个字已经够认出是什么。 */
     public static final int MAX_LINE_CHARS = 400;
 
@@ -39,7 +50,18 @@ public final class LogcatNoise {
     /** 这一行是不是噪声。 */
     public static boolean isNoise(String line) {
         String tag = tagOf(line);
-        return tag != null && TAGS.contains(tag);
+        if (tag == null) {
+            return false;
+        }
+        if (TAGS.contains(tag)) {
+            return true;
+        }
+        for (String prefix : TAG_PREFIXES) {
+            if (tag.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 太长就截断，并标出原来多长。 */

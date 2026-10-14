@@ -62,6 +62,9 @@ public class ZeekrShortcutApp extends Application {
             com.kooo.evcam.recording.RecordingIntent.current().reset();
             com.kooo.evcam.blackbox.BlackBox.noteImportant("车机重启过：这一趟的录像选择清零（规格 1.2）");
         }
+        // 每一台相机的来历（车机重新初始化以来开过几台、最后一次关完；2.11.5 诊断）：读回存下的那一份，在写盘的那条线程上读。
+        // 车机重启过没有看上面黑匣子的开机记录，所以排在它后面
+        com.kooo.evcam.camera.StepLog.loadHistory(this);
         Languages.apply(new AppConfig(this).getLanguageMode());
         StallWatch.start(this);
     }
