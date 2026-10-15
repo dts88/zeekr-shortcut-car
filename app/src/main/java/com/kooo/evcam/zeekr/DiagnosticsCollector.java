@@ -643,7 +643,7 @@ public final class DiagnosticsCollector {
         }
         if (e.afterSurroundFirst()) {
             // 关座舱前先关环视之后开回来的那一步（2.11.6）：开始关环视后多久开、座舱关了多久、环视断了多久
-            sb.append("（关座舱前先关环视之后开回来：开始关环视后 ").append(secondsText(e.surroundFirstMs)).append(" 开")
+            sb.append("（关座舱前先关环视之后开回来：开始关环视后 ").append(secondsText(e.surroundFirstMs)).append("开")
                     .append(e.surroundFirstCabinMs >= 0 ? "，座舱关了 " + secondsText(e.surroundFirstCabinMs) : "，座舱没关")
                     .append(e.surroundFirstGapMs() >= 0 ? "，环视断了 " + secondsText(e.surroundFirstGapMs()) : "")
                     .append('）');
