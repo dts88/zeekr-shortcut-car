@@ -44,8 +44,10 @@ import java.util.Set;
  * </ul>
  *
  * <p>项目所有者 2026-10-12（熄屏 v3，D2）：屏幕一黑（2026-10-13 起是黑满 30 秒），两路座舱谁都不要 —— 录像、预览、拍照一样不留，亮屏再回来；
- * 环视照登记表（熄屏持续录制那张表定它录不录）。只有一处判断：{@link #releasedByDark}。座舱这样比环视早关 3–6 分钟，
- * 「环视先关」只对连环视一起关的那几次（车机要睡、退出、没人要）还成立（D4 接受）。</p>
+ * 环视照登记表（熄屏持续录制那张表定它录不录）。只有一处判断：{@link #releasedByDark}。座舱这样比环视早关 3–6 分钟；
+ * 2.11.2–2.11.5 座舱就在开着的环视旁边关（D4 的例外）。项目所有者 2026-10-15 定（2.11.6）：计划里的关座舱，环视开着、此刻能用相机，
+ * 先单独关环视，座舱关完它照常开回来 —— 「环视单独开、单独关」对每一次计划里的关都成立（{@link #closeStep}、{@link Why#SURROUND_FIRST}）。
+ * 用不了相机时照旧（环视关了开不回来）。</p>
  *
  * <p>项目所有者 2026-10-13「黑满 30 秒再放」：通道眼里的熄屏是屏幕黑满 {@link #HOLD_MS}、或者车机要睡
  * （{@link #darkForChannel}）—— 和「保持 30 秒」同一个数。不到 30 秒又亮了，通道零变动。</p>
@@ -489,6 +491,12 @@ public final class ChannelRules {
          * 和 {@link #SCREEN_OFF} 分开，环视熄屏时关不写成「座舱放开」（设计 v3.1 C14）。
          */
         DARK_RELEASE,
+        /**
+         * 关座舱前先单独关环视（项目所有者 2026-10-15 定，2.11.6，{@link ChannelRules#closeStep}）：计划里要关座舱（熄屏放开、保持到点、
+         * 没人要），环视开着、还该开、此刻能用相机 —— 这一步只关环视。座舱接着一起关（原因照它们自己的），环视还有人要就由「开」那一步
+         * 照常开回来。只是一步的原因：登记表、谁要它都不变。
+         */
+        SURROUND_FIRST,
         /** 车机要睡。 */
         SLEEP,
         /** 退出。 */
@@ -1480,7 +1488,8 @@ public final class ChannelRules {
      *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy、另一个实例在关。后四种各封顶
      *       {@link #IN_FLIGHT_MAX_MS}。车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
-     *       座舱等环视先关完。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
+     *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
+     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
      *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
      *       但照 §二.6 仍要等安静。只摘本会话出过画面的（{@link #reconfigurable}）；没出过画面的由第 7 条重开时丢掉它；</li>
@@ -1674,7 +1683,21 @@ public final class ChannelRules {
     /**
      * 关（§二.2）：环视开着或正在开、但已不该开 → 单独关它；否则不该开的座舱一起关 —— 环视还在关（10 秒以内）就先等它关完。
      * 2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出。关不等安静。
-     * 熄屏放开座舱、环视还要（在录、后视镜）时，座舱一起关、环视一步不动（{@link #releasedByDark}）。
+     *
+     * <p><b>关座舱前先关环视</b>（项目所有者 2026-10-15 定，2.11.6，{@link Why#SURROUND_FIRST}）：要关座舱，而环视开着或在开、还该开
+     * （在录、后视镜、预览，或者在保持），此刻又能用相机（{@link #surroundFirst}）→ 这一步只关环视。之后照这里本来的规矩走：
+     * 下一轮环视关着了，座舱一起关（原因照它们自己的：熄屏放开、保持到点、没人要）；再下一轮「开」那一步把还有人要的环视照常开回来
+     * （{@link #next} 第 5 条，开的次序、安静、等录像输出都照旧）。不另立计时、常数、动手的地方；登记表一样不加、不改 ——
+     * 开回来靠的是登记表上本来就要它的那几样（录像、后视镜、预览）。只在保持、没人要的环视关了就不再开（保持要开着，{@link #holding}）：
+     * 它的保持跟着座舱一起结束。环视的 10 秒封顶照旧：到点没关完，座舱照样关，环视关完了再开回来。</p>
+     *
+     * <p>为什么（平台笔记 §3.6「放开座舱时环视跟着断」）：2.11.2–2.11.5 熄屏放开座舱、保持到点时座舱在开着的环视旁边关（D4 的例外），
+     * 之前 20 次里环视跟着停了 8 次，都停在一个座舱关完的那一帧前后，救了 40–50 秒；10-15 07:42 车主测试 A 的第 2 次又是这样（座舱开始关后
+     * 60 ms）。「先关环视、再关座舱、再开环视」同一个进程 23 次、退出再开 21 次都正常。代价：每一次计划里的关座舱，环视（含环视录像）
+     * 断约 0.5–1 秒、录像切一个新文件，开着的后视镜闪一下。</p>
+     *
+     * <p>只管这里出的关（计划里的关）。救援重开时关旧设备、丢了之后那一次关、车机拿走那一路，都不是这一步，不走它；
+     * 退出、车机要睡时环视本来就先单独关（它也不该开了，走上面第一条）。</p>
      */
     private static Decision closeStep(World w) {
         List<Lane> toClose = new ArrayList<>();
@@ -1688,19 +1711,33 @@ public final class ChannelRules {
         }
         Lane first = toClose.get(0);
         if (isSurround(first)) {
-            return close(w, Collections.singletonList(first), CLOSE_SURROUND_MAX_MS);
+            return close(Collections.singletonList(first), closeWhy(w, first), CLOSE_SURROUND_MAX_MS);
         }
         Lane surround = w.lane(CameraSlots.KEY_SURROUND);
+        if (surroundFirst(w, surround)) {
+            return close(Collections.singletonList(surround), Why.SURROUND_FIRST, CLOSE_SURROUND_MAX_MS);
+        }
         if (surround != null && (surround.device == Device.CLOSING || surround.device == Device.LOSING)
                 && w.now - surround.deviceSince < CLOSE_SURROUND_MAX_MS) {
             return Decision.waitFor(Why.SURROUND_CLOSING, surround.key,
                     CLOSE_SURROUND_MAX_MS - (w.now - surround.deviceSince));
         }
-        return close(w, toClose, CLOSE_CABINS_MAX_MS);
+        return close(toClose, closeWhy(w, first), CLOSE_CABINS_MAX_MS);
     }
 
-    private static Decision close(World w, List<Lane> lanes, long maxMs) {
-        Decision d = new Decision(Move.CLOSE, closeWhy(w, lanes.get(0)));
+    /**
+     * 座舱要关的这一轮，环视要不要先单独关（{@link #closeStep}，项目所有者 2026-10-15 定，2.11.6）：环视开着或在开、还该开，此刻能用相机
+     * （{@link #usable}，和「开」那一步看的是同一个 —— 关了它，开那一步才开得回来；用不了的照旧座舱在环视旁边关），没被拿着，
+     * 也不在救援梯子上（{@link #rescuing}：在梯子上的关了只能由救援按梯子的节奏重开，不是「开」那一步照常开回来，还要白算次数 ——
+     * 它此刻本来也没在出画面）。
+     */
+    private static boolean surroundFirst(World w, Lane surround) {
+        return surround != null && (surround.device == Device.OPEN || surround.device == Device.OPENING)
+                && shouldOpen(w, surround) && usable(w) && surround.mark == null && !rescuing(surround);
+    }
+
+    private static Decision close(List<Lane> lanes, Why why, long maxMs) {
+        Decision d = new Decision(Move.CLOSE, why);
         List<String> keys = new ArrayList<>();
         for (Lane lane : lanes) {
             keys.add(lane.key);
@@ -1712,7 +1749,8 @@ public final class ChannelRules {
 
     /**
      * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出）」）。一步里的几路原因一样：
-     * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。
+     * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。关座舱前先关环视的那一步不在这里判（{@link Why#SURROUND_FIRST}，
+     * {@link #closeStep} 直接给）：那时环视还该开，这里答不出它为什么关。
      */
     private static Why closeWhy(World w, Lane lane) {
         if (w.exitSince != 0) {

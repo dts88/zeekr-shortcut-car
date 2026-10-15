@@ -518,10 +518,14 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 座舱的每一次关都记下关的时候环视怎样、关了多久（R3：备选方案「关座舱时先短暂关环视」要比的就是它，只记录）。
+     * 座舱的每一次关都记下关的时候环视怎样、关了多久（R3「关座舱时先短暂关环视」要比的就是它）。2.11.6 起能用相机时环视先关，
+     * 座舱那两条记「环视关着」（{@link #replay1014_aDarkReleaseClosesTheSurroundFirstAndItRejoinsTheRecording}）；这里此刻用不了相机
+     * （主界面在后台、前台服务是后台起的），座舱照旧在出画面的环视旁边关。
      */
     @Test
     public void everyCabinCloseRecordsWhatTheSurroundWasDoing() {
+        host.mainForeground = false;
+        host.startedWhileVisible = false;
         claim(Holder.RECORDING);
         host.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
@@ -547,19 +551,21 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 10-14 21:52:20（A7）经调度回放（项目所有者 2026-10-15 批准，2.11.5 第 D1、D2、D3 项，只记录）：环视是相机 2 回来以后的第 5 台，
-     * 主界面在后台，屏幕黑满 30 秒放开座舱；环视最后一帧在开始关后 67 ms（前座舱关完前 35 ms、后座舱关完前 73 ms），之后一帧不出。
-     * 关完那一刻、关完之后头一轮（1 秒以后，不为它另醒）、关完 30 秒各一行；8 秒时规则照常救环视，30 秒那一行量到救它那一刻；
+     * 10-14 21:52:20（A7）的数，2.11.5 那样座舱在环视旁边关（项目所有者 2026-10-15 批准，2.11.5 第 D1、D2、D3 项，只记录）—— 2.11.6 起
+     * 能用相机时环视先关（{@link #replay1014_aDarkReleaseClosesTheSurroundFirstAndItRejoinsTheRecording}），这几行只剩用不了相机时
+     * 的计划里的关（这里：主界面在后台、前台服务是后台起的）和计划外的关。环视是相机 2 回来以后的第 5 台，屏幕黑满 30 秒放开座舱；
+     * 环视最后一帧在开始关后 67 ms（前座舱关完前 35 ms、后座舱关完前 73 ms），之后一帧不出。
+     * 关完那一刻、关完之后头一轮（1 秒以后，不为它另醒）、关完 30 秒各一行；8 秒时规则照常救环视（重建会话不用开相机），30 秒那一行量到救它那一刻；
      * 那一条记进统计：环视断了、第 5 台、主界面在后台。这几行一步都不动：动环视的只有规则那一下救。
      */
     @Test
-    public void replay1014_aCabinReleaseBesideANotFirstSurroundIsMeasuredThreeTimesAndCounted() {
+    public void aCabinReleaseBesideANotFirstSurroundWhileTheCameraIsUnusableIsMeasuredThreeTimesAndCounted() {
         host.cameraHistory.reset("2", CameraHistory.Reset.CAME_BACK, 1_000L, 1_000L);
         for (int i = 0; i < 5; i++) {
             host.cameraHistory.opened("2", 2_000L + i);
         }
         host.mainForeground = false;
-        host.startedWhileVisible = true;
+        host.startedWhileVisible = false;
         host.vehicle = new ChannelScheduler.Vehicle(0, 0x00200104, 30_000, -1, 30_000, 125);
         claim(Holder.RECORDING);
         host.plan(SUR, REAR, FRONT);
@@ -628,6 +634,206 @@ public class ChannelSchedulerTest {
         assertEquals(ChannelRules.Move.RESCUE, couple.coupling.surround.ours);
         assertEquals("座舱关着，一步没动", Arrays.asList("close dark-release"), rear.actions);
         assertEquals(Arrays.asList("close dark-release"), front.actions);
+    }
+
+    // ================================================================= 关座舱前先关环视（项目所有者 2026-10-15 定，2.11.6）
+
+    /**
+     * 10-14 21:52:20（A7）经调度回放，2.11.6：三路在录、主界面在后台（前台服务是主界面在前时起的，能用相机），屏幕黑满 30 秒。
+     * 那一刻只关环视（「surround-first」）：录像那一侧听说它走了、原因是关座舱前先关环视，录制器停放（录像还留着它，不派「随相机关了」）；
+     * 环视关完座舱才一起关（熄屏：座舱放开），座舱那两条统计记「环视关着」，不写关座舱时环视那几行（环视不在旁边）；座舱关完「开」那一步
+     * 照常开回环视、带着同一个录像输出，出了画面录像那一侧再听说一次（同一个录制器再加入）。一轮关一行「关相机：环视 → 座舱」，
+     * 那一趟一行（环视断了多久、各段多久），开回来那一条统计带着那一趟。登记表一次都没变，救援一次都没有。
+     */
+    @Test
+    public void replay1014_aDarkReleaseClosesTheSurroundFirstAndItRejoinsTheRecording() {
+        host.mainForeground = false;
+        host.startedWhileVisible = true;
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+        told.clear();
+        int needsLines = lines("needs").size();
+        Set<Holder> holders = EnumSet.copyOf(host.holders);
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long release = 1_000 + ChannelRules.HOLD_MS;
+        at(release - 1);
+        assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        at(release);
+        assertEquals("黑满 30 秒：只关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertTrue("座舱等环视关完", rear.actions.isEmpty() && front.actions.isEmpty());
+        assertEquals(Arrays.asList("closing [front] SURROUND_FIRST"), lines("closing"));
+        assertEquals(Arrays.asList("gone front CLOSED SURROUND_FIRST"), told("gone"));
+
+        at(release + 150);
+        closed(surround);
+        settle();
+        assertTrue("录像还要它：录制器停放，不派", surround.drops.isEmpty());
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertEquals(1, lines("closing [left, back] DARK_RELEASE").size());
+        assertEquals(Arrays.asList("gone front CLOSED SURROUND_FIRST", "gone left CLOSED DARK_RELEASE",
+                "gone back CLOSED DARK_RELEASE"), told("gone"));
+
+        at(release + 250);
+        closed(front);
+        settle();
+        at(release + 290);
+        closed(rear);
+        settle();
+        assertEquals("座舱关完：开那一步照常开回环视，带着同一个录像输出",
+                Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
+        assertEquals("一轮关一行：环视 → 座舱", Arrays.asList("closeRound front | back, left"), lines("closeRound"));
+        assertTrue("环视不在座舱旁边：不写关座舱时环视那几行", lines("coupling").isEmpty());
+        assertTrue(surround.drops.isEmpty() && rear.drops.isEmpty() && front.drops.isEmpty());
+
+        at(release + 400);
+        opened(surround);
+        at(release + 520);
+        frame(surround);
+        settle();
+        assertEquals("出了画面：录像那一侧再听说一次，同一个录制器再加入", Arrays.asList("streaming front"), told("streaming"));
+        assertEquals(Arrays.asList("surroundFirst FRAMED gap=520 surround=150 cabins=[back, left]/DARK_RELEASE/140 open=230"),
+                lines("surroundFirst"));
+        assertEquals(Arrays.asList(
+                "recorded front CLOSE CLOSED ms=150",
+                "recorded left CLOSE CLOSED ms=140 surround=CLOSED",
+                "recorded back CLOSE CLOSED ms=100 surround=CLOSED",
+                "recorded front OPEN FRAMED ms=230 sf=290/140"), lines("recorded"));
+
+        at(release + 60_000);
+        assertEquals("之后一步不动", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertTrue("救援一次都没有", lines("stepEnded RESCUE").isEmpty());
+        assertEquals(0, view(s.snapshot(), SUR).attempts);
+        assertEquals("登记表一次都没变", holders, host.holders);
+        assertEquals(needsLines, lines("needs").size());
+        assertTrue(lines("closeAftermath").isEmpty() && lines("coupling").isEmpty());
+    }
+
+    /**
+     * 10-15 07:42:42（车主的测试 A 第 2 次）经调度回放，2.11.6：三路录过、停了录（录像输出留在会话里），超级后视镜开着，07:42:12 最小化 ——
+     * 两路座舱各自保持 30 秒。到点只关环视；停了录，录像不再留着它的录像输出，关完当轮「随相机关了」（录制器放掉，和以前关相机一样）；
+     * 环视关完座舱保持到点一起关；座舱关完环视照常开回来给后视镜（只带后视镜）。以前这一下座舱在环视旁边关，环视在开始关后 60 ms 停了、救了约 45 秒。
+     */
+    @Test
+    public void replay1015_aHoldExpiryBesideTheMirrorClosesTheSurroundFirstAndTheMirrorComesBack() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror, recS);   // 07:42:10 停录：录制器停放，录像输出还声明着、留在会话里
+        streaming(rear, pvR, recR);
+        streaming(front, pvF, recF);
+        settle();
+        told.clear();
+
+        at(1_000);   // 最小化：主界面退到后台（前台服务是主界面在前时起的），只剩后视镜要环视
+        host.mainForeground = false;
+        host.startedWhileVisible = true;
+        drop(Holder.PREVIEW);
+        settle();
+        assertEquals(1, lines("holding [left, back]").size());
+        long expiry = 1_000 + ChannelRules.HOLD_MS;
+        at(expiry - 1);
+        assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        at(expiry);
+        assertEquals("保持到点：只关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
+        at(expiry + 150);
+        closed(surround);
+        settle();
+        assertEquals("停了录：录像不再留着它，随相机关了", Arrays.asList("RECORD CLOSED"), surround.drops);
+        assertEquals(Arrays.asList("close hold-over"), rear.actions);
+        assertEquals(Arrays.asList("close hold-over"), front.actions);
+        at(expiry + 250);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals("环视开回来给后视镜", Arrays.asList("close surround-first", "open [MIRROR]"), surround.actions);
+        at(expiry + 450);
+        opened(surround);
+        frame(surround);
+        settle();
+        assertEquals(1, lines("surroundFirst FRAMED gap=450 surround=150 cabins=[left, back]/HOLD_OVER/100").size());
+        assertEquals(Arrays.asList("gone front CLOSED SURROUND_FIRST", "gone left CLOSED HOLD_OVER",
+                "gone back CLOSED HOLD_OVER"), told("gone"));
+        assertEquals(Arrays.asList("streaming front"), told("streaming"));
+        assertTrue(lines("coupling").isEmpty());
+        assertTrue(lines("stepEnded RESCUE").isEmpty());
+        assertEquals("登记表没变：后视镜一直登记着", EnumSet.of(Holder.MIRROR), host.holders);
+        assertEquals(0, view(s.snapshot(), SUR).attempts);
+    }
+
+    /**
+     * 只在保持的环视（后视镜晚 10 秒收起）而座舱先到点：先单独关它，它的保持跟着结束、不再开回来 —— 那一趟写「没人要了，不再开回来」。
+     * 关座舱前先关环视的时候退出：环视关完、座舱照退出关完，那一趟写「不再开回来」，调度停下。
+     */
+    @Test
+    public void aSurroundFirstCloseThatIsNotOpenedAgainSaysWhy() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        drop(Holder.PREVIEW);
+        settle();
+        at(10_000);
+        drop(Holder.MIRROR);
+        settle();
+        at(ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close surround-first"), surround.actions);
+        at(ChannelRules.HOLD_MS + 100);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close hold-over"), rear.actions);
+        at(ChannelRules.HOLD_MS + 200);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals("保持要开着：不再开回来", Arrays.asList("close surround-first"), surround.actions);
+        assertEquals(Arrays.asList("surroundFirst UNWANTED gap=-1 surround=100 cabins=[left, back]/HOLD_OVER/100 open=-1"),
+                lines("surroundFirst"));
+
+        // 关座舱前先关环视的那一步还在关，人退出了：手上那一步做完、座舱照退出关完，那一趟写「不再开回来」，调度停下
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        surround.actions.clear();
+        rear.actions.clear();
+        front.actions.clear();
+        long t = ChannelRules.HOLD_MS + 1_000;
+        at(t);
+        drop(Holder.PREVIEW);
+        settle();
+        at(t + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close surround-first"), surround.actions);
+        s.exit();
+        settle();
+        assertTrue("手上那一步做完再关", rear.actions.isEmpty() && front.actions.isEmpty());
+        at(t + ChannelRules.HOLD_MS + 100);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close exit"), rear.actions);
+        assertEquals(Arrays.asList("close exit"), front.actions);
+        at(t + ChannelRules.HOLD_MS + 200);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals(1, lines("surroundFirst WINDING gap=-1 surround=100 cabins=[left, back]/EXIT/100 open=-1").size());
+        assertEquals(2, lines("surroundFirst").size());
+        assertTrue(host.stopped);
     }
 
     /**
@@ -1119,11 +1325,12 @@ public class ChannelSchedulerTest {
 
     /**
      * 录着三路熄屏：两路座舱一起关（「dark-release」），录像那一侧听说它们走了、带着关的原因（退出录像那一行写「熄屏：座舱放开」）；
-     * 录像还留着它们的录制器 —— 不派「随相机关了」，停放过夜；环视一步不动。关相机那一行带上环视这段时间里怎样，
-     * 30 秒后再量一次（设计 v3 §6 L3、v3.1 C22）。亮屏：后座舱 → 前座舱一路一路带着各自的录像输出回来。
+     * 录像还留着它们的录制器 —— 不派「随相机关了」，停放过夜。2.11.6 起（项目所有者 2026-10-15）座舱关之前环视先单独关（关座舱前先关环视），
+     * 座舱关完它带着停放的录制器开回来、接着录，环视不在座舱旁边，关座舱时环视那几行不写；之后熄屏这段时间里一步不动。
+     * 亮屏：后座舱 → 前座舱一路一路带着各自的录像输出回来，环视不再动。
      */
     @Test
-    public void theDarkReleasesBothCabinsKeepsTheirRecordersAndLeavesTheSurroundAlone() {
+    public void theDarkReleasesBothCabinsKeepsTheirRecordersAndBringsTheSurroundBack() {
         claim(Holder.RECORDING);
         host.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
@@ -1137,36 +1344,38 @@ public class ChannelSchedulerTest {
         host.screenOn = false;
         s.wake();
         settle();
-        assertEquals(Arrays.asList("close dark-release"), rear.actions);
-        assertEquals(Arrays.asList("close dark-release"), front.actions);
-        assertTrue("环视一步不动", surround.actions.isEmpty());
-        assertEquals(1, lines("closing [left, back] DARK_RELEASE").size());
-        assertEquals(Arrays.asList("gone left CLOSED DARK_RELEASE", "gone back CLOSED DARK_RELEASE"), told("gone"));
+        assertEquals("先单独关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertTrue("座舱等环视关完", rear.actions.isEmpty() && front.actions.isEmpty());
         assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
         assertFalse(s.releasedByDark(SUR));
-
         at(1_100);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertEquals(1, lines("closing [left, back] DARK_RELEASE").size());
+        assertEquals(Arrays.asList("gone front CLOSED SURROUND_FIRST", "gone left CLOSED DARK_RELEASE",
+                "gone back CLOSED DARK_RELEASE"), told("gone"));
+
+        at(1_200);
         closed(rear);
         closed(front);
         settle();
-        assertTrue("录像留着它们：录制器停放，不派", rear.drops.isEmpty() && front.drops.isEmpty());
-        assertEquals(Arrays.asList("closeRound null | left, back | others front gap=0 same"), lines("closeRound"));
-        assertEquals(1, lines("coupling END PLANNED [left, back] DARK_RELEASE front gap=0 same").size());
-        // 2.11.5：关完一轮的那一行带上关座舱时环视那几样，量到关完（1_100）30 秒以后；醒的那一轮和 2.11.4 一模一样 ——
-        // 开始关（1_000）+ 30 秒，不为关完 + 30 秒另醒、不挪：那一轮还不到量的时候，之后的头一轮（2 秒一轮）量
-        at(1_000 + ChannelScheduler.AFTERMATH_MS);
-        assertTrue(host.roundAt.toString(), host.roundAt.contains(1_000 + ChannelScheduler.AFTERMATH_MS));
-        assertTrue(lines("coupling AFTER_30S").isEmpty());
-        at(1_100 + ChannelScheduler.AFTERMATH_MS + ChannelRules.TICK_MS);
-        assertFalse(host.roundAt.toString(), host.roundAt.contains(1_100 + ChannelScheduler.AFTERMATH_MS));
-        assertEquals(1, lines("coupling AFTER_30S PLANNED [left, back] DARK_RELEASE front gap=0 same").size());
-        assertTrue(lines("coupling AFTER_30S").get(0), lines("coupling AFTER_30S").get(0).endsWith(
-                " | others front gap=0 same"));
-        assertTrue("计划里的关不另写那一行", lines("closeAftermath").isEmpty());
+        assertTrue("录像留着它们：录制器停放，不派",
+                rear.drops.isEmpty() && front.drops.isEmpty() && surround.drops.isEmpty());
+        assertEquals(Arrays.asList("closeRound front | left, back"), lines("closeRound"));
+        assertEquals("座舱关完环视开回来接着录", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
+        at(1_400);
+        opened(surround);
+        frame(surround);
+        settle();
+        assertEquals(1, lines("surroundFirst FRAMED gap=400").size());
         at(600_000);
-        assertTrue("熄屏这段时间里什么都不动", surround.actions.isEmpty()
+        assertTrue("熄屏这段时间里什么都不动", surround.actions.size() == 2
                 && rear.actions.size() == 1 && front.actions.size() == 1);
-        assertTrue(rear.drops.isEmpty() && front.drops.isEmpty());
+        assertTrue(rear.drops.isEmpty() && front.drops.isEmpty() && surround.drops.isEmpty());
+        assertTrue("环视不在座舱旁边：不写关座舱时环视那几行",
+                lines("coupling").isEmpty() && lines("closeAftermath").isEmpty());
 
         host.screenOn = true;
         s.wake();
@@ -1180,17 +1389,20 @@ public class ChannelSchedulerTest {
         frame(rear);
         settle();
         assertEquals(Arrays.asList("close dark-release", "open [RECORD]"), front.actions);
-        assertTrue(surround.actions.isEmpty());
+        assertEquals("环视不再动", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
     }
 
     /**
      * 熄屏放开的座舱关着的时候停了录（熄屏持续录制关着，10 秒后停）：停录那一轮就告诉它们「随相机关了」，录像那一侧放掉
      * 停放着的录制器（设计 v3.1 C13），只说一次；环视熄屏不保持，跟着关（原因是熄屏，不是座舱放开）。
      * 座舱那一轮关完 30 秒再量环视的那一行只量到我们关环视那一刻、写明是我们关的 —— 不把之后的 20 秒算成环视断帧、
-     * 会话被重建（审查 rev3 B2）。
+     * 会话被重建（审查 rev3 B2）。座舱在出画面的环视旁边关：这里此刻用不了相机（主界面在后台、前台服务是后台起的；能用相机时
+     * 2.11.6 起环视先关，{@link #theDarkReleasesBothCabinsKeepsTheirRecordersAndBringsTheSurroundBack}），关相机那一行带上环视这段时间里怎样。
      */
     @Test
     public void stoppingTheRecordingWhileTheCabinsAreDarkDropsTheirParkedRecorders() {
+        host.mainForeground = false;
+        host.startedWhileVisible = false;
         claim(Holder.RECORDING);
         host.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
@@ -1200,11 +1412,15 @@ public class ChannelSchedulerTest {
         host.screenOn = false;
         s.wake();
         settle();
+        assertEquals("用不了相机：座舱在环视旁边关", Arrays.asList("close dark-release"), rear.actions);
+        assertTrue(surround.actions.isEmpty());
         at(100);
         closed(rear);
         closed(front);
         settle();
         assertTrue(rear.drops.isEmpty() && front.drops.isEmpty());
+        assertEquals(Arrays.asList("closeRound null | left, back | others front gap=0 same"), lines("closeRound"));
+        assertEquals(1, lines("coupling END PLANNED [left, back] DARK_RELEASE front gap=0 same").size());
 
         at(10_000);
         drop(Holder.RECORDING);
@@ -1373,8 +1589,8 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 黑满 30 秒的那一刻（不是下一个两秒）两路座舱一起关（dark-release，「熄屏：座舱放开」），环视照录。
-     * 黑下来的那一下比调度那一轮早半秒（监听者先做完才轮到调度）：照黑下来的那一刻算。
+     * 黑满 30 秒的那一刻（不是下一个两秒）放开两路座舱（dark-release，「熄屏：座舱放开」）：2.11.6 起那一刻先单独关环视（关座舱前先关环视），
+     * 环视关完两路座舱一起关，环视开回来照录。黑下来的那一下比调度那一轮早半秒（监听者先做完才轮到调度）：照黑下来的那一刻算。
      */
     @Test
     public void theCabinsLeaveTheMomentTheScreenHasBeenDarkForThirtySeconds() {
@@ -1392,16 +1608,26 @@ public class ChannelSchedulerTest {
         s.wake();
         settle();
         at(500 + ChannelRules.HOLD_MS - 1);
-        assertTrue("差 1 毫秒：不动", rear.actions.isEmpty() && front.actions.isEmpty());
+        assertTrue("差 1 毫秒：不动", surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
         assertFalse(s.releasedByDark(REAR));
         at(500 + ChannelRules.HOLD_MS);
-        assertEquals(Arrays.asList("close dark-release"), rear.actions);
-        assertEquals(Arrays.asList("close dark-release"), front.actions);
-        assertTrue("环视一步不动", surround.actions.isEmpty());
-        assertEquals(1, lines("closing [left, back] DARK_RELEASE").size());
-        assertEquals(Arrays.asList("gone left CLOSED DARK_RELEASE", "gone back CLOSED DARK_RELEASE"), told("gone"));
+        assertEquals("那一刻：先单独关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
         assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
         assertFalse(s.releasedByDark(SUR));
+        at(500 + ChannelRules.HOLD_MS + 120);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertEquals(1, lines("closing [left, back] DARK_RELEASE").size());
+        assertEquals(Arrays.asList("gone front CLOSED SURROUND_FIRST", "gone left CLOSED DARK_RELEASE",
+                "gone back CLOSED DARK_RELEASE"), told("gone"));
+        at(500 + ChannelRules.HOLD_MS + 220);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals("环视开回来照录", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
     }
 
     /**
@@ -1436,7 +1662,10 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("close head-unit-sleeps"), front.actions);
     }
 
-    /** 安卓熄屏了、车机没判成要睡（开发者唤醒锁拉着车机）：同样不等 30 秒，座舱当场放开，环视照录。 */
+    /**
+     * 安卓熄屏了、车机没判成要睡（开发者唤醒锁拉着车机）：同样不等 30 秒，座舱当场放开 —— 2.11.6 起环视先单独关（关座舱前先关环视），
+     * 座舱关完它开回来照录。
+     */
     @Test
     public void androidGoingOffWhileDarkReleasesTheCabinsAtOnce() {
         claim(Holder.RECORDING);
@@ -1454,9 +1683,18 @@ public class ChannelSchedulerTest {
         host.androidOff = true;
         s.wake();
         settle();
+        assertEquals("当场：先单独关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
+        at(6_100);
+        closed(surround);
+        settle();
         assertEquals(Arrays.asList("close dark-release"), rear.actions);
         assertEquals(Arrays.asList("close dark-release"), front.actions);
-        assertTrue("环视照录", surround.actions.isEmpty());
+        at(6_200);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals("环视开回来照录", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
     }
 
     /**
@@ -3084,7 +3322,17 @@ public class ChannelSchedulerTest {
                     + (r.counts != null ? " counts=" + r.counts.kind() : "")
                     + (r.oldCloseMs >= 0 ? " oldClose=" + r.oldCloseMs : "")
                     + (r.context.surround != null ? " surround=" + r.context.surround : "")
-                    + (r.lineage > 0 ? " lineage=" + r.lineage + "/" + r.lineageReset : ""));
+                    + (r.lineage > 0 ? " lineage=" + r.lineage + "/" + r.lineageReset : "")
+                    + (r.surroundFirstStartMs >= 0 ? " sf=" + r.surroundFirstStartMs + "/" + r.surroundFirstCabinMs : ""));
+        }
+
+        /** 「surroundFirst FRAMED gap=520 surround=150 cabins=[back, left]/DARK_RELEASE/140 open=230」。 */
+        @Override
+        public void surroundFirst(ChannelScheduler.SurroundFirst f) {
+            journal.add("surroundFirst " + f.end + " gap=" + f.gapMs + " surround=" + f.surroundMs
+                    + (f.surroundTimedOut ? "!" : "") + " cabins=" + f.cabinKeys + "/" + f.cabinWhy + "/" + f.cabinMs
+                    + (f.cabinTimedOut ? "!" : "") + " open=" + f.reopenMs
+                    + (f.failure != null ? " failed " + f.failure.origin : ""));
         }
 
         @Override

@@ -12,15 +12,16 @@ import java.util.function.Function;
  * （{@link Entry}，一行文字，存在应用目录里，最近 {@link #MAX} 条，跨进程留着 —— {@code StepLog}），诊断报告
  * 「2.3.3 相机步骤统计」照它分组数（{@link #tally}、{@link #groupBy}、{@link #cabinClosesBySurround}）。
  * 2.11.5 起还记关座舱时环视那一条（{@link Move#COUPLE}，{@link #surroundAfterCloses}）、丢了之后那一次关和救援重开时关旧设备
- * （{@link CloseKind}）、环视那一台是车机重新初始化后第几台（{@link #lineageBucket}）。
+ * （{@link CloseKind}）、环视那一台是车机重新初始化后第几台（{@link #lineageBucket}）。2.11.6 起关座舱前先关环视之后环视开回来的那一步
+ * 带着那一趟（{@link Entry#surroundFirstMs}，{@link #surroundFirstReopens}）。
  *
  * <h3>为什么</h3>
  *
  * <p>2.11 以来座舱开了 40 次、2 次 15 秒没画面（都是后座舱、都是哨兵开着），环视 18 次里 3 次（都是哨兵关着）。
  * 哨兵、主界面在不在前、离我们上一次关它多久、是不是车机刚放开它，样本太少又互相纠缠，每一次都是事后从几份黑匣子里拼出来的，
  * 拼错过（9 次「不知道」其实都是哨兵关）。这里每一步当场记下结果和那一刻的这几样，报告里直接分组数：哪一种情形下没画面多，
- * 一眼看得出来，样本攒够了再谈原因。备选方案「关座舱时先短暂关环视」要比的（座舱关的时候环视在不在出画面，关得慢不慢、
- * 之后那一次开有没有画面）也在这里（R3，只记录）。</p>
+ * 一眼看得出来，样本攒够了再谈原因。「关座舱时先短暂关环视」要比的（座舱关的时候环视在不在出画面，关得慢不慢、
+ * 之后那一次开有没有画面）也在这里（R3；2.11.6 起照做，项目所有者 2026-10-15 定，环视关着那一组从此有了数）。</p>
  *
  * <p>只用 ASCII 的「键=值」，空格分开；读不懂的键跳过、坏行整行跳过：以后加字段，旧的行照样读。纯 Java（{@code StepStatsTest}），
  * 不写中文 —— 句子在 DiagnosticsCollector 里拼。</p>
@@ -154,6 +155,13 @@ public final class StepStats {
         public final long oursAtMs;
         /** 点火此刻的样子（{@code ACC}、{@code ON}、{@code DRIVING}，认不出的写十六进制）；读不到是 null。 */
         public final String ignition;
+        /**
+         * 关座舱前先关环视之后环视开回来的那一步（2.11.6，{@link #surroundFirstReopens}）：从开始关环视到这一步开始多久；
+         * 别的步是 -1。环视断了多久 = 它 + 出画面用的时间（{@link #surroundFirstGapMs}）。
+         */
+        public final long surroundFirstMs;
+        /** 同上：那一趟里座舱那一步关了多久（最慢的一路；到点没关完是那一步的封顶）；座舱没关、别的步是 -1。 */
+        public final long surroundFirstCabinMs;
 
         public Entry(Builder b) {
             this.at = b.at;
@@ -195,6 +203,18 @@ public final class StepStats {
             this.ours = b.ours;
             this.oursAtMs = b.oursAtMs;
             this.ignition = b.ignition;
+            this.surroundFirstMs = b.surroundFirstMs;
+            this.surroundFirstCabinMs = b.surroundFirstCabinMs;
+        }
+
+        /** 这一步是关座舱前先关环视之后环视开回来的那一步（2.11.6）。 */
+        public boolean afterSurroundFirst() {
+            return surroundFirstMs >= 0;
+        }
+
+        /** 关座舱前先关环视那一趟环视断了多久（从开始关环视到它又出画面）；不是那一步、开回来没出画面是 -1。 */
+        public long surroundFirstGapMs() {
+            return afterSurroundFirst() && result == Result.FRAMED && ms >= 0 ? surroundFirstMs + ms : -1;
         }
 
         /**
@@ -262,6 +282,8 @@ public final class StepStats {
             put(sb, "our", ours);
             put(sb, "ourms", oursAtMs);
             put(sb, "ign", ignition);
+            put(sb, "sfs", surroundFirstMs);
+            put(sb, "sfc", surroundFirstCabinMs);
             return sb.toString();
         }
 
@@ -319,6 +341,8 @@ public final class StepStats {
         String ours;
         long oursAtMs = -1;
         String ignition;
+        long surroundFirstMs = -1;
+        long surroundFirstCabinMs = -1;
 
         public Builder step(long at, String key, String cameraId, Move move, Result result, long ms) {
             this.at = at;
@@ -428,6 +452,16 @@ public final class StepStats {
             return this;
         }
 
+        /**
+         * 关座舱前先关环视之后环视开回来的那一步（2.11.6）：从开始关环视到这一步开始多久、座舱那一步关了多久；不是那一步都给 -1。
+         * 开始那一刻不知道（负数）的不记，座舱那一项也跟着不记。
+         */
+        public Builder surroundFirst(long startMs, long cabinMs) {
+            this.surroundFirstMs = startMs >= 0 ? startMs : -1;
+            this.surroundFirstCabinMs = startMs >= 0 && cabinMs >= 0 ? cabinMs : -1;
+            return this;
+        }
+
         public Entry build() {
             return new Entry(this);
         }
@@ -497,6 +531,8 @@ public final class StepStats {
             b.ours = values.get("our");
             b.oursAtMs = number(values, "ourms");
             b.ignition = values.get("ign");
+            b.surroundFirstMs = number(values, "sfs");
+            b.surroundFirstCabinMs = number(values, "sfc");
         } catch (IllegalArgumentException e) {
             return null;   // 名字认不出（以后的版本加了新的动作 / 结果）、数坏了：整行不要
         }
@@ -665,7 +701,7 @@ public final class StepStats {
         return CameraSlots.KEY_CABIN_FRONT.equals(e.key) ? 2 : 3;
     }
 
-    /** 关座舱时环视那一组的比较（R3：关座舱时先短暂关环视，备选方案之一，只记录）。 */
+    /** 关座舱时环视那一组的比较（R3：关座舱时先短暂关环视；2.11.6 起照做，用不了相机时、计划外的关照旧在环视旁边关）。 */
     public static final class CloseComparison {
         /** 这一组座舱关的那几步。 */
         public final List<Entry> closes = new ArrayList<>();
@@ -738,6 +774,66 @@ public final class StepStats {
                 t.stalled++;
                 t.longestMs = Math.max(t.longestMs, e.ms);
             }
+        }
+        return t;
+    }
+
+    /**
+     * 关座舱前先关环视之后环视开回来的那几次（{@link #surroundFirstReopens}，2.11.6）：几次、出画面 / 没画面 / 出错；出画面用了多久、
+     * 环视断了多久（从开始关环视到它又出画面）的中位、最长；中间座舱那一步关得慢（超过 {@link #SLOW_CLOSE_MS}）的几次、其中开回来没出画面的几次。
+     */
+    public static final class SurroundFirstReopens {
+        public int count;
+        public int framed;
+        public int noFrames;
+        public int errors;
+        /** 出了画面的那几次：开回来出第一帧用了多久、环视断了多久；没有是 -1。 */
+        public long frameMedianMs = -1;
+        public long frameMaxMs = -1;
+        public long gapMedianMs = -1;
+        public long gapMaxMs = -1;
+        /** 中间座舱那一步关得慢的几次；其中开回来没出画面（没画面、出错）的几次。 */
+        public int slowCabins;
+        public int slowCabinsDark;
+    }
+
+    /**
+     * 关座舱前先关环视之后环视开回来的那几步数一组（项目所有者 2026-10-15 定，2.11.6）：这条规矩的代价（环视断了多久）和风险
+     * （开回来没画面 —— 座舱关卡住之后紧接着开环视以前 2 次都黑了，看中间座舱那一步关得慢不慢）都在这里。别的条跳过。
+     */
+    public static SurroundFirstReopens surroundFirstReopens(List<Entry> entries) {
+        SurroundFirstReopens t = new SurroundFirstReopens();
+        List<Long> frames = new ArrayList<>();
+        List<Long> gaps = new ArrayList<>();
+        for (Entry e : entries) {
+            if (!e.afterSurroundFirst()) {
+                continue;
+            }
+            t.count++;
+            boolean framed = e.result == Result.FRAMED;
+            if (framed) {
+                t.framed++;
+                frames.add(e.ms);
+                gaps.add(e.surroundFirstGapMs());
+            } else if (e.result == Result.NO_FRAMES) {
+                t.noFrames++;
+            } else if (e.result == Result.ERROR) {
+                t.errors++;
+            }
+            if (e.surroundFirstCabinMs > SLOW_CLOSE_MS) {
+                t.slowCabins++;
+                if (!framed) {
+                    t.slowCabinsDark++;
+                }
+            }
+        }
+        if (!frames.isEmpty()) {
+            Collections.sort(frames);
+            Collections.sort(gaps);
+            t.frameMedianMs = frames.get((frames.size() - 1) / 2);
+            t.frameMaxMs = frames.get(frames.size() - 1);
+            t.gapMedianMs = gaps.get((gaps.size() - 1) / 2);
+            t.gapMaxMs = gaps.get(gaps.size() - 1);
         }
         return t;
     }

@@ -290,6 +290,55 @@ public class StepStatsTest {
         assertNull(entry(1, REAR, StepStats.Move.OPEN, StepStats.Result.FRAMED, 100).kind());
     }
 
+    /**
+     * 关座舱前先关环视之后环视开回来的那一步（项目所有者 2026-10-15 定，2.11.6）存得下、读得回；数一组：出画面 / 没画面 / 出错、
+     * 出画面用了多久、环视断了多久（开始关环视到开 + 出画面用的）、中间座舱关得慢的几次（其中开回来没画面的几次）。别的步不算进来。
+     */
+    @Test
+    public void surroundFirstReopensAreCountedWithTheirSeamAndSlowCabinCloses() {
+        StepStats.Entry framed = new StepStats.Builder()
+                .step(1, SUR, "2", StepStats.Move.OPEN, StepStats.Result.FRAMED, 230)
+                .surroundFirst(290, 140).build();
+        StepStats.Entry back = StepStats.parse(framed.encode());
+        assertNotNull(back);
+        assertEquals(framed.encode(), back.encode());
+        assertEquals(290, back.surroundFirstMs);
+        assertEquals(140, back.surroundFirstCabinMs);
+        assertEquals(true, back.afterSurroundFirst());
+        assertEquals("环视断了 = 开始关环视到开 + 出画面用的", 520, back.surroundFirstGapMs());
+        StepStats.Entry plain = StepStats.parse("v1 t=5 k=front m=OPEN r=FRAMED ms=200");
+        assertEquals(false, plain.afterSurroundFirst());
+        assertEquals(-1, plain.surroundFirstGapMs());
+        assertEquals("开始那一刻不知道的不记", -1, new StepStats.Builder()
+                .step(1, SUR, "2", StepStats.Move.OPEN, StepStats.Result.FRAMED, 230).surroundFirst(-1, 140).build()
+                .surroundFirstCabinMs);
+
+        List<StepStats.Entry> entries = Arrays.asList(
+                framed,
+                new StepStats.Builder().step(2, SUR, "2", StepStats.Move.OPEN, StepStats.Result.FRAMED, 400)
+                        .surroundFirst(300, 120).build(),
+                new StepStats.Builder().step(3, SUR, "2", StepStats.Move.OPEN, StepStats.Result.NO_FRAMES, 15_000)
+                        .surroundFirst(6_500, 6_200).build(),
+                new StepStats.Builder().step(4, SUR, "2", StepStats.Move.OPEN, StepStats.Result.ERROR, 900)
+                        .surroundFirst(300, -1).build(),
+                entry(5, SUR, StepStats.Move.OPEN, StepStats.Result.FRAMED, 100));
+        StepStats.SurroundFirstReopens t = StepStats.surroundFirstReopens(entries);
+        assertEquals(4, t.count);
+        assertEquals(2, t.framed);
+        assertEquals(1, t.noFrames);
+        assertEquals(1, t.errors);
+        assertEquals(230, t.frameMedianMs);
+        assertEquals(400, t.frameMaxMs);
+        assertEquals(520, t.gapMedianMs);
+        assertEquals(700, t.gapMaxMs);
+        assertEquals("中间座舱关得慢", 1, t.slowCabins);
+        assertEquals("那一次开回来没画面", 1, t.slowCabinsDark);
+        StepStats.SurroundFirstReopens none = StepStats.surroundFirstReopens(Collections.singletonList(
+                entry(6, REAR, StepStats.Move.CLOSE, StepStats.Result.CLOSED, 100)));
+        assertEquals(0, none.count);
+        assertEquals(-1, none.gapMaxMs);
+    }
+
     @Test
     public void tokensNeverCarrySpacesOrEquals() {
         assertEquals("a_b_c", StepStats.token("a b=c"));
