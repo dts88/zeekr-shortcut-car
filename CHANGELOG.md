@@ -11,6 +11,19 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.7-beta] - 2026-10-15
+
+Upgrade from 2.0.0. Same code as 2.11.6-alpha.
+
+- **Significantly improved stability.**
+- While recording, the record button shows what will happen when the screen turns off.
+- Fixed stuttering at high bitrates and frame rates.
+- Driving info bar redesigned, with new items including Sentry Mode, rear lamps and a 7X front view, plus an easter egg. Items are selected in Settings → System → System info (experimental). The bar is added to the surround view recording only.
+- Lock footage (Settings → Storage): videos and photos can be locked during playback, or automatically when the high beams are flashed (optional). Locked files are never deleted by loop recording.
+- Interface text revised in all three languages.
+- Diagnostics extended; Send to phone is available to all users.
+- Known issue: with all three cameras enabled (surround view, front and rear cabin), a camera may occasionally freeze before it recovers automatically. Current work focuses on reducing the impact on the head unit.
+
 ## [2.11.6-alpha] - 2026-10-15
 
 - When the cabin cameras are released while the surround view is open, the surround view now closes briefly first and reopens after the cabins have closed.
