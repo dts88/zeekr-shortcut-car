@@ -317,8 +317,8 @@ public final class DiagnosticsCollector {
     /**
      * 相机步骤统计（项目所有者 2026-10-14：「识别前后座舱摄像头被卡住的原因或者统计」，2.11.4 R2）：最近 200 步，跨进程留着
      * （{@code camera.StepLog}）。按相机、动作数出画面、没画面、出错、关的用时；再按哨兵、主界面在不在前、离我们上一次关它多久、
-     * 是不是车机刚放开它、环视是不是车机重新初始化后的第一台（2.11.5）分开数；备选方案「关座舱时先短暂关环视」要比的那一组（R3，只记录；
-     * 2.11.5 起加上环视那一边：关座舱之后 30 秒里环视断没断）；最后最近 30 步、关座舱时环视最近 10 次。
+     * 是不是车机刚放开它、环视是不是车机重新初始化后的第一台（2.11.5）分开数；「关座舱时先短暂关环视」要比的那一组（R3；
+     * 2.11.5 起加上环视那一边：关座舱之后 30 秒里环视断没断；2.11.6 起照做，再加上环视开回来的那一组）；最后最近 30 步、关座舱时环视最近 10 次。
      * 只读那个文件，不碰调度、不建管线。
      */
     private static void appendStepStats(StringBuilder sb, Context context) {
@@ -360,8 +360,8 @@ public final class DiagnosticsCollector {
         appendGroups(sb, entries, StepStats::laneMove, StepStats::releaseBucket);
         sb.append("按环视是不是车机重新初始化后的第一台（环视自己开的：这一台；座舱的：那时开着的环视；2.11.5 起记）：").append('\n');
         appendGroups(sb, entries, StepStats::laneMove, StepStats::lineageBucket);
-        sb.append("备选方案「关座舱时先短暂关环视」要比的（只记录，没做）：座舱每一次关（计划里的关），按关的时候环视怎样分，关的用时、之后那一次开：")
-                .append('\n');
+        sb.append("「关座舱时先短暂关环视」要比的（2.11.6 起照做：计划里的关座舱、能用相机时环视先关；用不了相机时照旧在环视旁边关）：")
+                .append("座舱每一次关（计划里的关），按关的时候环视怎样分，关的用时、之后那一次开：").append('\n');
         java.util.Map<String, StepStats.CloseComparison> closes = StepStats.cabinClosesBySurround(entries);
         if (closes.isEmpty()) {
             sb.append("  还没有座舱的关").append('\n');
@@ -372,6 +372,7 @@ public final class DiagnosticsCollector {
                     .append("；之后那一次开 ").append(c.nextOpens).append(" 次，没画面 ").append(c.nextNoFrames).append('\n');
         }
         appendSurroundAfterCloses(sb, couples);
+        appendSurroundFirstReopens(sb, entries);
         sb.append("最近 30 步（新的在前）：").append('\n');
         for (int i = entries.size() - 1; i >= Math.max(0, entries.size() - 30); i--) {
             sb.append("  ").append(entryText(entries.get(i))).append('\n');
@@ -406,6 +407,30 @@ public final class DiagnosticsCollector {
             sb.append("    ").append(name).append("：").append(surroundAfterText(StepStats.surroundAfterCloses(groups.get(name))))
                     .append('\n');
         }
+    }
+
+    /**
+     * 关座舱前先关环视之后环视开回来的那几次（项目所有者 2026-10-15 定，2.11.6）：出画面 / 没画面 / 出错，出画面用了多久，环视断了多久
+     * （从开始关环视到它又出画面），中间座舱那一步关得慢（超过 1 秒）的几次、其中开回来没画面的几次 —— 这条规矩的代价和风险
+     * （座舱关卡住之后紧接着开环视，以前 2 次都黑了）。
+     */
+    private static void appendSurroundFirstReopens(StringBuilder sb, List<StepStats.Entry> entries) {
+        sb.append("  关座舱前先关环视之后环视开回来（2.11.6 起）：");
+        StepStats.SurroundFirstReopens t = StepStats.surroundFirstReopens(entries);
+        if (t.count == 0) {
+            sb.append("还没有").append('\n');
+            return;
+        }
+        sb.append(t.count).append(" 次：出画面 ").append(t.framed).append("、没画面 ").append(t.noFrames)
+                .append("、出错 ").append(t.errors);
+        if (t.framed > 0) {
+            sb.append("；出画面用时中位 ").append(secondsText(t.frameMedianMs)).append("、最长 ").append(secondsText(t.frameMaxMs))
+                    .append("；环视断了（从开始关环视到又出画面）中位 ").append(secondsText(t.gapMedianMs))
+                    .append("、最长 ").append(secondsText(t.gapMaxMs));
+        }
+        sb.append("；中间座舱关得慢（超过 ").append(StepStats.SLOW_CLOSE_MS / 1000).append(" 秒）").append(t.slowCabins)
+                .append(" 次").append(t.slowCabins > 0 ? "，其中开回来没出画面 " + t.slowCabinsDark + " 次" : "")
+                .append('\n');
     }
 
     /** 「环视是第一台」「环视不是第一台」「环视第几台不可信（从记录开始数的）」「环视第几台不知道」。 */
@@ -615,6 +640,13 @@ public final class DiagnosticsCollector {
         }
         if (e.oldCloseMs >= 0) {
             sb.append("，旧设备关了 ").append(secondsText(e.oldCloseMs));
+        }
+        if (e.afterSurroundFirst()) {
+            // 关座舱前先关环视之后开回来的那一步（2.11.6）：开始关环视后多久开、座舱关了多久、环视断了多久
+            sb.append("（关座舱前先关环视之后开回来：开始关环视后 ").append(secondsText(e.surroundFirstMs)).append(" 开")
+                    .append(e.surroundFirstCabinMs >= 0 ? "，座舱关了 " + secondsText(e.surroundFirstCabinMs) : "，座舱没关")
+                    .append(e.surroundFirstGapMs() >= 0 ? "，环视断了 " + secondsText(e.surroundFirstGapMs()) : "")
+                    .append('）');
         }
         sb.append("；哨兵 ").append(e.sentry < 0 ? "?" : String.valueOf(e.sentry))
                 .append("、主界面").append(e.mainForeground < 0 ? "?" : e.mainForeground == 1 ? "在前" : "后台")

@@ -136,6 +136,31 @@ public class DiagnosticsCollectorTest {
                 text.indexOf("关座舱时环视最近 10 次")).contains("关座舱时"));
     }
 
+    /**
+     * 2.11.6（项目所有者 2026-10-15 定：关座舱前先关环视）：环视开回来的那几次单独一组 —— 出画面 / 没画面 / 出错、出画面用时、环视断了多久、
+     * 中间座舱关得慢的几次；那一步自己那一行带着这一趟。座舱的关记「环视关着」，进「关座舱时先短暂关环视」那一组。没有的时候也有一句。
+     */
+    @Test
+    public void stepStatisticsCountTheSurroundFirstReopens() {
+        java.util.List<com.kooo.evcam.camera.StepStats.Entry> none = java.util.Collections.singletonList(
+                com.kooo.evcam.camera.StepStats.parse("v1 t=1000 k=left c=1 m=CLOSE r=CLOSED ms=220 sur=STREAMING"));
+        String empty = DiagnosticsCollector.stepStatsText(none);
+        assertTrue(empty, empty.contains("  关座舱前先关环视之后环视开回来（2.11.6 起）：还没有\n"));
+        java.util.List<com.kooo.evcam.camera.StepStats.Entry> entries = java.util.Arrays.asList(
+                com.kooo.evcam.camera.StepStats.parse("v1 t=1000 k=front c=2 m=CLOSE r=CLOSED ms=150"),
+                com.kooo.evcam.camera.StepStats.parse("v1 t=1100 k=left c=1 m=CLOSE r=CLOSED ms=140 sur=CLOSED"),
+                com.kooo.evcam.camera.StepStats.parse("v1 t=1200 k=front c=2 m=OPEN r=FRAMED ms=230 sfs=290 sfc=140"),
+                com.kooo.evcam.camera.StepStats.parse(
+                        "v1 t=2000 k=front c=2 m=OPEN r=NO_FRAMES ms=15000 sfs=6500 sfc=6200"));
+        String text = DiagnosticsCollector.stepStatsText(entries);
+        assertTrue(text, text.contains("  关座舱前先关环视之后环视开回来（2.11.6 起）：2 次：出画面 1、没画面 1、出错 0"
+                + "；出画面用时中位 0.2 秒、最长 0.2 秒；环视断了（从开始关环视到又出画面）中位 0.5 秒、最长 0.5 秒"
+                + "；中间座舱关得慢（超过 1 秒）1 次，其中开回来没出画面 1 次\n"));
+        assertTrue(text, text.contains("环视 开 → 出画面 0.2 秒（关座舱前先关环视之后开回来：开始关环视后 0.3 秒开，"
+                + "座舱关了 0.1 秒，环视断了 0.5 秒）"));
+        assertTrue(text, text.contains("  环视关着：1 次：关 1 次"));
+    }
+
     @Test
     public void everyStepBucketHasItsOwnText() {
         java.util.Set<String> seen = new java.util.HashSet<>();

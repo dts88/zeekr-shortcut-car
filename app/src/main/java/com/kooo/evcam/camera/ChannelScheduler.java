@@ -46,7 +46,8 @@ import java.util.function.Consumer;
  *       换下来的录制器）离开了会话的，放掉；</li>
  *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；关完一轮 30 秒的、别的程序拿走一路相机 30 秒的
  *       （{@link #watchAfter}），量一次还开着的那几路（{@link #noteAftermaths}；在那之前我们自己动了它的，量到动它那一刻）；
- *       关座舱时环视开着的，关完那一刻、1 秒、30 秒各量一次环视（{@link Coupling}，2.11.5 第 D2 项）；救完一路接着量别的几路到下一步开始；</li>
+ *       关座舱时环视开着的，关完那一刻、1 秒、30 秒各量一次环视（{@link Coupling}，2.11.5 第 D2 项）；救完一路接着量别的几路到下一步开始；
+ *       关座舱前先关环视的那一趟（规则那一步，2.11.6）走完写一行：环视断了多久、各段多久（{@link SurroundFirst}）；</li>
  *   <li>告诉录像那一侧（{@link Recording}）：哪几路走了、哪几路的样子变了、哪几路带着新会话出了画面 ——
  *       录像按路加入、退出只看这几声，自己从不动相机；</li>
  *   <li>记下诊断报告读的快照（{@link #snapshot()}）。</li>
@@ -276,7 +277,9 @@ public final class ChannelScheduler {
         /**
          * 这一路的相机走了：丢了（{@link Gone#LOST}，在阻塞的关之前；{@code reason} 是丢的那一下）、我们关了它
          * （{@link Gone#CLOSED}；{@code closed} 是关的原因，熄屏放开座舱是 {@link ChannelRules.Why#DARK_RELEASE} ——
-         * 退出录像那一行照它写「熄屏：座舱放开」）、或者它卡住了在救（{@link Gone#RESCUED}：重建会话、重开）。
+         * 退出录像那一行照它写「熄屏：座舱放开」；关座舱前先关环视是 {@link ChannelRules.Why#SURROUND_FIRST}，那一行写
+         * 「关座舱前先关环视」，录制器停放，环视开回来带着同一个录像输出出了画面就再加入）、或者它卡住了在救
+         * （{@link Gone#RESCUED}：重建会话、重开）。
          *
          * @param reason 丢的那一下；不是丢了的是 null
          * @param closed 我们关它的原因；不是我们关的是 null
@@ -295,7 +298,7 @@ public final class ChannelScheduler {
     enum Gone {
         /** 丢了：被断开、报错（在那一次阻塞的关之前就说）。 */
         LOST,
-        /** 我们关的：没人要、保持到点、熄屏、熄屏放开座舱、车机要睡、退出。 */
+        /** 我们关的：没人要、保持到点、熄屏、熄屏放开座舱、关座舱前先关环视、车机要睡、退出。 */
         CLOSED,
         /** 开着却没进展（卡住了），调度在救：重建会话或者重开。 */
         RESCUED
@@ -419,6 +422,12 @@ public final class ChannelScheduler {
          * 计划里的关（熄屏放开、保持到点、没人要）关完 30 秒那一行就是 {@link #closeAftermath} 那一行（前面一字不改），这时不另写那一行。
          */
         void coupling(Coupling c);
+
+        /**
+         * 关座舱前先关环视的一趟走完了（{@link SurroundFirst}，项目所有者 2026-10-15 定，2.11.6）：一趟一行 ——
+         * 环视开回来出了画面（断了多久，关环视 → 关座舱 → 开环视各多久）、开回来没画面、开回来出了事，或者不再开回来（没人要了、退出、车机要睡）。
+         */
+        void surroundFirst(SurroundFirst f);
 
         /**
          * 救一路那一行之后接着量别的几路，量到下一步开始（{@code next} 为 null 是 {@link ChannelScheduler#AFTERMATH_MS} 里没有下一步）：
@@ -716,6 +725,13 @@ public final class ChannelScheduler {
         final CameraHistory.Reset lineageReset;
         /** 关座舱时环视那一条（{@link StepStats.Move#COUPLE}）：关完 30 秒那一次量的；别的是 null。 */
         final Coupling coupling;
+        /**
+         * 关座舱前先关环视之后环视开回来的那一步（2.11.6）：从开始关环视到这一步开始多久；别的步是 -1。
+         * 环视断了多久 = 它 + 这一步出画面用的时间（{@link #ms}，出了画面的话）。
+         */
+        final long surroundFirstStartMs;
+        /** 同上：那一趟里座舱一起关的那一步关了多久（最慢的一路；到点还没关完是那一步的封顶）；座舱没关、别的步是 -1。 */
+        final long surroundFirstCabinMs;
 
         StepRecord(StepContext context, StepStats.Move move, StepStats.Result result, long ms, long configuredMs,
                    CameraTaken.Reason reason, SessionCounts.Snapshot counts, long oldCloseMs, Other surround) {
@@ -725,6 +741,14 @@ public final class ChannelScheduler {
         StepRecord(StepContext context, StepStats.Move move, StepStats.Result result, long ms, long configuredMs,
                    CameraTaken.Reason reason, SessionCounts.Snapshot counts, long oldCloseMs, Other surround,
                    StepStats.CloseKind closeKind, int lineage, CameraHistory.Reset lineageReset, Coupling coupling) {
+            this(context, move, result, ms, configuredMs, reason, counts, oldCloseMs, surround, closeKind, lineage,
+                    lineageReset, coupling, -1, -1);
+        }
+
+        StepRecord(StepContext context, StepStats.Move move, StepStats.Result result, long ms, long configuredMs,
+                   CameraTaken.Reason reason, SessionCounts.Snapshot counts, long oldCloseMs, Other surround,
+                   StepStats.CloseKind closeKind, int lineage, CameraHistory.Reset lineageReset, Coupling coupling,
+                   long surroundFirstStartMs, long surroundFirstCabinMs) {
             this.context = context;
             this.move = move;
             this.result = result;
@@ -738,6 +762,8 @@ public final class ChannelScheduler {
             this.lineage = lineage;
             this.lineageReset = lineageReset;
             this.coupling = coupling;
+            this.surroundFirstStartMs = surroundFirstStartMs;
+            this.surroundFirstCabinMs = surroundFirstCabinMs;
         }
     }
 
@@ -783,7 +809,8 @@ public final class ChannelScheduler {
      * 没人要，救援重开时关旧设备，丢了之后那一次关；车机拿走座舱也是丢了那一种）—— 关完的时候环视开着（开着就算，出没出画面都量），
      * 关完那一刻、关完 {@link ChannelScheduler#COUPLING_CHECK_MS}、关完 {@link ChannelScheduler#AFTERMATH_MS} 各量一次：
      * 环视最后一帧在开始关、关完前后多少毫秒，开始关以来最长断帧、会话动没动，开始关以来每一路失败、丢缓冲几次，点火、离点火上一次变化多久，
-     * 主界面在不在前，环视那一台是车机重新初始化后第几台。不可变。
+     * 主界面在不在前，环视那一台是车机重新初始化后第几台。不可变。2.11.6 起计划里的关座舱、能用相机时环视先单独关了
+     * （{@link ChannelRules.Why#SURROUND_FIRST}），关座舱时环视已经关着、不量；这几行只剩用不了相机时的计划里的关和计划外的关（重开、丢了）。
      *
      * <p>为什么（rel_final §1–§3）：10-13 23:59、10-14 21:52 两次熄屏放开座舱，环视在一个座舱关完的那一帧前后就停了，关完那一行写的却是
      * 「环视最长断帧不到 0.2 秒」—— 那一行只量到关完，看不见关完前不到 0.2 秒开始的断帧；救援的关、丢了的关、车机拿走的关以前根本不量。
@@ -893,6 +920,71 @@ public final class ChannelScheduler {
             this.key = key;
             this.failures = failures;
             this.lost = lost;
+        }
+    }
+
+    /**
+     * 关座舱前先关环视的一趟（项目所有者 2026-10-15 定，2.11.6；规则那一步是 {@link ChannelRules.Why#SURROUND_FIRST}）：
+     * 环视单独关 → 座舱一起关 → 「开」那一步把环视开回来，走完写一行（{@link Journal#surroundFirst}）。只是记账、写黑匣子：
+     * 每一步照旧是规则出、调度做，这里一步都不加、不挪。不可变。
+     *
+     * <p>为什么记它：这一趟就是代价（环视断了多久、录像多切一个文件），也是这条规矩的证据 —— 开回来没画面（R3 那种黑）要一眼看得出来，
+     * 中间座舱关得慢也要看得出来（座舱关卡住之后紧接着开环视，10-10 07:51、10-11 23:19 两次都黑了，平台笔记 §3.6）。</p>
+     */
+    static final class SurroundFirst {
+        /** 这一趟怎么结束的。 */
+        enum End {
+            /** 环视开回来了，出了画面。 */
+            FRAMED,
+            /** 开回来那一步 15 秒没出画面（由救援接手）。 */
+            NO_FRAMES,
+            /** 开回来那一步里开不起来、或者丢了（{@link #failure}）。 */
+            ERROR,
+            /** 不再开回来：没人要它了（只在保持的环视、或者座舱关的时候要它的也放了）。 */
+            UNWANTED,
+            /** 不再开回来：退出、车机要睡。 */
+            WINDING
+        }
+
+        final End end;
+        /** 开始关环视的时刻（调度的钟）。 */
+        final long startedAt;
+        /** 环视那一步关了多久；到点（{@link ChannelRules#CLOSE_SURROUND_MAX_MS}）还没关完是 {@link #surroundTimedOut}。 */
+        final long surroundMs;
+        final boolean surroundTimedOut;
+        /** 座舱一起关的那一步：关的几路（按关完的先后，到点没关完的在后）、为什么关；座舱没关（又有人要了）是空的、null。 */
+        final List<String> cabinKeys;
+        final ChannelRules.Why cabinWhy;
+        /** 座舱那一步关了多久（最慢的一路）；到点还没关完是 {@link #cabinTimedOut}（那一步的封顶）；没关是 -1。 */
+        final long cabinMs;
+        final boolean cabinTimedOut;
+        /** 开回来那一步从开始关环视起多久开始的；没开回来是 -1。 */
+        final long reopenAfterMs;
+        /** 开回来那一步做了多久（到出画面、到点、到出事）；没开回来是 -1。 */
+        final long reopenMs;
+        /** 从开始关环视到它又出画面：环视断了多久；没出画面是 -1。 */
+        final long gapMs;
+        /** 开回来那一步里出了事（开不起来、丢了）；别的是 null。 */
+        final ChannelRules.Failure failure;
+        /** 这一趟结束的时刻（调度的钟）。 */
+        final long endedAt;
+
+        SurroundFirst(End end, long startedAt, long surroundMs, boolean surroundTimedOut, List<String> cabinKeys,
+                      ChannelRules.Why cabinWhy, long cabinMs, boolean cabinTimedOut, long reopenAfterMs, long reopenMs,
+                      long gapMs, ChannelRules.Failure failure, long endedAt) {
+            this.end = end;
+            this.startedAt = startedAt;
+            this.surroundMs = surroundMs;
+            this.surroundTimedOut = surroundTimedOut;
+            this.cabinKeys = Collections.unmodifiableList(new ArrayList<>(cabinKeys));
+            this.cabinWhy = cabinWhy;
+            this.cabinMs = cabinMs;
+            this.cabinTimedOut = cabinTimedOut;
+            this.reopenAfterMs = reopenAfterMs;
+            this.reopenMs = reopenMs;
+            this.gapMs = gapMs;
+            this.failure = failure;
+            this.endedAt = endedAt;
         }
     }
 
@@ -1290,6 +1382,8 @@ public final class ChannelScheduler {
     private final List<String> trailKeys = new ArrayList<>();
     private final List<Long> trailMs = new ArrayList<>();
     private CloseRound closeRound;
+    /** 关座舱前先关环视的那一趟，还没走完的（{@link SurroundFirstRun}，2.11.6）；没有是 null。只记账，不动哪一步。 */
+    private SurroundFirstRun surroundFirst;
     /** 每一路最近一次关完的时刻（调度的钟）。 */
     private final Map<String, Long> closedAt = new HashMap<>();
     /** 每一路最近一次丢了之后关完用了多久。 */
@@ -1390,6 +1484,7 @@ public final class ChannelScheduler {
         trailKeys.clear();
         trailMs.clear();
         closeRound = null;
+        surroundFirst = null;
         closedAt.clear();
         lossCloseMs.clear();
         wordAtRaw.clear();
@@ -1784,6 +1879,7 @@ public final class ChannelScheduler {
         noteWait(d, now);
         execute(d, now);
         flushTrails(d);
+        endSurroundFirstWithoutReopen(now);
         noteWatches(now);
         dispatchDrops();
         releaseHandedOver(false);
@@ -2108,8 +2204,18 @@ public final class ChannelScheduler {
                 && lastClose.endedAt >= step.startedAt ? lastClose.ms : -1;
         StepStats.Result result = failure != null ? StepStats.Result.ERROR
                 : timedOut ? StepStats.Result.NO_FRAMES : StepStats.Result.FRAMED;
+        // 关座舱前先关环视之后环视开回来的那一步（2.11.6）：统计里带上这一趟，再写那一趟的一行
+        SurroundFirstRun run = surroundFirst;
+        boolean reopen = run != null && step.move == ChannelRules.Move.OPEN && run.reopenStartedAt == step.startedAt
+                && CameraSlots.KEY_SURROUND.equals(key);
         record(r, key, result, durationMs, configuredMs, failure == null ? null : failure.reason, counts, oldCloseMs,
-                others);
+                others, reopen ? step.startedAt - run.startedAt : -1, reopen ? run.cabinMs : -1);
+        if (reopen) {
+            surroundFirst = null;
+            journal.surroundFirst(run.ended(result == StepStats.Result.FRAMED ? SurroundFirst.End.FRAMED
+                            : result == StepStats.Result.NO_FRAMES ? SurroundFirst.End.NO_FRAMES : SurroundFirst.End.ERROR,
+                    durationMs, frameMs >= 0 ? lane.firstFrameAt - run.startedAt : -1, failure, endedAt));
+        }
         if (step.move == ChannelRules.Move.RESCUE && !r.generations.isEmpty()) {
             // 救完一路接着量别的几路，量到下一步开始（2.11.5 第 D2 项）：救那一步关旧设备之后环视要是停了，停在关完那一帧前后，
             // 救那一行在出画面那一刻就量完了，看不见
@@ -2135,6 +2241,16 @@ public final class ChannelScheduler {
      */
     private void record(Running r, String key, StepStats.Result result, long ms, long configuredMs,
                         CameraTaken.Reason reason, SessionCounts.Snapshot counts, long oldCloseMs, List<Other> others) {
+        record(r, key, result, ms, configuredMs, reason, counts, oldCloseMs, others, -1, -1);
+    }
+
+    /**
+     * 同上；关座舱前先关环视之后环视开回来的那一步带上那一趟（2.11.6）：从开始关环视到这一步开始多久、座舱那一步关了多久
+     * （{@link StepRecord#surroundFirstStartMs}；别的步是 -1）。
+     */
+    private void record(Running r, String key, StepStats.Result result, long ms, long configuredMs,
+                        CameraTaken.Reason reason, SessionCounts.Snapshot counts, long oldCloseMs, List<Other> others,
+                        long surroundFirstStartMs, long surroundFirstCabinMs) {
         StepContext context = r == null ? null : r.contexts.get(key);
         if (context == null) {
             return;
@@ -2148,7 +2264,7 @@ public final class ChannelScheduler {
             }
         }
         record(context, statsMove(r.decision), null, result, ms, configuredMs, reason, counts, oldCloseMs, surround,
-                null);
+                null, surroundFirstStartMs, surroundFirstCabinMs);
     }
 
     /**
@@ -2159,6 +2275,14 @@ public final class ChannelScheduler {
     private void record(StepContext context, StepStats.Move move, StepStats.CloseKind closeKind, StepStats.Result result,
                         long ms, long configuredMs, CameraTaken.Reason reason, SessionCounts.Snapshot counts,
                         long oldCloseMs, Other surround, Coupling coupling) {
+        record(context, move, closeKind, result, ms, configuredMs, reason, counts, oldCloseMs, surround, coupling, -1, -1);
+    }
+
+    /** 同上，带上关座舱前先关环视的那一趟（{@link StepRecord#surroundFirstStartMs}；不是那一步是 -1）。 */
+    private void record(StepContext context, StepStats.Move move, StepStats.CloseKind closeKind, StepStats.Result result,
+                        long ms, long configuredMs, CameraTaken.Reason reason, SessionCounts.Snapshot counts,
+                        long oldCloseMs, Other surround, Coupling coupling, long surroundFirstStartMs,
+                        long surroundFirstCabinMs) {
         int lineage = 0;
         CameraHistory.Reset lineageReset = null;
         if (coupling != null) {
@@ -2181,7 +2305,7 @@ public final class ChannelScheduler {
             lineageReset = context.surroundHistory.lastReset;
         }
         journal.recorded(new StepRecord(context, move, result, ms, configuredMs, reason, counts, oldCloseMs, surround,
-                closeKind, lineage, lineageReset, coupling));
+                closeKind, lineage, lineageReset, coupling, surroundFirstStartMs, surroundFirstCabinMs));
     }
 
     /** 统计里的动作：开、救援的重开 / 重建、改输出、关。 */
@@ -2225,7 +2349,7 @@ public final class ChannelScheduler {
             }
             Long at = closedAt.get(key);
             long ms = (at != null && at >= step.startedAt ? at : now) - step.startedAt;
-            // 座舱每一次关都带着关的时候环视怎样（开始时的样子、这段时间断没断帧）：备选方案「关座舱时先短暂关环视」要比的就是它（R3）
+            // 座舱每一次关都带着关的时候环视怎样（开始时的样子、这段时间断没断帧）：「关座舱时先短暂关环视」要比的就是它（R3，2.11.6 起照做）
             record(r, key, StepStats.Result.CLOSED, ms, -1, null, null, -1, others);
             int i = 0;
             while (i < doneMs.size() && doneMs.get(i) <= ms) {
@@ -2236,6 +2360,21 @@ public final class ChannelScheduler {
         }
         if (!stuck.isEmpty()) {
             journal.closeTimedOut(stuck, step.maxMs, surroundStep);
+        }
+        SurroundFirstRun run = surroundFirst;
+        if (run != null && run.reopenStartedAt == 0) {
+            // 关座舱前先关环视的那一趟（2.11.6）：环视那一步、紧接着座舱那一步各关了多久（只记账）
+            if (surroundStep && r != null && r.decision.why == ChannelRules.Why.SURROUND_FIRST) {
+                run.surroundTimedOut = !stuck.isEmpty();
+                run.surroundMs = run.surroundTimedOut ? step.maxMs : doneMs.isEmpty() ? now - step.startedAt : doneMs.get(0);
+            } else if (!surroundStep && run.cabinMs < 0) {
+                run.cabinKeys.addAll(doneKeys);
+                run.cabinKeys.addAll(stuck);
+                run.cabinWhy = r == null ? null : r.decision.why;
+                run.cabinTimedOut = !stuck.isEmpty();
+                run.cabinMs = run.cabinTimedOut ? step.maxMs
+                        : doneMs.isEmpty() ? now - step.startedAt : doneMs.get(doneMs.size() - 1);
+            }
         }
         if (surroundStep) {
             closeRound.surroundKey = step.keys.get(0);
@@ -2600,6 +2739,10 @@ public final class ChannelScheduler {
             return;
         }
         journal.closing(keys, d.why);
+        if (d.why == ChannelRules.Why.SURROUND_FIRST) {
+            // 关座舱前先关环视（规则那一步，2.11.6）：从这里记这一趟，走完写一行（只记账）
+            surroundFirst = new SurroundFirstRun(now);
+        }
         String why = closeWhy(d.why);
         for (String key : keys) {
             ports.get(key).close(why);
@@ -2639,6 +2782,11 @@ public final class ChannelScheduler {
             }
         }
         noteTally(d, now);
+        SurroundFirstRun run = surroundFirst;
+        if (run != null && run.reopenStartedAt == 0 && d.move == ChannelRules.Move.OPEN
+                && CameraSlots.KEY_SURROUND.equals(d.key())) {
+            run.reopenStartedAt = now;   // 关座舱前先关环视之后，「开」那一步照常把环视开回来
+        }
         boolean opensDevice = d.move == ChannelRules.Move.OPEN
                 || d.move == ChannelRules.Move.RESCUE && d.rescue == ChannelRules.Rescue.REOPEN;
         if (opensDevice) {
@@ -2755,6 +2903,8 @@ public final class ChannelScheduler {
                 return "screen-off";
             case DARK_RELEASE:
                 return "dark-release";
+            case SURROUND_FIRST:
+                return "surround-first";
             case HOLD_OVER:
                 return "hold-over";
             default:
@@ -3108,6 +3258,30 @@ public final class ChannelScheduler {
                     surround.gapMs >= StepStats.SURROUND_STALL_MS ? StepStats.Result.STALLED : StepStats.Result.STEADY,
                     surround.gapMs, -1, watch.reason, null, -1, surround, c);
         }
+    }
+
+    // ---- 7.2 关座舱前先关环视的那一趟（2.11.6）
+
+    /**
+     * 关座舱前先关环视的那一趟，环视不再开回来的（这一轮照做之后看）：手上没有一步了，环视关着、不该开了（只在保持的环视关了，
+     * 或者座舱关的时候要它的那几样也放了）—— 「没人要了，不再开回来」；退出、车机要睡 —— 「不再开回来」。写那一趟的一行，不再记它。
+     * 还该开、只是这一轮没开（等安静、此刻用不了相机、相机层还在关它）的接着等：「开」那一步开它的时候记下开回来那一刻（{@link #begin}），
+     * 那一步结束时写那一行（{@link #stepEnded}）。只记账，一步都不动。
+     */
+    private void endSurroundFirstWithoutReopen(long now) {
+        SurroundFirstRun run = surroundFirst;
+        if (run == null || run.reopenStartedAt != 0 || w.step != null) {
+            return;
+        }
+        ChannelRules.Lane lane = w.lane(CameraSlots.KEY_SURROUND);
+        boolean winding = ChannelRules.winding(w);
+        if (lane != null && !winding
+                && (lane.device != ChannelRules.Device.CLOSED || ChannelRules.shouldOpen(w, lane))) {
+            return;
+        }
+        surroundFirst = null;
+        journal.surroundFirst(run.ended(winding ? SurroundFirst.End.WINDING : SurroundFirst.End.UNWANTED, -1, -1, null,
+                now));
     }
 
     /**
@@ -3487,6 +3661,43 @@ public final class ChannelScheduler {
                 }
             }
             return staying;
+        }
+    }
+
+    /**
+     * 关座舱前先关环视的那一趟，还没走完（{@link ChannelScheduler#surroundFirst}，2.11.6）：从关环视那一步开始记（{@link ChannelScheduler#close}），
+     * 环视、座舱那两步关完各记一笔（{@link ChannelScheduler#closeEnded}），「开」那一步开环视时记下那一刻（{@link ChannelScheduler#begin}）；
+     * 那一步结束、或者不再开回来时交成一份 {@link SurroundFirst} 写一行。只记账。
+     */
+    private static final class SurroundFirstRun {
+        /** 开始关环视的时刻（调度的钟）。 */
+        final long startedAt;
+        /** 环视那一步关了多久；-1 = 还没关完。 */
+        long surroundMs = -1;
+        boolean surroundTimedOut;
+        /** 座舱那一步：关的几路、为什么、关了多久（最慢的一路）；-1 = 座舱还没关（或者不用关了）。 */
+        final List<String> cabinKeys = new ArrayList<>();
+        ChannelRules.Why cabinWhy;
+        long cabinMs = -1;
+        boolean cabinTimedOut;
+        /** 「开」那一步开环视的时刻（调度的钟）；0 = 还没开。 */
+        long reopenStartedAt;
+
+        SurroundFirstRun(long startedAt) {
+            this.startedAt = startedAt;
+        }
+
+        /**
+         * 这一趟走完了：交成一份写黑匣子的。
+         *
+         * @param reopenMs 开回来那一步做了多久；没开回来是 -1
+         * @param gapMs    从开始关环视到它又出画面；没出画面是 -1
+         * @param endedAt  结束的时刻（调度的钟）
+         */
+        SurroundFirst ended(SurroundFirst.End end, long reopenMs, long gapMs, ChannelRules.Failure failure, long endedAt) {
+            return new SurroundFirst(end, startedAt, surroundMs, surroundTimedOut, cabinKeys,
+                    cabinKeys.isEmpty() ? null : cabinWhy, cabinMs, cabinTimedOut,
+                    reopenStartedAt == 0 ? -1 : reopenStartedAt - startedAt, reopenMs, gapMs, failure, endedAt);
         }
     }
 
