@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.6-alpha] - 2026-10-15
+
+- When the cabin cameras are released while the surround view is open, the surround view now closes briefly first and reopens after the cabins have closed.
+- Diagnostics: the report counts these surround view reopens.
+
 ## [2.11.5-alpha] - 2026-10-15
 
 - Diagnostics only; camera behaviour unchanged.
