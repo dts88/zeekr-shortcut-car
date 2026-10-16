@@ -169,12 +169,12 @@
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
-### 待项目所有者确认（2.11.2）
+### 待项目所有者确认
 
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- （PR #17，超级后视镜方向标签）set_rearview_camera_label_title「方向标签」/ Direction label / Label arah；set_rearview_camera_label_summary「在窗口左上角显示当前画面的方向」/ Shows the direction of the current view in the top-left corner of the window / Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap；set_rearview_reset_summary 加上「方向标签」（「重置窗口与画面」会把它恢复成开）。
 
 ---
 
@@ -200,6 +200,7 @@
 | 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
 | 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 前后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + front and rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin depan dan belakang) | 同一预设在设置列表和状态条上同名 |
 | 超级后视镜 | 超级后视镜；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
+| 方向标签 | 方向标签（超级后视镜窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*） |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
 | 行驶信息条 | 行驶信息条；仅系统信息页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
 | 系统信息 | 系统信息（试验性） | System info (experimental) | Maklumat sistem (percubaan) | — |

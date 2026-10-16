@@ -106,6 +106,14 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
+    /** Redraw the existing window after the label setting changes; no camera restart. */
+    public static void refreshCameraLabel() {
+        RearViewMirrorService svc = instance;
+        if (svc != null && svc.mirrorView != null) {
+            svc.mirrorView.invalidate();
+        }
+    }
+
     /** 设置页开关了按键模式之后通知正在显示的窗口。 */
     public static void applyButtonMode(Context context) {
         RearViewMirrorService svc = instance;

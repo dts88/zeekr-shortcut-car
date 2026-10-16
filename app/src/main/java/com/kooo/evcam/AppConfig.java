@@ -766,6 +766,16 @@ public class AppConfig {
      */
     public static final int REARVIEW_MIN_SIZE = 120;
     private static final String KEY_REARVIEW_BUTTON_MODE = "rearview_button_mode";
+    private static final String KEY_REARVIEW_CAMERA_LABEL = "rearview_camera_label";
+
+    /** Camera direction badge in Super mirror, enabled by default. */
+    public boolean isRearViewCameraLabelEnabled() {
+        return prefs.getBoolean(KEY_REARVIEW_CAMERA_LABEL, true);
+    }
+
+    public void setRearViewCameraLabelEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_REARVIEW_CAMERA_LABEL, enabled).apply();
+    }
 
     public boolean isRearViewEnabled() {
         return prefs.getBoolean(KEY_REARVIEW_ENABLED, false);
@@ -1054,6 +1064,7 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_PAN)
                 .remove(KEY_REARVIEW_LANE)
                 .remove(KEY_REARVIEW_FRONT_REAR)
+                .remove(KEY_REARVIEW_CAMERA_LABEL)
                 .apply();
         AppLog.i(TAG, "超级后视镜布局已恢复默认");
     }

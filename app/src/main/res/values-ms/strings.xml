@@ -54,7 +54,7 @@
     <string name="set_rearview_height_title">Tinggi tetingkap</string>
     <string name="set_rearview_height_summary">Setiap satu boleh sehingga skrin penuh; nisbah gambar kekal dan bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
     <string name="set_rearview_reset_title">Set semula tetingkap dan paparan</string>
-    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan dan Depan dan belakang sahaja kepada lalai, serta kembali ke pandangan belakang</string>
+    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Depan dan belakang sahaja dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
     <string name="set_rearview_guide_title">Cara guna</string>
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
     <string name="rearview_guide_hint">Leret untuk tukar halaman · Ketik di luar untuk tutup</string>
@@ -913,4 +913,6 @@
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
+    <string name="set_rearview_camera_label_title">Label arah</string>
+    <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
 </resources>

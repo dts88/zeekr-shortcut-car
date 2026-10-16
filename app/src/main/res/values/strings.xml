@@ -68,7 +68,7 @@
     <string name="set_rearview_height_title">窗口高度</string>
     <string name="set_rearview_height_summary">宽度和高度均可调至全屏；画面比例不变，窗口形状只决定可见范围</string>
     <string name="set_rearview_reset_title">重置窗口与画面</string>
-    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正和「只显示前后视」的默认值，并切回后视</string>
+    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「只显示前后视」和「方向标签」的默认值，并切回后视</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <string name="rearview_guide_hint">左右滑动翻页 · 点击图片外关闭</string>
@@ -923,4 +923,6 @@
     <string name="dev_tool_progress">（%1$d/%2$d）%3$s</string>
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
+    <string name="set_rearview_camera_label_title">方向标签</string>
+    <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
 </resources>
