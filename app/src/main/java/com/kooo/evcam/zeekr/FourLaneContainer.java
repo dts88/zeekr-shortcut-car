@@ -67,7 +67,11 @@ import com.kooo.evcam.ui.MotionPolicy;
  * <p>开发者选项里还有一种算法：GPU 逐像素（{@link PreviewDewarp}）。那时子视图里的画面
  * 在进来之前就已经校正好了，这里照常按矩阵画，不再分格。</p>
  */
-public class FourLaneContainer extends ViewGroup {
+public class FourLaneContainer extends ViewGroup implements LivePreview {
+    private final PreviewFrameGuard frameGuard = new PreviewFrameGuard(this);
+    @Override public void noteFrame(android.graphics.SurfaceTexture source) { frameGuard.observe(source); }
+    @Override public void resetFrames() { frameGuard.reset(); }
+
 
     private static final String TAG = "FourLaneContainer";
 
@@ -503,6 +507,7 @@ public class FourLaneContainer extends ViewGroup {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        frameGuard.attach();
         lastAttached = new java.lang.ref.WeakReference<>(this);
         readFisheye();
         fisheyeListener = new AppConfig(getContext()).onFisheyeChanged(this::readFisheye);
@@ -511,6 +516,7 @@ public class FourLaneContainer extends ViewGroup {
 
     @Override
     protected void onDetachedFromWindow() {
+        frameGuard.detach();
         AppLog.i(TAG, "detached: " + describeState());
         new AppConfig(getContext()).removeFisheyeListener(fisheyeListener);
         fisheyeListener = null;
@@ -582,6 +588,11 @@ public class FourLaneContainer extends ViewGroup {
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
+        drawLivePreview(canvas);
+        frameGuard.cover(canvas, false);
+    }
+
+    private void drawLivePreview(Canvas canvas) {
         CompositeStreamGeometry.Plan current = plan;
         if (textureView == null || current == null || !current.isComposite()
                 || displayMode == DisplayMode.RAW) {

@@ -288,6 +288,7 @@ public class RearViewMirrorService extends Service {
 
                     @Override
                     public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
+                        if (mirrorView != null) mirrorView.clearFrames();
                         // 画布要被系统收走了（窗口移走：服务退出、窗口被拆）：交给管线留着就返回 false，TextureView 不放（大纲 §7.7）
                         return !handCanvasToPipeline(st);
                     }
@@ -304,7 +305,7 @@ public class RearViewMirrorService extends Service {
                         StallWatch.mirrorFrame();
                         RearViewMirrorView view = mirrorView;
                         if (view != null) {
-                            view.noteFrame();
+                            view.noteFrame(st);
                         }
                     }
                 });
