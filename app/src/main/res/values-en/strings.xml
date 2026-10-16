@@ -935,7 +935,7 @@
     <string name="dev_tool_recording_title">Recording in progress</string>
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
-    <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
+<string name="dev_note">Turn off Settings → System → Enable developer mode to hide this section. Saved developer values are retained.</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
     <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
 </resources>

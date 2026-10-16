@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="set_developer_mode_title">Enable developer mode</string>
+<string name="set_developer_mode_summary">Warning: experimental features and troubleshooting tools can affect cameras, recording and storage. Off on new installs; stays as selected across restarts and updates. Turning it off hides Developer options and disables their settings without erasing saved values. Some changes require restarting the app.</string>
+</resources>

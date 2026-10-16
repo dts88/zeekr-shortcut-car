@@ -117,6 +117,10 @@ Diagnostics**.
 
 ---
 
+### Developer options
+
+Use **Settings → System → Enable developer mode** to reveal experimental controls. The switch includes a warning, is off on fresh installs and preserves the saved choice across restarts/updates. Turning it off hides the section and disables developer-gated settings without erasing their saved values. The About-page password gesture is removed; this is a discoverability choice, not an authentication boundary.
+
 ## Limitations
 
 - Built for the ZEEKR 7X. Only the camera recognised as the composite stream is split; a head unit
