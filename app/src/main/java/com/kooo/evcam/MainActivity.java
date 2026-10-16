@@ -298,7 +298,7 @@ public class MainActivity extends AppCompatActivity {
         // 重置U盘回退提示标志（每次冷启动重置）
         AppConfig.resetSdFallbackFlag();
         
-        // 根据车型配置设置布局和摄像头数量
+        // 照配置里启用的几路摆布局
         setupLayoutByCarModel();
 
         // 设置状态栏沉浸式
@@ -513,8 +513,8 @@ public class MainActivity extends AppCompatActivity {
 
         // 根据布局获取TextureView（不同布局有不同数量的TextureView）
         textureFront = findViewById(R.id.texture_front);
-        textureBack = findViewById(R.id.texture_back);  // 1摄布局中为null
-        textureLeft = findViewById(R.id.texture_left);  // 1摄和2摄布局中为null
+        textureBack = findViewById(R.id.texture_back);  // 只有环视的单路布局里为 null
+        textureLeft = findViewById(R.id.texture_left);  // 同上
 
         // 极氪合成流：texture_front 是容器里那个普通的 TextureView，
         // 四宫格由父容器 FourLaneContainer 重画子视图实现
@@ -604,9 +604,19 @@ public class MainActivity extends AppCompatActivity {
                 canvas.setSurfaceTextureListener(buildSurfaceListener(key));
             }
         }
-        showLanePanes();
+        showLanePanes(enabledLanes);
         // 主界面重建：上一个界面留下的预览画布接回来（大纲 §7.6），要在画布挂上窗口、系统自己建画布之前
         reattachKeptCanvases();
+        // 画布已经齐了（留着的全部接回了，或者一路都没启用、没有画布可等）：不会再有系统建画布的回调来叫，排一次接管线 ——
+        // 接上时（getForMainScreen）启用的几路和管线对不上就重建，录制状态也照管线画（onPipelineBuilt）。
+        // 视图挂上窗口时跑（View.post 在挂上之前排进视图自己的队列）：onCreate、onResume 都走完了
+        if (PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
+            getWindow().getDecorView().post(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    startPreviewIfReady();
+                }
+            });
+        }
     }
 
     /** 从别的界面按菜单键回来：抽屉要开着，否则那一下点击看起来没反应。 */
@@ -740,12 +750,6 @@ public class MainActivity extends AppCompatActivity {
         }
         com.kooo.evcam.blackbox.BlackBox.note("主界面重建：接回留着的预览画布 " + String.join("、", back)
                 + "（同一块画布，通道不动）");
-        // 视图挂上窗口时跑（View.post 在挂上之前排进视图自己的队列）：onCreate、onResume 都走完了
-        getWindow().getDecorView().post(() -> {
-            if (!isFinishing() && !isDestroyed()) {
-                startPreviewIfReady();
-            }
-        });
     }
 
     private TextureView.SurfaceTextureListener buildSurfaceListener(String cameraKey) {
@@ -917,7 +921,7 @@ public class MainActivity extends AppCompatActivity {
         }
         
         segmentLengthMs = com.kooo.evcam.profile.RecordSpecs.segmentMs(
-                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, com.kooo.evcam.profile.RecordSpecs.shownCameraKey(this)).segmentMinutes);
         // 分段按时长切：恢复时第 N 段的起点就是开始时间往后数 N-1 段
         segmentStartTime = recordingStartTime + (currentSegmentCount - 1) * segmentLengthMs;
         updateStatusLine();
@@ -1059,7 +1063,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         recordButtonUi.setSegmentMinutes(
-                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, com.kooo.evcam.profile.RecordSpecs.shownCameraKey(this)).segmentMinutes);
         renderRecordState();
     }
 
@@ -1544,6 +1548,14 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         showBuilt(built);
+        // 启用了、管线里却没建出来的座舱（相机列表里没有它、映射指重了）那一格也藏起来，和以前一样；环视那块照配置
+        java.util.Set<String> shown = new java.util.LinkedHashSet<>();
+        for (String key : enabledLanes) {
+            if ("front".equals(key) || pipeline.getCamera(key) != null) {
+                shown.add(key);
+            }
+        }
+        showLanePanes(shown);
         pipeline.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
         // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
         pipeline.firePreviewSizeCallbacks();
@@ -1658,14 +1670,17 @@ public class MainActivity extends AppCompatActivity {
      * <p>藏起来之后剩下的格子占满：环视那块藏了，座舱那一列占满整块预览区；前座舱藏了，后座舱占满这一列。
      * 让出来的间距一并去掉，不留一道缝。只开环视的布局里没有这几格，调了也不会有事。</p>
      *
-     * <p>只看配置（{@link #enabledLanes}），不看管线：布局每次重建（initViews）都回到默认的显示状态，在那里摆一次。</p>
+     * <p>布局每次重建（initViews）都回到默认的显示状态：在那里照启用的几路摆一次；管线建好后（onPipelineBuilt）
+     * 再把启用了却没建出来的座舱藏掉。</p>
+     *
+     * @param shown 要显示的那几路
      */
-    private void showLanePanes() {
-        boolean surround = enabledLanes.contains("front");
-        boolean cabinFront = enabledLanes.contains("back");
+    private void showLanePanes(java.util.Set<String> shown) {
+        boolean surround = shown.contains("front");
+        boolean cabinFront = shown.contains("back");
         showPane(R.id.composite_wrapper, surround);
         showPane(R.id.pane_cabin_front, cabinFront);
-        showPane(R.id.pane_cabin_rear, enabledLanes.contains("left"));
+        showPane(R.id.pane_cabin_rear, shown.contains("left"));
         if (!surround) {
             View column = findViewById(R.id.cabin_column);
             if (column != null && column.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {

@@ -1154,13 +1154,6 @@ public class AppConfig {
     }
 
 
-    /**
-     * 这份配置用几路相机：极氪7X 多路是环视 + 两路座舱，其余就环视一路。
-     */
-    public int getCameraCount() {
-        return CAR_MODEL_ZEEKR_7X_MULTI.equals(getCarModel()) ? 3 : 1;
-    }
-
 
     /**
      * 获取摄像头名称

@@ -5395,6 +5395,11 @@ public class MultiCameraManager {
 
         /** 没有地方存照片（没有 U 盘、开发者选项没开）：一路都没拍。和 {@link #onPhotoResult} 二选一。 */
         void onNoStorage();
+
+        /** 配置里一路都没启用：不拍（和拒录同一个判断）。和 {@link #onPhotoResult} 二选一。 */
+        default void onNoCameraEnabled() {
+            onPhotoResult(0, 0, 0);
+        }
     }
 
     /** 等各路出画面最多多久：冷开相机，加上调度第一次救（8 秒没画面就重建会话，{@link CameraLiveness#STUCK_MS}）都等得到。 */
@@ -5456,6 +5461,11 @@ public class MultiCameraManager {
         }
         if (isReleased()) {
             callback.onPhotoResult(0, 0, 0);
+            return false;
+        }
+        if (enabledLanes != null && enabledLanes.isEmpty()) {
+            // 配置里一路都没启用（登记表 §一：拍照要启用的全部，一路都没有）：当场拒，不去等一路不会开的相机
+            callback.onNoCameraEnabled();
             return false;
         }
         final PhotoJob job = new PhotoJob(callback);

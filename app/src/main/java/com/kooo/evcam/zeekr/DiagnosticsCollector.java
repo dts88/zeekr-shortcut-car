@@ -1132,7 +1132,8 @@ public final class DiagnosticsCollector {
         try {
             AppConfig cfg = new AppConfig(context);
             sb.append("车型: ").append(cfg.getCarModel()).append('\n');
-            sb.append("摄像头数量: ").append(cfg.getCameraCount()).append('\n');
+            // 启用了哪几路：建管线、主界面、录像、拍照都照它（环视一直建，没启用时只给超级后视镜）
+            sb.append("启用的摄像头: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context)).append('\n');
             // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准
             sb.append(new com.kooo.evcam.profile.ProfileStore(context).current()).append('\n');
             sb.append("录制模式: ").append(cfg.getRecordingMode())

@@ -149,7 +149,7 @@ public class CameraManagerHolder {
      * 照同一个函数）。环视一直建：登记表 §一 后视镜要的是环视，配置里没开环视也要能看（项目所有者 2026-10-16）；
      * 座舱启用了才建。建了不等于开：主界面预览、拍照只要启用的那几路，交给调度的就是这份（{@link MultiCameraManager#setEnabledLanes}）。
      */
-    private static final class Shape {
+    static final class Shape {
         final String carModel;
         final Profile profile;
         /** 启用的那几路（key）。 */
@@ -161,7 +161,7 @@ public class CameraManagerHolder {
         /** 建几路：环视，加上启用的座舱。 */
         final int count;
 
-        private Shape(String carModel, Profile profile, Set<String> enabled) {
+        Shape(String carModel, Profile profile, Set<String> enabled) {
             this.carModel = carModel;
             this.profile = profile;
             this.enabled = enabled;

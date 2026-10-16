@@ -101,6 +101,18 @@ public final class RecordSpecs {
         }
     }
 
+    /**
+     * 状态条、录制键、悬浮按钮上显示的帧率、码率、每段时长取哪一路的：环视启用了就是环视（和以前一样），
+     * 否则是开的次序里第一路启用的座舱；一路都没启用时照旧是环视。界面上的值要等于实际在录的那一路。
+     */
+    public static String shownCameraKey(Context context) {
+        java.util.Set<String> enabled = enabledCameraKeys(context);
+        if (enabled.isEmpty() || enabled.contains(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND)) {
+            return com.kooo.evcam.camera.CameraSlots.KEY_SURROUND;
+        }
+        return com.kooo.evcam.camera.CameraSlots.openOrder(enabled).get(0);
+    }
+
     /** 同上，配置已经在手里时用（建相机管线、主界面摆布局）。 */
     public static java.util.Set<String> enabledCameraKeys(Profile profile) {
         java.util.Set<String> keys = new java.util.LinkedHashSet<>();
