@@ -344,4 +344,26 @@ public class Mp4RepairTest {
         }
         throw new AssertionError("找不到顶层的 " + name);
     }
+
+    @Test public void adversarialSampleCountIsRejectedBeforeChangingOriginal() throws Exception {
+        File reference = writeReference(folder.newFile("reference.mp4"));
+        File broken = folder.newFile("broken.mp4");
+        try (FileOutputStream out = new FileOutputStream(broken)) {
+            out.write(ftyp()); out.write(mdatPlaceholder());
+            byte[] slice = nal(0x65, new byte[]{(byte)0x80});
+            for (int n = 0; n <= Mp4Repair.MAX_REPAIR_SAMPLES; n++) out.write(slice);
+        }
+        byte[] before = Files.readAllBytes(broken.toPath());
+        org.junit.Assert.assertThrows(IOException.class,
+                () -> Mp4Repair.repair(broken, Mp4Repair.templateFrom(reference), null));
+        assertArrayEquals(before, Files.readAllBytes(broken.toPath()));
+    }
+    @Test public void untrustedMaximumInputSizeCannotRequestGigabytes() {
+        org.junit.Assert.assertThrows(IOException.class,
+                () -> Mp4Repair.validationBufferBytes(Integer.MAX_VALUE));
+    }
+    @Test public void normalAndMissingSampleSizesRemainWithinEightMiB() throws Exception {
+        assertEquals(1 << 20, Mp4Repair.validationBufferBytes(250_000));
+        assertEquals(8 << 20, Mp4Repair.validationBufferBytes(0));
+    }
 }

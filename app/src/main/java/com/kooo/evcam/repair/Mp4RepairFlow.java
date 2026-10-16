@@ -135,7 +135,8 @@ public final class Mp4RepairFlow {
             message.append(line).append('\n');
         }
         message.append('\n').append(activity.getString(R.string.dev_repair_total, size(bytes))).append("\n\n")
-                .append(activity.getString(R.string.dev_repair_explain));
+                .append(activity.getString(R.string.dev_repair_explain)).append("\n\n")
+                .append(activity.getString(R.string.dev_repair_backup_note));
 
         CamDialogs.show(builder(activity)
                 .setTitle(R.string.dev_repair_mp4_title)
@@ -185,7 +186,7 @@ public final class Mp4RepairFlow {
                 dismiss(dialog);
                 CamDialogs.show(builder(activity)
                         .setTitle(activity.getString(R.string.dev_repair_done_title, done, broken.size()))
-                        .setMessage(join(report)
+                        .setMessage(join(report) + "\n\n" + activity.getString(R.string.dev_repair_backup_note)
                                 + (done > 0 ? "\n\n" + activity.getString(R.string.dev_repair_done_hint) : ""))
                         .setPositiveButton(R.string.action_got_it, null));
             });
@@ -236,6 +237,7 @@ public final class Mp4RepairFlow {
 
         Mp4Repair.Repaired repaired;
         try {
+            RepairBackup.preserve(file);
             repaired = Mp4Repair.repair(file, template, (done, total) -> {
                 final int percent = total > 0 ? (int) (done * 100 / total) : 0;
                 activity.runOnUiThread(() -> bar.setProgress(percent));
@@ -287,9 +289,8 @@ public final class Mp4RepairFlow {
                 return false;
             }
             extractor.selectTrack(0);
-            int capacity = format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)
-                    ? Math.max(format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE), 1 << 20)
-                    : 8 << 20;
+            int capacity = Mp4Repair.validationBufferBytes(format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)
+                    ? format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) : 0);
             java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(capacity);
             return extractor.readSampleData(buffer, 0) > 0;
         } catch (Exception e) {

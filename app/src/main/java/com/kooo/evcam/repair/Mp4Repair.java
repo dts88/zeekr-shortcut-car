@@ -37,14 +37,15 @@ import java.util.List;
  * 都要求提供参考文件的原因。行车记录仪这个场景反而最友好：参考文件遍地都是，
  * 参数和坏文件完全一致。</p>
  *
- * <h3>就地改，不拷贝</h3>
+ * <h3>Working-file repair</h3>
  *
- * <p>修复时不生成新文件：在原文件尾部追加一个 {@code moov}，再把 {@code mdat} 的长度补上。
- * 一是 U 盘可能本来就快满了，拷一份等于要两倍空间；二是文件名就是分段的分组键
- * （{@code 20250101_120000_front.mp4}），改名之后回看界面就不认它了。</p>
+ * <p>This primitive appends an index and patches the working file in place. The UI
+ * caller preserves a verified original with {@link RepairBackup} first. Retaining
+ * the working filename preserves playback grouping.</p>
  *
- * <p>写入顺序是<b>先追加 moov，再补 mdat 长度</b>。万一补长度之前又断电，文件和修复前
- * 完全一样，不会变得更坏。真出了问题还能 {@link Repaired#rollback()} 退回去。</p>
+ * <p>Append-before-patch reduces risk, but interrupted writes can still damage the
+ * working file. {@link Repaired#rollback()} is available only after a successful
+ * return and is not a substitute for the original backup.</p>
  */
 public final class Mp4Repair {
 
@@ -52,7 +53,13 @@ public final class Mp4Repair {
     private static final long MAX_NAL_BYTES = 32L * 1024 * 1024;
 
     /** moov 读进内存的上限。正常的 moov 只有几十到几百 KB。 */
-    private static final int MAX_MOOV_BYTES = 64 * 1024 * 1024;
+    private static final int MAX_MOOV_BYTES = 8 * 1024 * 1024;
+    static final int MAX_REPAIR_SAMPLES = 100_000;
+
+    static int validationBufferBytes(int declared) throws IOException {
+        if (declared > (8 << 20)) throw new IOException("Sample buffer exceeds repair validation limit");
+        return declared <= 0 ? 8 << 20 : Math.max(declared, 1 << 20);
+    }
 
     private Mp4Repair() {
     }
@@ -241,7 +248,9 @@ public final class Mp4Repair {
         if (stsdRange == null) {
             throw new IOException("参考文件缺 stsd（解码参数）");
         }
-        byte[] stsd = new byte[(stsdRange[1] - stsdRange[0]) + 8];
+        int stsdBytes = (stsdRange[1] - stsdRange[0]) + 8;
+        if (stsdBytes > (1 << 20)) throw new IOException("Decoder description exceeds repair limit");
+        byte[] stsd = new byte[stsdBytes];
         System.arraycopy(moov, stsdRange[0] - 8, stsd, 0, stsd.length);
         // stsd 内容：4 版本/标志 + 4 条目数，然后第一个样本条目（4 长度 + 4 类型）
         String codec = stsd.length >= 24 ? readType(stsd, 20) : "";
@@ -429,7 +438,8 @@ public final class Mp4Repair {
         /** 认到哪个字节为止。 */
         long consumedTo;
 
-        void add(long offset, long size, boolean sync) {
+        void add(long offset, long size, boolean sync) throws IOException {
+            if (count >= MAX_REPAIR_SAMPLES) throw new IOException("Too many samples for on-device repair");
             if (count == offsets.length) {
                 long[] o = new long[count * 2];
                 int[] s = new int[count * 2];
