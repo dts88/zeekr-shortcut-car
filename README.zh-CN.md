@@ -82,6 +82,8 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 ## 推荐
 
+**[wysie/zeekr-shortcut-car](https://github.com/wysie/zeekr-shortcut-car)**：针对极氪 009 车机优化的极氪即刻版本。Wysie 也是提供了大量极氪基础信息的重要贡献者，很开心能与 Wysie 一同探索极氪车机系统的可能性。
+
 **[CarPiano](https://github.com/jlunnn/CarPiano)**：任何车速下都能用车外喇叭播放声音，不再像原车功能那样只能在 P 挡使用。目前还在早期开发阶段，但很值得期待。
 
 在公共道路上使用车外喇叭前，请先了解当地法规。
