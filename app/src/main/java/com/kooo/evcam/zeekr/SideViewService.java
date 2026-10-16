@@ -207,10 +207,11 @@ public class SideViewService extends Service {
         Telemetry.get().release(TELEMETRY_USER);
         trigger.reset();
         if (refused) {
-            // 熄屏也是这一段的结束（同离开 D 挡 30 秒、原厂画面）：亮屏后再挂窗口时重试
+            // 熄屏也是这一段的结束（同离开 D 挡 30 秒、原厂画面）：亮屏后再挂窗口时重试。服务退出也走这里，那就只是结束
             refused = false;
             refusalShown = false;
-            BlackBox.note("盲区画面：熄屏，不带它的这一段结束，亮屏后再挂窗口时重试");
+            BlackBox.note(destroyed ? "盲区画面：服务停下，不带它的这一段结束"
+                    : "盲区画面：熄屏，不带它的这一段结束，亮屏后再挂窗口时重试");
         }
         detachWindow();
         AppLog.i(TAG, "盲区画面：停止监听");

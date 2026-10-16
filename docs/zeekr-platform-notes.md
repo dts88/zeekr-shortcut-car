@@ -1094,7 +1094,7 @@ ro.board.platform   = msmnile
 
 用哪几路只看视频流配置里每一路开没开（`RecordSpecs.enabledCameraKeys`，2.12 起；以前按车型、后来按「开了几路」）：
 
-- 建管线建哪几路：环视一直建（超级镜子要它），座舱启用了才建（`CameraManagerHolder.Shape`）
+- 建管线建哪几路：环视一直建（超级镜子、盲区画面要它），座舱启用了才建（`CameraManagerHolder.Shape`）
 - 主界面摆哪个布局、挂哪几块画布：只启用了环视是单路四宫格，其余是多路布局、没启用的格子藏起来（`PreviewSlots`）
 - 录哪几路（开录时的录像计划照它定）；拍哪几路、主界面预览开哪几路（登记表「启用的全部」，`ChannelRules.World#enabled`）
 - 状态条、录制键显示哪一路的规格（`RecordSpecs.shownCameraKey`）

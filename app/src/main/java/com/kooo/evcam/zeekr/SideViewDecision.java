@@ -11,7 +11,7 @@ package com.kooo.evcam.zeekr;
  *       泊车辅助开着，任何一样成立都不显示；已经显示着的立刻收。</li>
  *   <li>车速低于设定值不显示（默认 30 km/h：再慢原厂自己会弹侧方小窗）；车速读不到不拦。
  *       只在「还没显示」时看车速 —— 显示出来之后减速不收，免得在门槛上来回闪。</li>
- *   <li>灯一灭就不再要（灯灭后再留多久由 {@link SideViewService} 管）。</li>
+ *   <li>灯一灭就不再要（灯灭后再留多久由 {@link SideViewTrigger} 管）。</li>
  * </ul>
  *
  * <p>来源：FerixzTanz 的 PR #4（规则和测试），wysie 在 PR #19 里补了「原厂画面在时不备着」；GPL-3.0。</p>

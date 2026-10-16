@@ -1862,7 +1862,7 @@ public class MainActivity extends AppCompatActivity {
         cameraManager.setPreviewSizeCallback((cameraKey, cameraId, previewSize) -> {
             AppLog.d(TAG, "摄像头 " + cameraId + " 预览尺寸: " + previewSize.getWidth() + "x" + previewSize.getHeight());
             runOnUiThread(() -> {
-                // 没启用的那一路（只为后视镜建着的环视）没有画布，不摆
+                // 没启用的那一路（只为超级镜子、盲区画面建着的环视）没有画布，不摆
                 final AutoFitTextureView textureView = canvasFor(cameraKey);
                 if (textureView != null) {
                     applyPreviewSizeTransform(cameraKey, textureView, previewSize);
