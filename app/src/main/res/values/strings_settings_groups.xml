@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_cameras">相机</string>
+    <string name="menu_automatic_recording">自动录制与熄屏</string>
+    <string name="menu_photos">照片</string>
+    <string name="menu_stamps">水印与行驶信息</string>
+    <string name="menu_destination">存储位置</string>
+    <string name="menu_capacity">容量与用量</string>
+    <string name="menu_protection">影像保护</string>
+    <string name="menu_controls">相机与操作</string>
+    <string name="menu_picture">画面</string>
+    <string name="menu_window">窗口</string>
+    <string name="menu_actions">操作</string>
+    <string name="menu_appearance">外观</string>
+    <string name="menu_placement">位置</string>
+    <string name="menu_preview_playback">预览与回放</string>
+    <string name="menu_recording_internals">录制内部选项</string>
+    <string name="menu_image_rendering">画面与渲染</string>
+    <string name="menu_camera_research">相机排查</string>
+    <string name="menu_maintenance">维护</string>
+</resources>

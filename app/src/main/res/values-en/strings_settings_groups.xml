@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_cameras">Cameras</string>
+    <string name="menu_automatic_recording">Automatic recording &amp; screen off</string>
+    <string name="menu_photos">Photos</string>
+    <string name="menu_stamps">Stamps &amp; driving information</string>
+    <string name="menu_destination">Destination</string>
+    <string name="menu_capacity">Capacity &amp; usage</string>
+    <string name="menu_protection">Footage protection</string>
+    <string name="menu_controls">Camera &amp; controls</string>
+    <string name="menu_picture">Picture</string>
+    <string name="menu_window">Window</string>
+    <string name="menu_actions">Actions</string>
+    <string name="menu_appearance">Appearance</string>
+    <string name="menu_placement">Placement</string>
+    <string name="menu_preview_playback">Preview &amp; playback</string>
+    <string name="menu_recording_internals">Recording internals</string>
+    <string name="menu_image_rendering">Image &amp; rendering</string>
+    <string name="menu_camera_research">Camera research</string>
+    <string name="menu_maintenance">Maintenance</string>
+</resources>

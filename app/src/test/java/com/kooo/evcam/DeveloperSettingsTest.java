@@ -131,7 +131,7 @@ public class DeveloperSettingsTest {
         }
         Matcher matcher = KEY.matcher(xml.substring(start, end));
         while (matcher.find()) {
-            if (!"screen_developer".equals(matcher.group(1))) {
+            if (!"screen_developer".equals(matcher.group(1)) && !matcher.group(1).startsWith("group_")) {
                 rows.add(matcher.group(1));
             }
         }

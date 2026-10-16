@@ -98,6 +98,10 @@ Check your local rules before using the exterior speaker on public roads.
 
 ---
 
+## Settings
+
+Recording groups camera, automatic/screen-off and photo options; **Stamps & driving information** opens a separate page. Storage, Super mirror, Floating button, Interface and Developer options use task-based groups. Existing values, defaults and developer-only restrictions are preserved. Selecting another category leaves the previous subpage behind.
+
 ## Tips
 
 ### If the USB drive can't keep up

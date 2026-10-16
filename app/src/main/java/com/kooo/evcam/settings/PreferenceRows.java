@@ -97,7 +97,8 @@ final class PreferenceRows {
                 preference.setLayoutResource(R.layout.pref_category);
                 apply((PreferenceGroup) preference);
             } else if (preference instanceof PreferenceGroup) {
-                // 嵌套的分区在右栏里不会作为一行出现（按 key 取出来的就是它本身）
+                // Nested screens are navigation rows; categories remain inline groups.
+                preference.setLayoutResource(R.layout.pref_row_nav);
                 apply((PreferenceGroup) preference);
             } else if (preference instanceof SeekBarPreference) {
                 preference.setLayoutResource(R.layout.pref_row_seekbar);
