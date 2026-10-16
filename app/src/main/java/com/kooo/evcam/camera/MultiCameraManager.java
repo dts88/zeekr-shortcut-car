@@ -36,6 +36,11 @@ public class MultiCameraManager {
     private final Context context;
     private final Map<String, SingleCamera> cameras = new LinkedHashMap<>();
     private final List<String> activeCameraKeys = new ArrayList<>();
+    /**
+     * 启用的那几路（配置里开着的，建管线时 Holder 给，{@link #setEnabledLanes}）；null 是建了的全部。
+     * 环视一直建着：没启用时只为后视镜开（登记表 §一，项目所有者 2026-10-16）。
+     */
+    private Set<String> enabledLanes;
     private int maxOpenCameras = DEFAULT_MAX_OPEN_CAMERAS;
     /** 放了（{@link #release}）。见 {@link #isReleased}。 */
     private volatile boolean released;
@@ -1951,6 +1956,23 @@ public class MultiCameraManager {
     }
 
     /**
+     * 启用的那几路（建管线时 Holder 给，在 {@link #initCameras} 之前）：登记表 §一 里主界面预览、拍照要的「启用的全部」，
+     * 开录之前的录像也照它。交给调度（{@link ChannelRules.World#enabled}）。
+     */
+    public void setEnabledLanes(Set<String> keys) {
+        enabledLanes = keys == null ? null : new java.util.LinkedHashSet<>(keys);
+    }
+
+    /** 管线里的、启用的那几路，按开的次序。 */
+    private List<String> enabledActiveKeys() {
+        List<String> keys = getActiveCameraKeys();
+        if (enabledLanes != null) {
+            keys.retainAll(enabledLanes);
+        }
+        return keys;
+    }
+
+    /**
      * 设置软编码录制模式（用于 L6/L7 等不支持 MediaRecorder 直接录制的车机平台）
      * 在此模式下，使用 OpenGL 渲染 + MediaCodec 编码 + MediaMuxer 写入文件
      * 
@@ -2378,8 +2400,9 @@ public class MultiCameraManager {
         // 主线程上交（调度只在主线程上跑）；画面尺寸不开设备先算（SingleCamera 在自己起的相机线程上算），排在这一轮主线程
         // 任务之后 —— 调用方紧接着会钉住环视的合成流尺寸（setPreferredSize），先算就算成别的尺寸了。然后叫醒调度
         channelSide.noteIds(ports);
+        final Set<String> enabled = enabledLanes == null ? null : new java.util.LinkedHashSet<>(enabledLanes);
         channelHandler.post(() -> {
-            scheduler.setLanes(ports);
+            scheduler.setLanes(ports, enabled);
             for (SingleCamera camera : active) {
                 camera.resolveSize();
             }
@@ -2978,7 +3001,7 @@ public class MultiCameraManager {
         if (!CameraNeeds.current().isHeld(CameraNeeds.Holder.RECORDING)) {
             return keys;
         }
-        keys.addAll(recordingPlan.isEmpty() ? activeCameraKeys : recordingPlan.keySet());
+        keys.addAll(recordingPlan.isEmpty() ? enabledActiveKeys() : recordingPlan.keySet());
         return keys;
     }
 
@@ -5468,7 +5491,8 @@ public class MultiCameraManager {
             finishPhoto(job);
             return;
         }
-        List<String> keys = getActiveCameraKeys();
+        // 拍启用的那几路（登记表 §一）：只为后视镜开着的环视不拍
+        List<String> keys = enabledActiveKeys();
         // 调度判出被别的程序拿着（含被拿着的另一路挡着）、救了 3 轮停手的那几路这一张不拍、也不算在该拍的里面
         // （2026-10-10）：它们等到点也出不了画面 —— 以前每一张都白等满 10 秒，再报「有几路没出画面」。
         // 熄屏放开的座舱也一样（项目所有者 2026-10-12 D2，设计 v3.1 C4）：熄屏拍的那一张只有环视。

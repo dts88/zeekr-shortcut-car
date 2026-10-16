@@ -1469,13 +1469,18 @@ public final class ChannelScheduler {
      * 这一份管线要动的几路（主线程，MultiCameraManager.initCameras）：按开的次序排好，每一路从「关着、没人要」起。
      */
     void setLanes(Map<String, CameraPort> lanes) {
+        setLanes(lanes, null);
+    }
+
+    /** 同上；{@code enabled} 是其中启用的那几路（{@link ChannelRules.World#enabled}），null 是全部。 */
+    void setLanes(Map<String, CameraPort> lanes, Set<String> enabled) {
         ports.clear();
         List<ChannelRules.Lane> list = new ArrayList<>();
         for (Map.Entry<String, CameraPort> entry : lanes.entrySet()) {
             ports.put(entry.getKey(), entry.getValue());
             list.add(new ChannelRules.Lane(entry.getKey(), entry.getValue().cameraId()));
         }
-        w = new ChannelRules.World(list);
+        w = new ChannelRules.World(list, enabled);
         // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）
         readScreen();
         running = null;

@@ -1,73 +1,41 @@
 package com.kooo.evcam.camera;
 
+import java.util.Set;
+
 /**
- * 「这套配置里有哪几路画面」这一条规则。
+ * 主界面摆什么布局、挂哪几块画布：只看配置里启用了哪几路（{@code RecordSpecs.enabledCameraKeys}），一路一块画布。
  *
  * <h3>为什么值得单独拎出来</h3>
  *
- * <p>四个槽位按顺序是 front(1) / back(2) / left(3) / right(4)。上游只有 1、2、4 路
- * 的布局，左右天然成对出现，于是好几处代码把 left 和 right 一起卡在
- * {@code >= 4} —— 在 1/2/4 路下这么写<b>看不出错</b>。</p>
+ * <p>以前按「开了几路」配槽位号：1 路就是只有环视的四宫格，2 路是环视 + 前座舱，3 路才有后座舱。
+ * 只开一路座舱时摆的是环视的四宫格、建的也只有环视，那一路座舱打不开；只开两路座舱时，环视没开也被打开来预览，
+ * 后座舱却没有画布（2026-10-16）。现在不数路数，只问每一路开没开。</p>
  *
- * <p>「环视+座舱3路」是第一个 3 路配置，它把 left 当作第三个槽位用，同一处笔误
- * 已经咬过两次：一次是 {@code texture_left} 拿不到监听器，就绪计数永远差一个，
- * 相机根本没被打开（<b>三路全黑</b>）；一次是录制集合里没有 left，
- * 预览有画面而录出来的文件少一路。</p>
- *
- * <p>所以这条规则只留一份，并且钉上测试。</p>
+ * <p>更早还有一处同类笔误：三路时 {@code texture_left} 拿不到监听器，就绪计数永远差一个，相机没被打开（三路全黑）。
+ * 所以规则只留一份，并且钉上测试。</p>
  */
 public final class PreviewSlots {
 
-    /** 槽位顺序。下标 + 1 就是它的槽位号。 */
+    /** 主界面上的几格画布，按布局里的顺序（不是开的次序）。 */
     public static final String[] KEYS = {"front", "back", "left", "right"};
-
-    /** 布局最多就这四路。 */
-    public static final int MAX_SLOTS = 4;
 
     private PreviewSlots() {
     }
 
     /**
-     * 某一路的槽位号（从 1 起）。
-     *
-     * @return 不认识的名字返回 0
+     * 用只有环视的单路布局（一路合成流，由四宫格容器拆成四格）：配置里只启用了环视。
+     * 其余（启用了座舱、或者一路都没启用）用多路布局，没启用的那几格藏起来。
      */
-    public static int slotOf(String cameraKey) {
-        for (int i = 0; i < KEYS.length; i++) {
-            if (KEYS[i].equals(cameraKey)) {
-                return i + 1;
-            }
-        }
-        return 0;
+    public static boolean singleLayout(Set<String> enabled) {
+        return enabled.size() == 1 && enabled.contains(CameraSlots.KEY_SURROUND);
     }
 
     /**
-     * 这套配置里有没有这一路。
+     * 画布都就绪了，可以接上管线、登记预览：启用的每一路都有一块就绪的画布。
      *
-     * <p>判据是<b>槽位号</b>，不是「左右成对」。</p>
+     * <p>要等的就是这套布局<b>实际挂了监听</b>的那几块 —— 启用的那几路，一路一块。</p>
      */
-    public static boolean exists(int cameraCount, String cameraKey) {
-        int slot = slotOf(cameraKey);
-        return slot > 0 && slot <= cameraCount;
-    }
-
-    /**
-     * 要等几路 TextureView 就绪，才能去开相机。
-     *
-     * <p>就是这套布局<b>实际会挂监听的路数</b> —— 不是「要录几路」。
-     * 这两个数曾经被混用：自定义模式下按录制开关去算，
-     * 默认四路全开，而布局只给了一两个 TextureView，
-     * 那道闸门于是永远不成立，相机一次都没开过。</p>
-     */
-    public static int requiredTextures(int cameraCount) {
-        if (cameraCount < 1) {
-            return 1;
-        }
-        return Math.min(cameraCount, MAX_SLOTS);
-    }
-
-    /** 就绪的路数够不够开相机。 */
-    public static boolean canStartCamera(int readyCount, int cameraCount) {
-        return readyCount >= requiredTextures(cameraCount);
+    public static boolean canStartCamera(int readyCount, Set<String> enabled) {
+        return readyCount >= enabled.size();
     }
 }

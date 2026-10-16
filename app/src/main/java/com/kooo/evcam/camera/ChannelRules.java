@@ -345,7 +345,10 @@ public final class ChannelRules {
 
     /** 全局的事实（调度填）和账（这里记），加上按开的次序排好的几路。 */
     static final class World {
-        /** 启用的那几路，按开的次序：环视 → 后座舱 → 前座舱（{@link CameraSlots#openOrder}）。 */
+        /**
+         * 这一份管线管的那几路，按开的次序：环视 → 后座舱 → 前座舱（{@link CameraSlots#openOrder}）。启用的那几路，
+         * 加上一直建着的环视（登记表 §一 后视镜那一行要它，配置里没开环视也要）。
+         */
         final List<Lane> lanes;
         /** 此刻。 */
         long now;
@@ -356,6 +359,12 @@ public final class ChannelRules {
         final Set<CameraNeeds.Holder> holders = EnumSet.noneOf(CameraNeeds.Holder.class);
         /** 录像计划里的那几路（MultiCameraManager.recordingPlan 的 key）。 */
         final Set<String> recordPlan = new LinkedHashSet<>();
+        /**
+         * 启用的那几路（配置里开着的，RecordSpecs.enabledCameraKeys，建管线那一刻的）：登记表 §一 里主界面预览、拍照要的
+         * 「启用的全部」就是它。配置里没开环视时环视不在这里 —— 它照样建着，只为后视镜开（项目所有者 2026-10-16）。
+         * 没给是 {@link #lanes} 的全部。
+         */
+        final Set<String> enabled = new LinkedHashSet<>();
         /** 登记表每变一次（含停了再开录）调度在 CameraNeeds 的监听里 +1：几次变化并成一轮也认得出「变过」。 */
         int needsVersion;
         /**
@@ -407,6 +416,11 @@ public final class ChannelRules {
         long lastAskAt;
 
         World(List<Lane> lanes) {
+            this(lanes, null);
+        }
+
+        /** @param enabled 启用的那几路（{@link #enabled}）；null 是全部 */
+        World(List<Lane> lanes, Set<String> enabled) {
             List<String> keys = new ArrayList<>();
             for (Lane lane : lanes) {
                 keys.add(lane.key);
@@ -421,6 +435,11 @@ public final class ChannelRules {
                 }
             }
             this.lanes = Collections.unmodifiableList(ordered);
+            for (Lane lane : this.lanes) {
+                if (enabled == null || enabled.contains(lane.key)) {
+                    this.enabled.add(lane.key);
+                }
+            }
         }
 
         /** 这一路；不在这一份里是 null。 */
@@ -1160,8 +1179,8 @@ public final class ChannelRules {
     // ================================================================= 该是什么样
 
     /**
-     * 谁要这一路（§一的登记表）：预览 —— 登记着而且亮屏，要全部启用的路；录像 —— 录像计划里的路；
-     * 拍照 —— 全部启用的路；后视镜 —— 环视。保持不在这里（{@link #holding}）。
+     * 谁要这一路（§一的登记表）：预览 —— 登记着而且亮屏，要启用的全部（{@link World#enabled}）；录像 —— 录像计划里的路；
+     * 拍照 —— 启用的全部；后视镜 —— 环视，配置里没开环视也要（项目所有者 2026-10-16）。保持不在这里（{@link #holding}）。
      *
      * <p>熄屏时 PREVIEW 不算：主界面看不见。开发者「熄屏录制（阻止休眠）」开着、熄屏时没在录，于是照登记表关
      * （项目所有者 2026-10-11，§7.5）。</p>
@@ -1195,13 +1214,13 @@ public final class ChannelRules {
         }
         switch (holder) {
             case PREVIEW:
-                return w.screenOn;
+                return w.screenOn && w.enabled.contains(lane.key);
             case RECORDING:
                 return w.recordPlan.contains(lane.key);
             case MIRROR:
                 return isSurround(lane);
-            default:
-                return true;
+            default:   // 拍照
+                return w.enabled.contains(lane.key);
         }
     }
 
@@ -1291,7 +1310,7 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路要的这一种输出：预览 —— PREVIEW 登记着且亮屏；后视镜 —— MIRROR 登记着、这一路是环视；录像 —— 录像计划里有它。
+     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视；录像 —— 录像计划里有它。
      * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
      */
     private static boolean wantsKind(World w, Lane lane, Kind kind) {
@@ -1300,7 +1319,7 @@ public final class ChannelRules {
         }
         switch (kind) {
             case PREVIEW:
-                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn;
+                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key);
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && isSurround(lane);
             case RECORD:

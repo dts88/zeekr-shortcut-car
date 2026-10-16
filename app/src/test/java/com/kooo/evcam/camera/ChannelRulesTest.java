@@ -115,6 +115,35 @@ public class ChannelRulesTest {
         assertEquals(set(recR), ChannelRules.wantedOutputs(w, rear));
     }
 
+    /**
+     * 配置里没启用环视（只开座舱）：环视照样建着。登记表 §一 里主界面预览、拍照要的是「启用的全部」，不要它；
+     * 后视镜要的是环视，照样要（项目所有者 2026-10-16）。
+     */
+    @Test
+    public void aSurroundThatIsNotEnabledOpensForTheMirrorOnly() {
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        World cabinsOnly = new World(Arrays.asList(cab, sur), new LinkedHashSet<>(Collections.singletonList(REAR)));
+        cabinsOnly.screenOn = true;
+        cabinsOnly.holders.add(Holder.PREVIEW);
+        cabinsOnly.holders.add(Holder.PHOTO);
+        sur.declared.add(pvS);
+        assertFalse("没启用：主界面预览、拍照都不要", ChannelRules.wanted(cabinsOnly, sur));
+        assertTrue(ChannelRules.wantedOutputs(cabinsOnly, sur).isEmpty());
+        assertEquals(EnumSet.of(Holder.PREVIEW, Holder.PHOTO), ChannelRules.wantedBy(cabinsOnly, cab));
+
+        cabinsOnly.holders.add(Holder.MIRROR);
+        sur.declared.add(mirror);
+        assertEquals(EnumSet.of(Holder.MIRROR), ChannelRules.wantedBy(cabinsOnly, sur));
+        assertEquals("会话里只带后视镜", set(mirror), ChannelRules.wantedOutputs(cabinsOnly, sur));
+    }
+
+    /** 没说启用了哪几路：管线里的全部都算启用（以前的样子）。 */
+    @Test
+    public void everyLaneIsEnabledWhenNoneAreNamed() {
+        assertEquals(new LinkedHashSet<>(Arrays.asList(SUR, REAR, FRONT)), w.enabled);
+    }
+
     @Test
     public void photoWantsEveryLaneAndTheMirrorOnlyTheSurround() {
         claim(Holder.MIRROR);

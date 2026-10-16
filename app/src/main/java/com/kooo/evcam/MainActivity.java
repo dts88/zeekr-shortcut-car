@@ -211,7 +211,8 @@ public class MainActivity extends AppCompatActivity {
 
     // 车型配置相关
     private AppConfig appConfig;
-    private int configuredCameraCount = 4;  // 配置的摄像头数量
+    /** 启用的那几路（RecordSpecs.enabledCameraKeys）：主界面给它们摆格子、挂画布，一路一块（PreviewSlots）。 */
+    private java.util.Set<String> enabledLanes = new java.util.LinkedHashSet<>();
     // 录制状态显示相关
     private TextView tvRecordingStats;
     private android.os.Handler recordingTimerHandler;
@@ -436,28 +437,20 @@ public class MainActivity extends AppCompatActivity {
     private void setupLayoutByCarModel() {
         int layoutId;
 
-        // 用几路、摆什么布局，跟着<b>配置</b>走，不看车型那个字符串。
+        // 摆什么布局、挂哪几块画布，跟着<b>配置里启用了哪几路</b>走（和建相机管线、录像同一个函数），不看车型那个字符串，
+        // 也不数路数。
         //
-        // 以前这两件事看车型：于是在配置编辑里往「极氪7X」那份配置加两路座舱之后，
-        // 布局仍然是单路的（只有一个 TextureView），路数上限仍然是 1 ——
-        // 加进去的相机既没有地方显示，也不会被拍照和录制算进去。
-        Profile profile = new ProfileStore(this).current();
-        int enabled = 0;
-        for (CameraProfile camera : profile.cameras) {
-            if (camera.enabled) {
-                enabled++;
-            }
-        }
-
-        if (enabled > 1) {
-            layoutId = R.layout.activity_main_zeekr_7x_multi;
-            configuredCameraCount = Math.min(enabled, 3);
-            AppLog.d(TAG, "多路布局：配置里启用了 " + enabled + " 路");
-        } else {
-            // 一路合成流，由 FourLaneContainer 重画成四宫格。也是兜底。
+        // 以前先看车型，后来数路数：只开一路座舱时数出来是 1，摆成环视的四宫格，那一路座舱没地方显示、也没建；
+        // 只开两路座舱时数出来是 2，按槽位号挂的是环视和前座舱（2026-10-16）。
+        enabledLanes = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(new ProfileStore(this).current());
+        if (PreviewSlots.singleLayout(enabledLanes)) {
+            // 只启用了环视：一路合成流，由 FourLaneContainer 重画成四宫格
             layoutId = R.layout.activity_main_zeekr_7x;
-            configuredCameraCount = 1;
             AppLog.d(TAG, "单路布局：环视合成流 + 四宫格拆分");
+        } else {
+            // 启用了座舱（或者一路都没启用）：多路布局，没启用的那几格藏起来（showLanePanes）
+            layoutId = R.layout.activity_main_zeekr_7x_multi;
+            AppLog.d(TAG, "多路布局：启用了 " + enabledLanes);
         }
 
         setContentView(layoutId);
@@ -604,17 +597,14 @@ public class MainActivity extends AppCompatActivity {
 
         btnTakePhoto.setOnClickListener(v -> takePicture());
 
-        if (textureFront != null) {
-            textureFront.setSurfaceTextureListener(buildSurfaceListener("front"));
+        // 启用的那几路各挂一块画布（PreviewSlots）；没启用的不挂，它那一格在多路布局里藏起来
+        for (String key : PreviewSlots.KEYS) {
+            AutoFitTextureView canvas = canvasFor(key);
+            if (canvas != null) {
+                canvas.setSurfaceTextureListener(buildSurfaceListener(key));
+            }
         }
-        // 哪一路存在按槽位号判断，规则在 PreviewSlots 里 ——
-        // 「left 是第三路还是和 right 成对」这处笔误已经咬过两次。
-        if (textureBack != null && PreviewSlots.exists(configuredCameraCount, "back")) {
-            textureBack.setSurfaceTextureListener(buildSurfaceListener("back"));
-        }
-        if (textureLeft != null && PreviewSlots.exists(configuredCameraCount, "left")) {
-            textureLeft.setSurfaceTextureListener(buildSurfaceListener("left"));
-        }
+        showLanePanes();
         // 主界面重建：上一个界面留下的预览画布接回来（大纲 §7.6），要在画布挂上窗口、系统自己建画布之前
         reattachKeptCanvases();
     }
@@ -647,7 +637,7 @@ public class MainActivity extends AppCompatActivity {
      * 「这一趟要录」在 onCreate 里撤了，这里也什么都不做。</p>
      */
     private void claimPreviewIfReady() {
-        if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
+        if (PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
             com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
             if (!isInBackground) {
                 recordingCoordinator.resumeIfWanted("main-screen");
@@ -661,7 +651,7 @@ public class MainActivity extends AppCompatActivity {
     private void onPreviewCanvasReady(String cameraKey) {
         textureReadyCount++;
         AppLog.d(TAG, "TextureView " + cameraKey + " ready: " + textureReadyCount
-                + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
+                + "/" + enabledLanes.size());
         startPreviewIfReady();
     }
 
@@ -671,13 +661,13 @@ public class MainActivity extends AppCompatActivity {
      * 以前这里是 setTextureView + 重建会话）。然后登记「预览要相机」。
      */
     private void startPreviewIfReady() {
-        if (!PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount) || !checkPermissions()) {
+        if (!PreviewSlots.canStartCamera(textureReadyCount, enabledLanes) || !checkPermissions()) {
             return;
         }
         if (cameraManager == null) {
             initCamera();
         } else {
-            cameraManager.declarePreviews(textureFront, textureBack, textureLeft);
+            cameraManager.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
         }
         // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
         // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
@@ -685,15 +675,18 @@ public class MainActivity extends AppCompatActivity {
         claimPreviewIfReady();
     }
 
-    /** 这一格的画布；这套布局里没有这一路（没挂监听）是 null。 */
+    /** 这一路的画布；没启用（没挂监听、那一格藏着）、或者这套布局里没有这一格是 null。 */
     private AutoFitTextureView canvasFor(String cameraKey) {
+        if (!enabledLanes.contains(cameraKey)) {
+            return null;
+        }
         switch (cameraKey) {
             case "front":
                 return textureFront;
             case "back":
-                return PreviewSlots.exists(configuredCameraCount, "back") ? textureBack : null;
+                return textureBack;
             case "left":
-                return PreviewSlots.exists(configuredCameraCount, "left") ? textureLeft : null;
+                return textureLeft;
             default:
                 return null;
         }
@@ -810,13 +803,13 @@ public class MainActivity extends AppCompatActivity {
         if (findViewById(R.id.cabin_column) == null) {
             return;
         }
-        if (labelFront != null) {
+        if (labelFront != null && enabledLanes.contains("front")) {
             updateCameraLabel(labelFront, appConfig.getCameraName(this, "front"));
         }
-        if (labelBack != null && configuredCameraCount >= 2) {
+        if (labelBack != null && enabledLanes.contains("back")) {
             updateCameraLabel(labelBack, appConfig.getCameraName(this, "back"));
         }
-        if (labelLeft != null && configuredCameraCount >= 3) {
+        if (labelLeft != null && enabledLanes.contains("left")) {
             updateCameraLabel(labelLeft, appConfig.getCameraName(this, "left"));
         }
     }
@@ -1466,7 +1459,7 @@ public class MainActivity extends AppCompatActivity {
             if (checkPermissions()) {
                 // 权限已授予，但需要等待TextureView准备好
                 // 如果TextureView已经准备好，立即初始化摄像头
-                if (PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
+                if (PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
                     initCamera();
                 }
             } else {
@@ -1488,9 +1481,8 @@ public class MainActivity extends AppCompatActivity {
      */
     private void initCamera() {
         // 确保所有需要的TextureView都准备好
-        if (!PreviewSlots.canStartCamera(textureReadyCount, configuredCameraCount)) {
-            AppLog.w(TAG, "画面还没全部就绪: " + textureReadyCount
-                    + "/" + PreviewSlots.requiredTextures(configuredCameraCount));
+        if (!PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
+            AppLog.w(TAG, "画面还没全部就绪: " + textureReadyCount + "/" + enabledLanes.size());
             return;
         }
 
@@ -1552,14 +1544,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         showBuilt(built);
-        // 布局是新建的，座舱两格默认都显示。管线里只有真正要建的那一路才有实例（配置里关着的那一路没有），问它就是结论
-        showCabinPanes(pipeline.getCamera("back") != null, pipeline.getCamera("left") != null);
-        pipeline.declarePreviews(textureFront, textureBack, textureLeft);
+        pipeline.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
         // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
         pipeline.firePreviewSizeCallbacks();
         registerCamerasToImageAdjustManager();
-        AppLog.d(TAG, "Camera initialized with " + pipeline.getCameraCount() + " cameras (layout "
-                + configuredCameraCount + ")");
+        AppLog.d(TAG, "Camera initialized with " + pipeline.getCameraCount() + " cameras (canvases "
+                + enabledLanes + ")");
         // 管线还在录的话，界面先画成它现在的样子；然后才问要不要自动开一次（什么时候开由协调器定：查过盘就开，不等环视）
         syncRecordingStateFromManager();
         checkAutoStartRecording();
@@ -1580,7 +1570,7 @@ public class MainActivity extends AppCompatActivity {
         if (plan.compositeIsReal && built.compositeSize != null && compositeContainer != null) {
             compositeContainer.setSourceSize(built.compositeUse != null ? built.compositeUse : built.compositeSize);
         }
-        if (configuredCameraCount > 1) {
+        if (!PreviewSlots.singleLayout(enabledLanes)) {
             if (plan.assignedCount() == 0) {
                 AppLog.w(TAG, "没有任何可用相机，三路模式无法显示");
                 Toast.makeText(this, R.string.msg_no_camera_available, Toast.LENGTH_LONG).show();
@@ -1663,16 +1653,37 @@ public class MainActivity extends AppCompatActivity {
 
 
     /**
-     * 座舱那两格显不显示。
+     * 多路布局里各格显不显示：没启用的那一路整格藏起来 —— 一块黑方块下面写着「前座舱」，比空着更像出了故障。
      *
-     * <p>配置里没有的那一路，整格藏起来 —— 一块黑方块下面写着「前座舱」，比空着更像出了故障。
-     * 藏起来之后剩下那一格自己占满这一列。只开环视的布局里没有这两格，调了也不会有事。</p>
+     * <p>藏起来之后剩下的格子占满：环视那块藏了，座舱那一列占满整块预览区；前座舱藏了，后座舱占满这一列。
+     * 让出来的间距一并去掉，不留一道缝。只开环视的布局里没有这几格，调了也不会有事。</p>
      *
-     * <p>新建管线和复用管线两条路都要走这里：布局每次重建，两格都会回到默认的显示状态。</p>
+     * <p>只看配置（{@link #enabledLanes}），不看管线：布局每次重建（initViews）都回到默认的显示状态，在那里摆一次。</p>
      */
-    private void showCabinPanes(boolean front, boolean rear) {
-        showPane(R.id.pane_cabin_front, front);
-        showPane(R.id.pane_cabin_rear, rear);
+    private void showLanePanes() {
+        boolean surround = enabledLanes.contains("front");
+        boolean cabinFront = enabledLanes.contains("back");
+        showPane(R.id.composite_wrapper, surround);
+        showPane(R.id.pane_cabin_front, cabinFront);
+        showPane(R.id.pane_cabin_rear, enabledLanes.contains("left"));
+        if (!surround) {
+            View column = findViewById(R.id.cabin_column);
+            if (column != null && column.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+                android.view.ViewGroup.MarginLayoutParams params =
+                        (android.view.ViewGroup.MarginLayoutParams) column.getLayoutParams();
+                params.setMarginStart(0);
+                column.setLayoutParams(params);
+            }
+        }
+        if (!cabinFront) {
+            View rear = findViewById(R.id.pane_cabin_rear);
+            if (rear != null && rear.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+                android.view.ViewGroup.MarginLayoutParams params =
+                        (android.view.ViewGroup.MarginLayoutParams) rear.getLayoutParams();
+                params.topMargin = 0;
+                rear.setLayoutParams(params);
+            }
+        }
     }
 
     /** 某一格要不要出现在版面里。GONE 而不是 INVISIBLE：要把地方让出来。 */
@@ -1823,13 +1834,8 @@ public class MainActivity extends AppCompatActivity {
         cameraManager.setPreviewSizeCallback((cameraKey, cameraId, previewSize) -> {
             AppLog.d(TAG, "摄像头 " + cameraId + " 预览尺寸: " + previewSize.getWidth() + "x" + previewSize.getHeight());
             runOnUiThread(() -> {
-                final AutoFitTextureView textureView;
-                switch (cameraKey) {
-                    case "front": textureView = textureFront; break;
-                    case "back":  textureView = textureBack;  break;
-                    case "left":  textureView = textureLeft;  break;
-                    default:      textureView = null;         break;
-                }
+                // 没启用的那一路（只为后视镜建着的环视）没有画布，不摆
+                final AutoFitTextureView textureView = canvasFor(cameraKey);
                 if (textureView != null) {
                     applyPreviewSizeTransform(cameraKey, textureView, previewSize);
                 }
@@ -1997,14 +2003,8 @@ public class MainActivity extends AppCompatActivity {
             applyRotationTransform(textureView, previewSize, rotation, cameraKey);
         } else {
             textureView.setAspectRatio(previewSize.getWidth(), previewSize.getHeight());
-            boolean useFillMode = configuredCameraCount >= 4;
-            if (useFillMode) {
-                textureView.setFillContainer(true);
-                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 填满模式");
-            } else {
-                textureView.setFillContainer(false);
-                AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 适应模式");
-            }
+            textureView.setFillContainer(false);
+            AppLog.d(TAG, "设置 " + cameraKey + " 宽高比: " + previewSize.getWidth() + ":" + previewSize.getHeight() + ", 适应模式");
             textureView.setTransform(new android.graphics.Matrix());   // 回到单位阵：这一路以前可能带着别的矩阵
         }
     }
@@ -2154,7 +2154,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 车型
         sb.append("\n").append(getString(R.string.debug_model,
-                appConfig.getCarModel(), configuredCameraCount));
+                appConfig.getCarModel(), enabledLanes.size()));
 
         // 版本
         try {
@@ -3060,12 +3060,6 @@ public class MainActivity extends AppCompatActivity {
         return 0;
     }
     
-    /**
-     * 获取配置的摄像头总数
-     */
-    public int getTotalCameraCount() {
-        return configuredCameraCount;
-    }
 
 
     /**
