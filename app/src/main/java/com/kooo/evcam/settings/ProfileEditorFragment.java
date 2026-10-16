@@ -341,6 +341,7 @@ public class ProfileEditorFragment extends Fragment {
             card.findViewById(R.id.camera_tuned)
                     .setVisibility(tuned ? View.VISIBLE : View.GONE);
             android.widget.CompoundButton toggle = card.findViewById(R.id.camera_enabled);
+            toggle.setContentDescription(roleName(camera.role));
             toggle.setChecked(camera.enabled);
             toggle.setOnClickListener(v -> {
                 camera.enabled = toggle.isChecked();
@@ -400,19 +401,20 @@ public class ProfileEditorFragment extends Fragment {
         StreamSpec record = camera.record;
 
         LinearLayout header = new LinearLayout(context);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setGravity(android.view.Gravity.START);
         TextView title = new TextView(context);
         title.setText(getString(R.string.editor_detail_title, roleName(camera.role)));
         title.setTextAppearance(R.style.TextAppearance_Cam_Row);
         title.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.energy_text));
         header.addView(title);
         TextView which = new TextView(context);
-        which.setText("  " + cameraSummary(camera.role));
+        which.setText(cameraSummary(camera.role));
         which.setTextAppearance(R.style.TextAppearance_Cam_Caption);
         which.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
         LinearLayout.LayoutParams grow =
-                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        grow.topMargin = dp(4);
         which.setLayoutParams(grow);
         header.addView(which);
         detailBox.addView(header);
