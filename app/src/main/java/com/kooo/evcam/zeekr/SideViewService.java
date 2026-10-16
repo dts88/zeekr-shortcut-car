@@ -206,6 +206,12 @@ public class SideViewService extends Service {
         Telemetry.get().removeListener(readingsListener);
         Telemetry.get().release(TELEMETRY_USER);
         trigger.reset();
+        if (refused) {
+            // 熄屏也是这一段的结束（同离开 D 挡 30 秒、原厂画面）：亮屏后再挂窗口时重试
+            refused = false;
+            refusalShown = false;
+            BlackBox.note("盲区画面：熄屏，不带它的这一段结束，亮屏后再挂窗口时重试");
+        }
         detachWindow();
         AppLog.i(TAG, "盲区画面：停止监听");
     }
@@ -257,7 +263,8 @@ public class SideViewService extends Service {
                         : SideViewDecision.factoryViewActive(in) ? "原厂画面在：挡位 " + in.gear
                                 + "、原厂 360 " + in.stock360Shown + "、原厂小窗 " + in.stockPopupShown
                                 + "、泊车辅助 " + in.parkAssistOn
-                        : "离开 D 挡 " + SideViewTrigger.READY_GRACE_MS / 1000 + " 秒") + "）");
+                        : result.graceEnded ? "离开 D 挡 " + SideViewTrigger.READY_GRACE_MS / 1000 + " 秒"
+                        : "显示结束，不在 D 挡（挡位 " + in.gear + "）") + "）");
                 detachWindow();
             }
             return;

@@ -1335,7 +1335,7 @@ public final class ChannelRules {
         }
     }
 
-    /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、录像）。 */
+    /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、盲区画面、录像）。 */
     static Set<Out> wantedOutputs(World w, Lane lane) {
         Set<Out> want = new LinkedHashSet<>();
         for (Out out : lane.declared) {

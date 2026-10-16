@@ -2116,7 +2116,7 @@ public class MultiCameraManager {
     }
 
     /**
-     * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜的画布
+     * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜、盲区画面的画布
      * （{@link #ownerOf}）。弱引用；放的那一下（哪个线程都可能）写，主线程上读。
      */
     private static volatile java.lang.ref.WeakReference<MultiCameraManager> lastReleased =

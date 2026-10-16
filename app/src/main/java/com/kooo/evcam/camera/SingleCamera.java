@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *   <li><b>动作</b>（只给调度调，主线程）：{@link #open(Set)}、{@link #applyOutputs}、{@link #rebuildSession}、
  *       {@link #reopen}、{@link #closeCamera(String)}。会话只按给定的那一组输出（{@link ChannelRules.Out}）建，
  *       外加常驻的拍照 JPEG 输出；带着录像输出才用 {@code TEMPLATE_RECORD}。</li>
- *   <li><b>声明</b>（谁都能调，主线程，<b>不触发任何重建</b>）：预览、后视镜、录像各自声明自己的消费者、各自撤回。
+ *   <li><b>声明</b>（谁都能调，主线程，<b>不触发任何重建</b>）：预览、后视镜、盲区画面、录像各自声明自己的消费者、各自撤回。
  *       同一块画布（同一个 SurfaceTexture）再声明一次什么都不做 —— 主界面每次画布就绪都把各路重新声明一遍，
  *       主界面重建时我们留住的画布被新界面接回也还是它（大纲 §7.6）。关相机只清会话和设备，不清声明。</li>
  *   <li><b>事实</b>（主线程读）：{@link #sessionOutputs()}、{@link #declaredOutputs()}、{@link #deadInSession()}、
@@ -159,7 +159,7 @@ public class SingleCamera {
     /**
      * 不显示的出帧口（{@link ChannelRules.Out#SINK}）。
      *
-     * <p>这一路此刻没有预览、后视镜、录像任何一个活着的输出（主界面在后台，它的预览画面已被系统收回），
+     * <p>这一路此刻没有预览、后视镜、盲区画面、录像任何一个活着的输出（主界面在后台，它的预览画面已被系统收回），
      * 而它还该出帧时（拍照时相机没开、在「保持 30 秒」里，又没有留着的活输出），调度要的那一组里就是它，相机才有地方出帧；
      * 要的输出一样都不剩时建会话也补上它（{@link #requestedTargets}）。和预览同尺寸、同格式，帧到了就丢。</p>
      */
@@ -389,7 +389,7 @@ public class SingleCamera {
     private static final ChannelRules.Kind[] SESSION_ORDER = {
             ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SIDE,
             ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
-    /** 共享预览流最多能挂几块画布（车机报的），第一次建会话时记一次；0 = 还没记过。 */
+    /** 共享预览流最多能挂几块画布（框架给的上限，AOSP 是 4；车机上记一行看实际是几），变了才记；0 = 还没记过。 */
     private static volatile int sharedSurfaceLimitNoted;
 
     /**
@@ -2463,7 +2463,7 @@ public class SingleCamera {
                     noteSharedSurfaceLimit(previewSharedConfig.getMaxSharedSurfaceCount());
                 } else if (kind == ChannelRules.Kind.SIDE
                         && sharedCount >= previewSharedConfig.getMaxSharedSurfaceCount()) {
-                    // 共享预览流挂满了（上限是车机报的）：盲区画面最可有可无，这一份会话不带它，告诉盲区画面那一侧
+                    // 共享预览流挂满了（框架给的上限）：盲区画面最可有可无，这一份会话不带它，告诉盲区画面那一侧
                     // （它撤回声明，不然调度会一直想把它加回来）
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 共享预览流已挂 " + sharedCount
                             + " 块画布（上限 " + previewSharedConfig.getMaxSharedSurfaceCount() + "）：这一份会话不带盲区画面");
@@ -3554,7 +3554,7 @@ public class SingleCamera {
             captureSession = null;
             device = cameraDevice;
             cameraDevice = null;
-            // 只清会话和设备，不清声明（预览、后视镜、录像的声明留着，下一次开照样带上）
+            // 只清会话和设备，不清声明（预览、后视镜、盲区画面、录像的声明留着，下一次开照样带上）
             requested.set(Collections.emptySet());
             sessionGone();
 

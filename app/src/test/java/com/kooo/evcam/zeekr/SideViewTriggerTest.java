@@ -88,7 +88,10 @@ public class SideViewTriggerTest {
         assertTrue(r.attached);
         r = t.update(100_000 + SideViewTrigger.READY_GRACE_MS, in("P", 0), false);
         assertFalse(r.attached);
+        assertTrue("黑匣子写「离开 D 挡 30 秒」", r.graceEnded);
         assertEquals(0, r.wakeAt);
+        r = t.update(100_000 + SideViewTrigger.READY_GRACE_MS + 1, in("P", 0), false);
+        assertFalse("只在到点那一次", r.graceEnded);
     }
 
     @Test
@@ -166,6 +169,7 @@ public class SideViewTriggerTest {
         r = t.update(1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS, off, false);
         assertFalse(r.shown);
         assertFalse("不在 D 挡：收起后就移走", r.attached);
+        assertFalse("不是 30 秒到点，是显示结束", r.graceEnded);
     }
 
     @Test

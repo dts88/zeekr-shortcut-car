@@ -10,8 +10,10 @@ package com.kooo.evcam.zeekr;
  *       灯灭后再留 {@link #HOLD_AFTER_SIGNAL_MS} 才收；这期间同一侧又打灯就接着显示，换一侧就换过去。</li>
  *   <li><b>备着</b>（预备方式 B）：挂 D 挡、原厂画面不在时窗口一直挂着、隐藏，画面留在环视的会话里，打灯只是显示出来；
  *       离开 D 挡 {@link #READY_GRACE_MS} 后才不再备着（等红灯挂 N、P 不至于来回挂、摘）。显示着的一定挂着。</li>
- *   <li><b>立刻全收</b>：熄屏、原厂画面出现（倒挡、原厂 360、原厂侧方小窗、泊车辅助）、相机层拒绝了盲区画面 ——
- *       不显示、不备着，30 秒也不等：原厂要用环视。</li>
+ *   <li><b>立刻全收</b>：熄屏、原厂画面出现（倒挡、原厂 360、原厂侧方小窗、泊车辅助）—— 不显示、不备着，30 秒也不等：
+ *       原厂要用环视。</li>
+ *   <li>相机层这一回不带盲区画面的那一段不经这里，由 {@link SideViewService} 自己管（它的 {@code refused}），到这里说「不挂」为止：
+ *       当成 {@code blocked} 传进来的话，下一次判定就说「不挂」、它就当这一段结束了，每来一次读数重挂一次、重建一次会话。</li>
  *   <li><b>关闭按钮</b>：关掉这一次打灯（{@link SideViewDismissal}），窗口照规则回到备着或者移走。</li>
  * </ul>
  *
@@ -36,12 +38,15 @@ final class SideViewTrigger {
         final int lane;
         /** 到这个时刻（单调时钟）再算一次：灯灭后的保留、离开 D 挡后的 30 秒到点；不用是 0。 */
         final long wakeAt;
+        /** 这一次判定时离开 D 挡后的 30 秒刚到点（黑匣子里写准为什么移走窗口）。 */
+        final boolean graceEnded;
 
-        Result(boolean attached, boolean shown, int lane, long wakeAt) {
+        Result(boolean attached, boolean shown, int lane, long wakeAt, boolean graceEnded) {
             this.attached = attached;
             this.shown = shown;
             this.lane = lane;
             this.wakeAt = wakeAt;
+            this.graceEnded = graceEnded;
         }
     }
 
@@ -58,7 +63,7 @@ final class SideViewTrigger {
 
     /**
      * @param in      这一刻的读数；{@code showing} 由这里填
-     * @param blocked 熄屏、或者相机层拒绝了盲区画面：什么都不挂
+     * @param blocked 熄屏：什么都不挂
      */
     Result update(long now, SideViewDecision.Input in, boolean blocked) {
         if (blocked || SideViewDecision.factoryViewActive(in)) {
@@ -66,7 +71,7 @@ final class SideViewTrigger {
             holdUntil = 0;
             driving = false;
             readyUntil = 0;
-            return new Result(false, false, lastLane, 0);
+            return new Result(false, false, lastLane, 0, false);
         }
         in.showing = showing;
         boolean suppressed = dismissal.suppress(in.turnSignal, in.hazard);
@@ -85,6 +90,7 @@ final class SideViewTrigger {
             }
         }
         boolean drivingNow = SideViewDecision.shouldStayReady(in);
+        boolean graceEnded = false;
         if (drivingNow) {
             readyUntil = 0;
         } else if (driving) {
@@ -92,6 +98,7 @@ final class SideViewTrigger {
             readyUntil = now + READY_GRACE_MS;
         } else if (readyUntil != 0 && now >= readyUntil) {
             readyUntil = 0;
+            graceEnded = true;
         }
         driving = drivingNow;
         boolean shown = showing != SideViewDecision.NONE;
@@ -100,7 +107,7 @@ final class SideViewTrigger {
         if (readyUntil != 0 && (wakeAt == 0 || readyUntil < wakeAt)) {
             wakeAt = readyUntil;
         }
-        return new Result(attached, shown, shown ? showing : lastLane, wakeAt);
+        return new Result(attached, shown, shown ? showing : lastLane, wakeAt, graceEnded);
     }
 
     /** 点了关闭按钮：关掉这一次打灯（显示着的那一侧）。下一次 {@link #update} 照规则回到备着或者移走。 */
