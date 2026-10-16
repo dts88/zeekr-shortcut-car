@@ -77,7 +77,7 @@ public final class Recovery {
     public static void bringBackUiAfterScreenOn(Context context) {
         try {
             AppConfig config = new AppConfig(context);
-            if (!config.didUiLeaveForScreenOff() || UserExit.isExited(context)) {
+            if (!config.didUiLeaveForScreenOff() || UserExit.isExited(context) || factoryCameraActive()) {
                 return;
             }
             config.setUiLeftForScreenOff(false);
@@ -100,6 +100,14 @@ public final class Recovery {
         } catch (Exception e) {
             AppLog.w(TAG, "bringBackUiAfterScreenOn failed: " + e);
         }
+    }
+
+    public static boolean factoryCameraActive() {
+        com.kooo.evcam.telemetry.Readings r = com.kooo.evcam.telemetry.Telemetry.get().readings();
+        return RecoveryUiPolicy.factoryCameraActive(r.text(com.kooo.evcam.telemetry.Signal.GEAR),
+                r.bool(com.kooo.evcam.telemetry.Signal.STOCK_360),
+                r.bool(com.kooo.evcam.telemetry.Signal.STOCK_POPUP),
+                r.bool(com.kooo.evcam.telemetry.Signal.PARK_ASSIST));
     }
 
     /**
@@ -125,7 +133,7 @@ public final class Recovery {
      * @param where 谁要录的（ASCII，进黑匣子：RecordingCoordinator.Why）
      */
     public static void bringUpMainForRecording(Context context, String where) {
-        if (UserExit.isExited(context)) {
+        if (UserExit.isExited(context) || factoryCameraActive()) {
             return;
         }
         long now = SystemClock.elapsedRealtime();
@@ -151,6 +159,7 @@ public final class Recovery {
 
     /** 静默拉起主界面：不是人点开的（这一趟的录像选择不清），起来闪一下就退后台。还活着就挪到前面。 */
     private static void launchMainSilently(Context context) {
+        if (factoryCameraActive()) return;
         boolean alive = MainActivity.getInstance() != null;
         Intent main = new Intent(context, MainActivity.class);
         main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
