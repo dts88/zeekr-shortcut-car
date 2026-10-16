@@ -92,6 +92,8 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 
 ## Recommended
 
+**[wysie/zeekr-shortcut-car](https://github.com/wysie/zeekr-shortcut-car)** is a version of Zeekr Shortcut optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
+
 **[CarPiano](https://github.com/jlunnn/CarPiano)** plays sound through the car's exterior speaker at any speed — no longer limited to Park like the factory feature. It's still early in development, but very promising.
 
 Check your local rules before using the exterior speaker on public roads.
