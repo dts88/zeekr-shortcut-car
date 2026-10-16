@@ -121,6 +121,8 @@ public class MainActivity extends AppCompatActivity {
     private float[] expandedFrom;
     /** 收回的过渡正在跑：这时再点一下就直接收完，不再起一次过渡。 */
     private boolean collapsing;
+    /** 放大中管线建好了：收回之后照它摆座舱那两格（{@link #showBuiltCabins}）；null = 没有要补摆的。 */
+    private MultiCameraManager cabinPanesAfterCollapse;
     private final com.kooo.evcam.ui.PreviewExpandAnimator expandAnimator =
             new com.kooo.evcam.ui.PreviewExpandAnimator();
     /** 录制键的三个状态和本段进度都由它画。 */
@@ -426,8 +428,8 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 照配置里启用的几路选布局（{@link PreviewSlots}）：只启用了环视是单路四宫格，其余是多路布局。
      *
-     * <p>以前按车型选，后来数路数。车型（视频流配置的选择）现在只决定用哪一份配置；银河 E5 / L6 / L7 / 星舰 / 手机
-     * 那些车型和布局早就删了。</p>
+     * <p>以前按车型选，后来数路数。车型（视频流配置的选择）决定用哪一份配置，布局只看那一份配置启用了哪几路；
+     * 银河 E5 / L6 / L7 / 星舰 / 手机那些车型和布局早就删了。</p>
      */
     private void setupLayoutByCarModel() {
         int layoutId;
@@ -1545,9 +1547,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         showBuilt(built);
-        // 启用了、管线里却没建出来的座舱（相机列表里没有它、映射指重了）那一格藏起来，和以前一样
-        hideUnbuiltCabin(pipeline, "back", R.id.pane_cabin_front);
-        hideUnbuiltCabin(pipeline, "left", R.id.pane_cabin_rear);
+        showBuiltCabins(pipeline);
         pipeline.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
         // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
         pipeline.firePreviewSizeCallbacks();
@@ -1662,8 +1662,8 @@ public class MainActivity extends AppCompatActivity {
      * <p>藏起来之后剩下的格子占满：环视那块藏了，座舱那一列占满整块预览区；前座舱藏了，后座舱占满这一列。
      * 让出来的间距一并去掉，不留一道缝。只开环视的布局里没有这几格，调了也不会有事。</p>
      *
-     * <p>布局每次重建（initViews）都回到默认的显示状态，在那里照启用的几路摆一次。管线建好后只藏启用了却没建出来的座舱
-     * （{@link #hideUnbuiltCabin}）。</p>
+     * <p>布局每次重建（initViews）都回到默认的显示状态，在那里照启用的几路摆一次。管线建好后再照建出来没有摆启用的座舱
+     * （{@link #showBuiltCabins}）。</p>
      *
      * @param shown 要显示的那几路
      */
@@ -1692,14 +1692,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 启用了、管线里却没建出来的那一路座舱：它那一格藏起来（和以前 showCabinPanes 一样）。只藏、不显示别的格、不动间距、
-     * 不收回放大 —— 放大时藏起来的格子里有它的话，从记录里去掉，收回时不再冒出来。
+     * 管线建好了：启用的座舱那一格，建出来了就显示、没建出来（列相机出错、相机列表里没有它、映射指重了）就藏起来 ——
+     * 两个方向都摆，和以前 showCabinPanes 一样：列相机出错时藏起来的，过后重建成功了要显示回来。没启用的那一格在 initViews 里
+     * 已经藏了，这里不管；间距不动。
+     *
+     * <p>正放大着一格时不动版面（不打断放大），收回之后再照这一份管线摆（{@link #finishCollapse}）。</p>
      */
-    private void hideUnbuiltCabin(MultiCameraManager pipeline, String key, int paneId) {
-        View pane = findViewById(paneId);
-        if (pane != null && enabledLanes.contains(key) && pipeline.getCamera(key) == null) {
-            pane.setVisibility(View.GONE);
-            hiddenForExpand.remove(pane);
+    private void showBuiltCabins(MultiCameraManager pipeline) {
+        if (expandedPreview != null) {
+            cabinPanesAfterCollapse = pipeline;
+            return;
+        }
+        cabinPanesAfterCollapse = null;
+        showBuiltCabin(pipeline, "back", R.id.pane_cabin_front);
+        showBuiltCabin(pipeline, "left", R.id.pane_cabin_rear);
+    }
+
+    private void showBuiltCabin(MultiCameraManager pipeline, String key, int paneId) {
+        if (enabledLanes.contains(key)) {
+            showPane(paneId, pipeline.getCamera(key) != null);
         }
     }
 
@@ -2839,7 +2850,7 @@ public class MainActivity extends AppCompatActivity {
         // 手里那份管线不再是进程里在用的那一份（在后台时被 Holder 放掉重建了、建的时候列相机出错）：接上现在那一份
         reattachPipelineIfReplaced("resume");
 
-        // 预览又要用相机了 —— 画布还在、管线也接着的话现在登记；还没接上管线、画布没了（退过后台）的，等接上 / 画布回来再登记（见 claimPreviewIfReady）
+        // 预览又要用相机了 —— 画布都在、管线也接着的话现在登记（最小化回来就是这样：画布还在）；新建的界面还没接上管线，等接上再登记（见 claimPreviewIfReady）
         claimPreviewIfReady();
 
         // 前台服务：每次回到前台都刷新一次（大纲 §1 MainActivity，2.11 阶段 4a）
@@ -3372,6 +3383,12 @@ public class MainActivity extends AppCompatActivity {
             updateCompositeLabels();
         }
         expandedTopMargin = -1;
+        // 放大中管线建好了：现在照它摆座舱那两格（还是手里这一份才摆）
+        MultiCameraManager pending = cabinPanesAfterCollapse;
+        if (pending != null && pending == cameraManager) {
+            showBuiltCabins(pending);
+        }
+        cabinPanesAfterCollapse = null;
     }
 
     /**

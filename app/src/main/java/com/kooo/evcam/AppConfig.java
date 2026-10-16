@@ -167,7 +167,7 @@ public class AppConfig {
     }
     
     // 录制模式常量
-    public static final String RECORDING_MODE_AUTO = "auto";  // 自动（根据车型决定）
+    public static final String RECORDING_MODE_AUTO = "auto";  // 自动（一律 MediaCodec，见 shouldUseCodecRecording）
     public static final String RECORDING_MODE_MEDIA_RECORDER = "media_recorder";  // MediaRecorder（硬件编码）
     public static final String RECORDING_MODE_CODEC = "codec";  // MediaCodec（软编码）
     
@@ -1151,8 +1151,7 @@ public class AppConfig {
 
 
     /**
-     * 获取摄像头名称
-     * 对于预设车型返回默认名称，对于自定义车型返回用户设置的名称
+     * 获取摄像头名称：认出来的那几路是定名，其余用默认名（「自定义」车型和起名 1.44.0 删了）
      *
      * <p>要传<b>界面</b>的 Context（Activity / Fragment）：默认名字是从资源表里取的，
      * 理由见 {@link CameraNames}。</p>
