@@ -11,9 +11,11 @@
         <include .../>
         <exclude .../>
         -->
+        <exclude domain="file" path="temp_video/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="developer_mode.xml"/>
+        <exclude domain="file" path="temp_video/" />
     </device-transfer>
     <!--
     <device-transfer>

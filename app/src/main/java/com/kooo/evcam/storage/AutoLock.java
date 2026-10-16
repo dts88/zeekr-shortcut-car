@@ -67,7 +67,7 @@ public final class AutoLock implements Telemetry.Listener {
     private static final String USER = "auto-lock";
     /** 中转写入的目标目录不在（盘掉了）时，隔多久再试一遍。 */
     static final long RELAY_RETRY_MS = 30_000L;
-    /** 最多再试几遍：一小时。中转缓存里的文件放一小时就过期删掉（{@code FileTransferManager}），再等也没用。 */
+    /** 最多再试几遍：一小时。中转文件继续保留；超时后需用户恢复或导出。 */
     static final int RELAY_RETRY_LIMIT = 120;
     /** 离上一次弹不到这么久，提示不再弹（连着锁上几次时不一个接一个地弹）。 */
     private static final long TOAST_GAP_MS = 4_000L;
@@ -296,18 +296,22 @@ public final class AutoLock implements Telemetry.Listener {
     private static Scan scan(Context context, File relayTarget) {
         Scan scan = new Scan();
         File video = StorageHelper.getVideoDir(context);
-        File temp = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
+        File temp = FileTransferManager.relayDirectory(context);
+        File legacy = FileTransferManager.legacyRelayDirectory(context);
         File actual = StorageHelper.lastRecordingDir();
         collect(scan.byListDir, video, video);
-        if (actual != null && !actual.getAbsoluteFile().equals(temp.getAbsoluteFile())) {
+        if (actual != null && !actual.getAbsoluteFile().equals(temp.getAbsoluteFile())
+                && !actual.getAbsoluteFile().equals(legacy.getAbsoluteFile())) {
             collect(scan.byListDir, actual, actual);
         }
         if (relayTarget != null) {
             if (relayTarget.isDirectory()) {
                 collect(scan.byListDir, relayTarget, relayTarget);
                 collect(scan.byListDir, temp, relayTarget);
+                collect(scan.byListDir, legacy, relayTarget);
             } else {
                 scan.waiting.addAll(ownClips(temp));
+                scan.waiting.addAll(ownClips(legacy));
             }
         }
         return scan;
