@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="upd_err_integrity">Installer SHA-256 is missing or does not match; download aborted</string>
+</resources>

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="upd_err_integrity">安装文件的 SHA-256 缺失或不匹配，已中止</string>
+</resources>

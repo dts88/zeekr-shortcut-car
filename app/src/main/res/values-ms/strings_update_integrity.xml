@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="upd_err_integrity">SHA-256 pemasang tiada atau tidak sepadan; muat turun dibatalkan</string>
+</resources>
