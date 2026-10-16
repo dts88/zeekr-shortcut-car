@@ -353,7 +353,7 @@ public class MainActivity extends AppCompatActivity {
             requestRecordingFromFloatingButton(getIntent());
         }
 
-        // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级后视镜 /
+        // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级镜子 /
         // 录制悬浮按钮 / 补盲）。该不该开、能不能开都在协调器里判断。
         OverlayCoordinator.restoreOnLaunch(this);
         
@@ -2905,7 +2905,7 @@ public class MainActivity extends AppCompatActivity {
             com.kooo.evcam.blackbox.BlackBox.note("主界面销毁：预览画布交给管线，管线留给应用");
         }
         // 前台服务、中转写入留不留（keepServices，条件照旧）：还在录、在等开录（开机自启动、悬浮按钮拉起）、上一次停录还在收拾
-        // （needsPipeline），只是重建（夜间模式、语言切换），或者还有别人在用相机（超级后视镜、拍照）—— 留着
+        // （needsPipeline），只是重建（夜间模式、语言切换），或者还有别人在用相机（超级镜子、拍照）—— 留着
         com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
         final boolean othersNeedCamera = needs.heldByAnyoneExcept(
                 com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
@@ -3499,7 +3499,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     /**
-     * 抽屉里的「超级后视镜」开关。
+     * 抽屉里的「超级镜子」开关。
      *
      * <p>和设置里那个开关走同一条路（{@code OverlayCoordinator.setRearViewEnabled}）：
      * 悬浮窗权限不够时它会返回 false，这时去申请权限，开关停在原位 ——

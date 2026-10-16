@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /**
- * 卡顿监测：超级后视镜或录制卡住时，当场留下一份现场报告。
+ * 卡顿监测：超级镜子或录制卡住时，当场留下一份现场报告。
  *
  * <h3>为什么要有</h3>
  *
@@ -979,7 +979,7 @@ public final class StallWatch {
     /**
      * 一条线程卡超过这么久，就往黑匣子记一行：是哪条线程、卡在哪。恢复时再记一行卡了多久。
      *
-     * <p>主线程卡住时，主界面、超级后视镜、悬浮按钮全都不动；相机线程卡住时只是那一路相机没反应。
+     * <p>主线程卡住时，主界面、超级镜子、悬浮按钮全都不动；相机线程卡住时只是那一路相机没反应。
      * 这两行把两者分开 —— 2026-09-26 那次「车机卡死」之后，这正是分不清的地方。</p>
      */
     private static final long LOOPER_BLACKBOX_MS = 2000L;

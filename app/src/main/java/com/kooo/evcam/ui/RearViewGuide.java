@@ -28,7 +28,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 
 /**
- * 超级后视镜使用指南：五张说明图，左右划翻页，最后一张是「知道了」。
+ * 超级镜子使用指南：五张说明图，左右划翻页，最后一张是「知道了」。
  *
  * <h3>为什么是图，不是一段文字</h3>
  *
@@ -40,7 +40,7 @@ import com.kooo.evcam.R;
  *
  * <ul>
  *   <li>第一次在抽屉或设置里打开后视镜时弹一次（{@link #showOnce}）；</li>
- *   <li>设置 → 超级后视镜 → 使用指南，随时再看（{@link #show}）。</li>
+ *   <li>设置 → 超级镜子 → 使用指南，随时再看（{@link #show}）。</li>
  * </ul>
  *
  * <p>从悬浮按钮打开后视镜时不弹：那时主界面多半不在前台，为了一张说明图把应用拽到
@@ -71,7 +71,7 @@ public final class RearViewGuide {
     private RearViewGuide() {
     }
 
-    /** 第一次打开超级后视镜时弹一次；弹过就不再弹。 */
+    /** 第一次打开超级镜子时弹一次；弹过就不再弹。 */
     public static void showOnce(Activity activity) {
         if (activity == null) {
             return;

@@ -3,7 +3,7 @@ package com.kooo.evcam.zeekr;
 import java.util.Locale;
 
 /**
- * 超级后视镜的取景几何：显示框里究竟该看到那一路画面的哪一块。
+ * 超级镜子的取景几何：显示框里究竟该看到那一路画面的哪一块。
  *
  * <p>整条链路是三层坐标：</p>
  *

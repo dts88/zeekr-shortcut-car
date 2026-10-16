@@ -42,7 +42,7 @@ import java.util.function.Consumer;
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
  *   <li>录像输出离开了会话（改输出摘掉的），或者关着的一路录像不再留着它（停了录、不在计划里），告诉声明它的那一方
- *       （{@link #dispatchDrops}）；交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级后视镜留住的画布、
+ *       （{@link #dispatchDrops}）；交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级镜子留住的画布、
  *       换下来的录制器）离开了会话的，放掉；</li>
  *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；关完一轮 30 秒的、别的程序拿走一路相机 30 秒的
  *       （{@link #watchAfter}），量一次还开着的那几路（{@link #noteAftermaths}；在那之前我们自己动了它的，量到动它那一刻）；
@@ -1417,7 +1417,7 @@ public final class ChannelScheduler {
     private final Map<String, long[]> releases = new HashMap<>();
     /**
      * 交给调度、等它离开会话再放的消费者（{@link #handOver}），按路：输出 → 怎么放。大纲 §7.6 主界面重建时留住的预览画布、
-     * §7.7 关掉的超级后视镜留住的画布、换下来的录制器。
+     * §7.7 关掉的超级镜子留住的画布、换下来的录制器。
      * 不随 {@link #setLanes} 清：路没了的下一轮就放，不漏。
      */
     private final Map<String, Map<ChannelRules.Out, Runnable>> handedOver = new LinkedHashMap<>();
@@ -1584,7 +1584,7 @@ public final class ChannelScheduler {
      * 不能早放：会话还带着它的时候放掉，它就成了死输出，那一路整条重复请求停下，只能马上摘（大纲 §6 风险 2）。</p>
      *
      * <p>用在大纲 §7.6、§7.7（项目所有者 2026-10-11 都答「按建议」）：主界面重建（换日夜模式、换语言、从最近任务划掉）、
-     * 关超级后视镜（服务退出、窗口移走）时 onSurfaceTextureDestroyed 返回 false，预览画布、后视镜画布交到这里；
+     * 关超级镜子（服务退出、窗口移走）时 onSurfaceTextureDestroyed 返回 false，预览画布、后视镜画布交到这里；
      * 新界面、新开的后视镜窗口用 {@code TextureView.setSurfaceTexture} 接回同一块的，先 {@link #reclaim} 拿回去 ——
      * 同一块画布就是同一个输出，通道零变动。调度这一侧不分是谁的画布：输出种类、哪一路都在 {@code out}、{@code key} 里。</p>
      */
