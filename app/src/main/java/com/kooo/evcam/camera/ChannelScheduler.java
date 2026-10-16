@@ -181,7 +181,7 @@ public final class ChannelScheduler {
         /** 最后一次报错的短名；没有是 null。 */
         String lastErrorName();
 
-        /** 一个录像输出离开了会话：告诉声明它的录像那一侧（撤回了的不告诉）。 */
+        /** 一个录像、盲区画面输出离开了会话：告诉声明它的那一侧（撤回了的不告诉）。 */
         void dropped(ChannelRules.Out out, SingleCamera.Drop why);
 
         /**
@@ -1757,14 +1757,19 @@ public final class ChannelScheduler {
         wake();
     }
 
-    /** 相机层自己丢了一样输出（消费者被系统收走、会话配不上）：是录像输出就当场告诉录像那一侧。 */
+    /**
+     * 相机层自己丢了一样输出（消费者被系统收走、会话配不上、共享预览流挂不下）：当场告诉声明它的那一侧 ——
+     * 录像那一侧、盲区画面那一侧（只有它们留了接收方，{@link SingleCamera#dropListener}）。盲区画面收到后撤回声明，
+     * 调度就不会一直想把它加回去。
+     */
     void onOutputDropped(String cameraId, ChannelRules.Out out, SingleCamera.Drop why) {
         ChannelRules.Lane lane = live(cameraId);
         if (lane == null) {
             return;
         }
         CameraPort port = ports.get(lane.key);
-        if (port != null && out != null && out.kind == ChannelRules.Kind.RECORD) {
+        if (port != null && out != null
+                && (out.kind == ChannelRules.Kind.RECORD || out.kind == ChannelRules.Kind.SIDE)) {
             port.dropped(out, why);
         }
         wake();

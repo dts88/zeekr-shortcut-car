@@ -141,6 +141,8 @@ public final class ChannelRules {
         PREVIEW,
         /** 超级镜子的画布（只有环视有）。 */
         MIRROR,
+        /** 盲区画面的画布（只有环视有）：和预览、超级镜子挂在同一条共享的预览流上。 */
+        SIDE,
         /** 录制器的输入 SurfaceTexture：录制器停放、重新备好都是同一个，所以停录后它能留在会话里。 */
         RECORD,
         /** 不显示的出帧口：只用来补位 —— 一路要出帧、会话里却没有一个活着的输出能出帧时才加。 */
@@ -1180,7 +1182,7 @@ public final class ChannelRules {
 
     /**
      * 谁要这一路（§一的登记表）：预览 —— 登记着而且亮屏，要启用的全部（{@link World#enabled}）；录像 —— 录像计划里的路；
-     * 拍照 —— 启用的全部；后视镜 —— 环视，配置里没开环视也要（项目所有者 2026-10-16）。保持不在这里（{@link #holding}）。
+     * 拍照 —— 启用的全部；后视镜、盲区画面 —— 环视，配置里没开环视也要（项目所有者 2026-10-16）。保持不在这里（{@link #holding}）。
      *
      * <p>熄屏时 PREVIEW 不算：主界面看不见。开发者「熄屏录制（阻止休眠）」开着、熄屏时没在录，于是照登记表关
      * （项目所有者 2026-10-11，§7.5）。</p>
@@ -1218,6 +1220,7 @@ public final class ChannelRules {
             case RECORDING:
                 return w.recordPlan.contains(lane.key);
             case MIRROR:
+            case SIDE_VIEW:
                 return isSurround(lane);
             default:   // 拍照
                 return w.enabled.contains(lane.key);
@@ -1310,7 +1313,8 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视；录像 —— 录像计划里有它。
+     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视；
+     * 盲区画面 —— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
      * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
      */
     private static boolean wantsKind(World w, Lane lane, Kind kind) {
@@ -1322,6 +1326,8 @@ public final class ChannelRules {
                 return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key);
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && isSurround(lane);
+            case SIDE:
+                return w.holders.contains(CameraNeeds.Holder.SIDE_VIEW) && isSurround(lane);
             case RECORD:
                 return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
             default:
