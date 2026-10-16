@@ -60,6 +60,9 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_gpu_fisheye_preview", Arrays.asList("gpu_fisheye_preview"));
         ROWS.put("pref_gpu_fisheye_video", Arrays.asList("gpu_fisheye_video"));
         ROWS.put("pref_camera_holder_suspects", Arrays.asList("camera_holder_suspects"));
+        ROWS.put("pref_side_view_back", Arrays.asList("side_view_back"));
+        ROWS.put("pref_side_view_up", Arrays.asList("side_view_up"));
+        ROWS.put("pref_side_view_fov", Arrays.asList("side_view_fov"));
         ROWS.put("pref_repair_mp4", NONE);
         ROWS.put("pref_archive", NONE);
         ROWS.put("pref_developer_note", NONE);
@@ -73,7 +76,7 @@ public class DeveloperSettingsTest {
     private static final List<String> ORDINARY = Arrays.asList(
             "screen_off_keep_recording", "auto_start_recording", "footage_lock",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
-            "exposure_compensation", "awb_mode", "car_model");
+            "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed");
 
     private static final Pattern KEY = Pattern.compile("android:key=\"([^\"]+)\"");
 

@@ -77,6 +77,12 @@ public class AppConfig {
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
+    // 盲区画面：打转向灯时显示该侧的摄像头画面（zeekr.SideViewService）
+    private static final String KEY_SIDE_VIEW_ENABLED = "side_view_enabled";      // 开关
+    private static final String KEY_SIDE_VIEW_MIN_SPEED = "side_view_min_speed";  // 最低车速（km/h），0 不限
+    private static final String KEY_SIDE_VIEW_BACK = "side_view_back";            // 朝车尾转的角度（开发者选项）
+    private static final String KEY_SIDE_VIEW_UP = "side_view_up";                // 朝车外转的角度（开发者选项）
+    private static final String KEY_SIDE_VIEW_FOV = "side_view_fov";              // 横向视野（开发者选项）
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
 
@@ -624,7 +630,10 @@ public class AppConfig {
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
                 KEY_PHOTO_VIA_JPEG,                   // 拍照使用 JPEG 输出 → 开（关着时主界面在后台拍不到画面）
                 KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
-                KEY_RELAY_WRITE_ENABLED));            // 中转写入 → 关
+                KEY_RELAY_WRITE_ENABLED,              // 中转写入 → 关
+                KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
+                KEY_SIDE_VIEW_UP,
+                KEY_SIDE_VIEW_FOV));
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
             keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
         }
@@ -1066,6 +1075,75 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_CAMERA_LABEL)
                 .apply();
         AppLog.i(TAG, "超级镜子布局已恢复默认");
+    }
+
+    // ==================== 盲区画面 ====================
+
+    public static final int SIDE_VIEW_DEFAULT_MIN_SPEED = 30;
+    public static final int SIDE_VIEW_MAX_MIN_SPEED = 80;
+    /**
+     * 标定角度的默认值：往车尾转 50°、往车外转 15°、横向视野 90°（PR #19 的默认值，FerixzTanz、wysie 在 7X 上看过）。
+     * 每一路画面的朝向是猜的（{@code SideViewProjection}），上车标定之后再定；关着开发者选项时一律用默认值。
+     */
+    public static final int SIDE_VIEW_DEFAULT_BACK = 50;
+    public static final int SIDE_VIEW_DEFAULT_UP = 15;
+    public static final int SIDE_VIEW_DEFAULT_FOV = 90;
+
+    public boolean isSideViewEnabled() {
+        return prefs.getBoolean(KEY_SIDE_VIEW_ENABLED, false);
+    }
+
+    public void setSideViewEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIDE_VIEW_ENABLED, enabled).apply();
+        AppLog.d(TAG, "盲区画面: " + (enabled ? "开" : "关"));
+    }
+
+    /** 低于这个车速（km/h）不显示；0 不限。只在还没显示时看（{@code SideViewDecision}）。 */
+    public int getSideViewMinSpeed() {
+        return clampInt(prefs.getInt(KEY_SIDE_VIEW_MIN_SPEED, SIDE_VIEW_DEFAULT_MIN_SPEED), 0, SIDE_VIEW_MAX_MIN_SPEED);
+    }
+
+    public void setSideViewMinSpeed(int kmh) {
+        prefs.edit().putInt(KEY_SIDE_VIEW_MIN_SPEED, clampInt(kmh, 0, SIDE_VIEW_MAX_MIN_SPEED)).apply();
+    }
+
+    /** 画面中心朝车尾转多少度（负数朝车头），开发者选项。 */
+    public int getSideViewBack() {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        return clampInt(readInt(KEY_SIDE_VIEW_BACK, SIDE_VIEW_DEFAULT_BACK), -max, max);
+    }
+
+    public void setSideViewBack(int degrees) {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        prefs.edit().putInt(KEY_SIDE_VIEW_BACK, clampInt(degrees, -max, max)).apply();
+    }
+
+    /** 画面中心朝车外（画面上方）转多少度（负数朝车身），开发者选项。 */
+    public int getSideViewUp() {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        return clampInt(readInt(KEY_SIDE_VIEW_UP, SIDE_VIEW_DEFAULT_UP), -max, max);
+    }
+
+    public void setSideViewUp(int degrees) {
+        int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        prefs.edit().putInt(KEY_SIDE_VIEW_UP, clampInt(degrees, -max, max)).apply();
+    }
+
+    /** 横向视野（度），开发者选项；装不下时画的时候自动收窄（{@code SideViewFraming}），存着的不改。 */
+    public int getSideViewFov() {
+        return clampInt(readInt(KEY_SIDE_VIEW_FOV, SIDE_VIEW_DEFAULT_FOV),
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES));
+    }
+
+    public void setSideViewFov(int degrees) {
+        prefs.edit().putInt(KEY_SIDE_VIEW_FOV, clampInt(degrees,
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES))).apply();
+    }
+
+    private static int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     // ==================== 车型配置相关方法 ====================

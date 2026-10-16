@@ -176,7 +176,10 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 盲区画面（2026-10-16 草稿，PR side-view）：功能名 set_side_view_title「盲区画面」/ Blind spot view / Paparan titik buta；
+  set_side_view_summary「打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。」；
+  set_side_view_min_speed_title「最低车速」、_summary「低于此车速时不显示；0 为不限」；side_view_close（关闭按钮的无障碍描述）「关闭盲区画面」；
+  msg_side_view_unavailable「无法显示盲区画面」；开发者选项 dev_side_view_back / _up / _fov 的标题「盲区画面朝后角度」「盲区画面朝外角度」「盲区画面视野角度」和说明。
 
 ---
 
@@ -202,6 +205,8 @@
 | 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
 | 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 前后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + front and rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin depan dan belakang) | 同一预设在设置列表和状态条上同名 |
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
+| 盲区画面 | 盲区画面（打转向灯时在屏幕该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里） | Blind spot view（句中也大写 B） | Paparan titik buta | 待项目所有者确认；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
+| 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*） |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
 | 行驶信息条 | 行驶信息条；仅系统信息页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |

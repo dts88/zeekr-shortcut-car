@@ -2558,6 +2558,7 @@ public class MainActivity extends AppCompatActivity {
         //    留着只是让系统以 START_STICKY 的名义再去重启它们
         OverlayCoordinator.onActivityDestroyed(this);
         com.kooo.evcam.zeekr.RearViewMirrorService.stop(this);
+        com.kooo.evcam.zeekr.SideViewService.stop(this);
 
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();

@@ -197,6 +197,7 @@ public final class BlackBox {
                     + " 熄屏持续录制=" + onOff(c.isScreenOffKeepRecording())
                     + " 超级镜子=" + onOff(c.isRearViewEnabled())
                     + " 按键模式=" + onOff(c.isRearViewButtonMode())
+                    + " 盲区画面=" + onOff(c.isSideViewEnabled())
                     + " 录制悬浮按钮=" + onOff(c.isRecordingFloatingEnabled());
         } catch (Throwable t) {
             return "(读开关失败: " + t + ")";

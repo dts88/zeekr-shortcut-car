@@ -57,6 +57,11 @@
     <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction, Front and rear only and Direction label, and switches back to the rear view</string>
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
+    <string name="set_side_view_title">Blind spot view</string>
+    <string name="set_side_view_summary">Shows the side camera on the signalling side when the turn signal is on and hides it 1 second after the signal turns off; not shown in reverse or while a factory view is on screen. Surround view stays on in D.</string>
+    <string name="set_side_view_min_speed_title">Minimum speed</string>
+    <string name="set_side_view_min_speed_summary">Not shown below this speed; 0 means no limit</string>
+    <string name="side_view_close">Close Blind spot view</string>
     <string name="rearview_guide_hint">Swipe to turn pages · Tap outside to close</string>
     <string name="mirror_paused_tap">Picture stopped · tap to resume</string>
     <string name="mirror_resume_busy">The camera is in use and can\'t be opened right now</string>
@@ -275,6 +280,7 @@
     <string name="info_reading">Reading…</string>
     <string name="info_read_failed">Can\'t read</string>
     <string name="msg_rearview_on">Super mirror on. Drag the sides to move it; swipe the middle up or down to reframe.</string>
+    <string name="msg_side_view_unavailable">Can\'t show Blind spot view</string>
     <string name="msg_rearview_reset">Super mirror window and view reset</string>
     <string name="msg_floating_reset">Floating button reset</string>
     <string name="msg_adjust_opened">Image adjustment window opened. Go back to the main screen to see the effect.</string>
@@ -874,6 +880,12 @@
     <string name="dev_gpu_fisheye_video_summary">Corrects the surround view in video playback pixel by pixel on the GPU. Picks the method only; the Straighten button still turns correction on and off. Takes effect the next time video playback opens.</string>
     <string name="dev_camera_suspects_title">Log apps that may be using a camera</string>
     <string name="dev_camera_suspects_summary">Records which other apps started or stopped a foreground service or moved to the foreground or background from 10 seconds before to 3 seconds after another app takes or releases a camera, for reference only. Requires usage access; other apps\' package names are written to the diagnostics report.</string>
+    <string name="dev_side_view_back_title">Blind spot view rear angle</string>
+    <string name="dev_side_view_back_summary">Turns the view centre toward the rear; negative values turn it toward the front</string>
+    <string name="dev_side_view_up_title">Blind spot view outward angle</string>
+    <string name="dev_side_view_up_summary">Turns the view centre away from the vehicle; negative values turn it toward the vehicle</string>
+    <string name="dev_side_view_fov_title">Blind spot view field of view</string>
+    <string name="dev_side_view_fov_summary">Narrows automatically at large angles so no black areas appear</string>
     <string name="dev_repair_mp4_title">Repair unindexed recordings</string>
     <string name="dev_repair_mp4_summary">A clip cut off unexpectedly, for example by power loss, has no index and will not play. Rebuilds the index from a healthy clip of the same camera, keeping the file name.</string>
     <string name="dev_repair_refuse_recording">Can\'t repair while recording: the clip being recorded has no index either, so it can\'t be told apart from a clip that was cut off. Stop recording first.</string>

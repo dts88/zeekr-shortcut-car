@@ -57,6 +57,11 @@
     <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Depan dan belakang sahaja dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
     <string name="set_rearview_guide_title">Cara guna</string>
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
+    <string name="set_side_view_title">Paparan titik buta</string>
+    <string name="set_side_view_summary">Memaparkan kamera sisi di sebelah isyarat apabila lampu isyarat dihidupkan dan menyembunyikannya 1 saat selepas lampu isyarat dimatikan; tidak dipaparkan dalam gear undur atau semasa paparan kilang dipaparkan. Paparan sekeliling kekal hidup dalam gear D.</string>
+    <string name="set_side_view_min_speed_title">Kelajuan minimum</string>
+    <string name="set_side_view_min_speed_summary">Tidak dipaparkan di bawah kelajuan ini; 0 bermaksud tiada had</string>
+    <string name="side_view_close">Tutup Paparan titik buta</string>
     <string name="rearview_guide_hint">Leret untuk tukar halaman · Ketik di luar untuk tutup</string>
     <string name="mirror_paused_tap">Gambar terhenti · ketik untuk sambung</string>
     <string name="mirror_resume_busy">Kamera sedang digunakan dan tidak dapat dibuka buat masa ini</string>
@@ -275,6 +280,7 @@
     <string name="info_reading">Membaca…</string>
     <string name="info_read_failed">Tidak dapat dibaca</string>
     <string name="msg_rearview_on">Cermin super dihidupkan. Seret tepi untuk mengalihkannya; leret bahagian tengah ke atas atau bawah untuk mengubah bingkai.</string>
+    <string name="msg_side_view_unavailable">Tidak dapat memaparkan Paparan titik buta</string>
     <string name="msg_rearview_reset">Tetingkap dan paparan Cermin super ditetapkan semula</string>
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
     <string name="msg_adjust_opened">Tetingkap pelarasan imej dibuka. Kembali ke skrin utama untuk melihat kesannya.</string>
@@ -855,6 +861,12 @@
     <string name="dev_gpu_fisheye_video_summary">Paparan sekeliling dalam main semula video dibetulkan piksel demi piksel dengan GPU. Ini memilih kaedah sahaja; butang Luruskan masih menghidupkan dan mematikan pembetulan. Berkuat kuasa apabila main semula video dibuka lagi.</string>
     <string name="dev_camera_suspects_title">Rekod apl yang mungkin menggunakan kamera</string>
     <string name="dev_camera_suspects_summary">Merekod apl lain yang memulakan atau menghentikan perkhidmatan latar depan, atau beralih ke latar depan atau latar belakang, dari 10 saat sebelum hingga 3 saat selepas apl lain mula menggunakan atau melepaskan kamera, sebagai rujukan sahaja. Memerlukan akses penggunaan; nama pakej apl lain ditulis dalam laporan diagnostik.</string>
+    <string name="dev_side_view_back_title">Sudut belakang paparan titik buta</string>
+    <string name="dev_side_view_back_summary">Memusingkan pusat paparan ke arah belakang; nilai negatif ke arah depan</string>
+    <string name="dev_side_view_up_title">Sudut luar paparan titik buta</string>
+    <string name="dev_side_view_up_summary">Memusingkan pusat paparan menjauhi kenderaan; nilai negatif ke arah kenderaan</string>
+    <string name="dev_side_view_fov_title">Medan pandangan paparan titik buta</string>
+    <string name="dev_side_view_fov_summary">Disempitkan secara automatik pada sudut besar supaya tiada kawasan hitam</string>
     <string name="dev_repair_mp4_title">Baiki rakaman tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus secara tiba-tiba, contohnya kerana kuasa terputus, tiada indeks dan tidak boleh dimainkan. Indeks dibina semula daripada klip sihat kamera yang sama; nama fail kekal.</string>
     <string name="dev_repair_refuse_recording">Tidak dapat membaiki semasa merakam: klip yang sedang dirakam juga tiada indeks, jadi ia tidak dapat dibezakan daripada klip yang terputus. Hentikan rakaman dahulu.</string>

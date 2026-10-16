@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Blind spot view (Settings → Super mirror → Blind spot view, off by default): with the turn signal on, a window on that side of the screen shows the side camera, straightened and turned toward the rear, and hides 1 second after the signal turns off. Ready in D so it appears at once; not shown in reverse or while a factory view is on screen (based on code and on-car research by @FerixzTanz and @wysie).
 
 ## [2.12.0-alpha] - 2026-10-16
 
