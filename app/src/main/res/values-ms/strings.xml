@@ -861,11 +861,11 @@
     <string name="dev_gpu_fisheye_video_summary">Paparan sekeliling dalam main semula video dibetulkan piksel demi piksel dengan GPU. Ini memilih kaedah sahaja; butang Luruskan masih menghidupkan dan mematikan pembetulan. Berkuat kuasa apabila main semula video dibuka lagi.</string>
     <string name="dev_camera_suspects_title">Rekod apl yang mungkin menggunakan kamera</string>
     <string name="dev_camera_suspects_summary">Merekod apl lain yang memulakan atau menghentikan perkhidmatan latar depan, atau beralih ke latar depan atau latar belakang, dari 10 saat sebelum hingga 3 saat selepas apl lain mula menggunakan atau melepaskan kamera, sebagai rujukan sahaja. Memerlukan akses penggunaan; nama pakej apl lain ditulis dalam laporan diagnostik.</string>
-    <string name="dev_side_view_back_title">Sudut belakang paparan titik buta</string>
+    <string name="dev_side_view_back_title">Sudut belakang Paparan titik buta</string>
     <string name="dev_side_view_back_summary">Memusingkan pusat paparan ke arah belakang; nilai negatif ke arah depan</string>
-    <string name="dev_side_view_up_title">Sudut luar paparan titik buta</string>
+    <string name="dev_side_view_up_title">Sudut luar Paparan titik buta</string>
     <string name="dev_side_view_up_summary">Memusingkan pusat paparan menjauhi kenderaan; nilai negatif ke arah kenderaan</string>
-    <string name="dev_side_view_fov_title">Medan pandangan paparan titik buta</string>
+    <string name="dev_side_view_fov_title">Medan pandangan Paparan titik buta</string>
     <string name="dev_side_view_fov_summary">Disempitkan secara automatik pada sudut besar supaya tiada kawasan hitam</string>
     <string name="dev_repair_mp4_title">Baiki rakaman tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus secara tiba-tiba, contohnya kerana kuasa terputus, tiada indeks dan tidak boleh dimainkan. Indeks dibina semula daripada klip sihat kamera yang sama; nama fail kekal.</string>

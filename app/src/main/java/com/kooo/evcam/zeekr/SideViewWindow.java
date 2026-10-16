@@ -76,9 +76,6 @@ public class SideViewWindow extends ViewGroup {
     private int lane = LaneCycle.LEFT;
     /** 合成流的真实尺寸算出来的拆分几何；不知道时画面是黑的。 */
     private CompositeStreamGeometry.Plan plan;
-    private float fovDegrees;
-    private float backDegrees;
-    private float upDegrees;
     /** 这一次显示以来来了几帧：第一帧可能是画布设回可见时取的旧帧。 */
     private int framesSinceShown;
     private long lastFrameUptimeMs;
@@ -116,7 +113,6 @@ public class SideViewWindow extends ViewGroup {
             }
         });
         addView(closeButton);
-        readAim();
     }
 
     /** 相机要写进的 TextureView：服务把它的 SurfaceTexture 声明成环视的盲区画面输出，会话由通道调度建。 */
@@ -154,16 +150,12 @@ public class SideViewWindow extends ViewGroup {
         return lane;
     }
 
-    /** 设置页改了标定角度（开发者选项）：下一帧照新的画。 */
+    /**
+     * 设置页改了标定角度（开发者选项）：马上重画一次。角度每一帧照 AppConfig 读（{@link #dispatchDraw}），
+     * 开发者选项锁上、打开（归它管的设置按没存过算）也就在下一帧生效，不用另外通知。
+     */
     public void applyAim() {
-        readAim();
         invalidate();
-    }
-
-    private void readAim() {
-        fovDegrees = appConfig.getSideViewFov();
-        backDegrees = appConfig.getSideViewBack();
-        upDegrees = appConfig.getSideViewUp();
     }
 
     // ------------------------------------------------------------------ 窗口
@@ -368,7 +360,10 @@ public class SideViewWindow extends ViewGroup {
             drawTextureOnce(canvas);
             canvas.drawColor(0xFF000000);
         } else {
-            framing.configure(fovDegrees, backDegrees, upDegrees, lane, width / (float) height);
+            // 角度每一帧照设置读（读的是内存里的值）：开发者选项锁上时按默认值算，和改这一项本身一样马上生效；
+            // 没变的时候 SideViewFraming 不重算
+            framing.configure(appConfig.getSideViewFov(), appConfig.getSideViewBack(), appConfig.getSideViewUp(),
+                    lane, width / (float) height);
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                     plan, lane, RearViewGeometry.Viewport.full());
             mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
@@ -397,7 +392,8 @@ public class SideViewWindow extends ViewGroup {
         CloseButton(Context context) {
             super(context);
             setClickable(true);
-            setContentDescription(context.getString(R.string.side_view_close));
+            // 服务的 context 在安卓 13 以下跟系统语言走，不跟应用语言（Languages.localized）
+            setContentDescription(com.kooo.evcam.settings.Languages.localized(context).getString(R.string.side_view_close));
             cross.setColor(CROSS);
             cross.setStyle(Paint.Style.STROKE);
             cross.setStrokeCap(Paint.Cap.ROUND);
