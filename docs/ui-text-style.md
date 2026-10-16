@@ -175,7 +175,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- （关于页，代码贡献）about_credits_contributors「这些朋友为本应用贡献了代码：• wysie（GitHub）—— 超级后视镜的方向标签。」/ These friends contributed code: • wysie (GitHub) — the Super mirror direction label.
 
 ---
 
