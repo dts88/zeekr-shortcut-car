@@ -1096,10 +1096,11 @@ ro.board.platform   = msmnile
 
 - 建管线建哪几路：环视一直建（超级后视镜要它），座舱启用了才建（`CameraManagerHolder.Shape`）
 - 主界面摆哪个布局、挂哪几块画布：只启用了环视是单路四宫格，其余是多路布局、没启用的格子藏起来（`PreviewSlots`）
-- 录哪几路、拍哪几路、主界面预览开哪几路（登记表「启用的全部」，`ChannelRules.World#enabled`）
+- 录哪几路（开录时的录像计划照它定）；拍哪几路、主界面预览开哪几路（登记表「启用的全部」，`ChannelRules.World#enabled`）
 - 状态条、录制键显示哪一路的规格（`RecordSpecs.shownCameraKey`）
 
-车型这个键只剩：存下的相机映射按它分开存（`ZeekrMultiPlan.Stored`），换了车型管线重建。
+车型这个键就是「视频流配置」那一项的选择：选的是用哪一份配置（`ProfileStore`）；存下的相机映射也按它分开存
+（`ZeekrMultiPlan.Stored`），换了它管线重建。
 
 反过来被设置影响的只有：手动相机映射（`camera_override_*`）会覆盖自动分配的槽位。
 

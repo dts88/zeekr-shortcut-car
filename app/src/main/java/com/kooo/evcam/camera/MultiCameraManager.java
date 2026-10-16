@@ -5463,8 +5463,9 @@ public class MultiCameraManager {
             callback.onPhotoResult(0, 0, 0);
             return false;
         }
-        if (enabledLanes != null && enabledLanes.isEmpty()) {
-            // 配置里一路都没启用（登记表 §一：拍照要启用的全部，一路都没有）：当场拒，不去等一路不会开的相机
+        if (com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context).isEmpty()) {
+            // 配置里一路都没启用（登记表 §一：拍照要启用的全部，一路都没有）：当场拒，不去等一路不会开的相机。
+            // 和拒录读同一个（RecordingCoordinator 开录前问的也是此刻的配置），管线建没建好都一样
             callback.onNoCameraEnabled();
             return false;
         }

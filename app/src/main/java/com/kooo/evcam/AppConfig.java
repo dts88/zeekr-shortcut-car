@@ -180,7 +180,6 @@ public class AppConfig {
     private static final String KEY_SLOT_MAP_PREFIX = "slot_map_";  // 存下的槽位映射（按车型），见 getStoredSlotMap
 
 
-    public static final String CAR_MODEL_ZEEKR_7X_MULTI = "zeekr_7x_multi";  // 极氪7X（环视合成流 + 两路座舱）
     
     private final SharedPreferences prefs;
     private final Context context;

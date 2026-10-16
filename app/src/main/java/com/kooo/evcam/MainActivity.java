@@ -424,15 +424,10 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
-     * 根据车型配置设置布局
-     */
-    /**
-     * 按车型选布局。
+     * 照配置里启用的几路选布局（{@link PreviewSlots}）：只启用了环视是单路四宫格，其余是多路布局。
      *
-     * <p>只有三种可能：{@code getCarModel()} 走 {@link SettingsRegistry} 做净化，
-     * 取值只会是极氪的两档。以前这里还排着银河 E5 / L6 / L7 / 星舰 / 手机
-     * 等一长串分支，它们判断的取值早就选不出来了 —— 那些布局连同分支一起删掉了，
-     * 留着只会让人以为还支持那些车。</p>
+     * <p>以前按车型选，后来数路数。车型（视频流配置的选择）现在只决定用哪一份配置；银河 E5 / L6 / L7 / 星舰 / 手机
+     * 那些车型和布局早就删了。</p>
      */
     private void setupLayoutByCarModel() {
         int layoutId;
@@ -647,7 +642,8 @@ public class MainActivity extends AppCompatActivity {
      * 「这一趟要录」在 onCreate 里撤了，这里也什么都不做。</p>
      */
     private void claimPreviewIfReady() {
-        if (PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
+        // 接上了管线才登记：接上时（getForMainScreen）启用的几路变了会先重建，登记在旧的那一份上，它会把配置里已经关掉的路开一遍
+        if (cameraManager != null && PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
             com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
             if (!isInBackground) {
                 recordingCoordinator.resumeIfWanted("main-screen");
@@ -1548,6 +1544,14 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         showBuilt(built);
+        // 正放大着一格时管线换了一份：先收回（不走过渡），再照这一份摆各格 —— 不然放大时藏起来的格子收回时会冒出来
+        if (expandedPreview != null) {
+            if (collapsing) {
+                expandAnimator.finishNow();
+            } else {
+                finishCollapse(false);
+            }
+        }
         // 启用了、管线里却没建出来的座舱（相机列表里没有它、映射指重了）那一格也藏起来，和以前一样；环视那块照配置
         java.util.Set<String> shown = new java.util.LinkedHashSet<>();
         for (String key : enabledLanes) {
@@ -1681,23 +1685,21 @@ public class MainActivity extends AppCompatActivity {
         showPane(R.id.composite_wrapper, surround);
         showPane(R.id.pane_cabin_front, cabinFront);
         showPane(R.id.pane_cabin_rear, shown.contains("left"));
-        if (!surround) {
-            View column = findViewById(R.id.cabin_column);
-            if (column != null && column.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
-                android.view.ViewGroup.MarginLayoutParams params =
-                        (android.view.ViewGroup.MarginLayoutParams) column.getLayoutParams();
-                params.setMarginStart(0);
-                column.setLayoutParams(params);
-            }
+        // 间距照这一次摆：旁边那一格在就留（布局里的 gutter），藏了就不留 —— 两个方向都摆，同一个界面上再摆一次时能还回去
+        int gutter = getResources().getDimensionPixelSize(R.dimen.gutter);
+        View column = findViewById(R.id.cabin_column);
+        if (column != null && column.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+            android.view.ViewGroup.MarginLayoutParams params =
+                    (android.view.ViewGroup.MarginLayoutParams) column.getLayoutParams();
+            params.setMarginStart(surround ? gutter : 0);
+            column.setLayoutParams(params);
         }
-        if (!cabinFront) {
-            View rear = findViewById(R.id.pane_cabin_rear);
-            if (rear != null && rear.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
-                android.view.ViewGroup.MarginLayoutParams params =
-                        (android.view.ViewGroup.MarginLayoutParams) rear.getLayoutParams();
-                params.topMargin = 0;
-                rear.setLayoutParams(params);
-            }
+        View rear = findViewById(R.id.pane_cabin_rear);
+        if (rear != null && rear.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+            android.view.ViewGroup.MarginLayoutParams params =
+                    (android.view.ViewGroup.MarginLayoutParams) rear.getLayoutParams();
+            params.topMargin = cabinFront ? gutter : 0;
+            rear.setLayoutParams(params);
         }
     }
 
