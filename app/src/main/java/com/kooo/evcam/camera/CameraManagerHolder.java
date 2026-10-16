@@ -15,12 +15,14 @@ import com.kooo.evcam.profile.Profile;
 import com.kooo.evcam.profile.ProfileResolution;
 import com.kooo.evcam.profile.ProfileSizes;
 import com.kooo.evcam.profile.ProfileStore;
+import com.kooo.evcam.profile.RecordSpecs;
 import com.kooo.evcam.zeekr.StreamLayoutTable;
 import com.kooo.evcam.zeekr.ZeekrCameraLocator;
 import com.kooo.evcam.zeekr.ZeekrMultiPlan;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -60,7 +62,8 @@ import java.util.function.Consumer;
  *       环视是探测到的合成流、或者还没存过能用的；只在变了时写）；不完整时照存下的建，
  *       列表里少的那一路照样建出来，交给通道调度判「不在」（被别的程序拿着）—— 车机拿着后座舱时它就不在列表里，以前照列表分，
  *       后座舱这一格就没了，以后既认不出、也开不了。没存过（第一次装）照列表建（大纲 §6 风险 13）。</li>
- *   <li>用几路、座舱哪两格要建，照当前配置（{@link Profile}：开了几路、座舱那一路开没开、有没有格子）—— 和主界面的布局同一个判断；
+ *   <li>建哪几路照当前配置里启用了哪几路（{@link RecordSpecs#enabledCameraKeys}，和主界面的布局同一个函数）：环视一直建
+ *       （登记表 §一 后视镜要它，配置里没开环视也要），座舱启用了才建；建了不等于开，开不开由通道调度照登记表定。
  *       环视钉合成流尺寸（照配置解，「最大」也解得出来），座舱照配置定尺寸、auto 不钉。</li>
  * </ul>
  */
@@ -142,52 +145,38 @@ public class CameraManagerHolder {
     }
 
     /**
-     * 这一份照什么建：车型（存下的映射按它存）、配置里开了几路（主界面的布局也照它）、座舱两格要不要建。
-     * 和主界面 setupLayoutByCarModel / laneFor 是同一个判断：开了不止一路是多路，座舱那一路开着、有格子才建。
+     * 这一份照什么建：车型（存下的映射按它存）、配置里启用了哪几路（{@link RecordSpecs#enabledCameraKeys}；主界面的布局
+     * 照同一个函数）。环视一直建：登记表 §一 后视镜要的是环视，配置里没开环视也要能看（项目所有者 2026-10-16）；
+     * 座舱启用了才建。建了不等于开：主界面预览、拍照只要启用的那几路，交给调度的就是这份（{@link MultiCameraManager#setEnabledLanes}）。
      */
-    private static final class Shape {
+    static final class Shape {
         final String carModel;
         final Profile profile;
-        final boolean multi;
+        /** 启用的那几路（key）。 */
+        final Set<String> enabled;
         /** 前座舱（key back，配置里的座舱 1）要建。 */
         final boolean cabinFront;
         /** 后座舱（key left，配置里的座舱 2）要建。 */
         final boolean cabinRear;
-        /** 最多开几路。 */
+        /** 建几路：环视，加上启用的座舱。 */
         final int count;
 
-        private Shape(String carModel, Profile profile, boolean multi, boolean cabinFront, boolean cabinRear, int count) {
+        Shape(String carModel, Profile profile, Set<String> enabled) {
             this.carModel = carModel;
             this.profile = profile;
-            this.multi = multi;
-            this.cabinFront = cabinFront;
-            this.cabinRear = cabinRear;
-            this.count = count;
+            this.enabled = enabled;
+            this.cabinFront = enabled.contains(CameraSlots.KEY_CABIN_FRONT);
+            this.cabinRear = enabled.contains(CameraSlots.KEY_CABIN_REAR);
+            this.count = 1 + (cabinFront ? 1 : 0) + (cabinRear ? 1 : 0);
         }
 
         static Shape of(Context app) {
             Profile profile = new ProfileStore(app).current();
-            int enabled = 0;
-            for (CameraProfile camera : profile.cameras) {
-                if (camera.enabled) {
-                    enabled++;
-                }
-            }
-            boolean multi = enabled > 1;
-            return new Shape(new AppConfig(app).getCarModel(), profile, multi,
-                    multi && hasLane(profile, CameraProfile.ROLE_CABIN_1),
-                    multi && hasLane(profile, CameraProfile.ROLE_CABIN_2),
-                    multi ? Math.min(enabled, 3) : 1);
-        }
-
-        /** 配置里这一路开着、有格子：关着的那一路不算数（三路永远都在配置里，开关才是开关）。 */
-        private static boolean hasLane(Profile profile, String role) {
-            CameraProfile camera = profile.camera(role);
-            return camera != null && camera.enabled && !camera.lanes.isEmpty();
+            return new Shape(new AppConfig(app).getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile));
         }
 
         String key() {
-            return carModel + (multi ? "/multi" : "/single") + (cabinFront ? "+cabin1" : "") + (cabinRear ? "+cabin2" : "");
+            return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled)));
         }
     }
 
@@ -243,7 +232,7 @@ public class CameraManagerHolder {
         builtFor = shape.key();
         builtCarModel = shape.carModel;
         built = null;
-        AppLog.i(TAG, "建相机管线（" + builtFor + "，最多 " + shape.count + " 路）：相机列表、合成流探测在相机线程上做");
+        AppLog.i(TAG, "建相机管线（" + builtFor + "，建 " + shape.count + " 路）：相机列表、合成流探测在相机线程上做");
         setup.execute(() -> build(app, manager, shape));
         return manager;
     }
@@ -431,6 +420,7 @@ public class CameraManagerHolder {
             if (plan == null) {
                 manager.initCameras(null, null, null, null, null, null, null, null);
             } else {
+                manager.setEnabledLanes(shape.enabled);
                 manager.initCameras(plan.compositeId, null,
                         shape.cabinFront ? plan.cabin1Id : null, null,
                         shape.cabinRear ? plan.cabin2Id : null, null,

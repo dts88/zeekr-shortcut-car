@@ -85,24 +85,45 @@ public final class RecordSpecs {
      * <p>「录哪几路」和「用哪几路」本来就是同一件事：关掉的相机不开、不录、不占流。
      * 以前它们是两处设置，可以配出「这一路开着但不录」——
      * 那条路上的相机照样占着流，只是录不到东西，没人说得清它为什么在那儿。</p>
+     *
+     * <p>「启用的」只在这里判：录像、建相机管线、主界面的布局都问它（登记表 §一 的「启用的全部」）。
+     * 唯一不看它的是超级后视镜 —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16）。</p>
      */
     public static java.util.Set<String> enabledCameraKeys(Context context) {
-        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
         if (context == null) {
-            return keys;
+            return new java.util.LinkedHashSet<>();
         }
         try {
-            for (CameraProfile camera : new ProfileStore(context).current().cameras) {
-                if (!camera.enabled) {
-                    continue;
-                }
-                String key = ProfileSizes.cameraKeyForRole(camera.role);
-                if (key != null) {
-                    keys.add(key);
-                }
-            }
+            return enabledCameraKeys(new ProfileStore(context).current());
         } catch (Exception e) {
             AppLog.w(TAG, "读不到配置里启用的相机: " + e);
+            return new java.util.LinkedHashSet<>();
+        }
+    }
+
+    /**
+     * 状态条、录制键、悬浮按钮上显示的帧率、码率、每段时长取哪一路的：环视启用了就是环视（和以前一样），
+     * 否则是开的次序里第一路启用的座舱；一路都没启用时照旧是环视。界面上的值要等于实际在录的那一路。
+     */
+    public static String shownCameraKey(Context context) {
+        java.util.Set<String> enabled = enabledCameraKeys(context);
+        if (enabled.isEmpty() || enabled.contains(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND)) {
+            return com.kooo.evcam.camera.CameraSlots.KEY_SURROUND;
+        }
+        return com.kooo.evcam.camera.CameraSlots.openOrder(enabled).get(0);
+    }
+
+    /** 同上，配置已经在手里时用（建相机管线、主界面摆布局）。 */
+    public static java.util.Set<String> enabledCameraKeys(Profile profile) {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        for (CameraProfile camera : profile.cameras) {
+            if (!camera.enabled) {
+                continue;
+            }
+            String key = ProfileSizes.cameraKeyForRole(camera.role);
+            if (key != null) {
+                keys.add(key);
+            }
         }
         return keys;
     }

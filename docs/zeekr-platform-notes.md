@@ -1090,20 +1090,21 @@ ro.board.platform   = msmnile
 
 现在前台与后台两条初始化路径都钉住环视这一路，座舱两路仍按全局设置各自挑。
 
-### 车型（视频流配置）的影响范围
+### 车型与视频流配置的影响范围
 
-选择车型会改变：
+用哪几路只看视频流配置里每一路开没开（`RecordSpecs.enabledCameraKeys`，2.12 起；以前按车型、后来按「开了几路」）：
 
-- `getCameraCount()` —— 进而决定 `requiredTextureCount`、`maxOpenCameras`、
-  哪些槽位参与录制、设置页哪些勾选框可见
-- 加载哪个布局（单路四宫格 / 三路）
-- 是否走 `FourLaneContainer` 拆分
-- 预览变换分支（旋转与否）
-- 切换车型时会 `resetRecordingCameraSelection()`
+- 建管线建哪几路：环视一直建（超级后视镜要它），座舱启用了才建（`CameraManagerHolder.Shape`）
+- 主界面摆哪个布局、挂哪几块画布：只启用了环视是单路四宫格，其余是多路布局、没启用的格子藏起来（`PreviewSlots`）
+- 录哪几路（开录时的录像计划照它定）；拍哪几路、主界面预览开哪几路（登记表「启用的全部」，`ChannelRules.World#enabled`）
+- 状态条、录制键显示哪一路的规格（`RecordSpecs.shownCameraKey`）
+
+车型这个键就是「视频流配置」那一项的选择：选的是用哪一份配置（`ProfileStore`）；存下的相机映射也按它分开存
+（`ZeekrMultiPlan.Stored`），换了它管线重建。
 
 反过来被设置影响的只有：手动相机映射（`camera_override_*`）会覆盖自动分配的槽位。
 
-**车型不改变**帧率、码率、画质等任何一项 —— 那些都是独立的全局设置。
+车型这个键本身不改帧率、码率：那些在每一份配置里各路自己定，选了另一份配置，用的就是那一份里的。
 
 ---
 

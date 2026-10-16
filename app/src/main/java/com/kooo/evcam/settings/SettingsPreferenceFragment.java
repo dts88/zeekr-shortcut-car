@@ -212,12 +212,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * <p>「极氪7X（环视 + 前后座舱）」0.48 起对所有人开放：座舱那两路的旋转、镜像、
      * 画面适配都做完并在车上验证过了，它不再是半成品。</p>
      *
-     * <p>「自定义」仍然只在开发者选项里 —— 那一档要手动指定每一路接哪个相机，
-     * 用途是排查，不是日常使用。半成品混在正常选项里，选中之后出问题会让人
-     * 以为是应用坏了。</p>
-     *
-     * <p><b>当前值一定保留</b>：万一已经停在某个隐藏选项上，把它从列表里抹掉
-     * 会让下拉框显示空白，那才是真的没法收拾。</p>
+     * <p>只有这两项（{@link SettingsRegistry#CAR_MODEL}）；「自定义」1.44.0 删了。</p>
      */
     private void bindCarModel() {
         ListPreference pref = findPreference("pref_car_model");
@@ -236,8 +231,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
             appConfig.setCarModel(value);
-            // 「切换视频流配置」现在的含义就是「切换到另一份配置」——
-            // 车型这个字段留着只是为了第一次翻译时有个输入。
+            // 「切换视频流配置」的含义就是「切换到另一份配置」。车型这个字段另外还用来分开存相机映射
+            // （ZeekrMultiPlan.Stored），换了它相机管线重建。
             new ProfileStore(requireContext())
                     .select(ProfileMigration.presetIdFor(value));
             pref.setValue(value);

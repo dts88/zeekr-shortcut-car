@@ -4,7 +4,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.camera.CameraSlots;
+
 import org.junit.Test;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 
 /**
  * {@link RecordSpecs} 的单元测试。
@@ -88,5 +94,25 @@ public class RecordSpecsTest {
         assertEquals(StreamSpec.FPS_UNLIMITED, spec.fps);
         assertEquals(2, RecordSpecs.qualityLevel(spec.bitrate));
         assertTrue(spec.segmentMinutes > 0);
+    }
+
+    /**
+     * 启用了哪几路只看每一路的开关，不数路数：只开一路座舱就是那一路（2026-10-16，以前当成「只有环视」）。
+     * 建相机管线、主界面的布局、录像都问这一个函数。
+     */
+    @Test
+    public void enabledKeysFollowTheSwitchesOnly() {
+        ProfileMigration.Snapshot snapshot = new ProfileMigration.Snapshot();
+        snapshot.carModel = "zeekr_7x";
+        Profile profile = ProfileMigration.migrate(snapshot);
+        assertEquals(Collections.singleton(CameraSlots.KEY_SURROUND), RecordSpecs.enabledCameraKeys(profile));
+
+        profile.camera(CameraProfile.ROLE_COMPOSITE).enabled = false;
+        profile.camera(CameraProfile.ROLE_CABIN_2).enabled = true;
+        assertEquals(Collections.singleton(CameraSlots.KEY_CABIN_REAR), RecordSpecs.enabledCameraKeys(profile));
+
+        profile.camera(CameraProfile.ROLE_CABIN_1).enabled = true;
+        assertEquals(new LinkedHashSet<>(Arrays.asList(CameraSlots.KEY_CABIN_FRONT, CameraSlots.KEY_CABIN_REAR)),
+                RecordSpecs.enabledCameraKeys(profile));
     }
 }

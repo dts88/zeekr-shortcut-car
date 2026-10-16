@@ -171,6 +171,58 @@ public class ChannelSchedulerTest {
     }
 
     /**
+     * 配置里只开座舱（2026-10-16）：环视照样建着，交给调度时不在「启用的」里。主界面预览只开两路座舱，按开的次序；
+     * 拍照也不为它开环视（登记表 §一「启用的全部」）。
+     */
+    @Test
+    public void withOnlyTheCabinsEnabledPreviewAndPhotoLeaveTheSurroundClosed() {
+        cabinsOnly();
+        claim(Holder.PREVIEW);
+        declare(rear, pvR);
+        declare(front, pvF);
+        settle();
+        assertTrue("没启用的环视：预览不开它", surround.actions.isEmpty());
+        assertEquals(Arrays.asList("open [PREVIEW]"), rear.actions);
+        at(300);
+        opened(rear);
+        frame(rear);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), front.actions);
+        at(600);
+        opened(front);
+        frame(front);
+        settle();
+        claim(Holder.PHOTO);
+        at(5_000);
+        assertTrue("拍照也不开它", surround.actions.isEmpty());
+    }
+
+    /**
+     * 配置里只开座舱、超级后视镜开着：后视镜要的是环视，照样开（项目所有者 2026-10-16），会话里只带后视镜。
+     * 贴边收起注销 MIRROR：照现行逻辑保持 30 秒，没人要就关（项目所有者 2026-10-16 定贴边不始终保持）。
+     */
+    @Test
+    public void withOnlyTheCabinsEnabledTheMirrorStillGetsTheSurround() {
+        cabinsOnly();
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        declare(surround, mirror);
+        claim(Holder.MIRROR);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+        assertTrue("座舱没人要", rear.actions.isEmpty() && front.actions.isEmpty());
+        at(300);
+        opened(surround);
+        frame(surround);
+        settle();
+        drop(Holder.MIRROR);
+        at(300 + ChannelRules.HOLD_MS - ChannelRules.TICK_MS);
+        assertEquals("保持 30 秒内不动", 1, surround.actions.size());
+        at(300 + ChannelRules.HOLD_MS + ChannelRules.TICK_MS);
+        assertEquals(2, surround.actions.size());
+        assertTrue(surround.actions.get(1), surround.actions.get(1).startsWith("close "));
+    }
+
+    /**
      * 一路丢了、那一次关一直没关完：最多挡 60 秒（在途封顶），到点按当时的状态判，别的路不再等它。
      */
     @Test
@@ -2658,6 +2710,15 @@ public class ChannelSchedulerTest {
     private void claim(Holder holder) {
         host.holders.add(holder);
         s.onNeedsChanged();
+    }
+
+    /** 重新交一次各路：环视建着、只有两路座舱启用（配置里只开座舱）。 */
+    private void cabinsOnly() {
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(FRONT, front);
+        lanes.put(REAR, rear);
+        lanes.put(SUR, surround);
+        s.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(REAR, FRONT)));
     }
 
     private void drop(Holder holder) {

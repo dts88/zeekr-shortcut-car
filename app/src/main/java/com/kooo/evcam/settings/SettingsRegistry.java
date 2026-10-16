@@ -39,8 +39,8 @@ public final class SettingsRegistry {
     /**
      * 车型（视频流配置）。
      *
-     * <p>只列出本项目实际提供的两项。上游那些银河/星舰/手机车型的常量与分支代码都还在，
-     * 但不出现在这里 —— 不提供的选项就不该出现在合法取值里，否则自检会把它们放行。</p>
+     * <p>只列出本项目实际提供的两项。上游那些银河/星舰/手机车型连同代码都删了；
+     * 不提供的选项不该出现在合法取值里，否则自检会把它们放行。</p>
      */
     public static final SettingSpec CAR_MODEL = SettingSpec.of(
             "car_model", "车型", "zeekr_7x",

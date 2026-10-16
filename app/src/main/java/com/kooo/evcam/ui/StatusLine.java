@@ -105,7 +105,7 @@ public final class StatusLine {
         Context context = root.getContext();
         TextView stream = root.findViewById(R.id.tv_status_stream);
         if (stream != null) {
-            StreamSpec spec = RecordSpecs.forCameraKey(context, "front");
+            StreamSpec spec = RecordSpecs.forCameraKey(context, RecordSpecs.shownCameraKey(context));
             String fps = spec.fps == null || spec.fps.isEmpty()
                     || StreamSpec.FPS_UNLIMITED.equals(spec.fps)
                     ? context.getString(R.string.opt_fps_auto_unknown)

@@ -827,7 +827,7 @@ public class RecordingFloatingService extends Service {
             return;
         }
         long segment = com.kooo.evcam.profile.RecordSpecs.segmentMs(
-                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, "front").segmentMinutes);
+                com.kooo.evcam.profile.RecordSpecs.forCameraKey(this, com.kooo.evcam.profile.RecordSpecs.shownCameraKey(this)).segmentMinutes);
         if (segment <= 0) {
             return;
         }

@@ -43,4 +43,10 @@ public final class PhotoFeedback implements MultiCameraManager.PhotoCallback {
     public void onNoStorage() {
         Toast.makeText(context, R.string.msg_photo_no_drive, Toast.LENGTH_LONG).show();
     }
+
+    /** 和拒录说同一句（RecordingCoordinator）。 */
+    @Override
+    public void onNoCameraEnabled() {
+        Toast.makeText(context, R.string.msg_keep_one_camera_refuse, Toast.LENGTH_LONG).show();
+    }
 }
