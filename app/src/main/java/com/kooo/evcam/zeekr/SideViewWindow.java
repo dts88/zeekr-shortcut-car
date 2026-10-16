@@ -151,8 +151,9 @@ public class SideViewWindow extends ViewGroup {
     }
 
     /**
-     * 设置页改了标定角度（开发者选项）：马上重画一次。角度每一帧照 AppConfig 读（{@link #dispatchDraw}），
-     * 开发者选项锁上、打开（归它管的设置按没存过算）也就在下一帧生效，不用另外通知。
+     * 设置页改了标定角度（开发者选项）：马上重画一次。角度在本容器重画时照 AppConfig 读（{@link #dispatchDraw}）——
+     * 显示出来、换一侧、盖上 / 露出、这里叫重画时；新的一帧只重画画布，不重画容器。所以开发者选项锁上、打开
+     * （归它管的设置按没存过算）从下一次显示起照新的算，显示着的那一次不跟（AppConfig.DEVELOPER_KEYS）。
      */
     public void applyAim() {
         invalidate();
@@ -206,6 +207,7 @@ public class SideViewWindow extends ViewGroup {
         if (show && !wasShown) {
             // 新的一次显示：先盖着，等真正的新帧（显示着换一侧不用：画布一直可见，帧一直是新的）
             framesSinceShown = 0;
+            closeButton.refreshLabel();
             stale = false;
             lastFrameUptimeMs = SystemClock.uptimeMillis();
         }
@@ -360,8 +362,7 @@ public class SideViewWindow extends ViewGroup {
             drawTextureOnce(canvas);
             canvas.drawColor(0xFF000000);
         } else {
-            // 角度每一帧照设置读（读的是内存里的值）：开发者选项锁上时按默认值算，和改这一项本身一样马上生效；
-            // 没变的时候 SideViewFraming 不重算
+            // 角度在容器重画时照设置读（内存里的值；开发者选项锁着时是默认值）；没变的时候 SideViewFraming 不重算
             framing.configure(appConfig.getSideViewFov(), appConfig.getSideViewBack(), appConfig.getSideViewUp(),
                     lane, width / (float) height);
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
@@ -392,12 +393,20 @@ public class SideViewWindow extends ViewGroup {
         CloseButton(Context context) {
             super(context);
             setClickable(true);
-            // 服务的 context 在安卓 13 以下跟系统语言走，不跟应用语言（Languages.localized）
-            setContentDescription(com.kooo.evcam.settings.Languages.localized(context).getString(R.string.side_view_close));
+            refreshLabel();
             cross.setColor(CROSS);
             cross.setStyle(Paint.Style.STROKE);
             cross.setStrokeCap(Paint.Cap.ROUND);
             cross.setStrokeWidth(2.5f * context.getResources().getDisplayMetrics().density);
+        }
+
+        /**
+         * 无障碍描述照应用语言取：服务的 context 在安卓 13 以下跟系统语言走（Languages.localized）。
+         * 每次显示时再取一次 —— 窗口在 D 挡一直挂着，这期间改了应用语言也跟得上。
+         */
+        void refreshLabel() {
+            setContentDescription(com.kooo.evcam.settings.Languages.localized(getContext())
+                    .getString(R.string.side_view_close));
         }
 
         @Override
