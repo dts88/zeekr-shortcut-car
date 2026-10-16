@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.12.0-alpha] - 2026-10-16
+
+- Stream profiles with only cabin cameras enabled now work: one or both cabins are shown, recorded and photographed; the surround view opens only for the Super mirror.
+- Super mirror: direction label (Front, Rear, Left, Right) in the top-left corner of the window, Settings → Super mirror → Direction label, on by default (@wysie).
+- The status line, record button and floating button show the settings of the camera being recorded.
+- With no camera enabled, a photo is refused at once.
+- Diagnostics list the enabled cameras.
+
 ## [2.11.7-beta] - 2026-10-15
 
 Upgrade from 2.0.0. Same code as 2.11.6-alpha.

@@ -166,6 +166,7 @@
 - 2026-10-13 批准（2.11.2，熄屏 v3）：record_screen_off_pause「熄屏暂停，亮屏后恢复」（原来是「…唤醒后恢复」）；set_screen_off_keep_summary「熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；set_screen_off_summary（开发者「熄屏录制（阻止休眠）」）「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长」；vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）。
 - record_screen_off_needs_sentry（「熄屏续录需开启哨兵模式」）2.11.2 删了：熄屏那一下接着录不再要哨兵模式；车机休眠时也接着录（哨兵模式开着等）才写 record_screen_off_continue，休眠时会停的写 record_screen_off_pause（项目所有者 2026-10-13 定，不另加句子）。
 - set_screen_off_keep_summary 不写「黑满 30 秒再放」（2.11.3）：项目所有者 2026-10-13 定 —— 那 30 秒是为了软件稳定性，不是功能；说明以简单易懂为主，照原文「熄屏后只录制环视，亮屏后前后座舱恢复录制。…」。
+- 2026-10-16 批准（2.12.0，PR #17 超级后视镜方向标签）：set_rearview_camera_label_title「方向标签」/ Direction label / Label arah；set_rearview_camera_label_summary「在窗口左上角显示当前画面的方向」；set_rearview_reset_summary 加上「方向标签」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -174,7 +175,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （PR #17，超级后视镜方向标签）set_rearview_camera_label_title「方向标签」/ Direction label / Label arah；set_rearview_camera_label_summary「在窗口左上角显示当前画面的方向」/ Shows the direction of the current view in the top-left corner of the window / Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap；set_rearview_reset_summary 加上「方向标签」（「重置窗口与画面」会把它恢复成开）。
+- （现在没有。）
 
 ---
 
