@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_cameras">Kamera</string>
+    <string name="menu_automatic_recording">Rakaman automatik &amp; skrin padam</string>
+    <string name="menu_photos">Foto</string>
+    <string name="menu_stamps">Tera &amp; maklumat pemanduan</string>
+    <string name="menu_destination">Destinasi</string>
+    <string name="menu_capacity">Kapasiti &amp; penggunaan</string>
+    <string name="menu_protection">Perlindungan rakaman</string>
+    <string name="menu_controls">Kamera &amp; kawalan</string>
+    <string name="menu_picture">Gambar</string>
+    <string name="menu_window">Tetingkap</string>
+    <string name="menu_actions">Tindakan</string>
+    <string name="menu_appearance">Rupa</string>
+    <string name="menu_placement">Kedudukan</string>
+    <string name="menu_preview_playback">Pratonton &amp; main balik</string>
+    <string name="menu_recording_internals">Dalaman rakaman</string>
+    <string name="menu_image_rendering">Imej &amp; pemaparan</string>
+    <string name="menu_camera_research">Penyelidikan kamera</string>
+    <string name="menu_maintenance">Penyelenggaraan</string>
+</resources>

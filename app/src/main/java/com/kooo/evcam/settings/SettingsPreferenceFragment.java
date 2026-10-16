@@ -1492,6 +1492,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 .commit();
     }
 
+    @Override
+    public boolean onPreferenceTreeClick(Preference preference) {
+        if (preference instanceof androidx.preference.PreferenceScreen) {
+            SettingsPreferenceFragment next = forSection(preference.getKey());
+            if (getParentFragment() instanceof SettingsShellFragment) {
+                ((SettingsShellFragment) getParentFragment()).openDetail(next, preference.getTitle());
+            } else {
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, next)
+                        .addToBackStack(String.valueOf(preference.getTitle())).commit();
+            }
+            return true;
+        }
+        return super.onPreferenceTreeClick(preference);
+    }
+
     private void toast(String message) {
         if (getContext() != null) {
             Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
