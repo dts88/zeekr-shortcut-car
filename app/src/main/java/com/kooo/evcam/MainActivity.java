@@ -634,7 +634,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 「预览要相机」只在画布都在的时候登记：登记了相机就开，开出来的第一份会话要带着预览。
+     * 「预览要相机」只在画布都在、主界面接上了管线（{@link #initCamera} 里 getForMainScreen，启用的几路变了先重建）的时候登记：
+     * 登记了相机就开，开出来的第一份会话要带着预览。
      *
      * <p>登记了就是主界面起来了（在前、能用相机）：「这一趟要录」还在、又没在录没在等的，现在接
      * （{@link RecordingCoordinator#resumeIfWanted}）。要录像、而那时用不了相机时，协调器打开录像意图那一下把主界面拉起来、录像当场就开了
@@ -704,7 +705,7 @@ public class MainActivity extends AppCompatActivity {
      *
      * <p>在 onCreate 里、画布挂上窗口之前做：{@code TextureView.setSurfaceTexture} 之后视图不再自己建画布，
      * 也就不会来 onSurfaceTextureAvailable —— 所以这里当场把预览声明回去（同一块画布就是同一个输出，
-     * 通道零变动、录像不断），画布照「就绪」数上，onResume 照常登记 PREVIEW：重建这一趟里调度醒来时，
+     * 通道零变动、录像不断），画布照「就绪」数上；全部接回了就由 initViews 排的那一次接上管线、登记 PREVIEW：重建这一趟里调度醒来时，
      * 登记表和声明都和重建之前一样。相机这一侧的其余部分（回调、亮度调节、录制状态）等 onCreate 走完再接，
      * 和系统建的画布一样晚。没留下的那几格照旧等系统建。</p>
      */
@@ -1544,22 +1545,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         showBuilt(built);
-        // 正放大着一格时管线换了一份：先收回（不走过渡），再照这一份摆各格 —— 不然放大时藏起来的格子收回时会冒出来
-        if (expandedPreview != null) {
-            if (collapsing) {
-                expandAnimator.finishNow();
-            } else {
-                finishCollapse(false);
-            }
-        }
-        // 启用了、管线里却没建出来的座舱（相机列表里没有它、映射指重了）那一格也藏起来，和以前一样；环视那块照配置
-        java.util.Set<String> shown = new java.util.LinkedHashSet<>();
-        for (String key : enabledLanes) {
-            if ("front".equals(key) || pipeline.getCamera(key) != null) {
-                shown.add(key);
-            }
-        }
-        showLanePanes(shown);
+        // 启用了、管线里却没建出来的座舱（相机列表里没有它、映射指重了）那一格藏起来，和以前一样
+        hideUnbuiltCabin(pipeline, "back", R.id.pane_cabin_front);
+        hideUnbuiltCabin(pipeline, "left", R.id.pane_cabin_rear);
         pipeline.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
         // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
         pipeline.firePreviewSizeCallbacks();
@@ -1674,8 +1662,8 @@ public class MainActivity extends AppCompatActivity {
      * <p>藏起来之后剩下的格子占满：环视那块藏了，座舱那一列占满整块预览区；前座舱藏了，后座舱占满这一列。
      * 让出来的间距一并去掉，不留一道缝。只开环视的布局里没有这几格，调了也不会有事。</p>
      *
-     * <p>布局每次重建（initViews）都回到默认的显示状态：在那里照启用的几路摆一次；管线建好后（onPipelineBuilt）
-     * 再把启用了却没建出来的座舱藏掉。</p>
+     * <p>布局每次重建（initViews）都回到默认的显示状态，在那里照启用的几路摆一次。管线建好后只藏启用了却没建出来的座舱
+     * （{@link #hideUnbuiltCabin}）。</p>
      *
      * @param shown 要显示的那几路
      */
@@ -1700,6 +1688,18 @@ public class MainActivity extends AppCompatActivity {
                     (android.view.ViewGroup.MarginLayoutParams) rear.getLayoutParams();
             params.topMargin = cabinFront ? gutter : 0;
             rear.setLayoutParams(params);
+        }
+    }
+
+    /**
+     * 启用了、管线里却没建出来的那一路座舱：它那一格藏起来（和以前 showCabinPanes 一样）。只藏、不显示别的格、不动间距、
+     * 不收回放大 —— 放大时藏起来的格子里有它的话，从记录里去掉，收回时不再冒出来。
+     */
+    private void hideUnbuiltCabin(MultiCameraManager pipeline, String key, int paneId) {
+        View pane = findViewById(paneId);
+        if (pane != null && enabledLanes.contains(key) && pipeline.getCamera(key) == null) {
+            pane.setVisibility(View.GONE);
+            hiddenForExpand.remove(pane);
         }
     }
 
@@ -2839,7 +2839,7 @@ public class MainActivity extends AppCompatActivity {
         // 手里那份管线不再是进程里在用的那一份（在后台时被 Holder 放掉重建了、建的时候列相机出错）：接上现在那一份
         reattachPipelineIfReplaced("resume");
 
-        // 预览又要用相机了 —— 画布还在的话现在登记；画布没了（退过后台）等它回来再登记（见 claimPreviewIfReady）
+        // 预览又要用相机了 —— 画布还在、管线也接着的话现在登记；还没接上管线、画布没了（退过后台）的，等接上 / 画布回来再登记（见 claimPreviewIfReady）
         claimPreviewIfReady();
 
         // 前台服务：每次回到前台都刷新一次（大纲 §1 MainActivity，2.11 阶段 4a）

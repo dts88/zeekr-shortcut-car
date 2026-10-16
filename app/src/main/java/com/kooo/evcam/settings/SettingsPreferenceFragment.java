@@ -236,8 +236,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
             appConfig.setCarModel(value);
-            // 「切换视频流配置」现在的含义就是「切换到另一份配置」——
-            // 车型这个字段留着只是为了第一次翻译时有个输入。
+            // 「切换视频流配置」的含义就是「切换到另一份配置」。车型这个字段另外还用来分开存相机映射
+            // （ZeekrMultiPlan.Stored），换了它相机管线重建。
             new ProfileStore(requireContext())
                     .select(ProfileMigration.presetIdFor(value));
             pref.setValue(value);

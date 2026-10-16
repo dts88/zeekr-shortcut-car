@@ -1060,18 +1060,14 @@ public class AppConfig {
     // ==================== 车型配置相关方法 ====================
     
     /**
-     * 设置车型
-     * @param carModel 车型标识（galaxy_e5 或 custom）
+     * 设置车型（视频流配置的选择）
+     * @param carModel 车型标识（zeekr_7x 或 zeekr_7x_multi，见 SettingsRegistry.CAR_MODEL）
      */
     public void setCarModel(String carModel) {
         writeEnum(SettingsRegistry.CAR_MODEL, carModel);
         AppLog.d(TAG, "车型设置: " + carModel);
     }
     
-    /**
-     * 获取车型
-     * @return 车型标识，默认为银河E5
-     */
     /** 界面语言：auto / zh / en。 */
     public String getLanguageMode() {
         return readEnum(SettingsRegistry.LANGUAGE);

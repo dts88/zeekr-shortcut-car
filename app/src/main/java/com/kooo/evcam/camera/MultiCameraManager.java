@@ -5464,8 +5464,8 @@ public class MultiCameraManager {
             return false;
         }
         if (com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context).isEmpty()) {
-            // 配置里一路都没启用（登记表 §一：拍照要启用的全部，一路都没有）：当场拒，不去等一路不会开的相机。
-            // 和拒录读同一个（RecordingCoordinator 开录前问的也是此刻的配置），管线建没建好都一样
+            // 此刻的配置里一路都没启用：当场拒，和拒录读同一个（RecordingCoordinator 开录前问的也是此刻的配置），管线建没建好都一样。
+            // 拍哪几路照管线建它那一刻启用的（登记表 §一「启用的全部」）；两者对不上（改了配置没重启）时 stepPhoto 不白等
             callback.onNoCameraEnabled();
             return false;
         }
@@ -5533,7 +5533,8 @@ public class MultiCameraManager {
         }
         boolean allReady = !keys.isEmpty() && ready.size() == keys.size();
         // 每一路都被拿着或停手了：没有可等的，不白等到点
-        boolean nothingToWaitFor = keys.isEmpty() && !leftOut.isEmpty();
+        // 管线建好了却一路可拍都没有（建管线之后才在配置里打开的那一路，重启应用后才生效）：也没有可等的
+        boolean nothingToWaitFor = keys.isEmpty() && (!leftOut.isEmpty() || isBuilt());
         if (!allReady && !nothingToWaitFor && now < job.readyDeadline) {
             if (!job.toldWaiting) {
                 job.toldWaiting = true;
