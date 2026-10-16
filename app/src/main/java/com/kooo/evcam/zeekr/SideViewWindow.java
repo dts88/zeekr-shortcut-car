@@ -153,7 +153,8 @@ public class SideViewWindow extends ViewGroup {
     /**
      * 设置页改了标定角度（开发者选项）：马上重画一次。角度在本容器重画时照 AppConfig 读（{@link #dispatchDraw}）——
      * 显示出来、换一侧、盖上 / 露出、这里叫重画时；新的一帧只重画画布，不重画容器。所以开发者选项锁上、打开
-     * （归它管的设置按没存过算）从下一次显示起照新的算，显示着的那一次不跟（AppConfig.DEVELOPER_KEYS）。
+     * （归它管的设置按没存过算）不当场跟：等本容器下一次重画 —— 显示着时是换一侧、盖上 / 露出，最晚下一次显示
+     * （AppConfig.DEVELOPER_KEYS）。
      */
     public void applyAim() {
         invalidate();
