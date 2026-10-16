@@ -106,7 +106,7 @@
     <string name="set_reset_floating_title">重置悬浮按钮</string>
     <string name="set_reset_floating_summary">恢复默认位置、按钮大小和时长文字大小</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、悬浮按钮和自动录制。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、盲区画面、悬浮按钮和自动录制。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
@@ -854,7 +854,7 @@
     <string name="dev_perm_all_files">所有文件访问</string>
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>
-    <string name="dev_perm_overlay_why">用于超级镜子、悬浮按钮和画面调节窗口</string>
+    <string name="dev_perm_overlay_why">用于超级镜子、盲区画面、悬浮按钮和画面调节窗口</string>
     <string name="dev_perm_accessibility">无障碍服务</string>
     <string name="dev_perm_accessibility_why">用于开机自启动</string>
     <string name="dev_perm_usage_access">使用情况访问</string>

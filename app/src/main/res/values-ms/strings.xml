@@ -87,7 +87,7 @@
     <string name="set_reset_floating_title">Set semula butang terapung</string>
     <string name="set_reset_floating_summary">Memulihkan kedudukan, saiz butang dan saiz teks masa kepada lalai</string>
     <string name="set_auto_start_title">Mula semasa but</string>
-    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan Cermin super, butang terapung dan rakaman automatik jika dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
+    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan Cermin super, Paparan titik buta, butang terapung dan rakaman automatik jika dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka, dan menyambung rakaman yang berhenti kerana skrin padam apabila skrin hidup semula; rakaman yang anda hentikan tidak dimulakan semula</string>
     <string name="set_screen_off_title">Rakaman skrin padam (kekal berjaga)</string>
@@ -843,7 +843,7 @@
     <string name="dev_perm_all_files">Akses semua fail</string>
     <string name="dev_perm_all_files_why">Digunakan untuk membaca dan menulis fail pada pemacu USB</string>
     <string name="dev_perm_overlay">Paparan di atas apl lain</string>
-    <string name="dev_perm_overlay_why">Digunakan oleh Cermin super, butang terapung dan tetingkap pelarasan imej</string>
+    <string name="dev_perm_overlay_why">Digunakan oleh Cermin super, Paparan titik buta, butang terapung dan tetingkap pelarasan imej</string>
     <string name="dev_perm_accessibility">Perkhidmatan kebolehcapaian</string>
     <string name="dev_perm_accessibility_why">Digunakan oleh Mula semasa but</string>
     <string name="dev_perm_usage_access">Akses penggunaan</string>

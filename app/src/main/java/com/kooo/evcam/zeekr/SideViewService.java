@@ -80,8 +80,14 @@ public class SideViewService extends Service {
     private boolean restoreBufferOnFrame;
     private boolean listening;
     private boolean destroyed;
-    /** 相机层拒绝了盲区画面（共享预览流挂不下、会话配不上）：这一趟服务不再挂，设置里关了再开、或者应用重启才重来。 */
-    private boolean unavailable;
+    /**
+     * 这一段不带盲区画面：相机层这一回丢了它（共享预览流挂不下、会话配不上时它最先让路，JPEG 之后），或者窗口挂不上。
+     * 到窗口本来就该移走为止（离开 D 挡 30 秒、熄屏、原厂画面出现）不再挂，下一次再挂时重试 —— 一段里最多一次，
+     * 调度不会一直想把它加回去；配不上多半是一时的，不该从此不显示（ultracode 审查 core-1）。
+     */
+    private boolean refused;
+    /** 这一段里打灯时已经提示过一次「无法显示盲区画面」。 */
+    private boolean refusalShown;
     private int retryCount;
     private Runnable retryRunnable;
     private Runnable watchdog;
@@ -137,7 +143,7 @@ public class SideViewService extends Service {
         }
         SideViewWindow w = svc.window;
         SingleCamera camera = svc.boundCamera;
-        return "side view: listening=" + svc.listening + " unavailable=" + svc.unavailable
+        return "side view: listening=" + svc.listening + " refused=" + svc.refused
                 + " window=" + (w == null ? "none" : w.describe())
                 + " boundCamera=" + (camera != null ? camera.getCameraId() : "none")
                 + " claimed=" + CameraNeeds.current().isHeld(CameraNeeds.Holder.SIDE_VIEW)
@@ -222,8 +228,22 @@ public class SideViewService extends Service {
         in.speedKmh = s.speedKmh;
         in.minSpeedKmh = appConfig.getSideViewMinSpeed();
         long now = SystemClock.uptimeMillis();
-        SideViewTrigger.Result result = trigger.update(now, in, ScreenState.dark() || unavailable);
-        apply(result, in);
+        SideViewTrigger.Result result = trigger.update(now, in, ScreenState.dark());
+        if (refused && !result.attached) {
+            // 这一段过去了（离开 D 挡 30 秒、熄屏、原厂画面）：下一次挂窗口时重试
+            refused = false;
+            refusalShown = false;
+            BlackBox.note("盲区画面：不带它的这一段结束，下一次挂窗口时重试");
+        }
+        if (refused) {
+            if (result.shown && !refusalShown) {
+                // 打了灯却显示不了：说一句，这一段只说一次
+                refusalShown = true;
+                showRefusal();
+            }
+        } else {
+            apply(result, in);
+        }
         if (result.wakeAt > 0) {
             handler.postAtTime(evaluateRunnable, result.wakeAt);
         }
@@ -234,7 +254,6 @@ public class SideViewService extends Service {
         if (!result.attached) {
             if (w != null) {
                 BlackBox.note("盲区画面：移走窗口（" + (ScreenState.dark() ? "熄屏"
-                        : unavailable ? "相机层拒绝了盲区画面"
                         : SideViewDecision.factoryViewActive(in) ? "原厂画面在：挡位 " + in.gear
                                 + "、原厂 360 " + in.stock360Shown + "、原厂小窗 " + in.stockPopupShown
                                 + "、泊车辅助 " + in.parkAssistOn
@@ -317,7 +336,15 @@ public class SideViewService extends Service {
             w.attachHidden(lane);
         }
         if (!w.isAttached()) {
+            // 窗口挂不上：这一段不再试（不然每来一次读数就再挂一次、记一行，ultracode 审查 service-2）；
+            // 悬浮窗权限没了就停下服务，和开着时没有权限一样
             window = null;
+            boolean permitted = WakeUpHelper.hasOverlayPermission(this);
+            BlackBox.noteImportant("盲区画面：窗口挂不上" + (permitted ? "，这一段不再挂" : "，没有悬浮窗权限，服务停下"));
+            refuse();
+            if (!permitted) {
+                stopSelf();
+            }
             return;
         }
         takeBackKeptCanvas();
@@ -391,10 +418,16 @@ public class SideViewService extends Service {
         if (w.isShowing()) {
             noteIfNoFrame();
         }
+        // 窗口还没走过第一次布局就要移走：TextureView 没挂上过，不会来 onSurfaceTextureDestroyed ——
+        // 接回来的画布要自己交给管线，不然它没人管（ultracode 审查 service-1）
+        SurfaceTexture orphan = w.getTextureView().isAttachedToWindow() ? null : w.getTextureView().getSurfaceTexture();
         unbindCamera();
         withdrawOutput();
         window = null;
         w.detach();
+        if (orphan != null && !orphan.isReleased() && !handCanvasToPipeline(orphan)) {
+            orphan.release();
+        }
     }
 
     private void noteShown() {
@@ -487,7 +520,7 @@ public class SideViewService extends Service {
 
     /**
      * 相机层丢了盲区画面（调度在主线程上派发）：共享预览流挂不下、或者会话配不上时它最先让路（JPEG 之后），
-     * 预览、超级镜子、录像不受影响。这一趟服务不再挂（不然调度会一直想把它加回去，一次次重建环视会话）。
+     * 预览、超级镜子、录像不受影响。这一段不再挂（{@link #refused}），不然调度会一直想把它加回去，一次次重建环视会话。
      */
     private void onSideDropped(SingleCamera camera, SurfaceTexture texture, SingleCamera.Drop why) {
         if (destroyed || camera != boundCamera || texture != boundTexture) {
@@ -497,9 +530,21 @@ public class SideViewService extends Service {
             AppLog.w(TAG, "盲区画面的画布离开了会话（" + why + "）");
             return;
         }
-        unavailable = true;
-        BlackBox.noteImportant("盲区画面：相机层挂不下这块画布，这一趟不再显示（设置里关了再开、或者应用重启后重试）");
+        BlackBox.noteImportant("盲区画面：相机层这一回不带它（共享预览流挂不下或会话配不上），这一段不再挂"
+                + "（离开 D 挡 30 秒、熄屏或原厂画面之后再试）");
+        refuse();
+    }
+
+    /** 这一段不带盲区画面（{@link #refused}）：放开登记、撤回、移走窗口；正打着灯的话当场说一句。 */
+    private void refuse() {
+        refused = true;
+        refusalShown = false;
         detachWindow();
+        // 不在这里直接判：可能正在 apply 里（窗口挂不上）
+        handler.post(evaluateRunnable);
+    }
+
+    private void showRefusal() {
         try {
             android.widget.Toast.makeText(com.kooo.evcam.settings.Languages.localized(this),
                     R.string.msg_side_view_unavailable, android.widget.Toast.LENGTH_LONG).show();

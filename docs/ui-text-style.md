@@ -180,6 +180,8 @@
   set_side_view_summary「打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。」；
   set_side_view_min_speed_title「最低车速」、_summary「低于此车速时不显示；0 为不限」；side_view_close（关闭按钮的无障碍描述）「关闭盲区画面」；
   msg_side_view_unavailable「无法显示盲区画面」；开发者选项 dev_side_view_back / _up / _fov 的标题「盲区画面朝后角度」「盲区画面朝外角度」「盲区画面视野角度」和说明。
+  顺带改的两条（列举悬浮窗功能处加上「盲区画面」）：set_auto_start_summary「…并恢复已开启的超级镜子、盲区画面、悬浮按钮和自动录制。…」；
+  dev_perm_overlay_why「用于超级镜子、盲区画面、悬浮按钮和画面调节窗口」。
 
 ---
 

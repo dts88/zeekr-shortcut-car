@@ -87,7 +87,7 @@
     <string name="set_reset_floating_title">Reset floating button</string>
     <string name="set_reset_floating_summary">Restores the default position, button size and time text size</string>
     <string name="set_auto_start_title">Start on boot</string>
-    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores Super mirror, the floating button and auto-recording if they were on. When off, it isn\'t restarted.</string>
+    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores Super mirror, Blind spot view, the floating button and auto-recording if they were on. When off, it isn\'t restarted.</string>
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <string name="set_screen_off_title">Screen-off recording (keep awake)</string>
@@ -862,7 +862,7 @@
     <string name="dev_perm_all_files">All files access</string>
     <string name="dev_perm_all_files_why">Used to read and write files on USB drives</string>
     <string name="dev_perm_overlay">Overlay</string>
-    <string name="dev_perm_overlay_why">Used by Super mirror, the floating button and the image adjustment window</string>
+    <string name="dev_perm_overlay_why">Used by Super mirror, Blind spot view, the floating button and the image adjustment window</string>
     <string name="dev_perm_accessibility">Accessibility service</string>
     <string name="dev_perm_accessibility_why">Used by Start on boot</string>
     <string name="dev_perm_usage_access">Usage access</string>

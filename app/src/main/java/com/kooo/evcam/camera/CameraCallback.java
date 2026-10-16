@@ -80,8 +80,9 @@ public interface CameraCallback {
 
     /**
      * 会话里的一样输出被相机层自己丢了：消费者已被系统收走（建会话前查出来，或者建会话时报 Surface abandoned 查出来），
-     * 或者会话配不上、按 JPEG → 后视镜 → 录像的次序丢到了它。调度改输出、关相机摘掉的不走这里（那是调度自己做的）。
-     * 丢的是录像输出时，调度要当场叫录像那一侧退出这一路（{@link SingleCamera#dropListener}）。
+     * 或者会话配不上、按 JPEG → 盲区画面 → 后视镜 → 录像的次序丢到了它（共享预览流挂不下时也不带盲区画面）。
+     * 调度改输出、关相机摘掉的不走这里（那是调度自己做的）。丢的是录像、盲区画面输出时，调度当场告诉声明它的那一侧
+     * （{@link SingleCamera#dropListener}）：录像那一路退出，盲区画面这一段不再挂。
      */
     default void onOutputDropped(String cameraId, ChannelRules.Out out, SingleCamera.Drop why) {
     }
