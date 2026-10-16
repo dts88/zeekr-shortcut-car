@@ -162,6 +162,70 @@ public class ChannelRulesTest {
     }
 
     /**
+     * 通道眼里的熄屏（项目所有者 2026-10-13「黑满 30 秒再放」）：屏幕黑满 30 秒（和「保持 30 秒」同一个数）、或者车机要睡
+     * （黑着时安卓也熄屏了）才算黑；黑了不到 30 秒照亮着算。起点不明按满 30 秒算。还要多久才算黑，调度照它到点醒。
+     */
+    @Test
+    public void theChannelCallsItDarkOnlyAfterThirtySecondsOrWhenTheHeadUnitSleeps() {
+        assertFalse("亮着", ChannelRules.darkForChannel(false, -1, false));
+        assertFalse("刚黑", ChannelRules.darkForChannel(true, 0, false));
+        assertFalse("10-13 20:10:11 车门开关的那 4.7 秒", ChannelRules.darkForChannel(true, 4_700, false));
+        assertFalse("29.999 秒", ChannelRules.darkForChannel(true, ChannelRules.HOLD_MS - 1, false));
+        assertTrue("黑满 30 秒", ChannelRules.darkForChannel(true, ChannelRules.HOLD_MS, false));
+        assertTrue("起点不明：按满 30 秒算", ChannelRules.darkForChannel(true, -1, false));
+        assertTrue("车机要睡：不等 30 秒", ChannelRules.darkForChannel(true, 5_000, true));
+        assertTrue(ChannelRules.darkForChannel(true, -1, true));
+
+        assertEquals("亮着不等", -1, ChannelRules.untilDarkForChannel(false, -1, false));
+        assertEquals(ChannelRules.HOLD_MS, ChannelRules.untilDarkForChannel(true, 0, false));
+        assertEquals(ChannelRules.HOLD_MS - 4_700, ChannelRules.untilDarkForChannel(true, 4_700, false));
+        assertEquals(1, ChannelRules.untilDarkForChannel(true, ChannelRules.HOLD_MS - 1, false));
+        assertEquals("已经算黑了", -1, ChannelRules.untilDarkForChannel(true, ChannelRules.HOLD_MS, false));
+        assertEquals("起点不明", -1, ChannelRules.untilDarkForChannel(true, -1, false));
+        assertEquals("车机要睡", -1, ChannelRules.untilDarkForChannel(true, 5_000, true));
+    }
+
+    /**
+     * 屏幕真黑了、还不到 30 秒（{@link World#screenDark}，通道照亮着算）：开着的座舱照旧，关着的不在黑屏里开、算熄屏放开 ——
+     * 「30 秒内一步不动」（项目所有者 2026-10-13）。这时来的录像只开环视（和 2.11.2 一样）；黑满 30 秒时没有座舱可放，
+     * 什么都不动；亮了座舱照常一路一路开。
+     */
+    @Test
+    public void aClosedCabinIsNotOpenedWhileTheScreenIsDarkButNotYetThirtySeconds() {
+        w.screenDark = true;
+        assertTrue("关着的座舱不开：算放开", ChannelRules.releasedByDark(w, rear));
+        assertTrue(ChannelRules.releasedByDark(w, front));
+        assertFalse("环视照登记表", ChannelRules.releasedByDark(w, surround));
+        rear.device = Device.OPEN;
+        assertFalse("开着的照旧", ChannelRules.releasedByDark(w, rear));
+        rear.device = Device.OPENING;
+        assertFalse("在开的照旧开完", ChannelRules.releasedByDark(w, rear));
+        rear.device = Device.CLOSED;
+
+        planAll();
+        surround.declared.add(recS);
+        rear.declared.add(recR);
+        front.declared.add(recF);
+        claim(Holder.RECORDING);
+        assertEquals(Move.IDLE, run().move);
+        assertEquals("只开了环视", 1, done.size());
+        assertEquals(Move.OPEN, done.get(0).move);
+        assertEquals(Collections.singletonList(SUR), done.get(0).keys);
+        assertTrue(rear.device == Device.CLOSED && front.device == Device.CLOSED);
+
+        w.screenOn = false;
+        assertEquals("黑满 30 秒：没有座舱可放，什么都不动", Move.IDLE, run().move);
+        assertEquals(1, done.size());
+
+        w.screenOn = true;
+        w.screenDark = false;
+        assertEquals(Move.IDLE, run().move);
+        assertEquals("亮了：后座舱、前座舱一路一路开", 3, done.size());
+        assertEquals(Collections.singletonList(REAR), done.get(1).keys);
+        assertEquals(Collections.singletonList(FRONT), done.get(2).keys);
+    }
+
+    /**
      * 录像留着一路的录像输出（录制器）：RECORDING 登记着、这一路在计划里 —— 熄屏放开的座舱也留着（停放过夜，亮屏同一个录制器
      * 接回）；停了录、不在计划里就不留（设计 v3.1 C13）。
      */
@@ -310,7 +374,8 @@ public class ChannelRulesTest {
 
     /**
      * §7.1 每一路各自算（项目所有者 2026-10-11）：只开超级后视镜、主界面最小化时，两路座舱各自保持 30 秒，
-     * 30 秒内回到主界面通道零变动；超过 30 秒只关两路座舱，环视留给后视镜。
+     * 30 秒内回到主界面通道零变动；超过 30 秒两路座舱关，环视留给后视镜 —— 2.11.6 起（项目所有者 2026-10-15）先单独关环视，
+     * 座舱关完它照常开回来给后视镜（关座舱前先关环视）。
      */
     @Test
     public void eachLaneHoldsOnItsOwn() {
@@ -339,8 +404,19 @@ public class ChannelRulesTest {
         at(25_000 + ChannelRules.HOLD_MS);
         Decision d = round();
         assertEquals(Move.CLOSE, d.move);
-        assertEquals("只关座舱，环视留给后视镜", Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals("关座舱前先关环视", Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        perform(d);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals("座舱保持到点，一起关", Arrays.asList(REAR, FRONT), d.keys);
         assertEquals(Why.HOLD_OVER, d.why);
+        perform(d);
+        d = round();
+        assertEquals("环视留给后视镜：照常开回来", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(EnumSet.of(Holder.MIRROR), d.forWhom);
+        assertEquals("留着的预览不带回来", set(mirror), d.outputs);
     }
 
     // ================================================================= 顺序
@@ -427,13 +503,17 @@ public class ChannelRulesTest {
         assertEquals(ChannelRules.CLOSE_CABINS_MAX_MS, d.maxMs);
     }
 
-    /** 环视关卡住了：10 秒到点不再等它，接着关座舱。 */
+    /**
+     * 环视关卡住了：10 秒到点不再等它，接着关座舱。相机层还报着它在关（closingSince）也一样 —— 我们按次序关的那一步照 §二.2 的封顶，
+     * 「在关一个设备就是在途」（2.11.4 第 1c 项）不管它（{@link #aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut}）。
+     */
     @Test
     public void aStuckSurroundCloseStopsHoldingTheCabinsAfterTenSeconds() {
         w.foregroundService = false;
         streamingAll();
         Decision d = round();
         startOnly(d);
+        assertTrue("相机层登记着在关", surround.closingSince != 0);
         at(ChannelRules.CLOSE_SURROUND_MAX_MS - 1);
         assertEquals(Outcome.RUNNING, ChannelRules.outcome(w));
         assertWait(Why.STEP, SUR, round());
@@ -452,6 +532,329 @@ public class ChannelRulesTest {
         Decision d = round();
         assertEquals(Move.CLOSE, d.move);
         assertEquals(Collections.singletonList(SUR), d.keys);
+    }
+
+    // ================================================================= 关座舱前先关环视（项目所有者 2026-10-15 定，2.11.6）
+
+    /**
+     * 10-14 21:52:20（A7）的形状：三路在录、主界面在后台（前台服务是主界面在前时起的：能用相机），屏幕黑满 30 秒放开座舱。
+     * 以前座舱在开着的环视旁边关，环视停在前座舱关完那一帧前后、救了 42 秒；现在先单独关环视（10 秒封顶），座舱等它关完再一起关
+     * （熄屏：座舱放开），座舱关完「开」那一步照常把环视开回来、带着它停放着的录像输出。三步都是这里出的普通一步；
+     * 登记表一样没变（谁要它都没变：录像要它），救援梯子一次都没算。
+     */
+    @Test
+    public void replay1014_aDarkReleaseClosesTheSurroundFirstThenTheCabinsThenOpensItAgain() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        assertEquals(Move.IDLE, round().move);
+        Set<Holder> holders = EnumSet.copyOf(w.holders);
+        int needsVersion = w.needsVersion;
+
+        w.screenOn = false;   // 黑满 30 秒
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals("先单独关环视", Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        assertEquals("环视单独关的封顶照旧", ChannelRules.CLOSE_SURROUND_MAX_MS, d.maxMs);
+        startOnly(d);
+        at(50);
+        assertWait(Why.STEP, SUR, round());
+        at(150);
+        closed(surround);
+        serviceSays(surround, true, true);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals("座舱等环视关完，再一起关", Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals("原因照座舱自己的", Why.DARK_RELEASE, d.why);
+        assertEquals(ChannelRules.CLOSE_CABINS_MAX_MS, d.maxMs);
+        startOnly(d);
+        at(250);
+        closed(rear);
+        closed(front);
+        serviceSays(rear, true, true);
+        serviceSays(front, true, true);
+        d = round();
+        assertEquals("座舱关完：开那一步照常开回环视", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.WANTED, d.why);
+        assertEquals(EnumSet.of(Holder.RECORDING), d.forWhom);
+        assertEquals("带着停放着的录制器的录像输出", set(recS), d.outputs);
+        startOnly(d);
+        at(450);
+        opened(surround, d.outputs);
+        frame(surround);
+        assertEquals(Move.IDLE, round().move);
+
+        assertEquals(3, done.size());
+        assertEquals("登记表没动", holders, w.holders);
+        assertEquals(needsVersion, w.needsVersion);
+        assertEquals("救援梯子一次都没算", 0, surround.ladder.attempts());
+        assertFalse(surround.lostForRescue);
+        assertNull(surround.mark);
+        assertTrue(ChannelRules.streaming(surround));
+        assertTrue("座舱照旧熄屏放开", ChannelRules.releasedByDark(w, rear) && rear.device == Device.CLOSED);
+    }
+
+    /**
+     * 10-15 07:42:42（车主的测试 A 第 2 次）的形状：三路录过一段、停了录（录像输出留在会话里），超级后视镜开着、主界面最小化 ——
+     * 两路座舱各自保持 30 秒，环视留给后视镜。以前到点座舱在环视旁边关，环视在开始关后 60 ms 停了、救了约 45 秒；现在先单独关环视，
+     * 座舱保持到点一起关，环视照常开回来给后视镜 —— 只带后视镜：停录后留着的录像输出、最小化后留着的预览都跟着那一关走了。
+     */
+    @Test
+    public void replay1015_aHoldExpiryBesideTheMirrorClosesTheSurroundFirst() {
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror, recS);
+        streaming(rear, pvR, recR);
+        streaming(front, pvF, recF);
+        assertEquals(Move.IDLE, round().move);
+        drop(Holder.PREVIEW);   // 07:42:12 最小化：只剩后视镜要环视
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(Arrays.asList(REAR, FRONT), event(Event.Type.HOLD_STARTED).keys);
+
+        at(ChannelRules.HOLD_MS - 1);
+        assertEquals(Move.IDLE, round().move);
+        at(ChannelRules.HOLD_MS);
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        perform(d);
+        d = round();
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.HOLD_OVER, d.why);
+        perform(d);
+        d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(EnumSet.of(Holder.MIRROR), d.forWhom);
+        assertEquals(set(mirror), d.outputs);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("登记表没动", EnumSet.of(Holder.MIRROR), w.holders);
+        assertEquals(0, surround.ladder.attempts());
+        assertEquals(set(mirror), surround.session);
+    }
+
+    /**
+     * 此刻用不了相机（主界面不在前、前台服务是后台起的）：环视关了开不回来 —— 照旧，座舱在开着的环视旁边关（项目所有者 2026-10-15 定的例外）。
+     */
+    @Test
+    public void theCabinsCloseBesideTheSurroundWhileTheCameraCannotBeUsed() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        assertEquals(Move.IDLE, round().move);
+        w.cameraUsable = false;
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals("座舱在环视旁边关", Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.DARK_RELEASE, d.why);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("环视一步不动", 0, count(Move.CLOSE, surround) + count(Move.OPEN, surround));
+        assertEquals(set(recS), surround.session);
+    }
+
+    /** 开相机报过「用不了」、要等主界面回到前台的（{@link World#unusableSince}）也算此刻用不了：保持到点的座舱照旧在环视旁边关。 */
+    @Test
+    public void theCabinsCloseBesideTheSurroundWhileAnOpenReportedTheCameraUnusable() {
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        assertEquals(Move.IDLE, round().move);
+        drop(Holder.PREVIEW);
+        assertEquals(Move.IDLE, round().move);
+        w.unusableSince = w.now;
+        at(ChannelRules.HOLD_MS);
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.HOLD_OVER, d.why);
+    }
+
+    /**
+     * 环视自己只在保持（没人要、还不到 30 秒）而座舱先到点：先单独关它（关座舱前先关环视），它的保持跟着结束 —— 保持要开着，
+     * 关了就不再开回来。环视自己也不该开了（没人要、没有前台服务不保持）：照旧它先单独关（原因照它自己的），座舱再关，谁都不开回来。
+     */
+    @Test
+    public void anUnwantedSurroundClosesFirstAndIsNotOpenedAgain() {
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        assertEquals(Move.IDLE, round().move);
+        drop(Holder.PREVIEW);
+        assertEquals(Move.IDLE, round().move);
+        at(10_000);
+        drop(Holder.MIRROR);   // 后视镜 10 秒后才收起：环视的保持晚 10 秒到点
+        assertEquals(Move.IDLE, round().move);
+        assertTrue(ChannelRules.holding(w, surround));
+        at(ChannelRules.HOLD_MS);
+        Decision d = round();
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals("座舱先到点：保持着的环视先单独关", Why.SURROUND_FIRST, d.why);
+        perform(d);
+        serviceSays(surround, true, true);
+        d = round();
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.HOLD_OVER, d.why);
+        perform(d);
+        serviceSays(rear, true, true);
+        serviceSays(front, true, true);
+        assertEquals("保持要开着：环视不再开回来", Move.IDLE, round().move);
+        at(ChannelRules.HOLD_MS + 20_000);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(0, count(Move.OPEN));
+
+        // 没人要、也不保持（前台服务不在）：环视先单独关，原因是它自己的，座舱再关，谁都不开回来
+        w.foregroundService = false;
+        claim(Holder.PREVIEW);
+        streamingAll();
+        assertEquals(Move.IDLE, round().move);
+        drop(Holder.PREVIEW);
+        d = round();
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.UNWANTED, d.why);
+        perform(d);
+        d = round();
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.UNWANTED, d.why);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(0, count(Move.OPEN));
+    }
+
+    /**
+     * 不是这里出的关不走「先关环视」（项目所有者 2026-10-15）：救援重开一路座舱（相机层先关它的旧设备）、一路座舱丢了（报错之后那一次关）
+     * 都不动环视。
+     */
+    @Test
+    public void rescueAndLossClosesOfACabinLeaveTheSurroundAlone() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(front, recF);
+        rear.declared.add(recR);
+        rear.device = Device.OPEN;
+        rear.deviceSince = w.now;
+        configured(rear, set(recR));   // 配好了，一帧不出
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        perform(d);
+
+        at(1_000);
+        ChannelRules.lossStarted(w, front, CameraTaken.Reason.ofDeviceError(DEVICE_ERROR));
+        front.busySince = w.now;
+        assertWait(Why.LOSING, FRONT, round());
+        at(3_000);
+        serviceSays(front, true, true);
+        ChannelRules.lossClosed(w, front);
+        closed(front);
+        at(3_300);
+        d = round();
+        assertEquals(CameraTaken.Verdict.ORDINARY, event(Event.Type.JUDGED).verdict);
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("环视一步都没动", 0, count(Move.CLOSE, surround) + count(Move.OPEN, surround));
+        assertEquals(0, count(Move.CLOSE));
+    }
+
+    /**
+     * 环视自己在救援梯子上（开着、8 秒没进展、救过一次没好）：计划里的关座舱照旧在它旁边关 —— 关了它，就只能由救援按梯子的节奏重开
+     * （还要白算次数），不是「开」那一步照常开回来；它此刻本来也没在出画面。
+     */
+    @Test
+    public void aSurroundOnTheRescueLadderIsNotClosedFirst() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        surround.progressAgeMs = CameraLiveness.STUCK_MS + 4_000;
+        CameraLiveness.step(surround.ladder, true, Long.MAX_VALUE, T0 - 4_000);   // 救过一次
+        assertTrue(ChannelRules.rescuing(surround));
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.DARK_RELEASE, d.why);
+    }
+
+    /** 环视那一步 10 秒到点没关完（相机服务卡住）：座舱照旧不再等它、一起关；环视关完了，开那一步再把它开回来，不算救援。 */
+    @Test
+    public void aStuckSurroundFirstCloseStillLetsTheCabinsGoAndTheSurroundComesBackOnceClosed() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        assertEquals(Move.IDLE, round().move);
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        startOnly(d);
+        at(ChannelRules.CLOSE_SURROUND_MAX_MS - 1);
+        assertWait(Why.STEP, SUR, round());
+        at(ChannelRules.CLOSE_SURROUND_MAX_MS);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.DARK_RELEASE, d.why);
+        perform(d);
+        serviceSays(rear, true, true);
+        serviceSays(front, true, true);
+        assertEquals("环视还在关：不开它", Move.IDLE, round().move);
+        at(ChannelRules.CLOSE_SURROUND_MAX_MS + 4_000);
+        closed(surround);
+        serviceSays(surround, true, true);
+        d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(set(recS), d.outputs);
+        assertEquals(0, surround.ladder.attempts());
+    }
+
+    /** 环视关的时候人回到了主界面（座舱又有人要了）：座舱不关，环视照常开回来 —— 不多关一次。 */
+    @Test
+    public void cabinsWantedAgainWhileTheSurroundClosesStayOpenAndTheSurroundComesBack() {
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        assertEquals(Move.IDLE, round().move);
+        drop(Holder.PREVIEW);
+        assertEquals(Move.IDLE, round().move);
+        at(ChannelRules.HOLD_MS);
+        Decision d = round();
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        startOnly(d);
+        at(ChannelRules.HOLD_MS + 100);
+        claim(Holder.PREVIEW);   // 回到主界面
+        closed(surround);
+        serviceSays(surround, true, true);
+        d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(set(pvS, mirror), d.outputs);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("座舱一次都没关", 0, count(Move.CLOSE, rear) + count(Move.CLOSE, front));
     }
 
     /** §二.3：环视 → 后座舱 → 前座舱，上一路出第一帧、或者满 15 秒，才开下一路；满 15 秒的由救援接手、算第 1 次。 */
@@ -605,8 +1008,9 @@ public class ChannelRulesTest {
     // ================================================================= 减输出能拖就拖（§二.4）
 
     /**
-     * 不要了的活输出留在会话里，不为它改会话：主界面最小化、录像照录，预览画布还活着、没人要了 —— 一步都不动。熄屏以后环视照旧
-     * 带着它录（会话一次都不改），两路座舱熄屏放开、一起关（项目所有者 2026-10-12 D2）。
+     * 不要了的活输出留在会话里，不为它改会话：主界面最小化、录像照录，预览画布还活着、没人要了 —— 一步都不动。熄屏以后两路座舱
+     * 熄屏放开（项目所有者 2026-10-12 D2）：2.11.6 起先单独关环视（关座舱前先关环视），座舱一起关，环视开回来接着录 ——
+     * 留着的预览是「下一次本来要动、或者关相机时一起摘」的那一种，跟着这一关走了，开回来只带要的录像输出；会话一次都没为它改过。
      */
     @Test
     public void aLiveOutputNobodyWantsStaysInTheSession() {
@@ -624,20 +1028,30 @@ public class ChannelRulesTest {
         w.screenOn = false;
         Decision d = round();
         assertEquals(Move.CLOSE, d.move);
+        assertEquals("关座舱前先关环视", Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        assertNull("熄屏不保持", event(Event.Type.HOLD_STARTED));
+        perform(d);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
         assertEquals("座舱一起关", Arrays.asList(REAR, FRONT), d.keys);
         assertEquals(Why.DARK_RELEASE, d.why);
         assertEquals(ChannelRules.CLOSE_CABINS_MAX_MS, d.maxMs);
-        assertNull("熄屏不保持", event(Event.Type.HOLD_STARTED));
+        perform(d);
+        d = round();
+        assertEquals("环视开回来接着录", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals("留着的预览跟着那一关走了：只带要的", set(recS), d.outputs);
         perform(d);
         assertEquals(Move.IDLE, round().move);
-        assertEquals("环视一步不动", 0, count(Move.APPLY, surround) + count(Move.CLOSE, surround));
-        assertEquals(set(pvS, recS), surround.session);
+        assertEquals("会话一次都没为它改过", 0, count(Move.APPLY));
+        assertEquals(set(recS), surround.session);
         assertEquals(ChannelRules.OutState.WANTED, ChannelRules.outState(w, surround, recS));
     }
 
     /**
-     * 录着三路熄屏：座舱一起关，环视照录；亮屏：座舱按开的次序一路一路回来（后座舱 → 前座舱），带着各自停放着的录制器的
-     * 录像输出开 —— 不多改一次输出。
+     * 录着三路熄屏：环视先单独关（关座舱前先关环视，2.11.6），座舱一起关，环视开回来接着录；亮屏：座舱按开的次序一路一路回来
+     * （后座舱 → 前座舱），带着各自停放着的录制器的录像输出开 —— 不多改一次输出。
      */
     @Test
     public void theCabinsLeaveAtDarkAndComeBackOneAtATimeWithTheirRecordersWhenLit() {
@@ -650,6 +1064,11 @@ public class ChannelRulesTest {
 
         w.screenOn = false;
         Decision d = round();
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        perform(d);
+        serviceSays(surround, true, true);
+        d = round();
         assertEquals(Arrays.asList(REAR, FRONT), d.keys);
         assertEquals(Why.DARK_RELEASE, d.why);
         perform(d);
@@ -657,6 +1076,11 @@ public class ChannelRulesTest {
         // OWN_WORD_GRACE_MS 就只能算别人拿着（recognize），两路座舱被记成 TAKEN，亮屏也不开
         serviceSays(rear, true, true);
         serviceSays(front, true, true);
+        d = round();
+        assertEquals("环视开回来，带着它的录像输出接着录", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(set(recS), d.outputs);
+        perform(d);
         at(60_000);
         assertEquals("熄屏这段时间里什么都不动", Move.IDLE, round().move);
         assertTrue("录像输出还声明着（录制器停放着）", rear.declared.contains(recR));
@@ -680,7 +1104,8 @@ public class ChannelRulesTest {
         perform(d);
         assertEquals(Move.IDLE, round().move);
         assertEquals(0, count(Move.APPLY));
-        assertEquals("环视一步不动", 0, count(Move.CLOSE, surround) + count(Move.OPEN, surround));
+        assertEquals("环视只在座舱放开的那一下关了一次、开回来一次", 1, count(Move.CLOSE, surround));
+        assertEquals(1, count(Move.OPEN, surround));
     }
 
     /**
@@ -1394,6 +1819,177 @@ public class ChannelRulesTest {
         assertEquals(Move.RESCUE, d.move);
         assertEquals(Rescue.REOPEN, d.rescue);
         assertEquals(1, d.attempt);
+
+        // 缺了要的输出也一样：不改输出，第一次救就重开、带上它（2.11.4 第 1d 项）
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        surround.declared.add(recS);
+        at(CameraLiveness.RETRY_GAP_MS);
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(set(mirror, recS), d.outputs);
+        assertEquals(0, count(Move.APPLY));
+    }
+
+    // ================================================================= 本会话没出过画面的不改输出（2.11.4 第 1d 项）
+
+    /**
+     * 10-13 20:10 的回放（项目所有者 2026-10-14 批准：本会话没出过画面的，不改输出、不摘死输出；由救援重开时带上现在要的输出）：
+     * 后座舱只为录像开（主界面在后台），配好了、一帧不出；这 15 秒里主界面回到前台，要预览了。到点先开排在后面的前座舱，
+     * 再救后座舱：第 2 次、重开、带着预览和录像 —— 不在一帧不出的会话上改输出（那一下卡在 waitUntilIdle 4.8 秒、报错 4、
+     * 再关 6.2 秒，2.11.2 实测；10-12 20:04 环视、哨兵关着时也一样）。
+     */
+    @Test
+    public void replay1013_aSessionThatNeverFramedIsReopenedWithTheOutputsWantedNowNotReconfigured() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        rear.declared.add(recR);
+        front.declared.add(recF);
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(set(recR), d.outputs);
+        startOnly(d);
+        at(100);
+        opened(rear, d.outputs);   // 配好了，一帧不出
+        at(6_700);
+        claim(Holder.PREVIEW);     // 主界面回到前台：两路座舱要预览（环视的画布这里不声明，免得它也改一次输出）
+        rear.declared.add(pvR);
+        front.declared.add(pvF);
+        assertWait(Why.STEP, REAR, round());
+
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;   // 配好以来一点进展都没有
+        at(ChannelRules.STEP_MAX_MS);
+        d = round();
+        assertEquals("先往下走：排在后面的前座舱先开", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+        assertEquals(set(pvF, recF), d.outputs);
+        assertEquals("开那一步到点：后座舱算第 1 次", 1, rear.ladder.attempts());
+        perform(d);
+
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(2, d.attempt);
+        assertEquals("重开带上现在要的输出", set(pvR, recR), d.outputs);
+        assertEquals("一帧不出的会话不改输出", 0, count(Move.APPLY));
+    }
+
+    /** 本会话没出过画面的那一路，会话里的死输出也不摘：留给救援的重开丢掉（重开只带活着的、要的）。别的路照常。 */
+    @Test
+    public void aDeadOutputOnASessionThatNeverFramedIsLeftForTheReopenToDrop() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(front, pvF);
+        rear.declared.add(pvR);
+        Decision d = round();
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        startOnly(d);
+        at(100);
+        opened(rear, d.outputs);   // 配好了，一帧不出
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        at(ChannelRules.STEP_MAX_MS);
+        // 主界面换了一块画布：旧的那一块被系统收走（会话里那个死了），新的声明了
+        rear.dead.add(pvR);
+        rear.declared.remove(pvR);
+        Out pvR2 = new Out(Kind.PREVIEW, "preview-1b");
+        rear.declared.add(pvR2);
+        d = round();
+        assertEquals("不摘死输出，直接救", Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals("重开带新画布、丢掉死的", set(pvR2), d.outputs);
+        assertEquals(0, count(Move.APPLY));
+    }
+
+    /** 第一帧晚到了（开那一步已经到点）：本会话出过画面了，缺的输出照常由改输出加上，不重开。 */
+    @Test
+    public void aLateFirstFrameMakesTheSessionReconfigurableAgain() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(front, pvF);
+        rear.device = Device.OPEN;
+        rear.deviceSince = w.now;
+        configured(rear, set(Out.SINK));   // 只为拍照开着的那种：带出帧口，配好了，还没出过画面
+        rear.declared.add(pvR);
+        assertEquals("没出过画面：不改输出，也还不到救的时候", Move.IDLE, round().move);
+        at(3_000);
+        frame(rear);
+        Decision d = round();
+        assertEquals(Move.APPLY, d.move);
+        assertEquals(Why.MISSING, d.why);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(set(pvR), d.added);
+        assertEquals(set(Out.SINK), d.removed);
+    }
+
+    // ================================================================= 在关的设备是在途（2.11.4 第 1c 项）
+
+    /**
+     * 救援的重开那一步 15 秒到点、旧设备还在关（相机层报着在关）：照样是在途，别的路一步都不动（项目所有者 2026-10-14 批准：
+     * 在关旧设备的相机是在途，不管它属于哪一步，到点也不放过，封顶 60 秒 —— 和丢了之后的那一次关同一条规矩）。10-13 19:55:29
+     * 那一次关了 14.0 秒，离到点只差 1 秒；2.10.x 的强制重开关到过 21.4 秒。关完了、开新设备那一下是一个新动作，照常挡着；开好了别的路才动。
+     */
+    @Test
+    public void aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        w.recordPlan.add(REAR);
+        streaming(surround, recS);
+        rear.declared.add(recR);
+        rear.device = Device.OPEN;
+        rear.deviceSince = w.now;
+        configured(rear, set(recR));   // 配好了，一帧不出
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        startOnly(d);
+        // 相机层（SingleCamera.reopenWith）：旧设备从字段上摘下来、登记在关，关完才开新的
+        rear.closingSince = w.now;
+        rear.session.clear();
+        rear.sessionSince = 0;
+
+        // 这期间前座舱也要了：它排着
+        w.recordPlan.add(FRONT);
+        front.declared.add(recF);
+        assertWait(Why.STEP, REAR, round());
+        at(ChannelRules.STEP_MAX_MS);
+        d = round();
+        assertWait(Why.BUSY, REAR, d);
+        assertEquals(ChannelRules.IN_FLIGHT_MAX_MS - ChannelRules.STEP_MAX_MS, d.ms);
+        at(ChannelRules.STEP_MAX_MS + 5_000);
+        assertWait(Why.BUSY, REAR, round());
+        assertEquals("旧设备还在关：前座舱不开", 1, done.size());
+
+        // 旧设备关完了（20.0 秒），开新设备那一下上路：一个新动作，照常挡着
+        at(20_000);
+        rear.closingSince = 0;
+        rear.busySince = w.now;
+        assertWait(Why.BUSY, REAR, round());
+        at(20_300);
+        opened(rear, set(recR));
+        frame(rear);
+        d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+    }
+
+    /** 在关的设备一直关不完：最多挡 60 秒（在途封顶），之后别的路照常动。 */
+    @Test
+    public void anOldDeviceThatNeverFinishesClosingStopsHoldingAfterSixtySeconds() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        front.declared.add(pvF);
+        rear.closingSince = w.now;   // 晚到的设备在就地关（上一轮的相机线程上）
+        assertWait(Why.BUSY, REAR, round());
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertWait(Why.BUSY, REAR, round());
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
     }
 
     @Test
@@ -1959,6 +2555,7 @@ public class ChannelRulesTest {
             } else if (d.move == Move.CLOSE) {
                 lane.device = Device.CLOSING;
                 lane.deviceSince = w.now;
+                lane.closingSince = w.now;   // 照 SingleCamera.closeCamera：关那一下当场登记在关
             }
         }
     }
@@ -1991,6 +2588,7 @@ public class ChannelRulesTest {
         lane.device = Device.CLOSED;
         lane.deviceSince = w.now;
         lane.busySince = 0;
+        lane.closingSince = 0;
         lane.session.clear();
         lane.dead.clear();
         lane.sessionSince = 0;

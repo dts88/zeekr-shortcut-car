@@ -254,4 +254,44 @@ public class RecordingStopsTest {
         assertEquals(0, tally.midwayStops());
         assertFalse("下一段熄屏从零数", tally.anyStop());
     }
+
+    /**
+     * 开录等 U 盘（项目所有者 2026-10-13「U 盘一可用就开录」）：这台车机收不到 U 盘插拔广播，盘不能用拒了以后，
+     * 从第一次拒起头 2 分钟每 2 秒查一次，之后照旧 30 秒。查得勤的那一段里同一个原因不再告诉界面；过了那一段照旧每次都说。
+     * 等到了交出等了多久（开录那一行写），清掉；人停了、熄屏照表停了不再等。10-13 20:08:02.5 拒、09.5 时盘已经能用 ——
+     * 现在盘能用之后最多 2 秒就开，以前等到 33.4 秒那一次。
+     */
+    @Test
+    public void aStartWaitingForTheDiskChecksEveryTwoSecondsForTwoMinutes() {
+        long slow = 30_000L;
+        RecordingStops.DiskWait wait = new RecordingStops.DiskWait();
+        assertFalse(wait.waiting());
+        assertEquals("没在等盘：照旧", slow, wait.nextCheckMs(1_000L, slow));
+        assertEquals("没在等盘：没有等了多久", -1L, wait.ready(1_000L));
+
+        long t0 = 8_002_505L;
+        assertFalse("头一次拒：告诉界面", wait.refused(t0));
+        assertTrue(wait.waiting());
+        assertEquals(RecordingStops.DiskWait.FAST_EVERY_MS, wait.nextCheckMs(t0, slow));
+        assertTrue("2 秒后又拒：不再说", wait.refused(t0 + 2_000L));
+        assertEquals(RecordingStops.DiskWait.FAST_EVERY_MS, wait.nextCheckMs(t0 + 2_000L, slow));
+        assertTrue(wait.refused(t0 + RecordingStops.DiskWait.FAST_FOR_MS - 1));
+        assertEquals(RecordingStops.DiskWait.FAST_EVERY_MS,
+                wait.nextCheckMs(t0 + RecordingStops.DiskWait.FAST_FOR_MS - 1, slow));
+        assertFalse("2 分钟过了：照旧每次都说", wait.refused(t0 + RecordingStops.DiskWait.FAST_FOR_MS));
+        assertEquals("之后照旧 30 秒", slow, wait.nextCheckMs(t0 + RecordingStops.DiskWait.FAST_FOR_MS, slow));
+        assertFalse(wait.refused(t0 + RecordingStops.DiskWait.FAST_FOR_MS + slow));
+        assertEquals("起点不挪", RecordingStops.DiskWait.FAST_FOR_MS + slow + 7_000L,
+                wait.ready(t0 + RecordingStops.DiskWait.FAST_FOR_MS + slow + 7_000L));
+        assertFalse("等到了：清掉", wait.waiting());
+        assertEquals(-1L, wait.ready(t0 + 300_000L));
+
+        // 下一次等盘从头算；人停了不再等
+        assertFalse(wait.refused(t0 + 400_000L));
+        assertTrue(wait.refused(t0 + 402_000L));
+        wait.cancel();
+        assertFalse(wait.waiting());
+        assertEquals(slow, wait.nextCheckMs(t0 + 404_000L, slow));
+        assertFalse("不等了以后再拒：又是头一次", wait.refused(t0 + 406_000L));
+    }
 }

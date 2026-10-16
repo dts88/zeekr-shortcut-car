@@ -214,6 +214,10 @@ public final class CameraAvailabilityWatch {
             return;
         }
         boolean cameBack = cause == Cause.OTHERS && before.absent;
+        if (cameBack) {
+            // 没了又回来 = 车机重新初始化了它：这一台的来历从头数（2.11.5 第 D1 项，只记录）
+            StepLog.cameraReset(cameraId, CameraHistory.Reset.CAME_BACK);
+        }
         if (available) {
             BlackBox.noteImportant("相机服务: " + cameraId + " 空闲"
                     + (cause == Cause.INITIAL ? "（初始状态）"
@@ -478,6 +482,9 @@ public final class CameraAvailabilityWatch {
                 BlackBox.noteImportant("相机服务: " + fix.cameraId
                         + " 不在（初始状态：回放里没有它，相机服务的缓存里没有这一路）");
             } else if (asked && fix.changed()) {
+                if (fix.wasAbsent && !fix.nowAbsent()) {
+                    StepLog.cameraReset(fix.cameraId, CameraHistory.Reset.CAME_BACK);   // 问出来的「它回来了」，同上
+                }
                 BlackBox.noteImportant("问相机服务：表上 " + fix.cameraId + " "
                         + (fix.wasAbsent ? "不在" : Boolean.TRUE.equals(fix.before) ? "空闲" : "被占用")
                         + "，它现在" + (fix.nowAbsent() ? "没有这一路（相机服务的缓存里没有它）→ 记为不在"

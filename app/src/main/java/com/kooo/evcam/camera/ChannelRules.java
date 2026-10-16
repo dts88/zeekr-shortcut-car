@@ -43,9 +43,14 @@ import java.util.Set;
  *       新界面接回同一个 SurfaceTexture 就是同一个输出，通道零变动；没人接回的照「减输出能拖就拖」等下一次本来要动时摘。</li>
  * </ul>
  *
- * <p>项目所有者 2026-10-12（熄屏 v3，D2）：屏幕一黑，两路座舱谁都不要 —— 录像、预览、拍照一样不留，亮屏再回来；
- * 环视照登记表（熄屏持续录制那张表定它录不录）。只有一处判断：{@link #releasedByDark}。座舱这样比环视早关 3–6 分钟，
- * 「环视先关」只对连环视一起关的那几次（车机要睡、退出、没人要）还成立（D4 接受）。</p>
+ * <p>项目所有者 2026-10-12（熄屏 v3，D2）：屏幕一黑（2026-10-13 起是黑满 30 秒），两路座舱谁都不要 —— 录像、预览、拍照一样不留，亮屏再回来；
+ * 环视照登记表（熄屏持续录制那张表定它录不录）。只有一处判断：{@link #releasedByDark}。座舱这样比环视早关 3–6 分钟；
+ * 2.11.2–2.11.5 座舱就在开着的环视旁边关（D4 的例外）。项目所有者 2026-10-15 定（2.11.6）：计划里的关座舱，环视开着、此刻能用相机，
+ * 先单独关环视，座舱关完它照常开回来 —— 「环视单独开、单独关」对每一次计划里的关都成立（{@link #closeStep}、{@link Why#SURROUND_FIRST}）。
+ * 用不了相机时照旧（环视关了开不回来）。</p>
+ *
+ * <p>项目所有者 2026-10-13「黑满 30 秒再放」：通道眼里的熄屏是屏幕黑满 {@link #HOLD_MS}、或者车机要睡
+ * （{@link #darkForChannel}）—— 和「保持 30 秒」同一个数。不到 30 秒又亮了，通道零变动。</p>
  *
  * <p>§7.2（怎么算在开车）、§7.3（存储一类停了照旧接回）不在这一层。大纲 §7 末尾的四处解读：
  * ①「最后一句」不论多早说的、②同一次交接里被断开的另一路直接判 BLOCKED，都在 {@link CameraTaken#judge} 和这里的
@@ -70,6 +75,9 @@ public final class ChannelRules {
     /**
      * 没人要的一路，亮屏、前台服务在时留多久（§一「保持 30 秒」）。项目所有者 2026-10-09 定 30 秒：最小化、进诊断信息 / 回看，
      * 报告里 79% 在 30 秒内回来，这段时间里通道不动；2026-10-11 定每一路各自算（{@link #holding}）。
+     *
+     * <p>屏幕黑了也先留这么久（项目所有者 2026-10-13「黑满 30 秒再放」，{@link #darkForChannel}）：同一个数、同一个意思 ——
+     * 30 秒内回来，通道零变动。</p>
      */
     public static final long HOLD_MS = 30_000L;
 
@@ -260,6 +268,11 @@ public final class ChannelRules {
         long deviceSince;
         /** SingleCamera.isBusy() 从什么时候起（在开、在关、在配会话）；0 = 不忙。 */
         long busySince;
+        /**
+         * 相机层在关这一台相机的一个设备，从什么时候起（SingleCamera.closingSince）；0 = 没在关。每一种关都算：我们关的、丢了之后的关、
+         * 救援重开时关旧的、作废卡住的那一轮、晚到的设备就地关（2.11.4 起都登记成在关）。在途、手上那一步到点也不放过（{@link ChannelRules#next} 第 1 条）。
+         */
+        long closingSince;
         /** 会话里此刻带着的输出（SingleCamera.sessionOutputs() 的快照）；没有会话是空的。 */
         final Set<Out> session = new LinkedHashSet<>();
         /** 会话配好的时刻；0 = 没有会话。 */
@@ -345,8 +358,17 @@ public final class ChannelRules {
         final Set<String> recordPlan = new LinkedHashSet<>();
         /** 登记表每变一次（含停了再开录）调度在 CameraNeeds 的监听里 +1：几次变化并成一轮也认得出「变过」。 */
         int needsVersion;
+        /**
+         * 通道眼里屏幕亮着（{@link ChannelRules#darkForChannel} 的反面）：屏幕真黑了还不到 30 秒、车机也没要睡，照亮着算。
+         * 预览要不要、保持、熄屏放开座舱、关的原因、亮屏解除停手，读的都是它。
+         */
         boolean screenOn;
-        /** 最近一次亮屏的时刻（§7.4：亮屏解除停手）。 */
+        /**
+         * 屏幕真黑了（ScreenState.dark，物理屏幕）。黑了还不到 30 秒时 {@link #screenOn} 照亮着算，这时只有一件事看它：
+         * 关着的座舱不开（{@link ChannelRules#releasedByDark}）—— 「30 秒内一步不动」，也不在黑屏里去开它（项目所有者 2026-10-13）。
+         */
+        boolean screenDark;
+        /** 最近一次（通道眼里）亮屏的时刻（§7.4：亮屏解除停手）。黑了不到 30 秒又亮的，没黑过，不算。 */
         long screenOnAt;
         /** 前台服务在不在（CameraForegroundService.isRunning）：没有它就不保持 —— 后台拿着相机安卓要求有前台服务。 */
         boolean foregroundService;
@@ -437,7 +459,10 @@ public final class ChannelRules {
         STEP,
         /** 一路正被别人接手，我们这边的关还没关完。 */
         LOSING,
-        /** 一路 isBusy（在开、在关、在配会话）。 */
+        /**
+         * 一路 isBusy（在开、在关、在配会话）；或者它的相机层还在关一个设备（{@link Lane#closingSince}：重开时关旧的、晚到的设备就地关
+         * —— 手上那一步到点也照等，2.11.4 第 1c 项）。
+         */
         BUSY,
         /** 另一个管理器实例在关。 */
         OTHER_INSTANCE,
@@ -466,6 +491,12 @@ public final class ChannelRules {
          * 和 {@link #SCREEN_OFF} 分开，环视熄屏时关不写成「座舱放开」（设计 v3.1 C14）。
          */
         DARK_RELEASE,
+        /**
+         * 关座舱前先单独关环视（项目所有者 2026-10-15 定，2.11.6，{@link ChannelRules#closeStep}）：计划里要关座舱（熄屏放开、保持到点、
+         * 没人要），环视开着、还该开、此刻能用相机 —— 这一步只关环视。座舱接着一起关（原因照它们自己的），环视还有人要就由「开」那一步
+         * 照常开回来。只是一步的原因：登记表、谁要它都不变。
+         */
+        SURROUND_FIRST,
         /** 车机要睡。 */
         SLEEP,
         /** 退出。 */
@@ -765,6 +796,11 @@ public final class ChannelRules {
     /**
      * 手上那一步结束了（做完、出事、到点）：清掉它。到点的那一路，同一个动作还挂着也不再挡别的路（「先往下走」）；
      * 开那一步满 15 秒没出画面，由救援接手、算第 1 次（从这一步开始的那一刻算，和救援自己记的那一下同一个意思）。
+     *
+     * <p>「不再挡」只放过那个动作本身（{@link Lane#excusedBusySince}），不放过相机层在关的设备（{@link Lane#closingSince}）：
+     * 一台还在关旧设备的相机是在途，不管它属于哪一步，到点也照等，封顶 {@link #IN_FLIGHT_MAX_MS}（{@link #next} 第 1 条；
+     * 项目所有者 2026-10-14 批准，2.11.4 第 1c 项）。以前救援的重开 15 秒到点、旧设备还在关（10-13 19:55:29 那一次关了 14.0 秒），
+     * 别的路就可以动了 —— 2.10.9–2.10.11 那几条规矩防的正是这种「一台在拆、另一台在动」。</p>
      */
     static void finish(World w, Outcome outcome) {
         Step step = w.step;
@@ -1175,6 +1211,9 @@ public final class ChannelRules {
      * <p>「没人要」每一路各自算（项目所有者 2026-10-11，§7.1）：只开超级后视镜、主界面最小化时，两路座舱各自保持 30 秒，
      * 30 秒内回到主界面通道零变动；字面那种「登记表全空了才一起算」会让座舱当场关、回来再开。规则里只有这一处判断。
      * 关着的路不会为了保持去开。</p>
+     *
+     * <p>「亮屏」是通道眼里的（{@link World#screenOn}）：屏幕黑了还不到 30 秒也算亮着 —— 那时没人要了的（熄屏持续录制关着、
+     * 10 秒后停了录）保持到屏幕黑满 30 秒，和座舱放开同一刻关（项目所有者 2026-10-13）。</p>
      */
     static boolean holding(World w, Lane lane) {
         return lane.device == Device.OPEN && w.screenOn && w.foregroundService && !winding(w)
@@ -1192,11 +1231,45 @@ public final class ChannelRules {
     }
 
     /**
+     * 通道眼里屏幕黑了（{@link World#screenOn} 的反面，调度每一轮照它填）：屏幕真黑了满 {@link #HOLD_MS}，或者车机要睡
+     * （黑着时安卓熄屏 —— 这台车上就是车机下电，那一下照旧马上关）。项目所有者 2026-10-13「黑满 30 秒再放」：
+     * 屏幕黑了不到 30 秒，相机一样不动 —— 开着的接着开、输出不改、录像不分段、录制器不停放，关着的座舱也不开
+     * （{@link #releasedByDark} 看 {@link World#screenDark}）；这期间亮了，什么都没发生过。
+     * 黑满 30 秒才照熄屏的规矩来（座舱放开 {@link #releasedByDark}、预览不算、不保持）。
+     *
+     * <p>为什么：10-13 20:10:11 车门开关的那 4.7 秒（哨兵模式开着）里我们关了后座舱、亮屏又开，重开 15 秒没画面，
+     * 救援的那一次关又卡了 6.2 秒；车机要拿后座舱是在屏幕黑了 98 秒以后（98.5、148 秒），30 秒还赶在它前面。
+     * 和「保持 30 秒」同一个数、同一个意思（没人要的一路亮屏时留 30 秒，屏幕黑了的也先留 30 秒），不另立一个数。</p>
+     *
+     * <p>只挪相机：录像那张表（熄屏持续录制、10 秒后停、车机要睡现在停，RecordingCoordinator / ScreenOffPlan）照屏幕真黑的那一刻判。
+     * 起点不明（进程起来时已经黑着、车辆信号读到时已经黑着）按满 30 秒算。</p>
+     *
+     * @param dark       屏幕真黑了（ScreenState.dark）
+     * @param darkForMs  黑了多久；起点不明是负数
+     * @param androidOff 黑着时安卓也熄屏了（车机要睡 / 睡着）
+     */
+    static boolean darkForChannel(boolean dark, long darkForMs, boolean androidOff) {
+        return dark && (androidOff || darkForMs < 0 || darkForMs >= HOLD_MS);
+    }
+
+    /**
+     * 屏幕真黑了、还不到 30 秒（{@link #darkForChannel}）：再过多久通道就算黑了（毫秒）—— 调度到点醒那一下，不等下一个两秒。
+     * 不用等（亮着、已经算黑了）是 -1。
+     */
+    static long untilDarkForChannel(boolean dark, long darkForMs, boolean androidOff) {
+        return !dark || darkForChannel(dark, darkForMs, androidOff) ? -1 : HOLD_MS - darkForMs;
+    }
+
+    /**
      * 这一路被熄屏放开了：熄屏时除了环视，谁都不要它（项目所有者 2026-10-12 D2：屏幕一黑两路座舱都放开 ——
      * 录像、预览、拍照，一样不留。为了稳：车机熄屏约 98 秒后要拿后座舱相机 1，那时我们拿着它，关它要卡 5–8 秒，
      * 4 次里 3 次环视跟着断了 35–43 秒；我们不拿着它的那一晚车机拿了 6 次，环视一次没断）。亮屏又都要了。
+     * 「熄屏」是通道眼里的（{@link World#screenOn}）：屏幕黑满 30 秒、或者车机要睡（{@link #darkForChannel}，项目所有者 2026-10-13）。
+     * 屏幕真黑了还不到 30 秒（{@link World#screenDark}）时，关着的座舱也算放开：开着的照旧，关着的不在黑屏里开 ——
+     * 「30 秒内一步不动」（项目所有者 2026-10-13；黑屏里用不着它，哨兵模式开着时开后座舱正是 10-12、10-13 两次一帧不出的那一种操作），
+     * 这期间来的开录、拍照、接回只开环视（和 2.11.2 一样），黑满 30 秒时也就没有座舱可放。在开的、在关的照旧走完。
      *
-     * <p>和谁登记着无关，只看屏幕和是不是环视：{@link #holderWants}、{@link #wantsKind} 开头的那一道闸、录像的事实
+     * <p>和谁登记着无关，只看屏幕和是不是环视（黑了不到 30 秒时再看它关没关着）：{@link #holderWants}、{@link #wantsKind} 开头的那一道闸、录像的事实
      * （RecordingLanes.Facts#releasedByDark）、拍照不拍哪几路（{@link #excludedFromPhoto}）、关的原因（{@link #closeWhy}）
      * 问的都是这一句（设计 v3.1 C4）—— 按「有没有人要」问的话，录像刚登记、拍照刚登记的那一下读到的是上一轮的登记表，
      * 开录落定不了、拍照一路不拍就收尾。</p>
@@ -1204,7 +1277,7 @@ public final class ChannelRules {
      * <p>按「不是环视那一路」认：非极氪的自定义车型上，熄屏时除了环视那一路，别的路一律放开（记进规格）。</p>
      */
     static boolean releasedByDark(World w, Lane lane) {
-        return !w.screenOn && !isSurround(lane);
+        return !isSurround(lane) && (!w.screenOn || w.screenDark && lane.device == Device.CLOSED);
     }
 
     /**
@@ -1411,17 +1484,20 @@ public final class ChannelRules {
      * 下一步：每次只出一步（§二），按这个次序找，先找到的就是它。
      *
      * <ol>
-     *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一路 isBusy、另一个实例在关。后三种各封顶
+     *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一路的相机层在关一个设备（我们按次序关的那一步除外，
+     *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy、另一个实例在关。后四种各封顶
      *       {@link #IN_FLIGHT_MAX_MS}。车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
-     *       座舱等环视先关完。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
+     *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
+     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
      *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
-     *       但照 §二.6 仍要等安静；</li>
+     *       但照 §二.6 仍要等安静。只摘本会话出过画面的（{@link #reconfigurable}）；没出过画面的由第 7 条重开时丢掉它；</li>
      *   <li><b>开</b>（要安静、能用相机）：按开的次序，第一路该开、没开、没被拿着、不在救援梯子上的。它有录像要、录像输出还在备
      *       → 先等（最多 2 秒，从录像登记起算；等的时候后面的路也不开）。带着它要的输出开，一样都不要就带出帧口。
      *       被拿着的跳过，不挡后面；</li>
-     *   <li><b>改输出</b>（要安静）：缺了要的输出、或者该出帧却没有活输出的那一路，环视先；</li>
+     *   <li><b>改输出</b>（要安静）：缺了要的输出、或者该出帧却没有活输出的那一路，环视先。只改本会话出过画面的
+     *       （{@link #reconfigurable}）；没出过画面的由第 7 条重开时带上现在要的输出；</li>
      *   <li><b>救</b>（要安静；重开还要能用相机，重建不要）：有人要（保持不算）、没被拿着、关着等救或者开着 8 秒没进展的那一路，
      *       环视先；关着、在开而相机层手上还有开或关的，等它（最多 {@link #IN_FLIGHT_MAX_MS}，{@link #rescueAge}）。
      *       梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手；</li>
@@ -1532,7 +1608,7 @@ public final class ChannelRules {
             if (age < 0) {
                 continue;
             }
-            boolean canRebuild = lane.device == Device.OPEN && lane.sessionSince != 0 && lane.firstFrameAt != 0;
+            boolean canRebuild = framedSession(lane);
             if (!usable && !(canRebuild && !onLadder(lane))) {
                 // 重开要能用相机：不开、不计次数（重建会话不用开相机，梯子上第一次、出过画面的照样重建）
                 if (deferredKey == null) {
@@ -1566,7 +1642,14 @@ public final class ChannelRules {
         return withDeferred(idle, deferredKey);
     }
 
-    /** 在途（§二.1）：有一样就等。 */
+    /**
+     * 在途（§二.1）：有一样就等。
+     *
+     * <p>相机层在关一个设备的那一路（{@link Lane#closingSince}）是在途，不管它属于哪一步（救援的重开关旧的、作废卡住的那一轮、
+     * 晚到的设备就地关），手上那一步到点也照等，封顶 {@link #IN_FLIGHT_MAX_MS} —— 和丢了之后的那一次关（LOSING）同一条规矩
+     * （项目所有者 2026-10-14 批准，2.11.4 第 1c 项）。我们按次序关的那一步（{@link Device#CLOSING}）不在此列：它照 §二.2 自己的封顶，
+     * 环视 10 秒、座舱 30 秒到点就不再等（「环视等了 10 秒还没关完，先关座舱」）。</p>
+     */
     private static Decision inFlight(World w) {
         long now = w.now;
         Step step = w.step;
@@ -1577,6 +1660,12 @@ public final class ChannelRules {
         for (Lane lane : w.lanes) {
             if (lane.device == Device.LOSING && now - lane.deviceSince < IN_FLIGHT_MAX_MS) {
                 return Decision.waitFor(Why.LOSING, lane.key, IN_FLIGHT_MAX_MS - (now - lane.deviceSince));
+            }
+        }
+        for (Lane lane : w.lanes) {
+            if (lane.closingSince != 0 && lane.device != Device.CLOSING
+                    && now - lane.closingSince < IN_FLIGHT_MAX_MS) {
+                return Decision.waitFor(Why.BUSY, lane.key, IN_FLIGHT_MAX_MS - (now - lane.closingSince));
             }
         }
         for (Lane lane : w.lanes) {
@@ -1594,7 +1683,21 @@ public final class ChannelRules {
     /**
      * 关（§二.2）：环视开着或正在开、但已不该开 → 单独关它；否则不该开的座舱一起关 —— 环视还在关（10 秒以内）就先等它关完。
      * 2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出。关不等安静。
-     * 熄屏放开座舱、环视还要（在录、后视镜）时，座舱一起关、环视一步不动（{@link #releasedByDark}）。
+     *
+     * <p><b>关座舱前先关环视</b>（项目所有者 2026-10-15 定，2.11.6，{@link Why#SURROUND_FIRST}）：要关座舱，而环视开着或在开、还该开
+     * （在录、后视镜、预览，或者在保持），此刻又能用相机（{@link #surroundFirst}）→ 这一步只关环视。之后照这里本来的规矩走：
+     * 下一轮环视关着了，座舱一起关（原因照它们自己的：熄屏放开、保持到点、没人要）；再下一轮「开」那一步把还有人要的环视照常开回来
+     * （{@link #next} 第 5 条，开的次序、安静、等录像输出都照旧）。不另立计时、常数、动手的地方；登记表一样不加、不改 ——
+     * 开回来靠的是登记表上本来就要它的那几样（录像、后视镜、预览）。只在保持、没人要的环视关了就不再开（保持要开着，{@link #holding}）：
+     * 它的保持跟着座舱一起结束。环视的 10 秒封顶照旧：到点没关完，座舱照样关，环视关完了再开回来。</p>
+     *
+     * <p>为什么（平台笔记 §3.6「放开座舱时环视跟着断」）：2.11.2–2.11.5 熄屏放开座舱、保持到点时座舱在开着的环视旁边关（D4 的例外），
+     * 之前 20 次里环视跟着停了 8 次，都停在一个座舱关完的那一帧前后，救了 40–50 秒；10-15 07:42 车主测试 A 的第 2 次又是这样（座舱开始关后
+     * 60 ms）。「先关环视、再关座舱、再开环视」同一个进程 23 次、退出再开 21 次都正常。代价：每一次计划里的关座舱，环视（含环视录像）
+     * 断约 0.5–1 秒、录像切一个新文件，开着的后视镜闪一下。</p>
+     *
+     * <p>只管这里出的关（计划里的关）。救援重开时关旧设备、丢了之后那一次关、车机拿走那一路，都不是这一步，不走它；
+     * 退出、车机要睡时环视本来就先单独关（它也不该开了，走上面第一条）。</p>
      */
     private static Decision closeStep(World w) {
         List<Lane> toClose = new ArrayList<>();
@@ -1608,19 +1711,33 @@ public final class ChannelRules {
         }
         Lane first = toClose.get(0);
         if (isSurround(first)) {
-            return close(w, Collections.singletonList(first), CLOSE_SURROUND_MAX_MS);
+            return close(Collections.singletonList(first), closeWhy(w, first), CLOSE_SURROUND_MAX_MS);
         }
         Lane surround = w.lane(CameraSlots.KEY_SURROUND);
+        if (surroundFirst(w, surround)) {
+            return close(Collections.singletonList(surround), Why.SURROUND_FIRST, CLOSE_SURROUND_MAX_MS);
+        }
         if (surround != null && (surround.device == Device.CLOSING || surround.device == Device.LOSING)
                 && w.now - surround.deviceSince < CLOSE_SURROUND_MAX_MS) {
             return Decision.waitFor(Why.SURROUND_CLOSING, surround.key,
                     CLOSE_SURROUND_MAX_MS - (w.now - surround.deviceSince));
         }
-        return close(w, toClose, CLOSE_CABINS_MAX_MS);
+        return close(toClose, closeWhy(w, first), CLOSE_CABINS_MAX_MS);
     }
 
-    private static Decision close(World w, List<Lane> lanes, long maxMs) {
-        Decision d = new Decision(Move.CLOSE, closeWhy(w, lanes.get(0)));
+    /**
+     * 座舱要关的这一轮，环视要不要先单独关（{@link #closeStep}，项目所有者 2026-10-15 定，2.11.6）：环视开着或在开、还该开，此刻能用相机
+     * （{@link #usable}，和「开」那一步看的是同一个 —— 关了它，开那一步才开得回来；用不了的照旧座舱在环视旁边关），没被拿着，
+     * 也不在救援梯子上（{@link #rescuing}：在梯子上的关了只能由救援按梯子的节奏重开，不是「开」那一步照常开回来，还要白算次数 ——
+     * 它此刻本来也没在出画面）。
+     */
+    private static boolean surroundFirst(World w, Lane surround) {
+        return surround != null && (surround.device == Device.OPEN || surround.device == Device.OPENING)
+                && shouldOpen(w, surround) && usable(w) && surround.mark == null && !rescuing(surround);
+    }
+
+    private static Decision close(List<Lane> lanes, Why why, long maxMs) {
+        Decision d = new Decision(Move.CLOSE, why);
         List<String> keys = new ArrayList<>();
         for (Lane lane : lanes) {
             keys.add(lane.key);
@@ -1632,7 +1749,8 @@ public final class ChannelRules {
 
     /**
      * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出）」）。一步里的几路原因一样：
-     * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。
+     * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。关座舱前先关环视的那一步不在这里判（{@link Why#SURROUND_FIRST}，
+     * {@link #closeStep} 直接给）：那时环视还该开，这里答不出它为什么关。
      */
     private static Why closeWhy(World w, Lane lane) {
         if (w.exitSince != 0) {
@@ -1700,12 +1818,29 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路能改会话：开着、会话配好了、相机层手上没有动作。手上那一步到点、相机层还挂着那个动作的
-     * （{@link Lane#excusedBusySince}）不再给它改会话 —— 卡在配会话里的那一路，再改一次还是卡着，每 15 秒改一次
-     * 就永远轮不到救援；没进展满 8 秒由救援接手。
+     * 这一路能改会话（改输出、摘死输出）：本会话出过画面（{@link #framedSession}），相机层手上也没有动作。
+     *
+     * <p>项目所有者 2026-10-14 批准（2.11.4 第 1d 项）：<b>本会话没出过画面的，不改输出、不摘死输出；由救援重开时带上现在要的输出</b>
+     * （{@link #openOutputs}）。这是 2.10.8 那条「一帧都没出过的会话不重建」（SingleCamera.rebuildSession）用到每一种改会话上：
+     * 改输出、救援的重建在相机层是同一个动作（关旧会话、建新会话，建之前框架要等 HAL 把手上的请求做完 —— waitUntilIdle），
+     * 一帧不出的会话没有东西可等完，那一下卡满 4.7–4.9 秒、报错 4、再关一次设备。2.11 两次全是这样：10-12 20:04 环视（哨兵关）、
+     * 10-13 20:10 后座舱（开 15 秒没画面之后加预览），都没写进黑匣子，只在关相机小结的账里看得出来。救援排在改输出后面，
+     * 以前改输出先轮到它；改输出那一下的在途还把「8 秒没进展」重新算起。现在没出过画面的那一路直接落到救援：满 8 秒没进展
+     * （开 15 秒到点时早就满了）就重开，第一次救就是第 2 次（开那一步算了第 1 次）。出了第一帧，它就又能改了。</p>
+     *
+     * <p>相机层手上有动作（配会话、关旧会话、排着一次重建）的也不改：卡在配会话里的那一路，再改一次还是卡着；相机层的那个动作
+     * 最多挂 {@link #IN_FLIGHT_MAX_MS}，在那之前它就不能改，没进展满 8 秒由救援接手（救援不看它，重开把那一次作废）。</p>
      */
     private static boolean reconfigurable(Lane lane) {
-        return lane.device == Device.OPEN && lane.sessionSince != 0 && lane.busySince == 0;
+        return framedSession(lane) && lane.busySince == 0;
+    }
+
+    /**
+     * 本会话出过画面：开着、会话配好了、这一份会话出过第一帧。改输出、摘死输出（{@link #reconfigurable}）、救援的第一次重建（{@link #next}）
+     * 共用这一个定义 —— 只对出过画面的会话动会话，没出过的只重开。
+     */
+    private static boolean framedSession(Lane lane) {
+        return lane.device == Device.OPEN && lane.sessionSince != 0 && lane.firstFrameAt != 0;
     }
 
     private static Decision apply(World w, Lane lane, Why why) {

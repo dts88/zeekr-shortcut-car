@@ -66,6 +66,7 @@ public class MultiCameraManager {
     // closeStep 的说明（2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出）。
     // 熄屏 v3（项目所有者 2026-10-12 D2）：屏幕一黑两路座舱就放开（一起关），环视照熄屏持续录制那张表录 ——
     // 座舱比环视早关几分钟，环视先关只对连环视一起关的那几次还成立（ChannelRules.releasedByDark）。
+    // 2026-10-13 起「一黑」是黑满 30 秒（或者车机要睡）：不到 30 秒又亮，相机一样不动（ChannelRules.darkForChannel）。
     /**
      * 调度自己的 Handler（同一个主线程 Looper）。不用 mainHandler：release() 开头会 removeCallbacksAndMessages(null)，
      * 而调度那时正要按次序关相机 —— 2.10.5 时就是这样把「上一路关完、关下一路」的续命清掉了，后两路没关进程就退了
@@ -79,8 +80,11 @@ public class MultiCameraManager {
     /** 登记表的监听：只叫醒自己这一份调度。release 时只在它还是监听者时才摘（换车型时两份并存）。 */
     private final CameraNeeds.Listener needsListener;
     /**
-     * 亮屏、熄屏：叫醒调度（熄屏时 PREVIEW 不算、不保持、座舱谁都不要，由规则判 —— ChannelRules.releasedByDark）。
+     * 亮屏、熄屏：叫醒调度（熄屏时 PREVIEW 不算、不保持、座舱谁都不要，由规则判 —— ChannelRules.releasedByDark；
+     * 屏幕黑满 30 秒才算，那一刻调度自己醒，ChannelRules.darkForChannel）。
      * 熄屏那一下从头记这一段熄屏的座舱放开（{@link #newDarkPeriod}）。
+     * 亮屏时等着的录像输出重新声明（{@link #liftRefusals}），和调度的「亮屏解除停手」是同一个亮屏：通道把这一段算作黑过
+     * （{@link #channelCountedDark}）才算 —— 黑了不到 30 秒又亮，通道一步不动，录像输出也不动（项目所有者 2026-10-13）。
      */
     private final com.kooo.evcam.screen.ScreenState.Listener screenWake =
             new com.kooo.evcam.screen.ScreenState.Listener() {
@@ -92,10 +96,14 @@ public class MultiCameraManager {
 
                 @Override
                 public void onScreenOn() {
+                    // 亮屏那一轮还没跑（wake 只是排一轮）：快照还是这一段熄屏最后的样子
+                    boolean countedDark = channelCountedDark();
                     // 这一段熄屏结束：之后亮着时关座舱（保持到点）不算熄屏放开；记下的那一刻留到下一次熄屏
                     awaitingCabinRelease = false;
                     scheduler.wake();
-                    liftRefusals("亮屏了");
+                    if (countedDark) {
+                        liftRefusals("亮屏了");
+                    }
                 }
             };
     private PipelineCallback pipelineCallback;
@@ -874,10 +882,12 @@ public class MultiCameraManager {
         @Override
         public void onLaneCameraGone(String key, ChannelScheduler.Gone why, CameraTaken.Reason reason,
                                      ChannelRules.Why closed) {
-            // 熄屏放开的座舱：退出录像那一行写「熄屏：座舱放开」（设计 v3 §4），别的我们关的照旧是「相机关了」
+            // 熄屏放开的座舱：退出录像那一行写「熄屏：座舱放开」（设计 v3 §4）；关座舱前先关环视（2.11.6）写「关座舱前先关环视」——
+            // 录制器停放，环视开回来带着同一个录像输出出了画面再加入；别的我们关的照旧是「相机关了」
             leaveLane(key, why == ChannelScheduler.Gone.LOST ? channelSide.lossText(reason)
                     : why == ChannelScheduler.Gone.RESCUED ? "相机卡住了，调度在救"
-                    : closed == ChannelRules.Why.DARK_RELEASE ? channelSide.closeWhyText(closed) : "相机关了");
+                    : closed == ChannelRules.Why.DARK_RELEASE || closed == ChannelRules.Why.SURROUND_FIRST
+                    ? channelSide.closeWhyText(closed) : "相机关了");
             // 会话带不上它的录像输出的账随这一路的相机走了就清：回来时是一份新会话，照常声明
             if (refusals.remove(key) != null) {
                 ensureLane(key);
@@ -2043,10 +2053,16 @@ public class MultiCameraManager {
      * 主界面这一格的画布要被系统收走了（onSurfaceTextureDestroyed，主线程；主界面销毁时视图从窗口上摘下来那一下）：
      * 撤回预览，画布由管线留着（大纲 §7.6，见 {@link #keptCanvases}、{@link #keepCanvas}）。
      *
-     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：管线没了、没有这一路，调用方照常让它放
+     * <p>交给会话里还带着它的那一份管线（{@link #ownerOf}）：退出、换车型时那一份已经放了、它的调度还在按次序关，
+     * 画布多半还在它的会话里 —— 以前这时照常让 TextureView 放，关到一半的会话里多一个死输出（2.11.4 R1 审查）。</p>
+     *
+     * @param current 调用方手里的那一份（可能是 null、可能已经放了）
+     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：哪一份都不带着它、也没有这一路，调用方照常让它放
      */
-    public boolean keepPreviewCanvas(String cameraKey, android.graphics.SurfaceTexture texture) {
-        return keepCanvas(ChannelRules.Kind.PREVIEW, cameraKey, texture);
+    public static boolean keepPreviewCanvas(MultiCameraManager current, String cameraKey,
+                                            android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.PREVIEW, cameraKey, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.PREVIEW, cameraKey, texture);
     }
 
     /**
@@ -2058,10 +2074,34 @@ public class MultiCameraManager {
      * （改输出）、或者关环视时一起摘，摘掉以后才放。代价是这期间环视还往一块没人显示的画布送帧，和贴边、熄屏时留着的一样
      * （大纲 §6 风险 3）。</p>
      *
-     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：管线里没有环视那一路，调用方照常让它放
+     * @param current 调用方手里的那一份（可能是 null、可能已经放了）；交给哪一份照 {@link #ownerOf}
+     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：哪一份都不带着它、也没有环视那一路，调用方照常让它放
      */
-    public boolean keepMirrorCanvas(android.graphics.SurfaceTexture texture) {
-        return keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    public static boolean keepMirrorCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    }
+
+    /**
+     * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜的画布
+     * （{@link #ownerOf}）。弱引用；放的那一下（哪个线程都可能）写，主线程上读。
+     */
+    private static volatile java.lang.ref.WeakReference<MultiCameraManager> lastReleased =
+            new java.lang.ref.WeakReference<>(null);
+
+    /**
+     * 一块画布要被系统收走时，交给哪一份管线留着（R1，项目所有者 2026-10-14：动相机的都归通道调度管 —— 会话里还带着的画布，
+     * 不许由别人放掉，只交给带着它的那一份调度，等它离开会话再放）：最近放了、调度还在关、会话里正带着它的那一份优先；
+     * 否则就是 {@code current}（可能是 null）。主线程。
+     */
+    static MultiCameraManager ownerOf(MultiCameraManager current, ChannelRules.Kind kind, String cameraKey,
+                                      android.graphics.SurfaceTexture texture) {
+        MultiCameraManager released = lastReleased.get();
+        if (released != null && released != current && texture != null
+                && released.scheduler.sessionCarries(cameraKey, new ChannelRules.Out(kind, texture))) {
+            return released;
+        }
+        return current;
     }
 
     /**
@@ -2070,14 +2110,20 @@ public class MultiCameraManager {
      * <p>先摘掉旧视图挂在画布上的出帧监听 —— 那个监听拿着旧视图（连同销毁了的主界面、退出了的后视镜服务），新视图接回时
      * 会挂它自己的；再撤回这一种输出的声明 —— 撤回不碰会话：画布还活着，就是「留着的输出」，照「减输出能拖就拖」留在会话里；
      * 最后交给调度，等它离开会话再放。</p>
+     *
+     * <p>这一份已经放了（退出、换车型）：各路的相机对象已经交给调度（{@link #cameras} 清了），会话里还带着这块画布就照样交给调度 ——
+     * 它随相机关了才放（2.11.4 R1）；不带着的照常让 TextureView 放。</p>
      */
     private boolean keepCanvas(ChannelRules.Kind kind, String cameraKey, android.graphics.SurfaceTexture texture) {
+        if (texture == null || texture.isReleased()) {
+            return false;
+        }
         SingleCamera camera = cameras.get(cameraKey);
-        if (camera == null || texture == null || texture.isReleased()) {
+        if (camera == null && !scheduler.sessionCarries(cameraKey, new ChannelRules.Out(kind, texture))) {
             return false;
         }
         texture.setOnFrameAvailableListener(null);
-        boolean withdrawn = withdrawCanvas(camera, kind, texture);
+        boolean withdrawn = camera != null && withdrawCanvas(camera, kind, texture);
         android.graphics.SurfaceTexture older = keptOf(kind).put(cameraKey, texture);
         if (older != null && older != texture) {
             // 上一块留着的还没人接回就又来一块（新界面、新窗口没接回它，自己建了画布）：那一块不再等人接回，
@@ -2090,7 +2136,8 @@ public class MultiCameraManager {
             scheduler.wake();
         }
         AppLog.d(TAG, kind + " canvas for " + cameraKey + " kept by the pipeline (withdrawn=" + withdrawn
-                + ", in session=" + camera.sessionOutputs().carries(out) + ")");
+                + ", in session=" + scheduler.sessionCarries(cameraKey, out) + (released ? ", released pipeline" : "")
+                + ")");
         return true;
     }
 
@@ -2370,6 +2417,46 @@ public class MultiCameraManager {
         }
     }
 
+    /**
+     * 诊断报告 2.3.2 每一路「来历：」那一段（{@link CameraHistory}，2.11.5 第 D1 项）：「上一次重置以来开过 5 台（上次重置：它在相机服务里没了又回来，
+     * 10-14 21:01:55）；最近开的那一台是第 5 台；最后一次关完 3 分 2 秒前、关了 0.1 秒（dark-release）」。
+     */
+    private static String historyText(CameraHistory.Camera h) {
+        if (h == null) {
+            return "没有记录（2.11.5 起记：车机重新初始化以来开过几台、最后一次关完）";
+        }
+        java.text.SimpleDateFormat clock = new java.text.SimpleDateFormat("MM-dd HH:mm:ss", Locale.US);
+        StringBuilder sb = new StringBuilder();
+        if (h.reset == null) {
+            sb.append("记录开始以来开过 ").append(h.opens).append(" 台（记录从 ")
+                    .append(h.sinceWall > 0 ? clock.format(new Date(h.sinceWall)) : "?").append(" 起，之前的重置不知道）");
+        } else {
+            sb.append("上一次重置以来开过 ").append(h.opens).append(" 台（上次重置：")
+                    .append(h.reset == CameraHistory.Reset.BOOT ? "车机开机"
+                            : h.reset == CameraHistory.Reset.TAKEN ? "别的程序拿了它又空出来" : "它在相机服务里没了又回来")
+                    .append(h.resetWall > 0 ? "，" + clock.format(new Date(h.resetWall)) : "").append("）");
+        }
+        sb.append("；最近开的那一台是").append(h.lastOrdinal > 0 ? "第 " + h.lastOrdinal + " 台" : "还没开过");
+        sb.append("；最后一次关完").append(h.closedElapsed < 0 ? "：没有记录"
+                : " " + timeText(android.os.SystemClock.elapsedRealtime() - h.closedElapsed) + "前、关了 " + seconds(h.closeMs)
+                + (h.closeWhy == null ? "" : "（" + h.closeWhy + "）"));
+        return sb.toString();
+    }
+
+    /** 点火码的记号：ACC、ON、DRIVING，认不出的写十六进制（统计、关座舱那几行共用）。 */
+    static String ignitionCode(int code) {
+        if (code == com.kooo.evcam.telemetry.Signal.IGNITION_ACC) {
+            return "ACC";
+        }
+        if (code == com.kooo.evcam.telemetry.Signal.IGNITION_ON) {
+            return "ON";
+        }
+        if (code == com.kooo.evcam.telemetry.Signal.IGNITION_DRIVING) {
+            return "DRIVING";
+        }
+        return String.format(Locale.US, "0x%08X", code);
+    }
+
     /** 黑匣子里的叫法：环视 / 后座舱 / 前座舱；别的 key 原样。主界面接回留着的画布那一行也用它。 */
     public static String roleName(String key) {
         if (CameraSlots.KEY_SURROUND.equals(key)) {
@@ -2436,6 +2523,36 @@ public class MultiCameraManager {
     /** 这一段熄屏开始的那一刻座舱（环视以外的几路）开着、在开、或者在关：没开着的就没什么可放开。哪个线程都能读。 */
     public boolean cabinsOpenAtDark() {
         return cabinsOpenAtDark;
+    }
+
+    /**
+     * 屏幕黑了多久，按通道的算法（{@link ChannelRules#darkForChannel} 要的那个数，调度经 {@link ChannelSide#darkForMs} 读它）：
+     * 起点不明交 -1（按黑满 30 秒算）。车辆信号读到时已经黑着的（进程刚起来、之前读不到）也是起点不明 —— ScreenState 那时
+     * 从读到的那一刻起算「熄屏后 +N ms」，屏幕其实早就黑了（熄屏小结写「起点不明」的就是这一种）。哪个线程都能调。
+     */
+    static long channelDarkForMs() {
+        return com.kooo.evcam.screen.ScreenState.source() == com.kooo.evcam.screen.ScreenState.Source.VEHICLE_READ
+                ? -1 : com.kooo.evcam.screen.ScreenState.darkForMs();
+    }
+
+    /**
+     * 此刻通道眼里屏幕黑了（{@link ChannelRules#darkForChannel}：黑满 30 秒、起点不明、或者车机要睡）—— 座舱放开、预览不算、
+     * 不保持。和调度用的是同一句、同一组事实（{@link #channelDarkForMs}）；协调器写黑匣子时问它，不自己再判一遍
+     * （熄屏判的那一行「座舱放开 / 座舱黑满 30 秒后放开」、黑着开录的那几行）。哪个线程都能调。
+     */
+    public static boolean channelCountsDark() {
+        return ChannelRules.darkForChannel(com.kooo.evcam.screen.ScreenState.dark(), channelDarkForMs(),
+                com.kooo.evcam.screen.ScreenState.androidOff());
+    }
+
+    /**
+     * 调度最近一轮把屏幕算作黑了（{@link ChannelScheduler#snapshot}，还没跑过一轮算没有）。亮屏那一下（协调器写熄屏小结、
+     * 相机层的亮屏监听，都在亮屏后的那一轮之前 —— 叫醒调度只是排一轮）读的就是这一段熄屏最后的样子：不是，就是屏幕黑了
+     * 不到 30 秒又亮了，通道一步没动（项目所有者 2026-10-13「黑满 30 秒再放」）。主线程。
+     */
+    public boolean channelCountedDark() {
+        ChannelScheduler.Snapshot s = scheduler.snapshot();
+        return s != null && !s.screenOn;
     }
 
     /**
@@ -2537,7 +2654,11 @@ public class MultiCameraManager {
                 .append(s.stopped ? "；调度已停（退出之后都关完了）" : "").append('\n');
         sb.append("登记表：").append(channelSide.holderCodes(s.holders))
                 .append(s.recordKeys.isEmpty() ? "" : "（录 " + roles(s.recordKeys) + "）")
-                .append("；").append(s.screenOn ? "亮屏" : "熄屏" + darkSinceText())
+                .append("；").append(!s.screenOn ? "熄屏" + darkSinceText()
+                        // 屏幕黑了还不到 30 秒：通道照亮着算（ChannelRules.darkForChannel，项目所有者 2026-10-13）
+                        : com.kooo.evcam.screen.ScreenState.dark() ? "熄屏" + darkSinceText() + "，不到 "
+                        + (ChannelRules.HOLD_MS / 1000) + " 秒：开着的相机照旧、关着的座舱不开，黑满 "
+                        + (ChannelRules.HOLD_MS / 1000) + " 秒放开座舱" : "亮屏")
                 .append("；前台服务").append(s.foregroundService ? "在" : "不在").append('\n');
         if (!s.screenOn) {
             sb.append("熄屏放开座舱：").append(cabinReleaseText()).append('\n');
@@ -2705,6 +2826,7 @@ public class MultiCameraManager {
         sb.append("    最近一次开不起来：").append(judgedText(v.lastOpenFailure, now)).append('\n');
         sb.append("    最近一次丢了：").append(judgedText(v.lastLoss, now)).append('\n');
         sb.append("    救援梯子：").append(ladderText(v, now)).append('\n');
+        sb.append("    来历：").append(historyText(StepLog.history().camera(v.cameraId))).append('\n');
         if (v.asks > 0 || v.lastAnswer != null) {
             ChannelScheduler.Answer a = v.lastAnswer;
             sb.append("    问相机服务：被拿着以来问了 ").append(v.asks).append(" 次")
@@ -2926,6 +3048,36 @@ public class MultiCameraManager {
         }
 
         @Override
+        public long closingSince() {
+            return camera.closingSince();
+        }
+
+        @Override
+        public SingleCamera.LastClose lastClose() {
+            return camera.lastClose();
+        }
+
+        @Override
+        public SessionCounts.Snapshot sessionCounts() {
+            return camera.sessionCounts();
+        }
+
+        @Override
+        public long lastResultAt() {
+            return camera.lastResultAt();
+        }
+
+        @Override
+        public long captureFailures() {
+            return camera.captureFailures();
+        }
+
+        @Override
+        public long lostBuffers() {
+            return camera.lostBuffers();
+        }
+
+        @Override
         public String describeBusy() {
             return camera.busyKinds();
         }
@@ -3029,6 +3181,17 @@ public class MultiCameraManager {
             return !com.kooo.evcam.screen.ScreenState.dark();
         }
 
+        /** 屏幕黑了多久；起点不明交 -1（规则按黑满 30 秒算）。算法只在 {@link MultiCameraManager#channelDarkForMs} 一处。 */
+        @Override
+        public long darkForMs() {
+            return channelDarkForMs();
+        }
+
+        @Override
+        public boolean androidOff() {
+            return com.kooo.evcam.screen.ScreenState.androidOff();
+        }
+
         @Override
         public boolean foregroundService() {
             return com.kooo.evcam.CameraForegroundService.isRunning();
@@ -3067,6 +3230,33 @@ public class MultiCameraManager {
         @Override
         public ChannelRules.RecordPrep recordPrep(String key) {
             return recordPrepOf(key);
+        }
+
+        /**
+         * 车上的几样事实（ChannelScheduler.Vehicle）：哨兵原值读车辆信号那一份快照，点火 / 主驾门 / 屏幕电源事件多久以前变过读
+         * {@link com.kooo.evcam.telemetry.SignalAges}，进程的重要性读监测线程缓存的 —— 都不进车辆接口、不进系统服务（主线程）。
+         */
+        @Override
+        public ChannelScheduler.Vehicle vehicle() {
+            try {
+                com.kooo.evcam.telemetry.Readings r = com.kooo.evcam.telemetry.Telemetry.get().readings();
+                long now = android.os.SystemClock.elapsedRealtime();
+                return new ChannelScheduler.Vehicle(r.code(com.kooo.evcam.telemetry.Signal.SENTRY_MODE),
+                        r.code(com.kooo.evcam.telemetry.Signal.IGNITION),
+                        com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.IGNITION, now),
+                        com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.DOOR_DRIVER, now),
+                        com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.SCREEN_POWER_EVENT, now),
+                        StallWatch.importance());
+            } catch (RuntimeException e) {
+                AppLog.w(TAG, "vehicle facts unavailable: " + e);
+                return ChannelScheduler.Vehicle.UNKNOWN;
+            }
+        }
+
+        /** 这一台相机的来历（{@link CameraHistory}，内存里的那一份，主线程不碰盘）。 */
+        @Override
+        public CameraHistory.Camera history(String cameraId) {
+            return StepLog.history().camera(cameraId);
         }
 
         @Override
@@ -3114,10 +3304,18 @@ public class MultiCameraManager {
                     + (recordKeys.isEmpty() ? "" : "（录 " + roles(recordKeys) + "）"));
         }
 
+        /**
+         * 保持开始。屏幕黑了还不到 30 秒时也在保持（通道眼里还亮着，ChannelRules.darkForChannel）：那时保持到屏幕黑满 30 秒为止，
+         * 和座舱放开同一刻关 —— 那一行照实写，带「，熄屏后 +Nms」。
+         */
         @Override
         public void holding(List<String> keys, Set<ChannelRules.Kind> outlets) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：没人要 " + roles(keys) + " 了：亮屏、前台服务在，保持 "
-                    + (ChannelRules.HOLD_MS / 1000) + " 秒（画面接着送进 " + kindNames(outlets) + "）");
+            boolean dark = com.kooo.evcam.screen.ScreenState.dark();
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：没人要 " + roles(keys) + " 了：" + (dark
+                    ? "熄屏还不到 " + (ChannelRules.HOLD_MS / 1000) + " 秒、前台服务在，保持到熄屏满 "
+                    + (ChannelRules.HOLD_MS / 1000) + " 秒"
+                    : "亮屏、前台服务在，保持 " + (ChannelRules.HOLD_MS / 1000) + " 秒")
+                    + "（画面接着送进 " + kindNames(outlets) + "）" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         }
 
         @Override
@@ -3266,14 +3464,33 @@ public class MultiCameraManager {
                     : (ChannelRules.RECORD_OUTPUT_WAIT_MS / 1000) + " 秒还没好，先开"));
         }
 
+        /**
+         * 开、改输出、救那一行。出了画面的格式从 2.11 起没变（旧的分析脚本照样读）；15 秒没出画面的带上配好没有、配好以来相机回了什么
+         * （SingleCamera.countsText：HAL 一个都没回 / 我们的输出接不住 / 开始了没结果）；这一步里出了事的（开不起来、丢了）
+         * 2.11.4 起也写一行：做了多久、什么时候开始的、怎么没做完（项目所有者 2026-10-14 批准的诊断，第 1a 项）。
+         */
         @Override
         public void stepEnded(ChannelScheduler.StepReport r) {
             String name = roleName(r.key);
-            String result = r.timedOut
-                    ? (ChannelRules.STEP_MAX_MS / 1000) + " 秒没出画面" + (r.move == ChannelRules.Move.OPEN
-                    ? "，先往下走（由救援接手）" : "（由救援接手）")
-                    : (r.configuredMs >= 0 && r.move != ChannelRules.Move.OPEN ? "配好 " + seconds(r.configuredMs) + "、" : "")
-                    + "出画面 " + seconds(Math.max(0, r.frameMs));
+            String result;
+            if (r.failure != null) {
+                result = "没做完：" + (r.failure.origin == ChannelRules.Failure.Origin.LOSS
+                        ? "这一步里丢了（" + lossText(r.failure.reason) + "）"
+                        : "开不起来（" + openFailText(r.failure.reason) + "）")
+                        + "，做了 " + seconds(r.durationMs) + "（" + wallClock(r.startedAt) + " 开始）"
+                        + (r.configuredMs >= 0 ? "，配好过（" + seconds(r.configuredMs) + "）" : "");
+            } else if (r.timedOut) {
+                result = (ChannelRules.STEP_MAX_MS / 1000) + " 秒没出画面" + (r.move == ChannelRules.Move.OPEN
+                        ? "，先往下走（由救援接手）" : "（由救援接手）")
+                        + "；" + (r.configuredMs >= 0 ? "配好 " + seconds(r.configuredMs) : "没配好");
+            } else {
+                result = (r.configuredMs >= 0 && r.move != ChannelRules.Move.OPEN
+                        ? "配好 " + seconds(r.configuredMs) + "、" : "")
+                        + "出画面 " + seconds(Math.max(0, r.frameMs));
+            }
+            if (r.counts != null && (r.failure != null || r.timedOut)) {
+                result += "；" + SingleCamera.countsText(r.counts);
+            }
             String line;
             switch (r.move) {
                 case OPEN:
@@ -3296,6 +3513,297 @@ public class MultiCameraManager {
                     break;
             }
             com.kooo.evcam.blackbox.BlackBox.noteImportant(line + othersText(r.others));
+        }
+
+        /**
+         * 开一路（开、救援的重开）那一刻的情形，一行（项目所有者 2026-10-14 批准的诊断，2.11.4 第 1a 项）：
+         * 「通道：开 后座舱 时的情形：哨兵 1（开）；点火 0.2 秒前变过、主驾门 4.6 秒前变过、屏幕电源事件 0.1 秒前变过；主界面在后台（importance 125）；
+         * 相机服务 4.5 秒前说空闲（我们引起的）；我们上一次关它 4.5 秒前、关了 0.2 秒；车机拿过它 18 分 47 秒、3.0 秒前放开；环视在出画面；
+         * 环视：车机重新初始化后第 5 次打开（上次重置：它在相机服务里没了又回来，10-14 21:01:55，50 分 25 秒前）」。
+         * 2.11.5 起环视自己开、重开也写（项目所有者 2026-10-15 批准，第 D1 项）：要看的正是环视那一台是不是车机重新初始化后的第一台。
+         */
+        @Override
+        public void opening(ChannelScheduler.StepContext c) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + (c.move == ChannelRules.Move.RESCUE ? "救" : "开") + " "
+                    + roleName(c.key) + " 时的情形：" + contextText(c));
+        }
+
+        /** 开座舱那一行「时的情形：」后面那一段。 */
+        private String contextText(ChannelScheduler.StepContext c) {
+            ChannelScheduler.Vehicle v = c.vehicle;
+            StringBuilder sb = new StringBuilder("哨兵 ").append(v.sentry == null ? "读不到"
+                    : v.sentry + (v.sentry == 0 ? "（关）" : v.sentry == 1 ? "（开）" : v.sentry == 2 ? "（布防）" : ""));
+            sb.append("；点火").append(changedText(v.sinceIgnitionMs)).append("、主驾门").append(changedText(v.sinceDoorMs))
+                    .append("、屏幕电源事件").append(changedText(v.sinceScreenEventMs));
+            sb.append("；主界面").append(c.mainForeground ? "在前" : "在后台")
+                    .append("（importance ").append(v.importance < 0 ? "?" : String.valueOf(v.importance)).append('）');
+            sb.append("；相机服务").append(c.wordAgoMs < 0 ? "没说过它"
+                    : " " + duration(c.wordAgoMs) + "前说" + (c.wordAbsent ? "不在" : Boolean.TRUE.equals(c.wordFree)
+                    ? "空闲" : Boolean.FALSE.equals(c.wordFree) ? "被占用" : "?") + (c.wordOurs ? "（我们引起的）" : "（别人引起的）"));
+            sb.append("；我们").append(c.sinceCloseMs < 0 ? "没有关过它的记录"
+                    : "上一次关它 " + duration(c.sinceCloseMs) + "前、关了 " + seconds(c.closeMs));
+            if (c.heldMs >= 0) {
+                sb.append("；车机拿过它 ").append(duration(c.heldMs)).append("、").append(duration(c.releasedAgoMs)).append("前放开");
+            }
+            if (c.surround != null) {
+                sb.append("；环视").append(c.surround == ChannelScheduler.SurroundState.STREAMING ? "在出画面"
+                        : c.surround == ChannelScheduler.SurroundState.OPEN ? "开着、没在出画面" : "关着");
+                if (c.surround != ChannelScheduler.SurroundState.CLOSED && c.surroundHistory != null) {
+                    // 开着的那一台环视是车机重新初始化后第几台（2.11.5 第 D1 项）
+                    CameraHistory.Camera h = c.surroundHistory;
+                    sb.append("；环视：").append(lineageText(h.lastOrdinal, h.lastReset, h.lastResetWall, h.sinceWall));
+                }
+            } else if (CameraSlots.KEY_SURROUND.equals(c.key)) {
+                // 环视自己要开的这一台是车机重新初始化后第几台（2.11.5 第 D1 项）
+                CameraHistory.Camera h = c.history;
+                sb.append("；环视：").append(h == null ? lineageText(1, null, 0, 0)
+                        : lineageText(h.opens + 1, h.reset, h.resetWall, h.sinceWall));
+            }
+            return sb.toString();
+        }
+
+        /**
+         * 第几次打开，「车机重新初始化后第 5 次打开（上次重置：它在相机服务里没了又回来，10-14 21:01:55，50 分 25 秒前）」；
+         * 没见过重置的：「记录开始以来第 5 次打开（记录从 10-15 08:00:00 起，之前的重置不知道）」（2.11.5 第 D1 项）。
+         *
+         * @param ordinal   第几台；0 及以下是不知道
+         * @param reset     那一台开的时候上一次重置；null = 从记录开始数的
+         * @param resetWall 那一次重置（墙上时钟）
+         * @param sinceWall 记录从什么时候开始（墙上时钟；0 不知道）
+         */
+        private String lineageText(int ordinal, CameraHistory.Reset reset, long resetWall, long sinceWall) {
+            if (ordinal <= 0) {
+                return "第几次打开不知道（这一台是 2.11.5 之前开的，或者来历还没读回来）";
+            }
+            if (reset == null) {
+                return "记录开始以来第 " + ordinal + " 次打开（" + (sinceWall > 0 ? "记录从 " + wallText(sinceWall) + " 起，" : "")
+                        + "之前的重置不知道）";
+            }
+            return "车机重新初始化后第 " + ordinal + " 次打开（上次重置：" + resetText(reset)
+                    + (resetWall > 0 ? "，" + wallText(resetWall) + "，" + timeText(System.currentTimeMillis() - resetWall) + "前"
+                    : "") + "）";
+        }
+
+        /** 一次重置是什么。 */
+        private String resetText(CameraHistory.Reset reset) {
+            switch (reset) {
+                case BOOT:
+                    return "车机开机";
+                case TAKEN:
+                    return "别的程序拿了它又空出来";
+                default:
+                    return "它在相机服务里没了又回来";
+            }
+        }
+
+        /** 墙上时钟「10-14 21:01:55」。 */
+        private String wallText(long wall) {
+            return new SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(new Date(wall));
+        }
+
+        /**
+         * 关座舱时环视怎样（{@link ChannelScheduler.Coupling}，项目所有者 2026-10-15 批准，2.11.5 第 D2 项）：关完那一刻、关完 1 秒、关完 30 秒各一行。
+         * <ul>
+         *   <li>「通道：座舱关完时环视：关 前座舱 0.1 秒、后座舱 0.1 秒（熄屏：座舱放开）；环视最后一帧在开始关后 +67 ms、前座舱关完前 35 ms、
+         *       后座舱关完前 73 ms；开始关以来环视最长断帧不到 0.2 秒、会话没动；失败 / 丢缓冲（开始关以来）：环视 0 / 0、后座舱 0 / 0、前座舱 0 / 0；
+         *       点火 ACC（30.0 秒前变过）；主界面在后台；环视：车机重新初始化后第 5 次打开（…）」</li>
+         *   <li>「通道：座舱关完 1.6 秒后环视（关 前座舱、后座舱，熄屏：座舱放开）：关完以后没出过画面（最后一帧在关完前 73 ms）；失败 / 丢缓冲…」</li>
+         *   <li>计划里的关的 30 秒那一行就是以前关完一轮那一行（前面一字不改），后面接着这几样：「通道：关 前座舱、后座舱（熄屏：座舱放开）之后 30 秒：
+         *       环视最长断帧 8.1 秒、会话没动（只量到第 8.1 秒：那时我们在救它）；环视最后一帧在关完前 73 ms；关完 1 秒后没出过画面；…」；
+         *       丢了、重开的那一次关：「通道：座舱关完 30 秒后环视（后座舱 丢了：被断开）：…」。</li>
+         * </ul>
+         */
+        @Override
+        public void coupling(ChannelScheduler.Coupling c) {
+            StringBuilder sb = new StringBuilder();
+            switch (c.phase) {
+                case END:
+                    sb.append("通道：座舱关完时环视：").append(closedText(c, true)).append("；")
+                            .append(lastResultText(c, true)).append("；开始关以来")
+                            .append(gapsText(java.util.Collections.singletonList(c.surround)));
+                    break;
+                case AFTER_1S:
+                    sb.append("通道：座舱关完 ").append(seconds(c.measuredAt - c.endedAt)).append("后环视（")
+                            .append(closedText(c, false)).append("）：")
+                            .append(c.deliveredAfterEnd() ? "关完以后出过画面" : "关完以后没出过画面")
+                            .append("（").append(lastResultText(c, false)).append("）");
+                    break;
+                default:
+                    if (c.kind == ChannelScheduler.Coupling.Kind.PLANNED) {
+                        // 以前关完一轮的那一行，前面一字不改（旧的分析脚本照样读）
+                        sb.append("通道：关 ").append(roles(c.keys)).append("（").append(closeWhyText(c.why))
+                                .append("）之后 ").append(ChannelScheduler.AFTERMATH_MS / 1000).append(" 秒：")
+                                .append(gapsText(c.others.isEmpty()
+                                        ? java.util.Collections.singletonList(c.surround) : c.others));
+                    } else {
+                        sb.append("通道：座舱关完 ").append(ChannelScheduler.AFTERMATH_MS / 1000).append(" 秒后环视（")
+                                .append(closedText(c, false)).append("）：")
+                                .append(gapsText(java.util.Collections.singletonList(c.surround)));
+                    }
+                    sb.append("；").append(lastResultText(c, false)).append("；").append(c.deliveredAfter < 0
+                            ? "关完 1 秒后没量到" : c.deliveredAfter == 1 ? "关完 1 秒后出过画面" : "关完 1 秒后没出过画面");
+                    break;
+            }
+            sb.append("；失败 / 丢缓冲（开始关以来）：").append(troubleText(c.trouble));
+            if (c.phase != ChannelScheduler.Coupling.Phase.AFTER_1S) {
+                ChannelScheduler.Vehicle v = c.vehicle;
+                sb.append("；点火 ").append(v.ignition == null ? "读不到" : ignitionText(v.ignition))
+                        .append("（").append(v.sinceIgnitionMs < 0 ? "起来以后没变过" : duration(v.sinceIgnitionMs) + "前变过")
+                        .append("）；主界面").append(c.mainForeground ? "在前" : "在后台")
+                        .append("；环视：").append(lineageText(c.lineage, c.lineageReset, c.lineageResetWall, 0));
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(sb + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
+
+        /**
+         * 关的是什么：计划里的关「关 前座舱 0.1 秒、后座舱 0.1 秒（熄屏：座舱放开）」（{@code withTimes} 为 false 时不带秒数、为什么跟在逗号后面），
+         * 丢了「后座舱 丢了（被断开），关了 5.4 秒」，重开「救 后座舱 重开时关旧设备，关了 5.6 秒」。
+         */
+        private String closedText(ChannelScheduler.Coupling c, boolean withTimes) {
+            String lane = c.keys.isEmpty() ? "?" : roleName(c.keys.get(0));
+            long ms = c.endedMs.isEmpty() ? -1 : c.endedMs.get(0);
+            switch (c.kind) {
+                case LOSS:
+                    return lane + " 丢了" + (withTimes ? "（" + lossText(c.reason) + "），关了 " + seconds(Math.max(0, ms))
+                            : "：" + lossText(c.reason));
+                case REOPEN:
+                    return "救 " + lane + " 重开时关旧设备" + (withTimes ? "，关了 " + seconds(Math.max(0, ms)) : "");
+                default:
+                    if (!withTimes) {
+                        return "关 " + roles(c.keys) + "，" + closeWhyText(c.why);
+                    }
+                    List<String> parts = new ArrayList<>();
+                    for (int i = 0; i < c.keys.size(); i++) {
+                        long each = i < c.endedMs.size() ? c.endedMs.get(i) : -1;
+                        parts.add(roleName(c.keys.get(i)) + (each < 0 ? " 到点还没关完" : " " + seconds(each)));
+                    }
+                    return "关 " + String.join("、", parts) + "（" + closeWhyText(c.why) + "）";
+            }
+        }
+
+        /**
+         * 环视最后一帧在什么时候：{@code fromStart} 时「环视最后一帧在开始关后 +67 ms、前座舱关完前 35 ms、后座舱关完前 73 ms」，
+         * 不然只对关完（最后一路关完）：「最后一帧在关完前 73 ms」「最后一帧在关完后 +1.5 秒」。没出过画面：「环视还没出过画面」。
+         */
+        private String lastResultText(ChannelScheduler.Coupling c, boolean fromStart) {
+            long afterStart = c.lastResultAfterStartMs();
+            if (afterStart == Long.MIN_VALUE) {
+                return "环视还没出过画面";
+            }
+            if (!fromStart) {
+                return "最后一帧在关完" + relativeText(c.lastResultAfterEndMs());
+            }
+            StringBuilder sb = new StringBuilder("环视最后一帧在开始关").append(relativeText(afterStart));
+            for (int i = 0; i < c.keys.size() && i < c.endedMs.size(); i++) {
+                long ended = c.endedMs.get(i);
+                if (ended >= 0) {
+                    sb.append("、").append(roleName(c.keys.get(i))).append("关完").append(relativeText(afterStart - ended));
+                }
+            }
+            return sb.toString();
+        }
+
+        /** 「后 +67 ms」「前 35 ms」；一秒以上写秒：「后 +1.5 秒」。 */
+        private String relativeText(long ms) {
+            long abs = Math.abs(ms);
+            String amount = abs < 1_000L ? abs + " ms" : seconds(abs);
+            return ms >= 0 ? "后 +" + amount : "前 " + amount;
+        }
+
+        /** 「环视 0 / 0、后座舱 1 / 0、前座舱 0 / 0」（失败 / 丢缓冲）。 */
+        private String troubleText(List<ChannelScheduler.Trouble> trouble) {
+            List<String> parts = new ArrayList<>();
+            for (ChannelScheduler.Trouble t : trouble) {
+                parts.add(roleName(t.key) + " " + t.failures + " / " + t.lost);
+            }
+            return parts.isEmpty() ? "没有" : String.join("、", parts);
+        }
+
+        /** 点火的样子：「ACC」「ON」「DRIVING」，认不出的写十六进制（「0x00200102」）。 */
+        private String ignitionText(int code) {
+            return ignitionCode(code);
+        }
+
+        /**
+         * 救完一路之后接着量别的几路，量到下一步开始（2.11.5 第 D2 项）：「通道：救 后座舱 之后接着量到下一步开始（救那一步量了 5.8 秒，
+         * 一共量了 21.3 秒；下一步：开 前座舱）：环视最长断帧 8.1 秒、会话没动」。比救那一行多量不到 1 秒的不写（调度那边就不交）。
+         */
+        @Override
+        public void rescueAftermath(String key, long stepMs, long measuredMs, ChannelRules.Move next, String nextKey,
+                                    List<ChannelScheduler.Other> others) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：救 " + roleName(key) + " 之后接着量到下一步开始（救那一步量了 "
+                    + seconds(stepMs) + "，一共量了 " + seconds(measuredMs) + "；"
+                    + (next == null ? (ChannelScheduler.AFTERMATH_MS / 1000) + " 秒里没有下一步"
+                    : "下一步：" + stepName(next) + " " + roleName(nextKey)) + "）：" + gapsText(others)
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
+
+        /** 一步的叫法：开、改输出、救、关。 */
+        private String stepName(ChannelRules.Move move) {
+            switch (move) {
+                case OPEN:
+                    return "开";
+                case APPLY:
+                    return "改输出";
+                case RESCUE:
+                    return "救";
+                case CLOSE:
+                    return "关";
+                default:
+                    return "动";
+            }
+        }
+
+        /** 「 0.2 秒前变过」；进程起来以后没见它变过：「起来以后没变过」。 */
+        private String changedText(long agoMs) {
+            return agoMs < 0 ? "起来以后没变过" : " " + duration(agoMs) + "前变过";
+        }
+
+        /**
+         * 一步结束了：相机步骤统计记一条（{@link StepLog}，应用目录，最近 200 条；诊断报告「2.3.3 相机步骤统计」读）。
+         * 不写黑匣子 —— 那一步自己的那一行另有。写在 StepLog 自己的线程上，主线程不碰盘。
+         */
+        @Override
+        public void recorded(ChannelScheduler.StepRecord r) {
+            ChannelScheduler.StepContext c = r.context;
+            ChannelScheduler.Vehicle v = c.vehicle;
+            StepStats.Builder b = new StepStats.Builder()
+                    .step(System.currentTimeMillis(), c.key, c.cameraId, r.move, r.result, r.ms)
+                    .configured(r.configuredMs)
+                    .error(r.reason == null ? null : r.reason.source + (r.reason.code == 0 ? "" : ":" + r.reason.code))
+                    .counts(r.counts)
+                    .oldClose(r.oldCloseMs)
+                    .vehicle(v.sentry, v.sinceIgnitionMs, v.sinceDoorMs, v.sinceScreenEventMs, v.importance)
+                    .main(c.mainForeground)
+                    .lastClose(c.sinceCloseMs, c.closeMs)
+                    .released(c.heldMs, c.releasedAgoMs)
+                    .word(c.wordAgoMs, c.wordAgoMs < 0 ? null : c.wordOurs)
+                    .surround(c.surround == null ? null : c.surround.name(),
+                            r.surround == null ? -1 : r.surround.gapMs,
+                            r.surround == null ? null : r.surround.sessionChanged)
+                    .closeKind(r.closeKind)
+                    .lineage(r.lineage, r.lineageReset == null ? null : r.lineageReset.name())
+                    // 关座舱前先关环视之后环视开回来的那一步（2.11.6）：从开始关环视到这一步开始多久、座舱那一步关了多久
+                    .surroundFirst(r.surroundFirstStartMs, r.surroundFirstCabinMs);
+            ChannelScheduler.Coupling coupling = r.coupling;
+            if (coupling != null) {
+                // 关座舱时环视那一条（2.11.5 第 D3 项）：关的几路、为什么关、环视最后一帧比关完晚多少、关完 1 秒后出没出过画面、我们中途动没动它
+                b.coupling(coupling.keys, coupling.kind == ChannelScheduler.Coupling.Kind.PLANNED
+                                ? (coupling.why == null ? null : coupling.why.name())
+                                : coupling.reason == null ? coupling.kind.name()
+                                : coupling.reason.source + (coupling.reason.code == 0 ? "" : ":" + coupling.reason.code),
+                        coupling.lastResultAfterEndMs(), coupling.deliveredAfter,
+                        coupling.surround.ours == null ? null : coupling.surround.ours.name(), coupling.surround.oursAtMs)
+                        // 点火照开始关那一刻的（和哨兵、主界面那几样一样），不是关完 30 秒量的那一刻
+                        .ignition(v.ignition == null ? null : ignitionCode(v.ignition));
+            }
+            StepLog.append(context, b.build());
+        }
+
+        /** 调度的钟（uptime）上的一刻换成墙上时钟「20:10:30.918」，和黑匣子每行开头对得上。 */
+        private String wallClock(long uptimeMs) {
+            long wall = System.currentTimeMillis() - (android.os.SystemClock.uptimeMillis() - uptimeMs);
+            return new SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(new Date(wall));
         }
 
         @Override
@@ -3360,6 +3868,48 @@ public class MultiCameraManager {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：关 " + roles(closedKeys) + "（" + closeWhyText(why)
                     + "）之后 " + (ChannelScheduler.AFTERMATH_MS / 1000) + " 秒：" + gapsText(others)
                     + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
+
+        /**
+         * 关座舱前先关环视的一趟走完了（{@link ChannelScheduler.SurroundFirst}，项目所有者 2026-10-15 定，2.11.6），一趟一行：
+         * 「关座舱前先关环视：环视断了 0.6 秒（关 0.1 秒 → 座舱关 0.1 秒 → 开 0.2 秒）」；开回来没画面、出了事、不再开回来的照实写
+         * （「环视开回来 15 秒没出画面，由救援接手（…）；从开始关环视起 15.5 秒」「环视没人要了，不再开回来（…）」）。
+         */
+        @Override
+        public void surroundFirst(ChannelScheduler.SurroundFirst f) {
+            List<String> parts = new ArrayList<>();
+            parts.add(f.surroundMs < 0 ? "关 还没关完" : f.surroundTimedOut
+                    ? "关 " + (ChannelRules.CLOSE_SURROUND_MAX_MS / 1000) + " 秒还没关完" : "关 " + seconds(f.surroundMs));
+            parts.add(f.cabinMs < 0 ? "座舱没关（又有人要了）" : f.cabinTimedOut
+                    ? "座舱关 " + (ChannelRules.CLOSE_CABINS_MAX_MS / 1000) + " 秒还没关完" : "座舱关 " + seconds(f.cabinMs));
+            String head;
+            switch (f.end) {
+                case FRAMED:
+                    parts.add("开 " + seconds(f.reopenMs));
+                    head = "环视断了 " + seconds(f.gapMs);
+                    break;
+                case NO_FRAMES:
+                    parts.add("开 " + (ChannelRules.STEP_MAX_MS / 1000) + " 秒没画面");
+                    head = "环视开回来 " + (ChannelRules.STEP_MAX_MS / 1000) + " 秒没出画面，由救援接手";
+                    break;
+                case ERROR:
+                    parts.add("开 " + seconds(Math.max(0, f.reopenMs)) + " 出事");
+                    head = "环视开回来" + (f.failure != null && f.failure.origin == ChannelRules.Failure.Origin.LOSS
+                            ? "那一步里丢了（" + lossText(f.failure.reason) + "）"
+                            : "时开不起来（" + openFailText(f.failure == null ? null : f.failure.reason) + "）");
+                    break;
+                case WINDING:
+                    head = "退出 / 车机要睡，环视不再开回来";
+                    break;
+                default:
+                    head = "环视没人要了，不再开回来";
+                    break;
+            }
+            String tail = f.end == ChannelScheduler.SurroundFirst.End.NO_FRAMES
+                    || f.end == ChannelScheduler.SurroundFirst.End.ERROR
+                    ? "；从开始关环视起 " + seconds(f.endedAt - f.startedAt) : "";
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("关座舱前先关环视：" + head + "（" + String.join(" → ", parts) + "）"
+                    + tail + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         }
 
         @Override
@@ -3502,7 +4052,10 @@ public class MultiCameraManager {
             return record ? "画布被系统收走、MediaRecorder 停了" : "画布被系统收走";
         }
 
-        /** 关的原因（「通道：关 …（…）」、退出录像那一行、诊断报告「该开」、拍照不拍哪几路）。 */
+        /**
+         * 关的原因（「通道：关 …（…）」、退出录像那一行、诊断报告「该开」、拍照不拍哪几路）。关座舱前先关环视（2.11.6）那一行：
+         * 「通道：关 环视（关座舱前先关环视），熄屏后 +30001ms」。
+         */
         private String closeWhyText(ChannelRules.Why why) {
             switch (why) {
                 case EXIT:
@@ -3513,6 +4066,8 @@ public class MultiCameraManager {
                     return "熄屏";
                 case DARK_RELEASE:
                     return "熄屏：座舱放开";
+                case SURROUND_FIRST:
+                    return "关座舱前先关环视";
                 case HOLD_OVER:
                     return "保持到点";
                 default:
@@ -4731,6 +5286,8 @@ public class MultiCameraManager {
      */
     public void release() {
         released = true;
+        // 调度还要按次序关一阵：这期间被系统收走的画布交给这一份（ownerOf），等它离开会话再放
+        lastReleased = new java.lang.ref.WeakReference<>(this);
         // 登记表的监听只在还是自己时才摘：换车型时旧的这份晚 release，不能把新那份接上的监听摘了
         CameraNeeds.current().clearListener(needsListener);
         com.kooo.evcam.screen.ScreenState.removeListener(screenWake);

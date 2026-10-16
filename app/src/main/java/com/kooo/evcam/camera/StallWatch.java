@@ -73,8 +73,9 @@ import java.util.function.Supplier;
  *
  * <h3>不做什么</h3>
  *
- * <p><b>只记录，不修复。</b>自动恢复会把证据抹掉；而且 {@code SingleCamera} 里已经有一套
- * 按出帧结果触发的恢复（重建会话、重开相机），这里再动手只会和它打架。</p>
+ * <p><b>只记录，不修复。</b>自动恢复会把证据抹掉；而且动相机的只有通道调度一个地方（{@link ChannelScheduler}：
+ * 救援按出帧判、重建会话或重开相机；2.10.10 起 SingleCamera 自己不再重连），这里再动手只会和它打架
+ * （项目所有者 2026-10-14 R1 审查：这里一个相机动作都没有，只读、只写报告和黑匣子）。</p>
  *
  * <p>报告写在应用私有目录的 {@code stall/} 下，重启后还在。「保存日志」和诊断报告都会带上。
  * 报告是写给维护者看的，不做翻译。</p>
@@ -106,6 +107,11 @@ public final class StallWatch {
     private static final String DIR = "stall";
     private static final String FILE = "reports.log";
     private static final String OLD_FILE = "reports.1.log";
+    /**
+     * 诊断报告带最近几份现场（{@link #fitReports}，2.11.5 第 D4 项）：每一份（连同它后面的恢复 / 不再盯那一份）都带上，放不下就每一份
+     * 掐掉中间 —— 以前只带最新的 32 KB，10-14 21:52 那一份一份就占满了，10-13 23:59 那一次的现场（三路的出帧、失败、丢缓冲计数）没了。
+     */
+    static final int KEEP_REPORTS = 5;
 
     private static final Heartbeat MIRROR = new Heartbeat();
     private static final Map<String, Heartbeat> CAPTURE = new ConcurrentHashMap<>();
@@ -222,6 +228,36 @@ public final class StallWatch {
         return foreground;
     }
 
+    /** 进程的重要性多久读一次（监测线程上读，{@link #refreshImportance}）。 */
+    private static final long IMPORTANCE_EVERY_MS = 2_000L;
+    /** 最近一次读到的进程重要性（{@code RunningAppProcessInfo.importance}）；-1 = 还没读到。 */
+    private static volatile int importance = -1;
+    /** 上一次读的时刻；只在监测线程上读写。 */
+    private static long importanceReadAt = Long.MIN_VALUE / 2;
+
+    /**
+     * 进程此刻的重要性（相机服务按它排优先级），缓存的：监测线程每 2 秒读一次。开座舱那一行、相机步骤统计在主线程上读它
+     * （2.11.4，项目所有者 2026-10-14 批准的诊断）—— 主线程不为一行诊断进系统服务。-1 = 还没读到。
+     */
+    public static int importance() {
+        return importance;
+    }
+
+    /** 到点就读一次进程的重要性（监测线程）。读不到不改上一次的值。 */
+    private static void refreshImportance(long now) {
+        if (now - importanceReadAt < IMPORTANCE_EVERY_MS) {
+            return;
+        }
+        importanceReadAt = now;
+        try {
+            ActivityManager.RunningAppProcessInfo info = new ActivityManager.RunningAppProcessInfo();
+            ActivityManager.getMyMemoryState(info);
+            importance = info.importance;
+        } catch (Throwable t) {
+            AppLog.d(TAG, "importance unavailable: " + t);
+        }
+    }
+
     public static void setForeground(boolean value) {
         if (foreground != value) {
             foreground = value;
@@ -312,11 +348,8 @@ public final class StallWatch {
         String saved = readReports(ctx);
         if (saved.isEmpty()) {
             sb.append("(none saved)\n");
-        } else if (saved.length() > maxReportChars) {
-            sb.append("(showing the newest ").append(maxReportChars).append(" characters)\n");
-            sb.append(saved, saved.length() - maxReportChars, saved.length());
         } else {
-            sb.append(saved);
+            sb.append(fitReports(saved, KEEP_REPORTS, maxReportChars));
         }
         sb.append("===== previous process exits, newest first =====\n");
         appendExitReasons(sb, ctx);
@@ -333,6 +366,7 @@ public final class StallWatch {
         } catch (Throwable t) {
             AppLog.w(TAG, "check failed: " + t);
         }
+        refreshImportance(now());
         Handler handler = watchHandler;
         if (handler != null) {
             handler.postDelayed(TICK, isActive() ? TICK_ACTIVE_MS : TICK_IDLE_MS);
@@ -868,6 +902,61 @@ public final class StallWatch {
         return sb.toString();
     }
 
+    /**
+     * 存下的现场里最近 {@code keep} 份，每一份都带上（一份 = 一次卡住的那一份，连同它后面跟着的恢复 / 不再盯那几份），按先后：
+     * 加起来超过 {@code maxChars} 的，每一份分到一样多，超出的掐掉中间（留开头那一段 —— 标题、那一刻每一路的出帧 / 失败 / 丢缓冲计数、
+     * 线程、相机 —— 和最后那一段：卡住前后的日志、恢复那一份），写明掐掉了多少（2.11.5 第 D4 项）。认不出格式的整段当一份。纯函数。
+     */
+    static String fitReports(String saved, int keep, int maxChars) {
+        List<String> groups = new ArrayList<>();
+        StringBuilder current = null;
+        String[] lines = saved.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (i == lines.length - 1 && line.isEmpty()) {
+                break;   // 末尾那个换行之后是空的
+            }
+            boolean header = line.startsWith("===== ") && !line.startsWith("===== end");
+            if (current == null || header && line.startsWith("===== STALL ")) {
+                if (current != null && current.length() > 0) {
+                    groups.add(current.toString());
+                }
+                current = new StringBuilder();
+            }
+            current.append(line).append('\n');
+        }
+        if (current != null && current.toString().trim().length() > 0) {
+            groups.add(current.toString());
+        }
+        int dropped = Math.max(0, groups.size() - keep);
+        List<String> kept = groups.subList(dropped, groups.size());
+        StringBuilder sb = new StringBuilder();
+        if (dropped > 0) {
+            sb.append("(").append(dropped).append(" older reports not shown; the newest ").append(kept.size())
+                    .append(" follow)\n");
+        }
+        int total = 0;
+        for (String group : kept) {
+            total += group.length();
+        }
+        int budget = kept.isEmpty() ? maxChars : Math.max(1, maxChars / kept.size());
+        for (String group : kept) {
+            sb.append(total <= maxChars || group.length() <= budget ? group : clipMiddle(group, budget));
+        }
+        return sb.toString();
+    }
+
+    /** 掐掉中间：留开头三分之二、结尾三分之一（都从整行起止），中间写一行掐掉了多少。 */
+    private static String clipMiddle(String text, int budget) {
+        int headEnd = text.lastIndexOf('\n', Math.max(0, budget * 2 / 3));
+        int tailStart = text.indexOf('\n', Math.max(0, text.length() - budget / 3));
+        if (headEnd < 0 || tailStart < 0 || tailStart <= headEnd) {
+            return text.substring(0, Math.min(text.length(), budget)) + "\n(... report cut ...)\n";
+        }
+        return text.substring(0, headEnd + 1) + "(... " + (tailStart - headEnd - 1)
+                + " characters cut from the middle of this report ...)" + text.substring(tailStart);
+    }
+
     // ------------------------------------------------------------------ 小工具
 
     private static Trouble trouble(String cameraId) {
@@ -912,7 +1001,11 @@ public final class StallWatch {
     }
 
     /**
-     * 卡在哪：栈顶三帧，再加上第一帧我们自己的代码（栈顶多半是 binder 调用，看不出是谁发起的）。
+     * 卡在哪：栈顶三帧，再加上下面每一帧我们自己的代码（栈顶多半是 binder 调用，看不出是谁发起的）。中间隔着别人的帧写「 ... 」，
+     * 挨着的写「 <- 」。
+     *
+     * <p>以前只带第一帧我们自己的代码（2.11.4 起全带，项目所有者 2026-10-14 批准的诊断）：10-13 那一次相机线程卡在
+     * {@code configureSession} 里，是改输出、救援重建、还是开好之后建会话，只看那一帧分不出 —— 只能事后拿关相机小结的账倒推。</p>
      */
     static String whereStuck(StackTraceElement[] stack) {
         if (stack == null || stack.length == 0) {
@@ -926,10 +1019,11 @@ public final class StallWatch {
             }
             sb.append(shortFrame(stack[i]));
         }
+        int last = top - 1;
         for (int i = top; i < stack.length; i++) {
             if (stack[i].getClassName().startsWith("com.kooo.")) {
-                sb.append(" ... ").append(shortFrame(stack[i]));
-                break;
+                sb.append(i == last + 1 ? " <- " : " ... ").append(shortFrame(stack[i]));
+                last = i;
             }
         }
         return sb.toString();

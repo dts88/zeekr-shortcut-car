@@ -344,7 +344,7 @@ public class RearViewMirrorService extends Service {
         } catch (RuntimeException e) {
             // 接不上：还给管线，照旧等它离开会话再放；还不回去（管线里已经没有环视那一路）就放掉，这块画布不在它的会话里
             AppLog.w(TAG, "接回留着的后视镜画布失败: " + e);
-            if (!pipeline.keepMirrorCanvas(kept)) {
+            if (!MultiCameraManager.keepMirrorCanvas(pipeline, kept)) {
                 kept.release();
             }
             return;
@@ -366,8 +366,9 @@ public class RearViewMirrorService extends Service {
      *
      * <p>服务退出时 {@link #onDestroy} 已经放开登记、撤回过了（那时 boundTexture 已清，窗口随后当场移走）；服务还在而窗口被拆的，
      * 这里先放开、撤回。重试一律取消 —— 排着的那一次拿的是这块画布，没声明上（拿不到环视）时 boundTexture 不是它。
-     * 管线没了、放了、里面没有环视那一路时照旧让 TextureView 放：会话里那个成了死输出，叫醒调度马上摘 —— 这个回调返回之后
-     * TextureView 才放，post 出去的那一轮看到的就是死的，不用等调度每 2 秒一次的那一轮。</p>
+     * 退出、换车型时管线已经放了、它的调度还在按次序关：环视的会话里还带着这块画布的，照样交给那一份的调度，随环视关了再放
+     * （2.11.4 R1：会话里的画布只由通道调度放，{@link MultiCameraManager#ownerOf}）。哪一份都不带着它、也没有环视那一路时
+     * 照旧让 TextureView 放，叫醒调度 —— 这个回调返回之后 TextureView 才放，post 出去的那一轮看到的就是此刻的样子。</p>
      *
      * @return true：画布交给管线了（回调返回 false）；false：照旧让 TextureView 放
      */
@@ -379,7 +380,7 @@ public class RearViewMirrorService extends Service {
             withdrawOutput();
         }
         MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
-        boolean kept = pipeline != null && !pipeline.isReleased() && pipeline.keepMirrorCanvas(st);
+        boolean kept = MultiCameraManager.keepMirrorCanvas(pipeline, st);
         if (kept) {
             com.kooo.evcam.blackbox.BlackBox.note("后视镜窗口移走：画布交给管线留着，环视不动（没人接回的等它离开环视的会话再放）");
         } else {

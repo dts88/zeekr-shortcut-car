@@ -11,6 +11,46 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.11.7-beta] - 2026-10-15
+
+Upgrade from 2.0.0. Same code as 2.11.6-alpha.
+
+- **Significantly improved stability.**
+- While recording, the record button shows what will happen when the screen turns off.
+- Fixed stuttering at high bitrates and frame rates.
+- Driving info bar redesigned, with new items including Sentry Mode, rear lamps and a 7X front view, plus an easter egg. Items are selected in Settings → System → System info (experimental). The bar is added to the surround view recording only.
+- Lock footage (Settings → Storage): videos and photos can be locked during playback, or automatically when the high beams are flashed (optional). Locked files are never deleted by loop recording.
+- Interface text revised in all three languages.
+- Diagnostics extended; Send to phone is available to all users.
+- Known issue: with all three cameras enabled (surround view, front and rear cabin), a camera may occasionally freeze before it recovers automatically. Current work focuses on reducing the impact on the head unit.
+
+## [2.11.6-alpha] - 2026-10-15
+
+- When the cabin cameras are released while the surround view is open, the surround view now closes briefly first and reopens after the cabins have closed.
+- Diagnostics: the report counts these surround view reopens.
+
+## [2.11.5-alpha] - 2026-10-15
+
+- Diagnostics only; camera behaviour unchanged.
+- A camera session where the camera never started a frame is labelled as a camera-side failure.
+- Each cabin close while the surround view is open is logged with the surround view's last frame and re-checked after 1 and 30 seconds.
+- The report shows how many times each camera was opened since the head unit last reset it, and the surround view's side of cabin closes.
+- Keeps the last stall reports; logs the first run after an install.
+
+## [2.11.4-alpha] - 2026-10-14
+
+- A camera that opens without delivering frames is reopened instead of reconfigured.
+- While any camera is still closing, no other camera step starts.
+- Removed an unneeded 3-second wait before recovering a camera.
+- Photos and exit no longer act on a camera outside the camera scheduler.
+- Diagnostics: a camera that opens without frames is classified in the black box; the report adds camera step statistics.
+
+## [2.11.3-alpha] - 2026-10-13
+
+- Opening a door within 30 seconds of the screen going off no longer stops and restarts the cabin cameras.
+- Closed cabin cameras are not opened while the screen is off.
+- A recording waiting for the USB drive starts as soon as the drive is usable.
+
 ## [2.11.2-alpha] - 2026-10-13
 
 - Screen off now follows the physical screen: the vehicle's screen signal counts, not only Android's screen-off at power-down.
