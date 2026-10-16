@@ -225,7 +225,6 @@
     <string name="vi_fcw">前碰预警</string>
     <string name="vi_ldw">车道偏离预警</string>
     <string name="vi_lka">车道保持</string>
-    <string name="vi_bsd">盲区辅助</string>
     <string name="vi_rcw">后碰预警</string>
     <string name="vi_lane_change_assist">变道辅助</string>
     <string name="vi_auto_lane_change">自动变道</string>

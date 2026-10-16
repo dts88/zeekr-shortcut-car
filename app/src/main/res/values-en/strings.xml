@@ -207,7 +207,6 @@
     <string name="vi_fcw">Forward collision warning</string>
     <string name="vi_ldw">Lane departure warning</string>
     <string name="vi_lka">Lane keeping aid</string>
-    <string name="vi_bsd">Blind spot assist</string>
     <string name="vi_rcw">Rear collision warning</string>
     <string name="vi_lane_change_assist">Lane change assist</string>
     <string name="vi_auto_lane_change">Automatic lane change</string>
