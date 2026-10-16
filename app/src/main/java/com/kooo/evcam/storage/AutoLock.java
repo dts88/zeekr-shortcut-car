@@ -262,20 +262,18 @@ public final class AutoLock implements Telemetry.Listener {
      * 又闪了一下、那一段本来就锁着，不弹。
      */
     private final FootageLocks.Result toastWhenLocked = ok -> {
-        if (ok) {
-            toastLocked();
-        }
+        toastLocked(ok ? R.string.msg_flash_locked : R.string.msg_footage_lock_failed);
     };
 
     /** 「已锁定前后 10 秒所在的录像片段」。离上一次弹不到 {@link #TOAST_GAP_MS} 就不再弹。主线程。 */
-    private void toastLocked() {
+    private void toastLocked(int message) {
         Context context = app;
         long now = SystemClock.uptimeMillis();
         if (context == null || (lastToastAt > 0 && now - lastToastAt < TOAST_GAP_MS)) {
             return;
         }
         lastToastAt = now;
-        Toast.makeText(context, Languages.localized(context).getString(R.string.msg_flash_locked),
+        Toast.makeText(context, Languages.localized(context).getString(message),
                 Toast.LENGTH_SHORT).show();
     }
 
