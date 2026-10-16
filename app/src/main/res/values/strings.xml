@@ -71,7 +71,7 @@
     <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「只显示前后视」和「方向标签」的默认值，并切回后视</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
-    <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字待项目所有者过目 -->
+    <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
     <string name="set_side_view_title">盲区画面</string>
     <string name="set_side_view_summary">打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。</string>
     <string name="set_side_view_min_speed_title">最低车速</string>
