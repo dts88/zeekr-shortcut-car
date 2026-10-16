@@ -12,12 +12,12 @@ import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
 
 /**
- * 两个悬浮窗（超级后视镜、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
+ * 两个悬浮窗（超级镜子、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
  *
  * <h3>为什么要有这么个地方</h3>
  *
  * <p>同一个问题原先在三处各答一遍：主界面启动时、设置页开关时、前台服务在开机自启时。
- * 三份答案已经不一致了 —— 最明显的一处是<b>超级后视镜的开关没查悬浮窗权限</b>：
+ * 三份答案已经不一致了 —— 最明显的一处是<b>超级镜子的开关没查悬浮窗权限</b>：
  * 没授权时开关拨上去、提示语还告诉你手势怎么用，屏幕上什么都没有，
  * 服务在 {@code onStartCommand} 里 {@code stopSelf()} 走了，只往 logcat 写了一行。
  * 画面悬浮窗和录制悬浮按钮的开关都查了，唯独它漏了。</p>
@@ -61,7 +61,7 @@ public final class OverlayCoordinator {
             // 于是每次重开应用都要去设置里关一次再开一次它才出现。
             main().postDelayed(() -> {
                 RearViewMirrorService.start(context);
-                AppLog.d(TAG, "超级后视镜已按设置自动开启");
+                AppLog.d(TAG, "超级镜子已按设置自动开启");
             }, REAR_VIEW_DELAY_MS);
         }
 
@@ -94,7 +94,7 @@ public final class OverlayCoordinator {
     }
 
     /**
-     * 开 / 关超级后视镜。返回值含义同 {@link #setRecordButtonEnabled}。
+     * 开 / 关超级镜子。返回值含义同 {@link #setRecordButtonEnabled}。
      *
      * <p>这里的权限检查是补上的 —— 原来没有，没授权时开关会拨上去而窗口不出现。</p>
      */

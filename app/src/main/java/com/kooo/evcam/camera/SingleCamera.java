@@ -1557,7 +1557,7 @@ public class SingleCamera {
     }
 
     /**
-     * 声明超级后视镜的画布：以 SurfaceTexture 作身份，一个 SurfaceTexture 只建一个 Surface（建会话时在相机线程上建）。
+     * 声明超级镜子的画布：以 SurfaceTexture 作身份，一个 SurfaceTexture 只建一个 Surface（建会话时在相机线程上建）。
      * 贴边、放回都不算变化 —— 画面只要活着就留在会话里。
      */
     public boolean declareMirror(SurfaceTexture texture) {
@@ -3436,7 +3436,7 @@ public class SingleCamera {
      *
      * <p>关相机是一次进相机服务的调用，实测卡过 13.6 秒（2026-09-26，主线程）。以前它在调用方的
      * 线程上做 —— 多半就是主线程 —— 而且拿着 {@link #deviceLock}：主线程一卡，主界面、
-     * 超级后视镜、悬浮按钮全都跟着不动，分不清是界面的问题还是相机的问题。</p>
+     * 超级镜子、悬浮按钮全都跟着不动，分不清是界面的问题还是相机的问题。</p>
      *
      * <p>现在调用方这边只做不进相机服务的事：改标志、摘掉待办、把要关的会话和设备从字段上摘下来。
      * 真正关的那几步交给<b>这一路自己的相机线程</b>（卡顿监测里叫 {@code Camera-<id> closing}），

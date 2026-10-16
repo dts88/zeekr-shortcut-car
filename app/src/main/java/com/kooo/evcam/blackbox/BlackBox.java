@@ -195,7 +195,7 @@ public final class BlackBox {
                             ? "(存着是开，开发者选项没解锁，没生效)" : "")
                     + (c.isScreenOffRecordingEnabled() ? "(最多 " + c.getScreenOffWakeMinutes() + " 分钟不让睡)" : "")
                     + " 熄屏持续录制=" + onOff(c.isScreenOffKeepRecording())
-                    + " 超级后视镜=" + onOff(c.isRearViewEnabled())
+                    + " 超级镜子=" + onOff(c.isRearViewEnabled())
                     + " 按键模式=" + onOff(c.isRearViewButtonMode())
                     + " 录制悬浮按钮=" + onOff(c.isRecordingFloatingEnabled());
         } catch (Throwable t) {

@@ -152,7 +152,7 @@
             android:selectable="false" />
     </PreferenceScreen>
 
-    <!-- ==================== 超级后视镜 ==================== -->
+    <!-- ==================== 超级镜子 ==================== -->
     <PreferenceScreen
         android:key="screen_rearview"
         android:title="@string/set_section_rearview">

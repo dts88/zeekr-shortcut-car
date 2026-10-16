@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 
 /**
- * 建管线建哪几路（{@link CameraManagerHolder.Shape}）：照启用的几路，环视一直建（超级后视镜要它），座舱启用了才建。
+ * 建管线建哪几路（{@link CameraManagerHolder.Shape}）：照启用的几路，环视一直建（超级镜子要它），座舱启用了才建。
  *
  * <p>2026-10-16 修的就是这里：以前数路数，只开一路座舱时只建了环视；只开两路座舱时最多建 2 路，前座舱被挤掉。</p>
  */
@@ -55,7 +55,7 @@ public class CameraManagerHolderShapeTest {
         assertEquals(3, shape(SUR, REAR, FRONT).count);
     }
 
-    /** 一路都没启用：只建环视，给超级后视镜。 */
+    /** 一路都没启用：只建环视，给超级镜子。 */
     @Test
     public void nothingEnabledBuildsTheSurroundOnly() {
         CameraManagerHolder.Shape none = shape();

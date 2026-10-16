@@ -27,7 +27,7 @@
     <string name="upd_none_release">未找到可安装的正式版</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>
-    <string name="set_section_rearview">超级后视镜</string>
+    <string name="set_section_rearview">超级镜子</string>
     <string name="set_section_floating">悬浮按钮</string>
     <string name="set_section_system">系统</string>
     <string name="set_section_about">关于与致谢</string>
@@ -61,7 +61,7 @@
     <string name="set_rearview_front_rear_title">只显示前后视</string>
     <string name="set_rearview_front_rear_summary">仅在前视与后视之间切换</string>
     <string name="set_rearview_fisheye_title">鱼眼校正</string>
-    <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级后视镜，不影响录像。</string>
+    <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级镜子，不影响录像。</string>
     <string name="set_rearview_fov_title">视野角度</string>
     <string name="set_rearview_fov_summary">角度越大，视野越宽、画面越清晰，但边缘变形越明显</string>
     <string name="set_rearview_width_title">窗口宽度</string>
@@ -94,13 +94,13 @@
     <string name="floating_action_open_app">打开主界面</string>
     <string name="floating_action_toggle_recording">开始 / 停止录制</string>
     <string name="floating_action_take_photo">拍照</string>
-    <string name="floating_action_toggle_mirror">开启 / 关闭超级后视镜</string>
+    <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
     <string name="set_recording_stats_title">录制状态显示</string>
     <string name="set_recording_stats_summary">录制时在画面角落显示已录时长和当前片段序号</string>
     <string name="set_reset_floating_title">重置悬浮按钮</string>
     <string name="set_reset_floating_summary">恢复默认位置、按钮大小和时长文字大小</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级后视镜、悬浮按钮和自动录制。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、悬浮按钮和自动录制。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
@@ -293,8 +293,8 @@
     <string name="info_unlimited">不限制</string>
     <string name="info_reading">正在读取…</string>
     <string name="info_read_failed">无法读取</string>
-    <string name="msg_rearview_on">超级后视镜已开启：拖动两侧移动窗口，中间上下滑动调整取景</string>
-    <string name="msg_rearview_reset">超级后视镜窗口与画面已重置</string>
+    <string name="msg_rearview_on">超级镜子已开启：拖动两侧移动窗口，中间上下滑动调整取景</string>
+    <string name="msg_rearview_reset">超级镜子窗口与画面已重置</string>
     <string name="msg_floating_reset">悬浮按钮已重置</string>
     <string name="msg_adjust_opened">已打开画面调节窗口，返回主界面查看效果</string>
     <string name="msg_adjust_reset">画面参数已恢复默认</string>
@@ -320,7 +320,7 @@
     <string name="guide_title">开始之前</string>
     <string name="guide_1">试验性非官方应用，未经任何车辆功能安全认证，不能替代原厂行车记录仪、倒车影像或盲区监测。行驶中请勿操作本应用，也不要依据其画面判断路况。</string>
     <string name="guide_2">录像和照片仅保存到 U 盘，未插入 U 盘时不会开始录制，也无法拍照。行车记录需要持续写入，而内置存储的写入寿命有限，且通常无法更换。U 盘上的录像和照片未加密，取下后可在其他设备上直接读取。</string>
-    <string name="guide_3">菜单键固定在左上角。操作按钮可在「设置 → 界面 → 操作按钮位置」中放到驾驶座一侧。超级后视镜默认关闭，可在菜单或「设置 → 超级后视镜」中开启；开启后拖动窗口两侧可移动，双指可缩放，在窗口中间上下滑动调整取景、左右滑动切换摄像头。</string>
+    <string name="guide_3">菜单键固定在左上角。操作按钮可在「设置 → 界面 → 操作按钮位置」中放到驾驶座一侧。超级镜子默认关闭，可在菜单或「设置 → 超级镜子」中开启；开启后拖动窗口两侧可移动，双指可缩放，在窗口中间上下滑动调整取景、左右滑动切换摄像头。</string>
     <string name="guide_4">遇到问题请先重启应用。如仍未恢复，请在「设置 → 系统 → 诊断信息」中导出诊断报告，并附在 issue 中提交。</string>
     <string name="action_got_it_guide">知道了</string>
 
@@ -847,7 +847,7 @@
     <string name="dev_perm_all_files">所有文件访问</string>
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>
-    <string name="dev_perm_overlay_why">用于超级后视镜、悬浮按钮和画面调节窗口</string>
+    <string name="dev_perm_overlay_why">用于超级镜子、悬浮按钮和画面调节窗口</string>
     <string name="dev_perm_accessibility">无障碍服务</string>
     <string name="dev_perm_accessibility_why">用于开机自启动</string>
     <string name="dev_perm_usage_access">使用情况访问</string>

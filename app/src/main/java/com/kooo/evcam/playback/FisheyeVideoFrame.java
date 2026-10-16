@@ -24,7 +24,7 @@ import com.kooo.evcam.zeekr.FisheyeMesh;
  *
  * <p>不校正时，取景就是 TextureView 自己的变换矩阵（{@link PlaybackViewport#transformRects}）。
  * 校正是非线性的，一个矩阵做不到，只能由父视图把这个 TextureView 切成小格逐格画
- * （{@link FisheyeMesh}，和主界面预览、超级后视镜同一套）。所以校正时把 TextureView 的矩阵
+ * （{@link FisheyeMesh}，和主界面预览、超级镜子同一套）。所以校正时把 TextureView 的矩阵
  * 还原成单位阵，让视频铺满它自己，取景和校正都由这里画。</p>
  *
  * <p>开关和图片回看、主界面是同一个（{@link AppConfig#isFisheyeCorrection}），参数也是同一套。

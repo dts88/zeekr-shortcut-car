@@ -676,7 +676,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }, "storage-usage").start();
     }
 
-    // ------------------------------------------------------------------ 超级后视镜
+    // ------------------------------------------------------------------ 超级镜子
 
     private void bindRearView() {
         bindSwitch("pref_rearview_camera_label", appConfig.isRearViewCameraLabelEnabled(), value -> {

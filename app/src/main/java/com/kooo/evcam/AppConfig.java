@@ -59,7 +59,7 @@ public class AppConfig {
     private static final String KEY_RECORDING_STATS_ENABLED = "recording_stats_enabled";  // 录制状态显示开关
 
 
-    // 超级后视镜：把环视合成流里后方那一路单独放大显示
+    // 超级镜子：把环视合成流里后方那一路单独放大显示
     private static final String KEY_REARVIEW_ENABLED = "rearview_enabled";        // 总开关
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
@@ -242,7 +242,7 @@ public class AppConfig {
      * 开机自启动（规格 §1、§3）：App 不在了要不要自己回来。一个开关管两件事 ——
      * 保活（WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
      * 系统对 START_STICKY 服务的重启）让进程尽量活着、被杀了拉回来；回来之后 {@code Recovery}
-     * 按设置恢复悬浮按钮、超级后视镜和自动录制。关 = 被杀了不回来、也不恢复。默认开。
+     * 按设置恢复悬浮按钮、超级镜子和自动录制。关 = 被杀了不回来、也不恢复。默认开。
      */
     public boolean isAutoStartOnBoot() {
         mergeAutoStartSwitches();
@@ -746,7 +746,7 @@ public class AppConfig {
         prefs.edit().putString(spec.key, value).apply();
     }
 
-    // ==================== 超级后视镜 ====================
+    // ==================== 超级镜子 ====================
 
     /**
      * 后视镜窗口的默认尺寸（px）。
@@ -782,7 +782,7 @@ public class AppConfig {
 
     public void setRearViewEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_REARVIEW_ENABLED, enabled).apply();
-        AppLog.d(TAG, "超级后视镜: " + (enabled ? "开" : "关"));
+        AppLog.d(TAG, "超级镜子: " + (enabled ? "开" : "关"));
     }
 
     /** 窗口宽度（px），上限为屏幕宽。 */
@@ -1065,7 +1065,7 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_FRONT_REAR)
                 .remove(KEY_REARVIEW_CAMERA_LABEL)
                 .apply();
-        AppLog.i(TAG, "超级后视镜布局已恢复默认");
+        AppLog.i(TAG, "超级镜子布局已恢复默认");
     }
 
     // ==================== 车型配置相关方法 ====================
@@ -1107,7 +1107,7 @@ public class AppConfig {
     }
 
     /**
-     * 超级后视镜的使用指南弹过没有。只在第一次打开后视镜时弹，之后从设置里看。
+     * 超级镜子的使用指南弹过没有。只在第一次打开后视镜时弹，之后从设置里看。
      *
      * <p>「恢复默认布局」不清它：那是把窗口挪回来，不是重新学一遍怎么用。</p>
      */

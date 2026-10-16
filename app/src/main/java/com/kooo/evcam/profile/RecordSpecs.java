@@ -87,7 +87,7 @@ public final class RecordSpecs {
      * 那条路上的相机照样占着流，只是录不到东西，没人说得清它为什么在那儿。</p>
      *
      * <p>「启用的」只在这里判：录像、建相机管线、主界面的布局都问它（登记表 §一 的「启用的全部」）。
-     * 唯一不看它的是超级后视镜 —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16）。</p>
+     * 唯一不看它的是超级镜子 —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16）。</p>
      */
     public static java.util.Set<String> enabledCameraKeys(Context context) {
         if (context == null) {
