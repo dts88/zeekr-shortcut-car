@@ -170,6 +170,7 @@
 
         <SwitchPreferenceCompat
             android:key="pref_rearview_camera_label"
+            android:dependency="pref_rearview"
             android:title="@string/set_rearview_camera_label_title"
             android:summary="@string/set_rearview_camera_label_summary" />
 
