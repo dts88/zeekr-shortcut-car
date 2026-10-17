@@ -345,6 +345,13 @@
         android:key="screen_system"
         android:title="@string/set_section_system">
 
+        <SwitchPreferenceCompat
+            android:key="pref_developer_mode"
+            android:persistent="false"
+            android:defaultValue="false"
+            android:title="@string/set_developer_mode_title"
+            android:summary="@string/set_developer_mode_summary" />
+
         <!-- 这个分区只回答两个问题（规格 §0）：App 不在了要不要自己回来；熄屏算不算出状况 -->
         <SwitchPreferenceCompat
             android:key="pref_auto_start"
@@ -371,7 +378,7 @@
     </PreferenceScreen>
 
     <!--
-      开发者选项。默认整块隐藏，在「关于与致谢」里点击「安全须知」再输密码才出现，
+      开发者选项。默认整块隐藏，在「系统」里打开「启用开发者模式」后出现，
       重启、更新都不会关（见 DeveloperMode）—— 里面要么是没做完的，要么是排查用的。
       关闭后整块隐藏，里面的设置按没存过算（AppConfig.DEVELOPER_KEYS）。
     -->

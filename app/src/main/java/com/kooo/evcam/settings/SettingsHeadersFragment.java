@@ -49,18 +49,19 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         PreferenceRows.styleList(this, 0, 12);
     }
 
-    /**
-     * 解锁开发者模式是在「关于本应用」里做的 —— <b>那是另一个 Activity</b>。
-     *
-     * <p>从那儿回来时，这份列表还是解锁之前建的，「开发者选项」不会出现；
-     * 原先要退出设置再进来一次才看得见。这里发现状态变了就重建一次。</p>
-     */
     @Override
     public void onResume() {
         super.onResume();
-        if (builtUnlocked != DeveloperMode.isUnlocked()) {
-            build();
+        refreshDeveloperMode();
+        // The parent restores its selected section after child preferences are created.
+        if (getParentFragment() instanceof SettingsShellFragment) {
+            markSelected(((SettingsShellFragment) getParentFragment()).currentSection());
         }
+    }
+
+    /** Called by the System toggle while both panes remain resumed. */
+    void refreshDeveloperMode() {
+        if (builtUnlocked != DeveloperMode.isUnlocked()) build();
     }
 
     /** 右栏换了分区：左栏跟着把选中块挪过去。 */
