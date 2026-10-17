@@ -12,13 +12,13 @@ public class SideViewPlacementTest {
     public void leftOnTheLeftRightOnTheRightSameSize() {
         SideViewPlacement.Rect left = SideViewPlacement.compute(2560, 1440, LaneCycle.LEFT);
         SideViewPlacement.Rect right = SideViewPlacement.compute(2560, 1440, LaneCycle.RIGHT);
-        assertEquals(518, left.height);
-        assertEquals(691, left.width);
+        assertEquals(475, left.height);
+        assertEquals("宽 ÷ 高 = 2.2", 1045, left.width);
         assertEquals(left.width, right.width);
         assertEquals(left.height, right.height);
         assertEquals(77, left.left);
-        assertEquals(2560 - 691 - 77, right.left);
-        assertEquals("上下居中", (1440 - 518) / 2, left.top);
+        assertEquals(2560 - 1045 - 77, right.left);
+        assertEquals("上下居中", (1440 - 475) / 2, left.top);
         assertEquals(left.top, right.top);
     }
 
