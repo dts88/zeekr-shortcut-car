@@ -219,19 +219,13 @@ public final class FootageLocks {
         if (current.isEmpty()) {
             return !file.exists() || file.delete();
         }
-        File tmp = new File(dir, FILE_NAME + ".tmp");
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
-            writer.write(format(current));
-        } catch (IOException e) {
-            AppLog.w(TAG, "锁定清单写不进 " + tmp + ": " + e);
-            tmp.delete();
+        try {
+            AtomicLockList.write(file, format(current));
+            return true;
+        } catch (IOException error) {
+            AppLog.w(TAG, "Lock-list update failed; retaining previous protection: " + error);
             return false;
         }
-        if (tmp.renameTo(file)) {
-            return true;
-        }
-        // 有的文件系统不让改名盖掉已有的文件：先删再改名
-        return file.delete() && tmp.renameTo(file);
     }
 
     // ================================================================= 统计
