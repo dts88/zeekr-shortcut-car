@@ -78,6 +78,8 @@ Download the `ZeekrShortcut-*.apk` asset from the release page and sideload it t
 When the installer finishes, tap **Back** at the top left, not **Open**. Otherwise the head unit's
 installer gets stuck and later installs or updates fail.
 
+In-app APK downloads require the release asset’s SHA-256 digest and exact published size, and follow only HTTPS redirects. Assets without a valid digest must be downloaded manually from the release page. This checks downloaded bytes against GitHub metadata; it does not establish trust in the APK signing key.
+
 Building it yourself needs JDK 17+ and the Android SDK (compileSdk 36):
 
 ```bash
