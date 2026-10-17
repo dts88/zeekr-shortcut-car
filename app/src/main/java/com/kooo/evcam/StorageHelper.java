@@ -367,8 +367,8 @@ public class StorageHelper {
 
         // 检查是否应该使用中转写入
         if (config.shouldUseRelayWrite()) {
-            // 使用临时目录（内置存储的缓存目录）
-            File tempDir = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
+            // 使用应用私有文件目录（不是可被系统清掉的缓存）
+            File tempDir = FileTransferManager.relayDirectory(context);
             if (!tempDir.exists()) {
                 if (tempDir.mkdirs()) {
                     AppLog.d(TAG, "创建临时视频目录: " + tempDir.getAbsolutePath());
@@ -758,9 +758,10 @@ public class StorageHelper {
      */
     public static File savedVideoDir(Context context, boolean recording) {
         File actual = lastRecordingDir;
-        File relayCache = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
+        File relayCache = FileTransferManager.relayDirectory(context);
         if (recording && actual != null
-                && !actual.getAbsoluteFile().equals(relayCache.getAbsoluteFile())) {
+                && !actual.getAbsoluteFile().equals(relayCache.getAbsoluteFile())
+                && !actual.getAbsoluteFile().equals(FileTransferManager.legacyRelayDirectory(context).getAbsoluteFile())) {
             return actual;
         }
         if (!isRecordingStorageAvailable(context)) {

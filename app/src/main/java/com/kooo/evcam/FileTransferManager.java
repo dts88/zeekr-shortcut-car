@@ -5,10 +5,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class FileTransferManager {
     private static final String TAG = "FileTransferManager";
     
-    // 临时目录名称（在内部存储的应用缓存目录下）
+    // 中转目录名称（应用私有文件目录，旧缓存仅用于恢复）
     public static final String TEMP_VIDEO_DIR = "temp_video";
     
     // 传输任务
@@ -65,9 +62,7 @@ public class FileTransferManager {
     private static final int MAX_RETRY_COUNT = 5;           // 最大重试次数（增加到5次）
     private static final long RETRY_DELAY_MS = 3000;        // 重试延迟（毫秒）- 减少到3秒加快重试
     private static final long TRANSFER_CHECK_INTERVAL_MS = 500;  // 检查队列间隔（缩短到500ms）
-    private static final long STARTUP_CLEANUP_DELAY_MS = 60 * 1000;  // 启动后清理延迟：1分钟
-    private static final long TEMP_FILE_EXPIRE_MS = 60 * 60 * 1000;  // 临时文件过期时间：1小时
-    private static final long MIN_VALID_FILE_SIZE = 500 * 1024;  // 最小有效文件大小：500KB（增加到500KB）
+    private static final long MIN_VALID_FILE_SIZE = 1;  // Preserve any nonempty file; size is not an MP4 validity test.
     
     // 统计
     private long totalTransferred = 0;      // 已传输文件数
@@ -100,15 +95,14 @@ public class FileTransferManager {
             return;
         }
         
-        transferThread = new HandlerThread("FileTransfer");
+        transferThread = new HandlerThread("FileTransfer", android.os.Process.THREAD_PRIORITY_BACKGROUND);
         transferThread.start();
         transferHandler = new Handler(transferThread.getLooper());
         
         // 启动定期检查队列
         scheduleNextCheck();
         
-        // 启动后1分钟检查并清理过期的临时文件
-        transferHandler.postDelayed(this::cleanupExpiredTempFiles, STARTUP_CLEANUP_DELAY_MS);
+        // Untransferred footage is retained, never expired merely because USB is unavailable.
         
         AppLog.d(TAG, "File transfer service started");
     }
@@ -147,7 +141,7 @@ public class FileTransferManager {
      * @param callback 回调（可为null）
      */
     public void addTransferTask(File sourceFile, File targetFile, TransferCallback callback) {
-        if (sourceFile == null || !sourceFile.exists()) {
+        if (sourceFile == null || targetFile == null || !sourceFile.exists()) {
             AppLog.w(TAG, "Source file does not exist: " + sourceFile);
             if (callback != null) {
                 callback.onTransferFailed(sourceFile, targetFile, "Source file not found");
@@ -170,8 +164,16 @@ public class FileTransferManager {
      * 获取临时视频目录
      * @return 临时目录，如果创建失败返回null
      */
+    public static File relayDirectory(Context context) {
+        return new File(context.getFilesDir(), TEMP_VIDEO_DIR);
+    }
+
+    public static File legacyRelayDirectory(Context context) {
+        return new File(context.getCacheDir(), TEMP_VIDEO_DIR);
+    }
+
     public File getTempVideoDir() {
-        File tempDir = new File(context.getCacheDir(), TEMP_VIDEO_DIR);
+        File tempDir = relayDirectory(context);
         if (!tempDir.exists()) {
             if (!tempDir.mkdirs()) {
                 AppLog.e(TAG, "Failed to create temp video directory: " + tempDir.getAbsolutePath());
@@ -248,42 +250,6 @@ public class FileTransferManager {
     }
     
     /**
-     * 清理过期的临时文件
-     * 在服务运行期间定期调用
-     */
-    private void cleanupExpiredTempFiles() {
-        File tempDir = getTempVideoDir();
-        if (tempDir == null || !tempDir.exists()) {
-            return;
-        }
-        
-        File[] files = tempDir.listFiles();
-        if (files == null || files.length == 0) {
-            return;
-        }
-        
-        long now = System.currentTimeMillis();
-        int deletedCount = 0;
-        long deletedSize = 0;
-        
-        for (File file : files) {
-            long fileAge = now - file.lastModified();
-            if (fileAge > TEMP_FILE_EXPIRE_MS) {
-                long fileSize = file.length();
-                if (file.delete()) {
-                    deletedCount++;
-                    deletedSize += fileSize;
-                    AppLog.d(TAG, "Cleanup: deleted expired temp file: " + file.getName());
-                }
-            }
-        }
-        
-        if (deletedCount > 0) {
-            AppLog.d(TAG, "Periodic cleanup: deleted " + deletedCount + " expired files, freed " + formatSize(deletedSize));
-        }
-    }
-    
-    /**
      * 处理传输队列
      */
     private void processQueue() {
@@ -324,7 +290,7 @@ public class FileTransferManager {
         long sourceSize = task.sourceFile.length();
         if (sourceSize < MIN_VALID_FILE_SIZE) {
             AppLog.w(TAG, "Source file too small: " + task.sourceFile.getName() + " (" + sourceSize + " bytes)");
-            task.sourceFile.delete();
+            // Preserve even tiny files: short finalized MP4 clips can be valid.
             if (task.callback != null) {
                 task.callback.onTransferFailed(task.sourceFile, task.targetFile, "Source file too small");
             }
@@ -350,54 +316,19 @@ public class FileTransferManager {
             return;
         }
 
-        // 删除已存在的目标文件（如果存在）
-        if (task.targetFile.exists()) {
-            AppLog.d(TAG, "Deleting existing target file: " + task.targetFile.getName());
-            if (!task.targetFile.delete()) {
-                AppLog.w(TAG, "Failed to delete existing target file: " + task.targetFile.getName());
-            }
-        }
-
-        // 尝试复制文件（直接复制，不尝试移动，因为U盘可能是不同的文件系统）
-        AppLog.d(TAG, "Copying file: " + task.sourceFile.getName() + " (" + formatSize(sourceSize) + ") to " + task.targetFile.getAbsolutePath());
-
-        boolean copied = copyFile(task.sourceFile, task.targetFile);
-
-        if (copied) {
-            // 复制成功，删除源文件
+        try {
+            com.kooo.evcam.storage.VerifiedFileCopy.copy(task.sourceFile, task.targetFile);
             long targetSize = task.targetFile.length();
-
-            // 验证目标文件大小
-            if (targetSize != sourceSize) {
-                AppLog.w(TAG, "File size mismatch: source=" + sourceSize + ", target=" + targetSize);
-                task.targetFile.delete();
-                handleTransferFailure(task, "File size mismatch after copy");
-                return;
-            }
-
-            if (task.sourceFile.delete()) {
-                AppLog.d(TAG, "File transferred successfully: " + task.sourceFile.getName() +
-                        " -> " + task.targetFile.getAbsolutePath() + " (" + formatSize(targetSize) + ")");
-            } else {
-                AppLog.w(TAG, "File copied but failed to delete source: " + task.sourceFile.getName());
-            }
-
+            if (!task.sourceFile.delete()) AppLog.w(TAG, "Verified copy retained at both locations: " + task.sourceFile);
             totalTransferred++;
             totalBytesTransferred += targetSize;
-
-            if (task.callback != null) {
-                task.callback.onTransferComplete(task.sourceFile, task.targetFile);
-            }
-        } else {
-            // 复制失败
-            // 清理可能不完整的目标文件
-            if (task.targetFile.exists()) {
-                task.targetFile.delete();
-            }
-            handleTransferFailure(task, "Copy failed");
+            if (task.callback != null) task.callback.onTransferComplete(task.sourceFile, task.targetFile);
+        } catch (IOException error) {
+            // Existing destination and original source are both retained on failure/collision.
+            handleTransferFailure(task, error.getMessage());
         }
     }
-    
+
     /**
      * 处理传输失败
      */
@@ -424,76 +355,6 @@ public class FileTransferManager {
             
             if (task.callback != null) {
                 task.callback.onTransferFailed(task.sourceFile, task.targetFile, error);
-            }
-        }
-    }
-    
-    /**
-     * 复制文件（使用缓冲流，更稳定可靠）
-     * 针对U盘等慢速存储优化
-     */
-    private boolean copyFile(File source, File target) {
-        FileInputStream fis = null;
-        FileOutputStream fos = null;
-
-        try {
-            fis = new FileInputStream(source);
-            fos = new FileOutputStream(target);
-
-            // 验证源文件大小
-            long size = source.length();
-            if (size < MIN_VALID_FILE_SIZE) {
-                AppLog.w(TAG, "Source file too small: " + source.getName() + " (" + size + " bytes)");
-                return false;
-            }
-
-            // 使用 64KB 缓冲区（对U盘更友好）
-            byte[] buffer = new byte[64 * 1024];
-            long transferred = 0;
-            int read;
-
-            while ((read = fis.read(buffer)) != -1) {
-                fos.write(buffer, 0, read);
-                transferred += read;
-
-                // 定期刷新缓冲区，避免内存中积累太多
-                if (transferred % (1024 * 1024) == 0) {  // 每1MB刷新一次
-                    fos.flush();
-                }
-            }
-
-            // 最终刷新
-            fos.flush();
-
-            // 同步到磁盘（确保数据真正写入）
-            fos.getFD().sync();
-
-            // 验证目标文件大小
-            long targetSize = target.length();
-            if (targetSize != size) {
-                AppLog.w(TAG, "File size mismatch after copy: source=" + size + ", target=" + targetSize);
-                target.delete();
-                return false;
-            }
-
-            AppLog.d(TAG, "File copied successfully: " + source.getName() + " (" + formatSize(size) + ")");
-            return true;
-
-        } catch (IOException e) {
-            AppLog.e(TAG, "Error copying file: " + source.getName(), e);
-
-            // 删除可能不完整的目标文件
-            if (target.exists()) {
-                target.delete();
-            }
-
-            return false;
-        } finally {
-            try {
-                if (fis != null) fis.close();
-                if (fos != null) fos.close();
-            } catch (IOException e) {
-                // Ignore
             }
         }
     }

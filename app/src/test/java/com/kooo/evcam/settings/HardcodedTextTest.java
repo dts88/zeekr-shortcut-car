@@ -77,8 +77,6 @@ public class HardcodedTextTest {
         JAVA_ALLOWED.put("zeekr/LaneCycle.java", "日志里的方位名");
         JAVA_ALLOWED.put("repair/Mp4Repair.java",
                 "修不了时抛出的原因，只写进日志（修复报告里只说「无法修复」）");
-        JAVA_ALLOWED.put("repair/ArchiveFlow.java",
-                "复制失败时抛出的原因，只写进日志（归档报告里只列文件名）");
         JAVA_ALLOWED.put("zeekr/RawFrameDump.java",
                 "工程模式导出的那份说明文件的正文，写进 txt，不上界面");
         JAVA_ALLOWED.put("profile/ProfileMigration.java",

@@ -12,4 +12,5 @@
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>
 -->
+    <exclude domain="file" path="temp_video/" />
 </full-backup-content>

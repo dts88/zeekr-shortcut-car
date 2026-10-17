@@ -19,8 +19,6 @@ import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.ui.CamDialogs;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li><b>只搬本应用的目录</b>：{@code DCIM/EVCam_Video}、{@code DCIM/EVCam_Photo}、
  *       {@code Download/EVCam_Log}（诊断报告），盘上别人的东西一律不碰。
  *       应用自己的运行日志（内部存储）是<b>复制</b>不是搬 —— 它还在写。</li>
- *   <li><b>搬 = 复制、核对大小、再删源文件</b>；目标盘上同名同大小的文件当作搬过了，只删源文件；
+ *   <li><b>搬 = 复制、核对大小、再删源文件</b>；目标盘上同名且内容逐字节校验一致的文件当作搬过了，只删源文件；
  *       复制失败的源文件原样留着，写了一半的目标文件删掉。</li>
  *   <li><b>两分钟内动过的文件当成还在写，跳过。</b></li>
  *   <li>目标盘剩余空间不够就不开始。</li>
@@ -238,7 +236,6 @@ public final class ArchiveFlow {
             int already = 0;
             long done = 0;
             List<String> failed = new ArrayList<>();
-            byte[] buffer = new byte[1 << 20];
             for (int i = 0; i < plan.items.size() && !cancelled.get(); i++) {
                 Item item = plan.items.get(i);
                 final int index = i;
@@ -250,10 +247,10 @@ public final class ArchiveFlow {
                 });
                 long length = item.from.length();
                 try {
-                    if (item.to.isFile() && item.to.length() == length) {
+                    if (com.kooo.evcam.storage.VerifiedFileCopy.copy(item.from, item.to)
+                            == com.kooo.evcam.storage.VerifiedFileCopy.Result.ALREADY_IDENTICAL) {
                         already++;
                     } else {
-                        copy(item.from, item.to, buffer);
                         if (item.move) {
                             moved++;
                         } else {
@@ -265,9 +262,7 @@ public final class ArchiveFlow {
                     }
                 } catch (IOException e) {
                     AppLog.e(TAG, "归档失败：" + item.from.getAbsolutePath(), e);
-                    if (item.to.exists() && !item.to.delete()) {
-                        AppLog.w(TAG, "写了一半的目标文件删不掉：" + item.to.getAbsolutePath());
-                    }
+                    // VerifiedFileCopy cleans only its own partial file; existing destinations survive.
                     // 原因说得清（空间不足之类）就写上；说不清的只列文件名，原文在上面那行日志里
                     String reason = com.kooo.evcam.ui.FailureReason.of(activity, e);
                     failed.add(reason == null ? item.from.getName()
@@ -304,29 +299,6 @@ public final class ArchiveFlow {
         }, "archive").start();
     }
 
-    /** 复制一个文件：写完落盘、核对大小、保留修改时间（回看按时间排序靠它）。 */
-    private static void copy(File from, File to, byte[] buffer) throws IOException {
-        File dir = to.getParentFile();
-        if (dir != null && !dir.isDirectory() && !dir.mkdirs()) {
-            throw new IOException("建不了目录 " + dir.getAbsolutePath());
-        }
-        try (FileInputStream in = new FileInputStream(from);
-             FileOutputStream out = new FileOutputStream(to)) {
-            int n;
-            while ((n = in.read(buffer)) > 0) {
-                out.write(buffer, 0, n);
-            }
-            out.getFD().sync();
-        }
-        if (to.length() != from.length()) {
-            throw new IOException("复制后大小不对：" + to.length() + " ≠ " + from.length());
-        }
-        if (!to.setLastModified(from.lastModified())) {
-            AppLog.w(TAG, "修改时间没保住：" + to.getAbsolutePath());
-        }
-    }
-
-    // ================================================================= 零碎
 
     private static String size(long bytes) {
         if (bytes >= 1024L * 1024 * 1024) {

@@ -114,6 +114,8 @@ Changes apply from the next recording.
 
 A dash cam's main job is a clear picture. At 10 fps motion looks choppy, but each frame stays sharp.
 
+Relay write buffers closed clips in private app files rather than reclaimable Android cache, without deleting them merely for being old or smaller than 500 KB. Stop-time recovery checks both current and legacy buffer directories, including footage protection. Transfers and Developer archive verify copied bytes before removing a source; differing destination collisions keep both files. Pending buffers are excluded from backup/device transfer. App-data clearing or uninstall still removes private buffers; a full internal volume can stop recording. After a restart, keep the original relay USB attached: the destination/event queue is not durably journaled.
+
 For anything else, [open an issue](../../issues) and attach a report from **Settings → System →
 Diagnostics**.
 
