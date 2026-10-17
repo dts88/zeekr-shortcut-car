@@ -123,8 +123,11 @@ public enum Signal {
     FCW(Group.ASSIST, Kind.FUNCTION, 0x200E0200, 0, R.string.vi_fcw, Trust.CONFIRMED, Format.LEVEL),
     LDW(Group.ASSIST, Kind.FUNCTION, 0x28084100, 0, R.string.vi_ldw, Trust.UNVERIFIED, Format.ON_OFF),
     LKA(Group.ASSIST, Kind.FUNCTION, 0x20070100, 0, R.string.vi_lka, Trust.CONFIRMED, Format.ON_OFF),
-    BSD(Group.ASSIST, Kind.FUNCTION, 0x28081600, 0, R.string.vi_bsd, Trust.UNVERIFIED, Format.ON_OFF),
     RCW(Group.ASSIST, Kind.FUNCTION, 0x20071000, 0, R.string.vi_rcw, Trust.CONFIRMED, Format.ON_OFF),
+    /**
+     * 变道 / 盲区报警的开关（原车「变道辅助」）：Lab 从 0.9.0 起看到它跟着设置开关 0 / 1 变；信息条「安全辅助」那一格的 BSD 读它。
+     * 以前 BSD 读的 0x28081600（BLIND_SPOT_ASSIST）一直 0、只有可用性随上电变，多半是别的功能，2026-10-16 拿掉。
+     */
     LANE_CHANGE_ASSIST(Group.ASSIST, Kind.FUNCTION, 0x20070300, 0, R.string.vi_lane_change_assist, Trust.CONFIRMED, Format.ON_OFF),
     AUTO_LANE_CHANGE(Group.ASSIST, Kind.FUNCTION, 0x28040100, 0, R.string.vi_auto_lane_change, Trust.CONFIRMED, Format.ON_OFF),
     DOOR_OPEN_WARNING(Group.ASSIST, Kind.FUNCTION, 0x20120100, 0, R.string.vi_door_open_warning, Trust.CONFIRMED, Format.ON_OFF),

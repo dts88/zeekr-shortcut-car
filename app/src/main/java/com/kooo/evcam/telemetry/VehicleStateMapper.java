@@ -82,7 +82,7 @@ public final class VehicleStateMapper {
         b.forwardCollisionWarning(r.bool(Signal.FCW));
         b.laneDepartureWarning(r.bool(Signal.LDW));
         b.laneKeepingAid(r.bool(Signal.LKA));
-        b.blindSpotAssist(r.bool(Signal.BSD));
+        b.blindSpotAssist(r.bool(Signal.LANE_CHANGE_ASSIST));
         b.rearCollisionWarning(r.bool(Signal.RCW));
 
         int driverBit = driverOnRight ? VehicleState.FRONT_RIGHT : VehicleState.FRONT_LEFT;
