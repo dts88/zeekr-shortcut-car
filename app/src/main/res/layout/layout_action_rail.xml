@@ -10,12 +10,17 @@
   主操作只有录制一个：它大一档（132dp），状态由左侧的点（圆 ⇄ 方）和外圈分段进度环表示，
   红色只出现在那一小块上 —— 红标的是「正在录」这件事，不是这个按钮。
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/action_rail"
     android:layout_width="@dimen/rail_width"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
     <!--
       应用名。原来在标题栏左侧，标题栏拆掉之后它归到这一列的顶上 ——
@@ -219,4 +224,5 @@
             app:icon="@drawable/ic_minimize"
             app:iconTint="@color/text_secondary" />
     </LinearLayout>
-</LinearLayout>
+    </LinearLayout>
+</ScrollView>

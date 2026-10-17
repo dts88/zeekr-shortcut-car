@@ -40,6 +40,8 @@ On the main screen, tap any view to fill the preview with it and tap again to go
 **Straighten** button removes the fisheye bend, on the main screen and in playback. A floating
 button shows whether recording is running and opens the app from anywhere.
 
+The profile editor reserves space for each camera switch and stacks camera/preset cards in narrow panes. Settings options wrap at the normal text size, and the main action column scrolls in short windows.
+
 ### Super mirror
 
 An electronic rear-view mirror: a floating, dockable window showing any one camera enlarged. Pinch
