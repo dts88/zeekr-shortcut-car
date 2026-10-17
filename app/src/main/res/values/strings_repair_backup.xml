@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="dev_repair_backup_note">修复前的原始文件保存在录像目录的 repair-originals 子目录中。不会自动删除；空间不足时不会开始修复。</string>
+</resources>

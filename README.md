@@ -132,6 +132,8 @@ Diagnostics**.
 - On-vehicle validation is ongoing. Automated tests cover the pure logic only; test in a stationary
   vehicle first.
 
+Developer MP4 repair first preserves a verified original in the video folder’s **repair-originals** subdirectory. Repair does not begin if backup fails, conflicts with an existing different original, or lacks space. Backups remain until manually removed. The working file is still repaired in place; a backup is recovery material, not a guarantee of successful repair. Malformed input is bounded to limit sample-table/index and validation-buffer allocations.
+
 ---
 
 ## Credits and license

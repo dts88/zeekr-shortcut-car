@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="dev_repair_backup_note">Verified originals are kept in repair-originals inside the video folder. They are not automatically removed; repair will not start without space for the backup.</string>
+</resources>
