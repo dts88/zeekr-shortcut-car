@@ -90,6 +90,8 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 
 ---
 
+Startup requests camera and applicable storage permissions. Audio is not recorded and microphone permission is not required.
+
 ## Recommended
 
 **[wysie/zeekr-shortcut-car](https://github.com/wysie/zeekr-shortcut-car)** is a version of Zeekr Shortcut optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
