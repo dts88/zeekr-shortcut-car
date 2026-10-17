@@ -103,7 +103,7 @@
                                 android:layout_weight="14"
                                 android:orientation="vertical">
 
-                                <FrameLayout
+                                <com.kooo.evcam.zeekr.LiveCameraPreview
                                     android:id="@+id/pane_cabin_front"
                                     android:layout_width="match_parent"
                                     android:layout_height="0dp"
@@ -130,9 +130,9 @@
                                         android:text="@string/slot_cabin_front"
                                         android:textColor="#FFFFFF"
                                         android:textAppearance="@style/TextAppearance.Cam.Body" />
-                                </FrameLayout>
+                                </com.kooo.evcam.zeekr.LiveCameraPreview>
 
-                                <FrameLayout
+                                <com.kooo.evcam.zeekr.LiveCameraPreview
                                     android:id="@+id/pane_cabin_rear"
                                     android:layout_width="match_parent"
                                     android:layout_height="0dp"
@@ -160,7 +160,7 @@
                                         android:text="@string/slot_cabin_rear"
                                         android:textColor="#FFFFFF"
                                         android:textAppearance="@style/TextAppearance.Cam.Body" />
-                                </FrameLayout>
+                                </com.kooo.evcam.zeekr.LiveCameraPreview>
                             </LinearLayout>
                         </LinearLayout>
 

@@ -755,6 +755,7 @@ public class MainActivity extends AppCompatActivity {
         return new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int width, int height) {
+                resetPreviewFrames(cameraKey);
                 onPreviewCanvasReady(cameraKey);
             }
 
@@ -772,6 +773,7 @@ public class MainActivity extends AppCompatActivity {
              */
             @Override
             public boolean onSurfaceTextureDestroyed(@NonNull android.graphics.SurfaceTexture surface) {
+                resetPreviewFrames(cameraKey);
                 textureReadyCount--;
                 MultiCameraManager pipeline = cameraManager != null ? cameraManager
                         : com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
@@ -786,10 +788,19 @@ public class MainActivity extends AppCompatActivity {
                 // 这个回调每来一帧就响一次 —— 这就是「不录制时相机的出帧率」，
                 // 也就是这条视频流本身的上限。录制时的帧率再低，也不会比它高。
                 com.kooo.evcam.camera.PreviewFrameRates.onFrame(cameraKey);
+                AutoFitTextureView canvas = canvasFor(cameraKey);
+                if (canvas != null && canvas.getParent() instanceof com.kooo.evcam.zeekr.LivePreview)
+                    ((com.kooo.evcam.zeekr.LivePreview) canvas.getParent()).noteFrame(surface);
             }
         };
     }
     
+    private void resetPreviewFrames(String key) {
+        AutoFitTextureView canvas = canvasFor(key);
+        if (canvas != null && canvas.getParent() instanceof com.kooo.evcam.zeekr.LivePreview)
+            ((com.kooo.evcam.zeekr.LivePreview) canvas.getParent()).resetFrames();
+    }
+
     /**
      * 更新摄像头标签
      * 统一使用 AppConfig.getCameraName() 的值，确保主界面和设置界面显示一致

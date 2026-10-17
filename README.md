@@ -49,6 +49,8 @@ switch camera. Push it half off-screen to hide it at the edge, and tap to bring 
 rear camera is mirrored, like a real mirror. Fisheye correction with an adjustable field of view is
 optional.
 
+Main surround/cabin previews and Super mirror cover missing or stalled images with an opaque waiting screen after 500 ms without advancing source texture timestamps, checked every 100 ms. Reopening requires fresh progression. Native textures continue drawing/draining underneath the cover; this does not prove per-camera exposure freshness or end-to-end latency.
+
 ### Playback
 
 Video playback shows every camera together, in sync; tap one to enlarge it, tap again to go back.
