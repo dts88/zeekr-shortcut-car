@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.13.1-alpha] - 2026-10-17
+
 - Blind spot view: wider window (2.2 : 1, a third of the screen height) and default angles from on-car tuning by @FerixzTanz (rear 33°, outward 10°).
 
 ## [2.13.0-alpha] - 2026-10-17
