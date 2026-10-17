@@ -291,20 +291,19 @@
             </FrameLayout>
 
             <!-- 底部控制栏：摄像头切换按钮 -->
-            <LinearLayout
+            <com.kooo.evcam.ui.WrappingActionRow
                 android:id="@+id/controls_layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
                 android:padding="8dp"
-                android:gravity="center"
                 android:background="@color/preview_controls_background"
                 android:visibility="gone">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_view_mode"
                     android:layout_width="wrap_content"
-                    android:layout_height="48dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="@dimen/playback_action_min_height"
                     android:minWidth="72dp"
                     android:text="@string/photo_mode_multi"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
@@ -313,9 +312,9 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_lock"
                     android:layout_width="wrap_content"
-                    android:layout_height="48dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="@dimen/playback_action_min_height"
                     android:minWidth="72dp"
-                    android:layout_marginStart="8dp"
                     android:text="@string/action_lock_footage"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
                     android:visibility="gone"
@@ -323,13 +322,13 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_send_to_phone"
                     android:layout_width="wrap_content"
-                    android:layout_height="48dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="@dimen/playback_action_min_height"
                     android:minWidth="72dp"
-                    android:layout_marginStart="8dp"
                     android:text="@string/action_send_to_phone"
                     android:textAppearance="@style/TextAppearance.Cam.Body"
                     style="@style/Widget.Cam.RailSmall" />
-            </LinearLayout>
+            </com.kooo.evcam.ui.WrappingActionRow>
         </LinearLayout>
     </LinearLayout>
 

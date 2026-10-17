@@ -340,77 +340,7 @@
                     android:textColor="@color/text_primary"
                     android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_prev_session"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/player_prev" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_play_pause"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/action_play" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_next_session"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/player_next" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_speed"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="1.0x" />
-
-                    <!-- 和图片回看底部那个同一个按钮：网格 → 有录像的每一路 → 回到网格 -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_view_mode"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/photo_mode_multi" />
-
-                    <!-- 锁定此刻 / 解锁：此刻各路正在放的文件一起（锁定影像关着时收起） -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_lock"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/action_lock_footage"
-                        android:visibility="gone" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_send"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:text="@string/action_send_to_phone" />
-                </LinearLayout>
+                <include layout="@layout/layout_timeline_controls" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

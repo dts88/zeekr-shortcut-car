@@ -19,4 +19,6 @@
     <dimen name="rail_tile_height">104dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
     <dimen name="icon_button_size">48dp</dimen>
+    <dimen name="playback_action_gap">8dp</dimen>
+    <dimen name="playback_action_min_height">52dp</dimen>
 </resources>

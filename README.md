@@ -54,6 +54,8 @@ optional.
 Video playback shows every camera together, in sync; tap one to enlarge it, tap again to go back.
 Photo playback uses the same layout.
 
+Playback action buttons keep their normal text size, grow to a shared row height and wrap when space is tight, including **Send to phone**.
+
 ### Send to your phone
 
 While viewing a photo or a video segment, tap **Send to phone**: the app shows a QR code, your

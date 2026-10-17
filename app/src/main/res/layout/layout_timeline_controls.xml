@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.kooo.evcam.ui.WrappingActionRow
+                    xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:id="@+id/timeline_actions">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_prev_session"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="@string/player_prev" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_play_pause"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="@string/action_play" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_next_session"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="@string/player_next" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_speed"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="1.0x" />
+
+                    <!-- 和图片回看底部那个同一个按钮：网格 → 有录像的每一路 → 回到网格 -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_view_mode"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="@string/photo_mode_multi" />
+
+                    <!-- 锁定此刻 / 解锁：此刻各路正在放的文件一起（锁定影像关着时收起） -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_lock"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="@string/action_lock_footage"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/timeline_send"
+                        style="@style/Widget.Cam.RailSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="@dimen/playback_action_min_height"
+                        android:text="@string/action_send_to_phone" />
+                </com.kooo.evcam.ui.WrappingActionRow>
