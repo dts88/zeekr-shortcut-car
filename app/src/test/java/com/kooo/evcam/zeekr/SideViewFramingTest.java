@@ -74,7 +74,7 @@ public class SideViewFramingTest {
             for (float fov : new float[]{60, 90, 130}) {
                 for (float back : new float[]{-80, -50, 0, 50, 80}) {
                     for (float up : new float[]{-60, -15, 0, 15, 60}) {
-                        for (float aspect : new float[]{0.2f, 1, 4f / 3f, 3, 5}) {
+                        for (float aspect : new float[]{0.2f, 1, 2.2f, 3, 5}) {
                             SideViewFraming frame = frame(fov, back, up, lane, aspect);
                             assertTrue(frame.effectiveFovDegrees() > 0);
                             assertTrue(frame.effectiveFovDegrees() <= fov + 0.001);

@@ -4,17 +4,18 @@ package com.kooo.evcam.zeekr;
  * 盲区画面窗口的大小和位置：固定的，不能拖、不能缩放，左右各一个位置（项目所有者 2026-10-16）。
  *
  * <p>左灯的画面靠屏幕左边、右灯的靠右边，离那一侧的屏幕边 {@link #EDGE_PERCENT}% 屏幕宽；上下居中 ——
- * 超级镜子默认在右上角，两个窗口同时出现时不叠在一起。高度是屏幕高的 {@link #HEIGHT_PERCENT}%，宽 ÷ 高 = 4 : 3
- * （看旁边车道，横着比竖着有用）。屏幕放不下时按屏幕收。这几个数是第一版，上车看了再定。</p>
+ * 超级镜子默认在右上角，两个窗口同时出现时不叠在一起。高度是屏幕高的 {@link #HEIGHT_PERCENT}%，宽 ÷ 高 = 2.2 : 1
+ * —— 左右看得多比上下看得多有用（照 FerixzTanz 实车用的默认，CAMCORDER；项目所有者 2026-10-17 定换成偏宽的）。
+ * 屏幕放不下时按屏幕收。上车看了再定。</p>
  *
  * <p>纯 Java，见 {@code SideViewPlacementTest}。</p>
  */
 public final class SideViewPlacement {
 
-    static final int HEIGHT_PERCENT = 36;
+    static final int HEIGHT_PERCENT = 33;
     static final int EDGE_PERCENT = 3;
     /** 宽 ÷ 高。 */
-    static final float ASPECT = 4f / 3f;
+    static final float ASPECT = 2.2f;
 
     private SideViewPlacement() {
     }

@@ -1082,11 +1082,12 @@ public class AppConfig {
     public static final int SIDE_VIEW_DEFAULT_MIN_SPEED = 30;
     public static final int SIDE_VIEW_MAX_MIN_SPEED = 80;
     /**
-     * 标定角度的默认值：往车尾转 50°、往车外转 15°、横向视野 90°（PR #19 的默认值，FerixzTanz、wysie 在 7X 上看过）。
-     * 每一路画面的朝向是猜的（{@code SideViewProjection}），上车标定之后再定；关着开发者选项时一律用默认值。
+     * 标定角度的默认值：往车尾转 33°、往车外转 10°、横向视野 90° —— FerixzTanz 在他的 7X 上调出来的值（CAMCORDER 2026-10-15，
+     * 同一个投影模型），项目所有者 2026-10-17 定照用（之前是 PR #19 的 50° / 15°）。每一路画面的朝向仍是猜的
+     * （{@code SideViewProjection}），我们上车标定之后再定；关着开发者选项时一律用默认值。
      */
-    public static final int SIDE_VIEW_DEFAULT_BACK = 50;
-    public static final int SIDE_VIEW_DEFAULT_UP = 15;
+    public static final int SIDE_VIEW_DEFAULT_BACK = 33;
+    public static final int SIDE_VIEW_DEFAULT_UP = 10;
     public static final int SIDE_VIEW_DEFAULT_FOV = 90;
 
     public boolean isSideViewEnabled() {
