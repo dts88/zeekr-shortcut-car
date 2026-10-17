@@ -53,7 +53,8 @@ import com.kooo.evcam.telemetry.VehicleState;
  *
  * <p>亮屏时完整登记（要车速），熄屏注销、窗口移走：熄屏后不该留着监听和相机过去（同超级镜子熄屏放开登记的理由）。</p>
  *
- * <p>来源：打灯判定、拉直和取景借自 FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）；碰相机的部分照通道调度重写。</p>
+ * <p>来源：打灯判定、拉直和取景借自 FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）；读车辆信号、备着 / 显示的流程
+ * 也照它们的侧视弹窗服务写。碰相机的部分照通道调度重写。</p>
  */
 public class SideViewService extends Service {
 

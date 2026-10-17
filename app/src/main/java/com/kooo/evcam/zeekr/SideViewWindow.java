@@ -48,6 +48,9 @@ import com.kooo.evcam.R;
  * <p>画布设回可见那一下，TextureView 先取一次缓冲区里留着的那一帧 —— 相机要是停着，那一帧可能是很久以前的。
  * 所以每次显示先盖成黑的，显示之后来了第二帧才露出来；显示着时 {@link #STALE_MS} 没有新帧也盖上。
  * 盯着一张过时的侧方画面变道，比看见一块黑的危险得多（同超级镜子画面停住时盖上的道理）。</p>
+ *
+ * <p>来源：备着 / 显示两种窗口状态（备着时窗口透明、不接点击，显示时不能带 FLAG_NOT_TOUCHABLE）和分格拉直的画法，
+ * 照 FerixzTanz 的 PR #4、wysie 的 PR #19 里的侧视弹窗写；GPL-3.0。</p>
  */
 public class SideViewWindow extends ViewGroup {
 

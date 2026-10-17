@@ -61,6 +61,7 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
   打灯判定（`SideViewDecision`）、转过角度的虚拟相机（`SideViewProjection`）、按调用方给的反投影切网格（`FisheyeMesh.SourceMap`），
   以及对应的测试。
 
+盲区画面的服务和窗口（`SideViewService`、`SideViewWindow`）里读车辆信号、备着 / 显示两种状态的写法，也照两位 PR 里的侧视弹窗写。
 这些代码照本仓库的 GPL-3.0 发布。碰相机的部分（窗口怎么挂、画布怎么交给通道调度）由本项目照通道调度重写，没有用 PR 里的那一套。
 
 ---
