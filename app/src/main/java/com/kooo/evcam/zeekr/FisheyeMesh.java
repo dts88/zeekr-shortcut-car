@@ -6,7 +6,7 @@ import android.graphics.Matrix;
 /**
  * 在不碰相机链路的前提下，把一个 TextureView 按鱼眼校正画出来：分格反投影。
  *
- * <p>超级镜子、主界面预览、视频回看都走这一套。三处的共同点是：画面在一个普通的
+ * <p>超级镜子、盲区画面、主界面预览、视频回看都走这一套。几处的共同点是：画面在一个普通的
  * TextureView 里，相机（或解码器）那一头不动，能动的只有「父容器怎么把它画出来」。
  * 为什么预览不上 GL，见 docs/zeekr-platform-notes.md §2.1。</p>
  *
@@ -102,6 +102,36 @@ public final class FisheyeMesh {
                 float u = windowLeft + windowWidth * column / this.divisions;
                 // 校正后画面里的一点 → 原始鱼眼画面里的采样点（这一路内，夹在 0..1）
                 FisheyeProjection.sourcePoint(u, v, fovDegrees, projection, point, 0);
+                grid[index++] = laneLeft + point[0] * laneWidth;
+                grid[index++] = laneTop + point[1] * laneHeight;
+            }
+        }
+    }
+
+    /** 输出画面里的一点 (u, v) → 这一路原始画面里的采样点，两边都是 0..1。 */
+    public interface SourceMap {
+        void map(float u, float v, float[] out);
+    }
+
+    /**
+     * 算网格，但每个角点怎么反投影由调用方给（盲区画面用：虚拟相机转了个角度，见 {@link SideViewFraming}）。
+     * 画法和 {@link #prepare(int, float, float, float, float, float, float, float, float)} 完全一样。
+     *
+     * <p>来源：FerixzTanz 的 PR #4；GPL-3.0。</p>
+     */
+    public void prepare(int divisions, float laneLeft, float laneTop, float laneWidth, float laneHeight,
+                        SourceMap map) {
+        this.divisions = Math.max(1, divisions);
+        int side = this.divisions + 1;
+        if (grid.length != side * side * 2) {
+            grid = new float[side * side * 2];
+        }
+        int index = 0;
+        for (int row = 0; row < side; row++) {
+            float v = (float) row / this.divisions;
+            for (int column = 0; column < side; column++) {
+                float u = (float) column / this.divisions;
+                map.map(u, v, point);
                 grid[index++] = laneLeft + point[0] * laneWidth;
                 grid[index++] = laneTop + point[1] * laneHeight;
             }

@@ -71,6 +71,12 @@
     <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「只显示前后视」和「方向标签」的默认值，并切回后视</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
+    <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
+    <string name="set_side_view_title">盲区画面</string>
+    <string name="set_side_view_summary">打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。</string>
+    <string name="set_side_view_min_speed_title">最低车速</string>
+    <string name="set_side_view_min_speed_summary">低于此车速时不显示；0 为不限</string>
+    <string name="side_view_close">关闭盲区画面</string>
     <string name="rearview_guide_hint">左右滑动翻页 · 点击图片外关闭</string>
     <string name="mirror_paused_tap">画面已停止 · 点击恢复</string>
     <string name="mirror_resume_busy">摄像头被占用，暂时无法打开</string>
@@ -100,7 +106,7 @@
     <string name="set_reset_floating_title">重置悬浮按钮</string>
     <string name="set_reset_floating_summary">恢复默认位置、按钮大小和时长文字大小</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、悬浮按钮和自动录制。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、盲区画面、悬浮按钮和自动录制。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
@@ -294,6 +300,7 @@
     <string name="info_reading">正在读取…</string>
     <string name="info_read_failed">无法读取</string>
     <string name="msg_rearview_on">超级镜子已开启：拖动两侧移动窗口，中间上下滑动调整取景</string>
+    <string name="msg_side_view_unavailable">无法显示盲区画面</string>
     <string name="msg_rearview_reset">超级镜子窗口与画面已重置</string>
     <string name="msg_floating_reset">悬浮按钮已重置</string>
     <string name="msg_adjust_opened">已打开画面调节窗口，返回主界面查看效果</string>
@@ -847,7 +854,7 @@
     <string name="dev_perm_all_files">所有文件访问</string>
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>
-    <string name="dev_perm_overlay_why">用于超级镜子、悬浮按钮和画面调节窗口</string>
+    <string name="dev_perm_overlay_why">用于超级镜子、盲区画面、悬浮按钮和画面调节窗口</string>
     <string name="dev_perm_accessibility">无障碍服务</string>
     <string name="dev_perm_accessibility_why">用于开机自启动</string>
     <string name="dev_perm_usage_access">使用情况访问</string>
@@ -865,6 +872,12 @@
     <string name="dev_gpu_fisheye_video_summary">录像回放中的环视画面改用 GPU 逐像素校正。仅切换算法，是否校正仍由「鱼眼校正」按钮控制。下次打开录像回放时生效。</string>
     <string name="dev_camera_suspects_title">记录可能占用摄像头的应用</string>
     <string name="dev_camera_suspects_summary">其他应用占用或释放摄像头时，记录此前 10 秒至此后 3 秒内启动或停止前台服务、切换到前台或后台的其他应用，结果仅供参考。需授予使用情况访问权限；其他应用的包名会写入诊断报告。</string>
+    <string name="dev_side_view_back_title">盲区画面朝后角度</string>
+    <string name="dev_side_view_back_summary">画面中心朝车尾转动的角度，负值朝车头</string>
+    <string name="dev_side_view_up_title">盲区画面朝外角度</string>
+    <string name="dev_side_view_up_summary">画面中心朝车外转动的角度，负值朝车身</string>
+    <string name="dev_side_view_fov_title">盲区画面视野角度</string>
+    <string name="dev_side_view_fov_summary">转动角度较大时自动收窄，画面不出现黑块</string>
     <string name="dev_repair_mp4_title">修复缺少索引的录像</string>
     <string name="dev_repair_mp4_summary">录制意外中断（如断电）的片段缺少索引，无法播放。参照同一摄像头的完好片段重建索引，文件名不变。</string>
     <string name="dev_repair_refuse_recording">录制时无法修复：正在录制的片段同样没有索引，无法与意外中断的片段区分。请先停止录制。</string>

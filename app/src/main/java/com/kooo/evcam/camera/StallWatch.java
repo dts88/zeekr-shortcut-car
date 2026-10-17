@@ -554,6 +554,7 @@ public final class StallWatch {
                 .append(" android=").append(isScreenOn() ? "on" : "off")
                 .append(" uptime=").append(now).append("ms\n");
         sb.append(safe(RearViewMirrorService::describeForStall)).append('\n');
+        sb.append(safe(com.kooo.evcam.zeekr.SideViewService::describeForStall)).append('\n');
         sb.append("signals: ").append(describeBeats(now)).append('\n');
         sb.append("threads: ").append(describeLoopers(now)).append('\n');
         sb.append("main screen surround preview: ")
