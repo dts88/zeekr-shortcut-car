@@ -1109,6 +1109,10 @@ public class AppConfig {
     }
 
     /** 画面中心朝车尾转多少度（负数朝车头），开发者选项。 */
+    /** Off retains requested coverage, with black where the source has no image. */
+    public boolean isSideViewAutoFit() { return prefs.getBoolean("side_view_auto_fit", true); }
+    public void setSideViewAutoFit(boolean enabled) { prefs.edit().putBoolean("side_view_auto_fit", enabled).apply(); }
+
     public int getSideViewBack() {
         int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
         return clampInt(readInt(KEY_SIDE_VIEW_BACK, SIDE_VIEW_DEFAULT_BACK), -max, max);

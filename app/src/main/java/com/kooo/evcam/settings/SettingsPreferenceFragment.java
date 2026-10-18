@@ -800,6 +800,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
+        bindSwitch("pref_side_view_auto_fit", appConfig.isSideViewAutoFit(), value -> {
+            appConfig.setSideViewAutoFit(value);
+            SideViewService.applyAim();
+        });
         bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
                 appConfig.getSideViewMinSpeed(), " km/h", value -> {
                     appConfig.setSideViewMinSpeed(value);

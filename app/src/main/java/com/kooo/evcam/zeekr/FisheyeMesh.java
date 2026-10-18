@@ -1,6 +1,7 @@
 package com.kooo.evcam.zeekr;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 
 /**
@@ -52,6 +53,7 @@ public final class FisheyeMesh {
     private String projection = FisheyeProjection.PROJECTION_RECTILINEAR;
 
     private int divisions;
+    private float laneLeft, laneTop, laneWidth, laneHeight;
     /** (N+1)² 个源点，子视图坐标，按行排：[x0, y0, x1, y1, ...]。 */
     private float[] grid = new float[0];
     private final float[] point = new float[2];
@@ -90,6 +92,8 @@ public final class FisheyeMesh {
     public void prepare(int divisions,
                         float laneLeft, float laneTop, float laneWidth, float laneHeight,
                         float windowLeft, float windowTop, float windowWidth, float windowHeight) {
+        this.laneLeft = laneLeft; this.laneTop = laneTop;
+        this.laneWidth = laneWidth; this.laneHeight = laneHeight;
         this.divisions = Math.max(1, divisions);
         int side = this.divisions + 1;
         if (grid.length != side * side * 2) {
@@ -121,6 +125,8 @@ public final class FisheyeMesh {
      */
     public void prepare(int divisions, float laneLeft, float laneTop, float laneWidth, float laneHeight,
                         SourceMap map) {
+        this.laneLeft = laneLeft; this.laneTop = laneTop;
+        this.laneWidth = laneWidth; this.laneHeight = laneHeight;
         this.divisions = Math.max(1, divisions);
         int side = this.divisions + 1;
         if (grid.length != side * side * 2) {
@@ -162,6 +168,25 @@ public final class FisheyeMesh {
      */
     public int draw(Canvas canvas, float targetLeft, float targetTop,
                     float targetWidth, float targetHeight, Painter painter) {
+        return draw(canvas, targetLeft, targetTop, targetWidth, targetHeight, painter, false);
+    }
+
+    /** Side views with auto-fit off: black missing coverage, never sample adjacent lanes.
+     * Clip in source coordinates after each tile transform; retain unclamped UVs so
+     * partially visible tiles keep their real picture instead of collapsing at an edge.
+     */
+    public int drawClippedToLane(Canvas canvas, float targetLeft, float targetTop,
+                                 float targetWidth, float targetHeight, Painter painter) {
+        int save = canvas.save();
+        canvas.clipRect(targetLeft, targetTop, targetLeft + targetWidth, targetTop + targetHeight);
+        canvas.drawColor(Color.BLACK);
+        int drawn = draw(canvas, targetLeft, targetTop, targetWidth, targetHeight, painter, true);
+        canvas.restoreToCount(save);
+        return drawn;
+    }
+
+    private int draw(Canvas canvas, float targetLeft, float targetTop,
+                     float targetWidth, float targetHeight, Painter painter, boolean clipToLane) {
         if (matrix == null) {
             matrix = new Matrix();
         }
@@ -190,6 +215,12 @@ public final class FisheyeMesh {
                 int save = canvas.save();
                 canvas.clipRect(left, top, right, bottom);
                 canvas.concat(matrix);
+                if (clipToLane) {
+                    // Half-pixel-or-more guard for the supported >=512-pixel camera lanes.
+                    // Keep bilinear sampling away from neighbouring composite channels.
+                    canvas.clipRect(laneLeft + laneWidth * .001f, laneTop + laneHeight * .001f,
+                            laneLeft + laneWidth * .999f, laneTop + laneHeight * .999f);
+                }
                 painter.paint(canvas);
                 canvas.restoreToCount(save);
                 drawn++;

@@ -368,13 +368,14 @@ public class SideViewWindow extends ViewGroup {
         } else {
             // 角度在容器重画时照设置读（内存里的值；开发者选项锁着时是默认值）；没变的时候 SideViewFraming 不重算
             framing.configure(appConfig.getSideViewFov(), appConfig.getSideViewBack(), appConfig.getSideViewUp(),
-                    lane, width / (float) height);
+                    lane, width / (float) height, appConfig.isSideViewAutoFit());
             RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
                     plan, lane, RearViewGeometry.Viewport.full());
             mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
                     r.laneOffsetX * width, r.laneOffsetY * height,
                     r.laneScaleX * width, r.laneScaleY * height, turnedMap);
-            mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
+            if (appConfig.isSideViewAutoFit()) mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
+            else mesh.drawClippedToLane(canvas, 0f, 0f, width, height, paintTexture);
         }
         drawChild(canvas, closeButton, getDrawingTime());
     }

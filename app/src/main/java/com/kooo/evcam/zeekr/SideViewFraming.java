@@ -18,17 +18,23 @@ public final class SideViewFraming {
     private float fov, back, up, aspect;
     private int lane;
     private double fittedTangent;
+    private boolean autoFit = true;
 
     /** 参数变了才重算、返回 true；没变的时候每一帧都不用再算。 */
     public boolean configure(float fov, float back, float up, int lane, float aspect) {
+        return configure(fov, back, up, lane, aspect, true);
+    }
+
+    public boolean configure(float fov, float back, float up, int lane, float aspect, boolean autoFit) {
         fov = clamp(fov, SideViewProjection.MIN_FOV_DEGREES, SideViewProjection.MAX_FOV_DEGREES);
         back = clamp(back, -SideViewProjection.MAX_YAW_DEGREES, SideViewProjection.MAX_YAW_DEGREES);
         up = clamp(up, -SideViewProjection.MAX_PITCH_DEGREES, SideViewProjection.MAX_PITCH_DEGREES);
         aspect = Float.isFinite(aspect) && aspect > 0f ? aspect : 1f;
         if (rays != null && this.fov == fov && this.back == back && this.up == up
-                && this.lane == lane && this.aspect == aspect) {
+                && this.lane == lane && this.aspect == aspect && this.autoFit == autoFit) {
             return false;
         }
+        this.autoFit = autoFit;
         this.fov = fov;
         this.back = back;
         this.up = up;
@@ -36,7 +42,7 @@ public final class SideViewFraming {
         this.aspect = aspect;
         rays = new SideViewProjection.Rays(back, up, lane);
         double requested = Math.tan(Math.toRadians(fov) / 2.0);
-        if (fits(requested)) {
+        if (!autoFit || fits(requested)) {
             fittedTangent = requested;
         } else {
             double low = 0.0;
