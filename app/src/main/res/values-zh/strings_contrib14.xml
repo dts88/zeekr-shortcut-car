@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="floating_action_none">不执行</string>
+    <string name="set_floating_double_tap_summary">默认为不执行。设置双击动作后，单击会短暂等待，以区分这两种手势。</string>
+    <string name="set_floating_double_tap_title">双击</string>
+</resources>
