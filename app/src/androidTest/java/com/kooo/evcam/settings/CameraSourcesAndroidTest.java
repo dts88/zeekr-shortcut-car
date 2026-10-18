@@ -92,24 +92,23 @@ public class CameraSourcesAndroidTest {
    scenario.onActivity(activity->{SettingsShellFragment shell=new SettingsShellFragment();host[0]=shell;
     activity.findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
     activity.getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container,shell).commitNow();shell.getChildFragmentManager().executePendingTransactions();
-    sources[0]=open(shell,false);assertNotNull(sources[0].findPreference("cabin2"));Preference surround=sources[0].findPreference("composite");assertTrue(surround.getSummary().toString().contains("8"));
-    surround.getOnPreferenceClickListener().onPreferenceClick(surround);
+    sources[0]=open(shell,false);assertNotNull(sources[0].findPreference("cabin2"));
+    assertTrue(sources[0].findPreference("composite").getSummary().toString().contains("8"));
    });
+   onView(withText(R.string.record_group_surround)).perform(click());
    onView(withText(R.string.opt_camera_auto)).perform(click());onView(withText(R.string.action_cancel)).perform(click());assertEquals("8",config.getSourceCameraId("composite"));
-   scenario.onActivity(a->{Preference row=sources[0].findPreference("composite");row.getOnPreferenceClickListener().onPreferenceClick(row);});
+   onView(withText(R.string.record_group_surround)).perform(click());
    onView(withText(R.string.opt_camera_auto)).perform(click());onView(withText(R.string.action_ok)).perform(click());assertNull(config.getSourceCameraId("composite"));
    scenario.onActivity(a->{sources[0]=open(host[0],true);assertTrue(sources[0].findPreference("composite").getSummary().toString().contains("5"));
-    config.setSourceCameraId("manual","9");Preference reset=sources[0].findPreference("reset_sources");reset.getOnPreferenceClickListener().onPreferenceClick(reset);});
+    config.setSourceCameraId("manual","9");sources[0].scrollToPreference("reset_sources");});
+   onView(withText(R.string.camera_sources_reset)).perform(click());
    onView(withText(R.string.action_cancel)).perform(click());assertEquals("9",config.getSourceCameraId("manual"));
    scenario.recreate();
-   scenario.onActivity(a->{
-    host[0]=(SettingsShellFragment)a.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-    host[0].getChildFragmentManager().executePendingTransactions();
-    sources[0]=(CameraSourcesFragment)host[0].getChildFragmentManager().findFragmentById(R.id.settings_detail);
-    assertTrue(sources[0].isResumed());
-    Preference reset=sources[0].findPreference("reset_sources");reset.getOnPreferenceClickListener().onPreferenceClick(reset);
-   });
-   onView(withText(R.string.action_ok)).perform(click());assertNull(config.getSourceCameraId("manual"));assertEquals("5",ProfileSizes.cameraIdFor(target,"composite"));
+   scenario.onActivity(a->{host[0]=(SettingsShellFragment)a.getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+    host[0].getChildFragmentManager().executePendingTransactions();sources[0]=(CameraSourcesFragment)host[0].getChildFragmentManager().findFragmentById(R.id.settings_detail);
+    sources[0].scrollToPreference("reset_sources");});
+   onView(withText(R.string.camera_sources_reset)).perform(click());onView(withText(R.string.action_ok)).perform(click());
+   assertNull(config.getSourceCameraId("manual"));assertEquals("5",ProfileSizes.cameraIdFor(target,"composite"));
   }
  }
 }
