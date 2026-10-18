@@ -927,4 +927,9 @@
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
     <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
+    <string name="side_control_close">Tutup pandangan sisi ini</string>
+    <string name="side_control_expand">Besarkan pandangan sisi</string>
+    <string name="side_control_restore">Pulihkan saiz tetingkap</string>
+    <string name="mirror_control_close">Matikan Cermin super</string>
+    <string name="mirror_control_expand">Besarkan Cermin super</string>
 </resources>

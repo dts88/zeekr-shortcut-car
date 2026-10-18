@@ -89,6 +89,8 @@ public class RearViewMirrorView extends ViewGroup {
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
+    private final SideViewControls windowControls;
+    private final SideViewExpansion windowExpansion = new SideViewExpansion();
     private final CameraLabel cameraLabel;
 
     private WindowManager.LayoutParams params;
@@ -197,7 +199,11 @@ public class RearViewMirrorView extends ViewGroup {
 
         textureView = new AutoFitTextureView(context);
         addView(textureView);
-
+        windowControls = new SideViewControls(context,
+                () -> post(() -> com.kooo.evcam.overlay.OverlayCoordinator.setRearViewEnabled(getContext(), false)),
+                this::toggleExpanded);
+        windowControls.setMirrorMode(true);
+        addView(windowControls);
     }
 
     /**
@@ -234,8 +240,8 @@ public class RearViewMirrorView extends ViewGroup {
         if (attached) {
             return;
         }
-        int width = appConfig.getRearViewWidth(screenWidth());
-        int height = appConfig.getRearViewHeight(screenHeight());
+        int width = Math.max(windowControls.barHeight(), appConfig.getRearViewWidth(screenWidth()));
+        int height = Math.max(windowControls.barHeight(), appConfig.getRearViewHeight(screenHeight()));
         params = new WindowManager.LayoutParams(
                 width, height,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -265,6 +271,7 @@ public class RearViewMirrorView extends ViewGroup {
                     != RearViewTouchModel.Dock.NONE;
             // 上次就是贴边收起来的：画布一开始就不可见，和贴边那一刻一样（见 syncDockState）
             textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+        windowControls.setVisibility(docked ? View.GONE : View.VISIBLE);
             idleHandler.postDelayed(idleTick, IDLE_TICK_MS);
         } catch (Exception e) {
             AppLog.e(TAG, "后视镜窗口添加失败", e);
@@ -367,6 +374,7 @@ public class RearViewMirrorView extends ViewGroup {
         }
         // 状态先改好再改可见：设回可见时 TextureView 会叫重画，那一次 dispatchDraw 要按「放回来」画
         textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+        windowControls.setVisibility(docked ? View.GONE : View.VISIBLE);
         AppLog.i(TAG, docked ? "后视镜贴边收起：画布设为不可见，不再逐帧画" : "后视镜放回来：画布设回可见，接着画");
         invalidate();
         if (dockListener != null) {
@@ -385,6 +393,9 @@ public class RearViewMirrorView extends ViewGroup {
      * 当场摘是安全的。</p>
      */
     public void hide() {
+        SideViewExpansion.Geometry normal = windowExpansion.restore();
+        windowControls.setExpanded(false);
+        if (normal != null && params != null) applyExpandedGeometry(normal, false);
         idleHandler.removeCallbacks(idleTick);
         cancelGlide();
         cancelTapFlash();
@@ -453,8 +464,9 @@ public class RearViewMirrorView extends ViewGroup {
         if (params == null) {
             return;
         }
-        params.width = appConfig.getRearViewWidth(screenWidth());
-        params.height = appConfig.getRearViewHeight(screenHeight());
+        windowExpansion.restore(); windowControls.setExpanded(false);
+        params.width = Math.max(windowControls.barHeight(), appConfig.getRearViewWidth(screenWidth()));
+        params.height = Math.max(windowControls.barHeight(), appConfig.getRearViewHeight(screenHeight()));
         params.x = RearViewTouchModel.clampX(params.x, params.width, screenWidth(), PEEK_WIDTH_PX);
         params.y = RearViewTouchModel.clampY(params.y, params.height, screenHeight());
         applyLayout();
@@ -470,12 +482,14 @@ public class RearViewMirrorView extends ViewGroup {
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         // 子视图铺满，实际取景由 dispatchDraw 的矩阵决定
         textureView.layout(0, 0, getWidth(), getHeight());
+        windowControls.layoutIn(getWidth());
     }
 
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
         super.onMeasure(widthSpec, heightSpec);
-        measureChildren(widthSpec, heightSpec);
+        textureView.measure(widthSpec, heightSpec);
+        windowControls.measure(widthSpec, MeasureSpec.makeMeasureSpec(windowControls.barHeight(), MeasureSpec.EXACTLY));
     }
 
     @Override
@@ -492,10 +506,9 @@ public class RearViewMirrorView extends ViewGroup {
         }
         if (plan == null || !plan.isComposite()) {
             // 还不知道几何，先原样显示，总比全黑好
-            super.dispatchDraw(canvas);
-            if (frozen) {
-                drawFrozenHint(canvas, width, height);
-            }
+            drawTextureOnce(canvas);
+            if (frozen) drawFrozenHint(canvas, width, height);
+            drawChild(canvas, windowControls, getDrawingTime());
             return;
         }
 
@@ -544,6 +557,7 @@ public class RearViewMirrorView extends ViewGroup {
         if (!frozen && appConfig.isRearViewCameraLabelEnabled()) {
             cameraLabel.draw(canvas, laneIndex, width, height);
         }
+        drawChild(canvas, windowControls, getDrawingTime());
     }
 
     /**
@@ -736,7 +750,7 @@ public class RearViewMirrorView extends ViewGroup {
                 params.x, params.y, pinchStartWidth, pinchStartHeight,
                 pinchAnchorRatioX, pinchAnchorRatioY,
                 rawFocusX(event), rawFocusY(event), span / pinchStartSpan,
-                AppConfig.REARVIEW_MIN_SIZE, screenWidth(), screenHeight());
+                Math.max(AppConfig.REARVIEW_MIN_SIZE, windowControls.barHeight()), screenWidth(), screenHeight());
 
         params.width = result.width;
         params.height = result.height;
@@ -898,7 +912,24 @@ public class RearViewMirrorView extends ViewGroup {
         savePosition();
     }
 
+    private void toggleExpanded() {
+        if (!attached || params == null || docked) return;
+        SideViewExpansion.Geometry next = windowExpansion.toggle(new SideViewExpansion.Geometry(
+                params.x, params.y, params.width, params.height), screenWidth(), screenHeight(), 16);
+        cancelGlide(); cancelTapFlash();
+        applyExpandedGeometry(next, true);
+        windowControls.setExpanded(windowExpansion.expanded());
+    }
+
+    private void applyExpandedGeometry(SideViewExpansion.Geometry geometry, boolean updateWindow) {
+        params.x = geometry.x; params.y = geometry.y;
+        params.width = geometry.width; params.height = geometry.height;
+        if (updateWindow && attached) windowManager.updateViewLayout(this, params);
+        requestLayout(); invalidate();
+    }
+
     private void savePosition() {
+        if (windowExpansion.expanded()) return;
         appConfig.setRearViewPosition(params.x, params.y);
         appConfig.setRearViewSize(params.width, params.height,
                 screenWidth(), screenHeight());

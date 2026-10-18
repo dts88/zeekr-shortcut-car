@@ -60,4 +60,7 @@
     -->
     <color name="status_overlay_text">#F2FFFFFF</color>
     <color name="status_overlay_text_dim">#B3FFFFFF</color>
+    <color name="side_control_background">#E6F1F2F4</color>
+    <color name="side_control_icon">#FF202124</color>
+    <color name="side_control_pressed">#30202124</color>
 </resources>

@@ -143,3 +143,11 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Super mirror window controls
+
+Super mirror has accessible Close and Expand/Restore corner buttons. Close uses
+the existing mirror enable control. Expansion is temporary: Restore and reopening
+return to the saved normal placement, and gesture changes while expanded are not
+saved over it. Existing drag, pinch, docking and camera selection remain available.
+Very narrow windows retain Close and hide Expand until widened.

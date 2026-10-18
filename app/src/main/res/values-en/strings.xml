@@ -950,4 +950,9 @@
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
     <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
+    <string name="side_control_close">Dismiss this side view</string>
+    <string name="side_control_expand">Expand side view</string>
+    <string name="side_control_restore">Restore window size</string>
+    <string name="mirror_control_close">Turn off Super mirror</string>
+    <string name="mirror_control_expand">Expand Super mirror</string>
 </resources>
