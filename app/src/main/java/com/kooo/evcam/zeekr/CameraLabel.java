@@ -17,6 +17,7 @@ final class CameraLabel {
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final String[] names = new String[4];
     private String language;
+    private int paletteMode = -1;
 
     CameraLabel(Context context) {
         this.context = context;
@@ -28,6 +29,13 @@ final class CameraLabel {
     void draw(Canvas canvas, int lane, int width, int height) {
         if (lane < 0 || lane >= names.length || width <= 0 || height <= 0) {
             return;
+        }
+        int mode = com.kooo.evcam.settings.AppTheme.nightMode(context);
+        if (mode != paletteMode) {
+            paletteMode = mode;
+            Context palette = com.kooo.evcam.settings.AppTheme.palette(context);
+            background.setColor(palette.getColor(com.kooo.evcam.R.color.surface));
+            text.setColor(palette.getColor(com.kooo.evcam.R.color.text_primary));
         }
         String currentLanguage = AppCompatDelegate.getApplicationLocales().toLanguageTags()
                 + ":" + context.getResources().getConfiguration().getLocales().toLanguageTags();

@@ -1167,6 +1167,9 @@ public class AppConfig {
         writeEnum(SettingsRegistry.LANGUAGE, mode);
     }
 
+    public String getThemeMode() { return readEnum(SettingsRegistry.THEME); }
+    public void setThemeMode(String mode) { writeEnum(SettingsRegistry.THEME, mode); }
+
     /** 动作栏在屏幕哪一侧：right / left。 */
     public String getActionRailSide() {
         return readEnum(SettingsRegistry.ACTION_RAIL_SIDE);

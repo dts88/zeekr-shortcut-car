@@ -950,4 +950,9 @@
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
     <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
+    <string name="set_theme_title">Theme</string>
+    <string name="set_theme_summary">Choose Follow system, Light or Dark. Camera video is unchanged.</string>
+    <string name="theme_system">Follow system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
 </resources>

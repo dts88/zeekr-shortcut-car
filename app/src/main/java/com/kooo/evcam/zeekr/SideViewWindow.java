@@ -391,6 +391,7 @@ public class SideViewWindow extends ViewGroup {
         private static final int FILL_PRESSED = 0xCC000000;
         private static final int CROSS = 0xFFF2F2F3;
 
+        private int paletteMode = -1, normalFill, pressedFill;
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint cross = new Paint(Paint.ANTI_ALIAS_FLAG);
 
@@ -398,6 +399,7 @@ public class SideViewWindow extends ViewGroup {
             super(context);
             setClickable(true);
             refreshLabel();
+            com.kooo.evcam.settings.AppTheme.observe(this);
             cross.setColor(CROSS);
             cross.setStyle(Paint.Style.STROKE);
             cross.setStrokeCap(Paint.Cap.ROUND);
@@ -424,7 +426,15 @@ public class SideViewWindow extends ViewGroup {
             float cx = getWidth() / 2f;
             float cy = getHeight() / 2f;
             float radius = Math.min(getWidth(), getHeight()) / 2f;
-            fill.setColor(isPressed() ? FILL_PRESSED : FILL);
+            int mode = com.kooo.evcam.settings.AppTheme.nightMode(getContext());
+            if (mode != paletteMode) {
+                paletteMode = mode;
+                Context palette = com.kooo.evcam.settings.AppTheme.palette(getContext());
+                normalFill = palette.getColor(R.color.surface);
+                pressedFill = palette.getColor(R.color.sunken);
+                cross.setColor(palette.getColor(R.color.text_primary));
+            }
+            fill.setColor(isPressed() ? pressedFill : normalFill);
             canvas.drawCircle(cx, cy, radius, fill);
             float arm = radius * 0.36f;
             canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, cross);

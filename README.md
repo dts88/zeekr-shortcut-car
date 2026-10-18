@@ -143,3 +143,10 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### App appearance
+
+Settings → Interface → Theme offers Follow system (default), Light and Dark.
+Confirm a choice to apply it; Cancel preserves the current theme. The selected
+palette also colours camera-direction badges and the side-popup Close button.
+Camera pixels and recording files remain unchanged.

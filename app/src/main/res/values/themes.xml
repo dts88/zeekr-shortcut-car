@@ -1,7 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!--
       只有这一份主题，日间夜间共用：颜色全部引用 @color/ 下的语义色，
-      由 values / values-night 两份 colors.xml 各自给值，主题跟随系统昼夜。
+      由 values / values-night 两份 colors.xml 各自给值；默认跟随系统，也可在界面设置选择浅色或深色。
 
       以前夜间是整份重写的主题，加一个属性要记得两边都加 —— 忘了就是
       「设置界面直接崩」或「对话框按钮看不见」。现在没有第二份可以忘。

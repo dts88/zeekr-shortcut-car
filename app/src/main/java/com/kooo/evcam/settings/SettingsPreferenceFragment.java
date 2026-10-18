@@ -979,6 +979,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void bindInterface() {
         bindLanguage();
+        bindEnum("pref_theme", SettingsRegistry.THEME, appConfig.getThemeMode(), value -> {
+            appConfig.setThemeMode(value);
+            AppTheme.apply(value);
+        });
         // 回到主界面时生效（MainActivity.showRecordingInterface 会按它重新摆一次）。
         // 在这里选过，首次启动就不必再问
         bindSegmented("pref_rail_side", SettingsRegistry.ACTION_RAIL_SIDE,

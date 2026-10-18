@@ -60,6 +60,12 @@ public final class SettingsRegistry {
             entry("en", "English", R.string.lang_en),
             entry("ms", "Bahasa Melayu", R.string.lang_ms));
 
+    public static final SettingSpec THEME = SettingSpec.of(
+            "interface_theme", "界面主题", AppTheme.SYSTEM,
+            entry(AppTheme.SYSTEM, "跟随系统", R.string.theme_system),
+            entry(AppTheme.LIGHT, "浅色", R.string.theme_light),
+            entry(AppTheme.DARK, "深色", R.string.theme_dark));
+
     /**
      * 鱼眼校正用哪种投影。
      *
@@ -91,6 +97,7 @@ public final class SettingsRegistry {
             RECORDING_MODE,
             CAR_MODEL,
             LANGUAGE,
+            THEME,
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE));
 }

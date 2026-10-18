@@ -927,4 +927,9 @@
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
     <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
+    <string name="set_theme_title">Tema</string>
+    <string name="set_theme_summary">Pilih Ikut sistem, Cerah atau Gelap. Video kamera tidak berubah.</string>
+    <string name="theme_system">Ikut sistem</string>
+    <string name="theme_light">Cerah</string>
+    <string name="theme_dark">Gelap</string>
 </resources>
