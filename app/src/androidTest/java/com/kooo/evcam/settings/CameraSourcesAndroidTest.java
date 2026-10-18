@@ -107,8 +107,9 @@ public class CameraSourcesAndroidTest {
     host[0].getChildFragmentManager().executePendingTransactions();
     sources[0]=(CameraSourcesFragment)host[0].getChildFragmentManager().findFragmentById(R.id.settings_detail);
     assertTrue(sources[0].isResumed());
-    Preference reset=sources[0].findPreference("reset_sources");reset.getOnPreferenceClickListener().onPreferenceClick(reset);
+    sources[0].scrollToPreference("reset_sources");
    });
+   onView(withText(R.string.camera_sources_reset)).perform(click());
    onView(withText(R.string.action_ok)).perform(click());assertNull(config.getSourceCameraId("manual"));assertEquals("5",ProfileSizes.cameraIdFor(target,"composite"));
   }
  }
