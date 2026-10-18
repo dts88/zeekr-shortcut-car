@@ -213,6 +213,8 @@ public class MainActivity extends AppCompatActivity {
 
     // 车型配置相关
     private AppConfig appConfig;
+    private final java.util.Map<String, AutoFitTextureView> extraSourceViews = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, View> extraSourcePanes = new java.util.LinkedHashMap<>();
     /** 启用的那几路（RecordSpecs.enabledCameraKeys）：主界面给它们摆格子、挂画布，一路一块（PreviewSlots）。 */
     private java.util.Set<String> enabledLanes = new java.util.LinkedHashSet<>();
     // 录制状态显示相关
@@ -595,12 +597,13 @@ public class MainActivity extends AppCompatActivity {
         btnTakePhoto.setOnClickListener(v -> takePicture());
 
         // 启用的那几路各挂一块画布（PreviewSlots）；没启用的不挂，它那一格在多路布局里藏起来
-        for (String key : PreviewSlots.KEYS) {
+        for (String key : enabledLanes) {
             AutoFitTextureView canvas = canvasFor(key);
             if (canvas != null) {
                 canvas.setSurfaceTextureListener(buildSurfaceListener(key));
             }
         }
+        installExtraSourcePanes();
         showLanePanes(enabledLanes);
         // 主界面重建：上一个界面留下的预览画布接回来（大纲 §7.6），要在画布挂上窗口、系统自己建画布之前
         reattachKeptCanvases();
@@ -676,7 +679,7 @@ public class MainActivity extends AppCompatActivity {
         if (cameraManager == null) {
             initCamera();
         } else {
-            cameraManager.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
+            declareSourcePreviews(cameraManager);
         }
         // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
         // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
@@ -697,7 +700,7 @@ public class MainActivity extends AppCompatActivity {
             case "left":
                 return textureLeft;
             default:
-                return null;
+                return extraSourceViews.get(cameraKey);
         }
     }
 
@@ -711,6 +714,32 @@ public class MainActivity extends AppCompatActivity {
      * 登记表和声明都和重建之前一样。相机这一侧的其余部分（回调、亮度调节、录制状态）等 onCreate 走完再接，
      * 和系统建的画布一样晚。没留下的那几格照旧等系统建。</p>
      */
+    private void installExtraSourcePanes() {
+        android.widget.LinearLayout column = findViewById(R.id.cabin_column);
+        if (column == null) return;
+        for (String key : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES) {
+            if (!enabledLanes.contains(key)) continue;
+            android.widget.FrameLayout pane = new android.widget.FrameLayout(this);
+            pane.setBackgroundResource(R.drawable.bg_preview_frame);
+            AutoFitTextureView texture = new AutoFitTextureView(this);
+            pane.addView(texture, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            TextView label = new TextView(this); label.setText(appConfig.getCameraName(this, key));
+            label.setTextColor(android.graphics.Color.WHITE); label.setBackgroundResource(R.drawable.camera_label_background);
+            label.setPadding(12, 6, 12, 6);
+            pane.addView(label, new android.widget.FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP | android.view.Gravity.START));
+            android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(-1, 0, 1);
+            params.topMargin = 8; column.addView(pane, params);
+            extraSourceViews.put(key, texture); extraSourcePanes.put(key, pane);
+            texture.setSurfaceTextureListener(buildSurfaceListener(key));
+            pane.setOnClickListener(v -> toggleCabinExpanded(pane, key));
+        }
+    }
+
+    private void declareSourcePreviews(MultiCameraManager pipeline) {
+        for (String key : enabledLanes) pipeline.declarePreview(key, canvasFor(key));
+    }
+
+
     private void reattachKeptCanvases() {
         // 留着画布的只会是进程里那一份管线（管线属于应用，主界面销毁不放它）。这里不建：没有就没有画布可接。
         // 它要是随后因为换车型、配置里开关了一路被 Holder 放掉重建，接回的画布归视图，新的那一份照样声明它
@@ -719,7 +748,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         List<String> back = new ArrayList<>();
-        for (String key : PreviewSlots.KEYS) {
+        for (String key : enabledLanes) {
             AutoFitTextureView view = canvasFor(key);
             if (view == null || view.isAvailable()) {
                 continue;
@@ -1548,7 +1577,7 @@ public class MainActivity extends AppCompatActivity {
         }
         showBuilt(built);
         showBuiltCabins(pipeline);
-        pipeline.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
+        declareSourcePreviews(pipeline);
         // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
         pipeline.firePreviewSizeCallbacks();
         registerCamerasToImageAdjustManager();
@@ -3303,8 +3332,9 @@ public class MainActivity extends AppCompatActivity {
         }
         float[] from = com.kooo.evcam.ui.PreviewExpandAnimator.screenRect(pane);
         hideForExpand(findViewById(R.id.composite_wrapper));
-        hideForExpand(findViewById(pane.getId() == R.id.pane_cabin_front
-                ? R.id.pane_cabin_rear : R.id.pane_cabin_front));
+        android.view.ViewGroup column = findViewById(R.id.cabin_column);
+        if (column != null) for (int i = 0; i < column.getChildCount(); i++)
+            if (column.getChildAt(i) != pane) hideForExpand(column.getChildAt(i));
         if (pane.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
             android.view.ViewGroup.MarginLayoutParams params =
                     (android.view.ViewGroup.MarginLayoutParams) pane.getLayoutParams();
@@ -3405,7 +3435,7 @@ public class MainActivity extends AppCompatActivity {
         if (camera != null) {
             camera.setFitOverride(fill ? com.kooo.evcam.profile.LaneLayout.FILL : null);
         }
-        AutoFitTextureView view = "back".equals(cameraKey) ? textureBack : textureLeft;
+        AutoFitTextureView view = canvasFor(cameraKey);
         if (view == null) {
             return;
         }

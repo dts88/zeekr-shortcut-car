@@ -965,4 +965,9 @@
     <string name="camera_sources_reset_note">Clear manual camera assignments, including old Developer overrides. Keep vehicle model, preview layout, recording switches and picture quality. Surround returns to the detected feed; additional cameras without an automatic default will need mapping before use. Exit and reopen afterwards.</string>
     <string name="camera_sources_title">Camera sources</string>
     <string name="record_group_manual">Manual mapping</string>
+    <string name="record_source_choose">Choose a source</string>
+    <string name="record_source_change">Change camera source</string>
+    <string name="record_source_settings">Camera settings</string>
+    <string name="record_group_cabin">Cabin</string>
+    <string name="record_group_roads">Front + Rear</string>
 </resources>
