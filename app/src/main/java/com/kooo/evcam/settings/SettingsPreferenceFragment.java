@@ -800,6 +800,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
+        bindEnum("pref_side_popup_aspect",SettingsRegistry.SIDE_POPUP_ASPECT,appConfig.getSidePopupAspect(),value->{
+            appConfig.setSidePopupAspect(value);SideViewService.applyLayout();
+        });
+        bindSlider("pref_side_popup_size",15,70,appConfig.getSidePopupSize(),"%",value->{
+            appConfig.setSidePopupSize(value);SideViewService.applyLayout();
+        });
+        bindSwitch("pref_side_popup_adjustable",appConfig.isSidePopupAdjustable(),value->{
+            appConfig.setSidePopupAdjustable(value);SideViewService.applyLayout();
+        });
+        onClick("pref_side_popup_reset",pref->{
+            com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(),R.style.Theme_Cam_MaterialAlertDialog)
+                    .setTitle(R.string.popup_reset_title).setMessage(R.string.popup_reset_message)
+                    .setNegativeButton(R.string.action_cancel,null)
+                    .setPositiveButton(R.string.action_ok,(dialog,which)->{appConfig.resetSidePopupLayout();SideViewService.applyLayout();
+                        bindSideView();}));
+        });
         bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
                 appConfig.getSideViewMinSpeed(), " km/h", value -> {
                     appConfig.setSideViewMinSpeed(value);

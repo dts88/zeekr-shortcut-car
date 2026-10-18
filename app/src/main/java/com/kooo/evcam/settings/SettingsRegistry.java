@@ -86,11 +86,19 @@ public final class SettingsRegistry {
             entry("right", "右侧", R.string.opt_rail_right),
             entry("left", "左侧", R.string.opt_rail_left));
 
+    public static final SettingSpec SIDE_POPUP_ASPECT = SettingSpec.of(
+            "side_popup_aspect", "侧视窗口比例", "11:5",
+            entry("11:5", "11:5", R.string.popup_aspect_wide),
+            entry("16:9", "16:9", R.string.popup_aspect_landscape),
+            entry("1:1", "1:1", R.string.popup_aspect_square),
+            entry("3:4", "3:4", R.string.popup_aspect_portrait));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
             CAR_MODEL,
             LANGUAGE,
+            SIDE_POPUP_ASPECT,
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE));
 }

@@ -10,6 +10,8 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Size;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -76,6 +78,11 @@ public class SideViewWindow extends ViewGroup {
     private WindowManager.LayoutParams params;
     private boolean attached;
     private boolean shown;
+    private final ScaleGestureDetector resize;
+    private int startX, startY, pinchHeight;
+    private float touchX, touchY, pinchScale;
+    private boolean multiplePointers, placementChanged;
+
     private int lane = LaneCycle.LEFT;
     /** 合成流的真实尺寸算出来的拆分几何；不知道时画面是黑的。 */
     private CompositeStreamGeometry.Plan plan;
@@ -105,6 +112,24 @@ public class SideViewWindow extends ViewGroup {
     public SideViewWindow(Context context, AppConfig appConfig, Runnable onClose) {
         super(context);
         this.appConfig = appConfig;
+        resize = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScaleBegin(ScaleGestureDetector detector) {
+                if (params == null) return false;
+                pinchHeight = params.height; pinchScale = 1f; multiplePointers = true; return true;
+            }
+            @Override public boolean onScale(ScaleGestureDetector detector) {
+                placementChanged = true;
+                pinchScale *= detector.getScaleFactor();
+                int sh = getResources().getDisplayMetrics().heightPixels;
+                int sw = getResources().getDisplayMetrics().widthPixels;
+                SideViewPlacement.Rect rect = SideViewPlacement.compute(sw,sh,lane,
+                        SideViewPlacement.aspect(appConfig.getSidePopupAspect()),
+                        Math.round(pinchHeight * pinchScale * 100f / Math.max(1,sh)));
+                params.x += (params.width-rect.width)/2; params.y += (params.height-rect.height)/2;
+                params.width=rect.width; params.height=rect.height; clampPosition(); update(); requestLayout(); return true;
+            }
+        });
+        resize.setQuickScaleEnabled(false);
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         setBackgroundColor(0xFF000000);
         textureView = new AutoFitTextureView(context);
@@ -251,11 +276,51 @@ public class SideViewWindow extends ViewGroup {
     private void place() {
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
-        SideViewPlacement.Rect rect = SideViewPlacement.compute(w, h, lane);
+        SideViewPlacement.Rect rect = SideViewPlacement.compute(w, h, lane,
+                SideViewPlacement.aspect(appConfig.getSidePopupAspect()), appConfig.getSidePopupSize());
         params.x = rect.left;
         params.y = rect.top;
         params.width = rect.width;
         params.height = rect.height;
+        if (appConfig.isSidePopupAdjustable() && appConfig.getSidePopupX() >= 0 && appConfig.getSidePopupY() >= 0) {
+            params.x=appConfig.getSidePopupX(); params.y=appConfig.getSidePopupY(); clampPosition();
+        }
+    }
+
+    private void clampPosition() {
+        params.x=Math.max(0,Math.min(Math.max(0,getResources().getDisplayMetrics().widthPixels-params.width),params.x));
+        params.y=Math.max(0,Math.min(Math.max(0,getResources().getDisplayMetrics().heightPixels-params.height),params.y));
+    }
+
+    public void applyLayoutFromConfig() {
+        if (params == null) return;
+        place(); if (attached) update(); requestLayout(); invalidate();
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    @Override public boolean onTouchEvent(MotionEvent event) {
+        if (!appConfig.isSidePopupAdjustable() || params == null || !shown) return super.onTouchEvent(event);
+        resize.onTouchEvent(event);
+        switch(event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                startX=params.x; startY=params.y; touchX=event.getRawX();touchY=event.getRawY();multiplePointers=false;placementChanged=false; break;
+            case MotionEvent.ACTION_POINTER_DOWN: multiplePointers=true; break;
+            case MotionEvent.ACTION_MOVE:
+                if (!multiplePointers && !resize.isInProgress()) {
+                    int dx=Math.round(event.getRawX()-touchX), dy=Math.round(event.getRawY()-touchY);
+                    int slop=android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                    if (!placementChanged && Math.abs(dx)<=slop && Math.abs(dy)<=slop) break;
+                    placementChanged=true; params.x=startX+dx;params.y=startY+dy;
+                    clampPosition();update();
+                } break;
+            case MotionEvent.ACTION_UP:
+                if (!placementChanged) break;
+                appConfig.setSidePopupPosition(params.x,params.y);
+                appConfig.setSidePopupSize(Math.round(params.height*100f/Math.max(1,getResources().getDisplayMetrics().heightPixels)));
+                break;
+            case MotionEvent.ACTION_CANCEL: applyLayoutFromConfig(); break;
+        }
+        return true;
     }
 
     /** 显示时不透明、接点击、画布可见；备着时全透明、点击穿过去、画布建好后不可见。 */

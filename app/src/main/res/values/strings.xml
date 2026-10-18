@@ -938,4 +938,14 @@
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
     <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
+    <string name="popup_aspect_title">窗口比例</string>
+    <string name="popup_aspect_wide">超宽 11:5（默认）</string>
+    <string name="popup_aspect_landscape">横向 16:9</string>
+    <string name="popup_aspect_square">正方形 1:1</string>
+    <string name="popup_aspect_portrait">纵向 3:4</string>
+    <string name="popup_size_title" formatted="false">窗口高度（屏幕百分比）</string>
+    <string name="popup_adjustable_title">允许拖动和双指缩放</string>
+    <string name="popup_adjustable_summary">默认关闭，使用固定位置。开启后保存手动位置和大小。</string>
+    <string name="popup_reset_title">重置窗口布局</string>
+    <string name="popup_reset_message">恢复默认窗口比例、高度和位置。保留启用状态、拖动开关和画面角度。</string>
 </resources>

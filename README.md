@@ -143,3 +143,13 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Optional side-popup layout
+
+Side-camera settings offer square, portrait, landscape and ultra-wide shapes plus
+a popup height control. Defaults retain 11:5, 33% screen height and fixed placement.
+Allow dragging and pinch resizing is off by default; enabling it retains a shared
+manual position/size. Turning it off restores side-based placement while retaining
+manual coordinates. Reset popup layout confirms first and resets geometry only,
+leaving camera enablement, gesture choice and picture angles intact. Camera
+surfaces, factory/reverse yielding and recording are unchanged.
