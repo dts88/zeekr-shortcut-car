@@ -159,6 +159,13 @@ public class ProfileEditorFragment extends Fragment {
         camerasTitle = view.findViewById(R.id.editor_cameras_title);
         view.findViewById(R.id.editor_open_lanes).setOnClickListener(v -> openLanes());
         view.findViewById(R.id.editor_reset).setOnClickListener(v -> confirmReset());
+        android.widget.Button preview = view.findViewById(R.id.editor_preview_layout);
+        preview.setContentDescription(getString(R.string.record_preview_layout));
+        Runnable label = () -> preview.setText(getString(R.string.record_preview_current,
+                PreviewLayoutPicker.label(requireContext(), new AppConfig(requireContext()).getPreviewSourceMode())));
+        label.run(); preview.setOnClickListener(v -> PreviewLayoutPicker.show(requireContext(), () -> {
+            label.run(); toast(getString(R.string.msg_restart_required));
+        }));
         refresh();
     }
 

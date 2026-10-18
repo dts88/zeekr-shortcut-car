@@ -96,7 +96,7 @@ public class CameraSourcesFragment extends PreferenceFragmentCompat {
                 .setPositiveButton(R.string.action_ok, (dialog, which) -> {
                     String picked = selected[0] == 0 ? null : selected[0] == 1 ? "" : ids.get(selected[0] - 2);
                     String resolved = picked == null ? ProfileSizes.automaticCameraIdFor(context, role) : picked;
-                    Set<String> active = RecordSpecs.enabledCameraKeys(profile);
+                    Set<String> active = ProfileChannels.of(profile, config.getPreviewSourceMode()).keys;
                     if (resolved != null && !resolved.isEmpty()) for (CameraProfile camera : profile.cameras) {
                         if ((camera.enabled || active.contains(RecordingSources.key(camera.role)))
                                 && !camera.role.equals(role) && resolved.equals(ProfileSizes.cameraIdFor(context, camera.role))) {

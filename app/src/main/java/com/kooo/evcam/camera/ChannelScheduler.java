@@ -1473,7 +1473,8 @@ public final class ChannelScheduler {
     }
 
     /** 同上；{@code enabled} 是其中启用的那几路（{@link ChannelRules.World#enabled}），null 是全部。 */
-    void setLanes(Map<String, CameraPort> lanes, Set<String> enabled) {
+    void setLanes(Map<String, CameraPort> lanes, Set<String> enabled) { setLanes(lanes, enabled, enabled); }
+    void setLanes(Map<String, CameraPort> lanes, Set<String> enabled, Set<String> preview) {
         ports.clear();
         List<ChannelRules.Lane> list = new ArrayList<>();
         for (Map.Entry<String, CameraPort> entry : lanes.entrySet()) {
@@ -1481,6 +1482,7 @@ public final class ChannelScheduler {
             list.add(new ChannelRules.Lane(entry.getKey(), entry.getValue().cameraId()));
         }
         w = new ChannelRules.World(list, enabled);
+        if (preview != null) { w.previewEnabled.clear(); w.previewEnabled.addAll(preview); }
         // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）
         readScreen();
         running = null;

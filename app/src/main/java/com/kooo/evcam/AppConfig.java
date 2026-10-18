@@ -573,6 +573,8 @@ public class AppConfig {
     public void setAutomaticSourceId(String role, String id) {
         prefs.edit().putString("automatic_source_" + getCarModel() + "_" + role, id).apply();
     }
+    public String getPreviewSourceMode() { return readEnum(SettingsRegistry.PREVIEW_LAYOUT); }
+    public void setPreviewSourceMode(String mode) { writeEnum(SettingsRegistry.PREVIEW_LAYOUT, mode); }
     public String getDetectedSurroundId() { return getAutomaticSourceId("composite"); }
 
     // ==================== 存下的槽位映射（2.11 阶段 6） ====================

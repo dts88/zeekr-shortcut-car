@@ -155,6 +155,7 @@ public class CameraManagerHolder {
         final Profile profile;
         /** 启用的那几路（key）。 */
         final Set<String> enabled;
+        final Set<String> preview, requested;
         /** 前座舱（key back，配置里的座舱 1）要建。 */
         final boolean cabinFront;
         /** 后座舱（key left，配置里的座舱 2）要建。 */
@@ -164,25 +165,31 @@ public class CameraManagerHolder {
         final java.util.Map<String,String> sources = new java.util.LinkedHashMap<>();
 
         Shape(String carModel, Profile profile, Set<String> enabled) {
+            this(carModel, profile, enabled, enabled);
+        }
+        Shape(String carModel, Profile profile, Set<String> enabled, Set<String> preview) {
             this.carModel = carModel;
             this.profile = profile;
             this.enabled = enabled;
-            this.cabinFront = enabled.contains(CameraSlots.KEY_CABIN_FRONT);
-            this.cabinRear = enabled.contains(CameraSlots.KEY_CABIN_REAR);
-            java.util.Set<String> all = new java.util.HashSet<>(enabled); all.add(CameraSlots.KEY_SURROUND);
+            this.preview = preview;
+            this.requested = new java.util.LinkedHashSet<>(enabled); this.requested.addAll(preview);
+            this.cabinFront = requested.contains(CameraSlots.KEY_CABIN_FRONT);
+            this.cabinRear = requested.contains(CameraSlots.KEY_CABIN_REAR);
+            java.util.Set<String> all = new java.util.HashSet<>(requested); all.add(CameraSlots.KEY_SURROUND);
             this.count = all.size();
         }
 
         static Shape of(Context app) {
             Profile profile = new ProfileStore(app).current();
             AppConfig config = new AppConfig(app);
-            Shape shape = new Shape(config.getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile));
+            Shape shape = new Shape(config.getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile),
+                    com.kooo.evcam.profile.ProfileChannels.of(profile, config.getPreviewSourceMode()).previewKeys);
             for (String role : com.kooo.evcam.profile.RecordingSources.ALL_ROLES) shape.sources.put(role, config.getSourceCameraId(role));
             return shape;
         }
 
         String key() {
-            return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled))) + (sources.isEmpty() ? "" : "/sources=" + sources);
+            return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled))) + (sources.isEmpty() ? "" : "/sources=" + sources) + (preview.equals(enabled) ? "" : "/preview=" + preview);
         }
     }
 
@@ -418,7 +425,7 @@ public class CameraManagerHolder {
         Size cabinRearUse = shape.cabinRear ? profileSize(app, shape.profile, CameraProfile.ROLE_CABIN_2, null) : null;
         Built result = new Built(plan, compositeSize, compositeUse, located.diagnostics, false);
         for (String role : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES)
-            if (shape.enabled.contains(role)) result.extraSizes.put(role, profileSize(app, shape.profile, role, null));
+            if (shape.requested.contains(role)) result.extraSizes.put(role, profileSize(app, shape.profile, role, null));
         main.post(() -> finish(manager, shape, result, cabinFrontUse, cabinRearUse));
     }
 
@@ -437,11 +444,12 @@ public class CameraManagerHolder {
                 manager.initCameras(null, null, null, null, null, null, null, null);
             } else {
                 manager.setEnabledLanes(shape.enabled);
+                manager.setPreviewLanes(shape.preview);
                 java.util.Map<String,String> ids = new java.util.LinkedHashMap<>();
                 ids.put("front", plan.compositeId);
                 if (shape.cabinFront) ids.put("back", plan.cabin1Id);
                 if (shape.cabinRear) ids.put("left", plan.cabin2Id);
-                for (String role : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES) if (shape.enabled.contains(role)) {
+                for (String role : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES) if (shape.requested.contains(role)) {
                     String explicit = shape.sources.get(role);
                     ids.put(role, explicit == null || explicit.isEmpty() ? null : explicit);
                 }

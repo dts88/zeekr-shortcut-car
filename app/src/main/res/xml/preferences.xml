@@ -43,6 +43,9 @@
             android:title="@string/set_profile_editor_title"
             android:summary="@string/set_profile_editor_summary" />
 
+        <ListPreference android:key="pref_preview_layout" android:title="@string/record_preview_layout"
+            android:summary="%s" />
+
         <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（规格 §2） -->
         <SwitchPreferenceCompat
             android:key="pref_auto_record"

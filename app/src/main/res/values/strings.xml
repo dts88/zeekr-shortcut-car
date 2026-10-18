@@ -953,4 +953,9 @@
     <string name="camera_sources_reset_note">清除手动相机映射，包括旧开发者覆盖项。保留车型、预览布局、录制开关和画质。环视恢复检测到的来源；没有自动默认值的附加相机需要重新映射。之后请退出并重新打开。</string>
     <string name="camera_sources_title">相机来源</string>
     <string name="record_group_manual">手动映射</string>
+    <string name="record_preview_layout">预览布局</string>
+    <string name="record_preview_surround_roads">环视 + 前后道路</string>
+    <string name="record_preview_current">预览布局：%1$s</string>
+    <string name="record_group_roads">前方 + 后方</string>
+    <string name="record_preview_selected">选中的录制来源</string>
 </resources>

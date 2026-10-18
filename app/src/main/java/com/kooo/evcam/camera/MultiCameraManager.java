@@ -43,6 +43,8 @@ public class MultiCameraManager {
      * 环视一直建着：没启用时只为超级镜子、盲区画面开（登记表 §一，项目所有者 2026-10-16）。
      */
     private Set<String> enabledLanes;
+    private Set<String> previewLanes;
+    public void setPreviewLanes(Set<String> keys) { previewLanes = keys == null ? null : new java.util.LinkedHashSet<>(keys); }
     private int maxOpenCameras = DEFAULT_MAX_OPEN_CAMERAS;
     /** 放了（{@link #release}）。见 {@link #isReleased}。 */
     private volatile boolean released;
@@ -2412,8 +2414,9 @@ public class MultiCameraManager {
         // 任务之后 —— 调用方紧接着会钉住环视的合成流尺寸（setPreferredSize），先算就算成别的尺寸了。然后叫醒调度
         channelSide.noteIds(ports);
         final Set<String> enabled = enabledLanes == null ? null : new java.util.LinkedHashSet<>(enabledLanes);
+        final Set<String> preview = previewLanes == null ? enabled : new java.util.LinkedHashSet<>(previewLanes);
         channelHandler.post(() -> {
-            scheduler.setLanes(ports, enabled);
+            scheduler.setLanes(ports, enabled, preview);
             for (SingleCamera camera : active) {
                 camera.resolveSize();
             }

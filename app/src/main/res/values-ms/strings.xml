@@ -942,4 +942,9 @@
     <string name="camera_sources_reset_note">Padam pemetaan kamera manual termasuk pilihan Pembangun lama. Kekalkan model, susun atur pratonton, suis rakaman dan kualiti. Sekeliling kembali kepada suapan dikesan; kamera tambahan tanpa lalai automatik perlu dipetakan sebelum digunakan. Keluar dan buka semula selepas itu.</string>
     <string name="camera_sources_title">Sumber kamera</string>
     <string name="record_group_manual">Pemetaan manual</string>
+    <string name="record_preview_layout">Susun atur pratonton</string>
+    <string name="record_preview_surround_roads">Sekeliling + Hadapan + Belakang</string>
+    <string name="record_preview_current">Susun atur pratonton: %1$s</string>
+    <string name="record_group_roads">Hadapan + Belakang</string>
+    <string name="record_preview_selected">Sumber rakaman dipilih</string>
 </resources>

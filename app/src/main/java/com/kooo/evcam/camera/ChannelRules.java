@@ -367,6 +367,7 @@ public final class ChannelRules {
          * 没给是 {@link #lanes} 的全部。
          */
         final Set<String> enabled = new LinkedHashSet<>();
+        final Set<String> previewEnabled = new LinkedHashSet<>();
         /** 登记表每变一次（含停了再开录）调度在 CameraNeeds 的监听里 +1：几次变化并成一轮也认得出「变过」。 */
         int needsVersion;
         /**
@@ -440,6 +441,7 @@ public final class ChannelRules {
             for (Lane lane : this.lanes) {
                 if (enabled == null || enabled.contains(lane.key)) {
                     this.enabled.add(lane.key);
+                    this.previewEnabled.add(lane.key);
                 }
             }
         }
@@ -1216,7 +1218,7 @@ public final class ChannelRules {
         }
         switch (holder) {
             case PREVIEW:
-                return w.screenOn && w.enabled.contains(lane.key);
+                return w.screenOn && w.previewEnabled.contains(lane.key);
             case RECORDING:
                 return w.recordPlan.contains(lane.key);
             case MIRROR:
@@ -1323,7 +1325,7 @@ public final class ChannelRules {
         }
         switch (kind) {
             case PREVIEW:
-                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key);
+                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.previewEnabled.contains(lane.key);
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && isSurround(lane);
             case SIDE:
