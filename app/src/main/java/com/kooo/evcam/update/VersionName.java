@@ -1,125 +1,91 @@
 package com.kooo.evcam.update;
 
-/**
- * 版本号比较。
- *
- * <h3>为什么不直接比字符串</h3>
- *
- * <p>本项目的 tag 长这样：{@code v0.25.2-alpha}，而应用里的 {@code versionName}
- * 是 {@code 0.25.2-alpha} —— 前缀差一个 v。而且字符串比大小会得出
- * {@code "0.9.0" > "0.25.0"}（因为 '9' > '2'），正好是「有更新却说没有」。</p>
- *
- * <p>所以按段拆开、按数字比。这部分完全不碰网络和 Android，可以单独测。</p>
- */
+import java.math.BigInteger;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Numeric versions and pre-release ordering, for stable and explicitly selected release channels. */
 public final class VersionName {
+    private static final Pattern VERSION = Pattern.compile(
+            "(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*))?"
+                    + "(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?"
+                    + "(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?");
+    private static final Pattern CHANNEL = Pattern.compile("(?:alpha|beta)(?:\\.(?:0|[1-9][0-9]*))*");
+    private VersionName() {}
 
-    private VersionName() {
+    private static final class Parts {
+        final int[] core;
+        final String pre;
+        Parts(int[] core, String pre) { this.core = core; this.pre = pre; }
     }
 
-    /**
-     * 比较两个版本号。
-     *
-     * @return a 比 b 新返回正数，旧返回负数，一样返回 0
-     */
+    private static Parts parse(String version) {
+        if (version == null || version.length() > 256) return null;
+        String value = version.trim();
+        if (value.startsWith("v") || value.startsWith("V")) value = value.substring(1);
+        Matcher match = VERSION.matcher(value);
+        if (!match.matches()) return null;
+        int[] core = new int[3];
+        try {
+            for (int i = 0; i < core.length; i++)
+                core[i] = match.group(i + 1) == null ? 0 : Integer.parseInt(match.group(i + 1));
+        } catch (NumberFormatException invalid) { return null; }
+        String pre = match.group(4) == null ? "" : match.group(4);
+        for (String identifier : pre.split("\\."))
+            if (identifier.matches("[0-9]+") && identifier.length() > 1 && identifier.charAt(0) == '0')
+                return null;
+        return new Parts(core, pre);
+    }
+
+    /** Invalid inputs cannot rank above a valid version. Use isNewer when offering an update. */
     public static int compare(String a, String b) {
-        String[] coreA = splitCore(a);
-        String[] coreB = splitCore(b);
-
-        int[] numsA = numbers(coreA[0]);
-        int[] numsB = numbers(coreB[0]);
-        int len = Math.max(numsA.length, numsB.length);
-        for (int i = 0; i < len; i++) {
-            // 位数不一样时按 0 补齐：0.25 和 0.25.0 是同一个版本
-            int x = i < numsA.length ? numsA[i] : 0;
-            int y = i < numsB.length ? numsB[i] : 0;
-            if (x != y) {
-                return x < y ? -1 : 1;
-            }
+        Parts left = parse(a), right = parse(b);
+        if (left == null || right == null) return left == right ? 0 : left == null ? -1 : 1;
+        for (int i = 0; i < 3; i++) {
+            int result = Integer.compare(left.core[i], right.core[i]);
+            if (result != 0) return result;
         }
-
-        // 数字段一样，再看预发布后缀。按 semver：正式版比同号的预发布版新
-        boolean preA = !coreA[1].isEmpty();
-        boolean preB = !coreB[1].isEmpty();
-        if (preA != preB) {
-            return preA ? -1 : 1;
+        if (left.pre.isEmpty() || right.pre.isEmpty())
+            return left.pre.isEmpty() == right.pre.isEmpty() ? 0 : left.pre.isEmpty() ? 1 : -1;
+        String[] l = left.pre.split("\\."), r = right.pre.split("\\.");
+        for (int i = 0; i < Math.min(l.length, r.length); i++) {
+            boolean ln = l[i].matches("[0-9]+"), rn = r[i].matches("[0-9]+");
+            int result = ln && rn ? new BigInteger(l[i]).compareTo(new BigInteger(r[i]))
+                    : ln != rn ? (ln ? -1 : 1) : l[i].compareTo(r[i]);
+            if (result != 0) return result;
         }
-        return coreA[1].compareTo(coreB[1]);
+        return Integer.compare(l.length, r.length);
     }
 
-    /** 远端那个版本是不是比本机的新。拿不准（解析不出数字）时一律当作「不是」。 */
     public static boolean isNewer(String remote, String local) {
-        if (remote == null || local == null) {
-            return false;
-        }
-        if (numbers(splitCore(remote)[0]).length == 0
-                || numbers(splitCore(local)[0]).length == 0) {
-            // 认不出来的版本号不要冒充有更新 —— 误报会把用户带去装一个来路不明的包
-            return false;
-        }
-        return compare(remote, local) > 0;
+        return parse(remote) != null && parse(local) != null && compare(remote, local) > 0;
     }
 
-    /**
-     * 这个版本号属不属于「beta 或正式版」这一档。
-     *
-     * <p>检查更新只推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
-     * 拿它去覆盖一台正在用的车机不合适。</p>
-     *
-     * <p>后缀既不是空也不是 beta 的一律不算 —— 包括 rc。真要发 rc，
-     * 得在这里明确加上，而不是靠「看起来比 beta 新」这种默认。</p>
-     */
     public static boolean isBetaOrRelease(String version) {
-        String[] parts = splitCore(version);
-        if (numbers(parts[0]).length == 0) {
-            // 版本号都认不出来，谈不上属于哪一档
-            return false;
-        }
-        if (parts[1].isEmpty()) {
-            return true;
-        }
-        return parts[1].toLowerCase(java.util.Locale.US).startsWith("beta");
+        Parts parts = parse(version);
+        return parts != null && (parts.pre.isEmpty() || beta(parts.pre));
     }
 
-    /**
-     * 是不是正式版：认得出版本号，而且没有预发布后缀。
-     *
-     * <p>设置里关掉「接收 Beta 版」之后，检查更新只认这一档。</p>
-     */
     public static boolean isRelease(String version) {
-        String[] parts = splitCore(version);
-        return numbers(parts[0]).length > 0 && parts[1].isEmpty();
+        Parts parts = parse(version);
+        return parts != null && parts.pre.isEmpty();
     }
 
-    /** 拆成「数字部分」和「预发布后缀」两段，顺便吃掉前导的 v。 */
-    private static String[] splitCore(String version) {
-        String s = version == null ? "" : version.trim();
-        if (s.startsWith("v") || s.startsWith("V")) {
-            s = s.substring(1);
-        }
-        int plus = s.indexOf('+');           // 构建元数据，不参与比较
-        if (plus >= 0) {
-            s = s.substring(0, plus);
-        }
-        int dash = s.indexOf('-');
-        if (dash < 0) {
-            return new String[]{s, ""};
-        }
-        return new String[]{s.substring(0, dash), s.substring(dash + 1)};
+    /** Require agreement between the version channel and GitHub's pre-release checkbox. */
+    public static boolean isEligible(String version, boolean prerelease, UpdateChannel channel) {
+        Parts parts = parse(version);
+        if (parts == null) return false;
+        if (parts.pre.isEmpty()) return !prerelease;
+        if (!prerelease || channel == null || channel == UpdateChannel.STABLE) return false;
+        if (beta(parts.pre)) return true;
+        String suffix = parts.pre.toLowerCase(Locale.US);
+        return channel == UpdateChannel.ALPHA && CHANNEL.matcher(suffix).matches()
+                && (suffix.equals("alpha") || suffix.startsWith("alpha."));
     }
 
-    private static int[] numbers(String core) {
-        if (core.isEmpty()) {
-            return new int[0];
-        }
-        String[] parts = core.split("\\.");
-        int[] out = new int[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            try {
-                out[i] = Integer.parseInt(parts[i].trim());
-            } catch (NumberFormatException e) {
-                return new int[0];   // 有一段不是数字，整个版本号就当作认不出来
-            }
-        }
-        return out;
+    private static boolean beta(String suffix) {
+        String lower = suffix.toLowerCase(Locale.US);
+        return CHANNEL.matcher(lower).matches() && (lower.equals("beta") || lower.startsWith("beta."));
     }
 }

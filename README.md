@@ -143,3 +143,11 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Update channels
+
+Updates offers Stable only, Beta plus Stable, or Alpha plus Beta plus Stable.
+The existing default remains Beta plus Stable; previous beta-switch choices are
+preserved. Alpha requires explicit selection and is never inferred from the
+installed version. Unknown choices fall back to Stable. Tags and GitHub pre-release
+flags must agree; the update repository and release naming remain unchanged.

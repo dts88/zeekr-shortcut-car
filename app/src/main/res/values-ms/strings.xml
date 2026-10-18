@@ -8,8 +8,14 @@
     <string name="set_back_to_recording">Kembali ke skrin utama</string>
     <string name="set_check_update_title">Semak kemas kini</string>
     <string name="set_check_update_summary">Versi semasa %1$s</string>
-    <string name="set_update_beta_title">Termasuk keluaran beta</string>
-    <string name="set_update_beta_summary">Jika dimatikan, hanya keluaran stabil disemak</string>
+    <string name="set_update_channel_title">Saluran kemas kini</string>
+    <string name="set_update_channel_note">Pilih keluaran yang disertakan semasa menyemak kemas kini. Keluaran Alpha mengandungi perubahan percubaan terkini.</string>
+    <string name="update_channel_stable">Stabil</string>
+    <string name="update_channel_beta">Beta</string>
+    <string name="update_channel_alpha">Alpha</string>
+    <string name="update_channel_stable_option">Stabil — Keluaran stabil sahaja</string>
+    <string name="update_channel_beta_option">Beta — Keluaran beta dan stabil</string>
+    <string name="update_channel_alpha_option">Alpha — Keluaran alpha, beta dan stabil</string>
     <string name="upd_none_release">Tiada keluaran stabil yang boleh dipasang</string>
     <string name="set_section_recording">Rakaman</string>
     <string name="set_section_storage">Storan</string>
