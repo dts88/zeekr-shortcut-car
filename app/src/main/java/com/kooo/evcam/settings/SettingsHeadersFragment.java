@@ -2,7 +2,9 @@ package com.kooo.evcam.settings;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -11,6 +13,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceScreen;
 import androidx.preference.PreferenceViewHolder;
+import androidx.core.widget.TextViewCompat;
 
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
@@ -203,6 +206,7 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
             this.section = section;
             this.order = order;
             setLayoutResource(R.layout.pref_header_row);
+            setSingleLineTitle(false);
         }
 
         void setSelectedRow(boolean value) {
@@ -215,6 +219,14 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         @Override
         public void onBindViewHolder(@NonNull PreferenceViewHolder holder) {
             super.onBindViewHolder(holder);
+            TextView title = (TextView) holder.findViewById(android.R.id.title);
+            if (title != null) {
+                // Reset reused/OEM-styled titles too: actions and sections use the same size.
+                TextViewCompat.setAutoSizeTextTypeWithDefaults(title, TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE);
+                title.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                        getContext().getResources().getDimension(R.dimen.text_body));
+                title.setMaxLines(2); // Wrap long translations rather than shrinking the label.
+            }
             // 激活态会传给所有子控件：底色、图标、字一起变
             holder.itemView.setActivated(selected);
         }

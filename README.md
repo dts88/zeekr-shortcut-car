@@ -143,3 +143,10 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Settings typography
+
+Sidebar destinations and About/Quit actions retain the same Body size when rows
+are recycled. Long labels wrap to two lines instead of autoshrinking. MainActivity
+keeps its existing 1.2× font scale in a local configuration before view inflation;
+other screens retain their own scale. Theme changes do not select a smaller font.

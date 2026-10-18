@@ -260,6 +260,11 @@ public class MainActivity extends AppCompatActivity {
 
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(com.kooo.evcam.settings.MainFontScale.wrap(base));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Activity:MainActivity");
@@ -285,9 +290,6 @@ public class MainActivity extends AppCompatActivity {
         AppLog.i(TAG, "onCreate " + instanceTag() + " restored=" + (savedInstanceState != null)
                 + " cameraManagerInHolder="
                 + (com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager() != null));
-
-        // 设置字体缩放比例（1.3倍）
-        adjustFontScale(1.2f);
 
         // 初始化应用配置
         appConfig = new AppConfig(this);
@@ -418,13 +420,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void adjustFontScale(float scale) {
-        android.content.res.Configuration configuration = getResources().getConfiguration();
-        configuration.fontScale = scale;
-        android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
-        getBaseContext().getResources().updateConfiguration(configuration, metrics);
-    }
-    
     /**
      * 照配置里启用的几路选布局（{@link PreviewSlots}）：只启用了环视是单路四宫格，其余是多路布局。
      *
