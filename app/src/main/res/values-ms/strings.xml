@@ -934,7 +934,7 @@
     <string name="camera_source_manual">Manual · %1$s</string>
     <string name="record_source_unassigned">Belum dipetakan</string>
     <string name="slot_road_front">Kamera jalan hadapan</string>
-    <string name="camera_sources_help">Satu pemetaan untuk pratonton, rakaman dan tetingkap kamera. Automatik memadam pilihan manual: Sekeliling menggunakan suapan dikesan, kemudian lalai model. Sumber lain menggunakan lalai model atau penemuan. Pilihan manual kekal apabila mod pembangun dimatikan. Keluar dan buka semula selepas menukar. Tidak dipetakan menghentikan rakaman sumber itu (kedua-dua sumber jalan untuk Hadapan + Belakang).</string>
+    <string name="camera_sources_help">Satu pemetaan untuk pratonton, rakaman dan tetingkap kamera. Automatik mengekalkan pengesanan Sekeliling dan susunan kabin sedia ada. Jalan Hadapan/Belakang dan Manual memerlukan ID yang disahkan; ID tersenarai tidak membuktikan arah. Pilihan manual kekal apabila mod pembangun dimatikan. Keluar dan buka semula selepas menukar. Tidak dipetakan mematikan rakaman sumber itu (kedua-dua sumber jalan untuk Hadapan + Belakang).</string>
     <string name="camera_source_not_found">Tiada sumber automatik dikenal pasti</string>
     <string name="record_source_pick">Pilih sumber: %1$s</string>
     <string name="record_source_duplicate">Kamera ini sudah dipetakan kepada sumber aktif lain. Pilih kamera lain atau matikan sumber tersebut.</string>

@@ -957,7 +957,7 @@
     <string name="camera_source_manual">Manual · %1$s</string>
     <string name="record_source_unassigned">Unassigned</string>
     <string name="slot_road_front">Forward road camera</string>
-    <string name="camera_sources_help">One mapping for preview, recording and camera windows. Automatic clears the manual choice: Surround uses the detected feed, then the model fallback. Other sources use model defaults or discovery. Manual choices work with Developer mode off. Exit and reopen after changing. Unassigned stops recording that source (both road sources for Front + Rear).</string>
+    <string name="camera_sources_help">One mapping for preview, recording and camera windows. Automatic keeps Surround capability detection and existing cabin order. Road Front/Rear and Manual need verified ID assignments; listed IDs do not prove orientation. Manual choices work with Developer mode off. Exit and reopen after changing. Unassigned disables recording for that source (both road sources for Front + Rear).</string>
     <string name="camera_source_not_found">No automatic source identified</string>
     <string name="record_source_pick">Choose source: %1$s</string>
     <string name="record_source_duplicate">This camera is already assigned to another enabled source. Choose a different camera or turn that source off.</string>
