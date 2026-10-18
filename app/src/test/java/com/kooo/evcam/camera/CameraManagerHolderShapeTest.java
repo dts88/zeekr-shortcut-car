@@ -72,4 +72,10 @@ public class CameraManagerHolderShapeTest {
         assertEquals("zeekr_7x/left+back", shape(FRONT, REAR).key());
         assertEquals(shape(REAR, FRONT).key(), shape(FRONT, REAR).key());
     }
+    @Test public void exteriorSourcesAreIncludedWithoutDroppingOverlaySurround() {
+        CameraManagerHolder.Shape sources = shape("roadfront", "roadrear", "manual");
+        assertEquals(4, sources.count); assertFalse(sources.cabinFront); assertFalse(sources.cabinRear);
+        String previous = sources.key(); sources.sources.put("roadfront", "7");
+        assertFalse(previous.equals(sources.key()));
+    }
 }

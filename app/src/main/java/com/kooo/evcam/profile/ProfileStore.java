@@ -67,11 +67,13 @@ public final class ProfileStore {
     public Profile byId(String id) {
         Profile stored = load(id);
         if (!stored.cameras.isEmpty()) {
+            RecordingSources.ensure(stored);
             return stored;
         }
         ProfileMigration.Snapshot snapshot = snapshot(context);
         snapshot.carModel = ProfileMigration.carModelFor(id);
         Profile seeded = ProfileMigration.migrate(snapshot);
+        RecordingSources.ensure(seeded);
         save(seeded);
         AppLog.i(TAG, "配置 " + id + " 第一次使用，从旧设置翻译出初值:\n" + seeded);
         return seeded;

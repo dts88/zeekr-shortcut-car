@@ -143,3 +143,7 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Shared camera sources
+
+Recording → Camera sources and the Developer mapping entry now open the same per-role picker. Automatic retains capability-based Surround detection and existing cabin ordering; Unassigned disables an assignment explicitly; a Camera ID overrides it. Reset confirms before clearing mappings and keeps recording selections and image tuning. Active legacy developer overrides migrate once. Saved mappings apply when the camera pipeline is reopened; they do not interrupt recording. Road Front, Road Rear and Manual roles are reserved for the recording/preview follow-ups; their Automatic assignments remain unknown rather than guessing IDs or vehicle compatibility. Camera2 enumeration and retained assignments are evidence of IDs, not proof of physical orientation or simultaneous-camera support.
