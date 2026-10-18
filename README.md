@@ -143,3 +143,10 @@ every change since then is visible as a diff.
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Optional floating-button double tap
+
+Settings → Floating button adds Double tap alongside Tap and Long press. It starts
+off, preserving immediate single taps and existing assignments. Assigning Double
+tap makes a single tap wait briefly so only one action fires. Dragging, multiple
+fingers, cancellation and removing the window cancel pending actions.

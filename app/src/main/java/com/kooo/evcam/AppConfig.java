@@ -1845,6 +1845,7 @@ public class AppConfig {
     // ==================== 悬浮按钮的动作 ====================
 
     private static final String KEY_FLOATING_TAP_ACTION = "floating_tap_action";
+    private static final String KEY_FLOATING_DOUBLE_TAP_ACTION = "floating_double_tap_action";
     private static final String KEY_FLOATING_LONG_PRESS_ACTION = "floating_long_press_action";
     private static final String KEY_FLOATING_DURATION_VISIBLE = "floating_duration_visible";
     private static final String KEY_FLOATING_LOCKED = "floating_position_locked";
@@ -1874,6 +1875,17 @@ public class AppConfig {
 
     public void setFloatingTapAction(String key) {
         prefs.edit().putString(KEY_FLOATING_TAP_ACTION, key).apply();
+    }
+
+    /** Unset/unknown double-tap actions stay off, so existing taps remain immediate. */
+    public String getFloatingDoubleTapAction() {
+        return com.kooo.evcam.overlay.FloatingAction.fromKey(
+                prefs.getString(KEY_FLOATING_DOUBLE_TAP_ACTION, null),
+                com.kooo.evcam.overlay.FloatingAction.NONE).key;
+    }
+
+    public void setFloatingDoubleTapAction(String key) {
+        prefs.edit().putString(KEY_FLOATING_DOUBLE_TAP_ACTION, key).apply();
     }
 
     /** 长按做什么。默认同上。 */

@@ -69,10 +69,13 @@
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Halaman panduan %1$d daripada %2$d</string>
     <string name="set_floating_alpha_title">Kelegapan butang</string>
-    <string name="set_recording_floating_summary">Menunjukkan status rakaman dalam butang terapung; tetapkan tindakan ketik dan tekan lama di bawah</string>
+    <string name="set_recording_floating_summary">Menunjukkan status rakaman dalam butang terapung; tetapkan tindakan ketik, ketik dua kali dan tekan lama di bawah</string>
     <string name="set_button_size_title">Saiz butang</string>
     <string name="set_button_text_size_title">Saiz teks masa</string>
     <string name="set_floating_tap_title">Ketik</string>
+    <string name="set_floating_double_tap_title">Ketik dua kali</string>
+    <string name="set_floating_double_tap_summary">Dimatikan secara lalai. Menetapkan tindakan ketik dua kali menambah sedikit kelewatan pada ketikan tunggal untuk membezakan gerak isyarat.</string>
+    <string name="floating_action_none">Tiada tindakan</string>
     <string name="set_floating_long_press_title">Tekan lama</string>
     <string name="set_floating_lock_title">Kunci kedudukan</string>
     <string name="set_floating_lock_summary">Mengunci butang pada kedudukan semasa; ketik dan tekan lama tidak terjejas</string>

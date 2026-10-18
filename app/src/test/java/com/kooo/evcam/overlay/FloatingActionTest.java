@@ -30,6 +30,12 @@ public class FloatingActionTest {
         }
     }
 
+    @Test public void unknownOptionalGestureStaysDisabled() {
+        assertEquals(FloatingAction.NONE, FloatingAction.fromKey(null, FloatingAction.NONE));
+        assertEquals(FloatingAction.NONE, FloatingAction.fromKey("unknown", FloatingAction.NONE));
+        assertEquals(FloatingAction.NONE, FloatingAction.fromKey("none"));
+    }
+
     /** 存下去的字符串是契约，写死在测试里，改动就会被拦住。 */
     @Test
     public void theStoredKeysAreFixed() {
@@ -37,6 +43,7 @@ public class FloatingActionTest {
         assertEquals("toggle_recording", FloatingAction.TOGGLE_RECORDING.key);
         assertEquals("take_photo", FloatingAction.TAKE_PHOTO.key);
         assertEquals("toggle_mirror", FloatingAction.TOGGLE_MIRROR.key);
+        assertEquals("none", FloatingAction.NONE.key);
     }
 
     @Test

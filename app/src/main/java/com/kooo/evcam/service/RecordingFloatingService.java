@@ -20,6 +20,7 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -35,6 +36,7 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.overlay.FloatingAction;
+import com.kooo.evcam.overlay.FloatingButtonGesture;
 
 /**
  * 悬浮按钮服务：整个应用只有这一个悬浮按钮。
@@ -87,14 +89,10 @@ public class RecordingFloatingService extends Service {
     private AppConfig appConfig;
     private WindowManager windowManager;
 
-    // 长按：计时器要在 appConfig 之后声明，它读的是 appConfig
-    private boolean longPressFired = false;
+    private FloatingButtonGesture gestures;
     /** 位置锁着时手指滑了一段：这一下既不是点击也不是长按。 */
     private boolean slidWhileLocked = false;
-    private final Runnable longPressRunnable = () -> {
-        longPressFired = true;
-        perform(FloatingAction.fromKey(appConfig.getFloatingLongPressAction()));
-    };
+    private boolean multiTouch = false;
 
     // 视图组件
     private FrameLayout floatingContainer;
@@ -161,6 +159,15 @@ public class RecordingFloatingService extends Service {
 
         mainHandler = new Handler(Looper.getMainLooper());
         appConfig = new AppConfig(this);
+        gestures = new FloatingButtonGesture(new FloatingButtonGesture.Scheduler() {
+            @Override public void post(Runnable task, long delayMs) {
+                mainHandler.postDelayed(task, delayMs);
+            }
+            @Override public void remove(Runnable task) { mainHandler.removeCallbacks(task); }
+        }, action -> {
+            if (floatingContainer != null) perform(action);
+        }, ViewConfiguration.getDoubleTapTimeout(), LONG_PRESS_MS,
+                ViewConfiguration.get(this).getScaledDoubleTapSlop());
         windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
 
         // 获取屏幕尺寸
@@ -302,6 +309,7 @@ public class RecordingFloatingService extends Service {
             if (ACTION_HIDE.equals(action)) {
                 hideFloatingWindow();
             } else if (ACTION_UPDATE_STYLE.equals(action) || ACTION_UPDATE_SIZE.equals(action)) {
+                gestures.cancel();
                 // 只在已经显示时才有意义；没显示就什么都不做，
                 // 尤其不能顺手 showFloatingWindow —— 那会把关掉的按钮又拉出来
                 if (floatingContainer != null) {
@@ -371,6 +379,7 @@ public class RecordingFloatingService extends Service {
     }
 
     private void hideFloatingWindow() {
+        if (gestures != null) gestures.cancel();
         if (floatingContainer != null && windowManager != null) {
             windowManager.removeView(floatingContainer);
             floatingContainer = null;
@@ -404,6 +413,7 @@ public class RecordingFloatingService extends Service {
      * 「已重置」、按钮纹丝不动，看起来就是没生效。</p>
      */
     private void resetPosition() {
+        if (gestures != null) gestures.cancel();
         if (floatingContainer == null || recordingButton == null) {
             return;
         }
@@ -479,18 +489,23 @@ public class RecordingFloatingService extends Service {
         floatingContainer.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
+                switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
                         initialX = layoutParams.x;
                         initialY = layoutParams.y;
                         initialTouchX = event.getRawX();
                         initialTouchY = event.getRawY();
                         isDragging = false;
-                        longPressFired = false;
-                        mainHandler.postDelayed(longPressRunnable, LONG_PRESS_MS);
+                        slidWhileLocked = false;
+                        multiTouch = false;
+                        gestures.down(event.getEventTime(), initialTouchX, initialTouchY,
+                                FloatingAction.fromKey(appConfig.getFloatingTapAction()),
+                                FloatingAction.fromKey(appConfig.getFloatingDoubleTapAction(), FloatingAction.NONE),
+                                FloatingAction.fromKey(appConfig.getFloatingLongPressAction()));
                         return true;
 
                     case MotionEvent.ACTION_MOVE:
+                        if (multiTouch) return true;
                         int deltaX = (int) (event.getRawX() - initialTouchX);
                         int deltaY = (int) (event.getRawY() - initialTouchY);
 
@@ -498,7 +513,7 @@ public class RecordingFloatingService extends Service {
                             // 位置锁上时手指照样能滑，只是按钮不跟着走 ——
                             // 但这一下已经不算「点一下」了，也不该触发长按
                             isDragging = !appConfig.isFloatingPositionLocked();
-                            mainHandler.removeCallbacks(longPressRunnable);
+                            gestures.cancel();
                             if (!isDragging) {
                                 slidWhileLocked = true;
                             }
@@ -526,20 +541,34 @@ public class RecordingFloatingService extends Service {
                         return true;
 
                     case MotionEvent.ACTION_UP:
-                        mainHandler.removeCallbacks(longPressRunnable);
-                        if (slidWhileLocked) {
+                        if (Math.abs(event.getRawX() - initialTouchX) > CLICK_THRESHOLD
+                                || Math.abs(event.getRawY() - initialTouchY) > CLICK_THRESHOLD) {
+                            gestures.cancel();
+                        }
+                        if (multiTouch || slidWhileLocked) {
+                            gestures.cancel();
+                            multiTouch = false;
                             slidWhileLocked = false;
                             return true;
                         }
-                        if (!isDragging && !longPressFired) {
-                            perform(FloatingAction.fromKey(appConfig.getFloatingTapAction()));
-                        } else if (!isDragging) {
-                            // 长按已经在计时器里做过了，抬手不再做第二件事
-                            AppLog.d(TAG, "长按已处理，忽略这次抬手");
+                        if (!isDragging) {
+                            gestures.up(event.getEventTime());
                         } else {
                             // 拖动结束才落盘，避免拖动过程中反复写 SharedPreferences
                             appConfig.setRecordingFloatingPosition(layoutParams.x, layoutParams.y);
                         }
+                        return true;
+                    case MotionEvent.ACTION_POINTER_DOWN:
+                        multiTouch = true;
+                        gestures.cancel();
+                        return true;
+                    case MotionEvent.ACTION_POINTER_UP:
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        gestures.cancel();
+                        isDragging = false;
+                        slidWhileLocked = false;
+                        multiTouch = false;
                         return true;
                 }
                 return false;
@@ -564,13 +593,15 @@ public class RecordingFloatingService extends Service {
     // ========== 按钮动作 ==========
 
     /**
-     * 单击 / 长按各做什么，见 {@link FloatingAction}。
+     * 单击 / 双击 / 长按各做什么，见 {@link FloatingAction}。
      *
      * <p>录制那一条走原来那套（按应用在不在前台分三种情况），其余三条都是
      * 一句话的事。</p>
      */
     private void perform(FloatingAction action) {
         switch (action) {
+            case NONE:
+                return;
             case TOGGLE_RECORDING:
                 toggleRecording();
                 return;

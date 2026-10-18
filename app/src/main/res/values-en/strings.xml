@@ -69,10 +69,13 @@
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Guide page %1$d of %2$d</string>
     <string name="set_floating_alpha_title">Button opacity</string>
-    <string name="set_recording_floating_summary">Shows recording status in a floating button; set tap and long-press actions below</string>
+    <string name="set_recording_floating_summary">Shows recording status in a floating button; set tap, double-tap and long-press actions below</string>
     <string name="set_button_size_title">Button size</string>
     <string name="set_button_text_size_title">Time text size</string>
     <string name="set_floating_tap_title">Tap</string>
+    <string name="set_floating_double_tap_title">Double tap</string>
+    <string name="set_floating_double_tap_summary">Off by default. Assigning a double-tap action adds a short delay to single taps so the gestures can be distinguished.</string>
+    <string name="floating_action_none">Do nothing</string>
     <string name="set_floating_long_press_title">Long press</string>
     <string name="set_floating_lock_title">Lock position</string>
     <string name="set_floating_lock_summary">Locks the button in its current position; tap and long press still work</string>
