@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="side_auto_fit_summary">开启时会缩小视野以适配画面；关闭时保留请求视野，缺失区域显示为黑色。</string>
+    <string name="side_auto_fit_title">自动适配以避免黑边</string>
+</resources>
