@@ -58,8 +58,10 @@
     <string name="set_rearview_summary">Shows any surround camera in a floating window; the rear view is mirrored left to right, like the interior mirror</string>
     <string name="set_rearview_button_mode_title">Button mode</string>
     <string name="set_rearview_button_mode_summary">Switches to the front, rear, left or right view when the top, bottom, left or right area is tapped</string>
-    <string name="set_rearview_front_rear_title">Front and rear only</string>
-    <string name="set_rearview_front_rear_summary">Switches between the front and rear views only</string>
+    <string name="set_rearview_views_title">Views</string>
+    <string name="opt_views_four">All four</string>
+    <string name="opt_views_front_rear">Front and rear</string>
+    <string name="opt_views_rear_cabin">Rear + rear cabin</string>
     <string name="set_rearview_fisheye_title">Fisheye correction</string>
     <string name="set_rearview_fisheye_summary">Corrects fisheye barrel distortion in the Super mirror only; recordings are unchanged.</string>
     <string name="set_rearview_fov_title">Field of view</string>
@@ -68,7 +70,7 @@
     <string name="set_rearview_height_title">Window height</string>
     <string name="set_rearview_height_summary">Each can go up to full screen; the picture keeps its proportions and the window shape only sets how much is visible</string>
     <string name="set_rearview_reset_title">Reset window and view</string>
-    <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction, Front and rear only and Direction label, and switches back to the rear view</string>
+    <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction, Views and Direction label, and switches back to the rear view</string>
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="set_side_view_title">Blind spot view</string>

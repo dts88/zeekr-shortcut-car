@@ -58,8 +58,10 @@
     <string name="set_rearview_summary">Menunjukkan mana-mana kamera sekeliling dalam tetingkap terapung; paparan belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman</string>
     <string name="set_rearview_button_mode_title">Mod butang</string>
     <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik</string>
-    <string name="set_rearview_front_rear_title">Depan dan belakang sahaja</string>
-    <string name="set_rearview_front_rear_summary">Bertukar antara paparan depan dan belakang sahaja</string>
+    <string name="set_rearview_views_title">Paparan</string>
+    <string name="opt_views_four">Empat arah</string>
+    <string name="opt_views_front_rear">Depan dan belakang</string>
+    <string name="opt_views_rear_cabin">Belakang + kabin belakang</string>
     <string name="set_rearview_fisheye_title">Pembetulan mata ikan</string>
     <string name="set_rearview_fisheye_summary">Membetulkan herotan tong mata ikan dalam Cermin super sahaja; rakaman tidak berubah.</string>
     <string name="set_rearview_fov_title">Medan pandangan</string>
@@ -68,7 +70,7 @@
     <string name="set_rearview_height_title">Tinggi tetingkap</string>
     <string name="set_rearview_height_summary">Setiap satu boleh sehingga skrin penuh; nisbah gambar kekal dan bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
     <string name="set_rearview_reset_title">Set semula tetingkap dan paparan</string>
-    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Depan dan belakang sahaja dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
+    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Paparan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
     <string name="set_rearview_guide_title">Cara guna</string>
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
     <string name="set_side_view_title">Paparan titik buta</string>

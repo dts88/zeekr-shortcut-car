@@ -47,6 +47,9 @@ import java.util.function.Consumer;
  *       和以前「主界面看路数对不上就放掉重建」一样。后台的调用方（拍照、录像、后视镜）照用手里那一份：编辑配置的界面就长在
  *       主界面里，存一下不重建主界面，那时谁一要管线就重建的话，主界面握着放掉了的那一份，预览黑着、回调挂在死的那份上
  *       （审查 2026-10-11）。</li>
+ *   <li>只为超级镜子建的后座舱要不要了（切换范围换到、换出「后视 + 后座舱」，配置里没启用后座舱）：谁来要都重建 ——
+ *       启用的几路没变，主界面的布局不变，它照「放掉重建了」接上新的那一份（项目所有者 2026-10-19 方案 A；
+ *       设置页改了这一档就来要一次，当场重建）。</li>
  * </ul>
  *
  * <p>放掉重建了就告诉挂着的监听者（{@link #addReplacedListener}，主线程）：主界面据此当场接上新的那一份。</p>
@@ -63,7 +66,9 @@ import java.util.function.Consumer;
  *       列表里少的那一路照样建出来，交给通道调度判「不在」（被别的程序拿着）—— 车机拿着后座舱时它就不在列表里，以前照列表分，
  *       后座舱这一格就没了，以后既认不出、也开不了。没存过（第一次装）照列表建（大纲 §6 风险 13）。</li>
  *   <li>建哪几路照当前配置里启用了哪几路（{@link RecordSpecs#enabledCameraKeys}，和主界面的布局同一个函数）：环视一直建
- *       （登记表 §一 超级镜子、盲区画面要它，配置里没开环视也要），座舱启用了才建；建了不等于开，开不开由通道调度照登记表定。
+ *       （登记表 §一 超级镜子、盲区画面要它，配置里没开环视也要），座舱启用了才建；后座舱另外在超级镜子的切换范围是
+ *       「后视 + 后座舱」时也建（超级镜子要它，配置里没开也要 —— 和环视同一条规矩），它不算启用的（主界面预览、拍照、录像都不要它）。
+ *       建了不等于开，开不开由通道调度照登记表定。
  *       环视钉合成流尺寸（照配置解，「最大」也解得出来），座舱照配置定尺寸、auto 不钉。</li>
  * </ul>
  */
@@ -79,6 +84,8 @@ public class CameraManagerHolder {
      * （见类说明）。</p>
      */
     private String builtFor;
+    /** 这一份照哪几路启用的建的（{@link Shape#lanesKey}）：变了只在主界面接上时重建（见类说明）。 */
+    private String builtLanes;
     /** 这一份是照哪个车型建的（{@link Shape#carModel}）：车型变了谁来要都重建。 */
     private String builtCarModel;
     /** 这一份建好之后的样子（主线程上写）；null = 还在建。 */
@@ -147,36 +154,49 @@ public class CameraManagerHolder {
     /**
      * 这一份照什么建：车型（存下的映射按它存）、配置里启用了哪几路（{@link RecordSpecs#enabledCameraKeys}；主界面的布局
      * 照同一个函数）。环视一直建：登记表 §一 超级镜子、盲区画面要的是环视，配置里没开环视也要能看（项目所有者 2026-10-16）；
-     * 座舱启用了才建。建了不等于开：主界面预览、拍照只要启用的那几路，交给调度的就是这份（{@link MultiCameraManager#setEnabledLanes}）。
+     * 座舱启用了才建；后座舱另外在超级镜子要它时也建（{@link #mirrorCabin}）。建了不等于开：主界面预览、拍照只要启用的那几路，
+     * 交给调度的就是这份（{@link MultiCameraManager#setEnabledLanes}）。
      */
     static final class Shape {
         final String carModel;
         final Profile profile;
         /** 启用的那几路（key）。 */
         final Set<String> enabled;
+        /** 超级镜子要后座舱：切换范围是「后视 + 后座舱」（AppConfig.rearViewWantsCabinRear）。 */
+        final boolean mirrorCabin;
         /** 前座舱（key back，配置里的座舱 1）要建。 */
         final boolean cabinFront;
-        /** 后座舱（key left，配置里的座舱 2）要建。 */
+        /** 后座舱（key left，配置里的座舱 2）要建：启用了，或者超级镜子要它。 */
         final boolean cabinRear;
-        /** 建几路：环视，加上启用的座舱。 */
+        /** 建几路：环视，加上要建的座舱。 */
         final int count;
 
-        Shape(String carModel, Profile profile, Set<String> enabled) {
+        Shape(String carModel, Profile profile, Set<String> enabled, boolean mirrorCabin) {
             this.carModel = carModel;
             this.profile = profile;
             this.enabled = enabled;
+            this.mirrorCabin = mirrorCabin;
             this.cabinFront = enabled.contains(CameraSlots.KEY_CABIN_FRONT);
-            this.cabinRear = enabled.contains(CameraSlots.KEY_CABIN_REAR);
+            this.cabinRear = enabled.contains(CameraSlots.KEY_CABIN_REAR) || mirrorCabin;
             this.count = 1 + (cabinFront ? 1 : 0) + (cabinRear ? 1 : 0);
         }
 
         static Shape of(Context app) {
             Profile profile = new ProfileStore(app).current();
-            return new Shape(new AppConfig(app).getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile));
+            AppConfig config = new AppConfig(app);
+            return new Shape(config.getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile),
+                    config.rearViewWantsCabinRear());
         }
 
-        String key() {
+        /** 车型和启用的几路（主界面的布局照它）。 */
+        String lanesKey() {
             return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled)));
+        }
+
+        /** 建了哪几路：{@link #lanesKey}，加上只为超级镜子建的后座舱。 */
+        String key() {
+            return lanesKey() + (cabinRear && !enabled.contains(CameraSlots.KEY_CABIN_REAR)
+                    ? "/mirror:" + CameraSlots.KEY_CABIN_REAR : "");
         }
     }
 
@@ -216,6 +236,8 @@ public class CameraManagerHolder {
                         ? "车型变了（" + builtCarModel + " → " + shape.carModel + "），放掉旧的、重建"
                         : why == Rebuild.LISTING_FAILED ? "上一次列相机出错，放掉重建（再出错的话，隔 "
                         + FAILED_REBUILD_GAP_MS / 1000 + " 秒以上才再重建，不再逐次记）"
+                        : why == Rebuild.MIRROR_CABIN ? "超级镜子的切换范围变了，只为它建的后座舱要建 / 不要了（"
+                        + builtFor + " → " + shape.key() + "），放掉旧的、重建"
                         : "主界面接上时配置里开的几路变了（" + builtFor + " → " + shape.key() + "），放掉旧的、重建"));
             }
             cameraManager.release();
@@ -230,6 +252,7 @@ public class CameraManagerHolder {
         manager.setCodecRecordingMode(new AppConfig(app).shouldUseCodecRecording());
         cameraManager = manager;
         builtFor = shape.key();
+        builtLanes = shape.lanesKey();
         builtCarModel = shape.carModel;
         built = null;
         AppLog.i(TAG, "建相机管线（" + builtFor + "，建 " + shape.count + " 路）：相机列表、合成流探测在相机线程上做");
@@ -246,10 +269,12 @@ public class CameraManagerHolder {
         /** 上一次列相机出错，而且隔够了 {@link CameraManagerHolder#FAILED_REBUILD_GAP_MS}（谁来要都重建）。 */
         LISTING_FAILED,
         /** 配置里开的几路变了，主界面在接上管线（只在 {@link CameraManagerHolder#getForMainScreen} 里重建）。 */
-        LANES
+        LANES,
+        /** 只为超级镜子建的后座舱要建 / 不要了（谁来要都重建：主界面的布局不变，照「放掉重建了」接上新的那一份）。 */
+        MIRROR_CABIN
     }
 
-    /** 手里这一份要不要放掉重建（见类说明）。还在建的那一份（built 为 null）只看车型、开的几路。 */
+    /** 手里这一份要不要放掉重建（见类说明）。还在建的那一份（built 为 null）只看车型、开的几路、超级镜子要不要后座舱。 */
     private Rebuild rebuildReason(Shape shape, boolean forMainScreen) {
         if (!shape.carModel.equals(builtCarModel)) {
             return Rebuild.CAR_MODEL;
@@ -258,7 +283,10 @@ public class CameraManagerHolder {
             return android.os.SystemClock.elapsedRealtime() - failedAtMs < FAILED_REBUILD_GAP_MS
                     ? Rebuild.NO : Rebuild.LISTING_FAILED;
         }
-        return forMainScreen && !shape.key().equals(builtFor) ? Rebuild.LANES : Rebuild.NO;
+        if (!shape.lanesKey().equals(builtLanes)) {
+            return forMainScreen ? Rebuild.LANES : Rebuild.NO;
+        }
+        return shape.key().equals(builtFor) ? Rebuild.NO : Rebuild.MIRROR_CABIN;
     }
 
     /**

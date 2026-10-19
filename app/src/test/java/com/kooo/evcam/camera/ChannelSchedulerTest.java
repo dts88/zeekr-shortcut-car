@@ -3111,6 +3111,8 @@ public class ChannelSchedulerTest {
         final List<String> took = new ArrayList<>();
         boolean sleeps;
         boolean screenOn;
+        /** 超级镜子的切换范围是「后视 + 后座舱」。 */
+        boolean mirrorCabin;
         /**
          * 屏幕黑下来的那一刻（调度的钟）；0 = 起点不明 —— 规则按黑满 30 秒算（ChannelRules.darkForChannel），
          * 只设 {@link #screenOn} 的那些测试就是「一黑就放开」。
@@ -3167,6 +3169,11 @@ public class ChannelSchedulerTest {
         @Override
         public boolean headUnitSleeps() {
             return sleeps;
+        }
+
+        @Override
+        public boolean mirrorWantsCabinRear() {
+            return mirrorCabin;
         }
 
         @Override

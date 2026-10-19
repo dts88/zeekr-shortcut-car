@@ -47,6 +47,14 @@ import com.kooo.evcam.camera.StallWatch;
  *
  * <p>后视镜和主界面预览共用环视的那一条预览流（Surface Sharing，见 SingleCamera 建会话那一段）。
  * <b>没有新建 GL 管线</b> —— 那是这台车机上最容易出问题的地方。</p>
+ *
+ * <h3>后座舱（切换范围「后视 + 后座舱」，项目所有者 2026-10-19）</h3>
+ *
+ * <p>窗口还有一块后座舱的画布（{@link RearViewMirrorView#getCabinTextureView}）：这一档时照同一套声明成后座舱的
+ * 超级镜子输出（{@link #bindCabin}），登记还是那一项 MIRROR —— 调度照切换范围判后座舱要不要（ChannelRules.World#mirrorCabin）。
+ * 看后视时后座舱也带着，切过去不用等；换出这一档撤回（{@link #withdrawCabinOutput}）。熄屏、贴边只放登记，窗口移走时画布交给
+ * 管线留着，新窗口接回 —— 都和环视那块一样。管线里还没有后座舱这一路（刚换到这一档、管线正在重建）时不声明，看门狗两秒后再来。
+ * 两块画布总有一块看不见，看不见的 TextureView 不自己建画布，由这里建（{@link #canvasOf}）。</p>
  */
 public class RearViewMirrorService extends Service {
 
@@ -71,6 +79,16 @@ public class RearViewMirrorService extends Service {
     private MultiCameraManager boundManager;
     /** 声明出去的那块画布（输出的身份）。 */
     private SurfaceTexture boundTexture;
+    /** 后座舱的超级镜子输出声明在哪一路相机上（切换范围是「后视 + 后座舱」时，见类说明）；没声明是 null。 */
+    private SingleCamera boundCabinCamera;
+    /** 那一路属于哪一份管线：声明、撤回之后叫醒它的通道调度。 */
+    private MultiCameraManager boundCabinManager;
+    /** 声明出去的后座舱那块画布。 */
+    private SurfaceTexture boundCabinTexture;
+    /** 已经交给窗口的后座舱画面尺寸（{@link RearViewMirrorView#setCabinSource}）：没变就不再交。 */
+    private Size cabinSourceSize;
+    /** 刚接回上一个窗口留下的后座舱画布，下一次出帧时把缓冲区尺寸拨回去（同 {@link #restoreBufferOnFrame}）。 */
+    private boolean restoreCabinBufferOnFrame;
     /**
      * 已经交给窗口的合成流尺寸。看门狗每 2 秒重新声明一次，尺寸没变就不再交 ——
      * 交一次窗口就重算一次取景、写一行日志、重画一次。换了窗口（{@link #showMirror}）清掉。
@@ -138,11 +156,12 @@ public class RearViewMirrorService extends Service {
         }
     }
 
-    /** 设置页改了「只看前后」后通知正在显示的窗口。 */
+    /** 设置页改了切换范围后通知正在显示的窗口：换环；换到、换出「后视 + 后座舱」时接上或撤回后座舱的画布。 */
     public static void applyLaneMode(Context context) {
         RearViewMirrorService svc = instance;
         if (svc != null && svc.mirrorView != null) {
             svc.mirrorView.applyLaneModeFromConfig();
+            svc.syncCabin();
         }
     }
 
@@ -181,6 +200,9 @@ public class RearViewMirrorService extends Service {
                 + " cameraOpened=" + (camera != null && camera.isCameraOpened())
                 + " claimed=" + CameraNeeds.current().isHeld(CameraNeeds.Holder.MIRROR)
                 + " inSession=" + svc.mirrorInSession()
+                + " showingCabin=" + view.isShowingCabin()
+                + " cabinCamera=" + (svc.boundCabinCamera != null ? svc.boundCabinCamera.getCameraId() : "none")
+                + " cabinInSession=" + svc.cabinInSession()
                 + " bindRetries=" + svc.retryCount;
     }
 
@@ -308,11 +330,75 @@ public class RearViewMirrorService extends Service {
                         }
                     }
                 });
+        cabinSourceSize = null;
+        restoreCabinBufferOnFrame = false;
+        mirrorView.getCabinTextureView().setSurfaceTextureListener(
+                new TextureView.SurfaceTextureListener() {
+                    @Override
+                    public void onSurfaceTextureAvailable(SurfaceTexture st, int w, int h) {
+                        bindCabin(st);
+                    }
+
+                    @Override
+                    public void onSurfaceTextureSizeChanged(SurfaceTexture st, int w, int h) {
+                        restoreCabinBufferSize(st);
+                    }
+
+                    @Override
+                    public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
+                        // 同环视那块：交给管线留着就返回 false
+                        return !handCabinCanvasToPipeline(st);
+                    }
+
+                    @Override
+                    public void onSurfaceTextureUpdated(SurfaceTexture st) {
+                        if (restoreCabinBufferOnFrame) {
+                            restoreCabinBufferOnFrame = false;
+                            restoreCabinBufferSize(st);
+                        }
+                        // 只有看后座舱时这块画布才可见、才报帧：这时窗口上显示的就是它
+                        StallWatch.mirrorFrame();
+                        RearViewMirrorView view = mirrorView;
+                        if (view != null) {
+                            view.noteCabinFrame();
+                        }
+                    }
+                });
         mirrorView.setResumeAction(() -> rebindNow(true));
         mirrorView.setDockListener(this::onDockChanged);
         mirrorView.show();
         takeBackKeptCanvas();
+        // 看不见的那块画布不会自己建、也就不会来 onSurfaceTextureAvailable（停在后座舱上打开时环视那块）：现在就对一次（canvasOf）
+        ensureStillBound();
         startWatchdog();
+    }
+
+    /**
+     * 这块画布的 SurfaceTexture；看不见、还没有的由这里建一块（同接回留着的画布那条路：{@code setSurfaceTexture}，
+     * 第一次画出来时把缓冲区尺寸拨回去）。
+     *
+     * <p>TextureView 只在第一次画的时候自己建画布，看不见就一直不建。「后视 + 后座舱」时两块画布总有一块看不见：
+     * 看后视时后座舱那块要一直带着（切过去不用等），停在后座舱上打开窗口时环视那块也看不见 —— 那块不建，后视镜就登记不上。
+     * 看得见、还没画过的不建：它马上自己建，来 onSurfaceTextureAvailable。贴边收起时两块都看不见、也都不要画面，不建。</p>
+     *
+     * @return 画布；看得见还没画过、或者贴边收起时还没有的，是 null
+     */
+    private SurfaceTexture canvasOf(TextureView view, boolean cabin) {
+        if (view.isAvailable()) {
+            return view.getSurfaceTexture();
+        }
+        if (view.getVisibility() == android.view.View.VISIBLE || mirrorView == null || mirrorView.isDocked()) {
+            return null;
+        }
+        SurfaceTexture canvas = new SurfaceTexture(false);
+        view.setSurfaceTexture(canvas);
+        if (cabin) {
+            restoreCabinBufferOnFrame = true;
+        } else {
+            restoreBufferOnFrame = true;
+        }
+        AppLog.i(TAG, (cabin ? "后座舱" : "环视") + "那块画布看不见、自己不建：建了一块交给它");
+        return canvas;
     }
 
     /**
@@ -335,7 +421,8 @@ public class RearViewMirrorService extends Service {
         if (pipeline == null || pipeline.isReleased()) {
             return;
         }
-        SurfaceTexture kept = pipeline.takeKeptMirror();
+        takeBackKeptCabinCanvas(pipeline);
+        SurfaceTexture kept = pipeline.takeKeptMirror(CameraSlots.KEY_SURROUND);
         if (kept == null) {
             return;
         }
@@ -344,7 +431,7 @@ public class RearViewMirrorService extends Service {
         } catch (RuntimeException e) {
             // 接不上：还给管线，照旧等它离开会话再放；还不回去（管线里已经没有环视那一路）就放掉，这块画布不在它的会话里
             AppLog.w(TAG, "接回留着的后视镜画布失败: " + e);
-            if (!MultiCameraManager.keepMirrorCanvas(pipeline, kept)) {
+            if (!MultiCameraManager.keepMirrorCanvas(pipeline, CameraSlots.KEY_SURROUND, kept)) {
                 kept.release();
             }
             return;
@@ -380,7 +467,7 @@ public class RearViewMirrorService extends Service {
             withdrawOutput();
         }
         MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
-        boolean kept = MultiCameraManager.keepMirrorCanvas(pipeline, st);
+        boolean kept = MultiCameraManager.keepMirrorCanvas(pipeline, CameraSlots.KEY_SURROUND, st);
         if (kept) {
             com.kooo.evcam.blackbox.BlackBox.note("后视镜窗口移走：画布交给管线留着，环视不动（没人接回的等它离开环视的会话再放）");
         } else {
@@ -476,6 +563,147 @@ public class RearViewMirrorService extends Service {
                     + manager.channelScheduler().condition(CameraSlots.KEY_SURROUND)
                     + "，预览尺寸 " + previewSize + "，缓冲区 " + camera.getPreviewBufferSize() + "）");
         }
+        // 后座舱那块跟着走：通往这里的每一条路（画布准备好、接回、看门狗、放回来、亮屏、点恢复）后座舱都要同样对一次
+        syncCabin();
+    }
+
+    // ------------------------------------------------------------------ 后座舱（切换范围「后视 + 后座舱」）
+
+    /** 后座舱那块画布照切换范围对一次：这一档就声明（看不见的画布这里建，{@link #canvasOf}），换出这一档就撤回。 */
+    private void syncCabin() {
+        if (!appConfig.rearViewWantsCabinRear()) {
+            withdrawCabinOutput();
+            return;
+        }
+        RearViewMirrorView view = mirrorView;
+        if (view == null) {
+            return;
+        }
+        SurfaceTexture canvas = canvasOf(view.getCabinTextureView(), true);
+        if (canvas != null) {
+            bindCabin(canvas);
+        }
+    }
+
+    /**
+     * 声明后座舱的超级镜子输出 —— 和 {@link #bindCamera} 同样的守卫（屏幕黑着、贴边收起不声明），登记还是 MIRROR
+     * （bindCamera 登记，它最后会叫到这里；后座舱的画布先准备好时也照样先声明，等登记上了调度才加进会话）。
+     *
+     * <p>管线里还没有后座舱这一路（刚换到这一档、管线正在重建）就不声明、不重试：看门狗每两秒走 {@link #ensureStillBound}，
+     * 管线建好之后那一次就接上。</p>
+     */
+    private void bindCabin(SurfaceTexture surfaceTexture) {
+        if (com.kooo.evcam.screen.ScreenState.dark() || mirrorView == null || mirrorView.isDocked()
+                || surfaceTexture == null || surfaceTexture.isReleased()) {
+            return;
+        }
+        if (!appConfig.rearViewWantsCabinRear()) {
+            withdrawCabinOutput();
+            return;
+        }
+        MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
+        SingleCamera camera = manager != null ? manager.getCamera(CameraSlots.KEY_CABIN_REAR) : null;
+        if (camera == null) {
+            return;
+        }
+        if (camera != boundCabinCamera || surfaceTexture != boundCabinTexture) {
+            withdrawCabinOutput();
+            boundCabinCamera = camera;
+            boundCabinManager = manager;
+            boundCabinTexture = surfaceTexture;
+            restoreCabinBufferSize(surfaceTexture);
+        }
+        Size previewSize = camera.getPreviewSize();
+        if (previewSize != null && !previewSize.equals(cabinSourceSize)) {
+            // 摆正、填满窗口照的是相机的画面尺寸，和主界面摆这一路一样（SingleCamera.applyLaneTransform）
+            mirrorView.setCabinSource(previewSize.getWidth(), previewSize.getHeight(), camera.laneRotation(),
+                    camera.isSourceMirrored());
+            cabinSourceSize = previewSize;
+        }
+        if (camera.declareMirror(surfaceTexture)) {
+            manager.channelScheduler().wake();
+            AppLog.i(TAG, "后视镜声明了后座舱的输出：开后座舱、把画布加进会话都由通道调度做（后座舱此刻 "
+                    + manager.channelScheduler().condition(CameraSlots.KEY_CABIN_REAR) + "，预览尺寸 " + previewSize + "）");
+        }
+    }
+
+    /** 同 {@link #restoreBufferSize}：窗口一改大小就把后座舱画布的缓冲区尺寸拨回相机会话配置时用的那个。 */
+    private void restoreCabinBufferSize(SurfaceTexture surfaceTexture) {
+        if (surfaceTexture == null || boundCabinCamera == null) {
+            return;
+        }
+        Size buffer = boundCabinCamera.getPreviewBufferSize();
+        if (buffer == null || buffer.getWidth() <= 0 || buffer.getHeight() <= 0) {
+            return;
+        }
+        surfaceTexture.setDefaultBufferSize(buffer.getWidth(), buffer.getHeight());
+    }
+
+    /** 撤回后座舱的超级镜子输出（换出这一档、换了一路相机或一块画布、画布要被收走、服务退出）。同 {@link #withdrawOutput}。 */
+    private void withdrawCabinOutput() {
+        SingleCamera camera = boundCabinCamera;
+        MultiCameraManager manager = boundCabinManager;
+        SurfaceTexture texture = boundCabinTexture;
+        boundCabinCamera = null;
+        boundCabinManager = null;
+        boundCabinTexture = null;
+        cabinSourceSize = null;
+        if (camera != null && texture != null && camera.withdrawMirror(texture)) {
+            AppLog.i(TAG, "后视镜撤回了后座舱的输出（相机 " + camera.getCameraId() + "）：还在会话里的由通道调度摘");
+            if (manager != null) {
+                manager.channelScheduler().wake();
+            }
+        }
+    }
+
+    /** 后座舱的超级镜子输出此刻在后座舱的会话里。从监测线程读时是近似值。 */
+    private boolean cabinInSession() {
+        SingleCamera camera = boundCabinCamera;
+        SurfaceTexture texture = boundCabinTexture;
+        return camera != null && texture != null
+                && camera.sessionOutputs().carries(new ChannelRules.Out(ChannelRules.Kind.MIRROR, texture));
+    }
+
+    /**
+     * 新窗口接回上一个窗口留下的后座舱画布（同 {@link #takeBackKeptCanvas}）。切换范围已经不含后座舱的不接：
+     * 留在管线手里，照旧等它离开后座舱的会话再放。
+     */
+    private void takeBackKeptCabinCanvas(MultiCameraManager pipeline) {
+        if (!appConfig.rearViewWantsCabinRear()) {
+            return;
+        }
+        SurfaceTexture kept = pipeline.takeKeptMirror(CameraSlots.KEY_CABIN_REAR);
+        if (kept == null) {
+            return;
+        }
+        try {
+            mirrorView.getCabinTextureView().setSurfaceTexture(kept);
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "接回留着的后座舱画布失败: " + e);
+            if (!MultiCameraManager.keepMirrorCanvas(pipeline, CameraSlots.KEY_CABIN_REAR, kept)) {
+                kept.release();
+            }
+            return;
+        }
+        restoreCabinBufferOnFrame = true;
+        com.kooo.evcam.blackbox.BlackBox.note("后视镜重新打开：接回留着的后座舱画布（同一块画布，通道不动）");
+        bindCabin(kept);
+    }
+
+    /** 后座舱那块画布要被系统收走了：同 {@link #handCanvasToPipeline}，交给管线留着。 */
+    private boolean handCabinCanvasToPipeline(SurfaceTexture st) {
+        restoreCabinBufferOnFrame = false;
+        if (st == boundCabinTexture) {
+            withdrawCabinOutput();
+        }
+        MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
+        boolean kept = MultiCameraManager.keepMirrorCanvas(pipeline, CameraSlots.KEY_CABIN_REAR, st);
+        if (kept) {
+            com.kooo.evcam.blackbox.BlackBox.note("后视镜窗口移走：后座舱画布交给管线留着（没人接回的等它离开后座舱的会话再放）");
+        } else {
+            ChannelScheduler.wakeAll();
+        }
+        return kept;
     }
 
     /**
@@ -522,10 +750,10 @@ public class RearViewMirrorService extends Service {
         if (mirrorView.isDocked() || com.kooo.evcam.screen.ScreenState.dark()) {
             return;
         }
-        TextureView tv = mirrorView.getTextureView();
-        if (tv.isAvailable()) {
+        SurfaceTexture canvas = canvasOf(mirrorView.getTextureView(), false);
+        if (canvas != null) {
             retryCount = 0;
-            bindCamera(tv.getSurfaceTexture());
+            bindCamera(canvas);
         }
     }
 
@@ -600,13 +828,13 @@ public class RearViewMirrorService extends Service {
         if (mirrorView == null || !mirrorView.isShowing()) {
             return;
         }
-        TextureView tv = mirrorView.getTextureView();
-        if (!tv.isAvailable()) {
+        SurfaceTexture canvas = canvasOf(mirrorView.getTextureView(), false);
+        if (canvas == null) {
             AppLog.w(TAG, "后视镜画布还没准备好，暂不登记相机");
             return;
         }
         retryCount = 0;
-        bindCamera(tv.getSurfaceTexture());
+        bindCamera(canvas);
         if (explainIfItFails) {
             // 开相机、加输出都是调度异步做的，当场问一定还没好。等两秒半再看；连着点只留最后那一次
             explainSince = android.os.SystemClock.uptimeMillis();
@@ -640,13 +868,15 @@ public class RearViewMirrorService extends Service {
             // 这期间收起来了、熄屏了、窗口没了：后视镜不再要画面，没什么可解释的
             return;
         }
-        SingleCamera camera = boundCamera;
-        MultiCameraManager manager = boundManager;
-        ChannelRules.Condition condition = manager != null
-                ? manager.channelScheduler().condition(CameraSlots.KEY_SURROUND) : null;
+        // 看哪一路就说哪一路：环视，或者后座舱
+        boolean cabin = mirrorView.isShowingCabin();
+        SingleCamera camera = cabin ? boundCabinCamera : boundCamera;
+        MultiCameraManager manager = cabin ? boundCabinManager : boundManager;
+        ChannelRules.Condition condition = manager != null ? manager.channelScheduler().condition(
+                cabin ? CameraSlots.KEY_CABIN_REAR : CameraSlots.KEY_SURROUND) : null;
         boolean waiting = android.os.SystemClock.uptimeMillis() - explainSince < EXPLAIN_GIVE_UP_MS;
         if (condition == ChannelRules.Condition.STREAMING) {
-            if (mirrorInSession()) {
+            if (cabin ? cabinInSession() : mirrorInSession()) {
                 AppLog.i(TAG, "点击恢复之后环视在出画面、会话里带着后视镜，不用提示");
                 return;
             }
@@ -720,6 +950,7 @@ public class RearViewMirrorService extends Service {
         // （onSurfaceTextureDestroyed → handCanvasToPipeline）交给管线留着，环视不动（大纲 §7.7）
         unbindCamera();
         withdrawOutput();
+        withdrawCabinOutput();
         if (mirrorView != null) {
             mirrorView.hide();
             mirrorView = null;

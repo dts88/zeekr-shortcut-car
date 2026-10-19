@@ -2100,9 +2100,10 @@ public class MultiCameraManager {
      * @param current 调用方手里的那一份（可能是 null、可能已经放了）；交给哪一份照 {@link #ownerOf}
      * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：哪一份都不带着它、也没有环视那一路，调用方照常让它放
      */
-    public static boolean keepMirrorCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
-        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
-        return owner != null && owner.keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    public static boolean keepMirrorCanvas(MultiCameraManager current, String cameraKey,
+                                           android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.MIRROR, cameraKey, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.MIRROR, cameraKey, texture);
     }
 
     /**
@@ -2206,8 +2207,8 @@ public class MultiCameraManager {
      *
      * @return 留着、还活着的那一块；没有是 null
      */
-    public android.graphics.SurfaceTexture takeKeptMirror() {
-        return takeKeptCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND);
+    public android.graphics.SurfaceTexture takeKeptMirror(String cameraKey) {
+        return takeKeptCanvas(ChannelRules.Kind.MIRROR, cameraKey);
     }
 
     /** 新开的盲区画面窗口接回上一个窗口留下的画布（同 {@link #takeKeptMirror}）；拿回来之后接着重新声明（{@link SingleCamera#declareSide}）。 */
@@ -2243,8 +2244,8 @@ public class MultiCameraManager {
         }
         texture.release();
         if (kind == ChannelRules.Kind.MIRROR) {
-            com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：环视的会话里已经没有它，放掉"
-                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+            com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：" + roleName(cameraKey)
+                    + "的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         } else if (kind == ChannelRules.Kind.SIDE) {
             com.kooo.evcam.blackbox.BlackBox.note("盲区画面留下的画布没人接回：环视的会话里已经没有它，放掉"
                     + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
@@ -3224,6 +3225,28 @@ public class MultiCameraManager {
         @Override
         public Set<String> recordPlan() {
             return recordPlanKeys();
+        }
+
+        /** 上一轮读到的「超级镜子要后座舱」：变了记一行黑匣子。 */
+        private volatile boolean mirrorCabinNoted;
+        /** 读切换范围用（第一次要时建：这个对象跟着管线的字段一起建，那时 context 还没给）。 */
+        private volatile com.kooo.evcam.AppConfig config;
+
+        @Override
+        public boolean mirrorWantsCabinRear() {
+            com.kooo.evcam.AppConfig settings = config;
+            if (settings == null) {
+                settings = new com.kooo.evcam.AppConfig(context);
+                config = settings;
+            }
+            boolean wants = settings.rearViewWantsCabinRear();
+            if (wants != mirrorCabinNoted) {
+                mirrorCabinNoted = wants;
+                com.kooo.evcam.blackbox.BlackBox.note(wants
+                        ? "超级镜子切换范围是「后视 + 后座舱」：登记着超级镜子时后座舱也有人要"
+                        : "超级镜子切换范围不含后座舱：超级镜子只要环视");
+            }
+            return wants;
         }
 
         @Override

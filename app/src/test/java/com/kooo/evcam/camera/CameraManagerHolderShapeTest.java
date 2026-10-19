@@ -10,7 +10,8 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 
 /**
- * 建管线建哪几路（{@link CameraManagerHolder.Shape}）：照启用的几路，环视一直建（超级镜子要它），座舱启用了才建。
+ * 建管线建哪几路（{@link CameraManagerHolder.Shape}）：照启用的几路，环视一直建（超级镜子要它），座舱启用了才建；
+ * 超级镜子的切换范围是「后视 + 后座舱」时后座舱也建（2026-10-19）。
  *
  * <p>2026-10-16 修的就是这里：以前数路数，只开一路座舱时只建了环视；只开两路座舱时最多建 2 路，前座舱被挤掉。</p>
  */
@@ -21,7 +22,12 @@ public class CameraManagerHolderShapeTest {
     private static final String FRONT = CameraSlots.KEY_CABIN_FRONT;
 
     private static CameraManagerHolder.Shape shape(String... enabled) {
-        return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)));
+        return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)), false);
+    }
+
+    /** 超级镜子要后座舱（切换范围是「后视 + 后座舱」）。 */
+    private static CameraManagerHolder.Shape mirrorCabin(String... enabled) {
+        return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)), true);
     }
 
     @Test
@@ -71,5 +77,32 @@ public class CameraManagerHolderShapeTest {
         assertEquals("zeekr_7x/front+left+back", shape(FRONT, SUR, REAR).key());
         assertEquals("zeekr_7x/left+back", shape(FRONT, REAR).key());
         assertEquals(shape(REAR, FRONT).key(), shape(FRONT, REAR).key());
+    }
+
+    /** 超级镜子要后座舱、配置里没启用它：照样建，但不算启用的（主界面预览、拍照、录像都不要它）。 */
+    @Test
+    public void theMirrorBuildsTheRearCabinWithoutEnablingIt() {
+        CameraManagerHolder.Shape surround = mirrorCabin(SUR);
+        assertTrue(surround.cabinRear);
+        assertFalse(surround.enabled.contains(REAR));
+        assertEquals(2, surround.count);
+        assertEquals(3, mirrorCabin(SUR, FRONT).count);
+    }
+
+    /** 配置里已经启用了后座舱：超级镜子要不要它都建这三路，不多建一路。 */
+    @Test
+    public void anEnabledRearCabinIsBuiltOnce() {
+        assertEquals(shape(SUR, REAR).count, mirrorCabin(SUR, REAR).count);
+        assertEquals(shape(SUR, REAR).key(), mirrorCabin(SUR, REAR).key());
+    }
+
+    /**
+     * 只为超级镜子建的后座舱写进 key（变了谁来要都重建），不写进 lanesKey（启用的几路没变，主界面的布局不变）。
+     */
+    @Test
+    public void theMirrorCabinChangesTheKeyButNotTheLanes() {
+        assertEquals("zeekr_7x/front/mirror:left", mirrorCabin(SUR).key());
+        assertEquals(shape(SUR).lanesKey(), mirrorCabin(SUR).lanesKey());
+        assertFalse(shape(SUR).key().equals(mirrorCabin(SUR).key()));
     }
 }

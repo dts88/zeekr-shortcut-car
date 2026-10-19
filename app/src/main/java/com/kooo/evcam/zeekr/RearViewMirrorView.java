@@ -56,6 +56,13 @@ import com.kooo.evcam.R;
  *
  * <p>后视那一路做<b>左右镜像</b>，和真正的后视镜一致；前视、侧视不翻。
  * 预览、录制、回放都不受影响。</p>
+ *
+ * <h3>后座舱（切换范围「后视 + 后座舱」）</h3>
+ *
+ * <p>后座舱不是环视里的一格，是另一台摄像头：它有自己的一块画布（{@link #getCabinTextureView}），服务把它声明成
+ * 后座舱的超级镜子输出。两块画布都挂在窗口上、各自出帧，看哪一路就把哪一块设成可见、画哪一块；另一块不可见，
+ * 不逐帧画，流照旧留在会话里 —— 切过去不用等。后座舱整幅铺满窗口（照配置里那一格的旋转摆正，再左右镜像，
+ * 和车内后视镜里看到的一样），不做鱼眼校正、不调取景高低。</p>
  */
 public class RearViewMirrorView extends ViewGroup {
 
@@ -89,7 +96,15 @@ public class RearViewMirrorView extends ViewGroup {
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
+    /** 后座舱的画布：切换范围是「后视 + 后座舱」时服务把它声明成后座舱的超级镜子输出（见类说明）。 */
+    private final AutoFitTextureView cabinTextureView;
     private final CameraLabel cameraLabel;
+    /** 后座舱画面怎么摆（服务给，{@link #setCabinSource}）：缓冲区尺寸、配置里的旋转、系统有没有把它左右翻过。 */
+    private int cabinBufferWidth;
+    private int cabinBufferHeight;
+    private int cabinRotation;
+    private boolean cabinSourceMirrored;
+    private final Matrix cabinMatrix = new Matrix();
 
     private WindowManager.LayoutParams params;
     private boolean attached;
@@ -140,6 +155,8 @@ public class RearViewMirrorView extends ViewGroup {
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     /** 最后一帧新画面的时刻，单调时钟。 */
     private long lastFrameUptimeMs;
+    /** 后座舱最后一帧新画面的时刻。看哪一路，「画面停了」就按哪一路的算。 */
+    private long lastCabinFrameUptimeMs;
     /** 画面停了：盖住那张过时的画面，改成一句「点击恢复」。 */
     private boolean frozen;
     /** 贴边收起：那一条窄边上不画画面，只写名字。 */
@@ -152,7 +169,7 @@ public class RearViewMirrorView extends ViewGroup {
     /** 正在闪的是哪一路那一块；-1 表示没在闪。 */
     private int flashLane = -1;
     /** 闪的那一块按哪种切法画：点下去那一刻的，免得闪到一半设置变了、形状跟着跳。 */
-    private boolean flashFrontRearOnly;
+    private MirrorViews flashViews = MirrorViews.FOUR;
     /** 闪光还剩多亮，1 → 0。 */
     private float flashLevel;
     private ValueAnimator flashAnimator;
@@ -197,7 +214,89 @@ public class RearViewMirrorView extends ViewGroup {
 
         textureView = new AutoFitTextureView(context);
         addView(textureView);
+        cabinTextureView = new AutoFitTextureView(context);
+        addView(cabinTextureView);
+        syncTextureVisibility();
+    }
 
+    /**
+     * 后座舱要写进的 TextureView：切换范围是「后视 + 后座舱」时服务把它的 SurfaceTexture 声明成后座舱的超级镜子输出。
+     * 窗口移走时画布同样交给管线留着，新窗口接回（RearViewMirrorService）。
+     */
+    public AutoFitTextureView getCabinTextureView() {
+        return cabinTextureView;
+    }
+
+    /** 正在看后座舱。 */
+    public boolean isShowingCabin() {
+        return laneIndex == LaneCycle.CABIN_REAR;
+    }
+
+    /**
+     * 后座舱画面怎么摆（服务在声明后座舱输出时给）：相机缓冲区尺寸、配置里那一格的旋转、系统有没有把它左右翻过（前置摄像头）。
+     * 和主界面摆这一路用同一个算法（{@link com.kooo.evcam.camera.LaneSurfaceMatrix}），铺法固定是填满窗口。
+     */
+    public void setCabinSource(int bufferWidth, int bufferHeight, int rotation, boolean sourceMirrored) {
+        cabinBufferWidth = bufferWidth;
+        cabinBufferHeight = bufferHeight;
+        cabinRotation = rotation;
+        cabinSourceMirrored = sourceMirrored;
+        applyCabinTransform();
+    }
+
+    /**
+     * 后座舱画布的矩阵：照配置里的旋转摆正、填满窗口；系统翻过的先翻回正常视角，再整幅左右镜像 ——
+     * 和车内后视镜里看到的一样（项目所有者 2026-10-19）。配置里那一格的「镜像」不管：那是主界面怎么看。
+     */
+    private void applyCabinTransform() {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0 || height <= 0 || cabinBufferWidth <= 0 || cabinBufferHeight <= 0) {
+            return;
+        }
+        com.kooo.evcam.camera.LaneSurfaceMatrix.build(cabinMatrix, width, height,
+                cabinBufferWidth, cabinBufferHeight, cabinRotation, false,
+                0f, 0f, 0f, 0f, 1f, 1f, 0f, 0f, com.kooo.evcam.profile.LaneLayout.FILL);
+        if (cabinSourceMirrored) {
+            cabinMatrix.preScale(-1f, 1f, width / 2f, height / 2f);
+        }
+        cabinMatrix.postScale(-1f, 1f, width / 2f, height / 2f);
+        cabinTextureView.setTransform(cabinMatrix);
+    }
+
+    /** 服务每收到一帧后座舱的新画面调一次（画布不可见时系统不送这一下）。 */
+    public void noteCabinFrame() {
+        lastCabinFrameUptimeMs = SystemClock.uptimeMillis();
+        if (frozen && isShowingCabin()) {
+            frozen = false;
+            invalidate();
+        }
+    }
+
+    /**
+     * 两块画布谁可见：贴边收起时都不可见；平时看后座舱就是后座舱那一块，否则是环视那一块。不可见的画布不逐帧画，
+     * 流照旧留在会话里（TextureView 不可见时摘掉自己的帧监听）。
+     */
+    private void syncTextureVisibility() {
+        boolean cabin = isShowingCabin();
+        textureView.setVisibility(!docked && !cabin ? View.VISIBLE : View.INVISIBLE);
+        cabinTextureView.setVisibility(!docked && cabin ? View.VISIBLE : View.INVISIBLE);
+    }
+
+    /**
+     * 换了一路之后：画布可见跟着换；换上来的那一块刚设成可见，之前不可见时系统不报帧 —— 从此刻起给画面回来留出时间，
+     * 别一换过去就盖上「画面已停止」。
+     */
+    private void onLaneChanged() {
+        long now = SystemClock.uptimeMillis();
+        if (isShowingCabin()) {
+            lastCabinFrameUptimeMs = now;
+        } else {
+            lastFrameUptimeMs = now;
+        }
+        frozen = false;
+        syncTextureVisibility();
+        invalidate();
     }
 
     /**
@@ -260,11 +359,12 @@ public class RearViewMirrorView extends ViewGroup {
             windowManager.addView(this, params);
             attached = true;
             lastFrameUptimeMs = SystemClock.uptimeMillis();
+            lastCabinFrameUptimeMs = lastFrameUptimeMs;
             buttonMode = appConfig.isRearViewButtonMode();
             docked = RearViewTouchModel.dockedAt(params.x, params.width, screenWidth())
                     != RearViewTouchModel.Dock.NONE;
             // 上次就是贴边收起来的：画布一开始就不可见，和贴边那一刻一样（见 syncDockState）
-            textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+            syncTextureVisibility();
             idleHandler.postDelayed(idleTick, IDLE_TICK_MS);
         } catch (Exception e) {
             AppLog.e(TAG, "后视镜窗口添加失败", e);
@@ -319,8 +419,9 @@ public class RearViewMirrorView extends ViewGroup {
             if (!attached) {
                 return;
             }
+            long lastFrame = isShowingCabin() ? lastCabinFrameUptimeMs : lastFrameUptimeMs;
             boolean nowFrozen = !docked
-                    && SystemClock.uptimeMillis() - lastFrameUptimeMs > FROZEN_AFTER_MS;
+                    && SystemClock.uptimeMillis() - lastFrame > FROZEN_AFTER_MS;
             if (nowFrozen != frozen) {
                 frozen = nowFrozen;
                 AppLog.i(TAG, frozen ? "后视镜画面停了，改显示「点击恢复」" : "后视镜画面回来了");
@@ -364,9 +465,10 @@ public class RearViewMirrorView extends ViewGroup {
         } else {
             // 给画面回来留出时间：会话里还带着它就是下一帧，不在了就等调度排的那一步
             lastFrameUptimeMs = SystemClock.uptimeMillis();
+            lastCabinFrameUptimeMs = lastFrameUptimeMs;
         }
         // 状态先改好再改可见：设回可见时 TextureView 会叫重画，那一次 dispatchDraw 要按「放回来」画
-        textureView.setVisibility(docked ? View.INVISIBLE : View.VISIBLE);
+        syncTextureVisibility();
         AppLog.i(TAG, docked ? "后视镜贴边收起：画布设为不可见，不再逐帧画" : "后视镜放回来：画布设回可见，接着画");
         invalidate();
         if (dockListener != null) {
@@ -409,7 +511,7 @@ public class RearViewMirrorView extends ViewGroup {
      * 直接切到某一路（按键模式用）。
      *
      * <p>不走 {@link LaneCycle} 那个环：点哪一块是点名要哪一路，不是「往下一个」。
-     * 「只显示前后视」时窗口只分上下两半（{@link LaneTapZones}），点不出侧视。</p>
+     * 两路的那两档窗口只分上下两半（{@link LaneTapZones}），点不出侧视。</p>
      */
     private void selectLane(int lane) {
         if (lane == laneIndex) {
@@ -418,11 +520,11 @@ public class RearViewMirrorView extends ViewGroup {
         laneIndex = lane;
         appConfig.setRearViewLane(laneIndex);
         AppLog.i(TAG, "按键模式：切到「" + LaneCycle.labelOf(laneIndex) + "」路");
-        invalidate();
+        onLaneChanged();
     }
 
     private void switchLane(boolean clockwise) {
-        int next = LaneCycle.next(laneIndex, clockwise, appConfig.isRearViewFrontRearOnly());
+        int next = LaneCycle.next(laneIndex, clockwise, appConfig.getRearViewViews());
         if (next == laneIndex) {
             return;
         }
@@ -430,13 +532,13 @@ public class RearViewMirrorView extends ViewGroup {
         appConfig.setRearViewLane(laneIndex);
         AppLog.i(TAG, "后视镜切到「" + LaneCycle.labelOf(laneIndex) + "」路"
                 + (LaneCycle.isMirrored(laneIndex) ? "（镜像）" : "（不镜像）"));
-        invalidate();
+        onLaneChanged();
     }
 
     /**
-     * 设置页改了「只看前后」之后推过来。
+     * 设置页改了切换范围之后推过来。
      *
-     * <p>如果当前停在侧视，而侧视已经不在环上了，就退回后视 ——
+     * <p>当前那一路已经不在这一档的环上了（停在侧视时换成「前后」、停在后座舱时换走「后视 + 后座舱」），就退回后视 ——
      * 否则会停在一个划不动的画面上。</p>
      */
     public void applyLaneModeFromConfig() {
@@ -444,7 +546,7 @@ public class RearViewMirrorView extends ViewGroup {
         if (lane != laneIndex) {
             laneIndex = lane;
             AppLog.i(TAG, "后视镜回到「" + LaneCycle.labelOf(laneIndex) + "」路");
-            invalidate();
+            onLaneChanged();
         }
     }
 
@@ -468,8 +570,12 @@ public class RearViewMirrorView extends ViewGroup {
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        // 子视图铺满，实际取景由 dispatchDraw 的矩阵决定
+        // 子视图铺满，实际取景由 dispatchDraw 的矩阵决定；后座舱那块用它自己的矩阵（applyCabinTransform）
         textureView.layout(0, 0, getWidth(), getHeight());
+        cabinTextureView.layout(0, 0, getWidth(), getHeight());
+        if (changed) {
+            applyCabinTransform();
+        }
     }
 
     @Override
@@ -488,6 +594,12 @@ public class RearViewMirrorView extends ViewGroup {
         if (docked) {
             // 贴边收起：那条窄边上不画画面，见 drawDockedLabel
             drawDockedLabel(canvas, width, height);
+            return;
+        }
+        if (isShowingCabin()) {
+            // 后座舱：那块画布自己带着摆正、镜像的矩阵（applyCabinTransform），整幅照画
+            drawChild(canvas, cabinTextureView, getDrawingTime());
+            drawOverlays(canvas, width, height);
             return;
         }
         if (plan == null || !plan.isComposite()) {
@@ -533,8 +645,11 @@ public class RearViewMirrorView extends ViewGroup {
         }
 
         canvas.restoreToCount(mirrorSave);
+        drawOverlays(canvas, width, height);
+    }
 
-        // 盖在最上面，而且在镜像之外 —— 提示文字不该跟着画面一起左右翻
+    /** 盖在最上面，而且在镜像之外 —— 提示文字不该跟着画面一起左右翻。 */
+    private void drawOverlays(Canvas canvas, int width, int height) {
         if (frozen) {
             drawFrozenHint(canvas, width, height);
         }
@@ -553,7 +668,7 @@ public class RearViewMirrorView extends ViewGroup {
      * 画面本身就是按钮。画在镜像之外：左边那块永远是左。</p>
      */
     private void drawTapFlash(Canvas canvas, int width, int height) {
-        float[] points = LaneTapZones.outline(flashLane, width, height, flashFrontRearOnly);
+        float[] points = LaneTapZones.outline(flashLane, width, height, flashViews);
         flashPath.rewind();
         flashPath.moveTo(points[0], points[1]);
         for (int i = 2; i < points.length; i += 2) {
@@ -566,10 +681,10 @@ public class RearViewMirrorView extends ViewGroup {
         canvas.drawPath(flashPath, scrimPaint);
     }
 
-    private void startTapFlash(int lane, boolean frontRearOnly) {
+    private void startTapFlash(int lane, MirrorViews views) {
         cancelTapFlash();
         flashLane = lane;
-        flashFrontRearOnly = frontRearOnly;
+        flashViews = views;
         flashAnimator = ValueAnimator.ofFloat(1f, 0f);
         flashAnimator.setDuration(TAP_FLASH_MS);
         // 先亮着停一下再淡：一上来就开始褪，余光里几乎看不到
@@ -763,8 +878,8 @@ public class RearViewMirrorView extends ViewGroup {
             if (horizontalDrag == null) {
                 horizontalDrag = RearViewTouchModel.isHorizontalIntent(dx, dy);
             }
-            if (horizontalDrag) {
-                // 换不换路等松手再定，划到一半不该跳来跳去
+            if (horizontalDrag || isShowingCabin()) {
+                // 换不换路等松手再定，划到一半不该跳来跳去。后座舱整幅铺满，没有取景高低可调
                 return;
             }
             float shift = RearViewTouchModel.panShiftForDrag(
@@ -818,13 +933,13 @@ public class RearViewMirrorView extends ViewGroup {
                     resumeAction.run();
                 } else if (buttonMode && !pinchedThisGesture && !Float.isNaN(tapX)) {
                     // 按键模式：点哪一块就切到哪一路，随时点随时生效，不用先唤出什么。
-                    // 「只显示前后视」时只分上下两半。拖窗口、上下划取景、双指缩放都不是点，走不到这里
-                    boolean frontRearOnly = appConfig.isRearViewFrontRearOnly();
+                    // 两路的那两档只分上下两半。拖窗口、上下划取景、双指缩放都不是点，走不到这里
+                    MirrorViews views = appConfig.getRearViewViews();
                     int lane = LaneTapZones.laneAt(
-                            tapX, tapY, getWidth(), getHeight(), frontRearOnly);
+                            tapX, tapY, getWidth(), getHeight(), views);
                     if (lane >= 0) {
                         selectLane(lane);
-                        startTapFlash(lane, frontRearOnly);
+                        startTapFlash(lane, views);
                     }
                 }
             }

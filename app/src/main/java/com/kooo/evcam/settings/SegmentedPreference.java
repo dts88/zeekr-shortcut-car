@@ -32,6 +32,8 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
     private static final int SEGMENT_HEIGHT_DP = 46;
     private static final int SEGMENT_MIN_WIDTH_DP = 96;
     private static final int SEGMENT_PADDING_DP = 18;
+    /** 依赖的开关关着时段的不透明度（Material 的禁用值）。 */
+    private static final float DISABLED_ALPHA = 0.38f;
 
     private CharSequence[] entries = new CharSequence[0];
     private String[] values = new String[0];
@@ -90,6 +92,11 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
         view.setPadding(padding, 0, padding, 0);
         view.setMinWidth(Math.round(SEGMENT_MIN_WIDTH_DP * density));
         view.setOnClickListener(v -> pick(target));
+        // 依赖的开关关着（android:dependency）时整行置灰：段也跟着灰、点了不动（超级镜子的切换范围）
+        view.setEnabled(isEnabled());
+        if (!isEnabled()) {
+            view.setAlpha(DISABLED_ALPHA);
+        }
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(SEGMENT_HEIGHT_DP * density));

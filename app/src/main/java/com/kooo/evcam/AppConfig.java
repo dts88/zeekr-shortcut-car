@@ -73,7 +73,9 @@ public class AppConfig {
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
     private static final String KEY_REARVIEW_PAN = "rearview_pan";                // 上下平移，0..1
     private static final String KEY_REARVIEW_LANE = "rearview_lane";              // 当前显示哪一路
-    private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
+    private static final String KEY_REARVIEW_VIEWS = "rearview_views";            // 切换范围（MirrorViews.key）
+    /** 2.14 以前的「只显示前后视」开关：读到时换成「前后」档、拿掉（{@link #getRearViewViews}）。 */
+    private static final String KEY_REARVIEW_FRONT_REAR_LEGACY = "rearview_front_rear";
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
@@ -1009,9 +1011,8 @@ public class AppConfig {
      */
     public int getRearViewLane() {
         int lane = prefs.getInt(KEY_REARVIEW_LANE, com.kooo.evcam.zeekr.LaneCycle.REAR);
-        boolean frontRearOnly = isRearViewFrontRearOnly();
-        // 存的那一路可能已经不在当前模式的环上了（比如停在「左」时打开了只看前后）
-        return com.kooo.evcam.zeekr.LaneCycle.isOnRing(lane, frontRearOnly)
+        // 存的那一路可能已经不在这一档的环上了（比如停在「左」时换成了「前后」）
+        return com.kooo.evcam.zeekr.LaneCycle.isOnRing(lane, getRearViewViews())
                 ? lane : com.kooo.evcam.zeekr.LaneCycle.REAR;
     }
 
@@ -1033,13 +1034,34 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_REARVIEW_BUTTON_MODE, on).apply();
     }
 
-    /** 只在前后之间切换，不去侧视。 */
-    public boolean isRearViewFrontRearOnly() {
-        return prefs.getBoolean(KEY_REARVIEW_FRONT_REAR, false);
+    /**
+     * 超级镜子的切换范围（{@link com.kooo.evcam.zeekr.MirrorViews}），默认四向。
+     *
+     * <p>2.14 以前是「只显示前后视」开关（项目所有者 2026-10-19 改成三档）：开着的，第一次读到时换成「前后」档；
+     * 旧的那个键读到就拿掉。</p>
+     */
+    public com.kooo.evcam.zeekr.MirrorViews getRearViewViews() {
+        if (!prefs.contains(KEY_REARVIEW_VIEWS) && prefs.contains(KEY_REARVIEW_FRONT_REAR_LEGACY)) {
+            boolean frontRear = prefs.getBoolean(KEY_REARVIEW_FRONT_REAR_LEGACY, false);
+            com.kooo.evcam.zeekr.MirrorViews views = frontRear
+                    ? com.kooo.evcam.zeekr.MirrorViews.FRONT_REAR : com.kooo.evcam.zeekr.MirrorViews.FOUR;
+            prefs.edit().remove(KEY_REARVIEW_FRONT_REAR_LEGACY).putString(KEY_REARVIEW_VIEWS, views.key).apply();
+            return views;
+        }
+        return com.kooo.evcam.zeekr.MirrorViews.fromKey(
+                prefs.getString(KEY_REARVIEW_VIEWS, com.kooo.evcam.zeekr.MirrorViews.FOUR.key));
     }
 
-    public void setRearViewFrontRearOnly(boolean on) {
-        prefs.edit().putBoolean(KEY_REARVIEW_FRONT_REAR, on).apply();
+    public void setRearViewViews(com.kooo.evcam.zeekr.MirrorViews views) {
+        prefs.edit().putString(KEY_REARVIEW_VIEWS, views.key).remove(KEY_REARVIEW_FRONT_REAR_LEGACY).apply();
+    }
+
+    /**
+     * 超级镜子要后座舱：切换范围是「后视 + 后座舱」。开不开超级镜子都算 —— 管线照它建后座舱这一路
+     * （CameraManagerHolder），调度照它判超级镜子要不要后座舱（ChannelRules），开关超级镜子时都不用重建。
+     */
+    public boolean rearViewWantsCabinRear() {
+        return getRearViewViews() == com.kooo.evcam.zeekr.MirrorViews.REAR_CABIN;
     }
 
     public void setRearViewPan(float pan) {
@@ -1071,7 +1093,8 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_HEIGHT)
                 .remove(KEY_REARVIEW_PAN)
                 .remove(KEY_REARVIEW_LANE)
-                .remove(KEY_REARVIEW_FRONT_REAR)
+                .remove(KEY_REARVIEW_VIEWS)
+                .remove(KEY_REARVIEW_FRONT_REAR_LEGACY)
                 .remove(KEY_REARVIEW_CAMERA_LABEL)
                 .apply();
         AppLog.i(TAG, "超级镜子布局已恢复默认");

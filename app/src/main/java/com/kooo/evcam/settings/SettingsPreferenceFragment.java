@@ -706,12 +706,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         });
 
-        bindSwitch("pref_rearview_front_rear", appConfig.isRearViewFrontRearOnly(), value -> {
-            appConfig.setRearViewFrontRearOnly(value);
-            if (getContext() != null && appConfig.isRearViewEnabled()) {
-                RearViewMirrorService.applyLaneMode(getContext());
-            }
-        });
+        // 切换范围（项目所有者 2026-10-19，取代「只显示前后视」开关）
+        bindSegmented("pref_rearview_views", SettingsRegistry.REARVIEW_VIEWS,
+                appConfig.getRearViewViews().key, value -> {
+                    appConfig.setRearViewViews(com.kooo.evcam.zeekr.MirrorViews.fromKey(value));
+                    applyRearViewViews();
+                });
 
         bindSwitch("pref_rearview_fisheye", appConfig.isRearViewFisheyeCorrection(), value -> {
             appConfig.setRearViewFisheyeCorrection(value);
@@ -748,6 +748,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (label != null) {
                 label.setChecked(appConfig.isRearViewCameraLabelEnabled());
             }
+            SegmentedPreference views = findPreference("pref_rearview_views");
+            if (views != null) {
+                views.setValue(appConfig.getRearViewViews().key);
+            }
+            applyRearViewViews();
             if (getContext() != null && appConfig.isRearViewEnabled()) {
                 // 重开一次让新的默认值生效
                 RearViewMirrorService.stop(getContext());
@@ -779,6 +784,27 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         SeekBarPreference height = findPreference("pref_rearview_height");
         if (height != null) {
             height.setValue(appConfig.getRearViewHeight(screenHeight));
+        }
+    }
+
+    /**
+     * 切换范围变了（选了、或者重置了）。「后视 + 后座舱」要管线里有后座舱这一路：已经有管线时问一次
+     * （{@link com.kooo.evcam.camera.CameraManagerHolder#getOrInit}）—— 配置里没启用后座舱时这一档一变，管线当场放掉重建，
+     * 主界面、超级镜子照「放掉重建了」接上新的那一份（在录的话那一段到头、自动接回）。再叫醒调度（超级镜子要不要后座舱是
+     * 它每一轮读的事实），正在显示的窗口换环、接上或撤回后座舱的画布。
+     */
+    private void applyRearViewViews() {
+        android.content.Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
+        if (holder.getCameraManager() != null) {
+            holder.getOrInit(context);
+        }
+        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        if (appConfig.isRearViewEnabled()) {
+            RearViewMirrorService.applyLaneMode(context);
         }
     }
 
