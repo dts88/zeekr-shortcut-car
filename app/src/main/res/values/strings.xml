@@ -836,8 +836,6 @@
     <string name="dev_perm_group_advanced">高级权限</string>
     <string name="dev_perm_camera">相机权限</string>
     <string name="dev_perm_camera_why">用于录制和拍照</string>
-    <string name="dev_perm_microphone">麦克风权限</string>
-    <string name="dev_perm_microphone_why">用于录制声音</string>
     <string name="dev_perm_storage">存储权限</string>
     <string name="dev_perm_storage_why">用于保存和读取录像与照片</string>
     <string name="dev_perm_notifications">通知权限</string>

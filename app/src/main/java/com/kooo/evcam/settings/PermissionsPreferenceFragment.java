@@ -73,7 +73,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         PreferenceCategory basic = category(screen, context, R.string.dev_perm_group_basic);
         add(basic, context, R.string.dev_perm_camera, R.string.dev_perm_camera_why,
                 hasPermission(context, Manifest.permission.CAMERA), this::openAppSettings);
-
         add(basic, context, R.string.dev_perm_storage, R.string.dev_perm_storage_why,
                 hasStoragePermission(context), this::openAppSettings);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
