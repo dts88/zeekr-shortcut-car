@@ -82,6 +82,7 @@
     <string name="floating_action_toggle_recording">Mula / henti rakaman</string>
     <string name="floating_action_take_photo">Ambil foto</string>
     <string name="floating_action_toggle_mirror">Hidupkan / matikan Cermin super</string>
+    <string name="floating_action_lock_footage">Kunci rakaman semasa</string>
     <string name="set_recording_stats_title">Paparan status rakaman</string>
     <string name="set_recording_stats_summary">Menunjukkan masa berlalu dan nombor klip semasa di sudut semasa merakam</string>
     <string name="set_reset_floating_title">Set semula butang terapung</string>
@@ -359,6 +360,8 @@
     </plurals>
     <string name="msg_footage_lock_failed">Tidak dapat menyimpan status kunci. Cuba lagi</string>
     <string name="msg_footage_nothing_here">Tiada rakaman di sini untuk dikunci</string>
+    <string name="msg_footage_locked_around">Klip yang meliputi 10 saat sebelum dan selepas telah dikunci</string>
+    <string name="msg_footage_lock_needs_setting">Tidak dapat mengunci. Hidupkan Tetapan → Storan → Kunci rakaman dahulu</string>
     <string name="player_session_locked">ada fail dikunci</string>
     <string name="photo_group_locked">dikunci</string>
     <plurals name="msg_kept_locked">
