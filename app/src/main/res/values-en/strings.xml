@@ -484,6 +484,7 @@
     <string name="upd_err_no_dir">can\'t create the download folder</string>
     <string name="upd_err_over_limit">too much data, aborted</string>
     <string name="upd_err_truncated">only received %1$d of %2$d bytes</string>
+    <string name="upd_err_integrity">installer file failed verification, aborted</string>
     <string name="upd_need_install_title">Permission needed: Install unknown apps</string>
     <string name="upd_need_install_msg">Allow this app to install unknown apps in system settings, then come back and tap Check for updates again.</string>
     <string name="upd_go_settings">Open settings</string>

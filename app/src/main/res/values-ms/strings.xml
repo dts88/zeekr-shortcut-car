@@ -476,6 +476,7 @@
     <string name="upd_err_no_dir">tidak dapat mencipta folder muat turun</string>
     <string name="upd_err_over_limit">terlalu banyak data, dibatalkan</string>
     <string name="upd_err_truncated">hanya menerima %1$d daripada %2$d bait</string>
+    <string name="upd_err_integrity">fail pemasang gagal pengesahan, dibatalkan</string>
     <string name="upd_need_install_title">Kebenaran diperlukan: Pasang apl tidak diketahui</string>
     <string name="upd_need_install_msg">Benarkan apl ini memasang apl tidak diketahui dalam tetapan sistem, kemudian kembali dan ketik Semak kemas kini sekali lagi.</string>
     <string name="upd_go_settings">Buka tetapan</string>
