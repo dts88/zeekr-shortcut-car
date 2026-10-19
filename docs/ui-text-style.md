@@ -178,6 +178,7 @@
   Klip yang meliputi 10 saat sebelum dan selepas telah dikunci；「锁定影像」关着时 msg_footage_lock_needs_setting
   「无法锁定，请先开启「设置 → 存储 → 锁定影像」」/ Can't lock. Turn on Settings → Storage → Lock footage first /
   Tidak dapat mengunci. Hidupkan Tetapan → Storan → Kunci rakaman dahulu。没在录时沿用 msg_footage_nothing_here「当前时刻无可锁定的录像」。
+- 2026-10-19 批准（PR #38 下载更新时校验安装包）：upd_err_integrity，下载更新时安装包的 sha256 或大小与 GitHub 给的对不上、或 GitHub 没给 sha256，显示为「下载失败：安装包校验未通过，已中止」；English「Download failed: installer file failed verification, aborted」；Bahasa Melayu「Muat turun gagal: fail pemasang gagal pengesahan, dibatalkan」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -186,7 +187,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- upd_err_integrity（PR #38，2026-10-19）：下载更新时安装包的 sha256 或大小与 GitHub 给的对不上、或 GitHub 没给 sha256，显示为「下载失败：安装包校验未通过，已中止」；English「Download failed: installer file failed verification, aborted」；Bahasa Melayu「Muat turun gagal: fail pemasang gagal pengesahan, dibatalkan」。
+- （现在没有。）
 
 ---
 
