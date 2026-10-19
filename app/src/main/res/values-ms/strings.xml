@@ -55,9 +55,9 @@
     <string name="set_photo_limit_message">Disemak setiap jam: apabila melebihi had, foto paling lama dibersihkan secara automatik. Hanya foto tidak dikunci yang diambil oleh apl ini dipadam. Biarkan kosong atau isi 0 untuk tiada had.</string>
     <string name="set_storage_usage_title">Folder video</string>
     <string name="set_storage_usage_no_drive">Tiada pemacu USB ditemui</string>
-    <string name="set_rearview_summary">Menunjukkan mana-mana kamera sekeliling dalam tetingkap terapung; paparan belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman</string>
+    <string name="set_rearview_summary">Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman</string>
     <string name="set_rearview_button_mode_title">Mod butang</string>
-    <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik</string>
+    <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
     <string name="set_rearview_views_title">Paparan</string>
     <string name="opt_views_four">Empat arah</string>
     <string name="opt_views_front_rear">Depan dan belakang</string>

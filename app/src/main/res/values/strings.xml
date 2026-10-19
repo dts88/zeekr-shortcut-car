@@ -69,9 +69,9 @@
     <string name="set_photo_limit_message">每小时检查一次，超出上限时自动清理最旧的照片，仅删除本应用拍摄且未锁定的照片。留空或填 0 表示不限制。</string>
     <string name="set_storage_usage_title">录像保存路径</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
-    <string name="set_rearview_summary">悬浮显示环视中的任一路画面；后视画面左右镜像，与车内后视镜一致</string>
+    <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
     <string name="set_rearview_button_mode_title">按键模式</string>
-    <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面</string>
+    <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
     <string name="set_rearview_views_title">切换范围</string>
     <string name="opt_views_four">四向</string>
     <string name="opt_views_front_rear">前后</string>

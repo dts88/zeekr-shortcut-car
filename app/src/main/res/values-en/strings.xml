@@ -55,9 +55,9 @@
     <string name="set_photo_limit_message">Checked every hour: when over the cap, the oldest photos are cleaned up automatically. Only unlocked photos taken by this app are deleted. Leave blank or enter 0 for no limit.</string>
     <string name="set_storage_usage_title">Video folder</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
-    <string name="set_rearview_summary">Shows any surround camera in a floating window; the rear view is mirrored left to right, like the interior mirror</string>
+    <string name="set_rearview_summary">Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror</string>
     <string name="set_rearview_button_mode_title">Button mode</string>
-    <string name="set_rearview_button_mode_summary">Switches to the front, rear, left or right view when the top, bottom, left or right area is tapped</string>
+    <string name="set_rearview_button_mode_summary">Switches to the front, rear, left or right view when the top, bottom, left or right area is tapped; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom</string>
     <string name="set_rearview_views_title">Views</string>
     <string name="opt_views_four">All four</string>
     <string name="opt_views_front_rear">Front and rear</string>

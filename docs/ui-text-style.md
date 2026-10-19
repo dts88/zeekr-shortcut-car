@@ -195,7 +195,12 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- set_rearview_summary（2026-10-19，车主同意改、措辞待批）：「悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致」；
+  Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror；
+  Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman。
+- set_rearview_button_mode_summary（同上）：「点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视」；
+  …; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom；
+  …; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah。
 
 ---
 
