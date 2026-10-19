@@ -10,6 +10,7 @@ commit message, not here.
 ## [Unreleased]
 
 - Driving info bar: the BSD badge under Driver assistance shows the car's Lane change assist switch; System info drops the Blind spot assist signal, which always read off.
+- Floating button: tap or long press can lock the current recording, the same way flash-to-pass does (the clips 10 seconds before and after, every camera). Needs Settings → Storage → Lock footage.
 
 ## [2.13.1-alpha] - 2026-10-17
 

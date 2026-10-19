@@ -566,7 +566,7 @@ public class RecordingFloatingService extends Service {
     /**
      * 单击 / 长按各做什么，见 {@link FloatingAction}。
      *
-     * <p>录制那一条走原来那套（按应用在不在前台分三种情况），其余三条都是
+     * <p>录制那一条走原来那套（按应用在不在前台分三种情况），其余几条都是
      * 一句话的事。</p>
      */
     private void perform(FloatingAction action) {
@@ -579,6 +579,9 @@ public class RecordingFloatingService extends Service {
                 return;
             case TOGGLE_MIRROR:
                 toggleMirror();
+                return;
+            case LOCK_FOOTAGE:
+                com.kooo.evcam.storage.AutoLock.get().lockNow(this);
                 return;
             case OPEN_APP:
             default:

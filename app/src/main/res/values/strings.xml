@@ -101,6 +101,7 @@
     <string name="floating_action_toggle_recording">开始 / 停止录制</string>
     <string name="floating_action_take_photo">拍照</string>
     <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
+    <string name="floating_action_lock_footage">锁定当前录像</string>
     <string name="set_recording_stats_title">录制状态显示</string>
     <string name="set_recording_stats_summary">录制时在画面角落显示已录时长和当前片段序号</string>
     <string name="set_reset_floating_title">重置悬浮按钮</string>
@@ -369,6 +370,8 @@
     </plurals>
     <string name="msg_footage_lock_failed">无法保存锁定状态，请重试</string>
     <string name="msg_footage_nothing_here">当前时刻无可锁定的录像</string>
+    <string name="msg_footage_locked_around">已锁定前后 10 秒所在的录像片段</string>
+    <string name="msg_footage_lock_needs_setting">无法锁定，请先开启「设置 → 存储 → 锁定影像」</string>
     <string name="player_session_locked">含已锁定文件</string>
     <string name="photo_group_locked">已锁定</string>
     <plurals name="msg_kept_locked">

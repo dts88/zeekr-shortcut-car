@@ -82,6 +82,7 @@
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>
     <string name="floating_action_toggle_mirror">Super mirror on / off</string>
+    <string name="floating_action_lock_footage">Lock the current recording</string>
     <string name="set_recording_stats_title">Recording status readout</string>
     <string name="set_recording_stats_summary">Shows the elapsed time and current clip number in a corner while recording</string>
     <string name="set_reset_floating_title">Reset floating button</string>
@@ -363,6 +364,8 @@
     </plurals>
     <string name="msg_footage_lock_failed">Couldn\'t save the lock state. Try again</string>
     <string name="msg_footage_nothing_here">No recording here to lock</string>
+    <string name="msg_footage_locked_around">Locked the clips covering 10 seconds before and after</string>
+    <string name="msg_footage_lock_needs_setting">Can\'t lock. Turn on Settings → Storage → Lock footage first</string>
     <string name="player_session_locked">has locked files</string>
     <string name="photo_group_locked">locked</string>
     <plurals name="msg_kept_locked">
