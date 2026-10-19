@@ -92,7 +92,7 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 
 ## Recommended
 
-**[wysie/zeekr-shortcut-car](https://github.com/wysie/zeekr-shortcut-car)** is a version of Zeekr Shortcut optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
+**[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)** is wysie's version of Zeekr Shortcut, optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
 
 **[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)** is FerixzTanz's version of Zeekr Shortcut that also shows the blind spot view on the HUD. Special thanks for the HUD calibration work and a series of features that are ahead of Zeekr Shortcut; this project's blind spot view also started from FerixzTanz's code and on-car research. Thanks to FerixzTanz for the support and contributions to this project.
 
