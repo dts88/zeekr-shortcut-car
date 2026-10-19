@@ -152,7 +152,7 @@
             android:selectable="false" />
     </PreferenceScreen>
 
-    <!-- ==================== 超级后视镜 ==================== -->
+    <!-- ==================== 超级镜子 ==================== -->
     <PreferenceScreen
         android:key="screen_rearview"
         android:title="@string/set_section_rearview">
@@ -217,6 +217,24 @@
             android:dependency="pref_rearview"
             android:title="@string/set_rearview_reset_title"
             android:summary="@string/set_rearview_reset_summary" />
+
+        <!-- 盲区画面：单独的窗口，不挂在超级镜子的开关下面 —— 两个窗口各管各的（项目所有者 2026-10-16） -->
+        <PreferenceCategory
+            android:key="cat_side_view"
+            android:title="@string/set_side_view_title">
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_view"
+                android:title="@string/set_side_view_title"
+                android:summary="@string/set_side_view_summary" />
+
+            <SeekBarPreference
+                android:key="pref_side_view_min_speed"
+                android:dependency="pref_side_view"
+                android:title="@string/set_side_view_min_speed_title"
+                android:summary="@string/set_side_view_min_speed_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 悬浮窗 ==================== -->
@@ -423,6 +441,25 @@
             android:key="pref_camera_holder_suspects"
             android:title="@string/dev_camera_suspects_title"
             android:summary="@string/dev_camera_suspects_summary" />
+
+        <!-- 盲区画面的标定角度：每一路画面的朝向是猜的，上车标定之后再定默认值（AppConfig.SIDE_VIEW_DEFAULT_*） -->
+        <SeekBarPreference
+            android:key="pref_side_view_back"
+            android:title="@string/dev_side_view_back_title"
+            android:summary="@string/dev_side_view_back_summary"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_side_view_up"
+            android:title="@string/dev_side_view_up_title"
+            android:summary="@string/dev_side_view_up_summary"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:key="pref_side_view_fov"
+            android:title="@string/dev_side_view_fov_title"
+            android:summary="@string/dev_side_view_fov_summary"
+            app:showSeekBarValue="true" />
 
         <Preference
             android:key="pref_repair_mp4"

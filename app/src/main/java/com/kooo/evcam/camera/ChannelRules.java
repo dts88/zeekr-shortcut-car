@@ -139,8 +139,10 @@ public final class ChannelRules {
     public enum Kind {
         /** 主界面的预览画布。 */
         PREVIEW,
-        /** 超级后视镜的画布（只有环视有）。 */
+        /** 超级镜子的画布（只有环视有）。 */
         MIRROR,
+        /** 盲区画面的画布（只有环视有）：和预览、超级镜子挂在同一条共享的预览流上。 */
+        SIDE,
         /** 录制器的输入 SurfaceTexture：录制器停放、重新备好都是同一个，所以停录后它能留在会话里。 */
         RECORD,
         /** 不显示的出帧口：只用来补位 —— 一路要出帧、会话里却没有一个活着的输出能出帧时才加。 */
@@ -279,7 +281,7 @@ public final class ChannelRules {
         long sessionSince;
         /** 会话里消费者已被系统收走的那几样（死输出）。 */
         final Set<Out> dead = new LinkedHashSet<>();
-        /** 已声明、消费者还活着的输出（预览画布、后视镜画布、录制器的输入）。撤回了的不在这里，哪怕消费者还活着。 */
+        /** 已声明、消费者还活着的输出（预览画布、后视镜画布、盲区画面画布、录制器的输入）。撤回了的不在这里，哪怕消费者还活着。 */
         final Set<Out> declared = new LinkedHashSet<>();
         /** 录像输出在不在备。 */
         RecordPrep record = RecordPrep.NONE;
@@ -347,7 +349,7 @@ public final class ChannelRules {
     static final class World {
         /**
          * 这一份管线管的那几路，按开的次序：环视 → 后座舱 → 前座舱（{@link CameraSlots#openOrder}）。启用的那几路，
-         * 加上一直建着的环视（登记表 §一 后视镜那一行要它，配置里没开环视也要）。
+         * 加上一直建着的环视（登记表 §一 超级镜子、盲区画面那两行要它，配置里没开环视也要）。
          */
         final List<Lane> lanes;
         /** 此刻。 */
@@ -361,7 +363,7 @@ public final class ChannelRules {
         final Set<String> recordPlan = new LinkedHashSet<>();
         /**
          * 启用的那几路（配置里开着的，RecordSpecs.enabledCameraKeys，建管线那一刻的）：登记表 §一 里主界面预览、拍照要的
-         * 「启用的全部」就是它。配置里没开环视时环视不在这里 —— 它照样建着，只为后视镜开（项目所有者 2026-10-16）。
+         * 「启用的全部」就是它。配置里没开环视时环视不在这里 —— 它照样建着，只为超级镜子、盲区画面开（项目所有者 2026-10-16）。
          * 没给是 {@link #lanes} 的全部。
          */
         final Set<String> enabled = new LinkedHashSet<>();
@@ -1180,7 +1182,7 @@ public final class ChannelRules {
 
     /**
      * 谁要这一路（§一的登记表）：预览 —— 登记着而且亮屏，要启用的全部（{@link World#enabled}）；录像 —— 录像计划里的路；
-     * 拍照 —— 启用的全部；后视镜 —— 环视，配置里没开环视也要（项目所有者 2026-10-16）。保持不在这里（{@link #holding}）。
+     * 拍照 —— 启用的全部；后视镜、盲区画面 —— 环视，配置里没开环视也要（项目所有者 2026-10-16）。保持不在这里（{@link #holding}）。
      *
      * <p>熄屏时 PREVIEW 不算：主界面看不见。开发者「熄屏录制（阻止休眠）」开着、熄屏时没在录，于是照登记表关
      * （项目所有者 2026-10-11，§7.5）。</p>
@@ -1218,6 +1220,7 @@ public final class ChannelRules {
             case RECORDING:
                 return w.recordPlan.contains(lane.key);
             case MIRROR:
+            case SIDE_VIEW:
                 return isSurround(lane);
             default:   // 拍照
                 return w.enabled.contains(lane.key);
@@ -1227,7 +1230,7 @@ public final class ChannelRules {
     /**
      * 这一路在保持（§一「保持 30 秒」）：开着、亮屏、前台服务在、没人要还不到 30 秒；车机要睡、退出时不保持。
      *
-     * <p>「没人要」每一路各自算（项目所有者 2026-10-11，§7.1）：只开超级后视镜、主界面最小化时，两路座舱各自保持 30 秒，
+     * <p>「没人要」每一路各自算（项目所有者 2026-10-11，§7.1）：只开超级镜子、主界面最小化时，两路座舱各自保持 30 秒，
      * 30 秒内回到主界面通道零变动；字面那种「登记表全空了才一起算」会让座舱当场关、回来再开。规则里只有这一处判断。
      * 关着的路不会为了保持去开。</p>
      *
@@ -1310,7 +1313,8 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视；录像 —— 录像计划里有它。
+     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视；
+     * 盲区画面 —— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
      * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
      */
     private static boolean wantsKind(World w, Lane lane, Kind kind) {
@@ -1322,6 +1326,8 @@ public final class ChannelRules {
                 return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key);
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && isSurround(lane);
+            case SIDE:
+                return w.holders.contains(CameraNeeds.Holder.SIDE_VIEW) && isSurround(lane);
             case RECORD:
                 return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
             default:
@@ -1329,7 +1335,7 @@ public final class ChannelRules {
         }
     }
 
-    /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、录像）。 */
+    /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、盲区画面、录像）。 */
     static Set<Out> wantedOutputs(World w, Lane lane) {
         Set<Out> want = new LinkedHashSet<>();
         for (Out out : lane.declared) {
@@ -1704,16 +1710,17 @@ public final class ChannelRules {
      * 2026-10-09 黑匣子：环视比座舱晚关完的那几次，那一次关要 4–17 秒，下一次打开它一帧不出。关不等安静。
      *
      * <p><b>关座舱前先关环视</b>（项目所有者 2026-10-15 定，2.11.6，{@link Why#SURROUND_FIRST}）：要关座舱，而环视开着或在开、还该开
-     * （在录、后视镜、预览，或者在保持），此刻又能用相机（{@link #surroundFirst}）→ 这一步只关环视。之后照这里本来的规矩走：
+     * （在录、后视镜、盲区画面、预览，或者在保持），此刻又能用相机（{@link #surroundFirst}）→ 这一步只关环视。之后照这里本来的规矩走：
      * 下一轮环视关着了，座舱一起关（原因照它们自己的：熄屏放开、保持到点、没人要）；再下一轮「开」那一步把还有人要的环视照常开回来
      * （{@link #next} 第 5 条，开的次序、安静、等录像输出都照旧）。不另立计时、常数、动手的地方；登记表一样不加、不改 ——
-     * 开回来靠的是登记表上本来就要它的那几样（录像、后视镜、预览）。只在保持、没人要的环视关了就不再开（保持要开着，{@link #holding}）：
+     * 开回来靠的是登记表上本来就要它的那几样（录像、后视镜、盲区画面、预览）。只在保持、没人要的环视关了就不再开（保持要开着，{@link #holding}）：
      * 它的保持跟着座舱一起结束。环视的 10 秒封顶照旧：到点没关完，座舱照样关，环视关完了再开回来。</p>
      *
      * <p>为什么（平台笔记 §3.6「放开座舱时环视跟着断」）：2.11.2–2.11.5 熄屏放开座舱、保持到点时座舱在开着的环视旁边关（D4 的例外），
      * 之前 20 次里环视跟着停了 8 次，都停在一个座舱关完的那一帧前后，救了 40–50 秒；10-15 07:42 车主测试 A 的第 2 次又是这样（座舱开始关后
      * 60 ms）。「先关环视、再关座舱、再开环视」同一个进程 23 次、退出再开 21 次都正常。代价：每一次计划里的关座舱，环视（含环视录像）
-     * 断约 0.5–1 秒、录像切一个新文件，开着的后视镜闪一下。</p>
+     * 断约 0.5–1 秒、录像切一个新文件，开着的后视镜闪一下、显示着的盲区画面黑一下（挂 D 挡、盲区画面备着时环视一直有人要，
+     * 座舱只为预览开着的那种关也算在内）。</p>
      *
      * <p>只管这里出的关（计划里的关）。救援重开时关旧设备、丢了之后那一次关、车机拿走那一路，都不是这一步，不走它；
      * 退出、车机要睡时环视本来就先单独关（它也不该开了，走上面第一条）。</p>

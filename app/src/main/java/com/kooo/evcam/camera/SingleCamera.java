@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *   <li><b>动作</b>（只给调度调，主线程）：{@link #open(Set)}、{@link #applyOutputs}、{@link #rebuildSession}、
  *       {@link #reopen}、{@link #closeCamera(String)}。会话只按给定的那一组输出（{@link ChannelRules.Out}）建，
  *       外加常驻的拍照 JPEG 输出；带着录像输出才用 {@code TEMPLATE_RECORD}。</li>
- *   <li><b>声明</b>（谁都能调，主线程，<b>不触发任何重建</b>）：预览、后视镜、录像各自声明自己的消费者、各自撤回。
+ *   <li><b>声明</b>（谁都能调，主线程，<b>不触发任何重建</b>）：预览、后视镜、盲区画面、录像各自声明自己的消费者、各自撤回。
  *       同一块画布（同一个 SurfaceTexture）再声明一次什么都不做 —— 主界面每次画布就绪都把各路重新声明一遍，
  *       主界面重建时我们留住的画布被新界面接回也还是它（大纲 §7.6）。关相机只清会话和设备，不清声明。</li>
  *   <li><b>事实</b>（主线程读）：{@link #sessionOutputs()}、{@link #declaredOutputs()}、{@link #deadInSession()}、
@@ -159,7 +159,7 @@ public class SingleCamera {
     /**
      * 不显示的出帧口（{@link ChannelRules.Out#SINK}）。
      *
-     * <p>这一路此刻没有预览、后视镜、录像任何一个活着的输出（主界面在后台，它的预览画面已被系统收回），
+     * <p>这一路此刻没有预览、后视镜、盲区画面、录像任何一个活着的输出（主界面在后台，它的预览画面已被系统收回），
      * 而它还该出帧时（拍照时相机没开、在「保持 30 秒」里，又没有留着的活输出），调度要的那一组里就是它，相机才有地方出帧；
      * 要的输出一样都不剩时建会话也补上它（{@link #requestedTargets}）。和预览同尺寸、同格式，帧到了就丢。</p>
      */
@@ -346,12 +346,13 @@ public class SingleCamera {
 
     /** 声明、我们建的 Surface、上一份会话带着的输出，这几样的锁。拿着它时不进相机服务、不回调。 */
     private final Object outputLock = new Object();
-    /** 声明着的预览、后视镜、录像，每样最多一个（{@link #outputLock}）。 */
+    /** 声明着的预览、后视镜、盲区画面、录像，每样最多一个（{@link #outputLock}）。 */
     private Declared declaredPreview;
     private Declared declaredMirror;
+    private Declared declaredSide;
     private Declared declaredRecord;
     /**
-     * 我们自己建的 Surface（预览、后视镜的 {@code new Surface(SurfaceTexture)}，或者鱼眼校正管线的入口），按输出记。
+     * 我们自己建的 Surface（预览、后视镜、盲区画面的 {@code new Surface(SurfaceTexture)}，或者鱼眼校正管线的入口），按输出记。
      * 一个 SurfaceTexture 只建一个：贴边、放回、再声明一次都不算变化。没声明着、会话里也没带着了才放（{@link #tidySurfaces}）。
      */
     private final Map<ChannelRules.Out, Surface> owned = new LinkedHashMap<>();
@@ -384,9 +385,12 @@ public class SingleCamera {
     /** 强制重开时我们自己摘下、正在关的旧设备：它晚到的报错不是「开不起来」。 */
     private volatile CameraDevice retiringDevice;
 
-    /** 会话里几样输出的次序：预览、后视镜共用一条流（预览打头），出帧口、录像各一条，JPEG 最后。 */
+    /** 会话里几样输出的次序：预览、后视镜、盲区画面共用一条流（预览打头），出帧口、录像各一条，JPEG 最后。 */
     private static final ChannelRules.Kind[] SESSION_ORDER = {
-            ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
+            ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SIDE,
+            ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
+    /** 共享预览流最多能挂几块画布（框架给的上限，AOSP 是 4；车机上记一行看实际是几），变了才记；0 = 还没记过。 */
+    private static volatile int sharedSurfaceLimitNoted;
 
     /**
      * 会话的快照：配好时记下的，之后不变。调度拿它填 {@code ChannelRules.Lane} 的 session / sessionSince。
@@ -426,7 +430,7 @@ public class SingleCamera {
     public enum Drop {
         /** 消费者已被系统收走（SurfaceTexture 放掉了、Surface 失效了）。 */
         RELEASED,
-        /** 会话配不上，按 JPEG → 后视镜 → 录像的次序丢到了它。 */
+        /** 会话配不上（或者共享预览流挂不下），按 JPEG → 盲区画面 → 后视镜 → 录像的次序丢到了它。 */
         CONFIG_FAILED,
         /** 调度改输出时不要它了，摘掉了。 */
         REMOVED,
@@ -434,7 +438,7 @@ public class SingleCamera {
         CLOSED
     }
 
-    /** 录像输出离开了会话：告诉声明它的录像那一侧（调度在主线程上派发）。 */
+    /** 录像、盲区画面的输出离开了会话：告诉声明它的那一侧（调度在主线程上派发）。 */
     public interface RecordDropped {
         void onDropped(Drop why);
     }
@@ -1035,7 +1039,7 @@ public class SingleCamera {
     /**
      * 切换到仅预览模式 —— 停止往要走的录像输出送帧（相机线程，只由「改输出」那一步在重配之前调，{@link #reconfigure}；
      * 大纲阶段 5d）：
-     * 重复请求换成只送会话里别的活输出 —— 除了要走的录像输出（会话里有、要的那一组里没有的录像），预览、后视镜、出帧口、
+     * 重复请求换成只送会话里别的活输出 —— 除了要走的录像输出（会话里有、要的那一组里没有的录像），预览、后视镜、盲区画面、出帧口、
      * 留着的输出都照送，带上出帧回调（这期间的帧照样计数，不会被当成没画面）。
      *
      * <p>为什么：MediaRecorder 分段要换一个新的录像输出，旧的那个 MediaRecorder 等它离开会话才停、收文件
@@ -1254,6 +1258,8 @@ public class SingleCamera {
                             return "main-preview";
                         case MIRROR:
                             return "mirror";
+                        case SIDE:
+                            return "side";
                         case RECORD:
                             return "record";
                         default:
@@ -1557,7 +1563,7 @@ public class SingleCamera {
     }
 
     /**
-     * 声明超级后视镜的画布：以 SurfaceTexture 作身份，一个 SurfaceTexture 只建一个 Surface（建会话时在相机线程上建）。
+     * 声明超级镜子的画布：以 SurfaceTexture 作身份，一个 SurfaceTexture 只建一个 Surface（建会话时在相机线程上建）。
      * 贴边、放回都不算变化 —— 画面只要活着就留在会话里。
      */
     public boolean declareMirror(SurfaceTexture texture) {
@@ -1590,6 +1596,47 @@ public class SingleCamera {
         }
         if (changed) {
             AppLog.d(TAG, "Camera " + cameraId + " mirror withdrawn: " + texture);
+            tidyLater();
+        }
+        return changed;
+    }
+
+    /**
+     * 声明盲区画面的画布：以 SurfaceTexture 作身份，同 {@link #declareMirror}。窗口藏起来、再显示都不算变化 ——
+     * 画面只要活着就留在会话里。
+     *
+     * @param onDropped 相机层丢了它（共享预览流挂不下、会话配不上）时告诉谁（调度在主线程上派发）
+     */
+    public boolean declareSide(SurfaceTexture texture, RecordDropped onDropped) {
+        if (texture == null) {
+            return false;
+        }
+        ChannelRules.Out out = new ChannelRules.Out(ChannelRules.Kind.SIDE, texture);
+        boolean changed;
+        synchronized (outputLock) {
+            changed = declaredSide == null || !declaredSide.out.equals(out);
+            if (changed) {
+                declaredSide = new Declared(out, null, null, onDropped);
+            }
+        }
+        if (changed) {
+            AppLog.d(TAG, "Camera " + cameraId + " side view declared: " + texture);
+            tidyLater();
+        }
+        return changed;
+    }
+
+    /** 撤回盲区画面：只撤回 {@code texture} 这一块。 */
+    public boolean withdrawSide(SurfaceTexture texture) {
+        boolean changed;
+        synchronized (outputLock) {
+            changed = texture != null && declaredSide != null && declaredSide.out.consumer == texture;
+            if (changed) {
+                declaredSide = null;
+            }
+        }
+        if (changed) {
+            AppLog.d(TAG, "Camera " + cameraId + " side view withdrawn: " + texture);
             tidyLater();
         }
         return changed;
@@ -1635,11 +1682,15 @@ public class SingleCamera {
         return changed;
     }
 
-    /** 声明着的录像输出 {@code out} 离开会话时该告诉谁；不是它、或者已经撤回了返回 null。 */
+    /** 声明着的录像、盲区画面输出 {@code out} 离开会话时该告诉谁；不是它、或者已经撤回了返回 null。 */
     public RecordDropped dropListener(ChannelRules.Out out) {
         synchronized (outputLock) {
-            Declared current = declaredRecord;
-            return current != null && current.out.equals(out) ? current.onDropped : null;
+            for (Declared current : new Declared[]{declaredRecord, declaredSide}) {
+                if (current != null && current.out.equals(out)) {
+                    return current.onDropped;
+                }
+            }
+            return null;
         }
     }
 
@@ -1654,7 +1705,7 @@ public class SingleCamera {
     public Set<ChannelRules.Out> declaredOutputs() {
         Set<ChannelRules.Out> result = new LinkedHashSet<>();
         synchronized (outputLock) {
-            for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredRecord}) {
+            for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredSide, declaredRecord}) {
                 if (declared != null && alive(declared.out.consumer)
                         && (declared.surface == null || declared.surface.isValid())) {
                     result.add(declared.out);
@@ -1838,7 +1889,7 @@ public class SingleCamera {
 
     /** 和这一样输出相同的声明；没有返回 null（{@link #outputLock}）。 */
     private Declared declaredFor(ChannelRules.Out out) {
-        for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredRecord}) {
+        for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredSide, declaredRecord}) {
             if (declared != null && declared.out.equals(out)) {
                 return declared;
             }
@@ -2322,7 +2373,7 @@ public class SingleCamera {
     }
 
     /**
-     * 这一样输出在相机里写进哪个 Surface（相机线程）。录像是录制器给的那个；预览、后视镜是我们建的，
+     * 这一样输出在相机里写进哪个 Surface（相机线程）。录像是录制器给的那个；预览、后视镜、盲区画面是我们建的，
      * 一块画布只建一个，声明着而还没建过就现在建。撤回了的只用上一份会话带着的那个（留着的输出），不为它新建。都不是返回 null。
      */
     private Surface surfaceFor(ChannelRules.Out out) {
@@ -2374,7 +2425,7 @@ public class SingleCamera {
     }
 
     /**
-     * 按这一组输出建会话（相机线程）：预览、后视镜共用一条流（Surface Sharing，预览打头），出帧口、录像各一条，
+     * 按这一组输出建会话（相机线程）：预览、后视镜、盲区画面共用一条流（Surface Sharing，预览打头；挂不下时不带盲区画面），出帧口、录像各一条，
      * 常驻的拍照 JPEG 只进会话、不进预览请求。
      */
     private void configureSession(final int generation, final List<Target> targets, int template)
@@ -2397,20 +2448,31 @@ public class SingleCamera {
         List<OutputConfiguration> outputConfigs = new ArrayList<>();
 
         // 正常模式：使用 OutputConfiguration 实现 Surface Sharing (API 28+)
-        // 将所有预览性质的 Surface（主预览、后视镜）组合成一个硬件流；
-        // 两者的缓冲区尺寸在这之前都拨成了相机的输出尺寸，OutputConfiguration 才对得上
+        // 将所有预览性质的 Surface（主预览、后视镜、盲区画面）组合成一个硬件流；
+        // 几块的缓冲区尺寸在这之前都拨成了相机的输出尺寸，OutputConfiguration 才对得上
         OutputConfiguration previewSharedConfig = null;
+        int sharedCount = 0;
         final Map<ChannelRules.Out, Surface> built = new LinkedHashMap<>();
         for (Target target : targets) {
             ChannelRules.Kind kind = target.out.kind;
-            if (kind == ChannelRules.Kind.PREVIEW || kind == ChannelRules.Kind.MIRROR) {
+            if (kind == ChannelRules.Kind.PREVIEW || kind == ChannelRules.Kind.MIRROR || kind == ChannelRules.Kind.SIDE) {
                 if (previewSharedConfig == null) {
                     previewSharedConfig = new OutputConfiguration(target.surface);
                     previewSharedConfig.enableSurfaceSharing();
                     outputConfigs.add(previewSharedConfig);
+                    noteSharedSurfaceLimit(previewSharedConfig.getMaxSharedSurfaceCount());
+                } else if (kind == ChannelRules.Kind.SIDE
+                        && sharedCount >= previewSharedConfig.getMaxSharedSurfaceCount()) {
+                    // 共享预览流挂满了（框架给的上限）：盲区画面最可有可无，这一份会话不带它，告诉盲区画面那一侧
+                    // （它撤回声明，不然调度会一直想把它加回来）
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 共享预览流已挂 " + sharedCount
+                            + " 块画布（上限 " + previewSharedConfig.getMaxSharedSurfaceCount() + "）：这一份会话不带盲区画面");
+                    dropOutput(target.out, Drop.CONFIG_FAILED);
+                    continue;
                 } else {
                     previewSharedConfig.addSurface(target.surface);
                 }
+                sharedCount++;
             } else {
                 // 出帧口、录像各自一条独立的硬件流
                 outputConfigs.add(new OutputConfiguration(target.surface));
@@ -2450,6 +2512,7 @@ public class SingleCamera {
         }
 
         // 配不上时按这份会话里有什么来丢
+        final ChannelRules.Out sideOut = firstOfKind(built.keySet(), ChannelRules.Kind.SIDE);
         final ChannelRules.Out mirrorOut = firstOfKind(targets, ChannelRules.Kind.MIRROR);
         final ChannelRules.Out recordOut = firstOfKind(targets, ChannelRules.Kind.RECORD);
 
@@ -2539,7 +2602,7 @@ public class SingleCamera {
                     return;
                 }
 
-                // 重试逻辑：按 JPEG → 后视镜 → 录像的次序丢输出，一步里的重试都不往外报
+                // 重试逻辑：按 JPEG → 盲区画面 → 后视镜 → 录像的次序丢输出，一步里的重试都不往外报
                 // 先丢拍照通道：它是这条会话里最可有可无的一条流，
                 // 丢了照片退回抓预览，画面一帧不少；留着它却可能一帧都没有。
                 if (jpegReader != null && !jpegDropped) {
@@ -2548,6 +2611,15 @@ public class SingleCamera {
                     AppLog.w(TAG, "Camera " + cameraId
                             + " 会话配不上，先丢掉拍照通道再试（拍照将回退到抓预览）");
                     requestSessionRebuild("config-failed-drop-jpeg", 200);
+                    return;
+                }
+
+                // 再丢盲区画面：录不录像都先丢它（预览、超级镜子、录像都比它要紧），告诉盲区画面那一侧撤回
+                if (sideOut != null) {
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
+                            + " 会话配置失败：先丢掉盲区画面再试");
+                    dropOutput(sideOut, Drop.CONFIG_FAILED);
+                    requestSessionRebuild("config-failed-drop-side", 200);
                     return;
                 }
 
@@ -2663,6 +2735,24 @@ public class SingleCamera {
         return null;
     }
 
+    private static ChannelRules.Out firstOfKind(java.util.Collection<ChannelRules.Out> outs, ChannelRules.Kind kind) {
+        for (ChannelRules.Out out : outs) {
+            if (out.kind == kind) {
+                return out;
+            }
+        }
+        return null;
+    }
+
+    /** 共享预览流最多能挂几块画布：变了才记一行（第一次建会话时、换了车机）。 */
+    private void noteSharedSurfaceLimit(int limit) {
+        if (sharedSurfaceLimitNoted != limit) {
+            sharedSurfaceLimitNoted = limit;
+            com.kooo.evcam.blackbox.BlackBox.note("相机 " + cameraId + "：共享预览流最多能挂 " + limit
+                    + " 块画布（预览、超级镜子、盲区画面共用）");
+        }
+    }
+
     /** 会话重建这一件事只有一个任务：去抖后在相机线程上跑 {@link #createCameraPreviewSession}。 */
     private final Runnable recreateSessionRunnable = () -> {
         synchronized (sessionLock) {
@@ -2720,7 +2810,7 @@ public class SingleCamera {
     }
 
     /**
-     * 我们建的 Surface（预览、后视镜），没声明着、会话里也没带着的放掉。配会话在途时不收（那一份会话可能正要用它），
+     * 我们建的 Surface（预览、后视镜、盲区画面），没声明着、会话里也没带着的放掉。配会话在途时不收（那一份会话可能正要用它），
      * 配好时（{@link #carry}）再收。录制器给的 Surface 归录制器，这里不放。
      */
     private void tidySurfaces() {
@@ -3436,7 +3526,7 @@ public class SingleCamera {
      *
      * <p>关相机是一次进相机服务的调用，实测卡过 13.6 秒（2026-09-26，主线程）。以前它在调用方的
      * 线程上做 —— 多半就是主线程 —— 而且拿着 {@link #deviceLock}：主线程一卡，主界面、
-     * 超级后视镜、悬浮按钮全都跟着不动，分不清是界面的问题还是相机的问题。</p>
+     * 超级镜子、悬浮按钮全都跟着不动，分不清是界面的问题还是相机的问题。</p>
      *
      * <p>现在调用方这边只做不进相机服务的事：改标志、摘掉待办、把要关的会话和设备从字段上摘下来。
      * 真正关的那几步交给<b>这一路自己的相机线程</b>（卡顿监测里叫 {@code Camera-<id> closing}），
@@ -3464,7 +3554,7 @@ public class SingleCamera {
             captureSession = null;
             device = cameraDevice;
             cameraDevice = null;
-            // 只清会话和设备，不清声明（预览、后视镜、录像的声明留着，下一次开照样带上）
+            // 只清会话和设备，不清声明（预览、后视镜、盲区画面、录像的声明留着，下一次开照样带上）
             requested.set(Collections.emptySet());
             sessionGone();
 

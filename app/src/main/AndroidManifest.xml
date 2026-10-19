@@ -107,9 +107,14 @@
         <!-- 悬浮窗服务：显示悬浮录制按钮 -->
 
         <!-- 摄像头录制服务 (D:\yuan重构新增) -->
-        <!-- 超级后视镜：环视合成流里后方那一路的悬浮窗 -->
+        <!-- 超级镜子：环视合成流里后方那一路的悬浮窗 -->
         <service
             android:name=".zeekr.RearViewMirrorService"
+            android:exported="false" />
+
+        <!-- 盲区画面：打转向灯时显示该侧摄像头画面的悬浮窗 -->
+        <service
+            android:name=".zeekr.SideViewService"
             android:exported="false" />
 
         <service

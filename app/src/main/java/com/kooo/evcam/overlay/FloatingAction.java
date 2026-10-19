@@ -20,7 +20,7 @@ public enum FloatingAction {
     TOGGLE_RECORDING("toggle_recording"),
     /** 拍一张。 */
     TAKE_PHOTO("take_photo"),
-    /** 开 / 关超级后视镜。 */
+    /** 开 / 关超级镜子。 */
     TOGGLE_MIRROR("toggle_mirror");
 
     public final String key;

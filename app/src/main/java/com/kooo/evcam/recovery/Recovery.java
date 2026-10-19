@@ -18,7 +18,7 @@ import com.kooo.evcam.recording.RecordingIntent;
 /**
  * 开机自启动（规格 §1）的统一入口：收到各类信号、判断自己能正常运行了，就把核心程序起来。
  *
- * <p>核心程序 = 用户设定状态里开着的那些：悬浮按钮、超级后视镜、录像（自动录制；被结束之前在录、等着接回的那一次）。
+ * <p>核心程序 = 用户设定状态里开着的那些：悬浮按钮、超级镜子、盲区画面、录像（自动录制；被结束之前在录、等着接回的那一次）。
  * 谁来调：前台服务起来时、保活任务跑到时（睡醒后一秒内必跑）、亮屏广播来时、应用更新后。
  * 幂等，多调无害：已经在的不重复起。</p>
  *
@@ -184,7 +184,7 @@ public final class Recovery {
 
         StringBuilder did = new StringBuilder();
         if (OverlayCoordinator.canShowOverlay(context)) {
-            // 按设置起悬浮按钮和后视镜；已经在的不会重复。后视镜自己知道屏幕黑着就不接相机
+            // 按设置起悬浮按钮、后视镜和盲区画面；已经在的不会重复。它们自己知道屏幕黑着就不接相机
             OverlayCoordinator.restoreOnLaunch(context);
             did.append("overlays");
         }

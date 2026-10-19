@@ -32,7 +32,7 @@ import com.kooo.evcam.AutoFitTextureView;
 import com.kooo.evcam.R;
 
 /**
- * 超级后视镜：把环视合成流里<b>后方那一路</b>单独放大成一个悬浮窗。
+ * 超级镜子：把环视合成流里<b>后方那一路</b>单独放大成一个悬浮窗。
  *
  * <h3>为什么用重画而不是 GL</h3>
  *

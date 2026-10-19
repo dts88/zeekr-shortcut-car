@@ -31,6 +31,7 @@ import com.kooo.evcam.overlay.FloatingAction;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
+import com.kooo.evcam.zeekr.SideViewService;
 
 /**
  * 设置界面。
@@ -104,6 +105,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindRecording();
         bindStorage();
         bindRearView();
+        bindSideView();
         bindFloating();
         bindInterface();
         bindSystem();
@@ -676,7 +678,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }, "storage-usage").start();
     }
 
-    // ------------------------------------------------------------------ 超级后视镜
+    // ------------------------------------------------------------------ 超级镜子
 
     private void bindRearView() {
         bindSwitch("pref_rearview_camera_label", appConfig.isRearViewCameraLabelEnabled(), value -> {
@@ -790,6 +792,19 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (getContext() != null && appConfig.isRearViewEnabled()) {
             RearViewMirrorService.applySize(getContext());
         }
+    }
+
+    // ------------------------------------------------------------------ 盲区画面
+
+    /** 超级镜子分区里的一组：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。 */
+    private void bindSideView() {
+        bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
+                OverlayCoordinator::setSideViewEnabled, null);
+        bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
+                appConfig.getSideViewMinSpeed(), " km/h", value -> {
+                    appConfig.setSideViewMinSpeed(value);
+                    SideViewService.applyConfig();
+                });
     }
 
     // ------------------------------------------------------------------ 悬浮窗
@@ -1129,6 +1144,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 别的程序占用 / 放开相机时记嫌疑应用；要使用情况访问，在权限设置里授予
         bindSwitch("pref_camera_holder_suspects", appConfig.isCameraHolderSuspectsEnabled(),
                 appConfig::setCameraHolderSuspectsEnabled);
+
+        // 盲区画面的标定角度：每一路画面的朝向是猜的（SideViewProjection），上车标定之后定默认值
+        int maxBack = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        bindSlider("pref_side_view_back", -maxBack, maxBack, appConfig.getSideViewBack(), "°", value -> {
+            appConfig.setSideViewBack(value);
+            SideViewService.applyAim();
+        });
+        int maxUp = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        bindSlider("pref_side_view_up", -maxUp, maxUp, appConfig.getSideViewUp(), "°", value -> {
+            appConfig.setSideViewUp(value);
+            SideViewService.applyAim();
+        });
+        bindSlider("pref_side_view_fov", Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
+                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES),
+                appConfig.getSideViewFov(), "°", value -> {
+                    appConfig.setSideViewFov(value);
+                    SideViewService.applyAim();
+                });
 
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {

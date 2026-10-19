@@ -26,7 +26,7 @@ import com.kooo.evcam.R;
  * 下一次安装、升级会出错；点左上角的「返回」没事。到了那一页应用已经不在前台，
  * 没法再提醒 —— 所以只能在下载之前说。</p>
  *
- * <p>样子照超级后视镜指南（{@code ui/RearViewGuide}）：压暗的底、居中一张 16:9 的图。
+ * <p>样子照超级镜子指南（{@code ui/RearViewGuide}）：压暗的底、居中一张 16:9 的图。
  * 图按语言分两套：{@code drawable-zh-nodpi}（中文）和 {@code drawable-nodpi}（英文）——
  * 只有中文界面看中文图，其他语言一律看英文图。源文件在 {@code design/update-guide}（不入库）。</p>
  *

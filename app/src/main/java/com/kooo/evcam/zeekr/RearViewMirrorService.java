@@ -24,7 +24,7 @@ import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.camera.StallWatch;
 
 /**
- * 超级后视镜的窗口生命周期与相机登记。
+ * 超级镜子的窗口生命周期与相机登记。
  *
  * <h3>2.11 起：只声明、只登记（大纲 §2 阶段 4b）</h3>
  *

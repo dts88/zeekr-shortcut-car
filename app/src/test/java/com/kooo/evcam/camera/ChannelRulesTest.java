@@ -138,6 +138,31 @@ public class ChannelRulesTest {
         assertEquals("会话里只带后视镜", set(mirror), ChannelRules.wantedOutputs(cabinsOnly, sur));
     }
 
+    /**
+     * 盲区画面和超级镜子同一条规矩（项目所有者 2026-10-16）：要环视，配置里没开环视也要；座舱不为它开；
+     * 只要它自己那块画布。没登记 SIDE_VIEW 时声明着的画布不算要（留着的输出，等下一次本来要动时再摘）。
+     */
+    @Test
+    public void theSideViewWantsTheSurroundLikeTheMirror() {
+        Out side = new Out(Kind.SIDE, "side");
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        World cabinsOnly = new World(Arrays.asList(cab, sur), new LinkedHashSet<>(Collections.singletonList(REAR)));
+        cabinsOnly.screenOn = true;
+        sur.declared.add(side);
+        sur.declared.add(mirror);
+        assertTrue("没登记：声明着也不要", ChannelRules.wantedOutputs(cabinsOnly, sur).isEmpty());
+        assertFalse(ChannelRules.wanted(cabinsOnly, sur));
+
+        cabinsOnly.holders.add(Holder.SIDE_VIEW);
+        assertEquals(EnumSet.of(Holder.SIDE_VIEW), ChannelRules.wantedBy(cabinsOnly, sur));
+        assertFalse("座舱不为它开", ChannelRules.wanted(cabinsOnly, cab));
+        assertEquals("只要盲区画面那块画布", set(side), ChannelRules.wantedOutputs(cabinsOnly, sur));
+
+        cabinsOnly.holders.add(Holder.MIRROR);
+        assertEquals("和超级镜子各要各的", set(mirror, side), ChannelRules.wantedOutputs(cabinsOnly, sur));
+    }
+
     /** 没说启用了哪几路：管线里的全部都算启用（以前的样子）。 */
     @Test
     public void everyLaneIsEnabledWhenNoneAreNamed() {
@@ -185,7 +210,8 @@ public class ChannelRulesTest {
         for (Holder holder : Holder.values()) {
             w.holders.clear();
             claim(holder);
-            assertEquals(holder + "：亮屏照登记表", holder != Holder.MIRROR, ChannelRules.wanted(w, rear));
+            assertEquals(holder + "：亮屏照登记表", holder != Holder.MIRROR && holder != Holder.SIDE_VIEW,
+                    ChannelRules.wanted(w, rear));
             assertFalse(ChannelRules.releasedByDark(w, rear));
         }
     }
@@ -402,7 +428,7 @@ public class ChannelRulesTest {
     }
 
     /**
-     * §7.1 每一路各自算（项目所有者 2026-10-11）：只开超级后视镜、主界面最小化时，两路座舱各自保持 30 秒，
+     * §7.1 每一路各自算（项目所有者 2026-10-11）：只开超级镜子、主界面最小化时，两路座舱各自保持 30 秒，
      * 30 秒内回到主界面通道零变动；超过 30 秒两路座舱关，环视留给后视镜 —— 2.11.6 起（项目所有者 2026-10-15）先单独关环视，
      * 座舱关完它照常开回来给后视镜（关座舱前先关环视）。
      */
@@ -628,7 +654,7 @@ public class ChannelRulesTest {
     }
 
     /**
-     * 10-15 07:42:42（车主的测试 A 第 2 次）的形状：三路录过一段、停了录（录像输出留在会话里），超级后视镜开着、主界面最小化 ——
+     * 10-15 07:42:42（车主的测试 A 第 2 次）的形状：三路录过一段、停了录（录像输出留在会话里），超级镜子开着、主界面最小化 ——
      * 两路座舱各自保持 30 秒，环视留给后视镜。以前到点座舱在环视旁边关，环视在开始关后 60 ms 停了、救了约 45 秒；现在先单独关环视，
      * 座舱保持到点一起关，环视照常开回来给后视镜 —— 只带后视镜：停录后留着的录像输出、最小化后留着的预览都跟着那一关走了。
      */
