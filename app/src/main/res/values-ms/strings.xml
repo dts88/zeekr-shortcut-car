@@ -832,8 +832,6 @@
     <string name="dev_perm_group_advanced">Kebenaran lanjutan</string>
     <string name="dev_perm_camera">Kamera</string>
     <string name="dev_perm_camera_why">Digunakan untuk merakam dan mengambil foto</string>
-    <string name="dev_perm_microphone">Mikrofon</string>
-    <string name="dev_perm_microphone_why">Digunakan untuk merakam bunyi</string>
     <string name="dev_perm_storage">Storan</string>
     <string name="dev_perm_storage_why">Digunakan untuk menyimpan dan membaca rakaman dan foto</string>
     <string name="dev_perm_notifications">Pemberitahuan</string>

@@ -851,8 +851,6 @@
     <string name="dev_perm_group_advanced">Advanced permissions</string>
     <string name="dev_perm_camera">Camera</string>
     <string name="dev_perm_camera_why">Used to record and take photos</string>
-    <string name="dev_perm_microphone">Microphone</string>
-    <string name="dev_perm_microphone_why">Used to record sound</string>
     <string name="dev_perm_storage">Storage</string>
     <string name="dev_perm_storage_why">Used to save and read recordings and photos</string>
     <string name="dev_perm_notifications">Notifications</string>
