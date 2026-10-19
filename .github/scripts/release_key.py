@@ -11,6 +11,9 @@ release 环境里。
       存成 PKCS#12，打印证书的 SHA-256 指纹（公开信息）。最后问要不要上传到 GitHub：建 release 环境
       （只许 v* 标签用），存入密钥和密码，记下指纹。上传用本机已登录的 gh。
 
+  python release_key.py upload <密钥文件.p12>
+      只上传（上次没传、传到一半失败，或者 GitHub 上的要重放）：输入密码，确认打得开，再照上面上传。
+
   python release_key.py self-test <输出文件.p12>
       签名自检用的一次性密钥：密码取环境变量 RELEASE_KEYSTORE_PASSWORD，只打印指纹。
 
@@ -98,9 +101,24 @@ def main():
     # Windows 上输出被转接时（Git Bash 等）默认按本地代码页写，中文会乱
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8")
-    if len(sys.argv) != 3 or sys.argv[1] not in ("new", "self-test"):
+    if len(sys.argv) != 3 or sys.argv[1] not in ("new", "upload", "self-test"):
         sys.exit(__doc__)
     mode, path = sys.argv[1], sys.argv[2]
+
+    if mode == "upload":
+        with open(path, "rb") as f:
+            data = f.read()
+        password = getpass.getpass("密钥密码：")
+        try:
+            bundle = pkcs12.load_pkcs12(data, password.encode("ascii"))
+        except (ValueError, UnicodeEncodeError):
+            sys.exit("密码不对，或者不是这个脚本生成的密钥文件。")
+        fingerprint = hashlib.sha256(bundle.cert.certificate.public_bytes(serialization.Encoding.DER)).hexdigest()
+        print("证书 SHA-256 指纹：", fingerprint)
+        upload(data, password, fingerprint)
+        print("已上传：release 环境只许 v* 标签用，存入了密钥和密码，指纹记为 RELEASE_CERT_SHA256。")
+        return
+
     if os.path.exists(path):
         sys.exit(f"{path} 已存在，不覆盖。")
 
