@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Driving info bar: the BSD badge under Driver assistance shows the car's Lane change assist switch; System info drops the Blind spot assist signal, which always read off.
 
 ## [2.13.1-alpha] - 2026-10-17
 

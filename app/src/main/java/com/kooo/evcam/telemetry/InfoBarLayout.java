@@ -97,8 +97,11 @@ public final class InfoBarLayout {
          */
         REAR_LAMPS(106, R.string.vi_cell_rear_lamps, Signal.REAR_POSITION_LAMP, Signal.STOP_LAMP, Signal.REAR_FOG,
                 Signal.REVERSE_LAMP),
-        /** 六项安全辅助的开关：AEB、前碰预警、车道偏离、车道保持、盲区、后碰预警，各自一块，没数据的各自划掉。 */
-        ASSIST(200, R.string.vi_cell_assist, Signal.AEB, Signal.FCW, Signal.LDW, Signal.LKA, Signal.BSD, Signal.RCW),
+        /**
+         * 六项安全辅助的开关：AEB、前碰预警、车道偏离、车道保持、盲区（读变道辅助那个开关，{@link Signal#LANE_CHANGE_ASSIST}）、后碰预警，
+         * 各自一块，没数据的各自划掉。
+         */
+        ASSIST(200, R.string.vi_cell_assist, Signal.AEB, Signal.FCW, Signal.LDW, Signal.LKA, Signal.LANE_CHANGE_ASSIST, Signal.RCW),
         ODOMETER(160, R.string.vi_cell_odometer, Signal.ODOMETER),
         /** 经纬度（系统定位）：勾的是 {@link #POSITION_ITEM}。 */
         POSITION(170, R.string.vi_cell_position),
