@@ -7,8 +7,10 @@ android {
     compileSdk = 36
 
     // 签名配置。
-    // 默认沿用仓库内的公开测试密钥（AOSP 测试签名，口令公开），方便任何人自行构建、
-    // 并保证不同版本之间可以覆盖安装。正式发布可用环境变量覆盖为自己的密钥：
+    // 默认沿用仓库内的公开测试密钥（AOSP 测试签名，口令公开），方便任何人自行构建。
+    // 正式版不直接用它发：打 v* 标签时 CI 用项目所有者的私有密钥重新签名，从这把测试密钥轮换过去
+    // （.github/scripts/sign_release.sh）。装过正式版的车机，只用测试密钥签的包装不上去。
+    // 自己构建时也可用环境变量换成自己的密钥：
     //   ZEEKR_KEYSTORE / ZEEKR_KEYSTORE_PASSWORD / ZEEKR_KEY_ALIAS / ZEEKR_KEY_PASSWORD
     signingConfigs {
         create("release") {

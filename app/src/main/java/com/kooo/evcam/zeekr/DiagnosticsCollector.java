@@ -1,6 +1,9 @@
 package com.kooo.evcam.zeekr;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.content.pm.SigningInfo;
 import android.media.MediaFormat;
 import android.media.MediaCodecList;
 import android.media.MediaCodecInfo;
@@ -74,6 +77,7 @@ public final class DiagnosticsCollector {
         // 每一节计时：生成报告时界面会卡一下，先弄清是哪一节慢
         Timings timings = new Timings();
         timings.run("device", () -> appendDevice(sb));
+        timings.run("signing", () -> appendSigning(sb, context));
         timings.run("cameras", () -> appendCameras(sb, context));
         timings.run("frame rates", () -> appendPreviewFrameRates(sb));
         timings.run("stall watch", () -> appendStallWatch(sb, context));
@@ -143,6 +147,48 @@ public final class DiagnosticsCollector {
         sb.append("Android: ").append(Build.VERSION.RELEASE)
                 .append(" (API ").append(Build.VERSION.SDK_INT).append(')').append('\n');
         sb.append("指纹:   ").append(Build.FINGERPRINT).append('\n').append('\n');
+    }
+
+    /**
+     * 本应用的签名证书（SHA-256），按轮换顺序从最早一把到现在生效的那一把。
+     *
+     * <p>正式版从仓库里公开的测试密钥轮换到项目所有者的私有密钥（.github/scripts/sign_release.sh）：
+     * 车机装上轮换过的版本之后这里是两行，最后一行和 release_key.py 打印的指纹相同；只有一行就是没轮换过。</p>
+     */
+    private static void appendSigning(StringBuilder sb, Context context) {
+        sb.append("## 1.1 应用签名").append('\n');
+        try {
+            SigningInfo signing = context.getPackageManager().getPackageInfo(context.getPackageName(),
+                    PackageManager.GET_SIGNING_CERTIFICATES).signingInfo;
+            if (signing == null) {
+                sb.append("!! 读不到签名").append('\n').append('\n');
+                return;
+            }
+            Signature[] certs;
+            if (signing.hasMultipleSigners()) {
+                // 多个签名者时系统不给轮换历史
+                sb.append("多个签名者:").append('\n');
+                certs = signing.getApkContentsSigners();
+            } else {
+                sb.append("签名证书 SHA-256（从最早到现在生效的）:").append('\n');
+                certs = signing.getSigningCertificateHistory();
+            }
+            for (int i = 0; i < certs.length; i++) {
+                sb.append("  ").append(i + 1).append(". ").append(sha256(certs[i].toByteArray())).append('\n');
+            }
+        } catch (Exception e) {
+            sb.append("!! 读签名失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+    }
+
+    private static String sha256(byte[] bytes) throws java.security.NoSuchAlgorithmException {
+        StringBuilder hex = new StringBuilder(64);
+        for (byte b : java.security.MessageDigest.getInstance("SHA-256").digest(bytes)) {
+            hex.append(Character.forDigit((b >>> 4) & 15, 16));
+            hex.append(Character.forDigit(b & 15, 16));
+        }
+        return hex.toString();
     }
 
     /**
