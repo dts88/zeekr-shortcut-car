@@ -492,6 +492,7 @@
     <string name="upd_err_no_dir">无法创建下载目录</string>
     <string name="upd_err_over_limit">内容超出上限，已中止</string>
     <string name="upd_err_truncated">只收到 %1$d / %2$d 字节</string>
+    <string name="upd_err_integrity">安装包校验未通过，已中止</string>
     <string name="upd_need_install_title">需要「安装未知应用」权限</string>
     <string name="upd_need_install_msg">需在系统设置中允许本应用「安装未知应用」，才能打开系统安装界面。\n\n授权后返回此处，再次点击「检查更新」。</string>
     <string name="upd_go_settings">打开设置</string>
