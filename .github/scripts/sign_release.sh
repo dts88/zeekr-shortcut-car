@@ -19,6 +19,8 @@ in=$1
 out=$2
 : "${RELEASE_KEYSTORE:?}" "${RELEASE_KEYSTORE_PASSWORD:?}" "${RELEASE_CERT_SHA256:?}"
 expected=$(printf '%s' "$RELEASE_CERT_SHA256" | tr -d ':' | tr 'A-F' 'a-f')
+# keystore/release.jks（AOSP 测试密钥）的证书：2.13 及以前的版本都是它签的，车机上装着的就是它
+test_key=a40da80a59d170caa950cf15c18c454d47a39b26989d8b640ecd745ba71bf5dc
 
 apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
 old=(--ks keystore/release.jks --ks-key-alias apkeasytool --ks-pass pass:android)
@@ -40,9 +42,13 @@ fail() {
   exit 1
 }
 grep -qx 'Verified using v3 scheme (APK Signature Scheme v3): true' <<<"$verify" || fail "没有 v3 签名"
-grep -qx "Signer #1 certificate SHA-256 digest: $expected" <<<"$verify" || fail "v3 签名者不是正式版密钥"
+# 签名者那几行的写法随 apksigner 版本变（Signer #1、V3.0 Signer: ……），只认「certificate SHA-256 digest」
+signers=$(sed -n 's/.* certificate SHA-256 digest: //p' <<<"$verify" | sort -u)
+[ "$signers" = "$expected" ] || fail "签名者不是正式版密钥：$signers"
 [ "$(grep -c '^Signer #[0-9]* in lineage certificate SHA-256 digest: ' <<<"$history")" -eq 2 ] \
   || fail "轮换证明不是两把"
+grep -qx "Signer #1 in lineage certificate SHA-256 digest: $test_key" <<<"$history" \
+  || fail "轮换证明的第一把不是仓库里的测试密钥"
 grep -qx "Signer #2 in lineage certificate SHA-256 digest: $expected" <<<"$history" \
   || fail "轮换证明的最后一把不是正式版密钥"
 previous=$(awk '/^Signer #1 in lineage/ { s = 1 } /^Signer #2 in lineage/ { s = 0 } s' <<<"$history")
