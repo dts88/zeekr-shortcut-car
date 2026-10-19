@@ -10,6 +10,7 @@ commit message, not here.
 ## [Unreleased]
 
 - Driving info bar: the BSD badge under Driver assistance shows the car's Lane change assist switch; System info drops the Blind spot assist signal, which always read off.
+- Releases are signed with a private key, rotated from the public test key in the repo (APK Signature Scheme v3): installed versions update as before, and APKs signed only with the test key can no longer replace them. Diagnostics list the app's signing certificates.
 
 ## [2.13.1-alpha] - 2026-10-17
 
