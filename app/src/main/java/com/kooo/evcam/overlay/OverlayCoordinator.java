@@ -10,9 +10,10 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
+import com.kooo.evcam.zeekr.SideViewService;
 
 /**
- * 两个悬浮窗（超级镜子、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
+ * 三个悬浮窗（超级镜子、盲区画面、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
  *
  * <h3>为什么要有这么个地方</h3>
  *
@@ -65,6 +66,12 @@ public final class OverlayCoordinator {
             }, REAR_VIEW_DELAY_MS);
         }
 
+        if (config.isSideViewEnabled() && allowed) {
+            // 不用等相机：挂 D 挡才挂窗口、登记环视，开相机由通道调度做
+            SideViewService.start(context);
+            AppLog.d(TAG, "盲区画面已按设置开启");
+        }
+
         if (config.isRecordingFloatingEnabled() && allowed) {
             sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
             AppLog.d(TAG, "悬浮按钮已启动");
@@ -107,6 +114,20 @@ public final class OverlayCoordinator {
             RearViewMirrorService.start(context);
         } else {
             RearViewMirrorService.stop(context);
+        }
+        return true;
+    }
+
+    /** 开 / 关盲区画面。返回值含义同 {@link #setRecordButtonEnabled}。 */
+    public static boolean setSideViewEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setSideViewEnabled(enabled);
+        if (enabled) {
+            SideViewService.start(context);
+        } else {
+            SideViewService.stop(context);
         }
         return true;
     }

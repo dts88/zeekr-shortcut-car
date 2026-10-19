@@ -11,6 +11,15 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.13.1-alpha] - 2026-10-17
+
+- Blind spot view: wider window (2.2 : 1, a third of the screen height) and default angles from on-car tuning by @FerixzTanz (rear 33°, outward 10°).
+
+## [2.13.0-alpha] - 2026-10-17
+
+- Blind spot view (Settings → Super mirror → Blind spot view, off by default): with the turn signal on, a window on that side of the screen shows the side camera, straightened and turned toward the rear, and hides 1 second after the signal turns off. Ready in D so it appears at once; not shown in reverse or while a factory view is on screen (based on code and on-car research by @FerixzTanz and @wysie).
+- Developer options: rear, outward and field-of-view angles of the Blind spot view, for calibration on the car.
+
 ## [2.12.0-alpha] - 2026-10-16
 
 - Stream profiles with only cabin cameras enabled now work: one or both cabins are shown, recorded and photographed; the surround view opens only for the Super mirror.

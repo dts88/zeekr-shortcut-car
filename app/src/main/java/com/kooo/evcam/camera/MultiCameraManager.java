@@ -38,7 +38,7 @@ public class MultiCameraManager {
     private final List<String> activeCameraKeys = new ArrayList<>();
     /**
      * 启用的那几路（配置里开着的，建管线时 Holder 给，{@link #setEnabledLanes}）；null 是建了的全部。
-     * 环视一直建着：没启用时只为后视镜开（登记表 §一，项目所有者 2026-10-16）。
+     * 环视一直建着：没启用时只为超级镜子、盲区画面开（登记表 §一，项目所有者 2026-10-16）。
      */
     private Set<String> enabledLanes;
     private int maxOpenCameras = DEFAULT_MAX_OPEN_CAMERAS;
@@ -2008,19 +2008,20 @@ public class MultiCameraManager {
         return cameras.get(position);
     }
 
-    // ------------------------------------------------------------------ 主界面的预览画布、后视镜的画布（2.11 阶段 4a、4b）
-    // 主界面、超级镜子只声明、撤回自己的画布，再叫醒调度；带不带、什么时候摘由调度定（channel-logic §一、§二.4）。
+    // ------------------------------------------------------------------ 主界面的预览画布、后视镜、盲区画面的画布（2.11 阶段 4a、4b）
+    // 主界面、超级镜子、盲区画面只声明、撤回自己的画布，再叫醒调度；带不带、什么时候摘由调度定（channel-logic §一、§二.4）。
     // 以前画布一就绪、一销毁就 setTextureView + recreateSession，是调度之外的又一个动手方。
 
     /**
      * 画布被系统收走时由管线留下的那几块（主线程），按输出的种类、再按路：主界面重建时的预览画布（大纲 §7.6），
-     * 关掉的超级镜子的画布（大纲 §7.7，只在环视那一路）。项目所有者 2026-10-11 两问都答「按建议」，做法同一套。
+     * 关掉的超级镜子的画布（大纲 §7.7，只在环视那一路），移走的盲区画面窗口的画布（同 §7.7，2026-10-16）。
+     * 项目所有者 2026-10-11 两问都答「按建议」，做法同一套。
      *
      * <p>为什么留：画布被系统收走时，会话里的消费者一死，那一路整条重复请求停下 —— 预览和录像一起停，只能一路一路马上摘，
      * 摘到之前录像断着（大纲 §6 风险 2；10-10 09:13:10 主界面重建时在录就发生过；关后视镜时环视也一样，那一步还要等安静、
      * 等别的路手上那一步）。所以画布销毁时 onSurfaceTextureDestroyed 返回 false，画布交到这里（{@link #keepPreviewCanvas}、
-     * {@link #keepMirrorCanvas}）：新界面、新开的后视镜窗口用 {@code TextureView.setSurfaceTexture} 接回同一块
-     * （{@link #takeKeptPreview}、{@link #takeKeptMirror}）—— 同一块画布就是同一个输出，通道零变动、录像不断；
+     * {@link #keepMirrorCanvas}、{@link #keepSideCanvas}）：新界面、新开的后视镜、盲区画面窗口用 {@code TextureView.setSurfaceTexture}
+     * 接回同一块（{@link #takeKeptPreview}、{@link #takeKeptMirror}、{@link #takeKeptSide}）—— 同一块画布就是同一个输出，通道零变动、录像不断；
      * 没人接回的交给调度（{@link ChannelScheduler#handOver}），等它照「减输出」的规矩摘掉、或者随相机关了再放
      * （{@link #releaseKeptCanvas}）。</p>
      */
@@ -2105,7 +2106,18 @@ public class MultiCameraManager {
     }
 
     /**
-     * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜的画布
+     * 盲区画面的窗口移走了（onSurfaceTextureDestroyed，主线程）：撤回盲区画面输出，画布由管线留着、由调度放 ——
+     * 和超级镜子同一个办法（{@link #keepMirrorCanvas}），会话里的画布不自己放。只声明在环视那一路上。
+     *
+     * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：照常让它放
+     */
+    public static boolean keepSideCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND, texture);
+    }
+
+    /**
+     * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜、盲区画面的画布
      * （{@link #ownerOf}）。弱引用；放的那一下（哪个线程都可能）写，主线程上读。
      */
     private static volatile java.lang.ref.WeakReference<MultiCameraManager> lastReleased =
@@ -2127,7 +2139,7 @@ public class MultiCameraManager {
     }
 
     /**
-     * 留下这一块画布（主线程）：预览、后视镜同一套（大纲 §7.6、§7.7）。
+     * 留下这一块画布（主线程）：预览、后视镜、盲区画面同一套（大纲 §7.6、§7.7）。
      *
      * <p>先摘掉旧视图挂在画布上的出帧监听 —— 那个监听拿着旧视图（连同销毁了的主界面、退出了的后视镜服务），新视图接回时
      * 会挂它自己的；再撤回这一种输出的声明 —— 撤回不碰会话：画布还活着，就是「留着的输出」，照「减输出能拖就拖」留在会话里；
@@ -2166,7 +2178,14 @@ public class MultiCameraManager {
     /** 撤回这一种画布的声明（只撤回 {@code texture} 这一块，不是它就什么都不做）。 */
     private static boolean withdrawCanvas(SingleCamera camera, ChannelRules.Kind kind,
                                           android.graphics.SurfaceTexture texture) {
-        return kind == ChannelRules.Kind.MIRROR ? camera.withdrawMirror(texture) : camera.withdrawPreview(texture);
+        switch (kind) {
+            case MIRROR:
+                return camera.withdrawMirror(texture);
+            case SIDE:
+                return camera.withdrawSide(texture);
+            default:
+                return camera.withdrawPreview(texture);
+        }
     }
 
     /**
@@ -2189,6 +2208,11 @@ public class MultiCameraManager {
      */
     public android.graphics.SurfaceTexture takeKeptMirror() {
         return takeKeptCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND);
+    }
+
+    /** 新开的盲区画面窗口接回上一个窗口留下的画布（同 {@link #takeKeptMirror}）；拿回来之后接着重新声明（{@link SingleCamera#declareSide}）。 */
+    public android.graphics.SurfaceTexture takeKeptSide() {
+        return takeKeptCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND);
     }
 
     private android.graphics.SurfaceTexture takeKeptCanvas(ChannelRules.Kind kind, String cameraKey) {
@@ -2220,6 +2244,9 @@ public class MultiCameraManager {
         texture.release();
         if (kind == ChannelRules.Kind.MIRROR) {
             com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：环视的会话里已经没有它，放掉"
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        } else if (kind == ChannelRules.Kind.SIDE) {
+            com.kooo.evcam.blackbox.BlackBox.note("盲区画面留下的画布没人接回：环视的会话里已经没有它，放掉"
                     + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         } else {
             com.kooo.evcam.blackbox.BlackBox.note("主界面留下的预览画布没人接回：" + roleName(cameraKey)
@@ -4018,7 +4045,7 @@ public class MultiCameraManager {
             return codes.isEmpty() ? "(none)" : String.join("+", codes);
         }
 
-        /** 谁要它，中文：预览、录像、拍照、后视镜。 */
+        /** 谁要它，中文：预览、录像、拍照、后视镜、盲区画面。 */
         private String holderNames(Set<CameraNeeds.Holder> holders) {
             List<String> names = new ArrayList<>();
             for (CameraNeeds.Holder holder : holders) {
@@ -4032,15 +4059,21 @@ public class MultiCameraManager {
                     case PHOTO:
                         names.add("拍照");
                         break;
-                    default:
+                    case MIRROR:
                         names.add("后视镜");
+                        break;
+                    case SIDE_VIEW:
+                        names.add("盲区画面");
+                        break;
+                    default:
+                        names.add(holder.name());
                         break;
                 }
             }
             return names.isEmpty() ? "保持" : String.join("、", names);
         }
 
-        /** 输出的叫法：预览、后视镜、录像、出帧口。 */
+        /** 输出的叫法：预览、后视镜、盲区画面、录像、出帧口。 */
         private String kindNames(Set<ChannelRules.Kind> kinds) {
             List<String> names = new ArrayList<>();
             for (ChannelRules.Kind kind : kinds) {
@@ -4050,6 +4083,9 @@ public class MultiCameraManager {
                         break;
                     case MIRROR:
                         names.add("后视镜");
+                        break;
+                    case SIDE:
+                        names.add("盲区画面");
                         break;
                     case RECORD:
                         names.add("录像");
@@ -4063,11 +4099,12 @@ public class MultiCameraManager {
         }
 
         /**
-         * 死输出为什么死了：画布（预览、后视镜）是被系统收走的；录像输出死了只有一种 —— MediaRecorder 停了、放掉了
+         * 死输出为什么死了：画布（预览、后视镜、盲区画面）是被系统收走的；录像输出死了只有一种 —— MediaRecorder 停了、放掉了
          * 它的 Surface。编码录制的录像输出离开会话之后才放，不会死在会话里（这一步顺带摘的录像是留着的输出）。
          */
         private String deadText(Set<ChannelRules.Kind> removed) {
-            boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR);
+            boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR)
+                    || removed.contains(ChannelRules.Kind.SIDE);
             boolean record = !useCodecRecording && removed.contains(ChannelRules.Kind.RECORD);
             if (record && !canvas) {
                 return "MediaRecorder 停了";
@@ -5502,7 +5539,7 @@ public class MultiCameraManager {
             finishPhoto(job);
             return;
         }
-        // 拍启用的那几路（登记表 §一）：只为后视镜开着的环视不拍
+        // 拍启用的那几路（登记表 §一）：只为超级镜子、盲区画面开着的环视不拍
         List<String> keys = enabledActiveKeys();
         // 调度判出被别的程序拿着（含被拿着的另一路挡着）、救了 3 轮停手的那几路这一张不拍、也不算在该拍的里面
         // （2026-10-10）：它们等到点也出不了画面 —— 以前每一张都白等满 10 秒，再报「有几路没出画面」。

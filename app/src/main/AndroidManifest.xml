@@ -112,6 +112,11 @@
             android:name=".zeekr.RearViewMirrorService"
             android:exported="false" />
 
+        <!-- 盲区画面：打转向灯时显示该侧摄像头画面的悬浮窗 -->
+        <service
+            android:name=".zeekr.SideViewService"
+            android:exported="false" />
+
         <service
             android:name=".service.CameraRecordingService"
             android:enabled="true"

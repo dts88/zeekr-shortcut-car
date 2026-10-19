@@ -138,6 +138,31 @@ public class ChannelRulesTest {
         assertEquals("会话里只带后视镜", set(mirror), ChannelRules.wantedOutputs(cabinsOnly, sur));
     }
 
+    /**
+     * 盲区画面和超级镜子同一条规矩（项目所有者 2026-10-16）：要环视，配置里没开环视也要；座舱不为它开；
+     * 只要它自己那块画布。没登记 SIDE_VIEW 时声明着的画布不算要（留着的输出，等下一次本来要动时再摘）。
+     */
+    @Test
+    public void theSideViewWantsTheSurroundLikeTheMirror() {
+        Out side = new Out(Kind.SIDE, "side");
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        World cabinsOnly = new World(Arrays.asList(cab, sur), new LinkedHashSet<>(Collections.singletonList(REAR)));
+        cabinsOnly.screenOn = true;
+        sur.declared.add(side);
+        sur.declared.add(mirror);
+        assertTrue("没登记：声明着也不要", ChannelRules.wantedOutputs(cabinsOnly, sur).isEmpty());
+        assertFalse(ChannelRules.wanted(cabinsOnly, sur));
+
+        cabinsOnly.holders.add(Holder.SIDE_VIEW);
+        assertEquals(EnumSet.of(Holder.SIDE_VIEW), ChannelRules.wantedBy(cabinsOnly, sur));
+        assertFalse("座舱不为它开", ChannelRules.wanted(cabinsOnly, cab));
+        assertEquals("只要盲区画面那块画布", set(side), ChannelRules.wantedOutputs(cabinsOnly, sur));
+
+        cabinsOnly.holders.add(Holder.MIRROR);
+        assertEquals("和超级镜子各要各的", set(mirror, side), ChannelRules.wantedOutputs(cabinsOnly, sur));
+    }
+
     /** 没说启用了哪几路：管线里的全部都算启用（以前的样子）。 */
     @Test
     public void everyLaneIsEnabledWhenNoneAreNamed() {
@@ -185,7 +210,8 @@ public class ChannelRulesTest {
         for (Holder holder : Holder.values()) {
             w.holders.clear();
             claim(holder);
-            assertEquals(holder + "：亮屏照登记表", holder != Holder.MIRROR, ChannelRules.wanted(w, rear));
+            assertEquals(holder + "：亮屏照登记表", holder != Holder.MIRROR && holder != Holder.SIDE_VIEW,
+                    ChannelRules.wanted(w, rear));
             assertFalse(ChannelRules.releasedByDark(w, rear));
         }
     }

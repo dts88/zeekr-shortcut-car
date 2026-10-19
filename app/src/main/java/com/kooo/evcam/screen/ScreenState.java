@@ -33,7 +33,7 @@ import java.util.List;
  * （{@link ScreenTransitions}）：</p>
  *
  * <ul>
- *   <li><b>熄屏</b>（E1）：唤醒锁、录像那张表（{@link RecordingCoordinator#screenOff}）、监听者（相机层放开座舱、主界面、后视镜）；</li>
+ *   <li><b>熄屏</b>（E1）：唤醒锁、录像那张表（{@link RecordingCoordinator#screenOff}）、监听者（相机层放开座舱、主界面、后视镜、盲区画面）；</li>
  *   <li><b>车机要睡</b>（E2，黑着时安卓熄屏 = 车机下电）：只叫录像那张表再判一次（{@link RecordingCoordinator#headUnitSleeps}）——
  *       现在停、按次序关（这时只剩环视）；监听者不叫（屏幕早就黑了）；</li>
  *   <li><b>车机醒着、屏幕黑着</b>（E2'，黑着时安卓又亮了：车机自己醒了一阵）：撤掉「车机要睡」、照表接不接
@@ -43,7 +43,7 @@ import java.util.List;
  *
  * <p>顺序固定：熄屏录制的唤醒锁（{@link ScreenOffRecording}）→ 录像的规矩（{@link RecordingCoordinator}）→ 相机（谁要用就登记，
  * 调度照登记表和「熄屏放开座舱」开关，{@code ChannelRules.releasedByDark}）→ 界面（因熄屏退下去的主界面亮屏接回来，
- * {@link Recovery#bringBackUiAfterScreenOn}）→ 主界面、后视镜、相机层自己登记的监听者。每条边出了错写一行黑匣子，
+ * {@link Recovery#bringBackUiAfterScreenOn}）→ 主界面、后视镜、盲区画面、相机层自己登记的监听者。每条边出了错写一行黑匣子，
  * 看得出做到了哪一步。</p>
  *
  * <h3>安卓那一半</h3>
