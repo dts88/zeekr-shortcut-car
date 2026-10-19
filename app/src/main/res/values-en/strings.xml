@@ -13,6 +13,20 @@
     <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
+    <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
+    <string name="set_group_stream">Stream</string>
+    <string name="set_group_auto_record">Automatic recording</string>
+    <string name="set_group_photo">Photos</string>
+    <string name="set_group_stamps">Stamps</string>
+    <string name="set_group_cleanup">Automatic cleanup</string>
+    <string name="set_group_views">Switching views</string>
+    <string name="set_group_window">Window</string>
+    <string name="set_group_behavior">Behavior</string>
+    <string name="set_group_appearance">Appearance</string>
+    <string name="set_group_position">Position</string>
+    <string name="set_group_main_screen">Main screen</string>
+    <string name="set_group_cameras">Cameras</string>
+    <string name="set_group_files">File maintenance</string>
     <string name="set_section_rearview">Super mirror</string>
     <string name="set_section_floating">Floating button</string>
     <string name="set_section_system">System</string>
