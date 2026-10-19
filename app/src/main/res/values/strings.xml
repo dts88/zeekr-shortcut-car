@@ -27,6 +27,20 @@
     <string name="upd_none_release">未找到可安装的正式版</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>
+    <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
+    <string name="set_group_stream">视频流</string>
+    <string name="set_group_auto_record">自动录制</string>
+    <string name="set_group_photo">拍照</string>
+    <string name="set_group_stamps">水印</string>
+    <string name="set_group_cleanup">自动清理</string>
+    <string name="set_group_views">切换画面</string>
+    <string name="set_group_window">窗口</string>
+    <string name="set_group_behavior">行为</string>
+    <string name="set_group_appearance">外观</string>
+    <string name="set_group_position">位置</string>
+    <string name="set_group_main_screen">主界面</string>
+    <string name="set_group_cameras">摄像头</string>
+    <string name="set_group_files">文件维护</string>
     <string name="set_section_rearview">超级镜子</string>
     <string name="set_section_floating">悬浮按钮</string>
     <string name="set_section_system">系统</string>
