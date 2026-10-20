@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -301,6 +300,12 @@ public final class ChannelScheduler {
          * 补建录制器 —— 熄屏时不为它建）。
          */
         void onLaneConditionChanged(String key);
+
+        /**
+         * 这一路「谁要它」变了（{@link ChannelRules#wantersChanged}）：会话连着几次带不上录像输出、在等的那一路这时再试 ——
+         * 和解除停手同一个解锁。
+         */
+        void onLaneWantersChanged(String key);
     }
 
     /** 一路的相机为什么走了（{@link Recording#onLaneCameraGone}）。 */
@@ -324,6 +329,10 @@ public final class ChannelScheduler {
 
         @Override
         public void onLaneConditionChanged(String key) {
+        }
+
+        @Override
+        public void onLaneWantersChanged(String key) {
         }
     };
 
@@ -1357,8 +1366,8 @@ public final class ChannelScheduler {
     private final Runnable roundTask = this::round;
     private final Runnable timerTask = this::wake;
 
-    /** 登记表的监听叫过来、登记表真的变了的次数（哪个线程都能加；每一轮收走）。 */
-    private final AtomicInteger needsChanges = new AtomicInteger();
+    /** 登记表的监听叫过来、登记、放开过的登记方（哪个线程都能加；每一轮收走，交给 {@link ChannelRules.World#changed}）。 */
+    private final Set<CameraNeeds.Holder> changedHolders = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** 监听上一次看到的登记表：车机要睡那一项变了也会叫，但那不算「登记表变了」（不解除停手）。 */
     private final AtomicReference<Set<CameraNeeds.Holder>> notifiedHolders =
             new AtomicReference<>(EnumSet.noneOf(CameraNeeds.Holder.class));
@@ -1549,9 +1558,7 @@ public final class ChannelScheduler {
     void onNeedsChanged() {
         Set<CameraNeeds.Holder> now = host.holders();
         Set<CameraNeeds.Holder> before = notifiedHolders.getAndSet(now);
-        if (!now.equals(before)) {
-            needsChanges.incrementAndGet();
-        }
+        changedHolders.addAll(symmetricDifference(before, now));
         if (host.headUnitSleeps()) {
             long at = clock.now();
             sleepNoticedAt.compareAndSet(0, at);
@@ -1790,6 +1797,17 @@ public final class ChannelScheduler {
         wake();
     }
 
+    /** {@code a}、{@code b} 只在一边的那几个登记方。 */
+    private static Set<CameraNeeds.Holder> symmetricDifference(Set<CameraNeeds.Holder> a, Set<CameraNeeds.Holder> b) {
+        Set<CameraNeeds.Holder> diff = EnumSet.noneOf(CameraNeeds.Holder.class);
+        for (CameraNeeds.Holder holder : CameraNeeds.Holder.values()) {
+            if (a.contains(holder) != b.contains(holder)) {
+                diff.add(holder);
+            }
+        }
+        return diff;
+    }
+
     /** 回调要用的那一路；调度停了、不认识这台相机是 null。顺手对一下钟。 */
     private ChannelRules.Lane live(String cameraId) {
         if (stopped) {
@@ -1927,12 +1945,12 @@ public final class ChannelScheduler {
     private void refresh(long now) {
         long offset = host.elapsedNow() - now;
         Set<CameraNeeds.Holder> holders = host.holders();
-        int changes = needsChanges.getAndSet(0);
-        if (changes > 0) {
-            w.needsVersion += changes;
-        } else if (!w.holders.equals(holders)) {
-            w.needsVersion++;
+        for (java.util.Iterator<CameraNeeds.Holder> it = changedHolders.iterator(); it.hasNext(); ) {
+            w.changed.add(it.next());
+            it.remove();
         }
+        // 没经过监听的变化（监听还没挂上时）也认
+        w.changed.addAll(symmetricDifference(w.holders, holders));
         w.holders.clear();
         w.holders.addAll(holders);
         w.recordPlan.clear();
@@ -1941,9 +1959,9 @@ public final class ChannelScheduler {
         if (mirrorCabin != w.mirrorCabin) {
             w.mirrorCabin = mirrorCabin;
             if (w.holders.contains(CameraNeeds.Holder.MIRROR)) {
-                // 切换范围换了、后视镜登记着：和登记表变了一样，后座舱要不要、带不带超级镜子的画布跟着变。
+                // 切换范围换了、后视镜登记着：和后视镜登记、放开一样，后座舱要不要、带不带超级镜子的画布跟着变。
                 // 没登记着时谁的要求都没变，不算（不为它放开停手的路）
-                w.needsVersion++;
+                w.changed.add(CameraNeeds.Holder.MIRROR);
             }
         }
         noteNeeds();
@@ -2473,6 +2491,11 @@ public final class ChannelScheduler {
                 }
                 case STOP_LIFTED:
                     journal.stopLifted(event.keys.get(0), event.cause, copyOf(w.holders));
+                    break;
+                case WANTERS_CHANGED:
+                    for (String key : event.keys) {
+                        recording.onLaneWantersChanged(key);
+                    }
                     break;
                 case GAVE_UP:
                     journal.gaveUp(event.keys.get(0));

@@ -56,6 +56,8 @@ public class ChannelSchedulerTest {
     private final List<String> told = new ArrayList<>();
     /** 交给相机步骤统计的每一条（Journal.recorded）。 */
     private final List<ChannelScheduler.StepRecord> records = new ArrayList<>();
+    /** 调度告诉录像那一侧「谁要它」变了的那几路（Recording.onLaneWantersChanged）。 */
+    private final List<String> wantersChanged = new ArrayList<>();
     /** 关座舱时环视那几行（Journal.coupling）。 */
     private final List<ChannelScheduler.Coupling> couplings = new ArrayList<>();
     private final FakePort surround = new FakePort("2");
@@ -3410,6 +3412,11 @@ public class ChannelSchedulerTest {
         @Override
         public void onLaneConditionChanged(String key) {
             told.add("condition " + key + " " + s.condition(key));
+        }
+
+        @Override
+        public void onLaneWantersChanged(String key) {
+            wantersChanged.add(key);
         }
     }
 
