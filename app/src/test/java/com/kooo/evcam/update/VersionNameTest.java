@@ -118,4 +118,15 @@ public class VersionNameTest {
         assertFalse(VersionName.isRelease("nightly"));
         assertFalse(VersionName.isRelease(null));
     }
+
+    /** 大版本是第一段：导入设置只认同一个大版本（SettingsBackup）。 */
+    @Test
+    public void majorIsTheFirstNumber() {
+        assertTrue(VersionName.major("2.14.0-alpha") == 2);
+        assertTrue(VersionName.major("v10.1") == 10);
+        assertTrue(VersionName.major("3.0.0+abc") == 3);
+        assertTrue(VersionName.major("nightly") == -1);
+        assertTrue(VersionName.major("") == -1);
+        assertTrue(VersionName.major(null) == -1);
+    }
 }

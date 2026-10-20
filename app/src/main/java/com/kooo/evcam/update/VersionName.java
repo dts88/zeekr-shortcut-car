@@ -90,6 +90,15 @@ public final class VersionName {
         return numbers(parts[0]).length > 0 && parts[1].isEmpty();
     }
 
+    /**
+     * 大版本：版本号的第一段（2.14.0-alpha → 2）；认不出来是 -1。
+     * 导入设置只认同一个大版本导出的文件（settings.SettingsBackup，项目所有者 2026-10-19：大版本升级后配置可以失效，不做兼容）。
+     */
+    public static int major(String version) {
+        int[] nums = numbers(splitCore(version)[0]);
+        return nums.length == 0 ? -1 : nums[0];
+    }
+
     /** 拆成「数字部分」和「预发布后缀」两段，顺便吃掉前导的 v。 */
     private static String[] splitCore(String version) {
         String s = version == null ? "" : version.trim();

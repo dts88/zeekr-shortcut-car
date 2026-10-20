@@ -148,6 +148,26 @@
     <string name="set_camera_mapping_summary">手动指定环视、前座舱、后座舱各自使用的摄像头（用于排查）</string>
     <string name="set_diagnostics_title">诊断信息</string>
     <string name="set_diagnostics_summary">查看并导出摄像头、显示屏和存储的检测信息及最近日志</string>
+    <!-- 导出、导入设置（项目所有者 2026-10-19 要，文字待批准） -->
+    <string name="set_settings_export_title">导出设置</string>
+    <string name="set_settings_export_summary">将当前设置保存为文件，与诊断报告存放在同一文件夹</string>
+    <string name="set_settings_import_title">导入设置</string>
+    <string name="set_settings_import_summary">从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件</string>
+    <string name="settings_exported">已导出到：\n%1$s</string>
+    <string name="settings_export_failed">无法导出设置</string>
+    <string name="settings_export_failed_reason">导出设置失败：%1$s</string>
+    <string name="settings_pick_title">选择设置文件</string>
+    <string name="settings_file_label">%1$s · 版本 %2$s</string>
+    <string name="settings_none_title">未找到设置文件</string>
+    <string name="settings_none_msg">导入时从此文件夹读取导出的设置文件：%1$s。</string>
+    <string name="settings_import_refused_title">无法导入</string>
+    <string name="settings_other_version_msg">此文件由版本 %1$s 导出。只能导入 %2$d.x 版本导出的设置文件。</string>
+    <string name="settings_unreadable">无法读取此设置文件</string>
+    <string name="settings_import_confirm_title">导入设置？</string>
+    <string name="settings_import_confirm_msg">当前设置将被覆盖。导入后应用将退出，重新打开后生效。</string>
+    <string name="settings_import_action">导入并退出</string>
+    <string name="settings_import_failed">无法导入设置</string>
+    <string name="settings_imported_reopen">已导入设置，重新打开应用后生效</string>
     <!-- 系统信息（试验性）：分组、信号名、值 -->
     <string name="set_vehicle_info_title">系统信息（试验性）</string>
     <string name="set_vehicle_info_summary">车机可读取的车辆信号及当前状态；勾选的项目显示在行驶信息条上</string>
