@@ -213,7 +213,9 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 系统信息「驾驶模式」（2026-10-20，Lab 车上对过值，车主要求加）：vi_drive_mode「驾驶模式」/ Drive mode / Mod pemanduan；
+  三个值照车机界面的叫法：vi_v_drive_comfort「舒适」/ Comfort / Selesa，vi_v_drive_standard「标准」/ Standard / Standard，
+  vi_v_drive_sport「运动」/ Sport / Sukan。没对上的值照原样写号码（同灯光开关）。
 
 ---
 
