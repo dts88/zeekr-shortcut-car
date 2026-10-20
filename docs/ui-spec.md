@@ -130,6 +130,9 @@
 
 `TypeScaleTest` 钉住这条，开发者工具的布局不在其列。
 
+**界面上显示的就是表里的值，不另外整体放大。** EVCam 留下的主界面字号 1.2 倍已去掉（项目所有者 2026-10-20）。
+字要调大调小，先改这张表，再照表改界面。
+
 ### 颜色（`colors.xml` / `values-night/colors.xml`）
 
 十个语义名，日夜各一份、同名同数量，`ColorResourceParityTest` 钉住：
