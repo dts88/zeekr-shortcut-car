@@ -898,6 +898,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return R.string.floating_action_take_photo;
             case TOGGLE_MIRROR:
                 return R.string.floating_action_toggle_mirror;
+            case LOCK_FOOTAGE:
+                return R.string.floating_action_lock_footage;
             case OPEN_APP:
             default:
                 return R.string.floating_action_open_app;

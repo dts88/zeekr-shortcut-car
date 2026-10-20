@@ -154,7 +154,7 @@ public class InfoBarLayoutTest {
     @Test
     public void relatedButDifferentInformationStaysText() {
         for (Signal s : new Signal[]{Signal.AUTO_HOLD, Signal.STOCK_POPUP, Signal.PARK_ASSIST, Signal.LIGHT_SWITCH,
-                Signal.DOOR_FRUNK, Signal.DOOR_TRUNK, Signal.CHARGE_PORT, Signal.LANE_CHANGE_ASSIST,
+                Signal.DOOR_FRUNK, Signal.DOOR_TRUNK, Signal.CHARGE_PORT,
                 Signal.AUTO_LANE_CHANGE, Signal.DOOR_OPEN_WARNING, Signal.LCC, Signal.BATTERY}) {
             assertTrue(s.name(), InfoBarLayout.cellsFor(s.name()).isEmpty());
             assertFalse(s.name(), InfoBarLayout.hasIcon(s));

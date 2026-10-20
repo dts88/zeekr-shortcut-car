@@ -54,7 +54,7 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 下面这些不是从 EVCam 来的，是别的开发者为本项目写的。随 PR 直接合并的，作者记在 git 历史里；
 没有直接合并、由本项目挑出来用的，在这里写明出处，代码文件的类说明里也各写一行。
 
-- **wysie**（<https://github.com/wysie>）：超级镜子的方向标签（PR #17，直接合并）；
+- **wysie**（<https://github.com/wysie>）：超级镜子的方向标签（PR #17，直接合并）；下载更新时核对安装包的 sha256 和大小、只走 https（`DownloadIntegrity`，PR #38，直接合并）；
   盲区画面里的关闭按钮只关这一次（`SideViewDismissal`）、转的角度大时收窄视野不出黑块（`SideViewFraming`）、
   纵向视野随窗口形状变（`SideViewProjection.Rays`），取自 PR #19。
 - **FerixzTanz**（<https://github.com/FerixzTanz>）：打转向灯时显示侧方摄像头画面的最初代码和实车研究（PR #4，已并入 PR #19）——
