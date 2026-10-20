@@ -135,13 +135,6 @@ public class RearViewMirrorView extends ViewGroup {
     /** 分片绘制（和主界面预览、视频回看同一套）。 */
     private final FisheyeMesh mesh = new FisheyeMesh();
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
-    /**
-     * 多久没有新画面就不再拿它当实时画面看。
-     *
-     * <p>最省的档位也有 10fps，2.5 秒是二十多帧没来 —— 到这个地步已经不是卡顿，
-     * 是这条流停了。</p>
-     */
-    static final long FROZEN_AFTER_MS = 2500L;
     /** 没有画面时靠它定期重画 —— 画面停了就没有帧来驱动重画了。 */
     private static final long IDLE_TICK_MS = 1000L;
 
@@ -492,7 +485,7 @@ public class RearViewMirrorView extends ViewGroup {
             }
             long lastFrame = isShowingCabin() ? lastCabinFrameUptimeMs : lastFrameUptimeMs;
             boolean nowFrozen = !docked
-                    && SystemClock.uptimeMillis() - lastFrame > FROZEN_AFTER_MS;
+                    && SystemClock.uptimeMillis() - lastFrame > StalledPicture.AFTER_MS;
             if (nowFrozen != frozen) {
                 frozen = nowFrozen;
                 AppLog.i(TAG, frozen ? "后视镜画面停了，改显示「点击恢复」" : "后视镜画面回来了");
@@ -1162,14 +1155,6 @@ public class RearViewMirrorView extends ViewGroup {
 
     // ------------------------------------------------------------------ 没有画面时画什么
 
-    /**
-     * 画面停住时盖上去的一层。压暗而不是盖死 —— 让人看得出底下是张画面，只是不再更新了。
-     *
-     * <p>这一层盖的是摄像头画面，不是应用自己的界面，所以不跟日夜模式走：
-     * 底下永远是视频，压暗 + 浅色字在两种模式下都读得清。</p>
-     */
-    private static final int FROZEN_SCRIM = 0xCC000000;
-    private static final int FROZEN_TEXT = 0xFFF2F2F3;
 
     /**
      * 贴边那条窄边的底色与字色。<b>固定深色，不跟日夜模式走。</b>
@@ -1248,18 +1233,9 @@ public class RearViewMirrorView extends ViewGroup {
      * 比看见一块黑屏危险得多 —— 黑屏至少能看出它坏了。</p>
      */
     private void drawFrozenHint(Canvas canvas, int width, int height) {
-        scrimPaint.setColor(FROZEN_SCRIM);
-        canvas.drawRect(0, 0, width, height, scrimPaint);
-        String hint = getContext().getString(R.string.mirror_paused_tap);
-        if (hint.isEmpty()) {
-            return;
-        }
-        labelPaint.setColor(FROZEN_TEXT);
-        labelPaint.setTextAlign(Paint.Align.CENTER);
-        labelPaint.setTextSize(Math.max(1f,
-                Math.min(height * 0.17f, width / (hint.length() * 0.56f))));
-        Paint.FontMetrics fm = labelPaint.getFontMetrics();
-        canvas.drawText(hint, width / 2f, height / 2f - (fm.ascent + fm.descent) / 2f, labelPaint);
+        // 压暗、字色、字怎么摆和主界面预览同一套（StalledPicture）；窗口小，字号只随窗口走
+        StalledPicture.draw(canvas, scrimPaint, labelPaint, 0, 0, width, height,
+                getContext().getString(R.string.mirror_paused_tap), Float.MAX_VALUE);
     }
 
     private int screenWidth() {

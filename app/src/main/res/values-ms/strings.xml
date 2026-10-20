@@ -80,6 +80,7 @@
     <string name="side_view_close">Tutup Paparan titik buta</string>
     <string name="rearview_guide_hint">Leret untuk tukar halaman · Ketik di luar untuk tutup</string>
     <string name="mirror_paused_tap">Gambar terhenti · ketik untuk sambung</string>
+    <string name="preview_paused">Gambar terhenti</string>
     <string name="mirror_resume_busy">Kamera sedang digunakan dan tidak dapat dibuka buat masa ini</string>
     <string name="mirror_resume_failed">Kamera tidak dapat dibuka: %1$s</string>
     <string name="mirror_dock_label">Super mirror</string>

@@ -80,6 +80,7 @@
     <string name="side_view_close">Close Blind spot view</string>
     <string name="rearview_guide_hint">Swipe to turn pages · Tap outside to close</string>
     <string name="mirror_paused_tap">Picture stopped · tap to resume</string>
+    <string name="preview_paused">Picture stopped</string>
     <string name="mirror_resume_busy">The camera is in use and can\'t be opened right now</string>
     <string name="mirror_resume_failed">Can\'t open the camera: %1$s</string>
     <string name="mirror_dock_label">Super mirror</string>

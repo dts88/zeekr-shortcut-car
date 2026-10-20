@@ -213,6 +213,8 @@ public class MainActivity extends AppCompatActivity {
     private AppConfig appConfig;
     /** 启用的那几路（RecordSpecs.enabledCameraKeys）：主界面给它们摆格子、挂画布，一路一块（PreviewSlots）。 */
     private java.util.Set<String> enabledLanes = new java.util.LinkedHashSet<>();
+    /** 预览画面停了就压暗（{@link #attachPreviewStall}）。 */
+    private final com.kooo.evcam.zeekr.PreviewStall previewStall = new com.kooo.evcam.zeekr.PreviewStall();
     // 录制状态显示相关
     private TextView tvRecordingStats;
     private android.os.Handler recordingTimerHandler;
@@ -510,6 +512,7 @@ public class MainActivity extends AppCompatActivity {
         textureFront = findViewById(R.id.texture_front);
         textureBack = findViewById(R.id.texture_back);  // 只有环视的单路布局里为 null
         textureLeft = findViewById(R.id.texture_left);  // 同上
+        attachPreviewStall();
 
         // 极氪合成流：texture_front 是容器里那个普通的 TextureView，
         // 四宫格由父容器 FourLaneContainer 重画子视图实现
@@ -682,6 +685,22 @@ public class MainActivity extends AppCompatActivity {
         claimPreviewIfReady();
     }
 
+    /**
+     * 每一路画面停了就压暗、写「画面已停止」（{@link com.kooo.evcam.zeekr.PreviewStall}，和超级镜子同一套，项目所有者 2026-10-20）：
+     * 挂在画布所在的那一格上 —— 环视是整块四宫格（同一条流，只写一句），座舱是各自那一格。
+     */
+    private void attachPreviewStall() {
+        previewStall.detachAll();
+        String hint = getString(R.string.preview_paused);
+        float maxTextPx = getResources().getDimension(R.dimen.text_title);
+        for (String key : PreviewSlots.KEYS) {
+            previewStall.attach(key, canvasFor(key), hint, maxTextPx);
+        }
+        if (!isInBackground) {
+            previewStall.start();
+        }
+    }
+
     /** 这一路的画布；没启用（没挂监听、那一格藏着）、或者这套布局里没有这一格是 null。 */
     private AutoFitTextureView canvasFor(String cameraKey) {
         if (!enabledLanes.contains(cameraKey)) {
@@ -753,6 +772,8 @@ public class MainActivity extends AppCompatActivity {
         return new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int width, int height) {
+                // 系统新建的画布上什么都没有：还没显示过画面，不盖（PreviewStall）
+                previewStall.canvasReplaced(cameraKey);
                 onPreviewCanvasReady(cameraKey);
             }
 
@@ -784,6 +805,7 @@ public class MainActivity extends AppCompatActivity {
                 // 这个回调每来一帧就响一次 —— 这就是「不录制时相机的出帧率」，
                 // 也就是这条视频流本身的上限。录制时的帧率再低，也不会比它高。
                 com.kooo.evcam.camera.PreviewFrameRates.onFrame(cameraKey);
+                previewStall.noteFrame(cameraKey);
             }
         };
     }
@@ -2766,6 +2788,7 @@ public class MainActivity extends AppCompatActivity {
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
         pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
         com.kooo.evcam.camera.StallWatch.setForeground(false);
+        previewStall.stop();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
 
         // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表。
@@ -2832,6 +2855,7 @@ public class MainActivity extends AppCompatActivity {
         isInBackground = false;
         pausedByScreenOff = false;
         com.kooo.evcam.camera.StallWatch.setForeground(true);
+        previewStall.start();
         AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording);
@@ -2894,6 +2918,7 @@ public class MainActivity extends AppCompatActivity {
                 + " changingConfigurations=" + isChangingConfigurations());
         AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
+        previewStall.detachAll();
 
         // 相机管线属于应用，不属于主界面（大纲 §2 阶段 6，channel-logic §五）：主界面销毁不放它，相机关不关交给通道调度 ——
         // 主界面只是登记表里的一个需要方。预览画布在画布销毁那一下交给管线（keepPreviewCanvas；onSurfaceTextureDestroyed 在
