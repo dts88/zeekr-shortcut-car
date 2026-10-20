@@ -107,9 +107,8 @@ public class CameraManagerHolderShapeTest {
     }
 
     /**
-     * 为超级镜子重建只在「要后座舱而这一份里没有」时：谁来要都重建；换出这一档、或者这一份里已经有后座舱都不重建 ——
-     * 一份管线最多为它重建一次。配置里开的几路也变了：后台调用方照样为后座舱重建（启用的几路照原来那份），
-     * 主界面接上时先按开的几路重建。
+     * 为超级镜子当场重建只在「要后座舱而这一份里没有」时（谁来要都重建）；换出这一档、或者这一份里已经有后座舱，后台的调用方都不重建 ——
+     * 设置里来回切，一份管线最多为它重建一次。只为它建、现在没人要的后座舱，和开的几路变了一样，等主界面接上时照此刻的设置重建。
      */
     @Test
     public void theMirrorRebuildsOnlyForAMissingRearCabin() {
@@ -122,12 +121,16 @@ public class CameraManagerHolderShapeTest {
                 CameraManagerHolder.rebuildFor(mirrorCabin(SUR), false, "zeekr_7x", surroundLanes, true));
         assertEquals("换出这一档：多出来的后座舱不算", CameraManagerHolder.Rebuild.NO,
                 CameraManagerHolder.rebuildFor(shape(SUR), false, "zeekr_7x", surroundLanes, true));
-        assertEquals(CameraManagerHolder.Rebuild.NO,
+        assertEquals("主界面接上时去掉没人要的后座舱", CameraManagerHolder.Rebuild.LANES,
                 CameraManagerHolder.rebuildFor(shape(SUR), true, "zeekr_7x", surroundLanes, true));
-        assertEquals("开的几路也变了：后台调用方照样补后座舱", CameraManagerHolder.Rebuild.MIRROR_CABIN,
+        assertEquals("配置里启用了后座舱：不是只为超级镜子建的", CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(shape(SUR, REAR), true, "zeekr_7x", shape(SUR, REAR).lanesKey(), true));
+        assertEquals("开的几路也变了：照样当场补后座舱", CameraManagerHolder.Rebuild.MIRROR_CABIN,
                 CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), false, "zeekr_7x", surroundLanes, false));
-        assertEquals("主界面接上时先按开的几路", CameraManagerHolder.Rebuild.LANES,
+        assertEquals(CameraManagerHolder.Rebuild.MIRROR_CABIN,
                 CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), true, "zeekr_7x", surroundLanes, false));
+        assertEquals("主界面接上时按开的几路", CameraManagerHolder.Rebuild.LANES,
+                CameraManagerHolder.rebuildFor(shape(SUR, FRONT), true, "zeekr_7x", surroundLanes, false));
         assertEquals("只是开的几路变了：后台调用方不重建", CameraManagerHolder.Rebuild.NO,
                 CameraManagerHolder.rebuildFor(shape(SUR, FRONT), false, "zeekr_7x", surroundLanes, false));
         assertEquals(CameraManagerHolder.Rebuild.CAR_MODEL,

@@ -844,11 +844,14 @@ public class RearViewMirrorService extends Service {
                     && bound.sessionOutputs().carries(new ChannelRules.Out(ChannelRules.Kind.MIRROR, st));
         }
 
-        /** 这块画布此刻在出画面：那一路在出画面（通道调度的判断），会话里带着这块画布。 */
+        /**
+         * 这块画布此刻在出画面：会话里带着它、这一次会话出过画面，而且最近一帧在窗口自己算「画面停了」的时限之内
+         * （{@link RearViewMirrorView#FROZEN_AFTER_MS}）—— 和窗口看得见的那块用同一把尺子，不用调度那把 8 秒的。
+         */
         boolean streaming() {
-            MultiCameraManager owner = manager;
-            return owner != null && inSession()
-                    && owner.channelScheduler().condition(cameraKey) == ChannelRules.Condition.STREAMING;
+            SingleCamera bound = camera;
+            return bound != null && inSession() && bound.firstFrameOfSessionAt() != 0
+                    && bound.hasFramesWithin(RearViewMirrorView.FROZEN_AFTER_MS);
         }
 
         /** 新窗口接回上一个窗口留下的这块画布（{@link #takeBackKeptCanvas}），当场照「画布准备好」声明一次。 */

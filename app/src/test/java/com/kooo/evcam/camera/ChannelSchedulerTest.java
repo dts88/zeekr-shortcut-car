@@ -2773,7 +2773,6 @@ public class ChannelSchedulerTest {
         s.onNeedsChanged();
     }
 
-    /** 重新交一次各路：环视建着、只有两路座舱启用（配置里只开座舱）。 */
     /** 配置里只开环视；管线另外建了后座舱（超级镜子「后视 + 后座舱」要它，不算启用的）。 */
     private void surroundOnly() {
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
@@ -2782,6 +2781,7 @@ public class ChannelSchedulerTest {
         s.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(SUR)));
     }
 
+    /** 重新交一次各路：环视建着、只有两路座舱启用（配置里只开座舱）。 */
     private void cabinsOnly() {
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
         lanes.put(FRONT, front);

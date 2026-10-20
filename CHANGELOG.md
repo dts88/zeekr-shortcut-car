@@ -10,7 +10,7 @@ commit message, not here.
 ## [Unreleased]
 
 - Settings: rows on each page are grouped under headings. Keep recording when the screen goes off moves from System to Recording, next to Record on launch.
-- Super mirror: the Front and rear only switch becomes Views: All four (default), Front and rear, or Rear + rear cabin, which switches between the rear view and the rear cabin camera, mirrored (button mode: top half rear cabin, bottom half rear view). When the stream profile leaves the rear cabin off, changing to or from that choice restarts the cameras once.
+- Super mirror: the Front and rear only switch becomes Views: All four (default), Front and rear, or Rear + rear cabin, which switches between the rear view and the rear cabin camera, mirrored (button mode: top half rear cabin, bottom half rear view). When the stream profile leaves the rear cabin off, choosing it restarts the cameras once.
 
 ## [2.14.0-alpha] - 2026-10-19
 

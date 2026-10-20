@@ -141,7 +141,7 @@ public class RearViewMirrorView extends ViewGroup {
      * <p>最省的档位也有 10fps，2.5 秒是二十多帧没来 —— 到这个地步已经不是卡顿，
      * 是这条流停了。</p>
      */
-    private static final long FROZEN_AFTER_MS = 2500L;
+    static final long FROZEN_AFTER_MS = 2500L;
     /** 没有画面时靠它定期重画 —— 画面停了就没有帧来驱动重画了。 */
     private static final long IDLE_TICK_MS = 1000L;
 
