@@ -21,7 +21,9 @@ public enum FloatingAction {
     /** 拍一张。 */
     TAKE_PHOTO("take_photo"),
     /** 开 / 关超级镜子。 */
-    TOGGLE_MIRROR("toggle_mirror");
+    TOGGLE_MIRROR("toggle_mirror"),
+    /** 锁定此刻前后 10 秒所在的录像：和闪远光自动锁定同一套（{@code AutoLock#lockNow}）。 */
+    LOCK_FOOTAGE("lock_footage");
 
     public final String key;
 
