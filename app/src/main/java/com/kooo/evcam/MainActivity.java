@@ -286,9 +286,6 @@ public class MainActivity extends AppCompatActivity {
                 + " cameraManagerInHolder="
                 + (com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager() != null));
 
-        // 设置字体缩放比例（1.3倍）
-        adjustFontScale(1.2f);
-
         // 初始化应用配置
         appConfig = new AppConfig(this);
 
@@ -415,14 +412,6 @@ public class MainActivity extends AppCompatActivity {
                 AppLog.d(TAG, "应用已移到后台，开机自启动完成");
             }, 500);  // 延迟 500ms
         }
-    }
-
-
-    private void adjustFontScale(float scale) {
-        android.content.res.Configuration configuration = getResources().getConfiguration();
-        configuration.fontScale = scale;
-        android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
-        getBaseContext().getResources().updateConfiguration(configuration, metrics);
     }
     
     /**
