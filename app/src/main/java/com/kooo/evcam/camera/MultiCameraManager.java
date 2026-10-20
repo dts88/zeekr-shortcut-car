@@ -236,22 +236,26 @@ public class MultiCameraManager {
         final boolean forceH264;
         final boolean watermark;
         final boolean watermarkSpec;
+        /** 带声音的话用哪个来源（只给环视，{@link #footageAudioSource}）；null = 不带。 */
+        final String audio;
 
         LanePlan(StreamSpec spec, boolean infoBar, String brandLine, boolean forceH264,
-                 boolean watermark, boolean watermarkSpec) {
+                 boolean watermark, boolean watermarkSpec, String audio) {
             this.spec = spec;
             this.infoBar = infoBar;
             this.brandLine = brandLine;
             this.forceH264 = forceH264;
             this.watermark = watermark;
             this.watermarkSpec = watermarkSpec;
+            this.audio = audio;
         }
 
         /** 和另一份是不是同一种录法：一样的话停放着的录制器能沿用。 */
         boolean sameAs(LanePlan other) {
             return other != null && spec.toMap().equals(other.spec.toMap()) && infoBar == other.infoBar
                     && brandLine.equals(other.brandLine) && forceH264 == other.forceH264
-                    && watermark == other.watermark && watermarkSpec == other.watermarkSpec;
+                    && watermark == other.watermark && watermarkSpec == other.watermarkSpec
+                    && java.util.Objects.equals(audio, other.audio);
         }
     }
 
@@ -4454,6 +4458,8 @@ public class MultiCameraManager {
         codecRecorder.setForceH264(plan.forceH264);
         codecRecorder.setWatermarkEnabled(plan.watermark);
         codecRecorder.setWatermarkSpecEnabled(plan.watermarkSpec);
+        // 环视录像带声音（开发者选项「录制声音」）：MediaRecorder 那条路不带
+        codecRecorder.setFootageAudio(plan.audio);
         return codecRecorder;
     }
 
@@ -4468,7 +4474,25 @@ public class MultiCameraManager {
         return new LanePlan(spec, CameraSlots.KEY_SURROUND.equals(key) && infoBarOn, brandLine,
                 // 设置里的「强制 H.264」是总闸，盖过这一路配置里的编码选择
                 appConfig.isForceH264Encoding() || RecordSpecs.forceH264(spec.codec),
-                appConfig.isTimestampWatermarkEnabled(), appConfig.isWatermarkSpecEnabled());
+                appConfig.isTimestampWatermarkEnabled(), appConfig.isWatermarkSpecEnabled(),
+                // 声音只进环视（项目所有者 2026-10-20）
+                CameraSlots.KEY_SURROUND.equals(key) ? footageAudioSource(appConfig) : null);
+    }
+
+    /**
+     * 环视录像带不带声音、用哪个来源（开发者选项「录制声音」，试验）：开着、又有录音权限才带。开关打开时就要过权限（设置里），
+     * 走到这里还没有，多半是在系统设置里收回了：这一次不带，记一行。
+     */
+    private String footageAudioSource(AppConfig appConfig) {
+        if (!appConfig.isFootageAudioEnabled()) {
+            return null;
+        }
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            AppLog.w(TAG, "录制声音开着，但没有录音权限：这一次环视录像不带声音");
+            return null;
+        }
+        return appConfig.getFootageAudioSource();
     }
 
     /**

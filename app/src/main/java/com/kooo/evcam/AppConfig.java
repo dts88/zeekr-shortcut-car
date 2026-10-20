@@ -65,6 +65,8 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
+    private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（开发者选项，试验）
+    private static final String KEY_FOOTAGE_AUDIO_SOURCE = "footage_audio_source"; // 录声音用哪个来源（开发者选项）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
@@ -627,6 +629,8 @@ public class AppConfig {
                 KEY_SCREEN_OFF_WAKE_MINUTES,          // 熄屏录制的最长时长 → 默认（熄屏录制关着，用不到）
                 KEY_IMAGE_ADJUST_ENABLED,             // 画面调节 → 关
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
+                KEY_FOOTAGE_AUDIO,                    // 环视录像带声音 → 关
+                KEY_FOOTAGE_AUDIO_SOURCE,             // 录声音的来源 → 原始（录声音关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -924,6 +928,33 @@ public class AppConfig {
 
     public void setRawFrameDumpEnabled(boolean on) {
         prefs.edit().putBoolean(KEY_RAW_FRAME_DUMP, on).apply();
+    }
+
+    /** 录声音的来源：原始（AudioSource VOICE_RECOGNITION，不经降噪）。 */
+    public static final String FOOTAGE_AUDIO_RAW = "raw";
+    /** 录声音的来源：通话那一路（AudioSource VOICE_COMMUNICATION，经回声消除、降噪）。 */
+    public static final String FOOTAGE_AUDIO_CALL = "call";
+
+    /**
+     * 环视录像带声音（开发者选项「录制声音」，试验；项目所有者 2026-10-20 定先做框架、上车比来源）。
+     * 从下一次开录起（定录法时读，{@code MultiCameraManager}）。
+     */
+    public boolean isFootageAudioEnabled() {
+        return readBoolean(KEY_FOOTAGE_AUDIO, false);
+    }
+
+    public void setFootageAudioEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_FOOTAGE_AUDIO, on).apply();
+    }
+
+    /** 录声音用哪个来源：{@link #FOOTAGE_AUDIO_RAW} / {@link #FOOTAGE_AUDIO_CALL}；认不出的按原始。 */
+    public String getFootageAudioSource() {
+        return FOOTAGE_AUDIO_CALL.equals(readString(KEY_FOOTAGE_AUDIO_SOURCE, FOOTAGE_AUDIO_RAW))
+                ? FOOTAGE_AUDIO_CALL : FOOTAGE_AUDIO_RAW;
+    }
+
+    public void setFootageAudioSource(String source) {
+        prefs.edit().putString(KEY_FOOTAGE_AUDIO_SOURCE, source).apply();
     }
 
     /**
