@@ -13,6 +13,8 @@
   分区是<b>嵌套的 PreferenceScreen</b> 而不是 PreferenceCategory：
   只有前者能被 setPreferencesFromResource(res, rootKey) 单独取出来，
   两栏布局的右侧就是靠这个按 key 加载某一段的。
+  分区里再按用途分组用 PreferenceCategory：只是标题，不带 key（开发者选项分区的测试逐个核对 key）；
+  组名只用术语表里的词（项目所有者 2026-10-19 定的分组）。
 -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
@@ -30,63 +32,90 @@
         android:key="screen_recording"
         android:title="@string/set_section_recording">
 
-        <ListPreference
-            android:key="pref_car_model"
-            android:title="@string/set_car_model_title"
-            android:summary="%s"
-            app:useSimpleSummaryProvider="false" />
+        <PreferenceCategory
+            android:title="@string/set_group_stream">
 
-        <Preference
-            android:key="pref_profile_editor"
-            android:title="@string/set_profile_editor_title"
-            android:summary="@string/set_profile_editor_summary" />
+            <ListPreference
+                android:key="pref_car_model"
+                android:title="@string/set_car_model_title"
+                android:summary="%s"
+                app:useSimpleSummaryProvider="false" />
 
-        <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（规格 §2） -->
-        <SwitchPreferenceCompat
-            android:key="pref_auto_record"
-            android:title="@string/set_auto_record_title"
-            android:summary="@string/set_auto_record_summary" />
+            <Preference
+                android:key="pref_profile_editor"
+                android:title="@string/set_profile_editor_title"
+                android:summary="@string/set_profile_editor_summary" />
+        </PreferenceCategory>
 
-        <!-- 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（项目所有者 2026-10-09；行留在录制分区）。
-             关着时照片只能从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面
-             （AppConfig.isPhotoViaJpegEnabled） -->
-        <SwitchPreferenceCompat
-            android:key="pref_photo_via_jpeg"
-            android:title="@string/set_photo_jpeg_title"
-            android:summary="@string/set_photo_jpeg_summary" />
+        <PreferenceCategory
+            android:title="@string/set_group_auto_record">
 
-        <SwitchPreferenceCompat
-            android:key="pref_watermark_brand"
-            android:title="@string/set_watermark_brand_title"
-            android:summary="@string/set_watermark_brand_summary" />
+            <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（规格 §2） -->
+            <SwitchPreferenceCompat
+                android:key="pref_auto_record"
+                android:title="@string/set_auto_record_title"
+                android:summary="@string/set_auto_record_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_license_plate_enabled"
-            android:title="@string/set_plate_switch_title"
-            android:summary="@string/set_plate_switch_summary" />
+            <!-- 熄屏后还录不录：2026-10-19 起从「系统」挪到这里，和「启动自动录制」一组（项目所有者定；规格 lifecycle-spec 开头） -->
+            <SwitchPreferenceCompat
+                android:key="pref_screen_off_keep_recording"
+                android:defaultValue="true"
+                android:title="@string/set_screen_off_keep_title"
+                android:summary="@string/set_screen_off_keep_summary" />
+        </PreferenceCategory>
 
-        <EditTextPreference
-            android:key="pref_license_plate"
-            android:dependency="pref_license_plate_enabled"
-            android:title="@string/set_plate_title" />
+        <PreferenceCategory
+            android:title="@string/set_group_photo">
 
-        <SwitchPreferenceCompat
-            android:key="pref_watermark"
-            android:title="@string/set_watermark_title"
-            android:summaryOn="@string/set_watermark_on"
-            android:summaryOff="@string/set_watermark_off" />
+            <!-- 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（项目所有者 2026-10-09；行留在录制分区）。
+                 关着时照片只能从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面
+                 （AppConfig.isPhotoViaJpegEnabled） -->
+            <SwitchPreferenceCompat
+                android:key="pref_photo_via_jpeg"
+                android:title="@string/set_photo_jpeg_title"
+                android:summary="@string/set_photo_jpeg_summary" />
+        </PreferenceCategory>
 
-        <SwitchPreferenceCompat
-            android:key="pref_watermark_spec"
-            android:dependency="pref_watermark"
-            android:title="@string/set_watermark_spec_title"
-            android:summary="@string/set_watermark_spec_summary" />
+        <PreferenceCategory
+            android:title="@string/set_group_stamps">
 
-        <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。显示哪几项在「系统 → 系统信息」里勾 -->
-        <SwitchPreferenceCompat
-            android:key="pref_info_bar"
-            android:title="@string/set_info_bar_title"
-            android:summary="@string/set_info_bar_summary" />
+            <SwitchPreferenceCompat
+                android:key="pref_watermark_brand"
+                android:title="@string/set_watermark_brand_title"
+                android:summary="@string/set_watermark_brand_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_license_plate_enabled"
+                android:title="@string/set_plate_switch_title"
+                android:summary="@string/set_plate_switch_summary" />
+
+            <EditTextPreference
+                android:key="pref_license_plate"
+                android:dependency="pref_license_plate_enabled"
+                android:title="@string/set_plate_title" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_watermark"
+                android:title="@string/set_watermark_title"
+                android:summaryOn="@string/set_watermark_on"
+                android:summaryOff="@string/set_watermark_off" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_watermark_spec"
+                android:dependency="pref_watermark"
+                android:title="@string/set_watermark_spec_title"
+                android:summary="@string/set_watermark_spec_summary" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:title="@string/set_info_bar_title">
+
+            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。显示哪几项在「系统 → 系统信息」里勾 -->
+            <SwitchPreferenceCompat
+                android:key="pref_info_bar"
+                android:title="@string/set_info_bar_title"
+                android:summary="@string/set_info_bar_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->
@@ -94,62 +123,74 @@
         android:key="screen_storage"
         android:title="@string/set_section_storage">
 
-        <ListPreference
-            android:key="pref_storage_location"
-            android:title="@string/set_storage_location_title"
-            android:summary="%s" />
+        <PreferenceCategory
+            android:title="@string/set_storage_location_title">
 
-        <!-- 选哪个盘之前要知道的事：下车开哨兵模式后只有 USB-A 口还通电 -->
-        <Preference
-            android:key="pref_storage_sentry_note"
-            android:selectable="false"
-            android:summary="@string/set_storage_sentry_note" />
+            <ListPreference
+                android:key="pref_storage_location"
+                android:title="@string/set_storage_location_title"
+                android:summary="%s" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_relay_write"
-            android:title="@string/set_relay_title"
-            android:summary="@string/set_relay_summary" />
+            <!-- 选哪个盘之前要知道的事：下车开哨兵模式后只有 USB-A 口还通电 -->
+            <Preference
+                android:key="pref_storage_sentry_note"
+                android:selectable="false"
+                android:summary="@string/set_storage_sentry_note" />
 
-        <EditTextPreference
-            android:key="pref_video_limit"
-            android:title="@string/set_video_limit_title"
-            android:dialogTitle="@string/set_video_limit_dialog"
-            android:dialogMessage="@string/set_limit_message" />
+            <Preference
+                android:key="pref_storage_usage"
+                android:title="@string/set_storage_usage_title"
+                android:selectable="false" />
 
-        <EditTextPreference
-            android:key="pref_photo_limit"
-            android:title="@string/set_photo_limit_title"
-            android:dialogTitle="@string/set_photo_limit_dialog"
-            android:dialogMessage="@string/set_photo_limit_message" />
+            <SwitchPreferenceCompat
+                android:key="pref_relay_write"
+                android:title="@string/set_relay_title"
+                android:summary="@string/set_relay_summary" />
+        </PreferenceCategory>
 
-        <!-- 锁定影像：锁定的不被自动清理删掉（FootageLocks）；下面一行是锁了多少 -->
-        <SwitchPreferenceCompat
-            android:key="pref_footage_lock"
-            android:title="@string/set_footage_lock_title"
-            android:summary="@string/set_footage_lock_summary" />
+        <PreferenceCategory
+            android:title="@string/set_group_cleanup">
 
-        <!-- 车机信号自动锁定（AutoLock），默认关：自动锁的也占空间，锁满了就停录。锁定影像关着时置灰 -->
-        <SwitchPreferenceCompat
-            android:key="pref_footage_lock_flash"
-            android:dependency="pref_footage_lock"
-            android:title="@string/set_footage_lock_flash_title"
-            android:summary="@string/set_footage_lock_flash_summary" />
+            <EditTextPreference
+                android:key="pref_video_limit"
+                android:title="@string/set_video_limit_title"
+                android:dialogTitle="@string/set_video_limit_dialog"
+                android:dialogMessage="@string/set_limit_message" />
 
-        <!-- 鸣笛：车上还读不到喇叭信号，一直置灰、打不开（只在 SettingsPreferenceFragment.bindAutoLock 里设，和水印品牌那一行一样） -->
-        <SwitchPreferenceCompat
-            android:key="pref_footage_lock_horn"
-            android:title="@string/set_footage_lock_horn_title"
-            android:summary="@string/set_footage_lock_horn_summary" />
+            <EditTextPreference
+                android:key="pref_photo_limit"
+                android:title="@string/set_photo_limit_title"
+                android:dialogTitle="@string/set_photo_limit_dialog"
+                android:dialogMessage="@string/set_photo_limit_message" />
+        </PreferenceCategory>
 
-        <Preference
-            android:key="pref_footage_locked"
-            android:title="@string/set_footage_locked_title"
-            android:selectable="false" />
+        <PreferenceCategory
+            android:title="@string/set_footage_lock_title">
 
-        <Preference
-            android:key="pref_storage_usage"
-            android:title="@string/set_storage_usage_title"
-            android:selectable="false" />
+            <!-- 锁定影像：锁定的不被自动清理删掉（FootageLocks）；下面一行是锁了多少 -->
+            <SwitchPreferenceCompat
+                android:key="pref_footage_lock"
+                android:title="@string/set_footage_lock_title"
+                android:summary="@string/set_footage_lock_summary" />
+
+            <!-- 车机信号自动锁定（AutoLock），默认关：自动锁的也占空间，锁满了就停录。锁定影像关着时置灰 -->
+            <SwitchPreferenceCompat
+                android:key="pref_footage_lock_flash"
+                android:dependency="pref_footage_lock"
+                android:title="@string/set_footage_lock_flash_title"
+                android:summary="@string/set_footage_lock_flash_summary" />
+
+            <!-- 鸣笛：车上还读不到喇叭信号，一直置灰、打不开（只在 SettingsPreferenceFragment.bindAutoLock 里设，和水印品牌那一行一样） -->
+            <SwitchPreferenceCompat
+                android:key="pref_footage_lock_horn"
+                android:title="@string/set_footage_lock_horn_title"
+                android:summary="@string/set_footage_lock_horn_summary" />
+
+            <Preference
+                android:key="pref_footage_locked"
+                android:title="@string/set_footage_locked_title"
+                android:selectable="false" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 超级镜子 ==================== -->
@@ -168,55 +209,67 @@
             android:title="@string/set_section_rearview"
             android:summary="@string/set_rearview_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_rearview_camera_label"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_camera_label_title"
-            android:summary="@string/set_rearview_camera_label_summary" />
+        <PreferenceCategory
+            android:title="@string/set_group_views">
 
-        <SwitchPreferenceCompat
-            android:key="pref_rearview_front_rear"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_front_rear_title"
-            android:summary="@string/set_rearview_front_rear_summary" />
+            <SwitchPreferenceCompat
+                android:key="pref_rearview_camera_label"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_camera_label_title"
+                android:summary="@string/set_rearview_camera_label_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_rearview_fisheye"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_fisheye_title"
-            android:summary="@string/set_rearview_fisheye_summary" />
+            <SwitchPreferenceCompat
+                android:key="pref_rearview_front_rear"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_front_rear_title"
+                android:summary="@string/set_rearview_front_rear_summary" />
 
-        <SeekBarPreference
-            android:key="pref_rearview_fov"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_fov_title"
-            android:summary="@string/set_rearview_fov_summary"
-            app:showSeekBarValue="true" />
+            <SwitchPreferenceCompat
+                android:key="pref_rearview_button_mode"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_button_mode_title"
+                android:summary="@string/set_rearview_button_mode_summary" />
+        </PreferenceCategory>
 
-        <SeekBarPreference
-            android:key="pref_rearview_width"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_width_title"
-            app:showSeekBarValue="true" />
+        <PreferenceCategory
+            android:title="@string/set_rearview_fisheye_title">
 
-        <SeekBarPreference
-            android:key="pref_rearview_height"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_height_title"
-            android:summary="@string/set_rearview_height_summary"
-            app:showSeekBarValue="true" />
+            <SwitchPreferenceCompat
+                android:key="pref_rearview_fisheye"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_fisheye_title"
+                android:summary="@string/set_rearview_fisheye_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_rearview_button_mode"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_button_mode_title"
-            android:summary="@string/set_rearview_button_mode_summary" />
+            <SeekBarPreference
+                android:key="pref_rearview_fov"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_fov_title"
+                android:summary="@string/set_rearview_fov_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
 
-        <Preference
-            android:key="pref_rearview_reset"
-            android:dependency="pref_rearview"
-            android:title="@string/set_rearview_reset_title"
-            android:summary="@string/set_rearview_reset_summary" />
+        <PreferenceCategory
+            android:title="@string/set_group_window">
+
+            <SeekBarPreference
+                android:key="pref_rearview_width"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_width_title"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_rearview_height"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_height_title"
+                android:summary="@string/set_rearview_height_summary"
+                app:showSeekBarValue="true" />
+
+            <Preference
+                android:key="pref_rearview_reset"
+                android:dependency="pref_rearview"
+                android:title="@string/set_rearview_reset_title"
+                android:summary="@string/set_rearview_reset_summary" />
+        </PreferenceCategory>
 
         <!-- 盲区画面：单独的窗口，不挂在超级镜子的开关下面 —— 两个窗口各管各的（项目所有者 2026-10-16） -->
         <PreferenceCategory
@@ -247,59 +300,71 @@
             android:title="@string/set_section_floating"
             android:summary="@string/set_recording_floating_summary" />
 
-        <ListPreference
-            android:key="pref_floating_tap"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_tap_title" />
+        <PreferenceCategory
+            android:title="@string/set_group_behavior">
 
-        <ListPreference
-            android:key="pref_floating_double_tap"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_double_tap_title" />
-        <Preference
-            android:key="pref_floating_double_tap_help"
-            android:selectable="false"
-            android:summary="@string/set_floating_double_tap_summary" />
+            <ListPreference
+                android:key="pref_floating_tap"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_tap_title" />
 
-        <ListPreference
-            android:key="pref_floating_long_press"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_long_press_title" />
+            <ListPreference
+                android:key="pref_floating_double_tap"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_double_tap_title" />
+            <Preference
+                android:key="pref_floating_double_tap_help"
+                android:selectable="false"
+                android:summary="@string/set_floating_double_tap_summary" />
 
-        <SeekBarPreference
-            android:key="pref_button_size"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_button_size_title"
-            app:showSeekBarValue="true" />
+            <ListPreference
+                android:key="pref_floating_long_press"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_long_press_title" />
+        </PreferenceCategory>
 
-        <SeekBarPreference
-            android:key="pref_floating_alpha"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_alpha_title"
-            app:showSeekBarValue="true" />
+        <PreferenceCategory
+            android:title="@string/set_group_appearance">
 
-        <SwitchPreferenceCompat
-            android:key="pref_floating_lock"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_lock_title"
-            android:summary="@string/set_floating_lock_summary" />
+            <SeekBarPreference
+                android:key="pref_button_size"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_button_size_title"
+                app:showSeekBarValue="true" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_floating_duration"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_duration_title"
-            android:summary="@string/set_floating_duration_summary" />
+            <SeekBarPreference
+                android:key="pref_floating_alpha"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_alpha_title"
+                app:showSeekBarValue="true" />
 
-        <SeekBarPreference
-            android:key="pref_button_text_size"
-            android:dependency="pref_floating_duration"
-            android:title="@string/set_button_text_size_title"
-            app:showSeekBarValue="true" />
+            <SwitchPreferenceCompat
+                android:key="pref_floating_duration"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_duration_title"
+                android:summary="@string/set_floating_duration_summary" />
 
-        <Preference
-            android:key="pref_reset_floating"
-            android:title="@string/set_reset_floating_title"
-            android:summary="@string/set_reset_floating_summary" />
+            <SeekBarPreference
+                android:key="pref_button_text_size"
+                android:dependency="pref_floating_duration"
+                android:title="@string/set_button_text_size_title"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:title="@string/set_group_position">
+
+            <SwitchPreferenceCompat
+                android:key="pref_floating_lock"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_lock_title"
+                android:summary="@string/set_floating_lock_summary" />
+
+            <Preference
+                android:key="pref_reset_floating"
+                android:title="@string/set_reset_floating_title"
+                android:summary="@string/set_reset_floating_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 界面 ==================== -->
@@ -312,41 +377,48 @@
             android:title="@string/set_language_title"
             android:summary="%s" />
 
-        <!-- 两个选项：摆在行里点一次，不弹框 -->
-        <com.kooo.evcam.settings.SegmentedPreference
-            android:key="pref_rail_side"
-            android:title="@string/set_rail_side_title"
-            android:summary="@string/set_rail_side_summary" />
+        <PreferenceCategory
+            android:title="@string/set_group_main_screen">
 
-        <SwitchPreferenceCompat
-            android:key="pref_recording_stats"
-            android:title="@string/set_recording_stats_title"
-            android:summary="@string/set_recording_stats_summary" />
+            <!-- 两个选项：摆在行里点一次，不弹框 -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_rail_side"
+                android:title="@string/set_rail_side_title"
+                android:summary="@string/set_rail_side_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_reduce_motion"
-            android:title="@string/set_reduce_motion_title"
-            android:summary="@string/set_reduce_motion_summary" />
+            <SwitchPreferenceCompat
+                android:key="pref_recording_stats"
+                android:title="@string/set_recording_stats_title"
+                android:summary="@string/set_recording_stats_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_vehicle_status"
-            android:title="@string/set_vehicle_status_title"
-            android:summary="@string/set_vehicle_status_summary" />
+            <SwitchPreferenceCompat
+                android:key="pref_reduce_motion"
+                android:title="@string/set_reduce_motion_title"
+                android:summary="@string/set_reduce_motion_summary" />
 
-        <!--
-          鱼眼校正的两项：开关在图片回看的右上角，这里只管「怎么校正」。
-          两种投影的视野上限不同，所以换投影时滑块要重新绑一次。
-        -->
-        <ListPreference
-            android:key="pref_fisheye_projection"
-            android:title="@string/set_fisheye_projection_title" />
+            <SwitchPreferenceCompat
+                android:key="pref_vehicle_status"
+                android:title="@string/set_vehicle_status_title"
+                android:summary="@string/set_vehicle_status_summary" />
+        </PreferenceCategory>
 
-        <SeekBarPreference
-            android:key="pref_fisheye_fov"
-            android:title="@string/set_fisheye_fov_title"
-            android:summary="@string/set_fisheye_fov_summary"
-            app:showSeekBarValue="true" />
+        <PreferenceCategory
+            android:title="@string/set_rearview_fisheye_title">
 
+            <!--
+              鱼眼校正的两项：开关在图片回看的右上角，这里只管「怎么校正」。
+              两种投影的视野上限不同，所以换投影时滑块要重新绑一次。
+            -->
+            <ListPreference
+                android:key="pref_fisheye_projection"
+                android:title="@string/set_fisheye_projection_title" />
+
+            <SeekBarPreference
+                android:key="pref_fisheye_fov"
+                android:title="@string/set_fisheye_fov_title"
+                android:summary="@string/set_fisheye_fov_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 系统 ==================== -->
@@ -361,12 +433,6 @@
             android:title="@string/set_auto_start_title"
             android:summary="@string/set_auto_start_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_screen_off_keep_recording"
-            android:defaultValue="true"
-            android:title="@string/set_screen_off_keep_title"
-            android:summary="@string/set_screen_off_keep_summary" />
-
         <Preference
             android:key="pref_diagnostics"
             android:title="@string/set_diagnostics_title"
@@ -376,7 +442,6 @@
             android:key="pref_vehicle_info"
             android:title="@string/set_vehicle_info_title"
             android:summary="@string/set_vehicle_info_summary" />
-
     </PreferenceScreen>
 
     <!--
@@ -388,97 +453,117 @@
         android:key="screen_developer"
         android:title="@string/set_section_developer">
 
-        <!-- 原来「高级」里的那几项：录制管线、编码、画面调节、相机映射、调试日志 ——
-             都是排查问题时才动的东西，和开发者工具放在一起 -->
-        <ListPreference
-            android:key="pref_recording_mode"
-            android:title="@string/set_recording_mode_title"
-            android:summary="%s" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_force_h264"
-            android:title="@string/set_force_h264_title"
-            android:summary="@string/set_force_h264_summary" />
-
-        <!-- 熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善 -->
-        <SwitchPreferenceCompat
-            android:key="pref_screen_off_recording"
-            android:title="@string/set_screen_off_title"
-            android:summary="@string/set_screen_off_summary" />
-
-        <EditTextPreference
-            android:key="pref_screen_off_wake_hours"
-            android:dependency="pref_screen_off_recording"
-            android:title="@string/set_screen_off_wake_title" />
-
-        <Preference
-            android:key="pref_image_adjust"
-            android:title="@string/set_image_adjust_title"
-            android:summary="@string/set_image_adjust_summary" />
-
-        <Preference
-            android:key="pref_image_adjust_reset"
-            android:title="@string/set_image_adjust_reset_title" />
-
-        <Preference
-            android:key="pref_camera_mapping"
-            android:title="@string/set_camera_mapping_title"
-            android:summary="@string/set_camera_mapping_summary" />
-
         <Preference
             android:key="pref_permissions"
             android:title="@string/dev_permissions_title"
             android:summary="@string/dev_permissions_summary" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_raw_frame_dump"
-            android:title="@string/dev_raw_frame_title"
-            android:summary="@string/dev_raw_frame_summary" />
+        <PreferenceCategory
+            android:title="@string/set_section_recording">
 
-        <SwitchPreferenceCompat
-            android:key="pref_gpu_fisheye_preview"
-            android:title="@string/dev_gpu_fisheye_preview_title"
-            android:summary="@string/dev_gpu_fisheye_preview_summary" />
+            <!-- 原来「高级」里的那几项：录制管线、编码、画面调节、相机映射、调试日志 ——
+                 都是排查问题时才动的东西，和开发者工具放在一起 -->
+            <ListPreference
+                android:key="pref_recording_mode"
+                android:title="@string/set_recording_mode_title"
+                android:summary="%s" />
 
-        <SwitchPreferenceCompat
-            android:key="pref_gpu_fisheye_video"
-            android:title="@string/dev_gpu_fisheye_video_title"
-            android:summary="@string/dev_gpu_fisheye_video_summary" />
+            <SwitchPreferenceCompat
+                android:key="pref_force_h264"
+                android:title="@string/set_force_h264_title"
+                android:summary="@string/set_force_h264_summary" />
 
-        <!-- 别的程序占用 / 放开相机时，查那几秒里谁起停了前台服务、切了前后台（CameraHolderSuspects） -->
-        <SwitchPreferenceCompat
-            android:key="pref_camera_holder_suspects"
-            android:title="@string/dev_camera_suspects_title"
-            android:summary="@string/dev_camera_suspects_summary" />
+            <!-- 熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善 -->
+            <SwitchPreferenceCompat
+                android:key="pref_screen_off_recording"
+                android:title="@string/set_screen_off_title"
+                android:summary="@string/set_screen_off_summary" />
 
-        <!-- 盲区画面的标定角度：每一路画面的朝向是猜的，上车标定之后再定默认值（AppConfig.SIDE_VIEW_DEFAULT_*） -->
-        <SeekBarPreference
-            android:key="pref_side_view_back"
-            android:title="@string/dev_side_view_back_title"
-            android:summary="@string/dev_side_view_back_summary"
-            app:showSeekBarValue="true" />
+            <EditTextPreference
+                android:key="pref_screen_off_wake_hours"
+                android:dependency="pref_screen_off_recording"
+                android:title="@string/set_screen_off_wake_title" />
+        </PreferenceCategory>
 
-        <SeekBarPreference
-            android:key="pref_side_view_up"
-            android:title="@string/dev_side_view_up_title"
-            android:summary="@string/dev_side_view_up_summary"
-            app:showSeekBarValue="true" />
+        <PreferenceCategory
+            android:title="@string/set_group_cameras">
 
-        <SeekBarPreference
-            android:key="pref_side_view_fov"
-            android:title="@string/dev_side_view_fov_title"
-            android:summary="@string/dev_side_view_fov_summary"
-            app:showSeekBarValue="true" />
+            <Preference
+                android:key="pref_image_adjust"
+                android:title="@string/set_image_adjust_title"
+                android:summary="@string/set_image_adjust_summary" />
 
-        <Preference
-            android:key="pref_repair_mp4"
-            android:title="@string/dev_repair_mp4_title"
-            android:summary="@string/dev_repair_mp4_summary" />
+            <Preference
+                android:key="pref_image_adjust_reset"
+                android:title="@string/set_image_adjust_reset_title" />
 
-        <Preference
-            android:key="pref_archive"
-            android:title="@string/dev_archive_title"
-            android:summary="@string/dev_archive_summary" />
+            <Preference
+                android:key="pref_camera_mapping"
+                android:title="@string/set_camera_mapping_title"
+                android:summary="@string/set_camera_mapping_summary" />
+
+            <!-- 别的程序占用 / 放开相机时，查那几秒里谁起停了前台服务、切了前后台（CameraHolderSuspects） -->
+            <SwitchPreferenceCompat
+                android:key="pref_camera_holder_suspects"
+                android:title="@string/dev_camera_suspects_title"
+                android:summary="@string/dev_camera_suspects_summary" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:title="@string/set_rearview_fisheye_title">
+
+            <SwitchPreferenceCompat
+                android:key="pref_gpu_fisheye_preview"
+                android:title="@string/dev_gpu_fisheye_preview_title"
+                android:summary="@string/dev_gpu_fisheye_preview_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_gpu_fisheye_video"
+                android:title="@string/dev_gpu_fisheye_video_title"
+                android:summary="@string/dev_gpu_fisheye_video_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_raw_frame_dump"
+                android:title="@string/dev_raw_frame_title"
+                android:summary="@string/dev_raw_frame_summary" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:title="@string/set_side_view_title">
+
+            <!-- 盲区画面的标定角度：每一路画面的朝向是猜的，上车标定之后再定默认值（AppConfig.SIDE_VIEW_DEFAULT_*） -->
+            <SeekBarPreference
+                android:key="pref_side_view_back"
+                android:title="@string/dev_side_view_back_title"
+                android:summary="@string/dev_side_view_back_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_view_up"
+                android:title="@string/dev_side_view_up_title"
+                android:summary="@string/dev_side_view_up_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_side_view_fov"
+                android:title="@string/dev_side_view_fov_title"
+                android:summary="@string/dev_side_view_fov_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:title="@string/set_group_files">
+
+            <Preference
+                android:key="pref_repair_mp4"
+                android:title="@string/dev_repair_mp4_title"
+                android:summary="@string/dev_repair_mp4_summary" />
+
+            <Preference
+                android:key="pref_archive"
+                android:title="@string/dev_archive_title"
+                android:summary="@string/dev_archive_summary" />
+        </PreferenceCategory>
 
         <Preference
             android:key="pref_developer_note"

@@ -44,6 +44,7 @@ public class FloatingActionTest {
         assertEquals("take_photo", FloatingAction.TAKE_PHOTO.key);
         assertEquals("toggle_mirror", FloatingAction.TOGGLE_MIRROR.key);
         assertEquals("none", FloatingAction.NONE.key);
+        assertEquals("lock_footage", FloatingAction.LOCK_FOOTAGE.key);
     }
 
     @Test
