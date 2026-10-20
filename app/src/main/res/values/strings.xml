@@ -213,6 +213,7 @@
     <string name="vi_group_vehicle">车辆</string>
     <string name="vi_group_assist">驾驶辅助</string>
     <string name="vi_gear">挡位</string>
+    <string name="vi_drive_mode">驾驶模式</string>
     <string name="vi_speed">车速</string>
     <string name="vi_ignition">点火状态</string>
     <string name="vi_brake_pedal">刹车踏板</string>
@@ -301,6 +302,9 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">行驶</string>
+    <string name="vi_v_drive_comfort">舒适</string>
+    <string name="vi_v_drive_standard">标准</string>
+    <string name="vi_v_drive_sport">运动</string>
     <string name="vi_v_screen_off">熄屏</string>
     <string name="vi_v_screen_on">亮屏</string>
     <string name="set_language_title">语言 / Language</string>

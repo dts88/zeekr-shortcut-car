@@ -158,6 +158,16 @@ public class SignalDecodeTest {
         assertNull(Signal.FCW.decode(255));
     }
 
+    /** 驾驶模式按值用（Lab 2026-10-20）：三个对上的、没对上的都照原样留着号码，占位值算没数据。 */
+    @Test
+    public void driveModeKeepsTheCode() {
+        assertEquals(Integer.valueOf(Signal.DRIVE_MODE_COMFORT), Signal.DRIVE_MODE.decode(0x22010101));
+        assertEquals(Integer.valueOf(Signal.DRIVE_MODE_STANDARD), Signal.DRIVE_MODE.decode(0x22010102));
+        assertEquals(Integer.valueOf(Signal.DRIVE_MODE_SPORT), Signal.DRIVE_MODE.decode(0x22010103));
+        assertEquals(Integer.valueOf(0x22010109), Signal.DRIVE_MODE.decode(0x22010109));
+        assertNull(Signal.DRIVE_MODE.decode(255));
+    }
+
     @Test
     public void lightSwitchKeepsTheCode() {
         assertEquals(Integer.valueOf(0), Signal.LIGHT_SWITCH.decode(0));

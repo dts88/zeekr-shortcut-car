@@ -9,6 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
+- System info: Drive mode (Comfort, Standard or Sport, as the car shows it). Tick it to show it on the driving info bar.
 - About & credits: thanks FerixzTanz for Blind spot view's default angles and window size, tuned on his own 7X.
 
 ## [2.15.0-alpha] - 2026-10-20

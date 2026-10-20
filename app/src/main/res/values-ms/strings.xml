@@ -193,6 +193,7 @@
     <string name="vi_group_vehicle">Kenderaan</string>
     <string name="vi_group_assist">Bantuan pemandu</string>
     <string name="vi_gear">Gear</string>
+    <string name="vi_drive_mode">Mod pemanduan</string>
     <string name="vi_speed">Kelajuan</string>
     <string name="vi_ignition">Penyalaan</string>
     <string name="vi_brake_pedal">Pedal brek</string>
@@ -281,6 +282,9 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Memandu</string>
+    <string name="vi_v_drive_comfort">Selesa</string>
+    <string name="vi_v_drive_standard">Standard</string>
+    <string name="vi_v_drive_sport">Sukan</string>
     <string name="vi_v_screen_off">Skrin padam</string>
     <string name="vi_v_screen_on">Skrin hidup</string>
     <string name="set_language_title">Bahasa / Language</string>

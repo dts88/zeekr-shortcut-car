@@ -193,6 +193,7 @@
     <string name="vi_group_vehicle">Vehicle</string>
     <string name="vi_group_assist">Driver assistance</string>
     <string name="vi_gear">Gear</string>
+    <string name="vi_drive_mode">Drive mode</string>
     <string name="vi_speed">Speed</string>
     <string name="vi_ignition">Ignition</string>
     <string name="vi_brake_pedal">Brake pedal</string>
@@ -281,6 +282,9 @@
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Driving</string>
+    <string name="vi_v_drive_comfort">Comfort</string>
+    <string name="vi_v_drive_standard">Standard</string>
+    <string name="vi_v_drive_sport">Sport</string>
     <string name="vi_v_screen_off">Screen off</string>
     <string name="vi_v_screen_on">Screen on</string>
     <string name="set_language_title">Language / 语言</string>

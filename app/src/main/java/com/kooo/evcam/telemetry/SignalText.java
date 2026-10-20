@@ -82,6 +82,19 @@ public final class SignalText {
                 }
                 return String.format(Locale.US, "0x%08X", code);
             }
+            case DRIVE_MODE: {
+                int code = v instanceof Integer ? (Integer) v : -1;
+                if (code == Signal.DRIVE_MODE_COMFORT) {
+                    return ctx.getString(R.string.vi_v_drive_comfort);
+                }
+                if (code == Signal.DRIVE_MODE_STANDARD) {
+                    return ctx.getString(R.string.vi_v_drive_standard);
+                }
+                if (code == Signal.DRIVE_MODE_SPORT) {
+                    return ctx.getString(R.string.vi_v_drive_sport);
+                }
+                return String.format(Locale.US, "0x%08X", code);
+            }
             case GEAR:
                 return String.valueOf(v);
             case KMH:

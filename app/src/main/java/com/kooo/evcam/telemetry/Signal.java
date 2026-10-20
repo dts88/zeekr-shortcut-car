@@ -24,6 +24,12 @@ public enum Signal {
 
     // ---- 行驶
     GEAR(Group.DRIVE, Kind.SENSOR_EVENT, 0x00200200, 0, R.string.vi_gear, Trust.CONFIRMED, Format.GEAR),
+    /**
+     * 驾驶模式（Lab 手册「一」，2026-10-20 车主在车上来回切了 10 次对的）：切换那一刻推来。ECARX 的常量名和车机界面上的叫法对不上，
+     * 按值用（{@link #DRIVE_MODE_COMFORT} 舒适、{@link #DRIVE_MODE_STANDARD} 标准、{@link #DRIVE_MODE_SPORT} 运动）；
+     * 雪地、自定义这些还没对上，照原样写号码。
+     */
+    DRIVE_MODE(Group.DRIVE, Kind.FUNCTION, 0x22010100, 0, R.string.vi_drive_mode, Trust.CONFIRMED, Format.DRIVE_MODE),
     SPEED(Group.DRIVE, Kind.SENSOR_VALUE, 0x00100100, 0, R.string.vi_speed, Trust.CONFIRMED, Format.MPS),
     IGNITION(Group.DRIVE, Kind.FUNCTION, 0x20259000, 0, R.string.vi_ignition, Trust.CONFIRMED, Format.IGNITION),
     BRAKE_PEDAL(Group.DRIVE, Kind.FUNCTION, 0x20317A00, 0, R.string.vi_brake_pedal, Trust.CONFIRMED, Format.ON_OFF),
@@ -203,6 +209,8 @@ public enum Signal {
         IGNITION,
         /** 档位枚举 → 字母 P / R / N / D */
         GEAR,
+        /** 驾驶模式的枚举码 → Integer（{@link #DRIVE_MODE_COMFORT} / {@link #DRIVE_MODE_STANDARD} / {@link #DRIVE_MODE_SPORT}，别的照原样） */
+        DRIVE_MODE,
         /** 原样的整数（量程待定） → Integer */
         RAW,
         /** 传感器给的是 m/s（0.2778 = 1 km/h）→ 乘 3.6 记成 km/h（Float） */
@@ -233,6 +241,13 @@ public enum Signal {
 
     public static final int DAY = 0x00201001;
     public static final int NIGHT = 0x00201002;
+
+    /** 驾驶模式：ECARX 叫 ECO，车机界面上是「舒适」（Lab 2026-10-20）。 */
+    public static final int DRIVE_MODE_COMFORT = 0x22010101;
+    /** 驾驶模式：ECARX 叫 COMFORT，车机界面上是「标准」。 */
+    public static final int DRIVE_MODE_STANDARD = 0x22010102;
+    /** 驾驶模式：ECARX 叫 DYNAMIC，车机界面上是「运动」。 */
+    public static final int DRIVE_MODE_SPORT = 0x22010103;
 
     public static final int IGNITION_ACC = 0x00200104;
     public static final int IGNITION_ON = 0x00200105;
@@ -336,6 +351,7 @@ public enum Signal {
                 return v != 0;
             case IGNITION:
             case LIGHT_SWITCH:
+            case DRIVE_MODE:
             case RAW:
                 return v;
             case GEAR:
