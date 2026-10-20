@@ -1057,8 +1057,8 @@ public class AppConfig {
     }
 
     /**
-     * 超级镜子要后座舱：切换范围是「后视 + 后座舱」。开不开超级镜子都算 —— 管线照它建后座舱这一路
-     * （CameraManagerHolder），调度照它判超级镜子要不要后座舱（ChannelRules），开关超级镜子时都不用重建。
+     * 切换范围是「后视 + 后座舱」。调度照它判登记着的超级镜子要不要后座舱（ChannelRules）；管线在超级镜子开着时照它建后座舱这一路
+     * （CameraManagerHolder.Shape），超级镜子打开时缺这一路就当场重建（RearViewMirrorService.showMirror）。
      */
     public boolean rearViewWantsCabinRear() {
         return getRearViewViews() == com.kooo.evcam.zeekr.MirrorViews.REAR_CABIN;

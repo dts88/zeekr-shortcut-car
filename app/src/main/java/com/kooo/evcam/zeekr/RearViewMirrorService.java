@@ -270,6 +270,11 @@ public class RearViewMirrorService extends Service {
         if (mirrorView != null && mirrorView.isShowing()) {
             return;
         }
+        // 「后视 + 后座舱」而管线里还没有后座舱（超级镜子关着时管线不为它建）：已经有管线就问一次，缺这一路当场重建
+        // （CameraManagerHolder.rebuildFor）。设置页、主界面、悬浮按钮、恢复，哪条路打开的超级镜子都经过这里
+        if (CameraManagerHolder.getInstance().getCameraManager() != null) {
+            CameraManagerHolder.getInstance().getOrInit(this);
+        }
         mirrorView = new RearViewMirrorView(this, appConfig);
         // 新窗口还不知道画面尺寸：下一次声明时交给它（MirrorCanvas.attach）
         surround.attach(mirrorView);
@@ -854,6 +859,21 @@ public class RearViewMirrorService extends Service {
                     && bound.hasFramesWithin(RearViewMirrorView.FROZEN_AFTER_MS);
         }
 
+        /**
+         * 窗口没挂上过就要移走（服务刚起来就退出）：这块画布（接回来的、自己建的）不会来 onSurfaceTextureDestroyed，
+         * 自己交给管线留着；交不出去（哪一份都不带着它、也没有这一路）就放掉。
+         */
+        void handOrphan() {
+            TextureView view = view();
+            if (view == null || view.isAttachedToWindow()) {
+                return;
+            }
+            SurfaceTexture st = view.getSurfaceTexture();
+            if (st != null && !st.isReleased() && !handToPipeline(st)) {
+                st.release();
+            }
+        }
+
         /** 新窗口接回上一个窗口留下的这块画布（{@link #takeBackKeptCanvas}），当场照「画布准备好」声明一次。 */
         void takeBack(MultiCameraManager pipeline) {
             TextureView view = view();
@@ -936,6 +956,10 @@ public class RearViewMirrorService extends Service {
         unbindCamera();
         surround.withdraw();
         cabin.withdraw();
+        // 窗口还没走过第一次布局就要移走：TextureView 没挂上过，不会来 onSurfaceTextureDestroyed —— 接回来的、自己建的画布
+        // 要自己交给管线（同盲区画面 detachWindow）
+        surround.handOrphan();
+        cabin.handOrphan();
         if (mirrorView != null) {
             mirrorView.hide();
             mirrorView = null;

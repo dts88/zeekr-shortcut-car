@@ -165,7 +165,7 @@ public class CameraManagerHolder {
         final Profile profile;
         /** 启用的那几路（key）。 */
         final Set<String> enabled;
-        /** 超级镜子要后座舱：切换范围是「后视 + 后座舱」（AppConfig.rearViewWantsCabinRear）。 */
+        /** 超级镜子要后座舱：超级镜子开着，切换范围是「后视 + 后座舱」（AppConfig.rearViewWantsCabinRear）。 */
         final boolean mirrorCabin;
         /** 前座舱（key back，配置里的座舱 1）要建。 */
         final boolean cabinFront;
@@ -187,8 +187,9 @@ public class CameraManagerHolder {
         static Shape of(Context app) {
             Profile profile = new ProfileStore(app).current();
             AppConfig config = new AppConfig(app);
+            // 超级镜子关着时不为它建后座舱：用不上的一路建着，车机拿相机 1 时调度照样会认它、拿它判别的路
             return new Shape(config.getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile),
-                    config.rearViewWantsCabinRear());
+                    config.isRearViewEnabled() && config.rearViewWantsCabinRear());
         }
 
         /** 车型和启用的几路（主界面的布局照它）。 */
