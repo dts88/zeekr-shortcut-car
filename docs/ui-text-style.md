@@ -191,7 +191,15 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 导出、导入设置（2026-10-19，车主要的功能，措辞待批）：set_settings_export_title「导出设置」/ Export settings / Eksport tetapan；
+  set_settings_export_summary「将当前设置保存为文件，与诊断报告存放在同一文件夹」；set_settings_import_title「导入设置」/ Import settings / Import tetapan；
+  set_settings_import_summary「从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件」；settings_exported「已导出到：
+%1$s」；
+  settings_export_failed「无法导出设置」、settings_export_failed_reason「导出设置失败：%1$s」；settings_pick_title「选择设置文件」；
+  settings_file_label「%1$s · 版本 %2$s」；settings_none_title「未找到设置文件」、settings_none_msg「导入时从此文件夹读取导出的设置文件：%1$s。」；
+  settings_import_refused_title「无法导入」、settings_other_version_msg「此文件由版本 %1$s 导出。只能导入 %2$d.x 版本导出的设置文件。」；
+  settings_unreadable「无法读取此设置文件」；settings_import_confirm_title「导入设置？」、settings_import_confirm_msg「当前设置将被覆盖。导入后应用将退出，重新打开后生效。」；
+  settings_import_action「导入并退出」；settings_import_failed「无法导入设置」；settings_imported_reopen「已导入设置，重新打开应用后生效」。英文、马来文见 strings.xml。
 
 ---
 

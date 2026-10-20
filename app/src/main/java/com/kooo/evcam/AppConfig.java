@@ -15,7 +15,8 @@ import com.kooo.evcam.settings.SettingsRegistry;
  */
 public class AppConfig {
     private static final String TAG = "AppConfig";
-    private static final String PREF_NAME = "app_config";
+    /** 设置存在这个文件里（导出、导入设置时也读写它，{@code settings.SettingsBackup}）。 */
+    public static final String PREF_NAME = "app_config";
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
@@ -647,6 +648,31 @@ public class AppConfig {
 
     private static boolean readsAsUnset(String key) {
         return readsAsUnset(key, com.kooo.evcam.settings.DeveloperMode.isUnlocked());
+    }
+
+    /**
+     * 存在这份设置里、却不是设置的键：首次启动和「问过没有」的记号、因熄屏退下去的标记、自动检测的缓存、一次性迁移的记号、
+     * 存下的槽位映射（按车型，检测出来的，见 {@link #getStoredSlotMap}）。
+     *
+     * <p>导出设置不带它们，导入时也不动它们（{@code settings.SettingsBackup}，项目所有者 2026-10-19）。
+     * 新加的键默认算设置；是运行状态的，加到这里。</p>
+     */
+    private static final java.util.Set<String> RUNTIME_KEYS = runtimeKeys();
+
+    private static java.util.Set<String> runtimeKeys() {
+        return java.util.Collections.unmodifiableSet(new java.util.HashSet<>(java.util.Arrays.asList(
+                KEY_FIRST_LAUNCH,
+                KEY_LANGUAGE_CHOSEN,
+                KEY_RAIL_SIDE_CHOSEN,
+                KEY_UI_LEFT_FOR_SCREEN_OFF,
+                KEY_LAST_DETECTED_SD_PATH,
+                KEY_REARVIEW_GUIDE_SEEN,
+                KEY_PHOTO_VIA_JPEG_RESET)));
+    }
+
+    /** 这个键是运行状态，不是设置（见 {@link #RUNTIME_KEYS}）。纯函数，测试直接调。 */
+    public static boolean isRuntimeState(String key) {
+        return key == null || RUNTIME_KEYS.contains(key) || key.startsWith(KEY_SLOT_MAP_PREFIX);
     }
 
     private boolean readBoolean(String key, boolean defaultValue) {

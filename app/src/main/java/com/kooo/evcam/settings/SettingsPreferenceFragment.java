@@ -1026,13 +1026,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 系统：诊断信息、系统信息、开机自启动（含保活）、熄屏持续录制。
+     * 系统：诊断信息、导出 / 导入设置、系统信息、开机自启动（含保活）、熄屏持续录制。
      * 开发者的「熄屏录制（阻止休眠）」不在这里，在开发者选项分区（{@link #bindAdvanced}）。
      */
     private void bindSystem() {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
+        // 导出、导入设置（项目所有者 2026-10-19）：和诊断报告同一个文件夹；导入后应用退出，重新打开时照新设置起来
+        onClick("pref_settings_export", pref -> SettingsBackupFlow.export(requireActivity()));
+        onClick("pref_settings_import", pref -> SettingsBackupFlow.startImport(requireActivity()));
+        Preference importRow = findPreference("pref_settings_import");
+        if (importRow != null) {
+            importRow.setSummary(getString(R.string.set_settings_import_summary,
+                    SettingsBackup.currentMajor(requireContext())));
+        }
         // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));

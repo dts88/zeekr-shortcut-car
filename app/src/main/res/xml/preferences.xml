@@ -429,6 +429,16 @@
             android:title="@string/set_diagnostics_title"
             android:summary="@string/set_diagnostics_summary" />
 
+        <!-- 导出、导入设置：和诊断报告放在同一个文件夹；导入的说明写着能导入哪个大版本的文件，由代码填 -->
+        <Preference
+            android:key="pref_settings_export"
+            android:title="@string/set_settings_export_title"
+            android:summary="@string/set_settings_export_summary" />
+
+        <Preference
+            android:key="pref_settings_import"
+            android:title="@string/set_settings_import_title" />
+
         <Preference
             android:key="pref_vehicle_info"
             android:title="@string/set_vehicle_info_title"

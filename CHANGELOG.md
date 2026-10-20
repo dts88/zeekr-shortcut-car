@@ -10,6 +10,7 @@ commit message, not here.
 ## [Unreleased]
 
 - Settings: rows on each page are grouped under headings. Keep recording when the screen goes off moves from System to Recording, next to Record on launch.
+- Settings → System: Export settings saves every setting and the stream profiles to a file in the diagnostics report folder; Import settings restores one exported by the same major version, then exits the app so everything starts with the restored settings. Diagnostics reports now include the full settings.
 
 ## [2.14.0-alpha] - 2026-10-19
 
