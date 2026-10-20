@@ -144,4 +144,11 @@ every change since then is visible as a diff.
 
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
+### Contributors
+
+- **[wysie](https://github.com/wysie)** — a great deal of design and code.
+- **[FerixzTanz](https://github.com/FerixzTanz)** — the original code and on-car research for Blind spot view.
+  Its default angles and window size are the ones he tuned on his own 7X. Many thanks for his careful
+  parameter tuning.
+
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).

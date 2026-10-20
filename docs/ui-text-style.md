@@ -211,7 +211,9 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- about_credits_contributors 里 FerixzTanz 那一条（2026-10-20，项目所有者要求着重感谢他的参数调整）：
+  「• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究。盲区画面默认的角度和窗口大小，是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。」；
+  English「• FerixzTanz (GitHub) — the original code and on-car research for Blind spot view. Its default angles and window size are the ones he tuned on his own 7X. Many thanks for his careful parameter tuning.」（关于页只有中英两份）。
 
 ---
 

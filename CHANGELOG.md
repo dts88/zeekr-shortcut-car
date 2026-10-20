@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- About & credits: thanks FerixzTanz for Blind spot view's default angles and window size, tuned on his own 7X.
 
 ## [2.15.0-alpha] - 2026-10-20
 
