@@ -1,10 +1,8 @@
 package com.kooo.evcam.repair;
 
-import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +27,10 @@ import java.util.List;
  * <p>{@code mdat} 里是一串<b>带 4 字节长度前缀的 NAL</b>（MPEG4Writer 把编码器给的起始码
  * 换成了长度）。顺着长度前缀就能一个接一个走完整个文件，走出每一帧的位置和大小 ——
  * 这一步不需要解码，只读每个 NAL 的头一个字节判断类型。</p>
+ *
+ * <p>录着声音的文件（环视那一路），{@code mdat} 里是画面一块、声音一块交替着（MPEG4Writer 按时间把每条轨攒成块写）。
+ * 声音没有长度前缀，顺着画面走到一块声音就接不上了：从那里往后找下一段画面 —— 一个能开一帧的 NAL，
+ * 后面接得上再两个（{@link #opensRun}）—— 从那里接着走。声音那几块跳过，修好的文件只有画面。</p>
  *
  * <p>唯一补不出来的是解码参数 SPS/PPS：本应用把编码器的 codec-config 交给了 MediaMuxer
  * 写进 {@code moov}，没有混在画面数据里（见 CodecVideoRecorder 对
@@ -337,17 +339,20 @@ public final class Mp4Repair {
         public final long durationMs;
         /** 结尾没能认出来的字节数 —— 断电时写了一半的那一帧。 */
         public final long tailIgnored;
+        /** 夹在画面中间、跳过的字节数 —— 声音那几块（录着声音的文件），修好的文件里只有画面。 */
+        public final long otherBytes;
         private final long originalLength;
         private final long headerPos;
         private final byte[] headerBytes;
 
-        Repaired(File file, int samples, int syncSamples, long durationMs, long tailIgnored,
+        Repaired(File file, int samples, int syncSamples, long durationMs, long tailIgnored, long otherBytes,
                  long originalLength, long headerPos, byte[] headerBytes) {
             this.file = file;
             this.samples = samples;
             this.syncSamples = syncSamples;
             this.durationMs = durationMs;
             this.tailIgnored = tailIgnored;
+            this.otherBytes = otherBytes;
             this.originalLength = originalLength;
             this.headerPos = headerPos;
             this.headerBytes = headerBytes;
@@ -414,7 +419,7 @@ public final class Mp4Repair {
 
         long durationMs = samples.count * template.sampleTicks * 1000L / template.timescale;
         return new Repaired(broken, samples.count, samples.syncCount, durationMs,
-                scan.dataEnd - samples.consumedTo, originalLength, scan.mdatBoxStart, header);
+                scan.dataEnd - samples.consumedTo, samples.otherBytes, originalLength, scan.mdatBoxStart, header);
     }
 
     // ----------------------------------------------------------------- 走一遍 NAL
@@ -428,6 +433,8 @@ public final class Mp4Repair {
         int syncCount;
         /** 认到哪个字节为止。 */
         long consumedTo;
+        /** 中间跳过的字节（声音那几块）。 */
+        long otherBytes;
 
         void add(long offset, long size, boolean sync) {
             if (count == offsets.length) {
@@ -465,11 +472,22 @@ public final class Mp4Repair {
      * 指数哥伦布编码，值为 0 时第一个比特就是 1；HEVC 条带头的第一个比特正好是
      * {@code first_slice_segment_in_pic_flag}。两者都是「首字节最高位为 1 即新一帧」，
      * 不用真的去解析条带头。</p>
+     *
+     * <h3>接不上的时候</h3>
+     *
+     * <p>一个 NAL 认不出来（{@link #readNal}），就是走到了别的东西：一块声音，或者结尾写了一半的那一帧。
+     * 往后找下一段画面（{@link #resync}），找到了从那里接着走，前面那一帧到此为止；找不到就是结尾。</p>
+     *
+     * <p>还有一种：一块声音开头那几个字节碰巧像一个 NAL，长度又落在文件里 —— 照它走会一口跳过后面好几帧画面。
+     * 所以一个 NAL 后面接不上时（它可能是一段画面的最后一个，也可能就是这种假的），先在它自己这一截里找：
+     * 找到一段画面，说明它是假的，从那里接着走；找不到才算它是这一段的最后一个。真的那种这一截里全是编码数据，
+     * 找不出能连着接上三个 NAL 的位置。</p>
      */
     private static Samples walk(File file, Scan scan, boolean hevc, Progress progress)
             throws IOException {
         Samples out = new Samples();
         long total = scan.dataBytes();
+        long end = scan.dataEnd;
         long pos = scan.dataStart;
         long sampleStart = -1;
         long sampleSize = 0;
@@ -477,33 +495,38 @@ public final class Mp4Repair {
         boolean haveSlice = false;
         long lastReport = 0;
 
-        try (InputStream raw = new FileInputStream(file)) {
-            skipFully(raw, scan.dataStart);
-            BufferedInputStream in = new BufferedInputStream(raw, 1 << 16);
-            byte[] head = new byte[8];
-            while (pos + 4 <= scan.dataEnd) {
-                if (!readFully(in, head, 0, 4)) {
-                    break;
+        try (Reader in = new Reader(file)) {
+            while (pos + 4 <= end) {
+                Nal nal = readNal(in, pos, end, hevc);
+                // 不是画面时从哪里接着走；-1 = 后面再没有画面了
+                long next = -1;
+                if (nal != null) {
+                    long after = pos + 4 + nal.length;
+                    if (after < end && readNal(in, after, end, hevc) == null) {
+                        long inner = resync(in, pos + 1, after, end, hevc);
+                        if (inner >= 0) {
+                            nal = null;  // 它自己就是声音里像 NAL 的几个字节
+                            next = inner;
+                        }
+                    }
+                } else {
+                    next = resync(in, pos + 1, end, end, hevc);
                 }
-                long nalLength = readU32(head, 0);
-                if (nalLength <= 0 || nalLength > MAX_NAL_BYTES
-                        || pos + 4 + nalLength > scan.dataEnd) {
-                    break;  // 结尾那一帧写了一半，或者已经不是有效数据
+                if (nal == null) {
+                    if (next < 0) {
+                        break;  // 结尾那一帧写了一半，或者后面已经不是有效数据
+                    }
+                    // 画面在这里断开过：前面那一帧到此为止
+                    if (sampleStart >= 0) {
+                        out.add(sampleStart, sampleSize, sampleSync);
+                        sampleStart = -1;
+                    }
+                    out.otherBytes += next - pos;
+                    pos = next;
+                    continue;
                 }
-                int peek = (int) Math.min(3, nalLength);
-                if (!readFully(in, head, 4, peek)) {
-                    break;
-                }
-                int first = head[4] & 0xFF;
-                int type = hevc ? (first >> 1) & 0x3F : first & 0x1F;
-                boolean slice = hevc ? type <= 31 : (type >= 1 && type <= 5);
-                boolean key = hevc ? (type >= 16 && type <= 21) : type == 5;
-                // 条带头的首字节：H.264 在 NAL 头之后 1 字节，HEVC 之后 2 字节
-                int headerBytes = hevc ? 2 : 1;
-                boolean newPicture = slice && peek >= headerBytes + 1
-                        && (head[4 + headerBytes] & 0x80) != 0;
 
-                boolean starts = sampleStart < 0 || (haveSlice && (!slice || newPicture));
+                boolean starts = sampleStart < 0 || (haveSlice && (!nal.slice || nal.newPicture));
                 if (starts) {
                     if (sampleStart >= 0) {
                         out.add(sampleStart, sampleSize, sampleSync);
@@ -513,16 +536,15 @@ public final class Mp4Repair {
                     sampleSync = false;
                     haveSlice = false;
                 }
-                sampleSize += 4 + nalLength;
-                if (slice) {
+                sampleSize += 4 + nal.length;
+                if (nal.slice) {
                     haveSlice = true;
-                    if (key) {
+                    if (nal.key) {
                         sampleSync = true;
                     }
                 }
 
-                skipFully(in, nalLength - peek);
-                pos += 4 + nalLength;
+                pos += 4 + nal.length;
                 if (progress != null && pos - lastReport > (4 << 20)) {
                     lastReport = pos;
                     progress.onProgress(pos - scan.dataStart, total);
@@ -537,6 +559,164 @@ public final class Mp4Repair {
             progress.onProgress(total, total);
         }
         return out;
+    }
+
+    /** 一个 NAL 的长度和类型（{@link #readNal}）。 */
+    static final class Nal {
+        final long length;
+        final boolean slice;
+        final boolean key;
+        /** 条带，而且标着从第 0 个宏块开始（新的一帧）。 */
+        final boolean newPicture;
+        /** 能开一帧：参数集、SEI、访问单元分隔符，或者新的一帧的第一个条带。一段画面的第一个 NAL 一定是它。 */
+        final boolean opensPicture;
+
+        Nal(long length, boolean slice, boolean key, boolean newPicture, boolean opensPicture) {
+            this.length = length;
+            this.slice = slice;
+            this.key = key;
+            this.newPicture = newPicture;
+            this.opensPicture = opensPicture;
+        }
+    }
+
+    /** 往后找一段画面时，要连着接上几个 NAL 才算数（正好走到头的除外）。 */
+    private static final int RUN_NALS = 3;
+
+    /**
+     * pos 这里是不是一个像样的 NAL：长度在文件里、不超过上限；NAL 头合法 —— 禁止位是 0，类型是编码器会出的那几种，
+     * HEVC 的层号是 0、时域号不是 0，H.264 的 nal_ref_idc 和类型对得上（标准里规定死的那几条）。
+     * 声音、写了一半的结尾、编码数据中间随便一个位置，几乎都过不了这几条。
+     *
+     * @return 认不出是 null
+     */
+    static Nal readNal(Reader in, long pos, long end, boolean hevc) throws IOException {
+        if (pos + 4 > end) {
+            return null;
+        }
+        byte[] head = in.head;
+        if (!in.read(pos, head, 0, 4)) {
+            return null;
+        }
+        long length = readU32(head, 0);
+        int headerBytes = hevc ? 2 : 1;
+        if (length < headerBytes || length > MAX_NAL_BYTES || pos + 4 + length > end) {
+            return null;
+        }
+        int peek = (int) Math.min(3, length);
+        if (!in.read(pos + 4, head, 4, peek)) {
+            return null;
+        }
+        int b0 = head[4] & 0xFF;
+        if ((b0 & 0x80) != 0) {
+            return null;  // forbidden_zero_bit
+        }
+        int type;
+        boolean slice;
+        boolean key;
+        boolean opener;
+        if (hevc) {
+            int b1 = head[5] & 0xFF;
+            type = (b0 >> 1) & 0x3F;
+            int layer = ((b0 & 1) << 5) | (b1 >> 3);
+            if (layer != 0 || (b1 & 0x07) == 0) {
+                return null;  // nuh_layer_id 不是 0，或者 nuh_temporal_id_plus1 是 0
+            }
+            boolean vcl = type <= 9 || (type >= 16 && type <= 21);
+            if (!vcl && (type < 32 || type > 40)) {
+                return null;  // 保留的类型：编码器不会出
+            }
+            slice = vcl;
+            key = type >= 16 && type <= 21;
+            // VPS / SPS / PPS / 访问单元分隔符、前缀 SEI
+            opener = (type >= 32 && type <= 35) || type == 39;
+        } else {
+            type = b0 & 0x1F;
+            int ref = (b0 >> 5) & 0x03;
+            if (type < 1 || type > 12) {
+                return null;
+            }
+            if ((type == 5 || type == 7 || type == 8) && ref == 0) {
+                return null;  // IDR、SPS、PPS 的 nal_ref_idc 不能是 0
+            }
+            if ((type == 6 || type >= 9) && ref != 0) {
+                return null;  // SEI、分隔符、序列 / 码流结束、填充数据的 nal_ref_idc 必须是 0
+            }
+            slice = type <= 5;
+            key = type == 5;
+            // SEI / SPS / PPS / 访问单元分隔符
+            opener = type >= 6 && type <= 9;
+        }
+        boolean newPicture = slice && peek >= headerBytes + 1 && (head[4 + headerBytes] & 0x80) != 0;
+        return new Nal(length, slice, key, newPicture, slice ? newPicture : opener);
+    }
+
+    /** 从 [from, to) 里找下一段画面开始的地方（{@link #opensRun}）；没有是 -1。 */
+    static long resync(Reader in, long from, long to, long end, boolean hevc) throws IOException {
+        for (long p = from; p < to && p + 4 <= end; p++) {
+            if (opensRun(in, p, end, hevc)) {
+                return p;
+            }
+        }
+        return -1;
+    }
+
+    /** p 这里开始一段画面：一个能开一帧的 NAL，后面还接得上 {@link #RUN_NALS} - 1 个（或者正好走到头）。 */
+    private static boolean opensRun(Reader in, long p, long end, boolean hevc) throws IOException {
+        Nal first = readNal(in, p, end, hevc);
+        if (first == null || !first.opensPicture) {
+            return false;
+        }
+        long q = p + 4 + first.length;
+        for (int i = 1; i < RUN_NALS; i++) {
+            if (q == end) {
+                return true;
+            }
+            Nal next = readNal(in, q, end, hevc);
+            if (next == null) {
+                return false;
+            }
+            q += 4 + next.length;
+        }
+        return true;
+    }
+
+    /** 随机读文件：带一块 1 MB 的缓存（往前找、回头看一般都在附近）。 */
+    static final class Reader implements Closeable {
+        private final RandomAccessFile raf;
+        private final byte[] block = new byte[1 << 20];
+        private long blockStart = -1;
+        private int blockLength;
+        /** 读 NAL 头用的那几个字节（{@link #readNal}），一个 Reader 一份。 */
+        final byte[] head = new byte[8];
+
+        Reader(File file) throws IOException {
+            raf = new RandomAccessFile(file, "r");
+        }
+
+        /** 从 pos 读 length 个字节到 out[at..]；文件里没有这么多是 false。 */
+        boolean read(long pos, byte[] out, int at, int length) throws IOException {
+            if (blockStart < 0 || pos < blockStart || pos + length > blockStart + blockLength) {
+                raf.seek(pos);
+                blockStart = pos;
+                blockLength = 0;
+                int n;
+                while (blockLength < block.length
+                        && (n = raf.read(block, blockLength, block.length - blockLength)) > 0) {
+                    blockLength += n;
+                }
+                if (length > blockLength) {
+                    return false;
+                }
+            }
+            System.arraycopy(block, (int) (pos - blockStart), out, at, length);
+            return true;
+        }
+
+        @Override
+        public void close() throws IOException {
+            raf.close();
+        }
     }
 
     // ----------------------------------------------------------------- 拼索引
@@ -726,32 +906,5 @@ public final class Mp4Repair {
             at += (int) size;
         }
         return found;
-    }
-
-    private static boolean readFully(InputStream in, byte[] out, int at, int length)
-            throws IOException {
-        int done = 0;
-        while (done < length) {
-            int read = in.read(out, at + done, length - done);
-            if (read < 0) {
-                return false;
-            }
-            done += read;
-        }
-        return true;
-    }
-
-    private static void skipFully(InputStream in, long bytes) throws IOException {
-        long left = bytes;
-        while (left > 0) {
-            long skipped = in.skip(left);
-            if (skipped <= 0) {
-                if (in.read() < 0) {
-                    return;
-                }
-                skipped = 1;
-            }
-            left -= skipped;
-        }
     }
 }
