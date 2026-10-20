@@ -69,11 +69,13 @@
     <string name="set_photo_limit_message">每小时检查一次，超出上限时自动清理最旧的照片，仅删除本应用拍摄且未锁定的照片。留空或填 0 表示不限制。</string>
     <string name="set_storage_usage_title">录像保存路径</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
-    <string name="set_rearview_summary">悬浮显示环视中的任一路画面；后视画面左右镜像，与车内后视镜一致</string>
+    <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
     <string name="set_rearview_button_mode_title">按键模式</string>
-    <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面</string>
-    <string name="set_rearview_front_rear_title">只显示前后视</string>
-    <string name="set_rearview_front_rear_summary">仅在前视与后视之间切换</string>
+    <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
+    <string name="set_rearview_views_title">切换范围</string>
+    <string name="opt_views_four">四向</string>
+    <string name="opt_views_front_rear">前后</string>
+    <string name="opt_views_rear_cabin">后视 + 后座舱</string>
     <string name="set_rearview_fisheye_title">鱼眼校正</string>
     <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级镜子，不影响录像。</string>
     <string name="set_rearview_fov_title">视野角度</string>
@@ -82,7 +84,7 @@
     <string name="set_rearview_height_title">窗口高度</string>
     <string name="set_rearview_height_summary">宽度和高度均可调至全屏；画面比例不变，窗口形状只决定可见范围</string>
     <string name="set_rearview_reset_title">重置窗口与画面</string>
-    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「只显示前后视」和「方向标签」的默认值，并切回后视</string>
+    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「切换范围」和「方向标签」的默认值，并切回后视</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->

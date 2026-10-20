@@ -139,7 +139,7 @@ public final class ChannelRules {
     public enum Kind {
         /** 主界面的预览画布。 */
         PREVIEW,
-        /** 超级镜子的画布（只有环视有）。 */
+        /** 超级镜子的画布：环视有；切换范围是「后视 + 后座舱」时后座舱也有（{@link World#mirrorCabin}）。 */
         MIRROR,
         /** 盲区画面的画布（只有环视有）：和预览、超级镜子挂在同一条共享的预览流上。 */
         SIDE,
@@ -379,6 +379,12 @@ public final class ChannelRules {
          * 关着的座舱不开（{@link ChannelRules#releasedByDark}）—— 「30 秒内一步不动」，也不在黑屏里去开它（项目所有者 2026-10-13）。
          */
         boolean screenDark;
+        /**
+         * 超级镜子要后座舱：切换范围是「后视 + 后座舱」（AppConfig.rearViewWantsCabinRear，项目所有者 2026-10-19）。
+         * 登记着 MIRROR 时后座舱和环视一样有人要、带超级镜子的画布；配置里没启用后座舱也一样（管线照它建了这一路）。
+         * 熄屏放开座舱、车机要睡、退出照旧（{@link #releasedByDark}）。
+         */
+        boolean mirrorCabin;
         /** 最近一次（通道眼里）亮屏的时刻（§7.4：亮屏解除停手）。黑了不到 30 秒又亮的，没黑过，不算。 */
         long screenOnAt;
         /** 前台服务在不在（CameraForegroundService.isRunning）：没有它就不保持 —— 后台拿着相机安卓要求有前台服务。 */
@@ -1182,7 +1188,8 @@ public final class ChannelRules {
 
     /**
      * 谁要这一路（§一的登记表）：预览 —— 登记着而且亮屏，要启用的全部（{@link World#enabled}）；录像 —— 录像计划里的路；
-     * 拍照 —— 启用的全部；后视镜、盲区画面 —— 环视，配置里没开环视也要（项目所有者 2026-10-16）。保持不在这里（{@link #holding}）。
+     * 拍照 —— 启用的全部；后视镜 —— 环视，切换范围是「后视 + 后座舱」时还有后座舱（{@link #mirrorWants}）；盲区画面 —— 环视；
+     * 后视镜、盲区画面要的路配置里没开也要（项目所有者 2026-10-16、2026-10-19）。保持不在这里（{@link #holding}）。
      *
      * <p>熄屏时 PREVIEW 不算：主界面看不见。开发者「熄屏录制（阻止休眠）」开着、熄屏时没在录，于是照登记表关
      * （项目所有者 2026-10-11，§7.5）。</p>
@@ -1220,6 +1227,7 @@ public final class ChannelRules {
             case RECORDING:
                 return w.recordPlan.contains(lane.key);
             case MIRROR:
+                return mirrorWants(w, lane);
             case SIDE_VIEW:
                 return isSurround(lane);
             default:   // 拍照
@@ -1313,7 +1321,8 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视；
+     * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视
+     * （切换范围是「后视 + 后座舱」时还有后座舱）；
      * 盲区画面 —— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
      * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
      */
@@ -1325,7 +1334,7 @@ public final class ChannelRules {
             case PREVIEW:
                 return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key);
             case MIRROR:
-                return w.holders.contains(CameraNeeds.Holder.MIRROR) && isSurround(lane);
+                return w.holders.contains(CameraNeeds.Holder.MIRROR) && mirrorWants(w, lane);
             case SIDE:
                 return w.holders.contains(CameraNeeds.Holder.SIDE_VIEW) && isSurround(lane);
             case RECORD:
@@ -1443,6 +1452,19 @@ public final class ChannelRules {
 
     static boolean isSurround(Lane lane) {
         return CameraSlots.KEY_SURROUND.equals(lane.key);
+    }
+
+    /** 后座舱那一路（超级镜子「后视 + 后座舱」要它，{@link World#mirrorCabin}）。 */
+    static boolean isCabinRear(Lane lane) {
+        return CameraSlots.KEY_CABIN_REAR.equals(lane.key);
+    }
+
+    /**
+     * 后视镜要哪几路（登记着 MIRROR 时）：环视；切换范围是「后视 + 后座舱」时还有后座舱。谁要（{@link #holderWants}）和要哪种输出
+     * （{@link #wantsKind}）都问这一处。
+     */
+    static boolean mirrorWants(World w, Lane lane) {
+        return isSurround(lane) || w.mirrorCabin && isCabinRear(lane);
     }
 
     /** 一路此刻怎样，给录像和后视镜读（ChannelScheduler.condition）。 */

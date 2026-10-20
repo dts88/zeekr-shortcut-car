@@ -159,6 +159,25 @@ public class SideViewService extends Service {
         appConfig = new AppConfig(this);
         instance = this;
         ScreenState.addListener(screenListener);
+        // 管线被放掉重建了：新的一份建好当场重新声明（同超级镜子，见 pipelineReplaced）
+        CameraManagerHolder.getInstance().addReplacedListener(pipelineReplaced);
+    }
+
+    /**
+     * 管线被放掉重建了（换车型、上一次列相机出错、超级镜子要后座舱而管线里没有）：新的一份建好就当场重新声明，不等看门狗那两秒 ——
+     * 新的一份开环视时会话里就带着盲区画面的画布，不用随后再改一次输出。和超级镜子、主界面同一个办法。
+     */
+    private final Runnable pipelineReplaced = () -> {
+        CameraManagerHolder holder = CameraManagerHolder.getInstance();
+        holder.whenBuilt(holder.getCameraManager(), built -> handler.post(this::rebindIfAttached));
+    };
+
+    /** 窗口挂着、亮着屏、画布在：再声明一次（看门狗到点、管线换了都走这里）。 */
+    private void rebindIfAttached() {
+        SideViewWindow w = window;
+        if (!destroyed && w != null && w.isAttached() && !ScreenState.dark() && w.getTextureView().isAvailable()) {
+            bindCamera(w.getTextureView().getSurfaceTexture());
+        }
     }
 
     @Override
@@ -588,10 +607,7 @@ public class SideViewService extends Service {
         watchdog = new Runnable() {
             @Override
             public void run() {
-                SideViewWindow w = window;
-                if (w != null && w.isAttached() && !ScreenState.dark() && w.getTextureView().isAvailable()) {
-                    bindCamera(w.getTextureView().getSurfaceTexture());
-                }
+                rebindIfAttached();
                 handler.postDelayed(this, WATCHDOG_INTERVAL_MS);
             }
         };
@@ -654,6 +670,7 @@ public class SideViewService extends Service {
         destroyed = true;
         instance = null;
         ScreenState.removeListener(screenListener);
+        CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
         stopListening();
         detachWindow();
         handler.removeCallbacksAndMessages(null);

@@ -86,11 +86,19 @@ public final class SettingsRegistry {
             entry("right", "右侧", R.string.opt_rail_right),
             entry("left", "左侧", R.string.opt_rail_left));
 
+    /** 超级镜子的切换范围（{@link com.kooo.evcam.zeekr.MirrorViews}）：分段按钮，三档（项目所有者 2026-10-19）。 */
+    public static final SettingSpec REARVIEW_VIEWS = SettingSpec.of(
+            "rearview_views", "切换范围", "four",
+            entry("four", "四向", R.string.opt_views_four),
+            entry("front_rear", "前后", R.string.opt_views_front_rear),
+            entry("rear_cabin", "后视 + 后座舱", R.string.opt_views_rear_cabin));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
             CAR_MODEL,
             LANGUAGE,
             FISHEYE_PROJECTION,
-            ACTION_RAIL_SIDE));
+            ACTION_RAIL_SIDE,
+            REARVIEW_VIEWS));
 }

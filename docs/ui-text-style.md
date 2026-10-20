@@ -183,6 +183,24 @@
   _cleanup「自动清理」、_views「切换画面」、_window「窗口」、_behavior「行为」、_appearance「外观」、_position「位置」、
   _main_screen「主界面」、_cameras「摄像头」、_files「文件维护」；另有几组直接用同名设置项的文字（存储位置、锁定影像、行驶信息条、
   鱼眼校正、盲区画面、录制）。英文、马来文照术语表。
+- 2026-10-19 批准（超级镜子切换范围，取代「只显示前后视」开关）：set_rearview_views_title「切换范围」/ Views / Paparan；
+  三档 opt_views_four「四向」/ All four / Empat arah、opt_views_front_rear「前后」/ Front and rear / Depan dan belakang、
+  opt_views_rear_cabin「后视 + 后座舱」/ Rear + rear cabin / Belakang + kabin belakang；后座舱的方向标签沿用 slot_cabin_rear「后座舱」；
+  set_rearview_reset_summary 里「只显示前后视」换成「切换范围」。
+- 2026-10-20 批准（超级镜子说明跟上后座舱）：set_rearview_summary「悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致」；
+  Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror；
+  Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman。
+- 2026-10-20 批准：set_rearview_button_mode_summary「点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视」；
+  …; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom；
+  …; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah。
+- 2026-10-20 批准（导出、导入设置）：set_settings_export_title「导出设置」/ Export settings / Eksport tetapan；
+  set_settings_export_summary「将当前设置保存为文件，与诊断报告存放在同一文件夹」；set_settings_import_title「导入设置」/ Import settings / Import tetapan；
+  set_settings_import_summary「从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件」；settings_exported「已导出到：\n%1$s」；
+  settings_export_failed「无法导出设置」、settings_export_failed_reason「导出设置失败：%1$s」；settings_pick_title「选择设置文件」；
+  settings_file_label「%1$s · 版本 %2$s」；settings_none_title「未找到设置文件」、settings_none_msg「导入时从此文件夹读取导出的设置文件：%1$s。」；
+  settings_import_refused_title「无法导入」、settings_other_version_msg「此文件由版本 %1$s 导出。只能导入 %2$d.x 版本导出的设置文件。」；
+  settings_unreadable「无法读取此设置文件」；settings_import_confirm_title「导入设置？」、settings_import_confirm_msg「当前设置将被覆盖。导入后应用将退出，重新打开后生效。」；
+  settings_import_action「导入并退出」；settings_import_failed「无法导入设置」；settings_imported_reopen「已导入设置，重新打开应用后生效」。英文、马来文见 strings.xml。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -191,15 +209,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 导出、导入设置（2026-10-19，车主要的功能，措辞待批）：set_settings_export_title「导出设置」/ Export settings / Eksport tetapan；
-  set_settings_export_summary「将当前设置保存为文件，与诊断报告存放在同一文件夹」；set_settings_import_title「导入设置」/ Import settings / Import tetapan；
-  set_settings_import_summary「从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件」；settings_exported「已导出到：
-%1$s」；
-  settings_export_failed「无法导出设置」、settings_export_failed_reason「导出设置失败：%1$s」；settings_pick_title「选择设置文件」；
-  settings_file_label「%1$s · 版本 %2$s」；settings_none_title「未找到设置文件」、settings_none_msg「导入时从此文件夹读取导出的设置文件：%1$s。」；
-  settings_import_refused_title「无法导入」、settings_other_version_msg「此文件由版本 %1$s 导出。只能导入 %2$d.x 版本导出的设置文件。」；
-  settings_unreadable「无法读取此设置文件」；settings_import_confirm_title「导入设置？」、settings_import_confirm_msg「当前设置将被覆盖。导入后应用将退出，重新打开后生效。」；
-  settings_import_action「导入并退出」；settings_import_failed「无法导入设置」；settings_imported_reopen「已导入设置，重新打开应用后生效」。英文、马来文见 strings.xml。
+- （现在没有。）
 
 ---
 
@@ -227,7 +237,8 @@
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
 | 盲区画面 | 盲区画面（打转向灯时在屏幕该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
-| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*） |
+| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
+| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
 | 行驶信息条 | 行驶信息条；仅系统信息页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
 | 系统信息 | 系统信息（试验性） | System info (experimental) | Maklumat sistem (percubaan) | — |

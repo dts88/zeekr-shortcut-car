@@ -204,6 +204,9 @@ public final class ChannelScheduler {
         /** 录像要哪几路：这一次录像的计划。 */
         Set<String> recordPlan();
 
+        /** 超级镜子要后座舱：切换范围是「后视 + 后座舱」（{@link ChannelRules.World#mirrorCabin}）。哪个线程都能调。 */
+        boolean mirrorWantsCabinRear();
+
         /**
          * 屏幕亮着（屏幕真没黑：ScreenState.dark 的反面）。通道眼里亮不亮由调度照规则算（{@link ChannelRules#darkForChannel}：
          * 黑满 30 秒、或者车机要睡才算黑），下面两样是它要的另外两个事实。
@@ -1922,6 +1925,15 @@ public final class ChannelScheduler {
         w.holders.addAll(holders);
         w.recordPlan.clear();
         w.recordPlan.addAll(host.recordPlan());
+        boolean mirrorCabin = host.mirrorWantsCabinRear();
+        if (mirrorCabin != w.mirrorCabin) {
+            w.mirrorCabin = mirrorCabin;
+            if (w.holders.contains(CameraNeeds.Holder.MIRROR)) {
+                // 切换范围换了、后视镜登记着：和登记表变了一样，后座舱要不要、带不带超级镜子的画布跟着变。
+                // 没登记着时谁的要求都没变，不算（不为它放开停手的路）
+                w.needsVersion++;
+            }
+        }
         noteNeeds();
 
         boolean wasOn = w.screenOn;
