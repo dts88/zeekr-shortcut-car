@@ -688,6 +688,31 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("close dark-release"), front.actions);
     }
 
+    // ================================================================= 画布算到关完（2026-10-20 审查，车主批）
+
+    /**
+     * 关一开始会话快照就清了，相机还在关：这期间画布还算挂在这一路上，交给这一份调度、关完才放（以前当场就不算了，
+     * 退出、重建时画布在关完之前被放掉）。
+     */
+    @Test
+    public void aCanvasStaysCarriedUntilItsCameraHasClosed() {
+        host.foregroundService = false;   // 没有前台服务就不保持：没人要当场关
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        assertTrue(s.sessionCarries(SUR, mirror));
+        drop(Holder.MIRROR);
+        settle();
+        assertEquals(1, surround.actions.size());
+        assertTrue(surround.actions.get(0), surround.actions.get(0).startsWith("close "));
+        assertTrue("快照清了，相机还在关：还带着", s.sessionCarries(SUR, mirror));
+        at(300);
+        closed(surround);
+        settle();
+        assertFalse("关完了：不带着了", s.sessionCarries(SUR, mirror));
+    }
+
     // ================================================================= 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）
 
     /**
@@ -1281,13 +1306,18 @@ public class ChannelSchedulerTest {
         assertTrue("座舱不受影响", rear.actions.isEmpty() && front.actions.isEmpty());
     }
 
-    /** 相机层自己丢的录像输出（会话配不上、消费者被收走）：当场告诉；别的输出不归录像管。 */
+    /**
+     * 相机层自己丢的输出（会话配不上、消费者被收走）：录像、盲区画面、超级镜子当场告诉声明它的那一侧（盲区画面、超级镜子收到
+     * 「配不上」撤回，调度就不会一直想把它加回去）；预览不告诉。
+     */
     @Test
-    public void aRecordOutputTheCameraDroppedIsReportedAtOnce() {
+    public void anOutputTheCameraDroppedIsReportedAtOnce() {
         settle();
         s.onOutputDropped("2", recS, SingleCamera.Drop.CONFIG_FAILED);
+        s.onOutputDropped("2", new Out(Kind.SIDE, "side-2"), SingleCamera.Drop.CONFIG_FAILED);
+        s.onOutputDropped("2", new Out(Kind.MIRROR, "mirror-2"), SingleCamera.Drop.CONFIG_FAILED);
         s.onOutputDropped("2", pvS, SingleCamera.Drop.RELEASED);
-        assertEquals(Arrays.asList("RECORD CONFIG_FAILED"), surround.drops);
+        assertEquals(Arrays.asList("RECORD CONFIG_FAILED", "SIDE CONFIG_FAILED", "MIRROR CONFIG_FAILED"), surround.drops);
     }
 
     // ================================================================= 告诉录像那一侧（大纲 §2 阶段 5）
@@ -2951,6 +2981,8 @@ public class ChannelSchedulerTest {
         final Set<Out> declared = new LinkedHashSet<>();
         final Set<Out> dead = new LinkedHashSet<>();
         Set<Out> lastOutputs = new LinkedHashSet<>();
+        /** 关、丢的那一下会话快照清了，设备还没关完时相机还带着的那几样（SingleCamera.stillCarries 的 carried）。 */
+        Set<Out> closingWith = new LinkedHashSet<>();
         boolean deviceOpen;
         boolean holds;
         long busySince;
@@ -2986,6 +3018,7 @@ public class ChannelSchedulerTest {
         void lose(long at) {
             deviceOpen = false;
             opening = false;
+            closingWith = new LinkedHashSet<>(session.outputs);
             session = SingleCamera.SessionOutputs.NONE;
             firstFrameAt = 0;
             busySince = at;
@@ -2998,6 +3031,7 @@ public class ChannelSchedulerTest {
             holds = false;
             busySince = 0;
             session = SingleCamera.SessionOutputs.NONE;
+            closingWith.clear();
             firstFrameAt = 0;
             progressAgeMs = 0;
             if (closingSince != 0) {
@@ -3053,6 +3087,7 @@ public class ChannelSchedulerTest {
             actions.add("close " + why);
             deviceOpen = false;
             opening = false;
+            closingWith = new LinkedHashSet<>(session.outputs);
             session = SingleCamera.SessionOutputs.NONE;
             busySince = now;
             closingSince = now;   // 照 SingleCamera.closeCamera：关那一下当场登记在关
@@ -3121,6 +3156,11 @@ public class ChannelSchedulerTest {
         @Override
         public SingleCamera.SessionOutputs sessionOutputs() {
             return session;
+        }
+
+        @Override
+        public boolean stillCarries(Out out) {
+            return session.carries(out) || closingWith.contains(out);
         }
 
         @Override

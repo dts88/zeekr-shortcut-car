@@ -160,6 +160,12 @@ public final class ChannelScheduler {
         /** 眼下这份会话的快照：输出、代号、配好的时刻（调度的钟）。 */
         SingleCamera.SessionOutputs sessionOutputs();
 
+        /**
+         * 这一样输出此刻还挂在这一路相机上：眼下的会话带着它，或者会话、设备已经开始关、还没关完（相机还在往它写）。
+         * 关一开始会话快照就清了，关会话、关设备还要几百毫秒到十几秒（{@link #sessionCarries}）。
+         */
+        boolean stillCarries(ChannelRules.Out out);
+
         /** 已声明、消费者还活着的输出。 */
         Set<ChannelRules.Out> declaredOutputs();
 
@@ -1609,12 +1615,17 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 这一路此刻的会话里带着 {@code out} 吗（调度还没停）。画布要被系统收走时，管线据此找会话里还带着它的那一份调度去交
-     * （MultiCameraManager.ownerOf：退出、换车型时放了的那一份管线，它的调度还在按次序关）。
+     * 这一路相机此刻还带着 {@code out} 吗（调度还没停）：会话里带着，或者那一次关还没关完（{@link CameraPort#stillCarries}）。
+     * 画布要被系统收走时，管线据此找还带着它的那一份调度去交（MultiCameraManager.ownerOf：退出、换车型、为超级镜子重建时
+     * 放了的那一份管线，它的调度还在按次序关）。
+     *
+     * <p>以前只看会话快照（2026-10-20 审查，车主批）：关环视一开始快照就清了，可相机线程上关会话、关设备还要几百毫秒到十几秒，
+     * 这期间退出或者重建，主界面、超级镜子、盲区画面的画布在关完之前就被放掉 —— 正是「会话里的画布只由调度放」（2.11.4 R1）要防的。
+     * 现在算到关完：交给那一份调度，它照「离开会话、手上没有在途的一步」再放（{@link #releaseHandedOver}）。</p>
      */
     boolean sessionCarries(String key, ChannelRules.Out out) {
         CameraPort port = ports.get(key);
-        return !stopped && port != null && out != null && port.sessionOutputs().carries(out);
+        return !stopped && port != null && out != null && port.stillCarries(out);
     }
 
     /**
@@ -1762,8 +1773,8 @@ public final class ChannelScheduler {
 
     /**
      * 相机层自己丢了一样输出（消费者被系统收走、会话配不上、共享预览流挂不下）：当场告诉声明它的那一侧 ——
-     * 录像那一侧、盲区画面那一侧（只有它们留了接收方，{@link SingleCamera#dropListener}）。盲区画面收到后撤回声明，
-     * 调度就不会一直想把它加回去。
+     * 录像、盲区画面、超级镜子（只有它们留了接收方，{@link SingleCamera#dropListener}）。盲区画面、超级镜子收到「配不上」
+     * 撤回声明，调度就不会一直想把它加回去、一次次重建这一路的会话。
      */
     void onOutputDropped(String cameraId, ChannelRules.Out out, SingleCamera.Drop why) {
         ChannelRules.Lane lane = live(cameraId);
@@ -1772,7 +1783,8 @@ public final class ChannelScheduler {
         }
         CameraPort port = ports.get(lane.key);
         if (port != null && out != null
-                && (out.kind == ChannelRules.Kind.RECORD || out.kind == ChannelRules.Kind.SIDE)) {
+                && (out.kind == ChannelRules.Kind.RECORD || out.kind == ChannelRules.Kind.SIDE
+                || out.kind == ChannelRules.Kind.MIRROR)) {
             port.dropped(out, why);
         }
         wake();

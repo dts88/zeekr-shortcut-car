@@ -1957,7 +1957,7 @@ public class MultiCameraManager {
 
     /**
      * 启用的那几路（建管线时 Holder 给，在 {@link #initCameras} 之前）：登记表 §一 里主界面预览、拍照要的「启用的全部」，
-     * 开录之前的录像也照它。交给调度（{@link ChannelRules.World#enabled}）。
+     * 录像也只录它们（{@link #openRecordingIntent}）。交给调度（{@link ChannelRules.World#enabled}）。
      */
     public void setEnabledLanes(Set<String> keys) {
         enabledLanes = keys == null ? null : new java.util.LinkedHashSet<>(keys);
@@ -3136,6 +3136,11 @@ public class MultiCameraManager {
         @Override
         public SingleCamera.SessionOutputs sessionOutputs() {
             return camera.sessionOutputs();
+        }
+
+        @Override
+        public boolean stillCarries(ChannelRules.Out out) {
+            return camera.stillCarries(out);
         }
 
         @Override
@@ -4493,15 +4498,18 @@ public class MultiCameraManager {
             AppLog.e(TAG, "没有地方存录像（没有 U 盘），不开录");
             return false;
         }
-        // 这次录哪几路：启用的、这一份管线里有的，按开的次序
+        // 这次录哪几路：这一份管线建的时候启用的那几路（和主界面预览、拍照同一份，enabledActiveKeys），再照协调器给的
+        // 此刻的配置收一收，按开的次序。只为超级镜子、盲区画面建的那一路（没启用的环视、后座舱）不录 —— 配置里刚开了它、
+        // 还没重启的也不录，照「重启应用后生效」（2026-10-20 审查，车主批：以前录像照此刻的配置、预览拍照照建管线那一刻的）
         List<String> keys = new ArrayList<>();
-        for (String key : getActiveCameraKeys()) {
+        for (String key : enabledActiveKeys()) {
             if (enabledCameras == null || enabledCameras.isEmpty() || enabledCameras.contains(key)) {
                 keys.add(key);
             }
         }
         if (keys.isEmpty()) {
-            AppLog.e(TAG, "No camera to record: active=" + activeCameraKeys + ", enabled=" + enabledCameras);
+            AppLog.e(TAG, "No camera to record: active=" + activeCameraKeys + ", built enabled=" + enabledLanes
+                    + ", profile enabled=" + enabledCameras);
             return false;
         }
 

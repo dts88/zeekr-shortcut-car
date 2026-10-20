@@ -1494,7 +1494,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        final MultiCameraManager pipeline = holder.getForMainScreen(this);
+        final MultiCameraManager pipeline = holder.getForMainScreen(this, enabledLanes);
         cameraManager = pipeline;
         attachRecordingCoordinator();
         // 管线比界面活得久：回调在 onDestroy 一律摘掉（detachUiCallbacks），这里每个界面重新挂一遍

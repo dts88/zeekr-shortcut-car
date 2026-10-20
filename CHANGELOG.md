@@ -12,6 +12,10 @@ commit message, not here.
 - Settings: rows on each page are grouped under headings. Keep recording when the screen goes off moves from System to Recording, next to Record on launch.
 - Super mirror: the Front and rear only switch becomes Views: All four (default), Front and rear, or Rear + rear cabin, which switches between the rear view and the rear cabin camera, mirrored (button mode: top half rear cabin, bottom half rear view). When the stream profile leaves the rear cabin off, choosing it restarts the cameras once.
 - Settings → System: Export settings saves every setting and the stream profiles to a file in the diagnostics report folder; Import settings restores one exported by the same major version, then exits the app so everything starts with the restored settings. Diagnostics reports now include the full settings.
+- Cameras: a canvas on a camera that is still closing is released only after the close finishes (exit and pipeline rebuilds).
+- Recording records only the cameras the main screen was built with; a camera built only for Super mirror or Blind spot view is never recorded.
+- Super mirror: if the camera cannot fit its picture into the recording session, the mirror stops asking for it until it is reopened, instead of making the camera rebuild its session again and again.
+- After a stream profile change, the cameras follow the main screen's layout until the app restarts, so preview, photo and recording stay in step.
 
 ## [2.14.0-alpha] - 2026-10-19
 
