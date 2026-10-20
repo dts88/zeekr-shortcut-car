@@ -129,6 +129,25 @@
     <string name="set_camera_mapping_summary">Pilih kamera bagi paparan sekeliling, kabin depan dan kabin belakang secara manual (penyelesaian masalah)</string>
     <string name="set_diagnostics_title">Maklumat diagnostik</string>
     <string name="set_diagnostics_summary">Lihat dan eksport butiran kamera, paparan dan storan serta log terkini</string>
+    <string name="set_settings_export_title">Eksport tetapan</string>
+    <string name="set_settings_export_summary">Menyimpan tetapan semasa ke fail, dalam folder yang sama dengan laporan diagnostik</string>
+    <string name="set_settings_import_title">Import tetapan</string>
+    <string name="set_settings_import_summary">Memulihkan semua tetapan daripada fail yang dieksport; hanya fail yang dieksport oleh versi %1$d.x boleh diimport</string>
+    <string name="settings_exported">Dieksport ke:\n%1$s</string>
+    <string name="settings_export_failed">Tidak dapat mengeksport tetapan</string>
+    <string name="settings_export_failed_reason">Eksport tetapan gagal: %1$s</string>
+    <string name="settings_pick_title">Pilih fail tetapan</string>
+    <string name="settings_file_label">%1$s · versi %2$s</string>
+    <string name="settings_none_title">Tiada fail tetapan ditemui</string>
+    <string name="settings_none_msg">Fail tetapan dibaca daripada folder ini: %1$s.</string>
+    <string name="settings_import_refused_title">Tidak dapat mengimport</string>
+    <string name="settings_other_version_msg">Fail ini dieksport oleh versi %1$s. Hanya fail tetapan yang dieksport oleh versi %2$d.x boleh diimport.</string>
+    <string name="settings_unreadable">Tidak dapat membaca fail tetapan ini</string>
+    <string name="settings_import_confirm_title">Import tetapan?</string>
+    <string name="settings_import_confirm_msg">Tetapan semasa akan diganti. Apl kemudian keluar, dan tetapan berkuat kuasa apabila apl dibuka semula.</string>
+    <string name="settings_import_action">Import dan keluar</string>
+    <string name="settings_import_failed">Tidak dapat mengimport tetapan</string>
+    <string name="settings_imported_reopen">Tetapan diimport; berkuat kuasa selepas apl dibuka semula</string>
     <!-- System info (experimental): groups, signal names, values -->
     <string name="set_vehicle_info_title">Maklumat sistem (percubaan)</string>
     <string name="set_vehicle_info_summary">Isyarat kenderaan yang didedahkan unit kepala dan keadaan semasanya; item yang ditanda dipaparkan pada Bar maklumat pemanduan</string>

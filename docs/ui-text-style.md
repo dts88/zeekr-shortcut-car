@@ -193,6 +193,14 @@
 - 2026-10-20 批准：set_rearview_button_mode_summary「点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视」；
   …; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom；
   …; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah。
+- 2026-10-20 批准（导出、导入设置）：set_settings_export_title「导出设置」/ Export settings / Eksport tetapan；
+  set_settings_export_summary「将当前设置保存为文件，与诊断报告存放在同一文件夹」；set_settings_import_title「导入设置」/ Import settings / Import tetapan；
+  set_settings_import_summary「从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件」；settings_exported「已导出到：\n%1$s」；
+  settings_export_failed「无法导出设置」、settings_export_failed_reason「导出设置失败：%1$s」；settings_pick_title「选择设置文件」；
+  settings_file_label「%1$s · 版本 %2$s」；settings_none_title「未找到设置文件」、settings_none_msg「导入时从此文件夹读取导出的设置文件：%1$s。」；
+  settings_import_refused_title「无法导入」、settings_other_version_msg「此文件由版本 %1$s 导出。只能导入 %2$d.x 版本导出的设置文件。」；
+  settings_unreadable「无法读取此设置文件」；settings_import_confirm_title「导入设置？」、settings_import_confirm_msg「当前设置将被覆盖。导入后应用将退出，重新打开后生效。」；
+  settings_import_action「导入并退出」；settings_import_failed「无法导入设置」；settings_imported_reopen「已导入设置，重新打开应用后生效」。英文、马来文见 strings.xml。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
