@@ -201,6 +201,8 @@
   settings_import_refused_title「无法导入」、settings_other_version_msg「此文件由版本 %1$s 导出。只能导入 %2$d.x 版本导出的设置文件。」；
   settings_unreadable「无法读取此设置文件」；settings_import_confirm_title「导入设置？」、settings_import_confirm_msg「当前设置将被覆盖。导入后应用将退出，重新打开后生效。」；
   settings_import_action「导入并退出」；settings_import_failed「无法导入设置」；settings_imported_reopen「已导入设置，重新打开应用后生效」。英文、马来文见 strings.xml。
+- 2026-10-20（主界面预览停画遮盖，车主定「文字提示只显示一个」）：preview_paused「画面已停止」/ Picture stopped / Gambar terhenti，
+  沿用已批准的 mirror_paused_tap 前半句（主界面点一下不是「恢复」，不带后半句）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

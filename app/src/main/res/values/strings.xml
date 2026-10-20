@@ -95,6 +95,7 @@
     <string name="side_view_close">关闭盲区画面</string>
     <string name="rearview_guide_hint">左右滑动翻页 · 点击图片外关闭</string>
     <string name="mirror_paused_tap">画面已停止 · 点击恢复</string>
+    <string name="preview_paused">画面已停止</string>
     <string name="mirror_resume_busy">摄像头被占用，暂时无法打开</string>
     <string name="mirror_resume_failed">无法打开摄像头：%1$s</string>
     <!--

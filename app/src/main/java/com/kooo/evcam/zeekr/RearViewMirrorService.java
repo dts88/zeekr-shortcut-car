@@ -883,12 +883,12 @@ public class RearViewMirrorService extends Service {
 
         /**
          * 这块画布此刻在出画面：会话里带着它、这一次会话出过画面，而且最近一帧在窗口自己算「画面停了」的时限之内
-         * （{@link RearViewMirrorView#FROZEN_AFTER_MS}）—— 和窗口看得见的那块用同一把尺子，不用调度那把 8 秒的。
+         * （{@link StalledPicture#AFTER_MS}）—— 和窗口看得见的那块用同一把尺子，不用调度那把 8 秒的。
          */
         boolean streaming() {
             SingleCamera bound = camera;
             return bound != null && inSession() && bound.firstFrameOfSessionAt() != 0
-                    && bound.hasFramesWithin(RearViewMirrorView.FROZEN_AFTER_MS);
+                    && bound.hasFramesWithin(StalledPicture.AFTER_MS);
         }
 
         /**

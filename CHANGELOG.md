@@ -17,6 +17,7 @@ commit message, not here.
 - Super mirror: if the camera cannot fit its picture into the recording session, the mirror stops asking for it until it is reopened, instead of making the camera rebuild its session again and again.
 - After a stream profile change, the cameras follow the main screen's layout until the app restarts, so preview, photo and recording stay in step.
 - A camera that stopped being retried after 3 failed rounds is retried only when something that wants that camera starts or stops (for example the main screen or recording), not when Blind spot view comes and goes with the gear.
+- Main screen: a camera preview whose picture stops for 2.5 seconds is dimmed and shows "Picture stopped", the same way Super mirror does; the four surround cells come from one stream and share one note.
 
 ## [2.14.0-alpha] - 2026-10-19
 
