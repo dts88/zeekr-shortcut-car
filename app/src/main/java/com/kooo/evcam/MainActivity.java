@@ -694,10 +694,7 @@ public class MainActivity extends AppCompatActivity {
         String hint = getString(R.string.preview_paused);
         float maxTextPx = getResources().getDimension(R.dimen.text_title);
         for (String key : PreviewSlots.KEYS) {
-            AutoFitTextureView canvas = canvasFor(key);
-            if (canvas != null && canvas.getParent() instanceof View) {
-                previewStall.attach(key, (View) canvas.getParent(), hint, maxTextPx);
-            }
+            previewStall.attach(key, canvasFor(key), hint, maxTextPx);
         }
         if (!isInBackground) {
             previewStall.start();
