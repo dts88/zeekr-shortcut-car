@@ -82,7 +82,9 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 ## 推荐
 
-**[wysie/zeekr-shortcut-car](https://github.com/wysie/zeekr-shortcut-car)**：针对极氪 009 车机优化的极氪即刻版本。Wysie 也是提供了大量极氪基础信息的重要贡献者，很开心能与 Wysie 一同探索极氪车机系统的可能性。
+**[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)**：wysie 针对极氪 009 车机优化的极氪即刻版本。Wysie 也是提供了大量极氪基础信息的重要贡献者，很开心能与 Wysie 一同探索极氪车机系统的可能性。
+
+**[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)**：FerixzTanz 在极氪即刻基础上开发的版本，还能把盲区画面显示在抬头显示（HUD）上。特别感谢 FerixzTanz 在 HUD 标定上的工作，以及一系列领先于极氪即刻的功能开发；本项目的盲区画面也起步于 FerixzTanz 的代码和实车研究。感谢 FerixzTanz 对本项目的支持和贡献。
 
 **[CarPiano](https://github.com/jlunnn/CarPiano)**：任何车速下都能用车外喇叭播放声音，不再像原车功能那样只能在 P 挡使用。目前还在早期开发阶段，但很值得期待。
 

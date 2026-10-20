@@ -9,7 +9,14 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings: rows on each page are grouped under headings. Keep recording when the screen goes off moves from System to Recording, next to Record on launch.
+
+## [2.14.0-alpha] - 2026-10-19
+
+- Floating button: tap or long press can lock the current recording, the same way flash-to-pass does (the clips 10 seconds before and after, every camera). Needs Settings → Storage → Lock footage.
+- Updates: the downloaded APK must match the SHA-256 and size GitHub lists for it, or it is not installed; downloads and redirects use HTTPS only (@wysie).
+- Driving info bar: the BSD badge under Driver assistance shows the car's Lane change assist switch; System info drops the Blind spot assist signal, which always read off.
+- The microphone permission is no longer checked at startup or listed on the permissions page; the app records no audio (@wysie).
 
 ## [2.13.1-alpha] - 2026-10-17
 

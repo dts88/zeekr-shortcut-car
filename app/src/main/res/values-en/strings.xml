@@ -13,6 +13,20 @@
     <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
+    <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
+    <string name="set_group_stream">Stream</string>
+    <string name="set_group_auto_record">Automatic recording</string>
+    <string name="set_group_photo">Photos</string>
+    <string name="set_group_stamps">Stamps</string>
+    <string name="set_group_cleanup">Automatic cleanup</string>
+    <string name="set_group_views">Switching views</string>
+    <string name="set_group_window">Window</string>
+    <string name="set_group_behavior">Behavior</string>
+    <string name="set_group_appearance">Appearance</string>
+    <string name="set_group_position">Position</string>
+    <string name="set_group_main_screen">Main screen</string>
+    <string name="set_group_cameras">Cameras</string>
+    <string name="set_group_files">File maintenance</string>
     <string name="set_section_rearview">Super mirror</string>
     <string name="set_section_floating">Floating button</string>
     <string name="set_section_system">System</string>
@@ -82,6 +96,7 @@
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>
     <string name="floating_action_toggle_mirror">Super mirror on / off</string>
+    <string name="floating_action_lock_footage">Lock the current recording</string>
     <string name="set_recording_stats_title">Recording status readout</string>
     <string name="set_recording_stats_summary">Shows the elapsed time and current clip number in a corner while recording</string>
     <string name="set_reset_floating_title">Reset floating button</string>
@@ -212,7 +227,6 @@
     <string name="vi_fcw">Forward collision warning</string>
     <string name="vi_ldw">Lane departure warning</string>
     <string name="vi_lka">Lane keeping aid</string>
-    <string name="vi_bsd">Blind spot assist</string>
     <string name="vi_rcw">Rear collision warning</string>
     <string name="vi_lane_change_assist">Lane change assist</string>
     <string name="vi_auto_lane_change">Automatic lane change</string>
@@ -364,6 +378,8 @@
     </plurals>
     <string name="msg_footage_lock_failed">Couldn\'t save the lock state. Try again</string>
     <string name="msg_footage_nothing_here">No recording here to lock</string>
+    <string name="msg_footage_locked_around">Locked the clips covering 10 seconds before and after</string>
+    <string name="msg_footage_lock_needs_setting">Can\'t lock. Turn on Settings → Storage → Lock footage first</string>
     <string name="player_session_locked">has locked files</string>
     <string name="photo_group_locked">locked</string>
     <plurals name="msg_kept_locked">
@@ -490,6 +506,7 @@
     <string name="upd_err_no_dir">can\'t create the download folder</string>
     <string name="upd_err_over_limit">too much data, aborted</string>
     <string name="upd_err_truncated">only received %1$d of %2$d bytes</string>
+    <string name="upd_err_integrity">installer file failed verification, aborted</string>
     <string name="upd_need_install_title">Permission needed: Install unknown apps</string>
     <string name="upd_need_install_msg">Allow this app to install unknown apps in system settings, then come back and tap Check for updates again.</string>
     <string name="upd_go_settings">Open settings</string>
@@ -851,8 +868,6 @@
     <string name="dev_perm_group_advanced">Advanced permissions</string>
     <string name="dev_perm_camera">Camera</string>
     <string name="dev_perm_camera_why">Used to record and take photos</string>
-    <string name="dev_perm_microphone">Microphone</string>
-    <string name="dev_perm_microphone_why">Used to record sound</string>
     <string name="dev_perm_storage">Storage</string>
     <string name="dev_perm_storage_why">Used to save and read recordings and photos</string>
     <string name="dev_perm_notifications">Notifications</string>

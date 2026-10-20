@@ -13,6 +13,20 @@
     <string name="upd_none_release">Tiada keluaran stabil yang boleh dipasang</string>
     <string name="set_section_recording">Rakaman</string>
     <string name="set_section_storage">Storan</string>
+    <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
+    <string name="set_group_stream">Strim</string>
+    <string name="set_group_auto_record">Rakaman automatik</string>
+    <string name="set_group_photo">Foto</string>
+    <string name="set_group_stamps">Tera</string>
+    <string name="set_group_cleanup">Pembersihan automatik</string>
+    <string name="set_group_views">Tukar paparan</string>
+    <string name="set_group_window">Tetingkap</string>
+    <string name="set_group_behavior">Tingkah laku</string>
+    <string name="set_group_appearance">Penampilan</string>
+    <string name="set_group_position">Kedudukan</string>
+    <string name="set_group_main_screen">Skrin utama</string>
+    <string name="set_group_cameras">Kamera</string>
+    <string name="set_group_files">Penyelenggaraan fail</string>
     <string name="set_section_rearview">Cermin super</string>
     <string name="set_section_floating">Butang terapung</string>
     <string name="set_section_system">Sistem</string>
@@ -82,6 +96,7 @@
     <string name="floating_action_toggle_recording">Mula / henti rakaman</string>
     <string name="floating_action_take_photo">Ambil foto</string>
     <string name="floating_action_toggle_mirror">Hidupkan / matikan Cermin super</string>
+    <string name="floating_action_lock_footage">Kunci rakaman semasa</string>
     <string name="set_recording_stats_title">Paparan status rakaman</string>
     <string name="set_recording_stats_summary">Menunjukkan masa berlalu dan nombor klip semasa di sudut semasa merakam</string>
     <string name="set_reset_floating_title">Set semula butang terapung</string>
@@ -212,7 +227,6 @@
     <string name="vi_fcw">Amaran perlanggaran hadapan</string>
     <string name="vi_ldw">Amaran keluar lorong</string>
     <string name="vi_lka">Bantuan kekal lorong</string>
-    <string name="vi_bsd">Bantuan titik buta</string>
     <string name="vi_rcw">Amaran perlanggaran belakang</string>
     <string name="vi_lane_change_assist">Bantuan tukar lorong</string>
     <string name="vi_auto_lane_change">Tukar lorong automatik</string>
@@ -360,6 +374,8 @@
     </plurals>
     <string name="msg_footage_lock_failed">Tidak dapat menyimpan status kunci. Cuba lagi</string>
     <string name="msg_footage_nothing_here">Tiada rakaman di sini untuk dikunci</string>
+    <string name="msg_footage_locked_around">Klip yang meliputi 10 saat sebelum dan selepas telah dikunci</string>
+    <string name="msg_footage_lock_needs_setting">Tidak dapat mengunci. Hidupkan Tetapan → Storan → Kunci rakaman dahulu</string>
     <string name="player_session_locked">ada fail dikunci</string>
     <string name="photo_group_locked">dikunci</string>
     <plurals name="msg_kept_locked">
@@ -482,6 +498,7 @@
     <string name="upd_err_no_dir">tidak dapat mencipta folder muat turun</string>
     <string name="upd_err_over_limit">terlalu banyak data, dibatalkan</string>
     <string name="upd_err_truncated">hanya menerima %1$d daripada %2$d bait</string>
+    <string name="upd_err_integrity">fail pemasang gagal pengesahan, dibatalkan</string>
     <string name="upd_need_install_title">Kebenaran diperlukan: Pasang apl tidak diketahui</string>
     <string name="upd_need_install_msg">Benarkan apl ini memasang apl tidak diketahui dalam tetapan sistem, kemudian kembali dan ketik Semak kemas kini sekali lagi.</string>
     <string name="upd_go_settings">Buka tetapan</string>
@@ -832,8 +849,6 @@
     <string name="dev_perm_group_advanced">Kebenaran lanjutan</string>
     <string name="dev_perm_camera">Kamera</string>
     <string name="dev_perm_camera_why">Digunakan untuk merakam dan mengambil foto</string>
-    <string name="dev_perm_microphone">Mikrofon</string>
-    <string name="dev_perm_microphone_why">Digunakan untuk merakam bunyi</string>
     <string name="dev_perm_storage">Storan</string>
     <string name="dev_perm_storage_why">Digunakan untuk menyimpan dan membaca rakaman dan foto</string>
     <string name="dev_perm_notifications">Pemberitahuan</string>
