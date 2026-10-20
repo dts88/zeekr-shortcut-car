@@ -157,6 +157,11 @@ public class RearViewMirrorView extends ViewGroup {
     private long lastFrameUptimeMs;
     /** 后座舱最后一帧新画面的时刻。看哪一路，「画面停了」就按哪一路的算。 */
     private long lastCabinFrameUptimeMs;
+    /** 这块画布刚设成可见：下一次更新是重新贴上手里那一帧，不算新画面（{@link #noteFrame}）。 */
+    private boolean skipSurroundLatch;
+    private boolean skipCabinLatch;
+    /** 问服务画布在不在出画面、通知它画布刚可见（{@link CanvasHost}）。 */
+    private CanvasHost canvasHost;
     /** 画面停了：盖住那张过时的画面，改成一句「点击恢复」。 */
     private boolean frozen;
     /** 贴边收起：那一条窄边上不画画面，只写名字。 */
@@ -260,17 +265,51 @@ public class RearViewMirrorView extends ViewGroup {
         if (cabinSourceMirrored) {
             cabinMatrix.preScale(-1f, 1f, width / 2f, height / 2f);
         }
-        cabinMatrix.postScale(-1f, 1f, width / 2f, height / 2f);
+        if (LaneCycle.isMirrored(LaneCycle.CABIN_REAR)) {
+            // 镜不镜像和环视那几路问同一处（LaneCycle）；环视那几路在 dispatchDraw 里翻整个画布，这一块翻它自己的矩阵
+            cabinMatrix.postScale(-1f, 1f, width / 2f, height / 2f);
+        }
         cabinTextureView.setTransform(cabinMatrix);
     }
 
-    /** 服务每收到一帧后座舱的新画面调一次（画布不可见时系统不送这一下）。 */
-    public void noteCabinFrame() {
-        lastCabinFrameUptimeMs = SystemClock.uptimeMillis();
-        if (frozen && isShowingCabin()) {
+    /**
+     * 服务每收到一块画布的一次更新调一次（画布不可见时系统不送这一下）：环视那块，或者后座舱那块。
+     *
+     * <p>画布刚设成可见时，TextureView 会把手里那一帧重新贴一次、照样报一次更新（{@link #setCanvasVisible}）——
+     * 那张可能是很久以前的，不是新画面，不算。</p>
+     */
+    public void noteFrame(boolean cabin) {
+        if (cabin ? skipCabinLatch : skipSurroundLatch) {
+            if (cabin) {
+                skipCabinLatch = false;
+            } else {
+                skipSurroundLatch = false;
+            }
+            return;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (cabin) {
+            lastCabinFrameUptimeMs = now;
+        } else {
+            lastFrameUptimeMs = now;
+        }
+        if (frozen && cabin == isShowingCabin()) {
             frozen = false;
             invalidate();
         }
+    }
+
+    /** 窗口问服务的两件事（RearViewMirrorService 实现）。 */
+    public interface CanvasHost {
+        /** 这一块画布此刻在出画面：它那一路在出画面，会话里带着这块画布。 */
+        boolean streaming(boolean cabin);
+
+        /** 这一块画布刚设成可见、或者窗口重新可见：图层可能是新建的，缓冲区尺寸要拨回会话配置时那个。 */
+        void shown(boolean cabin);
+    }
+
+    public void setCanvasHost(CanvasHost host) {
+        this.canvasHost = host;
     }
 
     /**
@@ -279,23 +318,64 @@ public class RearViewMirrorView extends ViewGroup {
      */
     private void syncTextureVisibility() {
         boolean cabin = isShowingCabin();
-        textureView.setVisibility(!docked && !cabin ? View.VISIBLE : View.INVISIBLE);
-        cabinTextureView.setVisibility(!docked && cabin ? View.VISIBLE : View.INVISIBLE);
+        setCanvasVisible(textureView, !docked && !cabin, false);
+        setCanvasVisible(cabinTextureView, !docked && cabin, true);
     }
 
     /**
-     * 换了一路之后：画布可见跟着换；换上来的那一块刚设成可见，之前不可见时系统不报帧 —— 从此刻起给画面回来留出时间，
-     * 别一换过去就盖上「画面已停止」。
+     * 设一块画布可不可见。从不可见变成可见时：下一次更新是 TextureView 把手里那一帧重新贴上（onVisibilityChanged 里
+     * updateLayerAndInvalidate），不算新画面（{@link #noteFrame}）；图层可能是新建的，告诉服务把缓冲区尺寸拨回去。
      */
-    private void onLaneChanged() {
-        long now = SystemClock.uptimeMillis();
-        if (isShowingCabin()) {
-            lastCabinFrameUptimeMs = now;
-        } else {
-            lastFrameUptimeMs = now;
+    private void setCanvasVisible(AutoFitTextureView view, boolean visible, boolean cabin) {
+        boolean was = view.getVisibility() == View.VISIBLE;
+        view.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
+        if (visible && !was) {
+            if (cabin) {
+                skipCabinLatch = true;
+            } else {
+                skipSurroundLatch = true;
+            }
+            if (canvasHost != null) {
+                canvasHost.shown(cabin);
+            }
         }
-        frozen = false;
-        syncTextureVisibility();
+    }
+
+    /**
+     * 窗口重新可见（被系统弹窗盖过、内存紧时图层被收过）：看得见的那块画布的图层会重建，建的那一下把缓冲区尺寸改成窗口的
+     * 布局尺寸、又不叫任何回调 —— 让服务拨回去。
+     */
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if (visibility == View.VISIBLE && canvasHost != null && !docked) {
+            canvasHost.shown(isShowingCabin());
+        }
+    }
+
+    /**
+     * 换了一路之后。
+     *
+     * <p>同一台摄像头上换路（环视的前后左右）只重画：画面停没停是那台摄像头的事，换路不改。换到另一台摄像头
+     * （后视 ↔ 后座舱）：那块画布之前不可见、系统不报帧，问服务它此刻在不在出画面 —— 在出就从此刻起等下一帧，
+     * 不在就马上盖上「点击恢复」，不把画布里那张过时的画面当成现在的。</p>
+     */
+    private void onLaneChanged(int previous) {
+        boolean cabin = isShowingCabin();
+        if ((previous == LaneCycle.CABIN_REAR) != cabin) {
+            boolean live = canvasHost == null || canvasHost.streaming(cabin);
+            long since = live ? SystemClock.uptimeMillis() : 0L;
+            if (cabin) {
+                lastCabinFrameUptimeMs = since;
+            } else {
+                lastFrameUptimeMs = since;
+            }
+            frozen = !live && !docked;
+            if (frozen) {
+                AppLog.i(TAG, "换到「" + LaneCycle.labelOf(laneIndex) + "」：这一路此刻不在出画面，直接显示「点击恢复」");
+            }
+            syncTextureVisibility();
+        }
         invalidate();
     }
 
@@ -378,15 +458,6 @@ public class RearViewMirrorView extends ViewGroup {
      */
     public void applyButtonModeFromConfig() {
         buttonMode = appConfig.isRearViewButtonMode();
-    }
-
-    /** 服务每收到一帧新画面调一次。 */
-    public void noteFrame() {
-        lastFrameUptimeMs = SystemClock.uptimeMillis();
-        if (frozen) {
-            frozen = false;
-            invalidate();
-        }
     }
 
     /** 画面停了、点了那句提示时要做的事。 */
@@ -517,10 +588,11 @@ public class RearViewMirrorView extends ViewGroup {
         if (lane == laneIndex) {
             return;
         }
+        int previous = laneIndex;
         laneIndex = lane;
         appConfig.setRearViewLane(laneIndex);
         AppLog.i(TAG, "按键模式：切到「" + LaneCycle.labelOf(laneIndex) + "」路");
-        onLaneChanged();
+        onLaneChanged(previous);
     }
 
     private void switchLane(boolean clockwise) {
@@ -528,26 +600,29 @@ public class RearViewMirrorView extends ViewGroup {
         if (next == laneIndex) {
             return;
         }
+        int previous = laneIndex;
         laneIndex = next;
         appConfig.setRearViewLane(laneIndex);
         AppLog.i(TAG, "后视镜切到「" + LaneCycle.labelOf(laneIndex) + "」路"
                 + (LaneCycle.isMirrored(laneIndex) ? "（镜像）" : "（不镜像）"));
-        onLaneChanged();
+        onLaneChanged(previous);
     }
 
     /**
      * 设置页改了切换范围之后推过来。
      *
-     * <p>当前那一路已经不在这一档的环上了（停在侧视时换成「前后」、停在后座舱时换走「后视 + 后座舱」），就退回后视 ——
-     * 否则会停在一个划不动的画面上。</p>
+     * <p>当前那一路还在这一档的环上就不动；不在了（停在侧视时换成「前后」、停在后座舱时换走「后视 + 后座舱」）就退回后视、
+     * 存下来 —— 否则会停在一个划不动的画面上。</p>
      */
     public void applyLaneModeFromConfig() {
-        int lane = appConfig.getRearViewLane();
-        if (lane != laneIndex) {
-            laneIndex = lane;
-            AppLog.i(TAG, "后视镜回到「" + LaneCycle.labelOf(laneIndex) + "」路");
-            onLaneChanged();
+        if (LaneCycle.isOnRing(laneIndex, appConfig.getRearViewViews())) {
+            return;
         }
+        int previous = laneIndex;
+        laneIndex = LaneCycle.REAR;
+        appConfig.setRearViewLane(laneIndex);
+        AppLog.i(TAG, "后视镜回到「" + LaneCycle.labelOf(laneIndex) + "」路");
+        onLaneChanged(previous);
     }
 
     /** 设置页改了尺寸后，直接套用到正在显示的窗口上。 */
@@ -927,17 +1002,19 @@ public class RearViewMirrorView extends ViewGroup {
                         params.x, params.width, screenWidth());
                 if (dock != RearViewTouchModel.Dock.NONE) {
                     glideTo(RearViewTouchModel.flushX(dock, params.width, screenWidth()), 0f);
-                } else if (frozen && resumeAction != null) {
-                    // 画面停住时点一下就是「把它接回来」—— 那时候除了这个也没别的可做
-                    AppLog.i(TAG, "点了停住的后视镜，重新接相机");
-                    resumeAction.run();
-                } else if (buttonMode && !pinchedThisGesture && !Float.isNaN(tapX)) {
+                } else {
                     // 按键模式：点哪一块就切到哪一路，随时点随时生效，不用先唤出什么。
-                    // 两路的那两档只分上下两半。拖窗口、上下划取景、双指缩放都不是点，走不到这里
+                    // 两路的那两档只分上下两半。拖窗口、上下划取景、双指缩放都不是点，算不出点中哪一块（-1）
                     MirrorViews views = appConfig.getRearViewViews();
-                    int lane = LaneTapZones.laneAt(
-                            tapX, tapY, getWidth(), getHeight(), views);
-                    if (lane >= 0) {
+                    int lane = buttonMode && !pinchedThisGesture && !Float.isNaN(tapX)
+                            ? LaneTapZones.laneAt(tapX, tapY, getWidth(), getHeight(), views) : -1;
+                    boolean otherCamera = lane >= 0 && (lane == LaneCycle.CABIN_REAR) != isShowingCabin();
+                    if (frozen && resumeAction != null && !otherCamera) {
+                        // 画面停住时点一下就是「把它接回来」。点的是另一台摄像头的画面（后视 ↔ 后座舱）时不在这里：
+                        // 停住的是这一台，接回它帮不了那一台 —— 直接切过去（下面）
+                        AppLog.i(TAG, "点了停住的后视镜，重新接相机");
+                        resumeAction.run();
+                    } else if (lane >= 0) {
                         selectLane(lane);
                         startTapFlash(lane, views);
                     }

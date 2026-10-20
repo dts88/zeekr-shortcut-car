@@ -688,6 +688,67 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("close dark-release"), front.actions);
     }
 
+    // ================================================================= 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）
+
+    /**
+     * 配置里只开环视，管线为后视镜建了后座舱（不算启用的）。切换范围换到「后视 + 后座舱」：后座舱为后视镜开，会话里只带后视镜的画布；
+     * 换出这一档：它没人要了，保持 30 秒，到点照「关座舱前先关环视」—— 环视给后视镜开着，先关环视、再关后座舱、环视开回来。
+     */
+    @Test
+    public void theRearCabinViewOpensTheCabinForTheMirrorAndHoldsItWhenLeft() {
+        surroundOnly();
+        Out mirrorS = new Out(Kind.MIRROR, "mirror-2");
+        Out mirrorR = new Out(Kind.MIRROR, "mirror-1");
+        claim(Holder.MIRROR);
+        streaming(surround, mirrorS);
+        declare(rear, mirrorR);
+        settle();
+        assertTrue("切换范围不含后座舱：后视镜只要环视", rear.actions.isEmpty());
+
+        host.mirrorCabin = true;
+        s.wake();
+        settle();
+        assertEquals("换到这一档：后座舱为后视镜开，只带后视镜的画布", Arrays.asList("open [MIRROR]"), rear.actions);
+        assertEquals(EnumSet.of(Holder.MIRROR), view(s.snapshot(), REAR).wantedBy);
+        at(300);
+        opened(rear);
+        frame(rear);
+        settle();
+        assertEquals(ChannelRules.Condition.STREAMING, s.condition(REAR));
+
+        at(1_000);
+        host.mirrorCabin = false;
+        s.wake();
+        settle();
+        long expiry = 1_000 + ChannelRules.HOLD_MS;
+        at(expiry - 1);
+        assertEquals("换出这一档：没人要了，保持 30 秒内不动", Arrays.asList("open [MIRROR]"), rear.actions);
+        assertTrue(surround.actions.isEmpty());
+        at(expiry);
+        assertEquals("保持到点：先关环视", Arrays.asList("close surround-first"), surround.actions);
+        at(expiry + 150);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]", "close hold-over"), rear.actions);
+        at(expiry + 250);
+        closed(rear);
+        settle();
+        assertEquals("环视开回来给后视镜", Arrays.asList("close surround-first", "open [MIRROR]"), surround.actions);
+    }
+
+    /** 后视镜没登记着（贴边、熄屏、窗口关了）：切换范围是「后视 + 后座舱」也不为它开后座舱。 */
+    @Test
+    public void theRearCabinViewWantsNothingWhileTheMirrorIsNotClaimed() {
+        surroundOnly();
+        host.mirrorCabin = true;
+        declare(rear, new Out(Kind.MIRROR, "mirror-1"));
+        settle();
+        at(5_000);
+        assertTrue(rear.actions.isEmpty());
+        assertTrue(surround.actions.isEmpty());
+        assertTrue(view(s.snapshot(), REAR).wantedBy.isEmpty());
+    }
+
     // ================================================================= 关座舱前先关环视（项目所有者 2026-10-15 定，2.11.6）
 
     /**
@@ -2713,6 +2774,14 @@ public class ChannelSchedulerTest {
     }
 
     /** 重新交一次各路：环视建着、只有两路座舱启用（配置里只开座舱）。 */
+    /** 配置里只开环视；管线另外建了后座舱（超级镜子「后视 + 后座舱」要它，不算启用的）。 */
+    private void surroundOnly() {
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(REAR, rear);
+        lanes.put(SUR, surround);
+        s.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(SUR)));
+    }
+
     private void cabinsOnly() {
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
         lanes.put(FRONT, front);

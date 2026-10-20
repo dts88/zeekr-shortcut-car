@@ -105,4 +105,32 @@ public class CameraManagerHolderShapeTest {
         assertEquals(shape(SUR).lanesKey(), mirrorCabin(SUR).lanesKey());
         assertFalse(shape(SUR).key().equals(mirrorCabin(SUR).key()));
     }
+
+    /**
+     * 为超级镜子重建只在「要后座舱而这一份里没有」时：谁来要都重建；换出这一档、或者这一份里已经有后座舱都不重建 ——
+     * 一份管线最多为它重建一次。配置里开的几路也变了：后台调用方照样为后座舱重建（启用的几路照原来那份），
+     * 主界面接上时先按开的几路重建。
+     */
+    @Test
+    public void theMirrorRebuildsOnlyForAMissingRearCabin() {
+        String surroundLanes = shape(SUR).lanesKey();
+        assertEquals(CameraManagerHolder.Rebuild.MIRROR_CABIN,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), false, "zeekr_7x", surroundLanes, false));
+        assertEquals(CameraManagerHolder.Rebuild.MIRROR_CABIN,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), true, "zeekr_7x", surroundLanes, false));
+        assertEquals("这一份里已经有后座舱", CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), false, "zeekr_7x", surroundLanes, true));
+        assertEquals("换出这一档：多出来的后座舱不算", CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(shape(SUR), false, "zeekr_7x", surroundLanes, true));
+        assertEquals(CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(shape(SUR), true, "zeekr_7x", surroundLanes, true));
+        assertEquals("开的几路也变了：后台调用方照样补后座舱", CameraManagerHolder.Rebuild.MIRROR_CABIN,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), false, "zeekr_7x", surroundLanes, false));
+        assertEquals("主界面接上时先按开的几路", CameraManagerHolder.Rebuild.LANES,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), true, "zeekr_7x", surroundLanes, false));
+        assertEquals("只是开的几路变了：后台调用方不重建", CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(shape(SUR, FRONT), false, "zeekr_7x", surroundLanes, false));
+        assertEquals(CameraManagerHolder.Rebuild.CAR_MODEL,
+                CameraManagerHolder.rebuildFor(shape(SUR), false, "zeekr_7x_multi", surroundLanes, true));
+    }
 }

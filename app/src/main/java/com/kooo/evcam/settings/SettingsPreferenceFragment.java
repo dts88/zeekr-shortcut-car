@@ -789,9 +789,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 切换范围变了（选了、或者重置了）。「后视 + 后座舱」要管线里有后座舱这一路：已经有管线时问一次
-     * （{@link com.kooo.evcam.camera.CameraManagerHolder#getOrInit}）—— 配置里没启用后座舱时这一档一变，管线当场放掉重建，
-     * 主界面、超级镜子照「放掉重建了」接上新的那一份（在录的话那一段到头、自动接回）。再叫醒调度（超级镜子要不要后座舱是
-     * 它每一轮读的事实），正在显示的窗口换环、接上或撤回后座舱的画布。
+     * （{@link com.kooo.evcam.camera.CameraManagerHolder#getOrInit}）—— 换到这一档而管线里还没有后座舱时，管线当场放掉重建，
+     * 主界面、超级镜子照「放掉重建了」接上新的那一份（在录的话那一段到头、自动接回）；换出这一档不重建。再叫醒调度（超级镜子要不要
+     * 后座舱是它每一轮读的事实），正在显示的窗口换环、接上或撤回后座舱的画布。
      */
     private void applyRearViewViews() {
         android.content.Context context = getContext();

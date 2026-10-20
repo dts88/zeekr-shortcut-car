@@ -1927,9 +1927,12 @@ public final class ChannelScheduler {
         w.recordPlan.addAll(host.recordPlan());
         boolean mirrorCabin = host.mirrorWantsCabinRear();
         if (mirrorCabin != w.mirrorCabin) {
-            // 切换范围换了：和登记表变了一样，后座舱要不要、带不带超级镜子的画布跟着变
             w.mirrorCabin = mirrorCabin;
-            w.needsVersion++;
+            if (w.holders.contains(CameraNeeds.Holder.MIRROR)) {
+                // 切换范围换了、后视镜登记着：和登记表变了一样，后座舱要不要、带不带超级镜子的画布跟着变。
+                // 没登记着时谁的要求都没变，不算（不为它放开停手的路）
+                w.needsVersion++;
+            }
         }
         noteNeeds();
 
