@@ -173,6 +173,16 @@
   set_side_view_min_speed_title「最低车速」、_summary「低于此车速时不显示；0 为不限」；side_view_close（关闭按钮的无障碍描述）「关闭盲区画面」；
   msg_side_view_unavailable「无法显示盲区画面」；开发者选项 dev_side_view_back / _up / _fov 的标题「盲区画面朝后角度」「盲区画面朝外角度」「盲区画面视野角度」和说明；
   列举悬浮窗功能处加上「盲区画面」的 set_auto_start_summary、dev_perm_overlay_why。
+- 2026-10-19 批准（PR #61 悬浮按钮「锁定当前录像」）：选项 floating_action_lock_footage「锁定当前录像」/ Lock the current recording / Kunci rakaman semasa；
+  锁上时 msg_footage_locked_around「已锁定前后 10 秒所在的录像片段」/ Locked the clips covering 10 seconds before and after /
+  Klip yang meliputi 10 saat sebelum dan selepas telah dikunci；「锁定影像」关着时 msg_footage_lock_needs_setting
+  「无法锁定，请先开启「设置 → 存储 → 锁定影像」」/ Can't lock. Turn on Settings → Storage → Lock footage first /
+  Tidak dapat mengunci. Hidupkan Tetapan → Storan → Kunci rakaman dahulu。没在录时沿用 msg_footage_nothing_here「当前时刻无可锁定的录像」。
+- 2026-10-19 批准（PR #38 下载更新时校验安装包）：upd_err_integrity，下载更新时安装包的 sha256 或大小与 GitHub 给的对不上、或 GitHub 没给 sha256，显示为「下载失败：安装包校验未通过，已中止」；English「Download failed: installer file failed verification, aborted」；Bahasa Melayu「Muat turun gagal: fail pemasang gagal pengesahan, dibatalkan」。
+- 2026-10-19 批准（设置页分组）：组名 set_group_stream「视频流」、_auto_record「自动录制」、_photo「拍照」、_stamps「水印」、
+  _cleanup「自动清理」、_views「切换画面」、_window「窗口」、_behavior「行为」、_appearance「外观」、_position「位置」、
+  _main_screen「主界面」、_cameras「摄像头」、_files「文件维护」；另有几组直接用同名设置项的文字（存储位置、锁定影像、行驶信息条、
+  鱼眼校正、盲区画面、录制）。英文、马来文照术语表。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -215,7 +225,7 @@
 | 系统信息 | 系统信息（试验性） | System info (experimental) | Maklumat sistem (percubaan) | — |
 | 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
 | 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
-| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（系统） | screen off / on；sleep / wake；Screen-off recording (keep awake)；Keep recording when the screen goes off | skrin padam / hidup；tidur / bangun；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
+| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制） | screen off / on；sleep / wake；Screen-off recording (keep awake)；Keep recording when the screen goes off | skrin padam / hidup；tidur / bangun；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
 | 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件 0x20290300 那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
 | 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |
 | 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | 不用「软件」「程序」（关于页致谢原文除外） |
