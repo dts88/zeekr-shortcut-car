@@ -107,6 +107,21 @@ public class CameraManagerHolderShapeTest {
     }
 
     /**
+     * 照哪几路启用的建（2026-10-20 审查，车主批）：主界面接上时照它摆的格子（配置改了、主界面还没重建也一样），
+     * 后台的调用方照手里那一份，还没有过管线时照此刻的配置。
+     */
+    @Test
+    public void theMainScreenLayoutDecidesTheEnabledLanes() {
+        java.util.Set<String> laidOut = new LinkedHashSet<>(Arrays.asList(SUR, FRONT));
+        java.util.Set<String> built = new LinkedHashSet<>(Arrays.asList(SUR));
+        java.util.Set<String> profile = new LinkedHashSet<>(Arrays.asList(SUR, REAR));
+        assertEquals(laidOut, CameraManagerHolder.lanesFor(laidOut, built, profile));
+        assertEquals(laidOut, CameraManagerHolder.lanesFor(laidOut, null, profile));
+        assertEquals(built, CameraManagerHolder.lanesFor(null, built, profile));
+        assertEquals(profile, CameraManagerHolder.lanesFor(null, null, profile));
+    }
+
+    /**
      * 为超级镜子当场重建只在「要后座舱而这一份里没有」时（谁来要都重建）；换出这一档、或者这一份里已经有后座舱，后台的调用方都不重建 ——
      * 设置里来回切，一份管线最多为它重建一次。只为它建、现在没人要的后座舱，和开的几路变了一样，等主界面接上时照此刻的设置重建。
      */

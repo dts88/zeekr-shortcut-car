@@ -385,7 +385,7 @@ public class RearViewMirrorService extends Service {
             return;
         }
         retryCount = 0;
-        boolean declared = surround.declare(camera, manager, surfaceTexture);
+        boolean declared = !surround.refused && surround.declare(camera, manager, surfaceTexture);
         CameraNeeds needs = CameraNeeds.current();
         boolean claimed = !needs.isHeld(CameraNeeds.Holder.MIRROR);
         needs.claim(CameraNeeds.Holder.MIRROR);
@@ -439,7 +439,7 @@ public class RearViewMirrorService extends Service {
         }
         MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
         SingleCamera camera = manager != null ? manager.getCamera(CameraSlots.KEY_CABIN_REAR) : null;
-        if (camera == null) {
+        if (camera == null || cabin.refused) {
             return;
         }
         if (cabin.declare(camera, manager, surfaceTexture)) {
@@ -457,8 +457,17 @@ public class RearViewMirrorService extends Service {
      */
     private final Runnable pipelineReplaced = () -> {
         CameraManagerHolder holder = CameraManagerHolder.getInstance();
-        holder.whenBuilt(holder.getCameraManager(), built -> handler.post(this::ensureStillBound));
+        holder.whenBuilt(holder.getCameraManager(), built -> handler.post(() -> {
+            clearRefusals();
+            ensureStillBound();
+        }));
     };
+
+    /** 相机层上一回不带的画布（{@link MirrorCanvas#refused}）再试一次：重新打开、亮屏、放回来、点击恢复、管线换了。 */
+    private void clearRefusals() {
+        surround.refused = false;
+        cabin.refused = false;
+    }
 
     /**
      * 看门狗：重新声明、重新登记 —— 只做这两件（大纲 §2 阶段 4b）。
@@ -550,6 +559,7 @@ public class RearViewMirrorService extends Service {
         if (mirrorView == null || !mirrorView.isShowing()) {
             return;
         }
+        clearRefusals();
         SurfaceTexture canvas = surround.canvas();
         if (canvas == null) {
             AppLog.w(TAG, "后视镜画布还没准备好，暂不登记相机");
@@ -670,6 +680,12 @@ public class RearViewMirrorService extends Service {
          * 紧跟着的就是那一次 onSurfaceTextureUpdated（2026-10-11，§7.7）。
          */
         boolean restoreOnFrame;
+        /**
+         * 相机层这一回不带这块画布（录像中会话配不上，它在 JPEG 之后让路，{@link #onDropped}）：先不再声明，
+         * 不然调度会一直想把它加回去、一次次重建那一路的会话。重新打开窗口、亮屏、放回来、点「点击恢复」、管线换了时再试
+         * （{@link #clearRefusals}）；看门狗不试。
+         */
+        boolean refused;
 
         MirrorCanvas(String cameraKey, boolean cabin) {
             this.cameraKey = cameraKey;
@@ -689,6 +705,7 @@ public class RearViewMirrorService extends Service {
         void attach(RearViewMirrorView window) {
             source = null;
             restoreOnFrame = false;
+            refused = false;
             (cabin ? window.getCabinTextureView() : window.getTextureView()).setSurfaceTextureListener(listener);
         }
 
@@ -788,7 +805,22 @@ public class RearViewMirrorService extends Service {
                 }
                 source = preview;
             }
-            return to.declareMirror(st);
+            return to.declareMirror(st, why -> onDropped(to, st, why));
+        }
+
+        /** 相机层丢了这块画布（调度在主线程上派发）：「配不上」就撤回、这一回不再声明（{@link #refused}）。 */
+        void onDropped(SingleCamera from, SurfaceTexture st, SingleCamera.Drop why) {
+            if (from != camera || st != texture) {
+                return;
+            }
+            if (why != SingleCamera.Drop.CONFIG_FAILED) {
+                AppLog.w(TAG, "后视镜" + (cabin ? "后座舱" : "环视") + "画布离开了会话（" + why + "）");
+                return;
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("超级镜子：相机层这一回不带" + (cabin ? "后座舱" : "环视")
+                    + "的画布（会话配不上），撤回；重新打开、亮屏、放回来、点击恢复时再试");
+            refused = true;
+            withdraw();
         }
 
         /**
