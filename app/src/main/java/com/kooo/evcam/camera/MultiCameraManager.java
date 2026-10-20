@@ -107,7 +107,7 @@ public class MultiCameraManager {
                     awaitingCabinRelease = false;
                     scheduler.wake();
                     if (countedDark) {
-                        liftRefusals("亮屏了");
+                        liftRefusals("亮屏了", null);
                     }
                 }
             };
@@ -523,12 +523,9 @@ public class MultiCameraManager {
         scheduler.setRecording(new LaneSide());
         // 相机服务每说一句、问的结果回来、注册回放收全：叫醒调度；分类时问它「这一路有没有我们的开或关在途」
         CameraAvailabilityWatch.addListener(channelSide);
-        // 登记表一变就叫醒调度（只认这一份：换车型时旧的那份晚 release，摘不掉这份的监听）；会话连着几次带不上录像输出、
-        // 等着的那几路这时也重新声明（和救援停手一样解锁，liftRefusals）。监听可能在别的线程上叫
-        needsListener = () -> {
-            scheduler.onNeedsChanged();
-            laneHandler.post(() -> liftRefusals("登记表变了"));
-        };
+        // 登记表一变就叫醒调度（只认这一份：换车型时旧的那份晚 release，摘不掉这份的监听）。会话连着几次带不上录像输出、
+        // 等着的那一路，在要它的登记方变了时由调度告诉（LaneSide.onLaneWantersChanged，和救援停手一样解锁）。监听可能在别的线程上叫
+        needsListener = scheduler::onNeedsChanged;
         CameraNeeds.current().setListener(needsListener);
         // 亮屏、熄屏叫醒调度（ScreenState 在主线程上叫）
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
@@ -913,6 +910,12 @@ public class MultiCameraManager {
                 mediaConditionChanged(key);
             }
             publishLanes();
+        }
+
+        /** 这一路「谁要它」变了：会话连着几次带不上录像输出、在等的话，这时再试（和救援停手一样解锁）。 */
+        @Override
+        public void onLaneWantersChanged(String key) {
+            liftRefusals("登记表变了", java.util.Collections.singleton(key));
         }
     }
 
@@ -1385,19 +1388,21 @@ public class MultiCameraManager {
 
     /**
      * 会话连着几次都带不上录像输出、等着的那几路（{@link #refusedUntilGone}）重新声明（主线程）：和救援梯子停手之后同样的解锁
-     * （ChannelRules.liftStops，§7.4）—— 登记表变了、亮屏；相机服务报它空闲说明它的相机走过了，那时已经清了
+     * （ChannelRules.liftStops，§7.4）—— 要它的登记方变了（只那一路，{@link LaneSide#onLaneWantersChanged}）、亮屏（各路）；
+     * 相机服务报它空闲说明它的相机走过了，那时已经清了
      * （{@link LaneSide#onLaneCameraGone}）。以前只等相机走：录像开着时 RECORDING 一直让它开着、在出画面，相机不会走，
      * 这一路这一趟就再也不录，「等待摄像头，恢复后自动继续」和「各路都停手了 …再试」那一行都不属实（审查 2026-10-11）。
      *
-     * @param why 为什么现在再试（进黑匣子）
+     * @param why  为什么现在再试（进黑匣子）
+     * @param keys 只看这几路；null 是各路
      */
-    private void liftRefusals(String why) {
+    private void liftRefusals(String why, java.util.Collection<String> keys) {
         if (!isRecording || refusals.isEmpty()) {
             return;
         }
         List<String> lifted = new ArrayList<>();
         for (String key : new ArrayList<>(refusals.keySet())) {
-            if (refusedUntilGone(key)) {
+            if ((keys == null || keys.contains(key)) && refusedUntilGone(key)) {
                 refusals.remove(key);
                 lifted.add(key);
             }
