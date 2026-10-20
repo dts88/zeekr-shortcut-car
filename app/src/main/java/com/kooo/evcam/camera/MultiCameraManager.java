@@ -2014,7 +2014,7 @@ public class MultiCameraManager {
 
     /**
      * 画布被系统收走时由管线留下的那几块（主线程），按输出的种类、再按路：主界面重建时的预览画布（大纲 §7.6），
-     * 关掉的超级镜子的画布（大纲 §7.7，只在环视那一路），移走的盲区画面窗口的画布（同 §7.7，2026-10-16）。
+     * 关掉的超级镜子的画布（大纲 §7.7：环视那一路，「后视 + 后座舱」时还有后座舱），移走的盲区画面窗口的画布（同 §7.7，2026-10-16）。
      * 项目所有者 2026-10-11 两问都答「按建议」，做法同一套。
      *
      * <p>为什么留：画布被系统收走时，会话里的消费者一死，那一路整条重复请求停下 —— 预览和录像一起停，只能一路一路马上摘，
@@ -2091,7 +2091,7 @@ public class MultiCameraManager {
     /**
      * 超级镜子的画布要被系统收走了（onSurfaceTextureDestroyed，主线程；关后视镜 —— 服务退出、窗口移走那一下）：
      * 撤回后视镜输出，画布由管线留着（大纲 §7.7，项目所有者 2026-10-11「按建议，留住」；见 {@link #keptCanvases}、
-     * {@link #keepCanvas}）。后视镜只声明在环视那一路上。
+     * {@link #keepCanvas}）。后视镜声明在环视那一路上；切换范围是「后视 + 后座舱」时后座舱也有一块（{@code cameraKey}）。
      *
      * <p>这样关后视镜时环视零变动：画布还活着就是「留着的输出」，环视（含环视的录像）照旧出画面，等下一次本来要动环视
      * （改输出）、或者关环视时一起摘，摘掉以后才放。代价是这期间环视还往一块没人显示的画布送帧，和贴边、熄屏时留着的一样
@@ -2100,9 +2100,10 @@ public class MultiCameraManager {
      * @param current 调用方手里的那一份（可能是 null、可能已经放了）；交给哪一份照 {@link #ownerOf}
      * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：哪一份都不带着它、也没有环视那一路，调用方照常让它放
      */
-    public static boolean keepMirrorCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
-        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
-        return owner != null && owner.keepCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND, texture);
+    public static boolean keepMirrorCanvas(MultiCameraManager current, String cameraKey,
+                                           android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.MIRROR, cameraKey, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.MIRROR, cameraKey, texture);
     }
 
     /**
@@ -2206,8 +2207,8 @@ public class MultiCameraManager {
      *
      * @return 留着、还活着的那一块；没有是 null
      */
-    public android.graphics.SurfaceTexture takeKeptMirror() {
-        return takeKeptCanvas(ChannelRules.Kind.MIRROR, CameraSlots.KEY_SURROUND);
+    public android.graphics.SurfaceTexture takeKeptMirror(String cameraKey) {
+        return takeKeptCanvas(ChannelRules.Kind.MIRROR, cameraKey);
     }
 
     /** 新开的盲区画面窗口接回上一个窗口留下的画布（同 {@link #takeKeptMirror}）；拿回来之后接着重新声明（{@link SingleCamera#declareSide}）。 */
@@ -2243,8 +2244,8 @@ public class MultiCameraManager {
         }
         texture.release();
         if (kind == ChannelRules.Kind.MIRROR) {
-            com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：环视的会话里已经没有它，放掉"
-                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+            com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：" + roleName(cameraKey)
+                    + "的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         } else if (kind == ChannelRules.Kind.SIDE) {
             com.kooo.evcam.blackbox.BlackBox.note("盲区画面留下的画布没人接回：环视的会话里已经没有它，放掉"
                     + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
@@ -3224,6 +3225,28 @@ public class MultiCameraManager {
         @Override
         public Set<String> recordPlan() {
             return recordPlanKeys();
+        }
+
+        /** 上一轮读到的「超级镜子要后座舱」：变了记一行黑匣子。 */
+        private volatile boolean mirrorCabinNoted;
+        /** 读切换范围用（第一次要时建：这个对象跟着管线的字段一起建，那时 context 还没给）。 */
+        private volatile com.kooo.evcam.AppConfig config;
+
+        @Override
+        public boolean mirrorWantsCabinRear() {
+            com.kooo.evcam.AppConfig settings = config;
+            if (settings == null) {
+                settings = new com.kooo.evcam.AppConfig(context);
+                config = settings;
+            }
+            boolean wants = settings.rearViewWantsCabinRear();
+            if (wants != mirrorCabinNoted) {
+                mirrorCabinNoted = wants;
+                com.kooo.evcam.blackbox.BlackBox.note(wants
+                        ? "超级镜子切换范围是「后视 + 后座舱」：登记着超级镜子时后座舱也有人要"
+                        : "超级镜子切换范围不含后座舱：超级镜子只要环视");
+            }
+            return wants;
         }
 
         @Override

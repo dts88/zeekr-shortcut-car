@@ -637,6 +637,12 @@ public class SingleCamera {
         }
     }
 
+    /** 配置里这一路那一格的旋转（顺时针度数），取不到是 0：超级镜子摆后座舱画面时照它摆正，和主界面同一格。 */
+    public int laneRotation() {
+        com.kooo.evcam.profile.LaneLayout lane = laneForThisCamera();
+        return lane == null ? 0 : lane.rotation;
+    }
+
     /**
      * 应用左右镜像变换到TextureView
      */
@@ -1813,6 +1819,11 @@ public class SingleCamera {
         cameraCharacteristics = characteristics;
         Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
         sourceMirrored = facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT;
+    }
+
+    /** 系统会不会把这一路给预览的画面左右翻一次（前置摄像头）：超级镜子摆后座舱画面时要先翻回正常视角。 */
+    public boolean isSourceMirrored() {
+        return sourceMirrored();
     }
 
     /**

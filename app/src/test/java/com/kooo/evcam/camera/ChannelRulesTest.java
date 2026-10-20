@@ -163,6 +163,41 @@ public class ChannelRulesTest {
         assertEquals("和超级镜子各要各的", set(mirror, side), ChannelRules.wantedOutputs(cabinsOnly, sur));
     }
 
+    /**
+     * 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）：登记着 MIRROR 时后座舱和环视一样有人要，只带超级镜子那块画布；
+     * 配置里没启用后座舱也一样（管线照它建了这一路），主界面预览、拍照照旧不要它；熄屏照旧放开；前座舱不为它开。
+     */
+    @Test
+    public void theMirrorWantsTheRearCabinOnlyInTheRearCabinViews() {
+        Out cabinMirror = new Out(Kind.MIRROR, "mirror-cabin");
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        Lane cabFront = new Lane(FRONT, "0");
+        World surroundOnly = new World(Arrays.asList(cabFront, cab, sur), new LinkedHashSet<>(Collections.singletonList(SUR)));
+        surroundOnly.screenOn = true;
+        surroundOnly.holders.add(Holder.PREVIEW);
+        surroundOnly.holders.add(Holder.PHOTO);
+        surroundOnly.holders.add(Holder.MIRROR);
+        cab.declared.add(cabinMirror);
+        assertFalse("四向、前后：超级镜子不要后座舱", ChannelRules.wanted(surroundOnly, cab));
+        assertTrue(ChannelRules.wantedOutputs(surroundOnly, cab).isEmpty());
+
+        surroundOnly.mirrorCabin = true;
+        assertEquals("没启用：只有超级镜子要它", EnumSet.of(Holder.MIRROR), ChannelRules.wantedBy(surroundOnly, cab));
+        assertEquals("只带超级镜子那块画布", set(cabinMirror), ChannelRules.wantedOutputs(surroundOnly, cab));
+        assertFalse("前座舱不为它开", ChannelRules.wanted(surroundOnly, cabFront));
+
+        surroundOnly.holders.remove(Holder.MIRROR);
+        assertFalse("超级镜子没登记：不要", ChannelRules.wanted(surroundOnly, cab));
+        assertTrue(ChannelRules.wantedOutputs(surroundOnly, cab).isEmpty());
+
+        surroundOnly.holders.add(Holder.MIRROR);
+        surroundOnly.screenOn = false;
+        assertTrue("熄屏照旧放开座舱", ChannelRules.releasedByDark(surroundOnly, cab));
+        assertFalse(ChannelRules.wanted(surroundOnly, cab));
+        assertTrue(ChannelRules.wantedOutputs(surroundOnly, cab).isEmpty());
+    }
+
     /** 没说启用了哪几路：管线里的全部都算启用（以前的样子）。 */
     @Test
     public void everyLaneIsEnabledWhenNoneAreNamed() {

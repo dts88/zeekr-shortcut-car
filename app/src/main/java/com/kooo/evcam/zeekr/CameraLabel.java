@@ -7,6 +7,7 @@ import android.graphics.Typeface;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.kooo.evcam.R;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.settings.Languages;
 
@@ -15,7 +16,8 @@ final class CameraLabel {
     private final Context context;
     private final Paint background = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final String[] names = new String[4];
+    /** 0–3 是环视的前、后、左、右，{@link LaneCycle#CABIN_REAR} 是后座舱。 */
+    private final String[] names = new String[LaneCycle.CABIN_REAR + 1];
     private String language;
 
     CameraLabel(Context context) {
@@ -34,7 +36,9 @@ final class CameraLabel {
         if (!currentLanguage.equals(language)) {
             Context localized = Languages.localized(context);
             for (int i = 0; i < names.length; i++) {
-                names[i] = CameraNames.ofLane(localized, i);
+                names[i] = i == LaneCycle.CABIN_REAR
+                        ? localized.getString(R.string.slot_cabin_rear)
+                        : CameraNames.ofLane(localized, i);
             }
             language = currentLanguage;
         }

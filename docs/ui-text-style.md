@@ -183,6 +183,16 @@
   _cleanup「自动清理」、_views「切换画面」、_window「窗口」、_behavior「行为」、_appearance「外观」、_position「位置」、
   _main_screen「主界面」、_cameras「摄像头」、_files「文件维护」；另有几组直接用同名设置项的文字（存储位置、锁定影像、行驶信息条、
   鱼眼校正、盲区画面、录制）。英文、马来文照术语表。
+- 2026-10-19 批准（超级镜子切换范围，取代「只显示前后视」开关）：set_rearview_views_title「切换范围」/ Views / Paparan；
+  三档 opt_views_four「四向」/ All four / Empat arah、opt_views_front_rear「前后」/ Front and rear / Depan dan belakang、
+  opt_views_rear_cabin「后视 + 后座舱」/ Rear + rear cabin / Belakang + kabin belakang；后座舱的方向标签沿用 slot_cabin_rear「后座舱」；
+  set_rearview_reset_summary 里「只显示前后视」换成「切换范围」。
+- 2026-10-20 批准（超级镜子说明跟上后座舱）：set_rearview_summary「悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致」；
+  Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror；
+  Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman。
+- 2026-10-20 批准：set_rearview_button_mode_summary「点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视」；
+  …; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom；
+  …; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -219,7 +229,8 @@
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
 | 盲区画面 | 盲区画面（打转向灯时在屏幕该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
-| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*） |
+| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
+| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
 | 行驶信息条 | 行驶信息条；仅系统信息页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
 | 系统信息 | 系统信息（试验性） | System info (experimental) | Maklumat sistem (percubaan) | — |

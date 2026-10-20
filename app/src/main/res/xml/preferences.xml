@@ -218,11 +218,11 @@
                 android:title="@string/set_rearview_camera_label_title"
                 android:summary="@string/set_rearview_camera_label_summary" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_rearview_front_rear"
+            <!-- 切换范围：三档，摆在行里点一次（项目所有者 2026-10-19，取代「只显示前后视」开关） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_rearview_views"
                 android:dependency="pref_rearview"
-                android:title="@string/set_rearview_front_rear_title"
-                android:summary="@string/set_rearview_front_rear_summary" />
+                android:title="@string/set_rearview_views_title" />
 
             <SwitchPreferenceCompat
                 android:key="pref_rearview_button_mode"
