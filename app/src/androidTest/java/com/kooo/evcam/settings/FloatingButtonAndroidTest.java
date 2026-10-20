@@ -143,9 +143,9 @@ public class FloatingButtonAndroidTest {
                     assertNotNull(page.findPreference("pref_floating_long_press"));
                     ListPreference doubleTap = page.findPreference("pref_floating_double_tap");
                     assertTrue(doubleTap.isEnabled()); assertEquals(NONE.key, doubleTap.getValue());
-                    assertEquals(5, doubleTap.getEntryValues().length);
-                    assertTrue(doubleTap.callChangeListener(TAKE_PHOTO.key)); doubleTap.setValue(TAKE_PHOTO.key);
-                    assertEquals(TAKE_PHOTO.key, new AppConfig(context).getFloatingDoubleTapAction());
+                    assertEquals(6, doubleTap.getEntryValues().length);
+                    assertTrue(doubleTap.callChangeListener(LOCK_FOOTAGE.key)); doubleTap.setValue(LOCK_FOOTAGE.key);
+                    assertEquals(LOCK_FOOTAGE.key, new AppConfig(context).getFloatingDoubleTapAction());
                     assertEquals(preservedTap, config.getFloatingTapAction());
                     assertEquals(preservedHold, config.getFloatingLongPressAction());
                 });
@@ -164,7 +164,7 @@ public class FloatingButtonAndroidTest {
                             .findFragmentById(R.id.fragment_container);
                     SettingsPreferenceFragment page = (SettingsPreferenceFragment) shell.getChildFragmentManager()
                             .findFragmentById(R.id.settings_detail);
-                    assertEquals(TAKE_PHOTO.key, ((ListPreference) page.findPreference("pref_floating_double_tap")).getValue());
+                    assertEquals(LOCK_FOOTAGE.key, ((ListPreference) page.findPreference("pref_floating_double_tap")).getValue());
                 });
             }
             context.getSharedPreferences("app_config", Context.MODE_PRIVATE).edit()
