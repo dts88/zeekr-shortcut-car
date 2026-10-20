@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.15.0-alpha] - 2026-10-20
+
 - Settings: rows on each page are grouped under headings. Keep recording when the screen goes off moves from System to Recording, next to Record on launch.
 - Super mirror: the Front and rear only switch becomes Views: All four (default), Front and rear, or Rear + rear cabin, which switches between the rear view and the rear cabin camera, mirrored (button mode: top half rear cabin, bottom half rear view). When the stream profile leaves the rear cabin off, choosing it restarts the cameras once.
 - Settings → System: Export settings saves every setting and the stream profiles to a file in the diagnostics report folder; Import settings restores one exported by the same major version, then exits the app so everything starts with the restored settings. Diagnostics reports now include the full settings.
