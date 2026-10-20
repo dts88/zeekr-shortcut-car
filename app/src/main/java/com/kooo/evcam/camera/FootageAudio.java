@@ -33,7 +33,7 @@ import java.util.Locale;
  * 声音小、不经处理）和通话（VOICE_COMMUNICATION，走 id 80，最响，经回声消除 / 降噪；这个来源指定设备不管用）。
  * MIC / 系统默认在这台车上走的是蓝牙输入，多半是手机传来的声音，不用。都不指定设备，实际走了哪个记下来（{@link #status}）。</p>
  */
-final class FootageAudio {
+public final class FootageAudio {
 
     private static final String TAG = "FootageAudio";
 
@@ -42,8 +42,8 @@ final class FootageAudio {
     /** 来源：通话那一路（经回声消除、降噪）。 */
     static final String SOURCE_CALL = com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL;
 
-    /** AAC 单声道 64 kbps：每小时约 29 MB（存储估算算上它，{@code StorageBudget}）。 */
-    static final int BIT_RATE = 64_000;
+    /** AAC 单声道 64 kbps：每小时约 29 MB（存储估算算上它，{@code ProfileEditorFragment}）。 */
+    public static final int BIT_RATE = 64_000;
     /** 采样率按顺序试，第一个开得起来的用。 */
     private static final int[] RATES = {48_000, 44_100, 16_000};
     /** 一次读多少帧（单声道 16 位）：1024 帧，48 kHz 下约 21 毫秒，正好是 AAC 一帧的量。 */
@@ -77,8 +77,23 @@ final class FootageAudio {
     /** 最近一次开录的那一个（这一次或者上一次）：诊断报告读它的 {@link #status}。 */
     private static volatile FootageAudio latest;
 
+    /**
+     * 环视录像此刻会不会带声音、用哪个来源：开发者选项「录制声音」开着、有录音权限、安卓 11 起。
+     * 定录法（{@code MultiCameraManager}）、前台服务带不带麦克风类型、存储估算、诊断都问这一处；null = 不带。
+     */
+    public static String sourceFor(android.content.Context context, com.kooo.evcam.AppConfig config) {
+        if (!config.isFootageAudioEnabled() || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return null;
+        }
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return null;
+        }
+        return config.getFootageAudioSource();
+    }
+
     /** 最近一次录像里的声音怎么样（诊断报告用）；这次开进程还没录过是 null。 */
-    static String latestStatus() {
+    public static String latestStatus() {
         FootageAudio audio = latest;
         return audio == null ? null : audio.status();
     }

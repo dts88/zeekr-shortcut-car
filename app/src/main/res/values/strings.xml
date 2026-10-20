@@ -893,6 +893,14 @@
     <string name="dev_perm_notifications_why">用于显示录制状态通知</string>
     <string name="dev_perm_location">定位权限</string>
     <string name="dev_perm_location_why">用于在行驶信息条上显示经纬度</string>
+    <string name="dev_perm_microphone">麦克风权限</string>
+    <string name="dev_perm_microphone_why">开发者选项「录制声音」要用</string>
+    <string name="dev_footage_audio_title">录制声音（试验）</string>
+    <string name="dev_footage_audio_summary">环视录像带上一路车内麦克风的声音，打开时请求录音权限。录制模式为 MediaRecorder 时不带声音。麦克风的位置、熄屏和后台时能不能录到，还在实车测试</string>
+    <string name="dev_footage_audio_source_title">麦克风来源</string>
+    <string name="dev_footage_audio_source_raw">原始（VOICE_RECOGNITION，不经处理，声音小）</string>
+    <string name="dev_footage_audio_source_call">通话（VOICE_COMMUNICATION，经降噪和回声消除）</string>
+    <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
     <string name="dev_perm_all_files">所有文件访问</string>
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>

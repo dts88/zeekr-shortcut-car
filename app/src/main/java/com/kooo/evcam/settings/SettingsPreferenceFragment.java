@@ -61,6 +61,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private static final String TAG = "SettingsPreference";
 
     private AppConfig appConfig;
+    /**
+     * 「录制声音」打开时要录音权限（项目所有者 2026-10-20：开关打开时才要，不在启动时要）：系统弹窗的结果回到这里。
+     * 只能在建这个界面时登记（registerForActivityResult 的规矩），所以放在字段上。
+     */
+    private final androidx.activity.result.ActivityResultLauncher<String> micPermission =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                    this::onMicPermission);
     /** 绑定这一页时开发者选项开没开；回到这一页时变了就重绑（见 {@link #onResume}）。 */
     private boolean boundUnlocked;
     /** 外置卷的取值前缀，后面接它在探测结果里的下标。 */
@@ -1103,6 +1110,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindScreenOffWakeHours();
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
+        bindFootageAudio();
 
         // 画面调节：打开调节窗口（MainActivity 管着它，退出设置也还在），同时开启画面调节、套上存着的参数。
         // 窗口开没开成由 MainActivity 说：没有悬浮窗权限、相机还没好时它自己提示
@@ -1409,6 +1417,62 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 开 / 关一个悬浮窗；返回是否真的按要求生效。 */
     private interface OverlayToggle {
         boolean apply(Context context, boolean enabled);
+    }
+
+    /**
+     * 录制声音（开发者选项，试验）：打开时没有录音权限就先问系统，给了才打开。开关显示的是会不会真录（开着、又有权限）——
+     * 在系统设置里收回了权限，这里就显示关着。改了之后前台服务重走一遍（带上 / 去掉麦克风类型）；录法从下一次开录起。
+     */
+    private void bindFootageAudio() {
+        SwitchPreferenceCompat pref = findPreference("pref_footage_audio");
+        if (pref != null) {
+            pref.setPersistent(false);
+            pref.setChecked(appConfig.isFootageAudioEnabled() && hasMicPermission());
+            pref.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean on = Boolean.TRUE.equals(newValue);
+                if (on && !hasMicPermission()) {
+                    micPermission.launch(android.Manifest.permission.RECORD_AUDIO);
+                    return false;  // 等系统弹窗的结果（onMicPermission）
+                }
+                setFootageAudio(on);
+                return true;
+            });
+        }
+        bindEnum("pref_footage_audio_source", SettingsRegistry.FOOTAGE_AUDIO_SOURCE,
+                appConfig.getFootageAudioSource(), value -> appConfig.setFootageAudioSource(value));
+    }
+
+    /** 系统弹窗问完录音权限：给了就打开「录制声音」；没给就照旧关着，说一句。 */
+    private void onMicPermission(boolean granted) {
+        Context context = getContext();
+        if (context == null || appConfig == null) {
+            return;
+        }
+        if (!granted) {
+            Toast.makeText(context, R.string.msg_footage_audio_no_permission, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        setFootageAudio(true);
+        SwitchPreferenceCompat pref = findPreference("pref_footage_audio");
+        if (pref != null) {
+            pref.setChecked(true);
+        }
+    }
+
+    private void setFootageAudio(boolean on) {
+        appConfig.setFootageAudioEnabled(on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_audio → " + (on ? "开" : "关"));
+        Context context = getContext();
+        if (context != null) {
+            // 前台服务按此刻的开关重新起一次前台：带不带麦克风类型
+            com.kooo.evcam.CameraForegroundService.start(context.getApplicationContext());
+        }
+    }
+
+    private boolean hasMicPermission() {
+        Context context = getContext();
+        return context != null && androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
     }
 
     private void bindSwitch(String key, boolean current, BoolSetter setter) {

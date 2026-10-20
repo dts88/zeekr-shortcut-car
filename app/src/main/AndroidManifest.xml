@@ -29,6 +29,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- 前台服务类型：摄像头（Android 10+） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- 开发者选项「录制声音」（试验）：环视录像带一路麦克风的声音。打开开关时才请求，不在启动时要 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 录制声音开着时，前台服务试着带上麦克风类型（安卓 11 起后台用麦克风要它；带不上照旧） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- CPU唤醒锁（保持CPU运行，不亮屏，用于息屏状态下拍照/录制） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 悬浮窗权限（绕过后台启动Activity限制，需要用户手动授权） -->

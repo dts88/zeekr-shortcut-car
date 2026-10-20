@@ -484,6 +484,18 @@
                 android:key="pref_screen_off_wake_hours"
                 android:dependency="pref_screen_off_recording"
                 android:title="@string/set_screen_off_wake_title" />
+
+            <!-- 录制声音（试验，项目所有者 2026-10-20 定先做框架、上车比来源）：只给环视录像 -->
+            <SwitchPreferenceCompat
+                android:key="pref_footage_audio"
+                android:title="@string/dev_footage_audio_title"
+                android:summary="@string/dev_footage_audio_summary" />
+
+            <ListPreference
+                android:key="pref_footage_audio_source"
+                android:dependency="pref_footage_audio"
+                android:title="@string/dev_footage_audio_source_title"
+                android:summary="%s" />
         </PreferenceCategory>
 
         <PreferenceCategory

@@ -881,6 +881,14 @@
     <string name="dev_perm_notifications_why">Digunakan untuk pemberitahuan status rakaman</string>
     <string name="dev_perm_location">Lokasi</string>
     <string name="dev_perm_location_why">Digunakan untuk menunjukkan koordinat pada Bar maklumat pemanduan</string>
+    <string name="dev_perm_microphone">Mikrofon</string>
+    <string name="dev_perm_microphone_why">Diperlukan oleh Rakam bunyi dalam Pilihan pembangun</string>
+    <string name="dev_footage_audio_title">Rakam bunyi (percubaan)</string>
+    <string name="dev_footage_audio_summary">Menambah bunyi satu mikrofon kabin pada rakaman sekeliling dan meminta kebenaran mikrofon apabila dihidupkan. Tiada bunyi apabila Saluran rakaman ialah MediaRecorder. Kedudukan mikrofon dan rakaman semasa skrin mati atau di latar belakang masih diuji dalam kereta</string>
+    <string name="dev_footage_audio_source_title">Sumber mikrofon</string>
+    <string name="dev_footage_audio_source_raw">Asal (VOICE_RECOGNITION, tanpa pemprosesan, perlahan)</string>
+    <string name="dev_footage_audio_source_call">Panggilan (VOICE_COMMUNICATION, pengurangan hingar dan pembatalan gema)</string>
+    <string name="msg_footage_audio_no_permission">Tiada kebenaran mikrofon, Rakam bunyi kekal dimatikan</string>
     <string name="dev_perm_all_files">Akses semua fail</string>
     <string name="dev_perm_all_files_why">Digunakan untuk membaca dan menulis fail pada pemacu USB</string>
     <string name="dev_perm_overlay">Paparan di atas apl lain</string>

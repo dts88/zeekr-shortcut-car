@@ -93,6 +93,17 @@ public final class SettingsRegistry {
             entry("front_rear", "前后", R.string.opt_views_front_rear),
             entry("rear_cabin", "后视 + 后座舱", R.string.opt_views_rear_cabin));
 
+    /**
+     * 录制声音用哪个来源（开发者选项，试验；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
+     * 名字按来源叫，不叫「机身麦克风」：Lab 怀疑那一路其实在车外，测清之前不下结论。
+     */
+    public static final SettingSpec FOOTAGE_AUDIO_SOURCE = SettingSpec.of(
+            "footage_audio_source", "麦克风来源", com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_RAW,
+            entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_RAW, "原始（VOICE_RECOGNITION）",
+                    R.string.dev_footage_audio_source_raw),
+            entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL, "通话（VOICE_COMMUNICATION）",
+                    R.string.dev_footage_audio_source_call));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
@@ -100,5 +111,6 @@ public final class SettingsRegistry {
             LANGUAGE,
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE,
-            REARVIEW_VIEWS));
+            REARVIEW_VIEWS,
+            FOOTAGE_AUDIO_SOURCE));
 }

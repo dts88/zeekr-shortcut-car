@@ -230,6 +230,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             // 画面按比例居中，剩下的地方露出框的底色 —— 和图片回看一个样子
             view.setOpaque(false);
             player = new ManagedVideoPlayer(view);
+            // 只有环视那一路的录像带声音：这一路放声音，座舱两路静音
+            player.setAudible(CameraSlots.KEY_SURROUND.equals(CameraSlots.keyForSuffix(slot)));
             TextView label = findViewById(labelId);
             label.setText(new AppConfig(TimelinePlayerActivity.this).getCameraName(
                     TimelinePlayerActivity.this, CameraSlots.keyForSuffix(slot)));

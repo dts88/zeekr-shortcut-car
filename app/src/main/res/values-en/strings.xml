@@ -900,6 +900,14 @@
     <string name="dev_perm_notifications_why">Used for the recording status notification</string>
     <string name="dev_perm_location">Location</string>
     <string name="dev_perm_location_why">Used to show coordinates on the Driving info bar</string>
+    <string name="dev_perm_microphone">Microphone</string>
+    <string name="dev_perm_microphone_why">Needed by Record sound in Developer options</string>
+    <string name="dev_footage_audio_title">Record sound (experimental)</string>
+    <string name="dev_footage_audio_summary">Adds one cabin microphone\'s sound to the surround recording and asks for the microphone permission when turned on. No sound when Recording pipeline is MediaRecorder. Microphone position and recording with the screen off or in the background are still being tested on the car</string>
+    <string name="dev_footage_audio_source_title">Microphone source</string>
+    <string name="dev_footage_audio_source_raw">Raw (VOICE_RECOGNITION, unprocessed, quiet)</string>
+    <string name="dev_footage_audio_source_call">Call (VOICE_COMMUNICATION, noise reduction and echo cancellation)</string>
+    <string name="msg_footage_audio_no_permission">No microphone permission, Record sound stays off</string>
     <string name="dev_perm_all_files">All files access</string>
     <string name="dev_perm_all_files_why">Used to read and write files on USB drives</string>
     <string name="dev_perm_overlay">Overlay</string>

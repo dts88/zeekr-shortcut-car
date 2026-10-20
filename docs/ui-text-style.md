@@ -213,6 +213,12 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 开发者选项「录制声音（试验）」（2026-10-20，车主定先做框架、上车比来源）：dev_footage_audio_title「录制声音（试验）」/
+  Record sound (experimental) / Rakam bunyi (percubaan)；dev_footage_audio_summary「环视录像带上一路车内麦克风的声音，打开时请求录音权限。
+  录制模式为 MediaRecorder 时不带声音。麦克风的位置、熄屏和后台时能不能录到，还在实车测试」；dev_footage_audio_source_title「麦克风来源」，
+  两档 dev_footage_audio_source_raw「原始（VOICE_RECOGNITION，不经处理，声音小）」、dev_footage_audio_source_call「通话（VOICE_COMMUNICATION，经降噪和回声消除）」；
+  没给权限时 msg_footage_audio_no_permission「没有录音权限，录制声音没有打开」；权限设置页 dev_perm_microphone「麦克风权限」、
+  dev_perm_microphone_why「开发者选项「录制声音」要用」（录制声音开着时才列）。英文、马来文见 strings.xml。
 - 系统信息「驾驶模式」（2026-10-20，Lab 车上对过值，车主要求加）：vi_drive_mode「驾驶模式」/ Drive mode / Mod pemanduan；
   三个值照车机界面的叫法：vi_v_drive_comfort「舒适」/ Comfort / Selesa，vi_v_drive_standard「标准」/ Standard / Standard，
   vi_v_drive_sport「运动」/ Sport / Sukan。没对上的值照原样写号码（同灯光开关）。

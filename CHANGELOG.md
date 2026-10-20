@@ -9,6 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Developer options: Record sound (experimental) adds one cabin microphone to the surround recording (raw or call-processed source, off by default; asks for the microphone permission when turned on). Playback plays the surround recording's sound through the cabin speakers. Repair keeps the pictures of a recording with sound.
 - System info: Drive mode (Comfort, Standard or Sport, as the car shows it). Tick it to show it on the driving info bar.
 - About & credits: thanks FerixzTanz for Blind spot view's default angles and window size, tuned on his own 7X.
 
