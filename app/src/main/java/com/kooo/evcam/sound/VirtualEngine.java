@@ -20,11 +20,16 @@ package com.kooo.evcam.sound;
  *   <li><b>刹车、动力流</b> → 回收或踩刹车时负荷归零（单踏板时油门轻踩到 5–12 % 还在回收，只看油门分不出来）。</li>
  *   <li><b>档位</b>：D 照两种走法；倒挡固定在倒挡齿比上、永远不升挡（上限 {@link #REVERSE_MAX_RPM}）；P / N 空挡，转速只跟油门
  *       （上限 {@link #FREE_REV_MAX_RPM}，只在车内）。</li>
+ *   <li><b>伪挡位</b>（项目所有者 2026-10-21）：连续走法下油门踩到 {@link #PSEUDO_ON_PCT} 以上（或一脚到底），也按挡位走锯齿，
+ *       和模拟换挡一样升挡；油门回到 {@link #PSEUDO_OFF_PCT} 以下、踩刹车或回收时回到连续。</li>
+ *   <li><b>升挡</b>（两种走法一样）：先断扭（合成器那边燃烧减弱、电平掉一点），转速停一下再按 S 形落到新挡位，
+ *       动力回来时「吼」一下；每次换挡给合成器一个记号（{@link #shiftSerial}），它据此放换挡的「咚」。</li>
  * </ul>
  *
  * <h3>开始工作（{@link #ignite}）</h3>
  *
- * <p>车停着：启动声 —— 起动机转动、点着、转速冲到 {@link #START_FLARE_RPM}、回落到怠速（{@link Phase#STARTING}）。
+ * <p>车停着：启动声 —— 起动机转动、点着、转速冲到 {@link #START_FLARE_RPM}、回落到怠速（{@link Phase#STARTING}）；
+ * 不带起动机的风格（项目所有者 2026-10-21：「美式 V8」不要起动机那几声）直接从点着开始。
  * 车在走：开阀门式接入 —— 按此刻的车速、油门算好转速，{@link #JOIN_SEC} 里从闷到亮淡入；模拟换挡顺势降一挡、连续补一点转速，
  * 踩着刹车或在回收时只淡入（{@link Phase#JOINING}）。之后一直转着：停着就是怠速（项目所有者 2026-10-21 选的）。</p>
  */
@@ -149,6 +154,23 @@ final class VirtualEngine {
     /** 减速度超过这个（0–1）时不升挡：刹车、回收减速时运动模式不升挡。 */
     static final float NO_UPSHIFT_DECEL = 0.1f;
 
+    // ---- 伪挡位（连续走法，油门接近踩到底）
+    static final float PSEUDO_ON_PCT = 80f;
+    static final float PSEUDO_OFF_PCT = 55f;
+
+    // ---- 升挡：断扭、转速停一下再按 S 形落下、动力回来时「吼」一下
+    static final float UPSHIFT_SEC = 0.22f;
+    /** 升挡里转速先停住的那一段（占整个升挡的份额）。 */
+    static final float UPSHIFT_HOLD = 0.2f;
+    /** 断扭到这里（份额）开始淡出，到 {@link #CUT_FADE} 没了。 */
+    static final float CUT_END = 0.6f;
+    static final float CUT_FADE = 0.85f;
+    /** 负荷到这里断扭算满的；小油门升挡几乎听不出来。 */
+    static final float CUT_LOAD_FULL = 0.8f;
+    /** 动力回来时亮多少（dB）、多快淡掉。 */
+    static final float BARK_DB = 3f;
+    static final float BARK_SEC = 0.08f;
+
     // ---- 启动
     static final float START_CRANK_SEC = 0.6f;
     static final float START_CATCH_SEC = 0.3f;
@@ -183,6 +205,8 @@ final class VirtualEngine {
     static final float MAX_DT = 0.1f;
 
     private final SoundProfile p;
+    /** 启动时带不带起动机那一段。 */
+    private final boolean crank;
     private Phase phase = Phase.RUNNING;
     private float phaseSec;
     private float rpm;
@@ -203,7 +227,17 @@ final class VirtualEngine {
     /** 此刻算一脚到底（急踩，或者油门到了 {@link #KICKDOWN_PEDAL_PCT}）：模拟换挡直接降到该在的挡。 */
     private boolean kickdown;
     private float shiftLeftSec;
-    private float shiftDipDb;
+    /** 连续走法里此刻按伪挡位走。 */
+    private boolean pseudo;
+    /** 此刻按挡位走（模拟换挡，或伪挡位）。 */
+    private boolean geared;
+    private float upLeftSec;
+    private float upFromRpm;
+    private float cut;
+    private float bark;
+    private boolean barkPending;
+    private int shiftSerial;
+    private boolean shiftUp = true;
     private float fade = 1f;
     private float toneHz = TONE_OPEN_HZ;
     private float starter;
@@ -212,7 +246,13 @@ final class VirtualEngine {
     private Gear gear = Gear.UNKNOWN;
 
     VirtualEngine(SoundProfile profile) {
+        this(profile, true);
+    }
+
+    /** @param crank 启动时带起动机那一段（「试制 V8」）；不带就直接从点着开始 */
+    VirtualEngine(SoundProfile profile, boolean crank) {
         this.p = profile;
+        this.crank = crank;
         this.rpm = profile.idleRpm;
     }
 
@@ -228,8 +268,12 @@ final class VirtualEngine {
         steadySec = 0f;
         throttleRef = Float.NaN;
         shiftLeftSec = 0f;
-        shiftDipDb = 0f;
         shiftLoad = 0f;
+        pseudo = false;
+        geared = false;
+        upLeftSec = 0f;
+        cut = 0f;
+        bark = 0f;
         phaseSec = 0f;
         starter = 0f;
         overrun = 0f;
@@ -244,6 +288,11 @@ final class VirtualEngine {
             toneHz = TONE_OPEN_HZ;
             gearIndex = 0;
             gearPicked = true;
+            if (!crank) {
+                // 不要起动机：直接从点着开始
+                phaseSec = START_CRANK_SEC;
+                rpm = START_CRANK_RPM;
+            }
             return;
         }
         phase = Phase.JOINING;
@@ -293,6 +342,7 @@ final class VirtualEngine {
         effortEnv += (effort(in) - effortEnv) * follow(dt, EFFORT_SMOOTH_SEC);
         blip *= decay(dt, BLIP_DECAY_SEC);
         blipLoad *= decay(dt, BLIP_LOAD_DECAY_SEC);
+        bark *= decay(dt, BARK_SEC);
 
         if (phase == Phase.STARTING) {
             stepStart(dt, v, in);
@@ -322,21 +372,63 @@ final class VirtualEngine {
         updateCruise(dt, in.throttlePct, v);
 
         // 转速
+        updatePseudo(in);
+        geared = in.gear == Gear.D && (in.mode == RpmMode.SHIFTS || pseudo);
         boolean shifting = false;
-        if (in.gear == Gear.D && in.mode == RpmMode.SHIFTS) {
+        if (geared) {
             updateGear(dt, v, in);
             shifting = shiftLeftSec > 0f;
         } else {
             gearIndex = 0;
             gearPicked = false;
             shiftLeftSec = 0f;
-            shiftDipDb = 0f;
+            upLeftSec = 0f;
         }
-        moveRpm(dt, rpmTarget(v, in), shifting, in.gear);
+        float goal = rpmTarget(v, in);
+        if (upLeftSec > 0f) {
+            stepUpshift(dt, goal, in.gear);
+        } else {
+            cut = 0f;
+            moveRpm(dt, goal, shifting, in.gear);
+        }
         // 看这一刻该有的负荷（不等平滑）：一松油门就断油
         float overrunTarget = target < OVERRUN_LOAD
                 ? clamp01((rpm - p.idleRpm - OVERRUN_FROM_RPM) / OVERRUN_RPM_SPAN) : 0f;
         overrun += (overrunTarget - overrun) * follow(dt, OVERRUN_SEC);
+    }
+
+    /** 连续走法：油门接近踩到底时按伪挡位走（有回差：踩到 {@link #PSEUDO_ON_PCT}、或者一脚到底时进，回到 {@link #PSEUDO_OFF_PCT} 以下出）。 */
+    private void updatePseudo(Input in) {
+        if (in.gear != Gear.D || in.mode == RpmMode.SHIFTS) {
+            pseudo = false;
+            return;
+        }
+        float t = in.throttlePct > 0f ? in.throttlePct : 0f;
+        boolean easing = in.braking || in.flow == Flow.REGEN;
+        if (!pseudo) {
+            if (!easing && (t >= PSEUDO_ON_PCT || (kickdown && t >= PSEUDO_OFF_PCT))) {
+                pseudo = true;
+                gearPicked = false;
+            }
+        } else if (easing || t < PSEUDO_OFF_PCT) {
+            pseudo = false;
+        }
+    }
+
+    /** 升挡这一段：断扭，转速先停住再按 S 形落到新挡位；断扭淡出时「吼」一下。 */
+    private void stepUpshift(float dt, float target, Gear g) {
+        upLeftSec = Math.max(0f, upLeftSec - dt);
+        float f = 1f - upLeftSec / UPSHIFT_SEC;
+        float u = smooth(clamp01((f - UPSHIFT_HOLD) / (1f - UPSHIFT_HOLD)));
+        target = clamp(target, p.idleRpm, capFor(g));
+        rpm = upFromRpm + (target - upFromRpm) * u;
+        float c = f < CUT_END ? 1f : 1f - smooth(clamp01((f - CUT_END) / (CUT_FADE - CUT_END)));
+        float strength = clamp01(load / CUT_LOAD_FULL);
+        if (f >= CUT_END && barkPending) {
+            barkPending = false;
+            bark = Math.max(bark, strength);
+        }
+        cut = upLeftSec > 0f ? c * strength : 0f;
     }
 
     /** 启动：转动 → 点着冲高 → 回落到怠速。回落段里踩了油门、或者车动了，交还正常走法。 */
@@ -387,9 +479,6 @@ final class VirtualEngine {
     private void updateGear(float dt, float v, Input in) {
         if (shiftLeftSec > 0f) {
             shiftLeftSec = Math.max(0f, shiftLeftSec - dt);
-            if (shiftLeftSec == 0f) {
-                shiftDipDb = 0f;
-            }
         }
         if (v < SHIFT_RESET_KMH) {
             gearIndex = 0;
@@ -424,8 +513,12 @@ final class VirtualEngine {
         boolean slowing = easing && decel > NO_UPSHIFT_DECEL;
         if (gearIndex < last && inGear >= up && !slowing) {
             gearIndex++;
-            shiftLeftSec = p.shiftSec * SHIFT_SETTLE;
-            shiftDipDb = p.shiftDipDb;
+            shiftLeftSec = UPSHIFT_SEC;
+            upLeftSec = UPSHIFT_SEC;
+            upFromRpm = rpm;
+            barkPending = true;
+            shiftSerial++;
+            shiftUp = true;
         } else if (gearIndex > 0 && inGear < down
                 && v * p.gearRpmPerKmh[gearIndex - 1] < up * SHIFT_GUARD) {
             downshiftTo(gearIndex - 1, easing);
@@ -436,7 +529,9 @@ final class VirtualEngine {
     private void downshiftTo(int to, boolean easing) {
         gearIndex = to;
         shiftLeftSec = p.shiftSec * SHIFT_SETTLE;
-        shiftDipDb = 0f;
+        upLeftSec = 0f;
+        shiftSerial++;
+        shiftUp = false;
         blip = Math.max(blip, DOWNSHIFT_BLIP_RPM);
         blipLoad = Math.max(blipLoad, easing ? DOWNSHIFT_BLIP_LOAD : DOWNSHIFT_BLIP_LOAD * 0.5f);
     }
@@ -449,7 +544,7 @@ final class VirtualEngine {
                 base = Math.min(gearedRpm(launchRpm(load), v * p.reverseRpmPerKmh), REVERSE_MAX_RPM);
                 break;
             case D:
-                if (in.mode == RpmMode.SHIFTS) {
+                if (in.mode == RpmMode.SHIFTS || pseudo) {
                     base = gearedRpm(launchRpm(load), v * p.gearRpmPerKmh[gearIndex])
                             + STAB_FLARE_RPM * SHIFT_FLARE_SHARE * stabEnv * (1f - speedCurve(p, v));
                 } else {
@@ -596,6 +691,11 @@ final class VirtualEngine {
         return x < 0f ? 0f : (x > 1f ? 1f : x);
     }
 
+    /** 0–1 的 S 形（smoothstep）。 */
+    static float smooth(float x) {
+        return x * x * (3f - 2f * x);
+    }
+
     static float clamp(float x, float lo, float hi) {
         return x < lo ? lo : (x > hi ? hi : x);
     }
@@ -623,12 +723,15 @@ final class VirtualEngine {
         return Math.max(load, blipLoad);
     }
 
-    /** 电平（dB，相对满负荷）：负荷、车速、真加速、急踩、巡航收敛、换挡、倒挡都在里面；声浪自己的音量另加。 */
+    /**
+     * 电平（dB，相对满负荷）：负荷、车速、真加速、急踩、巡航收敛、倒挡都在里面；声浪自己的音量另加。升挡断扭的那一下
+     * 由合成器按 {@link #cut} 自己掉（各风格的电平范围不一样，断扭要在收窄之后再掉）。
+     */
     float levelDb() {
         float s = speedCurve(p, speedKmh);
         float l = voiceLoad();
         float db = LEVEL_FLOOR_DB + LEVEL_LOAD_DB * (float) Math.pow(l, LEVEL_LOAD_CURVE) + LEVEL_SPEED_DB * s
-                + LEVEL_SURGE_DB * effortEnv + LEVEL_STAB_DB * stabEnv - cruiseCutDb + shiftDipDb;
+                + LEVEL_SURGE_DB * effortEnv + LEVEL_STAB_DB * stabEnv - cruiseCutDb;
         if (gear == Gear.R) {
             db += REVERSE_DB;
         }
@@ -650,9 +753,34 @@ final class VirtualEngine {
         return starter;
     }
 
-    /** 高阶次多加的 dB（急踩、猛加速时更亮）。 */
+    /** 高阶次多加的 dB（急踩、猛加速、升挡后动力回来那一下更亮）。 */
     float brightDb() {
-        return BRIGHT_STAB_DB * stabEnv + BRIGHT_SURGE_DB * effortEnv;
+        return BRIGHT_STAB_DB * stabEnv + BRIGHT_SURGE_DB * effortEnv + BARK_DB * bark;
+    }
+
+    /** 升挡断扭（0–1，按负荷）：合成器据此减弱燃烧、电平掉一下。 */
+    float cut() {
+        return cut;
+    }
+
+    /** 换了几次挡（只增不减）：合成器看它变了就放换挡的声音。 */
+    int shiftSerial() {
+        return shiftSerial;
+    }
+
+    /** 最近一次换挡是升挡。 */
+    boolean shiftUp() {
+        return shiftUp;
+    }
+
+    /** 此刻按挡位走（模拟换挡，或连续走法里的伪挡位）。 */
+    boolean geared() {
+        return geared;
+    }
+
+    /** 连续走法里此刻按伪挡位走。 */
+    boolean pseudoGears() {
+        return pseudo;
     }
 
     /** 进气声多加的 dB（急踩时猛一下）。 */

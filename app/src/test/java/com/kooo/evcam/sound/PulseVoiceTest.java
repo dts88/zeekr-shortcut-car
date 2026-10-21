@@ -10,7 +10,8 @@ import org.junit.Test;
 /**
  * 逐缸合成：好不好听要上车听，这里钉的是听不出来、但一错就出事或者一错就退回「单薄」的几件 —— 峰值永远不超过 −3 dBFS、
  * 静音就是真的 0、同样的输入出同样的声音；怠速以点火阶次为主，交叉平面的「突突」在（同排的遮蔽让整数阶次的边带长出来）；
- * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫，气流声随转速长；
+ * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫，气流声随转速长；收油的沙哑随转速长；
+ * 升挡断扭、换挡的「咚」；车内听感更闷但差不多响；车速越高进气风声越大；每个缸摆在自己的位置上；
  * 起动机、倒挡啸叫、开阀门、跟着挡位变的变速箱啸叫。阈值都比原型（docs/local/drive-sound/check_pulse_tests.py）
  * 换着噪声种子量出来的最差值留了至少一倍的余量；单个频点落在噪声上起伏很大，只拿来比确定的音。
  */
@@ -250,24 +251,25 @@ public class PulseVoiceTest {
 
     @Test
     public void theSuperchargerWhines() {
-        // 5000 rpm（低转时本来就淡）：啸叫在叶片扫过出口的阶次上（11.56 阶 ≈ 963 Hz），是一个音（比两边高得多），
-        // 没有机械增压的同一台那里没有（单个频点落在噪声上起伏很大，所以拿「有」和「没有」比，不拿没有的那台自己和两边比）
-        double hz = SC.superchargerOrder * 5000 / 60.0;
-        float[] sc = mid(render(SC, params(5000f, 1f), 1.5f), 0.7f);
-        float[] plain = mid(render(PLAIN, params(5000f, 1f), 1.5f), 0.7f);
-        assertTrue(standsOut(sc, hz, 0.04) > 10);
+        // 2850 rpm 满负荷（车主偏好的那台录音的转速）：最响的是同步齿轮啮合的第 2 次（10.24 × 3 × 2 = 61.44 阶 ≈ 2.9 kHz），
+        // 是一个音（比两边 ±6 % 高得多，±4 % 会碰上转子的边带；原型最差 35 倍），没有机械增压的同一台那里没有（原型最差 25 倍）。
+        // 单个频点落在噪声上起伏很大，所以拿「有」和「没有」比，不拿没有的那台自己和两边比
+        double hz = SC.superchargerOrder * SC.meshMultiple * 2 * 2850 / 60.0;
+        float[] sc = mid(render(SC, params(2850f, 1f), 1.5f), 0.7f);
+        float[] plain = mid(render(PLAIN, params(2850f, 1f), 1.5f), 0.7f);
+        assertTrue(standsOut(sc, hz, 0.06) > 10);
         assertTrue(power(sc, hz) > 10 * power(plain, hz));
     }
 
     @Test
     public void theSuperchargerAirGrowsWithTheRevs() {
-        // 挤过出口的气流、进口的风声（2.5–7 kHz）：满负荷 6000 rpm 比没有机械增压的同一台多一倍以上，
-        // 而且这一份随转速长得比发动机本身快。原型换十个噪声种子量出来最差 2.9 倍、3000 → 6000 rpm 又大 2.2 倍；
-        // 宽频带的能量很稳，余量不用留到一倍
-        double at6000 = air(SC, 6000f) / air(PLAIN, 6000f);
-        double at3000 = air(SC, 3000f) / air(PLAIN, 3000f);
-        assertTrue("6000 rpm " + at6000, at6000 > 2);
-        assertTrue("3000 rpm " + at3000 + " → 6000 rpm " + at6000, at6000 > 1.6 * at3000);
+        // 2.5–7 kHz（齿轮声、挤过出口的气流）：满负荷 6000 rpm 比没有机械增压的同一台多一倍以上（原型十个种子最差 3.2 倍），
+        // 而且增压器加的这一份 6000 rpm 时是 3000 rpm 时的好几倍（原型最差 5.3 倍）；宽频带的能量很稳，余量不用留到一倍
+        double sc6000 = air(SC, 6000f);
+        double plain6000 = air(PLAIN, 6000f);
+        double added3000 = air(SC, 3000f) - air(PLAIN, 3000f);
+        assertTrue("6000 rpm " + sc6000 / plain6000, sc6000 > 2 * plain6000);
+        assertTrue("增压器加的 " + added3000 + " → " + (sc6000 - plain6000), sc6000 - plain6000 > 2.5 * added3000);
     }
 
     /** 满负荷时 2.5–7 kHz 的能量。 */
@@ -277,15 +279,135 @@ public class PulseVoiceTest {
                 Biquad.lowpass(7000f, 0.7071f, RATE), Biquad.lowpass(7000f, 0.7071f, RATE)));
     }
 
+    // ================================================================= 第六轮（项目所有者 2026-10-21）：随转速、换挡、听感、位置
+
+    /** {@code lo}–{@code hi} Hz 的能量（两个二阶高通 + 两个二阶低通）。 */
+    private static double band(float[] x, float lo, float hi) {
+        return energy(filter(x, Biquad.highpass(lo, 0.7071f, RATE), Biquad.highpass(lo, 0.7071f, RATE),
+                Biquad.lowpass(hi, 0.7071f, RATE), Biquad.lowpass(hi, 0.7071f, RATE)));
+    }
+
+    private static double db(double ratio) {
+        return 10 * Math.log10(ratio);
+    }
+
+    @Test
+    public void overrunRaspGrowsWithTheRevs() {
+        // 收油：低转很闷、高转一下亮起来（参考车录音 1300 → 2750 rpm 时 2–8 kHz 的占比 +13 dB，原型最差 +9.3 dB）
+        VoiceParams low = params(1300f, 0f);
+        low.overrun = 1f;
+        VoiceParams high = params(2750f, 0f);
+        high.overrun = 1f;
+        float[] a = mid(render(SC, low, 1.5f), 0.5f);
+        float[] b = mid(render(SC, high, 1.5f), 0.5f);
+        double growth = db(band(b, 2000f, 8000f) / energy(b)) - db(band(a, 2000f, 8000f) / energy(a));
+        assertTrue("2–8 kHz 占比多了 " + growth + " dB", growth > 4);
+    }
+
+    @Test
+    public void anUpshiftCutDropsTheExhaust() {
+        // 5000 rpm 满负荷：断扭时排气的主体（150–500 Hz）掉下来（原型最差 4.9 dB）；增压器照转，所以高频掉得少
+        VoiceParams cut = params(5000f, 1f);
+        cut.cut = 1f;
+        float[] on = mid(render(SC, params(5000f, 1f), 1f), 0.3f);
+        float[] off = mid(render(SC, cut, 1f), 0.3f);
+        double drop = db(band(on, 150f, 500f) / band(off, 150f, 500f));
+        assertTrue("断扭掉了 " + drop + " dB", drop > 2);
+    }
+
+    /** 4000 rpm 满负荷，第 40 块时换挡记号变一次（{@code serial} 不变 = 没换挡）。 */
+    private static float[] shifting(int serial, boolean up) {
+        PulseVoice voice = new PulseVoice(SC, RATE);
+        VoiceParams p = params(4000f, 1f);
+        int blocks = Math.round(0.6f * RATE / BLOCK);
+        float[] out = new float[2 * blocks * BLOCK];
+        float[] block = new float[2 * BLOCK];
+        for (int b = 0; b < blocks; b++) {
+            if (b == 40) {
+                p.shiftSerial = serial;
+                p.shiftUp = up;
+            }
+            voice.renderStereo(block, BLOCK, p);
+            System.arraycopy(block, 0, out, 2 * b * BLOCK, 2 * BLOCK);
+        }
+        return mid(out, 0f);
+    }
+
+    @Test
+    public void aGearChangeThunks() {
+        // 同一套随机数、只差换挡的记号：差出来的就是「咚」和「咔」。记号变之前一点不差；差的大半在 30–90 Hz，
+        // 和发动机自己这一段差不多响（「不大，但是有」，原型 +0.4 dB）；降挡轻一些（原型能量是升挡的一半）
+        float[] same = shifting(0, true);
+        float[] up = shifting(1, true);
+        float[] down = shifting(1, false);
+        int at = 40 * BLOCK;
+        for (int i = 0; i < at; i++) {
+            assertEquals(same[i], up[i], 0f);
+        }
+        int n = Math.round(0.15f * RATE);
+        float[] dUp = new float[n];
+        float[] dDown = new float[n];
+        float[] engine = new float[n];
+        for (int i = 0; i < n; i++) {
+            dUp[i] = up[at + i] - same[at + i];
+            dDown[i] = down[at + i] - same[at + i];
+            engine[i] = same[at + i];
+        }
+        assertTrue("「咚」在低频", band(dUp, 30f, 90f) > 0.5 * energy(dUp));
+        assertTrue("听得出来", band(dUp, 30f, 90f) > 0.25 * band(engine, 30f, 90f));
+        assertTrue("降挡轻一些", energy(dUp) > 1.5 * energy(dDown));
+    }
+
+    @Test
+    public void theCabinViewIsDarkerButAboutAsLoud() {
+        // 车内听感：隔着防火墙、车身，2–8 kHz 的占比少了（原型最差 11.5 dB），100 Hz 以上的响度差不多（原型车外大 2 dB）
+        float[] out = mid(render(new PulseVoice(SC, RATE), params(5000f, 1f), 1f), 0.3f);
+        float[] in = mid(render(new PulseVoice(SC, RATE, true), params(5000f, 1f), 1f), 0.3f);
+        double darker = db(band(out, 2000f, 8000f) / energy(out)) - db(band(in, 2000f, 8000f) / energy(in));
+        assertTrue("车内闷了 " + darker + " dB", darker > 6);
+        double louder = db(energy(highpass(out, 100f)) / energy(highpass(in, 100f)));
+        assertTrue("响度差 " + louder + " dB", Math.abs(louder) < 4.5);
+    }
+
+    @Test
+    public void theInletWindGrowsWithSpeed() {
+        // 6000 rpm 满负荷：200 km/h 时进气的风声（1–2.5 kHz）比停着多（原型最差 +1.2 dB）
+        VoiceParams fast = params(6000f, 1f);
+        fast.speedKmh = 200f;
+        float[] still = mid(render(SC, params(6000f, 1f), 1f), 0.3f);
+        float[] moving = mid(render(SC, fast, 1f), 0.3f);
+        double more = db(band(moving, 1000f, 2500f) / band(still, 1000f, 2500f));
+        assertTrue("多了 " + more + " dB", more > 0.5);
+    }
+
+    @Test
+    public void eachCylinderSitsInItsPlace() {
+        // 单号缸在左排：气门、燃烧声偏左；1、2 缸在发动机最前面（离驾驶座最远）：最轻、最晚到；7、8 缸最近
+        PulseVoice v = new PulseVoice(SC, RATE);
+        float[] c1 = v.cylinderPlace(1);
+        float[] c2 = v.cylinderPlace(2);
+        float[] c7 = v.cylinderPlace(7);
+        assertTrue("1 缸偏左", c1[2] > c1[3]);
+        assertTrue("2 缸偏右", c2[3] > c2[2]);
+        assertEquals("最近的缸不晚到", 0f, c7[1], 0f);
+        assertTrue("最前面的缸晚到", c1[1] > 1f);
+        assertTrue("最前面的缸轻一点", c1[0] < c7[0]);
+        // 等功率摆位
+        assertEquals(0.7071f, PulseVoice.panLeft(0f), 1e-3f);
+        assertEquals(1f, PulseVoice.panLeft(-1f), 1e-6f);
+        assertEquals(0f, PulseVoice.panRight(-1f), 1e-6f);
+        assertEquals(1f, PulseVoice.panLeft(0.3f) * PulseVoice.panLeft(0.3f) + PulseVoice.panRight(0.3f) * PulseVoice.panRight(0.3f), 1e-5f);
+    }
+
     // ================================================================= 起动机、倒挡、阀门、传动
 
     @Test
     public void theStarterCranks() {
         VoiceParams on = params(250f, 0.12f);
-        on.level = 0.15f;
+        on.level = 0.0225f;
         on.starter = 1f;
         VoiceParams off = params(250f, 0.12f);
-        off.level = 0.15f;
+        off.level = 0.0225f;
         float hz = EngineVoice.STARTER_WHINE_HZ;
         assertTrue(power(mid(render(SC, on, 0.6f), 0.1f), hz) > 100 * power(mid(render(SC, off, 0.6f), 0.1f), hz));
     }
@@ -293,11 +415,11 @@ public class PulseVoiceTest {
     @Test
     public void reverseGearWhines() {
         VoiceParams on = params(1000f, 0.2f);
-        on.level = 0.1f;
+        on.level = 0.01f;
         on.whineHz = 600f;
         on.whineAmp = 1f;
         VoiceParams off = params(1000f, 0.2f);
-        off.level = 0.1f;
+        off.level = 0.01f;
         off.whineHz = 600f;
         assertTrue(power(mid(render(SC, on, 0.6f), 0.1f), 600) > 100 * power(mid(render(SC, off, 0.6f), 0.1f), 600));
     }
@@ -313,12 +435,12 @@ public class PulseVoiceTest {
 
     @Test
     public void theGearboxWhineFollowsTheGear() {
-        // 3000 rpm，发动机压低 20 dB（传动的声音只跟总音量）
+        // 3000 rpm，发动机压低 20 dB（电平 0.01 取 0.5 次方；传动的声音只跟总音量）
         int[] gears = {0, 3, -1};
         float[] orders = {SC.gearOrders[0], SC.gearOrders[3], SC.cvtOrder};
         for (int k = 0; k < gears.length; k++) {
             VoiceParams p = params(3000f, 1f);
-            p.level = 0.1f;
+            p.level = 0.01f;
             p.drive = true;
             p.speedKmh = 60f;
             p.gearIndex = gears[k];
@@ -326,12 +448,12 @@ public class PulseVoiceTest {
             assertTrue("挡位 " + gears[k], standsOut(x, orders[k] * 50f, 0.03) > 30);
         }
         VoiceParams driving = params(3000f, 1f);
-        driving.level = 0.1f;
+        driving.level = 0.01f;
         driving.drive = true;
         driving.speedKmh = 60f;
         driving.gearIndex = 0;
         VoiceParams parked = params(3000f, 1f);
-        parked.level = 0.1f;
+        parked.level = 0.01f;
         parked.speedKmh = 60f;
         parked.gearIndex = 0;
         float hz = orders[0] * 50f;

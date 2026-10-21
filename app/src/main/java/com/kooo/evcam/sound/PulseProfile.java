@@ -50,9 +50,20 @@ final class PulseProfile {
     final float raspFloor;
     final float raspDecayDeg;
     final float raspHighpassHz;
-    /** 这个频率以下平、以上 −6 dB/倍频程；再留一点原样的白噪声（{@link #raspAir}）。 */
+    /**
+     * 这个频率以下平、以上 −6 dB/倍频程；再留一点原样的白噪声（{@link #raspAir}）。拐点随转速（流速）往上走：
+     * × (rpm / 2000)^{@link #raspTiltRpmPow}。
+     */
     final float raspTiltHz;
+    final float raspTiltRpmPow;
     final float raspAir;
+    /**
+     * 沙哑随流量（转速）变：每翻一倍转速多几 dB（带负荷、收油各一个），以 {@link #raspRefRpm} 为准，最多多 {@link #raspRpmMaxDb}。
+     * 参考车的录音：收油时低转很闷、高转一下亮起来（每翻一倍 +12 dB）；带负荷时变亮主要靠消声器随转速打开。
+     */
+    final float[] raspRpmDb;
+    final float raspRefRpm;
+    final float raspRpmMaxDb;
     final float raspPeakHz;
     final float raspPeakDb;
     final float raspPeakQ;
@@ -69,9 +80,13 @@ final class PulseProfile {
     final float[] helmholtzHz;
     final float helmholtzDb;
     final float helmholtzQ;
-    /** 消声器的低通：怠速时 → 3000 rpm 以上（Hz），满负荷再开 {@link #mufflerLoad} 这么多。 */
-    final float mufflerIdleHz;
-    final float mufflerOpenHz;
+    /**
+     * 消声器的低通（Hz）= {@link #mufflerHz} × (rpm / 1000)^{@link #mufflerPow}，到 {@link #mufflerTopHz} 为止，满负荷再开
+     * {@link #mufflerLoad} 这么多：一直开到红线（项目所有者 2026-10-21），系数照参考车的录音拟合。
+     */
+    final float mufflerHz;
+    final float mufflerPow;
+    final float mufflerTopHz;
     final float mufflerLoad;
     final float radiationHz;
     /** 压力大时的饱和（0 = 不饱和；怠速 / 满负荷）。 */
@@ -82,6 +97,12 @@ final class PulseProfile {
     final float bassMonoHz;
     /** 怠速到 6000 rpm 多响多少（dB）。 */
     final float rpmLoudDb;
+    /**
+     * 虚拟发动机给的电平取这个次方：踩油门主要变音色、响度变化不太大（项目所有者 2026-10-21：车主偏好的那台踩油门响度差得不多；
+     * 0.5 时怠速到全油门约 10 dB）。升挡断扭时再掉 {@link #cutDipDb}（满负荷）。
+     */
+    final float levelPow;
+    final float cutDipDb;
     /** 总的倍数：和经典风格一样响。 */
     final float norm;
 
@@ -97,22 +118,28 @@ final class PulseProfile {
     final float roarHz;
     final float roarQ;
 
-    // ---- 机械增压（阶次 0 = 没有）：双螺杆，曲轴用皮带带着转。转子的叶片每扫过出口一下，挤出去一股高压气 ——
-    //      这一下一下是啸叫，同时是挤过窄的出口通道的气流声；进口吸气是风声。增压随负荷，松油门旁通阀打开
-    /** 叶片扫过出口的阶次（曲轴每转一圈扫过几下）。 */
+    // ---- 机械增压（阶次 0 = 没有）：双螺杆，曲轴用皮带带着转。啸叫照车主偏好的那台的录音：叶片扫过出口的基频不响，
+    //      响的是同步齿轮的啮合声（3 倍，第 2、3 次最响），很纯、只在增压时有；松油门旁通阀打开，齿轮声几乎没了，基频反而显出来。
+    //      底下一层挤过窄出口通道的气流声、进口吸气的风声
+    /** 叶片扫过出口的阶次（曲轴每转一圈扫过几下；录音里是 10.24 = 阴转子 5 叶 × 曲轴的 2.05 倍）。 */
     final float superchargerOrder;
-    /** 啸叫各次谐波的电平（dB，第一个是基频）：一股一股的气，接近锯齿波。 */
-    final float[] superchargerHarmonicsDb;
+    /** 叶片基频的电平（dB，3000 rpm，和负荷无关）。 */
+    final float lobeDb;
+    /** 齿轮啮合是叶片频率的几倍（阴转子上的齿数 / 叶片数）；各次谐波的电平（dB，相对第 2 次）。 */
+    final float meshMultiple;
+    final float[] meshHarmonicsDb;
     /** 阴、阳转子各几个叶片（转一圈扫过几下）；叶片之间细小的差别让每个转子每转一圈调制一次啸叫（边带），调制多深。 */
     final float[] rotorLobes;
     final float[] rotorAm;
-    /** 满增压、6000 rpm 时啸叫基频的电平（dB）；随转速的 {@link #superchargerRpmPow} 次方变：低转淡，高转长得快。 */
+    /** 满增压、3000 rpm 时齿轮声第 2 次的电平（dB）；几个音都随转速的 {@link #toneRpmPow} 次方变（怠速时很轻，和录音一样）。 */
     final float superchargerDb;
+    final float toneRpmPow;
+    /** 气流声随转速的这个次方变（以 6000 rpm 为准）：低转淡，高转长得快。 */
     final float superchargerRpmPow;
     /** 转速的细小抖动（份额、低通 Hz）：皮带、曲轴的扭振，啸叫不是一根死的正弦。 */
     final float superchargerWobble;
     final float superchargerWobbleHz;
-    /** 旁通阀开着（不增压）时还剩几成啸叫。 */
+    /** 旁通阀开着（不增压，齿轮不受力）时齿轮声还剩几成。 */
     final float superchargerFree;
     /** 被发动机的进气脉冲（4 阶）调制多深。 */
     final float superchargerAm;
@@ -133,6 +160,38 @@ final class PulseProfile {
     final float inletQ;
     final float gustHz;
     final float gust;
+    /** 车速 200 km/h 时进气的风声（进口风声、进气呼啸）多几成（× (1 + 它)，按车速的平方长）：越开越快的感觉。 */
+    final float inletRam;
+
+    // ---- 声音从哪来（驾驶座看；立体声 −1 左 … +1 右）
+    /** 每个缸气门、燃烧的声音按排摆在左右多远；最靠后的缸离驾驶座多远（米）、缸距（米，1、2 缸在最前面）。 */
+    final float cylinderPan;
+    final float cylinderNearM;
+    final float cylinderPitchM;
+    /** 排气（尾管在车后两角）比发动机舱的声音晚到多久（毫秒）：管子里走一段、再从车后绕过来。 */
+    final float exhaustLagMs;
+    /** 两边中冷器出口的气流摆多开；进气口（左前）在哪。 */
+    final float jetPan;
+    final float inletPan;
+
+    // ---- 换挡：传动的「咚」（地板中间，几个衰减的低频）+ 挂挡的「咔」（一小段带通噪声）
+    final float[] thunkHz;
+    final float[] thunkMs;
+    final float[] thunkGainDb;
+    /** 满负荷升挡时「咚」多响（dB，只跟总音量）；降挡七成。 */
+    final float thunkDb;
+    final float clickHz;
+    final float clickQ;
+    /** 「咔」相对「咚」（dB）。 */
+    final float clickDb;
+
+    // ---- 车内听感（开发者选项「听感」选「车内」）：发动机舱的声音隔着防火墙、排气隔着车身，各过两个一阶低通；
+    //      低频多一点（车身传进来的）；总的再补一点，和车外的响度（100 Hz 以上）一样
+    final float[] cabinFrontHz;
+    final float[] cabinRearHz;
+    final float cabinLowHz;
+    final float cabinLowDb;
+    final float cabinGainDb;
 
 
     // ---- 气门、缸体、车厢
@@ -195,7 +254,11 @@ final class PulseProfile {
         raspDecayDeg = b.raspDecayDeg;
         raspHighpassHz = b.raspHighpassHz;
         raspTiltHz = b.raspTiltHz;
+        raspTiltRpmPow = b.raspTiltRpmPow;
         raspAir = b.raspAir;
+        raspRpmDb = b.raspRpmDb.clone();
+        raspRefRpm = b.raspRefRpm;
+        raspRpmMaxDb = b.raspRpmMaxDb;
         raspPeakHz = b.raspPeakHz;
         raspPeakDb = b.raspPeakDb;
         raspPeakQ = b.raspPeakQ;
@@ -208,8 +271,9 @@ final class PulseProfile {
         helmholtzHz = b.helmholtzHz.clone();
         helmholtzDb = b.helmholtzDb;
         helmholtzQ = b.helmholtzQ;
-        mufflerIdleHz = b.mufflerIdleHz;
-        mufflerOpenHz = b.mufflerOpenHz;
+        mufflerHz = b.mufflerHz;
+        mufflerPow = b.mufflerPow;
+        mufflerTopHz = b.mufflerTopHz;
         mufflerLoad = b.mufflerLoad;
         radiationHz = b.radiationHz;
         driveIdle = b.driveIdle;
@@ -217,6 +281,8 @@ final class PulseProfile {
         cross = b.cross;
         bassMonoHz = b.bassMonoHz;
         rpmLoudDb = b.rpmLoudDb;
+        levelPow = b.levelPow;
+        cutDipDb = b.cutDipDb;
         norm = b.norm;
         intakeIdleDb = b.intakeIdleDb;
         intakeLoadDb = b.intakeLoadDb;
@@ -229,10 +295,13 @@ final class PulseProfile {
         roarHz = b.roarHz;
         roarQ = b.roarQ;
         superchargerOrder = b.superchargerOrder;
-        superchargerHarmonicsDb = b.superchargerHarmonicsDb.clone();
+        lobeDb = b.lobeDb;
+        meshMultiple = b.meshMultiple;
+        meshHarmonicsDb = b.meshHarmonicsDb.clone();
         rotorLobes = b.rotorLobes.clone();
         rotorAm = b.rotorAm.clone();
         superchargerDb = b.superchargerDb;
+        toneRpmPow = b.toneRpmPow;
         superchargerRpmPow = b.superchargerRpmPow;
         superchargerWobble = b.superchargerWobble;
         superchargerWobbleHz = b.superchargerWobbleHz;
@@ -250,6 +319,25 @@ final class PulseProfile {
         inletQ = b.inletQ;
         gustHz = b.gustHz;
         gust = b.gust;
+        inletRam = b.inletRam;
+        cylinderPan = b.cylinderPan;
+        cylinderNearM = b.cylinderNearM;
+        cylinderPitchM = b.cylinderPitchM;
+        exhaustLagMs = b.exhaustLagMs;
+        jetPan = b.jetPan;
+        inletPan = b.inletPan;
+        thunkHz = b.thunkHz.clone();
+        thunkMs = b.thunkMs.clone();
+        thunkGainDb = b.thunkGainDb.clone();
+        thunkDb = b.thunkDb;
+        clickHz = b.clickHz;
+        clickQ = b.clickQ;
+        clickDb = b.clickDb;
+        cabinFrontHz = b.cabinFrontHz.clone();
+        cabinRearHz = b.cabinRearHz.clone();
+        cabinLowHz = b.cabinLowHz;
+        cabinLowDb = b.cabinLowDb;
+        cabinGainDb = b.cabinGainDb;
         tickDb = b.tickDb;
         tickHz = b.tickHz.clone();
         tickQ = b.tickQ.clone();
@@ -277,11 +365,11 @@ final class PulseProfile {
     }
 
     /**
-     * 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足；双螺杆增压器的啸叫和气流随转速长。
-     * 阶次 11.56 是参考车车内录音里量出来的（阴转子 5 个叶片 × 曲轴的 2.31 倍）。
+     * 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足；双螺杆增压器的啸叫（齿轮声）和气流。
+     * 增压器照车主偏好的那台的录音量（叶片 10.24 阶、齿轮 30.72 阶；项目所有者 2026-10-21：增压声要和它比）。
      */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
-            .supercharger(11.56f, -12f)
+            .supercharger(10.24f, -20f)
             .build();
 
     /** 写风格用：默认值是机械增压那一份的发动机、排气和增压器（增压器要 {@link #supercharger} 才装上），一项一项改，最后 {@link #build}。 */
@@ -312,7 +400,11 @@ final class PulseProfile {
         private float raspDecayDeg = 45f;
         private float raspHighpassHz = 90f;
         private float raspTiltHz = 600f;
+        private float raspTiltRpmPow = 0.5f;
         private float raspAir = 0.12f;
+        private float[] raspRpmDb = {0f, 12f};
+        private float raspRefRpm = 2850f;
+        private float raspRpmMaxDb = 6f;
         private float raspPeakHz = 1200f;
         private float raspPeakDb = 3f;
         private float raspPeakQ = 0.7f;
@@ -325,15 +417,18 @@ final class PulseProfile {
         private float[] helmholtzHz = {56f, 61f};
         private float helmholtzDb = 10f;
         private float helmholtzQ = 3.5f;
-        private float mufflerIdleHz = 2200f;
-        private float mufflerOpenHz = 5000f;
+        private float mufflerHz = 2100f;
+        private float mufflerPow = 0.9f;
+        private float mufflerTopHz = 12000f;
         private float mufflerLoad = 0.35f;
         private float radiationHz = 45f;
         private float driveIdle = 0.3f;
         private float driveLoad = 1.5f;
-        private float cross = 0.35f;
+        private float cross = 0.25f;
         private float bassMonoHz = 120f;
         private float rpmLoudDb = 5f;
+        private float levelPow = 0.5f;
+        private float cutDipDb = -4.5f;
         private float norm = 0.79f;
         private float intakeIdleDb = -30f;
         private float intakeLoadDb = -12f;
@@ -346,17 +441,20 @@ final class PulseProfile {
         private float roarHz = 1800f;
         private float roarQ = 0.7f;
         private float superchargerOrder;
-        private float[] superchargerHarmonicsDb = {0f, -6f, -8f, -11f, -13f, -15f, -17f, -19f};
+        private float lobeDb = -29f;
+        private float meshMultiple = 3f;
+        private float[] meshHarmonicsDb = {-2f, 0f, -3f, -16f, -14f};
+        private float toneRpmPow = 0.8f;
         private float[] rotorLobes = {5f, 3f};
         private float[] rotorAm = {0.2f, 0.15f};
         private float superchargerDb = -100f;
         private float superchargerRpmPow = 1.7f;
         private float superchargerWobble = 0.002f;
         private float superchargerWobbleHz = 30f;
-        private float superchargerFree = 0.25f;
+        private float superchargerFree = 0.03f;
         private float superchargerAm = 0.25f;
         private float superchargerSec = 0.12f;
-        private float jetDb = -9f;
+        private float jetDb = -12f;
         private float[] jetHz = {1800f, 3200f, 5500f};
         private float[] jetQ = {1.2f, 1.4f, 1.6f};
         private float[] jetGainDb = {0f, -1f, -6f};
@@ -367,6 +465,25 @@ final class PulseProfile {
         private float inletQ = 0.7f;
         private float gustHz = 5f;
         private float gust = 0.2f;
+        private float inletRam = 3f;
+        private float cylinderPan = 0.45f;
+        private float cylinderNearM = 1.7f;
+        private float cylinderPitchM = 0.12f;
+        private float exhaustLagMs = 10f;
+        private float jetPan = 0.5f;
+        private float inletPan = -0.3f;
+        private float[] thunkHz = {55f, 140f};
+        private float[] thunkMs = {35f, 12f};
+        private float[] thunkGainDb = {0f, -8f};
+        private float thunkDb = -11f;
+        private float clickHz = 2200f;
+        private float clickQ = 1.5f;
+        private float clickDb = -14f;
+        private float[] cabinFrontHz = {600f, 3500f};
+        private float[] cabinRearHz = {350f, 2000f};
+        private float cabinLowHz = 100f;
+        private float cabinLowDb = 4f;
+        private float cabinGainDb = 2.5f;
         private float tickDb = -34f;
         private float[] tickHz = {3100f, 4800f};
         private float[] tickQ = {14f, 10f};
@@ -410,7 +527,7 @@ final class PulseProfile {
             return this;
         }
 
-        /** 装一台机械增压：叶片扫过出口的阶次、满增压 6000 rpm 时啸叫基频的电平（dB）；谐波、转子、气流、进口用默认的那一份。 */
+        /** 装一台机械增压：叶片扫过出口的阶次、满增压 3000 rpm 时齿轮声第 2 次的电平（dB）；基频、齿轮、转子、气流、进口用默认的那一份。 */
         Builder supercharger(float order, float db) {
             superchargerOrder = order;
             superchargerDb = db;
@@ -421,7 +538,9 @@ final class PulseProfile {
             if (firing.length == 0 || trim.length < firing.length || headerMs.length < firing.length
                     || pipeHz.length != 2 || helmholtzHz.length != 2 || bankMs.length != 2
                     || rotorLobes.length != 2 || rotorAm.length != 2
-                    || jetQ.length != jetHz.length || jetGainDb.length != jetHz.length) {
+                    || jetQ.length != jetHz.length || jetGainDb.length != jetHz.length || raspRpmDb.length != 2
+                    || thunkMs.length != thunkHz.length || thunkGainDb.length != thunkHz.length
+                    || cabinFrontHz.length != 2 || cabinRearHz.length != 2) {
                 throw new IllegalStateException("pulse profile incomplete");
             }
             for (int c : firing) {

@@ -234,7 +234,10 @@
   悬浮按钮动作 floating_action_toggle_drive_sound「开启 / 关闭模拟声浪」，按下后 msg_drive_sound_on「已开启模拟声浪」/
   msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
   声音风格（2026-10-21 加，车主嫌第一版单薄、要按发动机的结构重做，第一版留作可选风格）：dev_drive_sound_style_title「声音风格」/
-  Sound style / Gaya bunyi（两档的名字车主定了，见上面的单子）。
+  Sound style / Gaya bunyi（两档的名字车主定了，见上面的单子）。第三档（2026-10-21 加，车主要试制一种纯电车主动声浪的喷气机取向）
+  dev_drive_sound_style_jet「超音速」/ Supersonic jet / Jet supersonik，名字是草稿，没用车型名。
+  听感（2026-10-21 加，车主「可以尝试一下」车内的听感）：dev_drive_sound_view_title「听感」/ Listening position / Kedudukan mendengar，
+  两档 dev_drive_sound_view_outside「车外」/ Outside / Di luar（默认）、dev_drive_sound_view_cabin「车内」/ In the cabin / Dalam kabin。
 - 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
   四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
   vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。

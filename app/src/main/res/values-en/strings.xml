@@ -925,6 +925,10 @@
     <string name="dev_drive_sound_style_title">Sound style</string>
     <string name="dev_drive_sound_style_american">American V8</string>
     <string name="dev_drive_sound_style_prototype">Prototype V8</string>
+    <string name="dev_drive_sound_style_jet">Supersonic jet</string>
+    <string name="dev_drive_sound_view_title">Listening position</string>
+    <string name="dev_drive_sound_view_outside">Outside</string>
+    <string name="dev_drive_sound_view_cabin">In the cabin</string>
     <string name="msg_drive_sound_on">Simulated drive sound on</string>
     <string name="msg_drive_sound_off">Simulated drive sound off</string>
     <string name="dev_perm_all_files">All files access</string>

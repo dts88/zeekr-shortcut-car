@@ -197,7 +197,8 @@ final class EngineVoice implements Voice {
             toneSetHz = params.toneHz;
         }
         float rpmStep = (rpmTarget - rpmNow) / frames;
-        float levelTarget = params.level;
+        // 升挡断扭：电平掉一下（{@link SoundProfile#shiftDipDb}，按断扭的深浅）
+        float levelTarget = params.level * dbToLin(p.shiftDipDb * VirtualEngine.clamp01(params.cut));
         float gainTarget = params.gain;
         for (int i = 0; i < frames; i++) {
             float r = rpmNow + rpmStep * (i + 1);

@@ -125,6 +125,25 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void withoutTheStarterItCatchesAtOnce() {
+        // 「美式 V8」「超音速」不要起动机那一段（项目所有者 2026-10-21）：一开始就点着、冲上来，再回落到怠速
+        VirtualEngine e = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        assertEquals(VirtualEngine.Phase.STARTING, e.phase());
+        float peak = 0f;
+        for (int i = 0; i < Math.round(0.35f / DT); i++) {
+            e.step(DT, in);
+            assertEquals("没有起动机", 0f, e.starter(), 0f);
+            peak = Math.max(peak, e.rpm());
+        }
+        assertTrue("一开始就点着、冲上来: " + peak, peak > 1500f);
+        run(e, in, 1.6f);
+        assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
+        assertEquals("回落到怠速", P.idleRpm, e.rpm(), 120f);
+    }
+
+    @Test
     public void pressingTheThrottleDuringTheSettleHandsBackAtOnce() {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
@@ -287,6 +306,74 @@ public class VirtualEngineTest {
         }
         assertTrue("一路降挡", e.gearIndex() < cruising);
         assertTrue("降挡带补油", blipped);
+    }
+
+    @Test
+    public void continuousGoesThroughPseudoGearsOnlyNearTheFloor() {
+        // 项目所有者 2026-10-21：连续走法全油门时也按挡位走锯齿；半油门还是连续的，松下来回到连续
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.flow = VirtualEngine.Flow.DRIVE;
+        in.throttlePct = 50f;
+        for (int i = 0; i < 1000; i++) {
+            in.speedKmh = 60f * i / 1000f;
+            e.step(DT, in);
+            assertFalse("半油门还是连续的", e.geared());
+        }
+        in.throttlePct = 100f;
+        int serial = e.shiftSerial();
+        float peak = 0f;
+        for (int i = 0; i < 3000; i++) {
+            in.speedKmh = 60f + 100f * i / 3000f;
+            e.step(DT, in);
+            assertTrue("踩到底按伪挡位走", e.pseudoGears() && e.geared());
+            peak = Math.max(peak, e.rpm());
+        }
+        assertTrue("一路升挡", e.shiftSerial() - serial >= 2 && e.shiftUp());
+        assertTrue("转到升挡点附近: " + peak, peak > VirtualEngine.upshiftRpm(P, 1f) - 200f);
+        in.throttlePct = 40f;
+        e.step(DT, in);
+        assertFalse("松到半油门回到连续", e.geared());
+        assertEquals(0, e.gearIndex());
+    }
+
+    @Test
+    public void anUpshiftCutsTheDriveThenTheRpmFallsSmoothly() {
+        // 升挡：一下子断扭（电平跌落由合成器按断扭自己加），转速先停住再只往下走到新挡位，断扭过去时「吼」一下，最后断扭归零
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.throttlePct = 100f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        float v = 0f;
+        int serial = e.shiftSerial();
+        for (int i = 0; i < 5000 && e.shiftSerial() == serial; i++) {
+            v += 0.02f;
+            in.speedKmh = v;
+            e.step(DT, in);
+        }
+        assertTrue("升挡了", e.shiftSerial() == serial + 1 && e.shiftUp());
+        float from = e.rpm();
+        assertEquals("断扭一下子到底", 1f, e.cut(), 0.05f);
+        float last = from;
+        float bark = 0f;
+        int steps = (int) (VirtualEngine.UPSHIFT_SEC / DT);
+        for (int k = 0; k < steps; k++) {
+            v += 0.02f;
+            in.speedKmh = v;
+            e.step(DT, in);
+            assertTrue("转速只往下走（新挡位跟着车速的那一点除外）", e.rpm() <= last + 5f);
+            last = e.rpm();
+            bark = Math.max(bark, e.brightDb());
+        }
+        assertTrue("落到新挡位: " + from + " → " + e.rpm(), e.rpm() < from - 800f);
+        assertTrue("动力回来时吼一下: " + bark, bark > 2f);
+        run(e, in, 0.02f);
+        assertEquals("断扭过去了", 0f, e.cut(), 0f);
     }
 
     @Test

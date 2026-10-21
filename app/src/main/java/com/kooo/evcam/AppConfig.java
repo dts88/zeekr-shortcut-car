@@ -635,6 +635,7 @@ public class AppConfig {
                 SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_VIEW.key,      // 听感 → 车外（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -968,6 +969,12 @@ public class AppConfig {
     public static final String DRIVE_SOUND_STYLE_AMERICAN = "american";
     /** 声音风格：试制 V8（第一版）。 */
     public static final String DRIVE_SOUND_STYLE_PROTOTYPE = "prototype";
+    /** 声音风格：超音速（双发喷气机的取向，试制）。 */
+    public static final String DRIVE_SOUND_STYLE_JET = "jet";
+    /** 听感（{@link SettingsRegistry#DRIVE_SOUND_VIEW}）：车外（默认，站在车旁听的那种）。 */
+    public static final String DRIVE_SOUND_VIEW_OUTSIDE = "outside";
+    /** 听感：车内（隔着防火墙、车身听，高频闷一些）。 */
+    public static final String DRIVE_SOUND_VIEW_CABIN = "cabin";
 
     /**
      * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
@@ -999,13 +1006,22 @@ public class AppConfig {
         writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
     }
 
-    /** 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE}。 */
+    /** 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE} / {@link #DRIVE_SOUND_STYLE_JET}。 */
     public String getDriveSoundStyle() {
         return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
     }
 
     public void setDriveSoundStyle(String style) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_STYLE, style);
+    }
+
+    /** 听感：{@link #DRIVE_SOUND_VIEW_OUTSIDE} / {@link #DRIVE_SOUND_VIEW_CABIN}。 */
+    public String getDriveSoundView() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_VIEW);
+    }
+
+    public void setDriveSoundView(String view) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_VIEW, view);
     }
 
     /**

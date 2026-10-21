@@ -67,7 +67,7 @@ final class SoundProfile {
     final float shiftDownRatio;
     /** 换挡时转速落到新挡位的时间常数。 */
     final float shiftSec;
-    /** 升挡那一下音量掉多少（dB，负数）。 */
+    /** 升挡断扭时音量掉多少（dB，负数；满负荷时，按断扭的深浅）。 */
     final float shiftDipDb;
 
     private SoundProfile(Builder b) {
@@ -130,7 +130,7 @@ final class SoundProfile {
             .resonance(1200f, 3f, 1.2f)
             .gears(120f, 80f, 58f, 45f, 36f, 30f, 25f, 21f)
             .reverse(120f)
-            .shifts(2500f, 3500f, 0.55f, 0.06f, -3f)
+            .shifts(2500f, 3500f, 0.55f, 0.06f, -4.5f)
             .build();
 
     private static float[] toArray(List<Float> list) {

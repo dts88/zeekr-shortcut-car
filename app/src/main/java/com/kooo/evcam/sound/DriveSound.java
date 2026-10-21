@@ -33,7 +33,7 @@ import java.util.Set;
  *   <li><b>声音线程</b>（{@link Run}，THREAD_PRIORITY_URGENT_AUDIO）：每 {@link #BLOCK} 帧（48 kHz 下 5.3 ms）读一次快读和读数
  *       （都是不可变快照，不加锁）→ {@link DriveInputs} 算出油门变化率、加减速度 → {@link VirtualEngine} 推进一步 →
  *       按声音风格（{@link SoundStyle}）的合成器出立体声 → {@link SoundOutput} 写进车内媒体喇叭。循环里不分配内存。
- *       换了声音风格：这一台淡出，按新风格重新开始（停着放启动声，在走就接入）。
+ *       换了声音风格或听感：这一台淡出，按新的重新开始（停着放启动声，在走就接入）。
  *       开始工作那一刻车停着放启动声、车在走开阀门式接入（{@link VirtualEngine#ignite}）；要停的时候 0.6 秒淡出再放掉喇叭。</li>
  * </ul>
  *
@@ -77,6 +77,8 @@ public final class DriveSound {
     private volatile float userDb = -12f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;
     private volatile SoundStyle style = SoundStyle.AMERICAN;
+    /** 听感：车内（隔着防火墙、车身）；关着是车外。 */
+    private volatile boolean cabinView;
     /** 最近一个声音线程（诊断报告用）。 */
     private volatile Run latest;
 
@@ -126,8 +128,8 @@ public final class DriveSound {
                 telemetry.releaseFast(USER);
             }
         }
-        if (run != null && run.style != style) {
-            // 换了声音风格：这一台淡出，下面按新风格重新开始
+        if (run != null && (run.style != style || run.cabin != cabinView)) {
+            // 换了声音风格或听感：这一台淡出，下面按新的重新开始
             run.stop();
             run = null;
         }
@@ -166,6 +168,7 @@ public final class DriveSound {
         rpmMode = AppConfig.DRIVE_SOUND_RPM_SHIFTS.equals(c.getDriveSoundRpm())
                 ? VirtualEngine.RpmMode.SHIFTS : VirtualEngine.RpmMode.CONTINUOUS;
         style = SoundStyle.of(c.getDriveSoundStyle());
+        cabinView = AppConfig.DRIVE_SOUND_VIEW_CABIN.equals(c.getDriveSoundView());
     }
 
     private static float num(Float value) {
@@ -184,8 +187,9 @@ public final class DriveSound {
     public static String diagnostics() {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.US, "  enabled=%s style=%s volume=%.0f dB rpm=%s armed=%s fastUsers=%s%n",
-                s.enabled, s.style.key, s.userDb, s.rpmMode, s.armed, Telemetry.get().fastUsers()));
+        sb.append(String.format(Locale.US, "  enabled=%s style=%s view=%s volume=%.0f dB rpm=%s armed=%s fastUsers=%s%n",
+                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.userDb, s.rpmMode, s.armed,
+                Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
         sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s%n", fast.ageMs(now),
@@ -197,8 +201,9 @@ public final class DriveSound {
 
     /** 一个声音线程：开车内喇叭、合成、写；要停时淡出再放掉。 */
     private final class Run implements Runnable {
-        /** 这一台的声音风格（起的时候定下，换风格就换一台）。 */
+        /** 这一台的声音风格、听感（起的时候定下，换了就换一台）。 */
         final SoundStyle style = DriveSound.this.style;
+        final boolean cabin = DriveSound.this.cabinView;
         private volatile boolean stopping;
         // ---- 诊断：声音线程写，随时读
         private volatile String state = "opening";
@@ -210,6 +215,7 @@ public final class DriveSound {
         private volatile float load;
         private volatile float levelDb;
         private volatile int gear;
+        private volatile boolean pseudo;
         private volatile float gate;
         private volatile float pedalRate;
         private volatile float accel;
@@ -277,8 +283,8 @@ public final class DriveSound {
             Telemetry telemetry = Telemetry.get();
             AudioManager audio = app.getSystemService(AudioManager.class);
             DriveInputs inputs = new DriveInputs();
-            VirtualEngine engine = new VirtualEngine(SoundProfile.V8);
-            Voice voice = style.voice(SoundOutput.RATE);
+            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, style.cranks());
+            Voice voice = style.voice(SoundOutput.RATE, cabin);
             VirtualEngine.Input in = new VirtualEngine.Input();
             VoiceParams params = new VoiceParams();
             float[] buffer = new float[2 * BLOCK];
@@ -348,11 +354,15 @@ public final class DriveSound {
                     params.overrun = engine.overrun();
                     params.speedKmh = engine.speedKmh();
                     params.drive = in.gear == VirtualEngine.Gear.D;
-                    params.gearIndex = params.drive && in.mode == VirtualEngine.RpmMode.SHIFTS ? engine.gearIndex() : -1;
+                    params.gearIndex = engine.geared() ? engine.gearIndex() : -1;
+                    params.cut = engine.cut();
+                    params.shiftSerial = engine.shiftSerial();
+                    params.shiftUp = engine.shiftUp();
                     rpm = engine.rpm();
                     load = engine.load();
                     levelDb = engine.levelDb();
-                    gear = engine.gearIndex() + 1;
+                    gear = engine.geared() ? engine.gearIndex() + 1 : 0;
+                    pseudo = engine.pseudoGears();
                 } else {
                     params.gain = 0f;
                 }
@@ -378,10 +388,10 @@ public final class DriveSound {
 
         String describe() {
             return String.format(Locale.US,
-                    "run: %s style=%s why=%s ignited=%s rpm=%.0f gear=%d load=%.2f level=%.1f dB gate=%.2f "
+                    "run: %s style=%s view=%s why=%s ignited=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s",
-                    state, style.key, why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear, load, levelDb, gate, pedalRate,
-                    accel,
+                    state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear,
+                    pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output);
         }

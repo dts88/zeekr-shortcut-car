@@ -22,8 +22,13 @@ final class VoiceParams {
     /** 收油时发动机被车拖着转（断油）多少（0–1，{@link VirtualEngine#overrun}）。 */
     float overrun;
     float speedKmh;
-    /** 模拟换挡的挡位（0 = 一挡）；连续走法没有挡位，是 −1。 */
+    /** 按挡位走时的挡位（0 = 一挡；模拟换挡、或连续走法里的伪挡位）；没有挡位是 −1。 */
     int gearIndex = -1;
     /** 在 D 挡（变速箱、传动轴、差速器的声音只在 D 挡有）。 */
     boolean drive;
+    /** 升挡断扭（0–1，{@link VirtualEngine#cut}）。 */
+    float cut;
+    /** 换了几次挡（{@link VirtualEngine#shiftSerial}）：一变就放换挡的声音；最近一次是不是升挡。 */
+    int shiftSerial;
+    boolean shiftUp = true;
 }

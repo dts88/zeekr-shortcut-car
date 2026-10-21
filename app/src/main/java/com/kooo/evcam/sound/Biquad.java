@@ -37,6 +37,20 @@ final class Biquad {
         return b;
     }
 
+    /** 低频搁架（斜率 1）：{@code hz} 以下多 {@code db}。 */
+    static Biquad lowShelf(float hz, float db, float rate) {
+        Biquad b = new Biquad();
+        double a = Math.pow(10.0, db / 40.0);
+        double w0 = 2.0 * Math.PI * hz / rate;
+        double cos = Math.cos(w0);
+        double sa = 2.0 * Math.sqrt(a) * Math.sin(w0) / 2.0 * Math.sqrt(2.0);
+        double a0 = (a + 1.0) + (a - 1.0) * cos + sa;
+        b.set(a * ((a + 1.0) - (a - 1.0) * cos + sa) / a0, 2.0 * a * ((a - 1.0) - (a + 1.0) * cos) / a0,
+                a * ((a + 1.0) - (a - 1.0) * cos - sa) / a0, -2.0 * ((a - 1.0) + (a + 1.0) * cos) / a0,
+                ((a + 1.0) + (a - 1.0) * cos - sa) / a0);
+        return b;
+    }
+
     /** 带通：中心频率处增益 1（0 dB）。 */
     static Biquad bandpass(float hz, float q, float rate) {
         Biquad b = new Biquad();
