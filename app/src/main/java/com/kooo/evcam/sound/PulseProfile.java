@@ -407,6 +407,24 @@ final class PulseProfile {
             return this;
         }
 
+        /** 每一下的随机起伏（标准差：怠速、满负荷、收油时另加）和时机的随机偏移（曲轴角：怠速、满负荷）。 */
+        Builder variation(float sigmaIdle, float sigmaLoad, float sigmaOverrun, float jitterIdleDeg, float jitterLoadDeg) {
+            this.sigmaIdle = sigmaIdle;
+            this.sigmaLoad = sigmaLoad;
+            this.sigmaOverrun = sigmaOverrun;
+            this.jitterIdleDeg = jitterIdleDeg;
+            this.jitterLoadDeg = jitterLoadDeg;
+            return this;
+        }
+
+        /** 同一排上一个脉冲压低下一个：1 − m × e^(−间隔 / {@code deg})，m 怠速、满负荷各一个（0 = 不压）。 */
+        Builder recovery(float deg, float idle, float load) {
+            recoveryDeg = deg;
+            recoveryIdle = idle;
+            recoveryLoad = load;
+            return this;
+        }
+
         Builder rasp(float idleDb, float loadDb, float overrunDb) {
             raspIdleDb = idleDb;
             raspLoadDb = loadDb;

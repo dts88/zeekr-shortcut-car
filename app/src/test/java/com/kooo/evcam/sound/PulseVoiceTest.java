@@ -9,10 +9,10 @@ import org.junit.Test;
 
 /**
  * 逐缸合成：好不好听要上车听，这里钉的是听不出来、但一错就出事或者一错就退回「单薄」的几件 —— 峰值永远不超过 −3 dBFS、
- * 静音就是真的 0、同样的输入出同样的声音；怠速以点火阶次为主，交叉平面的「突突」在（整数阶次的边带比半阶次强）；
+ * 静音就是真的 0、同样的输入出同样的声音；怠速以点火阶次为主，交叉平面的「突突」在（同排的遮蔽让整数阶次的边带长出来）；
  * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫、涡轮没有；涡轮起压后哨声在高处、松油门会泄压；
  * 起动机、倒挡啸叫、开阀门、跟着挡位变的变速箱啸叫。阈值都比原型（docs/local/drive-sound/check_pulse_tests.py）
- * 量出来的留了至少一倍的余量。
+ * 换着噪声种子量出来的最差值留了至少一倍的余量；单个频点落在噪声上起伏很大，只拿来比确定的音。
  */
 public class PulseVoiceTest {
 
@@ -183,12 +183,11 @@ public class PulseVoiceTest {
 
     @Test
     public void theCrossPlaneBurbleIsThere() {
-        // 同一排上一个点火隔 90° 的那一下最弱、隔 270° 的最强，每转一个来回：点火阶次两边长出整数阶次的边带（3、5 阶），
-        // 比只靠缸的细小差别、随机起伏出来的半阶次（3.5、4.5 阶）强
-        float[] x = mid(render(SC, params(900f, 0f), 2f), 0.5f);
-        double integer = power(x, 45) + power(x, 75);
-        double half = power(x, 52.5) + power(x, 67.5);
-        assertTrue(integer > 1.5 * half);
+        // 同一排上一个点火隔 90° 的那一下最弱、隔 270° 的最强，每转一个来回：点火阶次两边长出整数阶次的边带（3、5 阶）。
+        // 关掉每一下的随机起伏，和没有这种遮蔽的同一台比（原型里差 33 倍以上）
+        PulseProfile masked = new PulseProfile.Builder().variation(0f, 0f, 0f, 0f, 0f).build();
+        PulseProfile flat = new PulseProfile.Builder().variation(0f, 0f, 0f, 0f, 0f).recovery(107f, 0f, 0f).build();
+        assertTrue(sidebands(masked) > 10 * sidebands(flat));
         // 1-8-4-3-6-5-7-2，单号缸在左排：每排的间隔是 90、180、270、180
         PulseVoice voice = new PulseVoice(SC, RATE);
         int[] count = new int[3];
@@ -198,6 +197,34 @@ public class PulseVoiceTest {
             count[Math.round(gap / 90f) - 1]++;
         }
         assertArrayEquals(new int[] {2, 4, 2}, count);
+    }
+
+    /**
+     * 900 rpm 怠速，同步平均 10 个周期（一个 720° 周期正好 6400 个样本，平均掉随机的那部分）之后，
+     * 3、5 阶加起来相对 4 阶的功率。
+     */
+    private static double sidebands(PulseProfile profile) {
+        float[] x = mid(render(profile, params(900f, 0f), 1.8f), 0f);
+        int n = 6400;
+        double[] cycle = new double[n];
+        for (int c = 2; c < 12; c++) {
+            for (int i = 0; i < n; i++) {
+                cycle[i] += x[c * n + i] / 10.0;
+            }
+        }
+        return (cyclePower(cycle, 6) + cyclePower(cycle, 10)) / cyclePower(cycle, 8);
+    }
+
+    /** 一个 720° 周期里第 {@code k} 个谐波（= k / 2 阶）的功率。 */
+    private static double cyclePower(double[] cycle, int k) {
+        double re = 0;
+        double im = 0;
+        for (int i = 0; i < cycle.length; i++) {
+            double ph = 2.0 * Math.PI * k * i / cycle.length;
+            re += cycle[i] * Math.cos(ph);
+            im -= cycle[i] * Math.sin(ph);
+        }
+        return re * re + im * im;
     }
 
     @Test
@@ -222,11 +249,12 @@ public class PulseVoiceTest {
 
     @Test
     public void onlyTheSuperchargerWhines() {
-        // 3000 rpm：啸叫在 14.2 阶 = 710 Hz
+        // 3000 rpm：啸叫在 14.2 阶 = 710 Hz，是一个音（比两边高得多），双涡轮那里没有（单个频点落在噪声上起伏很大，
+        // 所以拿「有」和「没有」比，不拿双涡轮自己和两边比）
         float[] sc = mid(render(SC, params(3000f, 1f), 1.5f), 0.7f);
         float[] tt = mid(render(TT, params(3000f, 1f), 1.5f), 0.7f);
         assertTrue(standsOut(sc, 710, 0.04) > 10);
-        assertTrue(standsOut(tt, 710, 0.04) < 3);
+        assertTrue(power(sc, 710) > 10 * power(tt, 710));
     }
 
     @Test
@@ -320,10 +348,17 @@ public class PulseVoiceTest {
             float[] x = mid(render(SC, p, 1f), 0.4f);
             assertTrue("挡位 " + gears[k], standsOut(x, orders[k] * 50f, 0.03) > 30);
         }
+        VoiceParams driving = params(3000f, 1f);
+        driving.level = 0.1f;
+        driving.drive = true;
+        driving.speedKmh = 60f;
+        driving.gearIndex = 0;
         VoiceParams parked = params(3000f, 1f);
         parked.level = 0.1f;
         parked.speedKmh = 60f;
         parked.gearIndex = 0;
-        assertTrue("不在 D 挡没有", standsOut(mid(render(SC, parked, 1f), 0.4f), orders[0] * 50f, 0.03) < 5);
+        float hz = orders[0] * 50f;
+        assertTrue("不在 D 挡没有",
+                power(mid(render(SC, driving, 1f), 0.4f), hz) > 30 * power(mid(render(SC, parked, 1f), 0.4f), hz));
     }
 }
