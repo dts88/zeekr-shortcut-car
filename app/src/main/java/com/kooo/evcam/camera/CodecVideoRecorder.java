@@ -279,6 +279,13 @@ public class CodecVideoRecorder {
     private volatile MediaFormat audioFormat;
     /** 相机的时间戳用的是 MONOTONIC（第一帧时判断）：声音的时刻要换到它上面。 */
     private volatile boolean cameraClockMonotonic;
+    /** 最后一次排进一帧画面的时刻（开机时长，含深睡）：声音只跟着画面录（{@link #queueAudio}）。 */
+    private volatile long lastPictureQueuedMs = -1L;
+    /**
+     * 画面停了这么久，声音也不录了（项目所有者 2026-10-21：声音只是环视的附加项，环视没信号、录不了的时候不录声音）。
+     * 正常的帧间隔最长零点几秒（最省的档 10 fps、分段换编码器那一下），1 秒分得开「在录」和「停了」。
+     */
+    private static final long AUDIO_NEEDS_PICTURE_MS = 1_000L;
 
     // 时间水印设置
     private boolean watermarkEnabled = false;
@@ -366,11 +373,18 @@ public class CodecVideoRecorder {
 
     /**
      * 一块编码好的声音（声音线程上）：采集时刻换到画面的时间轴上（和画面样本同一个起点：这个录制器的第一帧），排给写入线程。
-     * 还没录到第一帧、比第一帧早、叫停了、排队满了（写入线程跟不上，画面也在少编）的丢掉 —— 声音不让画面等。
+     *
+     * <p>声音只跟着画面录（项目所有者 2026-10-21）：画面停了 {@link #AUDIO_NEEDS_PICTURE_MS} 以上（环视没信号、录不了 ——
+     * 这一路还算在录，但相机不出帧，要等写不进文件的裁判 15 秒后才收），这一块不要。还没录到第一帧、比第一帧早、
+     * 叫停了、排队满了（写入线程跟不上，画面也在少编）的也丢掉 —— 声音不让画面等。停录时声音跟着停，
+     * 所以熄屏后最晚和环视一起停；哨兵模式下环视接着录，声音也接着录。</p>
      */
     private void queueAudio(long captureBootUs, byte[] data) {
         long base = firstFrameTimestampNs;
-        if (base < 0 || stopRequested || isReleased || !ring.hasRoom()) {
+        long lastPicture = lastPictureQueuedMs;
+        long now = SystemClock.elapsedRealtime();
+        if (base < 0 || stopRequested || isReleased || !ring.hasRoom()
+                || lastPicture < 0 || now - lastPicture > AUDIO_NEEDS_PICTURE_MS) {
             return;
         }
         long cameraNs = FootageAudioMath.toCameraClock(captureBootUs * 1000L, cameraClockMonotonic,
@@ -379,7 +393,7 @@ public class CodecVideoRecorder {
         if (ptsUs < 0) {
             return;
         }
-        ring.offerAudio(ptsUs, data, SystemClock.elapsedRealtime());
+        ring.offerAudio(ptsUs, data, now);
         kickWriter();
     }
 
@@ -2689,7 +2703,10 @@ public class CodecVideoRecorder {
         encodedData.limit(info.offset + info.size);
         encodedData.get(data);
         // 关键帧、只有参数集都由 ring 从标志位上看（参数集不算排队的画面长度，见 SampleRing.Sample#config）
-        ring.offerSample(info.presentationTimeUs, info.flags, data, SystemClock.elapsedRealtime());
+        long now = SystemClock.elapsedRealtime();
+        ring.offerSample(info.presentationTimeUs, info.flags, data, now);
+        // 声音只跟着画面录：最后一帧画面什么时候进来的（queueAudio）
+        lastPictureQueuedMs = now;
         kickWriter();
         noteEncodedBytes(info.size);
     }
