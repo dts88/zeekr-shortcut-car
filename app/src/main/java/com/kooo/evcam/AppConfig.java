@@ -66,6 +66,7 @@ public class AppConfig {
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
     private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（开发者选项，试验）
+    private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（开发者选项，试验）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
@@ -630,6 +631,9 @@ public class AppConfig {
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
                 KEY_FOOTAGE_AUDIO,                    // 环视录像带声音 → 关
                 SettingsRegistry.FOOTAGE_AUDIO_SOURCE.key,  // 录声音的来源 → 原始（录声音关着，用不到）
+                KEY_DRIVE_SOUND,                      // 模拟声浪 → 关
+                SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -953,6 +957,41 @@ public class AppConfig {
 
     public void setFootageAudioSource(String source) {
         writeEnum(SettingsRegistry.FOOTAGE_AUDIO_SOURCE, source);
+    }
+
+    /** 转速变化方式：连续（{@link SettingsRegistry#DRIVE_SOUND_RPM}）。 */
+    public static final String DRIVE_SOUND_RPM_CONTINUOUS = "continuous";
+    /** 转速变化方式：模拟换挡。 */
+    public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
+
+    /**
+     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
+     * 改了马上生效（{@code DriveSound.refresh}）。
+     */
+    public boolean isDriveSoundEnabled() {
+        return readBoolean(KEY_DRIVE_SOUND, false);
+    }
+
+    public void setDriveSoundEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_DRIVE_SOUND, on).apply();
+    }
+
+    /** 声浪自己的音量（dB 数的字符串，{@link SettingsRegistry#DRIVE_SOUND_VOLUME}）：在车机媒体音量之上再乘。 */
+    public String getDriveSoundVolume() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_VOLUME);
+    }
+
+    public void setDriveSoundVolume(String db) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_VOLUME, db);
+    }
+
+    /** 转速变化方式：{@link #DRIVE_SOUND_RPM_CONTINUOUS} / {@link #DRIVE_SOUND_RPM_SHIFTS}。 */
+    public String getDriveSoundRpm() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_RPM);
+    }
+
+    public void setDriveSoundRpm(String mode) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
     }
 
     /**

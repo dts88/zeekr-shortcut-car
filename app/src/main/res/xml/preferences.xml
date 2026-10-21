@@ -498,6 +498,28 @@
                 android:summary="%s" />
         </PreferenceCategory>
 
+        <!-- 模拟声浪（试验，项目所有者 2026-10-21）：只在车内、只在运动模式出声（sound.DriveSound） -->
+        <PreferenceCategory
+            android:title="@string/dev_drive_sound_group">
+
+            <SwitchPreferenceCompat
+                android:key="pref_drive_sound"
+                android:title="@string/dev_drive_sound_title"
+                android:summary="@string/dev_drive_sound_summary" />
+
+            <ListPreference
+                android:key="pref_drive_sound_volume"
+                android:dependency="pref_drive_sound"
+                android:title="@string/dev_drive_sound_volume_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_rpm"
+                android:dependency="pref_drive_sound"
+                android:title="@string/dev_drive_sound_rpm_title"
+                android:summary="%s" />
+        </PreferenceCategory>
+
         <PreferenceCategory
             android:title="@string/set_group_cameras">
 

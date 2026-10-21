@@ -1,10 +1,8 @@
 package com.kooo.evcam.playback;
 
-import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
@@ -117,23 +115,6 @@ public class ManagedVideoPlayer {
      */
     public void setAudible(boolean audible) {
         this.audible = audible;
-    }
-
-    /**
-     * 车内的媒体喇叭那一路（Lab 2026-10-20：BUS00_MEDIA 车内听得到；容器里不指定输出就没声，Lab / CarPiano）。
-     * 找不到（不是这台车）是 null：交给系统选。
-     */
-    private static AudioDeviceInfo cabinSpeaker(Context context) {
-        AudioManager audio = context.getSystemService(AudioManager.class);
-        if (audio == null) {
-            return null;
-        }
-        for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
-            if (device.getType() == AudioDeviceInfo.TYPE_BUS && "BUS00_MEDIA".equals(device.getAddress())) {
-                return device;
-            }
-        }
-        return null;
     }
 
     public ManagedVideoPlayer(TextureView textureView) {
@@ -258,7 +239,8 @@ public class ManagedVideoPlayer {
             // 只有环视那一路的录像带声音（开发者选项「录制声音」）；别的路、没有声音轨的文件照样没声
             mp.setVolume(audible ? 1f : 0f, audible ? 1f : 0f);
             if (audible) {
-                AudioDeviceInfo speaker = cabinSpeaker(textureView.getContext());
+                // 车内的媒体喇叭（容器里不指定输出就没声）；找不到（不是这台车）交给系统选
+                AudioDeviceInfo speaker = com.kooo.evcam.sound.CarSpeakers.cabin(textureView.getContext());
                 if (speaker != null && !mp.setPreferredDevice(speaker)) {
                     AppLog.w(TAG, "回放：指定车内媒体喇叭没成，交给系统选");
                 }

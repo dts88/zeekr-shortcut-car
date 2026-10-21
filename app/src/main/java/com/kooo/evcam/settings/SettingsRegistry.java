@@ -104,6 +104,23 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL, "通话（VOICE_COMMUNICATION）",
                     R.string.dev_footage_audio_source_call));
 
+    /**
+     * 模拟声浪自己的音量（开发者选项，试验；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
+     * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。
+     */
+    public static final SettingSpec DRIVE_SOUND_VOLUME = SettingSpec.of(
+            "drive_sound_volume", "声浪音量", "-12",
+            entry("-18", "−18 dB"),
+            entry("-12", "−12 dB"),
+            entry("-6", "−6 dB"),
+            entry("0", "0 dB"));
+
+    /** 模拟声浪的转速变化方式（开发者选项，试验）。项目所有者 2026-10-21：两种都做，上车听了再定。 */
+    public static final SettingSpec DRIVE_SOUND_RPM = SettingSpec.of(
+            "drive_sound_rpm", "转速变化方式", com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS, "连续", R.string.dev_drive_sound_rpm_continuous),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_SHIFTS, "模拟换挡", R.string.dev_drive_sound_rpm_shifts));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
@@ -112,5 +129,7 @@ public final class SettingsRegistry {
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE,
             REARVIEW_VIEWS,
-            FOOTAGE_AUDIO_SOURCE));
+            FOOTAGE_AUDIO_SOURCE,
+            DRIVE_SOUND_VOLUME,
+            DRIVE_SOUND_RPM));
 }

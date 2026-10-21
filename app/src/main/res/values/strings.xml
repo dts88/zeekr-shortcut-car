@@ -119,6 +119,7 @@
     <string name="floating_action_take_photo">拍照</string>
     <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
     <string name="floating_action_lock_footage">锁定当前录像</string>
+    <string name="floating_action_toggle_drive_sound">开启 / 关闭模拟声浪</string>
     <string name="set_recording_stats_title">录制状态显示</string>
     <string name="set_recording_stats_summary">录制时在画面角落显示已录时长和当前片段序号</string>
     <string name="set_reset_floating_title">重置悬浮按钮</string>
@@ -214,6 +215,7 @@
     <string name="vi_group_assist">驾驶辅助</string>
     <string name="vi_gear">挡位</string>
     <string name="vi_drive_mode">驾驶模式</string>
+    <string name="vi_power_flow">动力流</string>
     <string name="vi_speed">车速</string>
     <string name="vi_ignition">点火状态</string>
     <string name="vi_brake_pedal">刹车踏板</string>
@@ -306,6 +308,10 @@
     <string name="vi_v_drive_standard">标准</string>
     <string name="vi_v_drive_sport">运动</string>
     <string name="vi_v_drive_snow">雪地</string>
+    <string name="vi_v_power_drive">驱动</string>
+    <string name="vi_v_power_regen">回收</string>
+    <string name="vi_v_power_idle">空闲</string>
+    <string name="vi_v_power_not_ready">未就绪</string>
     <string name="vi_v_screen_off">熄屏</string>
     <string name="vi_v_screen_on">亮屏</string>
     <string name="set_language_title">语言 / Language</string>
@@ -902,6 +908,15 @@
     <string name="dev_footage_audio_source_raw">原始（VOICE_RECOGNITION，不经处理，声音小）</string>
     <string name="dev_footage_audio_source_call">通话（VOICE_COMMUNICATION，经降噪和回声消除）</string>
     <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
+    <string name="dev_drive_sound_group">模拟声浪</string>
+    <string name="dev_drive_sound_title">模拟声浪（试验）</string>
+    <string name="dev_drive_sound_summary">运动模式下按油门、车速和加减速合成发动机声，从车内喇叭播放并跟随媒体音量。停车时切换到运动模式会先播放启动声；倒挡时音量降低 6 dB</string>
+    <string name="dev_drive_sound_volume_title">声浪音量</string>
+    <string name="dev_drive_sound_rpm_title">转速变化方式</string>
+    <string name="dev_drive_sound_rpm_continuous">连续</string>
+    <string name="dev_drive_sound_rpm_shifts">模拟换挡</string>
+    <string name="msg_drive_sound_on">已开启模拟声浪</string>
+    <string name="msg_drive_sound_off">已关闭模拟声浪</string>
     <string name="dev_perm_all_files">所有文件访问</string>
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>
