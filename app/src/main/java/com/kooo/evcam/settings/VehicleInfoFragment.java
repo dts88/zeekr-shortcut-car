@@ -23,6 +23,7 @@ import com.kooo.evcam.telemetry.SignalText;
 import com.kooo.evcam.telemetry.InfoBar;
 import com.kooo.evcam.telemetry.InfoBarLayout;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +49,8 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
     private static final String USER = "vehicle-info";
 
     private final Map<Signal, TextView> valueViews = new EnumMap<>(Signal.class);
+    /** 每一行旁边的信息条图标（{@link #addIcons}）：读数一变全部重画。 */
+    private final List<View> iconViews = new ArrayList<>();
     /** 经纬度那一行的值（不是车辆信号，从快照里取）。 */
     private TextView positionView;
     /** 经纬度那一行每秒刷一次：定位来了不通知监听，车停着时车辆读数又不变。 */
@@ -88,6 +91,7 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
                 label.setTextColor(ContextCompat.getColor(ctx, tone(s.trust)));
                 ((TextView) row.findViewById(R.id.vehicle_info_id)).setText(detail(ctx, s.name(), address(ctx, s)));
                 valueViews.put(s, row.findViewById(R.id.vehicle_info_value));
+                addIcons(row, s.name());
                 bindCheck(row, s.name(), InfoBar.selectable(s));
                 list.addView(row);
             }
@@ -98,10 +102,35 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
                 ((TextView) row.findViewById(R.id.vehicle_info_id)).setText(
                         detail(ctx, InfoBar.POSITION, ctx.getString(R.string.vi_position_source)));
                 positionView = row.findViewById(R.id.vehicle_info_value);
+                addIcons(row, InfoBar.POSITION);
                 bindCheck(row, InfoBar.POSITION, true);
                 list.addView(row);
             }
         }
+    }
+
+    /**
+     * 这一项有图标就在那一行画出来（项目所有者 2026-10-21）：勾上后信息条上带出的那几格（{@link InfoBarLayout#cellsFor}，
+     * 和摆格子同一处），组合的格整格画，一项带出两格的两格都画；没有图标的不画。照此刻的读数画，和录像里一样。
+     */
+    private void addIcons(View row, String item) {
+        List<InfoBarLayout.Cell> cells = InfoBarLayout.cellsFor(item);
+        if (cells.isEmpty()) {
+            return;
+        }
+        LinearLayout icons = row.findViewById(R.id.vehicle_info_icons);
+        int gap = row.getResources().getDimensionPixelSize(R.dimen.info_cell_icon_gap);
+        for (InfoBarLayout.Cell cell : cells) {
+            com.kooo.evcam.ui.InfoBarCellView icon = new com.kooo.evcam.ui.InfoBarCellView(row.getContext(), cell);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (icons.getChildCount() > 0) {
+                params.setMarginStart(gap);
+            }
+            icons.addView(icon, params);
+            iconViews.add(icon);
+        }
+        icons.setVisibility(View.VISIBLE);
     }
 
     /**
@@ -166,6 +195,9 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
         }
         showPosition();
         statusView.setText(status(ctx, r));
+        for (View icon : iconViews) {
+            icon.invalidate();
+        }
     }
 
     /**

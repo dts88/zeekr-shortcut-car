@@ -248,6 +248,8 @@ public enum Signal {
     public static final int DRIVE_MODE_STANDARD = 0x22010102;
     /** 驾驶模式：ECARX 叫 DYNAMIC，车机界面上是「运动」。 */
     public static final int DRIVE_MODE_SPORT = 0x22010103;
+    /** 驾驶模式：ECARX 叫 SNOW（雪地）。车上还没见过（Lab 2026-10-20 只对上了前三个），先按常量表认它。 */
+    public static final int DRIVE_MODE_SNOW = 0x22010109;
 
     public static final int IGNITION_ACC = 0x00200104;
     public static final int IGNITION_ON = 0x00200105;
