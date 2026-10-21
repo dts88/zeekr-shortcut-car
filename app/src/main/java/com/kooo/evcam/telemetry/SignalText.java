@@ -98,6 +98,22 @@ public final class SignalText {
                 }
                 return String.format(Locale.US, "0x%08X", code);
             }
+            case POWER_FLOW: {
+                int code = v instanceof Integer ? (Integer) v : -1;
+                if (code == Signal.POWER_FLOW_DRIVE) {
+                    return ctx.getString(R.string.vi_v_power_drive);
+                }
+                if (code == Signal.POWER_FLOW_REGEN) {
+                    return ctx.getString(R.string.vi_v_power_regen);
+                }
+                if (code == Signal.POWER_FLOW_IDLE) {
+                    return ctx.getString(R.string.vi_v_power_idle);
+                }
+                if (code == Signal.POWER_FLOW_NOT_READY) {
+                    return ctx.getString(R.string.vi_v_power_not_ready);
+                }
+                return String.format(Locale.US, "0x%08X", code);
+            }
             case GEAR:
                 return String.valueOf(v);
             case KMH:

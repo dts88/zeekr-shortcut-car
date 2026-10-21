@@ -100,6 +100,7 @@
     <string name="floating_action_take_photo">Take a photo</string>
     <string name="floating_action_toggle_mirror">Super mirror on / off</string>
     <string name="floating_action_lock_footage">Lock the current recording</string>
+    <string name="floating_action_toggle_drive_sound">Simulated drive sound on / off</string>
     <string name="set_recording_stats_title">Recording status readout</string>
     <string name="set_recording_stats_summary">Shows the elapsed time and current clip number in a corner while recording</string>
     <string name="set_reset_floating_title">Reset floating button</string>
@@ -194,6 +195,7 @@
     <string name="vi_group_assist">Driver assistance</string>
     <string name="vi_gear">Gear</string>
     <string name="vi_drive_mode">Drive mode</string>
+    <string name="vi_power_flow">Power flow</string>
     <string name="vi_speed">Speed</string>
     <string name="vi_ignition">Ignition</string>
     <string name="vi_brake_pedal">Brake pedal</string>
@@ -286,6 +288,10 @@
     <string name="vi_v_drive_standard">Standard</string>
     <string name="vi_v_drive_sport">Sport</string>
     <string name="vi_v_drive_snow">Snow</string>
+    <string name="vi_v_power_drive">Drive</string>
+    <string name="vi_v_power_regen">Regen</string>
+    <string name="vi_v_power_idle">Idle</string>
+    <string name="vi_v_power_not_ready">Not ready</string>
     <string name="vi_v_screen_off">Screen off</string>
     <string name="vi_v_screen_on">Screen on</string>
     <string name="set_language_title">Language / 语言</string>
@@ -909,6 +915,15 @@
     <string name="dev_footage_audio_source_raw">Raw (VOICE_RECOGNITION, unprocessed, quiet)</string>
     <string name="dev_footage_audio_source_call">Call (VOICE_COMMUNICATION, noise reduction and echo cancellation)</string>
     <string name="msg_footage_audio_no_permission">No microphone permission, Record sound stays off</string>
+    <string name="dev_drive_sound_group">Drive sound</string>
+    <string name="dev_drive_sound_title">Simulated drive sound (experimental)</string>
+    <string name="dev_drive_sound_summary">In Sport mode, synthesizes engine sound from the throttle, speed and acceleration and plays it through the cabin speakers at the media volume. Switching to Sport while stopped plays an engine start; reverse is 6 dB quieter</string>
+    <string name="dev_drive_sound_volume_title">Drive sound volume</string>
+    <string name="dev_drive_sound_rpm_title">Engine speed pattern</string>
+    <string name="dev_drive_sound_rpm_continuous">Continuous</string>
+    <string name="dev_drive_sound_rpm_shifts">Simulated gear shifts</string>
+    <string name="msg_drive_sound_on">Simulated drive sound on</string>
+    <string name="msg_drive_sound_off">Simulated drive sound off</string>
     <string name="dev_perm_all_files">All files access</string>
     <string name="dev_perm_all_files_why">Used to read and write files on USB drives</string>
     <string name="dev_perm_overlay">Overlay</string>

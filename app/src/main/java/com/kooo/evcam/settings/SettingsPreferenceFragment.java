@@ -929,6 +929,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return R.string.floating_action_toggle_mirror;
             case LOCK_FOOTAGE:
                 return R.string.floating_action_lock_footage;
+            case TOGGLE_DRIVE_SOUND:
+                return R.string.floating_action_toggle_drive_sound;
             case OPEN_APP:
             default:
                 return R.string.floating_action_open_app;
@@ -1111,6 +1113,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
         bindFootageAudio();
+        bindDriveSound();
 
         // 画面调节：打开调节窗口（MainActivity 管着它，退出设置也还在），同时开启画面调节、套上存着的参数。
         // 窗口开没开成由 MainActivity 说：没有悬浮窗权限、相机还没好时它自己提示
@@ -1440,6 +1443,31 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         bindEnum("pref_footage_audio_source", SettingsRegistry.FOOTAGE_AUDIO_SOURCE,
                 appConfig.getFootageAudioSource(), value -> appConfig.setFootageAudioSource(value));
+    }
+
+    /** 模拟声浪（开发者选项，试验）：开关、音量、转速变化方式，改了马上生效（{@code sound.DriveSound}）。 */
+    private void bindDriveSound() {
+        bindSwitch("pref_drive_sound", appConfig.isDriveSoundEnabled(), value -> {
+            appConfig.setDriveSoundEnabled(value);
+            refreshDriveSound();
+        });
+        bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
+                value -> {
+                    appConfig.setDriveSoundVolume(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_rpm", SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm(),
+                value -> {
+                    appConfig.setDriveSoundRpm(value);
+                    refreshDriveSound();
+                });
+    }
+
+    private void refreshDriveSound() {
+        Context context = getContext();
+        if (context != null) {
+            com.kooo.evcam.sound.DriveSound.refresh(context);
+        }
     }
 
     /** 系统弹窗问完录音权限：给了就打开「录制声音」；没给就照旧关着，说一句。 */

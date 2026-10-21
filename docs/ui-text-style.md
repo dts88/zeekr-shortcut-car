@@ -222,7 +222,16 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 开发者选项「模拟声浪（试验）」（2026-10-21，车主定先只做车内、只做运动模式）：分组 dev_drive_sound_group「模拟声浪」/ Drive sound /
+  Bunyi pemanduan；开关 dev_drive_sound_title「模拟声浪（试验）」/ Simulated drive sound (experimental) / Bunyi pemanduan simulasi (percubaan)；
+  dev_drive_sound_summary「运动模式下按油门、车速和加减速合成发动机声，从车内喇叭播放并跟随媒体音量。停车时切换到运动模式会先播放启动声；
+  倒挡时音量降低 6 dB」；dev_drive_sound_volume_title「声浪音量」（选项直接写 dB 数：−18 / −12 / −6 / 0 dB）；
+  dev_drive_sound_rpm_title「转速变化方式」，两档 dev_drive_sound_rpm_continuous「连续」、dev_drive_sound_rpm_shifts「模拟换挡」；
+  悬浮按钮动作 floating_action_toggle_drive_sound「开启 / 关闭模拟声浪」，按下后 msg_drive_sound_on「已开启模拟声浪」/
+  msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
+- 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
+  四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
+  vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。
 
 ---
 

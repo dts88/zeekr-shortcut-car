@@ -100,6 +100,7 @@
     <string name="floating_action_take_photo">Ambil foto</string>
     <string name="floating_action_toggle_mirror">Hidupkan / matikan Cermin super</string>
     <string name="floating_action_lock_footage">Kunci rakaman semasa</string>
+    <string name="floating_action_toggle_drive_sound">Hidupkan / matikan bunyi pemanduan simulasi</string>
     <string name="set_recording_stats_title">Paparan status rakaman</string>
     <string name="set_recording_stats_summary">Menunjukkan masa berlalu dan nombor klip semasa di sudut semasa merakam</string>
     <string name="set_reset_floating_title">Set semula butang terapung</string>
@@ -194,6 +195,7 @@
     <string name="vi_group_assist">Bantuan pemandu</string>
     <string name="vi_gear">Gear</string>
     <string name="vi_drive_mode">Mod pemanduan</string>
+    <string name="vi_power_flow">Aliran kuasa</string>
     <string name="vi_speed">Kelajuan</string>
     <string name="vi_ignition">Penyalaan</string>
     <string name="vi_brake_pedal">Pedal brek</string>
@@ -286,6 +288,10 @@
     <string name="vi_v_drive_standard">Standard</string>
     <string name="vi_v_drive_sport">Sukan</string>
     <string name="vi_v_drive_snow">Salji</string>
+    <string name="vi_v_power_drive">Pacuan</string>
+    <string name="vi_v_power_regen">Jana semula</string>
+    <string name="vi_v_power_idle">Melahu</string>
+    <string name="vi_v_power_not_ready">Belum sedia</string>
     <string name="vi_v_screen_off">Skrin padam</string>
     <string name="vi_v_screen_on">Skrin hidup</string>
     <string name="set_language_title">Bahasa / Language</string>
@@ -890,6 +896,15 @@
     <string name="dev_footage_audio_source_raw">Asal (VOICE_RECOGNITION, tanpa pemprosesan, perlahan)</string>
     <string name="dev_footage_audio_source_call">Panggilan (VOICE_COMMUNICATION, pengurangan hingar dan pembatalan gema)</string>
     <string name="msg_footage_audio_no_permission">Tiada kebenaran mikrofon, Rakam bunyi kekal dimatikan</string>
+    <string name="dev_drive_sound_group">Bunyi pemanduan</string>
+    <string name="dev_drive_sound_title">Bunyi pemanduan simulasi (percubaan)</string>
+    <string name="dev_drive_sound_summary">Dalam mod Sukan, menjana bunyi enjin daripada pendikit, kelajuan dan pecutan serta memainkannya melalui pembesar suara kabin pada kelantangan media. Bertukar ke mod Sukan semasa berhenti memainkan bunyi enjin dihidupkan; gear undur 6 dB lebih perlahan</string>
+    <string name="dev_drive_sound_volume_title">Kelantangan bunyi pemanduan</string>
+    <string name="dev_drive_sound_rpm_title">Corak kelajuan enjin</string>
+    <string name="dev_drive_sound_rpm_continuous">Berterusan</string>
+    <string name="dev_drive_sound_rpm_shifts">Tukar gear simulasi</string>
+    <string name="msg_drive_sound_on">Bunyi pemanduan simulasi dihidupkan</string>
+    <string name="msg_drive_sound_off">Bunyi pemanduan simulasi dimatikan</string>
     <string name="dev_perm_all_files">Akses semua fail</string>
     <string name="dev_perm_all_files_why">Digunakan untuk membaca dan menulis fail pada pemacu USB</string>
     <string name="dev_perm_overlay">Paparan di atas apl lain</string>
