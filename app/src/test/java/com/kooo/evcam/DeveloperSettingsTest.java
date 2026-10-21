@@ -50,6 +50,8 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_force_h264", Arrays.asList("force_h264_encoding"));
         ROWS.put("pref_screen_off_recording", Arrays.asList("screen_off_recording"));
         ROWS.put("pref_screen_off_wake_hours", Arrays.asList("screen_off_wake_min"));
+        ROWS.put("pref_footage_audio", Arrays.asList("footage_audio"));
+        ROWS.put("pref_footage_audio_source", Arrays.asList("footage_audio_source"));
         // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）
         ROWS.put("pref_image_adjust", Arrays.asList("image_adjust_enabled"));
         ROWS.put("pref_image_adjust_reset", NONE);

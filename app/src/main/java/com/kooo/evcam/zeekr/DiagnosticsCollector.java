@@ -82,6 +82,7 @@ public final class DiagnosticsCollector {
         timings.run("screen", () -> appendScreen(sb));
         timings.run("black box", () -> appendBlackBox(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
+        timings.run("footage audio", () -> appendFootageAudio(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("vehicle signals", () -> appendVehicleSignals(sb));
         timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
@@ -1183,6 +1184,26 @@ public final class DiagnosticsCollector {
         } catch (Exception e) {
             sb.append("  !! 读不出来: ").append(e).append('\n');
         }
+        sb.append('\n');
+    }
+
+    /**
+     * 录制声音（开发者选项，试验，项目所有者 2026-10-20）：开没开、有没有权限、这一刻会不会带声音、前台服务带没带麦克风类型，
+     * 最近一次录像里的声音怎么样 —— 来源、实际走的设备、电平、全是 0 的那几段多长（后台被系统挡住的迹象）。
+     */
+    private static void appendFootageAudio(StringBuilder sb, Context context) {
+        sb.append("## 5.1 录制声音（开发者选项，试验）").append('\n');
+        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(context);
+        boolean granted = androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        String source = com.kooo.evcam.camera.FootageAudio.sourceFor(context, config);
+        sb.append("  开关=").append(config.isFootageAudioEnabled() ? "开" : "关")
+                .append("  来源=").append(config.getFootageAudioSource())
+                .append("  录音权限=").append(granted ? "有" : "没有")
+                .append("  这一刻开录会不会带声音=").append(source != null ? "会（环视）" : "不会").append('\n');
+        sb.append("  前台服务类型=").append(com.kooo.evcam.CameraForegroundService.foregroundTypes()).append('\n');
+        String latest = com.kooo.evcam.camera.FootageAudio.latestStatus();
+        sb.append("  最近一次录音=").append(latest == null ? "这次开进程还没录过" : latest).append('\n');
         sb.append('\n');
     }
 

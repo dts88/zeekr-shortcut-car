@@ -1,6 +1,10 @@
 package com.kooo.evcam.playback;
 
+import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.media.AudioAttributes;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
@@ -84,6 +88,8 @@ public class ManagedVideoPlayer {
     }
 
     private final TextureView textureView;
+    /** 这一路放不放声音（只有环视那一路的录像带声音，{@link #setAudible}）。 */
+    private boolean audible;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private MediaPlayer player;
@@ -105,6 +111,30 @@ public class ManagedVideoPlayer {
 
     private String currentPath;
     private Runnable firstFrameFallback;
+
+    /**
+     * 这一路放不放声音：环视那一路放（它的录像带声音，开发者选项「录制声音」），别的路静音。打开下一个文件时生效。
+     */
+    public void setAudible(boolean audible) {
+        this.audible = audible;
+    }
+
+    /**
+     * 车内的媒体喇叭那一路（Lab 2026-10-20：BUS00_MEDIA 车内听得到；容器里不指定输出就没声，Lab / CarPiano）。
+     * 找不到（不是这台车）是 null：交给系统选。
+     */
+    private static AudioDeviceInfo cabinSpeaker(Context context) {
+        AudioManager audio = context.getSystemService(AudioManager.class);
+        if (audio == null) {
+            return null;
+        }
+        for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+            if (device.getType() == AudioDeviceInfo.TYPE_BUS && "BUS00_MEDIA".equals(device.getAddress())) {
+                return device;
+            }
+        }
+        return null;
+    }
 
     public ManagedVideoPlayer(TextureView textureView) {
         this.textureView = textureView;
@@ -218,8 +248,21 @@ public class ManagedVideoPlayer {
             MediaPlayer mp = new MediaPlayer();
             player = mp;
             mp.setSurface(surface);
+            if (audible) {
+                mp.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                        .build());
+            }
             mp.setDataSource(path);
-            mp.setVolume(0f, 0f);   // 行车记录仪没有声音
+            // 只有环视那一路的录像带声音（开发者选项「录制声音」）；别的路、没有声音轨的文件照样没声
+            mp.setVolume(audible ? 1f : 0f, audible ? 1f : 0f);
+            if (audible) {
+                AudioDeviceInfo speaker = cabinSpeaker(textureView.getContext());
+                if (speaker != null && !mp.setPreferredDevice(speaker)) {
+                    AppLog.w(TAG, "回放：指定车内媒体喇叭没成，交给系统选");
+                }
+            }
 
             mp.setOnPreparedListener(p -> {
                 if (myGeneration != generation) {

@@ -4487,12 +4487,11 @@ public class MultiCameraManager {
         if (!appConfig.isFootageAudioEnabled()) {
             return null;
         }
-        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            AppLog.w(TAG, "录制声音开着，但没有录音权限：这一次环视录像不带声音");
-            return null;
+        String source = FootageAudio.sourceFor(context, appConfig);
+        if (source == null) {
+            AppLog.w(TAG, "录制声音开着，但这一次环视录像不带声音（没有录音权限，或者安卓 11 以下）");
         }
-        return appConfig.getFootageAudioSource();
+        return source;
     }
 
     /**

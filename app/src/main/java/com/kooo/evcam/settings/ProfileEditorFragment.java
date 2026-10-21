@@ -547,13 +547,26 @@ public class ProfileEditorFragment extends Fragment {
             }
             String fps = preset == null ? camera.record.fps : preset.fps;
             String bitrate = preset == null ? camera.record.bitrate : preset.bitrate;
-            rates.add(estimatedBitrate(camera, fps, bitrate));
+            rates.add(estimatedBitrate(camera, fps, bitrate) + soundBitrate(camera));
         }
         int[] bits = new int[rates.size()];
         for (int i = 0; i < bits.length; i++) {
             bits[i] = rates.get(i);
         }
         return bits;
+    }
+
+    /**
+     * 环视那一路录着声音时多出来的码率（开发者选项「录制声音」）：开着、有权限、走 MediaCodec 录制时才真录 ——
+     * 和定录法问的是同一处（{@code FootageAudio.sourceFor}）。界面写的码率、每小时用量都要把它算进去。
+     */
+    private int soundBitrate(CameraProfile camera) {
+        if (!CameraProfile.ROLE_COMPOSITE.equals(camera.role)) {
+            return 0;
+        }
+        AppConfig config = new AppConfig(requireContext());
+        return com.kooo.evcam.camera.FootageAudio.sourceFor(requireContext(), config) != null
+                && config.shouldUseCodecRecording() ? com.kooo.evcam.camera.FootageAudio.BIT_RATE : 0;
     }
 
     /** 这份配置一小时落盘多少字节。 */
