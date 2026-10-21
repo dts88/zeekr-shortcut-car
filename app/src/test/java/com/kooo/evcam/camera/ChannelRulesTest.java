@@ -164,6 +164,34 @@ public class ChannelRulesTest {
     }
 
     /**
+     * HUD 上的盲区画面（2026-10-21）：另一样输出，跟中控屏那块同一个登记方、同一条规矩 —— 只在环视上、SIDE_VIEW 登记着才要；
+     * 两块可以同时要；熄屏放开时照旧（环视不放开，所以还要）。
+     */
+    @Test
+    public void theHudCanvasFollowsTheSideViewHolder() {
+        Out side = new Out(Kind.SIDE, "side");
+        Out hud = new Out(Kind.HUD, "hud");
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        World w = new World(Arrays.asList(cab, sur), new LinkedHashSet<>(Collections.singletonList(REAR)));
+        w.screenOn = true;
+        sur.declared.add(hud);
+        cab.declared.add(new Out(Kind.HUD, "hud-on-cabin"));
+        assertTrue("没登记：声明着也不要", ChannelRules.wantedOutputs(w, sur).isEmpty());
+
+        w.holders.add(Holder.SIDE_VIEW);
+        assertEquals("只要 HUD 那块", set(hud), ChannelRules.wantedOutputs(w, sur));
+        assertTrue("座舱不为它开", ChannelRules.wantedOutputs(w, cab).isEmpty());
+        assertFalse(ChannelRules.wanted(w, cab));
+
+        sur.declared.add(side);
+        assertEquals("中控屏、HUD 两块一起要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
+
+        w.screenOn = false;
+        assertEquals("熄屏不放开环视：照旧要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
+    }
+
+    /**
      * 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）：登记着 MIRROR 时后座舱和环视一样有人要，只带超级镜子那块画布；
      * 配置里没启用后座舱也一样（管线照它建了这一路），主界面预览、拍照照旧不要它；熄屏照旧放开；前座舱不为它开。
      */

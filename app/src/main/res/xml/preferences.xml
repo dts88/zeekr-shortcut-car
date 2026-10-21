@@ -281,11 +281,85 @@
                 android:title="@string/set_side_view_title"
                 android:summary="@string/set_side_view_summary" />
 
+            <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD，摆在行里点一次（2026-10-21，默认两处） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_side_view_target"
+                android:dependency="pref_side_view"
+                android:title="@string/set_side_view_target_title" />
+
             <SeekBarPreference
                 android:key="pref_side_view_min_speed"
                 android:dependency="pref_side_view"
                 android:title="@string/set_side_view_min_speed_title"
                 android:summary="@string/set_side_view_min_speed_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
+
+        <!--
+          HUD 上的盲区画面（2026-10-21）：大小、位置和样子；拉直、视野、朝向和中控屏共用。默认值照 FerixzTanz 在他 7X 上调的。
+          显示位置是「中控屏」时整组不可用（SettingsPreferenceFragment.bindSideView）。
+        -->
+        <PreferenceCategory
+            android:key="cat_side_view_hud"
+            android:dependency="pref_side_view"
+            android:title="@string/set_group_side_view_hud">
+
+            <SwitchPreferenceCompat
+                android:key="pref_hud_mirror"
+                android:title="@string/set_hud_mirror_title"
+                android:summary="@string/set_hud_mirror_summary" />
+
+            <SeekBarPreference
+                android:key="pref_hud_height"
+                android:title="@string/set_hud_height_title"
+                android:summary="@string/set_hud_height_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_shape"
+                android:title="@string/set_hud_shape_title"
+                android:summary="@string/set_hud_shape_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_edge"
+                android:title="@string/set_hud_edge_title"
+                android:summary="@string/set_hud_edge_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_vertical"
+                android:title="@string/set_hud_vertical_title"
+                android:summary="@string/set_hud_vertical_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_opacity"
+                android:title="@string/set_hud_opacity_title"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_contrast"
+                android:title="@string/set_hud_contrast_title"
+                android:summary="@string/set_hud_contrast_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_contrast_night"
+                android:title="@string/set_hud_contrast_night_title"
+                android:summary="@string/set_hud_contrast_night_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_night"
+                android:title="@string/set_hud_night_title"
+                android:summary="@string/set_hud_night_summary"
+                app:showSeekBarValue="true" />
+
+            <SeekBarPreference
+                android:key="pref_hud_fade"
+                android:title="@string/set_hud_fade_title"
+                android:summary="@string/set_hud_fade_summary"
                 app:showSeekBarValue="true" />
         </PreferenceCategory>
     </PreferenceScreen>

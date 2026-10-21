@@ -143,6 +143,11 @@ public final class ChannelRules {
         MIRROR,
         /** 盲区画面的画布（只有环视有）：和预览、超级镜子挂在同一条共享的预览流上。 */
         SIDE,
+        /**
+         * 盲区画面在 HUD 上的画布（只有环视有，2026-10-21）：和中控屏那块一样挂在共享的预览流上、跟同一个登记方
+         * （SIDE_VIEW）；共享预览流挂不下、会话配不上时和它一起最先让路。
+         */
+        HUD,
         /** 录制器的输入 SurfaceTexture：录制器停放、重新备好都是同一个，所以停录后它能留在会话里。 */
         RECORD,
         /** 不显示的出帧口：只用来补位 —— 一路要出帧、会话里却没有一个活着的输出能出帧时才加。 */
@@ -1354,7 +1359,7 @@ public final class ChannelRules {
     /**
      * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视
      * （切换范围是「后视 + 后座舱」时还有后座舱）；
-     * 盲区画面 —— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
+     * 盲区画面（中控屏、HUD 两块）—— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
      * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
      */
     private static boolean wantsKind(World w, Lane lane, Kind kind) {
@@ -1367,6 +1372,7 @@ public final class ChannelRules {
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && mirrorWants(w, lane);
             case SIDE:
+            case HUD:
                 return w.holders.contains(CameraNeeds.Holder.SIDE_VIEW) && isSurround(lane);
             case RECORD:
                 return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
