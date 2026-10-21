@@ -95,17 +95,28 @@ final class DriveSoundRules {
         return Why.RUNNING;
     }
 
+    /** 推送停了这么久（毫秒），快读又和它不一样，就改用快读：推送可能断了、或者漏了最后一个值。 */
+    static final long PUSH_QUIET_MS = 1000L;
+
     /**
-     * 油门用推来的还是快读的（试验，项目所有者 2026-10-21：订阅和 50 ms 快读并行，取更新的那个）：推来过、值读得到、
-     * 不比这一份快读旧，就用推来的。
+     * 油门用推来的还是快读的（项目所有者 2026-10-21：订阅和 50 ms 快读并行，用新的那个）。车上量到（2026-10-22）：
+     * 快读读到的值比推送晚约 100 ms（同一个新值推送先到 374 次、平均早 102 ms，快读先到 49 次），所以快读读到的时刻晚，
+     * 不等于值新 —— 推来过就用推来的；只有推送已经停了 {@link #PUSH_QUIET_MS}、快读又和它不一样（推送断了、漏了），才改用快读。
+     * 踩着、松着的时候两者本来就差一截（快读晚），那时推送一直在来，不会切过去。
      *
      * @param pushCount 推来过几次（0 = 没推过）
      * @param pushAtMs  最近一次推来的时刻
      * @param pushValue 最近一次推来的值（NaN = 读不到）
-     * @param pollAtMs  最近一份快读的时刻（0 = 还没读到）
+     * @param polled    这一份快读的值（NaN = 读不到）
+     * @param nowMs     此刻
      */
-    static boolean usePush(long pushCount, long pushAtMs, float pushValue, long pollAtMs) {
-        return pushCount > 0L && !Float.isNaN(pushValue) && pushAtMs >= pollAtMs;
+    static boolean usePush(long pushCount, long pushAtMs, float pushValue, float polled, long nowMs) {
+        if (pushCount <= 0L || Float.isNaN(pushValue)) {
+            return false;
+        }
+        boolean quiet = nowMs - pushAtMs > PUSH_QUIET_MS;
+        boolean differs = !Float.isNaN(polled) && Math.abs(polled - pushValue) > 0.5f;
+        return !(quiet && differs);
     }
 
     /** 存着的音量（"-6" 这样的 dB 数，{@code SettingsRegistry.DRIVE_SOUND_VOLUME}）→ dB；不会比 0 dB 更响，认不出的按 0 dB（默认）。 */

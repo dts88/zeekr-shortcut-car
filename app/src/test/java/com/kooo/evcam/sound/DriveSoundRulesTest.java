@@ -106,13 +106,16 @@ public class DriveSoundRulesTest {
     }
 
     @Test
-    public void thePushedThrottleIsUsedWhenItIsTheNewer() {
-        assertFalse("没推过", DriveSoundRules.usePush(0L, 0L, Float.NaN, 1000L));
-        assertTrue("推来的更新", DriveSoundRules.usePush(3L, 1020L, 40f, 1000L));
-        assertFalse("快读的更新", DriveSoundRules.usePush(3L, 980L, 40f, 1000L));
-        assertTrue("同一刻按推来的", DriveSoundRules.usePush(3L, 1000L, 40f, 1000L));
-        assertFalse("推来的读不到", DriveSoundRules.usePush(3L, 1020L, Float.NaN, 1000L));
-        assertTrue("快读还没到", DriveSoundRules.usePush(1L, 500L, 0f, 0L));
+    public void thePushedThrottleWinsWhilePushesKeepComing() {
+        assertFalse("没推过", DriveSoundRules.usePush(0L, 0L, Float.NaN, 10f, 1000L));
+        assertFalse("推来的读不到", DriveSoundRules.usePush(3L, 900L, Float.NaN, 10f, 1000L));
+        // 快读晚约 100 ms：刚推来 40，快读还是旧的 10 —— 照样用推来的（以前按读到的时刻比，旧值会把它拉回去）
+        assertTrue("快读读到得晚但值旧", DriveSoundRules.usePush(3L, 950L, 40f, 10f, 1000L));
+        assertTrue("一样就无所谓", DriveSoundRules.usePush(3L, 0L, 40f, 40f, 5000L));
+        assertTrue("快读读不到", DriveSoundRules.usePush(3L, 0L, 40f, Float.NaN, 5000L));
+        assertTrue("推送刚停一会儿", DriveSoundRules.usePush(3L, 1000L, 40f, 10f, 1000L + DriveSoundRules.PUSH_QUIET_MS));
+        assertFalse("推送停了一秒多、快读不一样：改用快读",
+                DriveSoundRules.usePush(3L, 1000L, 40f, 10f, 1001L + DriveSoundRules.PUSH_QUIET_MS));
     }
 
     @Test

@@ -357,8 +357,8 @@ public final class DriveSound {
                 FastReadings fast = telemetry.fast();
                 PushedValue push = telemetry.pushedThrottle();
                 float polled = num(fast.number(Signal.THROTTLE_DEPTH));
-                // 油门：推来的（试验）和快读的，取更新的那个
-                boolean pushed = DriveSoundRules.usePush(push.count, push.atMs, push.value, fast.atMs);
+                // 油门：推来过就用推来的（快读的值比推送晚约 100 ms），推送停了、快读又不一样才用快读
+                boolean pushed = DriveSoundRules.usePush(push.count, push.atMs, push.value, polled, now);
                 float throttle = pushed ? push.value : polled;
                 long throttleAt = pushed ? push.atMs : fast.atMs;
                 if (fast.version != seenFastVersion || push.count != seenPushCount) {
@@ -526,7 +526,8 @@ public final class DriveSound {
                             + "  throttle push: every %s (%d pushes), a new value came first by push %d times (ahead by %s), "
                             + "by the fast read %d times%n"
                             + "  pedal to speaker (the part measurable here): new throttle used %s after it arrived "
-                            + "+ output %s (+ the head unit's own signal and amplifier delays, not measurable here)",
+                            + "+ output %s (HAL timestamp; on the car's head unit it reads about 5.1 s whatever the buffer, so it is "
+                            + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
                     state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear,
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
