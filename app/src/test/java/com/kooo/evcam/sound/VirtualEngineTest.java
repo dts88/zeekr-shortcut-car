@@ -308,6 +308,31 @@ public class VirtualEngineTest {
         assertTrue("一脚到底连降几挡: " + before + " -> " + e.gearIndex(), e.gearIndex() <= before - 2);
     }
 
+    /** 慢慢踩到地板附近也算一脚到底（像自动挡的强制降挡开关）：降到此刻车速下该在的挡，不只降一挡。 */
+    @Test
+    public void flooringItSlowlyStillKicksDown() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 90f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.braking = true;
+        e.ignite(in);
+        in.braking = false;
+        in.throttlePct = 15f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        run(e, in, 6f);
+        int before = e.gearIndex();
+        // 每秒多踩 34 %，2.5 秒从 15 % 踩到 100 %：慢，不算急踩
+        in.pedalRate = 34f;
+        for (int i = 0; i < Math.round(2.5f / DT); i++) {
+            in.throttlePct = Math.min(100f, in.throttlePct + 34f * DT);
+            e.step(DT, in);
+        }
+        in.pedalRate = 0f;
+        run(e, in, 0.3f);
+        assertEquals("踩到底降到该在的挡", VirtualEngine.pickGear(P, 90f, 1f), e.gearIndex());
+        assertTrue("不只降一挡: " + before + " -> " + e.gearIndex(), e.gearIndex() <= before - 2);
+    }
+
     @Test
     public void aStabSoundsDifferentFromASlowPress() {
         VirtualEngine stab = new VirtualEngine(P);
