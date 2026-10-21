@@ -149,7 +149,7 @@
     <string name="set_camera_mapping_summary">手动指定环视、前座舱、后座舱各自使用的摄像头（用于排查）</string>
     <string name="set_diagnostics_title">诊断信息</string>
     <string name="set_diagnostics_summary">查看并导出摄像头、显示屏和存储的检测信息及最近日志</string>
-    <!-- 导出、导入设置（项目所有者 2026-10-19 要，文字待批准） -->
+    <!-- 导出、导入设置（项目所有者 2026-10-19 要，文字 2026-10-20 批准） -->
     <string name="set_settings_export_title">导出设置</string>
     <string name="set_settings_export_summary">将当前设置保存为文件，与诊断报告存放在同一文件夹</string>
     <string name="set_settings_import_title">导入设置</string>
