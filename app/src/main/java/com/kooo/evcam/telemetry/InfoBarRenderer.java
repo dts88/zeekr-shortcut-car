@@ -78,6 +78,10 @@ public final class InfoBarRenderer {
     private static final int TAIL_BRIGHT = 0xFFFF5A5F;
     /** 驾驶模式「舒适」时挡位框的颜色（标准是原来的橙 {@link #ON}，运动是刹车灯的红 {@link #TAIL_BRIGHT}）。 */
     private static final int MODE_COMFORT = 0xFF4DA3FF;
+    /** 驾驶模式「雪地」：白框（项目所有者 2026-10-21）。 */
+    private static final int MODE_SNOW = 0xFFF0F1F2;
+    /** 别的还没验证的驾驶模式（自定义等）：先用紫框，和别的几种都分得开（项目所有者 2026-10-21）。 */
+    private static final int MODE_OTHER = 0xFFB07CFF;
     /**
      * 转向灯亮时的绿：箭头外沿 3 px 的绿边和向外溢的光晕，芯是 {@link #LAMP_CORE}（项目所有者 2026-10-04：
      * 像实车的转向指示，不用橙）。取明度高的绿（BT.601 亮度 156；芯 246、灭的灰 128、底 44），
@@ -650,14 +654,15 @@ public final class InfoBarRenderer {
     }
 
     /**
-     * 挡位：框里是字母，框的颜色是驾驶模式 —— 舒适蓝、标准橙、运动红（刹车灯的红），带一点像灯那样的光晕
-     * （项目所有者 2026-10-21：挡位框换颜色就够明显，不多占地方）。驾驶模式没勾、没数据、没对上的值：照旧橙框、不带光晕。
+     * 挡位：框里是字母，框的颜色是驾驶模式（项目所有者 2026-10-21：挡位框换颜色就够明显，不多占地方）——
+     * 舒适蓝、标准橙、运动红（刹车灯的红，只有它带一点像刹车灯那样的光晕）、雪地白，别的还没验证的模式紫。
+     * 驾驶模式没勾、没数据：照旧橙框。
      */
     private void drawGear(float cx, float cy, String gear, Integer driveMode) {
         boolean known = gear != null && !gear.isEmpty();
         int mode = known ? driveModeColor(driveMode) : 0;
         rect.set(cx - 24, cy - 24, cx + 24, cy + 24);
-        if (mode != 0) {
+        if (mode != 0 && driveMode == Signal.DRIVE_MODE_SPORT) {
             glowOutline(rect, 9, mode);
         }
         stroke.setColor(!known ? UNKNOWN_LINE : mode != 0 ? mode : ON);
@@ -670,7 +675,7 @@ public final class InfoBarRenderer {
         }
     }
 
-    /** 驾驶模式 → 挡位框的颜色；没数据、没对上的值是 0（照旧的橙框、不带光晕）。 */
+    /** 驾驶模式 → 挡位框的颜色；没数据是 0（照旧的橙框）。 */
     private static int driveModeColor(Integer driveMode) {
         if (driveMode == null) {
             return 0;
@@ -684,7 +689,10 @@ public final class InfoBarRenderer {
         if (driveMode == Signal.DRIVE_MODE_SPORT) {
             return TAIL_BRIGHT;
         }
-        return 0;
+        if (driveMode == Signal.DRIVE_MODE_SNOW) {
+            return MODE_SNOW;
+        }
+        return MODE_OTHER;
     }
 
     /** 框往外溢的一圈光（和灯的光晕同一个强度，{@link #lampGlow}）：只沿着框描，不往框里糊。 */

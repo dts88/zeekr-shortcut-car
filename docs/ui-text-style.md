@@ -222,6 +222,7 @@
 - 系统信息「驾驶模式」（2026-10-20，Lab 车上对过值，车主要求加）：vi_drive_mode「驾驶模式」/ Drive mode / Mod pemanduan；
   三个值照车机界面的叫法：vi_v_drive_comfort「舒适」/ Comfort / Selesa，vi_v_drive_standard「标准」/ Standard / Standard，
   vi_v_drive_sport「运动」/ Sport / Sukan。没对上的值照原样写号码（同灯光开关）。
+  雪地（2026-10-21 加，车上还没见过这个值）：vi_v_drive_snow「雪地」/ Snow / Salji。
 
 ---
 

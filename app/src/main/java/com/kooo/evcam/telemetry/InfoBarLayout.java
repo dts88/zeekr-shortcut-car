@@ -55,8 +55,8 @@ public final class InfoBarLayout {
          */
         STEERING(78, R.string.vi_cell_steering, Signal.STEERING),
         /**
-         * 挡位字母在框里；框的颜色是驾驶模式（项目所有者 2026-10-21）：舒适蓝、标准橙（原来的颜色）、运动红，
-         * 带一点像灯那样的光晕。驾驶模式没勾、没数据、没对上的值，框照旧是橙的、不带光晕。
+         * 挡位字母在框里；框的颜色是驾驶模式（项目所有者 2026-10-21）：舒适蓝、标准橙（原来的颜色）、运动红（只有它带一点
+         * 像刹车灯那样的光晕）、雪地白，别的还没验证的模式紫。驾驶模式没勾、没数据，框照旧是橙的。
          */
         GEAR(70, R.string.vi_cell_gear, Signal.GEAR, Signal.DRIVE_MODE),
         /**

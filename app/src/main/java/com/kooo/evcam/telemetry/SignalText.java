@@ -93,6 +93,9 @@ public final class SignalText {
                 if (code == Signal.DRIVE_MODE_SPORT) {
                     return ctx.getString(R.string.vi_v_drive_sport);
                 }
+                if (code == Signal.DRIVE_MODE_SNOW) {
+                    return ctx.getString(R.string.vi_v_drive_snow);
+                }
                 return String.format(Locale.US, "0x%08X", code);
             }
             case GEAR:

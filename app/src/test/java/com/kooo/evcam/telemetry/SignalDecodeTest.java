@@ -164,7 +164,8 @@ public class SignalDecodeTest {
         assertEquals(Integer.valueOf(Signal.DRIVE_MODE_COMFORT), Signal.DRIVE_MODE.decode(0x22010101));
         assertEquals(Integer.valueOf(Signal.DRIVE_MODE_STANDARD), Signal.DRIVE_MODE.decode(0x22010102));
         assertEquals(Integer.valueOf(Signal.DRIVE_MODE_SPORT), Signal.DRIVE_MODE.decode(0x22010103));
-        assertEquals(Integer.valueOf(0x22010109), Signal.DRIVE_MODE.decode(0x22010109));
+        assertEquals(Integer.valueOf(Signal.DRIVE_MODE_SNOW), Signal.DRIVE_MODE.decode(0x22010109));
+        assertEquals(Integer.valueOf(0x22010140), Signal.DRIVE_MODE.decode(0x22010140));
         assertNull(Signal.DRIVE_MODE.decode(255));
     }
 
