@@ -55,6 +55,7 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_drive_sound", Arrays.asList("drive_sound"));
         ROWS.put("pref_drive_sound_volume", Arrays.asList("drive_sound_volume"));
         ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
+        ROWS.put("pref_drive_sound_style", Arrays.asList("drive_sound_style"));
         // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）
         ROWS.put("pref_image_adjust", Arrays.asList("image_adjust_enabled"));
         ROWS.put("pref_image_adjust_reset", NONE);

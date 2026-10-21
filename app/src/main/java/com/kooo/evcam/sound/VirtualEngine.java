@@ -171,6 +171,14 @@ final class VirtualEngine {
     static final float TONE_OPEN_HZ = 20000f;
     static final float JOIN_BLIP_RPM = 600f;
 
+    // ---- 收油（断油、发动机被车拖着转）：给合成器
+    /** 该有的负荷（{@link #loadTarget}）低于这个算收油。 */
+    static final float OVERRUN_LOAD = 0.08f;
+    /** 转速高出怠速这么多（rpm）开始算，再高 {@link #OVERRUN_RPM_SPAN} 算满。 */
+    static final float OVERRUN_FROM_RPM = 150f;
+    static final float OVERRUN_RPM_SPAN = 800f;
+    static final float OVERRUN_SEC = 0.15f;
+
     /** 一块最多按多长推进（秒）：线程被耽搁了也不一步跳太远。 */
     static final float MAX_DT = 0.1f;
 
@@ -199,6 +207,7 @@ final class VirtualEngine {
     private float fade = 1f;
     private float toneHz = TONE_OPEN_HZ;
     private float starter;
+    private float overrun;
     private float speedKmh;
     private Gear gear = Gear.UNKNOWN;
 
@@ -223,6 +232,7 @@ final class VirtualEngine {
         shiftLoad = 0f;
         phaseSec = 0f;
         starter = 0f;
+        overrun = 0f;
         float v = speedOf(in);
         speedKmh = v;
         gear = in.gear;
@@ -323,6 +333,10 @@ final class VirtualEngine {
             shiftDipDb = 0f;
         }
         moveRpm(dt, rpmTarget(v, in), shifting, in.gear);
+        // 看这一刻该有的负荷（不等平滑）：一松油门就断油
+        float overrunTarget = target < OVERRUN_LOAD
+                ? clamp01((rpm - p.idleRpm - OVERRUN_FROM_RPM) / OVERRUN_RPM_SPAN) : 0f;
+        overrun += (overrunTarget - overrun) * follow(dt, OVERRUN_SEC);
     }
 
     /** 启动：转动 → 点着冲高 → 回落到怠速。回落段里踩了油门、或者车动了，交还正常走法。 */
@@ -649,6 +663,19 @@ final class VirtualEngine {
     /** 急松油门的突突（0–1）。 */
     float burble() {
         return liftEnv;
+    }
+
+    /**
+     * 收油时发动机被车拖着转（断油）多少（0–1）：负荷几乎没有、转速在怠速之上 —— 滑行、刹车、空挡收油回落。
+     * 启动途中是 0。
+     */
+    float overrun() {
+        return overrun;
+    }
+
+    /** 此刻用的车速（km/h，非负）。 */
+    float speedKmh() {
+        return speedKmh;
     }
 
     /** 倒挡齿轮的啸叫频率（Hz）；不在倒挡是 0。 */

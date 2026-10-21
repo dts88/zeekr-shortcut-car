@@ -634,6 +634,7 @@ public class AppConfig {
                 KEY_DRIVE_SOUND,                      // 模拟声浪 → 关
                 SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -963,6 +964,12 @@ public class AppConfig {
     public static final String DRIVE_SOUND_RPM_CONTINUOUS = "continuous";
     /** 转速变化方式：模拟换挡。 */
     public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
+    /** 声音风格（{@link SettingsRegistry#DRIVE_SOUND_STYLE}）：机械增压 V8（默认）。 */
+    public static final String DRIVE_SOUND_STYLE_SUPERCHARGED = "supercharged";
+    /** 声音风格：双涡轮 V8。 */
+    public static final String DRIVE_SOUND_STYLE_TWIN_TURBO = "twin_turbo";
+    /** 声音风格：经典 V8（第一版）。 */
+    public static final String DRIVE_SOUND_STYLE_CLASSIC = "classic";
 
     /**
      * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
@@ -992,6 +999,15 @@ public class AppConfig {
 
     public void setDriveSoundRpm(String mode) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
+    }
+
+    /** 声音风格：{@link #DRIVE_SOUND_STYLE_SUPERCHARGED} / {@link #DRIVE_SOUND_STYLE_TWIN_TURBO} / {@link #DRIVE_SOUND_STYLE_CLASSIC}。 */
+    public String getDriveSoundStyle() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
+    }
+
+    public void setDriveSoundStyle(String style) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_STYLE, style);
     }
 
     /**

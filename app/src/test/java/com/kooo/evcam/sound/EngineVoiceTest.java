@@ -18,8 +18,8 @@ public class EngineVoiceTest {
     private static final int BLOCK = 256;
     private static final SoundProfile P = SoundProfile.V8;
 
-    private static EngineVoice.Params params(float rpm, float load, float level, float gain) {
-        EngineVoice.Params p = new EngineVoice.Params();
+    private static VoiceParams params(float rpm, float load, float level, float gain) {
+        VoiceParams p = new VoiceParams();
         p.rpm = rpm;
         p.load = load;
         p.level = level;
@@ -27,7 +27,7 @@ public class EngineVoiceTest {
         return p;
     }
 
-    private static float[] render(EngineVoice voice, EngineVoice.Params p, float seconds) {
+    private static float[] render(EngineVoice voice, VoiceParams p, float seconds) {
         int blocks = Math.round(seconds * RATE / BLOCK);
         float[] out = new float[blocks * BLOCK];
         for (int b = 0; b < blocks; b++) {
@@ -66,6 +66,21 @@ public class EngineVoiceTest {
     }
 
     @Test
+    public void stereoIsTheMonoSoundOnBothSides() {
+        VoiceParams p = params(3000f, 0.7f, 1f, 0.5f);
+        float[] mono = render(new EngineVoice(P, RATE), p, 0.1f);
+        EngineVoice voice = new EngineVoice(P, RATE);
+        float[] lr = new float[2 * BLOCK];
+        for (int b = 0; b < mono.length / BLOCK; b++) {
+            voice.renderStereo(lr, BLOCK, p);
+            for (int i = 0; i < BLOCK; i++) {
+                assertEquals(mono[b * BLOCK + i], lr[2 * i], 0f);
+                assertEquals(mono[b * BLOCK + i], lr[2 * i + 1], 0f);
+            }
+        }
+    }
+
+    @Test
     public void theFiringOrderCarriesTheSound() {
         // 3000 rpm：曲轴 50 Hz，V8 点火阶次（4 阶）200 Hz，2 阶 100 Hz；237.5 Hz 夹在阶次之间
         float[] x = tail(render(new EngineVoice(P, RATE), params(3000f, 1f, 1f, 0.5f), 1.2f), 0.2f);
@@ -93,7 +108,7 @@ public class EngineVoiceTest {
         EngineVoice voice = new EngineVoice(P, RATE);
         Random random = new Random(1);
         float[] out = new float[BLOCK];
-        EngineVoice.Params p = new EngineVoice.Params();
+        VoiceParams p = new VoiceParams();
         for (int i = 0; i < 800; i++) {
             p.rpm = random.nextFloat() * 7000f;
             p.load = random.nextFloat();
@@ -130,9 +145,9 @@ public class EngineVoiceTest {
 
     @Test
     public void theStarterIsHeardWhileCranking() {
-        EngineVoice.Params on = params(250f, 0.12f, 0.15f, 1f);
+        VoiceParams on = params(250f, 0.12f, 0.15f, 1f);
         on.starter = 1f;
-        EngineVoice.Params off = params(250f, 0.12f, 0.15f, 1f);
+        VoiceParams off = params(250f, 0.12f, 0.15f, 1f);
         float[] withStarter = tail(render(new EngineVoice(P, RATE), on, 0.5f), 0.1f);
         float[] without = tail(render(new EngineVoice(P, RATE), off, 0.5f), 0.1f);
         assertTrue(power(withStarter, EngineVoice.STARTER_WHINE_HZ) > 100 * power(without, EngineVoice.STARTER_WHINE_HZ));
@@ -140,10 +155,10 @@ public class EngineVoiceTest {
 
     @Test
     public void reverseGetsItsGearWhine() {
-        EngineVoice.Params on = params(1000f, 0.2f, 0.1f, 1f);
+        VoiceParams on = params(1000f, 0.2f, 0.1f, 1f);
         on.whineHz = 500f;
         on.whineAmp = 1f;
-        EngineVoice.Params off = params(1000f, 0.2f, 0.1f, 1f);
+        VoiceParams off = params(1000f, 0.2f, 0.1f, 1f);
         off.whineHz = 500f;
         float[] whine = tail(render(new EngineVoice(P, RATE), on, 0.5f), 0.1f);
         float[] plain = tail(render(new EngineVoice(P, RATE), off, 0.5f), 0.1f);
@@ -152,7 +167,7 @@ public class EngineVoiceTest {
 
     @Test
     public void aClosedValveMufflesTheHighOrders() {
-        EngineVoice.Params closed = params(4000f, 1f, 1f, 1f);
+        VoiceParams closed = params(4000f, 1f, 1f, 1f);
         closed.toneHz = 400f;
         float[] open = tail(render(new EngineVoice(P, RATE), params(4000f, 1f, 1f, 1f), 0.5f), 0.1f);
         float[] muffled = tail(render(new EngineVoice(P, RATE), closed, 0.5f), 0.1f);

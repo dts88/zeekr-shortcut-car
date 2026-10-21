@@ -1445,12 +1445,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 appConfig.getFootageAudioSource(), value -> appConfig.setFootageAudioSource(value));
     }
 
-    /** 模拟声浪（开发者选项，试验）：开关、音量、转速变化方式，改了马上生效（{@code sound.DriveSound}）。 */
+    /** 模拟声浪（开发者选项，试验）：开关、声音风格、音量、转速变化方式，改了马上生效（{@code sound.DriveSound}）。 */
     private void bindDriveSound() {
         bindSwitch("pref_drive_sound", appConfig.isDriveSoundEnabled(), value -> {
             appConfig.setDriveSoundEnabled(value);
             refreshDriveSound();
         });
+        bindEnum("pref_drive_sound_style", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
+                value -> {
+                    appConfig.setDriveSoundStyle(value);
+                    refreshDriveSound();
+                });
         bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
                 value -> {
                     appConfig.setDriveSoundVolume(value);

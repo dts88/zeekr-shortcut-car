@@ -388,6 +388,56 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void coastingInGearIsOverrunButIdlingIsNot() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 30f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.braking = true;
+        e.ignite(in);
+        in.braking = false;
+        run(e, in, 2f);
+        assertEquals("踩着油门不是收油", 0f, e.overrun(), 0.01f);
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.REGEN;
+        run(e, in, 1.5f);
+        assertTrue("挂着挡滑行：发动机被车拖着转 " + e.overrun() + " @ " + e.rpm(), e.overrun() > 0.8f);
+        in.speedKmh = 0f;
+        in.flow = VirtualEngine.Flow.IDLE;
+        run(e, in, 3f);
+        assertEquals("停下来怠速不算", 0f, e.overrun(), 0.02f);
+    }
+
+    @Test
+    public void aFreeRevFallingBackIsOverrunAtOnce() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        assertEquals("启动、怠速都不是收油", 0f, e.overrun(), 0f);
+        in.throttlePct = 80f;
+        run(e, in, 1.5f);
+        assertEquals(0f, e.overrun(), 0.01f);
+        in.throttlePct = 0f;
+        run(e, in, 0.3f);
+        assertTrue("一松油门就断油（不等负荷慢慢落）" + e.overrun(), e.overrun() > 0.5f);
+        run(e, in, 3f);
+        assertEquals("回到怠速", 0f, e.overrun(), 0.02f);
+    }
+
+    @Test
+    public void startingIsNeverOverrun() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        for (int i = 0; i < Math.round(2.2f / DT); i++) {
+            e.step(DT, in);
+            if (e.phase() == VirtualEngine.Phase.STARTING) {
+                assertEquals("冲高后回落不是断油", 0f, e.overrun(), 0f);
+            }
+        }
+    }
+
+    @Test
     public void adaptiveCruiseAccelerationIsHeard() {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 80f, 0f);

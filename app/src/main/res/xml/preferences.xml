@@ -508,6 +508,12 @@
                 android:summary="@string/dev_drive_sound_summary" />
 
             <ListPreference
+                android:key="pref_drive_sound_style"
+                android:dependency="pref_drive_sound"
+                android:title="@string/dev_drive_sound_style_title"
+                android:summary="%s" />
+
+            <ListPreference
                 android:key="pref_drive_sound_volume"
                 android:dependency="pref_drive_sound"
                 android:title="@string/dev_drive_sound_volume_title"

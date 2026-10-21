@@ -121,6 +121,18 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS, "连续", R.string.dev_drive_sound_rpm_continuous),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_SHIFTS, "模拟换挡", R.string.dev_drive_sound_rpm_shifts));
 
+    /**
+     * 模拟声浪的声音风格（开发者选项，试验；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
+     * 按发动机结构重做；第一版留着，叫「经典 V8」。
+     */
+    public static final SettingSpec DRIVE_SOUND_STYLE = SettingSpec.of(
+            "drive_sound_style", "声音风格", com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_SUPERCHARGED,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_SUPERCHARGED, "机械增压 V8",
+                    R.string.dev_drive_sound_style_supercharged),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_TWIN_TURBO, "双涡轮 V8",
+                    R.string.dev_drive_sound_style_twin_turbo),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_CLASSIC, "经典 V8", R.string.dev_drive_sound_style_classic));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
@@ -131,5 +143,6 @@ public final class SettingsRegistry {
             REARVIEW_VIEWS,
             FOOTAGE_AUDIO_SOURCE,
             DRIVE_SOUND_VOLUME,
-            DRIVE_SOUND_RPM));
+            DRIVE_SOUND_RPM,
+            DRIVE_SOUND_STYLE));
 }

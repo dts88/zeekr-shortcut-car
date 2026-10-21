@@ -1,8 +1,8 @@
 package com.kooo.evcam.sound;
 
 /**
- * 合成：把虚拟发动机（{@link VirtualEngine}）的转速、负荷、电平和几样音色参数变成一串样本。纯计算（{@code EngineVoiceTest}），
- * 声音线程上一块一块地调，循环里不分配内存。
+ * 「经典 V8」风格（{@link SoundStyle#CLASSIC}，第一版）：把虚拟发动机（{@link VirtualEngine}）的转速、负荷、电平和几样音色参数
+ * 变成一串单声道样本，左右声道一样。纯计算（{@code EngineVoiceTest}），声音线程上一块一块地调，循环里不分配内存。
  *
  * <ul>
  *   <li><b>阶次</b>：所有阶次共用一个曲轴相位（两转一个周期，半阶次也接得上），转速怎么变相位都连着走 —— 不出「咔哒」。
@@ -13,7 +13,7 @@ package com.kooo.evcam.sound;
  *   <li>电平、音量、转速逐样本平滑；最后软限幅，峰值不超过 {@link #CEILING}（−3 dBFS）。</li>
  * </ul>
  */
-final class EngineVoice {
+final class EngineVoice implements Voice {
 
     /** 峰值上限：−3 dBFS。 */
     static final float CEILING = 0.708f;
@@ -39,24 +39,6 @@ final class EngineVoice {
     /** 白噪声过带通 / 低通之后补回的倍数：让它的有效值和同样电平的正弦差不多。 */
     static final float INTAKE_NOISE_NORM = 4f;
     static final float EXHAUST_NOISE_NORM = 8f;
-
-    /** 一块的参数：声音线程里重用一份，不分配。 */
-    static final class Params {
-        float rpm;
-        /** 合成用的负荷（0–1）。 */
-        float load;
-        /** 发动机的电平（线性，{@link VirtualEngine#levelDb} 换来的）：管阶次、进气、排气。 */
-        float level;
-        /** 总音量（线性）：声浪自己的音量 × 门控 × 开始工作时的淡入。起动机、倒挡啸叫也跟着它。 */
-        float gain;
-        float brightDb;
-        float intakeBoostDb;
-        float burble;
-        float starter;
-        float whineHz;
-        float whineAmp;
-        float toneHz = VirtualEngine.TONE_OPEN_HZ;
-    }
 
     private static final int TABLE = 4096;
     private static final float[] SINE = sineTable();
@@ -108,6 +90,8 @@ final class EngineVoice {
     private final Biquad highpass;
     private final Biquad tone = new Biquad();
     private float toneSetHz = -1f;
+    /** {@link #renderStereo} 先合成到这里再复制到左右（第一次用时按块大小分配）。 */
+    private float[] mono = new float[0];
 
     EngineVoice(SoundProfile profile, float sampleRate) {
         this.p = profile;
@@ -150,10 +134,22 @@ final class EngineVoice {
         highpass = Biquad.highpass(HIGHPASS_HZ, 0.7071f, sampleRate);
     }
 
+    @Override
+    public void renderStereo(float[] lr, int frames, VoiceParams params) {
+        if (mono.length < frames) {
+            mono = new float[frames];
+        }
+        render(mono, 0, frames, params);
+        for (int i = 0; i < frames; i++) {
+            lr[2 * i] = mono[i];
+            lr[2 * i + 1] = mono[i];
+        }
+    }
+
     /**
      * 合成一块（{@code frames} 个单声道样本）写进 {@code out}。参数在块里逐样本平滑过去。
      */
-    void render(float[] out, int offset, int frames, Params params) {
+    void render(float[] out, int offset, int frames, VoiceParams params) {
         if (frames <= 0) {
             return;
         }
@@ -332,60 +328,5 @@ final class EngineVoice {
         x ^= x << 5;
         noise = x;
         return x * (1f / 2147483648f);
-    }
-
-    /** 二阶滤波器（RBJ 公式，转置直接 II 型）。 */
-    static final class Biquad {
-        private float b0 = 1f;
-        private float b1;
-        private float b2;
-        private float a1;
-        private float a2;
-        private float z1;
-        private float z2;
-
-        static Biquad peaking(float hz, float db, float q, float rate) {
-            Biquad b = new Biquad();
-            double a = Math.pow(10.0, db / 40.0);
-            double w0 = 2.0 * Math.PI * hz / rate;
-            double alpha = Math.sin(w0) / (2.0 * q);
-            double cos = Math.cos(w0);
-            double a0 = 1.0 + alpha / a;
-            b.set((1.0 + alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha / a) / a0);
-            return b;
-        }
-
-        static Biquad highpass(float hz, float q, float rate) {
-            Biquad b = new Biquad();
-            double w0 = 2.0 * Math.PI * hz / rate;
-            double alpha = Math.sin(w0) / (2.0 * q);
-            double cos = Math.cos(w0);
-            double a0 = 1.0 + alpha;
-            b.set((1.0 + cos) / 2.0 / a0, -(1.0 + cos) / a0, (1.0 + cos) / 2.0 / a0, -2.0 * cos / a0, (1.0 - alpha) / a0);
-            return b;
-        }
-
-        void setLowpass(float hz, float q, float rate) {
-            double w0 = 2.0 * Math.PI * Math.min(hz, rate * 0.45f) / rate;
-            double alpha = Math.sin(w0) / (2.0 * q);
-            double cos = Math.cos(w0);
-            double a0 = 1.0 + alpha;
-            set((1.0 - cos) / 2.0 / a0, (1.0 - cos) / a0, (1.0 - cos) / 2.0 / a0, -2.0 * cos / a0, (1.0 - alpha) / a0);
-        }
-
-        private void set(double nb0, double nb1, double nb2, double na1, double na2) {
-            b0 = (float) nb0;
-            b1 = (float) nb1;
-            b2 = (float) nb2;
-            a1 = (float) na1;
-            a2 = (float) na2;
-        }
-
-        float process(float x) {
-            float y = b0 * x + z1;
-            z1 = b1 * x - a1 * y + z2;
-            z2 = b2 * x - a2 * y;
-            return y;
-        }
     }
 }

@@ -230,6 +230,10 @@
   dev_drive_sound_rpm_title「转速变化方式」，两档 dev_drive_sound_rpm_continuous「连续」、dev_drive_sound_rpm_shifts「模拟换挡」；
   悬浮按钮动作 floating_action_toggle_drive_sound「开启 / 关闭模拟声浪」，按下后 msg_drive_sound_on「已开启模拟声浪」/
   msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
+  声音风格（2026-10-21 加，车主嫌第一版单薄、要按发动机的结构重做，第一版留作可选风格）：dev_drive_sound_style_title「声音风格」/
+  Sound style / Gaya bunyi；三档 dev_drive_sound_style_supercharged「机械增压 V8」/ Supercharged V8 / V8 pengecas lampau（默认）、
+  dev_drive_sound_style_twin_turbo「双涡轮 V8」/ Twin-turbo V8 / V8 turbo berkembar、dev_drive_sound_style_classic「经典 V8」/
+  Classic V8 / V8 klasik（第一版）。只写发动机的形式，不用车型名（商标）。
 - 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
   四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
   vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。

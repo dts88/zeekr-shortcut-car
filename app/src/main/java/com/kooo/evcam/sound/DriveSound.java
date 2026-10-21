@@ -32,7 +32,8 @@ import java.util.Set;
  *       只登记 / 注销、起 / 停线程，不碰声音。</li>
  *   <li><b>声音线程</b>（{@link Run}，THREAD_PRIORITY_URGENT_AUDIO）：每 {@link #BLOCK} 帧（48 kHz 下 5.3 ms）读一次快读和读数
  *       （都是不可变快照，不加锁）→ {@link DriveInputs} 算出油门变化率、加减速度 → {@link VirtualEngine} 推进一步 →
- *       {@link EngineVoice} 合成 → {@link SoundOutput} 写进车内媒体喇叭。循环里不分配内存。
+ *       按声音风格（{@link SoundStyle}）的合成器出立体声 → {@link SoundOutput} 写进车内媒体喇叭。循环里不分配内存。
+ *       换了声音风格：这一台淡出，按新风格重新开始（停着放启动声，在走就接入）。
  *       开始工作那一刻车停着放启动声、车在走开阀门式接入（{@link VirtualEngine#ignite}）；要停的时候 0.6 秒淡出再放掉喇叭。</li>
  * </ul>
  *
@@ -75,6 +76,7 @@ public final class DriveSound {
     private volatile boolean enabled;
     private volatile float userDb = -12f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;
+    private volatile SoundStyle style = SoundStyle.SUPERCHARGED;
     /** 最近一个声音线程（诊断报告用）。 */
     private volatile Run latest;
 
@@ -86,7 +88,7 @@ public final class DriveSound {
         INSTANCE.doInstall(context);
     }
 
-    /** 设置变了（开关、音量、转速变化方式，悬浮按钮也会改开关）：马上按新的设置再定一次。哪个线程都能叫。 */
+    /** 设置变了（开关、声音风格、音量、转速变化方式，悬浮按钮也会改开关）：马上按新的设置再定一次。哪个线程都能叫。 */
     public static void refresh(Context context) {
         INSTANCE.main.post(() -> {
             INSTANCE.doInstall(context);
@@ -124,6 +126,11 @@ public final class DriveSound {
                 telemetry.releaseFast(USER);
             }
         }
+        if (run != null && run.style != style) {
+            // 换了声音风格：这一台淡出，下面按新风格重新开始
+            run.stop();
+            run = null;
+        }
         if (why.open && run == null) {
             long now = SystemClock.elapsedRealtime();
             if (failedAtMs != 0L && now - failedAtMs < RETRY_AFTER_FAILURE_MS) {
@@ -158,6 +165,7 @@ public final class DriveSound {
         userDb = DriveSoundRules.volumeDb(c.getDriveSoundVolume());
         rpmMode = AppConfig.DRIVE_SOUND_RPM_SHIFTS.equals(c.getDriveSoundRpm())
                 ? VirtualEngine.RpmMode.SHIFTS : VirtualEngine.RpmMode.CONTINUOUS;
+        style = SoundStyle.of(c.getDriveSoundStyle());
     }
 
     private static float num(Float value) {
@@ -176,8 +184,8 @@ public final class DriveSound {
     public static String diagnostics() {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.US, "  enabled=%s volume=%.0f dB rpm=%s armed=%s fastUsers=%s%n",
-                s.enabled, s.userDb, s.rpmMode, s.armed, Telemetry.get().fastUsers()));
+        sb.append(String.format(Locale.US, "  enabled=%s style=%s volume=%.0f dB rpm=%s armed=%s fastUsers=%s%n",
+                s.enabled, s.style.key, s.userDb, s.rpmMode, s.armed, Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
         sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s%n", fast.ageMs(now),
@@ -189,6 +197,8 @@ public final class DriveSound {
 
     /** 一个声音线程：开车内喇叭、合成、写；要停时淡出再放掉。 */
     private final class Run implements Runnable {
+        /** 这一台的声音风格（起的时候定下，换风格就换一台）。 */
+        final SoundStyle style = DriveSound.this.style;
         private volatile boolean stopping;
         // ---- 诊断：声音线程写，随时读
         private volatile String state = "opening";
@@ -268,10 +278,10 @@ public final class DriveSound {
             AudioManager audio = app.getSystemService(AudioManager.class);
             DriveInputs inputs = new DriveInputs();
             VirtualEngine engine = new VirtualEngine(SoundProfile.V8);
-            EngineVoice voice = new EngineVoice(SoundProfile.V8, SoundOutput.RATE);
+            Voice voice = style.voice(SoundOutput.RATE);
             VirtualEngine.Input in = new VirtualEngine.Input();
-            EngineVoice.Params params = new EngineVoice.Params();
-            float[] buffer = new float[BLOCK];
+            VoiceParams params = new VoiceParams();
+            float[] buffer = new float[2 * BLOCK];
             float dt = BLOCK / (float) SoundOutput.RATE;
             boolean ignited = false;
             boolean inCall = false;
@@ -335,6 +345,10 @@ public final class DriveSound {
                     params.whineHz = engine.whineHz();
                     params.whineAmp = engine.whineAmp();
                     params.toneHz = engine.toneHz();
+                    params.overrun = engine.overrun();
+                    params.speedKmh = engine.speedKmh();
+                    params.drive = in.gear == VirtualEngine.Gear.D;
+                    params.gearIndex = params.drive && in.mode == VirtualEngine.RpmMode.SHIFTS ? engine.gearIndex() : -1;
                     rpm = engine.rpm();
                     load = engine.load();
                     levelDb = engine.levelDb();
@@ -345,7 +359,7 @@ public final class DriveSound {
                 pedalRate = inputs.pedalRate();
                 accel = inputs.accel();
                 long t0 = System.nanoTime();
-                voice.render(buffer, 0, BLOCK, params);
+                voice.renderStereo(buffer, BLOCK, params);
                 renderMs += ((System.nanoTime() - t0) / 1_000_000f - renderMs) * 0.01f;
                 if (!out.write(buffer, BLOCK)) {
                     trouble = "write failed";
@@ -364,9 +378,10 @@ public final class DriveSound {
 
         String describe() {
             return String.format(Locale.US,
-                    "run: %s why=%s ignited=%s rpm=%.0f gear=%d load=%.2f level=%.1f dB gate=%.2f pedal=%.0f %%/s "
-                            + "accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s",
-                    state, why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear, load, levelDb, gate, pedalRate, accel,
+                    "run: %s style=%s why=%s ignited=%s rpm=%.0f gear=%d load=%.2f level=%.1f dB gate=%.2f "
+                            + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s",
+                    state, style.key, why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear, load, levelDb, gate, pedalRate,
+                    accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output);
         }

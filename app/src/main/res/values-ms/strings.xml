@@ -903,6 +903,10 @@
     <string name="dev_drive_sound_rpm_title">Corak kelajuan enjin</string>
     <string name="dev_drive_sound_rpm_continuous">Berterusan</string>
     <string name="dev_drive_sound_rpm_shifts">Tukar gear simulasi</string>
+    <string name="dev_drive_sound_style_title">Gaya bunyi</string>
+    <string name="dev_drive_sound_style_supercharged">V8 pengecas lampau</string>
+    <string name="dev_drive_sound_style_twin_turbo">V8 turbo berkembar</string>
+    <string name="dev_drive_sound_style_classic">V8 klasik</string>
     <string name="msg_drive_sound_on">Bunyi pemanduan simulasi dihidupkan</string>
     <string name="msg_drive_sound_off">Bunyi pemanduan simulasi dimatikan</string>
     <string name="dev_perm_all_files">Akses semua fail</string>

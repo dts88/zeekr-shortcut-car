@@ -10,7 +10,7 @@ import android.media.AudioTrack;
 import java.util.Locale;
 
 /**
- * 一路输出：一个 {@link AudioTrack}（48 kHz、单声道、浮点、MODE_STREAM），指定到车机的某个 BUS。只在声音线程上用。
+ * 一路输出：一个 {@link AudioTrack}（48 kHz、立体声、浮点、MODE_STREAM），指定到车机的某个 BUS。只在声音线程上用。
  *
  * <ul>
  *   <li>一定指定设备（容器里不指定就没声）；找不到那个 BUS 就不开，不交给系统随便放。</li>
@@ -26,6 +26,8 @@ final class SoundOutput {
     static final int START_BUFFER_MS = 30;
     static final int GROW_MS = 10;
     static final int MAX_BUFFER_MS = 120;
+    /** 一帧：左右两个浮点。 */
+    static final int FRAME_BYTES = 8;
 
     private final AudioTrack track;
     private final String address;
@@ -52,8 +54,8 @@ final class SoundOutput {
             throw new IllegalStateException("no output " + address);
         }
         int maxFrames = RATE * MAX_BUFFER_MS / 1000;
-        int minBytes = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT);
-        int bytes = Math.max(minBytes > 0 ? minBytes : 0, maxFrames * 4);
+        int minBytes = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_FLOAT);
+        int bytes = Math.max(minBytes > 0 ? minBytes : 0, maxFrames * FRAME_BYTES);
         AudioTrack track;
         try {
             track = new AudioTrack.Builder()
@@ -64,7 +66,7 @@ final class SoundOutput {
                     .setAudioFormat(new AudioFormat.Builder()
                             .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
                             .setSampleRate(RATE)
-                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
                             .build())
                     .setTransferMode(AudioTrack.MODE_STREAM)
                     .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
@@ -81,7 +83,7 @@ final class SoundOutput {
             track.release();
             throw new IllegalStateException("setPreferredDevice refused " + address);
         }
-        SoundOutput out = new SoundOutput(track, address, bytes / 4);
+        SoundOutput out = new SoundOutput(track, address, bytes / FRAME_BYTES);
         int start = Math.min(out.capacityFrames, Math.max(track.getBufferSizeInFrames(), RATE * START_BUFFER_MS / 1000));
         out.bufferFrames = track.setBufferSizeInFrames(start);
         try {
@@ -93,13 +95,13 @@ final class SoundOutput {
         return out;
     }
 
-    /** 写一块（阻塞到写进去）。写不进（设备没了之类）返回 false。 */
-    boolean write(float[] buffer, int frames) {
-        int done = track.write(buffer, 0, frames, AudioTrack.WRITE_BLOCKING);
+    /** 写一块（{@code frames} 帧，左右交错；阻塞到写进去）。写不进（设备没了之类）返回 false。 */
+    boolean write(float[] lr, int frames) {
+        int done = track.write(lr, 0, 2 * frames, AudioTrack.WRITE_BLOCKING);
         if (done < 0) {
             return false;
         }
-        written += done;
+        written += done / 2;
         return true;
     }
 
@@ -150,7 +152,7 @@ final class SoundOutput {
 
     /** 一句话（英文，诊断报告 / 黑匣子用）。 */
     String describe() {
-        return String.format(Locale.US, "%s %d Hz mono float, buffer %d frames (%.0f ms, cap %d), underruns %d%s, latency %s",
+        return String.format(Locale.US, "%s %d Hz stereo float, buffer %d frames (%.0f ms, cap %d), underruns %d%s, latency %s",
                 address, RATE, bufferFrames, bufferFrames * 1000f / RATE, capacityFrames, underruns,
                 grew.isEmpty() ? "" : " (grew " + grew + ")",
                 latencyMs < 0f ? "?" : String.format(Locale.US, "%.0f ms", latencyMs));
