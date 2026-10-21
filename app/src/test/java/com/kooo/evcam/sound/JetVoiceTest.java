@@ -8,14 +8,16 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
- * 「超音速」（试制）：峰值永远不超过 −3 dBFS、静音就是真的 0、同样的输入出同样的声音；主音跟着转子
- * （怠速约 530 Hz、转满约 1200 Hz，P / N 里转到 4500 就算满）；怠速的哨声听得出来；一踩油门「轰」一下；升挡「音爆」。
- * 参考量出来的数在 docs/local/drive-sound-plan.md §13，阈值的原型数在 docs/local/drive-sound/check_round6.py。
+ * 「超音速」（试制第二版）：峰值永远不超过 −3 dBFS、静音就是真的 0、同样的输入出同样的声音；主音跟着转子
+ * （怠速约 533 Hz、转满约 1190 Hz；停着时跟油门，一松半秒多就回到怠速）；整扇哨声跟着转子往上走；一踩油门「轰」一下；升挡「音爆」。
+ * 参考量出来的数在 docs/local/drive-sound-plan.md §13，阈值的原型数在 docs/local/drive-sound/check_jet2.py。
  */
 public class JetVoiceTest {
 
     private static final int RATE = 48_000;
     private static final int BLOCK = 256;
+    /** P / N 里虚拟发动机最高转到这里。 */
+    private static final float FREE_MAX_RPM = 4500f;
 
     private static VoiceParams params(float rpm, float load, boolean drive) {
         VoiceParams p = new VoiceParams();
@@ -84,6 +86,23 @@ public class JetVoiceTest {
         return y;
     }
 
+    /** 从 {@code from} 起 {@code n} 个样本（汉宁窗）在 {@code lo}–{@code hi} Hz 里的频谱重心。 */
+    private static double centroid(float[] x, int from, int n, double lo, double hi) {
+        float[] w = new float[n];
+        for (int i = 0; i < n; i++) {
+            w[i] = (float) (x[from + i] * (0.5 - 0.5 * Math.cos(2.0 * Math.PI * i / n)));
+        }
+        double sum = 0;
+        double weighted = 0;
+        for (int k = (int) Math.ceil(lo * n / RATE); k <= hi * n / RATE; k++) {
+            double hz = (double) k * RATE / n;
+            double p = power(w, 0, n, hz);
+            sum += p;
+            weighted += p * hz;
+        }
+        return weighted / sum;
+    }
+
     // ================================================================= 不出事
 
     @Test
@@ -95,6 +114,7 @@ public class JetVoiceTest {
         float[] block = new float[2 * BLOCK];
         for (int b = 0; b < 400; b++) {
             loud.shiftSerial = b / 40;
+            loud.load = (b / 20) % 2 == 0 ? 1f : 0f;
             v.renderStereo(block, BLOCK, loud);
             for (float s : block) {
                 assertTrue(Math.abs(s) <= EngineVoice.CEILING + 1e-6f);
@@ -147,9 +167,10 @@ public class JetVoiceTest {
     public void theWhineFollowsTheSpool() {
         assertEquals("怠速", JetVoice.IDLE_HZ, settled(900f, 0f, true), JetVoice.IDLE_HZ * 0.03f);
         assertEquals("D 挡转满", JetVoice.TOP_HZ, settled(JetVoice.FULL_RPM, 1f, true), JetVoice.TOP_HZ * 0.03f);
-        assertEquals("P 挡踩到底", JetVoice.TOP_HZ, settled(JetVoice.FREE_FULL_RPM, 1f, false), JetVoice.TOP_HZ * 0.03f);
-        float light = settled(JetVoice.FREE_FULL_RPM, 0.2f, false);
-        assertTrue("同样的转速，油门小转子低一截: " + light, light > 900f && light < 1100f);
+        assertEquals("P 挡踩到底", JetVoice.TOP_HZ, settled(FREE_MAX_RPM, 1f, false), JetVoice.TOP_HZ * 0.03f);
+        // 停着踩一半：转子 = 0.5²，比转速给的低得多（原型 651.5 Hz）
+        double half = JetVoice.IDLE_HZ * Math.pow(JetVoice.TOP_HZ / JetVoice.IDLE_HZ, Math.pow(0.5, JetVoice.FREE_CURVE));
+        assertEquals("P 挡踩一半", half, settled(FREE_MAX_RPM, 0.5f, false), half * 0.03);
     }
 
     private static float settled(float rpm, float load, boolean drive) {
@@ -159,39 +180,49 @@ public class JetVoiceTest {
     }
 
     @Test
-    public void theIdleWhineStandsOut() {
-        // 怠速、怠速的电平：左边那台的主音比两边（±5 %）高得多（原型最差 2000 倍）
-        VoiceParams p = params(900f, 0f, true);
-        p.level = EngineVoice.dbToLin(VirtualEngine.LEVEL_FLOOR_DB);
-        float[] x = render(p, 1f);
-        int from = Math.round(0.5f * RATE);
-        int to = Math.round(0.8f * RATE);
-        double hz = JetVoice.IDLE_HZ * (1f - JetVoice.DETUNE);
-        double sides = Math.max(power(x, from, to, hz * 0.95), power(x, from, to, hz * 1.05));
-        assertTrue(power(x, from, to, hz) > 30 * sides);
+    public void parkedItFallsBackSoonAfterALift() {
+        // 停着踩满，虚拟转速还挂在高处（它落得慢），一松 0.6 s 主音就差不多回到怠速（原型 543 Hz）
+        JetVoice v = new JetVoice(RATE);
+        int at = 100;
+        render(v, params(FREE_MAX_RPM, 1f, false), (at * BLOCK + 0.6f * RATE) / RATE, at, 0f, 0, true);
+        assertTrue("回到怠速: " + v.mainHz(), v.mainHz() < JetVoice.IDLE_HZ * 1.05f);
+    }
+
+    @Test
+    public void theWholeFanRisesWithTheSpool() {
+        // 300–2500 Hz 的频谱重心：转满比怠速高得多（整扇线一起往上走，不只是主音；原型八个种子最差 1.76 倍）
+        float[] idle = render(params(900f, 0f, true), 1f);
+        float[] full = render(params(JetVoice.FULL_RPM, 1f, true), 1f);
+        int from = Math.round(0.6f * RATE);
+        int n = 16384;
+        double ratio = centroid(full, from, n, 300, 2500) / centroid(idle, from, n, 300, 2500);
+        assertTrue("重心: " + ratio, ratio > 1.4);
     }
 
     // ================================================================= 喷流、换挡
 
     @Test
     public void aStabWhoomps() {
-        // 3000 rpm 不动，第 40 块负荷 0 → 1：头 150 ms 的 40–100 Hz 比 0.7 s 之后同样长的一段大（原型十二个种子最差 2.1 倍）
+        // 3000 rpm 不动，第 40 块负荷 0 → 1：头 150 ms 的 40–100 Hz 比 0.7 s 之后同样长的一段大得多（原型十个种子最差 5.35 倍）
         float[] x = band(render(new JetVoice(RATE), params(3000f, 0f, true), 1.4f, 40, 1f, 0, true), 40f, 100f);
         int at = 40 * BLOCK;
         int n = Math.round(0.15f * RATE);
         int later = at + Math.round(0.7f * RATE);
-        assertTrue(energy(x, at, at + n) > 1.5 * energy(x, later, later + n));
+        double ratio = energy(x, at, at + n) / energy(x, later, later + n);
+        assertTrue("「轰」: " + ratio, ratio > 2.5);
     }
 
     @Test
     public void anUpshiftBooms() {
-        // 同一套随机数、只差换挡记号：记号变之前一点不差；之后差出来的（「音爆」、一捶、「轰」）不小（原型比发动机低 9 dB），
-        // 大半在 200 Hz 以下（原型 68 %）；降挡没有「音爆」，差得少
-        float[] same = render(new JetVoice(RATE), params(5000f, 1f, true), 0.6f, 40, 1f, 0, true);
-        float[] up = render(new JetVoice(RATE), params(5000f, 1f, true), 0.6f, 40, 1f, 1, true);
-        float[] down = render(new JetVoice(RATE), params(5000f, 1f, true), 0.6f, 40, 1f, 1, false);
-        int at = 40 * BLOCK;
-        for (int i = 0; i < at; i++) {
+        // 同一套随机数、只差换挡记号（第 300 块，起步那一下「轰」已经过去）：记号变之前一点不差；之后差出来的
+        // （「音爆」、一捶、「轰」）不小（原型比发动机低 4.9 dB），大半在 200 Hz 以下（原型 79 %）；
+        // 降挡没有「音爆」，只「轰」一点（原型是升挡的 31 %）
+        int at = 300;
+        float[] same = render(new JetVoice(RATE), params(5000f, 1f, true), 2f, at, 1f, 0, true);
+        float[] up = render(new JetVoice(RATE), params(5000f, 1f, true), 2f, at, 1f, 1, true);
+        float[] down = render(new JetVoice(RATE), params(5000f, 1f, true), 2f, at, 1f, 1, false);
+        int from = at * BLOCK;
+        for (int i = 0; i < from; i++) {
             assertEquals(same[i], up[i], 0f);
         }
         int n = Math.round(0.15f * RATE);
@@ -201,9 +232,10 @@ public class JetVoiceTest {
             dUp[i] = up[i] - same[i];
             dDown[i] = down[i] - same[i];
         }
-        double diff = energy(dUp, at, at + n);
-        assertTrue("差得不小", diff > 0.03 * energy(same, at, at + n));
-        assertTrue("大半在低频", energy(band(dUp, 20f, 200f), at, at + n) > 0.4 * diff);
-        assertTrue("降挡差得少", energy(dDown, at, at + n) < 0.8 * diff);
+        double diff = energy(dUp, from, from + n);
+        assertTrue("差得不小", diff > 0.1 * energy(same, from, from + n));
+        assertTrue("大半在低频", energy(band(dUp, 20f, 200f), from, from + n) > 0.5 * diff);
+        double downDiff = energy(dDown, from, from + n);
+        assertTrue("降挡差得少: " + downDiff / diff, downDiff < 0.6 * diff && downDiff > 0.05 * diff);
     }
 }
