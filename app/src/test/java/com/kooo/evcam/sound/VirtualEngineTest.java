@@ -204,11 +204,26 @@ public class VirtualEngineTest {
         }
         in.throttlePct = 0f;
         in.pedalRate = 0f;
-        in.speedKmh = 8f;
+        in.speedKmh = 20f;
         run(e, in, 3f);
-        assertEquals("转速跟着倒挡齿比", 8f * P.reverseRpmPerKmh, e.rpm(), 60f);
-        assertEquals(8f * VirtualEngine.REVERSE_WHINE_HZ_PER_KMH, e.whineHz(), 1e-3f);
-        assertTrue(e.whineAmp() > 0.5f);
+        assertEquals("转速跟着倒挡齿比", 20f * P.reverseRpmPerKmh, e.rpm(), 20f * P.reverseRpmPerKmh * 0.05f);
+        assertEquals(20f * VirtualEngine.REVERSE_WHINE_HZ_PER_KMH, e.whineHz(), 1e-3f);
+        assertEquals("车速快了啸叫到头", 1f, e.whineAmp(), 0f);
+    }
+
+    @Test
+    public void launchSlipBlendsIntoTheGearWithoutAPlateauOrADip() {
+        float launch = P.idleRpm + (P.maxRpm - P.idleRpm) * P.pedalKick * 0.47f;
+        assertEquals(launch, VirtualEngine.gearedRpm(launch, 0f), 0.01f);
+        float last = launch;
+        for (int kmh = 1; kmh <= 40; kmh++) {
+            float rpm = VirtualEngine.gearedRpm(launch, kmh * P.gearRpmPerKmh[0]);
+            assertTrue("起步时转速跟着车速一路往上: " + kmh, rpm > last);
+            assertTrue(rpm >= launch - 0.01f && rpm >= kmh * P.gearRpmPerKmh[0] - 0.01f);
+            last = rpm;
+        }
+        assertEquals("车速上来后就是挡位转速", 60f * P.gearRpmPerKmh[0],
+                VirtualEngine.gearedRpm(launch, 60f * P.gearRpmPerKmh[0]), 60f * P.gearRpmPerKmh[0] * 0.02f);
     }
 
     @Test

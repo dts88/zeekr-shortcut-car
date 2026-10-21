@@ -418,11 +418,11 @@ final class VirtualEngine {
         float base;
         switch (in.gear) {
             case R:
-                base = Math.min(Math.max(launchRpm(load), v * p.reverseRpmPerKmh), REVERSE_MAX_RPM);
+                base = Math.min(gearedRpm(launchRpm(load), v * p.reverseRpmPerKmh), REVERSE_MAX_RPM);
                 break;
             case D:
                 if (in.mode == RpmMode.SHIFTS) {
-                    base = Math.max(v * p.gearRpmPerKmh[gearIndex], launchRpm(load))
+                    base = gearedRpm(launchRpm(load), v * p.gearRpmPerKmh[gearIndex])
                             + STAB_FLARE_RPM * SHIFT_FLARE_SHARE * stabEnv * (1f - speedCurve(p, v));
                 } else {
                     boolean easing = in.braking || in.flow == Flow.REGEN;
@@ -527,6 +527,16 @@ final class VirtualEngine {
         float kick = p.pedalKick * load;
         float x = kick + (1f - kick) * s * (p.speedShare + (1f - p.speedShare) * load);
         return p.idleRpm + (p.maxRpm - p.idleRpm) * clamp01(x);
+    }
+
+    /**
+     * 挂着挡时的转速：起步打滑的转速（{@code launch}，跟着油门）和挡位转速（车速 × 齿比）平滑地合在一起（三次方的软最大值）——
+     * 低速时打滑的转速撑着，车速上来后跟着挡位走，中间不出平台、也不往下掉。
+     */
+    static float gearedRpm(float launch, float inGear) {
+        double a = Math.max(0f, launch);
+        double b = Math.max(0f, inGear);
+        return (float) Math.cbrt(a * a * a + b * b * b);
     }
 
     /** 升挡点：负荷越大越晚升（按 1.5 次方：轻油门早升，地板油拉到快到上限），离上限留 300 rpm。 */
