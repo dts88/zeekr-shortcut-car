@@ -30,6 +30,12 @@ public enum Signal {
      * 雪地、自定义这些还没对上，照原样写号码。
      */
     DRIVE_MODE(Group.DRIVE, Kind.FUNCTION, 0x22010100, 0, R.string.vi_drive_mode, Trust.CONFIRMED, Format.DRIVE_MODE),
+    /**
+     * 动力流（IHybrid.HYBRID_FUNC_POWER_FLOW，Lab 手册「一」，10-10 停车场逐段对过）：{@link #POWER_FLOW_DRIVE} 电机在出力
+     * （D / R 不踩油门的蠕行也算）、{@link #POWER_FLOW_REGEN} 在回收、{@link #POWER_FLOW_IDLE} 不出力也不回收（车在走时也会是它：
+     * 松油门先有 0.17–0.33 秒）、0 没就绪。回收只在 9–10 km/h 以上；单踏板时油门轻踩到 5–12 % 还在回收 —— 只看油门分不出来。
+     */
+    POWER_FLOW(Group.DRIVE, Kind.FUNCTION, 0x24010100, 0, R.string.vi_power_flow, Trust.CONFIRMED, Format.POWER_FLOW),
     SPEED(Group.DRIVE, Kind.SENSOR_VALUE, 0x00100100, 0, R.string.vi_speed, Trust.CONFIRMED, Format.MPS),
     IGNITION(Group.DRIVE, Kind.FUNCTION, 0x20259000, 0, R.string.vi_ignition, Trust.CONFIRMED, Format.IGNITION),
     BRAKE_PEDAL(Group.DRIVE, Kind.FUNCTION, 0x20317A00, 0, R.string.vi_brake_pedal, Trust.CONFIRMED, Format.ON_OFF),
@@ -211,6 +217,8 @@ public enum Signal {
         GEAR,
         /** 驾驶模式的枚举码 → Integer（{@link #DRIVE_MODE_COMFORT} / {@link #DRIVE_MODE_STANDARD} / {@link #DRIVE_MODE_SPORT}，别的照原样） */
         DRIVE_MODE,
+        /** 动力流的枚举码 → Integer（{@link #POWER_FLOW_DRIVE} / {@link #POWER_FLOW_REGEN} / {@link #POWER_FLOW_IDLE} / 0 没就绪，别的照原样） */
+        POWER_FLOW,
         /** 原样的整数（量程待定） → Integer */
         RAW,
         /** 传感器给的是 m/s（0.2778 = 1 km/h）→ 乘 3.6 记成 km/h（Float） */
@@ -248,6 +256,15 @@ public enum Signal {
     public static final int DRIVE_MODE_STANDARD = 0x22010102;
     /** 驾驶模式：ECARX 叫 DYNAMIC，车机界面上是「运动」。 */
     public static final int DRIVE_MODE_SPORT = 0x22010103;
+
+    /** 动力流：电机在出力（REAR_ELE_DRIVE，604045587）。 */
+    public static final int POWER_FLOW_DRIVE = 0x24010113;
+    /** 动力流：不出力也不回收（STANDSTILL，604045588）。 */
+    public static final int POWER_FLOW_IDLE = 0x24010114;
+    /** 动力流：在回收（REGENERATION，604045589）。 */
+    public static final int POWER_FLOW_REGEN = 0x24010115;
+    /** 动力流：没就绪（NOT_READY，还没上高压）。 */
+    public static final int POWER_FLOW_NOT_READY = 0;
 
     public static final int IGNITION_ACC = 0x00200104;
     public static final int IGNITION_ON = 0x00200105;
@@ -352,6 +369,7 @@ public enum Signal {
             case IGNITION:
             case LIGHT_SWITCH:
             case DRIVE_MODE:
+            case POWER_FLOW:
             case RAW:
                 return v;
             case GEAR:

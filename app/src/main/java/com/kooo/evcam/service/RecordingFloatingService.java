@@ -583,10 +583,30 @@ public class RecordingFloatingService extends Service {
             case LOCK_FOOTAGE:
                 com.kooo.evcam.storage.AutoLock.get().lockNow(this);
                 return;
+            case TOGGLE_DRIVE_SOUND:
+                toggleDriveSound();
+                return;
             case OPEN_APP:
             default:
                 openApp();
         }
+    }
+
+    /**
+     * 开 / 关模拟声浪（开发者选项「模拟声浪（试验）」）：开车时一键关的地方。开发者选项关着时不动、说一句；
+     * 每按一次回一句现在是开还是关。马上生效（{@code DriveSound.refresh}）。
+     */
+    private void toggleDriveSound() {
+        if (!com.kooo.evcam.settings.DeveloperMode.isUnlocked()) {
+            Toast.makeText(this, R.string.msg_dev_only, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean on = !appConfig.isDriveSoundEnabled();
+        appConfig.setDriveSoundEnabled(on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: 悬浮按钮 → 模拟声浪" + (on ? "开" : "关"));
+        com.kooo.evcam.sound.DriveSound.refresh(this);
+        Toast.makeText(this, on ? R.string.msg_drive_sound_on : R.string.msg_drive_sound_off,
+                Toast.LENGTH_SHORT).show();
     }
 
     private void openApp() {

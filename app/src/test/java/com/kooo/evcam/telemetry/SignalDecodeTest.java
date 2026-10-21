@@ -168,6 +168,16 @@ public class SignalDecodeTest {
         assertNull(Signal.DRIVE_MODE.decode(255));
     }
 
+    /** 动力流按值用（Lab 手册「一」）：出力 604045587、不出力也不回收 604045588、回收 604045589、0 没就绪；占位值算没数据。 */
+    @Test
+    public void powerFlowKeepsTheCode() {
+        assertEquals(Integer.valueOf(Signal.POWER_FLOW_DRIVE), Signal.POWER_FLOW.decode(604045587));
+        assertEquals(Integer.valueOf(Signal.POWER_FLOW_IDLE), Signal.POWER_FLOW.decode(604045588));
+        assertEquals(Integer.valueOf(Signal.POWER_FLOW_REGEN), Signal.POWER_FLOW.decode(604045589));
+        assertEquals("0 是没就绪，不是没数据", Integer.valueOf(Signal.POWER_FLOW_NOT_READY), Signal.POWER_FLOW.decode(0));
+        assertNull(Signal.POWER_FLOW.decode(255));
+    }
+
     @Test
     public void lightSwitchKeepsTheCode() {
         assertEquals(Integer.valueOf(0), Signal.LIGHT_SWITCH.decode(0));

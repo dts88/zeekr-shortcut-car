@@ -83,6 +83,7 @@ public final class DiagnosticsCollector {
         timings.run("black box", () -> appendBlackBox(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("footage audio", () -> appendFootageAudio(sb, context));
+        timings.run("drive sound", () -> appendDriveSound(sb));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("vehicle signals", () -> appendVehicleSignals(sb));
         timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
@@ -1204,6 +1205,16 @@ public final class DiagnosticsCollector {
         sb.append("  前台服务类型=").append(com.kooo.evcam.CameraForegroundService.foregroundTypes()).append('\n');
         String latest = com.kooo.evcam.camera.FootageAudio.latestStatus();
         sb.append("  最近一次录音=").append(latest == null ? "这次开进程还没录过" : latest).append('\n');
+        sb.append('\n');
+    }
+
+    /**
+     * 模拟声浪（开发者选项，试验，项目所有者 2026-10-21）：设置、快读那几个信号多新、声音线程此刻在做什么（为什么响 / 不响、
+     * 启动还是接入、转速、挡位、负荷、电平、踩油门的快慢、加速度）、车内喇叭（缓冲、欠载、输出延迟）、每块合成花了多久。
+     */
+    private static void appendDriveSound(StringBuilder sb) {
+        sb.append("## 5.2 模拟声浪（开发者选项，试验）").append('\n');
+        sb.append(com.kooo.evcam.sound.DriveSound.diagnostics());
         sb.append('\n');
     }
 
