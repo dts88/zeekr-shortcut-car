@@ -153,9 +153,30 @@ final class SoundOutput {
 
     /** 一句话（英文，诊断报告 / 黑匣子用）。 */
     String describe() {
-        return String.format(Locale.US, "%s %d Hz stereo float, buffer %d frames (%.0f ms, cap %d), underruns %d%s, latency %s",
-                address, RATE, bufferFrames, bufferFrames * 1000f / RATE, capacityFrames, underruns,
+        return String.format(Locale.US, "%s %d Hz stereo float, %s, buffer %d frames (%.0f ms, cap %d), underruns %d%s, latency %s",
+                address, RATE, performance(), bufferFrames, bufferFrames * 1000f / RATE, capacityFrames, underruns,
                 grew.isEmpty() ? "" : " (grew " + grew + ")",
                 latencyMs < 0f ? "?" : String.format(Locale.US, "%.0f ms", latencyMs));
+    }
+
+    /** 系统实际给的性能模式（要的是低延迟；给不了就是走普通混音）。 */
+    private String performance() {
+        try {
+            switch (track.getPerformanceMode()) {
+                case AudioTrack.PERFORMANCE_MODE_LOW_LATENCY:
+                    return "low-latency";
+                case AudioTrack.PERFORMANCE_MODE_POWER_SAVING:
+                    return "power-saving";
+                default:
+                    return "normal (no low-latency)";
+            }
+        } catch (IllegalStateException e) {
+            return "released";
+        }
+    }
+
+    /** 输出延迟（毫秒，{@code getTimestamp} 估：写进去到车机报告放出来）；还没估到是 -1。 */
+    float latencyMs() {
+        return latencyMs;
     }
 }

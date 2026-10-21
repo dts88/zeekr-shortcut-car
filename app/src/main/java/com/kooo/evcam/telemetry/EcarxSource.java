@@ -44,6 +44,9 @@ import java.util.Set;
  *       读完再排一次。</li>
  *   <li>浮点传感器（车速、转角、深度、温度……）不订阅 —— 变一点就推，订了只是噪声 —— 按 {@link #FLOAT_POLL_MS} 读，
  *       而且只在有完整用户时读（{@link #floats}，{@link TelemetryUsers}）：熄屏判断那一层只要离散信号。</li>
+ *   <li>例外（试验，项目所有者 2026-10-21）：快读里登记了油门深度（模拟声浪），就在第一次快读时另外挂上它的推送（{@link #pushes}），
+ *       和轮询并行，看车机推得是不是比 50 ms 快。推来的值就在车的线程上交给 {@link Telemetry#pushedThrottle}，不排队、不进普通读数、
+ *       不发布。传感器监听注销不掉，挂上就一直在；没人快读它时回调里直接丢掉。</li>
  *   <li><b>传感器监听疑似注销不掉</b>（注销再注册，回调会变成两条三条），所以传感器在一个车辆对象上只注册一次、永远留着，
  *       停了就不理它的回调；功能号的监听每次停都注销。车辆对象建一次一直用（{@code Car.create} 要一秒），
  *       连不上（{@link Telemetry.CarLink#FAILED}）时丢掉，下次再连重建、传感器在新的上面重新挂（{@link #forgetCar}）。</li>
@@ -128,6 +131,10 @@ final class EcarxSource {
     private Method getSensorLatestValue;
     private Object functionWatcher;
     private int[] functionIds = new int[0];
+    /** 这个来源试过挂油门深度的推送了（成不成都只试一次）。只在自己的线程上碰。 */
+    private boolean pushTried;
+    /** 推送挂得怎么样（诊断报告用）：没试过是空的。 */
+    private volatile String pushStatus = "";
 
     /**
      * 找黑屏信号的那几项（{@link DarkScreenProbes}）：上一个值和限量。只在自己的线程上碰。
@@ -313,6 +320,9 @@ final class EcarxSource {
         FastReads.Plan plan = fastPlan;
         if (stopped || !connected || plan == null) {
             return;
+        }
+        if (!pushTried) {
+            listenForPushes(plan);
         }
         Map<Signal, Float> read = new EnumMap<>(Signal.class);
         for (Signal s : plan.signals) {
@@ -584,6 +594,58 @@ final class EcarxSource {
         return "functions: refused";
     }
 
+    /** 能推送、快读里登记了就另外挂上推送的浮点：只有油门深度（试验）。 */
+    static boolean pushes(Signal s) {
+        return s == Signal.THROTTLE_DEPTH;
+    }
+
+    /**
+     * 快读里有能推送的浮点：挂上它的传感器监听。一个车辆对象上只挂一次、永远留着（注销不掉）；挂不上不再试（这个来源）。
+     * 订阅传感器事件时（{@link #subscribeSensors}）还没有快读，所以放在第一次快读这里。
+     */
+    private void listenForPushes(FastReads.Plan plan) {
+        pushTried = true;
+        for (Signal s : plan.signals) {
+            if (!pushes(s)) {
+                continue;
+            }
+            String result;
+            synchronized (SENSOR_LOCK) {
+                if (sensorTypesRegistered.contains(s.id)) {
+                    result = "listening";
+                } else {
+                    Method register = sensor == null ? null : findMethodWithInterfaceFirst(sensor, "registerListener", int.class);
+                    if (register == null || sensorProxy == null) {
+                        result = "no registerListener";
+                    } else if (invokeOk(register, sensor, sensorProxy, s.id)) {
+                        sensorTypesRegistered.add(s.id);
+                        result = "listening";
+                    } else {
+                        result = "refused";
+                    }
+                }
+            }
+            pushStatus = s.name() + " " + result;
+            AppLog.i(TAG, "push: " + pushStatus);
+        }
+    }
+
+    /** 车的线程上：推来的快读浮点直接交给 {@link Telemetry}（它只收此刻的来源、有人快读它的）。 */
+    private void onPush(Signal s, Object raw, long atMs) {
+        if (stopped) {
+            return;
+        }
+        Object decoded = s.decode(raw);
+        if (decoded instanceof Float) {
+            telemetry.publishPush(this, s, (Float) decoded, atMs);
+        }
+    }
+
+    /** 推送挂得怎么样（诊断报告用）。 */
+    String pushStatus() {
+        return pushStatus;
+    }
+
     /** 传感器事件：进程里每个类型只注册一次。 */
     private String subscribeSensors() {
         synchronized (SENSOR_LOCK) {
@@ -683,6 +745,11 @@ final class EcarxSource {
                 String name = method.getName();
                 Signal.Kind kind = "onSensorEventChanged".equals(name) ? Signal.Kind.SENSOR_EVENT
                         : "onSensorValueChanged".equals(name) ? Signal.Kind.SENSOR_VALUE : null;
+                if (kind == Signal.Kind.SENSOR_VALUE && (Integer) args[0] == Signal.THROTTLE_DEPTH.id) {
+                    // 推来的油门深度（试验）：要的就是快 —— 就在这个线程上交出去，不排队、不进普通读数
+                    target.onPush(Signal.THROTTLE_DEPTH, args[1], SystemClock.elapsedRealtime());
+                    return null;
+                }
                 if (kind != null) {
                     final int type = (Integer) args[0];
                     final Object value = args[1];

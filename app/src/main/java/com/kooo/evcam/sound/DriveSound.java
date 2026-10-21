@@ -11,6 +11,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.telemetry.FastReadings;
+import com.kooo.evcam.telemetry.PushedValue;
 import com.kooo.evcam.telemetry.Readings;
 import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.SignalAges;
@@ -56,6 +57,8 @@ public final class DriveSound {
     static final long CHECK_MS = 500L;
     /** 多久看一次输出（欠载、延迟）。 */
     static final long WATCH_MS = 1000L;
+    /** 诊断：记住最近几次推来的油门值（对快读用）。 */
+    private static final int PUSH_HISTORY = 16;
     /** 声音线程自己出错停了，多久之内不再起（毫秒）：车上没有那个喇叭时不反复开。 */
     static final long RETRY_AFTER_FAILURE_MS = 30_000L;
 
@@ -193,8 +196,12 @@ public final class DriveSound {
                 Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
-        sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s%n", fast.ageMs(now),
-                fast.number(Signal.SPEED), fast.number(Signal.THROTTLE_DEPTH), fast.number(Signal.BRAKE_DEPTH)));
+        PushedValue push = Telemetry.get().pushedThrottle();
+        sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s; throttle push: %s, last %s (%s ago, %d pushes)%n",
+                fast.ageMs(now), fast.number(Signal.SPEED), fast.number(Signal.THROTTLE_DEPTH), fast.number(Signal.BRAKE_DEPTH),
+                Telemetry.get().pushStatus().isEmpty() ? "not tried" : Telemetry.get().pushStatus(),
+                push.count > 0L ? String.valueOf(push.value) : "-",
+                push.count > 0L ? (now - push.atMs) + " ms" : "-", push.count));
         Run r = s.latest;
         sb.append("  ").append(r == null ? "no run since the process started" : r.describe()).append('\n');
         return sb.toString();
@@ -234,6 +241,17 @@ public final class DriveSound {
         private volatile long fastGapMaxMs = -1L;
         private volatile float throttleEveryMs = -1f;
         private volatile int throttleSteps;
+        /**
+         * 油门推送（试验）：推来的平均隔多久、推了几次；新的油门值先由谁送到（推送 / 快读），推送领先快读多少；
+         * 新的油门值读到时已经过了多久（合成用上它的那一刻）。和 output 那一行的延迟加起来，是「车机给出油门 → 喇叭」能量到的部分。
+         */
+        private volatile float pushEveryMs = -1f;
+        private volatile long pushes;
+        private volatile int pushFirst;
+        private volatile int pollFirst;
+        private volatile float pushLeadMs = -1f;
+        private volatile float inputAgeMs = -1f;
+        private volatile float outputLatencyMs = -1f;
 
         void start() {
             latest = this;
@@ -316,6 +334,17 @@ public final class DriveSound {
             long gapWindowEnd = 0L;
             float lastThrottle = Float.NaN;
             long lastThrottleAt = -1L;
+            long seenFastVersion = Long.MIN_VALUE;
+            long seenPushCount = -1L;
+            long inputVersion = 0L;
+            long lastPushCount = 0L;
+            long lastPushAt = -1L;
+            float usedThrottle = Float.NaN;
+            // 最近推来的值和时刻（找「这个新值推送早送到了多久」）
+            float[] pushedValues = new float[PUSH_HISTORY];
+            long[] pushedAt = new long[PUSH_HISTORY];
+            int pushedHead = 0;
+            int pushedCount = 0;
             state = "running";
             while (true) {
                 long now = SystemClock.elapsedRealtime();
@@ -326,8 +355,41 @@ public final class DriveSound {
                     link = telemetry.carLinkConnected();
                 }
                 FastReadings fast = telemetry.fast();
-                inputs.offer(fast.version, fast.atMs, num(fast.number(Signal.SPEED)),
-                        num(fast.number(Signal.THROTTLE_DEPTH)), num(fast.number(Signal.BRAKE_DEPTH)));
+                PushedValue push = telemetry.pushedThrottle();
+                float polled = num(fast.number(Signal.THROTTLE_DEPTH));
+                // 油门：推来的（试验）和快读的，取更新的那个
+                boolean pushed = DriveSoundRules.usePush(push.count, push.atMs, push.value, fast.atMs);
+                float throttle = pushed ? push.value : polled;
+                long throttleAt = pushed ? push.atMs : fast.atMs;
+                if (fast.version != seenFastVersion || push.count != seenPushCount) {
+                    seenFastVersion = fast.version;
+                    seenPushCount = push.count;
+                    inputVersion++;
+                }
+                inputs.offer(inputVersion, Math.max(fast.atMs, push.atMs), num(fast.number(Signal.SPEED)), throttle,
+                        num(fast.number(Signal.BRAKE_DEPTH)));
+                if (!Float.isNaN(throttle) && (Float.isNaN(usedThrottle) || Math.abs(throttle - usedThrottle) >= 1f)) {
+                    // 诊断：新的油门值用上时已经过了多久（读到 / 推来 → 这一块合成）
+                    if (!Float.isNaN(usedThrottle) && throttleAt > 0L) {
+                        long age = now - throttleAt;
+                        inputAgeMs = inputAgeMs < 0f ? age : inputAgeMs + (age - inputAgeMs) * 0.1f;
+                    }
+                    usedThrottle = throttle;
+                }
+                if (push.count != lastPushCount && push.count > 0L) {
+                    // 诊断：推送多久来一次（踩、松的时候，两次之间超过半秒的不算）；记下推来的值好对快读
+                    if (lastPushCount > 0L && push.count > lastPushCount && lastPushAt > 0L && push.atMs - lastPushAt < 500L) {
+                        float each = (push.atMs - lastPushAt) / (float) (push.count - lastPushCount);
+                        pushEveryMs = pushEveryMs < 0f ? each : pushEveryMs + (each - pushEveryMs) * 0.1f;
+                    }
+                    pushes = push.count;
+                    lastPushCount = push.count;
+                    lastPushAt = push.atMs;
+                    pushedValues[pushedHead] = push.value;
+                    pushedAt[pushedHead] = push.atMs;
+                    pushedHead = (pushedHead + 1) % PUSH_HISTORY;
+                    pushedCount = Math.min(PUSH_HISTORY, pushedCount + 1);
+                }
                 if (fast.version != lastFastVersion && fast.atMs > 0L) {
                     // 诊断：快读多久来一次、油门读数多久变一次（看车机那边刷新得快不快）
                     lastFastVersion = fast.version;
@@ -342,12 +404,28 @@ public final class DriveSound {
                         fastGapMaxMs = gapMax;
                         gapMax = 0L;
                     }
-                    float t = num(fast.number(Signal.THROTTLE_DEPTH));
+                    float t = polled;
                     if (!Float.isNaN(t) && t != lastThrottle) {
                         if (!Float.isNaN(lastThrottle) && lastThrottleAt > 0L && fast.atMs - lastThrottleAt < 500L) {
                             long step = fast.atMs - lastThrottleAt;
                             throttleSteps++;
                             throttleEveryMs = throttleEveryMs < 0f ? step : throttleEveryMs + (step - throttleEveryMs) * 0.1f;
+                            // 这个新值推送早送到了没有：推来的里面找同一个值（不晚于这份快读的最近一次）
+                            long sawAt = -1L;
+                            for (int k = 1; k <= pushedCount; k++) {
+                                int i = (pushedHead - k + PUSH_HISTORY) % PUSH_HISTORY;
+                                if (pushedValues[i] == t && pushedAt[i] <= fast.atMs) {
+                                    sawAt = pushedAt[i];
+                                    break;
+                                }
+                            }
+                            if (sawAt > 0L) {
+                                pushFirst++;
+                                long lead = fast.atMs - sawAt;
+                                pushLeadMs = pushLeadMs < 0f ? lead : pushLeadMs + (lead - pushLeadMs) * 0.1f;
+                            } else {
+                                pollFirst++;
+                            }
                         }
                         lastThrottle = t;
                         lastThrottleAt = fast.atMs;
@@ -427,8 +505,11 @@ public final class DriveSound {
                 blocks++;
                 if (now >= nextWatch) {
                     nextWatch = now + WATCH_MS;
-                    if (out.watch()) {
-                        output = out.describe();
+                    boolean grown = out.watch();
+                    // 每秒刷新一次（输出延迟要实时的；以前只在加缓冲时刷新，诊断里一直是开的那一刻的「?」）
+                    output = out.describe();
+                    outputLatencyMs = out.latencyMs();
+                    if (grown) {
                         BlackBox.note("模拟声浪：欠载，缓冲加大（" + output + "）");
                     }
                 }
@@ -441,13 +522,19 @@ public final class DriveSound {
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
                             + "  start: drive mode changed %s before the run was asked for, output opened in %s, "
                             + "first sound %s after the ask (%s after the mode change)%n"
-                            + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes)",
+                            + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes)%n"
+                            + "  throttle push: every %s (%d pushes), a new value came first by push %d times (ahead by %s), "
+                            + "by the fast read %d times%n"
+                            + "  pedal to speaker (the part measurable here): new throttle used %s after it arrived "
+                            + "+ output %s (+ the head unit's own signal and amplifier delays, not measurable here)",
                     state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear,
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
                     ms(modeAgeWhenAsked), ms(openMs), ms(askedToSoundMs), ms(modeToSoundMs),
-                    ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps);
+                    ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps,
+                    ms(pushEveryMs), pushes, pushFirst, ms(pushLeadMs), pollFirst,
+                    ms(inputAgeMs), ms(outputLatencyMs));
         }
 
         private String ms(float value) {

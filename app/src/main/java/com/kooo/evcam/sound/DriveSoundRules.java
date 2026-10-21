@@ -95,6 +95,19 @@ final class DriveSoundRules {
         return Why.RUNNING;
     }
 
+    /**
+     * 油门用推来的还是快读的（试验，项目所有者 2026-10-21：订阅和 50 ms 快读并行，取更新的那个）：推来过、值读得到、
+     * 不比这一份快读旧，就用推来的。
+     *
+     * @param pushCount 推来过几次（0 = 没推过）
+     * @param pushAtMs  最近一次推来的时刻
+     * @param pushValue 最近一次推来的值（NaN = 读不到）
+     * @param pollAtMs  最近一份快读的时刻（0 = 还没读到）
+     */
+    static boolean usePush(long pushCount, long pushAtMs, float pushValue, long pollAtMs) {
+        return pushCount > 0L && !Float.isNaN(pushValue) && pushAtMs >= pollAtMs;
+    }
+
     /** 存着的音量（"-6" 这样的 dB 数，{@code SettingsRegistry.DRIVE_SOUND_VOLUME}）→ dB；不会比 0 dB 更响，认不出的按 0 dB（默认）。 */
     static float volumeDb(String stored) {
         try {
