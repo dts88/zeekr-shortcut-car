@@ -1,7 +1,7 @@
 package com.kooo.evcam.sound;
 
 /**
- * 「机械增压 V8」「双涡轮 V8」风格（第二版，项目所有者 2026-10-21：第一版太单薄）：照发动机的结构逐缸合成，立体声。
+ * 「机械增压 V8」风格（第二版，项目所有者 2026-10-21：第一版太单薄，要这一类 V8 的取向）：照发动机的结构逐缸合成，立体声。
  * 纯计算（{@code PulseVoiceTest}），声音线程上一块一块地调，循环里不分配内存。数据在 {@link PulseProfile}，
  * 来历和量过的参考在 docs/local/drive-sound-plan.md §12。
  *
@@ -15,9 +15,8 @@ package com.kooo.evcam.sound;
  *       消声器的低通随转速、负荷打开；压力大时轻微饱和。左排进左声道、右排进右声道，互相串一点；
  *       {@link PulseProfile#bassMonoHz} 以下左右一样。</li>
  *   <li><b>进气</b>：每个缸进气门关时一个脉冲进进气腔、进气道的共振；负荷大时进气的呼啸。</li>
- *   <li><b>增压</b>：机械增压的啸叫（曲轴带着转，算发动机的声音：跟着转速，被进气脉冲调制；松油门旁通阀打开，
- *       啸叫掉下来、「呼」一声）；或者涡轮（起压有迟滞、哨声随叶轮转速、松油门泄压、叶轮慢慢掉转速）——
- *       涡轮这几样跟着增压压力和叶轮走，不跟发动机的电平（一松油门电平就掉，泄压却正是这时候响）。</li>
+ *   <li><b>机械增压</b>：曲轴带着转子转，啸叫跟着转速、被进气脉冲调制；增压随负荷，松油门旁通阀打开，
+ *       啸叫掉下来、「呼」一声。</li>
  *   <li><b>气门落座、燃烧</b>：每个缸的气门关上「嗒」一下、燃烧「咔」一下，各过几个高频共振，按左右排摆位置。</li>
  *   <li><b>车厢</b>：几个低频的车身、车厢共振（某个阶次扫过时「嗡」一下）和一个高 Q 的「和鸣」。</li>
  *   <li><b>传动</b>（D 挡、车在走）：变速箱齿轮的啸叫（每个挡阶次不同）、传动轴的二阶、差速器的啸叫（跟着车速）；
@@ -150,16 +149,6 @@ final class PulseVoice implements Voice {
     private float whooshNow;
     private final Biquad whooshBand;
     private float loadPeak;
-    private float spool;
-    private float press;
-    private float blowOff;
-    private double whistlePhase;
-    private double whistlePhase2;
-    private float whistleNow;
-    private float hissNow;
-    private float blowOffNow;
-    private final Biquad hissBand;
-    private final Biquad blowOffBand;
 
     // ---- 气门、缸体、车厢
     private final Biquad[][] tickModes = new Biquad[2][];
@@ -265,8 +254,6 @@ final class PulseVoice implements Voice {
         roar = Biquad.bandpass(profile.roarHz, profile.roarQ, sampleRate);
         supercharged = profile.superchargerOrder > 0f;
         whooshBand = Biquad.bandpass(WHOOSH_HZ, 0.9f, sampleRate);
-        hissBand = Biquad.bandpass(profile.hissHz, profile.hissQ, sampleRate);
-        blowOffBand = Biquad.bandpass(profile.blowOffHz, profile.blowOffQ, sampleRate);
         cabinLowpass = Biquad.lowpass(CABIN_LOWPASS_HZ, 0.7071f, sampleRate);
         cabinModes = bank(profile.cabinHz, profile.cabinQ);
         sympathetic = bank(profile.sympatheticHz, profile.sympatheticQ);
@@ -367,32 +354,6 @@ final class PulseVoice implements Voice {
                     * (p.superchargerFree + (1f - p.superchargerFree) * boost) * Math.min(rpmTarget / 6000f, 1.2f);
             whooshTarget = EngineVoice.dbToLin(WHOOSH_DB) * whoosh;
         }
-        float whistleHz = 0f;
-        float whistleTarget = 0f;
-        float hissTarget = 0f;
-        float blowOffTarget = 0f;
-        if (p.turbo) {
-            float reach = (float) Math.pow(VirtualEngine.clamp01((rpmTarget - p.turboFromRpm) / p.turboSpanRpm), 0.6);
-            float target = (float) Math.pow(load, 0.8) * reach;
-            float up = mix(p.spoolLowSec, p.spoolHighSec, VirtualEngine.clamp01((rpmTarget - 1500f) / 3500f));
-            spool += (target - spool) * VirtualEngine.follow(dt, target > spool ? up : p.spoolDownSec);
-            if (lift && press > 0.2f) {
-                blowOff = Math.max(blowOff, press * Math.min(1f, drop * 2f));
-                press *= 0.3f;
-            }
-            if (blowOff > 0.05f) {
-                press *= VirtualEngine.decay(dt, p.dumpSec);
-            } else if (load < 0.15f) {
-                press *= VirtualEngine.decay(dt, p.closedSec);
-            } else {
-                press += (spool * spool - press) * VirtualEngine.follow(dt, 0.1f);
-            }
-            blowOff *= VirtualEngine.decay(dt, p.blowOffSec);
-            whistleHz = p.whistleLowHz + (p.whistleHighHz - p.whistleLowHz) * spool;
-            whistleTarget = EngineVoice.dbToLin(p.whistleDb) * (float) Math.pow(spool, 1.5);
-            hissTarget = EngineVoice.dbToLin(p.hissDb) * press;
-            blowOffTarget = EngineVoice.dbToLin(p.blowOffDb) * blowOff;
-        }
 
         // ---- 传动、倒挡、起动机
         boolean driving = params.drive && params.speedKmh > 1f;
@@ -480,22 +441,6 @@ final class PulseVoice implements Voice {
                         + p.superchargerH3 * EngineVoice.sin(3.0 * whinePhase);
                 center += whine * am * whineNow * fade + whooshBand.process(white()) * whooshNow;
             }
-            float turbo = 0f;
-            if (p.turbo) {
-                whistlePhase += whistleHz / rate;
-                if (whistlePhase >= 1.0) {
-                    whistlePhase -= 1.0;
-                }
-                whistlePhase2 += 2.003 * whistleHz / rate;
-                if (whistlePhase2 >= 1.0) {
-                    whistlePhase2 -= 1.0;
-                }
-                whistleNow += (whistleTarget - whistleNow) * ampK;
-                hissNow += (hissTarget - hissNow) * ampK;
-                blowOffNow += (blowOffTarget - blowOffNow) * ampK;
-                turbo = (EngineVoice.sin(whistlePhase) + 0.3f * EngineVoice.sin(whistlePhase2)) * whistleNow
-                        + hissBand.process(white()) * hissNow + blowOffBand.process(white()) * blowOffNow;
-            }
 
             // 车厢共振、和鸣
             float both = left + right;
@@ -519,9 +464,8 @@ final class PulseVoice implements Voice {
             float side = sideHighpass.process(0.5f * (l - rr));
             levelNow += (params.level - levelNow) * gainK;
             float g = post * levelNow;
-            float boostOut = CENTER * p.norm * turbo;
-            l = (mid + side) * g + boostOut;
-            rr = (mid - side) * g + boostOut;
+            l = (mid + side) * g;
+            rr = (mid - side) * g;
 
             // 传动、倒挡、起动机（只跟总音量）
             float extra = 0f;

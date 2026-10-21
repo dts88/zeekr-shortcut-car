@@ -16,7 +16,6 @@ public class SoundStyleTest {
             assertEquals(s, SoundStyle.of(s.key));
         }
         assertEquals(SoundStyle.SUPERCHARGED, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_SUPERCHARGED));
-        assertEquals(SoundStyle.TWIN_TURBO, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_TWIN_TURBO));
         assertEquals(SoundStyle.CLASSIC, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_CLASSIC));
         assertEquals(SoundStyle.SUPERCHARGED, SoundStyle.of(null));
         assertEquals(SoundStyle.SUPERCHARGED, SoundStyle.of("v12"));

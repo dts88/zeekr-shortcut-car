@@ -966,8 +966,6 @@ public class AppConfig {
     public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
     /** 声音风格（{@link SettingsRegistry#DRIVE_SOUND_STYLE}）：机械增压 V8（默认）。 */
     public static final String DRIVE_SOUND_STYLE_SUPERCHARGED = "supercharged";
-    /** 声音风格：双涡轮 V8。 */
-    public static final String DRIVE_SOUND_STYLE_TWIN_TURBO = "twin_turbo";
     /** 声音风格：经典 V8（第一版）。 */
     public static final String DRIVE_SOUND_STYLE_CLASSIC = "classic";
 
@@ -1001,7 +999,7 @@ public class AppConfig {
         writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
     }
 
-    /** 声音风格：{@link #DRIVE_SOUND_STYLE_SUPERCHARGED} / {@link #DRIVE_SOUND_STYLE_TWIN_TURBO} / {@link #DRIVE_SOUND_STYLE_CLASSIC}。 */
+    /** 声音风格：{@link #DRIVE_SOUND_STYLE_SUPERCHARGED} / {@link #DRIVE_SOUND_STYLE_CLASSIC}。 */
     public String getDriveSoundStyle() {
         return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
     }

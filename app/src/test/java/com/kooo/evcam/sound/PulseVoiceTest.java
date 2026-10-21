@@ -10,7 +10,7 @@ import org.junit.Test;
 /**
  * 逐缸合成：好不好听要上车听，这里钉的是听不出来、但一错就出事或者一错就退回「单薄」的几件 —— 峰值永远不超过 −3 dBFS、
  * 静音就是真的 0、同样的输入出同样的声音；怠速以点火阶次为主，交叉平面的「突突」在（同排的遮蔽让整数阶次的边带长出来）；
- * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫、涡轮没有；涡轮起压后哨声在高处、松油门会泄压；
+ * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫；
  * 起动机、倒挡啸叫、开阀门、跟着挡位变的变速箱啸叫。阈值都比原型（docs/local/drive-sound/check_pulse_tests.py）
  * 换着噪声种子量出来的最差值留了至少一倍的余量；单个频点落在噪声上起伏很大，只拿来比确定的音。
  */
@@ -19,7 +19,8 @@ public class PulseVoiceTest {
     private static final int RATE = 48_000;
     private static final int BLOCK = 256;
     private static final PulseProfile SC = PulseProfile.SUPERCHARGED_V8;
-    private static final PulseProfile TT = PulseProfile.TWIN_TURBO_V8;
+    /** 同一台、没有机械增压：拿「有」和「没有」比。 */
+    private static final PulseProfile PLAIN = new PulseProfile.Builder().build();
 
     private static VoiceParams params(float rpm, float load) {
         VoiceParams p = new VoiceParams();
@@ -110,7 +111,7 @@ public class PulseVoiceTest {
 
     @Test
     public void neverAboveTheCeilingAndAlwaysFinite() {
-        for (PulseProfile profile : new PulseProfile[] {SC, TT}) {
+        for (PulseProfile profile : new PulseProfile[] {SC, PLAIN}) {
             VoiceParams loud = params(7000f, 1f);
             loud.level = 8f;
             loud.gain = 8f;
@@ -169,7 +170,7 @@ public class PulseVoiceTest {
     public void theSameInputGivesTheSameSound() {
         VoiceParams p = params(2500f, 0.7f);
         p.overrun = 0.3f;
-        assertArrayEquals(render(TT, p, 0.3f), render(TT, p, 0.3f), 0f);
+        assertArrayEquals(render(SC, p, 0.3f), render(SC, p, 0.3f), 0f);
     }
 
     // ================================================================= 发动机本身
@@ -248,56 +249,13 @@ public class PulseVoiceTest {
     // ================================================================= 增压
 
     @Test
-    public void onlyTheSuperchargerWhines() {
-        // 3000 rpm：啸叫在 14.2 阶 = 710 Hz，是一个音（比两边高得多），双涡轮那里没有（单个频点落在噪声上起伏很大，
-        // 所以拿「有」和「没有」比，不拿双涡轮自己和两边比）
+    public void theSuperchargerWhines() {
+        // 3000 rpm：啸叫在 14.2 阶 = 710 Hz，是一个音（比两边高得多），没有机械增压的同一台那里没有
+        // （单个频点落在噪声上起伏很大，所以拿「有」和「没有」比，不拿没有的那台自己和两边比）
         float[] sc = mid(render(SC, params(3000f, 1f), 1.5f), 0.7f);
-        float[] tt = mid(render(TT, params(3000f, 1f), 1.5f), 0.7f);
+        float[] plain = mid(render(PLAIN, params(3000f, 1f), 1.5f), 0.7f);
         assertTrue(standsOut(sc, 710, 0.04) > 10);
-        assertTrue(power(sc, 710) > 10 * power(tt, 710));
-    }
-
-    @Test
-    public void theTurboSpoolsUpAndBlowsOff() {
-        // 4000 rpm 地板油 3 秒：叶轮转起来了，哨声在高处
-        float[] spooled = mid(render(TT, params(4000f, 1f), 3f), 2.5f);
-        double best = 0;
-        int at = 0;
-        for (int hz = 2400; hz <= 6600; hz += 10) {
-            double pw = power(spooled, hz);
-            if (pw > best) {
-                best = pw;
-                at = hz;
-            }
-        }
-        assertTrue("哨声 " + at + " Hz", at > 6000);
-        // 松油门（电平随之掉 15 dB）：有增压时泄压，没有增压时没有
-        double withBoost = afterLift(1f);
-        double withoutBoost = afterLift(0.1f);
-        assertTrue("泄压 " + withBoost / withoutBoost, withBoost > 4 * withoutBoost);
-    }
-
-    /** 4000 rpm、负荷 {@code before} 走 3 秒后松油门：随后 0.35 秒里 2.6 kHz 一带的能量。 */
-    private static double afterLift(float before) {
-        PulseVoice voice = new PulseVoice(TT, RATE);
-        VoiceParams p = params(4000f, before);
-        int blocks = Math.round(3.4f * RATE / BLOCK);
-        float[] block = new float[2 * BLOCK];
-        float[] lr = new float[2 * blocks * BLOCK];
-        for (int b = 0; b < blocks; b++) {
-            boolean lifted = b * BLOCK >= 3 * RATE;
-            p.load = lifted ? 0f : before;
-            p.level = lifted ? EngineVoice.dbToLin(-15f) : 1f;
-            voice.renderStereo(block, BLOCK, p);
-            System.arraycopy(block, 0, lr, 2 * b * BLOCK, 2 * BLOCK);
-        }
-        float[] x = mid(lr, 0f);
-        float[] band = filter(x, Biquad.bandpass(2600f, 2f, RATE));
-        double e = 0;
-        for (int i = Math.round(3.02f * RATE); i < Math.round(3.37f * RATE); i++) {
-            e += (double) band[i] * band[i];
-        }
-        return e;
+        assertTrue(power(sc, 710) > 10 * power(plain, 710));
     }
 
     // ================================================================= 起动机、倒挡、阀门、传动

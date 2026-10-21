@@ -924,7 +924,6 @@
     <string name="dev_drive_sound_rpm_shifts">Simulated gear shifts</string>
     <string name="dev_drive_sound_style_title">Sound style</string>
     <string name="dev_drive_sound_style_supercharged">Supercharged V8</string>
-    <string name="dev_drive_sound_style_twin_turbo">Twin-turbo V8</string>
     <string name="dev_drive_sound_style_classic">Classic V8</string>
     <string name="msg_drive_sound_on">Simulated drive sound on</string>
     <string name="msg_drive_sound_off">Simulated drive sound off</string>

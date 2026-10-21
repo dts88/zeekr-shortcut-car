@@ -107,25 +107,6 @@ final class PulseProfile {
     final float superchargerAm;
     final float superchargerSec;
 
-    // ---- 涡轮（没有就是 false）：起压有迟滞、哨声随叶轮转速、松油门泄压、叶轮慢慢掉转速；哨声、嘶声、泄压不跟发动机电平
-    final boolean turbo;
-    final float spoolLowSec;
-    final float spoolHighSec;
-    final float spoolDownSec;
-    final float turboFromRpm;
-    final float turboSpanRpm;
-    final float whistleLowHz;
-    final float whistleHighHz;
-    final float whistleDb;
-    final float hissDb;
-    final float hissHz;
-    final float hissQ;
-    final float blowOffDb;
-    final float blowOffSec;
-    final float blowOffHz;
-    final float blowOffQ;
-    final float dumpSec;
-    final float closedSec;
 
     // ---- 气门、缸体、车厢
     final float tickDb;
@@ -227,24 +208,6 @@ final class PulseProfile {
         superchargerFree = b.superchargerFree;
         superchargerAm = b.superchargerAm;
         superchargerSec = b.superchargerSec;
-        turbo = b.turbo;
-        spoolLowSec = b.spoolLowSec;
-        spoolHighSec = b.spoolHighSec;
-        spoolDownSec = b.spoolDownSec;
-        turboFromRpm = b.turboFromRpm;
-        turboSpanRpm = b.turboSpanRpm;
-        whistleLowHz = b.whistleLowHz;
-        whistleHighHz = b.whistleHighHz;
-        whistleDb = b.whistleDb;
-        hissDb = b.hissDb;
-        hissHz = b.hissHz;
-        hissQ = b.hissQ;
-        blowOffDb = b.blowOffDb;
-        blowOffSec = b.blowOffSec;
-        blowOffHz = b.blowOffHz;
-        blowOffQ = b.blowOffQ;
-        dumpSec = b.dumpSec;
-        closedSec = b.closedSec;
         tickDb = b.tickDb;
         tickHz = b.tickHz.clone();
         tickQ = b.tickQ.clone();
@@ -274,19 +237,6 @@ final class PulseProfile {
     /** 机械增压交叉平面 V8（{@link SoundStyle#SUPERCHARGED}）：排气脉冲尖、沙哑足，啸叫随转速。 */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
             .supercharger(14.2f, 0.5f, 0.25f, -9f, 0.25f, 0.3f, 0.12f)
-            .build();
-
-    /**
-     * 双涡轮交叉平面 V8（{@link SoundStyle#TWIN_TURBO}）：涡轮吃掉一部分脉冲（起得慢一点、没那么沙哑），
-     * 起压有迟滞、哨声随叶轮转速、松油门泄压、叶轮慢慢掉转速。
-     */
-    static final PulseProfile TWIN_TURBO_V8 = new Builder()
-            .pulse(0.55f, 0.25f, 18f)
-            .rasp(-18f, -4f, -18f)
-            .turbo(0.9f, 0.3f, 1.6f, 1200f, 2500f)
-            .whistle(2500f, 6500f, -20f)
-            .hiss(-16f, 1500f, 0.8f)
-            .blowOff(-14f, 0.45f, 2600f, 0.9f, 0.15f, 0.6f)
             .build();
 
     /** 写风格用：默认值是机械增压那一份的发动机和排气，一项一项改，最后 {@link #build}。 */
@@ -357,24 +307,6 @@ final class PulseProfile {
         private float superchargerFree;
         private float superchargerAm;
         private float superchargerSec = 0.12f;
-        private boolean turbo;
-        private float spoolLowSec = 1f;
-        private float spoolHighSec = 0.3f;
-        private float spoolDownSec = 1.6f;
-        private float turboFromRpm = 1200f;
-        private float turboSpanRpm = 2500f;
-        private float whistleLowHz = 2500f;
-        private float whistleHighHz = 6500f;
-        private float whistleDb = -100f;
-        private float hissDb = -100f;
-        private float hissHz = 1500f;
-        private float hissQ = 0.8f;
-        private float blowOffDb = -100f;
-        private float blowOffSec = 0.45f;
-        private float blowOffHz = 2600f;
-        private float blowOffQ = 0.9f;
-        private float dumpSec = 0.15f;
-        private float closedSec = 0.6f;
         private float tickDb = -34f;
         private float[] tickHz = {3100f, 4800f};
         private float[] tickQ = {14f, 10f};
@@ -400,13 +332,6 @@ final class PulseProfile {
         private float popRiseMs = 0.3f;
         private float popDecayMs = 5f;
 
-        Builder pulse(float riseIdleMs, float riseLoadMs, float decayDeg) {
-            this.riseIdleMs = riseIdleMs;
-            this.riseLoadMs = riseLoadMs;
-            this.decayDeg = decayDeg;
-            return this;
-        }
-
         /** 每一下的随机起伏（标准差：怠速、满负荷、收油时另加）和时机的随机偏移（曲轴角：怠速、满负荷）。 */
         Builder variation(float sigmaIdle, float sigmaLoad, float sigmaOverrun, float jitterIdleDeg, float jitterLoadDeg) {
             this.sigmaIdle = sigmaIdle;
@@ -425,13 +350,6 @@ final class PulseProfile {
             return this;
         }
 
-        Builder rasp(float idleDb, float loadDb, float overrunDb) {
-            raspIdleDb = idleDb;
-            raspLoadDb = loadDb;
-            raspOverrunDb = overrunDb;
-            return this;
-        }
-
         Builder supercharger(float order, float h2, float h3, float db, float free, float am, float sec) {
             superchargerOrder = order;
             superchargerH2 = h2;
@@ -440,40 +358,6 @@ final class PulseProfile {
             superchargerFree = free;
             superchargerAm = am;
             superchargerSec = sec;
-            return this;
-        }
-
-        Builder turbo(float spoolLowSec, float spoolHighSec, float spoolDownSec, float fromRpm, float spanRpm) {
-            turbo = true;
-            this.spoolLowSec = spoolLowSec;
-            this.spoolHighSec = spoolHighSec;
-            this.spoolDownSec = spoolDownSec;
-            turboFromRpm = fromRpm;
-            turboSpanRpm = spanRpm;
-            return this;
-        }
-
-        Builder whistle(float lowHz, float highHz, float db) {
-            whistleLowHz = lowHz;
-            whistleHighHz = highHz;
-            whistleDb = db;
-            return this;
-        }
-
-        Builder hiss(float db, float hz, float q) {
-            hissDb = db;
-            hissHz = hz;
-            hissQ = q;
-            return this;
-        }
-
-        Builder blowOff(float db, float sec, float hz, float q, float dumpSec, float closedSec) {
-            blowOffDb = db;
-            blowOffSec = sec;
-            blowOffHz = hz;
-            blowOffQ = q;
-            this.dumpSec = dumpSec;
-            this.closedSec = closedSec;
             return this;
         }
 
