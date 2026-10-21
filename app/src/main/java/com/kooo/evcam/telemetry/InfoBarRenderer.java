@@ -76,6 +76,8 @@ public final class InfoBarRenderer {
     /** 尾灯：位置灯暗红，刹车灯、后雾灯亮红。 */
     private static final int TAIL_DIM = 0xFFA8323A;
     private static final int TAIL_BRIGHT = 0xFFFF5A5F;
+    /** 驾驶模式「舒适」时挡位框的颜色（标准是原来的橙 {@link #ON}，运动是刹车灯的红 {@link #TAIL_BRIGHT}）。 */
+    private static final int MODE_COMFORT = 0xFF4DA3FF;
     /**
      * 转向灯亮时的绿：箭头外沿 3 px 的绿边和向外溢的光晕，芯是 {@link #LAMP_CORE}（项目所有者 2026-10-04：
      * 像实车的转向指示，不用橙）。取明度高的绿（BT.601 亮度 156；芯 246、灭的灰 128、底 44），
@@ -152,6 +154,8 @@ public final class InfoBarRenderer {
     private final String none;
     /** 摆的时候用的勾选版本（{@link InfoBar#selectionVersion}）：变了就重新摆，正在录的下一帧就换。 */
     private int fittedSelection;
+    /** 信息条上勾了哪几项（摆的时候那一份）；车辆状态面板、系统信息页的图标是 null（照读数画）。 */
+    private java.util.Set<String> selected;
     private final Bitmap bitmap;
     private final Canvas canvas;
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -185,6 +189,7 @@ public final class InfoBarRenderer {
                 InfoBarLayout.fit(Math.max(2, width), InfoBar.selection(context)),
                 Math.max(2, width), HEIGHT, 1f, true);
         fittedSelection = InfoBar.selectionVersion();
+        selected = InfoBar.selection(context);
         readPlate();
     }
 
@@ -269,7 +274,8 @@ public final class InfoBarRenderer {
             int selection = InfoBar.selectionVersion();
             if (selection != fittedSelection) {
                 // 系统信息里改了勾选（或者开发者模式开关了）：重新摆，下一帧就是新的
-                cells = InfoBarLayout.fit(logicalWidth, InfoBar.selection(context));
+                selected = InfoBar.selection(context);
+                cells = InfoBarLayout.fit(logicalWidth, selected);
                 fittedSelection = selection;
                 refit = true;
             }
@@ -327,7 +333,9 @@ public final class InfoBarRenderer {
                 drawSteering(cx, cy, s.steeringDegrees);
                 break;
             case GEAR:
-                drawGear(cx, cy, s.gear);
+                // 驾驶模式只在勾了它时上框的颜色（只勾了挡位、或者系统信息页开着多读了它，都不算）
+                drawGear(cx, cy, s.gear, selected == null || selected.contains(Signal.DRIVE_MODE.name())
+                        ? s.driveMode : null);
                 break;
             case PEDALS:
                 drawPedals(cell.width, s.brake, s.throttle);
@@ -641,17 +649,53 @@ public final class InfoBarRenderer {
         }
     }
 
-    private void drawGear(float cx, float cy, String gear) {
+    /**
+     * 挡位：框里是字母，框的颜色是驾驶模式 —— 舒适蓝、标准橙、运动红（刹车灯的红），带一点像灯那样的光晕
+     * （项目所有者 2026-10-21：挡位框换颜色就够明显，不多占地方）。驾驶模式没勾、没数据、没对上的值：照旧橙框、不带光晕。
+     */
+    private void drawGear(float cx, float cy, String gear, Integer driveMode) {
         boolean known = gear != null && !gear.isEmpty();
-        stroke.setColor(known ? ON : UNKNOWN_LINE);
-        stroke.setStrokeWidth(6f);
+        int mode = known ? driveModeColor(driveMode) : 0;
         rect.set(cx - 24, cy - 24, cx + 24, cy + 24);
+        if (mode != 0) {
+            glowOutline(rect, 9, mode);
+        }
+        stroke.setColor(!known ? UNKNOWN_LINE : mode != 0 ? mode : ON);
+        stroke.setStrokeWidth(6f);
         canvas.drawRoundRect(rect, 9, 9, stroke);
         if (known) {
             centeredText(gear, cx, cy + 13, 36f, TEXT, text);
         } else {
             slash(cx - 24, cy + 24, cx + 24, cy - 24);
         }
+    }
+
+    /** 驾驶模式 → 挡位框的颜色；没数据、没对上的值是 0（照旧的橙框、不带光晕）。 */
+    private static int driveModeColor(Integer driveMode) {
+        if (driveMode == null) {
+            return 0;
+        }
+        if (driveMode == Signal.DRIVE_MODE_COMFORT) {
+            return MODE_COMFORT;
+        }
+        if (driveMode == Signal.DRIVE_MODE_STANDARD) {
+            return ON;
+        }
+        if (driveMode == Signal.DRIVE_MODE_SPORT) {
+            return TAIL_BRIGHT;
+        }
+        return 0;
+    }
+
+    /** 框往外溢的一圈光（和灯的光晕同一个强度，{@link #lampGlow}）：只沿着框描，不往框里糊。 */
+    private void glowOutline(android.graphics.RectF r, float radius, int color) {
+        glow.setStyle(Paint.Style.STROKE);
+        glow.setStrokeWidth(12f);
+        glow.setColor(color);
+        glow.setAlpha(200);
+        glow.setMaskFilter(new BlurMaskFilter(4f, BlurMaskFilter.Blur.NORMAL));
+        canvas.drawRoundRect(r, radius, radius, glow);
+        glow.setMaskFilter(null);
     }
 
     /** 刹车（上，红）和油门（下，绿）：横向的两根条，左边是深度数字。 */
