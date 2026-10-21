@@ -94,6 +94,16 @@ public final class SettingsRegistry {
             entry("rear_cabin", "后视 + 后座舱", R.string.opt_views_rear_cabin));
 
     /**
+     * 盲区画面显示在哪（2026-10-21）：中控屏、HUD、两处都显示。默认两处 —— FerixzTanz 的设置，项目所有者 2026-10-21 定照用。
+     * 选 HUD 而找不到 HUD、或者这一段 HUD 用不了时，退回中控屏（{@code zeekr.SideViewService}）。
+     */
+    public static final SettingSpec SIDE_VIEW_TARGET = SettingSpec.of(
+            "side_view_target", "显示位置", com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_BOTH,
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_CENTER, "中控屏", R.string.opt_side_view_target_center),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_HUD, "HUD", R.string.opt_side_view_target_hud),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_BOTH, "中控屏和 HUD", R.string.opt_side_view_target_both));
+
+    /**
      * 录制声音用哪个来源（开发者选项，试验；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
      * 名字按来源叫，不叫「机身麦克风」：Lab 怀疑那一路其实在车外，测清之前不下结论。
      */
@@ -129,6 +139,7 @@ public final class SettingsRegistry {
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE,
             REARVIEW_VIEWS,
+            SIDE_VIEW_TARGET,
             FOOTAGE_AUDIO_SOURCE,
             DRIVE_SOUND_VOLUME,
             DRIVE_SOUND_RPM));

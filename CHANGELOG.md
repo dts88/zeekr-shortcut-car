@@ -14,6 +14,7 @@ commit message, not here.
 - System info: Drive mode (Comfort, Standard or Sport, as the car shows it). Tick it to show it on the driving info bar.
 - Developer options: Simulated drive sound (experimental) synthesizes engine sound through the cabin speakers in Sport mode (off by default): engine start when switching to Sport while stopped, idle, throttle, pedal speed, speed and acceleration, continuous or simulated gear shifts, a fixed gear in reverse. The floating button can toggle it. System info: Power flow (drive, regen, idle, not ready).
 - About & credits: thanks FerixzTanz for Blind spot view's default angles and window size, tuned on his own 7X.
+- Blind spot view on the HUD (from FerixzTanz's CAMCORDER): Show on chooses Center screen, HUD or both (default both; HUD falls back to the center screen when it can't be used). The HUD ignores Minimum speed. HUD picture settings: mirror, height, shape, distance from the edge, vertical position, opacity, daytime and night contrast, night brightness, edge fade, defaulting to FerixzTanz's on-car values.
 
 ## [2.15.0-alpha] - 2026-10-20
 

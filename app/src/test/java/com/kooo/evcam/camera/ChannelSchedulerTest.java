@@ -1317,9 +1317,11 @@ public class ChannelSchedulerTest {
         settle();
         s.onOutputDropped("2", recS, SingleCamera.Drop.CONFIG_FAILED);
         s.onOutputDropped("2", new Out(Kind.SIDE, "side-2"), SingleCamera.Drop.CONFIG_FAILED);
+        s.onOutputDropped("2", new Out(Kind.HUD, "hud-2"), SingleCamera.Drop.CONFIG_FAILED);
         s.onOutputDropped("2", new Out(Kind.MIRROR, "mirror-2"), SingleCamera.Drop.CONFIG_FAILED);
         s.onOutputDropped("2", pvS, SingleCamera.Drop.RELEASED);
-        assertEquals(Arrays.asList("RECORD CONFIG_FAILED", "SIDE CONFIG_FAILED", "MIRROR CONFIG_FAILED"), surround.drops);
+        assertEquals(Arrays.asList("RECORD CONFIG_FAILED", "SIDE CONFIG_FAILED", "HUD CONFIG_FAILED",
+                "MIRROR CONFIG_FAILED"), surround.drops);
     }
 
     // ================================================================= 告诉录像那一侧（大纲 §2 阶段 5）

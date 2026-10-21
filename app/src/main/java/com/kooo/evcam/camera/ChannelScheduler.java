@@ -1791,7 +1791,7 @@ public final class ChannelScheduler {
         CameraPort port = ports.get(lane.key);
         if (port != null && out != null
                 && (out.kind == ChannelRules.Kind.RECORD || out.kind == ChannelRules.Kind.SIDE
-                || out.kind == ChannelRules.Kind.MIRROR)) {
+                || out.kind == ChannelRules.Kind.HUD || out.kind == ChannelRules.Kind.MIRROR)) {
             port.dropped(out, why);
         }
         wake();

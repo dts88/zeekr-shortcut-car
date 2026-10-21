@@ -233,7 +233,21 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 盲区画面投 HUD（2026-10-21，车主定直接用 FerixzTanz 的做法和设置）：显示位置 set_side_view_target_title「显示位置」/ Show on / Papar pada，
+  三档 opt_side_view_target_center「中控屏」/ Center screen / Skrin tengah、opt_side_view_target_hud「HUD」、
+  opt_side_view_target_both「中控屏和 HUD」/ Center screen and HUD / Skrin tengah dan HUD；分组 set_group_side_view_hud「HUD 画面」/ HUD picture / Gambar HUD；
+  set_hud_mirror_title「左右翻转」、_summary「左右翻转画面，方向与车外后视镜一致」；set_hud_height_title「画面高度」、_summary「占 HUD 高度的百分比；宽度由「画面形状」决定」；
+  set_hud_shape_title「画面形状」、_summary「宽与高之比的百分比；100 为正方形，数值越大越宽」；set_hud_edge_title「离边距离」、
+  _summary「打左转向灯时画面在左侧，打右转向灯时在右侧；数值为与该侧边缘的距离，0 为贴边，50 为居中」；
+  set_hud_vertical_title「上下位置」、_summary「0 为最上，100 为最下」；set_hud_opacity_title「画面透明度」（同「按钮透明度」，不带说明）；
+  set_hud_contrast_title「白天对比度」、_summary「数值越大，暗部越暗，画面在 HUD 上不发白；100 为原画面」；
+  set_hud_contrast_night_title「夜间对比度」、_summary「车辆处于夜间模式时使用；夜间画面较暗，数值过大会使画面整体变黑」；
+  set_hud_night_title「夜间亮度」、_summary「车辆处于夜间模式时，在「画面透明度」的基础上按此比例调暗；100 为不调暗」；
+  set_hud_fade_title「边缘渐隐」、_summary「画面四边渐隐的宽度，占短边的百分比；0 为硬边」。英文、马来文见 strings.xml。
+- 改已批的 set_side_view_min_speed_summary（HUD 不看最低车速）：「低于此车速时中控屏上不显示，HUD 不受此限；0 为不限」/
+  Not shown on the center screen below this speed (the HUD isn't affected); 0 means no limit /
+  Tidak dipaparkan pada skrin tengah di bawah kelajuan ini (HUD tidak terjejas); 0 bermaksud tiada had。
+  set_side_view_summary（「在屏幕该侧显示」）不改：HUD 也是一块屏，下面一行「显示位置」写明在哪。
 ---
 
 ## 10. 术语表
@@ -258,7 +272,7 @@
 | 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
 | 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 前后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + front and rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin depan dan belakang) | 同一预设在设置列表和状态条上同名 |
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
-| 盲区画面 | 盲区画面（打转向灯时在屏幕该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
+| 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
@@ -269,6 +283,7 @@
 | 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
 | 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制） | screen off / on；sleep / wake；Screen-off recording (keep awake)；Keep recording when the screen goes off | skrin padam / hidup；tidur / bangun；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
 | 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件 0x20290300 那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
+| HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
 | 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |
 | 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | 不用「软件」「程序」（关于页致谢原文除外） |
 | 开发者选项 | 开发者选项；条件写「需开启开发者选项」 | developer options | pilihan pembangun | 不用「开发者模式」 |

@@ -936,6 +936,14 @@ public final class DiagnosticsCollector {
                     .append('\n');
         }
         sb.append("可交互（isInteractive）: ").append(DisplayWatch.interactiveNow() ? "是" : "否").append('\n');
+        // 盲区画面投 HUD 用哪一块（HudScreen 的规则：1440x480、不是主屏；没有就退到 id 3，但不能是仪表盘）
+        java.util.List<HudScreen.Candidate> candidates = HudScreen.candidatesNow(context);
+        int bySize = HudScreen.findBySize(candidates);
+        int hudId = HudScreen.find(candidates);
+        sb.append("HUD（盲区画面投这一块）: ").append(bySize != HudScreen.NONE ? "id " + bySize + "（按尺寸 1440x480 找到）"
+                : hudId != HudScreen.NONE ? "id " + hudId + "（没有 1440x480 的屏，退到 id 3）" : "找不到").append('\n');
+        String hudWindow = SideViewService.describeHud();
+        sb.append("HUD 盲区画面窗口: ").append(hudWindow == null ? "盲区画面没在运行" : hudWindow).append('\n');
         if (displays.length <= 1) {
             sb.append(">> 只有一块屏，副屏推送不可用").append('\n');
         } else {

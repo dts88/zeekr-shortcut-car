@@ -2126,6 +2126,12 @@ public class MultiCameraManager {
         return owner != null && owner.keepCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND, texture);
     }
 
+    /** HUD 上的盲区画面窗口移走了：同 {@link #keepSideCanvas}，是另一样输出（{@link ChannelRules.Kind#HUD}）。 */
+    public static boolean keepHudCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND, texture);
+    }
+
     /**
      * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜、盲区画面的画布
      * （{@link #ownerOf}）。弱引用；放的那一下（哪个线程都可能）写，主线程上读。
@@ -2193,6 +2199,8 @@ public class MultiCameraManager {
                 return camera.withdrawMirror(texture);
             case SIDE:
                 return camera.withdrawSide(texture);
+            case HUD:
+                return camera.withdrawHud(texture);
             default:
                 return camera.withdrawPreview(texture);
         }
@@ -2225,6 +2233,11 @@ public class MultiCameraManager {
         return takeKeptCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND);
     }
 
+    /** 新开的 HUD 窗口接回上一个留下的画布（同 {@link #takeKeptSide}）；拿回来之后接着重新声明（{@link SingleCamera#declareHud}）。 */
+    public android.graphics.SurfaceTexture takeKeptHud() {
+        return takeKeptCanvas(ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND);
+    }
+
     private android.graphics.SurfaceTexture takeKeptCanvas(ChannelRules.Kind kind, String cameraKey) {
         android.graphics.SurfaceTexture texture = keptOf(kind).remove(cameraKey);
         if (texture == null) {
@@ -2255,9 +2268,9 @@ public class MultiCameraManager {
         if (kind == ChannelRules.Kind.MIRROR) {
             com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：" + roleName(cameraKey)
                     + "的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
-        } else if (kind == ChannelRules.Kind.SIDE) {
-            com.kooo.evcam.blackbox.BlackBox.note("盲区画面留下的画布没人接回：环视的会话里已经没有它，放掉"
-                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        } else if (kind == ChannelRules.Kind.SIDE || kind == ChannelRules.Kind.HUD) {
+            com.kooo.evcam.blackbox.BlackBox.note("盲区画面" + (kind == ChannelRules.Kind.HUD ? "（HUD）" : "")
+                    + "留下的画布没人接回：环视的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         } else {
             com.kooo.evcam.blackbox.BlackBox.note("主界面留下的预览画布没人接回：" + roleName(cameraKey)
                     + " 那一块已经离开会话，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
@@ -4110,7 +4123,7 @@ public class MultiCameraManager {
             return names.isEmpty() ? "保持" : String.join("、", names);
         }
 
-        /** 输出的叫法：预览、后视镜、盲区画面、录像、出帧口。 */
+        /** 输出的叫法：预览、后视镜、盲区画面、HUD 盲区画面、录像、出帧口。 */
         private String kindNames(Set<ChannelRules.Kind> kinds) {
             List<String> names = new ArrayList<>();
             for (ChannelRules.Kind kind : kinds) {
@@ -4123,6 +4136,9 @@ public class MultiCameraManager {
                         break;
                     case SIDE:
                         names.add("盲区画面");
+                        break;
+                    case HUD:
+                        names.add("HUD 盲区画面");
                         break;
                     case RECORD:
                         names.add("录像");
@@ -4141,7 +4157,7 @@ public class MultiCameraManager {
          */
         private String deadText(Set<ChannelRules.Kind> removed) {
             boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR)
-                    || removed.contains(ChannelRules.Kind.SIDE);
+                    || removed.contains(ChannelRules.Kind.SIDE) || removed.contains(ChannelRules.Kind.HUD);
             boolean record = !useCodecRecording && removed.contains(ChannelRules.Kind.RECORD);
             if (record && !canvas) {
                 return "MediaRecorder 停了";

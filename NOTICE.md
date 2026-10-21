@@ -61,6 +61,9 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
   打灯判定（`SideViewDecision`）、转过角度的虚拟相机（`SideViewProjection`）、按调用方给的反投影切网格（`FisheyeMesh.SourceMap`），
   以及对应的测试。
   盲区画面的默认角度（朝后 33°、朝外 10°、视野 90°）和窗口大小（屏高 33%、宽 ÷ 高 2.2）照他在自己 7X 上实车调出的值（PR #43）。
+  盲区画面投到 HUD 上（2026-10-21）照他的 CAMCORDER（<https://github.com/FerixzTanz/CAMCORDER>）：找 HUD 那块屏的规则（`HudScreen`）、
+  画面的位置大小 / 对比度 / 透明度 / 边缘渐隐的公式（`HudPicture`）、用 Presentation 投 HUD 的窗口画法（`SideViewHudWindow`），
+  以及全部 HUD 设置项和他在自己 7X 上调出的默认值。
 
 盲区画面的服务和窗口（`SideViewService`、`SideViewWindow`）里读车辆信号、备着 / 显示两种状态的写法，也照两位 PR 里的侧视弹窗写。
 这些代码照本仓库的 GPL-3.0 发布。碰相机的部分（窗口怎么挂、画布怎么交给通道调度）由本项目照通道调度重写，没有用 PR 里的那一套。

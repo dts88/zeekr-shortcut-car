@@ -829,15 +829,78 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     // ------------------------------------------------------------------ 盲区画面
 
-    /** 超级镜子分区里的一组：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。 */
+    /**
+     * 超级镜子分区里的一组：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）；
+     * 下面一组是 HUD 上的画面（2026-10-21），显示位置是「中控屏」时整组不可用。
+     */
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
+        bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
+                appConfig.getSideViewTarget(), value -> {
+                    appConfig.setSideViewTarget(value);
+                    syncHudGroup();
+                    SideViewService.applyConfig();
+                });
         bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
                 appConfig.getSideViewMinSpeed(), " km/h", value -> {
                     appConfig.setSideViewMinSpeed(value);
                     SideViewService.applyConfig();
                 });
+
+        bindSwitch("pref_hud_mirror", appConfig.isHudMirrored(), value -> {
+            appConfig.setHudMirrored(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_height", AppConfig.HUD_MIN_HEIGHT, AppConfig.HUD_MAX_HEIGHT, appConfig.getHudHeight(), "%",
+                value -> {
+                    appConfig.setHudHeight(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_shape", AppConfig.HUD_MIN_SHAPE, AppConfig.HUD_MAX_SHAPE, appConfig.getHudShape(), "%",
+                value -> {
+                    appConfig.setHudShape(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_edge", 0, 100, appConfig.getHudEdge(), "%", value -> {
+            appConfig.setHudEdge(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_vertical", 0, 100, appConfig.getHudVertical(), "%", value -> {
+            appConfig.setHudVertical(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_opacity", AppConfig.HUD_MIN_OPACITY, 100, appConfig.getHudOpacity(), "%", value -> {
+            appConfig.setHudOpacity(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_contrast", AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST,
+                appConfig.getHudContrast(), "%", value -> {
+                    appConfig.setHudContrast(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_contrast_night", AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST,
+                appConfig.getHudContrastNight(), "%", value -> {
+                    appConfig.setHudContrastNight(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_night", AppConfig.HUD_MIN_NIGHT, 100, appConfig.getHudNight(), "%", value -> {
+            appConfig.setHudNight(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_fade", 0, AppConfig.HUD_MAX_FADE, appConfig.getHudFade(), "%", value -> {
+            appConfig.setHudFade(value);
+            SideViewService.applyConfig();
+        });
+        syncHudGroup();
+    }
+
+    /** 显示位置是「中控屏」时，HUD 画面那一组不可用（盲区画面关着时它照依赖关系本来就不可用）。 */
+    private void syncHudGroup() {
+        Preference group = findPreference("cat_side_view_hud");
+        if (group != null) {
+            group.setEnabled(!AppConfig.SIDE_VIEW_TARGET_CENTER.equals(appConfig.getSideViewTarget()));
+        }
     }
 
     // ------------------------------------------------------------------ 悬浮窗
