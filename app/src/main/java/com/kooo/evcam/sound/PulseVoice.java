@@ -16,7 +16,9 @@ package com.kooo.evcam.sound;
  *       消声器的低通随转速、负荷打开；压力大时轻微饱和。左排进左声道、右排进右声道，互相串一点；
  *       {@link PulseProfile#bassMonoHz} 以下左右一样。</li>
  *   <li><b>进气</b>：每个缸进气门关时一个脉冲进进气腔、进气道的共振；负荷大时进气的呼啸。</li>
- *   <li><b>机械增压</b>：曲轴带着转子转，啸叫跟着转速、被进气脉冲调制；增压随负荷，松油门旁通阀打开，
+ *   <li><b>机械增压</b>（双螺杆，曲轴用皮带带着转）：叶片每扫过出口一下挤出去一股高压气。啸叫就是这一下一下的
+ *       （接近锯齿波，两个转子各自转一圈的边带，进气脉冲的调制，皮带的细小抖动）；这一股一股挤过窄的出口通道是气流声
+ *       （左右两路不相关），进口吸气是带阵风的风声。都跟着转速、高转长得快；增压随负荷，松油门旁通阀打开，
  *       啸叫掉下来、「呼」一声。</li>
  *   <li><b>气门落座、燃烧</b>：每个缸的气门关上「嗒」一下、燃烧「咔」一下，各过几个高频共振，按左右排摆位置。</li>
  *   <li><b>车厢</b>：几个低频的车身、车厢共振（某个阶次扫过时「嗡」一下）和一个高 Q 的「和鸣」。</li>
@@ -63,9 +65,16 @@ final class PulseVoice implements Voice {
     static final float WHOOSH_DB = -20f;
     static final float WHOOSH_SEC = 0.3f;
     static final float WHOOSH_HZ = 1200f;
-    /** 啸叫的三次谐波到这里（Hz）开始渐隐，再往上 {@link #WHINE_FADE_HZ} 没了。 */
-    static final float WHINE_TOP_HZ = 9000f;
-    static final float WHINE_FADE_HZ = 3000f;
+    /** 啸叫的每次谐波到 {@link #WHINE_TOP_HZ} − {@link #WHINE_FADE_HZ}（Hz）开始渐隐，到 {@link #WHINE_TOP_HZ} 没了。 */
+    static final float WHINE_TOP_HZ = 8000f;
+    static final float WHINE_FADE_HZ = 2000f;
+    /** 阳转子那份边带的相位（周）：两个转子的差别对不齐。 */
+    static final double MALE_PHASE = 1.3 / (2.0 * Math.PI);
+    /** 不增压时出口的气流还剩几成；松开油门时进口还有几成流量。 */
+    static final float JET_FREE = 0.15f;
+    static final float INLET_FREE = 0.25f;
+    /** 一股气的形状 (½ + ½ cos)³ 的平均值：减掉它，一股一股的起伏平均为 0。 */
+    static final float PUFF_MEAN = 0.3125f;
     static final float GEAR_SEC = 0.05f;
     static final float CABIN_LOWPASS_HZ = 200f;
     /** 一个「突」在脉冲之后随机晚多少（样本以内）。 */
@@ -143,11 +152,27 @@ final class PulseVoice implements Voice {
 
     // ---- 增压
     private final boolean supercharged;
-    private double whinePhase;
+    private final float[] harmonics;
+    private double lobePhase;
+    private double femalePhase;
+    private double malePhase;
+    /** 低通过的噪声：转速的抖动、进口的阵风。 */
+    private float wobbleNoise;
+    private float gustNoise;
+    private final float wobbleK;
+    private final float wobbleNorm;
+    private final float gustK;
+    private final float gustNorm;
     private float boost;
     private float whoosh;
     private float whineNow;
+    private float jetNow;
+    private float inletNow;
     private float whooshNow;
+    private final Biquad[][] jetBands = new Biquad[2][];
+    private final float[] jetGains;
+    private final Biquad[] airLowpass = new Biquad[2];
+    private final Biquad inletBand;
     private final Biquad whooshBand;
     private float loadPeak;
 
@@ -254,6 +279,23 @@ final class PulseVoice implements Voice {
         runner = Biquad.bandpass(profile.runnerHz, profile.runnerQ, sampleRate);
         roar = Biquad.bandpass(profile.roarHz, profile.roarQ, sampleRate);
         supercharged = profile.superchargerOrder > 0f;
+        harmonics = new float[profile.superchargerHarmonicsDb.length];
+        for (int k = 0; k < harmonics.length; k++) {
+            harmonics[k] = EngineVoice.dbToLin(profile.superchargerHarmonicsDb[k]);
+        }
+        wobbleK = onePole(profile.superchargerWobbleHz);
+        wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
+        gustK = onePole(profile.gustHz);
+        gustNorm = (float) (1.0 / Math.sqrt(gustK / (2.0 - gustK)));
+        jetGains = new float[profile.jetHz.length];
+        for (int k = 0; k < jetGains.length; k++) {
+            jetGains[k] = EngineVoice.dbToLin(profile.jetGainDb[k]);
+        }
+        for (int b = 0; b < 2; b++) {
+            jetBands[b] = bank(profile.jetHz, profile.jetQ);
+            airLowpass[b] = Biquad.lowpass(profile.airLowpassHz, 0.7071f, sampleRate);
+        }
+        inletBand = Biquad.bandpass(profile.inletHz, profile.inletQ, sampleRate);
         whooshBand = Biquad.bandpass(WHOOSH_HZ, 0.9f, sampleRate);
         cabinLowpass = Biquad.lowpass(CABIN_LOWPASS_HZ, 0.7071f, sampleRate);
         cabinModes = bank(profile.cabinHz, profile.cabinQ);
@@ -344,6 +386,8 @@ final class PulseVoice implements Voice {
             loadPeak = load;
         }
         float whineTarget = 0f;
+        float jetTarget = 0f;
+        float inletTarget = 0f;
         float whooshTarget = 0f;
         if (supercharged) {
             boost += (load - boost) * VirtualEngine.follow(dt, p.superchargerSec);
@@ -351,8 +395,13 @@ final class PulseVoice implements Voice {
                 whoosh = Math.max(whoosh, boost * Math.min(1f, drop * 2f));
             }
             whoosh *= VirtualEngine.decay(dt, WHOOSH_SEC);
+            float revs = Math.min(rpmTarget / 6000f, 1.2f);
+            float speed = (float) Math.pow(revs, p.superchargerRpmPow);
             whineTarget = EngineVoice.dbToLin(p.superchargerDb)
-                    * (p.superchargerFree + (1f - p.superchargerFree) * boost) * Math.min(rpmTarget / 6000f, 1.2f);
+                    * (p.superchargerFree + (1f - p.superchargerFree) * boost) * speed;
+            jetTarget = EngineVoice.dbToLin(p.jetDb) * (JET_FREE + (1f - JET_FREE) * boost) * speed;
+            float flow = revs * (INLET_FREE + (1f - INLET_FREE) * load);
+            inletTarget = EngineVoice.dbToLin(p.inletDb) * flow * (float) Math.sqrt(flow);
             whooshTarget = EngineVoice.dbToLin(WHOOSH_DB) * whoosh;
         }
 
@@ -427,20 +476,47 @@ final class PulseVoice implements Voice {
             roarNow += (roarTarget - roarNow) * ampK;
             float center = plenum.process(ip) * 1.5f + runner.process(ip) + roar.process(white()) * roarNow;
 
-            // 增压
+            // 增压：叶片扫过出口的啸叫、挤过出口通道的一股一股气流（左右两路）、进口的风声、松油门的「呼」
+            float jetL = 0f;
+            float jetR = 0f;
             if (supercharged) {
-                float hz = p.superchargerOrder * r / 60f;
-                whinePhase += hz / rate;
-                if (whinePhase >= 1.0) {
-                    whinePhase -= 1.0;
+                wobbleNoise += wobbleK * (white() - wobbleNoise);
+                float hz = p.superchargerOrder * r / 60f * (1f + p.superchargerWobble * wobbleNorm * wobbleNoise);
+                lobePhase += hz / rate;
+                if (lobePhase >= 1.0) {
+                    lobePhase -= 1.0;
+                }
+                femalePhase += hz / p.rotorLobes[0] / rate;
+                if (femalePhase >= 1.0) {
+                    femalePhase -= 1.0;
+                }
+                malePhase += hz / p.rotorLobes[1] / rate;
+                if (malePhase >= 1.0) {
+                    malePhase -= 1.0;
                 }
                 whineNow += (whineTarget - whineNow) * ampK;
+                jetNow += (jetTarget - jetNow) * ampK;
+                inletNow += (inletTarget - inletNow) * ampK;
                 whooshNow += (whooshTarget - whooshNow) * ampK;
-                float fade = VirtualEngine.clamp01((WHINE_TOP_HZ - 3f * hz) / WHINE_FADE_HZ);
+                float whine = 0f;
+                for (int k = 0; k < harmonics.length; k++) {
+                    float fade = (WHINE_TOP_HZ - (k + 1) * hz) / WHINE_FADE_HZ;
+                    if (fade <= 0f) {
+                        break;
+                    }
+                    whine += harmonics[k] * Math.min(fade, 1f) * EngineVoice.sin((k + 1) * lobePhase);
+                }
+                float rotor = 1f + p.rotorAm[0] * EngineVoice.sin(femalePhase)
+                        + p.rotorAm[1] * EngineVoice.sin(malePhase + MALE_PHASE);
                 float am = 1f + p.superchargerAm * EngineVoice.sin(theta / 90.0);
-                float whine = EngineVoice.sin(whinePhase) + p.superchargerH2 * EngineVoice.sin(2.0 * whinePhase)
-                        + p.superchargerH3 * EngineVoice.sin(3.0 * whinePhase);
-                center += whine * am * whineNow * fade + whooshBand.process(white()) * whooshNow;
+                float c = 0.5f + 0.5f * EngineVoice.sin(lobePhase + 0.25);
+                float push = 1f + p.jetPulse * (c * c * c / PUFF_MEAN - 1f);
+                jetL = airLowpass[0].process(jets(jetBands[0], white() * push)) * jetNow;
+                jetR = airLowpass[1].process(jets(jetBands[1], white() * push)) * jetNow;
+                gustNoise += gustK * (white() - gustNoise);
+                center += whine * rotor * am * whineNow
+                        + inletBand.process(white()) * inletNow * (1f + p.gust * gustNorm * gustNoise)
+                        + whooshBand.process(white()) * whooshNow;
             }
 
             // 车厢共振、和鸣
@@ -459,8 +535,8 @@ final class PulseVoice implements Voice {
             float knockL = modes(knockModes[0], knock[0], cur);
             float knockR = modes(knockModes[1], knock[1], cur);
 
-            float l = left + p.cross * right + CENTER * center + tickL + knockL;
-            float rr = right + p.cross * left + CENTER * center + tickR + knockR;
+            float l = left + p.cross * right + CENTER * (center + jetL) + tickL + knockL;
+            float rr = right + p.cross * left + CENTER * (center + jetR) + tickR + knockR;
             float mid = 0.5f * (l + rr);
             float side = sideHighpass.process(0.5f * (l - rr));
             levelNow += (params.level - levelNow) * gainK;
@@ -600,6 +676,15 @@ final class PulseVoice implements Voice {
         float w = q - i;
         ring[(cursor + i) & MASK] += amp * (1f - w);
         ring[(cursor + i + 1) & MASK] += amp * w;
+    }
+
+    /** 出口的一路气流：过几个通道的共振，按各自的电平加起来。 */
+    private float jets(Biquad[] bands, float x) {
+        float y = 0f;
+        for (int k = 0; k < bands.length; k++) {
+            y += jetGains[k] * bands[k].process(x);
+        }
+        return y;
     }
 
     /** 读走这一格的激励，过一组共振，加起来。 */

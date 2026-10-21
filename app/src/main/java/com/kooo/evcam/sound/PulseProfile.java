@@ -97,15 +97,42 @@ final class PulseProfile {
     final float roarHz;
     final float roarQ;
 
-    // ---- 机械增压（阶次 0 = 没有）：啸叫跟着转速，增压随负荷，松油门旁通阀打开
+    // ---- 机械增压（阶次 0 = 没有）：双螺杆，曲轴用皮带带着转。转子的叶片每扫过出口一下，挤出去一股高压气 ——
+    //      这一下一下是啸叫，同时是挤过窄的出口通道的气流声；进口吸气是风声。增压随负荷，松油门旁通阀打开
+    /** 叶片扫过出口的阶次（曲轴每转一圈扫过几下）。 */
     final float superchargerOrder;
-    final float superchargerH2;
-    final float superchargerH3;
+    /** 啸叫各次谐波的电平（dB，第一个是基频）：一股一股的气，接近锯齿波。 */
+    final float[] superchargerHarmonicsDb;
+    /** 阴、阳转子各几个叶片（转一圈扫过几下）；叶片之间细小的差别让每个转子每转一圈调制一次啸叫（边带），调制多深。 */
+    final float[] rotorLobes;
+    final float[] rotorAm;
+    /** 满增压、6000 rpm 时啸叫基频的电平（dB）；随转速的 {@link #superchargerRpmPow} 次方变：低转淡，高转长得快。 */
     final float superchargerDb;
+    final float superchargerRpmPow;
+    /** 转速的细小抖动（份额、低通 Hz）：皮带、曲轴的扭振，啸叫不是一根死的正弦。 */
+    final float superchargerWobble;
+    final float superchargerWobbleHz;
     /** 旁通阀开着（不增压）时还剩几成啸叫。 */
     final float superchargerFree;
+    /** 被发动机的进气脉冲（4 阶）调制多深。 */
     final float superchargerAm;
     final float superchargerSec;
+    /**
+     * 挤过出口的气流（满增压、6000 rpm，dB）：白噪声每扫过一个叶片涌一下（{@link #jetPulse}），过出口通道、进气腔、
+     * 中冷器的几个共振（Hz、Q、dB），再低通；左右两路不相关（两边各一个中冷器）。
+     */
+    final float jetDb;
+    final float[] jetHz;
+    final float[] jetQ;
+    final float[] jetGainDb;
+    final float jetPulse;
+    final float airLowpassHz;
+    /** 进口吸气的风声（满流量时的 dB、带通 Hz、Q），带阵风（低通 Hz、深浅）。 */
+    final float inletDb;
+    final float inletHz;
+    final float inletQ;
+    final float gustHz;
+    final float gust;
 
 
     // ---- 气门、缸体、车厢
@@ -202,12 +229,27 @@ final class PulseProfile {
         roarHz = b.roarHz;
         roarQ = b.roarQ;
         superchargerOrder = b.superchargerOrder;
-        superchargerH2 = b.superchargerH2;
-        superchargerH3 = b.superchargerH3;
+        superchargerHarmonicsDb = b.superchargerHarmonicsDb.clone();
+        rotorLobes = b.rotorLobes.clone();
+        rotorAm = b.rotorAm.clone();
         superchargerDb = b.superchargerDb;
+        superchargerRpmPow = b.superchargerRpmPow;
+        superchargerWobble = b.superchargerWobble;
+        superchargerWobbleHz = b.superchargerWobbleHz;
         superchargerFree = b.superchargerFree;
         superchargerAm = b.superchargerAm;
         superchargerSec = b.superchargerSec;
+        jetDb = b.jetDb;
+        jetHz = b.jetHz.clone();
+        jetQ = b.jetQ.clone();
+        jetGainDb = b.jetGainDb.clone();
+        jetPulse = b.jetPulse;
+        airLowpassHz = b.airLowpassHz;
+        inletDb = b.inletDb;
+        inletHz = b.inletHz;
+        inletQ = b.inletQ;
+        gustHz = b.gustHz;
+        gust = b.gust;
         tickDb = b.tickDb;
         tickHz = b.tickHz.clone();
         tickQ = b.tickQ.clone();
@@ -234,12 +276,15 @@ final class PulseProfile {
         popDecayMs = b.popDecayMs;
     }
 
-    /** 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足，啸叫随转速。 */
+    /**
+     * 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足；双螺杆增压器的啸叫和气流随转速长。
+     * 阶次 11.56 是参考车车内录音里量出来的（阴转子 5 个叶片 × 曲轴的 2.31 倍）。
+     */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
-            .supercharger(14.2f, 0.5f, 0.25f, -9f, 0.25f, 0.3f, 0.12f)
+            .supercharger(11.56f, -12f)
             .build();
 
-    /** 写风格用：默认值是机械增压那一份的发动机和排气，一项一项改，最后 {@link #build}。 */
+    /** 写风格用：默认值是机械增压那一份的发动机、排气和增压器（增压器要 {@link #supercharger} 才装上），一项一项改，最后 {@link #build}。 */
     static final class Builder {
         private int[] firing = {1, 8, 4, 3, 6, 5, 7, 2};
         private float[] trim = {1.03f, 0.97f, 1.00f, 0.98f, 1.02f, 0.96f, 1.04f, 0.99f};
@@ -301,12 +346,27 @@ final class PulseProfile {
         private float roarHz = 1800f;
         private float roarQ = 0.7f;
         private float superchargerOrder;
-        private float superchargerH2;
-        private float superchargerH3;
+        private float[] superchargerHarmonicsDb = {0f, -6f, -8f, -11f, -13f, -15f, -17f, -19f};
+        private float[] rotorLobes = {5f, 3f};
+        private float[] rotorAm = {0.2f, 0.15f};
         private float superchargerDb = -100f;
-        private float superchargerFree;
-        private float superchargerAm;
+        private float superchargerRpmPow = 1.7f;
+        private float superchargerWobble = 0.002f;
+        private float superchargerWobbleHz = 30f;
+        private float superchargerFree = 0.25f;
+        private float superchargerAm = 0.25f;
         private float superchargerSec = 0.12f;
+        private float jetDb = -9f;
+        private float[] jetHz = {1800f, 3200f, 5500f};
+        private float[] jetQ = {1.2f, 1.4f, 1.6f};
+        private float[] jetGainDb = {0f, -1f, -6f};
+        private float jetPulse = 0.8f;
+        private float airLowpassHz = 7000f;
+        private float inletDb = -13f;
+        private float inletHz = 1600f;
+        private float inletQ = 0.7f;
+        private float gustHz = 5f;
+        private float gust = 0.2f;
         private float tickDb = -34f;
         private float[] tickHz = {3100f, 4800f};
         private float[] tickQ = {14f, 10f};
@@ -350,20 +410,18 @@ final class PulseProfile {
             return this;
         }
 
-        Builder supercharger(float order, float h2, float h3, float db, float free, float am, float sec) {
+        /** 装一台机械增压：叶片扫过出口的阶次、满增压 6000 rpm 时啸叫基频的电平（dB）；谐波、转子、气流、进口用默认的那一份。 */
+        Builder supercharger(float order, float db) {
             superchargerOrder = order;
-            superchargerH2 = h2;
-            superchargerH3 = h3;
             superchargerDb = db;
-            superchargerFree = free;
-            superchargerAm = am;
-            superchargerSec = sec;
             return this;
         }
 
         PulseProfile build() {
             if (firing.length == 0 || trim.length < firing.length || headerMs.length < firing.length
-                    || pipeHz.length != 2 || helmholtzHz.length != 2 || bankMs.length != 2) {
+                    || pipeHz.length != 2 || helmholtzHz.length != 2 || bankMs.length != 2
+                    || rotorLobes.length != 2 || rotorAm.length != 2
+                    || jetQ.length != jetHz.length || jetGainDb.length != jetHz.length) {
                 throw new IllegalStateException("pulse profile incomplete");
             }
             for (int c : firing) {

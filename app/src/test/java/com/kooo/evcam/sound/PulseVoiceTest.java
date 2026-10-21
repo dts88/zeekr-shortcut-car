@@ -10,7 +10,7 @@ import org.junit.Test;
 /**
  * 逐缸合成：好不好听要上车听，这里钉的是听不出来、但一错就出事或者一错就退回「单薄」的几件 —— 峰值永远不超过 −3 dBFS、
  * 静音就是真的 0、同样的输入出同样的声音；怠速以点火阶次为主，交叉平面的「突突」在（同排的遮蔽让整数阶次的边带长出来）；
- * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫；
+ * 负荷越大越沙哑；左右两排不一样、低频左右一样；机械增压有啸叫，气流声随转速长；
  * 起动机、倒挡啸叫、开阀门、跟着挡位变的变速箱啸叫。阈值都比原型（docs/local/drive-sound/check_pulse_tests.py）
  * 换着噪声种子量出来的最差值留了至少一倍的余量；单个频点落在噪声上起伏很大，只拿来比确定的音。
  */
@@ -250,12 +250,31 @@ public class PulseVoiceTest {
 
     @Test
     public void theSuperchargerWhines() {
-        // 3000 rpm：啸叫在 14.2 阶 = 710 Hz，是一个音（比两边高得多），没有机械增压的同一台那里没有
-        // （单个频点落在噪声上起伏很大，所以拿「有」和「没有」比，不拿没有的那台自己和两边比）
-        float[] sc = mid(render(SC, params(3000f, 1f), 1.5f), 0.7f);
-        float[] plain = mid(render(PLAIN, params(3000f, 1f), 1.5f), 0.7f);
-        assertTrue(standsOut(sc, 710, 0.04) > 10);
-        assertTrue(power(sc, 710) > 10 * power(plain, 710));
+        // 5000 rpm（低转时本来就淡）：啸叫在叶片扫过出口的阶次上（11.56 阶 ≈ 963 Hz），是一个音（比两边高得多），
+        // 没有机械增压的同一台那里没有（单个频点落在噪声上起伏很大，所以拿「有」和「没有」比，不拿没有的那台自己和两边比）
+        double hz = SC.superchargerOrder * 5000 / 60.0;
+        float[] sc = mid(render(SC, params(5000f, 1f), 1.5f), 0.7f);
+        float[] plain = mid(render(PLAIN, params(5000f, 1f), 1.5f), 0.7f);
+        assertTrue(standsOut(sc, hz, 0.04) > 10);
+        assertTrue(power(sc, hz) > 10 * power(plain, hz));
+    }
+
+    @Test
+    public void theSuperchargerAirGrowsWithTheRevs() {
+        // 挤过出口的气流、进口的风声（2.5–7 kHz）：满负荷 6000 rpm 比没有机械增压的同一台多一倍以上，
+        // 而且这一份随转速长得比发动机本身快。原型换十个噪声种子量出来最差 2.9 倍、3000 → 6000 rpm 又大 2.2 倍；
+        // 宽频带的能量很稳，余量不用留到一倍
+        double at6000 = air(SC, 6000f) / air(PLAIN, 6000f);
+        double at3000 = air(SC, 3000f) / air(PLAIN, 3000f);
+        assertTrue("6000 rpm " + at6000, at6000 > 2);
+        assertTrue("3000 rpm " + at3000 + " → 6000 rpm " + at6000, at6000 > 1.6 * at3000);
+    }
+
+    /** 满负荷时 2.5–7 kHz 的能量。 */
+    private static double air(PulseProfile profile, float rpm) {
+        float[] x = mid(render(profile, params(rpm, 1f), 1f), 0.4f);
+        return energy(filter(x, Biquad.highpass(2500f, 0.7071f, RATE), Biquad.highpass(2500f, 0.7071f, RATE),
+                Biquad.lowpass(7000f, 0.7071f, RATE), Biquad.lowpass(7000f, 0.7071f, RATE)));
     }
 
     // ================================================================= 起动机、倒挡、阀门、传动
