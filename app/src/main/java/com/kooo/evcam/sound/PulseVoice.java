@@ -1,7 +1,8 @@
 package com.kooo.evcam.sound;
 
 /**
- * 「机械增压 V8」风格（第二版，项目所有者 2026-10-21：第一版太单薄，要这一类 V8 的取向）：照发动机的结构逐缸合成，立体声。
+ * 「美式 V8」风格（{@link SoundStyle#AMERICAN}，第二版。项目所有者 2026-10-21：第一版太单薄，要机械增压交叉平面 V8 的取向）：
+ * 照发动机的结构逐缸合成，立体声。
  * 纯计算（{@code PulseVoiceTest}），声音线程上一块一块地调，循环里不分配内存。数据在 {@link PulseProfile}，
  * 来历和量过的参考在 docs/local/drive-sound-plan.md §12。
  *

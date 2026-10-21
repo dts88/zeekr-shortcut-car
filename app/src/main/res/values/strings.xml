@@ -916,8 +916,8 @@
     <string name="dev_drive_sound_rpm_continuous">连续</string>
     <string name="dev_drive_sound_rpm_shifts">模拟换挡</string>
     <string name="dev_drive_sound_style_title">声音风格</string>
-    <string name="dev_drive_sound_style_supercharged">机械增压 V8</string>
-    <string name="dev_drive_sound_style_classic">经典 V8</string>
+    <string name="dev_drive_sound_style_american">美式 V8</string>
+    <string name="dev_drive_sound_style_prototype">试制 V8</string>
     <string name="msg_drive_sound_on">已开启模拟声浪</string>
     <string name="msg_drive_sound_off">已关闭模拟声浪</string>
     <string name="dev_perm_all_files">所有文件访问</string>

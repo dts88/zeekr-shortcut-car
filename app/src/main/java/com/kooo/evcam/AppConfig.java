@@ -964,10 +964,10 @@ public class AppConfig {
     public static final String DRIVE_SOUND_RPM_CONTINUOUS = "continuous";
     /** 转速变化方式：模拟换挡。 */
     public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
-    /** 声音风格（{@link SettingsRegistry#DRIVE_SOUND_STYLE}）：机械增压 V8（默认）。 */
-    public static final String DRIVE_SOUND_STYLE_SUPERCHARGED = "supercharged";
-    /** 声音风格：经典 V8（第一版）。 */
-    public static final String DRIVE_SOUND_STYLE_CLASSIC = "classic";
+    /** 声音风格（{@link SettingsRegistry#DRIVE_SOUND_STYLE}）：美式 V8（默认，机械增压交叉平面 V8）。 */
+    public static final String DRIVE_SOUND_STYLE_AMERICAN = "american";
+    /** 声音风格：试制 V8（第一版）。 */
+    public static final String DRIVE_SOUND_STYLE_PROTOTYPE = "prototype";
 
     /**
      * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
@@ -999,7 +999,7 @@ public class AppConfig {
         writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
     }
 
-    /** 声音风格：{@link #DRIVE_SOUND_STYLE_SUPERCHARGED} / {@link #DRIVE_SOUND_STYLE_CLASSIC}。 */
+    /** 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE}。 */
     public String getDriveSoundStyle() {
         return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
     }

@@ -123,13 +123,12 @@ public final class SettingsRegistry {
 
     /**
      * 模拟声浪的声音风格（开发者选项，试验；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
-     * 按发动机结构重做（目前只做机械增压 V8 一种取向）；第一版留着，叫「经典 V8」。
+     * 按发动机结构重做（目前只做「美式 V8」一种取向）；第一版留着，叫「试制 V8」。两个名字车主定的，不用车型名（商标）。
      */
     public static final SettingSpec DRIVE_SOUND_STYLE = SettingSpec.of(
-            "drive_sound_style", "声音风格", com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_SUPERCHARGED,
-            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_SUPERCHARGED, "机械增压 V8",
-                    R.string.dev_drive_sound_style_supercharged),
-            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_CLASSIC, "经典 V8", R.string.dev_drive_sound_style_classic));
+            "drive_sound_style", "声音风格", com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN, "美式 V8", R.string.dev_drive_sound_style_american),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_PROTOTYPE, "试制 V8", R.string.dev_drive_sound_style_prototype));
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(

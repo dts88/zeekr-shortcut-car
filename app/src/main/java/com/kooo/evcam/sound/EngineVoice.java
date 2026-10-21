@@ -1,7 +1,7 @@
 package com.kooo.evcam.sound;
 
 /**
- * 「经典 V8」风格（{@link SoundStyle#CLASSIC}，第一版）：把虚拟发动机（{@link VirtualEngine}）的转速、负荷、电平和几样音色参数
+ * 「试制 V8」风格（{@link SoundStyle#PROTOTYPE}，第一版）：把虚拟发动机（{@link VirtualEngine}）的转速、负荷、电平和几样音色参数
  * 变成一串单声道样本，左右声道一样。纯计算（{@code EngineVoiceTest}），声音线程上一块一块地调，循环里不分配内存。
  *
  * <ul>

@@ -15,10 +15,10 @@ public class SoundStyleTest {
         for (SoundStyle s : SoundStyle.values()) {
             assertEquals(s, SoundStyle.of(s.key));
         }
-        assertEquals(SoundStyle.SUPERCHARGED, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_SUPERCHARGED));
-        assertEquals(SoundStyle.CLASSIC, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_CLASSIC));
-        assertEquals(SoundStyle.SUPERCHARGED, SoundStyle.of(null));
-        assertEquals(SoundStyle.SUPERCHARGED, SoundStyle.of("v12"));
+        assertEquals(SoundStyle.AMERICAN, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_AMERICAN));
+        assertEquals(SoundStyle.PROTOTYPE, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_PROTOTYPE));
+        assertEquals(SoundStyle.AMERICAN, SoundStyle.of(null));
+        assertEquals(SoundStyle.AMERICAN, SoundStyle.of("v12"));
     }
 
     @Test

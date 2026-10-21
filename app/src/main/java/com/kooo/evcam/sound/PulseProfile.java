@@ -234,7 +234,7 @@ final class PulseProfile {
         popDecayMs = b.popDecayMs;
     }
 
-    /** 机械增压交叉平面 V8（{@link SoundStyle#SUPERCHARGED}）：排气脉冲尖、沙哑足，啸叫随转速。 */
+    /** 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足，啸叫随转速。 */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
             .supercharger(14.2f, 0.5f, 0.25f, -9f, 0.25f, 0.3f, 0.12f)
             .build();

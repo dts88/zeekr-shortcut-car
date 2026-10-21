@@ -76,7 +76,7 @@ public final class DriveSound {
     private volatile boolean enabled;
     private volatile float userDb = -12f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;
-    private volatile SoundStyle style = SoundStyle.SUPERCHARGED;
+    private volatile SoundStyle style = SoundStyle.AMERICAN;
     /** 最近一个声音线程（诊断报告用）。 */
     private volatile Run latest;
 
