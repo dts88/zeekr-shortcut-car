@@ -11,7 +11,8 @@ package com.kooo.evcam.sound;
  *   <li><b>油门开度</b> → 负荷（驾驶员要多少）：3 % 以下算没踩，85 % 算满，中间按 0.8 次方（小油门也听得出）。</li>
  *   <li><b>加速度</b> → 车真正出了多少力：电机在出力时，加速度换算的负荷和油门的取大的（自适应巡航自己加速时油门是 0，靠它）；
  *       也让声音在猛加速时厚一点。</li>
- *   <li><b>踩油门的快慢</b> → 急踩：负荷和转速起得更快、转速冲一下、进气声和高阶次猛一下，模拟换挡时更早降挡（一脚到底降两挡）；
+ *   <li><b>踩油门的快慢</b> → 急踩：负荷和转速起得更快、转速冲一下、进气声和高阶次猛一下，模拟换挡时直接降到该在的挡
+ *       （可以连降几挡；慢慢踩到地板附近也一样，像自动挡的强制降挡开关）；
  *       缓踩没有这些，平顺地往上走。</li>
  *   <li><b>松油门的快慢</b> → 急松（D 挡 15 km/h 以上）：排气那一路轻微的「突突」，几百毫秒淡掉；不做像枪声的放炮。</li>
  *   <li><b>减速度</b> → 模拟换挡时重刹、回收越猛，降挡越早，降挡带补油的「轰」一下。</li>
@@ -143,6 +144,8 @@ final class VirtualEngine {
     static final float SHIFT_LOAD_HOLD_SEC = 3f;
     /** 急踩到这个程度（0–1）直接降到该在的挡，不一挡一挡地降。 */
     static final float KICKDOWN_STAB = 0.5f;
+    /** 油门踩到这里（%，地板附近）也算一脚到底：像自动挡的强制降挡开关，踩得再慢也直接降到该在的挡。 */
+    static final float KICKDOWN_PEDAL_PCT = 90f;
     /** 减速度超过这个（0–1）时不升挡：刹车、回收减速时运动模式不升挡。 */
     static final float NO_UPSHIFT_DECEL = 0.1f;
 
@@ -189,6 +192,8 @@ final class VirtualEngine {
     private boolean gearPicked;
     /** 换挡看的负荷：最近的负荷慢慢回落（{@link #SHIFT_LOAD_HOLD_SEC}）。 */
     private float shiftLoad;
+    /** 此刻算一脚到底（急踩，或者油门到了 {@link #KICKDOWN_PEDAL_PCT}）：模拟换挡直接降到该在的挡。 */
+    private boolean kickdown;
     private float shiftLeftSec;
     private float shiftDipDb;
     private float fade = 1f;
@@ -299,8 +304,9 @@ final class VirtualEngine {
                 : (in.braking ? p.brakeReleaseSec : p.loadReleaseSec);
         load += (target - load) * follow(dt, tau);
         shiftLoad = Math.max(load, shiftLoad * decay(dt, SHIFT_LOAD_HOLD_SEC));
-        if (stabEnv >= KICKDOWN_STAB) {
-            // 猛踩：换挡按踩下去的量算，不等负荷爬上来（一脚到底直接降到该在的挡）
+        kickdown = stabEnv >= KICKDOWN_STAB || in.throttlePct >= KICKDOWN_PEDAL_PCT;
+        if (kickdown) {
+            // 一脚到底（急踩、或者踩到地板附近）：换挡按踩下去的量算，不等负荷爬上来
             shiftLoad = Math.max(shiftLoad, target);
         }
         updateCruise(dt, in.throttlePct, v);
@@ -386,13 +392,20 @@ final class VirtualEngine {
             return;
         }
         int last = p.gearRpmPerKmh.length - 1;
-        // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）和猛踩（降到该在的挡）才按记住的量
-        float up = upshiftRpm(p, shiftLoad);
         boolean easing = in.braking || in.flow == Flow.REGEN;
-        boolean kickdown = stabEnv >= KICKDOWN_STAB;
+        if (kickdown && !easing) {
+            // 一脚到底：直接降到此刻车速下该在的挡（转速还在升挡点以下的最低一挡），可以连降几挡
+            int to = pickGear(p, v, shiftLoad);
+            if (to < gearIndex) {
+                downshiftTo(to, false);
+                return;
+            }
+        }
+        // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）才按记住的量
+        float up = upshiftRpm(p, shiftLoad);
         float downRatio = p.shiftDownRatio + STAB_DOWNSHIFT_RAISE * stabEnv
                 + (easing ? DECEL_DOWNSHIFT_RAISE * decel : 0f);
-        float down = upshiftRpm(p, easing || kickdown ? shiftLoad : load) * downRatio;
+        float down = upshiftRpm(p, easing ? shiftLoad : load) * downRatio;
         float inGear = v * p.gearRpmPerKmh[gearIndex];
         boolean slowing = easing && decel > NO_UPSHIFT_DECEL;
         if (gearIndex < last && inGear >= up && !slowing) {
@@ -401,16 +414,17 @@ final class VirtualEngine {
             shiftDipDb = p.shiftDipDb;
         } else if (gearIndex > 0 && inGear < down
                 && v * p.gearRpmPerKmh[gearIndex - 1] < up * SHIFT_GUARD) {
-            int to = gearIndex - 1;
-            if (kickdown) {
-                to = Math.min(to, pickGear(p, v, shiftLoad));
-            }
-            gearIndex = to;
-            shiftLeftSec = p.shiftSec * SHIFT_SETTLE;
-            shiftDipDb = 0f;
-            blip = Math.max(blip, DOWNSHIFT_BLIP_RPM);
-            blipLoad = Math.max(blipLoad, easing ? DOWNSHIFT_BLIP_LOAD : DOWNSHIFT_BLIP_LOAD * 0.5f);
+            downshiftTo(gearIndex - 1, easing);
         }
+    }
+
+    /** 降到 {@code to} 挡：转速跟着冲上去，带一点补油（刹车 / 回收时那一下更响）。 */
+    private void downshiftTo(int to, boolean easing) {
+        gearIndex = to;
+        shiftLeftSec = p.shiftSec * SHIFT_SETTLE;
+        shiftDipDb = 0f;
+        blip = Math.max(blip, DOWNSHIFT_BLIP_RPM);
+        blipLoad = Math.max(blipLoad, easing ? DOWNSHIFT_BLIP_LOAD : DOWNSHIFT_BLIP_LOAD * 0.5f);
     }
 
     /** 此刻该去的转速（不改状态）。 */
