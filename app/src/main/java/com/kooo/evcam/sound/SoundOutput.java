@@ -16,8 +16,9 @@ import java.util.Locale;
  *   <li>一定指定设备（容器里不指定就没声）；找不到那个 BUS 就不开，不交给系统随便放。</li>
  *   <li>用途按媒体（车内 BUS00_MEDIA 按媒体放听得到）；不请求音频焦点 —— 请求了会把音乐停掉（车机的焦点只是建议，系统不强制），
  *       导航播报、电话时车机压低媒体，声浪跟着压低。不改系统音量。</li>
- *   <li>先要低延迟模式；缓冲起步约 {@link #START_BUFFER_MS}，出现欠载（{@code getUnderrunCount} 涨了）就加 {@link #GROW_MS}，
- *       最多 {@link #MAX_BUFFER_MS}。输出延迟按 {@code getTimestamp} 估（诊断报告用）。</li>
+ *   <li>先要低延迟模式；缓冲起步约 {@link #START_BUFFER_MS}（系统给不了那么小就按它的最小），出现欠载（{@code getUnderrunCount} 涨了）
+ *       就加 {@link #GROW_MS}，最多 {@link #MAX_BUFFER_MS}。输出延迟按 {@code getTimestamp} 估（诊断报告用）。
+ *       2.15.0 实车嫌反应慢（项目所有者 2026-10-21）：那时起步算错了，一开始就是整个缓冲（120 ms 以上）。</li>
  * </ul>
  */
 final class SoundOutput {
@@ -84,8 +85,8 @@ final class SoundOutput {
             throw new IllegalStateException("setPreferredDevice refused " + address);
         }
         SoundOutput out = new SoundOutput(track, address, bytes / FRAME_BYTES);
-        int start = Math.min(out.capacityFrames, Math.max(track.getBufferSizeInFrames(), RATE * START_BUFFER_MS / 1000));
-        out.bufferFrames = track.setBufferSizeInFrames(start);
+        // 刚建好时「有效大小」就是整个容量；要多小直接要，系统小不到那么小会自己按它的最小给（返回实际的）
+        out.bufferFrames = track.setBufferSizeInFrames(Math.min(out.capacityFrames, RATE * START_BUFFER_MS / 1000));
         try {
             track.play();
         } catch (IllegalStateException e) {

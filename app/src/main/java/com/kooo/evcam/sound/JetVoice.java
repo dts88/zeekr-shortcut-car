@@ -19,7 +19,7 @@ package com.kooo.evcam.sound;
  * </ul>
  *
  * <p>电平几乎不跟虚拟发动机变（参考里踩住油门并不比怠速响多少，变化靠低音、喷流随推力长和一踩一松的「轰」）。
- * 音量、阀门（接入时的低通）、30 Hz 高通、软限幅和别的风格一样，峰值不超过 {@link EngineVoice#CEILING}。
+ * 音量、阀门（接入时的低通）、30 Hz 高通、最后的限幅（{@link Limiter}）和别的风格一样，峰值不超过 {@link EngineVoice#CEILING}。
  * 不和别的风格比响度（项目所有者 2026-10-21：两种取向各自对各自的原型）。
  * 抖动、哨声的电平、低音的音调变得慢，每 16 个样本才算一次。</p>
  */
@@ -115,9 +115,9 @@ final class JetVoice implements Voice {
     /** 断扭时推力少几成。 */
     static final float CUT_THRUST = 0.7f;
     /** 电平几乎不跟油门变：虚拟发动机电平的这个次方。 */
-    static final float LEVEL_POW = 0.15f;
-    /** 总的倍数：只管别顶到限幅（「轰」「音爆」最响）。 */
-    static final float NORM = 0.45f;
+    static final float LEVEL_POW = 0.05f;
+    /** 总的倍数：全油门时限幅只压两三 dB（{@link Limiter}；「轰」「音爆」那一下压得多些）。 */
+    static final float NORM = 0.34f;
 
     private static final int LINES = FAN_RATIO.length;
     private static final int LOWS = LOW_DB.length;
@@ -186,6 +186,7 @@ final class JetVoice implements Voice {
     private final Biquad[] highpass = new Biquad[2];
     private final Biquad[] tone = new Biquad[2];
     private float toneSetHz = -1f;
+    private final Limiter limiter;
     private float levelNow;
     private float gainNow;
     private int noise = 0x6D2B79F5;
@@ -227,6 +228,7 @@ final class JetVoice implements Voice {
         whooshBand = Biquad.bandpass(WHOOSH_HZ, WHOOSH_Q, sampleRate);
         boomLowpass = Biquad.lowpass(BOOM_LOWPASS_HZ, 0.7071f, sampleRate);
         boomLength = Math.max(1, Math.round(BOOM_SEC * sampleRate));
+        limiter = new Limiter(sampleRate);
         engineNear = SQRT2 * PulseVoice.panLeft(-ENGINE_PAN);
         engineFar = SQRT2 * PulseVoice.panRight(-ENGINE_PAN);
     }
@@ -241,6 +243,7 @@ final class JetVoice implements Voice {
                 lr[i] = 0f;
             }
             gainNow = 0f;
+            limiter.reset();
             return;
         }
         float dt = frames / rate;
@@ -387,8 +390,9 @@ final class JetVoice implements Voice {
             l = highpass[0].process(l);
             r = highpass[1].process(r);
             gainNow += (params.gain - gainNow) * gainK;
-            lr[2 * i] = EngineVoice.limit(l * gainNow);
-            lr[2 * i + 1] = EngineVoice.limit(r * gainNow);
+            limiter.push(l * gainNow, r * gainNow);
+            lr[2 * i] = limiter.left;
+            lr[2 * i + 1] = limiter.right;
         }
     }
 

@@ -37,7 +37,7 @@ package com.kooo.evcam.sound;
  * <p><b>车内听感</b>（开发者选项「听感」选「车内」）：发动机舱的声音隔着防火墙、排气隔着车身，各自变闷（排气更闷），
  * 低频多一点（车身传进来的）；响度（100 Hz 以上）和车外一样。</p>
  *
- * <p>电平、音量逐样本平滑，最后软限幅，峰值不超过 {@link EngineVoice#CEILING}。</p>
+ * <p>电平、音量逐样本平滑，最后过先看一步的限幅（{@link Limiter}），峰值不超过 {@link EngineVoice#CEILING}。</p>
  */
 final class PulseVoice implements Voice {
 
@@ -248,6 +248,8 @@ final class PulseVoice implements Voice {
 
     // ---- 车内听感：前（防火墙）、后（车身）每个声道两个一阶低通，最后一个低频搁架
     private final boolean cabin;
+    /** 电平取的次方（按听感，{@link PulseProfile#levelPow}）。 */
+    private final float levelPow;
     private final float[] frontK;
     private final float[] rearK;
     private final float[][] frontLp = new float[2][2];
@@ -260,6 +262,7 @@ final class PulseVoice implements Voice {
     private final Biquad[] highpass = new Biquad[2];
     private final Biquad[] tone = new Biquad[2];
     private float toneSetHz = -1f;
+    private final Limiter limiter;
     private final float ampK;
     private final float gainK;
     private final float gearK;
@@ -281,6 +284,7 @@ final class PulseVoice implements Voice {
         this.p = profile;
         this.rate = sampleRate;
         this.cabin = cabin;
+        levelPow = cabin ? profile.cabinLevelPow : profile.levelPow;
         int n = profile.firing.length;
         int cylinders = profile.trim.length;
         bankOf = new int[cylinders];
@@ -354,6 +358,7 @@ final class PulseVoice implements Voice {
             highpass[b] = Biquad.highpass(EngineVoice.HIGHPASS_HZ, 0.7071f, sampleRate);
             tone[b] = new Biquad();
         }
+        limiter = new Limiter(sampleRate);
         plenum = Biquad.bandpass(profile.plenumHz, profile.plenumQ, sampleRate);
         runner = Biquad.bandpass(profile.runnerHz, profile.runnerQ, sampleRate);
         roar = Biquad.bandpass(profile.roarHz, profile.roarQ, sampleRate);
@@ -422,6 +427,7 @@ final class PulseVoice implements Voice {
             }
             gainNow = 0f;
             rpmNow = rpmTarget;
+            limiter.reset();
             return;
         }
         PulseProfile p = this.p;
@@ -539,7 +545,7 @@ final class PulseVoice implements Voice {
 
         // ---- 输出：电平收窄（踩油门主要变音色），升挡断扭时再掉一下
         float post = EngineVoice.dbToLin(p.rpmLoudDb * VirtualEngine.clamp01((rpmTarget - 800f) / 5200f)) * p.norm;
-        float levelTarget = (float) Math.pow(Math.max(params.level, 0f), p.levelPow) * EngineVoice.dbToLin(p.cutDipDb * cut);
+        float levelTarget = (float) Math.pow(Math.max(params.level, 0f), levelPow) * EngineVoice.dbToLin(p.cutDipDb * cut);
         boolean toneOn = params.toneHz < EngineVoice.TONE_BYPASS_HZ;
         if (toneOn && Math.abs(params.toneHz - toneSetHz) > 1f) {
             tone[0].setLowpass(params.toneHz, 0.7071f, rate);
@@ -750,8 +756,9 @@ final class PulseVoice implements Voice {
             l = highpass[0].process(l);
             rr = highpass[1].process(rr);
             gainNow += (params.gain - gainNow) * gainK;
-            lr[2 * i] = EngineVoice.limit(l * gainNow);
-            lr[2 * i + 1] = EngineVoice.limit(rr * gainNow);
+            limiter.push(l * gainNow, rr * gainNow);
+            lr[2 * i] = limiter.left;
+            lr[2 * i + 1] = limiter.right;
             cursor = (cursor + 1) & MASK;
         }
         rpmNow = rpmTarget;

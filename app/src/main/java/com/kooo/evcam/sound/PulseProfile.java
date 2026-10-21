@@ -98,12 +98,14 @@ final class PulseProfile {
     /** 怠速到 6000 rpm 多响多少（dB）。 */
     final float rpmLoudDb;
     /**
-     * 虚拟发动机给的电平取这个次方：踩油门主要变音色、响度变化不太大（项目所有者 2026-10-21：车主偏好的那台踩油门响度差得不多；
-     * 0.5 时怠速到全油门约 10 dB）。升挡断扭时再掉 {@link #cutDipDb}（满负荷）。
+     * 虚拟发动机给的电平取这个次方（车外、车内听感各一个）：踩油门主要变音色、响度变化不大 —— 发动机自己越转越响的那些
+     * （燃烧、沙哑、增压器、消声器打开）已经带出好几 dB。项目所有者 2026-10-21 实车：响度差太大，要以层次和丰富程度做真实感，
+     * 高速、大油门稍响一点就够。车内听感把高频滤掉了，自己带出来的少，次方大一些。升挡断扭时再掉 {@link #cutDipDb}（满负荷）。
      */
     final float levelPow;
+    final float cabinLevelPow;
     final float cutDipDb;
-    /** 总的倍数：和经典风格一样响。 */
+    /** 总的倍数：全油门时限幅只压两三 dB（{@link Limiter}）。 */
     final float norm;
 
     // ---- 进气
@@ -186,7 +188,7 @@ final class PulseProfile {
     final float clickDb;
 
     // ---- 车内听感（开发者选项「听感」选「车内」）：发动机舱的声音隔着防火墙、排气隔着车身，各过两个一阶低通；
-    //      低频多一点（车身传进来的）；总的再补一点，和车外的响度（100 Hz 以上）一样
+    //      低频多一点（车身传进来的）；总的再补一点，日常驾驶和车外差不多响
     final float[] cabinFrontHz;
     final float[] cabinRearHz;
     final float cabinLowHz;
@@ -282,6 +284,7 @@ final class PulseProfile {
         bassMonoHz = b.bassMonoHz;
         rpmLoudDb = b.rpmLoudDb;
         levelPow = b.levelPow;
+        cabinLevelPow = b.cabinLevelPow;
         cutDipDb = b.cutDipDb;
         norm = b.norm;
         intakeIdleDb = b.intakeIdleDb;
@@ -370,6 +373,7 @@ final class PulseProfile {
      */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
             .supercharger(10.24f, -20f)
+            .loudness(0.05f, 0.3f, 0.5f, 0.58f)
             .build();
 
     /** 写风格用：默认值是机械增压那一份的发动机、排气和增压器（增压器要 {@link #supercharger} 才装上），一项一项改，最后 {@link #build}。 */
@@ -428,6 +432,7 @@ final class PulseProfile {
         private float bassMonoHz = 120f;
         private float rpmLoudDb = 5f;
         private float levelPow = 0.5f;
+        private float cabinLevelPow = 0.5f;
         private float cutDipDb = -4.5f;
         private float norm = 0.79f;
         private float intakeIdleDb = -30f;
@@ -483,7 +488,7 @@ final class PulseProfile {
         private float[] cabinRearHz = {350f, 2000f};
         private float cabinLowHz = 100f;
         private float cabinLowDb = 4f;
-        private float cabinGainDb = 2.5f;
+        private float cabinGainDb = 3.5f;
         private float tickDb = -34f;
         private float[] tickHz = {3100f, 4800f};
         private float[] tickQ = {14f, 10f};
@@ -528,6 +533,15 @@ final class PulseProfile {
         }
 
         /** 装一台机械增压：叶片扫过出口的阶次、满增压 3000 rpm 时齿轮声第 2 次的电平（dB）；基频、齿轮、转子、气流、进口用默认的那一份。 */
+        /** 电平取的次方（车外、车内听感）、怠速到 6000 rpm 多响多少（dB）、总的倍数。 */
+        Builder loudness(float levelPow, float cabinLevelPow, float rpmLoudDb, float norm) {
+            this.levelPow = levelPow;
+            this.cabinLevelPow = cabinLevelPow;
+            this.rpmLoudDb = rpmLoudDb;
+            this.norm = norm;
+            return this;
+        }
+
         Builder supercharger(float order, float db) {
             superchargerOrder = order;
             superchargerDb = db;

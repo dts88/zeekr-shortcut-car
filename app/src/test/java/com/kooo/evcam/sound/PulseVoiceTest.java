@@ -20,6 +20,8 @@ public class PulseVoiceTest {
     private static final int RATE = 48_000;
     private static final int BLOCK = 256;
     private static final PulseProfile SC = PulseProfile.SUPERCHARGED_V8;
+    /** 发动机压低 20 dB 的电平（按风格的 {@link PulseProfile#levelPow} 取次方之后）：起动机、倒挡、传动的声音只跟总音量。 */
+    private static final float ENGINE_DOWN_20 = (float) Math.pow(0.1, 1.0 / SC.levelPow);
     /** 同一台、没有机械增压：拿「有」和「没有」比。 */
     private static final PulseProfile PLAIN = new PulseProfile.Builder().build();
 
@@ -404,10 +406,10 @@ public class PulseVoiceTest {
     @Test
     public void theStarterCranks() {
         VoiceParams on = params(250f, 0.12f);
-        on.level = 0.0225f;
+        on.level = ENGINE_DOWN_20;
         on.starter = 1f;
         VoiceParams off = params(250f, 0.12f);
-        off.level = 0.0225f;
+        off.level = ENGINE_DOWN_20;
         float hz = EngineVoice.STARTER_WHINE_HZ;
         assertTrue(power(mid(render(SC, on, 0.6f), 0.1f), hz) > 100 * power(mid(render(SC, off, 0.6f), 0.1f), hz));
     }
@@ -415,11 +417,11 @@ public class PulseVoiceTest {
     @Test
     public void reverseGearWhines() {
         VoiceParams on = params(1000f, 0.2f);
-        on.level = 0.01f;
+        on.level = ENGINE_DOWN_20;
         on.whineHz = 600f;
         on.whineAmp = 1f;
         VoiceParams off = params(1000f, 0.2f);
-        off.level = 0.01f;
+        off.level = ENGINE_DOWN_20;
         off.whineHz = 600f;
         assertTrue(power(mid(render(SC, on, 0.6f), 0.1f), 600) > 100 * power(mid(render(SC, off, 0.6f), 0.1f), 600));
     }
@@ -435,12 +437,12 @@ public class PulseVoiceTest {
 
     @Test
     public void theGearboxWhineFollowsTheGear() {
-        // 3000 rpm，发动机压低 20 dB（电平 0.01 取 0.5 次方；传动的声音只跟总音量）
+        // 3000 rpm，发动机压低 20 dB（传动的声音只跟总音量）
         int[] gears = {0, 3, -1};
         float[] orders = {SC.gearOrders[0], SC.gearOrders[3], SC.cvtOrder};
         for (int k = 0; k < gears.length; k++) {
             VoiceParams p = params(3000f, 1f);
-            p.level = 0.01f;
+            p.level = ENGINE_DOWN_20;
             p.drive = true;
             p.speedKmh = 60f;
             p.gearIndex = gears[k];
@@ -448,12 +450,12 @@ public class PulseVoiceTest {
             assertTrue("挡位 " + gears[k], standsOut(x, orders[k] * 50f, 0.03) > 30);
         }
         VoiceParams driving = params(3000f, 1f);
-        driving.level = 0.01f;
+        driving.level = ENGINE_DOWN_20;
         driving.drive = true;
         driving.speedKmh = 60f;
         driving.gearIndex = 0;
         VoiceParams parked = params(3000f, 1f);
-        parked.level = 0.01f;
+        parked.level = ENGINE_DOWN_20;
         parked.speedKmh = 60f;
         parked.gearIndex = 0;
         float hz = orders[0] * 50f;

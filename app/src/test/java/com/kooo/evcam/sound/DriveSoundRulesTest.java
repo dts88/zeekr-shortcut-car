@@ -107,10 +107,11 @@ public class DriveSoundRulesTest {
 
     @Test
     public void volumeIsReadAsDecibels() {
-        assertEquals(-12f, DriveSoundRules.volumeDb("-12"), 0f);
+        assertEquals(-6f, DriveSoundRules.volumeDb("-6"), 0f);
+        assertEquals(-3f, DriveSoundRules.volumeDb("-3"), 0f);
         assertEquals(0f, DriveSoundRules.volumeDb("0"), 0f);
         assertEquals("不会比 0 dB 更响", 0f, DriveSoundRules.volumeDb("6"), 0f);
-        assertEquals("认不出的按默认", -12f, DriveSoundRules.volumeDb("loud"), 0f);
-        assertEquals(-12f, DriveSoundRules.volumeDb(null), 0f);
+        assertEquals("认不出的按默认 0 dB", 0f, DriveSoundRules.volumeDb("loud"), 0f);
+        assertEquals(0f, DriveSoundRules.volumeDb(null), 0f);
     }
 }

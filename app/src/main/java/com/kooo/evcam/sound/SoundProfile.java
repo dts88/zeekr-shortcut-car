@@ -69,6 +69,12 @@ final class SoundProfile {
     final float shiftSec;
     /** 升挡断扭时音量掉多少（dB，负数；满负荷时，按断扭的深浅）。 */
     final float shiftDipDb;
+    /**
+     * 合成器（{@link EngineVoice}）把虚拟发动机的电平取这个次方：响度差压窄，音色照变（项目所有者 2026-10-21 实车）；
+     * 总的倍数（全油门时限幅只压两三 dB）。
+     */
+    final float levelPow;
+    final float norm;
 
     private SoundProfile(Builder b) {
         idleRpm = b.idleRpm;
@@ -100,6 +106,8 @@ final class SoundProfile {
         shiftDownRatio = b.shiftDownRatio;
         shiftSec = b.shiftSec;
         shiftDipDb = b.shiftDipDb;
+        levelPow = b.levelPow;
+        norm = b.norm;
     }
 
     /**
@@ -131,6 +139,7 @@ final class SoundProfile {
             .gears(120f, 80f, 58f, 45f, 36f, 30f, 25f, 21f)
             .reverse(120f)
             .shifts(2500f, 3500f, 0.55f, 0.06f, -4.5f)
+            .loudness(0.08f, 0.85f)
             .build();
 
     private static float[] toArray(List<Float> list) {
@@ -172,6 +181,8 @@ final class SoundProfile {
         private float shiftDownRatio = 0.55f;
         private float shiftSec = 0.06f;
         private float shiftDipDb = -3f;
+        private float levelPow = 1f;
+        private float norm = 1f;
 
         Builder rpm(float idle, float max) {
             idleRpm = idle;
@@ -247,6 +258,12 @@ final class SoundProfile {
             shiftDownRatio = downRatio;
             shiftSec = sec;
             shiftDipDb = dipDb;
+            return this;
+        }
+
+        Builder loudness(float levelPow, float norm) {
+            this.levelPow = levelPow;
+            this.norm = norm;
             return this;
         }
 

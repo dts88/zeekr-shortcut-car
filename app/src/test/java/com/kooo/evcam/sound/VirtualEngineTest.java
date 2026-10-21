@@ -246,7 +246,8 @@ public class VirtualEngineTest {
     }
 
     @Test
-    public void reverseIsSixDecibelsQuieter() {
+    public void reverseIsNotTurnedDown() {
+        // 项目所有者 2026-10-21：车机自己在倒挡压低音量，声浪不再另降
         VirtualEngine r = new VirtualEngine(P);
         VirtualEngine n = new VirtualEngine(P);
         VirtualEngine.Input inR = input(VirtualEngine.Gear.R, 5f, 30f);
@@ -255,7 +256,28 @@ public class VirtualEngineTest {
         n.ignite(inN);
         run(r, inR, 3f);
         run(n, inN, 3f);
-        assertEquals(VirtualEngine.REVERSE_DB, r.levelDb() - n.levelDb(), 0.01f);
+        assertEquals(n.outputDb(), r.outputDb(), 0f);
+        assertEquals(n.levelDb(), r.levelDb(), 0.01f);
+    }
+
+    @Test
+    public void speedMakesItALittleLouder() {
+        // 项目所有者 2026-10-21：响度差压窄以后，高速还是稍响一点 —— 加在总音量上，不随电平一起被压窄
+        VirtualEngine stopped = new VirtualEngine(P);
+        VirtualEngine slow = new VirtualEngine(P);
+        VirtualEngine fast = new VirtualEngine(P);
+        VirtualEngine.Input inStopped = input(VirtualEngine.Gear.D, 0f, 0f);
+        VirtualEngine.Input inSlow = input(VirtualEngine.Gear.D, 20f, 18f);
+        VirtualEngine.Input inFast = input(VirtualEngine.Gear.D, 130f, 18f);
+        stopped.ignite(inStopped);
+        slow.ignite(inSlow);
+        fast.ignite(inFast);
+        run(stopped, inStopped, 2f);
+        run(slow, inSlow, 2f);
+        run(fast, inFast, 2f);
+        assertEquals(0f, stopped.outputDb(), 0f);
+        float more = fast.outputDb() - slow.outputDb();
+        assertTrue("高速比低速稍响: " + more, more > 1f && more < VirtualEngine.SPEED_GAIN_DB);
     }
 
     @Test

@@ -95,13 +95,13 @@ final class DriveSoundRules {
         return Why.RUNNING;
     }
 
-    /** 存着的音量（"-12" 这样的 dB 数，{@code SettingsRegistry.DRIVE_SOUND_VOLUME}）→ dB；不会比 0 dB 更响，认不出的按 -12。 */
+    /** 存着的音量（"-6" 这样的 dB 数，{@code SettingsRegistry.DRIVE_SOUND_VOLUME}）→ dB；不会比 0 dB 更响，认不出的按 0 dB（默认）。 */
     static float volumeDb(String stored) {
         try {
             float db = Float.parseFloat(stored);
             return db > 0f ? 0f : db;
         } catch (RuntimeException e) {
-            return -12f;
+            return 0f;
         }
     }
 

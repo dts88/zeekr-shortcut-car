@@ -186,18 +186,6 @@ public class EngineVoiceTest {
     }
 
     @Test
-    public void theLimiterIsMonotonicAndBounded() {
-        float last = -1f;
-        for (int i = -1000; i <= 1000; i++) {
-            float y = EngineVoice.limit(i / 100f);
-            assertTrue(Math.abs(y) <= EngineVoice.CEILING + 1e-6f);
-            assertTrue("单调", y >= last - 1e-6f);
-            last = y;
-        }
-        assertEquals("小信号原样", 0.01f, EngineVoice.limit(0.01f), 1e-4f);
-    }
-
-    @Test
     public void ordersAboveTheBandFadeOut() {
         assertEquals(1f, EngineVoice.bandWeight(1000f), 0f);
         assertEquals(1f, EngineVoice.bandWeight(EngineVoice.BAND_FADE_HZ), 0f);

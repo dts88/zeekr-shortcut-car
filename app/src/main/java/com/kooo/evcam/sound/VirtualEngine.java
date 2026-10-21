@@ -107,8 +107,12 @@ final class VirtualEngine {
     static final float LEVEL_SPEED_DB = 4f;
     static final float LEVEL_SURGE_DB = 2f;
     static final float LEVEL_STAB_DB = 2f;
-    /** 倒挡整体低多少：倒车雷达要听清。 */
-    static final float REVERSE_DB = -6f;
+    /**
+     * 车速让总音量稍大一点（dB，高速时接近它，按 {@link #speedCurve}）。项目所有者 2026-10-21 实车：响度差要压窄，高速、大油门还是稍响一点。
+     * 加在总音量上（{@link #outputDb}），不进电平 —— 电平各风格会压得很窄，这一点不能跟着没了。
+     * 倒挡不另外降音量：车机自己在倒挡压低音量（项目所有者 2026-10-21）。
+     */
+    static final float SPEED_GAIN_DB = 2.5f;
     // ---- 音色
     static final float BRIGHT_STAB_DB = 3f;
     static final float BRIGHT_SURGE_DB = 2f;
@@ -724,18 +728,19 @@ final class VirtualEngine {
     }
 
     /**
-     * 电平（dB，相对满负荷）：负荷、车速、真加速、急踩、巡航收敛、倒挡都在里面；声浪自己的音量另加。升挡断扭的那一下
-     * 由合成器按 {@link #cut} 自己掉（各风格的电平范围不一样，断扭要在收窄之后再掉）。
+     * 电平（dB，相对满负荷）：负荷、车速、真加速、急踩、巡航收敛都在里面；车速的那一点、声浪自己的音量另加（{@link #outputDb}）。
+     * 各风格按自己的范围压窄它；升挡断扭的那一下由合成器按 {@link #cut} 自己掉（断扭要在收窄之后再掉）。
      */
     float levelDb() {
         float s = speedCurve(p, speedKmh);
         float l = voiceLoad();
-        float db = LEVEL_FLOOR_DB + LEVEL_LOAD_DB * (float) Math.pow(l, LEVEL_LOAD_CURVE) + LEVEL_SPEED_DB * s
+        return LEVEL_FLOOR_DB + LEVEL_LOAD_DB * (float) Math.pow(l, LEVEL_LOAD_CURVE) + LEVEL_SPEED_DB * s
                 + LEVEL_SURGE_DB * effortEnv + LEVEL_STAB_DB * stabEnv - cruiseCutDb;
-        if (gear == Gear.R) {
-            db += REVERSE_DB;
-        }
-        return db;
+    }
+
+    /** 加在总音量上的（dB）：车速越快稍大一点（{@link #SPEED_GAIN_DB}）。 */
+    float outputDb() {
+        return SPEED_GAIN_DB * speedCurve(p, speedKmh);
     }
 
     /** 开始工作时的淡入（0–1）：接入时 {@link #JOIN_SEC} 里从 0 到 1，启动时一开始就是 1。 */

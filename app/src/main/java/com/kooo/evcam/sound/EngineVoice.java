@@ -10,13 +10,16 @@ package com.kooo.evcam.sound;
  *   <li><b>进气声</b>：白噪声过带通，中心跟着转速；<b>排气</b>：白噪声过低通，负荷大时、急松油门的突突（随机起伏）走这一路。</li>
  *   <li><b>起动机</b>（启动时）：电机的啸声 + 齿轮的沙沙声，按压缩冲程一顿一顿；<b>倒挡齿轮</b>的啸叫（倒挡时，音调跟着车速）。</li>
  *   <li>两个固定共振（峰值均衡）、30 Hz 高通（保护喇叭）、接入时的阀门（低通慢慢打开）。</li>
- *   <li>电平、音量、转速逐样本平滑；最后软限幅，峰值不超过 {@link #CEILING}（−3 dBFS）。</li>
+ *   <li>电平、音量、转速逐样本平滑；最后过先看一步的限幅（{@link Limiter}），峰值不超过 {@link #CEILING}（−1 dBFS）。</li>
  * </ul>
  */
 final class EngineVoice implements Voice {
 
-    /** 峰值上限：−3 dBFS。 */
-    static final float CEILING = 0.708f;
+    /**
+     * 峰值上限：−1 dBFS（三种风格共用，{@link Limiter} 管着）。项目所有者 2026-10-21 实车嫌不够响：原来 −3 dBFS、软限幅，
+     * 留出的 2 dB 拿回来。
+     */
+    static final float CEILING = 0.891f;
     /** 阶次频率到这里（Hz）开始渐隐，到 {@link #BAND_TOP_HZ} 没了：车内喇叭放得出，也不会混叠。 */
     static final float BAND_FADE_HZ = 4500f;
     static final float BAND_TOP_HZ = 6000f;
@@ -90,6 +93,7 @@ final class EngineVoice implements Voice {
     private final Biquad highpass;
     private final Biquad tone = new Biquad();
     private float toneSetHz = -1f;
+    private final Limiter limiter;
     /** {@link #renderStereo} 先合成到这里再复制到左右（第一次用时按块大小分配）。 */
     private float[] mono = new float[0];
 
@@ -132,6 +136,7 @@ final class EngineVoice implements Voice {
             resonances[i] = Biquad.peaking(profile.resonanceHz[i], profile.resonanceDb[i], profile.resonanceQ[i], sampleRate);
         }
         highpass = Biquad.highpass(HIGHPASS_HZ, 0.7071f, sampleRate);
+        limiter = new Limiter(sampleRate);
     }
 
     @Override
@@ -164,6 +169,7 @@ final class EngineVoice implements Voice {
             }
             gainNow = 0f;
             rpmNow = rpmTarget;
+            limiter.reset();
             return;
         }
         float load = VirtualEngine.clamp01(params.load);
@@ -198,8 +204,9 @@ final class EngineVoice implements Voice {
         }
         float rpmStep = (rpmTarget - rpmNow) / frames;
         // 升挡断扭：电平掉一下（{@link SoundProfile#shiftDipDb}，按断扭的深浅）
-        float levelTarget = params.level * dbToLin(p.shiftDipDb * VirtualEngine.clamp01(params.cut));
-        float gainTarget = params.gain;
+        float levelTarget = (float) Math.pow(Math.max(params.level, 0f), p.levelPow)
+                * dbToLin(p.shiftDipDb * VirtualEngine.clamp01(params.cut));
+        float gainTarget = params.gain * p.norm;
         for (int i = 0; i < frames; i++) {
             float r = rpmNow + rpmStep * (i + 1);
             crank += r / 60.0 / rate;
@@ -266,7 +273,7 @@ final class EngineVoice implements Voice {
                 s = tone.process(s);
             }
             gainNow += (gainTarget - gainNow) * gainK;
-            out[offset + i] = limit(s * gainNow);
+            out[offset + i] = limiter.push(s * gainNow);
         }
         rpmNow = rpmTarget;
     }
@@ -280,21 +287,6 @@ final class EngineVoice implements Voice {
             return 0f;
         }
         return (BAND_TOP_HZ - hz) / (BAND_TOP_HZ - BAND_FADE_HZ);
-    }
-
-    /** 软限幅：小信号原样，大信号平滑地压到 {@link #CEILING} 以内（tanh 的有理近似，单调）。 */
-    static float limit(float x) {
-        float y = x / CEILING;
-        float t;
-        if (y >= 3f) {
-            t = 1f;
-        } else if (y <= -3f) {
-            t = -1f;
-        } else {
-            float y2 = y * y;
-            t = y * (27f + y2) / (27f + 9f * y2);
-        }
-        return t * CEILING;
     }
 
     static float dbToLin(float db) {

@@ -106,13 +106,13 @@ public final class SettingsRegistry {
 
     /**
      * 模拟声浪自己的音量（开发者选项，试验；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
-     * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。
+     * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。项目所有者 2026-10-21 实车：−12 dB 太小，平时用 0 dB，
+     * 最低 −6 dB 就够；默认 0 dB（以前存的 −18、−12 不在单子里，读出来按默认）。
      */
     public static final SettingSpec DRIVE_SOUND_VOLUME = SettingSpec.of(
-            "drive_sound_volume", "声浪音量", "-12",
-            entry("-18", "−18 dB"),
-            entry("-12", "−12 dB"),
+            "drive_sound_volume", "声浪音量", "0",
             entry("-6", "−6 dB"),
+            entry("-3", "−3 dB"),
             entry("0", "0 dB"));
 
     /** 模拟声浪的转速变化方式（开发者选项，试验）。项目所有者 2026-10-21：两种都做，上车听了再定。 */

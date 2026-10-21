@@ -13,6 +13,7 @@ import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.telemetry.FastReadings;
 import com.kooo.evcam.telemetry.Readings;
 import com.kooo.evcam.telemetry.Signal;
+import com.kooo.evcam.telemetry.SignalAges;
 import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.Collections;
@@ -74,7 +75,7 @@ public final class DriveSound {
 
     // ---- 设置（主线程、声音线程都会刷新，读的人拿到的总是完整的一项）
     private volatile boolean enabled;
-    private volatile float userDb = -12f;
+    private volatile float userDb = 0f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;
     private volatile SoundStyle style = SoundStyle.AMERICAN;
     /** 听感：车内（隔着防火墙、车身）；关着是车外。 */
@@ -221,6 +222,18 @@ public final class DriveSound {
         private volatile float accel;
         private volatile long blocks;
         private volatile float renderMs;
+        // ---- 诊断：反应快慢（项目所有者 2026-10-21 实车嫌切运动模式、踩油门到出声都慢）
+        /** 起这一台的时刻（elapsedRealtime）；那时驾驶模式变了多久（-1 = 没见它变过）。 */
+        private final long askedAt = SystemClock.elapsedRealtime();
+        private final long modeAgeWhenAsked = SignalAges.ageMs(Signal.DRIVE_MODE, askedAt);
+        private volatile long openMs = -1L;
+        private volatile long askedToSoundMs = -1L;
+        private volatile long modeToSoundMs = -1L;
+        /** 快读：新读数平均隔多久来一次、最近十秒最长隔了多久；油门读数平均隔多久变一次（踩、松的时候）、变了几次。 */
+        private volatile float fastEveryMs = -1f;
+        private volatile long fastGapMaxMs = -1L;
+        private volatile float throttleEveryMs = -1f;
+        private volatile int throttleSteps;
 
         void start() {
             latest = this;
@@ -237,8 +250,10 @@ public final class DriveSound {
         public void run() {
             raisePriority();
             SoundOutput out;
+            long openStart = SystemClock.elapsedRealtime();
             try {
                 out = SoundOutput.open(app, CarSpeakers.CABIN_MEDIA);
+                openMs = SystemClock.elapsedRealtime() - openStart;
             } catch (RuntimeException e) {
                 trouble = String.valueOf(e.getMessage());
                 state = "failed";
@@ -295,6 +310,12 @@ public final class DriveSound {
             float g = 0f;
             long nextCheck = 0L;
             long nextWatch = 0L;
+            long lastFastVersion = Long.MIN_VALUE;
+            long lastFastAt = -1L;
+            long gapMax = 0L;
+            long gapWindowEnd = 0L;
+            float lastThrottle = Float.NaN;
+            long lastThrottleAt = -1L;
             state = "running";
             while (true) {
                 long now = SystemClock.elapsedRealtime();
@@ -307,6 +328,31 @@ public final class DriveSound {
                 FastReadings fast = telemetry.fast();
                 inputs.offer(fast.version, fast.atMs, num(fast.number(Signal.SPEED)),
                         num(fast.number(Signal.THROTTLE_DEPTH)), num(fast.number(Signal.BRAKE_DEPTH)));
+                if (fast.version != lastFastVersion && fast.atMs > 0L) {
+                    // 诊断：快读多久来一次、油门读数多久变一次（看车机那边刷新得快不快）
+                    lastFastVersion = fast.version;
+                    if (lastFastAt > 0L) {
+                        long gap = fast.atMs - lastFastAt;
+                        fastEveryMs = fastEveryMs < 0f ? gap : fastEveryMs + (gap - fastEveryMs) * 0.05f;
+                        gapMax = Math.max(gapMax, gap);
+                    }
+                    lastFastAt = fast.atMs;
+                    if (now >= gapWindowEnd) {
+                        gapWindowEnd = now + 10_000L;
+                        fastGapMaxMs = gapMax;
+                        gapMax = 0L;
+                    }
+                    float t = num(fast.number(Signal.THROTTLE_DEPTH));
+                    if (!Float.isNaN(t) && t != lastThrottle) {
+                        if (!Float.isNaN(lastThrottle) && lastThrottleAt > 0L && fast.atMs - lastThrottleAt < 500L) {
+                            long step = fast.atMs - lastThrottleAt;
+                            throttleSteps++;
+                            throttleEveryMs = throttleEveryMs < 0f ? step : throttleEveryMs + (step - throttleEveryMs) * 0.1f;
+                        }
+                        lastThrottle = t;
+                        lastThrottleAt = fast.atMs;
+                    }
+                }
                 Readings r = telemetry.readings();
                 String gearText = r.text(Signal.GEAR);
                 DriveSoundRules.Why w = stopping ? DriveSoundRules.Why.OFF
@@ -325,6 +371,9 @@ public final class DriveSound {
                     engine.ignite(in);
                     ignited = true;
                     g = 1f;
+                    askedToSoundMs = now - askedAt;
+                    long modeAge = SignalAges.ageMs(Signal.DRIVE_MODE, now);
+                    modeToSoundMs = modeAge >= 0L && modeAge < 10_000L ? modeAge : -1L;
                     boolean starting = engine.phase() == VirtualEngine.Phase.STARTING;
                     ignitedAs = starting ? "start" : String.format(Locale.US, "join at %.0f km/h", in.speedKmh);
                     BlackBox.note("模拟声浪：" + (starting ? "启动（车停着）" : "接入（行驶中 " + Math.round(in.speedKmh) + " km/h）"));
@@ -343,7 +392,7 @@ public final class DriveSound {
                     params.rpm = engine.rpm();
                     params.load = engine.voiceLoad();
                     params.level = EngineVoice.dbToLin(engine.levelDb());
-                    params.gain = g * engine.fade() * EngineVoice.dbToLin(userDb);
+                    params.gain = g * engine.fade() * EngineVoice.dbToLin(userDb + engine.outputDb());
                     params.brightDb = engine.brightDb();
                     params.intakeBoostDb = engine.intakeBoostDb();
                     params.burble = engine.burble();
@@ -389,11 +438,20 @@ public final class DriveSound {
         String describe() {
             return String.format(Locale.US,
                     "run: %s style=%s view=%s why=%s ignited=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
-                            + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s",
+                            + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
+                            + "  start: drive mode changed %s before the run was asked for, output opened in %s, "
+                            + "first sound %s after the ask (%s after the mode change)%n"
+                            + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes)",
                     state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear,
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
-                    trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output);
+                    trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
+                    ms(modeAgeWhenAsked), ms(openMs), ms(askedToSoundMs), ms(modeToSoundMs),
+                    ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps);
+        }
+
+        private String ms(float value) {
+            return value < 0f ? "?" : String.format(Locale.US, "%.0f ms", value);
         }
     }
 }
