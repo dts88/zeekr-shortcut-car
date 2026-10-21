@@ -219,11 +219,11 @@ public final class DriveSound {
 
         @Override
         public void run() {
-            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
+            raisePriority();
             SoundOutput out;
             try {
                 out = SoundOutput.open(app, CarSpeakers.CABIN_MEDIA);
-            } catch (IllegalStateException e) {
+            } catch (RuntimeException e) {
                 trouble = String.valueOf(e.getMessage());
                 state = "failed";
                 AppLog.w(TAG, "cabin output: " + trouble);
@@ -246,6 +246,19 @@ public final class DriveSound {
                 output = out.describe();
                 BlackBox.note("模拟声浪：停止（" + (failed ? "出错 " + trouble + "；" : "") + output + "）");
                 ended(this, failed);
+            }
+        }
+
+        /** 音频线程的优先级：先要最高的那一档，系统不给就退一档，再不给就照默认的跑（不能让线程因此死掉）。 */
+        private void raisePriority() {
+            try {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
+            } catch (RuntimeException urgentRefused) {
+                try {
+                    Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
+                } catch (RuntimeException audioRefused) {
+                    AppLog.w(TAG, "audio thread priority refused: " + audioRefused);
+                }
             }
         }
 
