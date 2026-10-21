@@ -9,6 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Driving info bar: Drive mode is shown by the colour of the gear box instead of a text cell: Comfort blue, Standard orange, Sport red with a slight glow, Snow white, other modes purple. System info shows each signal's info bar icon next to it, drawn from the current reading.
 - Developer options: Record sound (experimental) adds one cabin microphone to the surround recording (raw or call-processed source, off by default; asks for the microphone permission when turned on). Playback plays the surround recording's sound through the cabin speakers. Repair keeps the pictures of a recording with sound.
 - System info: Drive mode (Comfort, Standard or Sport, as the car shows it). Tick it to show it on the driving info bar.
 - Developer options: Simulated drive sound (experimental) synthesizes engine sound through the cabin speakers in Sport mode (off by default): engine start when switching to Sport while stopped, idle, throttle, pedal speed, speed and acceleration, continuous or simulated gear shifts, a fixed gear in reverse. The floating button can toggle it. System info: Power flow (drive, regen, idle, not ready).

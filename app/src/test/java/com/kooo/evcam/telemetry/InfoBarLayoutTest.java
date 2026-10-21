@@ -131,6 +131,8 @@ public class InfoBarLayoutTest {
                 {Signal.BRAKE_PEDAL, InfoBarLayout.Cell.PEDALS},
                 {Signal.SEAT_DRIVER, InfoBarLayout.Cell.CABIN},
                 {Signal.SEAT_PASSENGER, InfoBarLayout.Cell.CABIN},
+                // 驾驶模式画成挡位框的颜色（项目所有者 2026-10-21），不再是文字格
+                {Signal.DRIVE_MODE, InfoBarLayout.Cell.GEAR},
         };
         for (Object[] c : cases) {
             Signal signal = (Signal) c[0];

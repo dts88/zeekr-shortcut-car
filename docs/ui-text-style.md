@@ -222,6 +222,7 @@
 - 系统信息「驾驶模式」（2026-10-20，Lab 车上对过值，车主要求加）：vi_drive_mode「驾驶模式」/ Drive mode / Mod pemanduan；
   三个值照车机界面的叫法：vi_v_drive_comfort「舒适」/ Comfort / Selesa，vi_v_drive_standard「标准」/ Standard / Standard，
   vi_v_drive_sport「运动」/ Sport / Sukan。没对上的值照原样写号码（同灯光开关）。
+  雪地（2026-10-21 加，车上还没见过这个值）：vi_v_drive_snow「雪地」/ Snow / Salji。
 - 开发者选项「模拟声浪（试验）」（2026-10-21，车主定先只做车内、只做运动模式）：分组 dev_drive_sound_group「模拟声浪」/ Drive sound /
   Bunyi pemanduan；开关 dev_drive_sound_title「模拟声浪（试验）」/ Simulated drive sound (experimental) / Bunyi pemanduan simulasi (percubaan)；
   dev_drive_sound_summary「运动模式下按油门、车速和加减速合成发动机声，从车内喇叭播放并跟随媒体音量。停车时切换到运动模式会先播放启动声；
