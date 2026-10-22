@@ -54,12 +54,17 @@ final class Biquad {
     /** 带通：中心频率处增益 1（0 dB）。 */
     static Biquad bandpass(float hz, float q, float rate) {
         Biquad b = new Biquad();
-        double w0 = 2.0 * Math.PI * hz / rate;
+        b.setBandpass(hz, q, rate);
+        return b;
+    }
+
+    /** 带通（中心频率处增益 1），改系数不清状态：中心频率跟着转速走的时候用。 */
+    void setBandpass(float hz, float q, float rate) {
+        double w0 = 2.0 * Math.PI * Math.min(hz, rate * 0.45f) / rate;
         double alpha = Math.sin(w0) / (2.0 * q);
         double cos = Math.cos(w0);
         double a0 = 1.0 + alpha;
-        b.set(alpha / a0, 0.0, -alpha / a0, -2.0 * cos / a0, (1.0 - alpha) / a0);
-        return b;
+        set(alpha / a0, 0.0, -alpha / a0, -2.0 * cos / a0, (1.0 - alpha) / a0);
     }
 
     void setLowpass(float hz, float q, float rate) {

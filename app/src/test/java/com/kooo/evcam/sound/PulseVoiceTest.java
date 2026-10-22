@@ -311,6 +311,45 @@ public class PulseVoiceTest {
         assertTrue("车内比车外只低一截: " + cabin + " vs " + outside, cabin > outside - 12 && cabin < outside);
     }
 
+    @Test
+    public void underBoostTheEngineOrdersRingAroundTheWhine() {
+        // 项目所有者 2026-10-22：齿轮声太单一，参考那台像好几组齿轮的和弦。EngineV1 那台带负荷时 10–34 阶几乎全是清楚的整数阶
+        // （转速跟踪后量的）—— 增压时进气腔的压力脉动：10–28 阶里至少 8 根冒出来（比两边 ±0.25 阶高 10 倍；量下来 11–15 根），
+        // 整数阶加起来比半阶响 6 dB 以上（两排错开一圈，半阶抵掉；量下来 +9.8 dB 起）；没有机械增压的同一台只有噪声
+        // （量下来最多 2 根、±4 dB 以内）；松油门（旁通、断油）时轻 10 dB 以上（量下来 −15 dB）
+        for (float rpm : new float[] {1300f, 2850f}) {
+            double[] boost = chord(SC, rpm, 1f, 0f);
+            double[] lifted = chord(SC, rpm, 0f, 1f);
+            double[] plain = chord(PLAIN, rpm, 1f, 0f);
+            assertTrue(rpm + " rpm 增压时冒出来的整数阶: " + boost[0], boost[0] >= 8);
+            assertTrue(rpm + " rpm 整数阶比半阶: " + db(boost[1]), db(boost[1]) > 6);
+            assertTrue(rpm + " rpm 没有机械增压: " + plain[0] + " 根, " + db(plain[1]), plain[0] <= 4 && db(plain[1]) < 3);
+            assertTrue(rpm + " rpm 松油门: " + db(lifted[2] / boost[2]), db(lifted[2] / boost[2]) < -10);
+        }
+    }
+
+    /** 10–28 阶（1 秒，从第 1 秒起）：比两边 ±0.25 阶高 10 倍的整数阶有几根、整数阶加起来比半阶加起来、整数阶加起来。 */
+    private static double[] chord(PulseProfile profile, float rpm, float load, float overrun) {
+        VoiceParams p = params(rpm, load);
+        p.overrun = overrun;
+        float[] x = mid(render(profile, p, 2f), 1f);
+        double f1 = rpm / 60.0;
+        int count = 0;
+        double ints = 0;
+        double halves = 0;
+        for (int k = 10; k <= 28; k++) {
+            double pk = power(x, k * f1);
+            if (pk > 10 * Math.max(power(x, (k - 0.25) * f1), power(x, (k + 0.25) * f1))) {
+                count++;
+            }
+            ints += pk;
+            if (k < 28) {
+                halves += power(x, (k + 0.5) * f1);
+            }
+        }
+        return new double[] {count, ints / halves, ints};
+    }
+
     private static double air(PulseProfile profile, float rpm) {
         float[] x = mid(render(profile, params(rpm, 1f), 1f), 0.4f);
         return energy(filter(x, Biquad.highpass(2500f, 0.7071f, RATE), Biquad.highpass(2500f, 0.7071f, RATE),

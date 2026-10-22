@@ -19,7 +19,9 @@ package com.kooo.evcam.sound;
  *   <li><b>机械增压</b>（双螺杆，曲轴用皮带带着转）：照车主偏好的那台的录音 —— 叶片扫过出口的基频不响、任何负荷都有；
  *       响的是同步齿轮的啮合声（叶片频率的 3 倍，第 2、3 次最响，很纯），只在增压时有，松油门旁通阀打开就几乎没了。
  *       带两个转子各自转一圈的边带、进气脉冲的调制、皮带的细小抖动；底下一层挤过窄出口通道的一股一股气流声（左右两路不相关）、
- *       进口吸气带阵风的风声（气流随转速长得快）。松油门「呼」一声。</li>
+ *       进口吸气带阵风的风声（气流随转速长得快）。松油门「呼」一声。
+ *       增压时进气腔里的压力脉动（每个进气门关上那一下，两排各自不均匀的间隔让每一下强弱、早晚不同）：
+ *       十几根发动机的整数阶跟齿轮声一起随转速走，叠成和弦。</li>
  *   <li><b>气门落座、燃烧</b>：每个缸的气门关上「嗒」一下、燃烧「咔」一下，各过几个高频共振，摆在那个缸的位置上。</li>
  *   <li><b>车厢</b>：几个低频的车身、车厢共振（某个阶次扫过时「嗡」一下）和一个高 Q 的「和鸣」。</li>
  *   <li><b>传动</b>（D 挡、车在走）：变速箱齿轮的啸叫（每个挡阶次不同）、传动轴的二阶、差速器的啸叫（跟着车速）；
@@ -116,6 +118,11 @@ final class PulseVoice implements Voice {
     static final float WHINE_FADE_HZ = 3000f;
     /** 阳转子那份边带的相位（周）：两个转子的差别对不齐。 */
     static final double MALE_PHASE = 1.3 / (2.0 * Math.PI);
+    /**
+     * 增压时进气腔的压力脉动（{@link PulseProfile#pulsationDb}）在这个转速（rpm）以上按转速的平方根收：参考那台只录到 2850 rpm；
+     * 再往上这层和弦落进 1–3 kHz（人耳最灵的一段），不收的话高转时整体响度多将近 1 dB。
+     */
+    static final float PULSATION_TOP_RPM = 3000f;
     /** 不增压时出口的气流还剩几成；松开油门时进口还有几成流量。 */
     static final float JET_FREE = 0.15f;
     static final float INLET_FREE = 0.25f;
@@ -157,6 +164,7 @@ final class PulseVoice implements Voice {
     private final float[][] tick = new float[2][RING];
     private final float[][] knock = new float[2][RING];
     private final float[] intake = new float[RING];
+    private final float[] pulsation = new float[RING];
     private final float[] click = new float[RING];
     private int cursor;
 
@@ -172,6 +180,7 @@ final class PulseVoice implements Voice {
     private float evTick;
     private float evKnock;
     private float evIntake;
+    private float evPulsation;
     private float evCut;
 
     // ---- 排气（每排一套）
@@ -211,6 +220,10 @@ final class PulseVoice implements Voice {
     private final float lobeGain;
     private final float[] meshGains;
     private float meshNow;
+    /** 增压时进气腔的压力脉动（{@link PulseProfile#pulsationDb}）：几个跟着转速走的共振和各自的增益（每块重算），每一下最多晚多少样本。 */
+    private final Biquad[] pulsationModes;
+    private final float[] pulsationGains;
+    private final float pulsationLagSamples;
     private double lobePhase;
     private double femalePhase;
     private double malePhase;
@@ -401,6 +414,12 @@ final class PulseVoice implements Voice {
         for (int k = 0; k < meshGains.length; k++) {
             meshGains[k] = EngineVoice.dbToLin(profile.superchargerDb + profile.meshHarmonicsDb[k]);
         }
+        pulsationModes = new Biquad[profile.pulsationOrders.length];
+        for (int k = 0; k < pulsationModes.length; k++) {
+            pulsationModes[k] = new Biquad();
+        }
+        pulsationGains = new float[pulsationModes.length];
+        pulsationLagSamples = profile.pulsationLagMs * 1e-3f * sampleRate;
         wobbleK = onePole(profile.superchargerWobbleHz);
         wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
         gustK = onePole(profile.gustHz);
@@ -572,6 +591,20 @@ final class PulseVoice implements Voice {
             whineTarget = (float) Math.pow(Math.min(Math.max(rpmTarget, 300f), 7200f) / 3000f, p.toneRpmPow);
             meshTarget = whineTarget * (p.superchargerFree + (1f - p.superchargerFree) * boost)
                     * EngineVoice.dbToLin(meshRpmDb(p, rpmTarget));
+            // 每一下的幅度跟进气腔的绝对压力（怠速时只有大气压的几成、满增压时一倍多），不随转速变：转速高了一下接一下来得密、
+            // 每一下也抖得快，总的能量和发动机的中频一样大致不变
+            evPulsation = EngineVoice.dbToLin(p.pulsationDb)
+                    * (p.pulsationFree + (1f - p.pulsationFree) * boost * (float) Math.sqrt(boost))
+                    * (float) Math.sqrt(Math.min(1f, PULSATION_TOP_RPM / rpmCalc));
+            for (int k = 0; k < pulsationModes.length; k++) {
+                float hz = Math.min(p.pulsationOrders[k] * rpmCalc / 60f, rate * 0.45f);
+                pulsationModes[k].setBandpass(hz, p.pulsationQ, rate);
+                // 带通在中心频率处增益 1，一个脉冲进去响起来只有 2α / (1 + α)：折回来，最低那个共振每一下起头的幅度就是 pulsationDb；
+                // 高处的共振宽、响得短，起头按阶次加，几个谱峰一样高；相邻的共振正负相间，免得每一下起头全叠在一起
+                double alpha = Math.sin(2.0 * Math.PI * hz / rate) / (2.0 * p.pulsationQ);
+                pulsationGains[k] = (float) ((k % 2 == 0 ? 1.0 : -1.0) * (1.0 + alpha) / (2.0 * alpha)
+                        * p.pulsationOrders[k] / p.pulsationOrders[0]);
+            }
             jetTarget = EngineVoice.dbToLin(p.jetDb) * (JET_FREE + (1f - JET_FREE) * boost) * speed;
             float flow = revs * (INLET_FREE + (1f - INLET_FREE) * load);
             inletTarget = EngineVoice.dbToLin(p.inletDb) * flow * (float) Math.sqrt(flow) * ram;
@@ -695,7 +728,14 @@ final class PulseVoice implements Voice {
                 jetR = airLowpass[1].process(jets(jetBands[1], white() * push)) * jetNow;
                 gustNoise += gustK * (white() - gustNoise);
                 inlet = inletBand.process(white()) * inletNow * (1f + p.gust * gustNorm * gustNoise);
-                float tones = whine * rotor * am;
+                // 进气腔的压力脉动：发动机的整数阶，和齿轮声一起在发动机舱顶上
+                float xs = pulsation[cur];
+                pulsation[cur] = 0f;
+                float puls = 0f;
+                for (int k = 0; k < pulsationModes.length; k++) {
+                    puls += pulsationGains[k] * pulsationModes[k].process(xs);
+                }
+                float tones = whine * rotor * am + puls;
                 if (cabin) {
                     toneLp += toneK * (tones - toneLp);
                     cabinTones = toneLp * cabinToneGain;
@@ -894,6 +934,11 @@ final class PulseVoice implements Voice {
             add(tick[1], at + cylDelay[c], a * cylRight[c]);
             if (kind == INTAKE_CLOSE) {
                 add(intake, at, evIntake * (0.9f + 0.2f * random01()));
+                if (evPulsation > 0f) {
+                    // 同一排上一下留下的压力还没恢复：这一下弱一点、晚一点（两排的样子一样、错开一圈 → 整数阶）
+                    float rec = Math.max(0.15f, 1f - p.pulsationRecovery * (float) Math.exp(-gapDeg[c] / p.recoveryDeg));
+                    add(pulsation, at + pulsationLagSamples * (1f - rec), evPulsation * rec * (0.97f + 0.06f * random01()));
+                }
             }
         } else {
             float a = evKnock * (0.8f + 0.4f * random01()) * cylGain[c];

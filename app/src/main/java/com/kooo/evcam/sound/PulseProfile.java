@@ -163,6 +163,24 @@ final class PulseProfile {
     final float superchargerAm;
     final float superchargerSec;
     /**
+     * 增压时进气腔里的压力脉动（项目所有者 2026-10-22：齿轮声太单一，参考那台像好几组齿轮的和弦）：每个进气门关上那一下，
+     * 那一排的进气腔（两排各一个中冷器）压力抖几下。抖的样子跟着曲轴角走（气门按曲轴角开关，转速翻倍、抖得也快一倍）：
+     * 几个在固定阶次上的共振（{@link #pulsationOrders}，Q {@link #pulsationQ}），谱峰一样高；最低那个起头的幅度
+     * {@link #pulsationDb}（相对排气脉冲，满增压）。幅度跟进气腔的绝对压力走（增压的 1.5 次方），不随转速变。
+     * 同一排上一下留下的压力还没恢复，这一下就弱一点（1 − {@link #pulsationRecovery} × e^(−间隔 / {@link #recoveryDeg})，
+     * 交叉平面每排的间隔 90/180/270°）、晚一点（缺多少晚多少，缺满了晚 {@link #pulsationLagMs} 毫秒）。两排的样子一样、
+     * 正好错开一圈，合起来每圈重复一次：出来的是发动机的整数阶（半阶抵掉），十几根一起随转速走，和齿轮声叠成和弦。
+     * 照 EngineV1 那台带负荷的录音（转速跟踪后量的，2026-10-22）：增压时 10–34 阶几乎全是清楚的整数阶，比底噪高 15–30 dB，
+     * 最响的在 14–25 阶、和齿轮声差不多响；我们原来这一段只有沙哑的噪声。这里放得比参考轻（齿轮声下面 4–10 dB，
+     * 全油门整体响度只多约 0.5 dB）；旁通阀开着（不增压）时还剩 {@link #pulsationFree}。
+     */
+    final float pulsationDb;
+    final float[] pulsationOrders;
+    final float pulsationQ;
+    final float pulsationRecovery;
+    final float pulsationLagMs;
+    final float pulsationFree;
+    /**
      * 挤过出口的气流（满增压、6000 rpm，dB）：白噪声每扫过一个叶片涌一下（{@link #jetPulse}），过出口通道、进气腔、
      * 中冷器的几个共振（Hz、Q、dB），再低通；左右两路不相关（两边各一个中冷器）。
      */
@@ -336,6 +354,12 @@ final class PulseProfile {
         superchargerFree = b.superchargerFree;
         superchargerAm = b.superchargerAm;
         superchargerSec = b.superchargerSec;
+        pulsationDb = b.pulsationDb;
+        pulsationOrders = b.pulsationOrders.clone();
+        pulsationQ = b.pulsationQ;
+        pulsationRecovery = b.pulsationRecovery;
+        pulsationLagMs = b.pulsationLagMs;
+        pulsationFree = b.pulsationFree;
         jetDb = b.jetDb;
         jetHz = b.jetHz.clone();
         jetQ = b.jetQ.clone();
@@ -398,9 +422,10 @@ final class PulseProfile {
     /**
      * 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足；双螺杆增压器的啸叫（齿轮声）和气流。
      * 增压器照车主偏好的那台的录音量（叶片 10.24 阶、齿轮 30.72 阶；项目所有者 2026-10-21：增压声要和它比）。
+     * 齿轮声 −20 → −20.7 dB（项目所有者 2026-10-22：响度调低 5 %，人耳的响度每 10 dB 翻一倍）。
      */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
-            .supercharger(10.24f, -20f)
+            .supercharger(10.24f, -20.7f)
             .loudness(0.15f, 0.42f, 0.5f, 0.56f)
             .build();
 
@@ -489,6 +514,12 @@ final class PulseProfile {
         private float superchargerFree = 0.05f;
         private float superchargerAm = 0.25f;
         private float superchargerSec = 0.12f;
+        private float pulsationDb = -3f;
+        private float[] pulsationOrders = {12f, 15.5f, 19.5f, 24.5f};
+        private float pulsationQ = 4f;
+        private float pulsationRecovery = 1.37f;
+        private float pulsationLagMs = 2f;
+        private float pulsationFree = 0.15f;
         private float jetDb = -12f;
         private float[] jetHz = {1800f, 3200f, 5500f};
         private float[] jetQ = {1.2f, 1.4f, 1.6f};
