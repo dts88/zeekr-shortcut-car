@@ -159,8 +159,17 @@ final class VirtualEngine {
      * 猛踩、接入降下来的挡也保持一会儿。
      */
     static final float SHIFT_LOAD_HOLD_SEC = 3f;
+    /**
+     * 一次换挡之后至少隔多久（秒）才换下一次（一脚到底除外）：项目所有者 2026-10-22 嫌低速换挡太勤 —— 刹车减速时一秒里连降
+     * 三挡、每挡补一下油，听着很碎。
+     */
+    static final float MIN_SHIFT_GAP_SEC = 1f;
+    /** 刹车、回收减速时，车速低于这个（km/h）不再降挡：快停下时不降到一挡（停住前车速低于 {@link #SHIFT_RESET_KMH} 自己回一挡）。 */
+    static final float EASE_DOWNSHIFT_MIN_KMH = 15f;
     /** 急踩到这个程度（0–1）直接降到该在的挡，不一挡一挡地降。 */
     static final float KICKDOWN_STAB = 0.5f;
+    /** 一脚到底降到哪一挡：转速在升挡点的这么多以下的最低一挡，留出往上拉的余地（不是一降就到红线、马上又升）。 */
+    static final float KICKDOWN_ROOM = 0.8f;
     /** 油门踩到这里（%，地板附近）也算一脚到底：像自动挡的强制降挡开关，踩得再慢也直接降到该在的挡。 */
     static final float KICKDOWN_PEDAL_PCT = 90f;
     /** 减速度超过这个（0–1）时不升挡：刹车、回收减速时运动模式不升挡。 */
@@ -240,9 +249,12 @@ final class VirtualEngine {
     // ---- 收油（断油、发动机被车拖着转）：给合成器
     /** 该有的负荷（{@link #loadTarget}）低于这个算收油。 */
     static final float OVERRUN_LOAD = 0.08f;
-    /** 转速高出怠速这么多（rpm）开始算，再高 {@link #OVERRUN_RPM_SPAN} 算满。 */
+    /**
+     * 转速高出怠速这么多（rpm）开始算，再高 {@link #OVERRUN_RPM_SPAN} 算满：真车滑行断油大约 1200–1500 rpm 以上就全断了。
+     * 挡位照车主偏好的那台换高了以后（2026-10-22），滑行时转速常在 1500 上下，原来 1850 才算满就嫌晚。
+     */
     static final float OVERRUN_FROM_RPM = 150f;
-    static final float OVERRUN_RPM_SPAN = 800f;
+    static final float OVERRUN_RPM_SPAN = 500f;
     static final float OVERRUN_SEC = 0.15f;
 
     /** 一块最多按多长推进（秒）：线程被耽搁了也不一步跳太远。 */
@@ -271,6 +283,8 @@ final class VirtualEngine {
     /** 此刻算一脚到底（急踩，或者油门到了 {@link #KICKDOWN_PEDAL_PCT}）：模拟换挡直接降到该在的挡。 */
     private boolean kickdown;
     private float shiftLeftSec;
+    /** 上一次换挡过了多久（秒，{@link #MIN_SHIFT_GAP_SEC}）。 */
+    private float sinceShiftSec = MIN_SHIFT_GAP_SEC;
     /** 连续走法里此刻按伪挡位走。 */
     private boolean pseudo;
     /** 此刻按挡位走（模拟换挡，或伪挡位）。 */
@@ -324,6 +338,7 @@ final class VirtualEngine {
         steadySec = 0f;
         throttleRef = Float.NaN;
         shiftLeftSec = 0f;
+        sinceShiftSec = MIN_SHIFT_GAP_SEC;
         shiftLoad = 0f;
         pseudo = false;
         geared = false;
@@ -603,6 +618,7 @@ final class VirtualEngine {
         if (shiftLeftSec > 0f) {
             shiftLeftSec = Math.max(0f, shiftLeftSec - dt);
         }
+        sinceShiftSec += dt;
         if (v < SHIFT_RESET_KMH) {
             gearIndex = 0;
             gearPicked = true;
@@ -620,12 +636,15 @@ final class VirtualEngine {
         int last = p.gearRpmPerKmh.length - 1;
         boolean easing = in.braking || in.flow == Flow.REGEN;
         if (kickdown && !easing) {
-            // 一脚到底：直接降到此刻车速下该在的挡（转速还在升挡点以下的最低一挡），可以连降几挡
-            int to = pickGear(p, v, shiftLoad);
+            // 一脚到底：直接降到此刻车速下该在的挡（留出往上拉的余地），可以连降几挡
+            int to = pickGear(p, v, shiftLoad, KICKDOWN_ROOM);
             if (to < gearIndex) {
                 downshiftTo(to, false);
                 return;
             }
+        }
+        if (sinceShiftSec < MIN_SHIFT_GAP_SEC) {
+            return;
         }
         // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）才按记住的量
         float up = upshiftRpm(p, shiftLoad);
@@ -642,7 +661,8 @@ final class VirtualEngine {
             barkPending = true;
             shiftSerial++;
             shiftUp = true;
-        } else if (gearIndex > 0 && inGear < down
+            sinceShiftSec = 0f;
+        } else if (gearIndex > 0 && inGear < down && !(easing && v < EASE_DOWNSHIFT_MIN_KMH)
                 && v * p.gearRpmPerKmh[gearIndex - 1] < up * SHIFT_GUARD) {
             downshiftTo(gearIndex - 1, easing);
         }
@@ -651,6 +671,7 @@ final class VirtualEngine {
     /** 降到 {@code to} 挡：转速跟着冲上去，带一点补油（刹车 / 回收时那一下更响）。 */
     private void downshiftTo(int to, boolean easing) {
         gearIndex = to;
+        sinceShiftSec = 0f;
         shiftLeftSec = p.shiftSec * SHIFT_SETTLE;
         upLeftSec = 0f;
         shiftSerial++;
@@ -785,15 +806,23 @@ final class VirtualEngine {
         return (float) Math.cbrt(a * a * a + b * b * b);
     }
 
-    /** 升挡点：负荷越大越晚升（按 1.5 次方：轻油门早升，地板油拉到快到上限），离上限留 300 rpm。 */
+    /**
+     * 升挡点：负荷越大越晚升，按平方 —— 轻踩、中等油门早升，不在低挡拖着；只有重踩、地板油才拉到快到上限
+     * （项目所有者 2026-10-22）。离上限留 300 rpm。
+     */
     static float upshiftRpm(SoundProfile p, float load) {
         float l = clamp01(load);
-        return Math.min(p.shiftUpBaseRpm + p.shiftUpLoadRpm * l * (float) Math.sqrt(l), p.maxRpm - 300f);
+        return Math.min(p.shiftUpBaseRpm + p.shiftUpLoadRpm * l * l, p.maxRpm - 300f);
     }
 
     /** 按车速和负荷直接选挡：转速还在升挡点以下的最低一挡。 */
     static int pickGear(SoundProfile p, float speedKmh, float load) {
-        float up = upshiftRpm(p, load) * SHIFT_GUARD;
+        return pickGear(p, speedKmh, load, SHIFT_GUARD);
+    }
+
+    /** 同上，转速在升挡点的 {@code room} 倍以下（一脚到底时留出往上拉的余地，{@link #KICKDOWN_ROOM}）。 */
+    static int pickGear(SoundProfile p, float speedKmh, float load, float room) {
+        float up = upshiftRpm(p, load) * room;
         for (int g = 0; g < p.gearRpmPerKmh.length; g++) {
             if (speedKmh * p.gearRpmPerKmh[g] < up) {
                 return g;

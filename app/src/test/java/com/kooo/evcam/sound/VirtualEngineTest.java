@@ -340,7 +340,9 @@ public class VirtualEngineTest {
         in.pedalRate = 0f;
         in.speedKmh = 20f;
         run(e, in, 3f);
-        assertEquals("转速跟着倒挡齿比", 20f * P.reverseRpmPerKmh, e.rpm(), 20f * P.reverseRpmPerKmh * 0.05f);
+        // 倒挡齿比照车主偏好的那台（3.30），20 km/h 只有 1300 rpm：和怠速的打滑合在一起
+        float expected = VirtualEngine.gearedRpm(P.idleRpm, 20f * P.reverseRpmPerKmh);
+        assertEquals("转速跟着倒挡齿比", expected, e.rpm(), expected * 0.05f);
         assertEquals(20f * VirtualEngine.REVERSE_WHINE_HZ_PER_KMH, e.whineHz(), 1e-3f);
         assertEquals("车速快了啸叫到头", 1f, e.whineAmp(), 0f);
     }
@@ -553,8 +555,88 @@ public class VirtualEngineTest {
         }
         in.pedalRate = 0f;
         run(e, in, 0.3f);
-        assertEquals("踩到底降到该在的挡", VirtualEngine.pickGear(P, 90f, 1f), e.gearIndex());
+        assertEquals("踩到底降到该在的挡（留出往上拉的余地）",
+                VirtualEngine.pickGear(P, 90f, 1f, VirtualEngine.KICKDOWN_ROOM), e.gearIndex());
         assertTrue("不只降一挡: " + before + " -> " + e.gearIndex(), e.gearIndex() <= before - 2);
+        assertTrue("不是一降就到红线", 90f * P.gearRpmPerKmh[e.gearIndex()]
+                < VirtualEngine.KICKDOWN_ROOM * VirtualEngine.upshiftRpm(P, 1f));
+    }
+
+    /** 从 {@code fromKmh} 按 {@code kmhPerSec} 匀变速跑 {@code seconds} 秒；返回每次换挡 {时刻, 车速, 换之前的转速, 1 = 升挡}。 */
+    private static java.util.List<float[]> ramp(VirtualEngine e, VirtualEngine.Input in, float fromKmh, float kmhPerSec,
+                                                float seconds) {
+        java.util.List<float[]> shifts = new java.util.ArrayList<>();
+        int serial = e.shiftSerial();
+        float before = e.rpm();
+        in.accel = kmhPerSec / 3.6f;
+        for (int i = 0; i < Math.round(seconds / DT); i++) {
+            in.speedKmh = Math.max(0f, fromKmh + kmhPerSec * (i + 1) * DT);
+            e.step(DT, in);
+            if (e.shiftSerial() != serial) {
+                serial = e.shiftSerial();
+                shifts.add(new float[] {(i + 1) * DT, in.speedKmh, before, e.shiftUp() ? 1f : 0f});
+            }
+            before = e.rpm();
+        }
+        return shifts;
+    }
+
+    @Test
+    public void lightThrottleShiftsUpEarlyAndOnlyHeavyThrottleRevsOut() {
+        // 项目所有者 2026-10-22：轻踩不在低挡拖着，只有重踩、急踩才在低挡拉高转速
+        VirtualEngine light = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        light.ignite(in);
+        run(light, in, 2.5f);
+        in.throttlePct = 20f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        java.util.List<float[]> soft = ramp(light, in, 0f, 2.5f, 30f);
+        assertTrue("轻踩也一挡一挡升上去: " + soft.size(), soft.size() >= 3);
+        for (float[] s : soft) {
+            assertEquals("轻踩只升不降", 1f, s[3], 0f);
+            assertTrue("轻踩 2600 rpm 以下就升: " + s[2] + " rpm @ " + s[1] + " km/h", s[2] < 2600f);
+        }
+        VirtualEngine heavy = new VirtualEngine(P, false);
+        VirtualEngine.Input hard = input(VirtualEngine.Gear.D, 0f, 0f);
+        hard.mode = VirtualEngine.RpmMode.SHIFTS;
+        heavy.ignite(hard);
+        run(heavy, hard, 2.5f);
+        hard.throttlePct = 100f;
+        hard.flow = VirtualEngine.Flow.DRIVE;
+        java.util.List<float[]> pull = ramp(heavy, hard, 0f, 15f, 10f);
+        assertTrue(pull.size() >= 2);
+        for (float[] s : pull) {
+            assertTrue("地板油拉到快到上限: " + s[2] + " rpm @ " + s[1] + " km/h", s[2] > 5600f);
+        }
+        assertTrue("一挡拉到 60 km/h 以上（八速的一挡很长）", pull.get(0)[1] > 60f);
+    }
+
+    @Test
+    public void brakingToAStopDoesNotRattleThroughTheGears() {
+        // 项目所有者 2026-10-22：低速换挡太勤。刹车减速时降挡至少隔一秒，快停下时不再降到一挡（停住前自己回一挡）
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 15f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 4f);
+        in.throttlePct = 0f;
+        in.braking = true;
+        in.flow = VirtualEngine.Flow.REGEN;
+        java.util.List<float[]> downs = ramp(e, in, 60f, -12f, 5.4f);
+        assertTrue("会降挡: " + downs.size(), downs.size() >= 1);
+        float last = -1f;
+        for (float[] s : downs) {
+            assertEquals("刹车时不升挡", 0f, s[3], 0f);
+            assertTrue("快停下时不再降挡: " + s[1] + " km/h", s[1] >= VirtualEngine.EASE_DOWNSHIFT_MIN_KMH);
+            if (last >= 0f) {
+                assertTrue("两次降挡至少隔一秒: " + (s[0] - last), s[0] - last >= VirtualEngine.MIN_SHIFT_GAP_SEC - DT);
+            }
+            last = s[0];
+        }
+        in.speedKmh = 0f;
+        e.step(DT, in);
+        assertEquals("停住了回一挡（不出声）", 0, e.gearIndex());
     }
 
     @Test

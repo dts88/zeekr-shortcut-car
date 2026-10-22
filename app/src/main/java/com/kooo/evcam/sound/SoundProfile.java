@@ -60,7 +60,7 @@ final class SoundProfile {
     final float[] gearRpmPerKmh;
     /** 倒挡：1 km/h 对应多少 rpm（和一挡差不多）。 */
     final float reverseRpmPerKmh;
-    /** 升挡点 = 它 + {@link #shiftUpLoadRpm} × 负荷。 */
+    /** 升挡点 = 它 + {@link #shiftUpLoadRpm} × 负荷²（{@link VirtualEngine#upshiftRpm}）。 */
     final float shiftUpBaseRpm;
     final float shiftUpLoadRpm;
     /** 降挡点 = 升挡点 × 它（猛踩、重刹时往上调，见 {@link VirtualEngine}）。 */
@@ -112,7 +112,11 @@ final class SoundProfile {
 
     /**
      * V8 味（点火阶次 4）：4、2、8 阶撑起主体；左右两排点火间隔不均匀，半阶次（0.5、1.5、2.5、3.5）给出「突突」；
-     * 12、16 阶在负荷大时把声音提亮。动态取运动那一档。挡位按八速：一挡到 58 km/h 就到 7000 rpm。
+     * 12、16 阶在负荷大时把声音提亮。动态取运动那一档。
+     *
+     * <p>挡位照车主偏好的那台机械增压 V8 的八速自动（项目所有者 2026-10-22：原来低速换挡太勤、齿比太密）：齿比 4.71、3.14、2.10、
+     * 1.67、1.29、1.00、0.84、0.67，倒挡 3.30，主减速比 2.62，275/40 R20 滚动周长约 2.22 m —— 1 km/h 对应的转速 = 齿比 × 19.7。
+     * 一挡到约 67 km/h 才到 6200 rpm（原来的表一挡 120、八挡 21，密得多）。轻踩 2000 rpm 多就升挡，地板油拉到 6000（{@link #shiftUpBaseRpm}）。</p>
      */
     static final SoundProfile V8 = new Builder()
             .rpm(900f, 7000f)
@@ -136,9 +140,9 @@ final class SoundProfile {
             .exhaust(-14f)
             .resonance(150f, 4f, 1.0f)
             .resonance(1200f, 3f, 1.2f)
-            .gears(120f, 80f, 58f, 45f, 36f, 30f, 25f, 21f)
-            .reverse(120f)
-            .shifts(2500f, 3500f, 0.55f, 0.06f, -4.5f)
+            .gears(92.7f, 61.8f, 41.3f, 32.9f, 25.4f, 19.7f, 16.5f, 13.2f)
+            .reverse(65f)
+            .shifts(2000f, 4000f, 0.55f, 0.06f, -4.5f)
             .loudness(0.17f, 0.8f)
             .build();
 
