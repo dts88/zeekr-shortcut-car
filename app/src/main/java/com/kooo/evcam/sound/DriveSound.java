@@ -47,8 +47,8 @@ public final class DriveSound {
     private static final String TAG = "DriveSound";
     /** 快读登记用的名字。 */
     static final String USER = "drive-sound";
-    /** 快读的间隔（毫秒）。 */
-    static final long FAST_MS = 50L;
+    /** 快读的间隔（毫秒）：项目所有者 2026-10-22 要这几个编码轮询再快一些（车机的读法最快 20 ms，见 FastReads）。 */
+    static final long FAST_MS = 20L;
     private static final Set<Signal> FAST =
             Collections.unmodifiableSet(EnumSet.of(Signal.SPEED, Signal.THROTTLE_DEPTH, Signal.BRAKE_DEPTH));
     /** 一块多少帧：48 kHz 下 5.3 ms。 */
@@ -57,8 +57,6 @@ public final class DriveSound {
     static final long CHECK_MS = 500L;
     /** 多久看一次输出（欠载、延迟）。 */
     static final long WATCH_MS = 1000L;
-    /** 诊断：记住最近几次推来的油门值（对快读用）。 */
-    private static final int PUSH_HISTORY = 16;
     /** 声音线程自己出错停了，多久之内不再起（毫秒）：车上没有那个喇叭时不反复开。 */
     static final long RETRY_AFTER_FAILURE_MS = 30_000L;
 
@@ -261,6 +259,7 @@ public final class DriveSound {
         private volatile int pushFirst;
         private volatile int pollFirst;
         private volatile float pushLeadMs = -1f;
+        private volatile float pollLeadMs = -1f;
         private volatile float inputAgeMs = -1f;
         private volatile float outputLatencyMs = -1f;
 
@@ -348,18 +347,11 @@ public final class DriveSound {
             long seenFastVersion = Long.MIN_VALUE;
             long seenPushCount = -1L;
             long inputVersion = 0L;
-            // 油门还原成连续的踏板（车机约 200 ms 才更新一次，PedalTrack）：上一次交给它的是哪一次推送 / 哪个快读值
+            // 油门：推送、快读赛跑，谁先带来新值用谁（ThrottleSources）；再还原成连续的踏板（车机约 200 ms 才更新一次，PedalTrack）
+            ThrottleSources sources = new ThrottleSources();
             PedalTrack pedal = new PedalTrack();
-            long pedalPush = -1L;
-            float pedalPolled = Float.NaN;
-            boolean pedalFromPush = false;
             long lastPushCount = 0L;
             float usedThrottle = Float.NaN;
-            // 最近推来的值和时刻（找「这个新值推送早送到了多久」）
-            float[] pushedValues = new float[PUSH_HISTORY];
-            long[] pushedAt = new long[PUSH_HISTORY];
-            int pushedHead = 0;
-            int pushedCount = 0;
             state = "running";
             while (true) {
                 long now = SystemClock.elapsedRealtime();
@@ -376,10 +368,11 @@ public final class DriveSound {
                 float polled = num(fast.number(Signal.THROTTLE_DEPTH));
                 float polledSpeed = num(fast.number(Signal.SPEED));
                 float polledBrake = num(fast.number(Signal.BRAKE_DEPTH));
-                // 车速、油门、刹车：推来过就用推来的（快读的值比推送晚约 100 ms），推送停了、快读又不一样才用快读
-                boolean pushed = DriveSoundRules.usePush(push.count, push.atMs, push.value, polled, now);
-                float throttle = pushed ? push.value : polled;
-                long throttleAt = pushed ? push.atMs : fast.atMs;
+                // 油门：推送、快读谁先带来新值用谁（快读读到的旧值不收）
+                boolean freshThrottle = sources.offer(push.count, push.value, push.atMs, fast.version, polled, fast.atMs);
+                float throttle = sources.sample;
+                long throttleAt = sources.sampleAt;
+                // 车速、刹车：推来过就用推来的（快读的值比推送晚），推送停了、快读又不一样才用快读
                 float speed = DriveSoundRules.usePush(pushSpeed.count, pushSpeed.atMs, pushSpeed.value, polledSpeed, now)
                         ? pushSpeed.value : polledSpeed;
                 float brake = DriveSoundRules.usePush(pushBrake.count, pushBrake.atMs, pushBrake.value, polledBrake, now)
@@ -392,20 +385,15 @@ public final class DriveSound {
                 }
                 long inputAt = Math.max(Math.max(fast.atMs, push.atMs), Math.max(pushSpeed.atMs, pushBrake.atMs));
                 inputs.offer(inputVersion, inputAt, speed, throttle, brake);
-                // 新的油门读数交给踏板：推送每来一次交一次（同一个值也算，说明脚停着）；退回快读时它的值变了才交
-                if (pushed) {
-                    if (push.count != pedalPush || !pedalFromPush) {
-                        pedalPush = push.count;
-                        pedalFromPush = true;
-                        pedal.sample(push.value, push.atMs, now);
-                    }
-                } else if (pedalFromPush || Float.isNaN(polled) != Float.isNaN(pedalPolled)
-                        || (!Float.isNaN(polled) && polled != pedalPolled)) {
-                    pedalFromPush = false;
-                    pedalPolled = polled;
-                    pedal.sample(polled, fast.atMs, now);
+                // 新的油门值交给踏板
+                if (freshThrottle) {
+                    pedal.sample(sources.sample, sources.sampleAt, now);
                 }
                 pedal.step(dt, now);
+                pushFirst = sources.pushFirst;
+                pollFirst = sources.pollFirst;
+                pushLeadMs = sources.pushLeadMs;
+                pollLeadMs = sources.pollLeadMs;
                 if (!Float.isNaN(throttle) && (Float.isNaN(usedThrottle) || Math.abs(throttle - usedThrottle) >= 1f)) {
                     // 诊断：新的油门值用上时已经过了多久（读到 / 推来 → 这一块合成）
                     if (!Float.isNaN(usedThrottle) && throttleAt > 0L) {
@@ -415,14 +403,10 @@ public final class DriveSound {
                     usedThrottle = throttle;
                 }
                 if (push.count != lastPushCount && push.count > 0L) {
-                    // 诊断：油门推送多久来一次（Telemetry 算的平均）；记下推来的值好对快读
+                    // 诊断：油门推送多久来一次（Telemetry 算的平均）
                     pushEveryMs = push.everyMs;
                     pushes = push.count;
                     lastPushCount = push.count;
-                    pushedValues[pushedHead] = push.value;
-                    pushedAt[pushedHead] = push.atMs;
-                    pushedHead = (pushedHead + 1) % PUSH_HISTORY;
-                    pushedCount = Math.min(PUSH_HISTORY, pushedCount + 1);
                 }
                 if (fast.version != lastFastVersion && fast.atMs > 0L) {
                     // 诊断：快读多久来一次、油门读数多久变一次（看车机那边刷新得快不快）
@@ -444,22 +428,6 @@ public final class DriveSound {
                             long step = fast.atMs - lastThrottleAt;
                             throttleSteps++;
                             throttleEveryMs = throttleEveryMs < 0f ? step : throttleEveryMs + (step - throttleEveryMs) * 0.1f;
-                            // 这个新值推送早送到了没有：推来的里面找同一个值（不晚于这份快读的最近一次）
-                            long sawAt = -1L;
-                            for (int k = 1; k <= pushedCount; k++) {
-                                int i = (pushedHead - k + PUSH_HISTORY) % PUSH_HISTORY;
-                                if (pushedValues[i] == t && pushedAt[i] <= fast.atMs) {
-                                    sawAt = pushedAt[i];
-                                    break;
-                                }
-                            }
-                            if (sawAt > 0L) {
-                                pushFirst++;
-                                long lead = fast.atMs - sawAt;
-                                pushLeadMs = pushLeadMs < 0f ? lead : pushLeadMs + (lead - pushLeadMs) * 0.1f;
-                            } else {
-                                pollFirst++;
-                            }
                         }
                         lastThrottle = t;
                         lastThrottleAt = fast.atMs;
@@ -560,7 +528,7 @@ public final class DriveSound {
                             + "first sound %s after the ask (%s after the mode change)%n"
                             + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes)%n"
                             + "  throttle push: every %s (%d pushes), a new value came first by push %d times (ahead by %s), "
-                            + "by the fast read %d times%n"
+                            + "by the fast read %d times (ahead by %s)%n"
                             + "  pedal to speaker (the part measurable here): new throttle used %s after it arrived "
                             + "+ output %s (HAL timestamp; on the car's head unit it reads about 5.1 s whatever the buffer, so it is "
                             + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
@@ -570,7 +538,7 @@ public final class DriveSound {
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
                     ms(modeAgeWhenAsked), ms(openMs), ms(askedToSoundMs), ms(modeToSoundMs),
                     ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps,
-                    ms(pushEveryMs), pushes, pushFirst, ms(pushLeadMs), pollFirst,
+                    ms(pushEveryMs), pushes, pushFirst, ms(pushLeadMs), pollFirst, ms(pollLeadMs),
                     ms(inputAgeMs), ms(outputLatencyMs));
         }
 

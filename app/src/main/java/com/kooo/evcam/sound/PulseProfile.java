@@ -458,7 +458,7 @@ final class PulseProfile {
         private float superchargerWobbleHz = 30f;
         private float superchargerFree = 0.03f;
         private float superchargerAm = 0.25f;
-        private float superchargerSec = 0.12f;
+        private float superchargerSec = 0.08f;
         private float jetDb = -12f;
         private float[] jetHz = {1800f, 3200f, 5500f};
         private float[] jetQ = {1.2f, 1.4f, 1.6f};

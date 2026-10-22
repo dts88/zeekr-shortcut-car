@@ -18,7 +18,7 @@ import com.kooo.evcam.telemetry.Signal;
  */
 final class DriveSoundRules {
 
-    /** 快读的值多旧算过期（毫秒）：快读 50 ms 一遍，十遍没来就不再信它。 */
+    /** 快读的值多旧算过期（毫秒）：快读 20 ms 一遍，这么久没来就不再信它。 */
     static final long STALE_MS = 500L;
 
     /** 结论。每一种的「快读 / 转着 / 响 / 淡多快」是定死的，所以结论本身就是全部信息，不用另外建对象（声音线程里不分配）。 */

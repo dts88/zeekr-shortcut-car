@@ -100,13 +100,21 @@ final class EcarxSource {
     private final Map<Long, List<Signal>> byKey = new HashMap<>();
     private HandlerThread thread;
     private volatile Handler handler;
+    /**
+     * 快读自己的线程（项目所有者 2026-10-22：这几个编码轮询再快一些，挑中间拖延迟的地方）：以前和对账挤在一个线程上，
+     * 每 3 秒一遍的全量对账要读几十个号，那时快读排不上（实车最长空了 93 ms）；也不再「读完再等一个间隔」，按固定的节拍读。
+     */
+    private HandlerThread fastThread;
+    private volatile Handler fastHandler;
+    /** 下一次快读的时刻（{@code uptimeMillis}）。只在快读线程上碰。 */
+    private long nextFastAt;
     /** 连接经过的细节：只进日志和黑匣子（{@link Telemetry#carReported}），诊断报告也读它（{@link #status()}）。 */
     private volatile String status = "not started";
     /** 连接的结果：页面上的状态行、熄屏判断看这个。 */
     private volatile Telemetry.CarLink link = Telemetry.CarLink.CONNECTING;
     private volatile boolean stopped;
-    /** 连上了、还在读（没断）：回调、对账、浮点只在这时算数。只在自己的线程上碰。 */
-    private boolean connected;
+    /** 连上了、还在读（没断）：回调、对账、浮点只在这时算数。只在自己的线程上改；快读线程也看。 */
+    private volatile boolean connected;
     /** 读不读浮点传感器（有完整用户）。构造时给，之后只在自己的线程上碰（{@link #floats}）。 */
     private boolean floatsOn;
     /** 连着几遍对账一个值都没读到（两遍之间车机深睡过的不算连着，{@link #emptyPassesAfter}）。 */
@@ -208,6 +216,9 @@ final class EcarxSource {
         appContext = app;
         thread = new HandlerThread("Telemetry-Ecarx");
         thread.start();
+        fastThread = new HandlerThread("Telemetry-Ecarx-Fast", android.os.Process.THREAD_PRIORITY_DISPLAY);
+        fastThread.start();
+        fastHandler = new Handler(fastThread.getLooper());
         handler = new Handler(thread.getLooper());
         handler.post(() -> connect(app));
     }
@@ -219,8 +230,18 @@ final class EcarxSource {
         }
         Handler h = handler;
         HandlerThread t = thread;
+        Handler fh = fastHandler;
+        HandlerThread ft = fastThread;
         handler = null;
         thread = null;
+        fastHandler = null;
+        fastThread = null;
+        if (fh != null) {
+            fh.removeCallbacksAndMessages(null);
+        }
+        if (ft != null) {
+            ft.quitSafely();
+        }
         if (h != null) {
             h.removeCallbacksAndMessages(null);
             // 功能号的监听每次都注销；传感器的留着（注销不掉，见类说明）
@@ -290,7 +311,7 @@ final class EcarxSource {
      * 没人快读了就发一份空的。
      */
     void fast(FastReads.Plan plan) {
-        Handler h = handler;
+        Handler h = fastHandler;
         if (h == null) {
             fastPlan = plan;
             return;
@@ -300,8 +321,9 @@ final class EcarxSource {
         }
     }
 
+    /** 快读线程上：换读法。停旧节拍；有读法而且连着就马上读一遍、按新间隔接着读；没人快读了就发一份空的。 */
     private void setFast(FastReads.Plan plan) {
-        Handler h = handler;
+        Handler h = fastHandler;
         if (stopped || h == null) {
             return;
         }
@@ -312,6 +334,7 @@ final class EcarxSource {
             return;
         }
         if (connected) {
+            nextFastAt = SystemClock.uptimeMillis();
             pollFast();
         }
     }
@@ -333,9 +356,12 @@ final class EcarxSource {
             }
         }
         telemetry.publishFast(this, new FastReadings(read, SystemClock.elapsedRealtime(), ++fastVersion));
-        Handler h = handler;
+        Handler h = fastHandler;
         if (h != null) {
-            h.postDelayed(fastPoll, plan.intervalMs);
+            // 固定节拍：下一次按上一次排的时刻往后数，不是读完再等一整个间隔；落后太多就从现在接着排
+            long now = SystemClock.uptimeMillis();
+            nextFastAt = Math.max(nextFastAt + plan.intervalMs, now + 1);
+            h.postAtTime(fastPoll, nextFastAt);
         }
     }
 
@@ -464,8 +490,12 @@ final class EcarxSource {
                 if (floatsOn) {
                     h.postDelayed(floatPoll, FLOAT_POLL_MS);
                 }
-                if (fastPlan != null) {
-                    h.post(fastPoll);
+                Handler fh = fastHandler;
+                if (fastPlan != null && fh != null) {
+                    fh.post(() -> {
+                        nextFastAt = SystemClock.uptimeMillis();
+                        pollFast();
+                    });
                 }
                 h.postDelayed(reconcile, RECONCILE_MS);
             }
@@ -1056,9 +1086,12 @@ final class EcarxSource {
         if (h != null) {
             h.removeCallbacks(reconcile);
             h.removeCallbacks(floatPoll);
-            h.removeCallbacks(fastPoll);
             h.removeCallbacks(publish);
             h.removeCallbacks(holdPublish);
+        }
+        Handler fh = fastHandler;
+        if (fh != null) {
+            fh.removeCallbacks(fastPoll);
         }
         values.clear();
         telemetry.publishFast(this, FastReadings.empty());
