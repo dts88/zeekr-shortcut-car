@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.16.1-alpha] - 2026-10-22
+
+- About & credits: thanks FerixzTanz for Blind spot view on the HUD and its default settings, from his CAMCORDER.
+
 ## [2.16.0-alpha] - 2026-10-22
 
 - Driving info bar: Drive mode is shown by the colour of the gear box instead of a text cell: Comfort blue, Standard orange, Sport red with a slight glow, Snow white, other modes purple. System info shows each signal's info bar icon next to it, drawn from the current reading.
