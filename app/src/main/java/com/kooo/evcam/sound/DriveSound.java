@@ -83,6 +83,8 @@ public final class DriveSound {
     private volatile boolean enabled;
     private volatile float userDb = 0f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;
+    /** 模拟换挡的变速箱（开发者选项「变速箱」）：声音线程每块交给虚拟发动机，改了马上换，不重新开始。 */
+    private volatile Gearbox gearbox = Gearbox.AUTO8;
     private volatile SoundStyle style = SoundStyle.AMERICAN;
     /** 听感：车内（隔着防火墙、车身）；关着是车外。 */
     private volatile boolean cabinView;
@@ -183,6 +185,7 @@ public final class DriveSound {
         userDb = DriveSoundRules.volumeDb(c.getDriveSoundVolume());
         rpmMode = AppConfig.DRIVE_SOUND_RPM_SHIFTS.equals(c.getDriveSoundRpm())
                 ? VirtualEngine.RpmMode.SHIFTS : VirtualEngine.RpmMode.CONTINUOUS;
+        gearbox = AppConfig.DRIVE_SOUND_GEARBOX_MANUAL6.equals(c.getDriveSoundGearbox()) ? Gearbox.MANUAL6 : Gearbox.AUTO8;
         style = SoundStyle.of(c.getDriveSoundStyle());
         cabinView = AppConfig.DRIVE_SOUND_VIEW_CABIN.equals(c.getDriveSoundView());
     }
@@ -203,8 +206,8 @@ public final class DriveSound {
     public static String diagnostics() {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.US, "  enabled=%s style=%s view=%s volume=%.0f dB rpm=%s armed=%s fastUsers=%s%n",
-                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.userDb, s.rpmMode, s.armed,
+        sb.append(String.format(Locale.US, "  enabled=%s style=%s view=%s volume=%.0f dB rpm=%s gearbox=%s armed=%s fastUsers=%s%n",
+                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.userDb, s.rpmMode, s.gearbox, s.armed,
                 Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
@@ -367,7 +370,7 @@ public final class DriveSound {
             Telemetry telemetry = Telemetry.get();
             AudioManager audio = app.getSystemService(AudioManager.class);
             DriveInputs inputs = new DriveInputs();
-            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, style.cranks());
+            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, gearbox, style.cranks());
             Voice voice = style.voice(SoundOutput.RATE, cabin);
             VirtualEngine.Input in = new VirtualEngine.Input();
             VoiceParams params = new VoiceParams();
@@ -511,6 +514,7 @@ public final class DriveSound {
                 in.gear = DriveSoundRules.gearOf(gearText);
                 in.flow = DriveSoundRules.flowOf(r.code(Signal.POWER_FLOW));
                 in.mode = rpmMode;
+                engine.setGearbox(gearbox);
                 if (!ignited && w == DriveSoundRules.Why.RUNNING) {
                     engine.ignite(in);
                     ignited = true;

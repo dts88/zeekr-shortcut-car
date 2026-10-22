@@ -17,6 +17,8 @@ import org.junit.Test;
 public class VirtualEngineTest {
 
     private static final SoundProfile P = SoundProfile.V8;
+    /** 默认的变速箱（8 速自动）。 */
+    private static final Gearbox G = Gearbox.AUTO8;
     /** 和声音线程一样的一块：256 帧 / 48 kHz。 */
     private static final float DT = 256f / 48_000f;
 
@@ -226,7 +228,7 @@ public class VirtualEngineTest {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 70f, 25f);
         in.mode = VirtualEngine.RpmMode.SHIFTS;
-        int natural = VirtualEngine.pickGear(P, 70f, VirtualEngine.demand(25f));
+        int natural = VirtualEngine.pickGear(P, G, 70f, VirtualEngine.demand(25f));
         e.ignite(in);
         assertEquals("顺势降一挡", natural - 1, e.gearIndex());
         run(e, in, 1f);
@@ -341,7 +343,7 @@ public class VirtualEngineTest {
         in.speedKmh = 20f;
         run(e, in, 3f);
         // 倒挡齿比照车主偏好的那台（3.30），20 km/h 只有 1300 rpm：和怠速的打滑合在一起
-        float expected = VirtualEngine.gearedRpm(P.idleRpm, 20f * P.reverseRpmPerKmh);
+        float expected = VirtualEngine.gearedRpm(P.idleRpm, 20f * G.reverseRpmPerKmh);
         assertEquals("转速跟着倒挡齿比", expected, e.rpm(), expected * 0.05f);
         assertEquals(20f * VirtualEngine.REVERSE_WHINE_HZ_PER_KMH, e.whineHz(), 1e-3f);
         assertEquals("车速快了啸叫到头", 1f, e.whineAmp(), 0f);
@@ -353,13 +355,13 @@ public class VirtualEngineTest {
         assertEquals(launch, VirtualEngine.gearedRpm(launch, 0f), 0.01f);
         float last = launch;
         for (int kmh = 1; kmh <= 40; kmh++) {
-            float rpm = VirtualEngine.gearedRpm(launch, kmh * P.gearRpmPerKmh[0]);
+            float rpm = VirtualEngine.gearedRpm(launch, kmh * G.rpmPerKmh[0]);
             assertTrue("起步时转速跟着车速一路往上: " + kmh, rpm > last);
-            assertTrue(rpm >= launch - 0.01f && rpm >= kmh * P.gearRpmPerKmh[0] - 0.01f);
+            assertTrue(rpm >= launch - 0.01f && rpm >= kmh * G.rpmPerKmh[0] - 0.01f);
             last = rpm;
         }
-        assertEquals("车速上来后就是挡位转速", 60f * P.gearRpmPerKmh[0],
-                VirtualEngine.gearedRpm(launch, 60f * P.gearRpmPerKmh[0]), 60f * P.gearRpmPerKmh[0] * 0.02f);
+        assertEquals("车速上来后就是挡位转速", 60f * G.rpmPerKmh[0],
+                VirtualEngine.gearedRpm(launch, 60f * G.rpmPerKmh[0]), 60f * G.rpmPerKmh[0] * 0.02f);
     }
 
     @Test
@@ -500,7 +502,7 @@ public class VirtualEngineTest {
         assertEquals("断扭一下子到底", 1f, e.cut(), 0.05f);
         float last = from;
         float bark = 0f;
-        int steps = (int) (VirtualEngine.UPSHIFT_SEC / DT);
+        int steps = (int) (G.upshiftSec / DT);
         for (int k = 0; k < steps; k++) {
             v += 0.02f;
             in.speedKmh = v;
@@ -556,13 +558,13 @@ public class VirtualEngineTest {
         in.pedalRate = 0f;
         run(e, in, 0.3f);
         assertEquals("踩到底降到该在的挡（留出往上拉的余地）",
-                VirtualEngine.pickGear(P, 90f, 1f, VirtualEngine.KICKDOWN_ROOM), e.gearIndex());
+                VirtualEngine.pickGear(P, G, 90f, 1f, VirtualEngine.KICKDOWN_ROOM), e.gearIndex());
         assertTrue("不只降一挡: " + before + " -> " + e.gearIndex(), e.gearIndex() <= before - 2);
-        assertTrue("不是一降就到红线", 90f * P.gearRpmPerKmh[e.gearIndex()]
+        assertTrue("不是一降就到红线", 90f * G.rpmPerKmh[e.gearIndex()]
                 < VirtualEngine.KICKDOWN_ROOM * VirtualEngine.upshiftRpm(P, 1f));
     }
 
-    /** 从 {@code fromKmh} 按 {@code kmhPerSec} 匀变速跑 {@code seconds} 秒；返回每次换挡 {时刻, 车速, 换之前的转速, 1 = 升挡}。 */
+    /** 从 {@code fromKmh} 按 {@code kmhPerSec} 匀变速跑 {@code seconds} 秒；返回每次换挡 {时刻, 车速, 换之前的转速, 1 = 升挡, 换到的挡}。 */
     private static java.util.List<float[]> ramp(VirtualEngine e, VirtualEngine.Input in, float fromKmh, float kmhPerSec,
                                                 float seconds) {
         java.util.List<float[]> shifts = new java.util.ArrayList<>();
@@ -574,7 +576,7 @@ public class VirtualEngineTest {
             e.step(DT, in);
             if (e.shiftSerial() != serial) {
                 serial = e.shiftSerial();
-                shifts.add(new float[] {(i + 1) * DT, in.speedKmh, before, e.shiftUp() ? 1f : 0f});
+                shifts.add(new float[] {(i + 1) * DT, in.speedKmh, before, e.shiftUp() ? 1f : 0f, e.gearIndex()});
             }
             before = e.rpm();
         }
@@ -613,8 +615,8 @@ public class VirtualEngineTest {
     }
 
     @Test
-    public void brakingToAStopDoesNotRattleThroughTheGears() {
-        // 项目所有者 2026-10-22：低速换挡太勤。刹车减速时降挡至少隔一秒，快停下时不再降到一挡（停住前自己回一挡）
+    public void brakingStepsDownOneGearAtATimeAndNeverUp() {
+        // 刹车减速：照正常的升降挡逻辑一挡一挡降（项目所有者 2026-10-22：不用刻意隔开、不用刻意不降），不升挡；停住了回一挡
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 15f);
         in.mode = VirtualEngine.RpmMode.SHIFTS;
@@ -623,20 +625,100 @@ public class VirtualEngineTest {
         in.throttlePct = 0f;
         in.braking = true;
         in.flow = VirtualEngine.Flow.REGEN;
+        int gear = e.gearIndex();
         java.util.List<float[]> downs = ramp(e, in, 60f, -12f, 5.4f);
         assertTrue("会降挡: " + downs.size(), downs.size() >= 1);
-        float last = -1f;
         for (float[] s : downs) {
             assertEquals("刹车时不升挡", 0f, s[3], 0f);
-            assertTrue("快停下时不再降挡: " + s[1] + " km/h", s[1] >= VirtualEngine.EASE_DOWNSHIFT_MIN_KMH);
-            if (last >= 0f) {
-                assertTrue("两次降挡至少隔一秒: " + (s[0] - last), s[0] - last >= VirtualEngine.MIN_SHIFT_GAP_SEC - DT);
-            }
-            last = s[0];
+            assertEquals("一挡一挡降", gear - 1, (int) s[4]);
+            gear = (int) s[4];
         }
         in.speedKmh = 0f;
         e.step(DT, in);
-        assertEquals("停住了回一挡（不出声）", 0, e.gearIndex());
+        assertEquals("停住了回一挡", 0, e.gearIndex());
+    }
+
+    // ================================================================= 变速箱（项目所有者 2026-10-22）
+
+    @Test
+    public void theGearboxesFollowTheReferenceCar() {
+        // 8 速自动：4.71 … 0.67，主减速比 2.62；6 速手动：2.26 … 0.63，主减速比 3.70；275/40 R20
+        assertEquals(8, Gearbox.AUTO8.rpmPerKmh.length);
+        assertEquals(6, Gearbox.MANUAL6.rpmPerKmh.length);
+        assertEquals(Gearbox.rpmPerKmh(4.71f, 2.62f), Gearbox.AUTO8.rpmPerKmh[0], 1e-3f);
+        assertEquals(Gearbox.rpmPerKmh(0.63f, 3.70f), Gearbox.MANUAL6.rpmPerKmh[5], 1e-3f);
+        assertEquals("自动挡一挡到 6200 rpm 约 67 km/h", 67f, 6200f / Gearbox.AUTO8.rpmPerKmh[0], 1.5f);
+        assertEquals("手动挡一挡到 6200 rpm 约 99 km/h", 99f, 6200f / Gearbox.MANUAL6.rpmPerKmh[0], 1.5f);
+        assertEquals("自动挡八挡 100 km/h 约 1300 rpm", 1320f, 100f * Gearbox.AUTO8.rpmPerKmh[7], 30f);
+        assertEquals("手动挡六挡 100 km/h 约 1750 rpm", 1750f, 100f * Gearbox.MANUAL6.rpmPerKmh[5], 30f);
+        for (Gearbox g : Gearbox.values()) {
+            for (int k = 1; k < g.rpmPerKmh.length; k++) {
+                assertTrue("一挡比一挡长", g.rpmPerKmh[k] < g.rpmPerKmh[k - 1]);
+            }
+        }
+        assertTrue("手动挡踩离合换挡，比自动挡慢", Gearbox.MANUAL6.upshiftSec > Gearbox.AUTO8.upshiftSec);
+    }
+
+    @Test
+    public void theManualPullsLongerGearsAndShiftsSlower() {
+        float[] firstShiftKmh = new float[2];
+        float[] cutSec = new float[2];
+        Gearbox[] boxes = {Gearbox.AUTO8, Gearbox.MANUAL6};
+        for (int b = 0; b < 2; b++) {
+            VirtualEngine e = new VirtualEngine(P, boxes[b], false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            e.ignite(in);
+            run(e, in, 2.5f);
+            in.throttlePct = 100f;
+            in.flow = VirtualEngine.Flow.DRIVE;
+            java.util.List<float[]> pull = ramp(e, in, 0f, 15f, 8f);
+            firstShiftKmh[b] = pull.get(0)[1];
+            // 再升一挡：量断扭持续多久
+            int serial = e.shiftSerial();
+            float v = in.speedKmh;
+            float t = 0f;
+            float cutFrom = -1f;
+            while (t < 10f) {
+                v += 15f * DT;
+                in.speedKmh = v;
+                e.step(DT, in);
+                t += DT;
+                if (e.shiftSerial() != serial && cutFrom < 0f) {
+                    cutFrom = t;
+                }
+                if (cutFrom >= 0f && e.cut() <= 0f && t > cutFrom) {
+                    break;
+                }
+            }
+            cutSec[b] = t - cutFrom;
+        }
+        assertTrue("手动挡一挡拉得更远: " + firstShiftKmh[1] + " vs " + firstShiftKmh[0], firstShiftKmh[1] > firstShiftKmh[0] + 20f);
+        assertTrue("手动挡换挡断开得更久: " + cutSec[1] + " vs " + cutSec[0], cutSec[1] > 1.3f * cutSec[0]);
+    }
+
+    @Test
+    public void switchingTheGearboxMidDriveRepicksTheGearSmoothly() {
+        // 开发者选项里随时改：不算一次换挡，挡位按此刻重新选，转速照常平滑地过去；8 速的高挡换到 6 速也不越界
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 150f, 10f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 8f);
+        assertTrue("8 速在高挡: " + e.gearIndex(), e.gearIndex() >= 6);
+        int serial = e.shiftSerial();
+        float before = e.rpm();
+        e.setGearbox(Gearbox.MANUAL6);
+        float maxStep = 0f;
+        for (int i = 0; i < Math.round(1f / DT); i++) {
+            e.step(DT, in);
+            maxStep = Math.max(maxStep, Math.abs(e.rpm() - before));
+            before = e.rpm();
+        }
+        assertTrue("挡位在 6 速里: " + e.gearIndex(), e.gearIndex() >= 0 && e.gearIndex() < 6);
+        assertEquals("不算一次换挡", serial, e.shiftSerial());
+        assertTrue("转速平滑地过去: " + maxStep, maxStep < P.rpmRisePerSec * DT * 2f + 1f);
+        assertEquals("跟着 6 速的挡位转速", 150f * Gearbox.MANUAL6.rpmPerKmh[e.gearIndex()], e.rpm(), 150f);
     }
 
     @Test

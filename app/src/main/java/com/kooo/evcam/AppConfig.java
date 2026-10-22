@@ -634,6 +634,7 @@ public class AppConfig {
                 KEY_DRIVE_SOUND,                      // 模拟声浪 → 关
                 SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_GEARBOX.key,   // 变速箱 → 8 速自动（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_VIEW.key,      // 听感 → 车外（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
@@ -965,6 +966,10 @@ public class AppConfig {
     public static final String DRIVE_SOUND_RPM_CONTINUOUS = "continuous";
     /** 转速变化方式：模拟换挡。 */
     public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
+    /** 模拟换挡的变速箱（{@link SettingsRegistry#DRIVE_SOUND_GEARBOX}）：8 速自动（默认）。 */
+    public static final String DRIVE_SOUND_GEARBOX_AUTO8 = "auto8";
+    /** 模拟换挡的变速箱：6 速手动。 */
+    public static final String DRIVE_SOUND_GEARBOX_MANUAL6 = "manual6";
     /** 声音风格（{@link SettingsRegistry#DRIVE_SOUND_STYLE}）：美式 V8（默认，机械增压交叉平面 V8）。 */
     public static final String DRIVE_SOUND_STYLE_AMERICAN = "american";
     /** 声音风格：试制 V8（第一版）。 */
@@ -1004,6 +1009,15 @@ public class AppConfig {
 
     public void setDriveSoundRpm(String mode) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
+    }
+
+    /** 模拟换挡的变速箱：{@link #DRIVE_SOUND_GEARBOX_AUTO8} / {@link #DRIVE_SOUND_GEARBOX_MANUAL6}。 */
+    public String getDriveSoundGearbox() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_GEARBOX);
+    }
+
+    public void setDriveSoundGearbox(String gearbox) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_GEARBOX, gearbox);
     }
 
     /** 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE} / {@link #DRIVE_SOUND_STYLE_JET}。 */

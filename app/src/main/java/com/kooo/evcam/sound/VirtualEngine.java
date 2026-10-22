@@ -159,13 +159,6 @@ final class VirtualEngine {
      * 猛踩、接入降下来的挡也保持一会儿。
      */
     static final float SHIFT_LOAD_HOLD_SEC = 3f;
-    /**
-     * 一次换挡之后至少隔多久（秒）才换下一次（一脚到底除外）：项目所有者 2026-10-22 嫌低速换挡太勤 —— 刹车减速时一秒里连降
-     * 三挡、每挡补一下油，听着很碎。
-     */
-    static final float MIN_SHIFT_GAP_SEC = 1f;
-    /** 刹车、回收减速时，车速低于这个（km/h）不再降挡：快停下时不降到一挡（停住前车速低于 {@link #SHIFT_RESET_KMH} 自己回一挡）。 */
-    static final float EASE_DOWNSHIFT_MIN_KMH = 15f;
     /** 急踩到这个程度（0–1）直接降到该在的挡，不一挡一挡地降。 */
     static final float KICKDOWN_STAB = 0.5f;
     /** 一脚到底降到哪一挡：转速在升挡点的这么多以下的最低一挡，留出往上拉的余地（不是一降就到红线、马上又升）。 */
@@ -179,8 +172,7 @@ final class VirtualEngine {
     static final float PSEUDO_ON_PCT = 80f;
     static final float PSEUDO_OFF_PCT = 55f;
 
-    // ---- 升挡：断扭、转速停一下再按 S 形落下、动力回来时「吼」一下
-    static final float UPSHIFT_SEC = 0.22f;
+    // ---- 升挡：断扭、转速停一下再按 S 形落下、动力回来时「吼」一下（一共多久看变速箱，{@link Gearbox#upshiftSec}）
     /** 升挡里转速先停住的那一段（占整个升挡的份额）。 */
     static final float UPSHIFT_HOLD = 0.2f;
     /** 断扭到这里（份额）开始淡出，到 {@link #CUT_FADE} 没了。 */
@@ -261,6 +253,8 @@ final class VirtualEngine {
     static final float MAX_DT = 0.1f;
 
     private final SoundProfile p;
+    /** 模拟换挡、伪挡位、倒挡用的变速箱（开发者选项「变速箱」，可以随时换，{@link #setGearbox}）。 */
+    private Gearbox gearbox;
     /** 启动时带不带起动机那一段。 */
     private final boolean crank;
     private Phase phase = Phase.RUNNING;
@@ -283,8 +277,6 @@ final class VirtualEngine {
     /** 此刻算一脚到底（急踩，或者油门到了 {@link #KICKDOWN_PEDAL_PCT}）：模拟换挡直接降到该在的挡。 */
     private boolean kickdown;
     private float shiftLeftSec;
-    /** 上一次换挡过了多久（秒，{@link #MIN_SHIFT_GAP_SEC}）。 */
-    private float sinceShiftSec = MIN_SHIFT_GAP_SEC;
     /** 连续走法里此刻按伪挡位走。 */
     private boolean pseudo;
     /** 此刻按挡位走（模拟换挡，或伪挡位）。 */
@@ -319,11 +311,32 @@ final class VirtualEngine {
         this(profile, true);
     }
 
-    /** @param crank 启动时带起动机那一段（「试制 V8」）；不带就直接从点着开始 */
     VirtualEngine(SoundProfile profile, boolean crank) {
+        this(profile, Gearbox.AUTO8, crank);
+    }
+
+    /**
+     * @param gearbox 变速箱（模拟换挡、伪挡位、倒挡）
+     * @param crank   启动时带起动机那一段（「试制 V8」）；不带就直接从点着开始
+     */
+    VirtualEngine(SoundProfile profile, Gearbox gearbox, boolean crank) {
         this.p = profile;
+        this.gearbox = gearbox;
         this.crank = crank;
         this.rpm = profile.idleRpm;
+    }
+
+    /** 换变速箱（开发者选项改了，随时）：下一块按此刻的车速、负荷重新选挡，转速照常平滑地过去，不算一次换挡。 */
+    void setGearbox(Gearbox g) {
+        if (g == gearbox) {
+            return;
+        }
+        gearbox = g;
+        gearPicked = false;
+        gearIndex = Math.min(gearIndex, g.rpmPerKmh.length - 1);
+        shiftLeftSec = 0f;
+        upLeftSec = 0f;
+        cut = 0f;
     }
 
     /** 开始工作：车停着放启动声，车在走就像混动车那样起动发动机。 */
@@ -338,7 +351,6 @@ final class VirtualEngine {
         steadySec = 0f;
         throttleRef = Float.NaN;
         shiftLeftSec = 0f;
-        sinceShiftSec = MIN_SHIFT_GAP_SEC;
         shiftLoad = 0f;
         pseudo = false;
         geared = false;
@@ -375,9 +387,9 @@ final class VirtualEngine {
         shiftLoad = loadTarget(in);
         boolean easing = in.braking || in.flow == Flow.REGEN;
         if (in.gear == Gear.D && in.mode == RpmMode.SHIFTS) {
-            gearIndex = pickGear(p, v, shiftLoad);
+            gearIndex = pickGear(p, gearbox, v, shiftLoad);
             if (!easing && gearIndex > 0
-                    && v * p.gearRpmPerKmh[gearIndex - 1] < upshiftRpm(p, 1f) * SHIFT_GUARD) {
+                    && v * gearbox.rpmPerKmh[gearIndex - 1] < upshiftRpm(p, 1f) * SHIFT_GUARD) {
                 // 顺势降一挡：表示运动模式接上了；换挡看的负荷记成满的，这一挡保持一会儿
                 gearIndex--;
                 shiftLoad = 1f;
@@ -509,7 +521,7 @@ final class VirtualEngine {
     /** 升挡这一段：断扭，转速先停住再按 S 形落到新挡位；断扭淡出时「吼」一下。 */
     private void stepUpshift(float dt, float target, Gear g) {
         upLeftSec = Math.max(0f, upLeftSec - dt);
-        float f = 1f - upLeftSec / UPSHIFT_SEC;
+        float f = 1f - upLeftSec / gearbox.upshiftSec;
         float u = smooth(clamp01((f - UPSHIFT_HOLD) / (1f - UPSHIFT_HOLD)));
         target = clamp(target, p.idleRpm, capFor(g));
         rpm = upFromRpm + (target - upFromRpm) * u;
@@ -618,52 +630,47 @@ final class VirtualEngine {
         if (shiftLeftSec > 0f) {
             shiftLeftSec = Math.max(0f, shiftLeftSec - dt);
         }
-        sinceShiftSec += dt;
         if (v < SHIFT_RESET_KMH) {
             gearIndex = 0;
             gearPicked = true;
             return;
         }
         if (!gearPicked) {
-            // 刚从别的挡、别的走法过来：按此刻的车速和负荷直接选，不一挡一挡地升
-            gearIndex = pickGear(p, v, shiftLoad);
+            // 刚从别的挡、别的走法、别的变速箱过来：按此刻的车速和负荷直接选，不一挡一挡地升
+            gearIndex = pickGear(p, gearbox, v, shiftLoad);
             gearPicked = true;
             return;
         }
         if (shiftLeftSec > 0f) {
             return;
         }
-        int last = p.gearRpmPerKmh.length - 1;
+        int last = gearbox.rpmPerKmh.length - 1;
         boolean easing = in.braking || in.flow == Flow.REGEN;
         if (kickdown && !easing) {
             // 一脚到底：直接降到此刻车速下该在的挡（留出往上拉的余地），可以连降几挡
-            int to = pickGear(p, v, shiftLoad, KICKDOWN_ROOM);
+            int to = pickGear(p, gearbox, v, shiftLoad, KICKDOWN_ROOM);
             if (to < gearIndex) {
                 downshiftTo(to, false);
                 return;
             }
-        }
-        if (sinceShiftSec < MIN_SHIFT_GAP_SEC) {
-            return;
         }
         // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）才按记住的量
         float up = upshiftRpm(p, shiftLoad);
         float downRatio = p.shiftDownRatio + STAB_DOWNSHIFT_RAISE * stabEnv
                 + (easing ? DECEL_DOWNSHIFT_RAISE * decel : 0f);
         float down = upshiftRpm(p, easing ? shiftLoad : load) * downRatio;
-        float inGear = v * p.gearRpmPerKmh[gearIndex];
+        float inGear = v * gearbox.rpmPerKmh[gearIndex];
         boolean slowing = easing && decel > NO_UPSHIFT_DECEL;
         if (gearIndex < last && inGear >= up && !slowing) {
             gearIndex++;
-            shiftLeftSec = UPSHIFT_SEC;
-            upLeftSec = UPSHIFT_SEC;
+            shiftLeftSec = gearbox.upshiftSec;
+            upLeftSec = gearbox.upshiftSec;
             upFromRpm = rpm;
             barkPending = true;
             shiftSerial++;
             shiftUp = true;
-            sinceShiftSec = 0f;
-        } else if (gearIndex > 0 && inGear < down && !(easing && v < EASE_DOWNSHIFT_MIN_KMH)
-                && v * p.gearRpmPerKmh[gearIndex - 1] < up * SHIFT_GUARD) {
+        } else if (gearIndex > 0 && inGear < down
+                && v * gearbox.rpmPerKmh[gearIndex - 1] < up * SHIFT_GUARD) {
             downshiftTo(gearIndex - 1, easing);
         }
     }
@@ -671,7 +678,6 @@ final class VirtualEngine {
     /** 降到 {@code to} 挡：转速跟着冲上去，带一点补油（刹车 / 回收时那一下更响）。 */
     private void downshiftTo(int to, boolean easing) {
         gearIndex = to;
-        sinceShiftSec = 0f;
         shiftLeftSec = p.shiftSec * SHIFT_SETTLE;
         upLeftSec = 0f;
         shiftSerial++;
@@ -685,11 +691,11 @@ final class VirtualEngine {
         float base;
         switch (in.gear) {
             case R:
-                base = Math.min(gearedRpm(launchRpm(load), v * p.reverseRpmPerKmh), REVERSE_MAX_RPM);
+                base = Math.min(gearedRpm(launchRpm(load), v * gearbox.reverseRpmPerKmh), REVERSE_MAX_RPM);
                 break;
             case D:
                 if (in.mode == RpmMode.SHIFTS || pseudo) {
-                    base = gearedRpm(launchRpm(load), v * p.gearRpmPerKmh[gearIndex])
+                    base = gearedRpm(launchRpm(load), v * gearbox.rpmPerKmh[gearIndex])
                             + STAB_FLARE_RPM * SHIFT_FLARE_SHARE * stabEnv * (1f - speedCurve(p, v));
                 } else {
                     boolean easing = in.braking || in.flow == Flow.REGEN;
@@ -816,19 +822,19 @@ final class VirtualEngine {
     }
 
     /** 按车速和负荷直接选挡：转速还在升挡点以下的最低一挡。 */
-    static int pickGear(SoundProfile p, float speedKmh, float load) {
-        return pickGear(p, speedKmh, load, SHIFT_GUARD);
+    static int pickGear(SoundProfile p, Gearbox gearbox, float speedKmh, float load) {
+        return pickGear(p, gearbox, speedKmh, load, SHIFT_GUARD);
     }
 
     /** 同上，转速在升挡点的 {@code room} 倍以下（一脚到底时留出往上拉的余地，{@link #KICKDOWN_ROOM}）。 */
-    static int pickGear(SoundProfile p, float speedKmh, float load, float room) {
+    static int pickGear(SoundProfile p, Gearbox gearbox, float speedKmh, float load, float room) {
         float up = upshiftRpm(p, load) * room;
-        for (int g = 0; g < p.gearRpmPerKmh.length; g++) {
-            if (speedKmh * p.gearRpmPerKmh[g] < up) {
+        for (int g = 0; g < gearbox.rpmPerKmh.length; g++) {
+            if (speedKmh * gearbox.rpmPerKmh[g] < up) {
                 return g;
             }
         }
-        return p.gearRpmPerKmh.length - 1;
+        return gearbox.rpmPerKmh.length - 1;
     }
 
     static float follow(float dt, float tau) {

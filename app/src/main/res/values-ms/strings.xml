@@ -903,6 +903,9 @@
     <string name="dev_drive_sound_rpm_title">Corak kelajuan enjin</string>
     <string name="dev_drive_sound_rpm_continuous">Berterusan</string>
     <string name="dev_drive_sound_rpm_shifts">Tukar gear simulasi</string>
+    <string name="dev_drive_sound_gearbox_title">Kotak gear</string>
+    <string name="dev_drive_sound_gearbox_auto8">Automatik 8 kelajuan</string>
+    <string name="dev_drive_sound_gearbox_manual6">Manual 6 kelajuan</string>
     <string name="dev_drive_sound_style_title">Gaya bunyi</string>
     <string name="dev_drive_sound_style_american">V8 Amerika</string>
     <string name="dev_drive_sound_style_prototype">V8 prototaip</string>

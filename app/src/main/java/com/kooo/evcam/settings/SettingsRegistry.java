@@ -122,6 +122,15 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_SHIFTS, "模拟换挡", R.string.dev_drive_sound_rpm_shifts));
 
     /**
+     * 模拟声浪的变速箱（开发者选项，试验；{@code sound.Gearbox}）：模拟换挡（和连续走法地板油时的伪挡位）按哪一种的齿比走。
+     * 项目所有者 2026-10-22：照车主偏好的那台的 8 速自动（默认）；它的 6 速手动也做成可选。不用车型名（商标）。
+     */
+    public static final SettingSpec DRIVE_SOUND_GEARBOX = SettingSpec.of(
+            "drive_sound_gearbox", "变速箱", com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_AUTO8,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_AUTO8, "8 速自动", R.string.dev_drive_sound_gearbox_auto8),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_MANUAL6, "6 速手动", R.string.dev_drive_sound_gearbox_manual6));
+
+    /**
      * 模拟声浪的声音风格（开发者选项，试验；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
      * 按发动机结构重做「美式 V8」这一种取向；第一版留着，叫「试制 V8」（两个名字车主定的）；另试制一种纯电车主动声浪的
      * 「超音速」（车主 2026-10-21 批的名字）。都不用车型名（商标）。
@@ -152,6 +161,7 @@ public final class SettingsRegistry {
             FOOTAGE_AUDIO_SOURCE,
             DRIVE_SOUND_VOLUME,
             DRIVE_SOUND_RPM,
+            DRIVE_SOUND_GEARBOX,
             DRIVE_SOUND_STYLE,
             DRIVE_SOUND_VIEW));
 }

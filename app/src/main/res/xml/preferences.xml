@@ -530,6 +530,12 @@
                 android:dependency="pref_drive_sound"
                 android:title="@string/dev_drive_sound_rpm_title"
                 android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_gearbox"
+                android:dependency="pref_drive_sound"
+                android:title="@string/dev_drive_sound_gearbox_title"
+                android:summary="%s" />
         </PreferenceCategory>
 
         <PreferenceCategory
