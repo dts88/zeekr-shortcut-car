@@ -91,6 +91,12 @@ final class EcarxSource {
     private static final Object SENSOR_LOCK = new Object();
     private static Object sensorProxy;
     private static final Set<Integer> sensorTypesRegistered = new HashSet<>();
+    /**
+     * 油门深度另挂的一个监听（试验，2026-10-22：想办法更快拿到新值）：用 {@code RATE_DR}（多半是导航航位推算用的速率），
+     * 和主监听分开计数，看它是不是推得更快；推来的值照样用。进程里一个、挂上就一直在（注销不掉），{@link #forgetCar} 时重挂。
+     */
+    private static Object throttleDrProxy;
+    private static boolean throttleDrRegistered;
     private static volatile EcarxSource active;
 
     private final Telemetry telemetry;
@@ -536,6 +542,7 @@ final class EcarxSource {
             }
             cachedCar = null;
             sensorTypesRegistered.clear();
+            throttleDrRegistered = false;
         }
         AppLog.i(TAG, "car object dropped: the next connect runs Car.create again");
     }
@@ -698,8 +705,66 @@ final class EcarxSource {
             }
             status.append(status.length() == 0 ? "" : "; ").append(s.name()).append(' ').append(result);
         }
+        if (plan.signals.contains(Signal.THROTTLE_DEPTH)) {
+            status.append("; ").append(listenThrottleDr());
+        }
+        status.append("; rates ").append(rateConstants());
         pushStatus = status.toString();
         AppLog.i(TAG, "push: " + pushStatus);
+    }
+
+    /** 油门深度再挂一个 {@code RATE_DR} 的监听（见 {@link #throttleDrProxy}）；返回结果（诊断）。 */
+    private String listenThrottleDr() {
+        int dr = rateConstant("RATE_DR", -1);
+        if (dr < 0) {
+            return "THROTTLE_DEPTH at RATE_DR: no such rate";
+        }
+        synchronized (SENSOR_LOCK) {
+            if (throttleDrRegistered) {
+                return "THROTTLE_DEPTH also at RATE_DR " + dr + " (registered before)";
+            }
+            Method withRate = sensor == null ? null : findMethodWithInterfaceThen(sensor, "registerListener", int.class, int.class);
+            if (withRate == null) {
+                return "THROTTLE_DEPTH at RATE_DR: no rate parameter";
+            }
+            if (throttleDrProxy == null) {
+                throttleDrProxy = Proxy.newProxyInstance(EcarxSource.class.getClassLoader(),
+                        new Class<?>[]{withRate.getParameterTypes()[0]}, new ThrottleDrCallback());
+            }
+            if (invokeOk(withRate, sensor, throttleDrProxy, Signal.THROTTLE_DEPTH.id, dr)) {
+                throttleDrRegistered = true;
+                return "THROTTLE_DEPTH also at RATE_DR " + dr;
+            }
+            return "THROTTLE_DEPTH at RATE_DR " + dr + " refused";
+        }
+    }
+
+    /** 接口上所有的速率常量（{@code RATE_*}，诊断用：还有哪几档能试）。 */
+    private String rateConstants() {
+        StringBuilder sb = new StringBuilder();
+        for (Class<?> type : publicInterfaces(sensor)) {
+            for (java.lang.reflect.Field f : type.getFields()) {
+                if (f.getName().startsWith("RATE_") && f.getType() == int.class && Modifier.isStatic(f.getModifiers())) {
+                    try {
+                        sb.append(sb.length() == 0 ? "" : " ").append(f.getName()).append('=').append(f.getInt(null));
+                    } catch (ReflectiveOperationException | RuntimeException ignored) {
+                        // 读不到就不列
+                    }
+                }
+            }
+        }
+        return sb.length() == 0 ? "none" : sb.toString();
+    }
+
+    /** 车的线程上：{@code RATE_DR} 那个监听推来的油门深度。 */
+    private void onThrottleDrPush(Object raw, long atMs) {
+        if (stopped) {
+            return;
+        }
+        Object decoded = Signal.THROTTLE_DEPTH.decode(raw);
+        if (decoded instanceof Float) {
+            telemetry.publishThrottleDrPush(this, (Float) decoded, atMs);
+        }
     }
 
     /** 车的线程上：推来的快读浮点直接交给 {@link Telemetry}（它只收此刻的来源、有人快读它的）。 */
@@ -804,6 +869,20 @@ final class EcarxSource {
                 }
             }
             return proxyDefault(proxy, method, args, "EcarxSource.FunctionCallback");
+        }
+    }
+
+    /** 油门深度 {@code RATE_DR} 那个监听的回调：转给此刻活着的来源，就在车的线程上。 */
+    private static final class ThrottleDrCallback implements InvocationHandler {
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) {
+            EcarxSource target = active;
+            if (target != null && "onSensorValueChanged".equals(method.getName()) && args != null && args.length == 2
+                    && args[0] instanceof Integer && (Integer) args[0] == Signal.THROTTLE_DEPTH.id && args[1] instanceof Number) {
+                target.onThrottleDrPush(args[1], SystemClock.elapsedRealtime());
+                return null;
+            }
+            return proxyDefault(proxy, method, args, "EcarxSource.ThrottleDrCallback");
         }
     }
 

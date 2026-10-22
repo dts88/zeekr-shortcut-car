@@ -198,9 +198,13 @@ public final class DriveSound {
                 fast.number(Signal.SPEED), fast.number(Signal.THROTTLE_DEPTH), fast.number(Signal.BRAKE_DEPTH)));
         String pushStatus = Telemetry.get().pushStatus();
         sb.append("  push: ").append(pushStatus.isEmpty() ? "not tried" : pushStatus).append('\n');
+        String formats = OutputProbe.result();
+        sb.append("  output formats: ").append(formats.isEmpty() ? "not tried" : formats).append('\n');
         sb.append("  pushed: ").append(pushed(Signal.SPEED, "speed", now)).append(", ")
                 .append(pushed(Signal.THROTTLE_DEPTH, "throttle", now)).append(", ")
                 .append(pushed(Signal.BRAKE_DEPTH, "brake", now)).append('\n');
+        sb.append("  throttle listeners: ").append(pushed(Telemetry.get().throttleListener(false), "fastest", now)).append(", ")
+                .append(pushed(Telemetry.get().throttleListener(true), "RATE_DR", now)).append('\n');
         Run r = s.latest;
         sb.append("  ").append(r == null ? "no run since the process started" : r.describe()).append('\n');
         return sb.toString();
@@ -208,7 +212,10 @@ public final class DriveSound {
 
     /** 诊断：推来的一个信号 —— 最近的值、多久以前、推了几次、平均隔多久。 */
     private static String pushed(Signal signal, String name, long now) {
-        PushedValue p = Telemetry.get().pushed(signal);
+        return pushed(Telemetry.get().pushed(signal), name, now);
+    }
+
+    private static String pushed(PushedValue p, String name, long now) {
         if (p.count == 0L) {
             return name + " -";
         }
@@ -238,6 +245,9 @@ public final class DriveSound {
         private volatile float accel;
         private volatile long blocks;
         private volatile float renderMs;
+        /** 混音多久来取一段（写的时候等了，就是它刚取走一段）、每段合多少块：输出这边我们能看到的节拍。 */
+        private volatile float mixerEveryMs = -1f;
+        private volatile float burstBlocks = -1f;
         // ---- 诊断：反应快慢（项目所有者 2026-10-21 实车嫌切运动模式、踩油门到出声都慢）
         /** 起这一台的时刻（elapsedRealtime）；那时驾驶模式变了多久（-1 = 没见它变过）。 */
         private final long askedAt = SystemClock.elapsedRealtime();
@@ -260,6 +270,11 @@ public final class DriveSound {
         private volatile int pollFirst;
         private volatile float pushLeadMs = -1f;
         private volatile float pollLeadMs = -1f;
+        /** 油门深度两个监听各自推得多勤（主监听最快档、另挂的 RATE_DR），停了以后诊断里也留着。 */
+        private volatile float mainEveryMs = -1f;
+        private volatile long mainPushes;
+        private volatile float drEveryMs = -1f;
+        private volatile long drPushes;
         private volatile float inputAgeMs = -1f;
         private volatile float outputLatencyMs = -1f;
 
@@ -292,6 +307,8 @@ public final class DriveSound {
             }
             output = out.describe();
             BlackBox.note("模拟声浪：开始（" + output + "）");
+            // 试验：哪种格式能拿到低延迟通道（进程里一次，自己的线程，不出声）
+            OutputProbe.runOnce(app, CarSpeakers.CABIN_MEDIA);
             boolean failed = false;
             try {
                 failed = loop(out);
@@ -344,6 +361,8 @@ public final class DriveSound {
             long gapWindowEnd = 0L;
             float lastThrottle = Float.NaN;
             long lastThrottleAt = -1L;
+            long lastWakeNs = 0L;
+            int blocksSinceWake = 0;
             long seenFastVersion = Long.MIN_VALUE;
             long seenPushCount = -1L;
             long inputVersion = 0L;
@@ -390,6 +409,16 @@ public final class DriveSound {
                     pedal.sample(sources.sample, sources.sampleAt, now);
                 }
                 pedal.step(dt, now);
+                PushedValue mainListener = telemetry.throttleListener(false);
+                PushedValue drListener = telemetry.throttleListener(true);
+                if (mainListener.count > 0L) {
+                    mainEveryMs = mainListener.everyMs;
+                    mainPushes = mainListener.count;
+                }
+                if (drListener.count > 0L) {
+                    drEveryMs = drListener.everyMs;
+                    drPushes = drListener.count;
+                }
                 pushFirst = sources.pushFirst;
                 pollFirst = sources.pollFirst;
                 pushLeadMs = sources.pushLeadMs;
@@ -502,11 +531,24 @@ public final class DriveSound {
                 long t0 = System.nanoTime();
                 voice.renderStereo(buffer, BLOCK, params);
                 renderMs += ((System.nanoTime() - t0) / 1_000_000f - renderMs) * 0.01f;
+                long w0 = System.nanoTime();
                 if (!out.write(buffer, BLOCK)) {
                     trouble = "write failed";
                     return true;
                 }
+                long w1 = System.nanoTime();
                 blocks++;
+                blocksSinceWake++;
+                if (w1 - w0 > 1_000_000L) {
+                    // 这一下写之前等了：混音刚取走一段。记它多久来一次、每次取多少块
+                    if (lastWakeNs > 0L) {
+                        float every = (w1 - lastWakeNs) / 1_000_000f;
+                        mixerEveryMs = mixerEveryMs < 0f ? every : mixerEveryMs + (every - mixerEveryMs) * 0.05f;
+                        burstBlocks = burstBlocks < 0f ? blocksSinceWake : burstBlocks + (blocksSinceWake - burstBlocks) * 0.05f;
+                    }
+                    lastWakeNs = w1;
+                    blocksSinceWake = 0;
+                }
                 if (now >= nextWatch) {
                     nextWatch = now + WATCH_MS;
                     boolean grown = out.watch();
@@ -524,11 +566,12 @@ public final class DriveSound {
             return String.format(Locale.US,
                     "run: %s style=%s view=%s why=%s ignited=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
+                            + "  mixer: takes a period every %s (%s blocks each)%n"
                             + "  start: drive mode changed %s before the run was asked for, output opened in %s, "
                             + "first sound %s after the ask (%s after the mode change)%n"
                             + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes)%n"
                             + "  throttle push: every %s (%d pushes), a new value came first by push %d times (ahead by %s), "
-                            + "by the fast read %d times (ahead by %s)%n"
+                            + "by the fast read %d times (ahead by %s); fastest listener every %s (%d), RATE_DR listener every %s (%d)%n"
                             + "  pedal to speaker (the part measurable here): new throttle used %s after it arrived "
                             + "+ output %s (HAL timestamp; on the car's head unit it reads about 5.1 s whatever the buffer, so it is "
                             + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
@@ -536,9 +579,11 @@ public final class DriveSound {
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
+                    ms(mixerEveryMs), burstBlocks < 0f ? "?" : String.format(Locale.US, "%.1f", burstBlocks),
                     ms(modeAgeWhenAsked), ms(openMs), ms(askedToSoundMs), ms(modeToSoundMs),
                     ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps,
                     ms(pushEveryMs), pushes, pushFirst, ms(pushLeadMs), pollFirst, ms(pollLeadMs),
+                    ms(mainEveryMs), mainPushes, ms(drEveryMs), drPushes,
                     ms(inputAgeMs), ms(outputLatencyMs));
         }
 
