@@ -10,21 +10,23 @@ package com.kooo.evcam.sound;
  *       （伪挡位、模拟换挡时每一挡从低爬到高、升挡掉下来）。主音和转速成正比（{@link #MAIN_ORDER} 阶）：怠速约 150 Hz，
  *       转满约 1030 Hz。项目所有者 2026-10-22 挑的几段参考：主音跟着虚拟转速走，挂挡加速每一挡从约 550 爬到约 1050 Hz，
  *       升挡掉回 0.65–0.8 倍，停着踩到顶约 1000–1030 Hz（第二版只在 533–1190 Hz 里走，挂挡全油门时还先顶到七成，几乎是平的）。</li>
- *   <li><b>哨声</b>：一大排不成倍数的线（相对主音 0.36 … 1.86，32 根，间隔不规则）跟着转子一起走，主音最响；左右两台只差一点点。
- *       线多、线和线之间满（项目所有者 2026-10-22：电音多了，原厂那种飞机的气势、多频率的齐鸣、厚度不够 —— 参考踩到顶那一刻
- *       200–2000 Hz 里 20 dB 以内有 13–22 根线，中间那一格只比最响的低 19–27 dB），但没有共同的「基频」（一整排严格的谐波听得出
- *       它们的公共频率，转速低时就是一串一串的节奏，像活塞发动机 —— 车主：飞机应该是嗡嗡的，没有明显的节奏）。插在中间的 14 根
- *       怠速时几乎没有、转得越高越响：转速低时它们和邻居一秒只拍几下，就是节奏；转满时拍成一秒几十下的「嗡」，把空当填满。</li>
- *   <li><b>低音</b>：一根，居中（88 → 140 Hz），带它的二次谐波，音调随机晃一点，转满时是最响的；随推力加一点它下面八度的低沉。</li>
+ *   <li><b>哨声</b>：主音和两边一排不成倍数的线（相对主音 0.41 … 1.89，14 根，间隔不规则），照参考踩到顶那一刻排的：两边的比
+ *       主音低 9–29 dB，主音带 2、3、4、6 倍的弱泛音；两台同频、错开相位（不相拍）。没有共同的「基频」（一整排严格的谐波听得出
+ *       它们的公共频率，转速低时就是一串一串的节奏，像活塞发动机 —— 车主：飞机应该是嗡嗡的，没有明显的节奏）。</li>
+ *   <li><b>底子</b>：一层跟着主音走的宽带噪声，主音那里鼓起来，比那里的线低约 9 dB，左右几乎各自独立 —— 参考的厚度、气势就是它
+ *       （项目所有者 2026-10-22：原厂那种飞机的气势、多频率的齐鸣、厚度不够；参考踩到顶那一刻 20 dB 以内 13–22 根线，中间那一格
+ *       只比最响的低 19–27 dB）。</li>
+ *   <li><b>低音</b>：一根，居中（88 → 110 Hz），带它的二次谐波，音调随机晃一点，转满时是最响的；随推力加一点它下面八度的低沉。</li>
  *   <li><b>「轰」</b>：一踩油门（负荷比它最近的平均高出一截）低音下面八度「轰」一声，约 0.2 秒；一松也「轰」，小一些。</li>
  *   <li><b>换挡</b>：升挡一声「音爆」（N 形的一下 + 45 Hz 的一捶）加一点「轰」；降挡只「轰」一点。松油门转子往下掉时「呼」一声。</li>
  *   <li><b>启动、熄火</b>：从静止起转，音调从低往上走到怠速（行驶中也一样，从低处赶到该有的转速）；熄火时转子落下去，
  *       音调往下走、越来越轻。</li>
  * </ul>
  *
- * <p>没有随机的快起伏（项目所有者 2026-10-22/23：沙沙的颗粒状噪音，一踩油门就变密变强；一层一层拆开听：一根纯音、一根低音、
- * 不抖的线都没有颗粒，有颗粒的是线的随机抖动、成对又随机晃的三根低音、喷流的噪声和那一大段噪声的「轰」）。所以：线不抖，
- * 低音一根，没有持续的噪声（喷流、气声、嘶声），「轰」是一声低音；跟着油门变的电平逐个样本平滑地走，不按块跳。</p>
+ * <p>没有窄带的随机起伏（项目所有者 2026-10-22/23：沙沙的颗粒状噪音，一踩油门就变密变强；一层一层拆开听：一根纯音、一根低音、
+ * 不抖的线都没有颗粒，有颗粒的是线的随机抖动（每根线两边一小片窄噪声）、成对又随机晃的三根低音、90 Hz 一带的喷流和那一大段
+ * 噪声的「轰」）。所以：线不抖，低音一根，「轰」是一声低音，噪声只有那层宽的底子；跟着油门变的电平逐个样本平滑地走。
+ * 也没有挨得近又一样强的线（转速一高拍成一秒二三十下的「一串一串」，项目所有者 2026-10-23）。</p>
  *
  * <p>电平不大跟虚拟发动机变（参考里踩住油门并不比怠速响多少，变化靠低音、推力的低沉和一踩一松的「轰」）。
  * 音量、阀门（低通，现在一直全开）、30 Hz 高通、最后的限幅（{@link Limiter}）和别的风格一样，峰值不超过 {@link EngineVoice#CEILING}。
@@ -52,33 +54,46 @@ final class JetVoice implements Voice {
     /** 挂着挡（或低于怠速：起转、熄火）时转子就是虚拟转速，只再平一点（秒）：升挡那一下要掉得干脆。 */
     static final float DRIVE_LAG_SEC = 0.04f;
 
-    // ---- 哨声：一大排不成倍数的线（× 主音；转满时 dB、怠速时 dB，相对主音，中间按 dB 走）；怠速 −40 dB 的那 14 根是插在中间、
-    //      转得越高越响的（不抖以后线和线之间是空的，参考踩到顶那一刻是满的）
-    static final float[] LINE_RATIO = {0.36f, 0.39f, 0.42f, 0.455f, 0.49f, 0.525f, 0.56f, 0.6f, 0.64f, 0.69f, 0.715f, 0.74f,
-        0.775f, 0.81f, 0.845f, 0.88f, 0.915f, 0.95f, 1f, 1.07f, 1.12f, 1.17f, 1.225f, 1.28f, 1.345f, 1.41f, 1.48f, 1.55f,
-        1.615f, 1.68f, 1.77f, 1.86f};
-    static final float[] LINE_FULL_DB = {-16f, -15f, -10f, -15f, -14f, -15f, -12f, -15f, -9f, -7f, -15f, -8f, -15f, -6f, -15f,
-        -9f, -15f, -7f, 0f, -8f, -15f, -9f, -15f, -11f, -15f, -13f, -15f, -12f, -15f, -15f, -15f, -18f};
-    static final float[] LINE_IDLE_DB = {-31.5f, -40f, -25.5f, -40f, -29.5f, -40f, -27.5f, -40f, -23.5f, -21.5f, -40f, -22.5f,
-        -40f, -19.5f, -40f, -27.5f, -40f, -30f, -1.5f, -30f, -40f, -27.5f, -40f, -16.5f, -40f, -19.5f, -40f, -19.5f, -40f,
-        -23.5f, -40f, -27.5f};
-    /** 左右两台差多少（份额；很小：两台的同一根线之间只有一两秒一次的慢起伏）。 */
-    static final float ENGINE_SPLIT = 0.0007f;
+    // ---- 哨声：主音和两边一排不成倍数的线（× 主音；转满时 dB、怠速时 dB，相对主音，中间按 dB 走），照参考踩到顶那一刻量的
+    //      （2026-10-23）：20 dB 以内只有六到九根，两边的比主音低 8–29 dB；线和线之间的「满」是一层噪声（见底子）。两边的线
+    //      都强、又挨得近的话，转速一高就拍成一秒二三十下的「一串一串」（项目所有者 2026-10-23）；主音旁边的几根怠速时压得很低
+    static final float[] LINE_RATIO = {0.41f, 0.45f, 0.58f, 0.63f, 0.75f, 1f, 1.07f, 1.13f, 1.18f, 1.36f, 1.42f, 1.58f, 1.68f, 1.89f};
+    static final float[] LINE_FULL_DB = {-9f, -14f, -18f, -16f, -15f, 0f, -20f, -24f, -18f, -22f, -17f, -28f, -29f, -27f};
+    static final float[] LINE_IDLE_DB = {-24f, -30f, -27f, -25f, -28f, -1.5f, -35f, -35f, -32f, -35f, -5f, -35f, -35f, -35f};
+    /** 主音的泛音（倍数、相对主音 dB）：参考 2–6 倍处有一串弱的线，每根比主音低 30–34 dB（再强就是几声干净的哨，像电音）。 */
+    static final int[] HARMONIC = {2, 3, 4, 6};
+    static final float[] HARMONIC_DB = {-30f, -33f, -32f, -34f};
+    /**
+     * 两台的同一根线错开多少（周，每根再按黄金分割错开）：两台同频、不相拍 —— 原来差 0.07 %，主音一独大就是每秒一两下的
+     * 深「哇哇」（两台在左右，一个声道里两份忽而相加忽而相消）。左右的宽度交给底子。
+     */
+    static final float ENGINE_OFFSET = 0.25f;
     /**
      * 每根线的音调各自慢慢漂（份额的标准差、两级低通 Hz；两台一起漂，不然两台同一根线之间拍成一秒几下的「哇哇」）：线和线之间
-     * 的拍、拍和拍之间的差（一秒十几下的颤）跟着漂，不成节奏。原来是随机的相位抖动，一秒几十下 —— 线变成一小片噪声，听着是颗粒
-     * （项目所有者 2026-10-23）。主音旁边的 0.88、0.95、1.07、1.17 倍怠速时压得很低：它们和主音拍的那几下，转速低时一秒只有
-     * 七到十几下。
+     * 的拍跟着漂，不成节奏。原来是随机的相位抖动，一秒几十下 —— 每根线两边一小片窄窄的噪声，听着是颗粒（项目所有者 2026-10-23）。
      */
     static final float WANDER = 0.003f;
     static final float WANDER_HZ = 1f;
+
+    // ---- 底子：一层跟着主音走的噪声（照参考踩到顶那一刻：100 Hz 以上大致平（粉红），主音那里鼓起来、比那里的线低约 9 dB，
+    //      主音以上很快没了；左右几乎各自独立）。宽的一层听着是「呼——」，是厚度和气势；窄的（抖动在每根线两边 ±35 Hz 的一小片、
+    //      原来 90 Hz 一带的喷流）才是颗粒
+    /** 电平（相对主音，dB）；鼓起来的地方（× 主音）、多尖；100 Hz 以下不要；左右各自的、共用的份额。 */
+    static final float FLOOR_DB = -5f;
+    static final float FLOOR_TOP = 1.1f;
+    static final float FLOOR_Q = 3f;
+    /** 鼓起来的那一块至少多宽（Hz）：转速低时主音才一两百 Hz，同样的 Q 只剩几十 Hz 宽，又成了窄带噪声（颗粒）。 */
+    static final float FLOOR_WIDTH_HZ = 350f;
+    static final float FLOOR_LOW_HZ = 100f;
+    static final float FLOOR_OWN = 0.9f;
+    static final float FLOOR_COMMON = 0.44f;
     /** 主音的电平（相对转满时的低音，dB；怠速时两者差不多）；两台摆在左右多远。 */
     static final float WHINE_DB = -6f;
     static final float ENGINE_PAN = 0.3f;
 
     // ---- 低音：一根，居中（怠速 Hz、转满 Hz、dB），怠速时比转满低多少；音调随机晃一点（份额、低通 Hz）
     static final float LOW_IDLE_HZ = 88f;
-    static final float LOW_FULL_HZ = 140f;
+    static final float LOW_FULL_HZ = 110f;
     static final float LOW_DB = -5f;
     static final float LOW_IDLE_DB = -1f;
     static final float LOW_WOBBLE = 0.012f;
@@ -86,7 +101,7 @@ final class JetVoice implements Voice {
     /** 低音的二次谐波（相对低音，dB，转满时；怠速时三成）：补上低音和最低那根哨声之间的空当（原来是喷流的噪声）。 */
     static final float LOW_SECOND_DB = -10f;
     /** 推力的低沉：低音下面八度，满推力时多大（dB）。 */
-    static final float SUB_DB = -11f;
+    static final float SUB_DB = -23f;
 
     // ---- 「轰」：低音下面八度的一声
     /** 多快落下去（秒）、多大（dB，满的一下）、松油门时是踩下时的几成；负荷「最近的平均」跟多慢、高出多少算满。 */
@@ -124,8 +139,6 @@ final class JetVoice implements Voice {
     /** 哨声电平、低音音调每这么多个样本算一次。 */
     private static final int CONTROL = 16;
     private static final float SQRT2 = 1.4142135f;
-    /** 两台发动机：频率的倍数。 */
-    private static final float[] ENGINE = {1f - ENGINE_SPLIT, 1f + ENGINE_SPLIT};
 
     private final float rate;
     private final float lagUpK;
@@ -147,6 +160,15 @@ final class JetVoice implements Voice {
     private final float secondGain;
     private final float subGain;
     private final float whoompGain;
+    /** 主音在哪一根（{@link #LINE_RATIO} 里的 1）；泛音的增益（相对主音）。 */
+    private final int mainLine;
+    private final float[] harmonicGain = new float[HARMONIC.length];
+    /** 底子：电平；三股粉红噪声（左、右、共用）各三级的状态；每个声道的高通和两级低通（鼓起来的那一级、跟着的一级）。 */
+    private final float floorGain;
+    private final float[] pinkState = new float[9];
+    private final Biquad[] floorHighpass = new Biquad[2];
+    private final Biquad[] floorPeak = new Biquad[2];
+    private final Biquad[] floorLowpass = new Biquad[2];
 
     /** 转子（0 怠速 … 1 转满；起转时是负的）。 */
     private float spool;
@@ -201,6 +223,9 @@ final class JetVoice implements Voice {
         wanderK = 1f - (float) Math.exp(-2.0 * Math.PI * WANDER_HZ * CONTROL / sampleRate);
         wanderNorm = twoPoleNorm(wanderK);
         java.util.Arrays.fill(lineMul, 1f);
+        for (int k = 0; k < LINES; k++) {
+            linePhase[LINES + k] = (ENGINE_OFFSET + 0.618034 * k) % 1.0;
+        }
         whoompDecay = perSample(WHOOMP_SEC);
         whooshDecay = perSample(WHOOSH_SEC);
         thumpDecay = perSample(THUMP_SEC);
@@ -215,9 +240,23 @@ final class JetVoice implements Voice {
         secondGain = EngineVoice.dbToLin(LOW_SECOND_DB);
         subGain = EngineVoice.dbToLin(SUB_DB);
         whoompGain = EngineVoice.dbToLin(WHOOMP_DB);
+        int main = 0;
+        for (int k = 0; k < LINES; k++) {
+            if (LINE_RATIO[k] == 1f) {
+                main = k;
+            }
+        }
+        mainLine = main;
+        for (int h = 0; h < HARMONIC.length; h++) {
+            harmonicGain[h] = EngineVoice.dbToLin(HARMONIC_DB[h]);
+        }
+        floorGain = EngineVoice.dbToLin(FLOOR_DB);
         for (int c = 0; c < 2; c++) {
             highpass[c] = Biquad.highpass(EngineVoice.HIGHPASS_HZ, 0.7071f, sampleRate);
             tone[c] = new Biquad();
+            floorHighpass[c] = Biquad.highpass(FLOOR_LOW_HZ, 0.7071f, sampleRate);
+            floorPeak[c] = Biquad.lowpass(IDLE_HZ * FLOOR_TOP, FLOOR_Q, sampleRate);
+            floorLowpass[c] = Biquad.lowpass(IDLE_HZ * FLOOR_TOP, 0.7071f, sampleRate);
         }
         whooshBand = Biquad.bandpass(WHOOSH_HZ, WHOOSH_Q, sampleRate);
         boomLowpass = Biquad.lowpass(BOOM_LOWPASS_HZ, 0.7071f, sampleRate);
@@ -309,6 +348,14 @@ final class JetVoice implements Voice {
             float e0 = lines(0, inc) * fanLevel;
             float e1 = lines(1, inc) * fanLevel;
 
+            // 底子：跟着主音的一层噪声，电平跟着主音
+            float common = pink(2, white());
+            float floorAmp = floorGain * fanGain[mainLine] * fanLevel;
+            float floorL = floorLowpass[0].process(floorPeak[0].process(floorHighpass[0].process(
+                    FLOOR_OWN * pink(0, white()) + FLOOR_COMMON * common))) * floorAmp;
+            float floorR = floorLowpass[1].process(floorPeak[1].process(floorHighpass[1].process(
+                    FLOOR_OWN * pink(1, white()) + FLOOR_COMMON * common))) * floorAmp;
+
             // 低音、它下面八度：推力的低沉 + 「轰」
             double lp = lowPhase + lowInc;
             if (lp >= 1.0) {
@@ -346,8 +393,8 @@ final class JetVoice implements Voice {
                 middle += thump * EngineVoice.sin(thumpPhase);
             }
 
-            float l = engineNear * e0 + engineFar * e1 + low + PulseVoice.CENTER * middle;
-            float r = engineFar * e0 + engineNear * e1 + low + PulseVoice.CENTER * middle;
+            float l = engineNear * e0 + engineFar * e1 + floorL + low + PulseVoice.CENTER * middle;
+            float r = engineFar * e0 + engineNear * e1 + floorR + low + PulseVoice.CENTER * middle;
             levelNow += (levelTarget - levelNow) * gainK;
             l *= levelNow;
             r *= levelNow;
@@ -372,6 +419,11 @@ final class JetVoice implements Voice {
             wanderSmooth[k] += wanderK * (wanderNoise[k] - wanderSmooth[k]);
             lineMul[k] = 1f + WANDER * wanderNorm * wanderSmooth[k];
         }
+        float top = Math.min(0.45f * rate, mainHz(spool) * FLOOR_TOP);
+        for (int c = 0; c < 2; c++) {
+            floorPeak[c].setLowpass(top, Math.max(0.7071f, Math.min(FLOOR_Q, top / FLOOR_WIDTH_HZ)), rate);
+            floorLowpass[c].setLowpass(top, 0.7071f, rate);
+        }
         lowWobble += wobbleK * (white() - lowWobble);
         lowInc = LOW_IDLE_HZ * (float) Math.exp(s * lowLnSpan) * (1f + LOW_WOBBLE * wobbleNorm * lowWobble) / rate;
     }
@@ -391,7 +443,7 @@ final class JetVoice implements Voice {
 
     /** 第 {@code e} 台的哨声往前走一个样本（主音每样本走 {@code inc} 周）：每根线按自己的倍数（和这一刻的漂移）走。 */
     private float lines(int e, float inc) {
-        float step = inc * ENGINE[e];
+        float step = inc;
         float sum = 0f;
         for (int k = 0; k < LINES; k++) {
             int o = e * LINES + k;
@@ -401,6 +453,13 @@ final class JetVoice implements Voice {
             }
             linePhase[o] = ph;
             sum += fanGain[k] * EngineVoice.sin(ph);
+            if (k == mainLine) {
+                float hs = 0f;
+                for (int h = 0; h < HARMONIC.length; h++) {
+                    hs += harmonicGain[h] * EngineVoice.sin(HARMONIC[h] * ph);
+                }
+                sum += fanGain[k] * hs;
+            }
         }
         return sum;
     }
@@ -411,6 +470,15 @@ final class JetVoice implements Voice {
     }
 
     /** 方差 1 的白噪声过两级一样的一阶低通（每步 {@code k}）以后，乘多少方差回到 1：输出方差 k⁴(1 + r) / (1 − r)³，r = (1 − k)²。 */
+    /** 第 {@code i} 股粉红噪声往前走一个样本（Paul Kellet 的三级近似，每倍频程低 3 dB）。 */
+    private float pink(int i, float w) {
+        int o = 3 * i;
+        pinkState[o] = 0.99765f * pinkState[o] + w * 0.0990460f;
+        pinkState[o + 1] = 0.96300f * pinkState[o + 1] + w * 0.2965164f;
+        pinkState[o + 2] = 0.57000f * pinkState[o + 2] + w * 1.0526913f;
+        return pinkState[o] + pinkState[o + 1] + pinkState[o + 2] + w * 0.1848f;
+    }
+
     private static float twoPoleNorm(float k) {
         double r = (1.0 - k) * (1.0 - k);
         return (float) (1.0 / Math.sqrt(Math.pow(k, 4) * (1.0 + r) / Math.pow(1.0 - r, 3)));
