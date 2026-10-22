@@ -370,6 +370,48 @@ public class JetVoiceTest {
         }
     }
 
+    @Test
+    public void theLevelDoesNotTwitch() {
+        // 项目所有者 2026-10-22/23：沙沙的颗粒状噪音，一踩油门就变密变强。一层一层拆开听：一根纯音、一根低音、不抖的线都没有
+        // 颗粒；有颗粒的是线的随机相位抖动、成对又随机晃的三根低音、喷流的噪声 —— 都是一秒几十下随机的忽大忽小。整个声音的电平
+        // （2.5 ms 一帧）减去 ±62.5 ms 的平均、再平 10 ms（约每秒 8–50 下）：起伏不到平均的 0.09（那几版 0.11–0.20，现在约 0.06）。
+        // 停着踩到顶、D 挡 2500 rpm 和 4800 rpm 小油门
+        for (VoiceParams p : new VoiceParams[] {params(FREE_MAX_RPM, 1f, false), params(2500f, 0.3f, true),
+                params(4800f, 0.4f, true)}) {
+            p.gain = 0.1f;
+            float[] x = render(p, 6.5f);
+            int from = Math.round(1.5f * RATE);
+            int hop = RATE / 400;
+            int n = (x.length - from) / hop;
+            double[] level = new double[n];
+            double mean = 0;
+            for (int f = 0; f < n; f++) {
+                level[f] = Math.sqrt(energy(x, from + f * hop, from + (f + 1) * hop) / hop);
+                mean += level[f] / n;
+            }
+            double[] fast = new double[n];
+            for (int f = 0; f < n; f++) {
+                double slow = 0;
+                int c = 0;
+                for (int j = Math.max(0, f - 25); j <= Math.min(n - 1, f + 25); j++) {
+                    slow += level[j];
+                    c++;
+                }
+                fast[f] = level[f] - slow / c;
+            }
+            double sum = 0;
+            int m = 0;
+            for (int f = 2; f < n - 2; f++) {
+                double s = (fast[f - 2] + fast[f - 1] + fast[f] + fast[f + 1] + fast[f + 2]) / 5;
+                sum += s * s;
+                m++;
+            }
+            double twitch = Math.sqrt(sum / m) / mean;
+            String what = p.drive ? "D 挡 " + p.rpm + " rpm" : "停着踩到顶";
+            assertTrue(what + " 电平每秒 8–50 下的起伏 " + twitch, twitch < 0.09);
+        }
+    }
+
     // ================================================================= 喷流、换挡
 
     @Test
