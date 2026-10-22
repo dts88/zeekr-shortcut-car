@@ -196,15 +196,26 @@ public final class DriveSound {
                 Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
-        PushedValue push = Telemetry.get().pushedThrottle();
-        sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s; throttle push: %s, last %s (%s ago, %d pushes)%n",
-                fast.ageMs(now), fast.number(Signal.SPEED), fast.number(Signal.THROTTLE_DEPTH), fast.number(Signal.BRAKE_DEPTH),
-                Telemetry.get().pushStatus().isEmpty() ? "not tried" : Telemetry.get().pushStatus(),
-                push.count > 0L ? String.valueOf(push.value) : "-",
-                push.count > 0L ? (now - push.atMs) + " ms" : "-", push.count));
+        sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s%n", fast.ageMs(now),
+                fast.number(Signal.SPEED), fast.number(Signal.THROTTLE_DEPTH), fast.number(Signal.BRAKE_DEPTH)));
+        String pushStatus = Telemetry.get().pushStatus();
+        sb.append("  push: ").append(pushStatus.isEmpty() ? "not tried" : pushStatus).append('\n');
+        sb.append("  pushed: ").append(pushed(Signal.SPEED, "speed", now)).append(", ")
+                .append(pushed(Signal.THROTTLE_DEPTH, "throttle", now)).append(", ")
+                .append(pushed(Signal.BRAKE_DEPTH, "brake", now)).append('\n');
         Run r = s.latest;
         sb.append("  ").append(r == null ? "no run since the process started" : r.describe()).append('\n');
         return sb.toString();
+    }
+
+    /** 诊断：推来的一个信号 —— 最近的值、多久以前、推了几次、平均隔多久。 */
+    private static String pushed(Signal signal, String name, long now) {
+        PushedValue p = Telemetry.get().pushed(signal);
+        if (p.count == 0L) {
+            return name + " -";
+        }
+        return String.format(Locale.US, "%s %s (%d ms ago, %d pushes, every %s)", name, p.value, now - p.atMs, p.count,
+                p.everyMs < 0f ? "?" : String.format(Locale.US, "%.0f ms", p.everyMs));
     }
 
     /** 一个声音线程：开车内喇叭、合成、写；要停时淡出再放掉。 */
@@ -338,7 +349,6 @@ public final class DriveSound {
             long seenPushCount = -1L;
             long inputVersion = 0L;
             long lastPushCount = 0L;
-            long lastPushAt = -1L;
             float usedThrottle = Float.NaN;
             // 最近推来的值和时刻（找「这个新值推送早送到了多久」）
             float[] pushedValues = new float[PUSH_HISTORY];
@@ -355,19 +365,28 @@ public final class DriveSound {
                     link = telemetry.carLinkConnected();
                 }
                 FastReadings fast = telemetry.fast();
-                PushedValue push = telemetry.pushedThrottle();
+                PushedValue push = telemetry.pushed(Signal.THROTTLE_DEPTH);
+                PushedValue pushSpeed = telemetry.pushed(Signal.SPEED);
+                PushedValue pushBrake = telemetry.pushed(Signal.BRAKE_DEPTH);
                 float polled = num(fast.number(Signal.THROTTLE_DEPTH));
-                // 油门：推来过就用推来的（快读的值比推送晚约 100 ms），推送停了、快读又不一样才用快读
+                float polledSpeed = num(fast.number(Signal.SPEED));
+                float polledBrake = num(fast.number(Signal.BRAKE_DEPTH));
+                // 车速、油门、刹车：推来过就用推来的（快读的值比推送晚约 100 ms），推送停了、快读又不一样才用快读
                 boolean pushed = DriveSoundRules.usePush(push.count, push.atMs, push.value, polled, now);
                 float throttle = pushed ? push.value : polled;
                 long throttleAt = pushed ? push.atMs : fast.atMs;
-                if (fast.version != seenFastVersion || push.count != seenPushCount) {
+                float speed = DriveSoundRules.usePush(pushSpeed.count, pushSpeed.atMs, pushSpeed.value, polledSpeed, now)
+                        ? pushSpeed.value : polledSpeed;
+                float brake = DriveSoundRules.usePush(pushBrake.count, pushBrake.atMs, pushBrake.value, polledBrake, now)
+                        ? pushBrake.value : polledBrake;
+                long pushCount = push.count + pushSpeed.count + pushBrake.count;
+                if (fast.version != seenFastVersion || pushCount != seenPushCount) {
                     seenFastVersion = fast.version;
-                    seenPushCount = push.count;
+                    seenPushCount = pushCount;
                     inputVersion++;
                 }
-                inputs.offer(inputVersion, Math.max(fast.atMs, push.atMs), num(fast.number(Signal.SPEED)), throttle,
-                        num(fast.number(Signal.BRAKE_DEPTH)));
+                long inputAt = Math.max(Math.max(fast.atMs, push.atMs), Math.max(pushSpeed.atMs, pushBrake.atMs));
+                inputs.offer(inputVersion, inputAt, speed, throttle, brake);
                 if (!Float.isNaN(throttle) && (Float.isNaN(usedThrottle) || Math.abs(throttle - usedThrottle) >= 1f)) {
                     // 诊断：新的油门值用上时已经过了多久（读到 / 推来 → 这一块合成）
                     if (!Float.isNaN(usedThrottle) && throttleAt > 0L) {
@@ -377,14 +396,10 @@ public final class DriveSound {
                     usedThrottle = throttle;
                 }
                 if (push.count != lastPushCount && push.count > 0L) {
-                    // 诊断：推送多久来一次（踩、松的时候，两次之间超过半秒的不算）；记下推来的值好对快读
-                    if (lastPushCount > 0L && push.count > lastPushCount && lastPushAt > 0L && push.atMs - lastPushAt < 500L) {
-                        float each = (push.atMs - lastPushAt) / (float) (push.count - lastPushCount);
-                        pushEveryMs = pushEveryMs < 0f ? each : pushEveryMs + (each - pushEveryMs) * 0.1f;
-                    }
+                    // 诊断：油门推送多久来一次（Telemetry 算的平均）；记下推来的值好对快读
+                    pushEveryMs = push.everyMs;
                     pushes = push.count;
                     lastPushCount = push.count;
-                    lastPushAt = push.atMs;
                     pushedValues[pushedHead] = push.value;
                     pushedAt[pushedHead] = push.atMs;
                     pushedHead = (pushedHead + 1) % PUSH_HISTORY;
