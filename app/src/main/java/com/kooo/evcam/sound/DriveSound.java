@@ -348,6 +348,11 @@ public final class DriveSound {
             long seenFastVersion = Long.MIN_VALUE;
             long seenPushCount = -1L;
             long inputVersion = 0L;
+            // 油门还原成连续的踏板（车机约 200 ms 才更新一次，PedalTrack）：上一次交给它的是哪一次推送 / 哪个快读值
+            PedalTrack pedal = new PedalTrack();
+            long pedalPush = -1L;
+            float pedalPolled = Float.NaN;
+            boolean pedalFromPush = false;
             long lastPushCount = 0L;
             float usedThrottle = Float.NaN;
             // 最近推来的值和时刻（找「这个新值推送早送到了多久」）
@@ -387,6 +392,20 @@ public final class DriveSound {
                 }
                 long inputAt = Math.max(Math.max(fast.atMs, push.atMs), Math.max(pushSpeed.atMs, pushBrake.atMs));
                 inputs.offer(inputVersion, inputAt, speed, throttle, brake);
+                // 新的油门读数交给踏板：推送每来一次交一次（同一个值也算，说明脚停着）；退回快读时它的值变了才交
+                if (pushed) {
+                    if (push.count != pedalPush || !pedalFromPush) {
+                        pedalPush = push.count;
+                        pedalFromPush = true;
+                        pedal.sample(push.value, push.atMs, now);
+                    }
+                } else if (pedalFromPush || Float.isNaN(polled) != Float.isNaN(pedalPolled)
+                        || (!Float.isNaN(polled) && polled != pedalPolled)) {
+                    pedalFromPush = false;
+                    pedalPolled = polled;
+                    pedal.sample(polled, fast.atMs, now);
+                }
+                pedal.step(dt, now);
                 if (!Float.isNaN(throttle) && (Float.isNaN(usedThrottle) || Math.abs(throttle - usedThrottle) >= 1f)) {
                     // 诊断：新的油门值用上时已经过了多久（读到 / 推来 → 这一块合成）
                     if (!Float.isNaN(usedThrottle) && throttleAt > 0L) {
@@ -453,8 +472,10 @@ public final class DriveSound {
                         r.code(Signal.DRIVE_MODE), inputs.speed(), inputs.throttle(), fast.ageMs(now), inCall);
                 why = w;
                 in.speedKmh = inputs.speed();
-                in.throttlePct = inputs.throttle();
-                in.pedalRate = inputs.pedalRate();
+                // 虚拟发动机看还原后的踏板和按相邻读数算的快慢；踏板读不到时照快读的
+                boolean tracked = !Float.isNaN(pedal.value());
+                in.throttlePct = tracked ? pedal.value() : inputs.throttle();
+                in.pedalRate = tracked ? pedal.rate(now) : inputs.pedalRate();
                 in.accel = inputs.accel();
                 in.braking = inputs.brake() > VirtualEngine.BRAKE_ON || Boolean.TRUE.equals(r.bool(Signal.BRAKE_PEDAL));
                 in.gear = DriveSoundRules.gearOf(gearText);
@@ -508,7 +529,7 @@ public final class DriveSound {
                 } else {
                     params.gain = 0f;
                 }
-                pedalRate = inputs.pedalRate();
+                pedalRate = in.pedalRate;
                 accel = inputs.accel();
                 long t0 = System.nanoTime();
                 voice.renderStereo(buffer, BLOCK, params);
