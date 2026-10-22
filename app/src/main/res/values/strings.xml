@@ -922,6 +922,7 @@
     <string name="dev_drive_sound_style_american">美式 V8</string>
     <string name="dev_drive_sound_style_prototype">试制 V8</string>
     <string name="dev_drive_sound_style_jet">超音速</string>
+    <string name="dev_drive_sound_style_jet_old">超音速（旧版）</string>
     <string name="dev_drive_sound_view_title">听感</string>
     <string name="dev_drive_sound_view_outside">车外</string>
     <string name="dev_drive_sound_view_cabin">车内</string>

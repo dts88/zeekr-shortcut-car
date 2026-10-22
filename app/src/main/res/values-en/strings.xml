@@ -929,6 +929,7 @@
     <string name="dev_drive_sound_style_american">American V8</string>
     <string name="dev_drive_sound_style_prototype">Prototype V8</string>
     <string name="dev_drive_sound_style_jet">Supersonic jet</string>
+    <string name="dev_drive_sound_style_jet_old">Supersonic jet (old version)</string>
     <string name="dev_drive_sound_view_title">Listening position</string>
     <string name="dev_drive_sound_view_outside">Outside</string>
     <string name="dev_drive_sound_view_cabin">In the cabin</string>

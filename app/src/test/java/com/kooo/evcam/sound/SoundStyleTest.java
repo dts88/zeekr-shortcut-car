@@ -22,6 +22,7 @@ public class SoundStyleTest {
         assertEquals(SoundStyle.AMERICAN, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_AMERICAN));
         assertEquals(SoundStyle.PROTOTYPE, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_PROTOTYPE));
         assertEquals(SoundStyle.JET, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_JET));
+        assertEquals(SoundStyle.JET_OLD, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_JET_OLD));
         assertEquals(SoundStyle.AMERICAN, SoundStyle.of(null));
         assertEquals(SoundStyle.AMERICAN, SoundStyle.of("v12"));
     }
@@ -31,6 +32,7 @@ public class SoundStyleTest {
         assertTrue(SoundStyle.PROTOTYPE.cranks());
         assertFalse(SoundStyle.AMERICAN.cranks());
         assertFalse(SoundStyle.JET.cranks());
+        assertFalse(SoundStyle.JET_OLD.cranks());
     }
 
     @Test

@@ -976,6 +976,8 @@ public class AppConfig {
     public static final String DRIVE_SOUND_STYLE_PROTOTYPE = "prototype";
     /** 声音风格：超音速（双发喷气机的取向，试制）。 */
     public static final String DRIVE_SOUND_STYLE_JET = "jet";
+    /** 声音风格：超音速（旧版）—— 2026-10-22 的那一版，和新的装车对比（项目所有者 2026-10-23）。 */
+    public static final String DRIVE_SOUND_STYLE_JET_OLD = "jet_old";
     /** 听感（{@link SettingsRegistry#DRIVE_SOUND_VIEW}）：车外（默认，站在车旁听的那种）。 */
     public static final String DRIVE_SOUND_VIEW_OUTSIDE = "outside";
     /** 听感：车内（隔着防火墙、车身听，高频闷一些）。 */
@@ -1020,7 +1022,10 @@ public class AppConfig {
         writeEnum(SettingsRegistry.DRIVE_SOUND_GEARBOX, gearbox);
     }
 
-    /** 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE} / {@link #DRIVE_SOUND_STYLE_JET}。 */
+    /**
+     * 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE} / {@link #DRIVE_SOUND_STYLE_JET} /
+     * {@link #DRIVE_SOUND_STYLE_JET_OLD}。
+     */
     public String getDriveSoundStyle() {
         return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
     }

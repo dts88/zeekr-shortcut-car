@@ -242,6 +242,7 @@
   msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
   声音风格（2026-10-21 加，车主嫌第一版单薄、要按发动机的结构重做，第一版留作可选风格）：dev_drive_sound_style_title「声音风格」/
   Sound style / Gaya bunyi（三档的名字车主定了，见上面的单子；「听感」「变速箱」也批了）。
+  第四档 dev_drive_sound_style_jet_old「超音速（旧版）」/ Supersonic jet (old version) / Jet supersonik (versi lama)（2026-10-23，车主要把 2026-10-22 的那版超音速留着、和新的装车对比，叫它「supersonic-old」）。
 - 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
   四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
   vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。
