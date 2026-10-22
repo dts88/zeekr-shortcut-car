@@ -18,7 +18,7 @@ package com.kooo.evcam.sound;
  *   <li><b>低音</b>：三根（88 → 140、76 → 120、165 → 215 Hz），也成对、抖得更宽，转满时是最响的。</li>
  *   <li><b>喷流</b>：250 Hz 以下的噪声，大半是两边共用的一股，随推力长；一踩油门（负荷比它最近的平均高出一截）「轰」一下 ——
  *       一段很大的低频噪声，约 0.2 秒；一松也「轰」，小一些。</li>
- *   <li><b>气声</b>：线之间 0.4–1.6 kHz 的气声、1.5–4 kHz 的嘶声，跟着转子长，一闪一闪（斑点状）。</li>
+ *   <li><b>气声</b>：线之间 0.4–1.6 kHz 的气声、1.5–4 kHz 的嘶声，跟着转子长，像风声那样慢慢起伏一点（不闪）。</li>
  *   <li><b>换挡</b>：升挡一声「音爆」（N 形的一下 + 45 Hz 的一捶）加一点「轰」；降挡只「轰」一点。松油门转子往下掉时「呼」一声。</li>
  *   <li><b>启动、熄火</b>：从静止起转，音调从低往上走到怠速（行驶中也一样，从低处赶到该有的转速）；熄火时转子落下去，
  *       音调往下走、越来越轻。</li>
@@ -98,7 +98,7 @@ final class JetVoice implements Voice {
     static final float WHOOMP_LAG_SEC = 0.3f;
     static final float WHOOMP_GAIN = 1.5f;
 
-    // ---- 气声（带 Hz、转满时 dB、怠速时再低多少 dB）、一闪一闪（低通 Hz、深浅）
+    // ---- 气声（带 Hz、转满时 dB、怠速时再低多少 dB）
     static final float HISS_LOW_HZ = 1500f;
     static final float HISS_HIGH_HZ = 4000f;
     static final float HISS_DB = -12f;
@@ -107,8 +107,12 @@ final class JetVoice implements Voice {
     static final float AIR_HIGH_HZ = 1600f;
     static final float AIR_DB = -24f;
     static final float AIR_IDLE_DB = -32f;
-    static final float SPECKLE_HZ = 25f;
-    static final float SPECKLE = 0.7f;
+    /**
+     * 气声慢慢起伏（两级低通 Hz、深浅）。原来每秒几十下、深 0.7：一闪一闪、常常整个断掉，几个频带一起忽大忽小 —— 车上就是「沙沙」声
+     * （项目所有者 2026-10-22）。参考频谱图上的「斑点」是噪声本来的样子，不是在闪。两级：只一级的话快的那头还剩不少，照样一起抖。
+     */
+    static final float SWELL_HZ = 3f;
+    static final float SWELL = 0.25f;
 
     // ---- 换挡、松油门
     /** 「音爆」：N 形那一下多长（秒）、多大（dB）；跟着的一捶（Hz、多快落下去、dB）；换挡时的「轰」（满负荷时，升、降挡）。 */
@@ -152,8 +156,8 @@ final class JetVoice implements Voice {
     private final float wobbleNorm;
     private final float jitterK;
     private final float jitterNorm;
-    private final float speckleK;
-    private final float speckleNorm;
+    private final float swellK;
+    private final float swellNorm;
     private final float whoompDecay;
     private final float whooshDecay;
     private final float thumpDecay;
@@ -185,7 +189,9 @@ final class JetVoice implements Voice {
     private final Biquad[] hissLowpass = new Biquad[2];
     private final Biquad[] airHighpass = new Biquad[2];
     private final Biquad[] airLowpass = new Biquad[2];
-    private final float[] speckle = new float[2];
+    /** 每个声道气声起伏的两级低通噪声。 */
+    private final float[] swell = new float[2];
+    private final float[] swellSmooth = new float[2];
     private final Biquad whooshBand;
     private final Biquad boomLowpass;
     private float whoomp;
@@ -219,11 +225,9 @@ final class JetVoice implements Voice {
         wobbleK = 1f - (float) Math.exp(-2.0 * Math.PI * WOBBLE_HZ * CONTROL / sampleRate);
         wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
         jitterK = 1f - (float) Math.exp(-2.0 * Math.PI * LINE_JITTER_HZ * CONTROL / sampleRate);
-        // 两级一样的一阶低通：输出方差 k⁴(1 + r) / (1 − r)³，r = (1 − k)²
-        double r = (1.0 - jitterK) * (1.0 - jitterK);
-        jitterNorm = (float) (1.0 / Math.sqrt(Math.pow(jitterK, 4) * (1.0 + r) / Math.pow(1.0 - r, 3)));
-        speckleK = 1f - (float) Math.exp(-2.0 * Math.PI * SPECKLE_HZ / sampleRate);
-        speckleNorm = (float) (1.0 / Math.sqrt(speckleK / (2.0 - speckleK)));
+        jitterNorm = twoPoleNorm(jitterK);
+        swellK = 1f - (float) Math.exp(-2.0 * Math.PI * SWELL_HZ / sampleRate);
+        swellNorm = twoPoleNorm(swellK);
         whoompDecay = perSample(WHOOMP_SEC);
         whooshDecay = perSample(WHOOSH_SEC);
         thumpDecay = perSample(THUMP_SEC);
@@ -365,7 +369,7 @@ final class JetVoice implements Voice {
             float roarR = (ROAR_COMMON * common + ROAR_OWN * roarLowpass[1].process(roarBand[1].process(white()))) * roarLevel
                     + burst;
 
-            // 气声：跟着转子，一闪一闪
+            // 气声：跟着转子，慢慢起伏
             float hissLevel = hissFull * (hissIdle + (1f - hissIdle) * s * s) * start;
             float airLevel = airFull * (airIdle + (1f - airIdle) * s) * start;
             float hissL = noisy(0, hissLevel, airLevel);
@@ -475,18 +479,25 @@ final class JetVoice implements Voice {
         return EngineVoice.sin(ph);
     }
 
-    /** 一个声道的气声：两层带通噪声，一起一闪一闪。 */
+    /** 一个声道的气声：两层带通噪声，一起慢慢起伏。 */
     private float noisy(int c, float hissLevel, float airLevel) {
-        speckle[c] += speckleK * (white() - speckle[c]);
-        float flicker = Math.max(0f, 1f + SPECKLE * speckleNorm * speckle[c]);
+        swell[c] += swellK * (white() - swell[c]);
+        swellSmooth[c] += swellK * (swell[c] - swellSmooth[c]);
+        float g = Math.max(0f, 1f + SWELL * swellNorm * swellSmooth[c]);
         float h = hissLowpass[c].process(hissHighpass[c].process(white())) * hissLevel;
         float a = airLowpass[c].process(airHighpass[c].process(white())) * airLevel;
-        return (h + a) * flicker;
+        return (h + a) * g;
     }
 
     /** 此刻的主音（Hz）：测试看转子跟没跟上。 */
     float mainHz() {
         return mainHz(spool);
+    }
+
+    /** 方差 1 的白噪声过两级一样的一阶低通（每步 {@code k}）以后，乘多少方差回到 1：输出方差 k⁴(1 + r) / (1 − r)³，r = (1 − k)²。 */
+    private static float twoPoleNorm(float k) {
+        double r = (1.0 - k) * (1.0 - k);
+        return (float) (1.0 / Math.sqrt(Math.pow(k, 4) * (1.0 + r) / Math.pow(1.0 - r, 3)));
     }
 
     private float perSample(float tauSec) {

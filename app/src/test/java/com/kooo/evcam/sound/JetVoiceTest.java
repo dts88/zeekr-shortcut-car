@@ -334,6 +334,58 @@ public class JetVoiceTest {
         }
     }
 
+    @Test
+    public void theHissDoesNotRustle() {
+        // 项目所有者 2026-10-22（装车听了去掉底噪的那版）：还有「沙沙」声 —— 气声一闪一闪（每秒几十下、深 0.7），几个频带一起忽大忽小。
+        // 嘶声里两段在所有线之上的频带（2.4–3.0、3.2–4.2 kHz；10 ms 汉宁窗、每 5 ms 一帧），各减去自己 ±60 ms 的平均以后一起起落的
+        // 相关不到 0.2（那一版 0.67，完全不起伏 0，两级 3 Hz 的慢起伏 0.02）。D 挡 4800 rpm 小油门
+        VoiceParams p = params(4800f, 0.4f, true);
+        p.gain = 0.1f;
+        float[] x = render(p, 6.5f);
+        int n = RATE / 100;
+        int hop = n / 2;
+        int from = Math.round(1.5f * RATE);
+        int frames = (x.length - from - n) / hop;
+        float[] w = new float[n];
+        double[][] level = new double[2][frames];
+        for (int f = 0; f < frames; f++) {
+            for (int i = 0; i < n; i++) {
+                w[i] = (float) (x[from + f * hop + i] * (0.5 - 0.5 * Math.cos(2.0 * Math.PI * i / n)));
+            }
+            for (int hz = 2400; hz <= 4200; hz += 100) {
+                if (hz > 3000 && hz < 3200) {
+                    continue;
+                }
+                level[hz <= 3000 ? 0 : 1][f] += power(w, 0, n, hz);
+            }
+        }
+        double[][] fast = new double[2][frames];
+        for (int k = 0; k < 2; k++) {
+            for (int f = 0; f < frames; f++) {
+                level[k][f] = Math.sqrt(level[k][f]);
+            }
+            for (int f = 0; f < frames; f++) {
+                double s = 0;
+                int c = 0;
+                for (int j = Math.max(0, f - 12); j <= Math.min(frames - 1, f + 12); j++) {
+                    s += level[k][j];
+                    c++;
+                }
+                fast[k][f] = level[k][f] - s / c;
+            }
+        }
+        double ab = 0;
+        double aa = 0;
+        double bb = 0;
+        for (int f = 0; f < frames; f++) {
+            ab += fast[0][f] * fast[1][f];
+            aa += fast[0][f] * fast[0][f];
+            bb += fast[1][f] * fast[1][f];
+        }
+        double together = ab / Math.sqrt(aa * bb);
+        assertTrue("嘶声两段频带一起起落的相关 " + together, together < 0.2);
+    }
+
     // ================================================================= 喷流、换挡
 
     @Test
