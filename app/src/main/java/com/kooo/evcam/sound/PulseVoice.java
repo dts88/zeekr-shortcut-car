@@ -101,10 +101,16 @@ final class PulseVoice implements Voice {
     /** 松油门：负荷比最近的峰值（{@link #LIFT_PEAK_SEC} 慢慢回落）掉了这么多，或者掉到一半以下。 */
     static final float LIFT_PEAK_SEC = 1.5f;
     static final float LIFT_DROP = 0.25f;
-    /** 机械增压旁通阀打开的「呼」（dB、多久淡掉、带通）。 */
-    static final float WHOOSH_DB = -20f;
+    /** 机械增压旁通阀打开的「呼」（dB、多久淡掉、带通）。项目所有者 2026-10-22 嫌松油门后的「呼」有点大：−20 → −26 dB。 */
+    static final float WHOOSH_DB = -26f;
     static final float WHOOSH_SEC = 0.3f;
     static final float WHOOSH_HZ = 1200f;
+    /**
+     * 车内听感时增压器的啸叫（叶片、齿轮）只过一个一阶低通、低几 dB，不过整个防火墙的两级低通（那会把 1–4 kHz 的啸叫压掉
+     * 10–20 dB）。项目所有者 2026-10-22：起压时机械质感严重不足（他用车内听感）；增压器就在挡风玻璃下面，啸叫在车里本来就听得见。
+     */
+    static final float CABIN_TONE_DB = -6f;
+    static final float CABIN_TONE_HZ = 3500f;
     /** 增压器的每个音到 {@link #WHINE_TOP_HZ} − {@link #WHINE_FADE_HZ}（Hz）开始渐隐，到 {@link #WHINE_TOP_HZ} 没了。 */
     static final float WHINE_TOP_HZ = 10000f;
     static final float WHINE_FADE_HZ = 3000f;
@@ -280,6 +286,10 @@ final class PulseVoice implements Voice {
     private final float[][] rearLp = new float[2][2];
     private final Biquad[] cabinLow = new Biquad[2];
     private final float cabinGain;
+    /** 车内听感：增压器啸叫自己的一阶低通（{@link #CABIN_TONE_HZ}）和增益。 */
+    private float toneLp;
+    private final float toneK;
+    private final float cabinToneGain;
 
     // ---- 输出
     private final Biquad sideHighpass;
@@ -428,6 +438,8 @@ final class PulseVoice implements Voice {
             cabinLow[b] = Biquad.lowShelf(profile.cabinLowHz, profile.cabinLowDb, sampleRate);
         }
         cabinGain = EngineVoice.dbToLin(profile.cabinGainDb);
+        toneK = onePole(CABIN_TONE_HZ);
+        cabinToneGain = EngineVoice.dbToLin(CABIN_TONE_DB);
         cabinLowpass = Biquad.lowpass(CABIN_LOWPASS_HZ, 0.7071f, sampleRate);
         cabinModes = bank(profile.cabinHz, profile.cabinQ);
         sympathetic = bank(profile.sympatheticHz, profile.sympatheticQ);
@@ -490,7 +502,8 @@ final class PulseVoice implements Voice {
         evJitter = mix(p.jitterIdleDeg, p.jitterLoadDeg, load);
         evSamplesPerDeg = rate / (6f * Math.max(rpmTarget, 50f));
         float flowDb = raspFlowDb(rpmTarget, over);
-        evRasp = EngineVoice.dbToLin(mix(p.raspIdleDb, p.raspLoadDb, load) + flowDb);
+        // 收油（断油）时沙哑往收油的电平靠（项目所有者 2026-10-22：松油门后「呼」的声音有点大，量下来就是它）
+        evRasp = EngineVoice.dbToLin(mix(mix(p.raspIdleDb, p.raspLoadDb, load), p.raspOverrunDb, over) + flowDb);
         evTick = EngineVoice.dbToLin(p.tickDb) * (0.4f + 0.6f * Math.min(rpmTarget / 6000f, 1f));
         evKnock = EngineVoice.dbToLin(p.knockDb) * (0.35f + 0.65f * load) * evCombustion;
         evIntake = EngineVoice.dbToLin(mix(p.intakeIdleDb, p.intakeLoadDb, (float) Math.pow(load, 1.2)));
@@ -522,7 +535,7 @@ final class PulseVoice implements Voice {
         muffler[1].setLowpass(mufflerHz, 0.6f, rate);
         setTilt(Math.min(p.raspTiltHz * (float) Math.pow(Math.max(rpmCalc, 300f) / 2000f, p.raspTiltRpmPow), TILT_TOP_HZ));
         float drive = mix(p.driveIdle, p.driveLoad, load);
-        float raspLevel = Math.max(evRasp, EngineVoice.dbToLin(p.raspOverrunDb + flowDb) * over);
+        float raspLevel = evRasp;
         float floorShare = Math.min(1f, p.raspFloor + 0.4f * over);
         float floor = floorShare * raspLevel * (unfired ? 0.2f : 1f);
         float kickShare = 1f - floorShare;
@@ -557,7 +570,8 @@ final class PulseVoice implements Voice {
             float speed = (float) Math.pow(revs, p.superchargerRpmPow);
             // 几个音：随转速温和地长；齿轮声只在增压时有
             whineTarget = (float) Math.pow(Math.min(Math.max(rpmTarget, 300f), 7200f) / 3000f, p.toneRpmPow);
-            meshTarget = whineTarget * (p.superchargerFree + (1f - p.superchargerFree) * boost);
+            meshTarget = whineTarget * (p.superchargerFree + (1f - p.superchargerFree) * boost)
+                    * EngineVoice.dbToLin(meshRpmDb(p, rpmTarget));
             jetTarget = EngineVoice.dbToLin(p.jetDb) * (JET_FREE + (1f - JET_FREE) * boost) * speed;
             float flow = revs * (INLET_FREE + (1f - INLET_FREE) * load);
             inletTarget = EngineVoice.dbToLin(p.inletDb) * flow * (float) Math.sqrt(flow) * ram;
@@ -640,6 +654,7 @@ final class PulseVoice implements Voice {
             float jetL = 0f;
             float jetR = 0f;
             float inlet = 0f;
+            float cabinTones = 0f;
             if (supercharged) {
                 wobbleNoise += wobbleK * (white() - wobbleNoise);
                 float hz = p.superchargerOrder * r / 60f * (1f + p.superchargerWobble * wobbleNorm * wobbleNoise);
@@ -680,7 +695,14 @@ final class PulseVoice implements Voice {
                 jetR = airLowpass[1].process(jets(jetBands[1], white() * push)) * jetNow;
                 gustNoise += gustK * (white() - gustNoise);
                 inlet = inletBand.process(white()) * inletNow * (1f + p.gust * gustNorm * gustNoise);
-                front += whine * rotor * am + whooshBand.process(white()) * whooshNow;
+                float tones = whine * rotor * am;
+                if (cabin) {
+                    toneLp += toneK * (tones - toneLp);
+                    cabinTones = toneLp * cabinToneGain;
+                } else {
+                    front += tones;
+                }
+                front += whooshBand.process(white()) * whooshNow;
             }
 
             // 车厢共振、和鸣（不分前后左右）
@@ -706,8 +728,8 @@ final class PulseVoice implements Voice {
             float rearL = left + p.cross * right;
             float rearR = right + p.cross * left;
             if (cabin) {
-                frontL = lowpass2(frontLp[0], frontK, frontL);
-                frontR = lowpass2(frontLp[1], frontK, frontR);
+                frontL = lowpass2(frontLp[0], frontK, frontL) + CENTER * cabinTones;
+                frontR = lowpass2(frontLp[1], frontK, frontR) + CENTER * cabinTones;
                 rearL = lowpass2(rearLp[0], rearK, rearL);
                 rearR = lowpass2(rearLp[1], rearK, rearR);
             }
@@ -899,6 +921,22 @@ final class PulseVoice implements Voice {
     private void rock(float amp) {
         rockEnv = Math.max(rockEnv, amp * EngineVoice.dbToLin(p.rockDb));
         rockPhase = 0.0;
+    }
+
+    /** 齿轮声随转速另加的 dB（{@link PulseProfile#meshRpmDb}）：按转速的对数在表里插值，两头照最边上的。 */
+    static float meshRpmDb(PulseProfile p, float rpm) {
+        float[] at = p.meshRpm;
+        float[] db = p.meshRpmDb;
+        if (rpm <= at[0]) {
+            return db[0];
+        }
+        for (int i = 1; i < at.length; i++) {
+            if (rpm <= at[i]) {
+                double f = Math.log(rpm / at[i - 1]) / Math.log(at[i] / at[i - 1]);
+                return (float) (db[i - 1] + (db[i] - db[i - 1]) * f);
+            }
+        }
+        return db[db.length - 1];
     }
 
     /** 沙哑随流量（转速）多几 dB：以 {@link PulseProfile#raspRefRpm} 为准，每翻一倍按带负荷 / 收油的斜率，最多多 {@link PulseProfile#raspRpmMaxDb}。 */

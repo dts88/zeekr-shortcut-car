@@ -44,7 +44,11 @@ final class PulseProfile {
     // ---- 气流噪声（「沙哑」）：白噪声 × 每一下点火踢起来的包络，进同一根排气管
     final float raspIdleDb;
     final float raspLoadDb;
-    /** 收油（断油、只泵气）时的气流噪声（dB）。 */
+    /**
+     * 收油（断油、只泵气）时的气流噪声（dB），收油时沙哑从怠速的 {@link #raspIdleDb} 往它靠。项目所有者 2026-10-22：松油门后「呼」的
+     * 声音有点大 —— 量下来松油门后几乎全是它（3500 rpm 时就是整个声音），旁通阀那一声「呼」反而低 20–30 dB。原来取怠速、收油两个
+     * 里大的（收油那个 −18 dB 比怠速的 −16 小，等于没起作用）；改成往收油的靠，−21 dB：松到底时沙哑少 5 dB。
+     */
     final float raspOverrunDb;
     /** 包络里不随点火起伏的那一份。 */
     final float raspFloor;
@@ -60,6 +64,7 @@ final class PulseProfile {
     /**
      * 沙哑随流量（转速）变：每翻一倍转速多几 dB（带负荷、收油各一个），以 {@link #raspRefRpm} 为准，最多多 {@link #raspRpmMaxDb}。
      * 参考车的录音：收油时低转很闷、高转一下亮起来（每翻一倍 +12 dB）；带负荷时变亮主要靠消声器随转速打开。
+     * 封顶 +2 dB（原来 +6）：参考只录到 2850 rpm，再往上是把那一段变调放，不再变亮；项目所有者 2026-10-22 嫌松油门后的「呼」大。
      */
     final float[] raspRpmDb;
     final float raspRefRpm;
@@ -139,7 +144,17 @@ final class PulseProfile {
     final float toneRpmPow;
     /** 气流声随转速的这个次方变（以 6000 rpm 为准）：低转淡，高转长得快。 */
     final float superchargerRpmPow;
-    /** 转速的细小抖动（份额、低通 Hz）：皮带、曲轴的扭振，啸叫不是一根死的正弦。 */
+    /**
+     * 齿轮声随转速另加的（dB，在 {@link #toneRpmPow} 那条律之上；按转速的对数插值，两头照最边上的）：照 EngineV1 那台带负荷的录音
+     * （项目所有者 2026-10-22：起压时机械质感严重不足）—— 1300–2400 rpm 增压时齿轮声很响，比点火阶次只低几 dB；2850 rpm 以上
+     * 和点火阶次的比例不再变。
+     */
+    final float[] meshRpm;
+    final float[] meshRpmDb;
+    /**
+     * 转速的细小抖动（份额、低通 Hz）：皮带、曲轴的扭振，啸叫不是一根死的正弦。EngineV1 那台的齿轮声每根宽 1–2 %
+     * （2026-10-22 量的），毛糙的机械感多半在这里。
+     */
     final float superchargerWobble;
     final float superchargerWobbleHz;
     /** 旁通阀开着（不增压，齿轮不受力）时齿轮声还剩几成。 */
@@ -314,6 +329,8 @@ final class PulseProfile {
         superchargerDb = b.superchargerDb;
         toneRpmPow = b.toneRpmPow;
         superchargerRpmPow = b.superchargerRpmPow;
+        meshRpm = b.meshRpm.clone();
+        meshRpmDb = b.meshRpmDb.clone();
         superchargerWobble = b.superchargerWobble;
         superchargerWobbleHz = b.superchargerWobbleHz;
         superchargerFree = b.superchargerFree;
@@ -410,7 +427,7 @@ final class PulseProfile {
         private float jitterLoadDeg = 0.5f;
         private float raspIdleDb = -16f;
         private float raspLoadDb = -1.5f;
-        private float raspOverrunDb = -18f;
+        private float raspOverrunDb = -21f;
         private float raspFloor = 0.15f;
         private float raspDecayDeg = 45f;
         private float raspHighpassHz = 90f;
@@ -419,7 +436,7 @@ final class PulseProfile {
         private float raspAir = 0.12f;
         private float[] raspRpmDb = {0f, 12f};
         private float raspRefRpm = 2850f;
-        private float raspRpmMaxDb = 6f;
+        private float raspRpmMaxDb = 2f;
         private float raspPeakHz = 1200f;
         private float raspPeakDb = 3f;
         private float raspPeakQ = 0.7f;
@@ -459,15 +476,17 @@ final class PulseProfile {
         private float superchargerOrder;
         private float lobeDb = -29f;
         private float meshMultiple = 3f;
-        private float[] meshHarmonicsDb = {-2f, 0f, -3f, -16f, -14f};
+        private float[] meshHarmonicsDb = {-2f, 0f, -3f, -13f, -13f};
         private float toneRpmPow = 0.8f;
         private float[] rotorLobes = {5f, 3f};
         private float[] rotorAm = {0.2f, 0.15f};
         private float superchargerDb = -100f;
         private float superchargerRpmPow = 1.7f;
-        private float superchargerWobble = 0.002f;
+        private float[] meshRpm = {1300f, 1900f, 2350f, 2850f, 4000f};
+        private float[] meshRpmDb = {9f, 14f, 8f, 0f, -4f};
+        private float superchargerWobble = 0.006f;
         private float superchargerWobbleHz = 30f;
-        private float superchargerFree = 0.03f;
+        private float superchargerFree = 0.05f;
         private float superchargerAm = 0.25f;
         private float superchargerSec = 0.12f;
         private float jetDb = -12f;

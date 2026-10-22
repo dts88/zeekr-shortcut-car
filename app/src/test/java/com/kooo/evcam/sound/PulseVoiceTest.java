@@ -265,16 +265,52 @@ public class PulseVoiceTest {
 
     @Test
     public void theSuperchargerAirGrowsWithTheRevs() {
-        // 2.5–7 kHz（齿轮声、挤过出口的气流）：满负荷 6000 rpm 比没有机械增压的同一台多一倍以上（原型十个种子最差 3.2 倍），
+        // 2.5–7 kHz（齿轮声、挤过出口的气流）：满负荷 6000 rpm 比没有机械增压的同一台多一半以上（2026-10-22 起齿轮声照 EngineV1
+        // 那台带负荷的录音定，2850 rpm 以上和点火阶次的比例不再变，高转比原来少约 4 dB；原来要求多一倍），
         // 而且增压器加的这一份 6000 rpm 时是 3000 rpm 时的好几倍（原型最差 5.3 倍）；宽频带的能量很稳，余量不用留到一倍
         double sc6000 = air(SC, 6000f);
         double plain6000 = air(PLAIN, 6000f);
         double added3000 = air(SC, 3000f) - air(PLAIN, 3000f);
-        assertTrue("6000 rpm " + sc6000 / plain6000, sc6000 > 2 * plain6000);
+        assertTrue("6000 rpm " + sc6000 / plain6000, sc6000 > 1.5 * plain6000);
         assertTrue("增压器加的 " + added3000 + " → " + (sc6000 - plain6000), sc6000 - plain6000 > 2.5 * added3000);
     }
 
     /** 满负荷时 2.5–7 kHz 的能量。 */
+    /** {@code [lo, hi]} 里每赫兹一个点的功率加起来（一段 1 秒的信号，Goertzel 的频点间隔就是 1 Hz）。 */
+    private static double bandPower(float[] x, double lo, double hi) {
+        double e = 0;
+        for (double f = Math.ceil(lo); f <= hi; f += (double) RATE / x.length) {
+            e += power(x, f);
+        }
+        return e;
+    }
+
+    /** 齿轮啮合第 2 次（±1.5 %）比 4 阶（±3 %）低多少 dB：和 EngineV1 那台的录音同一个量法。 */
+    private static double meshRe4(PulseVoice voice, float rpm, float load) {
+        float[] x = mid(render(voice, params(rpm, load), 2f), 1f);
+        double f1 = rpm / 60.0;
+        double mesh = SC.superchargerOrder * SC.meshMultiple * 2 * f1;
+        return 10 * Math.log10(bandPower(x, mesh * 0.985, mesh * 1.015) / bandPower(x, 4 * f1 * 0.97, 4 * f1 * 1.03));
+    }
+
+    @Test
+    public void underBoostAtLowRevsTheGearsWhineAlmostAsLoudAsTheFiring() {
+        // 项目所有者 2026-10-22：起压时机械质感严重不足。EngineV1 那台带负荷 1900 rpm：齿轮第 2 次比 4 阶还高 2 dB（1300 rpm 高 3 dB）；
+        // 怠速 702 rpm 时低 23 dB
+        double boost = meshRe4(new PulseVoice(SC, RATE), 1900f, 1f);
+        assertTrue("1900 rpm 增压时齿轮声: " + boost, boost > -6);
+        double idle = meshRe4(new PulseVoice(SC, RATE), 900f, 0f);
+        assertTrue("怠速时轻: " + idle, idle < -18);
+    }
+
+    @Test
+    public void theCabinViewKeepsTheSuperchargerWhine() {
+        // 车内听感：啸叫只过一个一阶低通、低几 dB，不过整个防火墙的低通（原来低 20 多 dB，几乎听不出来）
+        double outside = meshRe4(new PulseVoice(SC, RATE), 1900f, 1f);
+        double cabin = meshRe4(new PulseVoice(SC, RATE, true), 1900f, 1f);
+        assertTrue("车内比车外只低一截: " + cabin + " vs " + outside, cabin > outside - 12 && cabin < outside);
+    }
+
     private static double air(PulseProfile profile, float rpm) {
         float[] x = mid(render(profile, params(rpm, 1f), 1f), 0.4f);
         return energy(filter(x, Biquad.highpass(2500f, 0.7071f, RATE), Biquad.highpass(2500f, 0.7071f, RATE),
