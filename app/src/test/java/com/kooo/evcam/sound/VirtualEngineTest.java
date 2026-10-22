@@ -177,7 +177,7 @@ public class VirtualEngineTest {
 
     @Test
     public void joiningWhileMovingSpinsUpThenCatchesWithAFlare() {
-        // 项目所有者 2026-10-22 问开阀门还是混动车行驶中起动发动机：按建议做后者 —— 电机带起来、点着、补油冲一下
+        // 项目所有者 2026-10-22 问开阀门还是混动车行驶中起动发动机：做后者（项目所有者同意）—— 电机带起来、点着、补油冲一下
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 25f);
         e.ignite(in);
