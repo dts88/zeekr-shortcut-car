@@ -240,6 +240,8 @@
   Not shown on the center screen below this speed (the HUD isn't affected); 0 means no limit /
   Tidak dipaparkan pada skrin tengah di bawah kelajuan ini (HUD tidak terjejas); 0 bermaksud tiada had。
   set_side_view_summary（「在屏幕该侧显示」）不改：HUD 也是一块屏，下面一行「显示位置」写明在哪。
+- 2026-10-22 批准（关于页「开源与来源」FerixzTanz 那一条加上 HUD，车主要求更新致谢）：about_credits_contributors 里 FerixzTanz 那一条改为「• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。」
+  English「• FerixzTanz (GitHub) — the original code and on-car research for Blind spot view, and showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the ones he tuned on his own 7X. Many thanks for his careful parameter tuning.」（关于页只有中英两份）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -248,8 +250,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 关于页「开源与来源」FerixzTanz 那一条加上 HUD（2026-10-22，车主要求更新致谢）：「• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。」
-  English「• FerixzTanz (GitHub) — the original code and on-car research for Blind spot view, and showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the ones he tuned on his own 7X. Many thanks for his careful parameter tuning.」（关于页只有中英两份）。
+- （现在没有。）
 ---
 
 ## 10. 术语表
