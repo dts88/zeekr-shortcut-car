@@ -314,6 +314,26 @@ public class JetVoiceTest {
         return s1 * s1 + s2 * s2 - c * s1 * s2;
     }
 
+    @Test
+    public void theWhineLeavesNoHissFloor() {
+        // 项目所有者 2026-10-22：超音速有很严重的噪音，耳机、电脑音箱、车上喇叭都听得到。是哨声线的相位抖动：每 16 个样本一下跳过去
+        // （每秒 3000 个小台阶），又只有一级低通（每根线两边拖着长长的一片）。10–20 kHz 比全部低 48 dB 以上（第三版怠速 −56、
+        // D 挡 2500 rpm −53，第五版都是 −38）；怠速时 700–1400 Hz（线都在 300 Hz 以下）低 38 dB 以上（第三版 −49，第五版 −29）
+        for (VoiceParams p : new VoiceParams[] {params(900f, 0f, false), params(2500f, 0.3f, true)}) {
+            p.gain = 0.1f;
+            float[] x = render(p, 3.5f);
+            int from = Math.round(1.5f * RATE);
+            double all = energy(x, from, x.length);
+            double high = 10 * Math.log10(energy(band(x, 10000f, 20000f), from, x.length) / all);
+            String what = p.drive ? "D 挡 2500 rpm" : "怠速";
+            assertTrue(what + " 10–20 kHz 比全部低 " + -high + " dB", high < -48);
+            if (!p.drive) {
+                double skirt = 10 * Math.log10(energy(band(x, 700f, 1400f), from, x.length) / all);
+                assertTrue(what + " 700–1400 Hz 比全部低 " + -skirt + " dB", skirt < -38);
+            }
+        }
+    }
+
     // ================================================================= 喷流、换挡
 
     @Test

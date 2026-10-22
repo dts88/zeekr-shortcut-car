@@ -27,7 +27,8 @@ package com.kooo.evcam.sound;
  * <p>电平不大跟虚拟发动机变（参考里踩住油门并不比怠速响多少，变化靠低音、喷流随推力长和一踩一松的「轰」）。
  * 音量、阀门（低通，现在一直全开）、30 Hz 高通、最后的限幅（{@link Limiter}）和别的风格一样，峰值不超过 {@link EngineVoice#CEILING}。
  * 不和别的风格比响度（项目所有者 2026-10-21：两种取向各自对各自的原型）。
- * 抖动、哨声的电平、低音的音调变得慢，每 16 个样本才算一次。</p>
+ * 抖动、哨声的电平、低音的音调变得慢，每 16 个样本才算一次；哨声线的相位抖动在这中间逐个样本走过去（一下跳过去的话，
+ * 每秒 3000 个小台阶就是一层沙沙的高频底噪）。</p>
  */
 final class JetVoice implements Voice {
 
@@ -59,9 +60,13 @@ final class JetVoice implements Voice {
         -9.5f, -13.5f, -16.5f, -19.5f, -19.5f, -23.5f, -27.5f};
     /** 左右两台差多少（份额；很小，两台的抖动又各自独立，不出固定的拍）。 */
     static final float ENGINE_SPLIT = 0.0007f;
-    /** 每根线的随机相位抖动（周的标准差、低通 Hz）：抹成一小条（参考的线 −10 dB 宽 50–100 Hz），线和线之间的拍也就不成节奏。 */
+    /**
+     * 每根线的随机相位抖动（周的标准差、低通 Hz）：抹成一小条（参考的线 −10 dB 宽 50–100 Hz），线和线之间的拍也就不成节奏。
+     * 两级低通：只一级的话抖动里快的变化太多，每根线两边拖着长长的一片，怠速时 1–2 kHz、转起来一直到 20 kHz 都是一层沙沙的底噪
+     * （第四、五版；项目所有者 2026-10-22：超音速有很严重的噪音，耳机、电脑音箱、车上喇叭都听得到）。
+     */
     static final float LINE_JITTER = 0.13f;
-    static final float LINE_JITTER_HZ = 15f;
+    static final float LINE_JITTER_HZ = 35f;
     /** 低音成对的两根差多少、随机抖动（份额、低通 Hz）。 */
     static final float PAIR = 0.013f;
     static final float LOW_WOBBLE = 0.012f;
@@ -153,7 +158,7 @@ final class JetVoice implements Voice {
     private final float whooshDecay;
     private final float thumpDecay;
     private final float gainK;
-    /** 每根谐波：怠速时的增益（含主音电平；成对的是一半）、到转满差多少（自然对数）。低音一样，差的是音调。 */
+    /** 每根线：怠速时的增益（含主音电平）、到转满差多少（自然对数）。低音一样，差的是音调。 */
     private final float[] fanIdleGain = new float[LINES];
     private final float[] fanLnSpan = new float[LINES];
     private final float[] lowGain = new float[LOWS];
@@ -163,10 +168,12 @@ final class JetVoice implements Voice {
     private float spool;
     private boolean started;
     private int controlLeft;
-    /** 哨声的线 [台 × 根]：相位（周）、相位抖动（周）和它的低通噪声；每根这一刻的增益。 */
+    /** 哨声的线 [台 × 根]：相位（周）、相位抖动（周）、它每样本走多少和两级低通的噪声；每根这一刻的增益。 */
     private final double[] linePhase = new double[2 * LINES];
     private final float[] jitter = new float[2 * LINES];
+    private final float[] jitterStep = new float[2 * LINES];
     private final float[] jitterNoise = new float[2 * LINES];
+    private final float[] jitterSmooth = new float[2 * LINES];
     private final float[] fanGain = new float[LINES];
     /** 低音振荡器 [台 × 根 × 对里的哪根]：相位、抖动、每样本走多少周。 */
     private final double[] lowPhase = new double[2 * LOWS * 2];
@@ -212,7 +219,9 @@ final class JetVoice implements Voice {
         wobbleK = 1f - (float) Math.exp(-2.0 * Math.PI * WOBBLE_HZ * CONTROL / sampleRate);
         wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
         jitterK = 1f - (float) Math.exp(-2.0 * Math.PI * LINE_JITTER_HZ * CONTROL / sampleRate);
-        jitterNorm = (float) (1.0 / Math.sqrt(jitterK / (2.0 - jitterK)));
+        // 两级一样的一阶低通：输出方差 k⁴(1 + r) / (1 − r)³，r = (1 − k)²
+        double r = (1.0 - jitterK) * (1.0 - jitterK);
+        jitterNorm = (float) (1.0 / Math.sqrt(Math.pow(jitterK, 4) * (1.0 + r) / Math.pow(1.0 - r, 3)));
         speckleK = 1f - (float) Math.exp(-2.0 * Math.PI * SPECKLE_HZ / sampleRate);
         speckleNorm = (float) (1.0 / Math.sqrt(speckleK / (2.0 - speckleK)));
         whoompDecay = perSample(WHOOMP_SEC);
@@ -403,14 +412,15 @@ final class JetVoice implements Voice {
         }
     }
 
-    /** 慢变的部分：每根线的相位抖动和这一刻的增益（按 dB 在怠速、转满之间走），低音的音调和抖动。 */
+    /** 慢变的部分：每根线的相位抖动（接下来逐个样本走到）和这一刻的增益（按 dB 在怠速、转满之间走），低音的音调和抖动。 */
     private void control(float s) {
         for (int k = 0; k < LINES; k++) {
             fanGain[k] = fanIdleGain[k] * (float) Math.exp(s * fanLnSpan[k]);
             for (int e = 0; e < 2; e++) {
                 int o = e * LINES + k;
                 jitterNoise[o] += jitterK * (white() - jitterNoise[o]);
-                jitter[o] = LINE_JITTER * jitterNorm * jitterNoise[o];
+                jitterSmooth[o] += jitterK * (jitterNoise[o] - jitterSmooth[o]);
+                jitterStep[o] = (LINE_JITTER * jitterNorm * jitterSmooth[o] - jitter[o]) / CONTROL;
             }
         }
         for (int k = 0; k < LOWS; k++) {
@@ -438,7 +448,7 @@ final class JetVoice implements Voice {
         return Math.max(MIN_HZ, MAIN_ORDER * (IDLE_RPM + (FULL_RPM - IDLE_RPM) * s) / 60f);
     }
 
-    /** 第 {@code e} 台的哨声往前走一个样本（主音每样本走 {@code inc} 周）：每根线按自己的倍数走，加自己的抖动。 */
+    /** 第 {@code e} 台的哨声往前走一个样本（主音每样本走 {@code inc} 周）：每根线按自己的倍数走，加自己的抖动（也逐个样本走）。 */
     private float lines(int e, float inc) {
         float step = inc * ENGINE[e];
         float sum = 0f;
@@ -449,6 +459,7 @@ final class JetVoice implements Voice {
                 ph -= 1.0;
             }
             linePhase[o] = ph;
+            jitter[o] += jitterStep[o];
             sum += fanGain[k] * EngineVoice.sin(ph + jitter[o]);
         }
         return sum;
