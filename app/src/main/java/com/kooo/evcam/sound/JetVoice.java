@@ -10,10 +10,11 @@ package com.kooo.evcam.sound;
  *       （伪挡位、模拟换挡时每一挡从低爬到高、升挡掉下来）。主音和转速成正比（{@link #MAIN_ORDER} 阶）：怠速约 150 Hz，
  *       转满约 1030 Hz。项目所有者 2026-10-22 挑的几段参考：主音跟着虚拟转速走，挂挡加速每一挡从约 550 爬到约 1050 Hz，
  *       升挡掉回 0.65–0.8 倍，停着踩到顶约 1000–1030 Hz（第二版只在 533–1190 Hz 里走，挂挡全油门时还先顶到七成，几乎是平的）。</li>
- *   <li><b>哨声</b>：风扇轴转一圈的每个倍数上都有音（叶尖超音速时的「锯齿声」）—— 第 3 到第 24 次一整排跟着转子一起走，
- *       主音是第 12 次，旁边几根最响，其余参差不齐地低下去；每一根各自带随机的相位抖动（发糊、彼此不锁死），主音附近三根
- *       再成对（相差 1.3 %，每秒「拍」十几下）；左右两台，差一点点。项目所有者 2026-10-22：我们的电音多了一些，原厂那种飞机的
- *       气势、多频率的齐鸣、厚度不够 —— 参考踩到顶那一刻 200–2000 Hz 里 20 dB 以内有 13–22 根线，线和线之间是满的。</li>
+ *   <li><b>哨声</b>：一大排不成倍数的线（相对主音 0.36 … 1.86，18 根，间隔不规则）跟着转子一起走，主音和 0.95 倍那根最响；
+ *       每根带随机的相位抖动，抹成一小条；左右两台各抖各的，只差一点点。线多、线宽、线和线之间是满的（项目所有者 2026-10-22：
+ *       电音多了，原厂那种飞机的气势、多频率的齐鸣、厚度不够 —— 参考踩到顶那一刻 200–2000 Hz 里 20 dB 以内有 13–22 根线），
+ *       但没有共同的「基频」（一整排严格的谐波听得出它们的公共频率，转速低时就是一串一串的节奏，像活塞发动机 —— 车主：飞机应该是
+ *       嗡嗡的，没有明显的节奏），也没有固定相差的「成对」（每秒拍十几下的颤）。</li>
  *   <li><b>低音</b>：三根（88 → 140、76 → 120、165 → 215 Hz），也成对、抖得更宽，转满时是最响的。</li>
  *   <li><b>喷流</b>：250 Hz 以下的噪声，大半是两边共用的一股，随推力长；一踩油门（负荷比它最近的平均高出一截）「轰」一下 ——
  *       一段很大的低频噪声，约 0.2 秒；一松也「轰」，小一些。</li>
@@ -49,29 +50,24 @@ final class JetVoice implements Voice {
     /** 挂着挡（或低于怠速：起转、熄火）时转子就是虚拟转速，只再平一点（秒）：升挡那一下要掉得干脆。 */
     static final float DRIVE_LAG_SEC = 0.04f;
 
-    // ---- 哨声：风扇轴的第 COMB_FROM 次起一整排谐波（转满时 dB、怠速时 dB，相对主音，中间按 dB 走），主音是第 COMB_MAIN 次
-    static final int COMB_MAIN = 12;
-    static final int COMB_FROM = 3;
-    static final float[] COMB_FULL_DB = {-18f, -16f, -10f, -17f, -12f, -7f, -11f, -6f, -2f, 0f, -9f, -13f,
-        -15f, -14f, -17f, -16f, -19f, -18f, -21f, -20f, -23f, -22f};
-    static final float[] COMB_IDLE_DB = {-30f, -29f, -24f, -28f, -26f, -20f, -22f, -10f, -6f, -2f, -8f, -12f,
-        -14f, -13f, -16f, -15f, -18f, -17f, -21f, -20f, -24f, -23f};
-    /** 主音附近成对的几根（第几次到第几次）、一对的两根差多少；左右两台再差多少。 */
-    static final int PAIR_FROM = 10;
-    static final int PAIR_TO = 12;
+    // ---- 哨声：一大排不成倍数的线（× 主音；转满时 dB、怠速时 dB，相对主音，中间按 dB 走）
+    static final float[] LINE_RATIO = {0.36f, 0.42f, 0.49f, 0.56f, 0.64f, 0.69f, 0.74f, 0.81f, 0.88f, 0.95f, 1f,
+        1.07f, 1.17f, 1.28f, 1.41f, 1.55f, 1.68f, 1.86f};
+    static final float[] LINE_FULL_DB = {-16f, -10f, -14f, -12f, -9f, -7f, -8f, -6f, -9f, -7f, 0f,
+        -8f, -9f, -11f, -13f, -12f, -15f, -18f};
+    static final float[] LINE_IDLE_DB = {-31.5f, -25.5f, -29.5f, -27.5f, -23.5f, -21.5f, -22.5f, -19.5f, -15.5f, -9.5f, -1.5f,
+        -9.5f, -13.5f, -16.5f, -19.5f, -19.5f, -23.5f, -27.5f};
+    /** 左右两台差多少（份额；很小，两台的抖动又各自独立，不出固定的拍）。 */
+    static final float ENGINE_SPLIT = 0.0007f;
+    /** 每根线的随机相位抖动（周的标准差、低通 Hz）：抹成一小条（参考的线 −10 dB 宽 50–100 Hz），线和线之间的拍也就不成节奏。 */
+    static final float LINE_JITTER = 0.13f;
+    static final float LINE_JITTER_HZ = 15f;
+    /** 低音成对的两根差多少、随机抖动（份额、低通 Hz）。 */
     static final float PAIR = 0.013f;
-    static final float ENGINE_SPLIT = 0.002f;
-    /**
-     * 每根谐波的随机相位抖动（周的标准差、低通 Hz）：参考的线 −10 dB 宽 50–100 Hz。每根还有一个固定的相位（叶片之间的细小差别），
-     * 不然一整排对齐的谐波叠成一串尖脉冲 —— 峰值高（全油门时限幅要压 4 dB），听着也是「嗡嗡」的电子味。
-     */
-    static final float COMB_JITTER = 0.06f;
-    static final float COMB_JITTER_HZ = 10f;
-    /** 低音的随机抖动（份额、低通 Hz）。 */
     static final float LOW_WOBBLE = 0.012f;
     static final float WOBBLE_HZ = 8f;
     /** 主音的电平（相对转满时的低音，dB；怠速时两者差不多）；两台摆在左右多远。 */
-    static final float WHINE_DB = -4.5f;
+    static final float WHINE_DB = -6f;
     static final float ENGINE_PAN = 0.3f;
 
     // ---- 低音（怠速 Hz、转满 Hz、dB），怠速时比转满低多少
@@ -133,7 +129,7 @@ final class JetVoice implements Voice {
     /** 总的倍数：全油门时限幅只压两三 dB（{@link Limiter}；「轰」「音爆」那一下压得多些）。 */
     static final float NORM = 0.32f;
 
-    private static final int LINES = COMB_FULL_DB.length;
+    private static final int LINES = LINE_RATIO.length;
     private static final int LOWS = LOW_DB.length;
     /** 抖动、哨声电平、低音音调每这么多个样本算一次。 */
     private static final int CONTROL = 16;
@@ -167,13 +163,10 @@ final class JetVoice implements Voice {
     private float spool;
     private boolean started;
     private int controlLeft;
-    /** 两台风扇轴的相位（周）；每根谐波 [台 × 根] 的相位抖动（周）和它的低通噪声、成对的另一根的相位；每根这一刻的增益。 */
-    private final double[] shaftPhase = new double[2];
+    /** 哨声的线 [台 × 根]：相位（周）、相位抖动（周）和它的低通噪声；每根这一刻的增益。 */
+    private final double[] linePhase = new double[2 * LINES];
     private final float[] jitter = new float[2 * LINES];
     private final float[] jitterNoise = new float[2 * LINES];
-    private final double[] pairPhase = new double[2 * LINES];
-    /** 每根谐波 [台 × 根] 固定的相位（周）。 */
-    private final float[] combOffset = new float[2 * LINES];
     private final float[] fanGain = new float[LINES];
     /** 低音振荡器 [台 × 根 × 对里的哪根]：相位、抖动、每样本走多少周。 */
     private final double[] lowPhase = new double[2 * LOWS * 2];
@@ -218,14 +211,8 @@ final class JetVoice implements Voice {
         // 抖动每 CONTROL 个样本走一步：低通按这个步长算，输出方差归一
         wobbleK = 1f - (float) Math.exp(-2.0 * Math.PI * WOBBLE_HZ * CONTROL / sampleRate);
         wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
-        jitterK = 1f - (float) Math.exp(-2.0 * Math.PI * COMB_JITTER_HZ * CONTROL / sampleRate);
+        jitterK = 1f - (float) Math.exp(-2.0 * Math.PI * LINE_JITTER_HZ * CONTROL / sampleRate);
         jitterNorm = (float) (1.0 / Math.sqrt(jitterK / (2.0 - jitterK)));
-        // Schroeder 的相位（第 k 根 k(k − 1) / 2N 周）：一整排谐波叠出来最平；第二台错开半周
-        for (int e = 0; e < 2; e++) {
-            for (int k = 0; k < LINES; k++) {
-                combOffset[e * LINES + k] = (float) ((k * (k + 1) / (2.0 * LINES) + 0.5 * e) % 1.0);
-            }
-        }
         speckleK = 1f - (float) Math.exp(-2.0 * Math.PI * SPECKLE_HZ / sampleRate);
         speckleNorm = (float) (1.0 / Math.sqrt(speckleK / (2.0 - speckleK)));
         whoompDecay = perSample(WHOOMP_SEC);
@@ -234,9 +221,8 @@ final class JetVoice implements Voice {
         gainK = 1f - (float) Math.exp(-1.0 / (EngineVoice.GAIN_SMOOTH_SEC * sampleRate));
         float dbToLn = (float) (Math.log(10.0) / 20.0);
         for (int k = 0; k < LINES; k++) {
-            int n = COMB_FROM + k;
-            fanIdleGain[k] = (n >= PAIR_FROM && n <= PAIR_TO ? 0.5f : 1f) * EngineVoice.dbToLin(COMB_IDLE_DB[k] + WHINE_DB);
-            fanLnSpan[k] = (COMB_FULL_DB[k] - COMB_IDLE_DB[k]) * dbToLn;
+            fanIdleGain[k] = EngineVoice.dbToLin(LINE_IDLE_DB[k] + WHINE_DB);
+            fanLnSpan[k] = (LINE_FULL_DB[k] - LINE_IDLE_DB[k]) * dbToLn;
         }
         for (int k = 0; k < LOWS; k++) {
             lowGain[k] = 0.5f * EngineVoice.dbToLin(LOW_DB[k]);
@@ -341,11 +327,11 @@ final class JetVoice implements Voice {
                 controlLeft = CONTROL - 1;
                 control(s);
             }
-            float inc = mainHz(spool) / COMB_MAIN / rate;
+            float inc = mainHz(spool) / rate;
 
-            // 哨声：风扇轴的一整排谐波，左右两台
-            float e0 = comb(0, inc) * fanLevel;
-            float e1 = comb(1, inc) * fanLevel;
+            // 哨声：一大排不成倍数的线，左右两台
+            float e0 = lines(0, inc) * fanLevel;
+            float e1 = lines(1, inc) * fanLevel;
 
             // 低音
             float l0 = 0f;
@@ -417,14 +403,14 @@ final class JetVoice implements Voice {
         }
     }
 
-    /** 慢变的部分：每根谐波的相位抖动和这一刻的增益（按 dB 在怠速、转满之间走），低音的音调和抖动。 */
+    /** 慢变的部分：每根线的相位抖动和这一刻的增益（按 dB 在怠速、转满之间走），低音的音调和抖动。 */
     private void control(float s) {
         for (int k = 0; k < LINES; k++) {
             fanGain[k] = fanIdleGain[k] * (float) Math.exp(s * fanLnSpan[k]);
             for (int e = 0; e < 2; e++) {
                 int o = e * LINES + k;
                 jitterNoise[o] += jitterK * (white() - jitterNoise[o]);
-                jitter[o] = COMB_JITTER * jitterNorm * jitterNoise[o];
+                jitter[o] = LINE_JITTER * jitterNorm * jitterNoise[o];
             }
         }
         for (int k = 0; k < LOWS; k++) {
@@ -452,23 +438,18 @@ final class JetVoice implements Voice {
         return Math.max(MIN_HZ, MAIN_ORDER * (IDLE_RPM + (FULL_RPM - IDLE_RPM) * s) / 60f);
     }
 
-    /** 第 {@code e} 台的哨声往前走一个样本（风扇轴每样本走 {@code inc} 周）：每根谐波按轴的相位 × 次数，加自己的抖动。 */
-    private float comb(int e, float inc) {
-        double ph = shaftPhase[e] + inc * ENGINE[e];
-        ph -= Math.floor(ph);
-        shaftPhase[e] = ph;
+    /** 第 {@code e} 台的哨声往前走一个样本（主音每样本走 {@code inc} 周）：每根线按自己的倍数走，加自己的抖动。 */
+    private float lines(int e, float inc) {
+        float step = inc * ENGINE[e];
         float sum = 0f;
         for (int k = 0; k < LINES; k++) {
-            int n = COMB_FROM + k;
             int o = e * LINES + k;
-            float s = EngineVoice.sin(n * ph + combOffset[o] + jitter[o]);
-            if (n >= PAIR_FROM && n <= PAIR_TO) {
-                double q = pairPhase[o] + n * inc * ENGINE[e] * (1f + PAIR);
-                q -= Math.floor(q);
-                pairPhase[o] = q;
-                s += EngineVoice.sin(q + combOffset[o] + jitter[o]);
+            double ph = linePhase[o] + step * LINE_RATIO[k];
+            if (ph >= 1.0) {
+                ph -= 1.0;
             }
-            sum += fanGain[k] * s;
+            linePhase[o] = ph;
+            sum += fanGain[k] * EngineVoice.sin(ph + jitter[o]);
         }
         return sum;
     }

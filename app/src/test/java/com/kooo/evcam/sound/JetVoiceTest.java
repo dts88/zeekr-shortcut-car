@@ -251,6 +251,69 @@ public class JetVoiceTest {
         }
     }
 
+    @Test
+    public void theDroneHasNoRhythm() {
+        // 项目所有者 2026-10-22：上一版一串一串有节奏、像活塞发动机；飞机应该是嗡嗡的，没有明显的节奏。300–2000 Hz 的包络
+        // （去掉 0.7 s 以上的慢变）在每秒 2–20 下这一段里，最突出的那个比 2–60 下的中位数高不到 15 dB（参考 8–12 dB，散在各处；
+        // 一整排谐波 + 成对的那一版 21–26 dB，在 10–13 Hz）。停着踩到顶、D 挡 4800 rpm 小油门各看一次
+        for (VoiceParams p : new VoiceParams[] {params(FREE_MAX_RPM, 1f, false), params(4800f, 0.4f, true)}) {
+            p.gain = 0.1f;
+            float[] x = band(render(new JetVoice(RATE), p, 6.5f, -1, p.load, 0, true), 300f, 2000f);
+            int from = Math.round(1.5f * RATE);
+            int hop = 128;
+            // 整流、一阶低通（80 Hz）、每 hop 个样本取一点
+            double k = 1.0 - Math.exp(-2.0 * Math.PI * 80.0 / RATE);
+            double lp = 0;
+            int n = (x.length - from) / hop;
+            double[] env = new double[n];
+            for (int i = from; i < from + n * hop; i++) {
+                lp += k * (Math.abs(x[i]) - lp);
+                if ((i - from) % hop == hop - 1) {
+                    env[(i - from) / hop] = lp;
+                }
+            }
+            double fs = (double) RATE / hop;
+            int h = (int) (0.35 * fs);
+            float[] d = new float[n];
+            for (int i = 0; i < n; i++) {
+                double s = 0;
+                int c = 0;
+                for (int j = Math.max(0, i - h); j < Math.min(n, i + h); j++) {
+                    s += env[j];
+                    c++;
+                }
+                d[i] = (float) ((env[i] - s / c) * (0.5 - 0.5 * Math.cos(2.0 * Math.PI * i / n)));
+            }
+            java.util.List<Double> all = new java.util.ArrayList<>();
+            double max = 0;
+            double maxHz = 0;
+            for (double f = 2.0; f <= 60.0; f += 0.25) {
+                double pw = goertzelAt(d, fs, f);
+                all.add(pw);
+                if (f <= 20.0 && pw > max) {
+                    max = pw;
+                    maxHz = f;
+                }
+            }
+            java.util.Collections.sort(all);
+            double over = 10 * Math.log10(max / all.get(all.size() / 2));
+            assertTrue((p.drive ? "D 挡" : "停着踩到顶") + " 包络在 " + maxHz + " Hz 高出 " + over + " dB", over < 15);
+        }
+    }
+
+    /** {@code x}（采样率 {@code fs}）在 {@code hz} 上的功率（Goertzel）。 */
+    private static double goertzelAt(float[] x, double fs, double hz) {
+        double c = 2.0 * Math.cos(2.0 * Math.PI * hz / fs);
+        double s1 = 0;
+        double s2 = 0;
+        for (float v : x) {
+            double s0 = v + c * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+        return s1 * s1 + s2 * s2 - c * s1 * s2;
+    }
+
     // ================================================================= 喷流、换挡
 
     @Test
