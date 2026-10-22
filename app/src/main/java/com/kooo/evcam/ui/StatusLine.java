@@ -80,15 +80,26 @@ public final class StatusLine {
      *
      * <p>预设的按 id 取本地化的名字：存进配置里的名字是迁移时写的中文，照抄它的话
      * 英文、马来文界面下这里也是一行中文。</p>
+     *
+     * <p>写的是这一次运行的（{@code CameraManagerHolder.runProfileId}，还没建过管线时是存下的配置）：前后座舱只用一次时，
+     * 存下的配置在生效后、离车时就改了（camera.CabinsOneShot）。两份预设照这一次运行有没有座舱叫：离车去掉座舱之后是「环视」。</p>
      */
     private static String profileName(Context context) {
         try {
-            Profile profile = new com.kooo.evcam.profile.ProfileStore(context).current();
-            if (Profile.PRESET_COMPOSITE.equals(profile.id)) {
-                return context.getString(R.string.status_profile_composite);
-            }
-            if (Profile.PRESET_COMPOSITE_MULTI.equals(profile.id)) {
-                return context.getString(R.string.status_profile_composite_multi);
+            com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
+            String runId = holder.runProfileId();
+            Profile profile = runId != null ? new com.kooo.evcam.profile.ProfileStore(context).load(runId)
+                    : new com.kooo.evcam.profile.ProfileStore(context).current();
+            String id = runId != null ? runId : profile.id;
+            if (Profile.PRESET_COMPOSITE.equals(id) || Profile.PRESET_COMPOSITE_MULTI.equals(id)) {
+                boolean cabins = false;
+                for (String key : com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context)) {
+                    if (!com.kooo.evcam.camera.CameraSlots.KEY_SURROUND.equals(key)) {
+                        cabins = true;
+                    }
+                }
+                return context.getString(cabins ? R.string.status_profile_composite_multi
+                        : R.string.status_profile_composite);
             }
             String name = profile.name;
             return name == null ? "" : name.trim();

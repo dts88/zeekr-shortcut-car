@@ -686,7 +686,23 @@ public class AppConfig {
                 KEY_UI_LEFT_FOR_SCREEN_OFF,
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
-                KEY_PHOTO_VIA_JPEG_RESET)));
+                KEY_PHOTO_VIA_JPEG_RESET,
+                KEY_CABINS_REVERT_PENDING)));
+    }
+
+    /**
+     * 前后座舱只用一次（暂时的规矩，{@code camera.CabinsOneShot}）：这次照没改过的「极氪7X（环视 + 前后座舱）」启动了，
+     * 视频流配置要改回「极氪7X（环视）」—— 离车时、或者下一次启动时改。运行状态，不导出。
+     */
+    private static final String KEY_CABINS_REVERT_PENDING = "cabins_one_shot_revert_pending";
+
+    public boolean isCabinsRevertPending() {
+        return prefs.getBoolean(KEY_CABINS_REVERT_PENDING, false);
+    }
+
+    /** 立刻落盘（commit）：生效那一刻记下的，断电了下一次启动也要看得到。 */
+    public void setCabinsRevertPending(boolean pending) {
+        prefs.edit().putBoolean(KEY_CABINS_REVERT_PENDING, pending).commit();
     }
 
     /** 这个键是运行状态，不是设置（见 {@link #RUNTIME_KEYS}）。纯函数，测试直接调。 */

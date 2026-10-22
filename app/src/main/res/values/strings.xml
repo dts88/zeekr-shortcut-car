@@ -157,7 +157,7 @@
     <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
-    <string name="set_screen_off_keep_summary">熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
+    <string name="set_screen_off_keep_summary">熄屏后只录制环视。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
@@ -738,6 +738,7 @@
     <string name="editor_quality_sharp_note">不限帧率、高码率；细节保留最充分</string>
     <string name="editor_cameras_title">已开启 %1$d 路摄像头</string>
     <string name="editor_cameras_summary">关闭的摄像头不录制、不占用空间；点击卡片可单独调整该路。开关改动重启应用后生效。</string>
+    <string name="editor_cabin_one_shot">因造成车机不稳定等原因，此设置无法固化，用户离车后自动取消</string>
     <string name="editor_camera_tuned">自定义</string>
     <string name="editor_open_lanes">画面布局</string>
     <string name="editor_detail_title">%1$s · 参数</string>

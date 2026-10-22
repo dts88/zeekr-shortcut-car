@@ -60,4 +60,15 @@
         android:fontFeatureSettings="tnum"
         android:textAppearance="@style/TextAppearance.Cam.Caption"
         android:textColor="@color/text_secondary" />
+
+    <!-- 座舱那两张才有：前后座舱只用一次（暂时的规矩，camera.CabinsOneShot；ui-spec §十） -->
+    <TextView
+        android:id="@+id/camera_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/editor_cabin_one_shot"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:textColor="@color/text_secondary"
+        android:visibility="gone" />
 </LinearLayout>

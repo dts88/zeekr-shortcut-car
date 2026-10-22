@@ -138,7 +138,7 @@
     <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; front and rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
@@ -738,6 +738,7 @@
     <string name="editor_quality_sharp_note">No frame rate cap, high bitrate; most detail</string>
     <string name="editor_cameras_title">Cameras on: %1$d</string>
     <string name="editor_cameras_summary">Cameras that are off aren\'t recorded and use no space; tap a card to adjust that camera. Switch changes take effect after restarting the app.</string>
+    <string name="editor_cabin_one_shot">This setting can\'t be kept because it can make the head unit unstable, among other reasons. It turns off automatically after you leave the car.</string>
     <string name="editor_camera_tuned">custom</string>
     <string name="editor_open_lanes">Layout</string>
     <string name="editor_detail_title">%1$s · settings</string>
