@@ -328,6 +328,56 @@ public class PulseVoiceTest {
         }
     }
 
+    @Test
+    public void theWhineIsASmallBunchNotOnePureLine() {
+        // 项目所有者 2026-10-22：一根主线太过突出，应该是层次更多的一组声音。EngineV1 那台的齿轮声每一刻都是一小团
+        // （±0.5–0.7 %，几个峰此起彼伏）：1900 rpm 增压时齿轮第 2 次 ±1.5 % 里最响的那一个点（1 秒、1 Hz 一格）
+        // 只占三成以下（一根纯正弦几乎占满；量下来约一成半）
+        float[] x = mid(render(SC, params(1900f, 1f), 2f), 1f);
+        double mesh = SC.superchargerOrder * SC.meshMultiple * 2 * 1900 / 60.0;
+        double band = 0;
+        double top = 0;
+        for (double f = Math.ceil(mesh * 0.985); f <= mesh * 1.015; f += 1.0) {
+            double pk = power(x, f);
+            band += pk;
+            top = Math.max(top, pk);
+        }
+        assertTrue("最响的一格占 " + top / band, top / band < 0.3);
+    }
+
+    @Test
+    public void theWhinesColourChangesWithTheRevs() {
+        // 项目所有者 2026-10-22：实机不同转速音色略有变化。照 EngineV1 那台四个转速的录音：低转 h1 比 h2 响、h3 很弱（暗），
+        // 2350 rpm 起 h2、h3 上来（亮）。相对 h2（±1.5 % 的能量），1300 → 2350 rpm：h1 至少降 2 dB（参考 −4.1 dB，量下来 −3.8），
+        // h3 至少升 4 dB（参考 +8.8 dB，量下来 +7.3）。再往上齿轮声比底噪弱，窗口里量的多半是噪声，不比
+        double[] low = harmonicsRe2(1300f);
+        double[] high = harmonicsRe2(2350f);
+        assertTrue("h1 相对 h2: " + low[0] + " → " + high[0], high[0] < low[0] - 2);
+        assertTrue("h3 相对 h2: " + low[1] + " → " + high[1], high[1] > low[1] + 4);
+    }
+
+    /**
+     * 满增压时齿轮第 1、3 次比第 2 次（各自 ±1.5 % 的能量，3 秒，离发动机整数阶 0.1 阶以内的点不算 —— 那是进气腔的和弦）差多少 dB；
+     * 音量压低，不让限幅的增益起伏把别的阶次调制进来。
+     */
+    private static double[] harmonicsRe2(float rpm) {
+        VoiceParams p = params(rpm, 1f);
+        p.gain = 0.05f;
+        float[] x = mid(render(SC, p, 4f), 1f);
+        double f1 = rpm / 60.0;
+        double m1 = SC.superchargerOrder * SC.meshMultiple * f1;
+        double[] e = new double[3];
+        for (int h = 1; h <= 3; h++) {
+            for (double f = Math.ceil(h * m1 * 0.985); f <= h * m1 * 1.015; f += (double) RATE / x.length) {
+                double o = f / f1;
+                if (Math.abs(o - Math.round(o)) >= 0.1) {
+                    e[h - 1] += power(x, f);
+                }
+            }
+        }
+        return new double[] {db(e[0] / e[1]), db(e[2] / e[1])};
+    }
+
     /** 10–28 阶（1 秒，从第 1 秒起）：比两边 ±0.25 阶高 10 倍的整数阶有几根、整数阶加起来比半阶加起来、整数阶加起来。 */
     private static double[] chord(PulseProfile profile, float rpm, float load, float overrun) {
         VoiceParams p = params(rpm, load);

@@ -133,9 +133,13 @@ final class PulseProfile {
     final float superchargerOrder;
     /** 叶片基频的电平（dB，3000 rpm，和负荷无关）。 */
     final float lobeDb;
-    /** 齿轮啮合是叶片频率的几倍（阴转子上的齿数 / 叶片数）；各次谐波的电平（dB，相对第 2 次）。 */
+    /**
+     * 齿轮啮合是叶片频率的几倍（阴转子上的齿数 / 叶片数）；各次谐波的电平（dB，相对第 2 次），每一行对应 {@link #meshRpm} 的一个
+     * 转速（按转速的对数插值，两头照最边上的）。照 EngineV1 那台四个转速的录音：低转 h1 最响、h4 / h5 还在（暗、厚），转速上去
+     * h2、h3 上来、h4 / h5 很快没了（亮、利）。项目所有者 2026-10-22：实机不同转速音色略有变化，我们原来只是跟着转速变调。
+     */
     final float meshMultiple;
-    final float[] meshHarmonicsDb;
+    final float[][] meshHarmonicsDb;
     /** 阴、阳转子各几个叶片（转一圈扫过几下）；叶片之间细小的差别让每个转子每转一圈调制一次啸叫（边带），调制多深。 */
     final float[] rotorLobes;
     final float[] rotorAm;
@@ -157,6 +161,15 @@ final class PulseProfile {
      */
     final float superchargerWobble;
     final float superchargerWobbleHz;
+    /**
+     * 齿轮声不是一个来源：同步齿轮的啮合、转子出口的压力脉动、壳体，各自被皮带、扭振、气流调得不一样 —— 每个来源相对的
+     * 一点偏差（份额，个数就是来源数），各自慢慢游移（份额的标准差、低通 Hz），几个来源能量加起来和原来一个一样。
+     * 参考那台每一刻都是一小团（±0.5–0.7 %，几个峰此起彼伏）；项目所有者 2026-10-22：一根主线太过突出，应该是层次更多的
+     * 一组声音在同步变化。
+     */
+    final float[] meshVoiceDetune;
+    final float meshVoiceWander;
+    final float meshVoiceWanderHz;
     /** 旁通阀开着（不增压，齿轮不受力）时齿轮声还剩几成。 */
     final float superchargerFree;
     /** 被发动机的进气脉冲（4 阶）调制多深。 */
@@ -166,15 +179,22 @@ final class PulseProfile {
      * 增压时进气腔里的压力脉动（项目所有者 2026-10-22：齿轮声太单一，参考那台像好几组齿轮的和弦）：每个进气门关上那一下，
      * 那一排的进气腔（两排各一个中冷器）压力抖几下。抖的样子跟着曲轴角走（气门按曲轴角开关，转速翻倍、抖得也快一倍）：
      * 几个在固定阶次上的共振（{@link #pulsationOrders}，Q {@link #pulsationQ}），谱峰一样高；最低那个起头的幅度
-     * {@link #pulsationDb}（相对排气脉冲，满增压）。幅度跟进气腔的绝对压力走（增压的 1.5 次方），不随转速变。
+     * {@link #pulsationDb}（相对排气脉冲，满增压），随转速另加 {@link #pulsationRpmDb}（按转速的对数插值，两头照最边上的）。
+     * 幅度跟进气腔的绝对压力走（增压的 1.5 次方）。传到外面要过进气腔、中冷器：{@link #pulsationTopHz} 以上落下去（二阶低通）——
+     * 参考那台 1300、1900 rpm 时整数阶到 25 阶为止（按曲轴角的形状），2350、2850 rpm 时到 21–22 阶、900–1000 Hz 就收了
+     * （固定的频率）：转速越高，截掉的阶次越多，音色跟着变。
      * 同一排上一下留下的压力还没恢复，这一下就弱一点（1 − {@link #pulsationRecovery} × e^(−间隔 / {@link #recoveryDeg})，
      * 交叉平面每排的间隔 90/180/270°）、晚一点（缺多少晚多少，缺满了晚 {@link #pulsationLagMs} 毫秒）。两排的样子一样、
      * 正好错开一圈，合起来每圈重复一次：出来的是发动机的整数阶（半阶抵掉），十几根一起随转速走，和齿轮声叠成和弦。
      * 照 EngineV1 那台带负荷的录音（转速跟踪后量的，2026-10-22）：增压时 10–34 阶几乎全是清楚的整数阶，比底噪高 15–30 dB，
-     * 最响的在 14–25 阶、和齿轮声差不多响；我们原来这一段只有沙哑的噪声。这里放得比参考轻（齿轮声下面 4–10 dB，
-     * 全油门整体响度只多约 0.5 dB）；旁通阀开着（不增压）时还剩 {@link #pulsationFree}。
+     * 最响的在 14–25 阶、和齿轮声差不多响；我们原来这一段只有沙哑的噪声。2850 rpm 以下照参考放到和齿轮声差不多响
+     * （项目所有者 2026-10-22：齿轮声一根主线太过突出，应该是层次更多的一组声音）；参考只录到 2850 rpm，再往上这层落进 1–3 kHz，
+     * 收回到上一轮的电平（4000 rpm −5、5000 rpm 以上 −7 dB），全油门整体响度不变。旁通阀开着（不增压）时还剩 {@link #pulsationFree}。
      */
     final float pulsationDb;
+    final float pulsationTopHz;
+    final float[] pulsationRpm;
+    final float[] pulsationRpmDb;
     final float[] pulsationOrders;
     final float pulsationQ;
     final float pulsationRecovery;
@@ -341,7 +361,10 @@ final class PulseProfile {
         superchargerOrder = b.superchargerOrder;
         lobeDb = b.lobeDb;
         meshMultiple = b.meshMultiple;
-        meshHarmonicsDb = b.meshHarmonicsDb.clone();
+        meshHarmonicsDb = new float[b.meshHarmonicsDb.length][];
+        for (int i = 0; i < meshHarmonicsDb.length; i++) {
+            meshHarmonicsDb[i] = b.meshHarmonicsDb[i].clone();
+        }
         rotorLobes = b.rotorLobes.clone();
         rotorAm = b.rotorAm.clone();
         superchargerDb = b.superchargerDb;
@@ -351,10 +374,16 @@ final class PulseProfile {
         meshRpmDb = b.meshRpmDb.clone();
         superchargerWobble = b.superchargerWobble;
         superchargerWobbleHz = b.superchargerWobbleHz;
+        meshVoiceDetune = b.meshVoiceDetune.clone();
+        meshVoiceWander = b.meshVoiceWander;
+        meshVoiceWanderHz = b.meshVoiceWanderHz;
         superchargerFree = b.superchargerFree;
         superchargerAm = b.superchargerAm;
         superchargerSec = b.superchargerSec;
         pulsationDb = b.pulsationDb;
+        pulsationTopHz = b.pulsationTopHz;
+        pulsationRpm = b.pulsationRpm.clone();
+        pulsationRpmDb = b.pulsationRpmDb.clone();
         pulsationOrders = b.pulsationOrders.clone();
         pulsationQ = b.pulsationQ;
         pulsationRecovery = b.pulsationRecovery;
@@ -501,7 +530,12 @@ final class PulseProfile {
         private float superchargerOrder;
         private float lobeDb = -29f;
         private float meshMultiple = 3f;
-        private float[] meshHarmonicsDb = {-2f, 0f, -3f, -13f, -13f};
+        private float[][] meshHarmonicsDb = {
+                {1.5f, 0f, -9.5f, -9.5f, -12f},
+                {-0.5f, 0f, -6f, -9f, -12f},
+                {-2.5f, 0f, -1.5f, -9.5f, -10f},
+                {-3.5f, 0f, -3f, -14f, -19f},
+                {-3.5f, 0f, -3f, -14f, -19f}};
         private float toneRpmPow = 0.8f;
         private float[] rotorLobes = {5f, 3f};
         private float[] rotorAm = {0.2f, 0.15f};
@@ -511,10 +545,16 @@ final class PulseProfile {
         private float[] meshRpmDb = {9f, 14f, 8f, 0f, -4f};
         private float superchargerWobble = 0.006f;
         private float superchargerWobbleHz = 30f;
+        private float[] meshVoiceDetune = {0f, -0.0018f, 0.0022f};
+        private float meshVoiceWander = 0.0045f;
+        private float meshVoiceWanderHz = 2.5f;
         private float superchargerFree = 0.05f;
         private float superchargerAm = 0.25f;
         private float superchargerSec = 0.12f;
-        private float pulsationDb = -3f;
+        private float pulsationDb = 1f;
+        private float pulsationTopHz = 1000f;
+        private float[] pulsationRpm = {2850f, 4000f, 5000f};
+        private float[] pulsationRpmDb = {0f, -2f, -3f};
         private float[] pulsationOrders = {12f, 15.5f, 19.5f, 24.5f};
         private float pulsationQ = 4f;
         private float pulsationRecovery = 1.37f;
@@ -618,7 +658,9 @@ final class PulseProfile {
                     || rotorLobes.length != 2 || rotorAm.length != 2
                     || jetQ.length != jetHz.length || jetGainDb.length != jetHz.length || raspRpmDb.length != 2
                     || thunkMs.length != thunkHz.length || thunkGainDb.length != thunkHz.length
-                    || cabinFrontHz.length != 2 || cabinRearHz.length != 2) {
+                    || cabinFrontHz.length != 2 || cabinRearHz.length != 2
+                    || meshHarmonicsDb.length != meshRpm.length || meshRpmDb.length != meshRpm.length || meshVoiceDetune.length == 0
+                    || pulsationRpmDb.length != pulsationRpm.length) {
                 throw new IllegalStateException("pulse profile incomplete");
             }
             for (int c : firing) {

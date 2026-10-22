@@ -118,11 +118,6 @@ final class PulseVoice implements Voice {
     static final float WHINE_FADE_HZ = 3000f;
     /** 阳转子那份边带的相位（周）：两个转子的差别对不齐。 */
     static final double MALE_PHASE = 1.3 / (2.0 * Math.PI);
-    /**
-     * 增压时进气腔的压力脉动（{@link PulseProfile#pulsationDb}）在这个转速（rpm）以上按转速的平方根收：参考那台只录到 2850 rpm；
-     * 再往上这层和弦落进 1–3 kHz（人耳最灵的一段），不收的话高转时整体响度多将近 1 dB。
-     */
-    static final float PULSATION_TOP_RPM = 3000f;
     /** 不增压时出口的气流还剩几成；松开油门时进口还有几成流量。 */
     static final float JET_FREE = 0.15f;
     static final float INLET_FREE = 0.25f;
@@ -220,9 +215,16 @@ final class PulseVoice implements Voice {
     private final float lobeGain;
     private final float[] meshGains;
     private float meshNow;
+    /** 齿轮声的几个来源：各自相对的叶片相位（周）、游移的低通噪声；几个加起来的能量折回一个。 */
+    private final double[] voicePhase;
+    private final float[] voiceNoise;
+    private final float voiceK;
+    private final float voiceNorm;
+    private final float voiceScale;
     /** 增压时进气腔的压力脉动（{@link PulseProfile#pulsationDb}）：几个跟着转速走的共振和各自的增益（每块重算），每一下最多晚多少样本。 */
     private final Biquad[] pulsationModes;
     private final float[] pulsationGains;
+    private final Biquad pulsationTop;
     private final float pulsationLagSamples;
     private double lobePhase;
     private double femalePhase;
@@ -410,15 +412,18 @@ final class PulseVoice implements Voice {
         roar = Biquad.bandpass(profile.roarHz, profile.roarQ, sampleRate);
         supercharged = profile.superchargerOrder > 0f;
         lobeGain = EngineVoice.dbToLin(profile.lobeDb);
-        meshGains = new float[profile.meshHarmonicsDb.length];
-        for (int k = 0; k < meshGains.length; k++) {
-            meshGains[k] = EngineVoice.dbToLin(profile.superchargerDb + profile.meshHarmonicsDb[k]);
-        }
+        meshGains = new float[profile.meshHarmonicsDb[0].length];
+        voicePhase = new double[profile.meshVoiceDetune.length];
+        voiceNoise = new float[voicePhase.length];
+        voiceK = onePole(profile.meshVoiceWanderHz);
+        voiceNorm = (float) (1.0 / Math.sqrt(voiceK / (2.0 - voiceK)));
+        voiceScale = (float) (1.0 / Math.sqrt(voicePhase.length));
         pulsationModes = new Biquad[profile.pulsationOrders.length];
         for (int k = 0; k < pulsationModes.length; k++) {
             pulsationModes[k] = new Biquad();
         }
         pulsationGains = new float[pulsationModes.length];
+        pulsationTop = Biquad.lowpass(profile.pulsationTopHz, 0.7071f, sampleRate);
         pulsationLagSamples = profile.pulsationLagMs * 1e-3f * sampleRate;
         wobbleK = onePole(profile.superchargerWobbleHz);
         wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
@@ -591,11 +596,13 @@ final class PulseVoice implements Voice {
             whineTarget = (float) Math.pow(Math.min(Math.max(rpmTarget, 300f), 7200f) / 3000f, p.toneRpmPow);
             meshTarget = whineTarget * (p.superchargerFree + (1f - p.superchargerFree) * boost)
                     * EngineVoice.dbToLin(meshRpmDb(p, rpmTarget));
+            for (int k = 0; k < meshGains.length; k++) {
+                meshGains[k] = EngineVoice.dbToLin(p.superchargerDb + meshHarmonicDb(p, rpmTarget, k));
+            }
             // 每一下的幅度跟进气腔的绝对压力（怠速时只有大气压的几成、满增压时一倍多），不随转速变：转速高了一下接一下来得密、
             // 每一下也抖得快，总的能量和发动机的中频一样大致不变
-            evPulsation = EngineVoice.dbToLin(p.pulsationDb)
-                    * (p.pulsationFree + (1f - p.pulsationFree) * boost * (float) Math.sqrt(boost))
-                    * (float) Math.sqrt(Math.min(1f, PULSATION_TOP_RPM / rpmCalc));
+            evPulsation = EngineVoice.dbToLin(p.pulsationDb + rpmDb(p.pulsationRpm, p.pulsationRpmDb, rpmCalc))
+                    * (p.pulsationFree + (1f - p.pulsationFree) * boost * (float) Math.sqrt(boost));
             for (int k = 0; k < pulsationModes.length; k++) {
                 float hz = Math.min(p.pulsationOrders[k] * rpmCalc / 60f, rate * 0.45f);
                 pulsationModes[k].setBandpass(hz, p.pulsationQ, rate);
@@ -708,34 +715,13 @@ final class PulseVoice implements Voice {
                 jetNow += (jetTarget - jetNow) * ampK;
                 inletNow += (inletTarget - inletNow) * ampK;
                 whooshNow += (whooshTarget - whooshNow) * ampK;
-                // 叶片基频（任何负荷都有）+ 齿轮啮合的几次谐波（只在增压时有）
-                float whine = lobeGain * VirtualEngine.clamp01((WHINE_TOP_HZ - hz) / WHINE_FADE_HZ)
-                        * EngineVoice.sin(lobePhase) * whineNow;
-                for (int k = 0; k < meshGains.length; k++) {
-                    float m = p.meshMultiple * (k + 1);
-                    float fade = (WHINE_TOP_HZ - m * hz) / WHINE_FADE_HZ;
-                    if (fade <= 0f) {
-                        break;
-                    }
-                    whine += meshGains[k] * Math.min(fade, 1f) * EngineVoice.sin(m * lobePhase) * meshNow;
-                }
-                float rotor = 1f + p.rotorAm[0] * EngineVoice.sin(femalePhase)
-                        + p.rotorAm[1] * EngineVoice.sin(malePhase + MALE_PHASE);
-                float am = 1f + p.superchargerAm * EngineVoice.sin(theta / 90.0);
                 float c = 0.5f + 0.5f * EngineVoice.sin(lobePhase + 0.25);
                 float push = 1f + p.jetPulse * (c * c * c / PUFF_MEAN - 1f);
                 jetL = airLowpass[0].process(jets(jetBands[0], white() * push)) * jetNow;
                 jetR = airLowpass[1].process(jets(jetBands[1], white() * push)) * jetNow;
                 gustNoise += gustK * (white() - gustNoise);
                 inlet = inletBand.process(white()) * inletNow * (1f + p.gust * gustNorm * gustNoise);
-                // 进气腔的压力脉动：发动机的整数阶，和齿轮声一起在发动机舱顶上
-                float xs = pulsation[cur];
-                pulsation[cur] = 0f;
-                float puls = 0f;
-                for (int k = 0; k < pulsationModes.length; k++) {
-                    puls += pulsationGains[k] * pulsationModes[k].process(xs);
-                }
-                float tones = whine * rotor * am + puls;
+                float tones = whine(hz) + pulsation(cur);
                 if (cabin) {
                     toneLp += toneK * (tones - toneLp);
                     cabinTones = toneLp * cabinToneGain;
@@ -968,20 +954,79 @@ final class PulseVoice implements Voice {
         rockPhase = 0.0;
     }
 
+    /**
+     * 增压器这一个样本的啸叫：叶片基频（任何负荷都有）+ 齿轮啮合的几次谐波（只在增压时有），被两个转子各转一圈、
+     * 发动机的进气脉冲（4 阶）调制。{@code hz} 是这一刻叶片扫过出口的频率（相位已经走过了）。
+     */
+    private float whine(float hz) {
+        float whine = lobeGain * VirtualEngine.clamp01((WHINE_TOP_HZ - hz) / WHINE_FADE_HZ)
+                * EngineVoice.sin(lobePhase) * whineNow;
+        // 齿轮声的几个来源各自慢慢游移（{@link PulseProfile#meshVoiceDetune}）：同一个阶次上一小团，此起彼伏
+        for (int v = 0; v < voicePhase.length; v++) {
+            voiceNoise[v] += voiceK * (white() - voiceNoise[v]);
+            voicePhase[v] += hz * (p.meshVoiceDetune[v] + p.meshVoiceWander * voiceNorm * voiceNoise[v]) / rate;
+            voicePhase[v] -= Math.floor(voicePhase[v]);
+        }
+        for (int k = 0; k < meshGains.length; k++) {
+            float m = p.meshMultiple * (k + 1);
+            float fade = (WHINE_TOP_HZ - m * hz) / WHINE_FADE_HZ;
+            if (fade <= 0f) {
+                break;
+            }
+            float s = 0f;
+            for (double phase : voicePhase) {
+                s += EngineVoice.sin(m * (lobePhase + phase));
+            }
+            whine += meshGains[k] * Math.min(fade, 1f) * s * voiceScale * meshNow;
+        }
+        float rotor = 1f + p.rotorAm[0] * EngineVoice.sin(femalePhase)
+                + p.rotorAm[1] * EngineVoice.sin(malePhase + MALE_PHASE);
+        float am = 1f + p.superchargerAm * EngineVoice.sin(theta / 90.0);
+        return whine * rotor * am;
+    }
+
+    /** 进气腔的压力脉动这一个样本（{@link PulseProfile#pulsationDb}）：发动机的整数阶，和齿轮声一起在发动机舱顶上。 */
+    private float pulsation(int cur) {
+        float xs = pulsation[cur];
+        pulsation[cur] = 0f;
+        float puls = 0f;
+        for (int k = 0; k < pulsationModes.length; k++) {
+            puls += pulsationGains[k] * pulsationModes[k].process(xs);
+        }
+        return pulsationTop.process(puls);
+    }
+
     /** 齿轮声随转速另加的 dB（{@link PulseProfile#meshRpmDb}）：按转速的对数在表里插值，两头照最边上的。 */
     static float meshRpmDb(PulseProfile p, float rpm) {
-        float[] at = p.meshRpm;
-        float[] db = p.meshRpmDb;
+        return rpmDb(p.meshRpm, p.meshRpmDb, rpm);
+    }
+
+    /** 一张随转速变的 dB 表（转速 {@code at}、值 {@code db}）这个转速下的值：按转速的对数插值，两头照最边上的。 */
+    static float rpmDb(float[] at, float[] db, float rpm) {
+        double f = rpmPosition(at, rpm);
+        int i = (int) f;
+        return i >= db.length - 1 ? db[db.length - 1] : (float) (db[i] + (db[i + 1] - db[i]) * (f - i));
+    }
+
+    /** 齿轮声第 {@code k + 1} 次谐波这个转速下的电平（dB，相对第 2 次；{@link PulseProfile#meshHarmonicsDb}，插值同上）。 */
+    static float meshHarmonicDb(PulseProfile p, float rpm, int k) {
+        float[][] db = p.meshHarmonicsDb;
+        double f = rpmPosition(p.meshRpm, rpm);
+        int i = (int) f;
+        return i >= db.length - 1 ? db[db.length - 1][k] : (float) (db[i][k] + (db[i + 1][k] - db[i][k]) * (f - i));
+    }
+
+    /** {@code rpm} 落在转速表 {@code at} 的哪儿：整数部分是下边那一格，小数是按转速的对数插值的位置；两头照最边上的。 */
+    static double rpmPosition(float[] at, float rpm) {
         if (rpm <= at[0]) {
-            return db[0];
+            return 0.0;
         }
         for (int i = 1; i < at.length; i++) {
             if (rpm <= at[i]) {
-                double f = Math.log(rpm / at[i - 1]) / Math.log(at[i] / at[i - 1]);
-                return (float) (db[i - 1] + (db[i] - db[i - 1]) * f);
+                return i - 1 + Math.log(rpm / at[i - 1]) / Math.log(at[i] / at[i - 1]);
             }
         }
-        return db[db.length - 1];
+        return at.length - 1;
     }
 
     /** 沙哑随流量（转速）多几 dB：以 {@link PulseProfile#raspRefRpm} 为准，每翻一倍按带负荷 / 收油的斜率，最多多 {@link PulseProfile#raspRpmMaxDb}。 */
