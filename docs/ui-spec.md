@@ -114,16 +114,23 @@
 
 ### 字号（`type.xml`）
 
-六档，布局里写 `android:textAppearance`，不写 `android:textSize`：
+五档，布局里写 `android:textAppearance`，不写 `android:textSize`：
 
 | 档 | 值 | 用在 |
 |---|---|---|
-| `TextAppearance.Cam.Micro` | 14sp | 角标、计数 |
-| `TextAppearance.Cam.Caption` | 16sp | 说明、状态条、画面角标 |
-| `TextAppearance.Cam.Body` | 18sp | 正文、按钮文字 |
-| `TextAppearance.Cam.Row` | 21sp | 列表行标题、分区标题、对话框正文 |
-| `TextAppearance.Cam.Title` | 26sp | 页面标题、对话框标题 |
-| `TextAppearance.Cam.Display` | 28sp | 计时、张数这类要隔着一米看清的数字 |
+| `TextAppearance.Cam.Micro` | 16sp | 角标、计数 |
+| `TextAppearance.Cam.Caption` | 20sp | 说明、状态条、画面角标 |
+| `TextAppearance.Cam.Body` | 22sp | 正文、按钮文字 |
+| `TextAppearance.Cam.Row` | 24sp | 列表行标题、分区标题、对话框正文 |
+| `TextAppearance.Cam.Title` | 32sp | 页面标题、对话框标题 |
+
+**怎么取的值**（项目所有者 2026-10-23）：0.41.0 那一套（14 / 16 / 18 / 21 / 26）放大约 1.2 倍，
+取最近的常用字号 —— 偶数，24 以内每 2 一档、再往上每 4 一档（12、14、16、18、20、22、24、28、32、36…）。
+最小一档算出来 16.8，取 16 不取 18，和下一档 20 拉得开。主界面和设置回到 2.14 及以前的大小（每档差 1sp 左右），
+录像回放、照片回放、诊断信息、关于以前没放大过，这次一起变大。原来的第六档 Display（28sp，计时、张数）没有地方用，去掉了。
+
+**所有界面共用这一张表**：主界面、设置、录像回放、照片回放、诊断信息、关于、对话框。
+悬浮按钮（字号在它自己的设置里）、超级镜子和盲区画面（字跟着窗口大小算）不走这张表。
 
 **设置界面整体低一档**（行标题用 Body、说明用 Micro）：它是停着读的密集列表，
 一屏十几行，按开车时瞟一眼的尺寸排会挤满整屏。

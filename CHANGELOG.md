@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Text sizes are about 1.2× larger, rounded to common sizes (16 / 20 / 22 / 24 / 32 sp), on every screen: the main screen and Settings are back to their size before 2.15.0; Videos, Photos, Diagnostics and About & credits get larger too.
 
 ## [2.17.0-alpha] - 2026-10-22
 
