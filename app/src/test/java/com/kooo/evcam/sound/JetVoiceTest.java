@@ -214,12 +214,52 @@ public class JetVoiceTest {
         assertTrue("重心: " + ratio, ratio > 2);
     }
 
+    @Test
+    public void atFullSpoolTheWhineIsAFullRowOfHarmonics() {
+        // 项目所有者 2026-10-22：电音多了，原厂那种「多频率的齐鸣」、厚度不够。参考停着踩到顶那一刻（85 ms 一帧，200–2000 Hz）：
+        // 20 dB 以内 13–22 根线，线和线之间是满的（中间那一格只比最响的低 19–27 dB）；第二版只有 9–12 根干净的线，中间低 35 dB
+        JetVoice v = new JetVoice(RATE);
+        VoiceParams p = params(FREE_MAX_RPM, 1f, false);
+        p.gain = 0.1f;
+        float[] x = render(v, p, 1.7f, -1, 0f, 0, true);
+        int n = 4096;
+        for (float t : new float[] {1.2f, 1.4f, 1.6f}) {
+            int from = Math.round(t * RATE) - n / 2;
+            float[] w = new float[n];
+            for (int i = 0; i < n; i++) {
+                w[i] = (float) (x[from + i] * (0.5 - 0.5 * Math.cos(2.0 * Math.PI * i / n)));
+            }
+            int k0 = (int) Math.ceil(200.0 * n / RATE);
+            int k1 = (int) (2000.0 * n / RATE);
+            double[] pw = new double[k1 - k0 + 1];
+            double max = 0;
+            for (int k = k0; k <= k1; k++) {
+                pw[k - k0] = power(w, 0, n, (double) k * RATE / n);
+                max = Math.max(max, pw[k - k0]);
+            }
+            int lines = 0;
+            for (int i = 2; i < pw.length - 2; i++) {
+                if (pw[i] >= pw[i - 1] && pw[i] >= pw[i + 1] && pw[i] > 0.01 * max && pw[i] > 4 * Math.min(pw[i - 2], pw[i + 2])) {
+                    lines++;
+                }
+            }
+            double[] sorted = pw.clone();
+            java.util.Arrays.sort(sorted);
+            double median = 10 * Math.log10(sorted[sorted.length / 2] / max);
+            assertTrue(t + " s 20 dB 以内的线: " + lines, lines >= 12);
+            assertTrue(t + " s 中间那一格比最响的低: " + median, median > -28);
+        }
+    }
+
     // ================================================================= 喷流、换挡
 
     @Test
     public void aStabWhoomps() {
-        // 3000 rpm 不动，第 40 块负荷 0 → 1：头 150 ms 的 40–100 Hz 比 0.7 s 之后同样长的一段大得多（原型十个种子最差 5.35 倍）
-        float[] x = band(render(new JetVoice(RATE), params(3000f, 0f, true), 1.4f, 40, 1f, 0, true), 40f, 100f);
+        // 3000 rpm 不动，第 40 块负荷 0 → 1：头 150 ms 的 40–100 Hz 比 0.7 s 之后同样长的一段大得多（原型十个种子最差 5.35 倍）。
+        // 音量压低，不让限幅把「轰」那一下压扁（2026-10-22 起哨声是一整排谐波，满音量时限幅压得多）
+        VoiceParams p = params(3000f, 0f, true);
+        p.gain = 0.1f;
+        float[] x = band(render(new JetVoice(RATE), p, 1.4f, 40, 1f, 0, true), 40f, 100f);
         int at = 40 * BLOCK;
         int n = Math.round(0.15f * RATE);
         int later = at + Math.round(0.7f * RATE);
