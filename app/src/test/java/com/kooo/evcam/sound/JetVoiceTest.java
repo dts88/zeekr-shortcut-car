@@ -217,13 +217,17 @@ public class JetVoiceTest {
     @Test
     public void atFullSpoolTheWhineIsAFullRowOfHarmonics() {
         // 项目所有者 2026-10-22：电音多了，原厂那种「多频率的齐鸣」、厚度不够。参考停着踩到顶那一刻（85 ms 一帧，200–2000 Hz）：
-        // 20 dB 以内 13–22 根线，线和线之间是满的（中间那一格只比最响的低 19–27 dB）；第二版只有 9–12 根干净的线，中间低 35 dB
+        // 20 dB 以内 13–22 根线，线和线之间是满的（中间那一格只比最响的低 19–27 dB）；第二版只有 9–12 根干净的线，中间低 35 dB。
+        // 线带着随机的抖动，一帧一帧数出来 11–27 根不等：看 9 帧的平均（至少 14 根，中间那一格平均低不到 26 dB）
         JetVoice v = new JetVoice(RATE);
         VoiceParams p = params(FREE_MAX_RPM, 1f, false);
         p.gain = 0.1f;
-        float[] x = render(v, p, 1.7f, -1, 0f, 0, true);
+        float[] x = render(v, p, 3f, -1, 0f, 0, true);
         int n = 4096;
-        for (float t : new float[] {1.2f, 1.4f, 1.6f}) {
+        int frames = 0;
+        double lineSum = 0;
+        double medianSum = 0;
+        for (float t = 1.2f; t < 2.85f; t += 0.2f) {
             int from = Math.round(t * RATE) - n / 2;
             float[] w = new float[n];
             for (int i = 0; i < n; i++) {
@@ -245,10 +249,13 @@ public class JetVoiceTest {
             }
             double[] sorted = pw.clone();
             java.util.Arrays.sort(sorted);
-            double median = 10 * Math.log10(sorted[sorted.length / 2] / max);
-            assertTrue(t + " s 20 dB 以内的线: " + lines, lines >= 12);
-            assertTrue(t + " s 中间那一格比最响的低: " + median, median > -28);
+            lineSum += lines;
+            medianSum += 10 * Math.log10(sorted[sorted.length / 2] / max);
+            frames++;
         }
+        assertEquals(9, frames);
+        assertTrue("20 dB 以内的线（平均）: " + lineSum / frames, lineSum / frames >= 14);
+        assertTrue("中间那一格比最响的低（平均）: " + medianSum / frames, medianSum / frames > -26);
     }
 
     @Test
@@ -335,55 +342,32 @@ public class JetVoiceTest {
     }
 
     @Test
-    public void theHissDoesNotRustle() {
-        // 项目所有者 2026-10-22（装车听了去掉底噪的那版）：还有「沙沙」声 —— 气声一闪一闪（每秒几十下、深 0.7），几个频带一起忽大忽小。
-        // 嘶声里两段在所有线之上的频带（2.4–3.0、3.2–4.2 kHz；10 ms 汉宁窗、每 5 ms 一帧），各减去自己 ±60 ms 的平均以后一起起落的
-        // 相关不到 0.2（那一版 0.67，完全不起伏 0，两级 3 Hz 的慢起伏 0.02）。D 挡 4800 rpm 小油门
-        VoiceParams p = params(4800f, 0.4f, true);
-        p.gain = 0.1f;
-        float[] x = render(p, 6.5f);
-        int n = RATE / 100;
-        int hop = n / 2;
-        int from = Math.round(1.5f * RATE);
-        int frames = (x.length - from - n) / hop;
-        float[] w = new float[n];
-        double[][] level = new double[2][frames];
-        for (int f = 0; f < frames; f++) {
-            for (int i = 0; i < n; i++) {
-                w[i] = (float) (x[from + f * hop + i] * (0.5 - 0.5 * Math.cos(2.0 * Math.PI * i / n)));
-            }
-            for (int hz = 2400; hz <= 4200; hz += 100) {
-                if (hz > 3000 && hz < 3200) {
-                    continue;
+    public void nothingHissesAboveTheLines() {
+        // 项目所有者 2026-10-22（试听、装车）：还是有「沙沙」的颗粒状噪音，左右不一样，一踩油门就变密变强 —— 1.5–4 kHz 那层左右
+        // 各自独立的嘶声（先去掉它的一闪一闪也还在；踩到顶时 2–6 kHz 只有它，离 1 kHz 的线太远盖不住）。现在不带持续的噪声：
+        // 线上面 2.4–6 kHz（4096 点汉宁窗，1.2、1.4、1.6 s 三帧）比全部低 45 dB 以上（带嘶声时 −26、−27 dB，现在 −56、−59）。
+        // 停着踩到顶、D 挡 4800 rpm 小油门
+        for (VoiceParams p : new VoiceParams[] {params(FREE_MAX_RPM, 1f, false), params(4800f, 0.4f, true)}) {
+            p.gain = 0.1f;
+            float[] x = render(p, 1.7f);
+            int n = 4096;
+            double all = 0;
+            double above = 0;
+            for (float t : new float[] {1.2f, 1.4f, 1.6f}) {
+                int from = Math.round(t * RATE) - n / 2;
+                float[] w = new float[n];
+                for (int i = 0; i < n; i++) {
+                    w[i] = (float) (x[from + i] * (0.5 - 0.5 * Math.cos(2.0 * Math.PI * i / n)));
+                    all += (double) w[i] * w[i];
                 }
-                level[hz <= 3000 ? 0 : 1][f] += power(w, 0, n, hz);
-            }
-        }
-        double[][] fast = new double[2][frames];
-        for (int k = 0; k < 2; k++) {
-            for (int f = 0; f < frames; f++) {
-                level[k][f] = Math.sqrt(level[k][f]);
-            }
-            for (int f = 0; f < frames; f++) {
-                double s = 0;
-                int c = 0;
-                for (int j = Math.max(0, f - 12); j <= Math.min(frames - 1, f + 12); j++) {
-                    s += level[k][j];
-                    c++;
+                for (int k = (int) Math.ceil(2400.0 * n / RATE); k <= 6000 * n / RATE; k++) {
+                    above += power(w, 0, n, (double) k * RATE / n);
                 }
-                fast[k][f] = level[k][f] - s / c;
             }
+            // 正频率那一半的功率合起来是 n / 2 × Σ w²
+            double db = 10 * Math.log10(above / (all * n / 2));
+            assertTrue((p.drive ? "D 挡" : "停着踩到顶") + " 2.4–6 kHz 比全部低 " + -db + " dB", db < -45);
         }
-        double ab = 0;
-        double aa = 0;
-        double bb = 0;
-        for (int f = 0; f < frames; f++) {
-            ab += fast[0][f] * fast[1][f];
-            aa += fast[0][f] * fast[0][f];
-            bb += fast[1][f] * fast[1][f];
-        }
-        double together = ab / Math.sqrt(aa * bb);
-        assertTrue("嘶声两段频带一起起落的相关 " + together, together < 0.2);
     }
 
     // ================================================================= 喷流、换挡
