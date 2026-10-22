@@ -6,8 +6,10 @@ package com.kooo.evcam.sound;
  * 纯计算（{@code JetVoiceTest}），声音线程上一块一块地调，循环里不分配内存。量过的参考在 docs/local/drive-sound-plan.md §13。
  *
  * <ul>
- *   <li><b>转子</b>：停着时跟油门（喷气机的转速跟油门走：一踩 0.3 秒升上去，一松约半秒落回怠速）；挂 D 挡跟虚拟转速
- *       （伪挡位、模拟换挡时是锯齿），一踩先往上赶，松油门马上低一截。主音怠速约 533 Hz，转满约 1190 Hz。</li>
+ *   <li><b>转子</b>：停着时跟油门（喷气机的转速跟油门走：一踩约 0.2 秒升上去，一松 0.7 秒落到一半以下）；挂 D 挡就是虚拟转速
+ *       （伪挡位、模拟换挡时每一挡从低爬到高、升挡掉下来）。主音和转速成正比（{@link #MAIN_ORDER} 阶）：怠速约 150 Hz，
+ *       转满约 1030 Hz。项目所有者 2026-10-22 挑的几段参考：主音跟着虚拟转速走，挂挡加速每一挡从约 550 爬到约 1050 Hz，
+ *       升挡掉回 0.65–0.8 倍，停着踩到顶约 1000–1030 Hz（第二版只在 533–1190 Hz 里走，挂挡全油门时还先顶到七成，几乎是平的）。</li>
  *   <li><b>哨声</b>：一扇平行的线跟着转子一起走（相对主音 0.42、0.64、0.74、0.81、0.83、0.95、1、1.06，转满时还有很淡的 1.68），
  *       每根是相差 1.3 % 的一对（每秒「拍」十几下，粗糙、发颤），各自带一点随机的抖动；左右两台，差一点点。</li>
  *   <li><b>低音</b>：三根（88 → 140、76 → 120、165 → 215 Hz），也成对、抖得更宽，转满时是最响的。</li>
@@ -30,25 +32,24 @@ final class JetVoice implements Voice {
     static final float IDLE_RPM = 900f;
     /** 挂着挡时虚拟转速到这里算转满（停着时转子跟油门，不看转速）。 */
     static final float FULL_RPM = 6200f;
-    /** 转子 = ((rpm − 怠速) / (满 − 怠速))^它：前半段走得快。 */
-    static final float SPOOL_CURVE = 0.7f;
+    /** 主音是转子转速的几阶（转一圈几下）：转子 0 是怠速、1 是转满，中间按转速直线走。 */
+    static final float MAIN_ORDER = 10f;
     /** 怠速、转满时的主音（Hz）。 */
-    static final float IDLE_HZ = 533f;
-    static final float TOP_HZ = 1190f;
-    /** 低于怠速（起转）时主音 × (rpm / 怠速)^它。 */
-    static final float BELOW_IDLE_POW = 0.5f;
-    /** 挂着挡：一踩先往「负荷 × 它」赶，不等虚拟转速；目标再 × (1 − 份额 + 份额 × 负荷)，松油门马上低一截。 */
-    static final float LOAD_LEAD = 0.7f;
-    static final float LOAD_WEIGHT = 0.6f;
+    static final float IDLE_HZ = MAIN_ORDER * IDLE_RPM / 60f;
+    static final float TOP_HZ = MAIN_ORDER * FULL_RPM / 60f;
+    /** 主音最低到多少（Hz；起转、熄火落到底时）。 */
+    static final float MIN_HZ = 20f;
     /** 停着：转子 = 负荷^它（平方：负荷松开时那段拖尾很快就没了）。 */
     static final float FREE_CURVE = 2f;
-    /** 转子的惯性（秒，上、下）。 */
+    /** 停着时转子的惯性（秒，上、下）：参考一踩约 0.2 秒到顶，一松 0.7 秒落到一半以下、再慢慢回怠速。 */
     static final float LAG_UP_SEC = 0.14f;
-    static final float LAG_DOWN_SEC = 0.16f;
+    static final float LAG_DOWN_SEC = 0.7f;
+    /** 挂着挡（或低于怠速：起转、熄火）时转子就是虚拟转速，只再平一点（秒）：升挡那一下要掉得干脆。 */
+    static final float DRIVE_LAG_SEC = 0.04f;
 
     // ---- 哨声：一扇线（× 主音，转满时 dB，怠速时 dB，中间按 dB 走），每根一对
     static final float[] FAN_RATIO = {0.42f, 0.64f, 0.74f, 0.81f, 0.83f, 0.95f, 1f, 1.06f, 1.68f};
-    static final float[] FAN_FULL_DB = {-3f, -7f, -10f, -2f, -5f, -11f, 0f, -12f, -20f};
+    static final float[] FAN_FULL_DB = {-9f, -10f, -8f, -8f, -10f, -3f, 0f, -10f, -20f};
     static final float[] FAN_IDLE_DB = {-4f, -14f, -9f, -12f, -14f, -2f, 0f, -3f, -40f};
     /** 一对的两根差多少；左右两台再差多少。 */
     static final float PAIR = 0.013f;
@@ -126,7 +127,6 @@ final class JetVoice implements Voice {
     private static final int CONTROL = 16;
     private static final float LN2 = 0.6931472f;
     private static final float SQRT2 = 1.4142135f;
-    private static final float OCTAVES = (float) (Math.log(TOP_HZ / IDLE_HZ) / Math.log(2.0));
     /** 一对里的两根、两台发动机：频率的倍数。 */
     private static final float[] MEMBER = {1f - 0.5f * PAIR, 1f + 0.5f * PAIR};
     private static final float[] ENGINE = {1f - ENGINE_SPLIT, 1f + ENGINE_SPLIT};
@@ -134,6 +134,7 @@ final class JetVoice implements Voice {
     private final float rate;
     private final float lagUpK;
     private final float lagDownK;
+    private final float driveLagK;
     private final float wobbleK;
     private final float wobbleNorm;
     private final float speckleK;
@@ -196,6 +197,7 @@ final class JetVoice implements Voice {
         this.rate = sampleRate;
         lagUpK = 1f - (float) Math.exp(-1.0 / (LAG_UP_SEC * sampleRate));
         lagDownK = 1f - (float) Math.exp(-1.0 / (LAG_DOWN_SEC * sampleRate));
+        driveLagK = 1f - (float) Math.exp(-1.0 / (DRIVE_LAG_SEC * sampleRate));
         // 抖动每 CONTROL 个样本走一步：低通按这个步长算，输出方差归一
         wobbleK = 1f - (float) Math.exp(-2.0 * Math.PI * WOBBLE_HZ * CONTROL / sampleRate);
         wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
@@ -256,7 +258,7 @@ final class JetVoice implements Voice {
             spool = target;
             started = true;
         }
-        float lagK = target > spool ? lagUpK : lagDownK;
+        float lagK = params.drive || rpm < IDLE_RPM ? driveLagK : target > spool ? lagUpK : lagDownK;
         // 从静止起转：音量跟着转速起来
         float start = rpm < IDLE_RPM ? VirtualEngine.clamp01(rpm / IDLE_RPM) : 1f;
 
@@ -313,7 +315,7 @@ final class JetVoice implements Voice {
                 controlLeft = CONTROL - 1;
                 control(s);
             }
-            float inc = IDLE_HZ * (float) Math.exp(spool * OCTAVES * LN2) / rate;
+            float inc = mainHz(spool) / rate;
 
             // 哨声：一扇线，每根一对，左右两台
             float e0 = 0f;
@@ -421,16 +423,17 @@ final class JetVoice implements Voice {
         }
     }
 
-    /** 转子的目标：停着跟油门；挂着挡跟虚拟转速，一踩先往上赶、松油门低一截；低于怠速（起转）是负的。 */
+    /** 转子的目标：停着跟油门；挂着挡就是虚拟转速（转子 0 是怠速、1 是转满）；低于怠速（起转）是负的，主音跟着往下。 */
     private static float spoolTarget(float rpm, float load, boolean drive) {
-        if (rpm < IDLE_RPM) {
-            return BELOW_IDLE_POW * (float) (Math.log(Math.max(rpm, 30f) / IDLE_RPM) / Math.log(2.0)) / OCTAVES;
+        if (rpm < IDLE_RPM || drive) {
+            return Math.min(1.2f, (rpm - IDLE_RPM) / (FULL_RPM - IDLE_RPM));
         }
-        if (!drive) {
-            return (float) Math.pow(load, FREE_CURVE);
-        }
-        float s = (float) Math.pow(VirtualEngine.clamp01((rpm - IDLE_RPM) / (FULL_RPM - IDLE_RPM)), SPOOL_CURVE);
-        return Math.max(s, LOAD_LEAD * load) * (1f - LOAD_WEIGHT + LOAD_WEIGHT * load);
+        return (float) Math.pow(load, FREE_CURVE);
+    }
+
+    /** 转子在 {@code s} 时的主音（Hz）：和转子转速成正比，最低 {@link #MIN_HZ}。 */
+    private static float mainHz(float s) {
+        return Math.max(MIN_HZ, MAIN_ORDER * (IDLE_RPM + (FULL_RPM - IDLE_RPM) * s) / 60f);
     }
 
     /** 哨声的第 {@code o} 个振荡器往前走一个样本（主音每样本走 {@code inc} 周）。 */
@@ -464,7 +467,7 @@ final class JetVoice implements Voice {
 
     /** 此刻的主音（Hz）：测试看转子跟没跟上。 */
     float mainHz() {
-        return IDLE_HZ * (float) Math.exp(spool * OCTAVES * LN2);
+        return mainHz(spool);
     }
 
     private float perSample(float tauSec) {

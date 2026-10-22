@@ -168,9 +168,19 @@ public class JetVoiceTest {
         assertEquals("怠速", JetVoice.IDLE_HZ, settled(900f, 0f, true), JetVoice.IDLE_HZ * 0.03f);
         assertEquals("D 挡转满", JetVoice.TOP_HZ, settled(JetVoice.FULL_RPM, 1f, true), JetVoice.TOP_HZ * 0.03f);
         assertEquals("P 挡踩到底", JetVoice.TOP_HZ, settled(FREE_MAX_RPM, 1f, false), JetVoice.TOP_HZ * 0.03f);
-        // 停着踩一半：转子 = 0.5²，比转速给的低得多（原型 651.5 Hz）
-        double half = JetVoice.IDLE_HZ * Math.pow(JetVoice.TOP_HZ / JetVoice.IDLE_HZ, Math.pow(0.5, JetVoice.FREE_CURVE));
+        // 停着踩一半：转子 = 0.5²，比转速给的低得多；主音和转子转速成正比
+        double half = JetVoice.IDLE_HZ + (JetVoice.TOP_HZ - JetVoice.IDLE_HZ) * Math.pow(0.5, JetVoice.FREE_CURVE);
         assertEquals("P 挡踩一半", half, settled(FREE_MAX_RPM, 0.5f, false), half * 0.03);
+    }
+
+    @Test
+    public void inGearTheWhineIsTheVirtualRpm() {
+        // 项目所有者 2026-10-22 挑的参考：挂挡加速每一挡主音从低爬到高、升挡掉下来 —— 主音就是虚拟转速的 10 阶。
+        // 全油门 3000 rpm 时就是 3000 rpm 的音（第二版先顶到转满的七成，几乎是平的）
+        double hz3000 = JetVoice.MAIN_ORDER * 3000 / 60.0;
+        assertEquals("D 挡全油门 3000 rpm", hz3000, settled(3000f, 1f, true), hz3000 * 0.03);
+        double hz4500 = JetVoice.MAIN_ORDER * 4500 / 60.0;
+        assertEquals("D 挡小油门 4500 rpm", hz4500, settled(4500f, 0.2f, true), hz4500 * 0.03);
     }
 
     private static float settled(float rpm, float load, boolean drive) {
@@ -181,22 +191,27 @@ public class JetVoiceTest {
 
     @Test
     public void parkedItFallsBackSoonAfterALift() {
-        // 停着踩满，虚拟转速还挂在高处（它落得慢），一松 0.6 s 主音就差不多回到怠速（原型 543 Hz）
+        // 停着踩满，虚拟转速还挂在高处（它落得慢），主音只跟转子：一松 0.7 s 落到顶上的三到六成（参考 1026 → 450 Hz），
+        // 3 s 回到怠速附近
         JetVoice v = new JetVoice(RATE);
         int at = 100;
-        render(v, params(FREE_MAX_RPM, 1f, false), (at * BLOCK + 0.6f * RATE) / RATE, at, 0f, 0, true);
-        assertTrue("回到怠速: " + v.mainHz(), v.mainHz() < JetVoice.IDLE_HZ * 1.05f);
+        render(v, params(FREE_MAX_RPM, 1f, false), (at * BLOCK + 0.7f * RATE) / RATE, at, 0f, 0, true);
+        float soon = v.mainHz();
+        assertTrue("0.7 s: " + soon, soon > 0.3f * JetVoice.TOP_HZ && soon < 0.6f * JetVoice.TOP_HZ);
+        render(v, params(FREE_MAX_RPM, 0f, false), 2.3f, -1, 0f, 0, true);
+        assertTrue("3 s: " + v.mainHz(), v.mainHz() < JetVoice.IDLE_HZ * 1.15f);
     }
 
     @Test
     public void theWholeFanRisesWithTheSpool() {
-        // 300–2500 Hz 的频谱重心：转满比怠速高得多（整扇线一起往上走，不只是主音；原型八个种子最差 1.76 倍）
+        // 60–2500 Hz 的频谱重心：转满比怠速高得多（整扇线一起往上走，不只是主音；2026-10-22 起主音和转速成正比，
+        // 怠速时整扇线落在 60–250 Hz）
         float[] idle = render(params(900f, 0f, true), 1f);
         float[] full = render(params(JetVoice.FULL_RPM, 1f, true), 1f);
         int from = Math.round(0.6f * RATE);
         int n = 16384;
-        double ratio = centroid(full, from, n, 300, 2500) / centroid(idle, from, n, 300, 2500);
-        assertTrue("重心: " + ratio, ratio > 1.4);
+        double ratio = centroid(full, from, n, 60, 2500) / centroid(idle, from, n, 60, 2500);
+        assertTrue("重心: " + ratio, ratio > 2);
     }
 
     // ================================================================= 喷流、换挡
