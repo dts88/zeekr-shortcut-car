@@ -250,7 +250,13 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 前后座舱只用一次（2026-10-22，暂时的规矩）：「编辑视频流配置」前座舱、后座舱两张卡片上的一行 editor_cabin_one_shot
+  「因造成车机不稳定等原因，此设置无法固化，用户离车后自动取消」—— 中文是项目所有者定的原话（已定，不改）；
+  English「This setting can't be kept because it can make the head unit unstable, among other reasons. It turns off automatically after you leave the car.」；
+  Bahasa Melayu「Tetapan ini tidak dapat dikekalkan kerana boleh menjadikan unit kepala tidak stabil, antara sebab lain. Ia dimatikan secara automatik selepas anda meninggalkan kenderaan.」。
+- 改已批的 set_screen_off_keep_summary（前后座舱离车后去掉、不再恢复）：删掉「亮屏后前后座舱恢复录制」那半句 ——
+  「熄屏后只录制环视。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；英文、马来文同样删掉那半句。
+  这条规矩拿掉时改回原来那句。
 ---
 
 ## 10. 术语表

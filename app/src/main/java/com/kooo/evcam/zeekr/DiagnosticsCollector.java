@@ -1142,9 +1142,16 @@ public final class DiagnosticsCollector {
         try {
             AppConfig cfg = new AppConfig(context);
             sb.append("车型: ").append(cfg.getCarModel()).append('\n');
-            // 此刻配置里启用了哪几路（RecordSpecs.enabledCameraKeys）。管线照建它那一刻的建（环视一直建，没启用时只给超级镜子），
-            // 配置改了、还没重启时两者可能不同：管线建了哪几路看 §2.3.2 通道
-            sb.append("启用的摄像头: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context)).append('\n');
+            // 这一次运行启用了哪几路（RecordSpecs.enabledCameraKeys：进程里第一次建管线时照存下的配置定，离车时可能去掉了座舱），
+            // 和存下的配置里的（下一次启动用的）。前后座舱只用一次（暂时的规矩，camera.CabinsOneShot）时两者生效后就不同。
+            // 管线建了哪几路看 §2.3.2 通道
+            sb.append("启用的摄像头（这一次运行）: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context))
+                    .append('\n');
+            sb.append("启用的摄像头（存下的配置，下一次启动用）: ")
+                    .append(com.kooo.evcam.profile.RecordSpecs.storedEnabledCameraKeys(context)).append('\n');
+            sb.append("前后座舱只用一次: ").append(com.kooo.evcam.camera.CabinsOneShot.ACTIVE ? "开" : "关")
+                    .append("；视频流配置待改回「极氪7X（环视）」: ").append(cfg.isCabinsRevertPending() ? "是" : "否")
+                    .append('\n');
             // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准
             sb.append(new com.kooo.evcam.profile.ProfileStore(context).current()).append('\n');
             sb.append("录制模式: ").append(cfg.getRecordingMode())

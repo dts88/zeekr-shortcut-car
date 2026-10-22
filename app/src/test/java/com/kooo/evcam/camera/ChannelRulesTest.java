@@ -2625,6 +2625,89 @@ public class ChannelRulesTest {
         w.now = T0 + ms;
     }
 
+    // ================================================================= 前后座舱只用一次（暂时的规矩，2026-10-22）
+
+    /**
+     * 通道眼里熄屏的那一刻，这次运行启用的座舱去掉、报一次；之后亮屏，主界面预览、拍照、录像都不再要它们（录像计划里还写着也不要），
+     * 环视照旧。
+     */
+    @Test
+    public void withTheOneShotRuleTheCabinsAreRetiredWhenTheChannelGoesDark() {
+        w.cabinsOneShot = true;
+        claim(Holder.PREVIEW);
+        claim(Holder.PHOTO);
+        claim(Holder.RECORDING);
+        planAll();
+        round();
+        assertTrue("亮着：不去掉", retiredEvents().isEmpty());
+        w.screenOn = false;
+        round();
+        assertEquals(Collections.singletonList(Arrays.asList(REAR, FRONT)), retiredEvents());
+        assertTrue(w.cabinsRetired);
+        round();
+        assertTrue("只报一次", retiredEvents().isEmpty());
+
+        w.screenOn = true;
+        assertTrue(ChannelRules.wanted(w, surround));
+        assertFalse("亮屏也不回来", ChannelRules.wanted(w, rear));
+        assertFalse(ChannelRules.wanted(w, front));
+        assertTrue("不拍它们", ChannelRules.excludedFromPhoto(w, rear));
+        rear.declared.add(recR);
+        rear.declared.add(pvR);
+        assertFalse("录像输出不再留着", ChannelRules.keepsRecordOutput(w, rear));
+        assertTrue(ChannelRules.wantedOutputs(w, rear).isEmpty());
+    }
+
+    /** 去掉座舱之后，超级镜子要后座舱照旧（它不是录制配置里的一路）。 */
+    @Test
+    public void theMirrorStillGetsTheRearCabinAfterTheCabinsAreRetired() {
+        w.cabinsOneShot = true;
+        w.screenOn = false;
+        round();
+        assertTrue(w.cabinsRetired);
+        w.screenOn = true;
+        w.mirrorCabin = true;
+        claim(Holder.MIRROR);
+        assertTrue(ChannelRules.wanted(w, rear));
+        assertFalse(ChannelRules.wanted(w, front));
+    }
+
+    /** 这条规矩没开：熄屏照旧只是放开，亮屏回来。 */
+    @Test
+    public void withoutTheOneShotRuleTheCabinsComeBackWhenTheScreenTurnsOn() {
+        claim(Holder.PREVIEW);
+        w.screenOn = false;
+        round();
+        assertFalse(w.cabinsRetired);
+        assertTrue(retiredEvents().isEmpty());
+        w.screenOn = true;
+        assertTrue(ChannelRules.wanted(w, rear));
+    }
+
+    /** 这次运行没启用座舱（只有环视）：没有可去掉的，不报。 */
+    @Test
+    public void nothingIsRetiredWhenNoCabinIsEnabled() {
+        World surroundOnly = new World(Arrays.asList(front, rear, surround),
+                new LinkedHashSet<>(Collections.singletonList(SUR)));
+        surroundOnly.cabinsOneShot = true;
+        surroundOnly.screenOn = false;
+        surroundOnly.now = T0;
+        assertTrue(ChannelRules.settle(surroundOnly).stream()
+                .noneMatch(e -> e.type == Event.Type.CABINS_RETIRED));
+        assertFalse(surroundOnly.cabinsRetired);
+    }
+
+    /** 最近这一轮报的「座舱去掉了」，每一次是去掉的那几路。 */
+    private List<List<String>> retiredEvents() {
+        List<List<String>> out = new ArrayList<>();
+        for (Event event : events) {
+            if (event.type == Event.Type.CABINS_RETIRED) {
+                out.add(event.keys);
+            }
+        }
+        return out;
+    }
+
     private void claim(Holder holder) {
         if (w.holders.add(holder)) {
             w.changed.add(holder);
