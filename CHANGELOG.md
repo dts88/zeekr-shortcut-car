@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.17.0-alpha] - 2026-10-22
+
 - Front and rear cabin cameras are one-shot for now: they take effect after restarting the app as before, and are dropped when you leave the car (screen dark for 30 seconds, or the head unit sleeping). The next start, auto start and recording on launch use the surround view only; Zeekr 7X (surround + front and rear cabin) switches back to Zeekr 7X (surround), an edited profile turns its cabin switches off. The main screen shows the surround view only when you come back. Super mirror's rear cabin is not affected.
 
 ## [2.16.1-alpha] - 2026-10-22
