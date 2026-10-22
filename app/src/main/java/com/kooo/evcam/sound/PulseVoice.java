@@ -26,7 +26,8 @@ package com.kooo.evcam.sound;
  *       倒挡齿轮的啸叫、起动机照经典风格（{@link EngineVoice}）。</li>
  *   <li><b>换挡</b>：升挡时断扭（燃烧减弱、沙哑少、偶尔「突」），换挡那一刻地板中间「咚」一下、挂挡「咔」一下（降挡轻一点）。</li>
  *   <li><b>收油</b>（断油）：每一下只剩泵气、起伏更大，偶尔轻轻「突」一下，急松油门时多一点。不做像枪声的放炮。</li>
- *   <li><b>启动</b>：起动机带着转时只有压缩的「噗」；点着的头一下偶尔缺火。</li>
+ *   <li><b>启动、熄火</b>：起动机（或行驶中电机）带着转、没点火时只有压缩的「噗」；点着的头几圈偶尔缺火，发动机在支座上晃一下
+ *       （项目所有者 2026-10-22：点火体感再强些）。熄火后也只剩「噗」，最后几圈越转越慢、越来越轻，停住那一下再晃一下。</li>
  * </ul>
  *
  * <p><b>声音从哪来</b>（项目所有者 2026-10-21：不是死大才真实，要有层次、听得出方位）：从驾驶座看，发动机舱在前 ——
@@ -73,13 +74,27 @@ final class PulseVoice implements Voice {
     static final float DOWNSHIFT_THUNK = 0.7f;
     /** 进气风声按这个车速（km/h）的平方长（{@link PulseProfile#inletRam}）。 */
     static final float RAM_KMH = 200f;
+    /** 进气的呼啸要有气流：转速低于这个（rpm）越来越小，熄火停住时没了。 */
+    static final float ROAR_FULL_RPM = 600f;
     /** 沙哑的拐点随转速往上走，到这里（Hz）为止。 */
     static final float TILT_TOP_HZ = 4000f;
     /** 起动机带着转时，每一下压缩是燃烧的几成。 */
     static final float CRANK_LEVEL = 0.15f;
+    /**
+     * 没点火、也不是起动机在带（熄火停下来、行驶中电机刚带起来）：每一下压缩是燃烧的几成（比起动机带着时转得快、气多，
+     * 熄火后在车里还听得见）；在 {@link #UNFIRED_FULL_RPM} 以下越来越轻（流量小了）。
+     */
+    static final float UNFIRED_LEVEL = 0.35f;
+    static final float UNFIRED_FULL_RPM = 300f;
     /** 点着那一刻起，头几圈缺火的机会（随 {@link #CATCH_SEC} 消失）。 */
     static final float MISFIRE = 0.3f;
     static final float CATCH_SEC = 0.25f;
+    /** 发动机在支座上晃一下（{@link PulseProfile#rockDb} 的几倍）：停着点着、行驶中点着、停着熄火停住、行驶中停住。 */
+    static final float CATCH_ROCK = 1f;
+    static final float ROLL_CATCH_ROCK = 0.6f;
+    static final float SETTLE_ROCK = 0.35f;
+    static final float MOVING_SETTLE_ROCK = 0.15f;
+    static final float ROCK_ATTACK_SEC = 0.003f;
     /** 进气脉冲落下去的曲轴角、起来的时间。 */
     static final float INTAKE_DECAY_DEG = 30f;
     static final float INTAKE_RISE_MS = 1f;
@@ -245,6 +260,15 @@ final class PulseVoice implements Voice {
     private final Biquad clickBand;
     private boolean serialSeen;
     private int lastSerial;
+    // ---- 点着、停住时发动机在支座上晃一下：一个衰减的低频，几毫秒起来
+    private float rockEnv;
+    private float rockNow;
+    private double rockPhase;
+    private final float rockDecay;
+    private final float rockAttackK;
+    private final float rockStep;
+    /** 见过的点着次数（{@link VoiceParams#catchSerial}）。 */
+    private int lastCatch;
 
     // ---- 车内听感：前（防火墙）、后（车身）每个声道两个一阶低通，最后一个低频搁架
     private final boolean cabin;
@@ -270,7 +294,6 @@ final class PulseVoice implements Voice {
     private float levelNow;
     private float gainNow;
     private float catchEnv;
-    private float starterPrev;
     private int noise = 0x2545F491;
     /** 「咔」自己的噪声：换不换挡，别的声音用的随机数都一样（测试靠它）。 */
     private int clickNoise = 0x1B873593;
@@ -396,7 +419,10 @@ final class PulseVoice implements Voice {
             thunkStep[k] = profile.thunkHz[k] / sampleRate;
         }
         clickBand = Biquad.bandpass(profile.clickHz, profile.clickQ, sampleRate);
-        frontK = new float[] {onePole(profile.cabinFrontHz[0]), onePole(profile.cabinFrontHz[1])};
+        rockDecay = perSample(profile.rockMs * 1e-3f);
+        rockAttackK = 1f - perSample(ROCK_ATTACK_SEC);
+        rockStep = profile.rockHz / sampleRate;
+        frontK =new float[] {onePole(profile.cabinFrontHz[0]), onePole(profile.cabinFrontHz[1])};
         rearK = new float[] {onePole(profile.cabinRearHz[0]), onePole(profile.cabinRearHz[1])};
         for (int b = 0; b < 2; b++) {
             cabinLow[b] = Biquad.lowShelf(profile.cabinLowHz, profile.cabinLowDb, sampleRate);
@@ -435,18 +461,28 @@ final class PulseVoice implements Voice {
         float load = VirtualEngine.clamp01(params.load);
         float over = VirtualEngine.clamp01(params.overrun);
         float starter = VirtualEngine.clamp01(params.starter);
-        if (starterPrev > 0.5f && starter <= 0.5f) {
-            catchEnv = 1f;
-        }
-        starterPrev = starter;
-        catchEnv *= VirtualEngine.decay(dt, CATCH_SEC);
         boolean cranking = starter > 0.5f;
+        boolean unfired = cranking || params.fire < 0.5f;
+        boolean moving = params.speedKmh > VirtualEngine.START_LEAVE_KMH;
+        if (params.catchSerial != lastCatch) {
+            // 刚点着：头几圈偶尔缺火，发动机在支座上晃一下
+            lastCatch = params.catchSerial;
+            catchEnv = 1f;
+            rock(moving ? ROLL_CATCH_ROCK : CATCH_ROCK);
+        }
+        if (unfired && !cranking && rpmTarget <= 0f && rpmNow > 0f) {
+            // 熄火停住那一刻：再晃一下
+            rock(moving ? MOVING_SETTLE_ROCK : SETTLE_ROCK);
+        }
+        catchEnv *= VirtualEngine.decay(dt, CATCH_SEC);
         float rpmCalc = Math.max(rpmTarget, 100f);
 
-        // ---- 这一块里的事件（升挡断扭：燃烧减弱、沙哑少、偶尔「突」）
+        // ---- 这一块里的事件（升挡断扭：燃烧减弱、沙哑少、偶尔「突」；没点火只有压缩的「噗」）
         float cut = VirtualEngine.clamp01(params.cut);
         evCut = cut;
-        evCombustion = cranking ? CRANK_LEVEL : (1f - over * (1f - p.pump)) * (1f - cut * (1f - CUT_FLOOR));
+        evCombustion = cranking ? CRANK_LEVEL
+                : unfired ? UNFIRED_LEVEL * VirtualEngine.clamp01(rpmTarget / UNFIRED_FULL_RPM)
+                : (1f - over * (1f - p.pump)) * (1f - cut * (1f - CUT_FLOOR));
         evSigma = mix(p.sigmaIdle, p.sigmaLoad, load) + over * p.sigmaOverrun;
         evMisfire = MISFIRE * catchEnv;
         evPop = p.popMax * VirtualEngine.clamp01(0.1f * over + 0.6f * params.burble + CUT_POP * cut);
@@ -488,7 +524,7 @@ final class PulseVoice implements Voice {
         float drive = mix(p.driveIdle, p.driveLoad, load);
         float raspLevel = Math.max(evRasp, EngineVoice.dbToLin(p.raspOverrunDb + flowDb) * over);
         float floorShare = Math.min(1f, p.raspFloor + 0.4f * over);
-        float floor = floorShare * raspLevel * (cranking ? 0.2f : 1f);
+        float floor = floorShare * raspLevel * (unfired ? 0.2f : 1f);
         float kickShare = 1f - floorShare;
 
         // ---- 进气
@@ -497,7 +533,7 @@ final class PulseVoice implements Voice {
         float wind = Math.min(Math.max(params.speedKmh, 0f) / RAM_KMH, 1.2f);
         float ram = 1f + p.inletRam * wind * wind;
         float roarTarget = EngineVoice.dbToLin(mix(p.roarIdleDb, p.roarLoadDb, (float) Math.pow(load, 1.5))
-                + params.intakeBoostDb) * ram;
+                + params.intakeBoostDb) * ram * VirtualEngine.clamp01(rpmTarget / ROAR_FULL_RPM);
 
         // ---- 增压：松油门 = 负荷比最近的峰值掉了不少
         loadPeak = Math.max(load, loadPeak * VirtualEngine.decay(dt, LIFT_PEAK_SEC));
@@ -528,8 +564,8 @@ final class PulseVoice implements Voice {
             whooshTarget = EngineVoice.dbToLin(WHOOSH_DB) * whoosh;
         }
 
-        // ---- 传动、倒挡、起动机
-        boolean driving = params.drive && params.speedKmh > 1f;
+        // ---- 传动、倒挡、起动机（没点火时离合是开着的：发动机这边的变速箱、传动轴不响）
+        boolean driving = params.drive && params.speedKmh > 1f && !unfired;
         float torque = Math.max(load, 0.6f * over);
         float gearOrder = params.gearIndex >= 0
                 ? p.gearOrders[Math.min(params.gearIndex, p.gearOrders.length - 1)] : p.cvtOrder;
@@ -742,6 +778,16 @@ final class PulseVoice implements Voice {
             float xc = click[cur];
             click[cur] = 0f;
             extra += clickBand.process(xc);
+            // 点着、停住时发动机晃一下（起得快但不是一下跳上去，不出「嗒」）
+            if (rockEnv > 1e-7f || rockNow > 1e-7f) {
+                rockEnv *= rockDecay;
+                rockNow += (rockEnv - rockNow) * rockAttackK;
+                rockPhase += rockStep;
+                if (rockPhase >= 1.0) {
+                    rockPhase -= 1.0;
+                }
+                extra += rockNow * EngineVoice.sin(rockPhase);
+            }
             l += extra;
             rr += extra;
             if (cabin) {
@@ -847,6 +893,12 @@ final class PulseVoice implements Voice {
             click[(cursor + 1 + i) & MASK] += env * clickWhite();
             env *= d;
         }
+    }
+
+    /** 发动机在支座上晃一下：一个从零点起、按 {@link PulseProfile#rockMs} 落下去的低频（{@code amp} 倍 {@link PulseProfile#rockDb}）。 */
+    private void rock(float amp) {
+        rockEnv = Math.max(rockEnv, amp * EngineVoice.dbToLin(p.rockDb));
+        rockPhase = 0.0;
     }
 
     /** 沙哑随流量（转速）多几 dB：以 {@link PulseProfile#raspRefRpm} 为准，每翻一倍按带负荷 / 收油的斜率，最多多 {@link PulseProfile#raspRpmMaxDb}。 */

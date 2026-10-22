@@ -70,8 +70,8 @@ final class SoundProfile {
     /** 升挡断扭时音量掉多少（dB，负数；满负荷时，按断扭的深浅）。 */
     final float shiftDipDb;
     /**
-     * 合成器（{@link EngineVoice}）把虚拟发动机的电平取这个次方：响度差压窄，音色照变（项目所有者 2026-10-21 实车）；
-     * 总的倍数（全油门时限幅只压两三 dB）。
+     * 合成器（{@link EngineVoice}）把虚拟发动机的电平取这个次方：响度差压窄，音色照变（项目所有者 2026-10-21 实车；
+     * 2026-10-22 输入还原平滑以后略放大一些）；总的倍数（全油门时限幅只压两三 dB）。
      */
     final float levelPow;
     final float norm;
@@ -139,7 +139,7 @@ final class SoundProfile {
             .gears(120f, 80f, 58f, 45f, 36f, 30f, 25f, 21f)
             .reverse(120f)
             .shifts(2500f, 3500f, 0.55f, 0.06f, -4.5f)
-            .loudness(0.08f, 0.85f)
+            .loudness(0.17f, 0.8f)
             .build();
 
     private static float[] toArray(List<Float> list) {

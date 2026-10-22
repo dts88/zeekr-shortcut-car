@@ -15,11 +15,12 @@ package com.kooo.evcam.sound;
  *       一段很大的低频噪声，约 0.2 秒；一松也「轰」，小一些。</li>
  *   <li><b>气声</b>：线之间 0.4–1.6 kHz 的气声、1.5–4 kHz 的嘶声，跟着转子长，一闪一闪（斑点状）。</li>
  *   <li><b>换挡</b>：升挡一声「音爆」（N 形的一下 + 45 Hz 的一捶）加一点「轰」；降挡只「轰」一点。松油门转子往下掉时「呼」一声。</li>
- *   <li><b>启动</b>：从静止起转，音调从低往上走到怠速。</li>
+ *   <li><b>启动、熄火</b>：从静止起转，音调从低往上走到怠速（行驶中也一样，从低处赶到该有的转速）；熄火时转子落下去，
+ *       音调往下走、越来越轻。</li>
  * </ul>
  *
- * <p>电平几乎不跟虚拟发动机变（参考里踩住油门并不比怠速响多少，变化靠低音、喷流随推力长和一踩一松的「轰」）。
- * 音量、阀门（接入时的低通）、30 Hz 高通、最后的限幅（{@link Limiter}）和别的风格一样，峰值不超过 {@link EngineVoice#CEILING}。
+ * <p>电平不大跟虚拟发动机变（参考里踩住油门并不比怠速响多少，变化靠低音、喷流随推力长和一踩一松的「轰」）。
+ * 音量、阀门（低通，现在一直全开）、30 Hz 高通、最后的限幅（{@link Limiter}）和别的风格一样，峰值不超过 {@link EngineVoice#CEILING}。
  * 不和别的风格比响度（项目所有者 2026-10-21：两种取向各自对各自的原型）。
  * 抖动、哨声的电平、低音的音调变得慢，每 16 个样本才算一次。</p>
  */
@@ -114,10 +115,10 @@ final class JetVoice implements Voice {
     static final float WHOOSH_FROM = 0.3f;
     /** 断扭时推力少几成。 */
     static final float CUT_THRUST = 0.7f;
-    /** 电平几乎不跟油门变：虚拟发动机电平的这个次方。 */
-    static final float LEVEL_POW = 0.05f;
+    /** 电平不大跟油门变：虚拟发动机电平的这个次方（2026-10-22 输入还原平滑以后略放大了响度差）。 */
+    static final float LEVEL_POW = 0.12f;
     /** 总的倍数：全油门时限幅只压两三 dB（{@link Limiter}；「轰」「音爆」那一下压得多些）。 */
-    static final float NORM = 0.34f;
+    static final float NORM = 0.32f;
 
     private static final int LINES = FAN_RATIO.length;
     private static final int LOWS = LOW_DB.length;

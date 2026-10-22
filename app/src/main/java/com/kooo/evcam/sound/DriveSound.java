@@ -36,7 +36,8 @@ import java.util.Set;
  *       （都是不可变快照，不加锁）→ {@link DriveInputs} 算出油门变化率、加减速度 → {@link VirtualEngine} 推进一步 →
  *       按声音风格（{@link SoundStyle}）的合成器出立体声 → {@link SoundOutput} 写进车内媒体喇叭。循环里不分配内存。
  *       换了声音风格或听感：这一台淡出，按新的重新开始（停着放启动声，在走就接入）。
- *       开始工作那一刻车停着放启动声、车在走开阀门式接入（{@link VirtualEngine#ignite}）；要停的时候 0.6 秒淡出再放掉喇叭。</li>
+ *       开始工作那一刻车停着放启动声、车在走像混动车那样起动发动机（{@link VirtualEngine#ignite}）；切出运动模式、下电时发动机熄火
+ *       （{@link VirtualEngine#shutdown}），放完再放掉喇叭，熄火途中又切回来就很快淡掉、让新的那台点火；别的原因要停 0.6 秒淡出。</li>
  * </ul>
  *
  * <p>前台服务的寿命规则不变：声浪跟着进程走（录制或开机自启动开着时进程在），进程不在就不出声。
@@ -59,6 +60,8 @@ public final class DriveSound {
     static final long WATCH_MS = 1000L;
     /** 声音线程自己出错停了，多久之内不再起（毫秒）：车上没有那个喇叭时不反复开。 */
     static final long RETRY_AFTER_FAILURE_MS = 30_000L;
+    /** 熄火还没放完又要起新的一台（刚切出去又切回来）：旧的这么快淡掉（秒）。 */
+    static final float HURRY_FADE_SEC = 0.15f;
 
     private static final DriveSound INSTANCE = new DriveSound();
 
@@ -71,6 +74,8 @@ public final class DriveSound {
     private boolean armed;
     /** 此刻的声音线程（主线程管）；没转着是 null。 */
     private Run run;
+    /** 刚叫停、可能还在放熄火的那一台（主线程管）：起新的一台前叫它快点淡掉。 */
+    private Run leaving;
     /** 上一个声音线程自己出错停下的时刻（elapsedRealtime）；0 = 没有。 */
     private long failedAtMs;
 
@@ -140,10 +145,16 @@ public final class DriveSound {
             if (failedAtMs != 0L && now - failedAtMs < RETRY_AFTER_FAILURE_MS) {
                 return;
             }
+            if (leaving != null) {
+                // 刚切出去又切回来：上一台的熄火不放完了，很快淡掉
+                leaving.hurry();
+                leaving = null;
+            }
             run = new Run();
             run.start();
         } else if (!why.open && run != null) {
             run.stop();
+            leaving = run;
             run = null;
         }
     }
@@ -151,6 +162,9 @@ public final class DriveSound {
     /** 声音线程自己停了（出错）：主线程上把它摘掉，过一会儿才再起。 */
     private void ended(Run which, boolean failed) {
         main.post(() -> {
+            if (leaving == which) {
+                leaving = null;
+            }
             if (run == which) {
                 run = null;
                 if (failed) {
@@ -229,10 +243,13 @@ public final class DriveSound {
         final SoundStyle style = DriveSound.this.style;
         final boolean cabin = DriveSound.this.cabinView;
         private volatile boolean stopping;
+        /** 熄火不放完了，很快淡掉（新的一台要起）。 */
+        private volatile boolean hurry;
         // ---- 诊断：声音线程写，随时读
         private volatile String state = "opening";
         private volatile DriveSoundRules.Why why = DriveSoundRules.Why.STALE;
         private volatile String ignitedAs = "";
+        private volatile String endedAs = "";
         private volatile String output = "";
         private volatile String trouble = "";
         private volatile float rpm;
@@ -260,6 +277,8 @@ public final class DriveSound {
         private volatile long fastGapMaxMs = -1L;
         private volatile float throttleEveryMs = -1f;
         private volatile int throttleSteps;
+        /** 车速读数平均多久变一次（{@link SpeedTrack}：车机多久更新一次车速）。 */
+        private volatile float speedEveryMs = -1f;
         /**
          * 油门推送（试验）：推来的平均隔多久、推了几次；新的油门值先由谁送到（推送 / 快读），推送领先快读多少；
          * 新的油门值读到时已经过了多久（合成用上它的那一刻）。和 output 那一行的延迟加起来，是「车机给出油门 → 喇叭」能量到的部分。
@@ -284,9 +303,14 @@ public final class DriveSound {
             thread.start();
         }
 
-        /** 不等：线程自己淡出、放掉喇叭再退出。 */
+        /** 不等：线程自己熄火或淡出、放掉喇叭再退出。 */
         void stop() {
             stopping = true;
+        }
+
+        /** 不等：熄火不放完了，{@link #HURRY_FADE_SEC} 淡掉。 */
+        void hurry() {
+            hurry = true;
         }
 
         @Override
@@ -350,6 +374,8 @@ public final class DriveSound {
             float[] buffer = new float[2 * BLOCK];
             float dt = BLOCK / (float) SoundOutput.RATE;
             boolean ignited = false;
+            // 在放熄火（VirtualEngine.shutdown）
+            boolean windingDown = false;
             boolean inCall = false;
             boolean link = false;
             float g = 0f;
@@ -369,6 +395,7 @@ public final class DriveSound {
             // 油门：推送、快读赛跑，谁先带来新值用谁（ThrottleSources）；再还原成连续的踏板（车机约 200 ms 才更新一次，PedalTrack）
             ThrottleSources sources = new ThrottleSources();
             PedalTrack pedal = new PedalTrack();
+            SpeedTrack speedTrack = new SpeedTrack();
             long lastPushCount = 0L;
             float usedThrottle = Float.NaN;
             state = "running";
@@ -392,8 +419,9 @@ public final class DriveSound {
                 float throttle = sources.sample;
                 long throttleAt = sources.sampleAt;
                 // 车速、刹车：推来过就用推来的（快读的值比推送晚），推送停了、快读又不一样才用快读
-                float speed = DriveSoundRules.usePush(pushSpeed.count, pushSpeed.atMs, pushSpeed.value, polledSpeed, now)
-                        ? pushSpeed.value : polledSpeed;
+                boolean speedPushed = DriveSoundRules.usePush(pushSpeed.count, pushSpeed.atMs, pushSpeed.value, polledSpeed, now);
+                float speed = speedPushed ? pushSpeed.value : polledSpeed;
+                long speedAt = speedPushed ? pushSpeed.atMs : fast.atMs;
                 float brake = DriveSoundRules.usePush(pushBrake.count, pushBrake.atMs, pushBrake.value, polledBrake, now)
                         ? pushBrake.value : polledBrake;
                 long pushCount = push.count + pushSpeed.count + pushBrake.count;
@@ -409,6 +437,10 @@ public final class DriveSound {
                     pedal.sample(sources.sample, sources.sampleAt, now);
                 }
                 pedal.step(dt, now);
+                // 车速还原成连续的，加速度也从这里来（读数一级一级来，SpeedTrack）
+                speedTrack.sample(speed, speedAt);
+                speedTrack.step(dt, now);
+                speedEveryMs = speedTrack.everyMs();
                 PushedValue mainListener = telemetry.throttleListener(false);
                 PushedValue drListener = telemetry.throttleListener(true);
                 if (mainListener.count > 0L) {
@@ -464,16 +496,17 @@ public final class DriveSound {
                 }
                 Readings r = telemetry.readings();
                 String gearText = r.text(Signal.GEAR);
-                DriveSoundRules.Why w = stopping ? DriveSoundRules.Why.OFF
-                        : DriveSoundRules.decide(enabled, link, r.code(Signal.IGNITION), gearText,
+                DriveSoundRules.Why asked = DriveSoundRules.decide(enabled, link, r.code(Signal.IGNITION), gearText,
                         r.code(Signal.DRIVE_MODE), inputs.speed(), inputs.throttle(), fast.ageMs(now), inCall);
+                DriveSoundRules.Why w = stopping ? DriveSoundRules.Why.OFF : asked;
                 why = w;
-                in.speedKmh = inputs.speed();
-                // 虚拟发动机看还原后的踏板和按相邻读数算的快慢；踏板读不到时照快读的
+                // 虚拟发动机看还原后的车速、踏板和按相邻读数算的快慢、加速度；还原的读不到时照快读的
+                boolean speedTracked = !Float.isNaN(speedTrack.speed());
+                in.speedKmh = speedTracked ? speedTrack.speed() : inputs.speed();
+                in.accel = speedTracked ? speedTrack.accel() : inputs.accel();
                 boolean tracked = !Float.isNaN(pedal.value());
                 in.throttlePct = tracked ? pedal.value() : inputs.throttle();
                 in.pedalRate = tracked ? pedal.rate(now) : inputs.pedalRate();
-                in.accel = inputs.accel();
                 in.braking = inputs.brake() > VirtualEngine.BRAKE_ON || Boolean.TRUE.equals(r.bool(Signal.BRAKE_PEDAL));
                 in.gear = DriveSoundRules.gearOf(gearText);
                 in.flow = DriveSoundRules.flowOf(r.code(Signal.POWER_FLOW));
@@ -489,35 +522,43 @@ public final class DriveSound {
                     ignitedAs = starting ? "start" : String.format(Locale.US, "join at %.0f km/h", in.speedKmh);
                     BlackBox.note("模拟声浪：" + (starting ? "启动（车停着）" : "接入（行驶中 " + Math.round(in.speedKmh) + " km/h）"));
                 }
+                if (stopping && !windingDown && !hurry && ignited && g > 0.5f && asked.shutsDown) {
+                    // 切出运动模式、下电：发动机熄火（停着照真车，车在走像混动车停发动机），放完再放掉喇叭
+                    engine.shutdown(in);
+                    windingDown = true;
+                    boolean moving = in.speedKmh >= VirtualEngine.START_LEAVE_KMH;
+                    endedAs = moving ? String.format(Locale.US, "shutdown at %.0f km/h", in.speedKmh) : "shutdown";
+                    BlackBox.note("模拟声浪：熄火（" + (moving ? "行驶中 " + Math.round(in.speedKmh) + " km/h" : "车停着") + "）");
+                } else if (stopping && !windingDown && endedAs.isEmpty()) {
+                    endedAs = asked == DriveSoundRules.Why.RUNNING ? "fade (style or view changed)" : "fade (" + asked + ")";
+                } else if (windingDown && hurry && !endedAs.endsWith("cut short")) {
+                    endedAs += ", cut short";
+                }
                 if (ignited) {
                     engine.step(dt, in);
                 }
-                float target = w.audible ? 1f : 0f;
-                float stepSize = dt / Math.max(w.fadeSec, dt);
+                float target;
+                float fadeSec;
+                if (windingDown && !hurry) {
+                    // 熄火放着：门照开着，放完就停
+                    if (engine.done()) {
+                        return false;
+                    }
+                    target = g;
+                    fadeSec = w.fadeSec;
+                } else {
+                    target = w.audible ? 1f : 0f;
+                    fadeSec = hurry ? HURRY_FADE_SEC : w.fadeSec;
+                }
+                float stepSize = dt / Math.max(fadeSec, dt);
                 g = target > g ? Math.min(target, g + stepSize) : Math.max(target, g - stepSize);
                 gate = g;
                 if (stopping && g <= 0f) {
                     return false;
                 }
                 if (ignited) {
-                    params.rpm = engine.rpm();
-                    params.load = engine.voiceLoad();
-                    params.level = EngineVoice.dbToLin(engine.levelDb());
-                    params.gain = g * engine.fade() * EngineVoice.dbToLin(userDb + engine.outputDb());
-                    params.brightDb = engine.brightDb();
-                    params.intakeBoostDb = engine.intakeBoostDb();
-                    params.burble = engine.burble();
-                    params.starter = engine.starter();
-                    params.whineHz = engine.whineHz();
-                    params.whineAmp = engine.whineAmp();
-                    params.toneHz = engine.toneHz();
-                    params.overrun = engine.overrun();
-                    params.speedKmh = engine.speedKmh();
-                    params.drive = in.gear == VirtualEngine.Gear.D;
-                    params.gearIndex = engine.geared() ? engine.gearIndex() : -1;
-                    params.cut = engine.cut();
-                    params.shiftSerial = engine.shiftSerial();
-                    params.shiftUp = engine.shiftUp();
+                    engine.fill(params);
+                    params.gain = g * EngineVoice.dbToLin(userDb + engine.outputDb());
                     rpm = engine.rpm();
                     load = engine.load();
                     levelDb = engine.levelDb();
@@ -527,7 +568,7 @@ public final class DriveSound {
                     params.gain = 0f;
                 }
                 pedalRate = in.pedalRate;
-                accel = inputs.accel();
+                accel = in.accel;
                 long t0 = System.nanoTime();
                 voice.renderStereo(buffer, BLOCK, params);
                 renderMs += ((System.nanoTime() - t0) / 1_000_000f - renderMs) * 0.01f;
@@ -564,24 +605,26 @@ public final class DriveSound {
 
         String describe() {
             return String.format(Locale.US,
-                    "run: %s style=%s view=%s why=%s ignited=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
+                    "run: %s style=%s view=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
                             + "  mixer: takes a period every %s (%s blocks each)%n"
                             + "  start: drive mode changed %s before the run was asked for, output opened in %s, "
                             + "first sound %s after the ask (%s after the mode change)%n"
-                            + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes)%n"
+                            + "  inputs: fast reads every %s (longest gap in 10 s %s), throttle changed every %s (%d changes), "
+                            + "speed changed every %s%n"
                             + "  throttle push: every %s (%d pushes), a new value came first by push %d times (ahead by %s), "
                             + "by the fast read %d times (ahead by %s); fastest listener every %s (%d), RATE_DR listener every %s (%d)%n"
                             + "  pedal to speaker (the part measurable here): new throttle used %s after it arrived "
                             + "+ output %s (HAL timestamp; on the car's head unit it reads about 5.1 s whatever the buffer, so it is "
                             + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
-                    state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs, rpm, gear,
+                    state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs,
+                    endedAs.isEmpty() ? "-" : endedAs, rpm, gear,
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
                     ms(mixerEveryMs), burstBlocks < 0f ? "?" : String.format(Locale.US, "%.1f", burstBlocks),
                     ms(modeAgeWhenAsked), ms(openMs), ms(askedToSoundMs), ms(modeToSoundMs),
-                    ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps,
+                    ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps, ms(speedEveryMs),
                     ms(pushEveryMs), pushes, pushFirst, ms(pushLeadMs), pollFirst, ms(pollLeadMs),
                     ms(mainEveryMs), mainPushes, ms(drEveryMs), drPushes,
                     ms(inputAgeMs), ms(outputLatencyMs));

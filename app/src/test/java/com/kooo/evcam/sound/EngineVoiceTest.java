@@ -176,6 +176,28 @@ public class EngineVoiceTest {
     }
 
     @Test
+    public void withoutFireItIsMuchQuieterAndFadesAtTheEnd() {
+        // 熄火转着停下来、行驶中电机刚带起来：没有燃烧（起动机带着转的那一段照旧）
+        VoiceParams unfired = params(900f, 0f, 0.1f, 1f);
+        unfired.fire = 0f;
+        float[] on = tail(render(new EngineVoice(P, RATE), params(900f, 0f, 0.1f, 1f), 0.5f), 0.1f);
+        float[] off = tail(render(new EngineVoice(P, RATE), unfired, 0.5f), 0.1f);
+        VoiceParams last = params(100f, 0f, 0.1f, 1f);
+        last.fire = 0f;
+        float[] end = tail(render(new EngineVoice(P, RATE), last, 0.5f), 0.1f);
+        double e1 = 0;
+        double e0 = 0;
+        double eEnd = 0;
+        for (int i = 0; i < on.length; i++) {
+            e1 += on[i] * on[i];
+            e0 += off[i] * off[i];
+            eEnd += end[i] * end[i];
+        }
+        assertTrue("没点火低一截: " + 10 * Math.log10(e0 / e1), e0 < 0.1 * e1);
+        assertTrue("最后几圈更轻", eEnd < 0.2 * e0);
+    }
+
+    @Test
     public void loadBrightensTheHighOrders() {
         float[] full = tail(render(new EngineVoice(P, RATE), params(3000f, 1f, 1f, 1f), 0.6f), 0.1f);
         float[] light = tail(render(new EngineVoice(P, RATE), params(3000f, 0.1f, 1f, 1f), 0.6f), 0.1f);

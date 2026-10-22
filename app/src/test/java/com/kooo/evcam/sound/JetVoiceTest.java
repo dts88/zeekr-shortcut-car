@@ -213,6 +213,29 @@ public class JetVoiceTest {
     }
 
     @Test
+    public void aStopSpoolsDownToSilence() {
+        // 熄火：虚拟转速 0.7 秒从怠速落到 0，转子跟着落下去，音调往下走、越来越轻
+        JetVoice v = new JetVoice(RATE);
+        VoiceParams p = params(900f, 0f, false);
+        render(v, p, 1f, -1, 0f, 0, true);
+        float before = v.mainHz();
+        p.fire = 0f;
+        int blocks = Math.round(0.7f * RATE / BLOCK);
+        float[] block = new float[2 * BLOCK];
+        for (int b = 0; b < blocks; b++) {
+            p.rpm = 900f * (1f - (b + 1f) / blocks);
+            v.renderStereo(block, BLOCK, p);
+        }
+        assertTrue("音调往下走: " + before + " → " + v.mainHz(), v.mainHz() < 0.6f * before);
+        p.rpm = 0f;
+        float[] after = render(v, p, 0.5f, -1, 0f, 0, true);
+        float[] idle = render(params(900f, 0f, false), 1f);
+        int n = Math.round(0.2f * RATE);
+        assertTrue("停住以后没声了",
+                energy(after, after.length - n, after.length) < 1e-4 * energy(idle, idle.length - n, idle.length));
+    }
+
+    @Test
     public void anUpshiftBooms() {
         // 同一套随机数、只差换挡记号（第 300 块，起步那一下「轰」已经过去）：记号变之前一点不差；之后差出来的
         // （「音爆」、一捶、「轰」）不小（原型比发动机低 4.9 dB），大半在 200 Hz 以下（原型 79 %）；

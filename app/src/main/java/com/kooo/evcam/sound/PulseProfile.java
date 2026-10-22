@@ -100,7 +100,8 @@ final class PulseProfile {
     /**
      * 虚拟发动机给的电平取这个次方（车外、车内听感各一个）：踩油门主要变音色、响度变化不大 —— 发动机自己越转越响的那些
      * （燃烧、沙哑、增压器、消声器打开）已经带出好几 dB。项目所有者 2026-10-21 实车：响度差太大，要以层次和丰富程度做真实感，
-     * 高速、大油门稍响一点就够。车内听感把高频滤掉了，自己带出来的少，次方大一些。升挡断扭时再掉 {@link #cutDipDb}（满负荷）。
+     * 高速、大油门稍响一点就够；2026-10-22：油门、车速都还原平滑了，误当成急加速、急刹车的少了，响度差可以略放大一些。
+     * 车内听感把高频滤掉了，自己带出来的少，次方大一些。升挡断扭时再掉 {@link #cutDipDb}（满负荷）。
      */
     final float levelPow;
     final float cabinLevelPow;
@@ -186,6 +187,13 @@ final class PulseProfile {
     final float clickQ;
     /** 「咔」相对「咚」（dB）。 */
     final float clickDb;
+    /**
+     * 点着、熄火停住那一刻发动机在支座上晃一下（项目所有者 2026-10-22：点火的体感再强些；熄火照车主偏好的那台）：
+     * 一个衰减的低频（Hz、多快落下去 ms、多响 dB，只跟总音量）。
+     */
+    final float rockHz;
+    final float rockMs;
+    final float rockDb;
 
     // ---- 车内听感（开发者选项「听感」选「车内」）：发动机舱的声音隔着防火墙、排气隔着车身，各过两个一阶低通；
     //      低频多一点（车身传进来的）；总的再补一点，日常驾驶和车外差不多响
@@ -336,6 +344,9 @@ final class PulseProfile {
         clickHz = b.clickHz;
         clickQ = b.clickQ;
         clickDb = b.clickDb;
+        rockHz = b.rockHz;
+        rockMs = b.rockMs;
+        rockDb = b.rockDb;
         cabinFrontHz = b.cabinFrontHz.clone();
         cabinRearHz = b.cabinRearHz.clone();
         cabinLowHz = b.cabinLowHz;
@@ -373,7 +384,7 @@ final class PulseProfile {
      */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
             .supercharger(10.24f, -20f)
-            .loudness(0.05f, 0.3f, 0.5f, 0.58f)
+            .loudness(0.15f, 0.42f, 0.5f, 0.56f)
             .build();
 
     /** 写风格用：默认值是机械增压那一份的发动机、排气和增压器（增压器要 {@link #supercharger} 才装上），一项一项改，最后 {@link #build}。 */
@@ -481,6 +492,9 @@ final class PulseProfile {
         private float[] thunkMs = {35f, 12f};
         private float[] thunkGainDb = {0f, -8f};
         private float thunkDb = -11f;
+        private float rockHz = 40f;
+        private float rockMs = 90f;
+        private float rockDb = -13f;
         private float clickHz = 2200f;
         private float clickQ = 1.5f;
         private float clickDb = -14f;

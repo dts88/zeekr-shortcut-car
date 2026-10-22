@@ -9,7 +9,8 @@ package com.kooo.evcam.sound;
  *       每个阶次的幅度按负荷变（{@link SoundProfile#orderLoadDb}），高阶次在急踩、猛加速时再亮一点，半阶次在急松油门时多一点。</li>
  *   <li><b>进气声</b>：白噪声过带通，中心跟着转速；<b>排气</b>：白噪声过低通，负荷大时、急松油门的突突（随机起伏）走这一路。</li>
  *   <li><b>起动机</b>（启动时）：电机的啸声 + 齿轮的沙沙声，按压缩冲程一顿一顿；<b>倒挡齿轮</b>的啸叫（倒挡时，音调跟着车速）。</li>
- *   <li>两个固定共振（峰值均衡）、30 Hz 高通（保护喇叭）、接入时的阀门（低通慢慢打开）。</li>
+ *   <li>两个固定共振（峰值均衡）、30 Hz 高通（保护喇叭）、阀门（低通；现在一直全开，见 {@link VoiceParams#toneHz}）。</li>
+ *   <li>没点火（熄火转着停下来、行驶中电机刚带起来）：没有燃烧，整体低 {@link #UNFIRED_LEVEL}，最后几圈越来越轻。</li>
  *   <li>电平、音量、转速逐样本平滑；最后过先看一步的限幅（{@link Limiter}），峰值不超过 {@link #CEILING}（−1 dBFS）。</li>
  * </ul>
  */
@@ -29,6 +30,8 @@ final class EngineVoice implements Voice {
     static final float STARTER_WHINE_HZ = 1050f;
     /** 倒挡齿轮的啸叫（dB）。 */
     static final float WHINE_DB = -20f;
+    /** 没点火时发动机的声音剩几成（不是起动机在带的时候）。 */
+    static final float UNFIRED_LEVEL = 0.25f;
     /** 急松油门时半阶次多加多少（dB）、排气那一路的突突多响（dB）、随机起伏多快（Hz）。 */
     static final float BURBLE_HALF_ORDER_DB = 8f;
     static final float BURBLE_DB = -10f;
@@ -203,9 +206,11 @@ final class EngineVoice implements Voice {
             toneSetHz = params.toneHz;
         }
         float rpmStep = (rpmTarget - rpmNow) / frames;
-        // 升挡断扭：电平掉一下（{@link SoundProfile#shiftDipDb}，按断扭的深浅）
+        // 升挡断扭：电平掉一下（{@link SoundProfile#shiftDipDb}，按断扭的深浅）；没点火：弱很多，最后几圈越来越轻
+        float unfired = params.fire < 0.5f && params.starter <= 0.5f
+                ? UNFIRED_LEVEL * VirtualEngine.clamp01(rpmTarget / PulseVoice.UNFIRED_FULL_RPM) : 1f;
         float levelTarget = (float) Math.pow(Math.max(params.level, 0f), p.levelPow)
-                * dbToLin(p.shiftDipDb * VirtualEngine.clamp01(params.cut));
+                * dbToLin(p.shiftDipDb * VirtualEngine.clamp01(params.cut)) * unfired;
         float gainTarget = params.gain * p.norm;
         for (int i = 0; i < frames; i++) {
             float r = rpmNow + rpmStep * (i + 1);

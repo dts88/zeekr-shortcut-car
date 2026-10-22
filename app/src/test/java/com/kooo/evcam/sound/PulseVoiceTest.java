@@ -427,9 +427,10 @@ public class PulseVoiceTest {
     }
 
     @Test
-    public void theValveMufflesWhileJoining() {
+    public void theValveMufflesWhenClosed() {
+        // 现在一直全开（行驶中接入改成发动机起动，2026-10-22）；换回开阀门式时用
         VoiceParams closed = params(4000f, 1f);
-        closed.toneHz = VirtualEngine.JOIN_TONE_FROM_HZ;
+        closed.toneHz = 400f;
         double muffled = energy(highpass(mid(render(SC, closed, 0.6f), 0.1f), 2000f));
         double open = energy(highpass(mid(render(SC, params(4000f, 1f), 0.6f), 0.1f), 2000f));
         assertTrue(muffled < 0.05 * open);
@@ -461,5 +462,67 @@ public class PulseVoiceTest {
         float hz = orders[0] * 50f;
         assertTrue("不在 D 挡没有",
                 power(mid(render(SC, driving, 1f), 0.4f), hz) > 30 * power(mid(render(SC, parked, 1f), 0.4f), hz));
+        VoiceParams clutchOpen = params(3000f, 1f);
+        clutchOpen.level = ENGINE_DOWN_20;
+        clutchOpen.drive = true;
+        clutchOpen.speedKmh = 60f;
+        clutchOpen.gearIndex = 0;
+        clutchOpen.fire = 0f;
+        assertTrue("没点火（离合开着）也没有",
+                power(mid(render(SC, driving, 1f), 0.4f), hz) > 30 * power(mid(render(SC, clutchOpen, 1f), 0.4f), hz));
+    }
+
+    // ================================================================= 点着、熄火（项目所有者 2026-10-22）
+
+    @Test
+    public void withoutFireOnlyTheCompressionPuffsAreLeft() {
+        VoiceParams fired = params(900f, 0f);
+        VoiceParams unfired = params(900f, 0f);
+        unfired.fire = 0f;
+        double on = energy(mid(render(SC, fired, 0.8f), 0.3f));
+        double off = energy(mid(render(SC, unfired, 0.8f), 0.3f));
+        double db = 10 * Math.log10(off / on);
+        assertTrue("没点火轻很多，但还听得见: " + db + " dB", db < -6 && db > -25);
+    }
+
+    @Test
+    public void aCatchRocksTheEngineOnItsMounts() {
+        // 同样的怠速，一个刚点着：之后那一小段 40 Hz 附近（发动机在支座上晃）明显多
+        PulseVoice plain = new PulseVoice(SC, RATE);
+        PulseVoice caught = new PulseVoice(SC, RATE);
+        VoiceParams p = params(900f, 0.3f);
+        render(plain, p, 0.3f);
+        render(caught, p, 0.3f);
+        VoiceParams q = params(900f, 0.3f);
+        q.catchSerial = 1;
+        float[] a = mid(render(plain, p, 0.15f), 0f);
+        float[] b = mid(render(caught, q, 0.15f), 0f);
+        assertTrue(power(b, SC.rockHz) > 10 * power(a, SC.rockHz));
+    }
+
+    @Test
+    public void aStopRunsDownSettlesAndGoesSilent() {
+        PulseVoice v = new PulseVoice(SC, RATE);
+        VoiceParams p = params(900f, 0f);
+        double idle = energy(mid(render(v, p, 0.5f), 0.2f)) / (0.3 * RATE);
+        // 熄火：0.7 秒从怠速落到 0（和虚拟发动机差不多），再停着 0.5 秒
+        p.fire = 0f;
+        int blocks = Math.round(0.7f * RATE / BLOCK);
+        float[] block = new float[2 * BLOCK];
+        for (int b = 0; b < blocks; b++) {
+            p.rpm = 900f * (1f - (b + 1f) / blocks);
+            v.renderStereo(block, BLOCK, p);
+        }
+        p.rpm = 0f;
+        float[] after = mid(render(v, p, 0.5f), 0f);
+        float[] settle = java.util.Arrays.copyOfRange(after, 0, Math.round(0.15f * RATE));
+        float[] tail = java.util.Arrays.copyOfRange(after, Math.round(0.35f * RATE), after.length);
+        double settleRms = energy(settle) / settle.length;
+        assertTrue("停住那一下晃一下，听得出、比怠速轻: " + 10 * Math.log10(settleRms / idle),
+                settleRms < idle && settleRms > 1e-3 * idle);
+        float[] same = java.util.Arrays.copyOfRange(tail, tail.length - settle.length / 2, tail.length);
+        assertTrue("晃的是低频", power(settle, SC.rockHz) > 100 * power(same, SC.rockHz));
+        double tailRms = energy(tail) / tail.length;
+        assertTrue("然后就没声了: " + 10 * Math.log10(tailRms / idle), tailRms < 1e-3 * idle);
     }
 }

@@ -26,12 +26,20 @@ package com.kooo.evcam.sound;
  *       动力回来时「吼」一下；每次换挡给合成器一个记号（{@link #shiftSerial}），它据此放换挡的「咚」。</li>
  * </ul>
  *
- * <h3>开始工作（{@link #ignite}）</h3>
+ * <h3>开始工作（{@link #ignite}）、停下来（{@link #shutdown}）</h3>
  *
  * <p>车停着：启动声 —— 起动机转动、点着、转速冲到 {@link #START_FLARE_RPM}、回落到怠速（{@link Phase#STARTING}）；
- * 不带起动机的风格（项目所有者 2026-10-21：「美式 V8」不要起动机那几声）直接从点着开始。
- * 车在走：开阀门式接入 —— 按此刻的车速、油门算好转速，{@link #JOIN_SEC} 里从闷到亮淡入；模拟换挡顺势降一挡、连续补一点转速，
- * 踩着刹车或在回收时只淡入（{@link Phase#JOINING}）。之后一直转着：停着就是怠速（项目所有者 2026-10-21 选的）。</p>
+ * 不带起动机的风格（项目所有者 2026-10-21：「美式 V8」不要起动机那几声）直接从点着开始。点着那一下总音量、亮度、进气多冲一点
+ * （项目所有者 2026-10-22：体感再强 20 % 左右）。之后一直转着：停着就是怠速（项目所有者 2026-10-21 选的）。</p>
+ *
+ * <p>车在走：像混动车行驶中起动发动机（{@link Phase#JOINING}）—— 电机先把它带到此刻该有的转速（不点火，只有压缩的「噗」），
+ * 点着时补油冲一下；模拟换挡顺势降一挡，踩着刹车或在回收时不冲。项目所有者 2026-10-22 问开阀门还是混动车起动发动机：
+ * 按建议先做后者，和停着时的点火、熄火是一个说法（运动模式 = 发动机工作），上车听了再定；原来开阀门式的淡入见
+ * docs/local/drive-sound-plan.md §12.14。</p>
+ *
+ * <p>熄火（{@link Phase#STOPPING}，切出运动模式、下电时 {@link DriveSound} 叫）：断油断火，没有燃烧，只剩压缩的「噗」，转速自己落到 0；
+ * 最后几圈每次压缩慢一下，一顿一顿；停住那一下发动机在支座上晃一下（合成器）。车停着照真车熄火（参照车主偏好的那台机械增压 V8：
+ * 怠速约 0.7 秒停住）；车在走像混动车行驶中停发动机，电机帮着拖停，快一些。</p>
  */
 final class VirtualEngine {
 
@@ -43,7 +51,7 @@ final class VirtualEngine {
     /** 动力流（{@code Signal.POWER_FLOW}）。 */
     enum Flow { DRIVE, REGEN, IDLE, NOT_READY, UNKNOWN }
 
-    enum Phase { STARTING, JOINING, RUNNING }
+    enum Phase { STARTING, JOINING, RUNNING, STOPPING }
 
     /** 一块的输入：声音线程里重用一份，不分配。 */
     static final class Input {
@@ -181,21 +189,53 @@ final class VirtualEngine {
     static final float START_SETTLE_SEC = 1.3f;
     static final float START_CRANK_RPM = 250f;
     static final float START_CRANK_LOAD = 0.12f;
-    static final float START_FLARE_RPM = 2000f;
+    /** 点着后冲到多少（rpm）：项目所有者 2026-10-22 要启动的体感再强 20 % 左右，2000 → 2400。 */
+    static final float START_FLARE_RPM = 2400f;
     static final float START_CRANK_TAU = 0.15f;
     static final float START_CATCH_TAU = 0.08f;
     static final float START_SETTLE_TAU = 0.35f;
     static final float STARTER_SEC = 0.04f;
-    /** 车速到这个（km/h）就不算停着：开始工作时走接入，启动途中车动了就结束启动。 */
+    /** 车速到这个（km/h）就不算停着：开始工作时走接入、停下来时按行驶中停发动机，启动途中车动了就结束启动。 */
     static final float START_LEAVE_KMH = 2f;
     /** 启动的回落段里油门踩过这个负荷，交还正常走法。 */
     static final float START_TAKEOVER_LOAD = 0.1f;
+    /**
+     * 点着那一下多冲一点（项目所有者 2026-10-22：体感再强 20 % 左右，响度约 +2.5 dB）：总音量多加的（dB，不随电平压窄）、
+     * 高阶次多亮的、进气多响的（dB）；停着启动时冲高那一段一直满着，之后按 {@link #SURGE_SEC} 淡掉。
+     */
+    static final float SURGE_GAIN_DB = 2.5f;
+    static final float SURGE_BRIGHT_DB = 3f;
+    static final float SURGE_INTAKE_DB = 6f;
+    static final float SURGE_SEC = 0.3f;
 
-    // ---- 接入（开阀门）
-    static final float JOIN_SEC = 0.8f;
-    static final float JOIN_TONE_FROM_HZ = 400f;
+    // ---- 行驶中接入：像混动车行驶中起动发动机
+    /** 电机把发动机带到该有的转速：多久以后点着（秒）、带的时间常数（秒）；这一段不点火，只有压缩的「噗」。 */
+    static final float ROLL_SPIN_SEC = 0.22f;
+    static final float ROLL_SPIN_TAU = 0.06f;
+    /** 点着时补油冲多少（rpm）、那一下的负荷、多冲的（{@link #surge}，停着启动是 1）；踩着刹车、在回收时不冲，轻一些。 */
+    static final float ROLL_FLARE_RPM = 500f;
+    static final float ROLL_CATCH_LOAD = 0.6f;
+    static final float ROLL_SURGE = 0.6f;
+    static final float ROLL_EASING_LOAD = 0.15f;
+    static final float ROLL_EASING_SURGE = 0.25f;
+
+    // ---- 熄火（切出运动模式、下电）
+    /**
+     * 断油断火后转速每秒落 {@code STOP_DECEL + rpm / STOP_TAU}（rpm/s：摩擦、泵气，转得越快拖得越狠）。车停着照真车熄火，
+     * 怠速约 0.7 秒停住；车在走（混动车行驶中停发动机）电机帮着拖停，快一些。
+     */
+    static final float STOP_DECEL = 800f;
+    static final float STOP_TAU = 0.9f;
+    static final float STOP_MOVING_DECEL = 2500f;
+    static final float STOP_MOVING_TAU = 0.6f;
+    /** 最后几圈：每个缸压缩时曲轴慢一下、膨胀时推一下（V8 一圈压缩四次），转速起伏最多 {@link #STOP_LUMP} 倍，这个转速（rpm）以下才有。 */
+    static final float STOP_LUMP = 0.35f;
+    static final float STOP_LUMP_RPM = 300f;
+    static final float COMPRESSIONS_PER_REV = 4f;
+    /** 停住以后再留多久（秒）：最后那一下晃动落完，再放掉喇叭。 */
+    static final float STOP_TAIL_SEC = 0.35f;
+    /** 阀门全开（{@link VoiceParams#toneHz} 的默认）。 */
     static final float TONE_OPEN_HZ = 20000f;
-    static final float JOIN_BLIP_RPM = 600f;
 
     // ---- 收油（断油、发动机被车拖着转）：给合成器
     /** 该有的负荷（{@link #loadTarget}）低于这个算收油。 */
@@ -242,9 +282,21 @@ final class VirtualEngine {
     private boolean barkPending;
     private int shiftSerial;
     private boolean shiftUp = true;
-    private float fade = 1f;
-    private float toneHz = TONE_OPEN_HZ;
     private float starter;
+    /** 点着火（0 / 1）：起动机带着转、行驶中电机带着转还没点着、熄火时是 0。 */
+    private float fire = 1f;
+    /** 点着那一下多冲的（0–1，{@link #SURGE_GAIN_DB} 那几样）。 */
+    private float surge;
+    /** 点着了几次（只增不减）：合成器看它变了就放点着的那一下。 */
+    private int catchSerial;
+    // ---- 熄火
+    /** 车在走时停的（电机帮着拖停）。 */
+    private boolean stopMoving;
+    /** 不带最后几圈起伏的转速、起伏的相位（周）、停住的时刻（{@link #phaseSec}）。 */
+    private float stopRpm;
+    private float lumpPhase;
+    private float stopAtSec;
+    private boolean done;
     private float overrun;
     private float speedKmh;
     private Gear gear = Gear.UNKNOWN;
@@ -260,7 +312,7 @@ final class VirtualEngine {
         this.rpm = profile.idleRpm;
     }
 
-    /** 开始工作：车停着放启动声，车在走就开阀门接入。 */
+    /** 开始工作：车停着放启动声，车在走就像混动车那样起动发动机。 */
     void ignite(Input in) {
         stabEnv = 0f;
         liftEnv = 0f;
@@ -281,46 +333,66 @@ final class VirtualEngine {
         phaseSec = 0f;
         starter = 0f;
         overrun = 0f;
+        surge = 0f;
+        done = false;
         float v = speedOf(in);
         speedKmh = v;
         gear = in.gear;
+        gearIndex = 0;
+        gearPicked = true;
+        rpm = 0f;
+        load = 0f;
+        fire = 0f;
         if (v < START_LEAVE_KMH) {
             phase = Phase.STARTING;
-            rpm = 0f;
-            load = 0f;
-            fade = 1f;
-            toneHz = TONE_OPEN_HZ;
-            gearIndex = 0;
-            gearPicked = true;
             if (!crank) {
                 // 不要起动机：直接从点着开始
                 phaseSec = START_CRANK_SEC;
                 rpm = START_CRANK_RPM;
+                fire = 1f;
+                surge = 1f;
+                catchSerial++;
             }
             return;
         }
+        // 车在走：发动机从停着被电机带起来，点着以后接上（stepJoin）
         phase = Phase.JOINING;
-        fade = 0f;
-        toneHz = JOIN_TONE_FROM_HZ;
-        load = loadTarget(in);
-        shiftLoad = load;
+        shiftLoad = loadTarget(in);
         boolean easing = in.braking || in.flow == Flow.REGEN;
-        gearIndex = 0;
-        gearPicked = true;
         if (in.gear == Gear.D && in.mode == RpmMode.SHIFTS) {
-            gearIndex = pickGear(p, v, load);
+            gearIndex = pickGear(p, v, shiftLoad);
             if (!easing && gearIndex > 0
                     && v * p.gearRpmPerKmh[gearIndex - 1] < upshiftRpm(p, 1f) * SHIFT_GUARD) {
                 // 顺势降一挡：表示运动模式接上了；换挡看的负荷记成满的，这一挡保持一会儿
                 gearIndex--;
                 shiftLoad = 1f;
-                blip = DOWNSHIFT_BLIP_RPM;
-                blipLoad = DOWNSHIFT_BLIP_LOAD;
             }
-        } else if (in.gear == Gear.D && !easing) {
-            blip = JOIN_BLIP_RPM;
         }
-        rpm = clamp(rpmTarget(v, in), p.idleRpm, capFor(in.gear));
+    }
+
+    /**
+     * 停下来（切出运动模式、下电）：断油断火，转速自己落到 0，{@link #done} 以后才放掉喇叭。车在走时电机帮着拖停，快一些。
+     * 已经在熄火就不重来。
+     */
+    void shutdown(Input in) {
+        if (phase == Phase.STOPPING) {
+            return;
+        }
+        phase = Phase.STOPPING;
+        phaseSec = 0f;
+        stopMoving = speedOf(in) >= START_LEAVE_KMH;
+        stopRpm = rpm;
+        stopAtSec = 0f;
+        lumpPhase = 0f;
+        done = false;
+        fire = 0f;
+        starter = 0f;
+        surge = 0f;
+        cut = 0f;
+        upLeftSec = 0f;
+        shiftLeftSec = 0f;
+        barkPending = false;
+        overrun = 0f;
     }
 
     /** 推进 {@code dt} 秒。 */
@@ -347,19 +419,19 @@ final class VirtualEngine {
         blip *= decay(dt, BLIP_DECAY_SEC);
         blipLoad *= decay(dt, BLIP_LOAD_DECAY_SEC);
         bark *= decay(dt, BARK_SEC);
+        surge *= decay(dt, SURGE_SEC);
 
+        if (phase == Phase.STOPPING) {
+            stepStop(dt);
+            return;
+        }
         if (phase == Phase.STARTING) {
             stepStart(dt, v, in);
             return;
         }
         if (phase == Phase.JOINING) {
-            fade = Math.min(1f, phaseSec / JOIN_SEC);
-            toneHz = JOIN_TONE_FROM_HZ * (float) Math.pow(TONE_OPEN_HZ / JOIN_TONE_FROM_HZ, fade);
-            if (phaseSec >= JOIN_SEC) {
-                phase = Phase.RUNNING;
-                fade = 1f;
-                toneHz = TONE_OPEN_HZ;
-            }
+            stepJoin(dt, v, in);
+            return;
         }
 
         // 负荷：急踩时起得快，踩刹车时落得快
@@ -435,7 +507,7 @@ final class VirtualEngine {
         cut = upLeftSec > 0f ? c * strength : 0f;
     }
 
-    /** 启动：转动 → 点着冲高 → 回落到怠速。回落段里踩了油门、或者车动了，交还正常走法。 */
+    /** 启动：转动 → 点着冲高（{@link #surge} 一直满着）→ 回落到怠速。回落段里踩了油门、或者车动了，交还正常走法。 */
     private void stepStart(float dt, float v, Input in) {
         float crankEnd = START_CRANK_SEC;
         float catchEnd = crankEnd + START_CATCH_SEC;
@@ -454,6 +526,11 @@ final class VirtualEngine {
             loadTarget = 1f;
             starterTarget = 0f;
             tau = START_CATCH_TAU;
+            if (fire < 0.5f) {
+                catchSerial++;
+            }
+            fire = 1f;
+            surge = 1f;
         } else {
             rpmTarget = p.idleRpm;
             loadTarget = 0f;
@@ -469,10 +546,52 @@ final class VirtualEngine {
         if (phaseSec >= end || (phaseSec >= catchEnd && (pressed || leaving))) {
             phase = Phase.RUNNING;
             starter = 0f;
+            fire = 1f;
             gearPicked = false;
             if (rpm < p.idleRpm) {
                 rpm = p.idleRpm;
             }
+        }
+    }
+
+    /** 行驶中起动：电机把发动机带到此刻油门要的转速（不点火），{@link #ROLL_SPIN_SEC} 后点着、接上，补油冲一下。 */
+    private void stepJoin(float dt, float v, Input in) {
+        float want = loadTarget(in);
+        load += (want - load) * follow(dt, want > load ? p.loadAttackSec : p.loadReleaseSec);
+        float target = clamp(rpmTarget(v, in), p.idleRpm, capFor(in.gear));
+        rpm += (target - rpm) * follow(dt, ROLL_SPIN_TAU);
+        if (phaseSec < ROLL_SPIN_SEC) {
+            return;
+        }
+        phase = Phase.RUNNING;
+        fire = 1f;
+        catchSerial++;
+        boolean easing = in.braking || in.flow == Flow.REGEN;
+        surge = Math.max(surge, easing ? ROLL_EASING_SURGE : ROLL_SURGE);
+        blipLoad = Math.max(blipLoad, easing ? ROLL_EASING_LOAD : ROLL_CATCH_LOAD);
+        if (!easing) {
+            blip = Math.max(blip, ROLL_FLARE_RPM);
+        }
+    }
+
+    /** 熄火：断油断火，转速按摩擦、泵气落到 0，最后几圈一顿一顿；停住后再留 {@link #STOP_TAIL_SEC}。 */
+    private void stepStop(float dt) {
+        load += (0f - load) * follow(dt, p.loadReleaseSec);
+        if (stopRpm > 0f) {
+            float decel = stopMoving ? STOP_MOVING_DECEL : STOP_DECEL;
+            float tau = stopMoving ? STOP_MOVING_TAU : STOP_TAU;
+            stopRpm = Math.max(0f, stopRpm - (decel + stopRpm / tau) * dt);
+            lumpPhase += COMPRESSIONS_PER_REV * stopRpm / 60f * dt;
+            lumpPhase -= (float) Math.floor(lumpPhase);
+            float lump = STOP_LUMP * clamp01(1f - stopRpm / STOP_LUMP_RPM);
+            rpm = stopRpm * (1f + lump * (float) Math.sin(2.0 * Math.PI * lumpPhase));
+            if (stopRpm <= 0f) {
+                rpm = 0f;
+                stopAtSec = phaseSec;
+            }
+        } else if (phaseSec - stopAtSec >= STOP_TAIL_SEC) {
+            rpm = 0f;
+            done = true;
         }
     }
 
@@ -722,9 +841,12 @@ final class VirtualEngine {
         return load;
     }
 
-    /** 合成器用的负荷：降挡补油那一下也算进去。 */
+    /**
+     * 合成器用的负荷：降挡补油那一下也算进去。行驶中起动、电机带着转的那一段是 0（节气门关着，点着那一下才是一个清楚的「轰」）；
+     * 油门要的负荷只拿来定带到多少转。
+     */
     float voiceLoad() {
-        return Math.max(load, blipLoad);
+        return phase == Phase.JOINING ? 0f : Math.max(load, blipLoad);
     }
 
     /**
@@ -738,19 +860,9 @@ final class VirtualEngine {
                 + LEVEL_SURGE_DB * effortEnv + LEVEL_STAB_DB * stabEnv - cruiseCutDb;
     }
 
-    /** 加在总音量上的（dB）：车速越快稍大一点（{@link #SPEED_GAIN_DB}）。 */
+    /** 加在总音量上的（dB）：车速越快稍大一点（{@link #SPEED_GAIN_DB}）；点着那一下多冲一点（{@link #SURGE_GAIN_DB}）。 */
     float outputDb() {
-        return SPEED_GAIN_DB * speedCurve(p, speedKmh);
-    }
-
-    /** 开始工作时的淡入（0–1）：接入时 {@link #JOIN_SEC} 里从 0 到 1，启动时一开始就是 1。 */
-    float fade() {
-        return fade;
-    }
-
-    /** 阀门：接入时低通从 {@link #JOIN_TONE_FROM_HZ} 打开到 {@link #TONE_OPEN_HZ}。 */
-    float toneHz() {
-        return toneHz;
+        return SPEED_GAIN_DB * speedCurve(p, speedKmh) + SURGE_GAIN_DB * surge;
     }
 
     /** 起动机那一层有多响（0–1）。 */
@@ -758,9 +870,24 @@ final class VirtualEngine {
         return starter;
     }
 
-    /** 高阶次多加的 dB（急踩、猛加速、升挡后动力回来那一下更亮）。 */
+    /** 点着火（0 / 1）：起动机、电机带着转还没点着、熄火时是 0。 */
+    float fire() {
+        return fire;
+    }
+
+    /** 点着了几次（只增不减）：合成器看它变了就放点着的那一下（缺火、晃一下）。 */
+    int catchSerial() {
+        return catchSerial;
+    }
+
+    /** 熄火放完了（转速落到 0，最后那一下晃动也落完）：可以放掉喇叭。 */
+    boolean done() {
+        return done;
+    }
+
+    /** 高阶次多加的 dB（急踩、猛加速、升挡后动力回来那一下、点着那一下更亮）。 */
     float brightDb() {
-        return BRIGHT_STAB_DB * stabEnv + BRIGHT_SURGE_DB * effortEnv + BARK_DB * bark;
+        return BRIGHT_STAB_DB * stabEnv + BRIGHT_SURGE_DB * effortEnv + BARK_DB * bark + SURGE_BRIGHT_DB * surge;
     }
 
     /** 升挡断扭（0–1，按负荷）：合成器据此减弱燃烧、电平掉一下。 */
@@ -788,9 +915,9 @@ final class VirtualEngine {
         return pseudo;
     }
 
-    /** 进气声多加的 dB（急踩时猛一下）。 */
+    /** 进气声多加的 dB（急踩时、点着那一下猛一下）。 */
     float intakeBoostDb() {
-        return INTAKE_STAB_DB * stabEnv;
+        return INTAKE_STAB_DB * stabEnv + SURGE_INTAKE_DB * surge;
     }
 
     /** 急松油门的突突（0–1）。 */
@@ -800,7 +927,7 @@ final class VirtualEngine {
 
     /**
      * 收油时发动机被车拖着转（断油）多少（0–1）：负荷几乎没有、转速在怠速之上 —— 滑行、刹车、空挡收油回落。
-     * 启动途中是 0。
+     * 启动、接入途中、熄火时是 0（熄火看 {@link #fire}）。
      */
     float overrun() {
         return overrun;
@@ -828,5 +955,27 @@ final class VirtualEngine {
 
     float cruiseCutDb() {
         return cruiseCutDb;
+    }
+
+    /** 合成器这一块的参数，总音量（{@link VoiceParams#gain}）除外：那个由叫的人按门控、声浪音量、{@link #outputDb} 定。 */
+    void fill(VoiceParams out) {
+        out.rpm = rpm;
+        out.load = voiceLoad();
+        out.level = EngineVoice.dbToLin(levelDb());
+        out.brightDb = brightDb();
+        out.intakeBoostDb = intakeBoostDb();
+        out.burble = burble();
+        out.starter = starter;
+        out.fire = fire;
+        out.catchSerial = catchSerial;
+        out.whineHz = whineHz();
+        out.whineAmp = whineAmp();
+        out.overrun = overrun;
+        out.speedKmh = speedKmh;
+        out.drive = gear == Gear.D;
+        out.gearIndex = geared ? gearIndex : -1;
+        out.cut = cut;
+        out.shiftSerial = shiftSerial;
+        out.shiftUp = shiftUp;
     }
 }

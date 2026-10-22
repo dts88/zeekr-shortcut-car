@@ -77,7 +77,12 @@ public class DriveSoundRulesTest {
                 && DriveSoundRules.Why.CALL.open);
         assertFalse(DriveSoundRules.Why.STALE.audible || DriveSoundRules.Why.CALL.audible);
         assertTrue(DriveSoundRules.Why.RUNNING.audible);
-        assertEquals("切出运动模式 0.6 秒淡出", 0.6f, DriveSoundRules.Why.NOT_SPORT.fadeSec, 0f);
+        assertEquals("切出运动模式：放不了熄火时 0.6 秒淡出", 0.6f, DriveSoundRules.Why.NOT_SPORT.fadeSec, 0f);
+        // 项目所有者 2026-10-22：切出运动模式、下电时发动机熄火（和停着切进来点火一个说法）；别的原因淡出
+        assertTrue(DriveSoundRules.Why.NOT_SPORT.shutsDown && DriveSoundRules.Why.POWER_OFF.shutsDown);
+        assertFalse("开关关了、接口断了：淡出", DriveSoundRules.Why.OFF.shutsDown || DriveSoundRules.Why.NO_LINK.shutsDown);
+        assertFalse("没停下来的不熄火", DriveSoundRules.Why.STALE.shutsDown || DriveSoundRules.Why.CALL.shutsDown
+                || DriveSoundRules.Why.RUNNING.shutsDown);
         for (DriveSoundRules.Why why : DriveSoundRules.Why.values()) {
             assertTrue(why.fadeSec > 0f);
             assertTrue("响就一定转着、转着就一定在快读", (!why.audible || why.open) && (!why.open || why.armed));

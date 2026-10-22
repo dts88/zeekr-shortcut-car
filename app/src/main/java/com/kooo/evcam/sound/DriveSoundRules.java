@@ -11,7 +11,8 @@ import com.kooo.evcam.telemetry.Signal;
  * <ul>
  *   <li>只在车内；只做运动模式的效果 —— 舒适、标准不出声，驾驶模式读不到也不出声。</li>
  *   <li>运动模式下虚拟发动机一直转着：停着是怠速，P / N 踩油门轰转速，倒挡按倒挡齿比（{@link VirtualEngine}）。</li>
- *   <li>切出运动模式、开关关了、没上电：0.6 秒淡出，发动机「熄火」。</li>
+ *   <li>切出运动模式、没上电：发动机熄火（{@link Why#shutsDown}，2026-10-22：停着照真车熄火，车在走像混动车停发动机），
+ *       放完再放掉喇叭（{@link DriveSound}）；开关关了：0.6 秒淡出。</li>
  *   <li>车速、油门读不到或过期（超过 {@link #STALE_MS}）、车辆接口断了：0.3 秒淡到无声，不会卡在一个声音上；回来时 0.3 秒淡入。</li>
  *   <li>通话中静音（车机本来也压低媒体）。</li>
  * </ul>
@@ -24,19 +25,19 @@ final class DriveSoundRules {
     /** 结论。每一种的「快读 / 转着 / 响 / 淡多快」是定死的，所以结论本身就是全部信息，不用另外建对象（声音线程里不分配）。 */
     enum Why {
         /** 开关关着（或者开发者选项关了） */
-        OFF(false, false, false, 0.6f),
+        OFF(false, false, false, 0.6f, false),
         /** 车辆接口没连上 */
-        NO_LINK(false, false, false, 0.3f),
+        NO_LINK(false, false, false, 0.3f, false),
         /** 没上电（点火不在 ON / DRIVING，挡位也不在 R / N / D） */
-        POWER_OFF(false, false, false, 0.6f),
+        POWER_OFF(false, false, false, 0.6f, true),
         /** 不是运动模式（驾驶模式读不到也算） */
-        NOT_SPORT(false, false, false, 0.6f),
+        NOT_SPORT(false, false, false, 0.6f, true),
         /** 车速 / 油门读不到或过期 */
-        STALE(true, true, false, 0.3f),
+        STALE(true, true, false, 0.3f, false),
         /** 通话中 */
-        CALL(true, true, false, 0.15f),
+        CALL(true, true, false, 0.15f, false),
         /** 出声 */
-        RUNNING(true, true, true, 0.3f);
+        RUNNING(true, true, true, 0.3f, false);
 
         /**
          * 要快读车辆信号：只在运动模式下（不用的时候不让车机服务 50 ms 读一遍）。切进运动模式后第一遍快读 50 ms 内就到，
@@ -49,12 +50,18 @@ final class DriveSoundRules {
         final boolean audible;
         /** 淡到这个状态用多久（秒）。 */
         final float fadeSec;
+        /**
+         * 因为它停下来时发动机熄火（{@link VirtualEngine#shutdown}），放完再放掉喇叭，而不是淡出：切出运动模式、下电 ——
+         * 和停着切进运动模式放启动声是一个说法（项目所有者 2026-10-22）。
+         */
+        final boolean shutsDown;
 
-        Why(boolean armed, boolean open, boolean audible, float fadeSec) {
+        Why(boolean armed, boolean open, boolean audible, float fadeSec, boolean shutsDown) {
             this.armed = armed;
             this.open = open;
             this.audible = audible;
             this.fadeSec = fadeSec;
+            this.shutsDown = shutsDown;
         }
     }
 

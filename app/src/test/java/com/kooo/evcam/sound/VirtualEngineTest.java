@@ -10,7 +10,8 @@ import org.junit.Test;
  * 虚拟发动机（项目所有者 2026-10-21 定的走法，docs/local/drive-sound-plan.md §2、§9）。
  *
  * <p>算错的表现：地板油一路顶在红线上；急踩和缓踩听起来一样；松油门、刹车时乱升挡；倒挡升挡；
- * 停着切到运动模式没有启动声、或者启动声之后一直是起动机的声音；行驶中接入时突然冒出来、降的那一挡马上又升回去；
+ * 停着切到运动模式没有启动声、或者启动声之后一直是起动机的声音；行驶中接入时不点火就冒出来、降的那一挡马上又升回去；
+ * 切出运动模式时发动机不熄火、或者熄了火停不下来；
  * 自适应巡航自己加速时没声音；块大小一变声音的快慢就变。</p>
  */
 public class VirtualEngineTest {
@@ -121,7 +122,8 @@ public class VirtualEngineTest {
         assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
         assertEquals("回落到怠速", P.idleRpm, e.rpm(), 120f);
         assertEquals("怠速的电平", VirtualEngine.LEVEL_FLOOR_DB, e.levelDb(), 1f);
-        assertEquals(1f, e.fade(), 0f);
+        assertEquals(1f, e.fire(), 0f);
+        assertEquals("点着一次", 1, e.catchSerial());
     }
 
     @Test
@@ -131,16 +133,34 @@ public class VirtualEngineTest {
         VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
         e.ignite(in);
         assertEquals(VirtualEngine.Phase.STARTING, e.phase());
+        assertEquals(1f, e.fire(), 0f);
+        assertEquals(1, e.catchSerial());
         float peak = 0f;
         for (int i = 0; i < Math.round(0.35f / DT); i++) {
             e.step(DT, in);
             assertEquals("没有起动机", 0f, e.starter(), 0f);
             peak = Math.max(peak, e.rpm());
         }
-        assertTrue("一开始就点着、冲上来: " + peak, peak > 1500f);
+        // 项目所有者 2026-10-22：体感再强 20 % 左右，冲到 2400 附近（原来 2000）
+        assertTrue("一开始就点着、冲上来: " + peak, peak > 2200f && peak <= VirtualEngine.START_FLARE_RPM);
         run(e, in, 1.6f);
         assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
         assertEquals("回落到怠速", P.idleRpm, e.rpm(), 120f);
+        assertEquals("只点着一次", 1, e.catchSerial());
+    }
+
+    @Test
+    public void theCatchIsBriefLouderAndBrighterThenSettles() {
+        VirtualEngine e = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 0.25f);
+        assertEquals("冲高那一段多冲满", VirtualEngine.SURGE_GAIN_DB, e.outputDb(), 0.01f);
+        assertTrue(e.brightDb() >= VirtualEngine.SURGE_BRIGHT_DB - 0.01f);
+        assertTrue(e.intakeBoostDb() >= VirtualEngine.SURGE_INTAKE_DB - 0.01f);
+        run(e, in, 2.5f);
+        assertEquals("之后淡掉", 0f, e.outputDb(), 0.01f);
+        assertEquals(0f, e.brightDb(), 0.01f);
     }
 
     @Test
@@ -156,31 +176,49 @@ public class VirtualEngineTest {
     }
 
     @Test
-    public void joiningWhileMovingFadesInLikeAnOpeningValve() {
+    public void joiningWhileMovingSpinsUpThenCatchesWithAFlare() {
+        // 项目所有者 2026-10-22 问开阀门还是混动车行驶中起动发动机：按建议做后者 —— 电机带起来、点着、补油冲一下
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 25f);
         e.ignite(in);
         assertEquals(VirtualEngine.Phase.JOINING, e.phase());
-        assertEquals(0f, e.fade(), 0f);
-        assertEquals(VirtualEngine.JOIN_TONE_FROM_HZ, e.toneHz(), 0f);
-        float steady = VirtualEngine.continuousRpm(P, 60f, VirtualEngine.demand(25f));
-        assertTrue("连续走法补一点转速，表示接上了", e.rpm() > steady + 300f);
-        run(e, in, 0.4f);
-        assertTrue(e.fade() > 0.4f && e.fade() < 0.6f);
-        assertTrue("阀门在打开", e.toneHz() > 2000f && e.toneHz() < VirtualEngine.TONE_OPEN_HZ);
-        run(e, in, 0.45f);
+        assertEquals("还没点着", 0f, e.fire(), 0f);
+        assertEquals("发动机本来停着", 0f, e.rpm(), 0f);
+        run(e, in, 0.15f);
+        assertEquals(VirtualEngine.Phase.JOINING, e.phase());
+        assertEquals(0f, e.fire(), 0f);
+        assertEquals("带着转时不算断油", 0f, e.overrun(), 0f);
+        assertTrue("电机把它带起来了: " + e.rpm(), e.rpm() > 0.8f * VirtualEngine.continuousRpm(P, 60f, 0f));
+        run(e, in, 0.08f);
         assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
-        assertEquals(1f, e.fade(), 0f);
-        assertEquals(VirtualEngine.TONE_OPEN_HZ, e.toneHz(), 0f);
+        assertEquals(1f, e.fire(), 0f);
+        assertEquals("点着一次", 1, e.catchSerial());
+        assertTrue("点着那一下多冲一点", e.outputDb() - VirtualEngine.SPEED_GAIN_DB * VirtualEngine.speedCurve(P, 60f) > 1f);
+        float steady = VirtualEngine.continuousRpm(P, 60f, VirtualEngine.demand(25f));
+        float peak = 0f;
+        for (int i = 0; i < Math.round(0.5f / DT); i++) {
+            e.step(DT, in);
+            peak = Math.max(peak, e.rpm());
+        }
+        assertTrue("点着时补油冲一下: " + peak + " vs " + steady, peak > steady + 200f);
+        run(e, in, 1.5f);
+        assertEquals("回到该有的转速", steady, e.rpm(), 150f);
     }
 
     @Test
-    public void joiningWhileBrakingOnlyFadesIn() {
+    public void joiningWhileBrakingCatchesWithoutAFlare() {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 0f);
         in.braking = true;
         e.ignite(in);
-        assertEquals("不补转速", VirtualEngine.continuousRpm(P, 60f, 0f), e.rpm(), 1f);
+        float peak = 0f;
+        for (int i = 0; i < Math.round(1f / DT); i++) {
+            e.step(DT, in);
+            peak = Math.max(peak, e.rpm());
+        }
+        assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
+        assertEquals(1f, e.fire(), 0f);
+        assertTrue("不补转速: " + peak, peak < VirtualEngine.continuousRpm(P, 60f, 0f) + 50f);
     }
 
     @Test
@@ -199,6 +237,83 @@ public class VirtualEngineTest {
             e.step(DT, in);
         }
         assertTrue(e.gearIndex() >= natural);
+    }
+
+    // ================================================================= 熄火
+
+    /** 跑到停住、放完（最多 {@code limit} 秒）；返回 {停住的时刻, 放完的时刻, 往回升了几次}（秒；没到是 −1）。 */
+    private static float[] runDown(VirtualEngine e, VirtualEngine.Input in, float limit) {
+        float stoppedAt = -1f;
+        float t = 0f;
+        float prev = e.rpm();
+        int rises = 0;
+        while (!e.done() && t < limit) {
+            e.step(DT, in);
+            t += DT;
+            assertTrue("转速不会是负的", e.rpm() >= 0f);
+            assertEquals("熄着火", 0f, e.fire(), 0f);
+            if (e.rpm() > prev + 1f) {
+                rises++;
+            }
+            prev = e.rpm();
+            if (stoppedAt < 0f && e.rpm() <= 0f) {
+                stoppedAt = t;
+            }
+        }
+        return new float[] {stoppedAt, e.done() ? t : -1f, rises};
+    }
+
+    @Test
+    public void aParkedShutdownRunsDownLikeARealEngine() {
+        // 项目所有者 2026-10-22：停着切出运动模式要有熄火的效果，照车主偏好的那台机械增压 V8 —— 怠速约 0.7 秒停住，最后几圈一顿一顿
+        VirtualEngine e = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 3f);
+        assertEquals(P.idleRpm, e.rpm(), 50f);
+        e.shutdown(in);
+        assertEquals(VirtualEngine.Phase.STOPPING, e.phase());
+        assertEquals(0f, e.fire(), 0f);
+        assertFalse(e.done());
+        float[] r = runDown(e, in, 3f);
+        assertTrue("怠速约 0.7 秒停住: " + r[0], r[0] > 0.5f && r[0] < 0.95f);
+        assertTrue("停住以后再留一会儿才放完: " + r[1], r[1] - r[0] >= VirtualEngine.STOP_TAIL_SEC - DT);
+        assertTrue("最后几圈一顿一顿: " + r[2], r[2] >= 2f);
+        assertEquals(0f, e.overrun(), 0f);
+    }
+
+    @Test
+    public void stoppingWhileMovingIsQuickerAndQuiet() {
+        // 车在走：像混动车行驶中停发动机，电机帮着拖停
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 25f);
+        e.ignite(in);
+        run(e, in, 3f);
+        float from = e.rpm();
+        e.shutdown(in);
+        float[] r = runDown(e, in, 3f);
+        // 停着时从同样的转速落下来要多久（同一条式子，按停着的参数）
+        float parked = VirtualEngine.STOP_TAU * (float) Math.log(1.0 + from / (VirtualEngine.STOP_DECEL * VirtualEngine.STOP_TAU));
+        assertTrue("从 " + from + " rpm 停住: " + r[0] + " s，停着要 " + parked + " s", r[0] > 0f && r[0] < 0.8f * parked);
+        assertTrue(e.done());
+    }
+
+    @Test
+    public void aShutdownCanCutAStartAndIsNotRestarted() {
+        // 刚切进运动模式又切出去：还在起动机带着转就熄火
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 0.3f);
+        e.shutdown(in);
+        assertEquals(0f, e.starter(), 0f);
+        run(e, in, 0.2f);
+        float rpm = e.rpm();
+        e.shutdown(in);
+        e.step(DT, in);
+        assertTrue("再叫一遍不重来", e.rpm() <= rpm);
+        float[] r = runDown(e, in, 2f);
+        assertTrue(r[1] > 0f && r[1] < 1f);
     }
 
     // ================================================================= 挡位
@@ -272,10 +387,10 @@ public class VirtualEngineTest {
         stopped.ignite(inStopped);
         slow.ignite(inSlow);
         fast.ignite(inFast);
-        run(stopped, inStopped, 2f);
-        run(slow, inSlow, 2f);
-        run(fast, inFast, 2f);
-        assertEquals(0f, stopped.outputDb(), 0f);
+        run(stopped, inStopped, 3f);
+        run(slow, inSlow, 3f);
+        run(fast, inFast, 3f);
+        assertEquals("点着那一下多冲的早淡掉了", 0f, stopped.outputDb(), 0.01f);
         float more = fast.outputDb() - slow.outputDb();
         assertTrue("高速比低速稍响: " + more, more > 1f && more < VirtualEngine.SPEED_GAIN_DB);
     }
@@ -586,6 +701,8 @@ public class VirtualEngineTest {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 50f, 0f);
         e.ignite(in);
+        // 先让电机带起来、点着（带起来那一段转速本来就在怠速以下）
+        run(e, in, 0.3f);
         long seed = 12345L;
         for (int i = 0; i < 20_000; i++) {
             seed = seed * 6364136223846793005L + 1442695040888963407L;
