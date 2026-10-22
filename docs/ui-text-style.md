@@ -225,15 +225,7 @@
   四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
   vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。
 
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 盲区画面投 HUD（2026-10-21，车主定直接用 FerixzTanz 的做法和设置）：显示位置 set_side_view_target_title「显示位置」/ Show on / Papar pada，
+- 2026-10-22 批准（盲区画面投 HUD，2026-10-21 车主定直接用 FerixzTanz 的做法和设置）：显示位置 set_side_view_target_title「显示位置」/ Show on / Papar pada，
   三档 opt_side_view_target_center「中控屏」/ Center screen / Skrin tengah、opt_side_view_target_hud「HUD」、
   opt_side_view_target_both「中控屏和 HUD」/ Center screen and HUD / Skrin tengah dan HUD；分组 set_group_side_view_hud「HUD 画面」/ HUD picture / Gambar HUD；
   set_hud_mirror_title「左右翻转」、_summary「左右翻转画面，方向与车外后视镜一致」；set_hud_height_title「画面高度」、_summary「占 HUD 高度的百分比；宽度由「画面形状」决定」；
@@ -244,10 +236,19 @@
   set_hud_contrast_night_title「夜间对比度」、_summary「车辆处于夜间模式时使用；夜间画面较暗，数值过大会使画面整体变黑」；
   set_hud_night_title「夜间亮度」、_summary「车辆处于夜间模式时，在「画面透明度」的基础上按此比例调暗；100 为不调暗」；
   set_hud_fade_title「边缘渐隐」、_summary「画面四边渐隐的宽度，占短边的百分比；0 为硬边」。英文、马来文见 strings.xml。
-- 改已批的 set_side_view_min_speed_summary（HUD 不看最低车速）：「低于此车速时中控屏上不显示，HUD 不受此限；0 为不限」/
+- 2026-10-22 批准（HUD 不看最低车速，改已批的 set_side_view_min_speed_summary）：「低于此车速时中控屏上不显示，HUD 不受此限；0 为不限」/
   Not shown on the center screen below this speed (the HUD isn't affected); 0 means no limit /
   Tidak dipaparkan pada skrin tengah di bawah kelajuan ini (HUD tidak terjejas); 0 bermaksud tiada had。
   set_side_view_summary（「在屏幕该侧显示」）不改：HUD 也是一块屏，下面一行「显示位置」写明在哪。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 ---
 
 ## 10. 术语表
