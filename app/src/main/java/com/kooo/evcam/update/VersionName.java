@@ -62,8 +62,9 @@ public final class VersionName {
     /**
      * 这个版本号属不属于「beta 或正式版」这一档。
      *
-     * <p>检查更新只推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
-     * 拿它去覆盖一台正在用的车机不合适。</p>
+     * <p>检查更新默认推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
+     * 不问一声就拿它去覆盖一台正在用的车机不合适 —— 要 alpha 得在设置里打开「接收 Alpha 版」
+     * （{@link #isAlphaBetaOrRelease}）。</p>
      *
      * <p>后缀既不是空也不是 beta 的一律不算 —— 包括 rc。真要发 rc，
      * 得在这里明确加上，而不是靠「看起来比 beta 新」这种默认。</p>
@@ -78,6 +79,19 @@ public final class VersionName {
             return true;
         }
         return parts[1].toLowerCase(java.util.Locale.US).startsWith("beta");
+    }
+
+    /**
+     * 这个版本号属不属于「alpha、beta 或正式版」：设置里打开了「接收 Alpha 版」（项目所有者 2026-10-23，默认关）
+     * 时检查更新认这一档。后缀照样只认这三种，rc 之类不算。
+     */
+    public static boolean isAlphaBetaOrRelease(String version) {
+        if (isBetaOrRelease(version)) {
+            return true;
+        }
+        String[] parts = splitCore(version);
+        return numbers(parts[0]).length > 0
+                && parts[1].toLowerCase(java.util.Locale.US).startsWith("alpha");
     }
 
     /**

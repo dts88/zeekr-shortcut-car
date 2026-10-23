@@ -167,59 +167,53 @@
             android:summary="@string/set_rearview_guide_summary" />
 
         <!--
-          超级镜子（2026-10-23 整理，开关加附加项）：开着时下面一排「方向标签」「点按切换」（原来各占一行）。
-          点按切换打开时提示一句怎么点（SettingsPreferenceFragment.bindRearView）
+          超级镜子（2026-10-23 整理）：这一页不分组（项目所有者删掉了四个小标题）。总开关一行，开着时下面「方向标签」（附加项）
         -->
         <com.kooo.evcam.settings.SwitchChipsPreference
             android:key="pref_rearview"
             android:title="@string/set_section_rearview"
             android:summary="@string/set_rearview_summary" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_views">
+        <!-- 切换范围：三档，摆在行里点一次（项目所有者 2026-10-19，取代「只显示前后视」开关） -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_rearview_views"
+            android:dependency="pref_rearview"
+            android:title="@string/set_rearview_views_title" />
 
-            <!-- 切换范围：三档，摆在行里点一次（项目所有者 2026-10-19，取代「只显示前后视」开关） -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_rearview_views"
-                android:dependency="pref_rearview"
-                android:title="@string/set_rearview_views_title" />
-        </PreferenceCategory>
+        <!--
+          切换方式：滑动切换 / 点按切换，二选一，默认滑动切换（项目所有者 2026-10-23；原来的「按键模式」开关 ——
+          点按切换时横划不换路，两样本来就只能用一样）。存的还是那个开关（AppConfig.isRearViewButtonMode）
+        -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_rearview_switch_mode"
+            android:dependency="pref_rearview"
+            android:title="@string/set_rearview_switch_mode_title" />
 
-        <PreferenceCategory
-            android:title="@string/set_rearview_fisheye_title">
+        <!-- 鱼眼校正（2026-10-23 和视野角度合成一行，开关加下一层）：行尾写视野角度，点这一行在框里拖 -->
+        <com.kooo.evcam.settings.SwitchNavPreference
+            android:key="pref_rearview_fisheye"
+            android:dependency="pref_rearview"
+            android:title="@string/set_rearview_fisheye_title"
+            android:summary="@string/set_rearview_fisheye_summary" />
 
-            <!-- 鱼眼校正（2026-10-23 和视野角度合成一行，开关加下一层）：行尾写视野角度，点这一行在框里拖 -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_rearview_fisheye"
-                android:dependency="pref_rearview"
-                android:title="@string/set_rearview_fisheye_title"
-                android:summary="@string/set_rearview_fisheye_summary" />
-        </PreferenceCategory>
+        <!--
+          窗口（2026-10-23 宽度、高度、重置合成一行，值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调
+          （zeekr.RearViewWindowEditor），行尾「重置」= 原来的「重置窗口与画面」（先问一句）
+        -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_rearview_window"
+            android:dependency="pref_rearview"
+            android:title="@string/set_group_window"
+            android:summary="@string/set_rearview_window_summary" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_window">
-
-            <!--
-              窗口（2026-10-23 宽度、高度、重置合成一行，值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调
-              （zeekr.RearViewWindowEditor），行尾「重置」= 原来的「重置窗口与画面」（先问一句）
-            -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_rearview_window"
-                android:dependency="pref_rearview"
-                android:title="@string/set_group_window"
-                android:summary="@string/set_rearview_window_summary" />
-        </PreferenceCategory>
-
-        <!-- 盲区画面：单独的窗口，不挂在超级镜子的开关下面 —— 两个窗口各管各的（项目所有者 2026-10-16） -->
-        <PreferenceCategory
-            android:title="@string/set_side_view_title">
-
-            <!-- 2026-10-23 起开关加下一层：行尾写显示位置，点这一行进下面的「盲区画面」页 -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_side_view"
-                android:title="@string/set_side_view_title"
-                android:summary="@string/set_side_view_summary" />
-        </PreferenceCategory>
+        <!--
+          盲区画面：单独的窗口，不挂在超级镜子的开关下面 —— 两个窗口各管各的（项目所有者 2026-10-16）。
+          2026-10-23 起开关加下一层：行尾写显示位置，点这一行进下面的「盲区画面」页
+        -->
+        <com.kooo.evcam.settings.SwitchNavPreference
+            android:key="pref_side_view"
+            android:title="@string/set_side_view_title"
+            android:summary="@string/set_side_view_summary" />
 
         <!--
           盲区画面的下一层（2026-10-23）：嵌在分区里的 PreferenceScreen 不在上一层列成一行，只从它那一行进
@@ -655,6 +649,16 @@
             android:key="pref_update_beta"
             android:title="@string/set_update_beta_title"
             android:summary="@string/set_update_beta_summary" />
+
+        <!--
+          接收 Alpha 版（项目所有者 2026-10-23，默认关）：随「接收 Beta 版」—— 正式版、Beta、Alpha 一档比一档新、一档比一档没验证过，
+          要 Alpha 先得要 Beta（update.GithubReleases）
+        -->
+        <SwitchPreferenceCompat
+            android:key="pref_update_alpha"
+            android:dependency="pref_update_beta"
+            android:title="@string/set_update_alpha_title"
+            android:summary="@string/set_update_alpha_summary" />
     </PreferenceScreen>
 
     <!--

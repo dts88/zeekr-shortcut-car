@@ -284,17 +284,7 @@
   「推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。」/
   「A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car; any recording after that goes to the drive on the USB-A port.」/
   「Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta; sebarang rakaman selepas itu disimpan ke pemacu pada port USB-A.」。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 2026-10-23（设置整理第三轮：超级镜子页，ui-spec §十一）：
-  - set_rearview_button_mode_title 改名「点按切换」/「Tap to switch」/「Ketik untuk tukar」（原「按键模式」）；
-    打开时用已批的 set_rearview_button_mode_summary 提示一句。
+- 2026-10-23 批准（设置整理第三轮：超级镜子页，ui-spec §十一）：
   - 鱼眼校正一行的行尾 set_rearview_fisheye_value「视野 %1$d°」/「Field of view %1$d°」/「Medan pandangan %1$d°」；
     拖动条框的标题和说明用已批的 set_rearview_fov_title、set_rearview_fov_summary。
   - 窗口一行：标题用已批的 set_group_window「窗口」；说明 set_rearview_window_summary「画面比例不变，窗口形状只决定可见范围」
@@ -303,12 +293,29 @@
     「宽度 %1$d 像素 · 高度 %2$d 像素」（写法是项目所有者定的）/「Width %1$d px · Height %2$d px」/「Lebar %1$d px · Tinggi %2$d px」；
     按钮 action_reset「重置」/「Reset」/「Set semula」；先问的那一句 dlg_rearview_reset_title「重置窗口与画面？」/
     「Reset window and view?」/「Set semula tetingkap dan paparan?」，正文用已批的 set_rearview_reset_summary。
-  - 窗口编辑框上面的提示 rearview_editor_hint「拖动边或角调整宽度和高度，也可以双指缩放。拖动框内可以移动，位置不保存。」/
+  - 窗口编辑框下面的提示 rearview_editor_hint「拖动边或角调整宽度和高度，也可以双指缩放。拖动框内可以移动，位置不保存。」/
     「Drag an edge or corner to change the width and height, or pinch with two fingers. Drag inside the frame to move it;
     the position is not saved.」/「Seret tepi atau sudut untuk menukar lebar dan tinggi, atau cubit dengan dua jari.
     Seret di dalam bingkai untuk mengalihkannya; kedudukan tidak disimpan.」；按钮用已有的「取消」「保存」，框里的宽高同行尾。
   - 删掉：set_rearview_width_title、set_rearview_height_title、set_rearview_height_summary、set_rearview_reset_title、
-    set_rearview_camera_label_summary（方向标签成了附加项，没有说明）。
+    set_rearview_camera_label_summary（方向标签成了附加项，没有说明）、set_rearview_button_mode_title（换成切换方式）、
+    set_group_views（这一页不分组）。
+  - 切换方式的两个选项是项目所有者定的名字：opt_rearview_switch_swipe「滑动切换」/「Swipe」/「Leret」、
+    opt_rearview_switch_tap「点按切换」/「Tap」/「Ketik」；选到点按切换时用已批的 set_rearview_button_mode_summary 提示一句。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- 2026-10-23（超级镜子页切换方式那一行的名字、检查更新加「接收 Alpha 版」）：
+  - set_rearview_switch_mode_title「切换方式」/「Switch views by」/「Tukar paparan dengan」（两个选项见上面已批的那一条）。
+  - set_update_alpha_title「接收 Alpha 版」/「Include alpha releases」/「Termasuk keluaran alpha」；
+    set_update_alpha_summary「Alpha 版是开发中的测试版本，可能不稳定」/「Alpha releases are test builds still in development
+    and may be unstable」/「Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil」。
+    随「接收 Beta 版」：Beta 关着时这一行不可用（说明里不另写）。
 
 ---
 

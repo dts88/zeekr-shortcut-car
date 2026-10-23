@@ -53,12 +53,15 @@ public final class UpdateFlow {
         }
         AlertDialog checking = message(activity,
                 activity.getString(R.string.upd_checking), false);
-        final boolean includeBeta = new com.kooo.evcam.AppConfig(activity).isUpdateBetaEnabled();
+        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(activity);
+        final boolean includeBeta = config.isUpdateBetaEnabled();
+        // 「接收 Alpha 版」随「接收 Beta 版」：Beta 关着时它不算数
+        final boolean includeAlpha = includeBeta && config.isUpdateAlphaEnabled();
         new Thread(() -> {
             GithubReleases.Release release = null;
             String error = null;
             try {
-                release = GithubReleases.fetchLatest(includeBeta, currentVersion(activity));
+                release = GithubReleases.fetchLatest(includeBeta, includeAlpha, currentVersion(activity));
             } catch (Exception e) {
                 AppLog.w(TAG, "检查更新失败", e);
                 error = failureText(activity, e,

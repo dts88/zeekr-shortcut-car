@@ -80,6 +80,7 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FRONT_REAR_LEGACY = "rearview_front_rear";
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
+    private static final String KEY_UPDATE_ALPHA = "update_include_alpha";  // 检查更新是否接收 Alpha 版
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     // 盲区画面：打转向灯时显示该侧的摄像头画面（zeekr.SideViewService）
     private static final String KEY_SIDE_VIEW_ENABLED = "side_view_enabled";      // 开关
@@ -1482,7 +1483,7 @@ public class AppConfig {
 
     /**
      * 检查更新时接不接收 Beta 版。默认接收：现在发出去的除了 alpha 就是 beta，
-     * 默认关掉等于「永远没有更新」。关掉之后只推正式版。alpha 无论如何都不推。
+     * 默认关掉等于「永远没有更新」。关掉之后只推正式版。alpha 只在「接收 Alpha 版」也开着时推（{@link #isUpdateAlphaEnabled}）。
      */
     public boolean isUpdateBetaEnabled() {
         return prefs.getBoolean(KEY_UPDATE_BETA, true);
@@ -1492,9 +1493,21 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_UPDATE_BETA, enabled).apply();
     }
 
-    /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */
+    /**
+     * 检查更新时接不接收 Alpha 版（项目所有者 2026-10-23）。默认不接收：alpha 是开发过程里发的，没验证过。
+     * 只在「接收 Beta 版」也开着时算数（update.UpdateFlow）—— 一档比一档新，要 Alpha 先得要 Beta。
+     */
+    public boolean isUpdateAlphaEnabled() {
+        return prefs.getBoolean(KEY_UPDATE_ALPHA, false);
+    }
+
+    public void setUpdateAlphaEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_UPDATE_ALPHA, enabled).apply();
+    }
+
+    /** 录制时减少装饰性动效（编码器在用 GPU，界面不跟它抢）。默认关（项目所有者 2026-10-23；原来默认开）。 */
     public boolean isReduceMotionWhileRecording() {
-        return prefs.getBoolean(KEY_REDUCE_MOTION_RECORDING, true);
+        return prefs.getBoolean(KEY_REDUCE_MOTION_RECORDING, false);
     }
 
     public void setReduceMotionWhileRecording(boolean on) {
