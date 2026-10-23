@@ -310,67 +310,32 @@
         android:key="screen_floating"
         android:title="@string/set_section_floating">
 
-        <SwitchPreferenceCompat
+        <!--
+          悬浮按钮（2026-10-23 整理）：这一页不分组。总开关一行，开着时下面「显示录制时长」「锁定位置」两个附加项（原来各占一行）
+        -->
+        <com.kooo.evcam.settings.SwitchChipsPreference
             android:key="pref_recording_floating"
             android:title="@string/set_section_floating"
             android:summary="@string/set_recording_floating_summary" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_behavior">
+        <ListPreference
+            android:key="pref_floating_tap"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_tap_title" />
 
-            <ListPreference
-                android:key="pref_floating_tap"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_tap_title" />
+        <ListPreference
+            android:key="pref_floating_long_press"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_floating_long_press_title" />
 
-            <ListPreference
-                android:key="pref_floating_long_press"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_long_press_title" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:title="@string/set_group_appearance">
-
-            <SeekBarPreference
-                android:key="pref_button_size"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_button_size_title"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_floating_alpha"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_alpha_title"
-                app:showSeekBarValue="true" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_floating_duration"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_duration_title"
-                android:summary="@string/set_floating_duration_summary" />
-
-            <SeekBarPreference
-                android:key="pref_button_text_size"
-                android:dependency="pref_floating_duration"
-                android:title="@string/set_button_text_size_title"
-                app:showSeekBarValue="true" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:title="@string/set_group_position">
-
-            <SwitchPreferenceCompat
-                android:key="pref_floating_lock"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_lock_title"
-                android:summary="@string/set_floating_lock_summary" />
-
-            <Preference
-                android:key="pref_reset_floating"
-                android:title="@string/set_reset_floating_title"
-                android:summary="@string/set_reset_floating_summary" />
-        </PreferenceCategory>
+        <!--
+          外观（2026-10-23 按钮大小、透明度、时长文字大小合成一行，值加一个按钮）：行尾写大小和透明度，点这一行在一个框里拖、
+          按钮当场跟着变（SliderDialog）；行尾「重置」= 原来的「重置悬浮按钮」，位置也回去，所以先问一句
+        -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_floating_appearance"
+            android:dependency="pref_recording_floating"
+            android:title="@string/set_group_appearance" />
     </PreferenceScreen>
 
     <!-- ==================== 界面 ==================== -->
@@ -383,43 +348,32 @@
             android:title="@string/set_language_title"
             android:summary="%s" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_main_screen">
+        <!-- 2026-10-23 起这一页不分组 -->
+        <!-- 两个选项：摆在行里点一次，不弹框 -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_rail_side"
+            android:title="@string/set_rail_side_title"
+            android:summary="@string/set_rail_side_summary" />
 
-            <!-- 两个选项：摆在行里点一次，不弹框 -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_rail_side"
-                android:title="@string/set_rail_side_title"
-                android:summary="@string/set_rail_side_summary" />
+        <SwitchPreferenceCompat
+            android:key="pref_recording_stats"
+            android:title="@string/set_recording_stats_title"
+            android:summary="@string/set_recording_stats_summary" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_recording_stats"
-                android:title="@string/set_recording_stats_title"
-                android:summary="@string/set_recording_stats_summary" />
+        <SwitchPreferenceCompat
+            android:key="pref_reduce_motion"
+            android:title="@string/set_reduce_motion_title"
+            android:summary="@string/set_reduce_motion_summary" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_reduce_motion"
-                android:title="@string/set_reduce_motion_title"
-                android:summary="@string/set_reduce_motion_summary" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:title="@string/set_rearview_fisheye_title">
-
-            <!--
-              鱼眼校正的两项：开关在图片回看的右上角，这里只管「怎么校正」。
-              两种投影的视野上限不同，所以换投影时滑块要重新绑一次。
-            -->
-            <ListPreference
-                android:key="pref_fisheye_projection"
-                android:title="@string/set_fisheye_projection_title" />
-
-            <SeekBarPreference
-                android:key="pref_fisheye_fov"
-                android:title="@string/set_fisheye_fov_title"
-                android:summary="@string/set_fisheye_fov_summary"
-                app:showSeekBarValue="true" />
-        </PreferenceCategory>
+        <!--
+          鱼眼校正（2026-10-23 校正方式和校正视野合成一行）：管主界面预览、照片回放、录像回放里那个鱼眼按钮怎么校正
+          （开关在那个按钮上，这里只管「怎么校正」）。行尾写方式和视野；点这一行，框里选方式、拖视野 ——
+          两种投影的视野上限不同，拖动条跟着方式变
+        -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_fisheye"
+            android:title="@string/set_rearview_fisheye_title"
+            android:summary="@string/set_fisheye_scope_summary" />
     </PreferenceScreen>
 
     <!-- ==================== 系统 ==================== -->
@@ -484,28 +438,23 @@
                 android:title="@string/set_force_h264_title"
                 android:summary="@string/set_force_h264_summary" />
 
-            <!-- 熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善 -->
-            <SwitchPreferenceCompat
+            <!--
+              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善。
+              2026-10-23 和时长上限合成一行（开关加下一层）：行尾写最长多久，点这一行填小时数
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_screen_off_recording"
                 android:title="@string/set_screen_off_title"
                 android:summary="@string/set_screen_off_summary" />
 
-            <EditTextPreference
-                android:key="pref_screen_off_wake_hours"
-                android:dependency="pref_screen_off_recording"
-                android:title="@string/set_screen_off_wake_title" />
-
-            <!-- 录制声音（试验，项目所有者 2026-10-20 定先做框架、上车比来源）：只给环视录像 -->
-            <SwitchPreferenceCompat
+            <!--
+              录制声音（试验，项目所有者 2026-10-20 定先做框架、上车比来源）：只给环视录像。
+              2026-10-23 和麦克风来源合成一行（开关加下一层）：行尾写来源，点这一行选
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_footage_audio"
                 android:title="@string/dev_footage_audio_title"
                 android:summary="@string/dev_footage_audio_summary" />
-
-            <ListPreference
-                android:key="pref_footage_audio_source"
-                android:dependency="pref_footage_audio"
-                android:title="@string/dev_footage_audio_source_title"
-                android:summary="%s" />
 
             <!-- 应用水印（2026-10-23 从录制页挪来）：固定开着、点不动，只是摆出来让人知道录像和照片上有这一行字 -->
             <SwitchPreferenceCompat
@@ -514,49 +463,53 @@
                 android:summary="@string/set_watermark_brand_summary" />
         </PreferenceCategory>
 
-        <!-- 主界面（2026-10-23）：车辆状态从界面页挪来 -->
+        <!-- 试验性功能（2026-10-23：原来各占一组、一组一行的两项并在一起） -->
         <PreferenceCategory
-            android:title="@string/set_group_main_screen">
+            android:title="@string/set_group_experiments">
 
+            <!-- 车辆状态（2026-10-23 从界面页挪来） -->
             <SwitchPreferenceCompat
                 android:key="pref_vehicle_status"
                 android:title="@string/set_vehicle_status_title"
                 android:summary="@string/set_vehicle_status_summary" />
-        </PreferenceCategory>
 
-        <!-- 模拟声浪（试验，项目所有者 2026-10-21）：只在车内、只在运动模式出声（sound.DriveSound） -->
-        <PreferenceCategory
-            android:title="@string/dev_drive_sound_group">
-
-            <SwitchPreferenceCompat
+            <!--
+              模拟声浪（试验，项目所有者 2026-10-21）：只在车内、只在运动模式出声（sound.DriveSound）。
+              2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进下面的「模拟声浪」页
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_drive_sound"
                 android:title="@string/dev_drive_sound_title"
                 android:summary="@string/dev_drive_sound_summary" />
+        </PreferenceCategory>
+
+        <!--
+          模拟声浪的下一层（嵌着的 PreferenceScreen，上一层不列成一行，见 SettingsPreferenceFragment.hideSubPages）。
+          和开关不在同一页，不写 dependency
+        -->
+        <PreferenceScreen
+            android:key="screen_drive_sound"
+            android:title="@string/dev_drive_sound_group">
 
             <ListPreference
                 android:key="pref_drive_sound_volume"
-                android:dependency="pref_drive_sound"
                 android:title="@string/dev_drive_sound_volume_title"
                 android:summary="%s" />
 
             <ListPreference
                 android:key="pref_drive_sound_rpm"
-                android:dependency="pref_drive_sound"
                 android:title="@string/dev_drive_sound_rpm_title"
                 android:summary="%s" />
-        </PreferenceCategory>
+        </PreferenceScreen>
 
         <PreferenceCategory
             android:title="@string/set_group_cameras">
 
-            <Preference
+            <!-- 画面调节（2026-10-23 和恢复默认值合成一行，值加一个按钮）：点这一行打开调节窗口，行尾「重置」 -->
+            <com.kooo.evcam.settings.ValueActionPreference
                 android:key="pref_image_adjust"
                 android:title="@string/set_image_adjust_title"
                 android:summary="@string/set_image_adjust_summary" />
-
-            <Preference
-                android:key="pref_image_adjust_reset"
-                android:title="@string/set_image_adjust_reset_title" />
 
             <Preference
                 android:key="pref_camera_mapping"
@@ -568,6 +521,14 @@
                 android:key="pref_camera_holder_suspects"
                 android:title="@string/dev_camera_suspects_title"
                 android:summary="@string/dev_camera_suspects_summary" />
+
+            <!--
+              盲区画面标定（2026-10-23 三根拖动条合成一行）：每一路画面的朝向是猜的，上车标定之后再定默认值
+              （AppConfig.SIDE_VIEW_DEFAULT_*）。行尾写三个角度，点这一行在一个框里拖，盲区画面跟着变（SliderDialog）
+            -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_side_view_calibration"
+                android:title="@string/dev_side_view_calibration_title" />
         </PreferenceCategory>
 
         <PreferenceCategory
@@ -587,29 +548,6 @@
                 android:key="pref_raw_frame_dump"
                 android:title="@string/dev_raw_frame_title"
                 android:summary="@string/dev_raw_frame_summary" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:title="@string/set_side_view_title">
-
-            <!-- 盲区画面的标定角度：每一路画面的朝向是猜的，上车标定之后再定默认值（AppConfig.SIDE_VIEW_DEFAULT_*） -->
-            <SeekBarPreference
-                android:key="pref_side_view_back"
-                android:title="@string/dev_side_view_back_title"
-                android:summary="@string/dev_side_view_back_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_side_view_up"
-                android:title="@string/dev_side_view_up_title"
-                android:summary="@string/dev_side_view_up_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_side_view_fov"
-                android:title="@string/dev_side_view_fov_title"
-                android:summary="@string/dev_side_view_fov_summary"
-                app:showSeekBarValue="true" />
         </PreferenceCategory>
 
         <PreferenceCategory

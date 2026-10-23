@@ -316,7 +316,25 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-10-23（设置整理第四轮：悬浮按钮、界面、开发者选项，ui-spec §十一）：
+  - 悬浮按钮：「外观」那一行用已批的 set_group_appearance；行尾 set_floating_appearance_value「%1$d dp · %2$d%%」
+    （三种语言一样）；框里三根用已批的「按钮大小」「按钮透明度」「时长文字大小」；先问的那一句 dlg_floating_reset_title
+    「重置悬浮按钮？」/「Reset floating button?」/「Set semula butang terapung?」，正文用已批的 set_reset_floating_summary。
+    附加项用已批的「显示录制时长」「锁定位置」。删掉：set_group_behavior、set_group_position、set_reset_floating_title、
+    set_floating_duration_summary、set_floating_lock_summary（成了附加项，没有说明）。
+  - 界面：鱼眼校正一行的说明 set_fisheye_scope_summary「用于主界面预览、照片回放和录像回放」/「Applies to the live preview,
+    photos and videos」/「Untuk pratonton langsung, foto dan video」（取自已批的 set_fisheye_projection_summary 后半句）；
+    行尾 set_fisheye_value「%1$s · %2$d°」（三种语言一样）；框里拖动条用已批的「校正视野」和它的说明。
+    删掉：set_fisheye_projection_title、set_fisheye_projection_summary、set_group_main_screen（界面、开发者选项都不再有这一组）。
+  - 开发者选项：组名 set_group_experiments「试验性功能」/「Experimental」/「Percubaan」；
+    熄屏录制行尾 set_screen_off_wake_value「最长 %1$s 小时」/「Up to %1$s h」/「Sehingga %1$s jam」，
+    改已批的 set_screen_off_summary（「下方」没有了）——「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长不超过设定的时长」/
+    「…keep the head unit awake for up to the set time」/「…sehingga tempoh yang ditetapkan」；
+    录制声音行尾的短名字 dev_footage_audio_source_raw_short「原始」/「Raw」/「Asal」、dev_footage_audio_source_call_short
+    「通话」/「Call」/「Panggilan」；模拟声浪行尾 dev_drive_sound_value「%1$s · %2$s」（三种语言一样）；
+    dev_side_view_calibration_title「盲区画面标定」/「Blind spot view calibration」/「Kalibrasi paparan titik buta」，
+    行尾 dev_side_view_calibration_value「朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°」/「Back %1$d° · Out %2$d° · Field %3$d°」/
+    「Belakang %1$d° · Luar %2$d° · Medan %3$d°」。删掉：set_image_adjust_reset_title（成了行尾的「重置」）。
 
 ---
 
