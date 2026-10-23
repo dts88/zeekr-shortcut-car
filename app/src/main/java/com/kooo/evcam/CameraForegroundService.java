@@ -9,6 +9,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -140,8 +141,8 @@ public class CameraForegroundService extends Service {
         Notification notification = buildNotification(this,
                 coordinator.notificationTitle(), coordinator.notificationContent());
 
-        // 启动前台服务
-        startForeground(NOTIFICATION_ID, notification);
+        // 启动前台服务（录制声音开着时试着带上麦克风类型，见 startForegroundWithSound）
+        startForegroundWithSound(notification);
 
         // 这一次 start 时主界面在前：从此能用相机（只升不降，见 startedWhileVisible）
         if (com.kooo.evcam.camera.StallWatch.isForeground()) {
@@ -153,6 +154,43 @@ public class CameraForegroundService extends Service {
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
 
         return stickiness(this);
+    }
+
+    /** 前台服务此刻带的类型（诊断报告读）：照清单（平时）、相机 + 麦克风，或者带不上麦克风的原因。 */
+    private static volatile String foregroundTypes = "-";
+    /** 带不上麦克风类型这件事这个进程里记过黑匣子了：每次叫起来都会再试，只记一次。 */
+    private static volatile boolean microphoneRefusedNoted;
+
+    /** 前台服务此刻带的类型（诊断报告）。 */
+    public static String foregroundTypes() {
+        return foregroundTypes;
+    }
+
+    /**
+     * 起前台。平时和以前一模一样（照清单里的类型）。开发者选项「录制声音」开着、又有录音权限时，试着带上麦克风类型 ——
+     * 安卓 11 起后台用麦克风要它；带不上（清单里没声明这个类型；容器里 CarPiano 也见过这个报错）就照旧起，记一行：
+     * 熄屏、后台时可能录不到声音（诊断报告里看录音那一节有没有连着全是 0）。
+     */
+    private void startForegroundWithSound(Notification notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && com.kooo.evcam.camera.FootageAudio.sourceFor(this, new AppConfig(this)) != null) {
+            try {
+                startForeground(NOTIFICATION_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+                foregroundTypes = "camera|microphone";
+                return;
+            } catch (RuntimeException e) {
+                foregroundTypes = "manifest (microphone refused: " + e.getClass().getSimpleName() + ")";
+                if (!microphoneRefusedNoted) {
+                    microphoneRefusedNoted = true;
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务带不上麦克风类型（" + e
+                            + "）：照旧起，熄屏、后台时可能录不到声音");
+                }
+            }
+        } else {
+            foregroundTypes = "manifest";
+        }
+        startForeground(NOTIFICATION_ID, notification);
     }
 
     /** 黑匣子心跳间隔：一分钟看一次。 */

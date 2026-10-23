@@ -56,6 +56,8 @@ public class ChannelSchedulerTest {
     private final List<String> told = new ArrayList<>();
     /** 交给相机步骤统计的每一条（Journal.recorded）。 */
     private final List<ChannelScheduler.StepRecord> records = new ArrayList<>();
+    /** 调度告诉录像那一侧「谁要它」变了的那几路（Recording.onLaneWantersChanged）。 */
+    private final List<String> wantersChanged = new ArrayList<>();
     /** 关座舱时环视那几行（Journal.coupling）。 */
     private final List<ChannelScheduler.Coupling> couplings = new ArrayList<>();
     private final FakePort surround = new FakePort("2");
@@ -570,6 +572,48 @@ public class ChannelSchedulerTest {
     }
 
     /**
+     * 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱）：黑满 30 秒放开座舱的同一刻，调度报一次
+     * 「前座舱去掉了」；之后亮屏，后座舱照一般的规矩开回来接着录，前座舱录像计划里还写着也不再开。
+     */
+    @Test
+    public void withTheOneShotRuleOnlyTheFrontCabinIsRetiredAndTheRearComesBackWhenLit() {
+        host.frontCabinOneShot = true;
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        assertTrue("黑了不到 30 秒：还没去掉", host.retired.isEmpty());
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList(FRONT), host.retired);
+        at(1_000 + ChannelRules.HOLD_MS + 120);
+        closed(surround);
+        settle();
+        assertEquals("两路座舱照旧熄屏放开", Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        at(1_000 + ChannelRules.HOLD_MS + 220);
+        closed(rear);
+        closed(front);
+        settle();
+        opened(surround);
+        frame(surround);
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS + 5_000);
+        host.goLit();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS + 20_000);
+        assertEquals("亮屏：后座舱开回来接着录", Arrays.asList("close dark-release", "open [RECORD]"), rear.actions);
+        assertEquals("前座舱不再开", Arrays.asList("close dark-release"), front.actions);
+        assertEquals("只报一次", Arrays.asList(FRONT), host.retired);
+    }
+
+    /**
      * 座舱的每一次关都记下关的时候环视怎样、关了多久（R3「关座舱时先短暂关环视」要比的就是它）。2.11.6 起能用相机时环视先关，
      * 座舱那两条记「环视关着」（{@link #replay1014_aDarkReleaseClosesTheSurroundFirstAndItRejoinsTheRecording}）；这里此刻用不了相机
      * （主界面在后台、前台服务是后台起的），座舱照旧在出画面的环视旁边关。
@@ -686,6 +730,92 @@ public class ChannelSchedulerTest {
         assertEquals(ChannelRules.Move.RESCUE, couple.coupling.surround.ours);
         assertEquals("座舱关着，一步没动", Arrays.asList("close dark-release"), rear.actions);
         assertEquals(Arrays.asList("close dark-release"), front.actions);
+    }
+
+    // ================================================================= 画布算到关完（2026-10-20 审查，车主批）
+
+    /**
+     * 关一开始会话快照就清了，相机还在关：这期间画布还算挂在这一路上，交给这一份调度、关完才放（以前当场就不算了，
+     * 退出、重建时画布在关完之前被放掉）。
+     */
+    @Test
+    public void aCanvasStaysCarriedUntilItsCameraHasClosed() {
+        host.foregroundService = false;   // 没有前台服务就不保持：没人要当场关
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        assertTrue(s.sessionCarries(SUR, mirror));
+        drop(Holder.MIRROR);
+        settle();
+        assertEquals(1, surround.actions.size());
+        assertTrue(surround.actions.get(0), surround.actions.get(0).startsWith("close "));
+        assertTrue("快照清了，相机还在关：还带着", s.sessionCarries(SUR, mirror));
+        at(300);
+        closed(surround);
+        settle();
+        assertFalse("关完了：不带着了", s.sessionCarries(SUR, mirror));
+    }
+
+    // ================================================================= 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）
+
+    /**
+     * 配置里只开环视，管线为后视镜建了后座舱（不算启用的）。切换范围换到「后视 + 后座舱」：后座舱为后视镜开，会话里只带后视镜的画布；
+     * 换出这一档：它没人要了，保持 30 秒，到点照「关座舱前先关环视」—— 环视给后视镜开着，先关环视、再关后座舱、环视开回来。
+     */
+    @Test
+    public void theRearCabinViewOpensTheCabinForTheMirrorAndHoldsItWhenLeft() {
+        surroundOnly();
+        Out mirrorS = new Out(Kind.MIRROR, "mirror-2");
+        Out mirrorR = new Out(Kind.MIRROR, "mirror-1");
+        claim(Holder.MIRROR);
+        streaming(surround, mirrorS);
+        declare(rear, mirrorR);
+        settle();
+        assertTrue("切换范围不含后座舱：后视镜只要环视", rear.actions.isEmpty());
+
+        host.mirrorCabin = true;
+        s.wake();
+        settle();
+        assertEquals("换到这一档：后座舱为后视镜开，只带后视镜的画布", Arrays.asList("open [MIRROR]"), rear.actions);
+        assertEquals(EnumSet.of(Holder.MIRROR), view(s.snapshot(), REAR).wantedBy);
+        at(300);
+        opened(rear);
+        frame(rear);
+        settle();
+        assertEquals(ChannelRules.Condition.STREAMING, s.condition(REAR));
+
+        at(1_000);
+        host.mirrorCabin = false;
+        s.wake();
+        settle();
+        long expiry = 1_000 + ChannelRules.HOLD_MS;
+        at(expiry - 1);
+        assertEquals("换出这一档：没人要了，保持 30 秒内不动", Arrays.asList("open [MIRROR]"), rear.actions);
+        assertTrue(surround.actions.isEmpty());
+        at(expiry);
+        assertEquals("保持到点：先关环视", Arrays.asList("close surround-first"), surround.actions);
+        at(expiry + 150);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]", "close hold-over"), rear.actions);
+        at(expiry + 250);
+        closed(rear);
+        settle();
+        assertEquals("环视开回来给后视镜", Arrays.asList("close surround-first", "open [MIRROR]"), surround.actions);
+    }
+
+    /** 后视镜没登记着（贴边、熄屏、窗口关了）：切换范围是「后视 + 后座舱」也不为它开后座舱。 */
+    @Test
+    public void theRearCabinViewWantsNothingWhileTheMirrorIsNotClaimed() {
+        surroundOnly();
+        host.mirrorCabin = true;
+        declare(rear, new Out(Kind.MIRROR, "mirror-1"));
+        settle();
+        at(5_000);
+        assertTrue(rear.actions.isEmpty());
+        assertTrue(surround.actions.isEmpty());
+        assertTrue(view(s.snapshot(), REAR).wantedBy.isEmpty());
     }
 
     // ================================================================= 关座舱前先关环视（项目所有者 2026-10-15 定，2.11.6）
@@ -1220,13 +1350,20 @@ public class ChannelSchedulerTest {
         assertTrue("座舱不受影响", rear.actions.isEmpty() && front.actions.isEmpty());
     }
 
-    /** 相机层自己丢的录像输出（会话配不上、消费者被收走）：当场告诉；别的输出不归录像管。 */
+    /**
+     * 相机层自己丢的输出（会话配不上、消费者被收走）：录像、盲区画面、超级镜子当场告诉声明它的那一侧（盲区画面、超级镜子收到
+     * 「配不上」撤回，调度就不会一直想把它加回去）；预览不告诉。
+     */
     @Test
-    public void aRecordOutputTheCameraDroppedIsReportedAtOnce() {
+    public void anOutputTheCameraDroppedIsReportedAtOnce() {
         settle();
         s.onOutputDropped("2", recS, SingleCamera.Drop.CONFIG_FAILED);
+        s.onOutputDropped("2", new Out(Kind.SIDE, "side-2"), SingleCamera.Drop.CONFIG_FAILED);
+        s.onOutputDropped("2", new Out(Kind.HUD, "hud-2"), SingleCamera.Drop.CONFIG_FAILED);
+        s.onOutputDropped("2", new Out(Kind.MIRROR, "mirror-2"), SingleCamera.Drop.CONFIG_FAILED);
         s.onOutputDropped("2", pvS, SingleCamera.Drop.RELEASED);
-        assertEquals(Arrays.asList("RECORD CONFIG_FAILED"), surround.drops);
+        assertEquals(Arrays.asList("RECORD CONFIG_FAILED", "SIDE CONFIG_FAILED", "HUD CONFIG_FAILED",
+                "MIRROR CONFIG_FAILED"), surround.drops);
     }
 
     // ================================================================= 告诉录像那一侧（大纲 §2 阶段 5）
@@ -2712,6 +2849,14 @@ public class ChannelSchedulerTest {
         s.onNeedsChanged();
     }
 
+    /** 配置里只开环视；管线另外建了后座舱（超级镜子「后视 + 后座舱」要它，不算启用的）。 */
+    private void surroundOnly() {
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(REAR, rear);
+        lanes.put(SUR, surround);
+        s.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(SUR)));
+    }
+
     /** 重新交一次各路：环视建着、只有两路座舱启用（配置里只开座舱）。 */
     private void cabinsOnly() {
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
@@ -2882,6 +3027,8 @@ public class ChannelSchedulerTest {
         final Set<Out> declared = new LinkedHashSet<>();
         final Set<Out> dead = new LinkedHashSet<>();
         Set<Out> lastOutputs = new LinkedHashSet<>();
+        /** 关、丢的那一下会话快照清了，设备还没关完时相机还带着的那几样（SingleCamera.stillCarries 的 carried）。 */
+        Set<Out> closingWith = new LinkedHashSet<>();
         boolean deviceOpen;
         boolean holds;
         long busySince;
@@ -2917,6 +3064,7 @@ public class ChannelSchedulerTest {
         void lose(long at) {
             deviceOpen = false;
             opening = false;
+            closingWith = new LinkedHashSet<>(session.outputs);
             session = SingleCamera.SessionOutputs.NONE;
             firstFrameAt = 0;
             busySince = at;
@@ -2929,6 +3077,7 @@ public class ChannelSchedulerTest {
             holds = false;
             busySince = 0;
             session = SingleCamera.SessionOutputs.NONE;
+            closingWith.clear();
             firstFrameAt = 0;
             progressAgeMs = 0;
             if (closingSince != 0) {
@@ -2984,6 +3133,7 @@ public class ChannelSchedulerTest {
             actions.add("close " + why);
             deviceOpen = false;
             opening = false;
+            closingWith = new LinkedHashSet<>(session.outputs);
             session = SingleCamera.SessionOutputs.NONE;
             busySince = now;
             closingSince = now;   // 照 SingleCamera.closeCamera：关那一下当场登记在关
@@ -3055,6 +3205,11 @@ public class ChannelSchedulerTest {
         }
 
         @Override
+        public boolean stillCarries(Out out) {
+            return session.carries(out) || closingWith.contains(out);
+        }
+
+        @Override
         public Set<Out> declaredOutputs() {
             return new LinkedHashSet<>(declared);
         }
@@ -3111,6 +3266,8 @@ public class ChannelSchedulerTest {
         final List<String> took = new ArrayList<>();
         boolean sleeps;
         boolean screenOn;
+        /** 超级镜子的切换范围是「后视 + 后座舱」。 */
+        boolean mirrorCabin;
         /**
          * 屏幕黑下来的那一刻（调度的钟）；0 = 起点不明 —— 规则按黑满 30 秒算（ChannelRules.darkForChannel），
          * 只设 {@link #screenOn} 的那些测试就是「一黑就放开」。
@@ -3167,6 +3324,11 @@ public class ChannelSchedulerTest {
         @Override
         public boolean headUnitSleeps() {
             return sleeps;
+        }
+
+        @Override
+        public boolean mirrorWantsCabinRear() {
+            return mirrorCabin;
         }
 
         @Override
@@ -3275,6 +3437,21 @@ public class ChannelSchedulerTest {
         public void stopped() {
             stopped = true;
         }
+
+        /** 前座舱只用一次的规矩（暂时）：测试默认关，原来的熄屏、亮屏测试照旧；要测它的打开。 */
+        boolean frontCabinOneShot;
+        /** 调度报的「前座舱去掉了」，每一次一行（去掉的那一路）。 */
+        final List<String> retired = new ArrayList<>();
+
+        @Override
+        public boolean frontCabinOneShot() {
+            return frontCabinOneShot;
+        }
+
+        @Override
+        public void frontCabinRetired(String key) {
+            retired.add(key);
+        }
     }
 
     /** 录像那一侧：调度告诉它的每一声记成一行记号。 */
@@ -3294,6 +3471,11 @@ public class ChannelSchedulerTest {
         @Override
         public void onLaneConditionChanged(String key) {
             told.add("condition " + key + " " + s.condition(key));
+        }
+
+        @Override
+        public void onLaneWantersChanged(String key) {
+            wantersChanged.add(key);
         }
     }
 

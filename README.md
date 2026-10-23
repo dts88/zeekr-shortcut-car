@@ -94,7 +94,7 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 
 **[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)** is wysie's version of Zeekr Shortcut, optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
 
-**[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)** is FerixzTanz's version of Zeekr Shortcut that also shows the blind spot view on the HUD. Special thanks for the HUD calibration work and a series of features that are ahead of Zeekr Shortcut; this project's blind spot view also started from FerixzTanz's code and on-car research. Thanks to FerixzTanz for the support and contributions to this project.
+**[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)** is FerixzTanz's version of Zeekr Shortcut, with a series of features ahead of Zeekr Shortcut. This project's blind spot view started from FerixzTanz's code and on-car research, and showing it on the HUD comes from CAMCORDER: the approach, the HUD settings and his careful on-car calibration. Thanks to FerixzTanz for the support and contributions to this project.
 
 **[CarPiano](https://github.com/jlunnn/CarPiano)** plays sound through the car's exterior speaker at any speed — no longer limited to Park like the factory feature. It's still early in development, but very promising.
 
@@ -143,6 +143,13 @@ this app is forked from. The first commit in this repository is EVCam's complete
 every change since then is visible as a diff.
 
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
+
+### Contributors
+
+- **[wysie](https://github.com/wysie)** — a great deal of design and code.
+- **[FerixzTanz](https://github.com/FerixzTanz)** — the original code and on-car research for Blind spot view, and
+  showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the
+  ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
 

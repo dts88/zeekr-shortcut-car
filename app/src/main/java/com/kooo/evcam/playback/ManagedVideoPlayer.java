@@ -1,6 +1,8 @@
 package com.kooo.evcam.playback;
 
 import android.graphics.SurfaceTexture;
+import android.media.AudioAttributes;
+import android.media.AudioDeviceInfo;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
@@ -83,7 +85,19 @@ public class ManagedVideoPlayer {
         @Override public void onFirstFrame(ManagedVideoPlayer player) { }
     }
 
+    /** 回放出声用的属性：播放器和音频焦点（{@link PlaybackAudioFocus}）用同一份。 */
+    public static final AudioAttributes SOUND_ATTRIBUTES = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+            .build();
+
     private final TextureView textureView;
+    /** 这一路放不放声音（只有环视那一路的录像带声音，{@link #setAudible}）。 */
+    private boolean audible;
+    /** 出声之前先申请的音频焦点（{@link #setSoundFocus}）；null = 不申请。 */
+    private PlaybackAudioFocus soundFocus;
+    /** 打开的这个文件放出声音：这一路放声音，文件里也有声音轨。准备好时看。 */
+    private boolean fileHasSound;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private MediaPlayer player;
@@ -105,6 +119,18 @@ public class ManagedVideoPlayer {
 
     private String currentPath;
     private Runnable firstFrameFallback;
+
+    /**
+     * 这一路放不放声音：环视那一路放（它的录像带声音，开发者选项「录制声音」），别的路静音。打开下一个文件时生效。
+     */
+    public void setAudible(boolean audible) {
+        this.audible = audible;
+    }
+
+    /** 放有声音的文件之前先申请音频焦点（回放界面交给环视那一路）。 */
+    public void setSoundFocus(PlaybackAudioFocus focus) {
+        this.soundFocus = focus;
+    }
 
     public ManagedVideoPlayer(TextureView textureView) {
         this.textureView = textureView;
@@ -213,19 +239,32 @@ public class ManagedVideoPlayer {
         final int myGeneration = ++generation;
         currentPath = path;
         prepared = false;
+        fileHasSound = false;
 
         try {
             MediaPlayer mp = new MediaPlayer();
             player = mp;
             mp.setSurface(surface);
+            if (audible) {
+                mp.setAudioAttributes(SOUND_ATTRIBUTES);
+            }
             mp.setDataSource(path);
-            mp.setVolume(0f, 0f);   // 行车记录仪没有声音
+            // 只有环视那一路的录像带声音（开发者选项「录制声音」）；别的路、没有声音轨的文件照样没声
+            mp.setVolume(audible ? 1f : 0f, audible ? 1f : 0f);
+            if (audible) {
+                // 车内的媒体喇叭（容器里不指定输出就没声）；找不到（不是这台车）交给系统选
+                AudioDeviceInfo speaker = com.kooo.evcam.sound.CarSpeakers.cabin(textureView.getContext());
+                if (speaker != null && !mp.setPreferredDevice(speaker)) {
+                    AppLog.w(TAG, "回放：指定车内媒体喇叭没成，交给系统选");
+                }
+            }
 
             mp.setOnPreparedListener(p -> {
                 if (myGeneration != generation) {
                     return;   // 上一次打开的回调，丢弃
                 }
                 prepared = true;
+                fileHasSound = audible && hasSoundTrack(p);
                 if (offsetMs > 0) {
                     if (exact) {
                         seekToExact(offsetMs);
@@ -234,6 +273,7 @@ public class ManagedVideoPlayer {
                     }
                 }
                 if (playWhenReady) {
+                    claimSoundFocus();
                     p.start();
                 }
                 armFirstFrameFallback();
@@ -314,11 +354,33 @@ public class ManagedVideoPlayer {
         playWhenReady = true;
         if (isPrepared() && !player.isPlaying()) {
             try {
+                claimSoundFocus();
                 player.start();
             } catch (Exception e) {
                 AppLog.w(TAG, "start 失败: " + e);
             }
         }
+    }
+
+    /** 要开始放了：这个文件放出声音的话，先申请音频焦点（拿着的就不再申请）。 */
+    private void claimSoundFocus() {
+        if (fileHasSound && soundFocus != null) {
+            soundFocus.request();
+        }
+    }
+
+    /** 文件里有没有声音轨。读不到当没有。 */
+    private static boolean hasSoundTrack(MediaPlayer mp) {
+        try {
+            for (MediaPlayer.TrackInfo track : mp.getTrackInfo()) {
+                if (track.getTrackType() == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) {
+                    return true;
+                }
+            }
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "读不到轨道信息，当没有声音: " + e);
+        }
+        return false;
     }
 
     public void pause() {
