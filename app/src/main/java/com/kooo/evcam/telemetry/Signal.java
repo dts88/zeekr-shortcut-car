@@ -6,7 +6,7 @@ import com.kooo.evcam.R;
  * 车上能读到的信号，一张表：怎么读（功能号 / 带区域的功能号 / 传感器事件 / 传感器数值）、
  * 读到的数怎么解、在车上验证到什么程度。
  *
- * <p>信息条（{@link VehicleStateMapper}）和「系统信息」页都从这张表取，加一个信号就是加一行。
+ * <p>信息条（{@link VehicleStateMapper}）和「车辆信号」页都从这张表取，加一个信号就是加一行。
  * 号码和含义来自 zeekr-shortcut-lab 在 7X 上的实测：它的信号手册 {@code docs/signals.md} 是唯一依据
  * （分工：Lab 把信号找准，这里把找到的用准）。</p>
  *

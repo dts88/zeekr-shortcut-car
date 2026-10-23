@@ -151,14 +151,14 @@ public final class InfoBarRenderer {
     /** 文字格要用字串；车辆状态面板没有文字格，是 null。 */
     private final Context context;
     /**
-     * 没数据的读数写的字：vi_v_none「—」，和系统信息页（{@link SignalText}）同一个字，建的时候按界面语言取一次。
+     * 没数据的读数写的字：vi_v_none「—」，和车辆信号页（{@link SignalText}）同一个字，建的时候按界面语言取一次。
      * 量过（Roboto Bold 和等宽字，样稿 JPEG q22、缩一半看）：30 px 的「—」墨迹 22×4 px，和以前画的「--」一样宽、一样粗，
      * 压缩后照样认得出；车机字体里没有这个字时 Android 退到后备字体去画，不会是方框。
      */
     private final String none;
     /** 摆的时候用的勾选版本（{@link InfoBar#selectionVersion}）：变了就重新摆，正在录的下一帧就换。 */
     private int fittedSelection;
-    /** 信息条上勾了哪几项（摆的时候那一份）；车辆状态面板、系统信息页的图标是 null（照读数画）。 */
+    /** 信息条上勾了哪几项（摆的时候那一份）；车辆状态面板、车辆信号页的图标是 null（照读数画）。 */
     private java.util.Set<String> selected;
     private final Bitmap bitmap;
     private final Canvas canvas;
@@ -184,7 +184,7 @@ public final class InfoBarRenderer {
     private boolean drawnOnce;
 
     /**
-     * 录像下面那一条：宽 = 视频宽，高 {@link #HEIGHT}；放哪几格看系统信息里勾的（{@link InfoBar#selection}）。
+     * 录像下面那一条：宽 = 视频宽，高 {@link #HEIGHT}；放哪几格看车辆信号里勾的（{@link InfoBar#selection}）。
      * 前灯组车牌上的数字这时读一次设置（和录像左上角那行字里的车牌同一个来源、同一个时候），整段录像不变。
      */
     public InfoBarRenderer(Context context, int width) {
@@ -277,7 +277,7 @@ public final class InfoBarRenderer {
         if (strip && context != null) {
             int selection = InfoBar.selectionVersion();
             if (selection != fittedSelection) {
-                // 系统信息里改了勾选（或者开发者模式开关了）：重新摆，下一帧就是新的
+                // 车辆信号里改了勾选（或者开发者模式开关了）：重新摆，下一帧就是新的
                 selected = InfoBar.selection(context);
                 cells = InfoBarLayout.fit(logicalWidth, selected);
                 fittedSelection = selection;
@@ -337,7 +337,7 @@ public final class InfoBarRenderer {
                 drawSteering(cx, cy, s.steeringDegrees);
                 break;
             case GEAR:
-                // 驾驶模式只在勾了它时上框的颜色（只勾了挡位、或者系统信息页开着多读了它，都不算）
+                // 驾驶模式只在勾了它时上框的颜色（只勾了挡位、或者车辆信号页开着多读了它，都不算）
                 drawGear(cx, cy, s.gear, selected == null || selected.contains(Signal.DRIVE_MODE.name())
                         ? s.driveMode : null);
                 break;
@@ -1219,7 +1219,7 @@ public final class InfoBarRenderer {
 
     /**
      * 文字格：没有图标的信号（项目所有者 2026-10-03：先用文字，要的话之后再画）。
-     * 上面一行名称（小、灰），下面一行值（大、白），写法和系统信息页一样（{@link SignalText}）；
+     * 上面一行名称（小、灰），下面一行值（大、白），写法和车辆信号页一样（{@link SignalText}）；
      * 没数据是「—」（{@link SignalText} 给的就是 {@link #none} 那个字）加斜杠，和别的格一个规矩。放不下的截掉，末尾一个省略号。
      */
     private void drawText(Signal signal, int cellWidth, Readings readings) {

@@ -127,7 +127,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">Reset floating button?</string>
     <string name="set_auto_start_title">Start on boot</string>
-    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores Super mirror, Blind spot view, the floating button and auto-recording if they were on. When off, it isn\'t restarted.</string>
+    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores the features that were on. When off, it isn\'t restarted.</string>
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <string name="set_screen_off_title">Screen-off recording (keep awake)</string>
@@ -152,9 +152,7 @@
     <string name="set_camera_mapping_summary">Choose which camera feeds the surround, front cabin and rear cabin views (troubleshooting)</string>
     <string name="set_diagnostics_title">Diagnostics</string>
     <string name="set_diagnostics_summary">View and export camera, display and storage details and recent logs</string>
-    <string name="set_settings_export_title">Export settings</string>
-    <string name="set_settings_export_summary">Saves the current settings to a file, in the same folder as diagnostics reports</string>
-    <string name="set_settings_import_title">Import settings</string>
+    <string name="set_settings_backup_title">Settings backup</string>
     <string name="set_settings_import_summary">Restores all settings from an exported file; only files exported by version %1$d.x can be imported</string>
     <string name="settings_exported">Exported to:\n%1$s</string>
     <string name="settings_export_failed">Can\'t export settings</string>
@@ -171,13 +169,13 @@
     <string name="settings_import_action">Import and exit</string>
     <string name="settings_import_failed">Can\'t import settings</string>
     <string name="settings_imported_reopen">Settings imported; they take effect after the app is reopened</string>
-    <!-- System info (experimental): groups, signal names, values -->
-    <string name="set_vehicle_info_title">System info (experimental)</string>
+    <!-- Vehicle signals (experimental): groups, signal names, values -->
+    <string name="set_vehicle_info_title">Vehicle signals (experimental)</string>
     <string name="set_vehicle_info_summary">Vehicle signals the head unit exposes and their current state; ticked items appear on the Driving info bar</string>
     <string name="vi_legend">Ticked items appear on the Driving info bar (requires Settings → Recording → Driving info bar): as an icon where one exists, otherwise as text for now, as noted under each row; items that don\'t fit are left out. Label color shows how well a signal is verified: normal text color, consistent in on-car tests (still cross-checked); grey, usable with details pending; faint grey, readable but unverified, can be ticked only with developer options on.</string>
     <string name="vi_position">Position (lat/long)</string>
     <string name="vi_position_source">System location</string>
-    <!-- System info status line under the legend (VehicleInfoFragment.status); how each signal ID is read (VehicleInfoFragment.address; IDs and zones stay hex) -->
+    <!-- Vehicle signals status line under the legend (VehicleInfoFragment.status); how each signal ID is read (VehicleInfoFragment.address; IDs and zones stay hex) -->
     <string name="vi_status_known">Data for %1$d/%2$d signals</string>
     <string name="vi_status_car_connected">Vehicle interface: connected</string>
     <string name="vi_status_car_unavailable">Vehicle interface: unavailable</string>
@@ -189,7 +187,7 @@
     <string name="vi_kind_function_zone">function·zone %1$s</string>
     <string name="vi_kind_sensor_event">sensor event</string>
     <string name="vi_kind_sensor_value">sensor value</string>
-    <!-- Under each System info row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
+    <!-- Under each Vehicle signals row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
     <string name="vi_bar_icon">Info bar icon: %1$s</string>
     <string name="vi_bar_text">Info bar text (no icon yet)</string>
     <string name="vi_bar_join">", "</string>
@@ -367,6 +365,8 @@
     <string name="slot_cabin_rear">Rear cabin</string>
     <string name="action_save">Save</string>
     <string name="action_reset">Reset</string>
+    <string name="action_import">Import</string>
+    <string name="action_export">Export</string>
     <string name="action_all_auto">All automatic</string>
     <string name="msg_mapping_saved">Camera mapping saved. Takes effect after restarting the app.</string>
     <string name="msg_mapping_cleared">Automatic assignment restored. Takes effect after restarting the app.</string>
