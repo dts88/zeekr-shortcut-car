@@ -5,6 +5,7 @@
   id 必须是 switchWidget（SwitchPreferenceCompat 按它找控件）。
   样式显式指定 AppCompat 的那一份：Material 主题默认的开关样式带 thumbTint / trackTint，
   会把这里的轨道和滑块重新着色。
+  宽是 pref_switch_width（两个滑块宽）：没有开关的行照这个宽在行首留空位，名字才对得齐（values/dimens.xml）。
 -->
 <androidx.appcompat.widget.SwitchCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -16,5 +17,5 @@
     android:clickable="false"
     android:focusable="false"
     android:thumb="@drawable/pref_switch_thumb"
-    app:switchMinWidth="56dp"
+    app:switchMinWidth="@dimen/pref_switch_width"
     app:track="@drawable/pref_switch_track" />

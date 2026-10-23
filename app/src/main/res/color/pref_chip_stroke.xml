@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 附加项按钮的描边：按下（开）是能量橙，没按是分隔线色 -->
+<!-- 附加项按钮的描边：按下（开）是能量橙，没按是最弱一级文字色（看得见的灰边），还不能用的是分隔线色 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/line" android:state_enabled="false" />
     <item android:color="@color/energy" android:state_checked="true" />
-    <item android:color="@color/line" />
+    <item android:color="@color/text_tertiary" />
 </selector>

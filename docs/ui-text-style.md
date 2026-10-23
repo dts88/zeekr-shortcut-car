@@ -345,6 +345,16 @@
   「In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before
   and after the braking is locked as well.」/「Semasa brek kecemasan, kenderaan menghidupkan lampu kecemasan secara automatik;
   dengan Lampu kecemasan dihidupkan, rakaman sebelum dan selepas brek turut dikunci.」。
+- 2026-10-23 批准（设置整理第六轮，项目所有者直接定的删减，ui-spec §十一）：
+  - 存储页不分组：删掉 set_group_cleanup「自动清理」/「Automatic cleanup」/「Pembersihan automatik」
+    （另两组的名字就是组里那一行的名字，字符串留给那两行）。
+  - 悬浮按钮那一行的说明删掉后半句：set_recording_floating_summary「悬浮显示录制状态」/
+    「Shows recording status in a floating button」/「Menunjukkan status rakaman dalam butang terapung」。
+  - 「操作按钮位置」不写说明：删掉 set_rail_side_summary「建议选择驾驶座一侧」/「Put them on the driver's side」/
+    「Letak di sebelah pemandu」。
+- 2026-10-23 批准（熄屏持续录制的说明短三个字，项目所有者要的）：set_screen_off_keep_summary
+  「熄屏后只录制环视，后座舱亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后恢复。关闭本项，熄屏后停止录制。」
+  （删了「在」「自动」，意思不变）；英文、马来文本来就没有这两处，不动。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

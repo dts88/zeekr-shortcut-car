@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 设置行里的附加项按钮（Chip）的底：按下（开）是橙色淡底，没按是中性灰块 -->
+<!--
+  设置行里的附加项按钮（Chip）的底：按下（开）是橙色淡底；没按是浅一档的面（和行尾按钮 bg_pref_row_action 同一种），
+  在卡片的灰上看得出是个按钮（项目所有者 2026-10-23 选的方案 A）；还不能用的落回卡片的灰（sunken），不像能按
+-->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/sunken" android:state_enabled="false" />
     <item android:color="@color/energy_quiet" android:state_checked="true" />
-    <item android:color="@color/sunken" />
+    <item android:color="@color/surface" />
 </selector>

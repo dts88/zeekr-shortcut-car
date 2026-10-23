@@ -29,6 +29,8 @@ import com.kooo.evcam.R;
  * <ul>
  *   <li>每一行是一块灰底卡片，行间留缝，不画分隔线；</li>
  *   <li>开关放在行首（{@link R.layout#pref_row}），橙色轨道 + 白色方块滑块；</li>
+ *   <li>每一行的名字从同一条竖线开始：没有开关的行在开关的位置留出同样宽的空位
+ *       （{@code pref_text_start}，ui-spec §三「文字对齐」）；</li>
  *   <li>有当前值的（下拉、输入），值放行尾再加 ›（{@link R.layout#pref_row_value}）；</li>
  *   <li>点进去还有下一层的，行尾 ›（{@link R.layout#pref_row_nav}）；</li>
  *   <li>开关的效果要看哨兵模式的，行尾写着哨兵模式此刻开没开（{@link R.layout#pref_row_sentry}）；</li>
