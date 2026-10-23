@@ -109,13 +109,17 @@ public class UpdateChannelsAndroidTest {
             });
             capture("update-channel-row.png");
             onView(withText(R.string.set_update_channel_title)).perform(click());
-            onView(withText(R.string.update_channel_alpha_option)).perform(click());
+            androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything())
+                    .inAdapterView(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class))
+                    .atPosition(2).perform(click());
             capture("update-channel-options.png");
             onView(withText(R.string.action_cancel)).perform(click());
             assertEquals(UpdateChannel.BETA, new AppConfig(target()).getUpdateChannel());
 
             onView(withText(R.string.set_update_channel_title)).perform(click());
-            onView(withText(R.string.update_channel_alpha_option)).perform(click());
+            androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything())
+                    .inAdapterView(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class))
+                    .atPosition(2).perform(click());
             onView(withText(R.string.action_ok)).perform(click());
             assertEquals(UpdateChannel.ALPHA, new AppConfig(target()).getUpdateChannel());
             scenario.recreate();
@@ -128,7 +132,9 @@ public class UpdateChannelsAndroidTest {
             });
             capture("update-channel-alpha.png");
             onView(withText(R.string.set_update_channel_title)).perform(click());
-            onView(withText(R.string.update_channel_stable_option)).perform(click());
+            androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything())
+                    .inAdapterView(androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class))
+                    .atPosition(0).perform(click());
             onView(withText(R.string.action_ok)).perform(click());
             assertEquals(UpdateChannel.STABLE, new AppConfig(target()).getUpdateChannel());
         } finally { restore(old); }
