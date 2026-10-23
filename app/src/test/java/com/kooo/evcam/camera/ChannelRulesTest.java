@@ -163,6 +163,69 @@ public class ChannelRulesTest {
         assertEquals("和超级镜子各要各的", set(mirror, side), ChannelRules.wantedOutputs(cabinsOnly, sur));
     }
 
+    /**
+     * HUD 上的盲区画面（2026-10-21）：另一样输出，跟中控屏那块同一个登记方、同一条规矩 —— 只在环视上、SIDE_VIEW 登记着才要；
+     * 两块可以同时要；熄屏放开时照旧（环视不放开，所以还要）。
+     */
+    @Test
+    public void theHudCanvasFollowsTheSideViewHolder() {
+        Out side = new Out(Kind.SIDE, "side");
+        Out hud = new Out(Kind.HUD, "hud");
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        World w = new World(Arrays.asList(cab, sur), new LinkedHashSet<>(Collections.singletonList(REAR)));
+        w.screenOn = true;
+        sur.declared.add(hud);
+        cab.declared.add(new Out(Kind.HUD, "hud-on-cabin"));
+        assertTrue("没登记：声明着也不要", ChannelRules.wantedOutputs(w, sur).isEmpty());
+
+        w.holders.add(Holder.SIDE_VIEW);
+        assertEquals("只要 HUD 那块", set(hud), ChannelRules.wantedOutputs(w, sur));
+        assertTrue("座舱不为它开", ChannelRules.wantedOutputs(w, cab).isEmpty());
+        assertFalse(ChannelRules.wanted(w, cab));
+
+        sur.declared.add(side);
+        assertEquals("中控屏、HUD 两块一起要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
+
+        w.screenOn = false;
+        assertEquals("熄屏不放开环视：照旧要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
+    }
+
+    /**
+     * 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）：登记着 MIRROR 时后座舱和环视一样有人要，只带超级镜子那块画布；
+     * 配置里没启用后座舱也一样（管线照它建了这一路），主界面预览、拍照照旧不要它；熄屏照旧放开；前座舱不为它开。
+     */
+    @Test
+    public void theMirrorWantsTheRearCabinOnlyInTheRearCabinViews() {
+        Out cabinMirror = new Out(Kind.MIRROR, "mirror-cabin");
+        Lane sur = new Lane(SUR, "2");
+        Lane cab = new Lane(REAR, "1");
+        Lane cabFront = new Lane(FRONT, "0");
+        World surroundOnly = new World(Arrays.asList(cabFront, cab, sur), new LinkedHashSet<>(Collections.singletonList(SUR)));
+        surroundOnly.screenOn = true;
+        surroundOnly.holders.add(Holder.PREVIEW);
+        surroundOnly.holders.add(Holder.PHOTO);
+        surroundOnly.holders.add(Holder.MIRROR);
+        cab.declared.add(cabinMirror);
+        assertFalse("四向、前后：超级镜子不要后座舱", ChannelRules.wanted(surroundOnly, cab));
+        assertTrue(ChannelRules.wantedOutputs(surroundOnly, cab).isEmpty());
+
+        surroundOnly.mirrorCabin = true;
+        assertEquals("没启用：只有超级镜子要它", EnumSet.of(Holder.MIRROR), ChannelRules.wantedBy(surroundOnly, cab));
+        assertEquals("只带超级镜子那块画布", set(cabinMirror), ChannelRules.wantedOutputs(surroundOnly, cab));
+        assertFalse("前座舱不为它开", ChannelRules.wanted(surroundOnly, cabFront));
+
+        surroundOnly.holders.remove(Holder.MIRROR);
+        assertFalse("超级镜子没登记：不要", ChannelRules.wanted(surroundOnly, cab));
+        assertTrue(ChannelRules.wantedOutputs(surroundOnly, cab).isEmpty());
+
+        surroundOnly.holders.add(Holder.MIRROR);
+        surroundOnly.screenOn = false;
+        assertTrue("熄屏照旧放开座舱", ChannelRules.releasedByDark(surroundOnly, cab));
+        assertFalse(ChannelRules.wanted(surroundOnly, cab));
+        assertTrue(ChannelRules.wantedOutputs(surroundOnly, cab).isEmpty());
+    }
+
     /** 没说启用了哪几路：管线里的全部都算启用（以前的样子）。 */
     @Test
     public void everyLaneIsEnabledWhenNoneAreNamed() {
@@ -606,7 +669,6 @@ public class ChannelRulesTest {
         streaming(front, recF);
         assertEquals(Move.IDLE, round().move);
         Set<Holder> holders = EnumSet.copyOf(w.holders);
-        int needsVersion = w.needsVersion;
 
         w.screenOn = false;   // 黑满 30 秒
         Decision d = round();
@@ -645,7 +707,6 @@ public class ChannelRulesTest {
 
         assertEquals(3, done.size());
         assertEquals("登记表没动", holders, w.holders);
-        assertEquals(needsVersion, w.needsVersion);
         assertEquals("救援梯子一次都没算", 0, surround.ladder.attempts());
         assertFalse(surround.lostForRescue);
         assertNull(surround.mark);
@@ -2078,6 +2139,37 @@ public class ChannelRulesTest {
         assertEquals(1, d.attempt);
     }
 
+    /**
+     * 只给「谁要它」变了的那一路解除停手（2026-10-20 审查，车主批）：盲区画面只要环视，它登记、放开不解除停手的座舱；
+     * 主界面重新登记预览，要它的座舱解除。停了再开录并成一轮也算变了。
+     */
+    @Test
+    public void onlyAChangeAmongItsOwnWantersLiftsAStop() {
+        claim(Holder.PREVIEW);
+        rear.declared.add(pvR);
+        round();
+        stopLadder(rear);
+        at(1_000);
+        round();
+        assertEquals(Condition.GAVE_UP, ChannelRules.condition(rear));
+
+        claim(Holder.SIDE_VIEW);
+        round();
+        assertNull("盲区画面不要座舱：不解除", event(Event.Type.STOP_LIFTED));
+        drop(Holder.SIDE_VIEW);
+        round();
+        assertNull(event(Event.Type.STOP_LIFTED));
+        assertEquals(Condition.GAVE_UP, ChannelRules.condition(rear));
+
+        drop(Holder.PREVIEW);
+        claim(Holder.PREVIEW);   // 放开又登记，并成一轮
+        round();
+        Event lifted = event(Event.Type.STOP_LIFTED);
+        assertNotNull("要它的预览变过：解除", lifted);
+        assertEquals(Collections.singletonList(REAR), lifted.keys);
+        assertEquals(Event.Cause.NEEDS_CHANGED, lifted.cause);
+    }
+
     /** §7.4（项目所有者 2026-10-11）：停手之后，相机服务报它「空闲」、或者亮屏，也解除停手、从头救。 */
     @Test
     public void theServiceSayingFreeOrTheScreenComingOnLiftsAStop() {
@@ -2533,15 +2625,105 @@ public class ChannelRulesTest {
         w.now = T0 + ms;
     }
 
+    // ================================================================= 前座舱只用一次（暂时的规矩，2026-10-22 定、10-23 改成只管前座舱）
+
+    /**
+     * 通道眼里熄屏的那一刻，这次运行启用的前座舱去掉、报一次；之后亮屏，主界面预览、拍照、录像都不再要它（录像计划里还写着也不要）。
+     * 后座舱照一般的规矩：熄屏放开、亮屏又要它，录像输出留着。环视照旧。
+     */
+    @Test
+    public void withTheOneShotRuleOnlyTheFrontCabinIsRetiredWhenTheChannelGoesDark() {
+        w.frontCabinOneShot = true;
+        claim(Holder.PREVIEW);
+        claim(Holder.PHOTO);
+        claim(Holder.RECORDING);
+        planAll();
+        round();
+        assertTrue("亮着：不去掉", retiredEvents().isEmpty());
+        w.screenOn = false;
+        round();
+        assertEquals(Collections.singletonList(Collections.singletonList(FRONT)), retiredEvents());
+        assertTrue(w.frontCabinRetired);
+        round();
+        assertTrue("只报一次", retiredEvents().isEmpty());
+
+        w.screenOn = true;
+        assertTrue(ChannelRules.wanted(w, surround));
+        assertFalse("前座舱亮屏也不回来", ChannelRules.wanted(w, front));
+        assertTrue("不拍前座舱", ChannelRules.excludedFromPhoto(w, front));
+        front.declared.add(recF);
+        front.declared.add(pvF);
+        assertFalse("前座舱的录像输出不再留着", ChannelRules.keepsRecordOutput(w, front));
+        assertTrue(ChannelRules.wantedOutputs(w, front).isEmpty());
+
+        assertTrue("后座舱亮屏回来", ChannelRules.wanted(w, rear));
+        assertTrue("后座舱接着录", ChannelRules.keepsRecordOutput(w, rear));
+        assertFalse(ChannelRules.excludedFromPhoto(w, rear));
+    }
+
+    /** 去掉前座舱之后，超级镜子要后座舱照旧。 */
+    @Test
+    public void theMirrorStillGetsTheRearCabinAfterTheFrontCabinIsRetired() {
+        w.frontCabinOneShot = true;
+        w.screenOn = false;
+        round();
+        assertTrue(w.frontCabinRetired);
+        w.screenOn = true;
+        w.mirrorCabin = true;
+        claim(Holder.MIRROR);
+        assertTrue(ChannelRules.wanted(w, rear));
+        assertFalse(ChannelRules.wanted(w, front));
+    }
+
+    /** 这条规矩没开：熄屏照旧只是放开，两路座舱亮屏都回来。 */
+    @Test
+    public void withoutTheOneShotRuleTheCabinsComeBackWhenTheScreenTurnsOn() {
+        claim(Holder.PREVIEW);
+        w.screenOn = false;
+        round();
+        assertFalse(w.frontCabinRetired);
+        assertTrue(retiredEvents().isEmpty());
+        w.screenOn = true;
+        assertTrue(ChannelRules.wanted(w, rear));
+        assertTrue(ChannelRules.wanted(w, front));
+    }
+
+    /** 这次运行没启用前座舱（环视 + 后座舱）：没有可去掉的，不报；后座舱亮屏照旧回来。 */
+    @Test
+    public void nothingIsRetiredWhenTheFrontCabinIsNotEnabled() {
+        World noFront = new World(Arrays.asList(front, rear, surround),
+                new LinkedHashSet<>(Arrays.asList(SUR, REAR)));
+        noFront.frontCabinOneShot = true;
+        noFront.holders.add(Holder.PREVIEW);
+        noFront.screenOn = false;
+        noFront.now = T0;
+        assertTrue(ChannelRules.settle(noFront).stream()
+                .noneMatch(e -> e.type == Event.Type.FRONT_CABIN_RETIRED));
+        assertFalse(noFront.frontCabinRetired);
+        noFront.screenOn = true;
+        assertTrue(ChannelRules.wanted(noFront, rear));
+    }
+
+    /** 最近这一轮报的「前座舱去掉了」，每一次是去掉的那一路。 */
+    private List<List<String>> retiredEvents() {
+        List<List<String>> out = new ArrayList<>();
+        for (Event event : events) {
+            if (event.type == Event.Type.FRONT_CABIN_RETIRED) {
+                out.add(event.keys);
+            }
+        }
+        return out;
+    }
+
     private void claim(Holder holder) {
         if (w.holders.add(holder)) {
-            w.needsVersion++;
+            w.changed.add(holder);
         }
     }
 
     private void drop(Holder holder) {
         if (w.holders.remove(holder)) {
-            w.needsVersion++;
+            w.changed.add(holder);
         }
     }
 

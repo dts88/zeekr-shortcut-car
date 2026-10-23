@@ -62,8 +62,9 @@ public final class VersionName {
     /**
      * 这个版本号属不属于「beta 或正式版」这一档。
      *
-     * <p>检查更新只推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
-     * 拿它去覆盖一台正在用的车机不合适。</p>
+     * <p>检查更新默认推这两档：alpha 是开发过程中随手发的，数量多、稳定性没有保证，
+     * 不问一声就拿它去覆盖一台正在用的车机不合适 —— 要 alpha 得在设置里打开「接收 Alpha 版」
+     * （{@link #isAlphaBetaOrRelease}）。</p>
      *
      * <p>后缀既不是空也不是 beta 的一律不算 —— 包括 rc。真要发 rc，
      * 得在这里明确加上，而不是靠「看起来比 beta 新」这种默认。</p>
@@ -81,6 +82,19 @@ public final class VersionName {
     }
 
     /**
+     * 这个版本号属不属于「alpha、beta 或正式版」：设置里打开了「接收 Alpha 版」（项目所有者 2026-10-23，默认关）
+     * 时检查更新认这一档。后缀照样只认这三种，rc 之类不算。
+     */
+    public static boolean isAlphaBetaOrRelease(String version) {
+        if (isBetaOrRelease(version)) {
+            return true;
+        }
+        String[] parts = splitCore(version);
+        return numbers(parts[0]).length > 0
+                && parts[1].toLowerCase(java.util.Locale.US).startsWith("alpha");
+    }
+
+    /**
      * 是不是正式版：认得出版本号，而且没有预发布后缀。
      *
      * <p>设置里关掉「接收 Beta 版」之后，检查更新只认这一档。</p>
@@ -88,6 +102,15 @@ public final class VersionName {
     public static boolean isRelease(String version) {
         String[] parts = splitCore(version);
         return numbers(parts[0]).length > 0 && parts[1].isEmpty();
+    }
+
+    /**
+     * 大版本：版本号的第一段（2.14.0-alpha → 2）；认不出来是 -1。
+     * 导入设置只认同一个大版本导出的文件（settings.SettingsBackup，项目所有者 2026-10-19：大版本升级后配置可以失效，不做兼容）。
+     */
+    public static int major(String version) {
+        int[] nums = numbers(splitCore(version)[0]);
+        return nums.length == 0 ? -1 : nums[0];
     }
 
     /** 拆成「数字部分」和「预发布后缀」两段，顺便吃掉前导的 v。 */

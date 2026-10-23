@@ -215,6 +215,8 @@ public class MainActivity extends AppCompatActivity {
     private final java.util.Map<String, View> extraSourcePanes = new java.util.LinkedHashMap<>();
     /** 启用的那几路（RecordSpecs.enabledCameraKeys）：主界面给它们摆格子、挂画布，一路一块（PreviewSlots）。 */
     private java.util.Set<String> enabledLanes = new java.util.LinkedHashSet<>();
+    /** 预览画面停了就压暗（{@link #attachPreviewStall}）。 */
+    private final com.kooo.evcam.zeekr.PreviewStall previewStall = new com.kooo.evcam.zeekr.PreviewStall();
     // 录制状态显示相关
     private TextView tvRecordingStats;
     private android.os.Handler recordingTimerHandler;
@@ -285,9 +287,6 @@ public class MainActivity extends AppCompatActivity {
         AppLog.i(TAG, "onCreate " + instanceTag() + " restored=" + (savedInstanceState != null)
                 + " cameraManagerInHolder="
                 + (com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager() != null));
-
-        // 设置字体缩放比例（1.3倍）
-        adjustFontScale(1.2f);
 
         // 初始化应用配置
         appConfig = new AppConfig(this);
@@ -362,6 +361,8 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.screen.ScreenState.addListener(screenListener);
         // 管线被 Holder 放掉重建时当场接上新的那一份（见 pipelineReplaced），onDestroy 摘掉
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().addReplacedListener(pipelineReplaced);
+        // 这一次运行的几路变了（离车时去掉了前座舱）：照新的几路重新摆（见 runLanesChanged），onDestroy 摘掉
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().addRunLanesListener(runLanesChanged);
         initToggleRecordingReceiver();
     }
 
@@ -416,14 +417,6 @@ public class MainActivity extends AppCompatActivity {
             }, 500);  // 延迟 500ms
         }
     }
-
-
-    private void adjustFontScale(float scale) {
-        android.content.res.Configuration configuration = getResources().getConfiguration();
-        configuration.fontScale = scale;
-        android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
-        getBaseContext().getResources().updateConfiguration(configuration, metrics);
-    }
     
     /**
      * 照配置里启用的几路选布局（{@link PreviewSlots}）：只启用了环视是单路四宫格，其余是多路布局。
@@ -439,7 +432,9 @@ public class MainActivity extends AppCompatActivity {
         //
         // 以前先看车型，后来数路数：只开一路座舱时数出来是 1，摆成环视的四宫格，那一路座舱没地方显示、也没建；
         // 只开两路座舱时数出来是 2，按槽位号挂的是环视和前座舱（2026-10-16）。
-        enabledLanes = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(new ProfileStore(this).current());
+        // 问的是这一次运行的那几路（还没建过管线时是存下的配置）：前座舱只用一次时，生效后存下的配置里前座舱已经关了
+        // （camera.FrontCabinOneShot），主界面这一次运行里重建也还摆着前座舱，离车去掉前座舱之后才不摆它（onRunLanesChanged）
+        enabledLanes = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(this);
         if (PreviewSlots.singleLayout(enabledLanes)) {
             // 只启用了环视：一路合成流，由 FourLaneContainer 重画成四宫格
             layoutId = R.layout.activity_main_zeekr_7x;
@@ -512,6 +507,7 @@ public class MainActivity extends AppCompatActivity {
         textureFront = findViewById(R.id.texture_front);
         textureBack = findViewById(R.id.texture_back);  // 只有环视的单路布局里为 null
         textureLeft = findViewById(R.id.texture_left);  // 同上
+        attachPreviewStall();
 
         // 极氪合成流：texture_front 是容器里那个普通的 TextureView，
         // 四宫格由父容器 FourLaneContainer 重画子视图实现
@@ -685,6 +681,22 @@ public class MainActivity extends AppCompatActivity {
         claimPreviewIfReady();
     }
 
+    /**
+     * 每一路画面停了就压暗、写「画面已停止」（{@link com.kooo.evcam.zeekr.PreviewStall}，和超级镜子同一套，项目所有者 2026-10-20）：
+     * 挂在画布所在的那一格上 —— 环视是整块四宫格（同一条流，只写一句），座舱是各自那一格。
+     */
+    private void attachPreviewStall() {
+        previewStall.detachAll();
+        String hint = getString(R.string.preview_paused);
+        float maxTextPx = getResources().getDimension(R.dimen.text_title);
+        for (String key : PreviewSlots.KEYS) {
+            previewStall.attach(key, canvasFor(key), hint, maxTextPx);
+        }
+        if (!isInBackground) {
+            previewStall.start();
+        }
+    }
+
     /** 这一路的画布；没启用（没挂监听、那一格藏着）、或者这套布局里没有这一格是 null。 */
     private AutoFitTextureView canvasFor(String cameraKey) {
         if (!enabledLanes.contains(cameraKey)) {
@@ -782,6 +794,8 @@ public class MainActivity extends AppCompatActivity {
         return new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(@NonNull android.graphics.SurfaceTexture surface, int width, int height) {
+                // 系统新建的画布上什么都没有：还没显示过画面，不盖（PreviewStall）
+                previewStall.canvasReplaced(cameraKey);
                 onPreviewCanvasReady(cameraKey);
             }
 
@@ -813,6 +827,7 @@ public class MainActivity extends AppCompatActivity {
                 // 这个回调每来一帧就响一次 —— 这就是「不录制时相机的出帧率」，
                 // 也就是这条视频流本身的上限。录制时的帧率再低，也不会比它高。
                 com.kooo.evcam.camera.PreviewFrameRates.onFrame(cameraKey);
+                previewStall.noteFrame(cameraKey);
             }
         };
     }
@@ -1523,7 +1538,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        final MultiCameraManager pipeline = holder.getForMainScreen(this);
+        final MultiCameraManager pipeline = holder.getForMainScreen(this, enabledLanes);
         cameraManager = pipeline;
         attachRecordingCoordinator();
         // 管线比界面活得久：回调在 onDestroy 一律摘掉（detachUiCallbacks），这里每个界面重新挂一遍
@@ -1545,6 +1560,39 @@ public class MainActivity extends AppCompatActivity {
             reattachPipelineIfReplaced("replaced");
         }
     };
+
+    /**
+     * 这一次运行启用的几路变了（离车时去掉了前座舱，暂时的规矩 camera.FrontCabinOneShot）：主界面在前就当场照新的几路重新摆，
+     * 在后台的等回到前台（onResume）再摆。onCreate 挂上、onDestroy 摘掉。
+     */
+    private final Runnable runLanesChanged = () -> {
+        if (!isInBackground && !isFinishing() && !isDestroyed()) {
+            relayoutIfLanesChanged("run-lanes");
+        }
+    };
+
+    /**
+     * 摆着的格子和这一次运行的几路对不上（离车时去掉了前座舱）：整个界面照新的几路重建（{@link #setupLayoutByCarModel}）。
+     * 只重建界面、不重建管线：预览画面由管线留着，新界面接回还在的那几块，这一份管线记下的几路已经一起改了，接上时对得上，
+     * 环视画面和录像都不断；前座舱那一块没人接回，等调度把它摘掉再放。
+     *
+     * @param when 什么时候发现的（ASCII，进日志）
+     * @return true：要重建了
+     */
+    private boolean relayoutIfLanesChanged(String when) {
+        java.util.Set<String> now = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(this);
+        if (now.equals(enabledLanes)) {
+            return false;
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面照这一次运行的几路重新摆（" + when + "）：" + enabledLanes
+                + " → " + now);
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                recreate();
+            }
+        });
+        return true;
+    }
 
     /**
      * 手里那份管线不再是进程里在用的那一份（被 Holder 放掉重建了，或者建的时候列相机出错 —— 隔够了 Holder 会重建）：
@@ -2795,6 +2843,7 @@ public class MainActivity extends AppCompatActivity {
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
         pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
         com.kooo.evcam.camera.StallWatch.setForeground(false);
+        previewStall.stop();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording);
 
         // 预览不在前台了，注销这一项；剩下还有没有人要，问登记表。
@@ -2861,6 +2910,7 @@ public class MainActivity extends AppCompatActivity {
         isInBackground = false;
         pausedByScreenOff = false;
         com.kooo.evcam.camera.StallWatch.setForeground(true);
+        previewStall.start();
         AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         
         AppLog.d(TAG, "onResume called, wasInBackground=" + wasInBackground + ", isRecording=" + isRecording);
@@ -2877,6 +2927,10 @@ public class MainActivity extends AppCompatActivity {
 
         // 手里那份管线不再是进程里在用的那一份（在后台时被 Holder 放掉重建了、建的时候列相机出错）：接上现在那一份
         reattachPipelineIfReplaced("resume");
+        // 在后台时这一次运行去掉了前座舱（离车）：照新的几路重新摆，新界面起来再登记预览
+        if (relayoutIfLanesChanged("resume")) {
+            return;
+        }
 
         // 预览又要用相机了 —— 画布都在、管线也接着的话现在登记（最小化回来就是这样：画布还在）；新建的界面还没接上管线，等接上再登记（见 claimPreviewIfReady）
         claimPreviewIfReady();
@@ -2923,6 +2977,7 @@ public class MainActivity extends AppCompatActivity {
                 + " changingConfigurations=" + isChangingConfigurations());
         AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
+        previewStall.detachAll();
 
         // 相机管线属于应用，不属于主界面（大纲 §2 阶段 6，channel-logic §五）：主界面销毁不放它，相机关不关交给通道调度 ——
         // 主界面只是登记表里的一个需要方。预览画布在画布销毁那一下交给管线（keepPreviewCanvas；onSurfaceTextureDestroyed 在
@@ -2974,6 +3029,7 @@ public class MainActivity extends AppCompatActivity {
         // 熄屏退后台的那一步：界面都没了，不用退
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeRunLanesListener(runLanesChanged);
         cancelBackgroundTask();
 
         // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉（停不停还看开机自启动、这一趟要录，见 stop）

@@ -82,6 +82,8 @@ public final class DiagnosticsCollector {
         timings.run("screen", () -> appendScreen(sb));
         timings.run("black box", () -> appendBlackBox(sb, context));
         timings.run("storage", () -> appendStorage(sb, context));
+        timings.run("footage audio", () -> appendFootageAudio(sb, context));
+        timings.run("drive sound", () -> appendDriveSound(sb));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("vehicle signals", () -> appendVehicleSignals(sb));
         timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
@@ -934,6 +936,14 @@ public final class DiagnosticsCollector {
                     .append('\n');
         }
         sb.append("可交互（isInteractive）: ").append(DisplayWatch.interactiveNow() ? "是" : "否").append('\n');
+        // 盲区画面投 HUD 用哪一块（HudScreen 的规则：1440x480、不是主屏；没有就退到 id 3，但不能是仪表盘）
+        java.util.List<HudScreen.Candidate> candidates = HudScreen.candidatesNow(context);
+        int bySize = HudScreen.findBySize(candidates);
+        int hudId = HudScreen.find(candidates);
+        sb.append("HUD（盲区画面投这一块）: ").append(bySize != HudScreen.NONE ? "id " + bySize + "（按尺寸 1440x480 找到）"
+                : hudId != HudScreen.NONE ? "id " + hudId + "（没有 1440x480 的屏，退到 id 3）" : "找不到").append('\n');
+        String hudWindow = SideViewService.describeHud();
+        sb.append("HUD 盲区画面窗口: ").append(hudWindow == null ? "盲区画面没在运行" : hudWindow).append('\n');
         if (displays.length <= 1) {
             sb.append(">> 只有一块屏，副屏推送不可用").append('\n');
         } else {
@@ -1132,9 +1142,15 @@ public final class DiagnosticsCollector {
         try {
             AppConfig cfg = new AppConfig(context);
             sb.append("车型: ").append(cfg.getCarModel()).append('\n');
-            // 此刻配置里启用了哪几路（RecordSpecs.enabledCameraKeys）。管线照建它那一刻的建（环视一直建，没启用时只给超级镜子），
-            // 配置改了、还没重启时两者可能不同：管线建了哪几路看 §2.3.2 通道
-            sb.append("启用的摄像头: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context)).append('\n');
+            // 这一次运行启用了哪几路（RecordSpecs.enabledCameraKeys：进程里第一次建管线时照存下的配置定，离车时可能去掉了前座舱），
+            // 和存下的配置里的（下一次启动用的）。前座舱只用一次（暂时的规矩，camera.FrontCabinOneShot）时两者生效后就不同。
+            // 管线建了哪几路看 §2.3.2 通道
+            sb.append("启用的摄像头（这一次运行）: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context))
+                    .append('\n');
+            sb.append("启用的摄像头（存下的配置，下一次启动用）: ")
+                    .append(com.kooo.evcam.profile.RecordSpecs.storedEnabledCameraKeys(context)).append('\n');
+            sb.append("前座舱只用一次: ").append(com.kooo.evcam.camera.FrontCabinOneShot.ACTIVE ? "开" : "关")
+                    .append('\n');
             // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准
             sb.append(new com.kooo.evcam.profile.ProfileStore(context).current()).append('\n');
             sb.append("录制模式: ").append(cfg.getRecordingMode())
@@ -1183,6 +1199,36 @@ public final class DiagnosticsCollector {
         } catch (Exception e) {
             sb.append("  !! 读不出来: ").append(e).append('\n');
         }
+        sb.append('\n');
+    }
+
+    /**
+     * 录制声音（开发者选项，试验，项目所有者 2026-10-20）：开没开、有没有权限、这一刻会不会带声音、前台服务带没带麦克风类型，
+     * 最近一次录像里的声音怎么样 —— 来源、实际走的设备、电平、全是 0 的那几段多长（后台被系统挡住的迹象）。
+     */
+    private static void appendFootageAudio(StringBuilder sb, Context context) {
+        sb.append("## 5.1 录制声音（开发者选项，试验）").append('\n');
+        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(context);
+        boolean granted = androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        String source = com.kooo.evcam.camera.FootageAudio.sourceFor(context, config);
+        sb.append("  开关=").append(config.isFootageAudioEnabled() ? "开" : "关")
+                .append("  来源=").append(config.getFootageAudioSource())
+                .append("  录音权限=").append(granted ? "有" : "没有")
+                .append("  这一刻开录会不会带声音=").append(source != null ? "会（环视）" : "不会").append('\n');
+        sb.append("  前台服务类型=").append(com.kooo.evcam.CameraForegroundService.foregroundTypes()).append('\n');
+        String latest = com.kooo.evcam.camera.FootageAudio.latestStatus();
+        sb.append("  最近一次录音=").append(latest == null ? "这次开进程还没录过" : latest).append('\n');
+        sb.append('\n');
+    }
+
+    /**
+     * 模拟声浪（开发者选项，试验，项目所有者 2026-10-21）：设置、快读那几个信号多新、声音线程此刻在做什么（为什么响 / 不响、
+     * 启动还是接入、转速、挡位、负荷、电平、踩油门的快慢、加速度）、车内喇叭（缓冲、欠载、输出延迟）、每块合成花了多久。
+     */
+    private static void appendDriveSound(StringBuilder sb) {
+        sb.append("## 5.2 模拟声浪（开发者选项，试验）").append('\n');
+        sb.append(com.kooo.evcam.sound.DriveSound.diagnostics());
         sb.append('\n');
     }
 

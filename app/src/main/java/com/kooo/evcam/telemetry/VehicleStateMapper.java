@@ -60,6 +60,7 @@ public final class VehicleStateMapper {
 
         b.steeringDegrees(r.number(Signal.STEERING));
         b.gear(r.text(Signal.GEAR));
+        b.driveMode(r.code(Signal.DRIVE_MODE));
         b.brake(percent(r.number(Signal.BRAKE_DEPTH)));
         b.throttle(percent(r.number(Signal.THROTTLE_DEPTH)));
         b.speedKmh(r.number(Signal.SPEED));
