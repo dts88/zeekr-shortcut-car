@@ -2,7 +2,7 @@
 <!--
   检查更新的安装提醒（update/UpdateInstallGuide）：一张说明图 + 「知道了，开始下载」。
 
-  和超级后视镜指南同一种样子：窗口铺满、底下压暗，图片居中。点图片外面不关 ——
+  和超级镜子指南同一种样子：窗口铺满、底下压暗，图片居中。点图片外面不关 ——
   这一页挡在下载前面，点空了就等于没下载，用户只会以为按钮没反应。返回键可以取消。
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"

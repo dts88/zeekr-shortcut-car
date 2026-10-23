@@ -16,6 +16,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,16 +30,18 @@ import java.util.List;
  * 预发布，用它会永远返回 404 —— 表现就是「永远没有更新」。
  * 所以这里拉列表，自己挑。</p>
  *
- * <h3>只推 beta 与正式版</h3>
+ * <h3>默认只推 beta 与正式版</h3>
  *
  * <p>alpha 是开发过程中随手发的，数量多、稳定性没有保证 ——
- * 不该被推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。
- * 设置里关掉「接收 Beta 版」时只推正式版（{@link VersionName#isRelease}）。</p>
+ * 不该不问一声就推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。
+ * 设置里关掉「接收 Beta 版」时只推正式版（{@link VersionName#isRelease}）；打开「接收 Alpha 版」
+ * （项目所有者 2026-10-23，默认关，只在 Beta 也开着时算数）时连 alpha 一起推（{@link VersionName#isAlphaBetaOrRelease}）。</p>
  *
  * <h3>这是本应用唯一一次主动出网</h3>
  *
  * <p>只在用户点「检查更新」时发生，去的是 {@code api.github.com} 和
- * GitHub 的下载域名，不带任何设备信息，也不上传任何东西。</p>
+ * GitHub 的下载域名，不带任何设备信息，也不上传任何东西。
+ * 只走 https；下载回来的 APK 要和 GitHub 给的 sha256、大小对上才算数（{@link DownloadIntegrity}）。</p>
  */
 public final class GithubReleases {
 
@@ -81,6 +84,9 @@ public final class GithubReleases {
     /** APK 的大小上限。本应用约 16 MB，留足余量，超过就当作不对劲。 */
     private static final long MAX_APK_BYTES = 200L * 1024 * 1024;
 
+    /** 跳转最多跟几次（{@link #open}）。 */
+    private static final int MAX_REDIRECTS = 5;
+
     private GithubReleases() {
     }
 
@@ -90,6 +96,8 @@ public final class GithubReleases {
         public final String apkName;
         public final String apkUrl;
         public final long apkBytes;
+        /** GitHub 给这个附件算的摘要（「sha256:」加十六进制）；没给时是空串或 "null"，下载时当失败（{@link DownloadIntegrity#expected}）。 */
+        public final String apkDigest;
         public final String pageUrl;
         /** 发布页上的说明原文（Markdown）。 */
         public final String body;
@@ -99,19 +107,20 @@ public final class GithubReleases {
          */
         public final String notes;
 
-        Release(String tagName, String apkName, String apkUrl, long apkBytes, String pageUrl,
+        Release(String tagName, String apkName, String apkUrl, long apkBytes, String apkDigest, String pageUrl,
                 String body, String notes) {
             this.tagName = tagName;
             this.apkName = apkName;
             this.apkUrl = apkUrl;
             this.apkBytes = apkBytes;
+            this.apkDigest = apkDigest;
             this.pageUrl = pageUrl;
             this.body = body;
             this.notes = notes;
         }
 
         Release withNotes(String notes) {
-            return new Release(tagName, apkName, apkUrl, apkBytes, pageUrl, body, notes);
+            return new Release(tagName, apkName, apkUrl, apkBytes, apkDigest, pageUrl, body, notes);
         }
     }
 
@@ -124,15 +133,16 @@ public final class GithubReleases {
      * 取版本号最大的那个非草稿版本，并带上从手上这版到它之间的更新内容。
      *
      * <p>更新内容不只取最新那一版：跳过了几个版本的人，想知道的是「装上之后和现在比多了什么」，
-     * 所以把中间每个会被推送的版本都列出来（alpha 不推，也就不列）。
+     * 所以把中间每个会被推送的版本都列出来（不推的那几档也就不列）。
      * 发布列表本来就是一次请求拿全的，不多花一次网络。</p>
      *
-     * @param includeBeta    true：beta 和正式版都算；false：只算正式版。alpha 永远不算
+     * @param includeBeta    true：beta 和正式版都算；false：只算正式版
+     * @param includeAlpha   true：alpha 也算（只在 includeBeta 也是 true 时有用 —— 一档比一档新，要 alpha 先得要 beta）
      * @param currentVersion 手上这一版的版本名，用来挑出「比它新」的那几个
      * @return 没有符合条件、且带 APK 的版本时返回 null
      * @throws IOException 网络或解析出错
      */
-    public static Release fetchLatest(boolean includeBeta, String currentVersion)
+    public static Release fetchLatest(boolean includeBeta, boolean includeAlpha, String currentVersion)
             throws IOException {
         String body = getText(LIST_URL);
         Release best = null;
@@ -149,12 +159,12 @@ public final class GithubReleases {
                 if (candidate == null) {
                     continue;
                 }
-                boolean eligible = includeBeta
-                        ? VersionName.isBetaOrRelease(candidate.tagName)
-                        : VersionName.isRelease(candidate.tagName);
+                boolean eligible = !includeBeta ? VersionName.isRelease(candidate.tagName)
+                        : includeAlpha ? VersionName.isAlphaBetaOrRelease(candidate.tagName)
+                        : VersionName.isBetaOrRelease(candidate.tagName);
                 if (!eligible) {
-                    // alpha 永远不推：那是开发过程里随手发的，不该盖到一台在用的车机上。
-                    // 关了「接收 Beta 版」时 beta 也不推
+                    // alpha 默认不推：那是开发过程里随手发的，不该不问一声就盖到一台在用的车机上。
+                    // 关了「接收 Beta 版」时 beta、alpha 都不推
                     continue;
                 }
                 if (best == null || VersionName.compare(candidate.tagName, best.tagName) > 0) {
@@ -200,6 +210,7 @@ public final class GithubReleases {
                         name,
                         url,
                         asset.optLong("size", 0),
+                        asset.optString("digest", ""),
                         release.optString("html_url", ""),
                         release.optString("body", ""),
                         "");
@@ -211,11 +222,21 @@ public final class GithubReleases {
     /**
      * 把 APK 下载到指定文件。
      *
+     * <p>边收边算 sha256，收完大小和 sha256 都要和 GitHub 给的对上（{@link DownloadIntegrity}）；
+     * GitHub 没给 sha256 的不下载。</p>
+     *
      * <p>失败时会把没下完的残件删掉 —— 留着一个半截的 APK，下次装的时候
      * 只会得到一句莫名其妙的「解析包时出现问题」。</p>
      */
     public static void download(Release release, File target, ProgressListener listener)
             throws IOException {
+        String expected;
+        try {
+            expected = DownloadIntegrity.expected(release.apkDigest);
+        } catch (IOException e) {
+            throw new Failure(e.getMessage(), R.string.upd_err_integrity).because(e);
+        }
+        MessageDigest hash = DownloadIntegrity.sha256();
         HttpURLConnection connection = open(release.apkUrl);
         try {
             int code = connection.getResponseCode();
@@ -240,6 +261,7 @@ public final class GithubReleases {
                 int n;
                 while ((n = in.read(buffer)) != -1) {
                     out.write(buffer, 0, n);
+                    hash.update(buffer, 0, n);
                     done += n;
                     if (done > MAX_APK_BYTES) {
                         throw new Failure("Download exceeded the size limit, aborted",
@@ -253,6 +275,11 @@ public final class GithubReleases {
             if (total > 0 && done != total) {
                 throw new Failure("Only received " + done + "/" + total + " bytes",
                         R.string.upd_err_truncated, done, total);
+            }
+            try {
+                DownloadIntegrity.verify(expected, hash.digest(), release.apkBytes, done);
+            } catch (IOException e) {
+                throw new Failure(e.getMessage(), R.string.upd_err_integrity).because(e);
             }
             AppLog.d(TAG, "已下载 " + release.apkName + "（" + done + " 字节）");
         } catch (IOException e) {
@@ -291,14 +318,40 @@ public final class GithubReleases {
         }
     }
 
+    /**
+     * 发一个 GET。跳转自己跟（GitHub 的下载链接会跳到存储域名）：每一跳都要是 https（{@link DownloadIntegrity#https}），
+     * 最多 {@link #MAX_REDIRECTS} 次。
+     */
     private static HttpURLConnection open(String url) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setRequestMethod("GET");
-        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        connection.setReadTimeout(READ_TIMEOUT_MS);
-        connection.setRequestProperty("User-Agent", USER_AGENT);
-        connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setInstanceFollowRedirects(true);
-        return connection;
+        URL next = DownloadIntegrity.https(url);
+        for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+            HttpURLConnection connection = (HttpURLConnection) next.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("User-Agent", USER_AGENT);
+            connection.setRequestProperty("Accept", "application/vnd.github+json");
+            connection.setInstanceFollowRedirects(false);
+            try {
+                if (!isRedirect(connection.getResponseCode())) {
+                    return connection;
+                }
+                String location = connection.getHeaderField("Location");
+                if (location == null) {
+                    throw new IOException("Redirect without Location");
+                }
+                // Location 可能是相对路径：照这一跳的地址解析
+                next = DownloadIntegrity.https(new URL(next, location).toString());
+            } catch (IOException e) {
+                connection.disconnect();
+                throw e;
+            }
+            connection.disconnect();
+        }
+        throw new IOException("Too many update redirects");
+    }
+
+    private static boolean isRedirect(int status) {
+        return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
     }
 }

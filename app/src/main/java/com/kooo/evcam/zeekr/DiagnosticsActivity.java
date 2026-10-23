@@ -194,11 +194,7 @@ public class DiagnosticsActivity extends AppCompatActivity {
             return null;
         }
         try {
-            boolean useExternal = new com.kooo.evcam.AppConfig(this).isUsingExternalSdCard();
-            File dir = StorageHelper.getLogDir(this, useExternal);
-            if (dir == null) {
-                dir = getExternalFilesDir(null);
-            }
+            File dir = StorageHelper.getExportDir(this);
             if (dir != null && !dir.exists() && !dir.mkdirs()) {
                 toast(getString(R.string.diag_mkdir_failed, dir.getAbsolutePath()));
                 return null;

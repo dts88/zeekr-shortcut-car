@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -42,8 +41,8 @@ import java.util.function.Consumer;
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
  *   <li>录像输出离开了会话（改输出摘掉的），或者关着的一路录像不再留着它（停了录、不在计划里），告诉声明它的那一方
- *       （{@link #dispatchDrops}）；交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级后视镜留住的画布、
- *       换下来的录制器）离开了会话的，放掉；</li>
+ *       （{@link #dispatchDrops}）；交给它的消费者（{@link #handOver}：主界面重建时留住的预览画布、关掉的超级镜子留住的画布、
+ *       移走的盲区画面窗口留住的画布、换下来的录制器）离开了会话的，放掉；</li>
  *   <li>被拿着的一路有人要、到了 30 秒就问一次相机服务（只问，不开）；关完一轮 30 秒的、别的程序拿走一路相机 30 秒的
  *       （{@link #watchAfter}），量一次还开着的那几路（{@link #noteAftermaths}；在那之前我们自己动了它的，量到动它那一刻）；
  *       关座舱时环视开着的，关完那一刻、1 秒、30 秒各量一次环视（{@link Coupling}，2.11.5 第 D2 项）；救完一路接着量别的几路到下一步开始；
@@ -160,6 +159,12 @@ public final class ChannelScheduler {
         /** 眼下这份会话的快照：输出、代号、配好的时刻（调度的钟）。 */
         SingleCamera.SessionOutputs sessionOutputs();
 
+        /**
+         * 这一样输出此刻还挂在这一路相机上：眼下的会话带着它，或者会话、设备已经开始关、还没关完（相机还在往它写）。
+         * 关一开始会话快照就清了，关会话、关设备还要几百毫秒到十几秒（{@link #sessionCarries}）。
+         */
+        boolean stillCarries(ChannelRules.Out out);
+
         /** 已声明、消费者还活着的输出。 */
         Set<ChannelRules.Out> declaredOutputs();
 
@@ -181,7 +186,7 @@ public final class ChannelScheduler {
         /** 最后一次报错的短名；没有是 null。 */
         String lastErrorName();
 
-        /** 一个录像输出离开了会话：告诉声明它的录像那一侧（撤回了的不告诉）。 */
+        /** 一个录像、盲区画面输出离开了会话：告诉声明它的那一侧（撤回了的不告诉）。 */
         void dropped(ChannelRules.Out out, SingleCamera.Drop why);
 
         /**
@@ -203,6 +208,9 @@ public final class ChannelScheduler {
 
         /** 录像要哪几路：这一次录像的计划。 */
         Set<String> recordPlan();
+
+        /** 超级镜子要后座舱：切换范围是「后视 + 后座舱」（{@link ChannelRules.World#mirrorCabin}）。哪个线程都能调。 */
+        boolean mirrorWantsCabinRear();
 
         /**
          * 屏幕亮着（屏幕真没黑：ScreenState.dark 的反面）。通道眼里亮不亮由调度照规则算（{@link ChannelRules#darkForChannel}：
@@ -263,6 +271,15 @@ public final class ChannelScheduler {
 
         /** 退出之后都关完了，调度停了：摘掉它接在别处的监听。 */
         void stopped();
+
+        /** 前座舱只用一次的规矩开着（暂时，FrontCabinOneShot.ACTIVE；{@link ChannelRules.World#frontCabinOneShot}）。 */
+        boolean frontCabinOneShot();
+
+        /**
+         * 这次运行启用的前座舱去掉了（{@link ChannelRules.Event.Type#FRONT_CABIN_RETIRED}，通道眼里熄屏的那一刻）：管线、录像、主界面
+         * 把 {@code key} 这一路从这次运行里拿掉。只来一次。
+         */
+        void frontCabinRetired(String key);
     }
 
     /**
@@ -292,6 +309,12 @@ public final class ChannelScheduler {
          * 补建录制器 —— 熄屏时不为它建）。
          */
         void onLaneConditionChanged(String key);
+
+        /**
+         * 这一路「谁要它」变了（{@link ChannelRules#wantersChanged}）：会话连着几次带不上录像输出、在等的那一路这时再试 ——
+         * 和解除停手同一个解锁。
+         */
+        void onLaneWantersChanged(String key);
     }
 
     /** 一路的相机为什么走了（{@link Recording#onLaneCameraGone}）。 */
@@ -315,6 +338,10 @@ public final class ChannelScheduler {
 
         @Override
         public void onLaneConditionChanged(String key) {
+        }
+
+        @Override
+        public void onLaneWantersChanged(String key) {
         }
     };
 
@@ -1348,8 +1375,8 @@ public final class ChannelScheduler {
     private final Runnable roundTask = this::round;
     private final Runnable timerTask = this::wake;
 
-    /** 登记表的监听叫过来、登记表真的变了的次数（哪个线程都能加；每一轮收走）。 */
-    private final AtomicInteger needsChanges = new AtomicInteger();
+    /** 登记表的监听叫过来、登记、放开过的登记方（哪个线程都能加；每一轮收走，交给 {@link ChannelRules.World#changed}）。 */
+    private final Set<CameraNeeds.Holder> changedHolders = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /** 监听上一次看到的登记表：车机要睡那一项变了也会叫，但那不算「登记表变了」（不解除停手）。 */
     private final AtomicReference<Set<CameraNeeds.Holder>> notifiedHolders =
             new AtomicReference<>(EnumSet.noneOf(CameraNeeds.Holder.class));
@@ -1417,7 +1444,7 @@ public final class ChannelScheduler {
     private final Map<String, long[]> releases = new HashMap<>();
     /**
      * 交给调度、等它离开会话再放的消费者（{@link #handOver}），按路：输出 → 怎么放。大纲 §7.6 主界面重建时留住的预览画布、
-     * §7.7 关掉的超级后视镜留住的画布、换下来的录制器。
+     * §7.7 关掉的超级镜子留住的画布（移走的盲区画面窗口同样）、换下来的录制器。
      * 不随 {@link #setLanes} 清：路没了的下一轮就放，不漏。
      */
     private final Map<String, Map<ChannelRules.Out, Runnable>> handedOver = new LinkedHashMap<>();
@@ -1540,9 +1567,7 @@ public final class ChannelScheduler {
     void onNeedsChanged() {
         Set<CameraNeeds.Holder> now = host.holders();
         Set<CameraNeeds.Holder> before = notifiedHolders.getAndSet(now);
-        if (!now.equals(before)) {
-            needsChanges.incrementAndGet();
-        }
+        changedHolders.addAll(symmetricDifference(before, now));
         if (host.headUnitSleeps()) {
             long at = clock.now();
             sleepNoticedAt.compareAndSet(0, at);
@@ -1584,8 +1609,8 @@ public final class ChannelScheduler {
      * 不能早放：会话还带着它的时候放掉，它就成了死输出，那一路整条重复请求停下，只能马上摘（大纲 §6 风险 2）。</p>
      *
      * <p>用在大纲 §7.6、§7.7（项目所有者 2026-10-11 都答「按建议」）：主界面重建（换日夜模式、换语言、从最近任务划掉）、
-     * 关超级后视镜（服务退出、窗口移走）时 onSurfaceTextureDestroyed 返回 false，预览画布、后视镜画布交到这里；
-     * 新界面、新开的后视镜窗口用 {@code TextureView.setSurfaceTexture} 接回同一块的，先 {@link #reclaim} 拿回去 ——
+     * 关超级镜子（服务退出、窗口移走）、移走盲区画面窗口时 onSurfaceTextureDestroyed 返回 false，预览、后视镜、盲区画面的画布交到这里；
+     * 新界面、新开的后视镜、盲区画面窗口用 {@code TextureView.setSurfaceTexture} 接回同一块的，先 {@link #reclaim} 拿回去 ——
      * 同一块画布就是同一个输出，通道零变动。调度这一侧不分是谁的画布：输出种类、哪一路都在 {@code out}、{@code key} 里。</p>
      */
     public void handOver(String key, ChannelRules.Out out, Runnable release) {
@@ -1606,12 +1631,17 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 这一路此刻的会话里带着 {@code out} 吗（调度还没停）。画布要被系统收走时，管线据此找会话里还带着它的那一份调度去交
-     * （MultiCameraManager.ownerOf：退出、换车型时放了的那一份管线，它的调度还在按次序关）。
+     * 这一路相机此刻还带着 {@code out} 吗（调度还没停）：会话里带着，或者那一次关还没关完（{@link CameraPort#stillCarries}）。
+     * 画布要被系统收走时，管线据此找还带着它的那一份调度去交（MultiCameraManager.ownerOf：退出、换车型、为超级镜子重建时
+     * 放了的那一份管线，它的调度还在按次序关）。
+     *
+     * <p>以前只看会话快照（2026-10-20 审查，车主批）：关环视一开始快照就清了，可相机线程上关会话、关设备还要几百毫秒到十几秒，
+     * 这期间退出或者重建，主界面、超级镜子、盲区画面的画布在关完之前就被放掉 —— 正是「会话里的画布只由调度放」（2.11.4 R1）要防的。
+     * 现在算到关完：交给那一份调度，它照「离开会话、手上没有在途的一步」再放（{@link #releaseHandedOver}）。</p>
      */
     boolean sessionCarries(String key, ChannelRules.Out out) {
         CameraPort port = ports.get(key);
-        return !stopped && port != null && out != null && port.sessionOutputs().carries(out);
+        return !stopped && port != null && out != null && port.stillCarries(out);
     }
 
     /**
@@ -1757,17 +1787,34 @@ public final class ChannelScheduler {
         wake();
     }
 
-    /** 相机层自己丢了一样输出（消费者被系统收走、会话配不上）：是录像输出就当场告诉录像那一侧。 */
+    /**
+     * 相机层自己丢了一样输出（消费者被系统收走、会话配不上、共享预览流挂不下）：当场告诉声明它的那一侧 ——
+     * 录像、盲区画面、超级镜子（只有它们留了接收方，{@link SingleCamera#dropListener}）。盲区画面、超级镜子收到「配不上」
+     * 撤回声明，调度就不会一直想把它加回去、一次次重建这一路的会话。
+     */
     void onOutputDropped(String cameraId, ChannelRules.Out out, SingleCamera.Drop why) {
         ChannelRules.Lane lane = live(cameraId);
         if (lane == null) {
             return;
         }
         CameraPort port = ports.get(lane.key);
-        if (port != null && out != null && out.kind == ChannelRules.Kind.RECORD) {
+        if (port != null && out != null
+                && (out.kind == ChannelRules.Kind.RECORD || out.kind == ChannelRules.Kind.SIDE
+                || out.kind == ChannelRules.Kind.HUD || out.kind == ChannelRules.Kind.MIRROR)) {
             port.dropped(out, why);
         }
         wake();
+    }
+
+    /** {@code a}、{@code b} 只在一边的那几个登记方。 */
+    private static Set<CameraNeeds.Holder> symmetricDifference(Set<CameraNeeds.Holder> a, Set<CameraNeeds.Holder> b) {
+        Set<CameraNeeds.Holder> diff = EnumSet.noneOf(CameraNeeds.Holder.class);
+        for (CameraNeeds.Holder holder : CameraNeeds.Holder.values()) {
+            if (a.contains(holder) != b.contains(holder)) {
+                diff.add(holder);
+            }
+        }
+        return diff;
     }
 
     /** 回调要用的那一路；调度停了、不认识这台相机是 null。顺手对一下钟。 */
@@ -1907,16 +1954,25 @@ public final class ChannelScheduler {
     private void refresh(long now) {
         long offset = host.elapsedNow() - now;
         Set<CameraNeeds.Holder> holders = host.holders();
-        int changes = needsChanges.getAndSet(0);
-        if (changes > 0) {
-            w.needsVersion += changes;
-        } else if (!w.holders.equals(holders)) {
-            w.needsVersion++;
+        for (java.util.Iterator<CameraNeeds.Holder> it = changedHolders.iterator(); it.hasNext(); ) {
+            w.changed.add(it.next());
+            it.remove();
         }
+        // 没经过监听的变化（监听还没挂上时）也认
+        w.changed.addAll(symmetricDifference(w.holders, holders));
         w.holders.clear();
         w.holders.addAll(holders);
         w.recordPlan.clear();
         w.recordPlan.addAll(host.recordPlan());
+        boolean mirrorCabin = host.mirrorWantsCabinRear();
+        if (mirrorCabin != w.mirrorCabin) {
+            w.mirrorCabin = mirrorCabin;
+            if (w.holders.contains(CameraNeeds.Holder.MIRROR)) {
+                // 切换范围换了、后视镜登记着：和后视镜登记、放开一样，后座舱要不要、带不带超级镜子的画布跟着变。
+                // 没登记着时谁的要求都没变，不算（不为它放开停手的路）
+                w.changed.add(CameraNeeds.Holder.MIRROR);
+            }
+        }
         noteNeeds();
 
         boolean wasOn = w.screenOn;
@@ -1937,6 +1993,7 @@ public final class ChannelScheduler {
         w.cameraUsable = main || serviceStartedVisible;
         w.heardAnything = host.heardAnything();
         w.lastOthersChangeAt = ourClock(host.lastOthersChangeAt(), offset);
+        w.frontCabinOneShot = host.frontCabinOneShot();
 
         if (host.headUnitSleeps()) {
             sleepNoticedAt.compareAndSet(0, now);
@@ -2445,6 +2502,11 @@ public final class ChannelScheduler {
                 case STOP_LIFTED:
                     journal.stopLifted(event.keys.get(0), event.cause, copyOf(w.holders));
                     break;
+                case WANTERS_CHANGED:
+                    for (String key : event.keys) {
+                        recording.onLaneWantersChanged(key);
+                    }
+                    break;
                 case GAVE_UP:
                     journal.gaveUp(event.keys.get(0));
                     break;
@@ -2453,6 +2515,9 @@ public final class ChannelScheduler {
                     journal.stopped(event.keys.get(0), port == null ? null : port.lastErrorName());
                     break;
                 }
+                case FRONT_CABIN_RETIRED:
+                    host.frontCabinRetired(event.keys.get(0));
+                    break;
                 default:
                     break;
             }

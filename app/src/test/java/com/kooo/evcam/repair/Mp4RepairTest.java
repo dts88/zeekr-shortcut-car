@@ -11,6 +11,9 @@ import static com.kooo.evcam.repair.Mp4Repair.u16;
 import static com.kooo.evcam.repair.Mp4Repair.u32;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -49,6 +52,8 @@ public class Mp4RepairTest {
 
     /** 每帧的字节数（含 4 字节长度前缀），造文件时记下来，验索引时用。 */
     private final List<long[]> expected = new ArrayList<>();  // {偏移, 大小, 是否关键帧}
+    /** 夹在画面中间的声音块一共多少字节（录着声音的文件）。 */
+    private long soundBytes;
 
     // ================================================================= 整个来回
 
@@ -94,6 +99,83 @@ public class Mp4RepairTest {
         assertArrayEquals(template.stsd, after.stsd);
         assertEquals(template.timescale, after.timescale);
         assertEquals(3100, after.sampleTicks);
+    }
+
+    // ================================================================= 录着声音的文件
+
+    /**
+     * 环视那一路录着声音时，mdat 里画面一块、声音一块交替着。声音没有长度前缀：走到它就接不上了，
+     * 要找到下一块画面接着走 —— 一帧都不能少，位置、大小一个字节不差，声音那几块整块跳过。
+     */
+    @Test
+    public void skipsTheSoundBlocksBetweenPictureBlocks() throws IOException {
+        File reference = writeReference(folder.newFile("20250101_120000_surround.mp4"));
+        File broken = writeBroken(folder.newFile("20250101_120100_surround.mp4"), 5, false);
+
+        Mp4Repair.Repaired repaired = Mp4Repair.repair(broken, Mp4Repair.templateFrom(reference), null);
+        assertEquals(FRAMES, repaired.samples);
+        assertEquals(3, repaired.syncSamples);
+        assertEquals("声音那几块整块跳过", soundBytes, repaired.otherBytes);
+        assertEquals("结尾写了一半的那一帧照样丢掉", 14, repaired.tailIgnored);
+
+        byte[] file = Files.readAllBytes(broken.toPath());
+        checkSampleTable(path(child(file, 0, file.length, "moov"), "trak", "mdia", "minf", "stbl"));
+    }
+
+    /**
+     * 一块声音的开头碰巧像一个 NAL，长度又落在文件里：照它走会一口跳过后面好几帧画面。
+     * 它后面接不上，在它自己那一截里能找到下一块画面 —— 所以它是假的，从那块画面接着走。
+     */
+    @Test
+    public void aSoundBlockThatStartsLikeANalDoesNotSwallowThePicturesAfterIt() throws IOException {
+        File reference = writeReference(folder.newFile("20250101_120000_surround.mp4"));
+        File broken = writeBroken(folder.newFile("20250101_120100_surround.mp4"), 5, true);
+
+        Mp4Repair.Repaired repaired = Mp4Repair.repair(broken, Mp4Repair.templateFrom(reference), null);
+        assertEquals(FRAMES, repaired.samples);
+        assertEquals(soundBytes, repaired.otherBytes);
+
+        byte[] file = Files.readAllBytes(broken.toPath());
+        checkSampleTable(path(child(file, 0, file.length, "moov"), "trak", "mdia", "minf", "stbl"));
+    }
+
+    /** HEVC 的 NAL 头：层号要是 0、时域号不能是 0、禁止位是 0、类型是编码器会出的那几种。 */
+    @Test
+    public void hevcNalHeadersMustLookLikeAnEncoderMadeThem() throws IOException {
+        // 长度 4：两字节头 + 两字节内容
+        assertNotNull("IDR_W_RADL", readOne(new byte[]{0, 0, 0, 4, 0x26, 0x01, (byte) 0x80, 0}, true));
+        assertNotNull("TRAIL_R", readOne(new byte[]{0, 0, 0, 4, 0x02, 0x01, (byte) 0x80, 0}, true));
+        assertNotNull("VPS", readOne(new byte[]{0, 0, 0, 4, 0x40, 0x01, 0x0C, 0}, true));
+        assertNull("层号不是 0", readOne(new byte[]{0, 0, 0, 4, 0x26, 0x09, (byte) 0x80, 0}, true));
+        assertNull("时域号是 0", readOne(new byte[]{0, 0, 0, 4, 0x26, 0x00, (byte) 0x80, 0}, true));
+        assertNull("禁止位是 1", readOne(new byte[]{0, 0, 0, 4, (byte) 0xA6, 0x01, (byte) 0x80, 0}, true));
+        assertNull("保留类型 24", readOne(new byte[]{0, 0, 0, 4, 0x30, 0x01, (byte) 0x80, 0}, true));
+        assertNull("长度超出文件", readOne(new byte[]{0, 0, 0, 9, 0x26, 0x01, (byte) 0x80, 0}, true));
+
+        Mp4Repair.Nal idr = readOne(new byte[]{0, 0, 0, 4, 0x26, 0x01, (byte) 0x80, 0}, true);
+        assertTrue(idr.slice);
+        assertTrue(idr.key);
+        assertTrue("新的一帧的第一个条带能开一帧", idr.opensPicture);
+        Mp4Repair.Nal second = readOne(new byte[]{0, 0, 0, 4, 0x02, 0x01, 0x40, 0}, true);
+        assertFalse("同一帧的第二个条带开不了一帧", second.opensPicture);
+    }
+
+    /** H.264 的 NAL 头：nal_ref_idc 和类型对得上（IDR / 参数集不能是 0，SEI / 分隔符必须是 0）。 */
+    @Test
+    public void avcNalHeadersMustAgreeWithTheirReferenceIdc() throws IOException {
+        assertNotNull("IDR", readOne(new byte[]{0, 0, 0, 2, 0x65, (byte) 0x80}, false));
+        assertNotNull("SEI", readOne(new byte[]{0, 0, 0, 2, 0x06, 0x05}, false));
+        assertNull("IDR 的 nal_ref_idc 是 0", readOne(new byte[]{0, 0, 0, 2, 0x05, (byte) 0x80}, false));
+        assertNull("SEI 的 nal_ref_idc 不是 0", readOne(new byte[]{0, 0, 0, 2, 0x26, 0x05}, false));
+        assertNull("类型 0", readOne(new byte[]{0, 0, 0, 2, 0x60, (byte) 0x80}, false));
+    }
+
+    private Mp4Repair.Nal readOne(byte[] bytes, boolean hevc) throws IOException {
+        File file = folder.newFile();
+        Files.write(file.toPath(), bytes);
+        try (Mp4Repair.Reader in = new Mp4Repair.Reader(file)) {
+            return Mp4Repair.readNal(in, 0, bytes.length, hevc);
+        }
     }
 
     @Test
@@ -198,9 +280,18 @@ public class Mp4RepairTest {
      * 用「长度 1 + 8 字节 0」占位，后面直接跟画面数据。</p>
      */
     private File writeBroken(File file) throws IOException {
+        return writeBroken(file, 0, false);
+    }
+
+    /**
+     * @param soundEvery 每这么多帧后面插一块声音（几帧 AAC 的样子，没有长度前缀）；0 = 不插
+     * @param fakeNal    第一块声音的开头做成像一个 H.264 条带的样子，长度落在后面的画面里（但不正好落在一个 NAL 上）
+     */
+    private File writeBroken(File file, int soundEvery, boolean fakeNal) throws IOException {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         byte[] header = cat(ftyp(), freeBox(512), mdatPlaceholder());
         long at = header.length;
+        long fakeAt = -1;
 
         for (int i = 0; i < FRAMES; i++) {
             boolean key = i % 10 == 0;
@@ -216,17 +307,64 @@ public class Mp4RepairTest {
             }
             at += size;
             expected.add(new long[]{start, size, key ? 1 : 0});
+            if (soundEvery > 0 && i % soundEvery == soundEvery - 1 && i < FRAMES - 1) {
+                byte[] sound = soundBlock(i);
+                if (fakeNal && fakeAt < 0) {
+                    fakeAt = at;
+                    // 长度先空着（造完再定），后面一个字节像 H.264 的非 IDR 条带：nal_ref_idc 2、类型 1
+                    sound[4] = 0x41;
+                }
+                body.write(sound);
+                at += sound.length;
+                soundBytes += sound.length;
+            }
         }
 
         // 结尾：长度前缀说还有 999999 字节，实际只写了 10 个 —— 断电就断在这里
         body.write(new byte[]{0x00, 0x0F, 0x42, 0x3F});
         body.write(filler(10));
 
+        byte[] data = body.toByteArray();
         try (FileOutputStream out = new FileOutputStream(file)) {
             out.write(header);
-            out.write(body.toByteArray());
+            out.write(data);
+        }
+        if (fakeAt >= 0) {
+            // 假长度：越过这一块声音、落在后面的画面中间，又不正好落在一个认得出的 NAL 上
+            // （真碰上那种，从那里接着走也是对的 —— 这里要验的是「落在中间」那种常见的）
+            long end = header.length + data.length;
+            long length = 3000;
+            try (Mp4Repair.Reader in = new Mp4Repair.Reader(file)) {
+                while (fakeAt + 4 + length >= end || Mp4Repair.readNal(in, fakeAt + 4 + length, end, false) != null) {
+                    length++;
+                }
+            }
+            assertTrue("假长度要越过这一块声音", fakeAt + 4 + length > fakeAt + soundBlock(0).length);
+            byte[] patched = u32(length);
+            System.arraycopy(patched, 0, data, (int) (fakeAt - header.length), 4);
+            try (FileOutputStream out = new FileOutputStream(file)) {
+                out.write(header);
+                out.write(data);
+            }
         }
         return file;
+    }
+
+    /**
+     * 一块声音：6 帧 AAC 的样子（单声道 AAC 一帧的头一个字节是 0x00 或 0x01，后面是编码数据），每帧 150 字节。
+     * 内容按 seed 定，每次造出来一样。
+     */
+    private static byte[] soundBlock(int seed) {
+        byte[] out = new byte[6 * 150];
+        long x = 0x9E3779B97F4A7C15L ^ seed;
+        for (int i = 0; i < out.length; i++) {
+            x = x * 6364136223846793005L + 1442695040888963407L;
+            out[i] = (byte) (x >>> 56);
+        }
+        for (int frame = 0; frame < 6; frame++) {
+            out[frame * 150] = (byte) (frame % 2);
+        }
+        return out;
     }
 
     private static int write(ByteArrayOutputStream out, byte[] bytes) throws IOException {

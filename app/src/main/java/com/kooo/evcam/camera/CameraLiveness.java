@@ -158,7 +158,7 @@ public final class CameraLiveness {
             return true;
         }
 
-        /** 登记表变了（谁要哪几路变了）：停手的这一路重新救，同 {@link #liftStop()}。 */
+        /** 要这一路的登记方变了（ChannelRules.wantersChanged）：停手的这一路重新救，同 {@link #liftStop()}。 */
         public boolean registerChanged() {
             return liftStop();
         }

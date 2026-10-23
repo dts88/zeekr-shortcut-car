@@ -45,13 +45,20 @@ public final class CameraNeeds {
         PREVIEW,
         /** 录制中，或者正要开始录。 */
         RECORDING,
-        /** 超级后视镜那个悬浮窗。 */
+        /** 超级镜子那个悬浮窗。 */
         MIRROR,
         /**
          * 拍照：从按下快门到这一张存完（或放弃）。相机没开就为它开，主界面不在前台时由出帧口出画面；
          * 拍完注销，没人要了照常关（1.67.0）。
          */
-        PHOTO
+        PHOTO,
+        /**
+         * 盲区画面（打转向灯时弹出那一侧的摄像头画面）：设置里开着、亮屏，挂 D 挡（窗口隐藏着备好，打灯只是显示出来）
+         * 或者正在显示时登记；离开 D 挡 30 秒后、熄屏、原厂画面出现、关掉这个功能时注销；相机层丢了它（或窗口挂不上）时
+         * 这一段注销、不再登记，下一次挂窗口再试（zeekr.SideViewTrigger、SideViewService）。要的是环视，配置里没开环视也要 ——
+         * 和超级镜子同一条规矩（项目所有者 2026-10-16）。
+         */
+        SIDE_VIEW
     }
 
     private static final CameraNeeds CURRENT = new CameraNeeds();
