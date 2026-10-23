@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.21.0-alpha] - 2026-10-23
+
 - Settings → Recording: Timestamp now also covers the recording specs (one switch for both). Plate number stamp is one row: the switch shows or hides the plate, tapping the row edits it (turning it on with no plate asks for one first). Driving info bar is one row too: tapping it opens System info to choose what it shows, and the row shows how many are selected. App stamp moves to Developer options; so does Vehicle status from Settings → Interface.
 - Settings → Storage: the save folder moves into the Storage location chooser, with a note under the options recommending a drive on the USB-A port. Video and photo caps are one row, Storage caps, edited together in one dialog with the cleanup rules under the fields. Footage lock is one row that shows how much is locked; when it is on, Auto lock buttons sit under it: Flash to pass, and Horn, greyed out until the horn signal can be read. Notes in dialogs now sit under the options or fields.
 

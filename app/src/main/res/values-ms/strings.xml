@@ -43,7 +43,7 @@
     <string name="set_info_bar_summary">Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.</string>
     <string name="set_info_bar_value">%1$d dipilih</string>
     <string name="set_storage_location_title">Lokasi storan</string>
-    <string name="set_storage_port_note">Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta.</string>
+    <string name="set_storage_port_note">Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta; sebarang rakaman selepas itu disimpan ke pemacu pada port USB-A.</string>
     <string name="set_relay_title">Tulis melalui perantara</string>
     <string name="set_relay_summary">Menulis ke storan dalaman dahulu, kemudian memindahkan setiap klip yang siap ke pemacu USB, mengurangkan bingkai tercicir pada pemacu perlahan. Jika dihidupkan, rakaman tidak beralih ke pemacu USB lain apabila pemacu ini terputus.</string>
     <string name="set_storage_usage_no_drive">Tiada pemacu USB ditemui</string>

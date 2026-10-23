@@ -279,6 +279,11 @@
     关着时 set_footage_locked_value_unprotected「已锁定 %1$d 个 · %2$s，不受保护」/「…, not protected」/「…, tidak dilindungi」。
   - msg_storage_full_stopped / msg_storage_full_refuse 里引用的标题改成「未设置录像的「存储上限」」
     （「U 盘已满，录制已停止。未设置录像的「存储上限」，不会自动清理旧录像。」；英文、马来文没有引用标题，不动）。
+- 2026-10-23 批准（存储页选盘框选项下面的说明，意思是项目所有者给的：推荐 USB-A 口、实测 Type-C 口下车后断电、
+  之后的录制进 USB-A 口的 U 盘）：set_storage_port_note 取代 set_storage_sentry_note ——
+  「推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。」/
+  「A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car; any recording after that goes to the drive on the USB-A port.」/
+  「Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta; sebarang rakaman selepas itu disimpan ke pemacu pada port USB-A.」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -287,11 +292,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-10-23（存储页：选盘框里哨兵模式那一段，项目所有者给了意思，措辞待确认）：set_storage_port_note 取代 set_storage_sentry_note，
-  写在选项下面 ——「推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电。」/
-  「A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car.」/
-  「Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta.」。
-  原来那段的后半句（Type-C 口断电后自动改为录制到 USB-A 口的 U 盘）不再写。
+- （现在没有。）
 
 ---
 
