@@ -36,7 +36,7 @@
 主界面和回放里都能用。悬浮按钮在任何界面都显示是否正在录，
 点一下回到应用。
 
-### 超级后视镜
+### 超级镜子
 
 电子后视镜：可停靠的悬浮窗，把任意一路单独放大。捏合缩放，左右划换一路，中间三分之一上下滑调取景高低。
 也可以打开「按键模式」，点窗口的上、下、左、右切换摄像头。
@@ -82,6 +82,10 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 ## 推荐
 
+**[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)**：wysie 针对极氪 009 车机优化的极氪即刻版本。Wysie 也是提供了大量极氪基础信息的重要贡献者，很开心能与 Wysie 一同探索极氪车机系统的可能性。
+
+**[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)**：FerixzTanz 在极氪即刻基础上开发的版本，有一系列领先于极氪即刻的功能。本项目的盲区画面起步于 FerixzTanz 的代码和实车研究；把盲区画面投到抬头显示（HUD）上的做法、HUD 的设置和他细致的实车标定，也来自 CAMCORDER。感谢 FerixzTanz 对本项目的支持和贡献。
+
 **[CarPiano](https://github.com/jlunnn/CarPiano)**：任何车速下都能用车外喇叭播放声音，不再像原车功能那样只能在 P 挡使用。目前还在早期开发阶段，但很值得期待。
 
 在公共道路上使用车外喇叭前，请先了解当地法规。
@@ -119,5 +123,11 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 按 GPL-3.0 要求，本应用同样以 GPL-3.0 发布并公开全部源代码。
 
 把 App Lab 的合成流拆成四宫格并渲染出来，是本项目独立实现的。
+
+### 贡献者
+
+- **[wysie](https://github.com/wysie)**：大量设计以及代码。
+- **[FerixzTanz](https://github.com/FerixzTanz)**：盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。
+  盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。

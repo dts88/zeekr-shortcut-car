@@ -76,6 +76,30 @@ def main():
             out.append("")
 
 
+    out.append("## Known issue")
+    out.append("")
+    out.append("Using the cabin cameras (front and rear) for everyday recording disrupts App Lab's "
+               "resource scheduling and eventually crashes App Lab. "
+               "The cause is not yet known: it is unclear in what order, or under what conditions, "
+               "the head unit expects these cameras to be opened and released.")
+    out.append("")
+    out.append("Day-to-day use in the car is unaffected. However, if you lock the car and leave with "
+               "the app running, the fault is triggered almost every time you return. A single "
+               "occurrence does not crash App Lab, but the effects accumulate: on the developer's "
+               "car, App Lab became noticeably slow after about a week, and after about two weeks it "
+               "crashed and would no longer start. After a head unit restart, App Lab had "
+               "disappeared and had to be reinstalled.")
+    out.append("")
+    out.append("For now, the front cabin camera is one-shot: it takes effect after the app restarts "
+               "and turns itself off when you leave the car. The rear cabin camera works as usual "
+               "and is still under observation.")
+    out.append("")
+    out.append("**To avoid this:** for everyday recording, use the **Zeekr 7X (surround)** profile "
+               "(**Settings → Recording → Stream profile**). If you record the rear cabin with "
+               "**Zeekr 7X (surround + rear cabin)**, tap **Quit app** at the bottom of "
+               "Settings before leaving the car.")
+    out.append("")
+
     out.append("## Getting started")
     out.append("")
     out.append("Plug in a USB drive.")

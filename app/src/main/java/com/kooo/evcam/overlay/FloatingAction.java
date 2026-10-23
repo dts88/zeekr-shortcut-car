@@ -20,8 +20,12 @@ public enum FloatingAction {
     TOGGLE_RECORDING("toggle_recording"),
     /** 拍一张。 */
     TAKE_PHOTO("take_photo"),
-    /** 开 / 关超级后视镜。 */
-    TOGGLE_MIRROR("toggle_mirror");
+    /** 开 / 关超级镜子。 */
+    TOGGLE_MIRROR("toggle_mirror"),
+    /** 锁定此刻前后 10 秒所在的录像：和闪远光自动锁定同一套（{@code AutoLock#lockNow}）。 */
+    LOCK_FOOTAGE("lock_footage"),
+    /** 开 / 关模拟声浪（开发者选项「模拟声浪（试验）」；开发者选项关着时不动）：开车时一键关的地方。 */
+    TOGGLE_DRIVE_SOUND("toggle_drive_sound");
 
     public final String key;
 

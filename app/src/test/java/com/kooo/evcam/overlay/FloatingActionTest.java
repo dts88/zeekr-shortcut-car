@@ -37,6 +37,8 @@ public class FloatingActionTest {
         assertEquals("toggle_recording", FloatingAction.TOGGLE_RECORDING.key);
         assertEquals("take_photo", FloatingAction.TAKE_PHOTO.key);
         assertEquals("toggle_mirror", FloatingAction.TOGGLE_MIRROR.key);
+        assertEquals("lock_footage", FloatingAction.LOCK_FOOTAGE.key);
+        assertEquals("toggle_drive_sound", FloatingAction.TOGGLE_DRIVE_SOUND.key);
     }
 
     @Test

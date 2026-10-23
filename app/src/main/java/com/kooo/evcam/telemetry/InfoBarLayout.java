@@ -54,7 +54,11 @@ public final class InfoBarLayout {
          * 78 宽，比自动驻车宽一点：三位数的角度数字要放在圈里（项目所有者 2026-10-04）；数字和度数符号压在方向盘上，描底色边。
          */
         STEERING(78, R.string.vi_cell_steering, Signal.STEERING),
-        GEAR(70, R.string.vi_cell_gear, Signal.GEAR),
+        /**
+         * 挡位字母在框里；框的颜色是驾驶模式（项目所有者 2026-10-21）：舒适蓝、标准橙（原来的颜色）、运动红（只有它带一点
+         * 像刹车灯那样的光晕）、雪地白，别的还没验证的模式紫。驾驶模式没勾、没数据，框照旧是橙的。
+         */
+        GEAR(70, R.string.vi_cell_gear, Signal.GEAR, Signal.DRIVE_MODE),
         /**
          * 刹车（上）和油门（下）两根横条，左边带深度数字。刹车踏板（踩没踩）不拿来画，
          * 但踩没踩在刹车条上看得见，所以也列在这里。
@@ -97,8 +101,11 @@ public final class InfoBarLayout {
          */
         REAR_LAMPS(106, R.string.vi_cell_rear_lamps, Signal.REAR_POSITION_LAMP, Signal.STOP_LAMP, Signal.REAR_FOG,
                 Signal.REVERSE_LAMP),
-        /** 六项安全辅助的开关：AEB、前碰预警、车道偏离、车道保持、盲区、后碰预警，各自一块，没数据的各自划掉。 */
-        ASSIST(200, R.string.vi_cell_assist, Signal.AEB, Signal.FCW, Signal.LDW, Signal.LKA, Signal.BSD, Signal.RCW),
+        /**
+         * 六项安全辅助的开关：AEB、前碰预警、车道偏离、车道保持、盲区（读变道辅助那个开关，{@link Signal#LANE_CHANGE_ASSIST}）、后碰预警，
+         * 各自一块，没数据的各自划掉。
+         */
+        ASSIST(200, R.string.vi_cell_assist, Signal.AEB, Signal.FCW, Signal.LDW, Signal.LKA, Signal.LANE_CHANGE_ASSIST, Signal.RCW),
         ODOMETER(160, R.string.vi_cell_odometer, Signal.ODOMETER),
         /** 经纬度（系统定位）：勾的是 {@link #POSITION_ITEM}。 */
         POSITION(170, R.string.vi_cell_position),
@@ -217,6 +224,12 @@ public final class InfoBarLayout {
             y += InfoBar.HEIGHT + GAP;
         }
         return new Arrangement(placed, width, y - GAP);
+    }
+
+    /** 只有这一格的摆法：系统信息页每一行旁边那个图标（{@code ui.InfoBarCellView}）。 */
+    public static Arrangement single(Cell cell) {
+        return new Arrangement(Collections.singletonList(new Placed(cell, null, 0, 0, cell.width)),
+                cell.width, InfoBar.HEIGHT);
     }
 
     private static int rowWidth(Cell[] row) {

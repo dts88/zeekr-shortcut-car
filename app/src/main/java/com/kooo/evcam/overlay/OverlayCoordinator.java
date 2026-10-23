@@ -10,14 +10,15 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
+import com.kooo.evcam.zeekr.SideViewService;
 
 /**
- * 两个悬浮窗（超级后视镜、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
+ * 三个悬浮窗（超级镜子、盲区画面、录制悬浮按钮）「该不该开、能不能开、什么时候开」。
  *
  * <h3>为什么要有这么个地方</h3>
  *
  * <p>同一个问题原先在三处各答一遍：主界面启动时、设置页开关时、前台服务在开机自启时。
- * 三份答案已经不一致了 —— 最明显的一处是<b>超级后视镜的开关没查悬浮窗权限</b>：
+ * 三份答案已经不一致了 —— 最明显的一处是<b>超级镜子的开关没查悬浮窗权限</b>：
  * 没授权时开关拨上去、提示语还告诉你手势怎么用，屏幕上什么都没有，
  * 服务在 {@code onStartCommand} 里 {@code stopSelf()} 走了，只往 logcat 写了一行。
  * 画面悬浮窗和录制悬浮按钮的开关都查了，唯独它漏了。</p>
@@ -61,8 +62,14 @@ public final class OverlayCoordinator {
             // 于是每次重开应用都要去设置里关一次再开一次它才出现。
             main().postDelayed(() -> {
                 RearViewMirrorService.start(context);
-                AppLog.d(TAG, "超级后视镜已按设置自动开启");
+                AppLog.d(TAG, "超级镜子已按设置自动开启");
             }, REAR_VIEW_DELAY_MS);
+        }
+
+        if (config.isSideViewEnabled() && allowed) {
+            // 不用等相机：挂 D 挡才挂窗口、登记环视，开相机由通道调度做
+            SideViewService.start(context);
+            AppLog.d(TAG, "盲区画面已按设置开启");
         }
 
         if (config.isRecordingFloatingEnabled() && allowed) {
@@ -94,7 +101,7 @@ public final class OverlayCoordinator {
     }
 
     /**
-     * 开 / 关超级后视镜。返回值含义同 {@link #setRecordButtonEnabled}。
+     * 开 / 关超级镜子。返回值含义同 {@link #setRecordButtonEnabled}。
      *
      * <p>这里的权限检查是补上的 —— 原来没有，没授权时开关会拨上去而窗口不出现。</p>
      */
@@ -107,6 +114,20 @@ public final class OverlayCoordinator {
             RearViewMirrorService.start(context);
         } else {
             RearViewMirrorService.stop(context);
+        }
+        return true;
+    }
+
+    /** 开 / 关盲区画面。返回值含义同 {@link #setRecordButtonEnabled}。 */
+    public static boolean setSideViewEnabled(Context context, boolean enabled) {
+        if (enabled && !canShowOverlay(context)) {
+            return false;
+        }
+        new AppConfig(context).setSideViewEnabled(enabled);
+        if (enabled) {
+            SideViewService.start(context);
+        } else {
+            SideViewService.stop(context);
         }
         return true;
     }

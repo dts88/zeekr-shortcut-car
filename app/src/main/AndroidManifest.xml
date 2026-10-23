@@ -29,6 +29,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- 前台服务类型：摄像头（Android 10+） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- 开发者选项「录制声音」（试验）：环视录像带一路麦克风的声音。打开开关时才请求，不在启动时要 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 录制声音开着时，前台服务试着带上麦克风类型（安卓 11 起后台用麦克风要它；带不上照旧） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- CPU唤醒锁（保持CPU运行，不亮屏，用于息屏状态下拍照/录制） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 悬浮窗权限（绕过后台启动Activity限制，需要用户手动授权） -->
@@ -107,9 +111,14 @@
         <!-- 悬浮窗服务：显示悬浮录制按钮 -->
 
         <!-- 摄像头录制服务 (D:\yuan重构新增) -->
-        <!-- 超级后视镜：环视合成流里后方那一路的悬浮窗 -->
+        <!-- 超级镜子：环视合成流里后方那一路的悬浮窗 -->
         <service
             android:name=".zeekr.RearViewMirrorService"
+            android:exported="false" />
+
+        <!-- 盲区画面：打转向灯时显示该侧摄像头画面的悬浮窗 -->
+        <service
+            android:name=".zeekr.SideViewService"
             android:exported="false" />
 
         <service

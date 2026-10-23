@@ -108,6 +108,18 @@ public class VersionNameTest {
         assertTrue(VersionName.compare("0.25.2+abc", "0.25.2") == 0);
     }
 
+    /** 打开了「接收 Alpha 版」：alpha、beta、正式版都算，别的预发布后缀照样不算。 */
+    @Test
+    public void alphaCountsOnlyThroughItsOwnChannel() {
+        assertTrue(VersionName.isAlphaBetaOrRelease("v2.21.0-alpha"));
+        assertTrue(VersionName.isAlphaBetaOrRelease("2.11.7-beta"));
+        assertTrue(VersionName.isAlphaBetaOrRelease("2.0.0"));
+        assertFalse(VersionName.isAlphaBetaOrRelease("1.0.0-rc1"));
+        assertFalse(VersionName.isAlphaBetaOrRelease("alpha"));
+        assertFalse(VersionName.isAlphaBetaOrRelease(null));
+        assertFalse("默认那一档照样不认 alpha", VersionName.isBetaOrRelease("2.21.0-alpha"));
+    }
+
     /** 关了「接收 Beta 版」：只有正式版算，beta 和 alpha 都不算。 */
     @Test
     public void onlyReleasesCountWhenBetaIsOff() {
@@ -117,5 +129,16 @@ public class VersionNameTest {
         assertFalse(VersionName.isRelease("0.60.0-alpha"));
         assertFalse(VersionName.isRelease("nightly"));
         assertFalse(VersionName.isRelease(null));
+    }
+
+    /** 大版本是第一段：导入设置只认同一个大版本（SettingsBackup）。 */
+    @Test
+    public void majorIsTheFirstNumber() {
+        assertTrue(VersionName.major("2.14.0-alpha") == 2);
+        assertTrue(VersionName.major("v10.1") == 10);
+        assertTrue(VersionName.major("3.0.0+abc") == 3);
+        assertTrue(VersionName.major("nightly") == -1);
+        assertTrue(VersionName.major("") == -1);
+        assertTrue(VersionName.major(null) == -1);
     }
 }
