@@ -92,7 +92,9 @@ through `ZEEKR_KEYSTORE`, `ZEEKR_KEYSTORE_PASSWORD`, `ZEEKR_KEY_ALIAS` and `ZEEK
 
 ## Recommended
 
-**[wysie/zeekr-shortcut-car](https://github.com/wysie/zeekr-shortcut-car)** is a version of Zeekr Shortcut optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
+**[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)** is wysie's version of Zeekr Shortcut, optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
+
+**[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)** is FerixzTanz's version of Zeekr Shortcut, with a series of features ahead of Zeekr Shortcut. This project's blind spot view started from FerixzTanz's code and on-car research, and showing it on the HUD comes from CAMCORDER: the approach, the HUD settings and his careful on-car calibration. Thanks to FerixzTanz for the support and contributions to this project.
 
 **[CarPiano](https://github.com/jlunnn/CarPiano)** plays sound through the car's exterior speaker at any speed — no longer limited to Park like the factory feature. It's still early in development, but very promising.
 
@@ -142,6 +144,13 @@ every change since then is visible as a diff.
 
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
+### Contributors
+
+- **[wysie](https://github.com/wysie)** — a great deal of design and code.
+- **[FerixzTanz](https://github.com/FerixzTanz)** — the original code and on-car research for Blind spot view, and
+  showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the
+  ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
+
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
 
 ### Update channels
@@ -151,3 +160,10 @@ The existing default remains Beta plus Stable; previous beta-switch choices are
 preserved. Alpha requires explicit selection and is never inferred from the
 installed version. Unknown choices fall back to Stable. Tags and GitHub pre-release
 flags must agree; the update repository and release naming remain unchanged.
+
+The single Update channel choice replaces the separate beta/alpha switches.
+Upgrades preserve their effective combination: beta off stays Stable, beta on
+stays Beta unless alpha was also enabled, and both on becomes Alpha. Existing
+explicit channel selections take precedence; fresh installs retain upstream's
+Beta default. Alpha support itself is already present upstream; this contribution
+consolidates the controls and retains strict release metadata/channel checks.

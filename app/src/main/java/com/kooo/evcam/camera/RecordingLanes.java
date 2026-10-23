@@ -331,6 +331,14 @@ public final class RecordingLanes {
         settled = false;
     }
 
+    /**
+     * 这一路从这个录像意图的计划里拿掉（这次运行去掉的前座舱，暂时的规矩 FrontCabinOneShot）：表里删掉，带着它的任务回来时作废
+     * （{@link #current} 为假）。别的路不动。
+     */
+    void drop(String key) {
+        lanes.remove(key);
+    }
+
     /** 录像意图关了（停录）：表清空。 */
     void clear() {
         lanes.clear();

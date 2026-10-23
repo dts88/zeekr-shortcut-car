@@ -23,8 +23,8 @@ public final class ProfileStore {
 
     private static final String TAG = "ProfileStore";
 
-    /** 配置存在自己的文件里，和旧设置分开，迁移失败也不会污染原来那份。 */
-    private static final String FILE = "profiles";
+    /** 配置存在自己的文件里，和旧设置分开，迁移失败也不会污染原来那份。导出、导入设置时整份读写（settings.SettingsBackup）。 */
+    public static final String FILE = "profiles";
 
     /** 当前选中的配置 id。 */
     private static final String KEY_CURRENT = "current";

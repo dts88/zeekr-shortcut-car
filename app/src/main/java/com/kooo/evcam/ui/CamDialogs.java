@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
 
@@ -83,6 +84,19 @@ public final class CamDialogs {
         return input;
     }
 
+    /**
+     * 对话框里的说明（项目所有者 2026-10-23，ui-spec §三）：说明是次要的，写在选项、输入框下面 ——
+     * 小一号（Caption）、次要文字色，和 Material 输入框下面那行帮助文字一个位置。
+     * 对话框自带的正文（{@code setMessage}）只给确认框用：那里正文就是要问的事。边距由放它的地方给。
+     */
+    public static TextView note(Context context, CharSequence text) {
+        TextView note = new TextView(context);
+        note.setTextAppearance(R.style.TextAppearance_Cam_Caption);
+        note.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
+        note.setText(text);
+        return note;
+    }
+
     // ------------------------------------------------------------------ 弹
 
     public static androidx.appcompat.app.AlertDialog show(
@@ -126,6 +140,15 @@ public final class CamDialogs {
      */
     public static void paintNow(Dialog dialog) {
         paintButtons(dialog, false);
+    }
+
+    /**
+     * 不在对话框里、却是同一对「取消 / 保存」的按钮（超级镜子的窗口编辑框）：照对话框按钮画 ——
+     * 主操作实心能量色，次操作灰底。按钮要先放进父布局（要改它的边距）。
+     */
+    public static void paintButton(Button button, boolean primary) {
+        paint(button, primary ? R.color.energy : R.color.sunken,
+                primary ? R.color.on_energy : R.color.text_primary, primary);
     }
 
     // ------------------------------------------------------------------ 画按钮

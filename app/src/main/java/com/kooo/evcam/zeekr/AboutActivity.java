@@ -115,15 +115,23 @@ public class AboutActivity extends AppCompatActivity {
     }
 
     private void promptForDeveloperPassword() {
-        final EditText input = new EditText(this);
+        final EditText input = com.kooo.evcam.ui.CamDialogs.input(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
                 | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         input.setHint(R.string.dev_unlock_hint);
+        // 说明写在输入框下面（ui-spec §三：框里的说明是次要的）
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(input);
+        android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(this, getString(R.string.dev_unlock_msg));
+        note.setPadding(0, pad / 2, 0, 0);
+        box.addView(note);
 
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dev_unlock_title)
-                .setMessage(R.string.dev_unlock_msg)
-                .setView(input)
+                .setView(box)
                 .setPositiveButton(R.string.action_ok, (dialog, which) -> {
                     if (com.kooo.evcam.settings.DeveloperMode.unlock(this, input.getText().toString())) {
                         Toast.makeText(this, R.string.dev_unlocked,

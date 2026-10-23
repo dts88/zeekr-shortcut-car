@@ -38,8 +38,11 @@ public final class DiagnosticsJson {
      *
      * <p>2：去掉 properties / settings / services / vehicle_packages 和
      * meta.ungranted_car_permissions —— 找车辆信号那一轮的原始数据，结论已有（1.37.0）。</p>
+     *
+     * <p>3：加 settings —— 导出这一刻的全部设置，和「导出设置」同一份（SettingsBackup.snapshot），不截断
+     * （项目所有者 2026-10-19：导出日志时把当前设置也写进去）。文本报告里那份原始值每项截到 80 字。</p>
      */
-    private static final int SCHEMA_VERSION = 2;
+    private static final int SCHEMA_VERSION = 3;
 
     private DiagnosticsJson() {
     }
@@ -57,6 +60,7 @@ public final class DiagnosticsJson {
             root.put("schema_version", SCHEMA_VERSION);
             root.put("generated_at", System.currentTimeMillis());
             root.put("meta", meta(context));
+            root.put("settings", settings(context));
             root.put("text_report", textReport != null ? textReport : "");
         } catch (Throwable t) {
             AppLog.e(TAG, "组装 JSON 失败", t);
@@ -72,6 +76,18 @@ public final class DiagnosticsJson {
         } catch (Throwable t) {
             // 缩进只是为了好读，排版失败也不该让整份报告丢掉
             return root.toString();
+        }
+    }
+
+    /** 此刻的全部设置；读不出来时只记一个 error，报告的其余部分照样导出。 */
+    private static JSONObject settings(Context context) throws Exception {
+        try {
+            return com.kooo.evcam.settings.SettingsBackup.snapshot(context);
+        } catch (Throwable t) {
+            AppLog.w(TAG, "读不出设置: " + t);
+            JSONObject error = new JSONObject();
+            error.put("error", String.valueOf(t));
+            return error;
         }
     }
 

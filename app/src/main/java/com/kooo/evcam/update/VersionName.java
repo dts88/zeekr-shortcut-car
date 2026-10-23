@@ -67,6 +67,17 @@ public final class VersionName {
         return parts != null && (parts.pre.isEmpty() || beta(parts.pre));
     }
 
+    /** Upstream API retained for channel and backup callers. */
+    public static boolean isAlphaBetaOrRelease(String version) {
+        Parts parts = parse(version);
+        return parts != null && (parts.pre.isEmpty() || CHANNEL.matcher(parts.pre.toLowerCase(Locale.US)).matches());
+    }
+
+    public static int major(String version) {
+        Parts parts = parse(version);
+        return parts == null ? -1 : parts.core[0];
+    }
+
     public static boolean isRelease(String version) {
         Parts parts = parse(version);
         return parts != null && parts.pre.isEmpty();

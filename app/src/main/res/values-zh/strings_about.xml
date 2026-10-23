@@ -19,7 +19,7 @@
     <string name="about_thanks_body">这个项目是从 Singapore Zeekr Group 的聊天记录里长出来的。下面这些人给了它起点：\n\n• Jon（Singapore Zeekr Group）—— 讲清了怎么把应用装进车机。没有这一步，后面什么都不会发生。\n\n• SW（同一个群组）—— 分享了 AVM Recorder 这个项目的信息，让我知道这条路有人走通过。\n\n• Patrick（同一个群组）—— 给出了项目起步最要紧的那几条信息。\n\n• Gabriel（同一个群组）—— 帮忙测试软件，给了很多反馈。\n\n• 特别感谢 Singapore Zeekr Group —— 专业的管理团队，热情有趣的成员。一个大家愿意分享的地方，本身就很难得。\n\n走出新加坡之后，又有这些朋友帮忙：\n\n• R. Manochvarma（Zeekr Owners Community Malaysia，ZOCM）—— 提出了超级镜子按键模式的建议。\n\n• Storm Oshyer（Zeekr 7X Australia，Facebook 社区）—— 提出了盲区显示、转向信号、变道智能检测等建议，还一直大力鼓励、推广这个应用。\n\n• 理查（极氪7X 澳洲车主微信群）—— 提出了用喇叭等信号触发录像的建议。\n\n• Bilibili 极氪7X 车友圈微信群的各位成员，包括深藏功与名、G.T、宇等众多成员 —— 让我知道了中国版 7X 的能力边界、先驱们已经实现的功能，以及长期使用下来的见解。\n\n• 也谢谢我自己 —— 对生活的热情，和一直没丢的好奇心。\n\n• 谢谢每一位用它的人 —— 希望它让你用车省点事。\n\n• 最后谢谢极氪和吉利 —— 是你们把我们聚到一起，也是你们造出了这么好的车和这么好的团队。</string>
     <string name="about_credits_title">开源与来源</string>
     <string name="about_credits_evcam">本应用以 GNU GPL v3.0 发布，继承自 EVCam（作者 suyunkai）—— 相机、录制、悬浮窗这些基础部分来自它。按 GPL 的要求，本应用的源码同样公开。</string>
-    <string name="about_credits_contributors">这些朋友为本应用贡献了代码：\n\n• wysie（GitHub）—— 大量设计以及代码。\n\n• FerixzTanz（GitHub）—— 打转向灯时显示侧方摄像头画面的最初代码和实车研究。</string>
+    <string name="about_credits_contributors">这些朋友为本应用贡献了代码：\n\n• wysie（GitHub）—— 大量设计以及代码。\n\n• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。</string>
     <string name="about_coffee_title">请作者喝杯咖啡</string>
     <string name="about_coffee_body">PayNow 到 9271 6786。完全自愿，不影响任何功能。</string>
 </resources>

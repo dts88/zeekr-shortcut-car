@@ -28,7 +28,7 @@ import static androidx.test.espresso.matcher.ViewMatchers.withText;
 public class UpdateChannelsAndroidTest {
     private Context target() { return InstrumentationRegistry.getInstrumentation().getTargetContext(); }
     private SharedPreferences prefs() { return target().getSharedPreferences("app_config", Context.MODE_PRIVATE); }
-    private static final String[] KEYS = {"update_channel", "update_include_beta", "first_launch",
+    private static final String[] KEYS = {"update_channel", "update_include_beta", "update_include_alpha", "first_launch",
             "language_chosen", "rail_side_chosen"};
 
     private Map<String, Object> backup() {
@@ -50,7 +50,7 @@ public class UpdateChannelsAndroidTest {
     @Test public void migrationPreservesLegacyChoicesAndNeverEnablesAlpha() {
         Map<String, Object> old = backup();
         try {
-            prefs().edit().remove("update_channel").remove("update_include_beta")
+            prefs().edit().remove("update_channel").remove("update_include_beta").remove("update_include_alpha")
                     .putBoolean("first_launch", true).putBoolean("language_chosen", false).commit();
             AppConfig config = new AppConfig(target());
             assertEquals(UpdateChannel.BETA, config.getUpdateChannel());
@@ -62,7 +62,7 @@ public class UpdateChannelsAndroidTest {
             prefs().edit().remove("update_channel").putBoolean("update_include_beta", true).commit();
             assertEquals(UpdateChannel.BETA, new AppConfig(target()).getUpdateChannel());
             // Established installs that never touched the old default-on switch stay on Beta.
-            prefs().edit().remove("update_channel").remove("update_include_beta").commit();
+            prefs().edit().remove("update_channel").remove("update_include_beta").remove("update_include_alpha").commit();
             assertEquals(UpdateChannel.BETA, new AppConfig(target()).getUpdateChannel());
 
             config.setUpdateChannel(UpdateChannel.ALPHA);
@@ -70,6 +70,18 @@ public class UpdateChannelsAndroidTest {
             assertEquals(UpdateChannel.ALPHA, new AppConfig(target()).getUpdateChannel());
             prefs().edit().putString("update_channel", "nightly").commit();
             assertEquals(UpdateChannel.STABLE, new AppConfig(target()).getUpdateChannel());
+        } finally { restore(old); }
+    }
+
+    @Test public void migrationPreservesTheEffectiveUpstreamAlphaOptIn() {
+        Map<String, Object> old = backup();
+        try {
+            for (boolean beta : new boolean[]{false, true}) for (boolean alpha : new boolean[]{false, true}) {
+                prefs().edit().remove("update_channel").putBoolean("update_include_beta", beta)
+                        .putBoolean("update_include_alpha", alpha).commit();
+                assertEquals(!beta ? UpdateChannel.STABLE : alpha ? UpdateChannel.ALPHA : UpdateChannel.BETA,
+                        new AppConfig(target()).getUpdateChannel());
+            }
         } finally { restore(old); }
     }
 

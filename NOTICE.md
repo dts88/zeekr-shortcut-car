@@ -54,12 +54,16 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 下面这些不是从 EVCam 来的，是别的开发者为本项目写的。随 PR 直接合并的，作者记在 git 历史里；
 没有直接合并、由本项目挑出来用的，在这里写明出处，代码文件的类说明里也各写一行。
 
-- **wysie**（<https://github.com/wysie>）：超级镜子的方向标签（PR #17，直接合并）；
+- **wysie**（<https://github.com/wysie>）：超级镜子的方向标签（PR #17，直接合并）；下载更新时核对安装包的 sha256 和大小、只走 https（`DownloadIntegrity`，PR #38，直接合并）；
   盲区画面里的关闭按钮只关这一次（`SideViewDismissal`）、转的角度大时收窄视野不出黑块（`SideViewFraming`）、
   纵向视野随窗口形状变（`SideViewProjection.Rays`），取自 PR #19。
 - **FerixzTanz**（<https://github.com/FerixzTanz>）：打转向灯时显示侧方摄像头画面的最初代码和实车研究（PR #4，已并入 PR #19）——
   打灯判定（`SideViewDecision`）、转过角度的虚拟相机（`SideViewProjection`）、按调用方给的反投影切网格（`FisheyeMesh.SourceMap`），
   以及对应的测试。
+  盲区画面的默认角度（朝后 33°、朝外 10°、视野 90°）和窗口大小（屏高 33%、宽 ÷ 高 2.2）照他在自己 7X 上实车调出的值（PR #43）。
+  盲区画面投到 HUD 上（2026-10-21）照他的 CAMCORDER（<https://github.com/FerixzTanz/CAMCORDER>）：找 HUD 那块屏的规则（`HudScreen`）、
+  画面的位置大小 / 对比度 / 透明度 / 边缘渐隐的公式（`HudPicture`）、用 Presentation 投 HUD 的窗口画法（`SideViewHudWindow`），
+  以及全部 HUD 设置项和他在自己 7X 上调出的默认值。
 
 盲区画面的服务和窗口（`SideViewService`、`SideViewWindow`）里读车辆信号、备着 / 显示两种状态的写法，也照两位 PR 里的侧视弹窗写。
 这些代码照本仓库的 GPL-3.0 发布。碰相机的部分（窗口怎么挂、画布怎么交给通道调度）由本项目照通道调度重写，没有用 PR 里的那一套。
@@ -90,3 +94,11 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 **没有任何关系。** 本项目是独立的第三方实验性软件，与浙江极氪智能科技有限公司
 及其关联方无隶属、合作或背书关系。「极氪」「ZEEKR」「7X」等名称仅用于说明本应用
 适用于哪种车机环境，相关商标权归其各自所有者所有。
+
+---
+
+## 5. 只借用了事实的项目（不含代码）
+
+- **CarPiano**（<https://github.com/jlunnn/CarPiano>，MIT）：在 7X 车机上往喇叭出声的实测事实 —— App Lab 容器里不指定输出设备就没声；
+  车外 `BUS12_OUTER_NOTIFY` 配媒体用途有声；系统音量不一定管到车外那一路，要自己做软件增益。回放出声、模拟声浪选喇叭的做法用到了这些事实，
+  代码没有用。

@@ -109,6 +109,18 @@ public class VersionNameTest {
         assertTrue(VersionName.compare("0.25.2+abc", "0.25.2") == 0);
     }
 
+    /** 打开了「接收 Alpha 版」：alpha、beta、正式版都算，别的预发布后缀照样不算。 */
+    @Test
+    public void alphaCountsOnlyThroughItsOwnChannel() {
+        assertTrue(VersionName.isAlphaBetaOrRelease("v2.21.0-alpha"));
+        assertTrue(VersionName.isAlphaBetaOrRelease("2.11.7-beta"));
+        assertTrue(VersionName.isAlphaBetaOrRelease("2.0.0"));
+        assertFalse(VersionName.isAlphaBetaOrRelease("1.0.0-rc1"));
+        assertFalse(VersionName.isAlphaBetaOrRelease("alpha"));
+        assertFalse(VersionName.isAlphaBetaOrRelease(null));
+        assertFalse("默认那一档照样不认 alpha", VersionName.isBetaOrRelease("2.21.0-alpha"));
+    }
+
     /** 关了「接收 Beta 版」：只有正式版算，beta 和 alpha 都不算。 */
     @Test
     public void onlyReleasesCountWhenBetaIsOff() {

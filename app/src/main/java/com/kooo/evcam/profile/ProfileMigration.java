@@ -69,7 +69,7 @@ public final class ProfileMigration {
 
         Profile profile = new Profile();
         profile.id = multi ? Profile.PRESET_COMPOSITE_MULTI : Profile.PRESET_COMPOSITE;
-        profile.name = multi ? "环视 + 两路座舱" : "极氪7X（环视合成流）";
+        profile.name = multi ? "环视 + 后座舱" : "极氪7X（环视合成流）";
 
         // ---- 环视那一路 ----
         CameraProfile composite = new CameraProfile(CameraProfile.ROLE_COMPOSITE);
@@ -89,12 +89,16 @@ public final class ProfileMigration {
         // 于是编辑器里多了一个「加一路相机」的步骤 —— 而这台车就那三路，
         // “加”不是一件真实发生的事，开和关才是。
         //
-        // 尺寸给 auto：具体多大由相机声明决定，要钉死就去配置编辑里钉
+        // 尺寸给 auto：具体多大由相机声明决定，要钉死就去配置编辑里钉。
+        //
+        // 「环视 + 后座舱」那一份开的是后座舱；前座舱两份都默认关着（暂时只用一次，camera.FrontCabinOneShot，
+        // 项目所有者 2026-10-23：原来的「环视 + 前后座舱」改成「环视 + 后座舱」）
         String cabinSize = StreamSpec.RESOLUTION_AUTO;
+        String rear = ProfileSizes.roleForCameraKey(com.kooo.evcam.camera.CameraSlots.KEY_CABIN_REAR);
         String[] roles = {CameraProfile.ROLE_CABIN_1, CameraProfile.ROLE_CABIN_2};
         for (int i = 0; i < roles.length; i++) {
             CameraProfile cabin = new CameraProfile(roles[i]);
-            cabin.enabled = multi;
+            cabin.enabled = multi && roles[i].equals(rear);
             cabin.preview = StreamSpec.preview(cabinSize);
             cabin.record = defaultRecord(cabinSize);
             cabin.photo = StreamSpec.photo(StreamSpec.RESOLUTION_MAX, 95);

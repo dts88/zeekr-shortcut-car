@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行：有一个当前值、点进去改，行尾再带一个直接做的动作（ValueActionPreference，ui-spec §三）。
+
+  名字和说明在行首，当前值和 › 在后面（和 pref_row_value 一样）；隔一道竖线，最后是按钮（pref_action）。
+  点这一行进下一层；点按钮只做按钮那件事，不算点行。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingStart="20dp"
+    android:paddingEnd="14dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/pref_title"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:maxLines="4"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Micro" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pref_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxWidth="420dp"
+        android:maxLines="2"
+        android:textColor="@color/pref_summary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+
+    <ImageView
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="@color/text_tertiary" />
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="14dp"
+        android:background="@color/line" />
+
+    <TextView
+        android:id="@+id/pref_action"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:background="@drawable/bg_pref_row_action"
+        android:gravity="center"
+        android:minWidth="88dp"
+        android:minHeight="52dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:textColor="@color/pref_title"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+</LinearLayout>

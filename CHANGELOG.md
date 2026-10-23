@@ -11,6 +11,72 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.23.0-alpha] - 2026-10-23
+
+- Settings → Floating button: no group headings. Show recording time and Lock position are buttons on the Floating button row. Button size, Button opacity and Time text size are one row, Appearance, adjusted together in one dialog; Reset at the end of the row asks first. Tap and long press still open the app by default.
+- Settings → Interface: no group headings. Fisheye correction is one row: its dialog picks how to correct and the corrected field of view, whose range follows that choice.
+- Developer options: Screen-off recording with its time limit, Record sound with its microphone source, and Simulated drive sound with its volume and engine speed pattern are each one row that opens the next level. Image adjustment has Reset at the end of its row. The three blind spot view calibration sliders are one row with a dialog. Vehicle status and Simulated drive sound share an Experimental group.
+
+## [2.22.0-alpha] - 2026-10-23
+
+- Settings → Super mirror: the page has no group headings any more. Direction label is a button on the Super mirror row. Button mode becomes Switch views by, Swipe or Tap (Swipe by default); choosing Tap says how it works. Fisheye correction is one row with the field of view: tapping it opens a slider that previews on the window as you drag. Window is one row showing the width and height: tapping it opens a full-screen frame to drag by its edges or corners or pinch (moving it there is not saved), and Reset sits at the end of the row and asks first; after a reset every row on the page shows the restored values. Blind spot view opens its own page with the display position, minimum speed and HUD settings; minimum speed is greyed out when the view shows on the HUD only.
+- Settings → Interface: Less motion while recording is now off by default.
+- Settings → Check for updates: new Include alpha releases switch, off by default. It only counts while Include beta releases is on.
+
+## [2.21.0-alpha] - 2026-10-23
+
+- Settings → Recording: Timestamp now also covers the recording specs (one switch for both). Plate number stamp is one row: the switch shows or hides the plate, tapping the row edits it (turning it on with no plate asks for one first). Driving info bar is one row too: tapping it opens System info to choose what it shows, and the row shows how many are selected. App stamp moves to Developer options; so does Vehicle status from Settings → Interface.
+- Settings → Storage: the save folder moves into the Storage location chooser, with a note under the options recommending a drive on the USB-A port. Video and photo caps are one row, Storage caps, edited together in one dialog with the cleanup rules under the fields. Footage lock is one row that shows how much is locked; when it is on, Auto lock buttons sit under it: Flash to pass, and Horn, greyed out until the horn signal can be read. Notes in dialogs now sit under the options or fields.
+
+## [2.20.0-alpha] - 2026-10-23
+
+- Only the front cabin camera is one-shot now: the surround view and the rear cabin are back to normal (the rear cabin is released when the screen has been dark for 30 seconds and comes back when it turns on). Zeekr 7X (surround + front and rear cabin) becomes Zeekr 7X (surround + rear cabin). When the front cabin is on, the next start turns only its switch off; the selected stream profile and other settings are no longer changed. When you leave the car the front cabin is dropped and does not come back. In Edit stream profile only the front cabin card carries the note.
+
+## [2.19.0-alpha] - 2026-10-23
+
+- Videos: before playing a recording with sound, the app takes media audio focus like other video players (the radio or CarPlay pauses) and gives it back when you leave Videos. Playback pauses when another app takes the focus, and resumes after a short interruption such as a call.
+
+## [2.18.0-alpha] - 2026-10-23
+
+- Text sizes are about 1.2× larger, rounded to common sizes (16 / 20 / 22 / 24 / 32 sp), on every screen: the main screen and Settings are back to their size before 2.15.0; Videos, Photos, Diagnostics and About & credits get larger too.
+
+## [2.17.0-alpha] - 2026-10-22
+
+- Front and rear cabin cameras are one-shot for now: they take effect after restarting the app as before, and are dropped when you leave the car (screen dark for 30 seconds, or the head unit sleeping). The next start, auto start and recording on launch use the surround view only; Zeekr 7X (surround + front and rear cabin) switches back to Zeekr 7X (surround), an edited profile turns its cabin switches off. The main screen shows the surround view only when you come back. Super mirror's rear cabin is not affected.
+
+## [2.16.1-alpha] - 2026-10-22
+
+- About & credits: thanks FerixzTanz for Blind spot view on the HUD and its default settings, from his CAMCORDER.
+
+## [2.16.0-alpha] - 2026-10-22
+
+- Driving info bar: Drive mode is shown by the colour of the gear box instead of a text cell: Comfort blue, Standard orange, Sport red with a slight glow, Snow white, other modes purple. System info shows each signal's info bar icon next to it, drawn from the current reading.
+- Developer options: Record sound (experimental) adds one cabin microphone to the surround recording (raw or call-processed source, off by default; asks for the microphone permission when turned on). Playback plays the surround recording's sound through the cabin speakers. Repair keeps the pictures of a recording with sound.
+- System info: Drive mode (Comfort, Standard or Sport, as the car shows it). Tick it to show it on the driving info bar.
+- Developer options: Simulated drive sound (experimental) synthesizes engine sound through the cabin speakers in Sport mode (off by default): engine start when switching to Sport while stopped, idle, throttle, pedal speed, speed and acceleration, continuous or simulated gear shifts, a fixed gear in reverse. The floating button can toggle it. System info: Power flow (drive, regen, idle, not ready).
+- About & credits: thanks FerixzTanz for Blind spot view's default angles and window size, tuned on his own 7X.
+- Blind spot view on the HUD (from FerixzTanz's CAMCORDER): Show on chooses Center screen, HUD or both (default both; HUD falls back to the center screen when it can't be used). The HUD ignores Minimum speed. HUD picture settings: mirror, height, shape, distance from the edge, vertical position, opacity, daytime and night contrast, night brightness, edge fade, defaulting to FerixzTanz's on-car values.
+
+## [2.15.0-alpha] - 2026-10-20
+
+- Settings: rows on each page are grouped under headings. Keep recording when the screen goes off moves from System to Recording, next to Record on launch.
+- Super mirror: the Front and rear only switch becomes Views: All four (default), Front and rear, or Rear + rear cabin, which switches between the rear view and the rear cabin camera, mirrored (button mode: top half rear cabin, bottom half rear view). When the stream profile leaves the rear cabin off, choosing it restarts the cameras once.
+- Settings → System: Export settings saves every setting and the stream profiles to a file in the diagnostics report folder; Import settings restores one exported by the same major version, then exits the app so everything starts with the restored settings. Diagnostics reports now include the full settings.
+- Cameras: a canvas on a camera that is still closing is released only after the close finishes (exit and pipeline rebuilds).
+- Recording records only the cameras the main screen was built with; a camera built only for Super mirror or Blind spot view is never recorded.
+- Super mirror: if the camera cannot fit its picture into the recording session, the mirror stops asking for it until it is reopened, instead of making the camera rebuild its session again and again.
+- After a stream profile change, the cameras follow the main screen's layout until the app restarts, so preview, photo and recording stay in step.
+- A camera that stopped being retried after 3 failed rounds is retried only when something that wants that camera starts or stops (for example the main screen or recording), not when Blind spot view comes and goes with the gear.
+- Main screen: a camera preview whose picture stops for 2.5 seconds is dimmed and shows "Picture stopped", the same way Super mirror does; the four surround cells come from one stream and share one note.
+- Main screen and Settings: text uses the sizes in the UI spec. The 1.2× text enlargement inherited from EVCam is removed, so text there is about 17% smaller.
+
+## [2.14.0-alpha] - 2026-10-19
+
+- Floating button: tap or long press can lock the current recording, the same way flash-to-pass does (the clips 10 seconds before and after, every camera). Needs Settings → Storage → Lock footage.
+- Updates: the downloaded APK must match the SHA-256 and size GitHub lists for it, or it is not installed; downloads and redirects use HTTPS only (@wysie).
+- Driving info bar: the BSD badge under Driver assistance shows the car's Lane change assist switch; System info drops the Blind spot assist signal, which always read off.
+- The microphone permission is no longer checked at startup or listed on the permissions page; the app records no audio (@wysie).
+
 ## [2.13.1-alpha] - 2026-10-17
 
 - Blind spot view: wider window (2.2 : 1, a third of the screen height) and default angles from on-car tuning by @FerixzTanz (rear 33°, outward 10°).
