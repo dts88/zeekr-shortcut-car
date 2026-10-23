@@ -340,6 +340,11 @@
   （项目所有者说的名字）/「Hazard lights」/「Lampu kecemasan」（术语表「闪远光 / 双闪」那一行）；锁上时的提示 msg_hazard_locked
   「双闪：已锁定前 1 分钟起的录像片段，到关闭双闪为止」/「Hazard lights: locked the clips from 1 minute before, until the
   hazard lights go off」/「Lampu kecemasan: klip dari 1 minit sebelumnya telah dikunci, sehingga lampu kecemasan dimatikan」。
+- 2026-10-23 批准（存储页：「双闪」按钮下面的一行小字，意思是项目所有者给的）：set_footage_lock_hazard_note
+  「紧急制动时车辆会自动打开双闪警示灯，开启「双闪」后将同时锁定制动前后的录像。」/
+  「In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before
+  and after the braking is locked as well.」/「Semasa brek kecemasan, kenderaan menghidupkan lampu kecemasan secara automatik;
+  dengan Lampu kecemasan dihidupkan, rakaman sebelum dan selepas brek turut dikunci.」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -348,11 +353,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-10-23（存储页：「双闪」按钮下面的一行小字，意思是项目所有者给的）：set_footage_lock_hazard_note
-  「紧急制动时车辆会自动打开双闪警示灯，开启「双闪」后将同时锁定制动前后的录像。」/
-  「In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before
-  and after the braking is locked as well.」/「Semasa brek kecemasan, kenderaan menghidupkan lampu kecemasan secara automatik;
-  dengan Lampu kecemasan dihidupkan, rakaman sebelum dan selepas brek turut dikunci.」。
+- （现在没有。）
 
 ---
 

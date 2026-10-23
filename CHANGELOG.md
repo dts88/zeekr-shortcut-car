@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.25.0-alpha] - 2026-10-23
+
 - Lock footage: new Auto lock button, Hazard lights (off by default). When the hazard lights come on while recording, footage from 1 minute before until they go off is locked on every camera, the same way as Flash to pass (new clips are locked every 30 seconds while the lights stay on). A note under the buttons says that emergency braking turns the hazard lights on by itself.
 
 ## [2.24.0-alpha] - 2026-10-23
