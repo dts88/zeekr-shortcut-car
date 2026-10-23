@@ -380,7 +380,8 @@ public final class DriveSound {
             Telemetry telemetry = Telemetry.get();
             AudioManager audio = app.getSystemService(AudioManager.class);
             DriveInputs inputs = new DriveInputs();
-            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, style.gearbox(gearbox), style.cranks(), style.pseudoGears());
+            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, style.gearbox(gearbox), style.cranks(), style.pseudoGears(),
+                    style.realNeutral());
             Voice voice = style.voice(SoundOutput.RATE, cabin);
             VirtualEngine.Input in = new VirtualEngine.Input();
             VoiceParams params = new VoiceParams();

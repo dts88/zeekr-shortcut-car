@@ -15,13 +15,16 @@ package com.kooo.evcam.sound;
  *       它还跟着流量（转速）变：收油时低转很闷、高转一下亮起来，频谱的拐点随流速往上走。</li>
  *   <li><b>排气管</b>（左右各一根，长度略不同）：反馈梳状滤波器给出固定的共振峰，再加集气管、中段的共振和消声器的亥姆霍兹共振；
  *       消声器的低通随转速一直开到红线、负荷大再开一点；压力大时轻微饱和。</li>
- *   <li><b>进气</b>：每个缸进气门关时一个脉冲进进气腔、进气道的共振；负荷大时进气的呼啸，车速越高风声越大。</li>
+ *   <li><b>进气</b>：每个缸进气门关时一个脉冲进进气腔、进气道的共振；负荷大时进气的呼啸，车速越高风声越大。节气门几乎关着时
+ *       窄缝里声速的气流「嘶」一声，每吸一口气涌一股（怠速时一股一股，转速高了连成一片、被别的盖住）。</li>
  *   <li><b>机械增压</b>（双螺杆，曲轴用皮带带着转，比曲轴快、一点火就跟着转）：几个部件各出各的声，位置、转速不同
  *       （项目所有者 2026-10-23：应该分开、更有层次，不是单纯的风声；颗粒状噪音要着重避免 —— 全用确定的音，没有随机的抖动）：
  *       同步齿轮的啮合声（叶片频率的 3 倍那一串，照车主偏好的那台的录音，只在增压时有，旁通阀一开几乎没了）；
  *       出口的压力脉动（做功、压缩：叶片频率的 1、2、4、5 次，跟增压的 1.5 次方，经左右两个中冷器，出口风道的共振随压缩加热
  *       往上走）；进口那边空转的叶片声（任何负荷都有）；两个转子各转一圈的边带、进气脉冲的调制；曲轴每次点火的扭振带着转速
- *       一起抖（周期性的，很小）。底下一层轻的气流声（出口一股一股、进口吸气，左右两路不相关）。松油门「呼」一声。
+ *       一起抖（周期性的，很小）。底下一层轻的气流声（出口一股一股、进口吸气，左右两路不相关）。松油门「呼」一声；
+ *       松开以后（节气门关上、旁通阀打开，项目所有者 2026-10-23 的参考视频）燃烧、压缩那几层没了，剩下干净的啸叫 —— 叶片频率的
+ *       第 2、3、4 次，松开那一下最响，随转速落下去很快变淡：和踩着油门时的声调明显不同。
  *       增压时进气腔里的压力脉动（每个进气门关上那一下，两排各自不均匀的间隔让每一下强弱、早晚不同）：
  *       十几根发动机的整数阶跟齿轮声一起随转速走，叠成和弦。</li>
  *   <li><b>气门落座、燃烧</b>：每个缸的气门关上「嗒」一下、燃烧「咔」一下，各过几个高频共振，摆在那个缸的位置上。</li>
@@ -129,6 +132,12 @@ final class PulseVoice implements Voice {
     static final float CABIN_LOWPASS_HZ = 200f;
     /** 一个「突」在脉冲之后随机晚多少（样本以内）。 */
     static final float POP_SPREAD = 20f;
+    /** 节气门的嘶声每一股起来多快（秒）；每一股的大小按这个转速（rpm，怠速）为准，转速高了按平方根分少（{@link PulseProfile#hissDb}）。 */
+    static final float HISS_RISE_SEC = 0.0005f;
+    static final float HISS_REF_RPM = 900f;
+    /** 松开油门以后的啸叫按这个转速（rpm）定电平（{@link PulseProfile#decelDb}）；相邻两次谐波的相位差（周，固定的）。 */
+    static final float DECEL_REF_RPM = 4500f;
+    static final double DECEL_PHASE = 0.4;
 
     private final PulseProfile p;
     private final float rate;
@@ -163,6 +172,7 @@ final class PulseVoice implements Voice {
     private final float[] intake = new float[RING];
     private final float[] pulsation = new float[RING];
     private final float[] click = new float[RING];
+    private final float[] hiss = new float[RING];
     private int cursor;
 
     // ---- 这一块里事件用的量（每块算一次）
@@ -179,6 +189,7 @@ final class PulseVoice implements Voice {
     private float evIntake;
     private float evPulsation;
     private float evCut;
+    private float evHiss;
 
     // ---- 排气（每排一套）
     private final float[] pulseDecay = new float[2];
@@ -211,6 +222,15 @@ final class PulseVoice implements Voice {
     private final Biquad runner;
     private final Biquad roar;
     private float roarNow;
+    /** 节气门的嘶声：每一股的包络（落、起）、归一、带通，底下那一层的电平（目标、逐样本）。 */
+    private float hissDecay;
+    private float hissRise;
+    private final float hissDecayA;
+    private final float hissRiseA;
+    private final float hissNorm;
+    private final Biquad hissBand;
+    private float hissTarget;
+    private float hissNow;
 
     // ---- 增压
     private final boolean supercharged;
@@ -237,6 +257,11 @@ final class PulseVoice implements Voice {
     private float dischargeNow;
     private final Biquad[] intercooler = new Biquad[2];
     private final Biquad[] duct = new Biquad[2];
+    /** 松开油门以后的啸叫：每次谐波的增益（相对 {@link PulseProfile#decelDb}）、这一块的目标、逐样本的电平、松开那一下多响的（0–1）。 */
+    private final float[] decelGains;
+    private float decelTarget;
+    private float decelNow;
+    private float decelKick;
     private float boost;
     private float whoosh;
     private float whineNow;
@@ -328,6 +353,8 @@ final class PulseVoice implements Voice {
     private int noise = 0x2545F491;
     /** 「咔」自己的噪声：换不换挡，别的声音用的随机数都一样（测试靠它）。 */
     private int clickNoise = 0x1B873593;
+    /** 节气门嘶声自己的噪声：有没有这一层，别的声音用的随机数都一样。 */
+    private int hissNoise = 0x3C6EF372;
 
     PulseVoice(PulseProfile profile, float sampleRate) {
         this(profile, sampleRate, false);
@@ -416,6 +443,13 @@ final class PulseVoice implements Voice {
         plenum = Biquad.bandpass(profile.plenumHz, profile.plenumQ, sampleRate);
         runner = Biquad.bandpass(profile.runnerHz, profile.runnerQ, sampleRate);
         roar = Biquad.bandpass(profile.roarHz, profile.roarQ, sampleRate);
+        hissBand = Biquad.bandpass(profile.hissHz, profile.hissQ, sampleRate);
+        double hd = profile.hissDecayMs * 1e-3;
+        double hr = HISS_RISE_SEC;
+        double hp = Math.log(hd / hr) * hd * hr / (hd - hr);
+        hissNorm = (float) (1.0 / (Math.exp(-hp / hd) - Math.exp(-hp / hr)));
+        hissDecayA = perSample((float) hd);
+        hissRiseA = perSample(HISS_RISE_SEC);
         supercharged = profile.superchargerOrder > 0f;
         lobeGain = EngineVoice.dbToLin(profile.lobeDb);
         meshGains = new float[profile.meshHarmonicsDb[0].length];
@@ -438,6 +472,10 @@ final class PulseVoice implements Voice {
         for (int s = 0; s < 2; s++) {
             intercooler[s] = Biquad.lowpass(profile.intercoolerHz, 0.7071f, sampleRate);
             duct[s] = Biquad.peaking(profile.ductHz[s], profile.ductDb, profile.ductQ, sampleRate);
+        }
+        decelGains = new float[profile.decelHarmonics.length];
+        for (int k = 0; k < decelGains.length; k++) {
+            decelGains[k] = EngineVoice.dbToLin(profile.decelHarmonicsDb[k]);
         }
         jetGains = new float[profile.jetHz.length];
         for (int k = 0; k < jetGains.length; k++) {
@@ -604,6 +642,10 @@ final class PulseVoice implements Voice {
         float ram = 1f + p.inletRam * wind * wind;
         float roarTarget = EngineVoice.dbToLin(mix(p.roarIdleDb, p.roarLoadDb, (float) Math.pow(load, 1.5))
                 + params.intakeBoostDb) * ram * VirtualEngine.clamp01(rpmTarget / ROAR_FULL_RPM);
+        // 节气门的嘶声：缝里是声速的气流，流量只看缝多大 —— 转速高了每一股分到的少；节气门开大了缝两边没有压差，没了
+        float shut = 1f - load;
+        hissTarget = EngineVoice.dbToLin(p.hissDb) * shut * shut * VirtualEngine.clamp01(rpmTarget / ROAR_FULL_RPM);
+        evHiss = hissTarget * (float) Math.sqrt(HISS_REF_RPM / rpmCalc);
 
         // ---- 增压：松油门 = 负荷比最近的峰值掉了不少
         loadPeak = Math.max(load, loadPeak * VirtualEngine.decay(dt, LIFT_PEAK_SEC));
@@ -621,8 +663,10 @@ final class PulseVoice implements Voice {
             boost += (load - boost) * VirtualEngine.follow(dt, p.superchargerSec);
             if (lift && boost > 0.3f) {
                 whoosh = Math.max(whoosh, boost * Math.min(1f, drop * 2f));
+                decelKick = Math.max(decelKick, boost);
             }
             whoosh *= VirtualEngine.decay(dt, WHOOSH_SEC);
+            decelKick *= VirtualEngine.decay(dt, p.decelBurstSec);
             float revs = Math.min(rpmTarget / 6000f, 1.2f);
             float speed = (float) Math.pow(revs, p.superchargerRpmPow);
             // 几个音：随转速温和地长；齿轮声只在增压时有
@@ -656,6 +700,10 @@ final class PulseVoice implements Voice {
             float flow = revs * (INLET_FREE + (1f - INLET_FREE) * load);
             inletTarget = EngineVoice.dbToLin(p.inletDb) * flow * (float) Math.sqrt(flow) * ram;
             whooshTarget = EngineVoice.dbToLin(WHOOSH_DB) * whoosh;
+            // 松开油门以后的啸叫：节气门关着（负荷没了）才有，随转速落下去很快变淡；刚在增压就松开，那一下多响（节气门还没全关时就起）
+            decelTarget = EngineVoice.dbToLin(p.decelDb)
+                    * (float) Math.pow(Math.min(Math.max(rpmTarget, 300f), 7200f) / DECEL_REF_RPM, p.decelRpmPow)
+                    * (shut * shut + p.decelBurst * decelKick);
         }
 
         // ---- 传动、倒挡、起动机（没点火时离合是开着的：发动机这边的变速箱、传动轴不响）
@@ -734,6 +782,15 @@ final class PulseVoice implements Voice {
             float ip = intakeDecay - intakeRise;
             roarNow += (roarTarget - roarNow) * ampK;
             float front = plenum.process(ip) * 1.5f + runner.process(ip) + roar.process(white()) * roarNow;
+            // 节气门的嘶声：每吸一口气涌一股，底下一层一直有
+            float xh = hiss[cur];
+            hiss[cur] = 0f;
+            hissDecay = hissDecayA * hissDecay + xh;
+            hissRise = hissRiseA * hissRise + xh;
+            hissNow += (hissTarget - hissNow) * ampK;
+            float throttleAir = hissBand.process(hissWhite()) * (p.hissFloor * hissNow + (hissDecay - hissRise) * hissNorm);
+            // 车内听感：发动机舱顶上、挡风玻璃下面的这几样（节气门、增压器的音）不过整个防火墙（CABIN_TONE_DB）
+            float cowl = throttleAir;
 
             // 增压：齿轮的啮合声、出口的压力脉动（左右两个中冷器）、进口的叶片声，轻的一层气流声（左右两路）、进口的风声、松油门的「呼」
             float jetL = 0f;
@@ -771,15 +828,24 @@ final class PulseVoice implements Voice {
                 float dl = duct[0].process(intercooler[0].process(d));
                 float dr = duct[1].process(intercooler[1].process(d));
                 float tones = whine(hz) + pulsation(cur) * chordGain;
+                decelNow += (decelTarget - decelNow) * ampK;
+                if (decelNow > 1e-6f) {
+                    tones += decel(hz) * decelNow;
+                }
                 if (cabin) {
-                    toneLp += toneK * (tones + 0.5f * (dl + dr) - toneLp);
-                    cabinTones = toneLp * cabinToneGain;
+                    cowl += tones + 0.5f * (dl + dr);
                 } else {
                     front += tones;
                     jetL += dl;
                     jetR += dr;
                 }
                 front += whooshBand.process(white()) * whooshNow;
+            }
+            if (cabin) {
+                toneLp += toneK * (cowl - toneLp);
+                cabinTones = toneLp * cabinToneGain;
+            } else {
+                front += throttleAir;
             }
 
             // 车厢共振、和鸣（不分前后左右）
@@ -976,6 +1042,7 @@ final class PulseVoice implements Voice {
             add(tick[1], at + cylDelay[c], a * cylRight[c]);
             if (kind == INTAKE_CLOSE) {
                 add(intake, at, evIntake * (0.9f + 0.2f * random01()));
+                add(hiss, at, evHiss);
                 if (evPulsation > 0f) {
                     // 同一排上一下留下的压力还没恢复：这一下弱一点、晚一点（两排的样子一样、错开一圈 → 整数阶）
                     float rec = Math.max(0.15f, 1f - p.pulsationRecovery * (float) Math.exp(-gapDeg[c] / p.recoveryDeg));
@@ -1054,6 +1121,23 @@ final class PulseVoice implements Voice {
                 break;
             }
             d += dischargeGains[k] * Math.min(fade, 1f) * EngineVoice.sin(m * lobePhase + 0.25 * k);
+        }
+        return d;
+    }
+
+    /**
+     * 松开油门以后的啸叫这一个样本（{@link PulseProfile#decelDb}，还没乘电平）：叶片频率的几次谐波，各自固定的相位（不是随机的），
+     * 到 {@link #WHINE_TOP_HZ} 渐隐。{@code hz} 是这一刻叶片扫过出口的频率（相位已经走过了）。
+     */
+    private float decel(float hz) {
+        float d = 0f;
+        for (int k = 0; k < decelGains.length; k++) {
+            int m = p.decelHarmonics[k];
+            float fade = (WHINE_TOP_HZ - m * hz) / WHINE_FADE_HZ;
+            if (fade <= 0f) {
+                break;
+            }
+            d += decelGains[k] * Math.min(fade, 1f) * EngineVoice.sin(m * lobePhase + DECEL_PHASE * k);
         }
         return d;
     }
@@ -1227,6 +1311,16 @@ final class PulseVoice implements Voice {
         x ^= x >>> 17;
         x ^= x << 5;
         clickNoise = x;
+        return x * (1.7320508f / 2147483648f);
+    }
+
+    /** 节气门嘶声的白噪声，方差 1。 */
+    private float hissWhite() {
+        int x = hissNoise;
+        x ^= x << 13;
+        x ^= x >>> 17;
+        x ^= x << 5;
+        hissNoise = x;
         return x * (1.7320508f / 2147483648f);
     }
 

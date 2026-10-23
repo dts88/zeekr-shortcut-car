@@ -19,7 +19,8 @@ package com.kooo.evcam.sound;
  *   <li><b>车速</b> → 转速的一部分（连续）或挡位（模拟换挡）；电平随车速略升（盖过胎噪风噪）。</li>
  *   <li><b>刹车、动力流</b> → 回收或踩刹车时负荷归零（单踏板时油门轻踩到 5–12 % 还在回收，只看油门分不出来）。</li>
  *   <li><b>档位</b>：D 照两种走法；倒挡固定在倒挡齿比上、永远不升挡（上限 {@link #REVERSE_MAX_RPM}）；P / N 空挡，转速只跟油门
- *       （上限 {@link #FREE_REV_MAX_RPM}，只在车内）。</li>
+ *       （上限 {@link #FREE_REV_MAX_RPM}，只在车内）。美式 V8 的空挡照真车（{@link #realNeutral}）：松开后按摩擦、泵气落，
+ *       {@link #NEUTRAL_FUEL_RPM} 以下恢复供油、低负荷地转着落，落到怠速时电控稳一下。</li>
  *   <li><b>伪挡位</b>（项目所有者 2026-10-21）：连续走法下油门踩到 {@link #PSEUDO_ON_PCT} 以上（或一脚到底），也按挡位走锯齿，
  *       和模拟换挡一样升挡；油门回到 {@link #PSEUDO_OFF_PCT} 以下、踩刹车或回收时回到连续。</li>
  *   <li><b>升挡</b>（两种走法一样）：先断扭（合成器那边燃烧减弱、电平掉一点），转速停一下再按 S 形落到新挡位，
@@ -252,6 +253,35 @@ final class VirtualEngine {
     static final float OVERRUN_RPM_SPAN = 500f;
     static final float OVERRUN_SEC = 0.15f;
 
+    // ---- 空挡照真车（{@link #realNeutral}，美式 V8；项目所有者 2026-10-23 给的参考视频：停着在 P 挡轰油门）
+    /**
+     * 松开油门，转速每秒落 {@code NEUTRAL_DECEL + rpm / NEUTRAL_DECEL_TAU}（rpm/s）：节气门关着，摩擦、泵气拖着曲轴、飞轮、
+     * 增压器一起慢下来，转得越快拖得越狠。参考：从 4600 rpm 起每秒落约 1700 rpm，2000 rpm 附近约 1250，2.5 秒落到怠速
+     * （原来按 0.4 秒的时间常数、每秒最多 4000 rpm 落，不到 2 秒，前半段太快）。离要去的转速近了按 {@link #NEUTRAL_LAND_SEC} 落稳。
+     */
+    static final float NEUTRAL_DECEL = 1000f;
+    static final float NEUTRAL_DECEL_TAU = 6.5f;
+    static final float NEUTRAL_LAND_SEC = 0.2f;
+    /**
+     * 空挡收油：这个转速（rpm）以上才断油，再高 {@link #NEUTRAL_CUT_SPAN} 全断。参考：松开时（4300 rpm 上下）车内一下轻了 10 dB、
+     * 阶次几乎没了；落到 3300 rpm 慢慢回来，2600–2900 rpm 已经和轻踩着稳在那个转速一样响 —— 恢复供油，活塞低负荷地转着往下落
+     * （项目所有者：松开油门发动机也在持续出声）。挂着挡滑行照旧（{@link #OVERRUN_FROM_RPM}）。
+     */
+    static final float NEUTRAL_FUEL_RPM = 2600f;
+    static final float NEUTRAL_CUT_SPAN = 900f;
+    /**
+     * 落到怠速时电控稳一下（多给一点气、点火提前）：先落到怠速，再按 {@link #CATCH_RISE_SEC} 冲上 {@link #CATCH_FLARE_RPM}，
+     * 再按 {@link #CATCH_FALL_SEC} 落回怠速，那一下的负荷 {@link #CATCH_LOAD}（项目所有者：降到一定转速后稍微发力，稳定在一个转速上）。
+     * 参考：落到约 815 rpm，0.6 秒后到 920，约 2 秒回到 810。从怠速以上 {@link #CATCH_ARM_RPM} 往下落才算（轻轻动一下油门不算），
+     * 离怠速 {@link #CATCH_FROM_RPM} 以内开始；中途踩油门就交还油门。
+     */
+    static final float CATCH_FLARE_RPM = 120f;
+    static final float CATCH_RISE_SEC = 0.6f;
+    static final float CATCH_FALL_SEC = 0.6f;
+    static final float CATCH_LOAD = 0.08f;
+    static final float CATCH_ARM_RPM = 600f;
+    static final float CATCH_FROM_RPM = 30f;
+
     /** 一块最多按多长推进（秒）：线程被耽搁了也不一步跳太远。 */
     static final float MAX_DT = 0.1f;
 
@@ -310,6 +340,12 @@ final class VirtualEngine {
     private float overrun;
     private float speedKmh;
     private Gear gear = Gear.UNKNOWN;
+    // ---- 空挡照真车
+    private final boolean realNeutral;
+    /** 空挡里从怠速以上 {@link #CATCH_ARM_RPM} 往下落着（落到怠速时稳一下）。 */
+    private boolean catchArmed;
+    /** 稳一下走了多久（秒）；负的 = 没在稳。 */
+    private float catchSec = -1f;
 
     VirtualEngine(SoundProfile profile) {
         this(profile, true);
@@ -330,10 +366,20 @@ final class VirtualEngine {
      *                    时就是这样，项目所有者 2026-10-23）
      */
     VirtualEngine(SoundProfile profile, Gearbox gearbox, boolean crank, boolean pseudoGears) {
+        this(profile, gearbox, crank, pseudoGears, false);
+    }
+
+    /**
+     * @param realNeutral 空挡（P / N）照真车（美式 V8，项目所有者 2026-10-23）：松油门后按摩擦、泵气落转速，
+     *                    {@link #NEUTRAL_FUEL_RPM} 以下恢复供油低负荷地转着往下落，落到怠速时电控稳一下；不照的话按
+     *                    {@link SoundProfile#rpmFallSec} 平滑地落，断油到怠速附近
+     */
+    VirtualEngine(SoundProfile profile, Gearbox gearbox, boolean crank, boolean pseudoGears, boolean realNeutral) {
         this.p = profile;
         this.gearbox = gearbox;
         this.crank = crank;
         this.pseudoAllowed = pseudoGears;
+        this.realNeutral = realNeutral;
         this.rpm = profile.idleRpm;
     }
 
@@ -373,6 +419,8 @@ final class VirtualEngine {
         overrun = 0f;
         surge = 0f;
         done = false;
+        catchArmed = false;
+        catchSec = -1f;
         float v = speedOf(in);
         speedKmh = v;
         gear = in.gear;
@@ -498,6 +546,7 @@ final class VirtualEngine {
             shiftLeftSec = 0f;
             upLeftSec = 0f;
         }
+        updateCatch(dt, target, in.gear);
         float goal = rpmTarget(v, in);
         if (upLeftSec > 0f) {
             stepUpshift(dt, goal, in.gear);
@@ -505,10 +554,46 @@ final class VirtualEngine {
             cut = 0f;
             moveRpm(dt, goal, shifting, in.gear);
         }
-        // 看这一刻该有的负荷（不等平滑）：一松油门就断油
-        float overrunTarget = target < OVERRUN_LOAD
-                ? clamp01((rpm - p.idleRpm - OVERRUN_FROM_RPM) / OVERRUN_RPM_SPAN) : 0f;
+        // 看这一刻该有的负荷（不等平滑）：一松油门就断油；空挡照真车时只在高转断
+        float overrunTarget = target >= OVERRUN_LOAD ? 0f
+                : neutral(in.gear) ? clamp01((rpm - NEUTRAL_FUEL_RPM) / NEUTRAL_CUT_SPAN)
+                : clamp01((rpm - p.idleRpm - OVERRUN_FROM_RPM) / OVERRUN_RPM_SPAN);
         overrun += (overrunTarget - overrun) * follow(dt, OVERRUN_SEC);
+    }
+
+    /** 空挡照真车：从高处松油门落下来，落到怠速附近时电控稳一下（{@link #catchShape}）；踩油门、挂挡就不管了。 */
+    private void updateCatch(float dt, float target, Gear g) {
+        if (!neutral(g) || target >= OVERRUN_LOAD) {
+            catchArmed = false;
+            catchSec = -1f;
+            return;
+        }
+        if (catchSec >= 0f) {
+            catchSec += dt;
+            if (catchSec > CATCH_RISE_SEC + 8f * CATCH_FALL_SEC) {
+                catchSec = -1f;
+            }
+        }
+        if (rpm > p.idleRpm + CATCH_ARM_RPM) {
+            catchArmed = true;
+        } else if (catchArmed && rpm < p.idleRpm + CATCH_FROM_RPM) {
+            catchArmed = false;
+            catchSec = 0f;
+        }
+    }
+
+    /** 稳一下此刻冲到几成（0–1）：{@link #CATCH_RISE_SEC} 里 S 形起来，再按 {@link #CATCH_FALL_SEC} 落回去；没在稳是 0。 */
+    private float catchShape() {
+        if (catchSec < 0f) {
+            return 0f;
+        }
+        return catchSec < CATCH_RISE_SEC ? smooth(catchSec / CATCH_RISE_SEC)
+                : (float) Math.exp(-(catchSec - CATCH_RISE_SEC) / CATCH_FALL_SEC);
+    }
+
+    /** 此刻按空挡照真车走（{@link #realNeutral}，P、N、读不到挡位）。 */
+    private boolean neutral(Gear g) {
+        return realNeutral && g != Gear.D && g != Gear.R;
     }
 
     /** 连续走法：油门接近踩到底时按伪挡位走（有回差：踩到 {@link #PSEUDO_ON_PCT}、或者一脚到底时进，回到 {@link #PSEUDO_OFF_PCT} 以下出）。 */
@@ -716,8 +801,8 @@ final class VirtualEngine {
                 }
                 break;
             default:
-                // P、N、读不到：空挡，转速只跟油门
-                base = p.idleRpm + (FREE_REV_MAX_RPM - p.idleRpm) * load;
+                // P、N、读不到：空挡，转速只跟油门（照真车时落到怠速那一下电控稳一下）
+                base = p.idleRpm + (FREE_REV_MAX_RPM - p.idleRpm) * load + CATCH_FLARE_RPM * catchShape();
                 break;
         }
         return base + blip;
@@ -726,12 +811,14 @@ final class VirtualEngine {
     private void moveRpm(float dt, float target, boolean shifting, Gear g) {
         float cap = capFor(g);
         target = clamp(target, p.idleRpm, cap);
+        boolean free = neutral(g);
         float riseTau = p.rpmRiseSec * (1f - STAB_RISE_CUT * stabEnv);
-        float tau = shifting ? p.shiftSec : (target > rpm ? riseTau : p.rpmFallSec);
+        float tau = shifting ? p.shiftSec : (target > rpm ? riseTau : (free ? NEUTRAL_LAND_SEC : p.rpmFallSec));
         float next = rpm + (target - rpm) * follow(dt, tau);
         if (!shifting) {
             float up = p.rpmRisePerSec * (1f + stabEnv) * dt;
-            float down = p.rpmFallPerSec * dt;
+            // 空挡照真车：落得多快看摩擦、泵气
+            float down = (free ? NEUTRAL_DECEL + rpm / NEUTRAL_DECEL_TAU : p.rpmFallPerSec) * dt;
             next = clamp(next, rpm - down, rpm + up);
         }
         rpm = clamp(next, p.idleRpm, cap);
@@ -888,11 +975,11 @@ final class VirtualEngine {
     }
 
     /**
-     * 合成器用的负荷：降挡补油那一下也算进去。行驶中起动、电机带着转的那一段是 0（节气门关着，点着那一下才是一个清楚的「轰」）；
-     * 油门要的负荷只拿来定带到多少转。
+     * 合成器用的负荷：降挡补油、空挡落到怠速时电控稳一下的那一下也算进去。行驶中起动、电机带着转的那一段是 0（节气门关着，
+     * 点着那一下才是一个清楚的「轰」）；油门要的负荷只拿来定带到多少转。
      */
     float voiceLoad() {
-        return phase == Phase.JOINING ? 0f : Math.max(load, blipLoad);
+        return phase == Phase.JOINING ? 0f : Math.max(Math.max(load, blipLoad), CATCH_LOAD * catchShape());
     }
 
     /**

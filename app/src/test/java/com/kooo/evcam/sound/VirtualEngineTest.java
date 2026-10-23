@@ -835,6 +835,131 @@ public class VirtualEngineTest {
         assertEquals("回到怠速", 0f, e.overrun(), 0.02f);
     }
 
+    // ================================================================= 2026-10-23：空挡照真车（美式 V8）
+
+    /**
+     * 美式 V8 的走法（空挡照真车）：P 挡启动、等落稳，轰到顶再松开；返回松开那一刻起每块的 {秒, 转速, 断油, 合成器的负荷}。
+     */
+    private static java.util.List<float[]> blipInPark(float seconds) {
+        VirtualEngine e = new VirtualEngine(P, G, false, true, true);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 3f);
+        in.throttlePct = 100f;
+        in.pedalRate = 600f;
+        run(e, in, 1.5f);
+        in.throttlePct = 0f;
+        in.pedalRate = 0f;
+        java.util.List<float[]> out = new java.util.ArrayList<>();
+        for (int i = 0; i < Math.round(seconds / DT); i++) {
+            e.step(DT, in);
+            out.add(new float[] {(i + 1) * DT, e.rpm(), e.overrun(), e.voiceLoad()});
+        }
+        return out;
+    }
+
+    @Test
+    public void inParkALiftFallsAtTheRateOfFrictionAndPumping() {
+        // 项目所有者 2026-10-23 给的参考视频（停着在 P 挡轰油门）：从 4600 rpm 松开，每秒落约 1700 rpm，2.5 秒落到怠速
+        // （原来按 0.4 秒的时间常数落，不到 2 秒，前半段太快）
+        java.util.List<float[]> f = blipInPark(5f);
+        float atIdle = -1f;
+        float t4200 = -1f;
+        float t3800 = -1f;
+        for (float[] s : f) {
+            if (t4200 < 0f && s[1] < 4200f) {
+                t4200 = s[0];
+            }
+            if (t3800 < 0f && s[1] < 3800f) {
+                t3800 = s[0];
+            }
+            if (atIdle < 0f && s[1] < P.idleRpm + 100f) {
+                atIdle = s[0];
+            }
+        }
+        assertTrue("落到怠速用了 " + atIdle + " s", atIdle > 2.0f && atIdle < 3.2f);
+        float rate = 400f / (t3800 - t4200);
+        assertTrue("4000 rpm 附近每秒落 " + rate + " rpm", rate > 1300f && rate < 2100f);
+    }
+
+    @Test
+    public void inParkTheFuelComesBackBeforeIdle() {
+        // 参考视频：松开时车内一下轻了 10 dB、阶次几乎没了（断油）；落到 3300 rpm 慢慢回来，2600 rpm 已经和轻踩着一样响 ——
+        // 恢复供油，活塞低负荷地转着往下落（项目所有者：松开油门发动机也在持续出声）
+        for (float[] s : blipInPark(4f)) {
+            if (s[0] > 0.3f && s[1] > 3700f) {
+                assertTrue("高转断油 " + s[2] + " @ " + s[1], s[2] > 0.8f);
+            }
+            if (s[1] < 2200f) {
+                assertTrue("低转恢复供油 " + s[2] + " @ " + s[1], s[2] < 0.05f);
+            }
+        }
+    }
+
+    @Test
+    public void atTheBottomTheIdleIsCaughtWithALittlePush() {
+        // 参考视频：落到约 815 rpm，0.6 秒后冲到 920，约 2 秒回到 810（项目所有者：降到一定转速后稍微发力，稳定在一个转速上）
+        java.util.List<float[]> f = blipInPark(8f);
+        int bottom = 0;
+        for (int i = 0; i < f.size(); i++) {
+            if (f.get(i)[1] < f.get(bottom)[1]) {
+                bottom = i;
+            }
+            if (f.get(i)[0] > 3.5f) {
+                break;
+            }
+        }
+        int peak = bottom;
+        for (int i = bottom; i < f.size() && f.get(i)[0] < f.get(bottom)[0] + 1.5f; i++) {
+            if (f.get(i)[1] > f.get(peak)[1]) {
+                peak = i;
+            }
+        }
+        float low = f.get(bottom)[1] - P.idleRpm;
+        float push = f.get(peak)[1] - f.get(bottom)[1];
+        float rise = f.get(peak)[0] - f.get(bottom)[0];
+        assertTrue("先落到怠速 +" + low, low >= 0f && low < 50f);
+        assertTrue("再冲上去 " + push + " rpm", push > 70f && push < 160f);
+        assertTrue("冲上去用了 " + rise + " s", rise > 0.3f && rise < 0.9f);
+        float pushLoad = 0f;
+        for (int i = bottom; i <= peak; i++) {
+            pushLoad = Math.max(pushLoad, f.get(i)[3]);
+        }
+        assertTrue("那一下稍微发力 " + pushLoad, pushLoad > 0.04f && pushLoad < 0.15f);
+        float end = f.get(f.size() - 1)[1] - P.idleRpm;
+        assertTrue("最后回到怠速 +" + end, end >= 0f && end < 20f);
+    }
+
+    @Test
+    public void aSmallBlipDoesNotTriggerTheCatchAndOtherStylesFallAsBefore() {
+        // 从怠速以上 CATCH_ARM_RPM 往下落才稳一下：轻轻动一下油门不算；别的风格（不照真车）还是平滑地落，不稳那一下
+        VirtualEngine e = new VirtualEngine(P, G, false, true, true);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 3f);
+        in.throttlePct = 8f;
+        run(e, in, 1f);
+        assertTrue("轻轻一点 " + e.rpm(), e.rpm() < P.idleRpm + VirtualEngine.CATCH_ARM_RPM);
+        in.throttlePct = 0f;
+        float low = Float.MAX_VALUE;
+        float rise = 0f;
+        for (int i = 0; i < Math.round(3f / DT); i++) {
+            e.step(DT, in);
+            low = Math.min(low, e.rpm());
+            rise = Math.max(rise, e.rpm() - low);
+        }
+        assertTrue("没有稳那一下（落下来不再往上冲）" + rise, rise < 5f);
+        VirtualEngine plain = new VirtualEngine(P, G, false, true);
+        VirtualEngine.Input pin = input(VirtualEngine.Gear.P, 0f, 0f);
+        plain.ignite(pin);
+        run(plain, pin, 3f);
+        pin.throttlePct = 100f;
+        run(plain, pin, 1.5f);
+        pin.throttlePct = 0f;
+        run(plain, pin, 2.5f);
+        assertEquals("不照真车：还是原来那样很快落回怠速", P.idleRpm, plain.rpm(), 40f);
+    }
+
     @Test
     public void startingIsNeverOverrun() {
         VirtualEngine e = new VirtualEngine(P);

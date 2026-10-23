@@ -744,4 +744,108 @@ public class PulseVoiceTest {
         double freeAdded = bandPower(freeWith, l2 * 0.985, l2 * 1.015) - bandPower(freeWithout, l2 * 0.985, l2 * 1.015);
         assertTrue("不增压时加的 " + db(Math.abs(freeAdded) / added) + " dB", Math.abs(freeAdded) < added * EngineVoice.dbToLin(-30f));
     }
+
+    // ================================================================= 2026-10-23：松开油门以后的啸叫、节气门的嘶声（参考视频）
+
+    /** 同一台机械增压，只是改了一样（{@code tweak}）：拿「有、没有这一层」两份的差量这一层自己（别的完全一样，随机数也一样）。 */
+    private static PulseProfile scWith(java.util.function.UnaryOperator<PulseProfile.Builder> tweak) {
+        return tweak.apply(new PulseProfile.Builder().supercharger(SC.superchargerOrder, SC.superchargerDb)
+                .loudness(SC.levelPow, SC.cabinLevelPow, SC.rpmLoudDb, SC.norm)).build();
+    }
+
+    /** 两份（同样的输入）的差，(左 + 右) / 2。 */
+    private static float[] difference(float[] a, float[] b) {
+        float[] d = new float[a.length / 2];
+        for (int i = 0; i < d.length; i++) {
+            d[i] = 0.5f * (a[2 * i] + a[2 * i + 1] - b[2 * i] - b[2 * i + 1]);
+        }
+        return d;
+    }
+
+    private static float[] slice(float[] x, float from, float to) {
+        return java.util.Arrays.copyOfRange(x, Math.round(from * RATE), Math.round(to * RATE));
+    }
+
+    /**
+     * 这个转速满增压 1 秒，再松开（断油、电平落到收油）1 秒；松开以后的啸叫这一层（有 − 没有）在叶片频率第 2 次（±1.5 %）的能量：
+     * {踩着 0.6–0.9 s, 松开头 0.05–0.35 s, 松开 0.6–0.9 s 以后}。
+     */
+    private static double[] decelLine(PulseProfile none, float rpm) {
+        VoiceParams on = params(rpm, 1f);
+        on.gain = 0.3f;
+        VoiceParams off = params(rpm, 0f);
+        off.overrun = 1f;
+        off.level = EngineVoice.dbToLin(VirtualEngine.LEVEL_FLOOR_DB);
+        off.gain = 0.3f;
+        float[][] lr = new float[2][];
+        PulseProfile[] pair = {SC, none};
+        for (int k = 0; k < 2; k++) {
+            PulseVoice v = new PulseVoice(pair[k], RATE);
+            float[] a = render(v, on, 1f);
+            float[] b = render(v, off, 1f);
+            lr[k] = new float[a.length + b.length];
+            System.arraycopy(a, 0, lr[k], 0, a.length);
+            System.arraycopy(b, 0, lr[k], a.length, b.length);
+        }
+        float[] d = difference(lr[0], lr[1]);
+        double l2 = SC.superchargerOrder * 2 * rpm / 60.0;
+        return new double[] {bandPower(slice(d, 0.6f, 0.9f), l2 * 0.985, l2 * 1.015),
+                bandPower(slice(d, 1.05f, 1.35f), l2 * 0.985, l2 * 1.015),
+                bandPower(slice(d, 1.6f, 1.9f), l2 * 0.985, l2 * 1.015)};
+    }
+
+    @Test
+    public void afterTheThrottleClosesTheSuperchargerWhinesClean() {
+        // 项目所有者 2026-10-23 给的参考视频（发动机舱，停着轰油门）：踩着油门、发动机出力时增压器承受着压力，放开油门后的声调明显
+        // 不同 —— 节气门关上、旁通阀打开，燃烧、压缩那几层没了，剩下干净的啸叫（叶片频率的第 2 次最响）；松开那一下最响，随转速
+        // 落下去很快变淡（4600 → 3300 rpm 约 −7 dB）；踩着油门时没有这一层
+        PulseProfile none = scWith(b -> b.decel(-100f));
+        double[] high = decelLine(none, 4500f);
+        double[] low = decelLine(none, 1500f);
+        assertTrue("踩着油门时没有: " + db(high[0] / high[2]) + " dB", high[0] < high[2] * 1e-3);
+        assertTrue("松开那一下最响: " + db(high[1] / high[2]) + " dB", high[1] > high[2] * 1.6);
+        assertTrue("低转淡: " + db(low[2] / high[2]) + " dB", low[2] < high[2] * Math.pow(10, -1.5));
+    }
+
+    /** 节气门的嘶声这一层（有 − 没有，车外）1–2 s：{RMS dB, 1 ms 包络的起伏（标准差 / 平均）}。 */
+    private static double[] hissLayer(PulseProfile none, float rpm, float load) {
+        VoiceParams p = params(rpm, load);
+        p.gain = 0.3f;
+        float[] d = slice(difference(render(SC, p, 2f), render(none, p, 2f)), 1f, 2f);
+        int block = RATE / 1000;
+        int n = d.length / block;
+        double[] env = new double[n];
+        double sum = 0;
+        double energy = 0;
+        for (int j = 0; j < n; j++) {
+            double e = 0;
+            for (int i = 0; i < block; i++) {
+                e += (double) d[j * block + i] * d[j * block + i];
+            }
+            energy += e;
+            env[j] = Math.sqrt(e / block);
+            sum += env[j];
+        }
+        double mean = sum / n;
+        double var = 0;
+        for (double v : env) {
+            var += (v - mean) * (v - mean);
+        }
+        return new double[] {10 * Math.log10(energy / (n * block) + 1e-30), Math.sqrt(var / n) / mean};
+    }
+
+    @Test
+    public void theThrottleHissesAtIdleAndGetsDenserWithTheRevs() {
+        // 项目所有者 2026-10-23：P 挡落到怠速、稳住以后节气门的声音相对更明显；转速高了不是变小，是更快更密、被差不多频率或更响的
+        // 声音盖住。节气门几乎关着时窄缝里声速的气流，每吸一口气涌一股：怠速时一股一股分得开（参考视频发动机舱怠速 2–9 kHz 按点火
+        // 频率起伏 80 % 以上），转速高了连成一片（4500 rpm 收油时只起伏 30 % 上下），总的差不多一样响；节气门开大了没了
+        PulseProfile none = scWith(b -> b.hiss(-100f));
+        double[] idle = hissLayer(none, 900f, 0f);
+        double[] high = hissLayer(none, 4000f, 0f);
+        double[] open = hissLayer(none, 4000f, 1f);
+        assertTrue("怠速时一股一股: " + idle[1], idle[1] > 0.7);
+        assertTrue("转速高了连成一片: " + high[1] + " / " + idle[1], high[1] < idle[1] - 0.25);
+        assertTrue("不是变小（差不多一样响）: " + (high[0] - idle[0]) + " dB", high[0] - idle[0] > -2 && high[0] - idle[0] < 5);
+        assertTrue("节气门开大了没了: " + (open[0] - high[0]) + " dB", open[0] - high[0] < -20);
+    }
 }

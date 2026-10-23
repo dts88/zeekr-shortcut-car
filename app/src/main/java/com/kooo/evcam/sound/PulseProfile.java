@@ -125,6 +125,20 @@ final class PulseProfile {
     final float roarLoadDb;
     final float roarHz;
     final float roarQ;
+    /**
+     * 节气门的气流声（项目所有者 2026-10-23：P 挡落到怠速、稳住以后节气门的声音相对更明显；转速高了不是变小，是更快更密、被差不多
+     * 频率或更响的声音盖住）：节气门几乎关着时，后面的真空把空气从窄缝里吸进去，缝里的气流到了声速 ——「嘶」，宽带的（带通 Hz、Q）。
+     * 每个缸吸一口气就涌一股（进气门关上那一下起，按 {@link #hissDecayMs} 落下去，时间是固定的：怠速时一股一股分得开，转速高了
+     * 连成一片），底下一直有的一层占 {@link #hissFloor}。缝里是声速的气流，流量只看缝多大、和转速无关：转速高了每一股分到的少
+     * （按转速的平方根），总的差不多一样响。节气门开大了缝两边的压差没了，嘶声跟着没了（× (1 − 负荷)²）。参考视频（发动机舱，
+     * 怠速 813 rpm）：2–9 kHz 比 200 Hz 以下低 11–16 dB，按点火频率起伏 80 % 以上；4500 rpm 收油时只起伏 30 % 上下。
+     * 电平 {@link #hissDb}（dB，怠速、节气门全关，每一股的峰值）。
+     */
+    final float hissDb;
+    final float hissHz;
+    final float hissQ;
+    final float hissDecayMs;
+    final float hissFloor;
 
     // ---- 机械增压（阶次 0 = 没有）：双螺杆，曲轴用皮带带着转。啸叫照车主偏好的那台的录音：叶片扫过出口的基频不响，
     //      响的是同步齿轮的啮合声（3 倍，第 2、3 次最响），很纯、只在增压时有；松油门旁通阀打开，齿轮声几乎没了，基频反而显出来。
@@ -236,6 +250,22 @@ final class PulseProfile {
     final float inletQ;
     /** 车速 200 km/h 时进气的风声（进口风声、进气呼啸）多几成（× (1 + 它)，按车速的平方长）：越开越快的感觉。 */
     final float inletRam;
+    /**
+     * 松开油门以后的啸叫 ——「放开」那一层（项目所有者 2026-10-23 给的参考视频，发动机舱里停着轰油门：踩下油门、发动机出力时
+     * 增压器承受着压力，声音和放开油门后的声调明显不同；EngineV1 那台的素材基本是踩着油门录的，缺这一段）。节气门在增压器前面，
+     * 一关上，增压器进口那边抽成很低的真空、旁通阀打开，转子照样被皮带带着高速转、在旁通回路里搬着稀薄的空气：燃烧、压缩那几层
+     * 没了，剩下干净的啸叫 —— 叶片频率的 {@link #decelHarmonics} 次（各自的 dB，第 2 次最响），各自固定的相位。参考：松开那一下
+     * 最响（同一转速、同一根线比踩着时高约 8 dB），随转速落下去很快变淡（4600 → 3300 rpm 约 −7 dB，3000 rpm 以下几乎听不见）；
+     * 节气门开着没有。电平：{@link #decelDb}（dB，4500 rpm、节气门全关，和齿轮声同一个基准）× (转速 / 4500)^{@link #decelRpmPow}
+     * × ((1 − 负荷)² + {@link #decelBurst} × 刚才的增压)：刚在增压就松开，那一下多响，节气门还没全关时就起，按
+     * {@link #decelBurstSec} 落下去。
+     */
+    final float decelDb;
+    final float decelRpmPow;
+    final int[] decelHarmonics;
+    final float[] decelHarmonicsDb;
+    final float decelBurst;
+    final float decelBurstSec;
 
     // ---- 声音从哪来（驾驶座看；立体声 −1 左 … +1 右）
     /** 每个缸气门、燃烧的声音按排摆在左右多远；最靠后的缸离驾驶座多远（米）、缸距（米，1、2 缸在最前面）。 */
@@ -413,6 +443,11 @@ final class PulseProfile {
         roarLoadDb = b.roarLoadDb;
         roarHz = b.roarHz;
         roarQ = b.roarQ;
+        hissDb = b.hissDb;
+        hissHz = b.hissHz;
+        hissQ = b.hissQ;
+        hissDecayMs = b.hissDecayMs;
+        hissFloor = b.hissFloor;
         superchargerOrder = b.superchargerOrder;
         lobeDb = b.lobeDb;
         meshMultiple = b.meshMultiple;
@@ -461,6 +496,12 @@ final class PulseProfile {
         inletHz = b.inletHz;
         inletQ = b.inletQ;
         inletRam = b.inletRam;
+        decelDb = b.decelDb;
+        decelRpmPow = b.decelRpmPow;
+        decelHarmonics = b.decelHarmonics.clone();
+        decelHarmonicsDb = b.decelHarmonicsDb.clone();
+        decelBurst = b.decelBurst;
+        decelBurstSec = b.decelBurstSec;
         cylinderPan = b.cylinderPan;
         cylinderNearM = b.cylinderNearM;
         cylinderPitchM = b.cylinderPitchM;
@@ -599,6 +640,11 @@ final class PulseProfile {
         private float roarLoadDb = -14f;
         private float roarHz = 1800f;
         private float roarQ = 0.7f;
+        private float hissDb = -22f;
+        private float hissHz = 3000f;
+        private float hissQ = 0.6f;
+        private float hissDecayMs = 4f;
+        private float hissFloor = 0.1f;
         private float superchargerOrder;
         private float lobeDb = -29f;
         private float meshMultiple = 3f;
@@ -649,6 +695,12 @@ final class PulseProfile {
         private float inletHz = 1600f;
         private float inletQ = 0.7f;
         private float inletRam = 3f;
+        private float decelDb = -21f;
+        private float decelRpmPow = 2.4f;
+        private int[] decelHarmonics = {2, 3, 4};
+        private float[] decelHarmonicsDb = {0f, -7f, -9f};
+        private float decelBurst = 1.5f;
+        private float decelBurstSec = 0.15f;
         private float cylinderPan = 0.45f;
         private float cylinderNearM = 1.7f;
         private float cylinderPitchM = 0.12f;
@@ -747,6 +799,18 @@ final class PulseProfile {
             return this;
         }
 
+        /** 松开油门以后的啸叫那一层的电平（dB，{@link PulseProfile#decelDb}）；很低（−100）就是没有这一层。 */
+        Builder decel(float db) {
+            decelDb = db;
+            return this;
+        }
+
+        /** 节气门气流声的电平（dB，{@link PulseProfile#hissDb}）；很低（−100）就是没有这一层。 */
+        Builder hiss(float db) {
+            hissDb = db;
+            return this;
+        }
+
         PulseProfile build() {
             if (firing.length == 0 || trim.length < firing.length || headerMs.length < firing.length
                     || pipeHz.length != 2 || helmholtzHz.length != 2 || bankMs.length != 2
@@ -757,7 +821,8 @@ final class PulseProfile {
                     || meshHarmonicsDb.length != meshRpm.length || meshRpmDb.length != meshRpm.length || meshVoiceDetune.length == 0
                     || pulsationRpmDb.length != pulsationRpm.length || cabinChordRpmDb.length != cabinChordRpm.length
                     || cabinRaspRpmDb.length != cabinRaspRpm.length
-                    || dischargeHarmonicsDb.length != dischargeHarmonics.length || ductHz.length != 2) {
+                    || dischargeHarmonicsDb.length != dischargeHarmonics.length || ductHz.length != 2
+                    || decelHarmonicsDb.length != decelHarmonics.length) {
                 throw new IllegalStateException("pulse profile incomplete");
             }
             for (int c : firing) {

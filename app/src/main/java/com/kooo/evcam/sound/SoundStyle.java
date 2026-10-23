@@ -76,6 +76,14 @@ enum SoundStyle {
         return this == AMERICAN || this == PROTOTYPE;
     }
 
+    /**
+     * 空挡（P / N）照真车（{@link VirtualEngine}）：松油门后按摩擦、泵气落转速，低转恢复供油、低负荷地转着往下落，落到怠速时电控
+     * 稳一下。只有「美式 V8」（项目所有者 2026-10-23 给的参考视频）；别的照原来平滑地落。
+     */
+    boolean realNeutral() {
+        return this == AMERICAN;
+    }
+
     /** 这种风格的合成器；{@code cabin}：车内听感（只有「美式 V8」分车内、车外，别的本来就是按车内做的）。 */
     Voice voice(float sampleRate, boolean cabin) {
         switch (this) {
