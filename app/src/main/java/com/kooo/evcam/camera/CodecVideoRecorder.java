@@ -164,7 +164,7 @@ public class CodecVideoRecorder {
     private Surface placeholderSurface;
 
     // 时间戳基准（用于计算相对时间戳，供输入端使用）
-    private long firstFrameTimestampNs = -1;
+    private volatile long firstFrameTimestampNs = -1;
 
     /** 上一次写入 muxer 的 PTS，用于保证严格单调递增；-1 表示还没写过帧。写入线程上，每个文件从头算。 */
     private long lastWrittenPtsUs = -1L;
@@ -270,6 +270,23 @@ public class CodecVideoRecorder {
     // 回调（宿主每次开录可以换一个：哪个线程上报都读这一份）
     private volatile RecordCallback callback;
 
+    // ---- 环视录像里的声音（开发者选项「录制声音」，FootageAudio）
+    /** 带不带声音、用哪个来源（{@link #setFootageAudio}）；null = 不带。 */
+    private volatile String footageAudioSource;
+    /** 这一次开录的声音：开录时起、叫停时停。 */
+    private volatile FootageAudio footageAudio;
+    /** 声音编码器报的输出格式：写入线程开轨时带上声音轨（{@link #startTrack}）。每次开录的声音编码器配置一样，一直留着。 */
+    private volatile MediaFormat audioFormat;
+    /** 相机的时间戳用的是 MONOTONIC（第一帧时判断）：声音的时刻要换到它上面。 */
+    private volatile boolean cameraClockMonotonic;
+    /** 最后一次排进一帧画面的时刻（开机时长，含深睡）：声音只跟着画面录（{@link #queueAudio}）。 */
+    private volatile long lastPictureQueuedMs = -1L;
+    /**
+     * 画面停了这么久，声音也不录了（项目所有者 2026-10-21：声音只是环视的附加项，环视没信号、录不了的时候不录声音）。
+     * 正常的帧间隔最长零点几秒（最省的档 10 fps、分段换编码器那一下），1 秒分得开「在录」和「停了」。
+     */
+    private static final long AUDIO_NEEDS_PICTURE_MS = 1_000L;
+
     // 时间水印设置
     private boolean watermarkEnabled = false;
 
@@ -307,6 +324,77 @@ public class CodecVideoRecorder {
         this.fourLaneOrder = order;
         AppLog.i(TAG, "Camera " + cameraId + " 四宫格录制: 源 " + srcWidth + "x" + srcHeight
                 + " -> 编码 " + width + "x" + height);
+    }
+
+    /**
+     * 这一路录像带声音（只给环视，{@code MultiCameraManager} 定）：开录时起一个 {@link FootageAudio}、叫停时停，
+     * 编码好的声音和画面写进同一个文件的第二条轨。准备之前设；null = 不带。安卓 11 以下不带（那时空的声音轨收不了文件）。
+     *
+     * @param source {@link FootageAudio#SOURCE_RAW} / {@link FootageAudio#SOURCE_CALL}
+     */
+    public void setFootageAudio(String source) {
+        this.footageAudioSource = source;
+        if (source != null) {
+            AppLog.i(TAG, "Camera " + cameraId + " 录像带声音，来源 " + source);
+        }
+    }
+
+    /** 开录时：带声音的话起声音线程（不等；出什么错都不碍画面）。 */
+    private void startFootageAudio() {
+        String source = footageAudioSource;
+        if (source == null || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
+            return;
+        }
+        FootageAudio audio = new FootageAudio(source, cameraId, audioSink);
+        footageAudio = audio;
+        audio.start();
+    }
+
+    /** 叫停、放掉时：声音一起停（不等它）。之后才到的声音，{@link #queueAudio} 不收。 */
+    private void stopFootageAudio() {
+        FootageAudio audio = footageAudio;
+        footageAudio = null;
+        if (audio != null) {
+            audio.stop();
+        }
+    }
+
+    private final FootageAudio.Sink audioSink = new FootageAudio.Sink() {
+        @Override
+        public void onAudioFormat(MediaFormat format) {
+            audioFormat = format;
+        }
+
+        @Override
+        public void onAudioSample(long captureBootUs, byte[] data) {
+            queueAudio(captureBootUs, data);
+        }
+    };
+
+    /**
+     * 一块编码好的声音（声音线程上）：采集时刻换到画面的时间轴上（和画面样本同一个起点：这个录制器的第一帧），排给写入线程。
+     *
+     * <p>声音只跟着画面录（项目所有者 2026-10-21）：画面停了 {@link #AUDIO_NEEDS_PICTURE_MS} 以上（环视没信号、录不了 ——
+     * 这一路还算在录，但相机不出帧，要等写不进文件的裁判 15 秒后才收），这一块不要。还没录到第一帧、比第一帧早、
+     * 叫停了、排队满了（写入线程跟不上，画面也在少编）的也丢掉 —— 声音不让画面等。停录时声音跟着停，
+     * 所以熄屏后最晚和环视一起停；哨兵模式下环视接着录，声音也接着录。</p>
+     */
+    private void queueAudio(long captureBootUs, byte[] data) {
+        long base = firstFrameTimestampNs;
+        long lastPicture = lastPictureQueuedMs;
+        long now = SystemClock.elapsedRealtime();
+        if (base < 0 || stopRequested || isReleased || !ring.hasRoom()
+                || lastPicture < 0 || now - lastPicture > AUDIO_NEEDS_PICTURE_MS) {
+            return;
+        }
+        long cameraNs = FootageAudioMath.toCameraClock(captureBootUs * 1000L, cameraClockMonotonic,
+                SystemClock.elapsedRealtimeNanos(), System.nanoTime());
+        long ptsUs = (cameraNs - base) / 1000L;
+        if (ptsUs < 0) {
+            return;
+        }
+        ring.offerAudio(ptsUs, data, now);
+        kickWriter();
     }
 
     public CodecVideoRecorder(String cameraId, int width, int height) {
@@ -736,8 +824,14 @@ public class CodecVideoRecorder {
                             // 因为 eglPresentationTimeANDROID 需要单调递增的时间戳
                             // 否则 GraphicBufferSource 会拒绝帧
                             if (firstFrameTimestampNs < 0) {
+                                // 相机用的是哪个钟：声音的时刻要换到它上面（FootageAudioMath）。先定钟、再定基准 —— 声音线程先读基准
+                                long bootNs = SystemClock.elapsedRealtimeNanos();
+                                long monoNs = System.nanoTime();
+                                cameraClockMonotonic = FootageAudioMath.cameraUsesMonotonic(absoluteTimestampNs, bootNs, monoNs);
                                 firstFrameTimestampNs = absoluteTimestampNs;
-                                AppLog.d(TAG, "Camera " + cameraId + " First frame timestamp: " + absoluteTimestampNs + " ns");
+                                AppLog.d(TAG, "Camera " + cameraId + " First frame timestamp: " + absoluteTimestampNs + " ns ("
+                                        + (cameraClockMonotonic ? "MONOTONIC" : "BOOTTIME") + ", boot - mono "
+                                        + (bootNs - monoNs) / 1_000_000L + " ms)");
                             }
                             long relativeTimestampNs = absoluteTimestampNs - firstFrameTimestampNs;
 
@@ -870,6 +964,8 @@ public class CodecVideoRecorder {
         encoderBeat.arm(StallWatch.now(), StallRules.ARM_GRACE_MS);
         // 写入线程另外盯：卡在一次写 / fsync / 收文件里太久就记一份报告（闲着不算）
         writerBeat.arm(StallWatch.now(), 0L);
+        // 带声音的话这时起（只有环视）
+        startFootageAudio();
 
         // 注意：不再使用单独的编码循环
         // 帧的处理直接在 onFrameAvailable 回调中完成（该回调在 encoderHandler 上执行）
@@ -926,6 +1022,7 @@ public class CodecVideoRecorder {
         // 立即标记停止状态，防止新帧处理
         isRecording.set(false);
         encoderBeat.disarm();
+        stopFootageAudio();
 
         // 取消所有定时器和任务
         Handler segment = segmentHandler;
@@ -1124,6 +1221,7 @@ public class CodecVideoRecorder {
 
         isReleased = true;
         encoderBeat.disarm();
+        stopFootageAudio();
 
         // 还在录的、备好了没开过录的先叫停（单独放掉这一路时）；叫停了、还没等它收好的，在这里等。
         // 放掉之后表上什么都走不成了，所以这两步不经 beginStop / finishStop 的闸
@@ -1877,8 +1975,10 @@ public class CodecVideoRecorder {
         }
         muxerFile = file;
         videoTrackIndex = -1;
+        audioTrackIndex = -1;
         muxerStarted = false;
         lastWrittenPtsUs = -1L;
+        lastAudioPtsUs = -1L;
         segmentBasePtsUs = -1L;
 
         AppLog.d(TAG, "Camera " + cameraId + " Muxer created: " + filePath);
@@ -2401,6 +2501,12 @@ public class CodecVideoRecorder {
 
     private MediaMuxer muxer;
     private int videoTrackIndex = -1;
+    /** 声音轨（这个文件带声音的话）；-1 = 没有。 */
+    private int audioTrackIndex = -1;
+    /** 这个文件开轨时带上的声音格式（换盘补写、抢救用）；不带声音是 null。收文件时清掉。 */
+    private volatile MediaFormat fileAudioFormat;
+    /** 这个文件上一块声音的时间戳（声音轨也要严格递增）；-1 = 还没写过。写入线程上，每个文件从头算。 */
+    private long lastAudioPtsUs = -1L;
     private volatile boolean muxerStarted;
     /** muxer 写的那个文件，我们自己开的：muxer 内部 dup 了描述符，这一份留着 fsync。 */
     private RandomAccessFile muxerFile;
@@ -2597,7 +2703,10 @@ public class CodecVideoRecorder {
         encodedData.limit(info.offset + info.size);
         encodedData.get(data);
         // 关键帧、只有参数集都由 ring 从标志位上看（参数集不算排队的画面长度，见 SampleRing.Sample#config）
-        ring.offerSample(info.presentationTimeUs, info.flags, data, SystemClock.elapsedRealtime());
+        long now = SystemClock.elapsedRealtime();
+        ring.offerSample(info.presentationTimeUs, info.flags, data, now);
+        // 声音只跟着画面录：最后一帧画面什么时候进来的（queueAudio）
+        lastPictureQueuedMs = now;
         kickWriter();
         noteEncodedBytes(info.size);
     }
@@ -2732,10 +2841,13 @@ public class CodecVideoRecorder {
     /** 抢救的一段：同一个文件、同一个格式的样本，从关键帧开始。 */
     private static final class RescueRun {
         final MediaFormat format;
+        /** 这一段的声音格式（带声音的话；写进抢救文件的声音轨）；不带是 null。 */
+        final MediaFormat audioFormat;
         final List<SampleRing.Sample> samples;
 
-        RescueRun(MediaFormat format, List<SampleRing.Sample> samples) {
+        RescueRun(MediaFormat format, MediaFormat audioFormat, List<SampleRing.Sample> samples) {
             this.format = format;
+            this.audioFormat = audioFormat;
             this.samples = samples;
         }
     }
@@ -2748,6 +2860,7 @@ public class CodecVideoRecorder {
     private List<RescueRun> rescueRuns(List<Object> entries) {
         List<RescueRun> runs = new ArrayList<>();
         MediaFormat format = fileFormat;
+        MediaFormat sound = fileAudioFormat;
         List<SampleRing.Sample> current = new ArrayList<>();
         for (Object entry : entries) {
             if (entry instanceof SampleRing.Sample) {
@@ -2757,14 +2870,16 @@ public class CodecVideoRecorder {
                 }
             } else if (entry instanceof CloseFile || entry instanceof StartTrack) {
                 if (format != null && !current.isEmpty()) {
-                    runs.add(new RescueRun(format, current));
+                    runs.add(new RescueRun(format, sound, current));
                 }
                 current = new ArrayList<>();
                 format = entry instanceof StartTrack ? ((StartTrack) entry).format : null;
+                // 后面那个文件开轨时会带上声音轨的话（声音格式已经到了），抢救时也带
+                sound = entry instanceof StartTrack && footageAudioSource != null ? audioFormat : null;
             }
         }
         if (format != null && !current.isEmpty()) {
-            runs.add(new RescueRun(format, current));
+            runs.add(new RescueRun(format, sound, current));
         }
         return runs;
     }
@@ -2804,7 +2919,7 @@ public class CodecVideoRecorder {
                 String saved = null;
                 for (File dir : dirs) {
                     try {
-                        saved = writeRescueFile(dir, run.samples, run.format);
+                        saved = writeRescueFile(dir, run.samples, run.format, run.audioFormat);
                         break;
                     } catch (Exception e) {
                         AppLog.w(TAG, "Camera " + cameraId + " rescue to " + dir + " failed: " + e);
@@ -2943,6 +3058,7 @@ public class CodecVideoRecorder {
         writerFileName = open.name;
         fileSerial = open.serial;
         fileFormat = null;
+        fileAudioFormat = null;
         fileStarted = false;
         fileFailed = false;
         // 这个文件开成了才填：收文件时按它报，没开成就没什么可报的（见 closeFile）
@@ -2993,6 +3109,10 @@ public class CodecVideoRecorder {
         writerBeat.beginTask("track", start);
         try {
             videoTrackIndex = muxer.addTrack(track.format);
+            // 声音格式已经到了的话带上声音轨；没到、加不上，这个文件就只有画面（下一个文件再带）
+            MediaFormat sound = footageAudioSource != null ? audioFormat : null;
+            audioTrackIndex = addAudioTrack(muxer, sound);
+            fileAudioFormat = audioTrackIndex >= 0 ? sound : null;
             muxer.start();
             muxerStarted = true;
             fileStarted = true;
@@ -3005,7 +3125,21 @@ public class CodecVideoRecorder {
         }
         writerBeat.endTask();
         StallWatch.noteOp(writerBeat, cameraId, "track", start);
-        AppLog.d(TAG, "Camera " + cameraId + " Muxer started, track=" + videoTrackIndex);
+        AppLog.d(TAG, "Camera " + cameraId + " Muxer started, track=" + videoTrackIndex
+                + (audioTrackIndex >= 0 ? ", sound track=" + audioTrackIndex : ""));
+    }
+
+    /** 给这个 muxer 加声音轨（start 之前）；没有格式、加不上是 -1 —— 只是这个文件没声音，画面照写。 */
+    private int addAudioTrack(MediaMuxer target, MediaFormat format) {
+        if (format == null) {
+            return -1;
+        }
+        try {
+            return target.addTrack(format);
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "Camera " + cameraId + " cannot add the sound track, pictures only: " + e);
+            return -1;
+        }
     }
 
     /**
@@ -3019,6 +3153,10 @@ public class CodecVideoRecorder {
         if (fileFailed || muxer == null || !muxerStarted) {
             // 没有能写的文件：这个文件没开成、开轨失败、换盘也没换成。写不了的只能丢
             ring.discard(sample);
+            return;
+        }
+        if (sample.audio) {
+            writeAudio(sample);
             return;
         }
         while (true) {
@@ -3044,6 +3182,44 @@ public class CodecVideoRecorder {
         writerBeat.beat(StallWatch.now());
         ring.written(sample, SystemClock.elapsedRealtime());
         markWritten();
+    }
+
+    /**
+     * 写一块声音（写入线程上）。这个文件没有声音轨、画面还没开头（第一帧画面定了这个文件的 0）、比第一帧早、
+     * 时间戳没往前走的丢掉。写不进和画面一样换盘（写过多留的那段连声音一起补写进新文件）；换不了，这个文件就算写不了。
+     * 不算「写进去了」（{@link #markWritten}）：写不进文件的裁判只看画面。
+     */
+    private void writeAudio(SampleRing.Sample sample) {
+        while (true) {
+            if (audioTrackIndex < 0 || segmentBasePtsUs < 0) {
+                ring.discard(sample);
+                return;
+            }
+            long pts = sample.ptsUs - segmentBasePtsUs;
+            if (pts < 0 || pts <= lastAudioPtsUs) {
+                ring.discard(sample);
+                return;
+            }
+            writerInfo.set(0, sample.data.length, pts, 0);
+            long start = StallWatch.now();
+            writerBeat.beginTask("write", start);
+            try {
+                muxer.writeSampleData(audioTrackIndex, ByteBuffer.wrap(sample.data), writerInfo);
+            } catch (RuntimeException e) {
+                writerBeat.endTask();
+                if (!relocate("write", e)) {
+                    failFile("write", e);
+                    ring.discard(sample);
+                    return;
+                }
+                continue;  // 换好了：新文件的基准、声音轨按补写的那段定，重新算一遍
+            }
+            writerBeat.endTask();
+            StallWatch.noteOp(writerBeat, cameraId, "write", start);
+            lastAudioPtsUs = pts;
+            ring.written(sample, SystemClock.elapsedRealtime());
+            return;
+        }
     }
 
     /**
@@ -3093,6 +3269,7 @@ public class CodecVideoRecorder {
                 ring.clearKept();
             }
             fileFormat = null;
+            fileAudioFormat = null;
             fileStarted = false;
             fileFailed = false;
             currentFilePath = null;
@@ -3222,6 +3399,7 @@ public class CodecVideoRecorder {
             muxer = null;
             muxerStarted = false;
             videoTrackIndex = -1;
+            audioTrackIndex = -1;
         }
         closeMuxerFile();
         return confirmed;
@@ -3245,6 +3423,7 @@ public class CodecVideoRecorder {
             muxer = null;
             muxerStarted = false;
             videoTrackIndex = -1;
+            audioTrackIndex = -1;
         }
         closeMuxerFile();
     }
@@ -3301,7 +3480,7 @@ public class CodecVideoRecorder {
             File dir = dirs.get(i);
             writerTargetDir = dir.getAbsolutePath();
             try {
-                String path = writeRescueFile(dir, pending, format);
+                String path = writeRescueFile(dir, pending, format, fileAudioFormat);
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("上一个文件没确认落盘（相机 " + cameraId + "，"
                         + stage + "），把内存里的 " + (spanMs / 1000) + " 秒抢救到 " + path);
                 return;
@@ -3328,8 +3507,8 @@ public class CodecVideoRecorder {
      *
      * <p>写完 fsync：没确认落盘的抢救文件和没抢救一样。不成功就删掉并抛出。</p>
      */
-    private String writeRescueFile(File dir, List<SampleRing.Sample> samples, MediaFormat format)
-            throws IOException {
+    private String writeRescueFile(File dir, List<SampleRing.Sample> samples, MediaFormat format,
+                                   MediaFormat audio) throws IOException {
         if (!dir.isDirectory() && !dir.mkdirs()) {
             throw new IOException("cannot create " + dir);
         }
@@ -3341,8 +3520,9 @@ public class CodecVideoRecorder {
             file.setLength(0);
             rescue = new MediaMuxer(file.getFD(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             int track = rescue.addTrack(format);
+            int audioTrack = addAudioTrack(rescue, audio);
             rescue.start();
-            writeSamples(rescue, track, samples);
+            writeSamples(rescue, track, audioTrack, samples);
             rescue.stop();
             file.getFD().sync();
             ok = true;
@@ -3368,14 +3548,25 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 按顺序写进 muxer，时间戳从第一个样本归零；返回最后写的时间戳。
-     * 每写一个都算「写进去了」（{@link #markWritten}）：换盘时补写十几秒，不能让写不进文件的裁判以为停了。
+     * 按顺序写进 muxer，时间戳从第一个画面归零；返回最后写的时间戳 {画面, 声音}（声音没写过是 -1）。
+     * 声音样本写进 audioTrack（-1 = 这个文件没有声音轨，跳过）；比第一个画面早的、时间戳没往前走的跳过。
+     * 每写一个画面都算「写进去了」（{@link #markWritten}）：换盘时补写十几秒，不能让写不进文件的裁判以为停了。
      */
-    private long writeSamples(MediaMuxer target, int track, List<SampleRing.Sample> samples) {
+    private long[] writeSamples(MediaMuxer target, int track, int audioTrack, List<SampleRing.Sample> samples) {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-        long base = samples.get(0).ptsUs;
+        long base = firstPictureUs(samples);
         long last = -1L;
+        long lastAudio = -1L;
         for (SampleRing.Sample s : samples) {
+            if (s.audio) {
+                long pts = s.ptsUs - base;
+                if (audioTrack >= 0 && pts >= 0 && pts > lastAudio) {
+                    info.set(0, s.data.length, pts, 0);
+                    target.writeSampleData(audioTrack, ByteBuffer.wrap(s.data), info);
+                    lastAudio = pts;
+                }
+                continue;
+            }
             long pts = s.ptsUs - base;
             if (pts <= last) {
                 pts = last + ptsStepUs();
@@ -3385,15 +3576,22 @@ public class CodecVideoRecorder {
             target.writeSampleData(track, ByteBuffer.wrap(s.data), info);
             markWritten();
         }
-        return last;
+        return new long[]{last, lastAudio};
     }
 
-    /** 这些样本从头到尾多长的画面（毫秒）。 */
-    private static long spanMs(List<SampleRing.Sample> samples) {
-        if (samples.isEmpty()) {
-            return 0L;
+    /** 第一个画面的时间戳（写过多留的那段、抢救的一段都从画面的关键帧开始，夹着的声音不算）。 */
+    private static long firstPictureUs(List<SampleRing.Sample> samples) {
+        for (SampleRing.Sample s : samples) {
+            if (!s.audio) {
+                return s.ptsUs;
+            }
         }
-        return Math.max(0L, samples.get(samples.size() - 1).ptsUs - samples.get(0).ptsUs) / 1000L;
+        return samples.isEmpty() ? 0L : samples.get(0).ptsUs;
+    }
+
+    /** 这些样本从头到尾多长的画面（毫秒）；夹着的声音不算。 */
+    private static long spanMs(List<SampleRing.Sample> samples) {
+        return SampleRing.pictureSpanMs(samples);
     }
 
     /**
@@ -3515,14 +3713,20 @@ public class CodecVideoRecorder {
             return -1L;
         }
         if (fileFormat != null) {
-            // 编码器不会再报一次格式：这里直接开轨
+            // 编码器不会再报一次格式：这里直接开轨（原来带声音轨的，新文件也带）
             videoTrackIndex = muxer.addTrack(fileFormat);
+            audioTrackIndex = addAudioTrack(muxer, fileAudioFormat);
+            if (audioTrackIndex < 0) {
+                fileAudioFormat = null;
+            }
             muxer.start();
             muxerStarted = true;
             fileStarted = true;
             if (!kept.isEmpty()) {
-                segmentBasePtsUs = kept.get(0).ptsUs;
-                lastWrittenPtsUs = writeSamples(muxer, videoTrackIndex, kept);
+                segmentBasePtsUs = firstPictureUs(kept);
+                long[] last = writeSamples(muxer, videoTrackIndex, audioTrackIndex, kept);
+                lastWrittenPtsUs = last[0];
+                lastAudioPtsUs = last[1];
                 // 在新盘上还没落盘：等新盘上的 fsync 确认了才能丢
                 ring.rewritten(SystemClock.elapsedRealtime());
             }

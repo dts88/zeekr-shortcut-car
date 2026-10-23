@@ -92,6 +92,50 @@ public final class SettingsRegistry {
             entry("16:9", "16:9", R.string.popup_aspect_landscape),
             entry("1:1", "1:1", R.string.popup_aspect_square),
             entry("3:4", "3:4", R.string.popup_aspect_portrait));
+    /** 超级镜子的切换范围（{@link com.kooo.evcam.zeekr.MirrorViews}）：分段按钮，三档（项目所有者 2026-10-19）。 */
+    public static final SettingSpec REARVIEW_VIEWS = SettingSpec.of(
+            "rearview_views", "切换范围", "four",
+            entry("four", "四向", R.string.opt_views_four),
+            entry("front_rear", "前后", R.string.opt_views_front_rear),
+            entry("rear_cabin", "后视 + 后座舱", R.string.opt_views_rear_cabin));
+
+    /**
+     * 盲区画面显示在哪（2026-10-21）：中控屏、HUD、两处都显示。默认两处 —— FerixzTanz 的设置，项目所有者 2026-10-21 定照用。
+     * 选 HUD 而找不到 HUD、或者这一段 HUD 用不了时，退回中控屏（{@code zeekr.SideViewService}）。
+     */
+    public static final SettingSpec SIDE_VIEW_TARGET = SettingSpec.of(
+            "side_view_target", "显示位置", com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_BOTH,
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_CENTER, "中控屏", R.string.opt_side_view_target_center),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_HUD, "HUD", R.string.opt_side_view_target_hud),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_BOTH, "中控屏和 HUD", R.string.opt_side_view_target_both));
+
+    /**
+     * 录制声音用哪个来源（开发者选项，试验；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
+     * 名字按来源叫，不叫「机身麦克风」：Lab 怀疑那一路其实在车外，测清之前不下结论。
+     */
+    public static final SettingSpec FOOTAGE_AUDIO_SOURCE = SettingSpec.of(
+            "footage_audio_source", "麦克风来源", com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_RAW,
+            entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_RAW, "原始（VOICE_RECOGNITION）",
+                    R.string.dev_footage_audio_source_raw),
+            entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL, "通话（VOICE_COMMUNICATION）",
+                    R.string.dev_footage_audio_source_call));
+
+    /**
+     * 模拟声浪自己的音量（开发者选项，试验；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
+     * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。
+     */
+    public static final SettingSpec DRIVE_SOUND_VOLUME = SettingSpec.of(
+            "drive_sound_volume", "声浪音量", "-12",
+            entry("-18", "−18 dB"),
+            entry("-12", "−12 dB"),
+            entry("-6", "−6 dB"),
+            entry("0", "0 dB"));
+
+    /** 模拟声浪的转速变化方式（开发者选项，试验）。项目所有者 2026-10-21：两种都做，上车听了再定。 */
+    public static final SettingSpec DRIVE_SOUND_RPM = SettingSpec.of(
+            "drive_sound_rpm", "转速变化方式", com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS, "连续", R.string.dev_drive_sound_rpm_continuous),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_SHIFTS, "模拟换挡", R.string.dev_drive_sound_rpm_shifts));
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -100,5 +144,10 @@ public final class SettingsRegistry {
             LANGUAGE,
             SIDE_POPUP_ASPECT,
             FISHEYE_PROJECTION,
-            ACTION_RAIL_SIDE));
+            ACTION_RAIL_SIDE,
+            REARVIEW_VIEWS,
+            SIDE_VIEW_TARGET,
+            FOOTAGE_AUDIO_SOURCE,
+            DRIVE_SOUND_VOLUME,
+            DRIVE_SOUND_RPM));
 }

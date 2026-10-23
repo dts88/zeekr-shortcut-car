@@ -35,6 +35,8 @@ public class ZeekrShortcutApp extends Application {
         // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），
         // 主界面在不在都一样（规格 §3.1）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的录像意图先接上
         com.kooo.evcam.screen.ScreenState.install(this);
+        // 模拟声浪（开发者选项，试验）跟着车辆信号开关声音那一路：搭在上面登记的车辆信号核心上，开关关着时什么都不做
+        com.kooo.evcam.sound.DriveSound.install(this);
         // 「这一趟」的录像选择落盘（规格 1.2）：进程被杀又拉回来时还在；车机真正开机就清。
         // 「这一趟要录」变了、人按了停止时写到盘上才返回（commit）：熄屏那一刻改的「这一趟要录」要赶在车机几秒后结束进程之前落盘
         // （2026-10-10）；别的几项排队异步写（apply），不在主线程上等盘（审查 2026-10-11）
@@ -65,7 +67,10 @@ public class ZeekrShortcutApp extends Application {
         // 每一台相机的来历（车机重新初始化以来开过几台、最后一次关完；2.11.5 诊断）：读回存下的那一份，在写盘的那条线程上读。
         // 车机重启过没有看上面黑匣子的开机记录，所以排在它后面
         com.kooo.evcam.camera.StepLog.loadHistory(this);
-        Languages.apply(new AppConfig(this).getLanguageMode());
+        AppConfig config = new AppConfig(this);
+        // 去掉的功能留在设置里的键删掉，不进导出的设置和诊断报告
+        config.forgetRetiredKeys();
+        Languages.apply(config.getLanguageMode());
         StallWatch.start(this);
     }
 

@@ -344,6 +344,15 @@ public class StorageHelper {
     }
 
     /**
+     * 导出文件（诊断报告、设置）放的目录：跟着存储位置取 {@link #getLogDir}，取不到时退到应用自己的外部文件目录。
+     * 诊断页保存报告、设置的导出与导入（{@code settings.SettingsBackup}）用同一个：导出在哪，导入就在哪找。
+     */
+    public static File getExportDir(Context context) {
+        File dir = getLogDir(context, new AppConfig(context).isUsingExternalSdCard());
+        return dir != null ? dir : context.getExternalFilesDir(null);
+    }
+
+    /**
      * 根据 AppConfig 配置获取视频存储目录
      * @param context 上下文
      * @return 视频存储目录；没有地方可存（没有 U 盘、开发者选项没开）时为 null
@@ -744,13 +753,13 @@ public class StorageHelper {
     }
     
     /**
-     * 设置里「录像保存路径」那一行写的目录。
+     * 设置里选存储位置的框里「录像保存在 …」那句写的目录。
      *
      * <ul>
      *   <li>正在录：录制器实际写的那个（盘写不进、换过盘就是新盘）。中转写入时录像先在内部缓存里，
-     *       写完才转存过去 —— 这一行写转存到的目录，不写缓存；</li>
+     *       写完才转存过去 —— 那句写转存到的目录，不写缓存；</li>
      *   <li>没在录：按设置下一次开录会写的那个；</li>
-     *   <li>此刻录不了（没有 U 盘、开发者选项没开）：null —— 那一行写「未检测到 U 盘」，
+     *   <li>此刻录不了（没有 U 盘、开发者选项没开）：null —— 那句写「未检测到 U 盘」，
      *       不写一个永远不会写进去的内置存储路径。</li>
      * </ul>
      *

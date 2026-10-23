@@ -35,14 +35,16 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * 车机信号自动锁定：录像时闪一下远光，那一刻前后 10 秒的录像（每一路）自动锁上。规则见 docs/storage-spec.md。
+ * 锁定当前录像：录像时闪一下远光（车机信号，自动），或者按一下悬浮按钮的「锁定当前录像」（手动），
+ * 那一刻前后 10 秒的录像（每一路）锁上。规则见 docs/storage-spec.md。
  *
  * <h3>框架</h3>
  *
  * <ul>
- *   <li><b>开不开</b>（{@link #flashEnabled}）：「锁定影像」开着，而且「闪远光时自动锁定当前录像」开着
+ *   <li><b>开不开</b>（{@link #flashEnabled}）：「锁定影像」开着，而且下面「自动锁定」的「闪远光」按着
  *       （默认关：自动锁的也占空间，锁满了就停录）。真正录上了 / 不录了（{@code MultiCameraManager} 里录像状态
- *       只在一处改，开录失败、重建前停也走那里）、两个开关变了（设置页）都来这里对一次（{@link #update}）。</li>
+ *       只在一处改，开录失败、重建前停也走那里）、两个开关变了（设置页）都来这里对一次（{@link #update}）。
+ *       悬浮按钮只看「锁定影像」（{@link Source}）。</li>
  *   <li><b>信号</b>：要看的时候自己在 {@link Telemetry} 登记（信息条关着也得读），不看了就注销。
  *       闪远光读数从「没拨 / 没数据」变成「拨着」的那一下算一次（上升沿），那一刻 t = 系统时间 ——
  *       和文件名里的时刻是同一个钟。连着闪几下各算各的，锁过的再锁一遍没影响。</li>
@@ -58,7 +60,7 @@ import java.util.TreeSet;
  * </ul>
  *
  * <p>鸣笛自动锁定规则一样，但车上还读不到喇叭信号（Lab 还在找）：设置里那一项一直置灰、打不开，这里没有它的代码。
- * 找到信号后，它就是 {@link #lockAround} 的第二个来源。</p>
+ * 找到信号后，它就是 {@link #lockAround} 的又一个来源（{@link Source}）。</p>
  */
 public final class AutoLock implements Telemetry.Listener {
 
@@ -71,6 +73,21 @@ public final class AutoLock implements Telemetry.Listener {
     static final int RELAY_RETRY_LIMIT = 120;
     /** 离上一次弹不到这么久，提示不再弹（连着锁上几次时不一个接一个地弹）。 */
     private static final long TOAST_GAP_MS = 4_000L;
+
+    /**
+     * 锁定从哪来。几个来源共用一套：此刻前后 10 秒、锁两遍、同一份清单（{@link #lockAround}）；
+     * 不同的只有什么时候起作用、黑匣子上写哪个名字、怎么提示。
+     */
+    private enum Source {
+        /** 闪远光（车机信号）：「锁定影像」开着、「自动锁定」的「闪远光」按着才锁；第一遍锁上了新的才提示。 */
+        FLASH,
+        /** 悬浮按钮「锁定当前录像」：「锁定影像」开着就锁；每按一次回一句（{@link Reply}）。 */
+        BUTTON;
+
+        boolean enabled(Context context) {
+            return this == FLASH ? flashEnabled(context) : FootageLocks.enabled(context);
+        }
+    }
 
     private static final AutoLock INSTANCE = new AutoLock();
 
@@ -135,7 +152,7 @@ public final class AutoLock implements Telemetry.Listener {
         });
     }
 
-    /** 设置页里「锁定影像」或「闪远光时自动锁定」变了：正在录的话马上按新的来。 */
+    /** 设置页里「锁定影像」或「闪远光」变了：正在录的话马上按新的来。 */
     public void settingsChanged(Context context) {
         if (context == null) {
             return;
@@ -181,19 +198,41 @@ public final class AutoLock implements Telemetry.Listener {
         boolean rising = Boolean.TRUE.equals(flash) && !Boolean.TRUE.equals(lastFlash);
         lastFlash = flash;
         if (rising) {
-            lockAround(app, System.currentTimeMillis());
+            lockAround(app, System.currentTimeMillis(), Source.FLASH);
         }
+    }
+
+    /**
+     * 悬浮按钮「锁定当前录像」：按下那一刻前后 10 秒，和闪远光同一套（{@link #lockAround}）。哪个线程调都行。
+     * 没在录、「锁定影像」关着时不锁，直接说一句。
+     */
+    public void lockNow(Context context) {
+        final long momentMs = System.currentTimeMillis();
+        final Context appContext = context.getApplicationContext();
+        main.post(() -> {
+            if (!recording) {
+                BlackBox.note("悬浮按钮锁定：没在录，不锁");
+                toast(appContext, R.string.msg_footage_nothing_here);
+            } else if (!FootageLocks.enabled(appContext)) {
+                BlackBox.note("悬浮按钮锁定：「锁定影像」关着，不锁");
+                toast(appContext, R.string.msg_footage_lock_needs_setting);
+            } else {
+                lockAround(appContext, momentMs, Source.BUTTON);
+            }
+        });
     }
 
     // ================================================================= 锁
 
     /** 这一刻前后 10 秒：现在锁一遍，窗口结束后再锁一遍。主线程。 */
-    private void lockAround(Context context, long momentMs) {
+    private void lockAround(Context context, long momentMs, Source source) {
         final LockWindow window = LockWindow.around(momentMs);
         // 这次录像的中转目标跟着这一下走：第二遍时可能已经停了录、又开了一次
         final File target = relayTarget;
-        worker.post(() -> pass(context, window, target, 0));
-        worker.postDelayed(() -> pass(context, window, target, 1),
+        // 手动按的每按一次回一句：两遍共用一个，先碰到录像的那一遍回
+        final Reply reply = source == Source.BUTTON ? new Reply(context) : null;
+        worker.post(() -> pass(context, window, target, 0, source, reply));
+        worker.postDelayed(() -> pass(context, window, target, 1, source, reply),
                 window.endMs - momentMs + LockWindow.SECOND_PASS_DELAY_MS);
     }
 
@@ -202,10 +241,12 @@ public final class AutoLock implements Telemetry.Listener {
      *
      * @param relayTarget 中转写入的目标目录（见 {@link #scan}）；不是中转写入为 null
      * @param round       0 = 当时，1 = 补锁（窗口结束后），2 起 = 等中转目标目录回来再试
+     * @param reply       手动锁定时回的那一句；自动的为 null
      */
-    private void pass(Context context, LockWindow window, File relayTarget, int round) {
-        if (!flashEnabled(context)) {
-            BlackBox.noteImportant("闪远光自动锁定" + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
+    private void pass(Context context, LockWindow window, File relayTarget, int round, Source source, Reply reply) {
+        if (!source.enabled(context)) {
+            BlackBox.noteImportant((source == Source.FLASH ? "闪远光自动锁定" : "悬浮按钮锁定")
+                    + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
                     + " " + describe(window) + "：开关已关，不锁");
             return;
         }
@@ -220,32 +261,41 @@ public final class AutoLock implements Telemetry.Listener {
         waiting.retainAll(hit);
         List<String> locking = new ArrayList<>();
         int alreadyLocked = 0;
+        // 碰到了能锁的录像（已经锁着的也算）；每份清单这一遍要新锁上的
+        boolean found = false;
+        Map<File, Set<String>> toLock = new LinkedHashMap<>();
         for (Map.Entry<File, Set<String>> entry : scan.byListDir.entrySet()) {
             Set<String> names = new TreeSet<>(entry.getValue());
             names.retainAll(hit);
             if (names.isEmpty()) {
                 continue;
             }
+            found = true;
             Set<String> listed = FootageLocks.read(entry.getKey());
             if (listed != null) {
                 int before = names.size();
                 names.removeAll(listed);
                 alreadyLocked += before - names.size();
             }
-            if (names.isEmpty()) {
-                continue;
+            if (!names.isEmpty()) {
+                locking.addAll(names);
+                toLock.put(entry.getKey(), names);
             }
-            locking.addAll(names);
-            FootageLocks.set(entry.getKey(), names, true, round == 0 ? toastWhenLocked : null);
+        }
+        FootageLocks.Result result = reply != null ? reply.after(round, found, !waiting.isEmpty(), toLock.size())
+                : round == 0 ? toastWhenLocked : null;
+        for (Map.Entry<File, Set<String>> entry : toLock.entrySet()) {
+            FootageLocks.set(entry.getKey(), entry.getValue(), true, result);
         }
         // 第二遍起还有锁不了的：隔一阵再试，等盘回来（第一遍不用，第二遍本来就排着）
         boolean retry = !waiting.isEmpty() && round >= 1 && round < RELAY_RETRY_LIMIT;
         if (retry) {
-            worker.postDelayed(() -> pass(context, window, relayTarget, round + 1), RELAY_RETRY_MS);
+            worker.postDelayed(() -> pass(context, window, relayTarget, round + 1, source, reply), RELAY_RETRY_MS);
         }
         // 等盘回来的那几遍只在锁上了、或者不再等时记一行，不然一小时能记一百多行
         if (round <= 1 || !locking.isEmpty() || !retry) {
-            BlackBox.noteImportant("闪远光自动锁定" + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
+            BlackBox.noteImportant((source == Source.FLASH ? "闪远光自动锁定" : "悬浮按钮锁定")
+                    + (round == 0 ? "（当时）" : round == 1 ? "（补锁）" : "（等盘回来）")
                     + " " + describe(window)
                     + "：" + (locking.isEmpty() ? "没有新的要锁" : "锁上 " + locking.size() + " 个 " + locking)
                     + (alreadyLocked > 0 ? "，已经锁着 " + alreadyLocked + " 个" : "")
@@ -277,6 +327,63 @@ public final class AutoLock implements Telemetry.Listener {
         lastToastAt = now;
         Toast.makeText(context, Languages.localized(context).getString(R.string.msg_flash_locked),
                 Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * 手动锁定（悬浮按钮）回的那一句：一次按下只回一句，由两遍里先碰到录像的那一遍回 ——
+     * 碰到的都锁上了（新锁的、本来就锁着的都算）说「已锁定」，有一份清单没写成说「无法保存锁定状态」；
+     * 两遍都没碰到说「当前时刻无可锁定的录像」。中转写入、目标盘不在、要等盘回来才能锁的不算碰到，
+     * 也不说没有（开发者选项里才有中转写入）。
+     */
+    private final class Reply {
+        private final Context context;
+        /** 已经有一遍认领了这一句。只在 {@link #worker} 上读写（两遍都在它上面）。 */
+        private boolean claimed;
+
+        Reply(Context context) {
+            this.context = context;
+        }
+
+        /**
+         * 这一遍之后回不回、怎么回。{@link #worker} 上。
+         *
+         * @param found   这一遍碰到了能锁的录像（已经锁着的也算）
+         * @param waiting 这一遍碰到了要等盘回来才能锁的
+         * @param lists   这一遍要写几份清单（0 = 碰到的都已经锁着）
+         * @return 每份清单写完时的回调；不用回调时为 null
+         */
+        FootageLocks.Result after(int round, boolean found, boolean waiting, int lists) {
+            if (claimed || round > 1) {
+                return null;
+            }
+            if (!found) {
+                if (round == 1 && !waiting) {
+                    claimed = true;
+                    main.post(() -> toast(context, R.string.msg_footage_nothing_here));
+                }
+                return null;
+            }
+            claimed = true;
+            if (lists == 0) {
+                main.post(() -> toast(context, R.string.msg_footage_locked_around));
+                return null;
+            }
+            // 几份清单都写完再说（FootageLocks 在主线程上回调）
+            final int[] left = {lists};
+            final boolean[] failed = {false};
+            return ok -> {
+                failed[0] |= !ok;
+                if (--left[0] == 0) {
+                    toast(context, failed[0] ? R.string.msg_footage_lock_failed : R.string.msg_footage_locked_around);
+                }
+            };
+        }
+    }
+
+    /** 主线程。没保存成的说得久一点，和回放里一样。 */
+    private static void toast(Context context, int message) {
+        Toast.makeText(context, Languages.localized(context).getString(message),
+                message == R.string.msg_footage_lock_failed ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
     }
 
     // ================================================================= 盘上有什么

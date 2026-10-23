@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行里的一个附加项（SwitchChipsPreference）：Material 的筛选按钮，按下是开、再按是关。
+  颜色照开关：开是能量橙（淡底 + 橙描边 + 橙字 + 勾），关是中性灰块。高 48dp，手指够得着。
+-->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Material3.Chip.Filter"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:checkable="true"
+    android:textAppearance="@style/TextAppearance.Cam.Caption"
+    android:textColor="@color/pref_chip_text"
+    app:checkedIconTint="@color/energy_text"
+    app:chipBackgroundColor="@color/pref_chip_background"
+    app:chipCornerRadius="10dp"
+    app:chipMinHeight="48dp"
+    app:chipStrokeColor="@color/pref_chip_stroke"
+    app:chipStrokeWidth="1dp" />

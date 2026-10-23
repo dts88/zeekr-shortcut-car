@@ -22,7 +22,7 @@ import com.kooo.evcam.AutoFitTextureView;
 import com.kooo.evcam.R;
 
 /**
- * 盲区画面的窗口：打转向灯时在屏幕那一侧显示该侧摄像头的画面（拉直、往后看）。
+ * 盲区画面在中控屏上的窗口：打转向灯时在屏幕那一侧显示该侧摄像头的画面（拉直、往后看）。
  *
  * <h3>只看，不操作（项目所有者 2026-10-16）</h3>
  *
@@ -31,8 +31,8 @@ import com.kooo.evcam.R;
  *
  * <h3>画法和超级镜子一样</h3>
  *
- * <p>子视图是普通 TextureView，本容器在 {@code dispatchDraw} 里分格反投影（{@link FisheyeMesh}），
- * 虚拟相机先转过角度（{@link SideViewFraming}）。不新建 GL 管线，不动相机会话（为什么见 {@link RearViewMirrorView}）。</p>
+ * <p>子视图是普通 TextureView，本容器在 {@code dispatchDraw} 里分格反投影，画面本身和「不显示过时的画面」那条规矩在
+ * {@link SideViewPicture}（HUD 的窗口共用）。不新建 GL 管线，不动相机会话（为什么见 {@link RearViewMirrorView}）。</p>
  *
  * <h3>三种状态</h3>
  *
@@ -45,34 +45,23 @@ import com.kooo.evcam.R;
  *       （PR #19 实车看到「有点透明」）。</li>
  * </ul>
  *
- * <h3>不显示过时的画面</h3>
- *
- * <p>画布设回可见那一下，TextureView 先取一次缓冲区里留着的那一帧 —— 相机要是停着，那一帧可能是很久以前的。
- * 所以每次显示先盖成黑的，显示之后来了第二帧才露出来；显示着时 {@link #STALE_MS} 没有新帧也盖上。
- * 盯着一张过时的侧方画面变道，比看见一块黑的危险得多（同超级镜子画面停住时盖上的道理）。</p>
- *
  * <p>来源：备着 / 显示两种窗口状态（备着时窗口透明、不接点击，显示时不能带 FLAG_NOT_TOUCHABLE）和分格拉直的画法，
  * 照 FerixzTanz 的 PR #4、wysie 的 PR #19 里的侧视弹窗写；GPL-3.0。</p>
  */
-public class SideViewWindow extends ViewGroup {
+public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
 
     private static final String TAG = "SideViewWindow";
 
-    /** 显示着时多久没有新帧就盖上：最省的档位也有 10 fps，半秒是五帧没来。 */
-    static final long STALE_MS = 500L;
     private static final long TICK_MS = 250L;
     /** 关闭按钮的直径、离窗口边多远（dp）。 */
     private static final float CLOSE_SIZE_DP = 48f;
     private static final float CLOSE_MARGIN_DP = 10f;
 
     private final WindowManager windowManager;
-    private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
     private final CloseButton closeButton;
-    private final FisheyeMesh mesh = new FisheyeMesh();
+    private final SideViewPicture picture;
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
-    private final SideViewFraming framing = new SideViewFraming();
-    private final FisheyeMesh.SourceMap turnedMap = framing::sourcePoint;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private WindowManager.LayoutParams params;
@@ -84,12 +73,6 @@ public class SideViewWindow extends ViewGroup {
     private boolean multiplePointers, placementChanged;
 
     private int lane = LaneCycle.LEFT;
-    /** 合成流的真实尺寸算出来的拆分几何；不知道时画面是黑的。 */
-    private CompositeStreamGeometry.Plan plan;
-    /** 这一次显示以来来了几帧：第一帧可能是画布设回可见时取的旧帧。 */
-    private int framesSinceShown;
-    private long lastFrameUptimeMs;
-    private boolean stale;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -97,11 +80,9 @@ public class SideViewWindow extends ViewGroup {
             if (!attached || !shown) {
                 return;
             }
-            boolean nowStale = SystemClock.uptimeMillis() - lastFrameUptimeMs > STALE_MS;
-            if (nowStale != stale) {
-                stale = nowStale;
-                if (stale) {
-                    AppLog.i(TAG, "盲区画面 " + STALE_MS + " ms 没有新帧：盖上");
+            if (picture.checkStale(SystemClock.uptimeMillis())) {
+                if (picture.isStale()) {
+                    AppLog.i(TAG, "盲区画面 " + SideViewPicture.STALE_MS + " ms 没有新帧：盖上");
                 }
                 invalidate();
             }
@@ -130,6 +111,7 @@ public class SideViewWindow extends ViewGroup {
             }
         });
         resize.setQuickScaleEnabled(false);
+        this.picture = new SideViewPicture(appConfig);
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         setBackgroundColor(0xFF000000);
         textureView = new AutoFitTextureView(context);
@@ -143,64 +125,62 @@ public class SideViewWindow extends ViewGroup {
         addView(closeButton);
     }
 
-    /** 相机要写进的 TextureView：服务把它的 SurfaceTexture 声明成环视的盲区画面输出，会话由通道调度建。 */
+    @Override
     public AutoFitTextureView getTextureView() {
         return textureView;
     }
 
-    /** 合成流的真实尺寸；不像合成流的忽略（同 {@link RearViewMirrorView#setSourceSize}）。 */
+    @Override
     public void setSourceSize(Size size) {
-        if (size == null || size.getWidth() <= 0 || size.getHeight() <= 0) {
-            return;
+        if (picture.setSourceSize(size)) {
+            invalidate();
         }
-        String id = StreamLayoutTable.compositeCameraId();
-        if (!CompositeStreamGeometry.looksLikeComposite(id, size.getWidth(), size.getHeight())) {
-            AppLog.d(TAG, "忽略非合成流尺寸 " + size);
-            return;
-        }
-        plan = CompositeStreamGeometry.analyse(id, size.getWidth(), size.getHeight());
-        invalidate();
     }
 
+    @Override
     public boolean hasGeometry() {
-        return plan != null && plan.isComposite();
+        return picture.hasGeometry();
     }
 
+    @Override
     public boolean isAttached() {
         return attached;
     }
 
+    @Override
     public boolean isShowing() {
         return attached && shown;
     }
 
+    @Override
     public int lane() {
         return lane;
     }
 
     /**
-     * 设置页改了标定角度（开发者选项）：马上重画一次。角度在本容器重画时照 AppConfig 读（{@link #dispatchDraw}）——
+     * 设置页改了标定角度（开发者选项）：马上重画一次。角度在本容器重画时照 AppConfig 读（{@link SideViewPicture#draw}）——
      * 显示出来、换一侧、盖上 / 露出、这里叫重画时；新的一帧只重画画布，不重画容器。所以开发者选项锁上、打开
      * （归它管的设置按没存过算）不当场跟：等本容器下一次重画 —— 显示着时是换一侧、盖上 / 露出，最晚下一次显示
      * （AppConfig.DEVELOPER_KEYS）。
      */
+    @Override
     public void applyAim() {
         invalidate();
     }
 
     // ------------------------------------------------------------------ 窗口
 
-    /** 挂上但不显示（备着）；已经挂着就只是藏起来。 */
+    @Override
     public void attachHidden(int side) {
         attachAt(side, false);
     }
 
-    /** 显示 {@code side} 那一侧：没挂就挂上，备着就显示出来，显示着另一侧就换过去。 */
+    @Override
     public void show(int side) {
         attachAt(side, true);
     }
 
-    /** 藏起来，窗口留着、画面留在会话里（备着）。 */
+    @Override
     public void conceal() {
         if (!attached || !shown) {
             return;
@@ -216,6 +196,7 @@ public class SideViewWindow extends ViewGroup {
      * 服务在 onSurfaceTextureDestroyed 里把它交给管线留着（同超级镜子，{@link MultiCameraManager#keepSideCanvas}）。
      * 只从服务调，不在本窗口的绘制、触摸分发途中，当场摘是安全的（理由同 {@link RearViewMirrorView#hide}）。
      */
+    @Override
     public void detach() {
         handler.removeCallbacks(tick);
         if (!attached) {
@@ -235,10 +216,8 @@ public class SideViewWindow extends ViewGroup {
         lane = side;
         if (show && !wasShown) {
             // 新的一次显示：先盖着，等真正的新帧（显示着换一侧不用：画布一直可见，帧一直是新的）
-            framesSinceShown = 0;
+            picture.beginShowing(SystemClock.uptimeMillis());
             closeButton.refreshLabel();
-            stale = false;
-            lastFrameUptimeMs = SystemClock.uptimeMillis();
         }
         shown = show;
         if (!attached) {
@@ -338,6 +317,7 @@ public class SideViewWindow extends ViewGroup {
      * 画布可见不可见：显示着、或者还没建好（要先画一次才建得出来）时可见，备着时不可见、不逐帧画。
      * 服务在画布建好、接回留着的画布之后也叫一次。
      */
+    @Override
     public void syncCanvas() {
         int visibility = shown || !textureView.isAvailable() ? View.VISIBLE : View.INVISIBLE;
         if (textureView.getVisibility() != visibility) {
@@ -356,32 +336,20 @@ public class SideViewWindow extends ViewGroup {
         }
     }
 
-    /** 服务每收到一帧（onSurfaceTextureUpdated）调一次。 */
+    @Override
     public void noteFrame() {
-        lastFrameUptimeMs = SystemClock.uptimeMillis();
-        if (!shown) {
-            return;
-        }
-        boolean wasCovered = covered();
-        framesSinceShown++;
-        stale = false;
-        if (wasCovered != covered()) {
+        if (picture.noteFrame(SystemClock.uptimeMillis(), shown)) {
             invalidate();
         }
     }
 
-    /** 盖着：这一次显示之后还没来真正的新帧，或者新帧停了。 */
-    private boolean covered() {
-        return framesSinceShown < 2 || stale;
-    }
-
-    /** 黑匣子里的一行：窗口此刻的样子。 */
+    @Override
     public String describe() {
         return "attached=" + attached + " shown=" + shown + " lane=" + LaneCycle.labelOf(lane)
                 + " canvas=" + (textureView.isAvailable() ? "ready" : "none")
                 + " geometry=" + (hasGeometry() ? "known" : "unknown")
-                + " covered=" + (shown && covered())
-                + " fov=" + Math.round(framing.effectiveFovDegrees()) + "°";
+                + " covered=" + (shown && picture.covered())
+                + " fov=" + Math.round(picture.effectiveFovDegrees()) + "°";
     }
 
     // ------------------------------------------------------------------ 布局与绘制
@@ -426,21 +394,7 @@ public class SideViewWindow extends ViewGroup {
             }
             return;
         }
-        if (covered() || !hasGeometry()) {
-            // 照样画一次子视图（不画它就不取帧，新帧也就不来），再整个盖黑
-            drawTextureOnce(canvas);
-            canvas.drawColor(0xFF000000);
-        } else {
-            // 角度在容器重画时照设置读（内存里的值；开发者选项锁着时是默认值）；没变的时候 SideViewFraming 不重算
-            framing.configure(appConfig.getSideViewFov(), appConfig.getSideViewBack(), appConfig.getSideViewUp(),
-                    lane, width / (float) height);
-            RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(
-                    plan, lane, RearViewGeometry.Viewport.full());
-            mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
-                    r.laneOffsetX * width, r.laneOffsetY * height,
-                    r.laneScaleX * width, r.laneScaleY * height, turnedMap);
-            mesh.draw(canvas, 0f, 0f, width, height, paintTexture);
-        }
+        picture.draw(canvas, width, height, lane, paintTexture);
         drawChild(canvas, closeButton, getDrawingTime());
     }
 
