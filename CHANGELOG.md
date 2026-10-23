@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings → System: Export settings and Import settings are one row, Settings backup: tapping the row imports, Export sits at the end of the row. System info is renamed Vehicle signals. Start on boot has a shorter description.
 
 ## [2.23.0-alpha] - 2026-10-23
 
