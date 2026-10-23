@@ -253,8 +253,9 @@ public class PulseVoiceTest {
 
     @Test
     public void theSuperchargerWhines() {
-        // 2850 rpm 满负荷（车主偏好的那台录音的转速）：最响的是同步齿轮啮合的第 2 次（10.24 × 3 × 2 = 61.44 阶 ≈ 2.9 kHz），
-        // 是一小团（±1.5 % 里每赫兹的能量比两边 8–9.5 % 处高得多；两个转子各转一圈的边带在 ±3.3、5.6、6.7、10 %，避开），
+        // 2850 rpm 满负荷（车主偏好的那台录音的转速）：最响的是同步齿轮啮合的第 2 次（2026-10-24 起照参考视频那台的音高，
+        // 12.03 × 2 × 2 = 48.12 阶 ≈ 2.3 kHz），是一小团（±1.5 % 里每赫兹的能量比两边 6–7.5 % 处高得多；负载时转子、点火调出来的
+        // 边带在 ±3.3（两个转子之差）、5.0（阴转子）、8.3（阳转子、点火）、10 %，避开），
         // 没有机械增压的同一台那里没有。2026-10-23 起齿轮声的几个来源错开 ±0.8 %（项目所有者：一条主的音线太过突出），
         // 按 ±1.5 % 的能量量（和 EngineV1 那台的录音同一个量法），不再按单个频点；摊开以后每赫兹的能量比两边高三倍以上就是一个音
         // （原来三个来源只错开 ±0.2 %，单个频点比两边高十倍）
@@ -262,7 +263,7 @@ public class PulseVoiceTest {
         float[] sc = mid(render(SC, params(2850f, 1f), 1.5f), 0.7f);
         float[] plain = mid(render(PLAIN, params(2850f, 1f), 1.5f), 0.7f);
         double bunch = bandPower(sc, hz * 0.985, hz * 1.015) / 0.03;
-        double sides = Math.max(bandPower(sc, hz * 0.905, hz * 0.92), bandPower(sc, hz * 1.08, hz * 1.095)) / 0.015;
+        double sides = Math.max(bandPower(sc, hz * 0.925, hz * 0.94), bandPower(sc, hz * 1.06, hz * 1.075)) / 0.015;
         assertTrue("比两边高 " + bunch / sides, bunch > 3 * sides);
         assertTrue("比没有增压器的 " + bunch / bandPower(plain, hz * 0.985, hz * 1.015), bunch > 10 * bandPower(plain, hz * 0.985, hz * 1.015));
     }
@@ -853,5 +854,106 @@ public class PulseVoiceTest {
         assertTrue("转速高了连成一片: " + high[1] + " / " + idle[1], high[1] < idle[1] - 0.25);
         assertTrue("不是变小（差不多一样响）: " + (high[0] - idle[0]) + " dB", high[0] - idle[0] > -2 && high[0] - idle[0] < 5);
         assertTrue("节气门开大了没了: " + (open[0] - high[0]) + " dB", open[0] - high[0] < -20);
+    }
+
+    // ================================================================= 2026-10-24：沙沙声、负载时的机械感
+
+    @Test
+    public void theThrottleHissHasNoSizzleAbove() {
+        // 项目所有者 2026-10-24：车外有过于明显的沙沙状的噪音 —— 是节气门的嘶声：一级宽带通（3 kHz、Q 0.6）一直拖到 12 kHz
+        // （6–12 kHz 的能量反而比 1.5–3 kHz 的高约 2 dB），车外怠速 2.5–12.5 kHz 线和线之间的底噪比没有它时高 5–18 dB。
+        // 两级带通（2 kHz、Q 1）以后，6–12 kHz 的能量比 1.5–3 kHz 的低 12 dB 以上
+        PulseProfile none = scWith(b -> b.hiss(-100f));
+        VoiceParams p = params(900f, 0f);
+        p.gain = 0.3f;
+        float[] d = slice(difference(render(SC, p, 2f), render(none, p, 2f)), 1f, 2f);
+        double air = bandPower(d, 1500, 3000);
+        double sizzle = bandPower(d, 6000, 12000);
+        assertTrue("6–12 kHz 比 1.5–3 kHz 低 " + db(air / sizzle) + " dB", sizzle < air * Math.pow(10, -1.2));
+    }
+
+    /** {@code x} 里 2–5 kHz（增压器的啸叫在车内占主导的那一带）的包络（幅度）起伏得多粗：40–300 Hz 的起伏能量 / 平均的平方（dB）。 */
+    private static double roughness(float[] x) {
+        float[] b = filter(x, Biquad.highpass(2000f, 0.7071f, RATE), Biquad.highpass(2000f, 0.7071f, RATE),
+                Biquad.lowpass(5000f, 0.7071f, RATE), Biquad.lowpass(5000f, 0.7071f, RATE));
+        float[] e = new float[b.length];
+        for (int i = 0; i < b.length; i++) {
+            e[i] = Math.abs(b[i]);
+        }
+        e = filter(e, Biquad.lowpass(600f, 0.7071f, RATE), Biquad.lowpass(600f, 0.7071f, RATE));
+        double mean = 0;
+        for (float v : e) {
+            mean += v;
+        }
+        mean /= e.length;
+        float[] m = filter(e, Biquad.highpass(40f, 0.7071f, RATE), Biquad.highpass(40f, 0.7071f, RATE),
+                Biquad.lowpass(300f, 0.7071f, RATE), Biquad.lowpass(300f, 0.7071f, RATE));
+        return 10 * Math.log10(energy(m) / (e.length * mean * mean) + 1e-30);
+    }
+
+    @Test
+    public void underLoadTheSuperchargerGrowlsAndAfterALiftItIsClean() {
+        // 项目所有者 2026-10-24：还是没有听到机械增压负载和松油门以后音色的明显差异，负载时有更重的机械感。负载时齿轮受力，转子
+        // 每转一圈、每次点火都调一下（边带落在整数阶之间），粗、带着低吼；松开以后只剩干净的啸叫。车内听感，同一个转速：2–5 kHz
+        // 的包络在 40–300 Hz 上的起伏，负载比松开大 3 dB 以上（量下来 2000 rpm +8、4500 rpm +12 dB；上一版两个差不多）
+        for (float rpm : new float[] {2000f, 4500f}) {
+            VoiceParams on = params(rpm, 1f);
+            on.gain = 0.3f;
+            VoiceParams off = params(rpm, 0f);
+            off.overrun = 1f;
+            off.level = EngineVoice.dbToLin(VirtualEngine.LEVEL_FLOOR_DB);
+            off.gain = 0.3f;
+            double r1 = roughness(mid(render(new PulseVoice(SC, RATE, true), on, 3f), 1f));
+            double r0 = roughness(mid(render(new PulseVoice(SC, RATE, true), off, 3f), 1f));
+            assertTrue(rpm + " rpm 负载比松开粗 " + (r1 - r0) + " dB", r1 - r0 > 3);
+        }
+    }
+
+    @Test
+    public void theHousingCarriesTheLoadNotTheLift() {
+        // 负载时出口的压力顶着壳体、齿轮受力，壳体的振动经支座、车身传进车里（偏中低频，不过防火墙）：车内听感 2000 rpm 满增压，
+        // 这一路在 0.4–1.2 kHz 加的能量不少于那一带的十分之一；松开以后几乎没有（低 20 dB 以上）。拿有、没有这一路两份的差量
+        PulseProfile none = scWith(b -> b.body(-100f));
+        VoiceParams on = params(2000f, 1f);
+        on.gain = 0.3f;
+        VoiceParams off = params(2000f, 0f);
+        off.overrun = 1f;
+        off.level = EngineVoice.dbToLin(VirtualEngine.LEVEL_FLOOR_DB);
+        off.gain = 0.3f;
+        float[] withOn = render(new PulseVoice(SC, RATE, true), on, 2f);
+        float[] layerOn = slice(difference(withOn, render(new PulseVoice(none, RATE, true), on, 2f)), 1f, 2f);
+        float[] layerOff = slice(difference(render(new PulseVoice(SC, RATE, true), off, 2f),
+                render(new PulseVoice(none, RATE, true), off, 2f)), 1f, 2f);
+        double band = bandPower(slice(mid(withOn, 0f), 1f, 2f), 400, 1200);
+        double added = bandPower(layerOn, 400, 1200);
+        double offAdded = bandPower(layerOff, 400, 1200);
+        assertTrue("负载时壳体那一路占 " + db(added / band) + " dB", added > 0.1 * band);
+        assertTrue("松开以后 " + db(offAdded / added) + " dB", offAdded < added * 0.01);
+    }
+
+    @Test
+    public void pressingDownPushesTheLobeOnce() {
+        // 参考视频：踩下去起压那一下叶片基频猛一下（比松开时高约 15 dB）。一下就过去（和发动机第 12 阶来不及拍出「呜哇」）：
+        // 负荷从 0 跳到满，头 0.15 s 里这一下（有、没有两份的差）在叶片基频上的能量，比 1 s 以后（增压稳了）大 100 倍以上
+        PulseProfile none = scWith(b -> b.press(0f));
+        VoiceParams idle = params(2500f, 0f);
+        idle.gain = 0.3f;
+        VoiceParams full = params(2500f, 1f);
+        full.gain = 0.3f;
+        float[][] lr = new float[2][];
+        PulseProfile[] pair = {SC, none};
+        for (int k = 0; k < 2; k++) {
+            PulseVoice v = new PulseVoice(pair[k], RATE);
+            float[] a = render(v, idle, 0.5f);
+            float[] b = render(v, full, 1.5f);
+            lr[k] = new float[a.length + b.length];
+            System.arraycopy(a, 0, lr[k], 0, a.length);
+            System.arraycopy(b, 0, lr[k], a.length, b.length);
+        }
+        float[] d = difference(lr[0], lr[1]);
+        double lobe = SC.superchargerOrder * 2500 / 60.0;
+        double early = bandPower(slice(d, 0.5f, 0.65f), lobe * 0.97, lobe * 1.03);
+        double late = bandPower(slice(d, 1.5f, 1.65f), lobe * 0.97, lobe * 1.03);
+        assertTrue("起压那一下 " + db(early / late) + " dB", early > 100 * late);
     }
 }

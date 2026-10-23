@@ -127,9 +127,12 @@ final class PulseProfile {
     final float roarQ;
     /**
      * 节气门的气流声（项目所有者 2026-10-23：P 挡落到怠速、稳住以后节气门的声音相对更明显；转速高了不是变小，是更快更密、被差不多
-     * 频率或更响的声音盖住）：节气门几乎关着时，后面的真空把空气从窄缝里吸进去，缝里的气流到了声速 ——「嘶」，宽带的（带通 Hz、Q）。
+     * 频率或更响的声音盖住）：节气门几乎关着时，后面的真空把空气从窄缝里吸进去，缝里的气流到了声速 ——「嘶」，过两级带通（Hz、Q，
+     * 每级一样），4 kHz 以上很快落下去：原来一级宽带通（3 kHz、Q 0.6）一直拖到 12 kHz，车外听着是「沙沙」的（项目所有者 2026-10-24；
+     * 车外怠速 2.5–12.5 kHz 线和线之间的底噪比没有它时高 5–18 dB）。
      * 每个缸吸一口气就涌一股（进气门关上那一下起，按 {@link #hissDecayMs} 落下去，时间是固定的：怠速时一股一股分得开，转速高了
-     * 连成一片），底下一直有的一层占 {@link #hissFloor}。缝里是声速的气流，流量只看缝多大、和转速无关：转速高了每一股分到的少
+     * 连成一片）；底下一直有的一层占 {@link #hissFloor}（2026-10-24 起没有：一股一股之间那层连续的嘶声也是「沙沙」）。
+     * 缝里是声速的气流，流量只看缝多大、和转速无关：转速高了每一股分到的少
      * （按转速的平方根），总的差不多一样响。节气门开大了缝两边的压差没了，嘶声跟着没了（× (1 − 负荷)²）。参考视频（发动机舱，
      * 怠速 813 rpm）：2–9 kHz 比 200 Hz 以下低 11–16 dB，按点火频率起伏 80 % 以上；4500 rpm 收油时只起伏 30 % 上下。
      * 电平 {@link #hissDb}（dB，怠速、节气门全关，每一股的峰值）。
@@ -158,7 +161,10 @@ final class PulseProfile {
      */
     final float meshMultiple;
     final float[][] meshHarmonicsDb;
-    /** 阴、阳转子各几个叶片（转一圈扫过几下）；叶片之间细小的差别让每个转子每转一圈调制一次啸叫（边带），调制多深。 */
+    /**
+     * 阴、阳转子各几个叶片（转一圈扫过几下）；叶片之间细小的差别让每个转子每转一圈调制一次啸叫（边带），满增压时调制多深 ——
+     * 齿轮受力，转子的偏心、齿距的误差才显出来，不增压时剩 {@link #growlFree}。
+     */
     final float[] rotorLobes;
     final float[] rotorAm;
     /** 满增压、3000 rpm 时齿轮声第 2 次的电平（dB）；几个音都随转速的 {@link #toneRpmPow} 次方变（怠速时很轻，和录音一样）。 */
@@ -190,9 +196,37 @@ final class PulseProfile {
     final float meshVoiceWanderHz;
     /** 旁通阀开着（不增压，齿轮不受力）时齿轮声还剩几成。 */
     final float superchargerFree;
-    /** 被发动机的进气脉冲（4 阶）调制多深。 */
+    /**
+     * 满增压时被发动机的点火、进气脉冲（4 阶）调制多深：增压器要吃掉一百多马力，皮带上的扭矩跟着每次点火一下一下地变，齿轮、
+     * 出口的压力也跟着一下一下；不增压时剩 {@link #growlFree}。
+     */
     final float superchargerAm;
     final float superchargerSec;
+    /**
+     * 负载时那层机械感（项目所有者 2026-10-24：负载和松开油门以后的音色要有明显差异，负载时有更重的机械感）：转子的边带
+     * （{@link #rotorAm}）、4 阶的调制（{@link #superchargerAm}）在不增压时还剩几成。齿轮声、出口的压力脉动都跟着调，增压时
+     * 粗、带着低吼；松开以后的啸叫（{@link #decelDb}）不调，干净。换成参考视频那台的音高以后，增压器的线都离发动机的整数阶只有
+     * 0.25 %（12.03 对 12），光靠这几根线分不出来：调出来的边带落在整数阶之间（阴转子 2.41 阶），听得出来。
+     */
+    final float growlFree;
+    /**
+     * 负载时壳体那一路（项目所有者 2026-10-24：负载时要有更重的机械感）：增压时出口的压力一下一下顶着壳体，齿轮受力，壳体跟着振，
+     * 经发动机、支座、车身传出去 —— 偏中低频（几个壳体的共振：Hz、Q；再过 {@link #bodyTopHz} 的二阶低通，高频走不了这条路），
+     * 车内听感时不过防火墙那两级低通（结构传过来的）。
+     * 进去的是调过的齿轮声、出口脉动（本来就跟着增压），松开以后的啸叫不进去：松开以后只剩空气里那根干净的啸叫。电平 {@link #bodyDb}
+     * （dB，相对进去的音）。
+     */
+    final float[] bodyHz;
+    final float bodyQ;
+    final float bodyTopHz;
+    final float bodyDb;
+    /**
+     * 踩下去起压那一下（参考视频：叶片基频猛一下，比松开时高约 15 dB）：负荷跳上去、增压还没跟上（旁通阀刚关、进口突然灌进
+     * 空气），叶片基频 × (1 + {@link #pressBurst} × 2 × (负荷 − 增压))，按 {@link #pressBurstSec} 落下去。一下就过去，
+     * 和发动机第 12 阶来不及拍出「呜哇」。
+     */
+    final float pressBurst;
+    final float pressBurstSec;
     /**
      * 增压时进气腔里的压力脉动（项目所有者 2026-10-22：齿轮声太单一，参考那台像好几组齿轮的和弦）：每个进气门关上那一下，
      * 那一排的进气腔（两排各一个中冷器）压力抖几下。抖的样子跟着曲轴角走（气门按曲轴角开关，转速翻倍、抖得也快一倍）：
@@ -461,6 +495,13 @@ final class PulseProfile {
         }
         rotorLobes = b.rotorLobes.clone();
         rotorAm = b.rotorAm.clone();
+        growlFree = b.growlFree;
+        bodyHz = b.bodyHz.clone();
+        bodyQ = b.bodyQ;
+        bodyTopHz = b.bodyTopHz;
+        bodyDb = b.bodyDb;
+        pressBurst = b.pressBurst;
+        pressBurstSec = b.pressBurstSec;
         superchargerDb = b.superchargerDb;
         toneRpmPow = b.toneRpmPow;
         superchargerRpmPow = b.superchargerRpmPow;
@@ -646,10 +687,10 @@ final class PulseProfile {
         private float roarHz = 1800f;
         private float roarQ = 0.7f;
         private float hissDb = -22f;
-        private float hissHz = 3000f;
-        private float hissQ = 0.6f;
+        private float hissHz = 2000f;
+        private float hissQ = 1f;
         private float hissDecayMs = 4f;
-        private float hissFloor = 0.1f;
+        private float hissFloor = 0f;
         private float superchargerOrder;
         private float lobeDb = -35f;
         private float meshMultiple = 2f;
@@ -661,7 +702,14 @@ final class PulseProfile {
                 {-3.5f, 0f, -3f, -14f, -19f}};
         private float toneRpmPow = 0.8f;
         private float[] rotorLobes = {5f, 3f};
-        private float[] rotorAm = {0.2f, 0.15f};
+        private float[] rotorAm = {0.7f, 0.45f};
+        private float growlFree = 0.15f;
+        private float[] bodyHz = {550f, 950f};
+        private float bodyQ = 2.5f;
+        private float bodyTopHz = 1400f;
+        private float bodyDb = 0f;
+        private float pressBurst = 4f;
+        private float pressBurstSec = 0.25f;
         private float superchargerDb = -100f;
         private float superchargerRpmPow = 1.7f;
         private float[] meshRpm = {1300f, 1900f, 2350f, 2850f, 4000f};
@@ -671,7 +719,7 @@ final class PulseProfile {
         private float meshVoiceWander = 0.0045f;
         private float meshVoiceWanderHz = 2.5f;
         private float superchargerFree = 0.05f;
-        private float superchargerAm = 0.25f;
+        private float superchargerAm = 0.6f;
         private float superchargerSec = 0.12f;
         private float pulsationDb = 1f;
         private float pulsationTopHz = 1000f;
@@ -813,6 +861,18 @@ final class PulseProfile {
         /** 节气门气流声的电平（dB，{@link PulseProfile#hissDb}）；很低（−100）就是没有这一层。 */
         Builder hiss(float db) {
             hissDb = db;
+            return this;
+        }
+
+        /** 负载时壳体那一路的电平（dB，{@link PulseProfile#bodyDb}）；很低（−100）就是没有这一路。 */
+        Builder body(float db) {
+            bodyDb = db;
+            return this;
+        }
+
+        /** 踩下去起压那一下叶片基频多冲几倍（{@link PulseProfile#pressBurst}）；0 就是不冲。 */
+        Builder press(float burst) {
+            pressBurst = burst;
             return this;
         }
 
