@@ -158,6 +158,7 @@
         <!-- 增大字号适配车机屏幕 -->
         <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.Cam.Title</item>
         <item name="materialAlertDialogBodyTextStyle">@style/MaterialAlertDialog.Cam.Body</item>
+        <item name="android:checkedTextViewStyle">@style/MaterialAlertDialog.Cam.Choice</item>
     </style>
 
     <!-- 原生 AlertDialog：DayNight 父主题 + 全部颜色显式给定 -->
@@ -187,6 +188,14 @@
 
     <!-- 对话框正文：和列表行标题同一档 -->
     <style name="MaterialAlertDialog.Cam.Body" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textSize">@dimen/text_row</item>
+    </style>
+
+    <!--
+      单选框、多选框里的选项（列表里的 CheckedTextView）：和对话框正文同一档（ui-spec §三，项目所有者 2026-10-23）。
+      Material 默认是 16sp，比设置里别处的字小一大截；只有几行字的列表（setItems）本来就用正文那一档。
+    -->
+    <style name="MaterialAlertDialog.Cam.Choice" parent="Widget.Material3.CheckedTextView">
         <item name="android:textSize">@dimen/text_row</item>
     </style>
 </resources>

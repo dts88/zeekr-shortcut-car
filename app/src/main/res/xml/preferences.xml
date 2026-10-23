@@ -111,48 +111,37 @@
         android:key="screen_storage"
         android:title="@string/set_section_storage">
 
-        <PreferenceCategory
-            android:title="@string/set_storage_location_title">
+        <!-- 这一页不分组（项目所有者 2026-10-23 删掉存储位置、自动清理、锁定影像三个小标题，ui-spec §十一） -->
+        <!--
+          存储位置（2026-10-23 整理）：这两句不再各占一行，挪进选盘的框里（选哪个盘之前正好要知道）——
+          标题下面写录像保存在哪（此刻的状态，SettingsPreferenceFragment.updateSavedIn），
+          选项下面写推荐 USB-A 口的 U 盘（说明，dialogMessage）
+        -->
+        <ListPreference
+            android:key="pref_storage_location"
+            android:title="@string/set_storage_location_title"
+            android:dialogMessage="@string/set_storage_port_note"
+            android:summary="%s" />
 
-            <!--
-              存储位置（2026-10-23 整理）：这两句不再各占一行，挪进选盘的框里（选哪个盘之前正好要知道）——
-              标题下面写录像保存在哪（此刻的状态，SettingsPreferenceFragment.updateSavedIn），
-              选项下面写推荐 USB-A 口的 U 盘（说明，dialogMessage）
-            -->
-            <ListPreference
-                android:key="pref_storage_location"
-                android:title="@string/set_storage_location_title"
-                android:dialogMessage="@string/set_storage_port_note"
-                android:summary="%s" />
+        <SwitchPreferenceCompat
+            android:key="pref_relay_write"
+            android:title="@string/set_relay_title"
+            android:summary="@string/set_relay_summary" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_relay_write"
-                android:title="@string/set_relay_title"
-                android:summary="@string/set_relay_summary" />
-        </PreferenceCategory>
+        <!-- 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项，清理的规则写在框里 -->
+        <Preference
+            android:key="pref_storage_limits"
+            android:title="@string/set_storage_limits_title" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_cleanup">
-
-            <!-- 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项，清理的规则写在框里 -->
-            <Preference
-                android:key="pref_storage_limits"
-                android:title="@string/set_storage_limits_title" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:title="@string/set_footage_lock_title">
-
-            <!--
-              锁定影像（2026-10-23 合成一行，开关加附加项）：锁定的不被自动清理删掉（FootageLocks）；行尾写锁了多少；
-              开着时下面一排「自动锁定」按钮：闪远光（AutoLock），默认关 —— 自动锁的也占空间，锁满了就停录。
-              鸣笛：车上还读不到喇叭信号，按钮摆着、置灰按不动，读得到了再放开
-            -->
-            <com.kooo.evcam.settings.SwitchChipsPreference
-                android:key="pref_footage_lock"
-                android:title="@string/set_footage_lock_title"
-                android:summary="@string/set_footage_lock_summary" />
-        </PreferenceCategory>
+        <!--
+          锁定影像（2026-10-23 合成一行，开关加附加项）：锁定的不被自动清理删掉（FootageLocks）；行尾写锁了多少；
+          开着时下面一排「自动锁定」按钮：闪远光（AutoLock），默认关 —— 自动锁的也占空间，锁满了就停录。
+          鸣笛：车上还读不到喇叭信号，按钮摆着、置灰按不动，读得到了再放开
+        -->
+        <com.kooo.evcam.settings.SwitchChipsPreference
+            android:key="pref_footage_lock"
+            android:title="@string/set_footage_lock_title"
+            android:summary="@string/set_footage_lock_summary" />
     </PreferenceScreen>
 
     <!-- ==================== 超级镜子 ==================== -->
@@ -352,8 +341,7 @@
         <!-- 两个选项：摆在行里点一次，不弹框 -->
         <com.kooo.evcam.settings.SegmentedPreference
             android:key="pref_rail_side"
-            android:title="@string/set_rail_side_title"
-            android:summary="@string/set_rail_side_summary" />
+            android:title="@string/set_rail_side_title" />
 
         <SwitchPreferenceCompat
             android:key="pref_recording_stats"

@@ -20,7 +20,6 @@
     <string name="set_group_auto_record">Automatic recording</string>
     <string name="set_group_photo">Photos</string>
     <string name="set_group_stamps">Stamps</string>
-    <string name="set_group_cleanup">Automatic cleanup</string>
     <string name="set_group_window">Window</string>
     <string name="set_group_appearance">Appearance</string>
     <string name="set_group_cameras">Cameras</string>
@@ -104,7 +103,7 @@
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Guide page %1$d of %2$d</string>
     <string name="set_floating_alpha_title">Button opacity</string>
-    <string name="set_recording_floating_summary">Shows recording status in a floating button; set tap and long-press actions below</string>
+    <string name="set_recording_floating_summary">Shows recording status in a floating button</string>
     <string name="set_button_size_title">Button size</string>
     <string name="set_button_text_size_title">Time text size</string>
     <string name="set_floating_tap_title">Tap</string>
@@ -656,7 +655,6 @@
     <string name="cd_minimize">Hide to background</string>
     <string name="nav_exit">Quit app</string>
     <string name="set_rail_side_title">Action button side</string>
-    <string name="set_rail_side_summary">Put them on the driver\'s side</string>
     <string name="opt_rail_right">Right</string>
     <string name="opt_rail_left">Left</string>
 

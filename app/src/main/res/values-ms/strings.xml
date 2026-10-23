@@ -20,7 +20,6 @@
     <string name="set_group_auto_record">Rakaman automatik</string>
     <string name="set_group_photo">Foto</string>
     <string name="set_group_stamps">Tera</string>
-    <string name="set_group_cleanup">Pembersihan automatik</string>
     <string name="set_group_window">Tetingkap</string>
     <string name="set_group_appearance">Penampilan</string>
     <string name="set_group_cameras">Kamera</string>
@@ -104,7 +103,7 @@
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Halaman panduan %1$d daripada %2$d</string>
     <string name="set_floating_alpha_title">Kelegapan butang</string>
-    <string name="set_recording_floating_summary">Menunjukkan status rakaman dalam butang terapung; tetapkan tindakan ketik dan tekan lama di bawah</string>
+    <string name="set_recording_floating_summary">Menunjukkan status rakaman dalam butang terapung</string>
     <string name="set_button_size_title">Saiz butang</string>
     <string name="set_button_text_size_title">Saiz teks masa</string>
     <string name="set_floating_tap_title">Ketik</string>
@@ -645,7 +644,6 @@
     <string name="cd_minimize">Sembunyi ke latar belakang</string>
     <string name="nav_exit">Keluar apl</string>
     <string name="set_rail_side_title">Sebelah butang tindakan</string>
-    <string name="set_rail_side_summary">Letak di sebelah pemandu</string>
     <string name="opt_rail_right">Kanan</string>
     <string name="opt_rail_left">Kiri</string>
 
