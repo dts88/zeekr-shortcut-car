@@ -93,13 +93,15 @@ public class PreviewLayoutAndroidTest {
   Map<String,String> saved=new ProfileStore(target).current().toMap();
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
    scenario.onActivity(this::install);
-   onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription(R.string.record_preview_layout)).perform(click());
+   onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription(R.string.record_preview_layout)).perform(scrollTo(), click());
    onView(withText(R.string.record_group_roads)).check(androidx.test.espresso.assertion.ViewAssertions.matches(androidx.test.espresso.matcher.ViewMatchers.isChecked()));
-   onView(withText(R.string.slot_road_rear)).perform(click());
+   androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything()).inAdapterView(
+           androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class)).atPosition(4).perform(click());
    onView(withText(R.string.action_cancel)).perform(click());
    assertEquals("roads",config.getPreviewSourceMode());assertEquals(saved,new ProfileStore(target).current().toMap());
-   onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription(R.string.record_preview_layout)).perform(click());
-   onView(withText(R.string.record_preview_surround_roads)).perform(click());
+   onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription(R.string.record_preview_layout)).perform(scrollTo(), click());
+   androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything()).inAdapterView(
+           androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class)).atPosition(6).perform(click());
    onView(withText(R.string.action_ok)).perform(click());
    assertEquals("surround_roads",config.getPreviewSourceMode());assertEquals(saved,new ProfileStore(target).current().toMap());
    onView(androidx.test.espresso.matcher.ViewMatchers.withContentDescription(R.string.record_preview_layout))
