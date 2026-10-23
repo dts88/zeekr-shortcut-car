@@ -2,13 +2,8 @@ package com.kooo.evcam.settings;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.view.Gravity;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceViewHolder;
 
@@ -28,12 +23,6 @@ import com.kooo.evcam.R;
  * <p>三段是舒服的上限。再多，每一段就窄到看不清字，那时候下拉框反而是对的。</p>
  */
 public class SegmentedPreference extends Preference implements PreferenceRows.OwnLayout {
-
-    private static final int SEGMENT_HEIGHT_DP = 46;
-    private static final int SEGMENT_MIN_WIDTH_DP = 96;
-    private static final int SEGMENT_PADDING_DP = 18;
-    /** 依赖的开关关着时段的不透明度（Material 的禁用值）。 */
-    private static final float DISABLED_ALPHA = 0.38f;
 
     private CharSequence[] entries = new CharSequence[0];
     private String[] values = new String[0];
@@ -64,44 +53,14 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
     @Override
     public void onBindViewHolder(@NonNull PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
-        if (!(holder.findViewById(R.id.segments) instanceof ViewGroup)) {
-            return;
-        }
-        ViewGroup track = (ViewGroup) holder.findViewById(R.id.segments);
-        track.removeAllViews();
-
-        Context context = getContext();
-        float density = context.getResources().getDisplayMetrics().density;
-        for (int i = 0; i < entries.length; i++) {
-            track.addView(segment(context, density, entries[i], values[i]));
-        }
-    }
-
-    private TextView segment(Context context, float density, CharSequence label, String target) {
-        boolean chosen = target.equals(value);
-        TextView view = new TextView(context);
-        view.setText(label);
-        view.setGravity(Gravity.CENTER);
-        // 设置页整体比别处低一档，段上的字跟着行标题往下走一级
-        view.setTextAppearance(R.style.TextAppearance_Cam_Caption);
-        view.setTextColor(ContextCompat.getColor(context,
-                chosen ? R.color.on_energy : R.color.text_secondary));
-        view.setBackgroundResource(R.drawable.bg_segment);
-        view.setActivated(chosen);
-        int padding = Math.round(SEGMENT_PADDING_DP * density);
-        view.setPadding(padding, 0, padding, 0);
-        view.setMinWidth(Math.round(SEGMENT_MIN_WIDTH_DP * density));
-        view.setOnClickListener(v -> pick(target));
-        // 依赖的开关关着（android:dependency）时整行置灰：段也跟着灰、点了不动（超级镜子的切换范围）
-        view.setEnabled(isEnabled());
-        if (!isEnabled()) {
-            view.setAlpha(DISABLED_ALPHA);
-        }
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, Math.round(SEGMENT_HEIGHT_DP * density));
-        view.setLayoutParams(params);
-        return view;
+        com.kooo.evcam.ui.SegmentedBar bar =
+                (com.kooo.evcam.ui.SegmentedBar) holder.findViewById(R.id.segments);
+        if (bar == null) return;
+        String[] labels = new String[entries.length];
+        for (int i = 0; i < entries.length; i++) labels[i] = entries[i].toString();
+        bar.setLabelTextAppearance(R.style.TextAppearance_Cam_Caption);
+        bar.setEnabled(isEnabled());
+        bar.bind(labels, values, value, this::pick);
     }
 
     private void pick(String target) {

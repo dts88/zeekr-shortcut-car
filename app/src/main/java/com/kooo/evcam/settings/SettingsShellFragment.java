@@ -111,6 +111,12 @@ public class SettingsShellFragment extends Fragment {
             screenKey = DEFAULT_SECTION;
             order = -1;
         }
+        // A category selection replaces the whole detail path, including nested editor history.
+        // Otherwise Storage can retain the editor title/back arrow and Back resurrects that editor.
+        androidx.fragment.app.FragmentManager manager = getChildFragmentManager();
+        if (manager.getBackStackEntryCount() > 0) {
+            manager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        }
         boolean down = order < 0 || order >= currentOrder;
         currentSection = screenKey;
         if (order >= 0) {

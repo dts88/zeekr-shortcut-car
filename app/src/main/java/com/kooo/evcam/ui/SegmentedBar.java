@@ -36,6 +36,7 @@ public class SegmentedBar extends LinearLayout {
 
     private String[] values = new String[0];
     private OnPick onPick;
+    private int labelTextAppearance = R.style.TextAppearance_Cam_Body;
 
     public SegmentedBar(Context context) {
         this(context, null);
@@ -44,6 +45,8 @@ public class SegmentedBar extends LinearLayout {
     public SegmentedBar(Context context, AttributeSet attrs) {
         super(context, attrs);
         setOrientation(HORIZONTAL);
+        setBaselineAligned(false);
+        setGravity(Gravity.FILL_VERTICAL);
         setBackgroundResource(R.drawable.bg_segment_track);
         int pad = dp(3);
         setPadding(pad, pad, pad, pad);
@@ -70,15 +73,16 @@ public class SegmentedBar extends LinearLayout {
 
     private TextView segment(String label, String value, boolean active) {
         TextView view = new TextView(getContext());
-        LayoutParams params = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+        LayoutParams params = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f);
         view.setLayoutParams(params);
         view.setGravity(Gravity.CENTER);
         int padV = dp(13);
         view.setPadding(dp(6), padV, dp(6), padV);
-        view.setMaxLines(1);
+        view.setMinHeight(dp(48));
+        view.setFocusable(true);
+        view.setEnabled(isEnabled());
         view.setText(label);
-        view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
-                getResources().getDimension(R.dimen.text_body));
+        view.setTextAppearance(labelTextAppearance);
         view.setBackgroundResource(R.drawable.bg_segment);
         view.setActivated(active);
         view.setTextColor(ContextCompat.getColor(getContext(),
@@ -89,6 +93,13 @@ public class SegmentedBar extends LinearLayout {
             }
         });
         return view;
+    }
+
+    public void setLabelTextAppearance(int style) { labelTextAppearance = style; }
+
+    @Override public void setEnabled(boolean enabled) {
+        super.setEnabled(enabled);
+        for (int i = 0; i < getChildCount(); i++) getChildAt(i).setEnabled(enabled);
     }
 
     /** 现在这一排里有没有这个值，用来判断「自定义」。 */
