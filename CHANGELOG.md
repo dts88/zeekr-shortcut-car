@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.26.0-alpha] - 2026-10-23
+
 - Settings: every row's name starts at the same line; rows without a switch leave the switch's space empty.
 - Settings: a value at the end of a row stays on one line when the row has room (Storage location used to wrap).
 - Dialogs: options in single and multiple choice dialogs use the same text size as settings rows; they were much smaller.
