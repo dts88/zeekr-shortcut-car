@@ -1973,34 +1973,30 @@ public class MultiCameraManager {
     }
 
     /**
-     * 这次运行启用的座舱去掉了（调度报的，通道眼里熄屏的那一刻；暂时的规矩，见 {@link CabinsOneShot}）：启用的几路、
-     * 这一次录像的计划都拿掉它们，再告诉管线的持有者（主界面回到前台时照只有环视重新摆）。关相机不在这里 —— 那一刻座舱
+     * 这次运行启用的前座舱去掉了（调度报的，通道眼里熄屏的那一刻；暂时的规矩，见 {@link FrontCabinOneShot}）：启用的几路、
+     * 这一次录像的计划都拿掉它，再告诉管线的持有者（主界面回到前台时不再摆它）。关相机不在这里 —— 那一刻座舱
      * 本来就照熄屏放开，之后谁都不要它，调度照登记表关；它的录制器由调度照「不再留着录像输出」交回来再放。主线程。
      */
-    private void retireCabins(List<String> keys) {
-        if (isReleased() || keys == null || keys.isEmpty()) {
+    private void retireFrontCabin(String key) {
+        if (isReleased() || key == null) {
             return;
         }
         if (enabledLanes != null) {
-            enabledLanes.removeAll(keys);
+            enabledLanes.remove(key);
         }
-        List<String> dropped = new ArrayList<>();
-        for (String key : keys) {
-            if (recordingPlan.containsKey(key)) {
-                leaveLane(key, "这次运行去掉了座舱");
-                recordingPlan.remove(key);
-                lanes.drop(key);
-                dropped.add(key);
-            }
+        boolean dropped = recordingPlan.containsKey(key);
+        if (dropped) {
+            leaveLane(key, "这次运行去掉了前座舱");
+            recordingPlan.remove(key);
+            lanes.drop(key);
         }
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("前后座舱只用一次：通道眼里熄屏，" + roles(new ArrayList<>(keys))
-                + "从这次运行里去掉，亮屏也不再开；下次启动只有环视"
-                + (dropped.isEmpty() ? "" : "（这一次录像不再录" + roles(dropped) + "）"));
-        if (!dropped.isEmpty()) {
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("前座舱只用一次：通道眼里熄屏，前座舱从这次运行里去掉，"
+                + "亮屏也不再开；下次启动不带前座舱" + (dropped ? "（这一次录像不再录前座舱）" : ""));
+        if (dropped) {
             publishLanes();
             scheduler.wake();
         }
-        CameraManagerHolder.getInstance().cabinsRetired(context, this, keys);
+        CameraManagerHolder.getInstance().frontCabinRetired(this, key);
     }
 
     /** 管线里的、启用的那几路，按开的次序。 */
@@ -3411,13 +3407,13 @@ public class MultiCameraManager {
         }
 
         @Override
-        public boolean cabinsOneShot() {
-            return CabinsOneShot.ACTIVE;
+        public boolean frontCabinOneShot() {
+            return FrontCabinOneShot.ACTIVE;
         }
 
         @Override
-        public void cabinsRetired(List<String> keys) {
-            retireCabins(keys);
+        public void frontCabinRetired(String key) {
+            retireFrontCabin(key);
         }
 
         // ---- 相机服务那边（CameraAvailabilityWatch.Listener）

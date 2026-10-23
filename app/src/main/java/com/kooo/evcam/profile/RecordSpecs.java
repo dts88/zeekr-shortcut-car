@@ -90,8 +90,8 @@ public final class RecordSpecs {
      * 唯一不看它的是超级镜子 —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16）。</p>
      *
      * <p>运行中问的是<b>这一次运行</b>的那几路（{@code CameraManagerHolder.runLanes}）：进程里第一次建管线时照存下的配置定，
-     * 配置改动「重启应用后生效」；前后座舱只用一次时，生效后存下的配置就改成了只有环视、离车时这一次运行也去掉座舱
-     * （暂时的规矩，{@code camera.CabinsOneShot}）。还没建过管线时照存下的配置。要存下的那一份（下一次启动用的）调
+     * 配置改动「重启应用后生效」；前座舱只用一次时，生效后存下的配置里前座舱的开关就关了、离车时这一次运行也去掉前座舱
+     * （暂时的规矩，{@code camera.FrontCabinOneShot}）。还没建过管线时照存下的配置。要存下的那一份（下一次启动用的）调
      * {@link #storedEnabledCameraKeys}。</p>
      */
     public static java.util.Set<String> enabledCameraKeys(Context context) {

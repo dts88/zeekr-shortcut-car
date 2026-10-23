@@ -81,25 +81,20 @@ public final class StatusLine {
      * <p>预设的按 id 取本地化的名字：存进配置里的名字是迁移时写的中文，照抄它的话
      * 英文、马来文界面下这里也是一行中文。</p>
      *
-     * <p>写的是这一次运行的（{@code CameraManagerHolder.runProfileId}，还没建过管线时是存下的配置）：前后座舱只用一次时，
-     * 存下的配置在生效后、离车时就改了（camera.CabinsOneShot）。两份预设照这一次运行有没有座舱叫：离车去掉座舱之后是「环视」。</p>
+     * <p>写的是这一次运行的（{@code CameraManagerHolder.runProfileId}，还没建过管线时是存下的配置）：换了配置要重启应用才生效，
+     * 状态条写正在用的那一份。</p>
      */
     private static String profileName(Context context) {
         try {
-            com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-            String runId = holder.runProfileId();
+            String runId = com.kooo.evcam.camera.CameraManagerHolder.getInstance().runProfileId();
             Profile profile = runId != null ? new com.kooo.evcam.profile.ProfileStore(context).load(runId)
                     : new com.kooo.evcam.profile.ProfileStore(context).current();
             String id = runId != null ? runId : profile.id;
-            if (Profile.PRESET_COMPOSITE.equals(id) || Profile.PRESET_COMPOSITE_MULTI.equals(id)) {
-                boolean cabins = false;
-                for (String key : com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context)) {
-                    if (!com.kooo.evcam.camera.CameraSlots.KEY_SURROUND.equals(key)) {
-                        cabins = true;
-                    }
-                }
-                return context.getString(cabins ? R.string.status_profile_composite_multi
-                        : R.string.status_profile_composite);
+            if (Profile.PRESET_COMPOSITE.equals(id)) {
+                return context.getString(R.string.status_profile_composite);
+            }
+            if (Profile.PRESET_COMPOSITE_MULTI.equals(id)) {
+                return context.getString(R.string.status_profile_composite_multi);
             }
             String name = profile.name;
             return name == null ? "" : name.trim();
@@ -126,7 +121,7 @@ public final class StatusLine {
                     : level == 1 ? R.string.status_bitrate_low
                     : level == 3 ? R.string.status_bitrate_high
                     : R.string.status_bitrate_medium;
-            // 配置名原来在标题栏里（「极氪7X（环视 + 前后座舱）」那一行）。标题栏拆了之后
+            // 配置名原来在标题栏里（「极氪7X（环视 + 后座舱）」那一行）。标题栏拆了之后
             // 它归到这里 —— 它本来就是一条「现在按什么在跑」的状态，和帧率码率同类
             String profile = profileName(context);
             NumberRoll.set(stream, (profile.isEmpty() ? "" : profile + " · ")

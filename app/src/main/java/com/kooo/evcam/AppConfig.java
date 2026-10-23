@@ -686,23 +686,31 @@ public class AppConfig {
                 KEY_UI_LEFT_FOR_SCREEN_OFF,
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
-                KEY_PHOTO_VIA_JPEG_RESET,
-                KEY_CABINS_REVERT_PENDING)));
+                KEY_PHOTO_VIA_JPEG_RESET)));
     }
 
     /**
-     * 前后座舱只用一次（暂时的规矩，{@code camera.CabinsOneShot}）：这次照没改过的「极氪7X（环视 + 前后座舱）」启动了，
-     * 视频流配置要改回「极氪7X（环视）」—— 离车时、或者下一次启动时改。运行状态，不导出。
+     * 去掉的功能留在这份设置里的键：进程起来时删掉（{@link #forgetRetiredKeys}），不留在导出的设置、诊断报告里。
+     *
+     * <ul>
+     *   <li>{@code cabins_one_shot_revert_pending}：2.17.0–2.19.0 前后座舱只用一次时，「视频流配置待改回『极氪7X（环视）』」的记号。
+     *       2.20.0 起只有前座舱只用一次、不再改选择（项目所有者 2026-10-23）。</li>
+     * </ul>
      */
-    private static final String KEY_CABINS_REVERT_PENDING = "cabins_one_shot_revert_pending";
+    private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending"};
 
-    public boolean isCabinsRevertPending() {
-        return prefs.getBoolean(KEY_CABINS_REVERT_PENDING, false);
-    }
-
-    /** 立刻落盘（commit）：生效那一刻记下的，断电了下一次启动也要看得到。 */
-    public void setCabinsRevertPending(boolean pending) {
-        prefs.edit().putBoolean(KEY_CABINS_REVERT_PENDING, pending).commit();
+    /** 进程起来时调一次：去掉的功能留下的键（{@link #RETIRED_KEYS}）有就删。 */
+    public void forgetRetiredKeys() {
+        SharedPreferences.Editor editor = null;
+        for (String key : RETIRED_KEYS) {
+            if (prefs.contains(key)) {
+                editor = editor == null ? prefs.edit() : editor;
+                editor.remove(key);
+            }
+        }
+        if (editor != null) {
+            editor.apply();
+        }
     }
 
     /** 这个键是运行状态，不是设置（见 {@link #RUNTIME_KEYS}）。纯函数，测试直接调。 */

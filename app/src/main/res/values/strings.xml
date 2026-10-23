@@ -157,7 +157,7 @@
     <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
-    <string name="set_screen_off_keep_summary">熄屏后只录制环视。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
+    <string name="set_screen_off_keep_summary">熄屏后只录制环视，后座舱在亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
@@ -347,7 +347,7 @@
     <!-- 设置里的枚举选项 -->
     <string name="opt_mode_auto">自动（推荐）</string>
     <string name="opt_model_zeekr">极氪7X（环视）</string>
-    <string name="opt_model_zeekr_multi">极氪7X（环视 + 前后座舱）</string>
+    <string name="opt_model_zeekr_multi">极氪7X（环视 + 后座舱）</string>
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
@@ -681,7 +681,7 @@
     <string name="record_waiting_cameras">等待摄像头</string>
     <string name="record_waiting_detail">恢复后自动继续</string>
     <string name="status_profile_composite">极氪7X（环视）</string>
-    <string name="status_profile_composite_multi">极氪7X（环视 + 前后座舱）</string>
+    <string name="status_profile_composite_multi">极氪7X（环视 + 后座舱）</string>
     <string name="status_fps">≤%1$s fps</string>
     <string name="status_bitrate_very_low">极低码率</string>
     <string name="status_bitrate_low">低码率</string>

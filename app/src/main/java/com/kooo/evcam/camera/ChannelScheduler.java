@@ -272,14 +272,14 @@ public final class ChannelScheduler {
         /** 退出之后都关完了，调度停了：摘掉它接在别处的监听。 */
         void stopped();
 
-        /** 前后座舱只用一次的规矩开着（暂时，CabinsOneShot.ACTIVE；{@link ChannelRules.World#cabinsOneShot}）。 */
-        boolean cabinsOneShot();
+        /** 前座舱只用一次的规矩开着（暂时，FrontCabinOneShot.ACTIVE；{@link ChannelRules.World#frontCabinOneShot}）。 */
+        boolean frontCabinOneShot();
 
         /**
-         * 这次运行启用的座舱去掉了（{@link ChannelRules.Event.Type#CABINS_RETIRED}，通道眼里熄屏的那一刻）：管线、录像、主界面
-         * 把 {@code keys} 从这次运行里拿掉。只来一次。
+         * 这次运行启用的前座舱去掉了（{@link ChannelRules.Event.Type#FRONT_CABIN_RETIRED}，通道眼里熄屏的那一刻）：管线、录像、主界面
+         * 把 {@code key} 这一路从这次运行里拿掉。只来一次。
          */
-        void cabinsRetired(List<String> keys);
+        void frontCabinRetired(String key);
     }
 
     /**
@@ -1993,7 +1993,7 @@ public final class ChannelScheduler {
         w.cameraUsable = main || serviceStartedVisible;
         w.heardAnything = host.heardAnything();
         w.lastOthersChangeAt = ourClock(host.lastOthersChangeAt(), offset);
-        w.cabinsOneShot = host.cabinsOneShot();
+        w.frontCabinOneShot = host.frontCabinOneShot();
 
         if (host.headUnitSleeps()) {
             sleepNoticedAt.compareAndSet(0, now);
@@ -2515,8 +2515,8 @@ public final class ChannelScheduler {
                     journal.stopped(event.keys.get(0), port == null ? null : port.lastErrorName());
                     break;
                 }
-                case CABINS_RETIRED:
-                    host.cabinsRetired(event.keys);
+                case FRONT_CABIN_RETIRED:
+                    host.frontCabinRetired(event.keys.get(0));
                     break;
                 default:
                     break;
