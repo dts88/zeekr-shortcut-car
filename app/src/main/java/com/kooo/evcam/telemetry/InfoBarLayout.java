@@ -12,13 +12,13 @@ import java.util.Set;
 /**
  * 信息条上放哪几格、各放在哪。
  *
- * <h3>放哪几格：系统信息里勾的（项目所有者 2026-10-03）</h3>
+ * <h3>放哪几格：车辆信号里勾的（项目所有者 2026-10-03）</h3>
  *
- * <p>设置 → 系统 → 系统信息，每个信号前面一个勾，勾上的上信息条（{@link InfoBar#selection}）。
+ * <p>设置 → 系统 → 车辆信号，每个信号前面一个勾，勾上的上信息条（{@link InfoBar#selection}）。
  * 有图标的信号带出它所在的那一格 —— 一格管几个信号的，勾其中任意一个就带出整格，数据照旧全用；
- * 没有图标的暂时画成文字格（名称 + 值，写法和系统信息页一样，见 {@link SignalText}）。一格列哪几个信号、
+ * 没有图标的暂时画成文字格（名称 + 值，写法和车辆信号页一样，见 {@link SignalText}）。一格列哪几个信号、
  * 什么才算「有图标」见 {@link Cell}：图标画出来的是同一个信息才算（项目所有者 2026-10-04）。
- * 勾上显示成哪几格，系统信息页每一行下面都写着（{@link #cellsFor}）。
+ * 勾上显示成哪几格，车辆信号页每一行下面都写着（{@link #cellsFor}）。
  * 经纬度不是车辆信号，单独一项 {@link #POSITION_ITEM}。默认勾的是 2.0.10 信息条上在用的那些（{@link #defaultSelection}）。</p>
  *
  * <h3>放在哪</h3>
@@ -34,7 +34,7 @@ public final class InfoBarLayout {
     public static final String POSITION_ITEM = "POSITION";
 
     /**
-     * 有图标的格：宽度（逻辑像素）、名字（系统信息页上说「勾上显示成哪一格」用）、表示哪几个信号。
+     * 有图标的格：宽度（逻辑像素）、名字（车辆信号页上说「勾上显示成哪一格」用）、表示哪几个信号。
      * 声明的顺序就是从左到右的顺序。
      *
      * <p>一格列的信号 = 这一格画出来的信息：画的时候读的，加上和画出来的是同一个信息的（转向指示显示、刹车踏板）。
@@ -120,7 +120,7 @@ public final class InfoBarLayout {
         HAZARD(90, 0, false, Signal.INDICATOR, Signal.TURN_LEFT, Signal.TURN_RIGHT);
 
         public final int width;
-        /** 这一格的名字（字串资源）：系统信息页每一行下面说「勾上显示成哪一格」。只在车辆状态面板上的格没有名字（0）。 */
+        /** 这一格的名字（字串资源）：车辆信号页每一行下面说「勾上显示成哪一格」。只在车辆状态面板上的格没有名字（0）。 */
         public final int labelRes;
         /** 信息条上放不放（不放的只在车辆状态面板上用）。 */
         public final boolean onStrip;
@@ -226,7 +226,7 @@ public final class InfoBarLayout {
         return new Arrangement(placed, width, y - GAP);
     }
 
-    /** 只有这一格的摆法：系统信息页每一行旁边那个图标（{@code ui.InfoBarCellView}）。 */
+    /** 只有这一格的摆法：车辆信号页每一行旁边那个图标（{@code ui.InfoBarCellView}）。 */
     public static Arrangement single(Cell cell) {
         return new Arrangement(Collections.singletonList(new Placed(cell, null, 0, 0, cell.width)),
                 cell.width, InfoBar.HEIGHT);
@@ -242,7 +242,7 @@ public final class InfoBarLayout {
 
     /**
      * 勾上这一项（信号名，或者 {@link #POSITION_ITEM}），信息条上带出哪几格，按从左到右的顺序；
-     * 空的 = 没有图标，画成文字格。{@link #fit} 和系统信息页（每一行下面那句「勾上显示成什么」）都看它。
+     * 空的 = 没有图标，画成文字格。{@link #fit} 和车辆信号页（每一行下面那句「勾上显示成什么」）都看它。
      */
     public static List<Cell> cellsFor(String item) {
         Set<String> one = Collections.singleton(item);
