@@ -96,9 +96,11 @@ public class CameraSourcesAndroidTest {
     assertTrue(sources[0].findPreference("composite").getSummary().toString().contains("8"));
    });
    onView(withText(R.string.record_group_surround)).perform(click());
-   onView(withText(R.string.opt_camera_auto)).perform(click());onView(withText(R.string.action_cancel)).perform(click());assertEquals("8",config.getSourceCameraId("composite"));
+   androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything()).inAdapterView(
+           androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class)).atPosition(0).perform(click());onView(withText(R.string.action_cancel)).perform(click());assertEquals("8",config.getSourceCameraId("composite"));
    onView(withText(R.string.record_group_surround)).perform(click());
-   onView(withText(R.string.opt_camera_auto)).perform(click());onView(withText(R.string.action_ok)).perform(click());assertNull(config.getSourceCameraId("composite"));
+   androidx.test.espresso.Espresso.onData(org.hamcrest.Matchers.anything()).inAdapterView(
+           androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom(android.widget.ListView.class)).atPosition(0).perform(click());onView(withText(R.string.action_ok)).perform(click());assertNull(config.getSourceCameraId("composite"));
    scenario.onActivity(a->{sources[0]=open(host[0],true);assertTrue(sources[0].findPreference("composite").getSummary().toString().contains("5"));
     config.setSourceCameraId("manual","9");sources[0].scrollToPreference("reset_sources");});
    onView(withText(R.string.camera_sources_reset)).perform(click());
