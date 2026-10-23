@@ -290,6 +290,51 @@ final class PulseProfile {
     final float popGain;
     final float popRiseMs;
     final float popDecayMs;
+    /**
+     * 收油时电平少掉多少 dB（乘 {@link #levelPow} 次方之前）。项目所有者 2026-10-23：松开油门后引擎声音太小，踩和不踩的落差太大 ——
+     * 不踩油门时发动机仍被车拖着、和变速箱、车连成一体在转，每个缸照样吸气、压缩、排气。虚拟发动机的电平按负荷算，断油时一下掉
+     * 19 dB（车内听感的次方 0.42 → −8 dB），合成器里每一下脉冲又只剩泵气（{@link #pump}）—— 「没出力」算了两遍。
+     */
+    final float overrunLevelDb;
+    /**
+     * 松油门时燃烧不是一下断掉：电控先推迟点火、把扭矩慢慢收掉（免得传动「咣」一下），之后才断油（减速断油）—— 燃烧按这个时间
+     * （秒）收到泵气；踩下去马上回来。
+     */
+    final float fuelOutSec;
+    /**
+     * 排气管里的气体温度（K：冷、热；下面排气管、共振峰、亥姆霍兹的 Hz 是 {@link #gasRefK} 时的，约等于巡航时）：声速跟着温度的
+     * 平方根走，管子、消声器的共振一起往上移。温度跟着发动机的输出功率（负荷 × 转速 / {@link #heatFullRpm}），管壁有热惯性：
+     * 升温、降温都要几秒。项目所有者 2026-10-23：低转速下引擎的轰鸣不错，转速上去之后厚度、力量感不足 —— 共振峰固定不动时，
+     * 低转时它们正好托住 2.5–3.5 阶，高转时只托得住 1.5–2 阶（参考车车内高转是 1–4.5 阶一整排）。按功率、带惯性：巡航、低转加速
+     * 基本不动，持续高转全油门时才一起往上移。
+     */
+    final float gasColdK;
+    final float gasHotK;
+    final float gasRefK;
+    final float heatFullRpm;
+    final float heatUpSec;
+    final float heatDownSec;
+    /**
+     * 车内听感时排气的气流噪声（沙哑）随转速少多少 dB（按转速的对数插值，两头照最边上的）：参考车车内高转全油门时线和线之间的底子
+     * 比 4 阶低 26–50 dB，我们原来只低 11–26 dB；低转全油门的轰鸣里有一大块是这层随点火起伏的沙哑（项目所有者喜欢的低转），不动。
+     * 沙哑原来照车外的录音（EngineV1 那台，只录到 2850 rpm）定的，再往上是外推的。
+     */
+    final float[] cabinRaspRpm;
+    final float[] cabinRaspRpmDb;
+    /**
+     * 车内听感时增压器出口、进口的气流声也走啸叫那一路（dB，相对啸叫那一路；按转速的对数插值，两头照最边上的）：增压器就在挡风
+     * 玻璃下面，啸叫和它自己的气流声是一起传进来的。原来车内只有啸叫绕过防火墙，几根干净的线飘在上面，比旁边高 12–22 dB（参考车
+     * 车内只高 6–10 dB；项目所有者 2026-10-23：机械增压的质感略显单薄，有一条主的音线太过突出）。气流声随转速长得快（低转时很弱），
+     * 低转多给、高转少给（高转时它自己就响，车内的高频不能亮起来）。
+     */
+    final float[] cabinAirRpm;
+    final float[] cabinAirRpmDb;
+    /**
+     * 车内听感时进气腔的和弦（{@link #pulsationDb}）随转速另加的 dB（按转速的对数插值，两头照最边上的）：参考车车内高转全油门时
+     * 10–13 阶比 4 阶低 31–37 dB，我们原来只低 13–14 dB —— 高转时上面一层细的整数阶盖过了下面的厚度。
+     */
+    final float[] cabinChordRpm;
+    final float[] cabinChordRpmDb;
 
     private PulseProfile(Builder b) {
         firing = b.firing.clone();
@@ -447,6 +492,20 @@ final class PulseProfile {
         popGain = b.popGain;
         popRiseMs = b.popRiseMs;
         popDecayMs = b.popDecayMs;
+        overrunLevelDb = b.overrunLevelDb;
+        fuelOutSec = b.fuelOutSec;
+        gasColdK = b.gasColdK;
+        gasHotK = b.gasHotK;
+        gasRefK = b.gasRefK;
+        heatFullRpm = b.heatFullRpm;
+        heatUpSec = b.heatUpSec;
+        heatDownSec = b.heatDownSec;
+        cabinRaspRpm = b.cabinRaspRpm.clone();
+        cabinRaspRpmDb = b.cabinRaspRpmDb.clone();
+        cabinAirRpm = b.cabinAirRpm.clone();
+        cabinAirRpmDb = b.cabinAirRpmDb.clone();
+        cabinChordRpm = b.cabinChordRpm.clone();
+        cabinChordRpmDb = b.cabinChordRpmDb.clone();
     }
 
     /**
@@ -546,7 +605,7 @@ final class PulseProfile {
         private float[] meshRpmDb = {9f, 14f, 8f, 0f, -4f};
         private float superchargerWobble = 0.006f;
         private float superchargerWobbleHz = 30f;
-        private float[] meshVoiceDetune = {0f, -0.0018f, 0.0022f};
+        private float[] meshVoiceDetune = {0f, -0.004f, 0.0045f, -0.0085f};
         private float meshVoiceWander = 0.0045f;
         private float meshVoiceWanderHz = 2.5f;
         private float superchargerFree = 0.05f;
@@ -613,11 +672,25 @@ final class PulseProfile {
         private float diffDb = -40f;
         private float shaftHzPerKmh = 0.69f;
         private float shaftDb = -36f;
-        private float pump = 0.3f;
+        private float pump = 0.45f;
         private float popMax = 0.05f;
         private float popGain = 1.2f;
         private float popRiseMs = 0.3f;
         private float popDecayMs = 5f;
+        private float overrunLevelDb = 14f;
+        private float fuelOutSec = 0.35f;
+        private float gasColdK = 450f;
+        private float gasHotK = 1000f;
+        private float gasRefK = 495f;
+        private float heatFullRpm = 6500f;
+        private float heatUpSec = 3f;
+        private float heatDownSec = 5f;
+        private float[] cabinRaspRpm = {3000f, 5500f};
+        private float[] cabinRaspRpmDb = {0f, -8f};
+        private float[] cabinAirRpm = {2000f, 3500f, 5000f};
+        private float[] cabinAirRpmDb = {6f, 0f, -10f};
+        private float[] cabinChordRpm = {2500f, 3500f, 6000f};
+        private float[] cabinChordRpmDb = {3f, 0f, -8f};
 
         /** 每一下的随机起伏（标准差：怠速、满负荷、收油时另加）和时机的随机偏移（曲轴角：怠速、满负荷）。 */
         Builder variation(float sigmaIdle, float sigmaLoad, float sigmaOverrun, float jitterIdleDeg, float jitterLoadDeg) {
@@ -661,7 +734,8 @@ final class PulseProfile {
                     || thunkMs.length != thunkHz.length || thunkGainDb.length != thunkHz.length
                     || cabinFrontHz.length != 2 || cabinRearHz.length != 2
                     || meshHarmonicsDb.length != meshRpm.length || meshRpmDb.length != meshRpm.length || meshVoiceDetune.length == 0
-                    || pulsationRpmDb.length != pulsationRpm.length) {
+                    || pulsationRpmDb.length != pulsationRpm.length || cabinChordRpmDb.length != cabinChordRpm.length
+                    || cabinRaspRpmDb.length != cabinRaspRpm.length || cabinAirRpmDb.length != cabinAirRpm.length) {
                 throw new IllegalStateException("pulse profile incomplete");
             }
             for (int c : firing) {

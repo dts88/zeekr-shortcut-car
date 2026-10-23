@@ -190,8 +190,11 @@ final class VirtualEngine {
     static final float START_SETTLE_SEC = 1.3f;
     static final float START_CRANK_RPM = 250f;
     static final float START_CRANK_LOAD = 0.12f;
-    /** 点着后冲到多少（rpm）：项目所有者 2026-10-22 要启动的体感再强 20 % 左右，2000 → 2400。 */
-    static final float START_FLARE_RPM = 2400f;
+    /**
+     * 点着后冲到多少（rpm）：项目所有者 2026-10-22 要启动的体感再强 20 % 左右，2000 → 2400；2026-10-23 嫌美式 V8 启动时转速拉得
+     * 太高，恢复到 2000（冲高时多出来的音量、亮度、进气声照旧）。
+     */
+    static final float START_FLARE_RPM = 2000f;
     static final float START_CRANK_TAU = 0.15f;
     static final float START_CATCH_TAU = 0.08f;
     static final float START_SETTLE_TAU = 0.35f;

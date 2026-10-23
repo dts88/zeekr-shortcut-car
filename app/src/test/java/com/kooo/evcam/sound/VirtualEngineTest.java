@@ -143,8 +143,8 @@ public class VirtualEngineTest {
             assertEquals("没有起动机", 0f, e.starter(), 0f);
             peak = Math.max(peak, e.rpm());
         }
-        // 项目所有者 2026-10-22：体感再强 20 % 左右，冲到 2400 附近（原来 2000）
-        assertTrue("一开始就点着、冲上来: " + peak, peak > 2200f && peak <= VirtualEngine.START_FLARE_RPM);
+        // 冲到 2000 附近（项目所有者 2026-10-22 提到 2400，10-23 嫌转速拉得太高，恢复到 2000）
+        assertTrue("一开始就点着、冲上来: " + peak, peak > 1800f && peak <= VirtualEngine.START_FLARE_RPM);
         run(e, in, 1.6f);
         assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
         assertEquals("回落到怠速", P.idleRpm, e.rpm(), 120f);

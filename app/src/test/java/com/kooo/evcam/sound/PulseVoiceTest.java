@@ -254,13 +254,17 @@ public class PulseVoiceTest {
     @Test
     public void theSuperchargerWhines() {
         // 2850 rpm 满负荷（车主偏好的那台录音的转速）：最响的是同步齿轮啮合的第 2 次（10.24 × 3 × 2 = 61.44 阶 ≈ 2.9 kHz），
-        // 是一个音（比两边 ±6 % 高得多，±4 % 会碰上转子的边带；原型最差 35 倍），没有机械增压的同一台那里没有（原型最差 25 倍）。
-        // 单个频点落在噪声上起伏很大，所以拿「有」和「没有」比，不拿没有的那台自己和两边比
+        // 是一小团（±1.5 % 里每赫兹的能量比两边 8–9.5 % 处高得多；两个转子各转一圈的边带在 ±3.3、5.6、6.7、10 %，避开），
+        // 没有机械增压的同一台那里没有。2026-10-23 起齿轮声的几个来源错开 ±0.8 %（项目所有者：一条主的音线太过突出），
+        // 按 ±1.5 % 的能量量（和 EngineV1 那台的录音同一个量法），不再按单个频点；摊开以后每赫兹的能量比两边高三倍以上就是一个音
+        // （原来三个来源只错开 ±0.2 %，单个频点比两边高十倍）
         double hz = SC.superchargerOrder * SC.meshMultiple * 2 * 2850 / 60.0;
         float[] sc = mid(render(SC, params(2850f, 1f), 1.5f), 0.7f);
         float[] plain = mid(render(PLAIN, params(2850f, 1f), 1.5f), 0.7f);
-        assertTrue(standsOut(sc, hz, 0.06) > 10);
-        assertTrue(power(sc, hz) > 10 * power(plain, hz));
+        double bunch = bandPower(sc, hz * 0.985, hz * 1.015) / 0.03;
+        double sides = Math.max(bandPower(sc, hz * 0.905, hz * 0.92), bandPower(sc, hz * 1.08, hz * 1.095)) / 0.015;
+        assertTrue("比两边高 " + bunch / sides, bunch > 3 * sides);
+        assertTrue("比没有增压器的 " + bunch / bandPower(plain, hz * 0.985, hz * 1.015), bunch > 10 * bandPower(plain, hz * 0.985, hz * 1.015));
     }
 
     @Test
@@ -649,5 +653,56 @@ public class PulseVoiceTest {
         assertTrue("晃的是低频", power(settle, SC.rockHz) > 100 * power(same, SC.rockHz));
         double tailRms = energy(tail) / tail.length;
         assertTrue("然后就没声了: " + 10 * Math.log10(tailRms / idle), tailRms < 1e-3 * idle);
+    }
+
+    // ================================================================= 2026-10-23：松油门、持续高转
+
+    /** {@code x} 里 {@code from}–{@code to} 秒的 RMS（dB）。 */
+    private static double rmsDb(float[] x, float from, float to) {
+        int a = Math.round(from * RATE);
+        int b = Math.min(x.length, Math.round(to * RATE));
+        double e = 0;
+        for (int i = a; i < b; i++) {
+            e += (double) x[i] * x[i];
+        }
+        return 10 * Math.log10(e / (b - a) + 1e-30);
+    }
+
+    @Test
+    public void afterALiftTheEngineKeepsRunning() {
+        // 项目所有者 2026-10-23：松开油门后引擎声音太小，踩和不踩的落差太大 —— 不踩油门时发动机仍被车拖着、和变速箱、车连成一体在转，
+        // 每个缸照样吸气、压缩、排气（断油了，只是没有燃烧）。车内听感、同一个转速，电平照虚拟发动机给的（满负荷 0 dB、收油 −19 dB）：
+        // 满负荷和收油差 3–7 dB（原来 10 dB 以上）；燃烧不是一下断掉（电控先把扭矩收掉），松开后头 0.15 s 比 1 s 以后响
+        PulseVoice v = new PulseVoice(SC, RATE, true);
+        VoiceParams full = params(3500f, 1f);
+        full.gain = 0.3f;
+        float[] on = mid(render(v, full, 1.5f), 0.5f);
+        VoiceParams lift = params(3500f, 0f);
+        lift.overrun = 1f;
+        lift.gain = 0.3f;
+        lift.level = EngineVoice.dbToLin(VirtualEngine.LEVEL_FLOOR_DB);
+        float[] off = mid(render(v, lift, 1.6f), 0f);
+        double drop = rmsDb(on, 0f, 1f) - rmsDb(off, 1f, 1.6f);
+        assertTrue("落差 " + drop + " dB", drop > 3 && drop < 7);
+        double ramp = rmsDb(off, 0.03f, 0.15f) - rmsDb(off, 1f, 1.6f);
+        assertTrue("先收扭矩再断油: " + ramp + " dB", ramp > 1);
+    }
+
+    @Test
+    public void aSustainedPullWarmsTheExhaustAndMovesItsResonancesUp() {
+        // 项目所有者 2026-10-23：低转速下引擎的轰鸣不错，转速上去之后厚度、力量感不足。排气管里的气体温度跟着功率（负荷 × 转速）走、
+        // 管壁有热惯性：巡航时管子、消声器的共振基本不动（低转的味道不变），刚踩下去时也还没动，持续高转满负荷几秒以后一起往上移
+        // 约 1.3 倍（声速跟温度的平方根），托住高转时的 2–4.5 阶
+        PulseVoice v = new PulseVoice(SC, RATE, true);
+        VoiceParams cruise = params(2000f, 0.25f);
+        cruise.gain = 0.3f;
+        render(v, cruise, 8f);
+        assertEquals("巡航时基本不动", 1.0, v.gasScale(), 0.03);
+        VoiceParams pull = params(5500f, 1f);
+        pull.gain = 0.3f;
+        render(v, pull, 0.5f);
+        assertTrue("刚踩下去还没动: " + v.gasScale(), v.gasScale() < 1.08f);
+        render(v, pull, 8f);
+        assertTrue("拉了几秒热起来: " + v.gasScale(), v.gasScale() > 1.25f);
     }
 }
