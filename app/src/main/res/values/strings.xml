@@ -128,7 +128,7 @@
     <string name="set_floating_tap_title">点击</string>
     <string name="set_floating_long_press_title">长按</string>
     <string name="set_floating_lock_title">锁定位置</string>
-    <string name="set_floating_duration_title">显示录制时长</string>
+    <string name="set_floating_duration_title">录制时长</string>
     <string name="floating_action_open_app">打开主界面</string>
     <string name="floating_action_toggle_recording">开始 / 停止录制</string>
     <string name="floating_action_take_photo">拍照</string>
