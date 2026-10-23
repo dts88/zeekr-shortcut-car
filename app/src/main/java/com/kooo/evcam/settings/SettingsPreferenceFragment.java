@@ -1454,6 +1454,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_drive_sound_style", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
                 value -> {
                     appConfig.setDriveSoundStyle(value);
+                    showDriveSoundRows(value);
                     refreshDriveSound();
                 });
         bindEnum("pref_drive_sound_view", SettingsRegistry.DRIVE_SOUND_VIEW, appConfig.getDriveSoundView(),
@@ -1476,6 +1477,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setDriveSoundGearbox(value);
                     refreshDriveSound();
                 });
+        showDriveSoundRows(appConfig.getDriveSoundStyle());
+    }
+
+    /**
+     * 按声音风格只显示用得上的几行（项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项）：「听感」只有美式 V8 有；
+     * 「变速箱」两种超音速没有（固定 8 速，像参考车的 e-Shift）。设置值不动，换回去时还在。
+     */
+    private void showDriveSoundRows(String style) {
+        Preference view = findPreference("pref_drive_sound_view");
+        if (view != null) {
+            view.setVisible(com.kooo.evcam.sound.DriveSound.styleHasViews(style));
+        }
+        Preference gearbox = findPreference("pref_drive_sound_gearbox");
+        if (gearbox != null) {
+            gearbox.setVisible(com.kooo.evcam.sound.DriveSound.styleChoosesGearbox(style));
+        }
     }
 
     private void refreshDriveSound() {

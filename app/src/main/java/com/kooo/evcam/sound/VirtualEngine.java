@@ -277,8 +277,9 @@ final class VirtualEngine {
     /** 此刻算一脚到底（急踩，或者油门到了 {@link #KICKDOWN_PEDAL_PCT}）：模拟换挡直接降到该在的挡。 */
     private boolean kickdown;
     private float shiftLeftSec;
-    /** 连续走法里此刻按伪挡位走。 */
+    /** 连续走法里此刻按伪挡位走；这台走不走伪挡位。 */
     private boolean pseudo;
+    private final boolean pseudoAllowed;
     /** 此刻按挡位走（模拟换挡，或伪挡位）。 */
     private boolean geared;
     private float upLeftSec;
@@ -315,14 +316,21 @@ final class VirtualEngine {
         this(profile, Gearbox.AUTO8, crank);
     }
 
-    /**
-     * @param gearbox 变速箱（模拟换挡、伪挡位、倒挡）
-     * @param crank   启动时带起动机那一段（「试制 V8」）；不带就直接从点着开始
-     */
     VirtualEngine(SoundProfile profile, Gearbox gearbox, boolean crank) {
+        this(profile, gearbox, crank, true);
+    }
+
+    /**
+     * @param gearbox     变速箱（模拟换挡、伪挡位、倒挡）
+     * @param crank       启动时带起动机那一段（「试制 V8」）；不带就直接从点着开始
+     * @param pseudoGears 连续走法里油门接近踩到底时按伪挡位走（两种 V8）；不走的话就一路平滑上去（超音速：参考车关掉 e-Shift
+     *                    时就是这样，项目所有者 2026-10-23）
+     */
+    VirtualEngine(SoundProfile profile, Gearbox gearbox, boolean crank, boolean pseudoGears) {
         this.p = profile;
         this.gearbox = gearbox;
         this.crank = crank;
+        this.pseudoAllowed = pseudoGears;
         this.rpm = profile.idleRpm;
     }
 
@@ -502,7 +510,7 @@ final class VirtualEngine {
 
     /** 连续走法：油门接近踩到底时按伪挡位走（有回差：踩到 {@link #PSEUDO_ON_PCT}、或者一脚到底时进，回到 {@link #PSEUDO_OFF_PCT} 以下出）。 */
     private void updatePseudo(Input in) {
-        if (in.gear != Gear.D || in.mode == RpmMode.SHIFTS) {
+        if (!pseudoAllowed || in.gear != Gear.D || in.mode == RpmMode.SHIFTS) {
             pseudo = false;
             return;
         }

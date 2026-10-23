@@ -481,6 +481,29 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void withoutPseudoGearsContinuousStaysContinuousAtTheFloor() {
+        // 两种超音速（项目所有者 2026-10-23）：参考车关掉 e-Shift 时一路平滑上去 —— 连续走法踩到底也不按挡位走、不换挡，转速只往上
+        VirtualEngine e = new VirtualEngine(P, Gearbox.AUTO8, false, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.flow = VirtualEngine.Flow.DRIVE;
+        in.throttlePct = 100f;
+        int serial = e.shiftSerial();
+        float last = 0f;
+        for (int i = 0; i < 3000; i++) {
+            in.speedKmh = 60f + 100f * i / 3000f;
+            e.step(DT, in);
+            assertFalse("不按挡位走", e.pseudoGears() || e.geared());
+            if (i > 500) {
+                assertTrue("转速不往下掉: " + e.rpm() + " < " + last, e.rpm() >= last - 1f);
+            }
+            last = e.rpm();
+        }
+        assertEquals("不换挡", serial, e.shiftSerial());
+    }
+
+    @Test
     public void anUpshiftCutsTheDriveThenTheRpmFallsSmoothly() {
         // 升挡：一下子断扭（电平跌落由合成器按断扭自己加），转速先停住再只往下走到新挡位，断扭过去时「吼」一下，最后断扭归零
         VirtualEngine e = new VirtualEngine(P);

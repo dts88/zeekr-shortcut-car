@@ -36,6 +36,27 @@ public class SoundStyleTest {
     }
 
     @Test
+    public void eachStyleOnlyUsesTheSettingsThatFitIt() {
+        // 项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项。「听感」只有美式 V8 分车外、车内；两种超音速不看「变速箱」，
+        // 固定 8 速（参考车的 e-Shift 模拟 8 速双离合），「连续」时也不走伪挡位
+        assertTrue(SoundStyle.AMERICAN.hasViews());
+        assertFalse(SoundStyle.PROTOTYPE.hasViews());
+        assertFalse(SoundStyle.JET.hasViews());
+        assertFalse(SoundStyle.JET_OLD.hasViews());
+        for (SoundStyle s : new SoundStyle[] {SoundStyle.AMERICAN, SoundStyle.PROTOTYPE}) {
+            assertTrue(s.choosesGearbox());
+            assertEquals(Gearbox.MANUAL6, s.gearbox(Gearbox.MANUAL6));
+            assertEquals(Gearbox.AUTO8, s.gearbox(Gearbox.AUTO8));
+            assertTrue(s.pseudoGears());
+        }
+        for (SoundStyle s : new SoundStyle[] {SoundStyle.JET, SoundStyle.JET_OLD}) {
+            assertFalse(s.choosesGearbox());
+            assertEquals(Gearbox.AUTO8, s.gearbox(Gearbox.MANUAL6));
+            assertFalse(s.pseudoGears());
+        }
+    }
+
+    @Test
     public void everyStyleSoundsInStereo() {
         for (SoundStyle s : SoundStyle.values()) {
             for (boolean cabin : new boolean[] {false, true}) {

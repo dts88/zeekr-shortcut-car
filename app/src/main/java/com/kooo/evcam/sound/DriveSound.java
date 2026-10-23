@@ -99,6 +99,16 @@ public final class DriveSound {
         INSTANCE.doInstall(context);
     }
 
+    /** 这种声音风格（设置里存的值）用得上开发者选项「听感」吗：只有美式 V8 分车外、车内（设置页按它显示这一行）。 */
+    public static boolean styleHasViews(String style) {
+        return SoundStyle.of(style).hasViews();
+    }
+
+    /** 这种声音风格用得上开发者选项「变速箱」吗：两种超音速固定 8 速（设置页按它显示这一行）。 */
+    public static boolean styleChoosesGearbox(String style) {
+        return SoundStyle.of(style).choosesGearbox();
+    }
+
     /** 设置变了（开关、声音风格、音量、转速变化方式，悬浮按钮也会改开关）：马上按新的设置再定一次。哪个线程都能叫。 */
     public static void refresh(Context context) {
         INSTANCE.main.post(() -> {
@@ -370,7 +380,7 @@ public final class DriveSound {
             Telemetry telemetry = Telemetry.get();
             AudioManager audio = app.getSystemService(AudioManager.class);
             DriveInputs inputs = new DriveInputs();
-            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, gearbox, style.cranks());
+            VirtualEngine engine = new VirtualEngine(SoundProfile.V8, style.gearbox(gearbox), style.cranks(), style.pseudoGears());
             Voice voice = style.voice(SoundOutput.RATE, cabin);
             VirtualEngine.Input in = new VirtualEngine.Input();
             VoiceParams params = new VoiceParams();
@@ -514,7 +524,7 @@ public final class DriveSound {
                 in.gear = DriveSoundRules.gearOf(gearText);
                 in.flow = DriveSoundRules.flowOf(r.code(Signal.POWER_FLOW));
                 in.mode = rpmMode;
-                engine.setGearbox(gearbox);
+                engine.setGearbox(style.gearbox(gearbox));
                 if (!ignited && w == DriveSoundRules.Why.RUNNING) {
                     engine.ignite(in);
                     ignited = true;
