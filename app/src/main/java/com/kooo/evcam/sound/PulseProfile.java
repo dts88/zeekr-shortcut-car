@@ -140,12 +140,16 @@ final class PulseProfile {
     final float hissDecayMs;
     final float hissFloor;
 
-    // ---- 机械增压（阶次 0 = 没有）：双螺杆，曲轴用皮带带着转。啸叫照车主偏好的那台的录音：叶片扫过出口的基频不响，
-    //      响的是同步齿轮的啮合声（3 倍，第 2、3 次最响），很纯、只在增压时有；松油门旁通阀打开，齿轮声几乎没了，基频反而显出来。
+    // ---- 机械增压（阶次 0 = 没有）：双螺杆，曲轴用皮带带着转。啸叫的样子照车主偏好的那台的录音（EngineV1）：叶片扫过出口的
+    //      基频不响，响的是同步齿轮的啮合声，很纯、只在增压时有；松油门旁通阀打开，齿轮声几乎没了。音高照参考视频那台（项目所有者
+    //      2026-10-24 听了试听定的）：叶片 12.03 阶、齿轮声 24.06 阶（叶片频率的 2 倍）一串；原来照 EngineV1 那台是 10.24、30.72（3 倍）。
     //      底下一层挤过窄出口通道的气流声、进口吸气的风声
-    /** 叶片扫过出口的阶次（曲轴每转一圈扫过几下；录音里是 10.24 = 阴转子 5 叶 × 曲轴的 2.05 倍）。 */
+    /** 叶片扫过出口的阶次（曲轴每转一圈扫过几下；参考视频那台 12.03 = 阴转子 5 叶 × 曲轴的 2.41 倍）。 */
     final float superchargerOrder;
-    /** 叶片基频的电平（dB，3000 rpm，和负荷无关）。 */
+    /**
+     * 叶片基频的电平（dB，3000 rpm，和负荷无关）。2026-10-24 换音高以后 −29 → −35：12.03 阶离发动机的 12 阶只差 0.03 阶，两个拍成
+     * 一秒一两下的「呜哇」（项目所有者：压低一些）。
+     */
     final float lobeDb;
     /**
      * 齿轮啮合是叶片频率的几倍（阴转子上的齿数 / 叶片数）；各次谐波的电平（dB，相对第 2 次），每一行对应 {@link #meshRpm} 的一个
@@ -218,12 +222,12 @@ final class PulseProfile {
     /**
      * 出口的压力脉动 —— 「做功、压缩」那一层（项目所有者 2026-10-23：增压器有好几个出声的部件，位置、转速各不同，应该分开、更有层次，
      * 不是单纯的风声）。每扫过一个叶片，一腔压缩过的空气推开出口，出口那边的压力一下一下地跳：叶片频率和它的谐波
-     * （{@link #dischargeHarmonics} 次，各自的 dB；第 3、6 次和同步齿轮的啮合声同频，不放），幅度跟增压（压比）的 1.5 次方，
+     * （{@link #dischargeHarmonics} 次，各自的 dB；偶数次和同步齿轮的啮合声（2 倍）同频，不放），幅度跟增压（压比）的 1.5 次方，
      * 旁通阀开着（不增压）时没有。经两个中冷器（左、右排各一个）进进气腔：中冷器的芯子压高频（{@link #intercoolerHz}），出口到
      * 中冷器那一段风道有自己的共振（左、右各一个，Hz；dB、Q）；压缩把空气加热（满增压时温度是进口的 {@link #chargeHeat} 倍），
-     * 声速跟着变快，风道的共振随增压往上走。满增压、3000 rpm 时最响那一次（第 2 次）的电平 {@link #dischargeDb}（和齿轮声同一个
-     * 基准）。第 1 次（10.24 阶）离发动机的 10 阶只差 0.24 阶，低转时两个拍成一秒七八下的「呜哇」，压低 6 dB；第 2 次（20.48 阶）
-     * 离 20.5 阶只差 0.02 阶，拍得很慢。
+     * 声速跟着变快，风道的共振随增压往上走。满增压、3000 rpm 时最响那一次（第 3 次，36.09 阶）的电平 {@link #dischargeDb}（和齿轮声
+     * 同一个基准）。第 1 次（12.03 阶）离发动机的 12 阶只差 0.03 阶，满增压时两个拍成一秒一两下的「呜哇」：压低 14 dB（项目所有者
+     * 2026-10-24：压低一些）。
      */
     final float dischargeDb;
     final int[] dischargeHarmonics;
@@ -563,11 +567,12 @@ final class PulseProfile {
 
     /**
      * 机械增压交叉平面 V8（「美式 V8」，{@link SoundStyle#AMERICAN}）：排气脉冲尖、沙哑足；双螺杆增压器的啸叫（齿轮声）和气流。
-     * 增压器照车主偏好的那台的录音量（叶片 10.24 阶、齿轮 30.72 阶；项目所有者 2026-10-21：增压声要和它比）。
+     * 增压器的样子照车主偏好的那台的录音量（项目所有者 2026-10-21：增压声要和它比），音高照参考视频那台（叶片 12.03 阶、齿轮 24.06 阶；
+     * 项目所有者 2026-10-24 听了试听定的，原来是 10.24、30.72）。
      * 齿轮声 −20 → −20.7 dB（项目所有者 2026-10-22：响度调低 5 %，人耳的响度每 10 dB 翻一倍）。
      */
     static final PulseProfile SUPERCHARGED_V8 = new Builder()
-            .supercharger(10.24f, -20.7f)
+            .supercharger(12.03f, -20.7f)
             .loudness(0.15f, 0.42f, 0.5f, 0.56f)
             .build();
 
@@ -646,8 +651,8 @@ final class PulseProfile {
         private float hissDecayMs = 4f;
         private float hissFloor = 0.1f;
         private float superchargerOrder;
-        private float lobeDb = -29f;
-        private float meshMultiple = 3f;
+        private float lobeDb = -35f;
+        private float meshMultiple = 2f;
         private float[][] meshHarmonicsDb = {
                 {1.5f, 0f, -9.5f, -9.5f, -12f},
                 {-0.5f, 0f, -6f, -9f, -12f},
@@ -678,8 +683,8 @@ final class PulseProfile {
         private float pulsationLagMs = 2f;
         private float pulsationFree = 0.15f;
         private float dischargeDb = -23f;
-        private int[] dischargeHarmonics = {1, 2, 4, 5};
-        private float[] dischargeHarmonicsDb = {-6f, 0f, -5f, -9f};
+        private int[] dischargeHarmonics = {1, 3, 5};
+        private float[] dischargeHarmonicsDb = {-14f, 0f, -9f};
         private float intercoolerHz = 2600f;
         private float[] ductHz = {820f, 960f};
         private float ductDb = 6f;

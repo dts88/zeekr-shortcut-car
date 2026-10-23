@@ -726,13 +726,19 @@ public class PulseVoiceTest {
     @Test
     public void theDischargePulsationIsALayerOfItsOwn() {
         // 项目所有者 2026-10-23：增压器有好几个出声的部件，位置、转速各不同，应该分开、更有层次（不是单纯的风声）。出口的压力
-        // 脉动（叶片频率的第 2 次，20.48 阶）是做功、压缩那一层：满增压时它在那里加的能量和同步齿轮的啮合声差不多响（1900 rpm
-        // 车外比齿轮声第 1 次低不到 12 dB），旁通阀开着（不增压）时几乎没有。叶片频率的每一次都挨着发动机的某个半阶次（20.48 对 20.5），
-        // 所以拿同一台「有、没有这一层」两份比
+        // 脉动（最响的那一次：2026-10-24 换成参考视频那台的音高以后是叶片频率的第 3 次，36.09 阶）是做功、压缩那一层：满增压时
+        // 它在那里加的能量和同步齿轮的啮合声差不多响（1900 rpm 车外比齿轮声第 1 次低不到 12 dB），旁通阀开着（不增压）时几乎没有。
+        // 叶片频率的每一次都挨着发动机的某个整数阶（36.09 对 36），所以拿同一台「有、没有这一层」两份比
         PulseProfile none = new PulseProfile.Builder().supercharger(SC.superchargerOrder, SC.superchargerDb)
                 .loudness(SC.levelPow, SC.cabinLevelPow, SC.rpmLoudDb, SC.norm).discharge(-100f).build();
         double f1 = 1900 / 60.0;
-        double l2 = SC.superchargerOrder * 2 * f1;
+        int top = 0;
+        for (int k = 1; k < SC.dischargeHarmonics.length; k++) {
+            if (SC.dischargeHarmonicsDb[k] > SC.dischargeHarmonicsDb[top]) {
+                top = k;
+            }
+        }
+        double l2 = SC.superchargerOrder * SC.dischargeHarmonics[top] * f1;
         double m1 = SC.superchargerOrder * SC.meshMultiple * f1;
         float[] with = mid(render(SC, params(1900f, 1f), 2.5f), 1.5f);
         float[] without = mid(render(none, params(1900f, 1f), 2.5f), 1.5f);
