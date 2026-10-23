@@ -30,6 +30,18 @@ public class CameraManagerHolderShapeTest {
         return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)), true);
     }
 
+    @Test public void previewOnlyRoadDoesNotBecomeARecordingLaneOrLoseMirrorCabin() {
+        java.util.Set<String> recording = new LinkedHashSet<>(Arrays.asList(SUR));
+        java.util.Set<String> preview = new LinkedHashSet<>(Arrays.asList("roadfront"));
+        CameraManagerHolder.Shape shape = new CameraManagerHolder.Shape("zeekr_7x", null, recording, preview, true);
+        assertEquals(recording, shape.enabled);
+        assertEquals(preview, shape.preview);
+        assertTrue(shape.requested.contains("roadfront"));
+        assertTrue(shape.cabinRear);
+        assertEquals(3, shape.count);
+        assertFalse(shape.enabled.contains("roadfront"));
+    }
+
     @Test
     public void oneCabinBuildsThatCabinAndTheSurround() {
         CameraManagerHolder.Shape rearOnly = shape(REAR);

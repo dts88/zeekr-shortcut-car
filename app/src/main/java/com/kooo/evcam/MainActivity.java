@@ -32,6 +32,8 @@ import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
+import com.kooo.evcam.camera.CameraManagerHolder;
+import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.PreviewSlots;
 import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.Profile;
