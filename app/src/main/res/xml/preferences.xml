@@ -76,23 +76,12 @@
                 android:summary="@string/set_photo_jpeg_summary" />
         </PreferenceCategory>
 
+        <!--
+          水印（项目所有者 2026-10-23 整理，ui-spec §十一）：时间和录制规格同开同关，合成「时间水印」一项；
+          车牌号水印和车牌号合成一行（开关加下一层）；应用水印挪到开发者选项。
+        -->
         <PreferenceCategory
             android:title="@string/set_group_stamps">
-
-            <SwitchPreferenceCompat
-                android:key="pref_watermark_brand"
-                android:title="@string/set_watermark_brand_title"
-                android:summary="@string/set_watermark_brand_summary" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_license_plate_enabled"
-                android:title="@string/set_plate_switch_title"
-                android:summary="@string/set_plate_switch_summary" />
-
-            <EditTextPreference
-                android:key="pref_license_plate"
-                android:dependency="pref_license_plate_enabled"
-                android:title="@string/set_plate_title" />
 
             <SwitchPreferenceCompat
                 android:key="pref_watermark"
@@ -100,18 +89,17 @@
                 android:summaryOn="@string/set_watermark_on"
                 android:summaryOff="@string/set_watermark_off" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_watermark_spec"
-                android:dependency="pref_watermark"
-                android:title="@string/set_watermark_spec_title"
-                android:summary="@string/set_watermark_spec_summary" />
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_license_plate"
+                android:title="@string/set_plate_switch_title"
+                android:summary="@string/set_plate_switch_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory
             android:title="@string/set_info_bar_title">
 
-            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。显示哪几项在「系统 → 系统信息」里勾 -->
-            <SwitchPreferenceCompat
+            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。开关加下一层：点这一行进「系统信息」勾显示哪几项（系统页那个入口照旧） -->
+            <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_info_bar"
                 android:title="@string/set_info_bar_title"
                 android:summary="@string/set_info_bar_summary" />
@@ -460,11 +448,6 @@
                 android:key="pref_reduce_motion"
                 android:title="@string/set_reduce_motion_title"
                 android:summary="@string/set_reduce_motion_summary" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_vehicle_status"
-                android:title="@string/set_vehicle_status_title"
-                android:summary="@string/set_vehicle_status_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory
@@ -570,6 +553,22 @@
                 android:dependency="pref_footage_audio"
                 android:title="@string/dev_footage_audio_source_title"
                 android:summary="%s" />
+
+            <!-- 应用水印（2026-10-23 从录制页挪来）：固定开着、点不动，只是摆出来让人知道录像和照片上有这一行字 -->
+            <SwitchPreferenceCompat
+                android:key="pref_watermark_brand"
+                android:title="@string/set_watermark_brand_title"
+                android:summary="@string/set_watermark_brand_summary" />
+        </PreferenceCategory>
+
+        <!-- 主界面（2026-10-23）：车辆状态从界面页挪来 -->
+        <PreferenceCategory
+            android:title="@string/set_group_main_screen">
+
+            <SwitchPreferenceCompat
+                android:key="pref_vehicle_status"
+                android:title="@string/set_vehicle_status_title"
+                android:summary="@string/set_vehicle_status_summary" />
         </PreferenceCategory>
 
         <!-- 模拟声浪（试验，项目所有者 2026-10-21）：只在车内、只在运动模式出声（sound.DriveSound） -->

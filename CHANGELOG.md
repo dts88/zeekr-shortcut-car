@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings → Recording: Timestamp now also covers the recording specs (one switch for both). Plate number stamp is one row: the switch shows or hides the plate, tapping the row edits it (turning it on with no plate asks for one first). Driving info bar is one row too: tapping it opens System info to choose what it shows, and the row shows how many are selected. App stamp moves to Developer options; so does Vehicle status from Settings → Interface.
 
 ## [2.20.0-alpha] - 2026-10-23
 

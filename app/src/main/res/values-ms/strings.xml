@@ -37,12 +37,11 @@
     <string name="set_photo_jpeg_title">Gunakan output JPEG untuk foto</string>
     <string name="set_photo_jpeg_summary">Mengambil foto daripada output JPEG kamera pada saiz terbesar. Jika dimatikan, foto diambil daripada pratonton pada resolusi pratonton. Berkuat kuasa selepas apl dimulakan semula.</string>
     <string name="set_watermark_title">Tera masa</string>
-    <string name="set_watermark_on">Menambah tarikh dan masa pada video dan foto; tidak dipaparkan dalam pratonton</string>
-    <string name="set_watermark_off">Tiada tarikh dan masa pada video atau foto</string>
-    <string name="set_watermark_spec_title">Sertakan spesifikasi rakaman</string>
-    <string name="set_watermark_spec_summary">Menambah resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada tera video</string>
+    <string name="set_watermark_on">Menambah tarikh dan masa pada video dan foto, serta resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada video; tidak dipaparkan dalam pratonton</string>
+    <string name="set_watermark_off">Tiada tarikh, masa atau spesifikasi rakaman pada video atau foto</string>
     <string name="set_info_bar_title">Bar maklumat pemanduan</string>
-    <string name="set_info_bar_summary">Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Pilih apa yang dipaparkan dalam Tetapan → Sistem → Maklumat sistem. Percubaan.</string>
+    <string name="set_info_bar_summary">Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.</string>
+    <string name="set_info_bar_value">%1$d dipilih</string>
     <string name="set_storage_location_title">Lokasi storan</string>
     <string name="set_storage_sentry_note">Apabila Mod Sentry dihidupkan, hanya port USB-A (tempat Mod Sentry menyimpan rakamannya) kekal berkuasa selepas anda keluar dari kereta, jadi rakaman boleh diteruskan. Jika lokasi storan ialah pemacu pada port Type-C, port itu terputus kuasa dan rakaman beralih ke pemacu pada port USB-A.</string>
     <string name="set_relay_title">Tulis melalui perantara</string>

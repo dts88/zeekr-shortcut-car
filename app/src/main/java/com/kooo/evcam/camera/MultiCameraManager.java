@@ -4524,10 +4524,12 @@ public class MultiCameraManager {
      */
     private LanePlan planFor(String key, AppConfig appConfig, boolean infoBarOn, String brandLine) {
         StreamSpec spec = RecordSpecs.forCameraKey(context, key);
+        // 时间和录制规格同开同关：都跟着「时间水印」（项目所有者 2026-10-23）
+        boolean stamp = appConfig.isTimestampWatermarkEnabled();
         return new LanePlan(spec, CameraSlots.KEY_SURROUND.equals(key) && infoBarOn, brandLine,
                 // 设置里的「强制 H.264」是总闸，盖过这一路配置里的编码选择
                 appConfig.isForceH264Encoding() || RecordSpecs.forceH264(spec.codec),
-                appConfig.isTimestampWatermarkEnabled(), appConfig.isWatermarkSpecEnabled(),
+                stamp, stamp,
                 // 声音只进环视（项目所有者 2026-10-20）
                 CameraSlots.KEY_SURROUND.equals(key) ? footageAudioSource(appConfig) : null);
     }
