@@ -123,7 +123,8 @@ public class SideViewService extends Service {
     /** 开发者选项里改了标定角度：正在挂着的窗口照新的画。 */
     public static void applyLayout() {
         SideViewService svc = instance;
-        if (svc != null && svc.window != null) svc.window.applyLayoutFromConfig();
+        if (svc != null && svc.center.window instanceof SideViewWindow)
+            ((SideViewWindow) svc.center.window).applyLayoutFromConfig();
     }
 
     public static void applyAim() {

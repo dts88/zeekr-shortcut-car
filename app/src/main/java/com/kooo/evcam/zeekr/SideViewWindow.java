@@ -60,6 +60,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     private final WindowManager windowManager;
     private final AutoFitTextureView textureView;
     private final CloseButton closeButton;
+    private final AppConfig appConfig;
     private final SideViewPicture picture;
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     private final Handler handler = new Handler(Looper.getMainLooper());
