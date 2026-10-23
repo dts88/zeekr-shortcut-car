@@ -15,7 +15,8 @@ import com.kooo.evcam.settings.SettingsRegistry;
  */
 public class AppConfig {
     private static final String TAG = "AppConfig";
-    private static final String PREF_NAME = "app_config";
+    /** 设置存在这个文件里（导出、导入设置时也读写它，{@code settings.SettingsBackup}）。 */
+    public static final String PREF_NAME = "app_config";
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
@@ -31,7 +32,7 @@ public class AppConfig {
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
     private static final String KEY_SCREEN_OFF_KEEP_RECORDING = "screen_off_keep_recording";  // 熄屏持续录制
     private static final String KEY_FOOTAGE_LOCK = "footage_lock";  // 锁定影像
-    private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 闪远光时自动锁定当前录像
+    private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 自动锁定：闪远光
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
     
     // 存储位置配置
@@ -64,6 +65,8 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
+    private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（开发者选项，试验）
+    private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（开发者选项，试验）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
@@ -73,9 +76,11 @@ public class AppConfig {
     private static final String KEY_REARVIEW_HEIGHT = "rearview_height";          // 窗口高度（px）
     private static final String KEY_REARVIEW_PAN = "rearview_pan";                // 上下平移，0..1
     private static final String KEY_REARVIEW_LANE = "rearview_lane";              // 当前显示哪一路
-    private static final String KEY_REARVIEW_FRONT_REAR = "rearview_front_rear";  // 只在前后之间切换
+    /** 2.14.0-alpha 及以前的「只显示前后视」开关：读到时换成「前后」档、拿掉（{@link #getRearViewViews}）。 */
+    private static final String KEY_REARVIEW_FRONT_REAR_LEGACY = "rearview_front_rear";
     private static final String KEY_REARVIEW_GUIDE_SEEN = "rearview_guide_seen";  // 后视镜使用指南是否弹过
     private static final String KEY_UPDATE_BETA = "update_include_beta";  // 检查更新是否接收 Beta 版
+    private static final String KEY_UPDATE_ALPHA = "update_include_alpha";  // 检查更新是否接收 Alpha 版
     private static final String KEY_REARVIEW_X = "rearview_x";                    // 窗口位置
     // 盲区画面：打转向灯时显示该侧的摄像头画面（zeekr.SideViewService）
     private static final String KEY_SIDE_VIEW_ENABLED = "side_view_enabled";      // 开关
@@ -83,6 +88,17 @@ public class AppConfig {
     private static final String KEY_SIDE_VIEW_BACK = "side_view_back";            // 朝车尾转的角度（开发者选项）
     private static final String KEY_SIDE_VIEW_UP = "side_view_up";                // 朝车外转的角度（开发者选项）
     private static final String KEY_SIDE_VIEW_FOV = "side_view_fov";              // 横向视野（开发者选项）
+    // 盲区画面投到 HUD 上（2026-10-21，zeekr.SideViewHudWindow）：显示位置在 SettingsRegistry.SIDE_VIEW_TARGET
+    private static final String KEY_HUD_MIRROR = "side_view_hud_mirror";          // 左右翻转
+    private static final String KEY_HUD_HEIGHT = "side_view_hud_height";          // 高度，HUD 高度的百分比
+    private static final String KEY_HUD_SHAPE = "side_view_hud_shape";            // 宽 ÷ 高 ×100
+    private static final String KEY_HUD_EDGE = "side_view_hud_edge";              // 离打灯那一侧边缘的距离，剩余宽度的百分比
+    private static final String KEY_HUD_VERTICAL = "side_view_hud_vertical";      // 上下位置，剩余高度的百分比
+    private static final String KEY_HUD_OPACITY = "side_view_hud_opacity";        // 透明度（100 不透明）
+    private static final String KEY_HUD_CONTRAST = "side_view_hud_contrast";      // 白天对比度，100 原画面
+    private static final String KEY_HUD_CONTRAST_NIGHT = "side_view_hud_contrast_night";  // 夜间对比度
+    private static final String KEY_HUD_NIGHT = "side_view_hud_night";            // 夜间亮度：夜间在透明度上再乘的比例
+    private static final String KEY_HUD_FADE = "side_view_hud_fade";              // 边缘渐隐，短边的百分比
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
 
@@ -92,7 +108,6 @@ public class AppConfig {
 
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
-    private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
     private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";
     private static final String KEY_INFO_BAR = "info_bar_enabled";  // 录像下方的行驶信息条
     private static final String KEY_VEHICLE_STATUS = "vehicle_status_panel";  // 主界面的车辆状态面板（试验性）
@@ -368,7 +383,7 @@ public class AppConfig {
     }
 
     /**
-     * 闪远光时自动锁定当前录像（存储页「锁定影像」下面，默认关 —— 自动锁的也占空间，锁满了就停录）。
+     * 自动锁定：闪远光（存储页「锁定影像」开着时下面那一排按钮，默认不按 —— 自动锁的也占空间，锁满了就停录）。
      * 这是存着的值；只在「锁定影像」也开着时起作用，见 {@code AutoLock.flashEnabled}。
      */
     public boolean isFlashLockEnabled() {
@@ -637,6 +652,11 @@ public class AppConfig {
                 KEY_SCREEN_OFF_WAKE_MINUTES,          // 熄屏录制的最长时长 → 默认（熄屏录制关着，用不到）
                 KEY_IMAGE_ADJUST_ENABLED,             // 画面调节 → 关
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
+                KEY_FOOTAGE_AUDIO,                    // 环视录像带声音 → 关
+                SettingsRegistry.FOOTAGE_AUDIO_SOURCE.key,  // 录声音的来源 → 原始（录声音关着，用不到）
+                KEY_DRIVE_SOUND,                      // 模拟声浪 → 关
+                SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -645,7 +665,8 @@ public class AppConfig {
                 KEY_RELAY_WRITE_ENABLED,              // 中转写入 → 关
                 KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
                 KEY_SIDE_VIEW_UP,
-                KEY_SIDE_VIEW_FOV));
+                KEY_SIDE_VIEW_FOV,
+                KEY_VEHICLE_STATUS));                 // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
             keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
         }
@@ -659,6 +680,56 @@ public class AppConfig {
 
     private static boolean readsAsUnset(String key) {
         return readsAsUnset(key, com.kooo.evcam.settings.DeveloperMode.isUnlocked());
+    }
+
+    /**
+     * 存在这份设置里、却不是设置的键：首次启动和「问过没有」的记号、因熄屏退下去的标记、自动检测的缓存、一次性迁移的记号、
+     * 存下的槽位映射（按车型，检测出来的，见 {@link #getStoredSlotMap}）。
+     *
+     * <p>导出设置不带它们，导入时也不动它们（{@code settings.SettingsBackup}，项目所有者 2026-10-19）。
+     * 新加的键默认算设置；是运行状态的，加到这里。</p>
+     */
+    private static final java.util.Set<String> RUNTIME_KEYS = runtimeKeys();
+
+    private static java.util.Set<String> runtimeKeys() {
+        return java.util.Collections.unmodifiableSet(new java.util.HashSet<>(java.util.Arrays.asList(
+                KEY_FIRST_LAUNCH,
+                KEY_LANGUAGE_CHOSEN,
+                KEY_RAIL_SIDE_CHOSEN,
+                KEY_UI_LEFT_FOR_SCREEN_OFF,
+                KEY_LAST_DETECTED_SD_PATH,
+                KEY_REARVIEW_GUIDE_SEEN,
+                KEY_PHOTO_VIA_JPEG_RESET)));
+    }
+
+    /**
+     * 去掉的功能留在这份设置里的键：进程起来时删掉（{@link #forgetRetiredKeys}），不留在导出的设置、诊断报告里。
+     *
+     * <ul>
+     *   <li>{@code cabins_one_shot_revert_pending}：2.17.0–2.19.0 前后座舱只用一次时，「视频流配置待改回『极氪7X（环视）』」的记号。
+     *       2.20.0 起只有前座舱只用一次、不再改选择（项目所有者 2026-10-23）。</li>
+     *   <li>{@code watermark_spec_enabled}：「水印显示录制规格」。2026-10-23 起录制规格跟着「时间水印」同开同关（项目所有者）。</li>
+     * </ul>
+     */
+    private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending", "watermark_spec_enabled"};
+
+    /** 进程起来时调一次：去掉的功能留下的键（{@link #RETIRED_KEYS}）有就删。 */
+    public void forgetRetiredKeys() {
+        SharedPreferences.Editor editor = null;
+        for (String key : RETIRED_KEYS) {
+            if (prefs.contains(key)) {
+                editor = editor == null ? prefs.edit() : editor;
+                editor.remove(key);
+            }
+        }
+        if (editor != null) {
+            editor.apply();
+        }
+    }
+
+    /** 这个键是运行状态，不是设置（见 {@link #RUNTIME_KEYS}）。纯函数，测试直接调。 */
+    public static boolean isRuntimeState(String key) {
+        return key == null || RUNTIME_KEYS.contains(key) || key.startsWith(KEY_SLOT_MAP_PREFIX);
     }
 
     private boolean readBoolean(String key, boolean defaultValue) {
@@ -911,6 +982,67 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_RAW_FRAME_DUMP, on).apply();
     }
 
+    /** 录声音的来源：原始（AudioSource VOICE_RECOGNITION，不经降噪）。 */
+    public static final String FOOTAGE_AUDIO_RAW = "raw";
+    /** 录声音的来源：通话那一路（AudioSource VOICE_COMMUNICATION，经回声消除、降噪）。 */
+    public static final String FOOTAGE_AUDIO_CALL = "call";
+
+    /**
+     * 环视录像带声音（开发者选项「录制声音」，试验；项目所有者 2026-10-20 定先做框架、上车比来源）。
+     * 从下一次开录起（定录法时读，{@code MultiCameraManager}）。
+     */
+    public boolean isFootageAudioEnabled() {
+        return readBoolean(KEY_FOOTAGE_AUDIO, false);
+    }
+
+    public void setFootageAudioEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_FOOTAGE_AUDIO, on).apply();
+    }
+
+    /** 录声音用哪个来源：{@link #FOOTAGE_AUDIO_RAW} / {@link #FOOTAGE_AUDIO_CALL}（{@link SettingsRegistry#FOOTAGE_AUDIO_SOURCE}）。 */
+    public String getFootageAudioSource() {
+        return readEnum(SettingsRegistry.FOOTAGE_AUDIO_SOURCE);
+    }
+
+    public void setFootageAudioSource(String source) {
+        writeEnum(SettingsRegistry.FOOTAGE_AUDIO_SOURCE, source);
+    }
+
+    /** 转速变化方式：连续（{@link SettingsRegistry#DRIVE_SOUND_RPM}）。 */
+    public static final String DRIVE_SOUND_RPM_CONTINUOUS = "continuous";
+    /** 转速变化方式：模拟换挡。 */
+    public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
+
+    /**
+     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
+     * 改了马上生效（{@code DriveSound.refresh}）。
+     */
+    public boolean isDriveSoundEnabled() {
+        return readBoolean(KEY_DRIVE_SOUND, false);
+    }
+
+    public void setDriveSoundEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_DRIVE_SOUND, on).apply();
+    }
+
+    /** 声浪自己的音量（dB 数的字符串，{@link SettingsRegistry#DRIVE_SOUND_VOLUME}）：在车机媒体音量之上再乘。 */
+    public String getDriveSoundVolume() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_VOLUME);
+    }
+
+    public void setDriveSoundVolume(String db) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_VOLUME, db);
+    }
+
+    /** 转速变化方式：{@link #DRIVE_SOUND_RPM_CONTINUOUS} / {@link #DRIVE_SOUND_RPM_SHIFTS}。 */
+    public String getDriveSoundRpm() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_RPM);
+    }
+
+    public void setDriveSoundRpm(String mode) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
+    }
+
     /**
      * 主界面环视预览的鱼眼校正走 GPU 逐像素（{@code PreviewDewarp}），而不是分格近似。
      *
@@ -1021,9 +1153,8 @@ public class AppConfig {
      */
     public int getRearViewLane() {
         int lane = prefs.getInt(KEY_REARVIEW_LANE, com.kooo.evcam.zeekr.LaneCycle.REAR);
-        boolean frontRearOnly = isRearViewFrontRearOnly();
-        // 存的那一路可能已经不在当前模式的环上了（比如停在「左」时打开了只看前后）
-        return com.kooo.evcam.zeekr.LaneCycle.isOnRing(lane, frontRearOnly)
+        // 存的那一路可能已经不在这一档的环上了（比如停在「左」时换成了「前后」）
+        return com.kooo.evcam.zeekr.LaneCycle.isOnRing(lane, getRearViewViews())
                 ? lane : com.kooo.evcam.zeekr.LaneCycle.REAR;
     }
 
@@ -1045,13 +1176,35 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_REARVIEW_BUTTON_MODE, on).apply();
     }
 
-    /** 只在前后之间切换，不去侧视。 */
-    public boolean isRearViewFrontRearOnly() {
-        return prefs.getBoolean(KEY_REARVIEW_FRONT_REAR, false);
+    /**
+     * 超级镜子的切换范围（{@link com.kooo.evcam.zeekr.MirrorViews}），默认四向。
+     *
+     * <p>2.14.0-alpha 及以前是「只显示前后视」开关（项目所有者 2026-10-19 改成三档）：开着的，第一次读到时换成「前后」档；
+     * 旧的那个键读到就拿掉。值照 {@link SettingsRegistry#REARVIEW_VIEWS} 读写（不合法的读成默认、启动自检修掉）。</p>
+     */
+    public com.kooo.evcam.zeekr.MirrorViews getRearViewViews() {
+        String key = SettingsRegistry.REARVIEW_VIEWS.key;
+        if (!prefs.contains(key) && prefs.contains(KEY_REARVIEW_FRONT_REAR_LEGACY)) {
+            boolean frontRear = prefs.getBoolean(KEY_REARVIEW_FRONT_REAR_LEGACY, false);
+            com.kooo.evcam.zeekr.MirrorViews views = frontRear
+                    ? com.kooo.evcam.zeekr.MirrorViews.FRONT_REAR : com.kooo.evcam.zeekr.MirrorViews.FOUR;
+            prefs.edit().remove(KEY_REARVIEW_FRONT_REAR_LEGACY).putString(key, views.key).apply();
+            return views;
+        }
+        return com.kooo.evcam.zeekr.MirrorViews.fromKey(readEnum(SettingsRegistry.REARVIEW_VIEWS));
     }
 
-    public void setRearViewFrontRearOnly(boolean on) {
-        prefs.edit().putBoolean(KEY_REARVIEW_FRONT_REAR, on).apply();
+    public void setRearViewViews(com.kooo.evcam.zeekr.MirrorViews views) {
+        writeEnum(SettingsRegistry.REARVIEW_VIEWS, views.key);
+        prefs.edit().remove(KEY_REARVIEW_FRONT_REAR_LEGACY).apply();
+    }
+
+    /**
+     * 切换范围是「后视 + 后座舱」。调度照它判登记着的超级镜子要不要后座舱（ChannelRules）；管线在超级镜子开着时照它建后座舱这一路
+     * （CameraManagerHolder.Shape），超级镜子打开时缺这一路就当场重建（RearViewMirrorService.showMirror）。
+     */
+    public boolean rearViewWantsCabinRear() {
+        return getRearViewViews() == com.kooo.evcam.zeekr.MirrorViews.REAR_CABIN;
     }
 
     public void setRearViewPan(float pan) {
@@ -1083,7 +1236,8 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_HEIGHT)
                 .remove(KEY_REARVIEW_PAN)
                 .remove(KEY_REARVIEW_LANE)
-                .remove(KEY_REARVIEW_FRONT_REAR)
+                .remove(SettingsRegistry.REARVIEW_VIEWS.key)
+                .remove(KEY_REARVIEW_FRONT_REAR_LEGACY)
                 .remove(KEY_REARVIEW_CAMERA_LABEL)
                 .apply();
         AppLog.i(TAG, "超级镜子布局已恢复默认");
@@ -1155,6 +1309,135 @@ public class AppConfig {
                 Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES))).apply();
     }
 
+    // ==================== 盲区画面：HUD ====================
+
+    /** 显示位置：中控屏（{@link SettingsRegistry#SIDE_VIEW_TARGET}）。 */
+    public static final String SIDE_VIEW_TARGET_CENTER = "center";
+    /** 显示位置：HUD；找不到 HUD、或者这一段 HUD 用不了时，退回中控屏。 */
+    public static final String SIDE_VIEW_TARGET_HUD = "hud";
+    /** 显示位置：中控屏和 HUD（默认）。 */
+    public static final String SIDE_VIEW_TARGET_BOTH = "both";
+
+    /*
+     * HUD 上画面的默认值：FerixzTanz 在他的 7X 上调出来的（CAMCORDER docs/owner-config.md，2026-10-15），
+     * 项目所有者 2026-10-21 定照用。范围也照他的。
+     */
+    public static final int HUD_MIN_HEIGHT = 30;
+    public static final int HUD_MAX_HEIGHT = 100;
+    public static final int HUD_DEFAULT_HEIGHT = 49;
+    public static final int HUD_MIN_SHAPE = 100;
+    public static final int HUD_MAX_SHAPE = 300;
+    public static final int HUD_DEFAULT_SHAPE = 194;
+    public static final int HUD_DEFAULT_EDGE = 11;
+    public static final int HUD_DEFAULT_VERTICAL = 21;
+    public static final int HUD_MIN_OPACITY = 20;
+    public static final int HUD_DEFAULT_OPACITY = 100;
+    public static final int HUD_MIN_CONTRAST = 100;
+    public static final int HUD_MAX_CONTRAST = 300;
+    public static final int HUD_DEFAULT_CONTRAST = 220;
+    /** 夜间对比度：夜里摄像头画面本来就暗，220 会把整张压成黑（他 2026-10-15 夜间实车照片），默认原画面。 */
+    public static final int HUD_DEFAULT_CONTRAST_NIGHT = 100;
+    public static final int HUD_MIN_NIGHT = 20;
+    public static final int HUD_DEFAULT_NIGHT = 100;
+    public static final int HUD_MAX_FADE = 40;
+    public static final int HUD_DEFAULT_FADE = 6;
+
+    /** 显示在哪：{@link #SIDE_VIEW_TARGET_CENTER} / {@link #SIDE_VIEW_TARGET_HUD} / {@link #SIDE_VIEW_TARGET_BOTH}。 */
+    public String getSideViewTarget() {
+        return readEnum(SettingsRegistry.SIDE_VIEW_TARGET);
+    }
+
+    public void setSideViewTarget(String target) {
+        writeEnum(SettingsRegistry.SIDE_VIEW_TARGET, target);
+    }
+
+    /** HUD 上的画面左右翻转，像车门上的后视镜：后方来车从画面外侧进来。默认翻（他的设置）；中控屏那一块不翻（项目所有者 2026-10-16）。 */
+    public boolean isHudMirrored() {
+        return prefs.getBoolean(KEY_HUD_MIRROR, true);
+    }
+
+    public void setHudMirrored(boolean on) {
+        prefs.edit().putBoolean(KEY_HUD_MIRROR, on).apply();
+    }
+
+    public int getHudHeight() {
+        return clampInt(prefs.getInt(KEY_HUD_HEIGHT, HUD_DEFAULT_HEIGHT), HUD_MIN_HEIGHT, HUD_MAX_HEIGHT);
+    }
+
+    public void setHudHeight(int percent) {
+        prefs.edit().putInt(KEY_HUD_HEIGHT, clampInt(percent, HUD_MIN_HEIGHT, HUD_MAX_HEIGHT)).apply();
+    }
+
+    public int getHudShape() {
+        return clampInt(prefs.getInt(KEY_HUD_SHAPE, HUD_DEFAULT_SHAPE), HUD_MIN_SHAPE, HUD_MAX_SHAPE);
+    }
+
+    public void setHudShape(int percent) {
+        prefs.edit().putInt(KEY_HUD_SHAPE, clampInt(percent, HUD_MIN_SHAPE, HUD_MAX_SHAPE)).apply();
+    }
+
+    public int getHudEdge() {
+        return clampInt(prefs.getInt(KEY_HUD_EDGE, HUD_DEFAULT_EDGE), 0, 100);
+    }
+
+    public void setHudEdge(int percent) {
+        prefs.edit().putInt(KEY_HUD_EDGE, clampInt(percent, 0, 100)).apply();
+    }
+
+    public int getHudVertical() {
+        return clampInt(prefs.getInt(KEY_HUD_VERTICAL, HUD_DEFAULT_VERTICAL), 0, 100);
+    }
+
+    public void setHudVertical(int percent) {
+        prefs.edit().putInt(KEY_HUD_VERTICAL, clampInt(percent, 0, 100)).apply();
+    }
+
+    public int getHudOpacity() {
+        return clampInt(prefs.getInt(KEY_HUD_OPACITY, HUD_DEFAULT_OPACITY), HUD_MIN_OPACITY, 100);
+    }
+
+    public void setHudOpacity(int percent) {
+        prefs.edit().putInt(KEY_HUD_OPACITY, clampInt(percent, HUD_MIN_OPACITY, 100)).apply();
+    }
+
+    public int getHudContrast() {
+        return clampInt(prefs.getInt(KEY_HUD_CONTRAST, HUD_DEFAULT_CONTRAST), HUD_MIN_CONTRAST, HUD_MAX_CONTRAST);
+    }
+
+    public void setHudContrast(int percent) {
+        prefs.edit().putInt(KEY_HUD_CONTRAST, clampInt(percent, HUD_MIN_CONTRAST, HUD_MAX_CONTRAST)).apply();
+    }
+
+    public int getHudContrastNight() {
+        return clampInt(prefs.getInt(KEY_HUD_CONTRAST_NIGHT, HUD_DEFAULT_CONTRAST_NIGHT),
+                HUD_MIN_CONTRAST, HUD_MAX_CONTRAST);
+    }
+
+    public void setHudContrastNight(int percent) {
+        prefs.edit().putInt(KEY_HUD_CONTRAST_NIGHT, clampInt(percent, HUD_MIN_CONTRAST, HUD_MAX_CONTRAST)).apply();
+    }
+
+    /** 这一刻该用的对比度：车辆处于夜间模式时用夜间那一档。 */
+    public int getHudContrast(boolean night) {
+        return night ? getHudContrastNight() : getHudContrast();
+    }
+
+    public int getHudNight() {
+        return clampInt(prefs.getInt(KEY_HUD_NIGHT, HUD_DEFAULT_NIGHT), HUD_MIN_NIGHT, 100);
+    }
+
+    public void setHudNight(int percent) {
+        prefs.edit().putInt(KEY_HUD_NIGHT, clampInt(percent, HUD_MIN_NIGHT, 100)).apply();
+    }
+
+    public int getHudFade() {
+        return clampInt(prefs.getInt(KEY_HUD_FADE, HUD_DEFAULT_FADE), 0, HUD_MAX_FADE);
+    }
+
+    public void setHudFade(int percent) {
+        prefs.edit().putInt(KEY_HUD_FADE, clampInt(percent, 0, HUD_MAX_FADE)).apply();
+    }
+
     private static int clampInt(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -1212,7 +1495,7 @@ public class AppConfig {
 
     /**
      * 检查更新时接不接收 Beta 版。默认接收：现在发出去的除了 alpha 就是 beta，
-     * 默认关掉等于「永远没有更新」。关掉之后只推正式版。alpha 无论如何都不推。
+     * 默认关掉等于「永远没有更新」。关掉之后只推正式版。alpha 只在「接收 Alpha 版」也开着时推（{@link #isUpdateAlphaEnabled}）。
      */
     public boolean isUpdateBetaEnabled() {
         return prefs.getBoolean(KEY_UPDATE_BETA, true);
@@ -1222,9 +1505,21 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_UPDATE_BETA, enabled).apply();
     }
 
-    /** 录制时减少装饰性动效。默认开：编码器在用 GPU，界面不跟它抢。 */
+    /**
+     * 检查更新时接不接收 Alpha 版（项目所有者 2026-10-23）。默认不接收：alpha 是开发过程里发的，没验证过。
+     * 只在「接收 Beta 版」也开着时算数（update.UpdateFlow）—— 一档比一档新，要 Alpha 先得要 Beta。
+     */
+    public boolean isUpdateAlphaEnabled() {
+        return prefs.getBoolean(KEY_UPDATE_ALPHA, false);
+    }
+
+    public void setUpdateAlphaEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_UPDATE_ALPHA, enabled).apply();
+    }
+
+    /** 录制时减少装饰性动效（编码器在用 GPU，界面不跟它抢）。默认关（项目所有者 2026-10-23；原来默认开）。 */
     public boolean isReduceMotionWhileRecording() {
-        return prefs.getBoolean(KEY_REDUCE_MOTION_RECORDING, true);
+        return prefs.getBoolean(KEY_REDUCE_MOTION_RECORDING, false);
     }
 
     public void setReduceMotionWhileRecording(boolean on) {
@@ -1494,21 +1789,6 @@ public class AppConfig {
     }
     
     /**
-     * 角标是否附带录制规格（分辨率 / 帧率 / 编码 / 码率）。
-     *
-     * <p>默认开启：录像上带着自己的录制参数，事后回看时不必再去猜当时是什么设置。
-     * 需要角标尽量小的场合可以关掉。</p>
-     */
-    public boolean isWatermarkSpecEnabled() {
-        return prefs.getBoolean(KEY_WATERMARK_SPEC_ENABLED, true);
-    }
-
-    public void setWatermarkSpecEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_WATERMARK_SPEC_ENABLED, enabled).apply();
-        AppLog.d(TAG, "角标规格行: " + (enabled ? "显示" : "隐藏"));
-    }
-
-    /**
      * 要落进画面的车牌号；关掉开关或者没填时返回空串。
      *
      * <p>存进来的值一律先过 {@link LicensePlate#sanitize} —— 界面上显示的、
@@ -1601,9 +1881,9 @@ public class AppConfig {
         AppLog.i(TAG, "行驶信息条: " + (enabled ? "开" : "关"));
     }
 
-    /** 主界面动作栏里的车辆状态面板（试验性）。默认关。 */
+    /** 主界面动作栏里的车辆状态面板（试验性）。默认关；2026-10-23 起归开发者选项管，关着开发者选项时按关算（DEVELOPER_KEYS）。 */
     public boolean isVehicleStatusEnabled() {
-        return prefs.getBoolean(KEY_VEHICLE_STATUS, false);
+        return readBoolean(KEY_VEHICLE_STATUS, false);
     }
 
     public void setVehicleStatusEnabled(boolean enabled) {

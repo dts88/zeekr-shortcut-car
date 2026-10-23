@@ -60,6 +60,86 @@ public class SampleRingTest {
         return ring.keptSnapshot().get(0).ptsUs / 1000L;
     }
 
+    /** 排一个声音样本：t 毫秒、t 时刻进队。 */
+    private static SampleRing.Sample offerAudio(SampleRing ring, long tMs, int size) {
+        return ring.offerAudio(tMs * 1000L, new byte[size], tMs);
+    }
+
+    // ================================================================= 声音样本（环视录着声音时）
+
+    @Test
+    public void audioSamplesAreNeverKeyframesAndDoNotCountAsQueuedPicture() {
+        SampleRing ring = new SampleRing();
+        offer(ring, 0, true, 10);
+        SampleRing.Sample audio = offerAudio(ring, 500, 20);
+        offerAudio(ring, 2_900, 20);
+        offer(ring, SEC, false, 10);
+        assertTrue(audio.audio);
+        assertFalse(audio.keyframe);
+        assertFalse(audio.config);
+        // 排了多长只看画面：0 到 1 秒；声音的 2.9 秒不算
+        assertEquals(SEC, ring.queuedMs());
+        // 字节和个数照算
+        assertEquals(60L, ring.queuedBytes());
+        assertEquals(4, ring.queuedSamples());
+    }
+
+    @Test
+    public void keptSectionStartsAtAPictureKeyframeAndCarriesAudioAlong() {
+        SampleRing ring = new SampleRing();
+        // 文件开头、关键帧之前的声音：补写时也接不上画面，不留
+        offerAudio(ring, 0, 20);
+        writeHead(ring, 0);
+        assertTrue(ring.keptIsEmpty());
+        write(ring, 10, true, 10);
+        offerAudio(ring, 20, 20);
+        writeHead(ring, 20);
+        write(ring, SEC, false, 10);
+        offerAudio(ring, 1_500, 20);
+        writeHead(ring, 1_500);
+        List<SampleRing.Sample> kept = ring.keptSnapshot();
+        assertEquals(4, kept.size());
+        assertTrue(kept.get(0).keyframe);
+        assertTrue(kept.get(1).audio);
+        // 留了多长也只看画面：10 毫秒到 1 秒，最后那块声音的 1.5 秒不算
+        assertEquals(SEC - 10, ring.keptMs());
+        assertEquals(SEC - 10, SampleRing.pictureSpanMs(kept));
+    }
+
+    @Test
+    public void trimmingCutsAtPictureKeyframesEvenWithAudioInBetween() {
+        SampleRing ring = new SampleRing();
+        SampleRing.Sample last = null;
+        for (long t = 0; t <= 30 * SEC; t += SEC) {
+            last = write(ring, t, t % (3 * SEC) == 0, 10);
+            offerAudio(ring, t + 500, 20);
+            writeHead(ring, t + 500);
+        }
+        ring.markSynced(last.seq + 1);
+        write(ring, 31 * SEC, false, 10);
+        // 和只有画面时一样：最近 15 秒，截到 15 秒那个关键帧；第一个永远是画面的关键帧
+        List<SampleRing.Sample> kept = ring.keptSnapshot();
+        assertEquals(15 * SEC, kept.get(0).ptsUs / 1000L);
+        assertTrue(kept.get(0).keyframe);
+        assertFalse(kept.get(0).audio);
+    }
+
+    @Test
+    public void syncPointIgnoresATrailingAudioSample() {
+        SampleRing ring = new SampleRing();
+        SampleRing.Sample seventh = null;
+        for (long t = 0; t <= 10 * SEC; t += SEC) {
+            SampleRing.Sample s = write(ring, t, t % (3 * SEC) == 0, 10);
+            if (t == 7 * SEC) {
+                seventh = s;
+            }
+        }
+        // 最后写的是一块声音，时刻比最后一帧画面晚：「比最新的早 3 秒」照最后一帧画面（10 秒）算，不照声音（12.9 秒）
+        offerAudio(ring, 12_900, 20);
+        writeHead(ring, 12_900);
+        assertEquals("落盘算到 7 秒那一帧为止", seventh.seq, ring.syncPoint(30 * SEC));
+    }
+
     // ================================================================= 写过之后多留的那段
 
     @Test

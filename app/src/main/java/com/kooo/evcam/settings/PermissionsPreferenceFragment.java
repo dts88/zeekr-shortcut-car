@@ -83,6 +83,11 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         // 行驶信息条的经纬度：LocationSource 认的就是精确定位这一条
         add(basic, context, R.string.dev_perm_location, R.string.dev_perm_location_why,
                 hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION), this::openAppSettings);
+        // 开发者选项「录制声音」开着时才列：平时应用不录音，不要这个权限
+        if (new com.kooo.evcam.AppConfig(context).isFootageAudioEnabled()) {
+            add(basic, context, R.string.dev_perm_microphone, R.string.dev_perm_microphone_why,
+                    hasPermission(context, Manifest.permission.RECORD_AUDIO), this::openAppSettings);
+        }
 
         PreferenceCategory advanced = category(screen, context, R.string.dev_perm_group_advanced);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

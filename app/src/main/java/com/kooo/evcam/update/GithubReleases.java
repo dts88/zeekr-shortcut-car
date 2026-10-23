@@ -30,11 +30,12 @@ import java.util.List;
  * 预发布，用它会永远返回 404 —— 表现就是「永远没有更新」。
  * 所以这里拉列表，自己挑。</p>
  *
- * <h3>只推 beta 与正式版</h3>
+ * <h3>默认只推 beta 与正式版</h3>
  *
  * <p>alpha 是开发过程中随手发的，数量多、稳定性没有保证 ——
- * 不该被推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。
- * 设置里关掉「接收 Beta 版」时只推正式版（{@link VersionName#isRelease}）。</p>
+ * 不该不问一声就推给一台正在用的车机。判断在 {@link VersionName#isBetaOrRelease}。
+ * 设置里关掉「接收 Beta 版」时只推正式版（{@link VersionName#isRelease}）；打开「接收 Alpha 版」
+ * （项目所有者 2026-10-23，默认关，只在 Beta 也开着时算数）时连 alpha 一起推（{@link VersionName#isAlphaBetaOrRelease}）。</p>
  *
  * <h3>这是本应用唯一一次主动出网</h3>
  *
@@ -132,15 +133,16 @@ public final class GithubReleases {
      * 取版本号最大的那个非草稿版本，并带上从手上这版到它之间的更新内容。
      *
      * <p>更新内容不只取最新那一版：跳过了几个版本的人，想知道的是「装上之后和现在比多了什么」，
-     * 所以把中间每个会被推送的版本都列出来（alpha 不推，也就不列）。
+     * 所以把中间每个会被推送的版本都列出来（不推的那几档也就不列）。
      * 发布列表本来就是一次请求拿全的，不多花一次网络。</p>
      *
-     * @param includeBeta    true：beta 和正式版都算；false：只算正式版。alpha 永远不算
+     * @param includeBeta    true：beta 和正式版都算；false：只算正式版
+     * @param includeAlpha   true：alpha 也算（只在 includeBeta 也是 true 时有用 —— 一档比一档新，要 alpha 先得要 beta）
      * @param currentVersion 手上这一版的版本名，用来挑出「比它新」的那几个
      * @return 没有符合条件、且带 APK 的版本时返回 null
      * @throws IOException 网络或解析出错
      */
-    public static Release fetchLatest(boolean includeBeta, String currentVersion)
+    public static Release fetchLatest(boolean includeBeta, boolean includeAlpha, String currentVersion)
             throws IOException {
         String body = getText(LIST_URL);
         Release best = null;
@@ -157,12 +159,12 @@ public final class GithubReleases {
                 if (candidate == null) {
                     continue;
                 }
-                boolean eligible = includeBeta
-                        ? VersionName.isBetaOrRelease(candidate.tagName)
-                        : VersionName.isRelease(candidate.tagName);
+                boolean eligible = !includeBeta ? VersionName.isRelease(candidate.tagName)
+                        : includeAlpha ? VersionName.isAlphaBetaOrRelease(candidate.tagName)
+                        : VersionName.isBetaOrRelease(candidate.tagName);
                 if (!eligible) {
-                    // alpha 永远不推：那是开发过程里随手发的，不该盖到一台在用的车机上。
-                    // 关了「接收 Beta 版」时 beta 也不推
+                    // alpha 默认不推：那是开发过程里随手发的，不该不问一声就盖到一台在用的车机上。
+                    // 关了「接收 Beta 版」时 beta、alpha 都不推
                     continue;
                 }
                 if (best == null || VersionName.compare(candidate.tagName, best.tagName) > 0) {

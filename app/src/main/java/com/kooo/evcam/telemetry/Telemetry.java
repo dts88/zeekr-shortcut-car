@@ -29,6 +29,8 @@ import java.util.List;
  *             浮点和定位停掉，它们的值、位置、GPS 车速清掉 —— 下次不会把旧的车速、位置画进新录像；离散的照旧（核心还在用），
  *             不发空快照。</li>
  *       </ul></li>
+ *   <li><b>快读</b>（{@link #acquireFast} / {@link #releaseFast}，按名字，2026-10-21 模拟声浪）：登记的那几个浮点按登记的间隔另读一份
+ *       （{@link #fast}，{@link FastReadings}），不发布、不进主线程、不改上面两层的读法；搭在核心的车辆接口上，不开定位。</li>
  *   <li>车辆接口连不上（{@link CarLink#FAILED}：连的时候出错，或者连上之后整遍读不到）每 {@link #RETRY_MS} 换一个新来源再连，
  *       熄屏判断在安卓亮屏时也叫一次（{@link #retryLinkIfFailed}）；这台车机根本没有这套接口（{@link CarLink#UNAVAILABLE}）不再试。</li>
  *   <li>要「此刻」的读数（安卓刚亮屏，记着的可能是睡前的）：{@link #reconcileNow} 立刻读一遍、立刻发布，
@@ -61,9 +63,13 @@ public final class Telemetry {
     private final Object lock = new Object();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final TelemetryUsers users = new TelemetryUsers();
+    /** 谁要哪几个浮点读得更勤（{@link #acquireFast}）。 */
+    private final FastReads fastReads = new FastReads();
     private final List<Listener> listeners = new ArrayList<>();
     private volatile VehicleState state = VehicleState.empty();
     private volatile Readings readings = Readings.empty();
+    /** 快读那几个浮点最近一次的值（{@link #fast}）；没人快读时是空的。 */
+    private volatile FastReadings fastReadings = FastReadings.empty();
     /** 车速有没有从车辆接口来过：有的话定位那边的 GPS 车速就不写了（那个是推算的）。 */
     private volatile boolean carSpeedSeen;
     private Context app;
@@ -150,6 +156,7 @@ public final class Telemetry {
                 carSpeedSeen = false;
                 state = VehicleState.empty();
                 readings = Readings.empty();
+                fastReadings = FastReadings.empty();
             } else {
                 car.floats(false);
             }
@@ -167,12 +174,71 @@ public final class Telemetry {
         }
     }
 
-    /** 在 {@link #lock} 里：起一个新的车辆接口来源，快照从空的开始。 */
+    /**
+     * 快读登记：这几个浮点信号我要读得比 {@link EcarxSource#FLOAT_POLL_MS} 勤（模拟声浪要 50 ms，跟得上脚），同一个名字再登记就是改。
+     * 只收浮点（离散的本来就是订阅的）；读到的放进 {@link #fast} 那份快照，不发布、不进主线程、不走信息条那条路，
+     * 其余的读法一样不动。快读搭在核心的车辆接口上（核心进程活着一直在），不开定位。
+     */
+    public void acquireFast(String who, java.util.Set<Signal> signals, long intervalMs) {
+        EcarxSource c;
+        FastReads.Plan plan;
+        synchronized (lock) {
+            plan = fastReads.acquire(who, signals, intervalMs);
+            c = car;
+        }
+        if (c != null) {
+            c.fast(plan);
+        }
+        AppLog.i(TAG, "快读登记（" + who + "）：" + plan);
+    }
+
+    /** 快读注销；没登记过也无害。最后一个走了，快读停掉、那份快照清空。 */
+    public void releaseFast(String who) {
+        EcarxSource c;
+        FastReads.Plan plan;
+        synchronized (lock) {
+            plan = fastReads.release(who);
+            c = car;
+            if (plan == null) {
+                fastReadings = FastReadings.empty();
+            }
+        }
+        if (c != null) {
+            c.fast(plan);
+        }
+        AppLog.i(TAG, "快读注销（" + who + "）：" + (plan == null ? "没人快读了" : plan));
+    }
+
+    /** 快读那几个浮点最近一次读到的值，永远不为 null；没人快读、或者车辆接口没连着时是空的。哪个线程都能读。 */
+    public FastReadings fast() {
+        return fastReadings;
+    }
+
+    /** 此刻登记着快读的名字（诊断报告用）。 */
+    public List<String> fastUsers() {
+        synchronized (lock) {
+            return fastReads.names();
+        }
+    }
+
+    /** 车辆接口快读了一遍。不是当前来源的丢掉。 */
+    void publishFast(EcarxSource source, FastReadings snapshot) {
+        synchronized (lock) {
+            if (source != car) {
+                return;
+            }
+            fastReadings = snapshot;
+        }
+    }
+
+    /** 在 {@link #lock} 里：起一个新的车辆接口来源，快照从空的开始；快读照登记着的来。 */
     private void startCar(boolean floats) {
         carSpeedSeen = false;
         state = VehicleState.empty();
         readings = Readings.empty();
+        fastReadings = FastReadings.empty();
         car = new EcarxSource(this, floats);
+        car.fast(fastReads.plan());
         car.start(app);
     }
 
@@ -194,7 +260,9 @@ public final class Telemetry {
             main.removeCallbacks(retry);
             // 旧的先停：它停的时候把传感器回调的去处（EcarxSource.active）清掉，新的连上后再接过去
             old.stop();
+            fastReadings = FastReadings.empty();
             car = new EcarxSource(this, users.full());
+            car.fast(fastReads.plan());
             car.start(app);
         }
         AppLog.i(TAG, "车辆接口再连一次（上次：" + last + "）");
