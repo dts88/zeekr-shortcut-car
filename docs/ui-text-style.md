@@ -336,6 +336,10 @@
   - 改已批的 set_auto_start_summary：「保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。
     关闭后不再自动启动。」/「…restarts it and restores the features that were on. When off, it isn't restarted.」/
     「…memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.」。
+- 2026-10-23 批准（存储页：自动锁定加「双闪」，storage-spec §车机信号自动锁定）：按钮 set_footage_lock_hazard_chip「双闪」
+  （项目所有者说的名字）/「Hazard lights」/「Lampu kecemasan」（术语表「闪远光 / 双闪」那一行）；锁上时的提示 msg_hazard_locked
+  「双闪：已锁定前 1 分钟起的录像片段，到关闭双闪为止」/「Hazard lights: locked the clips from 1 minute before, until the
+  hazard lights go off」/「Lampu kecemasan: klip dari 1 minit sebelumnya telah dikunci, sehingga lampu kecemasan dimatikan」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -344,7 +348,11 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-10-23（存储页：「双闪」按钮下面的一行小字，意思是项目所有者给的）：set_footage_lock_hazard_note
+  「紧急制动时车辆会自动打开双闪警示灯，开启「双闪」后将同时锁定制动前后的录像。」/
+  「In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before
+  and after the braking is locked as well.」/「Semasa brek kecemasan, kenderaan menghidupkan lampu kecemasan secara automatik;
+  dengan Lampu kecemasan dihidupkan, rakaman sebelum dan selepas brek turut dikunci.」。
 
 ---
 
@@ -394,7 +402,7 @@
 | 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | 不用「角标」；英文不用 overlay、badge |
 | 试验性 | 功能名后缀「（试验性）」 | (experimental) | (percubaan) | 不用「实验性」「试验功能」 |
 | 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级镜子）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | 英文引用按钮时写 Straighten |
-| 闪远光 / 双闪 | 闪远光；双闪 | flash-to-pass；hazard lights（值标签 Hazard） | kelip lampu tinggi；lampu kecemasan | — |
+| 闪远光 / 双闪 | 闪远光；双闪（说明文字里可写全称「双闪警示灯」，项目所有者 2026-10-23） | flash-to-pass；hazard lights（值标签 Hazard；设置里的按钮 Hazard lights） | kelip lampu tinggi；lampu kecemasan | — |
 | 原厂 | 原厂（原厂 360、原厂界面、原厂行车记录仪） | factory | kilang | 英文不用 stock |
 | 挡位 | 挡位 | gear | gear | 不写「档位」；「码率档」的「档」指等级，用字正确 |
 | 驾驶座 / 操作按钮 | 驾驶座（一侧）；操作按钮、操作按钮位置 | driver's side；action buttons、Action button side | sebelah pemandu；butang tindakan、Sebelah butang tindakan | 不用「驾驶位」 |

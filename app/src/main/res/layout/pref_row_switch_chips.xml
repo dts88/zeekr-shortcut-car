@@ -7,7 +7,7 @@
   那一排自己接住点击（clickable）：没点中按钮时不会顺带把整个开关关掉。
 
   id 照 androidx.preference 的默认布局（widget_frame / title / summary）；当前值是 pref_value，
-  那一排是 pref_options（标题 pref_options_label、按钮放进 pref_option_chips）。
+  那一排是 pref_options（标题 pref_options_label、按钮放进 pref_option_chips，下面可以有一行小字 pref_options_note）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -62,24 +62,40 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:clickable="true"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:visibility="gone">
 
-            <TextView
-                android:id="@+id/pref_options_label"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="14dp"
-                android:textColor="@color/pref_summary"
-                android:textAppearance="@style/TextAppearance.Cam.Caption" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/pref_option_chips"
+                <TextView
+                    android:id="@+id/pref_options_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="14dp"
+                    android:textColor="@color/pref_summary"
+                    android:textAppearance="@style/TextAppearance.Cam.Caption" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/pref_option_chips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:chipSpacingHorizontal="12dp"
+                    app:singleLine="true" />
+            </LinearLayout>
+
+            <!-- 那一排按钮下面的一行小字（锁定影像：紧急制动会自动打开双闪警示灯） -->
+            <TextView
+                android:id="@+id/pref_options_note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:chipSpacingHorizontal="12dp"
-                app:singleLine="true" />
+                android:layout_marginTop="8dp"
+                android:textColor="@color/pref_summary"
+                android:textAppearance="@style/TextAppearance.Cam.Micro"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 

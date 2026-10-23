@@ -418,6 +418,8 @@
     <string name="set_storage_limits_message">超出上限时自动清理最旧的文件，只删除本应用录制、拍摄且未锁定的；录像在剩余空间不足时也会清理，照片每小时检查一次。留空或填 0 表示不限制：不自动删除，录像在空间不足时停止录制。</string>
     <string name="set_footage_lock_auto">自动锁定</string>
     <string name="set_footage_lock_flash_chip">闪远光</string>
+    <string name="set_footage_lock_hazard_chip">双闪</string>
+    <string name="set_footage_lock_hazard_note">紧急制动时车辆会自动打开双闪警示灯，开启「双闪」后将同时锁定制动前后的录像。</string>
     <string name="set_footage_lock_horn_chip">鸣笛</string>
     <string name="set_footage_locked_value">已锁定 %1$d 个 · %2$s</string>
     <string name="set_footage_locked_value_unprotected">已锁定 %1$d 个 · %2$s，不受保护</string>
@@ -428,6 +430,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">关闭</string>
     <string name="msg_flash_locked">闪远光：已锁定前后 10 秒所在的录像片段</string>
+    <string name="msg_hazard_locked">双闪：已锁定前 1 分钟起的录像片段，到关闭双闪为止</string>
     <string name="msg_storage_locked_stopped">锁定的影像占满了空间，录制已停止。请在回放里解锁一些</string>
     <string name="msg_storage_locked_refuse">锁定的影像占满了空间，无法开始录制。请在回放里解锁一些</string>
     <string name="action_lock_footage">锁定</string>

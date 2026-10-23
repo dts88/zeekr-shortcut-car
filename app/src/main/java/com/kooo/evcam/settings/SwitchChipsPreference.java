@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * 开关加几个附加项（ui-spec §三，项目所有者 2026-10-23）：一个功能开着时还有几样可以单独开、关的附加项，合成一行 ——
- * 锁定影像（附加项：「自动锁定」的「闪远光」「鸣笛」）、超级镜子（附加项：「方向标签」「点按切换」）。
+ * 锁定影像（附加项：「自动锁定」的「闪远光」「双闪」「鸣笛」）、超级镜子（附加项：「方向标签」「点按切换」）。
  *
  * <p>行首的开关管整个功能，点这一行其余的地方也是这个开关（没有下一层；那一排按钮所在的地方除外）；
  * 行尾写当前值（{@link #setValue}）。
@@ -49,6 +49,7 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
     private final List<Option> options = new ArrayList<>();
     private CharSequence value;
     private CharSequence optionsLabel;
+    private CharSequence optionsNote;
 
     public SwitchChipsPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -68,6 +69,14 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
     public void setOptionsLabel(CharSequence label) {
         if (!TextUtils.equals(optionsLabel, label)) {
             optionsLabel = label;
+            notifyChanged();
+        }
+    }
+
+    /** 那一排按钮下面的一行小字（附加项的说明是次要的，写在下面，ui-spec §三）；空就不写。 */
+    public void setOptionsNote(CharSequence note) {
+        if (!TextUtils.equals(optionsNote, note)) {
+            optionsNote = note;
             notifyChanged();
         }
     }
@@ -111,6 +120,11 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
         if (label != null) {
             label.setText(optionsLabel);
             label.setVisibility(TextUtils.isEmpty(optionsLabel) ? View.GONE : View.VISIBLE);
+        }
+        TextView note = (TextView) holder.findViewById(R.id.pref_options_note);
+        if (note != null) {
+            note.setText(optionsNote);
+            note.setVisibility(TextUtils.isEmpty(optionsNote) ? View.GONE : View.VISIBLE);
         }
         chips.removeAllViews();
         if (!show) {
