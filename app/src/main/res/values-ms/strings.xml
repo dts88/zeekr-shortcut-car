@@ -138,7 +138,7 @@
     <string name="set_screen_off_wake_title">Kekal berjaga sehingga (jam)</string>
     <string name="unit_hours">%1$s jam</string>
     <string name="set_screen_off_keep_title">Terus merakam apabila skrin padam</string>
-    <string name="set_screen_off_keep_summary">Hanya merakam paparan sekeliling ketika skrin padam. Tanpa Mod Sentry, rakaman dijeda semasa unit kepala tidur dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.</string>
+    <string name="set_screen_off_keep_summary">Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, rakaman dijeda semasa unit kepala tidur dan disambung semula apabila bangun. Jika dimatikan, rakaman berhenti apabila skrin padam.</string>
     <string name="sentry_status_on">Mod Sentry: hidup</string>
     <string name="sentry_status_armed">Mod Sentry: bersiaga</string>
     <string name="sentry_status_off">Mod Sentry: mati</string>
@@ -327,7 +327,7 @@
     <!-- Pilihan tetapan -->
     <string name="opt_mode_auto">Automatik (disyorkan)</string>
     <string name="opt_model_zeekr">Zeekr 7X (sekeliling)</string>
-    <string name="opt_model_zeekr_multi">Zeekr 7X (sekeliling + kabin depan dan belakang)</string>
+    <string name="opt_model_zeekr_multi">Zeekr 7X (sekeliling + kabin belakang)</string>
 
     <!-- Gesaan dan dialog tetapan -->
     <string name="msg_stream_changed">Profil strim ditetapkan kepada “%1$s”. Berkuat kuasa selepas apl dimulakan semula.</string>
@@ -671,7 +671,7 @@
     <string name="record_waiting_detail">Disambung semula secara automatik apabila tersedia</string>
     <!-- 配置名只做中英两种：马来文界面也用英文名 -->
     <string name="status_profile_composite">Zeekr 7X (sekeliling)</string>
-    <string name="status_profile_composite_multi">Zeekr 7X (sekeliling + kabin depan dan belakang)</string>
+    <string name="status_profile_composite_multi">Zeekr 7X (sekeliling + kabin belakang)</string>
     <string name="status_fps">≤%1$s fps</string>
     <string name="status_bitrate_very_low">Kadar bit sangat rendah</string>
     <string name="status_bitrate_low">Kadar bit rendah</string>

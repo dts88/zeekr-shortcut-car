@@ -138,7 +138,7 @@
     <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
@@ -327,7 +327,7 @@
     <!-- Enumerated setting options -->
     <string name="opt_mode_auto">Automatic (recommended)</string>
     <string name="opt_model_zeekr">Zeekr 7X (surround)</string>
-    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + front and rear cabin)</string>
+    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + rear cabin)</string>
 
     <!-- Settings prompts and dialogs -->
     <string name="msg_stream_changed">Stream profile set to “%1$s”. Takes effect after restarting the app.</string>
@@ -681,7 +681,7 @@
     <string name="record_waiting_cameras">Waiting for cameras</string>
     <string name="record_waiting_detail">Resumes automatically when available</string>
     <string name="status_profile_composite">Zeekr 7X (surround)</string>
-    <string name="status_profile_composite_multi">Zeekr 7X (surround + front and rear cabin)</string>
+    <string name="status_profile_composite_multi">Zeekr 7X (surround + rear cabin)</string>
     <string name="status_fps">≤%1$s fps</string>
     <string name="status_bitrate_very_low">Very low bitrate</string>
     <string name="status_bitrate_low">Low bitrate</string>

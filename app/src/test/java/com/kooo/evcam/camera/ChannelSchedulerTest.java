@@ -572,14 +572,12 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 前后座舱只用一次（暂时的规矩，项目所有者 2026-10-22）：黑满 30 秒放开座舱的同一刻，调度报一次「座舱去掉了」；
-     * 之后亮屏，录像计划里还写着它们也不再开。
+     * 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱）：黑满 30 秒放开座舱的同一刻，调度报一次
+     * 「前座舱去掉了」；之后亮屏，后座舱照一般的规矩开回来接着录，前座舱录像计划里还写着也不再开。
      */
     @Test
-    public void withTheOneShotRuleTheCabinsAreRetiredAtTheDarkReleaseAndNotReopened() {
-        host.cabinsOneShot = true;
-        host.mainForeground = false;
-        host.startedWhileVisible = false;
+    public void withTheOneShotRuleOnlyTheFrontCabinIsRetiredAndTheRearComesBackWhenLit() {
+        host.frontCabinOneShot = true;
         claim(Holder.RECORDING);
         host.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
@@ -592,19 +590,27 @@ public class ChannelSchedulerTest {
         settle();
         assertTrue("黑了不到 30 秒：还没去掉", host.retired.isEmpty());
         at(1_000 + ChannelRules.HOLD_MS);
-        assertEquals(Arrays.asList("left+back"), host.retired);
-        assertEquals(Arrays.asList("close dark-release"), rear.actions);
-        at(1_000 + ChannelRules.HOLD_MS + 200);
+        assertEquals(Arrays.asList(FRONT), host.retired);
+        at(1_000 + ChannelRules.HOLD_MS + 120);
+        closed(surround);
+        settle();
+        assertEquals("两路座舱照旧熄屏放开", Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        at(1_000 + ChannelRules.HOLD_MS + 220);
         closed(rear);
         closed(front);
+        settle();
+        opened(surround);
+        frame(surround);
         settle();
         at(1_000 + ChannelRules.HOLD_MS + 5_000);
         host.goLit();
         s.wake();
         settle();
         at(1_000 + ChannelRules.HOLD_MS + 20_000);
-        assertEquals("亮屏也不再开后座舱", Arrays.asList("close dark-release"), rear.actions);
-        assertEquals("只报一次", Arrays.asList("left+back"), host.retired);
+        assertEquals("亮屏：后座舱开回来接着录", Arrays.asList("close dark-release", "open [RECORD]"), rear.actions);
+        assertEquals("前座舱不再开", Arrays.asList("close dark-release"), front.actions);
+        assertEquals("只报一次", Arrays.asList(FRONT), host.retired);
     }
 
     /**
@@ -3432,19 +3438,19 @@ public class ChannelSchedulerTest {
             stopped = true;
         }
 
-        /** 前后座舱只用一次的规矩（暂时）：测试默认关，原来的熄屏、亮屏测试照旧；要测它的打开。 */
-        boolean cabinsOneShot;
-        /** 调度报的「座舱去掉了」，每一次一行。 */
+        /** 前座舱只用一次的规矩（暂时）：测试默认关，原来的熄屏、亮屏测试照旧；要测它的打开。 */
+        boolean frontCabinOneShot;
+        /** 调度报的「前座舱去掉了」，每一次一行（去掉的那一路）。 */
         final List<String> retired = new ArrayList<>();
 
         @Override
-        public boolean cabinsOneShot() {
-            return cabinsOneShot;
+        public boolean frontCabinOneShot() {
+            return frontCabinOneShot;
         }
 
         @Override
-        public void cabinsRetired(List<String> keys) {
-            retired.add(String.join("+", keys));
+        public void frontCabinRetired(String key) {
+            retired.add(key);
         }
     }
 

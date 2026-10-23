@@ -335,9 +335,9 @@ public class ProfileEditorFragment extends Fragment {
             float dim = camera.enabled ? 1f : 0.45f;
             card.findViewById(R.id.camera_name).setAlpha(dim);
             card.findViewById(R.id.camera_summary).setAlpha(dim);
-            // 座舱的开关只用一次（暂时的规矩，camera.CabinsOneShot）：两张座舱卡片上写明，离车后自动取消
-            card.findViewById(R.id.camera_note).setVisibility(com.kooo.evcam.camera.CabinsOneShot.ACTIVE
-                    && !CameraProfile.ROLE_COMPOSITE.equals(camera.role) ? View.VISIBLE : View.GONE);
+            // 前座舱的开关只用一次（暂时的规矩，camera.FrontCabinOneShot）：前座舱那张卡片上写明，离车后自动取消
+            card.findViewById(R.id.camera_note).setVisibility(com.kooo.evcam.camera.FrontCabinOneShot.ACTIVE
+                    && com.kooo.evcam.camera.FrontCabinOneShot.ROLE.equals(camera.role) ? View.VISIBLE : View.GONE);
             // 「我选了均衡，但后座舱不是」—— 这件事必须看得见。比的是记下来的那一档：
             // 以前比的是从各路参数倒推出来的档，倒推得出来就说明每一路都对得上，标记永远不出现
             boolean tuned = !profile.quality.matches(camera.record);

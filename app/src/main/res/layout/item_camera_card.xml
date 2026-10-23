@@ -61,7 +61,7 @@
         android:textAppearance="@style/TextAppearance.Cam.Caption"
         android:textColor="@color/text_secondary" />
 
-    <!-- 座舱那两张才有：前后座舱只用一次（暂时的规矩，camera.CabinsOneShot；ui-spec §十） -->
+    <!-- 前座舱那张才有：前座舱只用一次（暂时的规矩，camera.FrontCabinOneShot；ui-spec §十） -->
     <TextView
         android:id="@+id/camera_note"
         android:layout_width="match_parent"

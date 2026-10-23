@@ -257,7 +257,14 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-10-23（只有前座舱只用一次，后座舱恢复一般的安排）：预设改名 opt_model_zeekr_multi / status_profile_composite_multi
+  「极氪7X（环视 + 后座舱）」—— 中文照项目所有者说的「环视 + 后座舱」；English「Zeekr 7X (surround + rear cabin)」；
+  Bahasa Melayu「Zeekr 7X (sekeliling + kabin belakang)」。
+- 2026-10-23（后座舱亮屏后又会接回录制）：set_screen_off_keep_summary 补上后座舱那半句 ——
+  「熄屏后只录制环视，后座舱在亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；
+  English「Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, …」；
+  Bahasa Melayu「Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, …」。
+- editor_cabin_one_shot 文字不变（2026-10-22 已批），只留在前座舱那张卡片上。
 ---
 
 ## 10. 术语表
@@ -280,7 +287,7 @@
 | 座舱 | 座舱；前座舱、后座舱 | cabin；front cabin、rear cabin | kabin；kabin depan、kabin belakang | 不用「车厢」；「前排 / 后排」只指座位排 |
 | 摄像头 | 摄像头；摄像头映射 | camera；Camera mapping | kamera；Pemetaan kamera | Android 权限名照系统写「相机权限」；关于页致谢原文不动 |
 | 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
-| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 前后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + front and rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin depan dan belakang) | 同一预设在设置列表和状态条上同名 |
+| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin belakang) | 同一预设在设置列表和状态条上同名；2.20 之前叫「极氪7X（环视 + 前后座舱）」 |
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
 | 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
