@@ -226,7 +226,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindLicensePlate();
 
-        // 行驶信息条（试验项目）：开关加下一层（ui-spec §三）—— 点这一行进「系统信息」勾显示哪几项（系统页那个入口照旧），
+        // 行驶信息条（试验项目）：开关加下一层（ui-spec §三）—— 点这一行进「车辆信号」勾显示哪几项（系统页那个入口照旧），
         // 行尾写勾了几项。经纬度和 GPS 车速要定位权限，已经有了（比如车机预先授予）才用，
         // 不弹权限框（项目所有者 2026-10-06）；没有就不显示，见 LocationSource
         bindSwitch("pref_info_bar", appConfig.isInfoBarEnabled(),
@@ -1450,22 +1450,28 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 系统：诊断信息、导出 / 导入设置、系统信息、开机自启动（含保活）、熄屏持续录制。
+     * 系统：诊断信息、设置备份、车辆信号、开机自启动（含保活）、熄屏持续录制。
      * 开发者的「熄屏录制（阻止休眠）」不在这里，在开发者选项分区（{@link #bindAdvanced}）。
      */
     private void bindSystem() {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
-        // 导出、导入设置（项目所有者 2026-10-19）：和诊断报告同一个文件夹；导入后应用退出，重新打开时照新设置起来
-        onClick("pref_settings_export", pref -> SettingsBackupFlow.export(requireActivity()));
-        onClick("pref_settings_import", pref -> SettingsBackupFlow.startImport(requireActivity()));
-        Preference importRow = findPreference("pref_settings_import");
-        if (importRow != null) {
-            importRow.setSummary(getString(R.string.set_settings_import_summary,
+        // 设置备份（项目所有者 2026-10-19 导出、导入；2026-10-23 合成一行，值加一个按钮）：和诊断报告同一个文件夹。
+        // 点这一行导入（说明写着能导入哪个大版本的文件），行尾「导出」—— 导出不改这一页上的任何一行，不用先问；
+        // 导出到哪由导出那一下的提示说。导入后应用退出，重新打开时照新设置起来
+        ValueActionPreference backup = findPreference("pref_settings_backup");
+        if (backup != null) {
+            backup.setSummary(getString(R.string.set_settings_import_summary,
                     SettingsBackup.currentMajor(requireContext())));
+            backup.setValue(getString(R.string.action_import));
+            backup.setOnPreferenceClickListener(preference -> {
+                SettingsBackupFlow.startImport(requireActivity());
+                return true;
+            });
+            backup.setAction(getString(R.string.action_export), () -> SettingsBackupFlow.export(requireActivity()));
         }
-        // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
+        // 车辆信号（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
 

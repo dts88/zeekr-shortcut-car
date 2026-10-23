@@ -103,7 +103,7 @@
         <PreferenceCategory
             android:title="@string/set_info_bar_title">
 
-            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。开关加下一层：点这一行进「系统信息」勾显示哪几项（系统页那个入口照旧） -->
+            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。开关加下一层：点这一行进「车辆信号」勾显示哪几项（系统页那个入口照旧） -->
             <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_info_bar"
                 android:title="@string/set_info_bar_title"
@@ -398,16 +398,15 @@
             android:title="@string/set_diagnostics_title"
             android:summary="@string/set_diagnostics_summary" />
 
-        <!-- 导出、导入设置：和诊断报告放在同一个文件夹；导入的说明写着能导入哪个大版本的文件，由代码填 -->
-        <Preference
-            android:key="pref_settings_export"
-            android:title="@string/set_settings_export_title"
-            android:summary="@string/set_settings_export_summary" />
+        <!--
+          设置备份（2026-10-23 导出、导入合成一行，值加一个按钮）：和诊断报告放在同一个文件夹。点这一行导入
+          （说明写着能导入哪个大版本的文件，由代码填），行尾「导出」
+        -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_settings_backup"
+            android:title="@string/set_settings_backup_title" />
 
-        <Preference
-            android:key="pref_settings_import"
-            android:title="@string/set_settings_import_title" />
-
+        <!-- 车辆信号（试验性，2026-10-23 由「系统信息」改名）：车机能读到的车辆信号；勾上的显示在行驶信息条上 -->
         <Preference
             android:key="pref_vehicle_info"
             android:title="@string/set_vehicle_info_title"
