@@ -9,7 +9,9 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings → Floating button: no group headings. Show recording time and Lock position are buttons on the Floating button row. Button size, Button opacity and Time text size are one row, Appearance, adjusted together in one dialog; Reset at the end of the row asks first. Tap and long press still open the app by default.
+- Settings → Interface: no group headings. Fisheye correction is one row: its dialog picks how to correct and the corrected field of view, whose range follows that choice.
+- Developer options: Screen-off recording with its time limit, Record sound with its microphone source, and Simulated drive sound with its volume and engine speed pattern are each one row that opens the next level. Image adjustment has Reset at the end of its row. The three blind spot view calibration sliders are one row with a dialog. Vehicle status and Simulated drive sound share an Experimental group.
 
 ## [2.22.0-alpha] - 2026-10-23
 
