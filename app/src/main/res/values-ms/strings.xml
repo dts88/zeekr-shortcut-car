@@ -123,7 +123,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">Set semula butang terapung?</string>
     <string name="set_auto_start_title">Mula semasa but</string>
-    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan Cermin super, Paparan titik buta, butang terapung dan rakaman automatik jika dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
+    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka, dan menyambung rakaman yang berhenti kerana skrin padam apabila skrin hidup semula; rakaman yang anda hentikan tidak dimulakan semula</string>
     <string name="set_screen_off_title">Rakaman skrin padam (kekal berjaga)</string>
@@ -148,9 +148,7 @@
     <string name="set_camera_mapping_summary">Pilih kamera bagi paparan sekeliling, kabin depan dan kabin belakang secara manual (penyelesaian masalah)</string>
     <string name="set_diagnostics_title">Maklumat diagnostik</string>
     <string name="set_diagnostics_summary">Lihat dan eksport butiran kamera, paparan dan storan serta log terkini</string>
-    <string name="set_settings_export_title">Eksport tetapan</string>
-    <string name="set_settings_export_summary">Menyimpan tetapan semasa ke fail, dalam folder yang sama dengan laporan diagnostik</string>
-    <string name="set_settings_import_title">Import tetapan</string>
+    <string name="set_settings_backup_title">Sandaran tetapan</string>
     <string name="set_settings_import_summary">Memulihkan semua tetapan daripada fail yang dieksport; hanya fail yang dieksport oleh versi %1$d.x boleh diimport</string>
     <string name="settings_exported">Dieksport ke:\n%1$s</string>
     <string name="settings_export_failed">Tidak dapat mengeksport tetapan</string>
@@ -167,13 +165,13 @@
     <string name="settings_import_action">Import dan keluar</string>
     <string name="settings_import_failed">Tidak dapat mengimport tetapan</string>
     <string name="settings_imported_reopen">Tetapan diimport; berkuat kuasa selepas apl dibuka semula</string>
-    <!-- System info (experimental): groups, signal names, values -->
-    <string name="set_vehicle_info_title">Maklumat sistem (percubaan)</string>
+    <!-- Vehicle signals (experimental): groups, signal names, values -->
+    <string name="set_vehicle_info_title">Isyarat kenderaan (percubaan)</string>
     <string name="set_vehicle_info_summary">Isyarat kenderaan yang didedahkan unit kepala dan keadaan semasanya; item yang ditanda dipaparkan pada Bar maklumat pemanduan</string>
     <string name="vi_legend">Item yang ditanda dipaparkan pada Bar maklumat pemanduan (memerlukan Tetapan → Rakaman → Bar maklumat pemanduan): sebagai ikon jika ada, jika tidak sebagai teks buat masa ini, seperti dinyatakan di bawah setiap baris; item yang tidak muat tidak dipaparkan. Warna label menunjukkan tahap pengesahan: warna teks biasa, konsisten dalam ujian di kereta (masih disemak silang); kelabu, boleh digunakan, butiran belum muktamad; kelabu pudar, boleh dibaca tetapi belum disahkan, hanya boleh ditanda apabila pilihan pembangun dihidupkan.</string>
     <string name="vi_position">Kedudukan (lat/long)</string>
     <string name="vi_position_source">Lokasi sistem</string>
-    <!-- System info status line under the legend (VehicleInfoFragment.status); how each signal ID is read (VehicleInfoFragment.address; IDs and zones stay hex) -->
+    <!-- Vehicle signals status line under the legend (VehicleInfoFragment.status); how each signal ID is read (VehicleInfoFragment.address; IDs and zones stay hex) -->
     <string name="vi_status_known">Data untuk %1$d/%2$d isyarat</string>
     <string name="vi_status_car_connected">Antara muka kenderaan: disambungkan</string>
     <string name="vi_status_car_unavailable">Antara muka kenderaan: tidak tersedia</string>
@@ -185,7 +183,7 @@
     <string name="vi_kind_function_zone">fungsi·zon %1$s</string>
     <string name="vi_kind_sensor_event">peristiwa sensor</string>
     <string name="vi_kind_sensor_value">nilai sensor</string>
-    <!-- Under each System info row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
+    <!-- Under each Vehicle signals row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
     <string name="vi_bar_icon">Ikon bar maklumat: %1$s</string>
     <string name="vi_bar_text">Teks bar maklumat (belum ada ikon)</string>
     <string name="vi_bar_join">", "</string>
@@ -363,6 +361,8 @@
     <string name="slot_cabin_rear">Kabin belakang</string>
     <string name="action_save">Simpan</string>
     <string name="action_reset">Set semula</string>
+    <string name="action_import">Import</string>
+    <string name="action_export">Eksport</string>
     <string name="action_all_auto">Semua automatik</string>
     <string name="msg_mapping_saved">Pemetaan kamera disimpan. Berkuat kuasa selepas apl dimulakan semula.</string>
     <string name="msg_mapping_cleared">Penetapan automatik dipulihkan. Berkuat kuasa selepas apl dimulakan semula.</string>

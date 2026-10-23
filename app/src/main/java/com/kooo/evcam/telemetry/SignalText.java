@@ -7,7 +7,7 @@ import com.kooo.evcam.R;
 import java.util.Locale;
 
 /**
- * 信号的值写成人话。系统信息页和信息条上的文字格用的是这一份 —— 两处写的一样。
+ * 信号的值写成人话。车辆信号页和信息条上的文字格用的是这一份 —— 两处写的一样。
  */
 public final class SignalText {
 
