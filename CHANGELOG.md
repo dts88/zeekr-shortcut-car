@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.19.0-alpha] - 2026-10-23
+
 - Videos: before playing a recording with sound, the app takes media audio focus like other video players (the radio or CarPlay pauses) and gives it back when you leave Videos. Playback pauses when another app takes the focus, and resumes after a short interruption such as a call.
 
 ## [2.18.0-alpha] - 2026-10-23
