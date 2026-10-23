@@ -308,15 +308,7 @@
     set_update_alpha_summary「Alpha 版是开发中的测试版本，可能不稳定」/「Alpha releases are test builds still in development
     and may be unstable」/「Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil」。
     随「接收 Beta 版」：Beta 关着时这一行不可用（说明里不另写）。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 2026-10-23（设置整理第四轮：悬浮按钮、界面、开发者选项，ui-spec §十一）：
+- 2026-10-23 批准（设置整理第四轮：悬浮按钮、界面、开发者选项，ui-spec §十一）：
   - 悬浮按钮：「外观」那一行用已批的 set_group_appearance；行尾 set_floating_appearance_value「%1$d dp · %2$d%%」
     （三种语言一样）；框里三根用已批的「按钮大小」「按钮透明度」「时长文字大小」；先问的那一句 dlg_floating_reset_title
     「重置悬浮按钮？」/「Reset floating button?」/「Set semula butang terapung?」，正文用已批的 set_reset_floating_summary。
@@ -335,6 +327,15 @@
     dev_side_view_calibration_title「盲区画面标定」/「Blind spot view calibration」/「Kalibrasi paparan titik buta」，
     行尾 dev_side_view_calibration_value「朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°」/「Back %1$d° · Out %2$d° · Field %3$d°」/
     「Belakang %1$d° · Luar %2$d° · Medan %3$d°」。删掉：set_image_adjust_reset_title（成了行尾的「重置」）。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 
 ---
 
