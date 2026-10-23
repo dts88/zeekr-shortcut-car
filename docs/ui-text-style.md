@@ -327,15 +327,7 @@
     dev_side_view_calibration_title「盲区画面标定」/「Blind spot view calibration」/「Kalibrasi paparan titik buta」，
     行尾 dev_side_view_calibration_value「朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°」/「Back %1$d° · Out %2$d° · Field %3$d°」/
     「Belakang %1$d° · Luar %2$d° · Medan %3$d°」。删掉：set_image_adjust_reset_title（成了行尾的「重置」）。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 2026-10-23（设置整理第五轮：系统页，ui-spec §十一；名字照项目所有者批的建议）：
+- 2026-10-23 批准（设置整理第五轮：系统页，ui-spec §十一；名字照项目所有者批的建议）：
   - set_settings_backup_title「设置备份」/「Settings backup」/「Sandaran tetapan」；说明用已批的 set_settings_import_summary；
     › 前面 action_import「导入」/「Import」/「Import」，行尾按钮 action_export「导出」/「Export」/「Eksport」。
     删掉：set_settings_export_title、set_settings_export_summary、set_settings_import_title（导出到哪由导出后的提示说）。
@@ -344,6 +336,15 @@
   - 改已批的 set_auto_start_summary：「保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。
     关闭后不再自动启动。」/「…restarts it and restores the features that were on. When off, it isn't restarted.」/
     「…memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.」。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 
 ---
 
