@@ -16,10 +16,12 @@ package com.kooo.evcam.sound;
  *   <li><b>排气管</b>（左右各一根，长度略不同）：反馈梳状滤波器给出固定的共振峰，再加集气管、中段的共振和消声器的亥姆霍兹共振；
  *       消声器的低通随转速一直开到红线、负荷大再开一点；压力大时轻微饱和。</li>
  *   <li><b>进气</b>：每个缸进气门关时一个脉冲进进气腔、进气道的共振；负荷大时进气的呼啸，车速越高风声越大。</li>
- *   <li><b>机械增压</b>（双螺杆，曲轴用皮带带着转）：照车主偏好的那台的录音 —— 叶片扫过出口的基频不响、任何负荷都有；
- *       响的是同步齿轮的啮合声（叶片频率的 3 倍，第 2、3 次最响，很纯），只在增压时有，松油门旁通阀打开就几乎没了。
- *       带两个转子各自转一圈的边带、进气脉冲的调制、皮带的细小抖动；底下一层挤过窄出口通道的一股一股气流声（左右两路不相关）、
- *       进口吸气带阵风的风声（气流随转速长得快）。松油门「呼」一声。
+ *   <li><b>机械增压</b>（双螺杆，曲轴用皮带带着转，比曲轴快、一点火就跟着转）：几个部件各出各的声，位置、转速不同
+ *       （项目所有者 2026-10-23：应该分开、更有层次，不是单纯的风声；颗粒状噪音要着重避免 —— 全用确定的音，没有随机的抖动）：
+ *       同步齿轮的啮合声（叶片频率的 3 倍那一串，照车主偏好的那台的录音，只在增压时有，旁通阀一开几乎没了）；
+ *       出口的压力脉动（做功、压缩：叶片频率的 1、2、4、5 次，跟增压的 1.5 次方，经左右两个中冷器，出口风道的共振随压缩加热
+ *       往上走）；进口那边空转的叶片声（任何负荷都有）；两个转子各转一圈的边带、进气脉冲的调制；曲轴每次点火的扭振带着转速
+ *       一起抖（周期性的，很小）。底下一层轻的气流声（出口一股一股、进口吸气，左右两路不相关）。松油门「呼」一声。
  *       增压时进气腔里的压力脉动（每个进气门关上那一下，两排各自不均匀的间隔让每一下强弱、早晚不同）：
  *       十几根发动机的整数阶跟齿轮声一起随转速走，叠成和弦。</li>
  *   <li><b>气门落座、燃烧</b>：每个缸的气门关上「嗒」一下、燃烧「咔」一下，各过几个高频共振，摆在那个缸的位置上。</li>
@@ -112,7 +114,7 @@ final class PulseVoice implements Voice {
      * 10–20 dB）。项目所有者 2026-10-22：起压时机械质感严重不足（他用车内听感）；增压器就在挡风玻璃下面，啸叫在车里本来就听得见。
      */
     static final float CABIN_TONE_DB = -6f;
-    static final float CABIN_TONE_HZ = 6000f;
+    static final float CABIN_TONE_HZ = 3500f;
     /** 增压器的每个音到 {@link #WHINE_TOP_HZ} − {@link #WHINE_FADE_HZ}（Hz）开始渐隐，到 {@link #WHINE_TOP_HZ} 没了。 */
     static final float WHINE_TOP_HZ = 10000f;
     static final float WHINE_FADE_HZ = 3000f;
@@ -229,13 +231,12 @@ final class PulseVoice implements Voice {
     private double lobePhase;
     private double femalePhase;
     private double malePhase;
-    /** 低通过的噪声：转速的抖动、进口的阵风。 */
-    private float wobbleNoise;
-    private float gustNoise;
-    private final float wobbleK;
-    private final float wobbleNorm;
-    private final float gustK;
-    private final float gustNorm;
+    /** 出口的压力脉动：每次谐波的增益（相对 {@link PulseProfile#dischargeDb}）、这一块的目标和逐样本的电平；两个中冷器的低通、风道的共振（左、右）。 */
+    private final float[] dischargeGains;
+    private float dischargeTarget;
+    private float dischargeNow;
+    private final Biquad[] intercooler = new Biquad[2];
+    private final Biquad[] duct = new Biquad[2];
     private float boost;
     private float whoosh;
     private float whineNow;
@@ -305,8 +306,7 @@ final class PulseVoice implements Voice {
     private float toneLp;
     private final float toneK;
     private final float cabinToneGain;
-    /** 车内听感，这一块里：增压器的气流声走啸叫那一路多少（{@link PulseProfile#cabinAirRpmDb}）、进气腔和弦的倍数（高转时收）。 */
-    private float cabinAirGain;
+    /** 车内听感，这一块里进气腔和弦的倍数（高转时收）。 */
     private float chordGain = 1f;
 
     // ---- 输出
@@ -431,10 +431,14 @@ final class PulseVoice implements Voice {
         pulsationGains = new float[pulsationModes.length];
         pulsationTop = Biquad.lowpass(profile.pulsationTopHz, 0.7071f, sampleRate);
         pulsationLagSamples = profile.pulsationLagMs * 1e-3f * sampleRate;
-        wobbleK = onePole(profile.superchargerWobbleHz);
-        wobbleNorm = (float) (1.0 / Math.sqrt(wobbleK / (2.0 - wobbleK)));
-        gustK = onePole(profile.gustHz);
-        gustNorm = (float) (1.0 / Math.sqrt(gustK / (2.0 - gustK)));
+        dischargeGains = new float[profile.dischargeHarmonics.length];
+        for (int k = 0; k < dischargeGains.length; k++) {
+            dischargeGains[k] = EngineVoice.dbToLin(profile.dischargeHarmonicsDb[k]);
+        }
+        for (int s = 0; s < 2; s++) {
+            intercooler[s] = Biquad.lowpass(profile.intercoolerHz, 0.7071f, sampleRate);
+            duct[s] = Biquad.peaking(profile.ductHz[s], profile.ductDb, profile.ductQ, sampleRate);
+        }
         jetGains = new float[profile.jetHz.length];
         for (int k = 0; k < jetGains.length; k++) {
             jetGains[k] = EngineVoice.dbToLin(profile.jetGainDb[k]);
@@ -631,7 +635,12 @@ final class PulseVoice implements Voice {
             // 每一下的幅度跟进气腔的绝对压力（怠速时只有大气压的几成、满增压时一倍多），不随转速变：转速高了一下接一下来得密、
             // 每一下也抖得快，总的能量和发动机的中频一样大致不变
             chordGain = cabin ? EngineVoice.dbToLin(rpmDb(p.cabinChordRpm, p.cabinChordRpmDb, rpmCalc)) : 1f;
-            cabinAirGain = cabin ? EngineVoice.dbToLin(rpmDb(p.cabinAirRpm, p.cabinAirRpmDb, rpmCalc)) : 0f;
+            // 出口的压力脉动：跟增压（压比）的 1.5 次方；压缩把空气加热，风道里的声速变快，共振跟着往上走
+            dischargeTarget = EngineVoice.dbToLin(p.dischargeDb) * whineTarget * boost * (float) Math.sqrt(boost);
+            float charge = (float) Math.sqrt(1f + (p.chargeHeat - 1f) * boost);
+            for (int s = 0; s < 2; s++) {
+                duct[s].setPeaking(Math.min(p.ductHz[s] * charge, 0.45f * rate), p.ductDb, p.ductQ, rate);
+            }
             evPulsation = EngineVoice.dbToLin(p.pulsationDb + rpmDb(p.pulsationRpm, p.pulsationRpmDb, rpmCalc))
                     * (p.pulsationFree + (1f - p.pulsationFree) * boost * (float) Math.sqrt(boost));
             for (int k = 0; k < pulsationModes.length; k++) {
@@ -726,14 +735,14 @@ final class PulseVoice implements Voice {
             roarNow += (roarTarget - roarNow) * ampK;
             float front = plenum.process(ip) * 1.5f + runner.process(ip) + roar.process(white()) * roarNow;
 
-            // 增压：叶片扫过出口的啸叫、挤过出口通道的一股一股气流（左右两路）、进口的风声、松油门的「呼」
+            // 增压：齿轮的啮合声、出口的压力脉动（左右两个中冷器）、进口的叶片声，轻的一层气流声（左右两路）、进口的风声、松油门的「呼」
             float jetL = 0f;
             float jetR = 0f;
             float inlet = 0f;
             float cabinTones = 0f;
             if (supercharged) {
-                wobbleNoise += wobbleK * (white() - wobbleNoise);
-                float hz = p.superchargerOrder * r / 60f * (1f + p.superchargerWobble * wobbleNorm * wobbleNoise);
+                // 曲轴每次点火快一下，皮带带着增压器一起：点火频率上一个很小的、周期性的调频（不是随机的抖动）
+                float hz = p.superchargerOrder * r / 60f * (1f + p.torsion * EngineVoice.sin(theta / 90.0));
                 lobePhase += hz / rate;
                 if (lobePhase >= 1.0) {
                     lobePhase -= 1.0;
@@ -755,15 +764,20 @@ final class PulseVoice implements Voice {
                 float push = 1f + p.jetPulse * (c * c * c / PUFF_MEAN - 1f);
                 jetL = airLowpass[0].process(jets(jetBands[0], white() * push)) * jetNow;
                 jetR = airLowpass[1].process(jets(jetBands[1], white() * push)) * jetNow;
-                gustNoise += gustK * (white() - gustNoise);
-                inlet = inletBand.process(white()) * inletNow * (1f + p.gust * gustNorm * gustNoise);
+                inlet = inletBand.process(white()) * inletNow;
+                // 出口的压力脉动（左、右两个中冷器）
+                dischargeNow += (dischargeTarget - dischargeNow) * ampK;
+                float d = discharge(hz) * dischargeNow;
+                float dl = duct[0].process(intercooler[0].process(d));
+                float dr = duct[1].process(intercooler[1].process(d));
                 float tones = whine(hz) + pulsation(cur) * chordGain;
                 if (cabin) {
-                    // 增压器就在挡风玻璃下面：啸叫和它自己的气流声一起传进来
-                    toneLp += toneK * (tones + cabinAirGain * (jetL + jetR + inlet) - toneLp);
+                    toneLp += toneK * (tones + 0.5f * (dl + dr) - toneLp);
                     cabinTones = toneLp * cabinToneGain;
                 } else {
                     front += tones;
+                    jetL += dl;
+                    jetR += dr;
                 }
                 front += whooshBand.process(white()) * whooshNow;
             }
@@ -1025,6 +1039,23 @@ final class PulseVoice implements Voice {
                 + p.rotorAm[1] * EngineVoice.sin(malePhase + MALE_PHASE);
         float am = 1f + p.superchargerAm * EngineVoice.sin(theta / 90.0);
         return whine * rotor * am;
+    }
+
+    /**
+     * 出口的压力脉动这一个样本（{@link PulseProfile#dischargeDb}，还没乘电平）：叶片频率的几次谐波，各自固定的相位（不是随机的），
+     * 到 {@link #WHINE_TOP_HZ} 渐隐。{@code hz} 是这一刻叶片扫过出口的频率（相位已经走过了）。
+     */
+    private float discharge(float hz) {
+        float d = 0f;
+        for (int k = 0; k < dischargeGains.length; k++) {
+            int m = p.dischargeHarmonics[k];
+            float fade = (WHINE_TOP_HZ - m * hz) / WHINE_FADE_HZ;
+            if (fade <= 0f) {
+                break;
+            }
+            d += dischargeGains[k] * Math.min(fade, 1f) * EngineVoice.sin(m * lobePhase + 0.25 * k);
+        }
+        return d;
     }
 
     /** 进气腔的压力脉动这一个样本（{@link PulseProfile#pulsationDb}）：发动机的整数阶，和齿轮声一起在发动机舱顶上。 */

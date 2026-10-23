@@ -705,4 +705,43 @@ public class PulseVoiceTest {
         render(v, pull, 8f);
         assertTrue("拉了几秒热起来: " + v.gasScale(), v.gasScale() > 1.25f);
     }
+
+    @Test
+    public void theSuperchargerLinesHaveNoNoiseSkirts() {
+        // 项目所有者 2026-10-23：颗粒状噪音会破坏整体氛围，要着重避免。颗粒是每根线两边一小片随机的窄噪声（超音速那里查出来的；
+        // 这里原来是增压器转速的随机抖动 0.6 %）。1900 rpm 满增压，齿轮声第 1、2 次：两边 1.5–2.8 % 处每赫兹的能量比线本身
+        // （±0.6 %）低 14 dB 以上（转子的边带在 3.3 % 以外）；随机抖动那一版只低 11–14 dB
+        for (boolean cabin : new boolean[] {false, true}) {
+            float[] x = mid(render(new PulseVoice(SC, RATE, cabin), params(1900f, 1f), 2.5f), 1.5f);
+            for (int h = 1; h <= 2; h++) {
+                double m = SC.superchargerOrder * SC.meshMultiple * h * 1900 / 60.0;
+                double core = bandPower(x, m * 0.994, m * 1.006) / (0.012 * m);
+                double skirt = (bandPower(x, m * 0.972, m * 0.985) + bandPower(x, m * 1.015, m * 1.028)) / (0.026 * m);
+                double db = 10 * Math.log10(skirt / core);
+                assertTrue((cabin ? "车内" : "车外") + " 第 " + h + " 次两边 " + db + " dB", db < -14);
+            }
+        }
+    }
+
+    @Test
+    public void theDischargePulsationIsALayerOfItsOwn() {
+        // 项目所有者 2026-10-23：增压器有好几个出声的部件，位置、转速各不同，应该分开、更有层次（不是单纯的风声）。出口的压力
+        // 脉动（叶片频率的第 2 次，20.48 阶）是做功、压缩那一层：满增压时它在那里加的能量和同步齿轮的啮合声差不多响（1900 rpm
+        // 车外比齿轮声第 1 次低不到 12 dB），旁通阀开着（不增压）时几乎没有。叶片频率的每一次都挨着发动机的某个半阶次（20.48 对 20.5），
+        // 所以拿同一台「有、没有这一层」两份比
+        PulseProfile none = new PulseProfile.Builder().supercharger(SC.superchargerOrder, SC.superchargerDb)
+                .loudness(SC.levelPow, SC.cabinLevelPow, SC.rpmLoudDb, SC.norm).discharge(-100f).build();
+        double f1 = 1900 / 60.0;
+        double l2 = SC.superchargerOrder * 2 * f1;
+        double m1 = SC.superchargerOrder * SC.meshMultiple * f1;
+        float[] with = mid(render(SC, params(1900f, 1f), 2.5f), 1.5f);
+        float[] without = mid(render(none, params(1900f, 1f), 2.5f), 1.5f);
+        double added = bandPower(with, l2 * 0.985, l2 * 1.015) - bandPower(without, l2 * 0.985, l2 * 1.015);
+        double gears = bandPower(with, m1 * 0.985, m1 * 1.015);
+        assertTrue("加的能量和齿轮声比 " + db(added / gears) + " dB", added > gears * EngineVoice.dbToLin(-24f));
+        float[] freeWith = mid(render(SC, params(1900f, 0.05f), 2.5f), 1.5f);
+        float[] freeWithout = mid(render(none, params(1900f, 0.05f), 2.5f), 1.5f);
+        double freeAdded = bandPower(freeWith, l2 * 0.985, l2 * 1.015) - bandPower(freeWithout, l2 * 0.985, l2 * 1.015);
+        assertTrue("不增压时加的 " + db(Math.abs(freeAdded) / added) + " dB", Math.abs(freeAdded) < added * EngineVoice.dbToLin(-30f));
+    }
 }

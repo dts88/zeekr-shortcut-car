@@ -156,11 +156,11 @@ final class PulseProfile {
     final float[] meshRpm;
     final float[] meshRpmDb;
     /**
-     * 转速的细小抖动（份额、低通 Hz）：皮带、曲轴的扭振，啸叫不是一根死的正弦。EngineV1 那台的齿轮声每根宽 1–2 %
-     * （2026-10-22 量的），毛糙的机械感多半在这里。
+     * 曲轴的扭振带着增压器的转速一起抖（份额）：每次点火曲轴快一下，皮带把它传给增压器 —— 点火频率（4 阶）上一个周期性的、
+     * 很小的调频（原厂皮带轮上还有解耦器压着）。原来是随机的抖动（0.6 %、30 Hz 低通）：高次谐波一抖，每根线两边一小片窄噪声，
+     * 就是颗粒（项目所有者 2026-10-23：新版在产生颗粒状噪音的临界点上，要着重避免）。
      */
-    final float superchargerWobble;
-    final float superchargerWobbleHz;
+    final float torsion;
     /**
      * 齿轮声不是一个来源：同步齿轮的啮合、转子出口的压力脉动、壳体，各自被皮带、扭振、气流调得不一样 —— 每个来源相对的
      * 一点偏差（份额，个数就是来源数），各自慢慢游移（份额的标准差、低通 Hz），几个来源能量加起来和原来一个一样。
@@ -202,8 +202,27 @@ final class PulseProfile {
     final float pulsationLagMs;
     final float pulsationFree;
     /**
+     * 出口的压力脉动 —— 「做功、压缩」那一层（项目所有者 2026-10-23：增压器有好几个出声的部件，位置、转速各不同，应该分开、更有层次，
+     * 不是单纯的风声）。每扫过一个叶片，一腔压缩过的空气推开出口，出口那边的压力一下一下地跳：叶片频率和它的谐波
+     * （{@link #dischargeHarmonics} 次，各自的 dB；第 3、6 次和同步齿轮的啮合声同频，不放），幅度跟增压（压比）的 1.5 次方，
+     * 旁通阀开着（不增压）时没有。经两个中冷器（左、右排各一个）进进气腔：中冷器的芯子压高频（{@link #intercoolerHz}），出口到
+     * 中冷器那一段风道有自己的共振（左、右各一个，Hz；dB、Q）；压缩把空气加热（满增压时温度是进口的 {@link #chargeHeat} 倍），
+     * 声速跟着变快，风道的共振随增压往上走。满增压、3000 rpm 时最响那一次（第 2 次）的电平 {@link #dischargeDb}（和齿轮声同一个
+     * 基准）。第 1 次（10.24 阶）离发动机的 10 阶只差 0.24 阶，低转时两个拍成一秒七八下的「呜哇」，压低 6 dB；第 2 次（20.48 阶）
+     * 离 20.5 阶只差 0.02 阶，拍得很慢。
+     */
+    final float dischargeDb;
+    final int[] dischargeHarmonics;
+    final float[] dischargeHarmonicsDb;
+    final float intercoolerHz;
+    final float[] ductHz;
+    final float ductDb;
+    final float ductQ;
+    final float chargeHeat;
+    /**
      * 挤过出口的气流（满增压、6000 rpm，dB）：白噪声每扫过一个叶片涌一下（{@link #jetPulse}），过出口通道、进气腔、
-     * 中冷器的几个共振（Hz、Q、dB），再低通；左右两路不相关（两边各一个中冷器）。
+     * 中冷器的几个共振（Hz、Q、dB），再低通；左右两路不相关（两边各一个中冷器）。2026-10-23 −12 → −17 dB：增压器的声音不是
+     * 单纯的风声（项目所有者），出口那一层主要靠压力脉动（{@link #dischargeDb}）。
      */
     final float jetDb;
     final float[] jetHz;
@@ -211,12 +230,10 @@ final class PulseProfile {
     final float[] jetGainDb;
     final float jetPulse;
     final float airLowpassHz;
-    /** 进口吸气的风声（满流量时的 dB、带通 Hz、Q），带阵风（低通 Hz、深浅）。 */
+    /** 进口吸气的风声（满流量时的 dB、带通 Hz、Q）。2026-10-23 去掉了随机的阵风（一闪一闪的风声），−13 → −17 dB。 */
     final float inletDb;
     final float inletHz;
     final float inletQ;
-    final float gustHz;
-    final float gust;
     /** 车速 200 km/h 时进气的风声（进口风声、进气呼啸）多几成（× (1 + 它)，按车速的平方长）：越开越快的感觉。 */
     final float inletRam;
 
@@ -322,14 +339,6 @@ final class PulseProfile {
     final float[] cabinRaspRpm;
     final float[] cabinRaspRpmDb;
     /**
-     * 车内听感时增压器出口、进口的气流声也走啸叫那一路（dB，相对啸叫那一路；按转速的对数插值，两头照最边上的）：增压器就在挡风
-     * 玻璃下面，啸叫和它自己的气流声是一起传进来的。原来车内只有啸叫绕过防火墙，几根干净的线飘在上面，比旁边高 12–22 dB（参考车
-     * 车内只高 6–10 dB；项目所有者 2026-10-23：机械增压的质感略显单薄，有一条主的音线太过突出）。气流声随转速长得快（低转时很弱），
-     * 低转多给、高转少给（高转时它自己就响，车内的高频不能亮起来）。
-     */
-    final float[] cabinAirRpm;
-    final float[] cabinAirRpmDb;
-    /**
      * 车内听感时进气腔的和弦（{@link #pulsationDb}）随转速另加的 dB（按转速的对数插值，两头照最边上的）：参考车车内高转全油门时
      * 10–13 阶比 4 阶低 31–37 dB，我们原来只低 13–14 dB —— 高转时上面一层细的整数阶盖过了下面的厚度。
      */
@@ -418,8 +427,7 @@ final class PulseProfile {
         superchargerRpmPow = b.superchargerRpmPow;
         meshRpm = b.meshRpm.clone();
         meshRpmDb = b.meshRpmDb.clone();
-        superchargerWobble = b.superchargerWobble;
-        superchargerWobbleHz = b.superchargerWobbleHz;
+        torsion = b.torsion;
         meshVoiceDetune = b.meshVoiceDetune.clone();
         meshVoiceWander = b.meshVoiceWander;
         meshVoiceWanderHz = b.meshVoiceWanderHz;
@@ -435,6 +443,14 @@ final class PulseProfile {
         pulsationRecovery = b.pulsationRecovery;
         pulsationLagMs = b.pulsationLagMs;
         pulsationFree = b.pulsationFree;
+        dischargeDb = b.dischargeDb;
+        dischargeHarmonics = b.dischargeHarmonics.clone();
+        dischargeHarmonicsDb = b.dischargeHarmonicsDb.clone();
+        intercoolerHz = b.intercoolerHz;
+        ductHz = b.ductHz.clone();
+        ductDb = b.ductDb;
+        ductQ = b.ductQ;
+        chargeHeat = b.chargeHeat;
         jetDb = b.jetDb;
         jetHz = b.jetHz.clone();
         jetQ = b.jetQ.clone();
@@ -444,8 +460,6 @@ final class PulseProfile {
         inletDb = b.inletDb;
         inletHz = b.inletHz;
         inletQ = b.inletQ;
-        gustHz = b.gustHz;
-        gust = b.gust;
         inletRam = b.inletRam;
         cylinderPan = b.cylinderPan;
         cylinderNearM = b.cylinderNearM;
@@ -502,8 +516,6 @@ final class PulseProfile {
         heatDownSec = b.heatDownSec;
         cabinRaspRpm = b.cabinRaspRpm.clone();
         cabinRaspRpmDb = b.cabinRaspRpmDb.clone();
-        cabinAirRpm = b.cabinAirRpm.clone();
-        cabinAirRpmDb = b.cabinAirRpmDb.clone();
         cabinChordRpm = b.cabinChordRpm.clone();
         cabinChordRpmDb = b.cabinChordRpmDb.clone();
     }
@@ -603,9 +615,8 @@ final class PulseProfile {
         private float superchargerRpmPow = 1.7f;
         private float[] meshRpm = {1300f, 1900f, 2350f, 2850f, 4000f};
         private float[] meshRpmDb = {9f, 14f, 8f, 0f, -4f};
-        private float superchargerWobble = 0.006f;
-        private float superchargerWobbleHz = 30f;
-        private float[] meshVoiceDetune = {0f, -0.004f, 0.0045f, -0.0085f};
+        private float torsion = 0.003f;
+        private float[] meshVoiceDetune = {0f, -0.0018f, 0.0022f};
         private float meshVoiceWander = 0.0045f;
         private float meshVoiceWanderHz = 2.5f;
         private float superchargerFree = 0.05f;
@@ -620,17 +631,23 @@ final class PulseProfile {
         private float pulsationRecovery = 1.37f;
         private float pulsationLagMs = 2f;
         private float pulsationFree = 0.15f;
-        private float jetDb = -12f;
+        private float dischargeDb = -23f;
+        private int[] dischargeHarmonics = {1, 2, 4, 5};
+        private float[] dischargeHarmonicsDb = {-6f, 0f, -5f, -9f};
+        private float intercoolerHz = 2600f;
+        private float[] ductHz = {820f, 960f};
+        private float ductDb = 6f;
+        private float ductQ = 2f;
+        private float chargeHeat = 1.27f;
+        private float jetDb = -17f;
         private float[] jetHz = {1800f, 3200f, 5500f};
         private float[] jetQ = {1.2f, 1.4f, 1.6f};
         private float[] jetGainDb = {0f, -1f, -6f};
         private float jetPulse = 0.8f;
         private float airLowpassHz = 7000f;
-        private float inletDb = -13f;
+        private float inletDb = -17f;
         private float inletHz = 1600f;
         private float inletQ = 0.7f;
-        private float gustHz = 5f;
-        private float gust = 0.2f;
         private float inletRam = 3f;
         private float cylinderPan = 0.45f;
         private float cylinderNearM = 1.7f;
@@ -687,8 +704,6 @@ final class PulseProfile {
         private float heatDownSec = 5f;
         private float[] cabinRaspRpm = {3000f, 5500f};
         private float[] cabinRaspRpmDb = {0f, -8f};
-        private float[] cabinAirRpm = {2000f, 3500f, 5000f};
-        private float[] cabinAirRpmDb = {6f, 0f, -10f};
         private float[] cabinChordRpm = {2500f, 3500f, 6000f};
         private float[] cabinChordRpmDb = {3f, 0f, -8f};
 
@@ -726,6 +741,12 @@ final class PulseProfile {
             return this;
         }
 
+        /** 出口压力脉动那一层最响那一次的电平（dB，{@link PulseProfile#dischargeDb}）；很低（−100）就是没有这一层。 */
+        Builder discharge(float db) {
+            dischargeDb = db;
+            return this;
+        }
+
         PulseProfile build() {
             if (firing.length == 0 || trim.length < firing.length || headerMs.length < firing.length
                     || pipeHz.length != 2 || helmholtzHz.length != 2 || bankMs.length != 2
@@ -735,7 +756,8 @@ final class PulseProfile {
                     || cabinFrontHz.length != 2 || cabinRearHz.length != 2
                     || meshHarmonicsDb.length != meshRpm.length || meshRpmDb.length != meshRpm.length || meshVoiceDetune.length == 0
                     || pulsationRpmDb.length != pulsationRpm.length || cabinChordRpmDb.length != cabinChordRpm.length
-                    || cabinRaspRpmDb.length != cabinRaspRpm.length || cabinAirRpmDb.length != cabinAirRpm.length) {
+                    || cabinRaspRpmDb.length != cabinRaspRpm.length
+                    || dischargeHarmonicsDb.length != dischargeHarmonics.length || ductHz.length != 2) {
                 throw new IllegalStateException("pulse profile incomplete");
             }
             for (int c : firing) {
