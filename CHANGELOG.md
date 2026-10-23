@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.20.0-alpha] - 2026-10-23
+
 - Only the front cabin camera is one-shot now: the surround view and the rear cabin are back to normal (the rear cabin is released when the screen has been dark for 30 seconds and comes back when it turns on). Zeekr 7X (surround + front and rear cabin) becomes Zeekr 7X (surround + rear cabin). When the front cabin is on, the next start turns only its switch off; the selected stream profile and other settings are no longer changed. When you leave the car the front cabin is dropped and does not come back. In Edit stream profile only the front cabin card carries the note.
 
 ## [2.19.0-alpha] - 2026-10-23

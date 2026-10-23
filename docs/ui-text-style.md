@@ -248,7 +248,14 @@
   Bahasa Melayu「Tetapan ini tidak dapat dikekalkan kerana boleh menjadikan unit kepala tidak stabil, antara sebab lain. Ia dimatikan secara automatik selepas anda meninggalkan kenderaan.」。
 - 2026-10-22 批准（前后座舱离车后去掉、不再恢复）：改已批的 set_screen_off_keep_summary，删掉「亮屏后前后座舱恢复录制」那半句 ——
   「熄屏后只录制环视。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；英文、马来文同样删掉那半句。
-  这条规矩拿掉时改回原来那句。
+  这条规矩拿掉时改回原来那句。（2026-10-23 起被下面那条取代。）
+- 2026-10-23 批准（只有前座舱只用一次，后座舱恢复一般的安排）：预设改名 opt_model_zeekr_multi / status_profile_composite_multi
+  「极氪7X（环视 + 后座舱）」—— 中文照项目所有者说的「环视 + 后座舱」；English「Zeekr 7X (surround + rear cabin)」；
+  Bahasa Melayu「Zeekr 7X (sekeliling + kabin belakang)」。editor_cabin_one_shot 文字不变，只留在前座舱那张卡片上。
+- 2026-10-23 批准（后座舱亮屏后又会接回录制）：set_screen_off_keep_summary 补上后座舱那半句 ——
+  「熄屏后只录制环视，后座舱在亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；
+  English「Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, …」；
+  Bahasa Melayu「Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, …」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -257,14 +264,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-10-23（只有前座舱只用一次，后座舱恢复一般的安排）：预设改名 opt_model_zeekr_multi / status_profile_composite_multi
-  「极氪7X（环视 + 后座舱）」—— 中文照项目所有者说的「环视 + 后座舱」；English「Zeekr 7X (surround + rear cabin)」；
-  Bahasa Melayu「Zeekr 7X (sekeliling + kabin belakang)」。
-- 2026-10-23（后座舱亮屏后又会接回录制）：set_screen_off_keep_summary 补上后座舱那半句 ——
-  「熄屏后只录制环视，后座舱在亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；
-  English「Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, …」；
-  Bahasa Melayu「Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, …」。
-- editor_cabin_one_shot 文字不变（2026-10-22 已批），只留在前座舱那张卡片上。
+- （现在没有。）
 ---
 
 ## 10. 术语表
