@@ -23,6 +23,8 @@ public class SoundStyleTest {
         assertEquals(SoundStyle.PROTOTYPE, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_PROTOTYPE));
         assertEquals(SoundStyle.JET, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_JET));
         assertEquals(SoundStyle.JET_OLD, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_JET_OLD));
+        assertEquals(SoundStyle.TURBO4, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_TURBO4));
+        assertEquals(SoundStyle.ELECTRIC, SoundStyle.of(AppConfig.DRIVE_SOUND_STYLE_ELECTRIC));
         assertEquals(SoundStyle.AMERICAN, SoundStyle.of(null));
         assertEquals(SoundStyle.AMERICAN, SoundStyle.of("v12"));
     }
@@ -33,23 +35,24 @@ public class SoundStyleTest {
         assertFalse(SoundStyle.AMERICAN.cranks());
         assertFalse(SoundStyle.JET.cranks());
         assertFalse(SoundStyle.JET_OLD.cranks());
+        assertFalse(SoundStyle.TURBO4.cranks());
+        assertFalse(SoundStyle.ELECTRIC.cranks());
     }
 
     @Test
     public void eachStyleOnlyUsesTheSettingsThatFitIt() {
-        // 项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项。「听感」只有美式 V8 分车外、车内；两种超音速不看「变速箱」，
-        // 固定 8 速（参考车的 e-Shift 模拟 8 速双离合），「连续」时也不走伪挡位
-        assertTrue(SoundStyle.AMERICAN.hasViews());
-        assertFalse(SoundStyle.PROTOTYPE.hasViews());
-        assertFalse(SoundStyle.JET.hasViews());
-        assertFalse(SoundStyle.JET_OLD.hasViews());
+        // 项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项。「听感」只有美式 V8 分车外、车内；参考车的主题（两种超音速、
+        // 涡轮四缸、电动概念车）不看「变速箱」，固定 8 速（参考车的 e-Shift 模拟 8 速双离合），「连续」时也不走伪挡位
+        for (SoundStyle s : SoundStyle.values()) {
+            assertEquals(s.toString(), s == SoundStyle.AMERICAN, s.hasViews());
+        }
         for (SoundStyle s : new SoundStyle[] {SoundStyle.AMERICAN, SoundStyle.PROTOTYPE}) {
             assertTrue(s.choosesGearbox());
             assertEquals(Gearbox.MANUAL6, s.gearbox(Gearbox.MANUAL6));
             assertEquals(Gearbox.AUTO8, s.gearbox(Gearbox.AUTO8));
             assertTrue(s.pseudoGears());
         }
-        for (SoundStyle s : new SoundStyle[] {SoundStyle.JET, SoundStyle.JET_OLD}) {
+        for (SoundStyle s : new SoundStyle[] {SoundStyle.JET, SoundStyle.JET_OLD, SoundStyle.TURBO4, SoundStyle.ELECTRIC}) {
             assertFalse(s.choosesGearbox());
             assertEquals(Gearbox.AUTO8, s.gearbox(Gearbox.MANUAL6));
             assertFalse(s.pseudoGears());

@@ -134,14 +134,16 @@ public final class SettingsRegistry {
      * 模拟声浪的声音风格（开发者选项，试验；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
      * 按发动机结构重做「美式 V8」这一种取向；第一版留着，叫「试制 V8」（两个名字车主定的）；另试制一种纯电车主动声浪的
      * 「超音速」（车主 2026-10-21 批的名字）。都不用车型名（商标）。「超音速（旧版）」是 2026-10-22 的那一版，车主要和新的
-     * 装车对比（2026-10-23）。
+     * 装车对比（2026-10-23）。「涡轮四缸」「电动概念车」照参考车另外两种主题仿制（2026-10-23，名字待车主确认）。
      */
     public static final SettingSpec DRIVE_SOUND_STYLE = SettingSpec.of(
             "drive_sound_style", "声音风格", com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN,
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN, "美式 V8", R.string.dev_drive_sound_style_american),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_PROTOTYPE, "试制 V8", R.string.dev_drive_sound_style_prototype),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_JET, "超音速", R.string.dev_drive_sound_style_jet),
-            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_JET_OLD, "超音速（旧版）", R.string.dev_drive_sound_style_jet_old));
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_JET_OLD, "超音速（旧版）", R.string.dev_drive_sound_style_jet_old),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_TURBO4, "涡轮四缸", R.string.dev_drive_sound_style_turbo4),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_ELECTRIC, "电动概念车", R.string.dev_drive_sound_style_electric));
 
     /**
      * 模拟声浪的听感（开发者选项，试验）：车外（站在车旁）或车内（隔着防火墙、车身）。项目所有者 2026-10-21：车内的可以试一下；

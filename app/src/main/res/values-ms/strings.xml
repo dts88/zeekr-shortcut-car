@@ -911,6 +911,8 @@
     <string name="dev_drive_sound_style_prototype">V8 prototaip</string>
     <string name="dev_drive_sound_style_jet">Jet supersonik</string>
     <string name="dev_drive_sound_style_jet_old">Jet supersonik (versi lama)</string>
+    <string name="dev_drive_sound_style_turbo4">Empat silinder turbo</string>
+    <string name="dev_drive_sound_style_electric">Kereta konsep elektrik</string>
     <string name="dev_drive_sound_view_title">Kedudukan mendengar</string>
     <string name="dev_drive_sound_view_outside">Di luar</string>
     <string name="dev_drive_sound_view_cabin">Dalam kabin</string>

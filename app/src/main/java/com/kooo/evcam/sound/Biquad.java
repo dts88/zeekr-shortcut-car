@@ -12,13 +12,18 @@ final class Biquad {
 
     static Biquad peaking(float hz, float db, float q, float rate) {
         Biquad b = new Biquad();
+        b.setPeaking(hz, db, q, rate);
+        return b;
+    }
+
+    /** 峰值，改系数不清状态：共振峰跟着排气温度走的时候用（{@link TurboFourVoice}）。 */
+    void setPeaking(float hz, float db, float q, float rate) {
         double a = Math.pow(10.0, db / 40.0);
         double w0 = 2.0 * Math.PI * hz / rate;
         double alpha = Math.sin(w0) / (2.0 * q);
         double cos = Math.cos(w0);
         double a0 = 1.0 + alpha / a;
-        b.set((1.0 + alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha / a) / a0);
-        return b;
+        set((1.0 + alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha / a) / a0);
     }
 
     static Biquad highpass(float hz, float q, float rate) {

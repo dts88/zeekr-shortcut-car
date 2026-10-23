@@ -978,6 +978,10 @@ public class AppConfig {
     public static final String DRIVE_SOUND_STYLE_JET = "jet";
     /** 声音风格：超音速（旧版）—— 2026-10-22 的那一版，和新的装车对比（项目所有者 2026-10-23）。 */
     public static final String DRIVE_SOUND_STYLE_JET_OLD = "jet_old";
+    /** 声音风格：涡轮四缸（参考车模仿汽油机的那一种主题，试制；项目所有者 2026-10-23）。 */
+    public static final String DRIVE_SOUND_STYLE_TURBO4 = "turbo4";
+    /** 声音风格：电动概念车（参考车电动概念车声的那一种主题，试制；项目所有者 2026-10-23）。 */
+    public static final String DRIVE_SOUND_STYLE_ELECTRIC = "electric";
     /** 听感（{@link SettingsRegistry#DRIVE_SOUND_VIEW}）：车外（默认，站在车旁听的那种）。 */
     public static final String DRIVE_SOUND_VIEW_OUTSIDE = "outside";
     /** 听感：车内（隔着防火墙、车身听，高频闷一些）。 */
@@ -1024,7 +1028,7 @@ public class AppConfig {
 
     /**
      * 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE} / {@link #DRIVE_SOUND_STYLE_JET} /
-     * {@link #DRIVE_SOUND_STYLE_JET_OLD}。
+     * {@link #DRIVE_SOUND_STYLE_JET_OLD} / {@link #DRIVE_SOUND_STYLE_TURBO4} / {@link #DRIVE_SOUND_STYLE_ELECTRIC}。
      */
     public String getDriveSoundStyle() {
         return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
