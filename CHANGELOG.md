@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.24.0-alpha] - 2026-10-23
+
+- Settings → System: Export settings and Import settings are one row, Settings backup: tapping the row imports, Export sits at the end of the row. System info is renamed Vehicle signals. Start on boot has a shorter description.
+
 ## [2.23.0-alpha] - 2026-10-23
 
 - Settings → Floating button: no group headings. Show recording time and Lock position are buttons on the Floating button row. Button size, Button opacity and Time text size are one row, Appearance, adjusted together in one dialog; Reset at the end of the row asks first. Tap and long press still open the app by default.
