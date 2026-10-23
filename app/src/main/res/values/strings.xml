@@ -142,7 +142,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">重置悬浮按钮？</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、盲区画面、悬浮按钮和自动录制。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
@@ -168,9 +168,7 @@
     <string name="set_diagnostics_title">诊断信息</string>
     <string name="set_diagnostics_summary">查看并导出摄像头、显示屏和存储的检测信息及最近日志</string>
     <!-- 导出、导入设置（项目所有者 2026-10-19 要，文字 2026-10-20 批准） -->
-    <string name="set_settings_export_title">导出设置</string>
-    <string name="set_settings_export_summary">将当前设置保存为文件，与诊断报告存放在同一文件夹</string>
-    <string name="set_settings_import_title">导入设置</string>
+    <string name="set_settings_backup_title">设置备份</string>
     <string name="set_settings_import_summary">从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件</string>
     <string name="settings_exported">已导出到：\n%1$s</string>
     <string name="settings_export_failed">无法导出设置</string>
@@ -187,13 +185,13 @@
     <string name="settings_import_action">导入并退出</string>
     <string name="settings_import_failed">无法导入设置</string>
     <string name="settings_imported_reopen">已导入设置，重新打开应用后生效</string>
-    <!-- 系统信息（试验性）：分组、信号名、值 -->
-    <string name="set_vehicle_info_title">系统信息（试验性）</string>
+    <!-- 车辆信号（试验性）：分组、信号名、值 -->
+    <string name="set_vehicle_info_title">车辆信号（试验性）</string>
     <string name="set_vehicle_info_summary">车机可读取的车辆信号及当前状态；勾选的项目显示在行驶信息条上</string>
     <string name="vi_legend">勾选的项目显示在行驶信息条上（需开启「设置 → 录制 → 行驶信息条」）：有图标的显示为图标，其余暂以文字显示，每行下方注明；超出信息条宽度的不显示。名称颜色表示验证程度：正文色为实车测试结果一致（持续交叉验证）；灰色为可用、细节待定；淡灰色为可读取但未验证，需开启开发者选项才能勾选。</string>
     <string name="vi_position">位置（经纬度）</string>
     <string name="vi_position_source">系统定位</string>
-    <!-- 系统信息图例下方的状态行（VehicleInfoFragment.status）；每行号码后的读法（VehicleInfoFragment.address，号码与区域号照原样） -->
+    <!-- 车辆信号页图例下方的状态行（VehicleInfoFragment.status）；每行号码后的读法（VehicleInfoFragment.address，号码与区域号照原样） -->
     <string name="vi_status_known">有数据 %1$d/%2$d 项</string>
     <string name="vi_status_car_connected">车辆接口：已连接</string>
     <string name="vi_status_car_unavailable">车辆接口：不可用</string>
@@ -205,7 +203,7 @@
     <string name="vi_kind_function_zone">功能·区域 %1$s</string>
     <string name="vi_kind_sensor_event">传感器事件</string>
     <string name="vi_kind_sensor_value">传感器值</string>
-    <!-- 系统信息每一行下面：勾上在信息条上显示成什么（InfoBarLayout.cellsFor）；信息条各格的名字（InfoBarLayout.Cell） -->
+    <!-- 车辆信号页每一行下面：勾上在信息条上显示成什么（InfoBarLayout.cellsFor）；信息条各格的名字（InfoBarLayout.Cell） -->
     <string name="vi_bar_icon">信息条图标：%1$s</string>
     <string name="vi_bar_text">信息条文字（暂无图标）</string>
     <string name="vi_bar_join">、</string>
@@ -384,6 +382,8 @@
     <string name="slot_cabin_rear">后座舱</string>
     <string name="action_save">保存</string>
     <string name="action_reset">重置</string>
+    <string name="action_import">导入</string>
+    <string name="action_export">导出</string>
     <string name="action_all_auto">全部自动</string>
     <string name="msg_mapping_saved">已保存摄像头映射，重启应用后生效</string>
     <string name="msg_mapping_cleared">已恢复自动分配，重启应用后生效</string>

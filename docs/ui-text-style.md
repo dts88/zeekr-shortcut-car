@@ -161,7 +161,7 @@
 
 ## 9. 车主定过的名称与文字（不改）
 
-- 功能名：超级镜子 / Super mirror（2026-10-16 由「超级后视镜」改名，英文、马来文不变；「电子后视镜」只作解释）；锁定影像 / Lock footage；熄屏持续录制；行驶信息条；车辆状态（试验性）；系统信息（试验性）；鱼眼校正按钮的英文 Straighten；按钮透明度；关于与致谢。
+- 功能名：超级镜子 / Super mirror（2026-10-16 由「超级后视镜」改名，英文、马来文不变；「电子后视镜」只作解释）；锁定影像 / Lock footage；熄屏持续录制；行驶信息条；车辆状态（试验性）；车辆信号（试验性）（2026-10-23 由「系统信息（试验性）」改名）；鱼眼校正按钮的英文 Straighten；按钮透明度；关于与致谢。
 - 文字：record_screen_off_continue（2026-10-12 批准「熄屏后继续录制环视」）/ _stop；dlg_footage_lock_off_msg；set_footage_lock_*；msg_storage_locked_*；关于页的致谢与来源（about_thanks_*、about_credits_*）。
 - 2026-10-13 批准（2.11.2，熄屏 v3）：record_screen_off_pause「熄屏暂停，亮屏后恢复」（原来是「…唤醒后恢复」）；set_screen_off_keep_summary「熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；set_screen_off_summary（开发者「熄屏录制（阻止休眠）」）「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长」；vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）。
 - record_screen_off_needs_sentry（「熄屏续录需开启哨兵模式」）2.11.2 删了：熄屏那一下接着录不再要哨兵模式；车机休眠时也接着录（哨兵模式开着等）才写 record_screen_off_continue，休眠时会停的写 record_screen_off_pause（项目所有者 2026-10-13 定，不另加句子）。
@@ -327,6 +327,15 @@
     dev_side_view_calibration_title「盲区画面标定」/「Blind spot view calibration」/「Kalibrasi paparan titik buta」，
     行尾 dev_side_view_calibration_value「朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°」/「Back %1$d° · Out %2$d° · Field %3$d°」/
     「Belakang %1$d° · Luar %2$d° · Medan %3$d°」。删掉：set_image_adjust_reset_title（成了行尾的「重置」）。
+- 2026-10-23 批准（设置整理第五轮：系统页，ui-spec §十一；名字照项目所有者批的建议）：
+  - set_settings_backup_title「设置备份」/「Settings backup」/「Sandaran tetapan」；说明用已批的 set_settings_import_summary；
+    › 前面 action_import「导入」/「Import」/「Import」，行尾按钮 action_export「导出」/「Export」/「Eksport」。
+    删掉：set_settings_export_title、set_settings_export_summary、set_settings_import_title（导出到哪由导出后的提示说）。
+  - 改名 set_vehicle_info_title「车辆信号（试验性）」/「Vehicle signals (experimental)」/「Isyarat kenderaan (percubaan)」
+    （原「系统信息（试验性）」/ System info / Maklumat sistem）。
+  - 改已批的 set_auto_start_summary：「保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。
+    关闭后不再自动启动。」/「…restarts it and restores the features that were on. When off, it isn't restarted.」/
+    「…memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -366,8 +375,8 @@
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
-| 行驶信息条 | 行驶信息条；仅系统信息页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
-| 系统信息 | 系统信息（试验性） | System info (experimental) | Maklumat sistem (percubaan) | — |
+| 行驶信息条 | 行驶信息条；仅车辆信号页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
+| 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |
 | 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
 | 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
 | 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制） | screen off / on；sleep / wake；Screen-off recording (keep awake)；Keep recording when the screen goes off | skrin padam / hidup；tidur / bangun；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
