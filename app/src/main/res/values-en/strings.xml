@@ -409,6 +409,7 @@
     <string name="set_footage_lock_auto">Auto lock</string>
     <string name="set_footage_lock_flash_chip">Flash to pass</string>
     <string name="set_footage_lock_hazard_chip">Hazard lights</string>
+    <string name="set_footage_lock_hazard_note">In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before and after the braking is locked as well.</string>
     <string name="set_footage_lock_horn_chip">Horn</string>
     <string name="set_footage_locked_value">%1$d locked · %2$s</string>
     <string name="set_footage_locked_value_unprotected">%1$d locked · %2$s, not protected</string>

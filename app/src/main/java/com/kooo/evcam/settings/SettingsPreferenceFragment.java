@@ -326,6 +326,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
         });
         pref.addUnavailableOption(getString(R.string.set_footage_lock_horn_chip));
+        // 按钮下面一行小字（项目所有者 2026-10-23）：紧急制动时车辆自己会打开双闪，所以「双闪」也接得住紧急制动
+        pref.setOptionsNote(getString(R.string.set_footage_lock_hazard_note));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             if (Boolean.TRUE.equals(newValue)) {
                 applyFootageLock(pref, true);

@@ -49,6 +49,7 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
     private final List<Option> options = new ArrayList<>();
     private CharSequence value;
     private CharSequence optionsLabel;
+    private CharSequence optionsNote;
 
     public SwitchChipsPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -68,6 +69,14 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
     public void setOptionsLabel(CharSequence label) {
         if (!TextUtils.equals(optionsLabel, label)) {
             optionsLabel = label;
+            notifyChanged();
+        }
+    }
+
+    /** 那一排按钮下面的一行小字（附加项的说明是次要的，写在下面，ui-spec §三）；空就不写。 */
+    public void setOptionsNote(CharSequence note) {
+        if (!TextUtils.equals(optionsNote, note)) {
+            optionsNote = note;
             notifyChanged();
         }
     }
@@ -111,6 +120,11 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
         if (label != null) {
             label.setText(optionsLabel);
             label.setVisibility(TextUtils.isEmpty(optionsLabel) ? View.GONE : View.VISIBLE);
+        }
+        TextView note = (TextView) holder.findViewById(R.id.pref_options_note);
+        if (note != null) {
+            note.setText(optionsNote);
+            note.setVisibility(TextUtils.isEmpty(optionsNote) ? View.GONE : View.VISIBLE);
         }
         chips.removeAllViews();
         if (!show) {

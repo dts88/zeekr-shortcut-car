@@ -408,6 +408,7 @@
     <string name="set_footage_lock_auto">Kunci automatik</string>
     <string name="set_footage_lock_flash_chip">Kelip lampu tinggi</string>
     <string name="set_footage_lock_hazard_chip">Lampu kecemasan</string>
+    <string name="set_footage_lock_hazard_note">Semasa brek kecemasan, kenderaan menghidupkan lampu kecemasan secara automatik; dengan Lampu kecemasan dihidupkan, rakaman sebelum dan selepas brek turut dikunci.</string>
     <string name="set_footage_lock_horn_chip">Hon</string>
     <string name="set_footage_locked_value">%1$d dikunci · %2$s</string>
     <string name="set_footage_locked_value_unprotected">%1$d dikunci · %2$s, tidak dilindungi</string>
