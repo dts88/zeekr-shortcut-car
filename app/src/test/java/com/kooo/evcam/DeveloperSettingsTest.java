@@ -55,6 +55,10 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_drive_sound", Arrays.asList("drive_sound"));
         ROWS.put("pref_drive_sound_volume", Arrays.asList("drive_sound_volume"));
         ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
+        // 应用水印固定开着、点不动，不存设置（2026-10-23 从录制页挪来）
+        ROWS.put("pref_watermark_brand", NONE);
+        // 车辆状态（2026-10-23 从界面页挪来）
+        ROWS.put("pref_vehicle_status", Arrays.asList("vehicle_status_panel"));
         // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）
         ROWS.put("pref_image_adjust", Arrays.asList("image_adjust_enabled"));
         ROWS.put("pref_image_adjust_reset", NONE);

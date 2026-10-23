@@ -264,7 +264,16 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-10-23（设置整理：时间水印和录制规格同开同关，ui-spec §十一）：改已批的 set_watermark_on / set_watermark_off ——
+  开「在录像和照片上叠加日期和时间，录像另外标注分辨率、实测帧率、编码和实时码率；预览画面中不显示」、关「录像和照片不叠加日期、时间和录制规格」；
+  English「Adds the date and time to videos and photos, and the resolution, measured frame rate, codec and live bitrate to videos; not shown in the preview」/
+  「No date, time or recording specs on videos or photos」；
+  Bahasa Melayu「Menambah tarikh dan masa pada video dan foto, serta resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada video; tidak dipaparkan dalam pratonton」/
+  「Tiada tarikh, masa atau spesifikasi rakaman pada video atau foto」。set_watermark_spec_title / _summary 删掉。
+- 2026-10-23（设置整理：行驶信息条改成开关加下一层）：改 set_info_bar_summary，去掉「显示项在『设置 → 系统 → 系统信息』中选择」那半句 ——
+  「在环视录像画面下方附加一栏车辆信号。试验性功能。」/「Adds a strip of vehicle signals below the surround view video. Experimental.」/
+  「Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.」；新加行尾的值 set_info_bar_value
+  「已选 %1$d 项」/「%1$d selected」/「%1$d dipilih」。
 ---
 
 ## 10. 术语表

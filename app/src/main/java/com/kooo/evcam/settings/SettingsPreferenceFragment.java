@@ -184,35 +184,23 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
 
 
-        bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
-                enabled -> {
-                    appConfig.setLicensePlateEnabled(enabled);
-                    showLicensePlate();
-                });
-        bindLicensePlate();
-
-        // 应用名与版本（填了车牌号跟在后面）每一路 MediaCodec 录像、每一张照片都盖，和「时间水印」开不开无关
-        // （录像见 EglSurfaceEncoder.drawBrandOverlay，照片见 SingleCamera.addWatermark；
-        // 开发者选项里的 MediaRecorder 模式什么角标都画不了），
-        // 这里只是把这件事摆在界面上：开着、灰着、点不动。
-        // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
-        SwitchPreferenceCompat brand = findPreference("pref_watermark_brand");
-        if (brand != null) {
-            brand.setPersistent(false);
-            brand.setChecked(true);
-            brand.setEnabled(false);
-        }
-
+        // 时间水印：时间和录制规格同开同关（项目所有者 2026-10-23），录像上的规格那一行跟着它（MultiCameraManager.planFor）
         bindSwitch("pref_watermark", appConfig.isTimestampWatermarkEnabled(),
                 value -> appConfig.setTimestampWatermarkEnabled(value));
 
-        bindSwitch("pref_watermark_spec", appConfig.isWatermarkSpecEnabled(),
-                value -> appConfig.setWatermarkSpecEnabled(value));
+        bindLicensePlate();
 
-        // 行驶信息条（试验项目）：经纬度和 GPS 车速要定位权限，已经有了（比如车机预先授予）才用，
+        // 行驶信息条（试验项目）：开关加下一层（ui-spec §三）—— 点这一行进「系统信息」勾显示哪几项（系统页那个入口照旧），
+        // 行尾写勾了几项。经纬度和 GPS 车速要定位权限，已经有了（比如车机预先授予）才用，
         // 不弹权限框（项目所有者 2026-10-06）；没有就不显示，见 LocationSource
         bindSwitch("pref_info_bar", appConfig.isInfoBarEnabled(),
                 value -> appConfig.setInfoBarEnabled(value));
+        onClick("pref_info_bar", pref ->
+                openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        SwitchNavPreference infoBar = findPreference("pref_info_bar");
+        if (infoBar != null) {
+            infoBar.setValue(getString(R.string.set_info_bar_value, appConfig.getInfoBarItems().size()));
+        }
     }
 
     /**
@@ -613,43 +601,69 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 车牌号输入框。
+     * 车牌号水印（开关加下一层，ui-spec §三，项目所有者 2026-10-23）：开关管录像和照片上显不显示车牌号；
+     * 点这一行改车牌号，行尾写车牌号（没填写「未填写」）。开着就一定有车牌号：还没填时打开，先弹输入框、填了才算打开；
+     * 改成空的，开关跟着关。
      *
      * <p>输入的东西一律先过 {@link LicensePlate#sanitize}：小写转大写，
-     * 空格连字符之类去掉，超过十位截断。清洗结果直接显示在下面 ——
+     * 空格连字符之类去掉，超过十位截断。清洗结果写在行尾 ——
      * 录进画面的就是这一串，不能让人以为自己敲的原样进去了。</p>
      */
     private void bindLicensePlate() {
-        EditTextPreference pref = findPreference("pref_license_plate");
+        SwitchNavPreference pref = findPreference("pref_license_plate");
         if (pref == null) {
             return;
         }
         pref.setPersistent(false);
-        pref.setText(appConfig.getLicensePlateRaw());
-        showLicensePlate();
+        pref.setChecked(appConfig.isLicensePlateEnabled());
+        showLicensePlate(pref);
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            String raw = String.valueOf(newValue);
-            String clean = LicensePlate.sanitize(raw);
-            appConfig.setLicensePlate(clean);
-            pref.setText(clean);
-            showLicensePlate();
-            if (!clean.equals(raw.trim()) && !clean.isEmpty()) {
-                toast(getString(R.string.msg_plate_cleaned, clean));
+            boolean on = Boolean.TRUE.equals(newValue);
+            if (on && appConfig.getLicensePlateRaw().isEmpty()) {
+                editLicensePlate(pref, true);
+                return false;
             }
-            return false;
+            showPlateStamp(on);
+            return true;
+        });
+        pref.setOnPreferenceClickListener(preference -> {
+            editLicensePlate(pref, false);
+            return true;
         });
     }
 
-    /** 摘要写当前车牌号；没填就说没填，并把规则写在后面。 */
-    private void showLicensePlate() {
-        EditTextPreference pref = findPreference("pref_license_plate");
-        if (pref == null) {
-            return;
-        }
+    /**
+     * 改车牌号（输入框，提示写着规则）。
+     *
+     * @param turnOn 是打开开关时车牌号还空着弹的：填了就打开
+     */
+    private void editLicensePlate(SwitchNavPreference pref, boolean turnOn) {
+        showTextDialog("pref_license_plate", getString(R.string.set_plate_title), getString(R.string.set_plate_hint),
+                appConfig.getLicensePlateRaw(), raw -> {
+                    String clean = LicensePlate.sanitize(raw);
+                    appConfig.setLicensePlate(clean);
+                    if (!clean.equals(raw.trim()) && !clean.isEmpty()) {
+                        toast(getString(R.string.msg_plate_cleaned, clean));
+                    }
+                    boolean on = !clean.isEmpty() && (turnOn || pref.isChecked());
+                    if (on != pref.isChecked()) {
+                        showPlateStamp(on);
+                        pref.setChecked(on);
+                    }
+                    showLicensePlate(pref);
+                });
+    }
+
+    /** 车牌号水印开 / 关，记黑匣子（和别的开关一样）。 */
+    private void showPlateStamp(boolean on) {
+        appConfig.setLicensePlateEnabled(on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_license_plate → " + (on ? "开" : "关"));
+    }
+
+    /** 行尾写当前车牌号；没填写「未填写」。 */
+    private void showLicensePlate(SwitchNavPreference pref) {
         String plate = appConfig.getLicensePlateRaw();
-        pref.setSummary(plate.isEmpty()
-                ? getString(R.string.set_plate_empty) + " · " + getString(R.string.set_plate_hint)
-                : plate + " · " + getString(R.string.set_plate_hint));
+        pref.setValue(plate.isEmpty() ? getString(R.string.set_plate_empty) : plate);
     }
 
     private String describeLimit(int gigabytes) {
@@ -1092,9 +1106,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_reduce_motion", appConfig.isReduceMotionWhileRecording(),
                 value -> appConfig.setReduceMotionWhileRecording(value));
-        // 车辆状态面板：主界面那个控件自己听这个开关
-        bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
-                value -> appConfig.setVehicleStatusEnabled(value));
 
         bindEnum("pref_fisheye_projection", SettingsRegistry.FISHEYE_PROJECTION,
                 appConfig.getFisheyeProjection(), value -> {
@@ -1242,6 +1253,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
+        // 应用水印（2026-10-23 从录制页挪来）：应用名与版本（填了车牌号跟在后面）每一路 MediaCodec 录像、每一张照片都盖，
+        // 和「时间水印」开不开无关（录像见 EglSurfaceEncoder.drawBrandOverlay，照片见 SingleCamera.addWatermark；
+        // MediaRecorder 模式什么角标都画不了），这里只是把这件事摆出来：开着、灰着、点不动。
+        // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
+        SwitchPreferenceCompat brand = findPreference("pref_watermark_brand");
+        if (brand != null) {
+            brand.setPersistent(false);
+            brand.setChecked(true);
+            brand.setEnabled(false);
+        }
+
+        // 车辆状态面板（2026-10-23 从界面页挪来）：主界面那个控件自己听这个开关
+        bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
+                value -> appConfig.setVehicleStatusEnabled(value));
+
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
 
@@ -1351,33 +1377,39 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 单行文本输入：车牌号、视频 / 图片存储上限。
+     * 单行文本输入：视频 / 图片存储上限、熄屏录制时长。
      * 标题和说明取 XML 里的 dialogTitle / dialogMessage（存储上限靠它们写单位和清理规则），
      * 和下拉框一个规矩：没写标题就用这一行的标题，没写说明就不带。
      */
     private void showTextDialog(EditTextPreference pref) {
+        CharSequence title = pref.getDialogTitle() != null
+                ? pref.getDialogTitle() : pref.getTitle();
+        showTextDialog(pref.getKey(), title, pref.getDialogMessage(), pref.getText(), value -> {
+            if (pref.callChangeListener(value)) {
+                pref.setText(value);
+            }
+        });
+    }
+
+    /** 单行文本输入框：上面那几行和车牌号（开关加下一层那一行）共用。键盘按 {@code key} 配（{@link #configureInput}）。 */
+    private void showTextDialog(String key, CharSequence title, CharSequence message, String current,
+                                StringSetter onSave) {
         final android.widget.EditText input =
                 com.kooo.evcam.ui.CamDialogs.input(requireContext());
-        input.setText(pref.getText());
+        input.setText(current);
         input.setSelectAllOnFocus(true);
-        configureInput(pref.getKey(), input);
+        configureInput(key, input);
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
         android.widget.FrameLayout box = new android.widget.FrameLayout(requireContext());
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(input);
 
-        CharSequence title = pref.getDialogTitle() != null
-                ? pref.getDialogTitle() : pref.getTitle();
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
-                .setMessage(pref.getDialogMessage())
+                .setMessage(message)
                 .setView(box)
-                .setPositiveButton(R.string.action_save, (dialog, which) -> {
-                    String value = input.getText().toString();
-                    if (pref.callChangeListener(value)) {
-                        pref.setText(value);
-                    }
-                })
+                .setPositiveButton(R.string.action_save,
+                        (dialog, which) -> onSave.set(input.getText().toString()))
                 .setNegativeButton(R.string.action_cancel, null));
     }
 

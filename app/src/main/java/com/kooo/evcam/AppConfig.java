@@ -107,7 +107,6 @@ public class AppConfig {
 
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
-    private static final String KEY_WATERMARK_SPEC_ENABLED = "watermark_spec_enabled";  // 角标附带录制规格
     private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";
     private static final String KEY_INFO_BAR = "info_bar_enabled";  // 录像下方的行驶信息条
     private static final String KEY_VEHICLE_STATUS = "vehicle_status_panel";  // 主界面的车辆状态面板（试验性）
@@ -653,7 +652,8 @@ public class AppConfig {
                 KEY_RELAY_WRITE_ENABLED,              // 中转写入 → 关
                 KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
                 KEY_SIDE_VIEW_UP,
-                KEY_SIDE_VIEW_FOV));
+                KEY_SIDE_VIEW_FOV,
+                KEY_VEHICLE_STATUS));                 // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
             keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
         }
@@ -695,9 +695,10 @@ public class AppConfig {
      * <ul>
      *   <li>{@code cabins_one_shot_revert_pending}：2.17.0–2.19.0 前后座舱只用一次时，「视频流配置待改回『极氪7X（环视）』」的记号。
      *       2.20.0 起只有前座舱只用一次、不再改选择（项目所有者 2026-10-23）。</li>
+     *   <li>{@code watermark_spec_enabled}：「水印显示录制规格」。2026-10-23 起录制规格跟着「时间水印」同开同关（项目所有者）。</li>
      * </ul>
      */
-    private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending"};
+    private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending", "watermark_spec_enabled"};
 
     /** 进程起来时调一次：去掉的功能留下的键（{@link #RETIRED_KEYS}）有就删。 */
     public void forgetRetiredKeys() {
@@ -1763,21 +1764,6 @@ public class AppConfig {
     }
     
     /**
-     * 角标是否附带录制规格（分辨率 / 帧率 / 编码 / 码率）。
-     *
-     * <p>默认开启：录像上带着自己的录制参数，事后回看时不必再去猜当时是什么设置。
-     * 需要角标尽量小的场合可以关掉。</p>
-     */
-    public boolean isWatermarkSpecEnabled() {
-        return prefs.getBoolean(KEY_WATERMARK_SPEC_ENABLED, true);
-    }
-
-    public void setWatermarkSpecEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_WATERMARK_SPEC_ENABLED, enabled).apply();
-        AppLog.d(TAG, "角标规格行: " + (enabled ? "显示" : "隐藏"));
-    }
-
-    /**
      * 要落进画面的车牌号；关掉开关或者没填时返回空串。
      *
      * <p>存进来的值一律先过 {@link LicensePlate#sanitize} —— 界面上显示的、
@@ -1870,9 +1856,9 @@ public class AppConfig {
         AppLog.i(TAG, "行驶信息条: " + (enabled ? "开" : "关"));
     }
 
-    /** 主界面动作栏里的车辆状态面板（试验性）。默认关。 */
+    /** 主界面动作栏里的车辆状态面板（试验性）。默认关；2026-10-23 起归开发者选项管，关着开发者选项时按关算（DEVELOPER_KEYS）。 */
     public boolean isVehicleStatusEnabled() {
-        return prefs.getBoolean(KEY_VEHICLE_STATUS, false);
+        return readBoolean(KEY_VEHICLE_STATUS, false);
     }
 
     public void setVehicleStatusEnabled(boolean enabled) {
