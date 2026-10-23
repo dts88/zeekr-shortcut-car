@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings → Super mirror: Direction label and Tap to switch (was Button mode) are buttons on the Super mirror row; Tap to switch says how it works when turned on. Fisheye correction is one row with the field of view: tapping it opens a slider that previews on the window as you drag. Window is one row showing the width and height: tapping it opens a full-screen frame to drag by its edges or corners or pinch (moving it there is not saved), and Reset sits at the end of the row and asks first; after a reset every row on the page shows the restored values. Blind spot view opens its own page with the display position, minimum speed and HUD settings; minimum speed is greyed out when the view shows on the HUD only.
 
 ## [2.21.0-alpha] - 2026-10-23
 

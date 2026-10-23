@@ -140,6 +140,19 @@ public class RearViewMirrorService extends Service {
         }
     }
 
+    /** 窗口此刻在屏幕上的位置和大小（设置里的窗口编辑框从这里起步，{@link RearViewWindowEditor}）；没在显示时为 null。主线程调。 */
+    public static android.graphics.Rect windowOnScreen() {
+        RearViewMirrorService svc = instance;
+        RearViewMirrorView view = svc != null ? svc.mirrorView : null;
+        if (view == null || !view.isShowing() || view.getWidth() <= 0 || view.getHeight() <= 0) {
+            return null;
+        }
+        int[] location = new int[2];
+        view.getLocationOnScreen(location);
+        return new android.graphics.Rect(location[0], location[1],
+                location[0] + view.getWidth(), location[1] + view.getHeight());
+    }
+
     /**
      * 卡顿监测用：窗口此刻是否真的在屏幕上画。
      *
