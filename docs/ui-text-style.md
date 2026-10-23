@@ -302,6 +302,12 @@
     set_group_views（这一页不分组）。
   - 切换方式的两个选项是项目所有者定的名字：opt_rearview_switch_swipe「滑动切换」/「Swipe」/「Leret」、
     opt_rearview_switch_tap「点按切换」/「Tap」/「Ketik」；选到点按切换时用已批的 set_rearview_button_mode_summary 提示一句。
+- 2026-10-23 批准（超级镜子页切换方式那一行的名字、检查更新加「接收 Alpha 版」）：
+  - set_rearview_switch_mode_title「切换方式」/「Switch views by」/「Tukar paparan dengan」（两个选项见上面已批的那一条）。
+  - set_update_alpha_title「接收 Alpha 版」/「Include alpha releases」/「Termasuk keluaran alpha」；
+    set_update_alpha_summary「Alpha 版是开发中的测试版本，可能不稳定」/「Alpha releases are test builds still in development
+    and may be unstable」/「Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil」。
+    随「接收 Beta 版」：Beta 关着时这一行不可用（说明里不另写）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -310,12 +316,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-10-23（超级镜子页切换方式那一行的名字、检查更新加「接收 Alpha 版」）：
-  - set_rearview_switch_mode_title「切换方式」/「Switch views by」/「Tukar paparan dengan」（两个选项见上面已批的那一条）。
-  - set_update_alpha_title「接收 Alpha 版」/「Include alpha releases」/「Termasuk keluaran alpha」；
-    set_update_alpha_summary「Alpha 版是开发中的测试版本，可能不稳定」/「Alpha releases are test builds still in development
-    and may be unstable」/「Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil」。
-    随「接收 Beta 版」：Beta 关着时这一行不可用（说明里不另写）。
+- （现在没有。）
 
 ---
 

@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.22.0-alpha] - 2026-10-23
+
 - Settings → Super mirror: the page has no group headings any more. Direction label is a button on the Super mirror row. Button mode becomes Switch views by, Swipe or Tap (Swipe by default); choosing Tap says how it works. Fisheye correction is one row with the field of view: tapping it opens a slider that previews on the window as you drag. Window is one row showing the width and height: tapping it opens a full-screen frame to drag by its edges or corners or pinch (moving it there is not saved), and Reset sits at the end of the row and asks first; after a reset every row on the page shows the restored values. Blind spot view opens its own page with the display position, minimum speed and HUD settings; minimum speed is greyed out when the view shows on the HUD only.
 - Settings → Interface: Less motion while recording is now off by default.
 - Settings → Check for updates: new Include alpha releases switch, off by default. It only counts while Include beta releases is on.
