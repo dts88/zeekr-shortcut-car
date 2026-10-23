@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置行里的附加项按钮（Chip）的底：按下（开）是橙色淡底，没按是中性灰块 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/energy_quiet" android:state_checked="true" />
+    <item android:color="@color/sunken" />
+</selector>

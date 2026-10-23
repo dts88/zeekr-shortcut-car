@@ -41,7 +41,7 @@ import java.util.TreeSet;
  * <h3>框架</h3>
  *
  * <ul>
- *   <li><b>开不开</b>（{@link #flashEnabled}）：「锁定影像」开着，而且「闪远光时自动锁定当前录像」开着
+ *   <li><b>开不开</b>（{@link #flashEnabled}）：「锁定影像」开着，而且下面「自动锁定」的「闪远光」按着
  *       （默认关：自动锁的也占空间，锁满了就停录）。真正录上了 / 不录了（{@code MultiCameraManager} 里录像状态
  *       只在一处改，开录失败、重建前停也走那里）、两个开关变了（设置页）都来这里对一次（{@link #update}）。
  *       悬浮按钮只看「锁定影像」（{@link Source}）。</li>
@@ -79,7 +79,7 @@ public final class AutoLock implements Telemetry.Listener {
      * 不同的只有什么时候起作用、黑匣子上写哪个名字、怎么提示。
      */
     private enum Source {
-        /** 闪远光（车机信号）：「锁定影像」和「闪远光时自动锁定当前录像」都开着才锁；第一遍锁上了新的才提示。 */
+        /** 闪远光（车机信号）：「锁定影像」开着、「自动锁定」的「闪远光」按着才锁；第一遍锁上了新的才提示。 */
         FLASH,
         /** 悬浮按钮「锁定当前录像」：「锁定影像」开着就锁；每按一次回一句（{@link Reply}）。 */
         BUTTON;
@@ -152,7 +152,7 @@ public final class AutoLock implements Telemetry.Listener {
         });
     }
 
-    /** 设置页里「锁定影像」或「闪远光时自动锁定」变了：正在录的话马上按新的来。 */
+    /** 设置页里「锁定影像」或「闪远光」变了：正在录的话马上按新的来。 */
     public void settingsChanged(Context context) {
         if (context == null) {
             return;
