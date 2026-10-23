@@ -80,6 +80,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private List<StorageHelper.VolumeInfo> storageVolumes;
     /** 选择框标题下面那一行此刻的状态，挂在这一行的 extras 上（存储位置：录像保存在哪，{@link #updateSavedIn}）。 */
     private static final String EXTRA_DIALOG_STATUS = "cam_dialog_status";
+    /** 超级镜子「切换方式」两个选项的值（{@link #bindSwitchMode}）。 */
+    private static final String SWITCH_SWIPE = "swipe";
+    private static final String SWITCH_TAP = "tap";
 
     private static final String ARG_SECTION = "section";
 
@@ -807,7 +810,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 });
         SwitchChipsPreference mirror = findPreference("pref_rearview");
         if (mirror != null) {
-            // 第 0 项方向标签、第 1 项点按切换（重置之后照这个顺序改回来，见 resetRearView）
+            // 第 0 项（也是唯一一项）方向标签：重置之后照这个下标改回来，见 resetRearView
             mirror.addOption(getString(R.string.set_rearview_camera_label_title),
                     appConfig.isRearViewCameraLabelEnabled(), on -> {
                         appConfig.setRearViewCameraLabelEnabled(on);
@@ -815,24 +818,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                                 "开关变更: pref_rearview_camera_label → " + (on ? "开" : "关"));
                         RearViewMirrorService.refreshCameraLabel();
                     });
-            // 附加项没有说明：点按切换打开时提示一句怎么点
-            mirror.addOption(getString(R.string.set_rearview_button_mode_title),
-                    appConfig.isRearViewButtonMode(), on -> {
-                        appConfig.setRearViewButtonMode(on);
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
-                                "开关变更: pref_rearview_button_mode → " + (on ? "开" : "关"));
-                        if (getContext() == null) {
-                            return;
-                        }
-                        if (on) {
-                            Toast.makeText(getContext(), R.string.set_rearview_button_mode_summary,
-                                    Toast.LENGTH_LONG).show();
-                        }
-                        if (appConfig.isRearViewEnabled()) {
-                            RearViewMirrorService.applyButtonMode(getContext());
-                        }
-                    });
         }
+        bindSwitchMode();
 
         // 不跟着开关走：还没打开后视镜之前，也该能先看看它怎么用
         onClick("pref_rearview_guide",
@@ -847,6 +834,39 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindFisheye();
         bindRearViewWindow();
+    }
+
+    /**
+     * 切换方式：滑动切换 / 点按切换，二选一，默认滑动切换（项目所有者 2026-10-23）。存的还是原来那个开关
+     * （{@code AppConfig.isRearViewButtonMode}，开 = 点按切换）—— 点按切换时横划不换路，两样本来就只能用一样；
+     * 所以这里不走 {@link SettingsRegistry}（那里的设置存的是选项的值），两个选项直接写在这。
+     * 选到点按切换时提示一句怎么点。
+     */
+    private void bindSwitchMode() {
+        SegmentedPreference pref = findPreference("pref_rearview_switch_mode");
+        if (pref == null) {
+            return;
+        }
+        pref.setOptions(new CharSequence[]{
+                getString(R.string.opt_rearview_switch_swipe), getString(R.string.opt_rearview_switch_tap)},
+                new String[]{SWITCH_SWIPE, SWITCH_TAP});
+        pref.setValue(appConfig.isRearViewButtonMode() ? SWITCH_TAP : SWITCH_SWIPE);
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean tap = SWITCH_TAP.equals(newValue);
+            appConfig.setRearViewButtonMode(tap);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                    "设置变更: pref_rearview_switch_mode → " + (tap ? "点按切换" : "滑动切换"));
+            if (getContext() == null) {
+                return true;
+            }
+            if (tap) {
+                Toast.makeText(getContext(), R.string.set_rearview_button_mode_summary, Toast.LENGTH_LONG).show();
+            }
+            if (appConfig.isRearViewEnabled()) {
+                RearViewMirrorService.applyButtonMode(getContext());
+            }
+            return true;
+        });
     }
 
     /** 鱼眼校正（开关加下一层）：行首的开关管校正开不开；行尾写视野角度，点这一行在框里拖（{@link #editFov}）。 */
@@ -998,7 +1018,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         SwitchChipsPreference mirror = findPreference("pref_rearview");
         if (mirror != null) {
             mirror.setOptionChecked(0, appConfig.isRearViewCameraLabelEnabled());
-            mirror.setOptionChecked(1, appConfig.isRearViewButtonMode());
         }
         SegmentedPreference views = findPreference("pref_rearview_views");
         if (views != null) {
@@ -1747,6 +1766,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
         bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
                 value -> appConfig.setUpdateBetaEnabled(value));
+        // 随「接收 Beta 版」（XML 里的 dependency）：Beta 关着时它不可用，也不算数（UpdateFlow）
+        bindSwitch("pref_update_alpha", appConfig.isUpdateAlphaEnabled(),
+                value -> appConfig.setUpdateAlphaEnabled(value));
     }
 
     // ------------------------------------------------------------------ 小工具

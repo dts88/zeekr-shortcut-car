@@ -10,6 +10,8 @@
     <string name="set_check_update_summary">Current version %1$s</string>
     <string name="set_update_beta_title">Include beta releases</string>
     <string name="set_update_beta_summary">When off, checks stable releases only</string>
+    <string name="set_update_alpha_title">Include alpha releases</string>
+    <string name="set_update_alpha_summary">Alpha releases are test builds still in development and may be unstable</string>
     <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
@@ -19,7 +21,6 @@
     <string name="set_group_photo">Photos</string>
     <string name="set_group_stamps">Stamps</string>
     <string name="set_group_cleanup">Automatic cleanup</string>
-    <string name="set_group_views">Switching views</string>
     <string name="set_group_window">Window</string>
     <string name="set_group_behavior">Behavior</string>
     <string name="set_group_appearance">Appearance</string>
@@ -48,7 +49,9 @@
     <string name="set_relay_summary">Writes to internal storage first, then moves each finished clip to the USB drive, reducing dropped frames on a slow drive. When on, recording doesn\'t switch to another USB drive if this one disconnects.</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
     <string name="set_rearview_summary">Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror</string>
-    <string name="set_rearview_button_mode_title">Tap to switch</string>
+    <string name="set_rearview_switch_mode_title">Switch views by</string>
+    <string name="opt_rearview_switch_swipe">Swipe</string>
+    <string name="opt_rearview_switch_tap">Tap</string>
     <string name="set_rearview_button_mode_summary">Switches to the front, rear, left or right view when the top, bottom, left or right area is tapped; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom</string>
     <string name="set_rearview_views_title">Views</string>
     <string name="opt_views_four">All four</string>

@@ -24,6 +24,8 @@
     <string name="set_check_update_summary">当前版本 %1$s</string>
     <string name="set_update_beta_title">接收 Beta 版</string>
     <string name="set_update_beta_summary">关闭后，仅检查正式版</string>
+    <string name="set_update_alpha_title">接收 Alpha 版</string>
+    <string name="set_update_alpha_summary">Alpha 版是开发中的测试版本，可能不稳定</string>
     <string name="upd_none_release">未找到可安装的正式版</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>
@@ -33,7 +35,6 @@
     <string name="set_group_photo">拍照</string>
     <string name="set_group_stamps">水印</string>
     <string name="set_group_cleanup">自动清理</string>
-    <string name="set_group_views">切换画面</string>
     <string name="set_group_window">窗口</string>
     <string name="set_group_behavior">行为</string>
     <string name="set_group_appearance">外观</string>
@@ -62,7 +63,9 @@
     <string name="set_relay_summary">先写入内置存储，每个片段完成后再转存至 U 盘，可减少 U 盘写入不稳导致的丢帧。开启后，U 盘断开时不会自动改为录制到其他 U 盘。</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
     <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
-    <string name="set_rearview_button_mode_title">点按切换</string>
+    <string name="set_rearview_switch_mode_title">切换方式</string>
+    <string name="opt_rearview_switch_swipe">滑动切换</string>
+    <string name="opt_rearview_switch_tap">点按切换</string>
     <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
     <string name="set_rearview_views_title">切换范围</string>
     <string name="opt_views_four">四向</string>

@@ -10,6 +10,8 @@
     <string name="set_check_update_summary">Versi semasa %1$s</string>
     <string name="set_update_beta_title">Termasuk keluaran beta</string>
     <string name="set_update_beta_summary">Jika dimatikan, hanya keluaran stabil disemak</string>
+    <string name="set_update_alpha_title">Termasuk keluaran alpha</string>
+    <string name="set_update_alpha_summary">Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil</string>
     <string name="upd_none_release">Tiada keluaran stabil yang boleh dipasang</string>
     <string name="set_section_recording">Rakaman</string>
     <string name="set_section_storage">Storan</string>
@@ -19,7 +21,6 @@
     <string name="set_group_photo">Foto</string>
     <string name="set_group_stamps">Tera</string>
     <string name="set_group_cleanup">Pembersihan automatik</string>
-    <string name="set_group_views">Tukar paparan</string>
     <string name="set_group_window">Tetingkap</string>
     <string name="set_group_behavior">Tingkah laku</string>
     <string name="set_group_appearance">Penampilan</string>
@@ -48,7 +49,9 @@
     <string name="set_relay_summary">Menulis ke storan dalaman dahulu, kemudian memindahkan setiap klip yang siap ke pemacu USB, mengurangkan bingkai tercicir pada pemacu perlahan. Jika dihidupkan, rakaman tidak beralih ke pemacu USB lain apabila pemacu ini terputus.</string>
     <string name="set_storage_usage_no_drive">Tiada pemacu USB ditemui</string>
     <string name="set_rearview_summary">Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman</string>
-    <string name="set_rearview_button_mode_title">Ketik untuk tukar</string>
+    <string name="set_rearview_switch_mode_title">Tukar paparan dengan</string>
+    <string name="opt_rearview_switch_swipe">Leret</string>
+    <string name="opt_rearview_switch_tap">Ketik</string>
     <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
     <string name="set_rearview_views_title">Paparan</string>
     <string name="opt_views_four">Empat arah</string>
