@@ -36,6 +36,8 @@ splits it back into a 2×2 grid and builds on that. Chinese, English and Malay i
 - *Driving info bar* (experimental, off by default): turn signals, steering, gear, pedals, speed,
   lamps and more, recorded in a strip under the video.
 
+Footage protection-list updates publish a synced temporary file atomically. If replacement fails or is unsupported, the previous list is retained and the lock operation reports failure; it never deletes the previous list merely to retry a rename. This does not guarantee filesystem/controller durability after power loss.
+
 On the main screen, tap any view to fill the preview with it and tap again to go back. The
 **Straighten** button removes the fisheye bend, on the main screen and in playback. A floating
 button shows whether recording is running and opens the app from anywhere.
