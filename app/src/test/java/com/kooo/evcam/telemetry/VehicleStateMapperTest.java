@@ -49,6 +49,14 @@ public class VehicleStateMapperTest {
         assertEquals(Integer.valueOf(VehicleState.TURN_NONE), s.turnSignal);
     }
 
+    /** 驾驶模式照原样的号进快照（挡位框的颜色按它画）；读不到是 null。 */
+    @Test
+    public void driveModeCodeGoesIntoTheSnapshot() {
+        assertEquals(Integer.valueOf(Signal.DRIVE_MODE_SPORT),
+                map(readings(Signal.DRIVE_MODE, Signal.DRIVE_MODE_SPORT), false).driveMode);
+        assertEquals(null, map(readings(), false).driveMode);
+    }
+
     /** 读不到指示状态时：两盏一起闪就是双闪。 */
     @Test
     public void bothLampsBlinkingIsHazard() {

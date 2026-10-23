@@ -47,6 +47,8 @@ public final class VehicleState {
     public final Float steeringDegrees;
     /** 档位字母：P R N D S 等。 */
     public final String gear;
+    /** 驾驶模式的号（{@link Signal#DRIVE_MODE_COMFORT} …，没对上的照原样）：信息条上是挡位框的颜色。 */
+    public final Integer driveMode;
     /** 油门 / 刹车开度 0..1。 */
     public final Float throttle;
     public final Float brake;
@@ -97,6 +99,7 @@ public final class VehicleState {
         this.hazard = b.hazard;
         this.steeringDegrees = b.steeringDegrees;
         this.gear = b.gear;
+        this.driveMode = b.driveMode;
         this.throttle = b.throttle;
         this.brake = b.brake;
         this.speedKmh = b.speedKmh;
@@ -158,6 +161,7 @@ public final class VehicleState {
         private Boolean hazard;
         private Float steeringDegrees;
         private String gear;
+        private Integer driveMode;
         private Float throttle;
         private Float brake;
         private Float speedKmh;
@@ -195,6 +199,7 @@ public final class VehicleState {
             hazard = s.hazard;
             steeringDegrees = s.steeringDegrees;
             gear = s.gear;
+            driveMode = s.driveMode;
             throttle = s.throttle;
             brake = s.brake;
             speedKmh = s.speedKmh;
@@ -228,6 +233,7 @@ public final class VehicleState {
         public Builder hazard(Boolean v) { hazard = v; return this; }
         public Builder steeringDegrees(Float v) { steeringDegrees = v; return this; }
         public Builder gear(String v) { gear = v; return this; }
+        public Builder driveMode(Integer v) { driveMode = v; return this; }
         public Builder throttle(Float v) { throttle = clamp01(v); return this; }
         public Builder brake(Float v) { brake = clamp01(v); return this; }
         public Builder speedKmh(Float v) { speedKmh = v; return this; }

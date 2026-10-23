@@ -131,6 +131,8 @@ public class InfoBarLayoutTest {
                 {Signal.BRAKE_PEDAL, InfoBarLayout.Cell.PEDALS},
                 {Signal.SEAT_DRIVER, InfoBarLayout.Cell.CABIN},
                 {Signal.SEAT_PASSENGER, InfoBarLayout.Cell.CABIN},
+                // 驾驶模式画成挡位框的颜色（项目所有者 2026-10-21），不再是文字格
+                {Signal.DRIVE_MODE, InfoBarLayout.Cell.GEAR},
         };
         for (Object[] c : cases) {
             Signal signal = (Signal) c[0];
@@ -154,7 +156,7 @@ public class InfoBarLayoutTest {
     @Test
     public void relatedButDifferentInformationStaysText() {
         for (Signal s : new Signal[]{Signal.AUTO_HOLD, Signal.STOCK_POPUP, Signal.PARK_ASSIST, Signal.LIGHT_SWITCH,
-                Signal.DOOR_FRUNK, Signal.DOOR_TRUNK, Signal.CHARGE_PORT, Signal.LANE_CHANGE_ASSIST,
+                Signal.DOOR_FRUNK, Signal.DOOR_TRUNK, Signal.CHARGE_PORT,
                 Signal.AUTO_LANE_CHANGE, Signal.DOOR_OPEN_WARNING, Signal.LCC, Signal.BATTERY}) {
             assertTrue(s.name(), InfoBarLayout.cellsFor(s.name()).isEmpty());
             assertFalse(s.name(), InfoBarLayout.hasIcon(s));

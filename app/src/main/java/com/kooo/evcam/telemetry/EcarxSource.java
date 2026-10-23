@@ -143,7 +143,15 @@ final class EcarxSource {
     /** 记录出过错、日志写过了（只写一次，{@link #probeFailed}）。 */
     private boolean probeFailureLogged;
 
+    /**
+     * 快读的读法（{@link FastReads}）：读哪几个浮点、多久一次；没人快读是 null。还没起线程时由 {@link Telemetry} 直接写，
+     * 之后只在自己的线程上改（{@link #setFast}）。
+     */
+    private volatile FastReads.Plan fastPlan;
+    private long fastVersion;
+
     private final Runnable floatPoll = this::pollFloats;
+    private final Runnable fastPoll = this::pollFast;
     private final Runnable reconcile = this::reconcileDiscrete;
     /** 合并窗口到点的那一次发布；当场对账（{@link #reconcileNow}）要立刻发布，撤的是它。 */
     private final Runnable publish = this::publishNow;
@@ -266,6 +274,58 @@ final class EcarxSource {
         values.keySet().removeIf(Signal::isFloat);
         telemetry.floatsCleared(this);
         schedulePublish(0);
+    }
+
+    /**
+     * 快读的读法变了（{@link Telemetry#acquireFast} / {@link Telemetry#releaseFast}；新来源起之前也给一次）。
+     * 还没起线程的直接记下，连上后照它读；起了的在自己的线程上换：停旧节拍，有读法而且连着就马上读一遍、按新间隔接着读，
+     * 没人快读了就发一份空的。
+     */
+    void fast(FastReads.Plan plan) {
+        Handler h = handler;
+        if (h == null) {
+            fastPlan = plan;
+            return;
+        }
+        if (!stopped) {
+            h.post(() -> setFast(plan));
+        }
+    }
+
+    private void setFast(FastReads.Plan plan) {
+        Handler h = handler;
+        if (stopped || h == null) {
+            return;
+        }
+        fastPlan = plan;
+        h.removeCallbacks(fastPoll);
+        if (plan == null) {
+            telemetry.publishFast(this, FastReadings.empty());
+            return;
+        }
+        if (connected) {
+            pollFast();
+        }
+    }
+
+    /** 快读一遍：只读读法里那几个浮点，解出来放进一份新快照交给 {@link Telemetry}（不进读数表、不发布），再排下一次。 */
+    private void pollFast() {
+        FastReads.Plan plan = fastPlan;
+        if (stopped || !connected || plan == null) {
+            return;
+        }
+        Map<Signal, Float> read = new EnumMap<>(Signal.class);
+        for (Signal s : plan.signals) {
+            Object decoded = s.decode(read(s));
+            if (decoded instanceof Float) {
+                read.put(s, (Float) decoded);
+            }
+        }
+        telemetry.publishFast(this, new FastReadings(read, SystemClock.elapsedRealtime(), ++fastVersion));
+        Handler h = handler;
+        if (h != null) {
+            h.postDelayed(fastPoll, plan.intervalMs);
+        }
     }
 
     /**
@@ -392,6 +452,9 @@ final class EcarxSource {
             if (h != null && !stopped) {
                 if (floatsOn) {
                     h.postDelayed(floatPoll, FLOAT_POLL_MS);
+                }
+                if (fastPlan != null) {
+                    h.post(fastPoll);
                 }
                 h.postDelayed(reconcile, RECONCILE_MS);
             }
@@ -883,10 +946,12 @@ final class EcarxSource {
         if (h != null) {
             h.removeCallbacks(reconcile);
             h.removeCallbacks(floatPoll);
+            h.removeCallbacks(fastPoll);
             h.removeCallbacks(publish);
             h.removeCallbacks(holdPublish);
         }
         values.clear();
+        telemetry.publishFast(this, FastReadings.empty());
         publishNow();
         status = "lost: " + DEAD_PASSES + " read passes in a row returned nothing";
         report(Telemetry.CarLink.FAILED);

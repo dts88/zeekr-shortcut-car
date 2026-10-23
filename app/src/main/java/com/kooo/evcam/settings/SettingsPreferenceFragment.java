@@ -11,7 +11,6 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.List;
 import androidx.annotation.Nullable;
-import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
@@ -61,6 +60,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private static final String TAG = "SettingsPreference";
 
     private AppConfig appConfig;
+    /**
+     * 「录制声音」打开时要录音权限（项目所有者 2026-10-20：开关打开时才要，不在启动时要）：系统弹窗的结果回到这里。
+     * 只能在建这个界面时登记（registerForActivityResult 的规矩），所以放在字段上。
+     */
+    private final androidx.activity.result.ActivityResultLauncher<String> micPermission =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                    this::onMicPermission);
     /** 绑定这一页时开发者选项开没开；回到这一页时变了就重绑（见 {@link #onResume}）。 */
     private boolean boundUnlocked;
     /** 外置卷的取值前缀，后面接它在探测结果里的下标。 */
@@ -71,6 +77,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
     private static final String EXTERNAL_MISSING = "external-missing";
     private List<StorageHelper.VolumeInfo> storageVolumes;
+    /** 选择框标题下面那一行此刻的状态，挂在这一行的 extras 上（存储位置：录像保存在哪，{@link #updateSavedIn}）。 */
+    private static final String EXTRA_DIALOG_STATUS = "cam_dialog_status";
+    /** 超级镜子「切换方式」两个选项的值（{@link #bindSwitchMode}）。 */
+    private static final String SWITCH_SWIPE = "swipe";
+    private static final String SWITCH_TAP = "tap";
 
     private static final String ARG_SECTION = "section";
 
@@ -89,6 +100,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         return fragment;
     }
 
+    /**
+     * 嵌在分区里的 PreferenceScreen 是下一层页面（盲区画面），只从它那一行（开关加下一层）进：
+     * 在上一层不列成一行 —— androidx 本来会把它画成一行，点了却没处接。
+     */
+    private static void hideSubPages(androidx.preference.PreferenceGroup group) {
+        if (group == null) {
+            return;
+        }
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            Preference child = group.getPreference(i);
+            if (child instanceof androidx.preference.PreferenceScreen) {
+                child.setVisible(false);
+            } else if (child instanceof androidx.preference.PreferenceGroup) {
+                hideSubPages((androidx.preference.PreferenceGroup) child);
+            }
+        }
+    }
+
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
         String section = rootKey;
@@ -96,6 +125,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             section = getArguments().getString(ARG_SECTION);
         }
         setPreferencesFromResource(R.xml.preferences, section);
+        hideSubPages(getPreferenceScreen());
         if (getContext() == null) {
             return;
         }
@@ -145,8 +175,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
-        updateStorageUsage();
-        refreshRearViewSize();
+        updateSavedIn();
+        refreshRearViewWindow();
+        refreshSideViewTarget();
+        refreshDriveSoundValue();
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // 窗口编辑框是一层全屏悬浮窗：设置页退到后台时关掉、不存，不压在别的应用上面
+        com.kooo.evcam.zeekr.RearViewWindowEditor.cancel();
     }
 
     // ------------------------------------------------------------------ 录制
@@ -177,35 +216,23 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
 
 
-        bindSwitch("pref_license_plate_enabled", appConfig.isLicensePlateEnabled(),
-                enabled -> {
-                    appConfig.setLicensePlateEnabled(enabled);
-                    showLicensePlate();
-                });
-        bindLicensePlate();
-
-        // 应用名与版本（填了车牌号跟在后面）每一路 MediaCodec 录像、每一张照片都盖，和「时间水印」开不开无关
-        // （录像见 EglSurfaceEncoder.drawBrandOverlay，照片见 SingleCamera.addWatermark；
-        // 开发者选项里的 MediaRecorder 模式什么角标都画不了），
-        // 这里只是把这件事摆在界面上：开着、灰着、点不动。
-        // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
-        SwitchPreferenceCompat brand = findPreference("pref_watermark_brand");
-        if (brand != null) {
-            brand.setPersistent(false);
-            brand.setChecked(true);
-            brand.setEnabled(false);
-        }
-
+        // 时间水印：时间和录制规格同开同关（项目所有者 2026-10-23），录像上的规格那一行跟着它（MultiCameraManager.planFor）
         bindSwitch("pref_watermark", appConfig.isTimestampWatermarkEnabled(),
                 value -> appConfig.setTimestampWatermarkEnabled(value));
 
-        bindSwitch("pref_watermark_spec", appConfig.isWatermarkSpecEnabled(),
-                value -> appConfig.setWatermarkSpecEnabled(value));
+        bindLicensePlate();
 
-        // 行驶信息条（试验项目）：经纬度和 GPS 车速要定位权限，已经有了（比如车机预先授予）才用，
+        // 行驶信息条（试验项目）：开关加下一层（ui-spec §三）—— 点这一行进「系统信息」勾显示哪几项（系统页那个入口照旧），
+        // 行尾写勾了几项。经纬度和 GPS 车速要定位权限，已经有了（比如车机预先授予）才用，
         // 不弹权限框（项目所有者 2026-10-06）；没有就不显示，见 LocationSource
         bindSwitch("pref_info_bar", appConfig.isInfoBarEnabled(),
                 value -> appConfig.setInfoBarEnabled(value));
+        onClick("pref_info_bar", pref ->
+                openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        SwitchNavPreference infoBar = findPreference("pref_info_bar");
+        if (infoBar != null) {
+            infoBar.setValue(getString(R.string.set_info_bar_value, appConfig.getInfoBarItems().size()));
+        }
     }
 
     /**
@@ -265,46 +292,33 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
-        bindGigabyteLimit("pref_video_limit", appConfig.getVideoStorageLimitGb(),
-                value -> appConfig.setVideoStorageLimitGb(value));
-        bindGigabyteLimit("pref_photo_limit", appConfig.getPhotoStorageLimitGb(),
-                value -> appConfig.setPhotoStorageLimitGb(value));
-
+        bindStorageLimits();
         bindFootageLock();
-        bindAutoLock();
-        updateStorageUsage();
+        updateSavedIn();
     }
 
     /**
-     * 锁定影像下面的两个自动锁定（项目所有者 2026-10-04），默认关：自动锁的也占空间，锁满了就停录。
-     * 「锁定影像」关着时闪远光那一项置灰、不起作用（XML 里的 dependency；{@code AutoLock.flashEnabled} 也看它）。
-     * 鸣笛那一项：车上还读不到喇叭信号，一直置灰、打不开，没有触发它的代码。「打不开」只在这里设
-     * （XML 里不写 enabled，和水印品牌那一行一样）。
-     */
-    private void bindAutoLock() {
-        bindSwitch("pref_footage_lock_flash", appConfig.isFlashLockEnabled(), value -> {
-            appConfig.setFlashLockEnabled(value);
-            com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
-        });
-        SwitchPreferenceCompat horn = findPreference("pref_footage_lock_horn");
-        if (horn != null) {
-            horn.setPersistent(false);
-            horn.setChecked(false);
-            horn.setEnabled(false);
-        }
-    }
-
-    /**
-     * 锁定影像。打开直接生效；关掉时如果锁着东西，先说清楚代价（项目所有者 2026-10-03）：
-     * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。
+     * 锁定影像（2026-10-23 合成一行，开关加附加项）。打开直接生效；关掉时如果锁着东西，先说清楚代价（项目所有者 2026-10-03）：
+     * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。行尾写锁了多少（{@link #updateFootageLocked}）。
+     *
+     * <p>开着时下面一排「自动锁定」：闪远光（项目所有者 2026-10-04），默认关 —— 自动锁的也占空间，锁满了就停录；
+     * 锁定影像关着时不起作用（{@code AutoLock.flashEnabled} 也看它）。鸣笛：车上还读不到喇叭信号，按钮摆着、
+     * 置灰按不动（项目所有者 2026-10-23），没有触发它的代码；读得到了再放开。</p>
      */
     private void bindFootageLock() {
-        SwitchPreferenceCompat pref = findPreference("pref_footage_lock");
+        SwitchChipsPreference pref = findPreference("pref_footage_lock");
         if (pref == null) {
             return;
         }
         pref.setPersistent(false);
         pref.setChecked(appConfig.isFootageLockEnabled());
+        pref.setOptionsLabel(getString(R.string.set_footage_lock_auto));
+        pref.addOption(getString(R.string.set_footage_lock_flash_chip), appConfig.isFlashLockEnabled(), on -> {
+            appConfig.setFlashLockEnabled(on);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock_flash → " + (on ? "开" : "关"));
+            com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
+        });
+        pref.addUnavailableOption(getString(R.string.set_footage_lock_horn_chip));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             if (Boolean.TRUE.equals(newValue)) {
                 applyFootageLock(pref, true);
@@ -353,13 +367,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         updateFootageLocked();
     }
 
-    /** 「已锁定」那一行：录像几个文件多大、照片几张多大；开关关着时注明不受保护。 */
+    /** 锁定影像那一行的行尾：锁了几个文件（录像和照片一起数）、多大；开关关着时注明不受保护。 */
     private void updateFootageLocked() {
-        Preference pref = findPreference("pref_footage_locked");
+        SwitchChipsPreference pref = findPreference("pref_footage_lock");
         if (pref == null || getContext() == null) {
             return;
         }
-        pref.setSummary(getString(R.string.info_reading));
+        pref.setValue(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
         final boolean on = appConfig.isFootageLockEnabled();
         new Thread(() -> {
@@ -370,14 +384,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (!isAdded()) {
                 return;
             }
-            String text = videos.files + photos.files == 0
-                    ? getString(R.string.set_footage_locked_none)
-                    : getString(R.string.set_footage_locked_summary,
-                            videos.files, StorageHelper.formatSize(videos.bytes),
-                            photos.files, StorageHelper.formatSize(photos.bytes));
-            final String result = on || videos.files + photos.files == 0 ? text
-                    : getString(R.string.set_footage_locked_unprotected, text);
-            requireActivity().runOnUiThread(() -> pref.setSummary(result));
+            int files = videos.files + photos.files;
+            String size = StorageHelper.formatSize(videos.bytes + photos.bytes);
+            final String result = files == 0 ? getString(R.string.set_footage_locked_none)
+                    : on ? getString(R.string.set_footage_locked_value, files, size)
+                    : getString(R.string.set_footage_locked_value_unprotected, files, size);
+            requireActivity().runOnUiThread(() -> pref.setValue(result));
         }, "footage-locked").start();
     }
 
@@ -477,7 +489,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             return false;
         });
-        updateStorageUsage();
+        updateSavedIn();
     }
 
     /**
@@ -533,68 +545,154 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setValue(value);
         pref.setSummary(pref.getEntry());
         toast(getString(R.string.msg_storage_changed, pref.getEntry()));
-        updateStorageUsage();
-    }
-
-    /** 上限用 GB 存，界面上是个数字输入框；留空或 0 表示不限制。 */
-    private void bindGigabyteLimit(String key, int current, IntSetter setter) {
-        EditTextPreference pref = findPreference(key);
-        if (pref == null) {
-            return;
-        }
-        pref.setPersistent(false);
-        pref.setText(current > 0 ? String.valueOf(current) : "");
-        pref.setSummary(describeLimit(current));
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            int parsed = 0;
-            String text = String.valueOf(newValue).trim();
-            if (!text.isEmpty()) {
-                try {
-                    parsed = Math.max(0, Integer.parseInt(text));
-                } catch (NumberFormatException e) {
-                    toast(getString(R.string.msg_enter_number));
-                    return false;
-                }
-            }
-            setter.set(parsed);
-            pref.setText(parsed > 0 ? String.valueOf(parsed) : "");
-            pref.setSummary(describeLimit(parsed));
-            return false;
-        });
+        updateSavedIn();
     }
 
     /**
-     * 熄屏录制最多不让车机睡多久：用户自己填小时数，可带小数（24、30 都行），存成分钟。
-     * 填错、留空、填 0 或负数（折成分钟四舍五入为 0 的也算）都不收，提示「请输入大于 0 的数字」；
-     * 大到分钟数存不下的，按能存的最大值收。
+     * 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项（GB），清理的规则写在框里。
+     * 上限用 GB 存；留空或 0 表示不限制。
      */
-    private void bindScreenOffWakeHours() {
-        EditTextPreference pref = findPreference("pref_screen_off_wake_hours");
+    private void bindStorageLimits() {
+        Preference pref = findPreference("pref_storage_limits");
         if (pref == null) {
             return;
         }
-        pref.setPersistent(false);
-        pref.setText(hoursText(appConfig.getScreenOffWakeMinutes()));
-        pref.setSummary(getString(R.string.unit_hours, hoursText(appConfig.getScreenOffWakeMinutes())));
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            int minutes;
-            try {
-                double hours = Double.parseDouble(String.valueOf(newValue).trim());
-                // 先夹在 int 范围里再收窄：直接强转，太大的正数会绕成负数被当成「填了负数」，
-                // 太小的负数反倒绕成正数被收下
-                minutes = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(hours * 60)));
-            } catch (NumberFormatException e) {
-                minutes = 0;
-            }
-            if (minutes <= 0) {
-                toast(getString(R.string.msg_enter_positive_number));
-                return false;
-            }
-            appConfig.setScreenOffWakeMinutes(minutes);
-            pref.setText(hoursText(minutes));
-            pref.setSummary(getString(R.string.unit_hours, hoursText(minutes)));
-            return false;
+        PreferenceRows.markValue(pref);
+        showStorageLimits(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            editStorageLimits(pref);
+            return true;
         });
+    }
+
+    private void showStorageLimits(Preference pref) {
+        pref.setSummary(getString(R.string.set_storage_limits_value,
+                describeLimit(appConfig.getVideoStorageLimitGb()), describeLimit(appConfig.getPhotoStorageLimitGb())));
+    }
+
+    /** 一个框里两个数字输入框：录像、照片（GB）。有一个填的不是数字就都不存，提示一句。 */
+    private void editStorageLimits(Preference pref) {
+        Context context = requireContext();
+        android.widget.EditText video = limitInput(context, appConfig.getVideoStorageLimitGb());
+        android.widget.EditText photo = limitInput(context, appConfig.getPhotoStorageLimitGb());
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(context);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(limitRow(context, R.string.set_storage_limits_video, video));
+        box.addView(limitRow(context, R.string.set_storage_limits_photo, photo));
+        android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(context,
+                getString(R.string.set_storage_limits_message));
+        note.setPadding(0, pad / 2, 0, 0);
+        box.addView(note);
+
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_storage_limits_title)
+                .setView(box)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    Integer videoGb = parseLimit(video);
+                    Integer photoGb = parseLimit(photo);
+                    if (videoGb == null || photoGb == null) {
+                        toast(getString(R.string.msg_enter_number));
+                        return;
+                    }
+                    appConfig.setVideoStorageLimitGb(videoGb);
+                    appConfig.setPhotoStorageLimitGb(photoGb);
+                    showStorageLimits(pref);
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    private static android.widget.EditText limitInput(Context context, int current) {
+        android.widget.EditText input = com.kooo.evcam.ui.CamDialogs.input(context);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(current > 0 ? String.valueOf(current) : "");
+        input.setSelectAllOnFocus(true);
+        return input;
+    }
+
+    /** 一行：名称（录像 / 照片）、输入框、单位 GB。 */
+    private static android.view.View limitRow(Context context, int labelRes, android.widget.EditText input) {
+        float density = context.getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout row = new android.widget.LinearLayout(context);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, Math.round(6 * density), 0, Math.round(6 * density));
+        android.widget.TextView label = new android.widget.TextView(context);
+        label.setTextAppearance(R.style.TextAppearance_Cam_Row);
+        label.setText(labelRes);
+        label.setMinWidth(Math.round(96 * density));
+        row.addView(label);
+        row.addView(input, new android.widget.LinearLayout.LayoutParams(0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        android.widget.TextView unit = new android.widget.TextView(context);
+        unit.setTextAppearance(R.style.TextAppearance_Cam_Row);
+        unit.setText("GB");
+        unit.setPadding(Math.round(12 * density), 0, 0, 0);
+        row.addView(unit);
+        return row;
+    }
+
+    /** 留空是 0（不限制）；不是数字是 null。 */
+    private static Integer parseLimit(android.widget.EditText input) {
+        String text = input.getText().toString().trim();
+        if (text.isEmpty()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(text));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 熄屏录制（开发者选项，2026-10-23 和时长上限合成一行，开关加下一层）：行尾写最长多久；点这一行填小时数。
+     * 小时数可带小数（24、30 都行），存成分钟（{@link #saveWakeHours}）。
+     */
+    private void bindScreenOffRecording() {
+        SwitchNavPreference pref = findPreference("pref_screen_off_recording");
+        if (pref == null) {
+            return;
+        }
+        bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
+                value -> appConfig.setScreenOffRecordingEnabled(value));
+        showWakeHours(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            showTextDialog("pref_screen_off_wake_hours", getString(R.string.set_screen_off_wake_title), null,
+                    hoursText(appConfig.getScreenOffWakeMinutes()), text -> {
+                        if (saveWakeHours(text)) {
+                            showWakeHours(pref);
+                        }
+                    });
+            return true;
+        });
+    }
+
+    private void showWakeHours(SwitchNavPreference pref) {
+        pref.setValue(getString(R.string.set_screen_off_wake_value, hoursText(appConfig.getScreenOffWakeMinutes())));
+    }
+
+    /**
+     * 填的小时数收不收：填错、留空、填 0 或负数（折成分钟四舍五入为 0 的也算）都不收，提示「请输入大于 0 的数字」；
+     * 大到分钟数存不下的，按能存的最大值收。收下了返回 true。
+     */
+    private boolean saveWakeHours(String text) {
+        int minutes;
+        try {
+            double hours = Double.parseDouble(text.trim());
+            // 先夹在 int 范围里再收窄：直接强转，太大的正数会绕成负数被当成「填了负数」，
+            // 太小的负数反倒绕成正数被收下
+            minutes = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(hours * 60)));
+        } catch (NumberFormatException e) {
+            minutes = 0;
+        }
+        if (minutes <= 0) {
+            toast(getString(R.string.msg_enter_positive_number));
+            return false;
+        }
+        appConfig.setScreenOffWakeMinutes(minutes);
+        return true;
     }
 
     /** 分钟数写成小时：整点写「2」，不整写「1.5」。 */
@@ -606,43 +704,69 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 车牌号输入框。
+     * 车牌号水印（开关加下一层，ui-spec §三，项目所有者 2026-10-23）：开关管录像和照片上显不显示车牌号；
+     * 点这一行改车牌号，行尾写车牌号（没填写「未填写」）。开着就一定有车牌号：还没填时打开，先弹输入框、填了才算打开；
+     * 改成空的，开关跟着关。
      *
      * <p>输入的东西一律先过 {@link LicensePlate#sanitize}：小写转大写，
-     * 空格连字符之类去掉，超过十位截断。清洗结果直接显示在下面 ——
+     * 空格连字符之类去掉，超过十位截断。清洗结果写在行尾 ——
      * 录进画面的就是这一串，不能让人以为自己敲的原样进去了。</p>
      */
     private void bindLicensePlate() {
-        EditTextPreference pref = findPreference("pref_license_plate");
+        SwitchNavPreference pref = findPreference("pref_license_plate");
         if (pref == null) {
             return;
         }
         pref.setPersistent(false);
-        pref.setText(appConfig.getLicensePlateRaw());
-        showLicensePlate();
+        pref.setChecked(appConfig.isLicensePlateEnabled());
+        showLicensePlate(pref);
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            String raw = String.valueOf(newValue);
-            String clean = LicensePlate.sanitize(raw);
-            appConfig.setLicensePlate(clean);
-            pref.setText(clean);
-            showLicensePlate();
-            if (!clean.equals(raw.trim()) && !clean.isEmpty()) {
-                toast(getString(R.string.msg_plate_cleaned, clean));
+            boolean on = Boolean.TRUE.equals(newValue);
+            if (on && appConfig.getLicensePlateRaw().isEmpty()) {
+                editLicensePlate(pref, true);
+                return false;
             }
-            return false;
+            showPlateStamp(on);
+            return true;
+        });
+        pref.setOnPreferenceClickListener(preference -> {
+            editLicensePlate(pref, false);
+            return true;
         });
     }
 
-    /** 摘要写当前车牌号；没填就说没填，并把规则写在后面。 */
-    private void showLicensePlate() {
-        EditTextPreference pref = findPreference("pref_license_plate");
-        if (pref == null) {
-            return;
-        }
+    /**
+     * 改车牌号（输入框，提示写着规则）。
+     *
+     * @param turnOn 是打开开关时车牌号还空着弹的：填了就打开
+     */
+    private void editLicensePlate(SwitchNavPreference pref, boolean turnOn) {
+        showTextDialog("pref_license_plate", getString(R.string.set_plate_title), getString(R.string.set_plate_hint),
+                appConfig.getLicensePlateRaw(), raw -> {
+                    String clean = LicensePlate.sanitize(raw);
+                    appConfig.setLicensePlate(clean);
+                    if (!clean.equals(raw.trim()) && !clean.isEmpty()) {
+                        toast(getString(R.string.msg_plate_cleaned, clean));
+                    }
+                    boolean on = !clean.isEmpty() && (turnOn || pref.isChecked());
+                    if (on != pref.isChecked()) {
+                        showPlateStamp(on);
+                        pref.setChecked(on);
+                    }
+                    showLicensePlate(pref);
+                });
+    }
+
+    /** 车牌号水印开 / 关，记黑匣子（和别的开关一样）。 */
+    private void showPlateStamp(boolean on) {
+        appConfig.setLicensePlateEnabled(on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_license_plate → " + (on ? "开" : "关"));
+    }
+
+    /** 行尾写当前车牌号；没填写「未填写」。 */
+    private void showLicensePlate(SwitchNavPreference pref) {
         String plate = appConfig.getLicensePlateRaw();
-        pref.setSummary(plate.isEmpty()
-                ? getString(R.string.set_plate_empty) + " · " + getString(R.string.set_plate_hint)
-                : plate + " · " + getString(R.string.set_plate_hint));
+        pref.setValue(plate.isEmpty() ? getString(R.string.set_plate_empty) : plate);
     }
 
     private String describeLimit(int gigabytes) {
@@ -650,41 +774,46 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 「录像保存路径」：在录写录制器实际写的目录，没在录写下一次会写的目录；
-     * 此刻录不了（没有 U 盘、开发者选项没开）写「未检测到 U 盘」（{@link StorageHelper#savedVideoDir}）。
+     * 选盘的框里标题下面那一行（2026-10-23 从一行只读信息挪来，选哪个盘之前正好要知道）：录像保存在哪个目录 ——
+     * 在录写录制器实际写的目录，没在录写下一次会写的目录；此刻录不了（没有 U 盘、开发者选项没开）写「未检测到 U 盘」
+     * （{@link StorageHelper#savedVideoDir}）。推荐 USB-A 口那一句是说明，写在 XML 的 dialogMessage 里，列在选项下面。
      */
-    private void updateStorageUsage() {
-        Preference pref = findPreference("pref_storage_usage");
+    private void updateSavedIn() {
+        ListPreference pref = findPreference("pref_storage_location");
         if (pref == null || getContext() == null) {
             return;
         }
-        pref.setSummary(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
         final boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
         final String noDrive = getString(R.string.set_storage_usage_no_drive);
         final String failed = getString(R.string.info_read_failed);
         new Thread(() -> {
-            String desc;
+            String where;
             try {
                 java.io.File dir = StorageHelper.savedVideoDir(context, recording);
-                desc = dir != null ? dir.getAbsolutePath() : noDrive;
+                where = dir != null ? dir.getAbsolutePath() : noDrive;
             } catch (Throwable t) {
-                desc = failed;
+                where = failed;
             }
-            final String result = desc;
+            final String found = where;
             if (isAdded()) {
-                requireActivity().runOnUiThread(() -> pref.setSummary(result));
+                requireActivity().runOnUiThread(() -> {
+                    if (isAdded()) {
+                        pref.getExtras().putCharSequence(EXTRA_DIALOG_STATUS,
+                                getString(R.string.set_storage_saved_in, found));
+                    }
+                });
             }
-        }, "storage-usage").start();
+        }, "storage-saved-in").start();
     }
 
     // ------------------------------------------------------------------ 超级镜子
 
+    /**
+     * 超级镜子（2026-10-23 整理，ui-spec §十一）：总开关一行带两个附加项（方向标签、点按切换）；鱼眼校正和视野角度合成一行
+     * （开关加下一层，{@link #bindFisheye}）；窗口的宽、高和重置合成一行（值加一个按钮，{@link #bindRearViewWindow}）。
+     */
     private void bindRearView() {
-        bindSwitch("pref_rearview_camera_label", appConfig.isRearViewCameraLabelEnabled(), value -> {
-            appConfig.setRearViewCameraLabelEnabled(value);
-            RearViewMirrorService.refreshCameraLabel();
-        });
         // 这个开关原先没查悬浮窗权限：没授权时它会拨上去、提示语还讲了手势怎么用，
         // 而服务在 onStartCommand 里就 stopSelf() 走了，屏幕上什么都没有。
         bindOverlaySwitch("pref_rearview", appConfig.isRearViewEnabled(),
@@ -694,91 +823,209 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         com.kooo.evcam.ui.RearViewGuide.showOnce(getActivity());
                     }
                 });
+        SwitchChipsPreference mirror = findPreference("pref_rearview");
+        if (mirror != null) {
+            // 第 0 项（也是唯一一项）方向标签：重置之后照这个下标改回来，见 resetRearView
+            mirror.addOption(getString(R.string.set_rearview_camera_label_title),
+                    appConfig.isRearViewCameraLabelEnabled(), on -> {
+                        appConfig.setRearViewCameraLabelEnabled(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_rearview_camera_label → " + (on ? "开" : "关"));
+                        RearViewMirrorService.refreshCameraLabel();
+                    });
+        }
+        bindSwitchMode();
 
         // 不跟着开关走：还没打开后视镜之前，也该能先看看它怎么用
         onClick("pref_rearview_guide",
                 pref -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
 
-        bindSwitch("pref_rearview_button_mode", appConfig.isRearViewButtonMode(), value -> {
-            appConfig.setRearViewButtonMode(value);
-            if (getContext() != null && appConfig.isRearViewEnabled()) {
-                RearViewMirrorService.applyButtonMode(getContext());
-            }
-        });
-
-        bindSwitch("pref_rearview_front_rear", appConfig.isRearViewFrontRearOnly(), value -> {
-            appConfig.setRearViewFrontRearOnly(value);
-            if (getContext() != null && appConfig.isRearViewEnabled()) {
-                RearViewMirrorService.applyLaneMode(getContext());
-            }
-        });
-
-        bindSwitch("pref_rearview_fisheye", appConfig.isRearViewFisheyeCorrection(), value -> {
-            appConfig.setRearViewFisheyeCorrection(value);
-            pushCorrection();
-        });
-
-        bindSlider("pref_rearview_fov",
-                (int) FisheyeProjectionBounds.MIN, (int) FisheyeProjectionBounds.MAX,
-                Math.round(appConfig.getRearViewFov()), "°", value -> {
-                    appConfig.setRearViewFov(value);
-                    pushCorrection();
+        // 切换范围（项目所有者 2026-10-19，取代「只显示前后视」开关）
+        bindSegmented("pref_rearview_views", SettingsRegistry.REARVIEW_VIEWS,
+                appConfig.getRearViewViews().key, value -> {
+                    appConfig.setRearViewViews(com.kooo.evcam.zeekr.MirrorViews.fromKey(value));
+                    applyRearViewViews();
                 });
 
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
-
-        bindSlider("pref_rearview_width", AppConfig.REARVIEW_MIN_SIZE, screenWidth,
-                appConfig.getRearViewWidth(screenWidth), " px", value -> {
-                    appConfig.setRearViewSize(value, appConfig.getRearViewHeight(screenHeight),
-                            screenWidth, screenHeight);
-                    pushSize();
-                });
-
-        bindSlider("pref_rearview_height", AppConfig.REARVIEW_MIN_SIZE, screenHeight,
-                appConfig.getRearViewHeight(screenHeight), " px", value -> {
-                    appConfig.setRearViewSize(appConfig.getRearViewWidth(screenWidth), value,
-                            screenWidth, screenHeight);
-                    pushSize();
-                });
-
-        onClick("pref_rearview_reset", pref -> {
-            appConfig.resetRearViewLayout();
-            SwitchPreferenceCompat label = findPreference("pref_rearview_camera_label");
-            if (label != null) {
-                label.setChecked(appConfig.isRearViewCameraLabelEnabled());
-            }
-            if (getContext() != null && appConfig.isRearViewEnabled()) {
-                // 重开一次让新的默认值生效
-                RearViewMirrorService.stop(getContext());
-                RearViewMirrorService.start(getContext());
-            }
-            toast(getString(R.string.msg_rearview_reset));
-        });
+        bindFisheye();
+        bindRearViewWindow();
     }
 
     /**
-     * 把「窗口宽度 / 高度」两根滑块拨到窗口当前的实际尺寸。
-     *
-     * <p>后视镜是个悬浮窗，<b>可以在设置页开着的时候被捏大捏小</b> ——
-     * 滑块的值是在 {@code onCreatePreferences} 里读一次就定了的，
-     * 不重读的话，界面上显示的宽高和眼前那个窗口对不上。</p>
-     *
-     * <p>放在 {@code onResume}：从别处回到这个界面时必然经过它。</p>
+     * 切换方式：滑动切换 / 点按切换，二选一，默认滑动切换（项目所有者 2026-10-23）。存的还是原来那个开关
+     * （{@code AppConfig.isRearViewButtonMode}，开 = 点按切换）—— 点按切换时横划不换路，两样本来就只能用一样；
+     * 所以这里不走 {@link SettingsRegistry}（那里的设置存的是选项的值），两个选项直接写在这。
+     * 选到点按切换时提示一句怎么点。
      */
-    private void refreshRearViewSize() {
+    private void bindSwitchMode() {
+        SegmentedPreference pref = findPreference("pref_rearview_switch_mode");
+        if (pref == null) {
+            return;
+        }
+        pref.setOptions(new CharSequence[]{
+                getString(R.string.opt_rearview_switch_swipe), getString(R.string.opt_rearview_switch_tap)},
+                new String[]{SWITCH_SWIPE, SWITCH_TAP});
+        pref.setValue(appConfig.isRearViewButtonMode() ? SWITCH_TAP : SWITCH_SWIPE);
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean tap = SWITCH_TAP.equals(newValue);
+            appConfig.setRearViewButtonMode(tap);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                    "设置变更: pref_rearview_switch_mode → " + (tap ? "点按切换" : "滑动切换"));
+            if (getContext() == null) {
+                return true;
+            }
+            if (tap) {
+                Toast.makeText(getContext(), R.string.set_rearview_button_mode_summary, Toast.LENGTH_LONG).show();
+            }
+            if (appConfig.isRearViewEnabled()) {
+                RearViewMirrorService.applyButtonMode(getContext());
+            }
+            return true;
+        });
+    }
+
+    /** 鱼眼校正（开关加下一层）：行首的开关管校正开不开；行尾写视野角度，点这一行在框里拖（{@link #editFov}）。 */
+    private void bindFisheye() {
+        SwitchNavPreference pref = findPreference("pref_rearview_fisheye");
+        if (pref == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setChecked(appConfig.isRearViewFisheyeCorrection());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean on = Boolean.TRUE.equals(newValue);
+            appConfig.setRearViewFisheyeCorrection(on);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                    "开关变更: pref_rearview_fisheye → " + (on ? "开" : "关"));
+            pushCorrection();
+            return true;
+        });
+        showFov(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            editFov(pref);
+            return true;
+        });
+    }
+
+    private void showFov(SwitchNavPreference pref) {
+        pref.setValue(getString(R.string.set_rearview_fisheye_value, Math.round(appConfig.getRearViewFov())));
+    }
+
+    /**
+     * 视野角度：框里一根拖动条，拖的时候窗口当场跟着变（看得见效果），「保存」才算数 ——
+     * 取消、点框外、返回键都回到原来的角度（{@link SliderDialog}）。说明写在拖动条下面。
+     */
+    private void editFov(SwitchNavPreference pref) {
+        SliderDialog.Slider fov = new SliderDialog.Slider(null,
+                (int) FisheyeProjectionBounds.MIN, (int) FisheyeProjectionBounds.MAX,
+                Math.round(appConfig.getRearViewFov()), "°", getString(R.string.set_rearview_fov_summary),
+                true, true, value -> {
+                    appConfig.setRearViewFov(value);
+                    pushCorrection();
+                });
+        SliderDialog.show(requireContext(), getString(R.string.set_rearview_fov_title),
+                java.util.Collections.singletonList(fov), () -> showFov(pref));
+    }
+
+    /**
+     * 窗口（值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调（{@link com.kooo.evcam.zeekr.RearViewWindowEditor}，
+     * 只存宽和高）；行尾「重置」就是原来的「重置窗口与画面」，先问一句 —— 重置的不止窗口，说明里列着。
+     */
+    private void bindRearViewWindow() {
+        ValueActionPreference pref = findPreference("pref_rearview_window");
+        if (pref == null) {
+            return;
+        }
+        showRearViewWindow(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            if (getContext() != null) {
+                com.kooo.evcam.zeekr.RearViewWindowEditor.show(requireContext(), appConfig, (width, height) -> {
+                    if (isAdded()) {
+                        showRearViewWindow(pref);
+                    }
+                });
+            }
+            return true;
+        });
+        pref.setAction(getString(R.string.action_reset), this::confirmRearViewReset);
+    }
+
+    /** 宽和高照超级镜子窗口自己用的那份屏幕尺寸夹（应用的，不是这个界面的），写出来的就是窗口实际的大小。 */
+    private void showRearViewWindow(ValueActionPreference pref) {
+        android.util.DisplayMetrics metrics =
+                requireContext().getApplicationContext().getResources().getDisplayMetrics();
+        pref.setValue(getString(R.string.set_rearview_window_value,
+                appConfig.getRearViewWidth(metrics.widthPixels), appConfig.getRearViewHeight(metrics.heightPixels)));
+    }
+
+    /** 重置窗口与画面：重置的不止窗口，所以先问一句；主按钮照「恢复初值」用红色（CamDialogs）。 */
+    private void confirmRearViewReset() {
         if (getContext() == null) {
             return;
         }
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        SeekBarPreference width = findPreference("pref_rearview_width");
-        if (width != null) {
-            width.setValue(appConfig.getRearViewWidth(screenWidth));
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.dlg_rearview_reset_title)
+                .setMessage(R.string.set_rearview_reset_summary)
+                .setPositiveButton(R.string.action_reset, (dialog, which) -> resetRearView())
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /** 恢复默认之后，这一页上被它改到的几行都照新的值显示（以前鱼眼校正、视野角度两行不跟着变）。 */
+    private void resetRearView() {
+        appConfig.resetRearViewLayout();
+        SwitchChipsPreference mirror = findPreference("pref_rearview");
+        if (mirror != null) {
+            mirror.setOptionChecked(0, appConfig.isRearViewCameraLabelEnabled());
         }
-        SeekBarPreference height = findPreference("pref_rearview_height");
-        if (height != null) {
-            height.setValue(appConfig.getRearViewHeight(screenHeight));
+        SegmentedPreference views = findPreference("pref_rearview_views");
+        if (views != null) {
+            views.setValue(appConfig.getRearViewViews().key);
+        }
+        SwitchNavPreference fisheye = findPreference("pref_rearview_fisheye");
+        if (fisheye != null) {
+            fisheye.setChecked(appConfig.isRearViewFisheyeCorrection());
+            showFov(fisheye);
+        }
+        refreshRearViewWindow();
+        applyRearViewViews();
+        if (getContext() != null && appConfig.isRearViewEnabled()) {
+            // 重开一次让新的默认值生效
+            RearViewMirrorService.stop(getContext());
+            RearViewMirrorService.start(getContext());
+        }
+        toast(getString(R.string.msg_rearview_reset));
+    }
+
+    /**
+     * 窗口那一行的宽和高：超级镜子是个悬浮窗，<b>可以在设置页开着的时候被捏大捏小</b>，
+     * 回到这一页时（{@code onResume}）重读一次。
+     */
+    private void refreshRearViewWindow() {
+        ValueActionPreference pref = findPreference("pref_rearview_window");
+        if (pref != null && getContext() != null) {
+            showRearViewWindow(pref);
+        }
+    }
+
+    /**
+     * 切换范围变了（选了、或者重置了）。「后视 + 后座舱」要管线里有后座舱这一路：已经有管线时问一次
+     * （{@link com.kooo.evcam.camera.CameraManagerHolder#getOrInit}）—— 换到这一档而管线里还没有后座舱时，管线当场放掉重建，
+     * 主界面、超级镜子照「放掉重建了」接上新的那一份（在录的话那一段到头、自动接回）；换出这一档不重建。再叫醒调度（超级镜子要不要
+     * 后座舱是它每一轮读的事实），正在显示的窗口换环、接上或撤回后座舱的画布。
+     */
+    private void applyRearViewViews() {
+        android.content.Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
+        if (holder.getCameraManager() != null) {
+            holder.getOrInit(context);
+        }
+        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        if (appConfig.isRearViewEnabled()) {
+            RearViewMirrorService.applyLaneMode(context);
         }
     }
 
@@ -796,7 +1043,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     // ------------------------------------------------------------------ 盲区画面
 
-    /** 超级镜子分区里的一组：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。 */
+    /**
+     * 超级镜子分区里的一行：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。
+     * 2026-10-23 起是开关加下一层：行尾写显示位置，点这一行进「盲区画面」页（preferences.xml 里嵌着的 screen_side_view），
+     * 显示位置、最低车速和 HUD 画面一组（2026-10-21）都在那一页。
+     */
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
@@ -804,54 +1055,202 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setSideViewAutoFit(value);
             SideViewService.applyAim();
         });
+        SwitchNavPreference row = findPreference("pref_side_view");
+        if (row != null) {
+            showSideViewTarget(row);
+            row.setOnPreferenceClickListener(preference -> {
+                openFragment(SettingsPreferenceFragment.forSection("screen_side_view"), R.string.set_side_view_title);
+                return true;
+            });
+        }
+        bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
+                appConfig.getSideViewTarget(), value -> {
+                    appConfig.setSideViewTarget(value);
+                    syncSideViewRows();
+                    SideViewService.applyConfig();
+                });
         bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
                 appConfig.getSideViewMinSpeed(), " km/h", value -> {
                     appConfig.setSideViewMinSpeed(value);
                     SideViewService.applyConfig();
                 });
+
+        bindSwitch("pref_hud_mirror", appConfig.isHudMirrored(), value -> {
+            appConfig.setHudMirrored(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_height", AppConfig.HUD_MIN_HEIGHT, AppConfig.HUD_MAX_HEIGHT, appConfig.getHudHeight(), "%",
+                value -> {
+                    appConfig.setHudHeight(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_shape", AppConfig.HUD_MIN_SHAPE, AppConfig.HUD_MAX_SHAPE, appConfig.getHudShape(), "%",
+                value -> {
+                    appConfig.setHudShape(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_edge", 0, 100, appConfig.getHudEdge(), "%", value -> {
+            appConfig.setHudEdge(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_vertical", 0, 100, appConfig.getHudVertical(), "%", value -> {
+            appConfig.setHudVertical(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_opacity", AppConfig.HUD_MIN_OPACITY, 100, appConfig.getHudOpacity(), "%", value -> {
+            appConfig.setHudOpacity(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_contrast", AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST,
+                appConfig.getHudContrast(), "%", value -> {
+                    appConfig.setHudContrast(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_contrast_night", AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST,
+                appConfig.getHudContrastNight(), "%", value -> {
+                    appConfig.setHudContrastNight(value);
+                    SideViewService.applyConfig();
+                });
+        bindSlider("pref_hud_night", AppConfig.HUD_MIN_NIGHT, 100, appConfig.getHudNight(), "%", value -> {
+            appConfig.setHudNight(value);
+            SideViewService.applyConfig();
+        });
+        bindSlider("pref_hud_fade", 0, AppConfig.HUD_MAX_FADE, appConfig.getHudFade(), "%", value -> {
+            appConfig.setHudFade(value);
+            SideViewService.applyConfig();
+        });
+        syncSideViewRows();
+    }
+
+    /** 盲区画面那一行的行尾：显示位置。 */
+    private void showSideViewTarget(SwitchNavPreference row) {
+        row.setValue(nameOf(SettingsRegistry.SIDE_VIEW_TARGET, appConfig.getSideViewTarget()));
+    }
+
+    /** 某个选项在界面上叫什么（有翻译用翻译，{@link #localizedNames}）；不认得的值照默认那一项。 */
+    private String nameOf(SettingSpec spec, String value) {
+        int index = spec.indexOf(spec.sanitize(value));
+        return index >= 0 ? localizedNames(spec)[index] : "";
+    }
+
+    /** 从「盲区画面」页回来时显示位置可能改过。 */
+    private void refreshSideViewTarget() {
+        SwitchNavPreference row = findPreference("pref_side_view");
+        if (row != null && getContext() != null) {
+            showSideViewTarget(row);
+        }
+    }
+
+    /**
+     * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速不可用（它只管中控屏）。
+     * 这一页和盲区画面的开关不在同一页，开关关着时这些照样能先调好。
+     */
+    private void syncSideViewRows() {
+        String target = appConfig.getSideViewTarget();
+        Preference hud = findPreference("cat_side_view_hud");
+        if (hud != null) {
+            hud.setEnabled(!AppConfig.SIDE_VIEW_TARGET_CENTER.equals(target));
+        }
+        Preference minSpeed = findPreference("pref_side_view_min_speed");
+        if (minSpeed != null) {
+            minSpeed.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target));
+        }
     }
 
     // ------------------------------------------------------------------ 悬浮窗
 
+    /**
+     * 悬浮按钮（2026-10-23 整理，ui-spec §十一）：总开关一行带「显示录制时长」「锁定位置」两个附加项；点击、长按各一行；
+     * 按钮大小、透明度、时长文字大小合成一行「外观」（值加一个按钮：点这一行在框里拖、按钮跟着变，行尾「重置」）。
+     */
     private void bindFloating() {
         // 按钮显示出来时自己问协调器在不在录，这里不用再推状态
         bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
                 OverlayCoordinator::setRecordButtonEnabled, null);
-
-        // 整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半
-        bindSlider("pref_button_size", 48, 150,
-                appConfig.getRecordingFloatingButtonSizeDp(), " dp",
-                value -> {
-                    appConfig.setRecordingFloatingButtonSizeDp(value);
-                    pushFloatingStyle();
-                });
-        bindSlider("pref_floating_alpha", 20, 100, appConfig.getFloatingWindowAlpha(), "%",
-                value -> {
-                    appConfig.setFloatingWindowAlpha(value);
-                    pushFloatingStyle();
-                });
+        SwitchChipsPreference floating = findPreference("pref_recording_floating");
+        if (floating != null) {
+            floating.addOption(getString(R.string.set_floating_duration_title),
+                    appConfig.isFloatingDurationVisible(), on -> {
+                        appConfig.setFloatingDurationVisible(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_floating_duration → " + (on ? "开" : "关"));
+                        pushFloatingStyle();
+                    });
+            floating.addOption(getString(R.string.set_floating_lock_title),
+                    appConfig.isFloatingPositionLocked(), on -> {
+                        appConfig.setFloatingPositionLocked(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_floating_lock → " + (on ? "开" : "关"));
+                    });
+        }
 
         bindFloatingAction("pref_floating_tap", appConfig.getFloatingTapAction(),
                 value -> appConfig.setFloatingTapAction(value));
         bindFloatingAction("pref_floating_long_press", appConfig.getFloatingLongPressAction(),
                 value -> appConfig.setFloatingLongPressAction(value));
 
-        bindSwitch("pref_floating_lock", appConfig.isFloatingPositionLocked(),
-                value -> appConfig.setFloatingPositionLocked(value));
+        ValueActionPreference appearance = findPreference("pref_floating_appearance");
+        if (appearance != null) {
+            showFloatingAppearance(appearance);
+            appearance.setOnPreferenceClickListener(preference -> {
+                editFloatingAppearance(appearance);
+                return true;
+            });
+            appearance.setAction(getString(R.string.action_reset), () -> confirmFloatingReset(appearance));
+        }
+    }
 
-        bindSwitch("pref_floating_duration", appConfig.isFloatingDurationVisible(), value -> {
-            appConfig.setFloatingDurationVisible(value);
-            pushFloatingStyle();
-        });
-        bindSlider("pref_button_text_size", 8, 24,
-                appConfig.getRecordingFloatingTimeTextSizeSp(), " sp",
-                value -> {
-                    appConfig.setRecordingFloatingTimeTextSizeSp(value);
-                    pushFloatingStyle();
-                });
+    /** 外观那一行的行尾：按钮大小和透明度。 */
+    private void showFloatingAppearance(ValueActionPreference pref) {
+        pref.setValue(getString(R.string.set_floating_appearance_value,
+                appConfig.getRecordingFloatingButtonSizeDp(), appConfig.getFloatingWindowAlpha()));
+    }
 
-        bindFloatingReset();
+    /**
+     * 外观：一个框里三根拖动条（{@link SliderDialog}），松手时按钮当场跟着变，「保存」才算数。
+     * 按钮大小整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半。时长文字大小随「显示录制时长」，没开时灰着。
+     */
+    private void editFloatingAppearance(ValueActionPreference pref) {
+        java.util.List<SliderDialog.Slider> sliders = java.util.Arrays.asList(
+                new SliderDialog.Slider(getString(R.string.set_button_size_title), 48, 150,
+                        appConfig.getRecordingFloatingButtonSizeDp(), " dp", null, true, false, value -> {
+                            appConfig.setRecordingFloatingButtonSizeDp(value);
+                            pushFloatingStyle();
+                        }),
+                new SliderDialog.Slider(getString(R.string.set_floating_alpha_title), 20, 100,
+                        appConfig.getFloatingWindowAlpha(), "%", null, true, false, value -> {
+                            appConfig.setFloatingWindowAlpha(value);
+                            pushFloatingStyle();
+                        }),
+                new SliderDialog.Slider(getString(R.string.set_button_text_size_title), 8, 24,
+                        appConfig.getRecordingFloatingTimeTextSizeSp(), " sp", null,
+                        appConfig.isFloatingDurationVisible(), false, value -> {
+                            appConfig.setRecordingFloatingTimeTextSizeSp(value);
+                            pushFloatingStyle();
+                        }));
+        SliderDialog.show(requireContext(), getString(R.string.set_group_appearance), sliders,
+                () -> showFloatingAppearance(pref));
+    }
 
+    /** 重置悬浮按钮：位置也回去（不止这一行），所以先问一句；主按钮照「恢复初值」用红色（CamDialogs）。 */
+    private void confirmFloatingReset(ValueActionPreference pref) {
+        if (getContext() == null) {
+            return;
+        }
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.dlg_floating_reset_title)
+                .setMessage(R.string.set_reset_floating_summary)
+                .setPositiveButton(R.string.action_reset, (dialog, which) -> {
+                    // 以前清的是旧「主屏悬浮窗」那几个键，合并后的按钮根本不读它们 ——
+                    // 点了提示「已重置」，按钮纹丝不动。现在清按钮自己的位置、大小、字号，
+                    // 并让它当场挪回默认位置（右上角）
+                    appConfig.resetRecordingFloatingLayout();
+                    sendToRecordingFloating(RecordingFloatingService.ACTION_RESET_POSITION, null);
+                    showFloatingAppearance(pref);
+                    toast(getString(R.string.msg_floating_reset));
+                })
+                .setNegativeButton(R.string.action_cancel, null));
     }
 
     /**
@@ -898,6 +1297,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return R.string.floating_action_take_photo;
             case TOGGLE_MIRROR:
                 return R.string.floating_action_toggle_mirror;
+            case LOCK_FOOTAGE:
+                return R.string.floating_action_lock_footage;
+            case TOGGLE_DRIVE_SOUND:
+                return R.string.floating_action_toggle_drive_sound;
             case OPEN_APP:
             default:
                 return R.string.floating_action_open_app;
@@ -942,26 +1345,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }, "recording-floating-cmd").start();
     }
 
-    private void bindFloatingReset() {
-        onClick("pref_reset_floating", pref -> {
-            // 以前清的是旧「主屏悬浮窗」那几个键，合并后的按钮根本不读它们 ——
-            // 点了提示「已重置」，按钮纹丝不动。现在清按钮自己的位置、大小、字号，
-            // 并让它当场挪回默认位置（右上角）
-            appConfig.resetRecordingFloatingLayout();
-            sendToRecordingFloating(RecordingFloatingService.ACTION_RESET_POSITION, null);
-            // 两个滑块跟着回去，否则界面上还写着重置之前的数
-            SeekBarPreference size = findPreference("pref_button_size");
-            if (size != null) {
-                size.setValue(appConfig.getRecordingFloatingButtonSizeDp());
-            }
-            SeekBarPreference textSize = findPreference("pref_button_text_size");
-            if (textSize != null) {
-                textSize.setValue(appConfig.getRecordingFloatingTimeTextSizeSp());
-            }
-            toast(getString(R.string.msg_floating_reset));
-        });
-    }
-
     // ------------------------------------------------------------------ 系统
 
     /**
@@ -996,45 +1379,92 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_reduce_motion", appConfig.isReduceMotionWhileRecording(),
                 value -> appConfig.setReduceMotionWhileRecording(value));
-        // 车辆状态面板：主界面那个控件自己听这个开关
-        bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
-                value -> appConfig.setVehicleStatusEnabled(value));
 
-        bindEnum("pref_fisheye_projection", SettingsRegistry.FISHEYE_PROJECTION,
-                appConfig.getFisheyeProjection(), value -> {
-                    appConfig.setFisheyeProjection(value);
-                    // 上限跟着投影变，滑块得重新绑 —— 否则界面上还能拖到 180°，
-                    // 实际生效的却是夹过的 140°
-                    bindFisheyeFov();
-                }, this::showProjectionSummary);
-        bindFisheyeFov();
-    }
-
-    /** 校正视野。范围随投影方式变，所以单独一个方法，换投影时再叫一次。 */
-    private void bindFisheyeFov() {
-        String projection = appConfig.getFisheyeProjection();
-        bindSlider("pref_fisheye_fov", (int) FisheyeProjectionBounds.MIN,
-                (int) com.kooo.evcam.zeekr.FisheyeProjection.maxFovFor(projection),
-                Math.round(appConfig.getFisheyeFov()), "°",
-                value -> appConfig.setFisheyeFov(value));
-    }
-
-    /** 摘要里除了选中项，还要写清楚它管到哪里：主界面预览、图片回看、视频回看。 */
-    private void showProjectionSummary() {
-        ListPreference pref = findPreference("pref_fisheye_projection");
-        if (pref != null && getContext() != null) {
-            pref.setSummary(getString(R.string.set_fisheye_projection_summary, pref.getEntry()));
-        }
+        bindInterfaceFisheye();
     }
 
     /**
-     * 系统：诊断信息、系统信息、开机自启动（含保活）、熄屏持续录制。
+     * 鱼眼校正（界面，2026-10-23 校正方式和校正视野合成一行）：管主界面预览、照片回放、录像回放里那个鱼眼按钮怎么校正
+     * （开关在那个按钮上，这里只管「怎么校正」）。行尾写方式和视野；点这一行，框里选方式、拖视野（{@link #editInterfaceFisheye}）。
+     */
+    private void bindInterfaceFisheye() {
+        ValueActionPreference pref = findPreference("pref_fisheye");
+        if (pref == null) {
+            return;
+        }
+        showInterfaceFisheye(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            editInterfaceFisheye(pref);
+            return true;
+        });
+    }
+
+    /** 行尾：方式和视野。视野照这一种方式的上限夹过再写 —— 写出来的就是实际生效的。 */
+    private void showInterfaceFisheye(ValueActionPreference pref) {
+        String projection = SettingsRegistry.FISHEYE_PROJECTION.sanitize(appConfig.getFisheyeProjection());
+        int fov = Math.round(com.kooo.evcam.zeekr.FisheyeProjection.clampFov(appConfig.getFisheyeFov(), projection));
+        pref.setValue(getString(R.string.set_fisheye_value,
+                nameOf(SettingsRegistry.FISHEYE_PROJECTION, projection), fov));
+    }
+
+    /**
+     * 框里上面选方式（单选列表），下面拖视野（{@link SliderDialog#block}）。两种投影的视野上限不同（直线 140°，另外两种 180°）：
+     * 换方式时拖动条跟着换、拖到的值夹进新的范围 —— 以前是换投影时滑块要重新绑一次，否则界面上还能拖到 180°，实际生效的却是夹过的 140°。
+     * 「保存」才存；说明写在拖动条下面。主界面这时候看不见，没什么好当场预览的。
+     */
+    private void editInterfaceFisheye(ValueActionPreference pref) {
+        Context context = requireContext();
+        SettingSpec spec = SettingsRegistry.FISHEYE_PROJECTION;
+        String[] values = spec.values();
+        final String[] projection = {spec.sanitize(appConfig.getFisheyeProjection())};
+        final SliderDialog.Slider[] fov = {fisheyeSlider(projection[0], Math.round(appConfig.getFisheyeFov()))};
+        int pad = Math.round(24 * getResources().getDisplayMetrics().density);
+        android.widget.FrameLayout holder = new android.widget.FrameLayout(context);
+        holder.setPadding(pad, 0, pad, 0);
+        holder.addView(SliderDialog.block(context, fov[0]));
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_rearview_fisheye_title)
+                // 自己放进去的视图排在列表下面（AlertDialog 本来的结构）
+                .setSingleChoiceItems(localizedNames(spec), Math.max(0, spec.indexOf(projection[0])),
+                        (dialog, which) -> {
+                            projection[0] = values[which];
+                            fov[0] = fisheyeSlider(projection[0], fov[0].value());
+                            holder.removeAllViews();
+                            holder.addView(SliderDialog.block(context, fov[0]));
+                        })
+                .setView(holder)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    appConfig.setFisheyeProjection(projection[0]);
+                    appConfig.setFisheyeFov(fov[0].value());
+                    showInterfaceFisheye(pref);
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /** 视野那根拖动条：范围照这一种方式（原来的值夹进去）；拖的时候不做事，「保存」时一起存。 */
+    private SliderDialog.Slider fisheyeSlider(String projection, int fov) {
+        return new SliderDialog.Slider(getString(R.string.set_fisheye_fov_title),
+                (int) FisheyeProjectionBounds.MIN, (int) com.kooo.evcam.zeekr.FisheyeProjection.maxFovFor(projection),
+                fov, "°", getString(R.string.set_fisheye_fov_summary), true, false, value -> {
+                });
+    }
+
+    /**
+     * 系统：诊断信息、导出 / 导入设置、系统信息、开机自启动（含保活）、熄屏持续录制。
      * 开发者的「熄屏录制（阻止休眠）」不在这里，在开发者选项分区（{@link #bindAdvanced}）。
      */
     private void bindSystem() {
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));
+        // 导出、导入设置（项目所有者 2026-10-19）：和诊断报告同一个文件夹；导入后应用退出，重新打开时照新设置起来
+        onClick("pref_settings_export", pref -> SettingsBackupFlow.export(requireActivity()));
+        onClick("pref_settings_import", pref -> SettingsBackupFlow.startImport(requireActivity()));
+        Preference importRow = findPreference("pref_settings_import");
+        if (importRow != null) {
+            importRow.setSummary(getString(R.string.set_settings_import_summary,
+                    SettingsBackup.currentMajor(requireContext())));
+        }
         // 系统信息（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
@@ -1066,11 +1496,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 this::showRecordingModeSummary);
 
         // 熄屏录制 = 熄屏持续录制 + 唤醒锁（规格 §3.1）。整块只在开发者选项里出现，不用再单独锁
-        bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
-                value -> appConfig.setScreenOffRecordingEnabled(value));
-        bindScreenOffWakeHours();
+        bindScreenOffRecording();
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
+        bindFootageAudio();
+        bindDriveSound();
 
         // 画面调节：打开调节窗口（MainActivity 管着它，退出设置也还在），同时开启画面调节、套上存着的参数。
         // 窗口开没开成由 MainActivity 说：没有悬浮窗权限、相机还没好时它自己提示
@@ -1083,16 +1513,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         });
 
-        onClick("pref_image_adjust_reset", pref -> {
-            if (getActivity() instanceof MainActivity) {
-                com.kooo.evcam.camera.ImageAdjustManager manager =
-                        ((MainActivity) getActivity()).getImageAdjustManager();
-                if (manager != null) {
-                    manager.resetToDefault();
-                    toast(getString(R.string.msg_adjust_reset));
+        // 行尾「重置」（2026-10-23 原来单独一行「恢复画面调节默认值」）：只动这一行管的参数，不用先问
+        ValueActionPreference adjust = findPreference("pref_image_adjust");
+        if (adjust != null) {
+            adjust.setAction(getString(R.string.action_reset), () -> {
+                if (getActivity() instanceof MainActivity) {
+                    com.kooo.evcam.camera.ImageAdjustManager manager =
+                            ((MainActivity) getActivity()).getImageAdjustManager();
+                    if (manager != null) {
+                        manager.resetToDefault();
+                        toast(getString(R.string.msg_adjust_reset));
+                    }
                 }
-            }
-        });
+            });
+        }
 
         onClick("pref_camera_mapping", pref -> {
             if (getContext() != null) {
@@ -1102,6 +1536,41 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
         updateCameraMappingSummary();
 
+    }
+
+    /** 盲区画面标定那一行的行尾：三个角度。 */
+    private void showSideViewCalibration(ValueActionPreference pref) {
+        pref.setValue(getString(R.string.dev_side_view_calibration_value,
+                appConfig.getSideViewBack(), appConfig.getSideViewUp(), appConfig.getSideViewFov()));
+    }
+
+    /** 三根拖动条一个框（{@link SliderDialog}）：松手时盲区画面当场跟着转，「保存」才算数。每一根的说明写在它下面。 */
+    private void editSideViewCalibration(ValueActionPreference pref) {
+        int maxBack = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
+        int maxUp = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
+        java.util.List<SliderDialog.Slider> sliders = java.util.Arrays.asList(
+                new SliderDialog.Slider(getString(R.string.dev_side_view_back_title), -maxBack, maxBack,
+                        appConfig.getSideViewBack(), "°", getString(R.string.dev_side_view_back_summary),
+                        true, false, value -> {
+                            appConfig.setSideViewBack(value);
+                            SideViewService.applyAim();
+                        }),
+                new SliderDialog.Slider(getString(R.string.dev_side_view_up_title), -maxUp, maxUp,
+                        appConfig.getSideViewUp(), "°", getString(R.string.dev_side_view_up_summary),
+                        true, false, value -> {
+                            appConfig.setSideViewUp(value);
+                            SideViewService.applyAim();
+                        }),
+                new SliderDialog.Slider(getString(R.string.dev_side_view_fov_title),
+                        Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
+                        Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES),
+                        appConfig.getSideViewFov(), "°", getString(R.string.dev_side_view_fov_summary),
+                        true, false, value -> {
+                            appConfig.setSideViewFov(value);
+                            SideViewService.applyAim();
+                        }));
+        SliderDialog.show(requireContext(), getString(R.string.dev_side_view_calibration_title), sliders,
+                () -> showSideViewCalibration(pref));
     }
 
     /** 摘要除了选中项，还写明这一项现在不起作用：录制固定走 MediaCodec。 */
@@ -1136,6 +1605,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
+        // 应用水印（2026-10-23 从录制页挪来）：应用名与版本（填了车牌号跟在后面）每一路 MediaCodec 录像、每一张照片都盖，
+        // 和「时间水印」开不开无关（录像见 EglSurfaceEncoder.drawBrandOverlay，照片见 SingleCamera.addWatermark；
+        // MediaRecorder 模式什么角标都画不了），这里只是把这件事摆出来：开着、灰着、点不动。
+        // 给一个能关的开关，等于承诺一件代码里并不打算允许的事。
+        SwitchPreferenceCompat brand = findPreference("pref_watermark_brand");
+        if (brand != null) {
+            brand.setPersistent(false);
+            brand.setChecked(true);
+            brand.setEnabled(false);
+        }
+
+        // 车辆状态面板（2026-10-23 从界面页挪来）：主界面那个控件自己听这个开关
+        bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
+                value -> appConfig.setVehicleStatusEnabled(value));
+
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
 
@@ -1149,23 +1633,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_camera_holder_suspects", appConfig.isCameraHolderSuspectsEnabled(),
                 appConfig::setCameraHolderSuspectsEnabled);
 
-        // 盲区画面的标定角度：每一路画面的朝向是猜的（SideViewProjection），上车标定之后定默认值
-        int maxBack = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
-        bindSlider("pref_side_view_back", -maxBack, maxBack, appConfig.getSideViewBack(), "°", value -> {
-            appConfig.setSideViewBack(value);
-            SideViewService.applyAim();
-        });
-        int maxUp = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_PITCH_DEGREES);
-        bindSlider("pref_side_view_up", -maxUp, maxUp, appConfig.getSideViewUp(), "°", value -> {
-            appConfig.setSideViewUp(value);
-            SideViewService.applyAim();
-        });
-        bindSlider("pref_side_view_fov", Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
-                Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES),
-                appConfig.getSideViewFov(), "°", value -> {
-                    appConfig.setSideViewFov(value);
-                    SideViewService.applyAim();
-                });
+        // 盲区画面标定（2026-10-23 三根拖动条合成一行）：每一路画面的朝向是猜的（SideViewProjection），上车标定之后定默认值
+        ValueActionPreference calibration = findPreference("pref_side_view_calibration");
+        if (calibration != null) {
+            showSideViewCalibration(calibration);
+            calibration.setOnPreferenceClickListener(preference -> {
+                editSideViewCalibration(calibration);
+                return true;
+            });
+        }
 
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {
@@ -1206,10 +1682,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
     @Override
     public void onDisplayPreferenceDialog(Preference preference) {
-        if (preference instanceof EditTextPreference) {
-            showTextDialog((EditTextPreference) preference);
-            return;
-        }
         if (preference instanceof ListPreference) {
             showChoiceDialog((ListPreference) preference);
             return;
@@ -1217,7 +1689,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         super.onDisplayPreferenceDialog(preference);
     }
 
-    /** 单选：视频流配置、存储位置、操作按钮位置。选中之后还要按确定才算数。 */
+    /**
+     * 单选：视频流配置、存储位置、语言……（ListPreference 那几行）。选中之后还要按确定才算数。
+     * 标题下面可以有一行此刻的状态（{@link #EXTRA_DIALOG_STATUS}，存储位置写录像保存在哪）；
+     * 说明（XML 里的 dialogMessage）是次要的，写在选项下面（ui-spec §三）。
+     */
     private void showChoiceDialog(ListPreference pref) {
         CharSequence[] entries = pref.getEntries();
         CharSequence[] values = pref.getEntryValues();
@@ -1225,53 +1701,97 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             super.onDisplayPreferenceDialog(pref);
             return;
         }
-        final int[] picked = {pref.findIndexOfValue(pref.getValue())};
+        String[] keys = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            keys[i] = values[i].toString();
+        }
         CharSequence title = pref.getDialogTitle() != null
                 ? pref.getDialogTitle() : pref.getTitle();
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(
-                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(title)
+        showChoice(title, pref.getExtras().getCharSequence(EXTRA_DIALOG_STATUS), pref.getDialogMessage(),
+                entries, keys, pref.getValue(), value -> {
+                    if (pref.callChangeListener(value)) {
+                        pref.setValue(value);
+                    }
+                });
+    }
+
+    /** 单选框本身：上面那几行和「开关加下一层」的下一层（录制声音的麦克风来源）共用。 */
+    private void showChoice(CharSequence title, CharSequence status, CharSequence note,
+                            CharSequence[] entries, String[] values, String current, StringSetter onPick) {
+        int index = -1;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(current)) {
+                index = i;
+                break;
+            }
+        }
+        final int[] picked = {index};
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog);
+        if (status == null) {
+            builder.setTitle(title);
+        } else {
+            builder.setCustomTitle(titleWithStatus(title, status));
+        }
+        // 自己放进去的视图排在列表下面（AlertDialog 本来的结构：列表占正文的位置，视图在它和按钮之间）
+        if (note != null) {
+            int pad = (int) (24 * getResources().getDisplayMetrics().density);
+            android.widget.TextView view = com.kooo.evcam.ui.CamDialogs.note(requireContext(), note);
+            view.setPadding(pad, pad / 2, pad, pad / 2);
+            builder.setView(view);
+        }
+        com.kooo.evcam.ui.CamDialogs.show(builder
                 .setSingleChoiceItems(entries, picked[0], (d, which) -> picked[0] = which)
                 .setPositiveButton(R.string.action_ok, (d, w) -> {
                     if (picked[0] < 0 || picked[0] >= values.length) {
                         return;
                     }
-                    String value = values[picked[0]].toString();
-                    if (pref.callChangeListener(value)) {
-                        pref.setValue(value);
-                    }
+                    onPick.set(values[picked[0]]);
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    /**
-     * 单行文本输入：车牌号、视频 / 图片存储上限。
-     * 标题和说明取 XML 里的 dialogTitle / dialogMessage（存储上限靠它们写单位和清理规则），
-     * 和下拉框一个规矩：没写标题就用这一行的标题，没写说明就不带。
-     */
-    private void showTextDialog(EditTextPreference pref) {
+    /** 对话框标题加标题下面一行此刻的状态（单选框的标题栏只有一行字，所以自己排）。 */
+    private android.view.View titleWithStatus(CharSequence title, CharSequence status) {
+        Context context = requireContext();
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(context);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, pad, pad, pad / 2);
+        android.widget.TextView heading = new android.widget.TextView(context);
+        heading.setTextAppearance(R.style.TextAppearance_Cam_Title);
+        heading.setText(title);
+        box.addView(heading);
+        android.widget.TextView line = com.kooo.evcam.ui.CamDialogs.note(context, status);
+        line.setPadding(0, pad / 2, 0, 0);
+        box.addView(line);
+        return box;
+    }
+
+    /** 单行文本输入框：「开关加下一层」的下一层（车牌号、熄屏录制的时长上限）用它。键盘按 {@code key} 配（{@link #configureInput}）。 */
+    private void showTextDialog(String key, CharSequence title, CharSequence message, String current,
+                                StringSetter onSave) {
         final android.widget.EditText input =
                 com.kooo.evcam.ui.CamDialogs.input(requireContext());
-        input.setText(pref.getText());
+        input.setText(current);
         input.setSelectAllOnFocus(true);
-        configureInput(pref.getKey(), input);
+        configureInput(key, input);
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        android.widget.FrameLayout box = new android.widget.FrameLayout(requireContext());
+        android.widget.LinearLayout box = new android.widget.LinearLayout(requireContext());
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(input);
+        if (message != null) {
+            android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(requireContext(), message);
+            note.setPadding(0, pad / 2, 0, 0);
+            box.addView(note);
+        }
 
-        CharSequence title = pref.getDialogTitle() != null
-                ? pref.getDialogTitle() : pref.getTitle();
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
-                .setMessage(pref.getDialogMessage())
                 .setView(box)
-                .setPositiveButton(R.string.action_save, (dialog, which) -> {
-                    String value = input.getText().toString();
-                    if (pref.callChangeListener(value)) {
-                        pref.setText(value);
-                    }
-                })
+                .setPositiveButton(R.string.action_save,
+                        (dialog, which) -> onSave.set(input.getText().toString()))
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
@@ -1288,9 +1808,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             input.setFilters(new android.text.InputFilter[]{
                     new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
             return;
-        }
-        if ("pref_video_limit".equals(key) || "pref_photo_limit".equals(key)) {
-            input.setInputType(InputType.TYPE_CLASS_NUMBER);
         }
         if ("pref_screen_off_wake_hours".equals(key)) {
             input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -1318,6 +1835,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
         bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
                 value -> appConfig.setUpdateBetaEnabled(value));
+        // 随「接收 Beta 版」（XML 里的 dependency）：Beta 关着时它不可用，也不算数（UpdateFlow）
+        bindSwitch("pref_update_alpha", appConfig.isUpdateAlphaEnabled(),
+                value -> appConfig.setUpdateAlphaEnabled(value));
     }
 
     // ------------------------------------------------------------------ 小工具
@@ -1377,6 +1897,131 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 开 / 关一个悬浮窗；返回是否真的按要求生效。 */
     private interface OverlayToggle {
         boolean apply(Context context, boolean enabled);
+    }
+
+    /**
+     * 录制声音（开发者选项，试验）：打开时没有录音权限就先问系统，给了才打开。开关显示的是会不会真录（开着、又有权限）——
+     * 在系统设置里收回了权限，这里就显示关着。改了之后前台服务重走一遍（带上 / 去掉麦克风类型）；录法从下一次开录起。
+     */
+    private void bindFootageAudio() {
+        SwitchNavPreference pref = findPreference("pref_footage_audio");
+        if (pref == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setChecked(appConfig.isFootageAudioEnabled() && hasMicPermission());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean on = Boolean.TRUE.equals(newValue);
+            if (on && !hasMicPermission()) {
+                micPermission.launch(android.Manifest.permission.RECORD_AUDIO);
+                return false;  // 等系统弹窗的结果（onMicPermission）
+            }
+            setFootageAudio(on);
+            return true;
+        });
+        // 麦克风来源（2026-10-23 起在这一行的下一层）：行尾写来源，点这一行选
+        showFootageAudioSource(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            SettingSpec spec = SettingsRegistry.FOOTAGE_AUDIO_SOURCE;
+            showChoice(getString(R.string.dev_footage_audio_source_title), null, null, localizedNames(spec),
+                    spec.values(), spec.sanitize(appConfig.getFootageAudioSource()), value -> {
+                        appConfig.setFootageAudioSource(value);
+                        showFootageAudioSource(pref);
+                    });
+            return true;
+        });
+    }
+
+    /** 录制声音那一行的行尾：来源的短名字（框里的长名字带着说明）。 */
+    private void showFootageAudioSource(SwitchNavPreference pref) {
+        boolean call = com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL.equals(
+                SettingsRegistry.FOOTAGE_AUDIO_SOURCE.sanitize(appConfig.getFootageAudioSource()));
+        pref.setValue(getString(call ? R.string.dev_footage_audio_source_call_short
+                : R.string.dev_footage_audio_source_raw_short));
+    }
+
+    /**
+     * 模拟声浪（开发者选项，试验）：开关、音量、转速变化方式，改了马上生效（{@code sound.DriveSound}）。
+     * 2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进「模拟声浪」页（preferences.xml 里嵌着的 screen_drive_sound）。
+     */
+    private void bindDriveSound() {
+        bindSwitch("pref_drive_sound", appConfig.isDriveSoundEnabled(), value -> {
+            appConfig.setDriveSoundEnabled(value);
+            refreshDriveSound();
+        });
+        SwitchNavPreference row = findPreference("pref_drive_sound");
+        if (row != null) {
+            showDriveSound(row);
+            row.setOnPreferenceClickListener(preference -> {
+                openFragment(SettingsPreferenceFragment.forSection("screen_drive_sound"), R.string.dev_drive_sound_group);
+                return true;
+            });
+        }
+        bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
+                value -> {
+                    appConfig.setDriveSoundVolume(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_rpm", SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm(),
+                value -> {
+                    appConfig.setDriveSoundRpm(value);
+                    refreshDriveSound();
+                });
+    }
+
+    /** 模拟声浪那一行的行尾：音量和转速变化方式。 */
+    private void showDriveSound(SwitchNavPreference row) {
+        row.setValue(getString(R.string.dev_drive_sound_value,
+                nameOf(SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume()),
+                nameOf(SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm())));
+    }
+
+    /** 从「模拟声浪」页回来时音量、转速变化方式可能改过。 */
+    private void refreshDriveSoundValue() {
+        SwitchNavPreference row = findPreference("pref_drive_sound");
+        if (row != null && getContext() != null) {
+            showDriveSound(row);
+        }
+    }
+
+    private void refreshDriveSound() {
+        Context context = getContext();
+        if (context != null) {
+            com.kooo.evcam.sound.DriveSound.refresh(context);
+        }
+    }
+
+    /** 系统弹窗问完录音权限：给了就打开「录制声音」；没给就照旧关着，说一句。 */
+    private void onMicPermission(boolean granted) {
+        Context context = getContext();
+        if (context == null || appConfig == null) {
+            return;
+        }
+        if (!granted) {
+            Toast.makeText(context, R.string.msg_footage_audio_no_permission, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        setFootageAudio(true);
+        SwitchPreferenceCompat pref = findPreference("pref_footage_audio");
+        if (pref != null) {
+            pref.setChecked(true);
+        }
+    }
+
+    private void setFootageAudio(boolean on) {
+        appConfig.setFootageAudioEnabled(on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_audio → " + (on ? "开" : "关"));
+        Context context = getContext();
+        if (context != null) {
+            // 前台服务按此刻的开关重新起一次前台：带不带麦克风类型
+            com.kooo.evcam.CameraForegroundService.start(context.getApplicationContext());
+        }
+    }
+
+    private boolean hasMicPermission() {
+        Context context = getContext();
+        return context != null && androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED;
     }
 
     private void bindSwitch(String key, boolean current, BoolSetter setter) {

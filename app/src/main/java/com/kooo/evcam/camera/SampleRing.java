@@ -43,6 +43,12 @@ import java.util.List;
  * <p>开文件、开轨、收文件这几条命令和样本按顺序排在一起，写入线程按顺序做：分段切换、停录时
  * 收文件之前，这个文件该写的一定都写完了。命令是什么由录制器自己解释，这里只管顺序。</p>
  *
+ * <h3>声音样本（环视那一路录着声音时）</h3>
+ *
+ * <p>声音线程把编码好的声音样本也排进这里（{@link #offerAudio}），和画面按先后排在一起，写入线程照顺序写进声音轨。
+ * 它们只跟着走：不是关键帧，不算排了多长的画面、留了多长，写过多留的那段从哪里截也只看画面的关键帧 ——
+ * 补写、抢救时夹在画面中间一起写。</p>
+ *
  * <p>纯 Java，不碰 Android，见 {@code SampleRingTest}。方法都加锁：编码线程放、写入线程取、诊断随时读。</p>
  */
 final class SampleRing {
@@ -102,6 +108,8 @@ final class SampleRing {
          * 它的时间戳常是 0，不是画面时间：算排了多长的画面、这个文件从哪个时间起，都不看它。
          */
         final boolean config;
+        /** 声音样本（{@link #offerAudio}）：写进声音轨；不是关键帧，不算画面的长短。 */
+        final boolean audio;
         final byte[] data;
         /** 拷出来进队的时刻（开机时长，含深睡）。抢救文件按它推算起名用的墙上时间。 */
         final long queuedAtMs;
@@ -109,13 +117,23 @@ final class SampleRing {
         private long writtenAtMs = -1L;
 
         Sample(long seq, long ptsUs, int flags, byte[] data, long queuedAtMs) {
+            this(seq, ptsUs, flags, data, queuedAtMs, false);
+        }
+
+        Sample(long seq, long ptsUs, int flags, byte[] data, long queuedAtMs, boolean audio) {
             this.seq = seq;
             this.ptsUs = ptsUs;
             this.flags = flags;
-            this.keyframe = (flags & FLAG_KEY_FRAME) != 0;
-            this.config = (flags & FLAG_CODEC_CONFIG) != 0 && !keyframe;
+            this.audio = audio;
+            this.keyframe = !audio && (flags & FLAG_KEY_FRAME) != 0;
+            this.config = !audio && (flags & FLAG_CODEC_CONFIG) != 0 && !keyframe;
             this.data = data;
             this.queuedAtMs = queuedAtMs;
+        }
+
+        /** 画面样本（不是声音，也不是只有参数集的）：排了多长、留了多长按它算。 */
+        boolean picture() {
+            return !audio && !config;
         }
     }
 
@@ -160,6 +178,23 @@ final class SampleRing {
         highBytes = Math.max(highBytes, queuedBytes);
         highUs = Math.max(highUs, queuedSpanUs());
         // 一共的上限：排队涨了，写过留着的让出来
+        trimKept();
+        return sample;
+    }
+
+    /**
+     * 排一个编码好的声音样本（声音线程上）。和画面一样总是收下；它很小（AAC 一块几百字节），
+     * 不算排了多长的画面，也不让编码线程少编 —— {@link #hasRoom} 照旧按画面的长短和字节数算。
+     *
+     * @param ptsUs 已经换到这一路画面的时间轴上（和画面样本的 ptsUs 同一个起点）
+     * @param nowMs 开机时长（含深睡）
+     */
+    synchronized Sample offerAudio(long ptsUs, byte[] data, long nowMs) {
+        Sample sample = new Sample(nextSeq++, ptsUs, 0, data, nowMs, true);
+        queue.addLast(sample);
+        queuedBytes += data.length;
+        queuedSamples++;
+        highBytes = Math.max(highBytes, queuedBytes);
         trimKept();
         return sample;
     }
@@ -278,10 +313,11 @@ final class SampleRing {
      * @return 最后一个算落盘的样本的顺序号；一个都不算是 -1
      */
     synchronized long syncPoint(long nowMs) {
-        if (kept.isEmpty()) {
+        Sample newest = lastPicture(kept);
+        if (newest == null) {
             return -1L;
         }
-        long newestPtsUs = kept.peekLast().ptsUs;
+        long newestPtsUs = newest.ptsUs;
         long point = -1L;
         for (Sample sample : kept) {
             if (sample.writtenAtMs > nowMs - SYNC_SLACK_MS
@@ -403,12 +439,12 @@ final class SampleRing {
 
     /**
      * 排着的第一个画面到最后一个画面隔了多久（画面时间，微秒）。命令不算；只有参数集的样本也不算 ——
-     * 它的时间戳常是 0，第二段起画面的时间戳早过了 60 秒，算进来排队就像一下子排了一分钟。
+     * 它的时间戳常是 0，第二段起画面的时间戳早过了 60 秒，算进来排队就像一下子排了一分钟。声音样本也不算。
      */
     private long queuedSpanUs() {
         Sample first = null;
         for (Object entry : queue) {
-            if (entry instanceof Sample && !((Sample) entry).config) {
+            if (entry instanceof Sample && ((Sample) entry).picture()) {
                 first = (Sample) entry;
                 break;
             }
@@ -420,7 +456,7 @@ final class SampleRing {
         Iterator<Object> it = queue.descendingIterator();
         while (it.hasNext()) {
             Object entry = it.next();
-            if (entry instanceof Sample && !((Sample) entry).config) {
+            if (entry instanceof Sample && ((Sample) entry).picture()) {
                 last = (Sample) entry;
                 break;
             }
@@ -428,8 +464,41 @@ final class SampleRing {
         return Math.max(0L, last.ptsUs - first.ptsUs);
     }
 
+    /** 写过多留的那段从第一个（关键帧）到最后一个画面多长；夹在里面的声音样本不算。 */
     private long keptSpanUs() {
-        return kept.isEmpty() ? 0L : Math.max(0L, kept.peekLast().ptsUs - kept.peekFirst().ptsUs);
+        Sample last = lastPicture(kept);
+        return last == null ? 0L : Math.max(0L, last.ptsUs - kept.peekFirst().ptsUs);
+    }
+
+    /** 最后一个不是声音的样本；没有是 null。 */
+    private static Sample lastPicture(ArrayDeque<Sample> samples) {
+        Iterator<Sample> it = samples.descendingIterator();
+        while (it.hasNext()) {
+            Sample sample = it.next();
+            if (!sample.audio) {
+                return sample;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 这些样本（写过多留的那段、抢救的一段，按顺序）从第一个到最后一个画面多长（毫秒）。
+     * 夹在里面的声音样本不算：它的时刻可能比最后一帧画面晚一点。
+     */
+    static long pictureSpanMs(List<Sample> samples) {
+        Sample first = null;
+        Sample last = null;
+        for (Sample sample : samples) {
+            if (sample.audio) {
+                continue;
+            }
+            if (first == null) {
+                first = sample;
+            }
+            last = sample;
+        }
+        return first == null ? 0L : Math.max(0L, last.ptsUs - first.ptsUs) / 1000L;
     }
 
     /** 留存规则；只在关键帧处截断，最后一整段（关键帧到最新）永远留着。 */
@@ -438,7 +507,8 @@ final class SampleRing {
             return;
         }
         // 1. 已落盘、又早于最新写过的 KEEP_MS 的丢掉：从头数，截到「前面的都能丢」的最后一个关键帧
-        long keepFromUs = kept.peekLast().ptsUs - KEEP_MS * 1000L;
+        Sample newest = lastPicture(kept);
+        long keepFromUs = (newest != null ? newest.ptsUs : kept.peekLast().ptsUs) - KEEP_MS * 1000L;
         int cut = 0;
         int i = 0;
         for (Sample sample : kept) {

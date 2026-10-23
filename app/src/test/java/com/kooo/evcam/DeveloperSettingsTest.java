@@ -48,11 +48,20 @@ public class DeveloperSettingsTest {
     static {
         ROWS.put("pref_recording_mode", Arrays.asList("recording_mode"));
         ROWS.put("pref_force_h264", Arrays.asList("force_h264_encoding"));
-        ROWS.put("pref_screen_off_recording", Arrays.asList("screen_off_recording"));
-        ROWS.put("pref_screen_off_wake_hours", Arrays.asList("screen_off_wake_min"));
-        // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）
+        // 熄屏录制和时长上限、录制声音和麦克风来源各合成一行（2026-10-23，开关加下一层）：一行存两个键
+        ROWS.put("pref_screen_off_recording", Arrays.asList("screen_off_recording", "screen_off_wake_min"));
+        ROWS.put("pref_footage_audio", Arrays.asList("footage_audio", "footage_audio_source"));
+        ROWS.put("pref_drive_sound", Arrays.asList("drive_sound"));
+        // 模拟声浪的下一层是嵌着的一页（2026-10-23）：那一页本身不存设置，里面两行照旧
+        ROWS.put("screen_drive_sound", NONE);
+        ROWS.put("pref_drive_sound_volume", Arrays.asList("drive_sound_volume"));
+        ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
+        // 应用水印固定开着、点不动，不存设置（2026-10-23 从录制页挪来）
+        ROWS.put("pref_watermark_brand", NONE);
+        // 车辆状态（2026-10-23 从界面页挪来）
+        ROWS.put("pref_vehicle_status", Arrays.asList("vehicle_status_panel"));
+        // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）；「恢复默认值」2026-10-23 起是这一行行尾的按钮
         ROWS.put("pref_image_adjust", Arrays.asList("image_adjust_enabled"));
-        ROWS.put("pref_image_adjust_reset", NONE);
         ROWS.put("pref_camera_mapping", Arrays.asList("zeekr_camera_override_front",
                 "zeekr_camera_override_back", "zeekr_camera_override_left"));
         ROWS.put("pref_permissions", NONE);
@@ -60,9 +69,8 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_gpu_fisheye_preview", Arrays.asList("gpu_fisheye_preview"));
         ROWS.put("pref_gpu_fisheye_video", Arrays.asList("gpu_fisheye_video"));
         ROWS.put("pref_camera_holder_suspects", Arrays.asList("camera_holder_suspects"));
-        ROWS.put("pref_side_view_back", Arrays.asList("side_view_back"));
-        ROWS.put("pref_side_view_up", Arrays.asList("side_view_up"));
-        ROWS.put("pref_side_view_fov", Arrays.asList("side_view_fov"));
+        // 盲区画面标定：三根拖动条 2026-10-23 合成一行（一个框里拖）
+        ROWS.put("pref_side_view_calibration", Arrays.asList("side_view_back", "side_view_up", "side_view_fov"));
         ROWS.put("pref_repair_mp4", NONE);
         ROWS.put("pref_archive", NONE);
         ROWS.put("pref_developer_note", NONE);
@@ -118,7 +126,10 @@ public class DeveloperSettingsTest {
         }
     }
 
-    /** {@code screen_developer} 里各行的 key（分区里没有嵌套的分区，读到它的结束标签为止）。 */
+    /**
+     * {@code screen_developer} 里各行的 key，连同嵌在里面的下一层页面（模拟声浪）里的行：
+     * 数着 PreferenceScreen 的开、关标签，读到分区自己的结束标签为止。
+     */
     private static Set<String> developerSectionRows() throws IOException {
         Set<String> rows = new LinkedHashSet<>();
         File module = findModuleRoot();
@@ -128,7 +139,7 @@ public class DeveloperSettingsTest {
         String xml = new String(Files.readAllBytes(
                 new File(module, "src/main/res/xml/preferences.xml").toPath()), StandardCharsets.UTF_8);
         int start = xml.indexOf("android:key=\"screen_developer\"");
-        int end = start < 0 ? -1 : xml.indexOf("</PreferenceScreen>", start);
+        int end = start < 0 ? -1 : sectionEnd(xml, start);
         if (end < 0) {
             return rows;
         }
@@ -139,6 +150,29 @@ public class DeveloperSettingsTest {
             }
         }
         return rows;
+    }
+
+    /** 分区的结束标签：嵌在里面的 PreferenceScreen 开一个、关一个，不算分区结束。没找到是 -1。 */
+    private static int sectionEnd(String xml, int start) {
+        int depth = 1;
+        int at = start;
+        while (true) {
+            int open = xml.indexOf("<PreferenceScreen", at);
+            int close = xml.indexOf("</PreferenceScreen>", at);
+            if (close < 0) {
+                return -1;
+            }
+            if (open >= 0 && open < close) {
+                depth++;
+                at = open + 1;
+            } else {
+                depth--;
+                if (depth == 0) {
+                    return close;
+                }
+                at = close + 1;
+            }
+        }
     }
 
     /** 从工作目录往上找，直到看见 {@code src/main/res/xml/preferences.xml}。 */

@@ -107,17 +107,22 @@ public class ProfileMigrationTest {
                 profile.camera(CameraProfile.ROLE_CABIN_2).preview.resolution);
     }
 
-    /** 新建的三路配置里，三路都是启用的 —— 要关某一路在配置编辑里关。 */
+    /**
+     * 新建的「环视 + 后座舱」里，环视和后座舱启用、前座舱关着（暂时只用一次，项目所有者 2026-10-23：原来的「环视 + 前后座舱」
+     * 改成「环视 + 后座舱」）—— 要开前座舱在配置编辑里开。
+     */
     @Test
-    public void everyCameraStartsEnabled() {
+    public void theSurroundAndRearCabinStartEnabledAndTheFrontCabinOff() {
         ProfileMigration.Snapshot snapshot = snapshot();
         snapshot.carModel = "zeekr_7x_multi";
 
         Profile profile = ProfileMigration.migrate(snapshot);
 
-        for (CameraProfile camera : profile.cameras) {
-            assertTrue(camera.role + " 应当是启用的", camera.enabled);
-        }
+        assertTrue(profile.camera(CameraProfile.ROLE_COMPOSITE).enabled);
+        assertTrue("后座舱", profile.camera(
+                ProfileSizes.roleForCameraKey(com.kooo.evcam.camera.CameraSlots.KEY_CABIN_REAR)).enabled);
+        assertFalse("前座舱", profile.camera(
+                ProfileSizes.roleForCameraKey(com.kooo.evcam.camera.CameraSlots.KEY_CABIN_FRONT)).enabled);
     }
 
 
