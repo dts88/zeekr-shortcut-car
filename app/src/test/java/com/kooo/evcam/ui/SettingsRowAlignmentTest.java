@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * 设置行的名字从同一条竖线开始（ui-spec §三「文字对齐」，项目所有者 2026-10-23）。
  *
  * <p>开关在行首的行：行内边距 + 开关 + 间距，名字在后面；没有开关的行在开关的位置留出同样宽的空位，
- * 名字从 {@code pref_text_start} 开始；分组小标题也从这条线开始。这里钉住三件事：</p>
+ * 名字从 {@code pref_text_start} 开始（分组小标题不跟着挪，贴着卡片边）。这里钉住三件事：</p>
  *
  * <ul>
  *   <li>{@code pref_text_start} 就是那三个数的和 —— 改了其中一个忘了改和，没开关的行就错开了；</li>
@@ -68,7 +68,7 @@ public class SettingsRowAlignmentTest {
         int checked = 0;
         for (Path path : CoreLayouts.all(res)) {
             String file = path.getFileName().toString();
-            if (!file.startsWith("pref_row") && !file.equals("pref_category.xml")) {
+            if (!file.startsWith("pref_row")) {
                 continue;
             }
             checked++;

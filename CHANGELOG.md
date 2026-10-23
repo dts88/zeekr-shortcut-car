@@ -9,9 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
-- Settings: every row's name starts at the same line; rows without a switch leave the switch's space empty. Group headings line up with them.
+- Settings: every row's name starts at the same line; rows without a switch leave the switch's space empty.
 - Settings: a value at the end of a row stays on one line when the row has room (Storage location used to wrap).
-- Dialogs: options in single and multiple choice dialogs use the dialog text size; they were much smaller.
+- Dialogs: options in single and multiple choice dialogs use the same text size as settings rows; they were much smaller.
+- Settings: add-on buttons that are off (such as Show recording time) have a lighter face and a visible border, so they read as buttons.
 - Settings → Storage: no group headings.
 - Settings → Floating button: the row's description no longer says tap and long press are set below. Settings → Interface: Action button side has no description.
 - Keep recording when the screen goes off: shorter Chinese description.

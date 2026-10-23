@@ -192,10 +192,10 @@
     </style>
 
     <!--
-      单选框、多选框里的选项（列表里的 CheckedTextView）：和对话框正文同一档（ui-spec §三，项目所有者 2026-10-23）。
-      Material 默认是 16sp，比设置里别处的字小一大截；只有几行字的列表（setItems）本来就用正文那一档。
+      单选框、多选框里的选项（列表里的 CheckedTextView）：和设置行的名字同一档（Body 22sp，ui-spec §三，
+      项目所有者 2026-10-23）。Material 默认是 16sp，比设置里别处的字小一大截。
     -->
     <style name="MaterialAlertDialog.Cam.Choice" parent="Widget.Material3.CheckedTextView">
-        <item name="android:textSize">@dimen/text_row</item>
+        <item name="android:textSize">@dimen/text_body</item>
     </style>
 </resources>
