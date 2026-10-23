@@ -14,7 +14,7 @@ import java.util.Locale;
  *   <li>{@link #IDS}：信号表里没有的几个功能号（不带区域）。号码、名字照 zeekr-shortcut-lab 的信号手册和 0.4.0 的遍历
  *       （{@code docs/signals.md}、{@code docs/findings.md} §2.39、{@code docs/reports/2026-09-28-sweep-0.4.0.txt}）：
  *       停车时读到 0、1 或 255（未知），含义都没弄清。
- *       <b>不进信号表</b>：「系统信息」页、信息条都不变；{@link EcarxSource} 只是一起订上、对账时一起读，原值照记（255 也记）。
+ *       <b>不进信号表</b>：「车辆信号」页、信息条都不变；{@link EcarxSource} 只是一起订上、对账时一起读，原值照记（255 也记）。
  *       这几个号的<b>可用状态</b>（回调 {@code onSupportedFunctionStatusChanged}，Lab §2.39：熄屏 / 上下电前后电源开关的可用状态
  *       active ↔ notactive，和屏幕电源事件 0 → 1 → 0 同一刻）也记，单独一项「名字.status」（{@link #STATUS}），只有回调、不去读。</li>
  *   <li>{@link #WATCHED}：信号表里已有的几项（屏幕电源事件、点火 / 用车状态 0x20259000、挡位、哨兵、主驾门、主驾座椅、主驾安全带），
