@@ -98,6 +98,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         return fragment;
     }
 
+    /**
+     * 嵌在分区里的 PreferenceScreen 是下一层页面（盲区画面），只从它那一行（开关加下一层）进：
+     * 在上一层不列成一行 —— androidx 本来会把它画成一行，点了却没处接。
+     */
+    private static void hideSubPages(androidx.preference.PreferenceGroup group) {
+        if (group == null) {
+            return;
+        }
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            Preference child = group.getPreference(i);
+            if (child instanceof androidx.preference.PreferenceScreen) {
+                child.setVisible(false);
+            } else if (child instanceof androidx.preference.PreferenceGroup) {
+                hideSubPages((androidx.preference.PreferenceGroup) child);
+            }
+        }
+    }
+
     @Override
     public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
         String section = rootKey;
@@ -105,6 +123,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             section = getArguments().getString(ARG_SECTION);
         }
         setPreferencesFromResource(R.xml.preferences, section);
+        hideSubPages(getPreferenceScreen());
         if (getContext() == null) {
             return;
         }
@@ -155,7 +174,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateSavedIn();
-        refreshRearViewSize();
+        refreshRearViewWindow();
+        refreshSideViewTarget();
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // 窗口编辑框是一层全屏悬浮窗：设置页退到后台时关掉、不存，不压在别的应用上面
+        com.kooo.evcam.zeekr.RearViewWindowEditor.cancel();
     }
 
     // ------------------------------------------------------------------ 录制
@@ -764,11 +791,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     // ------------------------------------------------------------------ 超级镜子
 
+    /**
+     * 超级镜子（2026-10-23 整理，ui-spec §十一）：总开关一行带两个附加项（方向标签、点按切换）；鱼眼校正和视野角度合成一行
+     * （开关加下一层，{@link #bindFisheye}）；窗口的宽、高和重置合成一行（值加一个按钮，{@link #bindRearViewWindow}）。
+     */
     private void bindRearView() {
-        bindSwitch("pref_rearview_camera_label", appConfig.isRearViewCameraLabelEnabled(), value -> {
-            appConfig.setRearViewCameraLabelEnabled(value);
-            RearViewMirrorService.refreshCameraLabel();
-        });
         // 这个开关原先没查悬浮窗权限：没授权时它会拨上去、提示语还讲了手势怎么用，
         // 而服务在 onStartCommand 里就 stopSelf() 走了，屏幕上什么都没有。
         bindOverlaySwitch("pref_rearview", appConfig.isRearViewEnabled(),
@@ -778,17 +805,38 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         com.kooo.evcam.ui.RearViewGuide.showOnce(getActivity());
                     }
                 });
+        SwitchChipsPreference mirror = findPreference("pref_rearview");
+        if (mirror != null) {
+            // 第 0 项方向标签、第 1 项点按切换（重置之后照这个顺序改回来，见 resetRearView）
+            mirror.addOption(getString(R.string.set_rearview_camera_label_title),
+                    appConfig.isRearViewCameraLabelEnabled(), on -> {
+                        appConfig.setRearViewCameraLabelEnabled(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_rearview_camera_label → " + (on ? "开" : "关"));
+                        RearViewMirrorService.refreshCameraLabel();
+                    });
+            // 附加项没有说明：点按切换打开时提示一句怎么点
+            mirror.addOption(getString(R.string.set_rearview_button_mode_title),
+                    appConfig.isRearViewButtonMode(), on -> {
+                        appConfig.setRearViewButtonMode(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_rearview_button_mode → " + (on ? "开" : "关"));
+                        if (getContext() == null) {
+                            return;
+                        }
+                        if (on) {
+                            Toast.makeText(getContext(), R.string.set_rearview_button_mode_summary,
+                                    Toast.LENGTH_LONG).show();
+                        }
+                        if (appConfig.isRearViewEnabled()) {
+                            RearViewMirrorService.applyButtonMode(getContext());
+                        }
+                    });
+        }
 
         // 不跟着开关走：还没打开后视镜之前，也该能先看看它怎么用
         onClick("pref_rearview_guide",
                 pref -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
-
-        bindSwitch("pref_rearview_button_mode", appConfig.isRearViewButtonMode(), value -> {
-            appConfig.setRearViewButtonMode(value);
-            if (getContext() != null && appConfig.isRearViewEnabled()) {
-                RearViewMirrorService.applyButtonMode(getContext());
-            }
-        });
 
         // 切换范围（项目所有者 2026-10-19，取代「只显示前后视」开关）
         bindSegmented("pref_rearview_views", SettingsRegistry.REARVIEW_VIEWS,
@@ -797,77 +845,188 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     applyRearViewViews();
                 });
 
-        bindSwitch("pref_rearview_fisheye", appConfig.isRearViewFisheyeCorrection(), value -> {
-            appConfig.setRearViewFisheyeCorrection(value);
+        bindFisheye();
+        bindRearViewWindow();
+    }
+
+    /** 鱼眼校正（开关加下一层）：行首的开关管校正开不开；行尾写视野角度，点这一行在框里拖（{@link #editFov}）。 */
+    private void bindFisheye() {
+        SwitchNavPreference pref = findPreference("pref_rearview_fisheye");
+        if (pref == null) {
+            return;
+        }
+        pref.setPersistent(false);
+        pref.setChecked(appConfig.isRearViewFisheyeCorrection());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean on = Boolean.TRUE.equals(newValue);
+            appConfig.setRearViewFisheyeCorrection(on);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                    "开关变更: pref_rearview_fisheye → " + (on ? "开" : "关"));
             pushCorrection();
+            return true;
         });
-
-        bindSlider("pref_rearview_fov",
-                (int) FisheyeProjectionBounds.MIN, (int) FisheyeProjectionBounds.MAX,
-                Math.round(appConfig.getRearViewFov()), "°", value -> {
-                    appConfig.setRearViewFov(value);
-                    pushCorrection();
-                });
-
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
-
-        bindSlider("pref_rearview_width", AppConfig.REARVIEW_MIN_SIZE, screenWidth,
-                appConfig.getRearViewWidth(screenWidth), " px", value -> {
-                    appConfig.setRearViewSize(value, appConfig.getRearViewHeight(screenHeight),
-                            screenWidth, screenHeight);
-                    pushSize();
-                });
-
-        bindSlider("pref_rearview_height", AppConfig.REARVIEW_MIN_SIZE, screenHeight,
-                appConfig.getRearViewHeight(screenHeight), " px", value -> {
-                    appConfig.setRearViewSize(appConfig.getRearViewWidth(screenWidth), value,
-                            screenWidth, screenHeight);
-                    pushSize();
-                });
-
-        onClick("pref_rearview_reset", pref -> {
-            appConfig.resetRearViewLayout();
-            SwitchPreferenceCompat label = findPreference("pref_rearview_camera_label");
-            if (label != null) {
-                label.setChecked(appConfig.isRearViewCameraLabelEnabled());
-            }
-            SegmentedPreference views = findPreference("pref_rearview_views");
-            if (views != null) {
-                views.setValue(appConfig.getRearViewViews().key);
-            }
-            applyRearViewViews();
-            if (getContext() != null && appConfig.isRearViewEnabled()) {
-                // 重开一次让新的默认值生效
-                RearViewMirrorService.stop(getContext());
-                RearViewMirrorService.start(getContext());
-            }
-            toast(getString(R.string.msg_rearview_reset));
+        showFov(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            editFov(pref);
+            return true;
         });
     }
 
+    private void showFov(SwitchNavPreference pref) {
+        pref.setValue(getString(R.string.set_rearview_fisheye_value, Math.round(appConfig.getRearViewFov())));
+    }
+
     /**
-     * 把「窗口宽度 / 高度」两根滑块拨到窗口当前的实际尺寸。
-     *
-     * <p>后视镜是个悬浮窗，<b>可以在设置页开着的时候被捏大捏小</b> ——
-     * 滑块的值是在 {@code onCreatePreferences} 里读一次就定了的，
-     * 不重读的话，界面上显示的宽高和眼前那个窗口对不上。</p>
-     *
-     * <p>放在 {@code onResume}：从别处回到这个界面时必然经过它。</p>
+     * 视野角度：框里一根拖动条，拖的时候窗口当场跟着变（看得见效果），「保存」才算数 ——
+     * 取消、点框外、返回键都回到原来的角度。说明写在拖动条下面（ui-spec §三）。
      */
-    private void refreshRearViewSize() {
+    private void editFov(SwitchNavPreference pref) {
+        Context context = requireContext();
+        final int min = Math.round(FisheyeProjectionBounds.MIN);
+        final int max = Math.round(FisheyeProjectionBounds.MAX);
+        final float original = appConfig.getRearViewFov();
+        final boolean[] saved = {false};
+        float density = getResources().getDisplayMetrics().density;
+        int pad = Math.round(24 * density);
+
+        android.widget.TextView value = new android.widget.TextView(context);
+        value.setTextAppearance(R.style.TextAppearance_Cam_Row);
+        value.setGravity(android.view.Gravity.END);
+        value.setMinWidth(Math.round(72 * density));
+        android.widget.SeekBar bar = new android.widget.SeekBar(context);
+        bar.setMax(max - min);
+        bar.setProgress(Math.max(0, Math.min(max - min, Math.round(original) - min)));
+        value.setText((min + bar.getProgress()) + "°");
+        bar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                value.setText((min + progress) + "°");
+                if (fromUser) {
+                    appConfig.setRearViewFov(min + progress);
+                    pushCorrection();
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+            }
+        });
+        android.widget.LinearLayout row = new android.widget.LinearLayout(context);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.addView(bar, new android.widget.LinearLayout.LayoutParams(0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(value);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(context);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(row);
+        android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(context,
+                getString(R.string.set_rearview_fov_summary));
+        note.setPadding(0, pad / 2, 0, 0);
+        box.addView(note);
+
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_rearview_fov_title)
+                .setView(box)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    saved[0] = true;
+                    appConfig.setRearViewFov(min + bar.getProgress());
+                    pushCorrection();
+                    showFov(pref);
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .setOnDismissListener(dialog -> {
+                    if (!saved[0]) {
+                        appConfig.setRearViewFov(original);
+                        pushCorrection();
+                    }
+                }));
+    }
+
+    /**
+     * 窗口（值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调（{@link com.kooo.evcam.zeekr.RearViewWindowEditor}，
+     * 只存宽和高）；行尾「重置」就是原来的「重置窗口与画面」，先问一句 —— 重置的不止窗口，说明里列着。
+     */
+    private void bindRearViewWindow() {
+        ValueActionPreference pref = findPreference("pref_rearview_window");
+        if (pref == null) {
+            return;
+        }
+        showRearViewWindow(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            if (getContext() != null) {
+                com.kooo.evcam.zeekr.RearViewWindowEditor.show(requireContext(), appConfig, (width, height) -> {
+                    if (isAdded()) {
+                        showRearViewWindow(pref);
+                    }
+                });
+            }
+            return true;
+        });
+        pref.setAction(getString(R.string.action_reset), this::confirmRearViewReset);
+    }
+
+    /** 宽和高照超级镜子窗口自己用的那份屏幕尺寸夹（应用的，不是这个界面的），写出来的就是窗口实际的大小。 */
+    private void showRearViewWindow(ValueActionPreference pref) {
+        android.util.DisplayMetrics metrics =
+                requireContext().getApplicationContext().getResources().getDisplayMetrics();
+        pref.setValue(getString(R.string.set_rearview_window_value,
+                appConfig.getRearViewWidth(metrics.widthPixels), appConfig.getRearViewHeight(metrics.heightPixels)));
+    }
+
+    /** 重置窗口与画面：重置的不止窗口，所以先问一句；主按钮照「恢复初值」用红色（CamDialogs）。 */
+    private void confirmRearViewReset() {
         if (getContext() == null) {
             return;
         }
-        int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        SeekBarPreference width = findPreference("pref_rearview_width");
-        if (width != null) {
-            width.setValue(appConfig.getRearViewWidth(screenWidth));
+        com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.dlg_rearview_reset_title)
+                .setMessage(R.string.set_rearview_reset_summary)
+                .setPositiveButton(R.string.action_reset, (dialog, which) -> resetRearView())
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /** 恢复默认之后，这一页上被它改到的几行都照新的值显示（以前鱼眼校正、视野角度两行不跟着变）。 */
+    private void resetRearView() {
+        appConfig.resetRearViewLayout();
+        SwitchChipsPreference mirror = findPreference("pref_rearview");
+        if (mirror != null) {
+            mirror.setOptionChecked(0, appConfig.isRearViewCameraLabelEnabled());
+            mirror.setOptionChecked(1, appConfig.isRearViewButtonMode());
         }
-        SeekBarPreference height = findPreference("pref_rearview_height");
-        if (height != null) {
-            height.setValue(appConfig.getRearViewHeight(screenHeight));
+        SegmentedPreference views = findPreference("pref_rearview_views");
+        if (views != null) {
+            views.setValue(appConfig.getRearViewViews().key);
+        }
+        SwitchNavPreference fisheye = findPreference("pref_rearview_fisheye");
+        if (fisheye != null) {
+            fisheye.setChecked(appConfig.isRearViewFisheyeCorrection());
+            showFov(fisheye);
+        }
+        refreshRearViewWindow();
+        applyRearViewViews();
+        if (getContext() != null && appConfig.isRearViewEnabled()) {
+            // 重开一次让新的默认值生效
+            RearViewMirrorService.stop(getContext());
+            RearViewMirrorService.start(getContext());
+        }
+        toast(getString(R.string.msg_rearview_reset));
+    }
+
+    /**
+     * 窗口那一行的宽和高：超级镜子是个悬浮窗，<b>可以在设置页开着的时候被捏大捏小</b>，
+     * 回到这一页时（{@code onResume}）重读一次。
+     */
+    private void refreshRearViewWindow() {
+        ValueActionPreference pref = findPreference("pref_rearview_window");
+        if (pref != null && getContext() != null) {
+            showRearViewWindow(pref);
         }
     }
 
@@ -907,16 +1066,25 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 盲区画面
 
     /**
-     * 超级镜子分区里的一组：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）；
-     * 下面一组是 HUD 上的画面（2026-10-21），显示位置是「中控屏」时整组不可用。
+     * 超级镜子分区里的一行：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。
+     * 2026-10-23 起是开关加下一层：行尾写显示位置，点这一行进「盲区画面」页（preferences.xml 里嵌着的 screen_side_view），
+     * 显示位置、最低车速和 HUD 画面一组（2026-10-21）都在那一页。
      */
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
+        SwitchNavPreference row = findPreference("pref_side_view");
+        if (row != null) {
+            showSideViewTarget(row);
+            row.setOnPreferenceClickListener(preference -> {
+                openFragment(SettingsPreferenceFragment.forSection("screen_side_view"), R.string.set_side_view_title);
+                return true;
+            });
+        }
         bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
                 appConfig.getSideViewTarget(), value -> {
                     appConfig.setSideViewTarget(value);
-                    syncHudGroup();
+                    syncSideViewRows();
                     SideViewService.applyConfig();
                 });
         bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
@@ -969,14 +1137,37 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setHudFade(value);
             SideViewService.applyConfig();
         });
-        syncHudGroup();
+        syncSideViewRows();
     }
 
-    /** 显示位置是「中控屏」时，HUD 画面那一组不可用（盲区画面关着时它照依赖关系本来就不可用）。 */
-    private void syncHudGroup() {
-        Preference group = findPreference("cat_side_view_hud");
-        if (group != null) {
-            group.setEnabled(!AppConfig.SIDE_VIEW_TARGET_CENTER.equals(appConfig.getSideViewTarget()));
+    /** 盲区画面那一行的行尾：显示位置。 */
+    private void showSideViewTarget(SwitchNavPreference row) {
+        SettingSpec spec = SettingsRegistry.SIDE_VIEW_TARGET;
+        int index = spec.indexOf(spec.sanitize(appConfig.getSideViewTarget()));
+        row.setValue(index >= 0 ? localizedNames(spec)[index] : null);
+    }
+
+    /** 从「盲区画面」页回来时显示位置可能改过。 */
+    private void refreshSideViewTarget() {
+        SwitchNavPreference row = findPreference("pref_side_view");
+        if (row != null && getContext() != null) {
+            showSideViewTarget(row);
+        }
+    }
+
+    /**
+     * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速不可用（它只管中控屏）。
+     * 这一页和盲区画面的开关不在同一页，开关关着时这些照样能先调好。
+     */
+    private void syncSideViewRows() {
+        String target = appConfig.getSideViewTarget();
+        Preference hud = findPreference("cat_side_view_hud");
+        if (hud != null) {
+            hud.setEnabled(!AppConfig.SIDE_VIEW_TARGET_CENTER.equals(target));
+        }
+        Preference minSpeed = findPreference("pref_side_view_min_speed");
+        if (minSpeed != null) {
+            minSpeed.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target));
         }
     }
 

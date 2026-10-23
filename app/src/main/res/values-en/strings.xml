@@ -48,7 +48,7 @@
     <string name="set_relay_summary">Writes to internal storage first, then moves each finished clip to the USB drive, reducing dropped frames on a slow drive. When on, recording doesn\'t switch to another USB drive if this one disconnects.</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
     <string name="set_rearview_summary">Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror</string>
-    <string name="set_rearview_button_mode_title">Button mode</string>
+    <string name="set_rearview_button_mode_title">Tap to switch</string>
     <string name="set_rearview_button_mode_summary">Switches to the front, rear, left or right view when the top, bottom, left or right area is tapped; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom</string>
     <string name="set_rearview_views_title">Views</string>
     <string name="opt_views_four">All four</string>
@@ -58,11 +58,12 @@
     <string name="set_rearview_fisheye_summary">Corrects fisheye barrel distortion in the Super mirror only; recordings are unchanged.</string>
     <string name="set_rearview_fov_title">Field of view</string>
     <string name="set_rearview_fov_summary">Wider shows more and looks sharper, with more distortion at the edges</string>
-    <string name="set_rearview_width_title">Window width</string>
-    <string name="set_rearview_height_title">Window height</string>
-    <string name="set_rearview_height_summary">Each can go up to full screen; the picture keeps its proportions and the window shape only sets how much is visible</string>
-    <string name="set_rearview_reset_title">Reset window and view</string>
     <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction, Views and Direction label, and switches back to the rear view</string>
+    <string name="set_rearview_fisheye_value">Field of view %1$d°</string>
+    <string name="set_rearview_window_summary">The picture keeps its proportions; the window shape only sets how much is visible</string>
+    <string name="set_rearview_window_value">Width %1$d px · Height %2$d px</string>
+    <string name="dlg_rearview_reset_title">Reset window and view?</string>
+    <string name="rearview_editor_hint">Drag an edge or corner to change the width and height, or pinch with two fingers. Drag inside the frame to move it; the position is not saved.</string>
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="set_side_view_title">Blind spot view</string>
@@ -361,6 +362,7 @@
     <string name="slot_cabin_front">Front cabin</string>
     <string name="slot_cabin_rear">Rear cabin</string>
     <string name="action_save">Save</string>
+    <string name="action_reset">Reset</string>
     <string name="action_all_auto">All automatic</string>
     <string name="msg_mapping_saved">Camera mapping saved. Takes effect after restarting the app.</string>
     <string name="msg_mapping_cleared">Automatic assignment restored. Takes effect after restarting the app.</string>
@@ -1035,5 +1037,4 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
-    <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
 </resources>

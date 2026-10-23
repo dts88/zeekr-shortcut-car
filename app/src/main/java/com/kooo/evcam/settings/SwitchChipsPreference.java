@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * 开关加几个附加项（ui-spec §三，项目所有者 2026-10-23）：一个功能开着时还有几样可以单独开、关的附加项，合成一行 ——
- * 锁定影像（附加项：「自动锁定」的「闪远光」「鸣笛」）。
+ * 锁定影像（附加项：「自动锁定」的「闪远光」「鸣笛」）、超级镜子（附加项：「方向标签」「点按切换」）。
  *
  * <p>行首的开关管整个功能，点这一行其余的地方也是这个开关（没有下一层；那一排按钮所在的地方除外）；
  * 行尾写当前值（{@link #setValue}）。
@@ -82,6 +82,14 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
     public void addUnavailableOption(CharSequence label) {
         options.add(new Option(label, false, null));
         notifyChanged();
+    }
+
+    /** 从外面改了某一项（第几个，照加的顺序；比如重置之后）：按钮照新的显示，不叫它的监听。 */
+    public void setOptionChecked(int index, boolean checked) {
+        if (index >= 0 && index < options.size() && options.get(index).checked != checked) {
+            options.get(index).checked = checked;
+            notifyChanged();
+        }
     }
 
     @Override

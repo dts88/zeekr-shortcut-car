@@ -48,7 +48,7 @@
     <string name="set_relay_summary">Menulis ke storan dalaman dahulu, kemudian memindahkan setiap klip yang siap ke pemacu USB, mengurangkan bingkai tercicir pada pemacu perlahan. Jika dihidupkan, rakaman tidak beralih ke pemacu USB lain apabila pemacu ini terputus.</string>
     <string name="set_storage_usage_no_drive">Tiada pemacu USB ditemui</string>
     <string name="set_rearview_summary">Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman</string>
-    <string name="set_rearview_button_mode_title">Mod butang</string>
+    <string name="set_rearview_button_mode_title">Ketik untuk tukar</string>
     <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
     <string name="set_rearview_views_title">Paparan</string>
     <string name="opt_views_four">Empat arah</string>
@@ -58,11 +58,12 @@
     <string name="set_rearview_fisheye_summary">Membetulkan herotan tong mata ikan dalam Cermin super sahaja; rakaman tidak berubah.</string>
     <string name="set_rearview_fov_title">Medan pandangan</string>
     <string name="set_rearview_fov_summary">Lebih luas menunjukkan lebih banyak dan nampak lebih tajam, tetapi tepinya lebih herot</string>
-    <string name="set_rearview_width_title">Lebar tetingkap</string>
-    <string name="set_rearview_height_title">Tinggi tetingkap</string>
-    <string name="set_rearview_height_summary">Setiap satu boleh sehingga skrin penuh; nisbah gambar kekal dan bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
-    <string name="set_rearview_reset_title">Set semula tetingkap dan paparan</string>
     <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Paparan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
+    <string name="set_rearview_fisheye_value">Medan pandangan %1$d°</string>
+    <string name="set_rearview_window_summary">Nisbah gambar kekal; bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
+    <string name="set_rearview_window_value">Lebar %1$d px · Tinggi %2$d px</string>
+    <string name="dlg_rearview_reset_title">Set semula tetingkap dan paparan?</string>
+    <string name="rearview_editor_hint">Seret tepi atau sudut untuk menukar lebar dan tinggi, atau cubit dengan dua jari. Seret di dalam bingkai untuk mengalihkannya; kedudukan tidak disimpan.</string>
     <string name="set_rearview_guide_title">Cara guna</string>
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
     <string name="set_side_view_title">Paparan titik buta</string>
@@ -361,6 +362,7 @@
     <string name="slot_cabin_front">Kabin depan</string>
     <string name="slot_cabin_rear">Kabin belakang</string>
     <string name="action_save">Simpan</string>
+    <string name="action_reset">Set semula</string>
     <string name="action_all_auto">Semua automatik</string>
     <string name="msg_mapping_saved">Pemetaan kamera disimpan. Berkuat kuasa selepas apl dimulakan semula.</string>
     <string name="msg_mapping_cleared">Penetapan automatik dipulihkan. Berkuat kuasa selepas apl dimulakan semula.</string>
@@ -1012,5 +1014,4 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
-    <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
 </resources>

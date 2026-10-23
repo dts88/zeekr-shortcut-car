@@ -62,7 +62,7 @@
     <string name="set_relay_summary">先写入内置存储，每个片段完成后再转存至 U 盘，可减少 U 盘写入不稳导致的丢帧。开启后，U 盘断开时不会自动改为录制到其他 U 盘。</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
     <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
-    <string name="set_rearview_button_mode_title">按键模式</string>
+    <string name="set_rearview_button_mode_title">点按切换</string>
     <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
     <string name="set_rearview_views_title">切换范围</string>
     <string name="opt_views_four">四向</string>
@@ -72,11 +72,12 @@
     <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级镜子，不影响录像。</string>
     <string name="set_rearview_fov_title">视野角度</string>
     <string name="set_rearview_fov_summary">角度越大，视野越宽、画面越清晰，但边缘变形越明显</string>
-    <string name="set_rearview_width_title">窗口宽度</string>
-    <string name="set_rearview_height_title">窗口高度</string>
-    <string name="set_rearview_height_summary">宽度和高度均可调至全屏；画面比例不变，窗口形状只决定可见范围</string>
-    <string name="set_rearview_reset_title">重置窗口与画面</string>
     <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「切换范围」和「方向标签」的默认值，并切回后视</string>
+    <string name="set_rearview_fisheye_value">视野 %1$d°</string>
+    <string name="set_rearview_window_summary">画面比例不变，窗口形状只决定可见范围</string>
+    <string name="set_rearview_window_value">宽度 %1$d 像素 · 高度 %2$d 像素</string>
+    <string name="dlg_rearview_reset_title">重置窗口与画面？</string>
+    <string name="rearview_editor_hint">拖动边或角调整宽度和高度，也可以双指缩放。拖动框内可以移动，位置不保存。</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
@@ -382,6 +383,7 @@
     <string name="slot_cabin_front">前座舱</string>
     <string name="slot_cabin_rear">后座舱</string>
     <string name="action_save">保存</string>
+    <string name="action_reset">重置</string>
     <string name="action_all_auto">全部自动</string>
     <string name="msg_mapping_saved">已保存摄像头映射，重启应用后生效</string>
     <string name="msg_mapping_cleared">已恢复自动分配，重启应用后生效</string>
@@ -1024,5 +1026,4 @@
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
-    <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
 </resources>
