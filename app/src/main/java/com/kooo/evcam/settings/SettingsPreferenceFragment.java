@@ -302,7 +302,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。行尾写锁了多少（{@link #updateFootageLocked}）。
      *
      * <p>开着时下面一排「自动锁定」：闪远光（项目所有者 2026-10-04），默认关 —— 自动锁的也占空间，锁满了就停录；
-     * 锁定影像关着时不起作用（{@code AutoLock.flashEnabled} 也看它）。鸣笛：车上还读不到喇叭信号，按钮摆着、
+     * 锁定影像关着时不起作用（{@code AutoLock.flashEnabled} 也看它）。双闪（项目所有者 2026-10-23）同样默认关，
+     * 锁的是亮起前 1 分钟到关闭（{@code AutoLock.hazardEnabled}）。鸣笛：车上还读不到喇叭信号，按钮摆着、
      * 置灰按不动（项目所有者 2026-10-23），没有触发它的代码；读得到了再放开。</p>
      */
     private void bindFootageLock() {
@@ -316,6 +317,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.addOption(getString(R.string.set_footage_lock_flash_chip), appConfig.isFlashLockEnabled(), on -> {
             appConfig.setFlashLockEnabled(on);
             com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock_flash → " + (on ? "开" : "关"));
+            com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
+        });
+        // 双闪（项目所有者 2026-10-23，默认不按）：亮起前 1 分钟到关闭的录像锁上，和闪远光同一套（AutoLock）
+        pref.addOption(getString(R.string.set_footage_lock_hazard_chip), appConfig.isHazardLockEnabled(), on -> {
+            appConfig.setHazardLockEnabled(on);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock_hazard → " + (on ? "开" : "关"));
             com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
         });
         pref.addUnavailableOption(getString(R.string.set_footage_lock_horn_chip));

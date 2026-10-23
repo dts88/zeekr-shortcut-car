@@ -407,6 +407,7 @@
     <string name="set_storage_limits_message">Apabila had dilepasi, fail paling lama dipadam, hanya yang tidak dikunci dan dirakam atau diambil oleh apl ini; video juga dibersihkan apabila ruang kosong hampir habis, foto disemak setiap jam. Biarkan kosong atau masukkan 0 untuk tiada had: tiada yang dipadam, dan rakaman berhenti apabila ruang habis.</string>
     <string name="set_footage_lock_auto">Kunci automatik</string>
     <string name="set_footage_lock_flash_chip">Kelip lampu tinggi</string>
+    <string name="set_footage_lock_hazard_chip">Lampu kecemasan</string>
     <string name="set_footage_lock_horn_chip">Hon</string>
     <string name="set_footage_locked_value">%1$d dikunci · %2$s</string>
     <string name="set_footage_locked_value_unprotected">%1$d dikunci · %2$s, tidak dilindungi</string>
@@ -417,6 +418,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">Matikan</string>
     <string name="msg_flash_locked">Kelip lampu tinggi: klip yang meliputi 10 saat sebelum dan selepas telah dikunci</string>
+    <string name="msg_hazard_locked">Lampu kecemasan: klip dari 1 minit sebelumnya telah dikunci, sehingga lampu kecemasan dimatikan</string>
     <string name="msg_storage_locked_stopped">Rakaman yang dikunci telah memenuhi ruang, rakaman dihentikan. Buka kunci sebahagian dalam main semula</string>
     <string name="msg_storage_locked_refuse">Rakaman yang dikunci telah memenuhi ruang, rakaman tidak dapat dimulakan. Buka kunci sebahagian dalam main semula</string>
     <string name="action_lock_footage">Kunci</string>

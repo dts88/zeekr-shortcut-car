@@ -408,6 +408,7 @@
     <string name="set_storage_limits_message">When a cap is exceeded, the oldest files are deleted, only unlocked ones this app recorded or took; videos are also cleaned up when free space runs low, photos are checked every hour. Leave empty or enter 0 for no cap: nothing is deleted, and recording stops when space runs out.</string>
     <string name="set_footage_lock_auto">Auto lock</string>
     <string name="set_footage_lock_flash_chip">Flash to pass</string>
+    <string name="set_footage_lock_hazard_chip">Hazard lights</string>
     <string name="set_footage_lock_horn_chip">Horn</string>
     <string name="set_footage_locked_value">%1$d locked · %2$s</string>
     <string name="set_footage_locked_value_unprotected">%1$d locked · %2$s, not protected</string>
@@ -419,6 +420,7 @@
     </plurals>
     <string name="dlg_footage_lock_off_ok">Turn off</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the clips covering 10 seconds before and after</string>
+    <string name="msg_hazard_locked">Hazard lights: locked the clips from 1 minute before, until the hazard lights go off</string>
     <string name="msg_storage_locked_stopped">Locked footage has filled the space, so recording stopped. Unlock some in playback</string>
     <string name="msg_storage_locked_refuse">Locked footage has filled the space, so recording can\'t start. Unlock some in playback</string>
     <string name="action_lock_footage">Lock</string>

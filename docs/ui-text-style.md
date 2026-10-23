@@ -344,7 +344,10 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-10-23（存储页：自动锁定加「双闪」，storage-spec §车机信号自动锁定）：按钮 set_footage_lock_hazard_chip「双闪」
+  （项目所有者说的名字）/「Hazard lights」/「Lampu kecemasan」（术语表「闪远光 / 双闪」那一行）；锁上时的提示 msg_hazard_locked
+  「双闪：已锁定前 1 分钟起的录像片段，到关闭双闪为止」/「Hazard lights: locked the clips from 1 minute before, until the
+  hazard lights go off」/「Lampu kecemasan: klip dari 1 minit sebelumnya telah dikunci, sehingga lampu kecemasan dimatikan」。
 
 ---
 

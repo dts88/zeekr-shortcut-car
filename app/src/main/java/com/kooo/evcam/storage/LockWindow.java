@@ -18,7 +18,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * 自动锁定的时间窗：某一刻前后各 10 秒；盘上哪些录像文件和它有重叠（每一路都算）。纯函数（{@code LockWindowTest}）。
+ * 自动锁定的时间窗：某一刻前后各 10 秒（闪远光、悬浮按钮），或者双闪亮起前 1 分钟到关闭（{@link #hazard}）；
+ * 盘上哪些录像文件和它有重叠（每一路都算）。纯函数（{@code LockWindowTest}）。
  * 谁来锁、什么时候锁，看 {@link AutoLock}；规则见 docs/storage-spec.md。
  *
  * <h3>一个文件占哪一段时间</h3>
@@ -48,6 +49,8 @@ public final class LockWindow {
     public static final long BEFORE_MS = 10_000L;
     /** 往后锁多久。 */
     public static final long AFTER_MS = 10_000L;
+    /** 双闪：从亮起前多久锁起（项目所有者 2026-10-23）。设置项和提示里写的「前 1 分钟」说的就是它。 */
+    public static final long HAZARD_BEFORE_MS = 60_000L;
     /**
      * 文件名里的时刻最多比这一路真正切换早多久：几路分段切换时共用一个时间戳的有效期，
      * 再加秒被截掉的那 1 秒。每个文件的结束多算这么多（见类说明）；第二遍锁定也要多等这么久
@@ -80,6 +83,11 @@ public final class LockWindow {
     /** 这一刻前 {@link #BEFORE_MS} 到后 {@link #AFTER_MS}。 */
     public static LockWindow around(long momentMs) {
         return new LockWindow(momentMs - BEFORE_MS, momentMs + AFTER_MS);
+    }
+
+    /** 双闪：亮起前 {@link #HAZARD_BEFORE_MS} 到关闭（还亮着时到此刻）。 */
+    public static LockWindow hazard(long onMs, long offMs) {
+        return new LockWindow(onMs - HAZARD_BEFORE_MS, Math.max(onMs, offMs));
     }
 
     /**
