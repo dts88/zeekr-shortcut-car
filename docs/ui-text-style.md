@@ -256,6 +256,15 @@
   「熄屏后只录制环视，后座舱在亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；
   English「Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, …」；
   Bahasa Melayu「Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, …」。
+- 2026-10-23 批准（设置整理第一轮：时间水印和录制规格同开同关，ui-spec §十一）：set_watermark_on / set_watermark_off ——
+  开「在录像和照片上叠加日期和时间，录像另外标注分辨率、实测帧率、编码和实时码率；预览画面中不显示」、关「录像和照片不叠加日期、时间和录制规格」；
+  English「Adds the date and time to videos and photos, and the resolution, measured frame rate, codec and live bitrate to videos; not shown in the preview」/
+  「No date, time or recording specs on videos or photos」；
+  Bahasa Melayu「Menambah tarikh dan masa pada video dan foto, serta resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada video; tidak dipaparkan dalam pratonton」/
+  「Tiada tarikh, masa atau spesifikasi rakaman pada video atau foto」。
+- 2026-10-23 批准（设置整理第一轮：行驶信息条改成开关加下一层）：set_info_bar_summary「在环视录像画面下方附加一栏车辆信号。试验性功能。」/
+  「Adds a strip of vehicle signals below the surround view video. Experimental.」/「Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.」；
+  行尾的值 set_info_bar_value「已选 %1$d 项」/「%1$d selected」/「%1$d dipilih」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -264,16 +273,22 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-10-23（设置整理：时间水印和录制规格同开同关，ui-spec §十一）：改已批的 set_watermark_on / set_watermark_off ——
-  开「在录像和照片上叠加日期和时间，录像另外标注分辨率、实测帧率、编码和实时码率；预览画面中不显示」、关「录像和照片不叠加日期、时间和录制规格」；
-  English「Adds the date and time to videos and photos, and the resolution, measured frame rate, codec and live bitrate to videos; not shown in the preview」/
-  「No date, time or recording specs on videos or photos」；
-  Bahasa Melayu「Menambah tarikh dan masa pada video dan foto, serta resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada video; tidak dipaparkan dalam pratonton」/
-  「Tiada tarikh, masa atau spesifikasi rakaman pada video atau foto」。set_watermark_spec_title / _summary 删掉。
-- 2026-10-23（设置整理：行驶信息条改成开关加下一层）：改 set_info_bar_summary，去掉「显示项在『设置 → 系统 → 系统信息』中选择」那半句 ——
-  「在环视录像画面下方附加一栏车辆信号。试验性功能。」/「Adds a strip of vehicle signals below the surround view video. Experimental.」/
-  「Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.」；新加行尾的值 set_info_bar_value
-  「已选 %1$d 项」/「%1$d selected」/「%1$d dipilih」。
+- 2026-10-23（设置整理第二轮：存储页，ui-spec §十一）：
+  - set_storage_saved_in「录像保存在 %1$s」/「Videos are saved in %1$s」/「Video disimpan di %1$s」（写在选盘的框里，后面接已批的哨兵模式那一段）。
+  - 存储上限一行：标题 set_storage_limits_title「存储上限」/「Storage caps」/「Had storan」；行尾 set_storage_limits_value
+    「录像 %1$s · 照片 %2$s」/「Videos %1$s · Photos %2$s」/「Video %1$s · Foto %2$s」；框里两项「录像」「照片」（Videos / Photos、Video / Foto）；
+    框里的说明 set_storage_limits_message「超出上限时自动清理最旧的文件，只删除本应用录制、拍摄且未锁定的；录像在剩余空间不足时也会清理，
+    照片每小时检查一次。留空或填 0 表示不限制：不自动删除，录像在空间不足时停止录制。」（英文、马来文同义）。
+    原来的 set_video_limit_* / set_photo_limit_* / set_limit_message / set_storage_usage_title 删掉。
+  - 锁定影像一行：改已批的 set_footage_lock_summary「在回放中或用悬浮按钮手动锁定。锁定的录像和照片不会被自动清理，
+    也无法直接删除（需先解锁）；锁定的文件占满空间时停止录制。」（英文、马来文同样补上悬浮按钮）；附加项小标题 set_footage_lock_auto
+    「自动锁定」/「Auto lock」/「Kunci automatik」；按钮 set_footage_lock_flash_chip「闪远光」/「Flash to pass」/「Kelip lampu tinggi」；
+    行尾 set_footage_locked_value「已锁定 %1$d 个 · %2$s」/「%1$d locked · %2$s」/「%1$d dikunci · %2$s」，
+    关着时 set_footage_locked_value_unprotected「已锁定 %1$d 个 · %2$s，不受保护」/「…, not protected」/「…, tidak dilindungi」。
+    原来的闪远光、鸣笛两行，已锁定那一行的文字删掉。
+  - 改已批的 msg_storage_full_stopped / msg_storage_full_refuse 里引用的标题：「未设置「录像存储上限」」→「未设置录像的「存储上限」」
+    （「U 盘已满，录制已停止。未设置录像的「存储上限」，不会自动清理旧录像。」；英文、马来文没有引用标题，不动）。
+
 ---
 
 ## 10. 术语表
@@ -283,14 +298,14 @@
 | 概念 | 中文 | English | Bahasa Melayu | 例外与说明 |
 |---|---|---|---|---|
 | 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | 「录像」不作动词；不用单字「录」 |
-| 录像（保存的文件） | 录像；录像存储上限 | recording(s)；与照片并列时 video(s)；Video storage cap | rakaman；与照片并列时 video；Had storan video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
+| 录像（保存的文件） | 录像；「存储上限」里的「录像」 | recording(s)；与照片并列时 video(s)；Storage caps → Videos | rakaman；与照片并列时 video；Had storan → Video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
 | 片段与一次录像 | 片段（量词「段」：每段 3 分钟、第 2 段）；一次从开始到停止的录制 = 录像；回放里切换用「上一条 / 下一条」 | clip；recording；Previous / Next | klip；rakaman；Sebelumnya / Seterusnya | — |
 | 丢帧 | 丢帧（录像里少了画面）；U 盘写入速度跟不上 | dropped frames、drop frames；writes too slowly | bingkai tercicir；menulis terlalu perlahan | 不用「掉帧」「卡帧」 |
 | 影像 | 影像（录像和照片的合称） | footage | rakaman | 单指一种时写录像或照片；「倒车影像」「泊车影像」是原厂功能名 |
-| 照片 | 照片（量词「张」「组」）；照片存储上限 | photo(s)；Photo storage cap | foto；Had storan foto | 「图片」只指非照片的图像（使用指南插图） |
+| 照片 | 照片（量词「张」「组」）；「存储上限」里的「照片」 | photo(s)；Storage caps → Photos | foto；Had storan → Foto | 「图片」只指非照片的图像（使用指南插图） |
 | 回放 | 回放；页面名：录像回放、照片回放 | playback；页面名 Videos、Photos | main semula；页面名 Video、Foto | 不用「回看」 |
 | U 盘 | U 盘；需区分类型时写「U 盘或固态硬盘」 | USB drive | pemacu USB | 不用「录像盘」「固态盘」 |
-| 存储位置 / 录像保存路径 | 存储位置（设置中选定的 U 盘）；录像保存路径（实际写入的目录） | Storage location；Video folder | Lokasi storan；Folder video | — |
+| 存储位置 / 录像保存在 | 存储位置（设置中选定的 U 盘）；「录像保存在 …」（实际写入的目录，写在选存储位置的框里） | Storage location；Videos are saved in … | Lokasi storan；Video disimpan di … | — |
 | 内置存储 | 内置存储 | internal storage | storan dalaman | 解释寿命时写「内置存储的写入寿命有限」；不用「闪存」「车机存储」「内部存储」作名称 |
 | 环视 | 环视；技术处：环视合成流；版式：四格显示 / 整幅显示 | surround view（标签 Surround）；composite stream；2×2 grid / full frame | paparan sekeliling（标签 Sekeliling）；strim komposit；grid 2×2 / bingkai penuh | 马来文用 sekeliling，不用 keliling |
 | 座舱 | 座舱；前座舱、后座舱 | cabin；front cabin、rear cabin | kabin；kabin depan、kabin belakang | 不用「车厢」；「前排 / 后排」只指座位排 |

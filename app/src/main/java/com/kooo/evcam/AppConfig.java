@@ -32,7 +32,7 @@ public class AppConfig {
     private static final String KEY_SCREEN_OFF_RECORDING = "screen_off_recording";  // 息屏录制（锁车录制）
     private static final String KEY_SCREEN_OFF_KEEP_RECORDING = "screen_off_keep_recording";  // 熄屏持续录制
     private static final String KEY_FOOTAGE_LOCK = "footage_lock";  // 锁定影像
-    private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 闪远光时自动锁定当前录像
+    private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 自动锁定：闪远光
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
     
     // 存储位置配置
@@ -382,7 +382,7 @@ public class AppConfig {
     }
 
     /**
-     * 闪远光时自动锁定当前录像（存储页「锁定影像」下面，默认关 —— 自动锁的也占空间，锁满了就停录）。
+     * 自动锁定：闪远光（存储页「锁定影像」开着时下面那一排按钮，默认不按 —— 自动锁的也占空间，锁满了就停录）。
      * 这是存着的值；只在「锁定影像」也开着时起作用，见 {@code AutoLock.flashEnabled}。
      */
     public boolean isFlashLockEnabled() {

@@ -152,7 +152,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
-        updateStorageUsage();
+        updateStorageNote();
         refreshRearViewSize();
     }
 
@@ -260,46 +260,31 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
-        bindGigabyteLimit("pref_video_limit", appConfig.getVideoStorageLimitGb(),
-                value -> appConfig.setVideoStorageLimitGb(value));
-        bindGigabyteLimit("pref_photo_limit", appConfig.getPhotoStorageLimitGb(),
-                value -> appConfig.setPhotoStorageLimitGb(value));
-
+        bindStorageLimits();
         bindFootageLock();
-        bindAutoLock();
-        updateStorageUsage();
+        updateStorageNote();
     }
 
     /**
-     * 锁定影像下面的两个自动锁定（项目所有者 2026-10-04），默认关：自动锁的也占空间，锁满了就停录。
-     * 「锁定影像」关着时闪远光那一项置灰、不起作用（XML 里的 dependency；{@code AutoLock.flashEnabled} 也看它）。
-     * 鸣笛那一项：车上还读不到喇叭信号，一直置灰、打不开，没有触发它的代码。「打不开」只在这里设
-     * （XML 里不写 enabled，和水印品牌那一行一样）。
-     */
-    private void bindAutoLock() {
-        bindSwitch("pref_footage_lock_flash", appConfig.isFlashLockEnabled(), value -> {
-            appConfig.setFlashLockEnabled(value);
-            com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
-        });
-        SwitchPreferenceCompat horn = findPreference("pref_footage_lock_horn");
-        if (horn != null) {
-            horn.setPersistent(false);
-            horn.setChecked(false);
-            horn.setEnabled(false);
-        }
-    }
-
-    /**
-     * 锁定影像。打开直接生效；关掉时如果锁着东西，先说清楚代价（项目所有者 2026-10-03）：
-     * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。
+     * 锁定影像（2026-10-23 合成一行，开关加附加项）。打开直接生效；关掉时如果锁着东西，先说清楚代价（项目所有者 2026-10-03）：
+     * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。行尾写锁了多少（{@link #updateFootageLocked}）。
+     *
+     * <p>开着时下面一排「自动锁定」：闪远光（项目所有者 2026-10-04），默认关 —— 自动锁的也占空间，锁满了就停录；
+     * 锁定影像关着时不起作用（{@code AutoLock.flashEnabled} 也看它）。鸣笛车上还读不到喇叭信号，读得到了再加一个按钮。</p>
      */
     private void bindFootageLock() {
-        SwitchPreferenceCompat pref = findPreference("pref_footage_lock");
+        SwitchChipsPreference pref = findPreference("pref_footage_lock");
         if (pref == null) {
             return;
         }
         pref.setPersistent(false);
         pref.setChecked(appConfig.isFootageLockEnabled());
+        pref.setOptionsLabel(getString(R.string.set_footage_lock_auto));
+        pref.addOption(getString(R.string.set_footage_lock_flash_chip), appConfig.isFlashLockEnabled(), on -> {
+            appConfig.setFlashLockEnabled(on);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock_flash → " + (on ? "开" : "关"));
+            com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
+        });
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             if (Boolean.TRUE.equals(newValue)) {
                 applyFootageLock(pref, true);
@@ -348,13 +333,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         updateFootageLocked();
     }
 
-    /** 「已锁定」那一行：录像几个文件多大、照片几张多大；开关关着时注明不受保护。 */
+    /** 锁定影像那一行的行尾：锁了几个文件（录像和照片一起数）、多大；开关关着时注明不受保护。 */
     private void updateFootageLocked() {
-        Preference pref = findPreference("pref_footage_locked");
+        SwitchChipsPreference pref = findPreference("pref_footage_lock");
         if (pref == null || getContext() == null) {
             return;
         }
-        pref.setSummary(getString(R.string.info_reading));
+        pref.setValue(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
         final boolean on = appConfig.isFootageLockEnabled();
         new Thread(() -> {
@@ -365,14 +350,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (!isAdded()) {
                 return;
             }
-            String text = videos.files + photos.files == 0
-                    ? getString(R.string.set_footage_locked_none)
-                    : getString(R.string.set_footage_locked_summary,
-                            videos.files, StorageHelper.formatSize(videos.bytes),
-                            photos.files, StorageHelper.formatSize(photos.bytes));
-            final String result = on || videos.files + photos.files == 0 ? text
-                    : getString(R.string.set_footage_locked_unprotected, text);
-            requireActivity().runOnUiThread(() -> pref.setSummary(result));
+            int files = videos.files + photos.files;
+            String size = StorageHelper.formatSize(videos.bytes + photos.bytes);
+            final String result = files == 0 ? getString(R.string.set_footage_locked_none)
+                    : on ? getString(R.string.set_footage_locked_value, files, size)
+                    : getString(R.string.set_footage_locked_value_unprotected, files, size);
+            requireActivity().runOnUiThread(() -> pref.setValue(result));
         }, "footage-locked").start();
     }
 
@@ -472,7 +455,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             return false;
         });
-        updateStorageUsage();
+        updateStorageNote();
     }
 
     /**
@@ -528,34 +511,102 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setValue(value);
         pref.setSummary(pref.getEntry());
         toast(getString(R.string.msg_storage_changed, pref.getEntry()));
-        updateStorageUsage();
+        updateStorageNote();
     }
 
-    /** 上限用 GB 存，界面上是个数字输入框；留空或 0 表示不限制。 */
-    private void bindGigabyteLimit(String key, int current, IntSetter setter) {
-        EditTextPreference pref = findPreference(key);
+    /**
+     * 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项（GB），清理的规则写在框里。
+     * 上限用 GB 存；留空或 0 表示不限制。
+     */
+    private void bindStorageLimits() {
+        Preference pref = findPreference("pref_storage_limits");
         if (pref == null) {
             return;
         }
-        pref.setPersistent(false);
-        pref.setText(current > 0 ? String.valueOf(current) : "");
-        pref.setSummary(describeLimit(current));
-        pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            int parsed = 0;
-            String text = String.valueOf(newValue).trim();
-            if (!text.isEmpty()) {
-                try {
-                    parsed = Math.max(0, Integer.parseInt(text));
-                } catch (NumberFormatException e) {
-                    toast(getString(R.string.msg_enter_number));
-                    return false;
-                }
-            }
-            setter.set(parsed);
-            pref.setText(parsed > 0 ? String.valueOf(parsed) : "");
-            pref.setSummary(describeLimit(parsed));
-            return false;
+        PreferenceRows.markValue(pref);
+        showStorageLimits(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            editStorageLimits(pref);
+            return true;
         });
+    }
+
+    private void showStorageLimits(Preference pref) {
+        pref.setSummary(getString(R.string.set_storage_limits_value,
+                describeLimit(appConfig.getVideoStorageLimitGb()), describeLimit(appConfig.getPhotoStorageLimitGb())));
+    }
+
+    /** 一个框里两个数字输入框：录像、照片（GB）。有一个填的不是数字就都不存，提示一句。 */
+    private void editStorageLimits(Preference pref) {
+        Context context = requireContext();
+        android.widget.EditText video = limitInput(context, appConfig.getVideoStorageLimitGb());
+        android.widget.EditText photo = limitInput(context, appConfig.getPhotoStorageLimitGb());
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(context);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(limitRow(context, R.string.set_storage_limits_video, video));
+        box.addView(limitRow(context, R.string.set_storage_limits_photo, photo));
+
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_storage_limits_title)
+                .setMessage(R.string.set_storage_limits_message)
+                .setView(box)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    Integer videoGb = parseLimit(video);
+                    Integer photoGb = parseLimit(photo);
+                    if (videoGb == null || photoGb == null) {
+                        toast(getString(R.string.msg_enter_number));
+                        return;
+                    }
+                    appConfig.setVideoStorageLimitGb(videoGb);
+                    appConfig.setPhotoStorageLimitGb(photoGb);
+                    showStorageLimits(pref);
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    private static android.widget.EditText limitInput(Context context, int current) {
+        android.widget.EditText input = com.kooo.evcam.ui.CamDialogs.input(context);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(current > 0 ? String.valueOf(current) : "");
+        input.setSelectAllOnFocus(true);
+        return input;
+    }
+
+    /** 一行：名称（录像 / 照片）、输入框、单位 GB。 */
+    private static android.view.View limitRow(Context context, int labelRes, android.widget.EditText input) {
+        float density = context.getResources().getDisplayMetrics().density;
+        android.widget.LinearLayout row = new android.widget.LinearLayout(context);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, Math.round(6 * density), 0, Math.round(6 * density));
+        android.widget.TextView label = new android.widget.TextView(context);
+        label.setTextAppearance(R.style.TextAppearance_Cam_Row);
+        label.setText(labelRes);
+        label.setMinWidth(Math.round(96 * density));
+        row.addView(label);
+        row.addView(input, new android.widget.LinearLayout.LayoutParams(0,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        android.widget.TextView unit = new android.widget.TextView(context);
+        unit.setTextAppearance(R.style.TextAppearance_Cam_Row);
+        unit.setText("GB");
+        unit.setPadding(Math.round(12 * density), 0, 0, 0);
+        row.addView(unit);
+        return row;
+    }
+
+    /** 留空是 0（不限制）；不是数字是 null。 */
+    private static Integer parseLimit(android.widget.EditText input) {
+        String text = input.getText().toString().trim();
+        if (text.isEmpty()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(text));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -671,32 +722,37 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 「录像保存路径」：在录写录制器实际写的目录，没在录写下一次会写的目录；
-     * 此刻录不了（没有 U 盘、开发者选项没开）写「未检测到 U 盘」（{@link StorageHelper#savedVideoDir}）。
+     * 选盘的框里那两句（2026-10-23 从两行只读信息挪来，选哪个盘之前正好要知道）：录像保存在哪个目录 ——
+     * 在录写录制器实际写的目录，没在录写下一次会写的目录；此刻录不了（没有 U 盘、开发者选项没开）写「未检测到 U 盘」
+     * （{@link StorageHelper#savedVideoDir}）；再加哨兵模式下只有 USB-A 口通电那一段。
      */
-    private void updateStorageUsage() {
-        Preference pref = findPreference("pref_storage_usage");
+    private void updateStorageNote() {
+        ListPreference pref = findPreference("pref_storage_location");
         if (pref == null || getContext() == null) {
             return;
         }
-        pref.setSummary(getString(R.string.info_reading));
         final Context context = getContext().getApplicationContext();
         final boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
         final String noDrive = getString(R.string.set_storage_usage_no_drive);
         final String failed = getString(R.string.info_read_failed);
+        final String sentry = getString(R.string.set_storage_sentry_note);
         new Thread(() -> {
-            String desc;
+            String where;
             try {
                 java.io.File dir = StorageHelper.savedVideoDir(context, recording);
-                desc = dir != null ? dir.getAbsolutePath() : noDrive;
+                where = dir != null ? dir.getAbsolutePath() : noDrive;
             } catch (Throwable t) {
-                desc = failed;
+                where = failed;
             }
-            final String result = desc;
+            final String found = where;
             if (isAdded()) {
-                requireActivity().runOnUiThread(() -> pref.setSummary(result));
+                requireActivity().runOnUiThread(() -> {
+                    if (isAdded()) {
+                        pref.setDialogMessage(getString(R.string.set_storage_saved_in, found) + "\n\n" + sentry);
+                    }
+                });
             }
-        }, "storage-usage").start();
+        }, "storage-note").start();
     }
 
     // ------------------------------------------------------------------ 超级镜子
@@ -1360,9 +1416,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         final int[] picked = {pref.findIndexOfValue(pref.getValue())};
         CharSequence title = pref.getDialogTitle() != null
                 ? pref.getDialogTitle() : pref.getTitle();
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(
-                requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(title)
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(
+                requireContext(), R.style.Theme_Cam_MaterialAlertDialog);
+        // 有说明的（存储位置：保存在哪、哨兵模式下哪个口通电）写在标题下面：对话框的正文和单选列表不能同时出现
+        CharSequence note = pref.getDialogMessage();
+        if (note == null) {
+            builder.setTitle(title);
+        } else {
+            builder.setCustomTitle(titleWithNote(title, note));
+        }
+        com.kooo.evcam.ui.CamDialogs.show(builder
                 .setSingleChoiceItems(entries, picked[0], (d, which) -> picked[0] = which)
                 .setPositiveButton(R.string.action_ok, (d, w) -> {
                     if (picked[0] < 0 || picked[0] >= values.length) {
@@ -1376,9 +1439,29 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
+    /** 对话框标题加标题下面一段说明（单选框用：正文和列表只能出现一个）。 */
+    private android.view.View titleWithNote(CharSequence title, CharSequence note) {
+        Context context = requireContext();
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(context);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        box.setPadding(pad, pad, pad, pad / 2);
+        android.widget.TextView heading = new android.widget.TextView(context);
+        heading.setTextAppearance(R.style.TextAppearance_Cam_Title);
+        heading.setText(title);
+        box.addView(heading);
+        android.widget.TextView body = new android.widget.TextView(context);
+        body.setTextAppearance(R.style.TextAppearance_Cam_Caption);
+        body.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
+        body.setText(note);
+        body.setPadding(0, pad / 2, 0, 0);
+        box.addView(body);
+        return box;
+    }
+
     /**
-     * 单行文本输入：视频 / 图片存储上限、熄屏录制时长。
-     * 标题和说明取 XML 里的 dialogTitle / dialogMessage（存储上限靠它们写单位和清理规则），
+     * 单行文本输入：熄屏录制时长。
+     * 标题和说明取 XML 里的 dialogTitle / dialogMessage，
      * 和下拉框一个规矩：没写标题就用这一行的标题，没写说明就不带。
      */
     private void showTextDialog(EditTextPreference pref) {
@@ -1391,7 +1474,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
     }
 
-    /** 单行文本输入框：上面那几行和车牌号（开关加下一层那一行）共用。键盘按 {@code key} 配（{@link #configureInput}）。 */
+    /** 单行文本输入框：上面那一行和车牌号（开关加下一层那一行）共用。键盘按 {@code key} 配（{@link #configureInput}）。 */
     private void showTextDialog(String key, CharSequence title, CharSequence message, String current,
                                 StringSetter onSave) {
         final android.widget.EditText input =
@@ -1426,9 +1509,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             input.setFilters(new android.text.InputFilter[]{
                     new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
             return;
-        }
-        if ("pref_video_limit".equals(key) || "pref_photo_limit".equals(key)) {
-            input.setInputType(InputType.TYPE_CLASS_NUMBER);
         }
         if ("pref_screen_off_wake_hours".equals(key)) {
             input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);

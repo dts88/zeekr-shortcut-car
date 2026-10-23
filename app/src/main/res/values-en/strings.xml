@@ -46,13 +46,6 @@
     <string name="set_storage_sentry_note">With Sentry Mode on, only the USB-A port (where Sentry Mode saves its recordings) stays powered after you leave the car, so recording can continue. If the storage location is a drive on the Type-C port, that port loses power and recording switches to the drive on the USB-A port.</string>
     <string name="set_relay_title">Relay write</string>
     <string name="set_relay_summary">Writes to internal storage first, then moves each finished clip to the USB drive, reducing dropped frames on a slow drive. When on, recording doesn\'t switch to another USB drive if this one disconnects.</string>
-    <string name="set_video_limit_title">Video storage cap</string>
-    <string name="set_video_limit_dialog">Video storage cap (GB)</string>
-    <string name="set_photo_limit_title">Photo storage cap</string>
-    <string name="set_photo_limit_dialog">Photo storage cap (GB)</string>
-    <string name="set_limit_message">When over the cap or low on space, the oldest recordings are cleaned up automatically. Only unlocked files recorded by this app are deleted. Leave blank or enter 0 for no limit: nothing is deleted, and recording stops when space runs low.</string>
-    <string name="set_photo_limit_message">Checked every hour: when over the cap, the oldest photos are cleaned up automatically. Only unlocked photos taken by this app are deleted. Leave blank or enter 0 for no limit.</string>
-    <string name="set_storage_usage_title">Video folder</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
     <string name="set_rearview_summary">Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror</string>
     <string name="set_rearview_button_mode_title">Button mode</string>
@@ -404,21 +397,24 @@
         <item quantity="other">Automatic cleanup: deleted %1$d photos (%2$s)</item>
     </plurals>
     <string name="set_footage_lock_title">Lock footage</string>
-    <string name="set_footage_lock_summary">Lock videos and photos in playback. Locked files are never removed by automatic cleanup and can\'t be deleted until unlocked; if locked files fill the space, recording stops</string>
-    <string name="set_footage_locked_title">Locked</string>
-    <string name="set_footage_locked_summary">Videos: %1$d · %2$s; photos: %3$d · %4$s</string>
+    <string name="set_footage_lock_summary">Lock videos and photos in playback or with the floating button. Locked files are never removed by automatic cleanup and can\'t be deleted until unlocked; if locked files fill the space, recording stops</string>
+    <string name="set_storage_saved_in">Videos are saved in %1$s</string>
+    <string name="set_storage_limits_title">Storage caps</string>
+    <string name="set_storage_limits_value">Videos %1$s · Photos %2$s</string>
+    <string name="set_storage_limits_video">Videos</string>
+    <string name="set_storage_limits_photo">Photos</string>
+    <string name="set_storage_limits_message">When a cap is exceeded, the oldest files are deleted, only unlocked ones this app recorded or took; videos are also cleaned up when free space runs low, photos are checked every hour. Leave empty or enter 0 for no cap: nothing is deleted, and recording stops when space runs out.</string>
+    <string name="set_footage_lock_auto">Auto lock</string>
+    <string name="set_footage_lock_flash_chip">Flash to pass</string>
+    <string name="set_footage_locked_value">%1$d locked · %2$s</string>
+    <string name="set_footage_locked_value_unprotected">%1$d locked · %2$s, not protected</string>
     <string name="set_footage_locked_none">Nothing locked</string>
-    <string name="set_footage_locked_unprotected">%1$s (Lock footage is off, these are not protected)</string>
     <string name="dlg_footage_lock_off_title">Turn off Lock footage?</string>
     <plurals name="dlg_footage_lock_off_msg">
         <item quantity="one">%1$d file is locked (%2$s). When off, it is no longer protected: automatic cleanup deletes it oldest first like any other file, and deleted files can\'t be recovered.</item>
         <item quantity="other">%1$d files are locked (%2$s). When off, they are no longer protected: automatic cleanup deletes them oldest first like any other file, and deleted files can\'t be recovered.</item>
     </plurals>
     <string name="dlg_footage_lock_off_ok">Turn off</string>
-    <string name="set_footage_lock_flash_title">Lock footage on flash-to-pass</string>
-    <string name="set_footage_lock_flash_summary">While recording, flash the high beams to lock the clips covering 10 seconds before and after, on every camera. If locked footage fills the space, recording stops.</string>
-    <string name="set_footage_lock_horn_title">Lock footage on horn</string>
-    <string name="set_footage_lock_horn_summary">The head unit can\'t read the horn signal yet, so this is unavailable</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the clips covering 10 seconds before and after</string>
     <string name="msg_storage_locked_stopped">Locked footage has filled the space, so recording stopped. Unlock some in playback</string>
     <string name="msg_storage_locked_refuse">Locked footage has filled the space, so recording can\'t start. Unlock some in playback</string>
