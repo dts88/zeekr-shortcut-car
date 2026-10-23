@@ -111,7 +111,7 @@ public class AppConfig {
     private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";
     private static final String KEY_INFO_BAR = "info_bar_enabled";  // 录像下方的行驶信息条
     private static final String KEY_VEHICLE_STATUS = "vehicle_status_panel";  // 主界面的车辆状态面板（试验性）
-    private static final String KEY_INFO_BAR_ITEMS = "info_bar_items";  // 信息条上放哪几项（系统信息里勾的）
+    private static final String KEY_INFO_BAR_ITEMS = "info_bar_items";  // 信息条上放哪几项（车辆信号里勾的）
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
@@ -1862,7 +1862,7 @@ public class AppConfig {
      * 录像下方的行驶信息条（试验项目，1.68.0）。默认关。
      *
      * <p>开着时录制走 MediaCodec（{@link #shouldUseCodecRecording}），画面比视频高 100 像素。
-     * 显示哪几项在系统信息里勾选（{@link #getInfoBarItems}，{@code telemetry.InfoBar}）。</p>
+     * 显示哪几项在车辆信号里勾选（{@link #getInfoBarItems}，{@code telemetry.InfoBar}）。</p>
      */
     public boolean isInfoBarEnabled() {
         return prefs.getBoolean(KEY_INFO_BAR, false);
@@ -1883,7 +1883,7 @@ public class AppConfig {
     }
 
     /**
-     * 信息条上放哪几项：信号名（{@code telemetry.Signal}），加上经纬度那一项。系统信息里勾选；
+     * 信息条上放哪几项：信号名（{@code telemetry.Signal}），加上经纬度那一项。车辆信号里勾选；
      * 没存过时是 2.0.10 信息条上在用的那些（{@code InfoBarLayout.defaultSelection}）。读写走 {@code telemetry.InfoBar}。
      */
     public java.util.Set<String> getInfoBarItems() {
