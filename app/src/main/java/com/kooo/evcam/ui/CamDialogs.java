@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
 
@@ -81,6 +82,19 @@ public final class CamDialogs {
         input.setPadding(horizontal, vertical, horizontal, vertical);
         input.setMinHeight(Math.round(INPUT_HEIGHT_DP * density));
         return input;
+    }
+
+    /**
+     * 对话框里的说明（项目所有者 2026-10-23，ui-spec §三）：说明是次要的，写在选项、输入框下面 ——
+     * 小一号（Caption）、次要文字色，和 Material 输入框下面那行帮助文字一个位置。
+     * 对话框自带的正文（{@code setMessage}）只给确认框用：那里正文就是要问的事。边距由放它的地方给。
+     */
+    public static TextView note(Context context, CharSequence text) {
+        TextView note = new TextView(context);
+        note.setTextAppearance(R.style.TextAppearance_Cam_Caption);
+        note.setTextColor(ContextCompat.getColor(context, R.color.text_secondary));
+        note.setText(text);
+        return note;
     }
 
     // ------------------------------------------------------------------ 弹

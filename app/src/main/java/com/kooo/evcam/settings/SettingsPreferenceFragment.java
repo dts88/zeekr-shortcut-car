@@ -78,6 +78,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
     private static final String EXTERNAL_MISSING = "external-missing";
     private List<StorageHelper.VolumeInfo> storageVolumes;
+    /** 选择框标题下面那一行此刻的状态，挂在这一行的 extras 上（存储位置：录像保存在哪，{@link #updateSavedIn}）。 */
+    private static final String EXTRA_DIALOG_STATUS = "cam_dialog_status";
 
     private static final String ARG_SECTION = "section";
 
@@ -152,7 +154,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
-        updateStorageNote();
+        updateSavedIn();
         refreshRearViewSize();
     }
 
@@ -262,7 +264,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindStorageLimits();
         bindFootageLock();
-        updateStorageNote();
+        updateSavedIn();
     }
 
     /**
@@ -270,7 +272,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * 关掉后它们不再受保护，空间不够时和别的录像一样从旧到新删，删掉的找不回来。行尾写锁了多少（{@link #updateFootageLocked}）。
      *
      * <p>开着时下面一排「自动锁定」：闪远光（项目所有者 2026-10-04），默认关 —— 自动锁的也占空间，锁满了就停录；
-     * 锁定影像关着时不起作用（{@code AutoLock.flashEnabled} 也看它）。鸣笛车上还读不到喇叭信号，读得到了再加一个按钮。</p>
+     * 锁定影像关着时不起作用（{@code AutoLock.flashEnabled} 也看它）。鸣笛：车上还读不到喇叭信号，按钮摆着、
+     * 置灰按不动（项目所有者 2026-10-23），没有触发它的代码；读得到了再放开。</p>
      */
     private void bindFootageLock() {
         SwitchChipsPreference pref = findPreference("pref_footage_lock");
@@ -285,6 +288,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock_flash → " + (on ? "开" : "关"));
             com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
         });
+        pref.addUnavailableOption(getString(R.string.set_footage_lock_horn_chip));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             if (Boolean.TRUE.equals(newValue)) {
                 applyFootageLock(pref, true);
@@ -455,7 +459,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             return false;
         });
-        updateStorageNote();
+        updateSavedIn();
     }
 
     /**
@@ -511,7 +515,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setValue(value);
         pref.setSummary(pref.getEntry());
         toast(getString(R.string.msg_storage_changed, pref.getEntry()));
-        updateStorageNote();
+        updateSavedIn();
     }
 
     /**
@@ -547,10 +551,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(limitRow(context, R.string.set_storage_limits_video, video));
         box.addView(limitRow(context, R.string.set_storage_limits_photo, photo));
+        android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(context,
+                getString(R.string.set_storage_limits_message));
+        note.setPadding(0, pad / 2, 0, 0);
+        box.addView(note);
 
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.set_storage_limits_title)
-                .setMessage(R.string.set_storage_limits_message)
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (dialog, which) -> {
                     Integer videoGb = parseLimit(video);
@@ -722,11 +729,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 选盘的框里那两句（2026-10-23 从两行只读信息挪来，选哪个盘之前正好要知道）：录像保存在哪个目录 ——
+     * 选盘的框里标题下面那一行（2026-10-23 从一行只读信息挪来，选哪个盘之前正好要知道）：录像保存在哪个目录 ——
      * 在录写录制器实际写的目录，没在录写下一次会写的目录；此刻录不了（没有 U 盘、开发者选项没开）写「未检测到 U 盘」
-     * （{@link StorageHelper#savedVideoDir}）；再加哨兵模式下只有 USB-A 口通电那一段。
+     * （{@link StorageHelper#savedVideoDir}）。推荐 USB-A 口那一句是说明，写在 XML 的 dialogMessage 里，列在选项下面。
      */
-    private void updateStorageNote() {
+    private void updateSavedIn() {
         ListPreference pref = findPreference("pref_storage_location");
         if (pref == null || getContext() == null) {
             return;
@@ -735,7 +742,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         final boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
         final String noDrive = getString(R.string.set_storage_usage_no_drive);
         final String failed = getString(R.string.info_read_failed);
-        final String sentry = getString(R.string.set_storage_sentry_note);
         new Thread(() -> {
             String where;
             try {
@@ -748,11 +754,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (isAdded()) {
                 requireActivity().runOnUiThread(() -> {
                     if (isAdded()) {
-                        pref.setDialogMessage(getString(R.string.set_storage_saved_in, found) + "\n\n" + sentry);
+                        pref.getExtras().putCharSequence(EXTRA_DIALOG_STATUS,
+                                getString(R.string.set_storage_saved_in, found));
                     }
                 });
             }
-        }, "storage-note").start();
+        }, "storage-saved-in").start();
     }
 
     // ------------------------------------------------------------------ 超级镜子
@@ -1405,7 +1412,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         super.onDisplayPreferenceDialog(preference);
     }
 
-    /** 单选：视频流配置、存储位置、操作按钮位置。选中之后还要按确定才算数。 */
+    /**
+     * 单选：视频流配置、存储位置、操作按钮位置。选中之后还要按确定才算数。
+     * 标题下面可以有一行此刻的状态（{@link #EXTRA_DIALOG_STATUS}，存储位置写录像保存在哪）；
+     * 说明（XML 里的 dialogMessage）是次要的，写在选项下面（ui-spec §三）。
+     */
     private void showChoiceDialog(ListPreference pref) {
         CharSequence[] entries = pref.getEntries();
         CharSequence[] values = pref.getEntryValues();
@@ -1418,12 +1429,19 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 ? pref.getDialogTitle() : pref.getTitle();
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(
                 requireContext(), R.style.Theme_Cam_MaterialAlertDialog);
-        // 有说明的（存储位置：保存在哪、哨兵模式下哪个口通电）写在标题下面：对话框的正文和单选列表不能同时出现
-        CharSequence note = pref.getDialogMessage();
-        if (note == null) {
+        CharSequence status = pref.getExtras().getCharSequence(EXTRA_DIALOG_STATUS);
+        if (status == null) {
             builder.setTitle(title);
         } else {
-            builder.setCustomTitle(titleWithNote(title, note));
+            builder.setCustomTitle(titleWithStatus(title, status));
+        }
+        // 自己放进去的视图排在列表下面（AlertDialog 本来的结构：列表占正文的位置，视图在它和按钮之间）
+        CharSequence message = pref.getDialogMessage();
+        if (message != null) {
+            int pad = (int) (24 * getResources().getDisplayMetrics().density);
+            android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(requireContext(), message);
+            note.setPadding(pad, pad / 2, pad, pad / 2);
+            builder.setView(note);
         }
         com.kooo.evcam.ui.CamDialogs.show(builder
                 .setSingleChoiceItems(entries, picked[0], (d, which) -> picked[0] = which)
@@ -1439,8 +1457,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    /** 对话框标题加标题下面一段说明（单选框用：正文和列表只能出现一个）。 */
-    private android.view.View titleWithNote(CharSequence title, CharSequence note) {
+    /** 对话框标题加标题下面一行此刻的状态（单选框的标题栏只有一行字，所以自己排）。 */
+    private android.view.View titleWithStatus(CharSequence title, CharSequence status) {
         Context context = requireContext();
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
         android.widget.LinearLayout box = new android.widget.LinearLayout(context);
@@ -1450,18 +1468,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         heading.setTextAppearance(R.style.TextAppearance_Cam_Title);
         heading.setText(title);
         box.addView(heading);
-        android.widget.TextView body = new android.widget.TextView(context);
-        body.setTextAppearance(R.style.TextAppearance_Cam_Caption);
-        body.setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.text_secondary));
-        body.setText(note);
-        body.setPadding(0, pad / 2, 0, 0);
-        box.addView(body);
+        android.widget.TextView line = com.kooo.evcam.ui.CamDialogs.note(context, status);
+        line.setPadding(0, pad / 2, 0, 0);
+        box.addView(line);
         return box;
     }
 
     /**
      * 单行文本输入：熄屏录制时长。
-     * 标题和说明取 XML 里的 dialogTitle / dialogMessage，
+     * 标题和说明取 XML 里的 dialogTitle / dialogMessage（说明写在输入框下面），
      * 和下拉框一个规矩：没写标题就用这一行的标题，没写说明就不带。
      */
     private void showTextDialog(EditTextPreference pref) {
@@ -1483,13 +1498,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         input.setSelectAllOnFocus(true);
         configureInput(key, input);
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        android.widget.FrameLayout box = new android.widget.FrameLayout(requireContext());
+        android.widget.LinearLayout box = new android.widget.LinearLayout(requireContext());
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(input);
+        if (message != null) {
+            android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(requireContext(), message);
+            note.setPadding(0, pad / 2, 0, 0);
+            box.addView(note);
+        }
 
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
-                .setMessage(message)
                 .setView(box)
                 .setPositiveButton(R.string.action_save,
                         (dialog, which) -> onSave.set(input.getText().toString()))

@@ -19,12 +19,12 @@ import java.util.List;
 
 /**
  * 开关加几个附加项（ui-spec §三，项目所有者 2026-10-23）：一个功能开着时还有几样可以单独开、关的附加项，合成一行 ——
- * 锁定影像（附加项：「自动锁定」的「闪远光」）。
+ * 锁定影像（附加项：「自动锁定」的「闪远光」「鸣笛」）。
  *
  * <p>行首的开关管整个功能，点这一行其余的地方也是这个开关（没有下一层；那一排按钮所在的地方除外）；
  * 行尾写当前值（{@link #setValue}）。
  * 开着时说明下面多一排：一个小标题（{@link #setOptionsLabel}）加几个按钮（{@link #addOption}，Material 的筛选按钮，
- * 按下是开、再按是关）；关着时那一排不显示。</p>
+ * 按下是开、再按是关）；关着时那一排不显示。还不能用的附加项照样摆出来，置灰、按不动（{@link #addUnavailableOption}）。</p>
  */
 public class SwitchChipsPreference extends SwitchPreferenceCompat implements PreferenceRows.OwnLayout {
 
@@ -36,6 +36,7 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
     private static final class Option {
         final CharSequence label;
         boolean checked;
+        /** null：还不能用（置灰、按不动）。 */
         final OptionListener listener;
 
         Option(CharSequence label, boolean checked, OptionListener listener) {
@@ -77,6 +78,12 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
         notifyChanged();
     }
 
+    /** 加一个还不能用的附加项：摆着、置灰、按不动（鸣笛：车机还读不到喇叭信号）。 */
+    public void addUnavailableOption(CharSequence label) {
+        options.add(new Option(label, false, null));
+        notifyChanged();
+    }
+
     @Override
     public void onBindViewHolder(PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
@@ -106,11 +113,13 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
             Chip chip = (Chip) inflater.inflate(R.layout.pref_option_chip, chips, false);
             chip.setText(option.label);
             chip.setChecked(option.checked);
-            chip.setEnabled(isEnabled());
-            chip.setOnCheckedChangeListener((button, checked) -> {
-                option.checked = checked;
-                option.listener.onChanged(checked);
-            });
+            chip.setEnabled(isEnabled() && option.listener != null);
+            if (option.listener != null) {
+                chip.setOnCheckedChangeListener((button, checked) -> {
+                    option.checked = checked;
+                    option.listener.onChanged(checked);
+                });
+            }
             chips.addView(chip);
         }
     }

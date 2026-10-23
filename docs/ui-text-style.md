@@ -265,6 +265,20 @@
 - 2026-10-23 批准（设置整理第一轮：行驶信息条改成开关加下一层）：set_info_bar_summary「在环视录像画面下方附加一栏车辆信号。试验性功能。」/
   「Adds a strip of vehicle signals below the surround view video. Experimental.」/「Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.」；
   行尾的值 set_info_bar_value「已选 %1$d 项」/「%1$d selected」/「%1$d dipilih」。
+- 2026-10-23 批准（设置整理第二轮：存储页，ui-spec §十一）：
+  - set_storage_saved_in「录像保存在 %1$s」/「Videos are saved in %1$s」/「Video disimpan di %1$s」（选盘框的标题下面）。
+  - 存储上限一行：标题 set_storage_limits_title「存储上限」/「Storage caps」/「Had storan」；行尾 set_storage_limits_value
+    「录像 %1$s · 照片 %2$s」/「Videos %1$s · Photos %2$s」/「Video %1$s · Foto %2$s」；框里两项「录像」「照片」（Videos / Photos、Video / Foto）；
+    两个输入框下面的说明 set_storage_limits_message「超出上限时自动清理最旧的文件，只删除本应用录制、拍摄且未锁定的；录像在剩余空间不足时也会清理，
+    照片每小时检查一次。留空或填 0 表示不限制：不自动删除，录像在空间不足时停止录制。」（英文、马来文同义）。
+  - 锁定影像一行：set_footage_lock_summary「在回放中或用悬浮按钮手动锁定。锁定的录像和照片不会被自动清理，
+    也无法直接删除（需先解锁）；锁定的文件占满空间时停止录制。」（英文、马来文同样补上悬浮按钮）；附加项小标题 set_footage_lock_auto
+    「自动锁定」/「Auto lock」/「Kunci automatik」；按钮 set_footage_lock_flash_chip「闪远光」/「Flash to pass」/「Kelip lampu tinggi」、
+    set_footage_lock_horn_chip「鸣笛」/「Horn」/「Hon」（名字是项目所有者定的，按钮置灰、按不动）；
+    行尾 set_footage_locked_value「已锁定 %1$d 个 · %2$s」/「%1$d locked · %2$s」/「%1$d dikunci · %2$s」，
+    关着时 set_footage_locked_value_unprotected「已锁定 %1$d 个 · %2$s，不受保护」/「…, not protected」/「…, tidak dilindungi」。
+  - msg_storage_full_stopped / msg_storage_full_refuse 里引用的标题改成「未设置录像的「存储上限」」
+    （「U 盘已满，录制已停止。未设置录像的「存储上限」，不会自动清理旧录像。」；英文、马来文没有引用标题，不动）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -273,21 +287,11 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-10-23（设置整理第二轮：存储页，ui-spec §十一）：
-  - set_storage_saved_in「录像保存在 %1$s」/「Videos are saved in %1$s」/「Video disimpan di %1$s」（写在选盘的框里，后面接已批的哨兵模式那一段）。
-  - 存储上限一行：标题 set_storage_limits_title「存储上限」/「Storage caps」/「Had storan」；行尾 set_storage_limits_value
-    「录像 %1$s · 照片 %2$s」/「Videos %1$s · Photos %2$s」/「Video %1$s · Foto %2$s」；框里两项「录像」「照片」（Videos / Photos、Video / Foto）；
-    框里的说明 set_storage_limits_message「超出上限时自动清理最旧的文件，只删除本应用录制、拍摄且未锁定的；录像在剩余空间不足时也会清理，
-    照片每小时检查一次。留空或填 0 表示不限制：不自动删除，录像在空间不足时停止录制。」（英文、马来文同义）。
-    原来的 set_video_limit_* / set_photo_limit_* / set_limit_message / set_storage_usage_title 删掉。
-  - 锁定影像一行：改已批的 set_footage_lock_summary「在回放中或用悬浮按钮手动锁定。锁定的录像和照片不会被自动清理，
-    也无法直接删除（需先解锁）；锁定的文件占满空间时停止录制。」（英文、马来文同样补上悬浮按钮）；附加项小标题 set_footage_lock_auto
-    「自动锁定」/「Auto lock」/「Kunci automatik」；按钮 set_footage_lock_flash_chip「闪远光」/「Flash to pass」/「Kelip lampu tinggi」；
-    行尾 set_footage_locked_value「已锁定 %1$d 个 · %2$s」/「%1$d locked · %2$s」/「%1$d dikunci · %2$s」，
-    关着时 set_footage_locked_value_unprotected「已锁定 %1$d 个 · %2$s，不受保护」/「…, not protected」/「…, tidak dilindungi」。
-    原来的闪远光、鸣笛两行，已锁定那一行的文字删掉。
-  - 改已批的 msg_storage_full_stopped / msg_storage_full_refuse 里引用的标题：「未设置「录像存储上限」」→「未设置录像的「存储上限」」
-    （「U 盘已满，录制已停止。未设置录像的「存储上限」，不会自动清理旧录像。」；英文、马来文没有引用标题，不动）。
+- 2026-10-23（存储页：选盘框里哨兵模式那一段，项目所有者给了意思，措辞待确认）：set_storage_port_note 取代 set_storage_sentry_note，
+  写在选项下面 ——「推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电。」/
+  「A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car.」/
+  「Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta.」。
+  原来那段的后半句（Type-C 口断电后自动改为录制到 USB-A 口的 U 盘）不再写。
 
 ---
 

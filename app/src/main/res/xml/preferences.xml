@@ -115,12 +115,14 @@
             android:title="@string/set_storage_location_title">
 
             <!--
-              存储位置（2026-10-23 整理）：录像保存在哪个目录、哨兵模式下只有 USB-A 口通电，这两句不再各占一行，
-              挪进选盘的框里（选哪个盘之前正好要知道；对话框的说明，SettingsPreferenceFragment.updateStorageNote）
+              存储位置（2026-10-23 整理）：这两句不再各占一行，挪进选盘的框里（选哪个盘之前正好要知道）——
+              标题下面写录像保存在哪（此刻的状态，SettingsPreferenceFragment.updateSavedIn），
+              选项下面写推荐 USB-A 口的 U 盘（说明，dialogMessage）
             -->
             <ListPreference
                 android:key="pref_storage_location"
                 android:title="@string/set_storage_location_title"
+                android:dialogMessage="@string/set_storage_port_note"
                 android:summary="%s" />
 
             <SwitchPreferenceCompat
@@ -144,7 +146,7 @@
             <!--
               锁定影像（2026-10-23 合成一行，开关加附加项）：锁定的不被自动清理删掉（FootageLocks）；行尾写锁了多少；
               开着时下面一排「自动锁定」按钮：闪远光（AutoLock），默认关 —— 自动锁的也占空间，锁满了就停录。
-              鸣笛那一项车上还读不到喇叭信号，读得到了再加一个按钮
+              鸣笛：车上还读不到喇叭信号，按钮摆着、置灰按不动，读得到了再放开
             -->
             <com.kooo.evcam.settings.SwitchChipsPreference
                 android:key="pref_footage_lock"

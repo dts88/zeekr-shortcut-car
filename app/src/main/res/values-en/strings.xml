@@ -43,7 +43,7 @@
     <string name="set_info_bar_summary">Adds a strip of vehicle signals below the surround view video. Experimental.</string>
     <string name="set_info_bar_value">%1$d selected</string>
     <string name="set_storage_location_title">Storage location</string>
-    <string name="set_storage_sentry_note">With Sentry Mode on, only the USB-A port (where Sentry Mode saves its recordings) stays powered after you leave the car, so recording can continue. If the storage location is a drive on the Type-C port, that port loses power and recording switches to the drive on the USB-A port.</string>
+    <string name="set_storage_port_note">A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car.</string>
     <string name="set_relay_title">Relay write</string>
     <string name="set_relay_summary">Writes to internal storage first, then moves each finished clip to the USB drive, reducing dropped frames on a slow drive. When on, recording doesn\'t switch to another USB drive if this one disconnects.</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
@@ -406,6 +406,7 @@
     <string name="set_storage_limits_message">When a cap is exceeded, the oldest files are deleted, only unlocked ones this app recorded or took; videos are also cleaned up when free space runs low, photos are checked every hour. Leave empty or enter 0 for no cap: nothing is deleted, and recording stops when space runs out.</string>
     <string name="set_footage_lock_auto">Auto lock</string>
     <string name="set_footage_lock_flash_chip">Flash to pass</string>
+    <string name="set_footage_lock_horn_chip">Horn</string>
     <string name="set_footage_locked_value">%1$d locked · %2$s</string>
     <string name="set_footage_locked_value_unprotected">%1$d locked · %2$s, not protected</string>
     <string name="set_footage_locked_none">Nothing locked</string>
