@@ -161,7 +161,7 @@
 
 ## 9. 车主定过的名称与文字（不改）
 
-- 功能名：超级镜子 / Super mirror（2026-10-16 由「超级后视镜」改名，英文、马来文不变；「电子后视镜」只作解释）；锁定影像 / Lock footage；熄屏持续录制；行驶信息条；车辆状态（试验性）；系统信息（试验性）；鱼眼校正按钮的英文 Straighten；按钮透明度；关于与致谢。
+- 功能名：超级镜子 / Super mirror（2026-10-16 由「超级后视镜」改名，英文、马来文不变；「电子后视镜」只作解释）；锁定影像 / Lock footage；熄屏持续录制；行驶信息条；车辆状态（试验性）；车辆信号（试验性）（2026-10-23 由「系统信息（试验性）」改名）；鱼眼校正按钮的英文 Straighten；按钮透明度；关于与致谢。
 - 文字：record_screen_off_continue（2026-10-12 批准「熄屏后继续录制环视」）/ _stop；dlg_footage_lock_off_msg；set_footage_lock_*；msg_storage_locked_*；关于页的致谢与来源（about_thanks_*、about_credits_*）。
 - 2026-10-13 批准（2.11.2，熄屏 v3）：record_screen_off_pause「熄屏暂停，亮屏后恢复」（原来是「…唤醒后恢复」）；set_screen_off_keep_summary「熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；set_screen_off_summary（开发者「熄屏录制（阻止休眠）」）「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长」；vi_screen_power_event「中控屏」和它的值 vi_v_screen_off / _on（熄屏 / 亮屏）。
 - record_screen_off_needs_sentry（「熄屏续录需开启哨兵模式」）2.11.2 删了：熄屏那一下接着录不再要哨兵模式；车机休眠时也接着录（哨兵模式开着等）才写 record_screen_off_continue，休眠时会停的写 record_screen_off_pause（项目所有者 2026-10-13 定，不另加句子）。
@@ -219,6 +219,158 @@
 - 2026-10-23 批准（模拟声浪，照参考车另外两种主题仿制，不用车型名）：第五种声音风格 dev_drive_sound_style_turbo4「涡轮四缸」/
   Turbo four / Empat silinder turbo（参考车模仿汽油机的那一种：涡轮增压直列四缸）；第六种 dev_drive_sound_style_electric
   「电动概念车」/ Electric concept car / Kereta konsep elektrik（车主说的「电动概念车声」那一种）。
+- 2026-10-21 批准（开发者选项「录制声音（试验）」，2026-10-20 车主定先做框架、上车比来源）：dev_footage_audio_title「录制声音（试验）」/
+  Record sound (experimental) / Rakam bunyi (percubaan)；dev_footage_audio_summary「环视录像带上一路车内麦克风的声音，打开时请求录音权限。
+  录制模式为 MediaRecorder 时不带声音。麦克风的位置、熄屏和后台时能不能录到，还在实车测试」；dev_footage_audio_source_title「麦克风来源」，
+  两档 dev_footage_audio_source_raw「原始（VOICE_RECOGNITION，不经处理，声音小）」、dev_footage_audio_source_call「通话（VOICE_COMMUNICATION，经降噪和回声消除）」；
+  没给权限时 msg_footage_audio_no_permission「没有录音权限，录制声音没有打开」；权限设置页 dev_perm_microphone「麦克风权限」、
+  dev_perm_microphone_why「开发者选项「录制声音」要用」（录制声音开着时才列）。英文、马来文见 strings.xml。
+- 2026-10-21 批准（系统信息「驾驶模式」，Lab 2026-10-20 车上对过值）：vi_drive_mode「驾驶模式」/ Drive mode / Mod pemanduan；
+  三个值照车机界面的叫法：vi_v_drive_comfort「舒适」/ Comfort / Selesa，vi_v_drive_standard「标准」/ Standard / Standard，
+  vi_v_drive_sport「运动」/ Sport / Sukan；雪地 vi_v_drive_snow「雪地」/ Snow / Salji（车上还没见过这个值）。没对上的值照原样写号码（同灯光开关）。
+- 2026-10-21 批准（开发者选项「模拟声浪（试验）」，车主定先只做车内、只做运动模式）：分组 dev_drive_sound_group「模拟声浪」/ Drive sound /
+  Bunyi pemanduan；开关 dev_drive_sound_title「模拟声浪（试验）」/ Simulated drive sound (experimental) / Bunyi pemanduan simulasi (percubaan)；
+  dev_drive_sound_summary「运动模式下按油门、车速和加减速合成发动机声，从车内喇叭播放并跟随媒体音量。停车时切换到运动模式会先播放启动声；
+  倒挡时音量降低 6 dB」；dev_drive_sound_volume_title「声浪音量」（选项直接写 dB 数：−18 / −12 / −6 / 0 dB）；
+  dev_drive_sound_rpm_title「转速变化方式」，两档 dev_drive_sound_rpm_continuous「连续」、dev_drive_sound_rpm_shifts「模拟换挡」；
+  悬浮按钮动作 floating_action_toggle_drive_sound「开启 / 关闭模拟声浪」，按下后 msg_drive_sound_on「已开启模拟声浪」/
+  msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
+- 2026-10-21 批准（系统信息「动力流」，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
+  四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
+  vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。
+
+- 2026-10-22 批准（盲区画面投 HUD，2026-10-21 车主定直接用 FerixzTanz 的做法和设置）：显示位置 set_side_view_target_title「显示位置」/ Show on / Papar pada，
+  三档 opt_side_view_target_center「中控屏」/ Center screen / Skrin tengah、opt_side_view_target_hud「HUD」、
+  opt_side_view_target_both「中控屏和 HUD」/ Center screen and HUD / Skrin tengah dan HUD；分组 set_group_side_view_hud「HUD 画面」/ HUD picture / Gambar HUD；
+  set_hud_mirror_title「左右翻转」、_summary「左右翻转画面，方向与车外后视镜一致」；set_hud_height_title「画面高度」、_summary「占 HUD 高度的百分比；宽度由「画面形状」决定」；
+  set_hud_shape_title「画面形状」、_summary「宽与高之比的百分比；100 为正方形，数值越大越宽」；set_hud_edge_title「离边距离」、
+  _summary「打左转向灯时画面在左侧，打右转向灯时在右侧；数值为与该侧边缘的距离，0 为贴边，50 为居中」；
+  set_hud_vertical_title「上下位置」、_summary「0 为最上，100 为最下」；set_hud_opacity_title「画面透明度」（同「按钮透明度」，不带说明）；
+  set_hud_contrast_title「白天对比度」、_summary「数值越大，暗部越暗，画面在 HUD 上不发白；100 为原画面」；
+  set_hud_contrast_night_title「夜间对比度」、_summary「车辆处于夜间模式时使用；夜间画面较暗，数值过大会使画面整体变黑」；
+  set_hud_night_title「夜间亮度」、_summary「车辆处于夜间模式时，在「画面透明度」的基础上按此比例调暗；100 为不调暗」；
+  set_hud_fade_title「边缘渐隐」、_summary「画面四边渐隐的宽度，占短边的百分比；0 为硬边」。英文、马来文见 strings.xml。
+- 2026-10-22 批准（HUD 不看最低车速，改已批的 set_side_view_min_speed_summary）：「低于此车速时中控屏上不显示，HUD 不受此限；0 为不限」/
+  Not shown on the center screen below this speed (the HUD isn't affected); 0 means no limit /
+  Tidak dipaparkan pada skrin tengah di bawah kelajuan ini (HUD tidak terjejas); 0 bermaksud tiada had。
+  set_side_view_summary（「在屏幕该侧显示」）不改：HUD 也是一块屏，下面一行「显示位置」写明在哪。
+- 2026-10-22 批准（关于页「开源与来源」FerixzTanz 那一条加上 HUD，车主要求更新致谢）：about_credits_contributors 里 FerixzTanz 那一条改为「• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。」
+  English「• FerixzTanz (GitHub) — the original code and on-car research for Blind spot view, and showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the ones he tuned on his own 7X. Many thanks for his careful parameter tuning.」（关于页只有中英两份）。
+- 2026-10-22 批准（前后座舱只用一次，暂时的规矩）：「编辑视频流配置」前座舱、后座舱两张卡片上的一行 editor_cabin_one_shot
+  「因造成车机不稳定等原因，此设置无法固化，用户离车后自动取消」—— 中文是项目所有者定的原话（已定，不改）；
+  English「This setting can't be kept because it can make the head unit unstable, among other reasons. It turns off automatically after you leave the car.」；
+  Bahasa Melayu「Tetapan ini tidak dapat dikekalkan kerana boleh menjadikan unit kepala tidak stabil, antara sebab lain. Ia dimatikan secara automatik selepas anda meninggalkan kenderaan.」。
+- 2026-10-22 批准（前后座舱离车后去掉、不再恢复）：改已批的 set_screen_off_keep_summary，删掉「亮屏后前后座舱恢复录制」那半句 ——
+  「熄屏后只录制环视。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；英文、马来文同样删掉那半句。
+  这条规矩拿掉时改回原来那句。（2026-10-23 起被下面那条取代。）
+- 2026-10-23 批准（只有前座舱只用一次，后座舱恢复一般的安排）：预设改名 opt_model_zeekr_multi / status_profile_composite_multi
+  「极氪7X（环视 + 后座舱）」—— 中文照项目所有者说的「环视 + 后座舱」；English「Zeekr 7X (surround + rear cabin)」；
+  Bahasa Melayu「Zeekr 7X (sekeliling + kabin belakang)」。editor_cabin_one_shot 文字不变，只留在前座舱那张卡片上。
+- 2026-10-23 批准（后座舱亮屏后又会接回录制）：set_screen_off_keep_summary 补上后座舱那半句 ——
+  「熄屏后只录制环视，后座舱在亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。」；
+  English「Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, …」；
+  Bahasa Melayu「Hanya merakam paparan sekeliling ketika skrin padam; rakaman kabin belakang disambung semula apabila skrin hidup. Tanpa Mod Sentry, …」。
+- 2026-10-23 批准（设置整理第一轮：时间水印和录制规格同开同关，ui-spec §十一）：set_watermark_on / set_watermark_off ——
+  开「在录像和照片上叠加日期和时间，录像另外标注分辨率、实测帧率、编码和实时码率；预览画面中不显示」、关「录像和照片不叠加日期、时间和录制规格」；
+  English「Adds the date and time to videos and photos, and the resolution, measured frame rate, codec and live bitrate to videos; not shown in the preview」/
+  「No date, time or recording specs on videos or photos」；
+  Bahasa Melayu「Menambah tarikh dan masa pada video dan foto, serta resolusi, kadar bingkai sebenar, kodek dan kadar bit semasa pada video; tidak dipaparkan dalam pratonton」/
+  「Tiada tarikh, masa atau spesifikasi rakaman pada video atau foto」。
+- 2026-10-23 批准（设置整理第一轮：行驶信息条改成开关加下一层）：set_info_bar_summary「在环视录像画面下方附加一栏车辆信号。试验性功能。」/
+  「Adds a strip of vehicle signals below the surround view video. Experimental.」/「Menambah jalur isyarat kenderaan di bawah video paparan sekeliling. Percubaan.」；
+  行尾的值 set_info_bar_value「已选 %1$d 项」/「%1$d selected」/「%1$d dipilih」。
+- 2026-10-23 批准（设置整理第二轮：存储页，ui-spec §十一）：
+  - set_storage_saved_in「录像保存在 %1$s」/「Videos are saved in %1$s」/「Video disimpan di %1$s」（选盘框的标题下面）。
+  - 存储上限一行：标题 set_storage_limits_title「存储上限」/「Storage caps」/「Had storan」；行尾 set_storage_limits_value
+    「录像 %1$s · 照片 %2$s」/「Videos %1$s · Photos %2$s」/「Video %1$s · Foto %2$s」；框里两项「录像」「照片」（Videos / Photos、Video / Foto）；
+    两个输入框下面的说明 set_storage_limits_message「超出上限时自动清理最旧的文件，只删除本应用录制、拍摄且未锁定的；录像在剩余空间不足时也会清理，
+    照片每小时检查一次。留空或填 0 表示不限制：不自动删除，录像在空间不足时停止录制。」（英文、马来文同义）。
+  - 锁定影像一行：set_footage_lock_summary「在回放中或用悬浮按钮手动锁定。锁定的录像和照片不会被自动清理，
+    也无法直接删除（需先解锁）；锁定的文件占满空间时停止录制。」（英文、马来文同样补上悬浮按钮）；附加项小标题 set_footage_lock_auto
+    「自动锁定」/「Auto lock」/「Kunci automatik」；按钮 set_footage_lock_flash_chip「闪远光」/「Flash to pass」/「Kelip lampu tinggi」、
+    set_footage_lock_horn_chip「鸣笛」/「Horn」/「Hon」（名字是项目所有者定的，按钮置灰、按不动）；
+    行尾 set_footage_locked_value「已锁定 %1$d 个 · %2$s」/「%1$d locked · %2$s」/「%1$d dikunci · %2$s」，
+    关着时 set_footage_locked_value_unprotected「已锁定 %1$d 个 · %2$s，不受保护」/「…, not protected」/「…, tidak dilindungi」。
+  - msg_storage_full_stopped / msg_storage_full_refuse 里引用的标题改成「未设置录像的「存储上限」」
+    （「U 盘已满，录制已停止。未设置录像的「存储上限」，不会自动清理旧录像。」；英文、马来文没有引用标题，不动）。
+- 2026-10-23 批准（存储页选盘框选项下面的说明，意思是项目所有者给的：推荐 USB-A 口、实测 Type-C 口下车后断电、
+  之后的录制进 USB-A 口的 U 盘）：set_storage_port_note 取代 set_storage_sentry_note ——
+  「推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。」/
+  「A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car; any recording after that goes to the drive on the USB-A port.」/
+  「Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta; sebarang rakaman selepas itu disimpan ke pemacu pada port USB-A.」。
+- 2026-10-23 批准（设置整理第三轮：超级镜子页，ui-spec §十一）：
+  - 鱼眼校正一行的行尾 set_rearview_fisheye_value「视野 %1$d°」/「Field of view %1$d°」/「Medan pandangan %1$d°」；
+    拖动条框的标题和说明用已批的 set_rearview_fov_title、set_rearview_fov_summary。
+  - 窗口一行：标题用已批的 set_group_window「窗口」；说明 set_rearview_window_summary「画面比例不变，窗口形状只决定可见范围」
+    （取自已批的 set_rearview_height_summary 后半句）/「The picture keeps its proportions; the window shape only sets how much is visible」/
+    「Nisbah gambar kekal; bentuk tetingkap hanya menentukan berapa banyak yang kelihatan」；行尾 set_rearview_window_value
+    「宽度 %1$d 像素 · 高度 %2$d 像素」（写法是项目所有者定的）/「Width %1$d px · Height %2$d px」/「Lebar %1$d px · Tinggi %2$d px」；
+    按钮 action_reset「重置」/「Reset」/「Set semula」；先问的那一句 dlg_rearview_reset_title「重置窗口与画面？」/
+    「Reset window and view?」/「Set semula tetingkap dan paparan?」，正文用已批的 set_rearview_reset_summary。
+  - 窗口编辑框下面的提示 rearview_editor_hint「拖动边或角调整宽度和高度，也可以双指缩放。拖动框内可以移动，位置不保存。」/
+    「Drag an edge or corner to change the width and height, or pinch with two fingers. Drag inside the frame to move it;
+    the position is not saved.」/「Seret tepi atau sudut untuk menukar lebar dan tinggi, atau cubit dengan dua jari.
+    Seret di dalam bingkai untuk mengalihkannya; kedudukan tidak disimpan.」；按钮用已有的「取消」「保存」，框里的宽高同行尾。
+  - 删掉：set_rearview_width_title、set_rearview_height_title、set_rearview_height_summary、set_rearview_reset_title、
+    set_rearview_camera_label_summary（方向标签成了附加项，没有说明）、set_rearview_button_mode_title（换成切换方式）、
+    set_group_views（这一页不分组）。
+  - 切换方式的两个选项是项目所有者定的名字：opt_rearview_switch_swipe「滑动切换」/「Swipe」/「Leret」、
+    opt_rearview_switch_tap「点按切换」/「Tap」/「Ketik」；选到点按切换时用已批的 set_rearview_button_mode_summary 提示一句。
+- 2026-10-23 批准（超级镜子页切换方式那一行的名字、检查更新加「接收 Alpha 版」）：
+  - set_rearview_switch_mode_title「切换方式」/「Switch views by」/「Tukar paparan dengan」（两个选项见上面已批的那一条）。
+  - set_update_alpha_title「接收 Alpha 版」/「Include alpha releases」/「Termasuk keluaran alpha」；
+    set_update_alpha_summary「Alpha 版是开发中的测试版本，可能不稳定」/「Alpha releases are test builds still in development
+    and may be unstable」/「Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil」。
+    随「接收 Beta 版」：Beta 关着时这一行不可用（说明里不另写）。
+- 2026-10-23 批准（设置整理第四轮：悬浮按钮、界面、开发者选项，ui-spec §十一）：
+  - 悬浮按钮：「外观」那一行用已批的 set_group_appearance；行尾 set_floating_appearance_value「%1$d dp · %2$d%%」
+    （三种语言一样）；框里三根用已批的「按钮大小」「按钮透明度」「时长文字大小」；先问的那一句 dlg_floating_reset_title
+    「重置悬浮按钮？」/「Reset floating button?」/「Set semula butang terapung?」，正文用已批的 set_reset_floating_summary。
+    附加项用已批的「显示录制时长」「锁定位置」。删掉：set_group_behavior、set_group_position、set_reset_floating_title、
+    set_floating_duration_summary、set_floating_lock_summary（成了附加项，没有说明）。
+  - 界面：鱼眼校正一行的说明 set_fisheye_scope_summary「用于主界面预览、照片回放和录像回放」/「Applies to the live preview,
+    photos and videos」/「Untuk pratonton langsung, foto dan video」（取自已批的 set_fisheye_projection_summary 后半句）；
+    行尾 set_fisheye_value「%1$s · %2$d°」（三种语言一样）；框里拖动条用已批的「校正视野」和它的说明。
+    删掉：set_fisheye_projection_title、set_fisheye_projection_summary、set_group_main_screen（界面、开发者选项都不再有这一组）。
+  - 开发者选项：组名 set_group_experiments「试验性功能」/「Experimental」/「Percubaan」；
+    熄屏录制行尾 set_screen_off_wake_value「最长 %1$s 小时」/「Up to %1$s h」/「Sehingga %1$s jam」，
+    改已批的 set_screen_off_summary（「下方」没有了）——「熄屏时若正在录制，继续录制环视并阻止车机休眠，最长不超过设定的时长」/
+    「…keep the head unit awake for up to the set time」/「…sehingga tempoh yang ditetapkan」；
+    录制声音行尾的短名字 dev_footage_audio_source_raw_short「原始」/「Raw」/「Asal」、dev_footage_audio_source_call_short
+    「通话」/「Call」/「Panggilan」；模拟声浪行尾 dev_drive_sound_value「%1$s · %2$s」（三种语言一样）；
+    dev_side_view_calibration_title「盲区画面标定」/「Blind spot view calibration」/「Kalibrasi paparan titik buta」，
+    行尾 dev_side_view_calibration_value「朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°」/「Back %1$d° · Out %2$d° · Field %3$d°」/
+    「Belakang %1$d° · Luar %2$d° · Medan %3$d°」。删掉：set_image_adjust_reset_title（成了行尾的「重置」）。
+- 2026-10-23 批准（设置整理第五轮：系统页，ui-spec §十一；名字照项目所有者批的建议）：
+  - set_settings_backup_title「设置备份」/「Settings backup」/「Sandaran tetapan」；说明用已批的 set_settings_import_summary；
+    › 前面 action_import「导入」/「Import」/「Import」，行尾按钮 action_export「导出」/「Export」/「Eksport」。
+    删掉：set_settings_export_title、set_settings_export_summary、set_settings_import_title（导出到哪由导出后的提示说）。
+  - 改名 set_vehicle_info_title「车辆信号（试验性）」/「Vehicle signals (experimental)」/「Isyarat kenderaan (percubaan)」
+    （原「系统信息（试验性）」/ System info / Maklumat sistem）。
+  - 改已批的 set_auto_start_summary：「保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。
+    关闭后不再自动启动。」/「…restarts it and restores the features that were on. When off, it isn't restarted.」/
+    「…memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.」。
+- 2026-10-23 批准（存储页：自动锁定加「双闪」，storage-spec §车机信号自动锁定）：按钮 set_footage_lock_hazard_chip「双闪」
+  （项目所有者说的名字）/「Hazard lights」/「Lampu kecemasan」（术语表「闪远光 / 双闪」那一行）；锁上时的提示 msg_hazard_locked
+  「双闪：已锁定前 1 分钟起的录像片段，到关闭双闪为止」/「Hazard lights: locked the clips from 1 minute before, until the
+  hazard lights go off」/「Lampu kecemasan: klip dari 1 minit sebelumnya telah dikunci, sehingga lampu kecemasan dimatikan」。
+- 2026-10-23 批准（存储页：「双闪」按钮下面的一行小字，意思是项目所有者给的）：set_footage_lock_hazard_note
+  「紧急制动时车辆会自动打开双闪警示灯，开启「双闪」后将同时锁定制动前后的录像。」/
+  「In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before
+  and after the braking is locked as well.」/「Semasa brek kecemasan, kenderaan menghidupkan lampu kecemasan secara automatik;
+  dengan Lampu kecemasan dihidupkan, rakaman sebelum dan selepas brek turut dikunci.」。
+- 2026-10-23 批准（设置整理第六轮，项目所有者直接定的删减，ui-spec §十一）：
+  - 存储页不分组：删掉 set_group_cleanup「自动清理」/「Automatic cleanup」/「Pembersihan automatik」
+    （另两组的名字就是组里那一行的名字，字符串留给那两行）。
+  - 悬浮按钮那一行的说明删掉后半句：set_recording_floating_summary「悬浮显示录制状态」/
+    「Shows recording status in a floating button」/「Menunjukkan status rakaman dalam butang terapung」。
+  - 「操作按钮位置」不写说明：删掉 set_rail_side_summary「建议选择驾驶座一侧」/「Put them on the driver's side」/
+    「Letak di sebelah pemandu」。
+- 2026-10-23 批准（熄屏持续录制的说明短三个字，项目所有者要的）：set_screen_off_keep_summary
+  「熄屏后只录制环视，后座舱亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后恢复。关闭本项，熄屏后停止录制。」
+  （删了「在」「自动」，意思不变）；英文、马来文本来就没有这两处，不动。
+- 2026-10-24 批准（项目所有者改名）：悬浮按钮的附加项 set_floating_duration_title「录制时长」/「Recording time」/
+  「Masa rakaman」（原「显示录制时长」/ Show recording time / Tunjuk masa rakaman）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -227,29 +379,11 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 开发者选项「录制声音（试验）」（2026-10-20，车主定先做框架、上车比来源）：dev_footage_audio_title「录制声音（试验）」/
-  Record sound (experimental) / Rakam bunyi (percubaan)；dev_footage_audio_summary「环视录像带上一路车内麦克风的声音，打开时请求录音权限。
-  录制模式为 MediaRecorder 时不带声音。麦克风的位置、熄屏和后台时能不能录到，还在实车测试」；dev_footage_audio_source_title「麦克风来源」，
-  两档 dev_footage_audio_source_raw「原始（VOICE_RECOGNITION，不经处理，声音小）」、dev_footage_audio_source_call「通话（VOICE_COMMUNICATION，经降噪和回声消除）」；
-  没给权限时 msg_footage_audio_no_permission「没有录音权限，录制声音没有打开」；权限设置页 dev_perm_microphone「麦克风权限」、
-  dev_perm_microphone_why「开发者选项「录制声音」要用」（录制声音开着时才列）。英文、马来文见 strings.xml。
-- 系统信息「驾驶模式」（2026-10-20，Lab 车上对过值，车主要求加）：vi_drive_mode「驾驶模式」/ Drive mode / Mod pemanduan；
-  三个值照车机界面的叫法：vi_v_drive_comfort「舒适」/ Comfort / Selesa，vi_v_drive_standard「标准」/ Standard / Standard，
-  vi_v_drive_sport「运动」/ Sport / Sukan。没对上的值照原样写号码（同灯光开关）。
-  雪地（2026-10-21 加，车上还没见过这个值）：vi_v_drive_snow「雪地」/ Snow / Salji。
-- 开发者选项「模拟声浪（试验）」（2026-10-21，车主定先只做车内、只做运动模式）：分组 dev_drive_sound_group「模拟声浪」/ Drive sound /
-  Bunyi pemanduan；开关 dev_drive_sound_title「模拟声浪（试验）」/ Simulated drive sound (experimental) / Bunyi pemanduan simulasi (percubaan)；
-  dev_drive_sound_summary「运动、标准模式下按油门、车速和加减速合成发动机声（运动模式换挡更积极），从「播放喇叭」选的喇叭播放，
-  车内喇叭跟随媒体音量。停车时切换到这两种模式会先播放启动声」
-  （2026-10-24 车主加标准模式时改：原来是「运动模式下……停车时切换到运动模式会先播放启动声」；同一天加「播放喇叭」时改过一次：
-  原来是「从车内喇叭播放并跟随媒体音量」）
-  （2026-10-21 实车后去掉了「；倒挡时音量降低 6 dB」：车机自己在倒挡压低音量，车主定声浪不再另降）；
-  dev_drive_sound_volume_title「声浪音量」（选项直接写 dB 数：−6 / −3 / 0 dB，默认 0 dB；车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）；
-  dev_drive_sound_rpm_title「转速变化方式」，两档 dev_drive_sound_rpm_continuous「连续」、dev_drive_sound_rpm_shifts「模拟换挡」；
-  悬浮按钮动作 floating_action_toggle_drive_sound「开启 / 关闭模拟声浪」，按下后 msg_drive_sound_on「已开启模拟声浪」/
-  msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
-  声音风格（2026-10-21 加，车主嫌第一版单薄、要按发动机的结构重做，第一版留作可选风格）：dev_drive_sound_style_title「声音风格」/
-  Sound style / Gaya bunyi（六档的名字车主定了，见上面的单子；「听感」「变速箱」也批了）。
+- 开发者选项「模拟声浪（试验）」2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
+  dev_drive_sound_summary 现在是「运动、标准模式下按油门、车速和加减速合成发动机声（运动模式换挡更积极），从「播放喇叭」选的喇叭播放，
+  车内喇叭跟随媒体音量。停车时切换到这两种模式会先播放启动声」（2026-10-21 实车后去掉「；倒挡时音量降低 6 dB」：车机自己在倒挡
+  压低音量，车主定声浪不再另降；2026-10-24 加「播放喇叭」时改了「从车内喇叭播放并跟随媒体音量」；同一天车主加标准模式）；
+  dev_drive_sound_volume_title 的选项改成 −6 / −3 / 0 dB，默认 0 dB（车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）。
   播放喇叭（2026-10-24 加，车主要外放测试：车内、车外、车内和车外）：dev_drive_sound_output_title「播放喇叭」/ Speakers /
   Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、
   dev_drive_sound_output_outside「车外喇叭」/ Exterior speaker / Pembesar suara luar、dev_drive_sound_output_both「车内和车外」/
@@ -259,9 +393,6 @@
   BUS12 (outer notify) / BUS12 (pemberitahuan luar)（默认）、dev_drive_sound_route_playback「BUS11（外部播放）」/
   BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
   Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
-- 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
-  四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
-  vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。
 
 ---
 
@@ -272,32 +403,33 @@
 | 概念 | 中文 | English | Bahasa Melayu | 例外与说明 |
 |---|---|---|---|---|
 | 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | 「录像」不作动词；不用单字「录」 |
-| 录像（保存的文件） | 录像；录像存储上限 | recording(s)；与照片并列时 video(s)；Video storage cap | rakaman；与照片并列时 video；Had storan video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
+| 录像（保存的文件） | 录像；「存储上限」里的「录像」 | recording(s)；与照片并列时 video(s)；Storage caps → Videos | rakaman；与照片并列时 video；Had storan → Video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
 | 片段与一次录像 | 片段（量词「段」：每段 3 分钟、第 2 段）；一次从开始到停止的录制 = 录像；回放里切换用「上一条 / 下一条」 | clip；recording；Previous / Next | klip；rakaman；Sebelumnya / Seterusnya | — |
 | 丢帧 | 丢帧（录像里少了画面）；U 盘写入速度跟不上 | dropped frames、drop frames；writes too slowly | bingkai tercicir；menulis terlalu perlahan | 不用「掉帧」「卡帧」 |
 | 影像 | 影像（录像和照片的合称） | footage | rakaman | 单指一种时写录像或照片；「倒车影像」「泊车影像」是原厂功能名 |
-| 照片 | 照片（量词「张」「组」）；照片存储上限 | photo(s)；Photo storage cap | foto；Had storan foto | 「图片」只指非照片的图像（使用指南插图） |
+| 照片 | 照片（量词「张」「组」）；「存储上限」里的「照片」 | photo(s)；Storage caps → Photos | foto；Had storan → Foto | 「图片」只指非照片的图像（使用指南插图） |
 | 回放 | 回放；页面名：录像回放、照片回放 | playback；页面名 Videos、Photos | main semula；页面名 Video、Foto | 不用「回看」 |
 | U 盘 | U 盘；需区分类型时写「U 盘或固态硬盘」 | USB drive | pemacu USB | 不用「录像盘」「固态盘」 |
-| 存储位置 / 录像保存路径 | 存储位置（设置中选定的 U 盘）；录像保存路径（实际写入的目录） | Storage location；Video folder | Lokasi storan；Folder video | — |
+| 存储位置 / 录像保存在 | 存储位置（设置中选定的 U 盘）；「录像保存在 …」（实际写入的目录，写在选存储位置的框里） | Storage location；Videos are saved in … | Lokasi storan；Video disimpan di … | — |
 | 内置存储 | 内置存储 | internal storage | storan dalaman | 解释寿命时写「内置存储的写入寿命有限」；不用「闪存」「车机存储」「内部存储」作名称 |
 | 环视 | 环视；技术处：环视合成流；版式：四格显示 / 整幅显示 | surround view（标签 Surround）；composite stream；2×2 grid / full frame | paparan sekeliling（标签 Sekeliling）；strim komposit；grid 2×2 / bingkai penuh | 马来文用 sekeliling，不用 keliling |
 | 座舱 | 座舱；前座舱、后座舱 | cabin；front cabin、rear cabin | kabin；kabin depan、kabin belakang | 不用「车厢」；「前排 / 后排」只指座位排 |
 | 摄像头 | 摄像头；摄像头映射 | camera；Camera mapping | kamera；Pemetaan kamera | Android 权限名照系统写「相机权限」；关于页致谢原文不动 |
 | 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
-| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 前后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + front and rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin depan dan belakang) | 同一预设在设置列表和状态条上同名 |
+| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin belakang) | 同一预设在设置列表和状态条上同名；2.20 之前叫「极氪7X（环视 + 前后座舱）」 |
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
-| 盲区画面 | 盲区画面（打转向灯时在屏幕该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
+| 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
-| 行驶信息条 | 行驶信息条；仅系统信息页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
-| 系统信息 | 系统信息（试验性） | System info (experimental) | Maklumat sistem (percubaan) | — |
+| 行驶信息条 | 行驶信息条；仅车辆信号页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
+| 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |
 | 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
 | 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
 | 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制） | screen off / on；sleep / wake；Screen-off recording (keep awake)；Keep recording when the screen goes off | skrin padam / hidup；tidur / bangun；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
 | 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件 0x20290300 那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
+| HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
 | 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |
 | 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | 不用「软件」「程序」（关于页致谢原文除外） |
 | 开发者选项 | 开发者选项；条件写「需开启开发者选项」 | developer options | pilihan pembangun | 不用「开发者模式」 |
@@ -310,7 +442,7 @@
 | 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | 不用「角标」；英文不用 overlay、badge |
 | 试验性 | 功能名后缀「（试验性）」 | (experimental) | (percubaan) | 不用「实验性」「试验功能」 |
 | 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级镜子）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | 英文引用按钮时写 Straighten |
-| 闪远光 / 双闪 | 闪远光；双闪 | flash-to-pass；hazard lights（值标签 Hazard） | kelip lampu tinggi；lampu kecemasan | — |
+| 闪远光 / 双闪 | 闪远光；双闪（说明文字里可写全称「双闪警示灯」，项目所有者 2026-10-23） | flash-to-pass；hazard lights（值标签 Hazard；设置里的按钮 Hazard lights） | kelip lampu tinggi；lampu kecemasan | — |
 | 原厂 | 原厂（原厂 360、原厂界面、原厂行车记录仪） | factory | kilang | 英文不用 stock |
 | 挡位 | 挡位 | gear | gear | 不写「档位」；「码率档」的「档」指等级，用字正确 |
 | 驾驶座 / 操作按钮 | 驾驶座（一侧）；操作按钮、操作按钮位置 | driver's side；action buttons、Action button side | sebelah pemandu；butang tindakan、Sebelah butang tindakan | 不用「驾驶位」 |

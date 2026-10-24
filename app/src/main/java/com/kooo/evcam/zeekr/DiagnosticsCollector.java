@@ -936,6 +936,14 @@ public final class DiagnosticsCollector {
                     .append('\n');
         }
         sb.append("可交互（isInteractive）: ").append(DisplayWatch.interactiveNow() ? "是" : "否").append('\n');
+        // 盲区画面投 HUD 用哪一块（HudScreen 的规则：1440x480、不是主屏；没有就退到 id 3，但不能是仪表盘）
+        java.util.List<HudScreen.Candidate> candidates = HudScreen.candidatesNow(context);
+        int bySize = HudScreen.findBySize(candidates);
+        int hudId = HudScreen.find(candidates);
+        sb.append("HUD（盲区画面投这一块）: ").append(bySize != HudScreen.NONE ? "id " + bySize + "（按尺寸 1440x480 找到）"
+                : hudId != HudScreen.NONE ? "id " + hudId + "（没有 1440x480 的屏，退到 id 3）" : "找不到").append('\n');
+        String hudWindow = SideViewService.describeHud();
+        sb.append("HUD 盲区画面窗口: ").append(hudWindow == null ? "盲区画面没在运行" : hudWindow).append('\n');
         if (displays.length <= 1) {
             sb.append(">> 只有一块屏，副屏推送不可用").append('\n');
         } else {
@@ -993,7 +1001,7 @@ public final class DiagnosticsCollector {
     /**
      * 车辆信号（导出这一刻）：车辆接口连没连上、谁登记着，熄屏判断和熄屏那张表看的几项读数。
      *
-     * <p>熄屏 v3 起车辆信号进程活着一直在读离散信号（核心，熄屏判断登记的）；录像的信息条、「系统信息」页这些完整用户另外开浮点
+     * <p>熄屏 v3 起车辆信号进程活着一直在读离散信号（核心，熄屏判断登记的）；录像的信息条、「车辆信号」页这些完整用户另外开浮点
      * 传感器和定位（设计 v3 §2）。以前报告里一项车辆读数都没有：熄屏那张表为什么那样判、屏幕黑没黑，只能翻黑匣子。</p>
      *
      * <p>只读：不登记、不叫车辆接口读一遍，读的是 {@link Telemetry} 此刻那一份快照。车速是浮点传感器，没有完整用户时不读，
@@ -1134,9 +1142,15 @@ public final class DiagnosticsCollector {
         try {
             AppConfig cfg = new AppConfig(context);
             sb.append("车型: ").append(cfg.getCarModel()).append('\n');
-            // 此刻配置里启用了哪几路（RecordSpecs.enabledCameraKeys）。管线照建它那一刻的建（环视一直建，没启用时只给超级镜子），
-            // 配置改了、还没重启时两者可能不同：管线建了哪几路看 §2.3.2 通道
-            sb.append("启用的摄像头: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context)).append('\n');
+            // 这一次运行启用了哪几路（RecordSpecs.enabledCameraKeys：进程里第一次建管线时照存下的配置定，离车时可能去掉了前座舱），
+            // 和存下的配置里的（下一次启动用的）。前座舱只用一次（暂时的规矩，camera.FrontCabinOneShot）时两者生效后就不同。
+            // 管线建了哪几路看 §2.3.2 通道
+            sb.append("启用的摄像头（这一次运行）: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context))
+                    .append('\n');
+            sb.append("启用的摄像头（存下的配置，下一次启动用）: ")
+                    .append(com.kooo.evcam.profile.RecordSpecs.storedEnabledCameraKeys(context)).append('\n');
+            sb.append("前座舱只用一次: ").append(com.kooo.evcam.camera.FrontCabinOneShot.ACTIVE ? "开" : "关")
+                    .append('\n');
             // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准
             sb.append(new com.kooo.evcam.profile.ProfileStore(context).current()).append('\n');
             sb.append("录制模式: ").append(cfg.getRecordingMode())

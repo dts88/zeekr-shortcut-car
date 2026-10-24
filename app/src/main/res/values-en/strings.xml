@@ -10,6 +10,8 @@
     <string name="set_check_update_summary">Current version %1$s</string>
     <string name="set_update_beta_title">Include beta releases</string>
     <string name="set_update_beta_summary">When off, checks stable releases only</string>
+    <string name="set_update_alpha_title">Include alpha releases</string>
+    <string name="set_update_alpha_summary">Alpha releases are test builds still in development and may be unstable</string>
     <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
@@ -18,15 +20,11 @@
     <string name="set_group_auto_record">Automatic recording</string>
     <string name="set_group_photo">Photos</string>
     <string name="set_group_stamps">Stamps</string>
-    <string name="set_group_cleanup">Automatic cleanup</string>
-    <string name="set_group_views">Switching views</string>
     <string name="set_group_window">Window</string>
-    <string name="set_group_behavior">Behavior</string>
     <string name="set_group_appearance">Appearance</string>
-    <string name="set_group_position">Position</string>
-    <string name="set_group_main_screen">Main screen</string>
     <string name="set_group_cameras">Cameras</string>
     <string name="set_group_files">File maintenance</string>
+    <string name="set_group_experiments">Experimental</string>
     <string name="set_section_rearview">Super mirror</string>
     <string name="set_section_floating">Floating button</string>
     <string name="set_section_system">System</string>
@@ -37,26 +35,20 @@
     <string name="set_photo_jpeg_title">Use JPEG output for photos</string>
     <string name="set_photo_jpeg_summary">Takes photos from the camera\'s JPEG output at the largest size. When off, photos are captured from the preview at preview resolution. Takes effect after restarting the app.</string>
     <string name="set_watermark_title">Timestamp</string>
-    <string name="set_watermark_on">Adds the date and time to videos and photos; not shown in the preview</string>
-    <string name="set_watermark_off">No date and time on videos or photos</string>
-    <string name="set_watermark_spec_title">Include recording specs</string>
-    <string name="set_watermark_spec_summary">Adds resolution, measured frame rate, codec and live bitrate to the video stamp</string>
+    <string name="set_watermark_on">Adds the date and time to videos and photos, and the resolution, measured frame rate, codec and live bitrate to videos; not shown in the preview</string>
+    <string name="set_watermark_off">No date, time or recording specs on videos or photos</string>
     <string name="set_info_bar_title">Driving info bar</string>
-    <string name="set_info_bar_summary">Adds a strip of vehicle signals below the surround view video. Choose what it shows in Settings → System → System info. Experimental.</string>
+    <string name="set_info_bar_summary">Adds a strip of vehicle signals below the surround view video. Experimental.</string>
+    <string name="set_info_bar_value">%1$d selected</string>
     <string name="set_storage_location_title">Storage location</string>
-    <string name="set_storage_sentry_note">With Sentry Mode on, only the USB-A port (where Sentry Mode saves its recordings) stays powered after you leave the car, so recording can continue. If the storage location is a drive on the Type-C port, that port loses power and recording switches to the drive on the USB-A port.</string>
+    <string name="set_storage_port_note">A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car; any recording after that goes to the drive on the USB-A port.</string>
     <string name="set_relay_title">Relay write</string>
     <string name="set_relay_summary">Writes to internal storage first, then moves each finished clip to the USB drive, reducing dropped frames on a slow drive. When on, recording doesn\'t switch to another USB drive if this one disconnects.</string>
-    <string name="set_video_limit_title">Video storage cap</string>
-    <string name="set_video_limit_dialog">Video storage cap (GB)</string>
-    <string name="set_photo_limit_title">Photo storage cap</string>
-    <string name="set_photo_limit_dialog">Photo storage cap (GB)</string>
-    <string name="set_limit_message">When over the cap or low on space, the oldest recordings are cleaned up automatically. Only unlocked files recorded by this app are deleted. Leave blank or enter 0 for no limit: nothing is deleted, and recording stops when space runs low.</string>
-    <string name="set_photo_limit_message">Checked every hour: when over the cap, the oldest photos are cleaned up automatically. Only unlocked photos taken by this app are deleted. Leave blank or enter 0 for no limit.</string>
-    <string name="set_storage_usage_title">Video folder</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
     <string name="set_rearview_summary">Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror</string>
-    <string name="set_rearview_button_mode_title">Button mode</string>
+    <string name="set_rearview_switch_mode_title">Switch views by</string>
+    <string name="opt_rearview_switch_swipe">Swipe</string>
+    <string name="opt_rearview_switch_tap">Tap</string>
     <string name="set_rearview_button_mode_summary">Switches to the front, rear, left or right view when the top, bottom, left or right area is tapped; with Views set to Front and rear or Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom</string>
     <string name="set_rearview_views_title">Views</string>
     <string name="opt_views_four">All four</string>
@@ -66,18 +58,43 @@
     <string name="set_rearview_fisheye_summary">Corrects fisheye barrel distortion in the Super mirror only; recordings are unchanged.</string>
     <string name="set_rearview_fov_title">Field of view</string>
     <string name="set_rearview_fov_summary">Wider shows more and looks sharper, with more distortion at the edges</string>
-    <string name="set_rearview_width_title">Window width</string>
-    <string name="set_rearview_height_title">Window height</string>
-    <string name="set_rearview_height_summary">Each can go up to full screen; the picture keeps its proportions and the window shape only sets how much is visible</string>
-    <string name="set_rearview_reset_title">Reset window and view</string>
     <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction, Views and Direction label, and switches back to the rear view</string>
+    <string name="set_rearview_fisheye_value">Field of view %1$d°</string>
+    <string name="set_rearview_window_summary">The picture keeps its proportions; the window shape only sets how much is visible</string>
+    <string name="set_rearview_window_value">Width %1$d px · Height %2$d px</string>
+    <string name="dlg_rearview_reset_title">Reset window and view?</string>
+    <string name="rearview_editor_hint">Drag an edge or corner to change the width and height, or pinch with two fingers. Drag inside the frame to move it; the position is not saved.</string>
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="set_side_view_title">Blind spot view</string>
     <string name="set_side_view_summary">Shows the side camera on the signalling side when the turn signal is on and hides it 1 second after the signal turns off; not shown in reverse or while a factory view is on screen. Surround view stays on in D.</string>
     <string name="set_side_view_min_speed_title">Minimum speed</string>
-    <string name="set_side_view_min_speed_summary">Not shown below this speed; 0 means no limit</string>
+    <string name="set_side_view_min_speed_summary">Not shown on the center screen below this speed (the HUD isn\'t affected); 0 means no limit</string>
     <string name="side_view_close">Close Blind spot view</string>
+    <string name="set_side_view_target_title">Show on</string>
+    <string name="opt_side_view_target_center">Center screen</string>
+    <string name="opt_side_view_target_hud">HUD</string>
+    <string name="opt_side_view_target_both">Center screen and HUD</string>
+    <string name="set_group_side_view_hud">HUD picture</string>
+    <string name="set_hud_mirror_title">Mirror left to right</string>
+    <string name="set_hud_mirror_summary">Flips the picture left to right, as in the side mirror</string>
+    <string name="set_hud_height_title">Picture height</string>
+    <string name="set_hud_height_summary">Percentage of the HUD height; the width follows Picture shape</string>
+    <string name="set_hud_shape_title">Picture shape</string>
+    <string name="set_hud_shape_summary">Width to height as a percentage; 100 is square, higher is wider</string>
+    <string name="set_hud_edge_title">Distance from the edge</string>
+    <string name="set_hud_edge_summary">The picture is on the left for the left turn signal and on the right for the right one; this is its distance from that edge, 0 at the edge, 50 in the middle</string>
+    <string name="set_hud_vertical_title">Vertical position</string>
+    <string name="set_hud_vertical_summary">0 is the top, 100 the bottom</string>
+    <string name="set_hud_opacity_title">Picture opacity</string>
+    <string name="set_hud_contrast_title">Daytime contrast</string>
+    <string name="set_hud_contrast_summary">Higher values make the dark parts darker so the picture doesn\'t wash out on the HUD; 100 is the original picture</string>
+    <string name="set_hud_contrast_night_title">Night contrast</string>
+    <string name="set_hud_contrast_night_summary">Used while the vehicle is in night mode; the night picture is darker, so a high value turns it black</string>
+    <string name="set_hud_night_title">Night brightness</string>
+    <string name="set_hud_night_summary">While the vehicle is in night mode, dims the picture to this share of Picture opacity; 100 means no dimming</string>
+    <string name="set_hud_fade_title">Edge fade</string>
+    <string name="set_hud_fade_summary">Width of the fade at the four edges, as a percentage of the shorter side; 0 is a hard edge</string>
     <string name="rearview_guide_hint">Swipe to turn pages · Tap outside to close</string>
     <string name="mirror_paused_tap">Picture stopped · tap to resume</string>
     <string name="preview_paused">Picture stopped</string>
@@ -86,15 +103,13 @@
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">Guide page %1$d of %2$d</string>
     <string name="set_floating_alpha_title">Button opacity</string>
-    <string name="set_recording_floating_summary">Shows recording status in a floating button; set tap and long-press actions below</string>
+    <string name="set_recording_floating_summary">Shows recording status in a floating button</string>
     <string name="set_button_size_title">Button size</string>
     <string name="set_button_text_size_title">Time text size</string>
     <string name="set_floating_tap_title">Tap</string>
     <string name="set_floating_long_press_title">Long press</string>
     <string name="set_floating_lock_title">Lock position</string>
-    <string name="set_floating_lock_summary">Locks the button in its current position; tap and long press still work</string>
-    <string name="set_floating_duration_title">Show recording time</string>
-    <string name="set_floating_duration_summary">Shows elapsed time next to the button while recording</string>
+    <string name="set_floating_duration_title">Recording time</string>
     <string name="floating_action_open_app">Open the app</string>
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>
@@ -103,18 +118,20 @@
     <string name="floating_action_toggle_drive_sound">Simulated drive sound on / off</string>
     <string name="set_recording_stats_title">Recording status readout</string>
     <string name="set_recording_stats_summary">Shows the elapsed time and current clip number in a corner while recording</string>
-    <string name="set_reset_floating_title">Reset floating button</string>
     <string name="set_reset_floating_summary">Restores the default position, button size and time text size</string>
+    <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
+    <string name="dlg_floating_reset_title">Reset floating button?</string>
     <string name="set_auto_start_title">Start on boot</string>
-    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores Super mirror, Blind spot view, the floating button and auto-recording if they were on. When off, it isn\'t restarted.</string>
+    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores the features that were on. When off, it isn\'t restarted.</string>
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <string name="set_screen_off_title">Screen-off recording (keep awake)</string>
-    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the time set below</string>
+    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the set time</string>
     <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
+    <string name="set_screen_off_wake_value">Up to %1$s h</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; front and rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
@@ -126,14 +143,11 @@
     <string name="set_force_h264_summary">Uses H.264 for every camera, overriding the codec set for each camera in Edit stream profile</string>
     <string name="set_image_adjust_title">Image adjustment</string>
     <string name="set_image_adjust_summary">Opens a window to adjust exposure, white balance, noise reduction and more, live</string>
-    <string name="set_image_adjust_reset_title">Reset image adjustment</string>
     <string name="set_camera_mapping_title">Camera mapping</string>
     <string name="set_camera_mapping_summary">Choose which camera feeds the surround, front cabin and rear cabin views (troubleshooting)</string>
     <string name="set_diagnostics_title">Diagnostics</string>
     <string name="set_diagnostics_summary">View and export camera, display and storage details and recent logs</string>
-    <string name="set_settings_export_title">Export settings</string>
-    <string name="set_settings_export_summary">Saves the current settings to a file, in the same folder as diagnostics reports</string>
-    <string name="set_settings_import_title">Import settings</string>
+    <string name="set_settings_backup_title">Settings backup</string>
     <string name="set_settings_import_summary">Restores all settings from an exported file; only files exported by version %1$d.x can be imported</string>
     <string name="settings_exported">Exported to:\n%1$s</string>
     <string name="settings_export_failed">Can\'t export settings</string>
@@ -150,13 +164,13 @@
     <string name="settings_import_action">Import and exit</string>
     <string name="settings_import_failed">Can\'t import settings</string>
     <string name="settings_imported_reopen">Settings imported; they take effect after the app is reopened</string>
-    <!-- System info (experimental): groups, signal names, values -->
-    <string name="set_vehicle_info_title">System info (experimental)</string>
+    <!-- Vehicle signals (experimental): groups, signal names, values -->
+    <string name="set_vehicle_info_title">Vehicle signals (experimental)</string>
     <string name="set_vehicle_info_summary">Vehicle signals the head unit exposes and their current state; ticked items appear on the Driving info bar</string>
     <string name="vi_legend">Ticked items appear on the Driving info bar (requires Settings → Recording → Driving info bar): as an icon where one exists, otherwise as text for now, as noted under each row; items that don\'t fit are left out. Label color shows how well a signal is verified: normal text color, consistent in on-car tests (still cross-checked); grey, usable with details pending; faint grey, readable but unverified, can be ticked only with developer options on.</string>
     <string name="vi_position">Position (lat/long)</string>
     <string name="vi_position_source">System location</string>
-    <!-- System info status line under the legend (VehicleInfoFragment.status); how each signal ID is read (VehicleInfoFragment.address; IDs and zones stay hex) -->
+    <!-- Vehicle signals status line under the legend (VehicleInfoFragment.status); how each signal ID is read (VehicleInfoFragment.address; IDs and zones stay hex) -->
     <string name="vi_status_known">Data for %1$d/%2$d signals</string>
     <string name="vi_status_car_connected">Vehicle interface: connected</string>
     <string name="vi_status_car_unavailable">Vehicle interface: unavailable</string>
@@ -168,7 +182,7 @@
     <string name="vi_kind_function_zone">function·zone %1$s</string>
     <string name="vi_kind_sensor_event">sensor event</string>
     <string name="vi_kind_sensor_value">sensor value</string>
-    <!-- Under each System info row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
+    <!-- Under each Vehicle signals row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
     <string name="vi_bar_icon">Info bar icon: %1$s</string>
     <string name="vi_bar_text">Info bar text (no icon yet)</string>
     <string name="vi_bar_join">", "</string>
@@ -303,7 +317,7 @@
     <!-- Enumerated setting options -->
     <string name="opt_mode_auto">Automatic (recommended)</string>
     <string name="opt_model_zeekr">Zeekr 7X (surround)</string>
-    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + front and rear cabin)</string>
+    <string name="opt_model_zeekr_multi">Zeekr 7X (surround + rear cabin)</string>
 
     <!-- Settings prompts and dialogs -->
     <string name="msg_stream_changed">Stream profile set to “%1$s”. Takes effect after restarting the app.</string>
@@ -345,6 +359,9 @@
     <string name="slot_cabin_front">Front cabin</string>
     <string name="slot_cabin_rear">Rear cabin</string>
     <string name="action_save">Save</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_import">Import</string>
+    <string name="action_export">Export</string>
     <string name="action_all_auto">All automatic</string>
     <string name="msg_mapping_saved">Camera mapping saved. Takes effect after restarting the app.</string>
     <string name="msg_mapping_cleared">Automatic assignment restored. Takes effect after restarting the app.</string>
@@ -381,22 +398,29 @@
         <item quantity="other">Automatic cleanup: deleted %1$d photos (%2$s)</item>
     </plurals>
     <string name="set_footage_lock_title">Lock footage</string>
-    <string name="set_footage_lock_summary">Lock videos and photos in playback. Locked files are never removed by automatic cleanup and can\'t be deleted until unlocked; if locked files fill the space, recording stops</string>
-    <string name="set_footage_locked_title">Locked</string>
-    <string name="set_footage_locked_summary">Videos: %1$d · %2$s; photos: %3$d · %4$s</string>
+    <string name="set_footage_lock_summary">Lock videos and photos in playback or with the floating button. Locked files are never removed by automatic cleanup and can\'t be deleted until unlocked; if locked files fill the space, recording stops</string>
+    <string name="set_storage_saved_in">Videos are saved in %1$s</string>
+    <string name="set_storage_limits_title">Storage caps</string>
+    <string name="set_storage_limits_value">Videos %1$s · Photos %2$s</string>
+    <string name="set_storage_limits_video">Videos</string>
+    <string name="set_storage_limits_photo">Photos</string>
+    <string name="set_storage_limits_message">When a cap is exceeded, the oldest files are deleted, only unlocked ones this app recorded or took; videos are also cleaned up when free space runs low, photos are checked every hour. Leave empty or enter 0 for no cap: nothing is deleted, and recording stops when space runs out.</string>
+    <string name="set_footage_lock_auto">Auto lock</string>
+    <string name="set_footage_lock_flash_chip">Flash to pass</string>
+    <string name="set_footage_lock_hazard_chip">Hazard lights</string>
+    <string name="set_footage_lock_hazard_note">In emergency braking the vehicle turns on its hazard lights automatically, so with Hazard lights on, footage from before and after the braking is locked as well.</string>
+    <string name="set_footage_lock_horn_chip">Horn</string>
+    <string name="set_footage_locked_value">%1$d locked · %2$s</string>
+    <string name="set_footage_locked_value_unprotected">%1$d locked · %2$s, not protected</string>
     <string name="set_footage_locked_none">Nothing locked</string>
-    <string name="set_footage_locked_unprotected">%1$s (Lock footage is off, these are not protected)</string>
     <string name="dlg_footage_lock_off_title">Turn off Lock footage?</string>
     <plurals name="dlg_footage_lock_off_msg">
         <item quantity="one">%1$d file is locked (%2$s). When off, it is no longer protected: automatic cleanup deletes it oldest first like any other file, and deleted files can\'t be recovered.</item>
         <item quantity="other">%1$d files are locked (%2$s). When off, they are no longer protected: automatic cleanup deletes them oldest first like any other file, and deleted files can\'t be recovered.</item>
     </plurals>
     <string name="dlg_footage_lock_off_ok">Turn off</string>
-    <string name="set_footage_lock_flash_title">Lock footage on flash-to-pass</string>
-    <string name="set_footage_lock_flash_summary">While recording, flash the high beams to lock the clips covering 10 seconds before and after, on every camera. If locked footage fills the space, recording stops.</string>
-    <string name="set_footage_lock_horn_title">Lock footage on horn</string>
-    <string name="set_footage_lock_horn_summary">The head unit can\'t read the horn signal yet, so this is unavailable</string>
     <string name="msg_flash_locked">Flash-to-pass: locked the clips covering 10 seconds before and after</string>
+    <string name="msg_hazard_locked">Hazard lights: locked the clips from 1 minute before, until the hazard lights go off</string>
     <string name="msg_storage_locked_stopped">Locked footage has filled the space, so recording stopped. Unlock some in playback</string>
     <string name="msg_storage_locked_refuse">Locked footage has filled the space, so recording can\'t start. Unlock some in playback</string>
     <string name="action_lock_footage">Lock</string>
@@ -631,7 +655,6 @@
     <string name="cd_minimize">Hide to background</string>
     <string name="nav_exit">Quit app</string>
     <string name="set_rail_side_title">Action button side</string>
-    <string name="set_rail_side_summary">Put them on the driver\'s side</string>
     <string name="opt_rail_right">Right</string>
     <string name="opt_rail_left">Left</string>
 
@@ -641,12 +664,12 @@
     <string name="set_reduce_motion_summary">Turns off transitions and other decorative animation while recording, leaving the GPU to the encoder. The record button and progress ring still animate.</string>
     <string name="set_vehicle_status_title">Vehicle status (experimental)</string>
     <string name="set_vehicle_status_summary">Shows horn, flash-to-pass and hazard lights below Straighten on the main screen, using the Driving info bar icons; the horn signal can\'t be read yet</string>
-    <string name="set_fisheye_projection_title">Fisheye projection</string>
-    <string name="set_fisheye_projection_summary">%1$s · applies to the live preview, photos and videos</string>
     <string name="opt_projection_rectilinear">Straight lines</string>
     <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
     <string name="set_fisheye_fov_title">Corrected field of view</string>
     <string name="set_fisheye_fov_summary">A wider angle keeps more of the picture. Up to 140° for Straight lines, 180° for Wide and Full circle.</string>
+    <string name="set_fisheye_scope_summary">Applies to the live preview, photos and videos</string>
+    <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">Full circle (lines slightly curved)</string>
     <string name="dlg_rail_side_title">Which side is the driver\'s seat on?</string>
     <string name="dlg_rail_side_lhd">Left (left-hand drive) · action buttons on the left</string>
@@ -657,7 +680,7 @@
     <string name="record_waiting_cameras">Waiting for cameras</string>
     <string name="record_waiting_detail">Resumes automatically when available</string>
     <string name="status_profile_composite">Zeekr 7X (surround)</string>
-    <string name="status_profile_composite_multi">Zeekr 7X (surround + front and rear cabin)</string>
+    <string name="status_profile_composite_multi">Zeekr 7X (surround + rear cabin)</string>
     <string name="status_fps">≤%1$s fps</string>
     <string name="status_bitrate_very_low">Very low bitrate</string>
     <string name="status_bitrate_low">Low bitrate</string>
@@ -714,6 +737,7 @@
     <string name="editor_quality_sharp_note">No frame rate cap, high bitrate; most detail</string>
     <string name="editor_cameras_title">Cameras on: %1$d</string>
     <string name="editor_cameras_summary">Cameras that are off aren\'t recorded and use no space; tap a card to adjust that camera. Switch changes take effect after restarting the app.</string>
+    <string name="editor_cabin_one_shot">This setting can\'t be kept because it can make the head unit unstable, among other reasons. It turns off automatically after you leave the car.</string>
     <string name="editor_camera_tuned">custom</string>
     <string name="editor_open_lanes">Layout</string>
     <string name="editor_detail_title">%1$s · settings</string>
@@ -914,6 +938,8 @@
     <string name="dev_footage_audio_source_title">Microphone source</string>
     <string name="dev_footage_audio_source_raw">Raw (VOICE_RECOGNITION, unprocessed, quiet)</string>
     <string name="dev_footage_audio_source_call">Call (VOICE_COMMUNICATION, noise reduction and echo cancellation)</string>
+    <string name="dev_footage_audio_source_raw_short">Raw</string>
+    <string name="dev_footage_audio_source_call_short">Call</string>
     <string name="msg_footage_audio_no_permission">No microphone permission, Record sound stays off</string>
     <string name="dev_drive_sound_group">Drive sound</string>
     <string name="dev_drive_sound_title">Simulated drive sound (experimental)</string>
@@ -943,6 +969,7 @@
     <string name="dev_drive_sound_route_notify">BUS12 (outer notify)</string>
     <string name="dev_drive_sound_route_playback">BUS11 (outer playback)</string>
     <string name="dev_drive_sound_exterior_volume_title">Exterior volume</string>
+    <string name="dev_drive_sound_value">%1$s · %2$s</string>
     <string name="msg_drive_sound_on">Simulated drive sound on</string>
     <string name="msg_drive_sound_off">Simulated drive sound off</string>
     <string name="dev_perm_all_files">All files access</string>
@@ -972,6 +999,8 @@
     <string name="dev_side_view_up_summary">Turns the view centre away from the vehicle; negative values turn it toward the vehicle</string>
     <string name="dev_side_view_fov_title">Blind spot view field of view</string>
     <string name="dev_side_view_fov_summary">Narrows automatically at large angles so no black areas appear</string>
+    <string name="dev_side_view_calibration_title">Blind spot view calibration</string>
+    <string name="dev_side_view_calibration_value">Back %1$d° · Out %2$d° · Field %3$d°</string>
     <string name="dev_repair_mp4_title">Repair unindexed recordings</string>
     <string name="dev_repair_mp4_summary">A clip cut off unexpectedly, for example by power loss, has no index and will not play. Rebuilds the index from a healthy clip of the same camera, keeping the file name.</string>
     <string name="dev_repair_refuse_recording">Can\'t repair while recording: the clip being recorded has no index either, so it can\'t be told apart from a clip that was cut off. Stop recording first.</string>
@@ -1035,5 +1064,4 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
-    <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
 </resources>

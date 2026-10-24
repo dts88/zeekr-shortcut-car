@@ -143,6 +143,11 @@ public final class ChannelRules {
         MIRROR,
         /** 盲区画面的画布（只有环视有）：和预览、超级镜子挂在同一条共享的预览流上。 */
         SIDE,
+        /**
+         * 盲区画面在 HUD 上的画布（只有环视有，2026-10-21）：和中控屏那块一样挂在共享的预览流上、跟同一个登记方
+         * （SIDE_VIEW）；共享预览流挂不下、会话配不上时和它一起最先让路。
+         */
+        HUD,
         /** 录制器的输入 SurfaceTexture：录制器停放、重新备好都是同一个，所以停录后它能留在会话里。 */
         RECORD,
         /** 不显示的出帧口：只用来补位 —— 一路要出帧、会话里却没有一个活着的输出能出帧时才加。 */
@@ -424,6 +429,16 @@ public final class ChannelRules {
         /** 上一次问相机服务的时刻；0 = 没问过。 */
         long lastAskAt;
 
+        // ---- 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱；{@link ChannelRules#retireFrontCabin}）----
+
+        /** 事实：这条规矩开着（FrontCabinOneShot.ACTIVE；调度每一轮照 Host 填）。 */
+        boolean frontCabinOneShot;
+        /**
+         * 账：这次运行启用的前座舱已经去掉 —— 通道眼里熄屏的那一刻起，主界面预览、拍照、录像都不再要它，亮屏也不回来。
+         * 后座舱照一般的规矩（熄屏放开、亮屏接回）。只由 {@link ChannelRules#retireFrontCabin} 改。
+         */
+        boolean frontCabinRetired;
+
         World(List<Lane> lanes) {
             this(lanes, null);
         }
@@ -681,7 +696,12 @@ public final class ChannelRules {
             /** 连着救 3 次没用，歇 60 秒。 */
             GAVE_UP,
             /** 救了 3 轮没用，停手。 */
-            STOPPED
+            STOPPED,
+            /**
+             * 这次运行启用的前座舱去掉了（{@link ChannelRules#retireFrontCabin}，暂时的规矩）：{@code keys} 是前座舱那一路。
+             * 管线、录像、主界面据此把它从这次运行里拿掉。只报一次。
+             */
+            FRONT_CABIN_RETIRED
         }
 
         /** 解除停手是因为什么。 */
@@ -875,6 +895,7 @@ public final class ChannelRules {
         Set<CameraNeeds.Holder> changed = EnumSet.noneOf(CameraNeeds.Holder.class);
         changed.addAll(w.changed);
         w.changed.clear();
+        retireFrontCabin(w, events);
         for (Lane lane : w.lanes) {
             if (!wantsKind(w, lane, Kind.RECORD)) {
                 lane.recordWantedSince = 0;
@@ -889,6 +910,31 @@ public final class ChannelRules {
         liftStops(w, changed, events);
         clearLadders(w);
         return events;
+    }
+
+    /**
+     * 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱）：车机不稳定的根因找到之前，前座舱不留到下一次用车。
+     * 这次运行启用了前座舱的，通道眼里一熄屏（黑满 30 秒、或者车机要睡，{@link #darkForChannel}）—— 正是座舱本来就放开的那一刻
+     * （{@link #releasedByDark}）—— 就把它从这次运行里去掉：之后亮屏也没人要（{@link #retiredFrontCabin}），关相机还是放开那一步。
+     * 后座舱照一般的规矩：熄屏放开、亮屏接回。另一半在 FrontCabinOneShot：生效后就把那份配置里的前座舱开关关掉。
+     * 找到根因后，这一条连同 {@link World#frontCabinOneShot}、{@link World#frontCabinRetired} 和 FrontCabinOneShot 一起拿掉。
+     */
+    private static void retireFrontCabin(World w, List<Event> events) {
+        if (!w.frontCabinOneShot || w.frontCabinRetired || w.screenOn) {
+            return;
+        }
+        for (Lane lane : w.lanes) {
+            if (isCabinFront(lane) && w.enabled.contains(lane.key)) {
+                w.frontCabinRetired = true;
+                events.add(new Event(Event.Type.FRONT_CABIN_RETIRED, Collections.singletonList(lane.key)));
+                return;
+            }
+        }
+    }
+
+    /** 这一路是这次运行已经去掉的前座舱（{@link #retireFrontCabin}）：主界面预览、拍照、录像都不要它。 */
+    static boolean retiredFrontCabin(World w, Lane lane) {
+        return w.frontCabinRetired && isCabinFront(lane);
     }
 
     /** 谁不要了从什么时候起（保持按它算）；保持开始、取消各报一次。 */
@@ -1254,15 +1300,15 @@ public final class ChannelRules {
         }
         switch (holder) {
             case PREVIEW:
-                return w.screenOn && w.enabled.contains(lane.key);
+                return w.screenOn && w.enabled.contains(lane.key) && !retiredFrontCabin(w, lane);
             case RECORDING:
-                return w.recordPlan.contains(lane.key);
+                return w.recordPlan.contains(lane.key) && !retiredFrontCabin(w, lane);
             case MIRROR:
                 return mirrorWants(w, lane);
             case SIDE_VIEW:
                 return isSurround(lane);
             default:   // 拍照
-                return w.enabled.contains(lane.key);
+                return w.enabled.contains(lane.key) && !retiredFrontCabin(w, lane);
         }
     }
 
@@ -1348,13 +1394,14 @@ public final class ChannelRules {
      * 它才放掉那个录制器（ChannelScheduler 每一轮的那一条规矩）。
      */
     static boolean keepsRecordOutput(World w, Lane lane) {
-        return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
+        return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key)
+                && !retiredFrontCabin(w, lane);
     }
 
     /**
      * 这一路要的这一种输出：预览 —— PREVIEW 登记着、亮屏、这一路启用；后视镜 —— MIRROR 登记着、这一路是环视
      * （切换范围是「后视 + 后座舱」时还有后座舱）；
-     * 盲区画面 —— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
+     * 盲区画面（中控屏、HUD 两块）—— SIDE_VIEW 登记着、这一路是环视；录像 —— 录像计划里有它。
      * 熄屏放开的一路一样都不要（{@link #releasedByDark}）。
      */
     private static boolean wantsKind(World w, Lane lane, Kind kind) {
@@ -1363,13 +1410,16 @@ public final class ChannelRules {
         }
         switch (kind) {
             case PREVIEW:
-                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key);
+                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key)
+                        && !retiredFrontCabin(w, lane);
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && mirrorWants(w, lane);
             case SIDE:
+            case HUD:
                 return w.holders.contains(CameraNeeds.Holder.SIDE_VIEW) && isSurround(lane);
             case RECORD:
-                return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key);
+                return w.holders.contains(CameraNeeds.Holder.RECORDING) && w.recordPlan.contains(lane.key)
+                        && !retiredFrontCabin(w, lane);
             default:
                 return false;
         }
@@ -1490,6 +1540,11 @@ public final class ChannelRules {
         return CameraSlots.KEY_CABIN_REAR.equals(lane.key);
     }
 
+    /** 前座舱那一路（暂时只用一次，{@link #retireFrontCabin}）。 */
+    static boolean isCabinFront(Lane lane) {
+        return CameraSlots.KEY_CABIN_FRONT.equals(lane.key);
+    }
+
     /**
      * 后视镜要哪几路（登记着 MIRROR 时）：环视；切换范围是「后视 + 后座舱」时还有后座舱。谁要（{@link #holderWants}）和要哪种输出
      * （{@link #wantsKind}）都问这一处。
@@ -1553,7 +1608,8 @@ public final class ChannelRules {
      * 该拍几路照实数）；在出画面的照拍（哪怕它的录像路不在）。
      */
     static boolean excludedFromPhoto(World w, Lane lane) {
-        return !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || releasedByDark(w, lane));
+        return retiredFrontCabin(w, lane)
+                || !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || releasedByDark(w, lane));
     }
 
     // ================================================================= 下一步

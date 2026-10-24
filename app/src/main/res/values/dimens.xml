@@ -19,8 +19,18 @@
     <dimen name="rail_tile_height">104dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
     <dimen name="icon_button_size">48dp</dimen>
-    <!-- 系统信息页每一行旁边的信息条图标（ui.InfoBarCellView）：高固定，宽按那一格的比例 -->
+    <!-- 车辆信号页每一行旁边的信息条图标（ui.InfoBarCellView）：高固定，宽按那一格的比例 -->
     <dimen name="info_cell_icon_height">44dp</dimen>
     <dimen name="info_cell_icon_radius">6dp</dimen>
     <dimen name="info_cell_icon_gap">6dp</dimen>
+    <!--
+      设置行（pref_row*）的名字从同一条竖线开始（ui-spec §三「文字对齐」，项目所有者 2026-10-23）：
+      开关在行首的行 = 行内边距 + 开关 + 间距，名字在它后面；没有开关的行在开关的位置留出同样宽的空位，
+      名字从 pref_text_start 开始 —— 它就是前三个数的和（20 + 60 + 18），SettingsRowAlignmentTest 核对。
+      开关的宽：滑块 30dp（pref_switch_thumb），SwitchCompat 量出来是两个滑块宽，最小宽也照它写。
+    -->
+    <dimen name="pref_row_padding_start">20dp</dimen>
+    <dimen name="pref_switch_width">60dp</dimen>
+    <dimen name="pref_switch_gap">18dp</dimen>
+    <dimen name="pref_text_start">98dp</dimen>
 </resources>

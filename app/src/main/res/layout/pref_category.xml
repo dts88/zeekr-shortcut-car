@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 分组名：小号灰字压在一组卡片上方（车机系统里的「Ergonomics」「Parking comfort」） -->
+<!--
+  分组名：小号灰字压在一组卡片上方（车机系统里的「Ergonomics」「Parking comfort」）。
+  贴着卡片边，不跟卡片里的名字对齐（项目所有者 2026-10-23，ui-spec §三「文字对齐」）。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"

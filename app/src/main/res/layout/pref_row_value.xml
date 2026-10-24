@@ -5,6 +5,10 @@
   值放在行尾、名字放在行首，中间空出来 —— 车机系统设置里「Activation duration   Always on ›」
   就是这个排法：一眼扫下来左边是问题、右边是答案。值用的是 summary 这个 id，
   所以 ListPreference 的「%s」、代码里 setSummary 的值都照常落在这里。
+
+  名字照它自己的长度排，名字后面剩下的地方都是值那一格的（layout_weight）、字靠右：放得下就一行，放不下才折
+  （项目所有者 2026-10-23：以前值最宽 360dp，存储位置「U 盘（…）· 剩余 … / 共 …」行里放得下也折成两行）。
+  值套在一格里：值是空的时候 Preference 把它藏起来，那一格照样占着剩下的地方，› 还在行尾。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -15,14 +19,13 @@
     android:gravity="center_vertical"
     android:minHeight="72dp"
     android:orientation="horizontal"
-    android:paddingStart="20dp"
+    android:paddingStart="@dimen/pref_text_start"
     android:paddingEnd="14dp">
 
     <TextView
         android:id="@android:id/title"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="2"
         android:paddingTop="14dp"
@@ -30,17 +33,23 @@
         android:textColor="@color/pref_title"
         android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-    <TextView
-        android:id="@android:id/summary"
+    <FrameLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:ellipsize="end"
-        android:gravity="end"
-        android:maxWidth="360dp"
-        android:maxLines="2"
-        android:textColor="@color/pref_summary"
-        android:textAppearance="@style/TextAppearance.Cam.Caption" />
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:ellipsize="end"
+            android:gravity="end"
+            android:maxLines="2"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Caption" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@android:id/widget_frame"

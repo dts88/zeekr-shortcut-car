@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行：开关加几个附加项（SwitchChipsPreference，ui-spec §三）。
+
+  行首是开关（和 pref_row 一样），点这一行也是开关（没有下一层）；行尾写当前值。
+  开关开着时，说明下面多一排：一个小标题加几个按钮（pref_option_chip），按下是开、再按是关。
+  那一排自己接住点击（clickable）：没点中按钮时不会顺带把整个开关关掉。
+
+  id 照 androidx.preference 的默认布局（widget_frame / title / summary）；当前值是 pref_value，
+  那一排是 pref_options（标题 pref_options_label、按钮放进 pref_option_chips，下面可以有一行小字 pref_options_note）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/pref_row_padding_start"
+    android:paddingEnd="20dp">
+
+    <LinearLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="@dimen/pref_switch_width"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/pref_switch_gap"
+        android:gravity="center"
+        android:orientation="vertical" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/pref_title"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:maxLines="6"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Micro" />
+
+        <LinearLayout
+            android:id="@+id/pref_options"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:clickable="true"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/pref_options_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="14dp"
+                    android:textColor="@color/pref_summary"
+                    android:textAppearance="@style/TextAppearance.Cam.Caption" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/pref_option_chips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:chipSpacingHorizontal="12dp"
+                    app:singleLine="true" />
+            </LinearLayout>
+
+            <!-- 那一排按钮下面的一行小字（锁定影像：紧急制动会自动打开双闪警示灯） -->
+            <TextView
+                android:id="@+id/pref_options_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/pref_summary"
+                android:textAppearance="@style/TextAppearance.Cam.Micro"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pref_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxWidth="360dp"
+        android:maxLines="2"
+        android:textColor="@color/pref_summary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+</LinearLayout>

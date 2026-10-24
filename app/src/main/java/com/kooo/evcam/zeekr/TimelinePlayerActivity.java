@@ -162,6 +162,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private long targetEpochMs;
     /** 要不要在放（用户暂停过就不该被强制恢复）。 */
     private boolean playWhenReady = true;
+    /** 放有声音的录像之前申请的音频焦点：环视那一路出声前申请，离开回放界面时放掉。 */
+    private com.kooo.evcam.playback.PlaybackAudioFocus soundFocus;
+    /** 音频焦点被临时拿走时停下的（电话之类）：还回来时接着放。 */
+    private boolean resumeOnFocusGain;
     /** 领头那一路连续出错次数，用来阻止「出错→跳下一段→又出错」无限翻下去。 */
     private int consecutiveErrors = 0;
     /** 本次切换的起点时刻，用于统计切换耗时；0 表示没有正在进行的切换。 */
@@ -230,8 +234,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             // 画面按比例居中，剩下的地方露出框的底色 —— 和图片回看一个样子
             view.setOpaque(false);
             player = new ManagedVideoPlayer(view);
-            // 只有环视那一路的录像带声音：这一路放声音，座舱两路静音
-            player.setAudible(CameraSlots.KEY_SURROUND.equals(CameraSlots.keyForSuffix(slot)));
+            // 只有环视那一路的录像带声音：这一路放声音（出声前申请音频焦点），座舱两路静音
+            boolean audible = CameraSlots.KEY_SURROUND.equals(CameraSlots.keyForSuffix(slot));
+            player.setAudible(audible);
+            if (audible) {
+                player.setSoundFocus(soundFocus);
+            }
             TextView label = findViewById(labelId);
             label.setText(new AppConfig(TimelinePlayerActivity.this).getCameraName(
                     TimelinePlayerActivity.this, CameraSlots.keyForSuffix(slot)));
@@ -261,6 +269,27 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         listSummaryText = findViewById(R.id.timeline_list_summary);
         actionGroup = findViewById(R.id.pb_actions);
         cabinColumn = findViewById(R.id.cabin_column);
+
+        // 先于各路建好：环视那一路出声前要用它
+        soundFocus = new com.kooo.evcam.playback.PlaybackAudioFocus(this,
+                new com.kooo.evcam.playback.PlaybackAudioFocus.Listener() {
+                    @Override
+                    public void onFocusLost(boolean transientLoss) {
+                        // 别的音源要出声：和按暂停一样停下；临时的那种还回来时接着放
+                        resumeOnFocusGain = transientLoss && playWhenReady;
+                        if (playWhenReady) {
+                            setPlaying(false);
+                        }
+                    }
+
+                    @Override
+                    public void onFocusRegained() {
+                        if (resumeOnFocusGain) {
+                            resumeOnFocusGain = false;
+                            setPlaying(true);
+                        }
+                    }
+                });
 
         lanes = new Lane[]{
                 new Lane(COMPOSITE_SLOT, R.id.frame_surround, R.id.video_surround,
@@ -1216,6 +1245,15 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         updatePlayPauseLabel();
     }
 
+    /** 整体放 / 停，几路一起（音频焦点被拿走、还回来时）。 */
+    private void setPlaying(boolean play) {
+        playWhenReady = play;
+        for (Lane lane : lanes) {
+            matchPlayState(lane);
+        }
+        updatePlayPauseLabel();
+    }
+
     private void updatePlayPauseLabel() {
         if (playPauseButton != null) {
             playPauseButton.setText(leader().player.isPlaying()
@@ -1703,6 +1741,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         for (Lane lane : lanes) {
             resetLane(lane);
         }
+        // 离开回放界面：不再出声，焦点还给收音机、CarPlay 这类
+        resumeOnFocusGain = false;
+        soundFocus.abandon();
     }
 
     @Override
@@ -1734,6 +1775,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             for (Lane lane : lanes) {
                 lane.player.release();
             }
+        }
+        if (soundFocus != null) {
+            soundFocus.abandon();
         }
         super.onDestroy();
     }

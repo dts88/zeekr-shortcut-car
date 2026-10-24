@@ -88,8 +88,22 @@ public final class RecordSpecs {
      *
      * <p>「启用的」只在这里判：录像、建相机管线、主界面的布局都问它（登记表 §一 的「启用的全部」）。
      * 唯一不看它的是超级镜子 —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16）。</p>
+     *
+     * <p>运行中问的是<b>这一次运行</b>的那几路（{@code CameraManagerHolder.runLanes}）：进程里第一次建管线时照存下的配置定，
+     * 配置改动「重启应用后生效」；前座舱只用一次时，生效后存下的配置里前座舱的开关就关了、离车时这一次运行也去掉前座舱
+     * （暂时的规矩，{@code camera.FrontCabinOneShot}）。还没建过管线时照存下的配置。要存下的那一份（下一次启动用的）调
+     * {@link #storedEnabledCameraKeys}。</p>
      */
     public static java.util.Set<String> enabledCameraKeys(Context context) {
+        if (context == null) {
+            return new java.util.LinkedHashSet<>();
+        }
+        java.util.Set<String> run = com.kooo.evcam.camera.CameraManagerHolder.getInstance().runLanes();
+        return run != null ? run : storedEnabledCameraKeys(context);
+    }
+
+    /** 存下的配置里启用的那几路：下一次启动用的（诊断报告照它写「存下的配置」那一行）。 */
+    public static java.util.Set<String> storedEnabledCameraKeys(Context context) {
         if (context == null) {
             return new java.util.LinkedHashSet<>();
         }

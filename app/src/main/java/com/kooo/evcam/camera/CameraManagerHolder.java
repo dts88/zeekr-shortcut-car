@@ -92,6 +92,17 @@ public class CameraManagerHolder {
     private Set<String> builtEnabled;
     /** 这一份里有后座舱这一路（启用的，或者为超级镜子建的）。 */
     private boolean builtCabinRear;
+    /**
+     * 这次运行（这个进程）启用的那几路：进程里第一次建管线时照存下的配置定，之后同一次运行里不管管线因为什么重建都照它，
+     * 运行中问「启用的几路」的也都问它（{@link RecordSpecs#enabledCameraKeys(Context)}）—— 存下的配置是下一次启动用的
+     * （配置改动「重启应用后生效」；前座舱只用一次时生效后就关了它的开关，{@link FrontCabinOneShot}）。前座舱去掉时从这里拿掉
+     * （{@link #frontCabinRetired}）。null = 这个进程还没建过管线。
+     */
+    private Set<String> runEnabled;
+    /** 这次运行用的那份配置的 id（状态条照它写配置名）；null = 还没建过管线。 */
+    private String runProfileId;
+    /** 这次运行启用的几路变了（前座舱去掉了）要告诉的：主界面据此重新摆（主线程上叫）。 */
+    private final List<Runnable> runLanesListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     /** 这一份是照哪个车型建的（{@link Shape#carModel}）：车型变了谁来要都重建。 */
     private String builtCarModel;
     /** 这一份建好之后的样子（主线程上写）；null = 还在建。 */
@@ -197,12 +208,20 @@ public class CameraManagerHolder {
 
         /** 车型和启用的几路（主界面的布局照它）。 */
         String lanesKey() {
-            return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled)));
+            return lanesKeyOf(carModel, enabled);
         }
 
         /** 建了哪几路：{@link #lanesKey}，加上只为超级镜子建的后座舱。 */
         String key() {
-            return lanesKey() + (cabinRear && !enabled.contains(CameraSlots.KEY_CABIN_REAR)
+            return keyOf(carModel, enabled, cabinRear);
+        }
+
+        static String lanesKeyOf(String carModel, Set<String> enabled) {
+            return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled)));
+        }
+
+        static String keyOf(String carModel, Set<String> enabled, boolean cabinRear) {
+            return lanesKeyOf(carModel, enabled) + (cabinRear && !enabled.contains(CameraSlots.KEY_CABIN_REAR)
                     ? "/mirror:" + CameraSlots.KEY_CABIN_REAR : "");
         }
     }
@@ -248,7 +267,8 @@ public class CameraManagerHolder {
         boolean have = cameraManager != null && !cameraManager.isReleased();
         Shape live = Shape.of(app);
         Shape shape = new Shape(live.carModel, live.profile,
-                lanesFor(laidOut, have ? builtEnabled : null, live.enabled), live.mirrorCabin);
+                lanesFor(laidOut, have ? builtEnabled : null, runEnabled != null ? runEnabled : live.enabled),
+                live.mirrorCabin);
         if (cameraManager != null && !cameraManager.isReleased()) {
             Rebuild why = rebuildReason(shape, forMainScreen);
             if (why == Rebuild.NO) {
@@ -283,8 +303,59 @@ public class CameraManagerHolder {
         builtCarModel = shape.carModel;
         built = null;
         AppLog.i(TAG, "建相机管线（" + builtFor + "，建 " + shape.count + " 路）：相机列表、合成流探测在相机线程上做");
+        if (runEnabled == null) {
+            // 这次运行定下来了：之后同一次运行照它（见 runEnabled）；带前座舱的，那份配置里的前座舱开关关掉（暂时的规矩）
+            runEnabled = new java.util.LinkedHashSet<>(shape.enabled);
+            runProfileId = live.profile.id;
+            FrontCabinOneShot.consume(app, live.profile, shape.enabled);
+        }
         setup.execute(() -> build(app, manager, shape));
         return manager;
+    }
+
+    /**
+     * 这次运行启用的那几路（{@link #runEnabled}，拷贝）；这个进程还没建过管线是 null —— 那时问「启用的几路」的照存下的配置。
+     * 哪个线程都能调。
+     */
+    public synchronized Set<String> runLanes() {
+        return runEnabled == null ? null : new java.util.LinkedHashSet<>(runEnabled);
+    }
+
+    /** 这次运行用的那份配置的 id；还没建过管线是 null。 */
+    public synchronized String runProfileId() {
+        return runProfileId;
+    }
+
+    /**
+     * 这次运行启用的前座舱去掉了（调度报的，通道眼里熄屏的那一刻；暂时的规矩 {@link FrontCabinOneShot}，主线程）：这次运行的几路、
+     * 这一份记下的几路都拿掉它 —— 主界面不摆前座舱重新接上的时候和这一份对得上，不重建（前座舱这一路还建着，没人要就关着）。
+     * 后座舱没动，这一份带不带后座舱照旧。告诉主界面。
+     */
+    synchronized void frontCabinRetired(MultiCameraManager manager, String key) {
+        if (runEnabled != null) {
+            runEnabled.remove(key);
+        }
+        if (manager == cameraManager && builtEnabled != null) {
+            Set<String> remaining = new java.util.LinkedHashSet<>(builtEnabled);
+            remaining.remove(key);
+            builtEnabled = remaining;
+            builtLanes = Shape.lanesKeyOf(builtCarModel, builtEnabled);
+            builtFor = Shape.keyOf(builtCarModel, builtEnabled, builtCabinRear);
+        }
+        for (Runnable listener : runLanesListeners) {
+            main.post(listener);
+        }
+    }
+
+    /** 这次运行启用的几路变了就叫 {@code listener}（主线程）：主界面挂上，照它重新摆。挂了就要在销毁时摘。 */
+    public void addRunLanesListener(Runnable listener) {
+        if (listener != null && !runLanesListeners.contains(listener)) {
+            runLanesListeners.add(listener);
+        }
+    }
+
+    public void removeRunLanesListener(Runnable listener) {
+        runLanesListeners.remove(listener);
     }
 
     /** 手里这一份为什么要放掉重建（{@link #rebuildReason}；见类说明）。 */

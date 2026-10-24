@@ -24,6 +24,8 @@
     <string name="set_check_update_summary">当前版本 %1$s</string>
     <string name="set_update_beta_title">接收 Beta 版</string>
     <string name="set_update_beta_summary">关闭后，仅检查正式版</string>
+    <string name="set_update_alpha_title">接收 Alpha 版</string>
+    <string name="set_update_alpha_summary">Alpha 版是开发中的测试版本，可能不稳定</string>
     <string name="upd_none_release">未找到可安装的正式版</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>
@@ -32,15 +34,11 @@
     <string name="set_group_auto_record">自动录制</string>
     <string name="set_group_photo">拍照</string>
     <string name="set_group_stamps">水印</string>
-    <string name="set_group_cleanup">自动清理</string>
-    <string name="set_group_views">切换画面</string>
     <string name="set_group_window">窗口</string>
-    <string name="set_group_behavior">行为</string>
     <string name="set_group_appearance">外观</string>
-    <string name="set_group_position">位置</string>
-    <string name="set_group_main_screen">主界面</string>
     <string name="set_group_cameras">摄像头</string>
     <string name="set_group_files">文件维护</string>
+    <string name="set_group_experiments">试验性功能</string>
     <string name="set_section_rearview">超级镜子</string>
     <string name="set_section_floating">悬浮按钮</string>
     <string name="set_section_system">系统</string>
@@ -51,26 +49,20 @@
     <string name="set_photo_jpeg_title">拍照使用 JPEG 输出</string>
     <string name="set_photo_jpeg_summary">使用摄像头的 JPEG 输出，按最大尺寸拍照；关闭后从预览画面截取，分辨率与预览相同。重启应用后生效。</string>
     <string name="set_watermark_title">时间水印</string>
-    <string name="set_watermark_on">在录像和照片上叠加日期和时间，预览画面中不显示</string>
-    <string name="set_watermark_off">录像和照片不叠加日期和时间</string>
-    <string name="set_watermark_spec_title">水印显示录制规格</string>
-    <string name="set_watermark_spec_summary">在录像水印中标注分辨率、实测帧率、编码和实时码率</string>
+    <string name="set_watermark_on">在录像和照片上叠加日期和时间，录像另外标注分辨率、实测帧率、编码和实时码率；预览画面中不显示</string>
+    <string name="set_watermark_off">录像和照片不叠加日期、时间和录制规格</string>
     <string name="set_info_bar_title">行驶信息条</string>
-    <string name="set_info_bar_summary">在环视录像画面下方附加一栏车辆信号，显示项在「设置 → 系统 → 系统信息」中选择。试验性功能。</string>
+    <string name="set_info_bar_summary">在环视录像画面下方附加一栏车辆信号。试验性功能。</string>
+    <string name="set_info_bar_value">已选 %1$d 项</string>
     <string name="set_storage_location_title">存储位置</string>
-    <string name="set_storage_sentry_note">哨兵模式开启时，下车后仅 USB-A 口（哨兵模式保存录像的接口）保持供电，可继续录制。若存储位置为 Type-C 口的 U 盘，下车后该口断电，将自动改为录制到 USB-A 口的 U 盘。</string>
+    <string name="set_storage_port_note">推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。</string>
     <string name="set_relay_title">中转写入</string>
     <string name="set_relay_summary">先写入内置存储，每个片段完成后再转存至 U 盘，可减少 U 盘写入不稳导致的丢帧。开启后，U 盘断开时不会自动改为录制到其他 U 盘。</string>
-    <string name="set_video_limit_title">录像存储上限</string>
-    <string name="set_video_limit_dialog">录像存储上限（GB）</string>
-    <string name="set_photo_limit_title">照片存储上限</string>
-    <string name="set_photo_limit_dialog">照片存储上限（GB）</string>
-    <string name="set_limit_message">超出上限或剩余空间不足时，自动清理最旧的录像，仅删除本应用录制且未锁定的文件。留空或填 0 表示不限制：不自动删除，空间不足时停止录制。</string>
-    <string name="set_photo_limit_message">每小时检查一次，超出上限时自动清理最旧的照片，仅删除本应用拍摄且未锁定的照片。留空或填 0 表示不限制。</string>
-    <string name="set_storage_usage_title">录像保存路径</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
     <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
-    <string name="set_rearview_button_mode_title">按键模式</string>
+    <string name="set_rearview_switch_mode_title">切换方式</string>
+    <string name="opt_rearview_switch_swipe">滑动切换</string>
+    <string name="opt_rearview_switch_tap">点按切换</string>
     <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
     <string name="set_rearview_views_title">切换范围</string>
     <string name="opt_views_four">四向</string>
@@ -80,19 +72,44 @@
     <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级镜子，不影响录像。</string>
     <string name="set_rearview_fov_title">视野角度</string>
     <string name="set_rearview_fov_summary">角度越大，视野越宽、画面越清晰，但边缘变形越明显</string>
-    <string name="set_rearview_width_title">窗口宽度</string>
-    <string name="set_rearview_height_title">窗口高度</string>
-    <string name="set_rearview_height_summary">宽度和高度均可调至全屏；画面比例不变，窗口形状只决定可见范围</string>
-    <string name="set_rearview_reset_title">重置窗口与画面</string>
     <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「切换范围」和「方向标签」的默认值，并切回后视</string>
+    <string name="set_rearview_fisheye_value">视野 %1$d°</string>
+    <string name="set_rearview_window_summary">画面比例不变，窗口形状只决定可见范围</string>
+    <string name="set_rearview_window_value">宽度 %1$d 像素 · 高度 %2$d 像素</string>
+    <string name="dlg_rearview_reset_title">重置窗口与画面？</string>
+    <string name="rearview_editor_hint">拖动边或角调整宽度和高度，也可以双指缩放。拖动框内可以移动，位置不保存。</string>
     <string name="set_rearview_guide_title">使用指南</string>
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
     <string name="set_side_view_title">盲区画面</string>
     <string name="set_side_view_summary">打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。</string>
     <string name="set_side_view_min_speed_title">最低车速</string>
-    <string name="set_side_view_min_speed_summary">低于此车速时不显示；0 为不限</string>
+    <string name="set_side_view_min_speed_summary">低于此车速时中控屏上不显示，HUD 不受此限；0 为不限</string>
     <string name="side_view_close">关闭盲区画面</string>
+    <string name="set_side_view_target_title">显示位置</string>
+    <string name="opt_side_view_target_center">中控屏</string>
+    <string name="opt_side_view_target_hud">HUD</string>
+    <string name="opt_side_view_target_both">中控屏和 HUD</string>
+    <string name="set_group_side_view_hud">HUD 画面</string>
+    <string name="set_hud_mirror_title">左右翻转</string>
+    <string name="set_hud_mirror_summary">左右翻转画面，方向与车外后视镜一致</string>
+    <string name="set_hud_height_title">画面高度</string>
+    <string name="set_hud_height_summary">占 HUD 高度的百分比；宽度由「画面形状」决定</string>
+    <string name="set_hud_shape_title">画面形状</string>
+    <string name="set_hud_shape_summary">宽与高之比的百分比；100 为正方形，数值越大越宽</string>
+    <string name="set_hud_edge_title">离边距离</string>
+    <string name="set_hud_edge_summary">打左转向灯时画面在左侧，打右转向灯时在右侧；数值为与该侧边缘的距离，0 为贴边，50 为居中</string>
+    <string name="set_hud_vertical_title">上下位置</string>
+    <string name="set_hud_vertical_summary">0 为最上，100 为最下</string>
+    <string name="set_hud_opacity_title">画面透明度</string>
+    <string name="set_hud_contrast_title">白天对比度</string>
+    <string name="set_hud_contrast_summary">数值越大，暗部越暗，画面在 HUD 上不发白；100 为原画面</string>
+    <string name="set_hud_contrast_night_title">夜间对比度</string>
+    <string name="set_hud_contrast_night_summary">车辆处于夜间模式时使用；夜间画面较暗，数值过大会使画面整体变黑</string>
+    <string name="set_hud_night_title">夜间亮度</string>
+    <string name="set_hud_night_summary">车辆处于夜间模式时，在「画面透明度」的基础上按此比例调暗；100 为不调暗</string>
+    <string name="set_hud_fade_title">边缘渐隐</string>
+    <string name="set_hud_fade_summary">画面四边渐隐的宽度，占短边的百分比；0 为硬边</string>
     <string name="rearview_guide_hint">左右滑动翻页 · 点击图片外关闭</string>
     <string name="mirror_paused_tap">画面已停止 · 点击恢复</string>
     <string name="preview_paused">画面已停止</string>
@@ -105,15 +122,13 @@
     <string name="mirror_dock_label">Super mirror</string>
     <string name="rearview_guide_page">使用指南第 %1$d 张，共 %2$d 张</string>
     <string name="set_floating_alpha_title">按钮透明度</string>
-    <string name="set_recording_floating_summary">悬浮显示录制状态；点击和长按的操作在下方设置</string>
+    <string name="set_recording_floating_summary">悬浮显示录制状态</string>
     <string name="set_button_size_title">按钮大小</string>
     <string name="set_button_text_size_title">时长文字大小</string>
     <string name="set_floating_tap_title">点击</string>
     <string name="set_floating_long_press_title">长按</string>
     <string name="set_floating_lock_title">锁定位置</string>
-    <string name="set_floating_lock_summary">锁定当前位置，点击和长按不受影响</string>
-    <string name="set_floating_duration_title">显示录制时长</string>
-    <string name="set_floating_duration_summary">录制时在按钮旁显示已录制时长</string>
+    <string name="set_floating_duration_title">录制时长</string>
     <string name="floating_action_open_app">打开主界面</string>
     <string name="floating_action_toggle_recording">开始 / 停止录制</string>
     <string name="floating_action_take_photo">拍照</string>
@@ -122,18 +137,20 @@
     <string name="floating_action_toggle_drive_sound">开启 / 关闭模拟声浪</string>
     <string name="set_recording_stats_title">录制状态显示</string>
     <string name="set_recording_stats_summary">录制时在画面角落显示已录时长和当前片段序号</string>
-    <string name="set_reset_floating_title">重置悬浮按钮</string>
     <string name="set_reset_floating_summary">恢复默认位置、按钮大小和时长文字大小</string>
+    <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
+    <string name="dlg_floating_reset_title">重置悬浮按钮？</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的超级镜子、盲区画面、悬浮按钮和自动录制。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
-    <string name="set_screen_off_summary">熄屏时若正在录制，继续录制环视并阻止车机休眠，最长为下方设定的时长</string>
+    <string name="set_screen_off_summary">熄屏时若正在录制，继续录制环视并阻止车机休眠，最长不超过设定的时长</string>
     <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
+    <string name="set_screen_off_wake_value">最长 %1$s 小时</string>
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
-    <string name="set_screen_off_keep_summary">熄屏后只录制环视，亮屏后前后座舱恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后自动恢复。关闭本项，熄屏后停止录制。</string>
+    <string name="set_screen_off_keep_summary">熄屏后只录制环视，后座舱亮屏后恢复录制。未开启哨兵模式时，车机休眠期间录制暂停，唤醒后恢复。关闭本项，熄屏后停止录制。</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
@@ -145,15 +162,12 @@
     <string name="set_force_h264_summary">所有摄像头统一使用 H.264 编码，覆盖「编辑视频流配置」中各路的编码设置</string>
     <string name="set_image_adjust_title">画面调节</string>
     <string name="set_image_adjust_summary">打开画面调节窗口，实时调整曝光、白平衡、降噪等参数</string>
-    <string name="set_image_adjust_reset_title">恢复画面调节默认值</string>
     <string name="set_camera_mapping_title">摄像头映射</string>
     <string name="set_camera_mapping_summary">手动指定环视、前座舱、后座舱各自使用的摄像头（用于排查）</string>
     <string name="set_diagnostics_title">诊断信息</string>
     <string name="set_diagnostics_summary">查看并导出摄像头、显示屏和存储的检测信息及最近日志</string>
-    <!-- 导出、导入设置（项目所有者 2026-10-19 要，文字待批准） -->
-    <string name="set_settings_export_title">导出设置</string>
-    <string name="set_settings_export_summary">将当前设置保存为文件，与诊断报告存放在同一文件夹</string>
-    <string name="set_settings_import_title">导入设置</string>
+    <!-- 导出、导入设置（项目所有者 2026-10-19 要，文字 2026-10-20 批准） -->
+    <string name="set_settings_backup_title">设置备份</string>
     <string name="set_settings_import_summary">从导出的设置文件恢复全部设置；只能导入 %1$d.x 版本导出的文件</string>
     <string name="settings_exported">已导出到：\n%1$s</string>
     <string name="settings_export_failed">无法导出设置</string>
@@ -170,13 +184,13 @@
     <string name="settings_import_action">导入并退出</string>
     <string name="settings_import_failed">无法导入设置</string>
     <string name="settings_imported_reopen">已导入设置，重新打开应用后生效</string>
-    <!-- 系统信息（试验性）：分组、信号名、值 -->
-    <string name="set_vehicle_info_title">系统信息（试验性）</string>
+    <!-- 车辆信号（试验性）：分组、信号名、值 -->
+    <string name="set_vehicle_info_title">车辆信号（试验性）</string>
     <string name="set_vehicle_info_summary">车机可读取的车辆信号及当前状态；勾选的项目显示在行驶信息条上</string>
     <string name="vi_legend">勾选的项目显示在行驶信息条上（需开启「设置 → 录制 → 行驶信息条」）：有图标的显示为图标，其余暂以文字显示，每行下方注明；超出信息条宽度的不显示。名称颜色表示验证程度：正文色为实车测试结果一致（持续交叉验证）；灰色为可用、细节待定；淡灰色为可读取但未验证，需开启开发者选项才能勾选。</string>
     <string name="vi_position">位置（经纬度）</string>
     <string name="vi_position_source">系统定位</string>
-    <!-- 系统信息图例下方的状态行（VehicleInfoFragment.status）；每行号码后的读法（VehicleInfoFragment.address，号码与区域号照原样） -->
+    <!-- 车辆信号页图例下方的状态行（VehicleInfoFragment.status）；每行号码后的读法（VehicleInfoFragment.address，号码与区域号照原样） -->
     <string name="vi_status_known">有数据 %1$d/%2$d 项</string>
     <string name="vi_status_car_connected">车辆接口：已连接</string>
     <string name="vi_status_car_unavailable">车辆接口：不可用</string>
@@ -188,7 +202,7 @@
     <string name="vi_kind_function_zone">功能·区域 %1$s</string>
     <string name="vi_kind_sensor_event">传感器事件</string>
     <string name="vi_kind_sensor_value">传感器值</string>
-    <!-- 系统信息每一行下面：勾上在信息条上显示成什么（InfoBarLayout.cellsFor）；信息条各格的名字（InfoBarLayout.Cell） -->
+    <!-- 车辆信号页每一行下面：勾上在信息条上显示成什么（InfoBarLayout.cellsFor）；信息条各格的名字（InfoBarLayout.Cell） -->
     <string name="vi_bar_icon">信息条图标：%1$s</string>
     <string name="vi_bar_text">信息条文字（暂无图标）</string>
     <string name="vi_bar_join">、</string>
@@ -323,7 +337,7 @@
     <!-- 设置里的枚举选项 -->
     <string name="opt_mode_auto">自动（推荐）</string>
     <string name="opt_model_zeekr">极氪7X（环视）</string>
-    <string name="opt_model_zeekr_multi">极氪7X（环视 + 前后座舱）</string>
+    <string name="opt_model_zeekr_multi">极氪7X（环视 + 后座舱）</string>
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
@@ -366,6 +380,9 @@
     <string name="slot_cabin_front">前座舱</string>
     <string name="slot_cabin_rear">后座舱</string>
     <string name="action_save">保存</string>
+    <string name="action_reset">重置</string>
+    <string name="action_import">导入</string>
+    <string name="action_export">导出</string>
     <string name="action_all_auto">全部自动</string>
     <string name="msg_mapping_saved">已保存摄像头映射，重启应用后生效</string>
     <string name="msg_mapping_cleared">已恢复自动分配，重启应用后生效</string>
@@ -382,8 +399,8 @@
     <!-- 主界面 / 通知 / 回放 -->
     <string name="msg_need_camera_storage">需要相机和存储权限</string>
     <string name="msg_camera_access_failed">无法访问摄像头</string>
-    <string name="msg_storage_full_stopped">U 盘已满，录制已停止。未设置「录像存储上限」，不会自动清理旧录像。</string>
-    <string name="msg_storage_full_refuse">U 盘空间不足，无法开始录制。未设置「录像存储上限」，不会自动清理旧录像。</string>
+    <string name="msg_storage_full_stopped">U 盘已满，录制已停止。未设置录像的「存储上限」，不会自动清理旧录像。</string>
+    <string name="msg_storage_full_refuse">U 盘空间不足，无法开始录制。未设置录像的「存储上限」，不会自动清理旧录像。</string>
     <string name="msg_storage_cleaning">空间不足，正在清理最旧的录像，完成后开始录制…</string>
     <string name="msg_storage_cannot_free">U 盘空间不足，即使删除本应用的旧录像也不够，无法录制。请清理 U 盘上的其他文件。</string>
     <string name="msg_storage_too_slow">U 盘写入速度跟不上，录像可能丢帧</string>
@@ -391,21 +408,28 @@
         <item quantity="other">已自动清理 %1$d 张照片，释放 %2$s</item>
     </plurals>
     <string name="set_footage_lock_title">锁定影像</string>
-    <string name="set_footage_lock_summary">可在回放中锁定录像和照片。已锁定的文件不会被自动清理，也无法直接删除（需先解锁）；已锁定的文件占满空间时停止录制。</string>
-    <string name="set_footage_locked_title">已锁定</string>
-    <string name="set_footage_locked_summary">录像 %1$d 个文件 · %2$s；照片 %3$d 张 · %4$s</string>
+    <string name="set_footage_lock_summary">在回放中或用悬浮按钮手动锁定。锁定的录像和照片不会被自动清理，也无法直接删除（需先解锁）；锁定的文件占满空间时停止录制。</string>
+    <string name="set_storage_saved_in">录像保存在 %1$s</string>
+    <string name="set_storage_limits_title">存储上限</string>
+    <string name="set_storage_limits_value">录像 %1$s · 照片 %2$s</string>
+    <string name="set_storage_limits_video">录像</string>
+    <string name="set_storage_limits_photo">照片</string>
+    <string name="set_storage_limits_message">超出上限时自动清理最旧的文件，只删除本应用录制、拍摄且未锁定的；录像在剩余空间不足时也会清理，照片每小时检查一次。留空或填 0 表示不限制：不自动删除，录像在空间不足时停止录制。</string>
+    <string name="set_footage_lock_auto">自动锁定</string>
+    <string name="set_footage_lock_flash_chip">闪远光</string>
+    <string name="set_footage_lock_hazard_chip">双闪</string>
+    <string name="set_footage_lock_hazard_note">紧急制动时车辆会自动打开双闪警示灯，开启「双闪」后将同时锁定制动前后的录像。</string>
+    <string name="set_footage_lock_horn_chip">鸣笛</string>
+    <string name="set_footage_locked_value">已锁定 %1$d 个 · %2$s</string>
+    <string name="set_footage_locked_value_unprotected">已锁定 %1$d 个 · %2$s，不受保护</string>
     <string name="set_footage_locked_none">没有锁定的影像</string>
-    <string name="set_footage_locked_unprotected">%1$s（「锁定影像」已关闭，不受保护）</string>
     <string name="dlg_footage_lock_off_title">关闭「锁定影像」？</string>
     <plurals name="dlg_footage_lock_off_msg">
         <item quantity="other">已锁定 %1$d 个文件（%2$s）。关闭后它们不再受保护，自动清理时会和其他文件一样从最旧的开始删除，删除后无法找回。</item>
     </plurals>
     <string name="dlg_footage_lock_off_ok">关闭</string>
-    <string name="set_footage_lock_flash_title">闪远光时自动锁定当前录像</string>
-    <string name="set_footage_lock_flash_summary">录制时闪远光，自动锁定此刻前后 10 秒所在的录像片段（每一路画面）。锁定的录像占满空间时停止录制。</string>
-    <string name="set_footage_lock_horn_title">鸣笛时自动锁定当前录像</string>
-    <string name="set_footage_lock_horn_summary">车机暂无法读取喇叭信号，此项暂不可用</string>
     <string name="msg_flash_locked">闪远光：已锁定前后 10 秒所在的录像片段</string>
+    <string name="msg_hazard_locked">双闪：已锁定前 1 分钟起的录像片段，到关闭双闪为止</string>
     <string name="msg_storage_locked_stopped">锁定的影像占满了空间，录制已停止。请在回放里解锁一些</string>
     <string name="msg_storage_locked_refuse">锁定的影像占满了空间，无法开始录制。请在回放里解锁一些</string>
     <string name="action_lock_footage">锁定</string>
@@ -631,7 +655,6 @@
     <string name="cd_minimize">隐藏到后台</string>
     <string name="nav_exit">退出应用</string>
     <string name="set_rail_side_title">操作按钮位置</string>
-    <string name="set_rail_side_summary">建议选择驾驶座一侧</string>
     <string name="opt_rail_right">右侧</string>
     <string name="opt_rail_left">左侧</string>
 
@@ -641,12 +664,12 @@
     <string name="set_reduce_motion_summary">录制时关闭界面过渡、画面缩放等装饰动效，减少 GPU 占用；录制键和进度环不受影响</string>
     <string name="set_vehicle_status_title">车辆状态（试验性）</string>
     <string name="set_vehicle_status_summary">在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭、闪远光和双闪；喇叭信号暂无法读取</string>
-    <string name="set_fisheye_projection_title">鱼眼校正方式</string>
-    <string name="set_fisheye_projection_summary">%1$s · 用于主界面预览、照片回放和录像回放</string>
     <string name="opt_projection_rectilinear">直线</string>
     <string name="opt_projection_cylindrical">宽视野（地平线弯曲）</string>
     <string name="set_fisheye_fov_title">校正视野</string>
     <string name="set_fisheye_fov_summary">角度越大，保留的画面越多。「直线」最大 140°，「宽视野」和「全圆」最大 180°。</string>
+    <string name="set_fisheye_scope_summary">用于主界面预览、照片回放和录像回放</string>
+    <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">全圆（直线略弯）</string>
     <string name="dlg_rail_side_title">驾驶座在哪一侧？</string>
     <string name="dlg_rail_side_lhd">左侧（左舵车）· 操作按钮在左侧</string>
@@ -657,7 +680,7 @@
     <string name="record_waiting_cameras">等待摄像头</string>
     <string name="record_waiting_detail">恢复后自动继续</string>
     <string name="status_profile_composite">极氪7X（环视）</string>
-    <string name="status_profile_composite_multi">极氪7X（环视 + 前后座舱）</string>
+    <string name="status_profile_composite_multi">极氪7X（环视 + 后座舱）</string>
     <string name="status_fps">≤%1$s fps</string>
     <string name="status_bitrate_very_low">极低码率</string>
     <string name="status_bitrate_low">低码率</string>
@@ -714,6 +737,7 @@
     <string name="editor_quality_sharp_note">不限帧率、高码率；细节保留最充分</string>
     <string name="editor_cameras_title">已开启 %1$d 路摄像头</string>
     <string name="editor_cameras_summary">关闭的摄像头不录制、不占用空间；点击卡片可单独调整该路。开关改动重启应用后生效。</string>
+    <string name="editor_cabin_one_shot">因造成车机不稳定等原因，此设置无法固化，用户离车后自动取消</string>
     <string name="editor_camera_tuned">自定义</string>
     <string name="editor_open_lanes">画面布局</string>
     <string name="editor_detail_title">%1$s · 参数</string>
@@ -907,6 +931,8 @@
     <string name="dev_footage_audio_source_title">麦克风来源</string>
     <string name="dev_footage_audio_source_raw">原始（VOICE_RECOGNITION，不经处理，声音小）</string>
     <string name="dev_footage_audio_source_call">通话（VOICE_COMMUNICATION，经降噪和回声消除）</string>
+    <string name="dev_footage_audio_source_raw_short">原始</string>
+    <string name="dev_footage_audio_source_call_short">通话</string>
     <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
     <string name="dev_drive_sound_group">模拟声浪</string>
     <string name="dev_drive_sound_title">模拟声浪（试验）</string>
@@ -936,6 +962,7 @@
     <string name="dev_drive_sound_route_notify">BUS12（外部通知）</string>
     <string name="dev_drive_sound_route_playback">BUS11（外部播放）</string>
     <string name="dev_drive_sound_exterior_volume_title">车外音量</string>
+    <string name="dev_drive_sound_value">%1$s · %2$s</string>
     <string name="msg_drive_sound_on">已开启模拟声浪</string>
     <string name="msg_drive_sound_off">已关闭模拟声浪</string>
     <string name="dev_perm_all_files">所有文件访问</string>
@@ -965,6 +992,8 @@
     <string name="dev_side_view_up_summary">画面中心朝车外转动的角度，负值朝车身</string>
     <string name="dev_side_view_fov_title">盲区画面视野角度</string>
     <string name="dev_side_view_fov_summary">转动角度较大时自动收窄，画面不出现黑块</string>
+    <string name="dev_side_view_calibration_title">盲区画面标定</string>
+    <string name="dev_side_view_calibration_value">朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°</string>
     <string name="dev_repair_mp4_title">修复缺少索引的录像</string>
     <string name="dev_repair_mp4_summary">录制意外中断（如断电）的片段缺少索引，无法播放。参照同一摄像头的完好片段重建索引，文件名不变。</string>
     <string name="dev_repair_refuse_recording">录制时无法修复：正在录制的片段同样没有索引，无法与意外中断的片段区分。请先停止录制。</string>
@@ -1024,5 +1053,4 @@
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
-    <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
 </resources>

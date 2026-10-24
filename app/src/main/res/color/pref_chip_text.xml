@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 附加项按钮的字：按下（开）是橙色文字，没按是正文色，不可用变淡 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_tertiary" android:state_enabled="false" />
+    <item android:color="@color/energy_text" android:state_checked="true" />
+    <item android:color="@color/text_primary" />
+</selector>

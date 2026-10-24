@@ -1972,6 +1972,33 @@ public class MultiCameraManager {
         enabledLanes = keys == null ? null : new java.util.LinkedHashSet<>(keys);
     }
 
+    /**
+     * 这次运行启用的前座舱去掉了（调度报的，通道眼里熄屏的那一刻；暂时的规矩，见 {@link FrontCabinOneShot}）：启用的几路、
+     * 这一次录像的计划都拿掉它，再告诉管线的持有者（主界面回到前台时不再摆它）。关相机不在这里 —— 那一刻座舱
+     * 本来就照熄屏放开，之后谁都不要它，调度照登记表关；它的录制器由调度照「不再留着录像输出」交回来再放。主线程。
+     */
+    private void retireFrontCabin(String key) {
+        if (isReleased() || key == null) {
+            return;
+        }
+        if (enabledLanes != null) {
+            enabledLanes.remove(key);
+        }
+        boolean dropped = recordingPlan.containsKey(key);
+        if (dropped) {
+            leaveLane(key, "这次运行去掉了前座舱");
+            recordingPlan.remove(key);
+            lanes.drop(key);
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("前座舱只用一次：通道眼里熄屏，前座舱从这次运行里去掉，"
+                + "亮屏也不再开；下次启动不带前座舱" + (dropped ? "（这一次录像不再录前座舱）" : ""));
+        if (dropped) {
+            publishLanes();
+            scheduler.wake();
+        }
+        CameraManagerHolder.getInstance().frontCabinRetired(this, key);
+    }
+
     /** 管线里的、启用的那几路，按开的次序。 */
     private List<String> enabledActiveKeys() {
         List<String> keys = getActiveCameraKeys();
@@ -2126,6 +2153,12 @@ public class MultiCameraManager {
         return owner != null && owner.keepCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND, texture);
     }
 
+    /** HUD 上的盲区画面窗口移走了：同 {@link #keepSideCanvas}，是另一样输出（{@link ChannelRules.Kind#HUD}）。 */
+    public static boolean keepHudCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND, texture);
+        return owner != null && owner.keepCanvas(ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND, texture);
+    }
+
     /**
      * 最近放了的那一份（{@link #release}）：退出、换车型时它的调度还在按次序关，会话里可能还带着主界面、后视镜、盲区画面的画布
      * （{@link #ownerOf}）。弱引用；放的那一下（哪个线程都可能）写，主线程上读。
@@ -2193,6 +2226,8 @@ public class MultiCameraManager {
                 return camera.withdrawMirror(texture);
             case SIDE:
                 return camera.withdrawSide(texture);
+            case HUD:
+                return camera.withdrawHud(texture);
             default:
                 return camera.withdrawPreview(texture);
         }
@@ -2225,6 +2260,11 @@ public class MultiCameraManager {
         return takeKeptCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND);
     }
 
+    /** 新开的 HUD 窗口接回上一个留下的画布（同 {@link #takeKeptSide}）；拿回来之后接着重新声明（{@link SingleCamera#declareHud}）。 */
+    public android.graphics.SurfaceTexture takeKeptHud() {
+        return takeKeptCanvas(ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND);
+    }
+
     private android.graphics.SurfaceTexture takeKeptCanvas(ChannelRules.Kind kind, String cameraKey) {
         android.graphics.SurfaceTexture texture = keptOf(kind).remove(cameraKey);
         if (texture == null) {
@@ -2255,9 +2295,9 @@ public class MultiCameraManager {
         if (kind == ChannelRules.Kind.MIRROR) {
             com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：" + roleName(cameraKey)
                     + "的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
-        } else if (kind == ChannelRules.Kind.SIDE) {
-            com.kooo.evcam.blackbox.BlackBox.note("盲区画面留下的画布没人接回：环视的会话里已经没有它，放掉"
-                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        } else if (kind == ChannelRules.Kind.SIDE || kind == ChannelRules.Kind.HUD) {
+            com.kooo.evcam.blackbox.BlackBox.note("盲区画面" + (kind == ChannelRules.Kind.HUD ? "（HUD）" : "")
+                    + "留下的画布没人接回：环视的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         } else {
             com.kooo.evcam.blackbox.BlackBox.note("主界面留下的预览画布没人接回：" + roleName(cameraKey)
                     + " 那一块已经离开会话，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
@@ -3366,6 +3406,16 @@ public class MultiCameraManager {
             laneHandler.removeCallbacks(leftoversTask);
         }
 
+        @Override
+        public boolean frontCabinOneShot() {
+            return FrontCabinOneShot.ACTIVE;
+        }
+
+        @Override
+        public void frontCabinRetired(String key) {
+            retireFrontCabin(key);
+        }
+
         // ---- 相机服务那边（CameraAvailabilityWatch.Listener）
 
         @Override
@@ -4110,7 +4160,7 @@ public class MultiCameraManager {
             return names.isEmpty() ? "保持" : String.join("、", names);
         }
 
-        /** 输出的叫法：预览、后视镜、盲区画面、录像、出帧口。 */
+        /** 输出的叫法：预览、后视镜、盲区画面、HUD 盲区画面、录像、出帧口。 */
         private String kindNames(Set<ChannelRules.Kind> kinds) {
             List<String> names = new ArrayList<>();
             for (ChannelRules.Kind kind : kinds) {
@@ -4123,6 +4173,9 @@ public class MultiCameraManager {
                         break;
                     case SIDE:
                         names.add("盲区画面");
+                        break;
+                    case HUD:
+                        names.add("HUD 盲区画面");
                         break;
                     case RECORD:
                         names.add("录像");
@@ -4141,7 +4194,7 @@ public class MultiCameraManager {
          */
         private String deadText(Set<ChannelRules.Kind> removed) {
             boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR)
-                    || removed.contains(ChannelRules.Kind.SIDE);
+                    || removed.contains(ChannelRules.Kind.SIDE) || removed.contains(ChannelRules.Kind.HUD);
             boolean record = !useCodecRecording && removed.contains(ChannelRules.Kind.RECORD);
             if (record && !canvas) {
                 return "MediaRecorder 停了";
@@ -4471,10 +4524,12 @@ public class MultiCameraManager {
      */
     private LanePlan planFor(String key, AppConfig appConfig, boolean infoBarOn, String brandLine) {
         StreamSpec spec = RecordSpecs.forCameraKey(context, key);
+        // 时间和录制规格同开同关：都跟着「时间水印」（项目所有者 2026-10-23）
+        boolean stamp = appConfig.isTimestampWatermarkEnabled();
         return new LanePlan(spec, CameraSlots.KEY_SURROUND.equals(key) && infoBarOn, brandLine,
                 // 设置里的「强制 H.264」是总闸，盖过这一路配置里的编码选择
                 appConfig.isForceH264Encoding() || RecordSpecs.forceH264(spec.codec),
-                appConfig.isTimestampWatermarkEnabled(), appConfig.isWatermarkSpecEnabled(),
+                stamp, stamp,
                 // 声音只进环视（项目所有者 2026-10-20）
                 CameraSlots.KEY_SURROUND.equals(key) ? footageAudioSource(appConfig) : null);
     }

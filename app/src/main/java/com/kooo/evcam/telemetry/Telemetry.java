@@ -16,7 +16,7 @@ import java.util.List;
  * <h3>框架</h3>
  *
  * <ul>
- *   <li>两份快照，都不可变、版本号只往上走：{@link Readings}（每个信号的读数，「系统信息」页看它）和
+ *   <li>两份快照，都不可变、版本号只往上走：{@link Readings}（每个信号的读数，「车辆信号」页看它）和
  *       {@link VehicleState}（信息条要的那几项，由 {@link VehicleStateMapper} 从读数推出来，再加定位）。</li>
  *   <li>来源各管一条路：{@link EcarxSource}（车机自带的 ECARX 接口，订阅），{@link LocationSource}（经纬度，
  *       车不给车速时用 GPS 车速）。再有新的路就是再加一个来源。</li>
@@ -24,7 +24,7 @@ import java.util.List;
  *       <ul>
  *         <li>核心（{@link #keepCore}）：熄屏判断（{@code screen.ScreenState}）在进程一起来时登记，进程活着一直在。
  *             车辆接口的离散信号一直在读（订阅 + 每 {@link #RECONCILE_MS} 对账）；不读浮点传感器、不开定位。</li>
- *         <li>完整（{@link #acquire} / {@link #release}，按名字）：录像开着信息条、「系统信息」页、车辆状态面板、
+ *         <li>完整（{@link #acquire} / {@link #release}，按名字）：录像开着信息条、「车辆信号」页、车辆状态面板、
  *             录像时开着闪远光自动锁定（{@code storage.AutoLock}）……另外读浮点传感器、开定位。最后一个完整用户走了，
  *             浮点和定位停掉，它们的值、位置、GPS 车速清掉 —— 下次不会把旧的车速、位置画进新录像；离散的照旧（核心还在用），
  *             不发空快照。</li>
@@ -548,7 +548,7 @@ public final class Telemetry {
         notifyListeners(readings);
     }
 
-    /** 车辆接口这一路的结果（「系统信息」页的状态行、熄屏判断）。 */
+    /** 车辆接口这一路的结果（「车辆信号」页的状态行、熄屏判断）。 */
     public enum CarLink {
         /** 还在连（{@code Car.create} 第一次要一秒左右；再连时也是它）：状态行先不写这一项，熄屏判断只看安卓 */
         CONNECTING,
@@ -562,7 +562,7 @@ public final class Telemetry {
         FAILED
     }
 
-    /** 定位这一路的结果（「系统信息」页的状态行）。 */
+    /** 定位这一路的结果（「车辆信号」页的状态行）。 */
     public enum LocationLink {
         ON,
         NO_PERMISSION,
