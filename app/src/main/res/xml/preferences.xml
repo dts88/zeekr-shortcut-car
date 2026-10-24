@@ -41,10 +41,15 @@
                 android:summary="%s"
                 app:useSimpleSummaryProvider="false" />
 
+            <Preference android:key="pref_camera_sources" android:title="@string/camera_sources_title" android:summary="@string/camera_sources_help" />
+
             <Preference
                 android:key="pref_profile_editor"
                 android:title="@string/set_profile_editor_title"
                 android:summary="@string/set_profile_editor_summary" />
+
+            <ListPreference android:key="pref_preview_layout" android:title="@string/record_preview_layout"
+                android:summary="%s" />
         </PreferenceCategory>
 
         <PreferenceCategory

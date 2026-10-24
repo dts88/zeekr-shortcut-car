@@ -372,10 +372,7 @@ public final class ChannelRules {
          * 没给是 {@link #lanes} 的全部。
          */
         final Set<String> enabled = new LinkedHashSet<>();
-        /**
-         * 上一轮以来登记、放开过的登记方（含停了再开录：几次变化并成一轮也在这里）。调度在 CameraNeeds 的监听里记、每一轮交进来，
-         * {@link #settle} 收走：停手的一路只在要它的登记方变过时解除（{@link #wantersChanged}，2026-10-20 审查，车主批）。
-         */
+        final Set<String> previewEnabled = new LinkedHashSet<>();
         final Set<CameraNeeds.Holder> changed = EnumSet.noneOf(CameraNeeds.Holder.class);
         /**
          * 通道眼里屏幕亮着（{@link ChannelRules#darkForChannel} 的反面）：屏幕真黑了还不到 30 秒、车机也没要睡，照亮着算。
@@ -462,6 +459,7 @@ public final class ChannelRules {
             for (Lane lane : this.lanes) {
                 if (enabled == null || enabled.contains(lane.key)) {
                     this.enabled.add(lane.key);
+                    this.previewEnabled.add(lane.key);
                 }
             }
         }
@@ -1300,7 +1298,7 @@ public final class ChannelRules {
         }
         switch (holder) {
             case PREVIEW:
-                return w.screenOn && w.enabled.contains(lane.key) && !retiredFrontCabin(w, lane);
+                return w.screenOn && w.previewEnabled.contains(lane.key) && !retiredFrontCabin(w, lane);
             case RECORDING:
                 return w.recordPlan.contains(lane.key) && !retiredFrontCabin(w, lane);
             case MIRROR:
@@ -1410,7 +1408,7 @@ public final class ChannelRules {
         }
         switch (kind) {
             case PREVIEW:
-                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.enabled.contains(lane.key)
+                return w.holders.contains(CameraNeeds.Holder.PREVIEW) && w.screenOn && w.previewEnabled.contains(lane.key)
                         && !retiredFrontCabin(w, lane);
             case MIRROR:
                 return w.holders.contains(CameraNeeds.Holder.MIRROR) && mirrorWants(w, lane);

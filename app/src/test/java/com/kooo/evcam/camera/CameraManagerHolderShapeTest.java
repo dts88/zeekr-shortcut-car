@@ -30,6 +30,18 @@ public class CameraManagerHolderShapeTest {
         return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)), true);
     }
 
+    @Test public void previewOnlyRoadDoesNotBecomeARecordingLaneOrLoseMirrorCabin() {
+        java.util.Set<String> recording = new LinkedHashSet<>(Arrays.asList(SUR));
+        java.util.Set<String> preview = new LinkedHashSet<>(Arrays.asList("roadfront"));
+        CameraManagerHolder.Shape shape = new CameraManagerHolder.Shape("zeekr_7x", null, recording, preview, true);
+        assertEquals(recording, shape.enabled);
+        assertEquals(preview, shape.preview);
+        assertTrue(shape.requested.contains("roadfront"));
+        assertTrue(shape.cabinRear);
+        assertEquals(3, shape.count);
+        assertFalse(shape.enabled.contains("roadfront"));
+    }
+
     @Test
     public void oneCabinBuildsThatCabinAndTheSurround() {
         CameraManagerHolder.Shape rearOnly = shape(REAR);
@@ -77,6 +89,12 @@ public class CameraManagerHolderShapeTest {
         assertEquals("zeekr_7x/front+left+back", shape(FRONT, SUR, REAR).key());
         assertEquals("zeekr_7x/left+back", shape(FRONT, REAR).key());
         assertEquals(shape(REAR, FRONT).key(), shape(FRONT, REAR).key());
+    }
+    @Test public void exteriorSourcesAreIncludedWithoutDroppingOverlaySurround() {
+        CameraManagerHolder.Shape sources = shape("roadfront", "roadrear", "manual");
+        assertEquals(4, sources.count); assertFalse(sources.cabinFront); assertFalse(sources.cabinRear);
+        String previous = sources.key(); sources.sources.put("roadfront", "7");
+        assertFalse(previous.equals(sources.key()));
     }
 
     /** 超级镜子要后座舱、配置里没启用它：照样建，但不算启用的（主界面预览、拍照、录像都不要它）。 */

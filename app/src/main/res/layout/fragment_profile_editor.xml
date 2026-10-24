@@ -83,6 +83,11 @@
                 android:baselineAligned="false"
                 android:orientation="horizontal" />
 
+            <com.google.android.material.button.MaterialButton android:id="@+id/editor_preview_layout"
+                style="@style/Widget.Cam.RailSmall" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:minHeight="56dp"
+                android:text="@string/record_preview_layout" android:layout_marginTop="12dp" />
+
             <!-- ② 相机 -->
             <LinearLayout
                 android:layout_width="match_parent"

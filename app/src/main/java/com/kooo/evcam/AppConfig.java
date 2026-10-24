@@ -557,41 +557,53 @@ public class AppConfig {
      * @param slot     槽位：front / back / left
      * @param cameraId 相机 id；传 null 或空表示恢复自动
      */
-    public void setCameraOverride(String slot, String cameraId) {
-        String key = KEY_CAMERA_OVERRIDE_PREFIX + slot;
-        if (cameraId == null || cameraId.trim().isEmpty()) {
-            prefs.edit().remove(key).apply();
-        } else {
-            prefs.edit().putString(key, cameraId).apply();
-        }
-        AppLog.d(TAG, "相机映射覆盖 " + slot + " = " + cameraId);
+    public void setCameraOverride(String slot, String id) {
+        String role = com.kooo.evcam.profile.RecordingSources.role(slot);
+        if (role != null) setSourceCameraId(role, id == null || id.trim().isEmpty() ? null : id);
     }
-
-    /** 返回 null 表示该槽位走自动分配。归开发者选项管：关着时一律自动分配。 */
     public String getCameraOverride(String slot) {
-        String value = readString(KEY_CAMERA_OVERRIDE_PREFIX + slot, null);
-        return (value == null || value.trim().isEmpty()) ? null : value;
+        String role = com.kooo.evcam.profile.RecordingSources.role(slot);
+        return role == null ? null : getSourceCameraId(role);
     }
-
-    /** 是否有任何槽位被手动指定过。 */
     public boolean hasCameraOverride() {
-        for (String slot : CAMERA_OVERRIDE_SLOTS) {
-            if (getCameraOverride(slot) != null) {
-                return true;
-            }
-        }
+        for (String role : com.kooo.evcam.profile.RecordingSources.ALL_ROLES)
+            if (getSourceCameraId(role) != null) return true;
         return false;
     }
-
-    /** 清掉所有手动指定，全部恢复自动。 */
-    public void clearCameraOverrides() {
-        SharedPreferences.Editor editor = prefs.edit();
-        for (String slot : CAMERA_OVERRIDE_SLOTS) {
-            editor.remove(KEY_CAMERA_OVERRIDE_PREFIX + slot);
+    public void clearCameraOverrides() { resetSourceCameraIds(); }
+    private void migrateSourceMappings() {
+        synchronized (AppConfig.class) {
+            if (prefs.getBoolean("source_mapping_migrated_v1", false)) return;
+            SharedPreferences.Editor edit = prefs.edit();
+            for (java.util.Map.Entry<String,String> item : com.kooo.evcam.profile.SourceMappings.migrate(
+                    prefs.getAll(), com.kooo.evcam.settings.DeveloperMode.isUnlocked()).entrySet())
+                edit.putString(item.getKey(), item.getValue());
+            for (String slot : CAMERA_OVERRIDE_SLOTS) edit.remove(KEY_CAMERA_OVERRIDE_PREFIX + slot);
+            edit.putBoolean("source_mapping_migrated_v1", true).apply();
         }
-        editor.apply();
-        AppLog.i(TAG, "相机映射已全部恢复自动");
     }
+    /** null = Automatic, empty = Unassigned, otherwise an explicit Camera2 ID. */
+    public String getSourceCameraId(String role) {
+        migrateSourceMappings(); return prefs.getString("source_id_" + role, null);
+    }
+    public void setSourceCameraId(String role, String id) {
+        migrateSourceMappings();
+        SharedPreferences.Editor edit = prefs.edit();
+        if (id == null) edit.remove("source_id_" + role); else edit.putString("source_id_" + role, id.trim());
+        edit.apply();
+    }
+    public void resetSourceCameraIds() {
+        migrateSourceMappings(); SharedPreferences.Editor edit = prefs.edit();
+        for (String role : com.kooo.evcam.profile.RecordingSources.ALL_ROLES) edit.remove("source_id_" + role);
+        edit.apply();
+    }
+    public String getAutomaticSourceId(String role) { return prefs.getString("automatic_source_" + getCarModel() + "_" + role, null); }
+    public void setAutomaticSourceId(String role, String id) {
+        prefs.edit().putString("automatic_source_" + getCarModel() + "_" + role, id).apply();
+    }
+    public String getPreviewSourceMode() { return readEnum(SettingsRegistry.PREVIEW_LAYOUT); }
+    public void setPreviewSourceMode(String mode) { writeEnum(SettingsRegistry.PREVIEW_LAYOUT, mode); }
+    public String getDetectedSurroundId() { return getAutomaticSourceId("composite"); }
 
     // ==================== 存下的槽位映射（2.11 阶段 6） ====================
 

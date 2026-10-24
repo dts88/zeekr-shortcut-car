@@ -90,6 +90,8 @@ public class CameraManagerHolder {
     private String builtLanes;
     /** 这一份启用的那几路（{@link Shape#enabled}）：后台的调用方要重建时照它（{@link #lanesFor}）。 */
     private Set<String> builtEnabled;
+    private Set<String> builtPreview;
+    private boolean frontRetired;
     /** 这一份里有后座舱这一路（启用的，或者为超级镜子建的）。 */
     private boolean builtCabinRear;
     /**
@@ -105,6 +107,7 @@ public class CameraManagerHolder {
     private final List<Runnable> runLanesListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     /** 这一份是照哪个车型建的（{@link Shape#carModel}）：车型变了谁来要都重建。 */
     private String builtCarModel;
+    private String builtSourcesKey = "";
     /** 这一份建好之后的样子（主线程上写）；null = 还在建。 */
     private Built built;
     /** 等这一份建好的（{@link #whenBuilt}，主线程）。 */
@@ -137,6 +140,7 @@ public class CameraManagerHolder {
 
     /** 一份管线建好之后的样子：主界面画四宫格几何、状态条那一格、座舱格子、出错的提示用。 */
     public static final class Built {
+        final java.util.Map<String, Size> extraSizes = new java.util.LinkedHashMap<>();
         /** 槽位怎么分的（照存下的、或者照列表）；列相机出错时是 null。 */
         public final ZeekrMultiPlan plan;
         /** 合成流的尺寸：探测到的，或者存下的；null = 不知道（环视不是合成流、探测不到也没存过）。 */
@@ -179,7 +183,7 @@ public class CameraManagerHolder {
         final Profile profile;
         /** 启用的那几路（key）。 */
         final Set<String> enabled;
-        /** 超级镜子要后座舱：超级镜子开着，切换范围是「后视 + 后座舱」（AppConfig.rearViewWantsCabinRear）。 */
+        final Set<String> preview, requested;
         final boolean mirrorCabin;
         /** 前座舱（key back，配置里的座舱 1）要建。 */
         final boolean cabinFront;
@@ -187,34 +191,53 @@ public class CameraManagerHolder {
         final boolean cabinRear;
         /** 建几路：环视，加上要建的座舱。 */
         final int count;
+        final java.util.Map<String,String> sources = new java.util.LinkedHashMap<>();
 
+        Shape(String carModel, Profile profile, Set<String> enabled) { this(carModel, profile, enabled, enabled, false); }
         Shape(String carModel, Profile profile, Set<String> enabled, boolean mirrorCabin) {
+            this(carModel, profile, enabled, enabled, mirrorCabin);
+        }
+        Shape(String carModel, Profile profile, Set<String> enabled, Set<String> preview) {
+            this(carModel, profile, enabled, preview, false);
+        }
+        Shape(String carModel, Profile profile, Set<String> enabled, Set<String> preview, boolean mirrorCabin) {
             this.carModel = carModel;
             this.profile = profile;
             this.enabled = enabled;
+            this.preview = preview;
             this.mirrorCabin = mirrorCabin;
-            this.cabinFront = enabled.contains(CameraSlots.KEY_CABIN_FRONT);
-            this.cabinRear = enabled.contains(CameraSlots.KEY_CABIN_REAR) || mirrorCabin;
-            this.count = 1 + (cabinFront ? 1 : 0) + (cabinRear ? 1 : 0);
+            this.requested = new java.util.LinkedHashSet<>(enabled); this.requested.addAll(preview);
+            this.cabinFront = requested.contains(CameraSlots.KEY_CABIN_FRONT);
+            this.cabinRear = requested.contains(CameraSlots.KEY_CABIN_REAR) || mirrorCabin;
+            java.util.Set<String> all = new java.util.HashSet<>(requested);
+            all.add(CameraSlots.KEY_SURROUND);
+            if (cabinRear) all.add(CameraSlots.KEY_CABIN_REAR);
+            this.count = all.size();
         }
 
         static Shape of(Context app) {
             Profile profile = new ProfileStore(app).current();
             AppConfig config = new AppConfig(app);
-            // 超级镜子关着时不为它建后座舱：用不上的一路建着，车机拿相机 1 时调度照样会认它、拿它判别的路
-            return new Shape(config.getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile),
+            Shape shape = new Shape(config.getCarModel(), profile, RecordSpecs.enabledCameraKeys(profile),
+                    com.kooo.evcam.profile.ProfileChannels.of(profile, config.getPreviewSourceMode()).previewKeys,
                     config.isRearViewEnabled() && config.rearViewWantsCabinRear());
+            for (String role : com.kooo.evcam.profile.RecordingSources.ALL_ROLES)
+                shape.sources.put(role, config.getSourceCameraId(role));
+            return shape;
         }
 
         /** 车型和启用的几路（主界面的布局照它）。 */
         String lanesKey() {
-            return lanesKeyOf(carModel, enabled);
+            return lanesKeyOf(carModel, enabled) + sourcesKey() + previewKey();
         }
 
         /** 建了哪几路：{@link #lanesKey}，加上只为超级镜子建的后座舱。 */
         String key() {
-            return keyOf(carModel, enabled, cabinRear);
+            return keyOf(carModel, enabled, cabinRear) + sourcesKey() + previewKey();
         }
+
+        private String sourcesKey() { return sources.isEmpty() ? "" : "/sources=" + sources; }
+        private String previewKey() { return preview.equals(enabled) ? "" : "/preview=" + preview; }
 
         static String lanesKeyOf(String carModel, Set<String> enabled) {
             return carModel + "/" + (enabled.isEmpty() ? "-" : String.join("+", CameraSlots.openOrder(enabled)));
@@ -266,9 +289,13 @@ public class CameraManagerHolder {
         boolean forMainScreen = laidOut != null;
         boolean have = cameraManager != null && !cameraManager.isReleased();
         Shape live = Shape.of(app);
-        Shape shape = new Shape(live.carModel, live.profile,
-                lanesFor(laidOut, have ? builtEnabled : null, runEnabled != null ? runEnabled : live.enabled),
-                live.mirrorCabin);
+        Set<String> recording = new java.util.LinkedHashSet<>(runEnabled != null ? runEnabled : live.enabled);
+        Set<String> preview = new java.util.LinkedHashSet<>(laidOut != null ? laidOut
+                : have && builtPreview != null ? builtPreview
+                : com.kooo.evcam.profile.ProfileChannels.previewKeys(recording, new AppConfig(app).getPreviewSourceMode()));
+        if (frontRetired) preview.remove(CameraSlots.KEY_CABIN_FRONT);
+        Shape shape = new Shape(live.carModel, live.profile, recording, preview, live.mirrorCabin);
+        shape.sources.putAll(live.sources);
         if (cameraManager != null && !cameraManager.isReleased()) {
             Rebuild why = rebuildReason(shape, forMainScreen);
             if (why == Rebuild.NO) {
@@ -296,9 +323,11 @@ public class CameraManagerHolder {
         // 录制模式建管线时定一次（录制模式归开发者选项，从下一次启动应用起生效）
         manager.setCodecRecordingMode(new AppConfig(app).shouldUseCodecRecording());
         cameraManager = manager;
+        builtSourcesKey = shape.sourcesKey();
         builtFor = shape.key();
         builtLanes = shape.lanesKey();
         builtEnabled = shape.enabled;
+        builtPreview = new java.util.LinkedHashSet<>(shape.preview);
         builtCabinRear = shape.cabinRear;
         builtCarModel = shape.carModel;
         built = null;
@@ -331,7 +360,10 @@ public class CameraManagerHolder {
      * 这一份记下的几路都拿掉它 —— 主界面不摆前座舱重新接上的时候和这一份对得上，不重建（前座舱这一路还建着，没人要就关着）。
      * 后座舱没动，这一份带不带后座舱照旧。告诉主界面。
      */
+    public synchronized boolean isFrontCabinRetired() { return frontRetired; }
+
     synchronized void frontCabinRetired(MultiCameraManager manager, String key) {
+        frontRetired = true;
         if (runEnabled != null) {
             runEnabled.remove(key);
         }
@@ -339,8 +371,10 @@ public class CameraManagerHolder {
             Set<String> remaining = new java.util.LinkedHashSet<>(builtEnabled);
             remaining.remove(key);
             builtEnabled = remaining;
-            builtLanes = Shape.lanesKeyOf(builtCarModel, builtEnabled);
-            builtFor = Shape.keyOf(builtCarModel, builtEnabled, builtCabinRear);
+            if (builtPreview != null) builtPreview.remove(key);
+            String previewKey = builtPreview == null || builtPreview.equals(builtEnabled) ? "" : "/preview=" + builtPreview;
+            builtLanes = Shape.lanesKeyOf(builtCarModel, builtEnabled) + builtSourcesKey + previewKey;
+            builtFor = Shape.keyOf(builtCarModel, builtEnabled, builtCabinRear) + builtSourcesKey + previewKey;
         }
         for (Runnable listener : runLanesListeners) {
             main.post(listener);
@@ -496,14 +530,22 @@ public class CameraManagerHolder {
         ZeekrCameraLocator.Result located = ZeekrCameraLocator.locate(service);
         AppLog.i(TAG, "极氪合成流探测结果（相机列表 " + java.util.Arrays.toString(ids) + "）:\n" + located.diagnostics);
 
-        String overrideComposite = config.getCameraOverride(CameraSlots.KEY_SURROUND);
-        String overrideCabin1 = config.getCameraOverride(CameraSlots.KEY_CABIN_FRONT);
-        String overrideCabin2 = config.getCameraOverride(CameraSlots.KEY_CABIN_REAR);
+        String overrideComposite = shape.sources.get(CameraProfile.ROLE_COMPOSITE);
+        String overrideCabin1 = shape.sources.get(CameraProfile.ROLE_CABIN_1);
+        String overrideCabin2 = shape.sources.get(CameraProfile.ROLE_CABIN_2);
         String overrides = ZeekrMultiPlan.Stored.overridesKey(overrideComposite, overrideCabin1, overrideCabin2);
         String storedText = config.getStoredSlotMap(shape.carModel);
         ZeekrMultiPlan.Stored stored = ZeekrMultiPlan.Stored.decode(storedText);
         ZeekrMultiPlan plan = ZeekrMultiPlan.choose(ids, located.found() ? located.cameraId : null,
                 overrideComposite, overrideCabin1, overrideCabin2, stored);
+        // Publish automatic assignments separately from explicit source choices.
+        ZeekrMultiPlan automatic = ZeekrMultiPlan.choose(ids, located.found() ? located.cameraId : null,
+                null, null, null, null);
+        config.setAutomaticSourceId(CameraProfile.ROLE_COMPOSITE, automatic.compositeId);
+        config.setAutomaticSourceId(CameraProfile.ROLE_CABIN_1, automatic.cabin1Id);
+        config.setAutomaticSourceId(CameraProfile.ROLE_CABIN_2, automatic.cabin2Id);
+        plan = plan.withSourceChoices(ids, located.found() ? located.cameraId : null,
+                overrideComposite, overrideCabin1, overrideCabin2);
         AppLog.i(TAG, "槽位分配:\n" + plan.explanation + "-> " + plan);
 
         // 合成流尺寸：探测到的就是环视这一路，用探测的；环视不在列表里（探测不到它）用存下的
@@ -548,6 +590,8 @@ public class CameraManagerHolder {
         Size cabinFrontUse = shape.cabinFront ? profileSize(app, shape.profile, CameraProfile.ROLE_CABIN_1, null) : null;
         Size cabinRearUse = shape.cabinRear ? profileSize(app, shape.profile, CameraProfile.ROLE_CABIN_2, null) : null;
         Built result = new Built(plan, compositeSize, compositeUse, located.diagnostics, false);
+        for (String role : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES)
+            if (shape.requested.contains(role)) result.extraSizes.put(role, profileSize(app, shape.profile, role, null));
         main.post(() -> finish(manager, shape, result, cabinFrontUse, cabinRearUse));
     }
 
@@ -566,13 +610,21 @@ public class CameraManagerHolder {
                 manager.initCameras(null, null, null, null, null, null, null, null);
             } else {
                 manager.setEnabledLanes(shape.enabled);
-                manager.initCameras(plan.compositeId, null,
-                        shape.cabinFront ? plan.cabin1Id : null, null,
-                        shape.cabinRear ? plan.cabin2Id : null, null,
-                        null, null);
+                manager.setPreviewLanes(shape.preview);
+                manager.setPreviewLanes(shape.preview);
+                java.util.Map<String,String> ids = new java.util.LinkedHashMap<>();
+                ids.put("front", plan.compositeId);
+                if (shape.cabinFront) ids.put("back", plan.cabin1Id);
+                if (shape.cabinRear) ids.put("left", plan.cabin2Id);
+                for (String role : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES) if (shape.requested.contains(role)) {
+                    String explicit = shape.sources.get(role);
+                    ids.put(role, explicit == null || explicit.isEmpty() ? null : explicit);
+                }
+                manager.initCameras(ids, java.util.Collections.emptyMap());
                 pin(manager, CameraSlots.KEY_SURROUND, result.compositeUse);
                 pin(manager, CameraSlots.KEY_CABIN_FRONT, cabinFrontUse);
                 pin(manager, CameraSlots.KEY_CABIN_REAR, cabinRearUse);
+                for (java.util.Map.Entry<String,Size> extra : result.extraSizes.entrySet()) pin(manager, extra.getKey(), extra.getValue());
                 AppLog.i(TAG, "相机管线建好了（" + builtFor + "）: " + plan + "，环视尺寸 " + result.compositeUse
                         + "（合成流 " + result.compositeSize + "），前座舱 " + cabinFrontUse + "，后座舱 " + cabinRearUse);
             }

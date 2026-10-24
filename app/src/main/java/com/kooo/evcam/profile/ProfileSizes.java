@@ -175,52 +175,20 @@ public final class ProfileSizes {
      *
      * <p>接线那一层用的是槽位名，配置里用的是角色。这里是两者之间唯一的换算点。</p>
      */
-    public static String roleForCameraKey(String cameraKey) {
-        if ("front".equals(cameraKey)) {
-            return CameraProfile.ROLE_COMPOSITE;
-        }
-        if ("back".equals(cameraKey)) {
-            return CameraProfile.ROLE_CABIN_1;
-        }
-        if ("left".equals(cameraKey)) {
-            return CameraProfile.ROLE_CABIN_2;
-        }
-        return null;
-    }
+    public static String roleForCameraKey(String key) { return RecordingSources.role(key); }
+    public static String cameraKeyForRole(String role) { return RecordingSources.key(role); }
 
-    /** {@link #roleForCameraKey} 的反向：配置里的角色对应接线用的槽位名。 */
-    public static String cameraKeyForRole(String role) {
-        if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
-            return "front";
-        }
-        if (CameraProfile.ROLE_CABIN_1.equals(role)) {
-            return "back";
-        }
-        if (CameraProfile.ROLE_CABIN_2.equals(role)) {
-            return "left";
-        }
-        return null;
+    public static String cameraIdFor(Context context, String role) {
+        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(context);
+        String choice = config.getSourceCameraId(role);
+        return choice == null ? automaticCameraIdFor(context, role) : choice.isEmpty() ? null : choice;
     }
-
-    private static String cameraIdFor(Context context, String role) {
-        String composite = StreamLayoutTable.compositeCameraId();
-        try {
-            CameraManager manager =
-                    (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-            String[] ids = manager.getCameraIdList();
-            if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
-                return composite != null ? composite : (ids.length > 0 ? ids[0] : null);
-            }
-            java.util.List<String> others = new java.util.ArrayList<>();
-            for (String id : ids) {
-                if (!id.equals(composite)) {
-                    others.add(id);
-                }
-            }
-            int index = CameraProfile.ROLE_CABIN_1.equals(role) ? 0 : 1;
-            return index < others.size() ? others.get(index) : null;
-        } catch (Exception e) {
-            return null;
-        }
+    public static String automaticCameraIdFor(Context context, String role) {
+        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(context);
+        String saved = config.getAutomaticSourceId(role);
+        if (saved != null) return saved;
+        if (CameraProfile.ROLE_COMPOSITE.equals(role)) return StreamLayoutTable.compositeCameraId();
+        // The Camera2 list cannot identify exterior orientation. Never infer a road ID by number.
+        return null;
     }
 }

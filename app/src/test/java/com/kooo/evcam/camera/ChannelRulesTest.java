@@ -2925,4 +2925,15 @@ public class ChannelRulesTest {
         }
         return out;
     }
+    @Test public void previewOnlySourcesDoNotBecomePhotoOrRecordingSources() {
+        w.enabled.clear();w.enabled.add(SUR);
+        w.previewEnabled.clear();w.previewEnabled.add(REAR);
+        w.holders.add(Holder.PREVIEW);w.holders.add(Holder.PHOTO);w.holders.add(Holder.RECORDING);
+        w.recordPlan.add(SUR);rear.declared.add(pvR);surround.declared.add(recS);
+        assertEquals(EnumSet.of(Holder.PREVIEW),ChannelRules.wantedBy(w,rear));
+        assertEquals(EnumSet.of(Holder.PHOTO,Holder.RECORDING),ChannelRules.wantedBy(w,surround));
+        assertEquals(set(pvR),ChannelRules.wantedOutputs(w,rear));
+        w.holders.remove(Holder.PREVIEW);
+        assertFalse(ChannelRules.wanted(w,rear));assertTrue(ChannelRules.wanted(w,surround));
+    }
 }
