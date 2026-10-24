@@ -161,14 +161,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     @Override
     public void onResume() {
         super.onResume();
-        // 停在开发者选项这一页时把它关了（「关于与致谢」里关的）：这一页不能再留着，换回默认分区
+        // 停在开发者选项这一页时把它关了（系统开关关闭）：这一页不能再留着，换回默认分区
         if (!DeveloperMode.isUnlocked() && getArguments() != null
                 && SettingsShellFragment.DEVELOPER_SECTION.equals(getArguments().getString(ARG_SECTION))
                 && getParentFragment() instanceof SettingsShellFragment) {
             ((SettingsShellFragment) getParentFragment()).showSection(SettingsShellFragment.DEFAULT_SECTION);
             return;
         }
-        // 开发者选项在「关于与致谢」（另一个 Activity）里开关：回来时变了就按新的状态整页重绑 ——
+        // 开发者模式在系统中更改：回来时变了就按新的状态整页重绑 ——
         // 中转写入能不能开、内置存储那一项怎么写、开发者分区接不接线都跟着它
         if (appConfig != null && boundUnlocked != DeveloperMode.isUnlocked()) {
             onCreatePreferences(null, null);
@@ -1459,6 +1459,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * 开发者的「熄屏录制（阻止休眠）」不在这里，在开发者选项分区（{@link #bindAdvanced}）。
      */
     private void bindSystem() {
+        bindSwitch("pref_developer_mode", DeveloperMode.isUnlocked(), value -> {
+            DeveloperMode.setEnabled(requireContext(), value);
+            boundUnlocked = value;
+            if (getParentFragment() instanceof SettingsShellFragment) {
+                ((SettingsShellFragment) getParentFragment()).developerModeChanged();
+            }
+        });
         // 诊断信息放在系统里：它是给所有人导出报告用的
         onClick("pref_diagnostics", pref ->
                 startActivity(new Intent(getContext(), DiagnosticsActivity.class)));

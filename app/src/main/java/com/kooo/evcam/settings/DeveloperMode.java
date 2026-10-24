@@ -8,7 +8,7 @@ import android.content.SharedPreferences;
  *
  * <h3>打开之后一直开着（项目拥有者 2026-09-26 定）</h3>
  *
- * <p>重启、更新都不会关。只有三种情况会关：在「关于与致谢」里同一个位置关掉；清除应用数据；
+ * <p>重启、更新都不会关。只有三种情况会关：在「系统」里关闭「启用开发者模式」；清除应用数据；
  * 卸载重装。以前刻意不保存，装一次新版就悄悄关了 —— 开着「息屏录制」的人每次更新都失效一次，
  * 界面上还看不出来。</p>
  *
@@ -29,7 +29,6 @@ import android.content.SharedPreferences;
  */
 public final class DeveloperMode {
 
-    private static final String PASSWORD = "6651";
     private static final String PREFS = "developer_mode";
     private static final String KEY_UNLOCKED = "unlocked";
 
@@ -52,30 +51,9 @@ public final class DeveloperMode {
         return unlocked;
     }
 
-    /**
-     * 尝试解锁；对了就存下来。
-     *
-     * @return 密码对不对
-     */
-    public static boolean unlock(Context context, String password) {
-        if (!isPassword(password)) {
-            return false;
-        }
-        set(context, true);
-        return true;
-    }
-
-    /** 密码对不对。单独拿出来，测试不用碰存储。 */
-    static boolean isPassword(String password) {
-        return PASSWORD.equals(password);
-    }
-
-    /** 关掉，并存下来。 */
-    public static void lock(Context context) {
-        set(context, false);
-    }
-
-    private static void set(Context context, boolean value) {
+    /** System setting: persist the mode without a password, retaining existing state on upgrades. */
+    public static void setEnabled(Context context, boolean value) {
+        java.util.Objects.requireNonNull(context, "context");
         unlocked = value;
         loaded = true;
         prefs(context).edit().putBoolean(KEY_UNLOCKED, value).apply();
