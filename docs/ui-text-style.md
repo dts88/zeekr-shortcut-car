@@ -388,6 +388,9 @@
   「Plays the simulated drive sound in Standard mode too, with calmer shifting than Sport. When off, only Sport mode plays it.」/
   「Turut memainkan bunyi pemanduan simulasi dalam mod Standard, dengan pertukaran gear yang lebih tenang berbanding mod Sukan.
   Apabila dimatikan, hanya mod Sukan memainkannya.」。
+- 2026-10-24（项目所有者：存储位置选的是哪就只写哪，选 U 盘、盘不在时不再落到内置存储）：删掉 msg_sd_fallback
+  「未检测到 U 盘，已改为录制到内置存储」和 dlg_internal_reason_fallback「已选择 U 盘，但当前未检测到，录像会落到内置存储。」
+  （三种语言），这两种情况没有了；没有 U 盘时照旧用 msg_refuse_no_external / dlg_no_external_*。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

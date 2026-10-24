@@ -56,37 +56,39 @@ public final class StorageState {
         public final long freeBytes;
         /** 此刻能不能开录、拍照（和拒录、拒拍用的是同一个判断）。 */
         public final boolean available;
-        /** 选的是 U 盘、此刻没检测到：能录的话（开发者选项放行）落在内置存储上。 */
-        public final boolean sdFellBack;
         /** 此刻挂着的盘，黑匣子那种写法。 */
         public final String mounts;
 
-        static final Snapshot EMPTY = new Snapshot(false, null, null, null, -1L, false, false, "?");
+        static final Snapshot EMPTY = new Snapshot(false, null, null, null, -1L, false, "?");
 
         Snapshot(boolean known, File root, File videoDir, File recordDir, long freeBytes, boolean available,
-                 boolean sdFellBack, String mounts) {
+                 String mounts) {
             this.known = known;
             this.root = root;
             this.videoDir = videoDir;
             this.recordDir = recordDir;
             this.freeBytes = freeBytes;
             this.available = available;
-            this.sdFellBack = sdFellBack;
             this.mounts = mounts;
         }
 
         /** 除了剩余空间，别的都一样。 */
         boolean sameShape(Snapshot other) {
-            return known == other.known && available == other.available && sdFellBack == other.sdFellBack
+            return known == other.known && available == other.available
                     && mounts.equals(other.mounts)
                     && (root == null ? other.root == null
                             : other.root != null && root.getAbsolutePath().equals(other.root.getAbsolutePath()));
         }
 
+        /** 录像目录在内置存储上：存储位置选的就是内置存储（只有开发者选得了；选 U 盘的不会落到这里，2026-10-24）。 */
+        public boolean onInternal() {
+            return videoDir != null && "emulated".equals(StorageHelper.volumeOf(videoDir.getAbsolutePath()));
+        }
+
         /** 给黑匣子看的一行（ASCII）。 */
         public String describe() {
             return "root=" + (root == null ? "none" : root.getName()) + " available=" + (available ? "yes" : "no")
-                    + " internal=" + (sdFellBack ? "yes" : "no")
+                    + " internal=" + (onInternal() ? "yes" : "no")
                     + " free=" + (freeBytes < 0 ? "?" : StorageHelper.formatSize(freeBytes))
                     + " mounts=" + mounts;
         }
@@ -182,8 +184,7 @@ public final class StorageState {
             }
         }
         boolean available = StorageHelper.isRecordingStorageAvailable(context);
-        boolean fellBack = StorageHelper.isSdCardFallback(context);
-        return new Snapshot(true, root, videoDir, recordDir, free, available, fellBack, StorageHelper.describeMounts());
+        return new Snapshot(true, root, videoDir, recordDir, free, available, StorageHelper.describeMounts());
     }
 
     /** 主线程调。第一个监听者到了就开始定时刷新。 */

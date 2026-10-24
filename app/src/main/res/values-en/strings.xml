@@ -456,7 +456,6 @@
     <string name="msg_recording_started_all">Recording started (all cameras)</string>
     <string name="msg_recording_started_n">Recording started (cameras: %1$d)</string>
     <string name="msg_recording_waiting_cameras">Waiting for cameras. Recording resumes automatically when they\'re available.</string>
-    <string name="msg_sd_fallback">No USB drive found. Recording to internal storage.</string>
     <string name="msg_recording_interrupted">Recording interrupted: %1$s</string>
     <string name="msg_recording_interrupted_resuming">Recording interrupted: %1$s. Resuming…</string>
     <string name="rec_reason_unknown">unknown cause</string>
@@ -477,7 +476,6 @@
     <string name="dlg_no_external_msg">Recordings go to a USB drive only, to avoid wearing out the internal storage.\n\nInsert a USB drive and try again. If it isn\'t detected, try another port or select the drive again in Settings → Storage → Storage location.</string>
     <string name="dlg_will_use_internal_title">Recording to internal storage</string>
     <string name="dlg_internal_reason_chosen">Internal storage is the location currently selected.</string>
-    <string name="dlg_internal_reason_fallback">A USB drive is selected but none is detected, so recordings will go to internal storage.</string>
     <string name="dlg_internal_warn">%1$s\n\nContinuous recording wears out internal storage, which usually can\'t be replaced.\n\nInsert a USB drive and select it in Settings → Storage → Storage location.</string>
     <string name="action_record_anyway">Record anyway</string>
     <string name="notif_channel_name">App status</string>

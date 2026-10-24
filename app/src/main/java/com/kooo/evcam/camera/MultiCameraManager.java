@@ -8,7 +8,6 @@ import com.kooo.evcam.profile.StreamSpec;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 import android.content.Context;
-import android.os.Environment;
 import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
@@ -1831,7 +1830,7 @@ public class MultiCameraManager {
     /**
      * 录像盘写不进时还能写到哪，给录制器换盘用。
      *
-     * <p>别的挂着的 U 盘，设定的那个优先、其余按剩余空间；开发者放行时最后是内置存储。
+     * <p>别的挂着的 U 盘，设定的那个优先、其余按剩余空间。不换到内置存储（项目所有者 2026-10-24：存储位置选的是哪就只写哪）。
      * 中转写入时录制器写的是内置缓存，U 盘掉不掉线它感觉不到，不换。</p>
      */
     private List<File> fallbackDirsFor(Set<String> deadVolumes) {
@@ -1841,10 +1840,8 @@ public class MultiCameraManager {
             return dirs;
         }
         StorageHelper.clearCache();
-        File internal = StorageHelper.isInternalStorageAllowed()
-                ? Environment.getExternalStorageDirectory() : null;
         for (File root : FallbackVolumes.rank(StorageHelper.mountedVolumes(), config.getCustomSdCardPath(),
-                deadVolumes, StorageHelper::getAvailableSpace, internal)) {
+                deadVolumes, StorageHelper::getAvailableSpace)) {
             dirs.add(StorageHelper.videoDirOn(root));
         }
         return dirs;
