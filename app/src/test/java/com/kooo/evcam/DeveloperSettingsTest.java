@@ -48,20 +48,8 @@ public class DeveloperSettingsTest {
     static {
         ROWS.put("pref_recording_mode", Arrays.asList("recording_mode"));
         ROWS.put("pref_force_h264", Arrays.asList("force_h264_encoding"));
-        // 熄屏录制和时长上限、录制声音和麦克风来源各合成一行（2026-10-23，开关加下一层）：一行存两个键
+        // 熄屏录制和时长上限合成一行（2026-10-23，开关加下一层）：一行存两个键
         ROWS.put("pref_screen_off_recording", Arrays.asList("screen_off_recording", "screen_off_wake_min"));
-        ROWS.put("pref_footage_audio", Arrays.asList("footage_audio", "footage_audio_source"));
-        ROWS.put("pref_drive_sound", Arrays.asList("drive_sound"));
-        // 模拟声浪的下一层是嵌着的一页（2026-10-23）：那一页本身不存设置，里面两行照旧
-        ROWS.put("screen_drive_sound", NONE);
-        ROWS.put("pref_drive_sound_volume", Arrays.asList("drive_sound_volume"));
-        ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
-        ROWS.put("pref_drive_sound_gearbox", Arrays.asList("drive_sound_gearbox"));
-        ROWS.put("pref_drive_sound_style", Arrays.asList("drive_sound_style"));
-        ROWS.put("pref_drive_sound_view", Arrays.asList("drive_sound_view"));
-        ROWS.put("pref_drive_sound_output", Arrays.asList("drive_sound_output"));
-        ROWS.put("pref_drive_sound_exterior_route", Arrays.asList("drive_sound_exterior_route"));
-        ROWS.put("pref_drive_sound_exterior_volume", Arrays.asList("drive_sound_exterior_volume"));
         // 应用水印固定开着、点不动，不存设置（2026-10-23 从录制页挪来）
         ROWS.put("pref_watermark_brand", NONE);
         // 车辆状态（2026-10-23 从界面页挪来）
@@ -86,9 +74,12 @@ public class DeveloperSettingsTest {
         OUTSIDE.put("pref_photo_via_jpeg", Arrays.asList("photo_via_jpeg"));
     }
 
-    /** 普通设置：关着开发者选项也照常读。 */
+    /** 普通设置：关着开发者选项也照常读。录制声音、模拟声浪 2026-10-24 从开发者选项挪出来（录制页、系统页）。 */
     private static final List<String> ORDINARY = Arrays.asList(
             "screen_off_keep_recording", "auto_start_recording", "footage_lock",
+            "footage_audio", "footage_audio_source", "drive_sound", "drive_sound_volume", "drive_sound_rpm",
+            "drive_sound_gearbox", "drive_sound_style", "drive_sound_view", "drive_sound_output",
+            "drive_sound_exterior_route", "drive_sound_exterior_volume",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
             "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed");
 

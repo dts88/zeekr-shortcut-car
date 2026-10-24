@@ -67,6 +67,8 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_PERMISSIONS = 100;
+    /** 「录制声音」的录音权限：可选，单独问（{@link #requestMicrophoneIfWanted}）。 */
+    private static final int REQUEST_MICROPHONE = 101;
     
     // 静态实例引用（用于悬浮窗等外部组件访问）
     private static MainActivity instance;
@@ -317,6 +319,8 @@ public class MainActivity extends AppCompatActivity {
         // 等待TextureView准备好后再初始化
         if (!checkPermissions()) {
             requestPermissions();
+        } else {
+            requestMicrophoneIfWanted();
         }
 
 
@@ -1468,6 +1472,35 @@ public class MainActivity extends AppCompatActivity {
         ActivityCompat.requestPermissions(this, getRequiredPermissions(), REQUEST_PERMISSIONS);
     }
 
+    /**
+     * 「录制声音」（设置 → 录制，2026-10-24 起正式功能、默认开）开着、还没有录音权限：问一次。录音权限是可选的 ——
+     * 不给就把录制声音关掉（开关照实显示，ui-spec §三），之后不再问；想要时在设置里打开，那里会再问。
+     * 相机（和存储）权限问完才问它，两个系统弹窗不叠在一起。安卓 11 以下不录声音（{@code FootageAudio.sourceFor}），不问。
+     */
+    private void requestMicrophoneIfWanted() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !appConfig.isFootageAudioEnabled()
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_MICROPHONE);
+    }
+
+    /** 录音权限问完了：给了，前台服务在跑的话重起一次前台、带上麦克风类型；没给就关掉录制声音、说一句。 */
+    private void onMicrophoneResult() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("录制声音：录音权限已给");
+            if (CameraForegroundService.isRunning()) {
+                CameraForegroundService.start(getApplicationContext());
+            }
+            return;
+        }
+        appConfig.setFootageAudioEnabled(false);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("录制声音：没给录音权限，关掉（开关变更: pref_footage_audio → 关）");
+        Toast.makeText(this, R.string.msg_footage_audio_no_permission, Toast.LENGTH_SHORT).show();
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -1478,10 +1511,13 @@ public class MainActivity extends AppCompatActivity {
                 if (PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
                     initCamera();
                 }
+                requestMicrophoneIfWanted();
             } else {
                 Toast.makeText(this, R.string.msg_need_camera_storage, Toast.LENGTH_SHORT).show();
                 finish();
             }
+        } else if (requestCode == REQUEST_MICROPHONE) {
+            onMicrophoneResult();
         }
     }
 
