@@ -1465,8 +1465,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindEnum("pref_drive_sound_output", SettingsRegistry.DRIVE_SOUND_OUTPUT, appConfig.getDriveSoundOutput(),
                 value -> {
                     appConfig.setDriveSoundOutput(value);
+                    showExteriorRows(value);
                     refreshDriveSound();
                 });
+        bindEnum("pref_drive_sound_exterior_route", SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE,
+                appConfig.getDriveSoundExteriorRoute(), value -> {
+                    appConfig.setDriveSoundExteriorRoute(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_exterior_volume", SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME,
+                appConfig.getDriveSoundExteriorVolume(), value -> {
+                    appConfig.setDriveSoundExteriorVolume(value);
+                    refreshDriveSound();
+                });
+        showExteriorRows(appConfig.getDriveSoundOutput());
         bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
                 value -> {
                     appConfig.setDriveSoundVolume(value);
@@ -1497,6 +1509,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         Preference gearbox = findPreference("pref_drive_sound_gearbox");
         if (gearbox != null) {
             gearbox.setVisible(com.kooo.evcam.sound.DriveSound.styleChoosesGearbox(style));
+        }
+    }
+
+    /** 「车外线路」「车外音量」只在「播放喇叭」用到车外时显示（设置值不动，换回去时还在）。 */
+    private void showExteriorRows(String output) {
+        boolean exterior = !AppConfig.DRIVE_SOUND_OUTPUT_CABIN.equals(output);
+        for (String key : new String[] {"pref_drive_sound_exterior_route", "pref_drive_sound_exterior_volume"}) {
+            Preference row = findPreference(key);
+            if (row != null) {
+                row.setVisible(exterior);
+            }
         }
     }
 

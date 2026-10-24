@@ -932,6 +932,10 @@
     <string name="dev_drive_sound_output_cabin">车内喇叭</string>
     <string name="dev_drive_sound_output_outside">车外喇叭</string>
     <string name="dev_drive_sound_output_both">车内和车外</string>
+    <string name="dev_drive_sound_route_title">车外线路</string>
+    <string name="dev_drive_sound_route_notify">BUS12（外部通知）</string>
+    <string name="dev_drive_sound_route_playback">BUS11（外部播放）</string>
+    <string name="dev_drive_sound_exterior_volume_title">车外音量</string>
     <string name="msg_drive_sound_on">已开启模拟声浪</string>
     <string name="msg_drive_sound_off">已关闭模拟声浪</string>
     <string name="dev_perm_all_files">所有文件访问</string>

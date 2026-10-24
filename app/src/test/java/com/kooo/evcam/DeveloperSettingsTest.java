@@ -59,6 +59,8 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_drive_sound_style", Arrays.asList("drive_sound_style"));
         ROWS.put("pref_drive_sound_view", Arrays.asList("drive_sound_view"));
         ROWS.put("pref_drive_sound_output", Arrays.asList("drive_sound_output"));
+        ROWS.put("pref_drive_sound_exterior_route", Arrays.asList("drive_sound_exterior_route"));
+        ROWS.put("pref_drive_sound_exterior_volume", Arrays.asList("drive_sound_exterior_volume"));
         // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）
         ROWS.put("pref_image_adjust", Arrays.asList("image_adjust_enabled"));
         ROWS.put("pref_image_adjust_reset", NONE);

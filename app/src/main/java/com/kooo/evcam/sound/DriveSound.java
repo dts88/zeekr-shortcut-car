@@ -93,6 +93,9 @@ public final class DriveSound {
      * 换了就换一台（像声音风格、听感）。
      */
     private volatile String outputMode = AppConfig.DRIVE_SOUND_OUTPUT_CABIN;
+    /** 车外线路（开发者选项「车外线路」：bus12 / bus11），换了就换一台；车外音量（dB，「车外音量」），随时生效。 */
+    private volatile String exteriorRoute = AppConfig.DRIVE_SOUND_ROUTE_NOTIFY;
+    private volatile float exteriorDb = 12f;
     /** 最近一个声音线程（诊断报告用）。 */
     private volatile Run latest;
 
@@ -152,8 +155,9 @@ public final class DriveSound {
                 telemetry.releaseFast(USER);
             }
         }
-        if (run != null && (run.style != style || run.cabin != cabinView || !run.outputMode.equals(outputMode))) {
-            // 换了声音风格、听感或播放喇叭：这一台淡出，下面按新的重新开始
+        if (run != null && (run.style != style || run.cabin != cabinView || !run.outputMode.equals(outputMode)
+                || (!run.exteriorRoute.equals(exteriorRoute) && !AppConfig.DRIVE_SOUND_OUTPUT_CABIN.equals(outputMode)))) {
+            // 换了声音风格、听感、播放喇叭或者（用着车外时）车外线路：这一台淡出，下面按新的重新开始
             run.stop();
             run = null;
         }
@@ -206,6 +210,9 @@ public final class DriveSound {
         String output = c.getDriveSoundOutput();
         outputMode = AppConfig.DRIVE_SOUND_OUTPUT_OUTSIDE.equals(output) || AppConfig.DRIVE_SOUND_OUTPUT_BOTH.equals(output)
                 ? output : AppConfig.DRIVE_SOUND_OUTPUT_CABIN;
+        exteriorRoute = AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK.equals(c.getDriveSoundExteriorRoute())
+                ? AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK : AppConfig.DRIVE_SOUND_ROUTE_NOTIFY;
+        exteriorDb = DriveSoundRules.exteriorDb(c.getDriveSoundExteriorVolume());
     }
 
     private static float num(Float value) {
@@ -225,9 +232,10 @@ public final class DriveSound {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
         sb.append(String.format(Locale.US,
-                "  enabled=%s style=%s view=%s speakers=%s volume=%.0f dB rpm=%s gearbox=%s armed=%s fastUsers=%s%n",
-                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.userDb, s.rpmMode, s.gearbox, s.armed,
-                Telemetry.get().fastUsers()));
+                "  enabled=%s style=%s view=%s speakers=%s exterior=%s %+.0f dB volume=%.0f dB rpm=%s gearbox=%s armed=%s "
+                        + "fastUsers=%s%n",
+                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.exteriorRoute, s.exteriorDb, s.userDb,
+                s.rpmMode, s.gearbox, s.armed, Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
         sb.append(String.format(Locale.US, "  fast: age=%d ms speed=%s throttle=%s brake=%s%n", fast.ageMs(now),
@@ -265,6 +273,14 @@ public final class DriveSound {
         final SoundStyle style = DriveSound.this.style;
         final boolean cabin = DriveSound.this.cabinView;
         final String outputMode = DriveSound.this.outputMode;
+        final String exteriorRoute = DriveSound.this.exteriorRoute;
+        // ---- 系统报给应用的媒体音量（音量键调的是它那一组；车外不在那一组）：第一次读到的、此刻的、最多几档、是不是写死的；
+        //      跟着变过一次（看得出它真跟着音量键走）以后，车外按它缩放（DriveSoundRules.mediaFollowDb）
+        private volatile int mediaFirst = Integer.MIN_VALUE;
+        private volatile int mediaIndex = -1;
+        private volatile int mediaMax = -1;
+        private volatile boolean mediaFixed;
+        private volatile boolean mediaTracked;
         private volatile boolean stopping;
         /** 熄火不放完了，很快淡掉（新的一台要起）。 */
         private volatile boolean hurry;
@@ -354,12 +370,9 @@ public final class DriveSound {
                 }
             }
             if (toOutside) {
-                // 车外只有一个喇叭，车机给了两路：先用 BUS12，找不到再用 BUS11（CarSpeakers）
-                String address = CarSpeakers.outsideAddress(app);
+                // 车外只有一个喇叭，车机给了两路：用开发者选项「车外线路」选的那一路，开不了就不放车外（不换另一路）
+                String address = CarSpeakers.exteriorAddress(exteriorRoute);
                 try {
-                    if (address == null) {
-                        throw new IllegalStateException("no exterior output");
-                    }
                     outside = SoundOutput.open(app, address);
                 } catch (RuntimeException e) {
                     trouble = (trouble.isEmpty() ? "" : trouble + "; ") + "exterior: " + e.getMessage();
@@ -397,6 +410,28 @@ public final class DriveSound {
                 output = describeOutputs(inside, outside);
                 BlackBox.note("模拟声浪：停止（" + (failed ? "出错 " + trouble + "；" : "") + output + "）");
                 ended(this, failed);
+            }
+        }
+
+        /** 系统报给应用的媒体音量：读一次；跟第一次读到的不一样了，就算它跟着音量键走（记一行黑匣子），车外从此跟着它。 */
+        private void readMedia(AudioManager audio) {
+            if (audio == null) {
+                return;
+            }
+            try {
+                int index = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+                int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                mediaFixed = audio.isVolumeFixed();
+                mediaMax = max;
+                mediaIndex = index;
+                if (mediaFirst == Integer.MIN_VALUE) {
+                    mediaFirst = index;
+                } else if (!mediaTracked && index != mediaFirst) {
+                    mediaTracked = true;
+                    BlackBox.note("模拟声浪：系统报的媒体音量变了（" + mediaFirst + " → " + index + " / " + max + "），车外跟着它");
+                }
+            } catch (RuntimeException e) {
+                // 读不到就不跟
             }
         }
 
@@ -479,6 +514,7 @@ public final class DriveSound {
                     readSettings();
                     inCall = inCall(audio);
                     link = telemetry.carLinkConnected();
+                    readMedia(audio);
                 }
                 FastReadings fast = telemetry.fast();
                 PushedValue push = telemetry.pushed(Signal.THROTTLE_DEPTH);
@@ -651,7 +687,9 @@ public final class DriveSound {
                     voiceOut.renderStereo(outsideBuffer, BLOCK, params);
                 }
                 if (exterior != null) {
-                    exterior.process(voiceOut == voice ? buffer : outsideBuffer, exteriorBuffer, BLOCK);
+                    float follow = mediaTracked ? DriveSoundRules.mediaFollowDb(mediaIndex, mediaMax) : 0f;
+                    float exteriorGain = follow == Float.NEGATIVE_INFINITY ? 0f : EngineVoice.dbToLin(exteriorDb + follow);
+                    exterior.process(voiceOut == voice ? buffer : outsideBuffer, exteriorBuffer, BLOCK, exteriorGain);
                 }
                 renderMs += ((System.nanoTime() - t0) / 1_000_000f - renderMs) * 0.01f;
                 long w0 = System.nanoTime();
@@ -694,6 +732,7 @@ public final class DriveSound {
             return String.format(Locale.US,
                     "run: %s style=%s view=%s speakers=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
+                            + "  exterior: route %s, volume %+.0f dB, media volume %s%n"
                             + "  mixer: takes a period every %s (%s blocks each)%n"
                             + "  start: drive mode changed %s before the run was asked for, output opened in %s, "
                             + "first sound %s after the ask (%s after the mode change)%n"
@@ -709,12 +748,24 @@ public final class DriveSound {
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
+                    exteriorRoute, DriveSound.this.exteriorDb, mediaText(),
                     ms(mixerEveryMs), burstBlocks < 0f ? "?" : String.format(Locale.US, "%.1f", burstBlocks),
                     ms(modeAgeWhenAsked), ms(openMs), ms(askedToSoundMs), ms(modeToSoundMs),
                     ms(fastEveryMs), ms(fastGapMaxMs), ms(throttleEveryMs), throttleSteps, ms(speedEveryMs),
                     ms(pushEveryMs), pushes, pushFirst, ms(pushLeadMs), pollFirst, ms(pollLeadMs),
                     ms(mainEveryMs), mainPushes, ms(drEveryMs), drPushes,
                     ms(inputAgeMs), ms(outputLatencyMs));
+        }
+
+        /** 系统报的媒体音量（诊断）：此刻 / 最多，第一次读到的，写死没有，跟着变过没有、车外跟着缩放多少。 */
+        private String mediaText() {
+            if (mediaMax < 0) {
+                return "not read";
+            }
+            float follow = DriveSoundRules.mediaFollowDb(mediaIndex, mediaMax);
+            return String.format(Locale.US, "%d / %d (first %d, fixed=%s, %s)", mediaIndex, mediaMax, mediaFirst, mediaFixed,
+                    mediaTracked ? (follow == Float.NEGATIVE_INFINITY ? "followed: muted"
+                            : String.format(Locale.US, "followed: %.0f dB", follow)) : "never changed, not followed");
         }
 
         private String ms(float value) {

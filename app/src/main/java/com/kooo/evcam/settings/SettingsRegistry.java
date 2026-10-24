@@ -164,6 +164,27 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_OUTSIDE, "车外喇叭", R.string.dev_drive_sound_output_outside),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_BOTH, "车内和车外", R.string.dev_drive_sound_output_both));
 
+    /**
+     * 车外喇叭用哪一路（开发者选项，试验）：车外只有一个喇叭，车机给了两路（{@code sound.CarSpeakers}）。项目所有者 2026-10-24：
+     * 两个逻辑喇叭都给选项，自己选。选的那一路开不了就不放（记进黑匣子），不换另一路。
+     */
+    public static final SettingSpec DRIVE_SOUND_EXTERIOR_ROUTE = SettingSpec.of(
+            "drive_sound_exterior_route", "车外线路", com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_NOTIFY,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_NOTIFY, "BUS12（外部通知）", R.string.dev_drive_sound_route_notify),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK, "BUS11（外部播放）", R.string.dev_drive_sound_route_playback));
+
+    /**
+     * 车外那一路的音量（开发者选项，试验；{@code sound.ExteriorMix}）：在声浪之上再加这么多 dB，后面有限幅（峰值不过 −1 dBFS）。
+     * 项目所有者 2026-10-24：车外音量过低，音量键也调不到车外 —— 车外喇叭在车机里是另一个音量组，音量键只管媒体那一组，
+     * 只能在软件里加。存的就是 dB 数，界面上显示的也是它。
+     */
+    public static final SettingSpec DRIVE_SOUND_EXTERIOR_VOLUME = SettingSpec.of(
+            "drive_sound_exterior_volume", "车外音量", "12",
+            entry("0", "0 dB"),
+            entry("6", "+6 dB"),
+            entry("12", "+12 dB"),
+            entry("18", "+18 dB"));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
@@ -178,5 +199,7 @@ public final class SettingsRegistry {
             DRIVE_SOUND_GEARBOX,
             DRIVE_SOUND_STYLE,
             DRIVE_SOUND_VIEW,
-            DRIVE_SOUND_OUTPUT));
+            DRIVE_SOUND_OUTPUT,
+            DRIVE_SOUND_EXTERIOR_ROUTE,
+            DRIVE_SOUND_EXTERIOR_VOLUME));
 }

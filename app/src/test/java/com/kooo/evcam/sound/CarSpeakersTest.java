@@ -32,15 +32,12 @@ public class CarSpeakersTest {
     }
 
     @Test
-    public void theExteriorSpeakerPrefersItsNotifyRoute() {
-        // 车外只有一个喇叭，车机给了两路（Lab §2.43）：先用 BUS12（CarPiano 按媒体用途放有声的那一路），没有再用 BUS11
-        int[] types = {BUS, BUS, BUS};
-        assertEquals(CarSpeakers.OUTSIDE_NOTIFY, CarSpeakers.outsideAddress(types,
-                new String[] {"BUS11_OUTER_SPEAKER_PLAYBACK", "BUS00_MEDIA", "BUS12_OUTER_NOTIFY"}));
-        assertEquals(CarSpeakers.OUTSIDE_PLAYBACK, CarSpeakers.outsideAddress(types,
-                new String[] {"BUS11_OUTER_SPEAKER_PLAYBACK", "BUS00_MEDIA", "BUS01_SYS_NOTIFICATION"}));
-        assertEquals("没有车外喇叭（不是这台车）", null, CarSpeakers.outsideAddress(types,
-                new String[] {"BUS00_MEDIA", "BUS01_SYS_NOTIFICATION", "BUS17_FDHU_REAR_NOTIFICATION"}));
+    public void theExteriorRouteIsTheOwnersChoice() {
+        // 车外只有一个喇叭，车机给了两路（Lab §2.43）：开发者选项「车外线路」选哪一路就开哪一路（项目所有者 2026-10-24）
+        assertEquals("BUS12_OUTER_NOTIFY", CarSpeakers.exteriorAddress(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_NOTIFY));
+        assertEquals("BUS11_OUTER_SPEAKER_PLAYBACK",
+                CarSpeakers.exteriorAddress(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK));
+        assertEquals("读不到、旧的值按 BUS12", "BUS12_OUTER_NOTIFY", CarSpeakers.exteriorAddress(null));
     }
 
     @Test

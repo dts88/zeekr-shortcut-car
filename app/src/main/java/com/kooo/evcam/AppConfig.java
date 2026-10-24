@@ -638,6 +638,8 @@ public class AppConfig {
                 SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_VIEW.key,      // 听感 → 车外（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_OUTPUT.key,    // 播放喇叭 → 车内（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE.key,   // 车外线路 → BUS12（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME.key,  // 车外音量 → 默认（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -993,6 +995,10 @@ public class AppConfig {
     public static final String DRIVE_SOUND_OUTPUT_OUTSIDE = "outside";
     /** 播放喇叭：车内和车外一起。 */
     public static final String DRIVE_SOUND_OUTPUT_BOTH = "both";
+    /** 车外线路（{@link SettingsRegistry#DRIVE_SOUND_EXTERIOR_ROUTE}）：BUS12_OUTER_NOTIFY（默认）。 */
+    public static final String DRIVE_SOUND_ROUTE_NOTIFY = "bus12";
+    /** 车外线路：BUS11_OUTER_SPEAKER_PLAYBACK。 */
+    public static final String DRIVE_SOUND_ROUTE_PLAYBACK = "bus11";
 
     /**
      * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
@@ -1061,6 +1067,24 @@ public class AppConfig {
 
     public void setDriveSoundOutput(String output) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_OUTPUT, output);
+    }
+
+    /** 车外线路：{@link #DRIVE_SOUND_ROUTE_NOTIFY} / {@link #DRIVE_SOUND_ROUTE_PLAYBACK}。 */
+    public String getDriveSoundExteriorRoute() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE);
+    }
+
+    public void setDriveSoundExteriorRoute(String route) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE, route);
+    }
+
+    /** 车外音量（dB 数的字符串，{@link SettingsRegistry#DRIVE_SOUND_EXTERIOR_VOLUME}）：车外那一路在声浪之上再加这么多。 */
+    public String getDriveSoundExteriorVolume() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME);
+    }
+
+    public void setDriveSoundExteriorVolume(String db) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME, db);
     }
 
     /**

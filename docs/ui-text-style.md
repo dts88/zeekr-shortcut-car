@@ -252,6 +252,11 @@
   Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、
   dev_drive_sound_output_outside「车外喇叭」/ Exterior speaker / Pembesar suara luar、dev_drive_sound_output_both「车内和车外」/
   Cabin and exterior / Kabin dan luar。
+  车外线路、车外音量（2026-10-24 加，车主：两个逻辑喇叭自己选；车外音量过低、音量键调不到车外；「播放喇叭」用到车外时才显示）：
+  dev_drive_sound_route_title「车外线路」/ Exterior route / Laluan luar，两档 dev_drive_sound_route_notify「BUS12（外部通知）」/
+  BUS12 (outer notify) / BUS12 (pemberitahuan luar)（默认）、dev_drive_sound_route_playback「BUS11（外部播放）」/
+  BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
+  Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
 - 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
   四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
   vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。

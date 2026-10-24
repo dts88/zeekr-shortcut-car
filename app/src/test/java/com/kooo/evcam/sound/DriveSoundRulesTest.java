@@ -132,4 +132,25 @@ public class DriveSoundRulesTest {
         assertEquals("认不出的按默认 0 dB", 0f, DriveSoundRules.volumeDb("loud"), 0f);
         assertEquals(0f, DriveSoundRules.volumeDb(null), 0f);
     }
+
+    @Test
+    public void theExteriorVolumeIsReadAsDecibelsUpTo18() {
+        // 车外音量（项目所有者 2026-10-24：车外音量过低）：在声浪之上再加 0–18 dB，读不出按 12 dB
+        assertEquals(0f, DriveSoundRules.exteriorDb("0"), 0f);
+        assertEquals(12f, DriveSoundRules.exteriorDb("12"), 0f);
+        assertEquals(18f, DriveSoundRules.exteriorDb("18"), 0f);
+        assertEquals("不超过 18 dB", 18f, DriveSoundRules.exteriorDb("30"), 0f);
+        assertEquals("不往下压", 0f, DriveSoundRules.exteriorDb("-6"), 0f);
+        assertEquals(12f, DriveSoundRules.exteriorDb(null), 0f);
+    }
+
+    @Test
+    public void theExteriorFollowsTheMediaVolumeWhenItCanBeRead() {
+        // 系统报给应用的媒体音量：最大一档 0 dB，往下按比例到 −30 dB，0 档静音；读不到不缩放
+        assertEquals(0f, DriveSoundRules.mediaFollowDb(30, 30), 0f);
+        assertEquals(-15f, DriveSoundRules.mediaFollowDb(15, 30), 1e-4f);
+        assertEquals(Float.NEGATIVE_INFINITY, DriveSoundRules.mediaFollowDb(0, 30), 0f);
+        assertEquals("读不到最多几档", 0f, DriveSoundRules.mediaFollowDb(5, 0), 0f);
+        assertEquals("比最多还大按最大", 0f, DriveSoundRules.mediaFollowDb(40, 30), 0f);
+    }
 }

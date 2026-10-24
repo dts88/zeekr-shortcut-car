@@ -526,6 +526,18 @@
                 android:summary="%s" />
 
             <ListPreference
+                android:key="pref_drive_sound_exterior_route"
+                android:dependency="pref_drive_sound"
+                android:title="@string/dev_drive_sound_route_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_exterior_volume"
+                android:dependency="pref_drive_sound"
+                android:title="@string/dev_drive_sound_exterior_volume_title"
+                android:summary="%s" />
+
+            <ListPreference
                 android:key="pref_drive_sound_volume"
                 android:dependency="pref_drive_sound"
                 android:title="@string/dev_drive_sound_volume_title"

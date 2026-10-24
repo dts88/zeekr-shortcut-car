@@ -136,6 +136,31 @@ final class DriveSoundRules {
         }
     }
 
+    /** 车外音量（开发者选项「车外音量」存的 dB 数）：0–18 dB，读不出按 12 dB。 */
+    static float exteriorDb(String stored) {
+        try {
+            float db = Float.parseFloat(stored);
+            return Math.max(0f, Math.min(18f, db));
+        } catch (RuntimeException e) {
+            return 12f;
+        }
+    }
+
+    /**
+     * 车外跟着车机媒体音量缩放多少 dB（系统报给应用的那一档 {@code index}，共 {@code max} 档）：最大一档 0 dB，往下按比例到
+     * −30 dB，0 档是负无穷（静音）；读不到（max ≤ 0）不缩放。车外喇叭在车机里是另一个音量组，音量键调不到它（项目所有者
+     * 2026-10-24）；系统报的媒体音量跟不跟着音量键变还不知道，声音线程看到它变过才用（{@code DriveSound}）。
+     */
+    static float mediaFollowDb(int index, int max) {
+        if (max <= 0) {
+            return 0f;
+        }
+        if (index <= 0) {
+            return Float.NEGATIVE_INFINITY;
+        }
+        return -30f * (1f - Math.min(index, max) / (float) max);
+    }
+
     /** 上电了：点火在 ON / DRIVING；点火读不到时挂着 R / N / D 也算。 */
     static boolean poweredOn(Integer ignition, String gear) {
         if (ignition != null) {

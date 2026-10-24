@@ -939,6 +939,10 @@
     <string name="dev_drive_sound_output_cabin">Cabin speakers</string>
     <string name="dev_drive_sound_output_outside">Exterior speaker</string>
     <string name="dev_drive_sound_output_both">Cabin and exterior</string>
+    <string name="dev_drive_sound_route_title">Exterior route</string>
+    <string name="dev_drive_sound_route_notify">BUS12 (outer notify)</string>
+    <string name="dev_drive_sound_route_playback">BUS11 (outer playback)</string>
+    <string name="dev_drive_sound_exterior_volume_title">Exterior volume</string>
     <string name="msg_drive_sound_on">Simulated drive sound on</string>
     <string name="msg_drive_sound_off">Simulated drive sound off</string>
     <string name="dev_perm_all_files">All files access</string>

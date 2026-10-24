@@ -920,6 +920,10 @@
     <string name="dev_drive_sound_output_cabin">Pembesar suara kabin</string>
     <string name="dev_drive_sound_output_outside">Pembesar suara luar</string>
     <string name="dev_drive_sound_output_both">Kabin dan luar</string>
+    <string name="dev_drive_sound_route_title">Laluan luar</string>
+    <string name="dev_drive_sound_route_notify">BUS12 (pemberitahuan luar)</string>
+    <string name="dev_drive_sound_route_playback">BUS11 (main balik luar)</string>
+    <string name="dev_drive_sound_exterior_volume_title">Kelantangan luar</string>
     <string name="msg_drive_sound_on">Bunyi pemanduan simulasi dihidupkan</string>
     <string name="msg_drive_sound_off">Bunyi pemanduan simulasi dimatikan</string>
     <string name="dev_perm_all_files">Akses semua fail</string>
