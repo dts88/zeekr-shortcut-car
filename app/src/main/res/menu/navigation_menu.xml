@@ -50,9 +50,10 @@
                 android:checkable="true"
                 android:icon="@drawable/ic_settings"
                 android:title="@string/nav_settings" />
+            <!-- 另开的一页：不亮（亮着的是当前这个界面，NavDrawer.select） -->
             <item
                 android:id="@+id/nav_about"
-                android:checkable="true"
+                android:checkable="false"
                 android:icon="@drawable/ic_info"
                 android:title="@string/about_title" />
             <!-- 最底下：和主界面那个「隐藏到后台」分开，真要退出往下找得到 -->

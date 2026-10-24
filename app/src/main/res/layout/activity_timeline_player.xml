@@ -4,415 +4,425 @@
 
   左上角是菜单键，和主界面同一个位置、同一个图标；右边是刷新、多选、主页，
   和图片回看那一排对齐 —— 两个回看界面从此是一套操作。
+  外面一层是抽屉：点菜单键在这个界面上滑出，和主界面同一份（layout_nav_drawer，行为在 NavDrawer）。
 
   画面区和图片回看逐项对齐（图片回看又是照着主界面预览排的）：环视在左（权重 22），
   座舱竖排在右（权重 14），间距 @dimen/gutter，框是 bg_preview_frame 那张圆角底。
   这一条录制里没有文件的那一路整格收起来；座舱都没有时整列让开，环视独占整块。
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/bg"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/title_bar_height"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="10dp"
-        android:paddingEnd="16dp">
+        android:layout_height="match_parent"
+        android:background="@color/bg"
+        android:orientation="vertical">
 
-        <!-- 菜单键和主界面同一个位置、同一个图标：点开抽屉，不是「返回上一层」 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/timeline_menu"
-            style="@style/Widget.Cam.IconButton"
-            android:layout_width="@dimen/icon_button_size"
-            android:layout_height="@dimen/icon_button_size"
-            android:contentDescription="@string/cd_menu"
-            app:icon="@drawable/ic_menu" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
-            android:text="@string/player_title"
-            android:textColor="@color/text_primary"
-            android:textAppearance="@style/TextAppearance.Cam.Title"
-            android:textStyle="bold" />
-
-        <!--
-          这一条录制的说明（第几条、几点开始、几段、多长）。和图片回看标题区里
-          那行拍摄时间同一个位置 —— 以前它压在画面左上角，和环视那一格的角标抢地方。
-        -->
-        <TextView
-            android:id="@+id/timeline_info"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:gravity="start|center_vertical"
-            android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-        <include
-            layout="@layout/layout_playback_actions"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/line" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
-
-        <!-- 左：连续录制列表 -->
         <LinearLayout
-            android:layout_width="@dimen/list_width"
-            android:layout_height="match_parent"
-            android:background="@color/bg"
-            android:orientation="vertical">
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/title_bar_height"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="16dp">
+
+            <!-- 菜单键和主界面同一个位置、同一个图标：点开抽屉，不是「返回上一层」 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/timeline_menu"
+                style="@style/Widget.Cam.IconButton"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
+                android:contentDescription="@string/cd_menu"
+                app:icon="@drawable/ic_menu" />
 
             <TextView
-                android:id="@+id/timeline_list_summary"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:paddingStart="16dp"
-                android:paddingTop="12dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="8dp"
-                android:text="@string/msg_scanning_short"
-                android:textColor="@color/text_secondary"
-                android:textAppearance="@style/TextAppearance.Cam.Caption" />
+                android:layout_marginStart="14dp"
+                android:text="@string/player_title"
+                android:textColor="@color/text_primary"
+                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textStyle="bold" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/timeline_session_list"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
+            <!--
+              这一条录制的说明（第几条、几点开始、几段、多长）。和图片回看标题区里
+              那行拍摄时间同一个位置 —— 以前它压在画面左上角，和环视那一格的角标抢地方。
+            -->
+            <TextView
+                android:id="@+id/timeline_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
                 android:layout_weight="1"
-                android:clipToPadding="false"
-                android:paddingBottom="8dp" />
+                android:ellipsize="end"
+                android:gravity="start|center_vertical"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+            <include
+                layout="@layout/layout_playback_actions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <!-- 右：播放器 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/line" />
+
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:background="@color/preview_background"
-            android:orientation="vertical">
+            android:orientation="horizontal">
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="horizontal"
-                    android:padding="@dimen/gutter">
-
-                    <!--
-                      每一格：画面 + 遮罩 + 角标。
-
-                      画面用 TextureView 而不是 VideoView：VideoView 内部是 SurfaceView，
-                      会在窗口上挖一个洞，画面在洞后面合成 —— 小窗发虚/透明就是这么来的。
-
-                      遮罩是一个不透明的普通 View，盖在画面上方：换分段时盖住上一段的
-                      最后一帧，这一刻这一路没有录像时写一句话。不动 surface。
-                    -->
-                    <FrameLayout
-                        android:id="@+id/frame_surround"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="22"
-                        android:background="@drawable/bg_preview_frame">
-
-                        <!-- 取景和鱼眼校正由外框画：校正是非线性的，TextureView 自己的矩阵做不到 -->
-                        <com.kooo.evcam.playback.FisheyeVideoFrame
-                            android:id="@+id/video_surround_frame"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent">
-
-                            <TextureView
-                                android:id="@+id/video_surround"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent" />
-                        </com.kooo.evcam.playback.FisheyeVideoFrame>
-
-                        <TextView
-                            android:id="@+id/cover_surround"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="@drawable/bg_preview_frame"
-                            android:gravity="center"
-                            android:textColor="@color/preview_placeholder_text"
-                            android:textAppearance="@style/TextAppearance.Cam.Caption"
-                            android:visibility="gone" />
-
-                        <TextView
-                            android:id="@+id/label_surround"
-                            android:layout_width="wrap_content"
-                            android:layout_height="34dp"
-                            android:layout_gravity="top|start"
-                            android:layout_marginStart="10dp"
-                            android:layout_marginTop="6dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="10dp"
-                            android:paddingEnd="10dp"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:id="@+id/cabin_column"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="@dimen/gutter"
-                        android:layout_weight="14"
-                        android:orientation="vertical">
-
-                        <FrameLayout
-                            android:id="@+id/frame_cabin_front"
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame">
-
-                            <TextureView
-                                android:id="@+id/video_cabin_front"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent" />
-
-                            <TextView
-                                android:id="@+id/cover_cabin_front"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/bg_preview_frame"
-                                android:gravity="center"
-                                android:textColor="@color/preview_placeholder_text"
-                                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                                android:visibility="gone" />
-
-                            <TextView
-                                android:id="@+id/label_cabin_front"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-                        </FrameLayout>
-
-                        <FrameLayout
-                            android:id="@+id/frame_cabin_rear"
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_marginTop="@dimen/gutter"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame">
-
-                            <TextureView
-                                android:id="@+id/video_cabin_rear"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent" />
-
-                            <TextView
-                                android:id="@+id/cover_cabin_rear"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/bg_preview_frame"
-                                android:gravity="center"
-                                android:textColor="@color/preview_placeholder_text"
-                                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                                android:visibility="gone" />
-
-                            <TextView
-                                android:id="@+id/label_cabin_rear"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-                        </FrameLayout>
-
-                        <!--
-                          第四路在极氪 7X 上不存在，永远没有文件，于是永远不显示；
-                          留着它是为自定义车型那种四面各一个相机的接法（图片回看也留着）。
-                        -->
-                        <FrameLayout
-                            android:id="@+id/frame_fourth"
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_marginTop="@dimen/gutter"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame"
-                            android:visibility="gone">
-
-                            <TextureView
-                                android:id="@+id/video_fourth"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent" />
-
-                            <TextView
-                                android:id="@+id/cover_fourth"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/bg_preview_frame"
-                                android:gravity="center"
-                                android:textColor="@color/preview_placeholder_text"
-                                android:textAppearance="@style/TextAppearance.Cam.Caption"
-                                android:visibility="gone" />
-
-                            <TextView
-                                android:id="@+id/label_fourth"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-                        </FrameLayout>
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!--
-                  这里不放 ⑤ 状态条：它写的是现在的设置和 U 盘余量，不是这段录像的，
-                  压在录像上会被当成这段录像的参数（项目拥有者 2026-10-01 定）。
-                -->
-            </FrameLayout>
-
-            <!-- 进度条与控制 -->
+            <!-- 左：连续录制列表 -->
             <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_width="@dimen/list_width"
+                android:layout_height="match_parent"
                 android:background="@color/bg"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <SeekBar
-                    android:id="@+id/timeline_seek"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <!-- 锁定的那几段：进度条正下方一条细条，只画不接触摸（锁定影像关着时收起） -->
-                <com.kooo.evcam.ui.LockedRangeStrip
-                    android:id="@+id/timeline_locked_strip"
-                    android:layout_width="match_parent"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="2dp"
-                    android:visibility="gone" />
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/timeline_position"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/timeline_list_summary"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="2dp"
-                    android:fontFamily="monospace"
-                    android:textColor="@color/text_primary"
-                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+                    android:paddingStart="16dp"
+                    android:paddingTop="12dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/msg_scanning_short"
+                    android:textColor="@color/text_secondary"
+                    android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/timeline_session_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:paddingBottom="8dp" />
+            </LinearLayout>
+
+            <!-- 右：播放器 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@color/preview_background"
+                android:orientation="vertical">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal"
+                        android:padding="@dimen/gutter">
+
+                        <!--
+                          每一格：画面 + 遮罩 + 角标。
+
+                          画面用 TextureView 而不是 VideoView：VideoView 内部是 SurfaceView，
+                          会在窗口上挖一个洞，画面在洞后面合成 —— 小窗发虚/透明就是这么来的。
+
+                          遮罩是一个不透明的普通 View，盖在画面上方：换分段时盖住上一段的
+                          最后一帧，这一刻这一路没有录像时写一句话。不动 surface。
+                        -->
+                        <FrameLayout
+                            android:id="@+id/frame_surround"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="22"
+                            android:background="@drawable/bg_preview_frame">
+
+                            <!-- 取景和鱼眼校正由外框画：校正是非线性的，TextureView 自己的矩阵做不到 -->
+                            <com.kooo.evcam.playback.FisheyeVideoFrame
+                                android:id="@+id/video_surround_frame"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent">
+
+                                <TextureView
+                                    android:id="@+id/video_surround"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent" />
+                            </com.kooo.evcam.playback.FisheyeVideoFrame>
+
+                            <TextView
+                                android:id="@+id/cover_surround"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:background="@drawable/bg_preview_frame"
+                                android:gravity="center"
+                                android:textColor="@color/preview_placeholder_text"
+                                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                                android:visibility="gone" />
+
+                            <TextView
+                                android:id="@+id/label_surround"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:layout_gravity="top|start"
+                                android:layout_marginStart="10dp"
+                                android:layout_marginTop="6dp"
+                                android:background="@drawable/camera_label_background"
+                                android:gravity="center"
+                                android:paddingStart="10dp"
+                                android:paddingEnd="10dp"
+                                android:textColor="#FFFFFF"
+                                android:textAppearance="@style/TextAppearance.Cam.Body" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:id="@+id/cabin_column"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginStart="@dimen/gutter"
+                            android:layout_weight="14"
+                            android:orientation="vertical">
+
+                            <FrameLayout
+                                android:id="@+id/frame_cabin_front"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame">
+
+                                <TextureView
+                                    android:id="@+id/video_cabin_front"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent" />
+
+                                <TextView
+                                    android:id="@+id/cover_cabin_front"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:background="@drawable/bg_preview_frame"
+                                    android:gravity="center"
+                                    android:textColor="@color/preview_placeholder_text"
+                                    android:textAppearance="@style/TextAppearance.Cam.Caption"
+                                    android:visibility="gone" />
+
+                                <TextView
+                                    android:id="@+id/label_cabin_front"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="34dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="10dp"
+                                    android:layout_marginTop="6dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            </FrameLayout>
+
+                            <FrameLayout
+                                android:id="@+id/frame_cabin_rear"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:layout_marginTop="@dimen/gutter"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame">
+
+                                <TextureView
+                                    android:id="@+id/video_cabin_rear"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent" />
+
+                                <TextView
+                                    android:id="@+id/cover_cabin_rear"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:background="@drawable/bg_preview_frame"
+                                    android:gravity="center"
+                                    android:textColor="@color/preview_placeholder_text"
+                                    android:textAppearance="@style/TextAppearance.Cam.Caption"
+                                    android:visibility="gone" />
+
+                                <TextView
+                                    android:id="@+id/label_cabin_rear"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="34dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="10dp"
+                                    android:layout_marginTop="6dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            </FrameLayout>
+
+                            <!--
+                              第四路在极氪 7X 上不存在，永远没有文件，于是永远不显示；
+                              留着它是为自定义车型那种四面各一个相机的接法（图片回看也留着）。
+                            -->
+                            <FrameLayout
+                                android:id="@+id/frame_fourth"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:layout_marginTop="@dimen/gutter"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame"
+                                android:visibility="gone">
+
+                                <TextureView
+                                    android:id="@+id/video_fourth"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent" />
+
+                                <TextView
+                                    android:id="@+id/cover_fourth"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:background="@drawable/bg_preview_frame"
+                                    android:gravity="center"
+                                    android:textColor="@color/preview_placeholder_text"
+                                    android:textAppearance="@style/TextAppearance.Cam.Caption"
+                                    android:visibility="gone" />
+
+                                <TextView
+                                    android:id="@+id/label_fourth"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="34dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="10dp"
+                                    android:layout_marginTop="6dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+                            </FrameLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!--
+                      这里不放 ⑤ 状态条：它写的是现在的设置和 U 盘余量，不是这段录像的，
+                      压在录像上会被当成这段录像的参数（项目拥有者 2026-10-01 定）。
+                    -->
+                </FrameLayout>
+
+                <!-- 进度条与控制 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
+                    android:background="@color/bg"
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_prev_session"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/player_prev" />
+                    <SeekBar
+                        android:id="@+id/timeline_seek"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_play_pause"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/action_play" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_next_session"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/player_next" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_speed"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="1.0x" />
-
-                    <!-- 和图片回看底部那个同一个按钮：网格 → 有录像的每一路 → 回到网格 -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_view_mode"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/photo_mode_multi" />
-
-                    <!-- 锁定此刻 / 解锁：此刻各路正在放的文件一起（锁定影像关着时收起） -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_lock"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/action_lock_footage"
+                    <!-- 锁定的那几段：进度条正下方一条细条，只画不接触摸（锁定影像关着时收起） -->
+                    <com.kooo.evcam.ui.LockedRangeStrip
+                        android:id="@+id/timeline_locked_strip"
+                        android:layout_width="match_parent"
+                        android:layout_height="4dp"
+                        android:layout_marginTop="2dp"
                         android:visibility="gone" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/timeline_send"
-                        style="@style/Widget.Cam.RailSmall"
-                        android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:text="@string/action_send_to_phone" />
+                    <TextView
+                        android:id="@+id/timeline_position"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="2dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/text_primary"
+                        android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_prev_session"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/player_prev" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_play_pause"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/action_play" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_next_session"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/player_next" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_speed"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="1.0x" />
+
+                        <!-- 和图片回看底部那个同一个按钮：网格 → 有录像的每一路 → 回到网格 -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_view_mode"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/photo_mode_multi" />
+
+                        <!-- 锁定此刻 / 解锁：此刻各路正在放的文件一起（锁定影像关着时收起） -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_lock"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/action_lock_footage"
+                            android:visibility="gone" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/timeline_send"
+                            style="@style/Widget.Cam.RailSmall"
+                            android:layout_width="0dp"
+                            android:layout_height="52dp"
+                            android:layout_weight="1"
+                            android:text="@string/action_send_to_phone" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
+
     </LinearLayout>
 
-</LinearLayout>
+    <include layout="@layout/layout_nav_drawer" />
+
+</androidx.drawerlayout.widget.DrawerLayout>
