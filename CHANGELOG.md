@@ -9,9 +9,19 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.27.0-alpha] - 2026-10-24
+
 - Settings: add-on buttons no longer show a check mark when on; the orange colour alone shows it.
 - Settings → Recording: Photos and Driving info bar swap places.
 - Settings → Floating button: Show recording time is renamed Recording time.
+- Simulated drive sound (Developer options): Standard mode plays it as well as Sport; the two differ only in how eagerly the simulated gearbox shifts (Sport shifts up later at light throttle, holds the gear when you lift and shifts down earlier when slowing).
+- Simulated drive sound: Sound style chooses American V8 (default, a supercharged cross-plane V8 built cylinder by cylinder in stereo), Prototype V8, Supersonic jet, Supersonic jet (old version), Turbo four or Electric concept car; Listening position (outside or in the cabin) for American V8; Gearbox (8-speed automatic or 6-speed manual) for the two V8s.
+- Simulated drive sound: Speakers chooses the cabin speakers, the exterior speaker or both; Exterior route (BUS12 or BUS11) and Exterior volume (0 to +18 dB) appear when the exterior speaker is used.
+- Simulated drive sound: the engine starts when you switch to Sport or Standard while stopped, joins like a hybrid's engine while moving and shuts down when you leave; in Park and Neutral it revs freely and falls back like a real engine.
+- Simulated drive sound: the engine load follows the pedal (Sport's livelier pedal taken into account) rather than the measured acceleration; in gear the engine stays locked to the wheels except while pulling away; throttle and speed are smoothed from the car's sparse readings.
+- Simulated drive sound: volume −6, −3 or 0 dB (default); a look-ahead limiter keeps peaks clean.
 
 ## [2.26.0-alpha] - 2026-10-23
 
