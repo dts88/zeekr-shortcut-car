@@ -357,7 +357,7 @@ final class VirtualEngine {
     static final float MAX_DT = 0.1f;
 
     private final SoundProfile p;
-    /** 模拟换挡、伪挡位、倒挡用的变速箱（开发者选项「变速箱」，可以随时换，{@link #setGearbox}）。 */
+    /** 模拟换挡、伪挡位、倒挡用的变速箱（「模拟声浪」页的「变速箱」，可以随时换，{@link #setGearbox}）。 */
     private Gearbox gearbox;
     /** 启动时带不带起动机那一段。 */
     private final boolean crank;
@@ -459,7 +459,7 @@ final class VirtualEngine {
         this.rpm = profile.idleRpm;
     }
 
-    /** 换变速箱（开发者选项改了，随时）：下一块按此刻的车速、负荷重新选挡，转速照常平滑地过去，不算一次换挡。 */
+    /** 换变速箱（「模拟声浪」页改了，随时）：下一块按此刻的车速、负荷重新选挡，转速照常平滑地过去，不算一次换挡。 */
     void setGearbox(Gearbox g) {
         if (g == gearbox) {
             return;

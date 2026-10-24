@@ -390,10 +390,18 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 开发者选项「模拟声浪（试验）」2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
-  dev_drive_sound_summary 现在是「运动、标准模式下按油门、车速和加减速合成发动机声（运动模式换挡更积极），从「播放喇叭」选的喇叭播放，
-  车内喇叭跟随媒体音量。停车时切换到这两种模式会先播放启动声」（2026-10-21 实车后去掉「；倒挡时音量降低 6 dB」：车机自己在倒挡
-  压低音量，车主定声浪不再另降；2026-10-24 加「播放喇叭」时改了「从车内喇叭播放并跟随媒体音量」；同一天车主加标准模式）；
+- 「模拟声浪」（2026-10-24 起在设置 → 系统）2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
+  dev_drive_sound_summary 现在是「运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，
+  车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声」/「In Sport mode (optionally Standard too), …Switching to these
+  modes while stopped plays an engine start」/「Dalam mod Sukan (dan mod Standard jika dipilih), …Bertukar ke mod ini semasa
+  berhenti memainkan bunyi enjin dihidupkan」（2026-10-21 实车后去掉「；倒挡时音量降低 6 dB」：车机自己在倒挡压低音量，车主定声浪
+  不再另降；2026-10-24 加「播放喇叭」时改了「从车内喇叭播放并跟随媒体音量」；同一天车主加标准模式，又定标准模式要自己打开）；
+  标准模式也启用（2026-10-24 加，车主：像更新页的「接收 Alpha 版」，默认关，不开的话标准模式没有声浪）：
+  dev_drive_sound_standard_title「标准模式也启用」/ Also in Standard mode / Juga dalam mod Standard；
+  dev_drive_sound_standard_summary「标准模式下也播放声浪，换挡比运动模式平和。关闭时只在运动模式播放」/
+  「Plays the drive sound in Standard mode too, with calmer shifting than Sport. When off, only Sport mode plays it」/
+  「Turut memainkan bunyi pemanduan dalam mod Standard, dengan pertukaran gear yang lebih tenang berbanding mod Sukan. Apabila
+  dimatikan, hanya mod Sukan memainkannya」；
   dev_drive_sound_volume_title 的选项改成 −6 / −3 / 0 dB，默认 0 dB（车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）。
   播放喇叭（2026-10-24 加，车主要外放测试：车内、车外、车内和车外）：dev_drive_sound_output_title「播放喇叭」/ Speakers /
   Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、

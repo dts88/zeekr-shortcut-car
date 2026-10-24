@@ -3,7 +3,7 @@ package com.kooo.evcam.sound;
 import com.kooo.evcam.AppConfig;
 
 /**
- * 声音风格（开发者选项「声音风格」）。项目所有者 2026-10-21：第一版太单薄，按发动机的结构重做（{@link PulseVoice}），
+ * 声音风格（「模拟声浪」页的「声音风格」）。项目所有者 2026-10-21：第一版太单薄，按发动机的结构重做（{@link PulseVoice}），
  * 「美式 V8」（机械增压交叉平面 V8）这一种取向；第一版留着，叫「试制 V8」；另做一种纯电车主动声浪的「超音速」（{@link JetVoice}，试制）。
  * 「超音速（旧版）」（{@link JetOldVoice}）是 2026-10-22 的那一版，车主要和新的装车对比（2026-10-23）。
  * 「涡轮四缸」（{@link TurboFourVoice}）、「电动概念车」（{@link ElectricVoice}）照参考车另外两种主题、用同样的做法仿制（2026-10-23，试制）。
@@ -48,13 +48,13 @@ enum SoundStyle {
         return this == PROTOTYPE;
     }
 
-    /** 开发者选项「听感」对它有没有用：只有「美式 V8」分车外、车内。 */
+    /** 「模拟声浪」页的「听感」对它有没有用：只有「美式 V8」分车外、车内。 */
     boolean hasViews() {
         return this == AMERICAN;
     }
 
     /**
-     * 开发者选项「变速箱」对它有没有用：两种超音速没有 —— 喷气机本来没有变速箱，换挡是参考车的 N e-Shift（模拟 8 速双离合）
+     * 「模拟声浪」页的「变速箱」对它有没有用：两种超音速没有 —— 喷气机本来没有变速箱，换挡是参考车的 N e-Shift（模拟 8 速双离合）
      * 做出来的，固定按 8 速走（视频里升挡掉回 0.65–0.8 倍，和 8 速的级差对得上）。项目所有者 2026-10-23。
      * 「涡轮四缸」「电动概念车」也是参考车的主题，换挡同样是 e-Shift 的 8 速（参考升挡掉回 0.68–0.82 倍）。
      */
@@ -62,7 +62,7 @@ enum SoundStyle {
         return this == AMERICAN || this == PROTOTYPE;
     }
 
-    /** 这种风格实际用的变速箱：两种 V8 照开发者选项，别的（参考车的主题）固定 8 速。 */
+    /** 这种风格实际用的变速箱：两种 V8 照「模拟声浪」页的选择，别的（参考车的主题）固定 8 速。 */
     Gearbox gearbox(Gearbox chosen) {
         return choosesGearbox() ? chosen : Gearbox.AUTO8;
     }

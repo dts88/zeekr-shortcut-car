@@ -17,7 +17,7 @@ public final class CarSpeakers {
     /**
      * 车外喇叭：车上只有一个（单声道），车机给了两路 —— 这一路和 {@link #OUTSIDE_PLAYBACK}（Lab findings §2.43，2026-10-20：
      * 各 1 个声道，项目所有者听着是同一个喇叭）。CarPiano 在 7X 上按媒体用途往这一路放有声、往另一路「指定得上、没声」，
-     * Lab 两路都有声。用哪一路由开发者选项「车外线路」选（项目所有者 2026-10-24）。车外喇叭在车机里是另一个音量组：
+     * Lab 两路都有声。用哪一路由「模拟声浪」页的「车外线路」选（项目所有者 2026-10-24）。车外喇叭在车机里是另一个音量组：
      * 音量键（媒体那一组）调不到它（项目所有者 2026-10-24 实车），系统音量不一定管得到车外（CarPiano 自己做软件增益）。
      */
     public static final String OUTSIDE_NOTIFY = "BUS12_OUTER_NOTIFY";
@@ -32,7 +32,7 @@ public final class CarSpeakers {
         return find(context, CABIN_MEDIA);
     }
 
-    /** 开发者选项「车外线路」存的值（{@code AppConfig.DRIVE_SOUND_ROUTE_*}）对应的地址：bus11 → BUS11，别的都按 BUS12。 */
+    /** 「模拟声浪」页的「车外线路」存的值（{@code AppConfig.DRIVE_SOUND_ROUTE_*}）对应的地址：bus11 → BUS11，别的都按 BUS12。 */
     static String exteriorAddress(String route) {
         return "bus11".equals(route) ? OUTSIDE_PLAYBACK : OUTSIDE_NOTIFY;
     }
