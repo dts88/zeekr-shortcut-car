@@ -124,12 +124,13 @@ final class SideViewPicture {
             return;
         }
         framing.configure(appConfig.getSideViewFov(), appConfig.getSideViewBack(), appConfig.getSideViewUp(),
-                lane, width / (float) height);
+                lane, width / (float) height, appConfig.isSideViewAutoFit());
         RearViewGeometry.ShaderRects r = RearViewGeometry.toShaderRects(plan, lane, RearViewGeometry.Viewport.full());
         mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
                 r.laneOffsetX * width, r.laneOffsetY * height,
                 r.laneScaleX * width, r.laneScaleY * height, turnedMap);
-        mesh.draw(canvas, 0f, 0f, width, height, painter);
+        if (appConfig.isSideViewAutoFit()) mesh.draw(canvas, 0f, 0f, width, height, painter);
+        else mesh.drawClippedToLane(canvas, 0f, 0f, width, height, painter);
     }
 
     /** 此刻实际用的横向视野（装不下时自动收窄过）。 */

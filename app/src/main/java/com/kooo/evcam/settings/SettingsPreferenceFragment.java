@@ -1060,6 +1060,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
+        bindSwitch("pref_side_view_auto_fit", appConfig.isSideViewAutoFit(), value -> {
+            appConfig.setSideViewAutoFit(value);
+            SideViewService.applyAim();
+        });
         SwitchNavPreference row = findPreference("pref_side_view");
         if (row != null) {
             showSideViewTarget(row);

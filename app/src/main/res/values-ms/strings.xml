@@ -1020,4 +1020,6 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
+    <string name="side_auto_fit_title">Muat automatik untuk elak kawasan hitam</string>
+    <string name="side_auto_fit_summary">Hidup mengecilkan pandangan jika perlu. Mati mengekalkan lebar diminta dan memaparkan kawasan tiada imej sebagai hitam.</string>
 </resources>

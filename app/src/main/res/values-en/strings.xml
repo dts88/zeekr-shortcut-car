@@ -1043,4 +1043,6 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
+    <string name="side_auto_fit_title">Auto-fit to avoid black patches</string>
+    <string name="side_auto_fit_summary">On narrows the view when necessary. Off keeps the requested width and shows missing areas in black.</string>
 </resources>
