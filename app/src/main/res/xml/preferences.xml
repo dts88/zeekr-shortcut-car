@@ -64,16 +64,15 @@
                 android:summary="@string/set_screen_off_keep_summary" />
         </PreferenceCategory>
 
+        <!-- 组的次序：视频流、自动录制、行驶信息条、水印、拍照（项目所有者 2026-10-24 把拍照和行驶信息条对调） -->
         <PreferenceCategory
-            android:title="@string/set_group_photo">
+            android:title="@string/set_info_bar_title">
 
-            <!-- 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（项目所有者 2026-10-09；行留在录制分区）。
-                 关着时照片只能从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面
-                 （AppConfig.isPhotoViaJpegEnabled） -->
-            <SwitchPreferenceCompat
-                android:key="pref_photo_via_jpeg"
-                android:title="@string/set_photo_jpeg_title"
-                android:summary="@string/set_photo_jpeg_summary" />
+            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。开关加下一层：点这一行进「车辆信号」勾显示哪几项（系统页那个入口照旧） -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_info_bar"
+                android:title="@string/set_info_bar_title"
+                android:summary="@string/set_info_bar_summary" />
         </PreferenceCategory>
 
         <!--
@@ -96,13 +95,15 @@
         </PreferenceCategory>
 
         <PreferenceCategory
-            android:title="@string/set_info_bar_title">
+            android:title="@string/set_group_photo">
 
-            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。开关加下一层：点这一行进「车辆信号」勾显示哪几项（系统页那个入口照旧） -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_info_bar"
-                android:title="@string/set_info_bar_title"
-                android:summary="@string/set_info_bar_summary" />
+            <!-- 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（项目所有者 2026-10-09；行留在录制分区）。
+                 关着时照片只能从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面
+                 （AppConfig.isPhotoViaJpegEnabled） -->
+            <SwitchPreferenceCompat
+                android:key="pref_photo_via_jpeg"
+                android:title="@string/set_photo_jpeg_title"
+                android:summary="@string/set_photo_jpeg_summary" />
         </PreferenceCategory>
     </PreferenceScreen>
 
@@ -300,7 +301,7 @@
         android:title="@string/set_section_floating">
 
         <!--
-          悬浮按钮（2026-10-23 整理）：这一页不分组。总开关一行，开着时下面「显示录制时长」「锁定位置」两个附加项（原来各占一行）
+          悬浮按钮（2026-10-23 整理）：这一页不分组。总开关一行，开着时下面「录制时长」「锁定位置」两个附加项（原来各占一行）
         -->
         <com.kooo.evcam.settings.SwitchChipsPreference
             android:key="pref_recording_floating"

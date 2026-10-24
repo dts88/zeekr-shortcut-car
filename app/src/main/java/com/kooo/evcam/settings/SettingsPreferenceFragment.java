@@ -1165,7 +1165,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 悬浮窗
 
     /**
-     * 悬浮按钮（2026-10-23 整理，ui-spec §十一）：总开关一行带「显示录制时长」「锁定位置」两个附加项；点击、长按各一行；
+     * 悬浮按钮（2026-10-23 整理，ui-spec §十一）：总开关一行带「录制时长」「锁定位置」两个附加项；点击、长按各一行；
      * 按钮大小、透明度、时长文字大小合成一行「外观」（值加一个按钮：点这一行在框里拖、按钮跟着变，行尾「重置」）。
      */
     private void bindFloating() {
@@ -1213,7 +1213,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 外观：一个框里三根拖动条（{@link SliderDialog}），松手时按钮当场跟着变，「保存」才算数。
-     * 按钮大小整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半。时长文字大小随「显示录制时长」，没开时灰着。
+     * 按钮大小整档上移 50%（原来 32–100）：最小的也要比原来的最小大一半。时长文字大小随「录制时长」，没开时灰着。
      */
     private void editFloatingAppearance(ValueActionPreference pref) {
         java.util.List<SliderDialog.Slider> sliders = java.util.Arrays.asList(

@@ -109,7 +109,7 @@
     <string name="set_floating_tap_title">Tap</string>
     <string name="set_floating_long_press_title">Long press</string>
     <string name="set_floating_lock_title">Lock position</string>
-    <string name="set_floating_duration_title">Show recording time</string>
+    <string name="set_floating_duration_title">Recording time</string>
     <string name="floating_action_open_app">Open the app</string>
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>

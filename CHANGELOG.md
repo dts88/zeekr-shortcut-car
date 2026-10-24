@@ -9,7 +9,9 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings: add-on buttons no longer show a check mark when on; the orange colour alone shows it.
+- Settings → Recording: Photos and Driving info bar swap places.
+- Settings → Floating button: Show recording time is renamed Recording time.
 
 ## [2.26.0-alpha] - 2026-10-23
 

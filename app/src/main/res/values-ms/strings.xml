@@ -109,7 +109,7 @@
     <string name="set_floating_tap_title">Ketik</string>
     <string name="set_floating_long_press_title">Tekan lama</string>
     <string name="set_floating_lock_title">Kunci kedudukan</string>
-    <string name="set_floating_duration_title">Tunjuk masa rakaman</string>
+    <string name="set_floating_duration_title">Masa rakaman</string>
     <string name="floating_action_open_app">Buka apl</string>
     <string name="floating_action_toggle_recording">Mula / henti rakaman</string>
     <string name="floating_action_take_photo">Ambil foto</string>
