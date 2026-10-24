@@ -82,8 +82,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     /**
      * 等「已渲染第一帧」最多等多久，超时就直接显示。
      *
-     * <p>MEDIA_INFO_VIDEO_RENDERING_START 并非所有实现都会发。真要不发，
-     * 没有这个兜底画面就永远不显示了 —— 那比它本来要避免的脏帧更糟。</p>
+     * <p>播放器到了要去的位置、那一帧画出来才报（{@link ManagedVideoPlayer.Listener#onFirstFrame}），
+     * 文件读不动、解码卡住时就等不来。没有这个兜底画面就永远不显示了 —— 那比它本来要避免的脏帧更糟。</p>
      */
     private static final long SHOW_VIDEO_TIMEOUT_MS = 1500L;
     /** 跟着的那一路和领头的差出多少，才去拉一把。 */
@@ -1732,7 +1732,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // 同样的道理：窗口不可见后 surface 会被销毁，只 pause 会让 MediaPlayer
+        // 同样的道理：窗口不可见后 surface 会被销毁，只 pause 会让播放器
         // 继续持有它并不停超时。
         // 这里彻底释放，位置记下来，回前台时再开回去。
         if (!sessions.isEmpty()) {
