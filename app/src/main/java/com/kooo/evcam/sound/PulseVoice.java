@@ -261,6 +261,10 @@ final class PulseVoice implements Voice {
     private final float[] voiceRight;
     private float whineL;
     private float whineR;
+    /** 这一个样本的叶片基频（居中，还没调）。 */
+    private float lobeNow;
+    /** 增压器啸叫里不变的那部分的倍数（{@link PulseProfile#steadyWhineDb}）。 */
+    private final float steadyWhine;
     /** {@link PulseProfile#widthHz} 以上左右的差放大多少（倍）；一阶搁架的系数、状态。 */
     private final float widthGain;
     private final float widthK;
@@ -509,6 +513,7 @@ final class PulseVoice implements Voice {
             voiceRight[v] = CENTER_PAN * panRight(x);
         }
         widthGain = EngineVoice.dbToLin(profile.widthDb);
+        steadyWhine = EngineVoice.dbToLin(profile.steadyWhineDb);
         widthK = onePole(profile.widthHz);
         pulsationLagSamples = profile.pulsationLagMs * 1e-3f * sampleRate;
         dischargeGains = new float[profile.dischargeHarmonics.length];
@@ -893,15 +898,19 @@ final class PulseVoice implements Voice {
                 float rotor = 1f + growlNow * (p.rotorAm[0] * EngineVoice.sin(femalePhase)
                         + p.rotorAm[1] * EngineVoice.sin(malePhase + MALE_PHASE));
                 float mod = rotor * (1f + growlNow * p.superchargerAm * EngineVoice.sin(theta / 90.0));
-                float d = discharge(hz) * dischargeNow * mod;
+                // 啸叫（项目所有者 2026-10-24：响度减 25 %，质感留着）：不变的那部分乘 steadyWhine，负载时调出来的那部分
+                // （mod − 1：齿轮受力、转子转一圈、每次点火调出来的边带，就是机械的质感）不降；出口脉动、齿轮声都这样，走哪条路都一样
+                float tone = steadyWhine + (mod - 1f);
+                float d = discharge(hz) * dischargeNow * tone;
                 float dl = duct[0].process(intercooler[0].process(d));
                 float dr = duct[1].process(intercooler[1].process(d));
                 whine(hz);
-                float loadedL = whineL * mod;
-                float loadedR = whineR * mod;
+                // 齿轮声同上；叶片基频不降
+                float loadedL = CENTER * lobeNow * mod + whineL * tone;
+                float loadedR = CENTER * lobeNow * mod + whineR * tone;
                 // 负载时壳体被出口的压力顶着、齿轮受力：调过的齿轮声、出口脉动经壳体、支座传出去（偏中低频，不过防火墙）
                 float shell = 0f;
-                float loaded = (loadedL + loadedR) * (0.5f / CENTER) + d;
+                float loaded = lobeNow * mod + (whineL + whineR) * (0.5f / CENTER) * tone + d;
                 for (Biquad m : bodyModes) {
                     shell += m.process(loaded);
                 }
@@ -909,7 +918,7 @@ final class PulseVoice implements Voice {
                 float pl = pulsation(0, cur) * chordGain;
                 float pr = pulsation(1, cur) * chordGain;
                 decelNow += (decelTarget - decelNow) * ampK;
-                float lifted = decelNow > 1e-6f ? CENTER * decel(hz) * decelNow : 0f;
+                float lifted = decelNow > 1e-6f ? CENTER * steadyWhine * decel(hz) * decelNow : 0f;
                 float toneL = loadedL + plenumLeft[0] * pl + plenumLeft[1] * pr + lifted;
                 float toneR = loadedR + plenumRight[0] * pl + plenumRight[1] * pr + lifted;
                 if (cabin) {
@@ -1166,15 +1175,16 @@ final class PulseVoice implements Voice {
     }
 
     /**
-     * 增压器这一个样本的啸叫（放在 {@link #whineL}、{@link #whineR}，还没调）：叶片基频（任何负荷都有，踩下去起压那一下猛一下，
-     * 居中）+ 齿轮啮合的几次谐波（只在增压时有，几个来源摆开：{@link PulseProfile#meshSpread}）。
+     * 增压器这一个样本的啸叫，还没调：叶片基频放在 {@link #lobeNow}（任何负荷都有，踩下去起压那一下猛一下，居中），
+     * 齿轮啮合的几次谐波放在 {@link #whineL}、{@link #whineR}（只在增压时有，几个来源摆开：{@link PulseProfile#meshSpread}）。
      * {@code hz} 是这一刻叶片扫过出口的频率（相位已经走过了）。
      */
     private void whine(float hz) {
         float lobe = lobeGain * (1f + p.pressBurst * pressNow) * VirtualEngine.clamp01((WHINE_TOP_HZ - hz) / WHINE_FADE_HZ)
                 * EngineVoice.sin(lobePhase) * whineNow;
-        float wl = CENTER * lobe;
-        float wr = CENTER * lobe;
+        lobeNow = lobe;
+        float wl = 0f;
+        float wr = 0f;
         // 齿轮声的几个来源各自慢慢游移（{@link PulseProfile#meshVoiceDetune}）：同一个阶次上一小团，此起彼伏
         for (int v = 0; v < voicePhase.length; v++) {
             voiceNoise[v] += voiceK * (white() - voiceNoise[v]);

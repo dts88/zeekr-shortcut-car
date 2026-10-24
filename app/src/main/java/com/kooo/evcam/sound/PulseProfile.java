@@ -238,6 +238,13 @@ final class PulseProfile {
     final float bodyTopHz;
     final float bodyDb;
     /**
+     * 增压器啸叫里不变的那部分再降多少 dB：齿轮声、出口的压力脉动、松开以后的啸叫，不管走空气还是壳体。项目所有者 2026-10-24：
+     * 高频那部分响度减 25 %（人耳的响度每 10 dB 翻一倍：10 × log2 0.75 ≈ −4.2 dB），机械的质感留着、啸叫少一点 ——
+     * 负载时调出来的那部分（齿轮受力、转子转一圈、每次点火调出来的边带，{@link #rotorAm} 等）不降，叶片基频不降。
+     * 只降不变的那部分：几次谐波之间的比例（随转速变的音色）照旧；整个一起降的话，负载时 2–5 kHz 的粗糙度少 2 dB。
+     */
+    final float steadyWhineDb;
+    /**
      * 踩下去起压那一下（参考视频：叶片基频猛一下，比松开时高约 15 dB）：负荷跳上去、增压还没跟上（旁通阀刚关、进口突然灌进
      * 空气），叶片基频 × (1 + {@link #pressBurst} × 2 × (负荷 − 增压))，按 {@link #pressBurstSec} 落下去。一下就过去，
      * 和发动机第 12 阶来不及拍出「呜哇」。
@@ -522,6 +529,7 @@ final class PulseProfile {
         bodyQ = b.bodyQ;
         bodyTopHz = b.bodyTopHz;
         bodyDb = b.bodyDb;
+        steadyWhineDb = b.steadyWhineDb;
         pressBurst = b.pressBurst;
         pressBurstSec = b.pressBurstSec;
         superchargerDb = b.superchargerDb;
@@ -734,6 +742,7 @@ final class PulseProfile {
         private float bodyQ = 2.5f;
         private float bodyTopHz = 1400f;
         private float bodyDb = 0f;
+        private float steadyWhineDb = -4.2f;
         private float pressBurst = 4f;
         private float pressBurstSec = 0.25f;
         private float superchargerDb = -100f;
@@ -899,6 +908,12 @@ final class PulseProfile {
         /** 踩下去起压那一下叶片基频多冲几倍（{@link PulseProfile#pressBurst}）；0 就是不冲。 */
         Builder press(float burst) {
             pressBurst = burst;
+            return this;
+        }
+
+        /** 增压器啸叫里不变的那部分降多少 dB（{@link PulseProfile#steadyWhineDb}）；0 就是不降。 */
+        Builder steadyWhine(float db) {
+            steadyWhineDb = db;
             return this;
         }
 

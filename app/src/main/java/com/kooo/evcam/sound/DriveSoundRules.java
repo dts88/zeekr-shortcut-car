@@ -9,9 +9,11 @@ import com.kooo.evcam.telemetry.Signal;
  * <h3>规则（项目所有者 2026-10-21）</h3>
  *
  * <ul>
- *   <li>只在车内；只做运动模式的效果 —— 舒适、标准不出声，驾驶模式读不到也不出声。</li>
- *   <li>运动模式下虚拟发动机一直转着：停着是怠速，P / N 踩油门轰转速，倒挡按倒挡齿比（{@link VirtualEngine}）。</li>
- *   <li>切出运动模式、没上电：发动机熄火（{@link Why#shutsDown}，2026-10-22：停着照真车熄火，车在走像混动车停发动机），
+ *   <li>只在车内；运动模式出声（2026-10-24 起标准模式也出声，和运动模式只差升降挡的积极性，{@link #eagerOf}）——
+ *       舒适、雪地这些不出声，驾驶模式读不到也不出声。</li>
+ *   <li>出声的驾驶模式下虚拟发动机一直转着：停着是怠速，P / N 踩油门轰转速，倒挡按倒挡齿比（{@link VirtualEngine}）；
+ *       运动、标准之间切换照常转着，只是换挡变了。</li>
+ *   <li>切到不出声的驾驶模式、没上电：发动机熄火（{@link Why#shutsDown}，2026-10-22：停着照真车熄火，车在走像混动车停发动机），
  *       放完再放掉喇叭（{@link DriveSound}）；开关关了：0.6 秒淡出。</li>
  *   <li>车速、油门读不到或过期（超过 {@link #STALE_MS}）、车辆接口断了：0.3 秒淡到无声，不会卡在一个声音上；回来时 0.3 秒淡入。</li>
  *   <li>通话中静音（车机本来也压低媒体）。</li>
@@ -30,8 +32,8 @@ final class DriveSoundRules {
         NO_LINK(false, false, false, 0.3f, false),
         /** 没上电（点火不在 ON / DRIVING，挡位也不在 R / N / D） */
         POWER_OFF(false, false, false, 0.6f, true),
-        /** 不是运动模式（驾驶模式读不到也算） */
-        NOT_SPORT(false, false, false, 0.6f, true),
+        /** 不出声的驾驶模式：不是运动、标准（舒适、雪地等；驾驶模式读不到也算） */
+        OTHER_MODE(false, false, false, 0.6f, true),
         /** 车速 / 油门读不到或过期 */
         STALE(true, true, false, 0.3f, false),
         /** 通话中 */
@@ -40,7 +42,7 @@ final class DriveSoundRules {
         RUNNING(true, true, true, 0.3f, false);
 
         /**
-         * 要快读车辆信号：只在运动模式下（不用的时候不让车机服务 50 ms 读一遍）。切进运动模式后第一遍快读 50 ms 内就到，
+         * 要快读车辆信号：只在出声的驾驶模式下（不用的时候不让车机服务 50 ms 读一遍）。切进来后第一遍快读 50 ms 内就到，
          * 读到之前算过期（{@link #STALE}），开始工作（启动 / 接入）等读数到了再定。
          */
         final boolean armed;
@@ -51,8 +53,8 @@ final class DriveSoundRules {
         /** 淡到这个状态用多久（秒）。 */
         final float fadeSec;
         /**
-         * 因为它停下来时发动机熄火（{@link VirtualEngine#shutdown}），放完再放掉喇叭，而不是淡出：切出运动模式、下电 ——
-         * 和停着切进运动模式放启动声是一个说法（项目所有者 2026-10-22）。
+         * 因为它停下来时发动机熄火（{@link VirtualEngine#shutdown}），放完再放掉喇叭，而不是淡出：切到不出声的驾驶模式、下电 ——
+         * 和停着切进来放启动声是一个说法（项目所有者 2026-10-22）。
          */
         final boolean shutsDown;
 
@@ -90,8 +92,8 @@ final class DriveSoundRules {
         if (!poweredOn(ignition, gear)) {
             return Why.POWER_OFF;
         }
-        if (driveMode == null || driveMode != Signal.DRIVE_MODE_SPORT) {
-            return Why.NOT_SPORT;
+        if (!soundMode(driveMode)) {
+            return Why.OTHER_MODE;
         }
         if (Float.isNaN(speedKmh) || Float.isNaN(throttlePct) || fastAgeMs < 0L || fastAgeMs > STALE_MS) {
             return Why.STALE;
@@ -100,6 +102,19 @@ final class DriveSoundRules {
             return Why.CALL;
         }
         return Why.RUNNING;
+    }
+
+    /** 这种驾驶模式出声：运动、标准（项目所有者 2026-10-24 加了标准模式）；读不到不算。 */
+    static boolean soundMode(Integer driveMode) {
+        return driveMode != null && (driveMode == Signal.DRIVE_MODE_SPORT || driveMode == Signal.DRIVE_MODE_STANDARD);
+    }
+
+    /**
+     * 换挡积极性（{@link VirtualEngine.Input#eager}）：运动模式 1，别的 0（标准模式照原来的换挡）。项目所有者 2026-10-24：
+     * 标准模式和运动模式只差升降挡的积极性。
+     */
+    static float eagerOf(Integer driveMode) {
+        return driveMode != null && driveMode == Signal.DRIVE_MODE_SPORT ? 1f : 0f;
     }
 
     /** 推送停了这么久（毫秒），快读又和它不一样，就改用快读：推送可能断了、或者漏了最后一个值。 */

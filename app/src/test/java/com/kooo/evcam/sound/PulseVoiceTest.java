@@ -257,14 +257,15 @@ public class PulseVoiceTest {
         // 12.03 × 2 × 2 = 48.12 阶 ≈ 2.3 kHz），是一小团（±1.5 % 里每赫兹的能量比两边 6–7.5 % 处高得多；负载时转子、点火调出来的
         // 边带在 ±3.3（两个转子之差）、5.0（阴转子）、8.3（阳转子、点火）、10 %，避开），
         // 没有机械增压的同一台那里没有。2026-10-23 起齿轮声的几个来源错开 ±0.8 %（项目所有者：一条主的音线太过突出），
-        // 按 ±1.5 % 的能量量（和 EngineV1 那台的录音同一个量法），不再按单个频点；摊开以后每赫兹的能量比两边高三倍以上就是一个音
-        // （原来三个来源只错开 ±0.2 %，单个频点比两边高十倍）
+        // 按 ±1.5 % 的能量量（和 EngineV1 那台的录音同一个量法），不再按单个频点；摊开以后每赫兹的能量比两边高两倍以上就是一个音
+        // （原来三个来源只错开 ±0.2 %，单个频点比两边高十倍；2026-10-24 车主要啸叫的响度减 25 %，不变的那部分低了 4.2 dB，
+        // 从高约六倍降到两倍多）
         double hz = SC.superchargerOrder * SC.meshMultiple * 2 * 2850 / 60.0;
         float[] sc = mid(render(SC, params(2850f, 1f), 1.5f), 0.7f);
         float[] plain = mid(render(PLAIN, params(2850f, 1f), 1.5f), 0.7f);
         double bunch = bandPower(sc, hz * 0.985, hz * 1.015) / 0.03;
         double sides = Math.max(bandPower(sc, hz * 0.925, hz * 0.94), bandPower(sc, hz * 1.06, hz * 1.075)) / 0.015;
-        assertTrue("比两边高 " + bunch / sides, bunch > 3 * sides);
+        assertTrue("比两边高 " + bunch / sides, bunch > 2 * sides);
         assertTrue("比没有增压器的 " + bunch / bandPower(plain, hz * 0.985, hz * 1.015), bunch > 10 * bandPower(plain, hz * 0.985, hz * 1.015));
     }
 
@@ -715,9 +716,15 @@ public class PulseVoiceTest {
     public void theSuperchargerLinesHaveNoNoiseSkirts() {
         // 项目所有者 2026-10-23：颗粒状噪音会破坏整体氛围，要着重避免。颗粒是每根线两边一小片随机的窄噪声（超音速那里查出来的；
         // 这里原来是增压器转速的随机抖动 0.6 %）。1900 rpm 满增压，齿轮声第 1、2 次：两边 1.5–2.8 % 处每赫兹的能量比线本身
-        // （±0.6 %）低 14 dB 以上（转子的边带在 3.3 % 以外）；随机抖动那一版只低 11–14 dB
+        // （±0.6 %）低 14 dB 以上（转子的边带在 3.3 % 以外）；随机抖动那一版只低 11–14 dB。
+        // 2026-10-24 起量齿轮声这一层自己（有、没有齿轮声两份的差，别的完全一样，随机数也一样）：车主要啸叫小一点以后，线比底下
+        // 发动机、气流的声音低了，两边那一片量到的多半是它们（车外第 2 次 −12.5 dB），不是线的裙边
+        PulseProfile none = scWith(b -> b.supercharger(SC.superchargerOrder, -100f));
+        VoiceParams full = params(1900f, 1f);
+        full.gain = 0.3f;
         for (boolean cabin : new boolean[] {false, true}) {
-            float[] x = mid(render(new PulseVoice(SC, RATE, cabin), params(1900f, 1f), 2.5f), 1.5f);
+            float[] x = slice(difference(render(new PulseVoice(SC, RATE, cabin), full, 2.5f),
+                    render(new PulseVoice(none, RATE, cabin), full, 2.5f)), 1.5f, 2.5f);
             for (int h = 1; h <= 2; h++) {
                 double m = SC.superchargerOrder * SC.meshMultiple * h * 1900 / 60.0;
                 double core = bandPower(x, m * 0.994, m * 1.006) / (0.012 * m);
@@ -911,6 +918,25 @@ public class PulseVoiceTest {
             double r0 = roughness(mid(render(new PulseVoice(SC, RATE, true), off, 3f), 1f));
             assertTrue(rpm + " rpm 负载比松开粗 " + (r1 - r0) + " dB", r1 - r0 > 3);
         }
+    }
+
+    @Test
+    public void theSteadyWhineIsQuieterTheGritStays() {
+        // 项目所有者 2026-10-24：增压器高频那部分的响度减 25 %（−4.2 dB），机械的质感留着、啸叫少一点。拿不降的同一台比：
+        // 2000 rpm 半增压（负荷 0.4）齿轮声第 2 次（±1.5 %）低 3 dB 以上（负载调出来的边带不降，所以不到 4.2）；
+        // 车内满增压 3000 rpm，2–5 kHz 包络的粗糙度差不到 1 dB（质感留着；整个一起降的话少 2 dB）
+        PulseProfile before = scWith(b -> b.steadyWhine(0f));
+        VoiceParams part = params(2000f, 0.4f);
+        part.gain = 0.3f;
+        double h2 = SC.superchargerOrder * SC.meshMultiple * 2 * 2000 / 60.0;
+        double now = bandPower(mid(render(new PulseVoice(SC, RATE, true), part, 2f), 1f), h2 * 0.985, h2 * 1.015);
+        double was = bandPower(mid(render(new PulseVoice(before, RATE, true), part, 2f), 1f), h2 * 0.985, h2 * 1.015);
+        assertTrue("啸叫低了 " + db(was / now) + " dB", db(was / now) > 3);
+        VoiceParams on = params(3000f, 1f);
+        on.gain = 0.3f;
+        double r = roughness(mid(render(new PulseVoice(SC, RATE, true), on, 3f), 1f));
+        double r0 = roughness(mid(render(new PulseVoice(before, RATE, true), on, 3f), 1f));
+        assertTrue("粗糙度差了 " + (r - r0) + " dB", Math.abs(r - r0) < 1);
     }
 
     @Test

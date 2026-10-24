@@ -239,8 +239,10 @@
   雪地（2026-10-21 加，车上还没见过这个值）：vi_v_drive_snow「雪地」/ Snow / Salji。
 - 开发者选项「模拟声浪（试验）」（2026-10-21，车主定先只做车内、只做运动模式）：分组 dev_drive_sound_group「模拟声浪」/ Drive sound /
   Bunyi pemanduan；开关 dev_drive_sound_title「模拟声浪（试验）」/ Simulated drive sound (experimental) / Bunyi pemanduan simulasi (percubaan)；
-  dev_drive_sound_summary「运动模式下按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到运动模式会先播放启动声」
-  （2026-10-24 加「播放喇叭」时改：原来是「从车内喇叭播放并跟随媒体音量」）
+  dev_drive_sound_summary「运动、标准模式下按油门、车速和加减速合成发动机声（运动模式换挡更积极），从「播放喇叭」选的喇叭播放，
+  车内喇叭跟随媒体音量。停车时切换到这两种模式会先播放启动声」
+  （2026-10-24 车主加标准模式时改：原来是「运动模式下……停车时切换到运动模式会先播放启动声」；同一天加「播放喇叭」时改过一次：
+  原来是「从车内喇叭播放并跟随媒体音量」）
   （2026-10-21 实车后去掉了「；倒挡时音量降低 6 dB」：车机自己在倒挡压低音量，车主定声浪不再另降）；
   dev_drive_sound_volume_title「声浪音量」（选项直接写 dB 数：−6 / −3 / 0 dB，默认 0 dB；车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）；
   dev_drive_sound_rpm_title「转速变化方式」，两档 dev_drive_sound_rpm_continuous「连续」、dev_drive_sound_rpm_shifts「模拟换挡」；

@@ -30,6 +30,11 @@ final class PedalTrack {
     static final float SETTLE_SEC = 0.12f;
     /** 两个读数的时间差至少按这么多算（秒）：同一刻来两个时不出无穷大的速度。 */
     static final float MIN_GAP_SEC = 0.05f;
+    /**
+     * 最多按这么多算（秒）：读数只在变了的时候来，上一个读数停了几秒，脚也是在最近一次更新（约 0.2 s）里才动的。2026-10-24：
+     * 原来按整段算，松开 4 秒后一下踩到 70 % 算成 17.5 %/s（像慢慢踩），急踩认不出、换挡也当成没在踩。
+     */
+    static final float MAX_GAP_SEC = 0.25f;
     /** 踩油门的快慢报多久（秒），之后按这个时间常数落下去。 */
     static final float RATE_HOLD_SEC = 0.15f;
     static final float RATE_DECAY_SEC = 0.1f;
@@ -63,7 +68,7 @@ final class PedalTrack {
             rateAtMs = nowMs;
             return;
         }
-        float gap = Math.max(MIN_GAP_SEC, (atMs - sampleAtMs) / 1000f);
+        float gap = Math.min(MAX_GAP_SEC, Math.max(MIN_GAP_SEC, (atMs - sampleAtMs) / 1000f));
         float slope = (pct - sample) / gap;
         float lead = VirtualEngine.clamp(slope * LEAD_SEC, -LEAD_MAX, LEAD_MAX);
         from = value;

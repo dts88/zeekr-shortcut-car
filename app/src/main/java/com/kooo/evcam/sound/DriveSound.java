@@ -36,7 +36,7 @@ import java.util.Set;
  *       （都是不可变快照，不加锁）→ {@link DriveInputs} 算出油门变化率、加减速度 → {@link VirtualEngine} 推进一步 →
  *       按声音风格（{@link SoundStyle}）的合成器出立体声 → {@link SoundOutput} 写进车内媒体喇叭。循环里不分配内存。
  *       换了声音风格或听感：这一台淡出，按新的重新开始（停着放启动声，在走就接入）。
- *       开始工作那一刻车停着放启动声、车在走像混动车那样起动发动机（{@link VirtualEngine#ignite}）；切出运动模式、下电时发动机熄火
+ *       开始工作那一刻车停着放启动声、车在走像混动车那样起动发动机（{@link VirtualEngine#ignite}）；切到不出声的驾驶模式、下电时发动机熄火
  *       （{@link VirtualEngine#shutdown}），放完再放掉喇叭，熄火途中又切回来就很快淡掉、让新的那台点火；别的原因要停 0.6 秒淡出。</li>
  * </ul>
  *
@@ -296,6 +296,9 @@ public final class DriveSound {
         private volatile float levelDb;
         private volatile int gear;
         private volatile boolean pseudo;
+        /** 换挡积极性（0 标准 … 1 运动）、挂着挡接合到几成（0 起步打滑 … 1 硬连着）。 */
+        private volatile float eager;
+        private volatile float coupled;
         private volatile float gate;
         private volatile float pedalRate;
         private volatile float accel;
@@ -620,6 +623,7 @@ public final class DriveSound {
                 in.gear = DriveSoundRules.gearOf(gearText);
                 in.flow = DriveSoundRules.flowOf(r.code(Signal.POWER_FLOW));
                 in.mode = rpmMode;
+                in.eager = DriveSoundRules.eagerOf(r.code(Signal.DRIVE_MODE));
                 engine.setGearbox(style.gearbox(gearbox));
                 if (!ignited && w == DriveSoundRules.Why.RUNNING) {
                     engine.ignite(in);
@@ -633,7 +637,7 @@ public final class DriveSound {
                     BlackBox.note("模拟声浪：" + (starting ? "启动（车停着）" : "接入（行驶中 " + Math.round(in.speedKmh) + " km/h）"));
                 }
                 if (stopping && !windingDown && !hurry && ignited && g > 0.5f && asked.shutsDown) {
-                    // 切出运动模式、下电：发动机熄火（停着照真车，车在走像混动车停发动机），放完再放掉喇叭
+                    // 切到不出声的驾驶模式、下电：发动机熄火（停着照真车，车在走像混动车停发动机），放完再放掉喇叭
                     engine.shutdown(in);
                     windingDown = true;
                     boolean moving = in.speedKmh >= VirtualEngine.START_LEAVE_KMH;
@@ -674,6 +678,8 @@ public final class DriveSound {
                     levelDb = engine.levelDb();
                     gear = engine.geared() ? engine.gearIndex() + 1 : 0;
                     pseudo = engine.pseudoGears();
+                    eager = engine.eager();
+                    coupled = engine.coupled();
                 } else {
                     params.gain = 0f;
                 }
@@ -730,7 +736,8 @@ public final class DriveSound {
 
         String describe() {
             return String.format(Locale.US,
-                    "run: %s style=%s view=%s speakers=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
+                    "run: %s style=%s view=%s speakers=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s eager=%.1f coupled=%.2f "
+                            + "load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
                             + "  exterior: route %s, volume %+.0f dB, media volume %s%n"
                             + "  mixer: takes a period every %s (%s blocks each)%n"
@@ -745,7 +752,7 @@ public final class DriveSound {
                             + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
                     state, style.key, cabin ? "cabin" : "outside", outputMode, why, ignitedAs.isEmpty() ? "-" : ignitedAs,
                     endedAs.isEmpty() ? "-" : endedAs, rpm, gear,
-                    pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
+                    pseudo ? " (pseudo)" : "", eager, coupled, load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
                     exteriorRoute, DriveSound.this.exteriorDb, mediaText(),

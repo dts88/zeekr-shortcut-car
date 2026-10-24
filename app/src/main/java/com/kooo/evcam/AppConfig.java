@@ -1001,7 +1001,7 @@ public class AppConfig {
     public static final String DRIVE_SOUND_ROUTE_PLAYBACK = "bus11";
 
     /**
-     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
+     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下（2026-10-24 起标准模式也是）合成发动机声（{@code sound.DriveSound}）。
      * 改了马上生效（{@code DriveSound.refresh}）。
      */
     public boolean isDriveSoundEnabled() {

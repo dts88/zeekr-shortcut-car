@@ -25,6 +25,12 @@ package com.kooo.evcam.sound;
  *       和模拟换挡一样升挡；油门回到 {@link #PSEUDO_OFF_PCT} 以下、踩刹车或回收时回到连续。</li>
  *   <li><b>升挡</b>（两种走法一样）：先断扭（合成器那边燃烧减弱、电平掉一点），转速停一下再按 S 形落到新挡位，
  *       动力回来时「吼」一下；每次换挡给合成器一个记号（{@link #shiftSerial}），它据此放换挡的「咚」。</li>
+ *   <li><b>挂着挡就是硬连着</b>（项目所有者 2026-10-24：除了 1 挡起步离合器半接触，发动机、变速箱、车轮是硬链接的）：
+ *       起步时离合器 / 液力变矩器打滑，转速由油门撑着；挡位转速超过起步转速就接合（{@link #COUPLE_OVER}），之后转速 = 车速 × 齿比，
+ *       油门只改负荷、不改转速（原来一直按打滑算，挂着挡踩油门转速比挡位高 200–970 rpm、一松就掉回去）。连续走法照旧（像无级变速）。</li>
+ *   <li><b>换挡积极性</b>（{@link Input#eager}，项目所有者 2026-10-24：标准模式也出声，和运动模式只差升降挡的积极性）：
+ *       标准模式照原来的换挡；运动模式轻踩时升挡点高 {@link #EAGER_UP_RPM}（踩到底一样）、松油门保持挡位、减速时早一点降挡。
+ *       手动挡不管哪种模式松油门都不升挡。两种都：油门正往下踩时不升挡（{@link #TIP_IN_RATE}），踩着油门降挡留出往上拉的余地。</li>
  * </ul>
  *
  * <h3>开始工作（{@link #ignite}）、停下来（{@link #shutdown}）</h3>
@@ -69,6 +75,11 @@ final class VirtualEngine {
         Gear gear = Gear.UNKNOWN;
         Flow flow = Flow.UNKNOWN;
         RpmMode mode = RpmMode.CONTINUOUS;
+        /**
+         * 换挡积极性（0–1，项目所有者 2026-10-24）：0 = 标准模式（原来的换挡），1 = 运动模式 —— 升挡点高一些、松油门不升挡、
+         * 减速时早一点降挡（{@link #EAGER_UP_RPM} 等）。别的都一样。
+         */
+        float eager;
     }
 
     // ---- 负荷
@@ -168,6 +179,35 @@ final class VirtualEngine {
     static final float KICKDOWN_PEDAL_PCT = 90f;
     /** 减速度超过这个（0–1）时不升挡：刹车、回收减速时运动模式不升挡。 */
     static final float NO_UPSHIFT_DECEL = 0.1f;
+
+    // ---- 挂着挡：起步打滑、接合（项目所有者 2026-10-24：除了 1 挡起步离合器半接触，发动机、变速箱、车轮是硬链接的）
+    /** 打滑到接合用多久（秒）：挡位转速超过起步转速以后，转速在这么久里收到挡位转速上。 */
+    static final float COUPLE_SEC = 0.3f;
+    /**
+     * 挡位转速超过起步转速多少（起步转速 ÷ 它）开始接合：这时打滑的转速（{@link #slipRpm}）只比挡位转速高约 1 %，接合时听不出往下掉
+     * （2026-10-24：按挡位转速追上就接合、打滑按三次方的软最大值算时，接合那一下掉 20 %，手动挡 40 % 油门起步掉约 470 rpm）。
+     */
+    static final float COUPLE_OVER = 0.75f;
+    /** 车速到这里（km/h）一定接合了（兜底，平时用不上）；行驶中接入时这么快就是接合着的。 */
+    static final float COUPLE_KMH = 60f;
+
+    // ---- 换挡积极性（{@link Input#eager}：0 标准模式、1 运动模式）
+    /**
+     * 运动模式升挡点抬高多少（rpm，松着、轻踩时满额，越往下踩越少，踩到底和标准模式一样都在快到上限处升）：轻踩巡航时比标准模式
+     * 低一挡（100 km/h 轻踩：标准六挡约 2000 rpm，运动五挡约 2500）。
+     */
+    static final float EAGER_UP_RPM = 600f;
+    /** 运动模式减速时降挡点抬高多少（按升挡点的比例）：转速掉到约 1700 rpm 就降，标准模式约 1150。 */
+    static final float EAGER_DOWN_RAISE = 0.1f;
+    /** 积极性变过去用多久（秒）：行驶中切换驾驶模式，挡位照常一挡一挡跟过去。 */
+    static final float EAGER_SEC = 1f;
+    /** 积极性超过这个、或者手动挡：松着油门不升挡（保持挡位、用发动机拖着）；只有快到上限才升。 */
+    static final float EAGER_HOLD = 0.5f;
+    /**
+     * 油门正往下踩（踩得比这快，%/s）时不升挡：要的负荷还在涨，等踩稳了再看。保持挡位以后再踩油门，换挡负荷已经落下来了，
+     * 不等它就会先升一挡、紧接着又降回来（2026-10-24 试听里见到的）。
+     */
+    static final float TIP_IN_RATE = 20f;
 
     // ---- 伪挡位（连续走法，油门接近踩到底）
     static final float PSEUDO_ON_PCT = 80f;
@@ -310,6 +350,11 @@ final class VirtualEngine {
     /** 此刻算一脚到底（急踩，或者油门到了 {@link #KICKDOWN_PEDAL_PCT}）：模拟换挡直接降到该在的挡。 */
     private boolean kickdown;
     private float shiftLeftSec;
+    /** 挂着挡：开始接合了（挡位转速追上了起步转速，或者车速够了）；接合到几成（0 打滑 … 1 硬连着）。车停下重来。 */
+    private boolean coupling;
+    private float coupled;
+    /** 此刻的换挡积极性（{@link Input#eager} 平滑过来的）。 */
+    private float eager;
     /** 连续走法里此刻按伪挡位走；这台走不走伪挡位。 */
     private boolean pseudo;
     private final boolean pseudoAllowed;
@@ -426,6 +471,10 @@ final class VirtualEngine {
         gear = in.gear;
         gearIndex = 0;
         gearPicked = true;
+        eager = clamp01(in.eager);
+        // 车在走时接上：够快就是接合着的（混动车行驶中起动发动机，离合器同步了才合上）
+        coupling = v >= COUPLE_KMH;
+        coupled = coupling ? 1f : 0f;
         rpm = 0f;
         load = 0f;
         fire = 0f;
@@ -446,9 +495,9 @@ final class VirtualEngine {
         shiftLoad = loadTarget(in);
         boolean easing = in.braking || in.flow == Flow.REGEN;
         if (in.gear == Gear.D && in.mode == RpmMode.SHIFTS) {
-            gearIndex = pickGear(p, gearbox, v, shiftLoad);
+            gearIndex = pickGear(p, gearbox, v, shiftLoad, SHIFT_GUARD, eager);
             if (!easing && gearIndex > 0
-                    && v * gearbox.rpmPerKmh[gearIndex - 1] < upshiftRpm(p, 1f) * SHIFT_GUARD) {
+                    && v * gearbox.rpmPerKmh[gearIndex - 1] < upshiftRpm(p, 1f, eager) * SHIFT_GUARD) {
                 // 顺势降一挡：表示运动模式接上了；换挡看的负荷记成满的，这一挡保持一会儿
                 gearIndex--;
                 shiftLoad = 1f;
@@ -501,6 +550,7 @@ final class VirtualEngine {
         float lift = overrunSpeed ? clamp01((-in.pedalRate - LIFT_FROM) / (LIFT_FULL - LIFT_FROM)) : 0f;
         liftEnv = Math.max(lift, liftEnv * decay(dt, LIFT_DECAY_SEC));
         decel += (clamp01(-in.accel / DECEL_FULL) - decel) * follow(dt, DECEL_SMOOTH_SEC);
+        eager += (clamp01(in.eager) - eager) * follow(dt, EAGER_SEC);
         effortEnv += (effort(in) - effortEnv) * follow(dt, EFFORT_SMOOTH_SEC);
         blip *= decay(dt, BLIP_DECAY_SEC);
         blipLoad *= decay(dt, BLIP_LOAD_DECAY_SEC);
@@ -540,11 +590,14 @@ final class VirtualEngine {
         if (geared) {
             updateGear(dt, v, in);
             shifting = shiftLeftSec > 0f;
+            updateCoupling(dt, v);
         } else {
             gearIndex = 0;
             gearPicked = false;
             shiftLeftSec = 0f;
             upLeftSec = 0f;
+            coupling = false;
+            coupled = 0f;
         }
         updateCatch(dt, target, in.gear);
         float goal = rpmTarget(v, in);
@@ -559,6 +612,25 @@ final class VirtualEngine {
                 : neutral(in.gear) ? clamp01((rpm - NEUTRAL_FUEL_RPM) / NEUTRAL_CUT_SPAN)
                 : clamp01((rpm - p.idleRpm - OVERRUN_FROM_RPM) / OVERRUN_RPM_SPAN);
         overrun += (overrunTarget - overrun) * follow(dt, OVERRUN_SEC);
+    }
+
+    /**
+     * 起步打滑 → 接合（项目所有者 2026-10-24）：车停下（{@link #SHIFT_RESET_KMH} 以下）离合器分开、变矩器打滑；挡位转速超过
+     * 起步转速（{@link #COUPLE_OVER}，或者车速到了 {@link #COUPLE_KMH}）开始接合，{@link #COUPLE_SEC} 里收到挡位转速上，
+     * 之后一直硬连着，直到再停下来。
+     */
+    private void updateCoupling(float dt, float v) {
+        if (v < SHIFT_RESET_KMH) {
+            coupling = false;
+            coupled = 0f;
+            return;
+        }
+        if (!coupling && (v * gearbox.rpmPerKmh[gearIndex] * COUPLE_OVER >= launchRpm(load) || v >= COUPLE_KMH)) {
+            coupling = true;
+        }
+        if (coupling) {
+            coupled += (1f - coupled) * follow(dt, COUPLE_SEC);
+        }
     }
 
     /** 空挡照真车：从高处松油门落下来，落到怠速附近时电控稳一下（{@link #catchShape}）；踩油门、挂挡就不管了。 */
@@ -721,6 +793,7 @@ final class VirtualEngine {
     /**
      * 模拟换挡：升挡点随换挡负荷（最近的负荷慢慢回落），降挡点随急踩、重刹抬高；刹车、回收减速时不升挡；
      * 猛踩直接降到该在的挡（一脚到底可以连降几挡），重刹一挡一挡地降；降挡带补油，升挡音量掉一下。
+     * 运动模式（{@link #eager}）升挡点、减速时的降挡点都高一些，松着油门不升挡；手动挡松着油门也不升挡（快到上限除外）。
      */
     private void updateGear(float dt, float v, Input in) {
         if (shiftLeftSec > 0f) {
@@ -733,7 +806,7 @@ final class VirtualEngine {
         }
         if (!gearPicked) {
             // 刚从别的挡、别的走法、别的变速箱过来：按此刻的车速和负荷直接选，不一挡一挡地升
-            gearIndex = pickGear(p, gearbox, v, shiftLoad);
+            gearIndex = pickGear(p, gearbox, v, shiftLoad, SHIFT_GUARD, eager);
             gearPicked = true;
             return;
         }
@@ -744,20 +817,25 @@ final class VirtualEngine {
         boolean easing = in.braking || in.flow == Flow.REGEN;
         if (kickdown && !easing) {
             // 一脚到底：直接降到此刻车速下该在的挡（留出往上拉的余地），可以连降几挡
-            int to = pickGear(p, gearbox, v, shiftLoad, KICKDOWN_ROOM);
+            int to = pickGear(p, gearbox, v, shiftLoad, KICKDOWN_ROOM, eager);
             if (to < gearIndex) {
                 downshiftTo(to, false);
                 return;
             }
         }
         // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）才按记住的量
-        float up = upshiftRpm(p, shiftLoad);
-        float downRatio = p.shiftDownRatio + STAB_DOWNSHIFT_RAISE * stabEnv
+        float up = upshiftRpm(p, shiftLoad, eager);
+        float downRatio = p.shiftDownRatio + EAGER_DOWN_RAISE * eager + STAB_DOWNSHIFT_RAISE * stabEnv
                 + (easing ? DECEL_DOWNSHIFT_RAISE * decel : 0f);
-        float down = upshiftRpm(p, easing ? shiftLoad : load) * downRatio;
+        float down = upshiftRpm(p, easing ? shiftLoad : load, eager) * downRatio;
         float inGear = v * gearbox.rpmPerKmh[gearIndex];
         boolean slowing = easing && decel > NO_UPSHIFT_DECEL;
-        if (gearIndex < last && inGear >= up && !slowing) {
+        // 松着油门保持挡位（运动模式；手动挡开车的人也不会松油门就升挡），快到上限才升。看踩着的量（不等负荷慢慢落）：
+        // 巡航时转速就在升挡点下面一点，松开那一下换挡负荷先往下落，按平滑后的负荷判就会抢先升一挡
+        boolean holding = loadTarget(in) < OVERRUN_LOAD && (eager > EAGER_HOLD || gearbox.manual())
+                && inGear < upshiftRpm(p, 1f, eager) * SHIFT_GUARD;
+        boolean pressing = in.pedalRate > TIP_IN_RATE;
+        if (gearIndex < last && inGear >= up && !slowing && !holding && !pressing) {
             gearIndex++;
             shiftLeftSec = gearbox.upshiftSec;
             upLeftSec = gearbox.upshiftSec;
@@ -766,7 +844,9 @@ final class VirtualEngine {
             shiftSerial++;
             shiftUp = true;
         } else if (gearIndex > 0 && inGear < down
-                && v * gearbox.rpmPerKmh[gearIndex - 1] < up * SHIFT_GUARD) {
+                && v * gearbox.rpmPerKmh[gearIndex - 1] < up * (easing ? SHIFT_GUARD : KICKDOWN_ROOM)) {
+            // 踩着油门降挡也留出往上拉的余地（和一脚到底一样）：不然一降就在升挡点底下，紧接着又升回去
+            // （2026-10-24：急踩 70 % 时三挡 → 二挡 → 一挡 → 0.25 秒后又升二挡）
             downshiftTo(gearIndex - 1, easing);
         }
     }
@@ -791,8 +871,11 @@ final class VirtualEngine {
                 break;
             case D:
                 if (in.mode == RpmMode.SHIFTS || pseudo) {
-                    base = gearedRpm(launchRpm(load), v * gearbox.rpmPerKmh[gearIndex])
+                    // 起步打滑时油门撑着转速（急踩还冲一下）；接合以后就是挡位转速（{@link #updateCoupling}）
+                    float inGear = v * gearbox.rpmPerKmh[gearIndex];
+                    float slipping = slipRpm(launchRpm(load), inGear)
                             + STAB_FLARE_RPM * SHIFT_FLARE_SHARE * stabEnv * (1f - speedCurve(p, v));
+                    base = slipping + (inGear - slipping) * coupled;
                 } else {
                     boolean easing = in.braking || in.flow == Flow.REGEN;
                     base = continuousRpm(p, v, load)
@@ -901,8 +984,8 @@ final class VirtualEngine {
     }
 
     /**
-     * 挂着挡时的转速：起步打滑的转速（{@code launch}，跟着油门）和挡位转速（车速 × 齿比）平滑地合在一起（三次方的软最大值）——
-     * 低速时打滑的转速撑着，车速上来后跟着挡位走，中间不出平台、也不往下掉。
+     * 起步打滑时的转速：起步打滑的转速（{@code launch}，跟着油门）和挡位转速（车速 × 齿比）平滑地合在一起（三次方的软最大值）——
+     * 低速时打滑的转速撑着，车速上来后跟着挡位走，中间不出平台、也不往下掉。接合以后不用它（{@link #updateCoupling}）；倒挡一直用它。
      */
     static float gearedRpm(float launch, float inGear) {
         double a = Math.max(0f, launch);
@@ -911,12 +994,32 @@ final class VirtualEngine {
     }
 
     /**
+     * D 挡起步打滑时的转速：起步转速和挡位转速的软最大值，按八次方 —— 低速时起步转速撑着，挡位转速超过它以后很快就贴上去
+     * （交叉处高 9 %，超过三分之一时只高 1 %，{@link #COUPLE_OVER}），接合时不往下掉。倒挡还按 {@link #gearedRpm}。
+     */
+    static float slipRpm(float launch, float inGear) {
+        double a = Math.max(0f, launch);
+        double b = Math.max(0f, inGear);
+        double a2 = a * a;
+        double b2 = b * b;
+        double a8 = a2 * a2 * a2 * a2;
+        double b8 = b2 * b2 * b2 * b2;
+        return (float) Math.pow(a8 + b8, 0.125);
+    }
+
+    /**
      * 升挡点：负荷越大越晚升，按平方 —— 轻踩、中等油门早升，不在低挡拖着；只有重踩、地板油才拉到快到上限
      * （项目所有者 2026-10-22）。离上限留 300 rpm。
      */
     static float upshiftRpm(SoundProfile p, float load) {
+        return upshiftRpm(p, load, 0f);
+    }
+
+    /** 同上，换挡积极性 {@code eager}（0 标准 … 1 运动）：运动模式轻踩时抬高 {@link #EAGER_UP_RPM}，踩到底不抬。 */
+    static float upshiftRpm(SoundProfile p, float load, float eager) {
         float l = clamp01(load);
-        return Math.min(p.shiftUpBaseRpm + p.shiftUpLoadRpm * l * l, p.maxRpm - 300f);
+        float l2 = l * l;
+        return Math.min(p.shiftUpBaseRpm + EAGER_UP_RPM * clamp01(eager) * (1f - l2) + p.shiftUpLoadRpm * l2, p.maxRpm - 300f);
     }
 
     /** 按车速和负荷直接选挡：转速还在升挡点以下的最低一挡。 */
@@ -926,7 +1029,12 @@ final class VirtualEngine {
 
     /** 同上，转速在升挡点的 {@code room} 倍以下（一脚到底时留出往上拉的余地，{@link #KICKDOWN_ROOM}）。 */
     static int pickGear(SoundProfile p, Gearbox gearbox, float speedKmh, float load, float room) {
-        float up = upshiftRpm(p, load) * room;
+        return pickGear(p, gearbox, speedKmh, load, room, 0f);
+    }
+
+    /** 同上，按换挡积极性 {@code eager}（{@link #upshiftRpm(SoundProfile, float, float)}）。 */
+    static int pickGear(SoundProfile p, Gearbox gearbox, float speedKmh, float load, float room, float eager) {
+        float up = upshiftRpm(p, load, eager) * room;
         for (int g = 0; g < gearbox.rpmPerKmh.length; g++) {
             if (speedKmh * gearbox.rpmPerKmh[g] < up) {
                 return g;
@@ -1079,6 +1187,16 @@ final class VirtualEngine {
     /** 倒挡齿轮的啸叫多响（0–1，跟着车速）；不在倒挡是 0。 */
     float whineAmp() {
         return gear == Gear.R ? clamp01(speedKmh / REVERSE_WHINE_FULL_KMH) : 0f;
+    }
+
+    /** 此刻的换挡积极性（0 标准 … 1 运动）。 */
+    float eager() {
+        return eager;
+    }
+
+    /** 挂着挡接合到几成（0 起步打滑 … 1 硬连着）。 */
+    float coupled() {
+        return coupled;
     }
 
     /** 模拟换挡的挡位（0 = 一挡）。 */

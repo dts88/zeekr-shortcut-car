@@ -102,6 +102,12 @@ public class PedalTrackTest {
         lift.sample(80f, 1000, 1000);
         lift.sample(0f, 1200, 1200);
         assertEquals(-400f, lift.rate(1200), 0.5f);
+        // 读数只在变了的时候来：松开 4 秒后一下到 70 %，脚是在最近一次更新里动的 —— 按最多 0.25 秒算 280 %/s，
+        // 不是按整段算成 17.5 %/s 的慢慢踩（2026-10-24）
+        PedalTrack rested = new PedalTrack();
+        rested.sample(0f, 1000, 1000);
+        rested.sample(70f, 5000, 5000);
+        assertEquals(70f / PedalTrack.MAX_GAP_SEC, rested.rate(5000), 0.5f);
     }
 
     @Test

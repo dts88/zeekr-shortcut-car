@@ -680,6 +680,146 @@ public class VirtualEngineTest {
             }
         }
         assertTrue("手动挡踩离合换挡，比自动挡慢", Gearbox.MANUAL6.upshiftSec > Gearbox.AUTO8.upshiftSec);
+        assertTrue(Gearbox.MANUAL6.manual() && !Gearbox.AUTO8.manual());
+    }
+
+    // ================================================================= 2026-10-24：挂着挡硬连着、换挡积极性
+
+    @Test
+    public void inGearTheEngineIsHardLinkedToTheWheels() {
+        // 项目所有者 2026-10-24：除了 1 挡起步离合器半接触，发动机、变速箱、车轮是硬链接的。原来一直按起步打滑算：挂着挡踩油门
+        // 转速比挡位高 200–970 rpm（手动挡 30 km/h 一挡 90 % 负荷 1883 → 2852），一松油门车速没变转速就掉回去
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine e = new VirtualEngine(P, box, false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 50f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            e.ignite(in);
+            run(e, in, 2.5f);
+            in.speedKmh = 5f;
+            run(e, in, 0.5f);
+            float slip = e.rpm() - 5f * box.rpmPerKmh[e.gearIndex()];
+            assertTrue(box + " 起步时离合器 / 变矩器打滑，转速由油门撑着：高 " + slip, slip > 500f);
+            for (int i = 0; i < Math.round(5.5f / DT); i++) {
+                in.speedKmh = Math.min(60f, in.speedKmh + 10f * DT);
+                e.step(DT, in);
+            }
+            run(e, in, 2f);
+            float inGear = 60f * box.rpmPerKmh[e.gearIndex()];
+            assertEquals(box + " 踩着油门：转速就是挡位转速", inGear, e.rpm(), inGear * 0.01f);
+            int gear = e.gearIndex();
+            in.throttlePct = 0f;
+            in.flow = VirtualEngine.Flow.IDLE;
+            run(e, in, 0.5f);
+            assertEquals(gear, e.gearIndex());
+            assertEquals(box + " 车速没变、松了油门：转速也不变", inGear, e.rpm(), inGear * 0.01f);
+            assertEquals(1f, e.coupled(), 0.01f);
+            in.speedKmh = 0f;
+            run(e, in, 0.1f);
+            assertEquals("停下来离合器分开", 0f, e.coupled(), 0f);
+        }
+    }
+
+    /** 130 km/h 轻踩巡航 6 秒，再松油门滑行（−0.4 m/s²）5 秒：{巡航的挡, 松开以后的挡}。 */
+    private static int[] cruiseThenLift(Gearbox box, float eager, float fromKmh) {
+        VirtualEngine e = new VirtualEngine(P, box, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, fromKmh, 15f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.eager = eager;
+        in.accel = 0.2f;
+        e.ignite(in);
+        run(e, in, 6f);
+        int cruise = e.gearIndex();
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.IDLE;
+        in.accel = -0.4f;
+        float v = fromKmh;
+        for (int i = 0; i < Math.round(5f / DT); i++) {
+            v -= 0.4f * 3.6f * DT;
+            in.speedKmh = v;
+            e.step(DT, in);
+        }
+        return new int[] {cruise, e.gearIndex()};
+    }
+
+    @Test
+    public void sportCruisesAGearLowerAndHoldsItAfterALift() {
+        // 项目所有者 2026-10-24：标准模式也出声，和运动模式只差升降挡的积极性。标准模式照原来：轻踩 130 km/h 在七挡、松油门滑行
+        // 升到八挡；运动模式升挡点高 600 rpm，同样轻踩在六挡，松油门保持挡位（转速跟着车速往下走）
+        int[] standard = cruiseThenLift(Gearbox.AUTO8, 0f, 130f);
+        int[] sport = cruiseThenLift(Gearbox.AUTO8, 1f, 130f);
+        assertTrue("运动模式巡航低一挡: " + sport[0] + " vs " + standard[0], sport[0] < standard[0]);
+        assertTrue("标准模式松油门升挡: " + standard[0] + " → " + standard[1], standard[1] > standard[0]);
+        assertEquals("运动模式松油门保持挡位", sport[0], sport[1]);
+        assertEquals("松着、轻踩时抬高", VirtualEngine.EAGER_UP_RPM,
+                VirtualEngine.upshiftRpm(P, 0f, 1f) - VirtualEngine.upshiftRpm(P, 0f, 0f), 1e-3f);
+        assertEquals("踩到底一样在快到上限处升", VirtualEngine.upshiftRpm(P, 1f, 0f), VirtualEngine.upshiftRpm(P, 1f, 1f), 1e-3f);
+    }
+
+    @Test
+    public void theManualHoldsItsGearOffThrottle() {
+        // 开手动挡的人松油门是要减速、要发动机拖着，不会松开就升挡（原来和自动挡一样：100 km/h 五挡松开就升到六挡）
+        int[] manual = cruiseThenLift(Gearbox.MANUAL6, 0f, 100f);
+        assertEquals("手动挡松油门不升挡", manual[0], manual[1]);
+    }
+
+    @Test
+    public void pressingAgainAfterAHeldGearDoesNotShiftUpFirst() {
+        // 运动模式松油门保持着挡位，这时换挡负荷已经落下来了；再一脚踩下去（70 %），要的负荷还在涨，不能先升一挡、紧接着又降回来
+        // （2026-10-24 试听里见到的），降挡也要留出往上拉的余地（不能三挡 → 二挡 → 一挡，0.25 秒后又升二挡）
+        VirtualEngine e = new VirtualEngine(P, G, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.eager = 1f;
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.throttlePct = 50f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        ramp(e, in, 0f, 8f, 8f);
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.REGEN;
+        ramp(e, in, 64f, -3.6f, 4f);
+        int held = e.gearIndex();
+        in.throttlePct = 70f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        in.pedalRate = 280f;
+        java.util.List<float[]> shifts = ramp(e, in, 49.6f, 10f, 0.15f);
+        in.pedalRate = 0f;
+        shifts.addAll(ramp(e, in, 51.1f, 10f, 1.5f));
+        int ups = 0;
+        int downs = 0;
+        for (float[] s : shifts) {
+            if (s[3] == 1f) {
+                ups++;
+            } else {
+                downs++;
+            }
+            assertTrue("先降后升，不先升", downs > 0 || s[3] == 0f);
+        }
+        assertTrue("从 " + (held + 1) + " 挡最多降一次、不马上升回去: " + downs + " 降 " + ups + " 升", downs <= 1 && ups == 0);
+    }
+
+    @Test
+    public void sportShiftsDownEarlierWhenSlowing() {
+        // 回收减速（−1 m/s²）：运动模式转速掉到约 1700 rpm 就降挡（补油「轰」一下），标准模式掉到 1100–1300 才降
+        float[] downFrom = new float[2];
+        for (int k = 0; k < 2; k++) {
+            VirtualEngine e = new VirtualEngine(P, G, false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 100f, 15f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            in.eager = k;
+            e.ignite(in);
+            run(e, in, 6f);
+            in.throttlePct = 0f;
+            in.flow = VirtualEngine.Flow.REGEN;
+            downFrom[k] = -1f;
+            for (float[] s : ramp(e, in, 100f, -3.6f, 15f)) {
+                if (s[3] == 0f && downFrom[k] < 0f) {
+                    downFrom[k] = s[2];
+                }
+            }
+            assertTrue("降过挡", downFrom[k] > 0f);
+        }
+        assertTrue("运动模式早降: " + downFrom[1] + " vs " + downFrom[0] + " rpm", downFrom[1] > downFrom[0] + 300f);
     }
 
     @Test

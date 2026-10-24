@@ -9,9 +9,10 @@ import com.kooo.evcam.telemetry.Signal;
 import org.junit.Test;
 
 /**
- * 模拟声浪什么时候出声（项目所有者 2026-10-21：只在车内、只做运动模式；运动模式下一直转着，停着是怠速）。
+ * 模拟声浪什么时候出声（项目所有者 2026-10-21：只在车内、只做运动模式；运动模式下一直转着，停着是怠速。
+ * 2026-10-24：标准模式也出声，和运动模式只差换挡积极性）。
  *
- * <p>算错的表现：舒适 / 标准模式也响；关了开关、切出运动模式还在响；车速油门读不到时卡在一个声音上；
+ * <p>算错的表现：舒适模式也响、标准模式不响；关了开关、切到舒适模式还在响；车速油门读不到时卡在一个声音上；
  * 电话里还在轰；或者没上电就开着喇叭。</p>
  */
 public class DriveSoundRulesTest {
@@ -34,13 +35,25 @@ public class DriveSoundRulesTest {
     }
 
     @Test
-    public void onlySportModeSounds() {
-        assertEquals(DriveSoundRules.Why.NOT_SPORT,
-                decide(true, true, ON, "D", Signal.DRIVE_MODE_COMFORT, 50f, 30f, 20L, false));
-        assertEquals(DriveSoundRules.Why.NOT_SPORT,
+    public void sportAndStandardSoundOtherModesDoNot() {
+        assertEquals(DriveSoundRules.Why.RUNNING,
                 decide(true, true, ON, "D", Signal.DRIVE_MODE_STANDARD, 50f, 30f, 20L, false));
-        assertEquals("驾驶模式读不到也不出声", DriveSoundRules.Why.NOT_SPORT,
+        assertEquals(DriveSoundRules.Why.OTHER_MODE,
+                decide(true, true, ON, "D", Signal.DRIVE_MODE_COMFORT, 50f, 30f, 20L, false));
+        assertEquals(DriveSoundRules.Why.OTHER_MODE,
+                decide(true, true, ON, "D", Signal.DRIVE_MODE_SNOW, 50f, 30f, 20L, false));
+        assertEquals("驾驶模式读不到也不出声", DriveSoundRules.Why.OTHER_MODE,
                 decide(true, true, ON, "D", null, 50f, 30f, 20L, false));
+    }
+
+    @Test
+    public void onlyTheShiftEagernessTellsSportFromStandard() {
+        // 项目所有者 2026-10-24：标准模式和运动模式只差升降挡的积极性
+        assertEquals(1f, DriveSoundRules.eagerOf(SPORT), 0f);
+        assertEquals(0f, DriveSoundRules.eagerOf(Signal.DRIVE_MODE_STANDARD), 0f);
+        assertEquals(0f, DriveSoundRules.eagerOf(null), 0f);
+        assertTrue(DriveSoundRules.soundMode(SPORT) && DriveSoundRules.soundMode(Signal.DRIVE_MODE_STANDARD));
+        assertFalse(DriveSoundRules.soundMode(Signal.DRIVE_MODE_COMFORT) || DriveSoundRules.soundMode(null));
     }
 
     @Test
@@ -70,16 +83,16 @@ public class DriveSoundRulesTest {
     @Test
     public void whatEachVerdictMeans() {
         assertFalse(DriveSoundRules.Why.OFF.armed);
-        assertFalse("不是运动模式不快读，不让车机服务白读", DriveSoundRules.Why.NOT_SPORT.armed);
-        assertFalse(DriveSoundRules.Why.NOT_SPORT.open);
+        assertFalse("不出声的驾驶模式不快读，不让车机服务白读", DriveSoundRules.Why.OTHER_MODE.armed);
+        assertFalse(DriveSoundRules.Why.OTHER_MODE.open);
         assertTrue("运动模式下读数过期也照样快读，等它回来", DriveSoundRules.Why.STALE.armed);
         assertTrue("读数过期、通话：发动机还转着，只是静音", DriveSoundRules.Why.STALE.open
                 && DriveSoundRules.Why.CALL.open);
         assertFalse(DriveSoundRules.Why.STALE.audible || DriveSoundRules.Why.CALL.audible);
         assertTrue(DriveSoundRules.Why.RUNNING.audible);
-        assertEquals("切出运动模式：放不了熄火时 0.6 秒淡出", 0.6f, DriveSoundRules.Why.NOT_SPORT.fadeSec, 0f);
-        // 项目所有者 2026-10-22：切出运动模式、下电时发动机熄火（和停着切进来点火一个说法）；别的原因淡出
-        assertTrue(DriveSoundRules.Why.NOT_SPORT.shutsDown && DriveSoundRules.Why.POWER_OFF.shutsDown);
+        assertEquals("切到不出声的模式：放不了熄火时 0.6 秒淡出", 0.6f, DriveSoundRules.Why.OTHER_MODE.fadeSec, 0f);
+        // 项目所有者 2026-10-22：切出运动模式（现在是切到不出声的模式）、下电时发动机熄火（和停着切进来点火一个说法）；别的原因淡出
+        assertTrue(DriveSoundRules.Why.OTHER_MODE.shutsDown && DriveSoundRules.Why.POWER_OFF.shutsDown);
         assertFalse("开关关了、接口断了：淡出", DriveSoundRules.Why.OFF.shutsDown || DriveSoundRules.Why.NO_LINK.shutsDown);
         assertFalse("没停下来的不熄火", DriveSoundRules.Why.STALE.shutsDown || DriveSoundRules.Why.CALL.shutsDown
                 || DriveSoundRules.Why.RUNNING.shutsDown);

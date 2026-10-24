@@ -34,6 +34,11 @@ enum Gearbox {
         this.upshiftSec = upshiftSec;
     }
 
+    /** 手动挡：松着油门不换挡（开车的人松油门是要减速、要用发动机拖着，不是要升挡，{@link VirtualEngine}）。 */
+    boolean manual() {
+        return this == MANUAL6;
+    }
+
     /** 齿比 × 主减速比 → 1 km/h 对应多少 rpm（车轮每分钟转几圈 × 总传动比）。 */
     static float rpmPerKmh(float ratio, float finalDrive) {
         return ratio * finalDrive * 1000f / 60f / ROLLING_M;
