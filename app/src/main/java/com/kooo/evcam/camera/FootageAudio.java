@@ -20,7 +20,8 @@ import java.nio.ByteBuffer;
 import java.util.Locale;
 
 /**
- * 环视录像里的声音（开发者选项「录制声音」，项目所有者 2026-10-20 定先做框架）：一个麦克风 → AAC → 交给环视那一路的录制器，
+ * 环视录像里的声音（设置 → 录制「录制声音」，项目所有者 2026-10-20 定先做框架，2026-10-24 定为正式功能、默认开）：
+ * 一个麦克风 → AAC → 交给环视那一路的录制器，
  * 和画面写进同一个文件（{@link CodecVideoRecorder#setFootageAudio}）。
  *
  * <p>一次开录一个、一条线程：录制器开录时起，叫停时停（{@link #stop} 不等）。读一块 PCM（{@link #CHUNK_FRAMES} 帧）
@@ -68,7 +69,7 @@ public final class FootageAudio {
         void onAudioSample(long captureBootUs, byte[] data);
     }
 
-    /** 开发者选项里存的来源 → AudioSource。认不出的按原始。 */
+    /** 设置里存的来源 → AudioSource。认不出的按原始。 */
     static int audioSourceFor(String source) {
         return SOURCE_CALL.equals(source) ? MediaRecorder.AudioSource.VOICE_COMMUNICATION
                 : MediaRecorder.AudioSource.VOICE_RECOGNITION;
@@ -78,7 +79,7 @@ public final class FootageAudio {
     private static volatile FootageAudio latest;
 
     /**
-     * 环视录像此刻会不会带声音、用哪个来源：开发者选项「录制声音」开着、有录音权限、安卓 11 起。
+     * 环视录像此刻会不会带声音、用哪个来源：「录制声音」（设置 → 录制）开着、有录音权限、安卓 11 起。
      * 定录法（{@code MultiCameraManager}）、前台服务带不带麦克风类型、存储估算、诊断都问这一处；null = 不带。
      */
     public static String sourceFor(android.content.Context context, com.kooo.evcam.AppConfig config) {

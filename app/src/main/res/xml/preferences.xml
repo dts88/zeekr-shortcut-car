@@ -45,6 +45,16 @@
                 android:key="pref_profile_editor"
                 android:title="@string/set_profile_editor_title"
                 android:summary="@string/set_profile_editor_summary" />
+
+            <!--
+              录制声音（2026-10-24 从开发者选项挪来，项目所有者：正式功能、默认开）：只给环视录像。
+              开关加下一层：行尾写麦克风来源，点这一行选。开着、没有录音权限时开关显示关（显示值 = 实际生效值）；
+              主界面起来时问一次权限，不给就关掉（MainActivity.requestMicrophoneIfWanted）
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_footage_audio"
+                android:title="@string/set_footage_audio_title"
+                android:summary="@string/set_footage_audio_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory
@@ -395,81 +405,15 @@
             android:key="pref_vehicle_info"
             android:title="@string/set_vehicle_info_title"
             android:summary="@string/set_vehicle_info_summary" />
-    </PreferenceScreen>
 
-    <!--
-      开发者选项。默认整块隐藏，在「关于与致谢」里点击「安全须知」再输密码才出现，
-      重启、更新都不会关（见 DeveloperMode）—— 里面要么是没做完的，要么是排查用的。
-      关闭后整块隐藏，里面的设置按没存过算（AppConfig.DEVELOPER_KEYS）。
-    -->
-    <PreferenceScreen
-        android:key="screen_developer"
-        android:title="@string/set_section_developer">
-
-        <Preference
-            android:key="pref_permissions"
-            android:title="@string/dev_permissions_title"
-            android:summary="@string/dev_permissions_summary" />
-
-        <PreferenceCategory
-            android:title="@string/set_section_recording">
-
-            <!-- 原来「高级」里的那几项：录制管线、编码、画面调节、相机映射、调试日志 ——
-                 都是排查问题时才动的东西，和开发者工具放在一起 -->
-            <ListPreference
-                android:key="pref_recording_mode"
-                android:title="@string/set_recording_mode_title"
-                android:summary="%s" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_force_h264"
-                android:title="@string/set_force_h264_title"
-                android:summary="@string/set_force_h264_summary" />
-
-            <!--
-              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善。
-              2026-10-23 和时长上限合成一行（开关加下一层）：行尾写最长多久，点这一行填小时数
-            -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_screen_off_recording"
-                android:title="@string/set_screen_off_title"
-                android:summary="@string/set_screen_off_summary" />
-
-            <!--
-              录制声音（试验，项目所有者 2026-10-20 定先做框架、上车比来源）：只给环视录像。
-              2026-10-23 和麦克风来源合成一行（开关加下一层）：行尾写来源，点这一行选
-            -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_footage_audio"
-                android:title="@string/dev_footage_audio_title"
-                android:summary="@string/dev_footage_audio_summary" />
-
-            <!-- 应用水印（2026-10-23 从录制页挪来）：固定开着、点不动，只是摆出来让人知道录像和照片上有这一行字 -->
-            <SwitchPreferenceCompat
-                android:key="pref_watermark_brand"
-                android:title="@string/set_watermark_brand_title"
-                android:summary="@string/set_watermark_brand_summary" />
-        </PreferenceCategory>
-
-        <!-- 试验性功能（2026-10-23：原来各占一组、一组一行的两项并在一起） -->
-        <PreferenceCategory
-            android:title="@string/set_group_experiments">
-
-            <!-- 车辆状态（2026-10-23 从界面页挪来） -->
-            <SwitchPreferenceCompat
-                android:key="pref_vehicle_status"
-                android:title="@string/set_vehicle_status_title"
-                android:summary="@string/set_vehicle_status_summary" />
-
-            <!--
-              模拟声浪（试验，项目所有者 2026-10-21）：只在车内、只在运动模式出声（sound.DriveSound）。
-              2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进下面的「模拟声浪」页
-            -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_drive_sound"
-                android:title="@string/dev_drive_sound_title"
-                android:summary="@string/dev_drive_sound_summary" />
-        </PreferenceCategory>
+        <!--
+          模拟声浪（试验性；项目所有者 2026-10-21 定，2026-10-24 从开发者选项挪来，保留试验性的标注）：
+          运动、标准模式下合成发动机声（sound.DriveSound）。开关加下一层：行尾写音量和转速变化方式，点这一行进下面的「模拟声浪」页
+        -->
+        <com.kooo.evcam.settings.SwitchNavPreference
+            android:key="pref_drive_sound"
+            android:title="@string/dev_drive_sound_title"
+            android:summary="@string/dev_drive_sound_summary" />
 
         <!--
           模拟声浪的下一层（嵌着的 PreferenceScreen，上一层不列成一行，见 SettingsPreferenceFragment.hideSubPages）。
@@ -519,6 +463,61 @@
                 android:title="@string/dev_drive_sound_gearbox_title"
                 android:summary="%s" />
         </PreferenceScreen>
+    </PreferenceScreen>
+
+    <!--
+      开发者选项。默认整块隐藏，在「关于与致谢」里点击「安全须知」再输密码才出现，
+      重启、更新都不会关（见 DeveloperMode）—— 里面要么是没做完的，要么是排查用的。
+      关闭后整块隐藏，里面的设置按没存过算（AppConfig.DEVELOPER_KEYS）。
+    -->
+    <PreferenceScreen
+        android:key="screen_developer"
+        android:title="@string/set_section_developer">
+
+        <Preference
+            android:key="pref_permissions"
+            android:title="@string/dev_permissions_title"
+            android:summary="@string/dev_permissions_summary" />
+
+        <!--
+          车辆状态（2026-10-23 从界面页挪来）：2026-10-24 模拟声浪挪去系统页后「试验性功能」组只剩它，
+          组去掉（一组一行的不成组，ui-spec §三），放在最上面
+        -->
+        <SwitchPreferenceCompat
+            android:key="pref_vehicle_status"
+            android:title="@string/set_vehicle_status_title"
+            android:summary="@string/set_vehicle_status_summary" />
+
+        <PreferenceCategory
+            android:title="@string/set_section_recording">
+
+            <!-- 原来「高级」里的那几项：录制管线、编码、画面调节、相机映射、调试日志 ——
+                 都是排查问题时才动的东西，和开发者工具放在一起 -->
+            <ListPreference
+                android:key="pref_recording_mode"
+                android:title="@string/set_recording_mode_title"
+                android:summary="%s" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_force_h264"
+                android:title="@string/set_force_h264_title"
+                android:summary="@string/set_force_h264_summary" />
+
+            <!--
+              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善。
+              2026-10-23 和时长上限合成一行（开关加下一层）：行尾写最长多久，点这一行填小时数
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_screen_off_recording"
+                android:title="@string/set_screen_off_title"
+                android:summary="@string/set_screen_off_summary" />
+
+            <!-- 应用水印（2026-10-23 从录制页挪来）：固定开着、点不动，只是摆出来让人知道录像和照片上有这一行字 -->
+            <SwitchPreferenceCompat
+                android:key="pref_watermark_brand"
+                android:title="@string/set_watermark_brand_title"
+                android:summary="@string/set_watermark_brand_summary" />
+        </PreferenceCategory>
 
         <PreferenceCategory
             android:title="@string/set_group_cameras">

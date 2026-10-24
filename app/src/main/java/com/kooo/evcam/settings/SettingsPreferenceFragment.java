@@ -198,6 +198,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 迟早会出现「这边写着 30、那边写着 15」。
         onClick("pref_profile_editor",
                 pref -> openFragment(new ProfileEditorFragment(), R.string.set_profile_editor_title));
+        bindFootageAudio();
 
         bindSwitch("pref_auto_record", appConfig.isAutoStartRecording(),
                 value -> appConfig.setAutoStartRecording(value));
@@ -1479,6 +1480,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 车辆信号（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
         onClick("pref_vehicle_info", pref ->
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        bindDriveSound();
 
         // 开机自启动接手全部保活手段（规格 §3）：关了就把定时任务也取消，别等它下次到点再自己退出
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
@@ -1510,8 +1512,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindScreenOffRecording();
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
-        bindFootageAudio();
-        bindDriveSound();
 
         // 画面调节：打开调节窗口（MainActivity 管着它，退出设置也还在），同时开启画面调节、套上存着的参数。
         // 窗口开没开成由 MainActivity 说：没有悬浮窗权限、相机还没好时它自己提示
@@ -1911,8 +1911,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 录制声音（开发者选项，试验）：打开时没有录音权限就先问系统，给了才打开。开关显示的是会不会真录（开着、又有权限）——
-     * 在系统设置里收回了权限，这里就显示关着。改了之后前台服务重走一遍（带上 / 去掉麦克风类型）；录法从下一次开录起。
+     * 录制声音（设置 → 录制，2026-10-24 起正式功能、默认开）：打开时没有录音权限就先问系统，给了才打开。开关显示的是会不会真录
+     * （开着、又有权限）—— 默认开着而还没给过权限、在系统设置里收回了权限，这里都显示关着。改了之后前台服务重走一遍
+     * （带上 / 去掉麦克风类型）；录法从下一次开录起。主界面起来时还会问一次（MainActivity.requestMicrophoneIfWanted）。
      */
     private void bindFootageAudio() {
         SwitchNavPreference pref = findPreference("pref_footage_audio");
@@ -1934,7 +1935,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         showFootageAudioSource(pref);
         pref.setOnPreferenceClickListener(preference -> {
             SettingSpec spec = SettingsRegistry.FOOTAGE_AUDIO_SOURCE;
-            showChoice(getString(R.string.dev_footage_audio_source_title), null, null, localizedNames(spec),
+            showChoice(getString(R.string.set_footage_audio_source_title), null, null, localizedNames(spec),
                     spec.values(), spec.sanitize(appConfig.getFootageAudioSource()), value -> {
                         appConfig.setFootageAudioSource(value);
                         showFootageAudioSource(pref);
@@ -1947,12 +1948,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void showFootageAudioSource(SwitchNavPreference pref) {
         boolean call = com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL.equals(
                 SettingsRegistry.FOOTAGE_AUDIO_SOURCE.sanitize(appConfig.getFootageAudioSource()));
-        pref.setValue(getString(call ? R.string.dev_footage_audio_source_call_short
-                : R.string.dev_footage_audio_source_raw_short));
+        pref.setValue(getString(call ? R.string.set_footage_audio_source_call_short
+                : R.string.set_footage_audio_source_raw_short));
     }
 
     /**
-     * 模拟声浪（开发者选项，试验）：开关、声音风格、听感、播放喇叭、车外线路、车外音量、音量、转速变化方式、变速箱，
+     * 模拟声浪（设置 → 系统，试验性；2026-10-24 从开发者选项挪来）：开关、声音风格、听感、播放喇叭、车外线路、车外音量、音量、转速变化方式、变速箱，
      * 改了马上生效（{@code sound.DriveSound}）。2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进「模拟声浪」页
      * （preferences.xml 里嵌着的 screen_drive_sound）；那一页的几行不在这一页时 {@code findPreference} 是 null，跳过。
      */

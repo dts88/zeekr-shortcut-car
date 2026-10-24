@@ -66,8 +66,8 @@ public class AppConfig {
     private static final String KEY_REARVIEW_FISHEYE = "rearview_fisheye";        // 鱼眼校正开关
     private static final String KEY_PHOTO_FISHEYE = "photo_fisheye";              // 图片回看的鱼眼校正开关
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
-    private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（开发者选项，试验）
-    private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（开发者选项，试验）
+    private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（设置 → 录制，默认开）
+    private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
@@ -653,17 +653,6 @@ public class AppConfig {
                 KEY_SCREEN_OFF_WAKE_MINUTES,          // 熄屏录制的最长时长 → 默认（熄屏录制关着，用不到）
                 KEY_IMAGE_ADJUST_ENABLED,             // 画面调节 → 关
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
-                KEY_FOOTAGE_AUDIO,                    // 环视录像带声音 → 关
-                SettingsRegistry.FOOTAGE_AUDIO_SOURCE.key,  // 录声音的来源 → 原始（录声音关着，用不到）
-                KEY_DRIVE_SOUND,                      // 模拟声浪 → 关
-                SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_GEARBOX.key,   // 变速箱 → 8 速自动（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_VIEW.key,      // 听感 → 车外（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_OUTPUT.key,    // 播放喇叭 → 车内（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE.key,   // 车外线路 → BUS12（声浪关着，用不到）
-                SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME.key,  // 车外音量 → 默认（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -995,11 +984,11 @@ public class AppConfig {
     public static final String FOOTAGE_AUDIO_CALL = "call";
 
     /**
-     * 环视录像带声音（开发者选项「录制声音」，试验；项目所有者 2026-10-20 定先做框架、上车比来源）。
-     * 从下一次开录起（定录法时读，{@code MultiCameraManager}）。
+     * 环视录像带声音（设置 → 录制「录制声音」；项目所有者 2026-10-20 定先做框架、上车比来源，2026-10-24 定为正式功能、默认开，
+     * 从开发者选项挪出来）。真录要再有录音权限（{@code FootageAudio.sourceFor}）。从下一次开录起（定录法时读，{@code MultiCameraManager}）。
      */
     public boolean isFootageAudioEnabled() {
-        return readBoolean(KEY_FOOTAGE_AUDIO, false);
+        return readBoolean(KEY_FOOTAGE_AUDIO, true);
     }
 
     public void setFootageAudioEnabled(boolean on) {
@@ -1051,7 +1040,7 @@ public class AppConfig {
     public static final String DRIVE_SOUND_ROUTE_PLAYBACK = "bus11";
 
     /**
-     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下（2026-10-24 起标准模式也是）合成发动机声（{@code sound.DriveSound}）。
+     * 模拟声浪（设置 → 系统「模拟声浪（试验性）」，项目所有者 2026-10-21；2026-10-24 从开发者选项挪出来）：运动模式下（2026-10-24 起标准模式也是）合成发动机声（{@code sound.DriveSound}）。
      * 改了马上生效（{@code DriveSound.refresh}）。
      */
     public boolean isDriveSoundEnabled() {

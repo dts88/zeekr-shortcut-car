@@ -394,6 +394,18 @@
   BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
   Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
 
+- 2026-10-24（录制声音挪到「设置 → 录制」、正式功能默认开；模拟声浪挪到「设置 → 系统」，项目所有者）：
+  - 录制声音的字符串改名 dev_footage_audio_* → set_footage_audio_*。标题 set_footage_audio_title「录制声音」/「Record sound」/
+    「Rakam bunyi」（去掉「（试验）」）；说明 set_footage_audio_summary「环视录像同步录制车内外的声音，需要录音权限」/
+    「Records the sound inside and outside the car with the surround view; needs the microphone permission」/
+    「Merakam bunyi di dalam dan luar kereta bersama paparan sekeliling; memerlukan kebenaran mikrofon」；来源去掉安卓的内部名：
+    set_footage_audio_source_raw「原始（不经处理，声音较小）」/「Raw (unprocessed, quieter)」/「Asal (tanpa pemprosesan, lebih perlahan)」、
+    set_footage_audio_source_call「通话（经降噪和回声消除）」/「Call (noise reduction and echo cancellation)」/
+    「Panggilan (pengurangan hingar dan pembatalan gema)」。麦克风来源、两个短名字、没权限时那一句（msg_footage_audio_no_permission）照旧。
+  - 模拟声浪的标题 dev_drive_sound_title 中文改「模拟声浪（试验性）」（试验性功能统一用这个后缀，见术语表；英文、马来文本来就是
+    (experimental) / (percubaan)）。
+  - 删掉 set_group_experiments「试验性功能」/ Experimental / Percubaan（开发者选项不再有这一组）。
+
 ---
 
 ## 10. 术语表

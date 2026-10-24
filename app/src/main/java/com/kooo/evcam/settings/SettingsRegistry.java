@@ -104,18 +104,18 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_BOTH, "中控屏和 HUD", R.string.opt_side_view_target_both));
 
     /**
-     * 录制声音用哪个来源（开发者选项，试验；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
+     * 录制声音用哪个来源（设置 → 录制「录制声音」的下一层；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
      * 名字按来源叫，不叫「机身麦克风」：Lab 怀疑那一路其实在车外，测清之前不下结论。
      */
     public static final SettingSpec FOOTAGE_AUDIO_SOURCE = SettingSpec.of(
             "footage_audio_source", "麦克风来源", com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_RAW,
             entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_RAW, "原始（VOICE_RECOGNITION）",
-                    R.string.dev_footage_audio_source_raw),
+                    R.string.set_footage_audio_source_raw),
             entry(com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL, "通话（VOICE_COMMUNICATION）",
-                    R.string.dev_footage_audio_source_call));
+                    R.string.set_footage_audio_source_call));
 
     /**
-     * 模拟声浪自己的音量（开发者选项，试验；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
+     * 模拟声浪自己的音量（设置 → 系统「模拟声浪」页，试验性；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
      * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。项目所有者 2026-10-21 实车：−12 dB 太小，平时用 0 dB，
      * 最低 −6 dB 就够；默认 0 dB（以前存的 −18、−12 不在单子里，读出来按默认）。
      */
@@ -125,14 +125,14 @@ public final class SettingsRegistry {
             entry("-3", "−3 dB"),
             entry("0", "0 dB"));
 
-    /** 模拟声浪的转速变化方式（开发者选项，试验）。项目所有者 2026-10-21：两种都做，上车听了再定。 */
+    /** 模拟声浪的转速变化方式（设置 → 系统「模拟声浪」页，试验性）。项目所有者 2026-10-21：两种都做，上车听了再定。 */
     public static final SettingSpec DRIVE_SOUND_RPM = SettingSpec.of(
             "drive_sound_rpm", "转速变化方式", com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS,
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS, "连续", R.string.dev_drive_sound_rpm_continuous),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_SHIFTS, "模拟换挡", R.string.dev_drive_sound_rpm_shifts));
 
     /**
-     * 模拟声浪的变速箱（开发者选项，试验；{@code sound.Gearbox}）：模拟换挡（和连续走法地板油时的伪挡位）按哪一种的齿比走。
+     * 模拟声浪的变速箱（设置 → 系统「模拟声浪」页，试验性；{@code sound.Gearbox}）：模拟换挡（和连续走法地板油时的伪挡位）按哪一种的齿比走。
      * 项目所有者 2026-10-22：照车主偏好的那台的 8 速自动（默认）；它的 6 速手动也做成可选。不用车型名（商标）。
      */
     public static final SettingSpec DRIVE_SOUND_GEARBOX = SettingSpec.of(
@@ -141,7 +141,7 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_MANUAL6, "6 速手动", R.string.dev_drive_sound_gearbox_manual6));
 
     /**
-     * 模拟声浪的声音风格（开发者选项，试验；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
+     * 模拟声浪的声音风格（设置 → 系统「模拟声浪」页，试验性；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
      * 按发动机结构重做「美式 V8」这一种取向；第一版留着，叫「试制 V8」（两个名字车主定的）；另试制一种纯电车主动声浪的
      * 「超音速」（车主 2026-10-21 批的名字）。都不用车型名（商标）。「超音速（旧版）」是 2026-10-22 的那一版，车主要和新的
      * 装车对比（2026-10-23）。「涡轮四缸」「电动概念车」照参考车另外两种主题仿制（2026-10-23，名字车主批了）。
@@ -156,7 +156,7 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_ELECTRIC, "电动概念车", R.string.dev_drive_sound_style_electric));
 
     /**
-     * 模拟声浪的听感（开发者选项，试验）：车外（站在车旁）或车内（隔着防火墙、车身）。项目所有者 2026-10-21：车内的可以试一下；
+     * 模拟声浪的听感（设置 → 系统「模拟声浪」页，试验性）：车外（站在车旁）或车内（隔着防火墙、车身）。项目所有者 2026-10-21：车内的可以试一下；
      * 默认还是车外。只有「美式 V8」分两种，另两种本来就按车内做的。
      */
     public static final SettingSpec DRIVE_SOUND_VIEW = SettingSpec.of(
@@ -165,7 +165,7 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_VIEW_CABIN, "车内", R.string.dev_drive_sound_view_cabin));
 
     /**
-     * 模拟声浪从哪些喇叭放（开发者选项，试验；{@code sound.DriveSound}）。项目所有者 2026-10-24 要加外放测试：车内、车外、车内和车外。
+     * 模拟声浪从哪些喇叭放（设置 → 系统「模拟声浪」页，试验性；{@code sound.DriveSound}）。项目所有者 2026-10-24 要加外放测试：车内、车外、车内和车外。
      * 车外喇叭是一个单声道的喇叭，车机给了两路（{@code sound.CarSpeakers}）。
      */
     public static final SettingSpec DRIVE_SOUND_OUTPUT = SettingSpec.of(
@@ -175,7 +175,7 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_BOTH, "车内和车外", R.string.dev_drive_sound_output_both));
 
     /**
-     * 车外喇叭用哪一路（开发者选项，试验）：车外只有一个喇叭，车机给了两路（{@code sound.CarSpeakers}）。项目所有者 2026-10-24：
+     * 车外喇叭用哪一路（设置 → 系统「模拟声浪」页，试验性）：车外只有一个喇叭，车机给了两路（{@code sound.CarSpeakers}）。项目所有者 2026-10-24：
      * 两个逻辑喇叭都给选项，自己选。选的那一路开不了就不放（记进黑匣子），不换另一路。
      */
     public static final SettingSpec DRIVE_SOUND_EXTERIOR_ROUTE = SettingSpec.of(
@@ -184,7 +184,7 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK, "BUS11（外部播放）", R.string.dev_drive_sound_route_playback));
 
     /**
-     * 车外那一路的音量（开发者选项，试验；{@code sound.ExteriorMix}）：在声浪之上再加这么多 dB，后面有限幅（峰值不过 −1 dBFS）。
+     * 车外那一路的音量（设置 → 系统「模拟声浪」页，试验性；{@code sound.ExteriorMix}）：在声浪之上再加这么多 dB，后面有限幅（峰值不过 −1 dBFS）。
      * 项目所有者 2026-10-24：车外音量过低，音量键也调不到车外 —— 车外喇叭在车机里是另一个音量组，音量键只管媒体那一组，
      * 只能在软件里加。存的就是 dB 数，界面上显示的也是它。
      */

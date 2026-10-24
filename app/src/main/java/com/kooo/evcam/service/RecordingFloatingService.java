@@ -593,14 +593,10 @@ public class RecordingFloatingService extends Service {
     }
 
     /**
-     * 开 / 关模拟声浪（开发者选项「模拟声浪（试验）」）：开车时一键关的地方。开发者选项关着时不动、说一句；
+     * 开 / 关模拟声浪（设置 → 系统「模拟声浪（试验性）」，2026-10-24 起不归开发者选项管）：开车时一键关的地方。
      * 每按一次回一句现在是开还是关。马上生效（{@code DriveSound.refresh}）。
      */
     private void toggleDriveSound() {
-        if (!com.kooo.evcam.settings.DeveloperMode.isUnlocked()) {
-            Toast.makeText(this, R.string.msg_dev_only, Toast.LENGTH_SHORT).show();
-            return;
-        }
         boolean on = !appConfig.isDriveSoundEnabled();
         appConfig.setDriveSoundEnabled(on);
         com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: 悬浮按钮 → 模拟声浪" + (on ? "开" : "关"));
