@@ -92,6 +92,10 @@ dependencies {
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.google.zxing:core:3.5.1")
 
+    // 录像回放的播放器（Media3 ExoPlayer，Apache-2.0，与 GPL-3.0 兼容）：画面按系统时钟走，
+    // 不跟着车机报的声音位置等（见 ManagedVideoPlayer）
+    implementation(libs.media3.exoplayer)
+
     // 设置界面（PreferenceScreen）
     implementation("androidx.preference:preference:1.2.1")
     // 两栏设置的左右分栏（androidx 自己的 PreferenceHeaderFragmentCompat 也用它）
