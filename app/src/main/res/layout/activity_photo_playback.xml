@@ -1,336 +1,348 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  照片回放。外面一层是抽屉：点菜单键在这个界面上滑出，和主界面同一份（layout_nav_drawer，行为在 NavDrawer）。
+-->
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg">
+    android:layout_height="match_parent">
 
-    <!--
-      ① 标题区：和主界面同一套 —— 64dp 高，菜单在左上，界面名紧跟着，
-      本界面的动作靠右。按钮都是矢量图标或灰底块，不再用 ☰ ⌂ 这类字符。
-    -->
     <LinearLayout
-        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/title_bar_height"
-        android:orientation="horizontal"
-        android:paddingStart="10dp"
-        android:paddingEnd="16dp"
-        android:gravity="center_vertical"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
         android:background="@color/bg">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_menu"
-            style="@style/Widget.Cam.IconButton"
-            android:layout_width="@dimen/icon_button_size"
-            android:layout_height="@dimen/icon_button_size"
-            android:contentDescription="@string/cd_menu"
-            app:icon="@drawable/ic_menu" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
-            android:text="@string/nav_photo_playback"
-            android:textColor="@color/text_primary"
-            android:textAppearance="@style/TextAppearance.Cam.Title"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/current_datetime"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="14dp"
-            android:text=""
-            android:textColor="@color/text_secondary"
-            android:textAppearance="@style/TextAppearance.Cam.Body"
-            android:gravity="start|center_vertical" />
-
-        <include
-            layout="@layout/layout_playback_actions"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-
-    </LinearLayout>
-
-
-    <!-- 主内容区：② 列表栏 · ③ 内容区 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
-
-        <!-- 左侧：图片列表。宽度和设置页、视频回看的左栏用同一个值 -->
-        <FrameLayout
-            android:layout_width="@dimen/list_width"
-            android:layout_height="match_parent"
+        <!--
+          ① 标题区：和主界面同一套 —— 64dp 高，菜单在左上，界面名紧跟着，
+          本界面的动作靠右。按钮都是矢量图标或灰底块，不再用 ☰ ⌂ 这类字符。
+        -->
+        <LinearLayout
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/title_bar_height"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="16dp"
+            android:gravity="center_vertical"
             android:background="@color/bg">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/photo_list"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="4dp"
-                android:clipToPadding="false" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_menu"
+                style="@style/Widget.Cam.IconButton"
+                android:layout_width="@dimen/icon_button_size"
+                android:layout_height="@dimen/icon_button_size"
+                android:contentDescription="@string/cd_menu"
+                app:icon="@drawable/ic_menu" />
 
             <TextView
-                android:id="@+id/empty_text"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="@string/photo_empty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:text="@string/nav_photo_playback"
+                android:textColor="@color/text_primary"
+                android:textAppearance="@style/TextAppearance.Cam.Title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/current_datetime"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="14dp"
+                android:text=""
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body"
-                android:visibility="gone" />
-        </FrameLayout>
+                android:gravity="start|center_vertical" />
 
-        <!-- 右侧：预览区（占据剩余空间） -->
+            <include
+                layout="@layout/layout_playback_actions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+
+        <!-- 主内容区：② 列表栏 · ③ 内容区 -->
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:background="@color/preview_background">
+            android:orientation="horizontal">
 
-            <!--
-              ③ 内容区。排版和主界面预览逐项对齐：环视在左（权重 22），两路座舱
-              竖排在右（权重 14），间距都是 @dimen/gutter，框是 bg_preview_frame
-              那张圆角底 —— 两个界面摆在一起才像同一个应用。
-
-              原来这里套了三层 AspectRatioFrameLayout（把自己压成写死的 16:10）：
-              外层压整块，每个框自己再压一次，于是框既不在该在的位置，也不是该有的
-              大小。比例的事本来就归 ImageView 的 fitCenter 管，框只负责排版 ——
-              那个类全项目只有这里在用，一并删了。
-            -->
+            <!-- 左侧：图片列表。宽度和设置页、视频回看的左栏用同一个值 -->
             <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
-                android:padding="@dimen/gutter">
+                android:layout_width="@dimen/list_width"
+                android:layout_height="match_parent"
+                android:background="@color/bg">
 
-                <!--
-                  多路：有文件才显示 —— 同一个时间戳下没拍到的那一格整个收起来，
-                  不留空框（见 updatePhotoDisplay）。两路座舱都没有时整列让开，
-                  环视独占整块。第四路（right）在极氪 7X 上不存在，永远没有文件，
-                  于是永远不显示；留着它是为自定义车型那种四面各一个相机的接法。
-                -->
-                <LinearLayout
-                    android:id="@+id/multi_view_layout"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/photo_list"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="horizontal">
+                    android:padding="4dp"
+                    android:clipToPadding="false" />
 
-                    <FrameLayout
-                        android:id="@+id/frame_front"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="22"
-                        android:background="@drawable/bg_preview_frame">
-
-                        <ImageView
-                            android:id="@+id/image_front"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="fitCenter" />
-
-                        <TextView
-                            android:id="@+id/label_front"
-                            android:layout_width="wrap_content"
-                            android:layout_height="34dp"
-                            android:layout_gravity="top|start"
-                            android:layout_marginStart="10dp"
-                            android:layout_marginTop="6dp"
-                            android:background="@drawable/camera_label_background"
-                            android:gravity="center"
-                            android:paddingStart="10dp"
-                            android:paddingEnd="10dp"
-                            android:text="@string/zeekr_lane_front"
-                            android:textColor="#FFFFFF"
-                            android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-                        <TextView
-                            android:id="@+id/placeholder_front"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:text="@string/photo_no_image"
-                            android:textColor="@color/preview_placeholder_text"
-                            android:textAppearance="@style/TextAppearance.Cam.Caption"
-                            android:visibility="gone" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:id="@+id/cabin_column"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_marginStart="@dimen/gutter"
-                        android:layout_weight="14"
-                        android:orientation="vertical">
-
-                        <FrameLayout
-                            android:id="@+id/frame_back"
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame">
-
-                            <ImageView
-                                android:id="@+id/image_back"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="fitCenter" />
-
-                            <TextView
-                                android:id="@+id/label_back"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:text="@string/zeekr_lane_back"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-                        </FrameLayout>
-
-                        <FrameLayout
-                            android:id="@+id/frame_left"
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_marginTop="@dimen/gutter"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame">
-
-                            <ImageView
-                                android:id="@+id/image_left"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="fitCenter" />
-
-                            <TextView
-                                android:id="@+id/label_left"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:text="@string/zeekr_lane_left"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-                        </FrameLayout>
-
-                        <FrameLayout
-                            android:id="@+id/frame_right"
-                            android:layout_width="match_parent"
-                            android:layout_height="0dp"
-                            android:layout_marginTop="@dimen/gutter"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_preview_frame"
-                            android:visibility="gone">
-
-                            <ImageView
-                                android:id="@+id/image_right"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="fitCenter" />
-
-                            <TextView
-                                android:id="@+id/label_right"
-                                android:layout_width="wrap_content"
-                                android:layout_height="34dp"
-                                android:layout_gravity="top|start"
-                                android:layout_marginStart="10dp"
-                                android:layout_marginTop="6dp"
-                                android:background="@drawable/camera_label_background"
-                                android:gravity="center"
-                                android:paddingStart="10dp"
-                                android:paddingEnd="10dp"
-                                android:text="@string/zeekr_lane_right"
-                                android:textColor="#FFFFFF"
-                                android:textAppearance="@style/TextAppearance.Cam.Body" />
-
-                        </FrameLayout>
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- 无选中状态提示 -->
-                <LinearLayout
-                    android:id="@+id/no_selection_hint"
+                <TextView
+                    android:id="@+id/empty_text"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/photo_pick_hint"
-                        android:textColor="@color/text_secondary"
-                        android:textAppearance="@style/TextAppearance.Cam.Row" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/photo_tap_hint"
-                        android:textColor="@color/text_hint"
-                        android:textAppearance="@style/TextAppearance.Cam.Body" />
-                </LinearLayout>
+                    android:gravity="center"
+                    android:text="@string/photo_empty"
+                    android:textColor="@color/text_secondary"
+                    android:textAppearance="@style/TextAppearance.Cam.Body"
+                    android:visibility="gone" />
             </FrameLayout>
 
-            <!-- 底部控制栏：摄像头切换按钮 -->
+            <!-- 右侧：预览区（占据剩余空间） -->
             <LinearLayout
-                android:id="@+id/controls_layout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="8dp"
-                android:gravity="center"
-                android:background="@color/preview_controls_background"
-                android:visibility="gone">
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:background="@color/preview_background">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_view_mode"
-                    android:layout_width="wrap_content"
-                    android:layout_height="48dp"
-                    android:minWidth="72dp"
-                    android:text="@string/photo_mode_multi"
-                    android:textAppearance="@style/TextAppearance.Cam.Body"
-                    style="@style/Widget.Cam.RailSmall" />
-                <!-- 锁定 / 解锁这一组（锁定影像关着时收起） -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_lock"
-                    android:layout_width="wrap_content"
-                    android:layout_height="48dp"
-                    android:minWidth="72dp"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/action_lock_footage"
-                    android:textAppearance="@style/TextAppearance.Cam.Body"
-                    android:visibility="gone"
-                    style="@style/Widget.Cam.RailSmall" />
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_send_to_phone"
-                    android:layout_width="wrap_content"
-                    android:layout_height="48dp"
-                    android:minWidth="72dp"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/action_send_to_phone"
-                    android:textAppearance="@style/TextAppearance.Cam.Body"
-                    style="@style/Widget.Cam.RailSmall" />
+                <!--
+                  ③ 内容区。排版和主界面预览逐项对齐：环视在左（权重 22），两路座舱
+                  竖排在右（权重 14），间距都是 @dimen/gutter，框是 bg_preview_frame
+                  那张圆角底 —— 两个界面摆在一起才像同一个应用。
+
+                  原来这里套了三层 AspectRatioFrameLayout（把自己压成写死的 16:10）：
+                  外层压整块，每个框自己再压一次，于是框既不在该在的位置，也不是该有的
+                  大小。比例的事本来就归 ImageView 的 fitCenter 管，框只负责排版 ——
+                  那个类全项目只有这里在用，一并删了。
+                -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:padding="@dimen/gutter">
+
+                    <!--
+                      多路：有文件才显示 —— 同一个时间戳下没拍到的那一格整个收起来，
+                      不留空框（见 updatePhotoDisplay）。两路座舱都没有时整列让开，
+                      环视独占整块。第四路（right）在极氪 7X 上不存在，永远没有文件，
+                      于是永远不显示；留着它是为自定义车型那种四面各一个相机的接法。
+                    -->
+                    <LinearLayout
+                        android:id="@+id/multi_view_layout"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:id="@+id/frame_front"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="22"
+                            android:background="@drawable/bg_preview_frame">
+
+                            <ImageView
+                                android:id="@+id/image_front"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitCenter" />
+
+                            <TextView
+                                android:id="@+id/label_front"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:layout_gravity="top|start"
+                                android:layout_marginStart="10dp"
+                                android:layout_marginTop="6dp"
+                                android:background="@drawable/camera_label_background"
+                                android:gravity="center"
+                                android:paddingStart="10dp"
+                                android:paddingEnd="10dp"
+                                android:text="@string/zeekr_lane_front"
+                                android:textColor="#FFFFFF"
+                                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                            <TextView
+                                android:id="@+id/placeholder_front"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:text="@string/photo_no_image"
+                                android:textColor="@color/preview_placeholder_text"
+                                android:textAppearance="@style/TextAppearance.Cam.Caption"
+                                android:visibility="gone" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:id="@+id/cabin_column"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_marginStart="@dimen/gutter"
+                            android:layout_weight="14"
+                            android:orientation="vertical">
+
+                            <FrameLayout
+                                android:id="@+id/frame_back"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame">
+
+                                <ImageView
+                                    android:id="@+id/image_back"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:scaleType="fitCenter" />
+
+                                <TextView
+                                    android:id="@+id/label_back"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="34dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="10dp"
+                                    android:layout_marginTop="6dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:text="@string/zeekr_lane_back"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                            </FrameLayout>
+
+                            <FrameLayout
+                                android:id="@+id/frame_left"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:layout_marginTop="@dimen/gutter"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame">
+
+                                <ImageView
+                                    android:id="@+id/image_left"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:scaleType="fitCenter" />
+
+                                <TextView
+                                    android:id="@+id/label_left"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="34dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="10dp"
+                                    android:layout_marginTop="6dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:text="@string/zeekr_lane_left"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                            </FrameLayout>
+
+                            <FrameLayout
+                                android:id="@+id/frame_right"
+                                android:layout_width="match_parent"
+                                android:layout_height="0dp"
+                                android:layout_marginTop="@dimen/gutter"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_preview_frame"
+                                android:visibility="gone">
+
+                                <ImageView
+                                    android:id="@+id/image_right"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:scaleType="fitCenter" />
+
+                                <TextView
+                                    android:id="@+id/label_right"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="34dp"
+                                    android:layout_gravity="top|start"
+                                    android:layout_marginStart="10dp"
+                                    android:layout_marginTop="6dp"
+                                    android:background="@drawable/camera_label_background"
+                                    android:gravity="center"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="10dp"
+                                    android:text="@string/zeekr_lane_right"
+                                    android:textColor="#FFFFFF"
+                                    android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+                            </FrameLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- 无选中状态提示 -->
+                    <LinearLayout
+                        android:id="@+id/no_selection_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/photo_pick_hint"
+                            android:textColor="@color/text_secondary"
+                            android:textAppearance="@style/TextAppearance.Cam.Row" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="@string/photo_tap_hint"
+                            android:textColor="@color/text_hint"
+                            android:textAppearance="@style/TextAppearance.Cam.Body" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- 底部控制栏：摄像头切换按钮 -->
+                <LinearLayout
+                    android:id="@+id/controls_layout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="8dp"
+                    android:gravity="center"
+                    android:background="@color/preview_controls_background"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_view_mode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="72dp"
+                        android:text="@string/photo_mode_multi"
+                        android:textAppearance="@style/TextAppearance.Cam.Body"
+                        style="@style/Widget.Cam.RailSmall" />
+                    <!-- 锁定 / 解锁这一组（锁定影像关着时收起） -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_lock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="72dp"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/action_lock_footage"
+                        android:textAppearance="@style/TextAppearance.Cam.Body"
+                        android:visibility="gone"
+                        style="@style/Widget.Cam.RailSmall" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_send_to_phone"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:minWidth="72dp"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/action_send_to_phone"
+                        android:textAppearance="@style/TextAppearance.Cam.Body"
+                        style="@style/Widget.Cam.RailSmall" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
+
     </LinearLayout>
 
-</LinearLayout>
+    <include layout="@layout/layout_nav_drawer" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

@@ -33,7 +33,6 @@ import com.bumptech.glide.signature.ObjectKey;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.profile.RecordSpecs;
@@ -86,6 +85,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     private TextView selectedCount;
     private static final String TAG = "PhotoPlaybackActivity";
     private View toolbar, actionGroup, selectionGroup;
+    /** 抽屉：点菜单键在这个界面上滑出，和主界面同一份。 */
+    private com.kooo.evcam.ui.NavDrawer drawer;
 
     // 预览区组件
     private View multiViewLayout;
@@ -265,8 +266,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             }
         });
 
-        // 菜单：抽屉在主界面上，回去顺便把它打开 —— 和连续回放同一个做法
-        btnMenu.setOnClickListener(v -> openDrawerOnMain());
+        // 菜单：抽屉在这个界面上滑出，和主界面同一份
+        drawer = com.kooo.evcam.ui.NavDrawer.attachToPlayback(this, R.id.nav_photo_playback);
+        btnMenu.setOnClickListener(v -> drawer.toggle());
 
         // 返回主界面：独立 Activity，关掉自己就回去了
         btnHome.setOnClickListener(v -> finish());
@@ -948,6 +950,9 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      */
     @Override
     public void onBackPressed() {
+        if (drawer.closeIfOpen()) {
+            return;   // 抽屉开着：先收抽屉
+        }
         if (isMultiSelectMode) {
             exitMultiSelectMode();
             return;
@@ -958,20 +963,6 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
             return;
         }
         super.onBackPressed();
-    }
-
-    /**
-     * 回主界面，并让它把抽屉打开。
-     *
-     * <p>抽屉挂在主界面上，这里是另一个 Activity，够不着它 ——
-     * 所以带一个标志回去，由主界面自己打开。连续回放也是这么做的。</p>
-     */
-    private void openDrawerOnMain() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtra(MainActivity.EXTRA_OPEN_DRAWER, true);
-        startActivity(intent);
-        finish();
     }
 
     private void applyStatusBarInsets() {

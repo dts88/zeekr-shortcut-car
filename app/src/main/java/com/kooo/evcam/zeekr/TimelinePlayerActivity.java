@@ -164,6 +164,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private boolean playWhenReady = true;
     /** 放有声音的录像之前申请的音频焦点：环视那一路出声前申请，离开回放界面时放掉。 */
     private com.kooo.evcam.playback.PlaybackAudioFocus soundFocus;
+    /** 抽屉：点菜单键在这个界面上滑出，和主界面同一份。 */
+    private com.kooo.evcam.ui.NavDrawer drawer;
     /** 音频焦点被临时拿走时停下的（电话之类）：还回来时接着放。 */
     private boolean resumeOnFocusGain;
     /** 领头那一路连续出错次数，用来阻止「出错→跳下一段→又出错」无限翻下去。 */
@@ -328,9 +330,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         selectedCountText = findViewById(R.id.pb_selected_count);
         sessionAdapter.setOnSelectionChangedListener(this::updateSelectedCount);
 
+        drawer = com.kooo.evcam.ui.NavDrawer.attachToPlayback(this, R.id.nav_playback);
         View menu = findViewById(R.id.timeline_menu);
         if (menu != null) {
-            menu.setOnClickListener(v -> openDrawerOnMain());
+            menu.setOnClickListener(v -> drawer.toggle());
         }
         View home = findViewById(R.id.pb_home);
         if (home != null) {
@@ -1375,20 +1378,6 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(intent, getString(R.string.player_share_chooser)));
     }
 
-    /**
-     * 菜单键回主界面并把抽屉拉开。
-     *
-     * <p>抽屉长在主界面上，这里是另一个界面 —— 所以不是「打开抽屉」，
-     * 而是「回到有抽屉的那一屏，并让它开着」。看起来和主界面点菜单是一回事。</p>
-     */
-    private void openDrawerOnMain() {
-        Intent intent = new Intent(this, com.kooo.evcam.MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtra(com.kooo.evcam.MainActivity.EXTRA_OPEN_DRAWER, true);
-        startActivity(intent);
-        finish();
-    }
-
     /** 进出多选：两条工具条互换，列表自己换成勾选的点法。 */
     private void setSelecting(boolean on) {
         sessionAdapter.setSelectionMode(on);
@@ -1689,6 +1678,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      */
     @Override
     public void onBackPressed() {
+        if (drawer.closeIfOpen()) {
+            return;   // 抽屉开着：先收抽屉
+        }
         // 多选里按返回：先退出多选。直接离开会让人以为选择被「提交」了
         if (sessionAdapter != null && sessionAdapter.isSelectionMode()) {
             setSelecting(false);

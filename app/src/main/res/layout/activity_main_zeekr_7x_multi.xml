@@ -247,27 +247,6 @@
 
     </FrameLayout>
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav_view"
-        android:layout_width="300dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:background="@color/nav_background"
-        android:elevation="8dp"
-        android:fitsSystemWindows="false"
-        app:dividerInsetEnd="16dp"
-        app:dividerInsetStart="16dp"
-        app:headerLayout="@layout/nav_header"
-        app:itemBackground="@drawable/nav_item_background"
-        app:itemHorizontalPadding="16dp"
-        app:itemIconPadding="16dp"
-        app:itemIconSize="24dp"
-        app:itemIconTint="@color/nav_icon_color_selector"
-        app:itemTextAppearance="@style/NavigationMenuTextAppearance"
-        app:itemTextColor="@color/nav_text_color_selector"
-        app:itemVerticalPadding="16dp"
-        app:menu="@menu/navigation_menu"
-        app:subheaderInsetStart="16dp"
-        app:subheaderTextAppearance="@style/NavigationSubheaderTextAppearance" />
+    <include layout="@layout/layout_nav_drawer" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
