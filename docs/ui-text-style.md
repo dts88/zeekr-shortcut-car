@@ -382,6 +382,12 @@
   - 模拟声浪的标题 dev_drive_sound_title 中文改「模拟声浪（试验性）」（试验性功能统一用这个后缀，见术语表；英文、马来文本来就是
     (experimental) / (percubaan)）。
   - 删掉 set_group_experiments「试验性功能」/ Experimental / Percubaan（开发者选项不再有这一组）。
+- 2026-10-24 批准（「模拟声浪」页的标准模式开关，名字是项目所有者选的 A；声浪会话原草稿「标准模式也启用」）：
+  dev_drive_sound_standard_title「标准模式下播放」/「Play in Standard mode」/「Main dalam mod Standard」；
+  dev_drive_sound_standard_summary「在标准模式下也播放模拟声浪，换挡比运动模式平和。关闭时只在运动模式下播放。」/
+  「Plays the simulated drive sound in Standard mode too, with calmer shifting than Sport. When off, only Sport mode plays it.」/
+  「Turut memainkan bunyi pemanduan simulasi dalam mod Standard, dengan pertukaran gear yang lebih tenang berbanding mod Sukan.
+  Apabila dimatikan, hanya mod Sukan memainkannya.」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -392,16 +398,11 @@
 
 - 「模拟声浪」（2026-10-24 起在设置 → 系统）2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
   dev_drive_sound_summary 现在是「运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，
-  车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声」/「In Sport mode (optionally Standard too), …Switching to these
+  车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声。」（2026-10-24 照本规范补了句末「。」，英文、马来文补了句号）/「In Sport mode (optionally Standard too), …Switching to these
   modes while stopped plays an engine start」/「Dalam mod Sukan (dan mod Standard jika dipilih), …Bertukar ke mod ini semasa
   berhenti memainkan bunyi enjin dihidupkan」（2026-10-21 实车后去掉「；倒挡时音量降低 6 dB」：车机自己在倒挡压低音量，车主定声浪
   不再另降；2026-10-24 加「播放喇叭」时改了「从车内喇叭播放并跟随媒体音量」；同一天车主加标准模式，又定标准模式要自己打开）；
-  标准模式也启用（2026-10-24 加，车主：像更新页的「接收 Alpha 版」，默认关，不开的话标准模式没有声浪）：
-  dev_drive_sound_standard_title「标准模式也启用」/ Also in Standard mode / Juga dalam mod Standard；
-  dev_drive_sound_standard_summary「标准模式下也播放声浪，换挡比运动模式平和。关闭时只在运动模式播放」/
-  「Plays the drive sound in Standard mode too, with calmer shifting than Sport. When off, only Sport mode plays it」/
-  「Turut memainkan bunyi pemanduan dalam mod Standard, dengan pertukaran gear yang lebih tenang berbanding mod Sukan. Apabila
-  dimatikan, hanya mod Sukan memainkannya」；
+  标准模式的开关 2026-10-24 车主改了名字、批了，见上面的单子；
   dev_drive_sound_volume_title 的选项改成 −6 / −3 / 0 dB，默认 0 dB（车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）。
   播放喇叭（2026-10-24 加，车主要外放测试：车内、车外、车内和车外）：dev_drive_sound_output_title「播放喇叭」/ Speakers /
   Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、

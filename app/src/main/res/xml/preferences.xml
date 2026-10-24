@@ -423,7 +423,7 @@
             android:key="screen_drive_sound"
             android:title="@string/dev_drive_sound_group">
 
-            <!-- 标准模式也启用（项目所有者 2026-10-24，默认关，像更新页的「接收 Alpha 版」）：关着时标准模式没有声浪 -->
+            <!-- 标准模式下播放（项目所有者 2026-10-24，默认关，像更新页的「接收 Alpha 版」）：关着时标准模式没有声浪 -->
             <SwitchPreferenceCompat
                 android:key="pref_drive_sound_standard"
                 android:title="@string/dev_drive_sound_standard_title"

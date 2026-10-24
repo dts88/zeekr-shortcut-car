@@ -10,7 +10,7 @@ import org.junit.Test;
 
 /**
  * 模拟声浪什么时候出声（项目所有者 2026-10-21：只在车内、只做运动模式；运动模式下一直转着，停着是怠速。
- * 2026-10-24：标准模式也可以出声，和运动模式只差换挡积极性；要打开「标准模式也启用」，默认关）。
+ * 2026-10-24：标准模式也可以出声，和运动模式只差换挡积极性；要打开「标准模式下播放」，默认关）。
  *
  * <p>算错的表现：舒适模式也响、标准模式不响；关了开关、切到舒适模式还在响；车速油门读不到时卡在一个声音上；
  * 电话里还在轰；或者没上电就开着喇叭。</p>
@@ -20,7 +20,7 @@ public class DriveSoundRulesTest {
     private static final Integer ON = Signal.IGNITION_ON;
     private static final Integer SPORT = Signal.DRIVE_MODE_SPORT;
 
-    /** 「标准模式也启用」开着时的结论（只有标准模式那几条在乎它，见 {@link #standardSoundsOnlyWithItsSwitch}）。 */
+    /** 「标准模式下播放」开着时的结论（只有标准模式那几条在乎它，见 {@link #standardSoundsOnlyWithItsSwitch}）。 */
     private static DriveSoundRules.Why decide(boolean enabled, boolean link, Integer ignition, String gear,
                                               Integer mode, float speed, float throttle, long age, boolean call) {
         return DriveSoundRules.decide(enabled, link, ignition, gear, mode, true, speed, throttle, age, call);
@@ -49,7 +49,7 @@ public class DriveSoundRulesTest {
 
     @Test
     public void standardSoundsOnlyWithItsSwitch() {
-        // 项目所有者 2026-10-24：模拟声浪页加「标准模式也启用」（像更新页的「接收 Alpha 版」，默认关）—— 不开的话，标准模式没有声浪；
+        // 项目所有者 2026-10-24：模拟声浪页加「标准模式下播放」（像更新页的「接收 Alpha 版」，默认关）—— 不开的话，标准模式没有声浪；
         // 运动模式不管它
         assertEquals(DriveSoundRules.Why.OTHER_MODE, DriveSoundRules.decide(true, true, ON, "D", Signal.DRIVE_MODE_STANDARD,
                 false, 50f, 30f, 20L, false));
