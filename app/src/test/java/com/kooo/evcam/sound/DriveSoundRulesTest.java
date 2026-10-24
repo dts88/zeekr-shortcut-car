@@ -10,7 +10,7 @@ import org.junit.Test;
 
 /**
  * 模拟声浪什么时候出声（项目所有者 2026-10-21：只在车内、只做运动模式；运动模式下一直转着，停着是怠速。
- * 2026-10-24：标准模式也出声，和运动模式只差换挡积极性）。
+ * 2026-10-24：标准模式也可以出声，和运动模式只差换挡积极性；要打开「标准模式也启用」，默认关）。
  *
  * <p>算错的表现：舒适模式也响、标准模式不响；关了开关、切到舒适模式还在响；车速油门读不到时卡在一个声音上；
  * 电话里还在轰；或者没上电就开着喇叭。</p>
@@ -20,9 +20,10 @@ public class DriveSoundRulesTest {
     private static final Integer ON = Signal.IGNITION_ON;
     private static final Integer SPORT = Signal.DRIVE_MODE_SPORT;
 
+    /** 「标准模式也启用」开着时的结论（只有标准模式那几条在乎它，见 {@link #standardSoundsOnlyWithItsSwitch}）。 */
     private static DriveSoundRules.Why decide(boolean enabled, boolean link, Integer ignition, String gear,
                                               Integer mode, float speed, float throttle, long age, boolean call) {
-        return DriveSoundRules.decide(enabled, link, ignition, gear, mode, speed, throttle, age, call);
+        return DriveSoundRules.decide(enabled, link, ignition, gear, mode, true, speed, throttle, age, call);
     }
 
     @Test
@@ -47,17 +48,30 @@ public class DriveSoundRulesTest {
     }
 
     @Test
+    public void standardSoundsOnlyWithItsSwitch() {
+        // 项目所有者 2026-10-24：模拟声浪页加「标准模式也启用」（像更新页的「接收 Alpha 版」，默认关）—— 不开的话，标准模式没有声浪；
+        // 运动模式不管它
+        assertEquals(DriveSoundRules.Why.OTHER_MODE, DriveSoundRules.decide(true, true, ON, "D", Signal.DRIVE_MODE_STANDARD,
+                false, 50f, 30f, 20L, false));
+        assertEquals(DriveSoundRules.Why.RUNNING, DriveSoundRules.decide(true, true, ON, "D", Signal.DRIVE_MODE_STANDARD,
+                true, 50f, 30f, 20L, false));
+        assertEquals(DriveSoundRules.Why.RUNNING, DriveSoundRules.decide(true, true, ON, "D", SPORT, false, 50f, 30f, 20L, false));
+        assertTrue("关掉以后在标准模式里：熄火（和切到舒适模式一样）", DriveSoundRules.Why.OTHER_MODE.shutsDown);
+    }
+
+    @Test
     public void onlyTheShiftEagernessTellsSportFromStandard() {
         // 项目所有者 2026-10-24：标准模式和运动模式只差升降挡的积极性
         assertEquals(1f, DriveSoundRules.eagerOf(SPORT), 0f);
         assertEquals(0f, DriveSoundRules.eagerOf(Signal.DRIVE_MODE_STANDARD), 0f);
         assertEquals(0f, DriveSoundRules.eagerOf(null), 0f);
-        assertTrue(DriveSoundRules.soundMode(SPORT) && DriveSoundRules.soundMode(Signal.DRIVE_MODE_STANDARD));
+        assertTrue(DriveSoundRules.soundMode(SPORT, false) && DriveSoundRules.soundMode(Signal.DRIVE_MODE_STANDARD, true));
+        assertFalse(DriveSoundRules.soundMode(Signal.DRIVE_MODE_STANDARD, false));
         // 车机运动模式的踏板更灵：负荷按运动模式的踏板算（同样的车动起来，两种模式的负荷差不多）
         assertEquals(1f, DriveSoundRules.sportPedalOf(SPORT), 0f);
         assertEquals(0f, DriveSoundRules.sportPedalOf(Signal.DRIVE_MODE_STANDARD), 0f);
         assertEquals(0f, DriveSoundRules.sportPedalOf(null), 0f);
-        assertFalse(DriveSoundRules.soundMode(Signal.DRIVE_MODE_COMFORT) || DriveSoundRules.soundMode(null));
+        assertFalse(DriveSoundRules.soundMode(Signal.DRIVE_MODE_COMFORT, true) || DriveSoundRules.soundMode(null, true));
     }
 
     @Test

@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings → System → Simulated drive sound: new switch Also in Standard mode (off by default). When it is off, only Sport mode plays the drive sound; when on, Standard mode plays it too, with calmer shifting than Sport.
 
 ## [2.28.0-alpha] - 2026-10-24
 

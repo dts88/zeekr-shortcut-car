@@ -359,7 +359,7 @@ final class PulseProfile {
     final float rockMs;
     final float rockDb;
 
-    // ---- 车内听感（开发者选项「听感」选「车内」）：发动机舱的声音隔着防火墙、排气隔着车身，各过两个一阶低通；
+    // ---- 车内听感（「模拟声浪」页的「听感」选「车内」）：发动机舱的声音隔着防火墙、排气隔着车身，各过两个一阶低通；
     //      低频多一点（车身传进来的）；总的再补一点，日常驾驶和车外差不多响
     final float[] cabinFrontHz;
     final float[] cabinRearHz;
