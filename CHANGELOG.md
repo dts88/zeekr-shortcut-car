@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.28.0-alpha] - 2026-10-24
+
 - Settings → Recording: Record sound moves here from Developer options and is on by default. The app asks for the microphone permission once at start and turns Record sound off if it is refused. The source names no longer show Android's internal names.
 - Settings → System: Simulated drive sound (experimental) moves here from Developer options, with its page. The floating button can turn it on and off without developer options.
 - Developer options: Vehicle status sits at the top; the Experimental group is gone.
