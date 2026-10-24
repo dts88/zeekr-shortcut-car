@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="popup_adjustable_summary">默认关闭，使用固定位置。开启后保存手动位置和大小。</string>
+    <string name="popup_adjustable_title">允许拖动和双指缩放</string>
+    <string name="popup_aspect_landscape">横向 16:9</string>
+    <string name="popup_aspect_portrait">纵向 3:4</string>
+    <string name="popup_aspect_square">正方形 1:1</string>
+    <string name="popup_aspect_title">窗口比例</string>
+    <string name="popup_aspect_wide">超宽 11:5（默认）</string>
+    <string name="popup_reset_message">恢复默认窗口比例、高度和位置。保留启用状态、拖动开关和画面角度。</string>
+    <string name="popup_reset_title">重置窗口布局</string>
+    <string name="popup_size_title" formatted="false">窗口高度（屏幕百分比）</string>
+</resources>
