@@ -415,8 +415,12 @@ public class PulseVoiceTest {
 
     /** {@code lo}–{@code hi} Hz 的能量（两个二阶高通 + 两个二阶低通）。 */
     private static double band(float[] x, float lo, float hi) {
-        return energy(filter(x, Biquad.highpass(lo, 0.7071f, RATE), Biquad.highpass(lo, 0.7071f, RATE),
-                Biquad.lowpass(hi, 0.7071f, RATE), Biquad.lowpass(hi, 0.7071f, RATE)));
+        return energy(passBand(x, lo, hi));
+    }
+
+    private static float[] passBand(float[] x, float lo, float hi) {
+        return filter(x, Biquad.highpass(lo, 0.7071f, RATE), Biquad.highpass(lo, 0.7071f, RATE),
+                Biquad.lowpass(hi, 0.7071f, RATE), Biquad.lowpass(hi, 0.7071f, RATE));
     }
 
     private static double db(double ratio) {
@@ -955,5 +959,66 @@ public class PulseVoiceTest {
         double early = bandPower(slice(d, 0.5f, 0.65f), lobe * 0.97, lobe * 1.03);
         double late = bandPower(slice(d, 1.5f, 1.65f), lobe * 0.97, lobe * 1.03);
         assertTrue("起压那一下 " + db(early / late) + " dB", early > 100 * late);
+    }
+
+    // ================================================================= 2026-10-24：立体感
+
+    /** 从 {@code fromSeconds} 起的一个声道（0 左、1 右）。 */
+    private static float[] channel(float[] lr, float fromSeconds, int which) {
+        int from = Math.round(fromSeconds * RATE);
+        float[] x = new float[lr.length / 2 - from];
+        for (int i = 0; i < x.length; i++) {
+            x[i] = lr[2 * (i + from) + which];
+        }
+        return x;
+    }
+
+    /** 两路的相关（1 = 一样，0 = 不相干，负的 = 反相）。 */
+    private static double correlation(float[] a, float[] b) {
+        double ab = 0;
+        double aa = 0;
+        double bb = 0;
+        for (int i = 0; i < a.length; i++) {
+            ab += (double) a[i] * b[i];
+            aa += (double) a[i] * a[i];
+            bb += (double) b[i] * b[i];
+        }
+        return ab / Math.sqrt(aa * bb + 1e-30);
+    }
+
+    @Test
+    public void theCabinHearsTheSuperchargerAcrossTheWholeFront() {
+        // 项目所有者 2026-10-24：美式 V8 的声音汇聚在一起，像一个声道放出来的。车内满增压 3000 rpm，1–4 kHz（齿轮声、中冷器）
+        // 左右原来几乎一样（相关约 0.95）；齿轮声的几个来源一左一中一右、两个中冷器一左一右、中高频左右的差再放大 3 dB 以后
+        // 低于 0.85 —— 但不反相（高于 0.2，不发虚）
+        float[] x = render(new PulseVoice(SC, RATE, true), params(3000f, 1f), 2f);
+        double c = correlation(passBand(channel(x, 1f, 0), 1000f, 4000f), passBand(channel(x, 1f, 1), 1000f, 4000f));
+        assertTrue("1–4 kHz 左右相关 " + c, c < 0.85 && c > 0.2);
+    }
+
+    @Test
+    public void theWideningLeavesTheMonoSumAndTheLowSideAlone() {
+        // 只放大中高频本来就有的左右差（700 Hz 起的一阶搁架）：左右相加一点不变（车外喇叭、把左右合成一路的车机听到的一样）；
+        // 120–250 Hz（两排点火不均匀，本来就有反相的成分，放大了发虚）左右的差几乎不变，2–4 kHz 大约大 3 dB
+        PulseProfile flat = scWith(b -> b.width(0f));
+        VoiceParams p = params(3000f, 0.8f);
+        p.gain = 0.3f;
+        float[] wide = render(new PulseVoice(SC, RATE, true), p, 1.5f);
+        float[] narrow = render(new PulseVoice(flat, RATE, true), p, 1.5f);
+        float[] monoWide = mid(wide, 0.5f);
+        float[] monoNarrow = mid(narrow, 0.5f);
+        double off = 0;
+        for (int i = 0; i < monoWide.length; i++) {
+            double d = monoWide[i] - monoNarrow[i];
+            off += d * d;
+        }
+        // 只差浮点舍入（左右各自还要过几道滤波，约 −75 dB）
+        assertTrue("左右相加差了 " + db(off / energy(monoNarrow)) + " dB", off < 1e-6 * energy(monoNarrow));
+        float[] sideWide = side(wide, 0.5f);
+        float[] sideNarrow = side(narrow, 0.5f);
+        double low = db(band(sideWide, 120f, 250f) / band(sideNarrow, 120f, 250f));
+        double high = db(band(sideWide, 2000f, 4000f) / band(sideNarrow, 2000f, 4000f));
+        assertTrue("120–250 Hz 左右的差大了 " + low + " dB", Math.abs(low) < 1);
+        assertTrue("2–4 kHz 左右的差大了 " + high + " dB", high > 2 && high < 3.2);
     }
 }

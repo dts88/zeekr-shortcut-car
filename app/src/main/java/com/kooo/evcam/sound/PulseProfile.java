@@ -97,9 +97,26 @@ final class PulseProfile {
     /** 压力大时的饱和（0 = 不饱和；怠速 / 满负荷）。 */
     final float driveIdle;
     final float driveLoad;
-    /** 每排串到另一边的量；这个频率以下左右一样（车厢里低频本来就分不出左右）。 */
+    /**
+     * 每排串到另一边的量；这个频率以下左右一样（车厢里低频本来就分不出左右）。2026-10-24 为了立体感试过少串（0.25 → 0.12）：
+     * 两排点火不均匀，120–250 Hz 左右反相的成分更多（车内满油门左右相关 −0.26 → −0.53），左右相加少 1 dB —— 发虚、变薄，没用；
+     * 立体感放在中高频（{@link #widthDb}）。
+     */
     final float cross;
     final float bassMonoHz;
+    /**
+     * 立体感（项目所有者 2026-10-24）：齿轮声的几个来源摆开多远（第 1 个居中，后面的一左一右，等功率摆位的位置 −1…+1）——
+     * 齿轮声从壳体四面八方出来，到车里经挡风玻璃、仪表台、A 柱几条路，是一片，不是一个点；几个来源频率差一点，左右相加还是原来的声音。
+     */
+    final float meshSpread;
+    /** 两排的进气腔（各自一个中冷器，在增压器左右两边）摆开多远：每排进气门关上那一下的压力脉动从自己那一边出来。 */
+    final float plenumPan;
+    /**
+     * 中高频左右的差（side）再放大多少 dB：{@link #widthHz} 以上（一阶搁架；头挡住的高频本来就左右差得多）。只放大本来就有的差，
+     * 左右相加（单声道）不变；再往下不放大：两排点火不均匀，120–500 Hz 本来就有反相的成分，放大了发虚、相加变薄。
+     */
+    final float widthDb;
+    final float widthHz;
     /** 怠速到 6000 rpm 多响多少（dB）。 */
     final float rpmLoudDb;
     /**
@@ -305,7 +322,8 @@ final class PulseProfile {
     final float decelBurst;
     final float decelBurstSec;
 
-    // ---- 声音从哪来（驾驶座看；立体声 −1 左 … +1 右）
+    // ---- 声音从哪来（驾驶座看；立体声 −1 左 … +1 右）。2026-10-24 摆开一些（项目所有者：声音汇聚在一起、要立体感）：
+    //      缸 0.45 → 0.6，中冷器出口的气流 0.5 → 0.7，进气口 −0.3 → −0.45
     /** 每个缸气门、燃烧的声音按排摆在左右多远；最靠后的缸离驾驶座多远（米）、缸距（米，1、2 缸在最前面）。 */
     final float cylinderPan;
     final float cylinderNearM;
@@ -465,6 +483,10 @@ final class PulseProfile {
         driveIdle = b.driveIdle;
         driveLoad = b.driveLoad;
         cross = b.cross;
+        meshSpread = b.meshSpread;
+        plenumPan = b.plenumPan;
+        widthDb = b.widthDb;
+        widthHz = b.widthHz;
         bassMonoHz = b.bassMonoHz;
         rpmLoudDb = b.rpmLoudDb;
         levelPow = b.levelPow;
@@ -670,6 +692,10 @@ final class PulseProfile {
         private float driveIdle = 0.3f;
         private float driveLoad = 1.5f;
         private float cross = 0.25f;
+        private float meshSpread = 0.6f;
+        private float plenumPan = 0.35f;
+        private float widthDb = 3f;
+        private float widthHz = 700f;
         private float bassMonoHz = 120f;
         private float rpmLoudDb = 5f;
         private float levelPow = 0.5f;
@@ -754,12 +780,12 @@ final class PulseProfile {
         private float[] decelHarmonicsDb = {0f, -7f, -9f};
         private float decelBurst = 1.5f;
         private float decelBurstSec = 0.15f;
-        private float cylinderPan = 0.45f;
+        private float cylinderPan = 0.6f;
         private float cylinderNearM = 1.7f;
         private float cylinderPitchM = 0.12f;
         private float exhaustLagMs = 10f;
-        private float jetPan = 0.5f;
-        private float inletPan = -0.3f;
+        private float jetPan = 0.7f;
+        private float inletPan = -0.45f;
         private float[] thunkHz = {55f, 140f};
         private float[] thunkMs = {35f, 12f};
         private float[] thunkGainDb = {0f, -8f};
@@ -873,6 +899,12 @@ final class PulseProfile {
         /** 踩下去起压那一下叶片基频多冲几倍（{@link PulseProfile#pressBurst}）；0 就是不冲。 */
         Builder press(float burst) {
             pressBurst = burst;
+            return this;
+        }
+
+        /** 中高频左右的差再放大多少 dB（{@link PulseProfile#widthDb}）；0 就是不放大。 */
+        Builder width(float db) {
+            widthDb = db;
             return this;
         }
 

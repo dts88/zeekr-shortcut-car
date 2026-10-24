@@ -174,7 +174,8 @@ final class PulseVoice implements Voice {
     private final float[][] tick = new float[2][RING];
     private final float[][] knock = new float[2][RING];
     private final float[] intake = new float[RING];
-    private final float[] pulsation = new float[RING];
+    /** 两排进气腔各自的压力脉动（0 左排、1 右排）。 */
+    private final float[][] pulsation = new float[2][RING];
     private final float[] click = new float[RING];
     private final float[] hiss = new float[RING];
     private int cursor;
@@ -249,9 +250,21 @@ final class PulseVoice implements Voice {
     private final float voiceNorm;
     private final float voiceScale;
     /** 增压时进气腔的压力脉动（{@link PulseProfile#pulsationDb}）：几个跟着转速走的共振和各自的增益（每块重算），每一下最多晚多少样本。 */
-    private final Biquad[] pulsationModes;
+    private final Biquad[][] pulsationModes;
     private final float[] pulsationGains;
-    private final Biquad pulsationTop;
+    private final Biquad[] pulsationTop = new Biquad[2];
+    /** 两排进气腔进左右各多少（等功率摆位，{@link PulseProfile#plenumPan}）。 */
+    private final float[] plenumLeft = new float[2];
+    private final float[] plenumRight = new float[2];
+    /** 齿轮声的几个来源进左右各多少（{@link PulseProfile#meshSpread}）；这一个样本的啸叫（左、右）。 */
+    private final float[] voiceLeft;
+    private final float[] voiceRight;
+    private float whineL;
+    private float whineR;
+    /** {@link PulseProfile#widthHz} 以上左右的差放大多少（倍）；一阶搁架的系数、状态。 */
+    private final float widthGain;
+    private final float widthK;
+    private float widthLp;
     private final float pulsationLagSamples;
     private double lobePhase;
     private double femalePhase;
@@ -342,8 +355,10 @@ final class PulseVoice implements Voice {
     private final Biquad[] cabinLow = new Biquad[2];
     private final float cabinGain;
     /** 车内听感：增压器啸叫自己的一阶低通（{@link #CABIN_TONE_HZ}）和增益。 */
-    private float toneLp;
-    private float toneLp2;
+    private float toneLpL;
+    private float toneLp2L;
+    private float toneLpR;
+    private float toneLp2R;
     private final float toneK;
     private final float cabinToneGain;
     /** 车内听感，这一块里进气腔和弦的倍数（高转时收）。 */
@@ -474,12 +489,27 @@ final class PulseVoice implements Voice {
         voiceK = onePole(profile.meshVoiceWanderHz);
         voiceNorm = (float) (1.0 / Math.sqrt(voiceK / (2.0 - voiceK)));
         voiceScale = (float) (1.0 / Math.sqrt(voicePhase.length));
-        pulsationModes = new Biquad[profile.pulsationOrders.length];
-        for (int k = 0; k < pulsationModes.length; k++) {
-            pulsationModes[k] = new Biquad();
+        pulsationModes = new Biquad[2][profile.pulsationOrders.length];
+        for (int b = 0; b < 2; b++) {
+            for (int k = 0; k < profile.pulsationOrders.length; k++) {
+                pulsationModes[b][k] = new Biquad();
+            }
+            pulsationTop[b] = Biquad.lowpass(profile.pulsationTopHz, 0.7071f, sampleRate);
+            float x = b == 0 ? -profile.plenumPan : profile.plenumPan;
+            plenumLeft[b] = CENTER_PAN * panLeft(x);
+            plenumRight[b] = CENTER_PAN * panRight(x);
         }
-        pulsationGains = new float[pulsationModes.length];
-        pulsationTop = Biquad.lowpass(profile.pulsationTopHz, 0.7071f, sampleRate);
+        pulsationGains = new float[profile.pulsationOrders.length];
+        voiceLeft = new float[profile.meshVoiceDetune.length];
+        voiceRight = new float[voiceLeft.length];
+        for (int v = 0; v < voiceLeft.length; v++) {
+            // 第 1 个居中，后面的一左一右
+            float x = v == 0 ? 0f : (v % 2 == 1 ? -1f : 1f) * profile.meshSpread;
+            voiceLeft[v] = CENTER_PAN * panLeft(x);
+            voiceRight[v] = CENTER_PAN * panRight(x);
+        }
+        widthGain = EngineVoice.dbToLin(profile.widthDb);
+        widthK = onePole(profile.widthHz);
         pulsationLagSamples = profile.pulsationLagMs * 1e-3f * sampleRate;
         dischargeGains = new float[profile.dischargeHarmonics.length];
         for (int k = 0; k < dischargeGains.length; k++) {
@@ -712,9 +742,10 @@ final class PulseVoice implements Voice {
             }
             evPulsation = EngineVoice.dbToLin(p.pulsationDb + rpmDb(p.pulsationRpm, p.pulsationRpmDb, rpmCalc))
                     * (p.pulsationFree + (1f - p.pulsationFree) * boost * (float) Math.sqrt(boost));
-            for (int k = 0; k < pulsationModes.length; k++) {
+            for (int k = 0; k < pulsationGains.length; k++) {
                 float hz = Math.min(p.pulsationOrders[k] * rpmCalc / 60f, rate * 0.45f);
-                pulsationModes[k].setBandpass(hz, p.pulsationQ, rate);
+                pulsationModes[0][k].setBandpass(hz, p.pulsationQ, rate);
+                pulsationModes[1][k].setBandpass(hz, p.pulsationQ, rate);
                 // 带通在中心频率处增益 1，一个脉冲进去响起来只有 2α / (1 + α)：折回来，最低那个共振每一下起头的幅度就是 pulsationDb；
                 // 高处的共振宽、响得短，起头按阶次加，几个谱峰一样高；相邻的共振正负相间，免得每一下起头全叠在一起
                 double alpha = Math.sin(2.0 * Math.PI * hz / rate) / (2.0 * p.pulsationQ);
@@ -815,14 +846,19 @@ final class PulseVoice implements Voice {
             hissNow += (hissTarget - hissNow) * ampK;
             // 车内听感时它和发动机舱别的声音一样隔着防火墙（2026-10-24：走挡风玻璃下面那一路时，车内怠速 2–8 kHz 的底噪高了 7–11 dB）
             front += hissBand2.process(hissBand.process(hissWhite())) * (p.hissFloor * hissNow + (hissDecay - hissRise) * hissNorm);
-            // 车内听感：发动机舱顶上、挡风玻璃下面的增压器的音不过整个防火墙（CABIN_TONE_DB）
-            float cowl = 0f;
+            // 车内听感：发动机舱顶上、挡风玻璃下面的增压器的音不过整个防火墙（CABIN_TONE_DB），左右各一路
+            float cowlL = 0f;
+            float cowlR = 0f;
+            // 发动机舱里摆了位置的音（齿轮声的几个来源、两排进气腔、松开以后的啸叫）：左、右
+            float sideL = 0f;
+            float sideR = 0f;
 
             // 增压：齿轮的啮合声、出口的压力脉动（左右两个中冷器）、进口的叶片声，轻的一层气流声（左右两路）、进口的风声、松油门的「呼」
             float jetL = 0f;
             float jetR = 0f;
             float inlet = 0f;
-            float cabinTones = 0f;
+            float cabinTonesL = 0f;
+            float cabinTonesR = 0f;
             float housing = 0f;
             if (supercharged) {
                 // 曲轴每次点火快一下，皮带带着增压器一起：点火频率上一个很小的、周期性的调频（不是随机的抖动）
@@ -860,31 +896,41 @@ final class PulseVoice implements Voice {
                 float d = discharge(hz) * dischargeNow * mod;
                 float dl = duct[0].process(intercooler[0].process(d));
                 float dr = duct[1].process(intercooler[1].process(d));
-                float loaded = whine(hz) * mod;
-                float tones = loaded + pulsation(cur) * chordGain;
+                whine(hz);
+                float loadedL = whineL * mod;
+                float loadedR = whineR * mod;
                 // 负载时壳体被出口的压力顶着、齿轮受力：调过的齿轮声、出口脉动经壳体、支座传出去（偏中低频，不过防火墙）
                 float shell = 0f;
+                float loaded = (loadedL + loadedR) * (0.5f / CENTER) + d;
                 for (Biquad m : bodyModes) {
-                    shell += m.process(loaded + d);
+                    shell += m.process(loaded);
                 }
                 housing = bodyTop.process(shell) * bodyGain;
+                float pl = pulsation(0, cur) * chordGain;
+                float pr = pulsation(1, cur) * chordGain;
                 decelNow += (decelTarget - decelNow) * ampK;
-                if (decelNow > 1e-6f) {
-                    tones += decel(hz) * decelNow;
-                }
+                float lifted = decelNow > 1e-6f ? CENTER * decel(hz) * decelNow : 0f;
+                float toneL = loadedL + plenumLeft[0] * pl + plenumLeft[1] * pr + lifted;
+                float toneR = loadedR + plenumRight[0] * pl + plenumRight[1] * pr + lifted;
                 if (cabin) {
-                    cowl += tones + 0.5f * (dl + dr);
+                    // 两边的中冷器一左一右（原来在车里合成一路居中）
+                    cowlL += toneL + 0.5f * (jetNear * dl + jetFar * dr);
+                    cowlR += toneR + 0.5f * (jetFar * dl + jetNear * dr);
                 } else {
-                    front += tones;
+                    sideL += toneL;
+                    sideR += toneR;
                     jetL += dl;
                     jetR += dr;
                 }
                 front += whooshBand.process(white()) * whooshNow;
             }
             if (cabin) {
-                toneLp += toneK * (cowl - toneLp);
-                toneLp2 += toneK * (toneLp - toneLp2);
-                cabinTones = toneLp2 * cabinToneGain;
+                toneLpL += toneK * (cowlL - toneLpL);
+                toneLp2L += toneK * (toneLpL - toneLp2L);
+                toneLpR += toneK * (cowlR - toneLpR);
+                toneLp2R += toneK * (toneLpR - toneLp2R);
+                cabinTonesL = toneLp2L * cabinToneGain;
+                cabinTonesR = toneLp2R * cabinToneGain;
             }
 
             // 车厢共振、和鸣（不分前后左右）
@@ -905,20 +951,23 @@ final class PulseVoice implements Voice {
             float knockR = modes(knockModes[1], knock[1], cur);
 
             // 发动机舱在前：进气、增压器居中，进气口左前，两边的中冷器；排气在后：两根尾管在车后两角
-            float frontL = CENTER * front + inletLeft * inlet + jetNear * jetL + jetFar * jetR + tickL + knockL;
-            float frontR = CENTER * front + inletRight * inlet + jetFar * jetL + jetNear * jetR + tickR + knockR;
+            float frontL = CENTER * front + sideL + inletLeft * inlet + jetNear * jetL + jetFar * jetR + tickL + knockL;
+            float frontR = CENTER * front + sideR + inletRight * inlet + jetFar * jetL + jetNear * jetR + tickR + knockR;
             float rearL = left + p.cross * right;
             float rearR = right + p.cross * left;
             if (cabin) {
-                frontL = lowpass2(frontLp[0], frontK, frontL) + CENTER * cabinTones;
-                frontR = lowpass2(frontLp[1], frontK, frontR) + CENTER * cabinTones;
+                frontL = lowpass2(frontLp[0], frontK, frontL) + cabinTonesL;
+                frontR = lowpass2(frontLp[1], frontK, frontR) + cabinTonesR;
                 rearL = lowpass2(rearLp[0], rearK, rearL);
                 rearR = lowpass2(rearLp[1], rearK, rearR);
             }
             float l = rearL + frontL + CENTER * (room + housing);
             float rr = rearR + frontR + CENTER * (room + housing);
             float mid = 0.5f * (l + rr);
+            // 低频左右一样；中高频本来就有的左右差再放大一点（一阶搁架，左右相加不变）
             float side = sideHighpass.process(0.5f * (l - rr));
+            widthLp += widthK * (side - widthLp);
+            side += (widthGain - 1f) * (side - widthLp);
             levelNow += (levelTarget - levelNow) * gainK;
             float g = post * levelNow;
             l = (mid + side) * g;
@@ -1085,7 +1134,7 @@ final class PulseVoice implements Voice {
                 if (evPulsation > 0f) {
                     // 同一排上一下留下的压力还没恢复：这一下弱一点、晚一点（两排的样子一样、错开一圈 → 整数阶）
                     float rec = Math.max(0.15f, 1f - p.pulsationRecovery * (float) Math.exp(-gapDeg[c] / p.recoveryDeg));
-                    add(pulsation, at + pulsationLagSamples * (1f - rec), evPulsation * rec * (0.97f + 0.06f * random01()));
+                    add(pulsation[bankOf[c]], at + pulsationLagSamples * (1f - rec), evPulsation * rec * (0.97f + 0.06f * random01()));
                 }
             }
         } else {
@@ -1117,12 +1166,15 @@ final class PulseVoice implements Voice {
     }
 
     /**
-     * 增压器这一个样本的啸叫，还没调：叶片基频（任何负荷都有，踩下去起压那一下猛一下）+ 齿轮啮合的几次谐波（只在增压时有）。
+     * 增压器这一个样本的啸叫（放在 {@link #whineL}、{@link #whineR}，还没调）：叶片基频（任何负荷都有，踩下去起压那一下猛一下，
+     * 居中）+ 齿轮啮合的几次谐波（只在增压时有，几个来源摆开：{@link PulseProfile#meshSpread}）。
      * {@code hz} 是这一刻叶片扫过出口的频率（相位已经走过了）。
      */
-    private float whine(float hz) {
-        float whine = lobeGain * (1f + p.pressBurst * pressNow) * VirtualEngine.clamp01((WHINE_TOP_HZ - hz) / WHINE_FADE_HZ)
+    private void whine(float hz) {
+        float lobe = lobeGain * (1f + p.pressBurst * pressNow) * VirtualEngine.clamp01((WHINE_TOP_HZ - hz) / WHINE_FADE_HZ)
                 * EngineVoice.sin(lobePhase) * whineNow;
+        float wl = CENTER * lobe;
+        float wr = CENTER * lobe;
         // 齿轮声的几个来源各自慢慢游移（{@link PulseProfile#meshVoiceDetune}）：同一个阶次上一小团，此起彼伏
         for (int v = 0; v < voicePhase.length; v++) {
             voiceNoise[v] += voiceK * (white() - voiceNoise[v]);
@@ -1135,13 +1187,15 @@ final class PulseVoice implements Voice {
             if (fade <= 0f) {
                 break;
             }
-            float s = 0f;
-            for (double phase : voicePhase) {
-                s += EngineVoice.sin(m * (lobePhase + phase));
+            float g = meshGains[k] * Math.min(fade, 1f) * voiceScale * meshNow;
+            for (int v = 0; v < voicePhase.length; v++) {
+                float s = g * EngineVoice.sin(m * (lobePhase + voicePhase[v]));
+                wl += voiceLeft[v] * s;
+                wr += voiceRight[v] * s;
             }
-            whine += meshGains[k] * Math.min(fade, 1f) * s * voiceScale * meshNow;
         }
-        return whine;
+        whineL = wl;
+        whineR = wr;
     }
 
     /**
@@ -1178,15 +1232,19 @@ final class PulseVoice implements Voice {
         return d;
     }
 
-    /** 进气腔的压力脉动这一个样本（{@link PulseProfile#pulsationDb}）：发动机的整数阶，和齿轮声一起在发动机舱顶上。 */
-    private float pulsation(int cur) {
-        float xs = pulsation[cur];
-        pulsation[cur] = 0f;
+    /**
+     * 第 {@code bank} 排进气腔的压力脉动这一个样本（{@link PulseProfile#pulsationDb}）：两排加起来是发动机的整数阶（半阶抵掉），
+     * 和齿轮声一起在发动机舱顶上；各排从自己那一边出来（{@link PulseProfile#plenumPan}）。
+     */
+    private float pulsation(int bank, int cur) {
+        float xs = pulsation[bank][cur];
+        pulsation[bank][cur] = 0f;
         float puls = 0f;
-        for (int k = 0; k < pulsationModes.length; k++) {
-            puls += pulsationGains[k] * pulsationModes[k].process(xs);
+        Biquad[] modes = pulsationModes[bank];
+        for (int k = 0; k < modes.length; k++) {
+            puls += pulsationGains[k] * modes[k].process(xs);
         }
-        return pulsationTop.process(puls);
+        return pulsationTop[bank].process(puls);
     }
 
     /** 齿轮声随转速另加的 dB（{@link PulseProfile#meshRpmDb}）：按转速的对数在表里插值，两头照最边上的。 */
