@@ -32,6 +32,18 @@ public class CarSpeakersTest {
     }
 
     @Test
+    public void theExteriorSpeakerPrefersItsNotifyRoute() {
+        // 车外只有一个喇叭，车机给了两路（Lab §2.43）：先用 BUS12（CarPiano 按媒体用途放有声的那一路），没有再用 BUS11
+        int[] types = {BUS, BUS, BUS};
+        assertEquals(CarSpeakers.OUTSIDE_NOTIFY, CarSpeakers.outsideAddress(types,
+                new String[] {"BUS11_OUTER_SPEAKER_PLAYBACK", "BUS00_MEDIA", "BUS12_OUTER_NOTIFY"}));
+        assertEquals(CarSpeakers.OUTSIDE_PLAYBACK, CarSpeakers.outsideAddress(types,
+                new String[] {"BUS11_OUTER_SPEAKER_PLAYBACK", "BUS00_MEDIA", "BUS01_SYS_NOTIFICATION"}));
+        assertEquals("没有车外喇叭（不是这台车）", null, CarSpeakers.outsideAddress(types,
+                new String[] {"BUS00_MEDIA", "BUS01_SYS_NOTIFICATION", "BUS17_FDHU_REAR_NOTIFICATION"}));
+    }
+
+    @Test
     public void handlesMissingAddresses() {
         assertEquals(-1, CarSpeakers.indexOf(new int[]{BUS}, new String[]{null}, CarSpeakers.CABIN_MEDIA));
         assertEquals(-1, CarSpeakers.indexOf(new int[]{BUS}, new String[]{"BUS00_MEDIA"}, null));

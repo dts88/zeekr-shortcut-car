@@ -1462,6 +1462,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setDriveSoundView(value);
                     refreshDriveSound();
                 });
+        bindEnum("pref_drive_sound_output", SettingsRegistry.DRIVE_SOUND_OUTPUT, appConfig.getDriveSoundOutput(),
+                value -> {
+                    appConfig.setDriveSoundOutput(value);
+                    refreshDriveSound();
+                });
         bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
                 value -> {
                     appConfig.setDriveSoundVolume(value);

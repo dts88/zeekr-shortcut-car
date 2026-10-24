@@ -898,7 +898,7 @@
     <string name="msg_footage_audio_no_permission">Tiada kebenaran mikrofon, Rakam bunyi kekal dimatikan</string>
     <string name="dev_drive_sound_group">Bunyi pemanduan</string>
     <string name="dev_drive_sound_title">Bunyi pemanduan simulasi (percubaan)</string>
-    <string name="dev_drive_sound_summary">Dalam mod Sukan, menjana bunyi enjin daripada pendikit, kelajuan dan pecutan serta memainkannya melalui pembesar suara kabin pada kelantangan media. Bertukar ke mod Sukan semasa berhenti memainkan bunyi enjin dihidupkan</string>
+    <string name="dev_drive_sound_summary">Dalam mod Sukan, menjana bunyi enjin daripada pendikit, kelajuan dan pecutan serta memainkannya melalui pembesar suara yang dipilih dalam Pembesar suara (pembesar suara kabin mengikut kelantangan media). Bertukar ke mod Sukan semasa berhenti memainkan bunyi enjin dihidupkan</string>
     <string name="dev_drive_sound_volume_title">Kelantangan bunyi pemanduan</string>
     <string name="dev_drive_sound_rpm_title">Corak kelajuan enjin</string>
     <string name="dev_drive_sound_rpm_continuous">Berterusan</string>
@@ -916,6 +916,10 @@
     <string name="dev_drive_sound_view_title">Kedudukan mendengar</string>
     <string name="dev_drive_sound_view_outside">Di luar</string>
     <string name="dev_drive_sound_view_cabin">Dalam kabin</string>
+    <string name="dev_drive_sound_output_title">Pembesar suara</string>
+    <string name="dev_drive_sound_output_cabin">Pembesar suara kabin</string>
+    <string name="dev_drive_sound_output_outside">Pembesar suara luar</string>
+    <string name="dev_drive_sound_output_both">Kabin dan luar</string>
     <string name="msg_drive_sound_on">Bunyi pemanduan simulasi dihidupkan</string>
     <string name="msg_drive_sound_off">Bunyi pemanduan simulasi dimatikan</string>
     <string name="dev_perm_all_files">Akses semua fail</string>

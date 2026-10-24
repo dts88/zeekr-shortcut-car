@@ -239,7 +239,8 @@
   雪地（2026-10-21 加，车上还没见过这个值）：vi_v_drive_snow「雪地」/ Snow / Salji。
 - 开发者选项「模拟声浪（试验）」（2026-10-21，车主定先只做车内、只做运动模式）：分组 dev_drive_sound_group「模拟声浪」/ Drive sound /
   Bunyi pemanduan；开关 dev_drive_sound_title「模拟声浪（试验）」/ Simulated drive sound (experimental) / Bunyi pemanduan simulasi (percubaan)；
-  dev_drive_sound_summary「运动模式下按油门、车速和加减速合成发动机声，从车内喇叭播放并跟随媒体音量。停车时切换到运动模式会先播放启动声」
+  dev_drive_sound_summary「运动模式下按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到运动模式会先播放启动声」
+  （2026-10-24 加「播放喇叭」时改：原来是「从车内喇叭播放并跟随媒体音量」）
   （2026-10-21 实车后去掉了「；倒挡时音量降低 6 dB」：车机自己在倒挡压低音量，车主定声浪不再另降）；
   dev_drive_sound_volume_title「声浪音量」（选项直接写 dB 数：−6 / −3 / 0 dB，默认 0 dB；车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）；
   dev_drive_sound_rpm_title「转速变化方式」，两档 dev_drive_sound_rpm_continuous「连续」、dev_drive_sound_rpm_shifts「模拟换挡」；
@@ -247,6 +248,10 @@
   msg_drive_sound_off「已关闭模拟声浪」（开发者选项关着时沿用 msg_dev_only）。英文、马来文见 strings.xml。
   声音风格（2026-10-21 加，车主嫌第一版单薄、要按发动机的结构重做，第一版留作可选风格）：dev_drive_sound_style_title「声音风格」/
   Sound style / Gaya bunyi（六档的名字车主定了，见上面的单子；「听感」「变速箱」也批了）。
+  播放喇叭（2026-10-24 加，车主要外放测试：车内、车外、车内和车外）：dev_drive_sound_output_title「播放喇叭」/ Speakers /
+  Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、
+  dev_drive_sound_output_outside「车外喇叭」/ Exterior speaker / Pembesar suara luar、dev_drive_sound_output_both「车内和车外」/
+  Cabin and exterior / Kabin dan luar。
 - 系统信息「动力流」（2026-10-21，Lab 手册「一」观察一致，模拟声浪要用）：vi_power_flow「动力流」/ Power flow / Aliran kuasa；
   四个值 vi_v_power_drive「驱动」/ Drive / Pacuan，vi_v_power_regen「回收」/ Regen / Jana semula，vi_v_power_idle「空闲」/ Idle / Melahu，
   vi_v_power_not_ready「未就绪」/ Not ready / Belum sedia。没对上的值照原样写号码。

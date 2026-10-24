@@ -910,7 +910,7 @@
     <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
     <string name="dev_drive_sound_group">模拟声浪</string>
     <string name="dev_drive_sound_title">模拟声浪（试验）</string>
-    <string name="dev_drive_sound_summary">运动模式下按油门、车速和加减速合成发动机声，从车内喇叭播放并跟随媒体音量。停车时切换到运动模式会先播放启动声</string>
+    <string name="dev_drive_sound_summary">运动模式下按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到运动模式会先播放启动声</string>
     <string name="dev_drive_sound_volume_title">声浪音量</string>
     <string name="dev_drive_sound_rpm_title">转速变化方式</string>
     <string name="dev_drive_sound_rpm_continuous">连续</string>
@@ -928,6 +928,10 @@
     <string name="dev_drive_sound_view_title">听感</string>
     <string name="dev_drive_sound_view_outside">车外</string>
     <string name="dev_drive_sound_view_cabin">车内</string>
+    <string name="dev_drive_sound_output_title">播放喇叭</string>
+    <string name="dev_drive_sound_output_cabin">车内喇叭</string>
+    <string name="dev_drive_sound_output_outside">车外喇叭</string>
+    <string name="dev_drive_sound_output_both">车内和车外</string>
     <string name="msg_drive_sound_on">已开启模拟声浪</string>
     <string name="msg_drive_sound_off">已关闭模拟声浪</string>
     <string name="dev_perm_all_files">所有文件访问</string>

@@ -88,6 +88,11 @@ public final class DriveSound {
     private volatile SoundStyle style = SoundStyle.AMERICAN;
     /** 听感：车内（隔着防火墙、车身）；关着是车外。 */
     private volatile boolean cabinView;
+    /**
+     * 播放喇叭（开发者选项，项目所有者 2026-10-24 要加的外放测试）：{@code AppConfig.DRIVE_SOUND_OUTPUT_*}，车内 / 车外 / 车内和车外。
+     * 换了就换一台（像声音风格、听感）。
+     */
+    private volatile String outputMode = AppConfig.DRIVE_SOUND_OUTPUT_CABIN;
     /** 最近一个声音线程（诊断报告用）。 */
     private volatile Run latest;
 
@@ -147,8 +152,8 @@ public final class DriveSound {
                 telemetry.releaseFast(USER);
             }
         }
-        if (run != null && (run.style != style || run.cabin != cabinView)) {
-            // 换了声音风格或听感：这一台淡出，下面按新的重新开始
+        if (run != null && (run.style != style || run.cabin != cabinView || !run.outputMode.equals(outputMode))) {
+            // 换了声音风格、听感或播放喇叭：这一台淡出，下面按新的重新开始
             run.stop();
             run = null;
         }
@@ -198,6 +203,9 @@ public final class DriveSound {
         gearbox = AppConfig.DRIVE_SOUND_GEARBOX_MANUAL6.equals(c.getDriveSoundGearbox()) ? Gearbox.MANUAL6 : Gearbox.AUTO8;
         style = SoundStyle.of(c.getDriveSoundStyle());
         cabinView = AppConfig.DRIVE_SOUND_VIEW_CABIN.equals(c.getDriveSoundView());
+        String output = c.getDriveSoundOutput();
+        outputMode = AppConfig.DRIVE_SOUND_OUTPUT_OUTSIDE.equals(output) || AppConfig.DRIVE_SOUND_OUTPUT_BOTH.equals(output)
+                ? output : AppConfig.DRIVE_SOUND_OUTPUT_CABIN;
     }
 
     private static float num(Float value) {
@@ -216,8 +224,9 @@ public final class DriveSound {
     public static String diagnostics() {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format(Locale.US, "  enabled=%s style=%s view=%s volume=%.0f dB rpm=%s gearbox=%s armed=%s fastUsers=%s%n",
-                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.userDb, s.rpmMode, s.gearbox, s.armed,
+        sb.append(String.format(Locale.US,
+                "  enabled=%s style=%s view=%s speakers=%s volume=%.0f dB rpm=%s gearbox=%s armed=%s fastUsers=%s%n",
+                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.userDb, s.rpmMode, s.gearbox, s.armed,
                 Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
@@ -250,11 +259,12 @@ public final class DriveSound {
                 p.everyMs < 0f ? "?" : String.format(Locale.US, "%.0f ms", p.everyMs));
     }
 
-    /** 一个声音线程：开车内喇叭、合成、写；要停时淡出再放掉。 */
+    /** 一个声音线程：开喇叭（车内、车外，按「播放喇叭」）、合成、写；要停时淡出再放掉。 */
     private final class Run implements Runnable {
-        /** 这一台的声音风格、听感（起的时候定下，换了就换一台）。 */
+        /** 这一台的声音风格、听感、播放喇叭（起的时候定下，换了就换一台）。 */
         final SoundStyle style = DriveSound.this.style;
         final boolean cabin = DriveSound.this.cabinView;
+        final String outputMode = DriveSound.this.outputMode;
         private volatile boolean stopping;
         /** 熄火不放完了，很快淡掉（新的一台要起）。 */
         private volatile boolean hurry;
@@ -329,37 +339,73 @@ public final class DriveSound {
         @Override
         public void run() {
             raisePriority();
-            SoundOutput out;
+            boolean toCabin = !AppConfig.DRIVE_SOUND_OUTPUT_OUTSIDE.equals(outputMode);
+            boolean toOutside = !AppConfig.DRIVE_SOUND_OUTPUT_CABIN.equals(outputMode);
+            SoundOutput inside = null;
+            SoundOutput outside = null;
             long openStart = SystemClock.elapsedRealtime();
-            try {
-                out = SoundOutput.open(app, CarSpeakers.CABIN_MEDIA);
-                openMs = SystemClock.elapsedRealtime() - openStart;
-            } catch (RuntimeException e) {
-                trouble = String.valueOf(e.getMessage());
+            if (toCabin) {
+                try {
+                    inside = SoundOutput.open(app, CarSpeakers.CABIN_MEDIA);
+                } catch (RuntimeException e) {
+                    trouble = "cabin: " + e.getMessage();
+                    AppLog.w(TAG, "cabin output: " + e.getMessage());
+                    BlackBox.note("模拟声浪：开不了车内喇叭（" + e.getMessage() + "）");
+                }
+            }
+            if (toOutside) {
+                // 车外只有一个喇叭，车机给了两路：先用 BUS12，找不到再用 BUS11（CarSpeakers）
+                String address = CarSpeakers.outsideAddress(app);
+                try {
+                    if (address == null) {
+                        throw new IllegalStateException("no exterior output");
+                    }
+                    outside = SoundOutput.open(app, address);
+                } catch (RuntimeException e) {
+                    trouble = (trouble.isEmpty() ? "" : trouble + "; ") + "exterior: " + e.getMessage();
+                    AppLog.w(TAG, "exterior output: " + e.getMessage());
+                    BlackBox.note("模拟声浪：开不了车外喇叭（" + e.getMessage() + "）");
+                }
+            }
+            if (inside == null && outside == null) {
                 state = "failed";
-                AppLog.w(TAG, "cabin output: " + trouble);
-                BlackBox.note("模拟声浪：开不了车内喇叭（" + trouble + "）");
                 ended(this, true);
                 return;
             }
-            output = out.describe();
+            openMs = SystemClock.elapsedRealtime() - openStart;
+            output = describeOutputs(inside, outside);
             BlackBox.note("模拟声浪：开始（" + output + "）");
-            // 试验：哪种格式能拿到低延迟通道（进程里一次，自己的线程，不出声）
-            OutputProbe.runOnce(app, CarSpeakers.CABIN_MEDIA);
+            if (inside != null) {
+                // 试验：哪种格式能拿到低延迟通道（进程里一次，自己的线程，不出声）
+                OutputProbe.runOnce(app, CarSpeakers.CABIN_MEDIA);
+            }
             boolean failed = false;
             try {
-                failed = loop(out);
+                failed = loop(inside, outside);
             } catch (RuntimeException e) {
                 failed = true;
                 trouble = e.toString();
                 AppLog.w(TAG, "drive sound stopped: " + e);
             } finally {
-                out.close();
+                if (inside != null) {
+                    inside.close();
+                }
+                if (outside != null) {
+                    outside.close();
+                }
                 state = failed ? "failed" : "stopped";
-                output = out.describe();
+                output = describeOutputs(inside, outside);
                 BlackBox.note("模拟声浪：停止（" + (failed ? "出错 " + trouble + "；" : "") + output + "）");
                 ended(this, failed);
             }
+        }
+
+        /** 开着的几路，一句话（英文，诊断报告 / 黑匣子用）。 */
+        private String describeOutputs(SoundOutput inside, SoundOutput outside) {
+            if (outside == null) {
+                return inside.describe();
+            }
+            return (inside == null ? "" : inside.describe() + "; ") + "exterior " + outside.describe();
         }
 
         /** 音频线程的优先级：先要最高的那一档，系统不给就退一档，再不给就照默认的跑（不能让线程因此死掉）。 */
@@ -375,17 +421,30 @@ public final class DriveSound {
             }
         }
 
-        /** @return 出错停的（写不进喇叭） */
-        private boolean loop(SoundOutput out) {
+        /**
+         * 合成、写：车内那一路（{@code inside}）照「听感」合成；车外那一路（{@code outside}）总是车外的听感（站在车旁听的），车内正好
+         * 也是车外听感（或者这种风格不分听感）时两路用同一份，否则另合成一份。车外那一路再合成单声道、去低音、压一点（{@link ExteriorMix}）。
+         * 两路可以有一路是 null。
+         *
+         * @return 出错停的（写不进喇叭）
+         */
+        private boolean loop(SoundOutput inside, SoundOutput outside) {
             Telemetry telemetry = Telemetry.get();
             AudioManager audio = app.getSystemService(AudioManager.class);
             DriveInputs inputs = new DriveInputs();
             VirtualEngine engine = new VirtualEngine(SoundProfile.V8, style.gearbox(gearbox), style.cranks(), style.pseudoGears(),
                     style.realNeutral());
-            Voice voice = style.voice(SoundOutput.RATE, cabin);
+            Voice voice = inside != null ? style.voice(SoundOutput.RATE, cabin) : null;
+            Voice voiceOut = null;
+            if (outside != null) {
+                voiceOut = voice != null && (!cabin || !style.hasViews()) ? voice : style.voice(SoundOutput.RATE, false);
+            }
+            ExteriorMix exterior = outside != null ? new ExteriorMix(SoundOutput.RATE) : null;
             VirtualEngine.Input in = new VirtualEngine.Input();
             VoiceParams params = new VoiceParams();
             float[] buffer = new float[2 * BLOCK];
+            float[] outsideBuffer = new float[2 * BLOCK];
+            float[] exteriorBuffer = new float[2 * BLOCK];
             float dt = BLOCK / (float) SoundOutput.RATE;
             boolean ignited = false;
             // 在放熄火（VirtualEngine.shutdown）
@@ -585,11 +644,23 @@ public final class DriveSound {
                 pedalRate = in.pedalRate;
                 accel = in.accel;
                 long t0 = System.nanoTime();
-                voice.renderStereo(buffer, BLOCK, params);
+                if (voice != null) {
+                    voice.renderStereo(buffer, BLOCK, params);
+                }
+                if (voiceOut != null && voiceOut != voice) {
+                    voiceOut.renderStereo(outsideBuffer, BLOCK, params);
+                }
+                if (exterior != null) {
+                    exterior.process(voiceOut == voice ? buffer : outsideBuffer, exteriorBuffer, BLOCK);
+                }
                 renderMs += ((System.nanoTime() - t0) / 1_000_000f - renderMs) * 0.01f;
                 long w0 = System.nanoTime();
-                if (!out.write(buffer, BLOCK)) {
-                    trouble = "write failed";
+                if (inside != null && !inside.write(buffer, BLOCK)) {
+                    trouble = "write failed (cabin)";
+                    return true;
+                }
+                if (outside != null && !outside.write(exteriorBuffer, BLOCK)) {
+                    trouble = "write failed (exterior)";
                     return true;
                 }
                 long w1 = System.nanoTime();
@@ -607,10 +678,11 @@ public final class DriveSound {
                 }
                 if (now >= nextWatch) {
                     nextWatch = now + WATCH_MS;
-                    boolean grown = out.watch();
+                    boolean grown = inside != null && inside.watch();
+                    grown |= outside != null && outside.watch();
                     // 每秒刷新一次（输出延迟要实时的；以前只在加缓冲时刷新，诊断里一直是开的那一刻的「?」）
-                    output = out.describe();
-                    outputLatencyMs = out.latencyMs();
+                    output = describeOutputs(inside, outside);
+                    outputLatencyMs = (inside != null ? inside : outside).latencyMs();
                     if (grown) {
                         BlackBox.note("模拟声浪：欠载，缓冲加大（" + output + "）");
                     }
@@ -620,7 +692,7 @@ public final class DriveSound {
 
         String describe() {
             return String.format(Locale.US,
-                    "run: %s style=%s view=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
+                    "run: %s style=%s view=%s speakers=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
                             + "  mixer: takes a period every %s (%s blocks each)%n"
                             + "  start: drive mode changed %s before the run was asked for, output opened in %s, "
@@ -632,7 +704,7 @@ public final class DriveSound {
                             + "  pedal to speaker (the part measurable here): new throttle used %s after it arrived "
                             + "+ output %s (HAL timestamp; on the car's head unit it reads about 5.1 s whatever the buffer, so it is "
                             + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
-                    state, style.key, cabin ? "cabin" : "outside", why, ignitedAs.isEmpty() ? "-" : ignitedAs,
+                    state, style.key, cabin ? "cabin" : "outside", outputMode, why, ignitedAs.isEmpty() ? "-" : ignitedAs,
                     endedAs.isEmpty() ? "-" : endedAs, rpm, gear,
                     pseudo ? " (pseudo)" : "", load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,

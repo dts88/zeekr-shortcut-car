@@ -637,6 +637,7 @@ public class AppConfig {
                 SettingsRegistry.DRIVE_SOUND_GEARBOX.key,   // 变速箱 → 8 速自动（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_VIEW.key,      // 听感 → 车外（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_OUTPUT.key,    // 播放喇叭 → 车内（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -986,6 +987,12 @@ public class AppConfig {
     public static final String DRIVE_SOUND_VIEW_OUTSIDE = "outside";
     /** 听感：车内（隔着防火墙、车身听，高频闷一些）。 */
     public static final String DRIVE_SOUND_VIEW_CABIN = "cabin";
+    /** 播放喇叭（{@link SettingsRegistry#DRIVE_SOUND_OUTPUT}）：车内喇叭（默认）。 */
+    public static final String DRIVE_SOUND_OUTPUT_CABIN = "cabin";
+    /** 播放喇叭：车外喇叭。 */
+    public static final String DRIVE_SOUND_OUTPUT_OUTSIDE = "outside";
+    /** 播放喇叭：车内和车外一起。 */
+    public static final String DRIVE_SOUND_OUTPUT_BOTH = "both";
 
     /**
      * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
@@ -1045,6 +1052,15 @@ public class AppConfig {
 
     public void setDriveSoundView(String view) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_VIEW, view);
+    }
+
+    /** 播放喇叭：{@link #DRIVE_SOUND_OUTPUT_CABIN} / {@link #DRIVE_SOUND_OUTPUT_OUTSIDE} / {@link #DRIVE_SOUND_OUTPUT_BOTH}。 */
+    public String getDriveSoundOutput() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_OUTPUT);
+    }
+
+    public void setDriveSoundOutput(String output) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_OUTPUT, output);
     }
 
     /**

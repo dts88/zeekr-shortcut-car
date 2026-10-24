@@ -154,6 +154,16 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_VIEW_OUTSIDE, "车外", R.string.dev_drive_sound_view_outside),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_VIEW_CABIN, "车内", R.string.dev_drive_sound_view_cabin));
 
+    /**
+     * 模拟声浪从哪些喇叭放（开发者选项，试验；{@code sound.DriveSound}）。项目所有者 2026-10-24 要加外放测试：车内、车外、车内和车外。
+     * 车外喇叭是一个单声道的喇叭，车机给了两路（{@code sound.CarSpeakers}）。
+     */
+    public static final SettingSpec DRIVE_SOUND_OUTPUT = SettingSpec.of(
+            "drive_sound_output", "播放喇叭", com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_CABIN,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_CABIN, "车内喇叭", R.string.dev_drive_sound_output_cabin),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_OUTSIDE, "车外喇叭", R.string.dev_drive_sound_output_outside),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_BOTH, "车内和车外", R.string.dev_drive_sound_output_both));
+
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
@@ -167,5 +177,6 @@ public final class SettingsRegistry {
             DRIVE_SOUND_RPM,
             DRIVE_SOUND_GEARBOX,
             DRIVE_SOUND_STYLE,
-            DRIVE_SOUND_VIEW));
+            DRIVE_SOUND_VIEW,
+            DRIVE_SOUND_OUTPUT));
 }
