@@ -1043,4 +1043,24 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
+    <string name="slot_road_rear">Rearward road camera</string>
+    <string name="record_preview_cabin">Driver / front cabin</string>
+    <string name="camera_source_automatic">Automatic · %1$s</string>
+    <string name="camera_sources_reset">Reset all to automatic</string>
+    <string name="camera_source_manual">Manual · %1$s</string>
+    <string name="record_source_unassigned">Unassigned</string>
+    <string name="slot_road_front">Forward road camera</string>
+    <string name="camera_sources_help">One mapping for preview, recording and camera windows. Automatic keeps Surround capability detection and existing cabin order. Road Front/Rear and Manual need verified ID assignments; listed IDs do not prove orientation. Manual choices work with Developer mode off. Exit and reopen after changing. Unassigned disables recording for that source (both road sources for Front + Rear).</string>
+    <string name="camera_source_not_found">No automatic source identified</string>
+    <string name="record_source_pick">Choose source: %1$s</string>
+    <string name="record_source_duplicate">This camera is already assigned to another enabled source. Choose a different camera or turn that source off.</string>
+    <string name="record_group_surround">Surround</string>
+    <string name="camera_sources_reset_note">Clear manual camera assignments, including old Developer overrides. Keep vehicle model, preview layout, recording switches and picture quality. Surround returns to the detected feed; additional cameras without an automatic default will need mapping before use. Exit and reopen afterwards.</string>
+    <string name="camera_sources_title">Camera sources</string>
+    <string name="record_group_manual">Manual mapping</string>
+    <string name="record_source_choose">Choose a source</string>
+    <string name="record_source_change">Change camera source</string>
+    <string name="record_source_settings">Camera settings</string>
+    <string name="record_group_cabin">Cabin</string>
+    <string name="record_group_roads">Front + Rear</string>
 </resources>

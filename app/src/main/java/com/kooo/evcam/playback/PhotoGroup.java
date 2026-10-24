@@ -168,6 +168,7 @@ public class PhotoGroup {
         } else if (photoFiles.containsKey(POSITION_RIGHT)) {
             return photoFiles.get(POSITION_RIGHT);
         }
+        for (String key : new String[]{"roadfront", "roadrear", "manual"}) if (photoFiles.containsKey(key)) return photoFiles.get(key);
         return null;
     }
 

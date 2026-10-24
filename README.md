@@ -152,3 +152,11 @@ Splitting App Lab's composite stream into a grid and rendering it is implemented
   ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Shared camera sources
+
+Recording → Camera sources and the Developer mapping entry now open the same per-role picker. Automatic retains capability-based Surround detection and existing cabin ordering; Unassigned disables an assignment explicitly; a Camera ID overrides it. Reset confirms before clearing mappings and keeps recording selections and image tuning. Active legacy developer overrides migrate once. Saved mappings apply when the camera pipeline is reopened; they do not interrupt recording. Road Front, Road Rear and Manual roles are reserved for the recording/preview follow-ups; their Automatic assignments remain unknown rather than guessing IDs or vehicle compatibility. Camera2 enumeration and retained assignments are evidence of IDs, not proof of physical orientation or simultaneous-camera support.
+
+### Combined recording groups
+
+The profile editor offers independent Surround, Front + Rear, Cabin and Manual groups. Enable several groups to save separate camera files alongside Surround. New exterior/manual sources start off; choose their verified IDs under Camera sources first. Existing enabled cameras, quality and geometry are retained until explicitly changed. The Cabin group retains both legacy cabin entries and does not imply both have verified cabin feeds. Preview follows selected recording sources in this contribution. Separate road/manual clips and photos are included in playback, sharing and footage protection, including sessions recorded without Surround. More concurrent cameras/encoders require vehicle testing.

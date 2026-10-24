@@ -1020,4 +1020,24 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
+    <string name="slot_road_rear">Kamera jalan belakang</string>
+    <string name="record_preview_cabin">Pemandu / kabin hadapan</string>
+    <string name="camera_source_automatic">Automatik · %1$s</string>
+    <string name="camera_sources_reset">Tetapkan semua kepada automatik</string>
+    <string name="camera_source_manual">Manual · %1$s</string>
+    <string name="record_source_unassigned">Belum dipetakan</string>
+    <string name="slot_road_front">Kamera jalan hadapan</string>
+    <string name="camera_sources_help">Satu pemetaan untuk pratonton, rakaman dan tetingkap kamera. Automatik mengekalkan pengesanan Sekeliling dan susunan kabin sedia ada. Jalan Hadapan/Belakang dan Manual memerlukan ID yang disahkan; ID tersenarai tidak membuktikan arah. Pilihan manual kekal apabila mod pembangun dimatikan. Keluar dan buka semula selepas menukar. Tidak dipetakan mematikan rakaman sumber itu (kedua-dua sumber jalan untuk Hadapan + Belakang).</string>
+    <string name="camera_source_not_found">Tiada sumber automatik dikenal pasti</string>
+    <string name="record_source_pick">Pilih sumber: %1$s</string>
+    <string name="record_source_duplicate">Kamera ini sudah dipetakan kepada sumber aktif lain. Pilih kamera lain atau matikan sumber tersebut.</string>
+    <string name="record_group_surround">Sekeliling</string>
+    <string name="camera_sources_reset_note">Padam pemetaan kamera manual termasuk pilihan Pembangun lama. Kekalkan model, susun atur pratonton, suis rakaman dan kualiti. Sekeliling kembali kepada suapan dikesan; kamera tambahan tanpa lalai automatik perlu dipetakan sebelum digunakan. Keluar dan buka semula selepas itu.</string>
+    <string name="camera_sources_title">Sumber kamera</string>
+    <string name="record_group_manual">Pemetaan manual</string>
+    <string name="record_source_choose">Pilih sumber</string>
+    <string name="record_source_change">Tukar sumber kamera</string>
+    <string name="record_source_settings">Tetapan kamera</string>
+    <string name="record_group_cabin">Kabin</string>
+    <string name="record_group_roads">Hadapan + Belakang</string>
 </resources>

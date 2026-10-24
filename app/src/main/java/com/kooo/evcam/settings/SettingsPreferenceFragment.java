@@ -191,6 +191,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 录制
 
     private void bindRecording() {
+        onClick("pref_camera_sources", pref -> openFragment(new CameraSourcesFragment(), R.string.camera_sources_title));
         bindCarModel();
 
         // 相机与视频流的参数（每一路的三条流、每一格的摆法）都在下面这个
@@ -1539,12 +1540,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
-        onClick("pref_camera_mapping", pref -> {
-            if (getContext() != null) {
-                SettingsDialogs.showCameraMappingDialog(
-                        getContext(), appConfig, this::updateCameraMappingSummary);
-            }
-        });
+        onClick("pref_camera_mapping", pref -> openFragment(new CameraSourcesFragment(), R.string.camera_sources_title));
+        onClick("pref_camera_sources", pref -> openFragment(new CameraSourcesFragment(), R.string.camera_sources_title));
         updateCameraMappingSummary();
 
     }
