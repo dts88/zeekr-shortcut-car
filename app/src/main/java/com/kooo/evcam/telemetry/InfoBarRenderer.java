@@ -330,9 +330,6 @@ public final class InfoBarRenderer {
             case TURN:
                 drawIndicators(cell.width, s.turnSignal, s.hazard);
                 break;
-            case HAZARD:
-                drawHazard(cx, cy, s.hazard);
-                break;
             case STEERING:
                 drawSteering(cx, cy, s.steeringDegrees);
                 break;
@@ -374,9 +371,6 @@ public final class InfoBarRenderer {
                 break;
             case HORN:
                 drawHorn(cx, cy, s.horn);
-                break;
-            case FLASH:
-                drawFlash(s.flashToPass);
                 break;
             case ODOMETER:
                 drawOdometer(cx, cy, s.odometerKm);
@@ -531,14 +525,6 @@ public final class InfoBarRenderer {
         p.lineTo(cx + half, bottom);
         p.lineTo(cx - half, bottom);
         p.close();
-    }
-
-    /** 车辆状态面板的双闪格（90 宽）：和信息条转向灯那一格中间的三角同一个画法；没数据加一道斜杠。 */
-    private void drawHazard(float cx, float cy, Boolean on) {
-        hazardMark(cx, cy, on);
-        if (on == null) {
-            slash(cx - 30, cy + 30, cx + 30, cy - 30);
-        }
     }
 
     /**
@@ -1031,11 +1017,6 @@ public final class InfoBarRenderer {
         boolean highOn = Boolean.TRUE.equals(high);
         // 平直的光线：只远光四道全平直，近光远光同时开上两道，只近光 / 都不亮没有
         drawHeadlamp(low == null && high == null, lowOn || highOn, highOn ? (lowOn ? 2 : 4) : 0);
-    }
-
-    /** 闪远光（车辆状态面板上单独一格，90 宽）：远光的样子，四道光线全平直，闪的时候亮。 */
-    private void drawFlash(Boolean flashing) {
-        drawHeadlamp(flashing == null, Boolean.TRUE.equals(flashing), 4);
     }
 
     /** 前灯（90 宽）：半圆灯体 + 四道光线，上面 {@code straight} 道平直、其余斜向下。 */
