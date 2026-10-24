@@ -1962,6 +1962,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setDriveSoundEnabled(value);
             refreshDriveSound();
         });
+        bindSwitch("pref_drive_sound_standard", appConfig.isDriveSoundStandardEnabled(), value -> {
+            appConfig.setDriveSoundStandardEnabled(value);
+            refreshDriveSound();
+        });
         SwitchNavPreference row = findPreference("pref_drive_sound");
         if (row != null) {
             showDriveSound(row);

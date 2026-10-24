@@ -9,6 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Settings → System → Simulated drive sound: new switch Also in Standard mode (off by default). When it is off, only Sport mode plays the drive sound; when on, Standard mode plays it too, with calmer shifting than Sport.
 - Developer options → Vehicle status: the panel shows the horn and the brake and throttle bars; flash-to-pass and hazard lights are gone from it.
 
 ## [2.28.0-alpha] - 2026-10-24

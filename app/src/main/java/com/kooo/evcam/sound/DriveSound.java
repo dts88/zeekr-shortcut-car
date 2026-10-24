@@ -23,7 +23,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：进程里一个，跟着车辆信号开、关声音那一路。
+ * 模拟声浪（设置 → 系统「模拟声浪（试验性）」，项目所有者 2026-10-21）：进程里一个，跟着车辆信号开、关声音那一路。
  * 方案在 docs/local/drive-sound-plan.md；什么时候出声由 {@link DriveSoundRules} 一处定。
  *
  * <h3>两层</h3>
@@ -81,19 +81,21 @@ public final class DriveSound {
 
     // ---- 设置（主线程、声音线程都会刷新，读的人拿到的总是完整的一项）
     private volatile boolean enabled;
+    /** 「标准模式也启用」（项目所有者 2026-10-24，默认关）：开着时标准模式也出声。 */
+    private volatile boolean standardMode;
     private volatile float userDb = 0f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;
-    /** 模拟换挡的变速箱（开发者选项「变速箱」）：声音线程每块交给虚拟发动机，改了马上换，不重新开始。 */
+    /** 模拟换挡的变速箱（「模拟声浪」页的「变速箱」）：声音线程每块交给虚拟发动机，改了马上换，不重新开始。 */
     private volatile Gearbox gearbox = Gearbox.AUTO8;
     private volatile SoundStyle style = SoundStyle.AMERICAN;
     /** 听感：车内（隔着防火墙、车身）；关着是车外。 */
     private volatile boolean cabinView;
     /**
-     * 播放喇叭（开发者选项，项目所有者 2026-10-24 要加的外放测试）：{@code AppConfig.DRIVE_SOUND_OUTPUT_*}，车内 / 车外 / 车内和车外。
+     * 播放喇叭（「模拟声浪」页，项目所有者 2026-10-24 要加的外放测试）：{@code AppConfig.DRIVE_SOUND_OUTPUT_*}，车内 / 车外 / 车内和车外。
      * 换了就换一台（像声音风格、听感）。
      */
     private volatile String outputMode = AppConfig.DRIVE_SOUND_OUTPUT_CABIN;
-    /** 车外线路（开发者选项「车外线路」：bus12 / bus11），换了就换一台；车外音量（dB，「车外音量」），随时生效。 */
+    /** 车外线路（「模拟声浪」页的「车外线路」：bus12 / bus11），换了就换一台；车外音量（dB，「车外音量」），随时生效。 */
     private volatile String exteriorRoute = AppConfig.DRIVE_SOUND_ROUTE_NOTIFY;
     private volatile float exteriorDb = 12f;
     /** 最近一个声音线程（诊断报告用）。 */
@@ -107,12 +109,12 @@ public final class DriveSound {
         INSTANCE.doInstall(context);
     }
 
-    /** 这种声音风格（设置里存的值）用得上开发者选项「听感」吗：只有美式 V8 分车外、车内（设置页按它显示这一行）。 */
+    /** 这种声音风格（设置里存的值）用得上「模拟声浪」页的「听感」吗：只有美式 V8 分车外、车内（设置页按它显示这一行）。 */
     public static boolean styleHasViews(String style) {
         return SoundStyle.of(style).hasViews();
     }
 
-    /** 这种声音风格用得上开发者选项「变速箱」吗：两种超音速固定 8 速（设置页按它显示这一行）。 */
+    /** 这种声音风格用得上「模拟声浪」页的「变速箱」吗：两种超音速固定 8 速（设置页按它显示这一行）。 */
     public static boolean styleChoosesGearbox(String style) {
         return SoundStyle.of(style).choosesGearbox();
     }
@@ -146,7 +148,7 @@ public final class DriveSound {
         Readings r = telemetry.readings();
         // 这里只看「快读不快读、转不转」，车速、油门给个新鲜的占位（是否过期由声音线程每块判）
         DriveSoundRules.Why why = DriveSoundRules.decide(enabled, telemetry.carLinkConnected(),
-                r.code(Signal.IGNITION), r.text(Signal.GEAR), r.code(Signal.DRIVE_MODE), 0f, 0f, 0L, false);
+                r.code(Signal.IGNITION), r.text(Signal.GEAR), r.code(Signal.DRIVE_MODE), standardMode, 0f, 0f, 0L, false);
         if (why.armed != armed) {
             armed = why.armed;
             if (armed) {
@@ -201,6 +203,7 @@ public final class DriveSound {
             return;
         }
         enabled = c.isDriveSoundEnabled();
+        standardMode = c.isDriveSoundStandardEnabled();
         userDb = DriveSoundRules.volumeDb(c.getDriveSoundVolume());
         rpmMode = AppConfig.DRIVE_SOUND_RPM_SHIFTS.equals(c.getDriveSoundRpm())
                 ? VirtualEngine.RpmMode.SHIFTS : VirtualEngine.RpmMode.CONTINUOUS;
@@ -232,9 +235,9 @@ public final class DriveSound {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
         sb.append(String.format(Locale.US,
-                "  enabled=%s style=%s view=%s speakers=%s exterior=%s %+.0f dB volume=%.0f dB rpm=%s gearbox=%s armed=%s "
-                        + "fastUsers=%s%n",
-                s.enabled, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.exteriorRoute, s.exteriorDb, s.userDb,
+                "  enabled=%s standard=%s style=%s view=%s speakers=%s exterior=%s %+.0f dB volume=%.0f dB rpm=%s gearbox=%s "
+                        + "armed=%s fastUsers=%s%n",
+                s.enabled, s.standardMode, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.exteriorRoute, s.exteriorDb, s.userDb,
                 s.rpmMode, s.gearbox, s.armed, Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
@@ -373,7 +376,7 @@ public final class DriveSound {
                 }
             }
             if (toOutside) {
-                // 车外只有一个喇叭，车机给了两路：用开发者选项「车外线路」选的那一路，开不了就不放车外（不换另一路）
+                // 车外只有一个喇叭，车机给了两路：用「模拟声浪」页的「车外线路」选的那一路，开不了就不放车外（不换另一路）
                 String address = CarSpeakers.exteriorAddress(exteriorRoute);
                 try {
                     outside = SoundOutput.open(app, address);
@@ -609,7 +612,7 @@ public final class DriveSound {
                 Readings r = telemetry.readings();
                 String gearText = r.text(Signal.GEAR);
                 DriveSoundRules.Why asked = DriveSoundRules.decide(enabled, link, r.code(Signal.IGNITION), gearText,
-                        r.code(Signal.DRIVE_MODE), inputs.speed(), inputs.throttle(), fast.ageMs(now), inCall);
+                        r.code(Signal.DRIVE_MODE), standardMode, inputs.speed(), inputs.throttle(), fast.ageMs(now), inCall);
                 DriveSoundRules.Why w = stopping ? DriveSoundRules.Why.OFF : asked;
                 why = w;
                 // 虚拟发动机看还原后的车速、踏板和按相邻读数算的快慢、加速度；还原的读不到时照快读的

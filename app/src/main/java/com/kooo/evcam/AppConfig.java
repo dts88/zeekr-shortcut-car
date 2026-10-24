@@ -68,6 +68,7 @@ public class AppConfig {
     private static final String KEY_RAW_FRAME_DUMP = "raw_frame_dump";            // 拍照时另存原始整帧（工程模式）
     private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（设置 → 录制，默认开）
     private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
+    private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式也启用（默认关）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
@@ -1049,6 +1050,18 @@ public class AppConfig {
 
     public void setDriveSoundEnabled(boolean on) {
         prefs.edit().putBoolean(KEY_DRIVE_SOUND, on).apply();
+    }
+
+    /**
+     * 标准模式也播放模拟声浪（「模拟声浪」页的「标准模式也启用」，项目所有者 2026-10-24；默认关，像更新页的「接收 Alpha 版」）：
+     * 关着时只有运动模式出声；开着时标准模式也出声，换挡照标准模式的积极性（{@code sound.DriveSoundRules#eagerOf}）。
+     */
+    public boolean isDriveSoundStandardEnabled() {
+        return readBoolean(KEY_DRIVE_SOUND_STANDARD, false);
+    }
+
+    public void setDriveSoundStandardEnabled(boolean on) {
+        prefs.edit().putBoolean(KEY_DRIVE_SOUND_STANDARD, on).apply();
     }
 
     /** 声浪自己的音量（dB 数的字符串，{@link SettingsRegistry#DRIVE_SOUND_VOLUME}）：在车机媒体音量之上再乘。 */

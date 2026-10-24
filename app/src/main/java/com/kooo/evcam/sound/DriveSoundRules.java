@@ -9,8 +9,8 @@ import com.kooo.evcam.telemetry.Signal;
  * <h3>规则（项目所有者 2026-10-21）</h3>
  *
  * <ul>
- *   <li>只在车内；运动模式出声（2026-10-24 起标准模式也出声，和运动模式只差升降挡的积极性，{@link #eagerOf}）——
- *       舒适、雪地这些不出声，驾驶模式读不到也不出声。</li>
+ *   <li>只在车内；运动模式出声。标准模式要在「模拟声浪」页打开「标准模式也启用」才出声（项目所有者 2026-10-24，默认关），
+ *       出声时和运动模式只差升降挡的积极性（{@link #eagerOf}）—— 舒适、雪地这些不出声，驾驶模式读不到也不出声。</li>
  *   <li>出声的驾驶模式下虚拟发动机一直转着：停着是怠速，P / N 踩油门轰转速，倒挡按倒挡齿比（{@link VirtualEngine}）；
  *       运动、标准之间切换照常转着，只是换挡变了。</li>
  *   <li>切到不出声的驾驶模式、没上电：发动机熄火（{@link Why#shutsDown}，2026-10-22：停着照真车熄火，车在走像混动车停发动机），
@@ -26,13 +26,13 @@ final class DriveSoundRules {
 
     /** 结论。每一种的「快读 / 转着 / 响 / 淡多快」是定死的，所以结论本身就是全部信息，不用另外建对象（声音线程里不分配）。 */
     enum Why {
-        /** 开关关着（或者开发者选项关了） */
+        /** 开关关着 */
         OFF(false, false, false, 0.6f, false),
         /** 车辆接口没连上 */
         NO_LINK(false, false, false, 0.3f, false),
         /** 没上电（点火不在 ON / DRIVING，挡位也不在 R / N / D） */
         POWER_OFF(false, false, false, 0.6f, true),
-        /** 不出声的驾驶模式：不是运动、标准（舒适、雪地等；驾驶模式读不到也算） */
+        /** 不出声的驾驶模式：不是运动（标准模式没打开「标准模式也启用」时也算；舒适、雪地等；驾驶模式读不到也算） */
         OTHER_MODE(false, false, false, 0.6f, true),
         /** 车速 / 油门读不到或过期 */
         STALE(true, true, false, 0.3f, false),
@@ -71,18 +71,19 @@ final class DriveSoundRules {
     }
 
     /**
-     * @param enabled       开发者选项「模拟声浪」开着（开发者选项关了按关算）
+     * @param enabled       「模拟声浪」开关开着（设置 → 系统）
      * @param linkConnected 车辆接口连着
      * @param ignition      点火（{@link Signal#IGNITION} 的码）；读不到 null
      * @param gear          档位字母；读不到 null
      * @param driveMode     驾驶模式（{@link Signal#DRIVE_MODE} 的码）；读不到 null
+     * @param standard      「标准模式也启用」开着：标准模式也出声
      * @param speedKmh      快读的车速；读不到 NaN
      * @param throttlePct   快读的油门；读不到 NaN
      * @param fastAgeMs     快读那份读数多旧（毫秒）；一次都没读到 -1
      * @param inCall        通话中
      */
     static Why decide(boolean enabled, boolean linkConnected, Integer ignition, String gear, Integer driveMode,
-                      float speedKmh, float throttlePct, long fastAgeMs, boolean inCall) {
+                      boolean standard, float speedKmh, float throttlePct, long fastAgeMs, boolean inCall) {
         if (!enabled) {
             return Why.OFF;
         }
@@ -92,7 +93,7 @@ final class DriveSoundRules {
         if (!poweredOn(ignition, gear)) {
             return Why.POWER_OFF;
         }
-        if (!soundMode(driveMode)) {
+        if (!soundMode(driveMode, standard)) {
             return Why.OTHER_MODE;
         }
         if (Float.isNaN(speedKmh) || Float.isNaN(throttlePct) || fastAgeMs < 0L || fastAgeMs > STALE_MS) {
@@ -104,9 +105,11 @@ final class DriveSoundRules {
         return Why.RUNNING;
     }
 
-    /** 这种驾驶模式出声：运动、标准（项目所有者 2026-10-24 加了标准模式）；读不到不算。 */
-    static boolean soundMode(Integer driveMode) {
-        return driveMode != null && (driveMode == Signal.DRIVE_MODE_SPORT || driveMode == Signal.DRIVE_MODE_STANDARD);
+    /**
+     * 这种驾驶模式出声：运动模式；标准模式要 {@code standard}（「标准模式也启用」，项目所有者 2026-10-24，默认关）；读不到不算。
+     */
+    static boolean soundMode(Integer driveMode, boolean standard) {
+        return driveMode != null && (driveMode == Signal.DRIVE_MODE_SPORT || (standard && driveMode == Signal.DRIVE_MODE_STANDARD));
     }
 
     /**
@@ -156,7 +159,7 @@ final class DriveSoundRules {
         }
     }
 
-    /** 车外音量（开发者选项「车外音量」存的 dB 数）：0–18 dB，读不出按 12 dB。 */
+    /** 车外音量（「模拟声浪」页的「车外音量」存的 dB 数）：0–18 dB，读不出按 12 dB。 */
     static float exteriorDb(String stored) {
         try {
             float db = Float.parseFloat(stored);

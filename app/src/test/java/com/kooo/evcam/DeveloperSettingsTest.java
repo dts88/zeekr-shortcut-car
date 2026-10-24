@@ -79,7 +79,7 @@ public class DeveloperSettingsTest {
             "screen_off_keep_recording", "auto_start_recording", "footage_lock",
             "footage_audio", "footage_audio_source", "drive_sound", "drive_sound_volume", "drive_sound_rpm",
             "drive_sound_gearbox", "drive_sound_style", "drive_sound_view", "drive_sound_output",
-            "drive_sound_exterior_route", "drive_sound_exterior_volume",
+            "drive_sound_exterior_route", "drive_sound_exterior_volume", "drive_sound_standard",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
             "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed");
 
