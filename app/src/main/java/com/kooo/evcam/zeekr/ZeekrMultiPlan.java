@@ -67,6 +67,22 @@ public final class ZeekrMultiPlan {
         return !fromStored && compositeId != null && cabin1Id != null && cabin2Id != null;
     }
 
+    /** Apply canonical manual/Unassigned choices even when temporarily absent from the advertised list. */
+    public ZeekrMultiPlan withSourceChoices(String[] listed, String detected,
+                                            String surround, String frontCabin, String rearCabin) {
+        String c = surround == null ? compositeId : surround.isEmpty() ? null : surround;
+        String f = frontCabin == null ? cabin1Id : frontCabin.isEmpty() ? null : frontCabin;
+        String r = rearCabin == null ? cabin2Id : rearCabin.isEmpty() ? null : rearCabin;
+        if (f != null && f.equals(c)) f = null;
+        if (r != null && (r.equals(c) || r.equals(f))) r = null;
+        boolean real = c != null && (c.equals(detected) || c.equals(compositeId) && compositeIsReal);
+        List<String> absent = new ArrayList<>();
+        java.util.Set<String> available = new java.util.HashSet<>(java.util.Arrays.asList(listed));
+        for (String id : new String[]{c,f,r}) if (id != null && !available.contains(id)) absent.add(id);
+        return new ZeekrMultiPlan(c,f,r,real,explanation,fromStored,absent);
+    }
+
+
     /**
      * 照列表建的这一份该不该存下来、替掉存着的那一份（CameraManagerHolder 照列表建完时问）。
      *

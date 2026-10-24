@@ -83,6 +83,9 @@ public final class CameraNames {
     }
 
     private static int roleRes(String role) {
+        if ("roadfront".equals(role)) return R.string.slot_road_front;
+        if ("roadrear".equals(role)) return R.string.slot_road_rear;
+        if ("manual".equals(role)) return R.string.record_group_manual;
         if (com.kooo.evcam.profile.CameraProfile.ROLE_CABIN_1.equals(role)) {
             return R.string.slot_cabin_front;
         }
