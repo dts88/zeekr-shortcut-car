@@ -405,6 +405,12 @@
   BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
   Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
 
+- 2026-10-24（开发者选项「车辆状态（试验性）」面板去掉闪远光、双闪，加刹车、油门深度，项目所有者）：
+  set_vehicle_status_summary「在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭和刹车、油门深度；喇叭信号暂无法读取」/
+  「Shows the horn and the brake and throttle pedals below Straighten on the main screen, using the Driving info bar icons;
+  the horn signal can't be read yet」/「Memaparkan hon serta pedal brek dan pendikit di bawah Luruskan pada skrin utama,
+  menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca」（「刹车深度」「油门深度」照车辆信号里的名字）。
+
 ---
 
 ## 10. 术语表

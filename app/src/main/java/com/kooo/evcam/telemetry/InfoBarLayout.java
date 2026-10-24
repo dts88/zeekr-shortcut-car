@@ -110,14 +110,7 @@ public final class InfoBarLayout {
         /** 经纬度（系统定位）：勾的是 {@link #POSITION_ITEM}。 */
         POSITION(170, R.string.vi_cell_position),
         /** 按喇叭（Lab 0.23.0：多半拿不到，五次测试都没有号跟着变）。只在车辆状态面板上。 */
-        HORN(80, 0, false),
-        /** 闪远光：只在车辆状态面板上（信息条上它算进前灯组和近光 / 远光那一格）。 */
-        FLASH(90, 0, false, Signal.HIGH_BEAM_FLASH),
-        /**
-         * 双闪：只在车辆状态面板上（信息条上它算进转向灯那一格），和那一格中间的双层三角同一个画法。
-         * 90 宽：亮时的光晕不出格。
-         */
-        HAZARD(90, 0, false, Signal.INDICATOR, Signal.TURN_LEFT, Signal.TURN_RIGHT);
+        HORN(80, 0, false);
 
         public final int width;
         /** 这一格的名字（字串资源）：车辆信号页每一行下面说「勾上显示成哪一格」。只在车辆状态面板上的格没有名字（0）。 */
@@ -196,11 +189,12 @@ public final class InfoBarLayout {
     }
 
     /**
-     * 车辆状态面板放哪几格，一行一组：喇叭、闪远光、双闪。
-     * 用户 2026-10-03 定：只留这三项（哨兵模式在「熄屏持续录制」那一行、录制键上和信息条上）。
+     * 车辆状态面板放哪几格，一行一组：喇叭、刹车 / 油门（信息条上的那一格：两根横条，带深度数字）。
+     * 用户 2026-10-03 定只留喇叭、闪远光、双闪（哨兵模式在「熄屏持续录制」那一行、录制键上和信息条上）；
+     * 项目所有者 2026-10-24 去掉闪远光、双闪，加刹车、油门深度。
      */
     static final Cell[][] PANEL_ROWS = {
-            {Cell.HORN, Cell.FLASH, Cell.HAZARD},
+            {Cell.HORN, Cell.PEDALS},
     };
 
     private InfoBarLayout() {

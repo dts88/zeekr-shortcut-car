@@ -71,7 +71,6 @@ public final class VehicleStateMapper {
         // 闪一下最短只有 0.1 秒，至少显示 FLASH_HOLD_MS，录像里才看得见
         Boolean flashing = flash.update(nowMs, r.bool(Signal.HIGH_BEAM_FLASH));
         b.highBeam(anyOn(r.bool(Signal.HIGH_BEAM), flashing));
-        b.flashToPass(flashing);
         b.fogLights(r.bool(Signal.REAR_FOG));
         b.rearPositionLamps(r.bool(Signal.REAR_POSITION_LAMP));
         b.stopLamps(r.bool(Signal.STOP_LAMP));

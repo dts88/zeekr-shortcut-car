@@ -651,7 +651,7 @@
     <string name="set_reduce_motion_title">Kurangkan animasi semasa merakam</string>
     <string name="set_reduce_motion_summary">Mematikan peralihan dan animasi hiasan lain semasa merakam supaya GPU digunakan oleh pengekod. Butang rakam dan gelang kemajuan masih beranimasi.</string>
     <string name="set_vehicle_status_title">Status kenderaan (percubaan)</string>
-    <string name="set_vehicle_status_summary">Memaparkan hon, kelip lampu tinggi dan lampu kecemasan di bawah Luruskan pada skrin utama, menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca</string>
+    <string name="set_vehicle_status_summary">Memaparkan hon serta pedal brek dan pendikit di bawah Luruskan pada skrin utama, menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca</string>
     <string name="opt_projection_rectilinear">Garisan lurus</string>
     <string name="opt_projection_cylindrical">Luas (ufuk melengkung)</string>
     <string name="set_fisheye_fov_title">Medan pandangan dibetulkan</string>

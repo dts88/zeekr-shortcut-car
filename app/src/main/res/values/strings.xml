@@ -662,7 +662,7 @@
     <string name="set_reduce_motion_title">录制时减少动效</string>
     <string name="set_reduce_motion_summary">录制时关闭界面过渡、画面缩放等装饰动效，减少 GPU 占用；录制键和进度环不受影响</string>
     <string name="set_vehicle_status_title">车辆状态（试验性）</string>
-    <string name="set_vehicle_status_summary">在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭、闪远光和双闪；喇叭信号暂无法读取</string>
+    <string name="set_vehicle_status_summary">在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭和刹车、油门深度；喇叭信号暂无法读取</string>
     <string name="opt_projection_rectilinear">直线</string>
     <string name="opt_projection_cylindrical">宽视野（地平线弯曲）</string>
     <string name="set_fisheye_fov_title">校正视野</string>

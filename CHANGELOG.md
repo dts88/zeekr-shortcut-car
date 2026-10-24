@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Developer options → Vehicle status: the panel shows the horn and the brake and throttle bars; flash-to-pass and hazard lights are gone from it.
 
 ## [2.28.0-alpha] - 2026-10-24
 

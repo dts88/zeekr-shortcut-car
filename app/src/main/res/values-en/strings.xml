@@ -662,7 +662,7 @@
     <string name="set_reduce_motion_title">Less motion while recording</string>
     <string name="set_reduce_motion_summary">Turns off transitions and other decorative animation while recording, leaving the GPU to the encoder. The record button and progress ring still animate.</string>
     <string name="set_vehicle_status_title">Vehicle status (experimental)</string>
-    <string name="set_vehicle_status_summary">Shows horn, flash-to-pass and hazard lights below Straighten on the main screen, using the Driving info bar icons; the horn signal can\'t be read yet</string>
+    <string name="set_vehicle_status_summary">Shows the horn and the brake and throttle pedals below Straighten on the main screen, using the Driving info bar icons; the horn signal can\'t be read yet</string>
     <string name="opt_projection_rectilinear">Straight lines</string>
     <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
     <string name="set_fisheye_fov_title">Corrected field of view</string>

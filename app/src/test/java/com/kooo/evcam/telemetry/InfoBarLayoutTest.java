@@ -102,17 +102,14 @@ public class InfoBarLayoutTest {
     }
 
     /**
-     * 转向灯、双闪合成一格（项目所有者 2026-10-04）：默认照样勾着转向信号；双闪那格只在面板上，画的是同几个信号。
+     * 转向灯、双闪合成一格（项目所有者 2026-10-04）：默认照样勾着转向信号。
      * 转向指示显示（跟着闪）说的是同一个「左 / 右 / 双闪」，也列在转向灯那一格（不拿来画）。
      */
     @Test
-    public void theTurnCellCarriesTheTurnSignalsAndTheHazardCellStaysOnThePanel() {
-        List<Signal> drawn = Arrays.asList(Signal.INDICATOR, Signal.TURN_LEFT, Signal.TURN_RIGHT);
+    public void theTurnCellCarriesTheTurnSignals() {
         List<Signal> turn = Arrays.asList(Signal.INDICATOR, Signal.INDICATOR_DISPLAY, Signal.TURN_LEFT, Signal.TURN_RIGHT);
         assertEquals(turn, InfoBarLayout.Cell.TURN.signals());
-        assertEquals(drawn, InfoBarLayout.Cell.HAZARD.signals());
         assertTrue(InfoBarLayout.Cell.TURN.onStrip);
-        assertFalse(InfoBarLayout.Cell.HAZARD.onStrip);
         Set<String> defaults = InfoBarLayout.defaultSelection();
         for (Signal s : turn) {
             assertTrue(s.name(), defaults.contains(s.name()));
@@ -279,9 +276,8 @@ public class InfoBarLayoutTest {
     @Test
     public void thePanelHoldsTheRequestedCellsWithoutOverlap() {
         InfoBarLayout.Arrangement panel = InfoBarLayout.panel();
-        assertEquals("用户 2026-10-03 定：只留喇叭、闪远光、双闪", 3, panel.cells.size());
-        for (InfoBarLayout.Cell cell : new InfoBarLayout.Cell[]{InfoBarLayout.Cell.HORN, InfoBarLayout.Cell.FLASH,
-                InfoBarLayout.Cell.HAZARD}) {
+        assertEquals("项目所有者 2026-10-24：喇叭、刹车 / 油门", 2, panel.cells.size());
+        for (InfoBarLayout.Cell cell : new InfoBarLayout.Cell[]{InfoBarLayout.Cell.HORN, InfoBarLayout.Cell.PEDALS}) {
             assertTrue(cell.name(), has(panel.cells, cell));
         }
         for (InfoBarLayout.Placed a : panel.cells) {

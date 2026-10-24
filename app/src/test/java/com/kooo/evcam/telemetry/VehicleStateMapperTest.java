@@ -230,14 +230,6 @@ public class VehicleStateMapperTest {
         assertEquals(VehicleStateMapper.FLASH_HOLD_MS, VehicleStateMapper.republishAfterMs(Signal.HIGH_BEAM_FLASH));
     }
 
-    /** 车辆状态面板上的闪远光只看闪：开着远光不算。 */
-    @Test
-    public void flashToPassIsOnlyTheFlash() {
-        assertEquals(Boolean.TRUE, map(readings(Signal.HIGH_BEAM, false, Signal.HIGH_BEAM_FLASH, true), true).flashToPass);
-        assertEquals(Boolean.FALSE, map(readings(Signal.HIGH_BEAM, true, Signal.HIGH_BEAM_FLASH, false), true).flashToPass);
-        assertNull(map(readings(), true).flashToPass);
-    }
-
     /** 后灯组的四盏：按车外看到的直接带过去。 */
     @Test
     public void rearLampsComeThroughAsSeen() {
