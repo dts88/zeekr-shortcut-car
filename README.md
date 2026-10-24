@@ -126,7 +126,7 @@ Diagnostics**.
 - Built for the ZEEKR 7X. Only the camera recognised as the composite stream is split; a head unit
   that does not provide one gets nothing split.
 - Factory features come first: the built-in 360° view, reversing camera and parking cameras can
-  reclaim a camera at any time.
+  reclaim a camera at any time. Automatic UI recovery after screen-on or a recording restart yields while reverse, the factory surround camera, its popup, or parking assist is known to be active. Manual app opening is unchanged. Unknown vehicle signals retain the existing recovery behavior.
 - Starting on boot and recording on launch are off by default. With the screen off, only the
   surround view keeps recording; the cabins resume when the screen turns on. Without Sentry Mode,
   recording stops when the head unit sleeps, a few minutes after you leave the car.
