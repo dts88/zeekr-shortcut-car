@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="set_update_channel_note">选择检查更新时包含的版本。Alpha 版包含最新的实验性改动。</string>
+    <string name="set_update_channel_title">更新通道</string>
+    <string name="update_channel_alpha">Alpha</string>
+    <string name="update_channel_alpha_option">Alpha — Alpha、Beta 和正式版</string>
+    <string name="update_channel_beta">Beta</string>
+    <string name="update_channel_beta_option">Beta — Beta 和正式版</string>
+    <string name="update_channel_stable">正式版</string>
+    <string name="update_channel_stable_option">正式版 — 仅正式版</string>
+</resources>
