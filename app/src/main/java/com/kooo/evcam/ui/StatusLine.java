@@ -76,6 +76,18 @@ public final class StatusLine {
     }
 
     /**
+     * 录像写在存储位置选的盘以外时那一句（{@link StorageHelper#recordingFallback}）：状态条、改写那一下的提示、
+     * 设置里「存储位置」那一行用的都是它。选的盘认不出（自动找 U 盘、一次都没找到过）时说没检测到 U 盘。
+     */
+    public static String fallbackText(Context context, String[] fallback) {
+        if (fallback[1] == null) {
+            return context.getString(R.string.msg_sd_fallback);
+        }
+        return context.getString(R.string.status_recording_fallback,
+                volumeLabel(context, fallback[0]), volumeLabel(context, fallback[1]));
+    }
+
+    /**
      * 现在生效的那份配置叫什么；读不出来就空着，不编一个名字。
      *
      * <p>预设的按 id 取本地化的名字：存进配置里的名字是迁移时写的中文，照抄它的话
@@ -131,9 +143,8 @@ public final class StatusLine {
         TextView storage = root.findViewById(R.id.tv_status_storage);
         String[] fallback = StorageHelper.recordingFallback();
         if (storage != null && fallback != null) {
-            // 录像改写到了别的盘：这一格一直说明，直到这次录像停止
-            NumberRoll.set(storage, context.getString(R.string.status_recording_fallback,
-                    volumeLabel(context, fallback[0]), volumeLabel(context, fallback[1])));
+            // 录像改写到了别的盘：这一格一直说明，直到写回设定的盘或者这次录像停止
+            NumberRoll.set(storage, fallbackText(context, fallback));
             storage.setVisibility(View.VISIBLE);
         } else if (storage != null) {
             // 只读快照，不碰盘（探测在 StorageState 的后台线程上）；还没探测过就先不写

@@ -462,6 +462,7 @@
     <string name="msg_recording_started_all">已开始录制（全部摄像头）</string>
     <string name="msg_recording_started_n">已开始录制 %1$d 路</string>
     <string name="msg_recording_waiting_cameras">等待摄像头，恢复后自动继续</string>
+    <string name="msg_sd_fallback">未检测到 U 盘，已改为录制到内置存储</string>
     <string name="msg_recording_interrupted">录制中断：%1$s</string>
     <string name="msg_recording_interrupted_resuming">录制中断：%1$s，正在自动恢复…</string>
     <string name="rec_reason_unknown">原因未知</string>
@@ -482,6 +483,7 @@
     <string name="dlg_no_external_msg">录像仅保存到 U 盘，以免持续写入损耗内置存储。\n\n请插入 U 盘后重试。如已插入仍未识别，可更换 USB 接口，或在「设置 → 存储 → 存储位置」中重新选择 U 盘。</string>
     <string name="dlg_will_use_internal_title">将录制到内置存储</string>
     <string name="dlg_internal_reason_chosen">当前设置的存储位置就是内置存储。</string>
+    <string name="dlg_internal_reason_fallback">已选择 U 盘，但当前未检测到，录像会落到内置存储。</string>
     <string name="dlg_internal_warn">%1$s\n\n录制时会持续写入数据，内置存储的写入寿命有限，且通常无法更换。\n\n建议插入 U 盘，并在「设置 → 存储 → 存储位置」中选择它。</string>
     <string name="action_record_anyway">仍然录制</string>
     <string name="notif_channel_name">运行状态</string>

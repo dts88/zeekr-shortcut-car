@@ -9,8 +9,8 @@ commit message, not here.
 
 ## [Unreleased]
 
-- Storage: recordings and photos go only where Storage location points. With a USB drive chosen and not there (for example while it is still mounting after the head unit wakes), the app waits for it instead of recording to internal storage, with developer options on as well.
-- Recording: after switching to another drive because the chosen one failed, the next segment goes back to the chosen drive as soon as it is mounted again.
+- Storage: when recording falls back to internal storage (developer options on, chosen USB drive not there) or moves to another drive, the main screen status line and Settings → Storage → Storage location say so, and a message appears when it happens.
+- Recording: while recording anywhere other than the chosen drive, the next segment goes back to it as soon as it is mounted; a drive that failed during the recording is tried again only after it has been remounted.
 - Video playback: recordings with sound no longer freeze the picture while the sound plays on. Playback now uses ExoPlayer, and the APK is about 4.7 MB larger.
 - Video and photo playback: the menu button opens the side menu on the spot instead of going back to the main screen first. The side menu highlights the screen you are on.
 

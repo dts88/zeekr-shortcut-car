@@ -8,6 +8,7 @@ import com.kooo.evcam.profile.StreamSpec;
 import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 import android.content.Context;
+import android.os.Environment;
 import android.util.Log;
 import android.util.Size;
 import android.view.TextureView;
@@ -659,13 +660,10 @@ public class MultiCameraManager {
     private void noteRecordingDir(File dir) {
         try {
             StorageHelper.noteRecordingDir(dir);
-            String custom = new AppConfig(context).getCustomSdCardPath();
-            boolean offTarget = custom != null && !custom.isEmpty()
-                    && !dir.getAbsolutePath().startsWith(custom);
-            StorageHelper.noteRecordingFallback(offTarget ? StorageHelper.volumeOf(dir.getAbsolutePath()) : null,
-                    offTarget ? StorageHelper.volumeOf(custom) : null);
+            String[] off = StorageHelper.offTarget(context, dir);
+            StorageHelper.noteRecordingFallback(off);
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录像写到 " + dir.getAbsolutePath()
-                    + (offTarget ? "（设定的是 " + custom + "，那个盘此刻不可用）" : "")
+                    + (off != null ? "（设定的是 " + (off[1] != null ? off[1] : "U 盘") + "，那个盘此刻不可用）" : "")
                     + "；此刻挂着的盘：" + com.kooo.evcam.storage.StorageState.current().mounts);
         } catch (RuntimeException e) {
             AppLog.w(TAG, "noteRecordingDir failed: " + e);
@@ -1830,7 +1828,8 @@ public class MultiCameraManager {
     /**
      * 录像盘写不进时还能写到哪，给录制器换盘用。
      *
-     * <p>别的挂着的 U 盘，设定的那个优先、其余按剩余空间。不换到内置存储（项目所有者 2026-10-24：存储位置选的是哪就只写哪）。
+     * <p>别的挂着的 U 盘，设定的那个优先、其余按剩余空间；开发者选项打开着时最后是内置存储（降级，项目所有者 2026-10-24：
+     * 只在开发者选项打开时，要说清楚 —— {@link StorageHelper#recordingFallback}）。
      * 中转写入时录制器写的是内置缓存，U 盘掉不掉线它感觉不到，不换。</p>
      */
     private List<File> fallbackDirsFor(Set<String> deadVolumes) {
@@ -1840,21 +1839,32 @@ public class MultiCameraManager {
             return dirs;
         }
         StorageHelper.clearCache();
+        File internal = StorageHelper.isInternalStorageAllowed()
+                ? Environment.getExternalStorageDirectory() : null;
         for (File root : FallbackVolumes.rank(StorageHelper.mountedVolumes(), config.getCustomSdCardPath(),
-                deadVolumes, StorageHelper::getAvailableSpace)) {
+                deadVolumes, StorageHelper::getAvailableSpace, internal)) {
             dirs.add(StorageHelper.videoDirOn(root));
         }
         return dirs;
     }
 
-    /** 录制器换了盘：记下实际写到哪、状态条那一格跟着变、存储检查改看新盘。 */
+    /**
+     * 存储位置选的那个 U 盘上的录像目录，此刻挂着（看传进来的挂载表，不碰盘）才给：录制器写在别处时，每开一个新文件先问它，
+     * 挂回来就写回去。选的是内置存储、中转写入（录制器写的是内置缓存）、选的盘没挂着：null。
+     */
+    private File homeDirFor(List<File> mounted) {
+        AppConfig config = new AppConfig(context);
+        if (!config.isUsingExternalSdCard() || config.shouldUseRelayWrite()) {
+            return null;
+        }
+        File root = FallbackVolumes.home(mounted, config.getCustomSdCardPath(), config.getLastDetectedSdPath());
+        return root != null ? StorageHelper.videoDirOn(root) : null;
+    }
+
+    /** 录制器换了盘（写回设定的盘也算）：记下实际写到哪、状态条那一格跟着变、存储检查改看新盘。 */
     private void noteRelocated(File dir) {
         StorageHelper.noteRecordingDir(dir);
-        String custom = new AppConfig(context).getCustomSdCardPath();
-        boolean offTarget = custom != null && !custom.isEmpty()
-                && !dir.getAbsolutePath().startsWith(custom);
-        StorageHelper.noteRecordingFallback(offTarget ? StorageHelper.volumeOf(dir.getAbsolutePath()) : null,
-                offTarget ? StorageHelper.volumeOf(custom) : null);
+        StorageHelper.noteRecordingFallback(StorageHelper.offTarget(context, dir));
         checkStorage("换盘");
         com.kooo.evcam.storage.StorageState.refresh(context, "relocated");
     }
@@ -4497,8 +4507,18 @@ public class MultiCameraManager {
         }
         // 共用的分段名字：几路分段切换时拿同一个
         codecRecorder.setTimestampProvider(segmentTimestampProvider);
-        // 盘写不进时换到哪个盘
-        codecRecorder.setFallbackDirs(this::fallbackDirsFor);
+        // 盘写不进时换到哪个盘；写在别处时，存储位置选的那个盘挂回来就写回去
+        codecRecorder.setFallbackDirs(new CodecVideoRecorder.FallbackDirs() {
+            @Override
+            public List<File> candidates(Set<String> deadVolumes) {
+                return fallbackDirsFor(deadVolumes);
+            }
+
+            @Override
+            public File home(List<File> mounted) {
+                return homeDirFor(mounted);
+            }
+        });
         codecRecorder.setSegmentDuration(segmentDurationMs);
         codecRecorder.setFrameRate(targetFrameRate, frameRateCap);
         // 跟随这一路配置里的码率等级。写死一档的话那个选项就是个摆设。
@@ -4682,7 +4702,7 @@ public class MultiCameraManager {
         // 车辆信号的登记（信息条、闪远光自动锁定）也只在录像期间，跟着录像状态撤（setRecording）
         setRecording(false);
         mainHandler.removeCallbacks(storageTick);
-        StorageHelper.noteRecordingFallback(null, null);
+        StorageHelper.noteRecordingFallback(null);
         // 录像意图关了：每一路的表、计划清掉（这一次每一路进出了几次先记下，停录那一行要）
         final String tally = tripsText();
         lanes.clear();

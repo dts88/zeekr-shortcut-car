@@ -480,7 +480,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setEntryValues(values.toArray(new String[0]));
         // 当前值一定在列表里：某个卷、「U 盘（未检测到）」，或者一直列着的内置存储
         pref.setValue(current);
-        pref.setSummary(pref.getEntry());
+        showStorageSummary(pref);
 
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             String value = String.valueOf(newValue);
@@ -525,6 +525,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         return EXTERNAL_PREFIX + "0";
     }
 
+    /**
+     * 「存储位置」行尾：选的那一项；录像正写在选的盘以外（开发者选项打开着时降级到内置存储、换到了别的 U 盘）时，
+     * 写和状态条同一句（项目所有者 2026-10-24：存储位置写着 U 盘、录像却在内置存储上，要说清楚）。
+     */
+    private void showStorageSummary(ListPreference pref) {
+        String[] fallback = StorageHelper.recordingFallback();
+        pref.setSummary(fallback != null
+                ? com.kooo.evcam.ui.StatusLine.fallbackText(pref.getContext(), fallback)
+                : pref.getEntry());
+    }
+
     /** 说清楚为什么内置存储点不动，而不是让它默默没反应。 */
     private void explainInternalStorageIsGated() {
         if (getContext() == null) {
@@ -553,7 +564,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         StorageHelper.clearCache();
         com.kooo.evcam.storage.StorageState.refresh(pref.getContext(), "storage-setting");
         pref.setValue(value);
-        pref.setSummary(pref.getEntry());
+        showStorageSummary(pref);
         toast(getString(R.string.msg_storage_changed, pref.getEntry()));
         updateSavedIn();
     }
