@@ -5,6 +5,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -52,6 +53,42 @@ public class SettingSpecTest {
         assertFalse(SAMPLE.isValid("C"));      // 不做大小写宽容，存的就该是原值
         assertFalse(SAMPLE.isValid(" c"));
         assertFalse(SAMPLE.isValid(null));
+    }
+
+    // ---------- 只给开发者的选项 ----------
+
+    private static final SettingSpec GATED = SettingSpec.of(
+            "gated", "示例", "a",
+            entry("a", "甲"),
+            entry("b", "乙").forDevelopers(),
+            entry("c", "丙"));
+
+    /** 开发者选项关着：选项里没有只给开发者的那个，存着它读出来是默认值；打开着全都在。存值本身照样合法（自检不修掉）。 */
+    @Test
+    public void developerOnlyEntriesAreOfferedToDevelopersOnly() {
+        assertArrayEquals(new String[]{"a", "b", "c"}, GATED.offeredTo(true).values());
+        assertArrayEquals(new String[]{"a", "c"}, GATED.offeredTo(false).values());
+        assertArrayEquals(new String[]{"甲", "丙"}, GATED.offeredTo(false).displayNames());
+        assertEquals("b", GATED.offeredTo(true).sanitize("b"));
+        assertEquals("a", GATED.offeredTo(false).sanitize("b"));
+        assertEquals("c", GATED.offeredTo(false).sanitize("c"));
+        assertTrue(GATED.isValid("b"));
+        assertSame(SAMPLE, SAMPLE.offeredTo(false));
+    }
+
+    /** 默认值就是开发者选项关着时用的那个，不能只给开发者。 */
+    @Test(expected = IllegalArgumentException.class)
+    public void defaultCannotBeDeveloperOnly() {
+        SettingSpec.of("bad", "坏", "b", entry("a", "甲"), entry("b", "乙").forDevelopers());
+    }
+
+    /** 声音风格：所有人只有美式 V8、超音速（旧版）（项目所有者 2026-10-24），其余四种只给开发者。 */
+    @Test
+    public void driveSoundStylesForEveryoneAreAmericanAndOldJet() {
+        assertArrayEquals(new String[]{com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN,
+                        com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_JET_OLD},
+                SettingsRegistry.DRIVE_SOUND_STYLE.offeredTo(false).values());
+        assertEquals(6, SettingsRegistry.DRIVE_SOUND_STYLE.offeredTo(true).size());
     }
 
     // ---------- 取值与显示名必须一一对应 ----------

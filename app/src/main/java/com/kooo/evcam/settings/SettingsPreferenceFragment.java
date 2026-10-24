@@ -2141,6 +2141,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (pref == null) {
             return;
         }
+        spec = spec.offeredTo(DeveloperMode.isUnlocked());  // 只给开发者的选项，开发者选项关着时不列
         pref.setOptions(localizedNames(spec), spec.values());
         pref.setValue(spec.sanitize(current));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
@@ -2165,6 +2166,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (pref == null) {
             return;
         }
+        spec = spec.offeredTo(DeveloperMode.isUnlocked());  // 只给开发者的选项，开发者选项关着时不列
         pref.setPersistent(false);
         pref.setEntries(localizedNames(spec));
         pref.setEntryValues(spec.values());

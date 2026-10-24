@@ -634,6 +634,8 @@ public class AppConfig {
      *
      * <p>收进来的有两种：开发者选项分区里的设置（{@code preferences.xml} 的 {@code screen_developer}）；
      * 别的分区里只有开发者才选得了的值 —— 存储位置选内置存储、中转写入（先写内置存储）。
+     * 枚举型设置里只有几个选项只给开发者的（声音风格），不收整个键，标在那几个选项上
+     * （{@code SettingSpec.Entry#developerOnly}），读的时候一样按没存过算（{@link #readEnum}）。
      * 分区里只是动作的几行（恢复画面调节默认值、权限、修复录像、归档）不存设置，不在这里。
      * 画面调节的几个参数也不在：它们只在「画面调节」开着时才用到；按没存过算的话，
      * 画面调节窗口在开发者选项关着时建好、打开后再存一次，就把存着的参数冲掉了。</p>
@@ -817,10 +819,12 @@ public class AppConfig {
      *
      * <p>一律过一遍 {@link SettingSpec#sanitize(String)} —— 不合法的值<b>根本不可能被
      * 读出来</b>，启动自检只是顺手把坏值从存储里清掉，不是唯一的防线。
-     * 归开发者选项管的（录制模式）关着开发者选项时读到默认值，见 {@link #DEVELOPER_KEYS}。</p>
+     * 归开发者选项管的（录制模式）关着开发者选项时读到默认值，见 {@link #DEVELOPER_KEYS}；只给开发者的选项
+     * （声音风格里的几种）也一样，存着它的读到默认值（{@link SettingSpec#offeredTo}）。</p>
      */
     private String readEnum(SettingSpec spec) {
-        return spec.sanitize(readString(spec.key, spec.defaultValue));
+        return spec.offeredTo(com.kooo.evcam.settings.DeveloperMode.isUnlocked())
+                .sanitize(readString(spec.key, spec.defaultValue));
     }
 
     /** 写一个枚举型设置；不合法的值直接拒绝，避免把坏值写进存储。 */
