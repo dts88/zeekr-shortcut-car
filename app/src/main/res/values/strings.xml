@@ -935,9 +935,9 @@
     <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
     <string name="dev_drive_sound_group">模拟声浪</string>
     <string name="dev_drive_sound_title">模拟声浪（试验性）</string>
-    <string name="dev_drive_sound_summary">运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声</string>
-    <string name="dev_drive_sound_standard_title">标准模式也启用</string>
-    <string name="dev_drive_sound_standard_summary">标准模式下也播放声浪，换挡比运动模式平和。关闭时只在运动模式播放</string>
+    <string name="dev_drive_sound_summary">运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声。</string>
+    <string name="dev_drive_sound_standard_title">标准模式下播放</string>
+    <string name="dev_drive_sound_standard_summary">在标准模式下也播放模拟声浪，换挡比运动模式平和。关闭时只在运动模式下播放。</string>
     <string name="dev_drive_sound_volume_title">声浪音量</string>
     <string name="dev_drive_sound_rpm_title">转速变化方式</string>
     <string name="dev_drive_sound_rpm_continuous">连续</string>

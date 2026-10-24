@@ -81,7 +81,7 @@ public final class DriveSound {
 
     // ---- 设置（主线程、声音线程都会刷新，读的人拿到的总是完整的一项）
     private volatile boolean enabled;
-    /** 「标准模式也启用」（项目所有者 2026-10-24，默认关）：开着时标准模式也出声。 */
+    /** 「标准模式下播放」（项目所有者 2026-10-24，默认关）：开着时标准模式也出声。 */
     private volatile boolean standardMode;
     private volatile float userDb = 0f;
     private volatile VirtualEngine.RpmMode rpmMode = VirtualEngine.RpmMode.CONTINUOUS;

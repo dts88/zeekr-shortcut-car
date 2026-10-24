@@ -942,9 +942,9 @@
     <string name="msg_footage_audio_no_permission">No microphone permission, Record sound stays off</string>
     <string name="dev_drive_sound_group">Drive sound</string>
     <string name="dev_drive_sound_title">Simulated drive sound (experimental)</string>
-    <string name="dev_drive_sound_summary">In Sport mode (optionally Standard too), synthesizes engine sound from the throttle, speed and acceleration and plays it through the speakers chosen in Speakers (the cabin speakers follow the media volume). Switching to these modes while stopped plays an engine start</string>
-    <string name="dev_drive_sound_standard_title">Also in Standard mode</string>
-    <string name="dev_drive_sound_standard_summary">Plays the drive sound in Standard mode too, with calmer shifting than Sport. When off, only Sport mode plays it</string>
+    <string name="dev_drive_sound_summary">In Sport mode (optionally Standard too), synthesizes engine sound from the throttle, speed and acceleration and plays it through the speakers chosen in Speakers (the cabin speakers follow the media volume). Switching to these modes while stopped plays an engine start.</string>
+    <string name="dev_drive_sound_standard_title">Play in Standard mode</string>
+    <string name="dev_drive_sound_standard_summary">Plays the simulated drive sound in Standard mode too, with calmer shifting than Sport. When off, only Sport mode plays it.</string>
     <string name="dev_drive_sound_volume_title">Drive sound volume</string>
     <string name="dev_drive_sound_rpm_title">Engine speed pattern</string>
     <string name="dev_drive_sound_rpm_continuous">Continuous</string>
