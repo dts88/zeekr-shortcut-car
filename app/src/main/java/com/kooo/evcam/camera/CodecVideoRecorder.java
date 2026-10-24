@@ -2523,6 +2523,11 @@ public class CodecVideoRecorder {
     /** 这次录像里写不进的卷名，不再试。写入线程加，抢救线程读。 */
     private final Set<String> deadVolumes = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private volatile int relocations;
+    /**
+     * 这一次开录给的目录（存储位置选的那个盘上）：换过盘之后，每开一个新文件先看它挂回来没有，挂回来就写回去
+     * （{@link #returnHomeIfBack}，项目所有者 2026-10-24：存储位置选的是哪就只写哪）。写入线程上读写。
+     */
+    private String homeDirectory;
 
     /** 排队满了、丢相机帧的那几段（编码线程上）：黑匣子什么时候记、什么时候提示用户。 */
     private final SampleRing.Backpressure backpressure = new SampleRing.Backpressure();
@@ -3071,6 +3076,9 @@ public class CodecVideoRecorder {
         if (open.dir != null) {
             // 一次开录的第一个文件：写到这一次给的目录。录像目录还是只有写入线程改（这里，和换盘）
             saveDirectory = open.dir;
+            homeDirectory = open.dir;
+        } else {
+            returnHomeIfBack();
         }
         writerTargetDir = saveDirectory;
         String path = freshPath(new File(saveDirectory), open.name);
@@ -3089,6 +3097,42 @@ public class CodecVideoRecorder {
         StallWatch.noteOp(writerBeat, cameraId, "open", start);
         currentFilePath = path;
         recordedFilePaths.add(path);
+    }
+
+    /**
+     * 换过盘、开录时的那个盘又挂上了：这个新文件起写回那个盘（写入线程上，开新文件之前；项目所有者 2026-10-24）。
+     *
+     * <p>只看挂载表（{@link StorageHelper#mountedVolumes}）里有没有它，不去碰盘本身 —— 盘没好时一次探测要卡好几秒。
+     * 挂着却还写不进的，下面开文件时照旧换盘（它又算写不进的盘）。以前要等别的盘也写不进才回去：10-24 U 盘回来了，
+     * 录像还在别处录了两个半小时。</p>
+     */
+    private void returnHomeIfBack() {
+        String home = homeDirectory;
+        if (home == null || home.equals(saveDirectory)) {
+            return;
+        }
+        String volume = StorageHelper.volumeOf(home);
+        boolean mounted = false;
+        for (File root : StorageHelper.mountedVolumes()) {
+            if (volume.equals(root.getName())) {
+                mounted = true;
+                break;
+            }
+        }
+        if (!mounted) {
+            return;
+        }
+        String from = saveDirectory;
+        deadVolumes.remove(volume);
+        saveDirectory = home;
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("录像盘 " + volume + " 又挂上了（相机 " + cameraId
+                + "），这个文件起写回 " + home + "；之前写在 " + from);
+        RecordCallback cb = callback;
+        Handler segment = segmentHandler;
+        if (cb != null && segment != null) {
+            final File back = new File(home);
+            segment.post(() -> cb.onRecordingRelocated(cameraId, back, "back", 0L));
+        }
     }
 
     /** 开轨、启动 muxer（写入线程上）。文件头都写不进去的话换盘；换不了，这个文件就写不了。 */

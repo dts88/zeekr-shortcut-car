@@ -162,25 +162,6 @@ public class StorageHelper {
     }
     
     /**
-     * 检测是否发生了U盘回退
-     * 即：用户选择了U盘存储，但U盘不可用 —— 开发者选项开着时实际落在内置存储上，关着时没有地方可存（{@link #footageRoot}）
-     * @param context 上下文
-     * @return true 如果发生了回退
-     */
-    public static boolean isSdCardFallback(Context context) {
-        if (context == null) return false;
-        
-        AppConfig config = new AppConfig(context);
-        // 只有当用户选择了U盘时才需要检测回退
-        if (!config.isUsingExternalSdCard()) {
-            return false;
-        }
-        
-        // 检测U盘是否可用
-        return !hasExternalSdCard(context);
-    }
-    
-    /**
      * 一个可用的存储卷。
      */
     public static class VolumeInfo {
@@ -417,9 +398,9 @@ public class StorageHelper {
     /**
      * 影像（录像、照片）放在哪个盘上 —— 只有这一处决定（项目所有者 2026-10-06：不允许存到内置存储）。
      *
-     * <p>规则只有一条：设定的 U 盘；没有 U 盘（或者选的就是内置存储，那只有开发者选得了）时，
-     * 开发者选项开着（{@link #isInternalStorageAllowed}）才落在内置存储上，否则返回 null ——
-     * 没有地方可存，不退到内置存储。</p>
+     * <p>规则只有一条：存储位置选的是哪，就只写哪（项目所有者 2026-10-24）。选的是 U 盘：设定的那个 U 盘，
+     * 一时不在就返回 null —— 没有地方可存，等它回来，开发者选项开着也不退到内置存储（以前会，存储位置还写着 U 盘，
+     * 录像却悄悄进了内置存储）。选的是内置存储（只有开发者选得了，{@link #isInternalStorageAllowed}）才写内置存储。</p>
      *
      * <p>录像、照片、锁定清单、开发者选项里的整帧另存，目录都从这里来，拿到 null 就不写；
      * 开录和拍照之前先问 {@link #isRecordingStorageAvailable}（同一条规则），不录、不拍。
@@ -428,19 +409,10 @@ public class StorageHelper {
      */
     private static File footageRoot(Context context, boolean useExternalSd) {
         if (useExternalSd) {
-            // U盘的公共目录（U盘/DCIM/EVCam_Video 或 U盘/DCIM/EVCam_Photo）
-            File sdCardRoot = getExternalSdCardRoot(context);
-            if (sdCardRoot != null) {
-                return sdCardRoot;
-            }
+            // U盘的公共目录（U盘/DCIM/EVCam_Video 或 U盘/DCIM/EVCam_Photo）；不在就是 null，不退到内置存储
+            return getExternalSdCardRoot(context);
         }
-        if (!isInternalStorageAllowed()) {
-            return null;
-        }
-        if (useExternalSd) {
-            AppLog.w(TAG, "U盘不可用，回退到内置存储");
-        }
-        return Environment.getExternalStorageDirectory();
+        return isInternalStorageAllowed() ? Environment.getExternalStorageDirectory() : null;
     }
 
     /**
@@ -483,42 +455,34 @@ public class StorageHelper {
      * 所以它不是一个弹窗能放行的选择，而是默认就不给。</p>
      *
      * <p>选过的「内置存储」在开发者选项关着时本来就按 U 盘算（{@code AppConfig.getStorageLocation}）；
-     * 这里管的是选 U 盘、盘却不在时，录像、照片能不能退到内置存储上存（{@link #footageRoot}），
-     * 以及设置里那一项能不能选、录制器换盘时最后一站。</p>
+     * 这里管的是设置里那一项能不能选、选了能不能用（{@link #footageRoot}）。选 U 盘、盘却不在时不退到内置存储
+     * （项目所有者 2026-10-24），录制器换盘也不换到内置存储。</p>
      */
     public static boolean isInternalStorageAllowed() {
         return com.kooo.evcam.settings.DeveloperMode.isUnlocked();
     }
 
     /**
-     * 现在有没有地方存录像、照片：有 U 盘，或者开发者选项放行了内置存储（{@link #footageRoot} 的那条规则）。
+     * 现在有没有地方存录像、照片：存储位置选的那个此刻能用 —— 选 U 盘的有 U 盘，选内置存储的开发者选项开着
+     * （{@link #footageRoot} 的那条规则）。
      *
      * <p>拒录（{@code RecordingCoordinator}）、拍照入口的拒拍（{@code MultiCameraManager.takePhoto}）
      * 和录制键的「不可用」状态问的是同一件事，所以只有这一处判断 —— 各写一遍，
      * 迟早出现「按钮说能录、按下去说不能」。</p>
      */
     public static boolean isRecordingStorageAvailable(Context context) {
-        return !willRecordToInternal(context) || isInternalStorageAllowed();
-    }
-
-    /**
-     * 录像实际上会不会落在内置存储上。
-     *
-     * <p>两种情况都算：选的就是内置存储（开发者选项开着时才算数），或者选了 U 盘但盘不在
-     * （开发者选项开着时会回退到内置，见 {@link #footageRoot}）。</p>
-     *
-     * <p>后一种尤其值得提醒 —— 用户以为在写 U 盘，实际在写车机闪存，
-     * 而这是个不声不响就发生的降级。</p>
-     */
-    public static boolean willRecordToInternal(Context context) {
         if (context == null) {
             return false;
         }
-        if (!new AppConfig(context).isUsingExternalSdCard()) {
-            return true;
-        }
-        // 选了 U 盘但盘不在，走的是 footageRoot 里那条回退分支
-        return isSdCardFallback(context);
+        return new AppConfig(context).isUsingExternalSdCard() ? hasExternalSdCard(context) : isInternalStorageAllowed();
+    }
+
+    /**
+     * 录像会不会写在内置存储上：只有存储位置选的就是内置存储（开发者选项开着时才算数）。
+     * 选了 U 盘、盘却不在的不算 —— 那时没有地方可存，不录（项目所有者 2026-10-24）。
+     */
+    public static boolean willRecordToInternal(Context context) {
+        return context != null && !new AppConfig(context).isUsingExternalSdCard();
     }
 
     public static File getExternalSdCardRoot(Context context) {

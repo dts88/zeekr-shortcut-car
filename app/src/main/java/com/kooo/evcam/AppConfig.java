@@ -45,9 +45,6 @@ public class AppConfig {
     public static final String STORAGE_INTERNAL = "internal";  // 内部存储
     public static final String STORAGE_EXTERNAL_SD = "external_sd";  // U盘（默认）
     
-    // U盘回退提示标志（每次冷启动后重置）
-    private static boolean sdFallbackShownThisSession = false;
-    
     // 悬浮窗配置
     private static final String KEY_FLOATING_WINDOW_ALPHA = "floating_window_alpha";  // 悬浮窗透明度
     
@@ -1738,27 +1735,6 @@ public class AppConfig {
      */
     public String getLastDetectedSdPath() {
         return prefs.getString(KEY_LAST_DETECTED_SD_PATH, null);
-    }
-    
-    /**
-     * 检查本次启动是否已显示过U盘回退提示
-     */
-    public static boolean isSdFallbackShownThisSession() {
-        return sdFallbackShownThisSession;
-    }
-    
-    /**
-     * 标记本次启动已显示过U盘回退提示
-     */
-    public static void setSdFallbackShownThisSession(boolean shown) {
-        sdFallbackShownThisSession = shown;
-    }
-    
-    /**
-     * 重置U盘回退提示标志（应用启动时调用）
-     */
-    public static void resetSdFallbackFlag() {
-        sdFallbackShownThisSession = false;
     }
     
     /**

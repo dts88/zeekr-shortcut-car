@@ -296,9 +296,6 @@ public class MainActivity extends AppCompatActivity {
         recordingCoordinator = RecordingCoordinator.get(this);
         recordingCoordinator.addListener(recordingListener);
 
-        // 重置U盘回退提示标志（每次冷启动重置）
-        AppConfig.resetSdFallbackFlag();
-        
         // 照配置里启用的几路摆布局
         setupLayoutByCarModel();
 
@@ -2398,22 +2395,21 @@ public class MainActivity extends AppCompatActivity {
      * 那比写内置存储糟得多。自动路径改用一条 Toast 提示。</p>
      */
     private void confirmInternalStorageThen(Runnable onProceed) {
-        if (!StorageHelper.willRecordToInternal(this)) {
-            onProceed.run();
-            return;
-        }
-        // 正常模式下根本不往内置存储录 —— 与其偷偷降级，不如说清楚并且不录
-        if (!StorageHelper.isInternalStorageAllowed()) {
+        // 存储位置选的那个此刻用不了（选了 U 盘、盘不在）：说清楚，不录 —— 选的是哪就只写哪，不悄悄落到内置存储
+        // （项目所有者 2026-10-06；2026-10-24 起开发者选项开着也一样）
+        if (!StorageHelper.isRecordingStorageAvailable(this)) {
             com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                     .setTitle(R.string.dlg_no_external_title)
                     .setMessage(R.string.dlg_no_external_msg)
                     .setPositiveButton(R.string.action_got_it, null));
             return;
         }
-        boolean chosen = !new AppConfig(this).isUsingExternalSdCard();
-        String why = getString(chosen
-                ? R.string.dlg_internal_reason_chosen
-                : R.string.dlg_internal_reason_fallback);
+        if (!StorageHelper.willRecordToInternal(this)) {
+            onProceed.run();
+            return;
+        }
+        // 选的就是内置存储（只有开发者选得了）：开录前提醒一次
+        String why = getString(R.string.dlg_internal_reason_chosen);
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.dlg_will_use_internal_title)
                 .setMessage(getString(R.string.dlg_internal_warn, why))
@@ -2477,15 +2473,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onStartSettled(java.util.Collection<String> liveKeys, java.util.Collection<String> planned,
-                                   boolean sdFellBack) {
+        public void onStartSettled(java.util.Collection<String> liveKeys, java.util.Collection<String> planned) {
             // 说的是落定时真正在录的几路：被占用、在救、没录起来的那一路不算（它回来了自己加入，状态条上说）；
             // 一路都没在录，就说在等摄像头 —— 录像没停
-            if (sdFellBack && !AppConfig.isSdFallbackShownThisSession()) {
-                AppConfig.setSdFallbackShownThisSession(true);
-                Toast.makeText(MainActivity.this,
-                        R.string.msg_sd_fallback, Toast.LENGTH_LONG).show();
-            } else if (liveKeys.isEmpty()) {
+            if (liveKeys.isEmpty()) {
                 Toast.makeText(MainActivity.this,
                         R.string.msg_recording_waiting_cameras, Toast.LENGTH_LONG).show();
             } else {

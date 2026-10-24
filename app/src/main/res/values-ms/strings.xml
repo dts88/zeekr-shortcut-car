@@ -451,7 +451,6 @@
     <string name="msg_recording_started_all">Rakaman bermula (semua kamera)</string>
     <string name="msg_recording_started_n">Rakaman bermula (%1$d kamera)</string>
     <string name="msg_recording_waiting_cameras">Menunggu kamera. Rakaman disambung semula secara automatik apabila kamera tersedia.</string>
-    <string name="msg_sd_fallback">Tiada pemacu USB ditemui. Merakam ke storan dalaman.</string>
     <string name="msg_recording_interrupted">Rakaman terganggu: %1$s</string>
     <string name="msg_recording_interrupted_resuming">Rakaman terganggu: %1$s. Menyambung semula…</string>
     <string name="rec_reason_unknown">punca tidak diketahui</string>
@@ -472,7 +471,6 @@
     <string name="dlg_no_external_msg">Rakaman disimpan ke pemacu USB sahaja, untuk mengelakkan storan dalaman haus.\n\nMasukkan pemacu USB dan cuba lagi. Jika ia tidak dikesan, cuba port lain atau pilih semula pemacu di Tetapan → Storan → Lokasi storan.</string>
     <string name="dlg_will_use_internal_title">Merakam ke storan dalaman</string>
     <string name="dlg_internal_reason_chosen">Storan dalaman ialah lokasi yang dipilih sekarang.</string>
-    <string name="dlg_internal_reason_fallback">Pemacu USB dipilih tetapi tiada yang dikesan, jadi rakaman akan disimpan ke storan dalaman.</string>
     <string name="dlg_internal_warn">%1$s\n\nRakaman berterusan menghauskan storan dalaman, yang biasanya tidak boleh diganti.\n\nMasukkan pemacu USB dan pilihnya di Tetapan → Storan → Lokasi storan.</string>
     <string name="action_record_anyway">Rakam juga</string>
     <string name="notif_channel_name">Status apl</string>

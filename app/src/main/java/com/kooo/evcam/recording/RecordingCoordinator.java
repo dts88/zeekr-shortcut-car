@@ -115,11 +115,10 @@ public final class RecordingCoordinator {
          * 开录落定了（管线说的，每个录像意图只报一次）：此刻在录的是哪几路、这次计划录哪几路。被占用、在救、
          * 还没出画面的那几路不算在录 —— 它们回来了自己加入，状态条上说。
          *
-         * @param liveKeys   落定时在录的几路；空 = 一路都没在录（等待摄像头）
-         * @param planned    这次计划录的几路
-         * @param sdFellBack 用户选了 U 盘但没插，这次落到了内置存储
+         * @param liveKeys 落定时在录的几路；空 = 一路都没在录（等待摄像头）
+         * @param planned  这次计划录的几路
          */
-        default void onStartSettled(Collection<String> liveKeys, Collection<String> planned, boolean sdFellBack) {
+        default void onStartSettled(Collection<String> liveKeys, Collection<String> planned) {
         }
 
         /**
@@ -189,8 +188,6 @@ public final class RecordingCoordinator {
     private Why pending;
     private RecordingStops.Reason lastStopReason;
     private long startedAtMs;
-    /** 这一次开录落到了内置存储（用户选了 U 盘但没插）：开录落定时随开录的提示一起告诉界面。 */
-    private boolean startedOnFallback;
 
     /** 上一次推出去的样子（{@link #pushView}）：变了才换通知上的字、告诉悬浮按钮。 */
     private View shownView = View.IDLE;
@@ -546,7 +543,7 @@ public final class RecordingCoordinator {
         if (summary != null && summary.settled && !settleReported) {
             settleReported = true;
             for (Listener listener : new ArrayList<>(listeners)) {
-                listener.onStartSettled(summary.liveKeys, summary.planned, startedOnFallback);
+                listener.onStartSettled(summary.liveKeys, summary.planned);
             }
         }
         for (Listener listener : new ArrayList<>(listeners)) {
@@ -1147,7 +1144,6 @@ public final class RecordingCoordinator {
         resumeHold.finish();
         attemptManager = manager;
         startedAtMs = android.os.SystemClock.elapsedRealtime();
-        startedOnFallback = storage.sdFellBack;
         lastStopReason = null;
         slowWriteNoticedThisRecording = false;
         settleReported = false;
