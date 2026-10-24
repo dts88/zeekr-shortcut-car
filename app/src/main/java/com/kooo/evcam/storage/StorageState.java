@@ -80,7 +80,7 @@ public final class StorageState {
                             : other.root != null && root.getAbsolutePath().equals(other.root.getAbsolutePath()));
         }
 
-        /** 录像目录在内置存储上：存储位置选的就是内置存储（只有开发者选得了；选 U 盘的不会落到这里，2026-10-24）。 */
+        /** 录像目录在内置存储上：存储位置选的就是内置存储，或者选了 U 盘、盘不在、开发者选项打开着时降级到这里。 */
         public boolean onInternal() {
             return videoDir != null && "emulated".equals(StorageHelper.volumeOf(videoDir.getAbsolutePath()));
         }

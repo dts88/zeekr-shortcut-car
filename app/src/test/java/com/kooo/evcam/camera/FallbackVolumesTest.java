@@ -1,6 +1,8 @@
 package com.kooo.evcam.camera;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import com.kooo.evcam.StorageHelper;
 
@@ -20,6 +22,7 @@ public class FallbackVolumesTest {
     private static final File SSD = new File("/storage/1D8C-1D23");
     private static final File STICK = new File("/storage/B905-2EDD");
     private static final File SMALL = new File("/storage/AAAA-0001");
+    private static final File INTERNAL = new File("/storage/emulated/0");
 
     private static long free(File root) {
         if (root.equals(SSD)) {
@@ -41,7 +44,7 @@ public class FallbackVolumesTest {
     @Test
     public void skipsDeadVolumesAndOrdersByFreeSpace() {
         List<File> out = FallbackVolumes.rank(Arrays.asList(SSD, SMALL, STICK), SSD.getAbsolutePath(),
-                new HashSet<>(Collections.singletonList("1D8C-1D23")), FallbackVolumesTest::free);
+                new HashSet<>(Collections.singletonList("1D8C-1D23")), FallbackVolumesTest::free, null);
         assertEquals(Arrays.asList(STICK, SMALL), out);
     }
 
@@ -49,7 +52,29 @@ public class FallbackVolumesTest {
     @Test
     public void chosenVolumeComesFirstWhenAlive() {
         List<File> out = FallbackVolumes.rank(Arrays.asList(SMALL, STICK, SSD), SSD.getAbsolutePath(),
-                new HashSet<>(Collections.singletonList("B905-2EDD")), FallbackVolumesTest::free);
+                new HashSet<>(Collections.singletonList("B905-2EDD")), FallbackVolumesTest::free, null);
         assertEquals(Arrays.asList(SSD, SMALL), out);
+    }
+
+    /** 内置存储只在开发者选项打开着时出现（降级），而且排最后。 */
+    @Test
+    public void internalStorageIsLastResort() {
+        List<File> out = FallbackVolumes.rank(Collections.singletonList(STICK), null,
+                new HashSet<>(), FallbackVolumesTest::free, INTERNAL);
+        assertEquals(Arrays.asList(STICK, INTERNAL), out);
+        List<File> none = FallbackVolumes.rank(Collections.emptyList(), null,
+                new HashSet<>(Collections.singletonList("emulated")), FallbackVolumesTest::free, INTERNAL);
+        assertTrue(none.isEmpty());
+    }
+
+    /** 写回哪个盘：指定了的，它挂着才是它；自动找的，上一次找到的那个挂着就是它，不然是挂着的第一个。 */
+    @Test
+    public void homeIsThePinnedOrLastDetectedDrive() {
+        List<File> both = Arrays.asList(SSD, STICK);
+        assertEquals(STICK, FallbackVolumes.home(both, STICK.getAbsolutePath(), null));
+        assertNull(FallbackVolumes.home(Collections.singletonList(SSD), STICK.getAbsolutePath(), null));
+        assertEquals(STICK, FallbackVolumes.home(both, null, STICK.getAbsolutePath()));
+        assertEquals(SSD, FallbackVolumes.home(both, "", null));
+        assertNull(FallbackVolumes.home(Collections.emptyList(), null, STICK.getAbsolutePath()));
     }
 }

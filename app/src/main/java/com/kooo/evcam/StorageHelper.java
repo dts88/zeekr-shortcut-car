@@ -40,18 +40,49 @@ public class StorageHelper {
 
     /**
      * 这次录像写在「不是设定的那个盘」上：{写的盘, 设定的盘}，卷名（如 B905-2EDD）或 emulated；平时为 null。
+     * 设定的盘认不出（自动找 U 盘、一次都没找到过）时第二个是 null。怎么算见 {@link #offTarget}。
      *
-     * <p>状态条一直显示它，直到这次录像停止 —— 换盘时只弹一次提示的话，人不在车上就看不到
-     * （2026-09-26 哨兵模式：固态盘掉线、自动改写到另一个盘，回来的人以为什么都没录上）。</p>
+     * <p>状态条一直显示它，直到写回设定的盘或者这次录像停止 —— 换盘时只弹一次提示的话，人不在车上就看不到
+     * （2026-09-26 哨兵模式：固态盘掉线、自动改写到另一个盘，回来的人以为什么都没录上）。设置里「存储位置」那一行
+     * 也写这一句，改写的那一下主界面再提示一次（项目所有者 2026-10-24：降级了要有明确说明）。</p>
      */
     private static volatile String[] recordingFallback;
 
-    public static void noteRecordingFallback(String writingTo, String chosen) {
-        recordingFallback = writingTo == null ? null : new String[]{writingTo, chosen};
+    public static void noteRecordingFallback(String[] fallback) {
+        recordingFallback = fallback;
     }
 
     public static String[] recordingFallback() {
         return recordingFallback;
+    }
+
+    /**
+     * 录像目录 dir 是不是在存储位置选的那个盘以外：是就给 {写的盘, 选的盘}（卷名），不是给 null。
+     *
+     * <ul>
+     *   <li>选的是内置存储：不算；</li>
+     *   <li>选了 U 盘、指定了哪一个：dir 不在那个盘上就算（降级到内置存储、换到别的 U 盘）；</li>
+     *   <li>选了 U 盘、没指定（自动找）：哪个 U 盘都行，写在内置存储上才算；选的盘按上一次找到的那个写，
+     *       一次都没找到过是 null。</li>
+     * </ul>
+     */
+    public static String[] offTarget(Context context, File dir) {
+        AppConfig config = new AppConfig(context);
+        if (dir == null || !config.isUsingExternalSdCard()) {
+            return null;
+        }
+        String path = dir.getAbsolutePath();
+        String writing = volumeOf(path);
+        String pinned = config.getCustomSdCardPath();
+        if (pinned != null && !pinned.isEmpty()) {
+            return path.equals(pinned) || path.startsWith(pinned + "/") ? null
+                    : new String[]{writing, volumeOf(pinned)};
+        }
+        if (!"emulated".equals(writing)) {
+            return null;
+        }
+        String last = config.getLastDetectedSdPath();
+        return new String[]{writing, last == null || last.isEmpty() ? null : volumeOf(last)};
     }
 
     /** 路径所在的卷：/storage/B905-2EDD/... → B905-2EDD；/storage/emulated/0/... → emulated；认不出返回整条路径。 */
@@ -398,9 +429,10 @@ public class StorageHelper {
     /**
      * 影像（录像、照片）放在哪个盘上 —— 只有这一处决定（项目所有者 2026-10-06：不允许存到内置存储）。
      *
-     * <p>规则只有一条：存储位置选的是哪，就只写哪（项目所有者 2026-10-24）。选的是 U 盘：设定的那个 U 盘，
-     * 一时不在就返回 null —— 没有地方可存，等它回来，开发者选项开着也不退到内置存储（以前会，存储位置还写着 U 盘，
-     * 录像却悄悄进了内置存储）。选的是内置存储（只有开发者选得了，{@link #isInternalStorageAllowed}）才写内置存储。</p>
+     * <p>存储位置选的那个此刻能用就写它。选的是 U 盘、盘此刻不在（车机刚醒还没挂上、拔了）：只有开发者选项打开着才降级
+     * 写内置存储（{@link #isInternalStorageAllowed}），关着就返回 null —— 没有地方可存，等 U 盘。项目所有者 2026-10-24：
+     * 降级只在开发者选项打开时；降级了要说清楚（{@link #recordingFallback}）；U 盘一挂回来就从下一段写回去
+     * （{@code CodecVideoRecorder.returnHomeIfBack}）—— 不能界面上明明读得到 U 盘，录像却还写在内置存储上。</p>
      *
      * <p>录像、照片、锁定清单、开发者选项里的整帧另存，目录都从这里来，拿到 null 就不写；
      * 开录和拍照之前先问 {@link #isRecordingStorageAvailable}（同一条规则），不录、不拍。
@@ -409,10 +441,19 @@ public class StorageHelper {
      */
     private static File footageRoot(Context context, boolean useExternalSd) {
         if (useExternalSd) {
-            // U盘的公共目录（U盘/DCIM/EVCam_Video 或 U盘/DCIM/EVCam_Photo）；不在就是 null，不退到内置存储
-            return getExternalSdCardRoot(context);
+            // U盘的公共目录（U盘/DCIM/EVCam_Video 或 U盘/DCIM/EVCam_Photo）
+            File sdCardRoot = getExternalSdCardRoot(context);
+            if (sdCardRoot != null) {
+                return sdCardRoot;
+            }
         }
-        return isInternalStorageAllowed() ? Environment.getExternalStorageDirectory() : null;
+        if (!isInternalStorageAllowed()) {
+            return null;
+        }
+        if (useExternalSd) {
+            AppLog.w(TAG, "U盘不可用，开发者选项打开着：降级到内置存储");
+        }
+        return Environment.getExternalStorageDirectory();
     }
 
     /**
@@ -455,16 +496,16 @@ public class StorageHelper {
      * 所以它不是一个弹窗能放行的选择，而是默认就不给。</p>
      *
      * <p>选过的「内置存储」在开发者选项关着时本来就按 U 盘算（{@code AppConfig.getStorageLocation}）；
-     * 这里管的是设置里那一项能不能选、选了能不能用（{@link #footageRoot}）。选 U 盘、盘却不在时不退到内置存储
-     * （项目所有者 2026-10-24），录制器换盘也不换到内置存储。</p>
+     * 这里管的是设置里那一项能不能选，以及选 U 盘、盘却不在时能不能降级到内置存储（{@link #footageRoot}；
+     * 录制器换盘的最后一站也是它）。</p>
      */
     public static boolean isInternalStorageAllowed() {
         return com.kooo.evcam.settings.DeveloperMode.isUnlocked();
     }
 
     /**
-     * 现在有没有地方存录像、照片：存储位置选的那个此刻能用 —— 选 U 盘的有 U 盘，选内置存储的开发者选项开着
-     * （{@link #footageRoot} 的那条规则）。
+     * 现在有没有地方存录像、照片：有 U 盘，或者开发者选项打开着（选的就是内置存储，或者降级到内置存储；
+     * {@link #footageRoot} 的那条规则）。
      *
      * <p>拒录（{@code RecordingCoordinator}）、拍照入口的拒拍（{@code MultiCameraManager.takePhoto}）
      * 和录制键的「不可用」状态问的是同一件事，所以只有这一处判断 —— 各写一遍，
@@ -474,15 +515,18 @@ public class StorageHelper {
         if (context == null) {
             return false;
         }
-        return new AppConfig(context).isUsingExternalSdCard() ? hasExternalSdCard(context) : isInternalStorageAllowed();
+        return !willRecordToInternal(context) || isInternalStorageAllowed();
     }
 
     /**
-     * 录像会不会写在内置存储上：只有存储位置选的就是内置存储（开发者选项开着时才算数）。
-     * 选了 U 盘、盘却不在的不算 —— 那时没有地方可存，不录（项目所有者 2026-10-24）。
+     * 录像会不会写在内置存储上（开发者选项打开着才真写，关着就是没有地方可存）：存储位置选的就是内置存储，
+     * 或者选了 U 盘、盘此刻不在（降级，{@link #footageRoot}）。
      */
     public static boolean willRecordToInternal(Context context) {
-        return context != null && !new AppConfig(context).isUsingExternalSdCard();
+        if (context == null) {
+            return false;
+        }
+        return !new AppConfig(context).isUsingExternalSdCard() || !hasExternalSdCard(context);
     }
 
     public static File getExternalSdCardRoot(Context context) {

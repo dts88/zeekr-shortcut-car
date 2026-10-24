@@ -1589,6 +1589,7 @@ public class CodecVideoRecorder {
         ring.clear();
         backpressure.reset();
         deadVolumes.clear();
+        goneVolumes.clear();
         relocations = 0;
         // 这一次的文件：写入线程开成一个才记一个；上一次停录收掉的单子不算这一次的
         recordedFilePaths.clear();
@@ -2422,9 +2423,15 @@ public class CodecVideoRecorder {
     // 每 5 秒 fsync（夹在两次写之间）、收文件（写文件尾、fsync、关掉）、写不进时换盘并补写、没确认落盘时抢救。
     // 下面这些字段只有写入线程读写（标了 volatile 的给诊断、停录、抢救线程随时读）。
 
-    /** 录像盘写不进时还能写到哪些目录，按优先顺序；相机层提供，它知道此刻挂着哪些盘。 */
+    /** 录像盘写不进时还能写到哪些目录，按优先顺序；相机层提供，它知道此刻挂着哪些盘、存储位置选的是哪个。 */
     public interface FallbackDirs {
         List<File> candidates(Set<String> deadVolumes);
+
+        /**
+         * 存储位置选的那个盘上的录像目录：在 mounted（此刻的挂载表）里才给，否则 null。写在别处时
+         * （降级到内置存储、换到别的 U 盘）每开一个新文件先问它，挂上了就写回去（{@link #returnHomeIfBack}）。
+         */
+        File home(List<File> mounted);
     }
 
     public void setFallbackDirs(FallbackDirs dirs) {
@@ -2520,14 +2527,14 @@ public class CodecVideoRecorder {
     private boolean fileFailed;
     /** 这个文件是编码线程排的第几个：报错时编码线程凭它认出说的是不是还是现在这个。 */
     private int fileSerial;
-    /** 这次录像里写不进的卷名，不再试。写入线程加，抢救线程读。 */
-    private final Set<String> deadVolumes = java.util.concurrent.ConcurrentHashMap.newKeySet();
-    private volatile int relocations;
     /**
-     * 这一次开录给的目录（存储位置选的那个盘上）：换过盘之后，每开一个新文件先看它挂回来没有，挂回来就写回去
-     * （{@link #returnHomeIfBack}，项目所有者 2026-10-24：存储位置选的是哪就只写哪）。写入线程上读写。
+     * 这次录像里写不进的卷名，不再试 —— 除非它从挂载表里掉下来过、又挂上了（{@link #reviveRemounted}）。
+     * 写入线程加，抢救线程读。
      */
-    private String homeDirectory;
+    private final Set<String> deadVolumes = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** 写不进之后从挂载表里掉下来过的卷：再挂上就算回来了，可以再试（写入线程上看，开录时清）。 */
+    private final Set<String> goneVolumes = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile int relocations;
 
     /** 排队满了、丢相机帧的那几段（编码线程上）：黑匣子什么时候记、什么时候提示用户。 */
     private final SampleRing.Backpressure backpressure = new SampleRing.Backpressure();
@@ -3076,7 +3083,6 @@ public class CodecVideoRecorder {
         if (open.dir != null) {
             // 一次开录的第一个文件：写到这一次给的目录。录像目录还是只有写入线程改（这里，和换盘）
             saveDirectory = open.dir;
-            homeDirectory = open.dir;
         } else {
             returnHomeIfBack();
         }
@@ -3100,38 +3106,57 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 换过盘、开录时的那个盘又挂上了：这个新文件起写回那个盘（写入线程上，开新文件之前；项目所有者 2026-10-24）。
+     * 写在存储位置选的盘以外（开录时就降级到了内置存储，或者录着录着换过盘）、选的盘挂上了：这个新文件起写回去
+     * （写入线程上，开新文件之前；项目所有者 2026-10-24：U 盘挂回来就从下一段写回去）。
      *
-     * <p>只看挂载表（{@link StorageHelper#mountedVolumes}）里有没有它，不去碰盘本身 —— 盘没好时一次探测要卡好几秒。
-     * 挂着却还写不进的，下面开文件时照旧换盘（它又算写不进的盘）。以前要等别的盘也写不进才回去：10-24 U 盘回来了，
-     * 录像还在别处录了两个半小时。</p>
+     * <p>只看挂载表（{@link StorageHelper#mountedVolumes}），不去碰盘本身 —— 盘没好时一次探测要卡好几秒。
+     * 这次录像里在它上面写不进过的，要它从挂载表里掉下来过、又挂上了才回去：一直挂着却写不进的盘（哨兵模式下的固态盘），
+     * 每一段都去试一次的话，写入线程每次都可能卡上几秒。挂上了却还写不进的，下面开文件时照旧换盘（它又算写不进的盘）。
+     * 以前要等别的盘也写不进才回去：10-24 U 盘回来了，录像还在内置存储上录了两个半小时。</p>
      */
     private void returnHomeIfBack() {
-        String home = homeDirectory;
-        if (home == null || home.equals(saveDirectory)) {
+        FallbackDirs dirs = fallbackDirs;
+        if (dirs == null) {
             return;
         }
-        String volume = StorageHelper.volumeOf(home);
-        boolean mounted = false;
-        for (File root : StorageHelper.mountedVolumes()) {
-            if (volume.equals(root.getName())) {
-                mounted = true;
-                break;
-            }
-        }
-        if (!mounted) {
+        List<File> mounted = StorageHelper.mountedVolumes();
+        reviveRemounted(mounted);
+        File home = dirs.home(mounted);
+        if (home == null || home.getAbsolutePath().equals(saveDirectory)) {
             return;
+        }
+        String volume = StorageHelper.volumeOf(home.getAbsolutePath());
+        if (deadVolumes.contains(volume)) {
+            return;  // 这次录像里在它上面写不进过，还没掉下来再挂上
         }
         String from = saveDirectory;
-        deadVolumes.remove(volume);
-        saveDirectory = home;
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("录像盘 " + volume + " 又挂上了（相机 " + cameraId
-                + "），这个文件起写回 " + home + "；之前写在 " + from);
+        saveDirectory = home.getAbsolutePath();
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("存储位置选的盘 " + volume + " 挂着（相机 " + cameraId
+                + "），这个文件起写回 " + saveDirectory + "；之前写在 " + from);
         RecordCallback cb = callback;
         Handler segment = segmentHandler;
         if (cb != null && segment != null) {
-            final File back = new File(home);
-            segment.post(() -> cb.onRecordingRelocated(cameraId, back, "back", 0L));
+            segment.post(() -> cb.onRecordingRelocated(cameraId, home, "back", 0L));
+        }
+    }
+
+    /** 写不进的盘从挂载表里掉下来了：记下；掉下来过又挂上的，这次录像里可以再试（写入线程上）。 */
+    private void reviveRemounted(List<File> mounted) {
+        if (deadVolumes.isEmpty()) {
+            return;
+        }
+        Set<String> present = new HashSet<>();
+        for (File root : mounted) {
+            present.add(root.getName());
+        }
+        for (String volume : deadVolumes) {
+            if (!present.contains(volume)) {
+                goneVolumes.add(volume);
+            } else if (goneVolumes.remove(volume)) {
+                deadVolumes.remove(volume);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像盘 " + volume + " 掉下来又挂上了（相机 " + cameraId
+                        + "），这次录像里可以再试");
+            }
         }
     }
 
