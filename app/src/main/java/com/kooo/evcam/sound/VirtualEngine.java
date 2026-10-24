@@ -8,9 +8,13 @@ package com.kooo.evcam.sound;
  * <h3>几样输入各管什么（项目所有者 2026-10-21：油门开度、踩油门的快慢、车速、加减速度都要用上）</h3>
  *
  * <ul>
- *   <li><b>油门开度</b> → 负荷（驾驶员要多少）：3 % 以下算没踩，85 % 算满，中间按 0.8 次方（小油门也听得出）。</li>
- *   <li><b>加速度</b> → 车真正出了多少力：电机在出力时，加速度换算的负荷和油门的取大的（自适应巡航自己加速时油门是 0，靠它）；
- *       也让声音在猛加速时厚一点。</li>
+ *   <li><b>油门开度</b> → 负荷（驾驶员要多少）：3 % 以下算没踩，85 % 算满，中间按 0.8 次方（小油门也听得出）。
+ *       项目所有者 2026-10-24：功率直接按油门开度（和踩的快慢）模拟 —— 车速、加速度都是滞后的（先出了力，车速、加速度才跟上），
+ *       数据传过来本来就有延迟，不拿它们算；车重、车速、阻力只是配合（{@link #cruiseLoad}）。运动模式车机的踏板更灵
+ *       （{@link Input#sportPedal}、{@link #SPORT_PEDAL_EXP}）。猛加速时声音厚一点也按油门（{@link #push}）。</li>
+ *   <li><b>加速度</b> → 只在没踩油门、电机在出力时当负荷用（自适应巡航自己加速时油门是 0，只能靠它）；踩着油门时不看。</li>
+ *   <li><b>车重、车速、阻力</b> → 巡航要的负荷（{@link #cruiseLoad}）：踩着油门（或自适应巡航）时负荷不低于它 —— 高速时轻踩着
+ *       发动机也在出力，不像滑行。只是兜底，车速不是首要的。</li>
  *   <li><b>踩油门的快慢</b> → 急踩：负荷和转速起得更快、转速冲一下、进气声和高阶次猛一下，模拟换挡时直接降到该在的挡
  *       （可以连降几挡；慢慢踩到地板附近也一样，像自动挡的强制降挡开关）；
  *       缓踩没有这些，平顺地往上走。</li>
@@ -68,7 +72,7 @@ final class VirtualEngine {
         float throttlePct = Float.NaN;
         /** 踩油门的快慢（%/s）：正 = 踩下，负 = 松开（{@link DriveInputs}）。 */
         float pedalRate;
-        /** 加速度（m/s²）：正 = 加速，负 = 减速（{@link DriveInputs}）。 */
+        /** 加速度（m/s²）：正 = 加速，负 = 减速（{@link DriveInputs}）。只在没踩油门时当负荷用（自适应巡航），刹车降挡也看它。 */
         float accel;
         /** 踩着刹车（深度超过 {@link #BRAKE_ON}，或踏板 = 1）。 */
         boolean braking;
@@ -80,6 +84,8 @@ final class VirtualEngine {
          * 减速时早一点降挡（{@link #EAGER_UP_RPM} 等）。别的都一样。
          */
         float eager;
+        /** 运动模式的踏板（0 标准、1 运动，{@link #SPORT_PEDAL_EXP}）：车机在运动模式下踏板更灵，同样的油门开度出的力更大。 */
+        float sportPedal;
     }
 
     // ---- 负荷
@@ -90,9 +96,34 @@ final class VirtualEngine {
     static final float BRAKE_ON = 3f;
     /** 加速度到这个（m/s²）算车出满了力：7X 后驱 0–100 km/h 约 5.8 s（平均 4.8 m/s²），四驱约 3.8 s。 */
     static final float ACCEL_FULL = 5f;
-    /** 加速度换算的负荷打几折再和油门的比：油门是驾驶员要的，加速度是车给的。 */
+    /** 加速度换算的负荷打几折（只在没踩油门、自适应巡航自己加速时用）。 */
     static final float ACCEL_LOAD_WEIGHT = 0.8f;
     static final float EFFORT_SMOOTH_SEC = 0.2f;
+    /**
+     * 运动模式的踏板（项目所有者 2026-10-24：运动模式下油门开度不大就有足够的实车加速度，模拟里只觉得速度轻轻松松就上去了）：
+     * 运动模式踩 p % 当标准模式踩 100 × (p / 100)^它 % —— 20 → 30、40 → 50、60 → 68，踩到底一样。车机两种模式的踏板曲线
+     * 没有数据，先按估的，听了再调。
+     */
+    static final float SPORT_PEDAL_EXP = 0.75f;
+    /** 负荷过了这个（0–1）声音开始厚一点（{@link #push}），踩到底是 {@link #SURGE_MAX}。 */
+    static final float SURGE_FROM_LOAD = 0.5f;
+    static final float SURGE_MAX = 0.8f;
+
+    // ---- 巡航要的负荷（{@link #cruiseLoad}）：车重、车速、阻力 —— 只是兜底
+    /** 车重（kg）：7X 整备 2280–2475 kg，加一个人。 */
+    static final float CAR_MASS_KG = 2400f;
+    static final float ROLLING_COEF = 0.011f;
+    /** 风阻系数 × 迎风面积（m²）：公开资料 Cd 0.247，车宽 1.93 m、高 1.66 m，迎风面积按约 2.7 m² 估。 */
+    static final float DRAG_AREA_M2 = 0.67f;
+    static final float AIR_DENSITY = 1.2f;
+    /** 发动机到车轮的效率。 */
+    static final float DRIVELINE_EFF = 0.85f;
+    /**
+     * 虚拟发动机各转速的最大扭矩（N·m）：机械增压 6.2 V8，照参考那台的公开数据（881 N·m @ 4800 rpm、527 kW @ 6000 rpm），
+     * 低转按机械增压的样子早早起来；中间按转速线性插值。
+     */
+    static final float[] TORQUE_RPM = {1000f, 2000f, 3000f, 4800f, 6000f, 6500f};
+    static final float[] TORQUE_NM = {600f, 760f, 840f, 881f, 839f, 790f};
 
     // ---- 踩 / 松油门的快慢
     /** 踩得比这慢（%/s）算缓踩：0 踩到 50 % 用 2 秒是 25 %/s。 */
@@ -551,7 +582,7 @@ final class VirtualEngine {
         liftEnv = Math.max(lift, liftEnv * decay(dt, LIFT_DECAY_SEC));
         decel += (clamp01(-in.accel / DECEL_FULL) - decel) * follow(dt, DECEL_SMOOTH_SEC);
         eager += (clamp01(in.eager) - eager) * follow(dt, EAGER_SEC);
-        effortEnv += (effort(in) - effortEnv) * follow(dt, EFFORT_SMOOTH_SEC);
+        effortEnv += (push(in) - effortEnv) * follow(dt, EFFORT_SMOOTH_SEC);
         blip *= decay(dt, BLIP_DECAY_SEC);
         blipLoad *= decay(dt, BLIP_LOAD_DECAY_SEC);
         bark *= decay(dt, BARK_SEC);
@@ -570,8 +601,11 @@ final class VirtualEngine {
             return;
         }
 
-        // 负荷：急踩时起得快，踩刹车时落得快
+        // 负荷：急踩时起得快，踩刹车时落得快；踩着油门（或自适应巡航电机在出力）时不低于巡航要的那一截（车重、车速、阻力）
         float target = loadTarget(in);
+        if (in.gear == Gear.D && !in.braking && in.flow != Flow.REGEN && (target > 0f || in.flow == Flow.DRIVE)) {
+            target = Math.max(target, cruiseLoad(v, rpm));
+        }
         float tau = target > load ? p.loadAttackSec * (1f - STAB_ATTACK_CUT * stabEnv)
                 : (in.braking ? p.brakeReleaseSec : p.loadReleaseSec);
         load += (target - load) * follow(dt, tau);
@@ -951,25 +985,80 @@ final class VirtualEngine {
         return (float) Math.pow(clamp01(x), LOAD_CURVE);
     }
 
-    /** 加速度 → 车真正出的力（0–1）：只在 D / R 挡、电机在出力时算（读不到动力流时，踩着油门才算）；下坡滑行加速不算。 */
-    static float effort(Input in) {
-        if (in.braking || in.flow == Flow.REGEN || (in.gear != Gear.D && in.gear != Gear.R)) {
+    /**
+     * 同上，按驾驶模式的踏板（{@code sport} 0 标准 … 1 运动，{@link #SPORT_PEDAL_EXP}）：运动模式同样的开度当踩得深一些。
+     */
+    static float demand(float throttlePct, float sport) {
+        if (!(throttlePct > THROTTLE_DEADBAND)) {
             return 0f;
         }
-        boolean driving = in.flow == Flow.DRIVE || (in.flow == Flow.UNKNOWN && demand(in.throttlePct) > 0f);
-        return driving ? clamp01(in.accel / ACCEL_FULL) : 0f;
+        float p = Math.min(throttlePct, 100f);
+        float deeper = 100f * (float) Math.pow(p / 100f, SPORT_PEDAL_EXP);
+        return demand(p + (deeper - p) * clamp01(sport));
     }
 
-    /** 该有的负荷：踩刹车、回收时 0；空挡只看油门；否则油门和加速度取大的。 */
+    /**
+     * 加速度 → 车真正出的力（0–1）：只在没踩油门、D / R 挡、电机在出力时算 —— 自适应巡航自己加速（油门是 0）只能靠它；踩着油门时
+     * 负荷只看油门（项目所有者 2026-10-24：车速、加速度都是滞后的）。下坡滑行加速不算。
+     */
+    static float effort(Input in) {
+        if (in.braking || in.flow == Flow.REGEN || (in.gear != Gear.D && in.gear != Gear.R) || demand(in.throttlePct) > 0f) {
+            return 0f;
+        }
+        return in.flow == Flow.DRIVE ? clamp01(in.accel / ACCEL_FULL) : 0f;
+    }
+
+    /**
+     * 该有的负荷：踩刹车、回收时 0；空挡只看油门（照标准模式的踏板）；否则看油门（按驾驶模式的踏板），没踩油门、自适应巡航自己
+     * 加速时看加速度（{@link #effort}）。巡航要的那一截（{@link #cruiseLoad}）由 {@link #step} 另外兜底。
+     */
     static float loadTarget(Input in) {
         if (in.braking || in.flow == Flow.REGEN) {
             return 0f;
         }
-        float d = demand(in.throttlePct);
         if (in.gear != Gear.D && in.gear != Gear.R) {
-            return d;
+            return demand(in.throttlePct);
         }
-        return Math.max(d, ACCEL_LOAD_WEIGHT * effort(in));
+        return Math.max(demand(in.throttlePct, in.sportPedal), ACCEL_LOAD_WEIGHT * effort(in));
+    }
+
+    /**
+     * 猛加速时声音厚一点（{@link #LEVEL_SURGE_DB}、{@link #BRIGHT_SURGE_DB}）有多少（0–1）：踩着油门时按油门，负荷过了
+     * {@link #SURGE_FROM_LOAD} 才有、踩到底 {@link #SURGE_MAX}（原来按加速度，晚几百毫秒）；没踩油门时按自适应巡航的加速度。
+     */
+    static float push(Input in) {
+        if (in.braking || in.flow == Flow.REGEN || (in.gear != Gear.D && in.gear != Gear.R)) {
+            return 0f;
+        }
+        float d = demand(in.throttlePct, in.sportPedal);
+        return Math.max(effort(in), SURGE_MAX * clamp01((d - SURGE_FROM_LOAD) / (1f - SURGE_FROM_LOAD)));
+    }
+
+    /**
+     * 巡航要的负荷（0–1）：车重、车速下滚动阻力和风阻要的功率（{@link #CAR_MASS_KG} 等）÷ 虚拟发动机此刻转速下最多出的功率
+     * （{@link #TORQUE_NM}，乘传动效率）。只是兜底（项目所有者 2026-10-24：负荷按油门开度、踩的快慢模拟，车重、车速、阻力配合，
+     * 车速绝不是首要的）：高速时轻踩着、或者自适应巡航稳着车速，发动机也在出力。100 km/h 六挡约 0.11，130 km/h 七挡约 0.19，
+     * 160 km/h 八挡约 0.3；60 km/h 以下几乎是 0。
+     */
+    static float cruiseLoad(float speedKmh, float rpm) {
+        float v = Math.max(speedKmh, 0f) / 3.6f;
+        float force = ROLLING_COEF * CAR_MASS_KG * 9.81f + 0.5f * AIR_DENSITY * DRAG_AREA_M2 * v * v;
+        float available = DRIVELINE_EFF * maxTorque(rpm) * rpm * (float) (2.0 * Math.PI / 60.0);
+        return available > 0f ? clamp01(force * v / available) : 0f;
+    }
+
+    /** 虚拟发动机这个转速的最大扭矩（N·m，{@link #TORQUE_NM} 线性插值，两头照最边上的）。 */
+    static float maxTorque(float rpm) {
+        if (rpm <= TORQUE_RPM[0]) {
+            return TORQUE_NM[0];
+        }
+        for (int k = 1; k < TORQUE_RPM.length; k++) {
+            if (rpm <= TORQUE_RPM[k]) {
+                float f = (rpm - TORQUE_RPM[k - 1]) / (TORQUE_RPM[k] - TORQUE_RPM[k - 1]);
+                return TORQUE_NM[k - 1] + (TORQUE_NM[k] - TORQUE_NM[k - 1]) * f;
+            }
+        }
+        return TORQUE_NM[TORQUE_NM.length - 1];
     }
 
     /**

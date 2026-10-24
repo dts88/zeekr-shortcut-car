@@ -79,6 +79,55 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void sportsPedalGivesMoreLoadForTheSameOpening() {
+        // 项目所有者 2026-10-24：运动模式下油门开度不大就有足够的实车加速度。运动模式踩 20 % 当标准模式踩约 30 %，到底一样
+        assertEquals(VirtualEngine.demand(29.9f), VirtualEngine.demand(20f, 1f), 0.005f);
+        assertTrue(VirtualEngine.demand(20f, 1f) > 1.3f * VirtualEngine.demand(20f, 0f));
+        assertEquals("标准模式照旧", VirtualEngine.demand(40f), VirtualEngine.demand(40f, 0f), 0f);
+        assertEquals(1f, VirtualEngine.demand(100f, 1f), 0f);
+        assertEquals("没踩还是没踩", 0f, VirtualEngine.demand(3f, 1f), 0f);
+        float last = 0f;
+        for (int t = 0; t <= 100; t++) {
+            float d = VirtualEngine.demand(t, 1f);
+            assertTrue("越踩越多: " + t, d >= last);
+            last = d;
+        }
+    }
+
+    @Test
+    public void onThePedalTheLoadIgnoresTheLaggingAcceleration() {
+        // 项目所有者 2026-10-24：先出了力，车速、加速度才跟上，数据传过来还有延迟 —— 踩着油门时负荷只看油门（和驾驶模式的踏板），
+        // 猛加速时声音厚一点也按油门
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 20f);
+        in.accel = 4f;
+        assertEquals(VirtualEngine.demand(20f), VirtualEngine.loadTarget(in), 1e-6f);
+        in.sportPedal = 1f;
+        assertEquals(VirtualEngine.demand(20f, 1f), VirtualEngine.loadTarget(in), 1e-6f);
+        assertEquals("20 % 还没过半：不厚", 0f, VirtualEngine.push(in), 0f);
+        in.throttlePct = 100f;
+        assertEquals(VirtualEngine.SURGE_MAX, VirtualEngine.push(in), 1e-6f);
+    }
+
+    @Test
+    public void atSpeedTheEngineStillWorksAgainstWeightAndDrag() {
+        // 车重、车速、阻力只是兜底：160 km/h 八挡（约 2100 rpm）滚动阻力加风阻约 47 kW，负荷约 0.3；60 km/h 几乎是 0。
+        // 高速时轻踩着发动机也在出力（不是收油）；一松开就是收油
+        assertEquals(0.32f, VirtualEngine.cruiseLoad(160f, 160f * G.rpmPerKmh[7]), 0.03f);
+        assertTrue(VirtualEngine.cruiseLoad(60f, 60f * G.rpmPerKmh[3]) < 0.06f);
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 160f, 8f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 8f);
+        assertTrue("高速轻踩: " + e.load(), e.load() > 0.25f);
+        assertEquals(0f, e.overrun(), 0.01f);
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.IDLE;
+        run(e, in, 2f);
+        assertTrue("松开就是收油: " + e.load() + " / " + e.overrun(), e.load() < 0.02f && e.overrun() > 0.5f);
+    }
+
+    @Test
     public void brakingAndRegenTakeTheLoadAway() {
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 50f);
         assertTrue(VirtualEngine.loadTarget(in) > 0.5f);

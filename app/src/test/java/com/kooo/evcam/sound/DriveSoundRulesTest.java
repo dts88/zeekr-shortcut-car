@@ -53,6 +53,10 @@ public class DriveSoundRulesTest {
         assertEquals(0f, DriveSoundRules.eagerOf(Signal.DRIVE_MODE_STANDARD), 0f);
         assertEquals(0f, DriveSoundRules.eagerOf(null), 0f);
         assertTrue(DriveSoundRules.soundMode(SPORT) && DriveSoundRules.soundMode(Signal.DRIVE_MODE_STANDARD));
+        // 车机运动模式的踏板更灵：负荷按运动模式的踏板算（同样的车动起来，两种模式的负荷差不多）
+        assertEquals(1f, DriveSoundRules.sportPedalOf(SPORT), 0f);
+        assertEquals(0f, DriveSoundRules.sportPedalOf(Signal.DRIVE_MODE_STANDARD), 0f);
+        assertEquals(0f, DriveSoundRules.sportPedalOf(null), 0f);
         assertFalse(DriveSoundRules.soundMode(Signal.DRIVE_MODE_COMFORT) || DriveSoundRules.soundMode(null));
     }
 

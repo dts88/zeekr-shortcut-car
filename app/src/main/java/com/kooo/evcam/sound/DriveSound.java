@@ -624,6 +624,7 @@ public final class DriveSound {
                 in.flow = DriveSoundRules.flowOf(r.code(Signal.POWER_FLOW));
                 in.mode = rpmMode;
                 in.eager = DriveSoundRules.eagerOf(r.code(Signal.DRIVE_MODE));
+                in.sportPedal = DriveSoundRules.sportPedalOf(r.code(Signal.DRIVE_MODE));
                 engine.setGearbox(style.gearbox(gearbox));
                 if (!ignited && w == DriveSoundRules.Why.RUNNING) {
                     engine.ignite(in);

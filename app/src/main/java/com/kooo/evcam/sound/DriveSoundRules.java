@@ -117,6 +117,11 @@ final class DriveSoundRules {
         return driveMode != null && driveMode == Signal.DRIVE_MODE_SPORT ? 1f : 0f;
     }
 
+    /** 运动模式的踏板（{@link VirtualEngine.Input#sportPedal}）：运动模式 1（车机的踏板更灵），别的 0。 */
+    static float sportPedalOf(Integer driveMode) {
+        return driveMode != null && driveMode == Signal.DRIVE_MODE_SPORT ? 1f : 0f;
+    }
+
     /** 推送停了这么久（毫秒），快读又和它不一样，就改用快读：推送可能断了、或者漏了最后一个值。 */
     static final long PUSH_QUIET_MS = 1000L;
 
