@@ -205,6 +205,20 @@
   沿用已批准的 mirror_paused_tap 前半句（主界面点一下不是「恢复」，不带后半句）。
 - 2026-10-20 批准（关于页「开源与来源」，着重感谢 FerixzTanz 的参数调整）：about_credits_contributors 里 FerixzTanz 那一条改为「• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究。盲区画面默认的角度和窗口大小，是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。」；
   English「• FerixzTanz (GitHub) — the original code and on-car research for Blind spot view. Its default angles and window size are the ones he tuned on his own 7X. Many thanks for his careful parameter tuning.」（关于页只有中英两份）。
+- 2026-10-21 定名（模拟声浪的声音风格，不用车型名、商标）：dev_drive_sound_style_american「美式 V8」/ American V8 / V8 Amerika（默认，
+  机械增压交叉平面 V8）；dev_drive_sound_style_prototype「试制 V8」/ Prototype V8 / V8 prototaip（第一版）。车主写的是「美式V8」，
+  按 §4 中文与英文、数字之间加空格，和「试制 V8」一致；英文、马来文照译。
+- 2026-10-21 批准（模拟声浪）：第三种声音风格 dev_drive_sound_style_jet「超音速」/ Supersonic jet / Jet supersonik（喷气机取向，不用车型名）；
+  听感 dev_drive_sound_view_title「听感」/ Listening position / Kedudukan mendengar，连同两档 dev_drive_sound_view_outside「车外」/ Outside /
+  Di luar（默认）、dev_drive_sound_view_cabin「车内」/ In the cabin / Dalam kabin。
+- 2026-10-22 批准（模拟声浪的变速箱，模拟换挡照参考车的两种变速箱，不用车型名）：dev_drive_sound_gearbox_title「变速箱」/ Gearbox /
+  Kotak gear，两档 dev_drive_sound_gearbox_auto8「8 速自动」/ 8-speed automatic / Automatik 8 kelajuan（默认）、
+  dev_drive_sound_gearbox_manual6「6 速手动」/ 6-speed manual / Manual 6 kelajuan（按 §4 数字与中文之间加空格）。
+- 2026-10-23 批准（模拟声浪）：第四种声音风格 dev_drive_sound_style_jet_old「超音速（旧版）」/ Supersonic jet (old version) /
+  Jet supersonik (versi lama)（2026-10-22 的那版超音速，留着和新的装车对比；车主叫它「supersonic-old」）。
+- 2026-10-23 批准（模拟声浪，照参考车另外两种主题仿制，不用车型名）：第五种声音风格 dev_drive_sound_style_turbo4「涡轮四缸」/
+  Turbo four / Empat silinder turbo（参考车模仿汽油机的那一种：涡轮增压直列四缸）；第六种 dev_drive_sound_style_electric
+  「电动概念车」/ Electric concept car / Kereta konsep elektrik（车主说的「电动概念车声」那一种）。
 - 2026-10-21 批准（开发者选项「录制声音（试验）」，2026-10-20 车主定先做框架、上车比来源）：dev_footage_audio_title「录制声音（试验）」/
   Record sound (experimental) / Rakam bunyi (percubaan)；dev_footage_audio_summary「环视录像带上一路车内麦克风的声音，打开时请求录音权限。
   录制模式为 MediaRecorder 时不带声音。麦克风的位置、熄屏和后台时能不能录到，还在实车测试」；dev_footage_audio_source_title「麦克风来源」，
@@ -365,7 +379,20 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 开发者选项「模拟声浪（试验）」2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
+  dev_drive_sound_summary 现在是「运动、标准模式下按油门、车速和加减速合成发动机声（运动模式换挡更积极），从「播放喇叭」选的喇叭播放，
+  车内喇叭跟随媒体音量。停车时切换到这两种模式会先播放启动声」（2026-10-21 实车后去掉「；倒挡时音量降低 6 dB」：车机自己在倒挡
+  压低音量，车主定声浪不再另降；2026-10-24 加「播放喇叭」时改了「从车内喇叭播放并跟随媒体音量」；同一天车主加标准模式）；
+  dev_drive_sound_volume_title 的选项改成 −6 / −3 / 0 dB，默认 0 dB（车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）。
+  播放喇叭（2026-10-24 加，车主要外放测试：车内、车外、车内和车外）：dev_drive_sound_output_title「播放喇叭」/ Speakers /
+  Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、
+  dev_drive_sound_output_outside「车外喇叭」/ Exterior speaker / Pembesar suara luar、dev_drive_sound_output_both「车内和车外」/
+  Cabin and exterior / Kabin dan luar。
+  车外线路、车外音量（2026-10-24 加，车主：两个逻辑喇叭自己选；车外音量过低、音量键调不到车外；「播放喇叭」用到车外时才显示）：
+  dev_drive_sound_route_title「车外线路」/ Exterior route / Laluan luar，两档 dev_drive_sound_route_notify「BUS12（外部通知）」/
+  BUS12 (outer notify) / BUS12 (pemberitahuan luar)（默认）、dev_drive_sound_route_playback「BUS11（外部播放）」/
+  BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
+  Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
 
 ---
 

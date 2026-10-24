@@ -56,6 +56,12 @@ public class DeveloperSettingsTest {
         ROWS.put("screen_drive_sound", NONE);
         ROWS.put("pref_drive_sound_volume", Arrays.asList("drive_sound_volume"));
         ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
+        ROWS.put("pref_drive_sound_gearbox", Arrays.asList("drive_sound_gearbox"));
+        ROWS.put("pref_drive_sound_style", Arrays.asList("drive_sound_style"));
+        ROWS.put("pref_drive_sound_view", Arrays.asList("drive_sound_view"));
+        ROWS.put("pref_drive_sound_output", Arrays.asList("drive_sound_output"));
+        ROWS.put("pref_drive_sound_exterior_route", Arrays.asList("drive_sound_exterior_route"));
+        ROWS.put("pref_drive_sound_exterior_volume", Arrays.asList("drive_sound_exterior_volume"));
         // 应用水印固定开着、点不动，不存设置（2026-10-23 从录制页挪来）
         ROWS.put("pref_watermark_brand", NONE);
         // 车辆状态（2026-10-23 从界面页挪来）

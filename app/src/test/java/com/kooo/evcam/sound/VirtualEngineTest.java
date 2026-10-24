@@ -10,12 +10,15 @@ import org.junit.Test;
  * 虚拟发动机（项目所有者 2026-10-21 定的走法，docs/local/drive-sound-plan.md §2、§9）。
  *
  * <p>算错的表现：地板油一路顶在红线上；急踩和缓踩听起来一样；松油门、刹车时乱升挡；倒挡升挡；
- * 停着切到运动模式没有启动声、或者启动声之后一直是起动机的声音；行驶中接入时突然冒出来、降的那一挡马上又升回去；
+ * 停着切到运动模式没有启动声、或者启动声之后一直是起动机的声音；行驶中接入时不点火就冒出来、降的那一挡马上又升回去；
+ * 切出运动模式时发动机不熄火、或者熄了火停不下来；
  * 自适应巡航自己加速时没声音；块大小一变声音的快慢就变。</p>
  */
 public class VirtualEngineTest {
 
     private static final SoundProfile P = SoundProfile.V8;
+    /** 默认的变速箱（8 速自动）。 */
+    private static final Gearbox G = Gearbox.AUTO8;
     /** 和声音线程一样的一块：256 帧 / 48 kHz。 */
     private static final float DT = 256f / 48_000f;
 
@@ -76,6 +79,55 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void sportsPedalGivesMoreLoadForTheSameOpening() {
+        // 项目所有者 2026-10-24：运动模式下油门开度不大就有足够的实车加速度。运动模式踩 20 % 当标准模式踩约 30 %，到底一样
+        assertEquals(VirtualEngine.demand(29.9f), VirtualEngine.demand(20f, 1f), 0.005f);
+        assertTrue(VirtualEngine.demand(20f, 1f) > 1.3f * VirtualEngine.demand(20f, 0f));
+        assertEquals("标准模式照旧", VirtualEngine.demand(40f), VirtualEngine.demand(40f, 0f), 0f);
+        assertEquals(1f, VirtualEngine.demand(100f, 1f), 0f);
+        assertEquals("没踩还是没踩", 0f, VirtualEngine.demand(3f, 1f), 0f);
+        float last = 0f;
+        for (int t = 0; t <= 100; t++) {
+            float d = VirtualEngine.demand(t, 1f);
+            assertTrue("越踩越多: " + t, d >= last);
+            last = d;
+        }
+    }
+
+    @Test
+    public void onThePedalTheLoadIgnoresTheLaggingAcceleration() {
+        // 项目所有者 2026-10-24：先出了力，车速、加速度才跟上，数据传过来还有延迟 —— 踩着油门时负荷只看油门（和驾驶模式的踏板），
+        // 猛加速时声音厚一点也按油门
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 20f);
+        in.accel = 4f;
+        assertEquals(VirtualEngine.demand(20f), VirtualEngine.loadTarget(in), 1e-6f);
+        in.sportPedal = 1f;
+        assertEquals(VirtualEngine.demand(20f, 1f), VirtualEngine.loadTarget(in), 1e-6f);
+        assertEquals("20 % 还没过半：不厚", 0f, VirtualEngine.push(in), 0f);
+        in.throttlePct = 100f;
+        assertEquals(VirtualEngine.SURGE_MAX, VirtualEngine.push(in), 1e-6f);
+    }
+
+    @Test
+    public void atSpeedTheEngineStillWorksAgainstWeightAndDrag() {
+        // 车重、车速、阻力只是兜底：160 km/h 八挡（约 2100 rpm）滚动阻力加风阻约 47 kW，负荷约 0.3；60 km/h 几乎是 0。
+        // 高速时轻踩着发动机也在出力（不是收油）；一松开就是收油
+        assertEquals(0.32f, VirtualEngine.cruiseLoad(160f, 160f * G.rpmPerKmh[7]), 0.03f);
+        assertTrue(VirtualEngine.cruiseLoad(60f, 60f * G.rpmPerKmh[3]) < 0.06f);
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 160f, 8f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 8f);
+        assertTrue("高速轻踩: " + e.load(), e.load() > 0.25f);
+        assertEquals(0f, e.overrun(), 0.01f);
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.IDLE;
+        run(e, in, 2f);
+        assertTrue("松开就是收油: " + e.load() + " / " + e.overrun(), e.load() < 0.02f && e.overrun() > 0.5f);
+    }
+
+    @Test
     public void brakingAndRegenTakeTheLoadAway() {
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 50f);
         assertTrue(VirtualEngine.loadTarget(in) > 0.5f);
@@ -121,7 +173,45 @@ public class VirtualEngineTest {
         assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
         assertEquals("回落到怠速", P.idleRpm, e.rpm(), 120f);
         assertEquals("怠速的电平", VirtualEngine.LEVEL_FLOOR_DB, e.levelDb(), 1f);
-        assertEquals(1f, e.fade(), 0f);
+        assertEquals(1f, e.fire(), 0f);
+        assertEquals("点着一次", 1, e.catchSerial());
+    }
+
+    @Test
+    public void withoutTheStarterItCatchesAtOnce() {
+        // 「美式 V8」「超音速」不要起动机那一段（项目所有者 2026-10-21）：一开始就点着、冲上来，再回落到怠速
+        VirtualEngine e = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        assertEquals(VirtualEngine.Phase.STARTING, e.phase());
+        assertEquals(1f, e.fire(), 0f);
+        assertEquals(1, e.catchSerial());
+        float peak = 0f;
+        for (int i = 0; i < Math.round(0.35f / DT); i++) {
+            e.step(DT, in);
+            assertEquals("没有起动机", 0f, e.starter(), 0f);
+            peak = Math.max(peak, e.rpm());
+        }
+        // 冲到 2000 附近（项目所有者 2026-10-22 提到 2400，10-23 嫌转速拉得太高，恢复到 2000）
+        assertTrue("一开始就点着、冲上来: " + peak, peak > 1800f && peak <= VirtualEngine.START_FLARE_RPM);
+        run(e, in, 1.6f);
+        assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
+        assertEquals("回落到怠速", P.idleRpm, e.rpm(), 120f);
+        assertEquals("只点着一次", 1, e.catchSerial());
+    }
+
+    @Test
+    public void theCatchIsBriefLouderAndBrighterThenSettles() {
+        VirtualEngine e = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 0.25f);
+        assertEquals("冲高那一段多冲满", VirtualEngine.SURGE_GAIN_DB, e.outputDb(), 0.01f);
+        assertTrue(e.brightDb() >= VirtualEngine.SURGE_BRIGHT_DB - 0.01f);
+        assertTrue(e.intakeBoostDb() >= VirtualEngine.SURGE_INTAKE_DB - 0.01f);
+        run(e, in, 2.5f);
+        assertEquals("之后淡掉", 0f, e.outputDb(), 0.01f);
+        assertEquals(0f, e.brightDb(), 0.01f);
     }
 
     @Test
@@ -137,31 +227,49 @@ public class VirtualEngineTest {
     }
 
     @Test
-    public void joiningWhileMovingFadesInLikeAnOpeningValve() {
+    public void joiningWhileMovingSpinsUpThenCatchesWithAFlare() {
+        // 项目所有者 2026-10-22 问开阀门还是混动车行驶中起动发动机：做后者（项目所有者同意）—— 电机带起来、点着、补油冲一下
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 25f);
         e.ignite(in);
         assertEquals(VirtualEngine.Phase.JOINING, e.phase());
-        assertEquals(0f, e.fade(), 0f);
-        assertEquals(VirtualEngine.JOIN_TONE_FROM_HZ, e.toneHz(), 0f);
-        float steady = VirtualEngine.continuousRpm(P, 60f, VirtualEngine.demand(25f));
-        assertTrue("连续走法补一点转速，表示接上了", e.rpm() > steady + 300f);
-        run(e, in, 0.4f);
-        assertTrue(e.fade() > 0.4f && e.fade() < 0.6f);
-        assertTrue("阀门在打开", e.toneHz() > 2000f && e.toneHz() < VirtualEngine.TONE_OPEN_HZ);
-        run(e, in, 0.45f);
+        assertEquals("还没点着", 0f, e.fire(), 0f);
+        assertEquals("发动机本来停着", 0f, e.rpm(), 0f);
+        run(e, in, 0.15f);
+        assertEquals(VirtualEngine.Phase.JOINING, e.phase());
+        assertEquals(0f, e.fire(), 0f);
+        assertEquals("带着转时不算断油", 0f, e.overrun(), 0f);
+        assertTrue("电机把它带起来了: " + e.rpm(), e.rpm() > 0.8f * VirtualEngine.continuousRpm(P, 60f, 0f));
+        run(e, in, 0.08f);
         assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
-        assertEquals(1f, e.fade(), 0f);
-        assertEquals(VirtualEngine.TONE_OPEN_HZ, e.toneHz(), 0f);
+        assertEquals(1f, e.fire(), 0f);
+        assertEquals("点着一次", 1, e.catchSerial());
+        assertTrue("点着那一下多冲一点", e.outputDb() - VirtualEngine.SPEED_GAIN_DB * VirtualEngine.speedCurve(P, 60f) > 1f);
+        float steady = VirtualEngine.continuousRpm(P, 60f, VirtualEngine.demand(25f));
+        float peak = 0f;
+        for (int i = 0; i < Math.round(0.5f / DT); i++) {
+            e.step(DT, in);
+            peak = Math.max(peak, e.rpm());
+        }
+        assertTrue("点着时补油冲一下: " + peak + " vs " + steady, peak > steady + 200f);
+        run(e, in, 1.5f);
+        assertEquals("回到该有的转速", steady, e.rpm(), 150f);
     }
 
     @Test
-    public void joiningWhileBrakingOnlyFadesIn() {
+    public void joiningWhileBrakingCatchesWithoutAFlare() {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 0f);
         in.braking = true;
         e.ignite(in);
-        assertEquals("不补转速", VirtualEngine.continuousRpm(P, 60f, 0f), e.rpm(), 1f);
+        float peak = 0f;
+        for (int i = 0; i < Math.round(1f / DT); i++) {
+            e.step(DT, in);
+            peak = Math.max(peak, e.rpm());
+        }
+        assertEquals(VirtualEngine.Phase.RUNNING, e.phase());
+        assertEquals(1f, e.fire(), 0f);
+        assertTrue("不补转速: " + peak, peak < VirtualEngine.continuousRpm(P, 60f, 0f) + 50f);
     }
 
     @Test
@@ -169,7 +277,7 @@ public class VirtualEngineTest {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 70f, 25f);
         in.mode = VirtualEngine.RpmMode.SHIFTS;
-        int natural = VirtualEngine.pickGear(P, 70f, VirtualEngine.demand(25f));
+        int natural = VirtualEngine.pickGear(P, G, 70f, VirtualEngine.demand(25f));
         e.ignite(in);
         assertEquals("顺势降一挡", natural - 1, e.gearIndex());
         run(e, in, 1f);
@@ -180,6 +288,83 @@ public class VirtualEngineTest {
             e.step(DT, in);
         }
         assertTrue(e.gearIndex() >= natural);
+    }
+
+    // ================================================================= 熄火
+
+    /** 跑到停住、放完（最多 {@code limit} 秒）；返回 {停住的时刻, 放完的时刻, 往回升了几次}（秒；没到是 −1）。 */
+    private static float[] runDown(VirtualEngine e, VirtualEngine.Input in, float limit) {
+        float stoppedAt = -1f;
+        float t = 0f;
+        float prev = e.rpm();
+        int rises = 0;
+        while (!e.done() && t < limit) {
+            e.step(DT, in);
+            t += DT;
+            assertTrue("转速不会是负的", e.rpm() >= 0f);
+            assertEquals("熄着火", 0f, e.fire(), 0f);
+            if (e.rpm() > prev + 1f) {
+                rises++;
+            }
+            prev = e.rpm();
+            if (stoppedAt < 0f && e.rpm() <= 0f) {
+                stoppedAt = t;
+            }
+        }
+        return new float[] {stoppedAt, e.done() ? t : -1f, rises};
+    }
+
+    @Test
+    public void aParkedShutdownRunsDownLikeARealEngine() {
+        // 项目所有者 2026-10-22：停着切出运动模式要有熄火的效果，照车主偏好的那台机械增压 V8 —— 怠速约 0.7 秒停住，最后几圈一顿一顿
+        VirtualEngine e = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 3f);
+        assertEquals(P.idleRpm, e.rpm(), 50f);
+        e.shutdown(in);
+        assertEquals(VirtualEngine.Phase.STOPPING, e.phase());
+        assertEquals(0f, e.fire(), 0f);
+        assertFalse(e.done());
+        float[] r = runDown(e, in, 3f);
+        assertTrue("怠速约 0.7 秒停住: " + r[0], r[0] > 0.5f && r[0] < 0.95f);
+        assertTrue("停住以后再留一会儿才放完: " + r[1], r[1] - r[0] >= VirtualEngine.STOP_TAIL_SEC - DT);
+        assertTrue("最后几圈一顿一顿: " + r[2], r[2] >= 2f);
+        assertEquals(0f, e.overrun(), 0f);
+    }
+
+    @Test
+    public void stoppingWhileMovingIsQuickerAndQuiet() {
+        // 车在走：像混动车行驶中停发动机，电机帮着拖停
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 25f);
+        e.ignite(in);
+        run(e, in, 3f);
+        float from = e.rpm();
+        e.shutdown(in);
+        float[] r = runDown(e, in, 3f);
+        // 停着时从同样的转速落下来要多久（同一条式子，按停着的参数）
+        float parked = VirtualEngine.STOP_TAU * (float) Math.log(1.0 + from / (VirtualEngine.STOP_DECEL * VirtualEngine.STOP_TAU));
+        assertTrue("从 " + from + " rpm 停住: " + r[0] + " s，停着要 " + parked + " s", r[0] > 0f && r[0] < 0.8f * parked);
+        assertTrue(e.done());
+    }
+
+    @Test
+    public void aShutdownCanCutAStartAndIsNotRestarted() {
+        // 刚切进运动模式又切出去：还在起动机带着转就熄火
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 0.3f);
+        e.shutdown(in);
+        assertEquals(0f, e.starter(), 0f);
+        run(e, in, 0.2f);
+        float rpm = e.rpm();
+        e.shutdown(in);
+        e.step(DT, in);
+        assertTrue("再叫一遍不重来", e.rpm() <= rpm);
+        float[] r = runDown(e, in, 2f);
+        assertTrue(r[1] > 0f && r[1] < 1f);
     }
 
     // ================================================================= 挡位
@@ -206,7 +391,9 @@ public class VirtualEngineTest {
         in.pedalRate = 0f;
         in.speedKmh = 20f;
         run(e, in, 3f);
-        assertEquals("转速跟着倒挡齿比", 20f * P.reverseRpmPerKmh, e.rpm(), 20f * P.reverseRpmPerKmh * 0.05f);
+        // 倒挡齿比照车主偏好的那台（3.30），20 km/h 只有 1300 rpm：和怠速的打滑合在一起
+        float expected = VirtualEngine.gearedRpm(P.idleRpm, 20f * G.reverseRpmPerKmh);
+        assertEquals("转速跟着倒挡齿比", expected, e.rpm(), expected * 0.05f);
         assertEquals(20f * VirtualEngine.REVERSE_WHINE_HZ_PER_KMH, e.whineHz(), 1e-3f);
         assertEquals("车速快了啸叫到头", 1f, e.whineAmp(), 0f);
     }
@@ -217,17 +404,18 @@ public class VirtualEngineTest {
         assertEquals(launch, VirtualEngine.gearedRpm(launch, 0f), 0.01f);
         float last = launch;
         for (int kmh = 1; kmh <= 40; kmh++) {
-            float rpm = VirtualEngine.gearedRpm(launch, kmh * P.gearRpmPerKmh[0]);
+            float rpm = VirtualEngine.gearedRpm(launch, kmh * G.rpmPerKmh[0]);
             assertTrue("起步时转速跟着车速一路往上: " + kmh, rpm > last);
-            assertTrue(rpm >= launch - 0.01f && rpm >= kmh * P.gearRpmPerKmh[0] - 0.01f);
+            assertTrue(rpm >= launch - 0.01f && rpm >= kmh * G.rpmPerKmh[0] - 0.01f);
             last = rpm;
         }
-        assertEquals("车速上来后就是挡位转速", 60f * P.gearRpmPerKmh[0],
-                VirtualEngine.gearedRpm(launch, 60f * P.gearRpmPerKmh[0]), 60f * P.gearRpmPerKmh[0] * 0.02f);
+        assertEquals("车速上来后就是挡位转速", 60f * G.rpmPerKmh[0],
+                VirtualEngine.gearedRpm(launch, 60f * G.rpmPerKmh[0]), 60f * G.rpmPerKmh[0] * 0.02f);
     }
 
     @Test
-    public void reverseIsSixDecibelsQuieter() {
+    public void reverseIsNotTurnedDown() {
+        // 项目所有者 2026-10-21：车机自己在倒挡压低音量，声浪不再另降
         VirtualEngine r = new VirtualEngine(P);
         VirtualEngine n = new VirtualEngine(P);
         VirtualEngine.Input inR = input(VirtualEngine.Gear.R, 5f, 30f);
@@ -236,7 +424,28 @@ public class VirtualEngineTest {
         n.ignite(inN);
         run(r, inR, 3f);
         run(n, inN, 3f);
-        assertEquals(VirtualEngine.REVERSE_DB, r.levelDb() - n.levelDb(), 0.01f);
+        assertEquals(n.outputDb(), r.outputDb(), 0f);
+        assertEquals(n.levelDb(), r.levelDb(), 0.01f);
+    }
+
+    @Test
+    public void speedMakesItALittleLouder() {
+        // 项目所有者 2026-10-21：响度差压窄以后，高速还是稍响一点 —— 加在总音量上，不随电平一起被压窄
+        VirtualEngine stopped = new VirtualEngine(P);
+        VirtualEngine slow = new VirtualEngine(P);
+        VirtualEngine fast = new VirtualEngine(P);
+        VirtualEngine.Input inStopped = input(VirtualEngine.Gear.D, 0f, 0f);
+        VirtualEngine.Input inSlow = input(VirtualEngine.Gear.D, 20f, 18f);
+        VirtualEngine.Input inFast = input(VirtualEngine.Gear.D, 130f, 18f);
+        stopped.ignite(inStopped);
+        slow.ignite(inSlow);
+        fast.ignite(inFast);
+        run(stopped, inStopped, 3f);
+        run(slow, inSlow, 3f);
+        run(fast, inFast, 3f);
+        assertEquals("点着那一下多冲的早淡掉了", 0f, stopped.outputDb(), 0.01f);
+        float more = fast.outputDb() - slow.outputDb();
+        assertTrue("高速比低速稍响: " + more, more > 1f && more < VirtualEngine.SPEED_GAIN_DB);
     }
 
     @Test
@@ -290,6 +499,97 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void continuousGoesThroughPseudoGearsOnlyNearTheFloor() {
+        // 项目所有者 2026-10-21：连续走法全油门时也按挡位走锯齿；半油门还是连续的，松下来回到连续
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.flow = VirtualEngine.Flow.DRIVE;
+        in.throttlePct = 50f;
+        for (int i = 0; i < 1000; i++) {
+            in.speedKmh = 60f * i / 1000f;
+            e.step(DT, in);
+            assertFalse("半油门还是连续的", e.geared());
+        }
+        in.throttlePct = 100f;
+        int serial = e.shiftSerial();
+        float peak = 0f;
+        for (int i = 0; i < 3000; i++) {
+            in.speedKmh = 60f + 100f * i / 3000f;
+            e.step(DT, in);
+            assertTrue("踩到底按伪挡位走", e.pseudoGears() && e.geared());
+            peak = Math.max(peak, e.rpm());
+        }
+        assertTrue("一路升挡", e.shiftSerial() - serial >= 2 && e.shiftUp());
+        assertTrue("转到升挡点附近: " + peak, peak > VirtualEngine.upshiftRpm(P, 1f) - 200f);
+        in.throttlePct = 40f;
+        e.step(DT, in);
+        assertFalse("松到半油门回到连续", e.geared());
+        assertEquals(0, e.gearIndex());
+    }
+
+    @Test
+    public void withoutPseudoGearsContinuousStaysContinuousAtTheFloor() {
+        // 两种超音速（项目所有者 2026-10-23）：参考车关掉 e-Shift 时一路平滑上去 —— 连续走法踩到底也不按挡位走、不换挡，转速只往上
+        VirtualEngine e = new VirtualEngine(P, Gearbox.AUTO8, false, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.flow = VirtualEngine.Flow.DRIVE;
+        in.throttlePct = 100f;
+        int serial = e.shiftSerial();
+        float last = 0f;
+        for (int i = 0; i < 3000; i++) {
+            in.speedKmh = 60f + 100f * i / 3000f;
+            e.step(DT, in);
+            assertFalse("不按挡位走", e.pseudoGears() || e.geared());
+            if (i > 500) {
+                assertTrue("转速不往下掉: " + e.rpm() + " < " + last, e.rpm() >= last - 1f);
+            }
+            last = e.rpm();
+        }
+        assertEquals("不换挡", serial, e.shiftSerial());
+    }
+
+    @Test
+    public void anUpshiftCutsTheDriveThenTheRpmFallsSmoothly() {
+        // 升挡：一下子断扭（电平跌落由合成器按断扭自己加），转速先停住再只往下走到新挡位，断扭过去时「吼」一下，最后断扭归零
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.throttlePct = 100f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        float v = 0f;
+        int serial = e.shiftSerial();
+        for (int i = 0; i < 5000 && e.shiftSerial() == serial; i++) {
+            v += 0.02f;
+            in.speedKmh = v;
+            e.step(DT, in);
+        }
+        assertTrue("升挡了", e.shiftSerial() == serial + 1 && e.shiftUp());
+        float from = e.rpm();
+        assertEquals("断扭一下子到底", 1f, e.cut(), 0.05f);
+        float last = from;
+        float bark = 0f;
+        int steps = (int) (G.upshiftSec / DT);
+        for (int k = 0; k < steps; k++) {
+            v += 0.02f;
+            in.speedKmh = v;
+            e.step(DT, in);
+            assertTrue("转速只往下走（新挡位跟着车速的那一点除外）", e.rpm() <= last + 5f);
+            last = e.rpm();
+            bark = Math.max(bark, e.brightDb());
+        }
+        assertTrue("落到新挡位: " + from + " → " + e.rpm(), e.rpm() < from - 800f);
+        assertTrue("动力回来时吼一下: " + bark, bark > 2f);
+        run(e, in, 0.02f);
+        assertEquals("断扭过去了", 0f, e.cut(), 0f);
+    }
+
+    @Test
     public void aStabKicksDownSeveralGearsAtOnce() {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 90f, 0f);
@@ -329,8 +629,308 @@ public class VirtualEngineTest {
         }
         in.pedalRate = 0f;
         run(e, in, 0.3f);
-        assertEquals("踩到底降到该在的挡", VirtualEngine.pickGear(P, 90f, 1f), e.gearIndex());
+        assertEquals("踩到底降到该在的挡（留出往上拉的余地）",
+                VirtualEngine.pickGear(P, G, 90f, 1f, VirtualEngine.KICKDOWN_ROOM), e.gearIndex());
         assertTrue("不只降一挡: " + before + " -> " + e.gearIndex(), e.gearIndex() <= before - 2);
+        assertTrue("不是一降就到红线", 90f * G.rpmPerKmh[e.gearIndex()]
+                < VirtualEngine.KICKDOWN_ROOM * VirtualEngine.upshiftRpm(P, 1f));
+    }
+
+    /** 从 {@code fromKmh} 按 {@code kmhPerSec} 匀变速跑 {@code seconds} 秒；返回每次换挡 {时刻, 车速, 换之前的转速, 1 = 升挡, 换到的挡}。 */
+    private static java.util.List<float[]> ramp(VirtualEngine e, VirtualEngine.Input in, float fromKmh, float kmhPerSec,
+                                                float seconds) {
+        java.util.List<float[]> shifts = new java.util.ArrayList<>();
+        int serial = e.shiftSerial();
+        float before = e.rpm();
+        in.accel = kmhPerSec / 3.6f;
+        for (int i = 0; i < Math.round(seconds / DT); i++) {
+            in.speedKmh = Math.max(0f, fromKmh + kmhPerSec * (i + 1) * DT);
+            e.step(DT, in);
+            if (e.shiftSerial() != serial) {
+                serial = e.shiftSerial();
+                shifts.add(new float[] {(i + 1) * DT, in.speedKmh, before, e.shiftUp() ? 1f : 0f, e.gearIndex()});
+            }
+            before = e.rpm();
+        }
+        return shifts;
+    }
+
+    @Test
+    public void lightThrottleShiftsUpEarlyAndOnlyHeavyThrottleRevsOut() {
+        // 项目所有者 2026-10-22：轻踩不在低挡拖着，只有重踩、急踩才在低挡拉高转速
+        VirtualEngine light = new VirtualEngine(P, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        light.ignite(in);
+        run(light, in, 2.5f);
+        in.throttlePct = 20f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        java.util.List<float[]> soft = ramp(light, in, 0f, 2.5f, 30f);
+        assertTrue("轻踩也一挡一挡升上去: " + soft.size(), soft.size() >= 3);
+        for (float[] s : soft) {
+            assertEquals("轻踩只升不降", 1f, s[3], 0f);
+            assertTrue("轻踩 2600 rpm 以下就升: " + s[2] + " rpm @ " + s[1] + " km/h", s[2] < 2600f);
+        }
+        VirtualEngine heavy = new VirtualEngine(P, false);
+        VirtualEngine.Input hard = input(VirtualEngine.Gear.D, 0f, 0f);
+        hard.mode = VirtualEngine.RpmMode.SHIFTS;
+        heavy.ignite(hard);
+        run(heavy, hard, 2.5f);
+        hard.throttlePct = 100f;
+        hard.flow = VirtualEngine.Flow.DRIVE;
+        java.util.List<float[]> pull = ramp(heavy, hard, 0f, 15f, 10f);
+        assertTrue(pull.size() >= 2);
+        for (float[] s : pull) {
+            assertTrue("地板油拉到快到上限: " + s[2] + " rpm @ " + s[1] + " km/h", s[2] > 5600f);
+        }
+        assertTrue("一挡拉到 60 km/h 以上（八速的一挡很长）", pull.get(0)[1] > 60f);
+    }
+
+    @Test
+    public void brakingStepsDownOneGearAtATimeAndNeverUp() {
+        // 刹车减速：照正常的升降挡逻辑一挡一挡降（项目所有者 2026-10-22：不用刻意隔开、不用刻意不降），不升挡；停住了回一挡
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 15f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 4f);
+        in.throttlePct = 0f;
+        in.braking = true;
+        in.flow = VirtualEngine.Flow.REGEN;
+        int gear = e.gearIndex();
+        java.util.List<float[]> downs = ramp(e, in, 60f, -12f, 5.4f);
+        assertTrue("会降挡: " + downs.size(), downs.size() >= 1);
+        for (float[] s : downs) {
+            assertEquals("刹车时不升挡", 0f, s[3], 0f);
+            assertEquals("一挡一挡降", gear - 1, (int) s[4]);
+            gear = (int) s[4];
+        }
+        in.speedKmh = 0f;
+        e.step(DT, in);
+        assertEquals("停住了回一挡", 0, e.gearIndex());
+    }
+
+    // ================================================================= 变速箱（项目所有者 2026-10-22）
+
+    @Test
+    public void theGearboxesFollowTheReferenceCar() {
+        // 8 速自动：4.71 … 0.67，主减速比 2.62；6 速手动：2.26 … 0.63，主减速比 3.70；275/40 R20
+        assertEquals(8, Gearbox.AUTO8.rpmPerKmh.length);
+        assertEquals(6, Gearbox.MANUAL6.rpmPerKmh.length);
+        assertEquals(Gearbox.rpmPerKmh(4.71f, 2.62f), Gearbox.AUTO8.rpmPerKmh[0], 1e-3f);
+        assertEquals(Gearbox.rpmPerKmh(0.63f, 3.70f), Gearbox.MANUAL6.rpmPerKmh[5], 1e-3f);
+        assertEquals("自动挡一挡到 6200 rpm 约 67 km/h", 67f, 6200f / Gearbox.AUTO8.rpmPerKmh[0], 1.5f);
+        assertEquals("手动挡一挡到 6200 rpm 约 99 km/h", 99f, 6200f / Gearbox.MANUAL6.rpmPerKmh[0], 1.5f);
+        assertEquals("自动挡八挡 100 km/h 约 1300 rpm", 1320f, 100f * Gearbox.AUTO8.rpmPerKmh[7], 30f);
+        assertEquals("手动挡六挡 100 km/h 约 1750 rpm", 1750f, 100f * Gearbox.MANUAL6.rpmPerKmh[5], 30f);
+        for (Gearbox g : Gearbox.values()) {
+            for (int k = 1; k < g.rpmPerKmh.length; k++) {
+                assertTrue("一挡比一挡长", g.rpmPerKmh[k] < g.rpmPerKmh[k - 1]);
+            }
+        }
+        assertTrue("手动挡踩离合换挡，比自动挡慢", Gearbox.MANUAL6.upshiftSec > Gearbox.AUTO8.upshiftSec);
+        assertTrue(Gearbox.MANUAL6.manual() && !Gearbox.AUTO8.manual());
+    }
+
+    // ================================================================= 2026-10-24：挂着挡硬连着、换挡积极性
+
+    @Test
+    public void inGearTheEngineIsHardLinkedToTheWheels() {
+        // 项目所有者 2026-10-24：除了 1 挡起步离合器半接触，发动机、变速箱、车轮是硬链接的。原来一直按起步打滑算：挂着挡踩油门
+        // 转速比挡位高 200–970 rpm（手动挡 30 km/h 一挡 90 % 负荷 1883 → 2852），一松油门车速没变转速就掉回去
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine e = new VirtualEngine(P, box, false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 50f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            e.ignite(in);
+            run(e, in, 2.5f);
+            in.speedKmh = 5f;
+            run(e, in, 0.5f);
+            float slip = e.rpm() - 5f * box.rpmPerKmh[e.gearIndex()];
+            assertTrue(box + " 起步时离合器 / 变矩器打滑，转速由油门撑着：高 " + slip, slip > 500f);
+            for (int i = 0; i < Math.round(5.5f / DT); i++) {
+                in.speedKmh = Math.min(60f, in.speedKmh + 10f * DT);
+                e.step(DT, in);
+            }
+            run(e, in, 2f);
+            float inGear = 60f * box.rpmPerKmh[e.gearIndex()];
+            assertEquals(box + " 踩着油门：转速就是挡位转速", inGear, e.rpm(), inGear * 0.01f);
+            int gear = e.gearIndex();
+            in.throttlePct = 0f;
+            in.flow = VirtualEngine.Flow.IDLE;
+            run(e, in, 0.5f);
+            assertEquals(gear, e.gearIndex());
+            assertEquals(box + " 车速没变、松了油门：转速也不变", inGear, e.rpm(), inGear * 0.01f);
+            assertEquals(1f, e.coupled(), 0.01f);
+            in.speedKmh = 0f;
+            run(e, in, 0.1f);
+            assertEquals("停下来离合器分开", 0f, e.coupled(), 0f);
+        }
+    }
+
+    /** 130 km/h 轻踩巡航 6 秒，再松油门滑行（−0.4 m/s²）5 秒：{巡航的挡, 松开以后的挡}。 */
+    private static int[] cruiseThenLift(Gearbox box, float eager, float fromKmh) {
+        VirtualEngine e = new VirtualEngine(P, box, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, fromKmh, 15f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.eager = eager;
+        in.accel = 0.2f;
+        e.ignite(in);
+        run(e, in, 6f);
+        int cruise = e.gearIndex();
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.IDLE;
+        in.accel = -0.4f;
+        float v = fromKmh;
+        for (int i = 0; i < Math.round(5f / DT); i++) {
+            v -= 0.4f * 3.6f * DT;
+            in.speedKmh = v;
+            e.step(DT, in);
+        }
+        return new int[] {cruise, e.gearIndex()};
+    }
+
+    @Test
+    public void sportCruisesAGearLowerAndHoldsItAfterALift() {
+        // 项目所有者 2026-10-24：标准模式也出声，和运动模式只差升降挡的积极性。标准模式照原来：轻踩 130 km/h 在七挡、松油门滑行
+        // 升到八挡；运动模式升挡点高 600 rpm，同样轻踩在六挡，松油门保持挡位（转速跟着车速往下走）
+        int[] standard = cruiseThenLift(Gearbox.AUTO8, 0f, 130f);
+        int[] sport = cruiseThenLift(Gearbox.AUTO8, 1f, 130f);
+        assertTrue("运动模式巡航低一挡: " + sport[0] + " vs " + standard[0], sport[0] < standard[0]);
+        assertTrue("标准模式松油门升挡: " + standard[0] + " → " + standard[1], standard[1] > standard[0]);
+        assertEquals("运动模式松油门保持挡位", sport[0], sport[1]);
+        assertEquals("松着、轻踩时抬高", VirtualEngine.EAGER_UP_RPM,
+                VirtualEngine.upshiftRpm(P, 0f, 1f) - VirtualEngine.upshiftRpm(P, 0f, 0f), 1e-3f);
+        assertEquals("踩到底一样在快到上限处升", VirtualEngine.upshiftRpm(P, 1f, 0f), VirtualEngine.upshiftRpm(P, 1f, 1f), 1e-3f);
+    }
+
+    @Test
+    public void theManualHoldsItsGearOffThrottle() {
+        // 开手动挡的人松油门是要减速、要发动机拖着，不会松开就升挡（原来和自动挡一样：100 km/h 五挡松开就升到六挡）
+        int[] manual = cruiseThenLift(Gearbox.MANUAL6, 0f, 100f);
+        assertEquals("手动挡松油门不升挡", manual[0], manual[1]);
+    }
+
+    @Test
+    public void pressingAgainAfterAHeldGearDoesNotShiftUpFirst() {
+        // 运动模式松油门保持着挡位，这时换挡负荷已经落下来了；再一脚踩下去（70 %），要的负荷还在涨，不能先升一挡、紧接着又降回来
+        // （2026-10-24 试听里见到的），降挡也要留出往上拉的余地（不能三挡 → 二挡 → 一挡，0.25 秒后又升二挡）
+        VirtualEngine e = new VirtualEngine(P, G, false);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.eager = 1f;
+        e.ignite(in);
+        run(e, in, 2.5f);
+        in.throttlePct = 50f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        ramp(e, in, 0f, 8f, 8f);
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.REGEN;
+        ramp(e, in, 64f, -3.6f, 4f);
+        int held = e.gearIndex();
+        in.throttlePct = 70f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        in.pedalRate = 280f;
+        java.util.List<float[]> shifts = ramp(e, in, 49.6f, 10f, 0.15f);
+        in.pedalRate = 0f;
+        shifts.addAll(ramp(e, in, 51.1f, 10f, 1.5f));
+        int ups = 0;
+        int downs = 0;
+        for (float[] s : shifts) {
+            if (s[3] == 1f) {
+                ups++;
+            } else {
+                downs++;
+            }
+            assertTrue("先降后升，不先升", downs > 0 || s[3] == 0f);
+        }
+        assertTrue("从 " + (held + 1) + " 挡最多降一次、不马上升回去: " + downs + " 降 " + ups + " 升", downs <= 1 && ups == 0);
+    }
+
+    @Test
+    public void sportShiftsDownEarlierWhenSlowing() {
+        // 回收减速（−1 m/s²）：运动模式转速掉到约 1700 rpm 就降挡（补油「轰」一下），标准模式掉到 1100–1300 才降
+        float[] downFrom = new float[2];
+        for (int k = 0; k < 2; k++) {
+            VirtualEngine e = new VirtualEngine(P, G, false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 100f, 15f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            in.eager = k;
+            e.ignite(in);
+            run(e, in, 6f);
+            in.throttlePct = 0f;
+            in.flow = VirtualEngine.Flow.REGEN;
+            downFrom[k] = -1f;
+            for (float[] s : ramp(e, in, 100f, -3.6f, 15f)) {
+                if (s[3] == 0f && downFrom[k] < 0f) {
+                    downFrom[k] = s[2];
+                }
+            }
+            assertTrue("降过挡", downFrom[k] > 0f);
+        }
+        assertTrue("运动模式早降: " + downFrom[1] + " vs " + downFrom[0] + " rpm", downFrom[1] > downFrom[0] + 300f);
+    }
+
+    @Test
+    public void theManualPullsLongerGearsAndShiftsSlower() {
+        float[] firstShiftKmh = new float[2];
+        float[] cutSec = new float[2];
+        Gearbox[] boxes = {Gearbox.AUTO8, Gearbox.MANUAL6};
+        for (int b = 0; b < 2; b++) {
+            VirtualEngine e = new VirtualEngine(P, boxes[b], false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            e.ignite(in);
+            run(e, in, 2.5f);
+            in.throttlePct = 100f;
+            in.flow = VirtualEngine.Flow.DRIVE;
+            java.util.List<float[]> pull = ramp(e, in, 0f, 15f, 8f);
+            firstShiftKmh[b] = pull.get(0)[1];
+            // 再升一挡：量断扭持续多久
+            int serial = e.shiftSerial();
+            float v = in.speedKmh;
+            float t = 0f;
+            float cutFrom = -1f;
+            while (t < 10f) {
+                v += 15f * DT;
+                in.speedKmh = v;
+                e.step(DT, in);
+                t += DT;
+                if (e.shiftSerial() != serial && cutFrom < 0f) {
+                    cutFrom = t;
+                }
+                if (cutFrom >= 0f && e.cut() <= 0f && t > cutFrom) {
+                    break;
+                }
+            }
+            cutSec[b] = t - cutFrom;
+        }
+        assertTrue("手动挡一挡拉得更远: " + firstShiftKmh[1] + " vs " + firstShiftKmh[0], firstShiftKmh[1] > firstShiftKmh[0] + 20f);
+        assertTrue("手动挡换挡断开得更久: " + cutSec[1] + " vs " + cutSec[0], cutSec[1] > 1.3f * cutSec[0]);
+    }
+
+    @Test
+    public void switchingTheGearboxMidDriveRepicksTheGearSmoothly() {
+        // 开发者选项里随时改：不算一次换挡，挡位按此刻重新选，转速照常平滑地过去；8 速的高挡换到 6 速也不越界
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 150f, 10f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        e.ignite(in);
+        run(e, in, 8f);
+        assertTrue("8 速在高挡: " + e.gearIndex(), e.gearIndex() >= 6);
+        int serial = e.shiftSerial();
+        float before = e.rpm();
+        e.setGearbox(Gearbox.MANUAL6);
+        float maxStep = 0f;
+        for (int i = 0; i < Math.round(1f / DT); i++) {
+            e.step(DT, in);
+            maxStep = Math.max(maxStep, Math.abs(e.rpm() - before));
+            before = e.rpm();
+        }
+        assertTrue("挡位在 6 速里: " + e.gearIndex(), e.gearIndex() >= 0 && e.gearIndex() < 6);
+        assertEquals("不算一次换挡", serial, e.shiftSerial());
+        assertTrue("转速平滑地过去: " + maxStep, maxStep < P.rpmRisePerSec * DT * 2f + 1f);
+        assertEquals("跟着 6 速的挡位转速", 150f * Gearbox.MANUAL6.rpmPerKmh[e.gearIndex()], e.rpm(), 150f);
     }
 
     @Test
@@ -388,6 +988,181 @@ public class VirtualEngineTest {
     }
 
     @Test
+    public void coastingInGearIsOverrunButIdlingIsNot() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, 60f, 30f);
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        in.braking = true;
+        e.ignite(in);
+        in.braking = false;
+        run(e, in, 2f);
+        assertEquals("踩着油门不是收油", 0f, e.overrun(), 0.01f);
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.REGEN;
+        run(e, in, 1.5f);
+        assertTrue("挂着挡滑行：发动机被车拖着转 " + e.overrun() + " @ " + e.rpm(), e.overrun() > 0.8f);
+        in.speedKmh = 0f;
+        in.flow = VirtualEngine.Flow.IDLE;
+        run(e, in, 3f);
+        assertEquals("停下来怠速不算", 0f, e.overrun(), 0.02f);
+    }
+
+    @Test
+    public void aFreeRevFallingBackIsOverrunAtOnce() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        assertEquals("启动、怠速都不是收油", 0f, e.overrun(), 0f);
+        in.throttlePct = 80f;
+        run(e, in, 1.5f);
+        assertEquals(0f, e.overrun(), 0.01f);
+        in.throttlePct = 0f;
+        run(e, in, 0.3f);
+        assertTrue("一松油门就断油（不等负荷慢慢落）" + e.overrun(), e.overrun() > 0.5f);
+        run(e, in, 3f);
+        assertEquals("回到怠速", 0f, e.overrun(), 0.02f);
+    }
+
+    // ================================================================= 2026-10-23：空挡照真车（美式 V8）
+
+    /**
+     * 美式 V8 的走法（空挡照真车）：P 挡启动、等落稳，轰到顶再松开；返回松开那一刻起每块的 {秒, 转速, 断油, 合成器的负荷}。
+     */
+    private static java.util.List<float[]> blipInPark(float seconds) {
+        VirtualEngine e = new VirtualEngine(P, G, false, true, true);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 3f);
+        in.throttlePct = 100f;
+        in.pedalRate = 600f;
+        run(e, in, 1.5f);
+        in.throttlePct = 0f;
+        in.pedalRate = 0f;
+        java.util.List<float[]> out = new java.util.ArrayList<>();
+        for (int i = 0; i < Math.round(seconds / DT); i++) {
+            e.step(DT, in);
+            out.add(new float[] {(i + 1) * DT, e.rpm(), e.overrun(), e.voiceLoad()});
+        }
+        return out;
+    }
+
+    @Test
+    public void inParkALiftFallsAtTheRateOfFrictionAndPumping() {
+        // 项目所有者 2026-10-23 给的参考视频（停着在 P 挡轰油门）：从 4600 rpm 松开，每秒落约 1700 rpm，2.5 秒落到怠速
+        // （原来按 0.4 秒的时间常数落，不到 2 秒，前半段太快）
+        java.util.List<float[]> f = blipInPark(5f);
+        float atIdle = -1f;
+        float t4200 = -1f;
+        float t3800 = -1f;
+        for (float[] s : f) {
+            if (t4200 < 0f && s[1] < 4200f) {
+                t4200 = s[0];
+            }
+            if (t3800 < 0f && s[1] < 3800f) {
+                t3800 = s[0];
+            }
+            if (atIdle < 0f && s[1] < P.idleRpm + 100f) {
+                atIdle = s[0];
+            }
+        }
+        assertTrue("落到怠速用了 " + atIdle + " s", atIdle > 2.0f && atIdle < 3.2f);
+        float rate = 400f / (t3800 - t4200);
+        assertTrue("4000 rpm 附近每秒落 " + rate + " rpm", rate > 1300f && rate < 2100f);
+    }
+
+    @Test
+    public void inParkTheFuelComesBackBeforeIdle() {
+        // 参考视频：松开时车内一下轻了 10 dB、阶次几乎没了（断油）；落到 3300 rpm 慢慢回来，2600 rpm 已经和轻踩着一样响 ——
+        // 恢复供油，活塞低负荷地转着往下落（项目所有者：松开油门发动机也在持续出声）
+        for (float[] s : blipInPark(4f)) {
+            if (s[0] > 0.3f && s[1] > 3700f) {
+                assertTrue("高转断油 " + s[2] + " @ " + s[1], s[2] > 0.8f);
+            }
+            if (s[1] < 2200f) {
+                assertTrue("低转恢复供油 " + s[2] + " @ " + s[1], s[2] < 0.05f);
+            }
+        }
+    }
+
+    @Test
+    public void atTheBottomTheIdleIsCaughtWithALittlePush() {
+        // 参考视频：落到约 815 rpm，0.6 秒后冲到 920，约 2 秒回到 810（项目所有者：降到一定转速后稍微发力，稳定在一个转速上）
+        java.util.List<float[]> f = blipInPark(8f);
+        int bottom = 0;
+        for (int i = 0; i < f.size(); i++) {
+            if (f.get(i)[1] < f.get(bottom)[1]) {
+                bottom = i;
+            }
+            if (f.get(i)[0] > 3.5f) {
+                break;
+            }
+        }
+        int peak = bottom;
+        for (int i = bottom; i < f.size() && f.get(i)[0] < f.get(bottom)[0] + 1.5f; i++) {
+            if (f.get(i)[1] > f.get(peak)[1]) {
+                peak = i;
+            }
+        }
+        float low = f.get(bottom)[1] - P.idleRpm;
+        float push = f.get(peak)[1] - f.get(bottom)[1];
+        float rise = f.get(peak)[0] - f.get(bottom)[0];
+        assertTrue("先落到怠速 +" + low, low >= 0f && low < 50f);
+        assertTrue("再冲上去 " + push + " rpm", push > 70f && push < 160f);
+        assertTrue("冲上去用了 " + rise + " s", rise > 0.3f && rise < 0.9f);
+        float pushLoad = 0f;
+        for (int i = bottom; i <= peak; i++) {
+            pushLoad = Math.max(pushLoad, f.get(i)[3]);
+        }
+        assertTrue("那一下稍微发力 " + pushLoad, pushLoad > 0.04f && pushLoad < 0.15f);
+        float end = f.get(f.size() - 1)[1] - P.idleRpm;
+        assertTrue("最后回到怠速 +" + end, end >= 0f && end < 20f);
+    }
+
+    @Test
+    public void aSmallBlipDoesNotTriggerTheCatchAndOtherStylesFallAsBefore() {
+        // 从怠速以上 CATCH_ARM_RPM 往下落才稳一下：轻轻动一下油门不算；别的风格（不照真车）还是平滑地落，不稳那一下
+        VirtualEngine e = new VirtualEngine(P, G, false, true, true);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        run(e, in, 3f);
+        in.throttlePct = 8f;
+        run(e, in, 1f);
+        assertTrue("轻轻一点 " + e.rpm(), e.rpm() < P.idleRpm + VirtualEngine.CATCH_ARM_RPM);
+        in.throttlePct = 0f;
+        float low = Float.MAX_VALUE;
+        float rise = 0f;
+        for (int i = 0; i < Math.round(3f / DT); i++) {
+            e.step(DT, in);
+            low = Math.min(low, e.rpm());
+            rise = Math.max(rise, e.rpm() - low);
+        }
+        assertTrue("没有稳那一下（落下来不再往上冲）" + rise, rise < 5f);
+        VirtualEngine plain = new VirtualEngine(P, G, false, true);
+        VirtualEngine.Input pin = input(VirtualEngine.Gear.P, 0f, 0f);
+        plain.ignite(pin);
+        run(plain, pin, 3f);
+        pin.throttlePct = 100f;
+        run(plain, pin, 1.5f);
+        pin.throttlePct = 0f;
+        run(plain, pin, 2.5f);
+        assertEquals("不照真车：还是原来那样很快落回怠速", P.idleRpm, plain.rpm(), 40f);
+    }
+
+    @Test
+    public void startingIsNeverOverrun() {
+        VirtualEngine e = new VirtualEngine(P);
+        VirtualEngine.Input in = input(VirtualEngine.Gear.P, 0f, 0f);
+        e.ignite(in);
+        for (int i = 0; i < Math.round(2.2f / DT); i++) {
+            e.step(DT, in);
+            if (e.phase() == VirtualEngine.Phase.STARTING) {
+                assertEquals("冲高后回落不是断油", 0f, e.overrun(), 0f);
+            }
+        }
+    }
+
+    @Test
     public void adaptiveCruiseAccelerationIsHeard() {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 80f, 0f);
@@ -427,6 +1202,8 @@ public class VirtualEngineTest {
         VirtualEngine e = new VirtualEngine(P);
         VirtualEngine.Input in = input(VirtualEngine.Gear.D, 50f, 0f);
         e.ignite(in);
+        // 先让电机带起来、点着（带起来那一段转速本来就在怠速以下）
+        run(e, in, 0.3f);
         long seed = 12345L;
         for (int i = 0; i < 20_000; i++) {
             seed = seed * 6364136223846793005L + 1442695040888963407L;

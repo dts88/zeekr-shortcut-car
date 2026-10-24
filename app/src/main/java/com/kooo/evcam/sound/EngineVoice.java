@@ -1,22 +1,26 @@
 package com.kooo.evcam.sound;
 
 /**
- * 合成：把虚拟发动机（{@link VirtualEngine}）的转速、负荷、电平和几样音色参数变成一串样本。纯计算（{@code EngineVoiceTest}），
- * 声音线程上一块一块地调，循环里不分配内存。
+ * 「试制 V8」风格（{@link SoundStyle#PROTOTYPE}，第一版）：把虚拟发动机（{@link VirtualEngine}）的转速、负荷、电平和几样音色参数
+ * 变成一串单声道样本，左右声道一样。纯计算（{@code EngineVoiceTest}），声音线程上一块一块地调，循环里不分配内存。
  *
  * <ul>
  *   <li><b>阶次</b>：所有阶次共用一个曲轴相位（两转一个周期，半阶次也接得上），转速怎么变相位都连着走 —— 不出「咔哒」。
  *       每个阶次的幅度按负荷变（{@link SoundProfile#orderLoadDb}），高阶次在急踩、猛加速时再亮一点，半阶次在急松油门时多一点。</li>
  *   <li><b>进气声</b>：白噪声过带通，中心跟着转速；<b>排气</b>：白噪声过低通，负荷大时、急松油门的突突（随机起伏）走这一路。</li>
  *   <li><b>起动机</b>（启动时）：电机的啸声 + 齿轮的沙沙声，按压缩冲程一顿一顿；<b>倒挡齿轮</b>的啸叫（倒挡时，音调跟着车速）。</li>
- *   <li>两个固定共振（峰值均衡）、30 Hz 高通（保护喇叭）、接入时的阀门（低通慢慢打开）。</li>
- *   <li>电平、音量、转速逐样本平滑；最后软限幅，峰值不超过 {@link #CEILING}（−3 dBFS）。</li>
+ *   <li>两个固定共振（峰值均衡）、30 Hz 高通（保护喇叭）、阀门（低通；现在一直全开，见 {@link VoiceParams#toneHz}）。</li>
+ *   <li>没点火（熄火转着停下来、行驶中电机刚带起来）：没有燃烧，整体低 {@link #UNFIRED_LEVEL}，最后几圈越来越轻。</li>
+ *   <li>电平、音量、转速逐样本平滑；最后过先看一步的限幅（{@link Limiter}），峰值不超过 {@link #CEILING}（−1 dBFS）。</li>
  * </ul>
  */
-final class EngineVoice {
+final class EngineVoice implements Voice {
 
-    /** 峰值上限：−3 dBFS。 */
-    static final float CEILING = 0.708f;
+    /**
+     * 峰值上限：−1 dBFS（三种风格共用，{@link Limiter} 管着）。项目所有者 2026-10-21 实车嫌不够响：原来 −3 dBFS、软限幅，
+     * 留出的 2 dB 拿回来。
+     */
+    static final float CEILING = 0.891f;
     /** 阶次频率到这里（Hz）开始渐隐，到 {@link #BAND_TOP_HZ} 没了：车内喇叭放得出，也不会混叠。 */
     static final float BAND_FADE_HZ = 4500f;
     static final float BAND_TOP_HZ = 6000f;
@@ -26,6 +30,8 @@ final class EngineVoice {
     static final float STARTER_WHINE_HZ = 1050f;
     /** 倒挡齿轮的啸叫（dB）。 */
     static final float WHINE_DB = -20f;
+    /** 没点火时发动机的声音剩几成（不是起动机在带的时候）。 */
+    static final float UNFIRED_LEVEL = 0.25f;
     /** 急松油门时半阶次多加多少（dB）、排气那一路的突突多响（dB）、随机起伏多快（Hz）。 */
     static final float BURBLE_HALF_ORDER_DB = 8f;
     static final float BURBLE_DB = -10f;
@@ -39,24 +45,6 @@ final class EngineVoice {
     /** 白噪声过带通 / 低通之后补回的倍数：让它的有效值和同样电平的正弦差不多。 */
     static final float INTAKE_NOISE_NORM = 4f;
     static final float EXHAUST_NOISE_NORM = 8f;
-
-    /** 一块的参数：声音线程里重用一份，不分配。 */
-    static final class Params {
-        float rpm;
-        /** 合成用的负荷（0–1）。 */
-        float load;
-        /** 发动机的电平（线性，{@link VirtualEngine#levelDb} 换来的）：管阶次、进气、排气。 */
-        float level;
-        /** 总音量（线性）：声浪自己的音量 × 门控 × 开始工作时的淡入。起动机、倒挡啸叫也跟着它。 */
-        float gain;
-        float brightDb;
-        float intakeBoostDb;
-        float burble;
-        float starter;
-        float whineHz;
-        float whineAmp;
-        float toneHz = VirtualEngine.TONE_OPEN_HZ;
-    }
 
     private static final int TABLE = 4096;
     private static final float[] SINE = sineTable();
@@ -108,6 +96,9 @@ final class EngineVoice {
     private final Biquad highpass;
     private final Biquad tone = new Biquad();
     private float toneSetHz = -1f;
+    private final Limiter limiter;
+    /** {@link #renderStereo} 先合成到这里再复制到左右（第一次用时按块大小分配）。 */
+    private float[] mono = new float[0];
 
     EngineVoice(SoundProfile profile, float sampleRate) {
         this.p = profile;
@@ -148,12 +139,25 @@ final class EngineVoice {
             resonances[i] = Biquad.peaking(profile.resonanceHz[i], profile.resonanceDb[i], profile.resonanceQ[i], sampleRate);
         }
         highpass = Biquad.highpass(HIGHPASS_HZ, 0.7071f, sampleRate);
+        limiter = new Limiter(sampleRate);
+    }
+
+    @Override
+    public void renderStereo(float[] lr, int frames, VoiceParams params) {
+        if (mono.length < frames) {
+            mono = new float[frames];
+        }
+        render(mono, 0, frames, params);
+        for (int i = 0; i < frames; i++) {
+            lr[2 * i] = mono[i];
+            lr[2 * i + 1] = mono[i];
+        }
     }
 
     /**
      * 合成一块（{@code frames} 个单声道样本）写进 {@code out}。参数在块里逐样本平滑过去。
      */
-    void render(float[] out, int offset, int frames, Params params) {
+    void render(float[] out, int offset, int frames, VoiceParams params) {
         if (frames <= 0) {
             return;
         }
@@ -168,6 +172,7 @@ final class EngineVoice {
             }
             gainNow = 0f;
             rpmNow = rpmTarget;
+            limiter.reset();
             return;
         }
         float load = VirtualEngine.clamp01(params.load);
@@ -201,8 +206,12 @@ final class EngineVoice {
             toneSetHz = params.toneHz;
         }
         float rpmStep = (rpmTarget - rpmNow) / frames;
-        float levelTarget = params.level;
-        float gainTarget = params.gain;
+        // 升挡断扭：电平掉一下（{@link SoundProfile#shiftDipDb}，按断扭的深浅）；没点火：弱很多，最后几圈越来越轻
+        float unfired = params.fire < 0.5f && params.starter <= 0.5f
+                ? UNFIRED_LEVEL * VirtualEngine.clamp01(rpmTarget / PulseVoice.UNFIRED_FULL_RPM) : 1f;
+        float levelTarget = (float) Math.pow(Math.max(params.level, 0f), p.levelPow)
+                * dbToLin(p.shiftDipDb * VirtualEngine.clamp01(params.cut)) * unfired;
+        float gainTarget = params.gain * p.norm;
         for (int i = 0; i < frames; i++) {
             float r = rpmNow + rpmStep * (i + 1);
             crank += r / 60.0 / rate;
@@ -269,7 +278,7 @@ final class EngineVoice {
                 s = tone.process(s);
             }
             gainNow += (gainTarget - gainNow) * gainK;
-            out[offset + i] = limit(s * gainNow);
+            out[offset + i] = limiter.push(s * gainNow);
         }
         rpmNow = rpmTarget;
     }
@@ -283,21 +292,6 @@ final class EngineVoice {
             return 0f;
         }
         return (BAND_TOP_HZ - hz) / (BAND_TOP_HZ - BAND_FADE_HZ);
-    }
-
-    /** 软限幅：小信号原样，大信号平滑地压到 {@link #CEILING} 以内（tanh 的有理近似，单调）。 */
-    static float limit(float x) {
-        float y = x / CEILING;
-        float t;
-        if (y >= 3f) {
-            t = 1f;
-        } else if (y <= -3f) {
-            t = -1f;
-        } else {
-            float y2 = y * y;
-            t = y * (27f + y2) / (27f + 9f * y2);
-        }
-        return t * CEILING;
     }
 
     static float dbToLin(float db) {
@@ -332,60 +326,5 @@ final class EngineVoice {
         x ^= x << 5;
         noise = x;
         return x * (1f / 2147483648f);
-    }
-
-    /** 二阶滤波器（RBJ 公式，转置直接 II 型）。 */
-    static final class Biquad {
-        private float b0 = 1f;
-        private float b1;
-        private float b2;
-        private float a1;
-        private float a2;
-        private float z1;
-        private float z2;
-
-        static Biquad peaking(float hz, float db, float q, float rate) {
-            Biquad b = new Biquad();
-            double a = Math.pow(10.0, db / 40.0);
-            double w0 = 2.0 * Math.PI * hz / rate;
-            double alpha = Math.sin(w0) / (2.0 * q);
-            double cos = Math.cos(w0);
-            double a0 = 1.0 + alpha / a;
-            b.set((1.0 + alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha * a) / a0, -2.0 * cos / a0, (1.0 - alpha / a) / a0);
-            return b;
-        }
-
-        static Biquad highpass(float hz, float q, float rate) {
-            Biquad b = new Biquad();
-            double w0 = 2.0 * Math.PI * hz / rate;
-            double alpha = Math.sin(w0) / (2.0 * q);
-            double cos = Math.cos(w0);
-            double a0 = 1.0 + alpha;
-            b.set((1.0 + cos) / 2.0 / a0, -(1.0 + cos) / a0, (1.0 + cos) / 2.0 / a0, -2.0 * cos / a0, (1.0 - alpha) / a0);
-            return b;
-        }
-
-        void setLowpass(float hz, float q, float rate) {
-            double w0 = 2.0 * Math.PI * Math.min(hz, rate * 0.45f) / rate;
-            double alpha = Math.sin(w0) / (2.0 * q);
-            double cos = Math.cos(w0);
-            double a0 = 1.0 + alpha;
-            set((1.0 - cos) / 2.0 / a0, (1.0 - cos) / a0, (1.0 - cos) / 2.0 / a0, -2.0 * cos / a0, (1.0 - alpha) / a0);
-        }
-
-        private void set(double nb0, double nb1, double nb2, double na1, double na2) {
-            b0 = (float) nb0;
-            b1 = (float) nb1;
-            b2 = (float) nb2;
-            a1 = (float) na1;
-            a2 = (float) na2;
-        }
-
-        float process(float x) {
-            float y = b0 * x + z1;
-            z1 = b1 * x - a1 * y + z2;
-            z2 = b2 * x - a2 * y;
-            return y;
-        }
     }
 }

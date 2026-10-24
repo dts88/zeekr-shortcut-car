@@ -480,6 +480,31 @@
             android:title="@string/dev_drive_sound_group">
 
             <ListPreference
+                android:key="pref_drive_sound_style"
+                android:title="@string/dev_drive_sound_style_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_view"
+                android:title="@string/dev_drive_sound_view_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_output"
+                android:title="@string/dev_drive_sound_output_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_exterior_route"
+                android:title="@string/dev_drive_sound_route_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_exterior_volume"
+                android:title="@string/dev_drive_sound_exterior_volume_title"
+                android:summary="%s" />
+
+            <ListPreference
                 android:key="pref_drive_sound_volume"
                 android:title="@string/dev_drive_sound_volume_title"
                 android:summary="%s" />
@@ -487,6 +512,11 @@
             <ListPreference
                 android:key="pref_drive_sound_rpm"
                 android:title="@string/dev_drive_sound_rpm_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_gearbox"
+                android:title="@string/dev_drive_sound_gearbox_title"
                 android:summary="%s" />
         </PreferenceScreen>
 

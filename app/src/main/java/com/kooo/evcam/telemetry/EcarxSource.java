@@ -44,6 +44,10 @@ import java.util.Set;
  *       读完再排一次。</li>
  *   <li>浮点传感器（车速、转角、深度、温度……）不订阅 —— 变一点就推，订了只是噪声 —— 按 {@link #FLOAT_POLL_MS} 读，
  *       而且只在有完整用户时读（{@link #floats}，{@link TelemetryUsers}）：熄屏判断那一层只要离散信号。</li>
+ *   <li>例外（项目所有者 2026-10-21、22）：快读里登记了车速、油门深度、刹车深度（模拟声浪），就在第一次快读时另外挂上这三个的推送
+ *       （{@link #pushes}，只这三个），带速率：踏板最快档、车速次快档（{@link #pushRate}；不带速率时车机约 217 ms 才推一次，
+ *       快读读到的值还比推送晚约 100 ms）。推来的值就在车的线程上交给 {@link Telemetry#pushed}，不排队、不进普通读数、不发布。
+ *       传感器监听注销不掉，挂上就一直在；没人快读时回调里直接丢掉。快读照旧，兜底、看活着没有。</li>
  *   <li><b>传感器监听疑似注销不掉</b>（注销再注册，回调会变成两条三条），所以传感器在一个车辆对象上只注册一次、永远留着，
  *       停了就不理它的回调；功能号的监听每次停都注销。车辆对象建一次一直用（{@code Car.create} 要一秒），
  *       连不上（{@link Telemetry.CarLink#FAILED}）时丢掉，下次再连重建、传感器在新的上面重新挂（{@link #forgetCar}）。</li>
@@ -87,6 +91,12 @@ final class EcarxSource {
     private static final Object SENSOR_LOCK = new Object();
     private static Object sensorProxy;
     private static final Set<Integer> sensorTypesRegistered = new HashSet<>();
+    /**
+     * 油门深度另挂的一个监听（试验，2026-10-22：想办法更快拿到新值）：用 {@code RATE_DR}（多半是导航航位推算用的速率），
+     * 和主监听分开计数，看它是不是推得更快；推来的值照样用。进程里一个、挂上就一直在（注销不掉），{@link #forgetCar} 时重挂。
+     */
+    private static Object throttleDrProxy;
+    private static boolean throttleDrRegistered;
     private static volatile EcarxSource active;
 
     private final Telemetry telemetry;
@@ -96,13 +106,21 @@ final class EcarxSource {
     private final Map<Long, List<Signal>> byKey = new HashMap<>();
     private HandlerThread thread;
     private volatile Handler handler;
+    /**
+     * 快读自己的线程（项目所有者 2026-10-22：这几个编码轮询再快一些，挑中间拖延迟的地方）：以前和对账挤在一个线程上，
+     * 每 3 秒一遍的全量对账要读几十个号，那时快读排不上（实车最长空了 93 ms）；也不再「读完再等一个间隔」，按固定的节拍读。
+     */
+    private HandlerThread fastThread;
+    private volatile Handler fastHandler;
+    /** 下一次快读的时刻（{@code uptimeMillis}）。只在快读线程上碰。 */
+    private long nextFastAt;
     /** 连接经过的细节：只进日志和黑匣子（{@link Telemetry#carReported}），诊断报告也读它（{@link #status()}）。 */
     private volatile String status = "not started";
     /** 连接的结果：页面上的状态行、熄屏判断看这个。 */
     private volatile Telemetry.CarLink link = Telemetry.CarLink.CONNECTING;
     private volatile boolean stopped;
-    /** 连上了、还在读（没断）：回调、对账、浮点只在这时算数。只在自己的线程上碰。 */
-    private boolean connected;
+    /** 连上了、还在读（没断）：回调、对账、浮点只在这时算数。只在自己的线程上改；快读线程也看。 */
+    private volatile boolean connected;
     /** 读不读浮点传感器（有完整用户）。构造时给，之后只在自己的线程上碰（{@link #floats}）。 */
     private boolean floatsOn;
     /** 连着几遍对账一个值都没读到（两遍之间车机深睡过的不算连着，{@link #emptyPassesAfter}）。 */
@@ -128,6 +146,10 @@ final class EcarxSource {
     private Method getSensorLatestValue;
     private Object functionWatcher;
     private int[] functionIds = new int[0];
+    /** 这个来源试过挂推送了（成不成都只试一次）。只在自己的线程上碰。 */
+    private boolean pushTried;
+    /** 推送挂得怎么样（诊断报告用）：没试过是空的。 */
+    private volatile String pushStatus = "";
 
     /**
      * 找黑屏信号的那几项（{@link DarkScreenProbes}）：上一个值和限量。只在自己的线程上碰。
@@ -200,6 +222,9 @@ final class EcarxSource {
         appContext = app;
         thread = new HandlerThread("Telemetry-Ecarx");
         thread.start();
+        fastThread = new HandlerThread("Telemetry-Ecarx-Fast", android.os.Process.THREAD_PRIORITY_DISPLAY);
+        fastThread.start();
+        fastHandler = new Handler(fastThread.getLooper());
         handler = new Handler(thread.getLooper());
         handler.post(() -> connect(app));
     }
@@ -211,8 +236,18 @@ final class EcarxSource {
         }
         Handler h = handler;
         HandlerThread t = thread;
+        Handler fh = fastHandler;
+        HandlerThread ft = fastThread;
         handler = null;
         thread = null;
+        fastHandler = null;
+        fastThread = null;
+        if (fh != null) {
+            fh.removeCallbacksAndMessages(null);
+        }
+        if (ft != null) {
+            ft.quitSafely();
+        }
         if (h != null) {
             h.removeCallbacksAndMessages(null);
             // 功能号的监听每次都注销；传感器的留着（注销不掉，见类说明）
@@ -282,7 +317,7 @@ final class EcarxSource {
      * 没人快读了就发一份空的。
      */
     void fast(FastReads.Plan plan) {
-        Handler h = handler;
+        Handler h = fastHandler;
         if (h == null) {
             fastPlan = plan;
             return;
@@ -292,8 +327,9 @@ final class EcarxSource {
         }
     }
 
+    /** 快读线程上：换读法。停旧节拍；有读法而且连着就马上读一遍、按新间隔接着读；没人快读了就发一份空的。 */
     private void setFast(FastReads.Plan plan) {
-        Handler h = handler;
+        Handler h = fastHandler;
         if (stopped || h == null) {
             return;
         }
@@ -304,6 +340,7 @@ final class EcarxSource {
             return;
         }
         if (connected) {
+            nextFastAt = SystemClock.uptimeMillis();
             pollFast();
         }
     }
@@ -314,6 +351,9 @@ final class EcarxSource {
         if (stopped || !connected || plan == null) {
             return;
         }
+        if (!pushTried) {
+            listenForPushes(plan);
+        }
         Map<Signal, Float> read = new EnumMap<>(Signal.class);
         for (Signal s : plan.signals) {
             Object decoded = s.decode(read(s));
@@ -322,9 +362,12 @@ final class EcarxSource {
             }
         }
         telemetry.publishFast(this, new FastReadings(read, SystemClock.elapsedRealtime(), ++fastVersion));
-        Handler h = handler;
+        Handler h = fastHandler;
         if (h != null) {
-            h.postDelayed(fastPoll, plan.intervalMs);
+            // 固定节拍：下一次按上一次排的时刻往后数，不是读完再等一整个间隔；落后太多就从现在接着排
+            long now = SystemClock.uptimeMillis();
+            nextFastAt = Math.max(nextFastAt + plan.intervalMs, now + 1);
+            h.postAtTime(fastPoll, nextFastAt);
         }
     }
 
@@ -453,8 +496,12 @@ final class EcarxSource {
                 if (floatsOn) {
                     h.postDelayed(floatPoll, FLOAT_POLL_MS);
                 }
-                if (fastPlan != null) {
-                    h.post(fastPoll);
+                Handler fh = fastHandler;
+                if (fastPlan != null && fh != null) {
+                    fh.post(() -> {
+                        nextFastAt = SystemClock.uptimeMillis();
+                        pollFast();
+                    });
                 }
                 h.postDelayed(reconcile, RECONCILE_MS);
             }
@@ -495,6 +542,7 @@ final class EcarxSource {
             }
             cachedCar = null;
             sensorTypesRegistered.clear();
+            throttleDrRegistered = false;
         }
         AppLog.i(TAG, "car object dropped: the next connect runs Car.create again");
     }
@@ -582,6 +630,157 @@ final class EcarxSource {
             return "functions: per-id " + done + "/" + functionIds.length;
         }
         return "functions: refused";
+    }
+
+    /** 能推送、快读里登记了就另外挂上推送的浮点：车速、油门深度、刹车深度（模拟声浪要的那几个，别的不订）。 */
+    static boolean pushes(Signal s) {
+        return s == Signal.SPEED || s == Signal.THROTTLE_DEPTH || s == Signal.BRAKE_DEPTH;
+    }
+
+    /** 推来的传感器类型 → 信号；不是那三个是 null。 */
+    private static Signal pushedSignal(int type) {
+        if (type == Signal.THROTTLE_DEPTH.id) {
+            return Signal.THROTTLE_DEPTH;
+        }
+        if (type == Signal.BRAKE_DEPTH.id) {
+            return Signal.BRAKE_DEPTH;
+        }
+        return type == Signal.SPEED.id ? Signal.SPEED : null;
+    }
+
+    /**
+     * 订阅的速率（{@code ISensor.RATE_*}，0 最快 … 5 最慢，Lab findings「传感器组」那一段）：油门、刹车最快档（跟脚），车速次快档（车速变得慢，
+     * 推太勤只是噪声）。接口上读得到常量就用它的值，读不到按 0、1。
+     */
+    private int pushRate(Signal s) {
+        return s == Signal.SPEED ? rateConstant("RATE_FAST", 1) : rateConstant("RATE_FASTEST", 0);
+    }
+
+    private int rateConstant(String name, int fallback) {
+        for (Class<?> type : publicInterfaces(sensor)) {
+            try {
+                java.lang.reflect.Field f = type.getField(name);
+                if (f.getType() == int.class && Modifier.isStatic(f.getModifiers())) {
+                    return f.getInt(null);
+                }
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                // 这个接口上没有这个常量
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * 快读里有能推送的浮点：挂上它的传感器监听。一个车辆对象上只挂一次、永远留着（注销不掉）；挂不上不再试（这个来源）。
+     * 订阅传感器事件时（{@link #subscribeSensors}）还没有快读，所以放在第一次快读这里。
+     */
+    private void listenForPushes(FastReads.Plan plan) {
+        pushTried = true;
+        StringBuilder status = new StringBuilder();
+        for (Signal s : plan.signals) {
+            if (!pushes(s)) {
+                continue;
+            }
+            String result;
+            synchronized (SENSOR_LOCK) {
+                if (sensorTypesRegistered.contains(s.id)) {
+                    result = "listening (registered before)";
+                } else if (sensor == null || sensorProxy == null) {
+                    result = "no sensor manager";
+                } else {
+                    // 带速率的那个优先；没有再用不带速率的（车机按它的默认速率推）
+                    Method withRate = findMethodWithInterfaceThen(sensor, "registerListener", int.class, int.class);
+                    Method plain = findMethodWithInterfaceFirst(sensor, "registerListener", int.class);
+                    int rate = pushRate(s);
+                    if (withRate != null && invokeOk(withRate, sensor, sensorProxy, s.id, rate)) {
+                        sensorTypesRegistered.add(s.id);
+                        result = "listening at rate " + rate;
+                    } else if (plain != null && invokeOk(plain, sensor, sensorProxy, s.id)) {
+                        sensorTypesRegistered.add(s.id);
+                        result = "listening at the default rate" + (withRate == null ? " (no rate parameter)" : " (rate refused)");
+                    } else {
+                        result = withRate == null && plain == null ? "no registerListener" : "refused";
+                    }
+                }
+            }
+            status.append(status.length() == 0 ? "" : "; ").append(s.name()).append(' ').append(result);
+        }
+        if (plan.signals.contains(Signal.THROTTLE_DEPTH)) {
+            status.append("; ").append(listenThrottleDr());
+        }
+        status.append("; rates ").append(rateConstants());
+        pushStatus = status.toString();
+        AppLog.i(TAG, "push: " + pushStatus);
+    }
+
+    /** 油门深度再挂一个 {@code RATE_DR} 的监听（见 {@link #throttleDrProxy}）；返回结果（诊断）。 */
+    private String listenThrottleDr() {
+        int dr = rateConstant("RATE_DR", -1);
+        if (dr < 0) {
+            return "THROTTLE_DEPTH at RATE_DR: no such rate";
+        }
+        synchronized (SENSOR_LOCK) {
+            if (throttleDrRegistered) {
+                return "THROTTLE_DEPTH also at RATE_DR " + dr + " (registered before)";
+            }
+            Method withRate = sensor == null ? null : findMethodWithInterfaceThen(sensor, "registerListener", int.class, int.class);
+            if (withRate == null) {
+                return "THROTTLE_DEPTH at RATE_DR: no rate parameter";
+            }
+            if (throttleDrProxy == null) {
+                throttleDrProxy = Proxy.newProxyInstance(EcarxSource.class.getClassLoader(),
+                        new Class<?>[]{withRate.getParameterTypes()[0]}, new ThrottleDrCallback());
+            }
+            if (invokeOk(withRate, sensor, throttleDrProxy, Signal.THROTTLE_DEPTH.id, dr)) {
+                throttleDrRegistered = true;
+                return "THROTTLE_DEPTH also at RATE_DR " + dr;
+            }
+            return "THROTTLE_DEPTH at RATE_DR " + dr + " refused";
+        }
+    }
+
+    /** 接口上所有的速率常量（{@code RATE_*}，诊断用：还有哪几档能试）。 */
+    private String rateConstants() {
+        StringBuilder sb = new StringBuilder();
+        for (Class<?> type : publicInterfaces(sensor)) {
+            for (java.lang.reflect.Field f : type.getFields()) {
+                if (f.getName().startsWith("RATE_") && f.getType() == int.class && Modifier.isStatic(f.getModifiers())) {
+                    try {
+                        sb.append(sb.length() == 0 ? "" : " ").append(f.getName()).append('=').append(f.getInt(null));
+                    } catch (ReflectiveOperationException | RuntimeException ignored) {
+                        // 读不到就不列
+                    }
+                }
+            }
+        }
+        return sb.length() == 0 ? "none" : sb.toString();
+    }
+
+    /** 车的线程上：{@code RATE_DR} 那个监听推来的油门深度。 */
+    private void onThrottleDrPush(Object raw, long atMs) {
+        if (stopped) {
+            return;
+        }
+        Object decoded = Signal.THROTTLE_DEPTH.decode(raw);
+        if (decoded instanceof Float) {
+            telemetry.publishThrottleDrPush(this, (Float) decoded, atMs);
+        }
+    }
+
+    /** 车的线程上：推来的快读浮点直接交给 {@link Telemetry}（它只收此刻的来源、有人快读它的）。 */
+    private void onPush(Signal s, Object raw, long atMs) {
+        if (stopped) {
+            return;
+        }
+        Object decoded = s.decode(raw);
+        if (decoded instanceof Float) {
+            telemetry.publishPush(this, s, (Float) decoded, atMs);
+        }
+    }
+
+    /** 推送挂得怎么样（诊断报告用）。 */
+    String pushStatus() {
+        return pushStatus;
     }
 
     /** 传感器事件：进程里每个类型只注册一次。 */
@@ -673,6 +872,20 @@ final class EcarxSource {
         }
     }
 
+    /** 油门深度 {@code RATE_DR} 那个监听的回调：转给此刻活着的来源，就在车的线程上。 */
+    private static final class ThrottleDrCallback implements InvocationHandler {
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) {
+            EcarxSource target = active;
+            if (target != null && "onSensorValueChanged".equals(method.getName()) && args != null && args.length == 2
+                    && args[0] instanceof Integer && (Integer) args[0] == Signal.THROTTLE_DEPTH.id && args[1] instanceof Number) {
+                target.onThrottleDrPush(args[1], SystemClock.elapsedRealtime());
+                return null;
+            }
+            return proxyDefault(proxy, method, args, "EcarxSource.ThrottleDrCallback");
+        }
+    }
+
     /** 传感器的回调（进程级的一个代理）：转给此刻活着的来源。 */
     private static final class SensorCallback implements InvocationHandler {
         @Override
@@ -683,6 +896,12 @@ final class EcarxSource {
                 String name = method.getName();
                 Signal.Kind kind = "onSensorEventChanged".equals(name) ? Signal.Kind.SENSOR_EVENT
                         : "onSensorValueChanged".equals(name) ? Signal.Kind.SENSOR_VALUE : null;
+                Signal pushed = kind == Signal.Kind.SENSOR_VALUE ? pushedSignal((Integer) args[0]) : null;
+                if (pushed != null) {
+                    // 推来的车速、油门、刹车：要的就是快 —— 就在这个线程上交出去，不排队、不进普通读数
+                    target.onPush(pushed, args[1], SystemClock.elapsedRealtime());
+                    return null;
+                }
                 if (kind != null) {
                     final int type = (Integer) args[0];
                     final Object value = args[1];
@@ -946,9 +1165,12 @@ final class EcarxSource {
         if (h != null) {
             h.removeCallbacks(reconcile);
             h.removeCallbacks(floatPoll);
-            h.removeCallbacks(fastPoll);
             h.removeCallbacks(publish);
             h.removeCallbacks(holdPublish);
+        }
+        Handler fh = fastHandler;
+        if (fh != null) {
+            fh.removeCallbacks(fastPoll);
         }
         values.clear();
         telemetry.publishFast(this, FastReadings.empty());
@@ -1256,6 +1478,26 @@ final class EcarxSource {
             for (Method m : type.getMethods()) {
                 Class<?>[] p = m.getParameterTypes();
                 if (m.getName().equals(name) && p.length == 1 && p[0].isInterface()) {
+                    return m;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 找「(某个接口, rest...)」形状的方法：带速率的 registerListener(listener, type, rate)。 */
+    private static Method findMethodWithInterfaceThen(Object target, String name, Class<?>... rest) {
+        for (Class<?> type : publicInterfaces(target)) {
+            for (Method m : type.getMethods()) {
+                Class<?>[] p = m.getParameterTypes();
+                if (!m.getName().equals(name) || p.length != rest.length + 1 || !p[0].isInterface()) {
+                    continue;
+                }
+                boolean same = true;
+                for (int i = 0; i < rest.length; i++) {
+                    same &= p[i + 1] == rest[i];
+                }
+                if (same) {
                     return m;
                 }
             }

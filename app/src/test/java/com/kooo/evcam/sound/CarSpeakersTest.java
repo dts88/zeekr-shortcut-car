@@ -32,6 +32,15 @@ public class CarSpeakersTest {
     }
 
     @Test
+    public void theExteriorRouteIsTheOwnersChoice() {
+        // 车外只有一个喇叭，车机给了两路（Lab §2.43）：开发者选项「车外线路」选哪一路就开哪一路（项目所有者 2026-10-24）
+        assertEquals("BUS12_OUTER_NOTIFY", CarSpeakers.exteriorAddress(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_NOTIFY));
+        assertEquals("BUS11_OUTER_SPEAKER_PLAYBACK",
+                CarSpeakers.exteriorAddress(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK));
+        assertEquals("读不到、旧的值按 BUS12", "BUS12_OUTER_NOTIFY", CarSpeakers.exteriorAddress(null));
+    }
+
+    @Test
     public void handlesMissingAddresses() {
         assertEquals(-1, CarSpeakers.indexOf(new int[]{BUS}, new String[]{null}, CarSpeakers.CABIN_MEDIA));
         assertEquals(-1, CarSpeakers.indexOf(new int[]{BUS}, new String[]{"BUS00_MEDIA"}, null));

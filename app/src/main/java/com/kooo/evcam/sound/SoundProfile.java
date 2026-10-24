@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 一台虚拟发动机的风格：转速怎么跟车走、动态多快、哪些阶次多响、噪声和共振、模拟换挡的挡位。只是数据：
+ * 一台虚拟发动机的风格：转速怎么跟车走、动态多快、哪些阶次多响、噪声和共振、什么时候换挡（挡位在 {@link Gearbox}）。只是数据：
  * {@link VirtualEngine}（转速、负荷）和 {@link EngineVoice}（声音）照它算。再加一种风格 = 再加一份数据。
  *
  * <p>项目所有者 2026-10-21：燃油车风格，先做一份 V8 味（{@link #V8}）；只做运动模式的效果，所以动态取运动那一档。
@@ -55,20 +55,22 @@ final class SoundProfile {
     final float[] resonanceDb;
     final float[] resonanceQ;
 
-    // ---- 挡位
-    /** 模拟换挡：每个挡位 1 km/h 对应多少 rpm（一挡到最高挡）。 */
-    final float[] gearRpmPerKmh;
-    /** 倒挡：1 km/h 对应多少 rpm（和一挡差不多）。 */
-    final float reverseRpmPerKmh;
-    /** 升挡点 = 它 + {@link #shiftUpLoadRpm} × 负荷。 */
+    // ---- 换挡（挡位、齿比在变速箱里，{@link Gearbox}）
+    /** 升挡点 = 它 + {@link #shiftUpLoadRpm} × 负荷²（{@link VirtualEngine#upshiftRpm}）。 */
     final float shiftUpBaseRpm;
     final float shiftUpLoadRpm;
     /** 降挡点 = 升挡点 × 它（猛踩、重刹时往上调，见 {@link VirtualEngine}）。 */
     final float shiftDownRatio;
     /** 换挡时转速落到新挡位的时间常数。 */
     final float shiftSec;
-    /** 升挡那一下音量掉多少（dB，负数）。 */
+    /** 升挡断扭时音量掉多少（dB，负数；满负荷时，按断扭的深浅）。 */
     final float shiftDipDb;
+    /**
+     * 合成器（{@link EngineVoice}）把虚拟发动机的电平取这个次方：响度差压窄，音色照变（项目所有者 2026-10-21 实车；
+     * 2026-10-22 输入还原平滑以后略放大一些）；总的倍数（全油门时限幅只压两三 dB）。
+     */
+    final float levelPow;
+    final float norm;
 
     private SoundProfile(Builder b) {
         idleRpm = b.idleRpm;
@@ -93,18 +95,21 @@ final class SoundProfile {
         resonanceHz = toArray(b.resonanceHz);
         resonanceDb = toArray(b.resonanceDb);
         resonanceQ = toArray(b.resonanceQ);
-        gearRpmPerKmh = b.gearRpmPerKmh.clone();
-        reverseRpmPerKmh = b.reverseRpmPerKmh;
         shiftUpBaseRpm = b.shiftUpBaseRpm;
         shiftUpLoadRpm = b.shiftUpLoadRpm;
         shiftDownRatio = b.shiftDownRatio;
         shiftSec = b.shiftSec;
         shiftDipDb = b.shiftDipDb;
+        levelPow = b.levelPow;
+        norm = b.norm;
     }
 
     /**
      * V8 味（点火阶次 4）：4、2、8 阶撑起主体；左右两排点火间隔不均匀，半阶次（0.5、1.5、2.5、3.5）给出「突突」；
-     * 12、16 阶在负荷大时把声音提亮。动态取运动那一档。挡位按八速：一挡到 58 km/h 就到 7000 rpm。
+     * 12、16 阶在负荷大时把声音提亮。动态取运动那一档。
+     *
+     * <p>换挡（项目所有者 2026-10-22：原来低速换挡太勤、齿比太密；轻踩不在低挡拖着，只有重踩、急踩才拉高转速）：
+     * 轻踩 2000 rpm 多就升挡，地板油拉到 6000（{@link #shiftUpBaseRpm}）；挡位照车主偏好的那台的变速箱（{@link Gearbox}）。</p>
      */
     static final SoundProfile V8 = new Builder()
             .rpm(900f, 7000f)
@@ -128,9 +133,8 @@ final class SoundProfile {
             .exhaust(-14f)
             .resonance(150f, 4f, 1.0f)
             .resonance(1200f, 3f, 1.2f)
-            .gears(120f, 80f, 58f, 45f, 36f, 30f, 25f, 21f)
-            .reverse(120f)
-            .shifts(2500f, 3500f, 0.55f, 0.06f, -3f)
+            .shifts(2000f, 4000f, 0.55f, 0.06f, -4.5f)
+            .loudness(0.17f, 0.8f)
             .build();
 
     private static float[] toArray(List<Float> list) {
@@ -165,13 +169,13 @@ final class SoundProfile {
         private final List<Float> resonanceHz = new ArrayList<>();
         private final List<Float> resonanceDb = new ArrayList<>();
         private final List<Float> resonanceQ = new ArrayList<>();
-        private float[] gearRpmPerKmh = {120f};
-        private float reverseRpmPerKmh = 120f;
         private float shiftUpBaseRpm = 2500f;
         private float shiftUpLoadRpm = 3500f;
         private float shiftDownRatio = 0.55f;
         private float shiftSec = 0.06f;
         private float shiftDipDb = -3f;
+        private float levelPow = 1f;
+        private float norm = 1f;
 
         Builder rpm(float idle, float max) {
             idleRpm = idle;
@@ -231,16 +235,6 @@ final class SoundProfile {
             return this;
         }
 
-        Builder gears(float... rpmPerKmh) {
-            gearRpmPerKmh = rpmPerKmh.clone();
-            return this;
-        }
-
-        Builder reverse(float rpmPerKmh) {
-            reverseRpmPerKmh = rpmPerKmh;
-            return this;
-        }
-
         Builder shifts(float upBase, float upLoad, float downRatio, float sec, float dipDb) {
             shiftUpBaseRpm = upBase;
             shiftUpLoadRpm = upLoad;
@@ -250,8 +244,14 @@ final class SoundProfile {
             return this;
         }
 
+        Builder loudness(float levelPow, float norm) {
+            this.levelPow = levelPow;
+            this.norm = norm;
+            return this;
+        }
+
         SoundProfile build() {
-            if (orders.isEmpty() || gearRpmPerKmh.length == 0 || !(maxRpm > idleRpm)) {
+            if (orders.isEmpty() || !(maxRpm > idleRpm)) {
                 throw new IllegalStateException("sound profile incomplete");
             }
             return new SoundProfile(this);

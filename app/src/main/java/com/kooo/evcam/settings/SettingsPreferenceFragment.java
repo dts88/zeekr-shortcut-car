@@ -1952,8 +1952,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 模拟声浪（开发者选项，试验）：开关、音量、转速变化方式，改了马上生效（{@code sound.DriveSound}）。
-     * 2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进「模拟声浪」页（preferences.xml 里嵌着的 screen_drive_sound）。
+     * 模拟声浪（开发者选项，试验）：开关、声音风格、听感、播放喇叭、车外线路、车外音量、音量、转速变化方式、变速箱，
+     * 改了马上生效（{@code sound.DriveSound}）。2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进「模拟声浪」页
+     * （preferences.xml 里嵌着的 screen_drive_sound）；那一页的几行不在这一页时 {@code findPreference} 是 null，跳过。
      */
     private void bindDriveSound() {
         bindSwitch("pref_drive_sound", appConfig.isDriveSoundEnabled(), value -> {
@@ -1968,6 +1969,34 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return true;
             });
         }
+        bindEnum("pref_drive_sound_style", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
+                value -> {
+                    appConfig.setDriveSoundStyle(value);
+                    showDriveSoundRows(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_view", SettingsRegistry.DRIVE_SOUND_VIEW, appConfig.getDriveSoundView(),
+                value -> {
+                    appConfig.setDriveSoundView(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_output", SettingsRegistry.DRIVE_SOUND_OUTPUT, appConfig.getDriveSoundOutput(),
+                value -> {
+                    appConfig.setDriveSoundOutput(value);
+                    showExteriorRows(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_exterior_route", SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE,
+                appConfig.getDriveSoundExteriorRoute(), value -> {
+                    appConfig.setDriveSoundExteriorRoute(value);
+                    refreshDriveSound();
+                });
+        bindEnum("pref_drive_sound_exterior_volume", SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME,
+                appConfig.getDriveSoundExteriorVolume(), value -> {
+                    appConfig.setDriveSoundExteriorVolume(value);
+                    refreshDriveSound();
+                });
+        showExteriorRows(appConfig.getDriveSoundOutput());
         bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
                 value -> {
                     appConfig.setDriveSoundVolume(value);
@@ -1978,6 +2007,38 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setDriveSoundRpm(value);
                     refreshDriveSound();
                 });
+        bindEnum("pref_drive_sound_gearbox", SettingsRegistry.DRIVE_SOUND_GEARBOX, appConfig.getDriveSoundGearbox(),
+                value -> {
+                    appConfig.setDriveSoundGearbox(value);
+                    refreshDriveSound();
+                });
+        showDriveSoundRows(appConfig.getDriveSoundStyle());
+    }
+
+    /**
+     * 按声音风格只显示用得上的几行（项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项）：「听感」只有美式 V8 有；
+     * 「变速箱」两种超音速没有（固定 8 速，像参考车的 e-Shift）。设置值不动，换回去时还在。
+     */
+    private void showDriveSoundRows(String style) {
+        Preference view = findPreference("pref_drive_sound_view");
+        if (view != null) {
+            view.setVisible(com.kooo.evcam.sound.DriveSound.styleHasViews(style));
+        }
+        Preference gearbox = findPreference("pref_drive_sound_gearbox");
+        if (gearbox != null) {
+            gearbox.setVisible(com.kooo.evcam.sound.DriveSound.styleChoosesGearbox(style));
+        }
+    }
+
+    /** 「车外线路」「车外音量」只在「播放喇叭」用到车外时显示（设置值不动，换回去时还在）。 */
+    private void showExteriorRows(String output) {
+        boolean exterior = !AppConfig.DRIVE_SOUND_OUTPUT_CABIN.equals(output);
+        for (String key : new String[] {"pref_drive_sound_exterior_route", "pref_drive_sound_exterior_volume"}) {
+            Preference row = findPreference(key);
+            if (row != null) {
+                row.setVisible(exterior);
+            }
+        }
     }
 
     /** 模拟声浪那一行的行尾：音量和转速变化方式。 */

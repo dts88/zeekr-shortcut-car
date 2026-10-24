@@ -70,6 +70,14 @@ public final class Telemetry {
     private volatile Readings readings = Readings.empty();
     /** 快读那几个浮点最近一次的值（{@link #fast}）；没人快读时是空的。 */
     private volatile FastReadings fastReadings = FastReadings.empty();
+    /** 推来的车速、油门深度、刹车深度（{@link #pushed}）；快读里登记了的才收（{@link #pushWanted}）。 */
+    private volatile PushedValue pushedSpeed = PushedValue.empty();
+    private volatile PushedValue pushedThrottle = PushedValue.empty();
+    /** 油门深度两个监听各自的（诊断）。 */
+    private volatile PushedValue pushedThrottleMain = PushedValue.empty();
+    private volatile PushedValue pushedThrottleDr = PushedValue.empty();
+    private volatile PushedValue pushedBrake = PushedValue.empty();
+    private volatile java.util.Set<Signal> pushWanted = java.util.Collections.emptySet();
     /** 车速有没有从车辆接口来过：有的话定位那边的 GPS 车速就不写了（那个是推算的）。 */
     private volatile boolean carSpeedSeen;
     private Context app;
@@ -157,6 +165,7 @@ public final class Telemetry {
                 state = VehicleState.empty();
                 readings = Readings.empty();
                 fastReadings = FastReadings.empty();
+                clearPushed();
             } else {
                 car.floats(false);
             }
@@ -184,6 +193,7 @@ public final class Telemetry {
         FastReads.Plan plan;
         synchronized (lock) {
             plan = fastReads.acquire(who, signals, intervalMs);
+            updatePushWanted(plan);
             c = car;
         }
         if (c != null) {
@@ -199,8 +209,10 @@ public final class Telemetry {
         synchronized (lock) {
             plan = fastReads.release(who);
             c = car;
+            updatePushWanted(plan);
             if (plan == null) {
                 fastReadings = FastReadings.empty();
+                clearPushed();
             }
         }
         if (c != null) {
@@ -212,6 +224,102 @@ public final class Telemetry {
     /** 快读那几个浮点最近一次读到的值，永远不为 null；没人快读、或者车辆接口没连着时是空的。哪个线程都能读。 */
     public FastReadings fast() {
         return fastReadings;
+    }
+
+    /**
+     * 车机推来的车速、油门深度、刹车深度最近一份（项目所有者 2026-10-21、22：订阅，和 50 ms 快读并行），永远不为 null；
+     * 别的信号、快读里没有它、车机不推、或者车辆接口没连着时是空的。哪个线程都能读。
+     */
+    public PushedValue pushed(Signal signal) {
+        switch (signal) {
+            case SPEED:
+                return pushedSpeed;
+            case THROTTLE_DEPTH:
+                return pushedThrottle;
+            case BRAKE_DEPTH:
+                return pushedBrake;
+            default:
+                return PushedValue.empty();
+        }
+    }
+
+    /**
+     * 油门深度两个监听各自推来的（诊断：比谁推得快）：{@code dr} = 另挂的 {@code RATE_DR} 那个，否则是主监听（最快档）。
+     * 用的时候两个合在一起（{@link #pushed}）。
+     */
+    public PushedValue throttleListener(boolean dr) {
+        return dr ? pushedThrottleDr : pushedThrottleMain;
+    }
+
+    /** 推送挂得怎么样（诊断报告用）；没试过是空的。 */
+    public String pushStatus() {
+        EcarxSource c;
+        synchronized (lock) {
+            c = car;
+        }
+        return c == null ? "" : c.pushStatus();
+    }
+
+    /** 车辆接口收到一次推送（车的线程上叫，不转线程）。不是当前来源的、快读里没有它的丢掉。 */
+    void publishPush(EcarxSource source, Signal signal, float value, long atMs) {
+        if (!pushWanted.contains(signal)) {
+            return;
+        }
+        synchronized (lock) {
+            if (source != car) {
+                return;
+            }
+            switch (signal) {
+                case SPEED:
+                    pushedSpeed = pushedSpeed.next(value, atMs);
+                    break;
+                case THROTTLE_DEPTH:
+                    pushedThrottleMain = pushedThrottleMain.next(value, atMs);
+                    pushedThrottle = pushedThrottle.next(value, atMs);
+                    break;
+                case BRAKE_DEPTH:
+                    pushedBrake = pushedBrake.next(value, atMs);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    /** 油门深度 {@code RATE_DR} 那个监听推来的（车的线程上叫）：单独计数，也并进 {@link #pushed} 里用。 */
+    void publishThrottleDrPush(EcarxSource source, float value, long atMs) {
+        if (!pushWanted.contains(Signal.THROTTLE_DEPTH)) {
+            return;
+        }
+        synchronized (lock) {
+            if (source != car) {
+                return;
+            }
+            pushedThrottleDr = pushedThrottleDr.next(value, atMs);
+            pushedThrottle = pushedThrottle.next(value, atMs);
+        }
+    }
+
+    /** 在 {@link #lock} 里：推来的那几份清空。 */
+    private void clearPushed() {
+        pushedSpeed = PushedValue.empty();
+        pushedThrottle = PushedValue.empty();
+        pushedThrottleMain = PushedValue.empty();
+        pushedThrottleDr = PushedValue.empty();
+        pushedBrake = PushedValue.empty();
+    }
+
+    /** 在 {@link #lock} 里：快读里登记了哪几个能推送的。 */
+    private void updatePushWanted(FastReads.Plan plan) {
+        java.util.EnumSet<Signal> wanted = java.util.EnumSet.noneOf(Signal.class);
+        if (plan != null) {
+            for (Signal s : plan.signals) {
+                if (EcarxSource.pushes(s)) {
+                    wanted.add(s);
+                }
+            }
+        }
+        pushWanted = java.util.Collections.unmodifiableSet(wanted);
     }
 
     /** 此刻登记着快读的名字（诊断报告用）。 */
@@ -237,6 +345,7 @@ public final class Telemetry {
         state = VehicleState.empty();
         readings = Readings.empty();
         fastReadings = FastReadings.empty();
+        clearPushed();
         car = new EcarxSource(this, floats);
         car.fast(fastReads.plan());
         car.start(app);
@@ -261,6 +370,7 @@ public final class Telemetry {
             // 旧的先停：它停的时候把传感器回调的去处（EcarxSource.active）清掉，新的连上后再接过去
             old.stop();
             fastReadings = FastReadings.empty();
+            clearPushed();
             car = new EcarxSource(this, users.full());
             car.fast(fastReads.plan());
             car.start(app);

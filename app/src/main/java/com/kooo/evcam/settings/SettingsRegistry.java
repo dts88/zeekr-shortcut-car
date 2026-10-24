@@ -116,13 +116,13 @@ public final class SettingsRegistry {
 
     /**
      * 模拟声浪自己的音量（开发者选项，试验；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
-     * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。
+     * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。项目所有者 2026-10-21 实车：−12 dB 太小，平时用 0 dB，
+     * 最低 −6 dB 就够；默认 0 dB（以前存的 −18、−12 不在单子里，读出来按默认）。
      */
     public static final SettingSpec DRIVE_SOUND_VOLUME = SettingSpec.of(
-            "drive_sound_volume", "声浪音量", "-12",
-            entry("-18", "−18 dB"),
-            entry("-12", "−12 dB"),
+            "drive_sound_volume", "声浪音量", "0",
             entry("-6", "−6 dB"),
+            entry("-3", "−3 dB"),
             entry("0", "0 dB"));
 
     /** 模拟声浪的转速变化方式（开发者选项，试验）。项目所有者 2026-10-21：两种都做，上车听了再定。 */
@@ -130,6 +130,70 @@ public final class SettingsRegistry {
             "drive_sound_rpm", "转速变化方式", com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS,
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_CONTINUOUS, "连续", R.string.dev_drive_sound_rpm_continuous),
             entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_RPM_SHIFTS, "模拟换挡", R.string.dev_drive_sound_rpm_shifts));
+
+    /**
+     * 模拟声浪的变速箱（开发者选项，试验；{@code sound.Gearbox}）：模拟换挡（和连续走法地板油时的伪挡位）按哪一种的齿比走。
+     * 项目所有者 2026-10-22：照车主偏好的那台的 8 速自动（默认）；它的 6 速手动也做成可选。不用车型名（商标）。
+     */
+    public static final SettingSpec DRIVE_SOUND_GEARBOX = SettingSpec.of(
+            "drive_sound_gearbox", "变速箱", com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_AUTO8,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_AUTO8, "8 速自动", R.string.dev_drive_sound_gearbox_auto8),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_GEARBOX_MANUAL6, "6 速手动", R.string.dev_drive_sound_gearbox_manual6));
+
+    /**
+     * 模拟声浪的声音风格（开发者选项，试验；{@code sound.SoundStyle}）。项目所有者 2026-10-21：第一版太单薄，
+     * 按发动机结构重做「美式 V8」这一种取向；第一版留着，叫「试制 V8」（两个名字车主定的）；另试制一种纯电车主动声浪的
+     * 「超音速」（车主 2026-10-21 批的名字）。都不用车型名（商标）。「超音速（旧版）」是 2026-10-22 的那一版，车主要和新的
+     * 装车对比（2026-10-23）。「涡轮四缸」「电动概念车」照参考车另外两种主题仿制（2026-10-23，名字车主批了）。
+     */
+    public static final SettingSpec DRIVE_SOUND_STYLE = SettingSpec.of(
+            "drive_sound_style", "声音风格", com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_AMERICAN, "美式 V8", R.string.dev_drive_sound_style_american),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_PROTOTYPE, "试制 V8", R.string.dev_drive_sound_style_prototype),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_JET, "超音速", R.string.dev_drive_sound_style_jet),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_JET_OLD, "超音速（旧版）", R.string.dev_drive_sound_style_jet_old),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_TURBO4, "涡轮四缸", R.string.dev_drive_sound_style_turbo4),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_STYLE_ELECTRIC, "电动概念车", R.string.dev_drive_sound_style_electric));
+
+    /**
+     * 模拟声浪的听感（开发者选项，试验）：车外（站在车旁）或车内（隔着防火墙、车身）。项目所有者 2026-10-21：车内的可以试一下；
+     * 默认还是车外。只有「美式 V8」分两种，另两种本来就按车内做的。
+     */
+    public static final SettingSpec DRIVE_SOUND_VIEW = SettingSpec.of(
+            "drive_sound_view", "听感", com.kooo.evcam.AppConfig.DRIVE_SOUND_VIEW_OUTSIDE,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_VIEW_OUTSIDE, "车外", R.string.dev_drive_sound_view_outside),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_VIEW_CABIN, "车内", R.string.dev_drive_sound_view_cabin));
+
+    /**
+     * 模拟声浪从哪些喇叭放（开发者选项，试验；{@code sound.DriveSound}）。项目所有者 2026-10-24 要加外放测试：车内、车外、车内和车外。
+     * 车外喇叭是一个单声道的喇叭，车机给了两路（{@code sound.CarSpeakers}）。
+     */
+    public static final SettingSpec DRIVE_SOUND_OUTPUT = SettingSpec.of(
+            "drive_sound_output", "播放喇叭", com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_CABIN,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_CABIN, "车内喇叭", R.string.dev_drive_sound_output_cabin),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_OUTSIDE, "车外喇叭", R.string.dev_drive_sound_output_outside),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_OUTPUT_BOTH, "车内和车外", R.string.dev_drive_sound_output_both));
+
+    /**
+     * 车外喇叭用哪一路（开发者选项，试验）：车外只有一个喇叭，车机给了两路（{@code sound.CarSpeakers}）。项目所有者 2026-10-24：
+     * 两个逻辑喇叭都给选项，自己选。选的那一路开不了就不放（记进黑匣子），不换另一路。
+     */
+    public static final SettingSpec DRIVE_SOUND_EXTERIOR_ROUTE = SettingSpec.of(
+            "drive_sound_exterior_route", "车外线路", com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_NOTIFY,
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_NOTIFY, "BUS12（外部通知）", R.string.dev_drive_sound_route_notify),
+            entry(com.kooo.evcam.AppConfig.DRIVE_SOUND_ROUTE_PLAYBACK, "BUS11（外部播放）", R.string.dev_drive_sound_route_playback));
+
+    /**
+     * 车外那一路的音量（开发者选项，试验；{@code sound.ExteriorMix}）：在声浪之上再加这么多 dB，后面有限幅（峰值不过 −1 dBFS）。
+     * 项目所有者 2026-10-24：车外音量过低，音量键也调不到车外 —— 车外喇叭在车机里是另一个音量组，音量键只管媒体那一组，
+     * 只能在软件里加。存的就是 dB 数，界面上显示的也是它。
+     */
+    public static final SettingSpec DRIVE_SOUND_EXTERIOR_VOLUME = SettingSpec.of(
+            "drive_sound_exterior_volume", "车外音量", "12",
+            entry("0", "0 dB"),
+            entry("6", "+6 dB"),
+            entry("12", "+12 dB"),
+            entry("18", "+18 dB"));
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -142,5 +206,11 @@ public final class SettingsRegistry {
             SIDE_VIEW_TARGET,
             FOOTAGE_AUDIO_SOURCE,
             DRIVE_SOUND_VOLUME,
-            DRIVE_SOUND_RPM));
+            DRIVE_SOUND_RPM,
+            DRIVE_SOUND_GEARBOX,
+            DRIVE_SOUND_STYLE,
+            DRIVE_SOUND_VIEW,
+            DRIVE_SOUND_OUTPUT,
+            DRIVE_SOUND_EXTERIOR_ROUTE,
+            DRIVE_SOUND_EXTERIOR_VOLUME));
 }

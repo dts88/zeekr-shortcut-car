@@ -658,6 +658,12 @@ public class AppConfig {
                 KEY_DRIVE_SOUND,                      // 模拟声浪 → 关
                 SettingsRegistry.DRIVE_SOUND_VOLUME.key,    // 声浪音量 → 默认（声浪关着，用不到）
                 SettingsRegistry.DRIVE_SOUND_RPM.key,       // 转速变化方式 → 连续（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_GEARBOX.key,   // 变速箱 → 8 速自动（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_STYLE.key,     // 声音风格 → 默认（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_VIEW.key,      // 听感 → 车外（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_OUTPUT.key,    // 播放喇叭 → 车内（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE.key,   // 车外线路 → BUS12（声浪关着，用不到）
+                SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME.key,  // 车外音量 → 默认（声浪关着，用不到）
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
@@ -1013,9 +1019,39 @@ public class AppConfig {
     public static final String DRIVE_SOUND_RPM_CONTINUOUS = "continuous";
     /** 转速变化方式：模拟换挡。 */
     public static final String DRIVE_SOUND_RPM_SHIFTS = "shifts";
+    /** 模拟换挡的变速箱（{@link SettingsRegistry#DRIVE_SOUND_GEARBOX}）：8 速自动（默认）。 */
+    public static final String DRIVE_SOUND_GEARBOX_AUTO8 = "auto8";
+    /** 模拟换挡的变速箱：6 速手动。 */
+    public static final String DRIVE_SOUND_GEARBOX_MANUAL6 = "manual6";
+    /** 声音风格（{@link SettingsRegistry#DRIVE_SOUND_STYLE}）：美式 V8（默认，机械增压交叉平面 V8）。 */
+    public static final String DRIVE_SOUND_STYLE_AMERICAN = "american";
+    /** 声音风格：试制 V8（第一版）。 */
+    public static final String DRIVE_SOUND_STYLE_PROTOTYPE = "prototype";
+    /** 声音风格：超音速（双发喷气机的取向，试制）。 */
+    public static final String DRIVE_SOUND_STYLE_JET = "jet";
+    /** 声音风格：超音速（旧版）—— 2026-10-22 的那一版，和新的装车对比（项目所有者 2026-10-23）。 */
+    public static final String DRIVE_SOUND_STYLE_JET_OLD = "jet_old";
+    /** 声音风格：涡轮四缸（参考车模仿汽油机的那一种主题，试制；项目所有者 2026-10-23）。 */
+    public static final String DRIVE_SOUND_STYLE_TURBO4 = "turbo4";
+    /** 声音风格：电动概念车（参考车电动概念车声的那一种主题，试制；项目所有者 2026-10-23）。 */
+    public static final String DRIVE_SOUND_STYLE_ELECTRIC = "electric";
+    /** 听感（{@link SettingsRegistry#DRIVE_SOUND_VIEW}）：车外（默认，站在车旁听的那种）。 */
+    public static final String DRIVE_SOUND_VIEW_OUTSIDE = "outside";
+    /** 听感：车内（隔着防火墙、车身听，高频闷一些）。 */
+    public static final String DRIVE_SOUND_VIEW_CABIN = "cabin";
+    /** 播放喇叭（{@link SettingsRegistry#DRIVE_SOUND_OUTPUT}）：车内喇叭（默认）。 */
+    public static final String DRIVE_SOUND_OUTPUT_CABIN = "cabin";
+    /** 播放喇叭：车外喇叭。 */
+    public static final String DRIVE_SOUND_OUTPUT_OUTSIDE = "outside";
+    /** 播放喇叭：车内和车外一起。 */
+    public static final String DRIVE_SOUND_OUTPUT_BOTH = "both";
+    /** 车外线路（{@link SettingsRegistry#DRIVE_SOUND_EXTERIOR_ROUTE}）：BUS12_OUTER_NOTIFY（默认）。 */
+    public static final String DRIVE_SOUND_ROUTE_NOTIFY = "bus12";
+    /** 车外线路：BUS11_OUTER_SPEAKER_PLAYBACK。 */
+    public static final String DRIVE_SOUND_ROUTE_PLAYBACK = "bus11";
 
     /**
-     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下从车内媒体喇叭合成发动机声（{@code sound.DriveSound}）。
+     * 模拟声浪（开发者选项「模拟声浪（试验）」，项目所有者 2026-10-21）：运动模式下（2026-10-24 起标准模式也是）合成发动机声（{@code sound.DriveSound}）。
      * 改了马上生效（{@code DriveSound.refresh}）。
      */
     public boolean isDriveSoundEnabled() {
@@ -1042,6 +1078,63 @@ public class AppConfig {
 
     public void setDriveSoundRpm(String mode) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_RPM, mode);
+    }
+
+    /** 模拟换挡的变速箱：{@link #DRIVE_SOUND_GEARBOX_AUTO8} / {@link #DRIVE_SOUND_GEARBOX_MANUAL6}。 */
+    public String getDriveSoundGearbox() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_GEARBOX);
+    }
+
+    public void setDriveSoundGearbox(String gearbox) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_GEARBOX, gearbox);
+    }
+
+    /**
+     * 声音风格：{@link #DRIVE_SOUND_STYLE_AMERICAN} / {@link #DRIVE_SOUND_STYLE_PROTOTYPE} / {@link #DRIVE_SOUND_STYLE_JET} /
+     * {@link #DRIVE_SOUND_STYLE_JET_OLD} / {@link #DRIVE_SOUND_STYLE_TURBO4} / {@link #DRIVE_SOUND_STYLE_ELECTRIC}。
+     */
+    public String getDriveSoundStyle() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_STYLE);
+    }
+
+    public void setDriveSoundStyle(String style) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_STYLE, style);
+    }
+
+    /** 听感：{@link #DRIVE_SOUND_VIEW_OUTSIDE} / {@link #DRIVE_SOUND_VIEW_CABIN}。 */
+    public String getDriveSoundView() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_VIEW);
+    }
+
+    public void setDriveSoundView(String view) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_VIEW, view);
+    }
+
+    /** 播放喇叭：{@link #DRIVE_SOUND_OUTPUT_CABIN} / {@link #DRIVE_SOUND_OUTPUT_OUTSIDE} / {@link #DRIVE_SOUND_OUTPUT_BOTH}。 */
+    public String getDriveSoundOutput() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_OUTPUT);
+    }
+
+    public void setDriveSoundOutput(String output) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_OUTPUT, output);
+    }
+
+    /** 车外线路：{@link #DRIVE_SOUND_ROUTE_NOTIFY} / {@link #DRIVE_SOUND_ROUTE_PLAYBACK}。 */
+    public String getDriveSoundExteriorRoute() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE);
+    }
+
+    public void setDriveSoundExteriorRoute(String route) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE, route);
+    }
+
+    /** 车外音量（dB 数的字符串，{@link SettingsRegistry#DRIVE_SOUND_EXTERIOR_VOLUME}）：车外那一路在声浪之上再加这么多。 */
+    public String getDriveSoundExteriorVolume() {
+        return readEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME);
+    }
+
+    public void setDriveSoundExteriorVolume(String db) {
+        writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME, db);
     }
 
     /**

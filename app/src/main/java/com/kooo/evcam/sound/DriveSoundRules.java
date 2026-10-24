@@ -9,37 +9,40 @@ import com.kooo.evcam.telemetry.Signal;
  * <h3>规则（项目所有者 2026-10-21）</h3>
  *
  * <ul>
- *   <li>只在车内；只做运动模式的效果 —— 舒适、标准不出声，驾驶模式读不到也不出声。</li>
- *   <li>运动模式下虚拟发动机一直转着：停着是怠速，P / N 踩油门轰转速，倒挡按倒挡齿比（{@link VirtualEngine}）。</li>
- *   <li>切出运动模式、开关关了、没上电：0.6 秒淡出，发动机「熄火」。</li>
+ *   <li>只在车内；运动模式出声（2026-10-24 起标准模式也出声，和运动模式只差升降挡的积极性，{@link #eagerOf}）——
+ *       舒适、雪地这些不出声，驾驶模式读不到也不出声。</li>
+ *   <li>出声的驾驶模式下虚拟发动机一直转着：停着是怠速，P / N 踩油门轰转速，倒挡按倒挡齿比（{@link VirtualEngine}）；
+ *       运动、标准之间切换照常转着，只是换挡变了。</li>
+ *   <li>切到不出声的驾驶模式、没上电：发动机熄火（{@link Why#shutsDown}，2026-10-22：停着照真车熄火，车在走像混动车停发动机），
+ *       放完再放掉喇叭（{@link DriveSound}）；开关关了：0.6 秒淡出。</li>
  *   <li>车速、油门读不到或过期（超过 {@link #STALE_MS}）、车辆接口断了：0.3 秒淡到无声，不会卡在一个声音上；回来时 0.3 秒淡入。</li>
  *   <li>通话中静音（车机本来也压低媒体）。</li>
  * </ul>
  */
 final class DriveSoundRules {
 
-    /** 快读的值多旧算过期（毫秒）：快读 50 ms 一遍，十遍没来就不再信它。 */
+    /** 快读的值多旧算过期（毫秒）：快读 20 ms 一遍，这么久没来就不再信它。 */
     static final long STALE_MS = 500L;
 
     /** 结论。每一种的「快读 / 转着 / 响 / 淡多快」是定死的，所以结论本身就是全部信息，不用另外建对象（声音线程里不分配）。 */
     enum Why {
         /** 开关关着（或者开发者选项关了） */
-        OFF(false, false, false, 0.6f),
+        OFF(false, false, false, 0.6f, false),
         /** 车辆接口没连上 */
-        NO_LINK(false, false, false, 0.3f),
+        NO_LINK(false, false, false, 0.3f, false),
         /** 没上电（点火不在 ON / DRIVING，挡位也不在 R / N / D） */
-        POWER_OFF(false, false, false, 0.6f),
-        /** 不是运动模式（驾驶模式读不到也算） */
-        NOT_SPORT(false, false, false, 0.6f),
+        POWER_OFF(false, false, false, 0.6f, true),
+        /** 不出声的驾驶模式：不是运动、标准（舒适、雪地等；驾驶模式读不到也算） */
+        OTHER_MODE(false, false, false, 0.6f, true),
         /** 车速 / 油门读不到或过期 */
-        STALE(true, true, false, 0.3f),
+        STALE(true, true, false, 0.3f, false),
         /** 通话中 */
-        CALL(true, true, false, 0.15f),
+        CALL(true, true, false, 0.15f, false),
         /** 出声 */
-        RUNNING(true, true, true, 0.3f);
+        RUNNING(true, true, true, 0.3f, false);
 
         /**
-         * 要快读车辆信号：只在运动模式下（不用的时候不让车机服务 50 ms 读一遍）。切进运动模式后第一遍快读 50 ms 内就到，
+         * 要快读车辆信号：只在出声的驾驶模式下（不用的时候不让车机服务 50 ms 读一遍）。切进来后第一遍快读 50 ms 内就到，
          * 读到之前算过期（{@link #STALE}），开始工作（启动 / 接入）等读数到了再定。
          */
         final boolean armed;
@@ -49,12 +52,18 @@ final class DriveSoundRules {
         final boolean audible;
         /** 淡到这个状态用多久（秒）。 */
         final float fadeSec;
+        /**
+         * 因为它停下来时发动机熄火（{@link VirtualEngine#shutdown}），放完再放掉喇叭，而不是淡出：切到不出声的驾驶模式、下电 ——
+         * 和停着切进来放启动声是一个说法（项目所有者 2026-10-22）。
+         */
+        final boolean shutsDown;
 
-        Why(boolean armed, boolean open, boolean audible, float fadeSec) {
+        Why(boolean armed, boolean open, boolean audible, float fadeSec, boolean shutsDown) {
             this.armed = armed;
             this.open = open;
             this.audible = audible;
             this.fadeSec = fadeSec;
+            this.shutsDown = shutsDown;
         }
     }
 
@@ -83,8 +92,8 @@ final class DriveSoundRules {
         if (!poweredOn(ignition, gear)) {
             return Why.POWER_OFF;
         }
-        if (driveMode == null || driveMode != Signal.DRIVE_MODE_SPORT) {
-            return Why.NOT_SPORT;
+        if (!soundMode(driveMode)) {
+            return Why.OTHER_MODE;
         }
         if (Float.isNaN(speedKmh) || Float.isNaN(throttlePct) || fastAgeMs < 0L || fastAgeMs > STALE_MS) {
             return Why.STALE;
@@ -95,14 +104,81 @@ final class DriveSoundRules {
         return Why.RUNNING;
     }
 
-    /** 存着的音量（"-12" 这样的 dB 数，{@code SettingsRegistry.DRIVE_SOUND_VOLUME}）→ dB；不会比 0 dB 更响，认不出的按 -12。 */
+    /** 这种驾驶模式出声：运动、标准（项目所有者 2026-10-24 加了标准模式）；读不到不算。 */
+    static boolean soundMode(Integer driveMode) {
+        return driveMode != null && (driveMode == Signal.DRIVE_MODE_SPORT || driveMode == Signal.DRIVE_MODE_STANDARD);
+    }
+
+    /**
+     * 换挡积极性（{@link VirtualEngine.Input#eager}）：运动模式 1，别的 0（标准模式照原来的换挡）。项目所有者 2026-10-24：
+     * 标准模式和运动模式只差升降挡的积极性。
+     */
+    static float eagerOf(Integer driveMode) {
+        return driveMode != null && driveMode == Signal.DRIVE_MODE_SPORT ? 1f : 0f;
+    }
+
+    /** 运动模式的踏板（{@link VirtualEngine.Input#sportPedal}）：运动模式 1（车机的踏板更灵），别的 0。 */
+    static float sportPedalOf(Integer driveMode) {
+        return driveMode != null && driveMode == Signal.DRIVE_MODE_SPORT ? 1f : 0f;
+    }
+
+    /** 推送停了这么久（毫秒），快读又和它不一样，就改用快读：推送可能断了、或者漏了最后一个值。 */
+    static final long PUSH_QUIET_MS = 1000L;
+
+    /**
+     * 油门用推来的还是快读的（项目所有者 2026-10-21：订阅和 50 ms 快读并行，用新的那个）。车上量到（2026-10-22）：
+     * 快读读到的值比推送晚约 100 ms（同一个新值推送先到 374 次、平均早 102 ms，快读先到 49 次），所以快读读到的时刻晚，
+     * 不等于值新 —— 推来过就用推来的；只有推送已经停了 {@link #PUSH_QUIET_MS}、快读又和它不一样（推送断了、漏了），才改用快读。
+     * 踩着、松着的时候两者本来就差一截（快读晚），那时推送一直在来，不会切过去。
+     *
+     * @param pushCount 推来过几次（0 = 没推过）
+     * @param pushAtMs  最近一次推来的时刻
+     * @param pushValue 最近一次推来的值（NaN = 读不到）
+     * @param polled    这一份快读的值（NaN = 读不到）
+     * @param nowMs     此刻
+     */
+    static boolean usePush(long pushCount, long pushAtMs, float pushValue, float polled, long nowMs) {
+        if (pushCount <= 0L || Float.isNaN(pushValue)) {
+            return false;
+        }
+        boolean quiet = nowMs - pushAtMs > PUSH_QUIET_MS;
+        boolean differs = !Float.isNaN(polled) && Math.abs(polled - pushValue) > 0.5f;
+        return !(quiet && differs);
+    }
+
+    /** 存着的音量（"-6" 这样的 dB 数，{@code SettingsRegistry.DRIVE_SOUND_VOLUME}）→ dB；不会比 0 dB 更响，认不出的按 0 dB（默认）。 */
     static float volumeDb(String stored) {
         try {
             float db = Float.parseFloat(stored);
             return db > 0f ? 0f : db;
         } catch (RuntimeException e) {
-            return -12f;
+            return 0f;
         }
+    }
+
+    /** 车外音量（开发者选项「车外音量」存的 dB 数）：0–18 dB，读不出按 12 dB。 */
+    static float exteriorDb(String stored) {
+        try {
+            float db = Float.parseFloat(stored);
+            return Math.max(0f, Math.min(18f, db));
+        } catch (RuntimeException e) {
+            return 12f;
+        }
+    }
+
+    /**
+     * 车外跟着车机媒体音量缩放多少 dB（系统报给应用的那一档 {@code index}，共 {@code max} 档）：最大一档 0 dB，往下按比例到
+     * −30 dB，0 档是负无穷（静音）；读不到（max ≤ 0）不缩放。车外喇叭在车机里是另一个音量组，音量键调不到它（项目所有者
+     * 2026-10-24）；系统报的媒体音量跟不跟着音量键变还不知道，声音线程看到它变过才用（{@code DriveSound}）。
+     */
+    static float mediaFollowDb(int index, int max) {
+        if (max <= 0) {
+            return 0f;
+        }
+        if (index <= 0) {
+            return Float.NEGATIVE_INFINITY;
+        }
+        return -30f * (1f - Math.min(index, max) / (float) max);
     }
 
     /** 上电了：点火在 ON / DRIVING；点火读不到时挂着 R / N / D 也算。 */
