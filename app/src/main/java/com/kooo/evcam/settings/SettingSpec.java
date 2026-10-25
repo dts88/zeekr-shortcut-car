@@ -33,15 +33,30 @@ public final class SettingSpec {
          * 所以本类仍然不依赖任何 Android API，照旧能跑 JVM 单元测试。</p>
          */
         public final int nameRes;
+        /**
+         * 只给开发者的选项：开发者选项打开着才列出来；关着时存着它的，读出来是默认值。存着的不动，再打开开发者选项就回来 ——
+         * 和 {@code AppConfig.DEVELOPER_KEYS} 同一条规矩，落在单个选项上（{@link #offeredTo}）。
+         */
+        public final boolean developerOnly;
 
         public Entry(String value, String displayName) {
             this(value, displayName, 0);
         }
 
         public Entry(String value, String displayName, int nameRes) {
+            this(value, displayName, nameRes, false);
+        }
+
+        private Entry(String value, String displayName, int nameRes, boolean developerOnly) {
             this.value = value;
             this.displayName = displayName;
             this.nameRes = nameRes;
+            this.developerOnly = developerOnly;
+        }
+
+        /** 同一个选项，只给开发者（{@link #developerOnly}）。 */
+        public Entry forDevelopers() {
+            return new Entry(value, displayName, nameRes, true);
         }
     }
 
@@ -53,12 +68,22 @@ public final class SettingSpec {
     public final String defaultValue;
 
     private final List<Entry> entries;
+    /** 开发者选项关着时给出的选项：去掉只给开发者的那几个；没有那种选项时就是自己。 */
+    private final SettingSpec forEveryone;
 
     private SettingSpec(String key, String label, String defaultValue, List<Entry> entries) {
         this.key = key;
         this.label = label;
         this.defaultValue = defaultValue;
         this.entries = Collections.unmodifiableList(entries);
+        List<Entry> everyone = new ArrayList<>();
+        for (Entry e : entries) {
+            if (!e.developerOnly) {
+                everyone.add(e);
+            }
+        }
+        this.forEveryone = everyone.size() == entries.size() ? this
+                : new SettingSpec(key, label, defaultValue, everyone);
     }
 
     /** 便捷构造：value 与显示名成对写在一起，避免两个数组错位。 */
@@ -74,7 +99,7 @@ public final class SettingSpec {
     /**
      * 定义一个枚举型设置项。
      *
-     * @throws IllegalArgumentException 默认值不在取值列表里 —— 这属于写错了代码，
+     * @throws IllegalArgumentException 默认值不在取值列表里、或者只给开发者 —— 这属于写错了代码，
      *                                  应该当场炸掉而不是留到运行时变成一个诡异现象
      */
     public static SettingSpec of(String key, String label, String defaultValue, Entry... entries) {
@@ -94,6 +119,10 @@ public final class SettingSpec {
             }
             list.add(e);
             if (e.value.equals(defaultValue)) {
+                if (e.developerOnly) {
+                    // 默认值就是开发者选项关着时用的那个，不能只给开发者
+                    throw new IllegalArgumentException(key + ": 默认值 " + defaultValue + " 只给开发者");
+                }
                 defaultIsValid = true;
             }
         }
@@ -102,6 +131,15 @@ public final class SettingSpec {
                     key + ": 默认值 " + defaultValue + " 不在取值列表里");
         }
         return new SettingSpec(key, label, defaultValue, list);
+    }
+
+    /**
+     * 此刻给出的选项：开发者选项打开着是全部，关着时去掉只给开发者的那几个（{@link Entry#developerOnly}）。
+     * 读设置（{@code AppConfig.readEnum}）和设置页列选项都按它，所以关着时存着的那几个读出来是默认值、
+     * 选项里也没有它们；合法不合法（{@link #isValid}、启动自检）照旧按全部算，存着的不会被修掉。
+     */
+    public SettingSpec offeredTo(boolean developer) {
+        return developer ? this : forEveryone;
     }
 
     /** 全部合法取值，顺序即界面上的显示顺序。 */

@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Settings → System → Simulated drive sound: Sound style offers American V8 and Supersonic jet (old version). Prototype V8, Supersonic jet, Turbo four and Electric concept car appear only with developer options on; with them off, a stored choice among those plays as American V8.
 
 ## [2.30.0-alpha] - 2026-10-24
 
