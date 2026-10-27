@@ -3165,6 +3165,58 @@ public class ChannelRulesTest {
         assertEquals(Rescue.REOPEN, d.rescue);
     }
 
+    /** R8 救援那一道不管在开车时：开车时显示屏关了、开着的后座舱卡住，和以前一样，重建会话没用就重开。 */
+    @Test
+    public void whileDrivingAStalledCabinInTheDarkIsStillReopened() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        w.driving = true;
+        assertEquals(Move.IDLE, round().move);
+        w.screenDark = true;   // 黑了还不到 30 秒
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(Rescue.REBUILD, d.rescue);
+        startOnly(d);
+        at(500);
+        configured(rear, d.outputs);   // 配好了，一帧不出
+        at(ChannelRules.STEP_MAX_MS);
+        rear.progressAgeMs = CameraLiveness.STUCK_MS + ChannelRules.STEP_MAX_MS;
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals("在开车：照以前重开", Rescue.REOPEN, d.rescue);
+    }
+
+    /** R8 救援那一道只管座舱：熄屏留着的环视卡住了，照常救 —— 重建会话没用就重开。 */
+    @Test
+    public void aKeptSurroundStalledInTheDarkIsStillReopened() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        streaming(surround, recS);
+        keptInDark();
+        w.screenDark = true;
+        w.screenOn = false;
+        assertEquals(Move.IDLE, round().move);
+        surround.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Rescue.REBUILD, d.rescue);
+        startOnly(d);
+        at(500);
+        configured(surround, d.outputs);   // 配好了，一帧不出
+        at(ChannelRules.STEP_MAX_MS);
+        surround.progressAgeMs = CameraLiveness.STUCK_MS + ChannelRules.STEP_MAX_MS;
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals("环视不归这一道：重开", Rescue.REOPEN, d.rescue);
+    }
+
     /**
      * R10：屏幕不知道黑没黑时谁登记着都不开、不重开（等 SCREEN_UNKNOWN，不写「先不开」）；改输出、第一次重建会话同一轮照做，
      * 都没有才等。知道了照常开。

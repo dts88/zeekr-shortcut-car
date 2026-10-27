@@ -1883,7 +1883,7 @@ public class ChannelSchedulerTest {
 
     /**
      * 车机要睡（黑着时安卓熄屏）不等 30 秒：黑了 5 秒就要睡的，当场按次序关（环视先单独关，再关座舱）。
-     * 安卓熄屏了而车机不睡的（开发者唤醒锁拉着）：座舱当场放开，环视照录。
+     * 安卓熄屏了而车机不睡的（哨兵模式、开发者唤醒锁拉着）：同样当场放开，环视也放开（下一条）。
      */
     @Test
     public void theHeadUnitSleepingDoesNotWaitThirtySeconds() {
@@ -1970,6 +1970,7 @@ public class ChannelSchedulerTest {
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
+        host.keep = false;
         settle();
 
         at(1_000);
@@ -1985,6 +1986,7 @@ public class ChannelSchedulerTest {
         at(1_000 + ChannelRules.HOLD_MS);
         assertEquals(Arrays.asList("close screen-off"), surround.actions);
         assertTrue("座舱等环视先关完", rear.actions.isEmpty());
+        assertEquals(Arrays.asList("surroundInDark RELEASED DARK_ONSET sentry=null keepOff"), lines("surroundInDark"));
         at(1_000 + ChannelRules.HOLD_MS + 100);
         closed(surround);
         settle();
