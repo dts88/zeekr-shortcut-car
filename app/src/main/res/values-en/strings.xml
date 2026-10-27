@@ -130,7 +130,7 @@
     <string name="set_screen_off_wake_value">Up to %1$s h</string>
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">Records only the surround view with the screen off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses while the head unit sleeps and resumes on wake. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">With Sentry Mode on, keeps recording the surround view after the screen turns off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses when the screen turns off and resumes when it turns on. When off, recording stops once the screen turns off.</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>

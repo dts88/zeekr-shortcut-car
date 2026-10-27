@@ -398,7 +398,13 @@
   选的盘认不出（自动找 U 盘、一次都没找到过）时这三处用 msg_sd_fallback。没有新句子。
 - 2026-10-27 批准（熄屏放开相机：黑满 30 秒时环视看哨兵模式留或放，lifecycle-spec §2.4、§3.5）：set_screen_off_keep_summary
   「开启哨兵模式时，熄屏后继续录制环视，后座舱亮屏后恢复录制；未开启时，熄屏后暂停录制，亮屏后恢复。关闭本项，熄屏后停止录制。」
-  （项目所有者：还是太复杂，先这样）。只批了中文；英文、马来文还是旧的意思（「车机休眠期间暂停」），草稿在下面「待项目所有者确认」，批了再换。
+  （项目所有者：还是太复杂，先这样）。英文、马来文 2026-10-27 照草稿批准、换上：
+  English「With Sentry Mode on, keeps recording the surround view after the screen turns off; rear cabin recording resumes when
+  the screen turns on. Without Sentry Mode, recording pauses when the screen turns off and resumes when it turns on. When off,
+  recording stops once the screen turns off.」/
+  Bahasa Melayu「Apabila Mod Sentry dihidupkan, terus merakam paparan sekeliling selepas skrin padam; rakaman kabin belakang
+  disambung semula apabila skrin hidup. Tanpa Mod Sentry, rakaman dijeda apabila skrin padam dan disambung semula apabila skrin hidup.
+  Jika dimatikan, rakaman berhenti apabila skrin padam.」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -425,14 +431,6 @@
   BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
   Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
 
-- 2026-10-27（「熄屏持续录制」新说明的英文、马来文，没上 —— 这一条和上面几条不一样：values-en、values-ms 里还是旧句子，
-  意思是「车机休眠期间暂停、唤醒后恢复」，和新规则对不上；批了再换）：set_screen_off_keep_summary 草稿
-  English「With Sentry Mode on, keeps recording the surround view after the screen turns off; rear cabin recording resumes when
-  the screen turns on. Without Sentry Mode, recording pauses when the screen turns off and resumes when it turns on. When off,
-  recording stops once the screen turns off.」/
-  Bahasa Melayu「Apabila Mod Sentry dihidupkan, terus merakam paparan sekeliling selepas skrin padam; rakaman kabin belakang
-  disambung semula apabila skrin hidup. Tanpa Mod Sentry, rakaman dijeda apabila skrin padam dan disambung semula apabila skrin hidup.
-  Jika dimatikan, rakaman berhenti apabila skrin padam.」。
 
 - 2026-10-24（开发者选项「车辆状态（试验性）」面板去掉闪远光、双闪，加刹车、油门深度，项目所有者）：
   set_vehicle_status_summary「在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭和刹车、油门深度；喇叭信号暂无法读取」/
