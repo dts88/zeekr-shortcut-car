@@ -37,8 +37,8 @@ import java.util.function.Consumer;
  *       哨兵模式、在不在开车、「熄屏持续录制」（2026-10-27）；</li>
  *   <li>手上那一步做完没有、到没到顶（{@link ChannelRules#outcome} → {@link ChannelRules#finish}）；结束了的那一步写一行
  *       （做完、到点、出事都写），每一路交一条相机步骤统计（{@link #stepEnded}，2.11.4）；</li>
- *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；会话里每一样输出算要的、
- *       留着的、还是死的，从什么时候起（{@link #trackOutputs}）；</li>
+ *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；通道对环视的熄屏决定变了就发给
+ *       录像协调器（{@link #surroundVerdict}，2026-10-27）；会话里每一样输出算要的、留着的、还是死的，从什么时候起（{@link #trackOutputs}）；</li>
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
  *   <li>录像输出离开了会话（改输出摘掉的），或者关着的一路录像不再留着它（停了录、不在计划里），告诉声明它的那一方
@@ -60,7 +60,8 @@ import java.util.function.Consumer;
  * 相机回调在相机线程上发，由 MultiCameraManager 转到主线程再交进来（{@link #onOpened} 那几个入口）；从不在回调里
  * 当场跑一轮。能在别的线程上调的只有 {@link #wake}、{@link #exit}、{@link #onNeedsChanged}、{@link #askNow}、
  * {@link #closingAnywhere}：它们只动原子字段，然后叫醒；诊断报告读的 {@link #snapshot()} 是每一轮最后建好的不可变的一份，
- * 放在 volatile 字段里。</p>
+ * 放在 volatile 字段里。通道对环视的熄屏决定变了时叫的监听者（{@link #setSurroundVerdictListener}，录像协调器）在一轮当中叫：
+ * 它只 post，不当场动手。</p>
  *
  * <h3>钟</h3>
  *
@@ -1408,10 +1409,43 @@ public final class ChannelScheduler {
     /** 同上，上一次读得到的哨兵模式（{@link ChannelRules.World#lastSentry}）；null = 还没有。 */
     private static Integer processLastSentry;
 
+    /**
+     * 通道对环视的熄屏决定（{@link ChannelRules#surroundVerdict}：LIT 不归熄屏管、KEPT 留着、RELEASED 放开），进程这一层发布的那一份 ——
+     * 录像协调器照它停录、开录（项目所有者 2026-10-27）。只由 {@link #publishVerdict} 写：在退出的那一份不写，屏幕不知道黑没黑时
+     * 和环视留不留一样不动（车机要睡那一条照写）。管线重建时新的那一份从进程那一份接着判，算出来的一样，不再发。
+     * 进程起来时是放开（在黑着时被拉起的不开相机）。
+     */
+    private static ChannelRules.SurroundInDark processVerdict = ChannelRules.SurroundInDark.RELEASED;
+    /**
+     * 上面那个决定为什么变成这样（变的那一轮的 {@link ChannelRules.World#surroundCause}：通道刚算黑、熄屏中哨兵变成开、哨兵关了、车机要睡）；
+     * 不是环视留不留变出来的（亮了、在开车、设置变了）、进程刚起来是 null。
+     */
+    private static ChannelRules.Event.Cause processVerdictCause;
+    /** 决定变了叫谁（进程里只有录像协调器一个）：在一轮当中、主线程上叫，只许 post，不许当场动手。哪个线程都能挂。 */
+    private static volatile Runnable verdictListener;
+
+    /** 通道对环视的熄屏决定（{@link #processVerdict}）。主线程。 */
+    public static ChannelRules.SurroundInDark surroundVerdict() {
+        return processVerdict;
+    }
+
+    /** 那个决定为什么变成这样（{@link #processVerdictCause}）；null = 不是环视留不留变出来的。主线程。 */
+    public static ChannelRules.Event.Cause surroundVerdictCause() {
+        return processVerdictCause;
+    }
+
+    /** 决定变了叫它（只许 post）：录像协调器建起来时挂一次。 */
+    public static void setSurroundVerdictListener(Runnable listener) {
+        verdictListener = listener;
+    }
+
     /** 测试用：回到进程刚起来的样子（每一条测试之前调，不让上一条的熄屏留到下一条）。 */
     static void resetProcessDark() {
         processSurroundInDark = ChannelRules.SurroundInDark.RELEASED;
         processLastSentry = null;
+        processVerdict = ChannelRules.SurroundInDark.RELEASED;
+        processVerdictCause = null;
+        verdictListener = null;
     }
 
     /**
@@ -2010,7 +2044,11 @@ public final class ChannelScheduler {
             stepEnded(step, outcome, now);
             ChannelRules.finish(w, outcome);
         }
-        note(ChannelRules.settle(w), now);
+        List<ChannelRules.Event> settled = ChannelRules.settle(w);
+        // 通道的决定此刻定了：先发给录像协调器（它排到主线程上），再报这一轮的事、动相机、告诉录像那一侧 ——
+        // 它排的那一下在这一轮里任何一次各路样子变了（含去掉前座舱那一下）之前，录像的样子不会闪一下「等待摄像头」
+        publishVerdict();
+        note(settled, now);
         trackOutputs(now);
         pruneRecordWaits();
         ChannelRules.Decision d = ChannelRules.next(w);
@@ -2141,6 +2179,28 @@ public final class ChannelScheduler {
         }
         processSurroundInDark = w.surroundInDark;
         processLastSentry = w.lastSentry;
+    }
+
+    /**
+     * 通道对环视的熄屏决定变了就发（{@link #processVerdict}，连同为什么变）：每一轮在 {@link ChannelRules#settle} 之后、
+     * 报这一轮的事之前。
+     * 和环视留不留同一道闸 —— 在退出的那一份不发；屏幕不知道黑没黑时不发（车机要睡那一条照发，它不等屏幕）。
+     * 只在变了时叫监听者：每一段熄屏都从 LIT 起，通道刚算黑、哨兵变成开、哨兵关了、车机要睡、亮了、开起车来，每一下都是一次变。
+     */
+    private void publishVerdict() {
+        if (w.exitSince != 0 || !w.screenKnown && !(ChannelRules.parkedDark(w) && w.androidOff)) {
+            return;
+        }
+        ChannelRules.SurroundInDark verdict = ChannelRules.surroundVerdict(w);
+        if (verdict == processVerdict) {
+            return;
+        }
+        processVerdict = verdict;
+        processVerdictCause = w.surroundCause;
+        Runnable listener = verdictListener;
+        if (listener != null) {
+            listener.run();
+        }
     }
 
     private void refreshLane(ChannelRules.Lane lane, CameraPort port, long offset, long now) {
