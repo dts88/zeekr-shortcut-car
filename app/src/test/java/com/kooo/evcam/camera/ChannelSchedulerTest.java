@@ -74,6 +74,8 @@ public class ChannelSchedulerTest {
 
     @Before
     public void setUp() {
+        // 环视熄屏时留不留跟着进程：每一条测试从进程刚起来的样子起
+        ChannelScheduler.resetProcessDark();
         host.screenOn = true;
         host.foregroundService = true;
         host.mainForeground = true;
@@ -629,6 +631,7 @@ public class ChannelSchedulerTest {
         streaming(front, recF);
         settle();
         at(1_000);
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.goDark();
         s.wake();
         settle();
@@ -670,6 +673,7 @@ public class ChannelSchedulerTest {
         streaming(front, recF);
         settle();
         at(1_000);
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.goDark();
         s.wake();
         settle();
@@ -842,6 +846,7 @@ public class ChannelSchedulerTest {
         Set<Holder> holders = EnumSet.copyOf(host.holders);
 
         at(1_000);
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.goDark();
         s.wake();
         settle();
@@ -850,6 +855,8 @@ public class ChannelSchedulerTest {
         assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
         at(release);
         assertEquals("黑满 30 秒：只关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertEquals("环视留着那一行", Arrays.asList("surroundInDark KEPT DARK_ONSET sentry=2 records"),
+                lines("surroundInDark"));
         assertTrue("座舱等环视关完", rear.actions.isEmpty() && front.actions.isEmpty());
         assertEquals(Arrays.asList("closing [front] SURROUND_FIRST"), lines("closing"));
         assertEquals(Arrays.asList("gone front CLOSED SURROUND_FIRST"), told("gone"));
@@ -1530,6 +1537,7 @@ public class ChannelSchedulerTest {
         told.clear();
 
         at(1_000);
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.screenOn = false;
         s.wake();
         settle();
@@ -1598,6 +1606,7 @@ public class ChannelSchedulerTest {
         streaming(rear, recR);
         streaming(front, recF);
         settle();
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.screenOn = false;
         s.wake();
         settle();
@@ -1701,9 +1710,12 @@ public class ChannelSchedulerTest {
         assertFalse(s.releasedByDark(REAR));
     }
 
-    /** 熄屏拍照只拍环视：座舱熄屏放开了，不开、不算在该拍的里面（设计 v3.1 C4）。 */
+    /**
+     * 熄屏拍照（设计 v3.1 C4；项目所有者 2026-10-27）：通道算黑、没在开车时不为拍照开相机 —— 座舱熄屏放开、关着的环视也不开，
+     * 三路都不拍、不算在该拍的里面（拍照那一侧当场收尾）。
+     */
     @Test
-    public void aDarkPhotoOpensOnlyTheSurround() {
+    public void aDarkPhotoOpensNoCamera() {
         claim(Holder.PREVIEW);
         streaming(surround, pvS);
         streaming(rear, pvR);
@@ -1722,13 +1734,16 @@ public class ChannelSchedulerTest {
         closed(front);
         settle();
         assertTrue(s.excludedFromPhoto(REAR) && s.excludedFromPhoto(FRONT));
-        assertFalse(s.excludedFromPhoto(SUR));
+        assertTrue("关着的环视：不为拍照开", s.excludedFromPhoto(SUR));
+        assertTrue(s.parkedDark());
 
         claim(Holder.PHOTO);
         settle();
-        assertEquals(Arrays.asList("close screen-off", "open [SINK]"), surround.actions);
+        at(5_000);
+        assertEquals("拍照不开相机", Arrays.asList("close screen-off"), surround.actions);
         assertEquals(Arrays.asList("close dark-release"), rear.actions);
         assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertTrue(s.excludedFromPhoto(SUR));
     }
 
     // ================================================================= 黑满 30 秒再放（项目所有者 2026-10-13）
@@ -1792,6 +1807,7 @@ public class ChannelSchedulerTest {
         told.clear();
 
         at(1_000);
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.goDark();
         host.darkAt = T0 + 500;
         s.wake();
@@ -1817,6 +1833,52 @@ public class ChannelSchedulerTest {
         closed(front);
         settle();
         assertEquals("环视开回来照录", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
+    }
+
+    /**
+     * 同一个那一刻，哨兵模式关着（项目所有者 2026-10-27）：环视没留着，和座舱同一轮放开 —— 环视先单独关（熄屏），关完座舱一起关
+     * （熄屏：座舱放开），三路都不开回来、录制器都停放着；录像那一侧听说三路都走了（环视「熄屏」）。黑匣子一行「环视放开（哨兵关）」。
+     * 操作 3 次（以前 5 次：环视关、座舱关、环视开，再到车机要睡关一次）。
+     */
+    @Test
+    public void theCabinsLeaveTheMomentTheScreenHasBeenDarkForThirtySecondsNotKeptReleasesAllThreeWithNoReopen() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        host.sentry = 0;
+        settle();
+        told.clear();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS - 1);
+        assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        assertFalse(s.releasedByDark(SUR));
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals("那一刻：环视先单独关，原因是熄屏", Arrays.asList("close screen-off"), surround.actions);
+        assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
+        assertTrue(s.releasedByDark(SUR) && s.releasedByDark(REAR) && s.releasedByDark(FRONT));
+        assertEquals(Arrays.asList("surroundInDark RELEASED DARK_ONSET sentry=0 records"), lines("surroundInDark"));
+        at(1_000 + ChannelRules.HOLD_MS + 120);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertEquals(Arrays.asList("gone front CLOSED SCREEN_OFF", "gone left CLOSED DARK_RELEASE",
+                "gone back CLOSED DARK_RELEASE"), told("gone"));
+        at(1_000 + ChannelRules.HOLD_MS + 220);
+        closed(rear);
+        closed(front);
+        settle();
+        at(600_000);
+        assertEquals("不开回来", Arrays.asList("close screen-off"), surround.actions);
+        assertEquals(1, rear.actions.size());
+        assertEquals(1, front.actions.size());
+        assertTrue("录制器都停放着：不派", surround.drops.isEmpty() && rear.drops.isEmpty() && front.drops.isEmpty());
     }
 
     /**
@@ -1852,16 +1914,18 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 安卓熄屏了、车机没判成要睡（开发者唤醒锁拉着车机）：同样不等 30 秒，座舱当场放开 —— 2.11.6 起环视先单独关（关座舱前先关环视），
-     * 座舱关完它开回来照录。
+     * 安卓熄屏了、车机没判成要睡（哨兵模式布防、开发者唤醒锁拉着车机）：同样不等 30 秒，座舱当场放开；环视也放开
+     * （项目所有者 2026-10-27「车机要睡」：不管哨兵模式、唤醒锁）—— 环视先单独关（熄屏），座舱再关，什么都不开回来。
+     * 醒来哨兵模式还布防着不算变成开：相机不开；睡着时被打开的（关 → 布防），醒来读到算。
      */
     @Test
-    public void androidGoingOffWhileDarkReleasesTheCabinsAtOnce() {
+    public void androidGoingOffWhileDarkReleasesEverythingEvenWithSentryArmed() {
         claim(Holder.RECORDING);
         host.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
+        host.sentryArmed();
         settle();
 
         at(1_000);
@@ -1872,8 +1936,9 @@ public class ChannelSchedulerTest {
         host.androidOff = true;
         s.wake();
         settle();
-        assertEquals("当场：先单独关环视", Arrays.asList("close surround-first"), surround.actions);
+        assertEquals("当场：环视先单独关", Arrays.asList("close screen-off"), surround.actions);
         assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
+        assertEquals(Arrays.asList("surroundInDark RELEASED ANDROID_OFF sentry=2 records"), lines("surroundInDark"));
         at(6_100);
         closed(surround);
         settle();
@@ -1883,7 +1948,15 @@ public class ChannelSchedulerTest {
         closed(rear);
         closed(front);
         settle();
-        assertEquals("环视开回来照录", Arrays.asList("close surround-first", "open [RECORD]"), surround.actions);
+        at(60_000);
+        assertEquals("不开回来", Arrays.asList("close screen-off"), surround.actions);
+
+        // 醒了（安卓亮了、屏幕还黑着）：哨兵模式还布防着 —— 不是变成开，相机不开
+        host.androidOff = false;
+        s.wake();
+        at(120_000);
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        assertTrue(s.releasedByDark(SUR));
     }
 
     /**
@@ -1928,6 +2001,7 @@ public class ChannelSchedulerTest {
     public void aStartInTheFirstThirtySecondsOfDarkLeavesTheClosedCabinsClosed() {
         settle();
         at(1_000);
+        host.sentryArmed();   // 哨兵模式布防：熄屏时环视留着（项目所有者 2026-10-27）
         host.goDark();
         s.wake();
         settle();
@@ -1957,6 +2031,177 @@ public class ChannelSchedulerTest {
         assertEquals("亮了：后座舱先开", Arrays.asList("open [RECORD]"), rear.actions);
         assertTrue("一路一路来", front.actions.isEmpty());
         assertFalse(s.releasedByDark(REAR) || s.releasedByDark(FRONT));
+    }
+
+    // ================================================================= 熄屏放开相机（项目所有者 2026-10-27）
+
+    /**
+     * 10-14 21:01 那一种（车机睡过、进程只是冻住）：哨兵模式关着，30 秒那一下三路放开；车机要睡、停录；睡着时远程打开哨兵模式，
+     * 醒来读到布防算变成开 —— 环视留着，可录像还没回来（查 U 盘要 4.5 秒）不开；录像一登记，环视带着停放的录制器开起来，座舱不动。
+     */
+    @Test
+    public void replay1014_sentryArmedAtWakeOpensTheSurroundWhenRecordingArrives() {
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        host.sentry = 0;
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long release = 1_000 + ChannelRules.HOLD_MS;
+        at(release);
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        at(release + 100);
+        closed(surround);
+        settle();
+        at(release + 200);
+        closed(rear);
+        closed(front);
+        settle();
+
+        at(60_000);   // 车机要睡：停录
+        host.androidOff = true;
+        host.sleeps = true;
+        s.onNeedsChanged();
+        settle();
+        drop(Holder.RECORDING);
+        settle();
+
+        at(3_600_000);   // 醒了：睡着时哨兵模式被远程打开
+        host.sentryArmed();
+        host.androidOff = false;
+        host.sleeps = false;
+        s.onNeedsChanged();
+        settle();
+        assertEquals("录像还没回来：不开", Arrays.asList("close screen-off"), surround.actions);
+        at(3_604_500);
+        claim(Holder.RECORDING);
+        settle();
+        assertEquals("录像一登记：环视开起来录", Arrays.asList("close screen-off", "open [RECORD]"), surround.actions);
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertEquals(Arrays.asList("surroundInDark RELEASED DARK_ONSET sentry=0 records",
+                "surroundInDark KEPT SENTRY_ON sentry=2"), lines("surroundInDark"));
+    }
+
+    /**
+     * 屏幕不知道黑没黑（进程刚起来、安卓刚亮）：谁登记着都不开，黑匣子一行「先不开」（只在变了时写，不写成用不了相机）；
+     * 知道了（Android 那一层叫醒调度）照常开。
+     */
+    @Test
+    public void aStartWhileTheScreenIsUnknownWaitsThenOpensOnceKnown() {
+        host.known = false;
+        claim(Holder.PREVIEW);
+        declare(surround, pvS);
+        declare(rear, pvR);
+        declare(front, pvF);
+        settle();
+        at(1_000);
+        assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        assertEquals(Arrays.asList("waiting SCREEN_UNKNOWN " + SUR), lines("waiting SCREEN_UNKNOWN"));
+        assertTrue("不写成用不了相机", lines("deferred").isEmpty());
+        assertFalse(s.snapshot().screenKnown);
+        host.known = true;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
+    }
+
+    /** 环视留不留每变一次一行（通道刚算黑那一下、哨兵关了、变成开、车机要睡），不变不写。 */
+    @Test
+    public void surroundInDarkJournalLines() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long release = 1_000 + ChannelRules.HOLD_MS;
+        at(release);
+        assertTrue("留着：一步不动", surround.actions.isEmpty());
+        host.sentry = 0;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        at(release + 100);
+        closed(surround);
+        settle();
+        at(120_000);
+        host.sentry = null;   // 读不到：不变
+        s.wake();
+        settle();
+        host.sentry = 1;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("close screen-off", "open [RECORD]"), surround.actions);
+        at(120_300);
+        opened(surround);
+        frame(surround);
+        settle();
+        at(200_000);
+        host.androidOff = true;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("close screen-off", "open [RECORD]", "close screen-off"), surround.actions);
+        at(300_000);
+        assertEquals(Arrays.asList(
+                "surroundInDark KEPT DARK_ONSET sentry=2 records",
+                "surroundInDark RELEASED SENTRY_OFF sentry=0 records",
+                "surroundInDark KEPT SENTRY_ON sentry=1 records",
+                "surroundInDark RELEASED ANDROID_OFF sentry=1 records"), lines("surroundInDark"));
+    }
+
+    /**
+     * 环视留不留跟着进程、不跟着管线（项目所有者 2026-10-27）：管线放掉重建（旧的那一份退出、只关），新的那一份调度从进程那一份接着用 ——
+     * 第一轮之前就读得到「环视留着」，熄屏录像不断；进程重新起来（测试里回到进程刚起来的样子）是放开。
+     */
+    @Test
+    public void theSurroundInDarkSurvivesAPipelineRebuildButNotAProcessStart() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, s.snapshot().surroundInDark);
+        assertTrue(s.snapshot().surroundKept);
+
+        s.exit();   // 换车型：旧的那一份放掉，只关
+        ChannelScheduler rebuilt = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, new FakePort("2"));
+        lanes.put(REAR, new FakePort("1"));
+        rebuilt.setLanes(lanes);
+        try {
+            assertFalse("第一轮之前：环视照旧留着", rebuilt.releasedByDark(SUR));
+            assertTrue("座舱照旧放开", rebuilt.releasedByDark(REAR));
+            at(1_000 + ChannelRules.HOLD_MS + 5_000);
+            assertEquals(ChannelRules.SurroundInDark.KEPT, rebuilt.snapshot().surroundInDark);
+
+            ChannelScheduler.resetProcessDark();   // 进程重新起来
+            ChannelScheduler fresh = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+            Map<String, ChannelScheduler.CameraPort> again = new LinkedHashMap<>();
+            again.put(SUR, new FakePort("2"));
+            fresh.setLanes(again);
+            try {
+                assertTrue("进程刚起来、黑着：放开", fresh.releasedByDark(SUR));
+            } finally {
+                fresh.detach();
+            }
+        } finally {
+            rebuilt.detach();
+        }
     }
 
     // ================================================================= 问（只问，不开）
@@ -3353,6 +3598,40 @@ public class ChannelSchedulerTest {
             return androidOff;
         }
 
+        /** 屏幕知道黑没黑（ScreenState.known）：测试默认知道。 */
+        boolean known = true;
+        /** 哨兵模式：0 关、1 开、2 布防、null 读不到（默认）。 */
+        Integer sentry;
+        /** 「熄屏持续录制」：测试默认开着。 */
+        boolean keep = true;
+        /** 在开车。 */
+        boolean driving;
+
+        @Override
+        public boolean screenKnown() {
+            return known;
+        }
+
+        @Override
+        public Integer sentry() {
+            return sentry;
+        }
+
+        @Override
+        public boolean keepRecordingWhenDark() {
+            return keep;
+        }
+
+        @Override
+        public boolean driving() {
+            return driving;
+        }
+
+        /** 哨兵模式布防着（车主离车前开的）：熄屏时环视留着。 */
+        void sentryArmed() {
+            sentry = 2;
+        }
+
         /** 屏幕真黑了（车主下车那一下）：从此刻起算黑了多久。 */
         void goDark() {
             screenOn = false;
@@ -3516,6 +3795,14 @@ public class ChannelSchedulerTest {
         @Override
         public void stopLifted(String key, ChannelRules.Event.Cause cause, Set<Holder> holders) {
             journal.add("stopLifted " + key + " " + cause);
+        }
+
+        /** 「surroundInDark KEPT DARK_ONSET sentry=2 records」。 */
+        @Override
+        public void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
+                                   boolean recordsSurround) {
+            journal.add("surroundInDark " + (kept ? "KEPT" : "RELEASED") + " " + why + " sentry=" + sentry
+                    + (keepSetting ? "" : " keepOff") + (recordsSurround ? " records" : ""));
         }
 
         @Override

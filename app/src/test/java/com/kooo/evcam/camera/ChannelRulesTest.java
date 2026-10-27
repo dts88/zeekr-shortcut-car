@@ -80,6 +80,15 @@ public class ChannelRulesTest {
         w.foregroundService = true;
         w.cameraUsable = true;
         w.heardAnything = true;
+        // 「熄屏持续录制」默认开着（项目所有者 2026-10-27 的熄屏规矩里环视留不留要它）
+        w.keepWhenDark = true;
+    }
+
+    /** 熄屏时环视留着：哨兵模式布防、通道刚算黑那一下已经判过（{@link ChannelRules#judgeSurroundInDark}）。 */
+    private void keptInDark() {
+        w.sentry = 2;
+        w.lastSentry = 2;
+        w.surroundInDark = ChannelRules.SurroundInDark.KEPT;
     }
 
     // ================================================================= 该开
@@ -107,7 +116,9 @@ public class ChannelRulesTest {
         assertEquals(set(recR), ChannelRules.wantedOutputs(w, rear));
         assertFalse("不在这次录像计划里", ChannelRules.wanted(w, front));
         w.screenOn = false;
-        assertTrue("熄屏环视照录（熄屏持续录制那张表定它录不录）", ChannelRules.wanted(w, surround));
+        assertFalse("熄屏、环视没留着：放开（项目所有者 2026-10-27）", ChannelRules.wanted(w, surround));
+        keptInDark();
+        assertTrue("熄屏、环视留着（哨兵布防、熄屏持续录制开）：照录", ChannelRules.wanted(w, surround));
         assertFalse("熄屏座舱放开（项目所有者 2026-10-12 D2）", ChannelRules.wanted(w, rear));
         assertTrue("录像输出也不要", ChannelRules.wantedOutputs(w, rear).isEmpty());
         w.screenOn = true;
@@ -165,7 +176,7 @@ public class ChannelRulesTest {
 
     /**
      * HUD 上的盲区画面（2026-10-21）：另一样输出，跟中控屏那块同一个登记方、同一条规矩 —— 只在环视上、SIDE_VIEW 登记着才要；
-     * 两块可以同时要；熄屏放开时照旧（环视不放开，所以还要）。
+     * 两块可以同时要。通道算黑、没在开车时（2026-10-27）留着的环视也只要录像输出，盲区画面不算；在开车时照旧要。
      */
     @Test
     public void theHudCanvasFollowsTheSideViewHolder() {
@@ -188,7 +199,14 @@ public class ChannelRulesTest {
         assertEquals("中控屏、HUD 两块一起要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
 
         w.screenOn = false;
-        assertEquals("熄屏不放开环视：照旧要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
+        w.keepWhenDark = true;
+        w.surroundInDark = ChannelRules.SurroundInDark.KEPT;
+        assertTrue("熄屏、没在开车：环视留着也不要盲区画面", ChannelRules.wantedOutputs(w, sur).isEmpty());
+        assertFalse(ChannelRules.wanted(w, sur));
+        w.driving = true;
+        assertEquals("在开车：照旧要", set(hud, side), ChannelRules.wantedOutputs(w, sur));
+        w.surroundInDark = ChannelRules.SurroundInDark.RELEASED;
+        assertEquals("在开车时环视不按熄屏放开", set(hud, side), ChannelRules.wantedOutputs(w, sur));
     }
 
     /**
@@ -243,23 +261,37 @@ public class ChannelRulesTest {
         assertEquals(EnumSet.of(Holder.PHOTO), ChannelRules.wantedBy(w, rear));
         assertEquals(EnumSet.of(Holder.PHOTO), ChannelRules.wantedBy(w, front));
         w.screenOn = false;
-        assertEquals("熄屏拍照只要环视", EnumSet.of(Holder.MIRROR, Holder.PHOTO), ChannelRules.wantedBy(w, surround));
+        keptInDark();
+        assertTrue("熄屏、没在开车：拍照、超级镜子都不算（项目所有者 2026-10-27），留着的环视也不要",
+                ChannelRules.wantedBy(w, surround).isEmpty());
+        assertTrue(ChannelRules.wantedBy(w, rear).isEmpty());
+        assertTrue(ChannelRules.wantedBy(w, front).isEmpty());
+        w.driving = true;
+        assertEquals("在开车：熄屏拍照只要环视（和以前一样）", EnumSet.of(Holder.MIRROR, Holder.PHOTO),
+                ChannelRules.wantedBy(w, surround));
         assertTrue(ChannelRules.wantedBy(w, rear).isEmpty());
         assertTrue(ChannelRules.wantedBy(w, front).isEmpty());
     }
 
     /**
-     * 熄屏放开座舱（项目所有者 2026-10-12 D2，设计 v3.1 C4）：只看屏幕和是不是环视，和谁登记着无关 —— 预览、录像、拍照、
-     * 后视镜一律不要座舱；环视照各自的规矩。自定义车型上环视以外的每一路都一样放开。
+     * 熄屏放开相机（项目所有者 2026-10-12 D2，设计 v3.1 C4；2026-10-27）：只看屏幕、开车、哨兵模式和设置，和谁登记着无关 ——
+     * 预览、录像、拍照、后视镜一律不要座舱；环视没留着时一样放开，留着时只有录像算；在开车时环视照各自的规矩（和以前一样）。
+     * 自定义车型上环视以外的每一路都一样放开。
      */
     @Test
-    public void theDarkReleasesTheCabinsForEveryHolderAndOnlyThem() {
+    public void inChannelDarkOnlyAKeptSurroundIsWantedAndOnlyByRecording() {
         assertFalse("亮着、谁都没登记：不算放开", ChannelRules.releasedByDark(w, rear));
+        assertFalse(ChannelRules.releasedByDark(w, surround));
         w.screenOn = false;
         assertTrue("谁都没登记也算", ChannelRules.releasedByDark(w, rear));
         assertTrue(ChannelRules.releasedByDark(w, front));
-        assertFalse(ChannelRules.releasedByDark(w, surround));
+        assertTrue("环视没留着：也放开", ChannelRules.releasedByDark(w, surround));
         assertTrue("自定义车型的第四路也放开", ChannelRules.releasedByDark(w, new Lane(CameraSlots.KEY_FOURTH, "3")));
+        keptInDark();
+        assertFalse("环视留着：不放开", ChannelRules.releasedByDark(w, surround));
+        w.keepWhenDark = false;
+        assertTrue("熄屏持续录制关着：哨兵布防也放开", ChannelRules.releasedByDark(w, surround));
+        w.keepWhenDark = true;
 
         planAll();
         for (Holder holder : Holder.values()) {
@@ -267,8 +299,22 @@ public class ChannelRulesTest {
             claim(holder);
             assertFalse(holder + "：熄屏时后座舱谁都不要", ChannelRules.wanted(w, rear));
             assertFalse(holder + "：熄屏时前座舱谁都不要", ChannelRules.wanted(w, front));
-            assertEquals(holder + "：环视照它自己的规矩", holder != Holder.PREVIEW, ChannelRules.wanted(w, surround));
+            assertEquals(holder + "：留着的环视只算录像", holder == Holder.RECORDING, ChannelRules.wanted(w, surround));
         }
+        w.surroundInDark = ChannelRules.SurroundInDark.RELEASED;
+        for (Holder holder : Holder.values()) {
+            w.holders.clear();
+            claim(holder);
+            assertFalse(holder + "：没留着的环视谁都不要", ChannelRules.wanted(w, surround));
+        }
+        w.driving = true;
+        for (Holder holder : Holder.values()) {
+            w.holders.clear();
+            claim(holder);
+            assertFalse(holder + "：在开车，座舱照旧放开", ChannelRules.wanted(w, rear));
+            assertEquals(holder + "：在开车，环视照它自己的规矩", holder != Holder.PREVIEW, ChannelRules.wanted(w, surround));
+        }
+        w.driving = false;
         w.screenOn = true;
         for (Holder holder : Holder.values()) {
             w.holders.clear();
@@ -331,6 +377,7 @@ public class ChannelRulesTest {
         assertEquals(Collections.singletonList(SUR), done.get(0).keys);
         assertTrue(rear.device == Device.CLOSED && front.device == Device.CLOSED);
 
+        w.sentry = 2;   // 哨兵模式布防：环视留着（项目所有者 2026-10-27）
         w.screenOn = false;
         assertEquals("黑满 30 秒：没有座舱可放，什么都不动", Move.IDLE, run().move);
         assertEquals(1, done.size());
@@ -670,8 +717,10 @@ public class ChannelRulesTest {
         assertEquals(Move.IDLE, round().move);
         Set<Holder> holders = EnumSet.copyOf(w.holders);
 
+        w.sentry = 2;         // 哨兵模式布防：环视留着（项目所有者 2026-10-27）
         w.screenOn = false;   // 黑满 30 秒
         Decision d = round();
+        assertEquals("环视留着", ChannelRules.SurroundInDark.KEPT, w.surroundInDark);
         assertEquals(Move.CLOSE, d.move);
         assertEquals("先单独关环视", Collections.singletonList(SUR), d.keys);
         assertEquals(Why.SURROUND_FIRST, d.why);
@@ -712,6 +761,50 @@ public class ChannelRulesTest {
         assertNull(surround.mark);
         assertTrue(ChannelRules.streaming(surround));
         assertTrue("座舱照旧熄屏放开", ChannelRules.releasedByDark(w, rear) && rear.device == Device.CLOSED);
+    }
+
+    /**
+     * 同一个形状，哨兵模式关着（项目所有者 2026-10-27）：环视没留着，和座舱同一轮放开 —— 环视先单独关（原因「熄屏」，不是
+     * 「关座舱前先关环视」），关完座舱一起关（熄屏：座舱放开），什么都不开回来。不会先关环视、开回来给录像、紧接着又关。
+     * 录制器都停放着（录像还登记着），三路都不算在起来。
+     */
+    @Test
+    public void replay1014NotKept_theSurroundClosesFirstThenTheCabinsAndNothingReopens() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        assertEquals(Move.IDLE, round().move);
+        Set<Holder> holders = EnumSet.copyOf(w.holders);
+
+        w.sentry = 0;
+        w.screenOn = false;   // 黑满 30 秒
+        Decision d = round();
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals(Event.Cause.DARK_ONSET, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals("环视先单独关", Collections.singletonList(SUR), d.keys);
+        assertEquals("原因是熄屏，不写成座舱放开", Why.SCREEN_OFF, d.why);
+        perform(d);
+        serviceSays(surround, true, true);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.DARK_RELEASE, d.why);
+        perform(d);
+        serviceSays(rear, true, true);
+        serviceSays(front, true, true);
+        assertEquals("什么都不开回来", Move.IDLE, round().move);
+        at(ChannelRules.HOLD_MS);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(2, done.size());
+        assertEquals(0, count(Move.OPEN));
+        assertEquals("登记表没动", holders, w.holders);
+        for (Lane lane : w.lanes) {
+            assertTrue(lane.key + "：熄屏放开", ChannelRules.releasedByDark(w, lane));
+            assertTrue(lane.key + "：录制器停放着", ChannelRules.keepsRecordOutput(w, lane));
+        }
     }
 
     /**
@@ -767,6 +860,7 @@ public class ChannelRulesTest {
         streaming(front, recF);
         assertEquals(Move.IDLE, round().move);
         w.cameraUsable = false;
+        w.sentry = 2;   // 哨兵模式布防：环视留着
         w.screenOn = false;
         Decision d = round();
         assertEquals(Move.CLOSE, d.move);
@@ -904,6 +998,7 @@ public class ChannelRulesTest {
         surround.progressAgeMs = CameraLiveness.STUCK_MS + 4_000;
         CameraLiveness.step(surround.ladder, true, Long.MAX_VALUE, T0 - 4_000);   // 救过一次
         assertTrue(ChannelRules.rescuing(surround));
+        keptInDark();   // 哨兵模式布防：环视留着
         w.screenOn = false;
         Decision d = round();
         assertEquals(Move.CLOSE, d.move);
@@ -920,6 +1015,7 @@ public class ChannelRulesTest {
         streaming(rear, recR);
         streaming(front, recF);
         assertEquals(Move.IDLE, round().move);
+        w.sentry = 2;   // 哨兵模式布防：环视留着
         w.screenOn = false;
         Decision d = round();
         assertEquals(Why.SURROUND_FIRST, d.why);
@@ -1141,6 +1237,7 @@ public class ChannelRulesTest {
         assertEquals(Move.IDLE, round().move);
         assertTrue(done.isEmpty());
 
+        w.sentry = 2;   // 哨兵模式布防：环视留着（项目所有者 2026-10-27）
         w.screenOn = false;
         Decision d = round();
         assertEquals(Move.CLOSE, d.move);
@@ -1178,6 +1275,7 @@ public class ChannelRulesTest {
         streaming(front, recF);
         assertEquals(Move.IDLE, round().move);
 
+        w.sentry = 2;   // 哨兵模式布防：环视留着（项目所有者 2026-10-27）
         w.screenOn = false;
         Decision d = round();
         assertEquals(Collections.singletonList(SUR), d.keys);
@@ -1231,6 +1329,7 @@ public class ChannelRulesTest {
     @Test
     public void theRecordOutputWaitCountsFromWhenTheLaneIsWantedAgain() {
         w.screenOn = false;
+        keptInDark();   // 哨兵模式布防：环视留着，接着录
         claim(Holder.RECORDING);
         planAll();
         streaming(surround, recS);
@@ -2535,18 +2634,35 @@ public class ChannelRulesTest {
         assertFalse(ChannelRules.excludedFromPhoto(w, surround));
     }
 
-    /** 熄屏拍照只拍环视（设计 v3.1 C4）：座舱熄屏放开了，不开、不白等 10 秒、不算在该拍的里面；熄屏那一下还在出画面的照拍。 */
+    /**
+     * 熄屏拍照（设计 v3.1 C4；项目所有者 2026-10-27）：通道算黑、没在开车时不为拍照开相机 —— 不在出画面的一路都不拍、不白等 10 秒、
+     * 不算在该拍的里面，一路都没有就当场收尾；在出画面的照拍（一般是留着的环视）。在开车时和以前一样：座舱熄屏放开，只开环视。
+     */
     @Test
-    public void aDarkPhotoIsSurroundOnly() {
+    public void aDarkPhotoOpensNothingAndUsesOnlyAStreamingSurround() {
         w.screenOn = false;
         claim(Holder.PHOTO);
         assertTrue(ChannelRules.excludedFromPhoto(w, rear));
         assertTrue(ChannelRules.excludedFromPhoto(w, front));
+        assertTrue("没在出画面的环视：不为拍照开", ChannelRules.excludedFromPhoto(w, surround));
+        assertEquals(Move.IDLE, run().move);
+        assertTrue("一路都不开", done.isEmpty());
+        keptInDark();
+        assertTrue("环视留着也不为拍照开", ChannelRules.excludedFromPhoto(w, surround));
+        assertEquals(Move.IDLE, run().move);
+        assertTrue(done.isEmpty());
+
+        w.driving = true;   // 在开车：和以前一样，只开环视
         assertFalse(ChannelRules.excludedFromPhoto(w, surround));
+        assertTrue(ChannelRules.excludedFromPhoto(w, rear));
         assertEquals(Move.IDLE, run().move);
         assertEquals(1, done.size());
         assertEquals(Collections.singletonList(SUR), done.get(0).keys);
         assertEquals(set(Out.SINK), done.get(0).outputs);
+
+        w.driving = false;
+        assertTrue(ChannelRules.streaming(surround));
+        assertFalse("在出画面的环视照拍", ChannelRules.excludedFromPhoto(w, surround));
         streaming(rear, pvR);
         assertFalse("还在出画面的照拍", ChannelRules.excludedFromPhoto(w, rear));
     }
@@ -2617,6 +2733,533 @@ public class ChannelRulesTest {
         assertEquals(3, CameraLiveness.MAX_ATTEMPTS);
         assertEquals(60_000L, CameraLiveness.COOL_OFF_MS);
         assertEquals(3, CameraLiveness.MAX_CYCLES);
+    }
+
+    // ================================================================= 熄屏放开相机（项目所有者 2026-10-27）
+
+    /**
+     * 环视这一段熄屏留不留（{@link ChannelRules#judgeSurroundInDark}）的整张表：照亮着算、通道刚算黑那一下（R1、R3）、
+     * 之后读到关（R5）、变成开或布防（R4）、读不到不变（R3）、车机要睡（R6，屏幕不知道也照判、上一次读数不动）、
+     * 屏幕不知道时不判（R10）、在开车照亮着算。
+     */
+    @Test
+    public void surroundInDarkFollowsItsTable() {
+        final ChannelRules.SurroundInDark LIT = ChannelRules.SurroundInDark.LIT;
+        final ChannelRules.SurroundInDark KEPT = ChannelRules.SurroundInDark.KEPT;
+        final ChannelRules.SurroundInDark RELEASED = ChannelRules.SurroundInDark.RELEASED;
+        //     名字                       原来      亮着   安卓熄屏 知道   开车   哨兵 上一次 → 之后      上一次  事件
+        row("亮着：照亮着算，记下读数", LIT, true, false, true, false, 0, null, LIT, 0, null);
+        row("亮着：读不到不动上一次", LIT, true, false, true, false, null, 2, LIT, 2, null);
+        row("通道刚算黑，布防：留着", LIT, false, false, true, false, 2, 0, KEPT, 2, Event.Cause.DARK_ONSET);
+        row("通道刚算黑，开：留着", LIT, false, false, true, false, 1, null, KEPT, 1, Event.Cause.DARK_ONSET);
+        row("通道刚算黑，关：放开", LIT, false, false, true, false, 0, 2, RELEASED, 0, Event.Cause.DARK_ONSET);
+        row("通道刚算黑，读不到：放开，上一次记成关", LIT, false, false, true, false, null, 2, RELEASED, 0,
+                Event.Cause.DARK_ONSET);
+        row("留着，读不到：不算关", KEPT, false, false, true, false, null, 2, KEPT, 2, null);
+        row("留着，读到关：放开", KEPT, false, false, true, false, 0, 2, RELEASED, 0, Event.Cause.SENTRY_OFF);
+        row("留着，布防变开：不变", KEPT, false, false, true, false, 1, 2, KEPT, 1, null);
+        row("放开，关变布防：留着", RELEASED, false, false, true, false, 2, 0, KEPT, 2, Event.Cause.SENTRY_ON);
+        row("放开，关变开：留着（不等布防）", RELEASED, false, false, true, false, 1, 0, KEPT, 1, Event.Cause.SENTRY_ON);
+        row("放开，第一次读到布防：只当底", RELEASED, false, false, true, false, 2, null, RELEASED, 2, null);
+        row("放开，读不到：不算开", RELEASED, false, false, true, false, null, 0, RELEASED, 0, null);
+        row("放开，一直布防：不是变成开", RELEASED, false, false, true, false, 2, 2, RELEASED, 2, null);
+        row("留着，车机要睡：放开，上一次不动", KEPT, false, true, true, false, 0, 2, RELEASED, 2,
+                Event.Cause.ANDROID_OFF);
+        row("照亮着算直接到车机要睡、没读到过：上一次记成关", LIT, false, true, true, false, null, null, RELEASED, 0,
+                Event.Cause.ANDROID_OFF);
+        row("照亮着算直接到车机要睡、这一下读到布防：记下它", LIT, false, true, true, false, 2, null, RELEASED, 2,
+                Event.Cause.ANDROID_OFF);
+        row("放开，睡着时哨兵变了：上一次不动", RELEASED, false, true, true, false, 2, 0, RELEASED, 0, null);
+        row("屏幕不知道：不判", KEPT, false, false, false, false, 0, 2, KEPT, 2, null);
+        row("屏幕不知道，亮着：不记底", RELEASED, true, false, false, false, 2, null, RELEASED, null, null);
+        row("屏幕不知道也照判车机要睡", KEPT, false, true, false, false, 2, 2, RELEASED, 2, Event.Cause.ANDROID_OFF);
+        row("在开车：照亮着算", RELEASED, false, false, true, true, 0, 2, LIT, 0, null);
+        row("在开车，安卓熄屏：不算车机要睡", KEPT, false, true, true, true, 2, 2, LIT, 2, null);
+    }
+
+    private void row(String name, ChannelRules.SurroundInDark was, boolean lit, boolean androidOff, boolean known,
+                     boolean driving, Integer sentry, Integer last, ChannelRules.SurroundInDark want, Integer wantLast,
+                     Event.Cause wantCause) {
+        w.surroundInDark = was;
+        w.screenOn = lit;
+        w.androidOff = androidOff;
+        w.screenKnown = known;
+        w.driving = driving;
+        w.sentry = sentry;
+        w.lastSentry = last;
+        List<Event> out = new ArrayList<>();
+        ChannelRules.judgeSurroundInDark(w, out);
+        assertEquals(name, want, w.surroundInDark);
+        assertEquals(name + "：上一次读数", wantLast, w.lastSentry);
+        assertTrue(name, out.size() <= 1);
+        assertEquals(name + "：那一行", wantCause, out.isEmpty() ? null : out.get(0).cause);
+    }
+
+    /**
+     * R1：通道刚算黑那一下，环视留着要三样 ——「熄屏持续录制」开着、哨兵模式开或布防、录像要它；少一样就和座舱同一轮放开
+     * （录像不要它时留着也不开，开了录再开）。八种组合。
+     */
+    @Test
+    public void theSurroundIsKeptAtThirtySecondsOnlyWithSettingSentryAndRecording() {
+        for (boolean keep : new boolean[]{true, false}) {
+            for (int sentry : new int[]{2, 0}) {
+                for (boolean recording : new boolean[]{true, false}) {
+                    String name = "熄屏持续录制" + (keep ? "开" : "关") + "、哨兵 " + sentry + (recording ? "、在录" : "、没在录");
+                    w.holders.clear();
+                    w.recordPlan.clear();
+                    if (recording) {
+                        claim(Holder.RECORDING);
+                        planAll();
+                    }
+                    w.keepWhenDark = keep;
+                    w.sentry = sentry;
+                    w.screenOn = true;
+                    ChannelRules.settle(w);
+                    w.screenOn = false;
+                    ChannelRules.settle(w);
+                    boolean kept = keep && sentry == 2;
+                    assertEquals(name, kept, ChannelRules.surroundKept(w));
+                    assertEquals(name, !kept, ChannelRules.releasedByDark(w, surround));
+                    assertEquals(name, kept && recording, ChannelRules.wanted(w, surround));
+                    assertTrue(name + "：座舱照旧放开", ChannelRules.releasedByDark(w, rear));
+                }
+            }
+        }
+    }
+
+    /** R2：黑了不到 30 秒哨兵模式变了，什么都不动，等 30 秒那一下照那时的读数判 —— 两个方向都一样。 */
+    @Test
+    public void aSentryChangeInTheFirstThirtySecondsWaitsForTheDecision() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        streaming(surround, recS);
+        w.sentry = 2;
+        assertEquals(Move.IDLE, round().move);
+        w.screenDark = true;   // 屏幕真黑了，通道还照亮着算
+        w.sentry = 0;
+        assertEquals("黑了不到 30 秒：不判、不动", Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+        assertNull(event(Event.Type.SURROUND_IN_DARK));
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals("30 秒那一下照那时的读数：关 → 放开", ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals(Event.Cause.DARK_ONSET, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Why.SCREEN_OFF, d.why);
+
+        w.screenOn = true;
+        w.screenDark = false;
+        assertEquals(Move.IDLE, round().move);
+        w.screenDark = true;
+        assertEquals(Move.IDLE, round().move);
+        w.sentry = 2;   // 黑了 10 秒远程打开哨兵模式
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+        w.screenOn = false;
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("30 秒那一下：布防 → 留着", ChannelRules.SurroundInDark.KEPT, w.surroundInDark);
+        assertTrue(ChannelRules.wanted(w, surround));
+    }
+
+    /** R3：通道刚算黑时哨兵模式读不到算没开 —— 放开；留着之后读不到不算关，环视一直录。 */
+    @Test
+    public void anUnreadableSentryAtThirtySecondsReleases_butNeverClosesAKeptSurround() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        streaming(surround, recS);
+        w.sentry = 2;
+        assertEquals(Move.IDLE, round().move);
+        w.screenOn = false;
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, w.surroundInDark);
+        w.sentry = null;   // 10-24 15:43:58：哨兵模式读不到 60 秒
+        at(60_000);
+        assertEquals("留着的不算关", Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, w.surroundInDark);
+        assertNull(event(Event.Type.SURROUND_IN_DARK));
+        assertTrue(ChannelRules.wanted(w, surround));
+
+        w.screenOn = true;
+        at(120_000);
+        assertEquals(Move.IDLE, round().move);
+        w.screenOn = false;   // 又黑满 30 秒，这时读不到
+        Decision d = round();
+        assertEquals("读不到算没开：放开", ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals("上一次读数记成关：之后布防算变成开", Integer.valueOf(0), w.lastSentry);
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SCREEN_OFF, d.why);
+    }
+
+    /**
+     * 10-24 的两次（熄屏后 64 秒、267 秒远程打开哨兵模式，读数从关直接跳到布防）：30 秒那一下哨兵关，三路同一轮放开、什么都不开回来；
+     * 读到布防，环视带着停放着的录制器的录像输出单独开起来，座舱一步不动。
+     */
+    @Test
+    public void replay1024_sentryOffStraightToArmedOpensTheSurroundWithItsParkedRecorder() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        w.sentry = 0;
+        assertEquals(Move.IDLE, round().move);
+        w.screenOn = false;
+        assertEquals(Move.IDLE, run().move);
+        assertEquals(2, done.size());
+        assertEquals(Why.SCREEN_OFF, done.get(0).why);
+        assertEquals(Collections.singletonList(SUR), done.get(0).keys);
+        assertEquals(Why.DARK_RELEASE, done.get(1).why);
+        serviceSays(surround, true, true);
+        serviceSays(rear, true, true);
+        serviceSays(front, true, true);
+
+        at(64_000);
+        w.sentry = 2;
+        Decision d = round();
+        assertEquals(Event.Cause.SENTRY_ON, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(EnumSet.of(Holder.RECORDING), d.forWhom);
+        assertEquals("带着停放着的录制器的录像输出", set(recS), d.outputs);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+        assertTrue("座舱一步不动", rear.device == Device.CLOSED && front.device == Device.CLOSED);
+        assertEquals(1, count(Move.OPEN));
+    }
+
+    /** R4：哨兵模式变成开，「熄屏持续录制」关着、或者录像不要环视（只有超级镜子、拍照登记着），环视不开。 */
+    @Test
+    public void aSentryRiseOpensNothingWithoutTheSettingOrRecording() {
+        surround.declared.add(recS);
+        surround.declared.add(mirror);
+        w.sentry = 0;
+        round();
+        w.screenOn = false;
+        assertEquals(Move.IDLE, round().move);
+        w.keepWhenDark = false;
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        w.sentry = 2;
+        assertEquals("熄屏持续录制关着：不开", Move.IDLE, round().move);
+        assertEquals(Event.Cause.SENTRY_ON, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertFalse(ChannelRules.surroundKept(w));
+
+        w.keepWhenDark = true;
+        drop(Holder.RECORDING);
+        claim(Holder.MIRROR);
+        claim(Holder.PHOTO);
+        assertEquals("录像不要它：超级镜子、拍照黑着不算，不开", Move.IDLE, round().move);
+        assertTrue(ChannelRules.surroundKept(w));
+        assertTrue(done.isEmpty());
+    }
+
+    /** R4 是此刻的事：哨兵模式先变成开、录像几秒后才登记（10-14 那一次 U 盘 4.5 秒后能用），录像一登记环视就开。 */
+    @Test
+    public void aSentryRiseBeforeRecordingIsClaimedOpensWhenItIs() {
+        surround.declared.add(recS);
+        w.sentry = 0;
+        round();
+        w.screenOn = false;
+        round();
+        w.sentry = 2;
+        assertEquals("还没在录：不开", Move.IDLE, round().move);
+        at(4_500);
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(set(recS), d.outputs);
+    }
+
+    /** R4：要开环视而用不了相机（后台起的前台服务）：照「能用相机」先不开、等，不另想办法。 */
+    @Test
+    public void aSentryRiseWhileTheCameraCannotBeUsedOnlyDefers() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        surround.declared.add(recS);
+        w.sentry = 0;
+        round();
+        w.screenOn = false;
+        round();
+        w.cameraUsable = false;
+        w.sentry = 1;
+        Decision d = round();
+        assertEquals(Move.IDLE, d.move);
+        assertEquals("先不开", SUR, d.deferredKey);
+        assertTrue(done.isEmpty());
+    }
+
+    /** R5：30 秒之后读到哨兵模式关，留着的环视当场放开（熄屏，10 秒封顶），录制器停放着。 */
+    @Test
+    public void sentryOffAfterThirtySecondsReleasesTheSurroundAtOnce() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        streaming(surround, recS);
+        w.sentry = 2;
+        round();
+        w.screenOn = false;
+        assertEquals(Move.IDLE, round().move);
+        at(600_000);
+        w.sentry = 0;
+        Decision d = round();
+        assertEquals(Event.Cause.SENTRY_OFF, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SCREEN_OFF, d.why);
+        assertEquals(ChannelRules.CLOSE_SURROUND_MAX_MS, d.maxMs);
+        assertTrue(ChannelRules.keepsRecordOutput(w, surround));
+    }
+
+    /**
+     * R6：车机要睡（黑着时安卓熄屏、没在开车）环视放开，哨兵模式布防着也一样；醒来哨兵模式还布防着不算变成开，相机不开。
+     */
+    @Test
+    public void androidOffReleasesTheSurroundAndAWakeWithSentryStillOnBringsNothing() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        streaming(surround, recS);
+        w.sentry = 2;
+        round();
+        w.screenOn = false;
+        assertEquals(Move.IDLE, round().move);
+        w.androidOff = true;
+        Decision d = round();
+        assertEquals(Event.Cause.ANDROID_OFF, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SCREEN_OFF, d.why);
+        perform(d);
+        serviceSays(surround, true, true);
+
+        at(3_600_000);
+        w.androidOff = false;   // 醒了（自己醒、远程开空调），屏幕还黑着
+        assertEquals("哨兵模式还布防着：不是变成开", Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals(1, done.size());
+    }
+
+    /**
+     * R6 + R3：亮着时一次都没读到过哨兵模式，安卓直接熄屏 —— 那一下也算 30 秒那一下，上一次读数记成关；睡着时哨兵模式被打开，
+     * 醒来读到布防算变成开，环视开起来录。
+     */
+    @Test
+    public void aWakeWithSentryTurnedOnDuringTheSleepOpensTheSurround() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        surround.declared.add(recS);
+        round();
+        assertEquals(ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+        assertNull(w.lastSentry);
+        w.screenDark = true;
+        w.screenOn = false;
+        w.androidOff = true;
+        round();
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals(Integer.valueOf(0), w.lastSentry);
+        at(3_600_000);
+        w.androidOff = false;
+        w.sentry = 2;
+        Decision d = round();
+        assertEquals(Event.Cause.SENTRY_ON, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+    }
+
+    /** 进程在黑着时被拉起（保活、开机）：新世界从放开起，第一次读到的只当底 —— 不开相机，之后变成开才算。 */
+    @Test
+    public void aWorldStartingDarkKeepsNothingUntilASentryRise() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        surround.declared.add(recS);
+        w.screenOn = false;
+        w.screenDark = true;
+        w.sentry = 2;
+        assertEquals("哨兵模式布防着：只当底，不开", Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals(Integer.valueOf(2), w.lastSentry);
+        w.sentry = 0;
+        assertEquals(Move.IDLE, round().move);
+        w.sentry = 1;
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+    }
+
+    /**
+     * 通道算黑、没在开车：留着的环视只要录像输出 —— 预览、超级镜子、盲区画面的画布声明着、登记着也不算，会话不为它们改，
+     * 没在会话里的不加（不在黑屏里重建会话、多切一个文件）。
+     */
+    @Test
+    public void inChannelDarkOnlyTheRecordOutputIsWanted() {
+        Out side = new Out(Kind.SIDE, "side");
+        claim(Holder.RECORDING);
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        claim(Holder.SIDE_VIEW);
+        planAll();
+        streaming(surround, recS, pvS);
+        surround.declared.add(mirror);
+        surround.declared.add(side);
+        keptInDark();
+        w.screenOn = false;
+        assertEquals(set(recS), ChannelRules.wantedOutputs(w, surround));
+        assertEquals(EnumSet.of(Holder.RECORDING), ChannelRules.wantedBy(w, surround));
+        assertEquals("会话不改", Move.IDLE, round().move);
+        assertEquals(set(recS, pvS), surround.session);
+        w.screenOn = true;
+        assertEquals("亮屏又都要了", set(recS, pvS, mirror, side), ChannelRules.wantedOutputs(w, surround));
+    }
+
+    /**
+     * R8：熄屏期间绝不开座舱 —— 谁登记着都一样：黑了不到 30 秒关着的不开、通道算黑时放开；黑了不到 30 秒开着的卡住了，
+     * 救援只做第一次的重建会话（不开设备），不重开；亮了才重开。
+     */
+    @Test
+    public void theCabinsNeverOpenWhileDarkForAnyHolder() {
+        planAll();
+        declarePreviews();
+        rear.declared.add(mirror);
+        w.mirrorCabin = true;
+        w.screenDark = true;
+        for (Holder holder : Holder.values()) {
+            w.holders.clear();
+            claim(holder);
+            w.screenOn = true;
+            assertFalse(holder + "：黑了不到 30 秒，关着的后座舱不开", ChannelRules.wanted(w, rear));
+            assertFalse(ChannelRules.wanted(w, front));
+            w.screenOn = false;
+            assertFalse(holder + "：通道算黑，后座舱放开", ChannelRules.wanted(w, rear));
+            assertFalse(ChannelRules.wanted(w, front));
+        }
+
+        // 黑了不到 30 秒，开着的后座舱卡住了（预览开着它）
+        w.holders.clear();
+        w.screenOn = true;
+        w.screenDark = false;
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        assertEquals(Move.IDLE, round().move);
+        w.screenDark = true;
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals("第一次：重建会话（不开设备）", Rescue.REBUILD, d.rescue);
+        startOnly(d);
+        at(500);
+        configured(rear, d.outputs);   // 配好了，一帧不出
+        at(ChannelRules.STEP_MAX_MS);
+        rear.progressAgeMs = CameraLiveness.STUCK_MS + ChannelRules.STEP_MAX_MS;
+        assertEquals("黑着：不重开", Move.IDLE, round().move);
+        at(ChannelRules.STEP_MAX_MS + CameraLiveness.RETRY_GAP_MS);
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("只救了那一次", 1, count(Move.RESCUE));
+
+        w.screenDark = false;   // 亮了
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+    }
+
+    /**
+     * R10：屏幕不知道黑没黑时谁登记着都不开、不重开（等 SCREEN_UNKNOWN，不写「先不开」）；改输出、第一次重建会话同一轮照做，
+     * 都没有才等。知道了照常开。
+     */
+    @Test
+    public void noCameraOpensOrReopensWhileTheScreenIsUnknownButApplyAndFirstRebuildsGoOn() {
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        declarePreviews();
+        streaming(surround, pvS);
+        surround.declared.add(mirror);   // 后视镜的画布声明着、会话里还没有：要改输出
+        streaming(front, pvF);
+        front.progressAgeMs = CameraLiveness.STUCK_MS;   // 前座舱卡住了：出过画面，第一次救是重建会话
+        w.screenKnown = false;
+        Decision d = round();
+        assertEquals("改输出照做", Move.APPLY, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        perform(d);
+        d = round();
+        assertEquals("第一次重建会话照做", Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+        assertEquals(Rescue.REBUILD, d.rescue);
+        startOnly(d);
+        at(500);
+        configured(front, d.outputs);   // 一帧不出
+        at(ChannelRules.STEP_MAX_MS + CameraLiveness.RETRY_GAP_MS);
+        front.progressAgeMs = CameraLiveness.STUCK_MS + ChannelRules.STEP_MAX_MS;
+        d = round();
+        assertWait(Why.SCREEN_UNKNOWN, REAR, d);
+        assertEquals(Move.OPEN, d.pending);
+        assertFalse("不写「先不开」", d.deferralKnown);
+        assertEquals(0, count(Move.OPEN));
+        assertEquals("不重开", 1, count(Move.RESCUE));
+
+        w.screenKnown = true;
+        d = round();
+        assertEquals("知道了：照常开", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+    }
+
+    /** R10：屏幕不知道时不先关环视 —— 关了它，「开」那一步也开不回来；保持到点的座舱照旧在它旁边关。 */
+    @Test
+    public void theSurroundIsNotClosedFirstWhileTheScreenIsUnknown() {
+        claim(Holder.PREVIEW);
+        claim(Holder.MIRROR);
+        streaming(surround, pvS, mirror);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        assertEquals(Move.IDLE, round().move);
+        drop(Holder.PREVIEW);
+        assertEquals(Move.IDLE, round().move);
+        w.screenKnown = false;
+        at(ChannelRules.HOLD_MS);
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.HOLD_OVER, d.why);
+    }
+
+    /**
+     * 在开车：2026-10-27 的熄屏规矩一条都不用 —— 环视不按熄屏放开、不判、盲区画面照要、拍照照开，车机要睡那一行也不放开；
+     * 座舱照旧放开。不再开车时还算黑，就在那一刻判。
+     */
+    @Test
+    public void whileDrivingTheDarkLeavesTheSurroundAsTodayAndDecidesWhenDrivingEnds() {
+        Out side = new Out(Kind.SIDE, "side");
+        claim(Holder.RECORDING);
+        claim(Holder.SIDE_VIEW);
+        w.recordPlan.add(SUR);   // 只录环视：座舱亮着时不为录像开
+        streaming(surround, recS, side);
+        w.sentry = 0;   // 开车时哨兵模式读关
+        w.driving = true;
+        assertEquals(Move.IDLE, round().move);
+        w.screenDark = true;
+        w.screenOn = false;   // 开车时显示屏关了，通道算黑
+        assertEquals(Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+        assertNull(event(Event.Type.SURROUND_IN_DARK));
+        assertFalse(ChannelRules.releasedByDark(w, surround));
+        assertEquals(set(recS, side), ChannelRules.wantedOutputs(w, surround));
+        assertEquals(EnumSet.of(Holder.RECORDING, Holder.SIDE_VIEW), ChannelRules.wantedBy(w, surround));
+        assertFalse(ChannelRules.excludedFromPhoto(w, surround));
+        assertTrue("座舱照旧放开", ChannelRules.releasedByDark(w, rear));
+        w.androidOff = true;
+        assertEquals("安卓熄屏也不放开环视", Move.IDLE, round().move);
+        assertEquals(ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+
+        w.androidOff = false;
+        w.driving = false;   // 停车了，屏幕还黑着
+        Decision d = round();
+        assertEquals(Event.Cause.DARK_ONSET, event(Event.Type.SURROUND_IN_DARK).cause);
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, w.surroundInDark);
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SCREEN_OFF, d.why);
     }
 
     // ================================================================= 帮手：扮演相机层、登记表

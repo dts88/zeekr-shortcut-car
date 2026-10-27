@@ -233,6 +233,21 @@ public class RecordingLanesTest {
         assertEquals(Collections.singletonList(SURROUND), settled.liveKeys);
     }
 
+    /**
+     * 环视和座舱一起被熄屏放开（项目所有者 2026-10-27：哨兵模式关着、没留着的环视）：三路都不算在起来、不算被占用 ——
+     * 录像是「等待摄像头」，落定了，状态条什么都不说；亮屏它们自己回来。
+     */
+    @Test
+    public void aSurroundReleasedByTheDarkWithTheCabinsIsWaitingAndSettled() {
+        RecordingLanes lanes = begun();
+        Summary summary = lanes.summarize(Arrays.asList(dark(SURROUND, Condition.BRINGING_UP),
+                dark(CABIN_REAR, Condition.TAKEN), dark(CABIN_FRONT, Condition.BRINGING_UP)));
+        assertEquals(View.WAITING, summary.view);
+        assertTrue("三路都熄屏放开：落定", summary.settled);
+        assertTrue(summary.liveKeys.isEmpty());
+        assertEquals(RecordingLanes.Hint.Kind.NONE, summary.hint.kind);
+    }
+
     /** 亮着、谁都没登记的座舱照旧算在起来（只有熄屏放开才不算）：刚开录、调度还没跑那一轮也落定不了。 */
     @Test
     public void aLitLaneNobodyHasClaimedYetIsStillComingUp() {

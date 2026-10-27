@@ -32,8 +32,9 @@ import java.util.function.Consumer;
  * <h3>一轮</h3>
  *
  * <ol>
- *   <li>刷新事实：每一路照 SingleCamera（{@link CameraPort}）填，全局的照 {@link Host} 填 —— 登记表、录像计划、亮熄屏、
- *       前台服务、能不能用相机、相机服务对每一路说的最后一句、车机要睡、退出；</li>
+ *   <li>刷新事实：每一路照 SingleCamera（{@link CameraPort}）填，全局的照 {@link Host} 填 —— 登记表、录像计划、亮熄屏
+ *       （含屏幕知不知道）、前台服务、能不能用相机、相机服务对每一路说的最后一句、车机要睡、退出，还有环视熄屏时留不留要的
+ *       哨兵模式、在不在开车、「熄屏持续录制」（2026-10-27）；</li>
  *   <li>手上那一步做完没有、到没到顶（{@link ChannelRules#outcome} → {@link ChannelRules#finish}）；结束了的那一步写一行
  *       （做完、到点、出事都写），每一路交一条相机步骤统计（{@link #stepEnded}，2.11.4）；</li>
  *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；会话里每一样输出算要的、
@@ -224,6 +225,24 @@ public final class ChannelScheduler {
         /** 黑着时安卓也熄屏了（车机要睡 / 睡着；ScreenState.androidOff）。 */
         boolean androidOff();
 
+        /**
+         * 屏幕知道黑没黑（ScreenState.known）：不知道时谁登记着都不开（{@link ChannelRules.Why#SCREEN_UNKNOWN}）。
+         * 答「不知道」时 Android 那一层排一下：知道了叫醒调度。
+         */
+        boolean screenKnown();
+
+        /**
+         * 哨兵模式（车辆信号核心那一份）：0 关、1 开、2 布防；读不到、车辆接口没连着是 null。环视熄屏时留不留看它
+         * （{@link ChannelRules#judgeSurroundInDark}）；变了 Android 那一层叫醒调度。
+         */
+        Integer sentry();
+
+        /** 「熄屏持续录制」开着（AppConfig.isScreenOffKeepRecording；开发者「熄屏录制」不算）。每一轮现读。 */
+        boolean keepRecordingWhenDark();
+
+        /** 在开车（ScreenOffPlan.driving；车辆接口没连着算没在开车）。变了 Android 那一层叫醒调度。 */
+        boolean driving();
+
         /** 前台服务在不在：没有它不保持。 */
         boolean foregroundService();
 
@@ -294,7 +313,8 @@ public final class ChannelScheduler {
         /**
          * 这一路的相机走了：丢了（{@link Gone#LOST}，在阻塞的关之前；{@code reason} 是丢的那一下）、我们关了它
          * （{@link Gone#CLOSED}；{@code closed} 是关的原因，熄屏放开座舱是 {@link ChannelRules.Why#DARK_RELEASE} ——
-         * 退出录像那一行照它写「熄屏：座舱放开」；关座舱前先关环视是 {@link ChannelRules.Why#SURROUND_FIRST}，那一行写
+         * 退出录像那一行照它写「熄屏：座舱放开」；熄屏放开的环视是 {@link ChannelRules.Why#SCREEN_OFF}、它此刻
+         * {@link #releasedByDark}，那一行写「熄屏：环视放开」（2026-10-27）；关座舱前先关环视是 {@link ChannelRules.Why#SURROUND_FIRST}，那一行写
          * 「关座舱前先关环视」，录制器停放，环视开回来带着同一个录像输出出了画面就再加入）、或者它卡住了在救
          * （{@link Gone#RESCUED}：重建会话、重开）。
          *
@@ -305,8 +325,8 @@ public final class ChannelScheduler {
 
         /**
          * 这一路的 {@link #condition} 变了（被拿着、放开了、在救、停手、在出画面），或者它关着时能不能用相机变了
-         * （{@link #cannotOpen}），或者它被不被熄屏放开变了（{@link #releasedByDark}：熄屏放开的座舱亮屏时，编码录制在这时
-         * 补建录制器 —— 熄屏时不为它建）。
+         * （{@link #cannotOpen}），或者它被不被熄屏放开变了（{@link #releasedByDark}：熄屏放开的座舱亮屏时、放开的环视又留下时，
+         * 编码录制在这时补建录制器或者沿用停放着的 —— 熄屏放开时不为它建）。
          */
         void onLaneConditionChanged(String key);
 
@@ -321,7 +341,7 @@ public final class ChannelScheduler {
     enum Gone {
         /** 丢了：被断开、报错（在那一次阻塞的关之前就说）。 */
         LOST,
-        /** 我们关的：没人要、保持到点、熄屏、熄屏放开座舱、关座舱前先关环视、车机要睡、退出。 */
+        /** 我们关的：没人要、保持到点、熄屏（含熄屏放开的环视）、熄屏放开座舱、关座舱前先关环视、车机要睡、退出。 */
         CLOSED,
         /** 开着却没进展（卡住了），调度在救：重建会话或者重开。 */
         RESCUED
@@ -380,6 +400,14 @@ public final class ChannelScheduler {
 
         /** 停手的一路重新救。 */
         void stopLifted(String key, ChannelRules.Event.Cause cause, Set<CameraNeeds.Holder> holders);
+
+        /**
+         * 环视这一段熄屏留不留变了（项目所有者 2026-10-27，{@link ChannelRules#judgeSurroundInDark}）：每变一次一行；通道刚算黑那一下
+         * 不管变没变都写。{@code kept} 是此刻留着（{@link ChannelRules#surroundKept}，含设置）；{@code recordsSurround}：录像要它
+         * （RECORDING 登记着、计划里有环视）。
+         */
+        void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
+                            boolean recordsSurround);
 
         /** 连着救 3 次没用，歇 60 秒。 */
         void gaveUp(String key);
@@ -1114,7 +1142,7 @@ public final class ChannelScheduler {
         final long unwantedSince;
         /** 关着、该开，而此刻用不了相机：主界面回到前台之前不开（{@link ChannelRules#cannotOpen}）。 */
         final boolean cannotOpen;
-        /** 熄屏放开了：座舱熄屏时谁都不要（{@link ChannelRules#releasedByDark}）。诊断报告「该开」照它写原因。 */
+        /** 熄屏放开了：座舱熄屏时谁都不要，没留着的环视也是（{@link ChannelRules#releasedByDark}）。诊断报告「该开」照它写原因。 */
         final boolean releasedByDark;
         final ChannelRules.Device device;
         final long deviceSince;
@@ -1199,6 +1227,16 @@ public final class ChannelScheduler {
         final List<String> recordKeys;
         /** 通道眼里亮着（{@link ChannelRules#darkForChannel} 的反面：屏幕黑了不到 30 秒、车机没要睡也算亮着）。 */
         final boolean screenOn;
+        /** 屏幕知道黑没黑（不知道时谁都不开，{@link ChannelRules.Why#SCREEN_UNKNOWN}）。 */
+        final boolean screenKnown;
+        /** 在开车（2026-10-27 的熄屏规矩这时不用）。 */
+        final boolean driving;
+        /** 环视这一段熄屏是哪一种（{@link ChannelRules.SurroundInDark}）、此刻留着没有（含设置，{@link ChannelRules#surroundKept}）。 */
+        final ChannelRules.SurroundInDark surroundInDark;
+        final boolean surroundKept;
+        /** 哨兵模式（这一轮读到的；null 读不到）、「熄屏持续录制」开着。 */
+        final Integer sentry;
+        final boolean keepWhenDark;
         final boolean foregroundService;
         final boolean mainForeground;
         final boolean serviceStartedWhileVisible;
@@ -1237,6 +1275,12 @@ public final class ChannelScheduler {
             this.holders = Collections.unmodifiableSet(copyOf(w.holders));
             this.recordKeys = Collections.unmodifiableList(new ArrayList<>(recordKeys));
             this.screenOn = w.screenOn;
+            this.screenKnown = w.screenKnown;
+            this.driving = w.driving;
+            this.surroundInDark = w.surroundInDark;
+            this.surroundKept = ChannelRules.surroundKept(w);
+            this.sentry = w.sentry;
+            this.keepWhenDark = w.keepWhenDark;
             this.foregroundService = w.foregroundService;
             this.mainForeground = mainForeground;
             this.serviceStartedWhileVisible = serviceStartedWhileVisible;
@@ -1350,6 +1394,23 @@ public final class ChannelScheduler {
         for (Runnable done : due) {
             done.run();
         }
+    }
+
+    // ---- 环视这一段熄屏留不留：跟着进程，不跟着管线（项目所有者 2026-10-27；只在主线程上读写）----
+
+    /**
+     * 进程这一层记着的环视这一段熄屏是哪一种（{@link ChannelRules.World#surroundInDark}）：调度建新世界时照它填（{@link #setLanes}），
+     * 正在用的那一份（不在退出、车机要睡）每一轮写回。管线放掉重建（换车型、列相机出错、启用的几路变了、超级镜子要后座舱）时
+     * 新的那一份调度接着用 —— 熄屏录像不断；进程起来时是放开、没有上一次读数（进程在黑着时被拉起不开相机）。
+     */
+    private static ChannelRules.SurroundInDark processSurroundInDark = ChannelRules.SurroundInDark.RELEASED;
+    /** 同上，上一次读得到的哨兵模式（{@link ChannelRules.World#lastSentry}）；null = 还没有。 */
+    private static Integer processLastSentry;
+
+    /** 测试用：回到进程刚起来的样子（每一条测试之前调，不让上一条的熄屏留到下一条）。 */
+    static void resetProcessDark() {
+        processSurroundInDark = ChannelRules.SurroundInDark.RELEASED;
+        processLastSentry = null;
     }
 
     /** 叫醒每一份调度：前台服务就绪 / 没了、主界面进出前台（这几件事是进程级的，不归哪一份管理器）。 */
@@ -1508,8 +1569,13 @@ public final class ChannelScheduler {
             list.add(new ChannelRules.Lane(entry.getKey(), entry.getValue().cameraId()));
         }
         w = new ChannelRules.World(list, enabled);
-        // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）
+        // 环视这一段熄屏留不留照进程那一份接着用：管线重建不断熄屏录像（项目所有者 2026-10-27）
+        w.surroundInDark = processSurroundInDark;
+        w.lastSentry = processLastSentry;
+        // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）。
+        // 环视留不留要的车上几样也一样（留着的环视第一轮之前不能读成放开）
         readScreen();
+        readCar();
         running = null;
         lastWait = null;
         lastDeferred = null;
@@ -1879,16 +1945,28 @@ public final class ChannelScheduler {
      * 亮熄屏。和谁登记着无关 —— 录像、拍照刚登记的那一下来问，读到的也是对的（设计 v3.1 C4）。它变了告诉录像那一侧
      * （{@link Recording#onLaneConditionChanged}）。录像据此不把它算作在起来（RecordingLanes.Facts）、不为它备录制器。
      * 屏幕黑了还不到 30 秒时，开着的座舱不算、关着的算（黑着不开它；项目所有者 2026-10-13「黑满 30 秒再放」）。
+     * 环视（2026-10-27）：通道算黑、没在开车、没留着（「熄屏持续录制」开着、哨兵模式开或布防）时算。
      */
     public boolean releasedByDark(String key) {
         ChannelRules.Lane lane = w.lane(key);
         return lane != null && ChannelRules.releasedByDark(w, lane);
     }
 
-    /** 拍照不拍这一路：被拿着、被挡着、停手了、或者熄屏放开了；在出画面的照拍（哪怕它的录像路不在）。 */
+    /**
+     * 拍照不拍这一路：被拿着、被挡着、停手了、或者熄屏放开了；通道算黑、没在开车时不在出画面的都不拍（不为拍照开相机，2026-10-27）。
+     * 在出画面的照拍（哪怕它的录像路不在）。
+     */
     public boolean excludedFromPhoto(String key) {
         ChannelRules.Lane lane = w.lane(key);
         return lane != null && ChannelRules.excludedFromPhoto(w, lane);
+    }
+
+    /**
+     * 这一轮通道算黑、没在开车（{@link ChannelRules#parkedDark}）：这时只算录像，不为拍照、超级镜子、盲区画面开相机。
+     * 拍照不拍的那一行据此写「熄屏：不为拍照开相机」。
+     */
+    public boolean parkedDark() {
+        return ChannelRules.parkedDark(w);
     }
 
     /**
@@ -1938,6 +2016,7 @@ public final class ChannelScheduler {
         maybeAsk();
         noteAftermaths(now);
         tellRecording();
+        keepProcessDark();
         if (updateWinding(now)) {
             stop();
             publish(d, now);
@@ -1994,6 +2073,7 @@ public final class ChannelScheduler {
         w.heardAnything = host.heardAnything();
         w.lastOthersChangeAt = ourClock(host.lastOthersChangeAt(), offset);
         w.frontCabinOneShot = host.frontCabinOneShot();
+        readCar();
 
         if (host.headUnitSleeps()) {
             sleepNoticedAt.compareAndSet(0, now);
@@ -2016,10 +2096,11 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 屏幕的两样事实，只在这里填（项目所有者 2026-10-13「黑满 30 秒再放」）：{@code w.screenOn} 是通道眼里亮着没有
+     * 屏幕的事实，只在这里填（项目所有者 2026-10-13「黑满 30 秒再放」）：{@code w.screenOn} 是通道眼里亮着没有
      * （{@link ChannelRules#darkForChannel}：屏幕黑满 30 秒、或者车机要睡才算黑）—— 规则里读它的每一处（预览、保持、
-     * 熄屏放开座舱、关的原因、亮屏解除停手）都是这一个；{@code w.screenDark} 是屏幕真黑了没有，黑了还不到 30 秒时
+     * 熄屏放开相机、关的原因、亮屏解除停手）都是这一个；{@code w.screenDark} 是屏幕真黑了没有，黑了还不到 30 秒时
      * 关着的座舱不开（{@link ChannelRules#releasedByDark}）。顺带记下还要多久才算黑（{@link #darkDueInMs}），{@link #arm} 照它到点醒。
+     * 还记下安卓熄屏了没有（车机要睡，环视放开）、屏幕知不知道黑没黑（不知道时不开，2026-10-27）。
      */
     private void readScreen() {
         boolean dark = !host.screenOn();
@@ -2028,6 +2109,29 @@ public final class ChannelScheduler {
         darkDueInMs = ChannelRules.untilDarkForChannel(dark, darkForMs, androidOff);
         w.screenOn = !ChannelRules.darkForChannel(dark, darkForMs, androidOff);
         w.screenDark = dark;
+        w.androidOff = androidOff;
+        w.screenKnown = host.screenKnown();
+    }
+
+    /**
+     * 环视熄屏时留不留要的三样（项目所有者 2026-10-27）：哨兵模式、在不在开车（变了 Android 那一层叫醒）、「熄屏持续录制」（每一轮现读）。
+     */
+    private void readCar() {
+        w.sentry = host.sentry();
+        w.keepWhenDark = host.keepRecordingWhenDark();
+        w.driving = host.driving();
+    }
+
+    /**
+     * 环视这一段熄屏留不留写回进程那一层（{@link #processSurroundInDark}）：只由正在用的那一份写 —— 为退出、车机要睡在关的那一份不写，
+     * 换车型时放掉的旧管线不会把新那一份的账盖掉。
+     */
+    private void keepProcessDark() {
+        if (ChannelRules.winding(w)) {
+            return;
+        }
+        processSurroundInDark = w.surroundInDark;
+        processLastSentry = w.lastSentry;
     }
 
     private void refreshLane(ChannelRules.Lane lane, CameraPort port, long offset, long now) {
@@ -2518,6 +2622,12 @@ public final class ChannelScheduler {
                 case FRONT_CABIN_RETIRED:
                     host.frontCabinRetired(event.keys.get(0));
                     break;
+                case SURROUND_IN_DARK: {
+                    ChannelRules.Lane lane = w.lane(event.keys.get(0));
+                    journal.surroundInDark(ChannelRules.surroundKept(w), event.cause, w.sentry, w.keepWhenDark,
+                            lane != null && ChannelRules.keepsRecordOutput(w, lane));
+                    break;
+                }
                 default:
                     break;
             }
@@ -2610,6 +2720,11 @@ public final class ChannelScheduler {
                         recordWaitSince.put(key, now);
                     }
                     wait = new Wait(d.why, key, d.pending, d.ms, "", 0, null, null, false, false);
+                    break;
+                case SCREEN_UNKNOWN:
+                    // 屏幕不知道黑没黑，先不开这一路（2026-10-27）：变了才写
+                    sig = d.why + "|" + key;
+                    wait = new Wait(d.why, key, d.pending, -1, "", 0, null, null, false, false);
                     break;
                 default:
                     // 手上那一步、待判、座舱等环视关完、退出时等关完：都是我们自己的步子，不写
