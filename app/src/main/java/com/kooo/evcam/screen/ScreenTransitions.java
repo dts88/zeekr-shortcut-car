@@ -15,9 +15,19 @@ import com.kooo.evcam.telemetry.Telemetry;
  *   <li>{@link Edge#DARK}（E1）：亮 → 黑。平常是车辆先说黑（车主下车、车门关上），安卓还亮着；车辆信号读不到时是安卓熄屏，
  *       那就是 E1 和 E2 一起来（降级，和 2.11.1 一样）；</li>
  *   <li>{@link Edge#HEAD_UNIT_SLEEPS}（E2）：已经黑着，安卓熄屏 —— 在这台车上就是车机下电（哨兵模式没开时离车约 4–6 分钟后）；</li>
- *   <li>{@link Edge#WOKE_WHILE_DARK}（E2'）：安卓又亮了，车辆还说黑着 —— 车机自己醒了一阵（10-12 01:40 那一次），还算熄屏；</li>
- *   <li>{@link Edge#LIT}（E3）：黑 → 亮（开车门；或者早上醒来、车辆说亮了）。</li>
+ *   <li>{@link Edge#WOKE_WHILE_DARK}（E2'）：安卓又亮了，车辆还说黑着 —— 车机自己醒了一阵（10-12 01:40 那一次），还算熄屏；
+ *       2026-10-27 起屏幕亮了、车没通电（点火 ACC 或更低）也是这一条；</li>
+ *   <li>{@link Edge#LIT}（E3）：黑 → 亮 —— 车通电了（点火 ON、DRIVING：开车门；早上回到车上）。</li>
  * </ul>
+ *
+ * <h3>亮要有证据（项目所有者 2026-10-27）</h3>
+ *
+ * <p>黑着、或者还没有车辆的判断（进程刚起来、车辆接口刚连上、读不到的时限过了）时（{@link #litNeedsEvidence}），
+ * 车辆的判断带着这段历史算（{@link VehicleScreen#verdict}）：车没通电（点火 ACC 或更低）就还是黑，屏幕电源事件说亮也不算 ——
+ * 远程开空调、远程看车时屏幕亮了，主界面、超级镜子、座舱都不动，也没有边；点火不知道、事件说亮：说不上来，照下面那条
+ * 照上一次的判断算，过了只看安卓。进程在 ACC、屏幕亮着时起来，读到的第一份就是黑（E1，起点不明）。人真回来全是车先通电再亮屏
+ * （10-13 到 10-24 的 13 次），所以黑着时结束黑的是车通电了。只有车辆判过亮的那一段（人在车里，一直没黑过）点火掉到 ACC、
+ * 事件还是亮，才照两项「且」算亮着。</p>
  *
  * <h3>车辆说不上来的时候（C3）</h3>
  *
@@ -72,6 +82,14 @@ final class ScreenTransitions {
     private ScreenTransitions() {
     }
 
+    /**
+     * 亮要有证据：黑着，或者还没有车辆的判断。这时车辆的判断按 {@link VehicleScreen#verdict} 带历史的那一半算 ——
+     * 车没通电就是黑。
+     */
+    static boolean litNeedsEvidence(State s) {
+        return s.dark() || s.vehicle == null;
+    }
+
     /** 进程起来时：安卓此刻熄没熄屏，车辆还没读（读到之前只看安卓）。 */
     static State initial(boolean androidOff) {
         return new State(androidOff, null, 0);
@@ -80,7 +98,8 @@ final class ScreenTransitions {
     /**
      * 车辆的判断来了（读数变了、车辆接口的结果变了、读不到的时限到了再看一次）。
      *
-     * @param fresh     此刻读数判出来的（{@link VehicleScreen#verdict}）；null = 说不上来
+     * @param fresh     此刻读数判出来的（{@link VehicleScreen#verdict}，亮要不要证据照 {@code s}，{@link #litNeedsEvidence}）；
+     *                  null = 说不上来
      * @param connected 车辆接口连着
      * @param now       此刻（elapsedRealtime）
      */
@@ -111,7 +130,7 @@ final class ScreenTransitions {
     /**
      * 安卓亮了，醒来那一遍车辆信号也读完了（或者等满了、车辆接口没连着）：只认这一遍读到的。
      *
-     * @param fresh     醒来后读到的判断；没读回来、读不到是 null（只看安卓）
+     * @param fresh     醒来后读到的判断（安卓熄屏着就是黑着，亮要有证据：车没通电还是黑，E2'）；没读回来、读不到是 null（只看安卓）
      * @param connected 车辆接口连着
      */
     static State androidOn(State s, Boolean fresh, boolean connected) {

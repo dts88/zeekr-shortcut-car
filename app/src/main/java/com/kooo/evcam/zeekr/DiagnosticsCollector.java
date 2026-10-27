@@ -980,7 +980,7 @@ public final class DiagnosticsCollector {
             sb.append("车辆判断（判断用着的）: ").append(verdictText(n.vehicle)).append('\n');
             sb.append("  screen_power_event=").append(eventText(n.screenPowerEvent))
                     .append("，点火=").append(ignitionText(n.ignition))
-                    .append(" → 此刻读数判下来: ").append(verdictText(VehicleScreen.verdict(n.screenPowerEvent, n.ignition)))
+                    .append(" → 此刻读数判下来: ").append(verdictText(VehicleScreen.verdict(n.screenPowerEvent, n.ignition, n.litNeedsEvidence)))
                     .append('\n');
             sb.append("  车辆接口: ").append(linkText(n.carLink)).append('\n');
             sb.append("安卓: 可交互=").append(n.interactive ? "是" : "否")

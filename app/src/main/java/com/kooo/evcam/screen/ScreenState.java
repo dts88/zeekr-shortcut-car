@@ -36,9 +36,10 @@ import java.util.List;
  *   <li><b>熄屏</b>（E1）：唤醒锁、录像那张表（{@link RecordingCoordinator#screenOff}）、监听者（相机层放开座舱、主界面、后视镜、盲区画面）；</li>
  *   <li><b>车机要睡</b>（E2，黑着时安卓熄屏 = 车机下电）：只叫录像那张表再判一次（{@link RecordingCoordinator#headUnitSleeps}）——
  *       现在停、按次序关（这时只剩环视）；监听者不叫（屏幕早就黑了）；</li>
- *   <li><b>车机醒着、屏幕黑着</b>（E2'，黑着时安卓又亮了：车机自己醒了一阵）：撤掉「车机要睡」、照表接不接
+ *   <li><b>车机醒着、屏幕黑着</b>（E2'，黑着时安卓又亮了：车机自己醒了一阵；2026-10-27 起屏幕亮了、车没通电也是）：撤掉「车机要睡」、照表接不接
  *       （{@link RecordingCoordinator#headUnitWoke}），按开机自启动恢复服务（不拉界面）；监听者不叫（还黑着）；</li>
- *   <li><b>亮屏</b>（E3）：和以前的亮屏一样，按固定顺序走一遍。</li>
+ *   <li><b>亮屏</b>（E3）：和以前的亮屏一样，按固定顺序走一遍。黑着时亮要有证据（项目所有者 2026-10-27，{@link VehicleScreen}）：
+ *       车通电了（点火 ON、DRIVING）才是亮屏；车没通电时屏幕亮了（远程开空调、远程看车）照熄屏算、不是边，黑匣子里记起止各一行。</li>
  * </ul>
  *
  * <p>顺序固定：熄屏录制的唤醒锁（{@link ScreenOffRecording}）→ 录像的规矩（{@link RecordingCoordinator}）→ 相机（谁要用就登记，
@@ -116,10 +117,15 @@ public final class ScreenState {
         public final boolean known;
         /** 在等安卓刚亮那一遍车辆信号。 */
         public final boolean wakePending;
+        /**
+         * 亮要有证据（黑着，或者还没有车辆的判断，{@link ScreenTransitions#litNeedsEvidence}）：此刻的读数照
+         * {@link VehicleScreen#verdict} 带历史的那一半判（车没通电就是黑）。
+         */
+        public final boolean litNeedsEvidence;
 
         Now(boolean dark, Source source, long darkForMs, boolean androidOff, long androidOffForMs, Boolean vehicle,
             Boolean screenPowerEvent, Integer ignition, Telemetry.CarLink carLink, boolean interactive, boolean known,
-            boolean wakePending) {
+            boolean wakePending, boolean litNeedsEvidence) {
             this.dark = dark;
             this.source = source;
             this.darkForMs = darkForMs;
@@ -132,6 +138,7 @@ public final class ScreenState {
             this.interactive = interactive;
             this.known = known;
             this.wakePending = wakePending;
+            this.litNeedsEvidence = litNeedsEvidence;
         }
     }
 
@@ -147,15 +154,21 @@ public final class ScreenState {
         /** 上一次看到的两项原值（黑匣子里写「0 → 1」）；车辆接口没连着是 null。 */
         final Boolean event;
         final Integer ignition;
+        /**
+         * 黑着时屏幕亮了、车没通电（{@link VehicleScreen#unpoweredLit}）的那一段从什么时候起（elapsedRealtime）；0 = 没有。
+         * 事件不再是亮、或者亮屏了就结束。只为黑匣子里记起止各一行。
+         */
+        final long unpoweredLitAtMs;
 
         Facts(ScreenTransitions.State state, long darkAtMs, long androidOffAtMs, Source source, Boolean event,
-              Integer ignition) {
+              Integer ignition, long unpoweredLitAtMs) {
             this.state = state;
             this.darkAtMs = darkAtMs;
             this.androidOffAtMs = androidOffAtMs;
             this.source = source;
             this.event = event;
             this.ignition = ignition;
+            this.unpoweredLitAtMs = unpoweredLitAtMs;
         }
     }
 
@@ -175,7 +188,7 @@ public final class ScreenState {
     private static final List<Runnable> WHEN_KNOWN = new ArrayList<>();
     private static Context app;
     private static boolean installed;
-    private static volatile Facts facts = new Facts(ScreenTransitions.initial(false), 0, 0, null, null, null);
+    private static volatile Facts facts = new Facts(ScreenTransitions.initial(false), 0, 0, null, null, null, 0);
     private static volatile Settle settle = Settle.NONE;
     /** 等的那一段的世代号：作废了的、等满了的，晚到的回调认得出来（主线程）。 */
     private static int settleGen;
@@ -204,7 +217,7 @@ public final class ScreenState {
         installed = true;
         app = context.getApplicationContext();
         boolean off = !interactive(app);
-        facts = new Facts(ScreenTransitions.initial(off), 0, 0, off ? Source.ANDROID : null, null, null);
+        facts = new Facts(ScreenTransitions.initial(off), 0, 0, off ? Source.ANDROID : null, null, null, 0);
         Telemetry telemetry = Telemetry.get();
         telemetry.addListener(VEHICLE);
         telemetry.keepCore(app);
@@ -303,7 +316,8 @@ public final class ScreenState {
         return new Now(dark, dark ? f.source : null, dark && f.darkAtMs > 0 ? now - f.darkAtMs : -1,
                 f.state.androidOff, dark && f.androidOffAtMs > 0 ? now - f.androidOffAtMs : -1, f.state.vehicle,
                 r.bool(Signal.SCREEN_POWER_EVENT), r.code(Signal.IGNITION), telemetry.carLink(),
-                DisplayWatch.interactiveNow(), s == Settle.NONE, s == Settle.WAKE);
+                DisplayWatch.interactiveNow(), s == Settle.NONE, s == Settle.WAKE,
+                ScreenTransitions.litNeedsEvidence(f.state));
     }
 
     /**
@@ -366,9 +380,10 @@ public final class ScreenState {
         boolean connected = link == Telemetry.CarLink.CONNECTED;
         Boolean event = connected ? readings.bool(Signal.SCREEN_POWER_EVENT) : null;
         Integer ignition = connected ? readings.code(Signal.IGNITION) : null;
-        Boolean fresh = VehicleScreen.verdict(event, ignition);
-        long now = SystemClock.elapsedRealtime();
         ScreenTransitions.State before = facts.state;
+        // 黑着、或者还没有车辆的判断：亮要有证据（车没通电还是黑）
+        Boolean fresh = VehicleScreen.verdict(event, ignition, ScreenTransitions.litNeedsEvidence(before));
+        long now = SystemClock.elapsedRealtime();
         ScreenTransitions.State next = ScreenTransitions.verdict(before, fresh, connected, now);
         // 进程起来后的第一份、安卓刚亮时等着连上的那一份：读到了判断，或者车辆接口有了结果（连上了要等那一遍读数发布出来：
         // 连上的通知比读数早 40 ms）
@@ -379,8 +394,9 @@ public final class ScreenState {
             endSettle();
         }
         if (connected && before.vehicle != null && next.vehicle == null) {
-            BlackBox.noteImportant("车辆信号连接：screen_power_event、点火读不到了 "
-                    + (now - before.unknownSinceMs) / 1000 + " 秒，熄屏只看安卓");
+            BlackBox.noteImportant("车辆信号连接：判不出屏幕 " + (now - before.unknownSinceMs) / 1000
+                    + " 秒（screen_power_event=" + VehicleScreen.eventText(event) + "、点火="
+                    + VehicleScreen.ignitionText(ignition) + "），熄屏只看安卓");
         }
         move(next, event, ignition);
         MAIN.removeCallbacks(UNKNOWN_CHECK);
@@ -500,7 +516,9 @@ public final class ScreenState {
         Boolean event = connected ? r.bool(Signal.SCREEN_POWER_EVENT) : null;
         Integer ignition = connected ? r.code(Signal.IGNITION) : null;
         wakeCapped = capped && connected;
-        Boolean fresh = capped ? null : VehicleScreen.verdict(event, ignition);
+        // 安卓熄屏着就是黑着：亮要有证据，车没通电还是黑（E2'）
+        Boolean fresh = capped ? null
+                : VehicleScreen.verdict(event, ignition, ScreenTransitions.litNeedsEvidence(facts.state));
         move(ScreenTransitions.androidOn(facts.state, fresh, connected), event, ignition);
         drainWhenKnown();
     }
@@ -572,29 +590,48 @@ public final class ScreenState {
             offAt = 0;
             source = null;
         }
-        Facts after = new Facts(next, darkAt, offAt, source, event, ignition);
+        // 黑着时屏幕亮了、车没通电的那一段：车辆照它判了黑（只有亮要证据时会这样）才起；事件不再是亮、或者亮屏了就完
+        long unpoweredAt = !next.dark() || !Boolean.FALSE.equals(event) ? 0
+                : before.unpoweredLitAtMs > 0 ? before.unpoweredLitAtMs
+                : Boolean.TRUE.equals(next.vehicle) && VehicleScreen.unpoweredLit(event, ignition) ? now : 0;
+        Facts after = new Facts(next, darkAt, offAt, source, event, ignition, unpoweredAt);
         facts = after;
-        if (edge == null) {
-            return;
-        }
-        try {
-            switch (edge) {
-                case DARK:
-                    wentDark(before, after);
-                    break;
-                case HEAD_UNIT_SLEEPS:
-                    headUnitSleeps(after);
-                    break;
-                case WOKE_WHILE_DARK:
-                    wokeWhileDark(after);
-                    break;
-                default:
-                    wentLit(before, after);
-                    break;
+        if (edge != null) {
+            try {
+                switch (edge) {
+                    case DARK:
+                        wentDark(before, after);
+                        break;
+                    case HEAD_UNIT_SLEEPS:
+                        headUnitSleeps(after);
+                        break;
+                    case WOKE_WHILE_DARK:
+                        wokeWhileDark(after);
+                        break;
+                    default:
+                        wentLit(before, after);
+                        break;
+                }
+            } catch (RuntimeException e) {
+                AppLog.e(TAG, "edge " + edge + " failed", e);
+                BlackBox.noteImportant("熄屏判断：" + edge + " 这一步出错（" + e + "），后面的没做完");
             }
-        } catch (RuntimeException e) {
-            AppLog.e(TAG, "edge " + edge + " failed", e);
-            BlackBox.noteImportant("熄屏判断：" + edge + " 这一步出错（" + e + "），后面的没做完");
+        }
+        noteUnpoweredLit(before, after, now);
+    }
+
+    /**
+     * 黑着时屏幕亮了、车没通电（远程开空调、远程看车那一类）的那一段，起止各记一行：亮过多久、为什么没当亮屏，黑匣子里看得到。
+     * 以亮屏（E3：车通电了）结束的不另记 —— 亮屏那一行就是。
+     */
+    private static void noteUnpoweredLit(Facts before, Facts after, long now) {
+        if (before.unpoweredLitAtMs == 0 && after.unpoweredLitAtMs > 0) {
+            BlackBox.noteImportant("屏幕亮了，车没通电（点火 ACC 或更低）：照熄屏算，不当亮屏（screen_power_event="
+                    + VehicleScreen.eventText(after.event) + "、点火=" + VehicleScreen.ignitionText(after.ignition) + "）");
+        } else if (before.unpoweredLitAtMs > 0 && after.unpoweredLitAtMs == 0 && after.state.dark()) {
+            BlackBox.noteImportant("车没通电时屏幕亮着的那一段完了，还是熄屏（screen_power_event="
+                    + VehicleScreen.eventText(after.event) + "、点火=" + VehicleScreen.ignitionText(after.ignition)
+                    + "），亮了 " + (now - before.unpoweredLitAtMs) / 1000 + " 秒");
         }
     }
 
@@ -639,7 +676,7 @@ public final class ScreenState {
     private static void wokeWhileDark(Facts after) {
         MAIN.removeCallbacks(WAKE_POLL);
         long darkMs = after.darkAtMs > 0 ? SystemClock.elapsedRealtime() - after.darkAtMs : -1;
-        BlackBox.noteImportant("安卓亮屏（" + wakeHow + "），车辆信号还黑着（screen_power_event="
+        BlackBox.noteImportant("安卓亮屏（" + wakeHow + "），车辆判断还是黑（screen_power_event="
                 + VehicleScreen.eventText(after.event) + "、点火=" + VehicleScreen.ignitionText(after.ignition)
                 + "）：车机醒着、屏幕黑着" + (darkMs < 0 ? "" : "，熄屏后 +" + darkMs / 1000 + " 秒"));
         RecordingCoordinator.get(app).headUnitWoke();

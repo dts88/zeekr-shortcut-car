@@ -127,9 +127,9 @@ Diagnostics**.
   that does not provide one gets nothing split.
 - Factory features come first: the built-in 360° view, reversing camera and parking cameras can
   reclaim a camera at any time.
-- Starting on boot and recording on launch are off by default. With the screen off, only the
-  surround view keeps recording; the cabins resume when the screen turns on. Without Sentry Mode,
-  recording stops when the head unit sleeps, a few minutes after you leave the car.
+- Starting on boot and recording on launch are off by default. With Sentry Mode on, the surround
+  view keeps recording with the screen off and the rear cabin resumes when the screen turns on.
+  Without Sentry Mode, recording pauses with the screen off and resumes when it turns on.
 - Cropping a surround view is switched off for now.
 - On-vehicle validation is ongoing. Automated tests cover the pure logic only; test in a stationary
   vehicle first.
