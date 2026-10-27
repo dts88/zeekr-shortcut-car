@@ -2795,7 +2795,7 @@ public class MultiCameraManager {
                         // 屏幕黑了还不到 30 秒：通道照亮着算（ChannelRules.darkForChannel，项目所有者 2026-10-13）
                         : com.kooo.evcam.screen.ScreenState.dark() ? "熄屏" + darkSinceText() + "，不到 "
                         + (ChannelRules.HOLD_MS / 1000) + " 秒：开着的相机照旧、关着的座舱不开，黑满 "
-                        + (ChannelRules.HOLD_MS / 1000) + " 秒放开座舱" : "亮屏")
+                        + (ChannelRules.HOLD_MS / 1000) + " 秒放开座舱，环视照哨兵模式留或放" : "亮屏")
                 .append("；前台服务").append(s.foregroundService ? "在" : "不在").append('\n');
         if (!s.screenOn) {
             sb.append("熄屏放开座舱：").append(cabinReleaseText()).append('\n');
@@ -3646,22 +3646,25 @@ public class MultiCameraManager {
 
         /**
          * 环视这一段熄屏留不留（项目所有者 2026-10-27）：每变一次一行，带「，熄屏后 +Nms」。通道刚算黑那一行不写「满 30 秒」——
-         * 起点不明时是当场算黑的。协调器判的那一行（熄屏那张表）不知道环视留没留，看这几行。
+         * 起点不明时是当场算黑的。只写通道定了什么（留下、放开，录像要不要它），不说相机此刻开没开得起来 ——
+         * 用不了相机、屏幕还不知道黑没黑时另有「先不开」那一行。协调器判的那一行（熄屏那张表）不知道环视留没留，看这几行。
          */
         @Override
         public void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
-                                   boolean recordsSurround) {
+                                   boolean recording, boolean recordsSurround) {
+            // 留着的环视此刻录像要不要它：要 → 留下；在录、计划里没有环视 → 不用；没在录 → 留下，录像要它再开
+            String keptText = recordsSurround ? "环视留下（录像）"
+                    : recording ? "环视不用（录像计划里没有环视）" : "环视留下（没在录，录像要它再开）";
             String line;
             switch (why) {
                 case DARK_ONSET:
-                    line = kept ? "通道：熄屏，哨兵 " + sentryText(sentry) + "、熄屏持续录制开"
-                            + (recordsSurround ? " → 环视接着录" : "，没在录环视 → 环视先关，开了录再开")
+                    line = kept ? "通道：熄屏，哨兵 " + sentryText(sentry) + "、熄屏持续录制开 → " + keptText
                             : "通道：熄屏，环视放开（" + (!keepSetting ? "熄屏持续录制关着"
                             : sentry == null ? "哨兵读不到" : "哨兵关") + "）";
                     break;
                 case SENTRY_ON:
-                    line = "通道：熄屏中哨兵变成 " + sentryText(sentry) + " → " + (kept && recordsSurround ? "环视开起来录"
-                            : "不开（" + (!keepSetting ? "熄屏持续录制关着" : "没在录环视") + "）");
+                    line = "通道：熄屏中哨兵变成 " + sentryText(sentry) + " → "
+                            + (kept ? keptText : "环视不开（熄屏持续录制关着）");
                     break;
                 case SENTRY_OFF:
                     line = "通道：熄屏中哨兵关了 → 环视放开";

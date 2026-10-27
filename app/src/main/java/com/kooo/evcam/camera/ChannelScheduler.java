@@ -403,11 +403,11 @@ public final class ChannelScheduler {
 
         /**
          * 环视这一段熄屏留不留变了（项目所有者 2026-10-27，{@link ChannelRules#judgeSurroundInDark}）：每变一次一行；通道刚算黑那一下
-         * 不管变没变都写。{@code kept} 是此刻留着（{@link ChannelRules#surroundKept}，含设置）；{@code recordsSurround}：录像要它
-         * （RECORDING 登记着、计划里有环视）。
+         * 不管变没变都写。{@code kept} 是此刻留着（{@link ChannelRules#surroundKept}，含设置）；{@code recording}：RECORDING 登记着；
+         * {@code recordsSurround}：录像要它（RECORDING 登记着、计划里有环视）。只说通道定了什么，不说相机此刻开没开得起来。
          */
         void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
-                            boolean recordsSurround);
+                            boolean recording, boolean recordsSurround);
 
         /** 连着救 3 次没用，歇 60 秒。 */
         void gaveUp(String key);
@@ -2634,6 +2634,7 @@ public final class ChannelScheduler {
                 case SURROUND_IN_DARK: {
                     ChannelRules.Lane lane = w.lane(event.keys.get(0));
                     journal.surroundInDark(ChannelRules.surroundKept(w), event.cause, w.sentry, w.keepWhenDark,
+                            w.holders.contains(CameraNeeds.Holder.RECORDING),
                             lane != null && ChannelRules.keepsRecordOutput(w, lane));
                     break;
                 }

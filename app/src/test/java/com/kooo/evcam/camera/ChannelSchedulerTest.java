@@ -2158,6 +2158,23 @@ public class ChannelSchedulerTest {
                 "surroundInDark RELEASED ANDROID_OFF sentry=1 records"), lines("surroundInDark"));
     }
 
+    /** 环视留着、在录，可这一次录像的计划里没有环视（只录座舱的配置）：那一行照实报「计划里没有」，不当成没在录。 */
+    @Test
+    public void theSurroundInDarkLineTellsAPlanWithoutTheSurroundFromNotRecording() {
+        claim(Holder.RECORDING);
+        host.plan(REAR, FRONT);
+        streaming(rear, recR);
+        streaming(front, recF);
+        host.sentryArmed();
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("surroundInDark KEPT DARK_ONSET sentry=2 notInPlan"), lines("surroundInDark"));
+    }
+
     /**
      * 环视留不留跟着进程、不跟着管线（项目所有者 2026-10-27）：管线放掉重建（旧的那一份退出、只关），新的那一份调度从进程那一份接着用 ——
      * 第一轮之前就读得到「环视留着」，熄屏录像不断；进程重新起来（测试里回到进程刚起来的样子）是放开。
@@ -3895,12 +3912,13 @@ public class ChannelSchedulerTest {
             journal.add("stopLifted " + key + " " + cause);
         }
 
-        /** 「surroundInDark KEPT DARK_ONSET sentry=2 records」。 */
+        /** 「surroundInDark KEPT DARK_ONSET sentry=2 records」；在录、计划里没有环视的是「notInPlan」。 */
         @Override
         public void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
-                                   boolean recordsSurround) {
+                                   boolean recording, boolean recordsSurround) {
             journal.add("surroundInDark " + (kept ? "KEPT" : "RELEASED") + " " + why + " sentry=" + sentry
-                    + (keepSetting ? "" : " keepOff") + (recordsSurround ? " records" : ""));
+                    + (keepSetting ? "" : " keepOff")
+                    + (recordsSurround ? " records" : recording ? " notInPlan" : ""));
         }
 
         @Override
