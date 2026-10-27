@@ -9,6 +9,15 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [2.31.0-alpha] - 2026-10-27
+
+- Screen off: 30 seconds after the screen goes off, the surround view keeps recording only when Keep recording when the screen goes off is on and Sentry Mode is on or armed; otherwise the surround is released with the cabins and recording pauses until the screen turns on.
+- Screen off: turning Sentry Mode on while the screen is off starts surround recording again. Turning it off stops it. When the head unit is about to sleep, every camera is released.
+- Screen off: a screen lit while the car is not powered (ACC or lower), such as remote climate control, still counts as off: the app does not come forward and no camera opens. The car powering on counts as returning.
+- Screen off: recording no longer starts when the head unit wakes on its own or the app is started with the screen off, and pauses instead of showing Waiting for cameras once the cameras are released with the screen off. No camera opens for photos while the screen is off unless the surround view is already recording.
+- Settings → Recording: the description of Keep recording when the screen goes off is updated.
 - Settings → System → Simulated drive sound: Sound style offers American V8 and Supersonic jet (old version). Prototype V8, Supersonic jet, Turbo four and Electric concept car appear only with developer options on; with them off, a stored choice among those plays as American V8.
 
 ## [2.30.0-alpha] - 2026-10-24
