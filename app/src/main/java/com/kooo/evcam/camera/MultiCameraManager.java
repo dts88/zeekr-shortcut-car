@@ -781,8 +781,16 @@ public class MultiCameraManager {
         }
         if (now.liveKeys.isEmpty()) {
             if (!before.liveKeys.isEmpty()) {
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("录像：一路都不在录了 —— 等待摄像头，恢复后自动继续"
-                        + "（录像不算停）；各路：" + lanesText(facts));
+                // 每一路都是熄屏放开的（通道刚算黑、哨兵关了、车机要睡那一轮，环视没留着）：不是等摄像头 ——
+                // 录像协调器照通道的决定随后停（ChannelScheduler.surroundVerdict）
+                boolean allReleased = !facts.isEmpty();
+                for (RecordingLanes.Facts lane : facts) {
+                    allReleased &= lane.releasedByDark;
+                }
+                com.kooo.evcam.blackbox.BlackBox.noteImportant((allReleased
+                        ? "录像：熄屏放开了在录的几路（通道定的），录像随后停（录像协调器）"
+                        : "录像：一路都不在录了 —— 等待摄像头，恢复后自动继续（录像不算停）")
+                        + "；各路：" + lanesText(facts));
             }
             if (now.view == RecordingLanes.View.WAITING && noneLiveSince == 0) {
                 noneLiveSince = at;
@@ -3647,14 +3655,18 @@ public class MultiCameraManager {
         /**
          * 环视这一段熄屏留不留（项目所有者 2026-10-27）：每变一次一行，带「，熄屏后 +Nms」。通道刚算黑那一行不写「满 30 秒」——
          * 起点不明时是当场算黑的。只写通道定了什么（留下、放开，录像要不要它），不说相机此刻开没开得起来 ——
-         * 用不了相机、屏幕还不知道黑没黑时另有「先不开」那一行。协调器判的那一行（熄屏那张表）不知道环视留没留，看这几行。
+         * 用不了相机、屏幕还不知道黑没黑时另有「先不开」那一行。录像协调器照通道这一决定停录、开录
+         * （{@link ChannelScheduler#surroundVerdict}）：放开了在录的就停；熄屏中哨兵变成开、留下了环视，「这一趟要录」立着就接着录。
          */
         @Override
         public void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
                                    boolean recording, boolean recordsSurround) {
-            // 留着的环视此刻录像要不要它：要 → 留下；在录、计划里没有环视 → 不用；没在录 → 留下，录像要它再开
+            // 留着的环视此刻录像要不要它：要 → 留下；在录、计划里没有环视 → 不用；没在录 → 留下 —— 哨兵变成开留下的，
+            // 录像协调器照「这一趟要录」接着开；通道刚算黑那一下没在录的，熄屏中不为它开录
             String keptText = recordsSurround ? "环视留下（录像）"
-                    : recording ? "环视不用（录像计划里没有环视）" : "环视留下（没在录，录像要它再开）";
+                    : recording ? "环视不用（录像计划里没有环视）"
+                    : why == ChannelRules.Event.Cause.SENTRY_ON ? "环视留下（没在录：「这一趟要录」立着的话录像接着开）"
+                    : "环视留下（没在录）";
             String line;
             switch (why) {
                 case DARK_ONSET:

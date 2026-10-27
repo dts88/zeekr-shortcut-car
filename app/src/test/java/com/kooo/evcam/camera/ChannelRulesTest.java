@@ -2787,12 +2787,59 @@ public class ChannelRulesTest {
         w.driving = driving;
         w.sentry = sentry;
         w.lastSentry = last;
+        w.surroundCause = Event.Cause.SENTRY_ON;   // 上一轮留下的：每一轮重算
         List<Event> out = new ArrayList<>();
         ChannelRules.judgeSurroundInDark(w, out);
         assertEquals(name, want, w.surroundInDark);
         assertEquals(name + "：上一次读数", wantLast, w.lastSentry);
         assertTrue(name, out.size() <= 1);
         assertEquals(name + "：那一行", wantCause, out.isEmpty() ? null : out.get(0).cause);
+        assertEquals(name + "：发给录像协调器的原因和那一行同一个", wantCause, w.surroundCause);
+    }
+
+    /** 没有环视那一路（管线重建、各路还没交）：不报那一行，原因照记 —— 通道的决定连同原因照样发给录像协调器。 */
+    @Test
+    public void theSurroundCauseIsKeptWithoutASurroundLane() {
+        World bare = new World(new ArrayList<>());
+        bare.keepWhenDark = true;
+        bare.surroundInDark = ChannelRules.SurroundInDark.RELEASED;
+        bare.screenOn = false;
+        bare.sentry = 2;
+        bare.lastSentry = 0;
+        List<Event> out = new ArrayList<>();
+        ChannelRules.judgeSurroundInDark(bare, out);
+        assertTrue(out.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.KEPT, bare.surroundInDark);
+        assertEquals(Event.Cause.SENTRY_ON, bare.surroundCause);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, ChannelRules.surroundVerdict(bare));
+    }
+
+    /**
+     * 通道对环视的熄屏决定（{@link ChannelRules#surroundVerdict}，发给录像协调器）：通道没算黑、或者在开车 → LIT；
+     * 算黑、没在开车 → 留着（含「熄屏持续录制」开着）是 KEPT，不然 RELEASED。环视「熄屏放开」就是 RELEASED 那一个 —— 每一种组合都一样。
+     */
+    @Test
+    public void theSurroundVerdictIsTheReleaseDecisionNamed() {
+        for (boolean lit : new boolean[]{true, false}) {
+            for (boolean driving : new boolean[]{true, false}) {
+                for (boolean keep : new boolean[]{true, false}) {
+                    for (ChannelRules.SurroundInDark latch : ChannelRules.SurroundInDark.values()) {
+                        w.screenOn = lit;
+                        w.screenDark = !lit;
+                        w.driving = driving;
+                        w.keepWhenDark = keep;
+                        w.surroundInDark = latch;
+                        String name = "亮着=" + lit + " 开车=" + driving + " 熄屏持续录制=" + keep + " " + latch;
+                        ChannelRules.SurroundInDark want = lit || driving ? ChannelRules.SurroundInDark.LIT
+                                : keep && latch == ChannelRules.SurroundInDark.KEPT ? ChannelRules.SurroundInDark.KEPT
+                                : ChannelRules.SurroundInDark.RELEASED;
+                        assertEquals(name, want, ChannelRules.surroundVerdict(w));
+                        assertEquals(name, ChannelRules.surroundVerdict(w) == ChannelRules.SurroundInDark.RELEASED,
+                                ChannelRules.releasedByDark(w, surround));
+                    }
+                }
+            }
+        }
     }
 
     /**

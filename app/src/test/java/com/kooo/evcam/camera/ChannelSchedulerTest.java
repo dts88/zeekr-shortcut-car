@@ -2,6 +2,7 @@ package com.kooo.evcam.camera;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -60,6 +61,8 @@ public class ChannelSchedulerTest {
     private final List<String> wantersChanged = new ArrayList<>();
     /** 关座舱时环视那几行（Journal.coupling）。 */
     private final List<ChannelScheduler.Coupling> couplings = new ArrayList<>();
+    /** 通道的决定发给录像协调器的每一次（{@link #listenToVerdict}）：「KEPT DARK_ONSET」。 */
+    private final List<String> verdicts = new ArrayList<>();
     private final FakePort surround = new FakePort("2");
     private final FakePort rear = new FakePort("1");
     private final FakePort front = new FakePort("0");
@@ -2088,6 +2091,9 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("close dark-release"), front.actions);
         assertEquals(Arrays.asList("surroundInDark RELEASED DARK_ONSET sentry=0 records",
                 "surroundInDark KEPT SENTRY_ON sentry=2"), lines("surroundInDark"));
+        assertEquals("发给录像协调器：留着，原因是哨兵变成开（醒来读到的也算）", ChannelRules.SurroundInDark.KEPT,
+                ChannelScheduler.surroundVerdict());
+        assertEquals(ChannelRules.Event.Cause.SENTRY_ON, ChannelScheduler.surroundVerdictCause());
     }
 
     /**
@@ -2319,6 +2325,235 @@ public class ChannelSchedulerTest {
         } finally {
             rebuilt.detach();
         }
+    }
+
+    // ================================================================= 通道的决定发给录像协调器（项目所有者 2026-10-27）
+
+    /** 录像协调器那一头：每听到一次记一行「KEPT DARK_ONSET」（此刻发布的决定和原因），也记进 told 看先后。 */
+    private void listenToVerdict() {
+        ChannelScheduler.setSurroundVerdictListener(() -> {
+            String line = ChannelScheduler.surroundVerdict() + " " + ChannelScheduler.surroundVerdictCause();
+            verdicts.add(line);
+            told.add("verdict " + line);
+        });
+    }
+
+    /**
+     * 决定每变一次发一次（连同原因），不变不发：通道刚算黑（留着）、哨兵关了、哨兵变成开、车机要睡、亮了 —— 每一下都是一次变；
+     * 头 30 秒照亮着算，不发；中间空转的那些轮不发。
+     */
+    @Test
+    public void theVerdictIsPublishedOncePerChangeWithItsCause() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        assertEquals("亮着", ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+        listenToVerdict();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS - 1);
+        assertTrue("头 30 秒：照亮着算，不发", verdicts.isEmpty());
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
+        at(1_000 + ChannelRules.HOLD_MS + 20_000);
+        assertEquals("空转的那几轮不发", 1, verdicts.size());
+
+        host.sentry = 0;
+        s.wake();
+        settle();
+        at(60_000);
+        host.sentry = 1;
+        s.wake();
+        settle();
+        at(90_000);
+        host.androidOff = true;
+        s.wake();
+        settle();
+        at(120_000);
+        host.goLit();
+        s.wake();
+        settle();
+        at(150_000);
+        assertEquals(Arrays.asList("KEPT DARK_ONSET", "RELEASED SENTRY_OFF", "KEPT SENTRY_ON", "RELEASED ANDROID_OFF",
+                "LIT null"), verdicts);
+    }
+
+    /**
+     * 不是环视留不留变出来的变化也发，原因是 null：通道算黑时「熄屏持续录制」关了 / 又开了（KEPT ↔ RELEASED），
+     * 开起车来 / 停下（LIT ↔ 放开）—— 停下那一刻就是通道刚算黑那一下。录像协调器只在原因是哨兵变成开时开录。
+     */
+    @Test
+    public void settingAndDrivingChangesWhileDarkArePublishedWithoutASentryCause() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        listenToVerdict();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        host.keep = false;
+        s.wake();
+        settle();
+        at(40_000);
+        host.keep = true;
+        s.wake();
+        settle();
+        at(50_000);
+        host.driving = true;
+        s.wake();
+        settle();
+        at(60_000);
+        host.sentry = 0;
+        host.driving = false;
+        s.wake();
+        settle();
+        at(70_000);
+        assertEquals(Arrays.asList("KEPT DARK_ONSET", "RELEASED null", "KEPT null", "LIT null", "RELEASED DARK_ONSET"),
+                verdicts);
+    }
+
+    /**
+     * 通道刚算黑那一轮：决定先发（录像协调器排它的那一下），再报这一轮的事（去掉前座舱那一下也会叫录像重算各路）、关相机、
+     * 告诉录像那一侧各路的样子变了 —— 协调器排的在各路样子变了的那几下之前，录像的样子不会闪一下「等待摄像头」。
+     */
+    @Test
+    public void theVerdictIsPublishedBeforeTheLanesAreToldInTheOnsetRound() {
+        host.frontCabinOneShot = true;
+        claim(Holder.RECORDING);
+        host.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        host.sentry = 0;
+        settle();
+        List<Integer> retiredWhenPublished = new ArrayList<>();
+        ChannelScheduler.setSurroundVerdictListener(() -> {
+            told.add("verdict " + ChannelScheduler.surroundVerdict() + " " + ChannelScheduler.surroundVerdictCause());
+            retiredWhenPublished.add(host.retired.size());
+        });
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        told.clear();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        assertEquals("verdict RELEASED DARK_ONSET", told.get(0));
+        assertFalse("同一轮里告诉了录像那一侧：" + told, told("condition").isEmpty());
+        assertEquals("前座舱同一轮去掉，在发决定之后", Arrays.asList(FRONT), host.retired);
+        assertEquals(Arrays.asList(0), retiredWhenPublished);
+    }
+
+    /** 在退出的那一份不发：管线换掉、旧的那一份只关，它那几轮算出来的不算数。 */
+    @Test
+    public void anExitingSchedulerPublishesNothing() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        settle();
+        listenToVerdict();
+        s.exit();
+        host.screenOn = false;   // 起点不明：当场算黑
+        host.darkAt = 0;
+        s.wake();
+        settle();
+        at(5_000);
+        assertTrue(verdicts.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+    }
+
+    /** 管线重建：新的那一份从进程那一份接着判，算出来的一样 —— 不再发。 */
+    @Test
+    public void aRebuildPublishesNothingNew() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        listenToVerdict();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
+
+        s.exit();
+        ChannelScheduler rebuilt = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        try {
+            rebuilt.wake();
+            at(1_000 + ChannelRules.HOLD_MS + 1_000);
+            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+            lanes.put(SUR, new FakePort("2"));
+            rebuilt.setLanes(lanes);
+            at(1_000 + ChannelRules.HOLD_MS + 10_000);
+            assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
+            assertEquals(ChannelRules.SurroundInDark.KEPT, ChannelScheduler.surroundVerdict());
+        } finally {
+            rebuilt.detach();
+        }
+    }
+
+    /**
+     * 屏幕不知道黑没黑时不发（和环视留不留一样不判；这时算出来的「放开」是假的）；车机要睡那一条照发。知道了照常发。
+     */
+    @Test
+    public void anUnknownScreenPublishesOnlyTheHeadUnitSleeping() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        listenToVerdict();
+        host.known = false;
+        host.screenOn = false;   // 起点不明：当场算黑
+        host.darkAt = 0;
+        s.wake();
+        settle();
+        at(5_000);
+        assertTrue("不知道：不发", verdicts.isEmpty());
+        host.androidOff = true;
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("RELEASED ANDROID_OFF"), verdicts);
+    }
+
+    /** 测试的「进程重新起来」：决定回到放开、没有原因，监听者摘掉。 */
+    @Test
+    public void resetProcessDarkReleasesTheVerdictAndDropsTheListener() {
+        settle();
+        assertEquals(ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+        listenToVerdict();
+        ChannelScheduler.resetProcessDark();
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, ChannelScheduler.surroundVerdict());
+        assertNull(ChannelScheduler.surroundVerdictCause());
+        s.wake();
+        settle();
+        assertEquals("亮着：又发了一次 LIT", ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+        assertTrue("监听者摘掉了", verdicts.isEmpty());
+    }
+
+    /** 进程在黑着时起来（进程那一层从放开起、起点不明）：决定就是放开，不发 —— 录像协调器读到放开，不开录。 */
+    @Test
+    public void aProcessStartingInTheDarkPublishesNothingAndReadsReleased() {
+        listenToVerdict();
+        host.screenOn = false;
+        host.darkAt = 0;
+        host.sentryArmed();
+        s.wake();
+        settle();
+        at(10_000);
+        assertTrue(verdicts.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, ChannelScheduler.surroundVerdict());
+        assertNull(ChannelScheduler.surroundVerdictCause());
     }
 
     // ================================================================= 问（只问，不开）

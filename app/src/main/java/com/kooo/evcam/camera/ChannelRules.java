@@ -468,6 +468,12 @@ public final class ChannelRules {
          * 环视留不留记着的上一次读得到的哨兵模式；null = 还没有（第一次读到的只当底）。和 {@link #surroundInDark} 一起跟着进程。
          */
         Integer lastSentry;
+        /**
+         * 这一轮 {@link #surroundInDark} 为什么变了（通道刚算黑那一下不管变没变都算）：和 {@link Event.Type#SURROUND_IN_DARK} 那一行
+         * 同一个原因；这一轮没变是 null。只由 {@link ChannelRules#judgeSurroundInDark} 改，每一轮重算。调度发布通道的决定时连同它一起发
+         * （ChannelScheduler.publishVerdict：录像协调器只在熄屏中哨兵模式变成开时开录）。
+         */
+        Event.Cause surroundCause;
 
         // ---- 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱；{@link ChannelRules#retireFrontCabin}）----
 
@@ -720,8 +726,11 @@ public final class ChannelRules {
         }
     }
 
-    /** {@link #settle} 和 {@link #next} 记下的事，调度据此写黑匣子（一件事一行）。 */
-    static final class Event {
+    /**
+     * {@link #settle} 和 {@link #next} 记下的事，调度据此写黑匣子（一件事一行）。{@link Cause} 公开：通道对环视的熄屏决定连同原因
+     * 发给录像协调器（{@link ChannelScheduler#surroundVerdictCause}）。
+     */
+    public static final class Event {
         enum Type {
             /** 没人要了，亮屏、前台服务在：保持 30 秒（画面接着送进留着的输出）。 */
             HOLD_STARTED,
@@ -757,7 +766,7 @@ public final class ChannelRules {
         }
 
         /** 为什么：解除停手（STOP_LIFTED）、环视留不留变了（SURROUND_IN_DARK）。 */
-        enum Cause {
+        public enum Cause {
             /** 要它的登记方变了（项目所有者 2026-10-10；2026-10-20 起只算要这一路的登记方，{@link #wantersChanged}）。 */
             NEEDS_CHANGED,
             /** 亮屏（项目所有者 2026-10-11，§7.4）。 */
@@ -999,8 +1008,11 @@ public final class ChannelRules {
         return w.frontCabinRetired && isCabinFront(lane);
     }
 
-    /** 环视这一段熄屏是哪一种（{@link World#surroundInDark}，项目所有者 2026-10-27「熄屏放开相机」）。 */
-    enum SurroundInDark {
+    /**
+     * 环视这一段熄屏是哪一种（{@link World#surroundInDark}，项目所有者 2026-10-27「熄屏放开相机」）。通道对环视的熄屏决定
+     * （{@link #surroundVerdict}，发给录像协调器）也用它：那时 KEPT 是真留着（含「熄屏持续录制」开着）。
+     */
+    public enum SurroundInDark {
         /** 照亮着算、不判：亮着、黑了还不到 30 秒、在开车。 */
         LIT,
         /** 留着：通道刚算黑时哨兵模式开或布防，或者之后变成开或布防。「熄屏持续录制」开着才真留（{@link #surroundKept}）。 */
@@ -1029,6 +1041,18 @@ public final class ChannelRules {
     }
 
     /**
+     * 通道此刻对环视的熄屏决定（项目所有者 2026-10-27，录像协调器照它停录、开录，ChannelScheduler.surroundVerdict）：
+     * 通道没算黑、或者在开车（{@link #parkedDark} 不成立：亮着、黑了不到 30 秒、在开车）→ {@link SurroundInDark#LIT}，不归熄屏管；
+     * 留着（{@link #surroundKept}：含「熄屏持续录制」）→ KEPT；不然 RELEASED。{@link #releasedByDark} 的环视那一句就是它。
+     */
+    static SurroundInDark surroundVerdict(World w) {
+        if (!parkedDark(w)) {
+            return SurroundInDark.LIT;
+        }
+        return surroundKept(w) ? SurroundInDark.KEPT : SurroundInDark.RELEASED;
+    }
+
+    /**
      * 环视这一段熄屏留不留（项目所有者 2026-10-27 定，为了车机稳定：不再追求环视录到最后一刻，也不为中间不明原因的启动、亮屏去试着录），
      * 每一轮最先判（{@link #settle}），只在这里改 {@link World#surroundInDark}、{@link World#lastSentry}：
      *
@@ -1043,11 +1067,13 @@ public final class ChannelRules {
      *   <li>之后从不是开变成开或布防（哪个先到都算）→ 留着。读不到不变：留着的不算关，放开的不算开。</li>
      * </ol>
      *
-     * <p>只看车的事实和屏幕，不看谁登记着（设计 v3.1 C4）：「在录」由 {@link #holderWants} 每一轮看。</p>
+     * <p>只看车的事实和屏幕，不看谁登记着（设计 v3.1 C4）：「在录」由 {@link #holderWants} 每一轮看。
+     * 变了（通道刚算黑那一下不管变没变）记下为什么（{@link World#surroundCause}），有环视那一路时报一行。</p>
      */
     static void judgeSurroundInDark(World w, List<Event> events) {
         SurroundInDark was = w.surroundInDark;
         Event.Cause why = null;
+        w.surroundCause = null;
         if (!w.screenOn && w.androidOff && !w.driving) {
             if (was == SurroundInDark.LIT && w.lastSentry == null) {
                 // 照亮着算时直接到这里：也算通道刚算黑那一下 —— 这一下读得到的就是睡前那一次，读不到记成关
@@ -1075,8 +1101,10 @@ public final class ChannelRules {
         if (why != Event.Cause.ANDROID_OFF && w.sentry != null) {
             w.lastSentry = w.sentry;
         }
-        if (why != null && (w.surroundInDark != was || why == Event.Cause.DARK_ONSET)
-                && w.lane(CameraSlots.KEY_SURROUND) != null) {
+        if (why != null && (w.surroundInDark != was || why == Event.Cause.DARK_ONSET)) {
+            w.surroundCause = why;
+        }
+        if (w.surroundCause != null && w.lane(CameraSlots.KEY_SURROUND) != null) {
             Event event = new Event(Event.Type.SURROUND_IN_DARK, CameraSlots.KEY_SURROUND);
             event.cause = why;
             events.add(event);
@@ -1535,12 +1563,13 @@ public final class ChannelRules {
      * <p>按「不是环视那一路」认：非极氪的自定义车型上，熄屏时除了环视那一路，别的路一律放开（记进规格）。</p>
      *
      * <p>环视（项目所有者 2026-10-27「熄屏放开相机」）：通道算黑、没在开车（{@link #parkedDark}），又没留着（{@link #surroundKept}：
-     * 「熄屏持续录制」开着、哨兵模式开或布防）就放开，和座舱同一轮 —— 关的次序照旧环视先单独关（原因 {@link Why#SCREEN_OFF}），
+     * 「熄屏持续录制」开着、哨兵模式开或布防）就放开（通道的决定 {@link #surroundVerdict} 是 RELEASED，录像协调器照它停录），
+     * 和座舱同一轮 —— 关的次序照旧环视先单独关（原因 {@link Why#SCREEN_OFF}），
      * 关完座舱一起关，什么都不开回来。黑了不到 30 秒、在开车时不放开（照登记表）。它也只看车的事实和设置，不看谁登记着。</p>
      */
     static boolean releasedByDark(World w, Lane lane) {
         if (isSurround(lane)) {
-            return parkedDark(w) && !surroundKept(w);
+            return surroundVerdict(w) == SurroundInDark.RELEASED;
         }
         return !w.screenOn || w.screenDark && lane.device == Device.CLOSED;
     }

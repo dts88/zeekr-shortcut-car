@@ -228,29 +228,29 @@ public class RecordingStopsTest {
     }
 
     /**
-     * 熄屏小结的停、开账（审查 rev3 B6）：熄屏持续录制开着、哨兵模式没开 —— 车机要睡（E2）照表停了，夜里车机醒来（E2'）
-     * 接着录环视，下一次车机要睡又停。两次照表停都数上、记第一次的时刻，醒来那一次开录也数上；照表停的不算「中途停过」，
-     * 存储一类的停才算。熄屏那一下清零。
+     * 熄屏小结的停、开账（审查 rev3 B6；项目所有者 2026-10-27）：熄屏持续录制开着、哨兵模式没开 —— 黑满 30 秒时通道放开了环视，
+     * 熄屏停了；熄屏中哨兵模式变成开、通道留下环视，接着录；哨兵关了又停。两次熄屏停都数上、记第一次的时刻，哨兵模式变成开那一次开录
+     * 也数上；熄屏停的不算「中途停过」，存储一类的停才算。熄屏那一下清零。
      */
     @Test
-    public void theDarkSummaryCountsEveryTableStopAndEveryWakeStart() {
+    public void theDarkSummaryCountsEveryTableStopAndEverySentryStart() {
         RecordingStops.DarkTally tally = new RecordingStops.DarkTally();
         tally.reset();
         assertFalse(tally.anyStop());
         tally.stopped(RecordingStops.Reason.SCREEN_OFF, 300_000L);
-        tally.wokeStarted();
+        tally.sentryStarted();
         tally.stopped(RecordingStops.Reason.WRITE_STALLED, 330_000L);
         tally.stopped(RecordingStops.Reason.SCREEN_OFF, 390_000L);
-        assertEquals("两次照表停都数上", 2, tally.tableStops());
+        assertEquals("两次熄屏停都数上", 2, tally.tableStops());
         assertEquals("第一次的时刻", 300_000L, tally.firstTableStopAt());
-        assertEquals("醒来接着录", 1, tally.wokeStarts());
-        assertEquals("照表停的不算中途停过", 1, tally.midwayStops());
+        assertEquals("哨兵模式变成开后接着录", 1, tally.sentryStarts());
+        assertEquals("熄屏停的不算中途停过", 1, tally.midwayStops());
         assertTrue(tally.anyStop());
 
         tally.reset();
         assertEquals(0, tally.tableStops());
         assertEquals(0L, tally.firstTableStopAt());
-        assertEquals(0, tally.wokeStarts());
+        assertEquals(0, tally.sentryStarts());
         assertEquals(0, tally.midwayStops());
         assertFalse("下一段熄屏从零数", tally.anyStop());
     }
