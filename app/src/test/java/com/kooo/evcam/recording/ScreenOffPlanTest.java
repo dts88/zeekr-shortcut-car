@@ -5,6 +5,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.camera.ChannelRules.Event.Cause;
+import com.kooo.evcam.camera.ChannelRules.SurroundInDark;
+
 import org.junit.Test;
 
 /**
@@ -12,6 +15,7 @@ import org.junit.Test;
  * 「在开车」怎么判、熄屏中哪些要重判、「车机要睡」什么时候写和清，照 channel-logic §四和大纲 §7 的答复（2026-10-11）。
  * 熄屏 v3（2026-10-12 D1–D3，设计 v3 §3、v3.1 C1）：熄屏 = 屏幕真黑了，车机还醒着几分钟；只有安卓熄屏（车机下电）才判得出现在停；
  * 黑着时只有环视录（熄屏持续录制开着、计划里有环视），座舱屏幕一黑就放开（不归这张表）。
+ * 黑满 30 秒以后照通道对环视的熄屏决定（项目所有者 2026-10-27）：放开了就停，熄屏中哨兵模式变成开、留下了才开。
  */
 public class ScreenOffPlanTest {
 
@@ -19,6 +23,11 @@ public class ScreenOffPlanTest {
     private static final Integer[] SENTRY_ON = {1, 2};
     private static final Integer[] SENTRY_OFF_OR_UNKNOWN = {0, null};
     private static final boolean[] BOTH = {false, true};
+    private static final SurroundInDark LIT = SurroundInDark.LIT;
+    private static final SurroundInDark KEPT = SurroundInDark.KEPT;
+    private static final SurroundInDark RELEASED = SurroundInDark.RELEASED;
+    /** 通道的决定变了的原因，加上「不是环视留不留变出来的」（null）。 */
+    private static final Cause[] ANY_CAUSE = {Cause.DARK_ONSET, Cause.SENTRY_ON, Cause.SENTRY_OFF, Cause.ANDROID_OFF, null};
 
     /** 计划里有环视（平常的情形）。 */
     private static ScreenOffPlan.Decision judge(boolean keeps, boolean lockHeld, boolean autoRecord, Integer sentry,
@@ -70,7 +79,8 @@ public class ScreenOffPlanTest {
 
     /**
      * 哨兵模式没开离车、熄屏持续录制开着（项目所有者 2026-10-12 D3）：屏幕一黑接着录环视（座舱放开），几分钟后安卓熄屏
-     * （车机要睡）照表再判 —— 现在停、写下「车机要睡」，醒来照表接。离车后那几分钟录下来，下电前最后约 15 秒丢了，车主接受。
+     * （车机要睡）照表再判 —— 现在停、写下「车机要睡」。这是照亮着算时的那张表；2026-10-27 起黑满 30 秒时通道放开环视就停
+     * （{@link #theChannelReleasingTheSurroundStopsNowWithoutTheSleepFact}），车机要睡那一下照样写「车机要睡」。
      */
     @Test
     public void sentryOffLeaveRecordsTheSurroundUntilTheHeadUnitSleeps() {
@@ -178,7 +188,12 @@ public class ScreenOffPlanTest {
                     }
                 }
             }
-            assertFalse(ScreenOffPlan.startsWhileDark(keeps, false));
+            for (SurroundInDark channel : SurroundInDark.values()) {
+                for (boolean bySentryRise : BOTH) {
+                    assertEquals(ScreenOffPlan.DarkStart.NO_SURROUND,
+                            ScreenOffPlan.startsWhileDark(channel, bySentryRise, false, keeps, keeps, false, true));
+                }
+            }
         }
         assertEquals(ScreenOffPlan.PAUSE, hint(true, false, false));
         assertEquals(ScreenOffPlan.PAUSE, hint(false, true, false));
@@ -201,18 +216,199 @@ public class ScreenOffPlanTest {
     }
 
     /**
-     * 黑着时录像能不能（再）开起来：熄屏持续录制开着、计划里有环视（只录环视）。熄屏持续录制关着就是熄屏后不录 ——
-     * 车机夜里自己醒了也不录，启动自动录制开着的等亮屏（设计 v3.1 C1）。车机醒着那一层由协调器看（安卓亮着）。
+     * 照亮着算（通道的决定是 LIT：黑了不到 30 秒、在开车）时黑着开不开录和以前一样：车机醒着、熄屏后不停录、计划里有环视
+     * （只录环视；设计 v3.1 C1）。是不是哨兵模式变成开那一下、「熄屏持续录制」本身、能不能用相机都不看。
      */
     @Test
-    public void onlyKeepRecordingWithTheSurroundStartsWhileDark() {
-        assertTrue(ScreenOffPlan.startsWhileDark(true, true));
-        assertFalse(ScreenOffPlan.startsWhileDark(false, true));
-        assertFalse(ScreenOffPlan.startsWhileDark(true, false));
-        assertFalse(ScreenOffPlan.startsWhileDark(false, false));
+    public void whileTheChannelCountsTheScreenLitTheOldStartRuleHolds() {
+        for (boolean bySentryRise : BOTH) {
+            for (boolean androidOff : BOTH) {
+                for (boolean keeps : BOTH) {
+                    for (boolean keepSetting : BOTH) {
+                        for (boolean surround : BOTH) {
+                            for (boolean usable : BOTH) {
+                                String row = "sentryRise=" + bySentryRise + " androidOff=" + androidOff + " keeps=" + keeps
+                                        + " setting=" + keepSetting + " surround=" + surround + " usable=" + usable;
+                                assertEquals(row, !androidOff && keeps && surround,
+                                        ScreenOffPlan.startsWhileDark(LIT, bySentryRise, androidOff, keeps, keepSetting,
+                                                surround, usable) == ScreenOffPlan.DarkStart.STARTS);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals(ScreenOffPlan.DarkStart.SETTING_OFF,
+                ScreenOffPlan.startsWhileDark(LIT, false, false, false, false, true, true));
         for (boolean autoRecord : BOTH) {
             assertEquals("黑着能开录的，熄屏那一刻也是接着录", ScreenOffPlan.Action.CONTINUE,
                     action(true, false, autoRecord, null, false, false));
+        }
+    }
+
+    /**
+     * 黑满 30 秒以后（项目所有者 2026-10-27）：通道留着环视时只有熄屏中哨兵模式变成开那一下的接回开录，能用相机才开 ——
+     * 恢复的例行接回、启动自动录制、人按的（悬浮按钮）、存储停了从恢复来的接回都不开（不为中间不明原因的启动去试着录）。
+     * 通道放开了：不开；熄屏持续录制关着的照实说是设置（先于「通道没留」）。车机要睡最先。
+     */
+    @Test
+    public void afterThirtySecondsOnlyASentryRiseWithAUsableCameraStarts() {
+        assertEquals(ScreenOffPlan.DarkStart.STARTS,
+                ScreenOffPlan.startsWhileDark(KEPT, true, false, true, true, true, true));
+        assertEquals("用不了相机：不开，不进等待摄像头", ScreenOffPlan.DarkStart.CAMERA_UNUSABLE,
+                ScreenOffPlan.startsWhileDark(KEPT, true, false, true, true, true, false));
+        for (boolean usable : BOTH) {
+            assertEquals("通道留着，可不是哨兵模式变成开那一下", ScreenOffPlan.DarkStart.NO_SENTRY_RISE,
+                    ScreenOffPlan.startsWhileDark(KEPT, false, false, true, true, true, usable));
+            for (boolean bySentryRise : BOTH) {
+                assertEquals(ScreenOffPlan.DarkStart.CHANNEL_RELEASED,
+                        ScreenOffPlan.startsWhileDark(RELEASED, bySentryRise, false, true, true, true, usable));
+                for (boolean keeps : BOTH) {
+                    assertEquals("熄屏持续录制关着：照实说是设置", ScreenOffPlan.DarkStart.SETTING_OFF,
+                            ScreenOffPlan.startsWhileDark(RELEASED, bySentryRise, false, keeps, false, true, usable));
+                    for (SurroundInDark channel : SurroundInDark.values()) {
+                        assertEquals("车机要睡最先", ScreenOffPlan.DarkStart.HEAD_UNIT_SLEEPS,
+                                ScreenOffPlan.startsWhileDark(channel, bySentryRise, true, keeps, keeps, true, usable));
+                    }
+                }
+            }
+        }
+        // 进程在黑着时起来（通道的决定从放开起）：恢复来的接回不开，哨兵模式变成开之前什么都不开
+        assertNotEquals(ScreenOffPlan.DarkStart.STARTS,
+                ScreenOffPlan.startsWhileDark(RELEASED, false, false, true, true, true, false));
+        // 在开车：通道照亮着算，照以前的规矩
+        assertEquals(ScreenOffPlan.DarkStart.STARTS,
+                ScreenOffPlan.startsWhileDark(LIT, false, false, true, true, true, false));
+    }
+
+    /**
+     * 通道的决定变了协调器做什么（{@link ScreenOffPlan#onChannel}）：亮着什么都不做；在录（含等开录、等自动接回）时通道放开了就停，
+     * 不管为什么放开（黑满 30 秒、哨兵关了、车机要睡）；没在录时只有熄屏中哨兵模式变成开（醒来读到也算）留下的才开 ——
+     * 黑满 30 秒那一下留着、没在录的不开（R1）。
+     */
+    @Test
+    public void theCoordinatorStopsOnAReleaseAndStartsOnlyOnASentryRise() {
+        for (Cause cause : ANY_CAUSE) {
+            for (SurroundInDark verdict : SurroundInDark.values()) {
+                for (boolean busy : BOTH) {
+                    assertEquals("亮着", ScreenOffPlan.ChannelStep.NOTHING,
+                            ScreenOffPlan.onChannel(verdict, cause, false, busy));
+                }
+            }
+            assertEquals("在录、通道放开了：停（" + cause + "）", ScreenOffPlan.ChannelStep.STOP,
+                    ScreenOffPlan.onChannel(RELEASED, cause, true, true));
+            assertEquals("在录、通道留着：接着录", ScreenOffPlan.ChannelStep.NOTHING,
+                    ScreenOffPlan.onChannel(KEPT, cause, true, true));
+            assertEquals("在录、照亮着算：照那张表", ScreenOffPlan.ChannelStep.NOTHING,
+                    ScreenOffPlan.onChannel(LIT, cause, true, true));
+            assertEquals("没在录、通道放开了", ScreenOffPlan.ChannelStep.NOTHING,
+                    ScreenOffPlan.onChannel(RELEASED, cause, true, false));
+            assertEquals("没在录、照亮着算", ScreenOffPlan.ChannelStep.NOTHING,
+                    ScreenOffPlan.onChannel(LIT, cause, true, false));
+            assertEquals("没在录、通道留着：只有哨兵模式变成开那一下开（" + cause + "）",
+                    cause == Cause.SENTRY_ON ? ScreenOffPlan.ChannelStep.START : ScreenOffPlan.ChannelStep.NOTHING,
+                    ScreenOffPlan.onChannel(KEPT, cause, true, false));
+        }
+        assertEquals("黑满 30 秒那一下留着、没在录：不开", ScreenOffPlan.ChannelStep.NOTHING,
+                ScreenOffPlan.onChannel(KEPT, Cause.DARK_ONSET, true, false));
+        assertEquals("车机要睡放开、在录：停", ScreenOffPlan.ChannelStep.STOP,
+                ScreenOffPlan.onChannel(RELEASED, Cause.ANDROID_OFF, true, true));
+    }
+
+    /**
+     * 协调器读的通道决定：通道还没把屏幕算黑（亮着、黑了不到 30 秒）时一律照亮着算，不管调度发布的是什么 ——
+     * 熄屏那一刻、头 30 秒不靠调度跑没跑过一轮（进程起来时发布的是放开）。算黑了照发布的。
+     */
+    @Test
+    public void theCoordinatorReadsLitUntilTheChannelCountsTheScreenDark() {
+        for (SurroundInDark published : SurroundInDark.values()) {
+            assertEquals(LIT, ScreenOffPlan.channelVerdict(false, published));
+            assertEquals(published, ScreenOffPlan.channelVerdict(true, published));
+        }
+    }
+
+    /**
+     * 通道放开了环视（黑满 30 秒时哨兵模式没开、熄屏中哨兵关了、熄屏持续录制关着；车机要睡时安卓熄屏了而车机不睡的那一种也是）：
+     * 车机醒着时现在停，不写「车机要睡」；「这一趟要录」照表留（熄屏后不停录、启动自动录制开着一个就留）。
+     */
+    @Test
+    public void theChannelReleasingTheSurroundStopsNowWithoutTheSleepFact() {
+        for (boolean keeps : BOTH) {
+            for (boolean lockHeld : BOTH) {
+                for (boolean autoRecord : BOTH) {
+                    for (Integer sentry : ANY_SENTRY) {
+                        for (boolean driving : BOTH) {
+                            for (boolean surround : BOTH) {
+                                String row = "keeps=" + keeps + " lock=" + lockHeld + " auto=" + autoRecord + " sentry=" + sentry
+                                        + " driving=" + driving + " surround=" + surround;
+                                ScreenOffPlan.Decision d = ScreenOffPlan.atDark(keeps, lockHeld, autoRecord, sentry, driving,
+                                        false, surround, RELEASED);
+                                assertEquals(row, ScreenOffPlan.Action.STOP_RELEASED, d.action);
+                                assertEquals(row, keeps || autoRecord, d.resumesOnWake);
+                                for (boolean written : BOTH) {
+                                    assertEquals(row, written ? ScreenOffPlan.SleepFact.CLEAR : ScreenOffPlan.SleepFact.KEEP,
+                                            ScreenOffPlan.sleepFact(false, d.action, written));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // 安卓熄屏了而车机不睡（哨兵模式开着、唤醒锁拉着）：通道放开了（车机要睡），停，不写「车机要睡」
+        ScreenOffPlan.Decision armed = ScreenOffPlan.atDark(true, false, false, 2, false, true, true, RELEASED);
+        assertEquals(ScreenOffPlan.Action.STOP_RELEASED, armed.action);
+        assertEquals(ScreenOffPlan.SleepFact.KEEP, ScreenOffPlan.sleepFact(true, armed.action, false));
+        assertFalse("已经停了：车辆信号变了不重判",
+                ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.STOP_RELEASED, false, true));
+    }
+
+    /** 车机要睡（安卓熄屏、哨兵模式没开、没在开车、唤醒锁没拉着）照样现在停、写「车机要睡」，不管通道的决定是什么。 */
+    @Test
+    public void aHeadUnitThatSleepsStillWritesTheSleepFactWhateverTheChannel() {
+        for (SurroundInDark channel : SurroundInDark.values()) {
+            for (Integer sentry : SENTRY_OFF_OR_UNKNOWN) {
+                for (boolean keeps : BOTH) {
+                    for (boolean autoRecord : BOTH) {
+                        ScreenOffPlan.Decision d = ScreenOffPlan.atDark(keeps, false, autoRecord, sentry, false, true, true,
+                                channel);
+                        assertEquals(channel + " " + sentry, ScreenOffPlan.Action.STOP_NOW, d.action);
+                        assertEquals(keeps || autoRecord, d.resumesOnWake);
+                        assertEquals(ScreenOffPlan.SleepFact.WRITE, ScreenOffPlan.sleepFact(true, d.action, false));
+                    }
+                }
+            }
+        }
+    }
+
+    /** 通道照亮着算（LIT）或者留着环视（KEPT）：那张表和以前一模一样，每一种输入都一样。 */
+    @Test
+    public void aKeptOrUndecidedChannelLeavesTheTableAsItWas() {
+        for (SurroundInDark channel : new SurroundInDark[]{LIT, KEPT}) {
+            for (boolean keeps : BOTH) {
+                for (boolean lockHeld : BOTH) {
+                    for (boolean autoRecord : BOTH) {
+                        for (Integer sentry : ANY_SENTRY) {
+                            for (boolean driving : BOTH) {
+                                for (boolean androidOff : BOTH) {
+                                    for (boolean surround : BOTH) {
+                                        ScreenOffPlan.Decision before = ScreenOffPlan.atDark(keeps, lockHeld, autoRecord,
+                                                sentry, driving, androidOff, surround);
+                                        ScreenOffPlan.Decision now = ScreenOffPlan.atDark(keeps, lockHeld, autoRecord,
+                                                sentry, driving, androidOff, surround, channel);
+                                        String row = channel + " keeps=" + keeps + " lock=" + lockHeld + " auto="
+                                                + autoRecord + " sentry=" + sentry + " driving=" + driving
+                                                + " androidOff=" + androidOff + " surround=" + surround;
+                                        assertEquals(row, before.action, now.action);
+                                        assertEquals(row, before.resumesOnWake, now.resumesOnWake);
+                                        assertNotEquals(row, ScreenOffPlan.Action.STOP_RELEASED, now.action);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -275,7 +471,11 @@ public class ScreenOffPlanTest {
                                     }
                                     if (recordsAtDark && !staysAwake) {
                                         assertTrue(row + "：车机休眠时暂停 —— 停了必定接", atSleep.resumesOnWake);
-                                        assertTrue(row + "：车机醒来照表接得回来", ScreenOffPlan.startsWhileDark(keeps, surround));
+                                        if (keeps) {
+                                            // 熄屏持续录制开着：睡着时哨兵模式被打开、醒来读到（通道留下环视）也接得回来
+                                            assertEquals(row, ScreenOffPlan.DarkStart.STARTS, ScreenOffPlan.startsWhileDark(
+                                                    KEPT, true, false, keeps, true, surround, true));
+                                        }
                                     }
                                 }
                             }
@@ -337,20 +537,27 @@ public class ScreenOffPlanTest {
     /**
      * 熄屏期间哨兵模式、挡位变了：「接着录」（不是唤醒锁拉着的那种）和「10 秒后停」照表再判 —— 车机要睡时在开车、
      * 后来挂 P 下车，或者关了哨兵模式，都不会再有熄屏事件（channel-logic §四「熄屏期间情况变了，重判一次」）。
-     * 现在停了的不因为信号变了录起来，锁拉着的等锁到点再判。
+     * 现在停了的、通道放开了停的不因为信号变了录起来，锁拉着的等锁到点再判。只在安卓熄屏着时重判（2026-10-27）：
+     * 车机醒着时重判改不了结果，哨兵模式变了归通道管。
      */
     @Test
     public void aContinueOrAStopLaterWithoutTheWakeLockIsRejudgedWhenTheCarChanges() {
-        assertTrue(ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.CONTINUE, false));
-        assertFalse(ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.CONTINUE, true));
-        assertTrue("10 秒后停的也重判", ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.STOP_LATER, false));
-        assertFalse(ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.STOP_NOW, false));
-        assertFalse("亮着", ScreenOffPlan.rejudgesOnVehicleChange(null, false));
+        assertTrue(ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.CONTINUE, false, true));
+        assertFalse(ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.CONTINUE, true, true));
+        assertTrue("10 秒后停的也重判", ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.STOP_LATER, false, true));
+        assertFalse(ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.STOP_NOW, false, true));
+        assertFalse("通道放开了停的", ScreenOffPlan.rejudgesOnVehicleChange(ScreenOffPlan.Action.STOP_RELEASED, false, true));
+        assertFalse("亮着", ScreenOffPlan.rejudgesOnVehicleChange(null, false, true));
+        for (ScreenOffPlan.Action action : ScreenOffPlan.Action.values()) {
+            for (boolean byLock : BOTH) {
+                assertFalse("车机醒着（安卓亮着）：不重判", ScreenOffPlan.rejudgesOnVehicleChange(action, byLock, false));
+            }
+        }
     }
 
     /**
      * 车辆信号变了的重判只会停在原处或者判成现在停：设置不变、锁没拉着，哨兵模式、挡位怎么变，接着录的不会变成
-     * 10 秒后停，10 秒后停的也不会变成接着录。车机醒着（安卓亮着）时连现在停也判不出：结果不变。
+     * 10 秒后停，10 秒后停的也不会变成接着录。车机醒着（安卓亮着）时连现在停也判不出：结果不变 —— 所以那时不重判。
      */
     @Test
     public void aRejudgeOnVehicleChangeOnlyStaysOrStopsNow() {
@@ -361,7 +568,9 @@ public class ScreenOffPlanTest {
                         for (boolean drivingBefore : BOTH) {
                             ScreenOffPlan.Action before = action(keeps, false, autoRecord, sentryBefore, drivingBefore,
                                     androidOff);
-                            if (!ScreenOffPlan.rejudgesOnVehicleChange(before, false)) {
+                            boolean rejudged = ScreenOffPlan.rejudgesOnVehicleChange(before, false, androidOff);
+                            assertEquals(androidOff && before != ScreenOffPlan.Action.STOP_NOW, rejudged);
+                            if (androidOff && !rejudged) {
                                 continue;
                             }
                             for (Integer sentryAfter : ANY_SENTRY) {
@@ -409,7 +618,7 @@ public class ScreenOffPlanTest {
             assertEquals(ScreenOffPlan.Action.STOP_LATER, atOff.action);
             assertEquals("车机醒着，不写", ScreenOffPlan.SleepFact.KEEP,
                     ScreenOffPlan.sleepFact(true, atOff.action, false));
-            assertTrue(ScreenOffPlan.rejudgesOnVehicleChange(atOff.action, false));
+            assertTrue(ScreenOffPlan.rejudgesOnVehicleChange(atOff.action, false, true));
             ScreenOffPlan.Decision rejudged = judge(false, false, autoRecord, 0, parked, true);
             assertEquals(ScreenOffPlan.Action.STOP_NOW, rejudged.action);
             assertEquals(atOff.resumesOnWake, rejudged.resumesOnWake);
@@ -425,7 +634,7 @@ public class ScreenOffPlanTest {
         for (boolean keeps : BOTH) {
             ScreenOffPlan.Action atOff = action(keeps, false, false, 0, inDrive, true);
             assertEquals(keeps ? ScreenOffPlan.Action.CONTINUE : ScreenOffPlan.Action.STOP_LATER, atOff);
-            assertTrue(ScreenOffPlan.rejudgesOnVehicleChange(atOff, false));
+            assertTrue(ScreenOffPlan.rejudgesOnVehicleChange(atOff, false, true));
             ScreenOffPlan.Action rejudged = action(keeps, false, false, 0, inPark, true);
             assertEquals(ScreenOffPlan.Action.STOP_NOW, rejudged);
             assertEquals(ScreenOffPlan.SleepFact.WRITE, ScreenOffPlan.sleepFact(true, rejudged, false));
@@ -492,7 +701,7 @@ public class ScreenOffPlanTest {
     }
 
     /**
-     * 安卓熄屏着时判成接着录、10 秒后停：「车机要睡」不动 —— 没写的不写；写了的也不清（相机已经在按次序关，
+     * 安卓熄屏着时判成接着录、10 秒后停、通道放开了：「车机要睡」不动 —— 没写的不写；写了的也不清（相机已经在按次序关，
      * 停了的录像黑着不接），只有安卓亮了才清。
      */
     @Test
@@ -502,6 +711,8 @@ public class ScreenOffPlanTest {
                     ScreenOffPlan.sleepFact(true, ScreenOffPlan.Action.CONTINUE, written));
             assertEquals(ScreenOffPlan.SleepFact.KEEP,
                     ScreenOffPlan.sleepFact(true, ScreenOffPlan.Action.STOP_LATER, written));
+            assertEquals(ScreenOffPlan.SleepFact.KEEP,
+                    ScreenOffPlan.sleepFact(true, ScreenOffPlan.Action.STOP_RELEASED, written));
             assertEquals(ScreenOffPlan.SleepFact.KEEP, ScreenOffPlan.sleepFact(true, null, written));
         }
     }

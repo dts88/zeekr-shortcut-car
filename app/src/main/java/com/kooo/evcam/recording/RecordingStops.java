@@ -23,7 +23,8 @@ public final class RecordingStops {
         /**
          * 因熄屏停的（{@link ScreenOffPlan}）：车机要睡（屏幕黑着时安卓熄屏，哨兵模式没开、车没在走）时现在停（车机几秒后就断电，
          * 2026-10-10）；熄屏持续录制、开发者熄屏录制都关着（{@link ScreenOffPlan#keepsRecording}），或者计划里没有环视，
-         * 屏幕一黑 10 秒后停（车机还醒着，熄屏 v3）。亮屏后接不接，停的那一刻照表定好了。
+         * 屏幕一黑 10 秒后停（车机还醒着，熄屏 v3）；黑满 30 秒以后通道放开了环视（哨兵模式没开、熄屏中哨兵关了、车机要睡）时现在停
+         * （项目所有者 2026-10-27）。亮屏后接不接，停的那一刻照表定好了。
          */
         SCREEN_OFF,
         /** U 盘满了。存储那边会自己从最老的清，走到这一步说明清不动。 */
@@ -65,8 +66,8 @@ public final class RecordingStops {
      *
      * <ul>
      *   <li>人停的 —— 永远不接；</li>
-     *   <li>熄屏停的 —— 不自动接：亮屏时接（接不接熄屏时照 {@link ScreenOffPlan} 定）；黑着时只有车机醒着、熄屏持续录制开着、
-     *       计划里有环视才接（车机黑着醒了，只录环视，{@link ScreenOffPlan#startsWhileDark}）；</li>
+     *   <li>熄屏停的 —— 不自动接：亮屏时接（接不接熄屏时照 {@link ScreenOffPlan} 定）；黑着时只有熄屏中哨兵模式变成开、通道留下了环视
+     *       才接（车机醒着、熄屏持续录制开着、计划里有环视、能用相机，只录环视，{@link ScreenOffPlan#startsWhileDark}）；</li>
      *   <li>存储满了 —— 接回去也录不下；</li>
      *   <li>存储一类（写不进、一笔没写进、管线被换、录制器都建不起来）—— 收拾完、查过盘就重开：
      *       重开一次就是新的编码器、新的文件，常常就好了。走同一份额度（{@link ResumeBudget}）。</li>
@@ -263,24 +264,24 @@ public final class RecordingStops {
     }
 
     /**
-     * 一段熄屏里录像停了几次、开了几次（熄屏小结，设计 v3 §6 L8、v3.1 C16）：照表停的（10 秒到点、车机要睡，
-     * {@link Reason#SCREEN_OFF}）单独数、记下第一次的那一刻，不算「中途停过」；别的停都算中途停过；车机黑着醒了照表接着录
-     * （E2'，只录环视）、真开起来的单独数。一段熄屏里照表停可能不止一次：车机要睡停了，夜里车机醒来接着录，下一次车机要睡又停
-     * （审查 rev3 B6：以前只记第一次，后面那一段录像和它的停在小结里看不到）。熄屏那一下清零，亮屏那一行写完不清（下一次熄屏再清）。
-     * 主线程上用；纯逻辑。
+     * 一段熄屏里录像停了几次、开了几次（熄屏小结，设计 v3 §6 L8、v3.1 C16）：熄屏停的（10 秒到点、车机要睡、通道放开了环视，
+     * {@link Reason#SCREEN_OFF}）单独数、记下第一次的那一刻，不算「中途停过」；别的停都算中途停过；熄屏中哨兵模式变成开、
+     * 通道留下环视后接着录（只录环视）、真开起来的单独数。一段熄屏里熄屏停可能不止一次：通道放开了停了，熄屏中哨兵模式变成开接着录，
+     * 哨兵关了、车机要睡又停（审查 rev3 B6：以前只记第一次，后面那一段录像和它的停在小结里看不到）。熄屏那一下清零，
+     * 亮屏那一行写完不清（下一次熄屏再清）。主线程上用；纯逻辑。
      */
     public static final class DarkTally {
         private int midwayStops;
         private int tableStops;
         private long firstTableStopAt;
-        private int wokeStarts;
+        private int sentryStarts;
 
         /** 熄屏了：这一段从零数。 */
         public void reset() {
             midwayStops = 0;
             tableStops = 0;
             firstTableStopAt = 0;
-            wokeStarts = 0;
+            sentryStarts = 0;
         }
 
         /**
@@ -298,9 +299,9 @@ public final class RecordingStops {
             }
         }
 
-        /** 车机黑着醒了、照表接着录，这一次真开起来了。 */
-        public void wokeStarted() {
-            wokeStarts++;
+        /** 熄屏中哨兵模式变成开、通道留下环视后接着录，这一次真开起来了。 */
+        public void sentryStarted() {
+            sentryStarts++;
         }
 
         /** 中途停过几次（照表停的不算）。 */
@@ -308,19 +309,19 @@ public final class RecordingStops {
             return midwayStops;
         }
 
-        /** 照表停录几次。 */
+        /** 熄屏停录几次（照表的、通道放开的）。 */
         public int tableStops() {
             return tableStops;
         }
 
-        /** 第一次照表停录的那一刻（elapsedRealtime）；没有是 0。 */
+        /** 第一次熄屏停录的那一刻（elapsedRealtime）；没有是 0。 */
         public long firstTableStopAt() {
             return firstTableStopAt;
         }
 
-        /** 车机醒来接着录、开起来了几次。 */
-        public int wokeStarts() {
-            return wokeStarts;
+        /** 熄屏中哨兵模式变成开后接着录、开起来了几次。 */
+        public int sentryStarts() {
+            return sentryStarts;
         }
 
         /** 这一段里停过（中途的、照表的都算）。 */
