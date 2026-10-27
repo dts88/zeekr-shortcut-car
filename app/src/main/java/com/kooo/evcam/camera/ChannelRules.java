@@ -459,8 +459,9 @@ public final class ChannelRules {
         long lastAskAt;
         /**
          * 环视这一段熄屏是哪一种（{@link SurroundInDark}，项目所有者 2026-10-27）：只由 {@link ChannelRules#judgeSurroundInDark} 改。
-         * 新世界从「放开」起 —— 没见过通道刚算黑的那一下（进程在黑着时被拉起）。跟着进程、不跟着管线：调度建新世界时照进程那一份填，
-         * 每一轮写回（ChannelScheduler.setLanes），管线放掉重建不断熄屏录像。
+         * 新世界从「放开」起 —— 没见过通道刚算黑的那一下（进程在黑着时被拉起）。跟着进程、不跟着管线：调度建世界时照进程那一份填
+         * （建调度时、ChannelScheduler.setLanes），除了在退出的那一份，每一轮写回（ChannelScheduler.keepProcessDark，车机要睡、睡着时也写），
+         * 管线放掉重建不断熄屏录像。
          */
         SurroundInDark surroundInDark = SurroundInDark.RELEASED;
         /**

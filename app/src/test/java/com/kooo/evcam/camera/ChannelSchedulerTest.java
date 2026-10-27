@@ -2204,6 +2204,104 @@ public class ChannelSchedulerTest {
         }
     }
 
+    /**
+     * 管线重建时新的那一份调度建好、各路还没交给它（列相机、探合成流要一会儿）就会被叫醒跑几轮（相机服务、登记表、车辆信号）：
+     * 那几轮也接着进程那一份判，写回去的还是「留着」—— 交了各路环视照旧留着，旧的那一份关完就开起来录（审查 2026-10-27）。
+     */
+    @Test
+    public void roundsBeforeTheLanesArriveKeepTheSurroundInDark() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long kept = 1_000 + ChannelRules.HOLD_MS;
+        at(kept);
+        assertTrue(s.snapshot().surroundKept);
+
+        s.exit();   // 列相机出错：旧的那一份放掉，只关
+        ChannelScheduler rebuilt = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        try {
+            rebuilt.wake();   // 各路还没交：相机服务、登记表、车辆信号叫醒
+            at(kept + 1_000);
+            assertEquals("交各路之前的那几轮", ChannelRules.SurroundInDark.KEPT, rebuilt.snapshot().surroundInDark);
+
+            FakePort newSurround = new FakePort("2");
+            declare(newSurround, recS);
+            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+            lanes.put(SUR, newSurround);
+            rebuilt.setLanes(lanes);
+            assertFalse("交了各路：进程那一份还是留着", rebuilt.releasedByDark(SUR));
+            at(kept + 1_100);
+            closed(surround);   // 旧的那一份关完
+            at(kept + 5_000);
+            assertEquals(ChannelRules.SurroundInDark.KEPT, rebuilt.snapshot().surroundInDark);
+            assertEquals("新的那一份开起来录", Arrays.asList("open [RECORD]"), newSurround.actions);
+        } finally {
+            rebuilt.detach();
+        }
+    }
+
+    /**
+     * 车机要睡那一下的放开也写回进程那一层（审查 2026-10-27）：留着的环视，车辆接口断了（哨兵模式读不到，留着不算关），
+     * 黑着时安卓熄屏、车机要睡 —— 环视放开。醒了哨兵模式还布防着，旧的那一份还没再跑一轮管线就重建了：
+     * 新的那一份接着「放开」，不开环视（醒来不算哨兵模式变成开）。
+     */
+    @Test
+    public void theHeadUnitSleepReleaseSurvivesARebuildAtTheWake() {
+        claim(Holder.RECORDING);
+        host.plan(SUR);
+        streaming(surround, recS);
+        host.sentryArmed();
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertTrue(s.snapshot().surroundKept);
+
+        at(60_000);
+        host.sentry = null;   // 车辆接口断了：读不到，留着不算关
+        s.wake();
+        settle();
+        assertTrue(s.snapshot().surroundKept);
+        host.androidOff = true;   // 车机要睡
+        host.sleeps = true;
+        s.onNeedsChanged();
+        settle();
+        assertEquals(Arrays.asList("close head-unit-sleeps"), surround.actions);
+        at(60_100);
+        closed(surround);
+        settle();
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, s.snapshot().surroundInDark);
+
+        at(3_600_000);   // 醒了，哨兵模式还布防着；旧的那一份还没再跑一轮，管线就重建了
+        host.androidOff = false;
+        host.sleeps = false;
+        host.sentryArmed();
+        s.exit();
+        ChannelScheduler rebuilt = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        FakePort newSurround = new FakePort("2");
+        declare(newSurround, recS);
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, newSurround);
+        rebuilt.setLanes(lanes);
+        try {
+            assertTrue("醒来不算变成开：环视还是放开", rebuilt.releasedByDark(SUR));
+            rebuilt.wake();
+            at(3_660_000);
+            assertEquals(ChannelRules.SurroundInDark.RELEASED, rebuilt.snapshot().surroundInDark);
+            assertTrue("不开：" + newSurround.actions, newSurround.actions.isEmpty());
+        } finally {
+            rebuilt.detach();
+        }
+    }
+
     // ================================================================= 问（只问，不开）
 
     /**

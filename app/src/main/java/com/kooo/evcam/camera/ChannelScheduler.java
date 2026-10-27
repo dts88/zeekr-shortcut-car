@@ -1399,9 +1399,10 @@ public final class ChannelScheduler {
     // ---- 环视这一段熄屏留不留：跟着进程，不跟着管线（项目所有者 2026-10-27；只在主线程上读写）----
 
     /**
-     * 进程这一层记着的环视这一段熄屏是哪一种（{@link ChannelRules.World#surroundInDark}）：调度建新世界时照它填（{@link #setLanes}），
-     * 正在用的那一份（不在退出、车机要睡）每一轮写回。管线放掉重建（换车型、列相机出错、启用的几路变了、超级镜子要后座舱）时
-     * 新的那一份调度接着用 —— 熄屏录像不断；进程起来时是放开、没有上一次读数（进程在黑着时被拉起不开相机）。
+     * 进程这一层记着的环视这一段熄屏是哪一种（{@link ChannelRules.World#surroundInDark}）：调度建世界时照它填（建调度时、
+     * {@link #setLanes}，{@link #withProcessDark}），除了在退出的那一份，每一份每一轮写回（{@link #keepProcessDark}，车机要睡、睡着时也写）。
+     * 管线放掉重建（换车型、列相机出错、启用的几路变了、超级镜子要后座舱）时新的那一份调度接着用 —— 熄屏录像不断，
+     * 车机要睡放开的也不会被重建带回来；进程起来时是放开、没有上一次读数（进程在黑着时被拉起不开相机）。
      */
     private static ChannelRules.SurroundInDark processSurroundInDark = ChannelRules.SurroundInDark.RELEASED;
     /** 同上，上一次读得到的哨兵模式（{@link ChannelRules.World#lastSentry}）；null = 还没有。 */
@@ -1411,6 +1412,16 @@ public final class ChannelScheduler {
     static void resetProcessDark() {
         processSurroundInDark = ChannelRules.SurroundInDark.RELEASED;
         processLastSentry = null;
+    }
+
+    /**
+     * 新世界照进程那一份接着：环视这一段熄屏是哪一种、上一次读数（建调度时、{@link #setLanes} 时）。建调度到交各路之间
+     * 也会跑几轮（相机服务、登记表、车辆信号叫醒），那几轮也得接着进程那一份判，不能从「放开」起再写回去。
+     */
+    private static ChannelRules.World withProcessDark(ChannelRules.World world) {
+        world.surroundInDark = processSurroundInDark;
+        world.lastSentry = processLastSentry;
+        return world;
     }
 
     /** 叫醒每一份调度：前台服务就绪 / 没了、主界面进出前台（这几件事是进程级的，不归哪一份管理器）。 */
@@ -1430,7 +1441,7 @@ public final class ChannelScheduler {
     /** 每一路的相机，按 key（主线程）。 */
     private final Map<String, CameraPort> ports = new LinkedHashMap<>();
     /** 规则的世界：每一路的事实和账（主线程）。 */
-    private ChannelRules.World w = new ChannelRules.World(new ArrayList<>());
+    private ChannelRules.World w = withProcessDark(new ChannelRules.World(new ArrayList<>()));
 
     private final AtomicBoolean roundPosted = new AtomicBoolean();
     private final Runnable roundTask = this::round;
@@ -1568,10 +1579,8 @@ public final class ChannelScheduler {
             ports.put(entry.getKey(), entry.getValue());
             list.add(new ChannelRules.Lane(entry.getKey(), entry.getValue().cameraId()));
         }
-        w = new ChannelRules.World(list, enabled);
         // 环视这一段熄屏留不留照进程那一份接着用：管线重建不断熄屏录像（项目所有者 2026-10-27）
-        w.surroundInDark = processSurroundInDark;
-        w.lastSentry = processLastSentry;
+        w = withProcessDark(new ChannelRules.World(list, enabled));
         // 亮熄屏从一开始就照实：第一轮之前录像、拍照来问「座舱被熄屏放开没有」（releasedByDark），读到的不能是新世界的初值（黑着）。
         // 环视留不留要的车上几样也一样（留着的环视第一轮之前不能读成放开）
         readScreen();
@@ -2123,11 +2132,11 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 环视这一段熄屏留不留写回进程那一层（{@link #processSurroundInDark}）：只由正在用的那一份写 —— 为退出、车机要睡在关的那一份不写，
-     * 换车型时放掉的旧管线不会把新那一份的账盖掉。
+     * 环视这一段熄屏留不留写回进程那一层（{@link #processSurroundInDark}）：除了在退出的那一份，每一份每一轮都写 ——
+     * 放掉的旧管线不会把新那一份的账盖掉；车机要睡、睡着时也写，车机要睡那一下的放开和上一次读数留到醒来，醒来重建的管线不会把放开前的「留着」带回来。
      */
     private void keepProcessDark() {
-        if (ChannelRules.winding(w)) {
+        if (w.exitSince != 0) {
             return;
         }
         processSurroundInDark = w.surroundInDark;
