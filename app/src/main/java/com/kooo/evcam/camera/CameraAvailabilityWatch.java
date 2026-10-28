@@ -39,7 +39,14 @@ import java.util.function.Predicate;
  * <p>判据很直接：<b>相机服务说环视被占用，而我们自己没开它</b> —— 那就是别人拿着，
  * 或者是相机服务里一条没清掉的残留占用。后一种正是重启车机才能解开的那一类。
  * 注册的那一刻系统会把每一路当前的状态报一遍，所以卡死之后只要应用还能起来，
- * 黑匣子第一屏就能看到答案。</p>
+ * 黑匣子第一屏就能看到答案 —— 进程起来那一次是相机服务现答的（本进程第一次连上相机服务时它把现状交过来），
+ * 之后同一个进程里再登记，报的只是本进程的缓存（见下面「回放怎么收全」）。车主 2026-10-27 确认：那几次「只有重启车机才好」，
+ * 进程刚起来报的「被占用」是真的，怎么造成的不清楚（平台笔记 §3.1.1）。</p>
+ *
+ * <p>这些回调靠不住的地方（AOSP 12L 源码 + 车上记录，Lab 2026-10-27）：只在「空闲 ↔ 不空闲」翻转时来 ——
+ * 有人开着（被占用）→ 没了（不在）一声不吭；我们还开着、在出画面的相机也被报过「空闲」（2.10.15-beta，车机拿走相机 1 的同一毫秒，
+ * 报了我们开着的 0 和 2）。所以「空闲」不是放行的证据：我们关一台相机还没返回，它说空闲也不开（SingleCamera.CLOSING，
+ * 项目所有者 2026-10-28）。</p>
  *
  * <p>2026-10-10 那一版看门狗按这张表重开被别的程序拿走的那一路（2.10 的 CameraTaken 闸门）；2.11 起只有通道调度读它，
  * 读的是每一路的最后一句和「上一次别人引起的变化」（见下），只问、不开。</p>
@@ -51,17 +58,20 @@ import java.util.function.Predicate;
  * 都要多等 3 秒；我们稳稳开着时它报的「空闲」算别人的 —— 那正是交接时的乱报（10-10 07:22，车机拿走相机 1 的
  * 同一毫秒报了我们开着的 0 和 2「空闲」）。怎么分见 {@link #classify}。</p>
  *
- * <p>被拿着的那一路每 30 秒问一次：注册一个新的可用性回调、收它的回放 —— 进程里的缓存，不进相机服务、不开相机
+ * <p>被拿着的那一路每 30 秒问一次：注册一个新的可用性回调、收它的回放 —— 本进程的缓存，不进相机服务、不开相机
  * （项目所有者 2026-10-10 确认：只问，不开）。回放和我们的记录对不上的，照回放改；回放里没有的槽位记为「不在」
- * （10-10 车机拿着后座舱时，相机 1 就这样从缓存里消失了）。怎么并见 {@link #merge}。</p>
+ * （10-10 车机拿着后座舱时，相机 1 就这样从缓存里消失了）。怎么并见 {@link #merge}。问补的只是漏收的那几声和不回调的那种变化，
+ * 不是相机服务现答（{@link #ask}）。</p>
  *
  * <h3>2.11 起：怎么收、记在哪、怎么交给调度</h3>
  *
  * <ul>
- *   <li><b>回放怎么收全</b>（{@link #start} 和 {@link #ask} 一样）：登记一个可用性回调时，相机服务进程内的缓存里每一路的现状
- *       都在登记那一刻 post 进我们给的 Handler（AOSP 12 {@code CameraManagerGlobal.updateCallbackLocked}：读进程里的缓存，
- *       不额外进相机服务，也不开任何相机）；登记之后紧接着在同一个 Handler 上再 post 一个收尾任务，它跑的时候回放都到了。
- *       缓存里没有的那一路（NOT_PRESENT）不回放：回放收全以后从没听相机服务说过它的，就是「不在」。</li>
+ *   <li><b>回放怎么收全</b>（{@link #start} 和 {@link #ask} 一样）：登记一个可用性回调时，<b>本进程</b>缓存的每一路现状
+ *       （{@code CameraManagerGlobal.mDeviceStatus}）都在登记那一刻 post 进我们给的 Handler（AOSP 12 {@code updateCallbackLocked}：
+ *       读的是本进程里的缓存，不额外进相机服务，也不开任何相机）；登记之后紧接着在同一个 Handler 上再 post 一个收尾任务，
+ *       它跑的时候回放都到了。缓存里没有的那一路（NOT_PRESENT）不回放：回放收全以后从没听相机服务说过它的，就是「不在」。
+ *       这份缓存只有两种时候是相机服务现答的：进程第一次连上相机服务（{@link #start} 多半就是这一次），相机服务挂了重连之后；
+ *       别的时候它只靠相机服务的通知更新（Lab 2026-10-27，AOSP 12L {@code connectCameraServiceLocked}）。</li>
  *   <li><b>记在哪</b>：每一声都用 {@link #classify} 分类，记进 {@link Ledger} —— 最后一句（不管多早说的）、是不是我们引起的、
  *       哪几路不在、上一次别人引起的变化。纯 Java，见 {@code CameraAvailabilityWatchTest}。只在主线程上改。</li>
  *   <li><b>交给调度</b>：调度（ChannelScheduler）用 {@link #addListener} 接上：分类时问它「这一路有没有我们的开或关在途」
@@ -91,6 +101,9 @@ public final class CameraAvailabilityWatch {
 
     /** 2.11 的记录：相机服务对每一路说的最后一句、哪几路不在、上一次别人引起的变化（{@link Ledger}）。只在主线程上改。 */
     private static final Ledger LEDGER = new Ledger();
+
+    /** 同一句又到了一次、已经记过一行的那几路（{@link #heard}）：说了别的才清，同一句再来不再记。 */
+    private static final Set<String> REPEAT_NOTED = ConcurrentHashMap.newKeySet();
 
     /** 接上来的调度（{@link Listener}）。换车型时两份管理器并存，各接各的。 */
     private static final CopyOnWriteArrayList<Listener> LISTENERS = new CopyOnWriteArrayList<>();
@@ -201,7 +214,11 @@ public final class CameraAvailabilityWatch {
      * 诊断报告的旧表、争用日志照旧记（{@link #changed}）。
      *
      * <p>黑匣子那一行的格式不变（「相机服务: N 空闲 / 被占用」加括号），括号按新的分类写：我们开着它时报的「空闲」
-     * 是相机服务乱报、算别人引起的变化；丢了之后那一次关的途中报的「被占用」是新的主人，算在途。</p>
+     * 是相机服务乱报、算别人引起的变化；丢了之后那一次关的途中报的「被占用」是新的主人，算在途。注册那一刻的回放写
+     * 「（初始状态：进程起来时相机服务现答）」—— 那是本进程第一次连上相机服务时它交过来的现状（类说明）。</p>
+     *
+     * <p>同一句又到了一次（{@link Cause#SAME}）以前一声不吭地扔掉；回调只在空闲 ↔ 不空闲翻转时来，同一句再来说明中间有一段我们没听到
+     * （相机服务重启后重报、这一路没了又回来，或者问出来已经改过、它这才到），每一路记一行（说了别的之后再来的再记），只记不算变化。</p>
      */
     private static void heard(String cameraId, boolean available, boolean replay) {
         long now = SystemClock.elapsedRealtime();
@@ -211,8 +228,13 @@ public final class CameraAvailabilityWatch {
         Cause cause = LEDGER.heard(cameraId, available, replay, ourStepInFlight(cameraId), holdsOrOpen, now);
         changed(cameraId, available);
         if (cause == Cause.SAME) {
+            if (REPEAT_NOTED.add(cameraId)) {
+                BlackBox.noteImportant("相机服务: " + cameraId + " 又报了一次" + (available ? "空闲" : "被占用")
+                        + "（同一句再来：相机服务重启后重报、这一路没了又回来，或者问出来改过之后它才到）");
+            }
             return;
         }
+        REPEAT_NOTED.remove(cameraId);
         boolean cameBack = cause == Cause.OTHERS && before.absent;
         if (cameBack) {
             // 没了又回来 = 车机重新初始化了它：这一台的来历从头数（2.11.5 第 D1 项，只记录）
@@ -220,14 +242,14 @@ public final class CameraAvailabilityWatch {
         }
         if (available) {
             BlackBox.noteImportant("相机服务: " + cameraId + " 空闲"
-                    + (cause == Cause.INITIAL ? "（初始状态）"
+                    + (cause == Cause.INITIAL ? "（初始状态：进程起来时相机服务现答）"
                     : cause == Cause.OURS ? ""
                     : holdsDevice ? "（可我们开着它：相机服务乱报，算别人引起的变化）"
                     : cameBack ? "（回来了：之前相机服务的缓存里没有它）" : ""));
         } else {
             BlackBox.noteImportant("相机服务: " + cameraId + " 被占用"
                     + (holdsOrOpen ? "（我们开着）" : "（不是我们：别的程序，或相机服务里没清掉的占用）")
-                    + (cause == Cause.INITIAL ? "（初始状态）"
+                    + (cause == Cause.INITIAL ? "（初始状态：进程起来时相机服务现答）"
                     : cause == Cause.OURS && !holdsOrOpen ? "（我们这边正在关它：算在途）"
                     : cause == Cause.OTHERS && holdsOrOpen ? "（相机服务改口，算别人引起的变化）"
                     : cameBack ? "（回来了：之前相机服务的缓存里没有它）" : ""));
@@ -363,10 +385,14 @@ public final class CameraAvailabilityWatch {
      * 问相机服务一次：这几路此刻空不空、在不在 —— 只问，不开（项目所有者 2026-10-10 确认）。
      *
      * <p>在主线程上登记一个新的一次性可用性回调，收完它的回放就注销（怎么收全见类说明），和我们的记录对不上的照回放改，
-     * 当作别人引起的变化并进来（{@link Ledger#replayed}），然后叫醒调度。读的是进程里的缓存，不额外进相机服务，不开任何相机。
+     * 当作别人引起的变化并进来（{@link Ledger#replayed}），然后叫醒调度。读的是本进程的缓存，不额外进相机服务，不开任何相机。
      * 不在主线程上调的，挪到主线程上做。</p>
      *
-     * <p>黑匣子：对不上的每一处这里写一行（「问相机服务：表上 1 被占用，它现在说空闲（漏收了一声）→ 照它说的改」）；
+     * <p>问出来的不是相机服务现答（Lab 2026-10-27）：它补的只是还没送到的那几声，和不回调的那种变化 —— 有人开着 → 没了，缓存里拿掉了这一路，
+     * 问出来就是「不在」。从来不是「空了」的新证据：我们关一台相机还没返回，问出来说它空闲也不开它（SingleCamera.CLOSING，
+     * 项目所有者 2026-10-28）。</p>
+     *
+     * <p>黑匣子：对不上的每一处这里写一行（「问相机服务（本进程缓存）：表上 1 被占用，它现在说空闲（漏收了一声）→ 照它说的改」）；
      * 每问一次写 AppLog。「第一次、每第 10 次」那一行由调度写 —— 被拿走多久、第几次在它的账上。</p>
      *
      * @param then 收尾时在主线程上交回结果；问不成（还没开始听、登记失败）也交，回放是空的
@@ -480,12 +506,13 @@ public final class CameraAvailabilityWatch {
         for (Correction fix : fixes) {
             if (!asked && fix.nowAbsent()) {
                 BlackBox.noteImportant("相机服务: " + fix.cameraId
-                        + " 不在（初始状态：回放里没有它，相机服务的缓存里没有这一路）");
+                        + " 不在（初始状态：进程起来时相机服务现答，回放里没有这一路）");
             } else if (asked && fix.changed()) {
                 if (fix.wasAbsent && !fix.nowAbsent()) {
                     StepLog.cameraReset(fix.cameraId, CameraHistory.Reset.CAME_BACK);   // 问出来的「它回来了」，同上
                 }
-                BlackBox.noteImportant("问相机服务：表上 " + fix.cameraId + " "
+                // 问的是本进程的缓存（ask 的说明）：补漏收的那几声，不是相机服务现答
+                BlackBox.noteImportant("问相机服务（本进程缓存）：表上 " + fix.cameraId + " "
                         + (fix.wasAbsent ? "不在" : Boolean.TRUE.equals(fix.before) ? "空闲" : "被占用")
                         + "，它现在" + (fix.nowAbsent() ? "没有这一路（相机服务的缓存里没有它）→ 记为不在"
                         : (Boolean.TRUE.equals(fix.after) ? "说空闲" : "说被占用")

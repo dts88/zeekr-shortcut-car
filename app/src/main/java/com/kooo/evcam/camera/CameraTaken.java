@@ -21,8 +21,9 @@ import java.util.Objects;
  * {@link #judge(Reason, boolean, boolean, boolean, boolean)} 判 —— 丢失和开失败共用这一个，不再分两套。
  * 判成被别的程序拿着（{@link Verdict#TAKEN}）、被另一路挡着（{@link Verdict#BLOCKED}）的不抢、不试开：
  * 每 {@link #ASK_EVERY_MS} 只问一次相机服务它空没空（只问，不开 —— 以前每 30 秒试开一次，试开在前台
- * 可能把原厂功能挤掉，项目所有者 2026-10-10 同意改掉）。放开了（{@link #releases}）、通道安静 {@link #QUIET_MS} 之后，
- * 按开的顺序单独开它，救援从头算。</p>
+ * 可能把原厂功能挤掉，项目所有者 2026-10-10 同意改掉）。问读的是本进程的缓存，补的是漏收的那几声，不是相机服务现答
+ * （CameraAvailabilityWatch.ask）。放开了（{@link #releases}）、通道安静 {@link #QUIET_MS} 之后，
+ * 按开的顺序单独开它，救援从头算 —— 我们关它还没返回的照旧不开（ChannelRules.closeOutstanding，项目所有者 2026-10-28）。</p>
  *
  * <p>怎么知道是被拿走的：我们这边关完以后，相机服务对这一路说的最后一句不是「空闲」—— 它还被占着，
  * 那只能是别人；或者这一路干脆不在（10-10 车机拿走后座舱时，相机服务一句话都不说，开的时候相机列表里也没有它）。
