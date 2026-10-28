@@ -121,7 +121,7 @@ public final class ChannelRules {
      * 别人的在途（一路被接手 LOSING、一路的相机层在关一个设备、一路 isBusy、另一个管理器实例在关）最多挡别的路多久：
      * 再久就当回调不会来了，别的路不再等它。数在 {@link SingleCamera#IN_FLIGHT_MAX_MS}。
      *
-     * <p>只管别的路（项目所有者 2026-10-28）：在关的那一台自己，那一次关返回之前不开、不救（{@link #closeOutstanding}），不设时限；
+     * <p>只管别的路（项目所有者 2026-10-28）：在关的那一台自己，那一次关返回之前不开、关着在开的不救（{@link #closeOutstanding}），不设时限；
      * 满这么久还没返回的，录像那一侧不再算它在起来、状态条说它无法录制（{@link #heldByClose}）。</p>
      */
     public static final long IN_FLIGHT_MAX_MS = SingleCamera.IN_FLIGHT_MAX_MS;
@@ -291,7 +291,8 @@ public final class ChannelRules {
          * 相机层在关这一台相机的一个设备，从什么时候起（SingleCamera.closingSince）；0 = 没在关。每一种关都算：我们关的、丢了之后的关、
          * 救援重开时关旧的、作废卡住的那一轮、晚到的设备就地关（2.11.4 起都登记成在关），任何一份管线的。
          * 在途、手上那一步到点也不放过，别的路最多等 {@link ChannelRules#IN_FLIGHT_MAX_MS}（{@link ChannelRules#next} 第 1 条）；
-         * 这一路自己，不是 0 就不开、不救（{@link ChannelRules#closeOutstanding}，项目所有者 2026-10-28）。
+         * 这一路自己，不是 0 就不开，关着、在开的也不救（{@link ChannelRules#closeOutstanding}，项目所有者 2026-10-28）。
+         * 是这一台从什么时候起一直有关没返回（链头那一次的时刻）：上面又登记一次关，它不变。
          */
         long closingSince;
         /** 会话里此刻带着的输出（SingleCamera.sessionOutputs() 的快照）；没有会话是空的。 */
@@ -1808,8 +1809,10 @@ public final class ChannelRules {
      * 这一台相机的相机层还有一次关没返回（{@link Lane#closingSince}：任何一种关、任何一份管线的）。项目所有者 2026-10-28：
      * 我们上一次关一台相机还没返回，App 里谁都不开它，直到那一次关返回、或者进程结束 —— 不设时限；相机服务说它空闲不算数
      * （同一个进程里问相机服务只是读本进程的缓存；我们还开着的相机也被报过空闲，平台笔记 §3.1）。这时这一路不开（{@link #next} 第 5 条，
-     * 像被拿着的一样跳过、不挡后面）、不救、不计次数（{@link #rescueAge}），关座舱前也不先关它（{@link #surroundFirst}：关了开不回来）。
-     * 不为它问相机服务：问只是读本进程的缓存，放不开它。
+     * 像被拿着的一样跳过、不挡后面）；设备不在我们手上的不救、不计次数（{@link #rescueAge}；开着的照救：那一次关是另一个设备的），
+     * 关座舱前也不先关它（{@link #surroundFirst}：关了开不回来）。
+     * 不因为关没返回去问相机服务：问只是读本进程的缓存，放不开它。它同时被拿着的，照被拿着的规矩每 30 秒问（{@link #askDue}）——
+     * 问出来的「空闲」放得开被拿着，放不开关没返回。
      *
      * <p>和「被拿着」（{@link Lane#mark}：相机服务说别人拿着它）是两样，一路要开得了，两样都不能有。别的路只在头 60 秒等它
      * （{@link #inFlight}），之后照常（项目所有者 2026-10-28）。</p>
@@ -1852,7 +1855,8 @@ public final class ChannelRules {
      * <ol>
      *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一路的相机层在关一个设备（我们按次序关的那一步除外，
      *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy、另一个实例在关。后四种各封顶
-     *       {@link #IN_FLIGHT_MAX_MS} —— 封顶只管别的路等多久：关没返回的那一路自己返回之前不开、不救（{@link #closeOutstanding}，
+     *       {@link #IN_FLIGHT_MAX_MS}（相机层在关的那一种从这一台一直有关没返回的那一刻算，上面又登记一次关不从头算）——
+     *       封顶只管别的路等多久：关没返回的那一路自己返回之前不开、关着在开的不救（{@link #closeOutstanding}，
      *       项目所有者 2026-10-28）。车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
      *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
@@ -1870,7 +1874,8 @@ public final class ChannelRules {
      *   <li><b>救</b>（要安静；重开还要能用相机、屏幕知道黑没黑，屏幕真黑着、没在开车时座舱不重开 —— 熄屏期间绝不开座舱，
      *       项目所有者 2026-10-27；重建不要）：有人要（保持不算）、没被拿着、关着等救或者开着 8 秒没进展的那一路，
      *       环视先；关着、在开而相机层手上还有开或关的，等它（最多 {@link #IN_FLIGHT_MAX_MS}，{@link #rescueAge}）；
-     *       相机层有一次关没返回的不救、不计次数，返回之前一直这样（{@link #closeOutstanding}，项目所有者 2026-10-28）。
+     *       关着、在开而相机层有一次关没返回的不救、不计次数，返回之前一直这样（{@link #closeOutstanding}，项目所有者 2026-10-28）；
+     *       开着的照救（那一次关是另一个设备的）。
      *       梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手；</li>
      *   <li>都没有 → 空闲。</li>
      * </ol>
@@ -2038,7 +2043,8 @@ public final class ChannelRules {
      * 环视 10 秒、座舱 30 秒到点就不再等（「环视等了 10 秒还没关完，先关座舱」）。</p>
      *
      * <p>这里的封顶只管别的路等多久（项目所有者 2026-10-28：一路的关卡住超过 60 秒，别的路照以前那样不再等它）。
-     * 在关的那一路自己，那一次关返回之前不开、不救，不设时限（{@link #closeOutstanding}）。</p>
+     * 从这一台一直有关没返回的那一刻算（{@link Lane#closingSince} 是链头那一次的时刻）：卡住的关上面又登记一次关，别的路不再从头等 60 秒。
+     * 在关的那一路自己，那一次关返回之前不开、关着在开的不救，不设时限（{@link #closeOutstanding}）。</p>
      */
     private static Decision inFlight(World w) {
         long now = w.now;
@@ -2265,15 +2271,18 @@ public final class ChannelRules {
      * 梯子却已经算了一次 —— 一次没救的「救」，3 次不成歇 60 秒、3 轮停手都会提前（审查 2026-10-11）。
      * 开着的那一路卡在配会话里不在此列：相机层的重开会把那一次配置作废、关掉设备再开（SingleCamera.reopen），满 8 秒照救。</p>
      *
-     * <p>相机层有一次关没返回的那一路不救（{@link #closeOutstanding}，项目所有者 2026-10-28）：重建、重开都不做，梯子不算次数，
-     * 也就不会歇 60 秒、不会停手 —— 返回之前一直这样，不设时限。重开相机层本来也只会合并掉（关没返回之前不开）。</p>
+     * <p>设备不在我们手上、相机层有一次关没返回的那一路不救（{@link #closeOutstanding}，项目所有者 2026-10-28）：重开开不出去
+     * （关没返回之前不开，相机层只会合并掉），梯子不算次数，也就不会歇 60 秒、不会停手 —— 返回之前一直这样，不设时限。
+     * 那一次关返回之后、相机层里在等它的开、重开接着上路之前也不救：那时 {@link Lane#busySince} 不归 0（SingleCamera.isBusy 一直算
+     * 在等关的那一下）。开着的那一路照救（审查 2026-10-28）：那一次关是另一个设备的
+     * （上一轮晚到的设备就地关、另一份管线在关），重建会话不开新句柄；重开相机层照样合并掉。以前一概不救，开着却卡住的那一路，
+     * 那一次关不返回就再也救不回来。</p>
      */
     private static long rescueAge(World w, Lane lane) {
-        if (lane.mark != null || lane.failure != null || lane.ladder.stopped() || !wanted(w, lane)
-                || closeOutstanding(lane)) {
+        if (lane.mark != null || lane.failure != null || lane.ladder.stopped() || !wanted(w, lane)) {
             return -1;
         }
-        if (lane.device != Device.OPEN && lane.busySince != 0) {
+        if (lane.device != Device.OPEN && (lane.busySince != 0 || closeOutstanding(lane))) {
             return -1;
         }
         switch (lane.device) {

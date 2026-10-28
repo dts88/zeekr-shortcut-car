@@ -1886,7 +1886,8 @@ public class ChannelRulesTest {
 
     /**
      * 一个卡死的关最多占住别的路 60 秒，之后按当时的状态判（大纲 §6 风险 5）。那一路自己返回之前不开（项目所有者 2026-10-28）：
-     * 相机服务说它空闲了（放开了被拿着），也不开。
+     * 丢了之后那一次关返回了（关着了），它上面却压着一次没返回的关（晚到的设备就地关；相机层报的还是链头那一刻），
+     * 相机服务说它空闲了（放开了被拿着），也不开；那一次也返回了才开。
      */
     @Test
     public void aStuckLossStopsBlockingAfterSixtySecondsAndIsJudgedThen() {
@@ -1908,13 +1909,27 @@ public class ChannelRulesTest {
         assertTrue(ChannelRules.heldByClose(w, rear));
         perform(d);
 
+        // 丢了之后那一次关返回了，可上面压着的那一次没返回：关着，closingSince 还是丢的那一刻（链头）
+        at(2 * 60_000);
+        ChannelRules.lossClosed(w, rear);
+        rear.busySince = 0;
+        assertEquals(Move.IDLE, run().move);
+        assertEquals(Device.CLOSED, rear.device);
+        assertTrue(ChannelRules.heldByClose(w, rear));
+
         at(3 * 60_000);
         serviceSays(rear, true, false);
         round();
         assertNotNull("相机服务说空闲：放开了被拿着", event(Event.Type.RELEASED));
+        assertNull(rear.mark);
         at(3 * 60_000 + ChannelRules.QUIET_MS);
         assertEquals(Move.IDLE, run().move);
-        assertEquals("那一次关没返回：照样不开", 0, count(Move.OPEN, rear));
+        assertEquals("关着、放开了，那一次关没返回：照样不开", 0, count(Move.OPEN, rear));
+
+        rear.closingSince = 0;   // 那一次也返回了
+        d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
     }
 
     // ================================================================= 车机要睡、退出
@@ -2384,6 +2399,60 @@ public class ChannelRulesTest {
         round();
         assertEquals("返回了还被占着：别人拿着", CameraTaken.Verdict.TAKEN, rear.mark);
         assertEquals(Collections.singletonList(REAR), event(Event.Type.RECOGNIZED).keys);
+    }
+
+    /**
+     * 开着的一路卡住了（8 秒没进展），它这台相机还有一次关没返回 —— 是另一个设备的（上一轮晚到的设备就地关，卡住满 60 秒）：照救
+     * （审查 2026-10-28：重建会话不开新句柄；重开相机层照样合并掉）。以前一概不救，那一次关不返回，开着却卡住的这一路就再也救不回来。
+     * 关着、在开的那种照旧不救（{@link #aLaneWithACloseThatHasNotReturnedIsNeitherRescuedNorCounted}、
+     * {@link #aCameraWhoseOldDeviceNeverFinishesClosingHoldsOnlyItself}）。
+     */
+    @Test
+    public void anOpenLaneIsRescuedWhileAnotherCloseOfItsCameraIsOutstanding() {
+        claim(Holder.PREVIEW);
+        streamingAll();
+        rear.closingSince = w.now - ChannelRules.IN_FLIGHT_MAX_MS;
+        assertEquals(Move.IDLE, round().move);
+        assertFalse("开着的不算在等那一次关", ChannelRules.heldByClose(w, rear));
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals("本会话出过画面：第一次救重建会话，不开新句柄", Rescue.REBUILD, d.rescue);
+        assertEquals(1, d.attempt);
+    }
+
+    /**
+     * 相机层里一次在等关返回的开（项目所有者 2026-10-28）：那一次关返回了、它还没接着上路的那一下，相机层照旧报它在途
+     * （SingleCamera.isBusy 一直算在等关的；busySince 还是那一次开上路的时刻，早过了 60 秒）—— 不救、不计次数；
+     * 别的路照旧只等它 60 秒（链头是开之前那一次关的时刻，在途封顶从开上路算，都早过了）。
+     */
+    @Test
+    public void aParkedOpenWhoseCloseJustReturnedIsNeitherRescuedNorWaitedFor() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        rear.declared.add(pvR);
+        front.declared.add(pvF);
+        Decision d = round();
+        assertEquals(Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        startOnly(d);
+        rear.closingSince = w.now - 1_000;   // 开那一下在相机线程上等这一台之前的一次关返回
+        at(ChannelRules.STEP_MAX_MS);
+        assertWait(Why.BUSY, REAR, round());
+        assertEquals("开那一步到点：算第 1 次", 1, rear.ladder.attempts());
+
+        at(ChannelRules.IN_FLIGHT_MAX_MS + 10_000);
+        d = round();
+        assertEquals("满 60 秒：别的路照常", Move.OPEN, d.move);
+        assertEquals(Collections.singletonList(FRONT), d.keys);
+        perform(d);
+
+        rear.closingSince = 0;               // 那一次关返回了，相机层那一下开还没接着上路
+        rear.progressAgeMs = ChannelRules.IN_FLIGHT_MAX_MS + 10_000;
+        assertEquals(Move.IDLE, round().move);
+        assertEquals("不救", 0, count(Move.RESCUE, rear));
+        assertEquals("不计次数", 1, rear.ladder.attempts());
     }
 
     @Test

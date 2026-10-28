@@ -137,8 +137,9 @@ public final class ChannelScheduler {
 
         /**
          * 这一台相机此刻在关一个设备的话（任何一种关、任何一份实例在关），从什么时候起（调度的钟）；没在关是 0。
-         * 在途、手上那一步到点也不放过（ChannelRules 第 1c 项，2.11.4）；不是 0 的时候这一路不开、不救（ChannelRules.closeOutstanding，
-         * 项目所有者 2026-10-28）。
+         * 在途、手上那一步到点也不放过（ChannelRules 第 1c 项，2.11.4）；不是 0 的时候这一路不开、关着在开的不救（ChannelRules.closeOutstanding，
+         * 项目所有者 2026-10-28）。是这一台从什么时候起一直有关没返回（链头那一次的时刻，SingleCamera.closingSince）：
+         * 卡住的关上面又登记一次关，它不变。
          */
         long closingSince();
 
@@ -400,8 +401,12 @@ public final class ChannelScheduler {
         /** 一路丢了、或者开不起来，判完了。 */
         void judged(Judgement judgement);
 
-        /** 被拿着的一路放开了（{@code asked}：是问出来的）。 */
-        void released(String key, String cameraId, CameraTaken.Verdict was, long heldMs, boolean asked);
+        /**
+         * 被拿着的一路放开了（{@code asked}：是问出来的）。{@code closeOutstanding}：相机层关它还没返回（{@link ChannelRules#closeOutstanding}）
+         * —— 放开了也不开，返回之前照旧（项目所有者 2026-10-28），那一行不说「等通道安静，单独开」。
+         */
+        void released(String key, String cameraId, CameraTaken.Verdict was, long heldMs, boolean asked,
+                      boolean closeOutstanding);
 
         /** 停手的一路重新救。 */
         void stopLifted(String key, ChannelRules.Event.Cause cause, Set<CameraNeeds.Holder> holders);
@@ -430,8 +435,11 @@ public final class ChannelScheduler {
          */
         void heldByClose(String key, String cameraId, String busy, long ms);
 
-        /** 写过 {@link #heldByClose} 的那一路，那一次关返回了（相机层不再在关）：照常开。{@code ms} 是关了多久。 */
-        void closeReturned(String key, String cameraId, long ms);
+        /**
+         * 写过 {@link #heldByClose} 的那一路，那一次关返回了（相机层不再在关）。{@code ms} 是关了多久；接下来怎样照这一路此刻的样子说：
+         * {@code wanted}（还该开，{@link ChannelRules#shouldOpen}）、{@code mark}（被拿着、被挡着；null 没有）—— 该开、没被拿着的照常开。
+         */
+        void closeReturned(String key, String cameraId, long ms, CameraTaken.Verdict mark, boolean wanted);
 
         /** 现在用不了相机，这一路先不开 / 不重开（只在变了时）。 */
         void deferred(String key, Unusable why);
@@ -1160,7 +1168,7 @@ public final class ChannelScheduler {
          * （{@link ChannelRules#cannotOpen}）。
          */
         final boolean cannotOpen;
-        /** 相机层在关这一台相机的一个设备，从什么时候起（{@link ChannelRules.Lane#closingSince}）；0 = 没在关。不是 0 就不开、不救它。 */
+        /** 相机层在关这一台相机的一个设备，从什么时候起（{@link ChannelRules.Lane#closingSince}）；0 = 没在关。不是 0 就不开它，关着、在开的也不救。 */
         final long closingSince;
         /** 那一次关满 60 秒还没返回（{@link ChannelRules#stuckClose}）：别的路不再等它，它自己照旧不开。 */
         final boolean stuckClose;
@@ -2712,7 +2720,8 @@ public final class ChannelScheduler {
                     if (lane != null) {
                         Long asked = askedWordAt.remove(lane.key);
                         boolean byAsk = asked != null && asked.equals(wordAtRaw.get(lane.key));
-                        journal.released(lane.key, lane.cameraId, event.verdict, event.ms, byAsk);
+                        journal.released(lane.key, lane.cameraId, event.verdict, event.ms, byAsk,
+                                ChannelRules.closeOutstanding(lane));
                         if (event.verdict == CameraTaken.Verdict.TAKEN) {
                             releases.put(lane.key, new long[]{now, event.ms});   // 被挡着的那一路不是被拿着
                         }
@@ -2803,8 +2812,9 @@ public final class ChannelScheduler {
 
     /**
      * 关没返回的那几路（项目所有者 2026-10-28，{@link ChannelRules#heldByClose}）：一次关满 60 秒还没返回、这一路还该开，
-     * 写一行「返回之前不开它，别的路照常」；写过的那一路相机层不再在关了，写一行「返回了」。一次没返回的关各一行 ——
-     * 它一直挂着、上面又登记了一次关的，还算同一次。只记账、写黑匣子，一步都不动。
+     * 写一行「返回之前不开它，别的路照常」；写过的那一路相机层不再在关了，写一行「返回了」，接下来怎样照它此刻的样子说
+     * （该开、没被拿着的照常开；被拿着的等它空出来；没人要了不开）。一次没返回的关各一行 —— 它一直挂着、上面又登记了一次关的，
+     * 还算同一次（closingSince 是链头那一次的时刻，不变）。只记账、写黑匣子，一步都不动。
      */
     private void noteHeldByClose(long now) {
         for (ChannelRules.Lane lane : w.lanes) {
@@ -2818,7 +2828,7 @@ public final class ChannelScheduler {
                 }
             } else if (!ChannelRules.closeOutstanding(lane)) {
                 heldNoted.remove(lane.key);
-                journal.closeReturned(lane.key, lane.cameraId, now - noted);
+                journal.closeReturned(lane.key, lane.cameraId, now - noted, lane.mark, ChannelRules.shouldOpen(w, lane));
             }
         }
     }

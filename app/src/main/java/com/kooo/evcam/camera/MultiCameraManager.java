@@ -2979,7 +2979,8 @@ public class MultiCameraManager {
         sb.append("    该开：").append(wantText(v, now)).append("；实际：").append(deviceText(v, now))
                 .append(v.cannotOpen && !v.stuckClose ? "；现在用不了相机，主界面回到前台之前不开" : "").append('\n');
         if (v.closingSince != 0) {
-            // 相机层有一次关没返回（项目所有者 2026-10-28）：返回之前不开、不救它；满 60 秒别的路不再等它
+            // 相机层有一次关没返回（项目所有者 2026-10-28）：返回之前不开它，关着、在开的也不救；满 60 秒别的路不再等它。
+            // 时刻是这一台一直有关没返回的那一刻（链头那一次），上面又登记一次关不从头算
             sb.append("    在关：上一次关还没返回，").append(timeText(now - v.closingSince)).append("前开始")
                     .append(v.closeBusy.isEmpty() ? "" : "（" + v.closeBusy + "）").append("；返回之前不开它")
                     .append(v.stuckClose ? "，别的路不再等它" : "").append('\n');
@@ -3647,12 +3648,18 @@ public class MultiCameraManager {
             com.kooo.evcam.blackbox.BlackBox.noteImportant(line);
         }
 
+        /**
+         * 「相机 1（后座舱）放开了（相机服务报的；被拿走 3 分 12 秒）：等通道安静 3 秒，单独开」；相机层关它还没返回的
+         * （项目所有者 2026-10-28：放开了也不开它）结尾换成「；上一次关还没返回，返回之前不开」。
+         */
         @Override
-        public void released(String key, String cameraId, CameraTaken.Verdict was, long heldMs, boolean asked) {
+        public void released(String key, String cameraId, CameraTaken.Verdict was, long heldMs, boolean asked,
+                             boolean closeOutstanding) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + "（" + roleName(key) + "）放开了（"
                     + (was == CameraTaken.Verdict.BLOCKED ? "挡着它的那一路放开了；被挡了 "
-                    : (asked ? "问出来的" : "相机服务报的") + "；被拿走 ") + duration(heldMs)
-                    + "）：等通道安静 " + (ChannelRules.QUIET_MS / 1000) + " 秒，单独开");
+                    : (asked ? "问出来的" : "相机服务报的") + "；被拿走 ") + duration(heldMs) + "）"
+                    + (closeOutstanding ? "；上一次关还没返回，返回之前不开"
+                    : "：等通道安静 " + (ChannelRules.QUIET_MS / 1000) + " 秒，单独开"));
         }
 
         @Override
@@ -3771,11 +3778,18 @@ public class MultiCameraManager {
                     + "）：返回之前不开它，别的路照常");
         }
 
-        /** 「通道：后座舱（相机 1）上一次关返回了（关了 3 分 12 秒）：照常开」。 */
+        /**
+         * 「通道：后座舱（相机 1）上一次关返回了（关了 3 分 12 秒）：照常开」。接下来怎样照这一路此刻的样子写：没人要了
+         * 「眼下没人要它，不开」，被拿着「别的程序拿着它，等它空出来再开」，被挡着「也算被拿着，等都放开再开」。
+         */
         @Override
-        public void closeReturned(String key, String cameraId, long ms) {
+        public void closeReturned(String key, String cameraId, long ms, CameraTaken.Verdict mark, boolean wanted) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + roleName(key) + "（相机 " + cameraId
-                    + "）上一次关返回了（关了 " + duration(ms) + "）：照常开");
+                    + "）上一次关返回了（关了 " + duration(ms) + "）："
+                    + (!wanted ? "眼下没人要它，不开"
+                    : mark == CameraTaken.Verdict.TAKEN ? "别的程序拿着它，等它空出来再开"
+                    : mark == CameraTaken.Verdict.BLOCKED ? "也算被拿着，等都放开再开"
+                    : "照常开"));
         }
 
         @Override
