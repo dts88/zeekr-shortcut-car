@@ -102,7 +102,7 @@ public final class CameraAvailabilityWatch {
     /** 2.11 的记录：相机服务对每一路说的最后一句、哪几路不在、上一次别人引起的变化（{@link Ledger}）。只在主线程上改。 */
     private static final Ledger LEDGER = new Ledger();
 
-    /** 同一句又到了一次、已经记过一行的那几路（{@link #heard}）：说了别的才清，同一句再来不再记。 */
+    /** 同一句又到了一次、已经记过一行的那几路（{@link #heard}）：说了别的（含问出来照它改了，{@link #settleReplay}）才清，同一句再来不再记。 */
     private static final Set<String> REPEAT_NOTED = ConcurrentHashMap.newKeySet();
 
     /** 接上来的调度（{@link Listener}）。换车型时两份管理器并存，各接各的。 */
@@ -511,6 +511,7 @@ public final class CameraAvailabilityWatch {
                 if (fix.wasAbsent && !fix.nowAbsent()) {
                     StepLog.cameraReset(fix.cameraId, CameraHistory.Reset.CAME_BACK);   // 问出来的「它回来了」，同上
                 }
+                REPEAT_NOTED.remove(fix.cameraId);   // 照问出来的改了，也算说了别的：之后同一句再来照记一行
                 // 问的是本进程的缓存（ask 的说明）：补漏收的那几声，不是相机服务现答
                 BlackBox.noteImportant("问相机服务（本进程缓存）：表上 " + fix.cameraId + " "
                         + (fix.wasAbsent ? "不在" : Boolean.TRUE.equals(fix.before) ? "空闲" : "被占用")
