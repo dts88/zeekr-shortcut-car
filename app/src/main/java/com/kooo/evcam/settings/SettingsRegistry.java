@@ -29,6 +29,12 @@ public final class SettingsRegistry {
     private SettingsRegistry() {
     }
 
+    public static final SettingSpec UPDATE_CHANNEL = SettingSpec.of(
+            "update_channel", "更新通道", com.kooo.evcam.update.UpdateChannel.BETA.value,
+            entry(com.kooo.evcam.update.UpdateChannel.STABLE.value, "正式版 — 仅正式版", R.string.update_channel_stable_option),
+            entry(com.kooo.evcam.update.UpdateChannel.BETA.value, "Beta — Beta 和正式版", R.string.update_channel_beta_option),
+            entry(com.kooo.evcam.update.UpdateChannel.ALPHA.value, "Alpha — Alpha、Beta 和正式版", R.string.update_channel_alpha_option));
+
     /** 录制模式。 */
     public static final SettingSpec RECORDING_MODE = SettingSpec.of(
             "recording_mode", "录制模式", "auto",
@@ -201,6 +207,7 @@ public final class SettingsRegistry {
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
+            UPDATE_CHANNEL,
             RECORDING_MODE,
             CAR_MODEL,
             LANGUAGE,

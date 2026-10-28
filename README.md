@@ -152,3 +152,18 @@ Splitting App Lab's composite stream into a grid and rendering it is implemented
   ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Update channels
+
+Updates offers Stable only, Beta plus Stable, or Alpha plus Beta plus Stable.
+The existing default remains Beta plus Stable; previous beta-switch choices are
+preserved. Alpha requires explicit selection and is never inferred from the
+installed version. Unknown choices fall back to Stable. Tags and GitHub pre-release
+flags must agree; the update repository and release naming remain unchanged.
+
+The single Update channel choice replaces the separate beta/alpha switches.
+Upgrades preserve their effective combination: beta off stays Stable, beta on
+stays Beta unless alpha was also enabled, and both on becomes Alpha. Existing
+explicit channel selections take precedence; fresh installs retain upstream's
+Beta default. Alpha support itself is already present upstream; this contribution
+consolidates the controls and retains strict release metadata/channel checks.

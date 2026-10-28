@@ -1842,7 +1842,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 检查更新
 
     /**
-     * 检查更新：点那一行就查；另有一个「接收 Beta 版」开关。
+     * 检查更新：点那一行就查；更新通道通过单选列表选择。
      *
      * <p>当前版本写在那一行的说明里 —— 点之前就知道本机装的是哪个，
      * 查完提示「已是最新」时也对得上。</p>
@@ -1855,11 +1855,19 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         onClick("pref_check_update",
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
-        bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
-                value -> appConfig.setUpdateBetaEnabled(value));
-        // 随「接收 Beta 版」（XML 里的 dependency）：Beta 关着时它不可用，也不算数（UpdateFlow）
-        bindSwitch("pref_update_alpha", appConfig.isUpdateAlphaEnabled(),
-                value -> appConfig.setUpdateAlphaEnabled(value));
+        bindEnum("pref_update_channel", SettingsRegistry.UPDATE_CHANNEL,
+                appConfig.getUpdateChannel().value,
+                value -> appConfig.setUpdateChannel(com.kooo.evcam.update.UpdateChannel.fromValue(value)), () -> {
+                    ListPreference pref = findPreference("pref_update_channel");
+                    if (pref == null) return;
+                    int name;
+                    switch (appConfig.getUpdateChannel()) {
+                        case ALPHA: name = R.string.update_channel_alpha; break;
+                        case BETA: name = R.string.update_channel_beta; break;
+                        default: name = R.string.update_channel_stable; break;
+                    }
+                    pref.setSummary(getString(name));
+                });
     }
 
     // ------------------------------------------------------------------ 小工具

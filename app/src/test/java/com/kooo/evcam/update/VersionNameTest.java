@@ -1,6 +1,7 @@
 package com.kooo.evcam.update;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -131,14 +132,56 @@ public class VersionNameTest {
         assertFalse(VersionName.isRelease(null));
     }
 
-    /** 大版本是第一段：导入设置只认同一个大版本（SettingsBackup）。 */
-    @Test
-    public void majorIsTheFirstNumber() {
-        assertTrue(VersionName.major("2.14.0-alpha") == 2);
-        assertTrue(VersionName.major("v10.1") == 10);
-        assertTrue(VersionName.major("3.0.0+abc") == 3);
-        assertTrue(VersionName.major("nightly") == -1);
-        assertTrue(VersionName.major("") == -1);
-        assertTrue(VersionName.major(null) == -1);
+    @Test public void numberedPrereleasesUseNumericOrdering() {
+        assertTrue(VersionName.isNewer("v2.11.42-beta.10", "2.11.42-beta.2"));
+        assertTrue(VersionName.isNewer("2.11.42-beta.1", "2.11.42-alpha.99"));
+        assertTrue(VersionName.isNewer("2.11.42", "2.11.42-beta.10"));
+        assertFalse(VersionName.isNewer("2.11.42-beta.2", "2.11.42-beta.10"));
+    }
+
+
+    @Test public void prereleaseFlagAndTagMustAgree() {
+        for (UpdateChannel channel : UpdateChannel.values()) {
+            assertTrue(VersionName.isEligible("v2.11.44", false, channel));
+            assertFalse(VersionName.isEligible("v2.11.44", true, channel));
+            assertFalse(VersionName.isEligible("v2.11.44-alpha.1", false, channel));
+            assertFalse(VersionName.isEligible("v2.11.44-beta.1", false, channel));
+        }
+    }
+
+    @Test public void channelsIncludeOnlyTheirOwnAndMoreStableReleases() {
+        assertTrue(VersionName.isEligible("v2.11.44", false, UpdateChannel.STABLE));
+        assertFalse(VersionName.isEligible("v2.11.44-beta.1", true, UpdateChannel.STABLE));
+        assertFalse(VersionName.isEligible("v2.11.44-alpha.1", true, UpdateChannel.STABLE));
+        assertTrue(VersionName.isEligible("v2.11.44", false, UpdateChannel.BETA));
+        assertTrue(VersionName.isEligible("v2.11.44-beta.1", true, UpdateChannel.BETA));
+        assertFalse(VersionName.isEligible("v2.11.44-alpha.1", true, UpdateChannel.BETA));
+        assertTrue(VersionName.isEligible("v2.11.44", false, UpdateChannel.ALPHA));
+        assertTrue(VersionName.isEligible("v2.11.44-beta.1", true, UpdateChannel.ALPHA));
+        assertTrue(VersionName.isEligible("v2.11.44-alpha.1", true, UpdateChannel.ALPHA));
+    }
+
+    @Test public void unknownChannelSettingsFallBackToStable() {
+        assertEquals(UpdateChannel.STABLE, UpdateChannel.fromValue(null));
+        assertEquals(UpdateChannel.STABLE, UpdateChannel.fromValue("nightly"));
+        assertEquals(UpdateChannel.ALPHA, UpdateChannel.fromValue("alpha"));
+        assertTrue(VersionName.isEligible("v2.11.44", false, null));
+        assertFalse(VersionName.isEligible("v2.11.44-alpha.1", true, null));
+    }
+
+    @Test public void enablingAlphaDoesNotMakeOlderAlphaAnUpgradeFromBeta() {
+        assertTrue(VersionName.isEligible("v2.11.43-alpha.99", true, UpdateChannel.ALPHA));
+        assertFalse(VersionName.isNewer("v2.11.43-alpha.99", "2.11.43-beta.1"));
+        assertTrue(VersionName.isNewer("v2.11.44-alpha.1", "2.11.43-beta.1"));
+        assertTrue(VersionName.isNewer("v2.11.44-alpha.10", "2.11.44-alpha.2"));
+    }
+
+    @Test public void malformedAndUnknownChannelsNeverBecomeUpdates() {
+        for (String value : new String[]{null, "", "nightly", "v2.11.42-rc.1", "v2.11.42-betamax",
+                "v2.11.42-betafoo", "2.11.42-beta.01", "2.11.42-beta.", "2.11.42-",
+                "02.11.42", "2.11.42+", "2.11.42/alpha", "999999999999999.0.0"}) {
+            assertFalse(String.valueOf(value), VersionName.isEligible(value, true, UpdateChannel.ALPHA));
+            assertFalse(String.valueOf(value), VersionName.isEligible(value, false, UpdateChannel.ALPHA));
+        }
     }
 }

@@ -595,7 +595,7 @@
 
     <!--
       检查更新放在顶层：藏在「关于与致谢」里面没人找得到，而这是安装新版本的唯一途径。
-      原来是左栏里一个点了就查的动作行；加了「接收 Beta 版」之后改成一个分区 ——
+      原来是左栏里一个点了就查的动作行；加入更新通道后改成一个分区 ——
       左边选、右边改，和其他分区一个样子。
     -->
     <PreferenceScreen
@@ -605,21 +605,13 @@
         <Preference
             android:key="pref_check_update"
             android:title="@string/set_check_update_title" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_update_beta"
-            android:title="@string/set_update_beta_title"
-            android:summary="@string/set_update_beta_summary" />
-
-        <!--
-          接收 Alpha 版（项目所有者 2026-10-23，默认关）：随「接收 Beta 版」—— 正式版、Beta、Alpha 一档比一档新、一档比一档没验证过，
-          要 Alpha 先得要 Beta（update.GithubReleases）
-        -->
-        <SwitchPreferenceCompat
-            android:key="pref_update_alpha"
-            android:dependency="pref_update_beta"
-            android:title="@string/set_update_alpha_title"
-            android:summary="@string/set_update_alpha_summary" />
+        <ListPreference
+            android:key="pref_update_channel"
+            android:title="@string/set_update_channel_title" />
+        <Preference
+            android:key="pref_update_channel_note"
+            android:selectable="false"
+            android:summary="@string/set_update_channel_note" />
     </PreferenceScreen>
 
     <!--
