@@ -837,6 +837,10 @@ public class MultiCameraManager {
         if (refusedUntilGone(lane.key)) {
             return "会话连着 " + CameraLiveness.MAX_ATTEMPTS + " 次带不上录像输出，等相机走了回来、登记表变了或者亮屏再试";
         }
+        // 一次关满 60 秒还没返回（项目所有者 2026-10-28）：被拿着、在救也是它在先 —— 返回之前谁都不开它
+        if (lane.heldByClose) {
+            return "上一次关还没返回，返回之前不开它";
+        }
         switch (lane.condition) {
             case TAKEN:
                 return "被占用";
@@ -852,14 +856,15 @@ public class MultiCameraManager {
     }
 
     /**
-     * 这个录像意图里每一路此刻的事实，按开的次序：录像表上的状态、调度说的相机怎样（能不能开、是不是被熄屏放开了）、
-     * 录制器怎样。
+     * 这个录像意图里每一路此刻的事实，按开的次序：录像表上的状态、调度说的相机怎样（能不能开、是不是在等一次满 60 秒还没返回的关、
+     * 是不是被熄屏放开了）、录制器怎样。
      */
     private List<RecordingLanes.Facts> laneFacts() {
         List<RecordingLanes.Facts> facts = new ArrayList<>();
         for (String key : lanes.keys()) {
             facts.add(new RecordingLanes.Facts(key, lanes.state(key), scheduler.condition(key),
-                    scheduler.cannotOpen(key), scheduler.releasedByDark(key), recorderOf(key)));
+                    scheduler.cannotOpen(key), scheduler.heldByClose(key), scheduler.releasedByDark(key),
+                    recorderOf(key)));
         }
         return facts;
     }
@@ -2972,7 +2977,13 @@ public class MultiCameraManager {
         sb.append("  ").append(roleName(v.key)).append("（相机 ").append(v.cameraId).append("）：")
                 .append(conditionText(v)).append('\n');
         sb.append("    该开：").append(wantText(v, now)).append("；实际：").append(deviceText(v, now))
-                .append(v.cannotOpen ? "；现在用不了相机，主界面回到前台之前不开" : "").append('\n');
+                .append(v.cannotOpen && !v.stuckClose ? "；现在用不了相机，主界面回到前台之前不开" : "").append('\n');
+        if (v.closingSince != 0) {
+            // 相机层有一次关没返回（项目所有者 2026-10-28）：返回之前不开、不救它；满 60 秒别的路不再等它
+            sb.append("    在关：上一次关还没返回，").append(timeText(now - v.closingSince)).append("前开始")
+                    .append(v.closeBusy.isEmpty() ? "" : "（" + v.closeBusy + "）").append("；返回之前不开它")
+                    .append(v.stuckClose ? "，别的路不再等它" : "").append('\n');
+        }
         sb.append("    会话：").append(outputsText(v, now)).append('\n');
         sb.append("    被拿着：").append(v.mark == null ? "没有"
                 : (v.mark == CameraTaken.Verdict.TAKEN ? "别的程序拿着（TAKEN）" : "被拿着的另一路挡着（BLOCKED）")
@@ -3747,6 +3758,24 @@ public class MultiCameraManager {
                     return;
             }
             com.kooo.evcam.blackbox.BlackBox.note(line);
+        }
+
+        /**
+         * 一路的一次关满 60 秒还没返回（项目所有者 2026-10-28：我们上一次关它还没返回，返回之前谁都不开它；别的路照常）：
+         * 「通道：后座舱（相机 1）上一次关还没返回（closing-lost，关了 60.0 秒）：返回之前不开它，别的路照常」。一次没返回的关一行。
+         */
+        @Override
+        public void heldByClose(String key, String cameraId, String busy, long ms) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + roleName(key) + "（相机 " + cameraId + "）上一次关还没返回（"
+                    + (busy == null || busy.isEmpty() ? "" : busy + "，") + "关了 " + duration(ms)
+                    + "）：返回之前不开它，别的路照常");
+        }
+
+        /** 「通道：后座舱（相机 1）上一次关返回了（关了 3 分 12 秒）：照常开」。 */
+        @Override
+        public void closeReturned(String key, String cameraId, long ms) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + roleName(key) + "（相机 " + cameraId
+                    + "）上一次关返回了（关了 " + duration(ms) + "）：照常开");
         }
 
         @Override

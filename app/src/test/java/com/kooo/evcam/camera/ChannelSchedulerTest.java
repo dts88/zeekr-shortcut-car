@@ -63,6 +63,11 @@ public class ChannelSchedulerTest {
     private final List<ChannelScheduler.Coupling> couplings = new ArrayList<>();
     /** 通道的决定发给录像协调器的每一次（{@link #listenToVerdict}）：「KEPT DARK_ONSET」。 */
     private final List<String> verdicts = new ArrayList<>();
+    /**
+     * 每台相机在关的那几次，按相机编号（照 SingleCamera.CLOSING：跟着进程、不跟着管线 —— 两份管线的同一台相机看到的是同一份）：
+     * 哪一份相机对象登记的、从什么时候起。
+     */
+    private final Map<String, Map<FakePort, Long>> closing = new HashMap<>();
     private final FakePort surround = new FakePort("2");
     private final FakePort rear = new FakePort("1");
     private final FakePort front = new FakePort("0");
@@ -253,6 +258,11 @@ public class ChannelSchedulerTest {
         at(ChannelRules.IN_FLIGHT_MAX_MS);
         assertEquals("到点按当时的状态判（最后一句被占用 → 被拿着）", 1, lines("judged left TAKEN LOSS").size());
         assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        // 那一次关返回之前不开它（项目所有者 2026-10-28）：黑匣子写一次，录像那一侧照现成的那一句说它无法录制
+        assertEquals(1, lines("heldByClose left 1").size());
+        assertTrue(s.heldByClose(REAR));
+        at(ChannelRules.IN_FLIGHT_MAX_MS + 5 * ChannelRules.TICK_MS);
+        assertEquals(1, lines("heldByClose left").size());
     }
 
     /**
@@ -454,7 +464,7 @@ public class ChannelSchedulerTest {
         rear.deviceOpen = false;
         rear.session = SingleCamera.SessionOutputs.NONE;
         rear.firstFrameAt = 0;
-        rear.closingSince = reopenAt;
+        rear.closingFrom(reopenAt);
 
         host.plan(FRONT);   // 这期间前座舱也要录了：它排着
         declare(front, recF);
@@ -468,7 +478,7 @@ public class ChannelSchedulerTest {
 
         // 旧设备关了 20.5 秒，关完；开新设备那一下上路（一个新动作，照常挡着）
         at(reopenAt - T0 + 20_500);
-        rear.closingSince = 0;
+        rear.closeReturned();
         rear.lastClose = new SingleCamera.LastClose(now, 20_500, "reopen");
         rear.busySince = now;
         s.wake();
@@ -528,9 +538,9 @@ public class ChannelSchedulerTest {
         long reopenAt = now;
         rear.deviceOpen = false;
         rear.session = SingleCamera.SessionOutputs.NONE;
-        rear.closingSince = reopenAt;
+        rear.closingFrom(reopenAt);
         at(reopenAt - T0 + 8_535);
-        rear.closingSince = 0;
+        rear.closeReturned();
         rear.lastClose = new SingleCamera.LastClose(now, 8_535, "reopen");
         rear.busySince = now;
         s.wake();
@@ -2760,7 +2770,9 @@ public class ChannelSchedulerTest {
      */
     @Test
     public void twoInstancesClosingDoNotWaitOnEachOtherAndAStuckCloseIsCapped() {
-        FakePort other = new FakePort("2");
+        // 新的那一份开着的是另一台相机：同一台相机旧的那一份关它没返回，新的那一份根本开不了它（关没返回就不开，项目所有者 2026-10-28；
+        // 在关的记录跟着相机、两份共用，见 aRebuiltPipelineNeverOpensACameraTheOldOneIsStillClosing）。这里只看两份退出互不等
+        FakePort other = new FakePort("3");
         ChannelScheduler b = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
         try {
             Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
@@ -2783,7 +2795,7 @@ public class ChannelSchedulerTest {
             assertEquals(Arrays.asList("close exit"), other.actions);
             at(1_100);
             other.closedNow();
-            b.onClosed("2");
+            b.onClosed("3");
             settle();
             assertTrue("旧的那一份还没关完", ChannelScheduler.closingAnywhere());
 
@@ -2875,6 +2887,75 @@ public class ChannelSchedulerTest {
             b.onClosed("2");
             at(1_000 + ChannelRules.TICK_MS * 2);
             assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+            assertTrue(lines("recognized").isEmpty());
+        } finally {
+            b.detach();
+        }
+    }
+
+    /**
+     * 同上，旧的那一份关环视一直没返回（项目所有者 2026-10-28：我们上一次关一台相机还没返回，App 里谁都不开它，直到那一次关返回）：
+     * 新的一份返回之前不开它 —— 头 60 秒别的路也等（另一份在关、在途），之后别的路照常开，环视跳过；黑匣子写一次「上一次关还没返回」；
+     * 旧的那一句「被占用（我们开着）」也不再在 60 秒后被认成别人拿着；录像那一侧听说它的样子变了（不再算在起来）。
+     * 10 分钟后那一次关返回了：写一次「返回了」，环视照常开。
+     */
+    @Test
+    public void aRebuiltPipelineNeverOpensACameraTheOldOneIsStillClosing() {
+        FakePort old = new FakePort("2");
+        ChannelScheduler b = new ChannelScheduler(() -> now, poster, host, new RecordingJournal());
+        try {
+            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+            lanes.put(SUR, old);
+            b.setLanes(lanes);
+            Out mirror = new Out(Kind.MIRROR, "mirror-2");
+            claim(Holder.MIRROR);
+            claim(Holder.PREVIEW);
+            streaming(old, mirror);   // 旧的那一份开着环视
+            b.exit();
+            declare(surround, mirror);
+            declare(rear, pvR);
+            declare(front, pvF);
+            settle();
+            assertEquals("旧的那一份关环视（一直不返回）", Arrays.asList("close exit"), old.actions);
+            assertFalse("60 秒以内录像那一侧照旧算它在起来", s.cannotOpen(SUR));
+
+            at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+            assertTrue("头 60 秒：别的路也等", rear.actions.isEmpty() && front.actions.isEmpty());
+            assertTrue(lines("heldByClose").isEmpty());
+            told.clear();
+            at(ChannelRules.IN_FLIGHT_MAX_MS);
+            assertEquals("满 60 秒：别的路照常，环视跳过", Arrays.asList("open [PREVIEW]"), rear.actions);
+            assertTrue(surround.actions.isEmpty());
+            assertEquals(1, lines("heldByClose front 2").size());
+            assertTrue("录像那一侧听说了", told("condition " + SUR).size() >= 1);
+            assertTrue(s.heldByClose(SUR));
+            assertTrue(s.cannotOpen(SUR));
+            opened(rear);
+            frame(rear);
+            settle();
+            assertEquals(Arrays.asList("open [PREVIEW]"), front.actions);
+            opened(front);
+            frame(front);
+            settle();
+
+            at(10 * 60_000);
+            assertTrue("10 分钟也不开", surround.actions.isEmpty());
+            assertEquals("只写一次", 1, lines("heldByClose front").size());
+            assertTrue("旧的那一句还算我们的：不认成别人拿着", lines("recognized").isEmpty());
+            ChannelScheduler.LaneView v = view(s.snapshot(), SUR);
+            assertTrue(v.stuckClose);
+            assertEquals(T0, v.closingSince);
+            assertEquals("closing-lost", v.closeBusy);
+
+            old.closedNow();
+            say(old, true, true);   // 相机服务为这一关说「空闲」（叫醒调度）
+            b.onClosed("2");
+            s.wake();
+            settle();
+            assertEquals(Arrays.asList("closeReturned front 2 ms=" + (10 * 60_000)), lines("closeReturned"));
+            assertFalse(s.heldByClose(SUR));
+            at(10 * 60_000 + ChannelRules.TICK_MS * 2);
+            assertEquals("返回了：照常开", Arrays.asList("open [MIRROR]"), surround.actions);
             assertTrue(lines("recognized").isEmpty());
         } finally {
             b.detach();
@@ -3635,10 +3716,8 @@ public class ChannelSchedulerTest {
         int generation;
         /** 开、重开发出去了、设备还没回来（SingleCamera.isOpening / reopenInFlight）。 */
         boolean opening;
-        /** 重开被合并掉了几次（相机层的开、重开还在途时）。 */
+        /** 重开被合并掉了几次（相机层的开、重开还在途时，或者这一台有一次关没返回时）。 */
         int refused;
-        /** 相机层在关一个设备，从什么时候起（SingleCamera.closingSince）；0 = 没在关。我们关的那一下当场登记，关完清。 */
-        long closingSince;
         /** 最近一次关完（SingleCamera.lastClose）；没关过是 null。 */
         SingleCamera.LastClose lastClose;
         /** 眼下这份会话配好以来相机回了什么（SingleCamera.sessionCounts）。 */
@@ -3657,7 +3736,7 @@ public class ChannelSchedulerTest {
             this.id = id;
         }
 
-        /** 丢了：设备、会话从字段上摘下，那一次关在途（SingleCamera.loseDevice）。 */
+        /** 丢了：设备、会话从字段上摘下，那一次关在途、登记在关（SingleCamera.loseDevice）。 */
         void lose(long at) {
             deviceOpen = false;
             opening = false;
@@ -3666,6 +3745,7 @@ public class ChannelSchedulerTest {
             firstFrameAt = 0;
             busySince = at;
             holds = true;
+            closingFrom(at);
         }
 
         void closedNow() {
@@ -3677,10 +3757,28 @@ public class ChannelSchedulerTest {
             closingWith.clear();
             firstFrameAt = 0;
             progressAgeMs = 0;
-            if (closingSince != 0) {
-                lastClose = new SingleCamera.LastClose(now, now - closingSince, "test");
+            Map<FakePort, Long> records = closing.get(id);
+            Long since = records == null ? null : records.get(this);
+            if (since != null) {
+                lastClose = new SingleCamera.LastClose(now, now - since, "test");
             }
-            closingSince = 0;
+            closeReturned();
+        }
+
+        /** 这一份相机对象登记一次关（SingleCamera.beginClosing）：同一台相机的每一份都看得到（{@link #closing}）。 */
+        void closingFrom(long at) {
+            closing.computeIfAbsent(id, k -> new LinkedHashMap<>()).put(this, at);
+        }
+
+        /** 这一份的那一次关返回了（SingleCamera.finishClosing）。 */
+        void closeReturned() {
+            Map<FakePort, Long> records = closing.get(id);
+            if (records != null) {
+                records.remove(this);
+                if (records.isEmpty()) {
+                    closing.remove(id);
+                }
+            }
         }
 
         private boolean start(String what, Set<Out> outputs) {
@@ -3713,11 +3811,12 @@ public class ChannelSchedulerTest {
         }
 
         /**
-         * 照 SingleCamera.reopen 的规矩：开、重开还在途（busySince 没到封顶归 0）就合并掉；配会话还挂着不挡（CameraPort.reopen）。
+         * 照 SingleCamera.reopen 的规矩：开、重开还在途（busySince 没到封顶归 0）、或者这一台有一次关没返回（不封顶）就合并掉；
+         * 配会话还挂着不挡（CameraPort.reopen）。
          */
         @Override
         public boolean reopen(Set<Out> outputs) {
-            if (opening && busySince != 0) {
+            if (opening && busySince != 0 || closingSince() != 0) {
                 refused++;
                 return false;
             }
@@ -3733,7 +3832,7 @@ public class ChannelSchedulerTest {
             closingWith = new LinkedHashSet<>(session.outputs);
             session = SingleCamera.SessionOutputs.NONE;
             busySince = now;
-            closingSince = now;   // 照 SingleCamera.closeCamera：关那一下当场登记在关
+            closingFrom(now);   // 照 SingleCamera.closeCamera：关那一下当场登记在关
             holds = true;
         }
 
@@ -3761,9 +3860,17 @@ public class ChannelSchedulerTest {
             return busySince;
         }
 
+        /** 照 SingleCamera.closingSince：这一台相机最新登记的那一次关（任何一份相机对象的）从什么时候起；没在关是 0。 */
         @Override
         public long closingSince() {
-            return closingSince;
+            Map<FakePort, Long> records = closing.get(id);
+            long since = 0;
+            if (records != null) {
+                for (long at : records.values()) {
+                    since = Math.max(since, at);
+                }
+            }
+            return since;
         }
 
         @Override
@@ -4171,6 +4278,18 @@ public class ChannelSchedulerTest {
         @Override
         public void waiting(ChannelScheduler.Wait wait) {
             journal.add("waiting " + wait.why + " " + wait.key);
+        }
+
+        /** 「heldByClose front 2 closing-lost ms=60000」。 */
+        @Override
+        public void heldByClose(String key, String cameraId, String busy, long ms) {
+            journal.add("heldByClose " + key + " " + cameraId + " " + busy + " ms=" + ms);
+        }
+
+        /** 「closeReturned front 2 ms=600000」。 */
+        @Override
+        public void closeReturned(String key, String cameraId, long ms) {
+            journal.add("closeReturned " + key + " " + cameraId + " ms=" + ms);
         }
 
         @Override

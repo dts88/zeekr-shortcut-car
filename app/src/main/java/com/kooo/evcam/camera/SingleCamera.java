@@ -78,6 +78,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p><b>每一种关都登记成在关</b>（{@link #CLOSING}，2.11.4 R1 / 1c）：我们关的、丢了之后的关、重开时关旧的、作废卡住的那一轮、
  * 晚到的设备就地关 —— 同一台相机后面的开先等它关完，调度也认它在途（{@link #closingSince}）。以前重开时关旧设备、
  * 晚到的设备就地关不登记，调度看不见它们：重开那一步 15 秒到点、旧设备还在关，别的路照样动。</p>
+ *
+ * <p><b>关没返回就不开</b>（项目所有者 2026-10-28）：我们上一次关这一台相机还没返回，App 里谁都不开它，直到那一次关返回、
+ * 或者进程结束 —— 不设时限，相机服务说它空闲也不算数（同一个进程里问只是读本进程的缓存；我们还开着的相机也被报过空闲，
+ * 平台笔记 §3.1）。这一类是最后一道：开、重开在相机线程上等它返回（{@link #waitForNoClose}），关完时等之前的关返回
+ * （{@link #finishClosing}），在途的开、重开、关合并掉再来的（{@link #openOrCloseInFlight}）。以前这几处都是 60 秒到点照样往下走。</p>
  */
 public class SingleCamera {
     private static final String TAG = "SingleCamera";
@@ -249,13 +254,16 @@ public class SingleCamera {
      * <p>关相机交给这一路自己的相机线程去做（见 {@link #closeCamera(String)}），调用方不等。
      * 于是紧接着的「再打开」可能赶在上一次关完之前 —— 同一个 App 对同一台相机
      * 「旧的还没放、新的又来要」，相机服务会把旧的踢掉，两轮的回调搅在一起。所以打开之前，
-     * 先在新一轮的相机线程上等上一次关完（{@link #openOnCameraThread}）。</p>
+     * 先在新一轮的相机线程上等上一次关返回（{@link #waitForNoClose}）—— 不设时限（项目所有者 2026-10-28：关没返回之前，
+     * 我们的连接可能还挂在相机服务里，这一台谁都不开）。</p>
      *
      * <p>按相机 id 而不是按对象记：主界面重建时会换一批新的 SingleCamera，旧对象的关闭照样要等。
-     * 同一台相机连着关两次时，后一次要等前一次关完才算完 —— 所以只看最新的那一个就够了。</p>
+     * 同一台相机连着关两次时，后一次要等前一次关完才算完 —— 所以只看最新的那一个就够了。
+     * 跟着进程：管线重建、调度停了都还在，进程结束才没（相机服务随进程断开我们的连接）。</p>
      *
      * <p>每一种关都登记在这里（{@link #beginClosing} / {@link #finishClosing}，2.11.4 R1 / 1c）：通道调度从
-     * {@link #closingSince} 认「这一台还在关一个设备」—— 那是在途，手上那一步到点也不放过（ChannelRules.inFlight）。</p>
+     * {@link #closingSince} 认「这一台还在关一个设备」—— 那是在途，手上那一步到点也不放过，别的路最多等 60 秒（ChannelRules.inFlight）；
+     * 这一路自己，返回之前不开、不救（ChannelRules.closeOutstanding）。</p>
      */
     private static final java.util.Map<String, Closing> CLOSING = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -275,7 +283,7 @@ public class SingleCamera {
 
         /**
          * 还没关完，而关它的那一下排在当前这条线程上、还没轮到 —— 当前这一下做完它才开始，所以它关完时当前这一下早关完了。
-         * 当前这一下要是等它，就是等自己（相机线程堵到 {@link #OPEN_WAIT_FOR_CLOSE_MS}）。
+         * 当前这一下要是等它，就是等自己（等不设时限：相机线程永远堵住）。
          */
         boolean queuedOnCurrentThread() {
             return getCount() > 0 && finisher != null && finisher == android.os.Looper.myLooper();
@@ -298,15 +306,16 @@ public class SingleCamera {
         }
     }
     /**
-     * 一路相机的开、关、重开、配会话，一次最多在途多久。在途期间同一路不叠第二个动作：
-     * 调度不插队，强制重开合并，打开等上一次关完。相机服务一次关实测要 2–20 秒
-     * （2026-10-08），所以留足；超过就当回调不会来了，强制重开接手。每一种在途都封顶，重开那一次也一样
+     * 一路相机的开、重开、配会话，一次最多在途多久。在途期间同一路不叠第二个动作：
+     * 调度不插队，强制重开合并，打开等上一次关返回。相机服务一次关实测要 2–20 秒
+     * （2026-10-08），所以留足；超过就当回调不会来了，强制重开接手。每一种开、重开都封顶，重开那一次也一样
      * （审查 2026-10-11：以前重开在途单独挡、不封顶，那一次 openCamera 没回音，这一路就再也救不回来）：
      * 超过封顶的那一轮开、重开不拿来接着用，像关相机一样作废，换一条相机线程重开（{@link #retireStaleOpen}）。
+     *
+     * <p>关不封顶（项目所有者 2026-10-28）：一次关没返回，这一台的开一直等它（{@link #waitForNoClose}）、再来的开和重开一直合并掉
+     * （{@link #openOrCloseInFlight}）。这个数对关只剩一个意思：调度让别的路最多等它多久（{@link #isBusy}、ChannelRules.inFlight）。</p>
      */
     static final long IN_FLIGHT_MAX_MS = 60_000L;
-    /** 打开前最多等上一次关闭多久：同一路相机在相机服务里不能有两个句柄，等它关完为止。 */
-    private static final long OPEN_WAIT_FOR_CLOSE_MS = IN_FLIGHT_MAX_MS;
     /** 关的时候还有一次打开在途：它的回调可能晚到，这一轮的相机线程多留这么久，好把晚到的设备关掉。 */
     private static final long LATE_OPEN_GRACE_MS = 3_000L;
     /** 被相机服务断开时报给 MultiCameraManager 的错误码（自定义，onError 的码都是正的）。 */
@@ -709,7 +718,8 @@ public class SingleCamera {
      *
      * <p>在途的时候不叠第二个动作 —— 调度不重开，强制重开合并。2026-10-08 的七次
      * 「被相机服务断开」全是自己顶自己：重连那一次打开还没回来，看门狗又开了一次，
-     * 相机服务把先开的那份踢掉。在途超过 {@link #IN_FLIGHT_MAX_MS} 才当回调不会来了，不再算在途。</p>
+     * 相机服务把先开的那份踢掉。在途超过 {@link #IN_FLIGHT_MAX_MS} 才当回调不会来了，不再算在途 —— 这只管调度让别的路等多久；
+     * 这一台自己有关没返回，照样不开（{@link #openOrCloseInFlight}、{@link #waitForNoClose}，项目所有者 2026-10-28）。</p>
      */
     public boolean isBusy() {
         boolean inFlight = isOpening || reopenInFlight || CLOSING.containsKey(cameraId);
@@ -728,11 +738,15 @@ public class SingleCamera {
     }
 
     /**
-     * 开、重开、关还在途（封顶同 {@link #isBusy()}）：这时再开就是同一台相机两个句柄，相机服务会踢掉先开的那份
-     * （2026-10-08，自己顶自己 7 次）。配会话、关旧会话不在此列 —— 设备在我们手上，重开时连它们一起作废、关掉。
+     * 开、重开还在途（封顶同 {@link #isBusy()}），或者这一台相机有一次关没返回（{@link #CLOSING}，任何一份实例、任何一种关，不封顶）：
+     * 这时再开就是同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）。
+     * 配会话、关旧会话不在此列 —— 设备在我们手上，重开时连它们一起作废、关掉。
+     *
+     * <p>关不封顶（项目所有者 2026-10-28）：以前关也是 60 秒以后就不算了（新建的一份实例从没动过手，一开始就不算），
+     * 再来的开、重开照样上路，打开那一下又只等 60 秒。封顶只留给开、重开：超过的那一轮作废、换一轮（{@link #retireStaleOpen}）。</p>
      */
     private boolean openOrCloseInFlight() {
-        return (isOpening || reopenInFlight || CLOSING.containsKey(cameraId)) && inFlightFresh();
+        return (isOpening || reopenInFlight) && inFlightFresh() || CLOSING.containsKey(cameraId);
     }
 
     /** 在途的是什么、多久了，给日志看。 */
@@ -799,8 +813,8 @@ public class SingleCamera {
      * 和 {@link #finishClosing} 成对，每一种关都走这一对（2.11.4 R1 / 1c）。
      *
      * <p>登记着的那一次要是排在当前这条线程上、还没轮到（{@link Closing#queuedOnCurrentThread}），它盖住这一次：它在这一下之后才关完，
-     * 一直登记着，后面的开、调度照它等。这一次不另登记、不等它（返回 null）—— 等它就是等自己，相机线程白堵 60 秒，
-     * 那 60 秒里调度认「在关」、哪一路都不动。两种来路：关相机那一下排在上一轮线程上，那一轮晚到的回调（过时的断开、报错、开好）
+     * 一直登记着，后面的开、调度照它等。这一次不另登记、不等它（返回 null）—— 等它就是等自己，相机线程永远堵住，
+     * 这一台从此不开。两种来路：关相机那一下排在上一轮线程上，那一轮晚到的回调（过时的断开、报错、开好）
      * 排在它前面先跑（{@link #closeStale}）；救援重开关旧设备那一下排着，旧设备的断开、报错排在它前面先跑（{@link #loseDevice}）。
      * 查和登记在同一下里做（{@code compute}）。</p>
      */
@@ -817,10 +831,14 @@ public class SingleCamera {
     }
 
     /**
-     * 一次关做完了（关它的那条线程上）：等之前那一次关完，记下这一台最近一次关完（{@link #lastClose}），摘掉在关的登记、放行等它的开。
+     * 一次关做完了（关它的那条线程上）：等之前那一次关返回，记下这一台最近一次关完（{@link #lastClose}），摘掉在关的登记、放行等它的开。
+     *
+     * <p>等之前那一次不设时限（{@link #awaitClosed}，项目所有者 2026-10-28）：以前等满 60 秒就摘掉自己的登记、放行，之前那一次还挂在
+     * 相机服务里，这一台却谁都看不出还在关 —— 调度当它关好了，打开也不再等。之前那一次不会排在这条线程上
+     * （{@link #beginClosing} 遇到那种不另登记）。</p>
      */
     private void finishClosing(Closing closing, java.util.concurrent.CountDownLatch previous) {
-        awaitQuietly(previous, OPEN_WAIT_FOR_CLOSE_MS);
+        awaitClosed(previous);
         long endedAt = SystemClock.uptimeMillis();
         // 最近一次关完记进这一台的来历（跨进程留着：「离上次关」装新版、退出之后也算得出，2.11.5 第 D3 项）
         StepLog.deviceClosed(cameraId, endedAt - closing.since, closing.why);
@@ -830,7 +848,8 @@ public class SingleCamera {
 
     /**
      * 这一台相机此刻在关一个设备的话（任何一份实例、任何一种关），那一次从什么时候起（uptime，和调度同一个钟）；没在关是 0。
-     * 通道调度据此认「还在关」（ChannelRules 1c：在途，60 秒封顶，手上那一步到点也不放过）。
+     * 通道调度据此认「还在关」（ChannelRules 1c：在途，手上那一步到点也不放过，别的路最多等 60 秒）；不是 0 的时候不开、不救这一路
+     * （ChannelRules.closeOutstanding，项目所有者 2026-10-28）。
      */
     public long closingSince() {
         Closing closing = CLOSING.get(cameraId);
@@ -1376,11 +1395,11 @@ public class SingleCamera {
         }
 
         // 相机服务的调用（查设备、查参数、打开）都放到这一路自己的相机线程上：
-        // 相机服务卡住时，卡住的是这一路的相机线程，不是主线程 —— 卡顿监测里一眼分得清
+        // 相机服务卡住时，卡住的是这一路的相机线程，不是主线程 —— 卡顿监测里一眼分得清。
+        // 这一台还有关没返回的，也在那条线程上等它返回（waitForNoClose），主线程不等
         startBackgroundThread();
         Handler handler = backgroundHandler;
-        java.util.concurrent.CountDownLatch previousClose = CLOSING.get(cameraId);
-        if (handler == null || !handler.post(() -> openOnCameraThread(handler, previousClose))) {
+        if (handler == null || !handler.post(() -> openOnCameraThread(handler))) {
             isOpening = false;
             AppLog.e(TAG, "Camera " + cameraId + " has no camera thread, cannot open");
             reportOpenFailed(CameraTaken.Reason.ofException("NoCameraThread"));
@@ -1397,7 +1416,11 @@ public class SingleCamera {
      * <p>这一步做完看 {@link CameraCallback#onFirstFrame}；开不起来报 {@link CameraCallback#onOpenFailed}。</p>
      *
      * <p>上一次开、重开在途已经超过 {@link #IN_FLIGHT_MAX_MS}（回调当它不会来了）：那一轮作废，换一轮开
-     * （{@link #retireStaleOpen}），和 {@link #reopen} 同一条规矩。</p>
+     * （{@link #retireStaleOpen}），和 {@link #reopen} 同一条规矩。这一台有一次关没返回的不作废：那一轮在等它返回
+     * （{@link #openOrCloseInFlight}）。</p>
+     *
+     * <p>这一台有一次关没返回（任何一份实例的）：照样上路，在相机线程上等它返回再开（{@link #waitForNoClose}，不设时限，
+     * 项目所有者 2026-10-28）。调度看得见那一次关（{@link #closingSince}），本来就不开这一路；走到这里的只有前后脚的那种。</p>
      *
      * @return false：这一路已经开着或正在开（含一次强制重开还在路上：那 300 ms 里设备是空的、也不算在开，
      *         可相机线程是同一条 —— 再开就是同一台相机两个句柄），什么都没做；或者没有相机线程
@@ -1443,8 +1466,9 @@ public class SingleCamera {
     /**
      * 救：重开（关掉设备，等 300 ms，再开），会话带着 {@code outputs}。关着的一路也走这里。
      *
-     * <p>合并：这一台相机的开、重开、关还在途（{@link #openOrCloseInFlight}，封顶 {@link #IN_FLIGHT_MAX_MS}），
-     * 就合并掉、什么都不做 —— 同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）。
+     * <p>合并：这一台相机的开、重开还在途（{@link #openOrCloseInFlight}，封顶 {@link #IN_FLIGHT_MAX_MS}），或者有一次关没返回
+     * （不封顶，任何一份实例的，项目所有者 2026-10-28），就合并掉、什么都不做 —— 同一台相机两个句柄，相机服务会踢掉先开的那份
+     * （2026-10-08，自己顶自己 7 次）。
      * 配会话、关旧会话还挂着不合并：设备在我们手上，重开把那一次作废、连设备一起关掉再开。调度只在那一步到点之后才来救
      * （审查 2026-10-11：以前也合并，卡在配会话里的那一路，救援梯子空转 60 秒、白算次数）。
      * 开、重开在途超过封顶的，那一轮作废、换一轮开（{@link #retireStaleOpen}）。</p>
@@ -1957,26 +1981,66 @@ public class SingleCamera {
     }
 
     /**
-     * 打开的实际步骤，在这一路的相机线程上跑。
+     * 开、重开之前（这一轮的相机线程上）：这一台相机还有一次关没返回（{@link #CLOSING}：任何一份实例、任何一种关），就等它返回 ——
+     * 不设时限（项目所有者 2026-10-28：我们上一次关一台相机还没返回，App 里谁都不开它，直到那一次关返回、或者进程结束；
+     * 相机服务说它空闲也不算数）。返回了再看一次：等的时候可能又登记了一次（另一份实例在关、晚到的设备就地关）。
+     * 开、重开那一步开头问一次，进相机服务打开之前（{@link #openCameraMarked}）再问一次：中间那几次进相机服务的时候也可能登记了一次。
      *
-     * <p>先等同一台相机上一次关完（见 {@link #CLOSING}）。等的时候又被关了、或者已经换了一轮，
-     * 这一次就作废。</p>
+     * <ul>
+     *   <li>每次等之前先看这一轮还是不是当前的：被关了、换了一轮的不等，这一次作废（标记归关它的那一下、或者新的那一轮）——
+     *       两份实例、两轮互相等的那种由此排除；</li>
+     *   <li>关它的那一下排在这条线程上、还没轮到（{@link Closing#queuedOnCurrentThread}）的不等：等它就是等自己。
+     *       这一次报开不起来，要不要再开由调度判 —— 调度看得见那一次关，返回之前不开、不救这一路；</li>
+     *   <li>等过的，接着开之前记一下有动作上路（{@link #markInFlight}）：这一轮是在等关、不是开了 60 秒没回音，不作废它
+     *       （{@link #retireStaleOpen}）。</li>
+     * </ul>
+     *
+     * <p>等的时候不拿锁（{@link #deviceLock}、{@link #sessionLock}）：主线程上的关相机照样做得了，这一轮被关了的，返回之后才看得到、作废。</p>
+     *
+     * @return true：没有没返回的关了、这一轮还是当前的，接着开；false：这一轮作废了，或者那一次关排在这条线程上（已经报了开不起来）
      */
-    private void openOnCameraThread(Handler handler,
-                                    java.util.concurrent.CountDownLatch previousClose) {
-        if (previousClose != null && previousClose.getCount() > 0) {
-            long waitStart = SystemClock.elapsedRealtime();
-            boolean closed = awaitQuietly(previousClose, OPEN_WAIT_FOR_CLOSE_MS);
+    private boolean waitForNoClose(Handler handler) {
+        long waitStart = 0;
+        Closing closing;
+        while ((closing = CLOSING.get(cameraId)) != null) {
+            if (handler != backgroundHandler) {
+                return false;
+            }
+            if (closing.queuedOnCurrentThread()) {
+                AppLog.w(TAG, "Camera " + cameraId + " open skipped: its close (" + closing.why
+                        + ") is queued on this camera thread");
+                failOpenIfCurrent(handler, CameraTaken.Reason.ofException("CloseQueuedOnThisThread"), true, 0, null);
+                return false;
+            }
+            if (waitStart == 0) {
+                waitStart = SystemClock.elapsedRealtime();
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 打开前等上一次关返回（" + closing.why
+                        + "，已经关了 " + secondsText(SystemClock.uptimeMillis() - closing.since) + "）：返回之前不开");
+            }
+            awaitClosed(closing);
+        }
+        if (handler != backgroundHandler) {
+            return false;
+        }
+        if (waitStart != 0) {
             long waited = SystemClock.elapsedRealtime() - waitStart;
-            if (!closed) {
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 上一次关闭等了 "
-                        + waited + "ms 还没完成（相机服务卡住？），照样试着打开");
-            } else if (waited >= 500) {
+            if (waited >= 500) {
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 等上一次关闭完成用了 "
                         + waited + "ms 才打开");
             }
+            markInFlight();
         }
-        if (handler != backgroundHandler || !isOpening) {
+        return true;
+    }
+
+    /**
+     * 打开的实际步骤，在这一路的相机线程上跑。
+     *
+     * <p>先等这一台相机没返回的关返回（{@link #waitForNoClose}，不设时限）。等的时候又被关了、或者已经换了一轮，
+     * 这一次就作废。</p>
+     */
+    private void openOnCameraThread(Handler handler) {
+        if (!waitForNoClose(handler) || !isOpening) {
             return;
         }
         configFailRetryCount = 0;   // 新的一步：会话配不上的重试从头数
@@ -2155,7 +2219,8 @@ public class SingleCamera {
      * 设备没了：被相机服务断开（{@code onDisconnected}），或者报错（{@code onError}）。在这一轮的相机线程上。
      *
      * <p>2026-10-10 起先摘、再关：锁里把设备和会话从字段上摘下来、标成「没开」，这一次关登记成在途
-     * （{@link #isBusy()}、{@link #holdsOrIsOpening()} 都算上，最多 {@link #IN_FLIGHT_MAX_MS}），然后才去关。
+     * （{@link #isBusy()}、{@link #holdsOrIsOpening()} 都算上；调度让别的路最多等 {@link #IN_FLIGHT_MAX_MS}，这一台返回之前不开，
+     * 项目所有者 2026-10-28），然后才去关。
      * 以前是先关、关完才摘：车机拿走后座舱相机 1 时，这一次关在相机服务里卡 5–8 秒（{@code ICameraDeviceUser.disconnect}），
      * 这几秒里设备字段还在、也不算在途 —— 看门狗、按次序开相机都当通道是静的，录像要等它关完才知道这一路没了，
      * 相机服务那一声「被占用」也被记成了「我们开着」。</p>
@@ -3677,8 +3742,8 @@ public class SingleCamera {
             // 拍照通道、出帧口也要放，否则下次建会话会多一条悬着的流
             closeJpegReader();
             closeFrameSink();
-            // 同一台相机上一次的关闭要是还没完，等它：「这一次关完」要蕴含「之前的都关完」
-            awaitQuietly(previous, OPEN_WAIT_FOR_CLOSE_MS);
+            // 同一台相机上一次的关闭要是还没返回，等它（不设时限，项目所有者 2026-10-28）：「这一次关完」要蕴含「之前的都关完」
+            awaitClosed(previous);
             // 会话随相机关了：它带着的输出不再算在会话里，我们建的 Surface 没声明着的放掉（下一轮开要等这一次关完，不会撞上）
             forgetCarried();
             finishClosing(done, null);
@@ -3700,8 +3765,9 @@ public class SingleCamera {
             }
         };
         if (!handler.post(job)) {
-            // 线程已经在退了（不该发生）：就地做，至少设备会被关掉
-            job.run();
+            // 线程已经在退了（不该发生）：另起一条线程做，至少设备会被关掉。不在调用方这里做：调用方多半是主线程，
+            // 这一下要进相机服务，还要等之前没返回的关（不设时限）
+            new Thread(job, watchName).start();
         }
     }
 
@@ -3728,7 +3794,7 @@ public class SingleCamera {
         }
     }
 
-    /** 等一个 latch，最多等 {@code timeoutMs}；latch 为 null 当作已经好了。 */
+    /** 等一个 latch，最多等 {@code timeoutMs}；latch 为 null 当作已经好了。只给退出时那一下用（{@link #awaitAllClosed}）。 */
     private static boolean awaitQuietly(java.util.concurrent.CountDownLatch latch, long timeoutMs) {
         if (latch == null) {
             return true;
@@ -3738,6 +3804,29 @@ public class SingleCamera {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;
+        }
+    }
+
+    /**
+     * 等一次关返回（{@link Closing}；null 当作已经返回了）：不设时限 —— 关没返回之前这一台谁都不开（项目所有者 2026-10-28）。
+     * 只在相机线程上等（开、重开之前 {@link #waitForNoClose}；关完时等之前那一次 {@link #finishClosing}、关相机那一下），从不在主线程上。
+     * 被打断照等，等完把打断的记号补回去。
+     */
+    private static void awaitClosed(java.util.concurrent.CountDownLatch latch) {
+        if (latch == null) {
+            return;
+        }
+        boolean interrupted = false;
+        while (true) {
+            try {
+                latch.await();
+                break;
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -3776,8 +3865,8 @@ public class SingleCamera {
      */
     private boolean reopenWith(Set<ChannelRules.Out> wanted) {
         if (openOrCloseInFlight()) {
-            // 开 / 重开 / 关还在途：那一次自己会有结果（开成、报错、关完）。这时再开一次，
-            // 就是同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）
+            // 开 / 重开还在途、或者这一台有一次关没返回（任何一份实例的，不封顶）：那一次自己会有结果（开成、报错、关返回）。
+            // 这时再开一次，就是同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）
             AppLog.d(TAG, "Camera " + cameraId + " busy (" + describeBusy() + "), reopen coalesced");
             return false;
         }
@@ -3818,7 +3907,8 @@ public class SingleCamera {
             return beginOpen(wanted);
         }
         // 关旧设备和别的关一样登记成在关（1c，项目所有者 2026-10-14 批准）：调度认它在途，救的那一步 15 秒到点、
-        // 旧设备还在关（7 次里最长 14.0 秒，10-13 19:55:29），别的路也不动；下面那一下开排在它后面，等它（和之前的关）关完
+        // 旧设备还在关（7 次里最长 14.0 秒，10-13 19:55:29），别的路也不动；下面那一下开排在它后面，等它（和之前的关）返回，
+        // 不设时限（项目所有者 2026-10-28）
         final Closing closing = oldDevice == null ? null : new Closing("reopen", handler.getLooper());
         final java.util.concurrent.CountDownLatch previous = closing == null ? null : beginClosing(closing);
         final SessionCounts.Snapshot lastCounts = oldDevice == null ? null : counts.snapshot();
@@ -3842,15 +3932,16 @@ public class SingleCamera {
     }
 
     /**
-     * 强制重开的那一下打开：先确认这一轮还没被关掉、这台相机还在，打开在锁外。
+     * 强制重开的那一下打开：先确认这一轮还没被关掉、这台相机没有关没返回（{@link #waitForNoClose}：旧设备那一次关排在前面、已经做完；
+     * 别的实例、晚到的设备的关等它返回，不设时限）、这台相机还在，打开在锁外。
      *
      * <p>中间那两次进相机服务（列相机、查参数）可能卡几秒，这期间这一轮可能被关掉：真正打开之前在锁里再看一次
      * （{@link #openCameraMarked}），没开成的只在这一轮还是当前的时候收标记、报上去（{@link #failOpenIfCurrent}）。
      * 早退的那一下什么标记都不碰：关它的 {@link #closeCamera} 已经清了，标记可能已经是新一轮的。</p>
      */
     private void reopenOnCameraThread(Handler handler) {
-        if (handler != backgroundHandler) {
-            return;   // 等的时候被关了，或者已经换了一轮
+        if (!waitForNoClose(handler)) {
+            return;   // 等的时候被关了，或者已经换了一轮（或者那一次关排在这条线程上，已经报了开不起来）
         }
         configFailRetryCount = 0;   // 新的一步：会话配不上的重试从头数
         try {
@@ -3900,9 +3991,15 @@ public class SingleCamera {
      * {@link #holdsOrIsOpening()} 认我们；重开时 {@code cameraDevice} 还是 null，不标的话每次重开都被记成「不是我们」——
      * 2026-09-27 的日志里就是这样。抛异常就把标记收回（这一轮还是当前的话），成功与否由 {@code onOpened} / {@code onError} 清。</p>
      *
-     * @return false：这一轮已经被关了、或者换了一轮，没打开
+     * <p>进相机服务打开之前再等一次这一台没返回的关（{@link #waitForNoClose}，项目所有者 2026-10-28）：前面列相机、查参数那几下
+     * 进相机服务的时候，可能又登记了一次关（另一份实例在关、晚到的设备就地关）。</p>
+     *
+     * @return false：这一轮已经被关了、或者换了一轮，没打开（或者那一次关排在这条线程上，已经报了开不起来）
      */
     private boolean openCameraMarked(Handler handler) throws CameraAccessException {
+        if (!waitForNoClose(handler)) {
+            return false;
+        }
         synchronized (deviceLock) {
             if (handler != backgroundHandler) {
                 return false;
@@ -3957,14 +4054,17 @@ public class SingleCamera {
      * 上一次开、重开在途已经超过 {@link #IN_FLIGHT_MAX_MS}（相机服务一直没回调，或者这一路的相机线程卡在相机服务里）：
      * 那一轮当它丢了 —— 像关相机一样作废（{@link #closeCamera}：摘下那条相机线程，它晚到的回调都是过时的，
      * 晚到的设备就地关掉；这一次关登记成在关），再在一条新的相机线程上开（审查 2026-10-11）。
-     * 新的那一轮先等这一次关完（最多 {@link #OPEN_WAIT_FOR_CLOSE_MS}），同一台相机不会有两个句柄。
+     * 新的那一轮先等这一次关返回（{@link #waitForNoClose}，不设时限，项目所有者 2026-10-28），同一台相机不会有两个句柄：
+     * 那条线程卡在相机服务里的，那一次打开返回、那一轮的关做完之前，这一台谁都不开 —— 以前新的那一轮只等 60 秒，
+     * 到点照样再开，救援每作废一轮就多叠一次。
      * 以前重开在途不封顶，那一次 openCamera 没回音，这一路就再也救不回来；接着用那条相机线程的话，卡住的还是它。
+     * 这一台有一次关没返回时走不到这里（{@link #openOrCloseInFlight} 先合并掉）。
      *
      * <p>这一下的关完回调（{@link CameraCallback#onCameraClosed}）调度不当回事：调度那边这一路已经记成在开。</p>
      */
     private boolean retireStaleOpen(Set<ChannelRules.Out> wanted) {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 上一次打开 " + (IN_FLIGHT_MAX_MS / 1000)
-                + " 秒还没回音（相机服务卡住？）：作废那一轮，换一条相机线程再开");
+                + " 秒还没回音（相机服务卡住？）：作废那一轮，换一条相机线程，等那一轮关完再开");
         closeCamera("stale-open");
         return beginOpen(wanted);
     }
