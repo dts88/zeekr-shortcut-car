@@ -250,8 +250,10 @@ public class SingleCamera {
     private final Object deviceLock = new Object();
 
     /**
-     * 手上这一轮：从下达开（{@link #beginRound}）起，到下达关（{@link #closeCamera}，摘下）或者这一轮结束为止；null = 没有（关着）。
-     * 改在 {@link #deviceLock} 里，读不拿锁。摘下来、还没结束的那一轮还在账本上（{@link #ROUNDS}）：它占着这一台，谁都不开它。
+     * 手上这一轮：从下达开（{@link #beginRound}）起，到下达关（{@link #closeCamera}，摘下）或者这一轮结束的那一声到主线程
+     * （{@link #roundEnded}，和账本同时摘下）为止；null = 没有（关着）。只在主线程上换，改在 {@link #deviceLock} 里，读不拿锁。
+     * 摘下来、还没结束的那一轮还在账本上（{@link #ROUNDS}）：它占着这一台，谁都不开它。结束了、那一声还没到主线程的那一下它还挂着：
+     * 开、重开合并掉，关照「没开着」收拾。
      */
     private volatile Round round;
 
@@ -277,6 +279,14 @@ public class SingleCamera {
          * {@link CameraCallback#onCameraClosed} 等这一轮结束时再报 —— 晚到的设备关掉才算关完。
          */
         boolean closedOwed;
+        /**
+         * 丢了之后那一次关做完了：{@link CameraCallback#onLossClosed} 在这一轮结束时报（{@link #finishRound}，连同那一次的码、
+         * 丢的时刻、关了多久）—— 多半就是关完的那一下；关的途中调度把这一路关了的，等关相机那一下结束它。
+         */
+        boolean lossOwed;
+        int lossCode;
+        long lostAt;
+        long lossCloseMs;
 
         Round(CameraRound state, HandlerThread thread, Handler handler, String watchName) {
             this.state = state;
@@ -2359,8 +2369,9 @@ public class SingleCamera {
      * {@code ICameraDeviceUser.disconnect}）别的路一步都不动；关完报 {@link CameraCallback#onLossClosed}。关完这一轮多半就结束了：
      * 结束的那一声先到主线程。以前是先关、关完才摘：这几秒里设备字段还在、也不算在途，看门狗、按次序开相机都当通道是静的。
      *
-     * <p>关的途中被 {@link #closeCamera} 关了也照报 onLossClosed（每一次 onLossStarted 都跟着恰好一次），那一轮由关相机那一下结束；
-     * 设备错误之后给界面的那一声（onCameraError）这时不再发。关卡在相机服务里：这一轮不结束，这一台一直占着。</p>
+     * <p>关的途中被 {@link #closeCamera} 关了也照报 onLossClosed（每一次 onLossStarted 都跟着恰好一次）：那一轮由关相机那一下结束，
+     * 这一声欠到那时（{@link Round#lossOwed}，排在「已关」前面）；设备错误之后给界面的那一声（onCameraError）这时不再发。
+     * 关卡在相机服务里：这一轮不结束，这一台一直占着。</p>
      */
     private void lose(Round r, CameraDevice camera, int code, boolean maybeTaken, long lostAt,
                       SessionCounts.Snapshot lastCounts, String why) {
@@ -2381,6 +2392,11 @@ public class SingleCamera {
             current = round == r;
             r.state.closed(camera, now());
             kickedClose = false;
+            // onLossClosed 在这一轮结束时报（finishRound）：这一下就结束的当场报，关相机那一下还排着的到它结束时
+            r.lossOwed = true;
+            r.lossCode = code;
+            r.lostAt = lostAt;
+            r.lossCloseMs = closeMs;
             ended = takeEnd(r);
             owed = ended && r.closedOwed;
         }
@@ -2389,9 +2405,6 @@ public class SingleCamera {
         forgetCarried();
         if (ended) {
             finishRound(r, owed);
-        }
-        if (channel != null) {
-            channel.onLossClosed(cameraId, code, lostAt, closeMs);
         }
         if (!maybeTaken && current && callback != null) {
             callback.onCameraError(cameraId, code);
@@ -3876,37 +3889,52 @@ public class SingleCamera {
     }
 
     /**
-     * 这一轮现在结束吗（{@link CameraRound#takeEnd}）；结束了就从字段上摘下（还挂着的话）—— 判和摘在同一把锁里，
-     * 主线程上的开不会看到一轮已经结束、却还挂着的那一轮。拿着 {@link #deviceLock} 调。
+     * 这一轮现在结束吗（{@link CameraRound#takeEnd}）；结束了就在这把锁里把结束的那一声排上主线程（{@link #roundEnded}），
+     * 相机线程的字段摘下（还挂着的话）。拿着 {@link #deviceLock} 调。
+     *
+     * <p>排在锁里：之后谁报的哪一声都排在它后面 —— 这条线程上的关完、丢了之后关完、开不起来，主线程上关相机那一下要先拿这把锁，
+     * 它报的「关了」也一样。调度看到这一路关着的时候，账本上这一台已经空了。</p>
      */
     private boolean takeEnd(Round r) {
         if (!r.state.takeEnd()) {
             return false;
         }
         if (round == r) {
-            round = null;
             backgroundThread = null;
             backgroundHandler = null;
         }
+        mainHandler().post(() -> roundEnded(r));
         return true;
     }
 
     /**
-     * 这一轮结束了（{@link #takeEnd} 刚答 true，结束它的那一下所在的线程上）：账本上划掉（主线程，{@link CameraRounds#end}），
-     * 每一份调度都叫醒，相机线程退出；关相机那一下欠着的「已关」现在报。结束的那一声排在之后报的每一声（关完、丢了之后关完、开不起来）
-     * 前面 —— 都 post 到主线程、先来先到：调度看到这一路关着的时候，账本上这一台已经空了。
+     * 主线程：这一轮结束了 —— 账本上划掉（{@link CameraRounds#end}），手上还是它就摘下（手上这一轮只在主线程上换，和账本同一下：
+     * 主线程上的开、重开、调度看不到「手上没有、账本上还有」的那一下），每一份调度都叫醒。
+     */
+    private void roundEnded(Round r) {
+        ROUNDS.end(r.state);
+        synchronized (deviceLock) {
+            if (round == r) {
+                round = null;
+            }
+        }
+        // 等这一台的不只是这一份调度（管线重建时另一份在等它）：都叫醒
+        ChannelScheduler.wakeAll();
+    }
+
+    /**
+     * 这一轮结束了（{@link #takeEnd} 刚答 true，结束它的那一下所在的线程上）：相机线程退出；欠着的那几声现在报 ——
+     * 丢了之后关完（{@link Round#lossOwed}）、关相机那一下的「已关」。结束的那一声已经排在前面了（{@link #takeEnd}）。
      *
      * @param closedOwed 关相机那一下的结果还没报（{@link #reportClosed}）
      */
     private void finishRound(Round r, boolean closedOwed) {
         StallWatch.unwatchLooper(r.watchName, r.handler);
-        mainHandler().post(() -> {
-            ROUNDS.end(r.state);
-            // 等这一台的不只是这一份调度（管线重建时另一份在等它）：都叫醒
-            ChannelScheduler.wakeAll();
-        });
         r.thread.quitSafely();
         AppLog.d(TAG, "Camera " + cameraId + " round " + r.state.number + " ended");
+        if (r.lossOwed && callback != null) {
+            callback.onLossClosed(cameraId, r.lossCode, r.lostAt, r.lossCloseMs);
+        }
         if (closedOwed) {
             reportClosed(r);
         }

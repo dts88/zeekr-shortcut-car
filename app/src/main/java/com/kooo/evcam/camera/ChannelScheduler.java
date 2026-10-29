@@ -2096,12 +2096,21 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 拍照不拍这一路：被拿着、被挡着、停手了、或者熄屏放开了；通道算黑、没在开车时不在出画面的都不拍（不为拍照开相机，2026-10-27）。
-     * 在出画面的照拍（哪怕它的录像路不在）。
+     * 拍照不拍这一路：被拿着、被挡着、停手了、它这一台那一轮满 60 秒还有开或关没返回、或者熄屏放开了；通道算黑、没在开车时
+     * 不在出画面的都不拍（不为拍照开相机，2026-10-27）。在出画面的照拍（哪怕它的录像路不在）。
      */
     public boolean excludedFromPhoto(String key) {
         ChannelRules.Lane lane = w.lane(key);
         return lane != null && ChannelRules.excludedFromPhoto(w, lane);
+    }
+
+    /**
+     * 设备不在我们手上，它这一台那一轮满 60 秒还有开或关没返回（{@link ChannelRules#roundStuck}）：那一下返回之前它出不了画面。
+     * 拍照不拍的那一行据此写原因。
+     */
+    public boolean roundStuck(String key) {
+        ChannelRules.Lane lane = w.lane(key);
+        return lane != null && ChannelRules.roundStuck(w, lane);
     }
 
     /**
@@ -2895,7 +2904,9 @@ public final class ChannelScheduler {
     private void noteHeld(long now) {
         for (ChannelRules.Lane lane : w.lanes) {
             HeldNote noted = heldNoted.get(lane.key);
-            if (noted != null && (!rounds.isLive(noted.round) || noted.round.outstandingSince() != noted.since)) {
+            // 和这一轮早先读的那一份比（noteRound，下面判 heldByClose 用的也是它）：不再去读账本此刻的样子 —— 相机线程上那一下
+            // 偏偏在两次读之间返回的话，「完了」写了又写一遍「占着」
+            if (noted != null && (liveRounds.get(lane.key) != noted.round || lane.outstandingSince != noted.since)) {
                 heldNoted.remove(lane.key);
                 journal.heldEnded(lane.key, lane.cameraId, noted.round.number, now - noted.since, lane.mark,
                         ChannelRules.shouldOpen(w, lane));

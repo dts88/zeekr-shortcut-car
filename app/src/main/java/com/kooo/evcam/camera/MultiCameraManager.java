@@ -5916,6 +5916,7 @@ public class MultiCameraManager {
         // 调度判出被别的程序拿着（含被拿着的另一路挡着）、救了 3 轮停手的那几路这一张不拍、也不算在该拍的里面
         // （2026-10-10）：它们等到点也出不了画面 —— 以前每一张都白等满 10 秒，再报「有几路没出画面」。
         // 熄屏放开的座舱也一样（项目所有者 2026-10-12 D2，设计 v3.1 C4）：熄屏拍的那一张只有环视。
+        // 这一台那一轮满 60 秒还有开或关没返回的也一样（2026-10-29）：那一下返回之前它不会开，也不会被救到停手。
         // 通道算黑、没在开车时不为拍照开相机（2026-10-27）：不在出画面的一路都不拍，一路都没有就当场收尾。
         // 一路只要在出画面就算数，哪怕它的录像路不在（2.11：以前录像里不在录的那几路也不拍）
         List<String> leftOut = new ArrayList<>();
@@ -5925,6 +5926,8 @@ public class MultiCameraManager {
                 ChannelRules.Condition condition = scheduler.condition(key);
                 leftOut.add(laneName(key) + (scheduler.releasedByDark(key) ? channelSide.darkText(key)
                         : condition == ChannelRules.Condition.TAKEN ? "被别的程序拿着"
+                        : scheduler.roundStuck(key) ? "那一轮 " + ChannelRules.IN_FLIGHT_MAX_MS / 1000
+                                + " 秒还有开或关没返回"
                         : scheduler.parkedDark() && condition != ChannelRules.Condition.GAVE_UP ? "熄屏：不为拍照开相机"
                         : "救了 " + CameraLiveness.MAX_CYCLES + " 轮没用、停手了"));
                 it.remove();

@@ -1829,26 +1829,34 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路该开、设备不在我们手上，这一台那一轮（谁的都算，这一路手上的也算：关卡住、openCamera 卡住、丢了之后那一次关卡住）
-     * 满 {@link #IN_FLIGHT_MAX_MS} 还有开或关没返回（{@link Lane#outstandingSince}，接连不断就不从头算）：那一下返回之前不会开它。
+     * 这一路该开，而它这一台那一轮满 60 秒还有开或关没返回（{@link #roundStuck}）：那一下返回之前不会开它。
      * 录像那一侧据此不算它在起来（{@link #cannotOpen}），在录时状态条照现成的那一句说它「无法录制，其他摄像头继续录制」
      * （RecordingLanes.Facts#heldByClose，项目所有者 2026-10-28）；调度写一行（ChannelScheduler.Journal#held）。
-     * 开着的不算：设备在我们手上，没有要开的。
      */
     static boolean heldByClose(World w, Lane lane) {
-        return lane.device != Device.OPEN && shouldOpen(w, lane) && lane.outstandingSince != 0
+        return shouldOpen(w, lane) && roundStuck(w, lane);
+    }
+
+    /**
+     * 设备不在我们手上，这一台那一轮（谁的都算，这一路手上的也算：关卡住、openCamera 卡住、丢了之后那一次关卡住）
+     * 满 {@link #IN_FLIGHT_MAX_MS} 还有开或关没返回（{@link Lane#outstandingSince}，接连不断就不从头算）：那一下返回之前它出不了画面
+     * （{@link #heldByClose}；拍照不等它，{@link #excludedFromPhoto}）。开着的不算：设备在我们手上。
+     */
+    static boolean roundStuck(World w, Lane lane) {
+        return lane.device != Device.OPEN && lane.outstandingSince != 0
                 && w.now - lane.outstandingSince >= IN_FLIGHT_MAX_MS;
     }
 
     /**
-     * 拍照不拍这一路：被拿着、停手了、或者熄屏放开了（{@link #releasedByDark}：熄屏拍的那一张只有环视，不白等 10 秒，
+     * 拍照不拍这一路：被拿着、停手了、它这一台那一轮满 60 秒还有开或关没返回（{@link #roundStuck}：那一下返回之前它出不了画面，
+     * 也不会被救到停手 —— 不白等 10 秒，2026-10-29）、或者熄屏放开了（{@link #releasedByDark}：熄屏拍的那一张只有环视，不白等 10 秒，
      * 该拍几路照实数）；在出画面的照拍（哪怕它的录像路不在）。通道算黑、没在开车（{@link #parkedDark}，项目所有者 2026-10-27）
      * 时不为拍照开相机：不在出画面的一路都不拍（拍照这时也不算要它，{@link #holderWants}），一路都没有就当场收尾。
      */
     static boolean excludedFromPhoto(World w, Lane lane) {
         return retiredFrontCabin(w, lane)
-                || !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || releasedByDark(w, lane)
-                || parkedDark(w));
+                || !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || roundStuck(w, lane)
+                || releasedByDark(w, lane) || parkedDark(w));
     }
 
     // ================================================================= 下一步

@@ -2877,6 +2877,30 @@ public class ChannelRulesTest {
     }
 
     /**
+     * 拍照不等卡住的那一台（2026-10-29）：它这一台那一轮满 60 秒还有开或关没返回，那一下返回之前它不会开，也不会被救到停手 ——
+     * 不拍、不白等 10 秒。拍照刚登记、还没人要它的那一下也算（{@link ChannelRules#roundStuck} 不看谁要）；60 秒以内照等；
+     * 那一轮结束了照拍。
+     */
+    @Test
+    public void aPhotoDoesNotWaitForALaneWhoseRoundIsStuck() {
+        rear.held = true;
+        rear.outstandingSince = w.now;
+        rear.closingSince = w.now;
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertFalse("60 秒以内照等", ChannelRules.excludedFromPhoto(w, rear));
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        assertTrue("还没人要它也不等", ChannelRules.excludedFromPhoto(w, rear));
+        claim(Holder.PHOTO);
+        assertTrue(ChannelRules.excludedFromPhoto(w, rear));
+        assertEquals("不会被救到停手", Condition.BRINGING_UP, ChannelRules.condition(rear));
+
+        rear.held = false;   // 那一轮结束了
+        rear.outstandingSince = 0;
+        rear.closingSince = 0;
+        assertFalse(ChannelRules.excludedFromPhoto(w, rear));
+    }
+
+    /**
      * 熄屏拍照（设计 v3.1 C4；项目所有者 2026-10-27）：通道算黑、没在开车时不为拍照开相机 —— 不在出画面的一路都不拍、不白等 10 秒、
      * 不算在该拍的里面，一路都没有就当场收尾；在出画面的照拍（一般是留着的环视）。在开车时和以前一样：座舱熄屏放开，只开环视。
      */
