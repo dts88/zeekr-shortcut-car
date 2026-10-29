@@ -2970,6 +2970,7 @@ public class ChannelSchedulerTest {
         assertTrue("头 60 秒：新的一份排着，什么都不开",
                 newSurround.actions.isEmpty() && newRear.actions.isEmpty() && newFront.actions.isEmpty());
         assertTrue(lines("swapped").isEmpty());
+        second.told.clear();
         at(ChannelRules.IN_FLIGHT_MAX_MS);
         assertEquals(Arrays.asList("swapped " + ChannelRules.IN_FLIGHT_MAX_MS + " successor orphans front 2 round=1 closing"),
                 lines("swapped"));
@@ -3500,7 +3501,8 @@ public class ChannelSchedulerTest {
 
     /**
      * 熄屏记着的那几样跨过一次换上（项目所有者 2026-10-29：只有每一路摄像头的账本和熄屏记录跨重建保留）：环视留着、通道的决定是留着，
-     * 旧的那一份关完、换上新的一份，接着「留着」、不再发一次决定；以前重建清零的照旧清零（被拿着、上次问相机服务、手上那一步）。
+     * 旧的那一份关完、换上新的一份，接着「留着」、不再发一次决定；以前重建清零的照旧清零（被拿着从新的一份自己认出来那一刻算、
+     * 上次问相机服务、手上那一步）。
      */
     @Test
     public void theDarkLatchAndVerdictSurviveASwapWhileTheRestStartsOver() {
@@ -3541,7 +3543,95 @@ public class ChannelSchedulerTest {
         assertFalse(next.releasedByDark(SUR));
         assertEquals("换上的那一份接着录环视", Arrays.asList("open [RECORD]"), s2.actions);
         assertTrue("座舱照旧熄屏放开", next.releasedByDark(REAR));
-        assertTrue("上次问相机服务清零", s.snapshot().askedAt == 0 || s.snapshot().askedAt > askedAt);
+        ChannelScheduler.LaneView taken = view(s.snapshot(), REAR);
+        assertEquals("被拿着：新的一份排着时自己认出来的", CameraTaken.Verdict.TAKEN, taken.mark);
+        assertEquals("从它认出来那一刻算，不接着旧的那一份", T0 + 1_000 + ChannelRules.HOLD_MS, taken.markSince);
+        assertEquals(2, lines("recognized").size());
+        assertEquals("上次问相机服务清零（黑着时座舱没人要，不问）", 0, s.snapshot().askedAt);
+    }
+
+    /**
+     * 别的程序拿着一路座舱时管线重建（审查 2026-10-30）：排着的那一份照样认出它被拿着（ChannelRules.settleMarks），问它的和以前新建一份调度
+     * 第一轮之后一样 —— 被拿着、拍照不等它、录像不为它备文件名定死了的录制器（录像那一侧听说了）。排着时不问相机服务；换上以后那一路
+     * 照旧被拿着，接着问。
+     */
+    @Test
+    public void aPendingPipelineAnswersTakenForALaneAnotherAppHolds() {
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, surround);
+        p.setLanes(lanes);   // 旧的那一份只有环视
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        settle();
+        p.retire();   // 换车型：旧的那一份关环视（还没关完）
+        host.busyNotOurs("1");   // 车机拿着后座舱
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, pvS);
+        declare(r2, pvR);
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+        assertTrue("旧的那一份还在关：排着", s.snapshot().waiting != null);
+        assertEquals(ChannelRules.Condition.TAKEN, next.condition(REAR));
+        assertTrue("拍照不等它", next.excludedFromPhoto(REAR));
+        assertFalse("录像不为它备录制器", RecordingLanes.keepsNamedRecorder(next.condition(REAR), next.cannotOpen(REAR),
+                next.releasedByDark(REAR)));
+        assertTrue("录像那一侧听说了", second.told.contains("condition " + REAR + " TAKEN"));
+        assertEquals(Arrays.asList("recognized " + REAR + " busy"), lines("recognized"));
+        assertEquals(ChannelRules.Condition.BRINGING_UP, next.condition(SUR));
+        assertEquals("排着的不问相机服务", 0, host.asks.size());
+
+        at(200);
+        closed(surround);
+        at(200 + ChannelRules.TICK_MS);
+        assertEquals("换上了", Arrays.asList("open [PREVIEW]"), s2.actions);
+        assertTrue(r2.actions.isEmpty());
+        assertEquals(ChannelRules.Condition.TAKEN, next.condition(REAR));
+        assertEquals("换上以后接着问", 1, host.asks.size());
+        assertEquals(1, lines("recognized").size());
+    }
+
+    /**
+     * 同上，那一台是换下去的那一份自己拿着的（审查 2026-10-30）：账本上它那一轮还没结束（后座舱那一次关卡住了），相机服务那一句
+     * 「被占用（我们开着）」排着的那一份不认成别人拿着；换上以后它当孤儿、那一轮照旧占着，接着的那一份也不认 —— 被一轮占着就是我们的
+     * （ChannelRules.camHeld）。
+     */
+    @Test
+    public void aCameraTheRetiringPipelinesOrAnOrphansRoundHoldsIsNeverRecognized() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        p.retire();
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        FakePort f2 = new FakePort("0");
+        declare(s2, pvS);
+        declare(r2, pvR);
+        declare(f2, pvF);
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2, FRONT, f2);
+        settle();
+        at(100);
+        closed(surround);
+        settle();
+        at(200);
+        closed(front);   // 后座舱那一次关一直不返回
+        settle();
+        at(30_000);
+        assertEquals("排着：换下去的那一份那一轮占着，不算被拿着", ChannelRules.Condition.BRINGING_UP, next.condition(REAR));
+        assertTrue(lines("recognized").isEmpty());
+
+        at(100 + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(1, lines("swapped").size());
+        at(10 * 60_000);
+        assertEquals("孤儿那一轮占着：也不认", ChannelRules.Condition.BRINGING_UP, next.condition(REAR));
+        assertTrue(next.heldByClose(REAR));
+        assertTrue(lines("recognized").isEmpty());
+        assertTrue(r2.actions.isEmpty());
+        assertEquals(1, s.snapshot().orphans.size());
     }
 
     // ================================================================= 能用相机

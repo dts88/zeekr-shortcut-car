@@ -1680,6 +1680,47 @@ public class ChannelRulesTest {
     }
 
     /**
+     * 排着的那一份管线每一轮只做认、放两步（{@link ChannelRules#settleMarks}，第 2 步审查 2026-10-30）：被别的程序拿着的、不在的认出来，
+     * 空出来的放开 —— 环视留不留不判、前座舱不去掉、登记表的变化不收，这几样留给换上以后它自己那一轮（{@link ChannelRules#settle}）。
+     */
+    @Test
+    public void aPendingPipelineOnlyRecognizesAndReleases() {
+        claim(Holder.RECORDING);
+        planAll();
+        w.frontCabinOneShot = true;
+        w.surroundInDark = ChannelRules.SurroundInDark.LIT;
+        w.screenOn = false;   // 通道刚算黑：settle 会判环视留不留、去掉前座舱
+        w.sentry = 2;
+        serviceSays(rear, false, false);   // 车机拿着后座舱
+        front.absent = true;   // 前座舱不在
+        List<Event> marks = ChannelRules.settleMarks(w);
+        assertEquals(CameraTaken.Verdict.TAKEN, rear.mark);
+        assertEquals(CameraTaken.Verdict.TAKEN, front.mark);
+        assertEquals(2, marks.size());
+        for (Event event : marks) {
+            assertEquals(Event.Type.RECOGNIZED, event.type);
+        }
+        assertEquals("环视留不留不判", ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+        assertNull("上一次读数不记", w.lastSentry);
+        assertFalse("前座舱不去掉", w.frontCabinRetired);
+        assertTrue("登记表的变化不收", w.changed.contains(Holder.RECORDING));
+        assertEquals("不判、不记保持", 0, rear.unwantedSince);
+
+        at(1_000);
+        serviceSays(rear, true, false);   // 车机放开了后座舱
+        marks = ChannelRules.settleMarks(w);
+        assertNull(rear.mark);
+        assertEquals(1, marks.size());
+        assertEquals(Event.Type.RELEASED, marks.get(0).type);
+        assertEquals(CameraTaken.Verdict.TAKEN, front.mark);
+
+        events = ChannelRules.settle(w);   // 换上以后它自己那一轮：那几样照判
+        assertEquals(ChannelRules.SurroundInDark.KEPT, w.surroundInDark);
+        assertTrue(w.frontCabinRetired);
+        assertTrue(w.changed.isEmpty());
+    }
+
+    /**
      * 这一份管线要换下去（管线重建，{@link World#retireSince}）：和退出一样只关、按次序关 —— 手上那一步做完，环视单独先关，
      * 座舱再一起关；关的原因是「管线重建」；不开、不改、不救、不问；退出、车机要睡时原因照写它们自己的。
      */

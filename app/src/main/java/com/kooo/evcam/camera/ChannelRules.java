@@ -1014,6 +1014,21 @@ public final class ChannelRules {
     }
 
     /**
+     * 排着的那一份管线每一轮（ChannelScheduler 的 shadow，第 2 步审查 2026-10-30）：只做 {@link #settle} 里认、放那两步 ——
+     * 主动认出被别的程序拿着的（{@link #recognize}）、空出来的放开（{@link #release}）。问它的（在起来还是被拿着、拍不拍、备不备录制器）
+     * 就和以前新建一份调度第一轮之后一样。别的几步都不做：不判环视留不留（只由跑的那一份写）、不去掉前座舱（换上以后它自己那一轮才算，
+     * 那一件不能在这里被收走）、不收登记表的变化、不判丢失和开不起来（它没开过相机）、不解除停手、不动保持。
+     *
+     * @return 认出、放开的那几件，按发生的先后
+     */
+    static List<Event> settleMarks(World w) {
+        List<Event> events = new ArrayList<>();
+        recognize(w, events);
+        release(w, events);
+        return events;
+    }
+
+    /**
      * 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱）：车机不稳定的根因找到之前，前座舱不留到下一次用车。
      * 这次运行启用了前座舱的，通道眼里一熄屏（黑满 30 秒、或者车机要睡，{@link #darkForChannel}）—— 正是座舱本来就放开的那一刻
      * （{@link #releasedByDark}）—— 就把它从这次运行里去掉：之后亮屏也没人要（{@link #retiredFrontCabin}），关相机还是放开那一步。

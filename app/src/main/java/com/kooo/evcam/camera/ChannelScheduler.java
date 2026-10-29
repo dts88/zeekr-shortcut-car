@@ -1788,8 +1788,9 @@ public final class ChannelScheduler {
      */
     private Pipeline attached;
     /**
-     * 等着接上的那一份（管线重建时新建的、旧的那一份还在关）：它的世界照建（{@link Pipeline#setLanes}），每一轮刷新事实、告诉它的录像那一侧，
-     * 只是不判、不动手；旧的那一份关完（或者卡住的那一路那一下开始关以后满 60 秒）就换上它。再来一份新的，替掉这一份（退出又马上开好几次）。
+     * 等着接上的那一份（管线重建时新建的、旧的那一份还在关）：它的世界照建（{@link Pipeline#setLanes}），每一轮刷新事实、认出被别的程序拿着的、
+     * 放开空出来的（{@link ChannelRules#settleMarks}）、告诉它的录像那一侧，别的不判、不动手；旧的那一份关完（或者卡住的那一路那一下开始关以后
+     * 满 60 秒）就换上它。再来一份新的，替掉这一份（退出又马上开好几次）。
      */
     private Pipeline pending;
     /**
@@ -2214,7 +2215,7 @@ public final class ChannelScheduler {
      * 都在这里 —— 一份新的管线就是一份新的账，以前每一份管线一个调度时重建清零的那些照旧清零（项目所有者 2026-10-29 定）。
      *
      * <p>一份管线四种样子：接着（{@link ChannelScheduler#attached}：跑的就是它的世界）、换下去（接着的那一份 {@link #retireAt} 不是 0：
-     * 和退出一样只关、按次序关）、排着（{@link ChannelScheduler#pending}：世界照建、事实照刷新、问它的照它答，不判、不动手）、
+     * 和退出一样只关、按次序关）、排着（{@link ChannelScheduler#pending}：世界照建、事实照刷新、问它的照它答、被拿着的照样认出来，别的不判、不动手）、
      * 孤儿（换下去了，还有一台那一轮没结束：只剩那几路的相机对象）。放完了（{@link #finish}）这个把手就不再连着那一份管线。</p>
      *
      * <p>只在主线程上用（报告由管理器 post 过来）。</p>
@@ -2592,12 +2593,15 @@ public final class ChannelScheduler {
 
         /**
          * 排着的这一份，每一轮（{@link ChannelScheduler#round}）：事实照刷新（问它的照它答：在起来、能不能用相机、熄屏放开没有、
-         * 那一轮满没满 60 秒）、环视留不留照调度记着的那一份、告诉它的录像那一侧、交给它的消费者照放 —— 只是不判、不动手。
+         * 那一轮满没满 60 秒）、环视留不留照调度记着的那一份、被别的程序拿着的照样认出来、空出来的放开（{@link ChannelRules#settleMarks}，
+         * 黑匣子照写）、告诉它的录像那一侧、交给它的消费者照放 —— 别的不判、不动手。以前排着时被拿着的一路也答「在起来」：
+         * 拍照等它、录像为它备录制器，换上才认出来（审查 2026-10-30）。
          */
         void shadow(long now) {
             w.now = now;
             refresh(now, false);
             seedLatch(w);
+            note(ChannelRules.settleMarks(w), now);
             dispatchDrops();
             releaseHandedOver(false);
             tellRecording();
@@ -2872,7 +2876,10 @@ public final class ChannelScheduler {
 
         // ================================================================= 对外的事实（主线程上读）
 
-        /** 一路此刻怎样（给录像和后视镜读）；不在这一份的世界里的当作在起来。排着的那一份照它建好的世界答（在起来，和以前一样）。 */
+        /**
+         * 一路此刻怎样（给录像和后视镜读）；不在这一份的世界里的当作在起来。排着的那一份照它的世界答：在起来，被别的程序拿着的是被拿着
+         * （{@link #shadow}），和以前新建一份调度第一轮之后一样。
+         */
         public ChannelRules.Condition condition(String key) {
             ChannelRules.Lane lane = w.lane(key);
             return lane == null ? ChannelRules.Condition.BRINGING_UP : ChannelRules.condition(lane);
