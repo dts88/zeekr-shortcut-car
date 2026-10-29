@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.32.0-alpha] - 2026-10-29
+
+- Cameras: a camera whose last close or open has not returned is not opened again until it returns or the app restarts. The other cameras go ahead after at most 60 seconds; while they record, the stuck one shows that it can't record, and photos leave it out.
+- Cameras: the app no longer waits for one camera's close before opening it, opens anyway after 60 seconds, or replaces an open that has not answered with a new one.
+
 ## [2.31.0-alpha] - 2026-10-27
 
 - Screen off: 30 seconds after the screen goes off, the surround view keeps recording only when Keep recording when the screen goes off is on and Sentry Mode is on or armed; otherwise the surround is released with the cabins and recording pauses until the screen turns on.
