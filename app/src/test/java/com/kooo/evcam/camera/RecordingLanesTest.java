@@ -39,17 +39,25 @@ public class RecordingLanesTest {
     private static final long T0 = 1_000_000L;
 
     private static Facts lane(String key, State state, Condition condition, Recorder recorder) {
-        return new Facts(key, state, condition, false, false, recorder);
+        return new Facts(key, state, condition, false, false, false, recorder);
     }
 
     /** 等着、录制器能用，相机关着、调度现在用不了相机（主界面不在前、前台服务是后台起的）。 */
     private static Facts cannotOpen(String key) {
-        return new Facts(key, State.WAITING, Condition.BRINGING_UP, true, false, Recorder.READY);
+        return new Facts(key, State.WAITING, Condition.BRINGING_UP, true, false, false, Recorder.READY);
     }
 
     /** 等着、录制器停放着，熄屏放开了（座舱熄屏时谁都不要，项目所有者 2026-10-12 D2）；调度说它是这个样子。 */
     private static Facts dark(String key, Condition condition) {
-        return new Facts(key, State.WAITING, condition, false, true, Recorder.READY);
+        return new Facts(key, State.WAITING, condition, false, false, true, Recorder.READY);
+    }
+
+    /**
+     * 等着、录制器能用，它这一台那一轮满 60 秒还有开或关没返回（项目所有者 2026-10-28、10-29）：那一下返回之前调度不开它 ——
+     * 调度照旧说它在起来、被拿着或者在救，它也算「现在开不了」（cannotOpen）。
+     */
+    private static Facts held(String key, Condition condition) {
+        return new Facts(key, State.WAITING, condition, true, true, false, Recorder.READY);
     }
 
     /** 等着、录制器能用、相机是这个样子。 */
@@ -219,7 +227,7 @@ public class RecordingLanesTest {
         assertFalse(RecordingLanes.bringingUp(dark(CABIN_REAR, Condition.BRINGING_UP)));
         assertFalse("被车机拿着也一样", RecordingLanes.bringingUp(dark(CABIN_REAR, Condition.TAKEN)));
         assertTrue("在加入的照算（它马上会退出）", RecordingLanes.bringingUp(new Facts(CABIN_REAR, State.STARTING,
-                Condition.BRINGING_UP, false, true, Recorder.BUSY)));
+                Condition.BRINGING_UP, false, false, true, Recorder.BUSY)));
 
         RecordingLanes lanes = begun();
         Summary first = lanes.summarize(Arrays.asList(waiting(SURROUND, Condition.BRINGING_UP),
@@ -397,6 +405,35 @@ public class RecordingLanesTest {
                 live(SURROUND), lane(CABIN_REAR, State.WAITING, Condition.STREAMING, Recorder.FAILED)));
         assertEquals(Hint.Kind.LANE_UNAVAILABLE, noRecorder.kind);
         assertEquals(CABIN_REAR, noRecorder.key);
+    }
+
+    /**
+     * 一路这一台那一轮满 60 秒还有开或关没返回（项目所有者 2026-10-28、10-29）：别的路在录时，状态条照现成的那一句说它无法录制 ——
+     * 被拿着的也是这一句（那一下返回之前谁都不开它，放开了也不回来）。它不算在起来：一路都没在录时是等待摄像头，也不算各路都停手
+     * （那一下一返回它就照常开）。在录的那一路不说（设备在我们手上，调度不会这样报它；报了也不说）。
+     */
+    @Test
+    public void aLaneHeldPastSixtySecondsIsSaidToBeUnavailable() {
+        Hint hint = RecordingLanes.hint(Arrays.asList(live(SURROUND), held(CABIN_REAR, Condition.BRINGING_UP)));
+        assertEquals(Hint.Kind.LANE_UNAVAILABLE, hint.kind);
+        assertEquals(CABIN_REAR, hint.key);
+        Hint taken = RecordingLanes.hint(Arrays.asList(live(SURROUND), held(CABIN_REAR, Condition.TAKEN),
+                waiting(CABIN_FRONT, Condition.TAKEN)));
+        assertEquals("占着没返回的那一路先说", Hint.Kind.LANE_UNAVAILABLE, taken.kind);
+        assertEquals(CABIN_REAR, taken.key);
+        assertFalse("不算在起来", RecordingLanes.bringingUp(held(CABIN_REAR, Condition.BRINGING_UP)));
+        Hint streaming = RecordingLanes.hint(Arrays.asList(live(SURROUND),
+                new Facts(CABIN_REAR, State.LIVE, Condition.STREAMING, false, true, false, Recorder.BUSY)));
+        assertEquals("在录的那一路不说", Hint.Kind.NONE, streaming.kind);
+        Hint notYet = RecordingLanes.hint(Arrays.asList(live(SURROUND), waiting(CABIN_REAR, Condition.BRINGING_UP)));
+        assertEquals("60 秒以内（调度还没报）：照旧在起来，不说", Hint.Kind.NONE, notYet.kind);
+
+        RecordingLanes lanes = begun();
+        Summary summary = lanes.summarize(Arrays.asList(held(SURROUND, Condition.BRINGING_UP),
+                held(CABIN_REAR, Condition.RESCUING)));
+        assertEquals("一路都没在录：等待摄像头", View.WAITING, summary.view);
+        assertTrue(summary.settled);
+        assertEquals("不算各路都停手", Hint.Kind.NONE, summary.hint.kind);
     }
 
     /**

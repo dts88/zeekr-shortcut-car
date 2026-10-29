@@ -31,8 +31,8 @@ import java.util.Map;
  * <h3>整体的样子（{@link #summarize}）</h3>
  *
  * <p>录制键、通知、悬浮按钮照 {@link View} 画：有一路在录是在录；一路都没在录、但有一路在起来，这个意图里还没录起来过是准备中，
- * 录起来过是等待；一路都没在录、也没有一路在起来（都被拿着、在救、停手、现在用不了相机、熄屏放开了，或者录制器建不起来）是等待，
- * 开录时也一样。一个意图里出了准备中，就不再回到准备中。</p>
+ * 录起来过是等待；一路都没在录、也没有一路在起来（都被拿着、在救、停手、现在用不了相机、熄屏放开了、这一台那一轮满 60 秒还有开或关
+ * 没返回，或者录制器建不起来）是等待，开录时也一样。一个意图里出了准备中，就不再回到准备中。</p>
  *
  * <p>纯 Java，时间由调用方传入，见 {@code RecordingLanesTest}。</p>
  */
@@ -92,10 +92,16 @@ public final class RecordingLanes {
         public final ChannelRules.Condition condition;
         /**
          * 这一路关着、调度现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起这样的服务开不了相机）：
-         * 主界面回到前台之前调度不会开它。调度说它「在起来」（{@link ChannelRules.Condition#BRINGING_UP}），
-         * 其实一时半会儿起不来。
+         * 主界面回到前台之前调度不会开它；或者它这一台那一轮满 60 秒还有开或关没返回（{@link #heldByClose}）。
+         * 调度说它「在起来」（{@link ChannelRules.Condition#BRINGING_UP}），其实一时半会儿起不来。
          */
         public final boolean cannotOpen;
+        /**
+         * 这一路这一台那一轮满 60 秒还有开或关没返回（ChannelScheduler.heldByClose，项目所有者 2026-10-28、10-29）：那一下返回之前
+         * 调度不开它，不设时限。别的路在录时，状态条照现成的那一句说它无法录制（{@link Hint.Kind#LANE_UNAVAILABLE}）。
+         * 它也算在 {@link #cannotOpen} 里。
+         */
+        public final boolean heldByClose;
         /**
          * 这一路被熄屏放开了（ChannelScheduler.releasedByDark：熄屏时座舱谁都不要，项目所有者 2026-10-12 D2）：亮屏之前调度
          * 不会开它。调度照旧说它「在起来」或者「被拿着」（车机熄屏约 98 秒后拿走后座舱），其实是熄屏让它走的 ——
@@ -105,11 +111,12 @@ public final class RecordingLanes {
         public final Recorder recorder;
 
         public Facts(String key, State state, ChannelRules.Condition condition, boolean cannotOpen,
-                     boolean releasedByDark, Recorder recorder) {
+                     boolean heldByClose, boolean releasedByDark, Recorder recorder) {
             this.key = key;
             this.state = state;
             this.condition = condition;
             this.cannotOpen = cannotOpen;
+            this.heldByClose = heldByClose;
             this.releasedByDark = releasedByDark;
             this.recorder = recorder;
         }
@@ -124,7 +131,10 @@ public final class RecordingLanes {
             LANE_TAKEN,
             /** 两路以上被占用。 */
             LANES_TAKEN,
-            /** 一路无法录制（救了 3 轮停手、或者录不了：{@link Recorder#FAILED}），别的照录：{@link Hint#key} 是那一路。 */
+            /**
+             * 一路无法录制（救了 3 轮停手、录不了：{@link Recorder#FAILED}，或者它这一台那一轮满 60 秒还有开或关没返回：
+             * {@link Facts#heldByClose}），别的照录：{@link Hint#key} 是那一路。
+             */
             LANE_UNAVAILABLE,
             /**
              * 一路都没在录，而每一路都停手了、或者录不了（{@link Recorder#FAILED}）：没有一路会自己按节奏重试。
@@ -266,10 +276,19 @@ public final class RecordingLanes {
     }
 
     /**
+     * 别的路在录时，这一路要说它无法录制（{@link Hint.Kind#LANE_UNAVAILABLE}）：不会自己按节奏重试了（{@link #unavailable}），
+     * 或者它这一台那一轮满 60 秒还有开或关没返回（{@link Facts#heldByClose}，项目所有者 2026-10-28：用现成的「无法录制，其他摄像头继续录制」）
+     * —— 那一下返回之前调度不开它，不设时限。后一种不算「各路都停手」：那一下一返回它就照常开（{@link #allGaveUp}）。
+     */
+    private static boolean cannotRecord(Facts lane) {
+        return unavailable(lane) || lane.state != State.LIVE && lane.heldByClose;
+    }
+
+    /**
      * 状态条上说哪一句。
      *
      * <ul>
-     *   <li>至少一路在录：有一路停手了、或者录不了，说它无法录制（它不会因为别人放开就回来）；
+     *   <li>至少一路在录：有一路停手了、录不了、或者它这一台那一轮满 60 秒还有开或关没返回，说它无法录制（它不会因为别人放开就回来）；
      *       否则一路被拿着说它被占用、释放后自动恢复，两路以上说部分摄像头被占用；在救、在起来的不说，熄屏放开的不说
      *       （{@link Facts#releasedByDark}：车机熄屏后拿走后座舱，可它没在录是因为熄屏，亮屏它自己回来）。</li>
      *   <li>一路都没在录，而每一路都停手了或者录不了：{@link Hint.Kind#ALL_GAVE_UP}（只进黑匣子，见它的说明）。</li>
@@ -284,7 +303,7 @@ public final class RecordingLanes {
             return allGaveUp(lanes) ? new Hint(Hint.Kind.ALL_GAVE_UP, null) : Hint.NONE;
         }
         for (Facts lane : lanes) {
-            if (unavailable(lane)) {
+            if (cannotRecord(lane)) {
                 return new Hint(Hint.Kind.LANE_UNAVAILABLE, lane.key);
             }
         }

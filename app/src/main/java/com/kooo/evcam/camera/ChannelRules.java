@@ -115,8 +115,11 @@ public final class ChannelRules {
     public static final long JUDGE_DELAY_MS = 300L;
 
     /**
-     * 别人的在途（一路被接手 LOSING、一路 isBusy、另一个管理器实例在关）最多挡多久：再久就当回调不会来了，不再挡。
-     * 数在 {@link SingleCamera#IN_FLIGHT_MAX_MS}。
+     * 别人的在途（一路被接手 LOSING、一台相机那一轮有一次关没返回、一路 isBusy、另一个管理器实例在关）最多挡别的路多久：
+     * 再久就当回调不会来了，别的路不再等它。数在 {@link SingleCamera#IN_FLIGHT_MAX_MS}。
+     *
+     * <p>只管别的路（项目所有者 2026-10-28）：被一轮占着的那一台自己（{@link #camHeld}：关没返回、开没返回），那一轮结束之前不开、
+     * 关着在开的不救，不设时限；满这么久还有开或关没返回的，录像那一侧不再算它在起来、状态条说它无法录制（{@link #heldByClose}）。</p>
      */
     public static final long IN_FLIGHT_MAX_MS = SingleCamera.IN_FLIGHT_MAX_MS;
 
@@ -282,10 +285,21 @@ public final class ChannelRules {
         /** SingleCamera.isBusy() 从什么时候起（在开、在关、在配会话）；0 = 不忙。 */
         long busySince;
         /**
-         * 相机层在关这一台相机的一个设备，从什么时候起（SingleCamera.closingSince）；0 = 没在关。每一种关都算：我们关的、丢了之后的关、
-         * 救援重开时关旧的、作废卡住的那一轮、晚到的设备就地关（2.11.4 起都登记成在关）。在途、手上那一步到点也不放过（{@link ChannelRules#next} 第 1 条）。
+         * 这一台在账本上的那一轮（CameraRounds，谁的都算）有一次关没返回，从什么时候起（那一轮的 outstandingSince：卡住的关上面又来一次关、
+         * 被关掉的开在等回调都不从头算）；0 = 没有。每一种关都算：我们关的、丢了之后的关、救援重开时关旧的、晚到的设备就地关，任何一份管线的。
+         * 在途、手上那一步到点也不放过，别的路最多等 {@link ChannelRules#IN_FLIGHT_MAX_MS}（{@link ChannelRules#next} 第 1 条）。
          */
         long closingSince;
+        /**
+         * 被占着（{@link ChannelRules#camHeld}）：这一台在账本上有一轮还没结束，而它不是这一路手上那一轮 —— 别的管线的，
+         * 或者这一路关了、还没结束的那一轮（关没返回、被关掉的开还在等回调）。第 1 步「轮次 + 账本」，项目所有者 2026-10-29 批。
+         */
+        boolean held;
+        /**
+         * 这一台在账本上的那一轮（谁的都算，这一路手上的也算）从什么时候起一直有开或关没返回（CameraRound.outstandingSince）；
+         * 0 = 没有那一轮、或者它稳稳开着。满 {@link ChannelRules#IN_FLIGHT_MAX_MS} 的那一路告诉录像（{@link ChannelRules#heldByClose}）。
+         */
+        long outstandingSince;
         /** 会话里此刻带着的输出（SingleCamera.sessionOutputs() 的快照）；没有会话是空的。 */
         final Set<Out> session = new LinkedHashSet<>();
         /** 会话配好的时刻；0 = 没有会话。 */
@@ -1169,7 +1183,9 @@ public final class ChannelRules {
     /**
      * 关着的这一路，相机服务那一句「被占用（我们引起的）」此刻还能不能算我们的：只在我们的哪一份还可能拿着它的时候 ——
      * 这一路刚关完、开不起来、丢了之后关完（{@link #OWN_WORD_GRACE_MS} 以内，为这一关说的「空闲」可能还在路上），
-     * 或者另一份管线还在关（换车型、退出后马上又开，最多 {@link #IN_FLIGHT_MAX_MS}：占着它的可能是那一份）。
+     * 另一份管线还在关（换车型、退出后马上又开，最多 {@link #IN_FLIGHT_MAX_MS}：占着它的可能是那一份），
+     * 或者这一台被一轮占着（{@link #camHeld}，不设时限，第 1 步「轮次 + 账本」）—— 那一轮结束之前，我们的连接可能还挂在相机服务里。
+     * 以前旧的那一份关卡住超过 60 秒，新的一份把那一句「被占用（我们开着）」认成别人拿着。
      *
      * <p>过了这些还被占着，只能是别人（审查 2026-10-11）。两种来路：别的程序在我们开着时悄悄拿走 —— 相机服务从「我们开着」
      * 直接变成「别人开着」，中间不说「空闲」（10-10，§二.7），同一句「被占用」不再改那个记号；管线在同一个进程里重建
@@ -1179,7 +1195,8 @@ public final class ChannelRules {
     private static boolean stillOurs(World w, Lane lane) {
         return lane.serviceWordOurs
                 && (w.now - lane.deviceSince < OWN_WORD_GRACE_MS
-                || w.otherClosingSince != 0 && w.now - w.otherClosingSince < IN_FLIGHT_MAX_MS);
+                || w.otherClosingSince != 0 && w.now - w.otherClosingSince < IN_FLIGHT_MAX_MS
+                || camHeld(lane));
     }
 
     /**
@@ -1784,22 +1801,62 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路该开、关着，而此刻用不了相机：调度不会开它，主界面回到前台之前它起不来（{@link #condition} 照旧说它在起来）。
+     * 这一路该开、关着，而此刻用不了相机：调度不会开它，主界面回到前台之前它起不来（{@link #condition} 照旧说它在起来）；
+     * 或者它这一台那一轮满 {@link #IN_FLIGHT_MAX_MS} 还有开或关没返回（{@link #heldByClose}）：那一下返回之前调度不会开它。
      * 给录像读：这样的一路不算在起来，不然录像一直是「准备中」（RecordingLanes.Facts#cannotOpen）。
+     * 60 秒以内照旧算在起来：平常退出又马上打开，那一次关一两秒就返回，录像不闪一下「等待摄像头」。
      */
     static boolean cannotOpen(World w, Lane lane) {
-        return lane.device == Device.CLOSED && !usable(w) && shouldOpen(w, lane);
+        return lane.device == Device.CLOSED && !usable(w) && shouldOpen(w, lane) || heldByClose(w, lane);
     }
 
     /**
-     * 拍照不拍这一路：被拿着、停手了、或者熄屏放开了（{@link #releasedByDark}：熄屏拍的那一张只有环视，不白等 10 秒，
+     * 被占着（第 1 步「轮次 + 账本」，项目所有者 2026-10-28、10-29）：这一台在账本上有一轮还没结束，而它不是这一路手上那一轮
+     * （{@link Lane#held}）—— 别的管线的那一轮（换车型、退出后马上又开），或者这一路关了、还没结束的那一轮（关没返回、被关掉的开还在等回调）。
+     * 一台相机我们上一次关它（或者开它）还没返回，App 里谁都不开它，直到那一轮结束、或者进程结束 —— 不设时限；相机服务说它空闲不算数
+     * （同一个进程里问相机服务只是读本进程的缓存；我们还开着的相机也被报过空闲，平台笔记 §3.1）。
+     *
+     * <p>这时：不开（{@link #next} 第 5 条，像被拿着的一样跳过、不挡后面）；设备不在我们手上的不救、不计次数（{@link #rescueAge}），
+     * 开着的只许重建会话、不重开（第 7 条：重建不开新句柄）；关座舱前不先关它（{@link #surroundFirst}：关了开不回来）；
+     * 关着的它，相机服务那一句「被占用（我们引起的）」还算我们的（{@link #stillOurs}）。不为它去问相机服务：问只是读本进程的缓存，放不开它；
+     * 它同时被拿着的，照被拿着的规矩每 30 秒问 —— 问出来的「空闲」放得开被拿着，放不开这个。</p>
+     *
+     * <p>和「被拿着」（{@link Lane#mark}：相机服务说别人拿着它）是两样，一路要开得了，两样都不能有。别的路只在头 60 秒等它
+     * （{@link #inFlight}），之后照常（项目所有者 2026-10-28）。相机层的开、重开照账本再看一次（SingleCamera，断言）。</p>
+     */
+    static boolean camHeld(Lane lane) {
+        return lane.held;
+    }
+
+    /**
+     * 这一路该开，而它这一台那一轮满 60 秒还有开或关没返回（{@link #roundStuck}）：那一下返回之前不会开它。
+     * 录像那一侧据此不算它在起来（{@link #cannotOpen}），在录时状态条照现成的那一句说它「无法录制，其他摄像头继续录制」
+     * （RecordingLanes.Facts#heldByClose，项目所有者 2026-10-28）；调度写一行（ChannelScheduler.Journal#held）。
+     */
+    static boolean heldByClose(World w, Lane lane) {
+        return shouldOpen(w, lane) && roundStuck(w, lane);
+    }
+
+    /**
+     * 设备不在我们手上，这一台那一轮（谁的都算，这一路手上的也算：关卡住、openCamera 卡住、丢了之后那一次关卡住）
+     * 满 {@link #IN_FLIGHT_MAX_MS} 还有开或关没返回（{@link Lane#outstandingSince}，接连不断就不从头算）：那一下返回之前它出不了画面
+     * （{@link #heldByClose}；拍照不等它，{@link #excludedFromPhoto}）。开着的不算：设备在我们手上。
+     */
+    static boolean roundStuck(World w, Lane lane) {
+        return lane.device != Device.OPEN && lane.outstandingSince != 0
+                && w.now - lane.outstandingSince >= IN_FLIGHT_MAX_MS;
+    }
+
+    /**
+     * 拍照不拍这一路：被拿着、停手了、它这一台那一轮满 60 秒还有开或关没返回（{@link #roundStuck}：那一下返回之前它出不了画面，
+     * 也不会被救到停手 —— 不白等 10 秒，2026-10-29）、或者熄屏放开了（{@link #releasedByDark}：熄屏拍的那一张只有环视，不白等 10 秒，
      * 该拍几路照实数）；在出画面的照拍（哪怕它的录像路不在）。通道算黑、没在开车（{@link #parkedDark}，项目所有者 2026-10-27）
      * 时不为拍照开相机：不在出画面的一路都不拍（拍照这时也不算要它，{@link #holderWants}），一路都没有就当场收尾。
      */
     static boolean excludedFromPhoto(World w, Lane lane) {
         return retiredFrontCabin(w, lane)
-                || !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || releasedByDark(w, lane)
-                || parkedDark(w));
+                || !streaming(lane) && (lane.mark != null || lane.ladder.stopped() || roundStuck(w, lane)
+                || releasedByDark(w, lane) || parkedDark(w));
     }
 
     // ================================================================= 下一步
@@ -1808,24 +1865,29 @@ public final class ChannelRules {
      * 下一步：每次只出一步（§二），按这个次序找，先找到的就是它。
      *
      * <ol>
-     *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一路的相机层在关一个设备（我们按次序关的那一步除外，
+     *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一台相机那一轮有一次关没返回（我们按次序关的那一步除外，
      *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy、另一个实例在关。后四种各封顶
-     *       {@link #IN_FLIGHT_MAX_MS}。车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
+     *       {@link #IN_FLIGHT_MAX_MS}（关没返回的那一种从那一轮一直有开或关没返回的那一刻算，不从头算）—— 封顶只管别的路等多久：
+     *       被一轮占着的那一台自己，那一轮结束之前不开、关着在开的不救（{@link #camHeld}，项目所有者 2026-10-28、10-29）。
+     *       车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
      *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
      *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
      *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
      *       但照 §二.6 仍要等安静。只摘本会话出过画面的（{@link #reconfigurable}）；没出过画面的由第 7 条重开时丢掉它；</li>
-     *   <li><b>开</b>（要安静、能用相机、屏幕知道黑没黑）：按开的次序，第一路该开、没开、没被拿着、不在救援梯子上的。它有录像要、录像输出还在备
+     *   <li><b>开</b>（要安静、能用相机、屏幕知道黑没黑）：按开的次序，第一路该开、没开、没被拿着、没被一轮占着（{@link #camHeld}）、
+     *       不在救援梯子上的。它有录像要、录像输出还在备
      *       → 先等（最多 2 秒，从录像登记起算；等的时候后面的路也不开）。带着它要的输出开，一样都不要就带出帧口。
-     *       被拿着的跳过，不挡后面。用不了相机、屏幕不知道（{@link Why#SCREEN_UNKNOWN}，2026-10-27）时这一路先不开，
+     *       被拿着的、被一轮占着的跳过，不挡后面。用不了相机、屏幕不知道（{@link Why#SCREEN_UNKNOWN}，2026-10-27）时这一路先不开，
      *       接着往下看改输出、救，都没有才等；</li>
      *   <li><b>改输出</b>（要安静）：缺了要的输出、或者该出帧却没有活输出的那一路，环视先。只改本会话出过画面的
      *       （{@link #reconfigurable}）；没出过画面的由第 7 条重开时带上现在要的输出；</li>
      *   <li><b>救</b>（要安静；重开还要能用相机、屏幕知道黑没黑，屏幕真黑着、没在开车时座舱不重开 —— 熄屏期间绝不开座舱，
      *       项目所有者 2026-10-27；重建不要）：有人要（保持不算）、没被拿着、关着等救或者开着 8 秒没进展的那一路，
-     *       环视先；关着、在开而相机层手上还有开或关的，等它（最多 {@link #IN_FLIGHT_MAX_MS}，{@link #rescueAge}）。
+     *       环视先；关着、在开而相机层手上还有开或关的，等它（最多 {@link #IN_FLIGHT_MAX_MS}，{@link #rescueAge}）；
+     *       关着、在开而这一台那一轮还有开或关没返回、或者被一轮占着的不救、不计次数，不设时限（{@link #camHeld}）；
+     *       开着而被一轮占着的只许重建会话，不重开。
      *       梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手；</li>
      *   <li>都没有 → 空闲。</li>
      * </ol>
@@ -1898,7 +1960,9 @@ public final class ChannelRules {
         // 屏幕不知道黑没黑时先不开的那一路（和「用不了相机」同一个样子：接着看改输出、救，都没有才等它）
         String unknownKey = null;
         for (Lane lane : w.lanes) {
-            if (lane.device != Device.CLOSED || lane.mark != null || rescuing(lane) || !shouldOpen(w, lane)) {
+            // 被拿着的、被一轮占着的（那一轮结束之前不开，第 1 步「轮次 + 账本」）都跳过，不挡后面
+            if (lane.device != Device.CLOSED || lane.mark != null || camHeld(lane) || rescuing(lane)
+                    || !shouldOpen(w, lane)) {
                 continue;
             }
             if (!w.screenKnown) {
@@ -1941,8 +2005,10 @@ public final class ChannelRules {
                 continue;
             }
             boolean canRebuild = framedSession(lane);
-            // 重开要能用相机、屏幕知道黑没黑；屏幕真黑着、没在开车时座舱不重开（熄屏期间绝不开座舱，项目所有者 2026-10-27）
-            boolean noReopen = !usable || !w.screenKnown || w.screenDark && !w.driving && !isSurround(lane);
+            // 重开要能用相机、屏幕知道黑没黑；屏幕真黑着、没在开车时座舱不重开（熄屏期间绝不开座舱，项目所有者 2026-10-27）；
+            // 被一轮占着的不重开（那一轮结束之前不开新句柄；重建会话不开）
+            boolean noReopen = !usable || !w.screenKnown || w.screenDark && !w.driving && !isSurround(lane)
+                    || camHeld(lane);
             if (noReopen && !(canRebuild && !onLadder(lane))) {
                 // 不开、不计次数（重建会话不用开相机，梯子上第一次、出过画面的照样重建）
                 if (!usable && deferredKey == null) {
@@ -1989,6 +2055,10 @@ public final class ChannelRules {
      * 晚到的设备就地关），手上那一步到点也照等，封顶 {@link #IN_FLIGHT_MAX_MS} —— 和丢了之后的那一次关（LOSING）同一条规矩
      * （项目所有者 2026-10-14 批准，2.11.4 第 1c 项）。我们按次序关的那一步（{@link Device#CLOSING}）不在此列：它照 §二.2 自己的封顶，
      * 环视 10 秒、座舱 30 秒到点就不再等（「环视等了 10 秒还没关完，先关座舱」）。</p>
+     *
+     * <p>这里的封顶只管别的路等多久（项目所有者 2026-10-28：一路的关卡住超过 60 秒，别的路照以前那样不再等它）。钟从账本上那一轮一直有开或关
+     * 没返回的那一刻算（{@link Lane#closingSince}）：卡住的关上面又来一次关，别的路不再从头等 60 秒。被一轮占着的那一路自己，
+     * 那一轮结束之前不开、关着在开的不救，不设时限（{@link #camHeld}）。</p>
      */
     private static Decision inFlight(World w) {
         long now = w.now;
@@ -2075,11 +2145,12 @@ public final class ChannelRules {
      * （{@link #usable}，和「开」那一步看的是同一个 —— 关了它，开那一步才开得回来；用不了的照旧座舱在环视旁边关），没被拿着，
      * 也不在救援梯子上（{@link #rescuing}：在梯子上的关了只能由救援按梯子的节奏重开，不是「开」那一步照常开回来，还要白算次数 ——
      * 它此刻本来也没在出画面）。屏幕不知道黑没黑时也不（{@link World#screenKnown}，2026-10-27）：那时「开」那一步不开，关了开不回来。
+     * 被一轮占着时也不（{@link #camHeld}）：那一轮结束之前「开」那一步不开它，关了也开不回来。
      */
     private static boolean surroundFirst(World w, Lane surround) {
         return surround != null && (surround.device == Device.OPEN || surround.device == Device.OPENING)
                 && shouldOpen(w, surround) && usable(w) && w.screenKnown && surround.mark == null
-                && !rescuing(surround);
+                && !rescuing(surround) && !camHeld(surround);
     }
 
     private static Decision close(List<Lane> lanes, Why why, long maxMs) {
@@ -2213,12 +2284,17 @@ public final class ChannelRules {
      * 等它有结果、或者到它自己的封顶（{@link #IN_FLIGHT_MAX_MS}）：这时重开，相机层只会合并掉（同一台相机不许两个句柄），
      * 梯子却已经算了一次 —— 一次没救的「救」，3 次不成歇 60 秒、3 轮停手都会提前（审查 2026-10-11）。
      * 开着的那一路卡在配会话里不在此列：相机层的重开会把那一次配置作废、关掉设备再开（SingleCamera.reopen），满 8 秒照救。</p>
+     *
+     * <p>设备不在我们手上、这一台被一轮占着（{@link #camHeld}）、或者这一台那一轮还有开或关没返回（{@link Lane#outstandingSince}：
+     * 这一路手上那一轮的 openCamera 还没回音也是）的不救（第 1 步「轮次 + 账本」，项目所有者 2026-10-28、10-29）：重开开不出去
+     * （那一轮结束之前不开，相机层只会合并掉），梯子不算次数，也就不会歇 60 秒、不会停手 —— 那一轮的那一下返回之前一直这样，不设时限。
+     * 以前在开的那一下 60 秒没回音，相机层的在途封顶一到就当它丢了、作废那一轮再开（2026-10-29 删：开没返回照「关没返回」同一条）。</p>
      */
     private static long rescueAge(World w, Lane lane) {
         if (lane.mark != null || lane.failure != null || lane.ladder.stopped() || !wanted(w, lane)) {
             return -1;
         }
-        if (lane.device != Device.OPEN && lane.busySince != 0) {
+        if (lane.device != Device.OPEN && (lane.busySince != 0 || camHeld(lane) || lane.outstandingSince != 0)) {
             return -1;
         }
         switch (lane.device) {
