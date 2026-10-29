@@ -78,6 +78,12 @@ public class CameraManagerHolderShapeTest {
         assertEquals("zeekr_7x/left+back", shape(FRONT, REAR).key());
         assertEquals(shape(REAR, FRONT).key(), shape(FRONT, REAR).key());
     }
+    @Test public void exteriorSourcesAreIncludedWithoutDroppingOverlaySurround() {
+        CameraManagerHolder.Shape sources = shape("roadfront", "roadrear", "manual");
+        assertEquals(4, sources.count); assertFalse(sources.cabinFront); assertFalse(sources.cabinRear);
+        String previous = sources.key(); sources.sources.put("roadfront", "7");
+        assertFalse(previous.equals(sources.key()));
+    }
 
     /** 超级镜子要后座舱、配置里没启用它：照样建，但不算启用的（主界面预览、拍照、录像都不要它）。 */
     @Test

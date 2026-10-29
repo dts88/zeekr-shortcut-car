@@ -20,6 +20,7 @@ public final class CameraProfile {
     /** 座舱相机，按探测顺序编号。 */
     public static final String ROLE_CABIN_1 = "cabin1";
     public static final String ROLE_CABIN_2 = "cabin2";
+    public static final String ROLE_ROAD_FRONT = "roadfront", ROLE_ROAD_REAR = "roadrear", ROLE_MANUAL = "manual";
 
     /**
      * 座舱两路默认镜像（项目拥有者 2026-09 定）。

@@ -41,6 +41,8 @@
                 android:summary="%s"
                 app:useSimpleSummaryProvider="false" />
 
+            <Preference android:key="pref_camera_sources" android:title="@string/camera_sources_title" android:summary="@string/camera_sources_help" />
+
             <Preference
                 android:key="pref_profile_editor"
                 android:title="@string/set_profile_editor_title"
