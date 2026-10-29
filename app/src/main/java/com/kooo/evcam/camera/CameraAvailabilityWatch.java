@@ -22,7 +22,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -63,7 +62,7 @@ import java.util.function.Consumer;
  *       缓存里没有的那一路（NOT_PRESENT）不回放：回放收全以后从没听相机服务说过它的，就是「不在」。</li>
  *   <li><b>记在哪</b>：每一声都用 {@link #classify} 分类，记进 {@link Ledger} —— 最后一句（不管多早说的）、是不是我们引起的、
  *       哪几路不在、上一次别人引起的变化。纯 Java，见 {@code CameraAvailabilityWatchTest}。只在主线程上改。</li>
- *   <li><b>交给调度</b>：调度（ChannelScheduler）用 {@link #addListener} 接上：分类时问它「这一路有没有我们的开或关在途」
+ *   <li><b>交给调度</b>：进程里那一个调度（ChannelScheduler）用 {@link #setListener} 接上一次：分类时问它「这一路有没有我们的开或关在途」
  *       （它在主线程上的账最准，见 {@link Listener#ourStepInFlight}），有话、问完、回放收全时叫醒它；
  *       调度读 {@link #word}（最后一句：空闲 / 被占用、在不在、是不是我们引起的）、{@link #lastOthersChangeAt}、{@link #heardAnything}，
  *       被拿着的那一路有人要时每 30 秒 {@link #ask}。</li>
@@ -91,8 +90,11 @@ public final class CameraAvailabilityWatch {
     /** 2.11 的记录：相机服务对每一路说的最后一句、哪几路不在、上一次别人引起的变化（{@link Ledger}）。只在主线程上改。 */
     private static final Ledger LEDGER = new Ledger();
 
-    /** 接上来的调度（{@link Listener}）。换车型时两份管理器并存，各接各的。 */
-    private static final CopyOnWriteArrayList<Listener> LISTENERS = new CopyOnWriteArrayList<>();
+    /**
+     * 接上来的那一个调度（{@link Listener}，进程里只有一个：装上时接一次，ChannelFacts）；没接上是 null。
+     * 以前每一份管线各接一份，换车型时两份并存（第 2 步「只有一个调度」）。
+     */
+    private static volatile Listener listener;
 
     /** {@link #start} 成功登记时用的 CameraManager（应用的 Context 取的）：{@link #ask} 用它登记一次性的回调。 */
     private static volatile CameraManager cameraManager;
@@ -108,8 +110,8 @@ public final class CameraAvailabilityWatch {
     }
 
     /**
-     * 开始听。重复调用无害。前台服务和 MultiCameraManager 的构造都调：以前只有前台服务调，它没起来时相机服务说的话
-     * 一句都没收，每次丢失都被判成「没说空闲」。
+     * 开始听（进相机服务登记可用性回调）。重复调用无害。前台服务和 MultiCameraManager 的构造都调：以前只有前台服务调，它没起来时相机服务说的话
+     * 一句都没收，每次丢失都被判成「没说空闲」。接调度（{@link #setListener}）是另一件事，装上调度时就接了。
      *
      * <p>登记之后紧接着在主线程上排一个收尾任务：它跑的时候注册那一刻的回放都已经到了（见类说明），回放里没有的槽位
      * 记为「不在」。在管理器的构造里调，这个收尾就排在调度的第一轮之前 —— 冷启动时车机还拿着相机 1，调度第一眼就看得到
@@ -161,9 +163,10 @@ public final class CameraAvailabilityWatch {
             // 前后台切换时相机服务重排优先级（API 29+）：记一行（2.11 起不再趁机试开 —— 被拿着的只问，不开）
             CameraContention.prioritiesChanged();
             // 调度：叫醒、马上问一次，绝不因此去开
-            for (Listener listener : LISTENERS) {
+            Listener l = listener;
+            if (l != null) {
                 try {
-                    listener.onAccessPrioritiesChanged();
+                    l.onAccessPrioritiesChanged();
                 } catch (RuntimeException e) {
                     AppLog.e(TAG, "listener.onAccessPrioritiesChanged failed", e);
                 }
@@ -299,7 +302,7 @@ public final class CameraAvailabilityWatch {
 
     // ================================================================= 2.11：调度读的事实、问、叫醒
 
-    /** 调度（ChannelScheduler，每个管理器一个）接在这里，见 {@link #addListener}。三个方法都在主线程上调。 */
+    /** 调度（ChannelScheduler，进程里那一个）接在这里，见 {@link #setListener}。三个方法都在主线程上调。 */
     interface Listener {
         /**
          * 这一路此刻有没有我们的开或关在途：在开（打开发出去了、设备还没回来）、在关、丢了之后的那一次关。只是改会话不算
@@ -320,16 +323,9 @@ public final class CameraAvailabilityWatch {
         }
     }
 
-    /** 接上一个调度（管理器建调度时）。重复接无害。 */
-    static void addListener(Listener listener) {
-        if (listener != null) {
-            LISTENERS.addIfAbsent(listener);
-        }
-    }
-
-    /** 摘掉一个调度（管理器放掉时）。 */
-    static void removeListener(Listener listener) {
-        LISTENERS.remove(listener);
+    /** 接上那一个调度（装上它时接一次，ChannelFacts.install）：之后每一声都问它、叫醒它。不摘。 */
+    static void setListener(Listener l) {
+        listener = l;
     }
 
     /** 相机服务对这一路说的最后一句（{@link Word}）：调度每一轮照它填这一路的事实。 */
@@ -479,16 +475,15 @@ public final class CameraAvailabilityWatch {
     }
 
     /**
-     * 我们在这一路有没有开或关在途（{@link #classify} 的那个参数）：接上来的调度谁说有就算有（换车型时两份管理器并存，
-     * 哪一份在动它都是我们）；再看账本 —— 这一台有一轮还没结束、手上没挂着设备：在开或在关（含丢了之后的那一次关、
-     * 另一份管理器在关同一台相机）。调度接上之前只有后者，它在相机线程上改得早，见 {@link Listener#ourStepInFlight}。
+     * 我们在这一路有没有开或关在途（{@link #classify} 的那个参数）：调度说有就算有（它的账最准，见 {@link Listener#ourStepInFlight}；
+     * 换下去还在关的那一份管线、孤儿的那一轮它也认）；调度接上之前看账本 —— 这一台有一轮还没结束、手上没挂着设备：在开或在关
+     * （含丢了之后的那一次关）。
      */
-    private static boolean ourStepInFlight(String cameraId) {
-        for (Listener listener : LISTENERS) {
+    static boolean ourStepInFlight(String cameraId) {
+        Listener l = listener;
+        if (l != null) {
             try {
-                if (listener.ourStepInFlight(cameraId)) {
-                    return true;
-                }
+                return l.ourStepInFlight(cameraId);
             } catch (RuntimeException e) {
                 AppLog.e(TAG, "listener.ourStepInFlight failed", e);
             }
@@ -497,11 +492,12 @@ public final class CameraAvailabilityWatch {
         return live != null && !live.holdsDevice();
     }
 
-    /** 叫醒接上来的调度（主线程）。调度自己把几次叫醒并成一轮。 */
+    /** 叫醒接上来的那一个调度（主线程）。调度自己把几次叫醒并成一轮。 */
     private static void wake() {
-        for (Listener listener : LISTENERS) {
+        Listener l = listener;
+        if (l != null) {
             try {
-                listener.onServiceChanged();
+                l.onServiceChanged();
             } catch (RuntimeException e) {
                 AppLog.e(TAG, "listener.onServiceChanged failed", e);
             }

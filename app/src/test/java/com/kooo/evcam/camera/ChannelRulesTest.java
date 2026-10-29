@@ -607,7 +607,10 @@ public class ChannelRulesTest {
         assertEquals(Collections.singletonList(REAR), d.keys);
     }
 
-    /** 别人的在途（一路 isBusy、另一个实例在关、一路正被接手）也挡住一切，各最多 60 秒。 */
+    /**
+     * 别人的在途（一路 isBusy、一路正被接手）也挡住一切，各最多 60 秒。第 2 步起没有「另一个实例在关」：进程里只有一个调度，
+     * 换下去的那一份的关在账本上（{@link Lane#closingSince}），照「有一次关没返回」那一条等。
+     */
     @Test
     public void othersInFlightBlockEverythingForAtMostSixtySeconds() {
         claim(Holder.PREVIEW);
@@ -623,11 +626,6 @@ public class ChannelRulesTest {
         assertEquals(Move.OPEN, round().move);
 
         rear.busySince = 0;
-        w.otherClosingSince = w.now;
-        assertEquals(Why.OTHER_INSTANCE, round().why);
-        at(2 * ChannelRules.IN_FLIGHT_MAX_MS);
-        assertEquals(Move.OPEN, round().move);
-
         ChannelRules.lossStarted(w, rear, CameraTaken.Reason.ofDisconnect());
         assertWait(Why.LOSING, REAR, round());
     }
@@ -1650,26 +1648,66 @@ public class ChannelRulesTest {
 
     /**
      * 管线在同一个进程里重建（配置里开关了一路、换车型、退出后马上又开）：新的一份从没碰过这一路，读到的「被占用（我们开着）」
-     * 是旧的那一份开的时候记下的。旧的那一份还在关 —— 算我们的，等它；关完了还被占着（原厂 360 拿着环视）—— 别人拿着，
-     * 一次也不试开（§二.7，审查 2026-10-11）。
+     * 是旧的那一份开的时候记下的。旧的那一份那一轮还没结束（账本：被一轮占着）—— 算我们的，不开它、别的路照开；那一轮结束了，
+     * 账本记下我们关完的那一刻（{@link Lane#ourCloseAt}），之后 0.5 秒以内还算我们的（为这一关说的「空闲」可能还在路上）；
+     * 过了还被占着（原厂 360 拿着环视）—— 别人拿着，一次也不试开（§二.7，审查 2026-10-11；第 2 步：以前看「另一份管线还在关」那扇窗）。
      */
     @Test
-    public void anOldOursWordIsOursOnlyWhileAnotherPipelineIsStillClosing() {
+    public void anOldOursWordIsOursOnlyWhileItsRoundLivesAndJustAfterItsClose() {
         claim(Holder.PREVIEW);
         declarePreviews();
         serviceSays(surround, false, true);
-        w.otherClosingSince = w.now;
+        surround.held = true;
         Decision d = round();
-        assertNull("另一份还在关：那一句还算我们的", surround.mark);
-        assertWait(Why.OTHER_INSTANCE, null, d);
+        assertNull("那一轮还没结束：那一句还算我们的", surround.mark);
+        assertEquals("被一轮占着的跳过，别的路照开", Collections.singletonList(REAR), d.keys);
+        perform(d);
 
         at(1_000);
-        w.otherClosingSince = 0;
+        surround.held = false;
+        surround.ourCloseAt = w.now;   // 旧的那一份那一轮关完、结束了
+        round();
+        assertNull("刚关完：还算我们的", surround.mark);
+        at(1_000 + ChannelRules.OWN_WORD_GRACE_MS - 1);
+        round();
+        assertNull(surround.mark);
+        at(1_000 + ChannelRules.OWN_WORD_GRACE_MS);
         assertEquals(Move.IDLE, run().move);
-        assertEquals(CameraTaken.Verdict.TAKEN, surround.mark);
+        assertEquals("关完 0.5 秒还被占着：别人拿着", CameraTaken.Verdict.TAKEN, surround.mark);
         assertEquals("一次也不试开", 0, count(Move.OPEN, surround));
         assertEquals("被拿着的跳过，不挡后面", 2, count(Move.OPEN));
         assertTrue(ChannelRules.askDue(w));
+    }
+
+    /**
+     * 这一份管线要换下去（管线重建，{@link World#retireSince}）：和退出一样只关、按次序关 —— 手上那一步做完，环视单独先关，
+     * 座舱再一起关；关的原因是「管线重建」；不开、不改、不救、不问；退出、车机要睡时原因照写它们自己的。
+     */
+    @Test
+    public void aRetiringPipelineClosesInOrderForARebuild() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        w.retireSince = w.now;
+        assertTrue(ChannelRules.winding(w));
+        assertFalse(ChannelRules.shouldOpen(w, rear));
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Why.REBUILD, d.why);
+        assertEquals("环视单独先关", Collections.singletonList(SUR), d.keys);
+        assertEquals(ChannelRules.CLOSE_SURROUND_MAX_MS, d.maxMs);
+        perform(d);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Why.REBUILD, d.why);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+
+        w.exitSince = w.now;
+        streaming(surround, pvS);
+        assertEquals("退出时照写退出", Why.EXIT, round().why);
     }
 
     /** 1 是 TAKEN 时开 2，报 MAX_CAMERAS_IN_USE：判 BLOCKED、不计次数；1 放开了，两路一起放开，先开环视再开后座舱。 */

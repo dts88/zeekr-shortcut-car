@@ -36,6 +36,63 @@ public class CameraAvailabilityWatchTest {
     /** 三路的相机编号：环视 2、后座舱 1、前座舱 0。 */
     private static final List<String> SLOTS = Arrays.asList("2", "1", "0");
 
+    // ------------------------------------------------------------------ 认人只照账本、只有一个调度接着（第 2 步）
+
+    /** 这一台的那一轮记着被踢（被断开、报错 1 / 2）：相机服务那边不算我们的 —— 谁的那一轮都一样答（管线重建时另一份相机对象问也是）。 */
+    @Test
+    public void whetherWeHoldItInTheServiceComesFromTheLedgerSoAnotherPipelinesKickedCloseIsRead() {
+        Object otherPipeline = new Object();
+        CameraRound round = CameraRounds.process().issue("9", otherPipeline, CameraSlots.KEY_CABIN_REAR, 0);
+        try {
+            assertTrue("在开：我们的", CameraAvailabilityWatch.weHoldOrOpen("9"));
+            CameraRound.Call call = round.beginCall(0);
+            round.returned(call, 0);
+            Object device = new Object();
+            assertEquals(CameraRound.Action.ADOPT, round.opened(call, device, 10));
+            assertTrue(CameraAvailabilityWatch.weHoldOrOpen("9"));
+            assertFalse("设备在手上：不是我们在开或关", CameraAvailabilityWatch.ourStepInFlight("9"));
+            assertEquals(CameraRound.Action.LOST, round.failed(call, device, true, 20));
+            assertFalse("被踢之后那一次关：相机服务说的「被占用」是新的主人", CameraAvailabilityWatch.weHoldOrOpen("9"));
+            assertTrue("那一次关在途：我们的", CameraAvailabilityWatch.ourStepInFlight("9"));
+            round.closed(device, 30);
+            assertTrue(round.takeEnd());
+        } finally {
+            CameraRounds.process().end(round, 40);
+        }
+        assertFalse("那一轮结束了：不是我们的", CameraAvailabilityWatch.weHoldOrOpen("9"));
+        assertFalse(CameraAvailabilityWatch.ourStepInFlight("9"));
+    }
+
+    /** 接着的调度只有一个：后接上的替掉先接上的，分类时只问它（以前每一份管线各接一份，换车型时两份并存）。 */
+    @Test
+    public void onlyOneSchedulerIsAskedWhetherAStepIsOurs() {
+        final List<String> asked = new ArrayList<>();
+        try {
+            CameraAvailabilityWatch.setListener(listener(asked, "old", false));
+            CameraAvailabilityWatch.setListener(listener(asked, "new", true));
+            assertTrue(CameraAvailabilityWatch.ourStepInFlight("8"));
+            assertEquals(Collections.singletonList("new 8"), asked);
+        } finally {
+            CameraAvailabilityWatch.setListener(null);
+        }
+        assertFalse("没接上：照账本（这一台没有一轮）", CameraAvailabilityWatch.ourStepInFlight("8"));
+    }
+
+    private static CameraAvailabilityWatch.Listener listener(final List<String> asked, final String name,
+                                                             final boolean answer) {
+        return new CameraAvailabilityWatch.Listener() {
+            @Override
+            public boolean ourStepInFlight(String cameraId) {
+                asked.add(name + " " + cameraId);
+                return answer;
+            }
+
+            @Override
+            public void onServiceChanged() {
+            }
+        };
+    }
+
     // ------------------------------------------------------------------ 分类
 
     /** 注册那一刻的回放是现状，不是变化：不论说什么、我们在不在开关它，都不挡安静。 */

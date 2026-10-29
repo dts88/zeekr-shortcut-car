@@ -115,22 +115,4 @@ public class CameraNeedsTest {
         needs.setHeadUnitSleeps(false);
         assertEquals("亮屏清掉也叫", 2, calls[0]);
     }
-
-    /** 换车型时两份管理器并存：旧的那份晚 release，摘不掉新那份的监听。 */
-    @Test
-    public void clearingTheListenerOnlyClearsItsOwn() {
-        final int[] older = {0};
-        final int[] newer = {0};
-        CameraNeeds.Listener old = () -> older[0]++;
-        CameraNeeds.Listener fresh = () -> newer[0]++;
-        needs.setListener(old);
-        needs.setListener(fresh);
-        needs.clearListener(old);
-        needs.claim(CameraNeeds.Holder.PREVIEW);
-        assertEquals("新那份还在听", 1, newer[0]);
-        assertEquals(0, older[0]);
-        needs.clearListener(fresh);
-        needs.release(CameraNeeds.Holder.PREVIEW);
-        assertEquals("摘掉之后不再叫", 1, newer[0]);
-    }
 }

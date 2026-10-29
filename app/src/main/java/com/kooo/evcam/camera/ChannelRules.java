@@ -115,18 +115,21 @@ public final class ChannelRules {
     public static final long JUDGE_DELAY_MS = 300L;
 
     /**
-     * 别人的在途（一路被接手 LOSING、一台相机那一轮有一次关没返回、一路 isBusy、另一个管理器实例在关）最多挡别的路多久：
+     * 别人的在途（一路被接手 LOSING、一台相机那一轮有一次关没返回、一路 isBusy）最多挡别的路多久：
      * 再久就当回调不会来了，别的路不再等它。数在 {@link SingleCamera#IN_FLIGHT_MAX_MS}。
      *
      * <p>只管别的路（项目所有者 2026-10-28）：被一轮占着的那一台自己（{@link #camHeld}：关没返回、开没返回），那一轮结束之前不开、
-     * 关着在开的不救，不设时限；满这么久还有开或关没返回的，录像那一侧不再算它在起来、状态条说它无法录制（{@link #heldByClose}）。</p>
+     * 关着在开的不救，不设时限；满这么久还有开或关没返回的，录像那一侧不再算它在起来、状态条说它无法录制（{@link #heldByClose}）。
+     * 管线重建时换下去的那一份关一路卡住（ChannelScheduler：那一下开始关以后满这么久），新的一份照样接上，那一台照这一条不开
+     * （项目所有者 2026-10-29「等旧管线这一步做完再算 60 秒」）。</p>
      */
     public static final long IN_FLIGHT_MAX_MS = SingleCamera.IN_FLIGHT_MAX_MS;
 
     /**
      * 我们的开、关做完之后多久以内，相机服务为这一路说的话还算我们引起的：那一句从 binder 线程上来，和相机线程报的开好 / 关完
      * 谁先到主线程没有保证，差的是同一次进相机服务的前后脚，几十毫秒的事。分类相机服务的话（ChannelScheduler.ourStepInFlight）
-     * 和主动认（{@link #recognize}）用的是这同一个数。
+     * 和主动认（{@link #recognize}）用的是这同一个数。管线重建换上新的一份之后也照算：「我们关完」看账本记的那一刻
+     * （{@link Lane#ourCloseAt}，谁的那一轮都算），不看新的这一路自己的账（第 2 步「只有一个调度」）。
      */
     static final long OWN_WORD_GRACE_MS = 500L;
 
@@ -300,6 +303,12 @@ public final class ChannelRules {
          * 0 = 没有那一轮、或者它稳稳开着。满 {@link ChannelRules#IN_FLIGHT_MAX_MS} 的那一路告诉录像（{@link ChannelRules#heldByClose}）。
          */
         long outstandingSince;
+        /**
+         * 这一台我们最近一次关完的时刻（账本记的：一轮在下达了关、或者丢了之后结束的那一下，谁的那一轮都算 —— CameraRounds.closedAt）；
+         * 0 = 进程里还没有。之后 {@link ChannelRules#OWN_WORD_GRACE_MS} 以内相机服务为它说的话还算我们的（{@link ChannelRules#stillOurs}）：
+         * 管线重建时那一关是换下去的那一份做的，新的这一路自己的账（{@link #deviceSince}）里没有它（第 2 步「只有一个调度」）。
+         */
+        long ourCloseAt;
         /** 会话里此刻带着的输出（SingleCamera.sessionOutputs() 的快照）；没有会话是空的。 */
         final Set<Out> session = new LinkedHashSet<>();
         /** 会话配好的时刻；0 = 没有会话。 */
@@ -455,8 +464,12 @@ public final class ChannelRules {
         long sleepSince;
         /** 「退出」从什么时候起；0 = 没有。 */
         long exitSince;
-        /** 另一个管理器实例在关相机（换车型时两份并存），从什么时候起；0 = 没有。 */
-        long otherClosingSince;
+        /**
+         * 这一份管线放掉了、要换下去（管线重建：换车型、列相机出错、启用的几路变了、超级镜子要后座舱），从什么时候起；0 = 没有。
+         * 和退出一样只关、按次序关（{@link ChannelRules#winding}），关的原因写「管线重建」（{@link Why#REBUILD}）。
+         * 关完（或者卡住的那一路那一下开始关以后满 {@link ChannelRules#IN_FLIGHT_MAX_MS}），唯一的那一个调度换上新的一份（第 2 步）。
+         */
+        long retireSince;
         /** 手上那一步；null = 没有。{@link ChannelRules#begin} 记、{@link ChannelRules#finish} 清。 */
         Step step;
 
@@ -473,8 +486,8 @@ public final class ChannelRules {
         long lastAskAt;
         /**
          * 环视这一段熄屏是哪一种（{@link SurroundInDark}，项目所有者 2026-10-27）：只由 {@link ChannelRules#judgeSurroundInDark} 改。
-         * 新世界从「放开」起 —— 没见过通道刚算黑的那一下（进程在黑着时被拉起）。跟着进程、不跟着管线：调度建世界时照进程那一份填
-         * （建调度时、ChannelScheduler.setLanes），除了在退出的那一份，每一轮写回（ChannelScheduler.keepProcessDark，车机要睡、睡着时也写），
+         * 新世界从「放开」起 —— 没见过通道刚算黑的那一下（进程在黑着时被拉起）。跟着进程、不跟着管线：唯一的那一个调度记着它
+         * （ChannelScheduler 的字段），建世界时照它填，跑的那一份世界每一轮写回（退出时不写，车机要睡、睡着时也写），
          * 管线放掉重建不断熄屏录像。
          */
         SurroundInDark surroundInDark = SurroundInDark.RELEASED;
@@ -567,8 +580,6 @@ public final class ChannelRules {
          * —— 手上那一步到点也照等，2.11.4 第 1c 项）。
          */
         BUSY,
-        /** 另一个管理器实例在关。 */
-        OTHER_INSTANCE,
         /** 座舱等环视先关完（§二.2）。 */
         SURROUND_CLOSING,
         /** 一路丢了 / 开不起来，关完还不到 300 ms、或者还有别的丢失没关完：等判完。 */
@@ -611,6 +622,11 @@ public final class ChannelRules {
         SLEEP,
         /** 退出。 */
         EXIT,
+        /**
+         * 管线重建（{@link World#retireSince}：换车型、列相机出错、启用的几路变了、超级镜子要后座舱）：这一份管线换下去，
+         * 和退出一样按次序关（第 2 步「只有一个调度」：以前旧的那一份调度照「退出」关，黑匣子写的是退出）。
+         */
+        REBUILD,
         // ---- 开 ----
         /** 有人要它（{@link Decision#forWhom}）。 */
         WANTED,
@@ -1182,10 +1198,10 @@ public final class ChannelRules {
 
     /**
      * 关着的这一路，相机服务那一句「被占用（我们引起的）」此刻还能不能算我们的：只在我们的哪一份还可能拿着它的时候 ——
-     * 这一路刚关完、开不起来、丢了之后关完（{@link #OWN_WORD_GRACE_MS} 以内，为这一关说的「空闲」可能还在路上），
-     * 另一份管线还在关（换车型、退出后马上又开，最多 {@link #IN_FLIGHT_MAX_MS}：占着它的可能是那一份），
+     * 这一路刚关完、开不起来、丢了之后关完，或者这一台我们刚关完（账本记的 {@link Lane#ourCloseAt}，谁的那一轮都算：管线重建时
+     * 那一关是换下去的那一份做的），{@link #OWN_WORD_GRACE_MS} 以内（为这一关说的「空闲」可能还在路上）；
      * 或者这一台被一轮占着（{@link #camHeld}，不设时限，第 1 步「轮次 + 账本」）—— 那一轮结束之前，我们的连接可能还挂在相机服务里。
-     * 以前旧的那一份关卡住超过 60 秒，新的一份把那一句「被占用（我们开着）」认成别人拿着。
+     * 以前另有一扇「另一份管线还在关」的窗（最多 60 秒）：第 2 步起进程里只有一个调度，旧的那一份的关在账本上，不再另开窗。
      *
      * <p>过了这些还被占着，只能是别人（审查 2026-10-11）。两种来路：别的程序在我们开着时悄悄拿走 —— 相机服务从「我们开着」
      * 直接变成「别人开着」，中间不说「空闲」（10-10，§二.7），同一句「被占用」不再改那个记号；管线在同一个进程里重建
@@ -1194,9 +1210,7 @@ public final class ChannelRules {
      */
     private static boolean stillOurs(World w, Lane lane) {
         return lane.serviceWordOurs
-                && (w.now - lane.deviceSince < OWN_WORD_GRACE_MS
-                || w.otherClosingSince != 0 && w.now - w.otherClosingSince < IN_FLIGHT_MAX_MS
-                || camHeld(lane));
+                && (w.now - Math.max(lane.deviceSince, lane.ourCloseAt) < OWN_WORD_GRACE_MS || camHeld(lane));
     }
 
     /**
@@ -1523,14 +1537,14 @@ public final class ChannelRules {
                 && !wanted(w, lane) && lane.unwantedSince != 0 && w.now - lane.unwantedSince < HOLD_MS;
     }
 
-    /** 这一路该开（§一）：不在退出、车机不睡，并且有人要、或者在保持。 */
+    /** 这一路该开（§一）：不在退出、车机不睡、这一份管线不在换下去，并且有人要、或者在保持。 */
     static boolean shouldOpen(World w, Lane lane) {
         return !winding(w) && (wanted(w, lane) || holding(w, lane));
     }
 
-    /** 退出、或者车机要睡：只关，不开、不改、不救。 */
+    /** 退出、车机要睡、或者这一份管线要换下去（{@link World#retireSince}）：只关，不开、不改、不救。 */
     static boolean winding(World w) {
-        return w.exitSince != 0 || w.sleepSince != 0;
+        return w.exitSince != 0 || w.sleepSince != 0 || w.retireSince != 0;
     }
 
     /**
@@ -1866,13 +1880,13 @@ public final class ChannelRules {
      *
      * <ol>
      *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一台相机那一轮有一次关没返回（我们按次序关的那一步除外，
-     *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy、另一个实例在关。后四种各封顶
+     *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy。后三种各封顶
      *       {@link #IN_FLIGHT_MAX_MS}（关没返回的那一种从那一轮一直有开或关没返回的那一刻算，不从头算）—— 封顶只管别的路等多久：
      *       被一轮占着的那一台自己，那一轮结束之前不开、关着在开的不救（{@link #camHeld}，项目所有者 2026-10-28、10-29）。
-     *       车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
+     *       车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出、管线换下去照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
      *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
-     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
+     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡、管线换下去时到这里为止，不摘死输出、不改、不开、不救；</li>
      *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
      *       但照 §二.6 仍要等安静。只摘本会话出过画面的（{@link #reconfigurable}）；没出过画面的由第 7 条重开时丢掉它；</li>
@@ -2084,9 +2098,6 @@ public final class ChannelRules {
                 return Decision.waitFor(Why.BUSY, lane.key, IN_FLIGHT_MAX_MS - (now - lane.busySince));
             }
         }
-        if (w.otherClosingSince != 0 && now - w.otherClosingSince < IN_FLIGHT_MAX_MS) {
-            return Decision.waitFor(Why.OTHER_INSTANCE, null, IN_FLIGHT_MAX_MS - (now - w.otherClosingSince));
-        }
         return null;
     }
 
@@ -2165,7 +2176,7 @@ public final class ChannelRules {
     }
 
     /**
-     * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出）」）。一步里的几路原因一样：
+     * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出 / 管线重建）」）。一步里的几路原因一样：
      * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。关座舱前先关环视的那一步不在这里判（{@link Why#SURROUND_FIRST}，
      * {@link #closeStep} 直接给）：那时环视还该开，这里答不出它为什么关。熄屏放开的环视（2026-10-27）照旧是「熄屏」，
      * 不写成「座舱放开」。
@@ -2176,6 +2187,9 @@ public final class ChannelRules {
         }
         if (w.sleepSince != 0) {
             return Why.SLEEP;
+        }
+        if (w.retireSince != 0) {
+            return Why.REBUILD;
         }
         if (releasedByDark(w, lane) && !isSurround(lane)) {
             return Why.DARK_RELEASE;
