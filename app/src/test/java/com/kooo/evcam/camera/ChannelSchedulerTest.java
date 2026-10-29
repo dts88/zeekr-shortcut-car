@@ -2563,7 +2563,10 @@ public class ChannelSchedulerTest {
         assertNull(fresh.verdictCause());
         fresh.wake();
         settle();
-        assertEquals("亮着：又发了一次 LIT", ChannelRules.SurroundInDark.LIT, fresh.verdict());
+        assertEquals("还没有管线：空的那一份不判、不发", ChannelRules.SurroundInDark.RELEASED, fresh.verdict());
+        register(fresh, new FakePipe(), false);
+        settle();
+        assertEquals("第一份管线那一轮：亮着，发了一次 LIT", ChannelRules.SurroundInDark.LIT, fresh.verdict());
         assertTrue("挂在另一个调度上的监听者听不到", verdicts.isEmpty());
     }
 
@@ -2580,6 +2583,50 @@ public class ChannelSchedulerTest {
         assertTrue(verdicts.isEmpty());
         assertEquals(ChannelRules.SurroundInDark.RELEASED, s.verdict());
         assertNull(s.verdictCause());
+    }
+
+    /**
+     * 进程在黑着时被拉起、还没有一份管线（审查 2026-10-30）：调度装上了，可空的那一份不判环视留不留、不发决定、不写回，也不按 2 秒醒 ——
+     * 之后哨兵模式开了也一样（空的那一份照判的话：先读到关、再读到开，就算「变成开」留下环视、发出 KEPT，录像协调器就去开录）。
+     * 第一份管线照进程刚起来的样子起（放开、没有上一次读数）：黑着、哨兵开着也不开环视、不发决定。
+     */
+    @Test
+    public void beforeAnyPipelineTheDarkIsNotJudged() {
+        FakePoster quiet = new FakePoster();
+        ChannelScheduler fresh = new ChannelScheduler(() -> now, quiet, host, rounds);
+        List<String> heard = new ArrayList<>();
+        fresh.setVerdictListener(() -> heard.add(fresh.verdict() + " " + fresh.verdictCause()));
+        host.screenOn = false;
+        host.darkAt = 0;   // 起点不明：照黑满 30 秒算
+        host.sentry = 0;
+        fresh.wake();
+        quiet.runUntil(now);
+        assertTrue("空的那一份不按时醒", quiet.tasks.isEmpty());
+        quiet.runUntil(T0 + 5_000);
+        host.sentryArmed();   // 哨兵模式开了
+        fresh.wake();
+        quiet.runUntil(now);
+        assertTrue(heard.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, fresh.verdict());
+        assertNull(fresh.verdictCause());
+        assertTrue(quiet.tasks.isEmpty());
+
+        host.holders.add(Holder.RECORDING);
+        fresh.onNeedsChanged();
+        FakePipe first = new FakePipe();
+        first.plan(SUR);
+        FakePort s2 = new FakePort("2");
+        declare(s2, recS);
+        ChannelScheduler.Pipeline handle = register(fresh, first, false);
+        s2.pipe = handle;
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, s2);
+        handle.setLanes(lanes);
+        quiet.runUntil(T0 + 60_000);
+        assertTrue("第一份管线照进程刚起来的样子起：不开环视", s2.actions.isEmpty());
+        assertTrue("不发决定", heard.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, fresh.snapshot().surroundInDark);
+        assertTrue(handle.releasedByDark(SUR));
     }
 
     // ================================================================= 问（只问，不开）

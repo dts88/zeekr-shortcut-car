@@ -1758,8 +1758,8 @@ public final class ChannelScheduler {
     // ---- 环视这一段熄屏留不留、通道的决定：跟着进程，不跟着管线（项目所有者 2026-10-27；只在主线程上读写）----
 
     /**
-     * 环视这一段熄屏是哪一种（{@link ChannelRules.World#surroundInDark}）：建世界时照它填（{@link #newWorld}），跑的那一份世界每一轮写回
-     * （退出时不写，车机要睡、睡着时也写）。管线放掉重建（换车型、列相机出错、启用的几路变了、超级镜子要后座舱）时新的那一份接着用 ——
+     * 环视这一段熄屏是哪一种（{@link ChannelRules.World#surroundInDark}）：建世界时照它填（{@link #newWorld}），跑的那一份管线的世界每一轮写回
+     * （退出时不写，车机要睡、睡着时也写；还没有管线时空的那一份不判、不写）。管线放掉重建（换车型、列相机出错、启用的几路变了、超级镜子要后座舱）时新的那一份接着用 ——
      * 熄屏录像不断，车机要睡放开的也不会被重建带回来；进程起来时是放开、没有上一次读数（进程在黑着时被拉起不开相机）。
      * 以前是进程里的静态字段，每一份调度建世界时抄进去、跑完抄回来（第 2 步起是这唯一一个调度的字段）。
      */
@@ -1768,7 +1768,7 @@ public final class ChannelScheduler {
     private Integer latchSentry;
     /**
      * 通道对环视的熄屏决定（{@link ChannelRules#surroundVerdict}：LIT 不归熄屏管、KEPT 留着、RELEASED 放开）—— 录像协调器照它停录、开录
-     * （项目所有者 2026-10-27）。只由跑的那一份世界写（{@link Pipeline#publishVerdict}）：退出时不写，屏幕不知道黑没黑时和环视留不留一样不动
+     * （项目所有者 2026-10-27）。只由跑的那一份管线的世界写（{@link Pipeline#publishVerdict}；空的那一份不发）：退出时不写，屏幕不知道黑没黑时和环视留不留一样不动
      * （车机要睡那一条照写）。管线重建时新的那一份接着判，算出来的一样，不再发。进程起来时是放开（在黑着时被拉起的不开相机）。
      */
     private ChannelRules.SurroundInDark verdict = ChannelRules.SurroundInDark.RELEASED;
@@ -1784,7 +1784,8 @@ public final class ChannelScheduler {
 
     /**
      * 接着的那一份：跑的就是它的世界（{@link Pipeline#w}）—— 可能在换下去（{@link Pipeline#retireAt}）。没有一份管线时是一份空的
-     * （{@link Pipeline#placeholder}：没有路、什么都不写），进程这一层的事照样每一轮跑（环视留不留、通道的决定、退出、车机要睡）。
+     * （{@link Pipeline#placeholder}：没有路、什么都不写，不判环视留不留、不发通道的决定、不按时醒 —— 进程在黑着时被拉起不开相机，
+     * 审查 2026-10-30）；叫醒照样跑一轮：退出、车机要睡、孤儿、换上。
      */
     private Pipeline attached;
     /**
@@ -2137,7 +2138,7 @@ public final class ChannelScheduler {
     // ---- 下一次什么时候醒
 
     /**
-     * 最迟 {@link ChannelRules#TICK_MS} 醒一次；手上那一步到点、等的东西到点（待判 300 ms、安静、录像输出、车机要睡的 1 秒）、
+     * 最迟 {@link ChannelRules#TICK_MS} 醒一次（空的那一份不按时醒）；手上那一步到点、等的东西到点（待判 300 ms、安静、录像输出、车机要睡的 1 秒）、
      * 保持到点、屏幕黑满 30 秒（{@link #darkDueInMs}）、关完一轮之后再量的那一下到点（{@link Pipeline#noteAftermaths}）、
      * 换下去的那一份卡住的那一路满 60 秒（{@link #swapIfDue}），早一点醒。
      *
@@ -2146,6 +2147,11 @@ public final class ChannelScheduler {
      */
     private void arm(ChannelRules.Decision d, long now) {
         Pipeline p = attached;
+        poster.cancel(timerTask);
+        if (p.placeholder) {
+            // 空的那一份不按时醒（审查 2026-10-30）：没有路要等；退出、车机要睡、孤儿那一次关返回、新的一份接上都会叫醒
+            return;
+        }
         long delay = ChannelRules.TICK_MS;
         ChannelRules.Step step = p.w.step;
         if (step != null) {
@@ -2180,7 +2186,6 @@ public final class ChannelScheduler {
         if (swapDue > 0) {
             delay = Math.min(delay, swapDue);
         }
-        poster.cancel(timerTask);
         poster.postDelayed(timerTask, Math.max(1, delay));
     }
 
@@ -2228,7 +2233,7 @@ public final class ChannelScheduler {
         private Recording recording;
         /** 什么时候接上来的（调度的钟）：诊断报告「排着」那一行。 */
         final long registeredAt;
-        /** 没有管线时接着的那一份空的：没有路、什么都不写。 */
+        /** 没有管线时接着的那一份空的：没有路、什么都不写，不判环视留不留、不发通道的决定（{@link #run}）、不按时醒（{@link ChannelScheduler#arm}）。 */
         final boolean placeholder;
         /** 放掉了、要换下去（{@link #retire}），从什么时候起（调度的钟）；0 = 没有。每一轮照它填 {@link ChannelRules.World#retireSince}。 */
         long retireAt;
@@ -2612,6 +2617,13 @@ public final class ChannelScheduler {
             w.now = now;
             refresh(now, true);
             noteWinding(now);
+            if (placeholder) {
+                // 还没有一份管线（或者换下去以后还没有新的一份）：没有路，环视留不留、通道的决定都不判、不发、不写回 ——
+                // 进程在黑着时被拉起不开相机（项目所有者 2026-10-27）：第一份管线照进程刚起来的样子起（放开、没有上一次读数，
+                // 审查 2026-10-30）。这一轮收下的登记表的变化没有路可归，扔掉
+                w.changed.clear();
+                return ChannelRules.Decision.idle();
+            }
             ChannelRules.Step step = w.step;
             ChannelRules.Outcome outcome = ChannelRules.outcome(w);
             if (step != null && outcome != ChannelRules.Outcome.RUNNING && outcome != ChannelRules.Outcome.NONE) {
