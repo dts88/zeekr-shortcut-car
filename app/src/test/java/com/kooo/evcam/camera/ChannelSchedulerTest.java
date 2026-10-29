@@ -698,6 +698,97 @@ public class ChannelSchedulerTest {
     }
 
     /**
+     * 关的那一半在关的时候管线重建：和退出一样，手上这一步照等；关完了，开的那一半不再下达（一行「不再开：管线重建」），重开的那一次关照记；
+     * 接着照次序关（环视单独关），关完换上新的一份，它照开的次序开。
+     */
+    @Test
+    public void aRebuildDuringTheCloseHalfDropsTheOpenHalfThenSwapsInOrder() {
+        long reopenAt = stuckRearIsReopened();
+        p.retire();
+        FakePipe second = new FakePipe();
+        second.plan(SUR, REAR);
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, new Out(Kind.RECORD, "recorder-2b"));
+        declare(r2, new Out(Kind.RECORD, "recorder-1b"));
+        rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+        assertTrue("手上那一步做完再关", surround.actions.isEmpty());
+
+        at(reopenAt - T0 + 500);
+        closed(rear);
+        settle();
+        assertEquals("开的那一半不再下达", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
+        assertEquals(1, lines("stepEnded RESCUE left dropped REBUILD after=500").size());
+        assertEquals(1, lines("recorded left CLOSE CLOSED ms=500 kind=REOPEN").size());
+        assertEquals("接着照次序关：环视单独关", Arrays.asList("close rebuild"), surround.actions);
+
+        at(reopenAt - T0 + 700);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("swapped 700 successor"), lines("swapped"));
+        assertTrue(pipe.gone);
+        assertEquals("换上了：环视先开", Arrays.asList("open [RECORD]"), s2.actions);
+        opened(s2);
+        frame(s2);
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), r2.actions);
+    }
+
+    /**
+     * 关的那一半卡住时管线重建：这一路从关的那一半起就在关，换上新的一份照「每一路从它开始关那一刻算」（项目所有者 2026-10-29）——
+     * 手上那一步 15 秒到点；那一次关在途，别的路等它，封顶也从关的那一半算，满 60 秒环视才单独关；环视关完当场换上：约 60 秒。
+     * 以前相机层自己重开，这一路记成在开，满 60 秒才下达按次序的关、从那一刻再等 60 秒：约 120 秒（第 2b 步改了的那一处行为）。
+     * 卡住的那一路留下当孤儿，重开那一次关的那一条随旧的那一份走了：关返回时谁都不记；新的一份那一路等那一轮结束才开。
+     */
+    @Test
+    public void aStuckCloseHalfDuringARebuildSwapsSixtySecondsAfterTheCloseHalfBegan() {
+        long reopenAt = stuckRearIsReopened();
+        int round = rear.live.number;
+        p.retire();
+        FakePipe second = new FakePipe();
+        second.plan(SUR, REAR);
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, new Out(Kind.RECORD, "recorder-2b"));
+        declare(r2, new Out(Kind.RECORD, "recorder-1b"));
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+
+        at(reopenAt - T0 + ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded RESCUE left timedOut").size());
+        assertTrue("那一次关在途：别的路等它", surround.actions.isEmpty());
+        at(reopenAt - T0 + ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(reopenAt - T0 + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals("从关的那一半算满 60 秒：环视单独关", Arrays.asList("close rebuild"), surround.actions);
+        assertTrue(lines("swapped").isEmpty());
+
+        at(reopenAt - T0 + ChannelRules.IN_FLIGHT_MAX_MS + 100);
+        closed(surround);
+        settle();
+        assertEquals("环视关完当场换上：后座舱从关的那一半算已经满了 60 秒，不再另等",
+                Arrays.asList("swapped " + (ChannelRules.IN_FLIGHT_MAX_MS + 100) + " successor orphans left 1 round="
+                        + round + " closing"), lines("swapped"));
+        assertTrue("状态条那一句", next.heldByClose(REAR));
+        assertEquals("环视照常开", Arrays.asList("open [RECORD]"), s2.actions);
+        opened(s2);
+        frame(s2);
+        settle();
+        assertTrue("被一轮占着：不开", r2.actions.isEmpty());
+        assertEquals(0, r2.heldRefusals);
+        assertFalse(pipe.gone);
+
+        at(reopenAt - T0 + 90_000);
+        closed(rear);   // 卡住的那一次关终于返回：报给旧的那一份
+        settle();
+        assertTrue(pipe.gone);
+        assertTrue("重开那一次关的那一条随旧的那一份走了", lines("recorded left CLOSE").isEmpty());
+        assertTrue(lines("coupling END REOPEN").isEmpty());
+        assertEquals("那一轮结束了：新的一份照常开", Arrays.asList("open [RECORD]"), r2.actions);
+    }
+
+    /**
      * 救援重开碰上那一台刚在相机线程上丢了（这一轮读完事实之后、照做之前，丢了的那一声还没到）：关的那一半不下达，合并掉 ——
      * 和以前相机层的重开在丢的那一轮上合并一样：不说在救、不记关的那一半、不起这一步。丢了的那一声到了，照丢了的规矩走：
      * 录像那一侧听说它丢了，关完记一条丢了之后的关，没有重开的关（审查 2026-10-30）。
