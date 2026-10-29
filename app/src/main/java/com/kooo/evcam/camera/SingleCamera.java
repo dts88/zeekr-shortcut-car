@@ -57,9 +57,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * 该带哪几样输出。接口分五块：</p>
  *
  * <ul>
- *   <li><b>动作</b>（只给调度调，主线程）：{@link #open(Set)}、{@link #applyOutputs}、{@link #rebuildSession}、
- *       {@link #reopen}、{@link #closeCamera(String)}。会话只按给定的那一组输出（{@link ChannelRules.Out}）建，
- *       外加常驻的拍照 JPEG 输出；带着录像输出才用 {@code TEMPLATE_RECORD}。</li>
+ *   <li><b>动作</b>（只给调度调，主线程）：{@link #open}、{@link #applyOutputs}、{@link #rebuildSession}、
+ *       {@link #closeCamera(String)}。救援的重开是调度先下达关、再下达开（第 2b 步），开的那一半带着 {@link OpenKind#RESCUE}。
+ *       会话只按给定的那一组输出（{@link ChannelRules.Out}）建，外加常驻的拍照 JPEG 输出；带着录像输出才用 {@code TEMPLATE_RECORD}。</li>
  *   <li><b>声明</b>（谁都能调，主线程，<b>不触发任何重建</b>）：预览、后视镜、盲区画面、录像各自声明自己的消费者、各自撤回。
  *       同一块画布（同一个 SurfaceTexture）再声明一次什么都不做 —— 主界面每次画布就绪都把各路重新声明一遍，
  *       主界面重建时我们留住的画布被新界面接回也还是它（大纲 §7.6）。关相机只清会话和设备，不清声明。</li>
@@ -76,14 +76,19 @@ import java.util.concurrent.atomic.AtomicReference;
  * 拍照改抓预览（项目所有者 2026-10-14 R1：动相机的都归通道调度管，请求级的从不和调度的一步叠在一起）。</p>
  *
  * <p><b>一轮一轮地开、关</b>（{@link CameraRound}，账本 {@link CameraRounds}；第 1 步「轮次 + 账本」，项目所有者 2026-10-29 批）：
- * 调度下达开，这一份就下达一轮 —— 账本上记着，一条它自己的相机线程；设备开着时救援的重开还在这一轮里（关旧的、开新的）。
+ * 调度下达开，这一份就下达一轮 —— 账本上记着，一条它自己的相机线程。救援的重开是两轮：调度先下达关（这一轮结束），再下达开（新的一轮）。
  * 这一轮里没有在等回调的 {@code openCamera}、拿到过的每一台设备都关完了、没有关在做，它才结束：结束了从账上划掉，那条相机线程退出。
  * 一次关、一次 {@code openCamera} 卡在相机服务里，这一轮就不结束，这一台到进程结束谁都不开（关没返回、开没返回都不再开，
- * 项目所有者 2026-10-28、10-29）。每一种关都在这一轮里：我们关的、丢了之后的关、重开时关旧的、晚到的设备就地关。</p>
+ * 项目所有者 2026-10-28、10-29）。每一种关都在这一轮里：我们关的（含救援重开的关那一半）、丢了之后的关、晚到的设备就地关。</p>
+ *
+ * <p><b>自己动手的只有两样</b>（第 2b 步，项目所有者 2026-10-29「丢了就关 / 晚到就关做成下达开时定好的常备指令」）：挂着的那一台丢了，
+ * 先报、再关（{@link #lose}）；下达了关之后才开好、才报错的那一台，就地关掉（{@link #closeLate}）。两样都是调度下达开时就定好的，
+ * 在这一轮的相机线程上照做，不等主线程（主线程可能卡几秒）。别的每一次开、关、改会话都是调度下达的；开不起来时关掉框架交来的那一个设备对象、
+ * 不归账的回调关一下（{@link #failOpenedCall}、{@link CameraRound.Action#STRAY}），是那一次开自己的收尾。</p>
  *
  * <p><b>谁都不等谁</b>：这一类从不在一条线程上等别的线程做完一件事（以前打开前在相机线程上等上一次关最多 60 秒、到点「照样试着打开」，
  * 关完时还等之前那一次关；2026-10-29 都删了）。一台相机有一轮还没结束时开不开，由调度照账本判（ChannelRules.camHeld）；
- * 这里的开、重开再看一次账本，是断言（{@link #heldByAnotherRound}）。</p>
+ * 这里的开再看一次账本，是断言（{@link #heldByAnotherRound}）。</p>
  */
 public class SingleCamera {
     private static final String TAG = "SingleCamera";
@@ -232,14 +237,14 @@ public class SingleCamera {
     private volatile String lastErrorName;
 
     /**
-     * 设备报错或被断开之后、还没重开。这一路不再自己重连（2.10.10 之前有一套按错误码退避的重连阶梯，和看门狗互相顶，
-     * 2026-10-08 自己顶自己 7 次）：报错就关掉自己、标成「没开」，要不要再开、什么节奏，只有通道调度
-     * （{@link ChannelScheduler}）一个地方判 —— 它从 {@link CameraCallback#onLossStarted} / {@link CameraCallback#onLossClosed}
-     * 知道这件事，等关完、再等 300 ms 判是不是被别的程序拿走的（2.11 阶段 3 起；以前是这里关完 post 到主线程的
-     * CameraTaken.judgeLoss，判完再叫看门狗重开）。
+     * 设备报错或被断开之后、还没再开（救援重开的开那一半查列表时它不在，也记成这样，照以前重开那样；只给卡顿现场看）。这一路不再自己重连
+     * （2.10.10 之前有一套按错误码退避的重连阶梯，和看门狗互相顶，2026-10-08 自己顶自己 7 次）：报错就关掉自己、标成「没开」，
+     * 要不要再开、什么节奏，只有通道调度（{@link ChannelScheduler}）一个地方判 —— 它从 {@link CameraCallback#onLossStarted} /
+     * {@link CameraCallback#onLossClosed} 知道这件事，等关完、再等 300 ms 判是不是被别的程序拿走的（2.11 阶段 3 起；以前是这里关完
+     * post 到主线程的 CameraTaken.judgeLoss，判完再叫看门狗重开）。
      */
     private volatile boolean deviceLost;
-    /** 最近一个动作（开 / 关 / 重开 / 配会话）上路的时刻（uptime）；0 = 没有过。见 {@link #isBusy()}。 */
+    /** 最近一个动作（开 / 关 / 配会话）上路的时刻（uptime）；0 = 没有过。见 {@link #isBusy()}。 */
     private volatile long inFlightSinceMs;
     /** 设备、会话、相机线程、手上这一轮（{@link #round}）这几个字段的锁；拿着它时不调相机服务，见 closeCamera。 */
     private final Object deviceLock = new Object();
@@ -248,7 +253,7 @@ public class SingleCamera {
      * 手上这一轮：从下达开（{@link #beginRound}）起，到下达关（{@link #closeCamera}，摘下）或者这一轮结束的那一声到主线程
      * （{@link #roundEnded}，和账本同时摘下）为止；null = 没有（关着）。只在主线程上换，改在 {@link #deviceLock} 里，读不拿锁。
      * 摘下来、还没结束的那一轮还在账本上（{@link #ROUNDS}）：它占着这一台，谁都不开它。结束了、那一声还没到主线程的那一下它还挂着：
-     * 开、重开合并掉，关照「没开着」收拾。
+     * 开合并掉，关照「没开着」收拾。
      */
     private volatile Round round;
 
@@ -256,13 +261,33 @@ public class SingleCamera {
     private static final CameraRounds ROUNDS = CameraRounds.process();
 
     /**
+     * 一次开是哪一种（调度下达开时给，{@link #open}）。开只有一条路（{@link #openOnCameraThread}），差别都照它（{@link Round#kind}）。
+     * 第 2b 步（项目所有者 2026-10-29「重开 = 调度下达关再下达开」）：以前救援的重开是这里一轮里关旧设备、等 300 ms、开新的（另一个开的方法），
+     * 现在是调度先下达关、关完再下达开，开的那一半带着 {@link #RESCUE}，照以前重开那几样做。
+     */
+    public enum OpenKind {
+        /**
+         * 照常开（开那一步、关着的一路的重开）：开之前照此刻的配置挑画面尺寸、重建拍照通道（会话配不上丢掉过的也再试）、出帧口，
+         * 报 {@link CameraCallback#onPreviewSizeChosen}；开不起来报给界面（{@link CameraCallback#onCameraError}）。
+         */
+        PLAIN,
+        /**
+         * 救援重开的开那一半（关的那一半关完以后）：开不起来不报给界面，不在列表里记成丢了设备；画面尺寸、出帧口照这一路开着时的
+         * （不重挑、不报 onPreviewSizeChosen，出帧口用时照原来的尺寸再建）；拍照通道随关的那一半关了，照原样建回 ——
+         * 这一路的会话之前因为它配不上丢掉过的照旧不加回。
+         */
+        RESCUE
+    }
+
+    /**
      * 一轮：账本上的那一份（{@link CameraRound}，纯的状态机，只在 {@link #deviceLock} 里改）加上它自己的相机线程（一轮一条，
-     * 这一轮结束它才退出）。关相机那一下的几样也记在这里（{@link #deviceLock}）。
+     * 这一轮结束它才退出）、调度下达开时给的那一种开（{@link OpenKind}）。关相机那一下的几样也记在这里（{@link #deviceLock}）。
      */
     private static final class Round {
         final CameraRound state;
         final HandlerThread thread;
         final Handler handler;
+        final OpenKind kind;
         /** 卡顿监测里这条线程叫什么（{@code Camera-<id>}；下达关以后是 {@code Camera-<id> closing}）。 */
         volatile String watchName;
         /** 关相机那一下：为什么关（调度给的英文短语）、下达的时刻（elapsedRealtime）、那一刻这一台最后那一份会话的统计（设备在的话）。 */
@@ -283,10 +308,11 @@ public class SingleCamera {
         long lostAt;
         long lossCloseMs;
 
-        Round(CameraRound state, HandlerThread thread, Handler handler, String watchName) {
+        Round(CameraRound state, HandlerThread thread, Handler handler, OpenKind kind, String watchName) {
             this.state = state;
             this.thread = thread;
             this.handler = handler;
+            this.kind = kind;
             this.watchName = watchName;
         }
     }
@@ -307,8 +333,8 @@ public class SingleCamera {
         }
     }
     /**
-     * 别的路最多等这一路在途的一个动作多久（开、关、重开、配会话，{@link #isBusy}；调度第 1 条，ChannelRules.IN_FLIGHT_MAX_MS）。
-     * 相机服务一次关实测要 2–20 秒（2026-10-08），所以留足。只管别的路等多久：这一路自己的开、重开在途时，再来的开、重开一律合并掉，
+     * 别的路最多等这一路在途的一个动作多久（开、关、配会话，{@link #isBusy}；调度第 1 条，ChannelRules.IN_FLIGHT_MAX_MS）。
+     * 相机服务一次关实测要 2–20 秒（2026-10-08），所以留足。只管别的路等多久：这一路自己的开在途时，再来的开一律合并掉，
      * 不设时限；一次关、一次 {@code openCamera} 不返回，这一轮就不结束，这一台到进程结束都不再开（项目所有者 2026-10-28、10-29）。
      * 以前在途超过它的那一轮开、重开当丢了作废、换一条相机线程重开（retireStaleOpen），打开前等上一次关也只等它这么久、
      * 到点「照样试着打开」（2026-10-29 都删了）。
@@ -680,8 +706,8 @@ public class SingleCamera {
 
     /**
      * 开着、正在开、或者这一台正在关 —— 只照账本答（{@link CameraRounds}）：这一台有一轮还没结束，谁的都算（这一份的、另一份管线的）。
-     * 一轮从下达开到它唯一的那一次结束：在开（还没进 {@code openCamera}、{@code openCamera} 还没回音、救援重开等的那 300 ms）、
-     * 开着、在关（关相机那一下、丢了之后的关、重开时关旧的、晚到的设备就地关）都在里面 —— 从字段上摘下来到相机服务真的放开之间，
+     * 一轮从下达开到它唯一的那一次结束：在开（还没进 {@code openCamera}、{@code openCamera} 还没回音）、
+     * 开着、在关（关相机那一下 —— 含救援重开的关那一半、丢了之后的关、晚到的设备就地关）都在里面 —— 从字段上摘下来到相机服务真的放开之间，
      * 占着它的仍然是我们（第 2 步「只有一个调度」：以前一半看这一份自己的字段，另一份管线开着、在开的那一轮看不到）。
      *
      * <p>它答的是「这一台此刻是不是我们的」，给进程这一层问的（CameraContention 记争用、通道调度的 portsHold、reconcileDevice）；
@@ -715,10 +741,10 @@ public class SingleCamera {
     }
 
     /**
-     * 这一路此刻有没有动作在途：这一份的那一轮在开、在关（含丢了之后的那一次关、重开时关旧的、关了以后晚到的设备就地关）、
+     * 这一路此刻有没有动作在途：这一份的那一轮在开、在关（含丢了之后的那一次关、关了以后晚到的设备就地关）、
      * 在配会话、排着一次会话重建。丢了之后的判定不在这里：它在通道调度的账上（等关完、再等 300 ms，那段时间调度自己不动别的路，2.11 阶段 3 起）。
      *
-     * <p>在途的时候不叠第二个动作 —— 调度不重开，开、重开合并掉（{@link #open}、{@link #reopen}，不设时限）。2026-10-08 的七次
+     * <p>在途的时候不叠第二个动作 —— 调度不重开，开合并掉（{@link #open}，不设时限）。2026-10-08 的七次
      * 「被相机服务断开」全是自己顶自己：重连那一次打开还没回来，看门狗又开了一次，相机服务把先开的那份踢掉。
      * 在途超过 {@link #IN_FLIGHT_MAX_MS} 这里就不再算在途 —— 只管别的路等它多久。</p>
      */
@@ -840,7 +866,7 @@ public class SingleCamera {
     }
 
     /**
-     * 这一路此刻有一步在途：这一份的那一轮在开、在重开、在关，在配会话、在关旧会话、排着一次会话重建。请求级的调用（画面调节、拍照）这时都不发 ——
+     * 这一路此刻有一步在途：这一份的那一轮在开、在关，在配会话、在关旧会话、排着一次会话重建。请求级的调用（画面调节、拍照）这时都不发 ——
      * 调度的那一步优先，请求级的从不和它叠在一起（项目所有者 2026-10-14 R1：动相机的都归通道调度管）。在相机线程上问。
      */
     private boolean stepInFlight() {
@@ -1333,12 +1359,13 @@ public class SingleCamera {
      * 下达一轮（主线程）：账本上记下（{@link CameraRounds#issue}），起这一轮自己的相机线程，在它上面开（{@link #openOnCameraThread}）。
      *
      * @param wanted 调度要这份会话带的那一组输出
+     * @param kind   哪一种开（{@link OpenKind}）
      * @return false：账本上这一台有一轮还没结束（调用方刚看过，走不到这里），或者没有相机线程（已经报了 {@link CameraCallback#onOpenFailed}）
      */
-    private boolean beginRound(Set<ChannelRules.Out> wanted) {
+    private boolean beginRound(Set<ChannelRules.Out> wanted, OpenKind kind) {
         CameraRound state = ROUNDS.issue(cameraId, this, cameraPosition, now());
         if (state == null) {
-            heldByAnotherRound(null);
+            heldByAnotherRound();
             return false;
         }
         // 相机服务的调用（查设备、查参数、打开、关）都放到这一轮自己的相机线程上：相机服务卡住时，卡住的是这一轮的相机线程，
@@ -1346,7 +1373,7 @@ public class SingleCamera {
         String watchName = "Camera-" + cameraId;
         HandlerThread thread = new HandlerThread(watchName);
         thread.start();
-        Round r = new Round(state, thread, new Handler(thread.getLooper()), watchName);
+        Round r = new Round(state, thread, new Handler(thread.getLooper()), kind, watchName);
         synchronized (deviceLock) {
             requested.set(wanted);
             deviceLost = false;
@@ -1355,8 +1382,8 @@ public class SingleCamera {
             backgroundHandler = r.handler;
         }
         markInFlight();
-        AppLog.d(TAG, "openCamera: Starting for camera " + cameraId + " (channel, round " + state.number + ") outputs "
-                + wanted);
+        AppLog.d(TAG, "openCamera: Starting for camera " + cameraId + " (channel, round " + state.number
+                + (kind == OpenKind.RESCUE ? ", rescue reopen" : "") + ") outputs " + wanted);
         // 卡顿报告里要看得出相机线程是不是被堵住了
         StallWatch.watchLooper(watchName, r.handler);
         if (!r.handler.post(() -> openOnCameraThread(r))) {
@@ -1372,12 +1399,12 @@ public class SingleCamera {
     private int refusedRound;
 
     /**
-     * 账本上这一台有一轮还没结束，而它不是 {@code mine}（手上这一轮；null = 手上没有）：不开（主线程，开、重开那一下；返回 true）。
-     * 调度照账本本来就不会让它开（ChannelRules.camHeld）—— 走到这里是断言没过：黑匣子记一行，同一轮只记一次。
+     * 账本上这一台有一轮还没结束：不开（主线程，开那一下 —— 手上没有一轮的时候；返回 true）。调度照账本本来就不会让它开（ChannelRules.camHeld）——
+     * 走到这里是断言没过：黑匣子记一行，同一轮只记一次。
      */
-    private boolean heldByAnotherRound(Round mine) {
+    private boolean heldByAnotherRound() {
         CameraRound live = ROUNDS.live(cameraId);
-        if (live == null || mine != null && live == mine.state) {
+        if (live == null) {
             return false;
         }
         if (live.number != refusedRound) {
@@ -1395,13 +1422,15 @@ public class SingleCamera {
 
     /**
      * 打开这一路，会话带着 {@code outputs} 建（一样都没有、或者都死了，补出帧口 —— 相机得有地方出帧）：下达一轮（{@link #beginRound}）。
+     * 救援重开的开那一半也走这里（{@link OpenKind#RESCUE}，调度在关的那一半关完、那一轮结束以后才下达）。
      *
      * <p>这一步做完看 {@link CameraCallback#onFirstFrame}；开不起来报 {@link CameraCallback#onOpenFailed}。</p>
      *
+     * @param kind 照常开，还是救援重开的开那一半（差别见 {@link OpenKind}）
      * @return false：什么都没做 —— 这一路已经开着，或者手上这一轮还在途（在开、在丢：合并掉，不设时限 —— 一次开没回音，这一台就等它；
      *         以前 60 秒后作废那一轮、换一条相机线程再开，2026-10-29 删），或者账本上这一台有一轮还没结束（{@link #heldByAnotherRound}）
      */
-    boolean open(Set<ChannelRules.Out> outputs) {
+    boolean open(Set<ChannelRules.Out> outputs, OpenKind kind) {
         if (cameraDevice != null) {
             AppLog.d(TAG, "Camera " + cameraId + " already open, channel open skipped");
             return false;
@@ -1410,10 +1439,10 @@ public class SingleCamera {
             AppLog.d(TAG, "Camera " + cameraId + " round in flight (" + describeBusy() + "), channel open merged");
             return false;
         }
-        if (heldByAnotherRound(null)) {
+        if (heldByAnotherRound()) {
             return false;
         }
-        return beginRound(frozen(outputs));
+        return beginRound(frozen(outputs), kind);
     }
 
     /**
@@ -1431,80 +1460,12 @@ public class SingleCamera {
     /**
      * 救：重建会话（第一次救、本会话出过画面时用）。配好之后一帧都没出过的会话，重建没有意义 —— 它没有东西可以排空，
      * 重建的 waitUntilIdle 每次都超时、报设备错误，再关一次设备（2026-10-08 实测，环视一次要 4–13 秒）；
-     * 那种由调度直接重开（{@link #reopen}）。
+     * 那种由调度重开：先下达关（{@link #closeCamera}），关完再下达开（{@link #open}，{@link OpenKind#RESCUE}）。
      *
      * @return false：设备没开着，什么都没做
      */
     boolean rebuildSession(Set<ChannelRules.Out> outputs) {
         return reconfigure(outputs, false, "rescue-rebuild");
-    }
-
-    /**
-     * 救：重开（关掉设备，等 300 ms，再开），会话带着 {@code outputs}。
-     *
-     * <ul>
-     *   <li>手上这一轮挂着一台设备、没有别的在途：同一轮里重开 —— 旧设备摘下来在这一轮的相机线程上关掉，300 ms 后开新的
-     *       （{@link #reopenOnCameraThread}；关旧的卡住了，开新的那一下排在它后面，这一台一直占着）。配会话、关旧会话还挂着不挡：
-     *       重开把那一次作废、连设备一起关掉再开（调度只在那一步到点之后才来救，审查 2026-10-11）；</li>
-     *   <li>手上没有一轮（关着：丢了、开不起来之后）：照开那样下达新的一轮；</li>
-     *   <li>手上这一轮在开、在丢：合并掉，什么都不做，不设时限 —— 同一台相机两个句柄，相机服务会踢掉先开的那份
-     *       （2026-10-08，自己顶自己 7 次）；</li>
-     *   <li>账本上这一台的那一轮不是手上这一轮（{@link #heldByAnotherRound}）：不开。</li>
-     * </ul>
-     *
-     * @return false：合并掉了、或者不开
-     */
-    boolean reopen(Set<ChannelRules.Out> outputs) {
-        final Set<ChannelRules.Out> wanted = frozen(outputs);
-        final Round r = round;
-        if (r == null) {
-            if (heldByAnotherRound(null)) {
-                return false;
-            }
-            return beginRound(wanted);
-        }
-        if (heldByAnotherRound(r)) {
-            return false;
-        }
-        final boolean accepted;
-        final CameraCaptureSession oldSession;
-        final CameraDevice oldDevice;
-        final SessionCounts.Snapshot lastCounts;
-        synchronized (deviceLock) {
-            accepted = round == r && r.state.reopenRequested(now());
-            if (accepted) {
-                AppLog.d(TAG, "Camera " + cameraId + " reopen requested (channel, round " + r.state.number + ") outputs "
-                        + wanted);
-                // 排着的重建取消、在途的配置作废：isConfiguring / isSessionClosing 只在相机回调里复位，而回调不来正是这条路被走到的原因。
-                // 设备和会话下面就关掉了，在途的那一次配置已经作废，清掉不会和谁打架
-                voidSessionWork();
-                requested.set(wanted);
-                oldSession = captureSession;
-                captureSession = null;
-                oldDevice = cameraDevice;
-                cameraDevice = null;
-                lastCounts = counts.snapshot();
-                sessionGone();
-            } else {
-                oldSession = null;
-                oldDevice = null;
-                lastCounts = null;
-            }
-        }
-        if (!accepted) {
-            // 开、重开、丢了之后的关还在途：那一次自己会有结果（开成、报错、关完）。这时再开一次，
-            // 就是同一台相机两个句柄，相机服务会踢掉先开的那份（2026-10-08，自己顶自己 7 次）
-            AppLog.d(TAG, "Camera " + cameraId + " busy (" + describeBusy() + "), reopen coalesced");
-            return false;
-        }
-        markInFlight();
-        final long requestedAt = SystemClock.elapsedRealtime();
-        // 关旧设备在这一轮的相机线程上做、算在这一轮里：调度照账本认它在关（1c，项目所有者 2026-10-14 批准：救的那一步 15 秒到点、
-        // 旧设备还在关 —— 7 次里最长 14.0 秒，10-13 19:55:29 —— 别的路也不动）；下面那一下开排在它后面，关完才开
-        r.handler.post(() -> closeRetired(r, oldSession, oldDevice, lastCounts, requestedAt));
-        // 延迟300ms，给系统时间释放资源
-        r.handler.postDelayed(() -> reopenOnCameraThread(r), 300);
-        return true;
     }
 
     /** 改输出、重建会话：换上要的那一组，在相机线程上重配。 */
@@ -2025,8 +1986,14 @@ public class SingleCamera {
     /**
      * 开的实际步骤，在这一轮的相机线程上跑：查列表、查参数、算尺寸，再进 {@code openCamera}（{@link #callOpenCamera}）。
      * 不等谁：账本上这一台有一轮还没结束，根本就不会下达这一轮。这期间被关了，这一次开就不进 {@code openCamera}。
+     *
+     * <p>救援重开的开那一半（{@link OpenKind#RESCUE}，第 2b 步）也走这一条，差别都照 {@link Round#kind}，和以前重开的那一下一样：
+     * 不在列表里记成丢了设备、开不起来都不报给界面（{@link #uiError}）；不重挑画面尺寸、不报 onPreviewSizeChosen，出帧口不动
+     * （关的那一半已经放了，用时照原来的尺寸再建）；拍照通道照原样建回（关的那一半放了它；之前会话配不上丢掉过的不加回）；
+     * 不查输出尺寸、不写画布那几行日志，打开以后记一行「reopen initiated」。</p>
      */
     private void openOnCameraThread(Round r) {
+        final boolean rescue = r.kind == OpenKind.RESCUE;
         if (r.state.cancelled()) {
             abandonOpen(r);   // 还没开始就被关了：关它的那一下自己有结果
             return;
@@ -2044,10 +2011,12 @@ public class SingleCamera {
             }
 
             if (!cameraExists) {
-                AppLog.e(TAG, "Camera ID " + cameraId + " does not exist on this device. Available IDs: " +
-                         java.util.Arrays.toString(availableCameraIds));
-                // 车机拿着后座舱时就是这样：相机服务的列表里干脆没有它（2026-10-10）
-                failOpen(r, CameraTaken.Reason.ofNotListed(), false, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE, null);
+                AppLog.e(TAG, "Camera ID " + cameraId + (rescue ? " does not exist anymore" : " does not exist on this device")
+                        + ". Available IDs: " + java.util.Arrays.toString(availableCameraIds));
+                // 车机拿着后座舱时就是这样：相机服务的列表里干脆没有它（2026-10-10）。救援重开时不在列表里，正是车机刚拿走它的样子：
+                // 照以前重开那样记成丢了设备、不报给界面
+                failOpen(r, CameraTaken.Reason.ofNotListed(), rescue,
+                        uiError(r, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE), null);
                 return;
             }
 
@@ -2060,12 +2029,22 @@ public class SingleCamera {
                 // 镜像判断要的 LENS_FACING 也顺手记下：sourceMirrored() 在视图线程上被调，不该再进相机服务
                 noteCharacteristics(characteristics);
             } catch (Exception e) {
-                AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be virtual/invalid", e);
-                failOpen(r, reasonOf(e), true, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE, null);
+                AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be "
+                        + (rescue ? "invalid" : "virtual/invalid"), e);
+                failOpen(r, reasonOf(e), true, uiError(r, CameraDevice.StateCallback.ERROR_CAMERA_DEVICE), null);
                 return;
             }
 
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            if (rescue) {
+                // 救援重开的开那一半：画面尺寸、出帧口照这一路开着时的；拍照通道随关的那一半放了，照原样建回（jpegDropped 不清：
+                // 这一路的会话之前因为它配不上丢掉过的照旧不加回）
+                if (map != null) {
+                    prepareJpegReader(map);
+                }
+                callOpenCamera(r);
+                return;
+            }
             if (map != null) {
                 Size chosen = sizeFrom(map);
                 if (chosen == null) {
@@ -2107,15 +2086,27 @@ public class SingleCamera {
 
             // 打开摄像头（前面几次进相机服务的时候这一轮可能被关了：callOpenCamera 在锁里最后看一次）
             AppLog.d(TAG, "Camera " + cameraId + " calling openCamera...");
-            callOpenCamera(r, false);
+            callOpenCamera(r);
 
         } catch (CameraAccessException | RuntimeException e) {
             // 打开没发出去（相机服务不可用、没权限、无效相机）：标成「没开」，报开不起来，再不再试由调度判
-            AppLog.e(TAG, "Failed to open camera " + cameraId, e);
-            failOpen(r, reasonOf(e), true, e instanceof SecurityException ? -2
-                            : e instanceof CameraAccessException ? -1 : CameraDevice.StateCallback.ERROR_CAMERA_DEVICE,
-                    e.getClass().getSimpleName());
+            AppLog.e(TAG, "Failed to " + (rescue ? "reopen" : "open") + " camera " + cameraId, e);
+            failOpen(r, reasonOf(e), true, uiError(r, openErrorCode(e)), e.getClass().getSimpleName());
         }
+    }
+
+    /** 打开抛了：给界面相机状态的码 —— 没权限 -2、相机服务不可用 -1、别的当设备错误。 */
+    private static int openErrorCode(Exception e) {
+        return e instanceof SecurityException ? -2
+                : e instanceof CameraAccessException ? -1 : CameraDevice.StateCallback.ERROR_CAMERA_DEVICE;
+    }
+
+    /**
+     * 开不起来时给界面相机状态的码（{@link CameraCallback#onCameraError}；{@link #failOpen} 的 uiError）：救援重开的开那一半一律不报（0），
+     * 照以前重开那样 —— 那是调度在后台救，界面上不为它报错。
+     */
+    private static int uiError(Round r, int code) {
+        return r.kind == OpenKind.RESCUE ? 0 : code;
     }
 
     /**
@@ -2126,9 +2117,10 @@ public class SingleCamera {
      * <p>以前不看就标（审查 2026-10-11）：前面那几次进相机服务卡着的时候调度把这一路关了，这里照样标上「正在打开」、照样打开，
      * 晚到的设备在过时的回调里就地关掉，「正在打开」却再也没人清 —— 这一路从此每一次开都被「已经在开」挡掉。</p>
      *
-     * @param reopen 救援重开的那一下（抛了不报 {@link CameraCallback#onCameraError}，照以前）
+     * <p>救援重开的开那一半（{@link OpenKind#RESCUE}）抛了不报 {@link CameraCallback#onCameraError}，打开以后记一行「reopen initiated」，照以前。</p>
      */
-    private void callOpenCamera(Round r, boolean reopen) {
+    private void callOpenCamera(Round r) {
+        final boolean rescue = r.kind == OpenKind.RESCUE;
         CameraRound.Call call;
         boolean ended = false;
         boolean owed = false;
@@ -2150,7 +2142,7 @@ public class SingleCamera {
         try {
             cameraManager.openCamera(cameraId, new RoundCallback(r, call), r.handler);
         } catch (CameraAccessException | RuntimeException e) {
-            AppLog.e(TAG, "Failed to " + (reopen ? "reopen" : "open") + " camera " + cameraId, e);
+            AppLog.e(TAG, "Failed to " + (rescue ? "reopen" : "open") + " camera " + cameraId, e);
             boolean current;
             synchronized (deviceLock) {
                 current = round == r;
@@ -2166,8 +2158,7 @@ public class SingleCamera {
                 finishRound(r, owed);
             }
             if (current) {
-                int uiError = reopen ? 0 : e instanceof SecurityException ? -2
-                        : e instanceof CameraAccessException ? -1 : CameraDevice.StateCallback.ERROR_CAMERA_DEVICE;
+                int uiError = uiError(r, openErrorCode(e));
                 if (uiError != 0 && callback != null) {
                     callback.onCameraError(cameraId, uiError);
                 }
@@ -2178,7 +2169,7 @@ public class SingleCamera {
         synchronized (deviceLock) {
             r.state.returned(call, now());
         }
-        if (reopen) {
+        if (rescue) {
             AppLog.d(TAG, "Camera " + cameraId + " reopen initiated");
         }
     }
@@ -2903,7 +2894,7 @@ public class SingleCamera {
                 }
                 boolean rebuild;
                 synchronized (sessionLock) {
-                    // 正在等的就是这份关完（closeCamera、重开会先把 closing 清掉）
+                    // 正在等的就是这份关完（closeCamera、丢了会先把 closing 清掉）
                     rebuild = isSessionClosing;
                     isSessionClosing = false;
                 }
@@ -3001,8 +2992,8 @@ public class SingleCamera {
     };
 
     /**
-     * 设备要没了（关相机 / 强制重开 / 掉线重连）：排着的重建取消，在途的配置作废，等着的关闭不再接着建。
-     * 三条路都调这一个，别各自清一遍标志。
+     * 设备要没了（关相机 —— 含救援重开的关那一半 / 丢了）：排着的重建取消，在途的配置作废，等着的关闭不再接着建。
+     * 两条路都调这一个，别各自清一遍标志。
      */
     private void voidSessionWork() {
         Handler handler = backgroundHandler;
@@ -3018,7 +3009,7 @@ public class SingleCamera {
     }
 
     /**
-     * 这一样输出此刻还挂在这台相机上：眼下的会话带着它，或者会话已经没了（关相机、丢了、重开、重建）而设备还没关完 ——
+     * 这一样输出此刻还挂在这台相机上：眼下的会话带着它，或者会话已经没了（关相机、丢了、重建）而设备还没关完 ——
      * {@link #carried} 设备没了才清（{@link #forgetCarried}），关会话、关设备那几百毫秒到十几秒里相机还在往它写。
      * 画布要被系统收走时据此判断交给谁放（ChannelScheduler.sessionCarries）。哪个线程都能调。
      */
@@ -3034,7 +3025,7 @@ public class SingleCamera {
         }
     }
 
-    /** 会话没了（重建前关掉旧的、设备丢了、关相机、重开）：快照清空，「本会话第一帧」归零。 */
+    /** 会话没了（重建前关掉旧的、设备丢了、关相机）：快照清空，「本会话第一帧」归零。 */
     private void sessionGone() {
         sessionSnapshot = SessionOutputs.NONE;
         firstFrameAt = 0;
@@ -3049,7 +3040,7 @@ public class SingleCamera {
         tidySurfaces();
     }
 
-    /** 设备没了（丢了、关了、重开）：会话带着的输出都不算了，谁都不用了的 Surface 放掉。 */
+    /** 设备没了（丢了、关了）：会话带着的输出都不算了，谁都不用了的 Surface 放掉。 */
     private void forgetCarried() {
         synchronized (outputLock) {
             carried.clear();
@@ -3790,6 +3781,9 @@ public class SingleCamera {
      * 「已关」那一行、{@link CameraCallback#onCameraClosed} 也等到那时。结束之前账本上这一台一直在关，谁都不开它；
      * 相机服务再卡，卡的是那条线程，主线程照常。</p>
      *
+     * <p>救援重开的关那一半也是这一下（第 2b 步，{@code why} 是 {@code reopen}）：配会话、关旧会话还挂着、排着一次重建的，
+     * 一起作废（{@link #voidSessionWork}，和以前重开时一样 —— 那几个标志只在相机回调里复位，而回调不来正是要救的原因）。</p>
+     *
      * @param why 为什么关（英文短语，调度给的）。关完时往黑匣子记一行，带用时
      */
     public void closeCamera(String why) {
@@ -3903,7 +3897,7 @@ public class SingleCamera {
 
     /**
      * 主线程：这一轮结束了 —— 账本上划掉（{@link CameraRounds#end}），手上还是它就摘下（手上这一轮只在主线程上换，和账本同一下：
-     * 主线程上的开、重开、调度看不到「手上没有、账本上还有」的那一下），每一份调度都叫醒。
+     * 主线程上的开、调度看不到「手上没有、账本上还有」的那一下），每一份调度都叫醒。
      */
     private void roundEnded(Round r) {
         ROUNDS.end(r.state, now());
@@ -4013,78 +4007,10 @@ public class SingleCamera {
         return cameraDevice != null;
     }
 
-    /** 重开时关旧设备（这一轮的相机线程）：关完记一笔；开新的那一下排在它后面（{@link #reopenOnCameraThread}）。 */
-    private void closeRetired(Round r, CameraCaptureSession oldSession, CameraDevice oldDevice,
-                              SessionCounts.Snapshot lastCounts, long requestedAt) {
-        closeSessionQuietly(oldSession);
-        closeDeviceTimed(oldDevice, "reopen");
-        // 旧会话随旧设备关了：它带着的输出不再算在会话里
-        forgetCarried();
-        long ms = SystemClock.elapsedRealtime() - requestedAt;
-        StepLog.deviceClosed(cameraId, ms, "reopen");
-        boolean ended;
-        boolean owed;
-        synchronized (deviceLock) {
-            r.state.closed(oldDevice, now());
-            ended = takeEnd(r);   // 开新的那一下还排着：这一轮不会在这里结束，照每一次改完都问一次的规矩问
-            owed = ended && r.closedOwed;
-        }
-        noteClosedWithoutFrames(lastCounts, "reopen", ms);
-        if (ended) {
-            finishRound(r, owed);
-        }
-    }
-
     /**
-     * 救援重开的那一下打开（关完旧设备、300 ms 后，这一轮的相机线程上）：先确认这一轮没被关、这台相机还在，再进
-     * {@code openCamera}（{@link #callOpenCamera}）。
-     *
-     * <p>中间那两次进相机服务（列相机、查参数）可能卡几秒，这期间这一轮可能被关掉：进 {@code openCamera} 之前在锁里再看一次，
-     * 没开成的只在这一轮还是当前的时候收标记、报上去（{@link #failOpen}）。</p>
-     */
-    private void reopenOnCameraThread(Round r) {
-        if (r.state.cancelled()) {
-            abandonOpen(r);   // 等的时候被关了
-            return;
-        }
-        configFailRetryCount = 0;   // 新的一步：会话配不上的重试从头数
-        try {
-            // 验证摄像头ID是否存在
-            String[] availableCameraIds = cameraManager.getCameraIdList();
-            boolean cameraExists = false;
-            for (String id : availableCameraIds) {
-                if (id.equals(cameraId)) {
-                    cameraExists = true;
-                    break;
-                }
-            }
-            if (!cameraExists) {
-                AppLog.e(TAG, "Camera ID " + cameraId + " does not exist anymore. Available IDs: " +
-                        java.util.Arrays.toString(availableCameraIds));
-                // 以前这里什么都不报：重开时不在列表里，正是车机刚拿走它的样子
-                failOpen(r, CameraTaken.Reason.ofNotListed(), true, 0, null);
-                return;
-            }
-            // 验证摄像头是否真正可用
-            try {
-                cameraManager.getCameraCharacteristics(cameraId);
-            } catch (Exception e) {
-                AppLog.e(TAG, "Camera " + cameraId + " failed to get characteristics - camera may be invalid", e);
-                failOpen(r, reasonOf(e), true, 0, null);
-                return;
-            }
-            callOpenCamera(r, true);
-        } catch (CameraAccessException | RuntimeException e) {
-            // 没发出去：标成「没开」，报开不起来，再不再试由调度判
-            AppLog.e(TAG, "Failed to reopen camera " + cameraId, e);
-            failOpen(r, reasonOf(e), true, 0, e.getClass().getSimpleName());
-        }
-    }
-
-    /**
-     * 开、重开没进 {@code openCamera} 就没成（不在列表里、查参数抛了、没有输出尺寸，这一轮的相机线程）：这一次开就此作罢，
+     * 开（含救援重开的开那一半）没进 {@code openCamera} 就没成（不在列表里、查参数抛了、没有输出尺寸，这一轮的相机线程）：这一次开就此作罢，
      * 这一轮多半就此结束（结束的那一声先到主线程）。这一轮还是当前的（没被关）才收标记、报开不起来 —— 判断和改标记在同一把锁里；
-     * 被关了的什么都不报：那是关，不是开不起来，标记归关它的那一下（审查 2026-10-11：以前照报，调度把一路已经在关、或者已经重开的
+     * 被关了的什么都不报：那是关，不是开不起来，标记归关它的那一下（审查 2026-10-11：以前照报，调度把一路已经在关、或者已经又开了的
      * 记成开不起来、关着，再判一次）。
      *
      * @param lost      记成丢了设备（{@link #deviceLost}）
@@ -4405,7 +4331,7 @@ public class SingleCamera {
      * 参数会立即应用到预览和录制
      *
      * <p>这是请求级的动作：只改重复请求，不改会话、不改输出 —— 调度之外唯一允许的相机调用（见类说明）。
-     * 在这一路的相机线程上做；这一路有一步在途（在开、在重开、在配会话、在关旧会话）时先不发，
+     * 在这一路的相机线程上做；这一路有一步在途（在开、在关、在配会话、在关旧会话）时先不发，
      * 参数记下来，下一次建会话时带上（{@link #overlayLatestAdjust}）。</p>
      *
      * @param exposureCompensation 曝光补偿值（Integer.MIN_VALUE 表示不设置）

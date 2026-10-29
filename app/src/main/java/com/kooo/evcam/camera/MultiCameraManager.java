@@ -2791,7 +2791,10 @@ public class MultiCameraManager {
                 what = "改输出 " + keys + "（改成 " + outputs + "）";
                 break;
             case RESCUE:
+                // 重开分两半（第 2b 步）：先下达关，关完再在同一步里下达开
                 what = "救 " + keys + "：" + (step.rescue == ChannelRules.Rescue.REBUILD ? "重建会话" : "重开")
+                        + (!step.split ? "" : step.openedAt == 0 ? "（先关、关完再开：开的那一半还没下达）"
+                        : "（先关、关完再开：开的那一半 " + seconds(now - step.openedAt) + "前下达）")
                         + "（输出 " + outputs + "）";
                 break;
             default:
@@ -3195,8 +3198,8 @@ public class MultiCameraManager {
         }
 
         @Override
-        public boolean open(Set<ChannelRules.Out> outputs) {
-            return camera.open(outputs);
+        public boolean open(Set<ChannelRules.Out> outputs, SingleCamera.OpenKind kind) {
+            return camera.open(outputs, kind);
         }
 
         @Override
@@ -3207,11 +3210,6 @@ public class MultiCameraManager {
         @Override
         public boolean rebuildSession(Set<ChannelRules.Out> outputs) {
             return camera.rebuildSession(outputs);
-        }
-
-        @Override
-        public boolean reopen(Set<ChannelRules.Out> outputs) {
-            return camera.reopen(outputs);
         }
 
         @Override
@@ -3646,7 +3644,8 @@ public class MultiCameraManager {
         /**
          * 开、改输出、救那一行。出了画面的格式从 2.11 起没变（旧的分析脚本照样读）；15 秒没出画面的带上配好没有、配好以来相机回了什么
          * （SingleCamera.countsText：HAL 一个都没回 / 我们的输出接不住 / 开始了没结果）；这一步里出了事的（开不起来、丢了）
-         * 2.11.4 起也写一行：做了多久、什么时候开始的、怎么没做完（项目所有者 2026-10-14 批准的诊断，第 1a 项）。
+         * 2.11.4 起也写一行：做了多久、什么时候开始的、怎么没做完（项目所有者 2026-10-14 批准的诊断，第 1a 项）。救援重开关完了旧设备、
+         * 开的那一半不再下达的（第 2b 步）：「没做完：关了旧设备，不再开（退出），做了 0.4 秒（…开始）」。
          */
         @Override
         public void stepEnded(ChannelScheduler.StepReport r) {
@@ -3658,6 +3657,10 @@ public class MultiCameraManager {
                         : "开不起来（" + openFailText(r.failure.reason) + "）")
                         + "，做了 " + seconds(r.durationMs) + "（" + wallClock(r.startedAt) + " 开始）"
                         + (r.configuredMs >= 0 ? "，配好过（" + seconds(r.configuredMs) + "）" : "");
+            } else if (r.dropped != null) {
+                result = "没做完：关了旧设备，不再开（" + (r.dropped == ChannelRules.Why.UNUSABLE ? "现在用不了相机"
+                        : r.dropped == ChannelRules.Why.SCREEN_UNKNOWN ? "屏幕不知道黑没黑" : closeWhyText(r.dropped))
+                        + "），做了 " + seconds(r.durationMs) + "（" + wallClock(r.startedAt) + " 开始）";
             } else if (r.timedOut) {
                 result = (ChannelRules.STEP_MAX_MS / 1000) + " 秒没出画面" + (r.move == ChannelRules.Move.OPEN
                         ? "，先往下走（由救援接手）" : "（由救援接手）")

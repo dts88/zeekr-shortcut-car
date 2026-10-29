@@ -121,8 +121,13 @@ public final class ChannelScheduler {
     interface CameraPort {
         String cameraId();
 
-        /** 开，会话带着这一组输出（一样都没有就带出帧口）。 */
-        boolean open(Set<ChannelRules.Out> outputs);
+        /**
+         * 开，会话带着这一组输出（一样都没有就带出帧口）：下达一轮。{@code kind} 是照常开（{@link SingleCamera.OpenKind#PLAIN}：开那一步、
+         * 关着的一路的重开），还是救援重开的开那一半（{@link SingleCamera.OpenKind#RESCUE}，第 2b 步：关的那一半关完以后）。
+         * 已经开着、手上那一轮还在途（合并掉，不设时限）、账本上这一台有一轮还没结束（{@link ChannelRules#camHeld}：规则本来就不会让它开，
+         * 相机层再看一次是断言）都返回 false。
+         */
+        boolean open(Set<ChannelRules.Out> outputs, SingleCamera.OpenKind kind);
 
         /** 改输出：按这一组重配会话。 */
         boolean applyOutputs(Set<ChannelRules.Out> outputs);
@@ -131,13 +136,9 @@ public final class ChannelScheduler {
         boolean rebuildSession(Set<ChannelRules.Out> outputs);
 
         /**
-         * 救：重开（关着的一路也走这里，下达新的一轮）。手上那一轮在开、在丢时合并掉、返回 false，不设时限（开没返回就等它，
-         * 2026-10-29 起不再作废那一轮）；配会话、关旧会话还挂着不挡它 —— 重开把那一次作废、连设备一起关掉再开。
-         * 账本上这一台有一轮不是手上那一轮（{@link ChannelRules#camHeld}）也返回 false：规则本来就不会让它重开，相机层再看一次是断言。
+         * 关（只清会话和设备，不清声明；配会话、关旧会话还挂着的那一次一起作废）。{@code why} 是给相机那一行的英文短语：
+         * 计划里的关照它的原因写，救援重开的关那一半写 {@link ChannelScheduler#REOPEN_CLOSE}。
          */
-        boolean reopen(Set<ChannelRules.Out> outputs);
-
-        /** 关（只清会话和设备，不清声明）。{@code why} 是给相机那一行的英文短语。 */
         void close(String why);
 
         /** 不开设备先算画面尺寸（这一路不在时算不出来，等它回来再算）。 */
@@ -857,6 +858,11 @@ public final class ChannelScheduler {
         final boolean timedOut;
         /** 这一步里出了事（开不起来、丢了）：哪一种、什么原因；做完、到点的是 null。 */
         final ChannelRules.Failure failure;
+        /**
+         * 救援重开关完了旧设备、开的那一半不再下达（{@link ChannelRules.Outcome#DROPPED}，第 2b 步）：为什么（{@link ChannelRules#reopenBlocked}：
+         * 退出、车机要睡、管线重建、熄屏、没人要、用不了相机、屏幕不知道黑没黑）；别的是 null。
+         */
+        final ChannelRules.Why dropped;
         /** 这一步从什么时候起（调度的钟）、做了多久（到出画面、到点、到出事）。 */
         final long startedAt;
         final long durationMs;
@@ -872,8 +878,8 @@ public final class ChannelScheduler {
         StepReport(ChannelRules.Move move, ChannelRules.Why why, String key, ChannelRules.Rescue rescue, int attempt,
                    long ageMs, Set<CameraNeeds.Holder> forWhom, Set<ChannelRules.Kind> outputs,
                    Set<ChannelRules.Kind> added, Set<ChannelRules.Kind> removed, boolean timedOut,
-                   ChannelRules.Failure failure, long startedAt, long durationMs, long configuredMs, long frameMs,
-                   SessionCounts.Snapshot counts, List<Other> others) {
+                   ChannelRules.Failure failure, ChannelRules.Why dropped, long startedAt, long durationMs,
+                   long configuredMs, long frameMs, SessionCounts.Snapshot counts, List<Other> others) {
             this.move = move;
             this.why = why;
             this.key = key;
@@ -886,6 +892,7 @@ public final class ChannelScheduler {
             this.removed = removed;
             this.timedOut = timedOut;
             this.failure = failure;
+            this.dropped = dropped;
             this.startedAt = startedAt;
             this.durationMs = durationMs;
             this.configuredMs = configuredMs;
@@ -2054,8 +2061,9 @@ public final class ChannelScheduler {
     // ================================================================= 对外的事实（主线程上读）
 
     /**
-     * 我们在这一路有没有开或关在途（CameraAvailabilityWatch 分类相机服务那一声用）：接着的那一份世界里这一路在开（含救援的重开，
-     * 那 300 ms 里设备是空的）、在关、丢了之后的那一次关；或者账本上这一台有一轮手上没挂着设备（在开、在关 —— 换下去的那一份、孤儿的也算）。
+     * 我们在这一路有没有开或关在途（CameraAvailabilityWatch 分类相机服务那一声用）：接着的那一份世界里这一路在开、在关、丢了之后的那一次关，
+     * 或者在救援重开的两半之间（{@link ChannelRules#reopenPending}：关的那一半关完了、开的那一半还没下达 —— 以前整个重开这一路都记成在开，
+     * 那 300 ms 里设备是空的，第 2b 步照旧算我们的）；或者账本上这一台有一轮手上没挂着设备（在开、在关 —— 换下去的那一份、孤儿的也算）。
      * 只是改会话不算。
      *
      * <p>我们的开、关做完之后 {@link #OWN_WORD_GRACE_MS} 以内也算：相机服务为这一开 / 一关说的那一句（「被占用」「空闲」）
@@ -2067,7 +2075,7 @@ public final class ChannelScheduler {
         Pipeline p = attached;
         ChannelRules.Lane lane = p.laneById(cameraId);
         if (lane != null && (lane.device == ChannelRules.Device.OPENING || lane.device == ChannelRules.Device.CLOSING
-                || lane.device == ChannelRules.Device.LOSING)) {
+                || lane.device == ChannelRules.Device.LOSING || ChannelRules.reopenPending(p.w, lane))) {
             return true;
         }
         CameraRound live = rounds.live(cameraId);
@@ -2864,7 +2872,13 @@ public final class ChannelScheduler {
             CameraTaken.Reason reason = CameraTaken.Reason.ofLoss(code);
             ChannelRules.lossStarted(w, lane, reason);
             noteGone(lane.key, Gone.LOST, reason, null);
-            // 丢了之后那一次关：关完记一条统计（2.11.5 第 D3 项）；座舱丢了而环视开着的，关完前后量环视（第 D2 项，车机拿走座舱也是这一种）
+            // 丢了之后那一次关：关完记一条统计（2.11.5 第 D3 项）；座舱丢了而环视开着的，关完前后量环视（第 D2 项，车机拿走座舱也是这一种）。
+            // 救援重开的关那一半刚下达、设备在相机线程上先丢了（两边前后脚）：那一台的关就是这一次，不再另记一条重开的关
+            for (Iterator<CloseWatch> it = reopenWatches.iterator(); it.hasNext(); ) {
+                if (lane.key.equals(it.next().key)) {
+                    it.remove();
+                }
+            }
             lossWatches.put(lane.key, watch(Coupling.Kind.LOSS, null, reason, lane, w.now));
             wake();
         }
@@ -3375,6 +3389,14 @@ public final class ChannelScheduler {
             boolean timedOut = outcome == ChannelRules.Outcome.TIMED_OUT;
             // 开不起来、这一步里丢了：判定那一行另写（被拿走、普通故障……），这里写这一步自己 —— 做的是什么、做了多久、怎么没做完
             ChannelRules.Failure failure = outcome == ChannelRules.Outcome.FAILED ? lane.failure : null;
+            // 救援重开关完了旧设备、开的那一半不再下达（第 2b 步）：为什么（和这一轮的结果同一个判断）
+            ChannelRules.Why dropped = null;
+            if (outcome == ChannelRules.Outcome.DROPPED) {
+                dropped = ChannelRules.reopenBlocked(w, lane);
+                if (dropped == null) {
+                    dropped = ChannelRules.Why.NOTHING;
+                }
+            }
             long endedAt = failure != null ? Math.max(step.startedAt, failure.at) : now;
             long frameMs = outcome == ChannelRules.Outcome.DONE && lane.firstFrameAt >= step.startedAt
                     ? lane.firstFrameAt - step.startedAt : -1;
@@ -3387,8 +3409,8 @@ public final class ChannelScheduler {
             List<Other> others = othersSince(r.generations, step.startedAt);
             ChannelRules.Decision d = r.decision;
             journal.stepEnded(new StepReport(step.move, d.why, key, d.rescue, d.attempt, d.ms, d.forWhom,
-                    kinds(d.outputs), kinds(d.added), kinds(d.removed), timedOut, failure, step.startedAt, durationMs,
-                    configuredMs, frameMs, counts, others));
+                    kinds(d.outputs), kinds(d.added), kinds(d.removed), timedOut, failure, dropped, step.startedAt,
+                    durationMs, configuredMs, frameMs, counts, others));
             if (step.move == ChannelRules.Move.OPEN) {
                 // 开不起来的那一路照旧记进「按次序开相机」，和 2.10 一样一轮一行（审查 2026-10-11：以前不记，后面的路接着开就另起一行，
                 // 旧的分析脚本看到的是拆开的、缺一路的两行）
@@ -3404,8 +3426,11 @@ public final class ChannelScheduler {
             SurroundFirstRun run = surroundFirst;
             boolean reopen = run != null && step.move == ChannelRules.Move.OPEN && run.reopenStartedAt == step.startedAt
                     && CameraSlots.KEY_SURROUND.equals(key);
-            record(r, key, result, durationMs, configuredMs, failure == null ? null : failure.reason, counts, oldCloseMs,
-                    others, reopen ? step.startedAt - run.startedAt : -1, reopen ? run.cabinMs : -1);
+            if (dropped == null) {
+                // 开的那一半没下达的（第 2b 步）不记：这一步没开设备，出画面、没画面、出错都不是；关的那一半那一条照记（noteWatches）
+                record(r, key, result, durationMs, configuredMs, failure == null ? null : failure.reason, counts, oldCloseMs,
+                        others, reopen ? step.startedAt - run.startedAt : -1, reopen ? run.cabinMs : -1);
+            }
             if (reopen) {
                 surroundFirst = null;
                 journal.surroundFirst(run.ended(result == StepStats.Result.FRAMED ? SurroundFirst.End.FRAMED
@@ -3741,10 +3766,10 @@ public final class ChannelScheduler {
                     case BUSY: {
                         CameraPort port = key == null ? null : ports.get(key);
                         ChannelRules.Lane lane = key == null ? null : w.lane(key);
-                        // 在关一个设备（重开时关旧的、晚到的设备就地关）从它开始关算，别的在途从那个动作上路算
+                        // 在关一个设备（救援重开的关那一半、晚到的设备就地关）从它开始关算，别的在途从那个动作上路算
                         long since = lane == null ? 0
                                 : d.why == ChannelRules.Why.LOSING ? lane.deviceSince
-                                : lane.closingSince != 0 && lane.device != ChannelRules.Device.CLOSING ? lane.closingSince
+                                : ChannelRules.closingInFlight(lane) ? lane.closingSince
                                 : lane.busySince;
                         sig = d.why + "|" + key;
                         wait = new Wait(d.why, key, null, d.ms, port == null ? "" : port.describeBusy(),
@@ -3832,8 +3857,10 @@ public final class ChannelScheduler {
         // ---- 5. 照做
 
         private void execute(ChannelRules.Decision d, long now) {
-            if (d.move == ChannelRules.Move.OPEN || d.move == ChannelRules.Move.APPLY
-                    || d.move == ChannelRules.Move.RESCUE || d.move == ChannelRules.Move.CLOSE) {
+            // 救援重开的开那一半不是新的一步（第 2b 步）：这一步开始时已经量过、记过
+            if ((d.move == ChannelRules.Move.OPEN || d.move == ChannelRules.Move.APPLY
+                    || d.move == ChannelRules.Move.RESCUE || d.move == ChannelRules.Move.CLOSE)
+                    && d.half != ChannelRules.Half.OPEN) {
                 cutAftermaths(d, now);
                 nextStepStarts(d, now);
             }
@@ -3897,8 +3924,8 @@ public final class ChannelScheduler {
             if (waitedSince != null) {
                 journal.recordWaitEnded(key, now - waitedSince, hasKind(d.outputs, ChannelRules.Kind.RECORD));
             }
-            if (!port.open(d.outputs)) {
-                return;   // 已经开着、在开、重开还在路上（回调还没到），或者没有相机线程（那时相机层已经报了开不起来）
+            if (!port.open(d.outputs, SingleCamera.OpenKind.PLAIN)) {
+                return;   // 已经开着、在开（回调还没到），或者没有相机线程（那时相机层已经报了开不起来）
             }
             setDevice(lane, ChannelRules.Device.OPENING, now);
             begin(d, now);
@@ -3915,6 +3942,10 @@ public final class ChannelScheduler {
             begin(d, now);
         }
 
+        /**
+         * 救：重建会话；或者重开 —— 这一路手上有设备（开着、在开）的分两半（第 2b 步，项目所有者 2026-10-29「重开 = 调度下达关再下达开」）：
+         * 这一步先下达关（{@link #closeHalf}），关完以后同一步里再下达开（{@link #openHalf}）；关着的一路（丢了、开不起来之后）照开那样下达一轮。
+         */
         private void rescue(ChannelRules.Decision d, long now) {
             String key = d.key();
             ChannelRules.Lane lane = w.lane(key);
@@ -3922,24 +3953,56 @@ public final class ChannelScheduler {
             if (lane == null || port == null) {
                 return;
             }
+            if (d.half == ChannelRules.Half.CLOSE) {
+                closeHalf(lane, port, d, now);
+                return;
+            }
+            if (d.half == ChannelRules.Half.OPEN) {
+                openHalf(lane, port, d, now);
+                return;
+            }
             boolean rebuild = d.rescue == ChannelRules.Rescue.REBUILD;
-            boolean started = rebuild ? port.rebuildSession(d.outputs) : port.reopen(d.outputs);
+            boolean started = rebuild ? port.rebuildSession(d.outputs) : port.open(d.outputs, SingleCamera.OpenKind.PLAIN);
             if (!started) {
                 return;
             }
             // 开着却卡住了的一路（关着等救的那种丢的时候已经说过）：录像那一路自己收尾退出，救好了带着录像输出出画面再加入
             if (lane.device == ChannelRules.Device.OPEN || lane.device == ChannelRules.Device.OPENING) {
                 noteGone(key, Gone.RESCUED, null, null);
-                if (!rebuild) {
-                    // 重开要先关旧设备：关完记一条统计（2.11.5 第 D3 项）；座舱的、环视开着的，关完前后量环视（第 D2 项）
-                    reopenWatches.add(watch(Coupling.Kind.REOPEN, null, null, lane, now));
-                }
             }
             queueRemoved(lane, d.outputs);
             if (!rebuild) {
                 setDevice(lane, ChannelRules.Device.OPENING, now);
             }
             begin(d, now);
+        }
+
+        /**
+         * 救援重开的关那一半：这一步从这里开始。录像那一路当场听说它在救（{@link Gone#RESCUED}：自己收尾退出，救好了带着录像输出出画面再加入）；
+         * 关完记一条统计（2.11.5 第 D3 项），座舱的、环视开着的，关完前后量环视（第 D2 项）—— 和以前相机层重开时关旧设备一样（{@link CloseWatch}
+         * {@link Coupling.Kind#REOPEN}）。先在账上记成在关，再交给相机层去关（{@link ChannelScheduler#REOPEN_CLOSE}）。不是计划里的关：不写「通道：关 …」那一行、
+         * 不进这一轮关（「关相机：…」、关相机小结、关完一轮之后再量）、不走关座舱前先关环视，录像那一侧也不听说「我们关了它」。
+         */
+        private void closeHalf(ChannelRules.Lane lane, CameraPort port, ChannelRules.Decision d, long now) {
+            noteGone(lane.key, Gone.RESCUED, null, null);
+            reopenWatches.add(watch(Coupling.Kind.REOPEN, null, null, lane, now));
+            queueRemoved(lane, d.outputs);
+            setDevice(lane, ChannelRules.Device.CLOSING, now);
+            port.close(REOPEN_CLOSE);
+            begin(d, now);
+        }
+
+        /**
+         * 救援重开的开那一半（规则那一步：关的那一半关完了、账本上那一轮结束了、离这一步开始满 {@link ChannelRules#REOPEN_GAP_MS}，
+         * 该开的样子都还在）：照开那样下达一轮，带着救援的那几样（{@link SingleCamera.OpenKind#RESCUE}），记成在开。不另起一步 ——
+         * 这一步的开始、封顶、那一行、那一条统计都照旧，规则只记下开的那一半下达了（{@link ChannelRules#begin}）。
+         */
+        private void openHalf(ChannelRules.Lane lane, CameraPort port, ChannelRules.Decision d, long now) {
+            if (!port.open(d.outputs, SingleCamera.OpenKind.RESCUE)) {
+                return;   // 账本上这一台又有了一轮（相机层的断言），或者没有相机线程（那时相机层已经报了开不起来）
+            }
+            setDevice(lane, ChannelRules.Device.OPENING, now);
+            ChannelRules.begin(w, d);
         }
 
         /**
@@ -4703,6 +4766,12 @@ public final class ChannelScheduler {
                 return StepStats.Move.CLOSE;
         }
     }
+
+    /**
+     * 救援重开的关那一半（第 2b 步），给相机那一行（「相机 1（后座舱）已关（reopen，…）」）、这一台的来历（上一次关为什么）的英文短语 ——
+     * 和以前相机层重开时关旧设备写的一样。
+     */
+    static final String REOPEN_CLOSE = "reopen";
 
     /** 关的原因，给相机那一行（「相机 2（环视）已关（…）」）的英文短语。 */
     private static String closeWhy(ChannelRules.Why why) {
