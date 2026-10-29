@@ -229,6 +229,12 @@
                 android:key="pref_side_view_target"
                 android:title="@string/set_side_view_target_title" />
 
+            <SwitchPreferenceCompat
+                android:key="pref_side_view_auto_fit"
+                android:dependency="pref_side_view"
+                android:title="@string/side_auto_fit_title"
+                android:summary="@string/side_auto_fit_summary" />
+
             <!-- 只管中控屏：显示位置是「HUD」时不可用 -->
             <SeekBarPreference
                 android:key="pref_side_view_min_speed"

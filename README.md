@@ -152,3 +152,10 @@ Splitting App Lab's composite stream into a grid and rendering it is implemented
   ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Side camera auto-fit
+
+The side-camera settings add Auto-fit to avoid black patches, on by default.
+Turning it off retains the requested field of view and aim; missing source
+coverage is black and never borrows pixels from adjacent composite lanes.
+Existing angles, placement, camera ownership and recording are unchanged.

@@ -1054,4 +1054,6 @@
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
+    <string name="side_auto_fit_title">自动适配以避免黑边</string>
+    <string name="side_auto_fit_summary">开启时会缩小视野以适配画面；关闭时保留请求视野，缺失区域显示为黑色。</string>
 </resources>
