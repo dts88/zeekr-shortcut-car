@@ -86,6 +86,12 @@ public final class SettingsRegistry {
             entry("right", "右侧", R.string.opt_rail_right),
             entry("left", "左侧", R.string.opt_rail_left));
 
+    public static final SettingSpec SIDE_POPUP_ASPECT = SettingSpec.of(
+            "side_popup_aspect", "侧视窗口比例", "11:5",
+            entry("11:5", "11:5", R.string.popup_aspect_wide),
+            entry("16:9", "16:9", R.string.popup_aspect_landscape),
+            entry("1:1", "1:1", R.string.popup_aspect_square),
+            entry("3:4", "3:4", R.string.popup_aspect_portrait));
     /** 超级镜子的切换范围（{@link com.kooo.evcam.zeekr.MirrorViews}）：分段按钮，三档（项目所有者 2026-10-19）。 */
     public static final SettingSpec REARVIEW_VIEWS = SettingSpec.of(
             "rearview_views", "切换范围", "four",
@@ -204,6 +210,7 @@ public final class SettingsRegistry {
             RECORDING_MODE,
             CAR_MODEL,
             LANGUAGE,
+            SIDE_POPUP_ASPECT,
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE,
             REARVIEW_VIEWS,

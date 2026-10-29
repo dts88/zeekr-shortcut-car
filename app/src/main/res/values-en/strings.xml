@@ -1065,4 +1065,14 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
+    <string name="popup_aspect_title">Popup aspect ratio</string>
+    <string name="popup_aspect_wide">Ultra-wide 11:5 (default)</string>
+    <string name="popup_aspect_landscape">Landscape 16:9</string>
+    <string name="popup_aspect_square">Square 1:1</string>
+    <string name="popup_aspect_portrait">Portrait 3:4</string>
+    <string name="popup_size_title" formatted="false">Popup height (% of screen)</string>
+    <string name="popup_adjustable_title">Allow dragging and pinch resizing</string>
+    <string name="popup_adjustable_summary">Off uses fixed placement. On saves the position and size you adjust.</string>
+    <string name="popup_reset_title">Reset popup layout</string>
+    <string name="popup_reset_message">Restore default shape, height and placement. Keep camera enablement, gesture choice and picture angles.</string>
 </resources>

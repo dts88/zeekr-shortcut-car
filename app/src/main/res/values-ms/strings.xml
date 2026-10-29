@@ -1042,4 +1042,14 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
+    <string name="popup_aspect_title">Nisbah tetingkap</string>
+    <string name="popup_aspect_wide">Ultra lebar 11:5 (lalai)</string>
+    <string name="popup_aspect_landscape">Landskap 16:9</string>
+    <string name="popup_aspect_square">Segi empat 1:1</string>
+    <string name="popup_aspect_portrait">Potret 3:4</string>
+    <string name="popup_size_title" formatted="false">Tinggi tetingkap (% skrin)</string>
+    <string name="popup_adjustable_title">Benarkan seret dan cubit untuk saiz</string>
+    <string name="popup_adjustable_summary">Mati menggunakan kedudukan tetap. Hidup menyimpan kedudukan dan saiz yang dilaras.</string>
+    <string name="popup_reset_title">Tetapkan semula susun atur</string>
+    <string name="popup_reset_message">Pulihkan bentuk, tinggi dan kedudukan lalai. Kekalkan pilihan kamera, gerak isyarat dan sudut imej.</string>
 </resources>

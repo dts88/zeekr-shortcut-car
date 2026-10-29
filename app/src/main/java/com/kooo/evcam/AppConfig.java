@@ -1372,6 +1372,18 @@ public class AppConfig {
     }
 
     /** 画面中心朝车尾转多少度（负数朝车头），开发者选项。 */
+    public String getSidePopupAspect() { return readEnum(SettingsRegistry.SIDE_POPUP_ASPECT); }
+    public void setSidePopupAspect(String value) { writeEnum(SettingsRegistry.SIDE_POPUP_ASPECT, value); }
+    public int getSidePopupSize() { return Math.max(15, Math.min(70, prefs.getInt("side_popup_size",33))); }
+    public void setSidePopupSize(int value) { prefs.edit().putInt("side_popup_size",Math.max(15,Math.min(70,value))).apply(); }
+    public boolean isSidePopupAdjustable() { return prefs.getBoolean("side_popup_adjustable",false); }
+    public void setSidePopupAdjustable(boolean value) { prefs.edit().putBoolean("side_popup_adjustable",value).apply(); }
+    public int getSidePopupX() { return prefs.getInt("side_popup_x",-1); }
+    public int getSidePopupY() { return prefs.getInt("side_popup_y",-1); }
+    public void setSidePopupPosition(int x,int y) { prefs.edit().putInt("side_popup_x",x).putInt("side_popup_y",y).apply(); }
+    public void resetSidePopupLayout() { prefs.edit().remove("side_popup_x").remove("side_popup_y")
+            .remove("side_popup_size").remove(SettingsRegistry.SIDE_POPUP_ASPECT.key).apply(); }
+
     public int getSideViewBack() {
         int max = Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_YAW_DEGREES);
         return clampInt(readInt(KEY_SIDE_VIEW_BACK, SIDE_VIEW_DEFAULT_BACK), -max, max);

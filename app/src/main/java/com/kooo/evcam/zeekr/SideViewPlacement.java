@@ -39,10 +39,23 @@ public final class SideViewPlacement {
      * @param lane {@link LaneCycle#LEFT} 靠左；其他（{@link LaneCycle#RIGHT}）靠右
      */
     public static Rect compute(int screenWidth, int screenHeight, int lane) {
+        return compute(screenWidth, screenHeight, lane, ASPECT, HEIGHT_PERCENT);
+    }
+
+    public static float aspect(String value) {
+        if ("1:1".equals(value)) return 1f;
+        if ("3:4".equals(value)) return .75f;
+        if ("16:9".equals(value)) return 16f/9f;
+        return ASPECT;
+    }
+
+    public static Rect compute(int screenWidth,int screenHeight,int lane,float aspect,int heightPercent) {
+        aspect = Float.isFinite(aspect) && aspect > 0f ? aspect : ASPECT;
+        int percent = Math.max(15, Math.min(70, heightPercent));
         int w = Math.max(1, screenWidth);
         int h = Math.max(1, screenHeight);
-        int height = Math.max(1, Math.round(h * HEIGHT_PERCENT / 100f));
-        int width = Math.round(height * ASPECT);
+        int height = Math.max(1, Math.round(h * percent / 100f));
+        int width = Math.round(height * aspect);
         if (width > w) {
             width = w;
             height = Math.max(1, Math.min(height, Math.round(w / ASPECT)));
