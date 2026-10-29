@@ -2581,13 +2581,13 @@ public class MultiCameraManager {
     }
 
     /**
-     * 熄屏了（ScreenState 的熄屏那一下，主线程）：这一段熄屏的座舱放开从头记 —— 那一刻座舱开着没有，之后第一轮关了座舱的
-     * 那一轮关完时记下时刻（{@link ChannelSide#closeRound}）。
+     * 熄屏了（ScreenState 的熄屏那一下，主线程）：这一段熄屏的座舱放开从头记 —— 那一刻这一份管线的座舱开着没有（它自己那一轮，
+     * {@link SingleCamera#ownRoundLive}：管线重建时另一份的那一轮不算），之后第一轮关了座舱的那一轮关完时记下时刻（{@link ChannelSide#closeRound}）。
      */
     private void newDarkPeriod() {
         boolean open = false;
         for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
-            if (!CameraSlots.KEY_SURROUND.equals(entry.getKey()) && entry.getValue().holdsOrIsOpening()) {
+            if (!CameraSlots.KEY_SURROUND.equals(entry.getKey()) && entry.getValue().ownRoundLive()) {
                 open = true;
                 break;
             }
@@ -2614,7 +2614,7 @@ public class MultiCameraManager {
         }
         SingleCamera surround = cameras.get(CameraSlots.KEY_SURROUND);
         if (released || cameraId == null || surround == null || cameraId.equals(surround.getCameraId())
-                || !surround.holdsOrIsOpening()) {
+                || !surround.ownRoundLive()) {
             return;
         }
         long ago = Math.max(0, android.os.SystemClock.elapsedRealtime() - tookAtElapsed);
@@ -2634,7 +2634,7 @@ public class MultiCameraManager {
         }
         CameraTaken.Verdict mark = markOf(CameraSlots.KEY_SURROUND);
         RecordingLanes.State state = isRecording ? lanes.state(CameraSlots.KEY_SURROUND) : null;
-        String recording = !surround.holdsOrIsOpening() ? "环视已关"
+        String recording = !surround.ownRoundLive() ? "环视已关"
                 : !isRecording ? "没在录像"
                 : state == null ? "环视不在这一次录像里"
                 : state == RecordingLanes.State.LIVE ? "环视在录" : "环视没在录";

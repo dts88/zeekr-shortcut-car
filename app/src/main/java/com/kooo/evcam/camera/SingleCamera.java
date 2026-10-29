@@ -683,9 +683,21 @@ public class SingleCamera {
      * 一轮从下达开到它唯一的那一次结束：在开（还没进 {@code openCamera}、{@code openCamera} 还没回音、救援重开等的那 300 ms）、
      * 开着、在关（关相机那一下、丢了之后的关、重开时关旧的、晚到的设备就地关）都在里面 —— 从字段上摘下来到相机服务真的放开之间，
      * 占着它的仍然是我们（第 2 步「只有一个调度」：以前一半看这一份自己的字段，另一份管线开着、在开的那一轮看不到）。
+     *
+     * <p>它答的是「这一台此刻是不是我们的」，给进程这一层问的（CameraContention 记争用、通道调度的 portsHold、reconcileDevice）；
+     * 问这一路在这一份管线里开着没有的看 {@link #ownRoundLive()}。</p>
      */
     public boolean holdsOrIsOpening() {
         return ROUNDS.live(cameraId) != null;
+    }
+
+    /**
+     * 这一份相机对象自己下达的那一轮还没结束（开着、在开、在关），只照账本答：它答的是「这一路在这一份管线里开着没有」，
+     * 给这一份管线自己的诊断问的（MultiCameraManager 熄屏那一刻座舱开没开着、别的程序拿走一路之后环视开没开着）——
+     * 管线重建时另一份管线的那一轮不算（那是 {@link #holdsOrIsOpening()} 答的「这一台是不是我们的」，审查 2026-10-30）。
+     */
+    public boolean ownRoundLive() {
+        return owns(ROUNDS.live(cameraId));
     }
 
     /**
