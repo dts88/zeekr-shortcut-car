@@ -15,10 +15,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * 下达开之前看账本，这一台有一轮还没结束就不下达（{@link #issue}）—— 谁的都算：别的管线的、这一份上一次开的。</p>
  *
  * <p>谁读：每一份调度（管线重建时可能有两份）在下达任何一次开之前照它判（ChannelRules.camHeld：不开、不救、关着的不重开）；
- * 相机层的开、重开再看一次，是断言（SingleCamera：不该走到那里，走到了就不开、记一行）；相机服务的那几声认人
- * （SingleCamera.holdsOrIsOpening）；退出的看门线程（{@link #closingIds}，MainActivity.finishExit）。第 2 步原样搬进唯一的那一个调度。</p>
+ * 相机层的开再看一次，是断言（SingleCamera：不该走到那里，走到了就不开、记一行）；相机服务的那几声认人
+ * （SingleCamera.holdsOrIsOpening）；退出的看门线程（{@link #closingIds}，MainActivity.finishExit）。第 2 步原样搬进唯一的那一个调度。
+ * 救援的重开是两轮（第 2b 步）：关的那一半那一轮结束了，开的那一半才下达新的一轮。</p>
  *
- * <p>线程：只在主线程上改 —— 下达（{@link #issue}，SingleCamera 的开、关着的一路的重开）、结束（{@link #end}，相机线程报上来的
+ * <p>线程：只在主线程上改 —— 下达（{@link #issue}，SingleCamera 的开，含救援重开的开那一半）、结束（{@link #end}，相机线程报上来的
  * 那一声 post 到主线程）。读的方法哪个线程都能调。</p>
  */
 public final class CameraRounds {

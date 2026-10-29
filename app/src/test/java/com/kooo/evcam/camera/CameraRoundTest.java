@@ -69,9 +69,9 @@ public class CameraRoundTest {
         assertEquals("一直有开或关没返回：钟从下达那一刻起，没从头算", T0, round.outstandingSince());
     }
 
-    /** 同上，次序反过来（重开等的那 300 ms 里被关了：关相机那一下先跑完）：开的那一下跑到时这一轮才结束。 */
+    /** 同上，次序反过来（开之前查列表、查参数的时候被关了：关相机那一下先跑完）：开的那一下跑到、不进 openCamera 时这一轮才结束。 */
     @Test
-    public void aCancelDuringTheReopenGapEndsWhenTheOpenGivesUp() {
+    public void aCancelWhileTheOpenIsStillListingEndsWhenTheOpenGivesUp() {
         CameraRound round = issue();
         assertTrue(round.closeRequested(T0 + 10));
         round.closeDone(T0 + 20);
@@ -245,78 +245,27 @@ public class CameraRoundTest {
         assertEquals("closing openCamera", round.status().kinds());
     }
 
-    // ================================================================= 救援重开（同一轮）
+    // ================================================================= 关了那一轮（救援的重开也是：先关这一轮，再开新的一轮，第 2b 步）
 
     /**
-     * 开着时救援重开：同一轮里关旧的、开新的，中间一直不结束；关旧的时候在关、之后在开，钟从重开那一刻起，开好了归 0。
-     * 旧的那一次晚到的回调认不成新的那一次：旧设备还在关时什么都不做，关完以后不归账。
+     * 开着的那一轮下达了关：关完、关相机那一下做完就结束 —— 一轮里只有那一次开，结束了不再开；那一台之前那一次的回调晚到，不归账。
+     * 救援的重开就是这样：调度先下达关，这一轮结束（账本划掉），再下达开（新的一轮）。
      */
     @Test
-    public void aReopenStaysInOneRoundAndALateCallbackOfTheOlderCallIsIgnored() {
+    public void aClosedRoundEndsAndAnOlderCallbackAfterItIsStray() {
         CameraRound round = issue();
-        Opened old = openToAdopt(round, T0);
-        Call oldCall = old.call;
-        Object oldDevice = old.device;
-        assertTrue(round.reopenRequested(T0 + 10_000));
-        assertTrue(round.status().reopening);
-        assertEquals("关旧的", Phase.CLOSING, round.phase());
-        assertEquals(T0 + 10_000, round.outstandingSince());
-        assertFalse("重开时不另起一次重开", round.reopenRequested(T0 + 10_001));
-        assertEquals("旧的那一次报错：旧设备在关", Action.IGNORE, round.failed(oldCall, oldDevice, false, T0 + 10_002));
-        round.closed(oldDevice, T0 + 14_000);
-        assertFalse(round.takeEnd());
-        assertEquals("关完旧的，在开新的", Phase.OPENING, round.phase());
-        assertEquals("reopen", round.status().kinds());
-
-        Call newCall = round.beginCall(T0 + 14_300);
-        round.returned(newCall, T0 + 14_300);
-        assertEquals("旧的那一次又来一声：早关完了，不归账", Action.STRAY, round.failed(oldCall, oldDevice, false, T0 + 14_400));
-        Object newDevice = new Object();
-        assertEquals(Action.ADOPT, round.opened(newCall, newDevice, T0 + 14_500));
-        assertEquals(Phase.OPEN, round.phase());
-        assertEquals(0, round.outstandingSince());
-        assertFalse(round.status().reopening);
-        assertFalse(round.takeEnd());
-        assertEquals(2, newCall.number);
-    }
-
-    /** 重开只给挂着一台、什么都不在途的那一轮：在开、在丢、下达了关都合并掉。 */
-    @Test
-    public void aReopenIsRefusedWhileAnythingIsInFlight() {
-        CameraRound opening = issue();
-        assertFalse("还没开好", opening.reopenRequested(T0));
-        Call call = opening.beginCall(T0);
-        opening.returned(call, T0);
-        assertFalse("openCamera 在等回调", opening.reopenRequested(T0 + 1));
-
-        CameraRound lost = issue();
-        Opened open = openToAdopt(lost, T0);
-        assertEquals(Action.LOST, lost.failed(open.call, open.device, false, T0 + 1_000));
-        assertFalse("在丢", lost.reopenRequested(T0 + 1_001));
-
-        CameraRound closing = issue();
-        openToAdopt(closing, T0);
-        assertTrue(closing.closeRequested(T0 + 1_000));
-        assertFalse("下达了关", closing.reopenRequested(T0 + 1_001));
-    }
-
-    /** 重开那一下的 openCamera 被关掉之前已经返回：照样等它的回调，晚到的设备关掉才结束。 */
-    @Test
-    public void aReopenCancelledWhileItsOpenIsPendingWaitsForTheCallback() {
-        CameraRound round = issue();
-        Object oldDevice = openToAdopt(round, T0).device;
-        assertTrue(round.reopenRequested(T0 + 1_000));
-        round.closed(oldDevice, T0 + 1_100);
-        Call call = round.beginCall(T0 + 1_400);
-        round.returned(call, T0 + 1_400);
-        assertTrue(round.closeRequested(T0 + 1_500));
-        round.closeDone(T0 + 1_510);
-        assertFalse(round.takeEnd());
-        Object late = new Object();
-        assertEquals(Action.CLOSE_LATE, round.opened(call, late, T0 + 1_700));
-        round.closed(late, T0 + 1_800);
+        Opened open = openToAdopt(round, T0);
+        assertTrue(round.closeRequested(T0 + 10_000));
+        assertEquals(Phase.CLOSING, round.phase());
+        assertEquals("关的那一刻起有关没返回", T0 + 10_000, round.outstandingSince());
+        assertEquals("关的途中那一台报错：关相机那一下在关它", Action.IGNORE,
+                round.failed(open.call, open.device, false, T0 + 10_002));
+        round.closed(open.device, T0 + 10_080);
+        assertFalse("关相机那一下还没做完", round.takeEnd());
+        round.closeDone(T0 + 10_080);
         assertTrue(round.takeEnd());
-        assertEquals("重开那一刻起一直有开或关没返回", T0 + 1_000, round.outstandingSince());
+        assertNull("结束了：不再开", round.beginCall(T0 + 10_300));
+        assertEquals(Action.STRAY, round.failed(open.call, open.device, false, T0 + 10_400));
     }
 
     /** 结束了的那一轮不再收关：相机层当它没开着。 */
