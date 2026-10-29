@@ -193,7 +193,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      * 一格：框、画面、遮罩、播放器，以及这一条录制里这一路的文件。
      */
     private final class Lane {
-        final String slot;
+        String slot;
         final View frame;
         final TextureView view;
         final TextView cover;
@@ -304,6 +304,21 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                         R.id.cover_fourth, R.id.label_fourth),
         };
         surround = lanes[0];
+        java.util.List<Lane> extraLanes = new java.util.ArrayList<>(java.util.Arrays.asList(lanes));
+        for (String slot : com.kooo.evcam.profile.RecordingSources.EXTRA_ROLES) {
+            android.widget.FrameLayout frame = new android.widget.FrameLayout(this); frame.setId(View.generateViewId());
+            android.view.TextureView texture = new android.view.TextureView(this); texture.setId(View.generateViewId());
+            TextView cover = new TextView(this); cover.setId(View.generateViewId()); cover.setGravity(android.view.Gravity.CENTER);
+            cover.setBackgroundColor(android.graphics.Color.BLACK); cover.setTextColor(android.graphics.Color.WHITE);
+            TextView label = new TextView(this); label.setId(View.generateViewId());
+            label.setTextColor(android.graphics.Color.WHITE); label.setBackgroundResource(R.drawable.camera_label_background);
+            frame.addView(texture, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            frame.addView(cover, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            frame.addView(label, new android.widget.FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP | android.view.Gravity.START));
+            ((android.widget.LinearLayout)cabinColumn).addView(frame, new android.widget.LinearLayout.LayoutParams(-1, 0, 1));
+            extraLanes.add(new Lane(slot, frame.getId(), texture.getId(), cover.getId(), label.getId()));
+        }
+        lanes = extraLanes.toArray(new Lane[0]);
         surroundFrame = findViewById(R.id.video_surround_frame);
         if (surroundFrame != null) {
             // 开发者选项「录像回放：GPU 逐像素鱼眼校正」开着时，解码器先画进外框的管线。
@@ -515,12 +530,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                 AppLog.e(TAG, "扫描录像失败", e);
             }
 
-            final List<RecordingTimeline.Session> built = RecordingTimeline.build(sources);
+            Map<String, List<RecordingTimeline.Source>> inventory = new HashMap<>(others);
+            inventory.put(CameraSlots.SURROUND, sources);
+            final List<RecordingTimeline.Session> built = com.kooo.evcam.zeekr.RecordingCatalog.build(inventory);
             // 其余几路的文件各归哪一条，在这里一次分好（见 LaneTrack#belongingTo）
             final Map<String, List<LaneTrack>> owned = new HashMap<>();
             for (Map.Entry<String, List<RecordingTimeline.Source>> entry : others.entrySet()) {
-                owned.put(entry.getKey(), LaneTrack.of(entry.getValue())
-                        .byRecording(built, segmentMsOf(entry.getKey())));
+                owned.put(entry.getKey(), RecordingCatalog.owned(entry.getValue(), built, segmentMsOf(entry.getKey())));
             }
             final boolean locksOn = com.kooo.evcam.storage.FootageLocks.enabled(getApplicationContext());
             final java.util.Set<String> locked = com.kooo.evcam.storage.FootageLocks.shown(
@@ -528,7 +544,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 sessions = built;
                 laneSources.clear();
-                laneSources.putAll(others);
+                laneSources.putAll(inventory);
                 laneOwned.clear();
                 laneOwned.putAll(owned);
                 lockEnabled = locksOn;
@@ -578,12 +594,14 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         consecutiveErrors = 0;
         playWhenReady = true;
 
+        surround.slot = RecordingCatalog.primarySlot(session);
+        ((TextView)findViewById(R.id.label_surround)).setText(cameraName(surround));
         surround.track = LaneTrack.of(session);
         for (Lane lane : lanes) {
             if (lane != surround) {
                 List<RecordingTimeline.Source> sources = laneSources.get(lane.slot);
-                lane.track = sources == null ? LaneTrack.EMPTY
-                        : LaneTrack.of(sources).shownIn(session);
+                lane.track = lane.slot.equals(surround.slot) || sources == null ? LaneTrack.EMPTY
+                        : RecordingCatalog.shown(sources, session);
                 lane.owned = ownedBy(lane.slot, sessionIndex);
             }
             resetLane(lane);
@@ -1320,7 +1338,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                 files.addAll(ownedBy(lane.slot, index).clips());
             }
         }
-        return files;
+        java.util.Map<String, LaneTrack.Clip> unique = new java.util.LinkedHashMap<>();
+        for (LaneTrack.Clip clip : files) unique.put(clip.path, clip);
+        return new ArrayList<>(unique.values());
     }
 
     /** 这一路归第 index 条录制的文件（扫描时分好的，见 {@link #laneOwned}）；这一路没有文件时是空的。 */

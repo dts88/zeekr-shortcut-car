@@ -165,9 +165,7 @@ public final class CameraContention {
             MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
             StringBuilder open = new StringBuilder();
             if (manager != null) {
-                for (String key : new String[]{CameraSlots.KEY_SURROUND, CameraSlots.KEY_CABIN_FRONT,
-                        CameraSlots.KEY_CABIN_REAR, CameraSlots.KEY_FOURTH}) {
-                    SingleCamera camera = manager.getCamera(key);
+                for (SingleCamera camera : manager.initializedCameras()) {
                     if (camera != null && camera.holdsOrIsOpening()) {
                         open.append(open.length() > 0 ? "," : "").append(camera.getCameraId());
                     }

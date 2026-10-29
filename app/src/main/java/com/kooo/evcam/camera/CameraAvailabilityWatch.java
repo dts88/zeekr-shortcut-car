@@ -101,10 +101,6 @@ public final class CameraAvailabilityWatch {
     /** 主线程的 Handler：回放、相机服务的每一声、收尾任务都排在它的队列里，先后就是到的先后。用时才建。 */
     private static volatile Handler mainHandler;
 
-    /** 主界面、录像、拍照、后视镜用到的几路的 key：我们管着的相机都在这几路里。 */
-    private static final String[] KEYS = {CameraSlots.KEY_SURROUND, CameraSlots.KEY_CABIN_FRONT,
-            CameraSlots.KEY_CABIN_REAR, CameraSlots.KEY_FOURTH};
-
     private CameraAvailabilityWatch() {
     }
 
@@ -281,8 +277,7 @@ public final class CameraAvailabilityWatch {
             if (manager == null) {
                 return false;
             }
-            for (String key : KEYS) {
-                SingleCamera camera = manager.getCamera(key);
+            for (SingleCamera camera : manager.initializedCameras()) {
                 if (camera != null && cameraId.equals(camera.getCameraId()) && test.test(camera)) {
                     return true;
                 }
@@ -543,8 +538,7 @@ public final class CameraAvailabilityWatch {
             if (manager == null) {
                 return ids;
             }
-            for (String key : KEYS) {
-                SingleCamera camera = manager.getCamera(key);
+            for (SingleCamera camera : manager.initializedCameras()) {
                 String id = camera == null ? null : camera.getCameraId();
                 if (id != null && !ids.contains(id)) {
                     ids.add(id);

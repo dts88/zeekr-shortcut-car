@@ -130,9 +130,11 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     /** 最近一次按在哪 —— 点击回调不带坐标，而「点的是哪一路」全看这个。 */
     private float lastTouchX, lastTouchY;
     /** 四路的顺序。分享、循环切换都按这个走，省得各写一份。 */
+    private final java.util.Map<String, ImageView> extraImages = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, View> extraFrames = new java.util.LinkedHashMap<>();
     private static final String[] POSITIONS = {
             PhotoGroup.POSITION_FRONT, PhotoGroup.POSITION_BACK,
-            PhotoGroup.POSITION_LEFT, PhotoGroup.POSITION_RIGHT,
+            PhotoGroup.POSITION_LEFT, PhotoGroup.POSITION_RIGHT, "roadfront", "roadrear", "manual",
     };
     /** 鱼眼校正：只改屏幕上的样子，原图不动。开关记在设置里，下次进来还是这个状态。 */
     private boolean fisheyeOn;
@@ -212,6 +214,16 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         frameLeft = findViewById(R.id.frame_left);
         frameRight = findViewById(R.id.frame_right);
         cabinColumn = findViewById(R.id.cabin_column);
+        for (String position : new String[]{"roadfront", "roadrear", "manual"}) {
+            android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+            ImageView image = new ImageView(this); image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            TextView label = new TextView(this); nameLane(label, position);
+            label.setTextColor(android.graphics.Color.WHITE); label.setBackgroundResource(R.drawable.camera_label_background);
+            frame.addView(image, new android.widget.FrameLayout.LayoutParams(-1, -1));
+            frame.addView(label, new android.widget.FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP | android.view.Gravity.START));
+            ((android.widget.LinearLayout)cabinColumn).addView(frame, new android.widget.LinearLayout.LayoutParams(-1, 0, 1));
+            extraImages.put(position, image); extraFrames.put(position, frame); tapExpands(frame, position);
+        }
 
         labelFront = findViewById(R.id.label_front);
         labelBack = findViewById(R.id.label_back);
@@ -441,13 +453,15 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
      */
     private void applyViewMode() {
         boolean grid = expandedPosition == null;
-        frameFront.setVisibility(grid || PhotoGroup.POSITION_FRONT.equals(expandedPosition)
-                ? View.VISIBLE : View.GONE);
+        frameFront.setVisibility((grid && currentGroup != null && currentGroup.hasPhoto(PhotoGroup.POSITION_FRONT))
+                || PhotoGroup.POSITION_FRONT.equals(expandedPosition) ? View.VISIBLE : View.GONE);
         boolean back = laneVisible(frameBack, PhotoGroup.POSITION_BACK);
         boolean left = laneVisible(frameLeft, PhotoGroup.POSITION_LEFT);
         boolean right = laneVisible(frameRight, PhotoGroup.POSITION_RIGHT);
         if (cabinColumn != null) {
-            cabinColumn.setVisibility(back || left || right ? View.VISIBLE : View.GONE);
+            boolean extra = false;
+            for (java.util.Map.Entry<String, View> entry : extraFrames.entrySet()) extra |= laneVisible(entry.getValue(), entry.getKey());
+            cabinColumn.setVisibility(back || left || right || extra ? View.VISIBLE : View.GONE);
         }
         applyCellZoom();
         btnViewMode.setText(grid
@@ -608,6 +622,7 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
     }
 
     private ImageView imageFor(String position) {
+        if (extraImages.containsKey(position)) return extraImages.get(position);
         switch (position) {
             case PhotoGroup.POSITION_BACK: return imageBack;
             case PhotoGroup.POSITION_LEFT: return imageLeft;

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="camera_source_automatic">自动 · %1$s</string>
+    <string name="camera_source_manual">手动 · %1$s</string>
+    <string name="camera_source_not_found">未识别到自动来源</string>
+    <string name="camera_sources_help">预览、录制和相机窗口共用一份映射。「自动」保留环视能力检测和现有座舱顺序；道路前后及手动来源需要核实并指定 ID。列出的 ID 不代表实际朝向。关闭开发者模式仍保留手动选择。更改后请退出并重新打开。「未分配」停用该来源的录制；前后道路为一组。</string>
+    <string name="camera_sources_reset">全部恢复自动</string>
+    <string name="camera_sources_reset_note">清除手动相机映射，包括旧开发者覆盖项。保留车型、预览布局、录制开关和画质。环视恢复检测到的来源；没有自动默认值的附加相机需要重新映射。之后请退出并重新打开。</string>
+    <string name="camera_sources_title">相机来源</string>
+    <string name="record_group_manual">手动映射</string>
+    <string name="record_group_surround">环视</string>
+    <string name="record_preview_cabin">驾驶员 / 前座舱</string>
+    <string name="record_source_duplicate">此相机已分配给另一已启用来源。请选择其他相机或关闭该来源。</string>
+    <string name="record_source_pick">选择来源：%1$s</string>
+    <string name="record_source_unassigned">未分配</string>
+    <string name="slot_road_front">前方道路相机</string>
+    <string name="slot_road_rear">后方道路相机</string>
+</resources>
