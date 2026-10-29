@@ -239,11 +239,6 @@ public class SingleCamera {
      * CameraTaken.judgeLoss，判完再叫看门狗重开）。
      */
     private volatile boolean deviceLost;
-    /**
-     * 被断开、报错 1 / 2 之后的那一次关在做（{@link #deviceGone}）：相机服务那边已经不算我们的（{@link #holdsInService()}）。
-     * 设备错误 3 / 4 / 5 之后的那一次关不在此列 —— 我们的连接还在，关完之前照样算我们占着。
-     */
-    private volatile boolean kickedClose;
     /** 最近一个动作（开 / 关 / 重开 / 配会话）上路的时刻（uptime）；0 = 没有过。见 {@link #isBusy()}。 */
     private volatile long inFlightSinceMs;
     /** 设备、会话、相机线程、手上这一轮（{@link #round}）这几个字段的锁；拿着它时不调相机服务，见 closeCamera。 */
@@ -684,28 +679,27 @@ public class SingleCamera {
     }
 
     /**
-     * 开着、正在开、或者这一台正在关 —— 相机服务报「被占用」时，用来判断是不是我们自己。
-     *
-     * <p>「正在开」是手上这一轮在开（还没进 {@code openCamera}、{@code openCamera} 还没回音；救援重开等的那 300 ms 也算）。
-     * 「正在关」按账本认（{@link CameraRounds}）：这一台还没结束的那一轮有一次关没返回（关相机那一下、丢了之后的关、重开时关旧的、
-     * 晚到的设备就地关），哪一份相机对象的都算 —— 从字段上摘下来到相机服务真的放开之间，占着它的仍然是我们。</p>
+     * 开着、正在开、或者这一台正在关 —— 只照账本答（{@link CameraRounds}）：这一台有一轮还没结束，谁的都算（这一份的、另一份管线的）。
+     * 一轮从下达开到它唯一的那一次结束：在开（还没进 {@code openCamera}、{@code openCamera} 还没回音、救援重开等的那 300 ms）、
+     * 开着、在关（关相机那一下、丢了之后的关、重开时关旧的、晚到的设备就地关）都在里面 —— 从字段上摘下来到相机服务真的放开之间，
+     * 占着它的仍然是我们（第 2 步「只有一个调度」：以前一半看这一份自己的字段，另一份管线开着、在开的那一轮看不到）。
      */
     public boolean holdsOrIsOpening() {
-        return cameraDevice != null || handPhase() == CameraRound.Phase.OPENING || closingAnywhere();
+        return ROUNDS.live(cameraId) != null;
     }
 
     /**
-     * 相机服务那边此刻算不算我们占着这一路：开着、正在开、正在照常关。
+     * 相机服务那边此刻算不算我们占着这一路：开着、正在开、正在照常关 —— 只照账本答（{@link CameraRound#holdsInService}），
+     * 谁的那一轮都一样。
      *
-     * <p>被断开、报错 1 / 2 之后的那一次关不算（{@link #kickedClose}，2026-10-10）：那一刻相机服务已经把我们踢了
+     * <p>被断开、报错 1 / 2 之后的那一次关不算（那一轮记着被踢，2026-10-10）：那一刻相机服务已经把我们踢了
      * （或者压根没让我们连上），那几秒里它报的「被占用」是新的主人。算成我们的话，别的程序拿走相机被记成「我们开着」，
-     * 它在那几秒里放开又被当成乱报。关相机的次序照样认这一次关（那边问的是 {@link #holdsOrIsOpening()}）。</p>
+     * 它在那几秒里放开又被当成乱报。关相机的次序照样认这一次关（那边问的是 {@link #holdsOrIsOpening()}）。
+     * 以前「被踢」记在这一份相机对象上：管线重建时另一份被踢、正在关，这一份答「我们占着」（第 1 步审查留给第 2 步）。</p>
      */
     public boolean holdsInService() {
-        if (cameraDevice != null || handPhase() == CameraRound.Phase.OPENING) {
-            return true;
-        }
-        return closingAnywhere() && !kickedClose;
+        CameraRound live = ROUNDS.live(cameraId);
+        return live != null && live.holdsInService();
     }
 
     /**
@@ -732,22 +726,10 @@ public class SingleCamera {
         return since != 0 && SystemClock.uptimeMillis() - since < IN_FLIGHT_MAX_MS;
     }
 
-    /** 手上这一轮此刻在哪一步（{@link CameraRound.Phase}）；手上没有一轮是 null。 */
-    private CameraRound.Phase handPhase() {
-        Round r = round;
-        return r == null ? null : r.state.phase();
-    }
-
     /** 这一份的那一轮（手上的，或者关了、还没结束的）此刻有开或关在途。 */
     private boolean ownRoundOutstanding() {
         CameraRound live = ROUNDS.live(cameraId);
         return live != null && live.owner == this && live.phase() != CameraRound.Phase.OPEN;
-    }
-
-    /** 这一台还没结束的那一轮（哪一份相机对象的都算）有一次关没返回。 */
-    private boolean closingAnywhere() {
-        CameraRound live = ROUNDS.live(cameraId);
-        return live != null && live.status().closing();
     }
 
     /** 在途的是什么、多久了，给日志看。 */
@@ -2305,15 +2287,15 @@ public class SingleCamera {
         SessionCounts.Snapshot lastCounts = null;
         // 丢了还是晚到、收标记，和主线程的 closeCamera 在同一把锁里定（审查 2026-10-11）：这一轮下达了关的，设备归关它的那一下
         synchronized (deviceLock) {
-            action = r.state.failed(call, camera, now());
+            // 被断开、报 1 / 2 的那一次关相机服务那边已经不算我们的（被踢，记在这一轮里：CameraRound.holdsInService）；
+            // 设备错误时我们的连接还在，关完之前照样算我们占着
+            action = r.state.failed(call, camera, maybeTaken, now());
             if (action == CameraRound.Action.LOST || action == CameraRound.Action.OPEN_FAILED) {
                 lastErrorName = errorName;
                 deviceLost = true;   // 要不要再开、什么节奏：调度一处判（被别的程序拿走的，等它放开、通道安静了单独开）
                 markInFlight();
             }
             if (action == CameraRound.Action.LOST) {
-                // 被断开、报 1 / 2 的那一次关相机服务那边已经不算我们的（holdsInService）；设备错误时我们的连接还在，关完之前照样算我们占着
-                kickedClose = maybeTaken;
                 // 这一台最后那一份会话配好以来回了什么：关完时没出过画面就记一行
                 lastCounts = counts.snapshot();
                 // 先摘、再报（2026-10-10）：会话跟着设备一起没了 —— 排着的重建取消、在途的配置作废，没人再拿它当活的
@@ -2390,8 +2372,8 @@ public class SingleCamera {
         boolean owed;
         synchronized (deviceLock) {
             current = round == r;
+            // 丢了的那一台关完了：这一轮记的「被踢」随之清掉（CameraRound.closed）
             r.state.closed(camera, now());
-            kickedClose = false;
             // onLossClosed 在这一轮结束时报（finishRound）：这一下就结束的当场报，关相机那一下还排着的到它结束时
             r.lossOwed = true;
             r.lossCode = code;
@@ -3912,7 +3894,7 @@ public class SingleCamera {
      * 主线程上的开、重开、调度看不到「手上没有、账本上还有」的那一下），每一份调度都叫醒。
      */
     private void roundEnded(Round r) {
-        ROUNDS.end(r.state);
+        ROUNDS.end(r.state, now());
         synchronized (deviceLock) {
             if (round == r) {
                 round = null;

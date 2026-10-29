@@ -4012,7 +4012,7 @@ public class ChannelSchedulerTest {
             opening = false;
             if (live != null && pending) {
                 Object failed = new Object();
-                live.failed(call, failed, now);
+                live.failed(call, failed, false, now);
                 live.closed(failed, now);
                 pending = false;
             }
@@ -4060,7 +4060,7 @@ public class ChannelSchedulerTest {
                 r.noCall(now);   // 重开那一下还没进 openCamera
                 assertTrue("这一轮该结束了", r.takeEnd());
             }
-            assertTrue(rounds.end(r));
+            assertTrue(rounds.end(r, now));
             live = null;
             attached = false;
         }
@@ -4068,7 +4068,7 @@ public class ChannelSchedulerTest {
         /** 丢了：设备、会话从字段上摘下，那一次关在途（SingleCamera.deviceGone：LOST，在丢）。 */
         void lose(long at) {
             if (attached && device != null) {
-                assertEquals(CameraRound.Action.LOST, live.failed(call, device, at));
+                assertEquals(CameraRound.Action.LOST, live.failed(call, device, false, at));
             }
             closeStartedAt = at;
             deviceOpen = false;

@@ -31,6 +31,12 @@ public final class CameraRounds {
     }
 
     private final Map<String, CameraRound> live = new ConcurrentHashMap<>();
+    /**
+     * 每台相机我们最近一次关完的时刻（调度的钟）：一轮在下达了关、或者丢了之后结束的那一下（{@link CameraRound#closedOut}），
+     * 谁的那一轮都算。相机服务为这一关说的话从 binder 线程上来，可能晚于这一下 —— 之后 OWN_WORD_GRACE_MS 以内还算我们引起的：
+     * 管线重建、换上新的一份之后也一样（第 2 步「只有一个调度」，ChannelScheduler.ourStepInFlight、ChannelRules.stillOurs）。
+     */
+    private final Map<String, Long> closedAt = new ConcurrentHashMap<>();
     /** 下达过几轮（主线程）：轮次号照它数，进程里唯一。 */
     private int issued;
 
@@ -55,16 +61,30 @@ public final class CameraRounds {
     }
 
     /**
-     * 主线程：这一轮结束了（相机线程判的那一下 post 过来的）：从账上划掉，这一台又能开了。不是账上那一轮（重复的那一声）什么都不做，
-     * 返回 false。
+     * 主线程：这一轮结束了（相机线程判的那一下 post 过来的）：从账上划掉，这一台又能开了；是一次关做完才结束的，记下这一刻
+     * （{@link #closedAt}）。不是账上那一轮（重复的那一声）什么都不做，返回 false。
+     *
+     * @param now 调度的钟
      */
-    boolean end(CameraRound round) {
-        return round != null && live.remove(round.cameraId, round);
+    boolean end(CameraRound round, long now) {
+        if (round == null || !live.remove(round.cameraId, round)) {
+            return false;
+        }
+        if (round.closedOut()) {
+            closedAt.put(round.cameraId, now);
+        }
+        return true;
     }
 
     /** 这一台此刻还没结束的那一轮；没有是 null。哪个线程都能读。 */
     public CameraRound live(String cameraId) {
         return cameraId == null ? null : live.get(cameraId);
+    }
+
+    /** 这一台我们最近一次关完的时刻（{@link #end} 记的，调度的钟）；进程里还没有过是 0。哪个线程都能读。 */
+    public long closedAt(String cameraId) {
+        Long at = cameraId == null ? null : closedAt.get(cameraId);
+        return at == null ? 0 : at;
     }
 
     /** 这一轮还在账上（还没结束）。 */

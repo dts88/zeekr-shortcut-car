@@ -90,7 +90,7 @@ public class CameraRoundTest {
         assertTrue(round.status().inOpenCamera);
         round.threw(call, T0 + 5);
         assertTrue(round.takeEnd());
-        assertEquals("抛了那一次的回调：不归账", Action.STRAY, round.failed(call, new Object(), T0 + 10));
+        assertEquals("抛了那一次的回调：不归账", Action.STRAY, round.failed(call, new Object(), false, T0 + 10));
     }
 
     /** 被关之后 openCamera 才抛：关相机那一下做完就结束，不等回调。 */
@@ -148,7 +148,7 @@ public class CameraRoundTest {
         assertTrue(round.closeRequested(T0 + 100));
         round.closeDone(T0 + 120);
         Object device = new Object();
-        assertEquals(Action.CLOSE_LATE, round.failed(call, device, T0 + 300));
+        assertEquals(Action.CLOSE_LATE, round.failed(call, device, false, T0 + 300));
         assertFalse(round.takeEnd());
         round.closed(device, T0 + 310);
         assertTrue(round.takeEnd());
@@ -162,7 +162,7 @@ public class CameraRoundTest {
         round.returned(call, T0 + 50);
         assertTrue(round.closeRequested(T0 + 100));
         Object device = new Object();
-        assertEquals(Action.CLOSE_LATE, round.failed(call, device, T0 + 200));
+        assertEquals(Action.CLOSE_LATE, round.failed(call, device, false, T0 + 200));
         round.closed(device, T0 + 210);
         assertFalse("关相机那一下还没做完", round.takeEnd());
         round.closeDone(T0 + 220);
@@ -176,7 +176,7 @@ public class CameraRoundTest {
         Call call = round.beginCall(T0);
         round.returned(call, T0 + 50);
         Object device = new Object();
-        assertEquals(Action.OPEN_FAILED, round.failed(call, device, T0 + 80));
+        assertEquals(Action.OPEN_FAILED, round.failed(call, device, false, T0 + 80));
         assertEquals("关那一个设备对象", Phase.CLOSING, round.phase());
         assertFalse(round.takeEnd());
         round.closed(device, T0 + 90);
@@ -192,14 +192,14 @@ public class CameraRoundTest {
         Opened open = openToAdopt(round, T0);
         Call call = open.call;
         Object device = open.device;
-        assertEquals(Action.LOST, round.failed(call, device, T0 + 5_000));
+        assertEquals(Action.LOST, round.failed(call, device, false, T0 + 5_000));
         assertEquals(Phase.LOSING, round.phase());
         assertEquals("丢的那一刻起有关没返回", T0 + 5_000, round.outstandingSince());
-        assertEquals("同一台又报一声：关已经在做", Action.IGNORE, round.failed(call, device, T0 + 5_001));
+        assertEquals("同一台又报一声：关已经在做", Action.IGNORE, round.failed(call, device, false, T0 + 5_001));
         assertFalse(round.takeEnd());
         round.closed(device, T0 + 11_000);
         assertTrue(round.takeEnd());
-        assertEquals(Action.STRAY, round.failed(call, device, T0 + 11_001));
+        assertEquals(Action.STRAY, round.failed(call, device, false, T0 + 11_001));
     }
 
     /** 下达关之后挂着的那一台才报错：关相机那一下在关它，什么都不做（不是丢了）。 */
@@ -210,7 +210,7 @@ public class CameraRoundTest {
         Call call = open.call;
         Object device = open.device;
         assertTrue(round.closeRequested(T0 + 1_000));
-        assertEquals(Action.IGNORE, round.failed(call, device, T0 + 1_001));
+        assertEquals(Action.IGNORE, round.failed(call, device, false, T0 + 1_001));
         round.closed(device, T0 + 1_200);
         round.closeDone(T0 + 1_200);
         assertTrue(round.takeEnd());
@@ -262,7 +262,7 @@ public class CameraRoundTest {
         assertEquals("关旧的", Phase.CLOSING, round.phase());
         assertEquals(T0 + 10_000, round.outstandingSince());
         assertFalse("重开时不另起一次重开", round.reopenRequested(T0 + 10_001));
-        assertEquals("旧的那一次报错：旧设备在关", Action.IGNORE, round.failed(oldCall, oldDevice, T0 + 10_002));
+        assertEquals("旧的那一次报错：旧设备在关", Action.IGNORE, round.failed(oldCall, oldDevice, false, T0 + 10_002));
         round.closed(oldDevice, T0 + 14_000);
         assertFalse(round.takeEnd());
         assertEquals("关完旧的，在开新的", Phase.OPENING, round.phase());
@@ -270,7 +270,7 @@ public class CameraRoundTest {
 
         Call newCall = round.beginCall(T0 + 14_300);
         round.returned(newCall, T0 + 14_300);
-        assertEquals("旧的那一次又来一声：早关完了，不归账", Action.STRAY, round.failed(oldCall, oldDevice, T0 + 14_400));
+        assertEquals("旧的那一次又来一声：早关完了，不归账", Action.STRAY, round.failed(oldCall, oldDevice, false, T0 + 14_400));
         Object newDevice = new Object();
         assertEquals(Action.ADOPT, round.opened(newCall, newDevice, T0 + 14_500));
         assertEquals(Phase.OPEN, round.phase());
@@ -291,7 +291,7 @@ public class CameraRoundTest {
 
         CameraRound lost = issue();
         Opened open = openToAdopt(lost, T0);
-        assertEquals(Action.LOST, lost.failed(open.call, open.device, T0 + 1_000));
+        assertEquals(Action.LOST, lost.failed(open.call, open.device, false, T0 + 1_000));
         assertFalse("在丢", lost.reopenRequested(T0 + 1_001));
 
         CameraRound closing = issue();
@@ -326,5 +326,70 @@ public class CameraRoundTest {
         round.noCall(T0);
         assertTrue(round.takeEnd());
         assertFalse(round.closeRequested(T0 + 1));
+    }
+
+    // ================================================================= 相机服务那边算不算我们的（第 2 步：被踢记在这一轮里）
+
+    /**
+     * 被踢（被断开、报错 1 / 2）之后那一次关在做：相机服务那边已经不算我们的 —— 那几秒里它报的「被占用」是新的主人；
+     * 那一次关返回就又算（这一轮马上结束）。在开、开着、照常在关都算我们的。账本上这一台的那一轮谁问都一样答。
+     */
+    @Test
+    public void aKickedLossIsNotOursInTheServiceUntilItsCloseReturns() {
+        CameraRound round = issue();
+        assertTrue("在开：我们的", round.holdsInService());
+        Opened open = openToAdopt(round, T0);
+        assertTrue("开着：我们的", round.holdsInService());
+        assertTrue(round.holdsDevice());
+        assertEquals(Action.LOST, round.failed(open.call, open.device, true, T0 + 1_000));
+        assertFalse("被踢之后那一次关：不是我们的", round.holdsInService());
+        assertFalse(round.holdsDevice());
+        assertTrue("下达了关也一样", round.closeRequested(T0 + 2_000));
+        assertFalse(round.holdsInService());
+        round.closed(open.device, T0 + 6_000);
+        assertTrue("那一次关返回了：被踢清掉", round.holdsInService());
+        round.closeDone(T0 + 6_000);
+        assertTrue(round.takeEnd());
+    }
+
+    /** 设备错误（3 / 4 / 5）之后那一次关：我们的连接还在，关完之前照样算我们占着。 */
+    @Test
+    public void aDeviceErrorLossStaysOursInTheServiceWhileItCloses() {
+        CameraRound round = issue();
+        Opened open = openToAdopt(round, T0);
+        assertEquals(Action.LOST, round.failed(open.call, open.device, false, T0 + 1_000));
+        assertEquals(Phase.LOSING, round.phase());
+        assertTrue(round.holdsInService());
+        assertFalse(round.holdsDevice());
+    }
+
+    /**
+     * 账本记「我们最近一次关完」只认一次关做完才结束的那一轮：下达过关的、丢过的算；开不起来、没下达关就结束的不算
+     * （那一下不是我们的关，相机服务那时说的话照旧按别人的算）。
+     */
+    @Test
+    public void onlyARoundEndedByACloseCountsAsOurClose() {
+        CameraRound closedByUs = issue();
+        openToAdopt(closedByUs, T0);
+        assertFalse(closedByUs.closedOut());
+        assertTrue(closedByUs.closeRequested(T0 + 1_000));
+        assertTrue(closedByUs.closedOut());
+
+        CameraRound lost = issue();
+        Opened open = openToAdopt(lost, T0);
+        assertEquals(Action.LOST, lost.failed(open.call, open.device, false, T0 + 1_000));
+        lost.closed(open.device, T0 + 2_000);
+        assertTrue(lost.takeEnd());
+        assertTrue("丢了之后那一次关也是我们的关", lost.closedOut());
+
+        CameraRound failed = issue();
+        Call call = failed.beginCall(T0);
+        failed.returned(call, T0);
+        Object device = new Object();
+        assertEquals(Action.OPEN_FAILED, failed.failed(call, device, true, T0 + 50));
+        failed.closed(device, T0 + 60);
+        assertTrue(failed.takeEnd());
+        assertFalse("开不起来：不是我们的关", failed.closedOut());
+        assertTrue("开不起来那一下不记被踢", failed.holdsInService());
     }
 }

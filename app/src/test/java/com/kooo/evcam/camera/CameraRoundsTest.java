@@ -47,14 +47,14 @@ public class CameraRoundsTest {
         first.noCall(5);
         assertTrue(first.takeEnd());
         assertTrue(rounds.isLive(first));
-        assertTrue(rounds.end(first));
+        assertTrue(rounds.end(first, 7));
         assertFalse(rounds.isLive(first));
         assertNull(rounds.live(CAM));
 
         CameraRound second = rounds.issue(CAM, oldPipeline, CameraSlots.KEY_CABIN_REAR, 10);
         assertNotNull(second);
         assertTrue(second.number > first.number);
-        assertFalse("上一轮重复的那一声：不动这一轮", rounds.end(first));
+        assertFalse("上一轮重复的那一声：不动这一轮", rounds.end(first, 7));
         assertSame(second, rounds.live(CAM));
     }
 
@@ -78,11 +78,39 @@ public class CameraRoundsTest {
         old.closed(device, 10 * 60_000 + 1);
         old.closeDone(10 * 60_000 + 1);
         assertTrue(old.takeEnd());
-        assertTrue(rounds.end(old));
+        assertTrue(rounds.end(old, 10 * 60_000 + 1));
         assertTrue(rounds.closingIds().isEmpty());
         CameraRound fresh = rounds.issue(CAM, newPipeline, CameraSlots.KEY_CABIN_REAR, 10 * 60_000 + 2);
         assertNotNull(fresh);
         assertSame(newPipeline, fresh.owner);
+    }
+
+    /**
+     * 账本记每台相机我们最近一次关完的时刻（谁的那一轮都算）：管线重建、换上新的一份之后，相机服务为旧的那一份那一关说的话
+     * 照它算我们引起的（第 2 步）。开不起来、没下达关就结束的那一轮不记。
+     */
+    @Test
+    public void theLedgerRemembersWhenWeLastClosedEachCamera() {
+        assertEquals("进程里还没关过", 0, rounds.closedAt(CAM));
+        CameraRound old = rounds.issue(CAM, oldPipeline, CameraSlots.KEY_CABIN_REAR, 0);
+        Call call = old.beginCall(0);
+        old.returned(call, 0);
+        Object device = new Object();
+        assertEquals(Action.ADOPT, old.opened(call, device, 100));
+        assertTrue(old.closeRequested(1_000));
+        old.closed(device, 1_200);
+        old.closeDone(1_200);
+        assertTrue(old.takeEnd());
+        assertTrue(rounds.end(old, 1_250));
+        assertEquals(1_250, rounds.closedAt(CAM));
+
+        CameraRound failed = rounds.issue(CAM, newPipeline, CameraSlots.KEY_CABIN_REAR, 2_000);
+        failed.noCall(2_010);
+        assertTrue(failed.takeEnd());
+        assertTrue(rounds.end(failed, 2_020));
+        assertEquals("开不起来的那一轮不记", 1_250, rounds.closedAt(CAM));
+        assertFalse("重复的那一声不动它", rounds.end(old, 3_000));
+        assertEquals(1_250, rounds.closedAt(CAM));
     }
 
     /** 退出的看门线程只等有关没返回的那几台：稳稳开着、在开的不在里面（退出时调度先关它们）。 */
@@ -129,7 +157,7 @@ public class CameraRoundsTest {
             aEnded.set(a.takeEnd());
         });
         Thread threadB = new Thread(() -> {
-            if (b.failed(open, surround, 80) == Action.LOST) {      // 另一台丢了：先报、再关，不等谁
+            if (b.failed(open, surround, false, 80) == Action.LOST) {      // 另一台丢了：先报、再关，不等谁
                 b.closed(surround, 90);
             }
             bEnded.set(b.takeEnd());
@@ -142,8 +170,8 @@ public class CameraRoundsTest {
         assertTrue("B 跑完、那一轮结束了", bEnded.get());
 
         // 主线程收到两声结束
-        assertTrue(rounds.end(a));
-        assertTrue(rounds.end(b));
+        assertTrue(rounds.end(a, 95));
+        assertTrue(rounds.end(b, 95));
         assertNotNull("这一轮结束了，新管线才下达", rounds.issue(CAM, newPipeline, CameraSlots.KEY_CABIN_REAR, 100));
     }
 }

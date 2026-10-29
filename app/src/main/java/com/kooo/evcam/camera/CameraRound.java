@@ -173,6 +173,14 @@ public final class CameraRound {
     private int jobs;
     private boolean cancelled;
     private boolean reopening;
+    /**
+     * 在丢的那一台是被踢的（被断开、报错 1 / 2）：相机服务那边已经把我们踢了，那几秒里它报的「被占用」是新的主人（{@link #holdsInService}）。
+     * 跟着丢了那一下记（{@link #failed}），那一次关返回就清（{@link #closed}）。以前是一份相机对象自己的标记（SingleCamera.kickedClose）：
+     * 管线重建时另一份相机对象问不到这一轮被踢（第 1 步审查留给第 2 步，2026-10-29）。
+     */
+    private boolean kicked;
+    /** 这一轮丢过（{@link #closedOut}）。 */
+    private boolean lost;
     private long outstandingSince;
     private boolean ended;
 
@@ -254,8 +262,13 @@ public final class CameraRound {
         return action;
     }
 
-    /** 相机线程：{@code call} 那一次的 onError / onDisconnected。 */
-    synchronized Action failed(Call call, Object device, long now) {
+    /**
+     * 相机线程：{@code call} 那一次的 onError / onDisconnected。
+     *
+     * @param kicked 被断开、报错 1 / 2（多半是别的程序拿走了）：挂着的那一台丢了的话，那一次关返回之前相机服务那边已经不算我们的
+     *               （{@link #holdsInService}）；设备错误 3 / 4 / 5 不算 —— 我们的连接还在
+     */
+    synchronized Action failed(Call call, Object device, boolean kicked, long now) {
         Action action;
         if (ended || call.state == Call.State.THREW) {
             action = Action.STRAY;
@@ -271,6 +284,8 @@ public final class CameraRound {
         } else if (device != null && device == adopted) {
             adopted = null;
             losing = device;
+            this.kicked = kicked;
+            lost = true;
             action = Action.LOST;
         } else {
             action = holds(device) ? Action.IGNORE : Action.STRAY;
@@ -294,6 +309,7 @@ public final class CameraRound {
         }
         if (losing == device) {
             losing = null;
+            kicked = false;
         }
         touch(now);
     }
@@ -362,6 +378,28 @@ public final class CameraRound {
     /** 下达了关。 */
     public synchronized boolean cancelled() {
         return cancelled;
+    }
+
+    /**
+     * 相机服务那边此刻算不算我们占着这一台：除了被踢之后那一次关在做（{@link #kicked}，那一下返回就清），这一轮在开、开着、在关都算 ——
+     * 从字段上摘下来到相机服务真的放开之间，占着它的仍然是我们。账本上这一台的那一轮谁的都一样问它（相机服务那几声认人，
+     * CameraAvailabilityWatch）：管线重建时另一份相机对象被踢、正在关，也照这一轮答（第 1 步审查留给第 2 步）。
+     */
+    public synchronized boolean holdsInService() {
+        return losing == null || !kicked;
+    }
+
+    /** 这一轮此刻挂着一台设备（开好了、没丢、没摘下：SingleCamera 那一份的设备字段就是它）。 */
+    public synchronized boolean holdsDevice() {
+        return !ended && adopted != null;
+    }
+
+    /**
+     * 这一轮是一次关做完才结束的（下达过关，或者丢过 —— 丢了之后那一次关也是我们的关）：账本据此记这一台我们最近一次关完的时刻
+     * （{@link CameraRounds#closedAt}）。开不起来、没下达关就结束的那种不算。
+     */
+    public synchronized boolean closedOut() {
+        return cancelled || lost;
     }
 
     public synchronized Phase phase() {

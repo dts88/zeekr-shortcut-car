@@ -24,7 +24,6 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * 相机服务眼里，每一路相机此刻空不空 —— 和「我们自己开没开」对着看。
@@ -262,35 +261,19 @@ public final class CameraAvailabilityWatch {
     }
 
     /**
-     * 这一路此刻在相机服务那边是不是我们的：开着、正在开、正在照常关。被断开、报错 1 / 2 之后的那一次关不算
-     * （{@link SingleCamera#holdsInService()}）—— 相机服务那时已经把我们踢了，它报的「被占用」是新主人。
+     * 这一路此刻在相机服务那边是不是我们的：开着、正在开、正在照常关 —— 只照账本答（{@link CameraRound#holdsInService}），
+     * 谁的那一轮都算（这一份管线的、换下去还在关的那一份的）。被断开、报错 1 / 2 之后的那一次关不算：相机服务那时已经把我们踢了，
+     * 它报的「被占用」是新主人（那一轮记着被踢，管线重建时也认得出，第 1 步审查留给第 2 步）。
      */
     static boolean weHoldOrOpen(String cameraId) {
-        return anyOfOurs(cameraId, SingleCamera::holdsInService);
+        CameraRound live = CameraRounds.process().live(cameraId);
+        return live != null && live.holdsInService();
     }
 
-    /** 这一路的设备此刻在我们手上（开成了、还没关）。 */
+    /** 这一路的设备此刻在我们手上（开成了、还没关）：账本上这一台的那一轮挂着一台设备（{@link CameraRound#holdsDevice}）。 */
     private static boolean weHoldDevice(String cameraId) {
-        return anyOfOurs(cameraId, SingleCamera::isCameraOpened);
-    }
-
-    /** 我们管着这一路的那份相机对象里，有没有一份此刻满足 {@code test}。 */
-    private static boolean anyOfOurs(String cameraId, Predicate<SingleCamera> test) {
-        try {
-            MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
-            if (manager == null) {
-                return false;
-            }
-            for (String key : KEYS) {
-                SingleCamera camera = manager.getCamera(key);
-                if (camera != null && cameraId.equals(camera.getCameraId()) && test.test(camera)) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            AppLog.w(TAG, "anyOfOurs: " + e);
-        }
-        return false;
+        CameraRound live = CameraRounds.process().live(cameraId);
+        return live != null && live.holdsDevice();
     }
 
     /** 有没有收到过回调。没有的话，多半是容器没把这条接口转过来。 */
@@ -497,8 +480,8 @@ public final class CameraAvailabilityWatch {
 
     /**
      * 我们在这一路有没有开或关在途（{@link #classify} 的那个参数）：接上来的调度谁说有就算有（换车型时两份管理器并存，
-     * 哪一份在动它都是我们）；再看 SingleCamera 的字段 —— 设备不在手上、在开或在关（含丢了之后的那一次关、另一份管理器
-     * 在关同一台相机）。调度接上之前只有后者，它在相机线程上改得早，见 {@link Listener#ourStepInFlight}。
+     * 哪一份在动它都是我们）；再看账本 —— 这一台有一轮还没结束、手上没挂着设备：在开或在关（含丢了之后的那一次关、
+     * 另一份管理器在关同一台相机）。调度接上之前只有后者，它在相机线程上改得早，见 {@link Listener#ourStepInFlight}。
      */
     private static boolean ourStepInFlight(String cameraId) {
         for (Listener listener : LISTENERS) {
@@ -510,7 +493,8 @@ public final class CameraAvailabilityWatch {
                 AppLog.e(TAG, "listener.ourStepInFlight failed", e);
             }
         }
-        return anyOfOurs(cameraId, camera -> !camera.isCameraOpened() && camera.holdsOrIsOpening());
+        CameraRound live = CameraRounds.process().live(cameraId);
+        return live != null && !live.holdsDevice();
     }
 
     /** 叫醒接上来的调度（主线程）。调度自己把几次叫醒并成一轮。 */
