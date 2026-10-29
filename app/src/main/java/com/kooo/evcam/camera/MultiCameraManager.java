@@ -504,9 +504,10 @@ public class MultiCameraManager {
         // 相机服务眼里每一路空不空：管线一建就听。以前只有前台服务调它，前台服务没起来时相机服务说的话一句都没收，
         // 每次丢失都被判成「没说空闲」。注册那一刻的回放在主线程上收全，排在之后 post 的每一轮之前（重复调用无害）
         CameraAvailabilityWatch.start(context);
-        // 接上进程里那一个通道调度（唯一动相机的地方，应用一起来就装上了，ChannelFacts.install）：没有别的管线接着就当场接上，
+        // 接上进程里那一个通道调度（唯一动相机的地方）：先装上（ChannelFacts.install：应用一起来就装上了，装过了什么都不做）。没有别的管线接着就当场接上，
         // 旧的那一份还在关（重建）就排着，它关完再换上这一份。录像那一侧：每一路的相机走了、样子变了、带着新会话出了画面，
         // 调度一轮最后告诉录像宿主（它只声明录像输出、照这几声进出）。登记表、相机服务、亮熄屏、车辆信号叫醒调度的监听在进程那一层，挂一次
+        ChannelFacts.install(context);
         channel = ChannelScheduler.app().register(channelSide, new LaneSide());
         // 这一份管线自己的亮熄屏那两件（ScreenState 在主线程上叫）
         if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {

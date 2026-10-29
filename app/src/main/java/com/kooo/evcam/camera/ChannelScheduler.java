@@ -1649,7 +1649,8 @@ public final class ChannelScheduler {
 
     /**
      * 装上进程里唯一的那一个调度（第 2 步「只有一个调度」，项目所有者 2026-10-29 批）：应用一起来就装（ZeekrShortcutApp.onCreate，
-     * 经 ChannelFacts.install —— 最早的那一处，之后谁来要管线、谁在静态入口上叫醒都是它）。只装一次：再调交回已经装上的那一个。主线程。
+     * 经 ChannelFacts.install —— 最早的那一处，之后谁来要管线、谁在静态入口上叫醒都是它）；要用它的入口（建管线、录像协调器挂监听）
+     * 也先经 ChannelFacts.install，装过了什么都不做，先后不要紧（审查 2026-10-30）。只装一次：再调交回已经装上的那一个。
      */
     public static synchronized ChannelScheduler install(Clock clock, Poster poster, Facts facts) {
         if (app == null) {
@@ -1712,7 +1713,7 @@ public final class ChannelScheduler {
         return s == null ? null : s.verdictCause();
     }
 
-    /** 决定变了叫它（只许 post）：录像协调器建起来时挂一次（{@link #setVerdictListener}）。 */
+    /** 决定变了叫它（只许 post）：录像协调器建起来时挂一次（{@link #setVerdictListener}；它先经 ChannelFacts.install 装上调度）。 */
     public static void setSurroundVerdictListener(Runnable listener) {
         ChannelScheduler s = app;
         if (s != null) {
@@ -1941,8 +1942,8 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 人退出以后主界面又回来了（MainActivity.onCreate：退出的记号清掉的那一下）：不再只关 —— 新建的那一份管线照常开。
-     * 换下去的那一份还在关就接着关完（它是放掉了的管线），关完换上新的一份。没在退出什么都不做。主线程。
+     * 人退出以后退出的记号清掉了（UserExit.clear：人又点开了主界面、真正开机了）：不再只关 —— 新建的那一份管线照常开。
+     * 换下去的那一份还在关就接着关完（它是放掉了的管线），关完换上新的一份。没在退出什么都不做。哪个线程都能调。
      */
     public void resumeAfterExit() {
         if (exitAt == 0) {

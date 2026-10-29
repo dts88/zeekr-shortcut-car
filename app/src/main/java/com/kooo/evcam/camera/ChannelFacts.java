@@ -71,10 +71,12 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
     }
 
     /**
-     * 装上进程里那一个调度（应用一起来，ZeekrShortcutApp.onCreate，主线程）：钟是开机以来、不含深睡（{@code SystemClock.uptimeMillis}），
-     * 队列是主线程（管线放掉时清自己的队列，碰不到调度的这一个）。只装一次。
+     * 装上进程里那一个调度：钟是开机以来、不含深睡（{@code SystemClock.uptimeMillis}），队列是主线程（管线放掉时清自己的队列，
+     * 碰不到调度的这一个）。只装一次，装过了什么都不做 —— 应用一起来就装（ZeekrShortcutApp.onCreate，最先），要用调度的入口也都先经这里
+     * （建管线、录像协调器挂监听，审查 2026-10-30），先后不要紧。哪个线程都能调：叫醒它的监听在主线程上挂（亮熄屏的监听只许主线程挂），
+     * 不在主线程上就排过去 —— 挂上之前的变化，下一轮照样认（登记表照读、相机服务的话照读）。
      */
-    public static void install(Context context) {
+    public static synchronized void install(Context context) {
         if (installed) {
             return;
         }
@@ -98,7 +100,11 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
                 main.removeCallbacks(task);
             }
         }, facts);
-        facts.attach(scheduler);
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            facts.attach(scheduler);
+        } else {
+            main.post(() -> facts.attach(scheduler));
+        }
     }
 
     /** 叫醒调度的几个监听，挂一次（主线程）。 */

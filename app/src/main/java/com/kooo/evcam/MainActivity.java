@@ -265,14 +265,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Activity:MainActivity");
         com.kooo.evcam.blackbox.BlackBox.note("主界面 onCreate savedState=" + (savedInstanceState != null));
-        // 用户退出之后，所有会自己拉起主界面的路都被拦住了 —— 这时主界面被创建，只能是人点开的
+        // 用户退出之后，所有会自己拉起主界面的路都被拦住了 —— 这时主界面被创建，只能是人点开的。清掉退出的记号也是通道调度退出的门
+        // （UserExit.clear，第 2 步「只有一个调度」）：退出以后通道只关、不开，这之前后台来要管线建出来的那一份什么都不开
         UserExit.clear(this, "manual open");
-        // 退出的门就开在这里（第 2 步「只有一个调度」）：退出以后通道只关、不开，人又点开了主界面才照常开 ——
-        // 这之前后台来要管线（录像协调器、后视镜……）建出来的那一份什么都不开。没在退出什么都不做
-        com.kooo.evcam.camera.ChannelScheduler scheduler = com.kooo.evcam.camera.ChannelScheduler.app();
-        if (scheduler != null) {
-            scheduler.resumeAfterExit();
-        }
         // 人点开的主界面 = 新的一趟（规格 1.2）：手动停录、自动开过的记录清零。
         // 我们自己静默拉起来的（恢复录像、亮屏接回）不算，界面重建（savedState 非空）也不算
         if (savedInstanceState == null
@@ -2543,7 +2538,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 退出的次序（channel-logic §五：停录 → 登记表清空 → 调度按顺序关完 → 再退出；大纲 §2 阶段 6）：
         // 1. 先告诉调度「退出」（进程里那一个）：同步写下、置 closingAnywhere，从此只关，不开、不改输出、不救；登记表从此作废 ——
-        //    接着的、排着的、这之后后台才建的管线都一样，直到人又点开主界面（onCreate 里 resumeAfterExit）。
+        //    接着的、排着的、这之后后台才建的管线都一样，直到退出的记号清掉（人又点开主界面、真正开机：UserExit.clear）。
         //    它的下一轮是 post 出去的，跑的时候下面几步的同步部分都已做完
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
         MultiCameraManager pipeline = holder.getCameraManager();
