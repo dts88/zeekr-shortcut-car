@@ -65,6 +65,11 @@ public class ChannelSchedulerTest {
     /** 通道的决定发给录像协调器的每一次（{@link #listenToVerdict}）：「KEPT DARK_ONSET」。 */
     private final List<String> verdicts = new ArrayList<>();
     /**
+     * 下一次「一步结束了」那一行写完之后跑一次（只跑这一次）：扮演相机线程在这一轮读完事实之后、照做之前动了一下（这一步结束写那一行
+     * 正落在这两样中间）。
+     */
+    private Runnable afterStepEnded;
+    /**
      * 账本（照 CameraRounds.process()：跟着进程、不跟着管线 —— 两份管线、几份假相机看的是同一本）。假相机照 SingleCamera 的样子
      * 下达一轮、下达关、报结束（{@link FakePort}）。
      */
@@ -690,6 +695,42 @@ public class ChannelSchedulerTest {
         assertTrue("没开设备：不记重开那一条", lines("recorded left REOPEN").isEmpty());
         assertEquals(1, lines("recorded left CLOSE CLOSED ms=1000 kind=REOPEN").size());
         assertEquals("接着照次序关：环视单独关", Arrays.asList("close exit"), surround.actions);
+    }
+
+    /**
+     * 救援重开碰上那一台刚在相机线程上丢了（这一轮读完事实之后、照做之前，丢了的那一声还没到）：关的那一半不下达，合并掉 ——
+     * 和以前相机层的重开在丢的那一轮上合并一样：不说在救、不记关的那一半、不起这一步。丢了的那一声到了，照丢了的规矩走：
+     * 录像那一侧听说它丢了，关完记一条丢了之后的关，没有重开的关（审查 2026-10-30）。
+     */
+    @Test
+    public void aReopenRacingALossMergesIntoTheLoss() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR, REAR);
+        streaming(surround, recS);
+        declare(rear, recR);
+        settle();
+        at(100);
+        opened(rear);   // 配好了，一帧不出
+        settle();
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        // 开那一步到点的那一轮：事实读完了，要救它的时候，相机线程上那一台刚丢了
+        afterStepEnded = () -> rear.lose(now);
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded OPEN left timedOut").size());
+        assertEquals("关的那一半没下达", Arrays.asList("open [RECORD]"), rear.actions);
+        assertTrue("不说在救", told("gone left RESCUED").isEmpty());
+        assertNull("没起这一步", s.snapshot().step);
+
+        p.onLossStarted("1", DISCONNECTED);
+        settle();
+        assertEquals(1, told("gone left LOST").size());
+        at(ChannelRules.STEP_MAX_MS + 2_000);
+        rear.closedNow();
+        p.onLossClosed("1", 2_000);
+        settle();
+        assertEquals(1, lines("recorded left CLOSE CLOSED ms=2000 kind=LOSS").size());
+        assertTrue("没有重开的关", lines("recorded left CLOSE CLOSED ms=2000 kind=REOPEN").isEmpty());
+        assertTrue(lines("stepEnded RESCUE").isEmpty());
     }
 
     /** 开的那一半开好了、还没出画面就丢了：这一步里丢了（和以前重开之后丢了一样），一行、一条出事的统计，录像那一侧听说它丢了。 */
@@ -5401,6 +5442,11 @@ public class ChannelSchedulerTest {
                     + (r.dropped != null ? " dropped " + r.dropped + " after=" + r.durationMs : "")
                     + (r.added.isEmpty() ? "" : " added=" + r.added)
                     + (r.counts != null ? " counts=" + r.counts.kind() : ""));
+            Runnable then = afterStepEnded;
+            afterStepEnded = null;
+            if (then != null) {
+                then.run();
+            }
         }
 
         @Override

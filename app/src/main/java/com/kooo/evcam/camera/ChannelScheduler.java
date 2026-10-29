@@ -3982,8 +3982,15 @@ public final class ChannelScheduler {
          * 关完记一条统计（2.11.5 第 D3 项），座舱的、环视开着的，关完前后量环视（第 D2 项）—— 和以前相机层重开时关旧设备一样（{@link CloseWatch}
          * {@link Coupling.Kind#REOPEN}）。先在账上记成在关，再交给相机层去关（{@link ChannelScheduler#REOPEN_CLOSE}）。不是计划里的关：不写「通道：关 …」那一行、
          * 不进这一轮关（「关相机：…」、关相机小结、关完一轮之后再量）、不走关座舱前先关环视，录像那一侧也不听说「我们关了它」。
+         *
+         * <p>这一路手上那一轮这时已经在丢（相机线程上刚丢了：这一轮读完事实之后、照做之前，丢了的那一声还没到）：合并掉 —— 不下达关、
+         * 不说在救、不记关的那一半、不起这一步，和以前相机层的重开在丢的那一轮上合并一样（审查 2026-10-30）。丢了的那一声到了，照丢了的规矩走。</p>
          */
         private void closeHalf(ChannelRules.Lane lane, CameraPort port, ChannelRules.Decision d, long now) {
+            CameraRound live = rounds.live(lane.cameraId);
+            if (live != null && port.owns(live) && live.phase() == CameraRound.Phase.LOSING) {
+                return;
+            }
             noteGone(lane.key, Gone.RESCUED, null, null);
             reopenWatches.add(watch(Coupling.Kind.REOPEN, null, null, lane, now));
             queueRemoved(lane, d.outputs);

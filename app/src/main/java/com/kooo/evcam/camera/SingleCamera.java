@@ -300,6 +300,13 @@ public class SingleCamera {
          */
         boolean closedOwed;
         /**
+         * 下达了关以后，这一下关掉过一台设备：关相机那一下关了挂着的那一台，或者就地关了晚到的那一台（{@link #closeLate}）。
+         * 「已关」那一行、这一台来历里的上一次关只在这时写（审查 2026-10-30）：关相机那一下没碰到设备的 —— 挂着的那一台已经丢了，
+         * 是丢了之后那一次关关的它（那几行另写、来历照它记）；或者开还没交来设备 —— 不写，不然一次和丢了前后脚的关会盖掉丢了那一次的记录、
+         * 多写一行说不准的「已关」。
+         */
+        boolean closedDevice;
+        /**
          * 丢了之后那一次关做完了：{@link CameraCallback#onLossClosed} 在这一轮结束时报（{@link #finishRound}，连同那一次的码、
          * 丢的时刻、关了多久）—— 多半就是关完的那一下；关的途中调度把这一路关了的，等关相机那一下结束它。
          */
@@ -2436,6 +2443,7 @@ public class SingleCamera {
         boolean owed;
         synchronized (deviceLock) {
             r.state.closed(camera, now());
+            r.closedDevice = true;   // 下达了关以后关掉的一台：这一轮结束时「已关」那一行照写
             ended = takeEnd(r);
             owed = ended && r.closedOwed;
         }
@@ -3779,7 +3787,8 @@ public class SingleCamera {
      * 把要关的会话和设备、这一轮都从字段上摘下来。真正关的那几步交给<b>这一轮自己的相机线程</b>（卡顿监测里叫 {@code Camera-<id> closing}）。
      * 关完了这一轮多半就结束了（{@link #finishRound}）；那一次 {@code openCamera} 还在等回调的，等它回音、晚到的设备关掉才结束，
      * 「已关」那一行、{@link CameraCallback#onCameraClosed} 也等到那时。结束之前账本上这一台一直在关，谁都不开它；
-     * 相机服务再卡，卡的是那条线程，主线程照常。</p>
+     * 相机服务再卡，卡的是那条线程，主线程照常。这一下没关到设备的（挂着的那一台已经丢了、开还没交来设备）不写「已关」那一行、
+     * 不记这一台的上一次关（{@link Round#closedDevice}），{@link CameraCallback#onCameraClosed} 照报。</p>
      *
      * <p>救援重开的关那一半也是这一下（第 2b 步，{@code why} 是 {@code reopen}）：配会话、关旧会话还挂着、排着一次重建的，
      * 一起作废（{@link #voidSessionWork}，和以前重开时一样 —— 那几个标志只在相机回调里复位，而回调不来正是要救的原因）。</p>
@@ -3853,12 +3862,16 @@ public class SingleCamera {
         closeFrameSink();
         // 会话随相机关了：它带着的输出不再算在会话里，我们建的 Surface 没声明着的放掉（下一轮要等这一轮结束才下达，不会撞上）
         forgetCarried();
-        // 最近一次关完记进这一台的来历（跨进程留着：「离上次关」装新版、退出之后也算得出，2.11.5 第 D3 项）
-        StepLog.deviceClosed(cameraId, SystemClock.elapsedRealtime() - requestedAt, why);
+        if (device != null) {
+            // 最近一次关完记进这一台的来历（跨进程留着：「离上次关」装新版、退出之后也算得出，2.11.5 第 D3 项）。
+            // 关到了设备才记：没碰到设备的（已经丢了：丢了之后那一次关记过了；开还没交来设备）记了就是盖掉真的那一次
+            StepLog.deviceClosed(cameraId, SystemClock.elapsedRealtime() - requestedAt, why);
+        }
         boolean ended;
         synchronized (deviceLock) {
             if (device != null) {
                 r.state.closed(device, now());
+                r.closedDevice = true;
             }
             r.state.closeDone(now());
             ended = takeEnd(r);
@@ -3928,13 +3941,20 @@ public class SingleCamera {
         }
     }
 
-    /** 关相机那一下的结果（这一轮结束时）：黑匣子「已关」一行、没出过画面的会话一行，报给调度。 */
+    /**
+     * 关相机那一下的结果（这一轮结束时）：黑匣子「已关」一行、没出过画面的会话一行，报给调度。「已关」那两行只在这一下关掉过一台设备时写
+     * （{@link Round#closedDevice}）—— 和丢了之后那一次关前后脚的关，设备是丢了那一下关的，那几行另写；报给调度照报，一种规矩管每一种关。
+     */
     private void reportClosed(Round r) {
         long ms = SystemClock.elapsedRealtime() - r.closeRequestedAt;
-        AppLog.d(TAG, "Camera " + cameraId + " closed in " + ms + "ms");
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 已关（"
-                + r.closeWhy + "，" + ms + "ms" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + "）");
-        noteClosedWithoutFrames(r.closeCounts, r.closeWhy, ms);
+        if (r.closedDevice) {
+            AppLog.d(TAG, "Camera " + cameraId + " closed in " + ms + "ms");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who() + " 已关（"
+                    + r.closeWhy + "，" + ms + "ms" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff() + "）");
+            noteClosedWithoutFrames(r.closeCounts, r.closeWhy, ms);
+        } else {
+            AppLog.d(TAG, "Camera " + cameraId + " close done in " + ms + "ms without a device to close (" + r.closeWhy + ")");
+        }
         if (callback != null) {
             callback.onCameraClosed(cameraId);
         }
