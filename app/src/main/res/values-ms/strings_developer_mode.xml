@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="set_developer_mode_title">Dayakan mod pembangun</string>
+<string name="set_developer_mode_summary">Amaran: ciri eksperimen dan alat penyelesaian masalah boleh menjejaskan kamera, rakaman dan storan. Mati pada pemasangan baharu; pilihan dikekalkan selepas mula semula dan kemas kini. Mematikannya menyembunyikan pilihan pembangun dan menyahaktifkan tetapannya tanpa memadam nilai tersimpan. Sesetengah perubahan memerlukan aplikasi dimulakan semula.</string>
+</resources>

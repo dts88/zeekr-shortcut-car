@@ -1052,6 +1052,6 @@
     <string name="dev_tool_recording_title">正在录制</string>
     <string name="dev_tool_progress">（%1$d/%2$d）%3$s</string>
     <string name="dev_tool_file_result">%1$s：%2$s</string>
-    <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
+<string name="dev_note">可在「设置 → 系统 → 启用开发者模式」中关闭并隐藏此分区，已保存的开发者设置会保留。</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
 </resources>
