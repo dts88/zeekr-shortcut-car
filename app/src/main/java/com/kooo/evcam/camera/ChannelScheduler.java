@@ -311,6 +311,24 @@ public final class ChannelScheduler {
 
         /** 前座舱只用一次的规矩开着（暂时，FrontCabinOneShot.ACTIVE；{@link ChannelRules.World#frontCabinOneShot}）。 */
         boolean frontCabinOneShot();
+
+        /** 进程这一层的黑匣子句子（{@link ProcessJournal}）：装上调度时拿一次。 */
+        ProcessJournal journal();
+    }
+
+    /**
+     * 进程这一层的黑匣子句子（第 2 步审查 2026-10-30）：退出、退出以后主界面又回来了、车机要睡 —— 一件事一行，由调度写（{@link #noteWinding}），
+     * 不跟着哪一份管线：空的那一份接着时也写得下，退出、车机要睡当中换上的那一份不再写一遍。句子在 ChannelFacts 里拼（这里不写中文）。主线程上调。
+     */
+    interface ProcessJournal {
+        /** 车机要睡：手上那一步（{@code key} 为 null 是没有）开了多久，最多再等 1 秒。 */
+        void sleep(String key, ChannelRules.Move move, long ms);
+
+        /** 退出：登记表作废，手上那一步做完后按次序关。 */
+        void exit(String key, ChannelRules.Move move, long ms);
+
+        /** 退出以后主界面又回来了（{@link ChannelScheduler#resumeAfterExit}）：不再只关，照常开。 */
+        void resumed();
     }
 
     /**
@@ -555,18 +573,10 @@ public final class ChannelScheduler {
          */
         void openSpan(OpenSpan span);
 
-        /** 车机要睡：手上那一步（{@code key} 为 null 是没有）开了多久，最多再等 1 秒。 */
-        void sleep(String key, ChannelRules.Move move, long ms);
-
-        /** 退出：登记表作废，手上那一步做完后按次序关。 */
-        void exit(String key, ChannelRules.Move move, long ms);
-
-        /** 退出以后主界面又回来了（{@link ChannelScheduler#resumeAfterExit}）：不再只关，照常开。 */
-        void resumed();
-
         /**
          * 这一份管线放掉了、要换下去（管线重建，{@link Pipeline#retire}）：只关，手上那一步（{@code key} 为 null 是没有）做完后按次序关。
-         * 退出时放掉的那一份不写（退出那一行已经说了）。
+         * 退出时放掉的那一份这时不写（退出那一行已经说了）；退出以后主界面又回来了、它还在换下去，那时写 —— 退出不算了，它就是一次重建
+         * （{@link ChannelScheduler#noteWinding}）。退出、主界面又回来了、车机要睡那几行在进程这一层（{@link ProcessJournal}）。
          */
         void retiring(String key, ChannelRules.Move move, long ms);
 
@@ -721,18 +731,6 @@ public final class ChannelScheduler {
 
         @Override
         public void openSpan(OpenSpan span) {
-        }
-
-        @Override
-        public void sleep(String key, ChannelRules.Move move, long ms) {
-        }
-
-        @Override
-        public void exit(String key, ChannelRules.Move move, long ms) {
-        }
-
-        @Override
-        public void resumed() {
         }
 
         @Override
@@ -1754,6 +1752,12 @@ public final class ChannelScheduler {
     private final AtomicLong windingSince = new AtomicLong();
     /** 等「都关完了」的那几位（{@link #whenClosed}），只在主线程上增删、叫。 */
     private final List<Runnable> closedWaiters = new CopyOnWriteArrayList<>();
+    /** 进程这一层的那几行（{@link ProcessJournal}）：装上时从事实那一层拿一次。 */
+    private final ProcessJournal processJournal;
+    /** 写过「车机要睡」的那一次（{@link #sleepNoticedAt} 那一刻）；0 = 没有。只在主线程上读写（{@link #noteWinding}）。 */
+    private long sleepNoted;
+    /** 写过「退出」、还没写「主界面又回来了」。只在主线程上读写。 */
+    private boolean exitNoted;
 
     // ---- 环视这一段熄屏留不留、通道的决定：跟着进程，不跟着管线（项目所有者 2026-10-27；只在主线程上读写）----
 
@@ -1815,6 +1819,7 @@ public final class ChannelScheduler {
         this.poster = Objects.requireNonNull(poster);
         this.facts = Objects.requireNonNull(facts);
         this.rounds = Objects.requireNonNull(rounds);
+        this.processJournal = Objects.requireNonNull(facts.journal());
         this.attached = placeholder();
     }
 
@@ -2122,6 +2127,37 @@ public final class ChannelScheduler {
         }
     }
 
+    /**
+     * 退出、退出以后主界面又回来了、车机要睡：每一件事写一行（进程这一层，{@link ProcessJournal}；审查 2026-10-30：以前每一份管线各写各的 ——
+     * 退出当中换上的那一份又写一遍退出，空的那一份接着时「主界面又回来了」写丢了）；手上那一步是什么、开了多久照跑的那一份的世界写。
+     * 跑的那一份换下去（管线重建）写它自己那一行：退出时放掉的这时不写（退出那一行已经说了），退出以后主界面又回来了、它还在换下去，那时写。
+     * 跑的那一份每一轮刷新事实之后调（{@link Pipeline#run}，空的那一份也调）。
+     */
+    private void noteWinding(Pipeline p, long now) {
+        ChannelRules.World w = p.w;
+        ChannelRules.Step step = w.step;
+        String key = step == null || step.keys.isEmpty() ? null : step.keys.get(0);
+        ChannelRules.Move move = step == null ? null : step.move;
+        long ms = step == null ? 0 : now - step.startedAt;
+        if (w.sleepSince != 0 && sleepNoted != w.sleepSince) {
+            sleepNoted = w.sleepSince;
+            processJournal.sleep(key, move, ms);
+        } else if (w.sleepSince == 0) {
+            sleepNoted = 0;
+        }
+        if (w.exitSince != 0 && !exitNoted) {
+            exitNoted = true;
+            processJournal.exit(key, move, ms);
+        } else if (w.exitSince == 0 && exitNoted) {
+            exitNoted = false;
+            processJournal.resumed();
+        }
+        if (w.retireSince != 0 && w.exitSince == 0 && !p.retireNoted) {
+            p.retireNoted = true;
+            p.journal.retiring(key, move, ms);
+        }
+    }
+
     /** 都关好了：接着的那一份账上都关着，它的、孤儿的相机层也没有一路开着、在开、在关（账本上一轮都不剩）。 */
     private boolean allClosed() {
         if (!ChannelRules.allClosed(attached.w) || attached.portsHold()) {
@@ -2255,8 +2291,7 @@ public final class ChannelScheduler {
         private final List<String> lastRecordKeys = new ArrayList<>();
         private boolean mainWasForeground;
         private boolean screenSeen;
-        private long sleepNoted;
-        private boolean exitNoted;
+        /** 写过「这一份换下去」那一行（{@link ChannelScheduler#noteWinding}）。 */
         private boolean retireNoted;
         private final List<String> trailKeys = new ArrayList<>();
         private final List<Long> trailMs = new ArrayList<>();
@@ -2616,7 +2651,7 @@ public final class ChannelScheduler {
         ChannelRules.Decision run(long now) {
             w.now = now;
             refresh(now, true);
-            noteWinding(now);
+            noteWinding(this, now);
             if (placeholder) {
                 // 还没有一份管线（或者换下去以后还没有新的一份）：没有路，环视留不留、通道的决定都不判、不发、不写回 ——
                 // 进程在黑着时被拉起不开相机（项目所有者 2026-10-27）：第一份管线照进程刚起来的样子起（放开、没有上一次读数，
@@ -3284,33 +3319,6 @@ public final class ChannelScheduler {
             EnumSet<CameraNeeds.Holder> copy = EnumSet.noneOf(CameraNeeds.Holder.class);
             copy.addAll(w.holders);
             journal.needs(copy, new ArrayList<>(recordKeys));
-        }
-
-        /** 车机要睡、退出、这一份管线换下去：第一次看到时各写一行（手上那一步是什么、开了多久）；退出以后主界面又回来了，写一行。 */
-        private void noteWinding(long now) {
-            ChannelRules.Step step = w.step;
-            String key = step == null || step.keys.isEmpty() ? null : step.keys.get(0);
-            ChannelRules.Move move = step == null ? null : step.move;
-            long ms = step == null ? 0 : now - step.startedAt;
-            if (w.sleepSince != 0 && sleepNoted != w.sleepSince) {
-                sleepNoted = w.sleepSince;
-                journal.sleep(key, move, ms);
-            } else if (w.sleepSince == 0) {
-                sleepNoted = 0;
-            }
-            if (w.exitSince != 0 && !exitNoted) {
-                exitNoted = true;
-                journal.exit(key, move, ms);
-            } else if (w.exitSince == 0 && exitNoted) {
-                exitNoted = false;
-                journal.resumed();
-            }
-            if (w.retireSince != 0 && !retireNoted) {
-                retireNoted = true;
-                if (w.exitSince == 0) {
-                    journal.retiring(key, move, ms);   // 退出时放掉的那一份：退出那一行已经说了
-                }
-            }
         }
 
         // ---- 2. 手上那一步结束了

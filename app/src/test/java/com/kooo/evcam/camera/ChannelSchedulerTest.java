@@ -2940,7 +2940,8 @@ public class ChannelSchedulerTest {
     /**
      * 退出又马上打开（第 2 步：只有一个调度）：退出时旧的那一份关环视，人又点开了主界面 —— 不再只关，新建的那一份排着；
      * 旧的那一份一秒就关完了，换上新的一份、开它（账本上那一台空了），一次都没被相机层挡（heldRefusals 0）；
-     * 同一台相机两份相机对象从不同时有一轮。黑匣子：退出、主界面又回来了、换下去了，各一行。
+     * 同一台相机两份相机对象从不同时有一轮。黑匣子：退出、主界面又回来了（进程这一层）、换下去了，各一行；退出不算了，
+     * 旧的那一份还在换下去 —— 那时补上它「这一份换下去」那一行（审查 2026-10-30：以前「主界面又回来了」由还在只关的它写，它那一行从不写）。
      */
     @Test
     public void aNormalExitThenAnImmediateReopenOpensOnlyAfterTheOldRoundEnds() {
@@ -2971,7 +2972,9 @@ public class ChannelSchedulerTest {
         assertTrue(lines("held ").isEmpty());
         assertEquals(1, lines("exit ").size());
         assertEquals(1, lines("resumed").size());
-        assertTrue("退出时放掉的那一份不另写重建", lines("retiring").isEmpty());
+        assertEquals("退出不算了，旧的那一份还在换下去：补上它那一行", Arrays.asList("retiring " + SUR + " CLOSE"),
+                lines("retiring"));
+        assertTrue("先写主界面又回来了", journal.indexOf("resumed") < journal.indexOf("retiring " + SUR + " CLOSE"));
         assertEquals(1, lines("swapped").size());
         assertTrue(pipe.gone);
         assertFalse(second.gone);
@@ -3379,6 +3382,58 @@ public class ChannelSchedulerTest {
         assertEquals(1, lines("swapped").size());
         assertEquals(3, lines("resumed").size());
         assertFalse(s.closing());
+    }
+
+    /**
+     * 退出当中换上的那一份（后台来要管线：排着，旧的那一份关完换上它）不再写一遍退出（审查 2026-10-30）：退出、车机要睡一件事一行，
+     * 进程这一层写，不跟着哪一份管线。
+     */
+    @Test
+    public void aPipelineSwappedInDuringExitWritesNoSecondExitLine() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        FakePort background = new FakePort("2");
+        declare(background, mirror);
+        rebuilt(new FakePipe(), SUR, background);   // 退出当中后台来要管线：排着
+        settle();
+        at(200);
+        closed(surround);   // 旧的那一份关完：换上它，接着只关
+        at(200 + ChannelRules.TICK_MS * 2);
+        assertEquals(1, lines("swapped").size());
+        assertTrue(pipe.gone);
+        assertEquals(Arrays.asList("exit null null"), lines("exit"));
+        assertTrue(lines("retiring").isEmpty());
+        assertTrue("退出时什么都不开", background.actions.isEmpty());
+    }
+
+    /**
+     * 退出、关完、换上空的那一份以后（还没有新的管线）人又点开了主界面：「主界面又回来了」照写一行 —— 以前写给空的那一份，丢了
+     * （审查 2026-10-30）。车机要睡那一行也一样不跟着管线。
+     */
+    @Test
+    public void aReopenWithNoPipelineAttachedStillWritesResumed() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        at(200);
+        closed(surround);
+        settle();
+        assertTrue("换上了空的那一份", pipe.gone);
+        assertTrue(lines("resumed").isEmpty());
+        s.resumeAfterExit();
+        settle();
+        assertEquals(1, lines("resumed").size());
+        host.sleeps = true;
+        s.onNeedsChanged();
+        settle();
+        assertEquals(Arrays.asList("sleep null null"), lines("sleep"));
     }
 
     /** 重建当中又重建：排着的那一份被新的一份替掉（还没交各路的也一样），只换上最新的那一份。 */
@@ -5052,6 +5107,14 @@ public class ChannelSchedulerTest {
         public boolean frontCabinOneShot() {
             return frontCabinOneShot;
         }
+
+        /** 进程这一层的那几行（退出、主界面又回来了、车机要睡）：和各份管线的记在同一处（{@link #journal}）。 */
+        final RecordingJournal processLines = new RecordingJournal();
+
+        @Override
+        public ChannelScheduler.ProcessJournal journal() {
+            return processLines;
+        }
     }
 
     /**
@@ -5133,7 +5196,7 @@ public class ChannelSchedulerTest {
     }
 
     /** 黑匣子：每一件事记成一行记号（「judged left TAKEN LOSS close=5409」），测试按前缀找。 */
-    private class RecordingJournal implements ChannelScheduler.Journal {
+    private class RecordingJournal implements ChannelScheduler.Journal, ChannelScheduler.ProcessJournal {
         @Override
         public void needs(Set<Holder> holders, List<String> recordKeys) {
             journal.add("needs " + holders + " " + recordKeys);

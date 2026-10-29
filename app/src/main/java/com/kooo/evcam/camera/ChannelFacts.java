@@ -38,6 +38,33 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
     private volatile boolean mirrorCabinNoted;
     /** 屏幕知道的那一刻要叫醒调度：已经排着的不再排（主线程）。 */
     private boolean knownWakeQueued;
+    /**
+     * 进程这一层的那几行黑匣子（{@link ChannelScheduler.ProcessJournal}）：退出、退出以后主界面又回来了、车机要睡 —— 一件事一行，
+     * 不跟着哪一份管线（审查 2026-10-30）。以前在每一份管线的 ChannelSide 里。
+     */
+    private final ChannelScheduler.ProcessJournal journal = new ChannelScheduler.ProcessJournal() {
+        @Override
+        public void sleep(String key, ChannelRules.Move move, long ms) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：车机要睡：相机都不要了"
+                    + (key == null || move == null ? "，按次序关"
+                    : "；手上 " + MultiCameraManager.roleName(key) + " " + MultiCameraManager.moveText(move)
+                    + "（" + MultiCameraManager.seconds(ms) + "），最多再等 " + (ChannelRules.SLEEP_GRACE_MS / 1000) + " 秒")
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
+
+        @Override
+        public void exit(String key, ChannelRules.Move move, long ms) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：退出：登记表作废，"
+                    + (key == null || move == null ? "按次序关"
+                    : "手上的 " + MultiCameraManager.roleName(key) + " " + MultiCameraManager.moveText(move)
+                    + "（" + MultiCameraManager.seconds(ms) + "）做完后按次序关"));
+        }
+
+        @Override
+        public void resumed() {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：退出以后主界面又打开了：不再只关，照常开");
+        }
+    };
 
     private ChannelFacts(Context app) {
         this.app = app;
@@ -319,5 +346,10 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
     @Override
     public boolean frontCabinOneShot() {
         return FrontCabinOneShot.ACTIVE;
+    }
+
+    @Override
+    public ChannelScheduler.ProcessJournal journal() {
+        return journal;
     }
 }

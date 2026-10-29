@@ -532,9 +532,25 @@ public class MultiCameraManager {
         return null;
     }
 
-    /** 黑匣子里的秒数，一位小数：「3.4 秒」。 */
-    private static String seconds(long ms) {
+    /** 黑匣子里的秒数，一位小数：「3.4 秒」（进程这一层的那几行也用，ChannelFacts）。 */
+    static String seconds(long ms) {
         return String.format(java.util.Locale.US, "%.1f 秒", ms / 1000f);
+    }
+
+    /** 黑匣子里手上那一步做到哪儿了：「开到一半」「正在关」（进程这一层的那几行也用，ChannelFacts）。 */
+    static String moveText(ChannelRules.Move move) {
+        switch (move) {
+            case OPEN:
+                return "开到一半";
+            case APPLY:
+                return "改输出到一半";
+            case RESCUE:
+                return "救到一半";
+            case CLOSE:
+                return "正在关";
+            default:
+                return "在途";
+        }
     }
 
     /** 「9 分 12 秒」；一分钟以内「3.4 秒」。 */
@@ -4103,27 +4119,6 @@ public class MultiCameraManager {
         }
 
         @Override
-        public void sleep(String key, ChannelRules.Move move, long ms) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：车机要睡：相机都不要了"
-                    + (key == null || move == null ? "，按次序关"
-                    : "；手上 " + roleName(key) + " " + moveText(move) + "（" + seconds(ms) + "），最多再等 "
-                    + (ChannelRules.SLEEP_GRACE_MS / 1000) + " 秒")
-                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
-        }
-
-        @Override
-        public void exit(String key, ChannelRules.Move move, long ms) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：退出：登记表作废，"
-                    + (key == null || move == null ? "按次序关"
-                    : "手上的 " + roleName(key) + " " + moveText(move) + "（" + seconds(ms) + "）做完后按次序关"));
-        }
-
-        @Override
-        public void resumed() {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：退出以后主界面又打开了：不再只关，照常开");
-        }
-
-        @Override
         public void retiring(String key, ChannelRules.Move move, long ms) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：管线重建：这一份换下去，只关，"
                     + (key == null || move == null ? "按次序关"
@@ -4281,21 +4276,6 @@ public class MultiCameraManager {
                     return "保持到点";
                 default:
                     return "没人要";
-            }
-        }
-
-        private String moveText(ChannelRules.Move move) {
-            switch (move) {
-                case OPEN:
-                    return "开到一半";
-                case APPLY:
-                    return "改输出到一半";
-                case RESCUE:
-                    return "救到一半";
-                case CLOSE:
-                    return "正在关";
-                default:
-                    return "在途";
             }
         }
 
