@@ -3077,7 +3077,12 @@ public class MultiCameraManager {
     /**
      * 相机层报来的那几声（每一路 SingleCamera 的回调，在相机线程上发）：转到主线程交给这一份管线在调度里的把手 —— 带着是哪一份管线
      * （{@link ChannelScheduler.Pipeline}：报给已经换下去的那一份的，调度只记一行，账本相机层自己改了）。给界面的相机状态、画面尺寸那几样
-     * 经弱引用找这一份管线：卡住的那一轮（孤儿）的相机线程一直挂着它的相机对象，回调不能把整份管线留住（第 2 步，审查 H2）。
+     * 经弱引用找这一份管线。
+     *
+     * <p>谁留着这一份管线（第 2 步，审查 H2、2026-10-30）：它是孤儿（换下去了、还有一台那一轮没结束）的时候，调度留着它（孤儿那几份，
+     * 连着这一份的 ChannelSide）—— 一台卡住的相机最多一份，录制器到「退出最多等」（{@link ChannelRules#EXIT_WAIT_MAX_MS}，105 秒）由
+     * 兜底那一下放掉（{@link #leftoversTask}）。放完（那一轮结束了，{@code Pipeline.finish}）以后相机层里没有谁再留着它：
+     * 卡过的那几路相机对象挂着的这个回调只经弱引用找它，把手也不再连着它。</p>
      */
     private static final class Reports implements CameraCallback {
         /** 主线程（调度只在主线程上跑；不用管线的 Handler —— 那是这一份管线的）。 */

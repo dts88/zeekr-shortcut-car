@@ -1812,6 +1812,8 @@ public final class ChannelScheduler {
     /**
      * 换下去了、还有一台相机那一轮没结束的那几份（关卡住了：「孤儿」）：只剩那几路的相机对象，账本上那一轮照旧占着那一台
      * （新的一份那一路照 {@link ChannelRules#camHeld} 不开它）。那一轮结束了、一轮都不剩，这一份才算放完（{@link PipelineHost#retired}）。
+     * 孤儿留着的时候这里留着那一份管线（连着它的 PipelineHost，也就连着那一份 MultiCameraManager）：一台卡住的相机最多一份
+     * （账本上一台只有一轮），录制器到「退出最多等」由那一份管线的兜底那一下放掉；放完以后相机层里没有谁再留着那一份管线。
      */
     private final List<Pipeline> orphans = new ArrayList<>();
     /**
@@ -1977,11 +1979,16 @@ public final class ChannelScheduler {
     // ================================================================= 关完了没有（closingAnywhere 那一组）
 
     /**
-     * 有没有正在为退出、车机要睡、管线换下去按次序关相机，还没关完（{@link #windingSince}）。哪个线程都能读。
+     * 正在按次序关相机、还没关完（{@link #windingSince}）。哪个线程都能读。为真的就是这一段（{@link #updateWinding}）：跑的那一份在为退出、
+     * 车机要睡、换下去（管线重建）收尾，而还没都关好 —— 它账上还有一路没关，或者它的、孤儿的相机层还有一路开着、在开、在关
+     * （{@link #allClosed}：这时孤儿都算）；退出、车机要睡不算了（主界面又回来了、亮屏）而手上那一步还是关的那一会儿也算。
      *
-     * <p>从进来起最多算 {@link ChannelRules#EXIT_WAIT_MAX_MS}（手上那一步封顶 + 按次序关封顶 + 余量）：一次关卡死在
-     * 相机服务里的那一下永远关不完，不封顶的话进程活着就一直为真 —— 读它的旧路径（画布没了、停录收拾完不重建会话）
-     * 从此全都不动（审查 2026-10-11）。</p>
+     * <p>纯粹的管线重建换上新的一份以后（没在退出、车机没要睡），孤儿那一次卡住的关不让它为真：读它的只有退出的最后一步
+     * （MainActivity.finishExit —— 它另看账本上还有没有一轮在关，CameraRounds.closingIds）和车机要睡（熄屏录制放唤醒锁之前，
+     * ScreenOffRecording 经 {@link #whenClosedEverywhere}），重建两样都不是；新的那一份照常跑，之后退出、车机要睡了，孤儿照算。</p>
+     *
+     * <p>从进来起最多算 {@link ChannelRules#EXIT_WAIT_MAX_MS}（在途封顶 + 按次序关封顶 + 余量）：一次关卡死在相机服务里的那一下永远关不完，
+     * 不封顶的话进程活着就一直为真，读它的那两处一直等（审查 2026-10-11；那时读它的还有画布没了、停录收拾完不重建会话那几条旧路径）。</p>
      */
     boolean closing() {
         long since = windingSince.get();
@@ -2582,7 +2589,9 @@ public final class ChannelScheduler {
         /**
          * 换下去了（{@link ChannelScheduler#swapIfDue}）：这一份的世界不再跑。录像输出该说「随相机关了」的说完，关座舱时环视那一条还没到 30 秒的
          * 提前量完、记统计（和以前调度停了一样），黑匣子写一行（换下去的那一份关了多久、有没有新的一份接上、还有哪几路没关完）。
-         * 没关完的那几路（账本上那一轮还是它的）留下当孤儿：只剩那几路的相机对象，交给它们的消费者等那一次关返回再放。
+         * 没关完的那几路（账本上那一轮还是它的）留下当孤儿：只剩那几路的相机对象，交给它们的消费者等那一次关返回再放；
+         * 不再告诉它的录像那一侧什么（孤儿那几步 —— {@link #releaseHandedOver}、{@link ChannelScheduler#settleOrphans} —— 都不用它），
+         * 不留着它。
          *
          * @param successor 有新的一份接上（不是空的那一份）
          */
@@ -2607,6 +2616,7 @@ public final class ChannelScheduler {
                 }
             }
             journal.swapped(now - retireAt, successor, stuck);
+            recording = NO_RECORDING;
             ports.clear();
             ports.putAll(keep);
             w = newWorld(new ArrayList<>(), null);
