@@ -4152,6 +4152,11 @@ public class MultiCameraManager {
         }
 
         @Override
+        public void superseded() {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：这一份管线还没放掉，又接上了一份新的：以新的那一份为准，这一份换下去");
+        }
+
+        @Override
         public void asked(String key, String cameraId, CameraTaken.Verdict mark, int n, long heldMs, Boolean free,
                           boolean absent, boolean important) {
             // 被挡着的那一路自己本来就空着：「说空闲了」不是放开，它等的是挡着它的那一路（审查 2026-10-11）

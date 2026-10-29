@@ -3436,6 +3436,35 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("sleep null null"), lines("sleep"));
     }
 
+    /**
+     * 接着的那一份还没放掉就又接上了一份（建新的之前没放旧的，不该有）：新的那一份为准（审查 2026-10-30）—— 旧的那一份换下去，
+     * 照放掉一样按次序关（原因「管线重建」），写一行；关完换上新的那一份、开它。以前新的那一份一直排着。
+     */
+    @Test
+    public void aNewerPipelineRetiresTheAttachedOneThatWasNeverReleased() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        declare(s2, mirror);
+        rebuilt(second, SUR, s2);   // 旧的那一份没放掉
+        settle();
+        assertEquals(1, lines("superseded").size());
+        assertEquals(Arrays.asList("close rebuild"), surround.actions);
+        assertEquals(1, lines("retiring").size());
+        assertTrue("旧的那一份还在关：新的一份排着", s2.actions.isEmpty());
+        at(200);
+        closed(surround);
+        at(200 + ChannelRules.TICK_MS * 2);
+        assertEquals(1, lines("swapped").size());
+        assertTrue(pipe.gone);
+        assertEquals(Arrays.asList("open [MIRROR]"), s2.actions);
+        assertFalse(second.gone);
+        assertEquals(1, lines("superseded").size());
+    }
+
     /** 重建当中又重建：排着的那一份被新的一份替掉（还没交各路的也一样），只换上最新的那一份。 */
     @Test
     public void aRebuildDuringARebuildReplacesThePendingPipeline() {
@@ -5422,6 +5451,11 @@ public class ChannelSchedulerTest {
         @Override
         public void stray(String cameraId, String report) {
             journal.add("stray " + cameraId + " " + report);
+        }
+
+        @Override
+        public void superseded() {
+            journal.add("superseded");
         }
 
         @Override

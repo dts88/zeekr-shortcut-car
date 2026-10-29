@@ -593,6 +593,12 @@ public final class ChannelScheduler {
         void stray(String cameraId, String report);
 
         /**
+         * 接着的这一份还没放掉，又接上了一份新的（{@link ChannelScheduler#register}，不该有：建新的之前先放旧的）：新的那一份为准，
+         * 这一份换下去（之后照常写「这一份换下去」那一行）。
+         */
+        void superseded();
+
+        /**
          * 问了相机服务，答回来了：这一路此刻怎么说（第 {@code n} 次）。{@code mark} 是它被拿着（TAKEN）还是被挡着（BLOCKED）：
          * 被挡着的那一路自己本来就空着，等的是挡着它的那一路放开，「说空闲了」对它不是放开。
          */
@@ -743,6 +749,10 @@ public final class ChannelScheduler {
 
         @Override
         public void stray(String cameraId, String report) {
+        }
+
+        @Override
+        public void superseded() {
         }
 
         @Override
@@ -1829,7 +1839,8 @@ public final class ChannelScheduler {
     /**
      * 一份管线接上来（MultiCameraManager 的构造，主线程）：交回它的把手（{@link Pipeline}）—— 它的各路、问的事实、它收到的报告都经这个把手。
      * 这时没有别的管线接着就当场接上；有一份接着（多半在换下去：重建时旧的那一份先放掉、再建新的），就排着等，排着的那一份被它替掉。
-     * 各路要等相机列表、合成流探测做完才交（{@link Pipeline#setLanes}）。
+     * 接着的那一份还没放掉（建新的之前没放旧的，不该有）：新的那一份为准 —— 旧的那一份换下去，和放掉一样（{@link Pipeline#retire}），
+     * 写一行（审查 2026-10-30：以前新的那一份一直排着）。各路要等相机列表、合成流探测做完才交（{@link Pipeline#setLanes}）。
      *
      * @param host      这一份管线自己的那几样（录像计划、录像输出在不在备、去掉前座舱、放完了、黑匣子的句子）
      * @param recording 这一份的录像那一侧
@@ -1844,6 +1855,10 @@ public final class ChannelScheduler {
             pending = p;
             if (older != null) {
                 older.finish();   // 排着的那一份还没接上就被替掉了（退出又马上开好几次、重建当中又重建）：什么都没开过，当场放完
+            }
+            if (attached.retireAt == 0) {
+                attached.journal.superseded();
+                attached.retire();
             }
         }
         wake();
