@@ -273,8 +273,9 @@ public class SingleCamera {
         PLAIN,
         /**
          * 救援重开的开那一半（关的那一半关完以后）：开不起来不报给界面，不在列表里记成丢了设备；画面尺寸、出帧口照这一路开着时的
-         * （不重挑、不报 onPreviewSizeChosen，出帧口用时照原来的尺寸再建）；拍照通道随关的那一半关了，照原样建回 ——
-         * 这一路的会话之前因为它配不上丢掉过的照旧不加回。
+         * （不重挑、不报 onPreviewSizeChosen，出帧口用时照原来的尺寸再建）。拍照通道随关的那一半关了，开的时候重建 —— 不是原样搬回：
+         * 「拍照使用 JPEG 输出」开关、拍照尺寸照此刻的设置重读（以前重开留着原来那个拍照通道），只是这一路的会话之前因为它配不上丢掉过的
+         * 照旧不加回；相机参数也照常记一遍（数是一样的，以前重开不记）。
          */
         RESCUE
     }
@@ -1996,8 +1997,9 @@ public class SingleCamera {
      *
      * <p>救援重开的开那一半（{@link OpenKind#RESCUE}，第 2b 步）也走这一条，差别都照 {@link Round#kind}，和以前重开的那一下一样：
      * 不在列表里记成丢了设备、开不起来都不报给界面（{@link #uiError}）；不重挑画面尺寸、不报 onPreviewSizeChosen，出帧口不动
-     * （关的那一半已经放了，用时照原来的尺寸再建）；拍照通道照原样建回（关的那一半放了它；之前会话配不上丢掉过的不加回）；
-     * 不查输出尺寸、不写画布那几行日志，打开以后记一行「reopen initiated」。</p>
+     * （关的那一半已经放了，用时照原来的尺寸再建）；不查输出尺寸、不写画布那几行日志，打开以后记一行「reopen initiated」。
+     * 和以前不一样的两样（关的那一半是一次完整的关）：拍照通道被关的那一半放了，这里重建 —— 「拍照使用 JPEG 输出」开关、拍照尺寸照此刻的设置
+     * 重读（之前会话配不上丢掉过的照旧不加回），以前重开留着原来那个；相机参数也照常记一遍（{@link #noteCharacteristics}，数是一样的）。</p>
      */
     private void openOnCameraThread(Round r) {
         final boolean rescue = r.kind == OpenKind.RESCUE;
@@ -2044,8 +2046,8 @@ public class SingleCamera {
 
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             if (rescue) {
-                // 救援重开的开那一半：画面尺寸、出帧口照这一路开着时的；拍照通道随关的那一半放了，照原样建回（jpegDropped 不清：
-                // 这一路的会话之前因为它配不上丢掉过的照旧不加回）
+                // 救援重开的开那一半：画面尺寸、出帧口照这一路开着时的；拍照通道随关的那一半放了，照此刻的设置重建（开关、拍照尺寸重读；
+                // jpegDropped 不清：这一路的会话之前因为它配不上丢掉过的照旧不加回）
                 if (map != null) {
                     prepareJpegReader(map);
                 }
