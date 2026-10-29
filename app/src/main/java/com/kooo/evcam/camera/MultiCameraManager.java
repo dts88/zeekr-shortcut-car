@@ -837,6 +837,10 @@ public class MultiCameraManager {
         if (refusedUntilGone(lane.key)) {
             return "会话连着 " + CameraLiveness.MAX_ATTEMPTS + " 次带不上录像输出，等相机走了回来、登记表变了或者亮屏再试";
         }
+        // 这一台那一轮满 60 秒还有开或关没返回（项目所有者 2026-10-28、10-29）：被拿着、在救也是它在先 —— 那一下返回之前谁都不开它
+        if (lane.heldByClose) {
+            return "这一台上一轮的开或关还没返回，返回之前不开它";
+        }
         switch (lane.condition) {
             case TAKEN:
                 return "被占用";
@@ -852,14 +856,15 @@ public class MultiCameraManager {
     }
 
     /**
-     * 这个录像意图里每一路此刻的事实，按开的次序：录像表上的状态、调度说的相机怎样（能不能开、是不是被熄屏放开了）、
-     * 录制器怎样。
+     * 这个录像意图里每一路此刻的事实，按开的次序：录像表上的状态、调度说的相机怎样（能不能开、这一台那一轮是不是满 60 秒还有开或关
+     * 没返回、是不是被熄屏放开了）、录制器怎样。
      */
     private List<RecordingLanes.Facts> laneFacts() {
         List<RecordingLanes.Facts> facts = new ArrayList<>();
         for (String key : lanes.keys()) {
             facts.add(new RecordingLanes.Facts(key, lanes.state(key), scheduler.condition(key),
-                    scheduler.cannotOpen(key), scheduler.releasedByDark(key), recorderOf(key)));
+                    scheduler.cannotOpen(key), scheduler.heldByClose(key), scheduler.releasedByDark(key),
+                    recorderOf(key)));
         }
         return facts;
     }
@@ -2972,7 +2977,11 @@ public class MultiCameraManager {
         sb.append("  ").append(roleName(v.key)).append("（相机 ").append(v.cameraId).append("）：")
                 .append(conditionText(v)).append('\n');
         sb.append("    该开：").append(wantText(v, now)).append("；实际：").append(deviceText(v, now))
-                .append(v.cannotOpen ? "；现在用不了相机，主界面回到前台之前不开" : "").append('\n');
+                .append(v.cannotOpen && !v.heldByClose ? "；现在用不了相机，主界面回到前台之前不开" : "").append('\n');
+        if (v.round != 0) {
+            // 账本上这一台的那一轮（第 1 步「轮次 + 账本」）：被它占着的、它有开或关一直没返回的，都看这一行
+            sb.append("    这一台的一轮：").append(roundText(v, now)).append('\n');
+        }
         sb.append("    会话：").append(outputsText(v, now)).append('\n');
         sb.append("    被拿着：").append(v.mark == null ? "没有"
                 : (v.mark == CameraTaken.Verdict.TAKEN ? "别的程序拿着（TAKEN）" : "被拿着的另一路挡着（BLOCKED）")
@@ -2993,6 +3002,43 @@ public class MultiCameraManager {
                             + (a.absent ? "还是不在" : Boolean.TRUE.equals(a.free) ? "说空闲了" : "还被占着"))
                     .append('\n');
         }
+    }
+
+    /**
+     * 诊断报告里账本上这一台的那一轮（第 1 步「轮次 + 账本」，项目所有者 2026-10-29 批）：「第 12 轮（另一份管线的后座舱，3 分 15 秒前下达）：
+     * 在关（closing open-pending），3 分 12 秒前起一直有开或关没返回；被它占着：它结束之前不开这一路，别的路不再等它」。
+     */
+    private static String roundText(ChannelScheduler.LaneView v, long now) {
+        CameraRound.Status st = v.roundStatus;
+        StringBuilder sb = new StringBuilder("第 ").append(v.round).append(" 轮（")
+                .append(v.roundOwnedByLane ? (v.held ? "这一路关了、还没结束的那一轮" : "这一路手上的")
+                        : "另一份管线的" + roleName(v.roundOwnerKey))
+                .append("，").append(timeText(now - v.roundSince)).append("前下达）：");
+        switch (st.phase) {
+            case OPENING:
+                sb.append("在开");
+                break;
+            case OPEN:
+                sb.append("开着");
+                break;
+            case LOSING:
+                sb.append("在丢（丢了之后那一次关还没返回）");
+                break;
+            default:
+                sb.append("在关");
+                break;
+        }
+        sb.append(st.kinds().isEmpty() ? "" : "（" + st.kinds() + "）");
+        if (st.outstandingSince != 0) {
+            sb.append("，").append(timeText(now - st.outstandingSince)).append("前起一直有开或关没返回");
+        }
+        if (v.held) {
+            sb.append("；被它占着：它结束之前不开这一路");
+        }
+        if (v.heldByClose) {
+            sb.append(v.held ? "，" : "；").append("别的路不再等它");
+        }
+        return sb.toString();
     }
 
     private static String conditionText(ChannelScheduler.LaneView v) {
@@ -3207,8 +3253,13 @@ public class MultiCameraManager {
         }
 
         @Override
-        public long closingSince() {
-            return camera.closingSince();
+        public CameraRound round() {
+            return camera.currentRound();
+        }
+
+        @Override
+        public boolean owns(CameraRound round) {
+            return camera.owns(round);
         }
 
         @Override
@@ -3636,12 +3687,18 @@ public class MultiCameraManager {
             com.kooo.evcam.blackbox.BlackBox.noteImportant(line);
         }
 
+        /**
+         * 「相机 1（后座舱）放开了（相机服务报的；被拿走 3 分 12 秒）：等通道安静 3 秒，单独开」；这一台还被一轮占着、或者它自己那一次关
+         * 还没返回的（第 1 步「轮次 + 账本」：放开了也不开它）结尾换成「；这一台上一轮的开或关还没返回，返回之前不开」。
+         */
         @Override
-        public void released(String key, String cameraId, CameraTaken.Verdict was, long heldMs, boolean asked) {
+        public void released(String key, String cameraId, CameraTaken.Verdict was, long heldMs, boolean asked,
+                             boolean stillHeld) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + "（" + roleName(key) + "）放开了（"
                     + (was == CameraTaken.Verdict.BLOCKED ? "挡着它的那一路放开了；被挡了 "
-                    : (asked ? "问出来的" : "相机服务报的") + "；被拿走 ") + duration(heldMs)
-                    + "）：等通道安静 " + (ChannelRules.QUIET_MS / 1000) + " 秒，单独开");
+                    : (asked ? "问出来的" : "相机服务报的") + "；被拿走 ") + duration(heldMs) + "）"
+                    + (stillHeld ? "；这一台上一轮的开或关还没返回，返回之前不开"
+                    : "：等通道安静 " + (ChannelRules.QUIET_MS / 1000) + " 秒，单独开"));
         }
 
         @Override
@@ -3747,6 +3804,33 @@ public class MultiCameraManager {
                     return;
             }
             com.kooo.evcam.blackbox.BlackBox.note(line);
+        }
+
+        /**
+         * 一路被一轮占着满 60 秒（项目所有者 2026-10-28、10-29：我们上一次关它、开它还没返回，返回之前谁都不开它；别的路照常）：
+         * 「通道：后座舱（相机 1）这一台的第 12 轮 60.0 秒还有开或关没返回（这一路的，closing-lost）：返回之前不开它，别的路照常」。
+         * 没返回的那一段一行。
+         */
+        @Override
+        public void held(ChannelScheduler.Held h) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + roleName(h.key) + "（相机 " + h.cameraId + "）这一台的第 "
+                    + h.round + " 轮 " + duration(h.ms) + "还有开或关没返回（"
+                    + (h.ownRound ? "这一路的" : "另一份管线的" + roleName(h.ownerKey))
+                    + (h.kinds.isEmpty() ? "" : "，" + h.kinds) + "）：返回之前不开它，别的路照常");
+        }
+
+        /**
+         * 「通道：后座舱（相机 1）第 12 轮那一下返回了（没返回了 3 分 12 秒）：照常开」。接下来怎样照这一路此刻的样子写：没人要了
+         * 「眼下没人要它，不开」，被拿着「别的程序拿着它，等它空出来再开」，被挡着「也算被拿着，等都放开再开」。
+         */
+        @Override
+        public void heldEnded(String key, String cameraId, int round, long ms, CameraTaken.Verdict mark, boolean wanted) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + roleName(key) + "（相机 " + cameraId + "）第 " + round
+                    + " 轮那一下返回了（没返回了 " + duration(ms) + "）："
+                    + (!wanted ? "眼下没人要它，不开"
+                    : mark == CameraTaken.Verdict.TAKEN ? "别的程序拿着它，等它空出来再开"
+                    : mark == CameraTaken.Verdict.BLOCKED ? "也算被拿着，等都放开再开"
+                    : "照常开"));
         }
 
         @Override

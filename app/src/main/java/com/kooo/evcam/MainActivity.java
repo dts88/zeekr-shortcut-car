@@ -2613,23 +2613,21 @@ public class MainActivity extends AppCompatActivity {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        // 相机由通道调度按次序关（环视先、座舱后）：等它报关完（closingAnywhere 变假），再等还在关的那几路的 latch
+        // 相机由通道调度按次序关（环视先、座舱后）：等它报关完（closingAnywhere 变假），再看账本上还有没有一轮在关、没结束
+        // （CameraRounds.closingIds：关没返回的那一轮结束之前这一台一直在上面，第 1 步「轮次 + 账本」）。只是看，不等谁的锁：
+        // 每 200 ms 看一次，歇着不空转、不和要跑关相机那几轮的主线程抢（审查 2026-10-11）
         java.util.List<String> stuck;
         while (true) {
             long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
-            stuck = com.kooo.evcam.camera.SingleCamera.awaitAllClosed(Math.min(Math.max(left, 0L), 200L));
+            stuck = com.kooo.evcam.camera.CameraRounds.process().closingIds();
             if (left <= 0 || (!com.kooo.evcam.camera.ChannelScheduler.closingAnywhere() && stuck.isEmpty())) {
                 break;
             }
-            if (stuck.isEmpty()) {
-                // 眼下没有一路在关（调度还在等手上那一步做完，开到一半、配会话最多 15 秒）：awaitAllClosed 当场返回，
-                // 不歇一下就空转占满一个核，和要跑关相机那几轮的主线程抢（审查 2026-10-11）
-                try {
-                    Thread.sleep(Math.min(200L, left));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
+            try {
+                Thread.sleep(Math.min(200L, left));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
             }
         }
         // 停录收尾（收拾线程上，每一路最多 CodecVideoRecorder.STOP_BUDGET_MS）：通常比关相机先做完，没做完就等到同一个期限
@@ -3479,7 +3477,8 @@ public class MainActivity extends AppCompatActivity {
      *
      * <p>只在在录（至少一路在录）时说，取自协调器给的各路摘要（{@link RecordingCoordinator#summary}，
      * 管线按 {@link com.kooo.evcam.camera.RecordingLanes#hint} 选的那一句）：一路被占用、两路以上被占用、
-     * 一路无法录制（停手了、录制器建不起来）。一路都没在录时录制键上说「等待摄像头」，这里不再说。</p>
+     * 一路无法录制（停手了、录制器建不起来，或者它这一台那一轮满 60 秒还有开或关没返回 —— 返回之前不开它，项目所有者 2026-10-28、10-29）。
+     * 一路都没在录时录制键上说「等待摄像头」，这里不再说。</p>
      *
      * <p>每次都现问协调器，不靠回调时记下的标记：界面重建、回到前台时，一路正被占用，新界面照样说。</p>
      */
