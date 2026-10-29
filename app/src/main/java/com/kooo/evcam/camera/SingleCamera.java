@@ -2110,7 +2110,7 @@ public class SingleCamera {
     }
 
     /**
-     * 进 {@code openCamera}（这一轮的相机线程）：一次一个回调（{@link RoundCallback}，框架自己认的那一份身份）。进之前在锁里看一次
+     * 进 {@code openCamera}（这一轮的相机线程；一轮只进这一次）：一个回调（{@link RoundCallback}，框架自己认的那一份身份）。进之前在锁里看一次
      * 这一轮下达了关没有（{@link CameraRound#beginCall}）—— 判断和记账在同一把锁里，和主线程上的 {@link #closeCamera} 不会错开；
      * 被关了就不进。正常返回了记成在等回调（这一轮结束之前一定等到它）；抛了这一次没有在等的，这一轮还是当前的就报开不起来。
      *
@@ -2175,7 +2175,7 @@ public class SingleCamera {
     }
 
     /**
-     * 一次 {@code openCamera} 的回调（每一次一个：框架自己认的那一份身份，{@link CameraRound.Call}），在那一轮的相机线程上。
+     * 这一轮那一次 {@code openCamera} 的回调（一轮一个：框架自己认的那一份身份，{@link CameraRound.Call}），在那一轮的相机线程上。
      * 照这一轮的账做（{@link CameraRound#opened}、{@link CameraRound#failed}）：挂上、丢了、开不起来、晚到的就地关、不管。
      */
     private final class RoundCallback extends CameraDevice.StateCallback {
@@ -2241,7 +2241,7 @@ public class SingleCamera {
                 deviceLost = false;
                 counts.clear();   // 新的一台设备：上一台那一份不再算，会话配好时重新数
                 CameraContention.ourCameraOpened(cameraId);
-                AppLog.d(TAG, "Camera " + cameraId + " opened (round " + r.state.number + ", call " + call.number + ")");
+                AppLog.d(TAG, "Camera " + cameraId + " opened (round " + r.state.number + ")");
                 if (callback != null) {
                     callback.onCameraOpened(cameraId);
                 }

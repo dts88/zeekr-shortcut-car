@@ -12,9 +12,9 @@ import java.util.List;
  *
  * <p>下面三样都成立的那一下（{@link #takeEnd}；在这一轮的相机线程上判，判和改都在 SingleCamera 的那把锁里，只结束一次）：</p>
  * <ul>
- *   <li>没有一次 {@code openCamera} 在等回调：{@code openCamera} 正常返回之后、这一次的 onOpened / onError / onDisconnected
- *       到之前算在等。每一次 {@code openCamera} 一个 StateCallback（{@link Call}，框架自己认的那一份身份）：旧的那一次晚到的回调
- *       认不成新的。开之前就被关了、{@code openCamera} 抛了的，没有在等的；</li>
+ *   <li>那一次 {@code openCamera} 没在等回调：{@code openCamera} 正常返回之后、它的 onOpened / onError / onDisconnected
+ *       到之前算在等。一轮一次 {@code openCamera}、一个 StateCallback（{@link Call}，框架自己认的那一份身份）：上一轮晚到的回调
+ *       落在上一轮的账上，认不成这一轮的。开之前就被关了、{@code openCamera} 抛了的，没有在等的；</li>
  *   <li>这一轮拿到过的每一个设备对象都关完了（{@code close()} 返回了）—— 关了之后才开好的那一台也算：关掉它，这一轮才结束；</li>
  *   <li>没有一次关在做（关相机那一下排着、在做），也没有一次开还没进 {@code openCamera}（开之前查列表、查参数）。</li>
  * </ul>
@@ -47,15 +47,15 @@ public final class CameraRound {
         LOSING
     }
 
-    /** 一次 {@code openCamera} 的回调来了，相机层照它做什么（{@link #opened}、{@link #failed}）。 */
+    /** 这一轮那一次 {@code openCamera} 的回调来了，相机层照它做什么（{@link #opened}、{@link #failed}）。 */
     public enum Action {
-        /** 这一轮最近那一次 {@code openCamera} 开好了，这一轮没下达关：设备挂上，接着建会话。 */
+        /** 那一次 {@code openCamera} 开好了，这一轮没下达关：设备挂上，接着建会话。 */
         ADOPT,
-        /** 这一轮最近那一次 {@code openCamera} 还没开好就报错、被断开：这个设备对象关掉，报开不起来。 */
+        /** 那一次 {@code openCamera} 还没开好就报错、被断开，这一轮没下达关：这个设备对象关掉，报开不起来。 */
         OPEN_FAILED,
         /** 挂着的那一台丢了（被断开、报错）：先报、再关。 */
         LOST,
-        /** 这一轮下达了关（或者这一次不是这一轮最近那一次 {@code openCamera}）：设备晚到，就地关掉，关完这一轮才可能结束。 */
+        /** 这一轮下达了关之后那一次 {@code openCamera} 才回音：设备晚到，就地关掉，关完这一轮才可能结束。 */
         CLOSE_LATE,
         /** 这一台的关已经有人在做（关相机那一下、丢了之后的关、晚到的就地关）：什么都不做。 */
         IGNORE,
@@ -66,7 +66,7 @@ public final class CameraRound {
         STRAY
     }
 
-    /** 一次 {@code openCamera}：一次一个 StateCallback（相机层的回调拿着它，凭它认是哪一次）。 */
+    /** 这一轮那一次 {@code openCamera}：一个 StateCallback（相机层的回调拿着它，凭它认是哪一轮的）。 */
     public static final class Call {
         enum State {
             /** 在调 {@code openCamera}（还没返回）。 */
@@ -79,13 +79,7 @@ public final class CameraRound {
             ANSWERED
         }
 
-        /** 这一轮里第几次 {@code openCamera}（从 1 起）。 */
-        public final int number;
         State state = State.CALLING;
-
-        Call(int number) {
-            this.number = number;
-        }
 
         boolean outstanding() {
             return state == State.CALLING || state == State.PENDING;
@@ -97,9 +91,9 @@ public final class CameraRound {
         public final Phase phase;
         /** 从什么时候起一直有开或关没返回（{@link CameraRound#outstandingSince}）；0 = 稳稳开着。 */
         public final long outstandingSince;
-        /** 最近那一次 {@code openCamera} 还没返回（卡在相机服务里的就是这样）。 */
+        /** 那一次 {@code openCamera} 还没返回（卡在相机服务里的就是这样）。 */
         public final boolean inOpenCamera;
-        /** 最近那一次 {@code openCamera} 返回了、还在等回调。 */
+        /** 那一次 {@code openCamera} 返回了、还在等回调。 */
         public final boolean openPending;
         /** 这一轮下达了关。 */
         public final boolean cancelled;
@@ -156,9 +150,8 @@ public final class CameraRound {
 
     /** 下达的那一次开还没进 {@code openCamera}（开之前查列表、查参数）：一轮里只有这一次开。 */
     private boolean beforeCall = true;
-    /** 这一轮最近那一次 {@code openCamera}；还没调过是 null。 */
+    /** 这一轮那一次 {@code openCamera}；还没调过（或者没进去）是 null。 */
     private Call current;
-    private int calls;
     /** 交到这一轮手上、还没关完的设备对象（按对象认）。 */
     private final List<Object> devices = new ArrayList<>();
     /** 挂在相机对象上的那一台（开好了、没丢、没摘下）；没有是 null。 */
@@ -200,7 +193,7 @@ public final class CameraRound {
             touch(now);
             return null;
         }
-        current = new Call(++calls);
+        current = new Call();
         touch(now);
         return current;
     }
@@ -235,7 +228,7 @@ public final class CameraRound {
         } else if (call.outstanding()) {
             call.state = Call.State.ANSWERED;
             received(device);
-            if (call == current && !cancelled) {
+            if (!cancelled) {
                 adopted = device;
                 action = Action.ADOPT;
             } else {
@@ -261,11 +254,7 @@ public final class CameraRound {
         } else if (call.outstanding()) {
             call.state = Call.State.ANSWERED;
             received(device);
-            if (call == current && !cancelled) {
-                action = Action.OPEN_FAILED;
-            } else {
-                action = Action.CLOSE_LATE;
-            }
+            action = cancelled ? Action.CLOSE_LATE : Action.OPEN_FAILED;
         } else if (device != null && device == adopted) {
             adopted = null;
             losing = device;

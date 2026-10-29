@@ -4702,7 +4702,7 @@ public class ChannelSchedulerTest {
         CameraRound live;
         /** {@link #live} 还在手上（没下达关）。 */
         boolean attached;
-        /** 那一轮最近那一次 openCamera、它还在等回调没有；挂着的那一台。 */
+        /** 那一轮那一次 openCamera、它还在等回调没有；挂着的那一台。 */
         CameraRound.Call call;
         boolean pending;
         Object device;
