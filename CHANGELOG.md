@@ -32,7 +32,7 @@ Upgrade from 2.0.0.
 - **Driving info bar (experimental) redesigned.** New items such as Sentry Mode, front and rear lamps and drive mode. You can choose which items it shows, and it is added to the surround view recording only. There's an easter egg in it.
 - **New: Simulated drive sound (experimental).** Simulated engine sound in Sport mode that follows throttle and speed. Two sounds, American V8 and Supersonic jet (old version); it can also play in Standard mode.
 - **New: Smart button support (experimental).** Smart buttons can be connected, and single and double press each run an action: anything the floating button can do, or switch the drive mode (Comfort, Standard or Sport). Settings show each button's battery level.
-- **Interface and features refined.** Settings reorganized, text sizes unified, and multi-line text easier to read. New settings backup (export and import). Downloaded updates are verified before installing (thanks to wysie).
+- **Interface and features refined.** Settings reorganized and text sizes unified. New settings backup (export and import). Downloaded updates are verified before installing (thanks to wysie).
 
 **Known issues**
 - Recording the rear cabin camera every day may eventually crash App Lab, which then has to be reinstalled. The cause is still under investigation. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
