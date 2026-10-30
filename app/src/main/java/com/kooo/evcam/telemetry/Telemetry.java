@@ -35,6 +35,7 @@ import java.util.List;
  *       熄屏判断在安卓亮屏时也叫一次（{@link #retryLinkIfFailed}）；这台车机根本没有这套接口（{@link CarLink#UNAVAILABLE}）不再试。</li>
  *   <li>要「此刻」的读数（安卓刚亮屏，记着的可能是睡前的）：{@link #reconcileNow} 立刻读一遍、立刻发布，
  *       回调排在监听者那一批后面。</li>
+ *   <li>只有一处写：灵动贴切驾驶模式（{@link #setDriveMode}，2026-10-30），别的号一个都不写。</li>
  * </ul>
  *
  * <p>车辆接口的结果每变一次往黑匣子记一行「车辆信号连接：…」（连接经过的细节在括号里）；
@@ -582,6 +583,31 @@ public final class Telemetry {
     /** 车辆接口此刻连着、读数是活的（熄屏判断：不连着就只看安卓）。 */
     public boolean carLinkConnected() {
         return carLink() == CarLink.CONNECTED;
+    }
+
+    /**
+     * 这个入口唯一的一处写（灵动贴「驾驶模式」，项目所有者 2026-10-30）：把驾驶模式切成舒适 / 标准 / 运动。
+     *
+     * <p>只收 {@link Signal#DRIVE_MODE_COMFORT}、{@link Signal#DRIVE_MODE_STANDARD}、{@link Signal#DRIVE_MODE_SPORT} 三个值，
+     * 写的号就是读驾驶模式的那个（{@link Signal#DRIVE_MODE}）。它是车机设置里本来就能随时切的偏好，车上写进去、仪表跟着变、
+     * 读回也变（Lab findings §2.55、§2.56）。别的号一个都不写：门锁、车窗、座椅、哨兵这些不在这里（项目所有者 2026-10-27 / 10-30）。</p>
+     *
+     * <p>车辆接口没连上、写不进、读回没变，都算没切。{@code done} 在主线程上收结果。</p>
+     */
+    public void setDriveMode(int mode, java.util.function.Consumer<Boolean> done) {
+        if (mode != Signal.DRIVE_MODE_COMFORT && mode != Signal.DRIVE_MODE_STANDARD && mode != Signal.DRIVE_MODE_SPORT) {
+            main.post(() -> done.accept(false));
+            return;
+        }
+        EcarxSource c;
+        synchronized (lock) {
+            c = car;
+        }
+        if (c == null) {
+            main.post(() -> done.accept(false));
+            return;
+        }
+        c.write(Signal.DRIVE_MODE.id, mode, ok -> main.post(() -> done.accept(ok)));
     }
 
     /** 车辆接口连接经过的细节（英文，诊断报告用）；没人用时 null。 */

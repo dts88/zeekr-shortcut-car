@@ -43,6 +43,8 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.camera.ChannelFacts.install(this);
         // 模拟声浪（开发者选项，试验）跟着车辆信号开关声音那一路：搭在上面登记的车辆信号核心上，开关关着时什么都不做
         com.kooo.evcam.sound.DriveSound.install(this);
+        // 灵动贴（试验性）：连接过的就开始听它们的广播，按下去照选的动作做；没连接过的、用户退出了的什么都不做
+        com.kooo.evcam.button.SmartButtons.install(this);
         // 「这一趟」的录像选择落盘（规格 1.2）：进程被杀又拉回来时还在；车机真正开机就清。
         // 「这一趟要录」变了、人按了停止时写到盘上才返回（commit）：熄屏那一刻改的「这一趟要录」要赶在车机几秒后结束进程之前落盘
         // （2026-10-10）；别的几项排队异步写（apply），不在主线程上等盘（审查 2026-10-11）

@@ -33,6 +33,29 @@ public enum FloatingAction {
         this.key = key;
     }
 
+    /**
+     * 在界面上叫什么（悬浮按钮的「点击」「长按」、灵动贴的「单击」「双击」都用它）。
+     *
+     * <p>新增一个动作时这里忘了加分支，它会显示成「打开主界面」—— 不会崩，但会说谎，所以新增时两处一起改。</p>
+     */
+    public int labelRes() {
+        switch (this) {
+            case TOGGLE_RECORDING:
+                return com.kooo.evcam.R.string.floating_action_toggle_recording;
+            case TAKE_PHOTO:
+                return com.kooo.evcam.R.string.floating_action_take_photo;
+            case TOGGLE_MIRROR:
+                return com.kooo.evcam.R.string.floating_action_toggle_mirror;
+            case LOCK_FOOTAGE:
+                return com.kooo.evcam.R.string.floating_action_lock_footage;
+            case TOGGLE_DRIVE_SOUND:
+                return com.kooo.evcam.R.string.floating_action_toggle_drive_sound;
+            case OPEN_APP:
+            default:
+                return com.kooo.evcam.R.string.floating_action_open_app;
+        }
+    }
+
     /** 认不出来的值一律回到默认 —— 配置是可以被手改的。 */
     public static FloatingAction fromKey(String key) {
         if (key != null) {

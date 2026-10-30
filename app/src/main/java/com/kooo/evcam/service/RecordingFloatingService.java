@@ -112,8 +112,7 @@ public class RecordingFloatingService extends Service {
     private boolean isDragging = false;
     private static final int CLICK_THRESHOLD = 10;
 
-    // 录制服务
-    private CameraRecordingService recordingService;
+    // 录制服务：按钮在时绑着它（开录、停录不经它，见 QuickActions）
     private boolean isServiceBound = false;
 
     // 录制状态（照协调器画，见 renderRecordingState）
@@ -137,8 +136,6 @@ public class RecordingFloatingService extends Service {
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            CameraRecordingService.LocalBinder binder = (CameraRecordingService.LocalBinder) service;
-            recordingService = binder.getService();
             isServiceBound = true;
 
             // 之后的变化协调器会发 ACTION_RECORDING_STATE_CHANGED 广播，本服务一直听着；这里只对一次当前状态
@@ -147,7 +144,6 @@ public class RecordingFloatingService extends Service {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            recordingService = null;
             isServiceBound = false;
         }
     };
@@ -564,200 +560,11 @@ public class RecordingFloatingService extends Service {
     // ========== 按钮动作 ==========
 
     /**
-     * 单击 / 长按各做什么，见 {@link FloatingAction}。
-     *
-     * <p>录制那一条走原来那套（按应用在不在前台分三种情况），其余几条都是
-     * 一句话的事。</p>
+     * 单击 / 长按各做什么，见 {@link FloatingAction}；怎么做在 {@link com.kooo.evcam.overlay.QuickActions}（灵动贴走同一份）。
      */
     private void perform(FloatingAction action) {
-        switch (action) {
-            case TOGGLE_RECORDING:
-                toggleRecording();
-                return;
-            case TAKE_PHOTO:
-                takePhoto();
-                return;
-            case TOGGLE_MIRROR:
-                toggleMirror();
-                return;
-            case LOCK_FOOTAGE:
-                com.kooo.evcam.storage.AutoLock.get().lockNow(this);
-                return;
-            case TOGGLE_DRIVE_SOUND:
-                toggleDriveSound();
-                return;
-            case OPEN_APP:
-            default:
-                openApp();
-        }
-    }
-
-    /**
-     * 开 / 关模拟声浪（设置 → 系统「模拟声浪（试验性）」，2026-10-24 起不归开发者选项管）：开车时一键关的地方。
-     * 每按一次回一句现在是开还是关。马上生效（{@code DriveSound.refresh}）。
-     */
-    private void toggleDriveSound() {
-        boolean on = !appConfig.isDriveSoundEnabled();
-        appConfig.setDriveSoundEnabled(on);
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: 悬浮按钮 → 模拟声浪" + (on ? "开" : "关"));
-        com.kooo.evcam.sound.DriveSound.refresh(this);
-        Toast.makeText(this, on ? R.string.msg_drive_sound_on : R.string.msg_drive_sound_off,
-                Toast.LENGTH_SHORT).show();
-    }
-
-    private void openApp() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        startActivity(intent);
-    }
-
-    /**
-     * 拍一张：和主界面的拍照键走同一个入口（相机层的 {@code takePhoto}）。
-     *
-     * <p>主界面在不在前台、相机开没开都一样：相机没开就先开（登记表的规则），出了画面再拍，
-     * 提示按真的存下了几路说。以前这里发广播给主界面、或者把主界面拉起来等 3 秒碰运气 ——
-     * 相机没开时拍不到，却照样提示「已保存」。</p>
-     */
-    private void takePhoto() {
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().getOrInit(this)
-                .takePhoto(new com.kooo.evcam.ui.PhotoFeedback(this));
-    }
-
-    private void toggleMirror() {
-        boolean on = appConfig.isRearViewEnabled();
-        if (!com.kooo.evcam.overlay.OverlayCoordinator.setRearViewEnabled(this, !on)) {
-            Toast.makeText(this, R.string.msg_need_overlay,
-                    Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    // ========== 录制控制 ==========
-
-    private void toggleRecording() {
-        AppLog.d(TAG, "toggleRecording called, recordingService=" + recordingService + ", isRecording=" + isRecording);
-
-        // 获取应用状态
-        AppState appState = getAppState();
-        AppLog.d(TAG, "App state: " + appState);
-
-        // 根据应用状态选择录制方式
-        switch (appState) {
-            case FOREGROUND:
-                // 应用在前台，通过 MainActivity 停止录制
-                AppLog.d(TAG, "App is in foreground, sending stop recording broadcast to MainActivity");
-                Intent stopIntent = new Intent("com.kooo.evcam.action.TOGGLE_RECORDING");
-                stopIntent.setPackage(getPackageName());
-                sendBroadcast(stopIntent);
-                return;
-            case BACKGROUND:
-                // 应用在后台，通过服务启动/停止录制，不拉起 MainActivity
-                AppLog.d(TAG, "App is in background, starting/stopping recording via service...");
-                startRecordingViaService();
-                return;
-            case NOT_RUNNING:
-                // 应用未运行，需要启动 MainActivity
-                AppLog.d(TAG, "App not running, starting MainActivity with auto_start_recording...");
-                Intent intent = new Intent(this, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                intent.putExtra("auto_start_recording", true);
-                startActivity(intent);
-                Toast.makeText(this, R.string.msg_starting_recording,
-                        Toast.LENGTH_SHORT).show();
-                return;
-        }
-    }
-
-    /**
-     * 通过服务启动/停止录制（用于应用在后台时）
-     */
-    private void startRecordingViaService() {
-        AppLog.d(TAG, "Recording via service... isRecording=" + isRecording);
-
-        // 确保录制服务已启动
-        Intent serviceIntent = new Intent(this, CameraRecordingService.class);
-        startService(serviceIntent);
-
-        // 如果服务未绑定，先绑定
-        if (recordingService == null) {
-            bindRecordingService();
-        }
-
-        // 使用递归检查确保服务绑定完成
-        tryStartOrStopRecording(0);
-    }
-
-    /**
-     * 尝试启动或停止录制（带重试机制）
-     * @param retryCount 重试次数
-     */
-    private void tryStartOrStopRecording(int retryCount) {
-        final int MAX_RETRIES = 5;
-        final long RETRY_DELAY_MS = 500;
-
-        if (recordingService != null) {
-            // 服务已绑定，执行录制操作
-            if (isRecording) {
-                AppLog.d(TAG, "Stopping recording via service");
-                // 在后台线程执行停止操作，避免阻塞主线程
-                new Thread(() -> {
-                    try {
-                        recordingService.stopRecording();
-                    } catch (Exception e) {
-                        AppLog.e(TAG, "Error stopping recording in background", e);
-                        // 按钮照协调器此刻的样子重画
-                        mainHandler.post(() -> renderRecordingState());
-                    }
-                }, "StopRecordingBg").start();
-            } else {
-                AppLog.d(TAG, "Starting recording via service");
-                recordingService.startRecording();
-            }
-        } else if (retryCount < MAX_RETRIES) {
-            // 服务未绑定，重试
-            AppLog.w(TAG, "Recording service not bound yet, retrying... (" + (retryCount + 1) + "/" + MAX_RETRIES + ")");
-            bindRecordingService();
-            mainHandler.postDelayed(() -> tryStartOrStopRecording(retryCount + 1), RETRY_DELAY_MS);
-        } else {
-            // 重试次数耗尽，显示错误
-            AppLog.e(TAG, "Failed to bind recording service after " + MAX_RETRIES + " retries");
-            Toast.makeText(this, R.string.msg_recording_service_failed,
-                    Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * 应用状态枚举
-     */
-    private enum AppState {
-        FOREGROUND,     // 应用在前台运行
-        BACKGROUND,     // 应用在后台运行
-        NOT_RUNNING     // 应用未运行
-    }
-
-    /**
-     * 获取应用当前状态
-     */
-    private AppState getAppState() {
-        android.app.ActivityManager activityManager = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        if (activityManager != null) {
-            java.util.List<android.app.ActivityManager.RunningTaskInfo> tasks = activityManager.getRunningTasks(10);
-            if (tasks != null) {
-                for (android.app.ActivityManager.RunningTaskInfo task : tasks) {
-                    if (task.baseActivity != null && 
-                        task.baseActivity.getPackageName().equals(getPackageName())) {
-                        // 应用的任务存在
-                        String topActivity = task.topActivity.getClassName();
-                        if (topActivity.equals("com.kooo.evcam.MainActivity")) {
-                            return AppState.FOREGROUND;
-                        } else {
-                            return AppState.BACKGROUND;
-                        }
-                    }
-                }
-            }
-        }
-        return AppState.NOT_RUNNING;
+        com.kooo.evcam.overlay.QuickActions.perform(this, action,
+                com.kooo.evcam.recording.RecordingCoordinator.Why.FLOATING);
     }
 
     /**
