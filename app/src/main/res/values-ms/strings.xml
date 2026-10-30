@@ -115,6 +115,26 @@
     <string name="floating_action_toggle_mirror">Hidupkan / matikan Cermin super</string>
     <string name="floating_action_lock_footage">Kunci rakaman semasa</string>
     <string name="floating_action_toggle_drive_sound">Hidupkan / matikan bunyi pemanduan simulasi</string>
+    <!-- 灵动贴（试验性，2026-10-30，button.SmartButtons；这一种语言待项目所有者确认） -->
+    <string name="set_section_floating_page">Butang terapung dan butang pintar</string>
+    <string name="set_group_smart_button">Butang pintar (percubaan)</string>
+    <string name="set_smart_button_search_title">Cari butang pintar</string>
+    <string name="set_smart_button_search_summary">Selepas disambungkan, pilih tindakan untuk tekan sekali dan tekan dua kali</string>
+    <string name="dlg_smart_button_search_note">Tekan butang pintar dan ia akan muncul di atas.</string>
+    <string name="smart_button_name">Butang pintar %1$s</string>
+    <string name="smart_button_battery">Bateri %1$d%%</string>
+    <string name="smart_button_summary">Tekan sekali: %1$s; tekan dua kali: %2$s</string>
+    <string name="set_smart_button_single">Tekan sekali</string>
+    <string name="set_smart_button_double">Tekan dua kali</string>
+    <string name="smart_button_action_none">Tiada</string>
+    <string name="smart_button_action_drive">Tukar ke mod %1$s</string>
+    <string name="dlg_smart_button_delete_title">Padam butang pintar ini?</string>
+    <string name="dlg_smart_button_delete_msg">Menekannya tidak akan melakukan apa-apa lagi. Untuk menggunakannya semula, cari dan sambungkannya semula.</string>
+    <string name="msg_smart_button_connected">Butang pintar %1$s disambungkan</string>
+    <string name="msg_smart_button_bluetooth_off">Hidupkan Bluetooth dahulu</string>
+    <string name="msg_smart_button_no_bluetooth">Unit kepala ini tiada Bluetooth</string>
+    <string name="msg_smart_button_no_permission">Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dicari</string>
+    <string name="msg_drive_mode_failed">Mod pemanduan tidak bertukar</string>
     <string name="set_recording_stats_title">Paparan status rakaman</string>
     <string name="set_recording_stats_summary">Menunjukkan masa berlalu dan nombor klip semasa di sudut semasa merakam</string>
     <string name="set_reset_floating_summary">Memulihkan kedudukan, saiz butang dan saiz teks masa kepada lalai</string>
@@ -478,7 +498,6 @@
     <string name="notif_channel_name">Status apl</string>
     <string name="notif_channel_desc">Pemberitahuan status rakaman dan berjalan di latar belakang</string>
     <string name="msg_starting_recording">Memulakan rakaman…</string>
-    <string name="msg_recording_service_failed">Perkhidmatan rakaman tidak bertindak balas. Cuba lagi</string>
     <string name="msg_segment_unplayable">Beberapa klip berturut-turut tidak boleh dimainkan. Main semula dihentikan.</string>
     <string name="player_lane_no_footage">Tiada rakaman daripada kamera ini pada saat ini</string>
     <string name="player_lane_unplayable">Klip ini tidak boleh dimainkan</string>

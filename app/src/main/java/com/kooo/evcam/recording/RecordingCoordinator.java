@@ -86,9 +86,10 @@ public final class RecordingCoordinator {
     /**
      * 谁要录 —— 进日志；屏幕黑着时只有 {@link #RESUME} 不看黑着开不开（{@link #request}）。{@link #SENTRY} 是熄屏中哨兵模式变成开
      * （布防）、通道留下了环视之后的接回（{@link #onChannelVerdict}）：黑满 30 秒以后只有它开得起来（{@link ScreenOffPlan#startsWhileDark}）。
+     * {@link #BUTTON} 是灵动贴（2026-10-30），和悬浮按钮一样是人按的。
      */
     public enum Why {
-        USER, FLOATING, AUTO_START, RESUME, SCREEN_ON, SENTRY
+        USER, FLOATING, AUTO_START, RESUME, SCREEN_ON, SENTRY, BUTTON
     }
 
     /**

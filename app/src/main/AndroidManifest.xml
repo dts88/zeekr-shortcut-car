@@ -47,10 +47,17 @@
          要在系统设置里单独授予，开发者选项的权限页显示它的状态 -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-    <!-- 蓝牙权限（用于监听蓝牙状态变化，车机启动会自动连蓝牙） -->
-
+    <!-- 蓝牙：灵动贴（button.SmartButtons，2026-10-30）。安卓 12 起扫描、连接各一个运行时权限（「附近的设备」），
+         neverForLocation 表示不拿蓝牙结果推位置（zeekr-shortcut-lab 在车上就是这么申请的，扫得到灵动贴）；
+         更早的安卓扫描要 BLUETOOTH_ADMIN 加定位 -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <!-- 声明使用摄像头功能 -->
     <uses-feature android:name="android.hardware.camera" android:required="true" />

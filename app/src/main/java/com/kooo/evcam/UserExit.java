@@ -71,6 +71,11 @@ public final class UserExit {
         if (scheduler != null) {
             scheduler.resumeAfterExit();
         }
+        // 灵动贴退出以后不听（进程起来时看的这个记号），清掉就接着听
+        com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+        if (buttons != null) {
+            buttons.resumeAfterExit();
+        }
     }
 
     /**

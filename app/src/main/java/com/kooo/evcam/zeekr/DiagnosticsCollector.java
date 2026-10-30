@@ -84,6 +84,7 @@ public final class DiagnosticsCollector {
         timings.run("storage", () -> appendStorage(sb, context));
         timings.run("footage audio", () -> appendFootageAudio(sb, context));
         timings.run("drive sound", () -> appendDriveSound(sb));
+        timings.run("smart buttons", () -> appendSmartButtons(sb, context));
         timings.run("config", () -> appendConfig(sb, context));
         timings.run("vehicle signals", () -> appendVehicleSignals(sb));
         timings.run("lane transforms", () -> appendLaneTransforms(sb, context));
@@ -1236,6 +1237,74 @@ public final class DiagnosticsCollector {
         sb.append("## 5.2 模拟声浪（开发者选项，试验）").append('\n');
         sb.append(com.kooo.evcam.sound.DriveSound.diagnostics());
         sb.append('\n');
+    }
+
+    /**
+     * 灵动贴（试验性，2026-10-30）：在不在听、为什么没在听，权限，连接过的每一台（单击 / 双击选的动作、电量和读到的时刻、
+     * 这次进程里按过几下、最后一下）。
+     */
+    private static void appendSmartButtons(StringBuilder sb, Context context) {
+        sb.append("## 5.3 灵动贴（试验性）").append('\n');
+        com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(context);
+        if (buttons == null) {
+            sb.append("  没装上").append('\n').append('\n');
+            return;
+        }
+        String detail = buttons.listenDetail();
+        sb.append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
+                .append("  在搜索=").append(buttons.searching() ? "是" : "否")
+                .append("  在连=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
+        sb.append("  蓝牙=").append(!buttons.hasBluetooth() ? "没有" : buttons.bluetoothOn() ? "开" : "关")
+                .append("  扫描权限=").append(com.kooo.evcam.button.SmartButtons.canScan(context) ? "有" : "没有")
+                .append("  连接权限=").append(com.kooo.evcam.button.SmartButtons.canConnect(context) ? "有" : "没有")
+                .append('\n');
+        java.util.List<String> addresses = config.getSmartButtons();
+        if (addresses.isEmpty()) {
+            sb.append("  还没有连接过的灵动贴").append('\n');
+        }
+        java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US);
+        java.text.SimpleDateFormat time = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US);
+        for (String address : addresses) {
+            int battery = buttons.battery(address);
+            long batteryAt = buttons.batteryReadAt(address);
+            com.kooo.evcam.button.SmartButtons.Pressed pressed = buttons.pressed(address);
+            sb.append("  ").append(address)
+                    .append("  单击=").append(config.getSmartButtonAction(address, com.kooo.evcam.button.SmartButtonAd.SINGLE))
+                    .append("  双击=").append(config.getSmartButtonAction(address, com.kooo.evcam.button.SmartButtonAd.DOUBLE))
+                    .append("  电量=").append(battery < 0 ? "没读到过"
+                            : battery + "%" + (batteryAt > 0 ? "（" + day.format(new java.util.Date(batteryAt)) + "）" : ""))
+                    .append("  这次按过=").append(pressed == null ? "0"
+                            : pressed.count + " 下，最后一下 " + time.format(new java.util.Date(pressed.lastAtWallMs))
+                            + (pressed.lastClicks == 2 ? " 双击" : pressed.lastClicks == 1 ? " 单击" : " 认不出")
+                            + (pressed.viaNotification ? "（通知）" : ""))
+                    .append('\n');
+        }
+        sb.append('\n');
+    }
+
+    private static String listenName(com.kooo.evcam.button.SmartButtons.Listen listen) {
+        switch (listen) {
+            case EXITED:
+                return "不听（用户退出了）";
+            case IDLE:
+                return "不扫（没有连接过的、也没在搜索）";
+            case NO_BLUETOOTH:
+                return "不听（车机没有蓝牙）";
+            case BLUETOOTH_OFF:
+                return "不听（蓝牙关着）";
+            case NO_PERMISSION:
+                return "不听（没有扫描权限）";
+            case CONNECTING:
+                return "先停着（连着一台读电量）";
+            case LISTENING:
+                return "在听";
+            case FAILED:
+                return "没听上（扫描起不来）";
+            case NOT_STARTED:
+            default:
+                return "还没开始";
+        }
     }
 
     /**

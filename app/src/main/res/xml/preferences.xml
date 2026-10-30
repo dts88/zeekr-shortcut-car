@@ -305,37 +305,60 @@
         </PreferenceScreen>
     </PreferenceScreen>
 
-    <!-- ==================== 悬浮窗 ==================== -->
+    <!-- ==================== 悬浮键与灵动贴 ==================== -->
+    <!--
+      2026-10-30 这一页多了灵动贴（项目所有者）：页名「悬浮键与灵动贴」（只改页名这一处，别处照旧叫「悬浮按钮」）；
+      页里两组，各有小标题：「悬浮按钮」「灵动贴（试验性）」
+    -->
     <PreferenceScreen
         android:key="screen_floating"
-        android:title="@string/set_section_floating">
+        android:title="@string/set_section_floating_page">
 
         <!--
-          悬浮按钮（2026-10-23 整理）：这一页不分组。总开关一行，开着时下面「录制时长」「锁定位置」两个附加项（原来各占一行）
+          悬浮按钮（2026-10-23 整理）：总开关一行，开着时下面「录制时长」「锁定位置」两个附加项（原来各占一行）
         -->
-        <com.kooo.evcam.settings.SwitchChipsPreference
-            android:key="pref_recording_floating"
-            android:title="@string/set_section_floating"
-            android:summary="@string/set_recording_floating_summary" />
+        <PreferenceCategory
+            android:key="cat_floating_button"
+            android:title="@string/set_section_floating">
 
-        <ListPreference
-            android:key="pref_floating_tap"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_tap_title" />
+            <com.kooo.evcam.settings.SwitchChipsPreference
+                android:key="pref_recording_floating"
+                android:title="@string/set_section_floating"
+                android:summary="@string/set_recording_floating_summary" />
 
-        <ListPreference
-            android:key="pref_floating_long_press"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_floating_long_press_title" />
+            <ListPreference
+                android:key="pref_floating_tap"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_tap_title" />
+
+            <ListPreference
+                android:key="pref_floating_long_press"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_floating_long_press_title" />
+
+            <!--
+              外观（2026-10-23 按钮大小、透明度、时长文字大小合成一行，值加一个按钮）：行尾写大小和透明度，点这一行在一个框里拖、
+              按钮当场跟着变（SliderDialog）；行尾「重置」= 原来的「重置悬浮按钮」，位置也回去，所以先问一句
+            -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_floating_appearance"
+                android:dependency="pref_recording_floating"
+                android:title="@string/set_group_appearance" />
+        </PreferenceCategory>
 
         <!--
-          外观（2026-10-23 按钮大小、透明度、时长文字大小合成一行，值加一个按钮）：行尾写大小和透明度，点这一行在一个框里拖、
-          按钮当场跟着变（SliderDialog）；行尾「重置」= 原来的「重置悬浮按钮」，位置也回去，所以先问一句
+          灵动贴（试验性，2026-10-30 从 zeekr-shortcut-lab 搬来，button.SmartButtons）：「搜索灵动贴」一行；连接过的每一台一行
+          （SmartButtonRows 在代码里加：说明写单击、双击各做什么，行尾电量和「删除」，点这一行改单击、双击）
         -->
-        <com.kooo.evcam.settings.ValueActionPreference
-            android:key="pref_floating_appearance"
-            android:dependency="pref_recording_floating"
-            android:title="@string/set_group_appearance" />
+        <PreferenceCategory
+            android:key="cat_smart_buttons"
+            android:title="@string/set_group_smart_button">
+
+            <Preference
+                android:key="pref_smart_button_search"
+                android:title="@string/set_smart_button_search_title"
+                android:summary="@string/set_smart_button_search_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 界面 ==================== -->

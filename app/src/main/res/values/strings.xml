@@ -134,6 +134,26 @@
     <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
     <string name="floating_action_lock_footage">锁定当前录像</string>
     <string name="floating_action_toggle_drive_sound">开启 / 关闭模拟声浪</string>
+    <!-- 灵动贴（试验性，2026-10-30 项目所有者批准，button.SmartButtons） -->
+    <string name="set_section_floating_page">悬浮键与灵动贴</string>
+    <string name="set_group_smart_button">灵动贴（试验性）</string>
+    <string name="set_smart_button_search_title">搜索灵动贴</string>
+    <string name="set_smart_button_search_summary">连接后可为单击、双击各选一个动作</string>
+    <string name="dlg_smart_button_search_note">按一下灵动贴，它就会出现在上方</string>
+    <string name="smart_button_name">灵动贴 %1$s</string>
+    <string name="smart_button_battery">电量 %1$d%%</string>
+    <string name="smart_button_summary">单击：%1$s；双击：%2$s</string>
+    <string name="set_smart_button_single">单击</string>
+    <string name="set_smart_button_double">双击</string>
+    <string name="smart_button_action_none">不使用</string>
+    <string name="smart_button_action_drive">切换到%1$s模式</string>
+    <string name="dlg_smart_button_delete_title">删除这个灵动贴？</string>
+    <string name="dlg_smart_button_delete_msg">删除后按它不再触发动作；要再用，需重新搜索并连接。</string>
+    <string name="msg_smart_button_connected">已连接灵动贴 %1$s</string>
+    <string name="msg_smart_button_bluetooth_off">请先打开蓝牙</string>
+    <string name="msg_smart_button_no_bluetooth">这台车机没有蓝牙</string>
+    <string name="msg_smart_button_no_permission">没有「附近的设备」权限，无法搜索灵动贴</string>
+    <string name="msg_drive_mode_failed">驾驶模式没有切换</string>
     <string name="set_recording_stats_title">录制状态显示</string>
     <string name="set_recording_stats_summary">录制时在画面角落显示已录时长和当前片段序号</string>
     <string name="set_reset_floating_summary">恢复默认位置、按钮大小和时长文字大小</string>
@@ -489,7 +509,6 @@
     <string name="notif_channel_name">运行状态</string>
     <string name="notif_channel_desc">录制状态与后台运行通知</string>
     <string name="msg_starting_recording">正在开始录制…</string>
-    <string name="msg_recording_service_failed">录制服务无响应，请重试</string>
     <string name="msg_segment_unplayable">连续多个片段无法播放，已停止播放</string>
     <string name="player_lane_no_footage">该路此时无录像</string>
     <string name="player_lane_unplayable">此片段无法播放</string>

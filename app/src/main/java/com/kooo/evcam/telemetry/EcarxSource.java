@@ -142,6 +142,8 @@ final class EcarxSource {
     private Object sensor;
     private Method getFunctionValue;
     private Method getFunctionValueZoned;
+    /** 唯一的写（{@link #write}）：灵动贴切驾驶模式。 */
+    private Method setFunctionValue;
     private Method getSensorEvent;
     private Method getSensorLatestValue;
     private Object functionWatcher;
@@ -456,6 +458,7 @@ final class EcarxSource {
             if (function != null) {
                 getFunctionValue = findMethod(function, "getFunctionValue", int.class);
                 getFunctionValueZoned = findMethod(function, "getFunctionValue", int.class, int.class);
+                setFunctionValue = findMethod(function, "setFunctionValue", int.class, int.class);
             }
             if (sensor != null) {
                 getSensorEvent = findMethod(sensor, "getSensorEvent", int.class);
@@ -1392,6 +1395,44 @@ final class EcarxSource {
         if (line.length() > 0) {
             BlackBox.note("车辆信号（限量后补记，时刻不是变化的时刻）：" + line);
         }
+    }
+
+    /** 写过之后隔多久读回来对（Lab 写入测试用的 0.15 秒，这里放宽一点）。 */
+    static final long WRITE_CHECK_MS = 300;
+
+    /**
+     * 写一个功能号（只有 {@link Telemetry#setDriveMode} 叫）：在自己的线程上写，隔 {@link #WRITE_CHECK_MS} 读回来，
+     * 读回等于写的值才算写进去了 —— 车机说「受理」不等于做到了（Lab findings §2.48、§2.50）。结果在本线程上交给 {@code done}。
+     */
+    void write(int id, int value, java.util.function.Consumer<Boolean> done) {
+        Handler h = handler;
+        if (h == null || stopped) {
+            done.accept(false);
+            return;
+        }
+        h.post(() -> {
+            if (stopped || !connected || setFunctionValue == null) {
+                AppLog.w(TAG, "write refused: connected=" + connected + " setter=" + (setFunctionValue != null));
+                done.accept(false);
+                return;
+            }
+            Object accepted;
+            try {
+                accepted = setFunctionValue.invoke(function, id, value);
+            } catch (Throwable t) {
+                AppLog.w(TAG, "write failed: " + describe(t));
+                done.accept(false);
+                return;
+            }
+            h.postDelayed(() -> {
+                Object back = readFunction(id);
+                boolean ok = back instanceof Number && ((Number) back).intValue() == value;
+                BlackBox.note("车辆接口写入：" + Integer.toHexString(id) + " = " + Integer.toHexString(value)
+                        + "，受理 " + accepted + "，读回 " + (back instanceof Number
+                        ? Integer.toHexString(((Number) back).intValue()) : String.valueOf(back)) + (ok ? "（写进去了）" : "（没变）"));
+                done.accept(ok);
+            }, WRITE_CHECK_MS);
+        });
     }
 
     /** 不在信号表里的功能号直接读一次；读不到返回 null。 */

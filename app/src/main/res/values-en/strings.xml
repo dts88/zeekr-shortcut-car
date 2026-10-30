@@ -115,6 +115,26 @@
     <string name="floating_action_toggle_mirror">Super mirror on / off</string>
     <string name="floating_action_lock_footage">Lock the current recording</string>
     <string name="floating_action_toggle_drive_sound">Simulated drive sound on / off</string>
+    <!-- 灵动贴（试验性，2026-10-30，button.SmartButtons；这一种语言待项目所有者确认） -->
+    <string name="set_section_floating_page">Floating button and smart buttons</string>
+    <string name="set_group_smart_button">Smart buttons (experimental)</string>
+    <string name="set_smart_button_search_title">Find smart buttons</string>
+    <string name="set_smart_button_search_summary">After connecting, choose an action for single and double press</string>
+    <string name="dlg_smart_button_search_note">Press the smart button and it appears above.</string>
+    <string name="smart_button_name">Smart button %1$s</string>
+    <string name="smart_button_battery">Battery %1$d%%</string>
+    <string name="smart_button_summary">Single press: %1$s; double press: %2$s</string>
+    <string name="set_smart_button_single">Single press</string>
+    <string name="set_smart_button_double">Double press</string>
+    <string name="smart_button_action_none">None</string>
+    <string name="smart_button_action_drive">Switch to %1$s mode</string>
+    <string name="dlg_smart_button_delete_title">Delete this smart button?</string>
+    <string name="dlg_smart_button_delete_msg">Pressing it will no longer do anything. To use it again, find and connect it again.</string>
+    <string name="msg_smart_button_connected">Smart button %1$s connected</string>
+    <string name="msg_smart_button_bluetooth_off">Turn on Bluetooth first</string>
+    <string name="msg_smart_button_no_bluetooth">This head unit has no Bluetooth</string>
+    <string name="msg_smart_button_no_permission">Without the Nearby devices permission, smart buttons can\'t be found</string>
+    <string name="msg_drive_mode_failed">Drive mode didn\'t change</string>
     <string name="set_recording_stats_title">Recording status readout</string>
     <string name="set_recording_stats_summary">Shows the elapsed time and current clip number in a corner while recording</string>
     <string name="set_reset_floating_summary">Restores the default position, button size and time text size</string>
@@ -483,7 +503,6 @@
     <string name="notif_channel_name">App status</string>
     <string name="notif_channel_desc">Recording status and background-running notifications</string>
     <string name="msg_starting_recording">Starting recording…</string>
-    <string name="msg_recording_service_failed">Recording service isn\'t responding. Try again</string>
     <string name="msg_segment_unplayable">Several clips in a row couldn\'t be played. Playback stopped.</string>
     <string name="player_lane_no_footage">No recording from this camera at this moment</string>
     <string name="player_lane_unplayable">Can\'t play this clip</string>

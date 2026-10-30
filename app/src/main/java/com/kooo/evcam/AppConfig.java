@@ -2285,6 +2285,60 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_FLOATING_DURATION_VISIBLE, visible).apply();
     }
 
+
+    // ==================== 灵动贴 ====================
+
+    /** 连接过的灵动贴（蓝牙地址，逗号隔开，按连接先后）。是设置：导出、导入跟着走；按键计数、电量这些运行状态不在这里（{@code button.SmartButtons}）。 */
+    private static final String KEY_SMART_BUTTONS = "smart_buttons";
+    /** 每一台单击 / 双击做什么：{@code smart_button_action.<地址>.<1 或 2>}，值是 {@code button.SmartButtonAction} 的 key。 */
+    private static final String KEY_SMART_BUTTON_ACTION_PREFIX = "smart_button_action.";
+
+    /** 连接过的灵动贴，按连接先后。 */
+    public java.util.List<String> getSmartButtons() {
+        String joined = prefs.getString(KEY_SMART_BUTTONS, "");
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String address : joined.split(",")) {
+            if (!address.trim().isEmpty() && !out.contains(address.trim())) {
+                out.add(address.trim());
+            }
+        }
+        return out;
+    }
+
+    /** 记下一台（已经记着就什么都不做）：单击、双击都是「不使用」，选了才做事。 */
+    public void addSmartButton(String address) {
+        java.util.List<String> buttons = getSmartButtons();
+        if (address == null || buttons.contains(address)) {
+            return;
+        }
+        buttons.add(address);
+        prefs.edit().putString(KEY_SMART_BUTTONS, String.join(",", buttons)).apply();
+    }
+
+    /** 删掉一台，连同它两种按法选的动作。 */
+    public void removeSmartButton(String address) {
+        java.util.List<String> buttons = getSmartButtons();
+        buttons.remove(address);
+        prefs.edit().putString(KEY_SMART_BUTTONS, String.join(",", buttons))
+                .remove(smartButtonActionKey(address, com.kooo.evcam.button.SmartButtonAd.SINGLE))
+                .remove(smartButtonActionKey(address, com.kooo.evcam.button.SmartButtonAd.DOUBLE))
+                .apply();
+    }
+
+    /** 这一台这种按法（1 单击、2 双击）做什么；没选过是「不使用」。 */
+    public String getSmartButtonAction(String address, int clicks) {
+        return prefs.getString(smartButtonActionKey(address, clicks),
+                com.kooo.evcam.button.SmartButtonAction.NONE.key);
+    }
+
+    public void setSmartButtonAction(String address, int clicks, String key) {
+        prefs.edit().putString(smartButtonActionKey(address, clicks), key).apply();
+    }
+
+    private static String smartButtonActionKey(String address, int clicks) {
+        return KEY_SMART_BUTTON_ACTION_PREFIX + address + "." + clicks;
+    }
+
     // ==================== 录制悬浮按钮配置 ====================
 
     private static final String KEY_RECORDING_FLOATING_ENABLED = "recording_floating_enabled";

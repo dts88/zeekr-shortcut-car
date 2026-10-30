@@ -67,6 +67,17 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private final androidx.activity.result.ActivityResultLauncher<String> micPermission =
             registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
                     this::onMicPermission);
+    /** 「悬浮键与灵动贴」页上的灵动贴那一组；别的页是 null。 */
+    private SmartButtonRows smartButtonRows;
+    /** 灵动贴：搜索前要「附近的设备」权限（扫描、连接），结果交给那一组（{@link SmartButtonRows}）。登记规矩同上。 */
+    private final androidx.activity.result.ActivityResultLauncher<String[]> bluetoothPermissions =
+            registerForActivityResult(
+                    new androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+                    result -> {
+                        if (smartButtonRows != null) {
+                            smartButtonRows.onPermissions();
+                        }
+                    });
     /** 绑定这一页时开发者选项开没开；回到这一页时变了就重绑（见 {@link #onResume}）。 */
     private boolean boundUnlocked;
     /** 外置卷的取值前缀，后面接它在探测结果里的下标。 */
@@ -1215,6 +1226,29 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
             appearance.setAction(getString(R.string.action_reset), () -> confirmFloatingReset(appearance));
         }
+        bindSmartButtons();
+    }
+
+    /** 灵动贴（试验性）那一组：搜索一行，连接过的每一台一行（{@link SmartButtonRows}）。重绑时先把上一份收掉。 */
+    private void bindSmartButtons() {
+        if (smartButtonRows != null) {
+            smartButtonRows.detach();
+            smartButtonRows = null;
+        }
+        androidx.preference.PreferenceCategory category = findPreference("cat_smart_buttons");
+        if (category != null) {
+            smartButtonRows = new SmartButtonRows(this, category, bluetoothPermissions);
+            smartButtonRows.bind();
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        if (smartButtonRows != null) {
+            smartButtonRows.detach();
+            smartButtonRows = null;
+        }
+        super.onDestroy();
     }
 
     /** 外观那一行的行尾：按钮大小和透明度。 */
@@ -1287,7 +1321,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         String[] labels = new String[actions.length];
         for (int i = 0; i < actions.length; i++) {
             values[i] = actions[i].key;
-            labels[i] = getString(labelOf(actions[i]));
+            labels[i] = getString(actions[i].labelRes());
         }
         list.setEntries(labels);
         list.setEntryValues(values);
@@ -1298,32 +1332,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return true;
         });
     }
-
-    /**
-     * 每个动作在界面上叫什么。
-     *
-     * <p>两个数组从 {@link FloatingAction#values()} 一起长出来，所以数量不会对不上；
-     * 新增一个动作时，忘了在这里加分支的后果是它显示成「打开主界面」——
-     * 不会崩，但会说谎，所以新增时两处一起改。</p>
-     */
-    private static int labelOf(FloatingAction action) {
-        switch (action) {
-            case TOGGLE_RECORDING:
-                return R.string.floating_action_toggle_recording;
-            case TAKE_PHOTO:
-                return R.string.floating_action_take_photo;
-            case TOGGLE_MIRROR:
-                return R.string.floating_action_toggle_mirror;
-            case LOCK_FOOTAGE:
-                return R.string.floating_action_lock_footage;
-            case TOGGLE_DRIVE_SOUND:
-                return R.string.floating_action_toggle_drive_sound;
-            case OPEN_APP:
-            default:
-                return R.string.floating_action_open_app;
-        }
-    }
-
 
     /**
      * 外观改了，让按钮就地重读一遍配置。
