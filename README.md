@@ -5,7 +5,7 @@ A surround-view dash cam for the ZEEKR 7X head unit.
 [中文说明](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Credits](NOTICE.md) · [Platform notes](docs/zeekr-platform-notes.md)
 
 > [!IMPORTANT]
-> **Known issue: recording the rear cabin camera every day may eventually crash App Lab, which then has to be reinstalled.** The cause is not yet known, so for everyday recording use the surround view alone. If you do record the rear cabin, tap **Quit app** at the bottom of Settings before leaving the car. If this happens, or the app stutters or camera images are unavailable, **export a report from Settings → System → Diagnostics before restarting the head unit** and report it via a [GitHub issue](https://github.com/dts88/zeekr-shortcut-car/issues) or other channels. Apologies for the inconvenience.
+> **Known issue: App Lab lost after a restart.** Some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. If this happens, or the app stutters or camera images are unavailable, **export a report from Settings → System → Diagnostics before restarting the head unit** and report it via a [GitHub issue](https://github.com/dts88/zeekr-shortcut-car/issues) or other channels. Apologies for the inconvenience.
 
 > [!WARNING]
 > Experimental, unofficial software. Not affiliated with, approved by, or endorsed by ZEEKR,

@@ -78,22 +78,15 @@ def main():
 
     out.append("## Known issue")
     out.append("")
-    out.append("Recording the rear cabin camera every day may eventually crash App Lab, which then "
-               "has to be reinstalled. "
-               "The cause is not yet known: it is unclear in what order, or under what conditions, "
-               "the head unit expects the cameras to be opened and released.")
-    out.append("")
-    out.append("Day-to-day use in the car is unaffected. The risk comes when you lock the car and "
-               "leave with the app running. A single occurrence does not crash App Lab, but the "
-               "effects accumulate.")
+    out.append("**App Lab lost after a restart.** Some users report that App Lab disappears after "
+               "the head unit restarts and must be reinstalled. This is likely related to this app; "
+               "the cause is under investigation. If this happens, or the app stutters or camera "
+               "images are unavailable, **export a report from Settings → System → Diagnostics "
+               "before restarting the head unit** and report it via a "
+               "[GitHub issue](" + REPO + "/issues) or other channels.")
     out.append("")
     out.append("For now, the front cabin camera is one-shot: it turns itself off when you leave the "
-               "car. The rear cabin camera works as usual and is still under observation.")
-    out.append("")
-    out.append("**To avoid this:** for everyday recording, use the **Zeekr 7X (surround)** profile "
-               "(**Settings → Recording → Stream profile**). If you record the rear cabin with "
-               "**Zeekr 7X (surround + rear cabin)**, tap **Quit app** at the bottom of "
-               "Settings before leaving the car.")
+               "car.")
     out.append("")
 
     out.append("## Getting started")

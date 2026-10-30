@@ -35,7 +35,7 @@ Upgrade from 2.0.0.
 - **Interface and features refined.** Settings reorganized and text sizes unified. New settings backup (export and import). Downloaded updates are verified before installing (thanks to wysie).
 
 **Known issues**
-- Recording the rear cabin camera every day may eventually crash App Lab, which then has to be reinstalled. The cause is still under investigation. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
+- App Lab lost after a restart: some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
 - Simulated drive sound is sometimes silent; so far it seems to play only while the radio or CarPlay is playing. Under investigation.
 
 ## [2.91.0-alpha] - 2026-10-30
@@ -67,7 +67,7 @@ Upgrade from 2.0.0.
 - **Interface and features refined.** Settings reorganized and text sizes unified. New settings backup (export and import). Downloaded updates are verified before installing (thanks to wysie).
 
 **Known issues**
-- Recording the rear cabin camera every day may eventually crash App Lab, which then has to be reinstalled. The cause is still under investigation. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
+- App Lab lost after a restart: some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
 - Simulated drive sound is sometimes silent; so far it seems to play only while the radio or CarPlay is playing. Under investigation.
 
 ## [2.35.0-alpha] - 2026-10-30
