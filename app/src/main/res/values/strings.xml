@@ -339,7 +339,7 @@
     <string name="opt_model_zeekr_multi">极氪7X（环视 + 后座舱）</string>
 
     <!-- 设置界面里的提示与对话框 -->
-    <string name="msg_stream_changed">视频流配置已改为「%1$s」，重启应用后生效</string>
+    <string name="msg_stream_changed">视频流配置已改为「%1$s」</string>
     <string name="msg_relay_dev_only">需开启开发者选项（会先写入内置存储）</string>
     <string name="msg_dev_only">需开启开发者选项</string>
     <string name="dlg_internal_title">使用内置存储？</string>
@@ -383,8 +383,8 @@
     <string name="action_import">导入</string>
     <string name="action_export">导出</string>
     <string name="action_all_auto">全部自动</string>
-    <string name="msg_mapping_saved">已保存摄像头映射，重启应用后生效</string>
-    <string name="msg_mapping_cleared">已恢复自动分配，重启应用后生效</string>
+    <string name="msg_mapping_saved">已保存摄像头映射</string>
+    <string name="msg_mapping_cleared">已恢复自动分配</string>
     <string name="msg_language_hint">可随时在「设置 → 界面 → 语言」中更改</string>
 
     <!-- 首次启动引导 -->
@@ -735,7 +735,7 @@
     <string name="editor_quality_sharp">最清晰</string>
     <string name="editor_quality_sharp_note">不限帧率、高码率；细节保留最充分</string>
     <string name="editor_cameras_title">已开启 %1$d 路摄像头</string>
-    <string name="editor_cameras_summary">关闭的摄像头不录制、不占用空间；点击卡片可单独调整该路。开关改动重启应用后生效。</string>
+    <string name="editor_cameras_summary">关闭的摄像头不录制、不占用空间；点击卡片可单独调整该路。</string>
     <string name="editor_cabin_one_shot">因造成车机不稳定等原因，此设置无法固化，用户离车后自动取消</string>
     <string name="editor_camera_tuned">自定义</string>
     <string name="editor_open_lanes">画面布局</string>

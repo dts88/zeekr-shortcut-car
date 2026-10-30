@@ -319,7 +319,7 @@
     <string name="opt_model_zeekr_multi">Zeekr 7X (sekeliling + kabin belakang)</string>
 
     <!-- Gesaan dan dialog tetapan -->
-    <string name="msg_stream_changed">Profil strim ditetapkan kepada “%1$s”. Berkuat kuasa selepas apl dimulakan semula.</string>
+    <string name="msg_stream_changed">Profil strim ditetapkan kepada “%1$s”.</string>
     <string name="msg_relay_dev_only">Memerlukan pilihan pembangun (menulis ke storan dalaman dahulu)</string>
     <string name="msg_dev_only">Memerlukan pilihan pembangun</string>
     <string name="dlg_internal_title">Guna storan dalaman?</string>
@@ -362,8 +362,8 @@
     <string name="action_import">Import</string>
     <string name="action_export">Eksport</string>
     <string name="action_all_auto">Semua automatik</string>
-    <string name="msg_mapping_saved">Pemetaan kamera disimpan. Berkuat kuasa selepas apl dimulakan semula.</string>
-    <string name="msg_mapping_cleared">Penetapan automatik dipulihkan. Berkuat kuasa selepas apl dimulakan semula.</string>
+    <string name="msg_mapping_saved">Pemetaan kamera disimpan.</string>
+    <string name="msg_mapping_cleared">Penetapan automatik dipulihkan.</string>
     <string name="msg_language_hint">Anda boleh menukarnya kemudian di Tetapan → Antara muka → Bahasa</string>
 
     <!-- Antara muka utama -->
@@ -725,7 +725,7 @@
     <string name="editor_quality_sharp">Paling tajam</string>
     <string name="editor_quality_sharp_note">Tiada had kadar bingkai, kadar bit tinggi; paling terperinci</string>
     <string name="editor_cameras_title">Kamera dihidupkan: %1$d</string>
-    <string name="editor_cameras_summary">Kamera yang dimatikan tidak dirakam dan tidak menggunakan ruang; ketik kad untuk melaraskan kamera itu. Perubahan suis berkuat kuasa selepas apl dimulakan semula.</string>
+    <string name="editor_cameras_summary">Kamera yang dimatikan tidak dirakam dan tidak menggunakan ruang; ketik kad untuk melaraskan kamera itu.</string>
     <string name="editor_cabin_one_shot">Tetapan ini tidak dapat dikekalkan kerana boleh menjadikan unit kepala tidak stabil, antara sebab lain. Ia dimatikan secara automatik selepas anda meninggalkan kenderaan.</string>
     <string name="editor_camera_tuned">tersuai</string>
     <string name="editor_open_lanes">Susun atur</string>
