@@ -69,7 +69,7 @@ public final class ProfileSizes {
             return null;
         }
         try {
-            CameraProfile camera = new ProfileStore(context).current().camera(role);
+            CameraProfile camera = RecordSpecs.effectiveProfile(context).camera(role);
             if (camera == null) {
                 return null;
             }

@@ -97,6 +97,18 @@ public final class ProfileStore {
     }
 
     public void save(Profile profile) {
+        edit(profile).apply();
+    }
+
+    /**
+     * 同上，写到盘上才返回（commit）：「前座舱只用一次」关开关用（camera.FrontCabinOneShot）—— 离车之后车机几秒就可能结束进程，
+     * 排队异步写的可能还没落盘。
+     */
+    public void saveNow(Profile profile) {
+        edit(profile).commit();
+    }
+
+    private SharedPreferences.Editor edit(Profile profile) {
         SharedPreferences.Editor editor = prefs.edit();
         String prefix = profile.id + ".";
         // 先清掉这份配置原有的键：相机变少时，残留的旧键会被 fromMap 读回来
@@ -108,7 +120,7 @@ public final class ProfileStore {
         for (Map.Entry<String, String> entry : profile.toMap().entrySet()) {
             editor.putString(prefix + entry.getKey(), entry.getValue());
         }
-        editor.apply();
+        return editor;
     }
 
     public Profile load(String id) {

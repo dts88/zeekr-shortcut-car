@@ -344,8 +344,8 @@ public final class ChannelScheduler {
         ChannelRules.RecordPrep recordPrep(String key);
 
         /**
-         * 这次运行启用的前座舱去掉了（{@link ChannelRules.Event.Type#FRONT_CABIN_RETIRED}，通道眼里熄屏的那一刻）：管线、录像、主界面
-         * 把 {@code key} 这一路从这次运行里拿掉。只来一次。
+         * 启用的前座舱离车去掉了（{@link ChannelRules.Event.Type#FRONT_CABIN_RETIRED}，通道眼里熄屏的那一刻）：管线、录像、主界面
+         * 把 {@code key} 这一路拿掉。只来一次。
          */
         void frontCabinRetired(String key);
 

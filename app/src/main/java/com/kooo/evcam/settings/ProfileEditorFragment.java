@@ -82,6 +82,12 @@ public class ProfileEditorFragment extends Fragment {
 
     private ProfileStore store;
     Profile profile;
+    /**
+     * 这一页上一次读进来、存下去的那一份（摊平，{@link Profile#toMap}）。存的时候和存下的比：这一页开着时存下的那份被别处改了
+     * （离车时「前座舱只用一次」关掉前座舱的开关，camera.FrontCabinOneShot），就在存下的上面只套这一页改了的那几项
+     * （{@link #rebase}），不拿这一页那份旧的整份盖回去。
+     */
+    private java.util.Map<String, String> base;
     private CameraManager cameraManager;
     private LinearLayout presetRow;
     private LinearLayout cameraRow;
@@ -98,6 +104,8 @@ public class ProfileEditorFragment extends Fragment {
         Context context = requireContext();
         store = new ProfileStore(context);
         profile = store.current();
+        // 读进来的那一份：下面调整成前台能表达的样子算这一页改的，存的时候一起存
+        base = profile.toMap();
         normaliseProfile();
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         if (savedInstanceState != null) {
@@ -206,8 +214,35 @@ public class ProfileEditorFragment extends Fragment {
      * 那时 refresh 没有 view 可搭会直接返回 —— 而摆位同样要存。</p>
      */
     void commit() {
+        java.util.Map<String, String> stored = store.load(profile.id).toMap();
+        if (base != null && !stored.equals(base)) {
+            profile = Profile.fromMap(rebase(stored, base, profile.toMap()));
+        }
         store.save(profile);
+        base = profile.toMap();
         refresh();
+    }
+
+    /**
+     * 存下的那份（{@code stored}）上只套这一页改了的那几项 —— {@code mine} 和 {@code base}（这一页上一次读进来、存下去的）
+     * 不一样的键；别处改了、这一页没动的键照存下的。纯函数，测试直接调。
+     */
+    static java.util.Map<String, String> rebase(java.util.Map<String, String> stored, java.util.Map<String, String> base,
+                                                java.util.Map<String, String> mine) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>(stored);
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>(base.keySet());
+        keys.addAll(mine.keySet());
+        for (String key : keys) {
+            String now = mine.get(key);
+            if (!java.util.Objects.equals(now, base.get(key))) {
+                if (now == null) {
+                    out.remove(key);
+                } else {
+                    out.put(key, now);
+                }
+            }
+        }
+        return out;
     }
 
     /** 按当前状态整页重搭。 */
@@ -947,6 +982,7 @@ public class ProfileEditorFragment extends Fragment {
                 .setMessage(R.string.editor_reset_msg)
                 .setPositiveButton(R.string.editor_reset_ok, (d, w) -> {
                     profile = store.reset(profile.id);
+                    base = profile.toMap();
                     normaliseProfile();
                     commit();
                     toast(getString(R.string.editor_reset_done));

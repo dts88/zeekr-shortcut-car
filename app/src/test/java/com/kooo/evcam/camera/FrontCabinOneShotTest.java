@@ -10,12 +10,13 @@ import com.kooo.evcam.profile.ProfileSizes;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 
-/** 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱）：下次启动的配置怎么改（{@link FrontCabinOneShot}）。 */
+/**
+ * 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱，10-30 开关照实显示）：
+ * 离车、或者下一次启动时那份配置怎么改（{@link FrontCabinOneShot}）。
+ */
 public class FrontCabinOneShotTest {
 
-    private static final String SUR = CameraSlots.KEY_SURROUND;
     private static final String REAR = CameraSlots.KEY_CABIN_REAR;
     private static final String FRONT = CameraSlots.KEY_CABIN_FRONT;
 
@@ -24,16 +25,6 @@ public class FrontCabinOneShotTest {
     public void theRuleIsAboutTheFrontCabinRole() {
         assertTrue(ProfileSizes.roleForCameraKey(FRONT).equals(FrontCabinOneShot.ROLE));
         assertFalse(ProfileSizes.roleForCameraKey(REAR).equals(FrontCabinOneShot.ROLE));
-    }
-
-    /** 这次运行带不带前座舱：只看前座舱那一路，后座舱、环视不算。 */
-    @Test
-    public void onlyTheFrontCabinCounts() {
-        assertTrue(FrontCabinOneShot.hasFrontCabin(Arrays.asList(SUR, REAR, FRONT)));
-        assertTrue(FrontCabinOneShot.hasFrontCabin(Collections.singletonList(FRONT)));
-        assertFalse(FrontCabinOneShot.hasFrontCabin(Arrays.asList(SUR, REAR)));
-        assertFalse(FrontCabinOneShot.hasFrontCabin(Collections.emptyList()));
-        assertFalse(FrontCabinOneShot.hasFrontCabin(null));
     }
 
     /** 只关前座舱的开关：环视、后座舱、别的参数都不动；已经关着的不算改。 */

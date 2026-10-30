@@ -1142,17 +1142,23 @@ public final class DiagnosticsCollector {
         try {
             AppConfig cfg = new AppConfig(context);
             sb.append("车型: ").append(cfg.getCarModel()).append('\n');
-            // 这一次运行启用了哪几路（RecordSpecs.enabledCameraKeys：进程里第一次建管线时照存下的配置定，离车时可能去掉了前座舱），
-            // 和存下的配置里的（下一次启动用的）。前座舱只用一次（暂时的规矩，camera.FrontCabinOneShot）时两者生效后就不同。
+            // 生效的配置启用了哪几路（RecordSpecs.enabledCameraKeys：现在这一份管线照的，离车时可能去掉了前座舱），
+            // 和存下的配置里的（设置页编辑的，回到主界面时生效）。设置里改了还没回到主界面时两者不同。
             // 管线建了哪几路看 §2.3.2 通道
-            sb.append("启用的摄像头（这一次运行）: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context))
+            sb.append("启用的摄像头（生效的）: ").append(com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context))
                     .append('\n');
-            sb.append("启用的摄像头（存下的配置，下一次启动用）: ")
+            sb.append("启用的摄像头（存下的配置，回到主界面时生效）: ")
                     .append(com.kooo.evcam.profile.RecordSpecs.storedEnabledCameraKeys(context)).append('\n');
             sb.append("前座舱只用一次: ").append(com.kooo.evcam.camera.FrontCabinOneShot.ACTIVE ? "开" : "关")
-                    .append('\n');
-            // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准
-            sb.append(new com.kooo.evcam.profile.ProfileStore(context).current()).append('\n');
+                    .append("（在用: ").append(cfg.getFrontCabinInUse() == null ? "无" : cfg.getFrontCabinInUse())
+                    .append('）').append('\n');
+            // 帧率、码率、分段、每一路的尺寸都在配置里，整份摆出来比逐项抄一遍准：生效的那份，存下的不一样时再摆一份
+            com.kooo.evcam.profile.Profile effective = com.kooo.evcam.profile.RecordSpecs.effectiveProfile(context);
+            com.kooo.evcam.profile.Profile stored = new com.kooo.evcam.profile.ProfileStore(context).current();
+            sb.append("生效的").append(effective).append('\n');
+            if (!stored.toMap().equals(effective.toMap())) {
+                sb.append("存下的（还没生效）").append(stored).append('\n');
+            }
             sb.append("录制模式: ").append(cfg.getRecordingMode())
                     .append("  (实际用 Codec: ").append(cfg.shouldUseCodecRecording()).append(')').append('\n');
             sb.append("存储位置: ").append(cfg.getStorageLocation()).append('\n');
@@ -1247,8 +1253,7 @@ public final class DiagnosticsCollector {
     private static void appendLaneTransforms(StringBuilder sb, Context context) {
         sb.append("## 8.1 每一路的摆位").append('\n');
         try {
-            com.kooo.evcam.profile.Profile profile =
-                    new com.kooo.evcam.profile.ProfileStore(context).current();
+            com.kooo.evcam.profile.Profile profile = com.kooo.evcam.profile.RecordSpecs.effectiveProfile(context);
             for (String key : new String[]{"front", "back", "left", "right"}) {
                 String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(key);
                 if (role == null) {

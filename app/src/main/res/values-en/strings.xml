@@ -319,7 +319,7 @@
     <string name="opt_model_zeekr_multi">Zeekr 7X (surround + rear cabin)</string>
 
     <!-- Settings prompts and dialogs -->
-    <string name="msg_stream_changed">Stream profile set to “%1$s”. Takes effect after restarting the app.</string>
+    <string name="msg_stream_changed">Stream profile set to “%1$s”.</string>
     <string name="msg_relay_dev_only">Requires developer options (writes to internal storage first)</string>
     <string name="msg_dev_only">Requires developer options</string>
     <string name="dlg_internal_title">Use internal storage?</string>
@@ -362,8 +362,8 @@
     <string name="action_import">Import</string>
     <string name="action_export">Export</string>
     <string name="action_all_auto">All automatic</string>
-    <string name="msg_mapping_saved">Camera mapping saved. Takes effect after restarting the app.</string>
-    <string name="msg_mapping_cleared">Automatic assignment restored. Takes effect after restarting the app.</string>
+    <string name="msg_mapping_saved">Camera mapping saved.</string>
+    <string name="msg_mapping_cleared">Automatic assignment restored.</string>
     <string name="msg_language_hint">You can change this later in Settings → Interface → Language</string>
 
     <!-- Main interface -->
@@ -735,7 +735,7 @@
     <string name="editor_quality_sharp">Sharpest</string>
     <string name="editor_quality_sharp_note">No frame rate cap, high bitrate; most detail</string>
     <string name="editor_cameras_title">Cameras on: %1$d</string>
-    <string name="editor_cameras_summary">Cameras that are off aren\'t recorded and use no space; tap a card to adjust that camera. Switch changes take effect after restarting the app.</string>
+    <string name="editor_cameras_summary">Cameras that are off aren\'t recorded and use no space; tap a card to adjust that camera.</string>
     <string name="editor_cabin_one_shot">This setting can\'t be kept because it can make the head unit unstable, among other reasons. It turns off automatically after you leave the car.</string>
     <string name="editor_camera_tuned">custom</string>
     <string name="editor_open_lanes">Layout</string>

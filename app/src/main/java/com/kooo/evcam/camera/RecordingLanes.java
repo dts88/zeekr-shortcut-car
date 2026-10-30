@@ -351,7 +351,7 @@ public final class RecordingLanes {
     }
 
     /**
-     * 这一路从这个录像意图的计划里拿掉（这次运行去掉的前座舱，暂时的规矩 FrontCabinOneShot）：表里删掉，带着它的任务回来时作废
+     * 这一路从这个录像意图的计划里拿掉（离车去掉的前座舱，暂时的规矩 FrontCabinOneShot）：表里删掉，带着它的任务回来时作废
      * （{@link #current} 为假）。别的路不动。
      */
     void drop(String key) {

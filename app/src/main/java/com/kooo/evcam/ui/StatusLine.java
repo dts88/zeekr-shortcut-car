@@ -93,15 +93,13 @@ public final class StatusLine {
      * <p>预设的按 id 取本地化的名字：存进配置里的名字是迁移时写的中文，照抄它的话
      * 英文、马来文界面下这里也是一行中文。</p>
      *
-     * <p>写的是这一次运行的（{@code CameraManagerHolder.runProfileId}，还没建过管线时是存下的配置）：换了配置要重启应用才生效，
-     * 状态条写正在用的那一份。</p>
+     * <p>写的是生效的那份（{@code RecordSpecs.effectiveProfile}：现在这一份管线照的，没有管线时是存下的配置）：
+     * 设置里换了配置、回到主界面换了管线才变，状态条写正在用的那一份。</p>
      */
     private static String profileName(Context context) {
         try {
-            String runId = com.kooo.evcam.camera.CameraManagerHolder.getInstance().runProfileId();
-            Profile profile = runId != null ? new com.kooo.evcam.profile.ProfileStore(context).load(runId)
-                    : new com.kooo.evcam.profile.ProfileStore(context).current();
-            String id = runId != null ? runId : profile.id;
+            Profile profile = com.kooo.evcam.profile.RecordSpecs.effectiveProfile(context);
+            String id = profile.id;
             if (Profile.PRESET_COMPOSITE.equals(id)) {
                 return context.getString(R.string.status_profile_composite);
             }
