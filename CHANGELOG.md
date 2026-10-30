@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.33.0-alpha] - 2026-10-30
+
+- Cameras: the app keeps one camera scheduler for its whole life. When the cameras are set up again (car model, enabled cameras, Super mirror Views), the old cameras close in order, then the new set opens. If a close does not return, that camera stays closed and the others open 60 seconds after its close began.
+- Cameras: a stalled camera is reopened as a close followed by a separate open. If you exit, the head unit sleeps, or the camera is no longer needed in between, it is not opened again.
+
 ## [2.32.0-alpha] - 2026-10-29
 
 - Cameras: a camera whose last close or open has not returned is not opened again until it returns or the app restarts. The other cameras go ahead after at most 60 seconds; while they record, the stuck one shows that it can't record, and photos leave it out.
