@@ -11,6 +11,33 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.90.0-beta] - 2026-10-30
+
+Upgrade from 2.0.0. Same code as 2.35.0-alpha.
+
+- **Recording stability further improved: recording and camera control completely reworked.**
+  - Fixed occasional short skips at high bitrates and full frame rate.
+  - When one camera has a problem, the others keep recording.
+  - All cameras stop together, and the end of a recording is no longer cut off.
+- **Camera settings no longer need an app restart.**
+- **New: Lock footage.** Videos and photos can be locked. Locked files are not removed by loop recording or a normal delete. If locked files fill the space, recording stops and says so.
+  - Recordings can be locked automatically on flash to pass or hazard lights. The car turns the hazard lights on by itself under emergency braking, so that locks too. Lock on horn is not available yet.
+  - The floating button can lock the current recording.
+- **New: Record sound (on by default).** Surround view recordings include the sound inside and outside the car, heard in playback.
+- **Super mirror**
+  - New Blind spot view: with the turn signal on, the side camera is shown on that side, on the center screen or the HUD. It is an aid only; please drive safely.
+    - Based on code and on-car research by FerixzTanz and wysie. FerixzTanz tuned the default angles and window on the car, and the HUD display comes from his CAMCORDER. Thanks to both for their contributions.
+  - New: switch between the rear view and the rear cabin.
+  - Direction labels (front, rear, left, right) on the window.
+- **Driving info bar (experimental) redesigned.** New items such as Sentry Mode, front and rear lamps and drive mode. You can choose which items it shows, and it is added to the surround view recording only. There's an easter egg in it.
+- **New: Simulated drive sound (experimental).** Simulated engine sound in Sport mode that follows throttle and speed. Two sounds, American V8 and Supersonic jet (old version); it can also play in Standard mode.
+- **New: Smart button support (experimental).** Smart buttons can be connected, and single and double press each run an action: anything the floating button can do, or switch the drive mode (Comfort, Standard or Sport). Settings show each button's battery level.
+- **Interface and features refined.** Settings reorganized and text sizes unified. New settings backup (export and import). Downloaded updates are verified before installing (thanks to wysie).
+
+**Known issues**
+- App Lab may disappear after the head unit restarts. The cause is still under investigation; the front cabin camera is the current suspect. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
+- Simulated drive sound is sometimes silent; so far it seems to play only while the radio or CarPlay is playing. Under investigation.
+
 ## [2.35.0-alpha] - 2026-10-30
 
 - Smart buttons (experimental): the app can find, connect and delete ZEEKR_button smart buttons, and shows each one's battery level. Single and double press each run a chosen action: any floating button action, or switching to Comfort, Standard or Sport drive mode. Presses while the screen is off don't count.
