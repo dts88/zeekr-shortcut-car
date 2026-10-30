@@ -578,7 +578,9 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- msg_side_view_camera_in_use「无法显示盲区画面：摄像头正被车机使用」/ Can't show Blind spot view: the car is using the camera /
+  Tidak dapat memaparkan Paparan titik buta: kamera sedang digunakan oleh kereta（盲区画面该显示、环视被车机拿着时说一次，
+  最常见的是车机自己的后排画面）。
 
 ---
 

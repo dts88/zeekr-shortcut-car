@@ -13,11 +13,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.camera.ChannelRules;
+
 import org.junit.Test;
 
 /**
- * {@link SideViewDecision}：左灯只显示左、右灯只显示右、灯灭就不要、原厂画面优先；后视镜上的灯哪一侧亮算哪一侧
- * （两侧怎么一起显示、先后在 {@code SideViewTriggerTest}）。
+ * {@link SideViewDecision}：左灯只显示左、右灯只显示右、灯灭就不要、原厂画面优先、环视出不了画面不显示；
+ * 后视镜上的灯哪一侧亮算哪一侧（两侧怎么一起显示、先后在 {@code SideViewTriggerTest}）。
  *
  * <p>来源：FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）。</p>
  */
@@ -133,6 +135,21 @@ public class SideViewDecisionTest {
             in.gear = gear;
             assertFalse("gear " + gear, SideViewDecision.shouldStayReady(in));
         }
+    }
+
+    @Test
+    public void surroundThatCannotStreamIsNotShown() {
+        // 车机自己的后排画面拿走相机 1、环视被挡住（TAKEN），在救、救不回来：显示出来只会是黑框
+        assertFalse(SideViewDecision.surroundCanShow(ChannelRules.Condition.TAKEN));
+        assertFalse(SideViewDecision.surroundCanShow(ChannelRules.Condition.RESCUING));
+        assertFalse(SideViewDecision.surroundCanShow(ChannelRules.Condition.GAVE_UP));
+    }
+
+    @Test
+    public void surroundStreamingOrComingUpIsShown() {
+        assertTrue(SideViewDecision.surroundCanShow(ChannelRules.Condition.STREAMING));
+        assertTrue(SideViewDecision.surroundCanShow(ChannelRules.Condition.BRINGING_UP));
+        assertTrue(SideViewDecision.surroundCanShow(null));
     }
 
     @Test
