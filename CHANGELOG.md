@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.91.0-alpha] - 2026-10-30
+
+- Text: every text size has its own line height, so multi-line text is easier to read, including the release notes in the update dialog, other dialogs, the first-launch guide and About & credits.
+- First-launch guide: the sentence about the action buttons is gone, because the dialog before it already asks which side the driver sits on.
+
 ## [2.90.0-beta] - 2026-10-30
 
 Upgrade from 2.0.0.
