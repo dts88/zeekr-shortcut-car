@@ -13,7 +13,7 @@ Nothing yet.
 
 ## [2.90.0-beta] - 2026-10-30
 
-Upgrade from 2.0.0. Same code as 2.35.0-alpha.
+Upgrade from 2.0.0.
 
 - **Recording stability further improved: recording and camera control completely reworked.**
   - Fixed occasional short skips at high bitrates and full frame rate.
