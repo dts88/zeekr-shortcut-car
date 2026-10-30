@@ -56,8 +56,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/guide_1"
                 android:textAppearance="@style/TextAppearance.Cam.Body"
-                android:textColor="@color/dialog_guide_content"
-                android:lineSpacingMultiplier="1.35" />
+                android:textColor="@color/dialog_guide_content" />
         </LinearLayout>
 
         <LinearLayout
@@ -80,8 +79,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/guide_2"
                 android:textAppearance="@style/TextAppearance.Cam.Body"
-                android:textColor="@color/dialog_guide_content"
-                android:lineSpacingMultiplier="1.35" />
+                android:textColor="@color/dialog_guide_content" />
         </LinearLayout>
 
         <LinearLayout
@@ -104,8 +102,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/guide_3"
                 android:textAppearance="@style/TextAppearance.Cam.Body"
-                android:textColor="@color/dialog_guide_content"
-                android:lineSpacingMultiplier="1.35" />
+                android:textColor="@color/dialog_guide_content" />
         </LinearLayout>
 
         <LinearLayout
@@ -128,8 +125,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/guide_4"
                 android:textAppearance="@style/TextAppearance.Cam.Body"
-                android:textColor="@color/dialog_guide_content"
-                android:lineSpacingMultiplier="1.35" />
+                android:textColor="@color/dialog_guide_content" />
         </LinearLayout>
 
 

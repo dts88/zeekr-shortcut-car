@@ -426,6 +426,7 @@
   Butang pintar %1$s disambungkan；Turn on Bluetooth first / Hidupkan Bluetooth dahulu；This head unit has no Bluetooth / Unit kepala ini tiada Bluetooth；
   Without the Nearby devices permission, smart buttons can't be found / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dicari；
   Drive mode didn't change / Mod pemanduan tidak bertukar。
+- 2026-10-30（项目所有者同意更新首启说明框）：guide_3 去掉「操作按钮可在「设置 → 界面 → 操作按钮位置」中放到驾驶座一侧。」（三种语言）：前一个框已经问过驾驶座在哪一侧，提示里也写了这条路径。没有新句子。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

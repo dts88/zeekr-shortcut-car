@@ -76,7 +76,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:lineSpacingMultiplier="1.25"
                 android:text="@string/about_tagline"
                 android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -94,7 +93,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_thanks_body"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -112,7 +110,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_credits_evcam"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -141,7 +138,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_credits_contributors"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -159,7 +155,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_project_body"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -187,7 +182,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_privacy_body"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -205,7 +199,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_storage_body"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -224,7 +217,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_safety_body"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
@@ -242,7 +234,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:lineSpacingMultiplier="1.3"
                 android:text="@string/about_coffee_body"
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />

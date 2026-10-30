@@ -34,6 +34,17 @@
     <dimen name="text_title">32sp</dimen>
 
     <!--
+      每一档的行高（docs/ui-spec.md「字号」，项目所有者 2026-10-30）：字号 × 1.4，取最近的偶数。只管多行之间的距离，
+      单行的高度不变。不写就继承 Material 的 20sp：24sp 的字排在 20sp 的行里，英文挤成一团。布局里不要再写行距：
+      MaterialTextView 用这里的行高盖掉 android:lineSpacingMultiplier。
+    -->
+    <dimen name="text_micro_line">22sp</dimen>
+    <dimen name="text_caption_line">28sp</dimen>
+    <dimen name="text_body_line">30sp</dimen>
+    <dimen name="text_row_line">34sp</dimen>
+    <dimen name="text_title_line">44sp</dimen>
+
+    <!--
       字重和字距和主题里保持一致：父样式（Material3）自带的那份会盖掉主题设的，
       于是「只改字号」会变成顺手改了全应用的字重。这里显式钉住。
     -->
@@ -46,26 +57,36 @@
     <!-- 角标、计数：贴在画面或缩略图上的那种 -->
     <style name="TextAppearance.Cam.Micro">
         <item name="android:textSize">@dimen/text_micro</item>
+        <item name="android:lineHeight">@dimen/text_micro_line</item>
+        <item name="lineHeight">@dimen/text_micro_line</item>
     </style>
 
     <!-- 说明、状态条、副标题：解释上一行是什么 -->
     <style name="TextAppearance.Cam.Caption">
         <item name="android:textSize">@dimen/text_caption</item>
+        <item name="android:lineHeight">@dimen/text_caption_line</item>
+        <item name="lineHeight">@dimen/text_caption_line</item>
     </style>
 
     <!-- 正文：段落、画面角标、列表次要行 -->
     <style name="TextAppearance.Cam.Body">
         <item name="android:textSize">@dimen/text_body</item>
+        <item name="android:lineHeight">@dimen/text_body_line</item>
+        <item name="lineHeight">@dimen/text_body_line</item>
     </style>
 
     <!-- 行标题、分区标题、对话框正文：一眼扫过去先看见的那一行 -->
     <style name="TextAppearance.Cam.Row">
         <item name="android:textSize">@dimen/text_row</item>
+        <item name="android:lineHeight">@dimen/text_row_line</item>
+        <item name="lineHeight">@dimen/text_row_line</item>
     </style>
 
     <!-- 页面标题、对话框标题、录制键上的那一行 -->
     <style name="TextAppearance.Cam.Title">
         <item name="android:textSize">@dimen/text_title</item>
+        <item name="android:lineHeight">@dimen/text_title_line</item>
+        <item name="lineHeight">@dimen/text_title_line</item>
     </style>
 
 </resources>
