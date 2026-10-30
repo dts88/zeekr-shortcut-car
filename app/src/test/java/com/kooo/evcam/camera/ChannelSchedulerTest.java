@@ -65,14 +65,29 @@ public class ChannelSchedulerTest {
     /** 通道的决定发给录像协调器的每一次（{@link #listenToVerdict}）：「KEPT DARK_ONSET」。 */
     private final List<String> verdicts = new ArrayList<>();
     /**
+     * 下一次「一步结束了」那一行写完之后跑一次（只跑这一次）：扮演相机线程在这一轮读完事实之后、照做之前动了一下（这一步结束写那一行
+     * 正落在这两样中间）。
+     */
+    private Runnable afterStepEnded;
+    /**
      * 账本（照 CameraRounds.process()：跟着进程、不跟着管线 —— 两份管线、几份假相机看的是同一本）。假相机照 SingleCamera 的样子
      * 下达一轮、下达关、报结束（{@link FakePort}）。
      */
     private final CameraRounds rounds = new CameraRounds();
+    /**
+     * 假的相机服务：每台相机此刻是哪一路相机对象拿着设备（开好了、还没关完）。同一台相机两份相机对象同时拿着 —— 两个句柄 —— 任何一条测试都当场失败
+     * （{@link FakePort#openedRound}，第 2 步：一个调度、管线重建一个接一个）。
+     */
+    private final Map<String, FakePort> service = new HashMap<>();
     private final FakePort surround = new FakePort("2");
     private final FakePort rear = new FakePort("1");
     private final FakePort front = new FakePort("0");
+    /** 这一份管线自己的那几样（录像计划、去掉前座舱、放完了）和它的黑匣子（{@link FakePipe}）。 */
+    private final FakePipe pipe = new FakePipe();
+    /** 进程里那一个调度（每一条测试一个新的：进程刚起来）。 */
     private ChannelScheduler s;
+    /** 这一份管线的把手：setUp 里接上（第一份，当场接上）。 */
+    private ChannelScheduler.Pipeline p;
 
     private final Out pvS = new Out(Kind.PREVIEW, "preview-2");
     private final Out pvR = new Out(Kind.PREVIEW, "preview-1");
@@ -83,25 +98,19 @@ public class ChannelSchedulerTest {
 
     @Before
     public void setUp() {
-        // 环视熄屏时留不留跟着进程：每一条测试从进程刚起来的样子起
-        ChannelScheduler.resetProcessDark();
+        // 环视熄屏时留不留跟着进程（这一个调度）：每一条测试一个新的调度，从进程刚起来的样子起
         host.screenOn = true;
         host.foregroundService = true;
         host.mainForeground = true;
         host.heard = true;
         s = scheduler();
-        s.setRecording(new FakeRecording());
+        p = register(s, pipe, true);
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
         // 故意不按开的次序给：调度照开的次序排
         lanes.put(FRONT, front);
         lanes.put(REAR, rear);
         lanes.put(SUR, surround);
-        s.setLanes(lanes);
-    }
-
-    @After
-    public void tearDown() {
-        s.detach();
+        p.setLanes(lanes);
     }
 
     // ================================================================= 叫醒
@@ -111,14 +120,14 @@ public class ChannelSchedulerTest {
     public void wakesCoalesceIntoOneRound() {
         settle();
         int posts = poster.posts;
-        int rounds = host.rounds;
+        int rounds = pipe.rounds;
         s.wake();
         s.wake();
         s.onNeedsChanged();
         s.wake();
         assertEquals("并成一次 post", posts + 1, poster.posts);
         settle();
-        assertEquals("跑了一轮", rounds + 1, host.rounds);
+        assertEquals("跑了一轮", rounds + 1, pipe.rounds);
         s.wake();
         assertEquals("跑完之后再叫，再排一次", posts + 2, poster.posts);
     }
@@ -127,9 +136,9 @@ public class ChannelSchedulerTest {
     @Test
     public void ticksEveryTwoSeconds() {
         settle();
-        int rounds = host.rounds;
+        int rounds = pipe.rounds;
         at(ChannelRules.TICK_MS * 5);
-        assertTrue("至少醒了 5 次：" + (host.rounds - rounds), host.rounds - rounds >= 5);
+        assertTrue("至少醒了 5 次：" + (pipe.rounds - rounds), pipe.rounds - rounds >= 5);
     }
 
     // ================================================================= 一步做完没有、到点
@@ -162,8 +171,8 @@ public class ChannelSchedulerTest {
         frame(front);
         settle();
         assertEquals(Arrays.asList("openTrail [front, left, back]"), lines("openTrail"));
-        assertEquals(ChannelRules.Condition.STREAMING, s.condition(SUR));
-        assertTrue(s.usable(SUR));
+        assertEquals(ChannelRules.Condition.STREAMING, p.condition(SUR));
+        assertTrue(p.usable(SUR));
     }
 
     /** 开那一步满 15 秒还没出画面：先往下走（下一路开），这一步由救援接手。 */
@@ -250,7 +259,7 @@ public class ChannelSchedulerTest {
         opened(front);
         frame(front);
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         say(rear, false, true);
         settle();
         assertEquals(1, lines("waiting LOSING left").size());
@@ -258,12 +267,12 @@ public class ChannelSchedulerTest {
         assertTrue(lines("judged").isEmpty());
         at(ChannelRules.IN_FLIGHT_MAX_MS);
         assertEquals("到点按当时的状态判（最后一句被占用 → 被拿着）", 1, lines("judged left TAKEN LOSS").size());
-        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.TAKEN, p.condition(REAR));
         // 那一次关返回之前不开它（项目所有者 2026-10-28）：黑匣子写一次，录像那一侧照现成的那一句说它无法录制
         assertEquals(Arrays.asList("held left 1 round=2 left own closing-lost ms=" + ChannelRules.IN_FLIGHT_MAX_MS),
                 lines("held "));
-        assertTrue(s.heldByClose(REAR));
-        assertTrue(s.cannotOpen(REAR));
+        assertTrue(p.heldByClose(REAR));
+        assertTrue(p.cannotOpen(REAR));
         at(ChannelRules.IN_FLIGHT_MAX_MS + 5 * ChannelRules.TICK_MS);
         assertEquals("一段只写一次", 1, lines("held ").size());
         assertEquals(0, rear.heldRefusals);
@@ -281,21 +290,21 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         settle();
         surround.lose(now);
-        s.onLossStarted("2", DEVICE_ERROR);
+        p.onLossStarted("2", DEVICE_ERROR);
         rear.lose(now);
-        s.onLossStarted("1", DEVICE_ERROR);
+        p.onLossStarted("1", DEVICE_ERROR);
         at(100);
         say(surround, true, true);
         surround.closedNow();
-        s.onLossClosed("2", 100);
+        p.onLossClosed("2", 100);
         at(1_000);
         say(rear, true, true);
         rear.closedNow();
-        s.onLossClosed("1", 1_000);
+        p.onLossClosed("1", 1_000);
         settle();
-        int rounds = host.rounds;
+        int rounds = pipe.rounds;
         at(1_299);
-        assertTrue("环视早到点了，只等后座舱到点：" + (host.rounds - rounds), host.rounds - rounds <= 2);
+        assertTrue("环视早到点了，只等后座舱到点：" + (pipe.rounds - rounds), pipe.rounds - rounds <= 2);
         assertTrue(lines("judged").isEmpty());
         at(1_300);
         assertEquals(2, lines("judged").size());
@@ -320,15 +329,15 @@ public class ChannelSchedulerTest {
         at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
         assertEquals("这一轮在开：不救", Arrays.asList("open [MIRROR]"), surround.actions);
         assertTrue(lines("held ").isEmpty());
-        assertFalse("60 秒以内照旧算在起来", s.cannotOpen(SUR));
+        assertFalse("60 秒以内照旧算在起来", p.cannotOpen(SUR));
         at(ChannelRules.IN_FLIGHT_MAX_MS);
         surround.busySince = 0;   // 相机层的在途过了 60 秒：只管别的路等多久
         s.wake();
         settle();
         assertEquals(Arrays.asList("held front 2 round=1 front own opening open-pending ms="
                 + ChannelRules.IN_FLIGHT_MAX_MS), lines("held "));
-        assertTrue(s.heldByClose(SUR));
-        assertTrue(s.cannotOpen(SUR));
+        assertTrue(p.heldByClose(SUR));
+        assertTrue(p.cannotOpen(SUR));
 
         at(10 * 60_000);
         assertEquals("10 分钟也不重开", Arrays.asList("open [MIRROR]"), surround.actions);
@@ -348,13 +357,13 @@ public class ChannelSchedulerTest {
         frame(surround);
         settle();
         assertEquals(Arrays.asList("heldEnded front 2 round=1 ms=" + (10 * 60_000)), lines("heldEnded"));
-        assertEquals(ChannelRules.Condition.STREAMING, s.condition(SUR));
-        assertFalse(s.heldByClose(SUR));
+        assertEquals(ChannelRules.Condition.STREAMING, p.condition(SUR));
+        assertFalse(p.heldByClose(SUR));
     }
 
     /**
-     * 改输出卡在配会话里（新会话一直配不好）：这一步满 15 秒，救援接手重开 —— 相机层的重开不因为在配会话合并掉
-     * （它把那一次配置作废、连设备一起关掉再开；审查 2026-10-11：以前合并掉，救援梯子空转到 60 秒封顶）。
+     * 改输出卡在配会话里（新会话一直配不好）：这一步满 15 秒，救援接手重开 —— 先下达关（第 2b 步：关相机那一下把那一次配置作废、
+     * 连设备一起关掉），关完再在同一步里下达开；不因为在配会话合并掉（审查 2026-10-11：以前合并掉，救援梯子空转到 60 秒封顶）。
      */
     @Test
     public void aStuckApplyIsTakenOverByAReopenAtFifteenSeconds() {
@@ -362,7 +371,7 @@ public class ChannelSchedulerTest {
         claim(Holder.MIRROR);
         streaming(surround, mirror);
         settle();
-        host.plan(SUR);
+        pipe.plan(SUR);
         declare(surround, recS);
         claim(Holder.RECORDING);
         settle();
@@ -373,7 +382,12 @@ public class ChannelSchedulerTest {
         surround.progressAgeMs = ChannelRules.STEP_MAX_MS;
         at(ChannelRules.STEP_MAX_MS + ChannelRules.TICK_MS);
         assertEquals(1, lines("stepEnded APPLY front timedOut").size());
-        assertEquals(Arrays.asList("apply [MIRROR, RECORD]", "reopen [MIRROR, RECORD]"), surround.actions);
+        assertEquals("重开先下达关", Arrays.asList("apply [MIRROR, RECORD]", "close reopen"), surround.actions);
+        long reopenAt = now;
+        closed(surround);
+        at(reopenAt - T0 + ChannelRules.REOPEN_GAP_MS);
+        assertEquals(Arrays.asList("apply [MIRROR, RECORD]", "close reopen", "reopen [MIRROR, RECORD]"),
+                surround.actions);
         assertEquals(0, surround.refused);
     }
 
@@ -385,17 +399,17 @@ public class ChannelSchedulerTest {
         streaming(rear, pvR);
         streaming(front, pvF);
         settle();
-        assertEquals(ChannelRules.Condition.STREAMING, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.STREAMING, p.condition(REAR));
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
-        assertEquals(ChannelRules.Condition.RESCUING, s.condition(REAR));
+        p.onLossStarted("1", DISCONNECTED);
+        assertEquals(ChannelRules.Condition.RESCUING, p.condition(REAR));
         at(5_400);
         rear.closedNow();
-        s.onLossClosed("1", 5_400);
+        p.onLossClosed("1", 5_400);
         settle();
-        assertEquals("关完了，那 300 ms 里还在判：说不出是被拿着", ChannelRules.Condition.RESCUING, s.condition(REAR));
+        assertEquals("关完了，那 300 ms 里还在判：说不出是被拿着", ChannelRules.Condition.RESCUING, p.condition(REAR));
         at(5_700);
-        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.TAKEN, p.condition(REAR));
     }
 
     /** 设备错误（4）丢了：还在判，算在救。 */
@@ -405,8 +419,8 @@ public class ChannelSchedulerTest {
         streaming(surround, pvS);
         settle();
         surround.lose(now);
-        s.onLossStarted("2", DEVICE_ERROR);
-        assertEquals(ChannelRules.Condition.RESCUING, s.condition(SUR));
+        p.onLossStarted("2", DEVICE_ERROR);
+        assertEquals(ChannelRules.Condition.RESCUING, p.condition(SUR));
     }
 
     /**
@@ -419,20 +433,20 @@ public class ChannelSchedulerTest {
         streaming(surround, pvS);
         settle();
         surround.lose(now);
-        s.onLossStarted("2", DEVICE_ERROR);
+        p.onLossStarted("2", DEVICE_ERROR);
         at(1_000);
         surround.closedNow();
-        s.onLossClosed("2", 1_000);
+        p.onLossClosed("2", 1_000);
         at(1_100);
         say(surround, false, true);
         surround.deviceOpen = true;
         surround.holds = true;
         configured(surround, pvS);
         frame(surround);
-        s.onOpened("2");
+        p.onOpened("2");
         at(2_000);
         assertTrue("待判作废，不判", lines("judged").isEmpty());
-        assertEquals(ChannelRules.Condition.STREAMING, s.condition(SUR));
+        assertEquals(ChannelRules.Condition.STREAMING, p.condition(SUR));
     }
 
     // ================================================================= 2.11.4（项目所有者 2026-10-14 批准）
@@ -450,11 +464,11 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         settle();
         rear.lose(now);
-        s.onLossStarted("1", DEVICE_ERROR);
+        p.onLossStarted("1", DEVICE_ERROR);
         settle();
         at(6_200);
         rear.closedNow();
-        s.onLossClosed("1", 6_200);
+        p.onLossClosed("1", 6_200);
         settle();
         at(6_205);
         boolean ours = s.ourStepInFlight("1");
@@ -464,20 +478,21 @@ public class ChannelSchedulerTest {
         at(6_200 + ChannelRules.JUDGE_DELAY_MS);
         assertEquals(1, lines("judged left ORDINARY LOSS").size());
         assertTrue("不等安静：" + lines("waiting"), lines("waiting QUIET").isEmpty());
-        assertEquals(Arrays.asList("reopen [PREVIEW]"), rear.actions);
+        assertEquals("关着的一路的重开：照开那样开", Arrays.asList("open [PREVIEW]"), rear.actions);
     }
 
     /**
-     * 在关旧设备的相机是在途（第 1c 项）：救援的重开 15 秒到点、旧设备还在关（相机层登记着在关），别的路一步都不动；
-     * 关完、新设备开好出了画面，排着的前座舱才开。以前到点就「先往下走」，旧设备还在拆，别的路就动了。
+     * 在关旧设备的相机是在途（第 1c 项）：救援的重开先下达关（第 2b 步），关的那一半 15 秒到点还没关完 —— 这一步照救援到点结束，
+     * 开的那一半不再下达；这一路的关是重开的关那一半，别的路照「在途」一步都不动（最多 60 秒）。关完了，这一路交给平常的规矩：
+     * 排着的前座舱先开，后座舱照救援梯子再救（第 3 次；关着的一路照开那样开）。以前到点就「先往下走」，旧设备还在拆，别的路就动了；
+     * 2b 之前关完是相机层接着开新的（不算次数），现在是梯子上的下一次。
      */
     @Test
     public void aRescueReopenWhoseOldDeviceIsStillClosingHoldsEveryoneAfterItsStepTimesOut() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         streaming(surround, recS);
         declare(rear, recR);
-        rear.slowRetire = true;
         settle();
         assertEquals(Arrays.asList("open [RECORD]"), rear.actions);
         at(100);
@@ -485,15 +500,11 @@ public class ChannelSchedulerTest {
         settle();
         rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
         at(ChannelRules.STEP_MAX_MS);
-        assertEquals("第 2 次：重开", Arrays.asList("open [RECORD]", "reopen [RECORD]"), rear.actions);
+        assertEquals("第 2 次：重开，先下达关", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
         long reopenAt = now;
-        // SingleCamera.reopen：同一轮里旧设备从字段上摘下来、在这一轮的相机线程上关（账本：在关），关完才开新的
-        rear.deviceOpen = false;
-        rear.session = SingleCamera.SessionOutputs.NONE;
-        rear.firstFrameAt = 0;
-        assertEquals(CameraRound.Phase.CLOSING, rear.live.phase());
+        assertEquals("关的那一半在那一轮里（账本：在关）", CameraRound.Phase.CLOSING, rear.live.phase());
 
-        host.plan(FRONT);   // 这期间前座舱也要录了：它排着
+        pipe.plan(FRONT);   // 这期间前座舱也要录了：它排着
         declare(front, recF);
         s.onNeedsChanged();
         settle();
@@ -502,20 +513,22 @@ public class ChannelSchedulerTest {
         assertEquals(1, lines("waiting BUSY left").size());
         at(reopenAt - T0 + ChannelRules.STEP_MAX_MS + 5_000);
         assertTrue("旧设备还在关：前座舱不开", front.actions.isEmpty());
+        assertEquals("开的那一半随这一步结束不再下达", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
 
-        // 旧设备关了 20.5 秒，关完；开新设备那一下上路（一个新动作，照常挡着）
+        // 旧设备关了 20.5 秒，关完：这一路关着，平常的规矩接手 —— 排着的前座舱先开
         at(reopenAt - T0 + 20_500);
-        rear.retiredClosed();
-        rear.lastClose = new SingleCamera.LastClose(now, 20_500, "reopen");
-        rear.busySince = now;
-        s.wake();
-        settle();
-        assertTrue(front.actions.isEmpty());
-        at(reopenAt - T0 + 20_800);
-        opened(rear);
-        frame(rear);
+        closed(rear);
         settle();
         assertEquals(Arrays.asList("open [RECORD]"), front.actions);
+        assertEquals(Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
+        opened(front);
+        frame(front);
+        settle();
+        assertEquals("后座舱照梯子再救：关着的一路照开那样开", Arrays.asList("open [RECORD]", "close reopen", "open [RECORD]"),
+                rear.actions);
+        assertEquals(Arrays.asList(SingleCamera.OpenKind.PLAIN, SingleCamera.OpenKind.PLAIN), rear.kinds);
+        assertEquals("关的那一半关了 20.5 秒：一条重开的关", 1,
+                lines("recorded left CLOSE CLOSED ms=" + 20_500 + " kind=REOPEN").size());
     }
 
     /**
@@ -529,11 +542,10 @@ public class ChannelSchedulerTest {
         host.mainForeground = false;
         host.startedWhileVisible = true;
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         declare(rear, recR);
         declare(front, recF);
-        rear.slowRetire = true;
         settle();
         assertEquals(Arrays.asList("open [RECORD]"), rear.actions);
         assertEquals(1, lines("opening left OPEN sentry=1 fg=false sinceClose=-1 held=-1 surround=STREAMING").size());
@@ -558,19 +570,16 @@ public class ChannelSchedulerTest {
         opened(front);
         frame(front);
         settle();
-        assertEquals("不改输出，重开带上预览", Arrays.asList("open [RECORD]", "reopen [PREVIEW, RECORD]"),
-                rear.actions);
+        assertEquals("不改输出，重开：先下达关", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
         assertTrue(lines("stepEnded APPLY").isEmpty());
         assertEquals(1, lines("opening left RESCUE").size());
 
         long reopenAt = now;
-        rear.deviceOpen = false;
-        rear.session = SingleCamera.SessionOutputs.NONE;
         at(reopenAt - T0 + 8_535);
-        rear.retiredClosed();
-        rear.lastClose = new SingleCamera.LastClose(now, 8_535, "reopen");
-        rear.busySince = now;
-        s.wake();
+        closed(rear);   // 旧设备关了 8.5 秒
+        settle();
+        assertEquals("关完了，早过了 300 ms：同一步里再下达开，带上预览",
+                Arrays.asList("open [RECORD]", "close reopen", "reopen [PREVIEW, RECORD]"), rear.actions);
         at(reopenAt - T0 + 8_700);
         opened(rear);
         frame(rear);
@@ -589,6 +598,252 @@ public class ChannelSchedulerTest {
         assertEquals(125, open.context.vehicle.importance);
     }
 
+    // ================================================================= 救援重开分两半（第 2b 步，项目所有者 2026-10-29）
+
+    /** 后座舱只为录像开着、配好了一帧不出：开那一步 15 秒到点，救援第 2 次就重开 —— 先下达关。返回下达关的那一刻（调度的钟）。 */
+    private long stuckRearIsReopened() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR, REAR);
+        streaming(surround, recS);
+        declare(rear, recR);
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), rear.actions);
+        at(100);
+        opened(rear);   // 配好了，一帧不出
+        settle();
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals("重开：先下达关", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
+        return now;
+    }
+
+    /**
+     * 救援的重开是两轮（第 2b 步）：关的那一半是这一路那一轮的一次关（不是计划里的关 —— 没有「通道：关 …」「关相机：…」、关相机小结）；
+     * 关完、那一轮结束、离下达关满 300 ms 才下达开：新的一轮（轮次号 +1）、带着救援的那一种。同一台相机从不同时两个句柄（假的相机服务当场查）。
+     * 这一步一行、一条重开的统计，关的那一半一条重开的关；录像那一侧只听说一次「在救」。
+     */
+    @Test
+    public void aRescueReopenIsACloseThenARescueOpenInTheNextRound() {
+        long reopenAt = stuckRearIsReopened();
+        int first = rear.roundNumbers.get(0);
+        assertEquals("关的那一半是这一路那一轮的关", first, rear.live.number);
+        assertTrue(rear.live.cancelled());
+        assertEquals(1, told("gone left RESCUED").size());
+
+        at(reopenAt - T0 + 80);
+        closed(rear);   // 关得快：80 ms
+        settle();
+        assertEquals("关完了，还不到 300 ms：不开", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
+        at(reopenAt - T0 + ChannelRules.REOPEN_GAP_MS - 1);
+        assertEquals(2, rear.actions.size());
+        at(reopenAt - T0 + ChannelRules.REOPEN_GAP_MS);
+        assertEquals(Arrays.asList("open [RECORD]", "close reopen", "reopen [RECORD]"), rear.actions);
+        assertEquals(Arrays.asList(SingleCamera.OpenKind.PLAIN, SingleCamera.OpenKind.RESCUE), rear.kinds);
+        assertEquals("开的那一半是新的一轮", first + 1, (int) rear.roundNumbers.get(1));
+
+        at(reopenAt - T0 + 700);
+        opened(rear);
+        frame(rear);
+        settle();
+        assertEquals("一步一行", 1, lines("stepEnded RESCUE left").size());
+        assertEquals(Arrays.asList(
+                "recorded left OPEN NO_FRAMES ms=15000 surround=STREAMING",
+                "recorded left CLOSE CLOSED ms=80 kind=REOPEN surround=STREAMING",
+                "recorded left REOPEN FRAMED ms=700 oldClose=80 surround=STREAMING"), lines("recorded"));
+        assertEquals("录像那一侧只听说一次在救", 1, told("gone left RESCUED").size());
+        assertTrue("不是计划里的关", lines("closing ").isEmpty());
+        assertTrue(lines("closeRound").isEmpty());
+        assertTrue(lines("openSpan").isEmpty());
+        assertEquals(0, rear.heldRefusals);
+        assertEquals(0, rear.refused);
+        assertEquals(ChannelRules.Condition.STREAMING, p.condition(REAR));
+    }
+
+    /**
+     * 两半之间那一下（关完了、开的那一半还没下达）相机服务说的话，调度答「我们在途」（CameraAvailabilityWatch 照它分类，不挡安静）——
+     * 和以前整个重开都记成在开一样：主线程卡了一下、离关完早过了 500 ms 也照算。开的那一半下达以后是在开，照旧算。
+     */
+    @Test
+    public void aServiceWordInTheGapBetweenTheHalvesIsOurs() {
+        long reopenAt = stuckRearIsReopened();
+        assertTrue("关的那一半：在关", s.ourStepInFlight("1"));
+        at(reopenAt - T0 + 80);
+        closed(rear);   // 关完了：那一轮结束，这一路关着（叫醒的那一轮还没跑）
+        now = reopenAt + 900;   // 主线程卡了一下：离关完早过了 500 ms，开的那一半还没下达
+        assertTrue("两半之间：我们在途", s.ourStepInFlight("1"));
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]", "close reopen", "reopen [RECORD]"), rear.actions);
+        assertTrue("开的那一半：在开", s.ourStepInFlight("1"));
+    }
+
+    /**
+     * 关的那一半在关的时候退出了：手上这一步照等（退出照常等它做完）；关完了，开的那一半不再下达，这一步当场结束（一行「不再开：退出」，
+     * 不记重开那一条），接着照次序关别的路。以前是相机层先把它开起来，再在按次序关里关掉（第 2b 步改了的那一处行为）。
+     */
+    @Test
+    public void anExitDuringTheCloseHalfDropsTheOpenHalf() {
+        long reopenAt = stuckRearIsReopened();
+        at(reopenAt - T0 + 500);
+        exitApp();
+        settle();
+        assertTrue("手上那一步在做：先不关别的", surround.actions.isEmpty());
+        at(reopenAt - T0 + 1_000);
+        closed(rear);
+        settle();
+        assertEquals("开的那一半不再下达", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
+        assertEquals(1, lines("stepEnded RESCUE left dropped EXIT after=1000").size());
+        assertTrue("没开设备：不记重开那一条", lines("recorded left REOPEN").isEmpty());
+        assertEquals(1, lines("recorded left CLOSE CLOSED ms=1000 kind=REOPEN").size());
+        assertEquals("接着照次序关：环视单独关", Arrays.asList("close exit"), surround.actions);
+    }
+
+    /**
+     * 关的那一半在关的时候管线重建：和退出一样，手上这一步照等；关完了，开的那一半不再下达（一行「不再开：管线重建」），重开的那一次关照记；
+     * 接着照次序关（环视单独关），关完换上新的一份，它照开的次序开。
+     */
+    @Test
+    public void aRebuildDuringTheCloseHalfDropsTheOpenHalfThenSwapsInOrder() {
+        long reopenAt = stuckRearIsReopened();
+        p.retire();
+        FakePipe second = new FakePipe();
+        second.plan(SUR, REAR);
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, new Out(Kind.RECORD, "recorder-2b"));
+        declare(r2, new Out(Kind.RECORD, "recorder-1b"));
+        rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+        assertTrue("手上那一步做完再关", surround.actions.isEmpty());
+
+        at(reopenAt - T0 + 500);
+        closed(rear);
+        settle();
+        assertEquals("开的那一半不再下达", Arrays.asList("open [RECORD]", "close reopen"), rear.actions);
+        assertEquals(1, lines("stepEnded RESCUE left dropped REBUILD after=500").size());
+        assertEquals(1, lines("recorded left CLOSE CLOSED ms=500 kind=REOPEN").size());
+        assertEquals("接着照次序关：环视单独关", Arrays.asList("close rebuild"), surround.actions);
+
+        at(reopenAt - T0 + 700);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("swapped 700 successor"), lines("swapped"));
+        assertTrue(pipe.gone);
+        assertEquals("换上了：环视先开", Arrays.asList("open [RECORD]"), s2.actions);
+        opened(s2);
+        frame(s2);
+        settle();
+        assertEquals(Arrays.asList("open [RECORD]"), r2.actions);
+    }
+
+    /**
+     * 关的那一半卡住时管线重建：这一路从关的那一半起就在关，换上新的一份照「每一路从它开始关那一刻算」（项目所有者 2026-10-29）——
+     * 手上那一步 15 秒到点；那一次关在途，别的路等它，封顶也从关的那一半算，满 60 秒环视才单独关；环视关完当场换上：约 60 秒。
+     * 以前相机层自己重开，这一路记成在开，满 60 秒才下达按次序的关、从那一刻再等 60 秒：约 120 秒（第 2b 步改了的那一处行为）。
+     * 卡住的那一路留下当孤儿，重开那一次关的那一条随旧的那一份走了：关返回时谁都不记；新的一份那一路等那一轮结束才开。
+     */
+    @Test
+    public void aStuckCloseHalfDuringARebuildSwapsSixtySecondsAfterTheCloseHalfBegan() {
+        long reopenAt = stuckRearIsReopened();
+        int round = rear.live.number;
+        p.retire();
+        FakePipe second = new FakePipe();
+        second.plan(SUR, REAR);
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, new Out(Kind.RECORD, "recorder-2b"));
+        declare(r2, new Out(Kind.RECORD, "recorder-1b"));
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+
+        at(reopenAt - T0 + ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded RESCUE left timedOut").size());
+        assertTrue("那一次关在途：别的路等它", surround.actions.isEmpty());
+        at(reopenAt - T0 + ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(reopenAt - T0 + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals("从关的那一半算满 60 秒：环视单独关", Arrays.asList("close rebuild"), surround.actions);
+        assertTrue(lines("swapped").isEmpty());
+
+        at(reopenAt - T0 + ChannelRules.IN_FLIGHT_MAX_MS + 100);
+        closed(surround);
+        settle();
+        assertEquals("环视关完当场换上：后座舱从关的那一半算已经满了 60 秒，不再另等",
+                Arrays.asList("swapped " + (ChannelRules.IN_FLIGHT_MAX_MS + 100) + " successor orphans left 1 round="
+                        + round + " closing"), lines("swapped"));
+        assertTrue("状态条那一句", next.heldByClose(REAR));
+        assertEquals("环视照常开", Arrays.asList("open [RECORD]"), s2.actions);
+        opened(s2);
+        frame(s2);
+        settle();
+        assertTrue("被一轮占着：不开", r2.actions.isEmpty());
+        assertEquals(0, r2.heldRefusals);
+        assertFalse(pipe.gone);
+
+        at(reopenAt - T0 + 90_000);
+        closed(rear);   // 卡住的那一次关终于返回：报给旧的那一份
+        settle();
+        assertTrue(pipe.gone);
+        assertTrue("重开那一次关的那一条随旧的那一份走了", lines("recorded left CLOSE").isEmpty());
+        assertTrue(lines("coupling END REOPEN").isEmpty());
+        assertEquals("那一轮结束了：新的一份照常开", Arrays.asList("open [RECORD]"), r2.actions);
+    }
+
+    /**
+     * 救援重开碰上那一台刚在相机线程上丢了（这一轮读完事实之后、照做之前，丢了的那一声还没到）：关的那一半不下达，合并掉 ——
+     * 和以前相机层的重开在丢的那一轮上合并一样：不说在救、不记关的那一半、不起这一步。丢了的那一声到了，照丢了的规矩走：
+     * 录像那一侧听说它丢了，关完记一条丢了之后的关，没有重开的关（审查 2026-10-30）。
+     */
+    @Test
+    public void aReopenRacingALossMergesIntoTheLoss() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR, REAR);
+        streaming(surround, recS);
+        declare(rear, recR);
+        settle();
+        at(100);
+        opened(rear);   // 配好了，一帧不出
+        settle();
+        rear.progressAgeMs = ChannelRules.STEP_MAX_MS - 100;
+        // 开那一步到点的那一轮：事实读完了，要救它的时候，相机线程上那一台刚丢了
+        afterStepEnded = () -> rear.lose(now);
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals(1, lines("stepEnded OPEN left timedOut").size());
+        assertEquals("关的那一半没下达", Arrays.asList("open [RECORD]"), rear.actions);
+        assertTrue("不说在救", told("gone left RESCUED").isEmpty());
+        assertNull("没起这一步", s.snapshot().step);
+
+        p.onLossStarted("1", DISCONNECTED);
+        settle();
+        assertEquals(1, told("gone left LOST").size());
+        at(ChannelRules.STEP_MAX_MS + 2_000);
+        rear.closedNow();
+        p.onLossClosed("1", 2_000);
+        settle();
+        assertEquals(1, lines("recorded left CLOSE CLOSED ms=2000 kind=LOSS").size());
+        assertTrue("没有重开的关", lines("recorded left CLOSE CLOSED ms=2000 kind=REOPEN").isEmpty());
+        assertTrue(lines("stepEnded RESCUE").isEmpty());
+    }
+
+    /** 开的那一半开好了、还没出画面就丢了：这一步里丢了（和以前重开之后丢了一样），一行、一条出事的统计，录像那一侧听说它丢了。 */
+    @Test
+    public void aLossDuringTheOpenHalfEndsTheStepAsALoss() {
+        long reopenAt = stuckRearIsReopened();
+        at(reopenAt - T0 + 100);
+        closed(rear);
+        at(reopenAt - T0 + ChannelRules.REOPEN_GAP_MS);
+        assertEquals(3, rear.actions.size());
+        at(reopenAt - T0 + 500);
+        opened(rear);
+        settle();
+        rear.lose(now);
+        p.onLossStarted("1", DISCONNECTED);
+        settle();
+        assertEquals(1, lines("stepEnded RESCUE left failed LOSS").size());
+        assertEquals(1, lines("recorded left REOPEN ERROR").size());
+        assertEquals(1, told("gone left LOST").size());
+        assertEquals("关的那一半那一条照记，丢了之后那一次关另记", 1, lines("recorded left CLOSE CLOSED ms=100 kind=REOPEN").size());
+    }
+
     /**
      * 这一步里出了事（改输出时丢了）：2.11.4 起也写一行（第 1a 项）、交一条统计 —— 以前什么都不写，
      * 10-13 那一次没做完的改输出只在关相机小结的账里看得出来。
@@ -599,14 +854,14 @@ public class ChannelSchedulerTest {
         claim(Holder.MIRROR);
         streaming(surround, mirror);
         settle();
-        host.plan(SUR);
+        pipe.plan(SUR);
         declare(surround, recS);
         claim(Holder.RECORDING);
         settle();
         assertEquals(Arrays.asList("apply [MIRROR, RECORD]"), surround.actions);
         at(600);
         surround.lose(now);
-        s.onLossStarted("2", DEVICE_ERROR);
+        p.onLossStarted("2", DEVICE_ERROR);
         settle();
         assertEquals(1, lines("stepEnded APPLY front failed LOSS after=600 added=[RECORD]").size());
         assertEquals(Arrays.asList("recorded front APPLY ERROR ms=600"), lines("recorded"));
@@ -621,7 +876,7 @@ public class ChannelSchedulerTest {
     public void withTheOneShotRuleOnlyTheFrontCabinIsRetiredAndTheRearComesBackWhenLit() {
         host.frontCabinOneShot = true;
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -630,9 +885,9 @@ public class ChannelSchedulerTest {
         host.goDark();
         s.wake();
         settle();
-        assertTrue("黑了不到 30 秒：还没去掉", host.retired.isEmpty());
+        assertTrue("黑了不到 30 秒：还没去掉", pipe.frontRetired.isEmpty());
         at(1_000 + ChannelRules.HOLD_MS);
-        assertEquals(Arrays.asList(FRONT), host.retired);
+        assertEquals(Arrays.asList(FRONT), pipe.frontRetired);
         at(1_000 + ChannelRules.HOLD_MS + 120);
         closed(surround);
         settle();
@@ -652,7 +907,7 @@ public class ChannelSchedulerTest {
         at(1_000 + ChannelRules.HOLD_MS + 20_000);
         assertEquals("亮屏：后座舱开回来接着录", Arrays.asList("close dark-release", "open [RECORD]"), rear.actions);
         assertEquals("前座舱不再开", Arrays.asList("close dark-release"), front.actions);
-        assertEquals("只报一次", Arrays.asList(FRONT), host.retired);
+        assertEquals("只报一次", Arrays.asList(FRONT), pipe.frontRetired);
     }
 
     /**
@@ -665,7 +920,7 @@ public class ChannelSchedulerTest {
         host.mainForeground = false;
         host.startedWhileVisible = false;
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -707,7 +962,7 @@ public class ChannelSchedulerTest {
         host.startedWhileVisible = false;
         host.vehicle = new ChannelScheduler.Vehicle(0, 0x00200104, 30_000, -1, 30_000, 125);
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -754,7 +1009,7 @@ public class ChannelSchedulerTest {
         assertTrue(surround.actions.get(0), surround.actions.get(0).startsWith("rebuild"));
         // 醒的那一轮和 2.11.4 一样是开始关 + 30 秒（那一下 2.11.4 写关完一轮那一行）；关完还不到 30 秒，不量，之后的头一轮量
         at(release + ChannelScheduler.AFTERMATH_MS);
-        assertTrue(host.roundAt.toString(), host.roundAt.contains(release + ChannelScheduler.AFTERMATH_MS));
+        assertTrue(pipe.roundAt.toString(), pipe.roundAt.contains(release + ChannelScheduler.AFTERMATH_MS));
         assertTrue(lines("coupling AFTER_30S").isEmpty());
         at(release + 140 + ChannelScheduler.AFTERMATH_MS + ChannelRules.TICK_MS);
         assertEquals(1, lines("coupling AFTER_30S PLANNED [back, left] DARK_RELEASE front gap=8000 same ours=RESCUE@8100"
@@ -789,16 +1044,16 @@ public class ChannelSchedulerTest {
         claim(Holder.MIRROR);
         streaming(surround, mirror);
         settle();
-        assertTrue(s.sessionCarries(SUR, mirror));
+        assertTrue(p.sessionCarries(SUR, mirror));
         drop(Holder.MIRROR);
         settle();
         assertEquals(1, surround.actions.size());
         assertTrue(surround.actions.get(0), surround.actions.get(0).startsWith("close "));
-        assertTrue("快照清了，相机还在关：还带着", s.sessionCarries(SUR, mirror));
+        assertTrue("快照清了，相机还在关：还带着", p.sessionCarries(SUR, mirror));
         at(300);
         closed(surround);
         settle();
-        assertFalse("关完了：不带着了", s.sessionCarries(SUR, mirror));
+        assertFalse("关完了：不带着了", p.sessionCarries(SUR, mirror));
     }
 
     // ================================================================= 超级镜子「后视 + 后座舱」（项目所有者 2026-10-19）
@@ -827,7 +1082,7 @@ public class ChannelSchedulerTest {
         opened(rear);
         frame(rear);
         settle();
-        assertEquals(ChannelRules.Condition.STREAMING, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.STREAMING, p.condition(REAR));
 
         at(1_000);
         host.mirrorCabin = false;
@@ -876,7 +1131,7 @@ public class ChannelSchedulerTest {
         host.mainForeground = false;
         host.startedWhileVisible = true;
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1048,7 +1303,7 @@ public class ChannelSchedulerTest {
         settle();
         at(t + ChannelRules.HOLD_MS);
         assertEquals(Arrays.asList("close surround-first"), surround.actions);
-        s.exit();
+        exitApp();
         settle();
         assertTrue("手上那一步做完再关", rear.actions.isEmpty() && front.actions.isEmpty());
         at(t + ChannelRules.HOLD_MS + 100);
@@ -1062,7 +1317,7 @@ public class ChannelSchedulerTest {
         settle();
         assertEquals(1, lines("surroundFirst WINDING gap=-1 surround=100 cabins=[left, back]/EXIT/100 open=-1").size());
         assertEquals(2, lines("surroundFirst").size());
-        assertTrue(host.stopped);
+        assertTrue(pipe.gone);
     }
 
     /**
@@ -1072,18 +1327,18 @@ public class ChannelSchedulerTest {
     @Test
     public void aCabinTakenBesideTheSurroundCountsItsCloseAndMeasuresTheSurround() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
         settle();
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         settle();
         surround.lastResultAt = T0 + 5_000;
         at(5_409);
         rear.closedNow();
-        s.onLossClosed("1", 5_409);
+        p.onLossClosed("1", 5_409);
         settle();
         assertEquals(Arrays.asList("recorded left CLOSE CLOSED ms=5409 kind=LOSS surround=STREAMING"), lines("recorded"));
         assertEquals(CameraTaken.Reason.Source.DISCONNECTED, records.get(0).reason.source);
@@ -1098,16 +1353,16 @@ public class ChannelSchedulerTest {
     @Test
     public void theSurroundsOwnLossCloseIsCountedButNotCoupled() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         streaming(surround, recS);
         streaming(rear, recR);
         settle();
         surround.lose(now);
-        s.onLossStarted("2", DEVICE_ERROR);
+        p.onLossStarted("2", DEVICE_ERROR);
         settle();
         at(5_798);
         surround.closedNow();
-        s.onLossClosed("2", 5_798);
+        p.onLossClosed("2", 5_798);
         settle();
         assertEquals(Arrays.asList("recorded front CLOSE CLOSED ms=5798 kind=LOSS"), lines("recorded"));
         assertTrue(lines("coupling").isEmpty());
@@ -1119,7 +1374,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aRescueKeepsMeasuringTheOtherLanesUntilTheNextStepStarts() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         streaming(surround, recS);
         streaming(rear, recR);
         settle();
@@ -1137,7 +1392,7 @@ public class ChannelSchedulerTest {
 
         at(5_000);
         surround.gapMs = 2_000;
-        host.plan(FRONT);   // 前座舱也要录了：下一步是开它
+        pipe.plan(FRONT);   // 前座舱也要录了：下一步是开它
         declare(front, recF);
         s.onNeedsChanged();
         settle();
@@ -1237,13 +1492,13 @@ public class ChannelSchedulerTest {
         List<String> released = new ArrayList<>();
         drop(Holder.PREVIEW);
         surround.declared.remove(pvS);
-        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        p.handOver(SUR, pvS, () -> released.add("pvS"));
         settle();
         assertTrue("还挂在会话里：不放", released.isEmpty());
         assertTrue("留着的活输出不为它改会话", surround.actions.isEmpty());
 
         at(1_000);
-        host.plan(SUR);
+        pipe.plan(SUR);
         declare(surround, recS);
         claim(Holder.RECORDING);
         settle();
@@ -1275,7 +1530,7 @@ public class ChannelSchedulerTest {
         List<String> released = new ArrayList<>();
         drop(Holder.PREVIEW);
         surround.declared.remove(pvS);
-        s.handOver(SUR, pvS, () -> released.add("pvS"));
+        p.handOver(SUR, pvS, () -> released.add("pvS"));
         settle();
         assertEquals("没人要、没有前台服务：不保持，关", Arrays.asList("close unwanted"), surround.actions);
         assertTrue("还在关：不放", released.isEmpty());
@@ -1290,8 +1545,8 @@ public class ChannelSchedulerTest {
     public void aHandedOverCanvasNoSessionCarriesIsReleasedAtOnce() {
         settle();
         List<String> released = new ArrayList<>();
-        s.handOver(SUR, pvS, () -> released.add("pvS"));
-        s.handOver("nowhere", new Out(Kind.PREVIEW, "preview-x"), () -> released.add("x"));
+        p.handOver(SUR, pvS, () -> released.add("pvS"));
+        p.handOver("nowhere", new Out(Kind.PREVIEW, "preview-x"), () -> released.add("x"));
         settle();
         assertEquals(Arrays.asList("pvS", "x"), released);
     }
@@ -1310,9 +1565,9 @@ public class ChannelSchedulerTest {
         List<String> released = new ArrayList<>();
         drop(Holder.PREVIEW);
         surround.declared.remove(pvS);
-        s.handOver(SUR, pvS, () -> released.add("pvS"));
-        assertTrue(s.reclaim(SUR, pvS));
-        assertFalse("拿回过了", s.reclaim(SUR, pvS));
+        p.handOver(SUR, pvS, () -> released.add("pvS"));
+        assertTrue(p.reclaim(SUR, pvS));
+        assertFalse("拿回过了", p.reclaim(SUR, pvS));
         surround.declared.add(pvS);
         claim(Holder.PREVIEW);
         settle();
@@ -1339,8 +1594,8 @@ public class ChannelSchedulerTest {
         List<String> released = new ArrayList<>();
         drop(Holder.PREVIEW);
         surround.declared.remove(pvS);
-        s.handOver(SUR, pvS, () -> released.add("pvS"));
-        s.exit();
+        p.handOver(SUR, pvS, () -> released.add("pvS"));
+        exitApp();
         settle();
         assertEquals(Arrays.asList("close exit"), surround.actions);
         assertTrue(released.isEmpty());
@@ -1353,7 +1608,7 @@ public class ChannelSchedulerTest {
         closed(rear);
         closed(front);
         settle();
-        assertTrue(host.stopped);
+        assertTrue(pipe.gone);
         assertEquals("只放一次", Arrays.asList("pvS"), released);
     }
 
@@ -1365,7 +1620,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aClosedMirrorsCanvasLeavesTheRecordingSurroundAloneUntilALaterApply() {
         Out mirror = new Out(Kind.MIRROR, "mirror-a");
-        host.plan(SUR);
+        pipe.plan(SUR);
         claim(Holder.RECORDING);
         claim(Holder.MIRROR);
         streaming(surround, mirror, recS);
@@ -1374,7 +1629,7 @@ public class ChannelSchedulerTest {
         List<String> released = new ArrayList<>();
         drop(Holder.MIRROR);
         surround.declared.remove(mirror);
-        s.handOver(SUR, mirror, () -> released.add("mirror-a"));
+        p.handOver(SUR, mirror, () -> released.add("mirror-a"));
         settle();
         at(10_000);
         assertTrue("环视一步不动：" + surround.actions, surround.actions.isEmpty());
@@ -1404,11 +1659,11 @@ public class ChannelSchedulerTest {
     @Test
     public void anOutputTheCameraDroppedIsReportedAtOnce() {
         settle();
-        s.onOutputDropped("2", recS, SingleCamera.Drop.CONFIG_FAILED);
-        s.onOutputDropped("2", new Out(Kind.SIDE, "side-2"), SingleCamera.Drop.CONFIG_FAILED);
-        s.onOutputDropped("2", new Out(Kind.HUD, "hud-2"), SingleCamera.Drop.CONFIG_FAILED);
-        s.onOutputDropped("2", new Out(Kind.MIRROR, "mirror-2"), SingleCamera.Drop.CONFIG_FAILED);
-        s.onOutputDropped("2", pvS, SingleCamera.Drop.RELEASED);
+        p.onOutputDropped("2", recS, SingleCamera.Drop.CONFIG_FAILED);
+        p.onOutputDropped("2", new Out(Kind.SIDE, "side-2"), SingleCamera.Drop.CONFIG_FAILED);
+        p.onOutputDropped("2", new Out(Kind.HUD, "hud-2"), SingleCamera.Drop.CONFIG_FAILED);
+        p.onOutputDropped("2", new Out(Kind.MIRROR, "mirror-2"), SingleCamera.Drop.CONFIG_FAILED);
+        p.onOutputDropped("2", pvS, SingleCamera.Drop.RELEASED);
         assertEquals(Arrays.asList("RECORD CONFIG_FAILED", "SIDE CONFIG_FAILED", "HUD CONFIG_FAILED",
                 "MIRROR CONFIG_FAILED"), surround.drops);
     }
@@ -1422,7 +1677,7 @@ public class ChannelSchedulerTest {
     @Test
     public void eachSessionThatStreamsIsToldToRecordingOnce() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         declare(surround, recS);
         settle();
         assertEquals("关着的带着录像输出开", Arrays.asList("open [RECORD]"), surround.actions);
@@ -1458,23 +1713,23 @@ public class ChannelSchedulerTest {
     @Test
     public void aLossIsToldAsGoneBeforeTheBlockingCloseEnds() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         streaming(surround, recS);
         streaming(rear, recR);
         settle();
         assertEquals(Arrays.asList("streaming front", "streaming left"), told("streaming"));
         told.clear();
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         settle();
         assertEquals(Arrays.asList("gone left LOST DISCONNECTED"), told("gone"));
         assertEquals(Arrays.asList("condition left RESCUING"), told("condition left"));
         at(5_400);
         rear.closedNow();
-        s.onLossClosed("1", 5_400);
+        p.onLossClosed("1", 5_400);
         settle();
         at(5_700);
-        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.TAKEN, p.condition(REAR));
         assertEquals(Arrays.asList("condition left RESCUING", "condition left TAKEN"), told("condition left"));
         assertEquals("关完不再说一次走了", 1, told("gone").size());
         assertTrue("别的路不受影响", told("gone front").isEmpty() && told("condition front").isEmpty());
@@ -1485,7 +1740,7 @@ public class ChannelSchedulerTest {
     public void aCloseIsToldAsGone() {
         host.foregroundService = false;
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         settle();
         told.clear();
@@ -1503,16 +1758,16 @@ public class ChannelSchedulerTest {
     @Test
     public void aParkedRecorderOnALostLaneIsDroppedWhenTheCloseEnds() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         streaming(surround, recS);
         streaming(rear, recR);
         settle();
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         settle();
         at(5_000);
         rear.closedNow();
-        s.onLossClosed("1", 5_000);
+        p.onLossClosed("1", 5_000);
         settle();
         assertTrue("在录：同一个录制器等相机回来直接加入", rear.drops.isEmpty());
 
@@ -1522,12 +1777,12 @@ public class ChannelSchedulerTest {
         assertEquals(ChannelRules.OutState.KEPT, surround.states.get(recS).state);
         at(6_000);
         surround.lose(now);
-        s.onLossStarted("2", DISCONNECTED);
+        p.onLossStarted("2", DISCONNECTED);
         settle();
         assertTrue("关完之前不派", surround.drops.isEmpty());
         at(8_000);
         surround.closedNow();
-        s.onLossClosed("2", 2_000);
+        p.onLossClosed("2", 2_000);
         settle();
         assertEquals(Arrays.asList("RECORD CLOSED"), surround.drops);
     }
@@ -1539,7 +1794,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aRescueOfAStuckLaneIsToldAsGoneAndItsNextSessionAsStreaming() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         settle();
         told.clear();
@@ -1568,12 +1823,12 @@ public class ChannelSchedulerTest {
     @Test
     public void theDarkReleasesBothCabinsKeepsTheirRecordersAndBringsTheSurroundBack() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
         settle();
-        assertFalse("亮着：没放开", s.releasedByDark(REAR));
+        assertFalse("亮着：没放开", p.releasedByDark(REAR));
         told.clear();
 
         at(1_000);
@@ -1583,8 +1838,8 @@ public class ChannelSchedulerTest {
         settle();
         assertEquals("先单独关环视", Arrays.asList("close surround-first"), surround.actions);
         assertTrue("座舱等环视关完", rear.actions.isEmpty() && front.actions.isEmpty());
-        assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
-        assertFalse(s.releasedByDark(SUR));
+        assertTrue(p.releasedByDark(REAR) && p.releasedByDark(FRONT));
+        assertFalse(p.releasedByDark(SUR));
         at(1_100);
         closed(surround);
         settle();
@@ -1620,7 +1875,7 @@ public class ChannelSchedulerTest {
         assertEquals("亮屏：后座舱先回来，带着停放的录制器", Arrays.asList("close dark-release", "open [RECORD]"),
                 rear.actions);
         assertEquals("一路一路来", Arrays.asList("close dark-release"), front.actions);
-        assertFalse(s.releasedByDark(REAR));
+        assertFalse(p.releasedByDark(REAR));
         at(600_300);
         opened(rear);
         frame(rear);
@@ -1641,7 +1896,7 @@ public class ChannelSchedulerTest {
         host.mainForeground = false;
         host.startedWhileVisible = false;
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1676,7 +1931,7 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("RECORD CLOSED"), surround.drops);
         assertTrue(lines("closeAftermath").isEmpty());
         at(30_000);
-        assertTrue("醒的那一轮照旧是座舱那一轮开始关 + 30 秒", host.roundAt.contains(30_000L));
+        assertTrue("醒的那一轮照旧是座舱那一轮开始关 + 30 秒", pipe.roundAt.contains(30_000L));
         assertTrue("关完（100）还不到 30 秒", lines("coupling AFTER_30S").isEmpty());
         at(100 + ChannelScheduler.AFTERMATH_MS + ChannelRules.TICK_MS);
         assertTrue(lines("closeAftermath").isEmpty());
@@ -1698,12 +1953,12 @@ public class ChannelSchedulerTest {
         settle();
         List<String> reports = new ArrayList<>();
         Consumer<List<ChannelScheduler.Other>> report = others -> reports.add(othersText(others));
-        assertTrue(s.watchAfter("take 1", SUR, now, report));
-        assertFalse("同一件只等一次", s.watchAfter("take 1", SUR, now, report));
-        assertFalse("这一份管线里没有的一路", s.watchAfter("take 9", "nowhere", now, report));
+        assertTrue(p.watchAfter("take 1", SUR, now, report));
+        assertFalse("同一件只等一次", p.watchAfter("take 1", SUR, now, report));
+        assertFalse("这一份管线里没有的一路", p.watchAfter("take 9", "nowhere", now, report));
 
         at(5_000);
-        host.plan(SUR);
+        pipe.plan(SUR);
         declare(surround, recS);
         claim(Holder.RECORDING);
         settle();
@@ -1717,7 +1972,7 @@ public class ChannelSchedulerTest {
         assertTrue(reports.isEmpty());
         at(ChannelScheduler.AFTERMATH_MS);
         assertEquals(Arrays.asList("front gap=0 same ours=APPLY@5000"), reports);
-        assertTrue("量完了，同一路再被拿走又能排上", s.watchAfter("take 1", SUR, now, report));
+        assertTrue("量完了，同一路再被拿走又能排上", p.watchAfter("take 1", SUR, now, report));
     }
 
     /**
@@ -1727,19 +1982,19 @@ public class ChannelSchedulerTest {
     @Test
     public void recordingHearsWhenTheDarkReleasesALaneAndWhenItGivesItBack() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         streaming(surround, recS);
         declare(rear, recR);
         host.absent("1");
         settle();
-        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.TAKEN, p.condition(REAR));
         told.clear();
 
         host.screenOn = false;
         s.wake();
         settle();
         assertEquals(Arrays.asList("condition left TAKEN"), told("condition left"));
-        assertTrue(s.releasedByDark(REAR));
+        assertTrue(p.releasedByDark(REAR));
         at(5_000);
         assertEquals("没变不再说", 1, told("condition left").size());
 
@@ -1747,7 +2002,7 @@ public class ChannelSchedulerTest {
         s.wake();
         settle();
         assertEquals(Arrays.asList("condition left TAKEN", "condition left TAKEN"), told("condition left"));
-        assertFalse(s.releasedByDark(REAR));
+        assertFalse(p.releasedByDark(REAR));
     }
 
     /**
@@ -1773,9 +2028,9 @@ public class ChannelSchedulerTest {
         closed(rear);
         closed(front);
         settle();
-        assertTrue(s.excludedFromPhoto(REAR) && s.excludedFromPhoto(FRONT));
-        assertTrue("关着的环视：不为拍照开", s.excludedFromPhoto(SUR));
-        assertTrue(s.parkedDark());
+        assertTrue(p.excludedFromPhoto(REAR) && p.excludedFromPhoto(FRONT));
+        assertTrue("关着的环视：不为拍照开", p.excludedFromPhoto(SUR));
+        assertTrue(p.parkedDark());
 
         claim(Holder.PHOTO);
         settle();
@@ -1783,7 +2038,7 @@ public class ChannelSchedulerTest {
         assertEquals("拍照不开相机", Arrays.asList("close screen-off"), surround.actions);
         assertEquals(Arrays.asList("close dark-release"), rear.actions);
         assertEquals(Arrays.asList("close dark-release"), front.actions);
-        assertTrue(s.excludedFromPhoto(SUR));
+        assertTrue(p.excludedFromPhoto(SUR));
     }
 
     // ================================================================= 黑满 30 秒再放（项目所有者 2026-10-13）
@@ -1795,7 +2050,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aDarkShorterThanThirtySecondsTouchesNoCamera() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1807,7 +2062,7 @@ public class ChannelSchedulerTest {
         host.goDark();
         s.wake();
         settle();
-        assertFalse("黑了还不到 30 秒：不算放开", s.releasedByDark(REAR));
+        assertFalse("黑了还不到 30 秒：不算放开", p.releasedByDark(REAR));
         at(5_700);
         host.goLit();
         s.wake();
@@ -1818,7 +2073,7 @@ public class ChannelSchedulerTest {
         s.wake();
         settle();
         at(100_000 + ChannelRules.HOLD_MS - 1_000);
-        assertFalse(s.releasedByDark(REAR) || s.releasedByDark(FRONT));
+        assertFalse(p.releasedByDark(REAR) || p.releasedByDark(FRONT));
         host.goLit();
         s.wake();
         settle();
@@ -1839,7 +2094,7 @@ public class ChannelSchedulerTest {
     @Test
     public void theCabinsLeaveTheMomentTheScreenHasBeenDarkForThirtySeconds() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1854,12 +2109,12 @@ public class ChannelSchedulerTest {
         settle();
         at(500 + ChannelRules.HOLD_MS - 1);
         assertTrue("差 1 毫秒：不动", surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
-        assertFalse(s.releasedByDark(REAR));
+        assertFalse(p.releasedByDark(REAR));
         at(500 + ChannelRules.HOLD_MS);
         assertEquals("那一刻：先单独关环视", Arrays.asList("close surround-first"), surround.actions);
         assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
-        assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
-        assertFalse(s.releasedByDark(SUR));
+        assertTrue(p.releasedByDark(REAR) && p.releasedByDark(FRONT));
+        assertFalse(p.releasedByDark(SUR));
         at(500 + ChannelRules.HOLD_MS + 120);
         closed(surround);
         settle();
@@ -1883,7 +2138,7 @@ public class ChannelSchedulerTest {
     @Test
     public void theCabinsLeaveTheMomentTheScreenHasBeenDarkForThirtySecondsNotKeptReleasesAllThreeWithNoReopen() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1897,11 +2152,11 @@ public class ChannelSchedulerTest {
         settle();
         at(1_000 + ChannelRules.HOLD_MS - 1);
         assertTrue(surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
-        assertFalse(s.releasedByDark(SUR));
+        assertFalse(p.releasedByDark(SUR));
         at(1_000 + ChannelRules.HOLD_MS);
         assertEquals("那一刻：环视先单独关，原因是熄屏", Arrays.asList("close screen-off"), surround.actions);
         assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
-        assertTrue(s.releasedByDark(SUR) && s.releasedByDark(REAR) && s.releasedByDark(FRONT));
+        assertTrue(p.releasedByDark(SUR) && p.releasedByDark(REAR) && p.releasedByDark(FRONT));
         assertEquals(Arrays.asList("surroundInDark RELEASED DARK_ONSET sentry=0 records"), lines("surroundInDark"));
         at(1_000 + ChannelRules.HOLD_MS + 120);
         closed(surround);
@@ -1928,7 +2183,7 @@ public class ChannelSchedulerTest {
     @Test
     public void theHeadUnitSleepingDoesNotWaitThirtySeconds() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1961,7 +2216,7 @@ public class ChannelSchedulerTest {
     @Test
     public void androidGoingOffWhileDarkReleasesEverythingEvenWithSentryArmed() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -1996,7 +2251,7 @@ public class ChannelSchedulerTest {
         s.wake();
         at(120_000);
         assertEquals(Arrays.asList("close screen-off"), surround.actions);
-        assertTrue(s.releasedByDark(SUR));
+        assertTrue(p.releasedByDark(SUR));
     }
 
     /**
@@ -2006,7 +2261,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aRecordingStoppedAtTenSecondsLeavesTheCamerasUntilThirtySeconds() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -2047,11 +2302,11 @@ public class ChannelSchedulerTest {
         host.goDark();
         s.wake();
         settle();
-        assertTrue("关着的座舱黑着不开：算熄屏放开", s.releasedByDark(REAR) && s.releasedByDark(FRONT));
-        assertFalse(s.releasedByDark(SUR));
+        assertTrue("关着的座舱黑着不开：算熄屏放开", p.releasedByDark(REAR) && p.releasedByDark(FRONT));
+        assertFalse(p.releasedByDark(SUR));
 
         at(7_000);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         declare(surround, recS);
         declare(rear, recR);
         declare(front, recF);
@@ -2065,14 +2320,14 @@ public class ChannelSchedulerTest {
         at(1_000 + ChannelRules.HOLD_MS + 5_000);
         assertTrue("座舱一直没开：" + rear.actions + front.actions, rear.actions.isEmpty() && front.actions.isEmpty());
         assertTrue(lines("closing").isEmpty());
-        assertTrue(s.releasedByDark(REAR) && s.releasedByDark(FRONT));
+        assertTrue(p.releasedByDark(REAR) && p.releasedByDark(FRONT));
 
         host.goLit();
         s.wake();
         settle();
         assertEquals("亮了：后座舱先开", Arrays.asList("open [RECORD]"), rear.actions);
         assertTrue("一路一路来", front.actions.isEmpty());
-        assertFalse(s.releasedByDark(REAR) || s.releasedByDark(FRONT));
+        assertFalse(p.releasedByDark(REAR) || p.releasedByDark(FRONT));
     }
 
     // ================================================================= 熄屏放开相机（项目所有者 2026-10-27）
@@ -2084,7 +2339,7 @@ public class ChannelSchedulerTest {
     @Test
     public void replay1014_sentryArmedAtWakeOpensTheSurroundWhenRecordingArrives() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -2129,8 +2384,8 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("surroundInDark RELEASED DARK_ONSET sentry=0 records",
                 "surroundInDark KEPT SENTRY_ON sentry=2"), lines("surroundInDark"));
         assertEquals("发给录像协调器：留着，原因是哨兵变成开（醒来读到的也算）", ChannelRules.SurroundInDark.KEPT,
-                ChannelScheduler.surroundVerdict());
-        assertEquals(ChannelRules.Event.Cause.SENTRY_ON, ChannelScheduler.surroundVerdictCause());
+                s.verdict());
+        assertEquals(ChannelRules.Event.Cause.SENTRY_ON, s.verdictCause());
     }
 
     /**
@@ -2160,7 +2415,7 @@ public class ChannelSchedulerTest {
     @Test
     public void surroundInDarkJournalLines() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2207,7 +2462,7 @@ public class ChannelSchedulerTest {
     @Test
     public void theSurroundInDarkLineTellsAPlanWithoutTheSurroundFromNotRecording() {
         claim(Holder.RECORDING);
-        host.plan(REAR, FRONT);
+        pipe.plan(REAR, FRONT);
         streaming(rear, recR);
         streaming(front, recF);
         host.sentryArmed();
@@ -2221,13 +2476,13 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 环视留不留跟着进程、不跟着管线（项目所有者 2026-10-27）：管线放掉重建（旧的那一份退出、只关），新的那一份调度从进程那一份接着用 ——
-     * 第一轮之前就读得到「环视留着」，熄屏录像不断；进程重新起来（测试里回到进程刚起来的样子）是放开。
+     * 环视留不留跟着进程、不跟着管线（项目所有者 2026-10-27）：管线放掉重建（旧的那一份换下去、只关），新的一份从调度记着的那一份接着用 ——
+     * 排着的时候（换上之前）就读得到「环视留着」，熄屏录像不断；进程重新起来（一个新的调度）是放开。
      */
     @Test
     public void theSurroundInDarkSurvivesAPipelineRebuildButNotAProcessStart() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2239,41 +2494,29 @@ public class ChannelSchedulerTest {
         assertEquals(ChannelRules.SurroundInDark.KEPT, s.snapshot().surroundInDark);
         assertTrue(s.snapshot().surroundKept);
 
-        s.exit();   // 换车型：旧的那一份放掉，只关
-        ChannelScheduler rebuilt = scheduler();
+        p.retire();   // 换车型：旧的那一份放掉，只关
+        ChannelScheduler.Pipeline next = rebuilt(new FakePipe(), SUR, new FakePort("2"), REAR, new FakePort("1"));
+        assertFalse("排着、第一轮之前：环视照旧留着", next.releasedByDark(SUR));
+        assertTrue("座舱照旧放开", next.releasedByDark(REAR));
+        at(1_000 + ChannelRules.HOLD_MS + 5_000);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, s.snapshot().surroundInDark);
+
+        ChannelScheduler fresh = scheduler();   // 进程重新起来
+        ChannelScheduler.Pipeline again = register(fresh, new FakePipe(), false);
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
         lanes.put(SUR, new FakePort("2"));
-        lanes.put(REAR, new FakePort("1"));
-        rebuilt.setLanes(lanes);
-        try {
-            assertFalse("第一轮之前：环视照旧留着", rebuilt.releasedByDark(SUR));
-            assertTrue("座舱照旧放开", rebuilt.releasedByDark(REAR));
-            at(1_000 + ChannelRules.HOLD_MS + 5_000);
-            assertEquals(ChannelRules.SurroundInDark.KEPT, rebuilt.snapshot().surroundInDark);
-
-            ChannelScheduler.resetProcessDark();   // 进程重新起来
-            ChannelScheduler fresh = scheduler();
-            Map<String, ChannelScheduler.CameraPort> again = new LinkedHashMap<>();
-            again.put(SUR, new FakePort("2"));
-            fresh.setLanes(again);
-            try {
-                assertTrue("进程刚起来、黑着：放开", fresh.releasedByDark(SUR));
-            } finally {
-                fresh.detach();
-            }
-        } finally {
-            rebuilt.detach();
-        }
+        again.setLanes(lanes);
+        assertTrue("进程刚起来、黑着：放开", again.releasedByDark(SUR));
     }
 
     /**
-     * 管线重建时新的那一份调度建好、各路还没交给它（列相机、探合成流要一会儿）就会被叫醒跑几轮（相机服务、登记表、车辆信号）：
-     * 那几轮也接着进程那一份判，写回去的还是「留着」—— 交了各路环视照旧留着，旧的那一份关完就开起来录（审查 2026-10-27）。
+     * 管线重建时新的那一份接上来、各路还没交给它（列相机、探合成流要一会儿）也照样一轮一轮跑（相机服务、登记表、车辆信号叫醒）：
+     * 那几轮接着调度记着的那一份判，写回去的还是「留着」—— 交了各路环视照旧留着，旧的那一份关完就换上、开起来录（审查 2026-10-27）。
      */
     @Test
     public void roundsBeforeTheLanesArriveKeepTheSurroundInDark() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2285,38 +2528,38 @@ public class ChannelSchedulerTest {
         at(kept);
         assertTrue(s.snapshot().surroundKept);
 
-        s.exit();   // 列相机出错：旧的那一份放掉，只关
-        ChannelScheduler rebuilt = scheduler();
-        try {
-            rebuilt.wake();   // 各路还没交：相机服务、登记表、车辆信号叫醒
-            at(kept + 1_000);
-            assertEquals("交各路之前的那几轮", ChannelRules.SurroundInDark.KEPT, rebuilt.snapshot().surroundInDark);
+        p.retire();   // 列相机出错：旧的那一份放掉，只关
+        FakePipe second = new FakePipe();
+        second.plan(SUR);
+        ChannelScheduler.Pipeline next = rebuilt(second);
+        s.wake();   // 各路还没交：相机服务、登记表、车辆信号叫醒
+        at(kept + 1_000);
+        assertEquals("交各路之前的那几轮", ChannelRules.SurroundInDark.KEPT, s.snapshot().surroundInDark);
+        assertEquals(Arrays.asList("close rebuild"), surround.actions);
 
-            FakePort newSurround = new FakePort("2");
-            declare(newSurround, recS);
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, newSurround);
-            rebuilt.setLanes(lanes);
-            assertFalse("交了各路：进程那一份还是留着", rebuilt.releasedByDark(SUR));
-            at(kept + 1_100);
-            closed(surround);   // 旧的那一份关完
-            at(kept + 5_000);
-            assertEquals(ChannelRules.SurroundInDark.KEPT, rebuilt.snapshot().surroundInDark);
-            assertEquals("新的那一份开起来录", Arrays.asList("open [RECORD]"), newSurround.actions);
-        } finally {
-            rebuilt.detach();
-        }
+        FakePort newSurround = new FakePort("2");
+        declare(newSurround, recS);
+        newSurround.pipe = next;
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, newSurround);
+        next.setLanes(lanes);
+        assertFalse("交了各路：调度记着的那一份还是留着", next.releasedByDark(SUR));
+        at(kept + 1_100);
+        closed(surround);   // 旧的那一份关完：换上新的一份
+        at(kept + 5_000);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, s.snapshot().surroundInDark);
+        assertEquals("新的那一份开起来录", Arrays.asList("open [RECORD]"), newSurround.actions);
     }
 
     /**
-     * 车机要睡那一下的放开也写回进程那一层（审查 2026-10-27）：留着的环视，车辆接口断了（哨兵模式读不到，留着不算关），
+     * 车机要睡那一下的放开也写回调度记着的那一份（审查 2026-10-27）：留着的环视，车辆接口断了（哨兵模式读不到，留着不算关），
      * 黑着时安卓熄屏、车机要睡 —— 环视放开。醒了哨兵模式还布防着，旧的那一份还没再跑一轮管线就重建了：
      * 新的那一份接着「放开」，不开环视（醒来不算哨兵模式变成开）。
      */
     @Test
     public void theHeadUnitSleepReleaseSurvivesARebuildAtTheWake() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2346,30 +2589,26 @@ public class ChannelSchedulerTest {
         host.androidOff = false;
         host.sleeps = false;
         host.sentryArmed();
-        s.exit();
-        ChannelScheduler rebuilt = scheduler();
+        p.retire();
+        FakePipe second = new FakePipe();
+        second.plan(SUR);
         FakePort newSurround = new FakePort("2");
         declare(newSurround, recS);
-        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-        lanes.put(SUR, newSurround);
-        rebuilt.setLanes(lanes);
-        try {
-            assertTrue("醒来不算变成开：环视还是放开", rebuilt.releasedByDark(SUR));
-            rebuilt.wake();
-            at(3_660_000);
-            assertEquals(ChannelRules.SurroundInDark.RELEASED, rebuilt.snapshot().surroundInDark);
-            assertTrue("不开：" + newSurround.actions, newSurround.actions.isEmpty());
-        } finally {
-            rebuilt.detach();
-        }
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, newSurround);
+        assertTrue("醒来不算变成开：环视还是放开", next.releasedByDark(SUR));
+        s.wake();
+        at(3_660_000);
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, s.snapshot().surroundInDark);
+        assertTrue("不开：" + newSurround.actions, newSurround.actions.isEmpty());
+        assertTrue("旧的那一份关完了，换上了新的一份", pipe.gone);
     }
 
     // ================================================================= 通道的决定发给录像协调器（项目所有者 2026-10-27）
 
     /** 录像协调器那一头：每听到一次记一行「KEPT DARK_ONSET」（此刻发布的决定和原因），也记进 told 看先后。 */
     private void listenToVerdict() {
-        ChannelScheduler.setSurroundVerdictListener(() -> {
-            String line = ChannelScheduler.surroundVerdict() + " " + ChannelScheduler.surroundVerdictCause();
+        s.setVerdictListener(() -> {
+            String line = s.verdict() + " " + s.verdictCause();
             verdicts.add(line);
             told.add("verdict " + line);
         });
@@ -2382,11 +2621,11 @@ public class ChannelSchedulerTest {
     @Test
     public void theVerdictIsPublishedOncePerChangeWithItsCause() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
-        assertEquals("亮着", ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+        assertEquals("亮着", ChannelRules.SurroundInDark.LIT, s.verdict());
         listenToVerdict();
         at(1_000);
         host.goDark();
@@ -2426,7 +2665,7 @@ public class ChannelSchedulerTest {
     @Test
     public void settingAndDrivingChangesWhileDarkArePublishedWithoutASentryCause() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2465,16 +2704,16 @@ public class ChannelSchedulerTest {
     public void theVerdictIsPublishedBeforeTheLanesAreToldInTheOnsetRound() {
         host.frontCabinOneShot = true;
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
         host.sentry = 0;
         settle();
         List<Integer> retiredWhenPublished = new ArrayList<>();
-        ChannelScheduler.setSurroundVerdictListener(() -> {
-            told.add("verdict " + ChannelScheduler.surroundVerdict() + " " + ChannelScheduler.surroundVerdictCause());
-            retiredWhenPublished.add(host.retired.size());
+        s.setVerdictListener(() -> {
+            told.add("verdict " + s.verdict() + " " + s.verdictCause());
+            retiredWhenPublished.add(pipe.frontRetired.size());
         });
         at(1_000);
         host.goDark();
@@ -2485,7 +2724,7 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("close screen-off"), surround.actions);
         assertEquals("verdict RELEASED DARK_ONSET", told.get(0));
         assertFalse("同一轮里告诉了录像那一侧：" + told, told("condition").isEmpty());
-        assertEquals("前座舱同一轮去掉，在发决定之后", Arrays.asList(FRONT), host.retired);
+        assertEquals("前座舱同一轮去掉，在发决定之后", Arrays.asList(FRONT), pipe.frontRetired);
         assertEquals(Arrays.asList(0), retiredWhenPublished);
     }
 
@@ -2493,7 +2732,7 @@ public class ChannelSchedulerTest {
     @Test
     public void anExitingSchedulerPublishesNothing() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         settle();
         listenToVerdict();
@@ -2504,14 +2743,14 @@ public class ChannelSchedulerTest {
         settle();
         at(5_000);
         assertTrue(verdicts.isEmpty());
-        assertEquals(ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+        assertEquals(ChannelRules.SurroundInDark.LIT, s.verdict());
     }
 
-    /** 管线重建：新的那一份从进程那一份接着判，算出来的一样 —— 不再发。 */
+    /** 管线重建：换下去的那一份、换上的那一份都接着调度记着的那一份判，算出来的一样 —— 不再发。 */
     @Test
     public void aRebuildPublishesNothingNew() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2523,20 +2762,21 @@ public class ChannelSchedulerTest {
         at(1_000 + ChannelRules.HOLD_MS);
         assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
 
-        s.exit();
-        ChannelScheduler rebuilt = scheduler();
-        try {
-            rebuilt.wake();
-            at(1_000 + ChannelRules.HOLD_MS + 1_000);
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, new FakePort("2"));
-            rebuilt.setLanes(lanes);
-            at(1_000 + ChannelRules.HOLD_MS + 10_000);
-            assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
-            assertEquals(ChannelRules.SurroundInDark.KEPT, ChannelScheduler.surroundVerdict());
-        } finally {
-            rebuilt.detach();
-        }
+        p.retire();
+        ChannelScheduler.Pipeline next = rebuilt(new FakePipe());
+        s.wake();
+        at(1_000 + ChannelRules.HOLD_MS + 1_000);
+        FakePort newSurround = new FakePort("2");
+        newSurround.pipe = next;
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, newSurround);
+        next.setLanes(lanes);
+        at(1_000 + ChannelRules.HOLD_MS + 10_000);
+        closed(surround);
+        at(1_000 + ChannelRules.HOLD_MS + 20_000);
+        assertTrue("换上了新的一份", pipe.gone);
+        assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, s.verdict());
     }
 
     /**
@@ -2545,7 +2785,7 @@ public class ChannelSchedulerTest {
     @Test
     public void anUnknownScreenPublishesOnlyTheHeadUnitSleeping() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         host.sentryArmed();
         settle();
@@ -2563,19 +2803,22 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("RELEASED ANDROID_OFF"), verdicts);
     }
 
-    /** 测试的「进程重新起来」：决定回到放开、没有原因，监听者摘掉。 */
+    /** 进程刚起来（一个新的调度）：决定是放开、没有原因；挂在别的调度上的监听者听不到它。 */
     @Test
-    public void resetProcessDarkReleasesTheVerdictAndDropsTheListener() {
+    public void aFreshSchedulerStartsReleasedWithoutACause() {
         settle();
-        assertEquals(ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
+        assertEquals(ChannelRules.SurroundInDark.LIT, s.verdict());
         listenToVerdict();
-        ChannelScheduler.resetProcessDark();
-        assertEquals(ChannelRules.SurroundInDark.RELEASED, ChannelScheduler.surroundVerdict());
-        assertNull(ChannelScheduler.surroundVerdictCause());
-        s.wake();
+        ChannelScheduler fresh = scheduler();
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, fresh.verdict());
+        assertNull(fresh.verdictCause());
+        fresh.wake();
         settle();
-        assertEquals("亮着：又发了一次 LIT", ChannelRules.SurroundInDark.LIT, ChannelScheduler.surroundVerdict());
-        assertTrue("监听者摘掉了", verdicts.isEmpty());
+        assertEquals("还没有管线：空的那一份不判、不发", ChannelRules.SurroundInDark.RELEASED, fresh.verdict());
+        register(fresh, new FakePipe(), false);
+        settle();
+        assertEquals("第一份管线那一轮：亮着，发了一次 LIT", ChannelRules.SurroundInDark.LIT, fresh.verdict());
+        assertTrue("挂在另一个调度上的监听者听不到", verdicts.isEmpty());
     }
 
     /** 进程在黑着时起来（进程那一层从放开起、起点不明）：决定就是放开，不发 —— 录像协调器读到放开，不开录。 */
@@ -2589,8 +2832,52 @@ public class ChannelSchedulerTest {
         settle();
         at(10_000);
         assertTrue(verdicts.isEmpty());
-        assertEquals(ChannelRules.SurroundInDark.RELEASED, ChannelScheduler.surroundVerdict());
-        assertNull(ChannelScheduler.surroundVerdictCause());
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, s.verdict());
+        assertNull(s.verdictCause());
+    }
+
+    /**
+     * 进程在黑着时被拉起、还没有一份管线（审查 2026-10-30）：调度装上了，可空的那一份不判环视留不留、不发决定、不写回，也不按 2 秒醒 ——
+     * 之后哨兵模式开了也一样（空的那一份照判的话：先读到关、再读到开，就算「变成开」留下环视、发出 KEPT，录像协调器就去开录）。
+     * 第一份管线照进程刚起来的样子起（放开、没有上一次读数）：黑着、哨兵开着也不开环视、不发决定。
+     */
+    @Test
+    public void beforeAnyPipelineTheDarkIsNotJudged() {
+        FakePoster quiet = new FakePoster();
+        ChannelScheduler fresh = new ChannelScheduler(() -> now, quiet, host, rounds);
+        List<String> heard = new ArrayList<>();
+        fresh.setVerdictListener(() -> heard.add(fresh.verdict() + " " + fresh.verdictCause()));
+        host.screenOn = false;
+        host.darkAt = 0;   // 起点不明：照黑满 30 秒算
+        host.sentry = 0;
+        fresh.wake();
+        quiet.runUntil(now);
+        assertTrue("空的那一份不按时醒", quiet.tasks.isEmpty());
+        quiet.runUntil(T0 + 5_000);
+        host.sentryArmed();   // 哨兵模式开了
+        fresh.wake();
+        quiet.runUntil(now);
+        assertTrue(heard.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, fresh.verdict());
+        assertNull(fresh.verdictCause());
+        assertTrue(quiet.tasks.isEmpty());
+
+        host.holders.add(Holder.RECORDING);
+        fresh.onNeedsChanged();
+        FakePipe first = new FakePipe();
+        first.plan(SUR);
+        FakePort s2 = new FakePort("2");
+        declare(s2, recS);
+        ChannelScheduler.Pipeline handle = register(fresh, first, false);
+        s2.pipe = handle;
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, s2);
+        handle.setLanes(lanes);
+        quiet.runUntil(T0 + 60_000);
+        assertTrue("第一份管线照进程刚起来的样子起：不开环视", s2.actions.isEmpty());
+        assertTrue("不发决定", heard.isEmpty());
+        assertEquals(ChannelRules.SurroundInDark.RELEASED, fresh.snapshot().surroundInDark);
+        assertTrue(handle.releasedByDark(SUR));
     }
 
     // ================================================================= 问（只问，不开）
@@ -2662,10 +2949,10 @@ public class ChannelSchedulerTest {
         declare(rear, pvR);
         settle();
         assertEquals(Arrays.asList("open [PREVIEW]"), rear.actions);
-        assertFalse(ChannelScheduler.closingAnywhere());
+        assertFalse(s.closing());
 
-        s.exit();
-        assertTrue("exit() 之后当场为真", ChannelScheduler.closingAnywhere());
+        exitApp();
+        assertTrue("exit() 之后当场为真", s.closing());
         settle();
         assertEquals(1, lines("exit left OPEN").size());
         assertTrue("手上那一步做完之前不关", surround.actions.isEmpty());
@@ -2674,7 +2961,7 @@ public class ChannelSchedulerTest {
         frame(rear);
         settle();
         assertEquals(Arrays.asList("close exit"), surround.actions);
-        assertTrue(ChannelScheduler.closingAnywhere());
+        assertTrue(s.closing());
         at(500);
         closed(surround);
         settle();
@@ -2683,12 +2970,12 @@ public class ChannelSchedulerTest {
         at(600);
         closed(rear);
         settle();
-        assertTrue("还有一路没关完", ChannelScheduler.closingAnywhere());
+        assertTrue("还有一路没关完", s.closing());
         at(700);
         closed(front);
         settle();
-        assertFalse("最后一路关完才变假", ChannelScheduler.closingAnywhere());
-        assertTrue(host.stopped);
+        assertFalse("最后一路关完才变假", s.closing());
+        assertTrue(pipe.gone);
         assertEquals(1, lines("closeRound front | left, back").size());
     }
 
@@ -2699,7 +2986,7 @@ public class ChannelSchedulerTest {
     @Test
     public void theHeadUnitSleepingWaitsOneSecondForTheStepInHandThenClosesInOrder() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(front, recF);
         declare(rear, recR);
@@ -2709,12 +2996,12 @@ public class ChannelSchedulerTest {
         at(100);
         host.sleeps = true;
         s.onNeedsChanged();
-        assertTrue("发布的那一刻就为真", ChannelScheduler.closingAnywhere());
+        assertTrue("发布的那一刻就为真", s.closing());
         settle();
         assertEquals(1, lines("sleep left OPEN").size());
         at(100 + ChannelRules.SLEEP_GRACE_MS - 1);
         assertTrue("1 秒宽限里不动", surround.actions.isEmpty());
-        assertTrue(ChannelScheduler.closingAnywhere());
+        assertTrue(s.closing());
         at(100 + ChannelRules.SLEEP_GRACE_MS);
         assertEquals("等满 1 秒：环视单独先关", Arrays.asList("close head-unit-sleeps"), surround.actions);
         assertTrue(front.actions.isEmpty());
@@ -2728,14 +3015,14 @@ public class ChannelSchedulerTest {
         closed(rear);
         closed(front);
         settle();
-        assertFalse(ChannelScheduler.closingAnywhere());
-        assertFalse("车机要睡不停调度（亮屏还要用）", host.stopped);
+        assertFalse(s.closing());
+        assertFalse("车机要睡不停调度（亮屏还要用）", pipe.gone);
 
         // 亮屏：清掉这项事实，照常开
         host.sleeps = false;
         s.onNeedsChanged();
         at(5_000);
-        assertFalse(ChannelScheduler.closingAnywhere());
+        assertFalse(s.closing());
         assertEquals(Arrays.asList("close head-unit-sleeps", "open [RECORD]"), surround.actions);
     }
 
@@ -2745,11 +3032,11 @@ public class ChannelSchedulerTest {
         settle();
         host.sleeps = true;
         s.onNeedsChanged();
-        assertTrue(ChannelScheduler.closingAnywhere());
+        assertTrue(s.closing());
         host.sleeps = false;
         s.onNeedsChanged();
         settle();
-        assertFalse(ChannelScheduler.closingAnywhere());
+        assertFalse(s.closing());
     }
 
     /**
@@ -2759,7 +3046,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aCloseWaiterRunsOnceWhenTheLastLaneClosedAndAtOnceWhenNothingCloses() {
         List<String> calls = new ArrayList<>();
-        ChannelScheduler.whenClosedEverywhere(() -> calls.add("idle"));
+        s.whenClosed(() -> calls.add("idle"));
         assertEquals("没有在关的：当场叫", Arrays.asList("idle"), calls);
 
         claim(Holder.PREVIEW);
@@ -2770,9 +3057,9 @@ public class ChannelSchedulerTest {
         host.sleeps = true;
         s.onNeedsChanged();
         Runnable cancelled = () -> calls.add("cancelled");
-        ChannelScheduler.whenClosedEverywhere(() -> calls.add("closed"));
-        ChannelScheduler.whenClosedEverywhere(cancelled);
-        ChannelScheduler.cancelClosedWaiter(cancelled);
+        s.whenClosed(() -> calls.add("closed"));
+        s.whenClosed(cancelled);
+        s.cancelWhenClosed(cancelled);
         settle();
         assertEquals("环视单独先关", Arrays.asList("close head-unit-sleeps"), surround.actions);
         assertEquals("还在关：不叫", Arrays.asList("idle"), calls);
@@ -2785,54 +3072,41 @@ public class ChannelSchedulerTest {
         closed(rear);
         closed(front);
         settle();
-        assertFalse(ChannelScheduler.closingAnywhere());
+        assertFalse(s.closing());
         assertEquals("最后一路关完的那一轮叫", Arrays.asList("idle", "closed"), calls);
         at(10_000);
         assertEquals("只叫一次", Arrays.asList("idle", "closed"), calls);
     }
 
     /**
-     * 两份管线同时为退出关相机（换车型后紧接着退出）：自己在关的不等另一份 —— 关不用谁放行（审查 2026-10-11：以前互相等，
-     * 谁都要等对方进来满 60 秒）。一份的关卡死在相机服务里：closingAnywhere 最多为真 EXIT_WAIT_MAX_MS，不会一直为真。
+     * 退出时一次关卡死在相机服务里：closingAnywhere 最多为真 EXIT_WAIT_MAX_MS，不会一直为真 —— 卡住的那一路那一下开始关以后满 60 秒，
+     * 换下去的那一份留下它当孤儿、换上一份空的，那一路的那一轮照旧在账本上（还在关），封顶从退出那一刻算。
      */
     @Test
-    public void twoInstancesClosingDoNotWaitOnEachOtherAndAStuckCloseIsCapped() {
-        // 新的那一份开着的是另一台相机：同一台相机旧的那一份那一轮还没结束，新的那一份根本开不了它
-        // （账本，见 aRebuiltPipelineNeverOpensACameraTheOldPipelinesRoundStillHolds）。这里只看两份退出互不等
-        FakePort other = new FakePort("3");
-        ChannelScheduler b = scheduler();
-        try {
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, other);
-            b.setLanes(lanes);
-            claim(Holder.MIRROR);   // 只要环视：两份手上都没有开到一半的步子，退出当场就关
-            streaming(surround, pvS);
-            streaming(other, pvS);
-            settle();
-            // 旧的那一份（换车型时晚 release 的）退出，它关环视卡死在相机服务里
-            s.exit();
-            settle();
-            assertEquals(Arrays.asList("close exit"), surround.actions);
-            assertTrue(ChannelScheduler.closingAnywhere());
+    public void aStuckCloseOnExitKeepsClosingAnywhereOnlyUntilTheCap() {
+        claim(Holder.MIRROR);   // 只要环视：手上没有开到一半的步子，退出当场就关
+        streaming(surround, pvS);
+        settle();
+        exitApp();
+        settle();
+        assertEquals(Arrays.asList("close exit"), surround.actions);
+        assertTrue(s.closing());
 
-            // 新的这一份紧接着退出：当场按次序关，不等旧的那一份
-            at(1_000);
-            b.exit();
-            settle();
-            assertEquals(Arrays.asList("close exit"), other.actions);
-            at(1_100);
-            other.closedNow();
-            b.onClosed("3");
-            settle();
-            assertTrue("旧的那一份还没关完", ChannelScheduler.closingAnywhere());
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals("满 60 秒：换下去，那一路当孤儿", 1, lines("swapped").size());
+        assertTrue(lines("swapped").get(0).contains("none orphans front 2"));
+        assertFalse("还有一轮没结束：没放完", pipe.gone);
+        assertTrue(s.closing());
+        at(ChannelRules.EXIT_WAIT_MAX_MS - 1);
+        assertTrue(s.closing());
+        at(ChannelRules.EXIT_WAIT_MAX_MS);
+        assertFalse("关卡死的那一下最多算这么久", s.closing());
 
-            at(ChannelRules.EXIT_WAIT_MAX_MS - 1);
-            assertTrue(ChannelScheduler.closingAnywhere());
-            at(ChannelRules.EXIT_WAIT_MAX_MS);
-            assertFalse("关卡死的那一份最多算这么久", ChannelScheduler.closingAnywhere());
-        } finally {
-            b.detach();
-        }
+        at(ChannelRules.EXIT_WAIT_MAX_MS + 10_000);
+        closed(surround);   // 那一下终于返回了：孤儿那一轮结束，这一份放完
+        settle();
+        assertTrue(pipe.gone);
+        assertEquals(Arrays.asList("stray 2 closed"), lines("stray"));
     }
 
     // ================================================================= 相机服务的话算谁引起的
@@ -2887,189 +3161,215 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 同上，旧的那一份还在关（退出、换车型时两份并存）：那一句「被占用（我们开着）」还算我们的 —— 不认成别人拿着，等它关完；
-     * 它关完、相机服务说「空闲」，照常开。
+     * 同上，旧的那一份还在关（管线重建、退出后马上又开）：新的那一份排着，那一句「被占用（我们开着）」不会被它认成别人拿着
+     * （排着的不判）；旧的那一份关完、相机服务说「空闲」，换上新的一份，照常开。
      */
     @Test
-    public void anOursWordWhileAnotherPipelineIsStillClosingIsNotTakenForOthers() {
-        FakePort old = new FakePort("2");
-        ChannelScheduler b = scheduler();
-        try {
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, old);
-            b.setLanes(lanes);
-            Out mirror = new Out(Kind.MIRROR, "mirror-2");
-            claim(Holder.MIRROR);
-            streaming(old, mirror);   // 旧的那一份开着环视
-            b.exit();
-            declare(surround, mirror);
-            settle();
-            assertEquals(Arrays.asList("close exit"), old.actions);
-            assertTrue("另一份还在关：那一句还算我们的", lines("recognized").isEmpty());
-            assertTrue(surround.actions.isEmpty());
+    public void anOursWordWhileTheOldPipelineIsStillClosingIsNotTakenForOthers() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);   // 旧的那一份开着环视
+        settle();
+        p.retire();
+        FakePort fresh = new FakePort("2");
+        declare(fresh, mirror);
+        rebuilt(new FakePipe(), SUR, fresh);
+        settle();
+        assertEquals(Arrays.asList("close rebuild"), surround.actions);
+        assertTrue("旧的那一份还在关：那一句还算我们的", lines("recognized").isEmpty());
+        assertTrue(fresh.actions.isEmpty());
 
-            at(1_000);
-            old.closedNow();
-            say(old, true, true);
-            b.onClosed("2");
-            at(1_000 + ChannelRules.TICK_MS * 2);
-            assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
-            assertTrue(lines("recognized").isEmpty());
-        } finally {
-            b.detach();
-        }
+        at(1_000);
+        closed(surround);   // 相机服务为这一关说「空闲」（我们引起的）
+        at(1_000 + ChannelRules.TICK_MS * 2);
+        assertEquals(Arrays.asList("open [MIRROR]"), fresh.actions);
+        assertTrue(lines("recognized").isEmpty());
     }
 
     // ================================================================= 轮次和账本（第 1 步，项目所有者 2026-10-29 批）
 
     /**
-     * 退出又马上打开（两份调度短暂并存）：旧的那一份关环视，一秒就关完了 —— 新的那一份等它那一轮结束才开（账本上那一台空了），
-     * 一次都没被相机层挡（heldRefusals 0）；同一台相机两份相机对象从不同时有一轮。
+     * 退出又马上打开（第 2 步：只有一个调度）：退出时旧的那一份关环视，人又点开了主界面 —— 不再只关，新建的那一份排着；
+     * 旧的那一份一秒就关完了，换上新的一份、开它（账本上那一台空了），一次都没被相机层挡（heldRefusals 0）；
+     * 同一台相机两份相机对象从不同时有一轮。黑匣子：退出、主界面又回来了（进程这一层）、换下去了，各一行；退出不算了，
+     * 旧的那一份还在换下去 —— 那时补上它「这一份换下去」那一行（审查 2026-10-30：以前「主界面又回来了」由还在只关的它写，它那一行从不写）。
      */
     @Test
     public void aNormalExitThenAnImmediateReopenOpensOnlyAfterTheOldRoundEnds() {
-        FakePort old = new FakePort("2");
-        ChannelScheduler b = scheduler();
-        try {
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, old);
-            b.setLanes(lanes);
-            Out mirror = new Out(Kind.MIRROR, "mirror-2");
-            claim(Holder.MIRROR);
-            streaming(old, mirror);
-            b.exit();
-            declare(surround, mirror);
-            settle();
-            assertEquals(Arrays.asList("close exit"), old.actions);
-            assertTrue("旧的那一轮还没结束：不开", surround.actions.isEmpty());
-            assertSame(old, rounds.live("2").owner);
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        assertEquals(Arrays.asList("close exit"), surround.actions);
 
-            at(1_000);
-            closed(old);
-            b.onClosed("2");
-            assertNull("旧的那一轮结束了", rounds.live("2"));
-            at(1_000 + ChannelRules.TICK_MS * 2);
-            assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
-            assertSame(surround, rounds.live("2").owner);
-            assertEquals(0, surround.heldRefusals);
-            assertTrue(lines("held ").isEmpty());
-        } finally {
-            b.detach();
-        }
+        s.resumeAfterExit();   // 人又点开了主界面
+        FakePort fresh = new FakePort("2");
+        declare(fresh, mirror);
+        FakePipe second = new FakePipe();
+        rebuilt(second, SUR, fresh);
+        settle();
+        assertTrue("旧的那一轮还没结束：不开", fresh.actions.isEmpty());
+        assertSame(surround, rounds.live("2").owner);
+
+        at(1_000);
+        closed(surround);
+        assertNull("旧的那一轮结束了", rounds.live("2"));
+        at(1_000 + ChannelRules.TICK_MS * 2);
+        assertEquals(Arrays.asList("open [MIRROR]"), fresh.actions);
+        assertSame(fresh, rounds.live("2").owner);
+        assertEquals(0, fresh.heldRefusals);
+        assertTrue(lines("held ").isEmpty());
+        assertEquals(1, lines("exit ").size());
+        assertEquals(1, lines("resumed").size());
+        assertEquals("退出不算了，旧的那一份还在换下去：补上它那一行", Arrays.asList("retiring " + SUR + " CLOSE"),
+                lines("retiring"));
+        assertTrue("先写主界面又回来了", journal.indexOf("resumed") < journal.indexOf("retiring " + SUR + " CLOSE"));
+        assertEquals(1, lines("swapped").size());
+        assertTrue(pipe.gone);
+        assertFalse(second.gone);
+        assertFalse(s.closing());
     }
 
     /**
      * 同上，旧的那一份关环视一直不返回（项目所有者 2026-10-28：我们上一次关一台相机还没返回，App 里谁都不开它，直到那一次关返回）：
-     * 新的一份那一轮结束之前不开它 —— 头 60 秒别的路也等（另一份在关、在途），之后别的路照常开，环视跳过；黑匣子写一次「还有开或关没返回」；
-     * 旧的那一句「被占用（我们开着）」也不再在 60 秒后被认成别人拿着；录像那一侧听说它的样子变了（不再算在起来）。
-     * 10 分钟后那一次关返回了：写一次「返回了」，环视照常开。相机层一次都没被挡（规则照账本本来就不让它开）。
+     * 旧的那一份环视单独关、10 秒到点照样关座舱，座舱关完；环视那一下开始关以后满 60 秒（项目所有者 2026-10-29「等旧管线这一步做完再算
+     * 60 秒」）换上新的一份 —— 环视当孤儿留下，新的一份那一路被一轮占着、不开，别的路照常开；黑匣子写一次「还有开或关没返回」；
+     * 旧的那一句「被占用（我们开着）」也不认成别人拿着；录像那一侧听说它不再算在起来。10 分钟后那一次关返回了：写一次「返回了」，
+     * 旧的那一份放完，环视照常开。相机层一次都没被挡（规则照账本本来就不让它开），同一台相机从不两份同时拿着。
      */
     @Test
     public void aRebuiltPipelineNeverOpensACameraTheOldPipelinesRoundStillHolds() {
-        FakePort old = new FakePort("2");
-        ChannelScheduler b = scheduler();
-        try {
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, old);
-            b.setLanes(lanes);
-            Out mirror = new Out(Kind.MIRROR, "mirror-2");
-            claim(Holder.MIRROR);
-            claim(Holder.PREVIEW);
-            streaming(old, mirror);   // 旧的那一份开着环视
-            b.exit();
-            declare(surround, mirror);
-            declare(rear, pvR);
-            declare(front, pvF);
-            settle();
-            assertEquals("旧的那一份关环视（一直不返回）", Arrays.asList("close exit"), old.actions);
-            assertFalse("60 秒以内录像那一侧照旧算它在起来", s.cannotOpen(SUR));
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        claim(Holder.PREVIEW);
+        streaming(surround, mirror);   // 旧的那一份开着三路
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        p.retire();
+        FakePipe second = new FakePipe();
+        FakePort newSurround = new FakePort("2");
+        FakePort newRear = new FakePort("1");
+        FakePort newFront = new FakePort("0");
+        declare(newSurround, mirror);
+        declare(newRear, new Out(Kind.PREVIEW, "preview-1b"));
+        declare(newFront, new Out(Kind.PREVIEW, "preview-0b"));
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, newSurround, REAR, newRear, FRONT, newFront);
+        settle();
+        assertEquals("旧的那一份环视单独先关（一直不返回）", Arrays.asList("close rebuild"), surround.actions);
+        assertEquals(1, lines("retiring").size());
+        at(ChannelRules.CLOSE_SURROUND_MAX_MS);
+        assertEquals("环视 10 秒到点：座舱照样关", Arrays.asList("close rebuild"), rear.actions);
+        at(ChannelRules.CLOSE_SURROUND_MAX_MS + 200);
+        closed(rear);
+        closed(front);
+        assertFalse("60 秒以内录像那一侧照旧算它在起来", next.cannotOpen(SUR));
 
-            at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
-            assertTrue("头 60 秒：别的路也等", rear.actions.isEmpty() && front.actions.isEmpty());
-            assertTrue(lines("held ").isEmpty());
-            told.clear();
-            at(ChannelRules.IN_FLIGHT_MAX_MS);
-            assertEquals("满 60 秒：别的路照常，环视跳过", Arrays.asList("open [PREVIEW]"), rear.actions);
-            assertTrue(surround.actions.isEmpty());
-            assertEquals(Arrays.asList("held front 2 round=1 front other closing ms=" + ChannelRules.IN_FLIGHT_MAX_MS),
-                    lines("held "));
-            assertTrue("录像那一侧听说了", told("condition " + SUR).size() >= 1);
-            assertTrue(s.heldByClose(SUR));
-            assertTrue(s.cannotOpen(SUR));
-            opened(rear);
-            frame(rear);
-            settle();
-            assertEquals(Arrays.asList("open [PREVIEW]"), front.actions);
-            opened(front);
-            frame(front);
-            settle();
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertTrue("头 60 秒：新的一份排着，什么都不开",
+                newSurround.actions.isEmpty() && newRear.actions.isEmpty() && newFront.actions.isEmpty());
+        assertTrue(lines("swapped").isEmpty());
+        second.told.clear();
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(Arrays.asList("swapped " + ChannelRules.IN_FLIGHT_MAX_MS + " successor orphans front 2 round=1 closing"),
+                lines("swapped"));
+        assertEquals("满 60 秒：换上新的一份，别的路照常，环视跳过", Arrays.asList("open [PREVIEW]"), newRear.actions);
+        assertTrue(newSurround.actions.isEmpty());
+        assertEquals(Arrays.asList("held front 2 round=1 front other closing ms=" + ChannelRules.IN_FLIGHT_MAX_MS),
+                lines("held "));
+        assertTrue("录像那一侧听说了", second.told.contains("condition " + SUR + " BRINGING_UP"));
+        assertTrue(next.heldByClose(SUR));
+        assertTrue(next.cannotOpen(SUR));
+        opened(newRear);
+        frame(newRear);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), newFront.actions);
+        opened(newFront);
+        frame(newFront);
+        settle();
 
-            at(10 * 60_000);
-            assertTrue("10 分钟也不开", surround.actions.isEmpty());
-            assertEquals("只写一次", 1, lines("held ").size());
-            assertTrue("旧的那一句还算我们的：不认成别人拿着", lines("recognized").isEmpty());
-            ChannelScheduler.LaneView v = view(s.snapshot(), SUR);
-            assertTrue(v.held);
-            assertTrue(v.heldByClose);
-            assertFalse("另一份管线的那一轮", v.roundOwnedByLane);
-            assertEquals(T0, v.roundStatus.outstandingSince);
-            assertEquals(0, surround.heldRefusals);
+        at(10 * 60_000);
+        assertTrue("10 分钟也不开", newSurround.actions.isEmpty());
+        assertEquals("只写一次", 1, lines("held ").size());
+        assertTrue("旧的那一句还算我们的：不认成别人拿着", lines("recognized").isEmpty());
+        ChannelScheduler.LaneView v = view(s.snapshot(), SUR);
+        assertTrue(v.held);
+        assertTrue(v.heldByClose);
+        assertFalse("旧的那一份管线的那一轮", v.roundOwnedByLane);
+        assertEquals(T0, v.roundStatus.outstandingSince);
+        assertEquals(1, s.snapshot().orphans.size());
+        assertFalse(pipe.gone);
+        assertEquals(0, newSurround.heldRefusals);
 
-            closed(old);   // 相机服务为这一关说「空闲」（叫醒调度）
-            b.onClosed("2");
-            s.wake();
-            settle();
-            assertEquals(Arrays.asList("heldEnded front 2 round=1 ms=" + (10 * 60_000)), lines("heldEnded"));
-            assertFalse(s.heldByClose(SUR));
-            at(10 * 60_000 + ChannelRules.TICK_MS * 2);
-            assertEquals("返回了：照常开", Arrays.asList("open [MIRROR]"), surround.actions);
-            assertTrue(lines("recognized").isEmpty());
-        } finally {
-            b.detach();
-        }
+        closed(surround);   // 那一次关返回了，相机服务为这一关说「空闲」（叫醒调度）
+        settle();
+        assertEquals(Arrays.asList("heldEnded front 2 round=1 ms=" + (10 * 60_000)), lines("heldEnded"));
+        assertFalse(next.heldByClose(SUR));
+        assertTrue("孤儿那一轮结束了：旧的那一份放完", pipe.gone);
+        assertTrue(s.snapshot().orphans.isEmpty());
+        at(10 * 60_000 + ChannelRules.TICK_MS * 2);
+        assertEquals("返回了：照常开", Arrays.asList("open [MIRROR]"), newSurround.actions);
+        assertTrue(lines("recognized").isEmpty());
     }
 
     /**
-     * 占着它的那一轮「从什么时候起一直有开或关没返回」不从头算（项目所有者 2026-10-29）：旧的那一份开环视，openCamera 返回了、
-     * 回调一直不来；30 秒时它退出、下达了关 —— 那一轮还是同一段（开的那一刻起），新的一份满 60 秒（从开的那一刻算）就写那一行，
-     * 不是从下达关那一刻再等 60 秒。
+     * 占着它的那一轮「从什么时候起一直有开或关没返回」不从头算（项目所有者 2026-10-29）：环视开，openCamera 返回了、回调一直不来；
+     * 30 秒时它不该开了、下达了关 —— 那一轮还是同一段（开的那一刻起）；又有人要它时它被自己那一轮占着，满 60 秒（从开的那一刻算）
+     * 就写那一行，不是从下达关那一刻再等 60 秒。
      */
     @Test
     public void theHeldClockRunsFromTheRoundsOutstandingStartAndNeverRestarts() {
-        FakePort old = new FakePort("2");
-        ChannelScheduler b = scheduler();
-        try {
-            Map<String, ChannelScheduler.CameraPort> noSurround = new LinkedHashMap<>();
-            noSurround.put(REAR, rear);   // 新的那一份还没交环视
-            s.setLanes(noSurround);
-            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
-            lanes.put(SUR, old);
-            b.setLanes(lanes);
-            Out mirror = new Out(Kind.MIRROR, "mirror-2");
-            declare(old, mirror);
-            claim(Holder.MIRROR);
-            settle();
-            assertEquals("旧的那一份开环视：openCamera 返回了，回调一直不来", Arrays.asList("open [MIRROR]"), old.actions);
-            Map<String, ChannelScheduler.CameraPort> mine = new LinkedHashMap<>();
-            mine.put(SUR, surround);
-            mine.put(REAR, rear);
-            s.setLanes(mine);
-            declare(surround, mirror);
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        declare(surround, mirror);
+        claim(Holder.MIRROR);
+        settle();
+        assertEquals("开环视：openCamera 返回了，回调一直不来", Arrays.asList("open [MIRROR]"), surround.actions);
 
-            at(30_000);
-            b.exit();
-            settle();
-            assertEquals(Arrays.asList("open [MIRROR]", "close exit"), old.actions);
-            assertEquals(CameraRound.Phase.CLOSING, old.live.phase());
-            at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
-            assertTrue(lines("held ").isEmpty());
-            at(ChannelRules.IN_FLIGHT_MAX_MS);
-            assertEquals(Arrays.asList("held front 2 round=1 front other closing open-pending ms="
-                    + ChannelRules.IN_FLIGHT_MAX_MS), lines("held "));
-            assertTrue(surround.actions.isEmpty());
-        } finally {
-            b.detach();
-        }
+        at(30_000);
+        host.foregroundService = false;   // 不保持
+        drop(Holder.MIRROR);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]", "close unwanted"), surround.actions);
+        assertEquals(CameraRound.Phase.CLOSING, surround.live.phase());
+        claim(Holder.MIRROR);
+        settle();
+        at(ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertTrue(lines("held ").isEmpty());
+        at(ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(Arrays.asList("held front 2 round=1 front own closing open-pending ms="
+                + ChannelRules.IN_FLIGHT_MAX_MS), lines("held "));
+        assertEquals("被自己那一轮占着：不再开", Arrays.asList("open [MIRROR]", "close unwanted"), surround.actions);
+    }
+
+    /**
+     * 换下去的那一份关一路，那一下开始关以后满 60 秒才换上新的一份（项目所有者 2026-10-29「等旧管线这一步做完再算 60 秒」）：
+     * 那一路的 openCamera 早就卡着（开的那一刻起一直有开没返回），换下去时下达了关 —— 从下达关那一刻算 60 秒，不是从开的那一刻。
+     * 新的一份换上以后照旧按那一轮的钟（开的那一刻起）写「还有开或关没返回」。
+     */
+    @Test
+    public void theSwapWaitsSixtySecondsFromWhenTheOldCloseBegan() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        declare(surround, mirror);
+        claim(Holder.MIRROR);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
+
+        at(30_000);
+        p.retire();
+        FakePort fresh = new FakePort("2");
+        declare(fresh, mirror);
+        rebuilt(new FakePipe(), SUR, fresh);
+        settle();
+        assertEquals(Arrays.asList("open [MIRROR]", "close rebuild"), surround.actions);
+        at(30_000 + ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertTrue("从开始关起还不到 60 秒：不换", lines("swapped").isEmpty());
+        at(30_000 + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(1, lines("swapped").size());
+        assertEquals(Arrays.asList("held front 2 round=1 front other closing open-pending ms="
+                + (30_000 + ChannelRules.IN_FLIGHT_MAX_MS)), lines("held "));
+        assertTrue(fresh.actions.isEmpty());
     }
 
     /**
@@ -3083,7 +3383,7 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         streaming(rear, pvR);
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         say(rear, false, true);
         settle();
         at(ChannelRules.IN_FLIGHT_MAX_MS);
@@ -3100,7 +3400,7 @@ public class ChannelSchedulerTest {
 
         at(3 * 60_000);
         rear.closedNow();
-        s.onLossClosed("1", 3 * 60_000);
+        p.onLossClosed("1", 3 * 60_000);
         settle();
         assertEquals(Arrays.asList("heldEnded left 1 round=3 ms=" + (3 * 60_000)), lines("heldEnded"));
         assertEquals("返回了：照常开", Arrays.asList("open [PREVIEW]"), rear.actions);
@@ -3117,7 +3417,7 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         streaming(rear, pvR);
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         say(rear, false, true);
         settle();
         at(ChannelRules.IN_FLIGHT_MAX_MS);
@@ -3125,7 +3425,7 @@ public class ChannelSchedulerTest {
 
         at(2 * 60_000);
         rear.closedNow();
-        s.onLossClosed("1", 2 * 60_000);
+        p.onLossClosed("1", 2 * 60_000);
         settle();
         assertEquals(Arrays.asList("heldEnded left 1 round=3 ms=" + (2 * 60_000) + " TAKEN"), lines("heldEnded"));
         at(2 * 60_000 + ChannelRules.QUIET_MS + ChannelRules.TICK_MS);
@@ -3148,22 +3448,572 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         streaming(rear, pvR);
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         say(rear, true, true);   // 为这一关说的「空闲」（我们引起的）：到点判成普通故障
         settle();
         at(ChannelRules.IN_FLIGHT_MAX_MS);
         assertEquals(1, lines("held left 1 ").size());
         drop(Holder.PREVIEW);
         settle();
-        assertFalse("没人要了：不算在等它", s.heldByClose(REAR));
+        assertFalse("没人要了：不算在等它", p.heldByClose(REAR));
 
         at(2 * 60_000);
         rear.closedNow();
-        s.onLossClosed("1", 2 * 60_000);
+        p.onLossClosed("1", 2 * 60_000);
         settle();
         assertEquals(Arrays.asList("heldEnded left 1 round=3 ms=" + (2 * 60_000) + " unwanted"), lines("heldEnded"));
         at(2 * 60_000 + ChannelRules.QUIET_MS + ChannelRules.TICK_MS);
         assertTrue("没人要：不开", rear.actions.isEmpty());
+    }
+
+    // ================================================================= 只有一个调度：管线一个接一个（第 2 步，项目所有者 2026-10-29 批）
+
+    /**
+     * 管线重建：旧的那一份放掉（换下去），和退出一样按次序关 —— 环视单独先关，关完座舱一起关；关的原因写「管线重建」，
+     * 黑匣子写一行「管线重建：这一份换下去」；这期间 closingAnywhere 为真（和以前旧的那一份调度照退出关一样）。新的那一份排着，
+     * 一步都不动；旧的那一份各路关完，换上它（「换下去了」一行），它照开的次序开 —— 环视先，出了画面再开下一路，相机服务为旧的那几关说的
+     * 「空闲」是我们引起的，不用等安静。旧的那一份放完（retired）。
+     */
+    @Test
+    public void aRebuildClosesTheOldPipelineInOrderThenOpensTheNewOneInOrder() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        p.retire();
+        assertTrue("放掉那一下当场为真", s.closing());
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        FakePort f2 = new FakePort("0");
+        declare(s2, new Out(Kind.PREVIEW, "preview-2b"));
+        declare(r2, new Out(Kind.PREVIEW, "preview-1b"));
+        declare(f2, new Out(Kind.PREVIEW, "preview-0b"));
+        ChannelScheduler.Pipeline next = rebuilt(second, FRONT, f2, REAR, r2, SUR, s2);
+        settle();
+        assertEquals("环视单独先关", Arrays.asList("close rebuild"), surround.actions);
+        assertTrue(rear.actions.isEmpty() && front.actions.isEmpty());
+        assertEquals(Arrays.asList("retiring null null"), lines("retiring"));
+        assertEquals("排着的那一份照它建好的世界答：在起来", ChannelRules.Condition.BRINGING_UP, next.condition(SUR));
+
+        at(200);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("close rebuild"), rear.actions);
+        assertEquals(Arrays.asList("close rebuild"), front.actions);
+        assertTrue("还排着：一步都不动", s2.actions.isEmpty() && r2.actions.isEmpty() && f2.actions.isEmpty());
+        assertTrue(s.closing());
+
+        at(300);
+        closed(rear);
+        closed(front);
+        settle();
+        assertEquals(Arrays.asList("swapped 300 successor"), lines("swapped"));
+        assertEquals(1, lines("closeRound front | left, back").size());
+        assertTrue(pipe.gone);
+        assertFalse(s.closing());
+        assertEquals("换上了：环视先开", Arrays.asList("open [PREVIEW]"), s2.actions);
+        assertTrue(r2.actions.isEmpty());
+        at(600);
+        opened(s2);
+        frame(s2);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), r2.actions);
+        at(800);
+        opened(r2);
+        frame(r2);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), f2.actions);
+        assertTrue("相机服务为旧的那几关说的话是我们的：不等安静", lines("waiting QUIET").isEmpty());
+    }
+
+    /**
+     * 最坏的那一种（项目所有者 2026-10-29「等旧管线这一步做完再算 60 秒」）：放掉时旧的那一份手上有一步（开后座舱，15 秒没出画面），
+     * 做完才关；环视单独关差一点满 10 秒；座舱一起关，前座舱那一次关一直不返回 —— 从它开始关算满 60 秒（放掉以后约 85 秒）才换上新的一份。
+     * 新的一份那一路（前座舱）被一轮占着、不开，环视、后座舱照常开；满 60 秒那一行、状态条那一句当场就有（从那一次关开始算已经满了）。
+     */
+    @Test
+    public void aStuckCabinCloseDuringARebuildSwapsSixtySecondsAfterThatCloseBegan() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(front, pvF);
+        declare(rear, pvR);
+        settle();
+        assertEquals("手上那一步：开后座舱（一直不出画面）", Arrays.asList("open [PREVIEW]"), rear.actions);
+        p.retire();
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        FakePort f2 = new FakePort("0");
+        declare(s2, new Out(Kind.PREVIEW, "preview-2b"));
+        declare(r2, new Out(Kind.PREVIEW, "preview-1b"));
+        declare(f2, new Out(Kind.PREVIEW, "preview-0b"));
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2, FRONT, f2);
+        settle();
+        assertTrue("手上那一步做完再关", surround.actions.isEmpty());
+
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals("那一步 15 秒到点：环视单独关", Arrays.asList("close rebuild"), surround.actions);
+        long cabinsAt = ChannelRules.STEP_MAX_MS + ChannelRules.CLOSE_SURROUND_MAX_MS - 100;
+        at(cabinsAt);
+        closed(surround);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]", "close rebuild"), rear.actions);
+        assertEquals(Arrays.asList("close rebuild"), front.actions);
+        at(cabinsAt + 100);
+        closed(rear);   // 后座舱关完；前座舱那一次关一直不返回
+
+        at(cabinsAt + ChannelRules.IN_FLIGHT_MAX_MS - 1);
+        assertTrue("从前座舱开始关算还不到 60 秒：不换", lines("swapped").isEmpty());
+        assertTrue(s2.actions.isEmpty() && r2.actions.isEmpty() && f2.actions.isEmpty());
+        at(cabinsAt + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals("放掉以后约 85 秒", 84_900, cabinsAt + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(1, lines("swapped").size());
+        assertTrue(lines("swapped").get(0), lines("swapped").get(0).contains("successor orphans back 0 round=2 closing"));
+        assertEquals(Arrays.asList("held back 0 round=2 back other closing ms=" + ChannelRules.IN_FLIGHT_MAX_MS),
+                lines("held "));
+        assertTrue("状态条那一句", next.heldByClose(FRONT));
+        assertEquals("环视照常开", Arrays.asList("open [PREVIEW]"), s2.actions);
+        opened(s2);
+        frame(s2);
+        settle();
+        assertEquals(Arrays.asList("open [PREVIEW]"), r2.actions);
+        opened(r2);
+        frame(r2);
+        settle();
+        assertTrue("被一轮占着：不开", f2.actions.isEmpty());
+        assertEquals(1, s.snapshot().orphans.size());
+        assertFalse(pipe.gone);
+    }
+
+    /**
+     * 退出又马上打开，连着三次（第 2 步：没有第二个调度）：每一次新建的那一份管线都排着，旧的那一份还在关；再退出就放掉排着的那一份
+     * （它什么都没开过，当场放完），新的一份替上来。旧的那一份关完，换上最后那一份，开它 —— 一个调度、一份接一份。
+     */
+    @Test
+    public void exitAndReopenThreeTimesKeepsOnlyTheNewestPendingPipeline() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        assertEquals(Arrays.asList("close exit"), surround.actions);
+        List<FakePipe> hosts = new ArrayList<>();
+        List<FakePort> ports = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            at(100 * (i + 1));
+            s.resumeAfterExit();   // 人又点开了主界面
+            FakePipe host = new FakePipe();
+            FakePort port = new FakePort("2");
+            declare(port, mirror);
+            ChannelScheduler.Pipeline handle = rebuilt(host, SUR, port);
+            settle();
+            hosts.add(host);
+            ports.add(port);
+            if (i < 2) {
+                s.exit();   // 又退出了：放管线 —— 排着的那一份当场放完
+                handle.retire();
+                settle();
+                assertTrue(host.gone);
+            }
+        }
+        assertTrue("旧的那一份还在关：排着的一份都不开", ports.get(2).actions.isEmpty());
+        assertEquals(ChannelRules.Condition.BRINGING_UP, s.snapshot().lanes.get(0).condition);
+        assertTrue(s.snapshot().waiting != null);
+
+        at(1_000);
+        closed(surround);
+        at(1_000 + ChannelRules.TICK_MS * 2);
+        assertEquals(Arrays.asList("open [MIRROR]"), ports.get(2).actions);
+        assertTrue(ports.get(0).actions.isEmpty() && ports.get(1).actions.isEmpty());
+        assertTrue(pipe.gone);
+        assertFalse(hosts.get(2).gone);
+        assertEquals(1, lines("swapped").size());
+        assertEquals(3, lines("resumed").size());
+        assertFalse(s.closing());
+    }
+
+    /**
+     * 退出当中换上的那一份（后台来要管线：排着，旧的那一份关完换上它）不再写一遍退出（审查 2026-10-30）：退出、车机要睡一件事一行，
+     * 进程这一层写，不跟着哪一份管线。
+     */
+    @Test
+    public void aPipelineSwappedInDuringExitWritesNoSecondExitLine() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        FakePort background = new FakePort("2");
+        declare(background, mirror);
+        rebuilt(new FakePipe(), SUR, background);   // 退出当中后台来要管线：排着
+        settle();
+        at(200);
+        closed(surround);   // 旧的那一份关完：换上它，接着只关
+        at(200 + ChannelRules.TICK_MS * 2);
+        assertEquals(1, lines("swapped").size());
+        assertTrue(pipe.gone);
+        assertEquals(Arrays.asList("exit null null"), lines("exit"));
+        assertTrue(lines("retiring").isEmpty());
+        assertTrue("退出时什么都不开", background.actions.isEmpty());
+    }
+
+    /**
+     * 退出、关完、换上空的那一份以后（还没有新的管线）人又点开了主界面：「主界面又回来了」照写一行 —— 以前写给空的那一份，丢了
+     * （审查 2026-10-30）。车机要睡那一行也一样不跟着管线。
+     */
+    @Test
+    public void aReopenWithNoPipelineAttachedStillWritesResumed() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        at(200);
+        closed(surround);
+        settle();
+        assertTrue("换上了空的那一份", pipe.gone);
+        assertTrue(lines("resumed").isEmpty());
+        s.resumeAfterExit();
+        settle();
+        assertEquals(1, lines("resumed").size());
+        host.sleeps = true;
+        s.onNeedsChanged();
+        settle();
+        assertEquals(Arrays.asList("sleep null null"), lines("sleep"));
+    }
+
+    /**
+     * 接着的那一份还没放掉就又接上了一份（建新的之前没放旧的，不该有）：新的那一份为准（审查 2026-10-30）—— 旧的那一份换下去，
+     * 照放掉一样按次序关（原因「管线重建」），写一行；关完换上新的那一份、开它。以前新的那一份一直排着。
+     */
+    @Test
+    public void aNewerPipelineRetiresTheAttachedOneThatWasNeverReleased() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        declare(s2, mirror);
+        rebuilt(second, SUR, s2);   // 旧的那一份没放掉
+        settle();
+        assertEquals(1, lines("superseded").size());
+        assertEquals(Arrays.asList("close rebuild"), surround.actions);
+        assertEquals(1, lines("retiring").size());
+        assertTrue("旧的那一份还在关：新的一份排着", s2.actions.isEmpty());
+        at(200);
+        closed(surround);
+        at(200 + ChannelRules.TICK_MS * 2);
+        assertEquals(1, lines("swapped").size());
+        assertTrue(pipe.gone);
+        assertEquals(Arrays.asList("open [MIRROR]"), s2.actions);
+        assertFalse(second.gone);
+        assertEquals(1, lines("superseded").size());
+    }
+
+    /** 重建当中又重建：排着的那一份被新的一份替掉（还没交各路的也一样），只换上最新的那一份。 */
+    @Test
+    public void aRebuildDuringARebuildReplacesThePendingPipeline() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        p.retire();
+        FakePipe first = new FakePipe();
+        rebuilt(first);   // 列相机还在做，各路还没交
+        FakePipe second = new FakePipe();
+        FakePort port = new FakePort("2");
+        declare(port, mirror);
+        rebuilt(second, SUR, port);
+        assertTrue("被替掉的那一份当场放完", first.gone);
+        settle();
+        at(200);
+        closed(surround);
+        at(200 + ChannelRules.TICK_MS);
+        assertEquals(Arrays.asList("open [MIRROR]"), port.actions);
+        assertFalse(second.gone);
+    }
+
+    /**
+     * 一路相机都没有的那一份管线（列相机出错）：接上、换下去都不用等谁 —— 换下去当场放完，新的一份当场接上、开起来。
+     * 问它的那几样照「不在这一份里」答（在起来、能不能开都是否）。
+     */
+    @Test
+    public void anEmptyPipelineComesAndGoesWithoutWaiting() {
+        settle();
+        p.retire();   // 没有开着的：当场换下去
+        settle();
+        assertTrue(pipe.gone);
+        FakePipe emptyHost = new FakePipe();
+        ChannelScheduler.Pipeline empty = rebuilt(emptyHost);
+        empty.setLanes(new LinkedHashMap<>());
+        claim(Holder.PREVIEW);
+        settle();
+        assertEquals(ChannelRules.Condition.BRINGING_UP, empty.condition(SUR));
+        assertFalse(empty.cannotOpen(SUR));
+        assertFalse(empty.releasedByDark(SUR));
+        empty.retire();
+        settle();
+        assertTrue(emptyHost.gone);
+        FakePort s2 = new FakePort("2");
+        declare(s2, new Out(Kind.PREVIEW, "preview-2b"));
+        rebuilt(new FakePipe(), SUR, s2);
+        at(ChannelRules.TICK_MS);
+        assertEquals(Arrays.asList("open [PREVIEW]"), s2.actions);
+    }
+
+    /**
+     * 退出以后（主界面还没回来）后台来要管线（录像协调器、后视镜）：新建的那一份接上了也什么都不开 —— 退出时只关；退出的看门线程照样看到
+     * 「关完」。人又点开了主界面（resumeAfterExit）才照常开。
+     */
+    @Test
+    public void aPipelineBuiltDuringExitOpensNothingUntilTheMainScreenIsBack() {
+        Out mirror = new Out(Kind.MIRROR, "mirror-2");
+        claim(Holder.MIRROR);
+        streaming(surround, mirror);
+        settle();
+        exitApp();
+        settle();
+        at(200);
+        closed(surround);
+        settle();
+        assertTrue(pipe.gone);
+        assertFalse("关完了：退出的看门线程照样往下走", s.closing());
+
+        FakePort background = new FakePort("2");
+        declare(background, mirror);
+        ChannelScheduler.Pipeline late = rebuilt(new FakePipe(), SUR, background);
+        at(60_000);
+        assertTrue("退出时什么都不开", background.actions.isEmpty());
+        assertFalse(s.closing());
+        assertEquals(ChannelRules.Condition.BRINGING_UP, late.condition(SUR));
+
+        s.resumeAfterExit();
+        at(60_000 + ChannelRules.TICK_MS);
+        assertEquals(Arrays.asList("open [MIRROR]"), background.actions);
+        assertEquals(1, lines("resumed").size());
+    }
+
+    /**
+     * 换上新的一份以后，相机服务为旧的那一份那一关说的话照样算我们的（第 1 步审查留给第 2 步：先到「那一轮结束」、后到「空闲」那一声）：
+     * 旧的那一份后座舱关完、那一轮结束，换上新的一份，相机服务那一声「空闲」还没来 —— 新的那一路读到的还是旧的那一份开的时候那一句
+     * 「被占用（我们开着）」，0.5 秒以内照算我们的，不认成别人拿着；「空闲」晚到也算我们引起的。过了 0.5 秒才不算。
+     */
+    @Test
+    public void aWordAfterTheSwapForTheOldCloseIsStillOursWhenTheRoundEndedFirst() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        host.foregroundService = false;
+        drop(Holder.PREVIEW);   // 谁都不要了：新的那一路换上来也不开
+        p.retire();
+        FakePort r2 = new FakePort("1");
+        rebuilt(new FakePipe(), REAR, r2);
+        settle();
+        at(100);
+        closed(surround);
+        settle();
+        at(200);
+        closed(front);
+        rear.closedNow();   // 后座舱关完、那一轮结束 —— 相机服务那一声「空闲」还在路上
+        p.onClosed("1");
+        settle();
+        assertEquals(1, lines("swapped").size());
+        assertTrue("刚关完（换下去的那一份关的）：相机服务那一声还算我们的", s.ourStepInFlight("1"));
+        assertTrue("「被占用（我们开着）」那一句不认成别人拿着", lines("recognized").isEmpty());
+        at(200 + ChannelRules.OWN_WORD_GRACE_MS - 1);
+        assertTrue(s.ourStepInFlight("1"));
+        say(r2, true, true);   // 「空闲」晚到，还在 0.5 秒以内：分类时算我们引起的
+        s.wake();
+        settle();
+        at(200 + ChannelRules.OWN_WORD_GRACE_MS);
+        assertFalse(s.ourStepInFlight("1"));
+        assertTrue(lines("recognized").isEmpty());
+        assertEquals(0, host.asks.size());
+    }
+
+    /**
+     * 同上，另一种先后：「空闲」那一声先到、那一轮后结束 —— 旧的那一份后座舱那一次关卡住了，满 60 秒换上新的一份，它当孤儿留下：
+     * 那一轮还在账本上（在关、手上没挂着设备），相机服务这时说的话算我们引起的；那一下终于返回了，之后 0.5 秒以内也还算。
+     */
+    @Test
+    public void aWordAfterTheSwapForAnOrphansCloseIsOursBeforeAndJustAfterItReturns() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        host.foregroundService = false;
+        drop(Holder.PREVIEW);
+        p.retire();
+        FakePort r2 = new FakePort("1");
+        rebuilt(new FakePipe(), REAR, r2);
+        settle();
+        at(100);
+        closed(surround);
+        settle();
+        at(200);
+        closed(front);   // 后座舱那一次关一直不返回
+        settle();
+        at(100 + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(1, lines("swapped").size());
+        assertTrue("孤儿那一轮还在关：我们的", s.ourStepInFlight("1"));
+        say(r2, true, true);   // 「空闲」先到
+        s.wake();
+        settle();
+        assertTrue(lines("recognized").isEmpty());
+
+        at(120_000);
+        rear.closedNow();   // 那一下终于返回了
+        p.onClosed("1");
+        settle();
+        assertTrue("刚返回：还算我们的", s.ourStepInFlight("1"));
+        assertTrue(pipe.gone);
+        assertEquals(Arrays.asList("stray 1 closed"), lines("stray"));
+        at(120_000 + ChannelRules.OWN_WORD_GRACE_MS);
+        assertFalse(s.ourStepInFlight("1"));
+    }
+
+    /**
+     * 熄屏记着的那几样跨过一次换上（项目所有者 2026-10-29：只有每一路摄像头的账本和熄屏记录跨重建保留）：环视留着、通道的决定是留着，
+     * 旧的那一份关完、换上新的一份，接着「留着」、不再发一次决定；以前重建清零的照旧清零（被拿着从新的一份自己认出来那一刻算、
+     * 上次问相机服务、手上那一步）。
+     */
+    @Test
+    public void theDarkLatchAndVerdictSurviveASwapWhileTheRestStartsOver() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR, REAR);
+        streaming(surround, recS);
+        rear.declared.add(recR);
+        host.absent("1");   // 车机拿着后座舱：认出来，被拿着
+        host.sentryArmed();
+        settle();
+        assertEquals(CameraTaken.Verdict.TAKEN, view(s.snapshot(), REAR).mark);
+        long askedAt = s.snapshot().askedAt;
+        assertTrue(askedAt != 0);
+        listenToVerdict();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("KEPT DARK_ONSET"), verdicts);
+
+        p.retire();
+        FakePipe second = new FakePipe();
+        second.plan(SUR, REAR);
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, recS);
+        declare(r2, recR);
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS + 200);
+        closed(surround);
+        settle();
+        assertTrue(pipe.gone);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, s.snapshot().surroundInDark);
+        assertEquals("不再发", Arrays.asList("KEPT DARK_ONSET"), verdicts);
+        assertEquals(ChannelRules.SurroundInDark.KEPT, s.verdict());
+        assertFalse(next.releasedByDark(SUR));
+        assertEquals("换上的那一份接着录环视", Arrays.asList("open [RECORD]"), s2.actions);
+        assertTrue("座舱照旧熄屏放开", next.releasedByDark(REAR));
+        ChannelScheduler.LaneView taken = view(s.snapshot(), REAR);
+        assertEquals("被拿着：新的一份排着时自己认出来的", CameraTaken.Verdict.TAKEN, taken.mark);
+        assertEquals("从它认出来那一刻算，不接着旧的那一份", T0 + 1_000 + ChannelRules.HOLD_MS, taken.markSince);
+        assertEquals(2, lines("recognized").size());
+        assertEquals("上次问相机服务清零（黑着时座舱没人要，不问）", 0, s.snapshot().askedAt);
+    }
+
+    /**
+     * 别的程序拿着一路座舱时管线重建（审查 2026-10-30）：排着的那一份照样认出它被拿着（ChannelRules.settleMarks），问它的和以前新建一份调度
+     * 第一轮之后一样 —— 被拿着、拍照不等它、录像不为它备文件名定死了的录制器（录像那一侧听说了）。排着时不问相机服务；换上以后那一路
+     * 照旧被拿着，接着问。
+     */
+    @Test
+    public void aPendingPipelineAnswersTakenForALaneAnotherAppHolds() {
+        Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+        lanes.put(SUR, surround);
+        p.setLanes(lanes);   // 旧的那一份只有环视
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        settle();
+        p.retire();   // 换车型：旧的那一份关环视（还没关完）
+        host.busyNotOurs("1");   // 车机拿着后座舱
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        declare(s2, pvS);
+        declare(r2, pvR);
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2);
+        settle();
+        assertTrue("旧的那一份还在关：排着", s.snapshot().waiting != null);
+        assertEquals(ChannelRules.Condition.TAKEN, next.condition(REAR));
+        assertTrue("拍照不等它", next.excludedFromPhoto(REAR));
+        assertFalse("录像不为它备录制器", RecordingLanes.keepsNamedRecorder(next.condition(REAR), next.cannotOpen(REAR),
+                next.releasedByDark(REAR)));
+        assertTrue("录像那一侧听说了", second.told.contains("condition " + REAR + " TAKEN"));
+        assertEquals(Arrays.asList("recognized " + REAR + " busy"), lines("recognized"));
+        assertEquals(ChannelRules.Condition.BRINGING_UP, next.condition(SUR));
+        assertEquals("排着的不问相机服务", 0, host.asks.size());
+
+        at(200);
+        closed(surround);
+        at(200 + ChannelRules.TICK_MS);
+        assertEquals("换上了", Arrays.asList("open [PREVIEW]"), s2.actions);
+        assertTrue(r2.actions.isEmpty());
+        assertEquals(ChannelRules.Condition.TAKEN, next.condition(REAR));
+        assertEquals("换上以后接着问", 1, host.asks.size());
+        assertEquals(1, lines("recognized").size());
+    }
+
+    /**
+     * 同上，那一台是换下去的那一份自己拿着的（审查 2026-10-30）：账本上它那一轮还没结束（后座舱那一次关卡住了），相机服务那一句
+     * 「被占用（我们开着）」排着的那一份不认成别人拿着；换上以后它当孤儿、那一轮照旧占着，接着的那一份也不认 —— 被一轮占着就是我们的
+     * （ChannelRules.camHeld）。
+     */
+    @Test
+    public void aCameraTheRetiringPipelinesOrAnOrphansRoundHoldsIsNeverRecognized() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        settle();
+        p.retire();
+        FakePipe second = new FakePipe();
+        FakePort s2 = new FakePort("2");
+        FakePort r2 = new FakePort("1");
+        FakePort f2 = new FakePort("0");
+        declare(s2, pvS);
+        declare(r2, pvR);
+        declare(f2, pvF);
+        ChannelScheduler.Pipeline next = rebuilt(second, SUR, s2, REAR, r2, FRONT, f2);
+        settle();
+        at(100);
+        closed(surround);
+        settle();
+        at(200);
+        closed(front);   // 后座舱那一次关一直不返回
+        settle();
+        at(30_000);
+        assertEquals("排着：换下去的那一份那一轮占着，不算被拿着", ChannelRules.Condition.BRINGING_UP, next.condition(REAR));
+        assertTrue(lines("recognized").isEmpty());
+
+        at(100 + ChannelRules.IN_FLIGHT_MAX_MS);
+        assertEquals(1, lines("swapped").size());
+        at(10 * 60_000);
+        assertEquals("孤儿那一轮占着：也不认", ChannelRules.Condition.BRINGING_UP, next.condition(REAR));
+        assertTrue(next.heldByClose(REAR));
+        assertTrue(lines("recognized").isEmpty());
+        assertTrue(r2.actions.isEmpty());
+        assertEquals(1, s.snapshot().orphans.size());
     }
 
     // ================================================================= 能用相机
@@ -3192,19 +4042,19 @@ public class ChannelSchedulerTest {
     public void aWantedLaneCannotOpenWhileTheCameraIsUnusableAndRecordingHearsWhenThatChanges() {
         host.mainForeground = false;
         host.startedWhileVisible = false;
-        host.plan(SUR);
+        pipe.plan(SUR);
         claim(Holder.RECORDING);
         declare(surround, recS);
         settle();
-        assertTrue(s.cannotOpen(SUR));
-        assertFalse("没人要的那几路不算", s.cannotOpen(REAR));
-        assertEquals(ChannelRules.Condition.BRINGING_UP, s.condition(SUR));
+        assertTrue(p.cannotOpen(SUR));
+        assertFalse("没人要的那几路不算", p.cannotOpen(REAR));
+        assertEquals(ChannelRules.Condition.BRINGING_UP, p.condition(SUR));
         told.clear();
         host.mainForeground = true;
         s.wake();
         settle();
         assertEquals(Arrays.asList("open [RECORD]"), surround.actions);
-        assertFalse(s.cannotOpen(SUR));
+        assertFalse(p.cannotOpen(SUR));
         assertEquals(Arrays.asList("condition " + SUR + " BRINGING_UP"), told("condition"));
     }
 
@@ -3247,7 +4097,7 @@ public class ChannelSchedulerTest {
         at(CameraLiveness.RETRY_GAP_MS - 1);
         assertEquals(1, surround.actions.size());
         at(CameraLiveness.RETRY_GAP_MS + ChannelRules.TICK_MS);
-        assertEquals(Arrays.asList("open [MIRROR]", "reopen [MIRROR]"), surround.actions);
+        assertEquals("关着的一路的重开：照开那样开", Arrays.asList("open [MIRROR]", "open [MIRROR]"), surround.actions);
     }
 
     /**
@@ -3263,7 +4113,7 @@ public class ChannelSchedulerTest {
         streaming(surround, mirror);
         settle();
         surround.lose(now);
-        s.onLossStarted("2", CameraDevice.StateCallback.ERROR_CAMERA_DISABLED);
+        p.onLossStarted("2", CameraDevice.StateCallback.ERROR_CAMERA_DISABLED);
         settle();
         at(2_000);
         host.mainForeground = true;   // 那一次关还没关完
@@ -3272,7 +4122,7 @@ public class ChannelSchedulerTest {
         at(5_000);
         say(surround, true, true);
         surround.closedNow();
-        s.onLossClosed("2", 5_000);
+        p.onLossClosed("2", 5_000);
         at(5_000 + ChannelRules.JUDGE_DELAY_MS);
         assertEquals(1, lines("judged front UNUSABLE LOSS close=5000 MAIN_CAME_BACK").size());
         assertEquals(Arrays.asList("open [MIRROR]"), surround.actions);
@@ -3288,7 +4138,7 @@ public class ChannelSchedulerTest {
     @Test
     public void replayA_rearCabinTakenWhileRecording() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
@@ -3296,14 +4146,14 @@ public class ChannelSchedulerTest {
         say(front, true, false);
         say(surround, true, false);
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         for (long t = 0; t < 5_409; t += 500) {
             at(t);
         }
         assertTrue("0 和 2 一步都不动", surround.actions.isEmpty() && front.actions.isEmpty());
         at(5_409);
         rear.closedNow();
-        s.onLossClosed("1", 5_409);
+        p.onLossClosed("1", 5_409);
         settle();
         assertTrue(lines("judged").isEmpty());
         at(5_709);
@@ -3334,17 +4184,17 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         settle();
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         settle();
         at(9_622);
         say(rear, true, true);
         at(9_627);
         rear.closedNow();
-        s.onLossClosed("1", 9_627);
+        p.onLossClosed("1", 9_627);
         at(9_927);
         assertEquals(Arrays.asList("judged left ORDINARY LOSS close=9627"), lines("judged"));
         assertTrue(host.took.isEmpty());
-        assertEquals(Arrays.asList("reopen [PREVIEW]"), rear.actions);
+        assertEquals("关着的一路的重开：照开那样开", Arrays.asList("open [PREVIEW]"), rear.actions);
     }
 
     /**
@@ -3354,30 +4204,30 @@ public class ChannelSchedulerTest {
     @Test
     public void replayC_error4AfterASpuriousFreeIsOrdinary() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(rear, recR);
         streaming(front, recF);
         settle();
         say(front, true, false);
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         say(surround, true, false);
         at(7_975);
         rear.closedNow();
-        s.onLossClosed("1", 7_975);
+        p.onLossClosed("1", 7_975);
         at(8_275);
-        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
+        assertEquals(ChannelRules.Condition.TAKEN, p.condition(REAR));
 
         at(14_114);
         surround.lose(now);
-        s.onLossStarted("2", DEVICE_ERROR);
+        p.onLossStarted("2", DEVICE_ERROR);
         at(15_270);
         surround.closedNow();
-        s.onLossClosed("2", 1_156);
+        p.onLossClosed("2", 1_156);
         at(15_570);
         assertEquals(1, lines("judged front ORDINARY LOSS").size());
-        assertEquals(Arrays.asList("reopen [RECORD]"), surround.actions);
+        assertEquals("关着的一路的重开：照开那样开", Arrays.asList("open [RECORD]"), surround.actions);
         assertTrue(rear.actions.isEmpty());
     }
 
@@ -3385,7 +4235,7 @@ public class ChannelSchedulerTest {
     @Test
     public void replayD_aReleaseTogetherWithASpuriousFreeOpensTheRearAloneAfterQuiet() {
         claim(Holder.RECORDING);
-        host.plan(SUR, REAR, FRONT);
+        pipe.plan(SUR, REAR, FRONT);
         streaming(surround, recS);
         streaming(front, recF);
         rear.declared.add(recR);
@@ -3422,23 +4272,23 @@ public class ChannelSchedulerTest {
         streaming(front, pvF);
         settle();
         rear.lose(now);
-        s.onLossStarted("1", DISCONNECTED);
+        p.onLossStarted("1", DISCONNECTED);
         surround.lose(now);
-        s.onLossStarted("2", DISCONNECTED);
+        p.onLossStarted("2", DISCONNECTED);
         at(50);
         say(surround, true, true);
         at(1_000);
         surround.closedNow();
-        s.onLossClosed("2", 1_000);
+        p.onLossClosed("2", 1_000);
         at(1_300);
         assertTrue("还有丢失没关完：等它一起判", lines("judged").isEmpty());
-        int rounds = host.rounds;
+        int rounds = pipe.rounds;
         at(5_399);
-        assertTrue("等后座舱关完的这几秒不空转（环视早到点了，按 2 秒一轮等）：" + (host.rounds - rounds),
-                host.rounds - rounds <= 5);
+        assertTrue("等后座舱关完的这几秒不空转（环视早到点了，按 2 秒一轮等）：" + (pipe.rounds - rounds),
+                pipe.rounds - rounds <= 5);
         at(5_400);
         rear.closedNow();
-        s.onLossClosed("1", 5_400);
+        p.onLossClosed("1", 5_400);
         at(5_700);
         assertEquals(Arrays.asList("judged left TAKEN LOSS close=5400", "judged front BLOCKED LOSS close=1000"),
                 lines("judged"));
@@ -3474,12 +4324,12 @@ public class ChannelSchedulerTest {
         streaming(surround, pvS);
         streaming(front, pvF);
         rear.declared.add(pvR);
-        assertFalse(s.excludedFromPhoto(REAR));
+        assertFalse(p.excludedFromPhoto(REAR));
         host.absent("1");
         settle();
-        assertEquals(ChannelRules.Condition.TAKEN, s.condition(REAR));
-        assertTrue(s.excludedFromPhoto(REAR));
-        assertFalse(s.excludedFromPhoto(SUR));
+        assertEquals(ChannelRules.Condition.TAKEN, p.condition(REAR));
+        assertTrue(p.excludedFromPhoto(REAR));
+        assertFalse(p.excludedFromPhoto(SUR));
     }
 
     // ================================================================= 黑匣子：一件事一行
@@ -3509,7 +4359,7 @@ public class ChannelSchedulerTest {
     @Test
     public void aRecordWaitThatEndedOtherwiseLeavesNoLine() {
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         settle();
         assertEquals(1, lines("waiting RECORD_OUTPUT front").size());
         at(500);
@@ -3531,7 +4381,7 @@ public class ChannelSchedulerTest {
         host.mainForeground = false;
         host.startedWhileVisible = false;
         Out mirror = new Out(Kind.MIRROR, "mirror-2");
-        host.plan(SUR, REAR);
+        pipe.plan(SUR, REAR);
         claim(Holder.MIRROR);
         claim(Holder.RECORDING);
         streaming(surround, mirror);
@@ -3589,7 +4439,7 @@ public class ChannelSchedulerTest {
     public void aCloseCarriesTheKeptOutputsAndSumsUpTheOpen() {
         Out mirror = new Out(Kind.MIRROR, "mirror-2");
         claim(Holder.RECORDING);
-        host.plan(SUR);
+        pipe.plan(SUR);
         streaming(surround, recS);
         settle();
         declare(surround, mirror);
@@ -3699,9 +4549,46 @@ public class ChannelSchedulerTest {
 
     // ================================================================= 帮手：扮演相机层、登记表
 
-    /** 一份调度，看测试这一本账（{@link #rounds}）。 */
+    /** 一个调度（进程里那一个），看测试这一本账（{@link #rounds}）。 */
     private ChannelScheduler scheduler() {
-        return new ChannelScheduler(() -> now, poster, host, new RecordingJournal(), rounds);
+        return new ChannelScheduler(() -> now, poster, host, rounds);
+    }
+
+    /**
+     * 一份管线接上 {@code to} 这个调度（MultiCameraManager 的构造）：它的录像那一侧照记（{@code told}，{@code tell} 为假的不记 ——
+     * 第二份管线的录像那一侧另记在 {@link FakePipe#told}）。
+     */
+    private ChannelScheduler.Pipeline register(ChannelScheduler to, FakePipe host, boolean tell) {
+        FakeRecording recording = new FakeRecording(tell ? told : host.told);
+        ChannelScheduler.Pipeline handle = to.register(host, recording);
+        recording.of = handle;
+        return handle;
+    }
+
+    /** 一份新的管线接上来（管线重建：旧的那一份先放掉），交它这几路（{@code ports}：key、相机交替给）。 */
+    private ChannelScheduler.Pipeline rebuilt(FakePipe host, Object... ports) {
+        ChannelScheduler.Pipeline handle = register(s, host, false);
+        if (ports.length > 0) {
+            Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
+            for (int i = 0; i < ports.length; i += 2) {
+                FakePort port = (FakePort) ports[i + 1];
+                port.pipe = handle;
+                lanes.put((String) ports[i], port);
+            }
+            handle.setLanes(lanes);
+        }
+        return handle;
+    }
+
+    /** 退出（MainActivity.exitApp）：先告诉调度退出，再放管线（这一份换下去）。 */
+    private void exitApp() {
+        s.exit();
+        p.retire();
+    }
+
+    /** 相机层报给这一路那一份管线的把手（{@link FakePort#pipe}；没设的是 setUp 那一份）。 */
+    private ChannelScheduler.Pipeline of(FakePort port) {
+        return port.pipe != null ? port.pipe : p;
     }
 
     /** 快照里的那一路。 */
@@ -3735,7 +4622,7 @@ public class ChannelSchedulerTest {
         Map<String, ChannelScheduler.CameraPort> lanes = new LinkedHashMap<>();
         lanes.put(REAR, rear);
         lanes.put(SUR, surround);
-        s.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(SUR)));
+        p.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(SUR)));
     }
 
     /** 重新交一次各路：环视建着、只有两路座舱启用（配置里只开座舱）。 */
@@ -3744,7 +4631,7 @@ public class ChannelSchedulerTest {
         lanes.put(FRONT, front);
         lanes.put(REAR, rear);
         lanes.put(SUR, surround);
-        s.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(REAR, FRONT)));
+        p.setLanes(lanes, new LinkedHashSet<>(Arrays.asList(REAR, FRONT)));
     }
 
     private void drop(Holder holder) {
@@ -3779,7 +4666,7 @@ public class ChannelSchedulerTest {
         port.opening = false;
         port.holds = true;
         configured(port, port.lastOutputs.toArray(new Out[0]));
-        s.onOpened(port.id);
+        of(port).onOpened(port.id);
     }
 
     private void configured(FakePort port, Out... outs) {
@@ -3788,7 +4675,7 @@ public class ChannelSchedulerTest {
         port.firstFrameAt = 0;
         port.busySince = 0;
         port.progressAgeMs = 0;
-        s.onCameraEvent();
+        of(port).onCameraEvent();
     }
 
     private void frame(FakePort port) {
@@ -3796,20 +4683,20 @@ public class ChannelSchedulerTest {
             port.firstFrameAt = now;
         }
         port.progressAgeMs = 0;
-        s.onCameraEvent();
+        of(port).onCameraEvent();
     }
 
     /** 开不起来（相机层照 SingleCamera：那一轮先结束、再报）：这一步没开成，账本上这一台空了。 */
     private void openFailed(FakePort port, CameraTaken.Reason reason) {
         port.failOpen();
-        s.onOpenFailed(port.id, reason);
+        of(port).onOpenFailed(port.id, reason);
     }
 
     /** 我们关的那一路关完了；相机服务照例为这一关说一句「空闲」（我们引起的）。 */
     private void closed(FakePort port) {
         port.closedNow();
         host.words.put(port.id, new CameraAvailabilityWatch.Word(true, false, true, elapsed(now)));
-        s.onClosed(port.id);
+        of(port).onClosed(port.id);
     }
 
     /** 相机服务对这一路说了一句；不是我们引起的就挡「安静」。 */
@@ -3909,10 +4796,11 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 一路相机：动作记下来（「open [PREVIEW]」「close unwanted」），事实由测试改。一轮一轮照 SingleCamera 的样子记在测试那一本账上
-     * （{@link #rounds}，{@link CameraRound}）：开、关着的一路的重开下达一轮（账本上这一台有一轮还没结束就不下达 —— 记一次，规则说开了
-     * 才走到这里，不该有）、openCamera 当场返回在等回调；开好了挂上；关的那一下下达关、摘下；关完、丢了之后关完、开不起来，这一轮结束、
-     * 从账上划掉。设备开着时的重开在同一轮里：旧设备当场关完（关得慢的由测试说，{@link #slowRetire}），开新的那一下在等回调。
+     * 一路相机：动作记下来（「open [PREVIEW]」「close unwanted」；救援重开的开那一半是「reopen [PREVIEW]」），事实由测试改。
+     * 一轮一轮照 SingleCamera 的样子记在测试那一本账上（{@link #rounds}，{@link CameraRound}）：开下达一轮（账本上这一台有一轮还没结束就不下达
+     * —— 记一次，规则说开了才走到这里，不该有）、openCamera 当场返回在等回调；开好了挂上；关的那一下下达关、摘下；关完、丢了之后关完、
+     * 开不起来，这一轮结束、从账上划掉。救援的重开是两轮（第 2b 步）：关的那一半就是一次关（关完由测试说，{@link #closedNow}），
+     * 开的那一半就是一次开（带着 {@link SingleCamera.OpenKind#RESCUE}，{@link #kinds}）。
      */
     private final class FakePort implements ChannelScheduler.CameraPort {
         final String id;
@@ -3932,23 +4820,24 @@ public class ChannelSchedulerTest {
         long firstFrameAt;
         long progressAgeMs;
         int generation;
-        /** 开、重开发出去了、设备还没回来（手上那一轮在开）。 */
+        /** 开发出去了、设备还没回来（手上那一轮在开）。 */
         boolean opening;
-        /** 重开被合并掉了几次（手上那一轮在开、在丢时：不设时限）。 */
+        /** 开被合并掉了几次（已经开着、手上那一轮还在途时：不设时限）。 */
         int refused;
-        /** 开、重开被账本挡掉了几次（SingleCamera.heldByAnotherRound：规则照账本本来就不让它开，不该有）。 */
+        /** 开被账本挡掉了几次（SingleCamera.heldByAnotherRound：规则照账本本来就不让它开，不该有）。 */
         int heldRefusals;
+        /** 每一次下达了的开是哪一种（{@link SingleCamera.OpenKind}），按先后。 */
+        final List<SingleCamera.OpenKind> kinds = new ArrayList<>();
+        /** 每一次下达了的开那一轮是第几轮（账本给的轮次号），按先后。 */
+        final List<Integer> roundNumbers = new ArrayList<>();
         /** 这一份的那一轮（手上的，或者下达了关、还没结束的）；没有是 null。 */
         CameraRound live;
         /** {@link #live} 还在手上（没下达关）。 */
         boolean attached;
-        /** 那一轮最近那一次 openCamera、它还在等回调没有；挂着的那一台、重开时摘下在关的那一台。 */
+        /** 那一轮那一次 openCamera、它还在等回调没有；挂着的那一台。 */
         CameraRound.Call call;
         boolean pending;
         Object device;
-        Object retired;
-        /** 重开时旧设备关得慢：不当场关完，等测试说 {@link #retiredClosed}（2.11.4 第 1c 项那种）。 */
-        boolean slowRetire;
         /** 这一次关、丢了之后那一次关从什么时候起（关完时记 lastClose）；0 = 没有。 */
         long closeStartedAt;
         /** 最近一次关完（SingleCamera.lastClose）；没关过是 null。 */
@@ -3964,6 +4853,8 @@ public class ChannelSchedulerTest {
         long gapMs;
         /** 调度最后一次交来的输出分类（卡顿现场用的那一份）。 */
         Map<Out, ChannelScheduler.OutputState> states = new HashMap<>();
+        /** 这一路是哪一份管线的（相机层的报告交给它的把手）；null = setUp 那一份。 */
+        ChannelScheduler.Pipeline pipe;
 
         FakePort(String id) {
             this.id = id;
@@ -3985,7 +4876,7 @@ public class ChannelSchedulerTest {
             return true;
         }
 
-        /** 开好了、挂上（SingleCamera.deviceOpened：ADOPT）。重开时旧设备还在关的先关完；手上没有一轮的（测试直接摆出来的）先下达一轮。 */
+        /** 开好了、挂上（SingleCamera.deviceOpened：ADOPT）。手上没有一轮的（测试直接摆出来的）先下达一轮。 */
         void openedRound() {
             if (!attached && !issue()) {
                 return;
@@ -3993,15 +4884,16 @@ public class ChannelSchedulerTest {
             if (device != null) {
                 return;   // 已经挂着一台（同一路又摆一次「开着」）
             }
-            if (retired != null) {
-                retiredClosed();
-            }
             if (!pending) {
                 call = live.beginCall(now);
                 live.returned(call, now);
             }
             pending = false;
             device = new Object();
+            FakePort other = service.put(id, this);
+            if (other != null && other != this && other.device != null) {
+                fail("相机服务里相机 " + id + " 有两个句柄：" + other.key + " 那一份还拿着，" + key + " 又开好了一台");
+            }
             assertEquals(CameraRound.Action.ADOPT, live.opened(call, device, now));
         }
 
@@ -4012,23 +4904,11 @@ public class ChannelSchedulerTest {
             opening = false;
             if (live != null && pending) {
                 Object failed = new Object();
-                live.failed(call, failed, now);
+                live.failed(call, failed, false, now);
                 live.closed(failed, now);
                 pending = false;
             }
             endRound();
-        }
-
-        /** 重开时旧设备关完了（SingleCamera.closeRetired），开新的那一下上路：openCamera 当场返回，在等回调。 */
-        void retiredClosed() {
-            if (retired == null || live == null) {
-                return;
-            }
-            live.closed(retired, now);
-            retired = null;
-            call = live.beginCall(now);
-            live.returned(call, now);
-            pending = true;
         }
 
         /**
@@ -4046,21 +4926,15 @@ public class ChannelSchedulerTest {
                 r.closed(late, now);
                 pending = false;
             }
-            for (Object d : new Object[]{device, retired}) {
-                if (d != null) {
-                    r.closed(d, now);
-                }
+            if (device != null) {
+                r.closed(device, now);
             }
             device = null;
-            retired = null;
             if (r.cancelled()) {
                 r.closeDone(now);
             }
-            if (!r.takeEnd()) {
-                r.noCall(now);   // 重开那一下还没进 openCamera
-                assertTrue("这一轮该结束了", r.takeEnd());
-            }
-            assertTrue(rounds.end(r));
+            assertTrue("这一轮该结束了", r.takeEnd());
+            assertTrue(rounds.end(r, now));
             live = null;
             attached = false;
         }
@@ -4068,7 +4942,7 @@ public class ChannelSchedulerTest {
         /** 丢了：设备、会话从字段上摘下，那一次关在途（SingleCamera.deviceGone：LOST，在丢）。 */
         void lose(long at) {
             if (attached && device != null) {
-                assertEquals(CameraRound.Action.LOST, live.failed(call, device, at));
+                assertEquals(CameraRound.Action.LOST, live.failed(call, device, false, at));
             }
             closeStartedAt = at;
             deviceOpen = false;
@@ -4110,9 +4984,12 @@ public class ChannelSchedulerTest {
             return id;
         }
 
-        /** 照 SingleCamera.open：开着、手上那一轮在途就合并掉；账本上这一台有一轮还没结束就不开（断言）。 */
+        /**
+         * 照 SingleCamera.open：开着、手上那一轮在途就合并掉；账本上这一台有一轮还没结束就不开（断言）。救援重开的开那一半
+         * （{@link SingleCamera.OpenKind#RESCUE}）记成「reopen」：和照常的开同一条路，只是那一种。
+         */
         @Override
-        public boolean open(Set<Out> outputs) {
+        public boolean open(Set<Out> outputs, SingleCamera.OpenKind kind) {
             if (deviceOpen || attached) {
                 refused++;
                 return false;
@@ -4121,7 +4998,9 @@ public class ChannelSchedulerTest {
                 return false;
             }
             opening = true;
-            return start("open", outputs);
+            kinds.add(kind);
+            roundNumbers.add(live.number);
+            return start(kind == SingleCamera.OpenKind.RESCUE ? "reopen" : "open", outputs);
         }
 
         @Override
@@ -4132,31 +5011,6 @@ public class ChannelSchedulerTest {
         @Override
         public boolean rebuildSession(Set<Out> outputs) {
             return start("rebuild", outputs);
-        }
-
-        /**
-         * 照 SingleCamera.reopen 的规矩：手上没有一轮就下达新的一轮（账本上这一台有一轮还没结束就不开）；挂着一台、没有别的在途就在同一轮里重开
-         * （旧设备摘下来关：当场关完，{@link #slowRetire} 时等测试说）；手上那一轮在开、在丢就合并掉，不设时限。配会话还挂着不挡。
-         */
-        @Override
-        public boolean reopen(Set<Out> outputs) {
-            if (!attached) {
-                if (!issue()) {
-                    return false;
-                }
-            } else if (live.reopenRequested(now)) {
-                retired = device;
-                device = null;
-                pending = false;
-                if (!slowRetire) {
-                    retiredClosed();
-                }
-            } else {
-                refused++;
-                return false;
-            }
-            opening = true;
-            return start("reopen", outputs);
         }
 
         @Override
@@ -4298,10 +5152,9 @@ public class ChannelSchedulerTest {
         }
     }
 
-    /** 全局事实：登记表、亮熄屏、前台服务、相机服务那几句（含深睡的钟）；问相机服务的回调排着，测试来答。 */
-    private final class FakeHost implements ChannelScheduler.Host {
+    /** 进程这一层的事实：登记表、亮熄屏、前台服务、相机服务那几句（含深睡的钟）；问相机服务的回调排着，测试来答。 */
+    private final class FakeHost implements ChannelScheduler.Facts {
         final Set<Holder> holders = EnumSet.noneOf(Holder.class);
-        final Set<String> plan = new LinkedHashSet<>();
         final Map<String, CameraAvailabilityWatch.Word> words = new HashMap<>();
         final List<Consumer<CameraAvailabilityWatch.Asked>> asks = new ArrayList<>();
         final List<String> took = new ArrayList<>();
@@ -4321,15 +5174,7 @@ public class ChannelSchedulerTest {
         boolean startedWhileVisible;
         boolean heard;
         long lastOthersChangeAt;
-        boolean stopped;
-        int rounds;
-        /** 每一轮跑在什么时候（离 T0 多少毫秒，一轮读一次录像计划）：诊断不多醒、不挪哪一轮（2.11.5）。 */
-        final List<Long> roundAt = new ArrayList<>();
         private int answered;
-
-        void plan(String... keys) {
-            plan.addAll(Arrays.asList(keys));
-        }
 
         /** 冷启动时这一路不在（10-10 车机拿着后座舱时那样）。 */
         void absent(String cameraId) {
@@ -4370,13 +5215,6 @@ public class ChannelSchedulerTest {
         @Override
         public boolean mirrorWantsCabinRear() {
             return mirrorCabin;
-        }
-
-        @Override
-        public Set<String> recordPlan() {
-            rounds++;
-            roundAt.add(now - T0);
-            return holders.contains(Holder.RECORDING) ? new LinkedHashSet<>(plan) : new LinkedHashSet<>();
         }
 
         @Override
@@ -4477,11 +5315,6 @@ public class ChannelSchedulerTest {
             return word == null ? CameraAvailabilityWatch.Word.NONE : word;
         }
 
-        @Override
-        public ChannelRules.RecordPrep recordPrep(String key) {
-            return ChannelRules.RecordPrep.NONE;
-        }
-
         /** 车上的那几样：测试改它（哨兵、点火多久以前变过……）；没改是「都不知道」。 */
         ChannelScheduler.Vehicle vehicle = ChannelScheduler.Vehicle.UNKNOWN;
 
@@ -4508,44 +5341,93 @@ public class ChannelSchedulerTest {
             took.add(cameraId + "@" + atElapsed);
         }
 
-        @Override
-        public void stopped() {
-            stopped = true;
-        }
-
         /** 前座舱只用一次的规矩（暂时）：测试默认关，原来的熄屏、亮屏测试照旧；要测它的打开。 */
         boolean frontCabinOneShot;
-        /** 调度报的「前座舱去掉了」，每一次一行（去掉的那一路）。 */
-        final List<String> retired = new ArrayList<>();
 
         @Override
         public boolean frontCabinOneShot() {
             return frontCabinOneShot;
         }
 
+        /** 进程这一层的那几行（退出、主界面又回来了、车机要睡）：和各份管线的记在同一处（{@link #journal}）。 */
+        final RecordingJournal processLines = new RecordingJournal();
+
         @Override
-        public void frontCabinRetired(String key) {
-            retired.add(key);
+        public ChannelScheduler.ProcessJournal journal() {
+            return processLines;
         }
     }
 
-    /** 录像那一侧：调度告诉它的每一声记成一行记号。 */
+    /**
+     * 一份管线自己的那几样（MultiCameraManager 的 ChannelSide）：录像计划（RECORDING 登记着才有）、录像输出在不在备（不备）、
+     * 去掉前座舱、放完了；黑匣子照 {@link RecordingJournal} 记进 {@link #journal}。每接一份管线一个。
+     */
+    private final class FakePipe extends RecordingJournal implements ChannelScheduler.PipelineHost {
+        final Set<String> plan = new LinkedHashSet<>();
+        int rounds;
+        /** 每一轮跑在什么时候（离 T0 多少毫秒，一轮读一次录像计划）：诊断不多醒、不挪哪一轮（2.11.5）。 */
+        final List<Long> roundAt = new ArrayList<>();
+        /** 调度报的「前座舱去掉了」，每一次一行（去掉的那一路）。 */
+        final List<String> frontRetired = new ArrayList<>();
+        /** 放完了（{@link ChannelScheduler.PipelineHost#retired}），几次。 */
+        int retiredCalls;
+        boolean gone;
+        /** 第二份管线的录像那一侧听到的（setUp 那一份记在 {@link #told}）。 */
+        final List<String> told = new ArrayList<>();
+
+        void plan(String... keys) {
+            plan.addAll(Arrays.asList(keys));
+        }
+
+        @Override
+        public Set<String> recordPlan() {
+            rounds++;
+            roundAt.add(now - T0);
+            return host.holders.contains(Holder.RECORDING) ? new LinkedHashSet<>(plan) : new LinkedHashSet<>();
+        }
+
+        @Override
+        public ChannelRules.RecordPrep recordPrep(String key) {
+            return ChannelRules.RecordPrep.NONE;
+        }
+
+        @Override
+        public void frontCabinRetired(String key) {
+            frontRetired.add(key);
+        }
+
+        @Override
+        public void retired() {
+            retiredCalls++;
+            gone = true;
+        }
+    }
+
+    /** 录像那一侧：调度告诉它的每一声记成一行记号（记进 {@link #lines}）。 */
     private final class FakeRecording implements ChannelScheduler.Recording {
+        final List<String> lines;
+        /** 它那一份管线的把手（register 之后接上）。 */
+        ChannelScheduler.Pipeline of;
+
+        FakeRecording(List<String> lines) {
+            this.lines = lines;
+        }
+
         @Override
         public void onLaneCameraStreaming(String key) {
-            told.add("streaming " + key);
+            lines.add("streaming " + key);
         }
 
         @Override
         public void onLaneCameraGone(String key, ChannelScheduler.Gone why, CameraTaken.Reason reason,
                                      ChannelRules.Why closed) {
-            told.add("gone " + key + " " + why + (reason == null ? "" : " " + reason.source)
+            lines.add("gone " + key + " " + why + (reason == null ? "" : " " + reason.source)
                     + (closed == null ? "" : " " + closed));
         }
 
         @Override
         public void onLaneConditionChanged(String key) {
-            told.add("condition " + key + " " + s.condition(key));
+            lines.add("condition " + key + " " + of.condition(key));
         }
 
         @Override
@@ -4555,7 +5437,7 @@ public class ChannelSchedulerTest {
     }
 
     /** 黑匣子：每一件事记成一行记号（「judged left TAKEN LOSS close=5409」），测试按前缀找。 */
-    private final class RecordingJournal implements ChannelScheduler.Journal {
+    private class RecordingJournal implements ChannelScheduler.Journal, ChannelScheduler.ProcessJournal {
         @Override
         public void needs(Set<Holder> holders, List<String> recordKeys) {
             journal.add("needs " + holders + " " + recordKeys);
@@ -4648,8 +5530,14 @@ public class ChannelSchedulerTest {
         public void stepEnded(ChannelScheduler.StepReport r) {
             journal.add("stepEnded " + r.move + " " + r.key + (r.timedOut ? " timedOut" : "")
                     + (r.failure != null ? " failed " + r.failure.origin + " after=" + r.durationMs : "")
+                    + (r.dropped != null ? " dropped " + r.dropped + " after=" + r.durationMs : "")
                     + (r.added.isEmpty() ? "" : " added=" + r.added)
                     + (r.counts != null ? " counts=" + r.counts.kind() : ""));
+            Runnable then = afterStepEnded;
+            afterStepEnded = null;
+            if (then != null) {
+                then.run();
+            }
         }
 
         @Override
@@ -4755,6 +5643,37 @@ public class ChannelSchedulerTest {
         @Override
         public void exit(String key, ChannelRules.Move move, long ms) {
             journal.add("exit " + key + " " + move);
+        }
+
+        @Override
+        public void resumed() {
+            journal.add("resumed");
+        }
+
+        @Override
+        public void retiring(String key, ChannelRules.Move move, long ms) {
+            journal.add("retiring " + key + " " + move);
+        }
+
+        /** 「swapped 1200 successor」；卡住的那几路接着「 orphans front 2 round=1 closing」。 */
+        @Override
+        public void swapped(long retiredMs, boolean successor, List<ChannelScheduler.Orphan> orphans) {
+            List<String> stuck = new ArrayList<>();
+            for (ChannelScheduler.Orphan o : orphans) {
+                stuck.add(o.key + " " + o.cameraId + " round=" + o.round + (o.kinds.isEmpty() ? "" : " " + o.kinds));
+            }
+            journal.add("swapped " + retiredMs + (successor ? " successor" : " none")
+                    + (stuck.isEmpty() ? "" : " orphans " + String.join(", ", stuck)));
+        }
+
+        @Override
+        public void stray(String cameraId, String report) {
+            journal.add("stray " + cameraId + " " + report);
+        }
+
+        @Override
+        public void superseded() {
+            journal.add("superseded");
         }
 
         @Override

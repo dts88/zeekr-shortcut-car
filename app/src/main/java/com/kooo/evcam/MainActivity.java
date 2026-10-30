@@ -265,7 +265,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Activity:MainActivity");
         com.kooo.evcam.blackbox.BlackBox.note("主界面 onCreate savedState=" + (savedInstanceState != null));
-        // 用户退出之后，所有会自己拉起主界面的路都被拦住了 —— 这时主界面被创建，只能是人点开的
+        // 用户退出之后，所有会自己拉起主界面的路都被拦住了 —— 这时主界面被创建，只能是人点开的。清掉退出的记号也是通道调度退出的门
+        // （UserExit.clear，第 2 步「只有一个调度」）：退出以后通道只关、不开，这之前后台来要管线建出来的那一份什么都不开
         UserExit.clear(this, "manual open");
         // 人点开的主界面 = 新的一趟（规格 1.2）：手动停录、自动开过的记录清零。
         // 我们自己静默拉起来的（恢复录像、亮屏接回）不算，界面重建（savedState 非空）也不算
@@ -2536,12 +2537,14 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> finishExit(app, exitStartedAt, mainCleanupDone, filesClosed), "exit-watchdog").start();
 
         // 退出的次序（channel-logic §五：停录 → 登记表清空 → 调度按顺序关完 → 再退出；大纲 §2 阶段 6）：
-        // 1. 先告诉调度「退出」：同步写下、置 closingAnywhere，从此只关，不开、不改输出、不救；登记表从此作废。
+        // 1. 先告诉调度「退出」（进程里那一个）：同步写下、置 closingAnywhere，从此只关，不开、不改输出、不救；登记表从此作废 ——
+        //    接着的、排着的、这之后后台才建的管线都一样，直到退出的记号清掉（人又点开主界面、真正开机：UserExit.clear）。
         //    它的下一轮是 post 出去的，跑的时候下面几步的同步部分都已做完
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
         MultiCameraManager pipeline = holder.getCameraManager();
-        if (pipeline != null) {
-            pipeline.channelScheduler().exit();
+        com.kooo.evcam.camera.ChannelScheduler scheduler = com.kooo.evcam.camera.ChannelScheduler.app();
+        if (scheduler != null) {
+            scheduler.exit();
         }
 
         // 2. 退出算一趟结束：下次打开是新的一趟，「启动自动录制」该重新生效
@@ -2565,8 +2568,8 @@ public class MainActivity extends AppCompatActivity {
         // 释放持续唤醒锁
         WakeUpHelper.releasePersistentWakeLock();
 
-        // 5. 放管线（只在退出和换车型时才放）：停录收尾；调度关完相机、丢掉输出，再放录制器（MultiCameraManager.release）。
-        //    这一份的调度已经在退出了，release 里再叫一次 exit 无害
+        // 5. 放管线（只在退出和换车型时才放）：停录收尾；这一份换下去，调度按次序关完相机、丢掉输出，再放录制器
+        //    （MultiCameraManager.release）。调度已经在退出了，关的原因照写「退出」
         holder.release();
         // 6. 停录收尾（等编码排空、收好文件）在管线的收拾线程上排着：排在它们后面数一下，退出的最后一步等到它
         //    （finishExit；channel-logic §五 停录在先 —— 以前只等相机关完，U 盘慢时进程可能在收好最后一段之前就结束了）

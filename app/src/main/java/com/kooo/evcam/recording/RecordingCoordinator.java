@@ -297,7 +297,9 @@ public final class RecordingCoordinator {
         // 车辆信号（核心，进程活着一直在读）：哨兵模式、挡位变了照表重判。只挂一次。ScreenState 装上时先挂了它的那一份
         // （进程一起来就装，这里总在它之后）：同一批读数里先判屏幕，再看这里
         Telemetry.get().addListener(vehicleListener);
-        // 通道对环视的熄屏决定（调度在一轮当中发）：排到主线程上再做，做的时候读此刻的决定。只挂一次
+        // 通道对环视的熄屏决定（调度在一轮当中发）：排到主线程上再做，做的时候读此刻的决定。只挂一次 —— 先装上调度
+        // （应用一起来就装上了，装过了什么都不做）：没装上时挂的会丢
+        com.kooo.evcam.camera.ChannelFacts.install(this.context);
         ChannelScheduler.setSurroundVerdictListener(() -> main.post(this::onChannelVerdict));
     }
 

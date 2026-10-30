@@ -35,9 +35,9 @@ public class StallWatchTest {
         StackTraceElement[] stack = {
                 frame("android.os.BinderProxy", "transact"),
                 frame("com.kooo.evcam.camera.SingleCamera", "closeDeviceTimed"),
-                frame("com.kooo.evcam.camera.SingleCamera", "lambda$reopenWith$9"),
+                frame("com.kooo.evcam.camera.SingleCamera", "closeJob"),
                 frame("com.kooo.evcam.camera.SingleCamera", "run")};
-        assertEquals("BinderProxy.transact <- SingleCamera.closeDeviceTimed <- SingleCamera.lambda$reopenWith$9"
+        assertEquals("BinderProxy.transact <- SingleCamera.closeDeviceTimed <- SingleCamera.closeJob"
                 + " <- SingleCamera.run", StallWatch.whereStuck(stack));
         assertEquals("?", StallWatch.whereStuck(new StackTraceElement[0]));
     }

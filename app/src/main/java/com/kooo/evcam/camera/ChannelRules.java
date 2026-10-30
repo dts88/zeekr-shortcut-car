@@ -115,18 +115,27 @@ public final class ChannelRules {
     public static final long JUDGE_DELAY_MS = 300L;
 
     /**
-     * 别人的在途（一路被接手 LOSING、一台相机那一轮有一次关没返回、一路 isBusy、另一个管理器实例在关）最多挡别的路多久：
+     * 救援的重开分两半（{@link Half}，第 2b 步）：开的那一半最早在这一步开始（下达关的那一刻）以后多久下达 —— 给相机服务、HAL 放开资源的时间。
+     * 不是新的数：以前写死在相机层的重开里（关旧设备、300 ms 后开新的，SingleCamera.reopen），挪到这里。
+     */
+    public static final long REOPEN_GAP_MS = 300L;
+
+    /**
+     * 别人的在途（一路被接手 LOSING、一台相机那一轮有一次关没返回、一路 isBusy）最多挡别的路多久：
      * 再久就当回调不会来了，别的路不再等它。数在 {@link SingleCamera#IN_FLIGHT_MAX_MS}。
      *
      * <p>只管别的路（项目所有者 2026-10-28）：被一轮占着的那一台自己（{@link #camHeld}：关没返回、开没返回），那一轮结束之前不开、
-     * 关着在开的不救，不设时限；满这么久还有开或关没返回的，录像那一侧不再算它在起来、状态条说它无法录制（{@link #heldByClose}）。</p>
+     * 关着在开的不救，不设时限；满这么久还有开或关没返回的，录像那一侧不再算它在起来、状态条说它无法录制（{@link #heldByClose}）。
+     * 管线重建时换下去的那一份关一路卡住（ChannelScheduler：那一下开始关以后满这么久），新的一份照样接上，那一台照这一条不开
+     * （项目所有者 2026-10-29「等旧管线这一步做完再算 60 秒」）。</p>
      */
     public static final long IN_FLIGHT_MAX_MS = SingleCamera.IN_FLIGHT_MAX_MS;
 
     /**
      * 我们的开、关做完之后多久以内，相机服务为这一路说的话还算我们引起的：那一句从 binder 线程上来，和相机线程报的开好 / 关完
      * 谁先到主线程没有保证，差的是同一次进相机服务的前后脚，几十毫秒的事。分类相机服务的话（ChannelScheduler.ourStepInFlight）
-     * 和主动认（{@link #recognize}）用的是这同一个数。
+     * 和主动认（{@link #recognize}）用的是这同一个数。管线重建换上新的一份之后也照算：「我们关完」看账本记的那一刻
+     * （{@link Lane#ourCloseAt}，谁的那一轮都算），不看新的这一路自己的账（第 2 步「只有一个调度」）。
      */
     static final long OWN_WORD_GRACE_MS = 500L;
 
@@ -300,6 +309,12 @@ public final class ChannelRules {
          * 0 = 没有那一轮、或者它稳稳开着。满 {@link ChannelRules#IN_FLIGHT_MAX_MS} 的那一路告诉录像（{@link ChannelRules#heldByClose}）。
          */
         long outstandingSince;
+        /**
+         * 这一台我们最近一次关完的时刻（账本记的：一轮在下达了关、或者丢了之后结束的那一下，谁的那一轮都算 —— CameraRounds.closedAt）；
+         * 0 = 进程里还没有。之后 {@link ChannelRules#OWN_WORD_GRACE_MS} 以内相机服务为它说的话还算我们的（{@link ChannelRules#stillOurs}）：
+         * 管线重建时那一关是换下去的那一份做的，新的这一路自己的账（{@link #deviceSince}）里没有它（第 2 步「只有一个调度」）。
+         */
+        long ourCloseAt;
         /** 会话里此刻带着的输出（SingleCamera.sessionOutputs() 的快照）；没有会话是空的。 */
         final Set<Out> session = new LinkedHashSet<>();
         /** 会话配好的时刻；0 = 没有会话。 */
@@ -349,6 +364,12 @@ public final class ChannelRules {
          * 它换了一个新动作（busySince 变了）照样挡。0 = 没有。
          */
         long excusedBusySince;
+        /**
+         * 这一路的关（{@link Device#CLOSING}）是救援重开的关那一半（{@link Half#CLOSE}，第 2b 步），不是按次序关的那一步：在关的设备照「在途」
+         * 挡别的路，那一步到点也照挡，封顶 {@link ChannelRules#IN_FLIGHT_MAX_MS}（{@link ChannelRules#closingInFlight}，2.11.4 第 1c 项 ——
+         * 以前重开时关旧设备在相机层的同一轮里，这一路一直记成在开，照的就是这一条）。{@link ChannelRules#begin} 下达关的时候记，只在这一路在关时作数。
+         */
+        boolean reopenClose;
         /** 被拿着以来问了几次（给黑匣子「第 11 次」）。 */
         int asks;
         /**
@@ -455,8 +476,12 @@ public final class ChannelRules {
         long sleepSince;
         /** 「退出」从什么时候起；0 = 没有。 */
         long exitSince;
-        /** 另一个管理器实例在关相机（换车型时两份并存），从什么时候起；0 = 没有。 */
-        long otherClosingSince;
+        /**
+         * 这一份管线放掉了、要换下去（管线重建：换车型、列相机出错、启用的几路变了、超级镜子要后座舱），从什么时候起；0 = 没有。
+         * 和退出一样只关、按次序关（{@link ChannelRules#winding}），关的原因写「管线重建」（{@link Why#REBUILD}）。
+         * 关完（或者卡住的那一路那一下开始关以后满 {@link ChannelRules#IN_FLIGHT_MAX_MS}），唯一的那一个调度换上新的一份（第 2 步）。
+         */
+        long retireSince;
         /** 手上那一步；null = 没有。{@link ChannelRules#begin} 记、{@link ChannelRules#finish} 清。 */
         Step step;
 
@@ -473,8 +498,8 @@ public final class ChannelRules {
         long lastAskAt;
         /**
          * 环视这一段熄屏是哪一种（{@link SurroundInDark}，项目所有者 2026-10-27）：只由 {@link ChannelRules#judgeSurroundInDark} 改。
-         * 新世界从「放开」起 —— 没见过通道刚算黑的那一下（进程在黑着时被拉起）。跟着进程、不跟着管线：调度建世界时照进程那一份填
-         * （建调度时、ChannelScheduler.setLanes），除了在退出的那一份，每一轮写回（ChannelScheduler.keepProcessDark，车机要睡、睡着时也写），
+         * 新世界从「放开」起 —— 没见过通道刚算黑的那一下（进程在黑着时被拉起）。跟着进程、不跟着管线：唯一的那一个调度记着它
+         * （ChannelScheduler 的字段），建世界时照它填，跑的那一份世界每一轮写回（退出时不写，车机要睡、睡着时也写），
          * 管线放掉重建不断熄屏录像。
          */
         SurroundInDark surroundInDark = SurroundInDark.RELEASED;
@@ -563,12 +588,10 @@ public final class ChannelRules {
         /** 一路正被别人接手，我们这边的关还没关完。 */
         LOSING,
         /**
-         * 一路 isBusy（在开、在关、在配会话）；或者它的相机层还在关一个设备（{@link Lane#closingSince}：重开时关旧的、晚到的设备就地关
-         * —— 手上那一步到点也照等，2.11.4 第 1c 项）。
+         * 一路 isBusy（在开、在关、在配会话）；或者它的相机层还在关一个设备（{@link #closingInFlight}：救援重开的关那一半、晚到的设备就地关、
+         * 换下去的那一份管线卡住的那一次关 —— 手上那一步到点也照等，2.11.4 第 1c 项）。
          */
         BUSY,
-        /** 另一个管理器实例在关。 */
-        OTHER_INSTANCE,
         /** 座舱等环视先关完（§二.2）。 */
         SURROUND_CLOSING,
         /** 一路丢了 / 开不起来，关完还不到 300 ms、或者还有别的丢失没关完：等判完。 */
@@ -611,6 +634,11 @@ public final class ChannelRules {
         SLEEP,
         /** 退出。 */
         EXIT,
+        /**
+         * 管线重建（{@link World#retireSince}：换车型、列相机出错、启用的几路变了、超级镜子要后座舱）：这一份管线换下去，
+         * 和退出一样按次序关（第 2 步「只有一个调度」：以前旧的那一份调度照「退出」关，黑匣子写的是退出）。
+         */
+        REBUILD,
         // ---- 开 ----
         /** 有人要它（{@link Decision#forWhom}）。 */
         WANTED,
@@ -636,7 +664,21 @@ public final class ChannelRules {
         REOPEN
     }
 
-    /** 手上那一步：什么、哪几路、带哪些输出、从何时开始、最多多久。 */
+    /**
+     * 救援重开的两半（第 2b 步，项目所有者 2026-10-29「重开 = 调度下达关再下达开」）：这一路手上有设备（开着、在开）时，一步里先下达关、
+     * 关完再下达开 —— 相机层不再自己在一轮里关旧设备、等 300 ms、开新的。关着的一路（丢了、开不起来之后）的重开不分两半：照开那样下达一轮。
+     */
+    enum Half {
+        /** 关：这一步从这里开始（{@link #begin} 记下这一步，{@link Step#split}）。 */
+        CLOSE,
+        /**
+         * 开：同一步里、关的那一半关完以后（{@link #next} 出它，{@link #openHalf}）。不另起一步：{@link #begin} 只记下开的那一半下达了
+         * （{@link Step#openedAt}），这一步的开始、封顶、结果照旧。
+         */
+        OPEN
+    }
+
+    /** 手上那一步：什么、哪几路、带哪些输出、从何时开始、最多多久。不可变（诊断报告的快照拿着它）。 */
     static final class Step {
         final Move move;
         final List<String> keys;
@@ -644,19 +686,39 @@ public final class ChannelRules {
         final Rescue rescue;
         final long startedAt;
         final long maxMs;
+        /**
+         * 救援的重开、开始时这一路手上有设备（开着、在开）：分两半（{@link Half}，第 2b 步）—— 这一步从下达关开始，关完、账本上那一轮结束、
+         * 离开始满 {@link #REOPEN_GAP_MS}，同一步里再下达开。别的步是 false。
+         */
+        final boolean split;
+        /** 分两半的重开：开的那一半什么时候下达的（调度的钟）；0 = 还没下达。 */
+        final long openedAt;
 
         Step(Move move, List<String> keys, Set<Out> outputs, Rescue rescue, long startedAt, long maxMs) {
+            this(move, keys, outputs, rescue, startedAt, maxMs, false, 0);
+        }
+
+        Step(Move move, List<String> keys, Set<Out> outputs, Rescue rescue, long startedAt, long maxMs, boolean split,
+             long openedAt) {
             this.move = move;
             this.keys = Collections.unmodifiableList(new ArrayList<>(keys));
             this.outputs = Collections.unmodifiableSet(new LinkedHashSet<>(outputs));
             this.rescue = rescue;
             this.startedAt = startedAt;
             this.maxMs = maxMs;
+            this.split = split;
+            this.openedAt = openedAt;
+        }
+
+        /** 同一步，开的那一半在 {@code at} 下达了（第 2b 步：不另起一步）。 */
+        Step withOpenHalf(long at) {
+            return new Step(move, keys, outputs, rescue, startedAt, maxMs, split, at);
         }
 
         @Override
         public String toString() {
-            return move + (rescue != null ? "/" + rescue : "") + " " + keys + " " + outputs;
+            return move + (rescue != null ? "/" + rescue : "") + (split ? openedAt == 0 ? "/close-half" : "/open-half" : "")
+                    + " " + keys + " " + outputs;
         }
     }
 
@@ -673,6 +735,8 @@ public final class ChannelRules {
         Set<Out> removed = Collections.emptySet();
         /** 救：重建还是重开。 */
         Rescue rescue;
+        /** 救：重开分两半时是哪一半（{@link Half}）；重建会话、关着的一路的重开、别的动作是 null。 */
+        Half half;
         /** 救：梯子上的第几次。 */
         int attempt;
         /** 开：谁要它。 */
@@ -728,7 +792,7 @@ public final class ChannelRules {
                 sb.append(" pending=").append(pending);
             }
             if (rescue != null) {
-                sb.append(' ').append(rescue).append(" #").append(attempt);
+                sb.append(' ').append(rescue).append(half != null ? "/" + half : "").append(" #").append(attempt);
             }
             if (!outputs.isEmpty()) {
                 sb.append(" out=").append(outputs);
@@ -897,7 +961,13 @@ public final class ChannelRules {
         /** 这一步里那一路丢了、或者开不起来（判定另外走）。 */
         FAILED,
         /** 到点（开、改、救 15 秒，关环视 10 秒，关座舱 30 秒）。 */
-        TIMED_OUT
+        TIMED_OUT,
+        /**
+         * 救援的重开分两半（{@link Half}，第 2b 步），关的那一半关完了，开的那一半不再下达：该开的样子不在了（{@link #reopenBlocked}：退出、
+         * 车机要睡、管线换下去、没人要了、用不了相机、屏幕不知道黑没黑、黑着没在开车的座舱）。这一步当场结束，不等到点；这一路关着，
+         * 交给平常的规矩。前面四种都不是它：没出画面、没出事、没到点。
+         */
+        DROPPED
     }
 
     /** 手上那一步做完没有、到没到顶。 */
@@ -926,17 +996,21 @@ public final class ChannelRules {
         if (lane.device == Device.OPEN && lane.firstFrameAt != 0 && lane.firstFrameAt >= step.startedAt) {
             return Outcome.DONE;
         }
-        return late ? Outcome.TIMED_OUT : Outcome.RUNNING;
+        if (late) {
+            return Outcome.TIMED_OUT;
+        }
+        return openHalfDue(step, lane) && reopenBlocked(w, lane) != null ? Outcome.DROPPED : Outcome.RUNNING;
     }
 
     /**
      * 手上那一步结束了（做完、出事、到点）：清掉它。到点的那一路，同一个动作还挂着也不再挡别的路（「先往下走」）；
      * 开那一步满 15 秒没出画面，由救援接手、算第 1 次（从这一步开始的那一刻算，和救援自己记的那一下同一个意思）。
      *
-     * <p>「不再挡」只放过那个动作本身（{@link Lane#excusedBusySince}），不放过相机层在关的设备（{@link Lane#closingSince}）：
+     * <p>「不再挡」只放过那个动作本身（{@link Lane#excusedBusySince}），不放过相机层在关的设备（{@link #closingInFlight}）：
      * 一台还在关旧设备的相机是在途，不管它属于哪一步，到点也照等，封顶 {@link #IN_FLIGHT_MAX_MS}（{@link #next} 第 1 条；
      * 项目所有者 2026-10-14 批准，2.11.4 第 1c 项）。以前救援的重开 15 秒到点、旧设备还在关（10-13 19:55:29 那一次关了 14.0 秒），
-     * 别的路就可以动了 —— 2.10.9–2.10.11 那几条规矩防的正是这种「一台在拆、另一台在动」。</p>
+     * 别的路就可以动了 —— 2.10.9–2.10.11 那几条规矩防的正是这种「一台在拆、另一台在动」。重开分两半以后（第 2b 步）关的那一半
+     * 到点还没关完也是这一条；开的那一半随这一步结束不再下达，关返回了由平常的规矩接手。</p>
      */
     static void finish(World w, Outcome outcome) {
         Step step = w.step;
@@ -958,12 +1032,29 @@ public final class ChannelRules {
         w.step = null;
     }
 
-    /** 调度照 {@link #next} 的答案动手了：记下手上这一步。等、空闲不算一步。 */
+    /**
+     * 调度照 {@link #next} 的答案动手了：记下手上这一步。等、空闲不算一步。救援重开的开那一半（{@link Half#OPEN}）也不算：
+     * 只记进手上那一步（{@link Step#openedAt}），不另起一步。下达关的那几路记下是哪一种关（{@link Lane#reopenClose}）。
+     */
     static void begin(World w, Decision d) {
         if (d.move == Move.IDLE || d.move == Move.WAIT) {
             return;
         }
-        w.step = new Step(d.move, d.keys, d.outputs, d.rescue, w.now, d.maxMs);
+        if (d.half == Half.OPEN) {
+            if (w.step != null && w.step.split) {
+                w.step = w.step.withOpenHalf(w.now);
+            }
+            return;
+        }
+        if (d.move == Move.CLOSE || d.half == Half.CLOSE) {
+            for (String key : d.keys) {
+                Lane lane = w.lane(key);
+                if (lane != null) {
+                    lane.reopenClose = d.half == Half.CLOSE;
+                }
+            }
+        }
+        w.step = new Step(d.move, d.keys, d.outputs, d.rescue, w.now, d.maxMs, d.half == Half.CLOSE, 0);
     }
 
     // ================================================================= 记账
@@ -994,6 +1085,21 @@ public final class ChannelRules {
         release(w, events);
         liftStops(w, changed, events);
         clearLadders(w);
+        return events;
+    }
+
+    /**
+     * 排着的那一份管线每一轮（ChannelScheduler 的 shadow，第 2 步审查 2026-10-30）：只做 {@link #settle} 里认、放那两步 ——
+     * 主动认出被别的程序拿着的（{@link #recognize}）、空出来的放开（{@link #release}）。问它的（在起来还是被拿着、拍不拍、备不备录制器）
+     * 就和以前新建一份调度第一轮之后一样。别的几步都不做：不判环视留不留（只由跑的那一份写）、不去掉前座舱（换上以后它自己那一轮才算，
+     * 那一件不能在这里被收走）、不收登记表的变化、不判丢失和开不起来（它没开过相机）、不解除停手、不动保持。
+     *
+     * @return 认出、放开的那几件，按发生的先后
+     */
+    static List<Event> settleMarks(World w) {
+        List<Event> events = new ArrayList<>();
+        recognize(w, events);
+        release(w, events);
         return events;
     }
 
@@ -1160,10 +1266,14 @@ public final class ChannelRules {
      * 冷启动时车机还拿着相机 1 就是这样。不查嫌疑应用：不知道是什么时候拿的（和「注册时报的初始状态不查」同一条规矩）。
      *
      * <p>「被占用」是不是我们，按此刻判（{@link #stillOurs}），不只看说的时候：那个记号只记说的那一刻、之后同一句不再改它。</p>
+     *
+     * <p>救援重开的两半之间那一下（{@link #reopenPending}：关的那一半关完了、开的那一半还没下达）这一路关着，可它在我们的一步里，
+     * 和在开、在关的一样不认（第 2b 步）：以前这一路整个重开都记成在开，那 300 ms 里相机服务说什么都算我们的；不在列表里的，
+     * 由开的那一半去开、开不起来再判。</p>
      */
     private static void recognize(World w, List<Event> events) {
         for (Lane lane : w.lanes) {
-            if (lane.mark != null || lane.failure != null || lane.device != Device.CLOSED) {
+            if (lane.mark != null || lane.failure != null || lane.device != Device.CLOSED || reopenPending(w, lane)) {
                 continue;
             }
             boolean othersHold = Boolean.FALSE.equals(lane.serviceFree) && !stillOurs(w, lane);
@@ -1182,10 +1292,10 @@ public final class ChannelRules {
 
     /**
      * 关着的这一路，相机服务那一句「被占用（我们引起的）」此刻还能不能算我们的：只在我们的哪一份还可能拿着它的时候 ——
-     * 这一路刚关完、开不起来、丢了之后关完（{@link #OWN_WORD_GRACE_MS} 以内，为这一关说的「空闲」可能还在路上），
-     * 另一份管线还在关（换车型、退出后马上又开，最多 {@link #IN_FLIGHT_MAX_MS}：占着它的可能是那一份），
+     * 这一路刚关完、开不起来、丢了之后关完，或者这一台我们刚关完（账本记的 {@link Lane#ourCloseAt}，谁的那一轮都算：管线重建时
+     * 那一关是换下去的那一份做的），{@link #OWN_WORD_GRACE_MS} 以内（为这一关说的「空闲」可能还在路上）；
      * 或者这一台被一轮占着（{@link #camHeld}，不设时限，第 1 步「轮次 + 账本」）—— 那一轮结束之前，我们的连接可能还挂在相机服务里。
-     * 以前旧的那一份关卡住超过 60 秒，新的一份把那一句「被占用（我们开着）」认成别人拿着。
+     * 以前另有一扇「另一份管线还在关」的窗（最多 60 秒）：第 2 步起进程里只有一个调度，旧的那一份的关在账本上，不再另开窗。
      *
      * <p>过了这些还被占着，只能是别人（审查 2026-10-11）。两种来路：别的程序在我们开着时悄悄拿走 —— 相机服务从「我们开着」
      * 直接变成「别人开着」，中间不说「空闲」（10-10，§二.7），同一句「被占用」不再改那个记号；管线在同一个进程里重建
@@ -1194,9 +1304,7 @@ public final class ChannelRules {
      */
     private static boolean stillOurs(World w, Lane lane) {
         return lane.serviceWordOurs
-                && (w.now - lane.deviceSince < OWN_WORD_GRACE_MS
-                || w.otherClosingSince != 0 && w.now - w.otherClosingSince < IN_FLIGHT_MAX_MS
-                || camHeld(lane));
+                && (w.now - Math.max(lane.deviceSince, lane.ourCloseAt) < OWN_WORD_GRACE_MS || camHeld(lane));
     }
 
     /**
@@ -1523,14 +1631,14 @@ public final class ChannelRules {
                 && !wanted(w, lane) && lane.unwantedSince != 0 && w.now - lane.unwantedSince < HOLD_MS;
     }
 
-    /** 这一路该开（§一）：不在退出、车机不睡，并且有人要、或者在保持。 */
+    /** 这一路该开（§一）：不在退出、车机不睡、这一份管线不在换下去，并且有人要、或者在保持。 */
     static boolean shouldOpen(World w, Lane lane) {
         return !winding(w) && (wanted(w, lane) || holding(w, lane));
     }
 
-    /** 退出、或者车机要睡：只关，不开、不改、不救。 */
+    /** 退出、车机要睡、或者这一份管线要换下去（{@link World#retireSince}）：只关，不开、不改、不救。 */
     static boolean winding(World w) {
-        return w.exitSince != 0 || w.sleepSince != 0;
+        return w.exitSince != 0 || w.sleepSince != 0 || w.retireSince != 0;
     }
 
     /**
@@ -1570,7 +1678,9 @@ public final class ChannelRules {
      * 「熄屏」是通道眼里的（{@link World#screenOn}）：屏幕黑满 30 秒、或者车机要睡（{@link #darkForChannel}，项目所有者 2026-10-13）。
      * 屏幕真黑了还不到 30 秒（{@link World#screenDark}）时，关着的座舱也算放开：开着的照旧，关着的不在黑屏里开 ——
      * 「30 秒内一步不动」（项目所有者 2026-10-13；黑屏里用不着它，哨兵模式开着时开后座舱正是 10-12、10-13 两次一帧不出的那一种操作），
-     * 这期间来的开录、拍照、接回只开环视（和 2.11.2 一样），黑满 30 秒时也就没有座舱可放。在开的、在关的照旧走完。
+     * 这期间来的开录、拍照、接回只开环视（和 2.11.2 一样），黑满 30 秒时也就没有座舱可放。在开的、在关的照旧走完；
+     * 救援重开两半之间那一下关着的（{@link #reopenPending}，第 2b 步）也是 —— 它还在我们的一步里，以前整个重开都记成在开；
+     * 黑着、没在开车时开的那一半不下达（{@link #reopenBlocked}），在开车时照下（R8）。
      *
      * <p>和谁登记着无关，只看屏幕和是不是环视（黑了不到 30 秒时再看它关没关着）：{@link #holderWants}、{@link #wantsKind} 开头的那一道闸、录像的事实
      * （RecordingLanes.Facts#releasedByDark）、拍照不拍哪几路（{@link #excludedFromPhoto}）、关的原因（{@link #closeWhy}）
@@ -1588,7 +1698,7 @@ public final class ChannelRules {
         if (isSurround(lane)) {
             return surroundVerdict(w) == SurroundInDark.RELEASED;
         }
-        return !w.screenOn || w.screenDark && lane.device == Device.CLOSED;
+        return !w.screenOn || w.screenDark && lane.device == Device.CLOSED && !reopenPending(w, lane);
     }
 
     /**
@@ -1822,7 +1932,7 @@ public final class ChannelRules {
      * 它同时被拿着的，照被拿着的规矩每 30 秒问 —— 问出来的「空闲」放得开被拿着，放不开这个。</p>
      *
      * <p>和「被拿着」（{@link Lane#mark}：相机服务说别人拿着它）是两样，一路要开得了，两样都不能有。别的路只在头 60 秒等它
-     * （{@link #inFlight}），之后照常（项目所有者 2026-10-28）。相机层的开、重开照账本再看一次（SingleCamera，断言）。</p>
+     * （{@link #inFlight}），之后照常（项目所有者 2026-10-28）。相机层的开照账本再看一次（SingleCamera，断言）。</p>
      */
     static boolean camHeld(Lane lane) {
         return lane.held;
@@ -1865,14 +1975,15 @@ public final class ChannelRules {
      * 下一步：每次只出一步（§二），按这个次序找，先找到的就是它。
      *
      * <ol>
-     *   <li><b>在途</b> → 等：手上那一步（含等第一帧）、一路 LOSING、一台相机那一轮有一次关没返回（我们按次序关的那一步除外，
-     *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy、另一个实例在关。后四种各封顶
+     *   <li><b>在途</b> → 等：手上那一步（含等第一帧；救援的重开分两半，关的那一半关完了，开的那一半在这里出 —— {@link #openHalf}）、
+     *       一路 LOSING、一台相机那一轮有一次关没返回（我们按次序关的那一步除外，
+     *       {@link #inFlight}；手上那一步到点也照等）、一路 isBusy。后三种各封顶
      *       {@link #IN_FLIGHT_MAX_MS}（关没返回的那一种从那一轮一直有开或关没返回的那一刻算，不从头算）—— 封顶只管别的路等多久：
      *       被一轮占着的那一台自己，那一轮结束之前不开、关着在开的不救（{@link #camHeld}，项目所有者 2026-10-28、10-29）。
-     *       车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出照常等它做完；</li>
+     *       车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出、管线换下去照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
      *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
-     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡时到这里为止，不摘死输出、不改、不开、不救；</li>
+     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡、管线换下去时到这里为止，不摘死输出、不改、不开、不救；</li>
      *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
      *       但照 §二.6 仍要等安静。只摘本会话出过画面的（{@link #reconfigurable}）；没出过画面的由第 7 条重开时丢掉它；</li>
@@ -1888,7 +1999,10 @@ public final class ChannelRules {
      *       环视先；关着、在开而相机层手上还有开或关的，等它（最多 {@link #IN_FLIGHT_MAX_MS}，{@link #rescueAge}）；
      *       关着、在开而这一台那一轮还有开或关没返回、或者被一轮占着的不救、不计次数，不设时限（{@link #camHeld}）；
      *       开着而被一轮占着的只许重建会话，不重开。
-     *       梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手；</li>
+     *       梯子照旧：第一次救、本会话出过画面就重建，否则重开；12 秒一次，3 次歇 60 秒，3 轮停手。
+     *       重开（第 2b 步，项目所有者 2026-10-29）：这一路手上有设备（开着、在开）就分两半（{@link Half}）—— 这一步先下达关；
+     *       关完、账本上那一轮结束、离开始满 {@link #REOPEN_GAP_MS}，该开的样子都还在（{@link #reopenBlocked}），同一步里再下达开，
+     *       不在就当场结束这一步（{@link Outcome#DROPPED}）。关着的一路的重开照开那样下达一轮；</li>
      *   <li>都没有 → 空闲。</li>
      * </ol>
      *
@@ -2005,10 +2119,8 @@ public final class ChannelRules {
                 continue;
             }
             boolean canRebuild = framedSession(lane);
-            // 重开要能用相机、屏幕知道黑没黑；屏幕真黑着、没在开车时座舱不重开（熄屏期间绝不开座舱，项目所有者 2026-10-27）；
-            // 被一轮占着的不重开（那一轮结束之前不开新句柄；重建会话不开）
-            boolean noReopen = !usable || !w.screenKnown || w.screenDark && !w.driving && !isSurround(lane)
-                    || camHeld(lane);
+            // 重开要能开设备（reopenGate：能用相机、屏幕知道黑没黑、不是黑着没在开车的座舱、没被一轮占着）；重建会话不开
+            boolean noReopen = reopenGate(w, lane) != null;
             if (noReopen && !(canRebuild && !onLadder(lane))) {
                 // 不开、不计次数（重建会话不用开相机，梯子上第一次、出过画面的照样重建）
                 if (!usable && deferredKey == null) {
@@ -2051,19 +2163,26 @@ public final class ChannelRules {
     /**
      * 在途（§二.1）：有一样就等。
      *
-     * <p>相机层在关一个设备的那一路（{@link Lane#closingSince}）是在途，不管它属于哪一步（救援的重开关旧的、作废卡住的那一轮、
-     * 晚到的设备就地关），手上那一步到点也照等，封顶 {@link #IN_FLIGHT_MAX_MS} —— 和丢了之后的那一次关（LOSING）同一条规矩
-     * （项目所有者 2026-10-14 批准，2.11.4 第 1c 项）。我们按次序关的那一步（{@link Device#CLOSING}）不在此列：它照 §二.2 自己的封顶，
-     * 环视 10 秒、座舱 30 秒到点就不再等（「环视等了 10 秒还没关完，先关座舱」）。</p>
+     * <p>相机层在关一个设备的那一路（{@link #closingInFlight}）是在途，不管它属于哪一步（救援重开的关那一半、晚到的设备就地关、
+     * 换下去的那一份管线卡住的那一次关），手上那一步到点也照等，封顶 {@link #IN_FLIGHT_MAX_MS} —— 和丢了之后的那一次关（LOSING）同一条规矩
+     * （项目所有者 2026-10-14 批准，2.11.4 第 1c 项）。我们按次序关的那一步（{@link Device#CLOSING}，不是重开的关那一半）不在此列：
+     * 它照 §二.2 自己的封顶，环视 10 秒、座舱 30 秒到点就不再等（「环视等了 10 秒还没关完，先关座舱」）。</p>
      *
      * <p>这里的封顶只管别的路等多久（项目所有者 2026-10-28：一路的关卡住超过 60 秒，别的路照以前那样不再等它）。钟从账本上那一轮一直有开或关
      * 没返回的那一刻算（{@link Lane#closingSince}）：卡住的关上面又来一次关，别的路不再从头等 60 秒。被一轮占着的那一路自己，
      * 那一轮结束之前不开、关着在开的不救，不设时限（{@link #camHeld}）。</p>
+     *
+     * <p>手上那一步是分两半的重开、关的那一半关完了：开的那一半就在这里出（{@link #openHalf}），它是这一步自己的事 ——
+     * 和以前相机层在一轮里关完旧设备接着开新的一样，不看别的路在不在途。</p>
      */
     private static Decision inFlight(World w) {
         long now = w.now;
         Step step = w.step;
         if (step != null && now - step.startedAt < step.maxMs) {
+            Decision half = openHalf(w, step);
+            if (half != null) {
+                return half;
+            }
             return Decision.waitFor(Why.STEP, step.keys.isEmpty() ? null : step.keys.get(0),
                     step.maxMs - (now - step.startedAt));
         }
@@ -2073,8 +2192,7 @@ public final class ChannelRules {
             }
         }
         for (Lane lane : w.lanes) {
-            if (lane.closingSince != 0 && lane.device != Device.CLOSING
-                    && now - lane.closingSince < IN_FLIGHT_MAX_MS) {
+            if (closingInFlight(lane) && now - lane.closingSince < IN_FLIGHT_MAX_MS) {
                 return Decision.waitFor(Why.BUSY, lane.key, IN_FLIGHT_MAX_MS - (now - lane.closingSince));
             }
         }
@@ -2084,10 +2202,91 @@ public final class ChannelRules {
                 return Decision.waitFor(Why.BUSY, lane.key, IN_FLIGHT_MAX_MS - (now - lane.busySince));
             }
         }
-        if (w.otherClosingSince != 0 && now - w.otherClosingSince < IN_FLIGHT_MAX_MS) {
-            return Decision.waitFor(Why.OTHER_INSTANCE, null, IN_FLIGHT_MAX_MS - (now - w.otherClosingSince));
-        }
         return null;
+    }
+
+    /**
+     * 这一路的相机层在关一个设备、算在途（{@link #inFlight}，2.11.4 第 1c 项）：账本上这一台那一轮有一次关没返回（{@link Lane#closingSince}），
+     * 而它不是我们按次序关的那一步（那一步照 §二.2 自己的封顶）—— 丢了之后的关、救援重开的关那一半（{@link Lane#reopenClose}）、
+     * 晚到的设备就地关、换下去的那一份管线卡住的那一次关都是。
+     */
+    static boolean closingInFlight(Lane lane) {
+        return lane.closingSince != 0 && (lane.device != Device.CLOSING || lane.reopenClose);
+    }
+
+    /**
+     * 手上那一步是这一路分两半的重开，开的那一半还没下达（关的那一半在关、或者关完了在等那 300 ms）—— 第 2b 步。这一路这时还在我们的一步里：
+     * 相机服务这时说的话算我们的（ChannelScheduler.ourStepInFlight、{@link #recognize}），关着也不算熄屏放开（{@link #releasedByDark}）——
+     * 以前整个重开这一路都记成在开，照的是同一个意思。
+     */
+    static boolean reopenPending(World w, Lane lane) {
+        Step step = w.step;
+        return step != null && step.split && step.openedAt == 0 && step.keys.contains(lane.key);
+    }
+
+    /**
+     * 分两半的重开，关的那一半关完了：这一路关着，账本上那一轮结束了（{@link #camHeld} 不成立、{@link Lane#outstandingSince} 归 0），
+     * 开的那一半还没下达。
+     */
+    private static boolean openHalfDue(Step step, Lane lane) {
+        return step.split && step.openedAt == 0 && lane.device == Device.CLOSED && !camHeld(lane)
+                && lane.outstandingSince == 0;
+    }
+
+    /**
+     * 分两半的重开，开的那一半（{@link Half#OPEN}，第 2b 步）：关的那一半关完了（{@link #openHalfDue}），离这一步开始（下达关）满
+     * {@link #REOPEN_GAP_MS}，该开的样子都还在（{@link #reopenBlocked}）—— 带着这一步的输出再下达开，同一步里只这一次。还不到 300 ms 的
+     * 等到那一刻；不在了的先等着，下一轮这一步当场结束（{@link Outcome#DROPPED}，结果只在 {@link #outcome} 定）。不是这种时候是 null。
+     */
+    private static Decision openHalf(World w, Step step) {
+        Lane lane = step.keys.isEmpty() ? null : w.lane(step.keys.get(0));
+        if (lane == null || !openHalfDue(step, lane)) {
+            return null;
+        }
+        if (reopenBlocked(w, lane) != null) {
+            return Decision.waitFor(Why.STEP, lane.key, 0);
+        }
+        long gapLeft = REOPEN_GAP_MS - (w.now - step.startedAt);
+        if (gapLeft > 0) {
+            return Decision.waitFor(Why.STEP, lane.key, gapLeft);
+        }
+        Decision d = new Decision(Move.RESCUE, Why.NO_PROGRESS);
+        d.keys = Collections.singletonList(lane.key);
+        d.rescue = Rescue.REOPEN;
+        d.half = Half.OPEN;
+        d.outputs = step.outputs;
+        d.maxMs = step.maxMs;
+        return d;
+    }
+
+    /**
+     * 分两半的重开，开的那一半此刻为什么不下达（第 2b 步）；下达得了是 null。和一次照常的开要的一样：不在退出、车机不睡、这一份管线不在换下去、
+     * 有人要（保持不算 —— 关着的一路不会为了保持去开），再加救援重开那几样（{@link #reopenGate}：能用相机、屏幕知道黑没黑、
+     * 不是黑着没在开车的座舱）。原因照关的那几个说（{@link #closeWhy}），用不了相机、屏幕不知道各是各的。
+     */
+    static Why reopenBlocked(World w, Lane lane) {
+        if (winding(w) || !wanted(w, lane)) {
+            return closeWhy(w, lane);
+        }
+        return reopenGate(w, lane);
+    }
+
+    /**
+     * 救援的重开此刻开得了设备吗（{@link #next} 第 7 条；分两半的重开，开的那一半也照它，{@link #reopenBlocked}）：开不了是为什么。
+     * 要能用相机、屏幕知道黑没黑；屏幕真黑着、没在开车时座舱不重开（熄屏期间绝不开座舱，项目所有者 2026-10-27）；被一轮占着的不重开
+     * （那一轮结束之前不开新句柄）。都没有是 null。
+     */
+    private static Why reopenGate(World w, Lane lane) {
+        if (!usable(w)) {
+            return Why.UNUSABLE;
+        }
+        if (!w.screenKnown) {
+            return Why.SCREEN_UNKNOWN;
+        }
+        if (w.screenDark && !w.driving && !isSurround(lane)) {
+            return Why.DARK_RELEASE;
+        }
+        return camHeld(lane) ? Why.BUSY : null;
     }
 
     /**
@@ -2165,7 +2364,7 @@ public final class ChannelRules {
     }
 
     /**
-     * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出）」）。一步里的几路原因一样：
+     * 关的原因（黑匣子「通道：关 …（没人要 / 保持到点 / 熄屏 / 熄屏：座舱放开 / 车机要睡 / 退出 / 管线重建）」）。一步里的几路原因一样：
      * 座舱一起关的那一步看第一路就是座舱，环视单独关的那一步就是环视。关座舱前先关环视的那一步不在这里判（{@link Why#SURROUND_FIRST}，
      * {@link #closeStep} 直接给）：那时环视还该开，这里答不出它为什么关。熄屏放开的环视（2026-10-27）照旧是「熄屏」，
      * 不写成「座舱放开」。
@@ -2176,6 +2375,9 @@ public final class ChannelRules {
         }
         if (w.sleepSince != 0) {
             return Why.SLEEP;
+        }
+        if (w.retireSince != 0) {
+            return Why.REBUILD;
         }
         if (releasedByDark(w, lane) && !isSurround(lane)) {
             return Why.DARK_RELEASE;
@@ -2247,7 +2449,7 @@ public final class ChannelRules {
      * （开 15 秒到点时早就满了）就重开，第一次救就是第 2 次（开那一步算了第 1 次）。出了第一帧，它就又能改了。</p>
      *
      * <p>相机层手上有动作（配会话、关旧会话、排着一次重建）的也不改：卡在配会话里的那一路，再改一次还是卡着；相机层的那个动作
-     * 最多挂 {@link #IN_FLIGHT_MAX_MS}，在那之前它就不能改，没进展满 8 秒由救援接手（救援不看它，重开把那一次作废）。</p>
+     * 最多挂 {@link #IN_FLIGHT_MAX_MS}，在那之前它就不能改，没进展满 8 秒由救援接手（救援不看它：重开先下达关，关相机那一下把那一次作废）。</p>
      */
     private static boolean reconfigurable(Lane lane) {
         return framedSession(lane) && lane.busySince == 0;
@@ -2280,10 +2482,10 @@ public final class ChannelRules {
      * 这一路该不该救、多久没进展（§二.5）：有人要（保持不算）、没被拿着、没在待判、没停手，并且关着等救（丢了、开不起来），
      * 或者开着 8 秒没进展（{@link CameraLiveness#STUCK_MS}）。不救是 -1；关着的是 {@link Long#MAX_VALUE}。
      *
-     * <p>设备不在我们手上（关着、在开）而相机层手上还有动作（{@link Lane#busySince}，开、重开、关还在途）的不救，
+     * <p>设备不在我们手上（关着、在开）而相机层手上还有动作（{@link Lane#busySince}，开、关还在途）的不救，
      * 等它有结果、或者到它自己的封顶（{@link #IN_FLIGHT_MAX_MS}）：这时重开，相机层只会合并掉（同一台相机不许两个句柄），
      * 梯子却已经算了一次 —— 一次没救的「救」，3 次不成歇 60 秒、3 轮停手都会提前（审查 2026-10-11）。
-     * 开着的那一路卡在配会话里不在此列：相机层的重开会把那一次配置作废、关掉设备再开（SingleCamera.reopen），满 8 秒照救。</p>
+     * 开着的那一路卡在配会话里不在此列：重开先下达关，关相机那一下把那一次配置作废、连设备一起关掉（SingleCamera.closeCamera），满 8 秒照救。</p>
      *
      * <p>设备不在我们手上、这一台被一轮占着（{@link #camHeld}）、或者这一台那一轮还有开或关没返回（{@link Lane#outstandingSince}：
      * 这一路手上那一轮的 openCamera 还没回音也是）的不救（第 1 步「轮次 + 账本」，项目所有者 2026-10-28、10-29）：重开开不出去
@@ -2312,6 +2514,8 @@ public final class ChannelRules {
         Decision d = new Decision(Move.RESCUE, lane.device == Device.CLOSED ? Why.DOWN : Why.NO_PROGRESS);
         d.keys = Collections.singletonList(lane.key);
         d.rescue = rebuild ? Rescue.REBUILD : Rescue.REOPEN;
+        // 手上有设备（开着、在开）的重开分两半：这一步先下达关（第 2b 步）；关着的一路照开那样下达一轮
+        d.half = !rebuild && lane.device != Device.CLOSED ? Half.CLOSE : null;
         d.outputs = rebuild ? composition(w, lane) : openOutputs(w, lane);
         d.attempt = lane.ladder.attempts();
         d.ms = age == Long.MAX_VALUE ? -1 : age;

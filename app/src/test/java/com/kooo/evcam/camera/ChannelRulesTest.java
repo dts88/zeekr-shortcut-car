@@ -607,7 +607,10 @@ public class ChannelRulesTest {
         assertEquals(Collections.singletonList(REAR), d.keys);
     }
 
-    /** 别人的在途（一路 isBusy、另一个实例在关、一路正被接手）也挡住一切，各最多 60 秒。 */
+    /**
+     * 别人的在途（一路 isBusy、一路正被接手）也挡住一切，各最多 60 秒。第 2 步起没有「另一个实例在关」：进程里只有一个调度，
+     * 换下去的那一份的关在账本上（{@link Lane#closingSince}），照「有一次关没返回」那一条等。
+     */
     @Test
     public void othersInFlightBlockEverythingForAtMostSixtySeconds() {
         claim(Holder.PREVIEW);
@@ -623,11 +626,6 @@ public class ChannelRulesTest {
         assertEquals(Move.OPEN, round().move);
 
         rear.busySince = 0;
-        w.otherClosingSince = w.now;
-        assertEquals(Why.OTHER_INSTANCE, round().why);
-        at(2 * ChannelRules.IN_FLIGHT_MAX_MS);
-        assertEquals(Move.OPEN, round().move);
-
         ChannelRules.lossStarted(w, rear, CameraTaken.Reason.ofDisconnect());
         assertWait(Why.LOSING, REAR, round());
     }
@@ -1650,26 +1648,107 @@ public class ChannelRulesTest {
 
     /**
      * 管线在同一个进程里重建（配置里开关了一路、换车型、退出后马上又开）：新的一份从没碰过这一路，读到的「被占用（我们开着）」
-     * 是旧的那一份开的时候记下的。旧的那一份还在关 —— 算我们的，等它；关完了还被占着（原厂 360 拿着环视）—— 别人拿着，
-     * 一次也不试开（§二.7，审查 2026-10-11）。
+     * 是旧的那一份开的时候记下的。旧的那一份那一轮还没结束（账本：被一轮占着）—— 算我们的，不开它、别的路照开；那一轮结束了，
+     * 账本记下我们关完的那一刻（{@link Lane#ourCloseAt}），之后 0.5 秒以内还算我们的（为这一关说的「空闲」可能还在路上）；
+     * 过了还被占着（原厂 360 拿着环视）—— 别人拿着，一次也不试开（§二.7，审查 2026-10-11；第 2 步：以前看「另一份管线还在关」那扇窗）。
      */
     @Test
-    public void anOldOursWordIsOursOnlyWhileAnotherPipelineIsStillClosing() {
+    public void anOldOursWordIsOursOnlyWhileItsRoundLivesAndJustAfterItsClose() {
         claim(Holder.PREVIEW);
         declarePreviews();
         serviceSays(surround, false, true);
-        w.otherClosingSince = w.now;
+        surround.held = true;
         Decision d = round();
-        assertNull("另一份还在关：那一句还算我们的", surround.mark);
-        assertWait(Why.OTHER_INSTANCE, null, d);
+        assertNull("那一轮还没结束：那一句还算我们的", surround.mark);
+        assertEquals("被一轮占着的跳过，别的路照开", Collections.singletonList(REAR), d.keys);
+        perform(d);
 
         at(1_000);
-        w.otherClosingSince = 0;
+        surround.held = false;
+        surround.ourCloseAt = w.now;   // 旧的那一份那一轮关完、结束了
+        round();
+        assertNull("刚关完：还算我们的", surround.mark);
+        at(1_000 + ChannelRules.OWN_WORD_GRACE_MS - 1);
+        round();
+        assertNull(surround.mark);
+        at(1_000 + ChannelRules.OWN_WORD_GRACE_MS);
         assertEquals(Move.IDLE, run().move);
-        assertEquals(CameraTaken.Verdict.TAKEN, surround.mark);
+        assertEquals("关完 0.5 秒还被占着：别人拿着", CameraTaken.Verdict.TAKEN, surround.mark);
         assertEquals("一次也不试开", 0, count(Move.OPEN, surround));
         assertEquals("被拿着的跳过，不挡后面", 2, count(Move.OPEN));
         assertTrue(ChannelRules.askDue(w));
+    }
+
+    /**
+     * 排着的那一份管线每一轮只做认、放两步（{@link ChannelRules#settleMarks}，第 2 步审查 2026-10-30）：被别的程序拿着的、不在的认出来，
+     * 空出来的放开 —— 环视留不留不判、前座舱不去掉、登记表的变化不收，这几样留给换上以后它自己那一轮（{@link ChannelRules#settle}）。
+     */
+    @Test
+    public void aPendingPipelineOnlyRecognizesAndReleases() {
+        claim(Holder.RECORDING);
+        planAll();
+        w.frontCabinOneShot = true;
+        w.surroundInDark = ChannelRules.SurroundInDark.LIT;
+        w.screenOn = false;   // 通道刚算黑：settle 会判环视留不留、去掉前座舱
+        w.sentry = 2;
+        serviceSays(rear, false, false);   // 车机拿着后座舱
+        front.absent = true;   // 前座舱不在
+        List<Event> marks = ChannelRules.settleMarks(w);
+        assertEquals(CameraTaken.Verdict.TAKEN, rear.mark);
+        assertEquals(CameraTaken.Verdict.TAKEN, front.mark);
+        assertEquals(2, marks.size());
+        for (Event event : marks) {
+            assertEquals(Event.Type.RECOGNIZED, event.type);
+        }
+        assertEquals("环视留不留不判", ChannelRules.SurroundInDark.LIT, w.surroundInDark);
+        assertNull("上一次读数不记", w.lastSentry);
+        assertFalse("前座舱不去掉", w.frontCabinRetired);
+        assertTrue("登记表的变化不收", w.changed.contains(Holder.RECORDING));
+        assertEquals("不判、不记保持", 0, rear.unwantedSince);
+
+        at(1_000);
+        serviceSays(rear, true, false);   // 车机放开了后座舱
+        marks = ChannelRules.settleMarks(w);
+        assertNull(rear.mark);
+        assertEquals(1, marks.size());
+        assertEquals(Event.Type.RELEASED, marks.get(0).type);
+        assertEquals(CameraTaken.Verdict.TAKEN, front.mark);
+
+        events = ChannelRules.settle(w);   // 换上以后它自己那一轮：那几样照判
+        assertEquals(ChannelRules.SurroundInDark.KEPT, w.surroundInDark);
+        assertTrue(w.frontCabinRetired);
+        assertTrue(w.changed.isEmpty());
+    }
+
+    /**
+     * 这一份管线要换下去（管线重建，{@link World#retireSince}）：和退出一样只关、按次序关 —— 手上那一步做完，环视单独先关，
+     * 座舱再一起关；关的原因是「管线重建」；不开、不改、不救、不问；退出、车机要睡时原因照写它们自己的。
+     */
+    @Test
+    public void aRetiringPipelineClosesInOrderForARebuild() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(rear, pvR);
+        streaming(front, pvF);
+        w.retireSince = w.now;
+        assertTrue(ChannelRules.winding(w));
+        assertFalse(ChannelRules.shouldOpen(w, rear));
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Why.REBUILD, d.why);
+        assertEquals("环视单独先关", Collections.singletonList(SUR), d.keys);
+        assertEquals(ChannelRules.CLOSE_SURROUND_MAX_MS, d.maxMs);
+        perform(d);
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Why.REBUILD, d.why);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        perform(d);
+        assertEquals(Move.IDLE, round().move);
+
+        w.exitSince = w.now;
+        streaming(surround, pvS);
+        assertEquals("退出时照写退出", Why.EXIT, round().why);
     }
 
     /** 1 是 TAKEN 时开 2，报 MAX_CAMERAS_IN_USE：判 BLOCKED、不计次数；1 放开了，两路一起放开，先开环视再开后座舱。 */
@@ -2146,9 +2225,10 @@ public class ChannelRulesTest {
     // ================================================================= 在关的设备是在途（2.11.4 第 1c 项）
 
     /**
-     * 救援的重开那一步 15 秒到点、旧设备还在关（相机层报着在关）：照样是在途，别的路一步都不动（项目所有者 2026-10-14 批准：
+     * 救援的重开（第 2b 步：先下达关）15 秒到点、旧设备还在关（重开的关那一半）：照样是在途，别的路一步都不动（项目所有者 2026-10-14 批准：
      * 在关旧设备的相机是在途，不管它属于哪一步，到点也不放过，封顶 60 秒 —— 和丢了之后的那一次关同一条规矩）。10-13 19:55:29
-     * 那一次关了 14.0 秒，离到点只差 1 秒；2.10.x 的强制重开关到过 21.4 秒。关完了、开新设备那一下是一个新动作，照常挡着；开好了别的路才动。
+     * 那一次关了 14.0 秒，离到点只差 1 秒；2.10.x 的强制重开关到过 21.4 秒。这一步到点了，开的那一半不再下达；关完了这一路关着，
+     * 交给平常的规矩：排着的前座舱照开的次序先开，后座舱照救援梯子再救。
      */
     @Test
     public void aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut() {
@@ -2164,11 +2244,10 @@ public class ChannelRulesTest {
         Decision d = round();
         assertEquals(Move.RESCUE, d.move);
         assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals("这一路手上有设备：先下达关", ChannelRules.Half.CLOSE, d.half);
         startOnly(d);
-        // 相机层（SingleCamera.reopenWith）：旧设备从字段上摘下来、登记在关，关完才开新的
-        rear.closingSince = w.now;
-        rear.session.clear();
-        rear.sessionSince = 0;
+        assertEquals(Device.CLOSING, rear.device);
+        assertTrue(rear.reopenClose);
 
         // 这期间前座舱也要了：它排着
         w.recordPlan.add(FRONT);
@@ -2176,23 +2255,26 @@ public class ChannelRulesTest {
         assertWait(Why.STEP, REAR, round());
         at(ChannelRules.STEP_MAX_MS);
         d = round();
+        assertEquals(Outcome.NONE, ChannelRules.outcome(w));
         assertWait(Why.BUSY, REAR, d);
         assertEquals(ChannelRules.IN_FLIGHT_MAX_MS - ChannelRules.STEP_MAX_MS, d.ms);
         at(ChannelRules.STEP_MAX_MS + 5_000);
         assertWait(Why.BUSY, REAR, round());
         assertEquals("旧设备还在关：前座舱不开", 1, done.size());
 
-        // 旧设备关完了（20.0 秒），开新设备那一下上路：一个新动作，照常挡着
+        // 旧设备关完了（20.0 秒）：这一步早结束了，开的那一半不再下达 —— 排着的前座舱照开的次序先开
         at(20_000);
-        rear.closingSince = 0;
-        rear.busySince = w.now;
-        assertWait(Why.BUSY, REAR, round());
-        at(20_300);
-        opened(rear, set(recR));
-        frame(rear);
+        closed(rear);
         d = round();
         assertEquals(Move.OPEN, d.move);
         assertEquals(Collections.singletonList(FRONT), d.keys);
+        perform(d);
+        d = round();
+        assertEquals("后座舱照梯子再救（第 2 次）：关着的一路照开那样开", Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertEquals(Why.DOWN, d.why);
+        assertNull(d.half);
+        assertEquals(2, d.attempt);
     }
 
     /**
@@ -2243,9 +2325,9 @@ public class ChannelRulesTest {
     }
 
     /**
-     * 同 {@link #aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut}，旧设备那一次关一直没返回（项目所有者 2026-10-28）：
-     * 别的路等满 60 秒照常动（前座舱开）；后座舱这一轮里开新设备那一下排在那一次关后面，返回之前不再救、不计次数（3 分钟以后也一样）；
-     * 关返回了，相机层接着那一下开（一个新动作，照常挡着），开好出了画面。
+     * 同 {@link #aCameraStillClosingItsOldDeviceIsInFlightAfterItsStepTimesOut}，旧设备那一次关（重开的关那一半）一直没返回（项目所有者 2026-10-28）：
+     * 别的路等满 60 秒照常动（前座舱开）；后座舱被它自己那一轮占着，返回之前不再救、不计次数（3 分钟以后也一样）；
+     * 关返回了，后座舱照救援梯子再救（关着的一路照开那样开），开好出了画面。
      */
     @Test
     public void aCameraWhoseOldDeviceNeverFinishesClosingHoldsOnlyItself() {
@@ -2262,11 +2344,7 @@ public class ChannelRulesTest {
         assertEquals(Move.RESCUE, d.move);
         assertEquals(Rescue.REOPEN, d.rescue);
         int attempts = rear.ladder.attempts();
-        startOnly(d);
-        // 相机层（SingleCamera.reopen）：同一轮里旧设备摘下来在关（账本：在关），关返回之前开新的那一下开不出去
-        rear.closingSince = rear.outstandingSince;
-        rear.session.clear();
-        rear.sessionSince = 0;
+        startOnly(d);   // 关的那一半：这一轮摘下了、在关（账本），返回之前谁都不开它
         w.recordPlan.add(FRONT);
         front.declared.add(recF);
 
@@ -2279,9 +2357,9 @@ public class ChannelRulesTest {
         assertEquals(Collections.singletonList(FRONT), d.keys);
         perform(d);
         assertTrue(ChannelRules.heldByClose(w, rear));
-        assertFalse("这一路手上那一轮：不算被占着", ChannelRules.camHeld(rear));
+        assertTrue("关了、还没结束的那一轮：被它占着", ChannelRules.camHeld(rear));
 
-        rear.busySince = 0;   // 相机层那一下重开的在途也过了 60 秒（只管别的路等多久）
+        rear.busySince = 0;   // 相机层那一下关的在途也过了 60 秒（只管别的路等多久）
         rear.progressAgeMs = 3 * 60_000;
         at(3 * 60_000);
         assertEquals(Move.IDLE, run().move);
@@ -2289,17 +2367,263 @@ public class ChannelRulesTest {
         assertEquals("不计次数", attempts, rear.ladder.attempts());
         assertFalse(rear.ladder.gaveUp());
 
-        // 关返回了：相机层接着那一下开（一个新动作，照常挡着），开好出了画面
-        rear.closingSince = 0;
-        rear.busySince = w.now;
-        rear.progressAgeMs = 0;
-        assertWait(Why.BUSY, REAR, round());
-        at(3 * 60_000 + 300);
-        opened(rear, set(recR));
-        frame(rear);
+        // 关返回了：后座舱关着，照救援梯子再救（关着的一路照开那样开），开好出了画面
+        closed(rear);
+        d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        assertNull("关着的一路的重开不分两半", d.half);
+        assertEquals(attempts + 1, d.attempt);
+        perform(d);
         assertEquals(Move.IDLE, round().move);
         assertTrue(ChannelRules.streaming(rear));
         assertFalse(ChannelRules.heldByClose(w, rear));
+    }
+
+    // ================================================================= 救援重开分两半（第 2b 步，项目所有者 2026-10-29）
+
+    /** 后座舱开着、配好了一帧不出、8 秒没进展：第一次救就重开（这一路手上有设备）。返回规则出的那一步，还没照做。 */
+    private Decision stuckRearReopen() {
+        claim(Holder.PREVIEW);
+        streaming(surround, pvS);
+        streaming(front, pvF);
+        rear.declared.add(pvR);
+        rear.device = Device.OPEN;
+        rear.deviceSince = w.now;
+        configured(rear, set(pvR));   // 配好了，一帧不出
+        rear.progressAgeMs = CameraLiveness.STUCK_MS;
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(Collections.singletonList(REAR), d.keys);
+        return d;
+    }
+
+    /**
+     * 手上有设备的一路，重开分两半：这一步先下达关（这一路记成在关）；关完的那一声到了、账本上那一轮还没结束 —— 不开；那一轮结束了，
+     * 离下达关还不到 300 ms 就等到那一刻（关得比 300 ms 快）；然后同一步里下达开，带着这一步的输出，只这一次。这一步的开始照旧，
+     * 出了第一帧才算完。
+     */
+    @Test
+    public void aReopenClosesFirstThenOpensInTheSameStepOnceTheRoundEndedAndTheGapPassed() {
+        Decision d = stuckRearReopen();
+        assertEquals(Why.NO_PROGRESS, d.why);
+        assertEquals("手上有设备：先下达关", ChannelRules.Half.CLOSE, d.half);
+        startOnly(d);
+        assertEquals(Device.CLOSING, rear.device);
+        assertTrue(w.step.split);
+        assertTrue(ChannelRules.reopenPending(w, rear));
+        assertWait(Why.STEP, REAR, round());
+
+        at(100);
+        rear.device = Device.CLOSED;   // 关完的那一声到了，账本上那一轮还没结束（还有一台在关）
+        rear.deviceSince = w.now;
+        assertWait(Why.STEP, REAR, round());
+        closed(rear);                  // 那一轮结束了
+        Decision wait = round();
+        assertWait(Why.STEP, REAR, wait);
+        assertEquals("关完了，等到离下达关满 300 ms", ChannelRules.REOPEN_GAP_MS - 100, wait.ms);
+        at(ChannelRules.REOPEN_GAP_MS - 1);
+        assertWait(Why.STEP, REAR, round());
+
+        at(ChannelRules.REOPEN_GAP_MS);
+        Decision open = round();
+        assertEquals(Move.RESCUE, open.move);
+        assertEquals(ChannelRules.Half.OPEN, open.half);
+        assertEquals(Rescue.REOPEN, open.rescue);
+        assertEquals("带着这一步的输出", d.outputs, open.outputs);
+        startOnly(open);
+        assertEquals("不另起一步", T0, w.step.startedAt);
+        assertEquals(T0 + ChannelRules.REOPEN_GAP_MS, w.step.openedAt);
+        assertFalse(ChannelRules.reopenPending(w, rear));
+        assertEquals(1, count(Move.RESCUE, rear));
+        assertWait(Why.STEP, REAR, round());
+        at(1_000);
+        assertWait(Why.STEP, REAR, round());
+        assertEquals("开的那一半只下达这一次", Device.OPENING, rear.device);
+
+        at(1_200);
+        opened(rear, open.outputs);
+        frame(rear);
+        assertEquals(Outcome.DONE, ChannelRules.outcome(w));
+        assertEquals(Move.IDLE, round().move);
+        assertTrue(ChannelRules.streaming(rear));
+    }
+
+    /** 关得比 300 ms 慢（5 秒）：关完、那一轮结束的这一轮就下达开 —— 和以前相机层「关完旧的，满 300 ms 才开新的」同一个时刻。 */
+    @Test
+    public void aSlowCloseHalfIsFollowedByTheOpenHalfAtOnce() {
+        Decision d = stuckRearReopen();
+        startOnly(d);
+        at(5_000);
+        assertWait(Why.STEP, REAR, round());
+        closed(rear);
+        Decision open = round();
+        assertEquals(ChannelRules.Half.OPEN, open.half);
+        startOnly(open);
+        assertEquals(T0 + 5_000, w.step.openedAt);
+        assertEquals(T0, w.step.startedAt);
+        at(ChannelRules.STEP_MAX_MS);
+        assertEquals("封顶照旧从下达关算", Outcome.TIMED_OUT, ChannelRules.outcome(w));
+    }
+
+    /**
+     * 关的那一半关完、开的那一半下达之前，该开的样子不在了：开的那一半不再下达，这一步当场结束（不等到点、不等那 300 ms），这一路关着，
+     * 交给平常的规矩 —— 退出、管线换下去、车机要睡、用不了相机、屏幕不知道黑没黑、没人要了、黑着没在开车的座舱。
+     */
+    @Test
+    public void theOpenHalfIsDroppedOnExit() {
+        assertOpenHalfDropped(() -> w.exitSince = w.now, Why.EXIT);
+        assertEquals("退出：照次序关别的路（环视先）", Move.CLOSE, lastDecision.move);
+        assertEquals(Collections.singletonList(SUR), lastDecision.keys);
+    }
+
+    @Test
+    public void theOpenHalfIsDroppedWhenThePipelineRetires() {
+        assertOpenHalfDropped(() -> w.retireSince = w.now, Why.REBUILD);
+        assertEquals(Move.CLOSE, lastDecision.move);
+    }
+
+    @Test
+    public void theOpenHalfIsDroppedWhenTheHeadUnitSleeps() {
+        assertOpenHalfDropped(() -> w.sleepSince = w.now, Why.SLEEP);
+        assertEquals(Move.CLOSE, lastDecision.move);
+    }
+
+    @Test
+    public void theOpenHalfIsDroppedWhileTheCameraIsUnusable() {
+        assertOpenHalfDropped(() -> w.cameraUsable = false, Why.UNUSABLE);
+        assertEquals("用不了相机：先不开", REAR, lastDecision.deferredKey);
+        w.cameraUsable = true;
+        at(CameraLiveness.RETRY_GAP_MS);
+        Decision d = round();
+        assertEquals("能用了：照救援梯子再救（关着的一路照开那样开）", Move.RESCUE, d.move);
+        assertNull(d.half);
+        assertEquals(Why.DOWN, d.why);
+    }
+
+    @Test
+    public void theOpenHalfIsDroppedWhileTheScreenIsUnknown() {
+        assertOpenHalfDropped(() -> w.screenKnown = false, Why.SCREEN_UNKNOWN);
+    }
+
+    @Test
+    public void theOpenHalfIsDroppedWhenTheLaneIsNoLongerWanted() {
+        assertOpenHalfDropped(() -> drop(Holder.PREVIEW), Why.UNWANTED);
+        assertEquals("没人要了：梯子归零", 0, rear.ladder.attempts());
+    }
+
+    @Test
+    public void theOpenHalfOfADarkCabinIsDroppedUnlessDriving() {
+        assertOpenHalfDropped(() -> w.screenDark = true, Why.DARK_RELEASE);
+        assertTrue("关着的座舱在黑屏里放开，不开", ChannelRules.releasedByDark(w, rear));
+    }
+
+    /** R8 那一道不管在开车时：黑着、在开车，开的那一半照下；两半之间那一下关着也不算熄屏放开。 */
+    @Test
+    public void whileDrivingTheOpenHalfOfADarkCabinIsStillIssued() {
+        Decision d = stuckRearReopen();
+        startOnly(d);
+        w.driving = true;
+        w.screenDark = true;   // 黑了还不到 30 秒
+        at(100);
+        closed(rear);
+        assertFalse("两半之间：还在我们的一步里", ChannelRules.releasedByDark(w, rear));
+        assertTrue(ChannelRules.wanted(w, rear));
+        at(ChannelRules.REOPEN_GAP_MS);
+        Decision open = round();
+        assertEquals(ChannelRules.Half.OPEN, open.half);
+    }
+
+    /** 最近一次 {@link #assertOpenHalfDropped} 里，这一步结束之后规则出的那一步。 */
+    private Decision lastDecision;
+
+    /**
+     * 关的那一半 50 ms 就关完了，{@code change} 之后：开的那一半不再下达（{@code why}），这一步当场结束，这一路关着，梯子上那一次照旧算过
+     * （没人要了的照旧归零）。记下这一步结束之后的那一步（{@link #lastDecision}）。
+     */
+    private void assertOpenHalfDropped(Runnable change, Why why) {
+        Decision d = stuckRearReopen();
+        startOnly(d);
+        at(50);
+        closed(rear);
+        change.run();
+        assertEquals(Outcome.DROPPED, ChannelRules.outcome(w));
+        assertEquals(why, ChannelRules.reopenBlocked(w, rear));
+        lastDecision = round();
+        assertNull("这一步当场结束", w.step);
+        assertTrue("开的那一半不再下达：" + lastDecision, lastDecision.half != ChannelRules.Half.OPEN);
+        assertEquals(Device.CLOSED, rear.device);
+        assertEquals(1, count(Move.RESCUE, rear));
+    }
+
+    /** 开的那一半开不起来：算救援里的重开开不起来（{@code Origin.REOPEN}），救的时候算过次数，不再算。 */
+    @Test
+    public void anOpenHalfThatFailsIsAReopenFailure() {
+        Decision d = stuckRearReopen();
+        int attempts = rear.ladder.attempts();
+        startOnly(d);
+        at(100);
+        closed(rear);
+        at(ChannelRules.REOPEN_GAP_MS);
+        startOnly(round());
+        at(400);
+        failedToOpen(rear, CameraTaken.Reason.ofDeviceError(DEVICE_ERROR));
+        assertEquals(ChannelRules.Failure.Origin.REOPEN, rear.failure.origin);
+        assertEquals(Outcome.FAILED, ChannelRules.outcome(w));
+        serviceSays(rear, true, true);
+        at(400 + ChannelRules.JUDGE_DELAY_MS);
+        round();
+        assertEquals(CameraTaken.Verdict.ORDINARY, event(Event.Type.JUDGED).verdict);
+        assertEquals("救的时候算过了", attempts, rear.ladder.attempts());
+    }
+
+    /** 关着的一路（丢了、判成普通故障）的重开不分两半：照开那样下达一轮，这一路记成在开。 */
+    @Test
+    public void aReopenOfAClosedLaneIsAPlainOpen() {
+        claim(Holder.PREVIEW);
+        streamingAll();
+        ChannelRules.lossStarted(w, rear, CameraTaken.Reason.ofDeviceError(DEVICE_ERROR));
+        at(1_000);
+        ChannelRules.lossClosed(w, rear);
+        closed(rear);
+        serviceSays(rear, true, true);
+        at(1_000 + ChannelRules.JUDGE_DELAY_MS);
+        Decision d = round();
+        assertEquals(Move.RESCUE, d.move);
+        assertEquals(Rescue.REOPEN, d.rescue);
+        assertEquals(Why.DOWN, d.why);
+        assertNull(d.half);
+        startOnly(d);
+        assertFalse(w.step.split);
+        assertEquals(Device.OPENING, rear.device);
+        assertFalse(rear.reopenClose);
+    }
+
+    /**
+     * 两半之间那一下（关完了、开的那一半还没下达）相机服务说的话算我们的：主线程卡了一下、离关完早过了 500 ms，那一句「被占用」也不认成别人拿着，
+     * 不在列表里也不认 —— 和以前整个重开都记成在开一样；开的那一半照下，开不起来再判。
+     */
+    @Test
+    public void aWordInTheGapBetweenTheHalvesStaysOurs() {
+        Decision d = stuckRearReopen();
+        startOnly(d);
+        at(100);
+        closed(rear);
+        serviceSays(rear, false, true);   // 「被占用」：说的时候这一路在两半之间（调度说在途 —— 分类算我们的，不挡安静）
+        rear.absent = true;
+        at(900);
+        Decision open = round();
+        assertNull("不认成被拿着", rear.mark);
+        assertNull(event(Event.Type.RECOGNIZED));
+        assertEquals(ChannelRules.Half.OPEN, open.half);
+        startOnly(open);
+        at(1_000);
+        failedToOpen(rear, CameraTaken.Reason.ofNotListed());
+        at(1_000 + ChannelRules.JUDGE_DELAY_MS);
+        round();
+        assertEquals("开不起来再判：不在列表里，被拿着", CameraTaken.Verdict.TAKEN, event(Event.Type.JUDGED).verdict);
+        assertEquals(ChannelRules.Failure.Origin.REOPEN, event(Event.Type.JUDGED).failure.origin);
     }
 
     /**
@@ -3792,13 +4116,22 @@ public class ChannelRulesTest {
         return null;
     }
 
-    /** 照做，相机当场做完：开好、配好并出第一帧，或者关完。 */
+    /**
+     * 照做，相机当场做完：开好、配好并出第一帧，或者关完。分两半的重开（第 2b 步）两半都做：关当场关完，等到 300 ms
+     * 那一刻再轮一轮出开的那一半，开好出第一帧。
+     */
     private void perform(Decision d) {
         startOnly(d);
         for (String key : d.keys) {
             Lane lane = w.lane(key);
             if (d.move == Move.CLOSE) {
                 closed(lane);
+            } else if (d.half == ChannelRules.Half.CLOSE) {
+                closed(lane);
+                w.now = Math.max(w.now, w.step.startedAt + ChannelRules.REOPEN_GAP_MS);
+                Decision open = round();
+                assertEquals("关完、满 300 ms：同一步里下达开的那一半", ChannelRules.Half.OPEN, open.half);
+                perform(open);
             } else if (d.move == Move.APPLY || d.rescue == Rescue.REBUILD) {
                 configured(lane, d.outputs);
                 frame(lane);
@@ -3810,23 +4143,27 @@ public class ChannelRulesTest {
     }
 
     /**
-     * 照做，相机这边才开始（在开、在关、在配）。账本上那一轮照 SingleCamera 的样子填（调度每一轮照账本填的那几样）：开、重开下达了，
-     * 这一路手上那一轮有开没返回；关下达了，那一轮摘下了、在关（被它占着，有一次关没返回）。
+     * 照做，相机这边才开始（在开、在关、在配）。账本上那一轮照 SingleCamera 的样子填（调度每一轮照账本填的那几样）：开（含重开的开那一半、
+     * 关着的一路的重开）下达了，这一路手上那一轮有开没返回；关（含重开的关那一半）下达了，那一轮摘下了、在关（被它占着，有一次关没返回）。
+     * 重开的开那一半不是新的一步，不记进 {@link #done}。
      */
     private void startOnly(Decision d) {
         assertTrue("只有一步才照做：" + d, d.move != Move.IDLE && d.move != Move.WAIT);
         ChannelRules.begin(w, d);
-        done.add(d);
+        if (d.half != ChannelRules.Half.OPEN) {
+            done.add(d);
+        }
         for (String key : d.keys) {
             Lane lane = w.lane(key);
             lane.busySince = w.now;
-            if (d.move == Move.OPEN || (d.move == Move.RESCUE && d.rescue == Rescue.REOPEN)) {
+            if (d.move == Move.OPEN || d.move == Move.RESCUE && d.rescue == Rescue.REOPEN
+                    && d.half != ChannelRules.Half.CLOSE) {
                 lane.device = Device.OPENING;
                 lane.deviceSince = w.now;
                 if (lane.outstandingSince == 0) {
                     lane.outstandingSince = w.now;
                 }
-            } else if (d.move == Move.CLOSE) {
+            } else if (d.move == Move.CLOSE || d.half == ChannelRules.Half.CLOSE) {
                 lane.device = Device.CLOSING;
                 lane.deviceSince = w.now;
                 // 照 SingleCamera.closeCamera：这一轮下达了关、摘下了 —— 一直有关没返回，直到它结束

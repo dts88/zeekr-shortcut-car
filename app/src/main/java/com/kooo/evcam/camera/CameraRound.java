@@ -5,18 +5,18 @@ import java.util.List;
 
 /**
  * 一轮：一份相机对象（{@link SingleCamera}）为一台相机走的一次设备生命周期（第 1 步「轮次 + 账本」，项目所有者 2026-10-29 批）。
- * 从调度下达开（开；关着的一路救援的重开）起，到它唯一的一次<b>结束</b>为止；设备开着时救援的重开还在这一轮里（关旧的、开新的）。
- * 进程里还没结束的每一轮记在账本上（{@link CameraRounds}）：一台相机有一轮还没结束，谁都不开它。纯 Java，见 {@code CameraRoundTest}。
+ * 从调度下达开起，到它唯一的一次<b>结束</b>为止；一轮里只有那一次开。救援的重开是两轮：调度先下达关（这一轮结束），再下达开（新的一轮，
+ * 第 2b 步）。进程里还没结束的每一轮记在账本上（{@link CameraRounds}）：一台相机有一轮还没结束，谁都不开它。纯 Java，见 {@code CameraRoundTest}。
  *
  * <h3>什么时候结束</h3>
  *
  * <p>下面三样都成立的那一下（{@link #takeEnd}；在这一轮的相机线程上判，判和改都在 SingleCamera 的那把锁里，只结束一次）：</p>
  * <ul>
- *   <li>没有一次 {@code openCamera} 在等回调：{@code openCamera} 正常返回之后、这一次的 onOpened / onError / onDisconnected
- *       到之前算在等。每一次 {@code openCamera} 一个 StateCallback（{@link Call}，框架自己认的那一份身份）：旧的那一次晚到的回调
- *       认不成新的。开之前就被关了、{@code openCamera} 抛了的，没有在等的；</li>
+ *   <li>那一次 {@code openCamera} 没在等回调：{@code openCamera} 正常返回之后、它的 onOpened / onError / onDisconnected
+ *       到之前算在等。一轮一次 {@code openCamera}、一个 StateCallback（{@link Call}，框架自己认的那一份身份）：上一轮晚到的回调
+ *       落在上一轮的账上，认不成这一轮的。开之前就被关了、{@code openCamera} 抛了的，没有在等的；</li>
  *   <li>这一轮拿到过的每一个设备对象都关完了（{@code close()} 返回了）—— 关了之后才开好的那一台也算：关掉它，这一轮才结束；</li>
- *   <li>没有一次关在做（关相机那一下排着、在做），也没有一次开还没进 {@code openCamera}（开之前查列表、查参数，重开等的那 300 ms）。</li>
+ *   <li>没有一次关在做（关相机那一下排着、在做），也没有一次开还没进 {@code openCamera}（开之前查列表、查参数）。</li>
  * </ul>
  *
  * <p>一次关卡在相机服务里、一次 {@code openCamera} 卡在相机服务里 ⇒ 这一轮永远不结束 ⇒ 这一台到进程结束都算占着。
@@ -25,39 +25,39 @@ import java.util.List;
  *
  * <h3>账上的样子（{@link Phase}、{@link #outstandingSince}）</h3>
  *
- * <p>在丢（丢了之后那一次关在做）、在关（下达了关，或者手上有一台不挂着的设备在关：重开时关旧的、晚到的就地关、开不起来的那一台）、
- * 在开（一次开还没进 {@code openCamera}、一次 {@code openCamera} 还没回音）、开着（挂着一台设备，别的都没有）。
+ * <p>在丢（丢了之后那一次关在做）、在关（下达了关，或者手上有一台不挂着的设备在关：晚到的就地关、开不起来的那一台）、
+ * 在开（那一次开还没进 {@code openCamera}、{@code openCamera} 还没回音）、开着（挂着一台设备，别的都没有）。
  * 不是开着就是有开或关没返回：从什么时候起一直这样（{@link #outstandingSince}），接连不断就不从头算 —— 卡住的关上面又来一次关、
  * 被关掉的开在等回调，都还是同一段；稳稳开着才归 0。别的路等多久、黑匣子「还没结束」那一行、状态条那一句都照它算。</p>
  *
- * <p>线程：改的方法都由 SingleCamera 在它的设备锁里调（相机线程，关相机、重开那两下在主线程）；读的方法（{@link #status} 那几个）
+ * <p>线程：改的方法都由 SingleCamera 在它的设备锁里调（相机线程，关相机那一下在主线程）；读的方法（{@link #status} 那几个）
  * 哪个线程都能调 —— 每个方法都锁这一份自己。</p>
  */
 public final class CameraRound {
 
     /** 账上的样子。 */
     public enum Phase {
-        /** 在开：一次开还没进 {@code openCamera}，或者一次 {@code openCamera} 还没回音。 */
+        /** 在开：那一次开还没进 {@code openCamera}，或者 {@code openCamera} 还没回音。 */
         OPENING,
         /** 开着：挂着一台设备，没有别的在途。 */
         OPEN,
-        /** 在关：下达了关；或者手上有一台不挂着的设备在关（重开时关旧的、晚到的就地关、开不起来的那一台）。 */
+        /** 在关：下达了关；或者手上有一台不挂着的设备在关（晚到的就地关、开不起来的那一台）。 */
         CLOSING,
         /** 在丢：挂着的那一台丢了（被断开、报错），这一次关还没返回。 */
         LOSING
     }
 
-    /** 一次 {@code openCamera} 的回调来了，相机层照它做什么（{@link #opened}、{@link #failed}）。 */
+    /** 这一轮那一次 {@code openCamera} 的回调来了，相机层照它做什么（{@link #opened}、{@link #failed}）。 */
     public enum Action {
-        /** 这一轮最近那一次 {@code openCamera} 开好了，这一轮没下达关：设备挂上，接着建会话。 */
+        /** 那一次 {@code openCamera} 开好了，这一轮没下达关：设备挂上，接着建会话。 */
         ADOPT,
-        /** 这一轮最近那一次 {@code openCamera} 还没开好就报错、被断开：这个设备对象关掉，报开不起来。 */
+        /** 那一次 {@code openCamera} 还没开好就报错、被断开，这一轮没下达关：这个设备对象关掉，报开不起来。 */
         OPEN_FAILED,
         /** 挂着的那一台丢了（被断开、报错）：先报、再关。 */
         LOST,
-        /** 这一轮下达了关（或者这一次不是这一轮最近那一次 {@code openCamera}）：设备晚到，就地关掉，关完这一轮才可能结束。 */
+        /** 这一轮下达了关之后那一次 {@code openCamera} 才回音：设备晚到，就地关掉，关完这一轮才可能结束。 */
         CLOSE_LATE,
-        /** 这一台的关已经有人在做（关相机那一下、重开时关旧的、丢了之后的关、晚到的就地关）：什么都不做。 */
+        /** 这一台的关已经有人在做（关相机那一下、丢了之后的关、晚到的就地关）：什么都不做。 */
         IGNORE,
         /**
          * 不归这一轮的账：{@code openCamera} 抛了的那一次的回调（框架报错时可能照样 post 一声），或者早关完了的设备又来一声。
@@ -66,7 +66,7 @@ public final class CameraRound {
         STRAY
     }
 
-    /** 一次 {@code openCamera}：一次一个 StateCallback（相机层的回调拿着它，凭它认是哪一次）。 */
+    /** 这一轮那一次 {@code openCamera}：一个 StateCallback（相机层的回调拿着它，凭它认是哪一轮的）。 */
     public static final class Call {
         enum State {
             /** 在调 {@code openCamera}（还没返回）。 */
@@ -79,13 +79,7 @@ public final class CameraRound {
             ANSWERED
         }
 
-        /** 这一轮里第几次 {@code openCamera}（从 1 起）。 */
-        public final int number;
         State state = State.CALLING;
-
-        Call(int number) {
-            this.number = number;
-        }
 
         boolean outstanding() {
             return state == State.CALLING || state == State.PENDING;
@@ -97,23 +91,19 @@ public final class CameraRound {
         public final Phase phase;
         /** 从什么时候起一直有开或关没返回（{@link CameraRound#outstandingSince}）；0 = 稳稳开着。 */
         public final long outstandingSince;
-        /** 最近那一次 {@code openCamera} 还没返回（卡在相机服务里的就是这样）。 */
+        /** 那一次 {@code openCamera} 还没返回（卡在相机服务里的就是这样）。 */
         public final boolean inOpenCamera;
-        /** 最近那一次 {@code openCamera} 返回了、还在等回调。 */
+        /** 那一次 {@code openCamera} 返回了、还在等回调。 */
         public final boolean openPending;
         /** 这一轮下达了关。 */
         public final boolean cancelled;
-        /** 开着时救援的重开还没开好（关旧的、等 300 ms、开新的）。 */
-        public final boolean reopening;
 
-        Status(Phase phase, long outstandingSince, boolean inOpenCamera, boolean openPending, boolean cancelled,
-               boolean reopening) {
+        Status(Phase phase, long outstandingSince, boolean inOpenCamera, boolean openPending, boolean cancelled) {
             this.phase = phase;
             this.outstandingSince = outstandingSince;
             this.inOpenCamera = inOpenCamera;
             this.openPending = openPending;
             this.cancelled = cancelled;
-            this.reopening = reopening;
         }
 
         /** 在关、在丢：有一次关没返回。 */
@@ -126,7 +116,7 @@ public final class CameraRound {
             StringBuilder sb = new StringBuilder();
             switch (phase) {
                 case OPENING:
-                    sb.append(reopening ? "reopen" : "opening");
+                    sb.append("opening");
                     break;
                 case CLOSING:
                     sb.append("closing");
@@ -158,11 +148,10 @@ public final class CameraRound {
     /** 下达的时刻（调度的钟）。 */
     public final long since;
 
-    /** 要进 {@code openCamera}、还没进的那几次开（下达的那一次；开着时救援的重开那一下）。 */
-    private int intents = 1;
-    /** 这一轮最近那一次 {@code openCamera}；还没调过是 null。 */
+    /** 下达的那一次开还没进 {@code openCamera}（开之前查列表、查参数）：一轮里只有这一次开。 */
+    private boolean beforeCall = true;
+    /** 这一轮那一次 {@code openCamera}；还没调过（或者没进去）是 null。 */
     private Call current;
-    private int calls;
     /** 交到这一轮手上、还没关完的设备对象（按对象认）。 */
     private final List<Object> devices = new ArrayList<>();
     /** 挂在相机对象上的那一台（开好了、没丢、没摘下）；没有是 null。 */
@@ -172,7 +161,14 @@ public final class CameraRound {
     /** 关相机那一下：下达了、还没做完的几次。 */
     private int jobs;
     private boolean cancelled;
-    private boolean reopening;
+    /**
+     * 在丢的那一台是被踢的（被断开、报错 1 / 2）：相机服务那边已经把我们踢了，那几秒里它报的「被占用」是新的主人（{@link #holdsInService}）。
+     * 跟着丢了那一下记（{@link #failed}），那一次关返回就清（{@link #closed}）。以前是一份相机对象自己的标记（SingleCamera.kickedClose）：
+     * 管线重建时另一份相机对象问不到这一轮被踢（第 1 步审查留给第 2 步，2026-10-29）。
+     */
+    private boolean kicked;
+    /** 这一轮丢过（{@link #closedOut}）。 */
+    private boolean lost;
     private long outstandingSince;
     private boolean ended;
 
@@ -192,24 +188,19 @@ public final class CameraRound {
      * 不进 {@code openCamera}，这一次开就当没开（接着 {@link #takeEnd}）。
      */
     synchronized Call beginCall(long now) {
-        if (intents > 0) {
-            intents--;
-        }
+        beforeCall = false;
         if (cancelled || ended) {
             touch(now);
             return null;
         }
-        current = new Call(++calls);
+        current = new Call();
         touch(now);
         return current;
     }
 
     /** 相机线程：这一次开没进 {@code openCamera}（不在列表里、查参数抛了、开之前就被关了）。接着 {@link #takeEnd}。 */
     synchronized void noCall(long now) {
-        if (intents > 0) {
-            intents--;
-        }
-        reopening = false;
+        beforeCall = false;
         touch(now);
     }
 
@@ -226,9 +217,6 @@ public final class CameraRound {
         if (call.state == Call.State.CALLING) {
             call.state = Call.State.THREW;
         }
-        if (call == current) {
-            reopening = false;
-        }
         touch(now);
     }
 
@@ -240,9 +228,8 @@ public final class CameraRound {
         } else if (call.outstanding()) {
             call.state = Call.State.ANSWERED;
             received(device);
-            if (call == current && !cancelled) {
+            if (!cancelled) {
                 adopted = device;
-                reopening = false;
                 action = Action.ADOPT;
             } else {
                 action = Action.CLOSE_LATE;
@@ -254,23 +241,25 @@ public final class CameraRound {
         return action;
     }
 
-    /** 相机线程：{@code call} 那一次的 onError / onDisconnected。 */
-    synchronized Action failed(Call call, Object device, long now) {
+    /**
+     * 相机线程：{@code call} 那一次的 onError / onDisconnected。
+     *
+     * @param kicked 被断开、报错 1 / 2（多半是别的程序拿走了）：挂着的那一台丢了的话，那一次关返回之前相机服务那边已经不算我们的
+     *               （{@link #holdsInService}）；设备错误 3 / 4 / 5 不算 —— 我们的连接还在
+     */
+    synchronized Action failed(Call call, Object device, boolean kicked, long now) {
         Action action;
         if (ended || call.state == Call.State.THREW) {
             action = Action.STRAY;
         } else if (call.outstanding()) {
             call.state = Call.State.ANSWERED;
             received(device);
-            if (call == current && !cancelled) {
-                reopening = false;
-                action = Action.OPEN_FAILED;
-            } else {
-                action = Action.CLOSE_LATE;
-            }
+            action = cancelled ? Action.CLOSE_LATE : Action.OPEN_FAILED;
         } else if (device != null && device == adopted) {
             adopted = null;
             losing = device;
+            this.kicked = kicked;
+            lost = true;
             action = Action.LOST;
         } else {
             action = holds(device) ? Action.IGNORE : Action.STRAY;
@@ -294,6 +283,7 @@ public final class CameraRound {
         }
         if (losing == device) {
             losing = null;
+            kicked = false;
         }
         touch(now);
     }
@@ -307,7 +297,6 @@ public final class CameraRound {
             return false;
         }
         cancelled = true;
-        reopening = false;
         jobs++;
         adopted = null;
         touch(now);
@@ -322,22 +311,6 @@ public final class CameraRound {
         touch(now);
     }
 
-    /**
-     * 主线程：救援重开挂着的那一台（同一轮里关旧的、开新的）。只在挂着一台、没下达关、没在丢、没有别的开在途时行（返回 true）：
-     * 旧的那一台摘下来交给重开那一下去关（关完才算），再开一次。别的时候返回 false —— 合并掉，不设时限。
-     */
-    synchronized boolean reopenRequested(long now) {
-        if (ended || cancelled || adopted == null || losing != null || intents > 0
-                || current != null && current.outstanding()) {
-            return false;
-        }
-        adopted = null;
-        intents++;
-        reopening = true;
-        touch(now);
-        return true;
-    }
-
     // ================================================================= 结束
 
     /**
@@ -345,7 +318,7 @@ public final class CameraRound {
      * 第一次成立时返回 true，之后都是 false（结束只有一次）。每一次改完都问一次。
      */
     synchronized boolean takeEnd() {
-        if (ended || intents > 0 || current != null && current.outstanding() || !devices.isEmpty() || jobs > 0) {
+        if (ended || beforeCall || current != null && current.outstanding() || !devices.isEmpty() || jobs > 0) {
             return false;
         }
         ended = true;
@@ -364,6 +337,28 @@ public final class CameraRound {
         return cancelled;
     }
 
+    /**
+     * 相机服务那边此刻算不算我们占着这一台：除了被踢之后那一次关在做（{@link #kicked}，那一下返回就清），这一轮在开、开着、在关都算 ——
+     * 从字段上摘下来到相机服务真的放开之间，占着它的仍然是我们。账本上这一台的那一轮谁的都一样问它（相机服务那几声认人，
+     * CameraAvailabilityWatch）：管线重建时另一份相机对象被踢、正在关，也照这一轮答（第 1 步审查留给第 2 步）。
+     */
+    public synchronized boolean holdsInService() {
+        return losing == null || !kicked;
+    }
+
+    /** 这一轮此刻挂着一台设备（开好了、没丢、没摘下：SingleCamera 那一份的设备字段就是它）。 */
+    public synchronized boolean holdsDevice() {
+        return !ended && adopted != null;
+    }
+
+    /**
+     * 这一轮是一次关做完才结束的（下达过关，或者丢过 —— 丢了之后那一次关也是我们的关）：账本据此记这一台我们最近一次关完的时刻
+     * （{@link CameraRounds#closedAt}）。开不起来、没下达关就结束的那种不算。
+     */
+    public synchronized boolean closedOut() {
+        return cancelled || lost;
+    }
+
     public synchronized Phase phase() {
         return phaseNow();
     }
@@ -376,7 +371,7 @@ public final class CameraRound {
     /** 此刻的样子，一次读齐。 */
     public synchronized Status status() {
         return new Status(phaseNow(), outstandingSince, current != null && current.state == Call.State.CALLING,
-                current != null && current.state == Call.State.PENDING, cancelled, reopening);
+                current != null && current.state == Call.State.PENDING, cancelled);
     }
 
     // ================================================================= 小工具
@@ -388,7 +383,7 @@ public final class CameraRound {
         if (cancelled || holdsOtherThan(adopted)) {
             return Phase.CLOSING;
         }
-        if (intents > 0 || current != null && current.outstanding()) {
+        if (beforeCall || current != null && current.outstanding()) {
             return Phase.OPENING;
         }
         if (adopted != null) {

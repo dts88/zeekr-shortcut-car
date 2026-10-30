@@ -55,7 +55,9 @@ public final class UserExit {
     }
 
     /**
-     * 人点开了主界面，或者真正开机了：恢复自启动。
+     * 人点开了主界面，或者真正开机了：恢复自启动。也是通道调度退出的门（第 2 步「只有一个调度」，审查 2026-10-30）：退出以后调度只关、
+     * 不开，清掉退出的记号就照常开（{@code ChannelScheduler.resumeAfterExit}，调度装上了才叫）—— 一处清、一处开，以前只有主界面那一处叫它，
+     * 开机清掉的不叫。
      *
      * @param why 给黑匣子看的原因，用 ASCII（调用方都是代码里的常量）
      */
@@ -65,6 +67,10 @@ public final class UserExit {
         }
         prefs(context).edit().remove(KEY_EXITED_AT).apply();
         BlackBox.noteImportant("恢复自启动：" + why);
+        com.kooo.evcam.camera.ChannelScheduler scheduler = com.kooo.evcam.camera.ChannelScheduler.app();
+        if (scheduler != null) {
+            scheduler.resumeAfterExit();
+        }
     }
 
     /**

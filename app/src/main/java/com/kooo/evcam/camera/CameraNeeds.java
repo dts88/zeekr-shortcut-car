@@ -74,7 +74,7 @@ public final class CameraNeeds {
     private boolean headUnitSleeps;
 
     /**
-     * 登记表变了（或者「车机要睡」变了）谁来看：当前管理器的通道调度（{@link ChannelScheduler}）—— 只叫醒它，自己不判。
+     * 登记表变了（或者「车机要睡」变了）谁来看：进程里那一个通道调度（{@link ChannelScheduler}）—— 只叫醒它，自己不判。
      * 在登记的那个线程上调。
      */
     public interface Listener {
@@ -83,18 +83,12 @@ public final class CameraNeeds {
 
     private volatile Listener listener;
 
+    /**
+     * 接上监听者：装上那一个调度时接一次（ChannelFacts.install），不再摘。以前每一份管线接一次、放掉时只在还是自己时才摘
+     * （换车型时两份并存，第 2 步「只有一个调度」起没有这一出了）。
+     */
     public synchronized void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    /**
-     * 摘掉监听者 —— 只在它还是 {@code listener} 时摘。换车型时两份管理器并存：旧的那份晚 release，
-     * 不能把新那份接上的监听摘了（以前 release 一律 setListener(null)，新管线从此听不到登记表）。
-     */
-    public synchronized void clearListener(Listener listener) {
-        if (this.listener == listener) {
-            this.listener = null;
-        }
     }
 
     /**
