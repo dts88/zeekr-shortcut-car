@@ -78,15 +78,15 @@ def main():
 
     out.append("## Known issue")
     out.append("")
-    out.append("Using the cabin cameras (front and rear) for everyday recording disrupts App Lab's "
-               "resource scheduling and eventually crashes App Lab. "
+    out.append("Recording the rear cabin camera every day may eventually crash App Lab, which then "
+               "has to be reinstalled. "
                "The cause is not yet known: it is unclear in what order, or under what conditions, "
-               "the head unit expects these cameras to be opened and released.")
+               "the head unit expects the cameras to be opened and released.")
     out.append("")
-    out.append("Day-to-day use in the car is unaffected. However, if you lock the car and leave with "
-               "the app running, the fault is triggered almost every time you return. A single "
-               "occurrence does not crash App Lab, but the effects accumulate: on the developer's "
-               "car, App Lab became noticeably slow after about a week, and after about two weeks it "
+    out.append("Day-to-day use in the car is unaffected. The risk comes when you lock the car and "
+               "leave with the app running. A single occurrence does not crash App Lab, but the "
+               "effects accumulate: on the developer's car, with the cabin cameras in use, App Lab "
+               "became noticeably slow after about a week, and after about two weeks it "
                "crashed and would no longer start. After a head unit restart, App Lab had "
                "disappeared and had to be reinstalled.")
     out.append("")
