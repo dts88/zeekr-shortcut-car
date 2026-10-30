@@ -115,7 +115,7 @@
     <string name="floating_action_toggle_mirror">Hidupkan / matikan Cermin super</string>
     <string name="floating_action_lock_footage">Kunci rakaman semasa</string>
     <string name="floating_action_toggle_drive_sound">Hidupkan / matikan bunyi pemanduan simulasi</string>
-    <!-- 灵动贴（试验性，2026-10-30，button.SmartButtons；这一种语言待项目所有者确认） -->
+    <!-- 灵动贴（试验性，2026-10-30 项目所有者批准，button.SmartButtons） -->
     <string name="set_section_floating_page">Butang terapung dan butang pintar</string>
     <string name="set_group_smart_button">Butang pintar (percubaan)</string>
     <string name="set_smart_button_search_title">Cari butang pintar</string>

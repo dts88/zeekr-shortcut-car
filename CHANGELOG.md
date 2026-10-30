@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.35.0-alpha] - 2026-10-30
+
+- Smart buttons (experimental): the app can find, connect and delete ZEEKR_button smart buttons, and shows each one's battery level. Single and double press each run a chosen action: any floating button action, or switching to Comfort, Standard or Sport drive mode. Presses while the screen is off don't count.
+- Settings: Floating button is now Floating button and smart buttons, with a heading over each group's rows.
+
 ## [2.34.0-alpha] - 2026-10-30
 
 - Settings: changes to the stream profile, its cameras and camera mapping take effect when you return to the main screen; restarting the app is no longer needed, and the messages no longer say so. Several changes in one visit switch the cameras once; changing only a profile's name or how its views are laid out does not reopen them.

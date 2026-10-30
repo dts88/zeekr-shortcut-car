@@ -415,7 +415,17 @@
   dlg_smart_button_delete_msg「删除后按它不再触发动作；要再用，需重新搜索并连接。」；msg_smart_button_connected「已连接灵动贴 %1$s」；
   msg_smart_button_bluetooth_off「请先打开蓝牙」；msg_smart_button_no_bluetooth「这台车机没有蓝牙」；
   msg_smart_button_no_permission「没有「附近的设备」权限，无法搜索灵动贴」；msg_drive_mode_failed「驾驶模式没有切换」。
-  英文、马来文还是草稿，见下面「待项目所有者确认」。
+  英文、马来文 2026-10-30 照草稿批准（项目所有者：「文字部分是可以的」）：灵动贴译 Smart button / Butang pintar。
+  页名 Floating button and smart buttons / Butang terapung dan butang pintar；小标题 Smart buttons (experimental) / Butang pintar (percubaan)；
+  Find smart buttons / Cari butang pintar；After connecting, choose an action for single and double press / Selepas disambungkan, pilih tindakan untuk
+  tekan sekali dan tekan dua kali；Press the smart button and it appears above. / Tekan butang pintar dan ia akan muncul di atas.；
+  Smart button %1$s / Butang pintar %1$s；Battery %1$d%% / Bateri %1$d%%；Single press: %1$s; double press: %2$s / Tekan sekali: %1$s; tekan dua kali: %2$s；
+  Single press / Tekan sekali；Double press / Tekan dua kali；None / Tiada；Switch to %1$s mode / Tukar ke mod %1$s；
+  Delete this smart button? / Padam butang pintar ini?；Pressing it will no longer do anything. To use it again, find and connect it again. /
+  Menekannya tidak akan melakukan apa-apa lagi. Untuk menggunakannya semula, cari dan sambungkannya semula.；Smart button %1$s connected /
+  Butang pintar %1$s disambungkan；Turn on Bluetooth first / Hidupkan Bluetooth dahulu；This head unit has no Bluetooth / Unit kepala ini tiada Bluetooth；
+  Without the Nearby devices permission, smart buttons can't be found / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dicari；
+  Drive mode didn't change / Mod pemanduan tidak bertukar。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -442,18 +452,6 @@
   BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
   Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
 
-
-- 灵动贴的英文、马来文（2026-10-30，中文批了，见上面的单子；这两种照草稿上了，项目所有者还没看）：灵动贴暂译 Smart button / Butang pintar。
-  页名 Floating button and smart buttons / Butang terapung dan butang pintar；小标题 Smart buttons (experimental) / Butang pintar (percubaan)；
-  Find smart buttons / Cari butang pintar；After connecting, choose an action for single and double press / Selepas disambungkan, pilih tindakan untuk
-  tekan sekali dan tekan dua kali；Press the smart button and it appears above. / Tekan butang pintar dan ia akan muncul di atas.；
-  Smart button %1$s / Butang pintar %1$s；Battery %1$d%% / Bateri %1$d%%；Single press: %1$s; double press: %2$s / Tekan sekali: %1$s; tekan dua kali: %2$s；
-  Single press / Tekan sekali；Double press / Tekan dua kali；None / Tiada；Switch to %1$s mode / Tukar ke mod %1$s；
-  Delete this smart button? / Padam butang pintar ini?；Pressing it will no longer do anything. To use it again, find and connect it again. /
-  Menekannya tidak akan melakukan apa-apa lagi. Untuk menggunakannya semula, cari dan sambungkannya semula.；Smart button %1$s connected /
-  Butang pintar %1$s disambungkan；Turn on Bluetooth first / Hidupkan Bluetooth dahulu；This head unit has no Bluetooth / Unit kepala ini tiada Bluetooth；
-  Without the Nearby devices permission, smart buttons can't be found / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dicari；
-  Drive mode didn't change / Mod pemanduan tidak bertukar。
 
 - 2026-10-24（开发者选项「车辆状态（试验性）」面板去掉闪远光、双闪，加刹车、油门深度，项目所有者）：
   set_vehicle_status_summary「在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭和刹车、油门深度；喇叭信号暂无法读取」/
