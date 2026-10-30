@@ -656,7 +656,7 @@ public class SingleCamera {
         return laneTransformNote;
     }
 
-    /** 配置里这一路的那一格；不拆分的那几路只有一格。取不到返回 null。 */
+    /** 生效的配置里这一路的那一格；不拆分的那几路只有一格。取不到返回 null。 */
     private com.kooo.evcam.profile.LaneLayout laneForThisCamera() {
         try {
             String role = com.kooo.evcam.profile.ProfileSizes.roleForCameraKey(cameraPosition);
@@ -664,7 +664,7 @@ public class SingleCamera {
                 return null;
             }
             com.kooo.evcam.profile.CameraProfile camera =
-                    new com.kooo.evcam.profile.ProfileStore(context).current().camera(role);
+                    com.kooo.evcam.profile.RecordSpecs.effectiveProfile(context).camera(role);
             if (camera == null || camera.lanes.isEmpty()) {
                 return null;
             }

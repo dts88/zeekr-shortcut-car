@@ -35,7 +35,8 @@ public class AppConfig {
     private static final String KEY_FOOTAGE_LOCK_FLASH = "footage_lock_flash";  // 自动锁定：闪远光
     private static final String KEY_FOOTAGE_LOCK_HAZARD = "footage_lock_hazard";  // 自动锁定：双闪
     private static final String KEY_UI_LEFT_FOR_SCREEN_OFF = "ui_left_for_screen_off";  // 主界面是因为熄屏才退下去的
-    
+    private static final String KEY_FRONT_CABIN_IN_USE = "front_cabin_in_use";  // 前座舱只用一次：带着前座舱建了管线的那份配置
+
     // 存储位置配置
     private static final String KEY_STORAGE_LOCATION = "storage_location";  // 存储位置
     private static final String KEY_CUSTOM_SD_CARD_PATH = "custom_sd_card_path";  // 手动设置的U盘路径
@@ -335,6 +336,26 @@ public class AppConfig {
 
     public boolean didUiLeaveForScreenOff() {
         return prefs.getBoolean(KEY_UI_LEFT_FOR_SCREEN_OFF, false);
+    }
+
+    /** 前座舱只用一次（camera.FrontCabinOneShot）：哪份配置的前座舱在用（带着它建了管线、还没离车）；没有是 null。 */
+    public String getFrontCabinInUse() {
+        return prefs.getString(KEY_FRONT_CABIN_IN_USE, null);
+    }
+
+    /**
+     * 同上：记下（配置 id）或清掉（null）。同步落盘（commit），和「因熄屏退下去」一样：离车之后车机几秒就可能结束进程，
+     * 这个记号是下一次启动关掉前座舱的依据。没变就不写。
+     */
+    public void setFrontCabinInUse(String profileId) {
+        if (java.util.Objects.equals(getFrontCabinInUse(), profileId)) {
+            return;
+        }
+        if (profileId == null) {
+            prefs.edit().remove(KEY_FRONT_CABIN_IN_USE).commit();
+        } else {
+            prefs.edit().putString(KEY_FRONT_CABIN_IN_USE, profileId).commit();
+        }
     }
 
     /**
@@ -679,8 +700,8 @@ public class AppConfig {
     }
 
     /**
-     * 存在这份设置里、却不是设置的键：首次启动和「问过没有」的记号、因熄屏退下去的标记、自动检测的缓存、一次性迁移的记号、
-     * 存下的槽位映射（按车型，检测出来的，见 {@link #getStoredSlotMap}）。
+     * 存在这份设置里、却不是设置的键：首次启动和「问过没有」的记号、因熄屏退下去的标记、前座舱在用的记号、自动检测的缓存、
+     * 一次性迁移的记号、存下的槽位映射（按车型，检测出来的，见 {@link #getStoredSlotMap}）。
      *
      * <p>导出设置不带它们，导入时也不动它们（{@code settings.SettingsBackup}，项目所有者 2026-10-19）。
      * 新加的键默认算设置；是运行状态的，加到这里。</p>
@@ -693,6 +714,7 @@ public class AppConfig {
                 KEY_LANGUAGE_CHOSEN,
                 KEY_RAIL_SIDE_CHOSEN,
                 KEY_UI_LEFT_FOR_SCREEN_OFF,
+                KEY_FRONT_CABIN_IN_USE,
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
                 KEY_PHOTO_VIA_JPEG_RESET)));

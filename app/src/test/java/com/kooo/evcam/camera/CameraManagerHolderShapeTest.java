@@ -4,6 +4,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.profile.CameraProfile;
+import com.kooo.evcam.profile.LaneLayout;
+import com.kooo.evcam.profile.Profile;
+
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -11,7 +15,8 @@ import java.util.LinkedHashSet;
 
 /**
  * 建管线建哪几路（{@link CameraManagerHolder.Shape}）：照启用的几路，环视一直建（超级镜子要它），座舱启用了才建；
- * 超级镜子的切换范围是「后视 + 后座舱」时后座舱也建（2026-10-19）。
+ * 超级镜子的切换范围是「后视 + 后座舱」时后座舱也建（2026-10-19）。配置改动回到主界面时生效（2026-10-30）：
+ * 主界面接上时建管线、录像用到的变了才换管线，只是名字、各格的摆法变了不换。
  *
  * <p>2026-10-16 修的就是这里：以前数路数，只开一路座舱时只建了环视；只开两路座舱时最多建 2 路，前座舱被挤掉。</p>
  */
@@ -22,12 +27,32 @@ public class CameraManagerHolderShapeTest {
     private static final String FRONT = CameraSlots.KEY_CABIN_FRONT;
 
     private static CameraManagerHolder.Shape shape(String... enabled) {
-        return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)), false);
+        return shape(null, false, enabled);
     }
 
     /** 超级镜子要后座舱（切换范围是「后视 + 后座舱」）。 */
     private static CameraManagerHolder.Shape mirrorCabin(String... enabled) {
-        return new CameraManagerHolder.Shape("zeekr_7x", null, new LinkedHashSet<>(Arrays.asList(enabled)), true);
+        return shape(null, true, enabled);
+    }
+
+    private static CameraManagerHolder.Shape shape(Profile profile, boolean mirrorCabin, String... enabled) {
+        return new CameraManagerHolder.Shape("zeekr_7x", profile, new LinkedHashSet<>(Arrays.asList(enabled)),
+                mirrorCabin, null, null, null);
+    }
+
+    /** 一份三路都在、环视开着的配置；环视那一格一个摆位。 */
+    private static Profile profile() {
+        Profile profile = new Profile();
+        profile.id = Profile.PRESET_COMPOSITE_MULTI;
+        profile.name = "三路";
+        CameraProfile composite = new CameraProfile(CameraProfile.ROLE_COMPOSITE);
+        composite.lanes.add(new LaneLayout());
+        CameraProfile cabin1 = new CameraProfile(CameraProfile.ROLE_CABIN_1);
+        cabin1.enabled = false;
+        CameraProfile cabin2 = new CameraProfile(CameraProfile.ROLE_CABIN_2);
+        cabin2.enabled = false;
+        profile.cameras.addAll(Arrays.asList(composite, cabin1, cabin2));
+        return profile;
     }
 
     @Test
@@ -71,7 +96,7 @@ public class CameraManagerHolderShapeTest {
         assertEquals("zeekr_7x/-", none.key());
     }
 
-    /** 主界面接上时启用的几路变了才重建：key 照开的次序写，给的先后不影响。 */
+    /** key 照开的次序写，给的先后不影响。 */
     @Test
     public void theKeyNamesTheEnabledLanesInOpenOrder() {
         assertEquals("zeekr_7x/front+left+back", shape(FRONT, SUR, REAR).key());
@@ -97,58 +122,111 @@ public class CameraManagerHolderShapeTest {
     }
 
     /**
-     * 只为超级镜子建的后座舱写进 key（变了谁来要都重建），不写进 lanesKey（启用的几路没变，主界面的布局不变）。
+     * 只为超级镜子建的后座舱写进 key（建管线用到的），不写进 lanesKey、configKey（启用的几路没变，主界面的布局不变）。
      */
     @Test
     public void theMirrorCabinChangesTheKeyButNotTheLanes() {
         assertEquals("zeekr_7x/front/mirror:left", mirrorCabin(SUR).key());
         assertEquals(shape(SUR).lanesKey(), mirrorCabin(SUR).lanesKey());
+        assertEquals(shape(SUR).configKey(), mirrorCabin(SUR).configKey());
         assertFalse(shape(SUR).key().equals(mirrorCabin(SUR).key()));
-    }
-
-    /**
-     * 照哪几路启用的建（2026-10-20 审查，车主批）：主界面接上时照它摆的格子（配置改了、主界面还没重建也一样），
-     * 后台的调用方照手里那一份，还没有过管线时照此刻的配置。
-     */
-    @Test
-    public void theMainScreenLayoutDecidesTheEnabledLanes() {
-        java.util.Set<String> laidOut = new LinkedHashSet<>(Arrays.asList(SUR, FRONT));
-        java.util.Set<String> built = new LinkedHashSet<>(Arrays.asList(SUR));
-        java.util.Set<String> profile = new LinkedHashSet<>(Arrays.asList(SUR, REAR));
-        assertEquals(laidOut, CameraManagerHolder.lanesFor(laidOut, built, profile));
-        assertEquals(laidOut, CameraManagerHolder.lanesFor(laidOut, null, profile));
-        assertEquals(built, CameraManagerHolder.lanesFor(null, built, profile));
-        assertEquals(profile, CameraManagerHolder.lanesFor(null, null, profile));
+        assertFalse(shape(SUR).pipelineKey().equals(mirrorCabin(SUR).pipelineKey()));
     }
 
     /**
      * 为超级镜子当场重建只在「要后座舱而这一份里没有」时（谁来要都重建）；换出这一档、或者这一份里已经有后座舱，后台的调用方都不重建 ——
-     * 设置里来回切，一份管线最多为它重建一次。只为它建、现在没人要的后座舱，和开的几路变了一样，等主界面接上时照此刻的设置重建。
+     * 设置里来回切，一份管线最多为它重建一次。只为它建、现在没人要的后座舱，和配置变了一样，等主界面接上时去掉。
      */
     @Test
     public void theMirrorRebuildsOnlyForAMissingRearCabin() {
-        String surroundLanes = shape(SUR).lanesKey();
+        CameraManagerHolder.Shape surround = shape(SUR);
+        CameraManagerHolder.Shape withMirror = mirrorCabin(SUR);
         assertEquals(CameraManagerHolder.Rebuild.MIRROR_CABIN,
-                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), false, "zeekr_7x", surroundLanes, false));
-        assertEquals(CameraManagerHolder.Rebuild.MIRROR_CABIN,
-                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), true, "zeekr_7x", surroundLanes, false));
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), surround, false));
+        assertEquals("主界面接上时：建的变了，一样当场重建", CameraManagerHolder.Rebuild.CONFIG,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), surround, true));
         assertEquals("这一份里已经有后座舱", CameraManagerHolder.Rebuild.NO,
-                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), false, "zeekr_7x", surroundLanes, true));
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR), withMirror, false));
         assertEquals("换出这一档：多出来的后座舱不算", CameraManagerHolder.Rebuild.NO,
-                CameraManagerHolder.rebuildFor(shape(SUR), false, "zeekr_7x", surroundLanes, true));
-        assertEquals("主界面接上时去掉没人要的后座舱", CameraManagerHolder.Rebuild.LANES,
-                CameraManagerHolder.rebuildFor(shape(SUR), true, "zeekr_7x", surroundLanes, true));
+                CameraManagerHolder.rebuildFor(shape(SUR), withMirror, false));
+        assertEquals("主界面接上时去掉没人要的后座舱", CameraManagerHolder.Rebuild.CONFIG,
+                CameraManagerHolder.rebuildFor(shape(SUR), withMirror, true));
         assertEquals("配置里启用了后座舱：不是只为超级镜子建的", CameraManagerHolder.Rebuild.NO,
-                CameraManagerHolder.rebuildFor(shape(SUR, REAR), true, "zeekr_7x", shape(SUR, REAR).lanesKey(), true));
-        assertEquals("开的几路也变了：照样当场补后座舱", CameraManagerHolder.Rebuild.MIRROR_CABIN,
-                CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), false, "zeekr_7x", surroundLanes, false));
-        assertEquals(CameraManagerHolder.Rebuild.MIRROR_CABIN,
-                CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), true, "zeekr_7x", surroundLanes, false));
-        assertEquals("主界面接上时按开的几路", CameraManagerHolder.Rebuild.LANES,
-                CameraManagerHolder.rebuildFor(shape(SUR, FRONT), true, "zeekr_7x", surroundLanes, false));
-        assertEquals("只是开的几路变了：后台调用方不重建", CameraManagerHolder.Rebuild.NO,
-                CameraManagerHolder.rebuildFor(shape(SUR, FRONT), false, "zeekr_7x", surroundLanes, false));
-        assertEquals(CameraManagerHolder.Rebuild.CAR_MODEL,
-                CameraManagerHolder.rebuildFor(shape(SUR), false, "zeekr_7x_multi", surroundLanes, true));
+                CameraManagerHolder.rebuildFor(shape(SUR, REAR), mirrorCabin(SUR, REAR), true));
+        assertEquals("后台的调用方：开的几路照生效的，照样当场补后座舱", CameraManagerHolder.Rebuild.MIRROR_CABIN,
+                CameraManagerHolder.rebuildFor(mirrorCabin(SUR, FRONT), shape(SUR, FRONT), false));
+    }
+
+    /**
+     * 配置变了（开的几路、车型、选的哪份配置、各路参数、映射）只在主界面接上时换管线（回到主界面时生效，2026-10-30）；
+     * 后台的调用方照用生效的那一份。
+     */
+    @Test
+    public void configChangesRebuildOnlyWhenTheMainScreenAttaches() {
+        CameraManagerHolder.Shape effective = shape(profile(), false, SUR);
+
+        CameraManagerHolder.Shape lanes = shape(profile(), false, SUR, FRONT);
+        assertEquals(CameraManagerHolder.Rebuild.CONFIG, CameraManagerHolder.rebuildFor(lanes, effective, true));
+        assertEquals(CameraManagerHolder.Rebuild.NO, CameraManagerHolder.rebuildFor(lanes, effective, false));
+
+        CameraManagerHolder.Shape carModel = new CameraManagerHolder.Shape("zeekr_7x_multi", profile(),
+                new LinkedHashSet<>(Arrays.asList(SUR)), false, null, null, null);
+        assertEquals("换了车型", CameraManagerHolder.Rebuild.CONFIG, CameraManagerHolder.rebuildFor(carModel, effective, true));
+        assertEquals("后台的调用方不因为换了车型重建", CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(carModel, effective, false));
+
+        Profile bitrate = profile();
+        bitrate.camera(CameraProfile.ROLE_COMPOSITE).record.bitrate = "high";
+        assertEquals("各路参数", CameraManagerHolder.Rebuild.CONFIG,
+                CameraManagerHolder.rebuildFor(shape(bitrate, false, SUR), effective, true));
+
+        Profile other = profile();
+        other.id = Profile.PRESET_COMPOSITE;
+        assertEquals("选了另一份配置", CameraManagerHolder.Rebuild.CONFIG,
+                CameraManagerHolder.rebuildFor(shape(other, false, SUR), effective, true));
+
+        CameraManagerHolder.Shape mapping = new CameraManagerHolder.Shape("zeekr_7x", profile(),
+                new LinkedHashSet<>(Arrays.asList(SUR)), false, "2", null, null);
+        assertEquals("摄像头映射", CameraManagerHolder.Rebuild.CONFIG,
+                CameraManagerHolder.rebuildFor(mapping, effective, true));
+        assertEquals(CameraManagerHolder.Rebuild.NO, CameraManagerHolder.rebuildFor(mapping, effective, false));
+
+        assertEquals("一样的配置不重建", CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(shape(profile(), false, SUR), effective, true));
+    }
+
+    /** 只是名字、各格的摆法变了：管线不换（pipelineKey 一样），主界面照新的重新摆（configKey 不一样）。 */
+    @Test
+    public void nameAndCellChangesKeepThePipeline() {
+        CameraManagerHolder.Shape effective = shape(profile(), false, SUR);
+
+        Profile rotated = profile();
+        rotated.camera(CameraProfile.ROLE_COMPOSITE).lanes.get(0).rotation = 90;
+        CameraManagerHolder.Shape cells = shape(rotated, false, SUR);
+        assertEquals(effective.pipelineKey(), cells.pipelineKey());
+        assertFalse(effective.configKey().equals(cells.configKey()));
+        assertEquals(CameraManagerHolder.Rebuild.NO, CameraManagerHolder.rebuildFor(cells, effective, true));
+
+        Profile renamed = profile();
+        renamed.name = "改了名字";
+        CameraManagerHolder.Shape name = shape(renamed, false, SUR);
+        assertEquals(effective.pipelineKey(), name.pipelineKey());
+        assertFalse(effective.configKey().equals(name.configKey()));
+    }
+
+    /** 离车去掉前座舱：启用的几路拿掉它、配置换成关掉前座舱的那份 —— 和存下的（开关已经关掉）对得上，主界面接上时不重建。 */
+    @Test
+    public void retiringTheFrontCabinMatchesTheStoredConfig() {
+        Profile inUse = profile();
+        inUse.camera(CameraProfile.ROLE_CABIN_1).enabled = true;
+        CameraManagerHolder.Shape effective = shape(inUse, false, SUR, FRONT);
+
+        Profile stored = profile();   // 前座舱的开关已经关掉
+        CameraManagerHolder.Shape retired = effective.withoutFrontCabin(FRONT, stored);
+        assertFalse(retired.cabinFront);
+        assertEquals(shape(stored, false, SUR).pipelineKey(), retired.pipelineKey());
+        assertEquals(shape(stored, false, SUR).configKey(), retired.configKey());
+        assertEquals(CameraManagerHolder.Rebuild.NO,
+                CameraManagerHolder.rebuildFor(shape(stored, false, SUR), retired, true));
     }
 }

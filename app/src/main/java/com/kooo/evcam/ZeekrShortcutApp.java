@@ -30,6 +30,8 @@ public class ZeekrShortcutApp extends Application {
         lastConfig = new Configuration(getResources().getConfiguration());
         // 黑匣子尽早接上。ContentProvider 比这里还早，那边也会接一次，谁先谁算
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
+        // 前座舱只用一次（暂时的规矩）：上一次运行带着前座舱、没等到离车就结束了的，这次启动不带它 —— 赶在主界面摆布局、建管线之前
+        com.kooo.evcam.camera.FrontCabinOneShot.settleAtStart(this);
         // U 盘挂上、卸下、异常掉线进黑匣子（2026-09-26 录像盘掉线，系统那边发生了什么一行都没记下）
         com.kooo.evcam.blackbox.VolumeEvents.register(this);
         // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），

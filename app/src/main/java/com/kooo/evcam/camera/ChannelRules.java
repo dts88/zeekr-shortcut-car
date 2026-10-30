@@ -519,7 +519,7 @@ public final class ChannelRules {
         /** 事实：这条规矩开着（FrontCabinOneShot.ACTIVE；调度每一轮照 Host 填）。 */
         boolean frontCabinOneShot;
         /**
-         * 账：这次运行启用的前座舱已经去掉 —— 通道眼里熄屏的那一刻起，主界面预览、拍照、录像都不再要它，亮屏也不回来。
+         * 账：启用的前座舱已经离车去掉 —— 通道眼里熄屏的那一刻起，主界面预览、拍照、录像都不再要它，亮屏也不回来。
          * 后座舱照一般的规矩（熄屏放开、亮屏接回）。只由 {@link ChannelRules#retireFrontCabin} 改。
          */
         boolean frontCabinRetired;
@@ -832,8 +832,8 @@ public final class ChannelRules {
             /** 救了 3 轮没用，停手。 */
             STOPPED,
             /**
-             * 这次运行启用的前座舱去掉了（{@link ChannelRules#retireFrontCabin}，暂时的规矩）：{@code keys} 是前座舱那一路。
-             * 管线、录像、主界面据此把它从这次运行里拿掉。只报一次。
+             * 启用的前座舱离车去掉了（{@link ChannelRules#retireFrontCabin}，暂时的规矩）：{@code keys} 是前座舱那一路。
+             * 管线、录像、主界面据此把它拿掉（配置里它的开关关掉）。只报一次。
              */
             FRONT_CABIN_RETIRED,
             /**
@@ -1105,8 +1105,8 @@ public final class ChannelRules {
 
     /**
      * 前座舱只用一次（暂时的规矩，项目所有者 2026-10-22 定、10-23 改成只管前座舱）：车机不稳定的根因找到之前，前座舱不留到下一次用车。
-     * 这次运行启用了前座舱的，通道眼里一熄屏（黑满 30 秒、或者车机要睡，{@link #darkForChannel}）—— 正是座舱本来就放开的那一刻
-     * （{@link #releasedByDark}）—— 就把它从这次运行里去掉：之后亮屏也没人要（{@link #retiredFrontCabin}），关相机还是放开那一步。
+     * 启用了前座舱的，通道眼里一熄屏（黑满 30 秒、或者车机要睡，{@link #darkForChannel}）—— 正是座舱本来就放开的那一刻
+     * （{@link #releasedByDark}）—— 就把它去掉（配置里它的开关一起关掉）：之后亮屏也没人要（{@link #retiredFrontCabin}），关相机还是放开那一步。
      * 后座舱照一般的规矩：熄屏放开、亮屏接回。另一半在 FrontCabinOneShot：生效后就把那份配置里的前座舱开关关掉。
      * 找到根因后，这一条连同 {@link World#frontCabinOneShot}、{@link World#frontCabinRetired} 和 FrontCabinOneShot 一起拿掉。
      */
@@ -1123,7 +1123,7 @@ public final class ChannelRules {
         }
     }
 
-    /** 这一路是这次运行已经去掉的前座舱（{@link #retireFrontCabin}）：主界面预览、拍照、录像都不要它。 */
+    /** 这一路是离车已经去掉的前座舱（{@link #retireFrontCabin}）：主界面预览、拍照、录像都不要它。 */
     static boolean retiredFrontCabin(World w, Lane lane) {
         return w.frontCabinRetired && isCabinFront(lane);
     }

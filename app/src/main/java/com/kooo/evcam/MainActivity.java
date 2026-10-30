@@ -211,8 +211,13 @@ public class MainActivity extends AppCompatActivity {
 
     // 车型配置相关
     private AppConfig appConfig;
-    /** 启用的那几路（RecordSpecs.enabledCameraKeys）：主界面给它们摆格子、挂画布，一路一块（PreviewSlots）。 */
+    /** 启用的那几路（存下的配置里的，RecordSpecs.enabledCameraKeys）：主界面给它们摆格子、挂画布，一路一块（PreviewSlots）。 */
     private java.util.Set<String> enabledLanes = new java.util.LinkedHashSet<>();
+    /**
+     * 这个界面照着摆的那份配置（{@code CameraManagerHolder.configKeyOf}，和 {@link #activeProfile}、{@link #enabledLanes}
+     * 同一刻取）：回到主界面时和存下的比，不一样就照存下的重新摆（{@link #relayoutIfConfigChanged}）。
+     */
+    private String laidOutConfig;
     /** 预览画面停了就压暗（{@link #attachPreviewStall}）。 */
     private final com.kooo.evcam.zeekr.PreviewStall previewStall = new com.kooo.evcam.zeekr.PreviewStall();
     // 录制状态显示相关
@@ -360,8 +365,8 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.screen.ScreenState.addListener(screenListener);
         // 管线被 Holder 放掉重建时当场接上新的那一份（见 pipelineReplaced），onDestroy 摘掉
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().addReplacedListener(pipelineReplaced);
-        // 这一次运行的几路变了（离车时去掉了前座舱）：照新的几路重新摆（见 runLanesChanged），onDestroy 摘掉
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().addRunLanesListener(runLanesChanged);
+        // 生效的几路变了（离车时去掉了前座舱）：照存下的配置重新摆（见 lanesChanged），onDestroy 摘掉
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().addLanesListener(lanesChanged);
         initToggleRecordingReceiver();
     }
 
@@ -431,9 +436,11 @@ public class MainActivity extends AppCompatActivity {
         //
         // 以前先看车型，后来数路数：只开一路座舱时数出来是 1，摆成环视的四宫格，那一路座舱没地方显示、也没建；
         // 只开两路座舱时数出来是 2，按槽位号挂的是环视和前座舱（2026-10-16）。
-        // 问的是这一次运行的那几路（还没建过管线时是存下的配置）：前座舱只用一次时，生效后存下的配置里前座舱已经关了
-        // （camera.FrontCabinOneShot），主界面这一次运行里重建也还摆着前座舱，离车去掉前座舱之后才不摆它（onRunLanesChanged）
-        enabledLanes = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(this);
+        // 照的是存下的配置（设置页编辑的那份）：主界面是配置生效的那一刻，接上管线时 Holder 照它摆的这份换管线
+        // （CameraManagerHolder 类说明「回到主界面时生效」）。配置、启用的几路、记下的键同一刻取，前半截和后半截照的是同一份
+        activeProfile = new ProfileStore(this).current();
+        enabledLanes = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(activeProfile);
+        laidOutConfig = com.kooo.evcam.camera.CameraManagerHolder.configKeyOf(this, activeProfile);
         if (PreviewSlots.singleLayout(enabledLanes)) {
             // 只启用了环视：一路合成流，由 FourLaneContainer 重画成四宫格
             layoutId = R.layout.activity_main_zeekr_7x;
@@ -1282,6 +1289,8 @@ public class MainActivity extends AppCompatActivity {
         updateStatusLine();
         recordingLayout.setVisibility(View.VISIBLE);
         fragmentContainer.setVisibility(View.GONE);
+        // 可能刚在设置里改了视频流配置、摄像头开关、各路参数、摄像头映射：这一刻生效，照存下的配置重新摆、接上时换管线
+        relayoutIfConfigChanged("settings");
     }
 
     /**
@@ -1448,8 +1457,8 @@ public class MainActivity extends AppCompatActivity {
      * 挂上主界面的回调，建好了再声明画布、画状态条（{@link #onPipelineBuilt}）。
      *
      * <p>以前这里自己按配置建一份映射（列相机、探测合成流都在主线程上），后台（悬浮窗、录制服务）在 Holder 里按车型再建一份，
-     * 两份规则对不上；路数对不上时还会把后台那份放掉重建。现在只有一份，放不放、重不重建由 Holder 定：换车型、上一次列相机出错，
-     * 以及主界面接上时（这里，{@code getForMainScreen}）配置里开的几路和它对不上 —— 布局照的就是此刻的配置。
+     * 两份规则对不上；路数对不上时还会把后台那份放掉重建。现在只有一份，放不放、重不重建由 Holder 定：上一次列相机出错、超级镜子要后座舱，
+     * 以及主界面接上时（这里，{@code getForMainScreen}）存下的配置和生效的不一样 —— 布局照的就是存下的配置（配置改动回到主界面时生效）。
      * Holder 放掉重建了会告诉这里（{@link #pipelineReplaced}），当场接上新的那一份。</p>
      */
     private void initCamera() {
@@ -1466,7 +1475,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        final MultiCameraManager pipeline = holder.getForMainScreen(this, enabledLanes);
+        final MultiCameraManager pipeline = holder.getForMainScreen(this, laidOutConfig);
         cameraManager = pipeline;
         attachRecordingCoordinator();
         // 管线比界面活得久：回调在 onDestroy 一律摘掉（detachUiCallbacks），这里每个界面重新挂一遍
@@ -1477,7 +1486,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Holder 放掉重建了（换车型、上一次列相机出错）：主界面在前就当场接上新的那一份；在后台的等回到前台（onResume）再接 ——
+     * Holder 放掉重建了（超级镜子要后座舱、上一次列相机出错）：主界面在前就当场接上新的那一份；在后台的等回到前台（onResume）再接 ——
      * 接的时候会登记预览（{@link #claimPreviewIfReady}），后台的主界面不该要相机。onCreate 挂上、onDestroy 摘掉
      * （CameraManagerHolder.addReplacedListener）。以前只在 onResume 里看手里那份放没放：主界面在前时管线被别人换掉
      * （录像在等开录时每 2 秒要一次管线，碰上上一次列相机出错就重建；拍照碰上换了车型），它握着死的那一份，预览黑着、
@@ -1490,30 +1499,39 @@ public class MainActivity extends AppCompatActivity {
     };
 
     /**
-     * 这一次运行启用的几路变了（离车时去掉了前座舱，暂时的规矩 camera.FrontCabinOneShot）：主界面在前就当场照新的几路重新摆，
-     * 在后台的等回到前台（onResume）再摆。onCreate 挂上、onDestroy 摘掉。
+     * 生效的几路变了（离车时去掉了前座舱，暂时的规矩 camera.FrontCabinOneShot；配置里它的开关已经关掉）：主界面在前、摆着录制界面
+     * 就当场照存下的配置重新摆；在后台、或者摆着设置页的，等回到主界面（onResume、showRecordingInterface）再摆。
+     * onCreate 挂上、onDestroy 摘掉。
      */
-    private final Runnable runLanesChanged = () -> {
+    private final Runnable lanesChanged = () -> {
         if (!isInBackground && !isFinishing() && !isDestroyed()) {
-            relayoutIfLanesChanged("run-lanes");
+            relayoutIfConfigChanged("front-cabin");
         }
     };
 
     /**
-     * 摆着的格子和这一次运行的几路对不上（离车时去掉了前座舱）：整个界面照新的几路重建（{@link #setupLayoutByCarModel}）。
-     * 只重建界面、不重建管线：预览画面由管线留着，新界面接回还在的那几块，这一份管线记下的几路已经一起改了，接上时对得上，
-     * 环视画面和录像都不断；前座舱那一块没人接回，等调度把它摘掉再放。
+     * 回到主界面：存下的配置和这个界面摆的那份（{@link #laidOutConfig}）不一样 —— 设置里改了视频流配置、摄像头开关、各路参数、
+     * 摄像头映射，或者离车去掉了前座舱 —— 整个界面照存下的配置重建（{@link #setupLayoutByCarModel}）。配置改动就在这一刻生效
+     * （项目所有者 2026-10-30「回到主界面时生效」）：新界面接上管线时 Holder 照它摆的这份比，建管线、录像用到的变了，由唯一的
+     * 通道调度换管线（旧的按次序关完、新的再开，录像接着录）；没变（只是摆法，或者离车去掉的前座舱 —— 生效的配置已经一起改了），
+     * 只重建界面、不重建管线：预览画面由管线留着，新界面接回还在的那几块，环视画面和录像都不断；前座舱那一块没人接回，
+     * 等调度把它摘掉再放。只在摆着录制界面时比：摆着设置页的等回到录制界面 —— 在设置里改几项都只换一次。
      *
      * @param when 什么时候发现的（ASCII，进日志）
      * @return true：要重建了
      */
-    private boolean relayoutIfLanesChanged(String when) {
-        java.util.Set<String> now = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(this);
-        if (now.equals(enabledLanes)) {
+    private boolean relayoutIfConfigChanged(String when) {
+        if (laidOutConfig == null || recordingLayout == null || recordingLayout.getVisibility() != View.VISIBLE) {
             return false;
         }
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面照这一次运行的几路重新摆（" + when + "）：" + enabledLanes
-                + " → " + now);
+        Profile stored = new ProfileStore(this).current();
+        if (com.kooo.evcam.camera.CameraManagerHolder.configKeyOf(this, stored).equals(laidOutConfig)) {
+            return false;
+        }
+        java.util.Set<String> lanes = com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(stored);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("主界面照存下的配置重新摆（" + when + "）："
+                + (lanes.equals(enabledLanes) ? "启用的几路没变 " + enabledLanes + "，别的配置变了"
+                : "启用的几路 " + enabledLanes + " → " + lanes));
         new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
             if (!isFinishing() && !isDestroyed()) {
                 recreate();
@@ -1599,8 +1617,9 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 这一界面的配置（布局、各格摆法、哪一路的摆位由配置说了算）。
      *
-     * <p>取一次存着，别在初始化过程中反复去读 —— 中途换了值，前半截和后半截
-     * 按不同的配置接线，出来的东西不属于任何一份配置。管线照的是同一份（CameraManagerHolder 建的时候读）。</p>
+     * <p>摆布局时取一次存着（{@link #setupLayoutByCarModel}，存下的那份），别在初始化过程中反复去读 —— 中途换了值，前半截和后半截
+     * 按不同的配置接线，出来的东西不属于任何一份配置。管线照的是同一份（主界面接上时 Holder 照存下的配置换，见
+     * {@link #relayoutIfConfigChanged}）。</p>
      */
     private Profile activeProfile;
 
@@ -2855,8 +2874,8 @@ public class MainActivity extends AppCompatActivity {
 
         // 手里那份管线不再是进程里在用的那一份（在后台时被 Holder 放掉重建了、建的时候列相机出错）：接上现在那一份
         reattachPipelineIfReplaced("resume");
-        // 在后台时这一次运行去掉了前座舱（离车）：照新的几路重新摆，新界面起来再登记预览
-        if (relayoutIfLanesChanged("resume")) {
+        // 在后台时离车去掉了前座舱、或者从设置页按主屏键离开后回来：摆着录制界面就照存下的配置重新摆，新界面起来再登记预览
+        if (relayoutIfConfigChanged("resume")) {
             return;
         }
 
@@ -2957,7 +2976,7 @@ public class MainActivity extends AppCompatActivity {
         // 熄屏退后台的那一步：界面都没了，不用退
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeRunLanesListener(runLanesChanged);
+        com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeLanesListener(lanesChanged);
         cancelBackgroundTask();
 
         // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉（停不停还看开机自启动、这一趟要录，见 stop）

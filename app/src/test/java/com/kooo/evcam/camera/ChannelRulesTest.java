@@ -3983,7 +3983,7 @@ public class ChannelRulesTest {
     // ================================================================= 前座舱只用一次（暂时的规矩，2026-10-22 定、10-23 改成只管前座舱）
 
     /**
-     * 通道眼里熄屏的那一刻，这次运行启用的前座舱去掉、报一次；之后亮屏，主界面预览、拍照、录像都不再要它（录像计划里还写着也不要）。
+     * 通道眼里熄屏的那一刻，启用的前座舱去掉、报一次；之后亮屏，主界面预览、拍照、录像都不再要它（录像计划里还写着也不要）。
      * 后座舱照一般的规矩：熄屏放开、亮屏又要它，录像输出留着。环视照旧。
      */
     @Test
@@ -4043,7 +4043,7 @@ public class ChannelRulesTest {
         assertTrue(ChannelRules.wanted(w, front));
     }
 
-    /** 这次运行没启用前座舱（环视 + 后座舱）：没有可去掉的，不报；后座舱亮屏照旧回来。 */
+    /** 没启用前座舱（环视 + 后座舱）：没有可去掉的，不报；后座舱亮屏照旧回来。 */
     @Test
     public void nothingIsRetiredWhenTheFrontCabinIsNotEnabled() {
         World noFront = new World(Arrays.asList(front, rear, surround),

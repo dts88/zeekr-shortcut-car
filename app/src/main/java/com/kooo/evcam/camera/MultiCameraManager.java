@@ -1991,8 +1991,8 @@ public class MultiCameraManager {
     }
 
     /**
-     * 这次运行启用的前座舱去掉了（调度报的，通道眼里熄屏的那一刻；暂时的规矩，见 {@link FrontCabinOneShot}）：启用的几路、
-     * 这一次录像的计划都拿掉它，再告诉管线的持有者（主界面回到前台时不再摆它）。关相机不在这里 —— 那一刻座舱
+     * 离车去掉了启用的前座舱（调度报的，通道眼里熄屏的那一刻；暂时的规矩，见 {@link FrontCabinOneShot}）：启用的几路、
+     * 这一次录像的计划都拿掉它，再告诉管线的持有者（配置里它的开关关掉，主界面回到前台时不再摆它）。关相机不在这里 —— 那一刻座舱
      * 本来就照熄屏放开，之后谁都不要它，调度照登记表关；它的录制器由调度照「不再留着录像输出」交回来再放。主线程。
      */
     private void retireFrontCabin(String key) {
@@ -2004,17 +2004,17 @@ public class MultiCameraManager {
         }
         boolean dropped = recordingPlan.containsKey(key);
         if (dropped) {
-            leaveLane(key, "这次运行去掉了前座舱");
+            leaveLane(key, "离车去掉了前座舱");
             recordingPlan.remove(key);
             lanes.drop(key);
         }
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("前座舱只用一次：通道眼里熄屏，前座舱从这次运行里去掉，"
-                + "亮屏也不再开；下次启动不带前座舱" + (dropped ? "（这一次录像不再录前座舱）" : ""));
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("前座舱只用一次：通道眼里熄屏，前座舱去掉、配置里它的开关关掉，"
+                + "亮屏也不再开" + (dropped ? "（这一次录像不再录前座舱）" : ""));
         if (dropped) {
             publishLanes();
             channel.wake();
         }
-        CameraManagerHolder.getInstance().frontCabinRetired(this, key);
+        CameraManagerHolder.getInstance().frontCabinRetired(context, this, key);
     }
 
     /** 管线里的、启用的那几路，按开的次序。 */
@@ -4645,8 +4645,8 @@ public class MultiCameraManager {
             return false;
         }
         // 这次录哪几路：这一份管线建的时候启用的那几路（和主界面预览、拍照同一份，enabledActiveKeys），再照协调器给的
-        // 此刻的配置收一收，按开的次序。只为超级镜子、盲区画面建的那一路（没启用的环视、后座舱）不录 —— 配置里刚开了它、
-        // 还没重启的也不录，照「重启应用后生效」（2026-10-20 审查，车主批：以前录像照此刻的配置、预览拍照照建管线那一刻的）
+        // 生效的配置收一收，按开的次序。只为超级镜子、盲区画面建的那一路（没启用的环视、后座舱）不录 —— 配置里刚开了它、
+        // 还没回到主界面换管线的也不录，照生效的配置（2026-10-20 审查，车主批：以前录像照此刻的配置、预览拍照照建管线那一刻的）
         List<String> keys = new ArrayList<>();
         for (String key : enabledActiveKeys()) {
             if (enabledCameras == null || enabledCameras.isEmpty() || enabledCameras.contains(key)) {
@@ -5676,8 +5676,8 @@ public class MultiCameraManager {
             return false;
         }
         if (com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context).isEmpty()) {
-            // 此刻的配置里一路都没启用：当场拒，和拒录读同一个（RecordingCoordinator 开录前问的也是此刻的配置），管线建没建好都一样。
-            // 拍哪几路照管线建它那一刻启用的（登记表 §一「启用的全部」）；两者对不上（改了配置没重启）时 stepPhoto 不白等
+            // 生效的配置里一路都没启用：当场拒，和拒录读同一个（RecordingCoordinator 开录前问的也是生效的配置），管线建没建好都一样。
+            // 拍哪几路照管线建它那一刻启用的（登记表 §一「启用的全部」）；两者对不上时 stepPhoto 不白等
             callback.onNoCameraEnabled();
             return false;
         }
