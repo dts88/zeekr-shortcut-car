@@ -34,8 +34,7 @@ import java.util.function.Consumer;
  *
  * <p>以前有两份按车型建映射的代码：主界面自己建一份（按配置分座舱、钉尺寸、画四宫格），后台（悬浮窗、录制服务）在这里建一份
  * （按车型字符串、不看配置），规则对不上；主界面销毁时还会把管线放掉，后视镜、录像跟着断。现在谁要管线都调
- * {@link #getOrInit}（主界面调 {@link #getForMainScreen}）：没有就在这里建，主界面拿到它只声明自己的画布、挂自己的回调
- * （{@link #whenBuilt}）。</p>
+ * {@link #getOrInit}：没有就在这里建，主界面拿到它只声明自己的画布、挂自己的回调（{@link #whenBuilt}）。</p>
  *
  * <h3>生效的配置</h3>
  *
@@ -48,14 +47,14 @@ import java.util.function.Consumer;
  *
  * <ul>
  *   <li>退出（{@link #release}）；</li>
- *   <li>配置变了：只在主界面接上管线时（{@link #getForMainScreen}）比。设置页就长在主界面里，回到主界面那一刻主界面先照存下的配置
- *       重新摆（MainActivity.relayoutIfConfigChanged），新界面接上时存下的配置生效：建管线、录像用到的变了（{@link Shape#pipelineKey}），
- *       放掉旧的、照存下的建新的 —— 唯一的通道调度交接，旧的按次序关完、新的再开，在录的话那一段到头、在新的一份上自动接回
- *       （RecordingCoordinator.setCameraManager）；只是名字、各格的摆法变了，管线不换，生效的配置换成存下的。
- *       布局和管线照的是同一份：只有照存下的配置摆过的主界面接上才生效；还没重新摆就接上的（摆着设置页时管线被换了一份）
- *       照用生效的，等它重新摆了再换（2026-10-20 审查，车主批：以前比的是此刻的配置，主界面还没重新摆就接上，布局和管线对不上）。
- *       后台的调用方（拍照、录像、超级镜子、悬浮按钮）一律照用生效的那一份，不因为配置变了重建；它们也要重建时（下面几条），
- *       照生效的配置建；</li>
+ *   <li>配置变了：只在主界面照存下的配置摆好、摆的是录制界面时（{@link #commitForMainScreen}）。设置页就长在主界面里，
+ *       回到录制界面那一刻，主界面摆的那份和存下的、生效的对不上，就照存下的重新摆（MainActivity.relayoutIfConfigChanged）；
+ *       新界面摆好、接回画布和读录制键之前存下的配置生效：建管线、录像用到的变了（{@link Shape#pipelineKey}），放掉旧的、照存下的
+ *       建新的 —— 唯一的通道调度交接，旧的按次序关完、新的再开，在录的话那一段到头、在新的一份上自动接回
+ *       （RecordingCoordinator.setCameraManager）；只是名字、各格的摆法变了，管线不换，生效的配置就地换成存下的。
+ *       布局和管线照的是同一份（2026-10-20 审查，车主批：以前比的是此刻的配置，主界面还没重新摆就接上，布局和管线对不上）。
+ *       摆着设置页时界面重建（换语言、深浅色）不生效，等回到录制界面。别的调用方（拍照、录像、超级镜子、悬浮按钮，
+ *       主界面接上管线也是）一律照用生效的那一份，不因为配置变了重建；它们也要重建时（下面几条），照生效的配置建；</li>
  *   <li>上一次列相机出错（这一份一路相机都没有）：谁来要都重建，但两次之间至少隔 {@link #FAILED_REBUILD_GAP_MS} ——
  *       录像在等开录时每 2 秒要一次管线，相机服务一直出错的话就成了每 2 秒放一份、建一份；</li>
  *   <li>超级镜子要后座舱（切换范围换到「后视 + 后座舱」）而这一份里没有后座舱：谁来要都重建（项目所有者 2026-10-19 方案 A；
@@ -91,7 +90,7 @@ public class CameraManagerHolder {
     private MultiCameraManager cameraManager;
     /**
      * 生效的配置：这一份管线是照什么建的（还在建的那一份也算；见类说明）。录像、尺寸、状态条问的「生效的」都是它
-     * （{@link #effectiveProfile}、{@link #effectiveLanes}）。主界面接上时存下的配置和它不一样才换；离车去掉前座舱时就地改
+     * （{@link #effectiveProfile}、{@link #effectiveLanes}）。主界面要存下的配置生效时（{@link #commitForMainScreen}）和它不一样才换；离车去掉前座舱时就地改
      * （{@link #frontCabinRetired}）。null = 没有管线（进程刚起来、退出后）。
      *
      * <p>在锁里换、换的是整个对象（Shape 不改），读的不拿锁（{@link #effectiveProfile} 在相机线程上配会话时也读，
@@ -246,7 +245,7 @@ public class CameraManagerHolder {
         }
 
         /**
-         * 建管线、录像用到的全部（主界面接上时变了就重建）：建了哪几路（{@link #key}）、摄像头映射、那份配置里除了名字、
+         * 建管线、录像用到的全部（主界面要存下的配置生效时变了就重建）：建了哪几路（{@link #key}）、摄像头映射、那份配置里除了名字、
          * 各格摆法以外的全部（每一路的开关、预览 / 录像 / 拍照的参数、画质档）。
          */
         String pipelineKey() {
@@ -299,38 +298,50 @@ public class CameraManagerHolder {
     }
 
     /**
-     * 进程里那一份管线；没有就建（大纲 §2 阶段 6：只在这里建）。后台的调用方都调它：录像协调器、后视镜、拍照（主界面的、
-     * 悬浮按钮的）。主界面接上管线调 {@link #getForMainScreen}。
+     * 进程里那一份管线；没有就建（大纲 §2 阶段 6：只在这里建）。谁要管线都调它：主界面接上管线、录像协调器、后视镜、拍照
+     * （主界面的、悬浮按钮的）。
      *
      * <p>对象当场交出去，各路相机要等相机线程上列完相机、探测完合成流才建出来（{@link MultiCameraManager#isBuilt}、
      * {@link #whenBuilt}）。超级镜子要后座舱而这一份里没有、或者上一次列相机出错（隔够 {@link #FAILED_REBUILD_GAP_MS}），
-     * 照生效的配置放掉重建；配置变了不在这里重建（见类说明）。主线程调。</p>
+     * 照生效的配置放掉重建；配置变了不在这里换（{@link #commitForMainScreen}，见类说明）。没有管线时照存下的配置建。主线程调。</p>
      */
     public synchronized MultiCameraManager getOrInit(Context context) {
         return obtain(context, null);
     }
 
     /**
-     * 主界面接上管线（MainActivity.initCamera）：和 {@link #getOrInit} 一样，另外主界面是照存下的配置摆的（{@code laidOut}
-     * 和存下的一样）时，存下的配置就在这一刻生效，和生效的不一样就在这里换（见类说明）。在录的话那一段到头，在新的一份上自动接回
-     * （RecordingCoordinator.setCameraManager）。主界面还没照新的配置重新摆（摆着设置页时管线被换了一份，回来接上）就和后台的
-     * 调用方一样照用生效的，等它重新摆了再换 —— 布局和管线照的是同一份，不拿新配置配旧格子。主线程调。
+     * 主界面照存下的配置摆好了、摆的是录制界面（MainActivity.initViews，接回留着的画布、读录制键之前）：存下的配置这一刻生效
+     * （见类说明）—— 建管线、录像用到的变了就换管线（在录的话那一段到头，在新的一份上自动接回，RecordingCoordinator.setCameraManager），
+     * 只是名字、各格的摆法变了就地换。提前到主界面读生效的配置之前：之后它接回的画布、录制键、状态条照的都是这份。
+     * {@code laidOut} 和存下的不一样（主界面摆完之后存下的又变了）就不换，等它照新的重新摆。没有管线时什么都不做（接上时照存下的建）。
+     * 主线程调。
      *
      * @param laidOut 主界面照着摆的那份配置的键（{@link #configKeyOf}，它摆布局时记下的）
      */
-    public synchronized MultiCameraManager getForMainScreen(Context context, String laidOut) {
-        return obtain(context, laidOut == null ? "" : laidOut);
+    public synchronized void commitForMainScreen(Context context, String laidOut) {
+        if (cameraManager != null && !cameraManager.isReleased() && laidOut != null) {
+            obtain(context, laidOut);
+        }
     }
 
-    /** @param laidOut 主界面接上时是它照着摆的那份配置的键；后台的调用方是 null */
+    /**
+     * 生效的配置的键（{@link Shape#configKey}）；没有管线是 null。主界面回到录制界面时据此判断它摆的那份是不是已经生效
+     * （MainActivity.relayoutIfConfigChanged）。哪个线程都能调。
+     */
+    public String effectiveConfigKey() {
+        Shape now = effective;
+        return now == null ? null : now.configKey();
+    }
+
+    /** @param laidOut 主界面要存下的配置生效（{@link #commitForMainScreen}）时是它照着摆的那份配置的键；别的调用方是 null */
     private MultiCameraManager obtain(Context context, String laidOut) {
         Context app = context.getApplicationContext();
         boolean have = cameraManager != null && !cameraManager.isReleased() && effective != null;
         Shape stored = Shape.of(app);
-        // 主界面照存下的配置摆过、来接上：存下的这一刻生效（启用的几路就是它摆了格子的那几路）
+        // 主界面照存下的配置摆好了、要它生效（启用的几路就是它摆了格子的那几路）
         boolean commits = laidOut != null && laidOut.equals(stored.configKey());
-        // 这一回照什么建（见类说明）：存下的这一刻生效时照存下的；别的（后台的调用方、还没重新摆的主界面）照生效的那份，
-        // 超级镜子要不要后座舱照此刻的设置；还没有管线时（进程刚起来、退出后）照存下的
+        // 这一回照什么建（见类说明）：存下的这一刻生效时照存下的；别的调用方照生效的那份，超级镜子要不要后座舱照此刻的设置；
+        // 还没有管线时（进程刚起来、退出后）照存下的
         Shape shape = commits ? stored : have ? effective.withMirrorCabin(stored.mirrorCabin) : stored;
         if (have) {
             Rebuild why = rebuildReason(shape, commits);
@@ -358,28 +369,27 @@ public class CameraManagerHolder {
                 main.post(listener);
             }
         }
+        // 先换生效的配置：下面定录制模式（问配置里有没有要拼四宫格的）、建管线时读的都是这一份
+        effective = shape;
         MultiCameraManager manager = new MultiCameraManager(app);
         manager.setMaxOpenCameras(shape.count);
         // 录制模式建管线时定一次（录制模式归开发者选项）
         manager.setCodecRecordingMode(new AppConfig(app).shouldUseCodecRecording());
         cameraManager = manager;
-        effective = shape;
         built = null;
         AppLog.i(TAG, "建相机管线（" + shape.key() + "，建 " + shape.count + " 路）：相机列表、合成流探测在相机线程上做");
-        if (shape.cabinFront) {
-            // 前座舱只用一次（暂时的规矩）：带着它建了，记下「在用」—— 没等到离车就结束的话，下一次启动关掉它的开关
-            FrontCabinOneShot.inUse(app, shape.profile);
-        }
+        // 前座舱只用一次（暂时的规矩）：带着它建了，记下「在用」；记着的是另一份配置的，那一份这一次用完了
+        FrontCabinOneShot.built(app, shape.profile, shape.cabinFront);
         setup.execute(() -> build(app, manager, shape));
         return manager;
     }
 
-    /** 黑匣子：主界面接上时配置变了，生效的 {@code from} 换成 {@code to}：建的几路、选的哪份配置（参数变没变）、摄像头映射。 */
+    /** 黑匣子：主界面要存下的配置生效，配置变了：生效的 {@code from} 换成 {@code to}：建的几路、选的哪份配置（参数变没变）、摄像头映射。 */
     private static void noteConfigChange(Shape from, Shape to) {
         String fromId = from.profile == null ? "-" : from.profile.id;
         String toId = to.profile == null ? "-" : to.profile.id;
         boolean params = !Shape.profileKey(from.profile, false).equals(Shape.profileKey(to.profile, false));
-        BlackBox.noteImportant("管线：主界面接上时配置变了（建的几路 " + from.key() + " → " + to.key()
+        BlackBox.noteImportant("管线：回到主界面，配置变了（建的几路 " + from.key() + " → " + to.key()
                 + "，视频流配置 " + fromId + " → " + toId + (params ? "（参数变了）" : "")
                 + "，摄像头映射 " + from.overridesKey() + " → " + to.overridesKey() + "），放掉旧的、重建");
     }
@@ -401,7 +411,7 @@ public class CameraManagerHolder {
 
     /**
      * 离车去掉了前座舱（调度报的，通道眼里熄屏的那一刻；暂时的规矩 {@link FrontCabinOneShot}，主线程）：配置里前座舱的开关关掉，
-     * 生效的那份就地一起改 —— 启用的几路拿掉它、配置换成关掉前座舱的那份：主界面照存下的配置重新摆、接上时和生效的对得上，不重建
+     * 生效的那份就地一起改 —— 启用的几路拿掉它、配置换成关掉前座舱的那份：主界面照存下的配置重新摆、要它生效时和生效的对得上，不重建
      * （前座舱这一路还建着，没人要就关着）。后座舱没动，这一份带不带后座舱照旧。告诉主界面。
      */
     synchronized void frontCabinRetired(Context context, MultiCameraManager manager, String key) {
@@ -434,7 +444,7 @@ public class CameraManagerHolder {
         LISTING_FAILED,
         /**
          * 配置变了（车型、选的哪份视频流配置、开的几路、各路参数、摄像头映射，或者超级镜子不再要只为它建的后座舱）：
-         * 只在主界面接上管线时（{@link CameraManagerHolder#getForMainScreen}）。
+         * 只在主界面要存下的配置生效时（{@link CameraManagerHolder#commitForMainScreen}）。
          */
         CONFIG,
         /** 超级镜子要后座舱，这一份里没有（谁来要都重建，主界面照「放掉重建了」接上新的那一份）。 */
@@ -455,7 +465,7 @@ public class CameraManagerHolder {
     }
 
     /**
-     * 列相机没出错时要不要重建（纯函数，测试直接调）：主界面接上时，建管线、录像用到的（{@link Shape#pipelineKey}）和生效的
+     * 列相机没出错时要不要重建（纯函数，测试直接调）：主界面要存下的配置生效时，建管线、录像用到的（{@link Shape#pipelineKey}）和生效的
      * 不一样就重建（配置变了，或者这一份里有只为超级镜子建、现在没人要的后座舱）；超级镜子要后座舱而这一份里没有，谁来要都重建。
      * 后台的调用方照用生效的那一份，多出来的那一路建了不等于开。
      */
