@@ -85,10 +85,7 @@ def main():
     out.append("")
     out.append("Day-to-day use in the car is unaffected. The risk comes when you lock the car and "
                "leave with the app running. A single occurrence does not crash App Lab, but the "
-               "effects accumulate: on the developer's car, with the cabin cameras in use, App Lab "
-               "became noticeably slow after about a week, and after about two weeks it "
-               "crashed and would no longer start. After a head unit restart, App Lab had "
-               "disappeared and had to be reinstalled.")
+               "effects accumulate.")
     out.append("")
     out.append("For now, the front cabin camera is one-shot: it turns itself off when you leave the "
                "car. The rear cabin camera works as usual and is still under observation.")
