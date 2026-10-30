@@ -116,13 +116,17 @@
 
 五档，布局里写 `android:textAppearance`，不写 `android:textSize`：
 
-| 档 | 值 | 用在 |
-|---|---|---|
-| `TextAppearance.Cam.Micro` | 16sp | 角标、计数 |
-| `TextAppearance.Cam.Caption` | 20sp | 说明、状态条、画面角标 |
-| `TextAppearance.Cam.Body` | 22sp | 正文、按钮文字 |
-| `TextAppearance.Cam.Row` | 24sp | 列表行标题、分区标题、对话框正文 |
-| `TextAppearance.Cam.Title` | 32sp | 页面标题、对话框标题 |
+| 档 | 值 | 行高 | 用在 |
+|---|---|---|---|
+| `TextAppearance.Cam.Micro` | 16sp | 22sp | 角标、计数 |
+| `TextAppearance.Cam.Caption` | 20sp | 28sp | 说明、状态条、画面角标 |
+| `TextAppearance.Cam.Body` | 22sp | 30sp | 正文、按钮文字 |
+| `TextAppearance.Cam.Row` | 24sp | 34sp | 列表行标题、分区标题、对话框正文 |
+| `TextAppearance.Cam.Title` | 32sp | 44sp | 页面标题、对话框标题 |
+
+**行高**（项目所有者 2026-10-30）：字号 × 1.4，取最近的偶数。只管多行之间的距离，单行的高度不变。对话框的标题和正文走同一组数。
+以前没写，全继承 Material 的 20sp：24sp 的字排在 20sp 的行里，「发现新版本」里的英文说明挤成一团；关于页、首启说明框布局里写的
+`lineSpacingMultiplier` 也被它盖掉，一直没生效，已删。布局里不再写行距（`TypeScaleTest`）。
 
 **怎么取的值**（项目所有者 2026-10-23）：0.41.0 那一套（14 / 16 / 18 / 21 / 26）放大约 1.2 倍，
 取最近的常用字号 —— 偶数，24 以内每 2 一档、再往上每 4 一档（12、14、16、18、20、22、24、28、32、36…）。

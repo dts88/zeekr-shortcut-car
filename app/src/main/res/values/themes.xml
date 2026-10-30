@@ -184,11 +184,15 @@
     <!-- 对话框标题：字号体系里的「标题」那一档，见 values/type.xml -->
     <style name="MaterialAlertDialog.Cam.Title" parent="MaterialAlertDialog.Material3.Title.Text">
         <item name="android:textSize">@dimen/text_title</item>
+        <item name="android:lineHeight">@dimen/text_title_line</item>
+        <item name="lineHeight">@dimen/text_title_line</item>
     </style>
 
     <!-- 对话框正文：和列表行标题同一档 -->
     <style name="MaterialAlertDialog.Cam.Body" parent="MaterialAlertDialog.Material3.Body.Text">
         <item name="android:textSize">@dimen/text_row</item>
+        <item name="android:lineHeight">@dimen/text_row_line</item>
+        <item name="lineHeight">@dimen/text_row_line</item>
     </style>
 
     <!--
