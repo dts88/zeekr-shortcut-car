@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.34.0-alpha] - 2026-10-30
+
+- Settings: changes to the stream profile, its cameras and camera mapping take effect when you return to the main screen; restarting the app is no longer needed, and the messages no longer say so. Several changes in one visit switch the cameras once; changing only a profile's name or how its views are laid out does not reopen them.
+- Front cabin: while it is in use, its switch in Edit stream profile stays on. It turns off when you leave the car, at the next start if the app ended before you left, or when another stream profile is used.
+
 ## [2.33.0-alpha] - 2026-10-30
 
 - Cameras: the app keeps one camera scheduler for its whole life. When the cameras are set up again (car model, enabled cameras, Super mirror Views), the old cameras close in order, then the new set opens. If a close does not return, that camera stays closed and the others open 60 seconds after its close began.
