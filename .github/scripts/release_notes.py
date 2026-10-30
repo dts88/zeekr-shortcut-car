@@ -90,9 +90,8 @@ def main():
                "crashed and would no longer start. After a head unit restart, App Lab had "
                "disappeared and had to be reinstalled.")
     out.append("")
-    out.append("For now, the front cabin camera is one-shot: it takes effect after the app restarts "
-               "and turns itself off when you leave the car. The rear cabin camera works as usual "
-               "and is still under observation.")
+    out.append("For now, the front cabin camera is one-shot: it turns itself off when you leave the "
+               "car. The rear cabin camera works as usual and is still under observation.")
     out.append("")
     out.append("**To avoid this:** for everyday recording, use the **Zeekr 7X (surround)** profile "
                "(**Settings → Recording → Stream profile**). If you record the rear cabin with "
