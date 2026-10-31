@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.92.1-alpha] - 2026-11-01
+
+- Smart buttons: after Bluetooth restarts, for example when the head unit wakes, the app replaces the dead Bluetooth service it was left with and listens again, without restarting the app.
+- About: SW's thanks now include testing and feedback.
+
 ## [2.92.0-alpha] - 2026-10-31
 
 - Smart buttons: new actions Drive mode up and Drive mode down move through Comfort, Standard and Sport one step at a time, and stop at either end.
