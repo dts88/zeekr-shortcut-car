@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.92.0-alpha] - 2026-10-31
+
+- Smart buttons: new actions Drive mode up and Drive mode down move through Comfort, Standard and Sport one step at a time, and stop at either end.
+- Smart buttons: new actions Shift up and Shift down change gear in the simulated drive sound only, on the 6-speed manual and the 8-speed automatic. A short beep marks the red zone and a shift that can't be done; past the limit it shifts up by itself.
+- Smart buttons: a scan that stops hearing anything now restarts by itself, and diagnostics record why listening failed.
+
 ## [2.91.0-beta] - 2026-10-30
 
 Upgrade from 2.0.0.
