@@ -1262,6 +1262,7 @@ public final class DiagnosticsCollector {
         long heard = buttons.heardAgoMs();
         sb.append("  最近收到蓝牙广播（任何设备）=").append(heard < 0 ? "这次进程还没有" : heard / 1000 + " 秒前（含车机睡着）")
                 .append("  这一阵：扫描失败 ").append(buttons.failures()).append(" 次、听不到重开 ").append(buttons.deafRestarts()).append(" 次")
+                .append("  这次进程换过 GATT 服务 ").append(buttons.gattReplaced()).append(" 次")
                 .append('\n');
         java.util.List<String> addresses = config.getSmartButtons();
         if (addresses.isEmpty()) {
