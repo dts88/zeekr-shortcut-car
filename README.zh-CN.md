@@ -146,5 +146,6 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 - **[wysie](https://github.com/wysie)**：大量设计以及代码。
 - **[FerixzTanz](https://github.com/FerixzTanz)**：盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。
   盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。
+- **SW**：积极测试和反馈，非常感谢。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。

@@ -172,5 +172,6 @@ Splitting App Lab's composite stream into a grid and rendering it is implemented
 - **[FerixzTanz](https://github.com/FerixzTanz)** — the original code and on-car research for Blind spot view, and
   showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the
   ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
+- **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
