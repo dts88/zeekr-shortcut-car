@@ -67,13 +67,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           ls -lh "$OUT"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ZeekrShortcut-apk
-          path: ${{ steps.apk.outputs.path }}
-          if-no-files-found: error
-
       # 打 tag 时自动发布 Release，车机/手机可直接下载安装
       # Release 正文由 CHANGELOG.md 里对应版本的小节自动生成，
       # 这样每个版本的说明就是它自己的改动，而不是每次都一样的模板。
@@ -95,6 +88,7 @@ jobs:
           # 带后缀的（-alpha / -beta）是测试版；1.0.0 这种不带后缀的是正式版，显示为 Latest
           prerelease: ${{ contains(steps.apk.outputs.version, '-') }}
           # 2026-09-29 起所有新版本一律不公开：建成草稿，只有仓库所有者能看到和下载
+          # 所以安装包也不存成 Actions 产物：公开仓库里任何登录的账号都能下载（项目所有者 2026-11-01）
           draft: true
           name: ${{ steps.apk.outputs.version }}
           body_path: RELEASE_NOTES.md
