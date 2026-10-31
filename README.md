@@ -24,17 +24,22 @@ splits it back into a 2×2 grid and builds on that. Chinese, English and Malay i
 ### Dash cam
 
 - Records the surround view as a 2×2 grid, plus the front and rear cabin cameras if you turn them on.
+- *Record sound* (on by default): surround view recordings include the sound inside and outside the
+  car, heard in playback.
 - Three recording presets — save space (10 fps), balanced (20 fps), sharpest — each showing how
   many GB an hour it needs and how long your USB drive will last. Frame rate, bitrate, segment
   length and codec can also be tuned per camera.
 - 1–10 minute segments. With a video storage cap set, the oldest unlocked clips are cleaned up when
   over the cap or low on space; with no cap, nothing is deleted and recording stops when space runs
   low.
+- *Lock footage*: locked videos and photos are safe from loop recording. The floating button can lock
+  the current recording, and recordings can also lock automatically when you flash your high beams or
+  the hazard lights come on.
 - Photos use each camera's largest size.
 - Records to a **USB drive only**. Writing to the head unit's built-in flash sits behind developer
   options, because that storage cannot be replaced once worn out.
 - *Driving info bar* (experimental, off by default): turn signals, steering, gear, pedals, speed,
-  lamps and more, recorded in a strip under the video.
+  lamps and more, recorded in a strip under the video. You choose which items it shows.
 
 On the main screen, tap any view to fill the preview with it and tap again to go back. The
 **Straighten** button removes the fisheye bend, on the main screen and in playback. A floating
@@ -44,10 +49,16 @@ button shows whether recording is running and opens the app from anywhere.
 
 An electronic rear-view mirror: a floating, dockable window showing any one camera enlarged. Pinch
 to zoom; swipe left or right to change camera; swipe up or down in the middle third to raise or
-lower the framing. Or turn on *Button mode* and tap the top, bottom, left or right of the window to
-switch camera. Push it half off-screen to hide it at the edge, and tap to bring it back. The
+lower the framing. Or set *Switch views by* to *Tap* and tap the top, bottom, left or right of the
+window to switch camera. *Views* can limit switching to front and rear, or to the rear view and the
+rear cabin. Push it half off-screen to hide it at the edge, and tap to bring it back. The
 rear camera is mirrored, like a real mirror. Fisheye correction with an adjustable field of view is
 optional.
+
+### Blind spot view
+
+With the turn signal on, the side camera is shown on that side, on the center screen, the HUD or
+both. Off by default. It is an aid only; please drive safely.
 
 ### Playback
 
@@ -63,6 +74,15 @@ The file is served over your local network only while the dialog is open, from a
 address, and only that one file. Both devices need to be on the same network — the easiest way is
 to turn on the phone's hotspot and connect the car to it.
 
+### Experimental
+
+- *Smart buttons*: connect Bluetooth buttons named `ZEEKR_button`. Single and double press each run
+  an action: anything the floating button can do, or switch the drive mode. Settings show each
+  button's battery level.
+- *Simulated drive sound*: an engine sound in Sport mode that follows throttle and speed, as an
+  American V8 or a supersonic jet. It can also play in Standard mode. It is sometimes silent; so far
+  it seems to play only while the radio or CarPlay is playing.
+
 ---
 
 ## Install
@@ -70,9 +90,10 @@ to turn on the phone's hotspot and connect the car to it.
 **Before you start:** you need to know how to sideload an app onto the head unit through App Lab.
 This page does not cover that.
 
-- **Recommended — the [latest stable release](../../releases/latest).**
-- **Happy to try things early — the newest `-beta` on the [Releases](../../releases) page.** Or
-  turn on *Include beta releases* under Settings → Check for updates and let the app fetch it.
+- **Recommended — the newest `-beta` on the [Releases](../../releases) page.** Once it is installed,
+  the app can fetch later betas itself under Settings → Check for updates.
+- The [latest stable release](../../releases/latest) is older and lacks some of the features on
+  this page.
 
 Download the `ZeekrShortcut-*.apk` asset from the release page and sideload it through App Lab.
 When the installer finishes, tap **Back** at the top left, not **Open**. Otherwise the head unit's
@@ -127,9 +148,10 @@ Diagnostics**.
   that does not provide one gets nothing split.
 - Factory features come first: the built-in 360° view, reversing camera and parking cameras can
   reclaim a camera at any time.
-- Starting on boot and recording on launch are off by default. With Sentry Mode on, the surround
+- Recording on launch is off by default. With Sentry Mode on, the surround
   view keeps recording with the screen off and the rear cabin resumes when the screen turns on.
   Without Sentry Mode, recording pauses with the screen off and resumes when it turns on.
+- For now, the front cabin camera is one-shot: it turns itself off when you leave the car.
 - Cropping a surround view is switched off for now.
 - On-vehicle validation is ongoing. Automated tests cover the pure logic only; test in a stationary
   vehicle first.
