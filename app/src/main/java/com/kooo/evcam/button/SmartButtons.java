@@ -68,6 +68,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *       没听上 {@link #RETRY_MS} 后再试（§2.64：以前只试一次，没成就一直没在听）。</li>
  *   <li>扫描看着还在、其实收不到的情况系统不一定告诉我们（车机睡一觉醒来，蓝牙可能已经重启过）：不带过滤器的扫描周围什么设备都报，
  *       亮着屏 {@link #DEAF_MS} 一包都没收到，就重开（{@link #watchScan}）。听不到的每一阵都进黑匣子（{@link ScanProbe}）。</li>
+ *   <li>蓝牙重启过以后容器手里的 GATT 服务还是死的，扫描、连接一直失败：换成系统现在这份，马上重开（{@link StaleGatt}）。</li>
  *   <li>广播里的按键计数变了就是按了一下（{@link SmartButtonAd}）。上一次的计数存着，进程重启后的第一下照样算；
  *       连接时拿搜索那会儿看到的计数当起点。</li>
  *   <li>按法查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
@@ -91,8 +92,10 @@ public final class SmartButtons {
 
     /** 连续扫 30 分钟安卓会把扫描降级，提前重开。 */
     static final long RESTART_MS = 25 * 60_000L;
-    /** 没听上（蓝牙关着、没权限、扫描失败、拿不到扫描器）多久再试。 */
+    /** 没听上（没权限、扫描失败、拿不到扫描器）多久再试。 */
     static final long RETRY_MS = 30_000L;
+    /** 蓝牙关着时多久看一眼开了没有：开关的广播车上没收到过（2026-11-01 报告：蓝牙关了又开，一条都没来），醒来后全靠这个。 */
+    static final long BLUETOOTH_POLL_MS = 5_000L;
     /** 在听的时候多久看一眼扫描还活着没有。 */
     static final long WATCH_MS = 15_000L;
     /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
@@ -211,6 +214,10 @@ public final class SmartButtons {
     /** 上次收到广播以来扫描失败了几次、聋了重开了几次：只在 bt 线程上写。 */
     private volatile int failures;
     private volatile int deafRestarts;
+    /** 这次进程换过几次容器手里的 GATT 服务（{@link StaleGatt}）：只在 bt 线程上写。 */
+    private volatile int gattReplaced;
+    /** 这一阵最后一次记下的 GATT 服务情况，一样的不再记：只在 bt 线程上碰。 */
+    private String gattNote = "";
     /** 刚要切到的驾驶模式、什么时候要的（主线程，{@link #stepDriveMode}）；0 = 没有。 */
     private int driveTarget;
     private long driveTargetAt;
@@ -445,6 +452,11 @@ public final class SmartButtons {
         return deafRestarts;
     }
 
+    /** 这次进程换过几次容器手里的 GATT 服务。 */
+    public int gattReplaced() {
+        return gattReplaced;
+    }
+
     /** 上次读到电量的时刻（墙上毫秒）；没读到过是 0。 */
     public long batteryReadAt(String address) {
         return state.getLong(batteryAtKey(address), 0);
@@ -490,9 +502,9 @@ public final class SmartButtons {
             on = false;
         }
         if (!on) {
-            // 蓝牙开了会有广播（adapterState），到时候接着听；不全靠广播，隔一会儿也再看一眼
+            // 蓝牙开了本该有广播（adapterState），车上没收到过：自己隔一会儿看一眼
             note(Listen.BLUETOOTH_OFF, "");
-            bt.postDelayed(restart, RETRY_MS);
+            bt.postDelayed(restart, BLUETOOTH_POLL_MS);
             return;
         }
         if (!canScan(app)) {
@@ -530,7 +542,10 @@ public final class SmartButtons {
         bt.postDelayed(watch, WATCH_MS);
     }
 
-    /** 没听上：{@link #RETRY_MS} 后再试。一阵里第一次失败把现场记下来：错误码本身看不出是哪一步（{@link ScanProbe}）。 */
+    /**
+     * 没听上：{@link #RETRY_MS} 后再试；要是容器手里的 GATT 服务死了，换一个马上试（{@link StaleGatt}）。
+     * 一阵里第一次失败把现场记下来：错误码本身看不出是哪一步（{@link ScanProbe}）。
+     */
     private void listenFailed(String detail) {
         note(Listen.FAILED, detail);
         failures = failures + 1;
@@ -541,8 +556,16 @@ public final class SmartButtons {
                 BlackBox.note("灵动贴现场：" + line);
             }
         }
+        StaleGatt.Result gatt = StaleGatt.replaceIfDead(adapter);
+        if (!gatt.text.equals(gattNote)) {
+            gattNote = gatt.text;
+            BlackBox.note("灵动贴：容器手里的 GATT 服务：" + gatt.text);
+        }
+        if (gatt.replaced) {
+            gattReplaced = gattReplaced + 1;
+        }
         bt.removeCallbacks(restart);
-        bt.postDelayed(restart, RETRY_MS);
+        bt.postDelayed(restart, gatt.replaced ? 0 : RETRY_MS);
     }
 
     private void stopScan() {
@@ -593,6 +616,7 @@ public final class SmartButtons {
                 + "收到蓝牙广播；这一阵扫描失败 " + failures + " 次、听不到重开 " + deafRestarts + " 次");
         failures = 0;
         deafRestarts = 0;
+        gattNote = "";
     }
 
     private int adapterState() {
@@ -1120,7 +1144,7 @@ public final class SmartButtons {
                     }
                     note(Listen.BLUETOOTH_OFF, "");
                     bt.removeCallbacks(restart);
-                    bt.postDelayed(restart, RETRY_MS);
+                    bt.postDelayed(restart, BLUETOOTH_POLL_MS);
                 }
             });
         }
