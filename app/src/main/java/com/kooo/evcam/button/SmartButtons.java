@@ -38,6 +38,7 @@ import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.overlay.QuickActions;
 import com.kooo.evcam.recording.RecordingCoordinator;
+import com.kooo.evcam.screen.DisplayWatch;
 import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.ArrayList;
@@ -62,7 +63,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *       而且它空闲 15 秒就自己断开（findings §2.61）。</li>
  *   <li>用不带过滤器的扫描、在回调里按地址筛：车上按地址过滤的扫描收不到它的广播（§2.61）。代价是安卓熄屏时会停掉这种扫描 ——
  *       熄屏时按了不算。连续扫 30 分钟安卓会降级，{@link #RESTART_MS} 重开一次；蓝牙关了先停、开了接着听；
- *       没听上 {@link #RETRY_MS} 后再试（§2.64：唤醒时蓝牙还没开好，试一次就不再试，一直没在听）。</li>
+ *       没听上 {@link #RETRY_MS} 后再试（§2.64：以前只试一次，没成就一直没在听）。</li>
+ *   <li>扫描看着还在、其实收不到的情况系统不一定告诉我们（车机睡一觉醒来，蓝牙可能已经重启过）：不带过滤器的扫描周围什么设备都报，
+ *       亮着屏 {@link #DEAF_MS} 一包都没收到，就重开（{@link #watchScan}）。听不到的每一阵都进黑匣子（{@link ScanProbe}）。</li>
  *   <li>广播里的按键计数变了就是按了一下（{@link SmartButtonAd}）。上一次的计数存着，进程重启后的第一下照样算；
  *       连接时拿搜索那会儿看到的计数当起点。</li>
  *   <li>按法查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
@@ -86,8 +89,14 @@ public final class SmartButtons {
 
     /** 连续扫 30 分钟安卓会把扫描降级，提前重开。 */
     static final long RESTART_MS = 25 * 60_000L;
-    /** 没听上（没权限、扫描失败、拿不到扫描器）多久再试。 */
+    /** 没听上（蓝牙关着、没权限、扫描失败、拿不到扫描器）多久再试。 */
     static final long RETRY_MS = 30_000L;
+    /** 在听的时候多久看一眼扫描还活着没有。 */
+    static final long WATCH_MS = 15_000L;
+    /** 亮着屏这么久一个设备的广播都没收到，就当扫描聋了（车上周围一般十几台，Lab findings §2.51）。重开过还是没有，下一回等的时间翻倍。 */
+    static final long DEAF_MS = 45_000L;
+    /** 最多翻几倍：真的一台设备都没有的地方，隔 12 分钟重开一次就够了。 */
+    static final int DEAF_MAX_DOUBLINGS = 4;
     /** 连上读电量最多试多久。 */
     static final long CONNECT_WINDOW_MS = 30_000L;
     /** 没连上隔多久再连。 */
@@ -180,6 +189,8 @@ public final class SmartButtons {
     // ---- 只在 bt 线程上碰
     private BluetoothLeScanner scanner;
     private ScanCallback scanCallback;
+    /** 这轮扫描开起来的时刻（{@link SystemClock#elapsedRealtime}）。 */
+    private long listeningSince;
     private boolean exited;
     /** 正在连的那一台（连接时读电量、按完顺手读电量）；同时只连一台。 */
     private Link link;
@@ -191,6 +202,11 @@ public final class SmartButtons {
     private volatile Listen listen = Listen.NOT_STARTED;
     private volatile String listenDetail = "";
     private volatile String connecting;
+    /** 上次收到广播（什么设备的都算）的时刻（{@link SystemClock#elapsedRealtime}）；这次进程还没收到过是 0。 */
+    private volatile long heardAt;
+    /** 上次收到广播以来扫描失败了几次、聋了重开了几次：只在 bt 线程上写。 */
+    private volatile int failures;
+    private volatile int deafRestarts;
     private final Map<String, Found> found = new LinkedHashMap<>();
     private final AtomicBoolean publishPending = new AtomicBoolean();
     private final Map<String, Pressed> pressed = new HashMap<>();
@@ -250,6 +266,11 @@ public final class SmartButtons {
     /** 有没有蓝牙。 */
     public boolean hasBluetooth() {
         return adapter != null;
+    }
+
+    /** 扫描聋了没有（纯逻辑）：安卓熄屏时系统本来就停着这种扫描，不算。时刻都是含深睡的；{@code restarts} 是这一阵已经重开过几次。 */
+    static boolean deaf(boolean interactive, long now, long listeningSince, long heardAt, int restarts) {
+        return interactive && now - Math.max(listeningSince, heardAt) >= DEAF_MS << Math.min(restarts, DEAF_MAX_DOUBLINGS);
     }
 
     /** 蓝牙开着没有。 */
@@ -401,6 +422,22 @@ public final class SmartButtons {
         return connecting;
     }
 
+    /** 离上次收到广播（什么设备的都算）多久了（毫秒，含深睡）；这次进程还没收到过是 -1。 */
+    public long heardAgoMs() {
+        long at = heardAt;
+        return at == 0 ? -1 : SystemClock.elapsedRealtime() - at;
+    }
+
+    /** 上次收到广播以来扫描失败了几次。 */
+    public int failures() {
+        return failures;
+    }
+
+    /** 上次收到广播以来聋了重开了几次。 */
+    public int deafRestarts() {
+        return deafRestarts;
+    }
+
     /** 上次读到电量的时刻（墙上毫秒）；没读到过是 0。 */
     public long batteryReadAt(String address) {
         return state.getLong(batteryAtKey(address), 0);
@@ -434,6 +471,7 @@ public final class SmartButtons {
 
     private void startScan() {
         bt.removeCallbacks(restart);
+        bt.removeCallbacks(watch);
         if (adapter == null) {
             note(Listen.NO_BLUETOOTH, "");
             return;
@@ -445,8 +483,9 @@ public final class SmartButtons {
             on = false;
         }
         if (!on) {
-            // 蓝牙开了会有广播（adapterState），到时候接着听
+            // 蓝牙开了会有广播（adapterState），到时候接着听；不全靠广播，隔一会儿也再看一眼
             note(Listen.BLUETOOTH_OFF, "");
+            bt.postDelayed(restart, RETRY_MS);
             return;
         }
         if (!canScan(app)) {
@@ -461,8 +500,7 @@ public final class SmartButtons {
             s = null;
         }
         if (s == null) {
-            note(Listen.FAILED, "no scanner");
-            bt.postDelayed(restart, RETRY_MS);
+            listenFailed("no scanner");
             return;
         }
         ScanCallback cb = newScanCallback();
@@ -474,18 +512,35 @@ public final class SmartButtons {
             // 不带过滤器：按地址过滤的扫描在车上收不到灵动贴的广播（Lab findings §2.61）
             s.startScan(null, settings, cb);
         } catch (RuntimeException e) {
-            note(Listen.FAILED, "startScan: " + e);
-            bt.postDelayed(restart, RETRY_MS);
+            listenFailed("startScan: " + e);
             return;
         }
         scanner = s;
         scanCallback = cb;
+        listeningSince = SystemClock.elapsedRealtime();
         note(Listen.LISTENING, "");
         bt.postDelayed(restart, RESTART_MS);
+        bt.postDelayed(watch, WATCH_MS);
+    }
+
+    /** 没听上：{@link #RETRY_MS} 后再试。一阵里第一次失败把现场记下来：错误码本身看不出是哪一步（{@link ScanProbe}）。 */
+    private void listenFailed(String detail) {
+        note(Listen.FAILED, detail);
+        failures = failures + 1;
+        if (failures == 1) {
+            BlackBox.note("灵动贴：扫描起不来（" + detail + "），每 " + RETRY_MS / 1000 + " 秒再试；蓝牙 " + stateName(adapterState())
+                    + "；" + ScanProbe.gattFacts(adapter));
+            for (String line : ScanProbe.bluetoothLog()) {
+                BlackBox.note("灵动贴现场：" + line);
+            }
+        }
+        bt.removeCallbacks(restart);
+        bt.postDelayed(restart, RETRY_MS);
     }
 
     private void stopScan() {
         bt.removeCallbacks(restart);
+        bt.removeCallbacks(watch);
         if (scanner != null && scanCallback != null) {
             try {
                 scanner.stopScan(scanCallback);
@@ -502,6 +557,59 @@ public final class SmartButtons {
         stopScan();
         ensureScan();
     };
+
+    private final Runnable watch = this::watchScan;
+
+    /** 在听的时候隔一会儿看一眼：聋了就重开一次，一阵里只记第一次。 */
+    private void watchScan() {
+        long now = SystemClock.elapsedRealtime();
+        if (!deaf(DisplayWatch.interactiveNow(), now, listeningSince, heardAt, deafRestarts)) {
+            bt.postDelayed(watch, WATCH_MS);
+            return;
+        }
+        deafRestarts = deafRestarts + 1;
+        if (deafRestarts == 1) {
+            BlackBox.note("灵动贴：" + (now - Math.max(listeningSince, heardAt)) / 1000
+                    + " 秒（含车机睡着）没收到任何蓝牙广播，重开扫描；蓝牙 " + stateName(adapterState()));
+        }
+        AppLog.i(TAG, "deaf: restarting the scan");
+        restart.run();
+    }
+
+    /** 隔了一阵又收到广播：这一阵的账记一句，清零。同一阵排着的后面几包到这里已经没账了。 */
+    private void heardAgain(long silentMs) {
+        boolean trouble = failures + deafRestarts > 0;
+        if (silentMs >= 0 && silentMs < DEAF_MS && !trouble) {
+            return;
+        }
+        BlackBox.note("灵动贴：" + (silentMs < 0 ? "这次进程第一次" : "隔 " + silentMs / 1000 + " 秒（含车机睡着）又")
+                + "收到蓝牙广播；这一阵扫描失败 " + failures + " 次、听不到重开 " + deafRestarts + " 次");
+        failures = 0;
+        deafRestarts = 0;
+    }
+
+    private int adapterState() {
+        try {
+            return adapter.getState();
+        } catch (RuntimeException e) {
+            return -1;
+        }
+    }
+
+    private static String stateName(int state) {
+        switch (state) {
+            case BluetoothAdapter.STATE_OFF:
+                return "off";
+            case BluetoothAdapter.STATE_TURNING_ON:
+                return "turning on";
+            case BluetoothAdapter.STATE_ON:
+                return "on";
+            case BluetoothAdapter.STATE_TURNING_OFF:
+                return "turning off";
+            default:
+                return String.valueOf(state);
+        }
+    }
 
     private void note(Listen now, String detail) {
         if (listen != now) {
@@ -534,16 +642,21 @@ public final class SmartButtons {
                     }
                     scanner = null;
                     scanCallback = null;
-                    note(Listen.FAILED, "scan failed " + errorCode);
-                    bt.removeCallbacks(restart);
-                    bt.postDelayed(restart, RETRY_MS);
+                    bt.removeCallbacks(watch);
+                    listenFailed("scan failed " + errorCode);
                 });
             }
         };
     }
 
-    /** 扫描回调（主线程）：什么设备都报，连接过的交给 bt 线程认按键；在搜索时名字是灵动贴的交给搜索。 */
+    /** 扫描回调（主线程）：什么设备都报，收到就是扫描活着；连接过的交给 bt 线程认按键；在搜索时名字是灵动贴的交给搜索。 */
     private void offer(ScanResult result) {
+        long now = SystemClock.elapsedRealtime();
+        long last = heardAt;
+        heardAt = now;
+        if (last == 0 || now - last >= DEAF_MS || failures + deafRestarts > 0) {
+            bt.post(() -> heardAgain(last == 0 ? -1 : now - last));
+        }
         try {
             String address = result.getDevice().getAddress();
             ScanRecord record = result.getScanRecord();
@@ -961,14 +1074,20 @@ public final class SmartButtons {
         public void onReceive(Context context, Intent intent) {
             int now = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
             bt.post(() -> {
+                if (!listening.isEmpty()) {
+                    BlackBox.note("灵动贴：蓝牙 " + stateName(now));
+                }
                 if (now == BluetoothAdapter.STATE_ON) {
-                    ensureScan();
+                    // 蓝牙刚开好，手里要是还有一轮扫描，那也是上一次开着时的（关的广播可能没收到）：换新的
+                    restart.run();
                 } else if (now == BluetoothAdapter.STATE_TURNING_OFF || now == BluetoothAdapter.STATE_OFF) {
                     stopScan();
                     if (link != null) {
                         finish(link, "Bluetooth off");
                     }
                     note(Listen.BLUETOOTH_OFF, "");
+                    bt.removeCallbacks(restart);
+                    bt.postDelayed(restart, RETRY_MS);
                 }
             });
         }

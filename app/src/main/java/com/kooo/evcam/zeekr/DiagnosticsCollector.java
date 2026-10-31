@@ -1240,7 +1240,7 @@ public final class DiagnosticsCollector {
     }
 
     /**
-     * 灵动贴（试验性，2026-10-30）：在不在听、为什么没在听，权限，连接过的每一台（单击 / 双击选的动作、电量和读到的时刻、
+     * 灵动贴（试验性，2026-10-30）：在不在听、为什么没在听，权限，最近收到广播是什么时候，连接过的每一台（单击 / 双击选的动作、电量和读到的时刻、
      * 这次进程里按过几下、最后一下）。
      */
     private static void appendSmartButtons(StringBuilder sb, Context context) {
@@ -1258,6 +1258,10 @@ public final class DiagnosticsCollector {
         sb.append("  蓝牙=").append(!buttons.hasBluetooth() ? "没有" : buttons.bluetoothOn() ? "开" : "关")
                 .append("  扫描权限=").append(com.kooo.evcam.button.SmartButtons.canScan(context) ? "有" : "没有")
                 .append("  连接权限=").append(com.kooo.evcam.button.SmartButtons.canConnect(context) ? "有" : "没有")
+                .append('\n');
+        long heard = buttons.heardAgoMs();
+        sb.append("  最近收到蓝牙广播（任何设备）=").append(heard < 0 ? "这次进程还没有" : heard / 1000 + " 秒前（含车机睡着）")
+                .append("  这一阵：扫描失败 ").append(buttons.failures()).append(" 次、听不到重开 ").append(buttons.deafRestarts()).append(" 次")
                 .append('\n');
         java.util.List<String> addresses = config.getSmartButtons();
         if (addresses.isEmpty()) {
