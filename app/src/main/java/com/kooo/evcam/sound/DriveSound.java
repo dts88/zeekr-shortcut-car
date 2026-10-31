@@ -1,7 +1,12 @@
 package com.kooo.evcam.sound;
 
 import android.content.Context;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.AudioPlaybackConfiguration;
+import android.media.AudioRecordingConfiguration;
+import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
@@ -17,8 +22,11 @@ import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.SignalAges;
 import com.kooo.evcam.telemetry.Telemetry;
 
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -60,6 +68,8 @@ public final class DriveSound {
     static final long WATCH_MS = 1000L;
     /** 声音线程自己出错停了，多久之内不再起（毫秒）：车上没有那个喇叭时不反复开。 */
     static final long RETRY_AFTER_FAILURE_MS = 30_000L;
+    /** 诊断里每秒一行留多少秒。 */
+    static final int HISTORY_SEC = 90;
     /** 熄火还没放完又要起新的一台（刚切出去又切回来）：旧的这么快淡掉（秒）。 */
     static final float HURRY_FADE_SEC = 0.15f;
 
@@ -307,6 +317,18 @@ public final class DriveSound {
         private volatile float accel;
         private volatile long blocks;
         private volatile float renderMs;
+        /** 总增益（dB，门 × 声浪音量 × 车速那一点，{@code params.gain}）。 */
+        private volatile float gainDb;
+        // ---- 诊断：最近 HISTORY_SEC 秒，每秒一行（项目所有者 2026-10-25：停着怠速，开声浪约 10 秒后响度明显下降，踩油门也不回来，
+        //      只有重开才恢复）。看我们写出去的电平变没变 —— 变了是这边的事，没变是车机那边压下去的；同时记下车里此刻在放的
+        //      声音（按用途，我们自己也在里面）、在录的麦克风（按来源）、音频模式、系统报的媒体音量
+        private final String[] history = new String[HISTORY_SEC];
+        private int historyNext;
+        private int historyCount;
+        private double outSquares;
+        private long outSamples;
+        private String lastOthers = "";
+        private final SimpleDateFormat clock = new SimpleDateFormat("HH:mm:ss", Locale.US);
         /** 混音多久来取一段（写的时候等了，就是它刚取走一段）、每段合多少块：输出这边我们能看到的节拍。 */
         private volatile float mixerEveryMs = -1f;
         private volatile float burstBlocks = -1f;
@@ -677,6 +699,7 @@ public final class DriveSound {
                 if (ignited) {
                     engine.fill(params);
                     params.gain = g * EngineVoice.dbToLin(userDb + engine.outputDb());
+                    gainDb = params.gain > 0f ? 20f * (float) Math.log10(params.gain) : Float.NEGATIVE_INFINITY;
                     rpm = engine.rpm();
                     load = engine.load();
                     levelDb = engine.levelDb();
@@ -712,6 +735,12 @@ public final class DriveSound {
                     return true;
                 }
                 long w1 = System.nanoTime();
+                // 诊断：这一秒写出去的电平（车内那一路；只有车外时是车外那一路）
+                float[] written = inside != null ? buffer : exteriorBuffer;
+                for (int i = 0; i < 2 * BLOCK; i++) {
+                    outSquares += (double) written[i] * written[i];
+                }
+                outSamples += 2 * BLOCK;
                 blocks++;
                 blocksSinceWake++;
                 if (w1 - w0 > 1_000_000L) {
@@ -734,11 +763,60 @@ public final class DriveSound {
                     if (grown) {
                         BlackBox.note("模拟声浪：欠载，缓冲加大（" + output + "）");
                     }
+                    logSecond(audio, w, fast.ageMs(now), inside != null ? inside : outside);
                 }
             }
         }
 
+        /**
+         * 诊断的一行（每秒）：时刻、结论、门、引擎电平、总增益，这一秒写出去的电平（dBFS），快读多旧、欠载、系统报的媒体音量、
+         * 音频模式，车里此刻在放的声音、在录的麦克风。在放的、在录的变了，再记一行黑匣子（和别的事对时间）。
+         */
+        private void logSecond(AudioManager audio, DriveSoundRules.Why w, long fastAge, SoundOutput out) {
+            double mean = outSamples > 0 ? outSquares / outSamples : 0.0;
+            outSquares = 0.0;
+            outSamples = 0;
+            String level = mean > 1e-12 ? String.format(Locale.US, "%.1f", 10.0 * Math.log10(mean)) : "-inf";
+            String players = players(audio);
+            String recordings = recordings(audio);
+            String line = String.format(Locale.US,
+                    "%s %s gate=%.2f level=%+.1f gain=%s out=%s dBFS fast=%s under=%d media=%s mode=%s play=%s rec=%s",
+                    clock.format(new Date()), w, gate, levelDb, Float.isInfinite(gainDb) ? "-inf" : String.format(Locale.US, "%+.1f", gainDb),
+                    level, fastAge < 0L ? "?" : fastAge + "ms", out == null ? -1 : out.underruns(),
+                    mediaMax < 0 ? "?" : mediaIndex + "/" + mediaMax, audio == null ? "?" : String.valueOf(audio.getMode()),
+                    players, recordings);
+            synchronized (history) {
+                history[historyNext] = line;
+                historyNext = (historyNext + 1) % HISTORY_SEC;
+                historyCount = Math.min(HISTORY_SEC, historyCount + 1);
+            }
+            String others = "play=" + players + " rec=" + recordings;
+            if (!others.equals(lastOthers)) {
+                if (!lastOthers.isEmpty()) {
+                    BlackBox.note("模拟声浪：车里在放的声音、在录的麦克风变了：" + others + "（我们写出去的 " + level + " dBFS）");
+                }
+                lastOthers = others;
+            }
+        }
+
+        /** 诊断：最近 {@link #HISTORY_SEC} 秒的每秒一行，旧的在前。 */
+        private String historyText() {
+            StringBuilder sb = new StringBuilder();
+            synchronized (history) {
+                for (int k = 0; k < historyCount; k++) {
+                    sb.append("    ").append(history[(historyNext - historyCount + k + HISTORY_SEC) % HISTORY_SEC]).append('\n');
+                }
+            }
+            return sb.toString();
+        }
+
         String describe() {
+            return describeRun() + String.format(Locale.US, "%n  per second (last %d s; out = what we write, before the "
+                    + "head unit's volume and sound effects; play = what plays in the car by usage, ours included; "
+                    + "rec = microphones in use by source):%n", HISTORY_SEC) + historyText();
+        }
+
+        private String describeRun() {
             return String.format(Locale.US,
                     "run: %s style=%s view=%s speakers=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s eager=%.1f coupled=%.2f "
                             + "load=%.2f level=%.1f dB gate=%.2f "
@@ -781,6 +859,91 @@ public final class DriveSound {
 
         private String ms(float value) {
             return value < 0f ? "?" : String.format(Locale.US, "%.0f ms", value);
+        }
+    }
+
+    /** 诊断：车里此刻在放的声音，按用途（我们自己的也在里面）；读不到是「?」。 */
+    private static String players(AudioManager audio) {
+        if (audio == null) {
+            return "?";
+        }
+        try {
+            List<AudioPlaybackConfiguration> list = audio.getActivePlaybackConfigurations();
+            StringBuilder sb = new StringBuilder();
+            for (AudioPlaybackConfiguration c : list) {
+                sb.append(sb.length() == 0 ? "" : ",").append(usageName(c.getAudioAttributes().getUsage()));
+            }
+            return list.size() + "[" + sb + "]";
+        } catch (RuntimeException e) {
+            return "?";
+        }
+    }
+
+    /** 诊断：此刻在录的麦克风，按来源（被系统静音了的标 silenced）；读不到是「?」。 */
+    private static String recordings(AudioManager audio) {
+        if (audio == null) {
+            return "?";
+        }
+        try {
+            List<AudioRecordingConfiguration> list = audio.getActiveRecordingConfigurations();
+            StringBuilder sb = new StringBuilder();
+            for (AudioRecordingConfiguration c : list) {
+                sb.append(sb.length() == 0 ? "" : ",").append(sourceName(c.getClientAudioSource()));
+                if (Build.VERSION.SDK_INT >= 29 && c.isClientSilenced()) {
+                    sb.append("(silenced)");
+                }
+            }
+            return list.size() + "[" + sb + "]";
+        } catch (RuntimeException e) {
+            return "?";
+        }
+    }
+
+    static String usageName(int usage) {
+        switch (usage) {
+            case AudioAttributes.USAGE_MEDIA:
+                return "media";
+            case AudioAttributes.USAGE_GAME:
+                return "game";
+            case AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
+                return "nav";
+            case AudioAttributes.USAGE_ASSISTANT:
+                return "assistant";
+            case AudioAttributes.USAGE_VOICE_COMMUNICATION:
+                return "call";
+            case AudioAttributes.USAGE_NOTIFICATION:
+                return "notification";
+            case AudioAttributes.USAGE_NOTIFICATION_RINGTONE:
+                return "ringtone";
+            case AudioAttributes.USAGE_ALARM:
+                return "alarm";
+            case AudioAttributes.USAGE_ASSISTANCE_SONIFICATION:
+                return "sonification";
+            case AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY:
+                return "accessibility";
+            case AudioAttributes.USAGE_UNKNOWN:
+                return "unknown";
+            default:
+                return "usage" + usage;
+        }
+    }
+
+    static String sourceName(int source) {
+        switch (source) {
+            case MediaRecorder.AudioSource.MIC:
+                return "mic";
+            case MediaRecorder.AudioSource.CAMCORDER:
+                return "camcorder";
+            case MediaRecorder.AudioSource.VOICE_RECOGNITION:
+                return "recognition";
+            case MediaRecorder.AudioSource.VOICE_COMMUNICATION:
+                return "communication";
+            case MediaRecorder.AudioSource.UNPROCESSED:
+                return "unprocessed";
+            case MediaRecorder.AudioSource.VOICE_PERFORMANCE:
+                return "performance";
+            default:
+                return "source" + source;
         }
     }
 }
