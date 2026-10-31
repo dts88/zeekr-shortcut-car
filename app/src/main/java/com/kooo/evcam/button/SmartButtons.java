@@ -39,6 +39,8 @@ import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.overlay.QuickActions;
 import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.screen.DisplayWatch;
+import com.kooo.evcam.sound.DriveSound;
+import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.ArrayList;
@@ -69,7 +71,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>广播里的按键计数变了就是按了一下（{@link SmartButtonAd}）。上一次的计数存着，进程重启后的第一下照样算；
  *       连接时拿搜索那会儿看到的计数当起点。</li>
  *   <li>按法查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
- *       驾驶模式走 {@link Telemetry#setDriveMode}。用户退出以后什么都不听（{@link UserExit}）。</li>
+ *       驾驶模式走 {@link Telemetry#setDriveMode}，升挡、降挡交给模拟声浪（{@link DriveSound#shift}）。用户退出以后什么都不听（{@link UserExit}）。</li>
  * </ul>
  *
  * <h3>电量</h3>
@@ -93,6 +95,8 @@ public final class SmartButtons {
     static final long RETRY_MS = 30_000L;
     /** 在听的时候多久看一眼扫描还活着没有。 */
     static final long WATCH_MS = 15_000L;
+    /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
+    static final long DRIVE_TARGET_MS = 2000L;
     /** 亮着屏这么久一个设备的广播都没收到，就当扫描聋了（车上周围一般十几台，Lab findings §2.51）。重开过还是没有，下一回等的时间翻倍。 */
     static final long DEAF_MS = 45_000L;
     /** 最多翻几倍：真的一台设备都没有的地方，隔 12 分钟重开一次就够了。 */
@@ -207,6 +211,9 @@ public final class SmartButtons {
     /** 上次收到广播以来扫描失败了几次、聋了重开了几次：只在 bt 线程上写。 */
     private volatile int failures;
     private volatile int deafRestarts;
+    /** 刚要切到的驾驶模式、什么时候要的（主线程，{@link #stepDriveMode}）；0 = 没有。 */
+    private int driveTarget;
+    private long driveTargetAt;
     private final Map<String, Found> found = new LinkedHashMap<>();
     private final AtomicBoolean publishPending = new AtomicBoolean();
     private final Map<String, Pressed> pressed = new HashMap<>();
@@ -777,12 +784,38 @@ public final class SmartButtons {
                 AppLog.w(TAG, "action " + action.key + " failed: " + e);
             }
         } else if (action.driveMode != 0) {
-            Telemetry.get().setDriveMode(action.driveMode, ok -> {
-                if (!ok) {
-                    Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
-                }
-            });
+            writeDriveMode(action.driveMode);
+        } else if (action.driveModeStep != 0) {
+            stepDriveMode(action.driveModeStep);
+        } else if (action.gearStep != 0) {
+            DriveSound.shift(action.gearStep);
         }
+    }
+
+    /**
+     * 驾驶模式走一级（{@link SmartButtonAction#nextDriveMode}）：到头不动、不提示；此刻不在舒适、标准、运动里（雪地、读不到）不切换。
+     * 连按时接着上一次的目标算，车机回报晚了也不会少走一级（{@link #DRIVE_TARGET_MS}）。
+     */
+    private void stepDriveMode(int step) {
+        boolean recent = driveTarget != 0 && SystemClock.elapsedRealtime() - driveTargetAt < DRIVE_TARGET_MS;
+        Integer from = recent ? Integer.valueOf(driveTarget) : Telemetry.get().readings().code(Signal.DRIVE_MODE);
+        int to = SmartButtonAction.nextDriveMode(from, step);
+        if (to == 0) {
+            Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
+        } else if (to != from) {
+            writeDriveMode(to);
+        }
+    }
+
+    private void writeDriveMode(int mode) {
+        driveTarget = mode;
+        driveTargetAt = SystemClock.elapsedRealtime();
+        Telemetry.get().setDriveMode(mode, ok -> {
+            if (!ok) {
+                driveTarget = 0;
+                Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     // ================================================================= 读电量（bt 线程）

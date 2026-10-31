@@ -35,6 +35,13 @@ package com.kooo.evcam.sound;
  *   <li><b>换挡积极性</b>（{@link Input#eager}，项目所有者 2026-10-24：标准模式也出声，和运动模式只差升降挡的积极性）：
  *       标准模式照原来的换挡；运动模式轻踩时升挡点高 {@link #EAGER_UP_RPM}（踩到底一样）、松油门保持挡位、减速时早一点降挡。
  *       手动挡不管哪种模式松油门都不升挡。两种都：油门正往下踩时不升挡（{@link #TIP_IN_RATE}），踩着油门降挡留出往上拉的余地。</li>
+ *   <li><b>灵动贴换挡</b>（{@link Input#shiftStep}，项目所有者 2026-10-31，docs/local/drive-sound-plan.md §12.34）：只改这里的转速和声音，不碰车。
+ *       两种变速箱都是：升挡、降挡能做就马上做，做不了响一声（{@link #beepSerial}）；人选的挡进红线区（{@link #REDLINE_RPM}）响一声，
+ *       到上限（{@link #SHIFT_LIMIT_RPM}）自动升一挡；停车回一挡。没按过和原来一模一样。
+ *       <b>6 速手动</b>：按第一下起只听按键（{@link #driverOnly}），不自动升降、不管一脚到底，直到发动机熄火。
+ *       <b>8 速自动</b>：按键是给自动换挡的指令，两者一起工作，没有手动 / 自动的切换，也没有定时器：做完记着「这一挡是人选的」
+ *       （{@link #driverHold}）—— 升挡点往上限靠、降挡点往拖不动（{@link #LUG_RPM}）靠，所以不会马上换回去；要力时不淡，匀速、松开时慢慢淡，
+ *       淡没了就是原来的自动换挡。一脚到底照常降挡。</li>
  * </ul>
  *
  * <h3>开始工作（{@link #ignite}）、停下来（{@link #shutdown}）</h3>
@@ -86,6 +93,8 @@ final class VirtualEngine {
         float eager;
         /** 运动模式的踏板（0 标准、1 运动，{@link #SPORT_PEDAL_EXP}）：车机在运动模式下踏板更灵，同样的油门开度出的力更大。 */
         float sportPedal;
+        /** 这一块灵动贴按了升挡（+1）或降挡（−1），0 = 没按（{@link DriveSound#shift}）。 */
+        int shiftStep;
     }
 
     // ---- 负荷
@@ -243,6 +252,25 @@ final class VirtualEngine {
     // ---- 伪挡位（连续走法，油门接近踩到底）
     static final float PSEUDO_ON_PCT = 80f;
     static final float PSEUDO_OFF_PCT = 55f;
+
+    // ---- 灵动贴换挡（{@link Input#shiftStep}）
+    /** 上限（rpm）：参考那台断油的转速（docs/local/drive-sound-plan.md §12.15）。人选的挡到这里自动升一挡；降挡会超过它就不降。 */
+    static final float SHIFT_LIMIT_RPM = 6200f;
+    /**
+     * 红线区从这里起（rpm），人选的挡进来响一声。定得早：按 7X 0–100 km/h 的平均加速度，地板油时一挡从这里到上限只有 0.3–0.6 秒，
+     * 灵动贴从按下到收到还要一段时间（没量过）。
+     */
+    static final float REDLINE_RPM = 5500f;
+    /** 响过以后转速回到这里（rpm）以下，再进红线区才又响：不在红线边上来回响。 */
+    static final float REDLINE_REARM_RPM = 5300f;
+    /** 8 速自动：转速低于这里（rpm）算拖不动 —— 升挡后会低于它就不升；人选的挡落到它以下自动降一挡。 */
+    static final float LUG_RPM = 1100f;
+    /** 8 速自动：人选的这一挡淡得多快（时间常数，秒）。要力时（负荷过了 {@link #CRUISE_LOAD}）不淡。 */
+    static final float DRIVER_HOLD_SEC = 4f;
+    /** 人选的这一挡淡到这里算没了。 */
+    static final float DRIVER_HOLD_END = 0.02f;
+    /** 自动升挡后这么久（秒）里再按升挡算同一次：按键来得晚，不连升两挡。 */
+    static final float SAME_UPSHIFT_SEC = 1f;
 
     // ---- 升挡：断扭、转速停一下再按 S 形落下、动力回来时「吼」一下（一共多久看变速箱，{@link Gearbox#upshiftSec}）
     /** 升挡里转速先停住的那一段（占整个升挡的份额）。 */
@@ -422,6 +450,19 @@ final class VirtualEngine {
     private boolean catchArmed;
     /** 稳一下走了多久（秒）；负的 = 没在稳。 */
     private float catchSec = -1f;
+    // ---- 灵动贴换挡
+    /** 6 速手动按过了：只听按键，直到发动机熄火。 */
+    private boolean driverOnly;
+    /** 8 速自动：这一挡是人选的，还算数多少（1 刚按 … 0 全归自动换挡）。 */
+    private float driverHold;
+    /** 按了还没做的（上一下换挡还没完）：正的升、负的降。 */
+    private int queuedShift;
+    /** 还有多久（秒）算刚自动升过挡（{@link #SAME_UPSHIFT_SEC}）。 */
+    private float sameUpLeftSec;
+    /** 再进红线区要响（{@link #REDLINE_REARM_RPM}）。 */
+    private boolean redlineArmed = true;
+    /** 响了几声（只增不减）：{@link DriveSound} 看它变了就放提示音（{@link ShiftBeep}）。 */
+    private int beepSerial;
 
     VirtualEngine(SoundProfile profile) {
         this(profile, true);
@@ -470,6 +511,16 @@ final class VirtualEngine {
         shiftLeftSec = 0f;
         upLeftSec = 0f;
         cut = 0f;
+        clearDriver();
+    }
+
+    /** 灵动贴这条线归零：开始工作、熄火、换变速箱时。 */
+    private void clearDriver() {
+        driverOnly = false;
+        driverHold = 0f;
+        queuedShift = 0;
+        sameUpLeftSec = 0f;
+        redlineArmed = true;
     }
 
     /** 开始工作：车停着放启动声，车在走就像混动车那样起动发动机。 */
@@ -497,6 +548,7 @@ final class VirtualEngine {
         done = false;
         catchArmed = false;
         catchSec = -1f;
+        clearDriver();
         float v = speedOf(in);
         speedKmh = v;
         gear = in.gear;
@@ -559,6 +611,7 @@ final class VirtualEngine {
         shiftLeftSec = 0f;
         barkPending = false;
         overrun = 0f;
+        clearDriver();
     }
 
     /** 推进 {@code dt} 秒。 */
@@ -619,7 +672,8 @@ final class VirtualEngine {
 
         // 转速
         updatePseudo(in);
-        geared = in.gear == Gear.D && (in.mode == RpmMode.SHIFTS || pseudo);
+        takeButton(dt, in);
+        geared = in.gear == Gear.D && byGears(in);
         boolean shifting = false;
         if (geared) {
             updateGear(dt, v, in);
@@ -702,6 +756,39 @@ final class VirtualEngine {
         return realNeutral && g != Gear.D && g != Gear.R;
     }
 
+    /** 这一块的按键收下来，人选的挡淡一点（要力时不淡）。不在 D 挡按键不算，人选的挡也作废；6 速手动照旧只听按键。 */
+    private void takeButton(float dt, Input in) {
+        if (in.gear != Gear.D) {
+            driverHold = 0f;
+            queuedShift = 0;
+            return;
+        }
+        if (in.shiftStep != 0) {
+            if (!geared) {
+                // 刚才不是按挡位走的（「连续」）：先按此刻的车速和负荷选一个挡
+                gearPicked = false;
+            }
+            queuedShift += in.shiftStep;
+            driverOnly |= gearbox.manual();
+        }
+        if (load < CRUISE_LOAD) {
+            driverHold *= decay(dt, DRIVER_HOLD_SEC);
+            if (driverHold < DRIVER_HOLD_END) {
+                driverHold = 0f;
+            }
+        }
+    }
+
+    /** 此刻的挡是人选的：只有灵动贴按过才会是。 */
+    private boolean driverGear() {
+        return driverOnly || driverHold > 0f || queuedShift != 0;
+    }
+
+    /** D 挡里此刻按挡位走（模拟换挡、伪挡位、人选的挡），不然走连续。 */
+    private boolean byGears(Input in) {
+        return in.mode == RpmMode.SHIFTS || pseudo || driverGear();
+    }
+
     /** 连续走法：油门接近踩到底时按伪挡位走（有回差：踩到 {@link #PSEUDO_ON_PCT}、或者一脚到底时进，回到 {@link #PSEUDO_OFF_PCT} 以下出）。 */
     private void updatePseudo(Input in) {
         if (!pseudoAllowed || in.gear != Gear.D || in.mode == RpmMode.SHIFTS) {
@@ -713,7 +800,7 @@ final class VirtualEngine {
         if (!pseudo) {
             if (!easing && (t >= PSEUDO_ON_PCT || (kickdown && t >= PSEUDO_OFF_PCT))) {
                 pseudo = true;
-                gearPicked = false;
+                gearPicked = gearPicked && driverGear();
             }
         } else if (easing || t < PSEUDO_OFF_PCT) {
             pseudo = false;
@@ -828,41 +915,69 @@ final class VirtualEngine {
      * 模拟换挡：升挡点随换挡负荷（最近的负荷慢慢回落），降挡点随急踩、重刹抬高；刹车、回收减速时不升挡；
      * 猛踩直接降到该在的挡（一脚到底可以连降几挡），重刹一挡一挡地降；降挡带补油，升挡音量掉一下。
      * 运动模式（{@link #eager}）升挡点、减速时的降挡点都高一些，松着油门不升挡；手动挡松着油门也不升挡（快到上限除外）。
+     * 灵动贴按的挡先做（{@link #takeShift}）；6 速手动按过以后只有到上限才自己升；8 速自动照常走这一套，人选的挡把升挡点、降挡点拉开。
      */
     private void updateGear(float dt, float v, Input in) {
         if (shiftLeftSec > 0f) {
             shiftLeftSec = Math.max(0f, shiftLeftSec - dt);
         }
+        if (sameUpLeftSec > 0f) {
+            sameUpLeftSec = Math.max(0f, sameUpLeftSec - dt);
+        }
         if (v < SHIFT_RESET_KMH) {
             gearIndex = 0;
             gearPicked = true;
+            driverHold = 0f;
+            redlineArmed = true;
+            if (queuedShift != 0) {
+                // 停着换不了：挡位就是一挡
+                refuseShift();
+            }
             return;
         }
         if (!gearPicked) {
             // 刚从别的挡、别的走法、别的变速箱过来：按此刻的车速和负荷直接选，不一挡一挡地升
             gearIndex = pickGear(p, gearbox, v, shiftLoad, SHIFT_GUARD, eager);
             gearPicked = true;
-            return;
+            if (queuedShift == 0) {
+                return;
+            }
         }
+        float inGear = v * gearbox.rpmPerKmh[gearIndex];
+        updateRedline(inGear);
         if (shiftLeftSec > 0f) {
             return;
         }
         int last = gearbox.rpmPerKmh.length - 1;
         boolean easing = in.braking || in.flow == Flow.REGEN;
+        if (queuedShift != 0) {
+            takeShift(v, easing);
+            return;
+        }
+        if ((driverOnly || driverHold > 0f) && gearIndex < last && inGear >= SHIFT_LIMIT_RPM) {
+            // 人选的挡到上限：油门怎么动都升一挡。这只是保护，新的这一挡照样算人选的（不然紧接着又被自动换挡多升一挡）
+            autoUpshift();
+            return;
+        }
+        if (driverOnly) {
+            return;
+        }
         if (kickdown && !easing) {
             // 一脚到底：直接降到此刻车速下该在的挡（留出往上拉的余地），可以连降几挡
             int to = pickGear(p, gearbox, v, shiftLoad, KICKDOWN_ROOM, eager);
             if (to < gearIndex) {
                 downshiftTo(to, false);
+                driverHold = 0f;
                 return;
             }
         }
-        // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）才按记住的量
+        // 记住的负荷只管「先别升挡」；降挡平时看此刻的负荷，刹车 / 回收（补油降挡）才按记住的量。
+        // 人选的挡：升挡点往上限靠、降挡点往拖不动靠，淡没了就是原来的
         float up = upshiftRpm(p, shiftLoad, eager);
+        up += (SHIFT_LIMIT_RPM - up) * driverHold;
         float downRatio = p.shiftDownRatio + EAGER_DOWN_RAISE * eager + STAB_DOWNSHIFT_RAISE * stabEnv
                 + (easing ? DECEL_DOWNSHIFT_RAISE * decel : 0f);
-        float down = upshiftRpm(p, easing ? shiftLoad : load, eager) * downRatio;
-        float inGear = v * gearbox.rpmPerKmh[gearIndex];
+        float down = Math.max(upshiftRpm(p, easing ? shiftLoad : load, eager) * downRatio * (1f - driverHold), LUG_RPM);
         boolean slowing = easing && decel > NO_UPSHIFT_DECEL;
         // 松着油门保持挡位（运动模式；手动挡开车的人也不会松油门就升挡），快到上限才升。看踩着的量（不等负荷慢慢落）：
         // 巡航时转速就在升挡点下面一点，松开那一下换挡负荷先往下落，按平滑后的负荷判就会抢先升一挡
@@ -870,19 +985,83 @@ final class VirtualEngine {
                 && inGear < upshiftRpm(p, 1f, eager) * SHIFT_GUARD;
         boolean pressing = in.pedalRate > TIP_IN_RATE;
         if (gearIndex < last && inGear >= up && !slowing && !holding && !pressing) {
-            gearIndex++;
-            shiftLeftSec = gearbox.upshiftSec;
-            upLeftSec = gearbox.upshiftSec;
-            upFromRpm = rpm;
-            barkPending = true;
-            shiftSerial++;
-            shiftUp = true;
+            autoUpshift();
+            driverHold = 0f;
         } else if (gearIndex > 0 && inGear < down
                 && v * gearbox.rpmPerKmh[gearIndex - 1] < up * (easing ? SHIFT_GUARD : KICKDOWN_ROOM)) {
             // 踩着油门降挡也留出往上拉的余地（和一脚到底一样）：不然一降就在升挡点底下，紧接着又升回去
             // （2026-10-24：急踩 70 % 时三挡 → 二挡 → 一挡 → 0.25 秒后又升二挡）
             downshiftTo(gearIndex - 1, easing);
+            driverHold = 0f;
         }
+    }
+
+    /**
+     * 灵动贴要的挡（一次一挡，还有就等这一下换完）：能做就做；做不了响一声 —— 没有更高、更低的挡，降挡会超过上限，
+     * 8 速自动升挡后会拖不动（6 速手动照升，转速停在怠速）。8 速自动做完记着这一挡是人选的。
+     */
+    private void takeShift(float v, boolean easing) {
+        int step = Integer.signum(queuedShift);
+        queuedShift -= step;
+        int to = gearIndex + step;
+        if (to < 0 || to >= gearbox.rpmPerKmh.length) {
+            refuseShift();
+            return;
+        }
+        float after = v * gearbox.rpmPerKmh[to];
+        if (step > 0) {
+            if (sameUpLeftSec > 0f) {
+                // 刚自动升过挡，这一下来晚了：算同一次
+                return;
+            }
+            if (after < LUG_RPM && !gearbox.manual()) {
+                refuseShift();
+                return;
+            }
+            upshift();
+        } else {
+            if (after > SHIFT_LIMIT_RPM) {
+                refuseShift();
+                return;
+            }
+            downshiftTo(to, easing);
+        }
+        if (!gearbox.manual()) {
+            driverHold = 1f;
+        }
+    }
+
+    /** 灵动贴要的挡做不了：响一声，后面按的也不算了。 */
+    private void refuseShift() {
+        queuedShift = 0;
+        beepSerial++;
+    }
+
+    /** 人选的挡进红线区响一声；转速回到 {@link #REDLINE_REARM_RPM} 以下才又响。自动换挡自己拉高转速时不响。 */
+    private void updateRedline(float inGear) {
+        if (inGear < REDLINE_REARM_RPM) {
+            redlineArmed = true;
+        } else if (redlineArmed && inGear >= REDLINE_RPM && (driverOnly || driverHold > 0f)) {
+            redlineArmed = false;
+            beepSerial++;
+        }
+    }
+
+    /** 不是按键要的升挡（换挡逻辑，或者人选的挡到了上限）：之后一小会儿里再按升挡算同一次（{@link #SAME_UPSHIFT_SEC}）。 */
+    private void autoUpshift() {
+        upshift();
+        sameUpLeftSec = SAME_UPSHIFT_SEC;
+    }
+
+    /** 升一挡：断扭、转速落到新挡位、动力回来（{@link #stepUpshift}）。 */
+    private void upshift() {
+        gearIndex++;
+        shiftLeftSec = gearbox.upshiftSec;
+        upLeftSec = gearbox.upshiftSec;
+        upFromRpm = rpm;
+        barkPending = true;
+        shiftSerial++;
+        shiftUp = true;
     }
 
     /** 降到 {@code to} 挡：转速跟着冲上去，带一点补油（刹车 / 回收时那一下更响）。 */
@@ -904,7 +1083,7 @@ final class VirtualEngine {
                 base = Math.min(gearedRpm(launchRpm(load), v * gearbox.reverseRpmPerKmh), REVERSE_MAX_RPM);
                 break;
             case D:
-                if (in.mode == RpmMode.SHIFTS || pseudo) {
+                if (byGears(in)) {
                     // 起步打滑时油门撑着转速（急踩还冲一下）；接合以后就是挡位转速（{@link #updateCoupling}）
                     float inGear = v * gearbox.rpmPerKmh[gearIndex];
                     float slipping = slipRpm(launchRpm(load), inGear)
@@ -1291,6 +1470,21 @@ final class VirtualEngine {
     /** 模拟换挡的挡位（0 = 一挡）。 */
     int gearIndex() {
         return gearIndex;
+    }
+
+    /** 6 速手动按过灵动贴了：只听按键，直到发动机熄火。 */
+    boolean driverOnly() {
+        return driverOnly;
+    }
+
+    /** 8 速自动：这一挡是人选的，还算数多少（0–1）。 */
+    float driverHold() {
+        return driverHold;
+    }
+
+    /** 灵动贴换挡响了几声（只增不减）：进红线区、要的挡做不了。 */
+    int beepSerial() {
+        return beepSerial;
     }
 
     float cruiseCutDb() {

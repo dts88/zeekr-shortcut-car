@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 模拟声浪（设置 → 系统「模拟声浪（试验性）」，项目所有者 2026-10-21）：进程里一个，跟着车辆信号开、关声音那一路。
@@ -125,6 +126,17 @@ public final class DriveSound {
             INSTANCE.doInstall(context);
             INSTANCE.update();
         });
+    }
+
+    /**
+     * 灵动贴的升挡（+1）、降挡（−1）：交给正在转的那一台，下一块由虚拟发动机定做不做（{@link VirtualEngine}）。只改声音，不碰车。
+     * 没有在转的就什么都不做。主线程上叫。
+     */
+    public static void shift(int step) {
+        Run r = INSTANCE.run;
+        if (r != null) {
+            r.shiftSteps.addAndGet(step);
+        }
     }
 
     private void doInstall(Context context) {
@@ -277,6 +289,8 @@ public final class DriveSound {
         final boolean cabin = DriveSound.this.cabinView;
         final String outputMode = DriveSound.this.outputMode;
         final String exteriorRoute = DriveSound.this.exteriorRoute;
+        /** 灵动贴按的挡（{@link DriveSound#shift}）：主线程加，声音线程每块取走。 */
+        final AtomicInteger shiftSteps = new AtomicInteger();
         // ---- 系统报给应用的媒体音量（音量键调的是它那一组；车外不在那一组）：第一次读到的、此刻的、最多几档、是不是写死的；
         //      跟着变过一次（看得出它真跟着音量键走）以后，车外按它缩放（DriveSoundRules.mediaFollowDb）
         private volatile int mediaFirst = Integer.MIN_VALUE;
@@ -302,6 +316,10 @@ public final class DriveSound {
         /** 换挡积极性（0 标准 … 1 运动）、挂着挡接合到几成（0 起步打滑 … 1 硬连着）。 */
         private volatile float eager;
         private volatile float coupled;
+        /** 灵动贴换挡：6 速手动只听按键了、8 速自动人选的挡还算数多少、响了几声。 */
+        private volatile boolean driverOnly;
+        private volatile float driverHold;
+        private volatile int beeps;
         private volatile float gate;
         private volatile float pedalRate;
         private volatile float accel;
@@ -481,6 +499,8 @@ public final class DriveSound {
                 voiceOut = voice != null && (!cabin || !style.hasViews()) ? voice : style.voice(SoundOutput.RATE, false);
             }
             ExteriorMix exterior = outside != null ? new ExteriorMix(SoundOutput.RATE) : null;
+            ShiftBeep beep = new ShiftBeep(SoundOutput.RATE);
+            int beepSeen = 0;
             VirtualEngine.Input in = new VirtualEngine.Input();
             VoiceParams params = new VoiceParams();
             float[] buffer = new float[2 * BLOCK];
@@ -628,6 +648,7 @@ public final class DriveSound {
                 in.mode = rpmMode;
                 in.eager = DriveSoundRules.eagerOf(r.code(Signal.DRIVE_MODE));
                 in.sportPedal = DriveSoundRules.sportPedalOf(r.code(Signal.DRIVE_MODE));
+                in.shiftStep = shiftSteps.getAndSet(0);
                 engine.setGearbox(style.gearbox(gearbox));
                 if (!ignited && w == DriveSoundRules.Why.RUNNING) {
                     engine.ignite(in);
@@ -684,6 +705,9 @@ public final class DriveSound {
                     pseudo = engine.pseudoGears();
                     eager = engine.eager();
                     coupled = engine.coupled();
+                    driverOnly = engine.driverOnly();
+                    driverHold = engine.driverHold();
+                    beeps = engine.beepSerial();
                 } else {
                     params.gain = 0f;
                 }
@@ -700,6 +724,14 @@ public final class DriveSound {
                     float follow = mediaTracked ? DriveSoundRules.mediaFollowDb(mediaIndex, mediaMax) : 0f;
                     float exteriorGain = follow == Float.NEGATIVE_INFINITY ? 0f : EngineVoice.dbToLin(exteriorDb + follow);
                     exterior.process(voiceOut == voice ? buffer : outsideBuffer, exteriorBuffer, BLOCK, exteriorGain);
+                }
+                if (voice != null) {
+                    // 提示音只放车内：车外那一路上面已经合好了
+                    if (engine.beepSerial() != beepSeen) {
+                        beepSeen = engine.beepSerial();
+                        beep.start();
+                    }
+                    beep.mix(buffer, BLOCK, g * EngineVoice.dbToLin(userDb));
                 }
                 renderMs += ((System.nanoTime() - t0) / 1_000_000f - renderMs) * 0.01f;
                 long w0 = System.nanoTime();
@@ -741,7 +773,7 @@ public final class DriveSound {
         String describe() {
             return String.format(Locale.US,
                     "run: %s style=%s view=%s speakers=%s why=%s ignited=%s ended=%s rpm=%.0f gear=%d%s eager=%.1f coupled=%.2f "
-                            + "load=%.2f level=%.1f dB gate=%.2f "
+                            + "buttons=%s beeps=%d load=%.2f level=%.1f dB gate=%.2f "
                             + "pedal=%.0f %%/s accel=%.2f m/s2 blocks=%d render=%.3f ms per %.1f ms block%s%n  output: %s%n"
                             + "  exterior: route %s, volume %+.0f dB, media volume %s%n"
                             + "  mixer: takes a period every %s (%s blocks each)%n"
@@ -756,7 +788,8 @@ public final class DriveSound {
                             + "not real; + the head unit's own signal and amplifier delays, not measurable here)",
                     state, style.key, cabin ? "cabin" : "outside", outputMode, why, ignitedAs.isEmpty() ? "-" : ignitedAs,
                     endedAs.isEmpty() ? "-" : endedAs, rpm, gear,
-                    pseudo ? " (pseudo)" : "", eager, coupled, load, levelDb, gate, pedalRate, accel,
+                    pseudo ? " (pseudo)" : "", eager, coupled,
+                    driverOnly ? "only" : String.format(Locale.US, "%.2f", driverHold), beeps, load, levelDb, gate, pedalRate, accel,
                     blocks, renderMs, BLOCK * 1000f / SoundOutput.RATE,
                     trouble.isEmpty() ? "" : " trouble=" + trouble, output.isEmpty() ? "-" : output,
                     exteriorRoute, DriveSound.this.exteriorDb, mediaText(),

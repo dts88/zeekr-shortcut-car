@@ -128,6 +128,10 @@
     <string name="set_smart_button_double">Double press</string>
     <string name="smart_button_action_none">None</string>
     <string name="smart_button_action_drive">Switch to %1$s mode</string>
+    <string name="smart_button_action_drive_up">Drive mode up</string>
+    <string name="smart_button_action_drive_down">Drive mode down</string>
+    <string name="smart_button_action_gear_up">Shift up (simulated drive sound)</string>
+    <string name="smart_button_action_gear_down">Shift down (simulated drive sound)</string>
     <string name="dlg_smart_button_delete_title">Delete this smart button?</string>
     <string name="dlg_smart_button_delete_msg">Pressing it will no longer do anything. To use it again, find and connect it again.</string>
     <string name="msg_smart_button_connected">Smart button %1$s connected</string>

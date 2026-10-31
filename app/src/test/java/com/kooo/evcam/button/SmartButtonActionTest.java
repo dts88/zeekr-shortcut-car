@@ -15,7 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** 灵动贴能选的动作（{@link SmartButtonAction}）：不使用 + 悬浮按钮的全部 + 驾驶模式三项，认不出的当不使用。 */
+/** 灵动贴能选的动作（{@link SmartButtonAction}）：不使用 + 悬浮按钮的全部 + 驾驶模式三项 + 手排模式四项，认不出的当不使用。 */
 public class SmartButtonActionTest {
 
     @Test
@@ -31,7 +31,7 @@ public class SmartButtonActionTest {
             assertSame(floating, action.floating);
             assertEquals(0, action.driveMode);
         }
-        assertEquals(1 + FloatingAction.values().length + 3, all.size());
+        assertEquals(1 + FloatingAction.values().length + 3 + 4, all.size());
     }
 
     @Test
@@ -41,6 +41,41 @@ public class SmartButtonActionTest {
         assertEquals(Signal.DRIVE_MODE_SPORT, SmartButtonAction.fromKey("drive_mode_sport").driveMode);
         assertNull(SmartButtonAction.fromKey("drive_mode_sport").floating);
         assertNotNull(SmartButtonAction.fromKey("lock_footage").floating);
+    }
+
+    @Test
+    public void theManualShiftActionsOnlyStep() {
+        assertEquals(1, SmartButtonAction.fromKey("drive_mode_up").driveModeStep);
+        assertEquals(-1, SmartButtonAction.fromKey("drive_mode_down").driveModeStep);
+        assertEquals(1, SmartButtonAction.fromKey("gear_up").gearStep);
+        assertEquals(-1, SmartButtonAction.fromKey("gear_down").gearStep);
+        for (String key : new String[] {"drive_mode_up", "drive_mode_down", "gear_up", "gear_down"}) {
+            assertNull(key, SmartButtonAction.fromKey(key).floating);
+            assertEquals(key, 0, SmartButtonAction.fromKey(key).driveMode);
+        }
+        assertEquals(0, SmartButtonAction.fromKey("gear_up").driveModeStep);
+        assertEquals(0, SmartButtonAction.fromKey("drive_mode_up").gearStep);
+        assertEquals(0, SmartButtonAction.fromKey("drive_mode_sport").driveModeStep);
+        assertEquals(0, SmartButtonAction.NONE.gearStep);
+    }
+
+    /** 舒适、标准、运动一次走一级，到头还是它（不循环）。 */
+    @Test
+    public void driveModesStepOneAtATimeAndDoNotWrap() {
+        assertEquals(Signal.DRIVE_MODE_STANDARD, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_COMFORT, 1));
+        assertEquals(Signal.DRIVE_MODE_SPORT, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_STANDARD, 1));
+        assertEquals(Signal.DRIVE_MODE_SPORT, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_SPORT, 1));
+        assertEquals(Signal.DRIVE_MODE_STANDARD, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_SPORT, -1));
+        assertEquals(Signal.DRIVE_MODE_COMFORT, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_STANDARD, -1));
+        assertEquals(Signal.DRIVE_MODE_COMFORT, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_COMFORT, -1));
+    }
+
+    /** 雪地、读不到：不在这三种里，不切换。 */
+    @Test
+    public void otherDriveModesDoNotStep() {
+        assertEquals(0, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_SNOW, 1));
+        assertEquals(0, SmartButtonAction.nextDriveMode(Signal.DRIVE_MODE_SNOW, -1));
+        assertEquals(0, SmartButtonAction.nextDriveMode(null, 1));
     }
 
     /** 配置可以被手改：认不出的、空的都当「不使用」，按一下不做没选过的事。 */

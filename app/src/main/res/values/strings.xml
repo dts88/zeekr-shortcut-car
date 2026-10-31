@@ -147,6 +147,10 @@
     <string name="set_smart_button_double">双击</string>
     <string name="smart_button_action_none">不使用</string>
     <string name="smart_button_action_drive">切换到%1$s模式</string>
+    <string name="smart_button_action_drive_up">驾驶模式向上</string>
+    <string name="smart_button_action_drive_down">驾驶模式向下</string>
+    <string name="smart_button_action_gear_up">升挡（模拟声浪）</string>
+    <string name="smart_button_action_gear_down">降挡（模拟声浪）</string>
     <string name="dlg_smart_button_delete_title">删除这个灵动贴？</string>
     <string name="dlg_smart_button_delete_msg">删除后按它不再触发动作；要再用，需重新搜索并连接。</string>
     <string name="msg_smart_button_connected">已连接灵动贴 %1$s</string>
