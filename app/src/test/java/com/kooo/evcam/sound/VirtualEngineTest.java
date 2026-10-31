@@ -12,7 +12,8 @@ import org.junit.Test;
  * <p>算错的表现：地板油一路顶在红线上；急踩和缓踩听起来一样；松油门、刹车时乱升挡；倒挡升挡；
  * 停着切到运动模式没有启动声、或者启动声之后一直是起动机的声音；行驶中接入时不点火就冒出来、降的那一挡马上又升回去；
  * 切出运动模式时发动机不熄火、或者熄了火停不下来；
- * 自适应巡航自己加速时没声音；块大小一变声音的快慢就变。</p>
+ * 自适应巡航自己加速时没声音；块大小一变声音的快慢就变；
+ * 灵动贴按了挡不马上换、换了又马上被自动换挡改回去，没按过却响提示音、变了原来的换挡。</p>
  */
 public class VirtualEngineTest {
 
@@ -1222,6 +1223,430 @@ public class VirtualEngineTest {
             assertTrue("电平 " + e.levelDb(), e.levelDb() > -36f && e.levelDb() < 10f);
             assertTrue("转速 " + e.rpm(), e.rpm() >= P.idleRpm && e.rpm() <= P.maxRpm);
             assertFalse(Float.isNaN(e.rpm()) || Float.isNaN(e.load()));
+        }
+    }
+
+    // ================================================================= 2026-10-31：灵动贴换挡
+
+    /** 在 D 挡走着的一台：接入完、转稳了（接入时顺势降的那一挡升回去以后，也过了「刚自动升过挡」那一小会儿）。 */
+    private static VirtualEngine driving(Gearbox box, VirtualEngine.Input in) {
+        in.mode = VirtualEngine.RpmMode.SHIFTS;
+        VirtualEngine e = new VirtualEngine(P, box, false);
+        e.ignite(in);
+        run(e, in, 2.5f);
+        return e;
+    }
+
+    /** 按一下（一块），再等 {@code settleSec} 秒换完。 */
+    private static void press(VirtualEngine e, VirtualEngine.Input in, int step, float settleSec) {
+        in.shiftStep = step;
+        e.step(DT, in);
+        in.shiftStep = 0;
+        run(e, in, settleSec);
+    }
+
+    /** 车速从现在匀速变到 {@code toKmh}，每块回调一次。 */
+    private static void ramp(VirtualEngine e, VirtualEngine.Input in, float toKmh, float kmhPerSec, Runnable eachBlock) {
+        float from = in.speedKmh;
+        int steps = Math.round(Math.abs(toKmh - from) / kmhPerSec / DT);
+        for (int i = 1; i <= steps; i++) {
+            in.speedKmh = from + (toKmh - from) * i / steps;
+            e.step(DT, in);
+            eachBlock.run();
+        }
+    }
+
+    private static VirtualEngine.Input cruise(float kmh, float throttle) {
+        VirtualEngine.Input in = input(VirtualEngine.Gear.D, kmh, throttle);
+        in.flow = VirtualEngine.Flow.DRIVE;
+        return in;
+    }
+
+    /** 没按过：两种变速箱地板油拉到 200 km/h，换挡照原来，不响提示音（自动换挡自己拉到高转不算人选的挡）。 */
+    @Test
+    public void withoutAPressNothingChangesAndNothingBeeps() {
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine.Input in = cruise(10f, 100f);
+            VirtualEngine e = driving(box, in);
+            int[] highest = {0};
+            ramp(e, in, 200f, 20f, () -> highest[0] = Math.max(highest[0], e.gearIndex()));
+            assertTrue(box + " 自己升过挡", highest[0] >= 3);
+            assertEquals(box + " 不响", 0, e.beepSerial());
+            assertFalse(e.driverOnly());
+            assertEquals(0f, e.driverHold(), 0f);
+        }
+    }
+
+    // ---- 6 速手动：按第一下起只听按键
+
+    @Test
+    public void onTheManualAfterTheFirstPressOnlyTheButtonsAndTheLimitChangeGear() {
+        VirtualEngine.Input in = cruise(40f, 50f);
+        VirtualEngine e = driving(Gearbox.MANUAL6, in);
+        assertEquals(0, e.gearIndex());
+        assertFalse(e.driverOnly());
+        press(e, in, 1, 0.5f);
+        assertTrue(e.driverOnly());
+        assertEquals("按了就升", 1, e.gearIndex());
+        // 二挡拉到 141 km/h 才到上限：原来 3000 rpm 上下就自己升了
+        ramp(e, in, 124f, 10f, () -> assertEquals("没到红线不自己升", 1, e.gearIndex()));
+        assertEquals("还没进红线区", 0, e.beepSerial());
+        ramp(e, in, 140f, 10f, () -> assertEquals("红线区里也不自己升", 1, e.gearIndex()));
+        assertEquals("进红线区响一声", 1, e.beepSerial());
+        float[] changedAt = {0f};
+        ramp(e, in, 150f, 10f, () -> {
+            if (changedAt[0] == 0f && e.gearIndex() == 2) {
+                changedAt[0] = in.speedKmh;
+            }
+        });
+        assertEquals("到上限（6200 rpm）自动升一挡", VirtualEngine.SHIFT_LIMIT_RPM / Gearbox.MANUAL6.rpmPerKmh[1], changedAt[0], 1f);
+        assertEquals(2, e.gearIndex());
+    }
+
+    @Test
+    public void onTheManualSlowingDownNeverShiftsAndTheRpmRestsAtIdle() {
+        VirtualEngine.Input in = cruise(60f, 30f);
+        VirtualEngine e = driving(Gearbox.MANUAL6, in);
+        for (int i = 0; i < 5; i++) {
+            press(e, in, 1, 0.5f);
+        }
+        assertEquals("六挡", 5, e.gearIndex());
+        in.throttlePct = 0f;
+        in.flow = VirtualEngine.Flow.REGEN;
+        in.braking = true;
+        in.accel = -3f;
+        int serial = e.shiftSerial();
+        ramp(e, in, 4f, 10f, () -> assertEquals("不自动降挡", 5, e.gearIndex()));
+        assertEquals(serial, e.shiftSerial());
+        assertEquals("转速停在怠速，不熄火", P.idleRpm, e.rpm(), 1f);
+        // 停车回一挡，不出声
+        in.speedKmh = 0f;
+        run(e, in, 0.2f);
+        assertEquals(0, e.gearIndex());
+        assertEquals("回一挡不算一次换挡", serial, e.shiftSerial());
+        assertTrue("还是只听按键", e.driverOnly());
+        // 再起步：一挡一直拉到上限前都不自己升
+        in.braking = false;
+        in.accel = 2f;
+        in.throttlePct = 50f;
+        in.flow = VirtualEngine.Flow.DRIVE;
+        ramp(e, in, 95f, 10f, () -> assertEquals(0, e.gearIndex()));
+    }
+
+    @Test
+    public void onTheManualAnUpshiftGoesThroughEvenIfTheRpmFallsToIdle() {
+        VirtualEngine.Input in = cruise(30f, 20f);
+        VirtualEngine e = driving(Gearbox.MANUAL6, in);
+        int gear = e.gearIndex();
+        press(e, in, 1, 0.5f);
+        press(e, in, 1, 0.5f);
+        press(e, in, 1, 0.5f);
+        assertEquals("都升了", gear + 3, e.gearIndex());
+        assertEquals("没响", 0, e.beepSerial());
+    }
+
+    @Test
+    public void onTheManualAFullPedalDoesNotKickDown() {
+        VirtualEngine.Input in = cruise(100f, 20f);
+        VirtualEngine e = driving(Gearbox.MANUAL6, in);
+        press(e, in, 1, 0.5f);
+        int gear = e.gearIndex();
+        in.throttlePct = 100f;
+        in.pedalRate = 600f;
+        run(e, in, 1f);
+        assertEquals(gear, e.gearIndex());
+    }
+
+    @Test
+    public void bothGearboxesRefuseADownshiftPastTheLimit() {
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine.Input in = cruise(120f, 20f);
+            VirtualEngine e = driving(box, in);
+            // 降到再降就超过上限的那一挡
+            int floor = 0;
+            while (120f * box.rpmPerKmh[floor] > VirtualEngine.SHIFT_LIMIT_RPM) {
+                floor++;
+            }
+            for (int i = e.gearIndex(); i > floor; i--) {
+                press(e, in, -1, 0.4f);
+            }
+            assertEquals(box + " 能降的都降了", floor, e.gearIndex());
+            int beeps = e.beepSerial();
+            int serial = e.shiftSerial();
+            press(e, in, -1, 0.4f);
+            assertEquals(box + " 这一下不降", floor, e.gearIndex());
+            assertEquals(box + " 不算换挡", serial, e.shiftSerial());
+            assertEquals(box + " 响一声", beeps + 1, e.beepSerial());
+        }
+    }
+
+    @Test
+    public void theManualHandsBackWhenTheEngineStops() {
+        VirtualEngine.Input in = cruise(40f, 50f);
+        VirtualEngine e = driving(Gearbox.MANUAL6, in);
+        press(e, in, 1, 0.5f);
+        assertTrue(e.driverOnly());
+        e.shutdown(in);
+        assertFalse("熄火手排就结束", e.driverOnly());
+        e.ignite(in);
+        run(e, in, 1f);
+        assertFalse(e.driverOnly());
+        int gear = e.gearIndex();
+        ramp(e, in, 120f, 10f, () -> { });
+        assertTrue("又自己换挡了", e.gearIndex() > gear);
+    }
+
+    // ---- 8 速自动：按键是给自动换挡的指令，没有切换
+
+    @Test
+    public void onTheAutoADownshiftHappensAtOnceThenTheAutoTakesOverByItself() {
+        VirtualEngine.Input in = cruise(100f, 15f);
+        VirtualEngine e = driving(Gearbox.AUTO8, in);
+        run(e, in, 3f);
+        int gear = e.gearIndex();
+        assertTrue(gear > 0);
+        press(e, in, -1, 0f);
+        assertEquals("这一块就降了", gear - 1, e.gearIndex());
+        assertFalse("没有手动模式", e.driverOnly());
+        assertEquals(1f, e.driverHold(), 0.01f);
+        // 匀速：人选的挡慢慢淡，自动换挡自己升回去，不用再按、不用等谁切回来
+        float sec = 0f;
+        while (e.gearIndex() == gear - 1 && sec < 30f) {
+            e.step(DT, in);
+            sec += DT;
+        }
+        assertEquals("自动升回去了", gear, e.gearIndex());
+        assertTrue("不会马上换回去：" + sec + " 秒", sec > 3f);
+        assertTrue("也不会一直拖着：" + sec + " 秒", sec < 15f);
+        assertEquals("自动换挡动了，这一挡就不算人选的了", 0f, e.driverHold(), 0f);
+    }
+
+    @Test
+    public void onTheAutoTheChosenGearHoldsWhileAcceleratingUpToTheLimit() {
+        VirtualEngine.Input in = cruise(60f, 60f);
+        VirtualEngine e = driving(Gearbox.AUTO8, in);
+        press(e, in, 1, 0.5f);
+        int gear = e.gearIndex();
+        float limitKmh = VirtualEngine.SHIFT_LIMIT_RPM / Gearbox.AUTO8.rpmPerKmh[gear];
+        float redlineKmh = VirtualEngine.REDLINE_RPM / Gearbox.AUTO8.rpmPerKmh[gear];
+        assertEquals(0, e.beepSerial());
+        ramp(e, in, redlineKmh - 1f, 10f, () -> assertEquals("要着力就不换回去", gear, e.gearIndex()));
+        assertEquals(1f, e.driverHold(), 0f);
+        assertEquals(0, e.beepSerial());
+        ramp(e, in, limitKmh - 1f, 10f, () -> assertEquals(gear, e.gearIndex()));
+        assertEquals("进红线区响一声", 1, e.beepSerial());
+        ramp(e, in, limitKmh + 2f, 10f, () -> { });
+        assertEquals("到上限自动升一挡", gear + 1, e.gearIndex());
+        run(e, in, 0.5f);
+        assertEquals("只升一挡：这只是保护，新的这一挡还算人选的", gear + 1, e.gearIndex());
+        assertEquals(1f, e.driverHold(), 0f);
+    }
+
+    @Test
+    public void onTheAutoAnUpshiftThatWouldLugIsRefused() {
+        VirtualEngine.Input in = cruise(30f, 10f);
+        VirtualEngine e = driving(Gearbox.AUTO8, in);
+        // 升到再升就拖不动的那一挡
+        int top = Gearbox.AUTO8.rpmPerKmh.length - 1;
+        while (30f * Gearbox.AUTO8.rpmPerKmh[top] < VirtualEngine.LUG_RPM) {
+            top--;
+        }
+        for (int i = e.gearIndex(); i < top; i++) {
+            press(e, in, 1, 0.5f);
+        }
+        assertEquals(top, e.gearIndex());
+        int beeps = e.beepSerial();
+        press(e, in, 1, 0.5f);
+        assertEquals("不升", top, e.gearIndex());
+        assertEquals("响一声", beeps + 1, e.beepSerial());
+    }
+
+    @Test
+    public void onTheAutoTheChosenGearDropsWhenItCanNoLongerPull() {
+        VirtualEngine.Input in = cruise(80f, 30f);
+        VirtualEngine e = driving(Gearbox.AUTO8, in);
+        press(e, in, 1, 0.5f);
+        int gear = e.gearIndex();
+        float lugKmh = VirtualEngine.LUG_RPM / Gearbox.AUTO8.rpmPerKmh[gear];
+        ramp(e, in, lugKmh + 1f, 10f, () -> assertEquals("拖得动就不降", gear, e.gearIndex()));
+        ramp(e, in, lugKmh - 1f, 10f, () -> { });
+        assertEquals("拖不动自动降一挡", gear - 1, e.gearIndex());
+    }
+
+    @Test
+    public void onTheAutoAFullPedalStillKicksDownAfterAPress() {
+        VirtualEngine.Input in = cruise(100f, 15f);
+        VirtualEngine e = driving(Gearbox.AUTO8, in);
+        press(e, in, 1, 0.5f);
+        int gear = e.gearIndex();
+        in.throttlePct = 100f;
+        in.pedalRate = 600f;
+        run(e, in, 0.1f);
+        assertTrue("一脚到底能降就降：" + gear + " → " + e.gearIndex(), e.gearIndex() < gear - 1);
+    }
+
+    @Test
+    public void onTheAutoAnUpshiftIsNotUndoneWhileThePedalStaysPut() {
+        VirtualEngine.Input in = cruise(100f, 50f);
+        VirtualEngine e = driving(Gearbox.AUTO8, in);
+        // 升到按这个油门自动换挡本来要降回去的那一挡
+        press(e, in, 1, 0.5f);
+        press(e, in, 1, 0.5f);
+        press(e, in, 1, 0.5f);
+        int gear = e.gearIndex();
+        assertTrue("转速 " + e.rpm(), e.rpm() < 2100f);
+        run(e, in, 20f);
+        assertEquals("油门没动就不降回去", gear, e.gearIndex());
+        // 再往下踩一截（不到一脚到底）：还是这一挡，一脚到底才降
+        in.throttlePct = 70f;
+        run(e, in, 2f);
+        assertEquals(gear, e.gearIndex());
+        in.throttlePct = 100f;
+        in.pedalRate = 600f;
+        run(e, in, 0.1f);
+        assertTrue("一脚到底降了", e.gearIndex() < gear);
+    }
+
+    // ---- 两种都一样
+
+    @Test
+    public void aLatePressRightAfterTheLimitUpshiftCountsAsTheSameShift() {
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine.Input in = cruise(60f, 60f);
+            VirtualEngine e = driving(box, in);
+            press(e, in, 1, 0.5f);
+            int gear = e.gearIndex();
+            ramp(e, in, VirtualEngine.SHIFT_LIMIT_RPM / box.rpmPerKmh[gear] + 0.2f, 10f, () -> { });
+            assertEquals(box + " 到上限升了", gear + 1, e.gearIndex());
+            int beeps = e.beepSerial();
+            press(e, in, 1, 0.3f);
+            assertEquals(box + " 来晚的这一下不再升", gear + 1, e.gearIndex());
+            assertEquals(box + " 也不响", beeps, e.beepSerial());
+            run(e, in, VirtualEngine.SAME_UPSHIFT_SEC);
+            press(e, in, 1, 0.5f);
+            assertEquals(box + " 过了那一会儿照常升", gear + 2, e.gearIndex());
+        }
+    }
+
+    @Test
+    public void quickPressesAreAllTakenOneAtATime() {
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine.Input in = cruise(90f, 15f);
+            VirtualEngine e = driving(box, in);
+            press(e, in, 1, 0.5f);
+            int gear = e.gearIndex();
+            in.shiftStep = -1;
+            e.step(DT, in);
+            e.step(DT, in);
+            in.shiftStep = 0;
+            assertEquals(box + " 先降一挡", gear - 1, e.gearIndex());
+            run(e, in, 0.5f);
+            assertEquals(box + " 这一下换完接着降", gear - 2, e.gearIndex());
+        }
+    }
+
+    @Test
+    public void outsideDTheButtonsDoNothing() {
+        for (Gearbox box : Gearbox.values()) {
+            for (VirtualEngine.Gear gear : new VirtualEngine.Gear[] {VirtualEngine.Gear.P, VirtualEngine.Gear.R, VirtualEngine.Gear.N}) {
+                VirtualEngine.Input in = input(gear, 0f, 0f);
+                VirtualEngine e = new VirtualEngine(P, box, false);
+                e.ignite(in);
+                run(e, in, 3f);
+                int serial = e.shiftSerial();
+                press(e, in, 1, 0.2f);
+                press(e, in, -1, 0.2f);
+                assertEquals(serial, e.shiftSerial());
+                assertEquals(0, e.beepSerial());
+                assertFalse(e.driverOnly());
+            }
+        }
+    }
+
+    @Test
+    public void whileParkedInDAPressCannotShift() {
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 0f, 0f);
+            in.mode = VirtualEngine.RpmMode.SHIFTS;
+            VirtualEngine e = new VirtualEngine(P, box, false);
+            e.ignite(in);
+            run(e, in, 3f);
+            int serial = e.shiftSerial();
+            press(e, in, 1, 0.2f);
+            assertEquals(box + " 还是一挡", 0, e.gearIndex());
+            assertEquals(box + " 没换挡", serial, e.shiftSerial());
+            assertEquals(box + " 响一声", 1, e.beepSerial());
+        }
+    }
+
+    /** 「连续」：按第一下起按挡位走，8 速自动人选的挡淡没了回到连续，6 速手动到熄火都按挡位走。 */
+    @Test
+    public void continuousGoesByGearsOnlyAsLongAsTheButtonsSaySo() {
+        VirtualEngine.Input in = cruise(100f, 15f);
+        VirtualEngine auto = new VirtualEngine(P, Gearbox.AUTO8, false);
+        auto.ignite(in);
+        run(auto, in, 3f);
+        assertFalse("连续", auto.geared());
+        press(auto, in, -1, 1f);
+        assertTrue("按了就按挡位走", auto.geared());
+        assertTrue(auto.shiftSerial() > 0);
+        run(auto, in, 30f);
+        assertFalse("人选的挡淡没了回到连续", auto.geared());
+
+        VirtualEngine.Input in6 = cruise(100f, 15f);
+        VirtualEngine manual = new VirtualEngine(P, Gearbox.MANUAL6, false);
+        manual.ignite(in6);
+        run(manual, in6, 3f);
+        press(manual, in6, -1, 1f);
+        assertTrue(manual.geared());
+        int gear = manual.gearIndex();
+        run(manual, in6, 30f);
+        assertTrue(manual.geared());
+        assertEquals(gear, manual.gearIndex());
+    }
+
+    /** 换变速箱：灵动贴这条线归零，下一块重新选挡。 */
+    @Test
+    public void changingTheGearboxClearsTheButtons() {
+        VirtualEngine.Input in = cruise(60f, 30f);
+        VirtualEngine e = driving(Gearbox.MANUAL6, in);
+        press(e, in, 1, 0.5f);
+        assertTrue(e.driverOnly());
+        e.setGearbox(Gearbox.AUTO8);
+        assertFalse(e.driverOnly());
+        run(e, in, 0.1f);
+        assertTrue(e.gearIndex() < Gearbox.AUTO8.rpmPerKmh.length);
+    }
+
+    /** 乱按、乱踩：挡位不越界，转速、电平都在范围里。 */
+    @Test
+    public void randomPressesStayInRange() {
+        for (Gearbox box : Gearbox.values()) {
+            VirtualEngine e = new VirtualEngine(P, box, false);
+            VirtualEngine.Input in = input(VirtualEngine.Gear.D, 50f, 0f);
+            e.ignite(in);
+            run(e, in, 0.3f);
+            long seed = 54321L;
+            for (int i = 0; i < 40_000; i++) {
+                seed = seed * 6364136223846793005L + 1442695040888963407L;
+                int r = (int) (seed >>> 33);
+                if (i % 50 == 0) {
+                    in.throttlePct = (r & 127) % 101;
+                    in.speedKmh = ((r >> 7) & 255) % 211;
+                    in.pedalRate = ((r >> 15) & 1023) - 512;
+                    in.accel = (((r >> 25) & 63) - 32) / 4f;
+                    in.braking = (r & 0x40000) != 0;
+                    in.gear = VirtualEngine.Gear.values()[((r >> 3) & 7) % 4];
+                    in.mode = (r & 1) == 0 ? VirtualEngine.RpmMode.CONTINUOUS : VirtualEngine.RpmMode.SHIFTS;
+                    in.flow = VirtualEngine.Flow.values()[((r >> 5) & 7) % 5];
+                }
+                in.shiftStep = i % 37 == 0 ? ((r & 2) == 0 ? 1 : -1) : 0;
+                e.step(DT, in);
+                assertTrue(box + " 挡位 " + e.gearIndex(), e.gearIndex() >= 0 && e.gearIndex() < box.rpmPerKmh.length);
+                assertTrue(box + " 转速 " + e.rpm(), e.rpm() >= P.idleRpm && e.rpm() <= P.maxRpm);
+                assertTrue(box + " 电平 " + e.levelDb(), e.levelDb() > -36f && e.levelDb() < 10f);
+                assertFalse(Float.isNaN(e.rpm()) || Float.isNaN(e.load()) || Float.isNaN(e.driverHold()));
+            }
         }
     }
 }

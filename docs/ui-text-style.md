@@ -435,6 +435,10 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 灵动贴手排模式（2026-10-31）：中文是项目所有者批的 —— smart_button_action_drive_up「驾驶模式向上」、smart_button_action_drive_down
+  「驾驶模式向下」、smart_button_action_gear_up「升挡（模拟声浪）」、smart_button_action_gear_down「降挡（模拟声浪）」。英文、马来文还是草稿：
+  Drive mode up / Mod pemanduan naik；Drive mode down / Mod pemanduan turun；Shift up (simulated drive sound) / Naik gear (bunyi pemanduan simulasi)；
+  Shift down (simulated drive sound) / Turun gear (bunyi pemanduan simulasi)。
 - 「模拟声浪」（2026-10-24 起在设置 → 系统）2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
   dev_drive_sound_summary 现在是「运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，
   车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声。」（2026-10-24 照本规范补了句末「。」，英文、马来文补了句号）/「In Sport mode (optionally Standard too), …Switching to these

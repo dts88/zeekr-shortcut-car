@@ -128,6 +128,10 @@
     <string name="set_smart_button_double">Tekan dua kali</string>
     <string name="smart_button_action_none">Tiada</string>
     <string name="smart_button_action_drive">Tukar ke mod %1$s</string>
+    <string name="smart_button_action_drive_up">Mod pemanduan naik</string>
+    <string name="smart_button_action_drive_down">Mod pemanduan turun</string>
+    <string name="smart_button_action_gear_up">Naik gear (bunyi pemanduan simulasi)</string>
+    <string name="smart_button_action_gear_down">Turun gear (bunyi pemanduan simulasi)</string>
     <string name="dlg_smart_button_delete_title">Padam butang pintar ini?</string>
     <string name="dlg_smart_button_delete_msg">Menekannya tidak akan melakukan apa-apa lagi. Untuk menggunakannya semula, cari dan sambungkannya semula.</string>
     <string name="msg_smart_button_connected">Butang pintar %1$s disambungkan</string>
