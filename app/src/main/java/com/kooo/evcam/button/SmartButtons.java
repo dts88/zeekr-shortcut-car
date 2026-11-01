@@ -687,11 +687,18 @@ public final class SmartButtons {
     private final Runnable watch = this::watchScan;
 
     /**
-     * 在听的时候隔一会儿看一眼：蓝牙稳了、还是聋的，就先停再开一次。再没有也不开了，等又收到、车机又睡一觉，或者 {@link #RESTART_MS} 到点：
+     * 在听的时候隔一会儿看一眼：蓝牙稳了、还是聋的，就先停再开一次。再没有也不开了，等又收到、车机又睡一觉、蓝牙关过，或者 {@link #RESTART_MS} 到点：
      * 一个没法判断的事不反复去碰蓝牙（车主 2026-11-01）。
+     *
+     * <p>蓝牙关了要自己看：开关的广播车上没收到过，车机没睡、人很快又回来时，蓝牙关过又开，手里这一轮已经没用了。只是读一下状态。</p>
      */
     private void watchScan() {
         long now = SystemClock.elapsedRealtime();
+        if (!bluetoothOn()) {
+            settleAgain(now, true);
+            restart.run();
+            return;
+        }
         boolean interactive = DisplayWatch.interactiveNow();
         settleAgain(now, !interactive);
         if (!mayRestart(now, settledAt, deafRestarts)
