@@ -25,7 +25,9 @@ public enum FloatingAction {
     /** 锁定此刻前后 10 秒所在的录像：和闪远光自动锁定同一套（{@code AutoLock#lockNow}）。 */
     LOCK_FOOTAGE("lock_footage"),
     /** 开 / 关模拟声浪（设置 → 系统「模拟声浪（试验性）」）：开车时一键关的地方。 */
-    TOGGLE_DRIVE_SOUND("toggle_drive_sound");
+    TOGGLE_DRIVE_SOUND("toggle_drive_sound"),
+    /** 车外喇叭放一遍礼让语音（{@code sound.OutsideVoice}）。 */
+    PLAY_OUTSIDE_VOICE("play_outside_voice");
 
     public final String key;
 
@@ -50,6 +52,8 @@ public enum FloatingAction {
                 return com.kooo.evcam.R.string.floating_action_lock_footage;
             case TOGGLE_DRIVE_SOUND:
                 return com.kooo.evcam.R.string.floating_action_toggle_drive_sound;
+            case PLAY_OUTSIDE_VOICE:
+                return com.kooo.evcam.R.string.floating_action_play_outside_voice;
             case OPEN_APP:
             default:
                 return com.kooo.evcam.R.string.floating_action_open_app;

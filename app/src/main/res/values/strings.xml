@@ -134,6 +134,8 @@
     <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
     <string name="floating_action_lock_footage">锁定当前录像</string>
     <string name="floating_action_toggle_drive_sound">开启 / 关闭模拟声浪</string>
+    <string name="floating_action_play_outside_voice">车外喇叭播放礼让语音</string>
+    <string name="msg_outside_voice_failed">车外喇叭没有播放</string>
     <!-- 灵动贴（试验性，2026-10-30 项目所有者批准，button.SmartButtons） -->
     <string name="set_section_floating_page">悬浮键与灵动贴</string>
     <string name="set_group_smart_button">灵动贴（试验性）</string>
