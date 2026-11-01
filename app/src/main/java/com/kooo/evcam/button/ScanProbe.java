@@ -2,8 +2,12 @@ package com.kooo.evcam.button;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
+import android.hardware.display.DisplayManager;
+import android.location.LocationManager;
 import android.os.IBinder;
 import android.os.IInterface;
+import android.view.Display;
 
 import com.kooo.evcam.camera.LogcatNoise;
 
@@ -24,7 +28,7 @@ import java.util.Set;
  * 这里分别问适配器手里那一份和现从系统拿的一份，再留下日志里蓝牙相关的几行：是系统没有、是死的、还是只有我们手里那份是旧的，一看就知道。</p>
  *
  * <p>扫描没报错却没声时也看这些（2026-11-01 车主：按键一开始能用，转而没反应，一分钟后好了）：应用只读得到自己进程的日志，蓝牙进程那边看不到，
- * 所以再记一笔当时别的蓝牙活动（在不在搜索设备、连着几台），看是不是撞上了它们。</p>
+ * 所以再记一笔当时会影响扫描的几件事：安卓在定位关了、所有屏都不亮时会停不带过滤器的扫描，在搜索设备、连着手机时蓝牙芯片可能顾不上。</p>
  */
 final class ScanProbe {
 
@@ -41,8 +45,35 @@ final class ScanProbe {
         return "GATT via adapter: " + viaAdapter(adapter) + "; via service manager: " + viaServiceManager();
     }
 
-    /** 此刻别的蓝牙活动：在不在搜索设备，配对过的连着几台（手机连上来的时候扫描可能受影响，没证实）。走隐藏接口，不让看就说不让看，不抛。 */
-    static String linkFacts(BluetoothAdapter adapter) {
+    /** 此刻会影响扫描的几件事：定位、屏幕、在不在搜索设备、配对过的连着几台。都是只读；有的走隐藏接口，不让看就说不让看，不抛。 */
+    static String scanFacts(Context context, BluetoothAdapter adapter) {
+        return "location " + location(context) + ", displays on " + displaysOn(context) + ", " + links(adapter);
+    }
+
+    private static String location(Context context) {
+        try {
+            return context.getSystemService(LocationManager.class).isLocationEnabled() ? "on" : "off";
+        } catch (Throwable e) {
+            return "? (" + e + ")";
+        }
+    }
+
+    private static String displaysOn(Context context) {
+        try {
+            Display[] displays = context.getSystemService(DisplayManager.class).getDisplays();
+            int on = 0;
+            for (Display display : displays) {
+                if (display.getState() == Display.STATE_ON) {
+                    on++;
+                }
+            }
+            return on + " of " + displays.length;
+        } catch (Throwable e) {
+            return "? (" + e + ")";
+        }
+    }
+
+    private static String links(BluetoothAdapter adapter) {
         try {
             Method isConnected = BluetoothDevice.class.getMethod("isConnected");
             int connected = 0;
@@ -54,7 +85,7 @@ final class ScanProbe {
             }
             return "discovering " + adapter.isDiscovering() + ", connected " + connected + " of " + bonded.size() + " bonded";
         } catch (Throwable e) {
-            return "can't look (" + e + ")";
+            return "links? (" + e + ")";
         }
     }
 
