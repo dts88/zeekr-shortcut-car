@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.93.1-alpha] - 2026-11-01
+
+- Smart buttons: a scan that goes silent comes back in about a second, so a press made meanwhile is still heard.
+- Smart buttons: reading the battery after a press no longer stops listening, so the other button still works.
+- Diagnostics: smart buttons now show how each silence ended.
+
 ## [2.93.0-alpha] - 2026-11-01
 
 - Floating button and smart buttons: a new action plays a courtesy message on the exterior speaker, at the Exterior route and Exterior volume set for the simulated drive sound.
