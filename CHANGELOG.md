@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.93.4-alpha] - 2026-11-01
+
+- Smart buttons: before the head unit sleeps, the app lets go of Bluetooth, as it does with the cameras.
+- Smart buttons: after a wake the app waits 10 seconds, asks the system for the Bluetooth service again and starts listening, instead of waiting a minute.
+
 ## [2.93.3-beta] - 2026-11-01
 
 Upgrade from 2.0.0.
