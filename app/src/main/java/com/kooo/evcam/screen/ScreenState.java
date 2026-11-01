@@ -43,6 +43,8 @@ import java.util.List;
  *       车通电了（点火 ON、DRIVING）才是亮屏；车没通电时屏幕亮了（远程开空调、远程看车）照熄屏算、不是边，黑匣子里记起止各一行。</li>
  * </ul>
  *
+ * <p>安卓熄屏、又亮了（车机要睡、醒了），不管是哪条边，还告诉灵动贴放开、再要蓝牙（{@code SmartButtons}）。</p>
+ *
  * <p>顺序固定：熄屏录制的唤醒锁（{@link ScreenOffRecording}）→ 录像的规矩（{@link RecordingCoordinator}）→ 相机（谁要用就登记，
  * 调度照登记表和「熄屏放开座舱」开关，{@code ChannelRules.releasedByDark}）→ 界面（因熄屏退下去的主界面亮屏接回来，
  * {@link Recovery#bringBackUiAfterScreenOn}）→ 主界面、后视镜、盲区画面、相机层自己登记的监听者。每条边出了错写一行黑匣子，
@@ -616,6 +618,14 @@ public final class ScreenState {
             } catch (RuntimeException e) {
                 AppLog.e(TAG, "edge " + edge + " failed", e);
                 BlackBox.noteImportant("熄屏判断：" + edge + " 这一步出错（" + e + "），后面的没做完");
+            }
+        }
+        com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+        if (buttons != null && before.state.androidOff != next.androidOff) {
+            if (next.androidOff) {
+                buttons.headUnitSleeps();
+            } else {
+                buttons.headUnitWoke();
             }
         }
         noteUnpoweredLit(before, after, now);

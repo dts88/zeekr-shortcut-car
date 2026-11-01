@@ -1302,8 +1302,10 @@ public final class DiagnosticsCollector {
                 return "不听（蓝牙关着）";
             case NO_PERMISSION:
                 return "不听（没有扫描权限）";
+            case ASLEEP:
+                return "不听（车机要睡，蓝牙放开了）";
             case SETTLING:
-                return "先等着（车机刚醒、蓝牙刚开好）";
+                return "先等着（车机刚醒）";
             case CONNECTING:
                 return "先停着（连着一台读电量）";
             case LISTENING:
