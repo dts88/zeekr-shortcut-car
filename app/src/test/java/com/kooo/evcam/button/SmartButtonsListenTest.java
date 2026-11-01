@@ -6,7 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** 灵动贴听不听得到的判断（{@link SmartButtons#deaf}、{@link SmartButtons#mayRestart}、{@link SmartButtons#waitToSettle}、{@link SmartButtons#slept}、{@link ScanProbe#aboutBluetooth}）。 */
+/** 灵动贴听不听得到的判断（{@link SmartButtons#deaf}、{@link SmartButtons#mayRestart}、{@link SmartButtons#waitToSettle}、{@link ScanProbe#aboutBluetooth}）。 */
 public class SmartButtonsListenTest {
 
     private static final long START = 1_000_000L;
@@ -59,27 +59,18 @@ public class SmartButtonsListenTest {
     /** 车主 2026-11-01：不要反复强行启动。同一阵听不到只重开一次。 */
     @Test
     public void oneSilenceGetsOneRestart() {
-        assertTrue(SmartButtons.mayRestart(START, START, 0, 0));
-        assertFalse(SmartButtons.mayRestart(START, START, 1, 0));
-        assertFalse(SmartButtons.mayRestart(START + 3_600_000L, START, 1, 0));
-    }
-
-    /** 蓝牙还没稳不碰它，稳了才算。 */
-    @Test
-    public void nothingIsRestartedWhileBluetoothSettles() {
-        long settled = START + SmartButtons.SETTLE_MS;
-        assertFalse(SmartButtons.mayRestart(START, settled, 0, 0));
-        assertFalse(SmartButtons.mayRestart(settled - 1, settled, 0, 0));
-        assertTrue(SmartButtons.mayRestart(settled, settled, 0, 0));
+        assertTrue(SmartButtons.mayRestart(START, 0, 0));
+        assertFalse(SmartButtons.mayRestart(START, 1, 0));
+        assertFalse(SmartButtons.mayRestart(START + 3_600_000L, 1, 0));
     }
 
     /** 上一次重开过了一阵才收到，是这里本来就稀：这几分钟不再开，一小时最多白开十二次。 */
     @Test
     public void aRestartForNothingPausesTheNext() {
         long quietUntil = START + SmartButtons.DEAF_QUIET_MS;
-        assertFalse(SmartButtons.mayRestart(START + SmartButtons.DEAF_MS, 0, 0, quietUntil));
-        assertFalse(SmartButtons.mayRestart(quietUntil - 1, 0, 0, quietUntil));
-        assertTrue(SmartButtons.mayRestart(quietUntil, 0, 0, quietUntil));
+        assertFalse(SmartButtons.mayRestart(START + SmartButtons.DEAF_MS, 0, quietUntil));
+        assertFalse(SmartButtons.mayRestart(quietUntil - 1, 0, quietUntil));
+        assertTrue(SmartButtons.mayRestart(quietUntil, 0, quietUntil));
         assertEquals(12, 3_600_000L / SmartButtons.DEAF_QUIET_MS);
     }
 
@@ -90,51 +81,26 @@ public class SmartButtonsListenTest {
         assertTrue(SmartButtons.CURED_MS < SmartButtons.DEAF_MS);
     }
 
-    /** 车机刚醒、蓝牙刚开好，什么都还没听到：先等。 */
+    /** 车主 2026-11-01：车机醒了等 10 秒，再向系统要蓝牙服务、开始扫描。 */
     @Test
-    public void aNewScanWaitsForBluetoothToSettle() {
+    public void aWakeWaitsTenSeconds() {
+        assertEquals(10_000L, SmartButtons.SETTLE_MS);
         long settled = START + SmartButtons.SETTLE_MS;
-        assertTrue(SmartButtons.waitToSettle(START, settled, START - 1000, false));
-        assertTrue(SmartButtons.waitToSettle(settled - 1, settled, START - 1000, false));
-        assertFalse(SmartButtons.waitToSettle(settled, settled, START - 1000, false));
-    }
-
-    /** 开机头一分钟也等：这时候还什么都没听到过。 */
-    @Test
-    public void theFirstMinuteAfterBootWaitsToo() {
-        assertTrue(SmartButtons.waitToSettle(30_000L, SmartButtons.SETTLE_MS, 0, false));
-        assertFalse(SmartButtons.waitToSettle(SmartButtons.SETTLE_MS, SmartButtons.SETTLE_MS, 0, false));
+        assertTrue(SmartButtons.waitToSettle(START, settled, false));
+        assertTrue(SmartButtons.waitToSettle(settled - 1, settled, false));
+        assertFalse(SmartButtons.waitToSettle(settled, settled, false));
     }
 
     /** 人就在设置页上搜索：不等。 */
     @Test
     public void searchingDoesNotWait() {
-        assertFalse(SmartButtons.waitToSettle(START, START + SmartButtons.SETTLE_MS, 0, true));
+        assertFalse(SmartButtons.waitToSettle(START, START + SmartButtons.SETTLE_MS, true));
     }
 
-    /** 这一阵已经听到过东西（上一轮还活着，读完电量接着听；搜索时听到了再点连接）：蓝牙是好的，不等。 */
+    /** 没睡过就不用等：进程刚起来、读完电量接着听。 */
     @Test
-    public void somethingHeardSinceTheWakeMeansNoWait() {
-        long settled = START + SmartButtons.SETTLE_MS;
-        assertFalse(SmartButtons.waitToSettle(START + 5_000L, settled, START + 1, false));
-    }
-
-    /** 2026-11-01 报告：醒来 45 秒那轮扫描无声地停了，醒来 104 秒开的没停过。 */
-    @Test
-    public void theWaitFitsWhatTheCarShowed() {
-        assertTrue(SmartButtons.SETTLE_MS > 45_000L);
-        assertTrue(SmartButtons.SETTLE_MS < 104_000L);
-    }
-
-    /** 深睡的时间又多了才算睡过：两个钟不是同一刻读的，差几毫秒不算；重启以后这个数变小，也不算。 */
-    @Test
-    public void onlyARealSleepCounts() {
-        assertFalse(SmartButtons.slept(61_392_000L, 61_392_000L));
-        assertFalse(SmartButtons.slept(61_392_000L, 61_392_000L + 5));
-        assertFalse(SmartButtons.slept(61_392_000L, 61_392_000L - 5));
-        assertFalse(SmartButtons.slept(61_392_000L, 0));
-        assertTrue(SmartButtons.slept(61_392_000L, 61_392_000L + SmartButtons.SLEPT_MS));
-        assertTrue(SmartButtons.slept(31_497_000L, 61_392_000L));
+    public void withoutAWakeThereIsNoWait() {
+        assertFalse(SmartButtons.waitToSettle(START, 0, false));
     }
 
     @Test
