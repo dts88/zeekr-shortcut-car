@@ -47,6 +47,13 @@ public class SmartButtonsListenTest {
         assertFalse(SmartButtons.deaf(false, START + 100 * SmartButtons.DEAF_MS, START, 0, 0));
     }
 
+    /** 一轮扫描聋了就重开，一直这样也不能超过安卓的限制（30 秒里开 5 次）。 */
+    @Test
+    public void restartsStayWithinAndroidsScanLimit() {
+        assertTrue(4 * SmartButtons.DEAF_MS >= 30_000L);
+        assertTrue(SmartButtons.WATCH_MS <= SmartButtons.DEAF_MS / 2);
+    }
+
     /** 重开过还是没有：等的时间翻倍，翻到头就不再翻。 */
     @Test
     public void restartsWaitLongerUpToTheLimit() {
@@ -68,5 +75,7 @@ public class SmartButtonsListenTest {
                 "10-31 13:58:06.000 D/falco_32(24373): IBluetoothManager.getBluetoothGatt -> null"));
         assertFalse(ScanProbe.aboutBluetooth(
                 "10-31 13:58:06.000 W/StallWatch(24373): slow sync on camera 2: 497ms"));
+        assertFalse(ScanProbe.aboutBluetooth(
+                "11-01 10:25:59.226 D/BluetoothLeScanner(24300): onScanResult() - ScanResult{device=64:19:CE:6A:AC:57}"));
     }
 }

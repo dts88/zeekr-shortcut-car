@@ -66,8 +66,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>用不带过滤器的扫描、在回调里按地址筛：车上按地址过滤的扫描收不到它的广播（§2.61）。代价是安卓熄屏时会停掉这种扫描 ——
  *       熄屏时按了不算。连续扫 30 分钟安卓会降级，{@link #RESTART_MS} 重开一次；蓝牙关了先停、开了接着听；
  *       没听上 {@link #RETRY_MS} 后再试（§2.64：以前只试一次，没成就一直没在听）。</li>
- *   <li>扫描看着还在、其实收不到的情况系统不一定告诉我们（车机睡一觉醒来，蓝牙可能已经重启过）：不带过滤器的扫描周围什么设备都报，
- *       亮着屏 {@link #DEAF_MS} 一包都没收到，就重开（{@link #watchScan}）。听不到的每一阵都进黑匣子（{@link ScanProbe}）。</li>
+ *   <li>扫描看着还在、其实收不到的情况系统不告诉我们（车机睡一觉醒来蓝牙可能已经重启过；蓝牙开着、也没报错，扫描也可能忽然没声）：
+ *       不带过滤器的扫描周围什么设备都报，亮着屏 {@link #DEAF_MS} 一包都没收到，就重开（{@link #watchScan}）。
+ *       听不到的每一阵都进黑匣子（{@link ScanProbe}）。</li>
  *   <li>蓝牙重启过以后容器手里的 GATT 服务还是死的，扫描、连接一直失败：换成系统现在这份，马上重开（{@link StaleGatt}）。</li>
  *   <li>广播里的按键计数变了就是按了一下（{@link SmartButtonAd}）。上一次的计数存着，进程重启后的第一下照样算；
  *       连接时拿搜索那会儿看到的计数当起点。</li>
@@ -97,12 +98,16 @@ public final class SmartButtons {
     /** 蓝牙关着时多久看一眼开了没有：开关的广播车上没收到过（2026-11-01 报告：蓝牙关了又开，一条都没来），醒来后全靠这个。 */
     static final long BLUETOOTH_POLL_MS = 5_000L;
     /** 在听的时候多久看一眼扫描还活着没有。 */
-    static final long WATCH_MS = 15_000L;
+    static final long WATCH_MS = 2_000L;
     /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
     static final long DRIVE_TARGET_MS = 2000L;
-    /** 亮着屏这么久一个设备的广播都没收到，就当扫描聋了（车上周围一般十几台，Lab findings §2.51）。重开过还是没有，下一回等的时间翻倍。 */
-    static final long DEAF_MS = 45_000L;
-    /** 最多翻几倍：真的一台设备都没有的地方，隔 12 分钟重开一次就够了。 */
+    /**
+     * 亮着屏这么久一个设备的广播都没收到，就当扫描聋了（车上周围一般十几台，Lab findings §2.51）。2026-11-01 报告：停车场里一秒四十多包，
+     * 最长隔 0.1 秒；有一轮扫描开了 31 秒后没声了，系统没说什么，重开 32 毫秒就又收到，所以等久了只是让按键多失灵一会儿。
+     * 不短过 7.5 秒：安卓 30 秒里只让开 5 次扫描。重开过还是没有，下一回等的时间翻倍。
+     */
+    static final long DEAF_MS = 8_000L;
+    /** 最多翻几倍：真的一台设备都没有的地方，隔 2 分钟重开一次就够了。 */
     static final int DEAF_MAX_DOUBLINGS = 4;
     /** 连上读电量最多试多久。 */
     static final long CONNECT_WINDOW_MS = 30_000L;
@@ -211,6 +216,8 @@ public final class SmartButtons {
     private volatile String connecting;
     /** 上次收到广播（什么设备的都算）的时刻（{@link SystemClock#elapsedRealtime}）；这次进程还没收到过是 0。 */
     private volatile long heardAt;
+    /** 这轮扫描收到几包：只在主线程上加，起扫描时清零。 */
+    private volatile int heardThisScan;
     /** 上次收到广播以来扫描失败了几次、聋了重开了几次：只在 bt 线程上写。 */
     private volatile int failures;
     private volatile int deafRestarts;
@@ -537,6 +544,7 @@ public final class SmartButtons {
         scanner = s;
         scanCallback = cb;
         listeningSince = SystemClock.elapsedRealtime();
+        heardThisScan = 0;
         note(Listen.LISTENING, "");
         bt.postDelayed(restart, RESTART_MS);
         bt.postDelayed(watch, WATCH_MS);
@@ -598,12 +606,25 @@ public final class SmartButtons {
             return;
         }
         deafRestarts = deafRestarts + 1;
-        if (deafRestarts == 1) {
-            BlackBox.note("灵动贴：" + (now - Math.max(listeningSince, heardAt)) / 1000
-                    + " 秒（含车机睡着）没收到任何蓝牙广播，重开扫描；蓝牙 " + stateName(adapterState()));
-        }
+        long silent = now - Math.max(listeningSince, heardAt);
+        long scanAge = now - listeningSince;
+        int packets = heardThisScan;
         AppLog.i(TAG, "deaf: restarting the scan");
         restart.run();
+        if (deafRestarts > 1) {
+            return;
+        }
+        // 先重开再记：读日志要近一秒，不让按键多等
+        int bluetooth = adapterState();
+        BlackBox.note("灵动贴：" + silent / 1000 + " 秒（含车机睡着）没收到任何蓝牙广播，重开扫描；这轮扫描开了 " + scanAge / 1000
+                + " 秒、收到 " + packets + " 包；蓝牙 " + stateName(bluetooth) + "；" + ScanProbe.linkFacts(adapter)
+                + "；" + ScanProbe.gattFacts(adapter));
+        if (bluetooth == BluetoothAdapter.STATE_ON) {
+            // 蓝牙开着、扫描也没报错，却一包都没有：系统不告诉我们为什么，只能看当时进程里还发生了什么
+            for (String line : ScanProbe.bluetoothLog()) {
+                BlackBox.note("灵动贴现场：" + line);
+            }
+        }
     }
 
     /** 隔了一阵又收到广播：这一阵的账记一句，清零。同一阵排着的后面几包到这里已经没账了。 */
@@ -685,6 +706,7 @@ public final class SmartButtons {
         long now = SystemClock.elapsedRealtime();
         long last = heardAt;
         heardAt = now;
+        heardThisScan = heardThisScan + 1;
         if (last == 0 || now - last >= DEAF_MS || failures + deafRestarts > 0) {
             bt.post(() -> heardAgain(last == 0 ? -1 : now - last));
         }

@@ -1,6 +1,7 @@
 package com.kooo.evcam.button;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.os.IBinder;
 import android.os.IInterface;
 
@@ -9,9 +10,11 @@ import com.kooo.evcam.camera.LogcatNoise;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 扫描起不来时看一眼为什么，只读，结果进黑匣子（2026-10-31 车主：车机唤醒后 scan failed 3，12 分钟没好，报告里看不出卡在哪）。
@@ -19,6 +22,9 @@ import java.util.List;
  * <p>安卓 12L 的 {@code BluetoothLeScanner}：错误 3 只有两个来路。问系统要 GATT 服务要到 null、或者问的时候抛远程异常（不打日志）；或者要到了，
  * 注册时抛远程异常（打一行 {@code E/BluetoothLeScanner}，紧接着再报一个错误 2）。应用跑在容器里，这些调用都经过它（标签 {@code falco_32} 的跟踪）。
  * 这里分别问适配器手里那一份和现从系统拿的一份，再留下日志里蓝牙相关的几行：是系统没有、是死的、还是只有我们手里那份是旧的，一看就知道。</p>
+ *
+ * <p>扫描没报错却没声时也看这些（2026-11-01 车主：按键一开始能用，转而没反应，一分钟后好了）：应用只读得到自己进程的日志，蓝牙进程那边看不到，
+ * 所以再记一笔当时别的蓝牙活动（在不在搜索设备、连着几台），看是不是撞上了它们。</p>
  */
 final class ScanProbe {
 
@@ -33,6 +39,23 @@ final class ScanProbe {
     /** 两份 GATT 服务各是什么样。走隐藏接口，不让看就说不让看，不抛。 */
     static String gattFacts(BluetoothAdapter adapter) {
         return "GATT via adapter: " + viaAdapter(adapter) + "; via service manager: " + viaServiceManager();
+    }
+
+    /** 此刻别的蓝牙活动：在不在搜索设备，配对过的连着几台（手机连上来的时候扫描可能受影响，没证实）。走隐藏接口，不让看就说不让看，不抛。 */
+    static String linkFacts(BluetoothAdapter adapter) {
+        try {
+            Method isConnected = BluetoothDevice.class.getMethod("isConnected");
+            int connected = 0;
+            Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            for (BluetoothDevice device : bonded) {
+                if (Boolean.TRUE.equals(isConnected.invoke(device))) {
+                    connected++;
+                }
+            }
+            return "discovering " + adapter.isDiscovering() + ", connected " + connected + " of " + bonded.size() + " bonded";
+        } catch (Throwable e) {
+            return "can't look (" + e + ")";
+        }
     }
 
     private static String viaAdapter(BluetoothAdapter adapter) {
@@ -94,7 +117,9 @@ final class ScanProbe {
         return kept.subList(Math.max(0, kept.size() - LOG_KEEP_LINES), kept.size());
     }
 
+    /** 蓝牙相关的行；每收到一包广播一行的不算（一秒几十行，别的全被它们挤掉）。 */
     static boolean aboutBluetooth(String line) {
-        return line.contains("luetooth") || line.contains("Gatt") || line.contains("GATT") || line.contains("registerScanner");
+        return !line.contains("ScanResult")
+                && (line.contains("luetooth") || line.contains("Gatt") || line.contains("GATT") || line.contains("registerScanner"));
     }
 }
