@@ -1264,8 +1264,7 @@ public final class DiagnosticsCollector {
                 .append("  这一阵：扫描失败 ").append(buttons.failures()).append(" 次、听不到重开 ").append(buttons.deafRestarts()).append(" 次")
                 .append("  这次进程换过 GATT 服务 ").append(buttons.gattReplaced()).append(" 次")
                 .append('\n');
-        sb.append("  平时隔 ").append(buttons.heardGapMs()).append(" 毫秒收到一包")
-                .append("  这次进程听不到重开 ").append(buttons.deafRestartsTotal()).append(" 回")
+        sb.append("  这次进程听不到重开 ").append(buttons.deafRestartsTotal()).append(" 回，其中马上就收到 ").append(buttons.deafCured()).append(" 回")
                 .append('\n');
         java.util.List<String> addresses = config.getSmartButtons();
         if (addresses.isEmpty()) {
