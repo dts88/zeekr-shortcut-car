@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.93.2-alpha] - 2026-11-01
+
+- Smart buttons: after the head unit wakes or Bluetooth comes on, listening starts about a minute later.
+- Smart buttons: only one scan runs, and a silent one is restarted once, not again and again.
+- Smart buttons: reading the battery after a press pauses listening again, for at most 6 seconds.
+
 ## [2.93.1-alpha] - 2026-11-01
 
 - Smart buttons: a scan that goes silent comes back in about a second, so a press made meanwhile is still heard.
