@@ -690,16 +690,18 @@ public final class SmartButtons {
         silentScan = null;
     }
 
+    private final Runnable restart = this::restartScan;
+
     /** 重开一次扫描（到点、或者上次没听上）。开的次数到限了就先留着现在这一路，到时候再来。 */
-    private final Runnable restart = () -> {
+    private void restartScan() {
         long wait = starts.waitMs(SystemClock.elapsedRealtime());
         if (wait > 0 && scanCallback != null) {
-            bt.postDelayed(this.restart, wait);
+            bt.postDelayed(restart, wait);
             return;
         }
         stopScan();
         ensureScan();
-    };
+    }
 
     private final Runnable watch = this::watchScan;
 
