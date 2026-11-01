@@ -1265,8 +1265,7 @@ public final class DiagnosticsCollector {
                 .append("  这次进程换过 GATT 服务 ").append(buttons.gattReplaced()).append(" 次")
                 .append('\n');
         sb.append("  平时隔 ").append(buttons.heardGapMs()).append(" 毫秒收到一包")
-                .append("  这次进程听不到以后：开新的一路就好 ").append(buttons.curedByFresh()).append(" 回、旧的自己好 ").append(buttons.curedBySelf())
-                .append(" 回、全停再开才好 ").append(buttons.curedByRestart()).append(" 回")
+                .append("  这次进程听不到重开 ").append(buttons.deafRestartsTotal()).append(" 回")
                 .append('\n');
         java.util.List<String> addresses = config.getSmartButtons();
         if (addresses.isEmpty()) {
@@ -1304,6 +1303,8 @@ public final class DiagnosticsCollector {
                 return "不听（蓝牙关着）";
             case NO_PERMISSION:
                 return "不听（没有扫描权限）";
+            case SETTLING:
+                return "先等着（车机刚醒、蓝牙刚开好）";
             case CONNECTING:
                 return "先停着（连着一台读电量）";
             case LISTENING:

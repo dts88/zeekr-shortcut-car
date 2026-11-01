@@ -6,7 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** 灵动贴听不听得到的判断（{@link SmartButtons#deaf}、{@link SmartButtons#deafLimit}、{@link ScanStarts}、{@link ScanProbe#aboutBluetooth}）。 */
+/** 灵动贴听不听得到的判断（{@link SmartButtons#deaf}、{@link SmartButtons#deafLimit}、{@link SmartButtons#mayRestart}、{@link SmartButtons#slept}、{@link ScanProbe#aboutBluetooth}）。 */
 public class SmartButtonsListenTest {
 
     private static final long START = 1_000_000L;
@@ -50,87 +50,74 @@ public class SmartButtonsListenTest {
         assertFalse(SmartButtons.deaf(false, START + 100 * LIMIT, START, 0, LIMIT));
     }
 
-    /** 2026-11-01 报告那种地方（一秒四十多包）：一秒没有一包就算聋，不等了。 */
+    /** 2026-11-01 报告那种地方（一秒四十多包）：也等够 10 秒，接手机之类的时候蓝牙芯片可能忙一阵，不去碰它。 */
     @Test
-    public void whereAdvertsAreDenseOneSecondIsEnough() {
-        assertEquals(SmartButtons.DEAF_MIN_MS, SmartButtons.deafLimit(20, 0));
-        assertEquals(1000L, SmartButtons.DEAF_MIN_MS);
-    }
-
-    /** 灵动贴一下广播最短 1.5 秒（Lab findings §2.61）：看的间隔、等新的一路都算上，接回来还赶得上同一下。 */
-    @Test
-    public void aPressDuringASilenceIsStillCaught() {
-        assertTrue(SmartButtons.DEAF_MIN_MS + SmartButtons.WATCH_MS + SmartButtons.FRESH_SCAN_WAIT_MS < 1_600L);
+    public void whereAdvertsAreDenseItStillWaitsTenSeconds() {
+        assertEquals(SmartButtons.DEAF_MIN_MS, SmartButtons.deafLimit(20));
+        assertEquals(10_000L, SmartButtons.DEAF_MIN_MS);
     }
 
     @Test
     public void whereAdvertsAreSparseItWaitsLonger() {
-        assertEquals(3000L, SmartButtons.deafLimit(100, 0));
-        assertEquals(SmartButtons.DEAF_MAX_MS, SmartButtons.deafLimit(5000, 0));
-    }
-
-    /** 两步都试过还是没有：多半周围真的没设备，等的时间翻倍，翻到头就不再翻。 */
-    @Test
-    public void restartsWaitLongerUpToTheLimit() {
-        assertEquals(SmartButtons.DEAF_RETRY_MS, SmartButtons.deafLimit(20, 1));
-        assertEquals(SmartButtons.DEAF_RETRY_MS * 2, SmartButtons.deafLimit(20, 2));
-        long most = SmartButtons.DEAF_RETRY_MS << SmartButtons.DEAF_MAX_DOUBLINGS;
-        assertEquals(most, SmartButtons.deafLimit(20, 1 + SmartButtons.DEAF_MAX_DOUBLINGS));
-        assertEquals(most, SmartButtons.deafLimit(20, 100));
+        assertEquals(30_000L, SmartButtons.deafLimit(1000));
+        assertEquals(SmartButtons.DEAF_MAX_MS, SmartButtons.deafLimit(5000));
+        assertEquals(60_000L, SmartButtons.DEAF_MAX_MS);
     }
 
     /** 周围设备变少，等的时间跟着变长；一次长长的停顿不会把它拉到回不来。 */
     @Test
     public void theAverageGapFollowsWhatIsHeard() {
         double gap = SmartButtons.DEAF_MAX_MS;
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 200; i++) {
             gap = SmartButtons.averageGap(gap, 20);
         }
         assertEquals(20.0, gap, 1.0);
 
         gap = SmartButtons.averageGap(gap, 3_600_000L);
-        assertTrue(gap < 900);
-        for (int i = 0; i < 60; i++) {
+        assertTrue(gap < SmartButtons.DEAF_MAX_MS / 9.0);
+        for (int i = 0; i < 120; i++) {
             gap = SmartButtons.averageGap(gap, 20);
         }
         assertEquals(20.0, gap, 2.0);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 30; i++) {
             gap = SmartButtons.averageGap(gap, 5000);
         }
-        assertEquals(SmartButtons.DEAF_MAX_MS, SmartButtons.deafLimit(gap, 0));
+        assertEquals(SmartButtons.DEAF_MAX_MS, SmartButtons.deafLimit(gap));
     }
 
-    /** 开扫描不超过安卓的限制（30 秒里 5 次）：留一次余量，到限了等最早的那次过了窗口。 */
+    /** 车主 2026-11-01：不要反复强行启动。同一阵听不到只重开一次。 */
     @Test
-    public void scanStartsStayWithinAndroidsLimit() {
-        assertTrue(ScanStarts.MOST < 5);
-        assertEquals(30_000L, ScanStarts.WINDOW_MS);
-        ScanStarts starts = new ScanStarts();
-        long t = START;
-        for (int i = 0; i < ScanStarts.MOST; i++) {
-            assertEquals(0, starts.waitMs(t));
-            starts.record(t);
-            t += 1000;
-        }
-        assertEquals(30_000L - ScanStarts.MOST * 1000L, starts.waitMs(t));
-        assertEquals(0, starts.waitMs(START + ScanStarts.WINDOW_MS));
-        starts.record(START + ScanStarts.WINDOW_MS);
-        assertEquals(1000L, starts.waitMs(START + ScanStarts.WINDOW_MS));
+    public void oneSilenceGetsOneRestart() {
+        assertTrue(SmartButtons.mayRestart(START, START, 0));
+        assertFalse(SmartButtons.mayRestart(START, START, 1));
+        assertFalse(SmartButtons.mayRestart(START + 3_600_000L, START, 1));
     }
 
-    /** 没开成的不算：醒来时扫描失败几次，不该占掉接回来的名额。 */
+    /** 蓝牙还没稳不碰它，稳了才算。 */
     @Test
-    public void aFailedStartDoesNotCount() {
-        ScanStarts starts = new ScanStarts();
-        for (int i = 0; i < ScanStarts.MOST; i++) {
-            starts.record(START);
-        }
-        assertTrue(starts.waitMs(START) > 0);
-        starts.forgetLast();
-        assertEquals(0, starts.waitMs(START));
-        starts.record(START);
-        assertTrue(starts.waitMs(START) > 0);
+    public void nothingIsRestartedWhileBluetoothSettles() {
+        long settled = START + SmartButtons.SETTLE_MS;
+        assertFalse(SmartButtons.mayRestart(START, settled, 0));
+        assertFalse(SmartButtons.mayRestart(settled - 1, settled, 0));
+        assertTrue(SmartButtons.mayRestart(settled, settled, 0));
+    }
+
+    /** 2026-11-01 报告：醒来 45 秒那轮扫描无声地停了，醒来 104 秒开的没停过。 */
+    @Test
+    public void theWaitFitsWhatTheCarShowed() {
+        assertTrue(SmartButtons.SETTLE_MS > 45_000L);
+        assertTrue(SmartButtons.SETTLE_MS < 104_000L);
+    }
+
+    /** 深睡的时间又多了才算睡过：两个钟不是同一刻读的，差几毫秒不算。 */
+    @Test
+    public void onlyARealSleepCounts() {
+        assertFalse(SmartButtons.slept(61_392_000L, 61_392_000L));
+        assertFalse(SmartButtons.slept(61_392_000L, 61_392_000L + 5));
+        assertFalse(SmartButtons.slept(61_392_000L, 61_392_000L - 5));
+        assertTrue(SmartButtons.slept(61_392_000L, 61_392_000L + SmartButtons.SLEPT_MS));
+        assertTrue(SmartButtons.slept(31_497_000L, 61_392_000L));
     }
 
     @Test
