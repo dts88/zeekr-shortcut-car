@@ -105,3 +105,10 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 - **EngineV1**（<https://evenginev1.com>，商业网站，项目所有者给的参考）：首页公开试听的「Dodge Hellcat」素材上量出来的频谱事实 ——
   点火阶次和 1、2 阶的比例、固定共振峰的位置、带负荷时七八成是随机成分、高频怎么滚降 —— 用来校准逐缸合成器（`sound.PulseVoice`）；
   也看了它网页上的做法（真车录音按转速、负荷分段循环、交叉淡化，再加随油门开合的低通）。录音和代码都没有用。
+
+---
+
+## 6. 不是代码的内容
+
+- `app/src/main/res/raw/outside_voice_go_first.wav`（「You're welcome to go first. Be careful.」）：项目所有者用手机录下车外喇叭放出来的这句语音，
+  再去噪、去混响、校正音色（2026-11-01）。

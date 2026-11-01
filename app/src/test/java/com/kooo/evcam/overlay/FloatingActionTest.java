@@ -39,6 +39,7 @@ public class FloatingActionTest {
         assertEquals("toggle_mirror", FloatingAction.TOGGLE_MIRROR.key);
         assertEquals("lock_footage", FloatingAction.LOCK_FOOTAGE.key);
         assertEquals("toggle_drive_sound", FloatingAction.TOGGLE_DRIVE_SOUND.key);
+        assertEquals("play_outside_voice", FloatingAction.PLAY_OUTSIDE_VOICE.key);
     }
 
     @Test

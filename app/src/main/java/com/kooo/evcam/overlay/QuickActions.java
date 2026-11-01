@@ -48,6 +48,9 @@ public final class QuickActions {
             case TOGGLE_DRIVE_SOUND:
                 toggleDriveSound(context, why);
                 return;
+            case PLAY_OUTSIDE_VOICE:
+                com.kooo.evcam.sound.OutsideVoice.play(context);
+                return;
             case OPEN_APP:
             default:
                 openApp(context);

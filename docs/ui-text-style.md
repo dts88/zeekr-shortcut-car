@@ -438,6 +438,9 @@
 - 关于页致谢里 SW 那一条（2026-11-01，项目所有者要求和 README 一样感谢积极测试和反馈，这句草稿给项目所有者看过，没有明确批）：about_thanks_body
   「• SW（同一个群组）—— 分享了 AVM Recorder 这个项目的信息，让我知道这条路有人走通过；后来也一直积极测试和反馈。」/
   「• SW (same group) — shared the AVM Recorder project, which showed it could be done, and has kept testing actively and sending feedback.」
+- 车外语音（2026-11-01，这几句都是草稿）：悬浮按钮、灵动贴的选项 floating_action_play_outside_voice「车外喇叭播放礼让语音」/
+  Play the courtesy message on the exterior speaker / Mainkan mesej budi bahasa pada pembesar suara luar；放不了的提示 msg_outside_voice_failed
+  「车外喇叭没有播放」/ The exterior speaker didn't play / Pembesar suara luar tidak memainkan mesej。
 - 灵动贴手排模式（2026-10-31）：中文是项目所有者批的 —— smart_button_action_drive_up「驾驶模式向上」、smart_button_action_drive_down
   「驾驶模式向下」、smart_button_action_gear_up「升挡（模拟声浪）」、smart_button_action_gear_down「降挡（模拟声浪）」。英文、马来文还是草稿：
   Drive mode up / Mod pemanduan naik；Drive mode down / Mod pemanduan turun；Shift up (simulated drive sound) / Naik gear (bunyi pemanduan simulasi)；
