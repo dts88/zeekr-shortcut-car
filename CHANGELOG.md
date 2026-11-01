@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.93.0-alpha] - 2026-11-01
+
+- Floating button and smart buttons: a new action plays a courtesy message on the exterior speaker, at the Exterior route and Exterior volume set for the simulated drive sound.
+- Smart buttons: a scan that goes silent restarts in about 10 seconds instead of up to a minute, and diagnostics record what else was going on.
+
 ## [2.92.1-alpha] - 2026-11-01
 
 - Smart buttons: after Bluetooth restarts, for example when the head unit wakes, the app replaces the dead Bluetooth service it was left with and listens again, without restarting the app.
