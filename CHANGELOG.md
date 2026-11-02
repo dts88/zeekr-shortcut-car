@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.96.0-alpha] - 2026-11-02
+
+- Recording: with Keep recording when the screen goes off turned off, recording now stops 30 s after the screen goes dark (was 10 s), when the cameras are released. This also applies while driving.
+
 ## [2.95.0-alpha] - 2026-11-02
 
 - Recording: before a camera is closed (screen off, exit), its recording file is finished and saved first.
