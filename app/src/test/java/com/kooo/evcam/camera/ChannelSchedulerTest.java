@@ -2131,6 +2131,121 @@ public class ChannelSchedulerTest {
     }
 
     /**
+     * 先停录、再释放（项目所有者 2026-11-02）：同一个那一刻，三路都在写文件 —— 环视先收尾（相机不动，录像那一侧退出录像、封文件；
+     * 这期间它不算能用，录像不在它上面再加入），封好了叫醒调度、当轮照原样单独关；座舱接着先收尾，都封好了再一起关。
+     * 录像那一侧之后照常听到「相机关了」。不在写文件时没有收尾，关照旧（下一条测试）。
+     */
+    @Test
+    public void aDarkReleaseSealsTheRecordingLanesBeforeItClosesThem() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR, REAR, FRONT);
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        pipe.writing.addAll(Arrays.asList(SUR, REAR, FRONT));
+        host.sentry = 0;
+        settle();
+        told.clear();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long release = 1_000 + ChannelRules.HOLD_MS;
+        at(release);
+        assertTrue("先收尾：相机不动", surround.actions.isEmpty() && rear.actions.isEmpty() && front.actions.isEmpty());
+        assertEquals(Arrays.asList("sealing [front] SCREEN_OFF"), lines("sealing"));
+        assertEquals(Arrays.asList("sealing front SCREEN_OFF"), told("sealing"));
+        assertFalse("收尾时不算能用：录像不在它上面再加入", p.usable(SUR));
+        assertTrue("录像那一侧听到它的样子变了", told("condition front").size() >= 1);
+
+        at(release + 400);
+        pipe.writing.remove(SUR);   // 环视的文件封好了、录制器停放了：录像那一侧叫醒调度
+        s.wake();
+        settle();
+        assertEquals("封好了：照原样单独关", Arrays.asList("close screen-off"), surround.actions);
+        assertEquals(Arrays.asList("gone front CLOSED SCREEN_OFF"), told("gone"));
+
+        at(release + 520);
+        closed(surround);
+        settle();
+        assertTrue("座舱先收尾", rear.actions.isEmpty() && front.actions.isEmpty());
+        assertEquals(Arrays.asList("sealing [front] SCREEN_OFF", "sealing [left, back] DARK_RELEASE"),
+                lines("sealing"));
+
+        at(release + 900);
+        pipe.writing.remove(REAR);
+        pipe.writing.remove(FRONT);
+        s.wake();
+        settle();
+        assertEquals(Arrays.asList("close dark-release"), rear.actions);
+        assertEquals(Arrays.asList("close dark-release"), front.actions);
+        assertEquals(Arrays.asList("sealed front 400", "sealed left 380", "sealed back 380"), lines("sealed"));
+        assertEquals(Arrays.asList("gone front CLOSED SCREEN_OFF", "gone left CLOSED DARK_RELEASE",
+                "gone back CLOSED DARK_RELEASE"), told("gone"));
+
+        at(release + 1_000);
+        closed(rear);
+        closed(front);
+        settle();
+        at(release + 3_000);
+        List<String> rounds = lines("closeRound");
+        assertEquals("收尾也在这一轮关里：照旧一行「环视 → 座舱」", 1, rounds.size());
+        assertTrue(rounds.get(0), rounds.get(0).startsWith("closeRound front | "));
+    }
+
+    /** 收尾到点（5 秒）还没封好：不再等，照常关；黑匣子那一行写到点了。 */
+    @Test
+    public void aSealThatNeverFinishesStopsHoldingTheCloseAfterFiveSeconds() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR);
+        streaming(surround, recS);
+        pipe.writing.add(SUR);
+        host.sentry = 0;
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long release = 1_000 + ChannelRules.HOLD_MS;
+        at(release + ChannelRules.SEAL_MAX_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(release + ChannelRules.SEAL_MAX_MS);
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        assertEquals(Arrays.asList("sealed front " + ChannelRules.SEAL_MAX_MS + " timedOut"), lines("sealed"));
+    }
+
+    /** 收尾中亮屏了：不关了 —— 相机一直开着，录像那一侧听到它的样子变了、又能用了，接着加入（开一个新文件）。 */
+    @Test
+    public void lightingTheScreenDuringASealCallsTheCloseOff() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR);
+        streaming(surround, recS);
+        pipe.writing.add(SUR);
+        host.sentry = 0;
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        long release = 1_000 + ChannelRules.HOLD_MS;
+        at(release);
+        assertFalse(p.usable(SUR));
+        told.clear();
+
+        at(release + 300);
+        pipe.writing.remove(SUR);
+        host.goLit();
+        s.wake();
+        settle();
+        at(release + 5_000);
+        assertTrue("不关了：相机不动", surround.actions.isEmpty());
+        assertEquals(Arrays.asList("sealCalledOff front 300"), lines("sealCalledOff"));
+        assertTrue("又能用了：录像接着加入", p.usable(SUR));
+        assertTrue("录像那一侧听到它的样子变了", told("condition front").size() >= 1);
+    }
+
+    /**
      * 同一个那一刻，哨兵模式关着（项目所有者 2026-10-27）：环视没留着，和座舱同一轮放开 —— 环视先单独关（熄屏），关完座舱一起关
      * （熄屏：座舱放开），三路都不开回来、录制器都停放着；录像那一侧听说三路都走了（环视「熄屏」）。黑匣子一行「环视放开（哨兵关）」。
      * 操作 3 次（以前 5 次：环视关、座舱关、环视开，再到车机要睡关一次）。
@@ -5374,6 +5489,8 @@ public class ChannelSchedulerTest {
         boolean gone;
         /** 第二份管线的录像那一侧听到的（setUp 那一份记在 {@link #told}）。 */
         final List<String> told = new ArrayList<>();
+        /** 录制器还在写文件的那几路（{@link ChannelScheduler.PipelineHost#writing}）：关它之前规则先等它收尾。 */
+        final Set<String> writing = new LinkedHashSet<>();
 
         void plan(String... keys) {
             plan.addAll(Arrays.asList(keys));
@@ -5389,6 +5506,11 @@ public class ChannelSchedulerTest {
         @Override
         public ChannelRules.RecordPrep recordPrep(String key) {
             return ChannelRules.RecordPrep.NONE;
+        }
+
+        @Override
+        public boolean writing(String key) {
+            return writing.contains(key);
         }
 
         @Override
@@ -5433,6 +5555,11 @@ public class ChannelSchedulerTest {
         @Override
         public void onLaneWantersChanged(String key) {
             wantersChanged.add(key);
+        }
+
+        @Override
+        public void onLaneSealing(String key, ChannelRules.Why closed) {
+            lines.add("sealing " + key + " " + closed);
         }
     }
 
@@ -5575,6 +5702,22 @@ public class ChannelSchedulerTest {
         @Override
         public void closing(List<String> keys, ChannelRules.Why why) {
             journal.add("closing " + keys + " " + why);
+        }
+
+        @Override
+        public void sealing(List<String> keys, ChannelRules.Why why) {
+            journal.add("sealing " + keys + " " + why);
+        }
+
+        /** 「sealed front 500」；到点还没封好的带「timedOut」。 */
+        @Override
+        public void sealed(String key, long waitedMs, boolean timedOut) {
+            journal.add("sealed " + key + " " + waitedMs + (timedOut ? " timedOut" : ""));
+        }
+
+        @Override
+        public void sealCalledOff(String key, long ms) {
+            journal.add("sealCalledOff " + key + " " + ms);
         }
 
         @Override

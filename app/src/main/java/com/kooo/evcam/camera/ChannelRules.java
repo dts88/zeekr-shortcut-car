@@ -102,14 +102,21 @@ public final class ChannelRules {
      */
     public static final long RECORD_OUTPUT_WAIT_MS = 2_000L;
 
+    /**
+     * 关一路之前，等录像那一侧把这一路的文件封好最多多久（项目所有者 2026-11-02「先停录、再释放」，定 5 秒）：从叫它收尾
+     * （{@link Move#SEAL}）那一刻算。平常 0.3–0.7 秒（10-30～11-01 熄屏放开环视的 10 次）；到点不再等，照原样关，
+     * 录制器自己接着收（它自己的期限是 CodecVideoRecorder.STOP_BUDGET_MS）。
+     */
+    public static final long SEAL_MAX_MS = 5_000L;
+
     /** 环视单独关最多等多久（§二.2）；到点（相机服务卡住）不再等它，接着关座舱。 */
     public static final long CLOSE_SURROUND_MAX_MS = 10_000L;
 
     /** 座舱一起关最多等多久（§二.2）。 */
     public static final long CLOSE_CABINS_MAX_MS = 30_000L;
 
-    /** 按次序关一轮的封顶：环视单独关 + 座舱一起关。 */
-    public static final long ORDERED_CLOSE_MAX_MS = CLOSE_SURROUND_MAX_MS + CLOSE_CABINS_MAX_MS;
+    /** 按次序关一轮的封顶：环视先收尾、单独关，座舱先收尾、一起关（收尾见 {@link #SEAL_MAX_MS}）。 */
+    public static final long ORDERED_CLOSE_MAX_MS = SEAL_MAX_MS + CLOSE_SURROUND_MAX_MS + SEAL_MAX_MS + CLOSE_CABINS_MAX_MS;
 
     /** 一路丢了（或开不起来）、我们这边关完以后再等多久才判：相机服务那几声「空闲 / 被占用」这时都到了。 */
     public static final long JUDGE_DELAY_MS = 300L;
@@ -140,7 +147,7 @@ public final class ChannelRules {
     static final long OWN_WORD_GRACE_MS = 500L;
 
     /**
-     * 退出最多等多久才结束进程：手上那一步最坏占满在途封顶，再按次序关一轮，留 5 秒余量（最坏约 105 秒，平常一两秒）。
+     * 退出最多等多久才结束进程：手上那一步最坏占满在途封顶，再按次序关一轮，留 5 秒余量（最坏约 115 秒，平常一两秒）。
      * 2.10 用的 20 秒盖不住调度自己关相机的上限（10 + 30 秒），所以由常量算出来。
      */
     public static final long EXIT_WAIT_MAX_MS = IN_FLIGHT_MAX_MS + ORDERED_CLOSE_MAX_MS + 5_000L;
@@ -325,6 +332,11 @@ public final class ChannelRules {
         final Set<Out> declared = new LinkedHashSet<>();
         /** 录像输出在不在备。 */
         RecordPrep record = RecordPrep.NONE;
+        /**
+         * 这一路的录制器还在写文件：在录，或者叫停了还没封好、没停放好（录像宿主报的）。关它之前先等它收尾
+         * （{@link ChannelRules#sealFirst}，项目所有者 2026-11-02「先停录、再释放」）。
+         */
+        boolean writing;
         /** 本会话第一帧的时刻；0 = 还没有。每建一次会话归零 —— 「本会话出过画面」就是它不是 0。 */
         long firstFrameAt;
         /** 多久没有进展：出了一帧、开了相机、建好会话都算（SingleCamera.progressAgeMs）。 */
@@ -378,6 +390,11 @@ public final class ChannelRules {
          * （熄屏时不为放开的座舱建录制器，设计 v3.1 C4），从开录那一刻算的话早过了 2 秒，开了还得再改一次输出。
          */
         long recordWantedSince;
+        /**
+         * 要关这一路、叫录像那一侧先收尾的那一刻（{@link Move#SEAL}）；0 = 没叫。关了、丢了就清，关那一步不再要关它也清
+         * （{@link ChannelRules#forgetSeals}）。叫过以后录像不在这一路上再加入（ChannelScheduler 的 usable 不算它能用）。
+         */
+        long sealAskedAt;
 
         Lane(String key, String cameraId) {
             this.key = Objects.requireNonNull(key);
@@ -577,7 +594,12 @@ public final class ChannelRules {
         /** 救一路：重建会话，或者重开。 */
         RESCUE,
         /** 关：环视单独关，或者座舱一起关。 */
-        CLOSE
+        CLOSE,
+        /**
+         * 收尾（项目所有者 2026-11-02「先停录、再释放」）：要关的几路里还在写文件的，叫录像那一侧先封好（{@link ChannelRules#sealFirst}）。
+         * 不动相机，不算一步：{@link ChannelRules#begin} 只记 {@link Lane#sealAskedAt}。
+         */
+        SEAL
     }
 
     /** 为什么（黑匣子那一行照它写）。 */
@@ -607,6 +629,8 @@ public final class ChannelRules {
         SCREEN_UNKNOWN,
         /** 退出 / 车机要睡：等还没关完的那几路关完。 */
         CLOSING,
+        /** 要关的那一路还在写文件：等录像那一侧封好再关（{@link ChannelRules#sealFirst}，最多 {@link ChannelRules#SEAL_MAX_MS}）。 */
+        SEALING,
         // ---- 先不开（记在 Decision.deferredKey）----
         /** 现在用不了相机：不开、不重开、不计次数。 */
         UNUSABLE,
@@ -840,7 +864,12 @@ public final class ChannelRules {
              * 环视这一段熄屏留不留变了（{@link ChannelRules#judgeSurroundInDark}，项目所有者 2026-10-27）：{@code keys} 是环视，
              * {@code cause} 是为什么（通道刚算黑、哨兵变成开、哨兵关了、车机要睡）。通道刚算黑那一下不管变没变都报一次。
              */
-            SURROUND_IN_DARK
+            SURROUND_IN_DARK,
+            /**
+             * 叫过收尾的一路，关那一步不再要关它了（亮屏了、又有人要了、环视不用先关了；{@link ChannelRules#forgetSeals}）：
+             * {@code keys} 是那一路，{@code ms} 是收尾叫了多久。相机一直开着，录像那一侧照常加入（开一个新文件）。
+             */
+            SEAL_CALLED_OFF
         }
 
         /** 为什么：解除停手（STOP_LIFTED）、环视留不留变了（SURROUND_IN_DARK）。 */
@@ -867,7 +896,7 @@ public final class ChannelRules {
         CameraTaken.Verdict verdict;
         /** JUDGED：判的是哪一次。 */
         Failure failure;
-        /** RELEASED：被拿着多久。 */
+        /** RELEASED：被拿着多久；SEAL_CALLED_OFF：收尾叫了多久。 */
         long ms;
         /** STOP_LIFTED、SURROUND_IN_DARK：为什么。 */
         Cause cause;
@@ -1040,6 +1069,16 @@ public final class ChannelRules {
         if (d.move == Move.IDLE || d.move == Move.WAIT) {
             return;
         }
+        if (d.move == Move.SEAL) {
+            // 收尾不算一步：只记下叫了哪几路（关那一步等它们封好，sealFirst）
+            for (String key : d.keys) {
+                Lane lane = w.lane(key);
+                if (lane != null) {
+                    lane.sealAskedAt = w.now;
+                }
+            }
+            return;
+        }
         if (d.half == Half.OPEN) {
             if (w.step != null && w.step.split) {
                 w.step = w.step.withOpenHalf(w.now);
@@ -1085,7 +1124,29 @@ public final class ChannelRules {
         release(w, events);
         liftStops(w, changed, events);
         clearLadders(w);
+        forgetSeals(w, events);
         return events;
+    }
+
+    /**
+     * 收尾的账（项目所有者 2026-11-02「先停录、再释放」）：叫过收尾的一路（{@link Lane#sealAskedAt}），关了、丢了（不再开着、在开）就清；
+     * 关那一步不再要关它（{@link #closing}：亮屏了、又有人要了、环视不用先关了）也清，报 {@link Event.Type#SEAL_CALLED_OFF} ——
+     * 相机一直开着，录像那一侧照常加入。
+     */
+    private static void forgetSeals(World w, List<Event> events) {
+        for (Lane lane : w.lanes) {
+            if (lane.sealAskedAt == 0) {
+                continue;
+            }
+            if (lane.device != Device.OPEN && lane.device != Device.OPENING) {
+                lane.sealAskedAt = 0;
+            } else if (!closing(w, lane)) {
+                Event event = new Event(Event.Type.SEAL_CALLED_OFF, lane.key);
+                event.ms = w.now - lane.sealAskedAt;
+                events.add(event);
+                lane.sealAskedAt = 0;
+            }
+        }
     }
 
     /**
@@ -1983,7 +2044,9 @@ public final class ChannelRules {
      *       车机要睡时最多再等 {@link #SLEEP_GRACE_MS}，然后直接去关；退出、管线换下去照常等它做完；</li>
      *   <li><b>关</b>：环视开着或正在开、但已不该开 → 单独关它（最多 10 秒）；否则不该开的座舱一起关（最多 30 秒）。
      *       座舱等环视先关完；环视还该开、此刻能用相机的，先单独关它（关座舱前先关环视，2.11.6，{@link #closeStep}），
-     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡、管线换下去时到这里为止，不摘死输出、不改、不开、不救；</li>
+     *       座舱关完由第 5 条照常开回来。关不等安静。退出、车机要睡、管线换下去时到这里为止，不摘死输出、不改、不开、不救。
+     *       要关的几路里还在写文件的先收尾（{@link #sealFirst}，项目所有者 2026-11-02）：叫录像那一侧封好，封好了（最多
+     *       {@link #SEAL_MAX_MS}）再照原样关；</li>
      *   <li>有一路丢了 / 开不起来还没判 → 等判完（最多 300 ms，或者等别的丢失关完；等的是最晚到点的那一路）；</li>
      *   <li><b>摘死输出</b>：一次一路、环视先，新组合照 {@link #composition}。排在开前面，因为 §二.4 说马上减（大纲 §7 解读 4），
      *       但照 §二.6 仍要等安静。只摘本会话出过画面的（{@link #reconfigurable}）；没出过画面的由第 7 条重开时丢掉它；</li>
@@ -2024,7 +2087,7 @@ public final class ChannelRules {
         }
         Decision close = closeStep(w);
         if (close != null) {
-            return close;
+            return sealFirst(w, close);
         }
         if (winding(w)) {
             for (Lane lane : w.lanes) {
@@ -2314,12 +2377,7 @@ public final class ChannelRules {
      * 关座舱前先关环视要环视还该开。不会先关环视、开回来给录像、紧接着又关。</p>
      */
     private static Decision closeStep(World w) {
-        List<Lane> toClose = new ArrayList<>();
-        for (Lane lane : w.lanes) {
-            if ((lane.device == Device.OPEN || lane.device == Device.OPENING) && !shouldOpen(w, lane)) {
-                toClose.add(lane);
-            }
-        }
+        List<Lane> toClose = unwanted(w);
         if (toClose.isEmpty()) {
             return null;
         }
@@ -2346,10 +2404,83 @@ public final class ChannelRules {
      * 它此刻本来也没在出画面）。屏幕不知道黑没黑时也不（{@link World#screenKnown}，2026-10-27）：那时「开」那一步不开，关了开不回来。
      * 被一轮占着时也不（{@link #camHeld}）：那一轮结束之前「开」那一步不开它，关了也开不回来。
      */
+    private static boolean surroundFirstDue(World w, Lane surround) {
+        List<Lane> toClose = unwanted(w);
+        return !toClose.isEmpty() && !isSurround(toClose.get(0)) && surroundFirst(w, surround);
+    }
+
     private static boolean surroundFirst(World w, Lane surround) {
         return surround != null && (surround.device == Device.OPEN || surround.device == Device.OPENING)
                 && shouldOpen(w, surround) && usable(w) && w.screenKnown && surround.mark == null
                 && !rescuing(surround) && !camHeld(surround);
+    }
+
+    /** 开着、在开、已不该开的那几路（{@link #closeStep} 要关的），按开的次序。 */
+    private static List<Lane> unwanted(World w) {
+        List<Lane> lanes = new ArrayList<>();
+        for (Lane lane : w.lanes) {
+            if ((lane.device == Device.OPEN || lane.device == Device.OPENING) && !shouldOpen(w, lane)) {
+                lanes.add(lane);
+            }
+        }
+        return lanes;
+    }
+
+    /**
+     * 关那一步要关这一路（此刻、或者等环视先关完以后，{@link #closeStep}）：它开着、在开、已不该开；或者它是环视，要关座舱而它得先单独关
+     * （{@link #surroundFirst}）。
+     */
+    static boolean closing(World w, Lane lane) {
+        if (lane.device != Device.OPEN && lane.device != Device.OPENING) {
+            return false;
+        }
+        if (!shouldOpen(w, lane)) {
+            return true;
+        }
+        return isSurround(lane) && surroundFirstDue(w, lane);
+    }
+
+    /**
+     * 关之前先收尾（项目所有者 2026-11-02「先停录、再释放」）：这一步要关的几路里还有录制器在写文件的（{@link Lane#writing}），
+     * 先叫录像那一侧收尾（{@link Move#SEAL}：那一路退出录像、封好文件、录制器停放，相机照常开着出画面），等它封好再关 ——
+     * 关的就和只开预览、超级镜子时一样。从叫它收尾起最多等 {@link #SEAL_MAX_MS}，到点照常关（录制器自己接着收）。
+     * 不在写文件的几路（只开预览、超级镜子，停了录的）不等，关照旧。退出、车机要睡、管线换下去也一样先收尾。
+     *
+     * <p>一步一件事：这一步还没叫过收尾的那几路先叫（{@code SEAL}）；叫过的等（{@link Why#SEALING}），等的是最晚到点的那一路；
+     * 都封好了、或者都到点了，就是原来那一步关。</p>
+     */
+    private static Decision sealFirst(World w, Decision close) {
+        if (close.move != Move.CLOSE) {
+            return close;
+        }
+        List<String> ask = new ArrayList<>();
+        String waitKey = null;
+        long waitLeft = 0;
+        for (String key : close.keys) {
+            Lane lane = w.lane(key);
+            if (lane == null || !lane.writing) {
+                continue;
+            }
+            if (lane.sealAskedAt == 0) {
+                ask.add(key);
+                continue;
+            }
+            long left = SEAL_MAX_MS - (w.now - lane.sealAskedAt);
+            if (left > 0 && (waitKey == null || left > waitLeft)) {
+                waitKey = key;
+                waitLeft = left;
+            }
+        }
+        if (!ask.isEmpty()) {
+            Decision d = new Decision(Move.SEAL, close.why);
+            d.keys = Collections.unmodifiableList(ask);
+            d.maxMs = SEAL_MAX_MS;
+            return d;
+        }
+        if (waitKey != null) {
+            return Decision.waitFor(Why.SEALING, waitKey, waitLeft).about(Move.CLOSE);
+        }
+        return close;
     }
 
     private static Decision close(List<Lane> lanes, Why why, long maxMs) {
