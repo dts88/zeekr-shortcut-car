@@ -70,7 +70,6 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_developer_note", NONE);
 
         OUTSIDE.put("pref_storage_location", Arrays.asList("storage_location"));
-        OUTSIDE.put("pref_relay_write", Arrays.asList("relay_write_enabled"));
         OUTSIDE.put("pref_photo_via_jpeg", Arrays.asList("photo_via_jpeg"));
     }
 
