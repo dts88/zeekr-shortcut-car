@@ -32,10 +32,9 @@ import java.util.Set;
  * <h3>2.11 起：只是数据，调度来读</h3>
  *
  * <p>登记表自己不动手：谁要哪几路、要什么输出、该不该保持，都由通道调度（{@link ChannelScheduler}）读这里的数据去判
- * （channel-logic §一，项目所有者 2026-10-10 确认）。监听者只是叫醒调度。同一张表上还记一项事实：「车机要睡」
- * （{@link #headUnitSleeps}）—— 熄屏那张表判成「现在停」时写（安卓熄屏了：熄屏 v3 起就是车机下电那一下）、安卓亮着时清
- * （车机黑着醒了、亮屏；录像协调器写，它是熄屏的唯一裁判，在不在录都判），
- * 调度看到它就不再保持、手上那一步最多再等 1 秒、然后按次序关相机。</p>
+ * （channel-logic §一，项目所有者 2026-10-10 确认）。监听者只是叫醒调度。以前同一张表上还记一项事实「车机要睡」
+ * （录像协调器判了写，调度来读）；2026-11-02 起车机要睡由相机管家自己判（{@link ChannelRules#headUnitSleeps}，项目所有者
+ * 「熄屏判断收归通道调度」），这里只记谁要相机。</p>
  */
 public final class CameraNeeds {
 
@@ -70,8 +69,6 @@ public final class CameraNeeds {
 
     private final Set<Holder> holders = EnumSet.noneOf(Holder.class);
 
-    /** 车机要睡，见 {@link #headUnitSleeps}。 */
-    private boolean headUnitSleeps;
 
     /**
      * 登记表变了（或者「车机要睡」变了）谁来看：进程里那一个通道调度（{@link ChannelScheduler}）—— 只叫醒它，自己不判。
@@ -89,30 +86,6 @@ public final class CameraNeeds {
      */
     public synchronized void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    /**
-     * 写下 / 清掉「车机要睡」：熄屏那张表判成「现在停」（安卓熄屏了，哨兵模式关或读不到、没在开车）时写，安卓亮着时清
-     * （写还是清由 {@code ScreenOffPlan.sleepFact} 定，录像协调器来写：RecordingCoordinator 的熄屏判定、车机黑着醒了、亮屏）。变了才叫监听者 ——
-     * 调度据此当场把「正在按次序关」置真，不等它自己 post 出去的那一轮（熄屏录制放唤醒锁之前要读它）。
-     */
-    public void setHeadUnitSleeps(boolean sleeps) {
-        boolean changed;
-        synchronized (this) {
-            changed = headUnitSleeps != sleeps;
-            headUnitSleeps = sleeps;
-        }
-        if (changed) {
-            notifyChanged();
-        }
-    }
-
-    /**
-     * 车机要睡：安卓熄屏了、熄屏那张表判了「现在停」，车机几秒后就断电。这不是谁要不要相机，是一项事实 ——
-     * 调度看到它就不再保持，手上那一步最多再等 1 秒，然后按次序关（channel-logic §四，项目所有者 2026-10-10 确认）。
-     */
-    public synchronized boolean headUnitSleeps() {
-        return headUnitSleeps;
     }
 
     /**

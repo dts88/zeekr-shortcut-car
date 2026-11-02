@@ -232,7 +232,10 @@ public final class ChannelScheduler {
         /** 登记表此刻有谁（{@link CameraNeeds}）。哪个线程都能调。 */
         Set<CameraNeeds.Holder> holders();
 
-        /** 车机要睡（{@link CameraNeeds#headUnitSleeps}）。哪个线程都能调。 */
+        /**
+         * 车机要睡（{@link ChannelRules#headUnitSleeps}：安卓熄屏了、没在开车 —— 相机管家的唯一定义，项目所有者 2026-11-02；
+         * 以前是录像协调器判了写进登记表）。哪个线程都能调。
+         */
         boolean headUnitSleeps();
 
         /** 超级镜子要后座舱：切换范围是「后视 + 后座舱」（{@link ChannelRules.World#mirrorCabin}）。哪个线程都能调。 */
@@ -265,7 +268,7 @@ public final class ChannelScheduler {
         /** 「熄屏持续录制」开着（AppConfig.isScreenOffKeepRecording；开发者「熄屏录制」不算）。每一轮现读。 */
         boolean keepRecordingWhenDark();
 
-        /** 在开车（ScreenOffPlan.driving；车辆接口没连着算没在开车）。变了 Android 那一层叫醒调度。 */
+        /** 在开车（{@link ChannelRules#driving}；车辆接口没连着算没在开车）。变了 Android 那一层叫醒调度。 */
         boolean driving();
 
         /** 前台服务在不在：没有它不保持。 */
@@ -1777,7 +1780,36 @@ public final class ChannelScheduler {
         return s == null ? null : s.verdictCause();
     }
 
-    /** 决定变了叫它（只许 post）：录像协调器建起来时挂一次（{@link #setVerdictListener}；它先经 ChannelFacts.install 装上调度）。 */
+    /** 相机管家对熄屏录像的决定（{@link #recordVerdict}，每一轮发布）；没装上调度是放开（进程刚起来的样子）。主线程。 */
+    public static ChannelRules.RecordInDark recordInDark() {
+        ChannelScheduler s = app;
+        return s == null ? ChannelRules.RecordInDark.RELEASED : s.recordVerdict();
+    }
+
+    /**
+     * 屏幕黑着时录像能不能开（相机管家的判断，{@link ChannelRules#startsInDark}；录像协调器黑着来的「要录」、接回照它）。
+     * 没装上调度时判不了，按车机要睡算（不开）。主线程。
+     */
+    public static ChannelRules.DarkStart startsInDark(boolean surroundPlanned, boolean bySentryRise,
+                                                      boolean cameraUsable) {
+        ChannelScheduler s = app;
+        return s == null ? ChannelRules.DarkStart.SLEEPS : s.darkStart(surroundPlanned, bySentryRise, cameraUsable);
+    }
+
+    /**
+     * 录制键下那行小字（相机管家的判断，{@link ChannelRules#darkOutlook}）：哨兵模式、在不在开车读进程这一层的事实
+     * （车辆接口没连着时读不到、算没在开车）。主线程。
+     */
+    public static ChannelRules.DarkOutlook darkOutlook(boolean keepWhenDark, boolean surroundPlanned, boolean autoStart) {
+        ChannelScheduler s = app;
+        return ChannelRules.darkOutlook(keepWhenDark, surroundPlanned, s != null && s.facts.driving(),
+                s == null ? null : s.facts.sentry(), autoStart);
+    }
+
+    /**
+     * 决定变了叫它（只许 post）：录像协调器建起来时挂一次（{@link #setVerdictListener}；它先经 ChannelFacts.install 装上调度）。
+     * 环视留不留（{@link #surroundVerdict}）、熄屏录像（{@link #recordInDark}）有一个变了就叫。
+     */
     public static void setSurroundVerdictListener(Runnable listener) {
         ChannelScheduler s = app;
         if (s != null) {
@@ -1842,10 +1874,16 @@ public final class ChannelScheduler {
      */
     private ChannelRules.SurroundInDark verdict = ChannelRules.SurroundInDark.RELEASED;
     /**
-     * 上面那个决定为什么变成这样（变的那一轮的 {@link ChannelRules.World#surroundCause}：通道刚算黑、熄屏中哨兵变成开、哨兵关了、车机要睡）；
-     * 不是环视留不留变出来的（亮了、在开车、设置变了）、进程刚起来是 null。
+     * 发布的那一轮环视留不留为什么变了（那一轮的 {@link ChannelRules.World#surroundCause}：通道刚算黑、熄屏中哨兵变成开、哨兵关了、
+     * 车机要睡）；那一轮环视留不留没变（亮了、在开车、设置变了、只有熄屏录像的决定变了）、进程刚起来是 null。
      */
     private ChannelRules.Event.Cause verdictCause;
+    /**
+     * 相机管家对熄屏录像的决定（{@link ChannelRules#recordInDark}：照亮着算、接着录环视、停 —— 为什么停），录像协调器照它停录
+     * （项目所有者 2026-11-02「熄屏判断收归通道调度」）。和上面那个同一处发、同一道闸（{@link Pipeline#publishVerdict}），
+     * 两个有一个变了就叫监听者。进程起来时是放开（和环视那个一样：在黑着时被拉起的不开录，起来那一下也不发）。
+     */
+    private ChannelRules.RecordInDark recordVerdict = ChannelRules.RecordInDark.RELEASED;
     /** 决定变了叫谁（进程里只有录像协调器一个）：在一轮当中、主线程上叫，只许 post，不许当场动手。哪个线程都能挂。 */
     private volatile Runnable verdictListener;
 
@@ -1979,8 +2017,9 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 登记表变了（CameraNeeds 的监听，装上时接一次，在登记的那个线程上调）。车机要睡发布时当场把 {@link #closingAnywhere} 置真 ——
-     * 熄屏那一刻协调器写下它，紧接着 ScreenOffRecording 就要读「关完没有」，不能等 post 出去的那一轮。
+     * 登记表变了（CameraNeeds 的监听，装上时接一次，在登记的那个线程上调）。这时车机要睡（{@link Facts#headUnitSleeps}）的，
+     * 当场把 {@link #closingAnywhere} 置真，不等 post 出去的那一轮。车机要睡那一下本身由屏幕的监听叫醒调度、这一轮算上
+     * （2026-11-02 起车机要睡由相机管家自己判，不再经登记表）。
      */
     void onNeedsChanged() {
         Set<CameraNeeds.Holder> now = facts.holders();
@@ -2098,6 +2137,24 @@ public final class ChannelScheduler {
     /** 那个决定为什么变成这样；null = 不是环视留不留变出来的。 */
     ChannelRules.Event.Cause verdictCause() {
         return verdictCause;
+    }
+
+    /** 相机管家对熄屏录像的决定（{@link #recordVerdict}）。 */
+    ChannelRules.RecordInDark recordVerdict() {
+        return recordVerdict;
+    }
+
+    /**
+     * 屏幕黑着时录像能不能开（{@link ChannelRules#startsInDark}）：屏幕、车、设置现读（进程这一层的事实，{@link Facts}），
+     * 环视留没留读这一轮发布的决定（{@link #verdict}）。
+     */
+    ChannelRules.DarkStart darkStart(boolean surroundPlanned, boolean bySentryRise, boolean cameraUsable) {
+        boolean androidOff = facts.androidOff();
+        boolean driving = facts.driving();
+        boolean keep = facts.keepRecordingWhenDark();
+        boolean channelDark = ChannelRules.darkForChannel(!facts.screenOn(), facts.darkForMs(), androidOff);
+        return ChannelRules.startsInDark(channelDark, ChannelRules.headUnitSleeps(androidOff, driving), keep,
+                surroundPlanned, driving, keep && verdict == ChannelRules.SurroundInDark.KEPT, bySentryRise, cameraUsable);
     }
 
     /** 决定变了叫它（只许 post）。 */
@@ -3250,7 +3307,8 @@ public final class ChannelScheduler {
         }
 
         /**
-         * 通道对环视的熄屏决定变了就发（{@link ChannelScheduler#verdict}，连同为什么变）：每一轮在 {@link ChannelRules#settle} 之后、
+         * 通道对环视的熄屏决定、熄屏录像的决定（{@link ChannelRules#recordInDark}）有一个变了就发（{@link ChannelScheduler#verdict}、
+         * {@link ChannelScheduler#recordVerdict}，连同环视为什么变）：每一轮在 {@link ChannelRules#settle} 之后、
          * 报这一轮的事之前。
          * 和环视留不留同一道闸 —— 退出时不发；屏幕不知道黑没黑时不发（车机要睡那一条照发，它不等屏幕）。
          * 只在变了时叫监听者：每一段熄屏都从 LIT 起，通道刚算黑、哨兵变成开、哨兵关了、车机要睡、亮了、开起车来，每一下都是一次变。
@@ -3260,11 +3318,13 @@ public final class ChannelScheduler {
                 return;
             }
             ChannelRules.SurroundInDark now = ChannelRules.surroundVerdict(w);
-            if (now == verdict) {
+            ChannelRules.RecordInDark record = ChannelRules.recordInDark(w);
+            if (now == verdict && record == recordVerdict) {
                 return;
             }
             verdict = now;
             verdictCause = w.surroundCause;
+            recordVerdict = record;
             Runnable listener = verdictListener;
             if (listener != null) {
                 listener.run();

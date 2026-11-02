@@ -2918,6 +2918,62 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("RELEASED ANDROID_OFF"), verdicts);
     }
 
+    /**
+     * 相机管家对熄屏录像的决定（项目所有者 2026-11-02「熄屏判断收归通道调度」）：和环视留不留同一处发、同一道闸。
+     * 熄屏持续录制关着：黑满 30 秒（通道算黑、相机放开的同一刻）判成停 —— 以前录像协调器屏幕黑 10 秒就停；
+     * 头 30 秒照亮着算，不发。
+     */
+    @Test
+    public void keepRecordingOffStopsTheRecordingWhenTheChannelCountsTheScreenDark() {
+        listenToVerdict();
+        claim(Holder.RECORDING);
+        pipe.plan(SUR);
+        streaming(surround, recS);
+        host.keep = false;
+        host.sentry = 0;
+        settle();
+        verdicts.clear();
+
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS - 1);
+        assertEquals("头 30 秒照亮着算", ChannelRules.RecordInDark.LIT, s.recordVerdict());
+        assertTrue(verdicts.isEmpty());
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(ChannelRules.RecordInDark.SETTING_OFF, s.recordVerdict());
+        assertEquals("发了一次", 1, verdicts.size());
+    }
+
+    /**
+     * 在开车时屏幕黑满 30 秒：环视照亮着算（不按熄屏放开），熄屏持续录制开着就接着录环视；关着的照样停（以前黑 10 秒停）。
+     * 车机要睡由相机管家自己判（安卓熄屏、没在开车）：在开车时安卓熄屏不算。
+     */
+    @Test
+    public void drivingInTheDarkKeepsTheSurroundRecordingOnlyWithKeepRecording() {
+        claim(Holder.RECORDING);
+        pipe.plan(SUR);
+        streaming(surround, recS);
+        host.driving = true;
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(ChannelRules.SurroundInDark.LIT, s.verdict());
+        assertEquals(ChannelRules.RecordInDark.KEEP, s.recordVerdict());
+        host.keep = false;
+        s.wake();
+        settle();
+        assertEquals(ChannelRules.RecordInDark.SETTING_OFF, s.recordVerdict());
+        host.keep = true;
+        s.wake();
+        settle();
+        assertEquals(ChannelRules.RecordInDark.KEEP, s.recordVerdict());
+    }
+
     /** 进程刚起来（一个新的调度）：决定是放开、没有原因；挂在别的调度上的监听者听不到它。 */
     @Test
     public void aFreshSchedulerStartsReleasedWithoutACause() {
