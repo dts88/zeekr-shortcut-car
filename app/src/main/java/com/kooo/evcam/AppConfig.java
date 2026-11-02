@@ -1764,19 +1764,19 @@ public class AppConfig {
     }
     
     /**
-     * 检查当前是否应该使用中转写入
-     * 当选择U盘存储且启用了中转写入时，使用中转写入以避免U盘慢速写入导致录制卡顿
-     * @return true 表示应该使用中转写入
+     * 要不要走中转写入（先写内置存储，每个片段写完再搬到 U 盘）。
+     *
+     * <p>2026-11-02 项目所有者定：停用，普通用户、开发者都不再用，设置里那一行也拿掉了。这里固定为关，
+     * 录制那边带中转的几条路都走不到。原来的判断注释在下面，要恢复时放回来，
+     * 再把 preferences.xml、SettingsPreferenceFragment.bindStorage 里注释掉的那一行放回。</p>
      */
     public boolean shouldUseRelayWrite() {
-        // 只有使用U盘存储时才考虑中转写入
-        if (!isUsingExternalSdCard()) {
-            return false;
-        }
-        // 走同一个入口，不要在这里另外写一个默认值——
-        // 之前这里写死为 true，而 isRelayWriteEnabled() 已改为默认 false，
-        // 结果开关显示关闭、实际却仍在走内部存储中转。
-        return isRelayWriteEnabled();
+        // // 只有使用U盘存储时才考虑中转写入
+        // if (!isUsingExternalSdCard()) {
+        //     return false;
+        // }
+        // return isRelayWriteEnabled();
+        return false;
     }
     
     /**

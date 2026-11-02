@@ -288,21 +288,23 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindStorage() {
         bindStorageLocation();
 
-        // 中转写入是「先写内置再搬走」，本质上就是往内置存储规律性地写，
-        // 所以和内置存储同一个门槛：开发者选项关着时置灰，值也按关算（AppConfig 那道门），写着关就是关
-        SwitchPreferenceCompat relay = findPreference("pref_relay_write");
-        if (relay != null) {
-            relay.setPersistent(false);
-            relay.setChecked(appConfig.isRelayWriteEnabled());
-            if (!StorageHelper.isInternalStorageAllowed()) {
-                relay.setEnabled(false);
-                relay.setSummary(getString(R.string.msg_relay_dev_only));
-            }
-            relay.setOnPreferenceChangeListener((preference, newValue) -> {
-                appConfig.setRelayWriteEnabled(Boolean.TRUE.equals(newValue));
-                return true;
-            });
-        }
+        // 中转写入 2026-11-02 停用（项目所有者：普通用户、开发者都不再用，界面上拿掉；AppConfig.shouldUseRelayWrite 固定为关）。
+        // 原来的绑定注释在这里，要恢复时连同 preferences.xml 里那一行一起放回：
+        // // 中转写入是「先写内置再搬走」，本质上就是往内置存储规律性地写，
+        // // 所以和内置存储同一个门槛：开发者选项关着时置灰，值也按关算（AppConfig 那道门），写着关就是关
+        // SwitchPreferenceCompat relay = findPreference("pref_relay_write");
+        // if (relay != null) {
+        //     relay.setPersistent(false);
+        //     relay.setChecked(appConfig.isRelayWriteEnabled());
+        //     if (!StorageHelper.isInternalStorageAllowed()) {
+        //         relay.setEnabled(false);
+        //         relay.setSummary(getString(R.string.msg_relay_dev_only));
+        //     }
+        //     relay.setOnPreferenceChangeListener((preference, newValue) -> {
+        //         appConfig.setRelayWriteEnabled(Boolean.TRUE.equals(newValue));
+        //         return true;
+        //     });
+        // }
 
         bindStorageLimits();
         bindFootageLock();
