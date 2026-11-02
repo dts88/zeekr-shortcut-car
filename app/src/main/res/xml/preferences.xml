@@ -535,13 +535,13 @@
                 android:summary="@string/set_force_h264_summary" />
 
             <!--
-              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）：留在开发者选项里继续完善。
-              2026-10-23 和时长上限合成一行（开关加下一层）：行尾写最长多久，点这一行填小时数
-            -->
+              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
+              要恢复时放回下面这一行（2026-10-23 和时长上限合成一行，开关加下一层：行尾写最长多久，点这一行填小时数）：
             <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_screen_off_recording"
                 android:title="@string/set_screen_off_title"
                 android:summary="@string/set_screen_off_summary" />
+            -->
 
             <!-- 应用水印（2026-10-23 从录制页挪来）：固定开着、点不动，只是摆出来让人知道录像和照片上有这一行字 -->
             <SwitchPreferenceCompat

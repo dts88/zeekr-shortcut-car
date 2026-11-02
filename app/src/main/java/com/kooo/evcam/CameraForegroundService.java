@@ -27,7 +27,6 @@ import androidx.core.app.NotificationCompat;
  * - TIME_TICK 每分钟触发一次，可以保持应用活跃
  * - onTaskRemoved: 用户滑动清除应用时自动重启
  * - onDestroy: 服务被杀时发送延迟重启广播
- * - WakeLock: 防止系统休眠（需用户开启）
  */
 public class CameraForegroundService extends Service {
     private static final String TAG = "CameraForegroundService";

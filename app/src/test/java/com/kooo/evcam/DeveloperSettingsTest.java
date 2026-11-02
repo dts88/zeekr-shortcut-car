@@ -40,7 +40,7 @@ public class DeveloperSettingsTest {
 
     /** 开发者选项分区里每一行 → 它存的键。 */
     private static final Map<String, List<String>> ROWS = new LinkedHashMap<>();
-    /** 别的分区里只有开发者才选得了的值：存储位置（内置存储）、中转写入、拍照使用 JPEG 输出（关）。 */
+    /** 别的分区里只有开发者才选得了的值：存储位置（内置存储）、拍照使用 JPEG 输出（关）。 */
     private static final Map<String, List<String>> OUTSIDE = new LinkedHashMap<>();
     /** 只是动作或说明，不存设置。 */
     private static final List<String> NONE = Collections.emptyList();
@@ -48,8 +48,6 @@ public class DeveloperSettingsTest {
     static {
         ROWS.put("pref_recording_mode", Arrays.asList("recording_mode"));
         ROWS.put("pref_force_h264", Arrays.asList("force_h264_encoding"));
-        // 熄屏录制和时长上限合成一行（2026-10-23，开关加下一层）：一行存两个键
-        ROWS.put("pref_screen_off_recording", Arrays.asList("screen_off_recording", "screen_off_wake_min"));
         // 应用水印固定开着、点不动，不存设置（2026-10-23 从录制页挪来）
         ROWS.put("pref_watermark_brand", NONE);
         // 车辆状态（2026-10-23 从界面页挪来）
@@ -134,6 +132,8 @@ public class DeveloperSettingsTest {
         }
         String xml = new String(Files.readAllBytes(
                 new File(module, "src/main/res/xml/preferences.xml").toPath()), StandardCharsets.UTF_8);
+        // 注释掉的行不算分区里的行（停用的功能注释着等恢复，比如熄屏录制 2026-11-02）
+        xml = xml.replaceAll("(?s)<!--.*?-->", "");
         int start = xml.indexOf("android:key=\"screen_developer\"");
         int end = start < 0 ? -1 : sectionEnd(xml, start);
         if (end < 0) {

@@ -151,10 +151,11 @@
     <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores the features that were on. When off, it isn\'t restarted.</string>
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
-    <string name="set_screen_off_title">Screen-off recording (keep awake)</string>
-    <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the set time</string>
-    <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string>
-    <string name="set_screen_off_wake_value">Up to %1$s h</string>
+    <!-- Screen-off recording was switched off on 2026-11-02 and removed from the developer options; restore these with it -->
+    <!-- <string name="set_screen_off_title">Screen-off recording (keep awake)</string> -->
+    <!-- <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the set time</string> -->
+    <!-- <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string> -->
+    <!-- <string name="set_screen_off_wake_value">Up to %1$s h</string> -->
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
     <string name="set_screen_off_keep_summary">With Sentry Mode on, keeps recording the surround view after the screen turns off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses when the screen turns off and resumes when it turns on. When off, recording stops once the screen turns off.</string>
@@ -362,7 +363,8 @@
     <string name="dlg_internal_locked_msg">Recording writes data continuously. Internal storage has limited write endurance and usually can\'t be replaced, so without developer options, recordings go to a USB drive only.\n\nTo use it anyway, go to Settings → About &amp; credits and tap Safety notice to turn on developer options.</string>
     <string name="msg_storage_changed">Storage location set to “%1$s”. Takes effect from the next recording.</string>
     <string name="msg_enter_number">Enter a number</string>
-    <string name="msg_enter_positive_number">Enter a number greater than 0</string>
+    <!-- Only the screen-off recording hours box used this (switched off on 2026-11-02); restore it with it -->
+    <!-- <string name="msg_enter_positive_number">Enter a number greater than 0</string> -->
     <string name="info_unlimited">No limit</string>
     <string name="info_reading">Reading…</string>
     <string name="info_read_failed">Can\'t read</string>
