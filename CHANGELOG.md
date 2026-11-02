@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.94.0-alpha] - 2026-11-02
+
+- Settings → Storage: Relay write is gone. Recordings always go straight to the USB drive.
+
 ## [2.93.4-alpha] - 2026-11-01
 
 - Smart buttons: before the head unit sleeps, the app lets go of Bluetooth, as it does with the cameras.
