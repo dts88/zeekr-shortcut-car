@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.95.0-alpha] - 2026-11-02
+
+- Recording: before a camera is closed (screen off, exit), its recording file is finished and saved first.
+- Developer options: Screen-off recording (keep awake) is gone.
+
 ## [2.94.0-alpha] - 2026-11-02
 
 - Settings → Storage: Relay write is gone. Recordings always go straight to the USB drive.
