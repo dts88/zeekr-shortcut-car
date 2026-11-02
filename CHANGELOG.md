@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.97.0-alpha] - 2026-11-03
+
+- Blind spot view: two new options, off by default, show the side whose blind spot light or door open warning is on, without the turn signal.
+- Blind spot view: its position and size on the center screen can be adjusted in settings; the left and right views mirror each other.
+
 ## [2.96.0-alpha] - 2026-11-02
 
 - Recording: with Keep recording when the screen goes off turned off, recording now stops 30 s after the screen goes dark (was 10 s), when the cameras are released. This also applies while driving.
