@@ -33,12 +33,13 @@ import java.util.List;
  * （{@link ScreenTransitions}）：</p>
  *
  * <ul>
- *   <li><b>熄屏</b>（E1）：唤醒锁、录像那张表（{@link RecordingCoordinator#screenOff}）、监听者（相机层放开座舱、主界面、后视镜、盲区画面）；</li>
- *   <li><b>车机要睡</b>（E2，黑着时安卓熄屏 = 车机下电）：只叫录像那张表再判一次（{@link RecordingCoordinator#headUnitSleeps}）——
- *       现在停、按次序关（这时只剩环视）；监听者不叫（屏幕早就黑了）；</li>
- *   <li><b>车机醒着、屏幕黑着</b>（E2'，黑着时安卓又亮了：车机自己醒了一阵；2026-10-27 起屏幕亮了、车没通电也是）：撤掉「车机要睡」
- *       （{@link RecordingCoordinator#headUnitWoke}；不开录 —— 睡着时哨兵模式被打开的，通道醒来那一轮读到、留下环视，录像照通道的决定接），
- *       按开机自启动恢复服务（不拉界面）；监听者不叫（还黑着）；</li>
+ *   <li><b>熄屏</b>（E1）：唤醒锁、录像那一侧记下这一段熄屏（{@link RecordingCoordinator#screenOff}）、监听者（相机层放开座舱、主界面、
+ *       后视镜、盲区画面）；</li>
+ *   <li><b>车机要睡</b>（E2，黑着时安卓熄屏 = 车机下电）：只叫醒相机管家 —— 车机要睡由它自己判（{@code ChannelRules.headUnitSleeps}），
+ *       按次序关（这时只剩环视），录像停不停也由它定、排给录像协调器（2026-11-02「熄屏判断收归通道调度」）；监听者不叫（屏幕早就黑了）；</li>
+ *   <li><b>车机醒着、屏幕黑着</b>（E2'，黑着时安卓又亮了：车机自己醒了一阵；2026-10-27 起屏幕亮了、车没通电也是）：相机管家当轮就不算
+ *       车机要睡了；录像那一侧记一笔（{@link RecordingCoordinator#headUnitWoke}；不开录 —— 睡着时哨兵模式被打开的，通道醒来那一轮读到、
+ *       留下环视，录像照相机管家的决定接），按开机自启动恢复服务（不拉界面）；监听者不叫（还黑着）；</li>
  *   <li><b>亮屏</b>（E3）：和以前的亮屏一样，按固定顺序走一遍。黑着时亮要有证据（项目所有者 2026-10-27，{@link VehicleScreen}）：
  *       车通电了（点火 ON、DRIVING）才是亮屏；车没通电时屏幕亮了（远程开空调、远程看车）照熄屏算、不是边，黑匣子里记起止各一行。</li>
  * </ul>
@@ -677,7 +678,8 @@ public final class ScreenState {
         BlackBox.noteImportant("车机要睡（安卓熄屏）：" + (darkMs < 0 ? "熄屏起点不明" : "熄屏后 +" + darkMs / 1000 + " 秒")
                 + "；车辆信号 screen_power_event=" + VehicleScreen.eventText(after.event)
                 + "、点火=" + VehicleScreen.ignitionText(after.ignition));
-        RecordingCoordinator.get(app).headUnitSleeps();
+        // 车机要睡由相机管家自己判（ChannelRules.headUnitSleeps：安卓熄屏、没在开车），录像停不停也是它定、排给录像协调器
+        // （2026-11-02「熄屏判断收归通道调度」，以前这里先叫协调器照它那张表判）。
         // 相机：通道眼里的熄屏也看安卓熄没熄屏（车机要睡不等黑满 30 秒，ChannelRules.darkForChannel）—— 叫醒调度，不等下一个两秒
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
         startWakePoll();
@@ -693,7 +695,7 @@ public final class ScreenState {
         RecordingCoordinator.get(app).headUnitWoke();
         // 相机：安卓又亮了，通道眼里的熄屏照黑了多久算（ChannelRules.darkForChannel）—— 叫醒调度
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
-        // 车机醒着：按开机自启动的规矩恢复服务；黑着不拉界面，录像接不接协调器照表判
+        // 车机醒着：按开机自启动的规矩恢复服务；黑着不拉界面，录像接不接照相机管家的决定
         Recovery.restore(app, "wake");
     }
 

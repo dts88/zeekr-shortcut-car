@@ -187,9 +187,10 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
         return held;
     }
 
+    /** 车机要睡：相机管家的唯一定义（{@link ChannelRules#headUnitSleeps}：安卓熄屏了、没在开车），照此刻的事实判。 */
     @Override
     public boolean headUnitSleeps() {
-        return CameraNeeds.current().headUnitSleeps();
+        return ChannelRules.headUnitSleeps(androidOff(), driving());
     }
 
     @Override
@@ -259,7 +260,7 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
         return config().isScreenOffKeepRecording();
     }
 
-    /** 在开车（ScreenOffPlan.driving，和录像那张表同一句）；车辆接口没连着算没在开车。 */
+    /** 在开车（{@link ChannelRules#driving}，相机管家的唯一定义）；车辆接口没连着算没在开车。 */
     @Override
     public boolean driving() {
         com.kooo.evcam.telemetry.Telemetry t = com.kooo.evcam.telemetry.Telemetry.get();
@@ -267,7 +268,7 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
             return false;
         }
         com.kooo.evcam.telemetry.VehicleState v = t.latest();
-        return com.kooo.evcam.recording.ScreenOffPlan.driving(v.gear, v.speedKmh);
+        return ChannelRules.driving(v.gear, v.speedKmh);
     }
 
     /**

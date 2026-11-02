@@ -9,9 +9,10 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.widget.AppCompatTextView;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.camera.ChannelRules;
+import com.kooo.evcam.camera.ChannelScheduler;
 import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.recording.ScreenOffPlan;
-import com.kooo.evcam.recording.ScreenOffRecording;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.telemetry.Telemetry;
 import com.kooo.evcam.telemetry.VehicleState;
@@ -22,15 +23,14 @@ import java.util.Objects;
  * 录制键上的小字：现在熄屏的话，这段录像会怎样（「熄屏后继续录制环视 /
  * 熄屏暂停，亮屏后恢复 / 熄屏后停止录制」）。
  *
- * <p>说什么由 {@link ScreenOffPlan#of} 定 —— 就是录制协调器照的那张表、同样的输入，判熄屏那一刻和之后车机要睡那一刻，
- * 所以写的就是实际会发生的：熄屏持续录制（和开发者的熄屏录制、它的唤醒锁拉不拉得住车机）、启动自动录制、这一次录像的计划里
- * 有没有环视（{@link RecordingCoordinator#surroundPlanned}）、哨兵模式和挡位（{@link Telemetry#latest}：离散信号，
- * 熄屏判断登记的核心一直在读），再加上熄屏那一刻安卓熄没熄屏 —— 车辆信号判着屏幕时是车辆先说黑、车机醒着；判不出屏幕时
- * （降级，{@link ScreenState#vehicleJudges}）熄屏就是车机下电，两下是同一下（审查 rev3 B1）。</p>
+ * <p>说什么由相机管家定（{@link ChannelScheduler#darkOutlook}，规矩在 {@link ChannelRules#darkOutlook}，2026-11-02 起）——
+ * 和熄屏时实际怎么录同一套规矩，所以写的就是实际会发生的：熄屏持续录制、启动自动录制、这一次录像的计划里有没有环视
+ * （{@link RecordingCoordinator#surroundPlanned}）、哨兵模式和在不在开车（相机管家读的那一份：车辆接口没连着时读不到、算没在开车，
+ * 也就是判不出屏幕、熄屏就是车机下电的那种）。</p>
  *
  * <p>录制中、等待摄像头时显示（{@link RecordButtonUi} 管显隐）；看得见时听那几个开关和车辆信号（连接、读数变了，
  * {@link Telemetry#addListener}，只听不登记：不开浮点传感器和定位），看不见就不听。车辆信号每变一次都来（录像开着信息条时
- * 车速每 200 ms 一次），表只看哨兵模式、在开车（{@link ScreenOffPlan#driving}）和车辆信号判不判得出屏幕：这三样变了才重判。</p>
+ * 车速每 200 ms 一次），小字只看哨兵模式、在开车（{@link ChannelRules#driving}）和车辆信号判不判得出屏幕：这三样变了才重判。</p>
  */
 public class ScreenOffHintView extends AppCompatTextView {
 
@@ -118,7 +118,7 @@ public class ScreenOffHintView extends AppCompatTextView {
     /** 写着的那一句就是照这几样判的。 */
     private boolean judgedWith(VehicleState vehicle, boolean vehicleJudges) {
         return Objects.equals(vehicle.sentry, judgedSentry)
-                && ScreenOffPlan.driving(vehicle.gear, vehicle.speedKmh) == judgedDriving
+                && ChannelRules.driving(vehicle.gear, vehicle.speedKmh) == judgedDriving
                 && vehicleJudges == judgedVehicleJudges;
     }
 
@@ -132,10 +132,11 @@ public class ScreenOffHintView extends AppCompatTextView {
         boolean vehicleJudges = ScreenState.vehicleJudges();
         judged = true;
         judgedSentry = vehicle.sentry;
-        judgedDriving = ScreenOffPlan.driving(vehicle.gear, vehicle.speedKmh);
+        judgedDriving = ChannelRules.driving(vehicle.gear, vehicle.speedKmh);
         judgedVehicleJudges = vehicleJudges;
-        ScreenOffPlan plan = ScreenOffPlan.of(config, ScreenOffRecording.holdsCarAwake(context), vehicle,
-                !vehicleJudges, RecordingCoordinator.get(context).surroundPlanned());
+        // 相机管家说（ChannelRules.darkOutlook）：熄屏持续录制、启动自动录制、计划里有没有环视，哨兵模式、在不在开车
+        ScreenOffPlan plan = ScreenOffPlan.of(ChannelScheduler.darkOutlook(config.isScreenOffKeepRecording(),
+                RecordingCoordinator.get(context).surroundPlanned(), config.isAutoStartRecording()));
         if (plan != shown) {
             shown = plan;
             setText(plan.text);
