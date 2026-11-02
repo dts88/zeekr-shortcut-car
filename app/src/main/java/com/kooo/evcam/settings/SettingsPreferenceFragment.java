@@ -197,6 +197,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         super.onStop();
         // 窗口编辑框是一层全屏悬浮窗：设置页退到后台时关掉、不存，不压在别的应用上面
         com.kooo.evcam.zeekr.RearViewWindowEditor.cancel();
+        com.kooo.evcam.zeekr.SideViewPlacementEditor.cancel();
     }
 
     // ------------------------------------------------------------------ 录制
@@ -1105,6 +1106,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setSideViewMinSpeed(value);
                     SideViewService.applyConfig();
                 });
+        // 后视镜上的灯亮了也显示（2026-11-03）：各自开关，开着至少一个时盲区画面才读这两样
+        bindSwitch("pref_side_view_blind_spot", appConfig.isSideViewBlindSpotEnabled(), value -> {
+            appConfig.setSideViewBlindSpotEnabled(value);
+            SideViewService.applyConfig();
+        });
+        bindSwitch("pref_side_view_door_warning", appConfig.isSideViewDoorWarningEnabled(), value -> {
+            appConfig.setSideViewDoorWarningEnabled(value);
+            SideViewService.applyConfig();
+        });
+        bindSideViewPlacement();
 
         bindSwitch("pref_hud_mirror", appConfig.isHudMirrored(), value -> {
             appConfig.setHudMirrored(value);
@@ -1153,6 +1164,43 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         syncSideViewRows();
     }
 
+    /**
+     * 中控屏上的位置和大小（值加一个按钮，2026-11-03）：行尾写左侧那个的宽和高；点这一行在整个屏幕上调左右两个框
+     * （{@link com.kooo.evcam.zeekr.SideViewPlacementEditor}）；行尾「重置」回到默认 —— 只重置这一项，不用先问。
+     */
+    private void bindSideViewPlacement() {
+        ValueActionPreference pref = findPreference("pref_side_view_place");
+        if (pref == null) {
+            return;
+        }
+        showSideViewPlacement(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            if (getContext() != null) {
+                com.kooo.evcam.zeekr.SideViewPlacementEditor.show(requireContext(), appConfig, () -> {
+                    if (isAdded()) {
+                        showSideViewPlacement(pref);
+                    }
+                });
+            }
+            return true;
+        });
+        pref.setAction(getString(R.string.action_reset), () -> {
+            appConfig.resetSideViewPlacement();
+            SideViewService.applyPlacement();
+            showSideViewPlacement(pref);
+        });
+    }
+
+    /** 宽和高照盲区画面窗口自己用的那份屏幕尺寸算（应用的，不是这个界面的），写出来的就是窗口实际的大小。 */
+    private void showSideViewPlacement(ValueActionPreference pref) {
+        android.util.DisplayMetrics metrics =
+                requireContext().getApplicationContext().getResources().getDisplayMetrics();
+        com.kooo.evcam.zeekr.SideViewPlacement.Rect rect = com.kooo.evcam.zeekr.SideViewPlacement.compute(
+                metrics.widthPixels, metrics.heightPixels, com.kooo.evcam.zeekr.LaneCycle.LEFT,
+                appConfig.getSideViewPlacement());
+        pref.setValue(getString(R.string.set_side_view_place_value, rect.width, rect.height));
+    }
+
     /** 盲区画面那一行的行尾：显示位置。 */
     private void showSideViewTarget(SwitchNavPreference row) {
         row.setValue(nameOf(SettingsRegistry.SIDE_VIEW_TARGET, appConfig.getSideViewTarget()));
@@ -1173,7 +1221,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速不可用（它只管中控屏）。
+     * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速、中控屏上的位置和大小不可用（只管中控屏）。
      * 这一页和盲区画面的开关不在同一页，开关关着时这些照样能先调好。
      */
     private void syncSideViewRows() {
@@ -1185,6 +1233,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         Preference minSpeed = findPreference("pref_side_view_min_speed");
         if (minSpeed != null) {
             minSpeed.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target));
+        }
+        Preference place = findPreference("pref_side_view_place");
+        if (place != null) {
+            place.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target));
         }
     }
 

@@ -231,12 +231,35 @@
                 android:key="pref_side_view_target"
                 android:title="@string/set_side_view_target_title" />
 
+            <!--
+              后视镜上的灯亮了也显示那一侧（2026-11-03，各自开关，默认关）：不用打转向灯，不看最低车速。
+              盲区指示灯是开车时旁边有车亮的，开门预警是停车后亮的（后视镜上同一盏灯）。
+            -->
+            <SwitchPreferenceCompat
+                android:key="pref_side_view_blind_spot"
+                android:title="@string/set_side_view_blind_spot_title"
+                android:summary="@string/set_side_view_blind_spot_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_side_view_door_warning"
+                android:title="@string/set_side_view_door_warning_title"
+                android:summary="@string/set_side_view_door_warning_summary" />
+
             <!-- 只管中控屏：显示位置是「HUD」时不可用 -->
             <SeekBarPreference
                 android:key="pref_side_view_min_speed"
                 android:title="@string/set_side_view_min_speed_title"
                 android:summary="@string/set_side_view_min_speed_summary"
                 app:showSeekBarValue="true" />
+
+            <!--
+              中控屏上的位置和大小（2026-11-03，值加一个按钮）：行尾写左侧那个的宽和高、「重置」；点这一行在整个屏幕上调
+              左右两个框（zeekr.SideViewPlacementEditor）。调盲区画面位置和大小只有这里。显示位置是「HUD」时不可用。
+            -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_side_view_place"
+                android:title="@string/set_side_view_place_title"
+                android:summary="@string/set_side_view_place_summary" />
 
             <!--
               HUD 上的盲区画面（2026-10-21）：大小、位置和样子；拉直、视野、朝向和中控屏共用。默认值照 FerixzTanz 在他 7X 上调的。

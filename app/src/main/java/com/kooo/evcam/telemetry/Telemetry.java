@@ -19,7 +19,8 @@ import java.util.List;
  *   <li>两份快照，都不可变、版本号只往上走：{@link Readings}（每个信号的读数，「车辆信号」页看它）和
  *       {@link VehicleState}（信息条要的那几项，由 {@link VehicleStateMapper} 从读数推出来，再加定位）。</li>
  *   <li>来源各管一条路：{@link EcarxSource}（车机自带的 ECARX 接口，订阅），{@link LocationSource}（经纬度，
- *       车不给车速时用 GPS 车速）。再有新的路就是再加一个来源。</li>
+ *       车不给车速时用 GPS 车速），{@link MirrorLampSource}（后视镜上的盲区指示灯、开门预警，车机设置服务，2026-11-03；
+ *       单独一份快照 {@link #lamps}，单独登记 {@link #acquireLamps}）。再有新的路就是再加一个来源。</li>
  *   <li><b>谁要用就登记，分两层</b>（{@link TelemetryUsers}，2026-10-12 熄屏跟着物理屏幕）：
  *       <ul>
  *         <li>核心（{@link #keepCore}）：熄屏判断（{@code screen.ScreenState}）在进程一起来时登记，进程活着一直在。
@@ -88,6 +89,13 @@ public final class Telemetry {
     private LocationSource location;
     /** 上一次写进黑匣子的车辆接口结果（一次变化一行，{@link #carReported}）；还没写过是 null。 */
     private String linkNoted;
+    /** 后视镜上的灯谁要（{@link #acquireLamps}）；有人要时来源不为 null。 */
+    private final java.util.Set<String> lampUsers = new java.util.LinkedHashSet<>();
+    private MirrorLampSource lampSource;
+    private volatile MirrorLamps lamps = MirrorLamps.UNKNOWN;
+    private final List<LampListener> lampListeners = new ArrayList<>();
+    /** 上一次写进黑匣子的灯的来源结果（{@link #lampsReported}）。 */
+    private String lampsNoted;
     private final Runnable retry = this::retryLinkIfFailed;
 
     private Telemetry() {
@@ -338,6 +346,119 @@ public final class Telemetry {
             }
             fastReadings = snapshot;
         }
+    }
+
+    // ================================================================= 后视镜上的灯
+
+    /**
+     * 后视镜上的灯（盲区指示灯、开门预警，{@link MirrorLamps}）：谁要用就登记，按名字，重复登记无害。第一个来的起一个来源
+     * （{@link MirrorLampSource}，车机设置服务那一条路，和车辆接口、核心、完整那两层都不相干），最后一个走的停掉它、快照回到读不到。
+     */
+    public void acquireLamps(Context context, String who) {
+        MirrorLampSource started;
+        synchronized (lock) {
+            if (!lampUsers.add(who) || lampUsers.size() > 1) {
+                return;
+            }
+            started = new MirrorLampSource(this, context);
+            lampSource = started;
+            lamps = MirrorLamps.UNKNOWN;
+            lampsNoted = null;
+        }
+        started.start();
+        AppLog.i(TAG, "后视镜灯开始读（" + who + "）");
+    }
+
+    /** 后视镜上的灯不用了；没登记过也无害。最后一个走了：来源停掉，快照回到读不到，通知一次监听者。 */
+    public void releaseLamps(String who) {
+        MirrorLampSource stopped;
+        synchronized (lock) {
+            if (!lampUsers.remove(who) || !lampUsers.isEmpty()) {
+                return;
+            }
+            stopped = lampSource;
+            lampSource = null;
+            lamps = MirrorLamps.UNKNOWN;
+            lampsNoted = null;
+        }
+        if (stopped != null) {
+            stopped.stop();
+        }
+        AppLog.i(TAG, "后视镜灯停止读（" + who + " 是最后一个）");
+        notifyLampListeners(MirrorLamps.UNKNOWN);
+    }
+
+    /** 后视镜上的灯此刻亮没亮，永远不为 null；没人要、没连上时全是读不到。哪个线程都能读。 */
+    public MirrorLamps lamps() {
+        return lamps;
+    }
+
+    /** 后视镜上的灯变了谁来看（在主线程上回调）。 */
+    public interface LampListener {
+        void onLampsChanged(MirrorLamps lamps);
+    }
+
+    public void addLampListener(LampListener listener) {
+        synchronized (lampListeners) {
+            if (!lampListeners.contains(listener)) {
+                lampListeners.add(listener);
+            }
+        }
+    }
+
+    public void removeLampListener(LampListener listener) {
+        synchronized (lampListeners) {
+            lampListeners.remove(listener);
+        }
+    }
+
+    /** 灯的来源发一份新的（它自己的线程上）。不是当前来源的丢掉。 */
+    void publishLamps(MirrorLampSource source, MirrorLamps snapshot) {
+        synchronized (lock) {
+            if (source != lampSource) {
+                return;
+            }
+            lamps = snapshot;
+        }
+        notifyLampListeners(snapshot);
+    }
+
+    /** 灯的来源报结果：日志每次一行，黑匣子一次变化一行「后视镜灯连接：…」。不是当前来源的不算。 */
+    void lampsReported(MirrorLampSource source, MirrorLampSource.Link link, String detail) {
+        String key = link + " " + (link == MirrorLampSource.Link.CONNECTED ? "" : detail);
+        String before;
+        synchronized (lock) {
+            if (source != lampSource) {
+                return;
+            }
+            before = lampsNoted;
+            lampsNoted = key;
+        }
+        AppLog.i(TAG, "mirror lamps " + link + ": " + detail);
+        if (!key.equals(before)) {
+            BlackBox.noteImportant("后视镜灯连接：" + (link == MirrorLampSource.Link.CONNECTED ? "接上了（" + detail + "）"
+                    : link == MirrorLampSource.Link.UNAVAILABLE ? "这台车机没有这条路（" + detail + "），盲区画面只看转向灯"
+                    : "没接上（" + detail + "），盲区画面先只看转向灯"));
+        }
+    }
+
+    private void notifyLampListeners(MirrorLamps snapshot) {
+        List<LampListener> copy;
+        synchronized (lampListeners) {
+            if (lampListeners.isEmpty()) {
+                return;
+            }
+            copy = new ArrayList<>(lampListeners);
+        }
+        main.post(() -> {
+            for (LampListener l : copy) {
+                try {
+                    l.onLampsChanged(snapshot);
+                } catch (RuntimeException e) {
+                    AppLog.w(TAG, "lamp listener failed: " + e);
+                }
+            }
+        });
     }
 
     /** 在 {@link #lock} 里：起一个新的车辆接口来源，快照从空的开始；快读照登记着的来。 */

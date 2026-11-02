@@ -45,4 +45,14 @@ public class SideViewDismissalTest {
         assertFalse(dismissal.suppress(2, true));
         assertFalse(dismissal.suppress(2, false));
     }
+
+    @Test
+    public void aDismissedLightStaysQuietWhileLitAndRearmsWhenOut() {
+        SideViewDismissal dismissal = new SideViewDismissal();
+        dismissal.dismissLight(LaneCycle.LEFT);
+        assertTrue(dismissal.suppressLight(LaneCycle.LEFT, true));
+        assertFalse("另一侧不受影响", dismissal.suppressLight(LaneCycle.RIGHT, true));
+        assertFalse("灭了清掉", dismissal.suppressLight(LaneCycle.LEFT, false));
+        assertFalse("再亮是新的一次", dismissal.suppressLight(LaneCycle.LEFT, true));
+    }
 }
