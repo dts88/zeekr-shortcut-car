@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="set_developer_mode_title">启用开发者模式</string>
+<string name="set_developer_mode_summary">警告：试验性功能和排查工具可能影响相机、录制和存储。全新安装默认关闭；重启和更新后保留选择。关闭后隐藏开发者选项，其设置不再生效，已保存的值不会删除。部分更改需重启应用。</string>
+<string name="dev_note">可在「设置 → 系统 → 启用开发者模式」中关闭并隐藏此分区，已保存的开发者设置会保留。</string>
+</resources>

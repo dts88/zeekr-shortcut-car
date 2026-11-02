@@ -138,6 +138,17 @@ public class SettingsShellFragment extends Fragment {
         refreshTitle();
     }
 
+    /** Refresh the category list immediately without changing the current System page. */
+    void developerModeChanged() {
+        Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+        if (headers instanceof SettingsHeadersFragment) {
+            ((SettingsHeadersFragment) headers).refreshDeveloperMode();
+        }
+        if (!DeveloperMode.isUnlocked() && DEVELOPER_SECTION.equals(currentSection)) {
+            showSection("screen_system");
+        }
+    }
+
     /** 右栏正在显示的分区。左栏建列表时用它决定哪一项是选中的。 */
     String currentSection() {
         return currentSection;

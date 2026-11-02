@@ -6,10 +6,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.LinkMovementMethod;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 
 import com.kooo.evcam.AppLog;
@@ -50,8 +48,6 @@ public class AboutActivity extends AppCompatActivity {
         bindLink(R.id.about_link_evcam, EVCAM_URL);
         bindLink(R.id.about_link_gpl, GPL_URL);
 
-        setUpDeveloperUnlock();
-
         View close = findViewById(R.id.about_close);
         if (close != null) {
             close.setOnClickListener(v -> finish());
@@ -87,71 +83,4 @@ public class AboutActivity extends AppCompatActivity {
         }
     }
 
-    // ------------------------------------------------------------------ 开发者选项
-
-
-    /**
-     * 点「安全须知」标题：没打开时输密码打开开发者选项，打开了就在这里关掉。
-     *
-     * <p>藏在这里而不是给个显眼的入口：后面那些要么没做完、要么是排查用的，
-     * 平时不该出现在设置里让人以为是正常功能。</p>
-     *
-     * <p>点一下就弹密码框。连点二十次那套是从安卓「关于本机」抄来的，
-     * 但那是<b>没有密码</b>的场景才需要的门槛 —— 这里既然要输密码，
-     * 密码本身就是门槛，再让人数二十下只是折磨自己。</p>
-     */
-    private void setUpDeveloperUnlock() {
-        View heading = findViewById(R.id.about_safety_heading);
-        if (heading == null) {
-            return;
-        }
-        heading.setOnClickListener(v -> {
-            if (com.kooo.evcam.settings.DeveloperMode.isUnlocked()) {
-                promptToLockDeveloperMode();
-            } else {
-                promptForDeveloperPassword();
-            }
-        });
-    }
-
-    private void promptForDeveloperPassword() {
-        final EditText input = com.kooo.evcam.ui.CamDialogs.input(this);
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
-                | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        input.setHint(R.string.dev_unlock_hint);
-        // 说明写在输入框下面（ui-spec §三：框里的说明是次要的）
-        int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        android.widget.LinearLayout box = new android.widget.LinearLayout(this);
-        box.setOrientation(android.widget.LinearLayout.VERTICAL);
-        box.setPadding(pad, pad / 2, pad, 0);
-        box.addView(input);
-        android.widget.TextView note = com.kooo.evcam.ui.CamDialogs.note(this, getString(R.string.dev_unlock_msg));
-        note.setPadding(0, pad / 2, 0, 0);
-        box.addView(note);
-
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.dev_unlock_title)
-                .setView(box)
-                .setPositiveButton(R.string.action_ok, (dialog, which) -> {
-                    if (com.kooo.evcam.settings.DeveloperMode.unlock(this, input.getText().toString())) {
-                        Toast.makeText(this, R.string.dev_unlocked,
-                                Toast.LENGTH_LONG).show();
-                    } else {
-                        Toast.makeText(this, R.string.dev_wrong_password, Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton(R.string.action_cancel, null));
-    }
-
-    /** 开发者选项打开之后一直开着，关只在这里关（见 DeveloperMode）。 */
-    private void promptToLockDeveloperMode() {
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.dev_lock_title)
-                .setMessage(R.string.dev_lock_msg)
-                .setPositiveButton(R.string.dev_lock_confirm, (dialog, which) -> {
-                    com.kooo.evcam.settings.DeveloperMode.lock(this);
-                    Toast.makeText(this, R.string.dev_locked, Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton(R.string.action_cancel, null));
-    }
 }
