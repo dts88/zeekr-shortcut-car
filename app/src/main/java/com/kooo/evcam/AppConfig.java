@@ -88,6 +88,13 @@ public class AppConfig {
     private static final String KEY_SIDE_VIEW_BACK = "side_view_back";            // 朝车尾转的角度（开发者选项）
     private static final String KEY_SIDE_VIEW_UP = "side_view_up";                // 朝车外转的角度（开发者选项）
     private static final String KEY_SIDE_VIEW_FOV = "side_view_fov";              // 横向视野（开发者选项）
+    // 后视镜上的灯亮了也显示（2026-11-03）：盲区指示灯、停车后的开门预警，各自开关
+    private static final String KEY_SIDE_VIEW_BLIND_SPOT = "side_view_blind_spot";
+    private static final String KEY_SIDE_VIEW_DOOR_WARNING = "side_view_door_warning";
+    // 中控屏上画面的位置和大小（2026-11-03，zeekr.SideViewPlacement.Spec，千分比）：高、离边、上边
+    private static final String KEY_SIDE_VIEW_PLACE_HEIGHT = "side_view_place_height";
+    private static final String KEY_SIDE_VIEW_PLACE_EDGE = "side_view_place_edge";
+    private static final String KEY_SIDE_VIEW_PLACE_TOP = "side_view_place_top";
     // 盲区画面投到 HUD 上（2026-10-21，zeekr.SideViewHudWindow）：显示位置在 SettingsRegistry.SIDE_VIEW_TARGET
     private static final String KEY_HUD_MIRROR = "side_view_hud_mirror";          // 左右翻转
     private static final String KEY_HUD_HEIGHT = "side_view_hud_height";          // 高度，HUD 高度的百分比
@@ -1431,6 +1438,48 @@ public class AppConfig {
         prefs.edit().putInt(KEY_SIDE_VIEW_FOV, clampInt(degrees,
                 Math.round(com.kooo.evcam.zeekr.SideViewProjection.MIN_FOV_DEGREES),
                 Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES))).apply();
+    }
+
+    /** 后视镜上的盲区指示灯亮了也显示那一侧，不用打转向灯、不看最低车速（项目所有者 2026-11-03）。默认关。 */
+    public boolean isSideViewBlindSpotEnabled() {
+        return prefs.getBoolean(KEY_SIDE_VIEW_BLIND_SPOT, false);
+    }
+
+    public void setSideViewBlindSpotEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIDE_VIEW_BLIND_SPOT, enabled).apply();
+    }
+
+    /** 停车后开门预警亮了也显示那一侧（项目所有者 2026-11-03）。默认关。 */
+    public boolean isSideViewDoorWarningEnabled() {
+        return prefs.getBoolean(KEY_SIDE_VIEW_DOOR_WARNING, false);
+    }
+
+    public void setSideViewDoorWarningEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIDE_VIEW_DOOR_WARNING, enabled).apply();
+    }
+
+    /**
+     * 中控屏上盲区画面的位置和大小：左右两个互为镜像，存的是左边那个（{@link com.kooo.evcam.zeekr.SideViewPlacement.Spec}，
+     * 千分比，算的时候再收进屏幕）。只在设置里的编辑框里改（项目所有者 2026-11-03）；没存过是默认（以前固定的那个）。
+     */
+    public com.kooo.evcam.zeekr.SideViewPlacement.Spec getSideViewPlacement() {
+        com.kooo.evcam.zeekr.SideViewPlacement.Spec d = com.kooo.evcam.zeekr.SideViewPlacement.Spec.DEFAULT;
+        if (!prefs.contains(KEY_SIDE_VIEW_PLACE_HEIGHT)) {
+            return d;
+        }
+        return new com.kooo.evcam.zeekr.SideViewPlacement.Spec(prefs.getInt(KEY_SIDE_VIEW_PLACE_HEIGHT, d.height),
+                prefs.getInt(KEY_SIDE_VIEW_PLACE_EDGE, d.edge), prefs.getInt(KEY_SIDE_VIEW_PLACE_TOP, d.top));
+    }
+
+    public void setSideViewPlacement(com.kooo.evcam.zeekr.SideViewPlacement.Spec spec) {
+        prefs.edit().putInt(KEY_SIDE_VIEW_PLACE_HEIGHT, spec.height).putInt(KEY_SIDE_VIEW_PLACE_EDGE, spec.edge)
+                .putInt(KEY_SIDE_VIEW_PLACE_TOP, spec.top).apply();
+    }
+
+    /** 回到默认（设置里那一行的「重置」）。 */
+    public void resetSideViewPlacement() {
+        prefs.edit().remove(KEY_SIDE_VIEW_PLACE_HEIGHT).remove(KEY_SIDE_VIEW_PLACE_EDGE)
+                .remove(KEY_SIDE_VIEW_PLACE_TOP).apply();
     }
 
     // ==================== 盲区画面：HUD ====================

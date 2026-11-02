@@ -435,6 +435,25 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 盲区画面：后视镜上的灯、中控屏上的位置和大小（2026-11-03，项目所有者要的功能，这几句都是草稿）：
+  set_side_view_blind_spot_title「盲区指示灯亮时显示」/ Show when the blind spot light is on / Papar apabila lampu titik buta menyala；
+  set_side_view_blind_spot_summary「后视镜上的盲区指示灯亮时显示该侧画面，不必打转向灯，不受最低车速限制」/
+  Shows that side when the blind spot light on the side mirror comes on, without the turn signal; Minimum speed doesn't apply /
+  Memaparkan sebelah itu apabila lampu titik buta pada cermin sisi menyala, tanpa lampu isyarat; Kelajuan minimum tidak terpakai；
+  set_side_view_door_warning_title「开门预警亮时显示」/ Show when the door open warning is on / Papar apabila amaran buka pintu menyala；
+  set_side_view_door_warning_summary「停车后开门预警亮起时显示该侧画面」/ Shows that side when the door open warning comes on after parking /
+  Memaparkan sebelah itu apabila amaran buka pintu menyala selepas meletak kenderaan；
+  set_side_view_place_title「中控屏上的位置和大小」/ Position and size on the center screen / Kedudukan dan saiz pada skrin tengah；
+  set_side_view_place_summary「左右两个画面以屏幕中线对称，只能在这里调整」/ The left and right views mirror each other across the middle
+  of the screen and can only be adjusted here / Paparan kiri dan kanan bercermin merentasi tengah skrin dan hanya boleh dilaraskan di sini；
+  set_side_view_place_value 照超级镜子窗口那一行（set_rearview_window_value）写「宽度 %1$d 像素 · 高度 %2$d 像素」；
+  编辑框提示 side_view_editor_hint「拖动框内移动，拖动边或角、或双指缩放调整大小，画面比例不变。另一个框左右对称跟着变。」/
+  Drag inside a frame to move it; drag an edge or corner, or pinch, to resize. The aspect ratio stays the same, and the other frame mirrors it. /
+  Seret di dalam bingkai untuk mengalihkannya; seret tepi atau sudut, atau cubit, untuk mengubah saiz. Nisbah kekal sama, dan bingkai satu
+  lagi bercermin dengannya.；框上的标签 side_view_editor_left / _right 用已批的「左侧」「右侧」（同 opt_rail_left / _right）。
+  批过的 set_side_view_min_speed_summary 前面加了「打转向灯时，」/ When the turn signal is on, / Apabila lampu isyarat menyala,：
+  后视镜上的灯不看最低车速，原句不加就和实际不符。
+
 - 关于页致谢里 SW 那一条（2026-11-01，项目所有者要求和 README 一样感谢积极测试和反馈，这句草稿给项目所有者看过，没有明确批）：about_thanks_body
   「• SW（同一个群组）—— 分享了 AVM Recorder 这个项目的信息，让我知道这条路有人走通过；后来也一直积极测试和反馈。」/
   「• SW (same group) — shared the AVM Recorder project, which showed it could be done, and has kept testing actively and sending feedback.」
@@ -496,6 +515,7 @@
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
 | 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
+| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，待项目所有者确认；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |

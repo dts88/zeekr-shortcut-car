@@ -24,8 +24,9 @@ import com.kooo.evcam.R;
  *
  * <h3>只看，不操作（项目所有者 2026-10-16）</h3>
  *
- * <p>固定大小、固定位置（左右各一个，{@link SideViewPlacement}），不能拖、不能缩放；只有一个关闭按钮，
- * 点了关掉这一次打灯（{@link SideViewDismissal}）。不镜像。</p>
+ * <p>窗口本身不能拖、不能缩放；只有一个关闭按钮，点了关掉这一次（{@link SideViewDismissal}）。不镜像。
+ * 位置和大小左右各一个、互为镜像（{@link SideViewPlacement}），只能在设置里调（{@link SideViewPlacementEditor}，
+ * 项目所有者 2026-11-03），开车时动不了它。</p>
  *
  * <h3>画法和超级镜子一样</h3>
  *
@@ -56,6 +57,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     private static final float CLOSE_MARGIN_DP = 10f;
 
     private final WindowManager windowManager;
+    private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
     private final CloseButton closeButton;
     private final SideViewPicture picture;
@@ -86,6 +88,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     public SideViewWindow(Context context, AppConfig appConfig, Runnable onClose) {
         super(context);
         this.picture = new SideViewPicture(appConfig);
+        this.appConfig = appConfig;
         this.windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         setBackgroundColor(0xFF000000);
         textureView = new AutoFitTextureView(context);
@@ -225,11 +228,22 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
         invalidate();
     }
 
-    /** 位置和大小：左右各一个，固定的（{@link SideViewPlacement}）。 */
+    /**
+     * 设置里改了位置和大小（{@link SideViewPlacementEditor} 保存、重置）：挂着的话当场挪过去。只从主线程叫。
+     */
+    public void applyPlacement() {
+        if (!attached || params == null) {
+            return;
+        }
+        place();
+        update();
+    }
+
+    /** 位置和大小：左右各一个、互为镜像，照设置里存的（{@link SideViewPlacement}，{@link AppConfig#getSideViewPlacement}）。 */
     private void place() {
         int w = getResources().getDisplayMetrics().widthPixels;
         int h = getResources().getDisplayMetrics().heightPixels;
-        SideViewPlacement.Rect rect = SideViewPlacement.compute(w, h, lane);
+        SideViewPlacement.Rect rect = SideViewPlacement.compute(w, h, lane, appConfig.getSideViewPlacement());
         params.x = rect.left;
         params.y = rect.top;
         params.width = rect.width;

@@ -181,4 +181,75 @@ public class SideViewTriggerTest {
         SideViewTrigger.Result r = t.update(100, in("D", 1), false);
         assertTrue(r.shown);
     }
+
+    // ------------------------------------------------------------------ 后视镜上的灯（2026-11-03）
+
+    @Test
+    public void doorWarningInParkShowsThenDetachesAfterTheHold() {
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input lit = in("P", 0);
+        lit.speedKmh = 0f;
+        lit.useDoorWarning = true;
+        lit.doorWarningLeft = true;
+        SideViewTrigger.Result r = t.update(0, lit, false);
+        assertTrue("停着车也挂、也显示", r.attached);
+        assertTrue(r.shown);
+        assertEquals(LaneCycle.LEFT, r.lane);
+        assertEquals(SideViewTrigger.Cause.DOOR_WARNING, r.cause);
+
+        SideViewDecision.Input out = in("P", 0);
+        out.speedKmh = 0f;
+        out.useDoorWarning = true;
+        out.doorWarningLeft = false;
+        r = t.update(4_000, out, false);
+        assertTrue("灭了先留 1 秒", r.shown);
+        assertEquals(null, r.cause);
+        r = t.update(4_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS, out, false);
+        assertFalse(r.shown);
+        assertFalse("不在 D 挡：移走", r.attached);
+    }
+
+    @Test
+    public void theCauseSaysWhichLightOrTheTurnSignal() {
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input in = in("D", 0);
+        in.useBlindSpot = true;
+        in.blindSpotRight = true;
+        assertEquals(SideViewTrigger.Cause.BLIND_SPOT, t.update(0, in, false).cause);
+        in.turnSignal = 2;
+        assertEquals("打着转向灯以转向灯为准", SideViewTrigger.Cause.TURN, t.update(100, in, false).cause);
+    }
+
+    @Test
+    public void closeButtonDismissesTheLitSideUntilItGoesOut() {
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input lit = in("D", 0);
+        lit.useBlindSpot = true;
+        lit.blindSpotRight = true;
+        assertTrue(t.update(0, lit, false).shown);
+        t.dismiss();
+        SideViewTrigger.Result r = t.update(100, lit, false);
+        assertFalse("还亮着：这一次关掉了", r.shown);
+        assertTrue("D 挡：回到备着", r.attached);
+
+        SideViewDecision.Input out = in("D", 0);
+        out.useBlindSpot = true;
+        out.blindSpotRight = false;
+        assertFalse(t.update(2_000, out, false).shown);
+        assertTrue("灭了再亮是新的一次", t.update(3_000, lit, false).shown);
+    }
+
+    @Test
+    public void dismissingALightDoesNotHideTheOtherSide() {
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input lit = in("D", 0);
+        lit.useBlindSpot = true;
+        lit.blindSpotLeft = true;
+        assertEquals(LaneCycle.LEFT, t.update(0, lit, false).lane);
+        t.dismiss();
+        lit.blindSpotRight = true;
+        SideViewTrigger.Result r = t.update(100, lit, false);
+        assertTrue("右边亮了照样显示", r.shown);
+        assertEquals(LaneCycle.RIGHT, r.lane);
+    }
 }

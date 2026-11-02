@@ -25,13 +25,15 @@ import com.kooo.evcam.camera.ChannelScheduler;
 import com.kooo.evcam.camera.MultiCameraManager;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.screen.ScreenState;
+import com.kooo.evcam.telemetry.MirrorLamps;
 import com.kooo.evcam.telemetry.Readings;
 import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 import com.kooo.evcam.telemetry.VehicleState;
 
 /**
- * 盲区画面：打转向灯时在中控屏、HUD 上显示该侧摄像头的画面（issue #6、#24）。窗口、相机登记、车辆信号都在这里。
+ * 盲区画面：打转向灯时在中控屏、HUD 上显示该侧摄像头的画面（issue #6、#24）；设置里开着的话，后视镜上的盲区指示灯、
+ * 停车后的开门预警亮了也显示那一侧（项目所有者 2026-11-03）。窗口、相机登记、车辆信号都在这里。
  *
  * <h3>两个出口，一套判定</h3>
  *
@@ -61,6 +63,7 @@ import com.kooo.evcam.telemetry.VehicleState;
  * <h3>车辆信号</h3>
  *
  * <p>亮屏时完整登记（要车速），熄屏注销、窗口移走：熄屏后不该留着监听和相机过去（同超级镜子熄屏放开登记的理由）。
+ * 后视镜上的灯另登记（{@link Telemetry#acquireLamps}）：亮屏、两个选项开着至少一个时才读。
  * HUD 的夜间对比度、夜间亮度看昼夜信号（{@link Signal#DAY_NIGHT}），读不到按白天。</p>
  *
  * <p>来源：打灯判定、拉直和取景借自 FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）；读车辆信号、备着 / 显示的流程
@@ -98,6 +101,9 @@ public class SideViewService extends Service {
 
     private final Runnable evaluateRunnable = this::evaluate;
     private final Telemetry.Listener readingsListener = readings -> evaluate();
+    private final Telemetry.LampListener lampListener = lamps -> evaluate();
+    /** 后视镜上的灯登记着（{@link #syncLamps}）。 */
+    private boolean lampsHeld;
 
     private final ScreenState.Listener screenListener = new ScreenState.Listener() {
         @Override
@@ -129,7 +135,7 @@ public class SideViewService extends Service {
         }
     }
 
-    /** 改了最低车速、显示位置、HUD 的设置：HUD 的窗口照新的画，再照新的设置判一次。 */
+    /** 改了最低车速、显示位置、后视镜上的灯、HUD 的设置：HUD 的窗口照新的画，灯照新的设置读不读，再照新的设置判一次。 */
     public static void applyConfig() {
         SideViewService svc = instance;
         if (svc != null) {
@@ -137,7 +143,20 @@ public class SideViewService extends Service {
                 if (svc.hud.window instanceof SideViewHudWindow) {
                     ((SideViewHudWindow) svc.hud.window).applyConfig();
                 }
+                svc.syncLamps();
                 svc.evaluate();
+            });
+        }
+    }
+
+    /** 设置里改了中控屏上的位置和大小（保存、重置）：挂着的窗口当场挪过去。 */
+    public static void applyPlacement() {
+        SideViewService svc = instance;
+        if (svc != null) {
+            svc.handler.post(() -> {
+                if (svc.center.window instanceof SideViewWindow) {
+                    ((SideViewWindow) svc.center.window).applyPlacement();
+                }
             });
         }
     }
@@ -149,6 +168,7 @@ public class SideViewService extends Service {
             return "side view: service not running";
         }
         return "side view: listening=" + svc.listening
+                + " lamps=" + (svc.lampsHeld ? Telemetry.get().lamps() : "off")
                 + " claimed=" + CameraNeeds.current().isHeld(CameraNeeds.Holder.SIDE_VIEW)
                 + " center{" + svc.center.describe() + "} hud{" + svc.hud.describe() + "}";
     }
@@ -221,7 +241,8 @@ public class SideViewService extends Service {
         listening = true;
         Telemetry.get().acquire(this, TELEMETRY_USER);
         Telemetry.get().addListener(readingsListener);
-        AppLog.i(TAG, "盲区画面：开始听转向灯和挡位");
+        syncLamps();
+        AppLog.i(TAG, "盲区画面：开始听转向灯和挡位" + (lampsHeld ? "，还有后视镜上的灯" : ""));
         evaluate();
     }
 
@@ -233,10 +254,28 @@ public class SideViewService extends Service {
         handler.removeCallbacks(evaluateRunnable);
         Telemetry.get().removeListener(readingsListener);
         Telemetry.get().release(TELEMETRY_USER);
+        syncLamps();
         center.stop();
         hud.stop();
         refusalShown = false;
         AppLog.i(TAG, "盲区画面：停止监听");
+    }
+
+    /** 后视镜上的灯读不读：听着（亮屏）、两个选项开着至少一个时读，不然放开。 */
+    private void syncLamps() {
+        boolean want = listening && !destroyed
+                && (appConfig.isSideViewBlindSpotEnabled() || appConfig.isSideViewDoorWarningEnabled());
+        if (want == lampsHeld) {
+            return;
+        }
+        lampsHeld = want;
+        if (want) {
+            Telemetry.get().addLampListener(lampListener);
+            Telemetry.get().acquireLamps(this, TELEMETRY_USER);
+        } else {
+            Telemetry.get().removeLampListener(lampListener);
+            Telemetry.get().releaseLamps(TELEMETRY_USER);
+        }
     }
 
     /**
@@ -260,9 +299,10 @@ public class SideViewService extends Service {
         boolean useHud = !AppConfig.SIDE_VIEW_TARGET_CENTER.equals(target) && hudDisplay(now) != null;
         boolean useCenter = !AppConfig.SIDE_VIEW_TARGET_HUD.equals(target) || !useHud || hud.refused;
 
-        SideViewDecision.Input in = input(s, r, appConfig.getSideViewMinSpeed());
+        MirrorLamps lamps = Telemetry.get().lamps();
+        SideViewDecision.Input in = input(s, r, lamps, appConfig.getSideViewMinSpeed());
         // HUD 不看最低车速：低速也显示（FerixzTanz 的规则）
-        SideViewDecision.Input hudIn = input(s, r, 0);
+        SideViewDecision.Input hudIn = input(s, r, lamps, 0);
         SideViewTrigger.Result centerResult = center.trigger.update(now, in, dark);
         SideViewTrigger.Result hudResult = hud.trigger.update(now, hudIn, dark);
         center.evaluate(useCenter ? centerResult : null, in);
@@ -281,7 +321,7 @@ public class SideViewService extends Service {
         }
     }
 
-    private static SideViewDecision.Input input(VehicleState s, Readings r, int minSpeedKmh) {
+    private SideViewDecision.Input input(VehicleState s, Readings r, MirrorLamps lamps, int minSpeedKmh) {
         SideViewDecision.Input in = new SideViewDecision.Input();
         in.turnSignal = s.turnSignal;
         in.hazard = s.hazard;
@@ -291,6 +331,13 @@ public class SideViewService extends Service {
         in.parkAssistOn = r.bool(Signal.PARK_ASSIST);
         in.speedKmh = s.speedKmh;
         in.minSpeedKmh = minSpeedKmh;
+        // 设置里关着的那一样不看
+        in.useBlindSpot = lampsHeld && appConfig.isSideViewBlindSpotEnabled();
+        in.useDoorWarning = lampsHeld && appConfig.isSideViewDoorWarningEnabled();
+        in.blindSpotLeft = lamps.blindSpotLeft;
+        in.blindSpotRight = lamps.blindSpotRight;
+        in.doorWarningLeft = lamps.doorWarningLeft;
+        in.doorWarningRight = lamps.doorWarningRight;
         return in;
     }
 
@@ -324,9 +371,9 @@ public class SideViewService extends Service {
         return hudDisplay;
     }
 
-    /** 点了中控屏窗口的关闭按钮：关掉这一次打灯，中控屏、HUD 两处一起收。 */
+    /** 点了中控屏窗口的关闭按钮：关掉这一次（打灯的、后视镜上的灯亮的），中控屏、HUD 两处一起收。 */
     private void onCloseTapped() {
-        BlackBox.note("盲区画面：点了关闭，这一次打灯不再显示");
+        BlackBox.note("盲区画面：点了关闭，这一次不再显示");
         center.noteIfNoFrame();
         hud.noteIfNoFrame();
         center.trigger.dismiss();
@@ -511,14 +558,19 @@ public class SideViewService extends Service {
             }
             if (w == null) {
                 BlackBox.note(result.shown
-                        ? "盲区画面" + label() + "：显示「" + LaneCycle.labelOf(result.lane) + "」（窗口没备着，现在挂）"
+                        ? "盲区画面" + label() + "：显示「" + LaneCycle.labelOf(result.lane) + "」"
+                        + (result.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
+                        : result.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : "")
+                        + "（窗口没备着，现在挂）"
                         : "盲区画面" + label() + "：D 挡，窗口备着");
                 open(result.lane, result.shown);
                 return;
             }
             if (result.shown) {
                 if (!w.isShowing() || w.lane() != result.lane) {
-                    BlackBox.note("盲区画面" + label() + "：显示「" + LaneCycle.labelOf(result.lane) + "」");
+                    BlackBox.note("盲区画面" + label() + "：显示「" + LaneCycle.labelOf(result.lane) + "」"
+                            + (result.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
+                            : result.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : ""));
                     noteShown();
                     w.show(result.lane);
                 }

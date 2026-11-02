@@ -135,4 +135,71 @@ public class SideViewDecisionTest {
         b.speedKmh = null;
         assertEquals(LaneCycle.LEFT, SideViewDecision.decide(b));
     }
+
+    // ------------------------------------------------------------------ 后视镜上的灯（2026-11-03）
+
+    @Test
+    public void blindSpotLightShowsThatSideWithoutATurnSignal() {
+        SideViewDecision.Input in = driving(0);
+        in.useBlindSpot = true;
+        in.blindSpotRight = true;
+        assertEquals(LaneCycle.RIGHT, SideViewDecision.decide(in));
+    }
+
+    @Test
+    public void lightsIgnoreTheSpeedThresholdAndHazards() {
+        SideViewDecision.Input in = driving(0);
+        in.gear = "P";
+        in.speedKmh = 0f;
+        in.hazard = true;
+        in.useDoorWarning = true;
+        in.doorWarningLeft = true;
+        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(in));
+    }
+
+    @Test
+    public void aTurnSignalWinsOverALight() {
+        SideViewDecision.Input in = driving(1);
+        in.useBlindSpot = true;
+        in.blindSpotRight = true;
+        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(in));
+    }
+
+    @Test
+    public void aLightWhoseOptionIsOffIsIgnored() {
+        SideViewDecision.Input in = driving(0);
+        in.blindSpotLeft = true;
+        in.doorWarningRight = true;
+        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        in.useBlindSpot = true;
+        assertEquals("只开了盲区指示灯", LaneCycle.LEFT, SideViewDecision.decide(in));
+    }
+
+    @Test
+    public void theShowingSideStaysWhileItIsLit() {
+        SideViewDecision.Input in = driving(0);
+        in.useBlindSpot = true;
+        in.blindSpotLeft = true;
+        in.blindSpotRight = true;
+        assertEquals("都亮着：先左边", LaneCycle.LEFT, SideViewDecision.decide(in));
+        in.showing = LaneCycle.RIGHT;
+        assertEquals("显示着的那一侧还亮着就不跳", LaneCycle.RIGHT, SideViewDecision.decide(in));
+    }
+
+    @Test
+    public void factoryViewsWinOverLights() {
+        SideViewDecision.Input in = driving(0);
+        in.gear = "R";
+        in.useDoorWarning = true;
+        in.doorWarningLeft = true;
+        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+    }
+
+    @Test
+    public void unreadableLightsShowNothing() {
+        SideViewDecision.Input in = driving(0);
+        in.useBlindSpot = true;
+        in.useDoorWarning = true;
+        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+    }
 }
