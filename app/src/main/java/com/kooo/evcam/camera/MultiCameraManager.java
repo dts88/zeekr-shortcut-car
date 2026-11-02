@@ -893,15 +893,10 @@ public class MultiCameraManager {
         @Override
         public void onLaneCameraGone(String key, ChannelScheduler.Gone why, CameraTaken.Reason reason,
                                      ChannelRules.Why closed) {
-            // 熄屏放开的座舱：退出录像那一行写「熄屏：座舱放开」（设计 v3 §4）；熄屏放开的环视写「熄屏：环视放开」（2026-10-27）；
-            // 关座舱前先关环视（2.11.6）写「关座舱前先关环视」—— 录制器停放，环视开回来带着同一个录像输出出了画面再加入；
-            // 别的我们关的照旧是「相机关了」
+            // 我们关的照 closeText 写原因（熄屏放开的座舱、环视，关座舱前先关环视），别的我们关的照旧是「相机关了」
             leaveLane(key, why == ChannelScheduler.Gone.LOST ? channelSide.lossText(reason)
                     : why == ChannelScheduler.Gone.RESCUED ? "相机卡住了，调度在救"
-                    : closed == ChannelRules.Why.DARK_RELEASE || closed == ChannelRules.Why.SURROUND_FIRST
-                    ? channelSide.closeWhyText(closed)
-                    : closed == ChannelRules.Why.SCREEN_OFF && channel.releasedByDark(key) ? channelSide.darkText(key)
-                    : "相机关了");
+                    : closeText(key, closed, "相机关了"));
             // 会话带不上它的录像输出的账随这一路的相机走了就清：回来时是一份新会话，照常声明
             if (refusals.remove(key) != null) {
                 ensureLane(key);
@@ -929,6 +924,44 @@ public class MultiCameraManager {
         public void onLaneWantersChanged(String key) {
             liftRefusals("登记表变了", java.util.Collections.singleton(key));
         }
+
+        /**
+         * 调度要关这一路了，它还在写文件（项目所有者 2026-11-02「先停录、再释放」）：先退出录像 —— 录制器叫停、收好文件、停放
+         * （{@link #leaveLane}），相机照常开着。停放好了叫醒调度（{@link #slotParked}），调度这才关它，和只开预览、超级镜子时一样。
+         * 退出录像那一行的原因和相机关了之后退出的写法一样（{@link #closeText}）。已经在停的（整次停那一下叫停的）照它自己的收拾走。
+         */
+        @Override
+        public void onLaneSealing(String key, ChannelRules.Why closed) {
+            leaveLane(key, closeText(key, closed, "要关相机，先收好文件"));
+            publishLanes();
+        }
+    }
+
+    /**
+     * 我们关这一路的原因，写进退出录像那一行（先收尾那一下、相机关了那一下都用）：熄屏放开的座舱写「熄屏：座舱放开」（设计 v3 §4）；
+     * 熄屏放开的环视写「熄屏：环视放开」（2026-10-27）；关座舱前先关环视（2.11.6）写「关座舱前先关环视」—— 录制器停放，
+     * 环视开回来带着同一个录像输出出了画面再加入；别的照 {@code other}。
+     */
+    private String closeText(String key, ChannelRules.Why closed, String other) {
+        return closed == ChannelRules.Why.DARK_RELEASE || closed == ChannelRules.Why.SURROUND_FIRST
+                ? channelSide.closeWhyText(closed)
+                : closed == ChannelRules.Why.SCREEN_OFF && channel.releasedByDark(key) ? channelSide.darkText(key)
+                : other;
+    }
+
+    /**
+     * 这一路的录制器还在写文件（主线程，调度每一轮读）：编码录制在录（含在加入），或者叫停了还没封好、没停放好；
+     * MediaRecorder 在开录、在录、在停。调度关它之前先等它收尾（ChannelRules.sealFirst，项目所有者 2026-11-02）。
+     * 不看录像意图：停了录、文件还没封好的也算在写。
+     */
+    private boolean writing(String key) {
+        if (useCodecRecording) {
+            Slot slot = slots.get(key);
+            return slot != null && (slot.phase == SlotPhase.RUNNING || slot.phase == SlotPhase.STOPPING);
+        }
+        MediaSlot media = mediaSlots.get(key);
+        return media != null && (media.phase == MediaPhase.STARTING || media.phase == MediaPhase.RUNNING
+                || media.phase == MediaPhase.STOPPING);
     }
 
     /**
@@ -1345,6 +1378,8 @@ public class MultiCameraManager {
             noteLeft(slotName(slot), change, slot.parkedAt, result, "录制器停放（同一个录像输出）");
         }
         slotIdle(slot);
+        // 不在写了：要关这一路的那一步可能在等它封好（ChannelRules.sealFirst）
+        channel.wake();
     }
 
     /** 手上那一步做完了（主线程）：不用了的交出去放掉；还要用的看能不能加入（相机可能早就回来了），录法变了的换一个。 */
@@ -3376,6 +3411,11 @@ public class MultiCameraManager {
         }
 
         @Override
+        public boolean writing(String key) {
+            return MultiCameraManager.this.writing(key);
+        }
+
+        @Override
         public void frontCabinRetired(String key) {
             retireFrontCabin(key);
         }
@@ -4001,6 +4041,26 @@ public class MultiCameraManager {
         public void closing(List<String> keys, ChannelRules.Why why) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：关 " + roles(keys) + "（" + closeWhyText(why) + "）"
                     + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
+
+        @Override
+        public void sealing(List<String> keys, ChannelRules.Why why) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：要关 " + roles(keys) + "（" + closeWhyText(why)
+                    + "），先收尾：录像封好文件再关，最多等 " + (ChannelRules.SEAL_MAX_MS / 1000) + " 秒"
+                    + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
+        }
+
+        @Override
+        public void sealed(String key, long waitedMs, boolean timedOut) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(timedOut
+                    ? "通道：" + roleName(key) + " 等了 " + seconds(waitedMs) + "，录像文件还没封好，不再等，照常关"
+                    : "通道：" + roleName(key) + " 录像文件封好了（等了 " + seconds(waitedMs) + "），照常关");
+        }
+
+        @Override
+        public void sealCalledOff(String key, long ms) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：" + roleName(key) + " 不关了（收尾 " + seconds(ms)
+                    + " 后），录像照常加入" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         }
 
         @Override
@@ -5397,6 +5457,8 @@ public class MultiCameraManager {
         String key = media.key;
         if (mediaSlots.get(key) == media) {
             mediaSlots.remove(key);
+            // 不在写了：要关这一路的那一步可能在等它停完（ChannelRules.sealFirst）
+            channel.wake();
         }
         boolean stuck = outcome == null || !outcome.finished;
         if ((stuck || releasing) && videoRecorders.get(key) == media.recorder) {

@@ -3313,11 +3313,12 @@ public class ChannelRulesTest {
         assertEquals(2_000L, ChannelRules.RECORD_OUTPUT_WAIT_MS);
         assertEquals(10_000L, ChannelRules.CLOSE_SURROUND_MAX_MS);
         assertEquals(30_000L, ChannelRules.CLOSE_CABINS_MAX_MS);
-        assertEquals(40_000L, ChannelRules.ORDERED_CLOSE_MAX_MS);
+        assertEquals("先停录、再释放：收尾最多等 5 秒（项目所有者 2026-11-02）", 5_000L, ChannelRules.SEAL_MAX_MS);
+        assertEquals("按次序关：收尾 + 环视 + 收尾 + 座舱", 50_000L, ChannelRules.ORDERED_CLOSE_MAX_MS);
         assertEquals(300L, ChannelRules.JUDGE_DELAY_MS);
         assertEquals(60_000L, ChannelRules.IN_FLIGHT_MAX_MS);
-        assertEquals("退出最多等：在途封顶 + 按次序关 + 5 秒", 105_000L, ChannelRules.EXIT_WAIT_MAX_MS);
-        assertEquals("唤醒锁最多拉：等在途 1 秒 + 按次序关", 41_000L, ChannelRules.WAKE_HOLD_MAX_MS);
+        assertEquals("退出最多等：在途封顶 + 按次序关 + 5 秒", 115_000L, ChannelRules.EXIT_WAIT_MAX_MS);
+        assertEquals("唤醒锁最多拉：等在途 1 秒 + 按次序关", 51_000L, ChannelRules.WAKE_HOLD_MAX_MS);
         assertEquals("梯子上的数字不变", 8_000L, CameraLiveness.STUCK_MS);
         assertEquals(12_000L, CameraLiveness.RETRY_GAP_MS);
         assertEquals(3, CameraLiveness.MAX_ATTEMPTS);
@@ -3974,6 +3975,155 @@ public class ChannelRulesTest {
         assertEquals(Why.SCREEN_OFF, d.why);
     }
 
+    // ================================================================= 先停录、再释放（项目所有者 2026-11-02）
+
+    /**
+     * 要关的那一路还在写文件：先叫录像那一侧收尾（SEAL，不动相机、不算一步），等的时候别的都不动；封好了当轮照原样关 ——
+     * 关的那一步和只开预览时一样，原因照旧。关了以后收尾的账清掉。
+     */
+    @Test
+    public void aLaneStillWritingIsSealedBeforeItCloses() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        streaming(surround, recS);
+        surround.writing = true;
+        assertEquals(Move.IDLE, round().move);
+
+        at(1_000);
+        w.screenOn = false;   // 通道算黑、环视没留着（哨兵没开）：放开
+        Decision d = round();
+        assertEquals("先收尾，不关", Move.SEAL, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals("带着关的原因（退出录像那一行照它写）", Why.SCREEN_OFF, d.why);
+        perform(d);
+        assertNull("收尾不算一步", w.step);
+        assertEquals(T0 + 1_000, surround.sealAskedAt);
+        assertEquals("相机不动", Device.OPEN, surround.device);
+
+        at(1_300);
+        d = round();
+        assertWait(Why.SEALING, SUR, d);
+        assertEquals(ChannelRules.SEAL_MAX_MS - 300, d.ms);
+
+        at(1_500);
+        surround.writing = false;   // 文件封好了、录制器停放了
+        d = round();
+        assertEquals("封好了：照原样关", Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SCREEN_OFF, d.why);
+        perform(d);
+        round();
+        assertEquals("关了，收尾的账清掉", 0, surround.sealAskedAt);
+        assertNull(event(Event.Type.SEAL_CALLED_OFF));
+    }
+
+    /** 到点（5 秒）还没封好：不再等，照常关（录制器自己接着收）。 */
+    @Test
+    public void aSealThatTakesTooLongStopsHoldingTheClose() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        streaming(surround, recS);
+        surround.writing = true;
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals(Move.SEAL, d.move);
+        perform(d);
+        at(ChannelRules.SEAL_MAX_MS - 1);
+        assertWait(Why.SEALING, SUR, round());
+        at(ChannelRules.SEAL_MAX_MS);
+        d = round();
+        assertEquals("满 5 秒：照常关", Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+    }
+
+    /** 没在写文件（只开预览、超级镜子，或者停了录、录制器停放着）：关照旧，不收尾、不等。 */
+    @Test
+    public void aLaneThatIsNotWritingClosesWithoutASeal() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        streaming(surround, recS);
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(0, surround.sealAskedAt);
+    }
+
+    /**
+     * 收尾中又不关了（亮屏了）：收尾的账清掉、报一次「不关了」，相机一直开着、什么都不动 —— 录像那一侧照常加入（开一个新文件）。
+     */
+    @Test
+    public void aSealIsCalledOffWhenTheLaneIsWantedAgain() {
+        claim(Holder.RECORDING);
+        w.recordPlan.add(SUR);
+        streaming(surround, recS);
+        surround.writing = true;
+        w.screenOn = false;
+        Decision d = round();
+        assertEquals(Move.SEAL, d.move);
+        perform(d);
+
+        at(400);
+        surround.writing = false;
+        w.screenOn = true;   // 亮屏：环视又该开了
+        d = round();
+        Event off = event(Event.Type.SEAL_CALLED_OFF);
+        assertNotNull("不关了，报一次", off);
+        assertEquals(Collections.singletonList(SUR), off.keys);
+        assertEquals(400, off.ms);
+        assertEquals(0, surround.sealAskedAt);
+        assertEquals("相机不动", Move.IDLE, d.move);
+        assertEquals(Device.OPEN, surround.device);
+        assertEquals("只叫过一次收尾", 1, count(Move.SEAL));
+        assertEquals(0, count(Move.CLOSE));
+    }
+
+    /**
+     * 关座舱前先关环视、环视在录：环视先收尾（原因照「关座舱前先关环视」写），封好再单独关；座舱接着照它们自己的原因先收尾，
+     * 等的是最晚封好的那一路，都封好了再一起关。
+     */
+    @Test
+    public void theSurroundClosedFirstForTheCabinsIsSealedFirstToo() {
+        claim(Holder.RECORDING);
+        planAll();
+        streaming(surround, recS);
+        streaming(rear, recR);
+        streaming(front, recF);
+        surround.writing = true;
+        rear.writing = true;
+        front.writing = true;
+        keptInDark();
+        w.screenOn = false;   // 黑满 30 秒：座舱放开，环视留着（哨兵布防）
+        Decision d = round();
+        assertEquals(Move.SEAL, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        perform(d);
+
+        at(500);
+        surround.writing = false;
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Collections.singletonList(SUR), d.keys);
+        assertEquals(Why.SURROUND_FIRST, d.why);
+        perform(d);
+
+        d = round();
+        assertEquals("座舱：先收尾", Move.SEAL, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.DARK_RELEASE, d.why);
+        perform(d);
+        at(900);
+        rear.writing = false;
+        assertWait(Why.SEALING, FRONT, round());
+        at(1_000);
+        front.writing = false;
+        d = round();
+        assertEquals(Move.CLOSE, d.move);
+        assertEquals(Arrays.asList(REAR, FRONT), d.keys);
+        assertEquals(Why.DARK_RELEASE, d.why);
+    }
+
     // ================================================================= 帮手：扮演相机层、登记表
 
     private void at(long ms) {
@@ -4122,6 +4272,9 @@ public class ChannelRulesTest {
      */
     private void perform(Decision d) {
         startOnly(d);
+        if (d.move == Move.SEAL) {
+            return;   // 收尾不动相机：录像那一侧封文件
+        }
         for (String key : d.keys) {
             Lane lane = w.lane(key);
             if (d.move == Move.CLOSE) {
@@ -4152,6 +4305,9 @@ public class ChannelRulesTest {
         ChannelRules.begin(w, d);
         if (d.half != ChannelRules.Half.OPEN) {
             done.add(d);
+        }
+        if (d.move == Move.SEAL) {
+            return;   // 收尾不动相机，规则只记下叫了哪几路
         }
         for (String key : d.keys) {
             Lane lane = w.lane(key);

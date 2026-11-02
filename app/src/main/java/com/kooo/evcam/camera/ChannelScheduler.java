@@ -344,6 +344,12 @@ public final class ChannelScheduler {
         ChannelRules.RecordPrep recordPrep(String key);
 
         /**
+         * 这一路的录制器还在写文件（录像宿主报的）：在录，或者叫停了还没封好、没停放好。关它之前规则先等它收尾
+         * （{@link ChannelRules.Lane#writing}，项目所有者 2026-11-02「先停录、再释放」）。
+         */
+        boolean writing(String key);
+
+        /**
          * 启用的前座舱离车去掉了（{@link ChannelRules.Event.Type#FRONT_CABIN_RETIRED}，通道眼里熄屏的那一刻）：管线、录像、主界面
          * 把 {@code key} 这一路拿掉。只来一次。
          */
@@ -392,6 +398,17 @@ public final class ChannelScheduler {
          * 和解除停手同一个解锁。
          */
         void onLaneWantersChanged(String key);
+
+        /**
+         * 调度要关这一路了，它的录制器还在写文件（{@link ChannelRules.Move#SEAL}，项目所有者 2026-11-02「先停录、再释放」）：
+         * 先收尾 —— 这一路退出录像、封好文件、录制器停放，相机照常开着出画面。不在写了（{@link PipelineHost#writing} 为假）调度才关它，
+         * 和只开预览、超级镜子时同一个关；之后照常听到 {@link #onLaneCameraGone}。收尾期间这一路不算能用（{@link Pipeline#usable}），
+         * 录像不在它上面再加入；调度不关了（{@link ChannelRules.Event.Type#SEAL_CALLED_OFF}）就照常说它的样子变了
+         * （{@link #onLaneConditionChanged}），那时再加入。
+         *
+         * @param closed 要关它的原因（退出录像那一行照它写，和 {@link #onLaneCameraGone} 一样）
+         */
+        void onLaneSealing(String key, ChannelRules.Why closed);
     }
 
     /** 一路的相机为什么走了（{@link Recording#onLaneCameraGone}）。 */
@@ -419,6 +436,10 @@ public final class ChannelScheduler {
 
         @Override
         public void onLaneWantersChanged(String key) {
+        }
+
+        @Override
+        public void onLaneSealing(String key, ChannelRules.Why closed) {
         }
     };
 
@@ -522,6 +543,15 @@ public final class ChannelScheduler {
         /** 开始关这几路。 */
         void closing(List<String> keys, ChannelRules.Why why);
 
+        /** 要关这几路，它们还在写文件：先收尾，录像封好文件再关（{@link ChannelRules#SEAL_MAX_MS}）。 */
+        void sealing(List<String> keys, ChannelRules.Why why);
+
+        /** 收尾过的一路现在关：等了多久，封好没有（{@code timedOut}：到点还没封好，照常关）。 */
+        void sealed(String key, long waitedMs, boolean timedOut);
+
+        /** 收尾过的一路不关了（{@link ChannelRules.Event.Type#SEAL_CALLED_OFF}）：收尾叫了多久。 */
+        void sealCalledOff(String key, long ms);
+
         /** 关到点了还没关完的这几路（{@code surround}：是环视单独关的那一步）。 */
         void closeTimedOut(List<String> keys, long maxMs, boolean surround);
 
@@ -620,6 +650,11 @@ public final class ChannelScheduler {
         }
 
         @Override
+        public boolean writing(String key) {
+            return false;
+        }
+
+        @Override
         public void frontCabinRetired(String key) {
         }
 
@@ -708,6 +743,18 @@ public final class ChannelScheduler {
 
         @Override
         public void closing(List<String> keys, ChannelRules.Why why) {
+        }
+
+        @Override
+        public void sealing(List<String> keys, ChannelRules.Why why) {
+        }
+
+        @Override
+        public void sealed(String key, long waitedMs, boolean timedOut) {
+        }
+
+        @Override
+        public void sealCalledOff(String key, long ms) {
         }
 
         @Override
@@ -2398,6 +2445,10 @@ public final class ChannelScheduler {
         private final Map<String, Boolean> toldReleasedByDark = new HashMap<>();
         /** 每一路上一次告诉录像时，它这一台那一轮是不是满 60 秒还有开或关没返回（{@link #heldByClose}）。 */
         private final Map<String, Boolean> toldHeldByClose = new HashMap<>();
+        /** 每一路上一次告诉录像时，它是不是在为关它收尾（{@link ChannelRules.Lane#sealAskedAt}，{@link #usable} 不算它能用）。 */
+        private final Map<String, Boolean> toldSealing = new HashMap<>();
+        /** 这一轮叫收尾的几路和要关它们的原因（{@link #seal}），一轮最后告诉录像。 */
+        private final Map<String, ChannelRules.Why> toSeal = new LinkedHashMap<>();
         /** 每一路这一轮读到的、账本上它这一台的那一轮（{@link #noteRound}）；没有的不在里面。黑匣子那两行、诊断报告照它写。 */
         private final Map<String, CameraRound> liveRounds = new HashMap<>();
         /**
@@ -2483,6 +2534,8 @@ public final class ChannelScheduler {
             toldCannotOpen.clear();
             toldReleasedByDark.clear();
             toldHeldByClose.clear();
+            toldSealing.clear();
+            toSeal.clear();
             liveRounds.clear();
             heldNoted.clear();
             gone.clear();
@@ -2972,9 +3025,13 @@ public final class ChannelScheduler {
             return lane == null ? ChannelRules.Condition.BRINGING_UP : ChannelRules.condition(lane);
         }
 
-        /** 这一路此刻能用：在出画面。 */
+        /**
+         * 这一路此刻能用：在出画面，而且调度没在为关它收尾（{@link ChannelRules.Lane#sealAskedAt}）—— 收尾时它的文件刚封好、相机马上要关，
+         * 录像不在它上面再加入（项目所有者 2026-11-02「先停录、再释放」）。只有录像读它。
+         */
         public boolean usable(String key) {
-            return condition(key) == ChannelRules.Condition.STREAMING;
+            ChannelRules.Lane lane = w.lane(key);
+            return condition(key) == ChannelRules.Condition.STREAMING && (lane == null || lane.sealAskedAt == 0);
         }
 
         /**
@@ -3226,6 +3283,7 @@ public final class ChannelScheduler {
             lane.declared.clear();
             lane.declared.addAll(port.declaredOutputs());
             lane.record = host.recordPrep(lane.key);
+            lane.writing = host.writing(lane.key);
             lane.firstFrameAt = port.firstFrameAt();
             lane.progressAgeMs = port.progressAgeMs();
             reconcileDevice(lane, port, now);
@@ -3671,6 +3729,9 @@ public final class ChannelScheduler {
                                 lane != null && ChannelRules.keepsRecordOutput(w, lane));
                         break;
                     }
+                    case SEAL_CALLED_OFF:
+                        journal.sealCalledOff(event.keys.get(0), event.ms);
+                        break;
                     default:
                         break;
                 }
@@ -3877,6 +3938,9 @@ public final class ChannelScheduler {
                 case CLOSE:
                     close(d, now);
                     break;
+                case SEAL:
+                    seal(d, now);
+                    break;
                 default:
                     break;
             }
@@ -4027,6 +4091,10 @@ public final class ChannelScheduler {
                     continue;
                 }
                 keys.add(key);
+                if (lane.sealAskedAt != 0) {
+                    // 先收尾过（sealFirst）：等了多久、封好没有（还在写就是到点了）
+                    journal.sealed(key, now - lane.sealAskedAt, lane.writing);
+                }
                 noteClosing(lane, now);
                 setDevice(lane, ChannelRules.Device.CLOSING, now);
                 closedAt.remove(key);
@@ -4045,6 +4113,26 @@ public final class ChannelScheduler {
                 ports.get(key).close(why);
             }
             begin(d, now);
+        }
+
+        /**
+         * 收尾（{@link ChannelRules.Move#SEAL}，项目所有者 2026-11-02「先停录、再释放」）：要关的这几路还在写文件 —— 这一轮最后告诉录像那一侧
+         * （{@link Recording#onLaneSealing}），它们退出录像、封好文件、录制器停放；相机不动，不算一步（规则只记下叫了哪几路）。
+         * 封好了、或者满 {@link ChannelRules#SEAL_MAX_MS}，规则才出关的那一步，和只开预览、超级镜子时一样关。
+         */
+        private void seal(ChannelRules.Decision d, long now) {
+            List<String> keys = new ArrayList<>();
+            for (String key : d.keys) {
+                if (w.lane(key) != null && ports.get(key) != null) {
+                    keys.add(key);
+                    toSeal.put(key, d.why);
+                }
+            }
+            if (keys.isEmpty()) {
+                return;
+            }
+            journal.sealing(keys, d.why);
+            ChannelRules.begin(w, d);
         }
 
         /**
@@ -4342,9 +4430,11 @@ public final class ChannelScheduler {
                 trailKeys.clear();
                 trailMs.clear();
             }
-            boolean closing = d.move == ChannelRules.Move.CLOSE
+            // 关之前的收尾（叫收尾、等它封好，ChannelRules.sealFirst）也在这一轮关里：环视关完、座舱先收尾再关，照旧一行
+            boolean closing = d.move == ChannelRules.Move.CLOSE || d.move == ChannelRules.Move.SEAL
                     || step != null && step.move == ChannelRules.Move.CLOSE
-                    || d.move == ChannelRules.Move.WAIT && d.why == ChannelRules.Why.SURROUND_CLOSING;
+                    || d.move == ChannelRules.Move.WAIT && (d.why == ChannelRules.Why.SURROUND_CLOSING
+                    || d.why == ChannelRules.Why.SEALING);
             if (!closing && closeRound != null) {
                 CloseRound round = closeRound;
                 closeRound = null;
@@ -4682,6 +4772,12 @@ public final class ChannelScheduler {
          * 走了的那一路，下一份出画面的会话一定算新的。录像那一侧在回调里只叫醒、声明、撤回，不在这里再跑一轮。
          */
         private void tellRecording() {
+            // 先说要收尾的几路（这一轮叫的）：它们先退出录像、封文件，相机还开着
+            Map<String, ChannelRules.Why> sealing = new LinkedHashMap<>(toSeal);
+            toSeal.clear();
+            for (Map.Entry<String, ChannelRules.Why> s : sealing.entrySet()) {
+                recording.onLaneSealing(s.getKey(), s.getValue());
+            }
             List<Left> left = new ArrayList<>(gone);
             gone.clear();
             for (Left g : left) {
@@ -4699,7 +4795,9 @@ public final class ChannelScheduler {
                 boolean darkChanged = !Boolean.valueOf(dark).equals(toldReleasedByDark.put(lane.key, dark));
                 boolean held = ChannelRules.heldByClose(w, lane);
                 boolean heldChanged = !Boolean.valueOf(held).equals(toldHeldByClose.put(lane.key, held));
-                if (conditionChanged || cannotOpenChanged || darkChanged || heldChanged) {
+                boolean sealingNow = lane.sealAskedAt != 0;
+                boolean sealingChanged = !Boolean.valueOf(sealingNow).equals(toldSealing.put(lane.key, sealingNow));
+                if (conditionChanged || cannotOpenChanged || darkChanged || heldChanged || sealingChanged) {
                     changed.add(lane.key);
                 }
                 long session = ChannelRules.streaming(lane) ? lane.sessionSince : 0L;
