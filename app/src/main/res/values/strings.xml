@@ -170,10 +170,11 @@
     <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
-    <string name="set_screen_off_title">熄屏录制（阻止休眠）</string>
-    <string name="set_screen_off_summary">熄屏时若正在录制，继续录制环视并阻止车机休眠，最长不超过设定的时长</string>
-    <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string>
-    <string name="set_screen_off_wake_value">最长 %1$s 小时</string>
+    <!-- 熄屏录制 2026-11-02 停用，开发者选项里那一行拿掉了；要恢复时放回下面几条 -->
+    <!-- <string name="set_screen_off_title">熄屏录制（阻止休眠）</string> -->
+    <!-- <string name="set_screen_off_summary">熄屏时若正在录制，继续录制环视并阻止车机休眠，最长不超过设定的时长</string> -->
+    <!-- <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string> -->
+    <!-- <string name="set_screen_off_wake_value">最长 %1$s 小时</string> -->
     <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
     <string name="set_screen_off_keep_summary">开启哨兵模式时，熄屏后继续录制环视，后座舱亮屏后恢复录制；未开启时，熄屏后暂停录制，亮屏后恢复。关闭本项，熄屏后停止录制。</string>
@@ -383,7 +384,8 @@
     <string name="dlg_internal_locked_msg">录制时会持续写入数据。内置存储的写入寿命有限，且通常无法更换，因此未开启开发者选项时仅录制到 U 盘。\n\n如确需使用，请在「设置 → 关于与致谢」中点击「安全须知」，开启开发者选项。</string>
     <string name="msg_storage_changed">存储位置已切换为「%1$s」，下次开始录制时生效</string>
     <string name="msg_enter_number">请输入数字</string>
-    <string name="msg_enter_positive_number">请输入大于 0 的数字</string>
+    <!-- 只有熄屏录制的时长框用它（2026-11-02 停用）；要恢复时一起放回 -->
+    <!-- <string name="msg_enter_positive_number">请输入大于 0 的数字</string> -->
     <string name="info_unlimited">不限制</string>
     <string name="info_reading">正在读取…</string>
     <string name="info_read_failed">无法读取</string>

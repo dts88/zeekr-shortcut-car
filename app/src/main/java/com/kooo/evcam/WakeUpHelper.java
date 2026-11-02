@@ -58,6 +58,8 @@ public class WakeUpHelper {
      * <p>现在只有一个调用者：「熄屏录制（阻止休眠）」（规格 §3.1，{@code ScreenOffRecording}）——
      * 熄屏时在录像才拿，录像停了、亮屏了、到了用户设的时长就放。项目所有者 2026-09-27
      * 明确允许熄屏录制不让车机睡。完整数据见 {@code docs/zeekr-platform-notes.md} §3.6。</p>
+     *
+     * <p>2026-11-02 熄屏录制停用（项目所有者：从来没有启用过），这里没有人再拿；代码留着等它恢复。</p>
      */
     public static void acquirePersistentWakeLock(Context context) {
         AppLog.d(TAG, "Acquiring persistent wake lock (prevent sleep)...");

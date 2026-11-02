@@ -433,10 +433,15 @@ public class AppConfig {
      * <p>没在录时不拿锁，空闲时也不再留着相机（大纲 §7 第 5 问，项目所有者 2026-10-11「按建议」：照登记表）：
      * 熄屏时主界面不算看得见、预览不算有人要，座舱谁都不要，也不保持，于是相机照登记表按次序关 —— 车机要睡
      * （安卓熄屏，哨兵模式没开、车没在走）的话当场按次序关。以前这个开关开着时主界面熄屏不退后台、相机一直开着。主界面熄屏时照旧不退后台（只是界面，不管相机）。</p>
+     *
+     * <p>2026-11-02 项目所有者定：停用（从来没有启用过），开发者选项里那一行也拿掉了。这里固定为关：唤醒锁没有人拿，
+     * {@code ScreenOffRecording}、录像协调器里跟锁有关的几条路都走不到。原来的判断注释在下面，要恢复时放回来，
+     * 再把 preferences.xml、SettingsPreferenceFragment.bindScreenOffRecording 和三种语言里注释掉的文字放回。</p>
      */
     public boolean isScreenOffRecordingEnabled() {
-        // 默认关。归开发者选项管：关着时按关算，存着的值不动（DEVELOPER_KEYS）
-        return readBoolean(KEY_SCREEN_OFF_RECORDING, false);
+        // // 默认关。归开发者选项管：关着时按关算，存着的值不动（DEVELOPER_KEYS）
+        // return readBoolean(KEY_SCREEN_OFF_RECORDING, false);
+        return false;
     }
 
     /**
@@ -670,7 +675,7 @@ public class AppConfig {
         java.util.Set<String> keys = new java.util.HashSet<>(java.util.Arrays.asList(
                 SettingsRegistry.RECORDING_MODE.key,  // 录制模式 → 自动
                 KEY_FORCE_H264_ENCODING,              // 强制 H.264 → 关，各路按自己配置里的编码
-                KEY_SCREEN_OFF_RECORDING,             // 熄屏录制 → 关
+                KEY_SCREEN_OFF_RECORDING,             // 熄屏录制 → 关（2026-11-02 停用，读值固定为关；这道门留着等恢复）
                 KEY_SCREEN_OFF_WAKE_MINUTES,          // 熄屏录制的最长时长 → 默认（熄屏录制关着，用不到）
                 KEY_IMAGE_ADJUST_ENABLED,             // 画面调节 → 关
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关

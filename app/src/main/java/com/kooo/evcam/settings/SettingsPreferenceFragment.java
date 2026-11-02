@@ -680,62 +680,63 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    /**
-     * 熄屏录制（开发者选项，2026-10-23 和时长上限合成一行，开关加下一层）：行尾写最长多久；点这一行填小时数。
-     * 小时数可带小数（24、30 都行），存成分钟（{@link #saveWakeHours}）。
-     */
-    private void bindScreenOffRecording() {
-        SwitchNavPreference pref = findPreference("pref_screen_off_recording");
-        if (pref == null) {
-            return;
-        }
-        bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
-                value -> appConfig.setScreenOffRecordingEnabled(value));
-        showWakeHours(pref);
-        pref.setOnPreferenceClickListener(preference -> {
-            showTextDialog("pref_screen_off_wake_hours", getString(R.string.set_screen_off_wake_title), null,
-                    hoursText(appConfig.getScreenOffWakeMinutes()), text -> {
-                        if (saveWakeHours(text)) {
-                            showWakeHours(pref);
-                        }
-                    });
-            return true;
-        });
-    }
-
-    private void showWakeHours(SwitchNavPreference pref) {
-        pref.setValue(getString(R.string.set_screen_off_wake_value, hoursText(appConfig.getScreenOffWakeMinutes())));
-    }
-
-    /**
-     * 填的小时数收不收：填错、留空、填 0 或负数（折成分钟四舍五入为 0 的也算）都不收，提示「请输入大于 0 的数字」；
-     * 大到分钟数存不下的，按能存的最大值收。收下了返回 true。
-     */
-    private boolean saveWakeHours(String text) {
-        int minutes;
-        try {
-            double hours = Double.parseDouble(text.trim());
-            // 先夹在 int 范围里再收窄：直接强转，太大的正数会绕成负数被当成「填了负数」，
-            // 太小的负数反倒绕成正数被收下
-            minutes = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(hours * 60)));
-        } catch (NumberFormatException e) {
-            minutes = 0;
-        }
-        if (minutes <= 0) {
-            toast(getString(R.string.msg_enter_positive_number));
-            return false;
-        }
-        appConfig.setScreenOffWakeMinutes(minutes);
-        return true;
-    }
-
-    /** 分钟数写成小时：整点写「2」，不整写「1.5」。 */
-    private static String hoursText(int minutes) {
-        if (minutes % 60 == 0) {
-            return String.valueOf(minutes / 60);
-        }
-        return String.format(java.util.Locale.US, "%.1f", minutes / 60.0);
-    }
+    // 熄屏录制那一行的绑定和它的几个帮手（2026-11-02 停用，项目所有者：从来没有启用过）。要恢复时去掉注释，连同 bindAdvanced 里那一处调用、preferences.xml 那一行、三种语言的文字一起放回。
+    // /**
+    //  * 熄屏录制（开发者选项，2026-10-23 和时长上限合成一行，开关加下一层）：行尾写最长多久；点这一行填小时数。
+    //  * 小时数可带小数（24、30 都行），存成分钟（{@link #saveWakeHours}）。
+    //  */
+    // private void bindScreenOffRecording() {
+    //     SwitchNavPreference pref = findPreference("pref_screen_off_recording");
+    //     if (pref == null) {
+    //         return;
+    //     }
+    //     bindSwitch("pref_screen_off_recording", appConfig.isScreenOffRecordingEnabled(),
+    //             value -> appConfig.setScreenOffRecordingEnabled(value));
+    //     showWakeHours(pref);
+    //     pref.setOnPreferenceClickListener(preference -> {
+    //         showTextDialog("pref_screen_off_wake_hours", getString(R.string.set_screen_off_wake_title), null,
+    //                 hoursText(appConfig.getScreenOffWakeMinutes()), text -> {
+    //                     if (saveWakeHours(text)) {
+    //                         showWakeHours(pref);
+    //                     }
+    //                 });
+    //         return true;
+    //     });
+    // }
+    //
+    // private void showWakeHours(SwitchNavPreference pref) {
+    //     pref.setValue(getString(R.string.set_screen_off_wake_value, hoursText(appConfig.getScreenOffWakeMinutes())));
+    // }
+    //
+    // /**
+    //  * 填的小时数收不收：填错、留空、填 0 或负数（折成分钟四舍五入为 0 的也算）都不收，提示「请输入大于 0 的数字」；
+    //  * 大到分钟数存不下的，按能存的最大值收。收下了返回 true。
+    //  */
+    // private boolean saveWakeHours(String text) {
+    //     int minutes;
+    //     try {
+    //         double hours = Double.parseDouble(text.trim());
+    //         // 先夹在 int 范围里再收窄：直接强转，太大的正数会绕成负数被当成「填了负数」，
+    //         // 太小的负数反倒绕成正数被收下
+    //         minutes = (int) Math.max(0, Math.min(Integer.MAX_VALUE, Math.round(hours * 60)));
+    //     } catch (NumberFormatException e) {
+    //         minutes = 0;
+    //     }
+    //     if (minutes <= 0) {
+    //         toast(getString(R.string.msg_enter_positive_number));
+    //         return false;
+    //     }
+    //     appConfig.setScreenOffWakeMinutes(minutes);
+    //     return true;
+    // }
+    //
+    // /** 分钟数写成小时：整点写「2」，不整写「1.5」。 */
+    // private static String hoursText(int minutes) {
+    //     if (minutes % 60 == 0) {
+    //         return String.valueOf(minutes / 60);
+    //     }
+    //     return String.format(java.util.Locale.US, "%.1f", minutes / 60.0);
+    // }
 
     /**
      * 车牌号水印（开关加下一层，ui-spec §三，项目所有者 2026-10-23）：开关管录像和照片上显不显示车牌号；
@@ -1529,8 +1530,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 appConfig.getRecordingMode(), value -> appConfig.setRecordingMode(value),
                 this::showRecordingModeSummary);
 
-        // 熄屏录制 = 熄屏持续录制 + 唤醒锁（规格 §3.1）。整块只在开发者选项里出现，不用再单独锁
-        bindScreenOffRecording();
+        // 熄屏录制 2026-11-02 停用（项目所有者：从来没有启用过），开发者选项里那一行拿掉了（AppConfig.isScreenOffRecordingEnabled
+        // 固定为关）。要恢复时连同 preferences.xml 那一行、下面注释掉的 bindScreenOffRecording 和它的几个帮手一起放回：
+        // // 熄屏录制 = 熄屏持续录制 + 唤醒锁（规格 §3.1）。整块只在开发者选项里出现，不用再单独锁
+        // bindScreenOffRecording();
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));
 
@@ -1841,9 +1844,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
             return;
         }
-        if ("pref_screen_off_wake_hours".equals(key)) {
-            input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        }
+        // 熄屏录制的时长框（2026-11-02 停用，要恢复时放回）：
+        // if ("pref_screen_off_wake_hours".equals(key)) {
+        //     input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        // }
     }
 
     
