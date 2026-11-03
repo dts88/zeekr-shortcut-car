@@ -15,7 +15,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.camera.CameraManagerHolder;
-import com.kooo.evcam.camera.CameraNeeds;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.camera.ChannelScheduler;
@@ -187,7 +187,7 @@ public class RearViewMirrorService extends Service {
                 + " textureAvailable=" + tv.isAvailable()
                 + " boundCamera=" + (camera != null ? camera.getCameraId() : "none")
                 + " cameraOpened=" + (camera != null && camera.isCameraOpened())
-                + " claimed=" + CameraNeeds.current().isHeld(CameraNeeds.Holder.MIRROR)
+                + " claimed=" + CameraKeeper.get(svc).needs(CameraKeeper.Use.MIRROR)
                 + " inSession=" + svc.surround.inSession()
                 + " showingCabin=" + view.isShowingCabin()
                 + " cabinCamera=" + (cabinCamera != null ? cabinCamera.getCameraId() : "none")
@@ -399,9 +399,9 @@ public class RearViewMirrorService extends Service {
         }
         retryCount = 0;
         boolean declared = !surround.refused && surround.declare(camera, manager, surfaceTexture);
-        CameraNeeds needs = CameraNeeds.current();
-        boolean claimed = !needs.isHeld(CameraNeeds.Holder.MIRROR);
-        needs.claim(CameraNeeds.Holder.MIRROR);
+        CameraKeeper keeper = CameraKeeper.get(this);
+        boolean claimed = !keeper.needs(CameraKeeper.Use.MIRROR);
+        keeper.need(CameraKeeper.Use.MIRROR);
         if (declared) {
             manager.channelScheduler().wake();
         }
@@ -659,7 +659,7 @@ public class RearViewMirrorService extends Service {
      */
     private void unbindCamera() {
         cancelRetry();
-        CameraNeeds.current().release(CameraNeeds.Holder.MIRROR);
+        CameraKeeper.get(this).release(CameraKeeper.Use.MIRROR);
         StallWatch.armMirror(false);
     }
 

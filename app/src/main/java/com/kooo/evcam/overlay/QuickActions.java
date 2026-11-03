@@ -84,8 +84,7 @@ public final class QuickActions {
      * 相机没开时拍不到，却照样提示「已保存」。</p>
      */
     private static void takePhoto(Context context) {
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().getOrInit(context)
-                .takePhoto(new com.kooo.evcam.ui.PhotoFeedback(context));
+        CameraKeeper.get(context).takePhoto(new com.kooo.evcam.ui.PhotoFeedback(context));
     }
 
     private static void toggleMirror(Context context) {

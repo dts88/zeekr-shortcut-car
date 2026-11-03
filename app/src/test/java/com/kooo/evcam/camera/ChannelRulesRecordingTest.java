@@ -154,6 +154,18 @@ public class ChannelRulesRecordingTest {
         assertFalse(ChannelRules.autoStartMoment(false, false, false));
     }
 
+    // ------------------------------------------------------------------ 前台服务
+
+    /** 前台服务（规格 §3）：开机自启动开着、在录、或者「这一趟要录」（等接回、等亮屏接）时开着；都不是、或者退出了就停。 */
+    @Test
+    public void theForegroundServiceStaysForBootRecordingOrAWantedRecording() {
+        assertTrue("开机自启动开着", ChannelRules.foregroundServiceNeeded(false, true, false, false));
+        assertTrue("在录", ChannelRules.foregroundServiceNeeded(false, false, true, false));
+        assertTrue("这一趟要录：接回时相机从后台开", ChannelRules.foregroundServiceNeeded(false, false, false, true));
+        assertFalse("都不是", ChannelRules.foregroundServiceNeeded(false, false, false, false));
+        assertFalse("退出了", ChannelRules.foregroundServiceNeeded(true, true, true, true));
+    }
+
     /** 屏幕黑着不看，等亮屏（不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。 */
     @Test
     public void aStartInTheDarkWaitsForTheScreen() {

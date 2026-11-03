@@ -287,8 +287,8 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         lastTriggerTime = now;
 
         try {
-            // 启动前台服务
-            CameraForegroundService.start(context);
+            // 启动前台服务（该不该开着相机管家判）
+            com.kooo.evcam.camera.CameraKeeper.get(context).ensureForegroundService("keep-alive " + reason);
             AppLog.d(TAG, "已请求启动前台服务 (触发: " + reason + ")");
         } catch (Exception e) {
             AppLog.e(TAG, "启动服务失败: " + e.getMessage(), e);
@@ -311,8 +311,8 @@ public class KeepAliveReceiver extends BroadcastReceiver {
         lastTriggerTime = now;
         
         try {
-            // 启动前台服务
-            CameraForegroundService.start(context);
+            // 启动前台服务（该不该开着相机管家判）
+            com.kooo.evcam.camera.CameraKeeper.get(context).ensureForegroundService("keep-alive");
         } catch (Exception e) {
             // 静默失败，不输出日志
         }
