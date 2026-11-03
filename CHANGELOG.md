@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.98.0-alpha] - 2026-11-03
+
+- Recording: starting, stopping and resuming are now decided in one place (the camera keeper); nothing should look different.
+- Recording: with Start recording automatically turned on mid-trip, it takes effect from the next trip.
+
 ## [2.97.0-alpha] - 2026-11-03
 
 - Blind spot view: two new options, off by default, show the side whose blind spot light or door open warning is on, without the turn signal.
