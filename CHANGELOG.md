@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.0.0-alpha] - 2026-11-04
+
+- Driving info bar: a turn arrow's border turns yellow while that side's blind spot light is on, or red for the door open warning.
+- Vehicle signals: four new rows under Lamps for the blind spot lights and door open warnings; untick them to keep the plain turn arrows.
+
 ## [2.99.0-alpha] - 2026-11-03
 
 - Preview, Super mirror, Blind spot view, photos, the background service and exit now all go through the camera keeper; nothing should look different.
