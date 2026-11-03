@@ -1401,6 +1401,20 @@ public final class ChannelRules {
         return !usedThisTrip && appStarting && !dark;
     }
 
+    /**
+     * 前台服务该不该开着（规格 §3，3b 起只有相机管家照它起停）：没退出，而且开机自启动开着、在录、或者「这一趟要录」
+     * （被打断等接回、因熄屏停下等亮屏接 —— 接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）。
+     *
+     * @param exited       用户退出了
+     * @param autoStartOnBoot 「开机自启动」开着
+     * @param recording    在录（开录中、在录）
+     * @param wanted       「这一趟要录」立着
+     */
+    public static boolean foregroundServiceNeeded(boolean exited, boolean autoStartOnBoot, boolean recording,
+                                                  boolean wanted) {
+        return !exited && (autoStartOnBoot || recording || wanted);
+    }
+
     // ================================================================= 熄屏时的录像（相机管家，项目所有者 2026-11-02）
 
     /**

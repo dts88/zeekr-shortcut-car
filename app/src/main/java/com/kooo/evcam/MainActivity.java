@@ -594,7 +594,7 @@ public class MainActivity extends AppCompatActivity {
     private void claimPreviewIfReady() {
         // 接上了管线才登记：接上的是照生效的配置建的那一份；登记在别的那一份上，它会把配置里已经关掉的路开一遍
         if (cameraManager != null && PreviewSlots.canStartCamera(textureReadyCount, enabledLanes)) {
-            com.kooo.evcam.camera.CameraNeeds.current().claim(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+            keeper.need(CameraKeeper.Use.PREVIEW);
             if (!isInBackground) {
                 keeper.mainScreenShown();
             }
@@ -1390,9 +1390,7 @@ public class MainActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("录制声音：录音权限已给");
-            if (CameraForegroundService.isRunning()) {
-                CameraForegroundService.start(getApplicationContext());
-            }
+            keeper.refreshForegroundService("microphone-granted");
             return;
         }
         appConfig.setFootageAudioEnabled(false);
@@ -2460,138 +2458,17 @@ public class MainActivity extends AppCompatActivity {
      */
     public void exitApp() {
         AppLog.d(TAG, "用户请求退出应用，停止所有服务...");
-        // 退出这条路到底走到哪一步、之后还有谁把我们拉起来 —— 靠这一行和后面的进程启动行对照
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("==== 用户退出应用 ====");
-        // 必须在停服务之前：前台服务的 onDestroy 会发保活广播，保活接收器收到就去重启它
-        UserExit.markExited(this);
-        // 结束进程交给看门的线程：它等主线程收尾、等停录收好文件、等每一路相机关完，最多等 EXIT_DEADLINE_MS，
-        // 到点照样结束。以前是主线程自己关相机、关完再结束 —— 相机服务一卡，进程就退不掉
-        // （2026-09-26 09:40 那一次：点了退出，系统里却没有这次退出的记录）
-        final long exitStartedAt = android.os.SystemClock.elapsedRealtime();
-        final java.util.concurrent.CountDownLatch mainCleanupDone = new java.util.concurrent.CountDownLatch(1);
-        final java.util.concurrent.CountDownLatch filesClosed = new java.util.concurrent.CountDownLatch(1);
-        final Context app = getApplicationContext();
-        new Thread(() -> finishExit(app, exitStartedAt, mainCleanupDone, filesClosed), "exit-watchdog").start();
-
-        // 退出的次序（channel-logic §五：停录 → 登记表清空 → 调度按顺序关完 → 再退出；大纲 §2 阶段 6）：
-        // 1. 先告诉调度「退出」（进程里那一个）：同步写下、置 closingAnywhere，从此只关，不开、不改输出、不救；登记表从此作废 ——
-        //    接着的、排着的、这之后后台才建的管线都一样，直到退出的记号清掉（人又点开主界面、真正开机：UserExit.clear）。
-        //    它的下一轮是 post 出去的，跑的时候下面几步的同步部分都已做完
-        com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        MultiCameraManager pipeline = holder.getCameraManager();
-        com.kooo.evcam.camera.ChannelScheduler scheduler = com.kooo.evcam.camera.ChannelScheduler.app();
-        if (scheduler != null) {
-            scheduler.exit();
-        }
-
-        // 2. 主动退出之后不该再被亮屏拉回来
+        // 退出的次序由相机管家排（停录 → 登记表作废 → 调度按次序关完 → 再结束进程，CameraKeeper.beginExit）；
+        // 界面这边只做界面的几件，做完告诉它
+        CameraKeeper.Exit exit = keeper.beginExit();
+        // 主动退出之后不该再被亮屏拉回来
         appConfig.setUiLeftForScreenOff(false);
-
-        // 3. 告诉相机管家：退出算一趟结束（下次打开是新的一趟，「启动自动录制」重新生效），在录的停掉，在等开录的也不等了
-        keeper.exit();
-
-        // 停止前台服务（确保清理）
-        CameraForegroundService.stop(this);
-
-        // 4. 退出就是退出：后视镜、录制按钮、补盲一起停（它们的画布死了，调度也不会再为它们排改输出 —— 退出时只关）。
-        //    以前这里写着「不停，它们本来就是脱离主界面用的」—— 但紧接着 System.exit，它们反正活不下去，
-        //    留着只是让系统以 START_STICKY 的名义再去重启它们
         OverlayCoordinator.onActivityDestroyed(this);
-        com.kooo.evcam.zeekr.RearViewMirrorService.stop(this);
-        com.kooo.evcam.zeekr.SideViewService.stop(this);
-
-        // 释放持续唤醒锁
-        WakeUpHelper.releasePersistentWakeLock();
-
-        // 5. 放管线（只在退出和换车型时才放）：停录收尾；这一份换下去，调度按次序关完相机、丢掉输出，再放录制器
-        //    （MultiCameraManager.release）。调度已经在退出了，关的原因照写「退出」
-        holder.release();
-        // 6. 停录收尾（等编码排空、收好文件）在管线的收拾线程上排着：排在它们后面数一下，退出的最后一步等到它
-        //    （finishExit；channel-logic §五 停录在先 —— 以前只等相机关完，U 盘慢时进程可能在收好最后一段之前就结束了）
-        if (pipeline != null) {
-            pipeline.afterStopsFinished(filesClosed::countDown);
-        } else {
-            filesClosed.countDown();
-        }
-
         // 保存日志（System.exit 会跳过 onDestroy，所以这里手动保存）
         AppLog.saveToPersistentLog(this);
-
-        // 结束所有Activity；进程由看门的线程结束（见 finishExit）
+        // 结束所有Activity；进程由相机管家的看门线程结束
         finishAffinity();
-        mainCleanupDone.countDown();
-    }
-
-    /**
-     * 退出最多等多久：主线程收尾、停录收好文件、调度按次序关完每一路相机。到点没好也照样结束进程。
-     * 环视先关、座舱后关，通常不到半秒；相机服务卡住时一次关实测 2–20 秒（2026-10-08），要留够：进程带着没关完的相机死掉，
-     * 相机服务里就剩一个没人收的句柄，下一个进程开相机全部超时。数由调度的常量算出来（{@code ChannelRules.EXIT_WAIT_MAX_MS}：
-     * 手上那一步的在途封顶 + 按次序关一轮的封顶 + 余量，最坏约 105 秒，界面早就没了，用户看不到）；以前的 20 秒盖不住调度自己
-     * 关相机的上限（环视 10 秒 + 座舱 30 秒）。
-     */
-    private static final long EXIT_DEADLINE_MS = com.kooo.evcam.camera.ChannelRules.EXIT_WAIT_MAX_MS;
-
-    /**
-     * 退出的最后一步，在看门的线程上跑：等主线程收尾、等相机关完、等停录收好文件，然后结束进程。
-     *
-     * <p>黑匣子里记一行结果：用了多久；到点没好的话，卡在哪 —— 是主线程收尾、录像文件，还是哪一路相机。
-     * 下次再「点了退出却退不掉」，这一行就是答案。</p>
-     *
-     * <p>收尾的这段时间里人又点开了应用（主界面 onCreate 清掉了退出标记，{@link UserExit#isExited}）：不结束进程 ——
-     * 新打开的主界面正接着用，它自己建了一份管线、等这一份关完才开相机，这时结束进程就把它一起杀了，相机开到一半丢给相机服务
-     * （审查 2026-10-11；EXIT_DEADLINE_MS 加长到「退出最多等」之后这段时间可以很长）。</p>
-     *
-     * @param filesClosed 停录收尾都做完了（{@link MultiCameraManager#afterStopsFinished}）
-     */
-    private static void finishExit(Context app, long startedAt, java.util.concurrent.CountDownLatch mainCleanupDone,
-                                   java.util.concurrent.CountDownLatch filesClosed) {
-        boolean mainDone = false;
-        try {
-            mainDone = mainCleanupDone.await(EXIT_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        // 相机由通道调度按次序关（环视先、座舱后）：等它报关完（closingAnywhere 变假），再看账本上还有没有一轮在关、没结束
-        // （CameraRounds.closingIds：关没返回的那一轮结束之前这一台一直在上面，第 1 步「轮次 + 账本」）。只是看，不等谁的锁：
-        // 每 200 ms 看一次，歇着不空转、不和要跑关相机那几轮的主线程抢（审查 2026-10-11）
-        java.util.List<String> stuck;
-        while (true) {
-            long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
-            stuck = com.kooo.evcam.camera.CameraRounds.process().closingIds();
-            if (left <= 0 || (!com.kooo.evcam.camera.ChannelScheduler.closingAnywhere() && stuck.isEmpty())) {
-                break;
-            }
-            try {
-                Thread.sleep(Math.min(200L, left));
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-        // 停录收尾（收拾线程上，每一路最多 CodecVideoRecorder.STOP_BUDGET_MS）：通常比关相机先做完，没做完就等到同一个期限
-        boolean filesDone = false;
-        try {
-            long left = EXIT_DEADLINE_MS - (android.os.SystemClock.elapsedRealtime() - startedAt);
-            filesDone = filesClosed.await(Math.max(left, 0L), java.util.concurrent.TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        long took = android.os.SystemClock.elapsedRealtime() - startedAt;
-        if (mainDone && stuck.isEmpty() && filesDone) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：收尾用了 " + took + "ms，相机都关好了");
-        } else {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：等满 " + EXIT_DEADLINE_MS
-                    + "ms 强制结束。" + (mainDone ? "" : "主线程收尾没做完；")
-                    + (filesDone ? "" : "停录还没收好文件；")
-                    + (stuck.isEmpty() ? "" : "相机 " + stuck + " 还没关好"));
-        }
-        if (!UserExit.isExited(app)) {
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("退出：收尾的时候应用又被打开了，不结束进程（新打开的主界面接着用）");
-            return;
-        }
-        // 黑匣子在自己的线程上写：等它把上面几行写完再结束进程
-        com.kooo.evcam.blackbox.BlackBox.flush(1000);
-        System.exit(0);
+        exit.uiDone();
     }
 
     /**
@@ -2669,8 +2546,7 @@ public class MainActivity extends AppCompatActivity {
      * 提示按真实结果说 —— 以前按下就弹「已保存」，不管拍没拍到。
      */
     private void takePicture() {
-        com.kooo.evcam.camera.CameraManagerHolder.getInstance().getOrInit(this)
-                .takePhoto(new com.kooo.evcam.ui.PhotoFeedback(this));
+        keeper.takePhoto(new com.kooo.evcam.ui.PhotoFeedback(this));
     }
 
 
@@ -2699,7 +2575,7 @@ public class MainActivity extends AppCompatActivity {
             AppLog.d(TAG, "onPause during a configuration change: PREVIEW stays claimed for the new instance");
             return;
         }
-        com.kooo.evcam.camera.CameraNeeds.current().release(com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        keeper.release(CameraKeeper.Use.PREVIEW);
     }
 
     @Override
@@ -2775,8 +2651,9 @@ public class MainActivity extends AppCompatActivity {
         // 预览又要用相机了 —— 画布都在、管线也接着的话现在登记（最小化回来就是这样：画布还在）；新建的界面还没接上管线，等接上再登记（见 claimPreviewIfReady）
         claimPreviewIfReady();
 
-        // 前台服务：每次回到前台都刷新一次（大纲 §1 MainActivity，2.11 阶段 4a）
-        refreshForegroundService();
+        // 前台服务：每次回到前台都请相机管家刷新一次 —— 安卓 12 起后台才起的前台服务用不了相机，主界面在前时刷新过的才能
+        // （大纲 §1 MainActivity，2.11 阶段 4a）；该不该开着它判
+        keeper.refreshForegroundService("main-resume");
 
         // 在后台的这段时间里有一路退出、加入过（回调可能没赶上这个界面），U 盘可能插拔过：
         // 录制键、状态条照此刻的样子重画（存储先按上一份快照，再去后台探测一次，结果经 storageListener 回来）
@@ -2785,26 +2662,6 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.storage.StorageState.refresh(this, "resume");
 
         // 回到前台要用相机：上面 claim(PREVIEW) 那一下叫醒通道调度，它照登记表开（主界面在前就能用相机）
-    }
-
-    /**
-     * 刷新前台服务：开机自启动开着、或者有录像意图（「这一趟要录」：在录、在等开录、因熄屏停下等亮屏接回）时，
-     * 主界面每次回到前台都 start 一次。通知上的字服务自己照录像此刻的样子写（{@link CameraKeeper#notificationTitle}：
-     * 正在录制、等待摄像头，或者在后台运行）。
-     *
-     * <p>为什么每次都刷：安卓 12 起，后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度只认两种「能用相机」：
-     * 主界面在前，或者前台服务是主界面在前时起的、那时刷新过（{@link CameraForegroundService#startedWhileVisible()}，
-     * 在 onStartCommand 那一刻判，只升不降）。以前只在服务不在时才起 —— 开机后在后台起的那个一直在，
-     * 就永远不会变成「能用相机」，主界面一退到后台调度就什么都不开（大纲 §1、§6 风险 7：通知会刷一下）。</p>
-     *
-     * <p>留不留服务的条件和 {@link CameraForegroundService#stop} 是同一条（开机自启动、或者这一趟要录）：
-     * 都不是就不起 —— 停不停由停录、退出那几处管。</p>
-     */
-    private void refreshForegroundService() {
-        if (!appConfig.isAutoStartOnBoot() && !keeper.recordingWanted() && !keeper.isRecording()) {
-            return;
-        }
-        CameraForegroundService.start(this);
     }
 
     @Override
@@ -2824,16 +2681,14 @@ public class MainActivity extends AppCompatActivity {
             // 退出那条路已经放了管线（exitApp），那时不写
             com.kooo.evcam.blackbox.BlackBox.note("主界面销毁：预览画布交给管线，管线留给应用");
         }
-        // 前台服务、中转写入留不留（keepServices，条件照旧）：还在录、在等开录（开机自启动、悬浮按钮拉起）、上一次停录还在收拾
-        // （needsPipeline），只是重建（夜间模式、语言切换），或者还有别人在用相机（超级镜子、拍照）—— 留着
-        com.kooo.evcam.camera.CameraNeeds needs = com.kooo.evcam.camera.CameraNeeds.current();
-        final boolean othersNeedCamera = needs.heldByAnyoneExcept(
-                com.kooo.evcam.camera.CameraNeeds.Holder.PREVIEW);
+        // 中转写入留不留（条件照旧）：还在录、在等开录、上一次停录还在收拾（needsPipeline），只是重建（夜间模式、语言切换），
+        // 或者还有别人在用相机（超级镜子、盲区画面、拍照）—— 留着。前台服务留不留由相机管家判（mainScreenGone）
         final boolean keepServices = cameraManager != null && !cameraManager.isReleased()
-                && (keeper.needsPipeline() || isChangingConfigurations() || othersNeedCamera);
-        AppLog.i(TAG, "onDestroy 前台服务、中转写入" + (keepServices ? "保留" : "照没人要收") + " "
+                && (keeper.needsPipeline() || isChangingConfigurations()
+                || keeper.needs(CameraKeeper.Use.MIRROR) || keeper.needs(CameraKeeper.Use.SIDE_VIEW));
+        AppLog.i(TAG, "onDestroy 中转写入" + (keepServices ? "保留" : "照没人要收") + " "
                 + instanceTag() + " recording=" + keeper.isRecording()
-                + " changingConfigurations=" + isChangingConfigurations() + " needs=" + needs.describe());
+                + " changingConfigurations=" + isChangingConfigurations() + " needs=" + keeper.describeNeeds());
 
         // 关闭预览矫正悬浮窗
 
@@ -2869,10 +2724,8 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeLanesListener(lanesChanged);
         cancelBackgroundTask();
 
-        // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉（停不停还看开机自启动、这一趟要录，见 stop）
-        if (!keepServices) {
-            CameraForegroundService.stop(this);
-        }
+        // 前台服务：录制还在继续就不能停 —— 没有它，系统会在后台把录制掐掉。留不留由相机管家照规矩判（开机自启动、在录、这一趟要录）
+        keeper.mainScreenGone(isChangingConfigurations());
 
         // 停止存储清理任务
         if (storageCleanupManager != null) {

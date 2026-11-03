@@ -18,7 +18,7 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraManagerHolder;
-import com.kooo.evcam.camera.CameraNeeds;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.camera.ChannelScheduler;
@@ -46,7 +46,7 @@ import com.kooo.evcam.telemetry.VehicleState;
  * <h3>只声明、只登记（同超级镜子，{@link RearViewMirrorService}）</h3>
  *
  * <p>通道调度（{@link ChannelScheduler}）是唯一动相机的地方。这里只做两件事：把窗口的画布声明成环视的盲区画面输出
- * （{@link SingleCamera#declareSide} / {@link SingleCamera#declareHud}），和在登记表上登记 {@link CameraNeeds.Holder#SIDE_VIEW}
+ * （{@link SingleCamera#declareSide} / {@link SingleCamera#declareHud}），和向相机管家要相机（{@link CameraKeeper#need}，{@link CameraKeeper.Use#SIDE_VIEW}）
  * —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16，{@code ChannelRules}）。两个出口共用这一个登记方，都放开了才放开。
  * 开不开环视、什么时候把画布加进会话、挂不下时谁让路，都由调度和相机层判；以后调规则也只在登记表这一处。</p>
  *
@@ -169,7 +169,7 @@ public class SideViewService extends Service {
         }
         return "side view: listening=" + svc.listening
                 + " lamps=" + (svc.lampsHeld ? Telemetry.get().lamps() : "off")
-                + " claimed=" + CameraNeeds.current().isHeld(CameraNeeds.Holder.SIDE_VIEW)
+                + " claimed=" + CameraKeeper.get(svc).needs(CameraKeeper.Use.SIDE_VIEW)
                 + " center{" + svc.center.describe() + "} hud{" + svc.hud.describe() + "}";
     }
 
@@ -393,7 +393,7 @@ public class SideViewService extends Service {
     /** 两个出口都声明了画布、登记了才算用着：都放开了才放开登记。登记表一变，监听就叫醒调度。 */
     private void releaseClaimIfUnused() {
         if (!center.claimed && !hud.claimed) {
-            CameraNeeds.current().release(CameraNeeds.Holder.SIDE_VIEW);
+            CameraKeeper.get(this).release(CameraKeeper.Use.SIDE_VIEW);
         }
     }
 
@@ -827,10 +827,10 @@ public class SideViewService extends Service {
             SingleCamera.RecordDropped dropped = why -> onDropped(declaredOn, surfaceTexture, why);
             boolean declared = isHud ? camera.declareHud(surfaceTexture, dropped)
                     : camera.declareSide(surfaceTexture, dropped);
-            CameraNeeds needs = CameraNeeds.current();
-            boolean newlyClaimed = !needs.isHeld(CameraNeeds.Holder.SIDE_VIEW);
+            CameraKeeper keeper = CameraKeeper.get(SideViewService.this);
+            boolean newlyClaimed = !keeper.needs(CameraKeeper.Use.SIDE_VIEW);
             claimed = true;
-            needs.claim(CameraNeeds.Holder.SIDE_VIEW);
+            keeper.need(CameraKeeper.Use.SIDE_VIEW);
             if (declared) {
                 manager.channelScheduler().wake();
             }

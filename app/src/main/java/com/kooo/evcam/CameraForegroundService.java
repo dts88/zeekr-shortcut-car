@@ -398,7 +398,7 @@ public class CameraForegroundService extends Service {
     }
 
     /**
-     * 录像停了（相机管家调）、或主界面收尾 / 退出要停服务。
+     * 停掉前台服务。只由相机管家叫（{@code CameraKeeper}）：停不停它判（{@code CameraKeeper#foregroundServiceNeeded}）。
      *
      * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3）。保活开着时它本来就该一直在：
      * 这里只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次），不停。等着接回的也一样
@@ -408,11 +408,6 @@ public class CameraForegroundService extends Service {
      * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
      */
     public static void stop(Context context) {
-        com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(context);
-        if (!UserExit.isExited(context) && (new AppConfig(context).isAutoStartOnBoot() || keeper.recordingWanted())) {
-            showText(context, keeper.notificationTitle(), keeper.notificationContent());
-            return;
-        }
         isForegroundReady = false;
         startedWhileVisible = false;
         Intent intent = new Intent(context, CameraForegroundService.class);

@@ -32,14 +32,15 @@ import java.util.Set;
  * 相机、录像此刻是什么样子都问它。判断只在它这里 —— 规矩在 {@link ChannelRules}，动相机的是通道调度（{@link ChannelScheduler}），
  * 照做的是相机层（{@link MultiCameraManager}、{@link SingleCamera}、录制器）。
  *
- * <p>这一步（3a，2026-11-03）先收录像：以前的录像协调器抹掉，用户要的那几样由这里照实际的需要处理。预览、拍照、超级镜子、
- * 盲区画面、退出、前台服务后面几步也改成向这里请求。</p>
+ * <p>2026-11-03 起：录像（3a：以前的录像协调器抹掉，用户要的那几样由这里照实际的需要处理）；画面要不要相机（主界面预览、超级镜子、
+ * 盲区画面，{@link #need}）、拍照（{@link #takePhoto}）、前台服务开不开（{@link #foregroundServiceNeeded}）、退出的次序
+ * （{@link #beginExit}）也都向这里请求（3b）。</p>
  *
  * <h3>录像</h3>
  *
  * <ul>
  *   <li><b>请求</b>：人按的开始 / 停止（主界面、悬浮按钮、灵动贴，{@link #startByUser}、{@link #stopByUser}、{@link #toggleByUser}）、
- *       退出（{@link #exit}）。别的都是这里自己看着事实判：亮屏（{@link #screenOn}）、应用被带回来（{@link #appRestored}）、
+ *       退出（{@link #beginExit}）。别的都是这里自己看着事实判：亮屏（{@link #screenOn}）、应用被带回来（{@link #appRestored}）、
  *       主界面打开 / 回到前台（{@link #mainScreenOpened}、{@link #mainScreenShown}）时看要不要开 —— 「这一趟要录」立着就接着录，
  *       这一趟还没看过「启动自动录制」就看一次（{@link ChannelRules#autoStartMoment}）。</li>
  *   <li><b>能不能录</b>：至少选了一路、有 U 盘（存储快照）、写得下。U 盘不能用就等着，一能用就开（{@link ChannelRules#nextStartCheckMs}）；
@@ -235,8 +236,8 @@ public final class CameraKeeper {
         return true;
     }
 
-    /** 用户退出：这一趟到头（下次打开是新的一趟，启动自动录制重新生效），在录的停、在等开录的不等。主线程。 */
-    public void exit() {
+    /** 退出的那一下：这一趟到头（下次打开是新的一趟，启动自动录制重新生效），在录的停、在等开录的不等。主线程。 */
+    private void endTripForExit() {
         newTrip("exit");
         stop(RecordStop.USER);
     }
@@ -313,6 +314,229 @@ public final class CameraKeeper {
                 request(Why.AUTO_START);
             }
         });
+    }
+
+    // ================================================================= 画面要相机、拍照（3b）
+
+    /** 要相机的画面（{@link #need}）：主界面预览、超级镜子、盲区画面（中控屏和 HUD 共用一份）。 */
+    public enum Use {
+        PREVIEW(CameraNeeds.Holder.PREVIEW),
+        MIRROR(CameraNeeds.Holder.MIRROR),
+        SIDE_VIEW(CameraNeeds.Holder.SIDE_VIEW);
+
+        final CameraNeeds.Holder holder;
+
+        Use(CameraNeeds.Holder holder) {
+            this.holder = holder;
+        }
+    }
+
+    /**
+     * 这个画面要相机了（画布在、声明好了）：开不开、带不带它、什么时候关，调度照登记表判（{@link CameraNeeds}）。重复要无害。
+     * 哪个线程都能调。
+     */
+    public void need(Use use) {
+        CameraNeeds.current().claim(use.holder);
+    }
+
+    /** 这个画面不要相机了：没人要的那一路照「保持」的规矩关。没要过也无害。哪个线程都能调。 */
+    public void release(Use use) {
+        CameraNeeds.current().release(use.holder);
+    }
+
+    /** 这个画面此刻登记着要相机。 */
+    public boolean needs(Use use) {
+        return CameraNeeds.current().isHeld(use.holder);
+    }
+
+    /** 此刻谁登记着要相机（日志、诊断用，ASCII）。 */
+    public String describeNeeds() {
+        return CameraNeeds.current().describe();
+    }
+
+    /**
+     * 拍一张（主界面的拍照键、悬浮按钮、灵动贴）：相机没开就先开（登记表的规矩），出了画面再拍，提示按真的存下了几路说。
+     * 主界面在不在前台都一样。主线程。
+     */
+    public void takePhoto(MultiCameraManager.PhotoCallback callback) {
+        CameraManagerHolder.getInstance().getOrInit(context).takePhoto(callback);
+    }
+
+    // ================================================================= 前台服务（3b）
+
+    /**
+     * 前台服务该不该开着 —— 只在这里判（规格 §3）：没退出，而且开机自启动开着、在录、或者「这一趟要录」（被打断等接回、因熄屏停下
+     * 等亮屏接：接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）。
+     */
+    public boolean foregroundServiceNeeded() {
+        return ChannelRules.foregroundServiceNeeded(UserExit.isExited(context), appConfig.isAutoStartOnBoot(),
+                isRecording(), trip.wanted());
+    }
+
+    /**
+     * 照规矩起、停前台服务（录像开、停那几下）：要的，没起就起、起着就照录像此刻的样子换通知上的字（不为换字再 start 一次）；
+     * 不要的，起着就停 —— 先停服务再放相机：调度看到没有前台服务，没人要的相机当场按次序关，不在后台拿着相机保持 30 秒。
+     */
+    private void syncForegroundService() {
+        if (foregroundServiceNeeded()) {
+            if (CameraForegroundService.isRunning()) {
+                CameraForegroundService.showText(context, notificationTitle(), notificationContent());
+            } else {
+                CameraForegroundService.start(context);
+            }
+        } else {
+            CameraForegroundService.stop(context);
+        }
+    }
+
+    /**
+     * 刷新前台服务（主界面回到前台、录制声音的开关或录音权限变了）：要的再 start 一次 —— 安卓 12 起后台才起的前台服务用不了相机，
+     * 主界面在前时起过、刷新过的才能（只升不降，{@link CameraForegroundService#startedWhileVisible}）；起的时候也照此刻的设置
+     * 带不带麦克风类型。不要的，起着就停。
+     *
+     * @param why 谁叫的（ASCII，日志）
+     */
+    public void refreshForegroundService(String why) {
+        boolean needed = foregroundServiceNeeded();
+        AppLog.d(TAG, "刷新前台服务（" + why + "）：" + (needed ? "要" : "不要"));
+        if (needed) {
+            CameraForegroundService.start(context);
+        } else if (CameraForegroundService.isRunning()) {
+            CameraForegroundService.stop(context);
+        }
+    }
+
+    /** 保活（开机广播、例行叫醒、无障碍、ContentProvider）要前台服务在：该开着、又没起的才起。 */
+    public void ensureForegroundService(String why) {
+        if (foregroundServiceNeeded() && !CameraForegroundService.isRunning()) {
+            AppLog.d(TAG, "前台服务没在，起来（" + why + "）");
+            CameraForegroundService.start(context);
+        }
+    }
+
+    /**
+     * 主界面销毁了（相机管线属于应用，主界面销毁不放它）：只是重建（日夜模式、换语言）什么都不动；不然前台服务照规矩留不留
+     * （{@link #foregroundServiceNeeded}）。
+     */
+    public void mainScreenGone(boolean changingConfigurations) {
+        if (!changingConfigurations) {
+            syncForegroundService();
+        }
+    }
+
+    // ================================================================= 退出（3b）
+
+    /**
+     * 退出最多等多久：主线程收尾、停录收好文件、调度按次序关完每一路相机。到点没好也照样结束进程。环视先关、座舱后关，通常不到半秒；
+     * 相机服务卡住时一次关实测 2–20 秒（2026-10-08），要留够：进程带着没关完的相机死掉，相机服务里就剩一个没人收的句柄，
+     * 下一个进程开相机全部超时。数由调度的常量算出来（{@link ChannelRules#EXIT_WAIT_MAX_MS}，最坏约 105 秒，界面早就没了）。
+     */
+    private static final long EXIT_DEADLINE_MS = ChannelRules.EXIT_WAIT_MAX_MS;
+
+    /** 退出的把手：主界面做完它自己那几件（关界面、存日志）就叫 {@link #uiDone}，看门的线程等它。 */
+    public static final class Exit {
+        private final java.util.concurrent.CountDownLatch uiDone = new java.util.concurrent.CountDownLatch(1);
+
+        public void uiDone() {
+            uiDone.countDown();
+        }
+    }
+
+    /**
+     * 用户退出（主界面长按退出那一下，主线程）：照退出的次序收 —— channel-logic §五：停录 → 登记表作废 → 调度按次序关完 → 再结束进程。
+     *
+     * <ol>
+     *   <li>记下「用户退出了」：必须在停服务之前（前台服务的 onDestroy 会发保活广播，保活接收器收到就去重启它）；</li>
+     *   <li>结束进程交给看门的线程（{@link #finishExit}）：等主界面收尾、等停录收好文件、等每一路相机关完，最多等
+     *       {@link #EXIT_DEADLINE_MS}，到点照样结束。以前是主线程自己关相机、关完再结束 —— 相机服务一卡，进程就退不掉；</li>
+     *   <li>告诉调度「退出」：从此只关，不开、不改输出、不救；登记表从此作废，直到退出的记号清掉（人又点开主界面、真正开机）；</li>
+     *   <li>这一趟到头、在录的停掉、在等开录的不等（{@link #endTripForExit}）；前台服务停；超级镜子、盲区画面停（它们的画布死了，
+     *       留着只是让系统以 START_STICKY 的名义再去重启它们）；唤醒锁放；</li>
+     *   <li>放管线：停录收尾、这一份换下去，调度按次序关完相机、丢掉输出，再放录制器；停录收尾排在管线的收拾线程上，看门的线程等到它。</li>
+     * </ol>
+     *
+     * <p>界面那几件（关界面、存日志、亮屏不再拉回来）由主界面自己做，做完叫 {@link Exit#uiDone}。</p>
+     */
+    public Exit beginExit() {
+        BlackBox.noteImportant("==== 用户退出应用 ====");
+        UserExit.markExited(context);
+        Exit exit = new Exit();
+        final long startedAt = SystemClock.elapsedRealtime();
+        final java.util.concurrent.CountDownLatch filesClosed = new java.util.concurrent.CountDownLatch(1);
+        new Thread(() -> finishExit(context, startedAt, exit.uiDone, filesClosed), "exit-watchdog").start();
+
+        CameraManagerHolder holder = CameraManagerHolder.getInstance();
+        MultiCameraManager pipeline = holder.getCameraManager();
+        ChannelScheduler scheduler = ChannelScheduler.app();
+        if (scheduler != null) {
+            scheduler.exit();
+        }
+        endTripForExit();
+        CameraForegroundService.stop(context);
+        com.kooo.evcam.zeekr.RearViewMirrorService.stop(context);
+        com.kooo.evcam.zeekr.SideViewService.stop(context);
+        com.kooo.evcam.WakeUpHelper.releasePersistentWakeLock();
+        holder.release();
+        if (pipeline != null) {
+            pipeline.afterStopsFinished(filesClosed::countDown);
+        } else {
+            filesClosed.countDown();
+        }
+        return exit;
+    }
+
+    /**
+     * 退出的最后一步，在看门的线程上跑：等主界面收尾、等相机关完、等停录收好文件，然后结束进程。黑匣子里记一行结果：用了多久；
+     * 到点没好的话，卡在哪。收尾的这段时间里人又点开了应用（退出的记号清掉了）：不结束进程 —— 新打开的主界面正接着用。
+     */
+    private static void finishExit(Context app, long startedAt, java.util.concurrent.CountDownLatch uiDone,
+                                   java.util.concurrent.CountDownLatch filesClosed) {
+        boolean mainDone = false;
+        try {
+            mainDone = uiDone.await(EXIT_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        // 相机由调度按次序关（环视先、座舱后）：等它报关完，再看账本上还有没有一轮在关、没结束。只是看，不等谁的锁：
+        // 每 200 ms 看一次，歇着不空转、不和要跑关相机那几轮的主线程抢
+        List<String> stuck;
+        while (true) {
+            long left = EXIT_DEADLINE_MS - (SystemClock.elapsedRealtime() - startedAt);
+            stuck = CameraRounds.process().closingIds();
+            if (left <= 0 || (!ChannelScheduler.closingAnywhere() && stuck.isEmpty())) {
+                break;
+            }
+            try {
+                Thread.sleep(Math.min(200L, left));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        // 停录收尾通常比关相机先做完，没做完就等到同一个期限
+        boolean filesDone = false;
+        try {
+            long left = EXIT_DEADLINE_MS - (SystemClock.elapsedRealtime() - startedAt);
+            filesDone = filesClosed.await(Math.max(left, 0L), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        long took = SystemClock.elapsedRealtime() - startedAt;
+        if (mainDone && stuck.isEmpty() && filesDone) {
+            BlackBox.noteImportant("退出：收尾用了 " + took + "ms，相机都关好了");
+        } else {
+            BlackBox.noteImportant("退出：等满 " + EXIT_DEADLINE_MS
+                    + "ms 强制结束。" + (mainDone ? "" : "主线程收尾没做完；")
+                    + (filesDone ? "" : "停录还没收好文件；")
+                    + (stuck.isEmpty() ? "" : "相机 " + stuck + " 还没关好"));
+        }
+        if (!UserExit.isExited(app)) {
+            BlackBox.noteImportant("退出：收尾的时候应用又被打开了，不结束进程（新打开的主界面接着用）");
+            return;
+        }
+        // 黑匣子在自己的线程上写：等它把上面几行写完再结束进程
+        BlackBox.flush(1000);
+        System.exit(0);
     }
 
     // ================================================================= 事实
@@ -862,9 +1086,7 @@ public final class CameraKeeper {
         }
         pushView();
         // 前台服务：没有它，系统会在应用退到后台后把录制掐掉。已经在的不再 start 一次 —— 通知上的字由 pushView 换
-        if (!CameraForegroundService.isRunning()) {
-            CameraForegroundService.start(context);
-        }
+        syncForegroundService();
         bringUpMainIfCamerasUnusable(why);
     }
 
@@ -944,7 +1166,7 @@ public final class CameraKeeper {
                 // 只是在等开录：「这一趟要录」留不留先定，前台服务跟着收，和停录同一个次序（见 end）
                 lastStopReason = reason;
                 settleWanted(reason);
-                CameraForegroundService.stop(context);
+                syncForegroundService();
                 cancelPending(reason.name());
                 return;
             }
@@ -993,7 +1215,7 @@ public final class CameraKeeper {
         }
         // 停录的次序：「这一趟要录」留不留 → 前台服务 → 放开相机。等着接回时前台服务留着（亮屏后从后台开相机要有它）；
         // 不接了、开机自启动又关着的先停服务再放相机：调度看到没有前台服务，没人要的相机当场按次序关
-        CameraForegroundService.stop(context);
+        syncForegroundService();
         if (!willResume) {
             CameraNeeds.current().release(CameraNeeds.Holder.RECORDING);
         }

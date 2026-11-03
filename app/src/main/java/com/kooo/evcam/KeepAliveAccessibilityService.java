@@ -132,7 +132,7 @@ public class KeepAliveAccessibilityService extends AccessibilityService {
         }
         try {
             // 启动摄像头前台服务
-            CameraForegroundService.start(this);
+            com.kooo.evcam.camera.CameraKeeper.get(this).ensureForegroundService("accessibility");
         } catch (Exception e) {
             AppLog.e(TAG, "拉起前台服务失败: " + e.getMessage(), e);
         }

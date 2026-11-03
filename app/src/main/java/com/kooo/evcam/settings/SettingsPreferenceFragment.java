@@ -2167,8 +2167,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_audio → " + (on ? "开" : "关"));
         Context context = getContext();
         if (context != null) {
-            // 前台服务按此刻的开关重新起一次前台：带不带麦克风类型
-            com.kooo.evcam.CameraForegroundService.start(context.getApplicationContext());
+            // 前台服务按此刻的开关重新起一次前台：带不带麦克风类型（该不该开着相机管家判）
+            com.kooo.evcam.camera.CameraKeeper.get(context).refreshForegroundService("footage-audio");
         }
     }
 
