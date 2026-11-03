@@ -85,7 +85,7 @@ Rear airflow was not separately measured.
 factory states in Park at zero speed, using the same climate power control.
 Times throughout this note are Sydney time (UTC+11).
 
-| Reading | AC1 — on with preferences, 11:39:06.953 | AC2 — off, 11:39:19.203 | AC3 — on again, 11:39:33.462 |
+| Reading | AC1: on with preferences, 11:39:06.953 | AC2: off, 11:39:19.203 | AC3: on again, 11:39:33.462 |
 |---|---|---|---|
 | Circulation, default | INNER `0x10030101` | AUTO `0x10030103` | AUTO `0x10030103` |
 | Front power, zone `0x08` | `1` | `0` | `1` |
