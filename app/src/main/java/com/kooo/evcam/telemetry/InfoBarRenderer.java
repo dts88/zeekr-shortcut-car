@@ -32,7 +32,8 @@ import java.util.Locale;
  *       灭 = 灰色空心描边（和自动驻车、哨兵的「灭」同一个画法）；亮 = 近白实心 + 绿色光晕（像实车的转向指示，
  *       和日行灯、远近光的「亮」同一个路数）—— 亮灭靠明度分，去掉颜色也分得开；双闪 = 两只箭头都亮、三角填红。
  *       后视镜上的灯（项目所有者 2026-11-03）：哪一侧亮了，那一侧箭头的边框换成灯的颜色 —— 盲区指示灯黄、开门预警红
- *       （同一侧都亮时红），6 px、不加光晕（项目所有者：颜色和线宽已经够了）；里面照旧画转向灯。只画勾了的那几盏，
+ *       （同一侧都亮时红），粗细和转向灯亮时的绿边一样（露在外面 3 px；项目所有者看过整整 6 px 的，嫌粗），不加光晕；
+ *       里面照旧画转向灯。只画勾了的那几盏，
  *       不勾的照原来画。黄（亮度 210）比灭的灰（128）亮得多，压缩、去掉颜色都认得出；红（132）和灰差不多，
  *       去掉颜色就认不出 —— 项目所有者看过样图，定了这一组。</li>
  *   <li>前灯组、后灯组一样宽（106），是同一台 7X 的车头和车尾：车身轮廓、风挡、轮子同一条路径（项目所有者 2026-10-04）。
@@ -484,8 +485,8 @@ public final class InfoBarRenderer {
     /**
      * 一只转向箭头，尖离格边 10：箭头 24 长 46 高，杆 19 长 20 高。
      * 亮 = 绿色光晕 + 6 px 绿边 + 近白的芯（芯盖住绿边的里半，外面露 3 px 绿）；灭 = 灰色空心描边；没数据 = 深灰底浅灰边。
-     * 后视镜上的灯亮着（{@code border} 不是 0）：边框换成灯的颜色、整整 6 px、不加光晕（亮的芯先画，边框盖在芯的外沿上），
-     * 芯照旧是转向灯：亮近白、灭空心、没数据深灰底。
+     * 后视镜上的灯亮着（{@code border} 不是 0）：边框换成灯的颜色，粗细和亮时的绿边一样 —— 6 px 的线、里半被芯盖住，
+     * 外面露 3 px；不加光晕。芯照旧是转向灯：亮近白、灭是底色（看起来空心）、没数据深灰。
      */
     private void indicatorArrow(int cellWidth, boolean left, Boolean on, int border) {
         float cy = HEIGHT / 2f;
@@ -501,13 +502,11 @@ public final class InfoBarRenderer {
         path.lineTo(tip + d * 24, cy + 23);
         path.close();
         if (border != 0) {
-            if (on == null || on) {
-                fill.setColor(on == null ? UNKNOWN_FILL : LAMP_CORE);
-                canvas.drawPath(path, fill);
-            }
             stroke.setColor(border);
             stroke.setStrokeWidth(6f);
             canvas.drawPath(path, stroke);
+            fill.setColor(on == null ? UNKNOWN_FILL : on ? LAMP_CORE : BG);
+            canvas.drawPath(path, fill);
         } else if (on == null) {
             fill.setColor(UNKNOWN_FILL);
             canvas.drawPath(path, fill);
