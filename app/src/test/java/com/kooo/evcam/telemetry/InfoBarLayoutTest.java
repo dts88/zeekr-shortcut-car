@@ -104,10 +104,12 @@ public class InfoBarLayoutTest {
     /**
      * 转向灯、双闪合成一格（项目所有者 2026-10-04）：默认照样勾着转向信号。
      * 转向指示显示（跟着闪）说的是同一个「左 / 右 / 双闪」，也列在转向灯那一格（不拿来画）。
+     * 后视镜上的四盏灯是箭头的边框（项目所有者 2026-11-03），也在这一格、也默认勾着。
      */
     @Test
     public void theTurnCellCarriesTheTurnSignals() {
-        List<Signal> turn = Arrays.asList(Signal.INDICATOR, Signal.INDICATOR_DISPLAY, Signal.TURN_LEFT, Signal.TURN_RIGHT);
+        List<Signal> turn = Arrays.asList(Signal.INDICATOR, Signal.INDICATOR_DISPLAY, Signal.TURN_LEFT, Signal.TURN_RIGHT,
+                Signal.BLIND_SPOT_LEFT, Signal.BLIND_SPOT_RIGHT, Signal.DOOR_WARNING_LEFT, Signal.DOOR_WARNING_RIGHT);
         assertEquals(turn, InfoBarLayout.Cell.TURN.signals());
         assertTrue(InfoBarLayout.Cell.TURN.onStrip);
         Set<String> defaults = InfoBarLayout.defaultSelection();
@@ -130,6 +132,11 @@ public class InfoBarLayoutTest {
                 {Signal.SEAT_PASSENGER, InfoBarLayout.Cell.CABIN},
                 // 驾驶模式画成挡位框的颜色（项目所有者 2026-10-21），不再是文字格
                 {Signal.DRIVE_MODE, InfoBarLayout.Cell.GEAR},
+                // 后视镜上的灯画成转向灯箭头的边框（项目所有者 2026-11-03）：只勾灯也带出这一格
+                {Signal.BLIND_SPOT_LEFT, InfoBarLayout.Cell.TURN},
+                {Signal.BLIND_SPOT_RIGHT, InfoBarLayout.Cell.TURN},
+                {Signal.DOOR_WARNING_LEFT, InfoBarLayout.Cell.TURN},
+                {Signal.DOOR_WARNING_RIGHT, InfoBarLayout.Cell.TURN},
         };
         for (Object[] c : cases) {
             Signal signal = (Signal) c[0];
@@ -192,7 +199,7 @@ public class InfoBarLayoutTest {
     public void theDefaultSelectionTakesTheNewlyListedSignals() {
         Set<String> defaults = InfoBarLayout.defaultSelection();
         for (Signal s : new Signal[]{Signal.SEAT_DRIVER, Signal.SEAT_PASSENGER, Signal.INDICATOR_DISPLAY,
-                Signal.BRAKE_PEDAL, Signal.BELT_DRIVER}) {
+                Signal.BRAKE_PEDAL, Signal.BELT_DRIVER, Signal.BLIND_SPOT_LEFT, Signal.DOOR_WARNING_RIGHT}) {
             assertTrue(s.name(), defaults.contains(s.name()));
         }
         for (Signal s : new Signal[]{Signal.BELT_PASSENGER, Signal.BELT_REAR_LEFT, Signal.AEB, Signal.AUTO_HOLD,
@@ -201,7 +208,8 @@ public class InfoBarLayoutTest {
         }
         Set<String> without = new LinkedHashSet<>(defaults);
         without.removeAll(Arrays.asList(Signal.SEAT_DRIVER.name(), Signal.SEAT_PASSENGER.name(),
-                Signal.INDICATOR_DISPLAY.name(), Signal.BRAKE_PEDAL.name()));
+                Signal.INDICATOR_DISPLAY.name(), Signal.BRAKE_PEDAL.name(), Signal.BLIND_SPOT_LEFT.name(),
+                Signal.BLIND_SPOT_RIGHT.name(), Signal.DOOR_WARNING_LEFT.name(), Signal.DOOR_WARNING_RIGHT.name()));
         List<InfoBarLayout.Placed> before = InfoBarLayout.fit(SURROUND, without);
         List<InfoBarLayout.Placed> after = InfoBarLayout.fit(SURROUND, defaults);
         assertEquals(cellsOf(before), cellsOf(after));

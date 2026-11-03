@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.telemetry.MirrorLamps;
 import com.kooo.evcam.telemetry.Readings;
 import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
@@ -42,9 +43,11 @@ import java.util.Map;
  * 后面是号码，对照 Lab 的记录用。</p>
  *
  * <p>多占的资源只在这一页开着时占：进来完整登记（{@link Telemetry#acquire}），离开注销 —— 没别人（录像的信息条）
- * 在用的话，浮点传感器和定位停掉。离散信号进程活着一直在读（熄屏判断登记的核心，{@link Telemetry#keepCore}，熄屏 v3）。</p>
+ * 在用的话，浮点传感器和定位停掉。离散信号进程活着一直在读（熄屏判断登记的核心，{@link Telemetry#keepCore}，熄屏 v3）。
+ * 后视镜上的四盏灯（车机设置服务里的，{@link Signal.Kind#SETTING}）另一个来源：进来也登记读灯（{@link Telemetry#acquireLamps}），
+ * 值从 {@link Telemetry#lamps} 取，灯一变这一页跟着重画。</p>
  */
-public class VehicleInfoFragment extends Fragment implements Telemetry.Listener {
+public class VehicleInfoFragment extends Fragment implements Telemetry.Listener, Telemetry.LampListener {
 
     private static final String USER = "vehicle-info";
 
@@ -158,7 +161,9 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
         super.onStart();
         Telemetry t = Telemetry.get();
         t.addListener(this);
+        t.addLampListener(this);
         t.acquire(requireContext(), USER);
+        t.acquireLamps(requireContext(), USER);
         render(t.readings());
         main.removeCallbacks(positionTick);
         main.post(positionTick);
@@ -169,7 +174,9 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
         main.removeCallbacks(positionTick);
         Telemetry t = Telemetry.get();
         t.removeListener(this);
+        t.removeLampListener(this);
         t.release(USER);
+        t.releaseLamps(USER);
         super.onStop();
     }
 
@@ -180,6 +187,13 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
         }
     }
 
+    @Override
+    public void onLampsChanged(MirrorLamps lamps) {
+        if (isAdded()) {
+            render(Telemetry.get().readings());
+        }
+    }
+
     private void render(Readings r) {
         Context ctx = getContext();
         if (ctx == null) {
@@ -187,14 +201,16 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
         }
         int known = ContextCompat.getColor(ctx, R.color.text_primary);
         int unknown = ContextCompat.getColor(ctx, R.color.text_tertiary);
+        MirrorLamps lamps = Telemetry.get().lamps();
         for (Map.Entry<Signal, TextView> e : valueViews.entrySet()) {
-            Object v = r.get(e.getKey());
+            Signal s = e.getKey();
+            Object v = s.viaCarInterface() ? r.get(s) : lamps.get(s);
             TextView tv = e.getValue();
             tv.setText(SignalText.text(ctx, e.getKey(), v));
             tv.setTextColor(v == null ? unknown : known);
         }
         showPosition();
-        statusView.setText(status(ctx, r));
+        statusView.setText(status(ctx, r, lamps));
         for (View icon : iconViews) {
             icon.invalidate();
         }
@@ -205,10 +221,10 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
      * 只进日志和黑匣子（{@code Telemetry.carReported} / {@code locationReported}）。不写「正在读取 / 已停止」：页面在 onStart 里
      * 先登记再画，看得见的时候一直在收集。车辆接口还在连（第一次约一秒）时先不写这一项，连上或连不上后再补上。
      */
-    private static String status(Context ctx, Readings r) {
+    private static String status(Context ctx, Readings r, MirrorLamps lamps) {
         Telemetry t = Telemetry.get();
-        StringBuilder sb = new StringBuilder(
-                ctx.getString(R.string.vi_status_known, r.knownCount(), Signal.values().length));
+        StringBuilder sb = new StringBuilder(ctx.getString(R.string.vi_status_known,
+                r.knownCount() + lamps.knownCount(), Signal.values().length));
         Telemetry.CarLink car = t.carLink();
         if (car != null && car != Telemetry.CarLink.CONNECTING) {
             sb.append(" · ").append(ctx.getString(carText(car)));
@@ -290,8 +306,15 @@ public class VehicleInfoFragment extends Fragment implements Telemetry.Listener 
         return ctx.getString(R.string.vi_bar_icon, names.toString());
     }
 
-    /** 号码 + 怎么读（+ 区域）：读法用 Lab 信号手册的叫法；号码和区域号照原样写十六进制。 */
+    /**
+     * 号码 + 怎么读（+ 区域）：读法用 Lab 信号手册的叫法；号码和区域号照原样写十六进制。
+     * 车机设置服务里的号不写死，写管理器上的常量名（Lab 也按这个名字记）；开门预警的号只有一个区域，不写区域。
+     */
     static String address(Context ctx, Signal s) {
+        if (s.kind == Signal.Kind.SETTING) {
+            return s.property + " · " + (s.zone == 0 ? ctx.getString(R.string.vi_kind_setting)
+                    : ctx.getString(R.string.vi_kind_setting_zone, "0x" + Integer.toHexString(s.zone)));
+        }
         String id = String.format(Locale.US, "0x%08X", s.id);
         switch (s.kind) {
             case FUNCTION_ZONE:

@@ -219,6 +219,8 @@
     <string name="vi_kind_function_zone">fungsi·zon %1$s</string>
     <string name="vi_kind_sensor_event">peristiwa sensor</string>
     <string name="vi_kind_sensor_value">nilai sensor</string>
+    <string name="vi_kind_setting">perkhidmatan tetapan</string>
+    <string name="vi_kind_setting_zone">perkhidmatan tetapan·zon %1$s</string>
     <!-- Under each Vehicle signals row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
     <string name="vi_bar_icon">Ikon bar maklumat: %1$s</string>
     <string name="vi_bar_text">Teks bar maklumat (belum ada ikon)</string>
@@ -259,6 +261,10 @@
     <string name="vi_indicator_display">Paparan penunjuk (berkelip)</string>
     <string name="vi_turn_left">Lampu isyarat kiri</string>
     <string name="vi_turn_right">Lampu isyarat kanan</string>
+    <string name="vi_blind_spot_left">Lampu titik buta kiri</string>
+    <string name="vi_blind_spot_right">Lampu titik buta kanan</string>
+    <string name="vi_door_warning_left">Amaran buka pintu kiri</string>
+    <string name="vi_door_warning_right">Amaran buka pintu kanan</string>
     <string name="vi_low_beam">Lampu rendah</string>
     <string name="vi_high_beam">Lampu tinggi</string>
     <string name="vi_high_beam_flash">Kelip lampu tinggi</string>

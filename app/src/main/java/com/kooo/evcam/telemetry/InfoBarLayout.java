@@ -47,8 +47,11 @@ public final class InfoBarLayout {
          * 转向灯和双闪合成一格（项目所有者 2026-10-04，原来是左转、双闪、右转三格）：左箭头 | 双层嵌套三角 | 右箭头。
          * 勾转向指示状态、转向指示显示或左 / 右转向灯任意一个就上。转向指示显示（跟着闪的那个号）不拿来画，
          * 但它说的就是这一格画的「左 / 右 / 双闪」，所以也列在这里。
+         * 后视镜上的灯（盲区指示灯、开门预警，左右各一，项目所有者 2026-11-03）是箭头的边框：勾了哪一盏才画哪一盏
+         * （和挡位框的驾驶模式一样，只勾了转向灯不算）；只勾了灯也带出这一格。
          */
-        TURN(184, R.string.vi_cell_turn, Signal.INDICATOR, Signal.INDICATOR_DISPLAY, Signal.TURN_LEFT, Signal.TURN_RIGHT),
+        TURN(184, R.string.vi_cell_turn, Signal.INDICATOR, Signal.INDICATOR_DISPLAY, Signal.TURN_LEFT, Signal.TURN_RIGHT,
+                Signal.BLIND_SPOT_LEFT, Signal.BLIND_SPOT_RIGHT, Signal.DOOR_WARNING_LEFT, Signal.DOOR_WARNING_RIGHT),
         /**
          * 方向盘随读数转；先用着，满舵几圈、最大读数多少等 Lab（{@link Signal#STEERING_DEGREES_PER_UNIT}）。
          * 78 宽，比自动驻车宽一点：三位数的角度数字要放在圈里（项目所有者 2026-10-04）；数字和度数符号压在方向盘上，描底色边。
@@ -256,7 +259,7 @@ public final class InfoBarLayout {
 
     /**
      * 默认勾哪些：2.0.10 信息条上在用的那几格（驾驶辅助那格当时整格划掉，不算）里能用的信号，加上经纬度。
-     * 后来列进这几格的信号（座椅、转向指示显示、刹车踏板）跟着进默认，带出来的格不变。
+     * 后来列进这几格的信号（座椅、转向指示显示、刹车踏板、后视镜上的四盏灯）跟着进默认，带出来的格不变。
      */
     public static Set<String> defaultSelection() {
         Set<String> names = new LinkedHashSet<>();

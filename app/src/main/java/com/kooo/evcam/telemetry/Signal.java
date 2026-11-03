@@ -3,7 +3,7 @@ package com.kooo.evcam.telemetry;
 import com.kooo.evcam.R;
 
 /**
- * 车上能读到的信号，一张表：怎么读（功能号 / 带区域的功能号 / 传感器事件 / 传感器数值）、
+ * 车上能读到的信号，一张表：怎么读（功能号 / 带区域的功能号 / 传感器事件 / 传感器数值 / 车机设置服务里的号）、
  * 读到的数怎么解、在车上验证到什么程度。
  *
  * <p>信息条（{@link VehicleStateMapper}）和「车辆信号」页都从这张表取，加一个信号就是加一行。
@@ -59,6 +59,18 @@ public enum Signal {
     INDICATOR_DISPLAY(Group.LAMPS, Kind.FUNCTION, 0x2A091400, 0, R.string.vi_indicator_display, Trust.CONFIRMED, Format.INDICATOR),
     TURN_LEFT(Group.LAMPS, Kind.FUNCTION, 0x21051100, 0, R.string.vi_turn_left, Trust.CONFIRMED, Format.ON_OFF),
     TURN_RIGHT(Group.LAMPS, Kind.FUNCTION, 0x21051200, 0, R.string.vi_turn_right, Trust.CONFIRMED, Format.ON_OFF),
+    /**
+     * 后视镜上那盏灯（项目所有者 2026-11-03）：开车时旁边有车亮的盲区指示灯；停车后同一盏灯是开门预警（下面两行）。
+     * 车机设置服务里的号（{@link Kind#SETTING}，Lab findings §2.75、§2.78）：盲区指示灯一个号分左右两个区域，开门预警左右各一个号。
+     * 读的是 {@link MirrorLampSource}，值在 {@link Telemetry#lamps}（{@link MirrorLamps}：0 灭，不是 0 都算亮）。
+     * 先用着：Lab 手册里还在「当前重点」，左右是项目所有者的车上对的（右舵）；开门预警见过 3，意思不知道。
+     * 信息条上是转向灯那一格箭头的边框，只在勾了它时画（{@link InfoBarRenderer}）。
+     */
+    BLIND_SPOT_LEFT(Group.LAMPS, "ID_SETTING_FUNC_LCMA_INDCN_DATA", 0x1, R.string.vi_blind_spot_left),
+    BLIND_SPOT_RIGHT(Group.LAMPS, "ID_SETTING_FUNC_LCMA_INDCN_DATA", 0x4, R.string.vi_blind_spot_right),
+    /** 开门预警的号只有一个区域，用这台车清单里写的那一个（{@link MirrorLampSource}），这里写 0。 */
+    DOOR_WARNING_LEFT(Group.LAMPS, "ID_ZEEKR_DOOROPENWARNLEINDCN_DATA", 0, R.string.vi_door_warning_left),
+    DOOR_WARNING_RIGHT(Group.LAMPS, "ID_ZEEKR_DOOROPENWARNRIINDCN_DATA", 0, R.string.vi_door_warning_right),
     LOW_BEAM(Group.LAMPS, Kind.FUNCTION, 0x21050100, 0, R.string.vi_low_beam, Trust.CONFIRMED, Format.ON_OFF),
     HIGH_BEAM(Group.LAMPS, Kind.FUNCTION, 0x21050200, 0, R.string.vi_high_beam, Trust.CONFIRMED, Format.ON_OFF),
     /** 闪远光：往前拨着拨杆时 1，松手回 0（轻拨也有 0.5 秒）；这时远光灯 0x21050200 一直是 0（Lab 0.16.0）。 */
@@ -164,7 +176,12 @@ public enum Signal {
         /** {@code ISensor.getSensorEvent(type)}：枚举，值 = 类型 + 序号 */
         SENSOR_EVENT,
         /** {@code ISensor.getSensorLatestValue(type)}：浮点 */
-        SENSOR_VALUE
+        SENSOR_VALUE,
+        /**
+         * 车机设置服务（{@code setting_zeekr}）里的号：按管理器上的常量名取（{@link Signal#property}），读的是 {@link MirrorLampSource}，
+         * 值在 {@link Telemetry#lamps}；车辆接口（{@link EcarxSource}）不读（2026-11-03，后视镜上的灯）
+         */
+        SETTING
     }
 
     /** 页面上的分组。 */
@@ -274,14 +291,26 @@ public enum Signal {
 
     public final Group group;
     public final Kind kind;
+    /** 号码；车机设置服务里的（{@link Kind#SETTING}）不写死，是 0：车上按 {@link #property} 取。 */
     public final int id;
     /** 带区域读时的区域值；不带区域的为 0。 */
     public final int zone;
     public final int labelRes;
     public final Trust trust;
     public final Format format;
+    /** 车机设置服务里的号在管理器上的常量名（{@link Kind#SETTING}）；别的读法是 null。 */
+    public final String property;
 
     Signal(Group group, Kind kind, int id, int zone, int labelRes, Trust trust, Format format) {
+        this(group, kind, id, zone, labelRes, trust, format, null);
+    }
+
+    /** 车机设置服务里的号（{@link Kind#SETTING}）：先用着，值是亮 / 灭（{@link MirrorLamps}）。 */
+    Signal(Group group, String property, int zone, int labelRes) {
+        this(group, Kind.SETTING, 0, zone, labelRes, Trust.PROVISIONAL, Format.ON_OFF, property);
+    }
+
+    Signal(Group group, Kind kind, int id, int zone, int labelRes, Trust trust, Format format, String property) {
         this.group = group;
         this.kind = kind;
         this.id = id;
@@ -289,11 +318,17 @@ public enum Signal {
         this.labelRes = labelRes;
         this.trust = trust;
         this.format = format;
+        this.property = property;
     }
 
     /** 能不能直接用：确认了的，或者先用着的。 */
     public boolean usable() {
         return trust != Trust.UNVERIFIED;
+    }
+
+    /** 车辆接口（{@link EcarxSource}）读的：车机设置服务里的（{@link Kind#SETTING}）不是。 */
+    public boolean viaCarInterface() {
+        return kind != Kind.SETTING;
     }
 
     public boolean isSensor() {

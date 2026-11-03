@@ -2,6 +2,7 @@ package com.kooo.evcam.telemetry;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 
 import org.junit.Test;
@@ -18,6 +19,17 @@ public class VehicleStateTest {
         assertNull(s.doorsOpen);
         assertEquals(VehicleState.SEAT_UNKNOWN, s.seat(VehicleState.FRONT_LEFT));
         assertNull(s.turnSignal);
+    }
+
+    /** 后视镜上的灯：没人读时是读不到（不是 null）；改别的项不动它，传 null 也回到读不到。 */
+    @Test
+    public void mirrorLampsAreNeverNullAndSurviveOtherEdits() {
+        assertSame(MirrorLamps.UNKNOWN, VehicleState.empty().mirrorLamps);
+        MirrorLamps lit = MirrorLamps.UNKNOWN.with(MirrorLamps.Lamp.BLIND_SPOT_LEFT, true);
+        VehicleState withLamps = VehicleState.empty().edit().mirrorLamps(lit).build();
+        VehicleState later = withLamps.edit().speedKmh(30f).turnSignal(VehicleState.TURN_LEFT).build();
+        assertSame(lit, later.mirrorLamps);
+        assertSame(MirrorLamps.UNKNOWN, later.edit().mirrorLamps(null).build().mirrorLamps);
     }
 
     @Test

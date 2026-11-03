@@ -4486,7 +4486,7 @@ public class MultiCameraManager {
         isRecording = recording;
         if (!recording) {
             // 信息条那份在开录时就登记了（还没真正录上），开录失败也要撤；没登记过时无害
-            com.kooo.evcam.telemetry.Telemetry.get().release("recording");
+            com.kooo.evcam.telemetry.InfoBar.recordingStopped();
         }
     }
 
@@ -4707,11 +4707,12 @@ public class MultiCameraManager {
         } else {
             finalSaveDir = null;
         }
-        // 行驶信息条开着：录像期间登记要用车辆信号，停录时注销（setRecording(false)；没别人在用就全停）。
-        // MediaRecorder 直接吃相机输出，画不了信息条（开着信息条的话建管线时就改用编码录制，见 AppConfig.shouldUseCodecRecording）
+        // 行驶信息条开着：录像期间登记要用车辆信号（勾了后视镜上的灯也读灯，InfoBar 定），停录时注销（setRecording(false)；
+        // 没别人在用就全停）。MediaRecorder 直接吃相机输出，画不了信息条（开着信息条的话建管线时就改用编码录制，
+        // 见 AppConfig.shouldUseCodecRecording）
         boolean infoBarOn = useCodecRecording && com.kooo.evcam.telemetry.InfoBar.isOnForRecording(context);
         if (infoBarOn) {
-            com.kooo.evcam.telemetry.Telemetry.get().acquire(context, "recording");
+            com.kooo.evcam.telemetry.InfoBar.recordingStarted(context);
         }
 
         // 这个录像意图：写到哪（建录制器、重新备好时先看录像此刻实际写在哪个盘上，见 laneDir），每一路的录法照此刻的设置定下

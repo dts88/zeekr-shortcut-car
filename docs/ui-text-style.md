@@ -477,6 +477,10 @@
   「Shows the horn and the brake and throttle pedals below Straighten on the main screen, using the Driving info bar icons;
   the horn signal can't be read yet」/「Memaparkan hon serta pedal brek dan pendikit di bawah Luruskan pada skrin utama,
   menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca」（「刹车深度」「油门深度」照车辆信号里的名字）。
+- 2026-11-03 批准（车辆信号灯光一组的后视镜上的灯，信息条转向灯那一格的边框）：vi_blind_spot_left「左侧盲区指示灯」/
+  Left blind spot light / Lampu titik buta kiri；vi_blind_spot_right「右侧盲区指示灯」/ Right blind spot light /
+  Lampu titik buta kanan；vi_door_warning_left「左侧开门预警」/ Left door open warning / Amaran buka pintu kiri；
+  vi_door_warning_right「右侧开门预警」/ Right door open warning / Amaran buka pintu kanan（「驾驶辅助」一组的「开门预警」是功能开关，不动）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -485,7 +489,9 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
+  vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
+  settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
 
 ---
 

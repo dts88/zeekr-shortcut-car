@@ -11,7 +11,8 @@ package com.kooo.evcam.telemetry;
  * 在画面上必须分得开，否则转向灯亮着而我们读不到，画出来就是「没打灯」。</p>
  *
  * <p>所以每个字段都是可空的包装类型：{@code null} = 没数据。座位例外：五个座位各自有一个状态，
- * 「没数据」是其中之一（{@link #SEAT_UNKNOWN}，{@link #seat}）。</p>
+ * 「没数据」是其中之一（{@link #SEAT_UNKNOWN}，{@link #seat}）。后视镜上的灯也例外：一份 {@link MirrorLamps}，
+ * 读不到的那一盏在里面是 null（{@link #mirrorLamps}）。</p>
  *
  * <p>纯数据，不碰 Android，{@code VehicleStateTest} 里测。</p>
  */
@@ -85,6 +86,11 @@ public final class VehicleState {
     public final Boolean horn;
     /** 哨兵模式：0 关、1 开、2 布防（锁车后）。熄屏后环视录到什么时候（车机要不要睡），看的就是它（规格 2.4）。 */
     public final Integer sentry;
+    /**
+     * 后视镜上的灯（盲区指示灯、开门预警，左右各一）：另一个来源的（{@link Telemetry#lamps}），信息条上是转向灯箭头的边框。
+     * 永远不为 null；没人读时是 {@link MirrorLamps#UNKNOWN}。
+     */
+    public final MirrorLamps mirrorLamps;
     public final Float odometerKm;
     public final Double latitude;
     public final Double longitude;
@@ -120,6 +126,7 @@ public final class VehicleState {
         this.reverseLamps = b.reverseLamps;
         this.horn = b.horn;
         this.sentry = b.sentry;
+        this.mirrorLamps = b.mirrorLamps;
         this.odometerKm = b.odometerKm;
         this.latitude = b.latitude;
         this.longitude = b.longitude;
@@ -181,6 +188,7 @@ public final class VehicleState {
         private Boolean reverseLamps;
         private Boolean horn;
         private Integer sentry;
+        private MirrorLamps mirrorLamps = MirrorLamps.UNKNOWN;
         private Float odometerKm;
         private Double latitude;
         private Double longitude;
@@ -218,6 +226,7 @@ public final class VehicleState {
             reverseLamps = s.reverseLamps;
             horn = s.horn;
             sentry = s.sentry;
+            mirrorLamps = s.mirrorLamps;
             odometerKm = s.odometerKm;
             latitude = s.latitude;
             longitude = s.longitude;
@@ -251,6 +260,7 @@ public final class VehicleState {
         public Builder horn(Boolean v) { horn = v; return this; }
         public Builder readings(Readings v) { readings = v; return this; }
         public Builder sentry(Integer v) { sentry = v; return this; }
+        public Builder mirrorLamps(MirrorLamps v) { mirrorLamps = v == null ? MirrorLamps.UNKNOWN : v; return this; }
         public Builder odometerKm(Float v) { odometerKm = v; return this; }
         public Builder position(Double lat, Double lon) { latitude = lat; longitude = lon; return this; }
 

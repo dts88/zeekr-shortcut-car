@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 后视镜上那盏灯的来源（{@link MirrorLamps}，项目所有者 2026-11-03 用在盲区画面上）：车机设置服务（{@code setting_zeekr}）里
+ * 后视镜上那盏灯的来源（{@link MirrorLamps}，项目所有者 2026-11-03 用在盲区画面、信息条上）：车机设置服务（{@code setting_zeekr}）里
  * 盲区指示灯、开门预警左右这三个号。车辆接口（{@link EcarxSource}）的功能号里没有盲区指示灯，所以另走这一条路。只读，一个都不写。
  *
  * <h3>怎么连（Lab findings §2.68、§2.75、§2.78，车上验证过的事实）</h3>
@@ -46,13 +46,13 @@ final class MirrorLampSource {
     private static final String CAR_CLASS = "android.car.Car";
     private static final String LIFECYCLE_CLASS = "android.car.Car$CarServiceLifecycleListener";
     static final String SERVICE = "setting_zeekr";
-    /** 管理器上的常量名：盲区指示灯（分左右区域）、开门预警左、右。 */
-    static final String BLIND_SPOT = "ID_SETTING_FUNC_LCMA_INDCN_DATA";
-    static final String DOOR_WARNING_LEFT = "ID_ZEEKR_DOOROPENWARNLEINDCN_DATA";
-    static final String DOOR_WARNING_RIGHT = "ID_ZEEKR_DOOROPENWARNRIINDCN_DATA";
+    /** 管理器上的常量名：盲区指示灯（分左右区域）、开门预警左、右。名字和区域写在信号表里（{@link Signal#BLIND_SPOT_LEFT} …）。 */
+    static final String BLIND_SPOT = Signal.BLIND_SPOT_LEFT.property;
+    static final String DOOR_WARNING_LEFT = Signal.DOOR_WARNING_LEFT.property;
+    static final String DOOR_WARNING_RIGHT = Signal.DOOR_WARNING_RIGHT.property;
     /** 盲区指示灯的区域。 */
-    static final int AREA_LEFT = 0x1;
-    static final int AREA_RIGHT = 0x4;
+    static final int AREA_LEFT = Signal.BLIND_SPOT_LEFT.zone;
+    static final int AREA_RIGHT = Signal.BLIND_SPOT_RIGHT.zone;
     /** 有灯亮着时多久再读一遍亮着的那几盏（漏推了「灭」，画面最多多挂这么久）。 */
     static final long RECONCILE_MS = 2000L;
 
