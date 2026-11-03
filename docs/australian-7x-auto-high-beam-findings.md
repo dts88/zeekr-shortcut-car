@@ -35,8 +35,17 @@ the auto samples did not differ from the untouched Drive samples. This is a find
 the queried API signals, not a full vehicle-bus capture.
 
 Exterior-light mode `0x20040E00` remained `LAMP_EXTERIOR_LIGHT_CONTROL_AUTOMATIC = 0x20040E03`.
-The generic SDK's `LAMP_EXTERIOR_LIGHT_CONTROL_AHBC = 0x20040E04` is only an enum candidate; it was **not written** or
-verified as the stalk-selected preference. Other AHB-labelled candidates returned unknown values.
+The generic SDK declares `LAMP_EXTERIOR_LIGHT_CONTROL_AHBC = 0x20040E04`, but the installed
+`CarFuncImplLamp` implementation maps only Off, Position, Low Beam and Auto for this function.
+AHBC is absent from that map. The setter translates missing entries to `-1` and skips the
+write, so this AHBC request would be ignored by the inspected backend. It does not translate
+to raw value `4`. No lighting write was attempted. Other AHB-labelled candidates returned
+unknown values.
+
+This differs from the implemented Comfort drive-mode command in Zeekr Shortcut. Its success
+does not establish an AHB command, and an SDK enum alone does not establish a setter path.
+The public upstream code at `e3e628e` reads high-beam output and flash-to-pass; no verified
+AHB-selection command was found there. This does not rule out another OEM or privileged route.
 
 ## 3. Android vehicle-service route
 
@@ -96,3 +105,8 @@ Backend inspection used the car's exported `CarService` version 12 (version code
 Relevant implementations were `CarPropertyService`, `PropertyHalService`, `PropertyHalServiceBase`,
 `HalServiceBase`, and `LightHalZeekrService`. Their method behaviour is summarized above;
 vendor binaries and decompiled source are not part of this PR.
+
+The ECARX enum/setter check also used the car's exported adapter implementation:
+`CarFuncImplLamp`'s value map and setter, `BidirectionalSparseIntArray`, and
+`VehiclePropertyMWIds`. Its exterior-light function maps to raw `0x22400F59`; that is separate
+from the raw AHB-switch candidate `0x21408E18` above.
