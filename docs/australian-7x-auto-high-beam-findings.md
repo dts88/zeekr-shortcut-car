@@ -91,7 +91,33 @@ no custom lighting values or writes were attempted.
 Further progress needs an accessible control path or an appropriate OEM/App Lab integration
 mechanism. Repeating the same stalk sequence would not resolve this access/mapping problem.
 
-## 5. Evidence retained for follow-up
+## 5. Separate Zeekr SDK route
+
+**On-car observation, diagnostic v0.30:** a bounded PackageManager check identified
+`com.zeekr.vehicle.service`, version **1.1.3.11** (code **233**), as the installed provider
+for service alias `car`. Its `CarService` matched the exact support-service action,
+car category and provider XML alias used by CoreService. The diagnostic exported normally
+readable code and the manifest; it did not initialize the SDK, bind a service or call a light control.
+
+**Implementation inspection:** both EE2 and EE3 lighting mappings translate
+`Car.Light.ExteriorLight` with SDK value `41242` (`ControlAhbc`) to ECARX property
+`0x20040E00` with value `0x20040E04`. The generic lighting path then calls
+`ICarFunction.setFunctionValue`. The alternative platform selection changes the Adas/Navi
+modules, but lighting still uses the ECARX adapter route. This is another wrapper around
+the incomplete AHBC mapping described in section 2, not a newly established raw AHB control.
+
+The provider also maps `Car.Light.ActiveHighbeam` to `0x2B010100`,
+`Car.Light.HighbeamActive` to `0x20040200` response-speed values,
+`Car.Light.AuxHighbeam` to `0x20040400`, and `MainBeam` to lamp-output `0x21050200`.
+These names do not establish the owner's stalk-selected AHB preference, and this inspection
+did not reveal a new AHB backend mapping. No additional stalk comparison or guessed write
+was performed.
+
+The broker's caller authorization is a separate, still untested question. Exported component
+metadata and readable code do not establish live SDK access. These findings close this
+specific mapped route; they do not prove that every OEM integration is unavailable.
+
+## 6. Evidence retained for follow-up
 
 The contributor retains the original reports and diagnostic source. This hash identifies the
 cumulative lighting-manager report. Full device logs and exported vehicle software are not
@@ -100,6 +126,7 @@ included in this documentation change.
 | Evidence | Diagnostic | Report SHA-256 |
 |---|---|---|
 | Lighting managers/configurations | v0.19 | `c3ed5aaf282a21144ccbbb91fb0383b314dd1c4ae95423e258c6d52dc999c394` |
+| Car-provider code export, received and hash-verified | v0.30 | `34bbc48487962a3dba97a3b11f03f0a0f45cfce96c9fea62f5a55115fd180956` |
 
 Backend inspection used the car's exported `CarService` version 12 (version code 32).
 Relevant implementations were `CarPropertyService`, `PropertyHalService`, `PropertyHalServiceBase`,

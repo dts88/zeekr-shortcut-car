@@ -77,12 +77,41 @@ The standard `CarPropertyManager` route did not advertise raw configuration `0x2
 so no raw property read was attempted. Permission filtering versus unsupported access
 remains indeterminate.
 
-No drive-session trigger, settings-initialization timing, sleep/wake, head-unit restart or
-automatic preservation of later manual changes was tested. The owner-reported Standard
-startup default and desired Comfort restoration require separate automation work. This
-finding does not establish unattended restoration or a reliable available-state getter.
+The warm vehicle off/on observation below identifies a useful trigger. Settings-initialization
+timing, automatic Comfort selection, long sleep, head-unit restart and preservation of later
+manual changes remain unverified. This finding does not establish unattended restoration
+or a reliable available-state getter.
 
-## 5. Evidence retained for follow-up
+## 5. Vehicle off/on signal observation
+
+**On-car observation, diagnostic v0.30:** during one normal door-and-seat off/on routine,
+the same two vehicle inputs used by Shortcut changed together while Android remained awake.
+All reads reported active support, and runtime constants were checked first.
+
+| Samples | Usage mode `0x20259000` | Screen-power event `0x20290300` |
+|---|---|---|
+| 1-28 | DRIVING (`0x00200107`) | `0` |
+| 29-33 | ON (`0x00200105`) | `0` |
+| 34-38 | ACC (`0x00200104`) | `1` |
+| 39-53 | ON (`0x00200105`) | `0` |
+
+The capture lasted about 54 seconds. Android reported `interactive=true` throughout,
+and elapsed time minus uptime did not increase, indicating no measured CPU suspend.
+USG labels are the runtime constants; DRIVING here is not a gear or motion measurement.
+The default-scope climate-power read stayed zero and did not identify the transition.
+
+This matches [`VehicleScreen`](../app/src/main/java/com/kooo/evcam/screen/VehicleScreen.java)'s
+combined vehicle-state logic and the vehicle-lit handling in
+[`ScreenState`](../app/src/main/java/com/kooo/evcam/screen/ScreenState.java).
+The earlier diagnostic's Android-suspend requirement was the wrong condition for this routine;
+its failure to select Comfort was not a rejected setter. The initial lit state and the
+DRIVING-to-ON change must not count as a new drive. The useful observed edge is ACC/screen-off
+to ON/screen-on. Sequential one-second polling does not establish subsecond ordering.
+
+**No Comfort command was issued in this capture.** It establishes the input transition for
+a subsequent one-shot test, not automatic restoration or cold-start reliability.
+
+## 6. Evidence retained for follow-up
 
 The contributor retains the report and diagnostic source. Full device logs, vehicle
 binaries and decompiled source are not included in this documentation change.
@@ -90,3 +119,4 @@ binaries and decompiled source are not included in this documentation change.
 | Evidence | Diagnostic | Report SHA-256 |
 |---|---|---|
 | AM4 accepted Comfort command and separate observation | `0.26-comfort-command-test` | `d7c312ea426fdcf2e2ed26ed2dcee320da2a1e7068b240f6a77a86345cebd0ec` |
+| Door-and-seat off/on signals and provider metadata | `0.30-combined-checks` | `e012d1660c384470da846da7db21b21efe55ce8918ab0c85fc8d35f1d2ca1bc8` |
