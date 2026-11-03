@@ -12,7 +12,9 @@ This follows the distinction in [the platform notes](zeekr-platform-notes.md):
 
 **Verified on this car:** one explicit ECARX Comfort command returned `true`, and the
 owner confirmed that the factory Acceleration setting changed to **Comfort**. This verifies
-attended manual control. Available-state API readback and startup restoration remain unverified.
+attended manual control. A later explicitly armed warm off/on test also selected Comfort
+automatically, with API acceptance and owner confirmation. Available-state API readback,
+long sleep and head-unit restart reliability remain unverified.
 
 **Owner observation:** Acceleration defaults to **Standard** when the car starts. The desired
 behaviour is Comfort once at the beginning of each drive, preserving later manual changes.
@@ -77,10 +79,10 @@ The standard `CarPropertyManager` route did not advertise raw configuration `0x2
 so no raw property read was attempted. Permission filtering versus unsupported access
 remains indeterminate.
 
-The warm vehicle off/on observation below identifies a useful trigger. Settings-initialization
-timing, automatic Comfort selection, long sleep, head-unit restart and preservation of later
-manual changes remain unverified. This finding does not establish unattended restoration
-or a reliable available-state getter.
+The warm vehicle off/on observation and follow-up below establish one successful automatic
+Comfort command during the owner's short routine. Settings-initialization timing across
+other starts, long sleep, head-unit restart and preservation of later manual changes remain
+unverified. This finding does not establish permanent startup reliability or a reliable getter.
 
 ## 5. Vehicle off/on signal observation
 
@@ -111,7 +113,37 @@ to ON/screen-on. Sequential one-second polling does not establish subsecond orde
 **No Comfort command was issued in this capture.** It establishes the input transition for
 a subsequent one-shot test, not automatic restoration or cold-start reliability.
 
-## 6. Evidence retained for follow-up
+## 6. Automatic Comfort on one warm vehicle wake
+
+**On-car observation, diagnostic v0.31:** one explicitly armed trial observed ON/screen0,
+then four samples of ACC/screen1, then ON/screen0 again. After two fresh returning samples
+at least one second apart, it prepared the same guarded Comfort command. Initial awake
+state did not trigger a command.
+
+| Event | Sydney time, 3 November 2026 | Result |
+|---|---|---|
+| First observed off state | 15:34:48.091 | ACC/screen1 |
+| First observed return | 15:34:52.268 | ON/screen0 |
+| Command helper start | 15:34:53.314 | Exact runtime constants and fresh Park/zero-speed guards |
+| Command result | 1,052ms after first observed return, measured by elapsed clock | One setter attempted, returned `true` |
+
+The complete report contains 15 samples, one preparation and one setter attempt. Property
+and sensor support were active; gear was Park and speed was 0.0. Guard collection took 3ms,
+and the command helper took 5ms. No ordinary ECARX mode getter or write retry was used.
+The final phase was FINISHED. The owner then confirmed that it worked.
+
+This verifies automatic Comfort selection for one attended warm door-and-seat cycle while
+the process survived. The app used no wake lock, foreground service, alarm or scheduled job
+for this trial. It did not require Android CPU sleep or a 60-second wait. The diagnostic's
+own `factoryUiConfirmed=false` and `readbackPerformed=false` fields remain accurate about
+what the app measured; factory confirmation was supplied separately by the owner.
+
+The armed trial is one-shot and stops after dispatch. A subsequent manual mode change was
+not separately tested. Long sleep, process death, a head-unit restart and permanent session
+handling remain unverified. This result should feed Shortcut's existing vehicle wake logic,
+not be presented as full startup reliability from a short-lived diagnostic.
+
+## 7. Evidence retained for follow-up
 
 The contributor retains the report and diagnostic source. Full device logs, vehicle
 binaries and decompiled source are not included in this documentation change.
@@ -120,3 +152,4 @@ binaries and decompiled source are not included in this documentation change.
 |---|---|---|
 | AM4 accepted Comfort command and separate observation | `0.26-comfort-command-test` | `d7c312ea426fdcf2e2ed26ed2dcee320da2a1e7068b240f6a77a86345cebd0ec` |
 | Door-and-seat off/on signals and provider metadata | `0.30-combined-checks` | `e012d1660c384470da846da7db21b21efe55ce8918ab0c85fc8d35f1d2ca1bc8` |
+| Automatic Comfort on one warm off/on cycle | `0.31-comfort-vehicle-wake` | `35b4eeb27b116f80269cf82e0cfb06dfd6ea15132ef1c52625d671c427a9ec57` |

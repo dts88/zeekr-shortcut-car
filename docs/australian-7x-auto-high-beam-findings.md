@@ -31,8 +31,9 @@ stalk action selected manual high-beam and the second selected auto.
 
 `BCM_FUNC_LIGHT_MAIN_BEAM = 0x21050200` read `0, 0, 1, 1, 0, 0, 0`.
 It distinguished lamp output, not AHB selection. Across the 64 captured numeric readings,
-the auto samples did not differ from the untouched Drive samples. This is a finding about
-the queried API signals, not a full vehicle-bus capture.
+the auto samples did not differ from the untouched Drive samples. Both comparisons
+(HB01/HB02 and HB06/HB07) explicitly recorded Drive and zero speed, so Park does not
+explain those unchanged readings. This concerns the queried signals, not a full vehicle-bus capture.
 
 Exterior-light mode `0x20040E00` remained `LAMP_EXTERIOR_LIGHT_CONTROL_AUTOMATIC = 0x20040E03`.
 The generic SDK declares `LAMP_EXTERIOR_LIGHT_CONTROL_AHBC = 0x20040E04`, but the installed
@@ -53,6 +54,8 @@ AHB-selection command was found there. This does not rule out another OEM or pri
 `Car.createCar(Context, Handler, long, CarServiceLifecycleListener)` factory with timeout `0`
 connected successfully and obtained the `property` and `light_zeekr` managers. The check
 completed and disconnected normally. This is separate from the ECARX connection used for the climate controls.
+This later API check did not record gear, so it must not be described as a verified Drive
+test. It collected access/configuration metadata, not an AHB value read or write.
 The earlier deprecated factory had returned null, and the app-visible automotive feature
 was false; changing connection method resolved that part of the experiment.
 
@@ -116,6 +119,10 @@ was performed.
 The broker's caller authorization is a separate, still untested question. Exported component
 metadata and readable code do not establish live SDK access. These findings close this
 specific mapped route; they do not prove that every OEM integration is unavailable.
+Drive may affect a valid control's current availability, but the inspected missing translation
+and alias collision have no gear-dependent branch. Changing gear does not repair those
+specific mappings. The public configuration filter also uses cached metadata and Android
+permission checks rather than a gear condition.
 
 ## 6. Evidence retained for follow-up
 
