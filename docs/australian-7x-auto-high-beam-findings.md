@@ -16,8 +16,9 @@ Related findings: [recirculation](australian-7x-recirculation-findings.md) and
 
 **No usable automatic-high-beam (AHB) selection control was verified, and no lighting write
 was attempted.** Lamp output was distinguishable; AHB selection was not. The public Android
-vehicle-service route connected, but did not provide the required configurations. Inspection
-also found an alias collision in the custom lighting route.
+vehicle-service route connected, but normal reads of both AHB candidates raised permission
+`SecurityException`s while the diagnostic recorded stationary Drive. Inspection also found
+an alias collision in the custom lighting route.
 
 These results apply to this diagnostic in this car's App Lab. They do not establish that
 every OEM or privileged integration route is unavailable.
@@ -66,15 +67,36 @@ was false; changing connection method resolved that part of the experiment.
 | `0x11400E01` | Standard high-beam lamp state | `android.car.permission.CAR_EXTERIOR_LIGHTS` | `null` |
 
 All three permissions were ungranted in the local app context and reported protection level
-`0x12` (signature/privileged). The diagnostic stopped before value reads because the exact
-configurations were unavailable: **no getter denial or getter `SecurityException` was observed**.
+`0x12` (signature/privileged). In v0.19, the diagnostic stopped before value reads because the
+exact configurations were unavailable: **that check did not attempt a getter or observe a
+getter `SecurityException`**.
 
 **Implementation inspection:** the installed `CarService` builds its permission map from
 runtime HAL properties and filters generic configurations by read permission. Combined with
-the non-null permission metadata, this strongly suggests the candidates exist but configuration
-access is filtered. **Inference:** restricted access is the likely obstacle; App Lab's local
-permission result does not establish the backend caller identity, and transport errors can
-also produce null. It is not proof that every integration route is unavailable.
+the non-null permission metadata, this suggested the candidates exist but configuration
+access is filtered. Those metadata results alone did not establish actual getter denial;
+App Lab's local permission result does not establish the backend caller identity, and
+transport errors can also produce null.
+
+**On-car observation, diagnostic v0.32:** the normal
+`CarPropertyManager.getProperty(int, int)` getter was then attempted once for each of the
+two selection candidates, even though their configurations remained `null`. Both IDs encode
+GLOBAL and INT32 in the installed API, providing the source basis for exact area `0`.
+
+| Attempted property | Actual getter result |
+|---|---|
+| `0x21408E18`, area `0` | `SecurityException: requires android.car.permission.CAR_VENDOR_EXTENSION` |
+| `0x11400E11`, area `0` | `SecurityException: requires android.car.permission.CONTROL_CAR_EXTERIOR_LIGHTS` |
+
+The known ECARX gear and speed sensors were active. Before and after the getters, they
+reported Drive (`0x00200220`) and finite speed `0.0`. The check took 1,163 ms and disconnected
+normally. It returned no property values and made no lighting writes, retries, subscriptions,
+permission requests or custom-lighting alias calls.
+
+**Result:** the ordinary Android property route is blocked by permission checks for this app
+in this car's App Lab, including in stationary Drive. Being in Drive did not make
+these normal reads accessible. This does not establish that every AHB route is unavailable,
+nor does it establish the candidates' AHB values or a working setter.
 
 ## 4. Custom lighting alias collision
 
@@ -124,16 +146,29 @@ and alias collision have no gear-dependent branch. Changing gear does not repair
 specific mappings. The public configuration filter also uses cached metadata and Android
 permission checks rather than a gear condition.
 
+The same v0.32 run attempted a targeted code-and-manifest export of factory settings package
+`com.geely.pma.settings`, version `cs1e_eu-20260404` (code `20260404`), whose known service is
+`com.zeekr.carcontrol.CBCService` with alias `carsettings`. It returned **metadata only**:
+the APK exceeded the exporter's 4,096-entry inventory limit. Its reported size was
+315,450,453 bytes; no partial code payload was included. This is an exporter limitation,
+not a finding that the factory package has no AHB handler. Its control path remains uninspected.
+
 ## 6. Evidence retained for follow-up
 
-The contributor retains the original reports and diagnostic source. This hash identifies the
-cumulative lighting-manager report. Full device logs and exported vehicle software are not
+The contributor retains the original reports and diagnostic source. The hashes below identify
+the relevant reports. Full device logs and exported vehicle software are not
 included in this documentation change.
 
 | Evidence | Diagnostic | Report SHA-256 |
 |---|---|---|
 | Lighting managers/configurations | v0.19 | `c3ed5aaf282a21144ccbbb91fb0383b314dd1c4ae95423e258c6d52dc999c394` |
 | Car-provider code export, received and hash-verified | v0.30 | `34bbc48487962a3dba97a3b11f03f0a0f45cfce96c9fea62f5a55115fd180956` |
+| Normal direct getters in stationary Drive | v0.32 | `a1789a212be52720f640a7eaab0916c5839b2c6c858a51e46bc2ce9e3babf7cf` |
+| Factory settings export metadata only, no code payload | v0.32 | `db784596aa3c96162d8ba9b0801b6f63f6aed909903cc53c260abcac91c1ef5a` |
+
+Both v0.32 reports share run ID `bc934eb8-f409-4d45-87cd-1acbe9e7e18b`.
+The direct check started on 3 November 2026 at 05:31:36.850 UTC (16:31:36.850 AEDT);
+the factory export report was created at 05:31:38.032 UTC (16:31:38.032 AEDT).
 
 Backend inspection used the car's exported `CarService` version 12 (version code 32).
 Relevant implementations were `CarPropertyService`, `PropertyHalService`, `PropertyHalServiceBase`,
