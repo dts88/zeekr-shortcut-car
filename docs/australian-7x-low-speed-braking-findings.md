@@ -78,6 +78,22 @@ No automatic trigger, wake lock or new vehicle subscription was added. This does
 establish persistence after a new drive, sleep/wake, head-unit restart, a restoration policy,
 or compatibility with other firmware/markets.
 
+### Driveway use case and geofenced option
+
+**Owner-reported motivation:** I and other owners experience recurring unwanted LSEB
+interventions in our own driveways. An optional location rule could disable LSEB within a
+user-defined geofence, such as home, while retaining normal LSEB behaviour outside that area.
+This is a proposal for a future feature.
+
+The owner reports that the Zeekr API can identify when the car is at home; access to an
+equivalent signal from an App Lab app remains unverified. The existing
+[`LocationSource`](../app/src/main/java/com/kooo/evcam/telemetry/LocationSource.java) uses Android
+GPS/network location, but its availability inside App Lab is also untested. If it works,
+a geofence could use user-configured home coordinates without a native home-presence flag.
+
+Location access, geofence entry/exit handling and the API command to re-enable LSEB on exit
+have not been tested. The existing on-car result verifies the explicit OFF command only.
+
 ## 5. Evidence retained for follow-up
 
 The contributor retains the original cumulative reports and diagnostic source. Comparisons
