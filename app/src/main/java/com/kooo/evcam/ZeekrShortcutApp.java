@@ -35,9 +35,9 @@ public class ZeekrShortcutApp extends Application {
         // U 盘挂上、卸下、异常掉线进黑匣子（2026-09-26 录像盘掉线，系统那边发生了什么一行都没记下）
         com.kooo.evcam.blackbox.VolumeEvents.register(this);
         // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），
-        // 主界面在不在都一样（规格 §3.1）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的录像意图先接上
+        // 主界面在不在都一样（规格 §3.1）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的相机管家先起来
         com.kooo.evcam.screen.ScreenState.install(this);
-        // 通道调度（唯一动相机的地方）进程里只有一个：在这里最先装上，不换、不停（第 2 步；建管线、录像协调器也各自先装一次，装过了什么都不做）。
+        // 通道调度（唯一动相机的地方）进程里只有一个：在这里最先装上，不换、不停（第 2 步；建管线、相机管家也各自先装一次，装过了什么都不做）。
         // 登记表、相机服务、亮熄屏、车辆信号叫醒它的监听跟着它挂一次 —— 车辆信号的核心上面刚登记好。这里不进相机服务（开始听相机服务的可用性
         // 还是在建管线、起前台服务时）
         com.kooo.evcam.camera.ChannelFacts.install(this);
@@ -45,31 +45,11 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.sound.DriveSound.install(this);
         // 灵动贴（试验性）：连接过的就开始听它们的广播，按下去照选的动作做；没连接过的、用户退出了的什么都不做
         com.kooo.evcam.button.SmartButtons.install(this);
-        // 「这一趟」的录像选择落盘（规格 1.2）：进程被杀又拉回来时还在；车机真正开机就清。
-        // 「这一趟要录」变了、人按了停止时写到盘上才返回（commit）：熄屏那一刻改的「这一趟要录」要赶在车机几秒后结束进程之前落盘
-        // （2026-10-10）；别的几项排队异步写（apply），不在主线程上等盘（审查 2026-10-11）
-        final android.content.SharedPreferences choices = getSharedPreferences("recording_intent", MODE_PRIVATE);
-        com.kooo.evcam.recording.RecordingIntent.current().attach(new com.kooo.evcam.recording.RecordingIntent.Store() {
-            @Override
-            public boolean get(String key, boolean fallback) {
-                return choices.getBoolean(key, fallback);
-            }
-
-            @Override
-            public void put(java.util.Map<String, Boolean> values, boolean durable) {
-                android.content.SharedPreferences.Editor editor = choices.edit();
-                for (java.util.Map.Entry<String, Boolean> entry : values.entrySet()) {
-                    editor.putBoolean(entry.getKey(), entry.getValue());
-                }
-                if (!durable) {
-                    editor.apply();
-                } else if (!editor.commit()) {
-                    AppLog.w("App", "recording intent not saved: " + values);
-                }
-            }
-        });
+        // 相机管家（要相机做什么都向它请求）在这里起来：「这一趟」的录像选择从盘上读回来（规格 1.2：进程被杀又拉回来时还在）；
+        // 车机真正开机是新的一趟
+        com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(this);
         if (com.kooo.evcam.blackbox.BlackBox.rebootedSinceLastRun()) {
-            com.kooo.evcam.recording.RecordingIntent.current().reset();
+            keeper.newTrip("reboot");
             com.kooo.evcam.blackbox.BlackBox.noteImportant("车机重启过：这一趟的录像选择清零（规格 1.2）");
         }
         // 每一台相机的来历（车机重新初始化以来开过几台、最后一次关完；2.11.5 诊断）：读回存下的那一份，在写盘的那条线程上读。

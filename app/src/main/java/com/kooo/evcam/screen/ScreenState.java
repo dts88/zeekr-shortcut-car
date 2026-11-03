@@ -12,7 +12,6 @@ import android.os.SystemClock;
 
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.blackbox.BlackBox;
-import com.kooo.evcam.recording.RecordingCoordinator;
 import com.kooo.evcam.recording.ScreenOffRecording;
 import com.kooo.evcam.recovery.Recovery;
 import com.kooo.evcam.telemetry.Readings;
@@ -33,20 +32,20 @@ import java.util.List;
  * （{@link ScreenTransitions}）：</p>
  *
  * <ul>
- *   <li><b>熄屏</b>（E1）：唤醒锁、录像那一侧记下这一段熄屏（{@link RecordingCoordinator#screenOff}）、监听者（相机层放开座舱、主界面、
+ *   <li><b>熄屏</b>（E1）：唤醒锁、相机管家记一行此刻的样子（{@link com.kooo.evcam.camera.CameraKeeper#screenOff}）、监听者（相机层放开座舱、主界面、
  *       后视镜、盲区画面）；</li>
  *   <li><b>车机要睡</b>（E2，黑着时安卓熄屏 = 车机下电）：只叫醒相机管家 —— 车机要睡由它自己判（{@code ChannelRules.headUnitSleeps}），
- *       按次序关（这时只剩环视），录像停不停也由它定、排给录像协调器（2026-11-02「熄屏判断收归通道调度」）；监听者不叫（屏幕早就黑了）；</li>
+ *       按次序关（这时只剩环视），录像停不停也由它定（2026-11-02「熄屏判断收归通道调度」）；监听者不叫（屏幕早就黑了）；</li>
  *   <li><b>车机醒着、屏幕黑着</b>（E2'，黑着时安卓又亮了：车机自己醒了一阵；2026-10-27 起屏幕亮了、车没通电也是）：相机管家当轮就不算
- *       车机要睡了；录像那一侧记一笔（{@link RecordingCoordinator#headUnitWoke}；不开录 —— 睡着时哨兵模式被打开的，通道醒来那一轮读到、
- *       留下环视，录像照相机管家的决定接），按开机自启动恢复服务（不拉界面）；监听者不叫（还黑着）；</li>
+ *       车机要睡了（不开录 —— 睡着时哨兵模式被打开的，通道醒来那一轮读到、留下环视，录像照相机管家的决定接），
+ *       按开机自启动恢复服务（不拉界面）；监听者不叫（还黑着）；</li>
  *   <li><b>亮屏</b>（E3）：和以前的亮屏一样，按固定顺序走一遍。黑着时亮要有证据（项目所有者 2026-10-27，{@link VehicleScreen}）：
  *       车通电了（点火 ON、DRIVING）才是亮屏；车没通电时屏幕亮了（远程开空调、远程看车）照熄屏算、不是边，黑匣子里记起止各一行。</li>
  * </ul>
  *
  * <p>安卓熄屏、又亮了（车机要睡、醒了），不管是哪条边，还告诉灵动贴放开、再要蓝牙（{@code SmartButtons}）。</p>
  *
- * <p>顺序固定：熄屏录制的唤醒锁（{@link ScreenOffRecording}）→ 录像的规矩（{@link RecordingCoordinator}）→ 相机（谁要用就登记，
+ * <p>顺序固定：熄屏录制的唤醒锁（{@link ScreenOffRecording}）→ 相机管家（{@link com.kooo.evcam.camera.CameraKeeper}）→ 相机（谁要用就登记，
  * 调度照登记表和「熄屏放开座舱」开关，{@code ChannelRules.releasedByDark}）→ 界面（因熄屏退下去的主界面亮屏接回来，
  * {@link Recovery#bringBackUiAfterScreenOn}）→ 主界面、后视镜、盲区画面、相机层自己登记的监听者。每条边出了错写一行黑匣子，
  * 看得出做到了哪一步。</p>
@@ -211,8 +210,8 @@ public final class ScreenState {
     /**
      * 进程一起来就装上（{@code ZeekrShortcutApp.onCreate}）：广播只能动态注册，而主界面可能不在。车辆信号的核心登记在这里
      * （{@link Telemetry#keepCore}：进程活着一直读离散信号，不开定位），监听者第一个挂上 —— 同一批读数里先判屏幕，
-     * 录像协调器的那一份（哨兵模式、挡位）在后面。这里不会当场跨过任何一条边：车辆信号在自己的线程上连、读到了才排到主线程，
-     * 录像意图（{@code RecordingIntent}）在这之后才接上。
+     * 相机管家的那一份（哨兵模式、挡位）在后面。这里不会当场跨过任何一条边：车辆信号在自己的线程上连、读到了才排到主线程，
+     * 相机管家（{@code CameraKeeper}）在这之后才起来。
      */
     public static synchronized void install(Context context) {
         if (installed) {
@@ -350,7 +349,7 @@ public final class ScreenState {
 
     /**
      * 屏幕此刻知道就当场做，不知道（进程刚起来在等第一份车辆判断、安卓刚亮在等那一遍车辆信号）就排着，知道了按排的先后做（主线程）。
-     * 恢复（{@link Recovery}）、接回录像（{@link RecordingCoordinator#resumeIfWanted}）走它：黑着的屏幕上不拉界面、不开不该开的录像。
+     * 恢复（{@link Recovery}）、相机管家看要不要开录都走它：黑着的屏幕上不拉界面、不开不该开的录像。
      */
     public static void whenKnown(Runnable action) {
         if (settle == Settle.NONE) {
@@ -663,7 +662,7 @@ public final class ScreenState {
                 + (after.state.androidOff ? "；安卓也熄屏了" : "；安卓还亮着"))
                 + "）");
         ScreenOffRecording.onScreenOff(app);
-        RecordingCoordinator.get(app).screenOff(after.state.androidOff);
+        com.kooo.evcam.camera.CameraKeeper.get(app).screenOff(after.state.androidOff);
         for (Listener listener : new ArrayList<>(LISTENERS)) {
             listener.onScreenOff();
         }
@@ -678,8 +677,8 @@ public final class ScreenState {
         BlackBox.noteImportant("车机要睡（安卓熄屏）：" + (darkMs < 0 ? "熄屏起点不明" : "熄屏后 +" + darkMs / 1000 + " 秒")
                 + "；车辆信号 screen_power_event=" + VehicleScreen.eventText(after.event)
                 + "、点火=" + VehicleScreen.ignitionText(after.ignition));
-        // 车机要睡由相机管家自己判（ChannelRules.headUnitSleeps：安卓熄屏、没在开车），录像停不停也是它定、排给录像协调器
-        // （2026-11-02「熄屏判断收归通道调度」，以前这里先叫协调器照它那张表判）。
+        // 车机要睡由相机管家自己判（ChannelRules.headUnitSleeps：安卓熄屏、没在开车），录像停不停也是它定
+        // （2026-11-02「熄屏判断收归通道调度」，以前这里先叫录像那一侧照它那张表判）。
         // 相机：通道眼里的熄屏也看安卓熄没熄屏（车机要睡不等黑满 30 秒，ChannelRules.darkForChannel）—— 叫醒调度，不等下一个两秒
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
         startWakePoll();
@@ -692,7 +691,6 @@ public final class ScreenState {
         BlackBox.noteImportant("安卓亮屏（" + wakeHow + "），车辆判断还是黑（screen_power_event="
                 + VehicleScreen.eventText(after.event) + "、点火=" + VehicleScreen.ignitionText(after.ignition)
                 + "）：车机醒着、屏幕黑着" + (darkMs < 0 ? "" : "，熄屏后 +" + darkMs / 1000 + " 秒"));
-        RecordingCoordinator.get(app).headUnitWoke();
         // 相机：安卓又亮了，通道眼里的熄屏照黑了多久算（ChannelRules.darkForChannel）—— 叫醒调度
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
         // 车机醒着：按开机自启动的规矩恢复服务；黑着不拉界面，录像接不接照相机管家的决定
@@ -717,7 +715,7 @@ public final class ScreenState {
                 + "）" + (darkMs < 0 ? "" : "，熄屏 " + darkMs / 1000 + " 秒"));
         wakeCapped = false;
         ScreenOffRecording.onScreenOn();
-        RecordingCoordinator.get(app).screenOn();
+        com.kooo.evcam.camera.CameraKeeper.get(app).screenOn();
         Recovery.bringBackUiAfterScreenOn(app);
         // 亮屏 = 车机醒了、能正常运行：按开机自启动的规矩恢复该恢复的（排到主线程下一轮，在监听者之后）
         Recovery.restore(app, "screen-on");

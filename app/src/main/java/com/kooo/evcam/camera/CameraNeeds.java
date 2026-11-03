@@ -33,7 +33,7 @@ import java.util.Set;
  *
  * <p>登记表自己不动手：谁要哪几路、要什么输出、该不该保持，都由通道调度（{@link ChannelScheduler}）读这里的数据去判
  * （channel-logic §一，项目所有者 2026-10-10 确认）。监听者只是叫醒调度。以前同一张表上还记一项事实「车机要睡」
- * （录像协调器判了写，调度来读）；2026-11-02 起车机要睡由相机管家自己判（{@link ChannelRules#headUnitSleeps}，项目所有者
+ * （以前录像那一侧判了写，调度来读）；2026-11-02 起车机要睡由相机管家自己判（{@link ChannelRules#headUnitSleeps}，项目所有者
  * 「熄屏判断收归通道调度」），这里只记谁要相机。</p>
  */
 public final class CameraNeeds {

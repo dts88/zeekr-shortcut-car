@@ -62,10 +62,10 @@ public class RecordingFloatingService extends Service {
     public static final String ACTION_RESET_POSITION = "com.kooo.evcam.action.RESET_FLOATING_POSITION";
 
     /**
-     * 录像的样子变了（RecordingCoordinator 推的：开录、停录、等待摄像头、又有一路在录），告诉按钮重画。
+     * 录像的样子变了（相机管家推的：开录、停录、等待摄像头、又有一路在录），告诉按钮重画。
      *
      * <p>这个广播原来由已删掉的那个按钮的类发，本服务一直同时听着这两个 action。广播只是叫一声：
-     * 收到了照协调器此刻的样子画（{@link #renderRecordingState}），不带状态 —— 以前带着「在不在录」，
+     * 收到了照相机管家此刻的样子画（{@link #renderRecordingState}），不带状态 —— 以前带着「在不在录」，
      * 说不出「在等摄像头」。</p>
      */
     public static final String ACTION_RECORDING_STATE_CHANGED = "com.kooo.evcam.RECORDING_STATE_CHANGED";
@@ -115,7 +115,7 @@ public class RecordingFloatingService extends Service {
     // 录制服务：按钮在时绑着它（开录、停录不经它，见 QuickActions）
     private boolean isServiceBound = false;
 
-    // 录制状态（照协调器画，见 renderRecordingState）
+    // 录制状态（照相机管家画，见 renderRecordingState）
     /** 录像意图开着（开录中、在录、等待摄像头）：按一下是停。 */
     private boolean isRecording = false;
     /** 一路都没在录、在等摄像头：灰环、灰方块、没有进度弧，不显示时长。 */
@@ -138,7 +138,7 @@ public class RecordingFloatingService extends Service {
         public void onServiceConnected(ComponentName name, IBinder service) {
             isServiceBound = true;
 
-            // 之后的变化协调器会发 ACTION_RECORDING_STATE_CHANGED 广播，本服务一直听着；这里只对一次当前状态
+            // 之后的变化相机管家会发 ACTION_RECORDING_STATE_CHANGED 广播，本服务一直听着；这里只对一次当前状态
             renderRecordingState();
         }
 
@@ -202,7 +202,7 @@ public class RecordingFloatingService extends Service {
             @Override
             public void onReceive(Context context, Intent intent) {
                 String action = intent.getAction();
-                // 兼容两种广播 action；广播只是叫一声，样子照协调器此刻的画
+                // 兼容两种广播 action；广播只是叫一声，样子照相机管家此刻的画
                 if ("com.kooo.evcam.RECORDING_STATE_CHANGED".equals(action) ||
                     "com.kooo.evcam.action.RECORDING_STATE_CHANGED".equals(action)) {
                     AppLog.d(TAG, "收到录制状态广播");
@@ -545,7 +545,7 @@ public class RecordingFloatingService extends Service {
         // 添加到窗口
         try {
             windowManager.addView(floatingContainer, layoutParams);
-            // 在不在录、什么样子只问协调器（和录制服务、前台通知同一个答案），之后的变化它会广播过来。
+            // 在不在录、什么样子只问相机管家（和前台通知同一个答案），之后的变化它会广播过来。
             // 以前靠主界面隔 500 ms 推它自己记的状态：主界面刚重建、还没对上时推的是「没在录」，
             // 录着像按钮却是灰的
             renderRecordingState();
@@ -564,20 +564,19 @@ public class RecordingFloatingService extends Service {
      */
     private void perform(FloatingAction action) {
         com.kooo.evcam.overlay.QuickActions.perform(this, action,
-                com.kooo.evcam.recording.RecordingCoordinator.Why.FLOATING);
+                com.kooo.evcam.camera.CameraKeeper.Why.FLOATING);
     }
 
     /**
-     * 照协调器此刻的样子画按钮（主线程）：开录中、在录是录制红的方块 + 本段进度 + 时长；等待摄像头是灰环、灰方块，
-     * 没有进度弧、不显示时长；没在录是灰圈灰点。在不在录、什么样子只问协调器（{@code RecordingCoordinator#view}），
+     * 照相机管家此刻的样子画按钮（主线程）：开录中、在录是录制红的方块 + 本段进度 + 时长；等待摄像头是灰环、灰方块，
+     * 没有进度弧、不显示时长；没在录是灰圈灰点。在不在录、什么样子只问相机管家（{@code CameraKeeper#view}），
      * 和主界面录制键、前台通知同一个答案。
      */
     private void renderRecordingState() {
-        com.kooo.evcam.recording.RecordingCoordinator coordinator =
-                com.kooo.evcam.recording.RecordingCoordinator.get(this);
-        com.kooo.evcam.recording.RecordingCoordinator.View view = coordinator.view();
-        isRecording = view != com.kooo.evcam.recording.RecordingCoordinator.View.IDLE;
-        waitingForCameras = view == com.kooo.evcam.recording.RecordingCoordinator.View.WAITING;
+        com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(this);
+        com.kooo.evcam.camera.CameraKeeper.View view = keeper.view();
+        isRecording = view != com.kooo.evcam.camera.CameraKeeper.View.IDLE;
+        waitingForCameras = view == com.kooo.evcam.camera.CameraKeeper.View.WAITING;
 
         if (recordingButton != null) {
             recordingButton.setRecording(isRecording, waitingForCameras);
@@ -586,7 +585,7 @@ public class RecordingFloatingService extends Service {
         if (isRecording && !waitingForCameras) {
             // 从这一段真正开录的时刻算（中途才显示出来的按钮也对得上），用开机以来的时钟：
             // 车机对时会把系统时钟往回拨（2026-10-08 实车拨回过 20 秒），按系统时钟算时长会变负
-            long startedAt = coordinator.startedAtElapsedMs();
+            long startedAt = keeper.startedAtElapsedMs();
             recordingStartTime = startedAt > 0 ? startedAt : android.os.SystemClock.elapsedRealtime();
             startTimeUpdate();
             if (timeTextView != null) {
@@ -621,7 +620,7 @@ public class RecordingFloatingService extends Service {
                     String timeStr = formatDuration(duration);
                     timeTextView.setText(timeStr);
                     // 本段的进度从这一阵有一路在录起量：等摄像头之后接回，分段从接回那一刻重新算
-                    long liveSince = com.kooo.evcam.recording.RecordingCoordinator.get(RecordingFloatingService.this)
+                    long liveSince = com.kooo.evcam.camera.CameraKeeper.get(RecordingFloatingService.this)
                             .liveSinceElapsedMs();
                     updateRingProgress(liveSince > 0 ? Math.max(0, now - liveSince) : duration);
                     mainHandler.postDelayed(this, 1000);
@@ -642,7 +641,7 @@ public class RecordingFloatingService extends Service {
     /**
      * 环走到哪儿了。
      *
-     * <p>服务这边不知道当前这一段是什么时候切的，只知道这一阵有一路在录是从什么时候起的（协调器的
+     * <p>服务这边不知道当前这一段是什么时候切的，只知道这一阵有一路在录是从什么时候起的（相机管家的
      * {@code liveSinceElapsedMs}；等摄像头之后接回，分段从接回那一刻重新算）—— 分段是等长的，
      * 所以「从那一刻起录了多久对分段时长取余」就是本段的进度。差别只会出现在中途改过分段长度的那一次。</p>
      *

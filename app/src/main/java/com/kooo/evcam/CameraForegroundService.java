@@ -135,10 +135,9 @@ public class CameraForegroundService extends Service {
 
         // 通知上的字照录像此刻的样子写（正在录制 / 等待摄像头 / 在后台运行，大纲 5c），谁叫起来的都一样 ——
         // 以前由叫的那一处带着字来：保活那几处只会写「在后台运行」，录着时被它们叫起来，通知就说错了
-        com.kooo.evcam.recording.RecordingCoordinator coordinator =
-                com.kooo.evcam.recording.RecordingCoordinator.get(this);
+        com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(this);
         Notification notification = buildNotification(this,
-                coordinator.notificationTitle(), coordinator.notificationContent());
+                keeper.notificationTitle(), keeper.notificationContent());
 
         // 启动前台服务（录制声音开着时试着带上麦克风类型，见 startForegroundWithSound）
         startForegroundWithSound(notification);
@@ -225,7 +224,7 @@ public class CameraForegroundService extends Service {
                     || androidOn != lastBeatAndroidOn || now - lastBeatAtMs >= BLACK_BOX_QUIET_MS) {
                 // view：录像此刻的样子（开录中 / 在录 / 等待摄像头），一夜里一路都录不了的那几段在这里看得出来
                 com.kooo.evcam.blackbox.BlackBox.note("心跳 recording=" + recording + " view="
-                        + com.kooo.evcam.recording.RecordingCoordinator.get(CameraForegroundService.this).view()
+                        + com.kooo.evcam.camera.CameraKeeper.get(CameraForegroundService.this).view()
                         + " screenOn=" + screenOn + " android=" + (androidOn ? "on" : "off"));
                 lastBeatRecording = recording;
                 lastBeatScreenOn = screenOn;
@@ -243,7 +242,7 @@ public class CameraForegroundService extends Service {
     }
 
     private boolean isRecordingNow() {
-        return com.kooo.evcam.recording.RecordingCoordinator.get(this).isRecording();
+        return com.kooo.evcam.camera.CameraKeeper.get(this).isRecording();
     }
 
     @Override
@@ -364,7 +363,7 @@ public class CameraForegroundService extends Service {
 
     /**
      * 启动前台服务（已经在的再走一次 onStartCommand）。通知上的字不由叫的这一处给：服务起来时照录像此刻的样子写
-     * （{@code RecordingCoordinator#notificationTitle}）。
+     * （{@code CameraKeeper#notificationTitle}）。
      */
     public static void start(Context context) {
         // 保活广播、ContentProvider、无障碍服务都从这里启动前台服务 —— 用户退出后一律不启动
@@ -399,7 +398,7 @@ public class CameraForegroundService extends Service {
     }
 
     /**
-     * 录像停了（RecordingCoordinator 调）、或主界面收尾 / 退出要停服务。
+     * 录像停了（相机管家调）、或主界面收尾 / 退出要停服务。
      *
      * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3）。保活开着时它本来就该一直在：
      * 这里只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次），不停。等着接回的也一样
@@ -409,11 +408,9 @@ public class CameraForegroundService extends Service {
      * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
      */
     public static void stop(Context context) {
-        if (!UserExit.isExited(context) && (new AppConfig(context).isAutoStartOnBoot()
-                || com.kooo.evcam.recording.RecordingIntent.current().recordingWanted())) {
-            com.kooo.evcam.recording.RecordingCoordinator coordinator =
-                    com.kooo.evcam.recording.RecordingCoordinator.get(context);
-            showText(context, coordinator.notificationTitle(), coordinator.notificationContent());
+        com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(context);
+        if (!UserExit.isExited(context) && (new AppConfig(context).isAutoStartOnBoot() || keeper.recordingWanted())) {
+            showText(context, keeper.notificationTitle(), keeper.notificationContent());
             return;
         }
         isForegroundReady = false;

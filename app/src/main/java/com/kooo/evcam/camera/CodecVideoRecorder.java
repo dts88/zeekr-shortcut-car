@@ -246,7 +246,7 @@ public class CodecVideoRecorder {
      * 写不进文件的裁判 —— 唯一的一个（项目所有者 2026-09-27：录像健不健康只由录制器判）。
      *
      * <p>从开录（或最后一次写进文件）起 {@link #WRITE_STALL_MS} 没有新数据写进文件，就报一次
-     * {@link RecordCallback#onWriteStalled}，由 RecordingCoordinator 按打断处理。这 15 秒里自己的修复
+     * {@link RecordCallback#onWriteStalled}，由相机管家（{@link CameraKeeper}）按打断处理。这 15 秒里自己的修复
      * （换盘、重建编码器、快速恢复）照常跑，救回来了就不报。以前相机层还有一个 15 秒看门狗、
      * 主界面还有一个 10 秒「无首帧」看门狗、这里还有一个 10 秒「首次写入超时」，四个裁判互相抢。</p>
      */
@@ -997,7 +997,7 @@ public class CodecVideoRecorder {
     /**
      * 停录第一步：叫停，不等（主线程上调）。几路一起停时，先每一路都叫停，再一起等 —— 先等编码线程都排空
      * （{@link #awaitDrain}），再等写入线程都收好（{@link #finishStop}），共用一个期限（{@link #STOP_BUDGET_MS}）。
-     * 以前一路一路停，后面几路在等前面的时候还在录，可能跨过分段又开出新文件，三路加起来还超过协调器的收拾期限。
+     * 以前一路一路停，后面几路在等前面的时候还在录，可能跨过分段又开出新文件，三路加起来还超过相机管家的收拾期限。
      *
      * <p>开着的、备好了还没开过录的才叫得停（{@link RecorderRun#canStop}），叫停只做一次。不再录、不再分段切换 / 恢复 / 重建
      * （{@link #stopRequested}），定时器都撤掉；编码线程上排空编码器（结束流，等到最后一帧），把「收文件」排在最后一个样本后面。
@@ -2451,7 +2451,7 @@ public class CodecVideoRecorder {
     /**
      * 停录的期限：几路一起叫停之后，一起等编码线程排空、写入线程写完收好，共用这一个期限
      * （{@code MultiCameraManager} 停录分两步：先每一路都叫停，再一起等）。按开机时长（不含深睡）算，
-     * 和协调器的收拾期限、等待用的计时是同一个钟。协调器等收拾最多 20 秒（{@code RecordingLifecycle.STOP_DEADLINE_MS}），
+     * 和相机管家的收拾期限、等待用的计时是同一个钟。相机管家等收拾最多 20 秒（{@link ChannelRules#STOP_DEADLINE_MS}），
      * 这里连同 {@link #STOP_GRACE_MS} 最多用一半，另一半留给停放录制器（放编码器，最多 {@link #ENCODER_WAIT_MS}）。
      * 排队最多 3 秒的画面，盘还在动的话 9 秒写得完；到点还没收好（盘多半没了），不再等（{@link #abandonWriter}）。
      */
@@ -2760,7 +2760,7 @@ public class CodecVideoRecorder {
             AppLog.w(TAG, "Camera " + cameraId + " write queue full (" + queuedMs + "ms, "
                     + megabytes(queuedBytes) + "MB): dropping camera frames until the writer catches up");
             // 提示用户「U 盘写入跟不上」：只在写的是 U 盘、又不是换盘补写占着排队的时候（中转写入的内部缓存、
-            // 内置存储、换盘补写都不是 U 盘慢）。多久提示一次由 RecordingCoordinator 定
+            // 内置存储、换盘补写都不是 U 盘慢）。多久提示一次由相机管家定
             boolean slowDrive = isOnUsbDrive(saveDirectory) && !writerRelocating;
             RecordCallback cb = callback;
             Handler segment = segmentHandler;
@@ -2799,7 +2799,7 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 等 latch 到 deadlineMs 为止。期限按开机时长（不含深睡）算：latch 自己的等待、协调器的收拾期限都不算深睡，
+     * 等 latch 到 deadlineMs 为止。期限按开机时长（不含深睡）算：latch 自己的等待、相机管家的收拾期限都不算深睡，
      * 按含深睡的钟算的话，车机睡一会儿，醒来期限就算过了，一口都没等。
      */
     private static boolean awaitUntil(CountDownLatch latch, long deadlineMs) {

@@ -51,7 +51,7 @@ import java.util.function.Consumer;
  *       回到录制界面那一刻，主界面摆的那份和存下的、生效的对不上，就照存下的重新摆（MainActivity.relayoutIfConfigChanged）；
  *       新界面摆好、接回画布和读录制键之前存下的配置生效：建管线、录像用到的变了（{@link Shape#pipelineKey}），放掉旧的、照存下的
  *       建新的 —— 唯一的通道调度交接，旧的按次序关完、新的再开，在录的话那一段到头、在新的一份上自动接回
- *       （RecordingCoordinator.setCameraManager）；只是名字、各格的摆法变了，管线不换，生效的配置就地换成存下的。
+ *       （{@link CameraKeeper#pipelineCreated}）；只是名字、各格的摆法变了，管线不换，生效的配置就地换成存下的。
  *       布局和管线照的是同一份（2026-10-20 审查，车主批：以前比的是此刻的配置，主界面还没重新摆就接上，布局和管线对不上）。
  *       摆着设置页时界面重建（换语言、深浅色）不生效，等回到录制界面。别的调用方（拍照、录像、超级镜子、悬浮按钮，
  *       主界面接上管线也是）一律照用生效的那一份，不因为配置变了重建；它们也要重建时（下面几条），照生效的配置建；</li>
@@ -298,7 +298,7 @@ public class CameraManagerHolder {
     }
 
     /**
-     * 进程里那一份管线；没有就建（大纲 §2 阶段 6：只在这里建）。谁要管线都调它：主界面接上管线、录像协调器、后视镜、拍照
+     * 进程里那一份管线；没有就建（大纲 §2 阶段 6：只在这里建）。谁要管线都调它：主界面接上管线、相机管家、后视镜、拍照
      * （主界面的、悬浮按钮的）。
      *
      * <p>对象当场交出去，各路相机要等相机线程上列完相机、探测完合成流才建出来（{@link MultiCameraManager#isBuilt}、
@@ -311,7 +311,7 @@ public class CameraManagerHolder {
 
     /**
      * 主界面照存下的配置摆好了、摆的是录制界面（MainActivity.initViews，接回留着的画布、读录制键之前）：存下的配置这一刻生效
-     * （见类说明）—— 建管线、录像用到的变了就换管线（在录的话那一段到头，在新的一份上自动接回，RecordingCoordinator.setCameraManager），
+     * （见类说明）—— 建管线、录像用到的变了就换管线（在录的话那一段到头，在新的一份上自动接回，{@link CameraKeeper#pipelineCreated}），
      * 只是名字、各格的摆法变了就地换。提前到主界面读生效的配置之前：之后它接回的画布、录制键、状态条照的都是这份。
      * {@code laidOut} 和存下的不一样（主界面摆完之后存下的又变了）就不换，等它照新的重新摆。没有管线时什么都不做（接上时照存下的建）。
      * 主线程调。
@@ -372,6 +372,8 @@ public class CameraManagerHolder {
         // 先换生效的配置：下面定录制模式（问配置里有没有要拼四宫格的）、建管线时读的都是这一份
         effective = shape;
         MultiCameraManager manager = new MultiCameraManager(app);
+        // 建的那一刻交给相机管家：录像的回调接上；录着的那一份换掉了，它当场收这一段、在新的一份上接回
+        CameraKeeper.get(app).pipelineCreated(manager);
         manager.setMaxOpenCameras(shape.count);
         // 录制模式建管线时定一次（录制模式归开发者选项）
         manager.setCodecRecordingMode(new AppConfig(app).shouldUseCodecRecording());

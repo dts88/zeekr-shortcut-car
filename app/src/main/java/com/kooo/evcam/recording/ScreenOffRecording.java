@@ -9,6 +9,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.camera.ChannelScheduler;
 
@@ -16,22 +17,20 @@ import com.kooo.evcam.camera.ChannelScheduler;
  * 熄屏录制（开发者选项，规格 §3.1）：熄屏时正在录像，就拿住唤醒锁不让车机睡（熄屏 v3 起只录环视：座舱屏幕黑满 30 秒放开）。
  *
  * <p><b>2026-11-02 停用</b>（项目所有者：从来没有启用过）：{@link AppConfig#isScreenOffRecordingEnabled} 固定为关，
- * 这里拿锁的入口都走不到，唤醒锁没有人拿。代码留着等恢复，下面写的是它开着时的样子。</p>
+ * 这里拿锁的入口都走不到，唤醒锁没有人拿。代码留着等恢复（唤醒锁的知识留着，项目所有者 2026-11-02），下面写的是它开着时的样子。
+ * 2026-11-03 录像收进相机管家时，它在录像那一侧接的几个口一起去掉了（开录、停录、到点重判）：恢复时由相机管家
+ * （{@link CameraKeeper}）在开录、停录那一下叫 {@link #onRecordingStarted}、{@link #onRecordingStopped}。</p>
  *
  * <p>熄屏录制 = 熄屏持续录制 + 防止休眠。车机下电（安卓熄屏）后几秒就深睡、进程被结束或冻住，睡着的进程一行代码都不跑，
  * 要在会睡的车上接着录，只有不让它睡这一个手段（平台笔记 §3.6）。项目所有者 2026-09-27 明确允许。
  * 原来「常驻唤醒锁」那个开关的能力全部归到这里，再往上做：</p>
  *
  * <ul>
- *   <li><b>只在录像期间拿</b>，录像停了就放；存储一类停了、判了自动接回的那一段也算（{@link RecordingCoordinator#isRecordingOrResuming}）——
- *       锁留到接回开录、或者确定不接了（大纲 §7 第 8 问）。放的时候屏幕黑着、锁正拉着车机（{@link #pullsCarAwake}），
- *       协调器先照熄屏那张表重判：车机要睡的锁留到相机按次序关完（以前一停就放，车机几秒后睡过去，不经那张表）；</li>
+ *   <li><b>只在录像期间拿</b>，录像停了就放（在不在录问相机管家，{@link CameraKeeper#isRecording}）。放的时候屏幕黑着、
+ *       锁正拉着车机（{@link #pullsCarAwake}），车机要睡的锁留到相机按次序关完（以前一停就放，车机几秒后睡过去）；</li>
  *   <li>最长拿多久由用户设，<b>从熄屏那一刻起算</b>：熄屏 v3 起熄屏是屏幕真黑了（车辆信号判的，车主下车那一下；
  *       ScreenState 的熄屏那一下拿、亮屏那一下放，车机要睡、车机黑着醒了都不叫到这里）。
- *       到点不当场放：照熄屏那张表再判一次（{@link RecordingCoordinator#lockTimedOut}，锁不算拉着车机了）——
- *       车机醒着（安卓亮着）、哨兵模式开着、车在走，接着录或 10 秒后停，锁现在放；车机要睡了（安卓熄屏），现在停录、
- *       相机按次序关完再放（2026-10-10，以前到点就放，车机带着开着的相机睡过去），亮屏、或熄屏中哨兵模式变成开时接（同 §2.4）。
- *       黑满 30 秒时通道放开了环视（熄屏持续录制关着、哨兵模式没开）也停录，锁随停录放（2026-10-27）；</li>
+ *       到点就放（录像停不停只听相机管家的熄屏规矩，{@link ChannelRules#recordInDark}）；</li>
  *   <li>屏幕已经黑着时才开始的录像（熄屏期间接回的那种）同样拿，剩余时长从熄屏那一刻算；</li>
  *   <li>活在进程上，不靠主界面：熄屏、亮屏由 {@code ScreenState}（进程里唯一的屏幕状态源）告诉这里，
  *       主界面在不在都一样。</li>
@@ -81,13 +80,11 @@ public final class ScreenOffRecording {
     }
 
     /**
-     * 录像要的几样放了（录像停了、不接回；判了自动接回的，协调器留到接回开录或者不接了才叫）：放。
-     * 判了「现在停」、在等相机关完的那一次除外 —— 锁留到相机关完（{@link #holdUntilCamerasClosed}）。
-     * 屏幕黑着、锁正拉着车机的，协调器先照熄屏那张表重判，不走这里（{@link #pullsCarAwake}）。
+     * 录像停了：放。判了「现在停」、在等相机关完的那一次除外 —— 锁留到相机关完（{@link #holdUntilCamerasClosed}）。
      *
      * @param why 给黑匣子看的原因（ASCII）
      */
-    static void onRecordingStopped(String why) {
+    public static void onRecordingStopped(String why) {
         if (closeWaitSinceMs != 0) {
             return;
         }
@@ -95,8 +92,7 @@ public final class ScreenOffRecording {
     }
 
     /**
-     * 锁此刻拿着、而且不是在等相机关完再放（{@link #holdUntilCamerasClosed}）：屏幕黑着时就是锁正拉着车机 ——
-     * 录像要的几样放了的时候，协调器照它决定放锁之前要不要先照熄屏那张表重判（{@link RecordingStops#rejudgesBeforeLockGoes}）。
+     * 锁此刻拿着、而且不是在等相机关完再放（{@link #holdUntilCamerasClosed}）：屏幕黑着时就是锁正拉着车机。
      * 看的是锁本身，不是时限（{@link #holdsCarAwake}）：时限刚过、到点那一下还没轮到主线程时，锁还拉着车机。
      */
     static boolean pullsCarAwake() {
@@ -110,15 +106,13 @@ public final class ScreenOffRecording {
     }
 
     /**
-     * 熄屏录制此刻拉不拉得住车机：开关开着、在录（含存储一类停了、留着等自动接回的那一段，
-     * {@link RecordingCoordinator#isRecordingOrResuming}）、从熄屏起还没到用户设的时长 —— 和拿锁的条件同一个（{@link #ensure}），
-     * 屏幕黑着时它成立就是锁拿着。熄屏那一刻、到点那一刻怎么做（{@link ScreenOffPlan#atDark}）看的是它，不是开关本身：
-     * 到点之后开关还开着，锁已经不拉着车机了；没在录（在等 U 盘、在等亮屏接）时不拿锁，车机照样会睡。
-     * 屏幕亮着时问的是「现在熄屏的话拿不拿」（录制键上的小字）。
+     * 熄屏录制此刻拉不拉得住车机：开关开着、在录（{@link CameraKeeper#isRecording}）、从熄屏起还没到用户设的时长 ——
+     * 和拿锁的条件同一个（{@link #ensure}），屏幕黑着时它成立就是锁拿着。到点之后开关还开着，锁已经不拉着车机了；
+     * 没在录（在等 U 盘、在等亮屏接）时不拿锁，车机照样会睡。
      */
     public static boolean holdsCarAwake(Context context) {
         AppConfig config = new AppConfig(context);
-        return config.isScreenOffRecordingEnabled() && RecordingCoordinator.get(context).isRecordingOrResuming()
+        return config.isScreenOffRecordingEnabled() && CameraKeeper.get(context).isRecording()
                 && remainingMs(config) > 0;
     }
 
@@ -128,13 +122,11 @@ public final class ScreenOffRecording {
         return screenOffAtMs == 0 ? limit : limit - (SystemClock.elapsedRealtime() - screenOffAtMs);
     }
 
-    /** 该拿就拿、到点就交给协调器重判。幂等，多调无害。 */
+    /** 该拿就拿、到点就放。幂等，多调无害。 */
     private static void ensure(Context context) {
         AppConfig config = new AppConfig(context);
-        // 「在录」问协调器：开录指令一发出去就算（以前问相机层，屏幕黑着时开始的录像在开录中这一步拿不到锁）；
-        // 存储一类停了、留着等自动接回的那一段也算（大纲 §7 第 8 问）
-        RecordingCoordinator coordinator = RecordingCoordinator.get(context);
-        if (!config.isScreenOffRecordingEnabled() || !coordinator.isRecordingOrResuming()) {
+        // 「在录」问相机管家：开录指令一发出去就算（以前问相机层，屏幕黑着时开始的录像在开录中这一步拿不到锁）
+        if (!config.isScreenOffRecordingEnabled() || !CameraKeeper.get(context).isRecording()) {
             return;
         }
         int minutes = config.getScreenOffWakeMinutes();
@@ -151,35 +143,29 @@ public final class ScreenOffRecording {
             WakeUpHelper.acquirePersistentWakeLock(context);
             heldSinceMs = SystemClock.elapsedRealtime();
             heldForMinutes = minutes;
-            BlackBox.noteImportant("熄屏录制：" + (coordinator.isRecording() ? "在录像" : "在等自动接回")
-                    + "，拿住唤醒锁不让车机睡，还能拿 " + remaining / 60000
+            BlackBox.noteImportant("熄屏录制：在录像，拿住唤醒锁不让车机睡，还能拿 " + remaining / 60000
                     + " 分钟（上限 " + minutes + " 分钟，从熄屏起算）");
             AppLog.i(TAG, "wake lock held, " + remaining / 60000 + " min left of " + minutes);
         }
     }
 
-    /**
-     * 到了用户设的时长（或者屏幕黑着才开始的录像，开录时已经过了时长）：锁先不放，协调器照熄屏那张表重判一次
-     * （{@link RecordingCoordinator#lockTimedOut}），由它放。排到主线程的下一轮：这里可能是开录那一步叫到的，
-     * 不能在开录的途中停录。
-     */
+    /** 到了用户设的时长（或者屏幕黑着才开始的录像，开录时已经过了时长）：放（排到主线程的下一轮）。 */
     private static void timedOut(Context app) {
         cancelTimeout();
-        HANDLER.post(() -> RecordingCoordinator.get(app).lockTimedOut());
+        HANDLER.post(() -> release("timeout"));
     }
 
     /**
      * 到点之后判了「现在停、相机按次序关」：锁留着，等调度发出「关完」（{@link ChannelScheduler#closingAnywhere} 变假，
      * {@link ChannelScheduler#whenClosedEverywhere}），或者等满 {@link #CLOSE_WAIT_MAX_MS}，再放 ——
      * 先放的话车机几秒就睡，环视、座舱还没关完（2026-10-10）。停录那一步的放锁这时不放（{@link #onRecordingStopped}）；
-     * 亮屏照样当场放。协调器在写下「车机要睡」之后、停录之前调：调度那时已经当场置了「正在按次序关」。
-     * 到点、录像停了不接回、不等自动接回了，都可能判到这里（协调器的 letLockGo）。
+     * 亮屏照样当场放。调度那时已经当场置了「正在按次序关」。
      *
      * <p>以前每 100 ms 问一次管理器「关完没有」、5 秒封顶（大纲 §2 阶段 6 改）。</p>
      *
      * @param why 这一次为什么判的，放锁那一行写（ASCII：timeout / recording-stopped / resume-dropped …）
      */
-    static void holdUntilCamerasClosed(String why) {
+    public static void holdUntilCamerasClosed(String why) {
         if (!WakeUpHelper.isPersistentWakeLockHeld()) {
             return;
         }

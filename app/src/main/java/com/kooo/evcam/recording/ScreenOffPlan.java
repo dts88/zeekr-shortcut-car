@@ -9,7 +9,7 @@ import com.kooo.evcam.camera.ChannelRules;
  * <p>2026-11-02 起熄屏怎么录只由相机管家判（项目所有者「熄屏判断收归通道调度」）：录像停不停、什么时候停、黑着能不能开、
  * 车机要睡，都在 {@link ChannelRules}（{@link ChannelRules#recordInDark}、{@link ChannelRules#startsInDark}、
  * {@link ChannelRules#headUnitSleeps}），小字照 {@link ChannelRules#darkOutlook} 说 —— 和实际会发生的同一套规矩。
- * 以前这里是录像协调器自己的那张表（熄屏持续录制关着时屏幕黑 10 秒就停；车机要睡另有一个定义，写进登记表给调度读）。
+ * 以前这里是录像那一侧自己的那张表（熄屏持续录制关着时屏幕黑 10 秒就停；车机要睡另有一个定义，写进登记表给调度读）。
  * 这里只剩句子。</p>
  */
 public enum ScreenOffPlan {

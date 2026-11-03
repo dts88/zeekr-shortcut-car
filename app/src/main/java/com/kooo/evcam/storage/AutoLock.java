@@ -13,6 +13,7 @@ import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.CameraSlots;
 import com.kooo.evcam.camera.StoragePlan;
 import com.kooo.evcam.profile.RecordSpecs;
@@ -118,7 +119,6 @@ public final class AutoLock implements Telemetry.Listener {
 
     // ---- 下面这几个只在主线程上动
     private Context app;
-    private boolean recording;
     /** 这次录像中转写入时，缓存里的文件写完搬去哪（开录时定下的）；不是中转写入为 null。 */
     private File relayTarget;
     private boolean watching;
@@ -155,7 +155,7 @@ public final class AutoLock implements Telemetry.Listener {
     // ================================================================= 什么时候看信号
 
     /**
-     * 真正录上了（{@code MultiCameraManager} 的录像状态变成「在录」）。哪个线程调都行。
+     * 开录了（相机管家开录那一下叫；在不在录只问它，{@link CameraKeeper#isRecording}）。哪个线程调都行。
      *
      * @param relayTarget 中转写入时，缓存里的文件写完搬去的目录（开录时定下的）；不是中转写入传 null
      */
@@ -165,21 +165,19 @@ public final class AutoLock implements Telemetry.Listener {
         worker.post(() -> segmentMs = segmentLengths(appContext));
         main.post(() -> {
             app = appContext;
-            recording = true;
             this.relayTarget = relayTarget;
             update();
         });
     }
 
-    /**
-     * 不录了（{@code MultiCameraManager} 的录像状态变成「不在录」：停录、开录失败、重建前停）：不再看信号。
-     * 已经排上的第二遍照样锁。
-     */
+    /** 停录了（相机管家停录那一下叫）：不再看信号。已经排上的第二遍照样锁。 */
     public void recordingStopped() {
-        main.post(() -> {
-            recording = false;
-            update();
-        });
+        main.post(this::update);
+    }
+
+    /** 此刻在录（相机管家说的）。主线程。 */
+    private boolean recording() {
+        return app != null && CameraKeeper.get(app).isRecording();
     }
 
     /** 设置页里「锁定影像」「闪远光」「双闪」变了：正在录的话马上按新的来。 */
@@ -198,7 +196,7 @@ public final class AutoLock implements Telemetry.Listener {
 
     /** 该不该看信号，和现在看没看对一下。主线程。 */
     private void update() {
-        boolean want = recording && app != null && (flashEnabled(app) || hazardEnabled(app));
+        boolean want = recording() && (flashEnabled(app) || hazardEnabled(app));
         // 双闪亮着时录像停了、双闪那一项（或者锁定影像）关了：这一次双闪当在此刻关闭（开关关了的，那两遍看到开关不锁）
         if (hazardSinceMs > 0 && (!want || !hazardEnabled(app))) {
             hazardOff(System.currentTimeMillis());
@@ -221,7 +219,7 @@ public final class AutoLock implements Telemetry.Listener {
             telemetry.release(USER);
             lastFlash = null;
             lastHazard = null;
-            BlackBox.note("车机信号自动锁定：不再看闪远光、双闪信号（" + (recording ? "开关关了" : "录像停了") + "）");
+            BlackBox.note("车机信号自动锁定：不再看闪远光、双闪信号（" + (recording() ? "开关关了" : "录像停了") + "）");
         }
     }
 
@@ -263,7 +261,7 @@ public final class AutoLock implements Telemetry.Listener {
         final long momentMs = System.currentTimeMillis();
         final Context appContext = context.getApplicationContext();
         main.post(() -> {
-            if (!recording) {
+            if (!CameraKeeper.get(appContext).isRecording()) {
                 BlackBox.note("悬浮按钮锁定：没在录，不锁");
                 toast(appContext, R.string.msg_footage_nothing_here);
             } else if (!FootageLocks.enabled(appContext)) {

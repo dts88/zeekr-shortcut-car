@@ -37,7 +37,7 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.overlay.QuickActions;
-import com.kooo.evcam.recording.RecordingCoordinator;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.screen.DisplayWatch;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.sound.DriveSound;
@@ -972,7 +972,7 @@ public final class SmartButtons {
         BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(address) + "：" + (clicks == SmartButtonAd.DOUBLE ? "双击" : "单击") + " → " + action.key);
         if (action.floating != null) {
             try {
-                QuickActions.perform(app, action.floating, RecordingCoordinator.Why.BUTTON);
+                QuickActions.perform(app, action.floating, CameraKeeper.Why.BUTTON);
             } catch (RuntimeException e) {
                 // 应用在后台、又没有前台服务撑着时，安卓不让起服务（超级镜子、录制）：这一下不做，进程不能因为它崩
                 AppLog.w(TAG, "action " + action.key + " failed: " + e);

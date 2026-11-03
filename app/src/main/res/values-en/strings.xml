@@ -483,7 +483,6 @@
     </plurals>
     <string name="msg_record_start_retrying">Recording didn\'t start. Retrying…</string>
     <string name="msg_record_start_gave_up">Recording still didn\'t start. Tap Start recording.</string>
-    <string name="msg_recording_lost_in_background">Recording stopped while the app was in the background</string>
     <string name="msg_record_error">Recording error: invalid clips deleted</string>
     <string name="msg_photo_taken">Photo saved</string>
     <string name="msg_photo_waiting">Opening cameras. The photo is taken once they\'re ready.</string>

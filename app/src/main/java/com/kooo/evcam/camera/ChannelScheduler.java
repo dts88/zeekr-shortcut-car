@@ -57,7 +57,7 @@ import java.util.function.Consumer;
  *   <li>手上那一步做完没有、到没到顶（{@link ChannelRules#outcome} → {@link ChannelRules#finish}）；结束了的那一步写一行
  *       （做完、到点、出事都写），每一路交一条相机步骤统计（{@link #stepEnded}，2.11.4）；</li>
  *   <li>记账（{@link ChannelRules#settle}）：保持、主动认出被拿走、到点的判定、放开、解除停手；通道对环视的熄屏决定变了就发给
- *       录像协调器（{@link #surroundVerdict}，2026-10-27）；会话里每一样输出算要的、留着的、还是死的，从什么时候起（{@link #trackOutputs}）；</li>
+ *       相机管家（{@link #surroundVerdict}，2026-10-27）；会话里每一样输出算要的、留着的、还是死的，从什么时候起（{@link #trackOutputs}）；</li>
  *   <li>下一步（{@link ChannelRules#next}），一次只出一步；照做（{@link CameraPort} 的动作），记下这一步
  *       （{@link ChannelRules#begin}）；</li>
  *   <li>录像输出离开了会话（改输出摘掉的），或者关着的一路录像不再留着它（停了录、不在计划里），告诉声明它的那一方
@@ -79,7 +79,7 @@ import java.util.function.Consumer;
  * 相机回调在相机线程上发，由 MultiCameraManager 转到主线程、交给那一路那一份管线的把手（{@link Pipeline#onOpened} 那几个入口，
  * 带着是哪一份管线、哪台相机）；从不在回调里当场跑一轮。能在别的线程上调的只有 {@link #wake}、{@link #exit}、{@link #onNeedsChanged}、
  * {@link #askNow}、{@link #closingAnywhere}：它们只动原子字段，然后叫醒；诊断报告读的 {@link #snapshot()} 是每一轮最后建好的不可变的一份，
- * 放在 volatile 字段里。通道对环视的熄屏决定变了时叫的监听者（{@link #setSurroundVerdictListener}，录像协调器）在一轮当中叫：
+ * 放在 volatile 字段里。通道对环视的熄屏决定变了时叫的监听者（{@link #setSurroundVerdictListener}，相机管家）在一轮当中叫：
  * 它只 post，不当场动手。</p>
  *
  * <h3>钟</h3>
@@ -234,7 +234,7 @@ public final class ChannelScheduler {
 
         /**
          * 车机要睡（{@link ChannelRules#headUnitSleeps}：安卓熄屏了、没在开车 —— 相机管家的唯一定义，项目所有者 2026-11-02；
-         * 以前是录像协调器判了写进登记表）。哪个线程都能调。
+         * 以前是录像那一侧判了写进登记表）。哪个线程都能调。
          */
         boolean headUnitSleeps();
 
@@ -1716,7 +1716,7 @@ public final class ChannelScheduler {
 
     /**
      * 装上进程里唯一的那一个调度（第 2 步「只有一个调度」，项目所有者 2026-10-29 批）：应用一起来就装（ZeekrShortcutApp.onCreate，
-     * 经 ChannelFacts.install —— 最早的那一处，之后谁来要管线、谁在静态入口上叫醒都是它）；要用它的入口（建管线、录像协调器挂监听）
+     * 经 ChannelFacts.install —— 最早的那一处，之后谁来要管线、谁在静态入口上叫醒都是它）；要用它的入口（建管线、相机管家挂监听）
      * 也先经 ChannelFacts.install，装过了什么都不做，先后不要紧（审查 2026-10-30）。只装一次：再调交回已经装上的那一个。
      */
     public static synchronized ChannelScheduler install(Clock clock, Poster poster, Facts facts) {
@@ -1787,7 +1787,7 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 屏幕黑着时录像能不能开（相机管家的判断，{@link ChannelRules#startsInDark}；录像协调器黑着来的「要录」、接回照它）。
+     * 屏幕黑着时录像能不能开（相机管家的判断，{@link ChannelRules#startsInDark}；相机管家黑着来的「要录」、接回照它）。
      * 没装上调度时判不了，按车机要睡算（不开）。主线程。
      */
     public static ChannelRules.DarkStart startsInDark(boolean surroundPlanned, boolean bySentryRise,
@@ -1807,7 +1807,7 @@ public final class ChannelScheduler {
     }
 
     /**
-     * 决定变了叫它（只许 post）：录像协调器建起来时挂一次（{@link #setVerdictListener}；它先经 ChannelFacts.install 装上调度）。
+     * 决定变了叫它（只许 post）：相机管家建起来时挂一次（{@link #setVerdictListener}；它先经 ChannelFacts.install 装上调度）。
      * 环视留不留（{@link #surroundVerdict}）、熄屏录像（{@link #recordInDark}）有一个变了就叫。
      */
     public static void setSurroundVerdictListener(Runnable listener) {
@@ -1868,7 +1868,7 @@ public final class ChannelScheduler {
     /** 同上，上一次读得到的哨兵模式（{@link ChannelRules.World#lastSentry}）；null = 还没有。 */
     private Integer latchSentry;
     /**
-     * 通道对环视的熄屏决定（{@link ChannelRules#surroundVerdict}：LIT 不归熄屏管、KEPT 留着、RELEASED 放开）—— 录像协调器照它停录、开录
+     * 通道对环视的熄屏决定（{@link ChannelRules#surroundVerdict}：LIT 不归熄屏管、KEPT 留着、RELEASED 放开）—— 相机管家照它停录、开录
      * （项目所有者 2026-10-27）。只由跑的那一份管线的世界写（{@link Pipeline#publishVerdict}；空的那一份不发）：退出时不写，屏幕不知道黑没黑时和环视留不留一样不动
      * （车机要睡那一条照写）。管线重建时新的那一份接着判，算出来的一样，不再发。进程起来时是放开（在黑着时被拉起的不开相机）。
      */
@@ -1879,12 +1879,12 @@ public final class ChannelScheduler {
      */
     private ChannelRules.Event.Cause verdictCause;
     /**
-     * 相机管家对熄屏录像的决定（{@link ChannelRules#recordInDark}：照亮着算、接着录环视、停 —— 为什么停），录像协调器照它停录
+     * 相机管家对熄屏录像的决定（{@link ChannelRules#recordInDark}：照亮着算、接着录环视、停 —— 为什么停），相机管家照它停录
      * （项目所有者 2026-11-02「熄屏判断收归通道调度」）。和上面那个同一处发、同一道闸（{@link Pipeline#publishVerdict}），
      * 两个有一个变了就叫监听者。进程起来时是放开（和环视那个一样：在黑着时被拉起的不开录，起来那一下也不发）。
      */
     private ChannelRules.RecordInDark recordVerdict = ChannelRules.RecordInDark.RELEASED;
-    /** 决定变了叫谁（进程里只有录像协调器一个）：在一轮当中、主线程上叫，只许 post，不许当场动手。哪个线程都能挂。 */
+    /** 决定变了叫谁（进程里只有相机管家一个）：在一轮当中、主线程上叫，只许 post，不许当场动手。哪个线程都能挂。 */
     private volatile Runnable verdictListener;
 
     // ---- 几份管线（主线程）----
@@ -2810,7 +2810,7 @@ public final class ChannelScheduler {
                 ChannelRules.finish(w, outcome);
             }
             List<ChannelRules.Event> settled = ChannelRules.settle(w);
-            // 通道的决定此刻定了：先发给录像协调器（它排到主线程上），再报这一轮的事、动相机、告诉录像那一侧 ——
+            // 通道的决定此刻定了：先发给相机管家（它排到主线程上），再报这一轮的事、动相机、告诉录像那一侧 ——
             // 它排的那一下在这一轮里任何一次各路样子变了（含去掉前座舱那一下）之前，录像的样子不会闪一下「等待摄像头」
             publishVerdict();
             note(settled, now);

@@ -8,17 +8,15 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
-import com.kooo.evcam.recording.RecordingCoordinator;
-import com.kooo.evcam.recording.RecordingIntent;
-import com.kooo.evcam.recording.RecordingStops;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.service.CameraRecordingService;
 
 /**
  * 悬浮按钮和灵动贴按下去做的那件事（{@link FloatingAction}）：两边走这同一份，不各写一套（2026-10-30 灵动贴搬进来时从
  * 悬浮按钮服务里拿出来）。
  *
- * <p>录制那一条按应用在不在前台分三种情况（主界面在前：交给主界面；在后台：直接告诉录像协调器，不拉起主界面；
- * 没在跑：拉起主界面并开录），其余几条都是一句话的事。都在主线程上叫。</p>
+ * <p>录制那一条：主界面在前交给主界面（和点它的录制键一样，录到内置存储之前它先问一句）；不在前就直接向相机管家请求，
+ * 用不了相机时它自己把主界面拉起来。其余几条都是一句话的事。都在主线程上叫。</p>
  */
 public final class QuickActions {
 
@@ -28,10 +26,10 @@ public final class QuickActions {
     }
 
     /**
-     * 做一件事。{@code why} 说是谁按的（{@link RecordingCoordinator.Why#FLOATING} 悬浮按钮、{@link RecordingCoordinator.Why#BUTTON}
-     * 灵动贴）：录像意图和黑匣子照它记。
+     * 做一件事。{@code why} 说是谁按的（{@link CameraKeeper.Why#FLOATING} 悬浮按钮、{@link CameraKeeper.Why#BUTTON}
+     * 灵动贴）：黑匣子照它记。
      */
-    public static void perform(Context context, FloatingAction action, RecordingCoordinator.Why why) {
+    public static void perform(Context context, FloatingAction action, CameraKeeper.Why why) {
         switch (action) {
             case TOGGLE_RECORDING:
                 toggleRecording(context, why);
@@ -61,11 +59,11 @@ public final class QuickActions {
      * 开 / 关模拟声浪（设置 → 系统「模拟声浪（试验性）」，2026-10-24 起不归开发者选项管）：开车时一键关的地方。
      * 每按一次回一句现在是开还是关。马上生效（{@code DriveSound.refresh}）。
      */
-    private static void toggleDriveSound(Context context, RecordingCoordinator.Why why) {
+    private static void toggleDriveSound(Context context, CameraKeeper.Why why) {
         AppConfig config = new AppConfig(context);
         boolean on = !config.isDriveSoundEnabled();
         config.setDriveSoundEnabled(on);
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: " + (why == RecordingCoordinator.Why.BUTTON ? "灵动贴" : "悬浮按钮") + " → 模拟声浪" + (on ? "开" : "关"));
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: " + (why == CameraKeeper.Why.BUTTON ? "灵动贴" : "悬浮按钮") + " → 模拟声浪" + (on ? "开" : "关"));
         com.kooo.evcam.sound.DriveSound.refresh(context);
         Toast.makeText(context, on ? R.string.msg_drive_sound_on : R.string.msg_drive_sound_off,
                 Toast.LENGTH_SHORT).show();
@@ -99,7 +97,7 @@ public final class QuickActions {
 
     // ========== 录制 ==========
 
-    private static void toggleRecording(Context context, RecordingCoordinator.Why why) {
+    private static void toggleRecording(Context context, CameraKeeper.Why why) {
         AppState appState = appState(context);
         AppLog.d(TAG, "toggleRecording (" + why + "), app state: " + appState);
         switch (appState) {
@@ -110,38 +108,20 @@ public final class QuickActions {
                 context.sendBroadcast(toggle);
                 return;
             case BACKGROUND:
-                toggleInBackground(context, why);
+                try {
+                    context.startService(new Intent(context, CameraRecordingService.class));
+                } catch (RuntimeException e) {
+                    // 后台起不了服务（没有前台服务撑着时安卓不让）：录像归相机管家管，照样往下走
+                    AppLog.w(TAG, "startService(CameraRecordingService) failed: " + e);
+                }
+                CameraKeeper.get(context).toggleByUser(why);
                 return;
             case NOT_RUNNING:
             default:
-                // 没在跑：拉起主界面并开录
-                Intent intent = new Intent(context, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                intent.putExtra("auto_start_recording", true);
-                context.startActivity(intent);
-                Toast.makeText(context, R.string.msg_starting_recording, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * 应用在后台：不拉起主界面，直接告诉录像协调器（在不在录照它此刻的样子：录像意图开着 —— 开录中、在录、等待摄像头 —— 按一下是停）。
-     * 人开的，前面的失败都不算了；人停的，这一趟不再自动接。录制服务先起来，和以前一样。
-     */
-    private static void toggleInBackground(Context context, RecordingCoordinator.Why why) {
-        try {
-            context.startService(new Intent(context, CameraRecordingService.class));
-        } catch (RuntimeException e) {
-            // 后台起不了服务（没有前台服务撑着时安卓不让）：录像归协调器管，照样往下走
-            AppLog.w(TAG, "startService(CameraRecordingService) failed: " + e);
-        }
-        RecordingCoordinator coordinator = RecordingCoordinator.get(context);
-        if (coordinator.view() != RecordingCoordinator.View.IDLE) {
-            RecordingIntent.current().noteUserStopped();
-            coordinator.stop(RecordingStops.Reason.USER);
-        } else {
-            RecordingIntent.current().noteUserStarted();
-            coordinator.resetBudget();
-            coordinator.request(why);
+                // 没在跑：向相机管家要录，用不了相机时它把主界面拉起来
+                if (CameraKeeper.get(context).toggleByUser(why)) {
+                    Toast.makeText(context, R.string.msg_starting_recording, Toast.LENGTH_SHORT).show();
+                }
         }
     }
 
