@@ -53,15 +53,12 @@ public final class UpdateFlow {
         }
         AlertDialog checking = message(activity,
                 activity.getString(R.string.upd_checking), false);
-        com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(activity);
-        final boolean includeBeta = config.isUpdateBetaEnabled();
-        // 「接收 Alpha 版」随「接收 Beta 版」：Beta 关着时它不算数
-        final boolean includeAlpha = includeBeta && config.isUpdateAlphaEnabled();
+        final UpdateChannel channel = new com.kooo.evcam.AppConfig(activity).getUpdateChannel();
         new Thread(() -> {
             GithubReleases.Release release = null;
             String error = null;
             try {
-                release = GithubReleases.fetchLatest(includeBeta, includeAlpha, currentVersion(activity));
+                release = GithubReleases.fetchLatest(channel, currentVersion(activity));
             } catch (Exception e) {
                 AppLog.w(TAG, "检查更新失败", e);
                 error = failureText(activity, e,
@@ -75,8 +72,8 @@ public final class UpdateFlow {
                     toast(activity, failure);
                 } else if (found == null) {
                     // 只查正式版时说清楚：不是「没有新版本」，是「没有正式版」
-                    toast(activity, activity.getString(includeBeta
-                            ? R.string.upd_none : R.string.upd_none_release));
+                    toast(activity, activity.getString(channel == UpdateChannel.STABLE
+                            ? R.string.upd_none_release : R.string.upd_none));
                 } else {
                     compareAndOffer(activity, found);
                 }
