@@ -442,7 +442,7 @@ public class AppConfig {
      * （安卓熄屏，哨兵模式没开、车没在走）的话当场按次序关。以前这个开关开着时主界面熄屏不退后台、相机一直开着。主界面熄屏时照旧不退后台（只是界面，不管相机）。</p>
      *
      * <p>2026-11-02 项目所有者定：停用（从来没有启用过），开发者选项里那一行也拿掉了。这里固定为关：唤醒锁没有人拿，
-     * {@code ScreenOffRecording}、录像协调器里跟锁有关的几条路都走不到。原来的判断注释在下面，要恢复时放回来，
+     * {@code ScreenOffRecording}、录像那一侧跟锁有关的几条路都走不到。原来的判断注释在下面，要恢复时放回来，
      * 再把 preferences.xml、SettingsPreferenceFragment.bindScreenOffRecording 和三种语言里注释掉的文字放回。</p>
      */
     public boolean isScreenOffRecordingEnabled() {

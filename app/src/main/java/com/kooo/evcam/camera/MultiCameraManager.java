@@ -111,7 +111,7 @@ public class MultiCameraManager {
             };
     private PipelineCallback pipelineCallback;
 
-    // ---- 熄屏放开座舱（项目所有者 2026-10-12 D2）：协调器写熄屏小结要的那一个数（设计 v3.1 C16）----
+    // ---- 熄屏放开座舱（项目所有者 2026-10-12 D2）：诊断报告里那一句（cabinReleaseText）----
     /**
      * 这一段熄屏里座舱放开完的那一刻（elapsedRealtime，含深睡）：熄屏以后第一轮关了座舱的那一轮关完时；0 = 还没有。
      * 每次熄屏从头算（{@link #newDarkPeriod}）。主线程上写，哪个线程都能读。
@@ -187,7 +187,7 @@ public class MultiCameraManager {
     private File recordDir;
     /** 这个录像意图里每一路进出了几次、上一次退出的时刻（主线程，黑匣子用）。 */
     private final Map<String, LaneTrip> trips = new HashMap<>();
-    /** 这个录像意图此刻的样子（主线程）：协调器、录制键、通知、悬浮按钮读它（{@link #laneSummary}）。 */
+    /** 这个录像意图此刻的样子（主线程）：相机管家、录制键、通知、悬浮按钮读它（{@link #laneSummary}）。 */
     private RecordingLanes.Summary summary = RecordingLanes.Summary.NONE;
     /** 这个录像意图里从什么时候起一路都不在录（uptime，主线程）；0 = 有一路在录，或者还没等过摄像头。黑匣子那一行用。 */
     private long noneLiveSince;
@@ -418,7 +418,7 @@ public class MultiCameraManager {
         }
     }
 
-    /** 录像的样子变了（主线程）：一路加入、退出、相机被拿着 / 放开、开录落定。RecordingCoordinator 照 {@link #laneSummary()} 重画。 */
+    /** 录像的样子变了（主线程）：一路加入、退出、相机被拿着 / 放开、开录落定。CameraKeeper 照 {@link #laneSummary()} 重画。 */
     public interface LaneListener {
         void onLanesChanged();
     }
@@ -448,7 +448,7 @@ public class MultiCameraManager {
     /**
      * 录不下去了（U 盘满）。
      *
-     * <p>由 RecordingCoordinator 去停：它同步按钮、前台服务、提示，主界面在不在都一样。</p>
+     * <p>由相机管家（{@link CameraKeeper}）去停：它同步按钮、前台服务、提示，主界面在不在都一样。</p>
      */
     public interface StorageFullCallback {
         /** @param decision FULL 的那个决定：看 capless（没设上限）、lockedFull（剩下的都锁着） */
@@ -463,7 +463,7 @@ public class MultiCameraManager {
     }
 
     /**
-     * 开录、停录走到哪一步了，报给 RecordingCoordinator。「在不在录」只有它说了算（RecordingLifecycle），
+     * 开录、停录走到哪一步了，报给相机管家（{@link CameraKeeper}）。「在不在录」只有它说了算（{@link ChannelRules.RecordPhase}），
      * 这里只报事实；过时的任务（代数对不上）不报。可能在任何线程上调。
      */
     public interface PipelineCallback {
@@ -477,7 +477,7 @@ public class MultiCameraManager {
 
         /**
          * 录不起来：计划里每一路的录制器都建不起来（MediaRecorder 还算上开录没成）——
-         * 这不是相机的事。这里不收拾 —— 协调器走停录那条路，由 {@link #stopRecording()} 按同一套收拾。
+         * 这不是相机的事。这里不收拾 —— 相机管家走停录那条路，由 {@link #stopRecording()} 按同一套收拾。
          */
         void onPipelineStartFailed(String why);
 
@@ -636,7 +636,7 @@ public class MultiCameraManager {
         }
     };
     /**
-     * 写不进文件：裁判在录制器里（{@link CodecVideoRecorder} 的 15 秒规则），是盘或编码器的事才转给协调器（整次停）。
+     * 写不进文件：裁判在录制器里（{@link CodecVideoRecorder} 的 15 秒规则），是盘或编码器的事才转给相机管家（整次停）。
      * 和「每一路的录制器都建不起来」共用一个「已经报过」的标记：一次录像只报一次打断。
      */
     private WriteStallCallback writeStallCallback;
@@ -680,7 +680,7 @@ public class MultiCameraManager {
         this.writeBacklogCallback = callback;
     }
 
-    /** 录制器报写盘跟不上（主线程）。提示不提示、多久提示一次由 RecordingCoordinator 定。 */
+    /** 录制器报写盘跟不上（主线程）。提示不提示、多久提示一次由 CameraKeeper 定。 */
     private void onWriteBacklog(String cameraId) {
         if (!isRecording) {
             return;
@@ -690,7 +690,7 @@ public class MultiCameraManager {
         }
     }
 
-    /** 录像的样子变了时告诉谁（RecordingCoordinator，它转给录制键、通知、悬浮按钮、主界面）。 */
+    /** 录像的样子变了时告诉谁（CameraKeeper，它转给录制键、通知、悬浮按钮、主界面）。 */
     public void setLaneListener(LaneListener listener) {
         this.laneListener = listener;
     }
@@ -712,7 +712,7 @@ public class MultiCameraManager {
     }
 
     /**
-     * 照此刻重算这个录像意图的样子（主线程）：变了就告诉协调器（{@link LaneListener}），样子变了的那几行黑匣子也在这里写
+     * 照此刻重算这个录像意图的样子（主线程）：变了就告诉相机管家（{@link LaneListener}），样子变了的那几行黑匣子也在这里写
      * （{@link #noteViewChanged}：只有这一处 —— 各路此刻怎样只有这里知道）。两种录制器一样。
      */
     private void publishLanes() {
@@ -750,13 +750,13 @@ public class MultiCameraManager {
         if (now.liveKeys.isEmpty()) {
             if (!before.liveKeys.isEmpty()) {
                 // 每一路都是熄屏放开的（通道刚算黑、哨兵关了、车机要睡那一轮，环视没留着）：不是等摄像头 ——
-                // 录像协调器照通道的决定随后停（ChannelScheduler.surroundVerdict）
+                // 相机管家照通道的决定随后停（ChannelScheduler.surroundVerdict）
                 boolean allReleased = !facts.isEmpty();
                 for (RecordingLanes.Facts lane : facts) {
                     allReleased &= lane.releasedByDark;
                 }
                 com.kooo.evcam.blackbox.BlackBox.noteImportant((allReleased
-                        ? "录像：熄屏放开了在录的几路（通道定的），录像随后停（录像协调器）"
+                        ? "录像：熄屏放开了在录的几路（通道定的），录像随后停（相机管家）"
                         : "录像：一路都不在录了 —— 等待摄像头，恢复后自动继续（录像不算停）")
                         + "；各路：" + lanesText(facts));
             }
@@ -1919,7 +1919,7 @@ public class MultiCameraManager {
         this.writeStallCallback = callback;
     }
 
-    /** 录制器报写不进文件了（主线程）。停不停、接不接由 RecordingCoordinator 判。 */
+    /** 录制器报写不进文件了（主线程）。停不停、接不接由 CameraKeeper 判。 */
     private void onWriteStalled(long stalledMs, boolean everWrote) {
         if (!isRecording || interruptReported) {
             return;
@@ -1998,7 +1998,7 @@ public class MultiCameraManager {
      * 也不再握着那个已经销毁的界面。</p>
      *
      * <p>盘满、写不进、录像的样子变了（一路加入 / 退出）、开录 / 停录走到哪一步这几个<b>不在这里动</b>：它们是
-     * RecordingCoordinator 接的，它不随主界面走 —— 换掉的话主界面一重建，录像就没人停、没人接了。</p>
+     * CameraKeeper 接的，它不随主界面走 —— 换掉的话主界面一重建，录像就没人停、没人接了。</p>
      */
     public void detachUiCallbacks() {
         statusCallback = (cameraId, status) -> { };
@@ -2552,8 +2552,8 @@ public class MultiCameraManager {
     /**
      * 此刻能不能用相机（大纲 §0 名词「能用相机」）：主界面在前，或者前台服务是主界面在前时起的、那时刷新过 ——
      * 安卓 12 起后台才起的前台服务用不了相机（lifecycle-spec §3）。通道调度读的是同一对事实（{@link ChannelSide} 的
-     * mainForeground、serviceStartedWhileVisible）；录像协调器在屏幕亮着、打开录像意图和亮屏时
-     * （RecordingCoordinator.bringUpMainIfCamerasUnusable）照它决定要不要先把主界面拉起来。
+     * mainForeground、serviceStartedWhileVisible）；相机管家在屏幕亮着、打开录像意图和亮屏时
+     * （CameraKeeper.bringUpMainIfCamerasUnusable）照它决定要不要先把主界面拉起来。
      * 哪个线程都能读。
      */
     public static boolean cameraUsableNow() {
@@ -2568,28 +2568,12 @@ public class MultiCameraManager {
         return channel;
     }
 
-    // ------------------------------------------------------------------ 熄屏放开座舱：给熄屏小结、诊断报告的几个数
-
-    /**
-     * 这一段熄屏里座舱放开完的那一刻（elapsedRealtime，含深睡；设计 v3.1 C16，协调器写熄屏小结「座舱 熄屏后 +N ms 放开完」用）：
-     * 熄屏以后第一轮关了座舱的那一轮关完时 —— 平常就是熄屏放开座舱的那一轮（{@link ChannelRules.Why#DARK_RELEASE}），
-     * 安卓直接熄屏、车机马上要睡的那种是按次序关的那一轮。0 = 还没有：熄屏时座舱就没开着（{@link #cabinsOpenAtDark}），
-     * 或者还没关完。每次熄屏（ScreenState 的熄屏那一下，{@link #newDarkPeriod}）从头算，亮屏后留着到下一次熄屏。
-     * 哪个线程都能读。
-     */
-    public long cabinsReleasedAtElapsed() {
-        return cabinsReleasedAt;
-    }
-
-    /** 这一段熄屏开始的那一刻座舱（环视以外的几路）开着、在开、或者在关：没开着的就没什么可放开。哪个线程都能读。 */
-    public boolean cabinsOpenAtDark() {
-        return cabinsOpenAtDark;
-    }
+    // ------------------------------------------------------------------ 熄屏放开座舱：给诊断报告的几个数
 
     /**
      * 屏幕黑了多久，按通道的算法（{@link ChannelRules#darkForChannel} 要的那个数，调度经 {@link ChannelSide#darkForMs} 读它）：
      * 起点不明交 -1（按黑满 30 秒算）。车辆信号读到时已经黑着的（进程刚起来、之前读不到）也是起点不明 —— ScreenState 那时
-     * 从读到的那一刻起算「熄屏后 +N ms」，屏幕其实早就黑了（熄屏小结写「起点不明」的就是这一种）。哪个线程都能调。
+     * 从读到的那一刻起算「熄屏后 +N ms」，屏幕其实早就黑了。哪个线程都能调。
      */
     static long channelDarkForMs() {
         return com.kooo.evcam.screen.ScreenState.source() == com.kooo.evcam.screen.ScreenState.Source.VEHICLE_READ
@@ -2598,8 +2582,8 @@ public class MultiCameraManager {
 
     /**
      * 此刻通道眼里屏幕黑了（{@link ChannelRules#darkForChannel}：黑满 30 秒、起点不明、或者车机要睡）—— 座舱放开、预览不算、
-     * 不保持。和调度用的是同一句、同一组事实（{@link #channelDarkForMs}）；协调器写黑匣子时问它，不自己再判一遍
-     * （熄屏判的那一行「座舱放开 / 座舱黑满 30 秒后放开」、黑着开录的那几行）。哪个线程都能调。
+     * 不保持。和调度用的是同一句、同一组事实（{@link #channelDarkForMs}）；相机管家写黑着开录的那几行时问它，不自己再判一遍。
+     * 哪个线程都能调。
      */
     public static boolean channelCountsDark() {
         return ChannelRules.darkForChannel(com.kooo.evcam.screen.ScreenState.dark(), channelDarkForMs(),
@@ -2607,8 +2591,8 @@ public class MultiCameraManager {
     }
 
     /**
-     * 调度最近一轮把屏幕算作黑了（{@link ChannelScheduler#snapshot}，还没跑过一轮算没有）。亮屏那一下（协调器写熄屏小结、
-     * 相机层的亮屏监听，都在亮屏后的那一轮之前 —— 叫醒调度只是排一轮）读的就是这一段熄屏最后的样子：不是，就是屏幕黑了
+     * 调度最近一轮把屏幕算作黑了（{@link ChannelScheduler#snapshot}，还没跑过一轮算没有）。亮屏那一下（相机层的亮屏监听，
+     * 在亮屏后的那一轮之前 —— 叫醒调度只是排一轮）读的就是这一段熄屏最后的样子：不是，就是屏幕黑了
      * 不到 30 秒又亮了，通道一步没动（项目所有者 2026-10-13「黑满 30 秒再放」）。主线程。
      */
     public boolean channelCountedDark() {
@@ -2780,7 +2764,7 @@ public class MultiCameraManager {
         return (s.surroundKept ? "留着（录像要它才开）" : "放开") + facts;
     }
 
-    /** 这一段熄屏里座舱放开了没有：「熄屏后 +212ms 放开完」/「熄屏时座舱没开着」/「还没关完」（{@link #cabinsReleasedAtElapsed}）。 */
+    /** 这一段熄屏里座舱放开了没有：「熄屏后 +212ms 放开完」/「熄屏时座舱没开着」/「还没关完」。 */
     private String cabinReleaseText() {
         if (!cabinsOpenAtDark) {
             return "熄屏时座舱没开着";
@@ -3548,14 +3532,14 @@ public class MultiCameraManager {
         /**
          * 环视这一段熄屏留不留（项目所有者 2026-10-27）：每变一次一行，带「，熄屏后 +Nms」。通道刚算黑那一行不写「满 30 秒」——
          * 起点不明时是当场算黑的。只写通道定了什么（留下、放开，录像要不要它），不说相机此刻开没开得起来 ——
-         * 用不了相机、屏幕还不知道黑没黑时另有「先不开」那一行。录像协调器照通道这一决定停录、开录
+         * 用不了相机、屏幕还不知道黑没黑时另有「先不开」那一行。相机管家照通道这一决定停录、开录
          * （{@link ChannelScheduler#surroundVerdict}）：放开了在录的就停；熄屏中哨兵变成开、留下了环视，「这一趟要录」立着就接着录。
          */
         @Override
         public void surroundInDark(boolean kept, ChannelRules.Event.Cause why, Integer sentry, boolean keepSetting,
                                    boolean recording, boolean recordsSurround) {
             // 留着的环视此刻录像要不要它：要 → 留下；在录、计划里没有环视 → 不用；没在录 → 留下 —— 哨兵变成开留下的，
-            // 录像协调器照「这一趟要录」接着开；通道刚算黑那一下没在录的，熄屏中不为它开录
+            // 相机管家照「这一趟要录」接着开；通道刚算黑那一下没在录的，熄屏中不为它开录
             String keptText = recordsSurround ? "环视留下（录像）"
                     : recording ? "环视不用（录像计划里没有环视）"
                     : why == ChannelRules.Event.Cause.SENTRY_ON ? "环视留下（没在录：「这一趟要录」立着的话录像接着开）"
@@ -4419,12 +4403,12 @@ public class MultiCameraManager {
     }
 
     /**
-     * 打开录像意图（唯一的开录入口是 RecordingCoordinator）：定下这次录哪几路、写到哪，每一路各自加入
+     * 打开录像意图（唯一的开录入口是 CameraKeeper）：定下这次录哪几路、写到哪，每一路各自加入
      * （{@link #openRecordingIntent}）。两种录制器一样，文件都按这一路真实开始的时刻起名。
      *
      * @param enabledCameras 要录的那几路（如 ["front", "back"]）；null 或空是启用的全部
      * @param storage        开录前刚查过的那一份存储快照：写到哪照它（目录在存储线程上找好、建好），主线程不碰盘
-     * @return false：没有地方存、没有能录的一路 —— 这里不收拾，协调器按开录失败走停录，由 {@link #stopRecording()} 收
+     * @return false：没有地方存、没有能录的一路 —— 这里不收拾，相机管家按开录失败走停录，由 {@link #stopRecording()} 收
      */
     public boolean startRecording(Set<String> enabledCameras, com.kooo.evcam.storage.StorageState.Snapshot storage) {
         // 以前还有不带参数的两个重载给悬浮按钮走，那条路没有写入看门狗、没有存储检查、也不拒录内置存储（2026-09-27 审查），删了
@@ -4461,7 +4445,7 @@ public class MultiCameraManager {
         return true;
     }
 
-    /** 这一代至少一路录起来了：报给协调器。过时的（停过、又开过）不报。 */
+    /** 这一代至少一路录起来了：报给相机管家。过时的（停过、又开过）不报。 */
     private void reportStarted(int gen, Set<String> active, Set<String> failed) {
         final Set<String> activeCopy = new HashSet<>(active);
         final Set<String> failedCopy = new HashSet<>(failed);
@@ -4476,7 +4460,7 @@ public class MultiCameraManager {
     }
 
     /**
-     * 这一代一路都没起来：报给协调器，它走停录那条路收拾。没人接（没有协调器）就自己停。
+     * 这一代一路都没起来：报给相机管家，它走停录那条路收拾（管线建的那一刻就接上了它）。
      * 过时的（停过、又开过）不报 —— 以前上一次的失败会把这一次的录像一起停掉。
      */
     private void reportStartFailed(int gen, String why) {
@@ -4488,30 +4472,27 @@ public class MultiCameraManager {
             AppLog.e(TAG, "开录失败: " + why);
             if (pipelineCallback != null) {
                 pipelineCallback.onPipelineStartFailed(why);
-            } else {
-                stopRecording();
             }
         });
     }
 
     /**
-     * 录像状态只在这里改。录像期间才有的登记跟着它走，不靠哪一条停录路径记得撤：
-     * 变成「在录」时闪远光自动锁定开始看信号（它自己登记车辆信号，带上这次中转写入的目标目录）；
-     * 变成「不在录」时 —— 停录、开录时所有相机都没起来、重建前先停 —— 车辆信号的两份登记
-     * （信息条的、自动锁定的）都撤掉。以前只有 stopRecording 撤，而开录失败后 RecordingCoordinator
-     * 看到「没在录」就不会再调它，登记一直挂着、车辆信号一直在收（2026-10-04 审查）。
+     * 这一份管线手上的录像意图开没开（相机管家的开录、停录命令执行到哪了；「在不在录」对外只有相机管家一个答案，
+     * {@link CameraKeeper#isRecording}，这里不给别人问）。录像期间才有的登记跟着它走，不靠哪一条停录路径记得撤：
+     * 变成「不在录」时 —— 停录、开录时所有相机都没起来、重建前先停 —— 信息条那份车辆信号的登记撤掉
+     * （2026-10-04 审查：以前只有 stopRecording 撤，开录失败后一直挂着）。
      */
     private void setRecording(boolean recording) {
-        boolean was = isRecording;
         isRecording = recording;
-        if (recording && !was) {
-            com.kooo.evcam.storage.AutoLock.get().recordingStarted(context,
-                    useRelayWrite ? finalSaveDir : null);
-        } else if (!recording) {
+        if (!recording) {
             // 信息条那份在开录时就登记了（还没真正录上），开录失败也要撤；没登记过时无害
             com.kooo.evcam.telemetry.Telemetry.get().release("recording");
-            com.kooo.evcam.storage.AutoLock.get().recordingStopped();
         }
+    }
+
+    /** 这一次录像中转写入时，缓存里的文件写完搬去哪（开录时定下的）；不是中转写入、没在录是 null。闪远光自动锁定要它。 */
+    public File relayTargetDir() {
+        return isRecording && useRelayWrite ? finalSaveDir : null;
     }
 
     /**
@@ -4535,8 +4516,6 @@ public class MultiCameraManager {
                             + decision.capless + " locked=" + decision.lockedFull);
                     if (storageFullCallback != null) {
                         storageFullCallback.onStorageFull(decision);
-                    } else {
-                        stopRecording();
                     }
                 });
     }
@@ -4700,11 +4679,11 @@ public class MultiCameraManager {
         File saveDir = storage == null ? null : storage.recordDir;
         boolean relay = appConfig.shouldUseRelayWrite();
         if (saveDir == null || (relay && storage.videoDir == null)) {
-            // 没有地方可存（没有 U 盘、开发者选项没开）：RecordingCoordinator 开录前已经拦过，走到这里是查盘时就没找到目录
+            // 没有地方可存（没有 U 盘、开发者选项没开）：CameraKeeper 开录前已经拦过，走到这里是查盘时就没找到目录
             AppLog.e(TAG, "没有地方存录像（没有 U 盘），不开录");
             return false;
         }
-        // 这次录哪几路：这一份管线建的时候启用的那几路（和主界面预览、拍照同一份，enabledActiveKeys），再照协调器给的
+        // 这次录哪几路：这一份管线建的时候启用的那几路（和主界面预览、拍照同一份，enabledActiveKeys），再照相机管家给的
         // 生效的配置收一收，按开的次序。只为超级镜子、盲区画面建的那一路（没启用的环视、后座舱）不录 —— 配置里刚开了它、
         // 还没回到主界面换管线的也不录，照生效的配置（2026-10-20 审查，车主批：以前录像照此刻的配置、预览拍照照建管线那一刻的）
         List<String> keys = new ArrayList<>();
@@ -4761,13 +4740,6 @@ public class MultiCameraManager {
     }
 
     /**
-     * 停止录制所有摄像头
-     */
-    public void stopRecording() {
-        stopRecording(false);
-    }
-
-    /**
      * 停录 —— 唯一的收拾路径，开录走到哪一步都一样（2026-10-05）。
      *
      * <ol>
@@ -4780,7 +4752,7 @@ public class MultiCameraManager {
      *       （{@link CodecVideoRecorder#finishStop}），几路共用一个期限（{@link CodecVideoRecorder#STOP_BUDGET_MS}）。
      *       MediaRecorder：在录的、备好了还没开录的当场每一路都叫停（不等，{@link VideoRecorder#stop}），各自在自己的线程上
      *       停下、收文件、放掉，收拾线程上共用同一个期限等；</li>
-     *   <li>文件都封好了就报「收拾完了」（{@link PipelineCallback#onPipelineStopped}），协调器这时才开下一次 ——
+     *   <li>文件都封好了就报「收拾完了」（{@link PipelineCallback#onPipelineStopped}），相机管家这时才开下一次 ——
      *       以前开 → 停 → 开两秒内，上一次的收拾会把这一次刚建的编码器一起放掉；</li>
      *   <li>编码录制的录制器接着每一路停放（{@link CodecVideoRecorder#park}：编码器放掉，EGL 和输入 SurfaceTexture 留着照常取帧）。
      *       不动相机：录像输出留在会话里（不要了、但还活着，照「减输出能拖就拖」），下一次开录计划一样就沿用；
@@ -4790,20 +4762,19 @@ public class MultiCameraManager {
      *       （{@link #mediaStopsDone}）。</li>
      * </ol>
      *
-     * @param skipRelayTransfer 是否跳过自动传输（用于远程录制，上传完成后再传输）
      */
-    public void stopRecording(boolean skipRelayTransfer) {
-        stopRecording(skipRelayTransfer, false);
+    public void stopRecording() {
+        stopRecording(false);
     }
 
     /**
      * @param forRelease 管理器要释放了：编码录制的录制器停放好就交给调度、等它离开会话再放（{@link #releasing}）；
      *                   MediaRecorder 的录制器这一趟停完就放掉，手上没有一趟的现在一起放
      */
-    private void stopRecording(boolean skipRelayTransfer, boolean forRelease) {
+    private void stopRecording(boolean forRelease) {
         final int gen = ++recordGeneration;
         AppLog.d(TAG, "stopRecording gen=" + gen + ", isRecording=" + isRecording + ", useCodecRecording="
-                + useCodecRecording + ", skipRelayTransfer=" + skipRelayTransfer);
+                + useCodecRecording);
 
         // 车辆信号的登记（信息条、闪远光自动锁定）也只在录像期间，跟着录像状态撤（setRecording）
         setRecording(false);
@@ -4822,10 +4793,10 @@ public class MultiCameraManager {
         noneLiveSince = 0;
         publishLanes();
 
-        final File relayTarget = useRelayWrite && !skipRelayTransfer ? finalSaveDir : null;
+        final File relayTarget = useRelayWrite ? finalSaveDir : null;
         // 编码录制第一步就在这里：在录的、备好了还没开过录的，每一路都叫停（不等）。从这一刻起都不再录、不再分段、不再恢复，
         // 各自排空编码器、把收文件排在最后。以前在后台一路一路停，后面几路在等前面的时候还在录，可能跨过分段又开出新文件；
-        // 三路各等十几秒，加起来超过协调器的收拾期限，协调器不等了、又开下一次，旧的还在写同一个盘。
+        // 三路各等十几秒，加起来超过相机管家的收拾期限，相机管家不等了、又开下一次，旧的还在写同一个盘。
         // 停放着的什么都不用做；管线放了的话直接交给调度，等它离开会话再放
         final List<Slot> stopping = new ArrayList<>();
         for (String key : CameraSlots.openOrder(new ArrayList<>(slots.keySet()))) {
@@ -4888,7 +4859,7 @@ public class MultiCameraManager {
             }
         }
         // 第二步（下面的收拾线程上）一起等它们排空、收好文件，共用这一个期限。按开机时长（不含深睡）算：
-        // 等待用的计时、协调器的收拾期限都不算深睡
+        // 等待用的计时、相机管家的收拾期限都不算深睡
         final long codecStopDeadline = android.os.SystemClock.uptimeMillis() + CodecVideoRecorder.STOP_BUDGET_MS;
         useRelayWrite = false;
         finalSaveDir = null;
@@ -4954,10 +4925,10 @@ public class MultiCameraManager {
             }
 
             if (!codec) {
-                // MediaRecorder：停完的从表里拿掉、写停录那一行（先于报「收拾完了」：协调器接着开下一次时，这几路已经能另备）
+                // MediaRecorder：停完的从表里拿掉、写停录那一行（先于报「收拾完了」：相机管家接着开下一次时，这几路已经能另备）
                 laneHandler.post(() -> mediaStopsDone(mediaStopping, mediaOutcomes, mediaResults, tally));
             }
-            // 文件都封好了：报「收拾完了」。停放不算在里面 —— 协调器等的是文件（期限见 CodecVideoRecorder.STOP_BUDGET_MS），
+            // 文件都封好了：报「收拾完了」。停放不算在里面 —— 相机管家等的是文件（期限见 CodecVideoRecorder.STOP_BUDGET_MS），
             // 一路停放最多等 5 秒，几路加起来会超过它的收拾期限
             laneHandler.post(() -> pipelineStopped(gen));
             if (!codec) {
@@ -4987,7 +4958,7 @@ public class MultiCameraManager {
         teardown.execute(done);
     }
 
-    /** 停录收拾完了（主线程，文件都封好了）：报给协调器。之后又停过、又开过的不算数（那一次自己报）。 */
+    /** 停录收拾完了（主线程，文件都封好了）：报给相机管家。之后又停过、又开过的不算数（那一次自己报）。 */
     private void pipelineStopped(int gen) {
         if (gen != recordGeneration) {
             AppLog.d(TAG, "stopRecording gen=" + gen + " superseded by gen=" + recordGeneration);
@@ -5604,10 +5575,10 @@ public class MultiCameraManager {
             //    录像输出离开会话再放（retire）—— 会话还带着它时放掉，它就成了死输出。MediaRecorder 的录制器这一趟停完就放
             //    （它停了就不再取帧，Surface 一放调度就摘；mediaGone），手上没有一趟的在停录那条路上一起放。
             //    以前这里接着又在本线程上放一遍，和停录线程同时动同一批录制器。
-            //    收拾完了照样报给协调器：它要是还以为在录，就按「管线没了」处理
+            //    收拾完了照样报给相机管家：它要是还以为在录，就按「管线没了」处理
             releasing = true;
             try {
-                stopRecording(false, true);
+                stopRecording(true);
             } catch (Exception e) {
                 AppLog.e(TAG, "Error stopping recording during release", e);
             }
@@ -5646,7 +5617,7 @@ public class MultiCameraManager {
 
     /**
      * 建好了：相机列表、合成流探测做完，各路相机交给调度了（{@link #initCameras}，CameraManagerHolder 在主线程上调）。
-     * 开录等它（RecordingCoordinator）；一路相机都没分到的也算建好了。
+     * 开录等它（CameraKeeper）；一路相机都没分到的也算建好了。
      */
     public boolean isBuilt() {
         return camerasBuilt;
@@ -5738,7 +5709,7 @@ public class MultiCameraManager {
             return false;
         }
         if (com.kooo.evcam.profile.RecordSpecs.enabledCameraKeys(context).isEmpty()) {
-            // 生效的配置里一路都没启用：当场拒，和拒录读同一个（RecordingCoordinator 开录前问的也是生效的配置），管线建没建好都一样。
+            // 生效的配置里一路都没启用：当场拒，和拒录读同一个（CameraKeeper 开录前问的也是生效的配置），管线建没建好都一样。
             // 拍哪几路照管线建它那一刻启用的（登记表 §一「启用的全部」）；两者对不上时 stepPhoto 不白等
             callback.onNoCameraEnabled();
             return false;

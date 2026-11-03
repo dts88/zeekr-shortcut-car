@@ -478,7 +478,6 @@
     </plurals>
     <string name="msg_record_start_retrying">Rakaman tidak bermula. Mencuba semula…</string>
     <string name="msg_record_start_gave_up">Rakaman masih tidak bermula. Ketik Mula rakam.</string>
-    <string name="msg_recording_lost_in_background">Rakaman berhenti semasa apl di latar belakang</string>
     <string name="msg_record_error">Ralat rakaman: klip tidak sah dipadam</string>
     <string name="msg_photo_taken">Foto disimpan</string>
     <string name="msg_photo_waiting">Membuka kamera. Foto diambil sebaik sahaja kamera sedia.</string>

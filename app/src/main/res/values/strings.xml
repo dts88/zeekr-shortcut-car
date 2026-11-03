@@ -489,7 +489,6 @@
     </plurals>
     <string name="msg_record_start_retrying">录制未能启动，正在自动重试…</string>
     <string name="msg_record_start_gave_up">录制仍未能启动，请点击「开始录制」</string>
-    <string name="msg_recording_lost_in_background">录制已在后台停止</string>
     <string name="msg_record_error">录制异常，已删除无效的录像片段</string>
     <string name="msg_photo_taken">照片已保存</string>
     <string name="msg_photo_waiting">正在打开摄像头，就绪后自动拍照</string>

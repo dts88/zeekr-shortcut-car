@@ -820,7 +820,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         final Context context = getContext().getApplicationContext();
-        final boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
+        final boolean recording = com.kooo.evcam.camera.CameraKeeper.get(requireContext()).isRecording();
         final String noDrive = getString(R.string.set_storage_usage_no_drive);
         final String failed = getString(R.string.info_read_failed);
         new Thread(() -> {
@@ -1247,7 +1247,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * 按钮大小、透明度、时长文字大小合成一行「外观」（值加一个按钮：点这一行在框里拖、按钮跟着变，行尾「重置」）。
      */
     private void bindFloating() {
-        // 按钮显示出来时自己问协调器在不在录，这里不用再推状态
+        // 按钮显示出来时自己问相机管家在不在录，这里不用再推状态
         bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
                 OverlayCoordinator::setRecordButtonEnabled, null);
         SwitchChipsPreference floating = findPreference("pref_recording_floating");
@@ -1735,7 +1735,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return;
             }
             // 录制中不能修：正在录的那一段也没有索引，和断电留下的半截文件长得一样
-            boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
+            boolean recording = com.kooo.evcam.camera.CameraKeeper.get(requireContext()).isRecording();
             com.kooo.evcam.repair.Mp4RepairFlow.start(getActivity(), recording);
         });
 
@@ -1744,7 +1744,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             if (getActivity() == null) {
                 return;
             }
-            boolean recording = com.kooo.evcam.recording.RecordingCoordinator.get(requireContext()).isRecording();
+            boolean recording = com.kooo.evcam.camera.CameraKeeper.get(requireContext()).isRecording();
             com.kooo.evcam.repair.ArchiveFlow.start(getActivity(), recording);
         });
 

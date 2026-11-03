@@ -11,9 +11,8 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.overlay.OverlayCoordinator;
-import com.kooo.evcam.recording.RecordingCoordinator;
-import com.kooo.evcam.recording.RecordingIntent;
 
 /**
  * 开机自启动（规格 §1）的统一入口：收到各类信号、判断自己能正常运行了，就把核心程序起来。
@@ -24,15 +23,12 @@ import com.kooo.evcam.recording.RecordingIntent;
  *
  * <p>只有「开机自启动」开着才做（规格 1.3：它管的是 App 不在时要不要带回来）；
  * 用户退出了不做（1.4）。主界面还在的时候，它自己会回到设定状态（§0），这里只管它不在的情况。
- * 相机管线属于应用（2.11 阶段 6），接录像不必经过主界面；但现在用不了相机（前台服务是后台起的）时，录像协调器打开录像意图那一下
- * 先静默把主界面拉起来，它闪一下就退后台，录像照样当场开、等它起来再开相机（{@link #bringUpMainForRecording}）。「启动自动录制」的入口在主界面，
- * 主界面不在也静默拉起来（1.6）。</p>
+ * 录像要不要开（接着录「这一趟要录」、这一趟还没看过的启动自动录制）只告诉相机管家，它判（{@link CameraKeeper#appRestored}）；
+ * 现在用不了相机（前台服务是后台起的）时，它开录那一下先静默把主界面拉起来，闪一下就退后台（{@link #bringUpMainForRecording}，1.6）。</p>
  *
- * <p>屏幕黑着（熄屏 = 屏幕真黑了，熄屏 v3）时不拉界面；录像接不接交给录像协调器判（{@link RecordingCoordinator#resumeIfWanted}：
- * 黑了不到 30 秒时车机醒着、熄屏持续录制开着、计划里有环视才接，只录环视；黑满 30 秒以后这里来的不接 —— 只有熄屏中哨兵模式变成开、
- * 通道留下环视时协调器自己接，项目所有者 2026-10-27），这里不再一律只记一笔（设计 v3 §3.2）。
+ * <p>屏幕黑着（熄屏 = 屏幕真黑了，熄屏 v3）时不拉界面；录像黑着接不接也是相机管家照熄屏的规矩判。
  * 屏幕此刻不知道黑没黑（进程刚起来、安卓刚亮在等车辆信号）时排到知道了再做（{@code ScreenState.whenKnown}，C11）。
- * 谁来调都先排到主线程上（C8）：保活任务在 WorkManager 的线程上调，而协调器只在主线程上动。</p>
+ * 谁来调都先排到主线程上（C8）：保活任务在 WorkManager 的线程上调，而相机管家只在主线程上动。</p>
  */
 public final class Recovery {
 
@@ -105,7 +101,7 @@ public final class Recovery {
 
     /**
      * 上一次为接录像把主界面拉起来（或者亮屏把因熄屏退下去的主界面接回来）的时刻（elapsedRealtime）：
-     * 亮屏那一下协调器、恢复各叫一次，拉一次就够。
+     * 亮屏那一下接回界面、接回录像各来一次，拉一次就够。
      */
     private static long broughtUpAtMs;
     /** 这么久之内再要拉，当作还在拉（主界面起来、登记预览要一两秒）。 */
@@ -118,12 +114,11 @@ public final class Recovery {
      * 相机却开不起来，没人打开主界面就永远开不起来。
      *
      * <p>静默：带着不是人点开的记号（这一趟的录像选择不清，规格 1.2），起来闪一下就退后台（1.6）。用户退出了不拉；
-     * 5 秒内拉过（亮屏那一下接回界面、接回录像各来一次）不再拉。只由 RecordingCoordinator 调，屏幕亮着时
-     * （{@code RecordingCoordinator.bringUpMainIfCamerasUnusable}：打开录像意图那一下 —— 人按的、悬浮按钮、启动自动录制、
-     * 亮屏接回、存储一类的自动接回都经那里，审查 2026-10-11 —— 和亮屏那一下）。屏幕黑着时它不调（项目所有者 2026-10-13：
+     * 5 秒内拉过（亮屏那一下接回界面、接回录像各来一次）不再拉。只由相机管家调，屏幕亮着时（开录那一下 —— 人按的、悬浮按钮、
+     * 灵动贴、启动自动录制、亮屏接回、存储一类的自动接回都经那里 —— 和亮屏那一下）。屏幕黑着时它不调（项目所有者 2026-10-13：
      * 熄屏不拉主界面，没有例外）。</p>
      *
-     * @param where 谁要录的（ASCII，进黑匣子：RecordingCoordinator.Why）
+     * @param where 谁要录的（ASCII，进黑匣子：CameraKeeper.Why）
      */
     public static void bringUpMainForRecording(Context context, String where) {
         if (UserExit.isExited(context)) {
@@ -190,39 +185,17 @@ public final class Recovery {
             did.append("overlays");
         }
 
-        RecordingCoordinator coordinator = RecordingCoordinator.get(context);
-        boolean recording = coordinator.isRecording();
-        boolean mainScreenAlive = MainActivity.getInstance() != null;
-        RecordingIntent intent = RecordingIntent.current();
-        boolean wanted = !recording && intent.recordingWanted();
-        boolean autoStart = !recording && config.isAutoStartRecording() && intent.shouldAutoStart(true);
-        // 被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘）：和亮屏同一个接回入口，
-        // 不看「启动自动录制」—— 以前只看它，而它关着、熄屏持续录制开着（默认）时「唤醒后恢复」在进程被结束后就落空了。
-        // 现在用不了相机（前台服务是后台起的）时协调器打开录像意图那一下把主界面拉起来（bringUpMainForRecording），
-        // 录像照样当场开、等它起来再开相机；能用相机就直接接 —— 管线属于应用，开录不用再经过主界面（大纲 §2 阶段 6）。
-        // 屏幕黑着时接不接也由协调器判：黑了不到 30 秒时车机醒着、熄屏持续录制开着、计划里有环视才接（只录环视）；黑满 30 秒以后
-        // 这里来的不接（只有熄屏中哨兵模式变成开时协调器自己接，2026-10-27）。别的只记下「这一趟要录」，亮屏再接
-        // （设计 v3 §3.2，以前黑着一律只记一笔）。黑着不拉主界面：用不了相机就等亮屏
-        coordinator.resumeIfWanted(why);
-        if (dark) {
-            // 黑着不拉界面：「启动自动录制」的入口在主界面，等亮屏
-            if ((wanted || autoStart) && !coordinator.isRecording() && !coordinator.isWaiting()) {
-                did.append(did.length() > 0 ? "; " : "").append("recording-waits-for-screen-on");
-            }
-        } else {
-            // 「启动自动录制」的入口在主界面（这一趟开没开过、停没停过都在那里记）：主界面不在就静默拉起来
-            if (autoStart && !wanted && !mainScreenAlive) {
-                launchMainSilently(context);
-                did.append(did.length() > 0 ? "; " : "").append("main-screen-for-recording");
-            }
-        }
+        // 录像：被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘），和这一趟还没看过的启动自动录制，
+        // 都交给相机管家判（黑着接不接、用不了相机时拉不拉主界面也是它）
+        CameraKeeper keeper = CameraKeeper.get(context);
+        keeper.appRestored(why);
 
         String summary = did.length() == 0 ? "nothing" : did.toString();
-        // 每次都记的话，例行那一条五分钟一行；只有做的事变了、或者拉了主界面，才值一行
-        if (!summary.equals(lastSummary) || summary.contains("main-screen")) {
+        // 每次都记的话，例行那一条五分钟一行；只有做的事变了，才值一行
+        if (!summary.equals(lastSummary)) {
             lastSummary = summary;
-            BlackBox.noteImportant("恢复（" + why + "）：" + summary + "；录像中=" + recording
-                    + " 主界面在=" + mainScreenAlive + " " + intent.describe());
+            BlackBox.noteImportant("恢复（" + why + "）：" + summary + "；录像 " + keeper.describe()
+                    + " 主界面在=" + (MainActivity.getInstance() != null));
         }
     }
 }

@@ -507,7 +507,7 @@ public class StorageHelper {
      * 现在有没有地方存录像、照片：有 U 盘，或者开发者选项打开着（选的就是内置存储，或者降级到内置存储；
      * {@link #footageRoot} 的那条规则）。
      *
-     * <p>拒录（{@code RecordingCoordinator}）、拍照入口的拒拍（{@code MultiCameraManager.takePhoto}）
+     * <p>拒录（{@code CameraKeeper}）、拍照入口的拒拍（{@code MultiCameraManager.takePhoto}）
      * 和录制键的「不可用」状态问的是同一件事，所以只有这一处判断 —— 各写一遍，
      * 迟早出现「按钮说能录、按下去说不能」。</p>
      */

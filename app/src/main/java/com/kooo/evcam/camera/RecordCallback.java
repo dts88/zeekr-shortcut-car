@@ -43,7 +43,7 @@ public interface RecordCallback {
      * 录制器自己的修复（换盘、重建编码器、快速恢复）都没救回来（MediaRecorder 没有这些修复：9 秒没再长、
      * 开录 10 秒还没写进第一笔、换段时新的一段开不起来，见 {@link VideoRecorder}）。
      * 这是「录像健不健康」唯一的裁判（项目所有者 2026-09-27）。收到后宿主先看是不是相机的事
-     * （{@link RecordingLanes#stallIsCamera}）：是就只这一路退出；不是才按打断处理，接不接由 RecordingCoordinator 判。
+     * （{@link RecordingLanes#stallIsCamera}）：是就只这一路退出；不是才按打断处理，接不接由相机管家判。
      *
      * @param everWrote false：这次录制一个字节都没写出过（对应「没收到画面」）
      */
@@ -52,7 +52,7 @@ public interface RecordCallback {
 
     /**
      * 写盘跟不上：写入排队满了（约 3 秒的画面），编码线程开始在相机这一侧丢帧。录像照常在录，
-     * 不算打断；每满一段报一次（那一段刚开始时）。提示不提示用户、多久提示一次由 RecordingCoordinator 定。
+     * 不算打断；每满一段报一次（那一段刚开始时）。提示不提示用户、多久提示一次由相机管家定。
      */
     default void onWriteBacklog(String cameraId) {
     }

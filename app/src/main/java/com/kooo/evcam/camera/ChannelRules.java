@@ -489,7 +489,7 @@ public final class ChannelRules {
         boolean heardAnything;
         /** 上一次<b>别人引起的</b>变化（CameraAvailabilityWatch.lastOthersChangeAt）；0 = 没有过。 */
         long lastOthersChangeAt;
-        /** 「车机要睡」从什么时候起（熄屏那张表判成现在停）；0 = 没有。亮屏时由协调器清。 */
+        /** 「车机要睡」从什么时候起（熄屏那张表判成现在停）；0 = 没有。亮屏时清。 */
         long sleepSince;
         /** 「退出」从什么时候起；0 = 没有。 */
         long exitSince;
@@ -527,7 +527,7 @@ public final class ChannelRules {
         /**
          * 这一轮 {@link #surroundInDark} 为什么变了（通道刚算黑那一下不管变没变都算）：和 {@link Event.Type#SURROUND_IN_DARK} 那一行
          * 同一个原因；这一轮没变是 null。只由 {@link ChannelRules#judgeSurroundInDark} 改，每一轮重算。调度发布通道的决定时连同它一起发
-         * （ChannelScheduler.publishVerdict：录像协调器只在熄屏中哨兵模式变成开时开录）。
+         * （ChannelScheduler.publishVerdict：相机管家只在熄屏中哨兵模式变成开时开录）。
          */
         Event.Cause surroundCause;
 
@@ -830,7 +830,7 @@ public final class ChannelRules {
 
     /**
      * {@link #settle} 和 {@link #next} 记下的事，调度据此写黑匣子（一件事一行）。{@link Cause} 公开：通道对环视的熄屏决定连同原因
-     * 发给录像协调器（{@link ChannelScheduler#surroundVerdictCause}）。
+     * 发给相机管家（{@link ChannelScheduler#surroundVerdictCause}）。
      */
     public static final class Event {
         enum Type {
@@ -1191,7 +1191,7 @@ public final class ChannelRules {
 
     /**
      * 环视这一段熄屏是哪一种（{@link World#surroundInDark}，项目所有者 2026-10-27「熄屏放开相机」）。通道对环视的熄屏决定
-     * （{@link #surroundVerdict}，发给录像协调器）也用它：那时 KEPT 是真留着（含「熄屏持续录制」开着）。
+     * （{@link #surroundVerdict}，发给相机管家）也用它：那时 KEPT 是真留着（含「熄屏持续录制」开着）。
      */
     public enum SurroundInDark {
         /** 照亮着算、不判：亮着、黑了还不到 30 秒、在开车。 */
@@ -1222,7 +1222,7 @@ public final class ChannelRules {
     }
 
     /**
-     * 通道此刻对环视的熄屏决定（项目所有者 2026-10-27，录像协调器照它停录、开录，ChannelScheduler.surroundVerdict）：
+     * 通道此刻对环视的熄屏决定（项目所有者 2026-10-27，相机管家照它停录、开录，ChannelScheduler.surroundVerdict）：
      * 通道没算黑、或者在开车（{@link #parkedDark} 不成立：亮着、黑了不到 30 秒、在开车）→ {@link SurroundInDark#LIT}，不归熄屏管；
      * 留着（{@link #surroundKept}：含「熄屏持续录制」）→ KEPT；不然 RELEASED。{@link #releasedByDark} 的环视那一句就是它。
      */
@@ -1231,6 +1231,174 @@ public final class ChannelRules {
             return SurroundInDark.LIT;
         }
         return surroundKept(w) ? SurroundInDark.KEPT : SurroundInDark.RELEASED;
+    }
+
+    // ================================================================= 录像（相机管家，项目所有者 2026-11-03：录像协调器抹掉，规矩和相机的放在一起）
+
+    /**
+     * 录像停下来的原因（项目所有者 2026-09-26 规格 §2.3；2026-10-11 大纲 §7 第 3 问）。摄像头被别的程序拿走、断开、卡住都不是停：
+     * 那一路自己收尾退出、回来自己加入，一路都录不了时录像也不停，显示「等待摄像头」（2.11，确认文档 §三）。
+     */
+    public enum RecordStop {
+        /** 人停的：点了停止、点了退出。 */
+        USER,
+        /**
+         * 因熄屏停的：通道算黑（黑满 30 秒、或者车机要睡）时相机管家判了停（{@link #recordInDark}）。亮屏后接不接停的那一刻照
+         * {@link #resumesOnLit} 定好了。
+         */
+        SCREEN_OFF,
+        /** U 盘满了，没设容量上限（不删录像）。 */
+        STORAGE_FULL,
+        /** U 盘满了而且清不出空间：删光本应用的旧录像也不够（盘被别的东西占了）。 */
+        STORAGE_CANNOT_FREE,
+        /** 锁定的影像占满了空间：没锁的删光也不够，解锁一些就能接着录。 */
+        STORAGE_LOCKED,
+        /**
+         * 一路在录了 15 秒一个字节都没写进文件，而它的相机在出画面、会话里带着它的录像输出（录制器判的，和 WRITE_STALLED
+         * 同一个裁判）：盘或编码器的事。相机没在出画面的，只那一路退出，不是停。
+         */
+        NO_DATA,
+        /** 录着录着写不进文件了，而相机好好的：编码器坏了没修好，或者 U 盘写不进（2026-09-26 哨兵模式那一次）。 */
+        WRITE_STALLED,
+        /**
+         * 录像根本没开始（所以不说「中断」）：相机层没能开始（没有地方存、没有能录的一路）；还没有一路加入时，计划里每一路的录制器
+         * 都建不起来。有一路加入过之后才每一路都建不起来的，录像开始过，算 {@link #UNKNOWN}。
+         */
+        START_FAILED,
+        /** 录制器自己停了，没人告诉我们为什么（含录着的那一份相机管线被释放、换掉）。 */
+        UNKNOWN
+    }
+
+    /**
+     * 这个原因停的，要不要自动接回（大纲 §7 第 3 问）：存储一类（写不进、一笔没写进、开录失败、原因不明）收拾完、查过盘就重开 ——
+     * 重开一次就是新的编码器、新的文件，常常就好了，走同一份额度（{@link #RESUME_TRIES}）。人停的不接；熄屏停的不在这里接
+     * （亮屏、熄屏中哨兵模式变成开时照「这一趟要录」接）；盘满的接回去也录不下。
+     */
+    public static boolean resumesAfter(RecordStop why) {
+        return why == RecordStop.NO_DATA || why == RecordStop.UNKNOWN || why == RecordStop.WRITE_STALLED
+                || why == RecordStop.START_FAILED;
+    }
+
+    /**
+     * 自动接回的额度：每一次自动接回都算一次，连着这么多次都没有一路录满 {@link #RESUME_COUNTS_MS} 就不再试 —— 防的是「接回去又立刻停」
+     * 的循环（成功的标准是录满一分钟，不是开始录了：以前开始就清零，一直写不进时会一直循环）。录满了额度回满，人开始录时清零。
+     */
+    public static final int RESUME_TRIES = 3;
+    /** 有一路在录满这么久，自动接回算成功（一路都不在录、等待摄像头的那几段不算）。 */
+    public static final long RESUME_COUNTS_MS = 60_000L;
+
+    /** 还能不能再自动接回一次（{@link #RESUME_TRIES}）。 */
+    public static boolean resumeAllowed(int triedSoFar) {
+        return triedSoFar < RESUME_TRIES;
+    }
+
+    /**
+     * 一次录像的阶段：空闲 → 开录中 → 在录 → 停录中 → 空闲。「在不在录」只有这一个答案（{@link #recording}）：开录指令发出去起，
+     * 到停为止；一路都没在录（等待摄像头）也算在录 —— 那是各路的样子，不是阶段（2026-10-05 批准的问题：以前相机层另有一个「在录」，
+     * 每一路都没起来时停录问它，于是什么都没收拾、也不接回）。
+     */
+    public enum RecordPhase {
+        /** 没在录，也没在收拾。 */
+        IDLE,
+        /** 开录指令发出去了，还没有一路加入（每一路的相机带着录像输出出了画面才加入）。 */
+        PREPARING,
+        /** 至少一路加入过。之后一路都不在录也还是它。 */
+        RECORDING,
+        /** 停了，相机层还在收拾（各路收尾封好文件、录制器停放）。只有收拾完（或者到了 {@link #STOP_DEADLINE_MS}）才能开下一次。 */
+        STOPPING;
+
+        /** 开录中、在录。 */
+        public boolean recording() {
+            return this == PREPARING || this == RECORDING;
+        }
+    }
+
+    /** 相机层（录像宿主）报上来开录、停录走到了哪一步。 */
+    public enum PipelineReport {
+        /** 有一路加入录像。 */
+        STARTED,
+        /** 计划里每一路的录制器都建不起来。会话带不上录像输出不是这个（相机那一侧的事，那一路退出、隔一会儿再声明）。 */
+        START_FAILED,
+        /** 停录收拾完了；没人叫停时是相机层自己停了（管线被释放）。 */
+        STOPPED
+    }
+
+    /** 收到一份报告后相机管家做什么（{@link #onPipelineReport}）。 */
+    public enum ReportStep {
+        /** 不是这一次的（过时的、重复的）：不理。 */
+        IGNORE,
+        /** 记一笔：开录中 → 在录，或者在录时重建后又起来了。 */
+        NOTE,
+        /** 这一次录像到头了：走停录那一条路（收拾、提示、判接不接），原因照 {@link #endReason}。 */
+        END,
+        /** 收拾完了：停录中 → 空闲，等着开录的可以开了。 */
+        SETTLED
+    }
+
+    /** 停录中最多等相机层收拾多久：编码器一路最坏要五六秒（排空、收文件、等写线程），几路一起叫停、共用一个期限。 */
+    public static final long STOP_DEADLINE_MS = 20_000L;
+
+    /** 一份报告在这个阶段算什么：只在对得上的阶段算数，过时的、重复的一律不理。纯函数。 */
+    public static ReportStep onPipelineReport(RecordPhase phase, PipelineReport report) {
+        switch (report) {
+            case STARTED:
+                return phase.recording() ? ReportStep.NOTE : ReportStep.IGNORE;
+            case START_FAILED:
+                return phase.recording() ? ReportStep.END : ReportStep.IGNORE;
+            case STOPPED:
+                return phase == RecordPhase.STOPPING ? ReportStep.SETTLED
+                        : phase.recording() ? ReportStep.END : ReportStep.IGNORE;
+            default:
+                return ReportStep.IGNORE;
+        }
+    }
+
+    /**
+     * 一份报告让这一次录像到头了（{@link ReportStep#END}）：按什么原因停 —— 开录中录制器都建不起来是开录失败（录像根本没开始，
+     * 提示不说「中断」）；录了一阵之后才每一路都录不了、或者相机层自己停了，录像开始过，是原因不明。停之前判（看的是停之前的阶段）。
+     */
+    public static RecordStop endReason(RecordPhase phase, PipelineReport report) {
+        return report == PipelineReport.START_FAILED && phase == RecordPhase.PREPARING
+                ? RecordStop.START_FAILED : RecordStop.UNKNOWN;
+    }
+
+    /**
+     * 开录前查盘、被拒之后多久再查（项目所有者 2026-10-13「U 盘一可用就开录」）：U 盘不能用（没插、车机刚醒还没挂上）的，从第一次拒起
+     * 头 {@link #DISK_FAST_FOR_MS} 每 {@link #DISK_FAST_EVERY_MS} 查一次 —— 这台车机收不到 U 盘插拔的广播，盘回来没有人叫；
+     * 之后、以及别的原因（盘满、一路都没选）每 {@link #START_RETRY_MS} 一次。
+     */
+    public static final long DISK_FAST_EVERY_MS = 2_000L;
+    /** 从第一次因为 U 盘不能用拒起，查得勤的那一段多长。 */
+    public static final long DISK_FAST_FOR_MS = 120_000L;
+    /** 条件不满足时多久再试（查得勤的那一段之外）。 */
+    public static final long START_RETRY_MS = 30_000L;
+
+    /**
+     * 下一次查盘隔多久。
+     *
+     * @param diskWaitSince 等 U 盘从什么时候起（第一次因为盘不能用拒的那一刻）；0 = 没在等 U 盘
+     */
+    public static long nextStartCheckMs(long diskWaitSince, long now) {
+        return inFastDiskWait(diskWaitSince, now) ? DISK_FAST_EVERY_MS : START_RETRY_MS;
+    }
+
+    /** 在等 U 盘、而且还在查得勤的那一段里：同一个原因拒的不再说一遍（界面本来也只说一次）。 */
+    public static boolean inFastDiskWait(long diskWaitSince, long now) {
+        return diskWaitSince != 0 && now - diskWaitSince < DISK_FAST_FOR_MS;
+    }
+
+    /**
+     * 这一下是不是这一趟看「启动自动录制」的那一下（规格 1.1：启动时自动开一次）：应用启动（主界面打开、开机自启动把应用带回来）、
+     * 屏幕亮着、这一趟还没看过 —— 看过（开关开着就开、关着就不开）、人开过或者停过就不再看（人按了停止之后切个日夜模式，不该看见它又录上了；
+     * 开关是这一趟中途打开的，下一趟才自动开）。屏幕黑着不看，等亮屏（不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。
+     * 亮屏本身不是启动：只接「这一趟要录」。
+     *
+     * @param usedThisTrip 这一趟里看过、人开过或者停过
+     * @param appStarting  这一下是应用启动
+     * @param dark         屏幕黑着
+     */
+    public static boolean autoStartMoment(boolean usedThisTrip, boolean appStarting, boolean dark) {
+        return !usedThisTrip && appStarting && !dark;
     }
 
     // ================================================================= 熄屏时的录像（相机管家，项目所有者 2026-11-02）
@@ -1251,14 +1419,14 @@ public final class ChannelRules {
      * 车机要睡（相机管家的唯一定义，项目所有者 2026-11-02「熄屏判断收归通道调度」）：安卓熄屏了、没在开车。这台车上安卓熄屏就是
      * 车机下电（哨兵模式没开时离车约 4–6 分钟后，熄屏后 3–5 秒进程被结束或冻住）；哨兵模式开着时车机一直醒着、安卓不熄屏
      * （平台笔记 §3.6），所以不另看哨兵模式。调度照它不再保持、手上那一步最多再等 1 秒、按次序关（{@link World#sleepSince}），
-     * 环视照它放开（{@link #judgeSurroundInDark}），录像照它停（{@link #recordInDark}）。以前录像协调器另有一个（还要哨兵模式关着），
+     * 环视照它放开（{@link #judgeSurroundInDark}），录像照它停（{@link #recordInDark}）。以前录像那一侧另有一个（还要哨兵模式关着），
      * 写进登记表给调度读。
      */
     public static boolean headUnitSleeps(boolean androidOff, boolean driving) {
         return androidOff && !driving;
     }
 
-    /** 录像在黑屏里接不接着录（相机管家的决定，{@link #recordInDark}；录像协调器只照它停、开）。 */
+    /** 录像在黑屏里接不接着录（{@link #recordInDark}）。 */
     public enum RecordInDark {
         /** 照亮着算：亮着、黑了不到 30 秒（通道没算黑）—— 录像照常。 */
         LIT,
@@ -1280,7 +1448,7 @@ public final class ChannelRules {
     }
 
     /**
-     * 录像在黑屏里接不接着录（项目所有者 2026-11-02「熄屏判断收归通道调度」；以前录像协调器照自己那张表判，熄屏持续录制关着时
+     * 录像在黑屏里接不接着录（项目所有者 2026-11-02「熄屏判断收归通道调度」；以前另有一张表，熄屏持续录制关着时
      * 屏幕黑 10 秒就停）。只在通道算黑（黑满 30 秒、或者安卓熄屏，{@link #darkForChannel}）以后判，和相机放开同一刻：
      * 车机要睡 → 停；熄屏持续录制关着 → 停；计划里没有环视 → 停；在开车、或者环视留着 → 接着录环视；不然 → 停（环视放开）。
      * 停的那一路先封好文件再关相机（{@link #sealFirst}）。纯函数。
@@ -1309,7 +1477,7 @@ public final class ChannelRules {
         return driving || surroundKept ? RecordInDark.KEEP : RecordInDark.RELEASED;
     }
 
-    /** 这一轮的世界里录像在黑屏里接不接着录（{@link #recordInDark}，调度每一轮发布给录像协调器）。 */
+    /** 这一轮的世界里录像在黑屏里接不接着录（{@link #recordInDark}，调度每一轮发布，相机管家照它停、开）。 */
     static RecordInDark recordInDark(World w) {
         return recordInDark(!w.screenOn, headUnitSleeps(w.androidOff, w.driving), w.keepWhenDark, surroundPlanned(w),
                 w.driving, surroundKept(w));
@@ -1317,7 +1485,7 @@ public final class ChannelRules {
 
     /**
      * 录像计划里有环视：在录时看这一次的计划（{@link World#recordPlan}，RECORDING 登记着才有）；没在录时看启用的那几路
-     * （开录时计划就从它们里定）—— 和录像协调器的 surroundPlanned 同一个意思。
+     * （开录时计划就从它们里定）—— 和相机管家的 surroundPlanned 同一个意思。
      */
     static boolean surroundPlanned(World w) {
         return w.recordPlan.isEmpty() ? w.enabled.contains(CameraSlots.KEY_SURROUND)
@@ -1329,7 +1497,7 @@ public final class ChannelRules {
         return keepWhenDark || autoStart;
     }
 
-    /** 屏幕黑着时录像开不开得起来，开不起来是因为什么（{@link #startsInDark}；录像协调器拦下时那一行照它写）。 */
+    /** 屏幕黑着时录像开不开得起来，开不起来是因为什么（{@link #startsInDark}；相机管家拦下时那一行照它写）。 */
     public enum DarkStart {
         /** 开：只录环视（座舱黑着时谁都不要）。 */
         STARTS,
@@ -1954,7 +2122,7 @@ public final class ChannelRules {
      * <p>按「不是环视那一路」认：非极氪的自定义车型上，熄屏时除了环视那一路，别的路一律放开（记进规格）。</p>
      *
      * <p>环视（项目所有者 2026-10-27「熄屏放开相机」）：通道算黑、没在开车（{@link #parkedDark}），又没留着（{@link #surroundKept}：
-     * 「熄屏持续录制」开着、哨兵模式开或布防）就放开（通道的决定 {@link #surroundVerdict} 是 RELEASED，录像协调器照它停录），
+     * 「熄屏持续录制」开着、哨兵模式开或布防）就放开（通道的决定 {@link #surroundVerdict} 是 RELEASED，相机管家照它停录），
      * 和座舱同一轮 —— 关的次序照旧环视先单独关（原因 {@link Why#SCREEN_OFF}），
      * 关完座舱一起关，什么都不开回来。黑了不到 30 秒、在开车时不放开（照登记表）。它也只看车的事实和设置，不看谁登记着。</p>
      */

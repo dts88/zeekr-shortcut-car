@@ -160,7 +160,7 @@ public final class RecordingLanes {
         }
     }
 
-    /** 这个录像意图此刻的样子（{@link #summarize}）：给协调器、录制键、通知、悬浮按钮读。不可变。 */
+    /** 这个录像意图此刻的样子（{@link #summarize}）：给相机管家、录制键、通知、悬浮按钮读。不可变。 */
     public static final class Summary {
         /** 没在录（没有录像意图）。 */
         public static final Summary NONE = new Summary(View.PREPARING, Collections.<String>emptyList(),
@@ -186,7 +186,7 @@ public final class RecordingLanes {
             this.hint = hint;
         }
 
-        /** 和另一份说的是不是同一个样子（变了才告诉协调器）。 */
+        /** 和另一份说的是不是同一个样子（变了才告诉相机管家）。 */
         public boolean sameAs(Summary other) {
             return other != null && view == other.view && settled == other.settled && planned.equals(other.planned)
                     && liveKeys.equals(other.liveKeys) && hint.sameAs(other.hint);
