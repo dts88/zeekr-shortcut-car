@@ -18,7 +18,9 @@ Related findings: [recirculation](australian-7x-recirculation-findings.md) and
 was attempted.** Lamp output was distinguishable; AHB selection was not. The public Android
 vehicle-service route connected, but normal reads of both AHB candidates raised permission
 `SecurityException`s while the diagnostic recorded stationary Drive. Inspection also found
-an alias collision in the custom lighting route.
+an alias collision in the custom lighting route. The factory settings code has now been
+received and inspected: its intelligent-high-beam switch uses an existing ECARX function,
+but this has not established a usable control for the owner's stalk-selected AHB mode.
 
 These results apply to this diagnostic in this car's App Lab. They do not establish that
 every OEM or privileged integration route is unavailable.
@@ -150,10 +152,59 @@ The same v0.32 run attempted a targeted code-and-manifest export of factory sett
 `com.geely.pma.settings`, version `cs1e_eu-20260404` (code `20260404`), whose known service is
 `com.zeekr.carcontrol.CBCService` with alias `carsettings`. It returned **metadata only**:
 the APK exceeded the exporter's 4,096-entry inventory limit. Its reported size was
-315,450,453 bytes; no partial code payload was included. This is an exporter limitation,
-not a finding that the factory package has no AHB handler. Its control path remains uninspected.
+315,450,453 bytes; no partial code payload was included. A later v0.35 export succeeded,
+as described below.
 
-## 6. Evidence retained for follow-up
+## 6. Factory settings implementation
+
+**On-car observation, diagnostic v0.35:** all four parts of the targeted factory settings
+export arrived and passed their checksums. The decoded payload contained 14 DEX files and
+the manifest, totaling 67,142,152 selected bytes. All 15 selected file hashes matched.
+This was a file export only, with no vehicle API calls or service binding. No further
+stalk comparison was needed to inspect this code.
+
+**Implementation inspection:** the factory HMI 5.0 intelligent-high-beam switch emits
+`IntelligentFarOffLight(boolean)`. Its repository uses `lampActiveHighBeamControl`,
+function `0x2B010100`, zone `0`, with `1` for enabled and `0` for disabled. The call passes
+through `FunctionSignalProcessor` and `FunctionProxy` to the ordinary three-argument
+ECARX `ICarFunction.setFunctionValue(function, zone, value)`. These values come from the
+factory event handler, not a guessed numeric sweep.
+
+This is the same function already present in the diagnostic reports. It reported active
+support, empty supported-value/zone lists and an unknown integer value of `255`.
+Active support alone is insufficient: the inspected adapter's status method can return
+active for an unlisted function. Its dispatcher separately checks for a registered handler
+before using the zone; without one, it returns `255` for a get and does not dispatch a set.
+The inspected lamp handler table has no registration for `0x2B010100`.
+Changing the setter overload or passing zone `0` does not bypass that registration check.
+The client setter can return `true` after a void Binder call completes, so that boolean
+alone would not prove that the car accepted a setting change.
+
+The factory switch's displayed state also needs care. Its observer preserves the previous
+displayed value when it receives `255`. The HMI 5.0 screen is selected using the runtime
+`persist.sys.hmi.version` property; this value was not captured. The presence of this UI
+branch in the shared factory package therefore does not establish that this car uses it,
+or that its switch represents the owner's physical-stalk AHB selection. No explicit gear
+gate was found in this particular switch/event chain.
+
+The inspected `CBCService` forwards to a scheme dispatcher for window, door, climate,
+seat, drive and sound actions. It does not expose an AHB action in that dispatcher.
+A separate settings remote service has a generic `signal/get` route, but its integer
+getter forwards to the same ECARX `getFunctionValue(function, zone)`. It does not supply
+an independent vehicle backend or a factory-only cached AHB state. That wrapper returns
+`253` if its manager is null and `0` if the getter throws, without preserving availability
+or the exception in the value response. A returned `0` would therefore not prove OFF.
+
+The factory manifest declares system shared identity and vendor-car permission, so the
+factory app's own access cannot be assumed for an App Lab app. No remote service call was
+made. Whether an App Lab caller can use that separate transport, or whether its caller
+context would change the result, remains untested; no AHB benefit has been established.
+
+**Result:** the export supplies concrete factory implementation evidence, but no verified
+AHB read/write control. The existing Drive/stalk reports remain valid and need no repeat.
+The source-derived `0/1` values alone do not justify a write through an unverified path.
+
+## 7. Evidence retained for follow-up
 
 The contributor retains the original reports and diagnostic source. The hashes below identify
 the relevant reports. Full device logs and exported vehicle software are not
@@ -165,10 +216,23 @@ included in this documentation change.
 | Car-provider code export, received and hash-verified | v0.30 | `34bbc48487962a3dba97a3b11f03f0a0f45cfce96c9fea62f5a55115fd180956` |
 | Normal direct getters in stationary Drive | v0.32 | `a1789a212be52720f640a7eaab0916c5839b2c6c858a51e46bc2ce9e3babf7cf` |
 | Factory settings export metadata only, no code payload | v0.32 | `db784596aa3c96162d8ba9b0801b6f63f6aed909903cc53c260abcac91c1ef5a` |
+| Factory settings code, part 1 of 4 | v0.35 | `9080db44027e5c23aaa3a6508c76a02bcd7fbe75dc875dfef2efeac090a29abb` |
+| Factory settings code, part 2 of 4 | v0.35 | `b2ad29025d541ba41aa68722587c93314b15750029665826f8c408ec77035bd2` |
+| Factory settings code, part 3 of 4 | v0.35 | `3c095f185d1e76fbc4c37480e857d52ca31f8d73604e2cbcb43b91ac608f2951` |
+| Factory settings code, part 4 of 4 | v0.35 | `7a5e87e75360eed2698bd8f366e96f3cf91c43748409c5884f56834f9d958948` |
 
 Both v0.32 reports share run ID `bc934eb8-f409-4d45-87cd-1acbe9e7e18b`.
 The direct check started on 3 November 2026 at 05:31:36.850 UTC (16:31:36.850 AEDT);
 the factory export report was created at 05:31:38.032 UTC (16:31:38.032 AEDT).
+
+The v0.35 parts share run ID `3339c327-56c4-4da1-9447-dbcd3e0aba60`.
+The verified code bundle SHA-256 is
+`14728876488444a34024ed517289bcb8d42f9735389352ee0ca457e3f7580e23`.
+Factory inspection used package `com.geely.pma.settings`, version `cs1e_eu-20260404`
+(code `20260404`). It included the lighting UI/domain/repository, HMI signal processors,
+`FunctionProxy`, `CBCService` and its dispatchers. Critical mappings were checked against
+DEX instructions where decompiled methods were incomplete. This did not involve executing
+the exported factory code.
 
 Backend inspection used the car's exported `CarService` version 12 (version code 32).
 Relevant implementations were `CarPropertyService`, `PropertyHalService`, `PropertyHalServiceBase`,
