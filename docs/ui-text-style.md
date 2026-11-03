@@ -427,15 +427,7 @@
   Without the Nearby devices permission, smart buttons can't be found / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dicari；
   Drive mode didn't change / Mod pemanduan tidak bertukar。
 - 2026-10-30（项目所有者同意更新首启说明框）：guide_3 去掉「操作按钮可在「设置 → 界面 → 操作按钮位置」中放到驾驶座一侧。」（三种语言）：前一个框已经问过驾驶座在哪一侧，提示里也写了这条路径。没有新句子。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 盲区画面：后视镜上的灯、中控屏上的位置和大小（2026-11-03，项目所有者要的功能，这几句都是草稿）：
+- 2026-11-03 批准（盲区画面：后视镜上的灯、中控屏上的位置和大小，项目所有者要的功能）：
   set_side_view_blind_spot_title「盲区指示灯亮时显示」/ Show when the blind spot light is on / Papar apabila lampu titik buta menyala；
   set_side_view_blind_spot_summary「后视镜上的盲区指示灯亮时显示该侧画面，不必打转向灯，不受最低车速限制」/
   Shows that side when the blind spot light on the side mirror comes on, without the turn signal; Minimum speed doesn't apply /
@@ -453,24 +445,23 @@
   lagi bercermin dengannya.；框上的标签 side_view_editor_left / _right 用已批的「左侧」「右侧」（同 opt_rail_left / _right）。
   批过的 set_side_view_min_speed_summary 前面加了「打转向灯时，」/ When the turn signal is on, / Apabila lampu isyarat menyala,：
   后视镜上的灯不看最低车速，原句不加就和实际不符。
-
-- 关于页致谢里 SW 那一条（2026-11-01，项目所有者要求和 README 一样感谢积极测试和反馈，这句草稿给项目所有者看过，没有明确批）：about_thanks_body
+- 2026-11-03 批准（关于页致谢里 SW 那一条，2026-11-01 项目所有者要求和 README 一样感谢积极测试和反馈）：about_thanks_body
   「• SW（同一个群组）—— 分享了 AVM Recorder 这个项目的信息，让我知道这条路有人走通过；后来也一直积极测试和反馈。」/
   「• SW (same group) — shared the AVM Recorder project, which showed it could be done, and has kept testing actively and sending feedback.」
-- 车外语音（2026-11-01，这几句都是草稿）：悬浮按钮、灵动贴的选项 floating_action_play_outside_voice「车外喇叭播放礼让语音」/
+- 2026-11-03 批准（车外语音，2026-11-01 加）：悬浮按钮、灵动贴的选项 floating_action_play_outside_voice「车外喇叭播放礼让语音」/
   Play the courtesy message on the exterior speaker / Mainkan mesej budi bahasa pada pembesar suara luar；放不了的提示 msg_outside_voice_failed
   「车外喇叭没有播放」/ The exterior speaker didn't play / Pembesar suara luar tidak memainkan mesej。
-- 灵动贴手排模式（2026-10-31）：中文是项目所有者批的 —— smart_button_action_drive_up「驾驶模式向上」、smart_button_action_drive_down
-  「驾驶模式向下」、smart_button_action_gear_up「升挡（模拟声浪）」、smart_button_action_gear_down「降挡（模拟声浪）」。英文、马来文还是草稿：
+- 2026-11-03 批准（灵动贴手排模式）：中文是项目所有者 2026-10-31 批的 —— smart_button_action_drive_up「驾驶模式向上」、smart_button_action_drive_down
+  「驾驶模式向下」、smart_button_action_gear_up「升挡（模拟声浪）」、smart_button_action_gear_down「降挡（模拟声浪）」。英文、马来文 2026-11-03 照草稿批准：
   Drive mode up / Mod pemanduan naik；Drive mode down / Mod pemanduan turun；Shift up (simulated drive sound) / Naik gear (bunyi pemanduan simulasi)；
   Shift down (simulated drive sound) / Turun gear (bunyi pemanduan simulasi)。
-- 「模拟声浪」（2026-10-24 起在设置 → 系统）2026-10-21 批准以后改过、加过的（批准时的原文见上面的单子）：
+- 2026-11-03 批准（「模拟声浪」，2026-10-24 起在设置 → 系统；2026-10-21 批准以后改过、加过的，批准时的原文见上面 2026-10-21 那一条）：
   dev_drive_sound_summary 现在是「运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，
   车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声。」（2026-10-24 照本规范补了句末「。」，英文、马来文补了句号）/「In Sport mode (optionally Standard too), …Switching to these
   modes while stopped plays an engine start」/「Dalam mod Sukan (dan mod Standard jika dipilih), …Bertukar ke mod ini semasa
   berhenti memainkan bunyi enjin dihidupkan」（2026-10-21 实车后去掉「；倒挡时音量降低 6 dB」：车机自己在倒挡压低音量，车主定声浪
   不再另降；2026-10-24 加「播放喇叭」时改了「从车内喇叭播放并跟随媒体音量」；同一天车主加标准模式，又定标准模式要自己打开）；
-  标准模式的开关 2026-10-24 车主改了名字、批了，见上面的单子；
+  标准模式的开关 2026-10-24 车主改了名字、批了，见上面 2026-10-24 那一条；
   dev_drive_sound_volume_title 的选项改成 −6 / −3 / 0 dB，默认 0 dB（车主 2026-10-21 实车：−12 dB 太小，最低 −6 dB 就够）。
   播放喇叭（2026-10-24 加，车主要外放测试：车内、车外、车内和车外）：dev_drive_sound_output_title「播放喇叭」/ Speakers /
   Pembesar suara，三档 dev_drive_sound_output_cabin「车内喇叭」/ Cabin speakers / Pembesar suara kabin（默认）、
@@ -481,13 +472,20 @@
   BUS12 (outer notify) / BUS12 (pemberitahuan luar)（默认）、dev_drive_sound_route_playback「BUS11（外部播放）」/
   BUS11 (outer playback) / BUS11 (main balik luar)；dev_drive_sound_exterior_volume_title「车外音量」/ Exterior volume /
   Kelantangan luar（选项直接写 dB 数：0 / +6 / +12 / +18 dB，默认 +12 dB）。
-
-
-- 2026-10-24（开发者选项「车辆状态（试验性）」面板去掉闪远光、双闪，加刹车、油门深度，项目所有者）：
+- 2026-11-03 批准（开发者选项「车辆状态（试验性）」，2026-10-24 项目所有者定面板去掉闪远光、双闪，加刹车、油门深度）：
   set_vehicle_status_summary「在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭和刹车、油门深度；喇叭信号暂无法读取」/
   「Shows the horn and the brake and throttle pedals below Straighten on the main screen, using the Driving info bar icons;
   the horn signal can't be read yet」/「Memaparkan hon serta pedal brek dan pendikit di bawah Luruskan pada skrin utama,
   menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca」（「刹车深度」「油门深度」照车辆信号里的名字）。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 
 ---
 
@@ -515,7 +513,7 @@
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
 | 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
-| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，待项目所有者确认；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
+| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
