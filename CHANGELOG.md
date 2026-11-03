@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [2.99.0-alpha] - 2026-11-03
+
+- Preview, Super mirror, Blind spot view, photos, the background service and exit now all go through the camera keeper; nothing should look different.
+- Turning Record sound on or off no longer starts the background service when it isn't needed.
+
 ## [2.98.0-alpha] - 2026-11-03
 
 - Recording: starting, stopping and resuming are now decided in one place (the camera keeper); nothing should look different.
