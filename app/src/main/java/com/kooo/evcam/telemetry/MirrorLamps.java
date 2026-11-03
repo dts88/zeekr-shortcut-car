@@ -1,7 +1,7 @@
 package com.kooo.evcam.telemetry;
 
 /**
- * 后视镜上那盏灯此刻亮没亮（项目所有者 2026-11-03 用在盲区画面上）：盲区指示灯（开车时旁边有车）、
+ * 后视镜上那盏灯此刻亮没亮（项目所有者 2026-11-03：盲区画面、信息条转向灯那一格的边框、「车辆信号」页）：盲区指示灯（开车时旁边有车）、
  * 停车后的开门预警（同一盏灯，Lab 11-02 车上对过），左右各一份。不可变，{@link MirrorLampSource} 每变一次给一份新的。
  *
  * <p>读不到的是 null：没连上、这台车没有这个号、这一侧还没读到过。值：0 灭、1 亮；开门预警见过 3（意思不知道，
@@ -56,6 +56,33 @@ public final class MirrorLamps {
             default:
                 return doorWarningRight;
         }
+    }
+
+    /** 信号表里的那一行（{@link Signal#BLIND_SPOT_LEFT} …）此刻亮没亮；读不到的、不是这四盏的是 null。 */
+    public Boolean get(Signal signal) {
+        switch (signal) {
+            case BLIND_SPOT_LEFT:
+                return blindSpotLeft;
+            case BLIND_SPOT_RIGHT:
+                return blindSpotRight;
+            case DOOR_WARNING_LEFT:
+                return doorWarningLeft;
+            case DOOR_WARNING_RIGHT:
+                return doorWarningRight;
+            default:
+                return null;
+        }
+    }
+
+    /** 读得到的有几盏（「车辆信号」页的状态行）。 */
+    public int knownCount() {
+        int known = 0;
+        for (Lamp lamp : Lamp.values()) {
+            if (get(lamp) != null) {
+                known++;
+            }
+        }
+        return known;
     }
 
     /** 换掉一盏的值；没变就是自己。 */

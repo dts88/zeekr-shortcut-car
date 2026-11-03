@@ -219,6 +219,8 @@
     <string name="vi_kind_function_zone">function·zone %1$s</string>
     <string name="vi_kind_sensor_event">sensor event</string>
     <string name="vi_kind_sensor_value">sensor value</string>
+    <string name="vi_kind_setting">settings service</string>
+    <string name="vi_kind_setting_zone">settings service·zone %1$s</string>
     <!-- Under each Vehicle signals row: how a tick shows on the info bar (InfoBarLayout.cellsFor); info bar cell names (InfoBarLayout.Cell) -->
     <string name="vi_bar_icon">Info bar icon: %1$s</string>
     <string name="vi_bar_text">Info bar text (no icon yet)</string>
@@ -259,6 +261,10 @@
     <string name="vi_indicator_display">Indicator display (blinks)</string>
     <string name="vi_turn_left">Left turn lamp</string>
     <string name="vi_turn_right">Right turn lamp</string>
+    <string name="vi_blind_spot_left">Left blind spot light</string>
+    <string name="vi_blind_spot_right">Right blind spot light</string>
+    <string name="vi_door_warning_left">Left door open warning</string>
+    <string name="vi_door_warning_right">Right door open warning</string>
     <string name="vi_low_beam">Low beam</string>
     <string name="vi_high_beam">High beam</string>
     <string name="vi_high_beam_flash">Flash-to-pass</string>

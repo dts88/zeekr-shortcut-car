@@ -30,7 +30,11 @@ import java.util.Locale;
  *       方向盘角度左偏黄、右偏白，不带正负号。</li>
  *   <li>转向灯、双闪一格（项目所有者 2026-10-04）：左箭头 | 双层嵌套三角（同实车双闪键）| 右箭头。
  *       灭 = 灰色空心描边（和自动驻车、哨兵的「灭」同一个画法）；亮 = 近白实心 + 绿色光晕（像实车的转向指示，
- *       和日行灯、远近光的「亮」同一个路数）—— 亮灭靠明度分，去掉颜色也分得开；双闪 = 两只箭头都亮、三角填红。</li>
+ *       和日行灯、远近光的「亮」同一个路数）—— 亮灭靠明度分，去掉颜色也分得开；双闪 = 两只箭头都亮、三角填红。
+ *       后视镜上的灯（项目所有者 2026-11-03）：哪一侧亮了，那一侧箭头的边框换成灯的颜色 —— 盲区指示灯黄、开门预警红
+ *       （同一侧都亮时红），6 px、不加光晕（项目所有者：颜色和线宽已经够了）；里面照旧画转向灯。只画勾了的那几盏，
+ *       不勾的照原来画。黄（亮度 210）比灭的灰（128）亮得多，压缩、去掉颜色都认得出；红（132）和灰差不多，
+ *       去掉颜色就认不出 —— 项目所有者看过样图，定了这一组。</li>
  *   <li>前灯组、后灯组一样宽（106），是同一台 7X 的车头和车尾：车身轮廓、风挡、轮子同一条路径（项目所有者 2026-10-04）。
  *       前灯组：深色星门灯带正中一个徽标（不亮），灯带下沿左右两条平直的日行灯条（徽标下面那一段不亮），
  *       两条灯条外端下面各一块扁的大灯模块。灯的档次靠明度和光晕分，不靠颜色：灭 = 实心灰；日行灯 = 灯条近白 + 光晕；
@@ -328,7 +332,9 @@ public final class InfoBarRenderer {
         float cy = HEIGHT / 2f;
         switch (cell) {
             case TURN:
-                drawIndicators(cell.width, s.turnSignal, s.hazard);
+                drawIndicators(cell.width, s.turnSignal, s.hazard,
+                        lampBorder(lamp(s, Signal.BLIND_SPOT_LEFT), lamp(s, Signal.DOOR_WARNING_LEFT)),
+                        lampBorder(lamp(s, Signal.BLIND_SPOT_RIGHT), lamp(s, Signal.DOOR_WARNING_RIGHT)));
                 break;
             case STEERING:
                 drawSteering(cx, cy, s.steeringDegrees);
@@ -437,18 +443,38 @@ public final class InfoBarRenderer {
     // ================================================================= 各格
 
     /**
+     * 后视镜上的这一盏亮没亮：信息条上勾了它才算（只勾了转向灯不算）；车辆状态面板、车辆信号页的图标照读数画。
+     */
+    private Boolean lamp(VehicleState s, Signal signal) {
+        return selected == null || selected.contains(signal.name()) ? s.mirrorLamps.get(signal) : null;
+    }
+
+    /**
+     * 箭头的边框换成什么颜色（项目所有者 2026-11-03）：开门预警亮 = 红（{@link #WARN}，和开着的门一样；停车后才亮，更急），
+     * 不然盲区指示灯亮 = 黄（{@link #LEFT_YELLOW}）；都没亮、读不到是 0 —— 照转向灯原来的画。纯函数，测试直接调。
+     */
+    static int lampBorder(Boolean blindSpot, Boolean doorWarning) {
+        if (Boolean.TRUE.equals(doorWarning)) {
+            return WARN;
+        }
+        return Boolean.TRUE.equals(blindSpot) ? LEFT_YELLOW : 0;
+    }
+
+    /**
      * 转向灯、双闪一格（184 宽）：左箭头 | 双闪三角 | 右箭头。转向和双闪读的是同一个转向指示状态。
      * 左转 / 右转：那一边的箭头亮绿，三角灰；双闪：两只箭头都亮绿、三角亮红；都不亮：全是灰色空心描边；
      * 两个都读不到才算没数据：箭头、三角都按没数据画，中间一道斜杠。
+     *
+     * @param leftBorder 左箭头的边框换成的颜色（后视镜上的灯，{@link #lampBorder}），0 = 不换；右边同
      */
-    private void drawIndicators(int cellWidth, Integer signal, Boolean hazard) {
+    private void drawIndicators(int cellWidth, Integer signal, Boolean hazard, int leftBorder, int rightBorder) {
         boolean unknown = signal == null && hazard == null;
         boolean haz = Boolean.TRUE.equals(hazard);
         Boolean leftOn = unknown ? null : (haz || (signal != null && signal == VehicleState.TURN_LEFT));
         Boolean rightOn = unknown ? null : (haz || (signal != null && signal == VehicleState.TURN_RIGHT));
         float cx = cellWidth / 2f;
-        indicatorArrow(cellWidth, true, leftOn);
-        indicatorArrow(cellWidth, false, rightOn);
+        indicatorArrow(cellWidth, true, leftOn, leftBorder);
+        indicatorArrow(cellWidth, false, rightOn, rightBorder);
         hazardMark(cx, HEIGHT / 2f, unknown ? null : haz);
         if (unknown) {
             slash(cx - 60, 88, cx + 60, 12);
@@ -458,8 +484,10 @@ public final class InfoBarRenderer {
     /**
      * 一只转向箭头，尖离格边 10：箭头 24 长 46 高，杆 19 长 20 高。
      * 亮 = 绿色光晕 + 6 px 绿边 + 近白的芯（芯盖住绿边的里半，外面露 3 px 绿）；灭 = 灰色空心描边；没数据 = 深灰底浅灰边。
+     * 后视镜上的灯亮着（{@code border} 不是 0）：边框换成灯的颜色、整整 6 px、不加光晕（亮的芯先画，边框盖在芯的外沿上），
+     * 芯照旧是转向灯：亮近白、灭空心、没数据深灰底。
      */
-    private void indicatorArrow(int cellWidth, boolean left, Boolean on) {
+    private void indicatorArrow(int cellWidth, boolean left, Boolean on, int border) {
         float cy = HEIGHT / 2f;
         float tip = left ? 10f : cellWidth - 10f;
         float d = left ? 1f : -1f;  // 从尖往杆的方向
@@ -472,7 +500,15 @@ public final class InfoBarRenderer {
         path.lineTo(tip + d * 24, cy + 10);
         path.lineTo(tip + d * 24, cy + 23);
         path.close();
-        if (on == null) {
+        if (border != 0) {
+            if (on == null || on) {
+                fill.setColor(on == null ? UNKNOWN_FILL : LAMP_CORE);
+                canvas.drawPath(path, fill);
+            }
+            stroke.setColor(border);
+            stroke.setStrokeWidth(6f);
+            canvas.drawPath(path, stroke);
+        } else if (on == null) {
             fill.setColor(UNKNOWN_FILL);
             canvas.drawPath(path, fill);
             stroke.setColor(UNKNOWN_LINE);

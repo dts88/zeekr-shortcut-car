@@ -204,6 +204,9 @@ final class EcarxSource {
         // 再连时换的新来源接着旧的版本号往上数（快照的版本号只往上走）
         this.readingsVersion = telemetry.readings().version;
         for (Signal s : Signal.values()) {
+            if (!s.viaCarInterface()) {
+                continue;
+            }
             long key = key(s.kind, s.id, s.zone);
             List<Signal> list = byKey.get(key);
             if (list == null) {
@@ -1073,7 +1076,7 @@ final class EcarxSource {
     private boolean readAll() {
         int answered = 0;
         for (Signal s : Signal.values()) {
-            if (!s.isFloat() || floatsOn) {
+            if (s.viaCarInterface() && (!s.isFloat() || floatsOn)) {
                 Object raw = read(s);
                 if (raw != null) {
                     answered++;
@@ -1111,7 +1114,7 @@ final class EcarxSource {
     private boolean readPass(Pass pass) {
         int answered = 0;
         for (Signal s : Signal.values()) {
-            if (!s.isFloat()) {
+            if (s.viaCarInterface() && !s.isFloat()) {
                 Object raw = read(s);
                 if (raw != null) {
                     answered++;

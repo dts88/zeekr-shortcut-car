@@ -239,6 +239,8 @@
     <string name="vi_kind_function_zone">功能·区域 %1$s</string>
     <string name="vi_kind_sensor_event">传感器事件</string>
     <string name="vi_kind_sensor_value">传感器值</string>
+    <string name="vi_kind_setting">设置服务</string>
+    <string name="vi_kind_setting_zone">设置服务·区域 %1$s</string>
     <!-- 车辆信号页每一行下面：勾上在信息条上显示成什么（InfoBarLayout.cellsFor）；信息条各格的名字（InfoBarLayout.Cell） -->
     <string name="vi_bar_icon">信息条图标：%1$s</string>
     <string name="vi_bar_text">信息条文字（暂无图标）</string>
@@ -279,6 +281,10 @@
     <string name="vi_indicator_display">转向指示显示（随闪烁）</string>
     <string name="vi_turn_left">左转向灯</string>
     <string name="vi_turn_right">右转向灯</string>
+    <string name="vi_blind_spot_left">左侧盲区指示灯</string>
+    <string name="vi_blind_spot_right">右侧盲区指示灯</string>
+    <string name="vi_door_warning_left">左侧开门预警</string>
+    <string name="vi_door_warning_right">右侧开门预警</string>
     <string name="vi_low_beam">近光灯</string>
     <string name="vi_high_beam">远光灯</string>
     <string name="vi_high_beam_flash">闪远光</string>

@@ -5,7 +5,8 @@ import java.util.EnumMap;
 import java.util.Map;
 
 /**
- * 全部信号此刻的（归一后的）读数：一份不可变快照。没数据的信号不在表里。
+ * 车辆接口读的全部信号此刻的（归一后的）读数：一份不可变快照。没数据的信号不在表里。
+ * 后视镜上的灯（车机设置服务里的，{@link Signal#viaCarInterface} 为假）不在这里，在 {@link Telemetry#lamps}。
  */
 public final class Readings {
 
@@ -83,6 +84,9 @@ public final class Readings {
     public String describe() {
         StringBuilder sb = new StringBuilder();
         for (Signal s : Signal.values()) {
+            if (!s.viaCarInterface()) {
+                continue;
+            }
             Object v = values.get(s);
             if (sb.length() > 0) {
                 sb.append(' ');

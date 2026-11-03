@@ -185,12 +185,15 @@ public class SignalDecodeTest {
         assertEquals(Integer.valueOf(Signal.LIGHT_SWITCH_AUTO), Signal.LIGHT_SWITCH.decode(0x20040E03));
     }
 
-    /** 同一个读法 + 号码 + 区域只能对应一条信号，否则回调分不清给谁。 */
+    /**
+     * 同一个读法 + 号码 + 区域只能对应一条信号，否则回调分不清给谁。车机设置服务里的号按常量名取（号码写 0），
+     * 号码那一项算常量名（{@link Signal#property}）。
+     */
     @Test
     public void everyAddressIsUnique() {
         Set<String> seen = new HashSet<>();
         for (Signal s : Signal.values()) {
-            assertTrue(s.name(), seen.add(s.kind + "/" + s.id + "/" + s.zone));
+            assertTrue(s.name(), seen.add(s.kind + "/" + s.id + "/" + s.property + "/" + s.zone));
         }
     }
 }
