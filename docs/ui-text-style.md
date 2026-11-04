@@ -505,6 +505,20 @@
 - 关于页致谢加 LEO（2026-11-05 项目所有者要求，中文照项目所有者的原话；关于页没有马来文）：about_thanks_body 在
   「Bilibili 极氪7X 车友圈微信群的各位成员」那一条前面加「• LEO（Bilibili 极氪7X 车友圈）—— 提供了国内车机所使用的一些重要代码数据。」/
   「• LEO (Bilibili Zeekr 7X owners' circle) — provided important code data used by Chinese-market head units.」
+- 灵动贴动作扩到「极+」那一套（2026-11-05，草稿；项目所有者 2026-11-04 定了做什么，名字还没看）：组名 smart_button_group_*
+  「应用功能」「驾驶」「语音与媒体」「座椅与方向盘」「空调」「车身」「灯光与香氛」「场景」/ App、Driving、Voice and media、
+  Seats and steering wheel、Climate、Body、Lights and fragrance、Scenes / Apl、Pemanduan、Suara dan media、
+  Tempat duduk dan stereng、Penyaman udara、Badan kereta、Lampu dan wangian、Senario；动作名 smart_button_action_*：
+  一键运动、语音助手、播放 / 暂停、上一首、下一首、静音 / 取消静音、音量加、音量减、方向盘加热、主驾 / 副驾座椅通风、
+  主驾 / 副驾 / 二排左侧 / 二排右侧座椅加热、二排座椅加热、主驾 / 副驾座椅按摩、座椅恢复、空调开关、循环模式、前除霜、后除霜、
+  中控锁、后视镜折叠 / 展开、充电口盖、原厂 360 画面（同「车辆信号」页 vi_stock_360）、迎宾灯语、充电灯语、行车灯语、香氛、
+  观影模式（主驾）/（副驾）、露营模式、哨兵模式（同术语表）；英文、马来文见 strings.xml。提示：msg_car_action_unavailable
+  「无法执行「%1$s」」/ Can't run %1$s / Tidak dapat menjalankan %1$s；msg_car_action_no_change「「%1$s」未生效，此车可能没有该功能」/
+  %1$s didn't take effect; this car may not have it / %1$s tidak berkesan; kereta ini mungkin tiada ciri ini；
+  msg_car_action_power_saving「超级省电模式下不可用」（「极+」的说法）/ Not available in Super Power Saving mode /
+  Tidak tersedia dalam mod Penjimatan Kuasa Super；msg_car_action_standstill「车辆停稳后才能使用」/ Available only when the car
+  is stationary / Hanya tersedia apabila kereta tidak bergerak；msg_car_action_no_fragrance「香氛未安装」/ Fragrance isn't installed /
+  Wangian tidak dipasang。
 - 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
   vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
   settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
