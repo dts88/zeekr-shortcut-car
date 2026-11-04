@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.3.0-alpha] - 2026-11-04
+
+- Blind spot view: both sides can show at once when the side mirror lamps light on both sides; with a turn signal on, the other lit side still shows.
+
 ## [3.2.0-alpha] - 2026-11-04
 
 - Blind spot view: Blind spot alert and Door open warning are now chips on the Blind spot view row.
