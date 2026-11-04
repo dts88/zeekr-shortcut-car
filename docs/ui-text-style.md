@@ -497,6 +497,9 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 关于页致谢加 LEO（2026-11-05 项目所有者要求，中文照项目所有者的原话；关于页没有马来文）：about_thanks_body 在
+  「Bilibili 极氪7X 车友圈微信群的各位成员」那一条前面加「• LEO（Bilibili 极氪7X 车友圈）—— 提供了国内车机所使用的一些重要代码数据。」/
+  「• LEO (Bilibili Zeekr 7X owners' circle) — provided important code data used by Chinese-market head units.」
 - 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
   vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
   settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
