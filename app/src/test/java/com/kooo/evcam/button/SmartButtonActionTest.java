@@ -15,7 +15,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** 灵动贴能选的动作（{@link SmartButtonAction}）：不使用 + 悬浮按钮的全部 + 驾驶模式三项 + 手排模式四项，认不出的当不使用。 */
+/**
+ * 灵动贴能选的动作（{@link SmartButtonAction}）：不使用 + 悬浮按钮的全部 + 驾驶模式三项 + 手排模式四项 + 车控动作（2026-11-05），
+ * 按组列出，认不出的当不使用。
+ */
 public class SmartButtonActionTest {
 
     @Test
@@ -31,7 +34,53 @@ public class SmartButtonActionTest {
             assertSame(floating, action.floating);
             assertEquals(0, action.driveMode);
         }
-        assertEquals(1 + FloatingAction.values().length + 3 + 4, all.size());
+        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 35, all.size());
+    }
+
+    /** 「不使用」不在哪一组；别的都在一组里，按组的先后列出，每一组都有东西。 */
+    @Test
+    public void everyActionButNoneIsInAGroupListedInOrder() {
+        List<SmartButtonAction> all = SmartButtonAction.all();
+        assertNull(SmartButtonAction.NONE.group);
+        int last = -1;
+        for (SmartButtonAction action : all.subList(1, all.size())) {
+            assertNotNull(action.key, action.group);
+            assertTrue(action.key + " 排在前一组后面", action.group.ordinal() >= last);
+            last = action.group.ordinal();
+        }
+        for (SmartButtonAction.Group group : SmartButtonAction.Group.values()) {
+            assertTrue(group + " 是空的", !SmartButtonAction.of(group).isEmpty());
+        }
+        for (FloatingAction floating : FloatingAction.values()) {
+            assertSame(SmartButtonAction.Group.APP, SmartButtonAction.fromKey(floating.key).group);
+        }
+    }
+
+    /** 车控动作：写车的有要做的事，媒体、语音的有不碰车的那一样；车门、尾门不在里面。 */
+    @Test
+    public void theJiPlusActionsKnowWhatToDo() {
+        String[] car = {"sport_one_touch", "volume_up", "volume_down", "steering_wheel_heat", "seat_vent_driver",
+                "seat_vent_passenger", "seat_heat_driver", "seat_heat_passenger", "seat_heat_rear_left",
+                "seat_heat_rear_right", "seat_heat_rear", "seat_massage_driver", "seat_massage_passenger", "seat_restore",
+                "climate_power", "climate_circulation", "defrost_front", "defrost_rear", "central_lock", "mirror_fold",
+                "charging_cap", "view_360", "welcome_light", "charging_light", "driving_light", "fragrance",
+                "theater_driver", "theater_passenger", "camping", "sentry"};
+        for (String key : car) {
+            SmartButtonAction action = SmartButtonAction.fromKey(key);
+            assertNotNull(key, action.car);
+            assertNull(key, action.media);
+            assertNull(key, action.floating);
+        }
+        String[] media = {"voice_assistant", "media_play_pause", "media_previous", "media_next", "media_mute"};
+        for (String key : media) {
+            SmartButtonAction action = SmartButtonAction.fromKey(key);
+            assertNotNull(key, action.media);
+            assertNull(key, action.car);
+            assertSame(key, SmartButtonAction.Group.MEDIA, action.group);
+        }
+        assertEquals(35, car.length + media.length);
+        assertSame(SmartButtonAction.NONE, SmartButtonAction.fromKey("door_passenger"));
+        assertSame(SmartButtonAction.NONE, SmartButtonAction.fromKey("tailgate"));
     }
 
     @Test
