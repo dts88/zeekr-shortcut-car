@@ -67,7 +67,7 @@
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="set_side_view_title">Blind spot view</string>
-    <string name="set_side_view_summary">Shows the side camera on the signalling side when the turn signal is on and hides it 1 second after the signal turns off; not shown in reverse or while a factory view is on screen. Surround view stays on in D.</string>
+    <string name="set_side_view_summary">Shows the side camera on the signalling side when the turn signal is on; 1 second after the signal turns off it starts to fade out and is gone 1 second later; not shown in reverse or while a factory view is on screen. Surround view stays on in D.</string>
     <string name="set_side_view_min_speed_title">Minimum speed</string>
     <string name="set_side_view_min_speed_summary">When the turn signal is on, not shown on the center screen below this speed (the HUD isn\'t affected); 0 means no limit</string>
     <string name="side_view_close">Close Blind spot view</string>

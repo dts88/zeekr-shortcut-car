@@ -53,6 +53,11 @@ public final class SideViewDecision {
         public boolean useBlindSpot;
         /** 设置里「盲区画面」那一行开着附加项「开门预警」。 */
         public boolean useDoorWarning;
+        /**
+         * 收起前淡出（项目所有者 2026-11-04，{@link SideViewTrigger#FADE_MS}）：装饰动效此刻放不放（{@code ui.MotionPolicy}：
+         * 「录制时减少动效」开着而在录、系统关了动画时不放）。不放就和以前一样，留够就收。
+         */
+        public boolean fade;
     }
 
     /**

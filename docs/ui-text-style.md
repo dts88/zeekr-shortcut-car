@@ -500,6 +500,13 @@
 - 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
   vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
   settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
+- 盲区画面的说明（2026-11-04，项目所有者加了淡出，照着改；2026-10-16 起的那一句是批过的）：set_side_view_summary
+  「打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后开始淡出，再过 1 秒完全消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。」/
+  「Shows the side camera on the signalling side when the turn signal is on; 1 second after the signal turns off it starts to fade out
+  and is gone 1 second later; not shown in reverse or while a factory view is on screen. Surround view stays on in D.」/
+  「Memaparkan kamera sisi di sebelah isyarat apabila lampu isyarat dihidupkan; 1 saat selepas lampu isyarat dimatikan ia mula pudar
+  dan hilang sepenuhnya 1 saat kemudian; tidak dipaparkan dalam gear undur atau semasa paparan kilang dipaparkan. Paparan sekeliling
+  kekal hidup dalam gear D.」（只改了「1 秒后消失」那半句）。
 - 盲区画面那一行的两个附加项（2026-11-04，草稿）：英文、马来文名字 set_side_view_blind_spot_chip Blind spot alert /
   Amaran titik buta、set_side_view_door_warning_chip Door open warning / Amaran buka pintu（「开门预警」照术语表）；
   按钮下面的一行小字 set_side_view_lamps_note「后视镜上的盲区提醒、开门预警亮起时也显示该侧画面，不必打转向灯，不受最低车速限制」/

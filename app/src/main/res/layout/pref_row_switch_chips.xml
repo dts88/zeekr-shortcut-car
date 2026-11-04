@@ -10,7 +10,6 @@
   那一排是 pref_options（标题 pref_options_label、按钮放进 pref_option_chips，下面可以有一行小字 pref_options_note）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"

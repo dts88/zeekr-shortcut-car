@@ -60,6 +60,8 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Paint fadePaint = new Paint();
+    /** 收起前的淡出（{@link #fadeOut}；和四边渐隐的 {@link #fadePaint} 不是一回事）。 */
+    private final SideViewFade fadeAway = new SideViewFade(this);
 
     private Presentation presentation;
     private FrameLayout root;
@@ -196,6 +198,7 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
 
     @Override
     public void conceal() {
+        fadeAway.stop();
         if (!isAttached() || !shown) {
             return;
         }
@@ -205,10 +208,23 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         syncCanvas();
     }
 
+    @Override
+    public void fadeOut(long durationMs) {
+        if (isAttached() && shown) {
+            fadeAway.start(durationMs);
+        }
+    }
+
+    @Override
+    public boolean isFading() {
+        return fadeAway.isFading();
+    }
+
     /** 当场移走：Presentation 收掉，画布在这一下被收走，服务把它交给管线留着（{@link MultiCameraManager#keepHudCanvas}）。 */
     @Override
     public void detach() {
         handler.removeCallbacks(tick);
+        fadeAway.stop();
         Presentation p = presentation;
         FrameLayout frame = root;
         presentation = null;
@@ -235,6 +251,10 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         boolean wasShown = isAttached() && shown;
         boolean sideChanged = side != lane;
         lane = side;
+        if (show) {
+            // 淡出中又显示、换一侧，或者上一次淡完收起的：回到正常
+            fadeAway.restore();
+        }
         if (show && !wasShown) {
             picture.beginShowing(SystemClock.uptimeMillis());
         }
