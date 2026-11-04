@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.4.0-alpha] - 2026-11-05
+
+- Smart buttons: Pair smart button replaces Find smart buttons; a new button is paired with a long press.
+- Smart buttons: long press connects and reads battery, version and serial number; each button's row shows them.
+- Smart buttons: scan filtered by name and delivered by the system; no periodic or silence restarts.
+- Smart buttons: new on/off switch; when off, no Bluetooth scanning.
+- About & credits: thanks LEO (Bilibili Zeekr 7X owners' circle) for important code data used by Chinese-market head units.
+
 ## [3.3.0-alpha] - 2026-11-04
 
 - Blind spot view: both sides can show at once when the side mirror lamps light on both sides; with a turn signal on, the other lit side still shows.
