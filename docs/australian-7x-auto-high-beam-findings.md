@@ -2,7 +2,7 @@
 
 Research contributed by Calvin Bui for [#138](https://github.com/dts88/zeekr-shortcut-car/issues/138),
 tested through App Lab on one Australian-market ZEEKR 7X, reported firmware **2.1.1c**,
-31 October-3 November 2026. The App Lab version was not recorded.
+31 October-4 November 2026. The App Lab version was not recorded.
 Zeekr Shortcut's ECARX integration was the starting point for a separate, small diagnostic APK.
 
 This follows the distinction in [the platform notes](zeekr-platform-notes.md):
@@ -18,9 +18,10 @@ Related findings: [recirculation](australian-7x-recirculation-findings.md) and
 was attempted.** Lamp output was distinguishable; AHB selection was not. The public Android
 vehicle-service route connected, but normal reads of both AHB candidates raised permission
 `SecurityException`s while the diagnostic recorded stationary Drive. Inspection also found
-an alias collision in the custom lighting route. The factory settings code has now been
-received and inspected: its intelligent-high-beam switch uses an existing ECARX function,
-but this has not established a usable control for the owner's stalk-selected AHB mode.
+an alias collision in the custom lighting route. The factory settings code was received
+and inspected. A later six-state test successfully called its remote reader, but both
+AHB candidates returned the unknown integer `255` in every state. This verifies access
+to that reader, without establishing a selection mapping or control.
 
 These results apply to this diagnostic in this car's App Lab. They do not establish that
 every OEM or privileged integration route is unavailable.
@@ -116,7 +117,7 @@ No distinct usable AHB-selection route was identified in the returned configurat
 no custom lighting values or writes were attempted.
 
 Further progress needs an accessible control path or an appropriate OEM/App Lab integration
-mechanism. Repeating the same stalk sequence would not resolve this access/mapping problem.
+mechanism. Repeating calls through this custom manager would not repair its alias collision.
 
 ## 5. Separate Zeekr SDK route
 
@@ -196,13 +197,52 @@ an independent vehicle backend or a factory-only cached AHB state. That wrapper 
 or the exception in the value response. A returned `0` would therefore not prove OFF.
 
 The factory manifest declares system shared identity and vendor-car permission, so the
-factory app's own access cannot be assumed for an App Lab app. No remote service call was
-made. Whether an App Lab caller can use that separate transport, or whether its caller
-context would change the result, remains untested; no AHB benefit has been established.
+factory app's own access cannot be assumed for an App Lab app. Access to its separate
+remote reader was subsequently tested directly, as follows.
 
-**Result:** the export supplies concrete factory implementation evidence, but no verified
-AHB read/write control. The existing Drive/stalk reports remain valid and need no repeat.
-The source-derived `0/1` values alone do not justify a write through an unverified path.
+**On-car observation, diagnostic v0.36:** all six state reports arrived with fresh ECARX
+readings. The factory reader failed during class initialization because its response
+parser used regex syntax rejected by Android's ICU engine. It never reached binding or
+the getter. This was a diagnostic defect, not a negative result for the factory service.
+
+**On-car observation, diagnostic v0.38:** after repairing the parser, all six captures
+successfully bound to `CarSettingsRemoteService$CarSettingsRemoteService0` using normal
+explicit binding with `BIND_AUTO_CREATE`. Each called `carsettings/signal/get` once for
+`0x2B010100` and `0x2B030A00`, both at zone `0`, and released the binding afterward.
+The procedure requested opening the factory settings screen once before the sequence.
+The two returned values were JSON integers `255` in every state; route code `0` indicated successful dispatch,
+not vehicle-property availability. Independent decoding of each raw response envelope
+matched the logged values. The diagnostic did not substitute `255` for failed reads.
+
+| Owner-labelled state | ECARX main-beam output `0x21050200` | Factory `0x2B010100`, zone `0` | Factory `0x2B030A00`, zone `0` |
+|---|---|---|---|
+| 1. Parked | `0` | `255` | `255` |
+| 2. Drive, no high beam | `0` | `255` | `255` |
+| 3. Drive, manual high beam | `1` | `255` | `255` |
+| 4. Drive, auto high beam | `0` | `255` | `255` |
+| 5. Parked, auto high beam | `0` | `255` | `255` |
+| 6. Parked, manual high beam | `1` | `255` | `255` |
+
+Both motion samples in every capture recorded the expected Park/Drive gear and zero speed.
+These readings corroborate gear and stationary timing; lighting labels remain owner
+observations. Main-beam output still identifies manual/lamp output without distinguishing
+selected auto high-beam from no high-beam mode. All 131 captured ECARX support/value/zone
+results per state matched the corresponding v0.36 state.
+
+The same captures also retained access failures from the other routes. HIDL stopped before
+service lookup because `android.hardware.automotive.vehicle.V2_0.IVehicle` was unavailable
+to the app classloader. Normal native-service lookups for `ecarxcar_service` and
+`soa_service` returned null; no native signal values were read. These failures do not
+establish whether those services or properties would be accessible through another client.
+The ordinary Android getters for `0x21408E18` and `0x11400E11` again raised their permission
+`SecurityException`s, including in stationary Drive.
+
+**Result:** normal access to this factory reader and its response decoding now work on
+this car, but neither candidate supplies an AHB-selection distinction. `255` remains
+unknown, with no property status or timestamp returned. No AHB read/write control was
+verified and no lighting write was attempted. The source-derived `0/1` values alone do
+not justify a write through an unverified mapping. These short captures do not establish
+cold-start, sleep/wake or head-unit restart reliability.
 
 ## 7. Evidence retained for follow-up
 
@@ -220,6 +260,17 @@ included in this documentation change.
 | Factory settings code, part 2 of 4 | v0.35 | `b2ad29025d541ba41aa68722587c93314b15750029665826f8c408ec77035bd2` |
 | Factory settings code, part 3 of 4 | v0.35 | `3c095f185d1e76fbc4c37480e857d52ca31f8d73604e2cbcb43b91ac608f2951` |
 | Factory settings code, part 4 of 4 | v0.35 | `7a5e87e75360eed2698bd8f366e96f3cf91c43748409c5884f56834f9d958948` |
+| Factory reader, state 1: Parked | v0.38 | `2905ac629843a225530fca91c589dbad7cb381affc39464512d154a9831ac9cb` |
+| Factory reader, state 2: Drive - no high beam | v0.38 | `6c006656ea4a0215a037d02656ae39a2511d3bd6a41f909ab65033fc9c41510b` |
+| Factory reader, state 3: Drive - manual high beam | v0.38 | `c3db93c71a0fbb8c0ba61efa9acde5f52dd77d7d87f70067ef200e92630215e0` |
+| Factory reader, state 4: Drive - auto high beam | v0.38 | `a433d8f747874d9cf15301ed6d65ef4326088cee70da4f9c81acde3b2c0de40e` |
+| Factory reader, state 5: Parked - auto high beam | v0.38 | `b087f8755b3007b72efeae5b95eca9ee889fb6cafe9b1fb9e108d9799bd3304f` |
+| Factory reader, state 6: Parked - manual high beam | v0.38 | `1635ed3639fa3d566f5c8800a450839cce9d6019aa0fd1378feffacd848ec9be` |
+
+The six v0.38 reports have distinct capture IDs and were created on 4 November 2026,
+04:20:10.798-04:20:55.116 UTC (15:20:10.798-15:20:55.116 AEDT). Their factory-code hashes
+matched the previously received v0.35 bundle; the static export was reused, while all six
+state readings were captured afresh.
 
 Both v0.32 reports share run ID `bc934eb8-f409-4d45-87cd-1acbe9e7e18b`.
 The direct check started on 3 November 2026 at 05:31:36.850 UTC (16:31:36.850 AEDT);
