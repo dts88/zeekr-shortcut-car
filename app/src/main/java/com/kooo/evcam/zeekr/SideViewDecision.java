@@ -49,10 +49,15 @@ public final class SideViewDecision {
         /** 停车后的开门预警（亮的是后视镜上同一盏灯）：左、右亮着没有；null 读不到。 */
         public Boolean doorWarningLeft;
         public Boolean doorWarningRight;
-        /** 设置里开着「盲区指示灯亮时显示」。 */
+        /** 设置里「盲区画面」那一行开着附加项「盲区提醒」。 */
         public boolean useBlindSpot;
-        /** 设置里开着「开门预警亮时显示」。 */
+        /** 设置里「盲区画面」那一行开着附加项「开门预警」。 */
         public boolean useDoorWarning;
+        /**
+         * 收起前淡出（项目所有者 2026-11-04，{@link SideViewTrigger#FADE_MS}）：装饰动效此刻放不放（{@code ui.MotionPolicy}：
+         * 「录制时减少动效」开着而在录、系统关了动画时不放）。不放就和以前一样，留够就收。
+         */
+        public boolean fade;
     }
 
     /**

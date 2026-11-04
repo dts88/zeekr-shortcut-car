@@ -212,7 +212,8 @@
 
         <!--
           盲区画面：单独的窗口，不挂在超级镜子的开关下面 —— 两个窗口各管各的（项目所有者 2026-10-16）。
-          2026-10-23 起开关加下一层：行尾写显示位置，点这一行进下面的「盲区画面」页
+          2026-10-23 起开关加下一层：行尾写显示位置，点这一行进下面的「盲区画面」页。
+          2026-11-04 起开着时说明下面一排附加项「盲区提醒」「开门预警」（项目所有者；原来是那一页的两个开关）
         -->
         <com.kooo.evcam.settings.SwitchNavPreference
             android:key="pref_side_view"
@@ -232,20 +233,6 @@
             <com.kooo.evcam.settings.SegmentedPreference
                 android:key="pref_side_view_target"
                 android:title="@string/set_side_view_target_title" />
-
-            <!--
-              后视镜上的灯亮了也显示那一侧（2026-11-03，各自开关，默认关）：不用打转向灯，不看最低车速。
-              盲区指示灯是开车时旁边有车亮的，开门预警是停车后亮的（后视镜上同一盏灯）。
-            -->
-            <SwitchPreferenceCompat
-                android:key="pref_side_view_blind_spot"
-                android:title="@string/set_side_view_blind_spot_title"
-                android:summary="@string/set_side_view_blind_spot_summary" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_side_view_door_warning"
-                android:title="@string/set_side_view_door_warning_title"
-                android:summary="@string/set_side_view_door_warning_summary" />
 
             <!-- 只管中控屏：显示位置是「HUD」时不可用 -->
             <SeekBarPreference

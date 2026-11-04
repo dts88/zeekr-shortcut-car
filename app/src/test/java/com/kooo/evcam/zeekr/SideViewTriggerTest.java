@@ -6,7 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** {@link SideViewTrigger}：D 挡备着、打灯显示、灯灭后留 1 秒、离开 D 挡 30 秒后摘掉、原厂画面和熄屏立刻全收。 */
+/** {@link SideViewTrigger}：D 挡备着、打灯显示、灯灭后留 1 秒（再淡 1 秒）、离开 D 挡 30 秒后摘掉、原厂画面和熄屏立刻全收。 */
 public class SideViewTriggerTest {
 
     private static SideViewDecision.Input in(String gear, Integer turn) {
@@ -251,5 +251,111 @@ public class SideViewTriggerTest {
         SideViewTrigger.Result r = t.update(100, lit, false);
         assertTrue("右边亮了照样显示", r.shown);
         assertEquals(LaneCycle.RIGHT, r.lane);
+    }
+
+    // ------------------------------------------------------------------ 淡出（项目所有者 2026-11-04）
+
+    /** 装饰动效放得了（服务照 MotionPolicy 填）。 */
+    private static SideViewDecision.Input fading(String gear, Integer turn) {
+        SideViewDecision.Input in = in(gear, turn);
+        in.fade = true;
+        return in;
+    }
+
+    /** 留够 1 秒之后再淡 1 秒：这一秒里照旧显示着、报还要淡多久，淡完才收。 */
+    @Test
+    public void afterTheHoldItFadesForOneSecondThenHides() {
+        SideViewTrigger t = new SideViewTrigger();
+        t.update(0, fading("D", 2), false);
+        SideViewTrigger.Result r = t.update(5_000, fading("D", 0), false);
+        assertTrue(r.shown);
+        assertEquals("留着的时候不淡", 0, r.fadeMs);
+
+        long held = 5_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS;
+        r = t.update(held, fading("D", 0), false);
+        assertTrue("淡出时照旧显示着", r.shown);
+        assertEquals(SideViewTrigger.FADE_MS, r.fadeMs);
+        assertEquals(held + SideViewTrigger.FADE_MS, r.wakeAt);
+
+        r = t.update(held + 400, fading("D", 0), false);
+        assertEquals("淡到一半：报还剩多少", SideViewTrigger.FADE_MS - 400, r.fadeMs);
+
+        r = t.update(held + SideViewTrigger.FADE_MS, fading("D", 0), false);
+        assertFalse(r.shown);
+        assertEquals(0, r.fadeMs);
+        assertTrue("D 挡：回到备着", r.attached);
+    }
+
+    /** 判定来晚了（留够之后 300 毫秒才来）：照留够那一刻起算，淡完的时刻不往后拖。 */
+    @Test
+    public void aLateWakeDoesNotStretchTheFade() {
+        SideViewTrigger t = new SideViewTrigger();
+        t.update(0, fading("D", 1), false);
+        t.update(1_000, fading("D", 0), false);
+        long held = 1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS;
+        SideViewTrigger.Result r = t.update(held + 300, fading("D", 0), false);
+        assertTrue(r.shown);
+        assertEquals(SideViewTrigger.FADE_MS - 300, r.fadeMs);
+        assertEquals(held + SideViewTrigger.FADE_MS, r.wakeAt);
+    }
+
+    /** 淡出中同一侧又打灯：回到正常（不再淡），原来淡完的那一刻不收。 */
+    @Test
+    public void signallingAgainDuringTheFadeShowsAgain() {
+        SideViewTrigger t = new SideViewTrigger();
+        t.update(0, fading("D", 1), false);
+        t.update(1_000, fading("D", 0), false);
+        long held = 1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS;
+        t.update(held + 200, fading("D", 0), false);
+        SideViewTrigger.Result r = t.update(held + 500, fading("D", 1), false);
+        assertTrue(r.shown);
+        assertEquals(0, r.fadeMs);
+        assertEquals(0, r.wakeAt);
+        r = t.update(held + SideViewTrigger.FADE_MS, fading("D", 1), false);
+        assertTrue("原来淡完的那一刻不收", r.shown);
+    }
+
+    /** 淡出中另一侧打灯：换过去，不再淡。 */
+    @Test
+    public void theOtherSideDuringTheFadeSwitchesOver() {
+        SideViewTrigger t = new SideViewTrigger();
+        t.update(0, fading("D", 1), false);
+        t.update(1_000, fading("D", 0), false);
+        long held = 1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS;
+        t.update(held + 100, fading("D", 0), false);
+        SideViewTrigger.Result r = t.update(held + 300, fading("D", 2), false);
+        assertTrue(r.shown);
+        assertEquals(LaneCycle.RIGHT, r.lane);
+        assertEquals(0, r.fadeMs);
+    }
+
+    /** 装饰动效不放时照以前：留够就收；点关闭、倒挡当场收，不淡。 */
+    @Test
+    public void noFadeWhenNotAllowedNorOnDismissOrFactoryView() {
+        long held = 1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS;
+
+        SideViewTrigger plain = new SideViewTrigger();
+        plain.update(0, in("D", 2), false);
+        plain.update(1_000, in("D", 0), false);
+        SideViewTrigger.Result r = plain.update(held, in("D", 0), false);
+        assertFalse("不淡：留够就收", r.shown);
+        assertEquals(0, r.fadeMs);
+
+        SideViewTrigger closed = new SideViewTrigger();
+        closed.update(0, fading("D", 2), false);
+        closed.update(1_000, fading("D", 0), false);
+        closed.update(held, fading("D", 0), false);
+        closed.dismiss();
+        r = closed.update(held + 100, fading("D", 0), false);
+        assertFalse("点了关闭：当场收", r.shown);
+        assertEquals(0, r.fadeMs);
+
+        SideViewTrigger reverse = new SideViewTrigger();
+        reverse.update(0, fading("D", 2), false);
+        reverse.update(1_000, fading("D", 0), false);
+        reverse.update(held, fading("D", 0), false);
+        r = reverse.update(held + 100, fading("R", 0), false);
+        assertFalse("倒挡：当场全收", r.attached);
+        assertEquals(0, r.fadeMs);
     }
 }

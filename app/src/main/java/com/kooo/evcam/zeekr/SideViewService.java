@@ -338,6 +338,8 @@ public class SideViewService extends Service {
         in.blindSpotRight = lamps.blindSpotRight;
         in.doorWarningLeft = lamps.doorWarningLeft;
         in.doorWarningRight = lamps.doorWarningRight;
+        // 收起前淡出是装饰动效，照同一条规矩放不放
+        in.fade = com.kooo.evcam.ui.MotionPolicy.decorative(this);
         return in;
     }
 
@@ -573,6 +575,13 @@ public class SideViewService extends Service {
                             : result.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : ""));
                     noteShown();
                     w.show(result.lane);
+                } else if (result.fadeMs == 0 && w.isFading()) {
+                    // 淡出中同一侧又亮了：回到正常，接着显示
+                    BlackBox.note("盲区画面" + label() + "：淡出中又显示「" + LaneCycle.labelOf(result.lane) + "」");
+                    w.show(result.lane);
+                }
+                if (result.fadeMs > 0) {
+                    w.fadeOut(result.fadeMs);
                 }
             } else if (w.isShowing()) {
                 noteIfNoFrame();

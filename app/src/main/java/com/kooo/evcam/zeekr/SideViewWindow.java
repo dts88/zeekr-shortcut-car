@@ -63,6 +63,8 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     private final SideViewPicture picture;
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** 收起前的淡出（{@link #fadeOut}）。 */
+    private final SideViewFade fadeAway = new SideViewFade(this);
 
     private WindowManager.LayoutParams params;
     private boolean attached;
@@ -159,6 +161,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
 
     @Override
     public void conceal() {
+        fadeAway.stop();
         if (!attached || !shown) {
             return;
         }
@@ -166,6 +169,18 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
         handler.removeCallbacks(tick);
         applyWindowState();
         update();
+    }
+
+    @Override
+    public void fadeOut(long durationMs) {
+        if (attached && shown) {
+            fadeAway.start(durationMs);
+        }
+    }
+
+    @Override
+    public boolean isFading() {
+        return fadeAway.isFading();
     }
 
     /**
@@ -176,6 +191,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     @Override
     public void detach() {
         handler.removeCallbacks(tick);
+        fadeAway.stop();
         if (!attached) {
             return;
         }
@@ -191,6 +207,10 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     private void attachAt(int side, boolean show) {
         boolean wasShown = attached && shown;
         lane = side;
+        if (show) {
+            // 淡出中又显示、换一侧，或者上一次淡完收起的：回到正常
+            fadeAway.restore();
+        }
         if (show && !wasShown) {
             // 新的一次显示：先盖着，等真正的新帧（显示着换一侧不用：画布一直可见，帧一直是新的）
             picture.beginShowing(SystemClock.uptimeMillis());

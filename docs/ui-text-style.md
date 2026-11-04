@@ -481,6 +481,9 @@
   Left blind spot light / Lampu titik buta kiri；vi_blind_spot_right「右侧盲区指示灯」/ Right blind spot light /
   Lampu titik buta kanan；vi_door_warning_left「左侧开门预警」/ Left door open warning / Amaran buka pintu kiri；
   vi_door_warning_right「右侧开门预警」/ Right door open warning / Amaran buka pintu kanan（「驾驶辅助」一组的「开门预警」是功能开关，不动）。
+- 2026-11-04 批准（盲区画面那一行的两个附加项，原来是「盲区画面」页的两个开关）：中文名字是项目所有者定的 ——
+  set_side_view_blind_spot_chip「盲区提醒」、set_side_view_door_warning_chip「开门预警」。2026-11-03 批的
+  set_side_view_blind_spot_title、set_side_view_door_warning_title 和它们的两句说明不用了，删掉。
 - 2026-11-04 批准（熄屏持续录制的说明；意思是项目所有者给的「需搭配哨兵模式，在人离车后，确保车机保持活跃状态，方能录制」，
   照本规范改写后项目所有者定的）：set_screen_off_keep_summary「下车后继续录制环视。需开启哨兵模式，使车机保持唤醒状态。」/
   「Keeps recording the surround view after you leave the car. Requires Sentry Mode to keep the head unit awake.」/
@@ -497,6 +500,19 @@
 - 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
   vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
   settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
+- 盲区画面的说明（2026-11-04，项目所有者加了淡出，照着改；2026-10-16 起的那一句是批过的）：set_side_view_summary
+  「打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后开始淡出，再过 1 秒完全消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。」/
+  「Shows the side camera on the signalling side when the turn signal is on; 1 second after the signal turns off it starts to fade out
+  and is gone 1 second later; not shown in reverse or while a factory view is on screen. Surround view stays on in D.」/
+  「Memaparkan kamera sisi di sebelah isyarat apabila lampu isyarat dihidupkan; 1 saat selepas lampu isyarat dimatikan ia mula pudar
+  dan hilang sepenuhnya 1 saat kemudian; tidak dipaparkan dalam gear undur atau semasa paparan kilang dipaparkan. Paparan sekeliling
+  kekal hidup dalam gear D.」（只改了「1 秒后消失」那半句）。
+- 盲区画面那一行的两个附加项（2026-11-04，草稿）：英文、马来文名字 set_side_view_blind_spot_chip Blind spot alert /
+  Amaran titik buta、set_side_view_door_warning_chip Door open warning / Amaran buka pintu（「开门预警」照术语表）；
+  按钮下面的一行小字 set_side_view_lamps_note「后视镜上的盲区提醒、开门预警亮起时也显示该侧画面，不必打转向灯，不受最低车速限制」/
+  「Also shows that side when the blind spot alert or door open warning on the side mirror comes on, without the turn signal;
+  Minimum speed doesn't apply」/「Turut memaparkan sebelah itu apabila amaran titik buta atau amaran buka pintu pada cermin sisi
+  menyala, tanpa lampu isyarat; Kelajuan minimum tidak terpakai」（意思照 2026-11-03 批的两句说明合成一句）。
 - 熄屏持续录制的下一层「熄屏后的帧率」（2026-11-04，草稿；项目所有者看过中文示意）：框的标题 set_screen_off_fps_title
   「熄屏后的帧率」/ Screen-off frame rate / Kadar bingkai skrin padam；选项下面的说明 set_screen_off_fps_note
   「熄屏后只录制环视时按所选帧率录制，录像占用的空间更小；亮屏或开车时恢复视频流配置的帧率。」/「When only the surround view
@@ -532,7 +548,7 @@
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
 | 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
-| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
+| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯）；盲区提醒（盲区画面那一行的附加项名，指盲区指示灯亮） | blind spot light；door open warning；Blind spot alert | lampu titik buta；amaran buka pintu；Amaran titik buta | 2026-11-03 加，项目所有者批准；2026-11-04 加「盲区提醒」（项目所有者定的附加项名）；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |

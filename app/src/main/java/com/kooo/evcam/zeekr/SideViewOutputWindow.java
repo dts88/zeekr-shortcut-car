@@ -35,6 +35,15 @@ interface SideViewOutputWindow {
     /** 藏起来，窗口留着、画面留在会话里（备着）。 */
     void conceal();
 
+    /**
+     * 淡出（项目所有者 2026-11-04，{@link SideViewFade}）：显示着的画面在 {@code durationMs} 内从正常淡到看不见；
+     * 窗口照旧挂着、显示着，淡完由服务收起。已经在淡就不重来。再显示（{@link #show}）回到正常，收起、移走时停下。
+     */
+    void fadeOut(long durationMs);
+
+    /** 在淡出（{@link #fadeOut}）。 */
+    boolean isFading();
+
     /** 当场移走：画布在这一下被收走，服务在 onSurfaceTextureDestroyed 里把它交给管线留着。只从服务调。 */
     void detach();
 
