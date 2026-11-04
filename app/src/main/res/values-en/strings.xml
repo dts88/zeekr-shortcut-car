@@ -76,10 +76,9 @@
     <string name="opt_side_view_target_hud">HUD</string>
     <string name="opt_side_view_target_both">Center screen and HUD</string>
     <string name="set_group_side_view_hud">HUD picture</string>
-    <string name="set_side_view_blind_spot_title">Show when the blind spot light is on</string>
-    <string name="set_side_view_blind_spot_summary">Shows that side when the blind spot light on the side mirror comes on, without the turn signal; Minimum speed doesn\'t apply</string>
-    <string name="set_side_view_door_warning_title">Show when the door open warning is on</string>
-    <string name="set_side_view_door_warning_summary">Shows that side when the door open warning comes on after parking</string>
+    <string name="set_side_view_blind_spot_chip">Blind spot alert</string>
+    <string name="set_side_view_door_warning_chip">Door open warning</string>
+    <string name="set_side_view_lamps_note">Also shows that side when the blind spot alert or door open warning on the side mirror comes on, without the turn signal; Minimum speed doesn\'t apply</string>
     <string name="set_side_view_place_title">Position and size on the center screen</string>
     <string name="set_side_view_place_summary">The left and right views mirror each other across the middle of the screen and can only be adjusted here</string>
     <string name="set_side_view_place_value">Width %1$d px · Height %2$d px</string>

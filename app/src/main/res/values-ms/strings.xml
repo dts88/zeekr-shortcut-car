@@ -75,10 +75,9 @@
     <string name="opt_side_view_target_center">Skrin tengah</string>
     <string name="opt_side_view_target_hud">HUD</string>
     <string name="opt_side_view_target_both">Skrin tengah dan HUD</string>
-    <string name="set_side_view_blind_spot_title">Papar apabila lampu titik buta menyala</string>
-    <string name="set_side_view_blind_spot_summary">Memaparkan sebelah itu apabila lampu titik buta pada cermin sisi menyala, tanpa lampu isyarat; Kelajuan minimum tidak terpakai</string>
-    <string name="set_side_view_door_warning_title">Papar apabila amaran buka pintu menyala</string>
-    <string name="set_side_view_door_warning_summary">Memaparkan sebelah itu apabila amaran buka pintu menyala selepas meletak kenderaan</string>
+    <string name="set_side_view_blind_spot_chip">Amaran titik buta</string>
+    <string name="set_side_view_door_warning_chip">Amaran buka pintu</string>
+    <string name="set_side_view_lamps_note">Turut memaparkan sebelah itu apabila amaran titik buta atau amaran buka pintu pada cermin sisi menyala, tanpa lampu isyarat; Kelajuan minimum tidak terpakai</string>
     <string name="set_side_view_place_title">Kedudukan dan saiz pada skrin tengah</string>
     <string name="set_side_view_place_summary">Paparan kiri dan kanan bercermin merentasi tengah skrin dan hanya boleh dilaraskan di sini</string>
     <string name="set_side_view_place_value">Lebar %1$d px · Tinggi %2$d px</string>

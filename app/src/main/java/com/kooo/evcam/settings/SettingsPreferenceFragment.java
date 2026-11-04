@@ -1082,7 +1082,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /**
      * 超级镜子分区里的一行：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。
      * 2026-10-23 起是开关加下一层：行尾写显示位置，点这一行进「盲区画面」页（preferences.xml 里嵌着的 screen_side_view），
-     * 显示位置、最低车速和 HUD 画面一组（2026-10-21）都在那一页。
+     * 显示位置、最低车速和 HUD 画面一组（2026-10-21）都在那一页。2026-11-04 起开着时说明下面一排附加项（项目所有者）：
+     * 「盲区提醒」「开门预警」—— 后视镜上的灯亮了也显示那一侧，各自开关、默认关（2026-11-03 加的时候是那一页的两个开关）。
      */
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
@@ -1094,6 +1095,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 openFragment(SettingsPreferenceFragment.forSection("screen_side_view"), R.string.set_side_view_title);
                 return true;
             });
+            // 开着至少一个时盲区画面才读后视镜上的灯（SideViewService）
+            row.addOption(getString(R.string.set_side_view_blind_spot_chip), appConfig.isSideViewBlindSpotEnabled(),
+                    on -> {
+                        appConfig.setSideViewBlindSpotEnabled(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_side_view_blind_spot → " + (on ? "开" : "关"));
+                        SideViewService.applyConfig();
+                    });
+            row.addOption(getString(R.string.set_side_view_door_warning_chip), appConfig.isSideViewDoorWarningEnabled(),
+                    on -> {
+                        appConfig.setSideViewDoorWarningEnabled(on);
+                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                                "开关变更: pref_side_view_door_warning → " + (on ? "开" : "关"));
+                        SideViewService.applyConfig();
+                    });
+            row.setOptionsNote(getString(R.string.set_side_view_lamps_note));
         }
         bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
                 appConfig.getSideViewTarget(), value -> {
@@ -1106,15 +1123,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setSideViewMinSpeed(value);
                     SideViewService.applyConfig();
                 });
-        // 后视镜上的灯亮了也显示（2026-11-03）：各自开关，开着至少一个时盲区画面才读这两样
-        bindSwitch("pref_side_view_blind_spot", appConfig.isSideViewBlindSpotEnabled(), value -> {
-            appConfig.setSideViewBlindSpotEnabled(value);
-            SideViewService.applyConfig();
-        });
-        bindSwitch("pref_side_view_door_warning", appConfig.isSideViewDoorWarningEnabled(), value -> {
-            appConfig.setSideViewDoorWarningEnabled(value);
-            SideViewService.applyConfig();
-        });
         bindSideViewPlacement();
 
         bindSwitch("pref_hud_mirror", appConfig.isHudMirrored(), value -> {
@@ -1596,16 +1604,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 熄屏持续录制那一行的行尾：熄屏后的帧率（「跟随视频流配置」「10 fps」这样，和框里的选项同一个名字）。 */
     private void showScreenOffFps(SwitchNavPreference pref) {
-        SettingSpec spec = SettingsRegistry.SCREEN_OFF_FPS;
-        String current = spec.sanitize(appConfig.getScreenOffFpsChoice());
-        String[] values = spec.values();
-        String[] names = localizedNames(spec);
-        for (int i = 0; i < values.length; i++) {
-            if (values[i].equals(current)) {
-                pref.setValue(names[i]);
-                return;
-            }
-        }
+        pref.setValue(nameOf(SettingsRegistry.SCREEN_OFF_FPS, appConfig.getScreenOffFpsChoice()));
     }
 
     // ------------------------------------------------------------------ 原「高级」，现在在开发者选项里

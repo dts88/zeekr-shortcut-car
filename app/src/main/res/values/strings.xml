@@ -91,10 +91,10 @@
     <string name="opt_side_view_target_hud">HUD</string>
     <string name="opt_side_view_target_both">中控屏和 HUD</string>
     <string name="set_group_side_view_hud">HUD 画面</string>
-    <string name="set_side_view_blind_spot_title">盲区指示灯亮时显示</string>
-    <string name="set_side_view_blind_spot_summary">后视镜上的盲区指示灯亮时显示该侧画面，不必打转向灯，不受最低车速限制</string>
-    <string name="set_side_view_door_warning_title">开门预警亮时显示</string>
-    <string name="set_side_view_door_warning_summary">停车后开门预警亮起时显示该侧画面</string>
+    <!-- 盲区画面那一行的附加项（2026-11-04，原来是下一层的两个开关）：名字是项目所有者定的 -->
+    <string name="set_side_view_blind_spot_chip">盲区提醒</string>
+    <string name="set_side_view_door_warning_chip">开门预警</string>
+    <string name="set_side_view_lamps_note">后视镜上的盲区提醒、开门预警亮起时也显示该侧画面，不必打转向灯，不受最低车速限制</string>
     <string name="set_side_view_place_title">中控屏上的位置和大小</string>
     <string name="set_side_view_place_summary">左右两个画面以屏幕中线对称，只能在这里调整</string>
     <string name="set_side_view_place_value">宽度 %1$d 像素 · 高度 %2$d 像素</string>
