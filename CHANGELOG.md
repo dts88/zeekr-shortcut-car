@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.2.0-alpha] - 2026-11-04
+
+- Blind spot view: Blind spot alert and Door open warning are now chips on the Blind spot view row.
+- Blind spot view: after the 1-second hold, the view fades out over 1 second.
+
 ## [3.1.0-alpha] - 2026-11-04
 
 - Keep recording when the screen goes off: new screen-off frame rate (follow stream profile, 10 fps or 3 fps) for when only the surround view is recorded; the stream profile rate returns as soon as the screen turns on or you drive.
