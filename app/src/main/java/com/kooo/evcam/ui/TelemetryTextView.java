@@ -16,7 +16,7 @@ import com.kooo.evcam.telemetry.Telemetry;
  * 这里的登记另外开浮点传感器和定位；最后一个走了，浮点和定位就停。子类只管「现在该写什么」（{@link #show}），
  * 要听设置的在 {@link #onStart} / {@link #onStop} 里挂、摘。
  *
- * <p>现在有一处：{@link SentryStatusView}（设置里「熄屏持续录制」那一行的右边）。录制键上的小字（{@link ScreenOffHintView}）
+ * <p>现在有一处：{@link SentryStatusView}（设置里「熄屏持续录制」那一行行尾的值下面）。录制键上的小字（{@link ScreenOffHintView}）
  * 不登记：它用到的哨兵模式、挡位是离散的，核心一直在读，只听不开浮点和定位。
  * {@link VehicleStatusPanel} 是画出来的，同一个规矩自己写了一份。</p>
  */

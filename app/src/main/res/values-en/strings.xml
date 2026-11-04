@@ -168,7 +168,10 @@
     <!-- <string name="set_screen_off_wake_value">Up to %1$s h</string> -->
     <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
-    <string name="set_screen_off_keep_summary">With Sentry Mode on, keeps recording the surround view after the screen turns off; rear cabin recording resumes when the screen turns on. Without Sentry Mode, recording pauses when the screen turns off and resumes when it turns on. When off, recording stops once the screen turns off.</string>
+    <string name="set_screen_off_keep_summary">Keeps recording the surround view after you leave the car. Requires Sentry Mode to keep the head unit awake.</string>
+    <string name="set_screen_off_fps_title">Screen-off frame rate</string>
+    <string name="set_screen_off_fps_note">When only the surround view is recorded after the screen goes off, it uses the selected frame rate to take up less space. The stream profile frame rate is restored when the screen turns on or you start driving.</string>
+    <string name="opt_screen_off_fps_follow">Follow stream profile</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
     <string name="sentry_status_off">Sentry Mode: off</string>

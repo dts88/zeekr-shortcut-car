@@ -397,6 +397,27 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_SCREEN_OFF_KEEP_RECORDING, enabled).apply();
     }
 
+    /** 熄屏后的帧率：跟随视频流配置（{@link SettingsRegistry#SCREEN_OFF_FPS} 的默认）。 */
+    public static final String SCREEN_OFF_FPS_FOLLOW = "follow";
+
+    /**
+     * 熄屏后的帧率（录制 →「熄屏持续录制」的下一层，项目所有者 2026-11-04）：{@link #SCREEN_OFF_FPS_FOLLOW} 或帧率数
+     * （{@link SettingsRegistry#SCREEN_OFF_FPS}）。熄屏后只录环视时按它录，判断在相机管家（{@code camera.ChannelRules.darkFps}）。
+     */
+    public String getScreenOffFpsChoice() {
+        return readEnum(SettingsRegistry.SCREEN_OFF_FPS);
+    }
+
+    public void setScreenOffFpsChoice(String value) {
+        writeEnum(SettingsRegistry.SCREEN_OFF_FPS, value);
+    }
+
+    /** 同上换成帧率（fps）：0 = 跟随视频流配置。读出来的都在单子里（readEnum 夹过），别的就是数字。 */
+    public int getScreenOffFps() {
+        String value = getScreenOffFpsChoice();
+        return SCREEN_OFF_FPS_FOLLOW.equals(value) ? 0 : Integer.parseInt(value);
+    }
+
     /**
      * 锁定影像（存储页，默认开）：回放里能锁录像和照片，锁定的不会被自动清理删掉、也不能直接删。
      * 关掉时锁定按钮收起、清理不再跳过锁定的；清单留在 U 盘上，重新打开恢复保护。见 {@code FootageLocks}。
@@ -475,11 +496,12 @@ public class AppConfig {
     public boolean shouldUseCodecRecording() {
         String mode = getRecordingMode();
         boolean grid = com.kooo.evcam.profile.RecordSpecs.anyGridEnabled(context);
-        if (grid || isInfoBarEnabled()) {
-            // 四宫格要在编码前用 GL 重排画面，行驶信息条要在画面下面拼一条 ——
+        boolean darkFps = isScreenOffKeepRecording() && getScreenOffFps() > 0;
+        if (grid || isInfoBarEnabled() || darkFps) {
+            // 四宫格要在编码前用 GL 重排画面，行驶信息条要在画面下面拼一条，熄屏后的帧率要在 GL 那一步隔帧 ——
             // 只有 MediaCodec 路径能做到；MediaRecorder 直接吃相机原始输出，没有插手的余地。
             if (RECORDING_MODE_MEDIA_RECORDER.equals(mode)) {
-                AppLog.i(TAG, (grid ? "已选四宫格录制" : "开着行驶信息条")
+                AppLog.i(TAG, (grid ? "已选四宫格录制" : isInfoBarEnabled() ? "开着行驶信息条" : "选了熄屏后的帧率")
                         + "，忽略 MediaRecorder 模式设置，改用 MediaCodec");
             }
             return true;

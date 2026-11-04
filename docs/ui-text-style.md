@@ -481,6 +481,11 @@
   Left blind spot light / Lampu titik buta kiri；vi_blind_spot_right「右侧盲区指示灯」/ Right blind spot light /
   Lampu titik buta kanan；vi_door_warning_left「左侧开门预警」/ Left door open warning / Amaran buka pintu kiri；
   vi_door_warning_right「右侧开门预警」/ Right door open warning / Amaran buka pintu kanan（「驾驶辅助」一组的「开门预警」是功能开关，不动）。
+- 2026-11-04 批准（熄屏持续录制的说明；意思是项目所有者给的「需搭配哨兵模式，在人离车后，确保车机保持活跃状态，方能录制」，
+  照本规范改写后项目所有者定的）：set_screen_off_keep_summary「下车后继续录制环视。需开启哨兵模式，使车机保持唤醒状态。」/
+  「Keeps recording the surround view after you leave the car. Requires Sentry Mode to keep the head unit awake.」/
+  「Terus merakam paparan sekeliling selepas anda keluar dari kereta. Memerlukan Mod Sentry supaya unit kepala kekal berjaga.」
+  （不再写后座舱亮屏后恢复录制、没开哨兵模式时亮屏后恢复：行为不变，只是不写）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -492,6 +497,14 @@
 - 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
   vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
   settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
+- 熄屏持续录制的下一层「熄屏后的帧率」（2026-11-04，草稿；项目所有者看过中文示意）：框的标题 set_screen_off_fps_title
+  「熄屏后的帧率」/ Screen-off frame rate / Kadar bingkai skrin padam；选项下面的说明 set_screen_off_fps_note
+  「熄屏后只录制环视时按所选帧率录制，录像占用的空间更小；亮屏或开车时恢复视频流配置的帧率。」/「When only the surround view
+  is recorded after the screen goes off, it uses the selected frame rate to take up less space. The stream profile frame rate is
+  restored when the screen turns on or you start driving.」/「Apabila hanya paparan sekeliling dirakam selepas skrin padam, kadar
+  bingkai yang dipilih digunakan supaya rakaman mengambil lebih sedikit ruang. Kadar bingkai profil strim digunakan semula apabila
+  skrin hidup atau anda mula memandu.」；选项 opt_screen_off_fps_follow「跟随视频流配置」/ Follow stream profile /
+  Ikut profil strim（另两项「10 fps」「3 fps」三种语言一样，行尾写的也是选项的名字）。
 
 ---
 
@@ -527,7 +540,7 @@
 | 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |
 | 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
 | 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
-| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制） | screen off / on；sleep / wake；Screen-off recording (keep awake)；Keep recording when the screen goes off | skrin padam / hidup；tidur / bangun；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
+| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；保持唤醒状态（车机，哨兵模式）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制）；熄屏后的帧率（熄屏持续录制的下一层） | screen off / on；sleep / wake；keep the head unit awake；Screen-off recording (keep awake)；Keep recording when the screen goes off；Screen-off frame rate | skrin padam / hidup；tidur / bangun；unit kepala kekal berjaga；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam；Kadar bingkai skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
 | 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件 0x20290300 那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
 | HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
 | 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |

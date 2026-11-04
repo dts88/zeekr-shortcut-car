@@ -265,6 +265,8 @@ public class EglSurfaceEncoder {
     private long deliveredFrames;
     /** 真正渲染出去、进了编码器的帧数。 */
     private long renderedFrames;
+    /** 节流按上限压下去的帧数（视频流配置里选了帧率、熄屏后的帧率）：这是要的，不算渲染跟不上。 */
+    private long throttledFrames;
     private long rateWindowStartNs;
 
     /** 帧率统计的窗口。5 秒足够平滑，又不至于要等很久才看到第一条。 */
@@ -294,7 +296,9 @@ public class EglSurfaceEncoder {
         float seconds = elapsed / 1_000_000_000f;
         float delivered = deliveredFrames / seconds;
         float rendered = renderedFrames / seconds;
-        boolean behind = delivered - rendered > 1f;
+        // 节流压下去的是要的（选了帧率、熄屏后的帧率），只看剩下的有没有都画出去：
+        // 以前直接拿相机给的比，选了 10 fps 的每个窗口都报一次「跟不上」
+        boolean behind = delivered - throttledFrames / seconds - rendered > 1f;
         if (behind || ++windowsSinceLog >= QUIET_WINDOWS) {
             windowsSinceLog = 0;
             AppLog.i(TAG, String.format(java.util.Locale.US,
@@ -307,6 +311,7 @@ public class EglSurfaceEncoder {
         lastRenderedFps = rendered;
         deliveredFrames = 0;
         renderedFrames = 0;
+        throttledFrames = 0;
         rateWindowStartNs = nowNs;
     }
 
@@ -497,6 +502,7 @@ public class EglSurfaceEncoder {
         reportFrameRates(currentTimeNs);
         if (!throttle.shouldRender(currentTimeNs)) {
             // 帧间隔太短，跳过渲染但消费帧
+            throttledFrames++;
             try {
                 makeCurrent();
                 inputSurfaceTexture.updateTexImage();

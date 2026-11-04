@@ -58,6 +58,10 @@ import java.util.Set;
  * （{@link #excludedFromPhoto}），屏幕不知道黑没黑时谁都不开、不重开（{@link Why#SCREEN_UNKNOWN}），
  * 黑着、没在开车时卡住的座舱不重开（{@link #next} 第 7 条）。在开车时这些一条都不用，和以前一样。</p>
  *
+ * <p>项目所有者 2026-11-04「熄屏后的帧率」：环视留着只录像时（{@link #surroundVerdict} 是 KEPT），录像按「熄屏持续录制」
+ * 下一层选的帧率录（{@link #darkFps}）；降下来从下一段起，亮屏或开车马上切一段恢复（{@link #darkFpsChange}）。
+ * 相机管家照它定，相机层、录制器照做；相机、会话不动。</p>
+ *
  * <p>§7.2（怎么算在开车）、§7.3（存储一类停了照旧接回）不在这一层。大纲 §7 末尾的四处解读：
  * ①「最后一句」不论多早说的、②同一次交接里被断开的另一路直接判 BLOCKED，都在 {@link CameraTaken#judge} 和这里的
  * 「先判 TAKEN」；③不在相机列表里、打开报被占用一类而最后一句不是空闲，都算被拿走（同上）；④摘死输出排在开前面，仍要等安静（{@link #next}）。</p>
@@ -1231,6 +1235,43 @@ public final class ChannelRules {
             return SurroundInDark.LIT;
         }
         return surroundKept(w) ? SurroundInDark.KEPT : SurroundInDark.RELEASED;
+    }
+
+    // ================================================================= 熄屏后的帧率（项目所有者 2026-11-04）
+
+    /**
+     * 这一次录像此刻该按什么帧率录（「熄屏持续录制」的下一层「熄屏后的帧率」）：通道对环视的熄屏决定是留着
+     * （{@link SurroundInDark#KEPT}：熄屏满 30 秒、没在开车、哨兵模式开或布防、「熄屏持续录制」开着，环视只录像）时，
+     * 用设置里选的那一档；别的时候 0 —— 照视频流配置（项目所有者：正常录制时仍然跟随录制配置）。
+     * 视频流配置本来更低的，录制器建编码器时照低的（{@code RecordSpecs.limitedFps}）。
+     *
+     * @param chosen 设置里选的帧率（fps）；0 = 跟随视频流配置
+     */
+    static int darkFps(SurroundInDark verdict, int chosen) {
+        return verdict == SurroundInDark.KEPT && chosen > 0 ? chosen : 0;
+    }
+
+    /** 录像的帧率怎么换上（{@link #darkFpsChange}）。 */
+    enum FpsChange {
+        /** 没变。 */
+        NONE,
+        /** 从下一段起：换段本来就要换编码器，帧率、码率在那时一起换，不多切一段。 */
+        NEXT_SEGMENT,
+        /** 马上切一段换上（和分段计时到点切的是同一步）。 */
+        CUT_NOW
+    }
+
+    /**
+     * 录像的帧率从 {@code from} 换到 {@code to}（fps；0 = 照视频流配置，算最高）怎么换（项目所有者 2026-11-04，以系统稳定为主）：
+     * 降下来从下一段起（最多晚一段，这时车边一般没人，也不多换一次编码器）；升回去马上切一段 —— 亮屏、开车正是人回到车上的时候，
+     * 不能让这一段剩下的时间还是低帧率。
+     */
+    static FpsChange darkFpsChange(int from, int to) {
+        if (from == to) {
+            return FpsChange.NONE;
+        }
+        boolean lower = to > 0 && (from == 0 || to < from);
+        return lower ? FpsChange.NEXT_SEGMENT : FpsChange.CUT_NOW;
     }
 
     // ================================================================= 录像（相机管家，项目所有者 2026-11-03：录像协调器抹掉，规矩和相机的放在一起）
