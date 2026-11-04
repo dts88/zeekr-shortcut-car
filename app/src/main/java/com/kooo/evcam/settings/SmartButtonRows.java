@@ -1,8 +1,6 @@
 package com.kooo.evcam.settings;
 
 import android.content.Context;
-import android.util.TypedValue;
-import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,30 +22,33 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 设置 → 悬浮键与灵动贴 → 灵动贴（试验性）（项目所有者 2026-10-30，ui-spec §十一）。
+ * 设置 → 悬浮键与灵动贴 → 灵动贴（试验性）（项目所有者 2026-10-30；2026-11-04 搜索改成绑定，ui-spec §十一）。
  *
  * <ul>
- *   <li>「搜索灵动贴」一行：蓝牙要开着、要有「附近的设备」权限（没有就当场要）。框里列搜到的 —— 只列名字是 ZEEKR_button、
- *       还没连接过的，信号强的在前 —— 点哪一台就连接哪一台。灵动贴只在按下时广播，所以框里提示按一下。</li>
- *   <li>连接过的每一台一行（{@link ValueActionPreference}）：名字「灵动贴 B5:E6」，说明写单击、双击各做什么，行尾值是电量，
- *       按钮「删除」（先问一句）；点这一行改单击、双击（{@link SmartButtonAction}）。</li>
+ *   <li>总开关「灵动贴」那一行由设置页照别的开关绑（关着时不扫描蓝牙，下面几行灰着）。</li>
+ *   <li>「绑定灵动贴」一行：蓝牙要开着、要有「附近的设备」权限（没有就当场要）、没绑满。框里提示长按灵动贴约 3 秒到背光闪；
+ *       {@link SmartButtons#BIND_WINDOW_MS} 里长按了没绑过的，框里改成正在连接，绑上了、拿绑过的来长按了、时间到了没找到、没连上，
+ *       都提示一句、关框。人关了框就不绑了。</li>
+ *   <li>绑定的每一台一行（{@link ValueActionPreference}）：名字「灵动贴 B5:E6」，说明写单击、双击各做什么，下面一行版本和序列号
+ *       （有了才写），行尾值是电量，按钮「删除」（先问一句）；点这一行改单击、双击（{@link SmartButtonAction}）。</li>
  * </ul>
  *
- * <p>真正的连接、听、读电量在 {@link SmartButtons}；这里只摆界面。连接过的、电量变了，它叫一声，这里照着重摆。</p>
+ * <p>真正的绑定、听、连在 {@link SmartButtons}；这里只摆界面。绑定的、电量这些变了，它叫一声，这里照着重摆。</p>
  */
 final class SmartButtonRows {
 
-    /** 连接过的那几行的 key 前缀（后面接地址）。 */
+    /** 绑定的那几行的 key 前缀（后面接地址）。 */
     private static final String ROW_PREFIX = "smart_button.";
+    /** 总开关：下面几行跟着它灰。 */
+    static final String SWITCH_KEY = "pref_smart_buttons";
 
     private final SettingsPreferenceFragment fragment;
     private final PreferenceCategory category;
     private final ActivityResultLauncher<String[]> permissions;
     private final Runnable onChanged = this::rebuildRows;
-    private SmartButtons.SearchListener searchListener;
-    private AlertDialog searchDialog;
-    /** 为了搜索去要的权限，回来了接着搜。 */
-    private boolean searchAfterPermission;
+    private AlertDialog bindDialog;
+    /** 为了绑定去要的权限，回来了接着绑。 */
+    private boolean bindAfterPermission;
 
     SmartButtonRows(SettingsPreferenceFragment fragment, PreferenceCategory category,
                     ActivityResultLauncher<String[]> permissions) {
@@ -57,10 +58,10 @@ final class SmartButtonRows {
     }
 
     void bind() {
-        Preference search = category.findPreference("pref_smart_button_search");
-        if (search != null) {
-            search.setOnPreferenceClickListener(p -> {
-                startSearch();
+        Preference bindRow = category.findPreference("pref_smart_button_bind");
+        if (bindRow != null) {
+            bindRow.setOnPreferenceClickListener(p -> {
+                startBinding();
                 return true;
             });
         }
@@ -71,17 +72,21 @@ final class SmartButtonRows {
         rebuildRows();
     }
 
-    /** 这一页没了：不再听变化，搜索框关掉（关掉时停止搜索）。 */
+    /** 这一页没了：不再听变化，绑定框关掉（关掉时不绑了）。 */
     void detach() {
         SmartButtons buttons = SmartButtons.get();
         if (buttons != null) {
             buttons.removeChangeListener(onChanged);
         }
-        if (searchDialog != null) {
-            searchDialog.dismiss();
-            searchDialog = null;
+        if (bindDialog != null) {
+            // 框的关闭回调是排着来的，等不到它：这里直接不绑了
+            AlertDialog dialog = bindDialog;
+            bindDialog = null;
+            dialog.dismiss();
+            if (buttons != null) {
+                buttons.cancelBinding();
+            }
         }
-        stopSearch();
     }
 
     /** 「附近的设备」权限的结果回来了。 */
@@ -93,120 +98,127 @@ final class SmartButtonRows {
         }
         // 刚给的权限：后台听不用等下一次重试
         buttons.refresh();
-        if (!searchAfterPermission) {
+        if (!bindAfterPermission) {
             return;
         }
-        searchAfterPermission = false;
-        if (SmartButtons.canScan(context)) {
-            showSearch();
+        bindAfterPermission = false;
+        if (SmartButtons.canScan(context) && SmartButtons.canConnect(context)) {
+            showBindDialog();
         } else {
-            toast(R.string.msg_smart_button_no_permission);
+            toast(context.getString(R.string.msg_smart_button_no_permission));
         }
     }
 
-    // ================================================================= 搜索
+    // ================================================================= 绑定
 
-    private void startSearch() {
+    private void startBinding() {
         SmartButtons buttons = SmartButtons.get();
         Context context = fragment.getContext();
         if (buttons == null || context == null) {
             return;
         }
         if (!buttons.hasBluetooth()) {
-            toast(R.string.msg_smart_button_no_bluetooth);
+            toast(context.getString(R.string.msg_smart_button_no_bluetooth));
             return;
         }
         if (!buttons.bluetoothOn()) {
-            toast(R.string.msg_smart_button_bluetooth_off);
+            toast(context.getString(R.string.msg_smart_button_bluetooth_off));
+            return;
+        }
+        if (new AppConfig(context).getSmartButtons().size() >= SmartButtons.MAX_BOUND) {
+            toast(context.getString(R.string.msg_smart_button_full, SmartButtons.MAX_BOUND));
             return;
         }
         if (!SmartButtons.canScan(context) || !SmartButtons.canConnect(context)) {
-            searchAfterPermission = true;
+            bindAfterPermission = true;
             permissions.launch(SmartButtons.permissions());
             return;
         }
-        showSearch();
+        showBindDialog();
     }
 
-    /** 搜索框：上面是搜到的几台（一台一行，点了就连接），下面一行说明。关掉就停止搜索。 */
-    private void showSearch() {
+    /** 绑定框：一行说明（长按到背光闪；连着的时候写正在连接），一个「取消」。关掉就不绑了。 */
+    private void showBindDialog() {
         SmartButtons buttons = SmartButtons.get();
         Context context = fragment.getContext();
-        if (buttons == null || context == null || searchDialog != null) {
+        if (buttons == null || context == null || bindDialog != null) {
             return;
         }
         int pad = dp(context, 24);
         LinearLayout box = new LinearLayout(context);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(pad, dp(context, 8), pad, 0);
-        LinearLayout list = new LinearLayout(context);
-        list.setOrientation(LinearLayout.VERTICAL);
-        box.addView(list);
-        TextView note = CamDialogs.note(context, context.getString(R.string.dlg_smart_button_search_note));
-        note.setPadding(0, dp(context, 12), 0, 0);
+        TextView note = new TextView(context);
+        note.setTextAppearance(R.style.TextAppearance_Cam_Body);
+        note.setText(R.string.dlg_smart_button_bind_note);
         box.addView(note);
 
-        searchListener = found -> fillSearch(list, found);
-        searchDialog = CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.set_smart_button_search_title)
+        SmartButtons.BindListener listener = new SmartButtons.BindListener() {
+            @Override
+            public void onConnecting(boolean connecting) {
+                Context c = fragment.getContext();
+                if (c != null) {
+                    note.setText(c.getString(connecting ? R.string.dlg_smart_button_bind_connecting
+                            : R.string.dlg_smart_button_bind_note));
+                }
+            }
+
+            @Override
+            public void onBindResult(SmartButtons.BindResult result, String address) {
+                AlertDialog dialog = bindDialog;
+                bindDialog = null;
+                if (dialog != null) {
+                    dialog.dismiss();
+                }
+                showResult(result, address);
+                rebuildRows();
+            }
+        };
+        bindDialog = CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_smart_button_bind_title)
                 .setView(box)
-                .setNegativeButton(R.string.action_close, null)
+                .setNegativeButton(R.string.action_cancel, null)
                 .setOnDismissListener(d -> {
-                    searchDialog = null;
-                    stopSearch();
+                    if (bindDialog != null) {
+                        // 人关的（不是有了结果关的）：不绑了
+                        bindDialog = null;
+                        SmartButtons b = SmartButtons.get();
+                        if (b != null) {
+                            b.cancelBinding();
+                        }
+                    }
                 }));
-        buttons.addSearchListener(searchListener);
+        buttons.startBinding(listener);
     }
 
-    private void stopSearch() {
-        SmartButtons buttons = SmartButtons.get();
-        if (buttons != null && searchListener != null) {
-            buttons.removeSearchListener(searchListener);
-        }
-        searchListener = null;
-    }
-
-    /** 搜到的几台一台一行（和选择框的选项一样大的字），点了就连接、关框。 */
-    private void fillSearch(LinearLayout list, List<SmartButtons.Found> found) {
+    private void showResult(SmartButtons.BindResult result, String address) {
         Context context = fragment.getContext();
         if (context == null) {
             return;
         }
-        list.removeAllViews();
-        TypedValue ripple = new TypedValue();
-        context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
-        for (SmartButtons.Found f : found) {
-            TextView row = new TextView(context);
-            row.setTextAppearance(R.style.TextAppearance_Cam_Body);
-            row.setText(context.getString(R.string.smart_button_name, SmartButtonAd.shortId(f.address)));
-            row.setMinHeight(dp(context, 56));
-            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            row.setBackgroundResource(ripple.resourceId);
-            row.setOnClickListener(v -> connect(f.address));
-            list.addView(row);
-        }
-        list.setVisibility(found.isEmpty() ? View.GONE : View.VISIBLE);
-    }
-
-    private void connect(String address) {
-        SmartButtons buttons = SmartButtons.get();
-        if (buttons == null) {
-            return;
-        }
-        if (searchDialog != null) {
-            searchDialog.dismiss();
-        }
-        buttons.connect(address);
-        Context context = fragment.getContext();
-        if (context != null) {
-            Toast.makeText(context, context.getString(R.string.msg_smart_button_connected,
-                    SmartButtonAd.shortId(address)), Toast.LENGTH_SHORT).show();
+        switch (result) {
+            case BOUND:
+                toast(context.getString(R.string.msg_smart_button_bound, SmartButtonAd.shortId(address)));
+                break;
+            case ALREADY_BOUND:
+                toast(context.getString(R.string.msg_smart_button_already_bound));
+                break;
+            case CONNECT_FAILED:
+                toast(context.getString(R.string.msg_smart_button_bind_failed));
+                break;
+            case FULL:
+                toast(context.getString(R.string.msg_smart_button_full, SmartButtons.MAX_BOUND));
+                break;
+            case NOT_FOUND:
+            default:
+                toast(context.getString(R.string.msg_smart_button_not_found));
+                break;
         }
     }
 
-    // ================================================================= 连接过的
+    // ================================================================= 绑定的
 
-    /** 照存下的重摆连接过的那几行（顺序 = 连接先后），排在「搜索灵动贴」下面。 */
+    /** 照存下的重摆绑定的那几行（顺序 = 绑定先后），排在「绑定灵动贴」下面。 */
     private void rebuildRows() {
         Context context = fragment.getContext();
         if (context == null) {
@@ -224,7 +236,7 @@ final class SmartButtonRows {
         }
         SmartButtons buttons = SmartButtons.get();
         AppConfig config = new AppConfig(context);
-        int order = 1;
+        int order = 2;
         for (String address : config.getSmartButtons()) {
             ValueActionPreference row = new ValueActionPreference(context, null);
             row.setKey(ROW_PREFIX + address);
@@ -232,9 +244,11 @@ final class SmartButtonRows {
             row.setIconSpaceReserved(false);
             row.setOrder(order++);
             row.setTitle(context.getString(R.string.smart_button_name, SmartButtonAd.shortId(address)));
-            row.setSummary(context.getString(R.string.smart_button_summary,
+            String actions = context.getString(R.string.smart_button_summary,
                     actionLabel(context, config, address, SmartButtonAd.SINGLE),
-                    actionLabel(context, config, address, SmartButtonAd.DOUBLE)));
+                    actionLabel(context, config, address, SmartButtonAd.DOUBLE));
+            String info = buttons == null ? "" : info(context, buttons.version(address), buttons.serial(address));
+            row.setSummary(info.isEmpty() ? actions : actions + "\n" + info);
             int battery = buttons == null ? -1 : buttons.battery(address);
             row.setValue(battery < 0 ? null : context.getString(R.string.smart_button_battery, battery));
             row.setAction(context.getString(R.string.action_delete), () -> confirmDelete(address));
@@ -243,7 +257,21 @@ final class SmartButtonRows {
                 return true;
             });
             category.addPreference(row);
+            // 挂上以后才能指依赖（之前找不到总开关）
+            row.setDependency(SWITCH_KEY);
         }
+    }
+
+    /** 说明下面那一行：版本、序列号（有了才写），「 · 」隔开；都没有是空的。 */
+    private static String info(Context context, String version, String serial) {
+        List<String> parts = new ArrayList<>();
+        if (version != null) {
+            parts.add(context.getString(R.string.smart_button_version, version));
+        }
+        if (serial != null) {
+            parts.add(context.getString(R.string.smart_button_serial, serial));
+        }
+        return String.join(" · ", parts);
     }
 
     private static String actionLabel(Context context, AppConfig config, String address, int clicks) {
@@ -318,7 +346,7 @@ final class SmartButtonRows {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    private void toast(int text) {
+    private void toast(String text) {
         Context context = fragment.getContext();
         if (context != null) {
             Toast.makeText(context, text, Toast.LENGTH_SHORT).show();

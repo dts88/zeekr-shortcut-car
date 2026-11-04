@@ -1,17 +1,11 @@
 package com.kooo.evcam.button;
 
 import android.Manifest;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
@@ -28,7 +22,6 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.AppConfig;
@@ -36,125 +29,117 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
-import com.kooo.evcam.overlay.QuickActions;
 import com.kooo.evcam.camera.CameraKeeper;
-import com.kooo.evcam.screen.DisplayWatch;
+import com.kooo.evcam.overlay.QuickActions;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.sound.DriveSound;
 import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 灵动贴（广播名 ZEEKR_button；项目所有者 2026-10-30 从 zeekr-shortcut-lab 搬来）。做法是 Lab 在车上验证过的那一套
- * （Lab {@code docs/bluetooth-button.md}、findings §2.51–§2.65），代码在这里按本项目重写。
+ * 灵动贴（广播名 ZEEKR_button；项目所有者 2026-10-30 从 zeekr-shortcut-lab 搬来；2026-11-04 扫描、连接、绑定照 Lab 3.5.x 重写，车主定）。
+ * 做法是 Lab 在车上验证过的那一套（Lab {@code docs/bluetooth-button.md} 第十一节、findings §2.92、§2.93），
+ * 代码在这里按本项目重写。
  *
  * <h3>怎么听</h3>
  * <ul>
- *   <li>「连接」只记下地址（{@link #connect}），以后不连着它、只听它的广播：按键只在按下时广播，一直连着耗它的电，
- *       而且它空闲 15 秒就自己断开（findings §2.61）。</li>
- *   <li>用不带过滤器的扫描、在回调里按地址筛：车上按地址过滤的扫描收不到它的广播（§2.61）。代价是安卓熄屏时会停掉这种扫描 ——
- *       熄屏时按了不算。连续扫 30 分钟安卓会降级，{@link #RESTART_MS} 重开一次；蓝牙关了先停、开了接着听；
- *       没听上 {@link #RETRY_MS} 后再试（§2.64：以前只试一次，没成就一直没在听）。</li>
- *   <li>扫描只有一路，开着就不动（车主 2026-11-01：不要反复强行启动，别像摄像头那样）。</li>
+ *   <li>扫描按名字过滤（{@link SmartButtonAd#NAME}），结果用 PendingIntent 由系统交给 {@link ScanReceiver}：应用在后台、被系统收掉了也送得到。
+ *       低延迟、积极匹配、每包都报、只收传统广播。</li>
+ *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
+ *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出，还有连接重试（见下）。</li>
+ *   <li>开之前先停一次、隔 {@link #START_DELAY_MS} 再开：上一个进程开的 PendingIntent 扫描不会跟着进程停。安卓 12 一个 uid 30 秒里开扫描超过 5 次
+ *       会被悄悄拒，容器里别的应用也算在这个 uid 上：{@link #STARTS_WINDOW_MS} 里最多开 {@link #MAX_STARTS} 次（{@link #startWait}）。</li>
+ *   <li>没开启灵动贴（设置里的开关）、没有绑定的也没在绑定、用户退出了：不扫（车主 2026-11-04：Lab 同时开着时，Lab 好用蓝牙做测试）。
+ *       退出时当场停（{@link #userExits}），不然进程没了系统还接着扫，又把应用叫起来。</li>
  *   <li>车机要睡时和相机一样放开，扫描、连接都停（{@link #headUnitSleeps}）。醒来等 {@link #SETTLE_MS}，向系统重新要蓝牙服务（{@link StaleGatt}），
- *       再开始扫描（{@link #headUnitWoke}，车主 2026-11-01）。蓝牙跟着点火走，到时候还没开的，隔 {@link #RETRY_MS} 看一眼，开了马上开始。</li>
- *   <li>扫描看着还在、其实收不到的情况系统不告诉我们（车机睡一觉醒来蓝牙可能已经重启过；蓝牙开着、也没报错，扫描也可能忽然没声）：
- *       不带过滤器的扫描周围什么设备都报，亮着屏 {@link #DEAF_MS} 一包都没收到，就先停再开，同一阵只开这一次；
- *       开了过一阵才收到，是这里本来就稀，{@link #DEAF_QUIET_MS} 之内不再开（{@link #watchScan}）。听不到的每一阵都进黑匣子（{@link ScanProbe}）。</li>
- *   <li>蓝牙重启过以后容器手里的 GATT 服务还是死的，扫描、连接一直失败：开扫描之前先换成系统现在这份；万一还是失败，再换一次、马上重开（{@link StaleGatt}）。</li>
- *   <li>广播里的按键计数变了就是按了一下（{@link SmartButtonAd}）。上一次的计数存着，进程重启后的第一下照样算；
- *       连接时拿搜索那会儿看到的计数当起点。</li>
- *   <li>按法查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
- *       驾驶模式走 {@link Telemetry#setDriveMode}，升挡、降挡交给模拟声浪（{@link DriveSound#shift}）。用户退出以后什么都不听（{@link UserExit}）。</li>
+ *       再开始扫描（{@link #headUnitWoke}，车主 2026-11-01）。蓝牙跟着点火走，开关的广播车上没收到过：扫描开着时每 {@link #WATCH_MS} 看一眼蓝牙开着没有；
+ *       蓝牙没开、扫描起不来的，隔 {@link #RETRY_MS} 再试，一阵里第一次起不来把现场记进黑匣子（{@link ScanProbe}）。</li>
  * </ul>
  *
- * <h3>电量</h3>
- * <p>连接时读一次；之后离上次读到超过 {@link #BATTERY_STALE_MS}（没读成的至少隔 {@link #BATTERY_RETRY_MS}），
- * 按完一下等 {@link #BATTERY_AFTER_PRESS_MS}（双击的第二下也按完）就连上读一次、读完断开。连着的这一两秒里按键不广播，
- * 按法从点击次数的通知来，照样做选的动作。连着时先停扫描，读完接着听：车机上一边扫一边连，连接会一下一下地失败（§2.61）。
- * 直接连（不等它自己广播），没连上隔 {@link #RECONNECT_MS} 再连；设置里点连接的那一次最多 {@link #CONNECT_WINDOW_MS}，
- * 按完顺手读的那一次最多 {@link #AFTER_PRESS_WINDOW_MS}，读不到一小时后的下一下再读；每一步最多等 {@link #STEP_TIMEOUT_MS}。
- * 只读：不往按键写任何东西，除了打开通知（蓝牙标准的订阅，写的是按键自己的描述符）。</p>
+ * <h3>按法</h3>
+ * <ul>
+ *   <li>广播里的计数变了就是按了一下（{@link SmartButtonAd}）。计数存着，进程重启后照样接得上。</li>
+ *   <li>单击、双击查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
+ *       驾驶模式走 {@link Telemetry#setDriveMode}，升挡、降挡交给模拟声浪（{@link DriveSound#shift}）。没开启灵动贴、用户退出以后什么都不做。</li>
+ *   <li>长按（约 3 秒、背光闪）只用来连接，不绑动作（车主 2026-11-04）。</li>
+ *   <li>同一下从广播、通知各来一遍只算一次（{@link SmartButtonAd#samePress}）。</li>
+ *   <li>正在绑定时绑过的按了不做；拿绑过的来长按，告诉一声，这次绑定结束。</li>
+ * </ul>
+ *
+ * <h3>连接</h3>
+ * <p>只在长按时连（{@link ButtonLink}）：订按键通知、查版本、读电量、查序列号，之后连着，灵动贴最后一下按完 15 秒自己断开。连着时它不广播，
+ * 按键从通知来，照样做选的动作。同时只连一台：另一台长按时，连好的那一台断开、换它，还在连的不换。第一次连时扫描开着，第二次起先停扫描再连，
+ * 连好了、不连了接着扫。连上过的断开以后，记着的计数作废：连着时按的几下没走广播，下一包广播一定是新按的。</p>
+ *
+ * <h3>电量、版本、序列号</h3>
+ * <p>电量取广播里带的（长按那一下带）和连着时读到、推来的：按键那一下会掉到 0 / 25，连着时取 {@link #BATTERY_WINDOW_MS} 里最高的（Lab 3.5.4）。
+ * 版本取广播里的和查到的，序列号只有查到的。都是运行状态，不导出。</p>
+ *
+ * <h3>绑定</h3>
+ * <p>设置里点「绑定灵动贴」（{@link #startBinding}）：{@link #BIND_WINDOW_MS} 里长按一台没绑过的，连上、订好按键通知就算绑上，
+ * 顺便查好版本、电量、序列号。最多 {@link #MAX_BOUND} 台，按地址记。</p>
  *
  * <h3>线程</h3>
- * <p>蓝牙的事都在自己的线程上（{@code SmartButton}）；扫描回调在主线程上来，只筛一下就转过去。搜索结果、设置页要的变化、
+ * <p>蓝牙的事都在自己的线程上（{@code SmartButton}）；扫描结果从主线程（{@link ScanReceiver}）转过去。绑定的结果、设置页要的变化、
  * 按下去的动作交给主线程。</p>
  */
 public final class SmartButtons {
 
     private static final String TAG = "SmartButtons";
 
-    /** 连续扫 30 分钟安卓会把扫描降级，提前重开。 */
-    static final long RESTART_MS = 25 * 60_000L;
-    /** 没听上（蓝牙关着、没权限、扫描失败、拿不到扫描器）多久再试。 */
+    /** 没听上（蓝牙关着、没权限、扫描起不来、拿不到扫描器）多久再试。 */
     static final long RETRY_MS = 5_000L;
     /** 车机醒了等这么久，再向系统要蓝牙服务、开始扫描（车主 2026-11-01）。 */
     static final long SETTLE_MS = 10_000L;
-    /** 在听的时候多久看一眼扫描还活着没有、蓝牙开着没有。 */
+    /** 在扫的时候多久看一眼蓝牙开着没有。 */
     static final long WATCH_MS = 2_000L;
+    /** 先停、隔这么久再开。 */
+    static final long START_DELAY_MS = 500L;
+    /** 开扫描的次数按这么长一阵算，一阵里最多开 {@link #MAX_STARTS} 次（安卓 12 按 uid 算 5 次，容器里别的应用也算，Lab 3.5.4）。 */
+    static final long STARTS_WINDOW_MS = 30_000L;
+    static final int MAX_STARTS = 3;
     /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
     static final long DRIVE_TARGET_MS = 2000L;
-    /**
-     * 亮着屏这么久一个设备的广播都没收到，就当扫描聋了，重开一次。不再短：接手机之类的时候蓝牙芯片可能忙一阵，不去碰它。
-     * 2026-11-01 报告：停车场里一秒四十多包，最长隔 0.1 秒。
-     */
-    static final long DEAF_MS = 10_000L;
-    /** 重开后这么快就收到，说明周围一直有广播，是原来那一轮真的没声了（2026-11-01 报告：32 毫秒），下次照样开。 */
-    static final long CURED_MS = 1_000L;
-    /** 重开后过了一阵才收到，是这里本来就稀，白开了一次：这么久之内不再为听不到重开。 */
-    static final long DEAF_QUIET_MS = 5 * 60_000L;
-    /** 这么久没收到又收到才记一句（重开过的不管多久都记）。 */
-    static final long LONG_SILENCE_MS = 60_000L;
-    /** 听不到的记录这次进程先记这么多条，之后隔 {@link #DEAF_NOTE_EVERY_MS} 记一条：广播稀的地方可能隔五分钟就来一回。 */
-    static final int DEAF_NOTES = 20;
-    static final long DEAF_NOTE_EVERY_MS = 10 * 60_000L;
-    /** 设置里点连接时，连上读电量最多试多久。 */
-    static final long CONNECT_WINDOW_MS = 30_000L;
-    /** 按完顺手读电量最多试多久（这时候扫描停着，两台都听不到）：平时不到 3 秒读完，按键空闲一会儿就睡，再试也连不上（Lab findings §2.61）。 */
-    static final long AFTER_PRESS_WINDOW_MS = 6_000L;
-    /** 没连上隔多久再连。 */
-    static final long RECONNECT_MS = 1_000L;
-    /** 连上以后每一步（找服务、打开通知、读电量）最多等多久。 */
-    static final long STEP_TIMEOUT_MS = 3_000L;
-    /** 电量多久读一次。 */
-    static final long BATTERY_STALE_MS = 24 * 3600_000L;
-    /** 没读成的多久再试。 */
-    static final long BATTERY_RETRY_MS = 3600_000L;
-    /** 按完一下等多久再连（双击的第二下也按完）。 */
-    static final long BATTERY_AFTER_PRESS_MS = 1_200L;
-    /** 搜索结果最多多久交给界面一次。 */
-    static final long SEARCH_PUBLISH_MS = 500L;
+    /** 绑定等多久（长按要 3 秒，再给连接留点，Lab）。 */
+    static final long BIND_WINDOW_MS = 30_000L;
+    /** 绑定的时间到了还在连：隔这么久再看（连接自己的超时管着它）。 */
+    static final long BIND_RECHECK_MS = 1_000L;
+    /** 最多绑几台。 */
+    public static final int MAX_BOUND = 10;
+    /** 连着时电量取这么久里最高的：按键那一下会掉（Lab 3.5.3 车上）。 */
+    static final long BATTERY_WINDOW_MS = 10_000L;
 
-    private static final UUID BATTERY_LEVEL = uuid16(0x2a19);
-    private static final UUID CLICKS = uuid16(0x2a60);
-    private static final UUID CCCD = uuid16(0x2902);
+    private static final int SCAN_REQUEST = 1;
 
-    /** 运行状态（按键计数、电量、读电量的时刻）：不是设置，不导出（{@code settings.SettingsBackup} 只带设置和视频流配置）。 */
+    /** 运行状态（计数、电量、版本、序列号）：不是设置，不导出（{@code settings.SettingsBackup} 只带设置和视频流配置）。 */
     private static final String STATE = "smart_button_state";
+    /** 以前「按完顺手读电量」记的上次试的时刻：那件事去掉了（2026-11-04），起来时把留下的删掉。 */
+    private static final String RETIRED_BATTERY_TRY = "batteryTry.";
 
     /** 在不在听（诊断报告用）。 */
     public enum Listen {
         /** 还没装上。 */
         NOT_STARTED,
-        /** 用户退出了：不听。 */
+        /** 设置里没开启灵动贴：不扫。 */
+        DISABLED,
+        /** 用户退出了：不扫。 */
         EXITED,
-        /** 没有连接过的灵动贴、也没在搜索：不扫。 */
+        /** 没有绑定的灵动贴、也没在绑定：不扫。 */
         IDLE,
         /** 这台车机没有蓝牙。 */
         NO_BLUETOOTH,
-        /** 蓝牙关着：开了接着听。 */
+        /** 蓝牙关着：开了接着扫。 */
         BLUETOOTH_OFF,
         /** 没有扫描权限：{@link #RETRY_MS} 后再看。 */
         NO_PERMISSION,
@@ -162,48 +147,86 @@ public final class SmartButtons {
         ASLEEP,
         /** 车机刚醒：等 {@link #SETTLE_MS}。 */
         SETTLING,
-        /** 连着一台读电量：先停着扫描。 */
+        /** 第二次起连之前先停着扫描。 */
         CONNECTING,
+        /** 刚开过太多次：等到这一阵过去。 */
+        THROTTLED,
+        /** 停了，隔 {@link #START_DELAY_MS} 就开。 */
+        STARTING,
         /** 在听。 */
         LISTENING,
         /** 扫描起不来：{@link #RETRY_MS} 后再试。 */
         FAILED
     }
 
-    /** 搜到的一台（没连接过的）。 */
-    public static final class Found {
-        public final String address;
-        public final int rssi;
-        /** 搜到时广播里的按键计数（连接时当起点）；读不出来是 -1。 */
-        final int counter;
-
-        Found(String address, int rssi, int counter) {
-            this.address = address;
-            this.rssi = rssi;
-            this.counter = counter;
-        }
+    /** 一次绑定的结果。 */
+    public enum BindResult {
+        /** 绑上了。 */
+        BOUND,
+        /** 长按的是绑过的那一台。 */
+        ALREADY_BOUND,
+        /** 时间到了，没看到没绑过的长按。 */
+        NOT_FOUND,
+        /** 看到了、没连上。 */
+        CONNECT_FAILED,
+        /** 已经绑满 {@link #MAX_BOUND} 台。 */
+        FULL
     }
 
-    /** 搜索结果给谁（主线程）。 */
-    public interface SearchListener {
-        /** 搜到的灵动贴（没连接过的），信号强的在前。 */
-        void onFound(List<Found> found);
+    /** 绑定的进展给谁（主线程）。 */
+    public interface BindListener {
+        /** 正在连一台长按了的（{@code true}），或者没连上、接着等（{@code false}）。 */
+        void onConnecting(boolean connecting);
+
+        /** 这次绑定结束了；{@code address} 是那一台，没有是 null。 */
+        void onBindResult(BindResult result, String address);
     }
 
     /** 这次进程里一台按过几下、最后一下（诊断报告用）。 */
     public static final class Pressed {
         public final int count;
         public final long lastAtWallMs;
-        /** 最后一下几击（0 是按法认不出）。 */
-        public final int lastClicks;
-        /** 最后一下是连着读电量时从通知来的（不是广播）。 */
+        /** 最后一下的按法（{@link SmartButtonAd#SINGLE} 等；0 是认不出）。 */
+        public final int lastGesture;
+        /** 最后一下是连着时从通知来的（不是广播）。 */
         public final boolean viaNotification;
 
-        Pressed(int count, long lastAtWallMs, int lastClicks, boolean viaNotification) {
+        Pressed(int count, long lastAtWallMs, int lastGesture, boolean viaNotification) {
             this.count = count;
             this.lastAtWallMs = lastAtWallMs;
-            this.lastClicks = lastClicks;
+            this.lastGesture = lastGesture;
             this.viaNotification = viaNotification;
+        }
+    }
+
+    /** 一台最近一下（去掉另一路又来的那一遍）。 */
+    private static final class Last {
+        final int gesture;
+        final boolean viaNotification;
+        final long at;
+
+        Last(int gesture, boolean viaNotification, long at) {
+            this.gesture = gesture;
+            this.viaNotification = viaNotification;
+            this.at = at;
+        }
+    }
+
+    /** 连着时一台的电量读数：按键那一下会掉，取 {@link #BATTERY_WINDOW_MS} 里最高的（纯逻辑，{@code SmartButtonsTest}）。 */
+    static final class BatteryWindow {
+        private final ArrayDeque<long[]> reads = new ArrayDeque<>();
+
+        /** 加一个读数（{@code now} 是开机起的毫秒），返回这一阵里最高的。 */
+        int add(long now, int percent) {
+            reads.addLast(new long[]{now, percent});
+            while (now - reads.peekFirst()[0] > BATTERY_WINDOW_MS) {
+                reads.pollFirst();
+            }
+            int max = 0;
+            for (long[] read : reads) {
+                max = Math.max(max, (int) read[1]);
+            }
+            return max;
         }
     }
 
@@ -214,65 +237,70 @@ public final class SmartButtons {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final SharedPreferences state;
     private final BluetoothAdapter adapter;
+    /** 扫描结果交给 {@link ScanReceiver}；开、停用的是同一个。 */
+    private final PendingIntent scanIntent;
 
     // ---- 只在 bt 线程上碰
-    private BluetoothLeScanner scanner;
-    private ScanCallback scanCallback;
+    /** 系统那边可能还开着我们的扫描（这次进程开过、或者上一个进程留下的）：停的时候要真的去停。 */
+    private boolean maybeScanning = true;
+    /** 每停一次加一：隔一会儿再开的那一下看它变没变。 */
+    private int scanGeneration;
+    private boolean startPending;
+    /** 最近开扫描的时刻（从早到晚，最多 {@link #MAX_STARTS} 个）。 */
+    private final ArrayDeque<Long> starts = new ArrayDeque<>();
     /** 看到蓝牙开着的时刻（{@link SystemClock#elapsedRealtime}）；关着是 0。 */
     private long bluetoothOnSince;
     /** 车机要睡了，蓝牙放开着（{@link #headUnitSleeps}）。 */
     private boolean asleep;
-    /** 车机醒了，等到这一刻才开始扫描（{@link SystemClock#elapsedRealtime}，{@link #headUnitWoke}）。 */
+    /** 车机醒了，等到这一刻才开始扫描（{@link #headUnitWoke}）。 */
     private long settledAt;
     /** 车机醒来的时刻，开始听时记一笔；0 = 记过了。 */
     private long wokeAt;
     /** 蓝牙重启过（车机睡过、蓝牙关过）：下次开扫描之前先向系统要一份现在的服务（{@link #refreshGatt}）。 */
     private boolean gattStale;
-    /** 这轮扫描开起来的时刻（{@link SystemClock#elapsedRealtime}）。 */
-    private long listeningSince;
-    /** 这一刻之前不再为听不到重开（{@link #DEAF_QUIET_MS}）；0 = 没有。 */
-    private long deafQuietUntil;
-    /** 这次进程记了几条听不到、上一条的时刻、这一阵记不记（{@link #DEAF_NOTES}）。 */
-    private int deafNotes;
-    private long lastDeafNoteAt;
-    private boolean noteThisDeaf;
-    private boolean exited;
-    /** 正在连的那一台（连接时读电量、按完顺手读电量）；同时只连一台。 */
-    private Link link;
+    /** 正在连的、连着的那一台；同时只有一台。 */
+    private ButtonLink link;
+    /** 绑定到这一刻为止（{@link SystemClock#elapsedRealtime}）。 */
+    private long bindUntil;
+    /** 这次绑定里没连上的次数。 */
+    private int bindFailures;
+    private final Map<String, Last> lastPress = new HashMap<>();
+    private final Map<String, BatteryWindow> batteryWindows = new HashMap<>();
+    /** 认不出广播的那几台：每台这次进程只记一次。 */
+    private final Set<String> unreadable = new HashSet<>();
+    /** 这一阵最后一次记下的 GATT 服务情况，一样的不再记。 */
+    private String gattNote = "";
 
     // ---- 跨线程
-    /** 连接过的几台（地址）：扫描回调按它筛。 */
-    private volatile Set<String> listening = Collections.emptySet();
-    private volatile boolean searching;
+    /** 绑定了的几台（地址）。 */
+    private volatile Set<String> bound = Collections.emptySet();
+    private volatile boolean enabled;
+    private volatile boolean exited;
+    private volatile boolean binding;
+    private volatile boolean scanning;
     private volatile Listen listen = Listen.NOT_STARTED;
     private volatile String listenDetail = "";
     private volatile String connecting;
-    /** 上次收到广播（什么设备的都算）的时刻（{@link SystemClock#elapsedRealtime}）；这次进程还没收到过是 0。 */
+    /** 上次收到扫描结果的时刻（{@link SystemClock#elapsedRealtime}）；这次进程还没收到过是 0。 */
     private volatile long heardAt;
-    /** 这轮扫描收到几包：只在主线程上加，起扫描时清零。 */
-    private volatile int heardThisScan;
-    /** 上次收到广播以来扫描失败了几次、聋了重开了几次（同一阵只开一次，车机又睡过才清零）：只在 bt 线程上写。 */
+    /** 这次进程收到几包：只在 bt 线程上写。 */
+    private volatile long packets;
+    /** 上次开起来以后扫描起不来了几次：只在 bt 线程上写。 */
     private volatile int failures;
-    private volatile int deafRestarts;
-    /** 这次进程听不到重开了几回、其中重开后马上就收到的几回（诊断报告用）：只在 bt 线程上写。 */
-    private volatile int deafRestartsTotal;
-    private volatile int deafCured;
     /** 这次进程换过几次容器手里的 GATT 服务（{@link StaleGatt}）：只在 bt 线程上写。 */
     private volatile int gattReplaced;
-    /** 这一阵最后一次记下的 GATT 服务情况，一样的不再记：只在 bt 线程上碰。 */
-    private String gattNote = "";
-    /** 刚要切到的驾驶模式、什么时候要的（主线程，{@link #stepDriveMode}）；0 = 没有。 */
-    private int driveTarget;
-    private long driveTargetAt;
-    private final Map<String, Found> found = new LinkedHashMap<>();
-    private final AtomicBoolean publishPending = new AtomicBoolean();
+    /** 这次进程因为开得太勤等过几回：只在 bt 线程上写。 */
+    private volatile int throttled;
     private final Map<String, Pressed> pressed = new HashMap<>();
 
     // ---- 只在主线程上碰
-    private final List<SearchListener> searchers = new ArrayList<>();
+    /** 刚要切到的驾驶模式、什么时候要的（{@link #stepDriveMode}）；0 = 没有。 */
+    private int driveTarget;
+    private long driveTargetAt;
+    private BindListener bindListener;
     private final List<Runnable> changeListeners = new ArrayList<>();
 
-    /** 进程起来时装一次（{@code ZeekrShortcutApp}）：有连接过的灵动贴就开始听。重复叫无害。 */
+    /** 进程起来时装一次（{@code ZeekrShortcutApp}，扫描结果把进程叫起来时 {@link ScanReceiver} 也叫）。重复叫无害。 */
     public static synchronized void install(Context context) {
         if (instance != null) {
             return;
@@ -301,6 +329,17 @@ public final class SmartButtons {
             AppLog.w(TAG, "no Bluetooth adapter: " + e);
         }
         adapter = a;
+        PendingIntent pi = null;
+        try {
+            // 系统要往里填结果，安卓 12 起得是可变的；目标写明了是自己的接收器
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT
+                    | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
+            pi = PendingIntent.getBroadcast(app, SCAN_REQUEST,
+                    new Intent(app, ScanReceiver.class).setAction(ScanReceiver.ACTION), flags);
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "no PendingIntent for the scan: " + e);
+        }
+        scanIntent = pi;
     }
 
     private void start() {
@@ -310,12 +349,14 @@ public final class SmartButtons {
         } else {
             app.registerReceiver(adapterState, filter);
         }
-        boolean exitedNow = UserExit.isExited(app);
+        enabled = new AppConfig(app).isSmartButtonsEnabled();
+        exited = UserExit.isExited(app);
+        bound = loadBound();
         boolean asleepNow = ScreenState.androidOff();
-        listening = loadListening();
         bt.post(() -> {
-            exited = exitedNow;
             asleep = asleepNow;
+            forgetRetiredState();
+            // 上一个进程留下的扫描也在这里停（不该扫的话），该扫的话停了重开
             ensureScan();
         });
     }
@@ -327,21 +368,6 @@ public final class SmartButtons {
         return adapter != null;
     }
 
-    /** 扫描聋了没有（纯逻辑）：安卓熄屏时系统本来就停着这种扫描，不算。时刻都是含深睡的。 */
-    static boolean deaf(boolean interactive, long now, long listeningSince, long heardAt) {
-        return interactive && now - Math.max(listeningSince, heardAt) >= DEAF_MS;
-    }
-
-    /** 聋了能不能重开（纯逻辑）：同一阵只开一次，开过还是没有多半是周围真的没设备，再开也没用；上一次白开了（{@link #DEAF_QUIET_MS}）先不开。 */
-    static boolean mayRestart(long now, int deafRestarts, long quietUntil) {
-        return deafRestarts == 0 && now >= quietUntil;
-    }
-
-    /** 这一下开扫描要不要先等（纯逻辑）：车机刚醒等够 {@link #SETTLE_MS}；在搜索不等，人就在设置页上看着。 */
-    static boolean waitToSettle(long now, long settledAt, boolean searching) {
-        return !searching && now < settledAt;
-    }
-
     /** 蓝牙开着没有。 */
     public boolean bluetoothOn() {
         try {
@@ -351,7 +377,7 @@ public final class SmartButtons {
         }
     }
 
-    /** 搜索、听、连要的运行时权限：安卓 12 起是「附近的设备」（扫描、连接），之前是定位。 */
+    /** 绑定、听、连要的运行时权限：安卓 12 起是「附近的设备」（扫描、连接），之前是定位。 */
     public static String[] permissions() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 ? new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT}
@@ -371,11 +397,77 @@ public final class SmartButtons {
         return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED;
     }
 
-    /** 权限刚给了、或者别的条件变了：马上再看一次要不要扫（不等 {@link #RETRY_MS}）。 */
+    /** 车机醒了要不要先等（纯逻辑）：车机刚醒等够 {@link #SETTLE_MS}；在绑定不等，人就在设置页上看着。 */
+    static boolean waitToSettle(long now, long settledAt, boolean binding) {
+        return !binding && now < settledAt;
+    }
+
+    /**
+     * 现在能不能开扫描（纯逻辑）：{@code starts} 是最近开过的时刻（从早到晚）。{@link #STARTS_WINDOW_MS} 里已经开满 {@link #MAX_STARTS} 次，
+     * 就等到最早的那一次过了这一阵。返回要等的毫秒，0 = 现在就能开。
+     */
+    static long startWait(List<Long> starts, long now) {
+        int recent = 0;
+        long oldest = 0;
+        for (long at : starts) {
+            if (now - at < STARTS_WINDOW_MS) {
+                if (recent == 0) {
+                    oldest = at;
+                }
+                recent++;
+            }
+        }
+        return recent < MAX_STARTS ? 0 : oldest + STARTS_WINDOW_MS - now;
+    }
+
+    /** 设置里开、关灵动贴（主线程，设置已经写好）：关了不扫、不连、不绑，连着的断开。 */
+    public void setEnabled(boolean on) {
+        enabled = on;
+        if (!on) {
+            bindListener = null;
+        }
+        bt.post(() -> {
+            if (!on) {
+                if (binding) {
+                    stopBinding();
+                }
+                if (link != null) {
+                    link.close("smart buttons turned off");
+                }
+            }
+            BlackBox.noteImportant(on ? "灵动贴：开启" : "灵动贴：关闭（不扫描蓝牙、不连接）");
+            ensureScan();
+        });
+    }
+
+    /** 开着灵动贴没有。 */
+    public boolean enabled() {
+        return enabled;
+    }
+
+    /** 权限刚给了、或者别的条件变了：马上再看一次要不要扫（不等 {@link #RETRY_MS}）。在扫的不动。 */
     public void refresh() {
-        listening = loadListening();
-        // 没在扫的话 startScan 会撤掉排着的重试、马上再看一次（车机刚醒就接着等）；在扫的话什么都不动（25 分钟的重开照旧）
-        bt.post(this::ensureScan);
+        bound = loadBound();
+        bt.post(() -> {
+            if (!scanning && !startPending) {
+                ensureScan();
+            }
+        });
+    }
+
+    /** 用户退出（{@code CameraKeeper#beginExit}，哪个线程都行）：当场停扫描，不然进程没了系统还接着扫、把应用叫起来；连着的断开。 */
+    public void userExits() {
+        exited = true;
+        stopIntentScan();
+        bt.post(() -> {
+            if (binding) {
+                stopBinding();
+            }
+            if (link != null) {
+                link.close("user exit");
+            }
+            ensureScan();
+        });
     }
 
     /** 用户退出后又手动打开了（{@link UserExit#clear}）：接着听。 */
@@ -391,10 +483,10 @@ public final class SmartButtons {
         bt.post(() -> {
             asleep = true;
             if (link != null) {
-                finish(link, "head unit sleeps");
+                link.close("head unit sleeps");
             }
             ensureScan();
-            if (!listening.isEmpty()) {
+            if (!bound.isEmpty()) {
                 BlackBox.note("灵动贴：车机要睡，放开蓝牙");
             }
         });
@@ -412,31 +504,39 @@ public final class SmartButtons {
         });
     }
 
-    /** 开始搜（主线程）：搜到的不断交给 {@code listener}，直到 {@link #removeSearchListener}。 */
-    public void addSearchListener(SearchListener listener) {
-        if (searchers.contains(listener)) {
-            return;
-        }
-        searchers.add(listener);
-        if (searchers.size() == 1) {
-            synchronized (found) {
-                found.clear();
+    /**
+     * 开始绑定（主线程）：{@link #BIND_WINDOW_MS} 里长按一台没绑过的。进展、结果交给 {@code listener}（主线程），除非先 {@link #cancelBinding}。
+     * 蓝牙、权限、开关、台数由设置页先看过。
+     */
+    public void startBinding(BindListener listener) {
+        bindListener = listener;
+        bt.post(() -> {
+            binding = true;
+            bindUntil = SystemClock.elapsedRealtime() + BIND_WINDOW_MS;
+            bindFailures = 0;
+            bt.removeCallbacks(bindTimeout);
+            bt.postDelayed(bindTimeout, BIND_WINDOW_MS);
+            BlackBox.noteImportant("灵动贴：开始绑定（" + BIND_WINDOW_MS / 1000 + " 秒）");
+            ensureScan();
+        });
+    }
+
+    /** 不绑了（主线程，人关了框）：正在连、还没绑上的那一台断开。 */
+    public void cancelBinding() {
+        bindListener = null;
+        bt.post(() -> {
+            if (!binding) {
+                return;
             }
-            searching = true;
-            bt.post(this::ensureScan);
-        }
-        listener.onFound(snapshotFound());
+            BlackBox.note("灵动贴：不绑了");
+            stopBinding();
+            if (link != null && link.binding && !link.wasReady()) {
+                link.close("binding cancelled");
+            }
+        });
     }
 
-    public void removeSearchListener(SearchListener listener) {
-        searchers.remove(listener);
-        if (searchers.isEmpty() && searching) {
-            searching = false;
-            bt.post(this::ensureScan);
-        }
-    }
-
-    /** 连接过的灵动贴、电量变了时叫谁（主线程）。 */
+    /** 绑定的灵动贴、电量这些变了时叫谁（主线程）。 */
     public void addChangeListener(Runnable listener) {
         if (!changeListeners.contains(listener)) {
             changeListeners.add(listener);
@@ -447,42 +547,17 @@ public final class SmartButtons {
         changeListeners.remove(listener);
     }
 
-    /**
-     * 连接一台（主线程）：地址马上记下，从这时起按它就算数（选了动作才做事）；再连上读一次电量就断开，读没读到都不影响用。
-     */
-    public void connect(String address) {
-        new AppConfig(app).addSmartButton(address);
-        Found f;
-        synchronized (found) {
-            f = found.remove(address);
-        }
-        int seed = f == null ? -1 : f.counter;
-        listening = loadListening();
-        BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(address) + "：连接（记下地址，按键计数起点 " + seed + "）");
-        bt.post(() -> {
-            if (seed >= 0) {
-                state.edit().putInt(counterKey(address), seed).apply();
-            }
-            state.edit().putLong(batteryTryKey(address), System.currentTimeMillis()).apply();
-            if (link == null && adapter != null && canConnect(app)) {
-                open(new Link(address, false));
-            } else {
-                ensureScan();
-            }
-        });
-        publishChange();
-    }
-
-    /** 删掉一台（主线程）：地址、两种按法选的动作、按键计数、电量都不要了。 */
+    /** 删掉一台（主线程）：地址、两种按法选的动作、计数、电量、版本、序列号都不要了；连着的断开。 */
     public void forget(String address) {
         new AppConfig(app).removeSmartButton(address);
-        listening = loadListening();
+        bound = loadBound();
         BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(address) + "：删除");
         bt.post(() -> {
             state.edit().remove(counterKey(address)).remove(batteryKey(address)).remove(batteryAtKey(address))
-                    .remove(batteryTryKey(address)).apply();
+                    .remove(versionKey(address)).remove(serialKey(address)).remove(RETIRED_BATTERY_TRY + address).apply();
+            lastPress.remove(address);
             if (link != null && link.address.equals(address)) {
-                finish(link, "forgotten");
+                link.close("forgotten");
             }
             ensureScan();
         });
@@ -492,9 +567,19 @@ public final class SmartButtons {
         publishChange();
     }
 
-    /** 这一台上次读到的电量（%）；没读到过是 -1。 */
+    /** 这一台的电量（%）；没有过是 -1。 */
     public int battery(String address) {
         return state.getInt(batteryKey(address), -1);
+    }
+
+    /** 这一台的固件版本（「1.2.1」）；没有过是 null。 */
+    public String version(String address) {
+        return state.getString(versionKey(address), null);
+    }
+
+    /** 这一台的序列号；没查到过是 null。 */
+    public String serial(String address) {
+        return state.getString(serialKey(address), null);
     }
 
     // ================================================================= 给诊断报告的
@@ -508,29 +593,29 @@ public final class SmartButtons {
         return listenDetail;
     }
 
-    public boolean searching() {
-        return searching;
+    public boolean binding() {
+        return binding;
     }
 
-    /** 正在连的那一台；没在连是 null。 */
+    /** 正在连、连着的那一台；没有是 null。 */
     public String connecting() {
         return connecting;
     }
 
-    /** 离上次收到广播（什么设备的都算）多久了（毫秒，含深睡）；这次进程还没收到过是 -1。 */
+    /** 离上次收到扫描结果多久了（毫秒，含深睡）；这次进程还没收到过是 -1。 */
     public long heardAgoMs() {
         long at = heardAt;
         return at == 0 ? -1 : SystemClock.elapsedRealtime() - at;
     }
 
-    /** 上次收到广播以来扫描失败了几次。 */
-    public int failures() {
-        return failures;
+    /** 这次进程收到几包。 */
+    public long packets() {
+        return packets;
     }
 
-    /** 上次收到广播以来聋了重开了几次。 */
-    public int deafRestarts() {
-        return deafRestarts;
+    /** 上次开起来以后扫描起不来了几次。 */
+    public int failures() {
+        return failures;
     }
 
     /** 这次进程换过几次容器手里的 GATT 服务。 */
@@ -538,17 +623,12 @@ public final class SmartButtons {
         return gattReplaced;
     }
 
-    /** 这次进程听不到重开了几回。 */
-    public int deafRestartsTotal() {
-        return deafRestartsTotal;
+    /** 这次进程因为开扫描太勤等过几回。 */
+    public int throttled() {
+        return throttled;
     }
 
-    /** 这次进程听不到重开后，马上就收到的有几回：原来那一轮真的没声了。 */
-    public int deafCured() {
-        return deafCured;
-    }
-
-    /** 上次读到电量的时刻（墙上毫秒）；没读到过是 0。 */
+    /** 现在这个电量记下的时刻（墙上毫秒）；没有过是 0。 */
     public long batteryReadAt(String address) {
         return state.getLong(batteryAtKey(address), 0);
     }
@@ -562,47 +642,75 @@ public final class SmartButtons {
 
     // ================================================================= 扫描（bt 线程）
 
-    private Set<String> loadListening() {
+    private Set<String> loadBound() {
         return Collections.unmodifiableSet(new HashSet<>(new AppConfig(app).getSmartButtons()));
     }
 
-    /** 该不该扫：没退出、车机没要睡、没在连、有连接过的或者在搜索。该扫没扫就起，不该扫在扫就停。 */
+    /** 去掉的做法留下的运行状态删掉（已删除功能不留残骸）。 */
+    private void forgetRetiredState() {
+        SharedPreferences.Editor editor = null;
+        for (String key : state.getAll().keySet()) {
+            if (key.startsWith(RETIRED_BATTERY_TRY)) {
+                if (editor == null) {
+                    editor = state.edit();
+                }
+                editor.remove(key);
+            }
+        }
+        if (editor != null) {
+            editor.apply();
+        }
+    }
+
+    /** 为什么不该扫；该扫是 null。 */
+    private Listen whyNotScan() {
+        if (!enabled) {
+            return Listen.DISABLED;
+        }
+        if (exited) {
+            return Listen.EXITED;
+        }
+        if (asleep) {
+            return Listen.ASLEEP;
+        }
+        if (bound.isEmpty() && !binding) {
+            return Listen.IDLE;
+        }
+        if (link != null && link.pausesScan) {
+            return Listen.CONNECTING;
+        }
+        return null;
+    }
+
+    /** 该扫没在扫就开，不该扫的停。在扫的不动。 */
     private void ensureScan() {
-        boolean want = !exited && !asleep && link == null && (searching || !listening.isEmpty());
-        if (!want) {
+        Listen not = whyNotScan();
+        if (not != null) {
             stopScan();
-            note(exited ? Listen.EXITED : asleep ? Listen.ASLEEP : link != null ? Listen.CONNECTING : Listen.IDLE, "");
+            note(not, "");
             return;
         }
-        if (scanCallback == null) {
+        if (!scanning && !startPending) {
             startScan();
         }
     }
 
     private void startScan() {
-        bt.removeCallbacks(restart);
-        bt.removeCallbacks(watch);
-        if (adapter == null) {
-            note(Listen.NO_BLUETOOTH, "");
+        bt.removeCallbacks(retry);
+        if (adapter == null || scanIntent == null) {
+            note(Listen.NO_BLUETOOTH, adapter == null ? "" : "no PendingIntent");
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        if (waitToSettle(now, settledAt, searching)) {
+        if (waitToSettle(now, settledAt, binding)) {
             note(Listen.SETTLING, "");
-            bt.postDelayed(restart, settledAt - now);
+            bt.postDelayed(retry, settledAt - now);
             return;
         }
-        boolean on;
-        try {
-            on = adapter.isEnabled();
-        } catch (RuntimeException e) {
-            on = false;
-        }
-        if (!on) {
-            // 蓝牙开了本该有广播（adapterState），车上没收到过（2026-11-01 报告：关了又开，一条都没来）：自己隔一会儿看一眼
+        if (!bluetoothOn()) {
             bluetoothRestarted();
             note(Listen.BLUETOOTH_OFF, "");
-            bt.postDelayed(restart, RETRY_MS);
+            bt.postDelayed(retry, RETRY_MS);
             return;
         }
         if (bluetoothOnSince == 0) {
@@ -610,55 +718,145 @@ public final class SmartButtons {
         }
         if (!canScan(app)) {
             note(Listen.NO_PERMISSION, "");
-            bt.postDelayed(restart, RETRY_MS);
+            bt.postDelayed(retry, RETRY_MS);
+            return;
+        }
+        long wait = startWait(new ArrayList<>(starts), now);
+        if (wait > 0) {
+            throttled = throttled + 1;
+            note(Listen.THROTTLED, wait + " ms");
+            bt.postDelayed(retry, wait);
             return;
         }
         if (gattStale) {
             gattStale = false;
             refreshGatt();
         }
-        BluetoothLeScanner s;
-        try {
-            s = adapter.getBluetoothLeScanner();
-        } catch (RuntimeException e) {
-            s = null;
+        // 上一个进程、上一轮开的 PendingIntent 扫描不会自己停：先停一次，隔一会儿再开
+        stopIntentScan();
+        maybeScanning = false;
+        startPending = true;
+        int generation = scanGeneration;
+        note(Listen.STARTING, "");
+        bt.postDelayed(() -> startNow(generation), START_DELAY_MS);
+    }
+
+    private void startNow(int generation) {
+        if (generation != scanGeneration || !startPending) {
+            return;
         }
+        startPending = false;
+        if (whyNotScan() != null) {
+            ensureScan();
+            return;
+        }
+        BluetoothLeScanner s = scanner();
         if (s == null) {
             listenFailed("no scanner");
             return;
         }
-        ScanCallback cb = newScanCallback();
+        long now = SystemClock.elapsedRealtime();
+        starts.addLast(now);
+        while (starts.size() > MAX_STARTS) {
+            starts.pollFirst();
+        }
+        maybeScanning = true;
         ScanSettings settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+                .setLegacy(true)
                 .setReportDelay(0)
                 .build();
+        List<ScanFilter> filters = Collections.singletonList(
+                new ScanFilter.Builder().setDeviceName(SmartButtonAd.NAME).build());
+        int result;
         try {
-            // 不带过滤器：按地址过滤的扫描在车上收不到灵动贴的广播（Lab findings §2.61）
-            s.startScan(null, settings, cb);
+            result = s.startScan(filters, settings, scanIntent);
         } catch (RuntimeException e) {
             listenFailed("startScan: " + e);
             return;
         }
-        scanner = s;
-        scanCallback = cb;
-        listeningSince = SystemClock.elapsedRealtime();
-        heardThisScan = 0;
+        if (result != 0) {
+            listenFailed("startScan returned " + result);
+            return;
+        }
+        scanning = true;
+        if (failures > 0) {
+            BlackBox.note("灵动贴：扫描开起来了（之前起不来 " + failures + " 次）");
+            failures = 0;
+            gattNote = "";
+        }
         note(Listen.LISTENING, "");
         if (wokeAt != 0) {
             BlackBox.note("灵动贴：车机醒来 " + seconds(now - wokeAt) + " 秒开始听；看到蓝牙开着 " + seconds(now - bluetoothOnSince)
                     + " 秒；" + ScanProbe.scanFacts(app, adapter));
             wokeAt = 0;
         }
-        bt.postDelayed(restart, RESTART_MS);
         bt.postDelayed(watch, WATCH_MS);
     }
 
-    /** 蓝牙重启过（车机睡过、蓝牙关过）：手里的服务不能用了，这一阵听不到重开的账也重新算。 */
+    private void stopScan() {
+        scanGeneration++;
+        startPending = false;
+        bt.removeCallbacks(retry);
+        bt.removeCallbacks(watch);
+        if (maybeScanning) {
+            stopIntentScan();
+            maybeScanning = false;
+        }
+        scanning = false;
+    }
+
+    /** 停我们的扫描（哪个线程都行；没开着也无害）。 */
+    private void stopIntentScan() {
+        BluetoothLeScanner s = scanner();
+        if (s == null || scanIntent == null) {
+            return;
+        }
+        try {
+            s.stopScan(scanIntent);
+        } catch (RuntimeException ignored) {
+            // 蓝牙已经关了之类：停不了就算了
+        }
+    }
+
+    /** 蓝牙关着时是 null。 */
+    private BluetoothLeScanner scanner() {
+        try {
+            return adapter == null ? null : adapter.getBluetoothLeScanner();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** 隔一会儿再看要不要扫（蓝牙没开、没权限、起不来、刚醒、开得太勤）。 */
+    private final Runnable retry = this::ensureScan;
+
+    private final Runnable watch = this::watchBluetooth;
+
+    /** 在扫的时候隔一会儿看一眼蓝牙：开关的广播车上没收到过，车机没睡、人很快又回来时，蓝牙关过又开，手里这一轮已经没用了。只是读一下状态。 */
+    private void watchBluetooth() {
+        if (!scanning) {
+            return;
+        }
+        if (!bluetoothOn()) {
+            BlackBox.note("灵动贴：蓝牙关了，扫描停下，开了再开");
+            bluetoothRestarted();
+            stopScan();
+            if (link != null) {
+                link.close("Bluetooth off");
+            }
+            ensureScan();
+            return;
+        }
+        bt.postDelayed(watch, WATCH_MS);
+    }
+
+    /** 蓝牙重启过（车机睡过、蓝牙关过）：手里的服务不能用了。 */
     private void bluetoothRestarted() {
         bluetoothOnSince = 0;
         gattStale = true;
-        deafRestarts = 0;
-        deafQuietUntil = 0;
     }
 
     /** 向系统要一份现在的蓝牙服务：容器手里那份死了就换（{@link StaleGatt}），活着什么都不动。情况一样的不再记。换了返回 true。 */
@@ -675,10 +873,12 @@ public final class SmartButtons {
     }
 
     /**
-     * 没听上：{@link #RETRY_MS} 后再试；要是容器手里的 GATT 服务死了，换一个马上试（{@link StaleGatt}）。
-     * 一阵里第一次失败把现场记下来：错误码本身看不出是哪一步（{@link ScanProbe}）。
+     * 没开成：{@link #RETRY_MS} 后再试；要是容器手里的 GATT 服务死了，换一个马上试（{@link StaleGatt}）。
+     * 一阵里第一次起不来把现场记下来：错误码本身看不出是哪一步（{@link ScanProbe}）。
      */
     private void listenFailed(String detail) {
+        scanning = false;
+        startPending = false;
         note(Listen.FAILED, detail);
         failures = failures + 1;
         if (failures == 1) {
@@ -689,99 +889,8 @@ public final class SmartButtons {
             }
         }
         boolean replaced = refreshGatt();
-        bt.removeCallbacks(restart);
-        bt.postDelayed(restart, replaced ? 0 : RETRY_MS);
-    }
-
-    private void stopScan() {
-        bt.removeCallbacks(restart);
-        bt.removeCallbacks(watch);
-        if (scanner != null && scanCallback != null) {
-            try {
-                scanner.stopScan(scanCallback);
-            } catch (RuntimeException ignored) {
-                // 蓝牙已经关了之类：停不了就算了
-            }
-        }
-        scanner = null;
-        scanCallback = null;
-    }
-
-    /** 重开一次扫描（到点、或者上次没听上）。 */
-    private final Runnable restart = () -> {
-        stopScan();
-        ensureScan();
-    };
-
-    private final Runnable watch = this::watchScan;
-
-    /**
-     * 在听的时候隔一会儿看一眼：蓝牙稳了、还是聋的，就先停再开一次。再没有也不开了，等又收到、车机又睡一觉、蓝牙关过，或者 {@link #RESTART_MS} 到点；
-     * 开了过一阵才收到是白开了，{@link #DEAF_QUIET_MS} 之内不再开：不反复去碰蓝牙（车主 2026-11-01）。
-     *
-     * <p>蓝牙关了要自己看：开关的广播车上没收到过，车机没睡、人很快又回来时，蓝牙关过又开，手里这一轮已经没用了。只是读一下状态。</p>
-     */
-    private void watchScan() {
-        long now = SystemClock.elapsedRealtime();
-        if (!bluetoothOn()) {
-            bluetoothRestarted();
-            restart.run();
-            return;
-        }
-        if (!mayRestart(now, deafRestarts, deafQuietUntil)
-                || !deaf(DisplayWatch.interactiveNow(), now, listeningSince, heardAt)) {
-            bt.postDelayed(watch, WATCH_MS);
-            return;
-        }
-        deafRestarts = deafRestarts + 1;
-        deafRestartsTotal = deafRestartsTotal + 1;
-        long silent = now - Math.max(listeningSince, heardAt);
-        long scanAge = now - listeningSince;
-        int packets = heardThisScan;
-        int bluetooth = adapterState();
-        AppLog.i(TAG, "deaf: restarting the scan");
-        restart.run();
-        noteThisDeaf = deafNotes < DEAF_NOTES || now - lastDeafNoteAt >= DEAF_NOTE_EVERY_MS;
-        if (!noteThisDeaf) {
-            return;
-        }
-        deafNotes = deafNotes + 1;
-        lastDeafNoteAt = now;
-        BlackBox.note("灵动贴：" + seconds(silent) + " 秒（含车机睡着）没收到任何蓝牙广播，重开一次；这轮扫描开了 " + seconds(scanAge) + " 秒、收到 " + packets + " 包；看到蓝牙开着 "
-                + (bluetoothOnSince == 0 ? "-" : seconds(now - bluetoothOnSince)) + " 秒；蓝牙 " + stateName(bluetooth)
-                + "；" + ScanProbe.scanFacts(app, adapter) + "；" + ScanProbe.gattFacts(adapter));
-        if (bluetooth == BluetoothAdapter.STATE_ON) {
-            // 蓝牙开着、扫描也没报错，却一包都没有：系统不告诉我们为什么，只能看当时进程里还发生了什么。读日志要近一秒，不占这个线程
-            new Thread(() -> {
-                for (String line : ScanProbe.bluetoothLog()) {
-                    BlackBox.note("灵动贴现场：" + line);
-                }
-            }, "SmartButton-log").start();
-        }
-    }
-
-    /** 隔了一阵又收到广播：这一阵的账记一句，清零。同一阵排着的后面几包到这里已经没账了。{@code at} 是收到的时刻。 */
-    private void heardAgain(long silentMs, long at) {
-        boolean trouble = failures + deafRestarts > 0;
-        if (silentMs >= 0 && silentMs < LONG_SILENCE_MS && !trouble) {
-            return;
-        }
-        long took = at - listeningSince;
-        if (deafRestarts > 0) {
-            if (took < CURED_MS) {
-                deafCured = deafCured + 1;
-            } else {
-                deafQuietUntil = at + DEAF_QUIET_MS;
-            }
-        }
-        if (deafRestarts == 0 || noteThisDeaf) {
-            BlackBox.note("灵动贴：" + (silentMs < 0 ? "这次进程第一次" : "隔 " + seconds(silentMs) + " 秒（含车机睡着）又")
-                    + "收到蓝牙广播；这一阵扫描失败 " + failures + " 次、听不到重开 " + deafRestarts + " 次；这轮扫描开了 "
-                    + took + " 毫秒");
-        }
-        failures = 0;
-        deafRestarts = 0;
-        gattNote = "";
+        bt.removeCallbacks(retry);
+        bt.postDelayed(retry, replaced ? 0 : RETRY_MS);
     }
 
     private static String seconds(long ms) {
@@ -819,149 +928,164 @@ public final class SmartButtons {
         listenDetail = detail;
     }
 
-    private ScanCallback newScanCallback() {
-        return new ScanCallback() {
-            @Override
-            public void onScanResult(int callbackType, ScanResult result) {
-                offer(result);
-            }
+    // ================================================================= 扫描结果
 
-            @Override
-            public void onBatchScanResults(List<ScanResult> results) {
-                for (ScanResult result : results) {
-                    offer(result);
-                }
-            }
-
-            @Override
-            public void onScanFailed(int errorCode) {
-                ScanCallback failed = this;
-                bt.post(() -> {
-                    if (scanCallback != failed) {
-                        return;
-                    }
-                    scanner = null;
-                    scanCallback = null;
-                    bt.removeCallbacks(watch);
-                    listenFailed("scan failed " + errorCode);
-                });
-            }
-        };
-    }
-
-    /** 扫描回调（主线程）：什么设备都报，收到就是扫描活着；连接过的交给 bt 线程认按键；在搜索时名字是灵动贴的交给搜索。 */
-    private void offer(ScanResult result) {
-        long now = SystemClock.elapsedRealtime();
-        long last = heardAt;
-        heardAt = now;
-        heardThisScan = heardThisScan + 1;
-        if (last == 0 || now - last >= LONG_SILENCE_MS || failures + deafRestarts > 0) {
-            bt.post(() -> heardAgain(last == 0 ? -1 : now - last, now));
-        }
+    /** {@link ScanReceiver} 收到的（主线程）：拆出来交给 bt 线程。 */
+    void onScanIntent(Intent intent) {
+        int error;
+        List<ScanResult> results;
         try {
-            String address = result.getDevice().getAddress();
-            ScanRecord record = result.getScanRecord();
-            if (listening.contains(address)) {
-                byte[] raw = record == null ? null : record.getBytes();
-                bt.post(() -> onAdvert(address, raw));
-                return;
-            }
-            if (searching && SmartButtonAd.isButtonName(nameOf(result, record))) {
-                byte[] raw = record == null ? null : record.getBytes();
-                int rssi = result.getRssi();
-                bt.post(() -> onFound(address, rssi, raw));
-            }
-        } catch (RuntimeException ignored) {
-            // 单包出错不影响别的
-        }
-    }
-
-    /** 广播里带的名字；没带的话问系统记着的名字（要连接权限）。 */
-    private String nameOf(ScanResult result, ScanRecord record) {
-        String name = record == null ? null : record.getDeviceName();
-        if (name == null && canConnect(app)) {
-            try {
-                name = result.getDevice().getName();
-            } catch (RuntimeException ignored) {
-                // 没权限就不认
-            }
-        }
-        return name;
-    }
-
-    // ================================================================= 搜索（bt 线程）
-
-    private void onFound(String address, int rssi, byte[] raw) {
-        if (listening.contains(address)) {
+            error = intent.getIntExtra(BluetoothLeScanner.EXTRA_ERROR_CODE, 0);
+            results = resultsOf(intent);
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "scan intent unreadable: " + e);
             return;
         }
-        SmartButtonAd.Press press = SmartButtonAd.parse(raw);
-        synchronized (found) {
-            Found old = found.get(address);
-            int counter = press != null ? press.counter : old != null ? old.counter : -1;
-            found.put(address, new Found(address, rssi, counter));
+        long at = SystemClock.elapsedRealtime();
+        bt.post(() -> onScanResults(error, results, at));
+    }
+
+    @SuppressWarnings("deprecation")
+    private static List<ScanResult> resultsOf(Intent intent) {
+        List<ScanResult> list = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                ? intent.getParcelableArrayListExtra(BluetoothLeScanner.EXTRA_LIST_SCAN_RESULT, ScanResult.class)
+                : intent.getParcelableArrayListExtra(BluetoothLeScanner.EXTRA_LIST_SCAN_RESULT);
+        return list == null ? Collections.emptyList() : list;
+    }
+
+    private void onScanResults(int error, List<ScanResult> results, long at) {
+        Listen not = whyNotScan();
+        if (not != null && not != Listen.CONNECTING) {
+            // 不该扫（关了、退出了、要睡了、没有要找的）系统还在送：上一回的扫描还开着，再停一次，结果不要
+            maybeScanning = true;
+            stopScan();
+            return;
         }
-        if (publishPending.compareAndSet(false, true)) {
-            main.postDelayed(publishFound, SEARCH_PUBLISH_MS);
+        if (error > 0) {
+            if (scanning) {
+                listenFailed("scan failed " + error);
+            }
+            return;
+        }
+        for (ScanResult result : results) {
+            packets = packets + 1;
+            heardAt = at;
+            offer(result);
         }
     }
 
-    private final Runnable publishFound = () -> {
-        publishPending.set(false);
-        List<Found> list = snapshotFound();
-        for (SearchListener listener : new ArrayList<>(searchers)) {
-            listener.onFound(list);
+    /** 一包：绑过的交给按键，正在绑定时没绑过的交给绑定。 */
+    private void offer(ScanResult result) {
+        String address;
+        byte[] raw;
+        try {
+            address = result.getDevice().getAddress();
+            ScanRecord record = result.getScanRecord();
+            raw = record == null ? null : record.getBytes();
+        } catch (RuntimeException e) {
+            return;
         }
-    };
-
-    private List<Found> snapshotFound() {
-        List<Found> list;
-        synchronized (found) {
-            list = new ArrayList<>(found.values());
+        SmartButtonAd.Advert ad = SmartButtonAd.parse(raw);
+        if (ad == null) {
+            if (unreadable.add(address)) {
+                BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：广播认不出，不算（"
+                        + SmartButtonAd.hex(raw == null || raw.length <= 31 ? raw : Arrays.copyOf(raw, 31)) + "）");
+            }
+            return;
         }
-        list.removeIf(f -> listening.contains(f.address));
-        list.sort((a, b) -> Integer.compare(b.rssi, a.rssi));
-        return list;
+        if (bound.contains(address)) {
+            onAdvert(address, ad);
+        } else if (binding) {
+            onUnbound(address, ad);
+        }
     }
 
     // ================================================================= 按键（bt 线程）
 
-    /** 连接过的一台的一包广播：计数和存着的不一样就是按了一下；同一阵里重复的包计数一样，不算。 */
-    private void onAdvert(String address, byte[] raw) {
-        SmartButtonAd.Press press = SmartButtonAd.parse(raw);
-        if (press == null || !listening.contains(address)) {
-            return;
-        }
+    /** 绑过的一台的一包广播：电量、版本记下；计数和存着的不一样就是按了一下，同一阵里重复的包计数一样，不算。 */
+    private void onAdvert(String address, SmartButtonAd.Advert ad) {
+        boolean changed = ad.battery >= 0 && keepBattery(address, ad.battery);
+        changed |= keepVersion(address, ad.version);
         int last = state.getInt(counterKey(address), -1);
-        if (last == press.counter) {
+        if (!SmartButtonAd.isNew(ad.counter, last)) {
+            if (changed) {
+                publishChange();
+            }
             return;
         }
-        state.edit().putInt(counterKey(address), press.counter).apply();
-        if (last < 0) {
-            // 没有起点（连接时没搜到它的计数）：这一包只当起点，下一下才算
-            AppLog.i(TAG, SmartButtonAd.shortId(address) + ": first counter " + press.counter + ", taken as the baseline");
+        state.edit().putInt(counterKey(address), ad.counter).apply();
+        if (changed) {
+            publishChange();
+        }
+        if (binding) {
+            if (ad.gesture == SmartButtonAd.LONG) {
+                BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：正在绑定，长按的是绑过的这一台");
+                endBinding(BindResult.ALREADY_BOUND, address);
+            } else {
+                BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：正在绑定，绑过的按了不做");
+            }
             return;
         }
-        onPress(address, press.clicks, false);
-        maybeReadBattery(address);
+        press(address, ad.gesture, false);
+        if (ad.gesture == SmartButtonAd.LONG) {
+            connect(address);
+        }
     }
 
-    private void onPress(String address, int clicks, boolean viaNotification) {
-        synchronized (pressed) {
-            Pressed old = pressed.get(address);
-            pressed.put(address, new Pressed(old == null ? 1 : old.count + 1, System.currentTimeMillis(), clicks,
-                    viaNotification));
-        }
-        if (clicks == 0) {
-            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：按了，按法认不出" + (viaNotification ? "（通知）" : ""));
+    /** 正在绑定时一台没绑过的：长按了（背光闪）就连它，别的等它长按。 */
+    private void onUnbound(String address, SmartButtonAd.Advert ad) {
+        if (ad.gesture != SmartButtonAd.LONG) {
             return;
         }
-        main.post(() -> act(address, clicks));
+        if (link != null && (link.address.equals(address) || !link.isReady())) {
+            return;
+        }
+        if (bound.size() >= MAX_BOUND) {
+            endBinding(BindResult.FULL, address);
+            return;
+        }
+        if (link != null) {
+            link.close("another button long-pressed");
+        }
+        if (!canConnect(app)) {
+            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：绑定，长按了，没有连接权限");
+            return;
+        }
+        BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(address) + "：绑定，长按了，连它");
+        open(new ButtonLink(app, bt, adapter, address, true, linkListener));
+        main.post(() -> {
+            BindListener l = bindListener;
+            if (l != null) {
+                l.onConnecting(true);
+            }
+        });
+    }
+
+    /** 一下（bt 线程）：另一路又来的同一下不算；单击、双击做选的动作，长按、长按松开不做事。 */
+    private void press(String address, int gesture, boolean viaNotification) {
+        long now = SystemClock.elapsedRealtime();
+        Last prev = lastPress.get(address);
+        if (prev != null && SmartButtonAd.samePress(prev.gesture, prev.viaNotification, prev.at, gesture, viaNotification, now)) {
+            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：同一下又从" + (viaNotification ? "通知" : "广播")
+                    + "来了一遍（晚 " + (now - prev.at) + " 毫秒），只算一次");
+            return;
+        }
+        lastPress.put(address, new Last(gesture, viaNotification, now));
+        synchronized (pressed) {
+            Pressed old = pressed.get(address);
+            pressed.put(address, new Pressed(old == null ? 1 : old.count + 1, System.currentTimeMillis(), gesture,
+                    viaNotification));
+        }
+        if (gesture == SmartButtonAd.SINGLE || gesture == SmartButtonAd.DOUBLE) {
+            main.post(() -> act(address, gesture));
+        } else if (gesture == 0) {
+            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：按了，按法认不出" + (viaNotification ? "（通知）" : ""));
+        }
     }
 
     /** 主线程：这一台这种按法选了什么就做什么。 */
     private void act(String address, int clicks) {
-        if (UserExit.isExited(app)) {
+        if (!enabled || UserExit.isExited(app)) {
             return;
         }
         AppConfig config = new AppConfig(app);
@@ -1012,292 +1136,207 @@ public final class SmartButtons {
         });
     }
 
-    // ================================================================= 读电量（bt 线程）
+    // ================================================================= 连接（bt 线程）
 
-    /** 电量离上次读到超过一天、上次试也过了一小时：按完这一下就顺手连上读一次。 */
-    private void maybeReadBattery(String address) {
-        long now = System.currentTimeMillis();
-        if (link != null || adapter == null || !canConnect(app)
-                || now - state.getLong(batteryAtKey(address), 0) < BATTERY_STALE_MS
-                || now - state.getLong(batteryTryKey(address), 0) < BATTERY_RETRY_MS) {
+    /** 绑过的一台长按了：连它。同时只连一台：连好的那一台断开、换它，还在连的不换。 */
+    private void connect(String address) {
+        if (adapter == null || !canConnect(app)) {
+            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：长按了，没有连接权限，不连");
             return;
         }
-        state.edit().putLong(batteryTryKey(address), now).apply();
-        bt.postDelayed(() -> {
-            if (link == null && !asleep && listening.contains(address)) {
-                open(new Link(address, true));
-            }
-        }, BATTERY_AFTER_PRESS_MS);
-    }
-
-    /** 同时只连一台，直接连，先停扫描，读完接着听。设置里点的连接最多 {@link #CONNECT_WINDOW_MS}，按完顺手读的最多 {@link #AFTER_PRESS_WINDOW_MS}。 */
-    private void open(Link l) {
-        link = l;
-        connecting = l.address;
-        stopScan();
-        note(Listen.CONNECTING, SmartButtonAd.shortId(l.address));
-        connectNow(l);
-        bt.postDelayed(() -> {
-            if (link == l && !l.done) {
-                finish(l, l.connected ? "connected, battery not read in time" : "not connected in time");
-            }
-        }, l.afterPress ? AFTER_PRESS_WINDOW_MS : CONNECT_WINDOW_MS);
-    }
-
-    private void connectNow(Link l) {
-        if (l.done) {
-            return;
-        }
-        closeGatt(l);
-        l.attempts++;
-        l.lastAttempt = SystemClock.elapsedRealtime();
-        try {
-            l.gatt = adapter.getRemoteDevice(l.address)
-                    .connectGatt(app, false, gattCallback, BluetoothDevice.TRANSPORT_LE);
-        } catch (RuntimeException e) {
-            finish(l, "connectGatt: " + e);
-            return;
-        }
-        if (l.gatt == null) {
-            retry(l);
-        }
-    }
-
-    /** 没连上、或者连上又断了：隔 {@link #RECONNECT_MS} 再连（排着一次就不再排）。 */
-    private void retry(Link l) {
-        if (l.retryPending || l.done) {
-            return;
-        }
-        l.retryPending = true;
-        long wait = Math.max(0, l.lastAttempt + RECONNECT_MS - SystemClock.elapsedRealtime());
-        bt.postDelayed(() -> {
-            l.retryPending = false;
-            connectNow(l);
-        }, wait);
-    }
-
-    /** 收尾：断开、记一句，接着听。 */
-    private void finish(Link l, String result) {
-        if (l.done) {
-            return;
-        }
-        l.done = true;
-        clearStep(l);
-        closeGatt(l);
-        if (link == l) {
-            link = null;
-            connecting = null;
-        }
-        AppLog.i(TAG, SmartButtonAd.shortId(l.address) + (l.afterPress ? " battery check" : " connect")
-                + " done after " + l.attempts + " attempt(s): " + result);
-        if (!l.batteryRead) {
-            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(l.address) + "：" + (l.afterPress ? "按完顺手" : "连接时")
-                    + "读电量没成，试了 " + l.attempts + " 次（" + result + "）");
-        }
-        ensureScan();
-        publishChange();
-    }
-
-    private static void closeGatt(Link l) {
-        if (l.gatt != null) {
-            try {
-                l.gatt.disconnect();
-                l.gatt.close();
-            } catch (RuntimeException ignored) {
-                // 关不了就算了
-            }
-            l.gatt = null;
-        }
-    }
-
-    private void step(Link l, Runnable onTimeout) {
-        clearStep(l);
-        l.stepTimeout = onTimeout;
-        bt.postDelayed(onTimeout, STEP_TIMEOUT_MS);
-    }
-
-    private void clearStep(Link l) {
-        if (l.stepTimeout != null) {
-            bt.removeCallbacks(l.stepTimeout);
-            l.stepTimeout = null;
-        }
-    }
-
-    /** 这个回调是不是正在连的那一台的。 */
-    private Link current(BluetoothGatt g) {
-        Link l = link;
-        return l != null && l.gatt == g && !l.done ? l : null;
-    }
-
-    /** 打开点击次数的通知（连着时按键从这里来）：开始写了返回 true，等它回话再读电量。 */
-    @SuppressWarnings("deprecation")
-    private boolean subscribeClicks(Link l, BluetoothGatt g) {
-        BluetoothGattCharacteristic clicks = find(g, CLICKS);
-        BluetoothGattDescriptor cccd = clicks == null ? null : clicks.getDescriptor(CCCD);
-        if (cccd == null) {
-            return false;
-        }
-        try {
-            g.setCharacteristicNotification(clicks, true);
-            cccd.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            if (!g.writeDescriptor(cccd)) {
-                return false;
-            }
-        } catch (RuntimeException e) {
-            return false;
-        }
-        step(l, () -> readBattery(l, g));
-        return true;
-    }
-
-    private void readBattery(Link l, BluetoothGatt g) {
-        if (l.done) {
-            return;
-        }
-        clearStep(l);
-        BluetoothGattCharacteristic battery = find(g, BATTERY_LEVEL);
-        if (battery == null) {
-            finish(l, "no battery characteristic");
-            return;
-        }
-        try {
-            if (!g.readCharacteristic(battery)) {
-                finish(l, "battery read refused");
+        if (link != null) {
+            if (link.address.equals(address)) {
                 return;
             }
-        } catch (RuntimeException e) {
-            finish(l, "battery read: " + e);
-            return;
+            if (!link.isReady()) {
+                BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：长按了，正在连另一台，这次不连");
+                return;
+            }
+            link.close("another button long-pressed");
         }
-        step(l, () -> finish(l, "battery read timed out"));
+        BlackBox.note("灵动贴 " + SmartButtonAd.shortId(address) + "：长按了，连它");
+        open(new ButtonLink(app, bt, adapter, address, false, linkListener));
     }
 
-    private static BluetoothGattCharacteristic find(BluetoothGatt g, UUID uuid) {
-        try {
-            for (BluetoothGattService service : g.getServices()) {
-                BluetoothGattCharacteristic ch = service.getCharacteristic(uuid);
-                if (ch != null) {
-                    return ch;
+    private void open(ButtonLink l) {
+        link = l;
+        connecting = l.address;
+        l.start();
+    }
+
+    private final ButtonLink.Listener linkListener = new ButtonLink.Listener() {
+        @Override
+        public void attempt(ButtonLink l, int n) {
+            if (link != l || n < 2 || l.pausesScan) {
+                return;
+            }
+            // 车上一边扫一边连失败过（Lab 2.14.3）：第二次起先停扫描再连，连好了、不连了接着扫
+            l.pausesScan = true;
+            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(l.address) + "：第 " + n + " 次连，先停扫描");
+            ensureScan();
+        }
+
+        @Override
+        public void ready(ButtonLink l) {
+            if (link != l) {
+                return;
+            }
+            l.pausesScan = false;
+            ensureScan();
+            if (!l.binding) {
+                BlackBox.note("灵动贴 " + SmartButtonAd.shortId(l.address) + "：连好了（第 " + l.attempts + " 次，"
+                        + seconds(l.ageMs()) + " 秒）");
+                return;
+            }
+            if (bound.size() >= MAX_BOUND) {
+                endBinding(BindResult.FULL, l.address);
+                l.close("already " + MAX_BOUND + " bound");
+                return;
+            }
+            new AppConfig(app).addSmartButton(l.address);
+            bound = loadBound();
+            BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(l.address) + "：绑好了（第 " + l.attempts + " 次连上，"
+                    + seconds(l.ageMs()) + " 秒）");
+            endBinding(BindResult.BOUND, l.address);
+            publishChange();
+        }
+
+        @Override
+        public void reply(ButtonLink l, SmartButtonAd.Reply r, byte[] raw) {
+            if (link != l) {
+                return;
+            }
+            String id = SmartButtonAd.shortId(l.address);
+            if (r.version != null) {
+                BlackBox.note("灵动贴 " + id + "：固件版本 " + r.version);
+                if (keepVersion(l.address, r.version)) {
+                    publishChange();
+                }
+            } else if (r.serial != null) {
+                BlackBox.note("灵动贴 " + id + "：序列号 " + r.serial);
+                if (keepSerial(l.address, r.serial)) {
+                    publishChange();
+                }
+            } else if (!bound.contains(l.address)) {
+                BlackBox.note("灵动贴 " + id + "：还没绑上，通知 " + SmartButtonAd.hex(raw) + " 不算");
+            } else if (binding) {
+                BlackBox.note("灵动贴 " + id + "：正在绑定，绑过的按了不做");
+            } else {
+                press(l.address, r.gesture, true);
+            }
+        }
+
+        @Override
+        public void battery(ButtonLink l, int percent) {
+            if (link != l || !bound.contains(l.address)) {
+                return;
+            }
+            BatteryWindow window = batteryWindows.get(l.address);
+            if (window == null) {
+                window = new BatteryWindow();
+                batteryWindows.put(l.address, window);
+            }
+            int steady = window.add(SystemClock.elapsedRealtime(), percent);
+            if (keepBattery(l.address, steady)) {
+                BlackBox.note("灵动贴 " + SmartButtonAd.shortId(l.address) + "：电量 " + steady + "%");
+                publishChange();
+            }
+        }
+
+        @Override
+        public void closed(ButtonLink l, String why) {
+            if (link != l) {
+                return;
+            }
+            link = null;
+            connecting = null;
+            batteryWindows.remove(l.address);
+            String id = SmartButtonAd.shortId(l.address);
+            if (l.everConnected && bound.contains(l.address)) {
+                // 连着时按的几下没走广播：计数作废，下一包广播一定是新按的
+                state.edit().remove(counterKey(l.address)).apply();
+            }
+            BlackBox.note("灵动贴 " + id + "：" + (l.wasReady() ? "断开（" : "没连好（") + why + "，连了 " + l.attempts + " 次）");
+            if (l.binding && !bound.contains(l.address) && binding) {
+                bindFailures = bindFailures + 1;
+                if (SystemClock.elapsedRealtime() >= bindUntil) {
+                    endBinding(BindResult.CONNECT_FAILED, l.address);
+                } else {
+                    main.post(() -> {
+                        BindListener listener = bindListener;
+                        if (listener != null) {
+                            listener.onConnecting(false);
+                        }
+                    });
                 }
             }
-        } catch (RuntimeException ignored) {
-            // 找不到就是没有
-        }
-        return null;
-    }
-
-    /** 蓝牙回调在别的线程上来，一律转到 bt 线程。安卓 13 起的新回调和老回调都接：哪个版本只会叫其中一个。 */
-    private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
-        @Override
-        public void onConnectionStateChange(BluetoothGatt g, int status, int newState) {
-            bt.post(() -> {
-                Link l = current(g);
-                if (l == null) {
-                    return;
-                }
-                if (newState == BluetoothProfile.STATE_CONNECTED) {
-                    l.connected = true;
-                    step(l, () -> finish(l, "service discovery timed out"));
-                    try {
-                        if (!g.discoverServices()) {
-                            finish(l, "discoverServices refused");
-                        }
-                    } catch (RuntimeException e) {
-                        finish(l, "discoverServices: " + e);
-                    }
-                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    // 按键在睡、没连上，或者连上了还没读到电量就断了：隔一会儿再连
-                    clearStep(l);
-                    retry(l);
-                }
-            });
-        }
-
-        @Override
-        public void onServicesDiscovered(BluetoothGatt g, int status) {
-            bt.post(() -> {
-                Link l = current(g);
-                if (l == null) {
-                    return;
-                }
-                clearStep(l);
-                if (!subscribeClicks(l, g)) {
-                    readBattery(l, g);
-                }
-            });
-        }
-
-        @Override
-        public void onDescriptorWrite(BluetoothGatt g, BluetoothGattDescriptor descriptor, int status) {
-            bt.post(() -> {
-                Link l = current(g);
-                if (l != null && CCCD.equals(descriptor.getUuid())) {
-                    readBattery(l, g);
-                }
-            });
-        }
-
-        @Override
-        @SuppressWarnings("deprecation")
-        public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic ch) {
-            changed(g, ch.getUuid(), ch.getValue());
-        }
-
-        @Override
-        public void onCharacteristicChanged(@NonNull BluetoothGatt g, @NonNull BluetoothGattCharacteristic ch,
-                                            @NonNull byte[] value) {
-            changed(g, ch.getUuid(), value);
-        }
-
-        @Override
-        @SuppressWarnings("deprecation")
-        public void onCharacteristicRead(BluetoothGatt g, BluetoothGattCharacteristic ch, int status) {
-            read(g, ch.getUuid(), ch.getValue(), status);
-        }
-
-        @Override
-        public void onCharacteristicRead(@NonNull BluetoothGatt g, @NonNull BluetoothGattCharacteristic ch,
-                                         @NonNull byte[] value, int status) {
-            read(g, ch.getUuid(), value, status);
+            ensureScan();
+            publishChange();
         }
     };
 
-    /** 连着时按键从点击次数的通知来。 */
-    private void changed(BluetoothGatt g, UUID uuid, byte[] value) {
-        if (!CLICKS.equals(uuid)) {
+    // ================================================================= 绑定（bt 线程）
+
+    private final Runnable bindTimeout = this::bindTimeUp;
+
+    /** 绑定的时间到了：还在连的等它连完（它自己的超时管着），不然就结束。 */
+    private void bindTimeUp() {
+        if (!binding) {
             return;
         }
-        byte[] copy = value == null ? null : value.clone();
-        bt.post(() -> {
-            Link l = current(g);
+        if (link != null && link.binding && !link.isClosed() && !link.wasReady()) {
+            bt.postDelayed(bindTimeout, BIND_RECHECK_MS);
+            return;
+        }
+        endBinding(bindFailures > 0 ? BindResult.CONNECT_FAILED : BindResult.NOT_FOUND, null);
+    }
+
+    private void endBinding(BindResult result, String address) {
+        if (!binding) {
+            return;
+        }
+        stopBinding();
+        BlackBox.noteImportant("灵动贴：绑定结束（" + result + (address == null ? "" : "，" + SmartButtonAd.shortId(address)) + "）");
+        main.post(() -> {
+            BindListener l = bindListener;
+            bindListener = null;
             if (l != null) {
-                onPress(l.address, SmartButtonAd.clicksOfNotification(copy), true);
+                l.onBindResult(result, address);
             }
         });
     }
 
-    private void read(BluetoothGatt g, UUID uuid, byte[] value, int status) {
-        if (!BATTERY_LEVEL.equals(uuid)) {
-            return;
+    private void stopBinding() {
+        binding = false;
+        bt.removeCallbacks(bindTimeout);
+        ensureScan();
+    }
+
+    // ================================================================= 电量、版本、序列号（bt 线程）
+
+    /** 记下电量和记下的时刻（变了才写：长按那一阵每包都带，连着时每秒推一次）；变了返回 true。 */
+    private boolean keepBattery(String address, int percent) {
+        if (state.getInt(batteryKey(address), -1) == percent) {
+            return false;
         }
-        byte[] copy = value == null ? null : value.clone();
-        bt.post(() -> {
-            Link l = current(g);
-            if (l == null) {
-                return;
-            }
-            clearStep(l);
-            if (status != BluetoothGatt.GATT_SUCCESS || copy == null || copy.length == 0) {
-                finish(l, "battery read failed, status " + status);
-                return;
-            }
-            int percent = copy[0] & 0xFF;
-            state.edit().putInt(batteryKey(l.address), percent)
-                    .putLong(batteryAtKey(l.address), System.currentTimeMillis()).apply();
-            BlackBox.note("灵动贴 " + SmartButtonAd.shortId(l.address) + "：电量 " + percent + "%");
-            l.batteryRead = true;
-            finish(l, "battery " + percent + "%");
-        });
+        state.edit().putInt(batteryKey(address), percent).putLong(batteryAtKey(address), System.currentTimeMillis()).apply();
+        return true;
+    }
+
+    private boolean keepVersion(String address, String version) {
+        if (version == null || version.equals(state.getString(versionKey(address), null))) {
+            return false;
+        }
+        state.edit().putString(versionKey(address), version).apply();
+        return true;
+    }
+
+    private boolean keepSerial(String address, String serial) {
+        if (serial == null || serial.isEmpty() || serial.equals(state.getString(serialKey(address), null))) {
+            return false;
+        }
+        state.edit().putString(serialKey(address), serial).apply();
+        return true;
     }
 
     /** 蓝牙开关：开了接着听，关了先停（正在连的也收尾）。 */
@@ -1306,22 +1345,21 @@ public final class SmartButtons {
         public void onReceive(Context context, Intent intent) {
             int now = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
             bt.post(() -> {
-                if (!listening.isEmpty()) {
+                if (!bound.isEmpty()) {
                     BlackBox.note("灵动贴：蓝牙 " + stateName(now));
                 }
                 if (now == BluetoothAdapter.STATE_ON) {
                     // 蓝牙刚开好，手里要是还有一轮扫描，那也是上一次开着时的（关的广播可能没收到）：停掉，开新的
                     bluetoothRestarted();
-                    restart.run();
+                    stopScan();
+                    ensureScan();
                 } else if (now == BluetoothAdapter.STATE_TURNING_OFF || now == BluetoothAdapter.STATE_OFF) {
                     bluetoothRestarted();
                     stopScan();
                     if (link != null) {
-                        finish(link, "Bluetooth off");
+                        link.close("Bluetooth off");
                     }
-                    note(Listen.BLUETOOTH_OFF, "");
-                    bt.removeCallbacks(restart);
-                    bt.postDelayed(restart, RETRY_MS);
+                    ensureScan();
                 }
             });
         }
@@ -1333,26 +1371,6 @@ public final class SmartButtons {
                 listener.run();
             }
         });
-    }
-
-    /** 正在连的那一台。 */
-    private static final class Link {
-        final String address;
-        /** 按完顺手读电量（不是连接时那一次）。 */
-        final boolean afterPress;
-        BluetoothGatt gatt;
-        boolean connected;
-        boolean batteryRead;
-        boolean done;
-        boolean retryPending;
-        int attempts;
-        long lastAttempt;
-        Runnable stepTimeout;
-
-        Link(String address, boolean afterPress) {
-            this.address = address;
-            this.afterPress = afterPress;
-        }
     }
 
     private static String counterKey(String address) {
@@ -1367,11 +1385,11 @@ public final class SmartButtons {
         return "batteryAt." + address;
     }
 
-    private static String batteryTryKey(String address) {
-        return "batteryTry." + address;
+    private static String versionKey(String address) {
+        return "version." + address;
     }
 
-    private static UUID uuid16(int value) {
-        return UUID.fromString(String.format(Locale.US, "%08x-0000-1000-8000-00805f9b34fb", value));
+    private static String serialKey(String address) {
+        return "serial." + address;
     }
 }

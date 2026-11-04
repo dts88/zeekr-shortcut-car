@@ -426,6 +426,11 @@
   Butang pintar %1$s disambungkan；Turn on Bluetooth first / Hidupkan Bluetooth dahulu；This head unit has no Bluetooth / Unit kepala ini tiada Bluetooth；
   Without the Nearby devices permission, smart buttons can't be found / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dicari；
   Drive mode didn't change / Mod pemanduan tidak bertukar。
+  2026-11-04 搜索改成绑定（项目所有者定的做法）：set_smart_button_search_title、set_smart_button_search_summary、
+  dlg_smart_button_search_note、msg_smart_button_connected 删掉，由下面绑定的几条代替；dlg_smart_button_delete_msg、
+  msg_smart_button_no_permission 里的「搜索」「连接」改成「绑定」（见「待项目所有者确认」）。
+- 2026-11-04 批准（灵动贴绑定，项目所有者看过设计里的文字：「文字描述没问题」）：set_smart_button_bind_title「绑定灵动贴」；
+  绑定框里的 dlg_smart_button_bind_note「长按灵动贴约 3 秒，直到背光闪烁」。
 - 2026-10-30（项目所有者同意更新首启说明框）：guide_3 去掉「操作按钮可在「设置 → 界面 → 操作按钮位置」中放到驾驶座一侧。」（三种语言）：前一个框已经问过驾驶座在哪一侧，提示里也写了这条路径。没有新句子。
 - 2026-11-03 批准（盲区画面：后视镜上的灯、中控屏上的位置和大小，项目所有者要的功能）：
   set_side_view_blind_spot_title「盲区指示灯亮时显示」/ Show when the blind spot light is on / Papar apabila lampu titik buta menyala；
@@ -521,6 +526,29 @@
   bingkai yang dipilih digunakan supaya rakaman mengambil lebih sedikit ruang. Kadar bingkai profil strim digunakan semula apabila
   skrin hidup atau anda mula memandu.」；选项 opt_screen_off_fps_follow「跟随视频流配置」/ Follow stream profile /
   Ikut profil strim（另两项「10 fps」「3 fps」三种语言一样，行尾写的也是选项的名字）。
+- 灵动贴绑定那一批（2026-11-04，草稿；中文只有上面批过的两条是项目所有者看过的原话）：
+  - 总开关 set_smart_buttons_title「灵动贴」/ Smart buttons / Butang pintar；说明 set_smart_buttons_summary
+    「按下已绑定的灵动贴时执行所选动作；关闭后，不扫描蓝牙」/「Runs the chosen action when a paired smart button is pressed;
+    when off, doesn't scan for Bluetooth devices」/「Menjalankan tindakan yang dipilih apabila butang pintar yang dipasangkan ditekan;
+    jika dimatikan, tidak mengimbas peranti Bluetooth」。
+  - 绑定那一行的说明 set_smart_button_bind_summary「绑定后可为单击、双击各选一个动作」（原来的「连接后…」）/
+    After pairing, choose an action for single and double press / Selepas dipasangkan, pilih tindakan untuk tekan sekali dan tekan dua kali；
+    绑定框标题、说明的英文、马来文：Pair smart button / Pasangkan butang pintar；Press and hold the smart button for about 3 seconds
+    until its backlight flashes / Tekan dan tahan butang pintar selama kira-kira 3 saat sehingga lampu latarnya berkelip；
+    连着的时候 dlg_smart_button_bind_connecting「正在连接灵动贴…」/ Connecting to the smart button… / Menyambung ke butang pintar…。
+  - 每一台那一行的第二行 smart_button_version「版本 %1$s」/ Version %1$s / Versi %1$s、smart_button_serial「序列号 %1$s」/
+    Serial number %1$s / Nombor siri %1$s（两项之间「 · 」）。
+  - 提示：msg_smart_button_bound「已绑定灵动贴 %1$s」/ Smart button %1$s paired / Butang pintar %1$s dipasangkan；
+    msg_smart_button_already_bound「此灵动贴已绑定」/ This smart button is already paired / Butang pintar ini sudah dipasangkan；
+    msg_smart_button_not_found「未找到灵动贴，请重试」/ No smart button found. Try again / Tiada butang pintar ditemui. Cuba lagi；
+    msg_smart_button_bind_failed「无法连接灵动贴，请重试」/ Can't connect to the smart button. Try again /
+    Tidak dapat menyambung ke butang pintar. Cuba lagi；msg_smart_button_full「最多绑定 %1$d 个灵动贴」/
+    Up to %1$d smart buttons can be paired / Sehingga %1$d butang pintar boleh dipasangkan。
+  - 改了的两条：dlg_smart_button_delete_msg「删除后按它不再触发动作；要再用，需重新绑定。」/ Pressing it will no longer do anything.
+    To use it again, pair it again. / Menekannya tidak akan melakukan apa-apa lagi. Untuk menggunakannya semula, pasangkannya semula.；
+    msg_smart_button_no_permission「没有「附近的设备」权限，无法绑定灵动贴」/ Without the Nearby devices permission, smart buttons
+    can't be paired / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dipasangkan。
+  - 术语表加「绑定」：英文 pair、马来文 pasangkan。
 
 ---
 
@@ -582,3 +610,4 @@
 | 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | 不用「亮度 / 降噪调节」 |
 | 设置分区与页面 | 录制、存储、超级镜子、悬浮键与灵动贴、界面、系统、开发者选项、检查更新、关于与致谢 | Recording、Storage、Super mirror、Floating button and smart buttons、Interface、System、Developer options、Check for updates、About & credits | Rakaman、Storan、Cermin super、Butang terapung dan butang pintar、Antara muka、Sistem、Pilihan pembangun、Semak kemas kini、Perihal & penghargaan | 关于页没有马来文，见 §5 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
+| 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04，待项目所有者确认） |
