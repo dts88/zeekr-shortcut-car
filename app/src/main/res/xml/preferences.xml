@@ -361,17 +361,24 @@
         </PreferenceCategory>
 
         <!--
-          灵动贴（试验性，2026-10-30 从 zeekr-shortcut-lab 搬来，button.SmartButtons）：「搜索灵动贴」一行；连接过的每一台一行
-          （SmartButtonRows 在代码里加：说明写单击、双击各做什么，行尾电量和「删除」，点这一行改单击、双击）
+          灵动贴（试验性，2026-10-30 从 zeekr-shortcut-lab 搬来，button.SmartButtons）：总开关一行（2026-11-04：关着时不扫描蓝牙）；
+          「绑定灵动贴」一行（2026-11-04 代替「搜索灵动贴」）；绑定的每一台一行（SmartButtonRows 在代码里加：说明写单击、双击各做什么，
+          下面一行版本和序列号，行尾电量和「删除」，点这一行改单击、双击）。总开关关着时下面几行灰着
         -->
         <PreferenceCategory
             android:key="cat_smart_buttons"
             android:title="@string/set_group_smart_button">
 
+            <SwitchPreferenceCompat
+                android:key="pref_smart_buttons"
+                android:title="@string/set_smart_buttons_title"
+                android:summary="@string/set_smart_buttons_summary" />
+
             <Preference
-                android:key="pref_smart_button_search"
-                android:title="@string/set_smart_button_search_title"
-                android:summary="@string/set_smart_button_search_summary" />
+                android:key="pref_smart_button_bind"
+                android:dependency="pref_smart_buttons"
+                android:title="@string/set_smart_button_bind_title"
+                android:summary="@string/set_smart_button_bind_summary" />
         </PreferenceCategory>
     </PreferenceScreen>
 

@@ -1240,8 +1240,8 @@ public final class DiagnosticsCollector {
     }
 
     /**
-     * 灵动贴（试验性，2026-10-30）：在不在听、为什么没在听，权限，最近收到广播是什么时候，连接过的每一台（单击 / 双击选的动作、电量和读到的时刻、
-     * 这次进程里按过几下、最后一下）。
+     * 灵动贴（试验性，2026-10-30；2026-11-04 扫描、连接、绑定重写）：开没开、在不在听、为什么没在听，权限，收到几包、最近一包是什么时候，
+     * 绑定的每一台（单击 / 双击选的动作、电量和记下的时刻、版本、序列号、这次进程里按过几下、最后一下）。
      */
     private static void appendSmartButtons(StringBuilder sb, Context context) {
         sb.append("## 5.3 灵动贴（试验性）").append('\n');
@@ -1252,50 +1252,71 @@ public final class DiagnosticsCollector {
             return;
         }
         String detail = buttons.listenDetail();
-        sb.append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
-                .append("  在搜索=").append(buttons.searching() ? "是" : "否")
-                .append("  在连=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
+        sb.append("  开关=").append(config.isSmartButtonsEnabled() ? "开" : "关")
+                .append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
+                .append("  在绑定=").append(buttons.binding() ? "是" : "否")
+                .append("  连着=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
         sb.append("  蓝牙=").append(!buttons.hasBluetooth() ? "没有" : buttons.bluetoothOn() ? "开" : "关")
                 .append("  扫描权限=").append(com.kooo.evcam.button.SmartButtons.canScan(context) ? "有" : "没有")
                 .append("  连接权限=").append(com.kooo.evcam.button.SmartButtons.canConnect(context) ? "有" : "没有")
                 .append('\n');
         long heard = buttons.heardAgoMs();
-        sb.append("  最近收到蓝牙广播（任何设备）=").append(heard < 0 ? "这次进程还没有" : heard / 1000 + " 秒前（含车机睡着）")
-                .append("  这一阵：扫描失败 ").append(buttons.failures()).append(" 次、听不到重开 ").append(buttons.deafRestarts()).append(" 次")
-                .append("  这次进程换过 GATT 服务 ").append(buttons.gattReplaced()).append(" 次")
-                .append('\n');
-        sb.append("  这次进程听不到重开 ").append(buttons.deafRestartsTotal()).append(" 回，其中马上就收到 ").append(buttons.deafCured()).append(" 回")
+        sb.append("  这次进程收到 ").append(buttons.packets()).append(" 包")
+                .append("  最近一包=").append(heard < 0 ? "还没有" : heard / 1000 + " 秒前（含车机睡着）")
+                .append("  扫描起不来 ").append(buttons.failures()).append(" 次（上次开起来以后）")
+                .append("  开得太勤等过 ").append(buttons.throttled()).append(" 回")
+                .append("  换过 GATT 服务 ").append(buttons.gattReplaced()).append(" 次")
                 .append('\n');
         java.util.List<String> addresses = config.getSmartButtons();
         if (addresses.isEmpty()) {
-            sb.append("  还没有连接过的灵动贴").append('\n');
+            sb.append("  还没有绑定的灵动贴").append('\n');
         }
         java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US);
         java.text.SimpleDateFormat time = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US);
         for (String address : addresses) {
             int battery = buttons.battery(address);
             long batteryAt = buttons.batteryReadAt(address);
+            String version = buttons.version(address);
+            String serial = buttons.serial(address);
             com.kooo.evcam.button.SmartButtons.Pressed pressed = buttons.pressed(address);
             sb.append("  ").append(address)
                     .append("  单击=").append(config.getSmartButtonAction(address, com.kooo.evcam.button.SmartButtonAd.SINGLE))
                     .append("  双击=").append(config.getSmartButtonAction(address, com.kooo.evcam.button.SmartButtonAd.DOUBLE))
-                    .append("  电量=").append(battery < 0 ? "没读到过"
-                            : battery + "%" + (batteryAt > 0 ? "（" + day.format(new java.util.Date(batteryAt)) + "）" : ""))
+                    .append("  电量=").append(battery < 0 ? "没有过"
+                            : battery + "%" + (batteryAt > 0 ? "（" + day.format(new java.util.Date(batteryAt)) + " 记下）" : ""))
+                    .append("  版本=").append(version == null ? "没有过" : version)
+                    .append("  序列号=").append(serial == null ? "没查到过" : serial)
                     .append("  这次按过=").append(pressed == null ? "0"
                             : pressed.count + " 下，最后一下 " + time.format(new java.util.Date(pressed.lastAtWallMs))
-                            + (pressed.lastClicks == 2 ? " 双击" : pressed.lastClicks == 1 ? " 单击" : " 认不出")
-                            + (pressed.viaNotification ? "（通知）" : ""))
+                            + " " + gestureName(pressed.lastGesture) + (pressed.viaNotification ? "（通知）" : ""))
                     .append('\n');
         }
         sb.append('\n');
     }
 
+    private static String gestureName(int gesture) {
+        switch (gesture) {
+            case com.kooo.evcam.button.SmartButtonAd.SINGLE:
+                return "单击";
+            case com.kooo.evcam.button.SmartButtonAd.DOUBLE:
+                return "双击";
+            case com.kooo.evcam.button.SmartButtonAd.LONG:
+                return "长按";
+            case com.kooo.evcam.button.SmartButtonAd.RELEASE:
+                return "长按松开";
+            default:
+                return "认不出";
+        }
+    }
+
     private static String listenName(com.kooo.evcam.button.SmartButtons.Listen listen) {
         switch (listen) {
+            case DISABLED:
+                return "不扫（灵动贴关着）";
             case EXITED:
-                return "不听（用户退出了）";
+                return "不扫（用户退出了）";
             case IDLE:
-                return "不扫（没有连接过的、也没在搜索）";
+                return "不扫（没有绑定的、也没在绑定）";
             case NO_BLUETOOTH:
                 return "不听（车机没有蓝牙）";
             case BLUETOOTH_OFF:
@@ -1307,7 +1328,11 @@ public final class DiagnosticsCollector {
             case SETTLING:
                 return "先等着（车机刚醒）";
             case CONNECTING:
-                return "先停着（连着一台读电量）";
+                return "先停着（第二次起连之前）";
+            case THROTTLED:
+                return "先等着（开扫描太勤）";
+            case STARTING:
+                return "正在开";
             case LISTENING:
                 return "在听";
             case FAILED:
