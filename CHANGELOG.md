@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.5.0-alpha] - 2026-11-05
+
+- Smart buttons: new actions: one-touch Sport; voice assistant, media keys, mute and volume; seat and steering wheel heating, ventilation and massage, seat restore; climate, circulation and defrost; central locking, side mirrors, charging port cover and the factory 360 view; light shows and fragrance; theater, camping and Sentry modes.
+- Smart buttons: choosing an action goes press type, then group, then action.
+- Smart buttons: a car action that doesn't take effect within 1 second shows a message; some are blocked in Super Power Saving mode or while the car is moving.
+
 ## [3.4.0-alpha] - 2026-11-05
 
 - Smart buttons: Pair smart button replaces Find smart buttons; a new button is paired with a long press.
